@@ -6,15 +6,16 @@
 ## 小白快速版（去哪裡 -> 做什麼 -> 看到什麼）
 1. 打開「檔案總管」
 2. 到這個資料夾：`D:\Work`
-3. 雙擊打開檔案：`mcp.json`
-4. 在檔案中加上新的 MCP server 設定，按 `Ctrl + S` 存檔
-5. 回到 `D:\Work` 資料夾空白處按右鍵，選「在終端機中開啟」
-6. 貼上這行，按 Enter：  
+3. 若尚無有效 `mcp.json`：複製 **`mcp.json.template`** → 另存為 **`mcp.json`**，再把 `<PASTE_*>`、`YOUR_*` 改成你的真值（**勿**把含真值的檔案提交 git）。
+4. 雙擊打開檔案：`mcp.json`
+5. 在檔案中加上新的 MCP server 設定，按 `Ctrl + S` 存檔
+6. 回到 `D:\Work` 資料夾空白處按右鍵，選「在終端機中開啟」
+7. 貼上這行，按 Enter：  
    `.\scripts\secrets-vault.ps1 -Action import-mcp -McpPath "D:\Work\mcp.json"`
-7. 看到 `Imported/updated secrets from mcp: ...` 代表已匯入成功
-8. 再貼這行，按 Enter：  
+8. 看到 `Imported/updated secrets from mcp: ...` 代表已匯入成功
+9. 再貼這行，按 Enter：  
    `.\scripts\secrets-vault.ps1 -Action list`
-9. 看到 key 名稱清單（不會顯示明文）就完成
+10. 看到 key 名稱清單（不會顯示明文）就完成
 
 ## 修復版（新增後連不上時）
 1. 打開 `D:\Work` 的終端機

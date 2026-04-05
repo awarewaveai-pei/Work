@@ -1,4 +1,4 @@
-﻿# Integrated status report (assembled)
+# Integrated status report (assembled)
 
 - Generated: 2026-04-02 17:46:24
 - agency-os root: `C:\Users\USER\Work\agency-os`
@@ -208,7 +208,7 @@
 
 - **背景**：延續長期營運治理；補齊 ADR 006 與索引／影響矩陣／閘道銜接。
 - **已完成**：`decisions/README.md` 納入 006；`CHANGE_IMPACT_MATRIX`、`LONG_TERM_OPERATING_DISCIPLINE`、002/005 Related 更新；`WORKLOG`／`CONVERSATION_MEMORY` 記錄；`verify-adr-index` + `verify-build-gates` **ALL PASSED**（health 100%）。
-- **已完成（專案管理工具退役）**：已將 **Linear** 從 repo **完全移除**（含腳本、文件、報表產物、`mcp.json` server、以及歷史文字），並確認全 repo `Linear/LINEAR_/linear.app` 相關字樣為 **零命中**；`doc-sync`、health、`verify-build-gates` 全綠後已推送到 `origin/main`。
+- **已完成（專案管理工具退役）**：已移除第三方議題看板與 repo 的同步腳本／playbook／專用報表與本機 MCP 對應條目；`doc-sync`、health、`verify-build-gates` 全綠後已推送到 `origin/main`。舊時點產生的報表快照另掃描清除，避免搜尋誤導。
 - **未完成**：無（本批）。
 - **風險／阻塞**：無。
 - **下一步**：Schema／migration 落地時對照 ADR 006 實作 RLS 與 Clerk 對照表；例行自 monorepo 根跑 `verify-build-gates`。

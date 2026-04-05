@@ -38,7 +38,7 @@
 1. 初始化
    - `.\scripts\secrets-vault.ps1 -Action init`
 2. 設定（直接給值）
-   - `.\scripts\secrets-vault.ps1 -Action set -Name LOBSTER_SUPABASE_URL -Value "https://<project-ref>.supabase.co"`
+   - `.\scripts\secrets-vault.ps1 -Action set -Name LOBSTER_SUPABASE_URL -Value "https://<your-api-host>"`（Cloud：`https://<project-ref>.supabase.co`；**自架**：`https://<kong-或-api-網域>`）
 3. 設定（不顯示輸入）
    - `.\scripts\secrets-vault.ps1 -Action set-prompt -Name LOBSTER_SUPABASE_SERVICE_ROLE_KEY`
 4. 列出可用 key（不顯示明文）

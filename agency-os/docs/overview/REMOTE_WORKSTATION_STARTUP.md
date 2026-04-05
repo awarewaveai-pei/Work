@@ -1,4 +1,4 @@
-# 他處電腦／公司機 — 開機與首次接線須知
+﻿# 他處電腦／公司機 — 開機與首次接線須知
 
 > **目的**：在家 push 後，到**另一台電腦**（公司機、筆電、新機）能**最快、安全、可驗證**地續接，並把流程收斂為「可重複、可回復、可追蹤」。
 >
@@ -314,5 +314,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1
 - `RESUME_AFTER_REBOOT.md`
 - `TASKS.md`
 
-_Last synced: 2026-04-02 09:23:24 UTC_
+_Last synced: 2026-04-05 06:12:34 UTC_
 

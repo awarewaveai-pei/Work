@@ -58,5 +58,5 @@ _Last updated: manual doc; report body is script-generated._
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-02 09:23:24 UTC_
+_Last synced: 2026-04-05 06:12:34 UTC_
 

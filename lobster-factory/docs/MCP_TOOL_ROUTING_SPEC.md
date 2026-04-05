@@ -89,5 +89,5 @@ Define enforceable tool routing for Lobster Factory so automation is predictable
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
 
-_Last synced: 2026-04-02 09:23:24 UTC_
+_Last synced: 2026-04-05 11:40:11 UTC_
 

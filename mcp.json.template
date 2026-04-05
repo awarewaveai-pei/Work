@@ -1,0 +1,154 @@
+{
+  "mcpServers": {
+    "wordpress": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@automattic/mcp-wordpress-remote@latest"
+      ],
+      "env": {
+        "WP_API_URL": "https://YOUR_WORDPRESS_SITE/",
+        "JWT_TOKEN": "<PASTE_WP_APPLICATION_PASSWORD>"
+      }
+    },
+    "replicate": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "replicate-mcp"
+      ],
+      "env": {
+        "REPLICATE_API_TOKEN": "<PASTE_REPLICATE_TOKEN>",
+        "REPLICATE_WEBHOOK_SIGNING_KEY": "<PASTE_REPLICATE_WEBHOOK_SECRET>"
+      }
+    },
+    "n8n": {
+      "type": "http",
+      "url": "https://YOUR_INSTANCE.app.n8n.cloud/mcp-server/http",
+      "headers": {
+        "Authorization": "Bearer <PASTE_N8N_MCP_BEARER>"
+      }
+    },
+    "github": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "<PASTE_GITHUB_PAT>"
+      }
+    },
+    "work-global": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\Users\\YOUR_WINDOWS_USER",
+        "D:\\Work"
+      ]
+    },
+    "chatgpt-fast": {
+      "command": "node",
+      "args": [
+        "D:\\Work\\mcp-local-wrappers\\llm-mcp.mjs",
+        "openai"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "<PASTE_OPENAI_KEY>",
+        "OPENAI_MODEL": "gpt-5.3-chat-latest"
+      }
+    },
+    "chatgpt-latest": {
+      "command": "node",
+      "args": [
+        "D:\\Work\\mcp-local-wrappers\\llm-mcp.mjs",
+        "openai"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "<PASTE_OPENAI_KEY>",
+        "OPENAI_MODEL": "gpt-5.4"
+      }
+    },
+    "claude-fast": {
+      "command": "node",
+      "args": [
+        "D:\\Work\\mcp-local-wrappers\\llm-mcp.mjs",
+        "anthropic"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "<PASTE_ANTHROPIC_KEY>",
+        "ANTHROPIC_MODEL": "claude-haiku-4-5-20251001"
+      }
+    },
+    "claude-latest": {
+      "command": "node",
+      "args": [
+        "D:\\Work\\mcp-local-wrappers\\llm-mcp.mjs",
+        "anthropic"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "<PASTE_ANTHROPIC_KEY>",
+        "ANTHROPIC_MODEL": "claude-sonnet-4-6"
+      }
+    },
+    "perplexity": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@perplexity-ai/mcp-server"
+      ],
+      "env": {
+        "PERPLEXITY_API_KEY": "<PASTE_PERPLEXITY_KEY>"
+      }
+    },
+    "gemini-fast": {
+      "command": "node",
+      "args": [
+        "D:\\Work\\mcp-local-wrappers\\llm-mcp.mjs",
+        "gemini"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "<PASTE_GEMINI_KEY>",
+        "GEMINI_MODEL": "gemini-2.5-flash"
+      }
+    },
+    "gemini-latest": {
+      "command": "node",
+      "args": [
+        "D:\\Work\\mcp-local-wrappers\\llm-mcp.mjs",
+        "gemini"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "<PASTE_GEMINI_KEY>",
+        "GEMINI_MODEL": "gemini-3.1-pro-preview"
+      }
+    },
+    "copilot": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer <PASTE_COPILOT_OR_GITHUB_TOKEN>"
+      }
+    },
+    "trigger": {
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "D:\\Work\\scripts\\start-trigger-mcp.ps1",
+        "-ProjectRef",
+        "<PASTE_TRIGGER_PROJECT_REF>"
+      ]
+    }
+  }
+}

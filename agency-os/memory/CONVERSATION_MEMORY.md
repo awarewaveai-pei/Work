@@ -6,7 +6,7 @@
 - **2026-04-02（ADR 006 migration）**：已新增 **`lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql`**（Clerk↔org 對照表、JWT org claim、`user_has_org_access` 擴充、多表 SELECT RLS）；ADR 006 已補 JWT／staging 驗證說明。
 - **2026-04-02（長期 §9–10）**：`LONG_TERM_OPERATING_DISCIPLINE.md` **§9** 為 **AI／MCP 輔助邊界**；**§10** 為 **執行節奏表**（閘道／ADR／釋出／開收工／雙機／audit + 12 個月 ADR 006 錨點）。
 - **2026-04-02（ADR 006 + 閘道）**：**006** 多租戶 **RLS／租戶鍵** 與 **Clerk 對照** 原則。`verify-build-gates` 已內建 **`verify-adr-index.ps1`**。見 `docs/architecture/decisions/006-supabase-tenant-isolation-and-clerk-mapping.md`。
-- **2026-04-02（工具退役）**：已將 **Linear** 從 repo **完全移除**（含腳本/文件/產物/`mcp.json` server/歷史文字），並以 `doc-sync` + health 100% + `verify-build-gates` PASS 驗證後推送 `origin/main`（避免再出現 401/衝突/殘留入口）。
+- **2026-04-02（工具退役）**：已移除「第三方議題看板 ↔ repo」同步鏈（腳本、playbook、報表目錄、本機 MCP 條目）；以 `doc-sync` + health 100% + `verify-build-gates` PASS 驗證後推送 `origin/main`。任務真相仍以 `TASKS.md`／Checklist 為準。
 - **2026-04-02（ADR 004／005）**：**004** Trigger vs n8n 編排邊界（以 `MCP_TOOL_ROUTING_SPEC.md` 為準）。**005** Supabase SoR vs WordPress 執行期 DB。見 `docs/architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md`、`005-supabase-sor-vs-wordpress-runtime-db.md`。
 - **2026-04-02（ADR 002／003）**：**002** 應用層預設 **Clerk**，邊界見 `docs/architecture/decisions/002-clerk-identity-boundary.md`。**003** 否決 manifest **自動雙邊同步**，見 `003-no-automated-manifest-dual-sync.md`。
 - **2026-04-02（ADR 001）**：**Manifest SSOT** = `lobster-factory/packages/manifests/`；**install／rollback shell SSOT** = `lobster-factory/templates/woocommerce/scripts/`；**`agency-os/platform-templates/woocommerce/manifests/`** 僅輔材。見 **`docs/architecture/decisions/001-wordpress-manifest-and-shell-ssot.md`**。
@@ -319,5 +319,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-02 09:46:10 UTC_
+_Last synced: 2026-04-05 11:40:11 UTC_
 

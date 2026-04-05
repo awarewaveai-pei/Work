@@ -87,8 +87,8 @@ Phase 1 預設「不會真的寫入 DB」。
 
 ### 需要設定的環境變數（示例，用你的實值替換）
 - `LOBSTER_ENABLE_DB_WRITES=true`
-- `LOBSTER_SUPABASE_URL=https://<project-ref>.supabase.co`
-- `LOBSTER_SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
+- `LOBSTER_SUPABASE_URL=https://<your-api-host>`（**Supabase Cloud** 時常為 `https://<project-ref>.supabase.co`；**自架**時為 **HTTPS 反代後的 API 根**，例如 `https://supabase-api.example.com`）
+- `LOBSTER_SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`（僅伺服器／受控環境；放 vault 或 Trigger secrets，勿提交 repo）
 
 ### 寫入行為說明（Phase 1）
 - `apply-manifest`

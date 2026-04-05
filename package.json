@@ -1,0 +1,12 @@
+{
+  "name": "work-monorepo-root-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "rag:embed": "tsx --env-file=.env.local scripts/rag_seed_and_embedding.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "tsx": "^4.19.3"
+  }
+}
