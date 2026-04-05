@@ -1,0 +1,47 @@
+---
+description: Architecture planes, stack discipline, MCP routing aligned with Lobster + Cursor inventory
+alwaysApply: true
+---
+
+# Architecture & MCP / Tool Routing
+
+## Authoritative sources (must read when routing tools)
+
+1. **`../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`** — **強制**；略過 staging／核准即屬違規。  
+2. **`docs/operations/cursor-mcp-and-plugin-inventory.md`** — **實際 `mcp.json` 鍵名與職責**；本檔表格若與該檔不一致，**以 inventory 與 Routing Spec 為準**。  
+3. **`docs/operations/security-secrets-policy.md`** — 憑證、mcp template、禁止寫入記憶體／日誌。
+
+## Architecture planes (mental model)
+
+| Don't mix in one module |
+|---|
+| **Control** — auth, roles, policies, approvals |
+| **Execution** — workflows, agents, async jobs (Trigger / n8n per spec) |
+| **Data** — schema, migrations, SoR, consistency |
+| **Observability** — logs, metrics, incidents, tracing |
+| **Decision** — evals, optimization loops |
+
+## Stack discipline
+
+Do not replace or restructure **core stack** components without documented reason, migration plan, and explicit tradeoffs — present as **proposal**, not done deal.
+
+## MCP / tool summary
+
+- **Supabase** = platform **SoR (Postgres)**. **Supabase MCP (IDE)** = inspection / docs / debug per inventory; **not** an excuse to bypass Trigger approvals or production write policy.  
+- **Trigger** = owner of **long-running** orchestration per Routing Spec; state in Supabase.  
+- **n8n** = **glue**: webhooks, notifications, CRM sync — **not** control plane.  
+- **GitHub** = CI, PRs, releases — **not** “deploy to prod by MCP alone”.  
+- **LLM wrappers (ChatGPT / Claude / Gemini etc.)** = draft / exploration — **not** authoritative over SoR.  
+- **Filesystem / work-global** = dev read — **no** production writes.
+
+### Production writes
+
+Must go through **approved paths**: app API, Edge Function, controlled server roles, approved n8n/Trigger tasks — **never** “convenient MCP shortcut” around gates.
+
+## Secrets
+
+**Never** paste active tokens into chat, `WORKLOG`, or `memory`. Use vault / env / template policy only.
+
+## Related SSOT
+
+- `docs/operations/cursor-enterprise-rules-index.md`

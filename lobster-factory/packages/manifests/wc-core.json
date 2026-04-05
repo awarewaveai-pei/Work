@@ -1,0 +1,46 @@
+{
+  "name": "wc-core",
+  "version": "1.0.0",
+  "schemaVersion": "1.0.0",
+  "target": "staging-only",
+  "description": "Base WooCommerce + Kadence + FluentCRM stack",
+  "guardrails": {
+    "allowEnvironments": ["staging"],
+    "requireBackup": true,
+    "blockIfProduction": true
+  },
+  "dependencies": [],
+  "conflicts": [],
+  "steps": [
+    { "id": "theme-kadence", "type": "install_theme", "slug": "kadence" },
+    { "id": "plugin-kadence-blocks", "type": "install_plugin", "slug": "kadence-blocks" },
+    { "id": "plugin-woocommerce", "type": "install_plugin", "slug": "woocommerce" },
+    { "id": "plugin-cartflows", "type": "install_plugin", "slug": "cartflows" },
+    { "id": "plugin-rank-math", "type": "install_plugin", "slug": "seo-by-rank-math" },
+    { "id": "plugin-fluent-crm", "type": "install_plugin", "slug": "fluent-crm" },
+    { "id": "plugin-fluent-forms", "type": "install_plugin", "slug": "fluentform" },
+    { "id": "plugin-fluent-smtp", "type": "install_plugin", "slug": "fluent-smtp" },
+    { "id": "plugin-site-kit", "type": "install_plugin", "slug": "google-site-kit" },
+    {
+      "id": "plugin-litespeed",
+      "type": "conditional_plugin",
+      "condition": "is_litespeed",
+      "slug": "litespeed-cache"
+    }
+  ],
+  "postInstall": [
+    { "type": "activate_theme", "slug": "kadence" },
+    { "type": "flush_permalinks" },
+    { "type": "set_option", "key": "timezone_string", "value": "Asia/Taipei" }
+  ],
+  "verification": [
+    { "type": "check_homepage" },
+    { "type": "check_admin_login" },
+    { "type": "check_plugin_active", "slug": "woocommerce" },
+    { "type": "check_plugin_active", "slug": "fluent-crm" }
+  ],
+  "rollback": {
+    "strategy": "restore_backup_snapshot"
+  }
+}
+

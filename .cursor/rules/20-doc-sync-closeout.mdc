@@ -1,0 +1,24 @@
+---
+description: Auto-run doc sync and closeout checklist for governance changes
+alwaysApply: true
+---
+
+# Doc Sync Closeout Rule
+
+When governance documents are added/edited under `docs/`, `tenants/`, or project policy files:
+
+1. Run:
+`powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -AutoDetect`
+2. Ensure a report is generated in `reports/closeout/`.
+3. Run:
+`powershell -ExecutionPolicy Bypass -File .\scripts\system-health-check.ps1`
+4. Confirm `system-health-check` Critical Gate is PASS.
+5. If policy-level changes occurred, update:
+- `README.md`
+- `TASKS.md`
+- `WORKLOG.md`
+6. If long-session milestone changed, update:
+- `memory/CONVERSATION_MEMORY.md`
+- `memory/daily/YYYY-MM-DD.md`
+
+Never skip the closeout report after substantial governance edits.

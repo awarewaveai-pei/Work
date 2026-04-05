@@ -1,0 +1,35 @@
+{
+  "schema_version": "1",
+  "tenant_slug_hint": "company-<slug>",
+  "notes": "複製到 tenants/company-*/core/DEPARTMENT_SELECTION.json 後依約填寫。cluster_id 見 DEPARTMENT_CLUSTER_CATALOG.md。",
+
+  "selected_cluster_ids": [
+    "CLU_STRATEGY_GOVERN",
+    "CLU_FINANCE",
+    "CLU_SECURITY_IT",
+    "CLU_ENGINEERING",
+    "CLU_ORDER_OPS"
+  ],
+
+  "excluded_explicit": [
+    {
+      "cluster_id": "CLU_IR",
+      "reason": "N/A — SMB 無 IR 需求"
+    },
+    {
+      "cluster_id": "CLU_ECOSYSTEM",
+      "reason": "N/A — 未採購平台生態模組"
+    }
+  ],
+
+  "planned_future": [
+    {
+      "cluster_id": "CLU_REGIONAL",
+      "notes": "預計 Q3 開海外站後啟用",
+      "target_quarter": "2026-Q3"
+    }
+  ],
+
+  "last_reviewed_iso": "YYYY-MM-DD",
+  "reviewed_by": ""
+}

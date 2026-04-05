@@ -1,0 +1,49 @@
+---
+description: Session startup report with yesterday recap and today plan
+alwaysApply: true
+---
+
+# Session Bootstrap
+
+Before proposing any implementation plan, always read:
+- `README.md`
+- `AGENTS.md`
+- `memory/CONVERSATION_MEMORY.md`
+- `memory/daily/` today and yesterday notes if they exist
+- `TASKS.md`
+- `WORKLOG.md`
+- `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` (if exists)
+- `lobster-factory/docs/LOBSTER_FACTORY_COMPLETION_PLAN_V2.md` (if exists)
+
+If those files are not found in the current opened folder, retry under `agency-os/`
+with the same filenames before declaring context missing.
+
+## 雙機協作（AO-RESUME 與 Git）
+- **`AO-RESUME` 會先檢查遠端並嘗試 `git pull --ff-only`**；若本機有未提交變更／衝突仍可能失敗。  
+- **建議**：在 **monorepo 根**先 `git fetch origin`，未與 `origin/main` 對齊則先 **`git pull --ff-only origin main`**（必要時 **`git pull --rebase origin main`**），再執行讀檔與後續工作。另一台 **AO-CLOSE** push 後，本機若不 pull，`TASKS`／`WORKLOG`／`memory` 可能落後，且 **push 會被拒**。  
+- 完整步驟與 30 秒自檢：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**、§2.3。
+
+
+At the beginning of every new conversation, output this exact structure:
+
+- Yesterday Recap:
+  - Completed
+  - Pending
+  - Risks/Blockers
+- Today Plan:
+  - Priority 1
+  - Priority 2
+  - Priority 3
+- Confirm:
+  - "今天先做哪一項？"
+
+If prior context is missing, explicitly say "無法可靠讀取昨日脈絡" and ask
+the user for a one-line recap before continuing.
+
+If files are missing, create them using project templates before proceeding.
+
+For any code/doc change request, first read the full target file and all directly
+related source-of-truth files. Before finalizing, do a conflict pass to detect:
+- duplicate or contradictory instructions
+- stale path assumptions (`D:\Work` vs `<WORK_ROOT>` vs relative paths)
+- mismatched status between checklist/task/worklog/memory

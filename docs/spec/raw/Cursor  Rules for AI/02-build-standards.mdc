@@ -1,0 +1,160 @@
+---
+description: Database design, state machine, project structure, and code quality standards
+alwaysApply: true
+---
+
+> **非現用 IDE 規則正文**：本檔為 **raw 溯源包**；實際載入與版控正本見 **`agency-os/.cursor/rules/65-build-standards-data-state.mdc`**。與正本衝突以 `.mdc` 為準。詳見同目錄 **`README-部署說明.md`**。  
+> **Schema／表名／RLS**：以 **`lobster-factory/` 內 migrations 與產品 spec** 為準；下方條列為**範本**，落地前必對照 repo。
+
+# 02 — Build Standards
+
+## DATABASE DESIGN (The Heart)
+
+### Every Table Must Have
+```sql
+id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+organization_id UUID NOT NULL REFERENCES organizations(id)
+created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+created_by      UUID REFERENCES users(id)
+```
+
+### Non-Negotiable Rules
+```
+✓ RLS policies defined at table creation — never added later
+✓ Every tenant-bound table has organization_id + workspace_id
+✓ No cross-tenant data access under any circumstance
+✓ Every migration has a rollback script
+✓ Soft-delete: use deleted_at TIMESTAMPTZ, not DELETE
+✓ Audit trail for any table where data changes matter
+✓ Inventory counts derived from append-only log — never mutable integer
+```
+
+### Inventory / Batch / Spec Pattern
+```
+batch           → group of items received at one time
+spec            → product variants (size, grade, weight range)
+inventory_item  → individual unit or lot within a batch
+inventory_log   → append-only record of every stock movement (insert only, never update)
+```
+
+### Schema Checklist Before Finalizing
+```
+✓ Can this table grow 100x without structural changes?
+✓ Does every write have an audit record?
+✓ Are RLS policies defined?
+✓ Is the rollback migration written?
+✓ Are indexes on actually-queried columns?
+```
+
+---
+
+## STATE MACHINE DESIGN (The Brain)
+
+Use state machines for any multi-step process. Never use ad-hoc status strings.
+
+### Rules
+```
+✓ Define ALL valid states before writing any code
+✓ Define ALL valid transitions (from → to) explicitly
+✓ Every transition: trigger + guard condition + side effects
+✓ Invalid transitions must be rejected — not silently ignored
+✓ Every state change logged: timestamp, from, to, actor, reason
+```
+
+### Design Template (document before coding)
+```
+States: [all valid states]
+Initial state: [starting state]
+Terminal states: [cannot transition further]
+
+Transitions:
+  [from] → [to]
+  Trigger: [what causes this]
+  Guard: [conditions that must be true]
+  Side effects: [what happens when transition fires]
+  On failure: [compensation action if side effects fail]
+```
+
+### Rollback Rule
+Every transition that triggers external actions must have a compensation action.
+Use Trigger.dev for durable multi-step transitions with retry logic.
+
+---
+
+## PROJECT STRUCTURE
+
+### Standard Directory Layout
+```
+/
+├── apps/                    # deployable applications
+│   ├── web/                 # frontend
+│   └── api/                 # backend / edge functions
+├── packages/                # shared libraries
+│   ├── types/               # shared TypeScript types
+│   ├── utils/               # shared utilities
+│   └── validators/          # shared Zod schemas
+├── services/                # domain services
+│   └── [domain]/
+│       ├── [domain].service.ts
+│       ├── [domain].schema.ts
+│       └── [domain].test.ts
+├── supabase/
+│   ├── migrations/          # numbered SQL migrations
+│   └── functions/           # edge functions
+├── docs/
+│   ├── architecture/
+│   ├── operations/
+│   └── api/
+├── .cursor/
+│   └── rules/               # project-specific .mdc rules
+├── .env.example             # template only — never commit real values
+└── AGENTS.md                # rules for humans and AI agents
+```
+
+### Naming Conventions
+```
+Files:        kebab-case          user-profile.service.ts
+Components:   PascalCase          UserProfile.tsx
+Functions:    camelCase           getUserProfile()
+Constants:    SCREAMING_SNAKE     MAX_RETRY_COUNT
+DB tables:    snake_case plural   inventory_batches
+DB columns:   snake_case          created_at
+Env vars:     SCREAMING_SNAKE     SUPABASE_URL
+```
+
+### Environment Rules
+```
+✓ .env.example always up to date
+✓ Never commit .env files
+✓ All secrets via vault / CI environment injection
+✓ Separate .env for local / staging / production
+✓ Every env var documented: name, purpose, where to get it
+```
+
+---
+
+## CODE QUALITY STANDARDS
+
+Required for every code output:
+- TypeScript strict mode — avoid `any`, explain if used
+- Full words, semantic names, no unexplained abbreviations
+- Every async has try/catch — errors logged, never silently swallowed
+- Validate schema before processing — reject malformed data early
+- All credentials via environment variables only
+- Parameterized queries or ORM — never raw SQL concatenation
+
+### Annotation Convention
+```
+// ✨ 新增 (New): explanation
+// ✏️ 修改 (Modified): what changed and why
+// ⚠️ 注意 (Caution): something to watch
+// 🚨 警告 (Warning): security or data integrity risk
+// TODO: future improvement
+```
+
+### Warning System
+- 💡 建議 — Optional, no urgency
+- ⚠️ 注意 — Better approach exists
+- 🚨 警告 — Security or data integrity risk, must address
+- ❌ 拒絕 — Violates core principle, explain and give correct path

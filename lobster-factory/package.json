@@ -1,0 +1,25 @@
+{
+  "name": "lobster-factory",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "validate": "node scripts/bootstrap-validate.mjs",
+    "validate:manifest": "node scripts/validate-manifests.mjs",
+    "validate:governance": "node scripts/validate-governance-configs.mjs",
+    "validate:routing": "node scripts/validate-workflow-routing-policy.mjs",
+    "validate:staging-executor": "node scripts/validate-staging-manifest-executor.mjs",
+    "rollback:manifest-staging": "node scripts/rollback-apply-manifest-staging.mjs",
+    "regression:staging-pipeline": "node scripts/run-staging-pipeline-regression.mjs --mode=fast",
+    "drill:staging-report": "node scripts/emit-staging-drill-report.mjs",
+    "payload:create-wp-site": "node scripts/print-create-wp-site-payload.mjs",
+    "payload:apply-manifest": "node scripts/print-apply-manifest-payload.mjs",
+    "operator:sanity": "npm run validate && npm run regression:staging-pipeline",
+    "validate:docs": "node scripts/validate-doc-integrity.mjs",
+    "validate:operable-e2e": "node scripts/validate-operable-e2e-skeleton.mjs",
+    "validate:artifacts-governance": "node scripts/validate-artifacts-governance.mjs",
+    "audit:artifacts-governance": "node scripts/audit-artifacts-governance.mjs"
+  }
+}

@@ -1,0 +1,329 @@
+{
+  "watch_roots": [
+    "docs",
+    "automation",
+    "tenants",
+    "project-kit",
+    "memory",
+    ".cursor/rules"
+  ],
+  "watch_files": [
+    "README.md",
+    "AGENTS.md",
+    "TASKS.md",
+    "WORKLOG.md",
+    "scripts/system-guard.ps1",
+    "scripts/build-product-bundle.ps1",
+    "scripts/system-health-check.ps1",
+    "scripts/doc-sync-automation.ps1",
+    "docs/operations/finance-operations.md",
+    "docs/operations/scope-change-policy.md",
+    "docs/operations/security-secrets-policy.md",
+    "docs/operations/tools-and-integrations.md"
+  ],
+  "rules": [
+    {
+      "source": "docs/operations/system-operation-sop.md",
+      "targets": [
+        "docs/operations/end-to-end-linkage-checklist.md",
+        "docs/overview/agency-os-complete-system-introduction.md",
+        "README.md",
+        "AGENTS.md",
+        "TASKS.md",
+        "WORKLOG.md"
+      ]
+    },
+    {
+      "source": "docs/overview/agency-os-complete-system-introduction.md",
+      "targets": [
+        "README.md",
+        "docs/README.md",
+        "tenants/company-a/01_COMMANDER_SYSTEM_GUIDE.md",
+        "tenants/company-a/02_CLIENT_WORKSPACE_GUIDE.md",
+        "tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md",
+        "tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md"
+      ]
+    },
+    {
+      "source": "docs/architecture/agency-command-center-v1.md",
+      "targets": [
+        "docs/architecture/multi-platform-delivery-architecture.md",
+        "docs/operations/system-operation-sop.md",
+        "docs/operations/tenant-scheduling.md",
+        "README.md",
+        "TASKS.md"
+      ]
+    },
+    {
+      "source": "docs/architecture/multi-platform-delivery-architecture.md",
+      "targets": [
+        "docs/standards/wordpress-custom-dev-guidelines.md",
+        "docs/operations/end-to-end-linkage-checklist.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/operations/client-risk-scoring-model.md",
+      "targets": [
+        "docs/metrics/kpi-margin-dashboard-spec.md",
+        "docs/product/templates/monthly-report-template-en.md",
+        "README.md",
+        "TASKS.md"
+      ]
+    },
+    {
+      "source": "docs/operations/outsourcing-vendor-scorecard.md",
+      "targets": [
+        "docs/operations/outsourcing-playbook.md",
+        "README.md",
+        "TASKS.md"
+      ]
+    },
+    {
+      "source": "docs/operations/tenant-scheduling.md",
+      "targets": [
+        "README.md",
+        "tenants/README.md",
+        "tenants/NEW_TENANT_ONBOARDING_SOP.md",
+        "automation/README.md"
+      ]
+    },
+    {
+      "source": "docs/operations/system-guard-and-notification.md",
+      "targets": [
+        "README.md",
+        "AGENTS.md",
+        "RESUME_AFTER_REBOOT.md",
+        "automation/REGISTER_SYSTEM_GUARD_TASKS.ps1",
+        "scripts/system-guard.ps1"
+      ]
+    },
+    {
+      "source": "docs/operations/end-to-end-linkage-checklist.md",
+      "targets": [
+        "scripts/system-guard.ps1",
+        "scripts/system-health-check.ps1",
+        "scripts/doc-sync-automation.ps1",
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/international/global-delivery-model.md",
+      "targets": [
+        "docs/international/global-compliance-baseline.md",
+        "docs/international/multi-currency-commercial-policy.md",
+        "docs/operations/tenant-scheduling.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/international/global-compliance-baseline.md",
+      "targets": [
+        "docs/operations/security-secrets-policy.md",
+        "docs/operations/incident-response-runbook.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/international/multi-currency-commercial-policy.md",
+      "targets": [
+        "docs/operations/finance-operations.md",
+        "docs/metrics/kpi-margin-dashboard-spec.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/quality/delivery-qa-gate.md",
+      "targets": [
+        "project-kit/20_BUILD_AND_CUSTOM_SYSTEM.md",
+        "project-kit/30_LAUNCH_AND_HANDOVER.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/compliance/leads-and-scraping-checklist.md",
+      "targets": [
+        "docs/international/global-compliance-baseline.md",
+        "README.md",
+        "TASKS.md"
+      ]
+    },
+    {
+      "source": "docs/product/resell-package-blueprint.md",
+      "targets": [
+        "docs/product/buyer-handover-checklist.md",
+        "docs/product/templates/proposal-template-en.md",
+        "docs/product/templates/sow-template-en.md",
+        "docs/product/templates/monthly-report-template-en.md",
+        "README.md",
+        "scripts/build-product-bundle.ps1"
+      ]
+    },
+    {
+      "source": "docs/releases/release-notes.md",
+      "targets": [
+        "docs/releases/upgrade-path.md",
+        "docs/releases/migration-checklist.md",
+        "README.md",
+        "WORKLOG.md"
+      ]
+    },
+    {
+      "source": "docs/releases/upgrade-path.md",
+      "targets": [
+        "docs/releases/migration-checklist.md",
+        "scripts/system-health-check.ps1",
+        "scripts/system-guard.ps1",
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/sales/service-packages-standard.md",
+      "targets": [
+        "docs/operations/finance-operations.md",
+        "docs/sales/cr-pricing-rules.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/sales/cr-pricing-rules.md",
+      "targets": [
+        "docs/operations/scope-change-policy.md",
+        "docs/templates/cr-template.md"
+      ]
+    },
+    {
+      "source": "docs/templates/msa-template.md",
+      "targets": [
+        "docs/templates/sow-template.md",
+        "docs/templates/cr-template.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/standards/wordpress-custom-dev-guidelines.md",
+      "targets": [
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/standards/n8n-workflow-architecture.md",
+      "targets": [
+        "docs/operations/tools-and-integrations.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "docs/metrics/kpi-margin-dashboard-spec.md",
+      "targets": [
+        "TASKS.md",
+        "WORKLOG.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "tenants/NEW_TENANT_ONBOARDING_SOP.md",
+      "targets": [
+        "tenants/README.md",
+        "tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md",
+        "tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md",
+        "tenants/templates/tenant-template/03_TOOLS_CONFIGURATION_GUIDE.md",
+        "tenants/templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md",
+        "tenants/company-a/01_COMMANDER_SYSTEM_GUIDE.md",
+        "tenants/company-a/02_CLIENT_WORKSPACE_GUIDE.md",
+        "tenants/company-a/03_TOOLS_CONFIGURATION_GUIDE.md",
+        "tenants/company-a/04_OPERATIONS_AUTOMATION_GUIDE.md",
+        "README.md",
+        "TASKS.md",
+        "WORKLOG.md"
+      ]
+    },
+    {
+      "source": "tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md",
+      "targets": [
+        "tenants/company-a/01_COMMANDER_SYSTEM_GUIDE.md",
+        "tenants/README.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md",
+      "targets": [
+        "tenants/company-a/02_CLIENT_WORKSPACE_GUIDE.md",
+        "tenants/README.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": "tenants/templates/tenant-template/03_TOOLS_CONFIGURATION_GUIDE.md",
+      "targets": [
+        "tenants/company-a/03_TOOLS_CONFIGURATION_GUIDE.md",
+        "tenants/README.md",
+        "README.md",
+        "docs/operations/tools-and-integrations.md"
+      ]
+    },
+    {
+      "source": "tenants/templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md",
+      "targets": [
+        "tenants/company-a/04_OPERATIONS_AUTOMATION_GUIDE.md",
+        "tenants/README.md",
+        "README.md",
+        "docs/operations/tenant-scheduling.md",
+        "automation/README.md"
+      ]
+    },
+    {
+      "source": ".cursor/rules/00-session-bootstrap.mdc",
+      "targets": [
+        "AGENTS.md",
+        "README.md",
+        "memory/CONVERSATION_MEMORY.md",
+        "TASKS.md",
+        "WORKLOG.md"
+      ]
+    },
+    {
+      "source": ".cursor/rules/10-memory-maintenance.mdc",
+      "targets": [
+        "AGENTS.md",
+        "memory/CONVERSATION_MEMORY.md",
+        "README.md"
+      ]
+    },
+    {
+      "source": ".cursor/rules/20-doc-sync-closeout.mdc",
+      "targets": [
+        "AGENTS.md",
+        "README.md",
+        "scripts/doc-sync-automation.ps1",
+        "TASKS.md",
+        "WORKLOG.md"
+      ]
+    },
+    {
+      "source": ".cursor/rules/30-resume-keyword.mdc",
+      "targets": [
+        "AGENTS.md",
+        "README.md",
+        "memory/CONVERSATION_MEMORY.md",
+        "TASKS.md",
+        "WORKLOG.md",
+        "LAST_SYSTEM_STATUS.md"
+      ]
+    },
+    {
+      "source": ".cursor/rules/40-shutdown-closeout.mdc",
+      "targets": [
+        "AGENTS.md",
+        "README.md",
+        "TASKS.md",
+        "WORKLOG.md",
+        "memory/CONVERSATION_MEMORY.md",
+        "scripts/doc-sync-automation.ps1",
+        "scripts/system-health-check.ps1",
+        "scripts/system-guard.ps1"
+      ]
+    }
+  ]
+}

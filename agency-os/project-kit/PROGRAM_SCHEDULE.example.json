@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "meta": {
+    "title": "Example schedule (copy per project)",
+    "description": "Duplicate this file into agency-os/docs/overview/, a lobster-factory folder, or tenants/.../projects/.../ then expand streams.tasks. Run agency-os/scripts/render-program-timeline-from-schedule.ps1 with -SchedulePath and -TimelinePath pointing at your copy.",
+    "reuse": "Three streams keys: AO (ops), LF (platform), PJ (client). Add rows; use null start/end for TBD (omits bar from Mermaid)."
+  },
+  "render_hints": {
+    "auto_note_md": "> Example: edit tasks below; render to your timeline .md.",
+    "table_columns": {
+      "id": "ID",
+      "task": "Task",
+      "start": "Start",
+      "end": "End",
+      "depends": "Deps",
+      "gantt_heading_suffix": "Gantt"
+    }
+  },
+  "streams": [
+    {
+      "key": "AO",
+      "section_title": "Ops stream (example)",
+      "table_intro": "",
+      "gantt_title": "Ops example",
+      "acceptance_header": "Acceptance",
+      "tasks": [
+        {
+          "id": "OP-X1",
+          "name": "Example ops task",
+          "start": "2026-04-01",
+          "end": "2026-04-15",
+          "depends": "-",
+          "acceptance": "TASKS checkbox + WORKLOG",
+          "gantt_group": "Phase1",
+          "gantt_label": "OP-X1",
+          "gantt_id": "opx1",
+          "crit": true
+        }
+      ]
+    },
+    {
+      "key": "LF",
+      "section_title": "Lobster / platform (example)",
+      "table_intro": "",
+      "gantt_title": "LF example",
+      "acceptance_header": "Acceptance",
+      "tasks": [
+        {
+          "id": "LF-X1",
+          "name": "Example platform task",
+          "start": "2026-04-01",
+          "end": "2026-05-01",
+          "depends": "OP-X1",
+          "acceptance": "Checklist tick",
+          "gantt_group": "Build",
+          "gantt_label": "LF-X1",
+          "gantt_id": "lfx1",
+          "crit": false
+        }
+      ]
+    },
+    {
+      "key": "PJ",
+      "section_title": "Client project (example)",
+      "table_intro": "",
+      "gantt_title": "Client example",
+      "acceptance_header": "Acceptance",
+      "tasks": [
+        {
+          "id": "PJ-X1",
+          "name": "Example discovery task",
+          "start": "2026-03-30",
+          "end": "2026-04-10",
+          "depends": "workshop",
+          "acceptance": "Discovery doc updated",
+          "gantt_group": "Discovery",
+          "gantt_label": "PJ-X1",
+          "gantt_id": "pjx1",
+          "crit": false
+        }
+      ]
+    }
+  ]
+}

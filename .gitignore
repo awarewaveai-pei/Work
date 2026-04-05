@@ -1,0 +1,56 @@
+# --- Secrets & local app state (never push) ---
+.claude/
+**/.claude/
+# Root MCP config + backups (API keys / tokens; never push)
+mcp.json
+**/mcp.json
+mcp-backups/
+.claude.json
+**/.claude.json.backup*
+**/.claude/backups/
+
+# AO-RESUME local stamp (see scripts/git-audit-tracked-remote.ps1 / check-three-way-sync knownNoise)
+agency-os/.agency-state/ao-resume-last.txt
+
+# --- Local scratch (wp-dummy paths for regression; never push) ---
+.scratch/
+
+# --- Dependencies (reinstall with npm ci / npm install) ---
+node_modules/
+lobster-factory/packages/workflows/.trigger/
+
+# --- Environment & keys ---
+hostinger-recovery-codes.txt
+**/recovery-codes*.txt
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+id_rsa
+id_ed25519
+*.key
+
+# --- OS & editors ---
+Thumbs.db
+.DS_Store
+*.swp
+*~
+
+# --- Cursor / IDE ephemeral locks (optional noise) ---
+.cursor/**/.lock
+**/.cursor/**/locks/
+
+# --- Agency reports (keep only canonical latest snapshot in git) ---
+agency-os/reports/health/health-*.md
+agency-os/reports/health/health-*.json
+agency-os/reports/closeout/closeout-*.md
+agency-os/reports/guard/guard-*.md
+agency-os/reports/status/integrated-status-*.md
+!agency-os/reports/status/integrated-status-LATEST.md
+
+# --- Legacy root-level reports (deprecated; canonical is agency-os/reports) ---
+reports/health/health-*.md
+reports/health/health-*.json
+reports/closeout/closeout-*.md
+reports/status/integrated-status-*.md

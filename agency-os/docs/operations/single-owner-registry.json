@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "ao-lobster-event-flow-mermaid",
+      "owner": "docs/overview/ao-lobster-operating-model.md",
+      "marker": "## 4) AO + Lobster Event Flow (Mermaid)",
+      "scan_files": [
+        "README.md",
+        "AGENTS.md",
+        "docs/overview/EXECUTION_DASHBOARD.md",
+        "docs/overview/agency-os-complete-system-introduction.md",
+        "docs/overview/INTEGRATED_STATUS_REPORT.md",
+        "docs/operations/end-of-day-checklist.md"
+      ]
+    },
+    {
+      "id": "ao-resume-startup-runbook",
+      "owner": "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
+      "marker": "## 2) 開機後必做四件事（約 5–15 分鐘）",
+      "scan_files": [
+        "README.md",
+        "AGENTS.md",
+        "docs/overview/EXECUTION_DASHBOARD.md",
+        "docs/overview/INTEGRATED_STATUS_REPORT.md",
+        "docs/operations/end-of-day-checklist.md",
+        "docs/overview/ao-lobster-operating-model.md"
+      ]
+    },
+    {
+      "id": "ao-resume-30s-self-check",
+      "owner": "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
+      "marker": "## 2.3 AO-RESUME 後 30 秒自檢（預防 dirty 與邏輯漂移）",
+      "scan_files": [
+        "README.md",
+        "AGENTS.md",
+        "docs/overview/EXECUTION_DASHBOARD.md",
+        "docs/overview/INTEGRATED_STATUS_REPORT.md",
+        "docs/operations/end-of-day-checklist.md"
+      ]
+    },
+    {
+      "id": "ao-close-hard-gates",
+      "owner": "docs/operations/end-of-day-checklist.md",
+      "marker": "## 1) 必跑三步（硬性 Gate）",
+      "scan_files": [
+        "README.md",
+        "AGENTS.md",
+        "docs/overview/EXECUTION_DASHBOARD.md",
+        "docs/overview/INTEGRATED_STATUS_REPORT.md",
+        "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
+        "docs/overview/ao-lobster-operating-model.md"
+      ]
+    }
+  ]
+}

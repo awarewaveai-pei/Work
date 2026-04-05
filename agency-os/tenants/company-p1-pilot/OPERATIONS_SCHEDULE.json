@@ -1,0 +1,12 @@
+{
+  "timezone": "Asia/Taipei",
+  "daily": [
+    {
+      "name": "onboarding-a10-2-preflight",
+      "enabled": true,
+      "command": "powershell -ExecutionPolicy Bypass -File .\\scripts\\preflight-onboarding-a10-2-readiness.ps1"
+    }
+  ],
+  "weekly": [],
+  "monthly": []
+}

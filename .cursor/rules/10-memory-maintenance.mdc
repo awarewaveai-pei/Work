@@ -1,0 +1,25 @@
+---
+description: Maintain long conversation memory and progress snapshots
+alwaysApply: true
+---
+
+# Memory Maintenance
+
+Maintain continuity across sessions by updating both:
+- `memory/CONVERSATION_MEMORY.md` (long-term distilled memory)
+- `memory/daily/YYYY-MM-DD.md` (daily raw notes)
+
+When to update:
+- After a milestone decision
+- After major scope changes
+- When conversation becomes long (roughly 8000+ Chinese characters)
+- When user asks to end or summarize the session
+
+Use this structure:
+- 背景
+- 已完成
+- 未完成
+- 風險/阻塞
+- 下一步
+
+Never store raw secrets, credentials, or personal sensitive data.

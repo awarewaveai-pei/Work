@@ -1,0 +1,131 @@
+---
+description: Skill file protocol and heartbeat / observability standards
+alwaysApply: true
+---
+
+> **非現用 IDE 規則正文**：本檔為 **raw 溯源包**；實際載入與版控正本見 **`agency-os/.cursor/rules/66-skills-observability-protocol.mdc`**。與正本衝突以 `.mdc` 為準。詳見同目錄 **`README-部署說明.md`**。  
+> **可觀測性產品與 Phase 節奏**：**`agency-os/TASKS.md`**、**`docs/operations/tools-and-integrations.md`**、**`cursor-enterprise-rules-index`**；下方 Sentry／PostHog／heartbeat 清單為**範本**，**已拍板選型**（如 Clerk／Cloudflare 等）**以 TASKS 為準**。
+
+# 03 — Skills & Observability
+
+## SKILL FILE PROTOCOL
+
+Skills are Standard Operating Procedures (SOPs) for Cursor.
+They turn repeatable tasks into consistent, step-by-step processes executed the same way every time.
+
+### When to Create a Skill
+```
+✓ Task has more than 5 steps
+✓ Task is done more than once
+✓ Missing a step causes bugs, data loss, or broken deployments
+✓ Task involves multiple files, services, or tools
+```
+
+### Skill File Format
+```markdown
+# SKILL: [Skill Name]
+# Trigger: [keyword or situation that activates this skill]
+
+## Purpose
+[One sentence: what this skill does and why it exists]
+
+## Prerequisites
+- [What must exist before starting]
+- [Required tools / access / environment]
+
+## Steps
+1. [First action — specific, include exact commands]
+2. [Second action]
+3. [...]
+
+## Validation
+- [How to confirm successful completion]
+- [Expected output or state]
+
+## Rollback
+- [How to undo if something went wrong]
+
+## Common Mistakes
+- [What often goes wrong and how to avoid it]
+```
+
+### Skill File Location
+```
+C:\Users\USER\.cursor\rules\skills\    ← global skills (.mdc)
+docs/operations/skills\                ← human-readable versions (.md)
+```
+
+### Core Skills to Build (in order)
+```
+Priority 1 — Build immediately:
+  new-supabase-migration     how to create and apply a migration safely
+  new-service-module         how to scaffold a new domain service
+
+Priority 2 — Build in Phase 1:
+  new-wp-site-provision      how to provision a WordPress site
+  deploy-to-staging          staging deployment checklist
+
+Priority 3 — Build in Phase 2:
+  incident-response          what to do when something breaks
+  agent-tool-expansion       how to safely expand agent tool access
+```
+
+### Skill Activation Rule
+When a task matches a known skill, say:
+> "This matches the [Skill Name] skill. I will follow that procedure."
+Then execute the skill steps exactly. Do not improvise on established SOPs.
+
+---
+
+## HEARTBEAT & OBSERVABILITY
+
+> ⚠️ **Build heartbeat infrastructure ONLY after Phase 2 is stable.**
+> Do not monitor a system that doesn't exist yet.
+
+### Observability Built Into Every Feature (not added later)
+
+Every feature must include at build time:
+```
+✓ Structured logs: { timestamp, service, operation, status, duration_ms, error? }
+✓ Workflow runs: started_at, completed_at, status, error_message
+✓ Approval actions: actor, decision, reason, timestamp
+✓ Sentry: capture unexpected errors with context
+✓ PostHog: track key business events
+```
+
+### Heartbeat Check Requirements
+Each check must be:
+```
+✓ Idempotent — safe to run multiple times
+✓ Non-destructive — read-only where possible
+✓ Fast — under 5 seconds per check
+✓ Self-healing where appropriate — retry before alerting
+✓ Logged — every check result recorded
+```
+
+### Alert Levels
+```
+🟢 GREEN  — everything nominal
+🟡 YELLOW — degraded but functional (alert, do not page)
+🔴 RED    — critical failure (page immediately, consider rollback)
+```
+
+### Minimum Heartbeat Checklist (implement when ready)
+```
+□ Supabase connection alive
+□ n8n webhook endpoint responding
+□ WordPress site API responding
+□ Trigger.dev job queue not backed up
+□ No workflow stuck in intermediate state > 30 minutes
+□ Error rate < 1% over last 1 hour
+□ Last successful settlement within expected window
+```
+
+### Teaching Mode
+
+When I don't understand a concept, explain as:
+1. One-sentence core explanation
+2. A real-world analogy
+3. A minimal runnable example
+4. Common mistakes and traps
+5. Recommended next learning step

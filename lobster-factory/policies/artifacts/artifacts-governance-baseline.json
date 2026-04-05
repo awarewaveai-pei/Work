@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "provider_strategy": {
+    "mode": "portable_single_provider",
+    "primary": "cloudflare_r2",
+    "supported": ["cloudflare_r2", "aws_s3"],
+    "contract": "presigned_put_http",
+    "switch_cost_policy": "adapter_and_iac_only"
+  },
+  "retention": {
+    "staging_days": 30,
+    "prod_days": 90,
+    "delete_mode": "hard_delete_after_retention"
+  },
+  "iam": {
+    "enforce_tenant_prefix": true,
+    "allow_runtime_bucket_list": false,
+    "presign_ttl_minutes_max": 15,
+    "required_prefix_template": "<orgId>/<workspaceId>/<trigger>/<workflowRunId>/"
+  },
+  "audit": {
+    "report_enabled": true,
+    "report_path": "agency-os/reports/operations",
+    "warn_if_prefix_fallback_used": true
+  }
+}

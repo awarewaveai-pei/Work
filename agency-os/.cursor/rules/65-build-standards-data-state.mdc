@@ -1,0 +1,40 @@
+---
+description: Database, state machine, and layout standards when editing Supabase/app code (scoped)
+alwaysApply: false
+globs:
+  - "**/supabase/**"
+  - "**/*.sql"
+  - "**/migrations/**"
+  - "**/apps/**"
+  - "**/packages/**"
+---
+
+# Build Standards — Data, State, Layout
+
+## Scope
+
+Applies when editing **SQL, Supabase migrations/functions**, or **app-style** `apps/` / `packages/` trees. **Monorepo** may also contain `lobster-factory/`, `agency-os/`, `tenants/` — do **not** assume every feature lives under `apps/web`; follow existing repo layout and architecture docs.
+
+## Database (when using Postgres / Supabase)
+
+Prefer:
+
+- Tenant boundaries: `organization_id` / `workspace_id` where applicable; **RLS** aligned with product spec.  
+- Timestamps: `created_at`, `updated_at`; consider `created_by` / audit where policy requires.  
+- Migrations: **reversible** where possible; no silent **destructive** DDL on production path without high-risk approval.  
+- Prefer **soft delete** (`deleted_at`) where product requires audit; avoid `DELETE` on SoR when policy forbids.
+
+Before finalizing schema: growth, audit, RLS, indexes on queried columns, rollback story.
+
+## State machines
+
+Multi-step flows: define **states + allowed transitions + guards + side effects**; invalid transitions **rejected**, not ignored; log actor/time/reason for state changes; compensating actions when external side effects exist. Use **durable** workers (e.g. Trigger) per Routing Spec for long runs.
+
+## Code quality (TypeScript / services)
+
+Strict typing; validate inputs (e.g. Zod) at boundaries; no silent empty catches; no credential literals; parameterized queries / ORM — no string-concat SQL for user input.
+
+## Related SSOT
+
+- `docs/operations/cursor-enterprise-rules-index.md`  
+- Lobster / product schema sources of truth under `lobster-factory/docs/` and repo migrations.

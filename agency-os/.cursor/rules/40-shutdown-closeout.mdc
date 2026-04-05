@@ -1,0 +1,50 @@
+---
+description: End-of-day closeout before shutdown with linkage verification
+alwaysApply: true
+---
+
+# Shutdown Closeout
+
+**`AO-CLOSE` 關鍵字與收工回覆格式（今日完成／未完成／連動檢查／明日優先）維持不變。**  
+目標：使用者收工前打 `AO-CLOSE` 後，**本機通過完整閘道、產出報告、並推上 GitHub**，公司電腦 **`git pull` 即得完整可續接狀態**（含龍蝦治理 + Agency 連動 + 綜合狀態檔）。
+
+When the user indicates end of day or shutdown intent (examples: `AO-CLOSE`,
+"要關機", "收工", "今天先到這"), run this closeout sequence before ending:
+
+1. **First** update progress files (so the next step can commit them):
+   - `TASKS.md`
+   - `WORKLOG.md`
+   - `memory/CONVERSATION_MEMORY.md`
+   - `memory/daily/YYYY-MM-DD.md` (create if missing, then write closeout summary)
+2. Run **one-shot closeout + GitHub push** from the current repo root:
+   `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`
+   If `.\scripts\ao-close.ps1` is missing, retry:
+   `powershell -ExecutionPolicy Bypass -File .\agency-os\scripts\ao-close.ps1`
+   - **`verify-build-gates.ps1`**（lobster `bootstrap-validate` + Agency `system-health-check`）— **預設必跑**；失敗則 **不 push**。
+   - **`system-guard -Mode manual`**（內含 `doc-sync-automation -AutoDetect` + health + guard 報告 + `LAST_SYSTEM_STATUS.md`）。
+   - **`generate-integrated-status-report.ps1`** → 更新 `reports/status/integrated-status-LATEST.md`。
+   - 若全程 **PASS**：`git add -A` → 有變更則 `git commit` → `git push origin <current-branch>`。
+   - **`-SkipPush`**：仍跑上述閘道與產報，**不** commit／push（僅當使用者明確要暫存本機時）。
+   - **`-SkipVerify`**：略過龍蝦閘道（較快；**不建議**在「明天公司機要 pull 完整」前使用）。
+   - 預設要求 `system-health-check` 分數 **100%**；未達 100% 視為收工未完成（除非使用者明確允許非 100% 收工）。
+   - Execute from a folder that is the git repository root (or contains `agency-os/`).
+3. Confirm：`verify-build-gates` 與 guard 路徑皆 **PASS**，且 push 成功（或依使用者要求正確使用 `-SkipPush`）。
+
+**公司機／另一台續接**：`AO-CLOSE` push 成功後，他處開工依 `docs/overview/REMOTE_WORKSTATION_STARTUP.md`：**新機／筆電第一次 §1.5**；**之後每次 §2**（含 **`git pull --ff-only origin main`**、**`lobster-factory\packages\workflows`** 之 `npm ci`、可選 `mcp-local-wrappers`、再 **`verify-build-gates`**），**再**打 **`AO-RESUME`**。`AO-RESUME` 會檢查是否落後並**嘗試** `git pull --ff-only`；若 pull 失敗再提示人工處理（與 §2 手動序列一致）。`node_modules` 不入庫。
+
+**若 `git push` 被拒（遠端超前）**：在 repo 根執行 `git pull --rebase origin main`，解決衝突後 `git rebase --continue`，再推送。
+
+Then respond with this exact structure:
+
+- 今日完成:
+  - <completed work>
+- 今日未完成:
+  - <pending work>
+- 連動檢查:
+  - <PASS/FAIL + key evidence>
+- 明日優先:
+  - P1
+  - P2
+  - P3
+
+If any check fails, provide a rollback-safe fix plan before signing off.

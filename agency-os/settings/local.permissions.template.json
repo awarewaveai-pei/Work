@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(node:*)",
+      "Bash(npm run:*)"
+    ],
+    "deny": [
+      "Bash(*rm -rf*:* )"
+    ],
+    "ask": [
+      "Bash(curl *supabase.co*)",
+      "Bash(curl *api.github.com*)",
+      "Bash(curl *api.dataforseo.com*)",
+      "Bash(curl *n8n*api*)"
+    ]
+  },
+  "notes": [
+    "Do not inline secrets in command strings.",
+    "Use environment variables or secret manager only."
+  ]
+}

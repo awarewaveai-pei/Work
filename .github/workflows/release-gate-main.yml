@@ -1,0 +1,31 @@
+name: Release Gate (main)
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.x"
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: lobster-factory
+
+      - name: Run lobster release gate
+        env:
+          LOBSTER_WORK_ROOT: ${{ github.workspace }}
+          LOBSTER_SKIP_AGENCY_CANONICAL: "1"
+        run: npm run validate
+        working-directory: lobster-factory

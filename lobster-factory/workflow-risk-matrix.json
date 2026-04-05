@@ -1,0 +1,86 @@
+{
+  "version": "1.0.0",
+  "default_action": "block",
+  "rules": [
+    {
+      "task_type": "client_onboarding",
+      "tool": "trigger",
+      "allowed_envs": ["staging", "qa"],
+      "risk_level": "medium",
+      "approval_required": false,
+      "rollback_required": true
+    },
+    {
+      "task_type": "site_provisioning",
+      "tool": "trigger",
+      "allowed_envs": ["staging"],
+      "risk_level": "high",
+      "approval_required": true,
+      "rollback_required": true
+    },
+    {
+      "task_type": "manifest_apply",
+      "tool": "trigger",
+      "allowed_envs": ["staging"],
+      "risk_level": "high",
+      "approval_required": true,
+      "rollback_required": true
+    },
+    {
+      "task_type": "deploy_production",
+      "tool": "trigger",
+      "allowed_envs": ["production"],
+      "risk_level": "critical",
+      "approval_required": true,
+      "rollback_required": true
+    },
+    {
+      "task_type": "incident_repair",
+      "tool": "trigger",
+      "allowed_envs": ["staging", "production"],
+      "risk_level": "high",
+      "approval_required": true,
+      "rollback_required": true
+    },
+    {
+      "task_type": "webhook_ingress",
+      "tool": "n8n",
+      "allowed_envs": ["staging", "production"],
+      "risk_level": "low",
+      "approval_required": false,
+      "rollback_required": false
+    },
+    {
+      "task_type": "crm_sync",
+      "tool": "n8n",
+      "allowed_envs": ["staging", "production"],
+      "risk_level": "low",
+      "approval_required": false,
+      "rollback_required": false
+    },
+    {
+      "task_type": "notification_dispatch",
+      "tool": "n8n",
+      "allowed_envs": ["staging", "production"],
+      "risk_level": "low",
+      "approval_required": false,
+      "rollback_required": false
+    },
+    {
+      "task_type": "ci_validate",
+      "tool": "github",
+      "allowed_envs": ["staging", "production"],
+      "risk_level": "medium",
+      "approval_required": false,
+      "rollback_required": false
+    },
+    {
+      "task_type": "runtime_content_ops",
+      "tool": "wordpress",
+      "allowed_envs": ["staging", "production"],
+      "risk_level": "medium",
+      "approval_required": false,
+      "rollback_required": false
+    }
+  ]
+}

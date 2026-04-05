@@ -1,0 +1,75 @@
+---
+description: Operator autopilot collaboration mode
+alwaysApply: true
+---
+
+# Operator Autopilot Mode
+
+目標：讓使用者以最少文字操作（甚至只打關鍵字）即可推進完整工作流，代理自動完成拆解、執行、驗證與回寫紀錄。
+
+## 1) 指令理解優先級
+
+當使用者訊息較短或模糊（例如「繼續」「你決定」「全權處理」「開始設定這個」）時：
+
+1. 先以最近一次明確目標作為主軸延續，不要求使用者重述。
+2. 若有多個可能路徑，預設選擇「可驗證、可回滾、最小風險」路徑先做。
+3. 只有在會造成不可逆或成本決策時才提單一確認問題。
+
+## 2) 執行模式（預設做到底）
+
+除非使用者明確要求僅討論，不要停在分析或提案，必須完成：
+- 搜集必要上下文
+- 直接實作
+- 跑檢查/驗證
+- 符合 §7 時**自動**本機 checkpoint（使用者無需額外手動步驟）
+- 回報結果與下一個最小動作
+
+回覆要短，先給結論，再給證據。
+
+## 3) 規則、技能、Subagent 的使用原則
+
+### Rules
+- 每次任務先遵守現有 `.cursor/rules/*`，避免與既有 AO-RESUME/AO-CLOSE 流程衝突。
+
+### Skills
+- 當任務是設定類（特別是 Cursor/VSCode settings）時，優先讀取對應 skill 並照流程執行。
+
+### Subagent
+- 遇到「廣泛探索、多區域並行搜尋」才啟用 subagent。
+- 狹窄任務（1~3 檔案可定位）直接本代理處理，避免增加回合成本。
+
+## 4) 自動回寫紀錄（降低使用者文書負擔）
+
+當出現以下任一情況，代理需主動回寫紀錄檔，不要求使用者重複描述：
+- 明確決策（例如工具選型、流程變更）
+- 里程碑完成
+- closeout 前狀態變更
+
+最低更新目標：
+- `WORKLOG.md`（決策與執行）
+- `TASKS.md`（任務勾選/下一步）
+- `memory/CONVERSATION_MEMORY.md`（長期記憶）
+- `memory/daily/YYYY-MM-DD.md`（當日脈絡）
+
+## 5) 成本與效益策略
+
+- 白天預設快速路徑（必要驗證），收工前再跑完整閘道。
+- 避免無必要的大範圍重掃描與重複驗證。
+- 先完成可交付結果，再做優化與延伸。
+
+## 6) 互動約定（對使用者）
+
+使用者不需每次輸入「今天目標/限制」。代理需從上下文推斷並自動執行。
+若需使用者輸入，僅請求最小必要資訊，且一次只問一題。
+
+## 7) Git：checkpoint（本機 `commit`）與 `push`（收工）
+
+**人類可讀流程表（不重複貼全文）**：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §2.5（**正本**在 `agency-os`；monorepo 根 `.cursor` 由 `sync-enterprise-cursor-rules-to-monorepo-root` 鏡像，勿手改）。
+
+**原則**：開工期間保留**可回滾的本地節點**；遠端 `main` 仍以**過收工閘道後的 push**為主，避免半成品上雲。
+
+- **里程碑完成時（`AO-RESUME` 之後～`AO-CLOSE` 之前）**：代理在交付一個**可敘述、已通過約定最小驗證**的單元後（例如一項 `TASKS` 子任務 DoD、一組檔案閉環、修復並跑過相關檢查），**應**在 monorepo 根**自動**執行本機 checkpoint（**僅本機，不 push**）——**使用者不必手動跑腳本**；由代理在可執行終端代跑 `powershell -ExecutionPolicy Bypass -File .\scripts\commit-checkpoint.ps1 -Message "checkpoint: <簡述>"`（或等價 `git add`/`git commit`）。若環境**無法執行 git**（權限／沙盒），才用**一句話**請使用者在本機執行同指令或授權終端。
+- **不要**在僅完成 **`AO-RESUME` 前檢**、或只有草稿／雜訊時為了習慣而**空 commit**。
+- **可略過 checkpoint**：疑似祕密未排除、使用者明示先不要 commit、純實驗性變更且將丟棄、或明知與即將收工閘道衝突的 WIP（應先說明風險）。
+- **收工**：**`AO-CLOSE`**（`ao-close.ps1`）仍為**預設**最終 **`commit`（收斂殘留變更）+ `push`** 的入口；通過閘道後再推。當日若已有多顆本地 checkpoint，**一次 push 可帶上多顆 commit**（無需 squash，除非使用者要）。
+- **例外**：使用者**明確一句話**要求立即提交／推送（hotfix、急件）時，依指示執行。

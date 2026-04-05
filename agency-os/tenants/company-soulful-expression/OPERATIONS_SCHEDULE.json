@@ -1,0 +1,27 @@
+{
+  "scheduler": {
+    "daily_time": "09:00",
+    "weekly_day": "MON",
+    "weekly_time": "09:30",
+    "monthly_day": 1,
+    "monthly_time": "10:00",
+    "adhoc_interval_minutes": 15
+  },
+  "tasks": {
+    "daily": [
+      {
+        "id": "daily-doc-sync",
+        "title": "Run documentation auto-sync",
+        "type": "command",
+        "enabled": true,
+        "command": "powershell -ExecutionPolicy Bypass -File .\\scripts\\doc-sync-automation.ps1 -AutoDetect",
+        "owner": "ops-owner",
+        "timeout_minutes": 15,
+        "retry_policy": "1x-immediate-retry",
+        "evidence_output": "reports/closeout/closeout-*.md"
+      }
+    ],
+    "weekly": [],
+    "monthly": []
+  }
+}

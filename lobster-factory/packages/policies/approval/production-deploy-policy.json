@@ -1,0 +1,16 @@
+{
+  "name": "production-deploy-policy",
+  "resourceType": "deployment",
+  "rules": [
+    {
+      "match": {
+        "environment": "production"
+      },
+      "requiredApprovals": [
+        { "role": "agency_admin", "count": 1 }
+      ],
+      "mode": "hard_block"
+    }
+  ]
+}
+

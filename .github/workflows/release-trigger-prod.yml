@@ -1,0 +1,75 @@
+name: Deploy to Trigger.dev (prod)
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/**'
+      - '.github/workflows/release-trigger-prod.yml'
+  workflow_dispatch:
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.x"
+      - name: Install dependencies with Yarn
+        run: yarn install --immutable
+        working-directory: lobster-factory
+      - name: Run lobster release gate
+        env:
+          LOBSTER_WORK_ROOT: ${{ github.workspace }}
+          LOBSTER_SKIP_AGENCY_CANONICAL: "1"
+        run: yarn validate
+        working-directory: lobster-factory
+
+  deploy:
+    needs: gate
+    runs-on: ubuntu-latest
+    env:
+      TRIGGER_PROJECT_REF: ${{ vars.TRIGGER_PROJECT_REF || 'proj_rqykzzwujizcxdzgnedn' }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.x"
+            - name: Install dependencies with npm
+                run: npm ci
+        working-directory: lobster-factory/packages/workflows
+      - name: Validate Trigger credentials
+        env:
+          TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
+          TRIGGER_SECRET_KEY: ${{ secrets.TRIGGER_SECRET_KEY }}
+        run: |
+          if [ -z "${TRIGGER_ACCESS_TOKEN}" ]; then
+            echo "Missing Trigger credentials. Set secrets.TRIGGER_ACCESS_TOKEN (PAT, prefix tr_pat_)."
+            exit 1
+          fi
+          if [ -z "${TRIGGER_SECRET_KEY}" ]; then
+            echo "Missing Trigger credentials. Set secrets.TRIGGER_SECRET_KEY (prefix tr_secret_)."
+            exit 1
+          fi
+      - name: Deploy Trigger.dev
+        env:
+          TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
+          TRIGGER_SECRET_KEY: ${{ secrets.TRIGGER_SECRET_KEY }}
+        run: |
+          for attempt in {1..5}; do
+            delay=$((30 * (2 ** ($attempt - 1))))
+            echo "Deployment attempt $attempt of 5..."
+            npx trigger.dev@4.4.3 deploy --env prod --project-ref "${TRIGGER_PROJECT_REF}" --log-level debug && break
+            if [ $attempt -lt 5 ]; then
+              echo "Failed, retrying in $delay seconds..."
+              sleep $delay
+            else
+              echo "Deployment failed after 5 attempts"
+              exit 1
+            fi
+          done
+        working-directory: lobster-factory/packages/workflows

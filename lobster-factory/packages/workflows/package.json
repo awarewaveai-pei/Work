@@ -1,0 +1,13 @@
+{
+    "name": "@lobster-factory/workflows",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+      "@trigger.dev/sdk": "4.4.3",
+      "zod": "^3.22.0"
+    },
+    "devDependencies": {
+      "trigger.dev": "4.4.3"
+    }
+  }

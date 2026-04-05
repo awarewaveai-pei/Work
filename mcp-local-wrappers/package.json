@@ -1,0 +1,8 @@
+{
+  "name": "mcp-local-wrappers",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1"
+  }
+}

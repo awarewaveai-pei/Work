@@ -1,0 +1,14 @@
+﻿{
+    "last_run_utc":  "2026-03-25T17:48:17.5039164Z",
+    "changed_files":  [
+                          "automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1",
+                          "scripts/system-health-check.ps1"
+                      ],
+    "impacted_files":  [
+                           "automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1",
+                           "scripts/system-health-check.ps1"
+                       ],
+    "auto_updated_files":  {
+
+                           }
+}

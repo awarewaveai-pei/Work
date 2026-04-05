@@ -1,0 +1,26 @@
+# Beginner Operation Format
+
+When user says they are a beginner / "小白" (or indicates they need hand-holding), all future operational guidance must use this format by default:
+
+1. 去哪裡（資料夾路徑 / 檔案位置 / UI 畫面）
+2. 做什麼（點擊、貼上、執行、存檔）
+3. 你會看到什麼（成功判斷）
+
+Mandatory requirements:
+- Avoid abstract wording only; always provide concrete actions.
+- Prefer copy-paste ready commands with full paths when possible.
+- Keep each step short and sequential; avoid nested or branching instructions unless necessary.
+- For docs authored/updated by the agent, include a quick-start section in the same beginner format.
+# Beginner Operation Format
+
+When user says they are a beginner / "小白" (or indicates they need hand-holding), all future operational guidance must use this format by default:
+
+1. 去哪裡（資料夾路徑 / 檔案位置 / UI 畫面）
+2. 做什麼（點擊、貼上、執行、存檔）
+3. 你會看到什麼（成功判斷）
+
+Mandatory requirements:
+- Avoid abstract wording only; always provide concrete actions.
+- Prefer copy-paste ready commands with full paths when possible.
+- Keep each step short and sequential; avoid nested or branching instructions unless necessary.
+- For docs authored/updated by the agent, include a quick-start section in the same beginner format.

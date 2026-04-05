@@ -1,0 +1,27 @@
+---
+description: Skill SOPs, observability expectations, coordination with heartbeat rule
+alwaysApply: true
+---
+
+# Skills & Observability Protocol
+
+## Skills (Cursor)
+
+- **When**: repeated >5-step flows, multi-file/service tasks, or missing steps would cause deploy/data incidents — capture as a **Skill** (`~/.cursor/skills-cursor/...` or project skill) with Purpose → Prerequisites → Steps → Validation → Rollback.  
+- **When a skill applies**: state that you are following it; do not improvise away from an agreed SOP.  
+- **Human-readable mirrors** may live under `docs/operations/` if the team needs non-IDE copies; keep **one owner** to avoid drift.
+
+## Observability
+
+- Instrument **meaningful** state changes (structured logs where code exists); workflow runs; approval decisions; use **Sentry / PostHog** when the stack already includes them (`posthog` / `sentry` skills inventory).  
+- **Greenfield**: do **not** build full heartbeat paging before core flows exist — align with **Phase 2** discipline（見 `cursor-enterprise-rules-index`／溯源包）與專案里程碑。  
+- Health checks should be **idempotent**, **fast**, and **non-destructive** where possible (see `scripts/system-health-check.ps1` pattern).
+
+## Long-running agent work
+
+If the user enabled autopilot / long tasks, follow **`62-progress-heartbeat-15min.mdc`** (start ping, 15m heartbeat, immediate escalation on blockers).
+
+## Related SSOT
+
+- `docs/operations/cursor-enterprise-rules-index.md`  
+- `AGENTS.md` (heartbeat + 小白格式)

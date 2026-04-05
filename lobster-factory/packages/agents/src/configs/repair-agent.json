@@ -1,0 +1,13 @@
+{
+  "name": "repair-agent",
+  "version": "1.0.0",
+  "domain": "repair",
+  "allowedTools": ["read_logs", "read_repo", "analyze_trace", "create_patch", "open_pr"],
+  "deniedTools": ["deploy_production", "read_secrets", "drop_database", "execute_destructive_migration"],
+  "requiresApprovalFor": ["production_change", "payment_logic_change", "schema_change"],
+  "limits": {
+    "maxSteps": 12,
+    "maxCostUsd": 5
+  }
+}
+

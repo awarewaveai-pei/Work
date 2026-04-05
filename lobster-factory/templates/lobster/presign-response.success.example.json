@@ -1,0 +1,18 @@
+{
+  "puts": {
+    "stdout.log": {
+      "url": "https://example.r2.cloudflarestorage.com/bucket/prefix/run-id/stdout.log?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=…",
+      "headers": {},
+      "contentType": "text/plain; charset=utf-8"
+    },
+    "stderr.log": {
+      "url": "https://example.r2.cloudflarestorage.com/bucket/prefix/run-id/stderr.log?…",
+      "contentType": "text/plain; charset=utf-8"
+    },
+    "meta.json": {
+      "url": "https://example.r2.cloudflarestorage.com/bucket/prefix/run-id/meta.json?…",
+      "contentType": "application/json"
+    }
+  },
+  "logsRef": "r2://my-bucket/lobster-artifacts/apply-manifest/<workflowRunId>/"
+}

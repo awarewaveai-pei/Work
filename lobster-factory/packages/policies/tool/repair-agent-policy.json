@@ -1,0 +1,11 @@
+{
+  "name": "repair-agent-policy",
+  "allowedTools": ["read_logs", "read_repo", "create_patch", "open_pr"],
+  "deniedTools": ["deploy_production", "read_secret_plaintext", "drop_database"],
+  "environmentConstraints": {
+    "allowedEnvironments": ["staging", "preview"],
+    "blockedEnvironments": ["production"]
+  },
+  "requiresApprovalFor": ["code_merge", "schema_change"]
+}
+

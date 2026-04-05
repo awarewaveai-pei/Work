@@ -1,0 +1,36 @@
+{
+  "folders": [
+    {
+      "name": "agency-os",
+      "path": "agency-os"
+    },
+    {
+      "name": "projects-clients",
+      "path": "Projects/clients"
+    },
+    {
+      "name": "projects-internal",
+      "path": "Projects/internal"
+    },
+    {
+      "name": "projects-sandbox",
+      "path": "Projects/sandbox"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/.git": true
+    },
+    "search.exclude": {
+      "**/dist/**": true,
+      "**/reports/**": true,
+      "**/.agency-state/**": true
+    },
+    "files.watcherExclude": {
+      "**/dist/**": true,
+      "**/reports/**": true,
+      "**/.agency-state/**": true,
+      "**/node_modules/**": true
+    }
+  }
+}

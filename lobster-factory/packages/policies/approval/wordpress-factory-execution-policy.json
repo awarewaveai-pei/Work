@@ -1,0 +1,31 @@
+{
+  "name": "wordpress-factory-execution-policy",
+  "version": "1.0.0",
+  "execution_channel": "single",
+  "stages": [
+    "precheck",
+    "staging_provision",
+    "manifest_apply",
+    "smoke_validation",
+    "decision_gate",
+    "production_rollout"
+  ],
+  "hard_requirements": {
+    "staging_first": true,
+    "production_requires_approval": true,
+    "high_risk_requires_rollback": true,
+    "audit_tables": [
+      "workflow_runs",
+      "approvals",
+      "incidents",
+      "artifacts"
+    ]
+  },
+  "routing_requirements": {
+    "durable_engine_tool": "trigger",
+    "glue_tool": "n8n",
+    "system_of_record": "supabase",
+    "ci_gate": "github",
+    "delivery_runtime": "wordpress"
+  }
+}

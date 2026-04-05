@@ -1,0 +1,47 @@
+---
+description: Resume session using AO-RESUME keyword
+alwaysApply: true
+---
+
+# AO Resume Keyword
+
+When the user message contains `AO-RESUME`, before proposing any new implementation:
+
+1. **Git 對齊（雙機／每日開工必做）**  
+   - **Agent 必做**：在可執行終端時，於 **monorepo 根**（`git rev-parse --show-toplevel`）執行 `git fetch origin`，再以 `git status -sb`（或 `git rev-list --left-right --count HEAD...origin/main`）檢查是否 **behind** `origin/main`。  
+   - **若 behind**：Agent 應先直接執行 **`git pull --ff-only origin main`**；若 pull 失敗，先用 `git status` 判斷是否有本機未提交／衝突，再請使用者決策（必要時改 **`git pull --rebase origin main`**）。  
+   - **AO-RESUME 後 30 秒自檢（必做）**：執行 `git status -sb` + `git rev-list --left-right --count HEAD...origin/main`；若工作樹 dirty（`M`／`??`）或非 `0 0`，必須先明確標示風險，不得直接宣告「已完全對齊」。  
+   - **Preventive gate**：當日第一次 AO-RESUME，需建議執行 `.\scripts\verify-build-gates.ps1`（至少 daily baseline 一次）以降低「版本對齊但邏輯行為漂移」風險。  
+   - **僅在無法執行終端**時，才於回覆開頭提醒使用者手動 pull 並說明理由。  
+   - **完整開機 runbook**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**、§2.3。
+
+2. Read these files in order:
+- `README.md`（根或 `agency-os` 視工作區而定）
+- `agency-os/AGENTS.md`
+- `agency-os/memory/CONVERSATION_MEMORY.md`
+- `agency-os/memory/daily/` today and yesterday notes if present
+- `agency-os/TASKS.md`
+- `agency-os/WORKLOG.md`
+- `agency-os/LAST_SYSTEM_STATUS.md` (if exists)
+- `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` (if exists)
+- `lobster-factory/docs/LOBSTER_FACTORY_COMPLETION_PLAN_V2.md` (if exists)
+
+If opened folder is `agency-os` only, use paths as above; lobster paths are `../lobster-factory/docs/...`.
+
+3. Respond with a concise startup brief in this exact structure:
+- 已完成
+- 目前進度
+- 下一步
+
+4. In `目前進度`, always include **龍蝦工廠**欄位：
+   - **目前 Milestone**（M1~M5）
+   - **今日 DoD**
+   - **阻塞／風險**（無則寫「無」）
+
+5. In `已完成` 或 `目前進度` 中，若剛才 Git 檢查有執行，可一句話標註 **Git 已對齊 origin/main** 或 **提醒使用者先 pull**。
+
+6. Ask one focused confirmation question only if a blocker or ambiguity exists.
+
+7. **雙機 §1.5 + audit 口頭提醒**：讀過 `TASKS.md` 後，若 **「（AO-RESUME 提醒）雙機環境對齊」** 仍為 **未勾選**，則本次回覆的 **「下一步」**（必要時 **「目前進度」**）**必含一行**，明確提醒使用者：**另一台**須依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5** 完成首次接線，並在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin` 至 **PASS（無 WARN）** 後再勾該項。已勾選則無需重複。
+
+8. **Windows 筆電／本機 WordPress（MariaDB）對齊**：若 **「雙機環境對齊」** 仍 **未勾選**，或 `memory/CONVERSATION_MEMORY.md` 已記載使用者**桌機已裝、筆電要補**，則本次回覆 **「下一步」** 除第 7 點外 **須再加一句**，要求依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5.1** 完成：**MariaDB.Server**、**PHP.PHP.NTS.8.4**、`scripts/setup-wp-cli-windows.ps1`、`scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`；並註明此為 **WordPress 專用 MySQL 相容層**，**非 MCP**、**不取代 Supabase**。操作正本：`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`；與 IDE MCP 分工對照：`docs/operations/cursor-mcp-and-plugin-inventory.md` §4。

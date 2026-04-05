@@ -1,0 +1,42 @@
+name: validate-manifest
+
+on:
+  pull_request:
+    paths:
+      - "packages/manifests/**"
+      - "scripts/validate-manifests.mjs"
+      - "scripts/bootstrap-validate.mjs"
+      - "scripts/validate-governance-configs.mjs"
+      - "scripts/validate-doc-integrity.mjs"
+      - "docs/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/manifests/**"
+      - "scripts/validate-manifests.mjs"
+      - "scripts/bootstrap-validate.mjs"
+      - "scripts/validate-governance-configs.mjs"
+      - "scripts/validate-doc-integrity.mjs"
+      - "docs/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lobster-factory
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Single entry: structural + manifest + governance + doc integrity (no duplicate runs)
+      - name: Bootstrap validation (full gate)
+        run: node scripts/bootstrap-validate.mjs
+        env:
+          LOBSTER_WORK_ROOT: ${{ github.workspace }}

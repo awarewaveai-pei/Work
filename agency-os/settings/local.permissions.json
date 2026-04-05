@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)"
+    ],
+    "deny": [
+      "Bash(*rm -rf*)",
+      "Bash(*del /f /s /q*)",
+      "Bash(*format *:*)"
+    ],
+    "ask": []
+  },
+  "notes": [
+    "Maximum automation mode for local solo operation.",
+    "Keep only destructive command blocks as hard deny."
+  ]
+}

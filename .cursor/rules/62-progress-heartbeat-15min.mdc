@@ -1,0 +1,54 @@
+# Progress Heartbeat (15 min)
+
+When the user grants proactive/autopilot execution:
+
+1. Start-of-work ping (mandatory)
+- Before substantial execution, send a short update:
+  - what you are doing now
+  - next expected update time
+
+2. Heartbeat cadence (mandatory)
+- While working on long tasks, send a progress heartbeat every 15 minutes.
+- Heartbeat format:
+  - current step
+  - blocked or not
+  - next step
+
+3. Immediate incident updates (mandatory)
+- Do not wait for heartbeat if any of these happen:
+  - error/failure
+  - blocker
+  - user decision required
+
+4. On-demand status
+- If user asks `進度?`, respond immediately with:
+  - current work
+  - blockers
+  - next action
+# Progress Heartbeat (15 min)
+
+When the user grants proactive/autopilot execution:
+
+1. Start-of-work ping (mandatory)
+- Before substantial execution, send a short update:
+  - what you are doing now
+  - next expected update time
+
+2. Heartbeat cadence (mandatory)
+- While working on long tasks, send a progress heartbeat every 15 minutes.
+- Heartbeat format:
+  - current step
+  - blocked or not
+  - next step
+
+3. Immediate incident updates (mandatory)
+- Do not wait for heartbeat if any of these happen:
+  - error/failure
+  - blocker
+  - user decision required
+
+4. On-demand status
+- If user asks `進度?`, respond immediately with:
+  - current work
+  - blockers
+  - next action
