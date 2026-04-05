@@ -1,41 +1,20 @@
 ﻿{
-    "last_run_utc":  "2026-04-05T11:40:12.2043165Z",
+    "last_run_utc":  "2026-04-05T12:56:19.8339176Z",
     "changed_files":  [
-                          "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                          "docs/operations/hetzner-full-stack-self-host-runbook.md",
-                          "docs/operations/hetzner-self-host.env.example",
-                          "docs/operations/local-secrets-vault-dpapi.md",
-                          "docs/operations/mcp-add-server-quickstart.md",
-                          "docs/operations/supabase-self-hosted-cutover-checklist.md",
                           "memory/CONVERSATION_MEMORY.md",
-                          "memory/daily/2026-04-02.md",
+                          "memory/daily/2026-04-05.md",
+                          "TASKS.md",
                           "WORKLOG.md"
                       ],
     "impacted_files":  [
-                           "../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
-                           ".cursor/rules/64-architecture-mcp-routing.mdc",
-                           "AGENTS.md",
-                           "docs/operations/cursor-enterprise-rules-index.md",
-                           "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                           "docs/operations/hetzner-full-stack-self-host-runbook.md",
-                           "docs/operations/hetzner-self-host.env.example",
-                           "docs/operations/local-secrets-vault-dpapi.md",
-                           "docs/operations/mcp-add-server-quickstart.md",
-                           "docs/operations/supabase-self-hosted-cutover-checklist.md",
-                           "docs/operations/tools-and-integrations.md",
                            "memory/CONVERSATION_MEMORY.md",
-                           "memory/daily/2026-04-02.md",
-                           "README.md",
+                           "memory/daily/2026-04-05.md",
+                           "TASKS.md",
                            "WORKLOG.md"
                        ],
     "auto_updated_files":  [
-                               "../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
-                               "AGENTS.md",
-                               "docs/operations/cursor-enterprise-rules-index.md",
-                               "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                               "docs/operations/tools-and-integrations.md",
                                "memory/CONVERSATION_MEMORY.md",
-                               "README.md",
+                               "TASKS.md",
                                "WORKLOG.md"
                            ]
 }

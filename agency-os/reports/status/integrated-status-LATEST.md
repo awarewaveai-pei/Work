@@ -1,7 +1,7 @@
-# Integrated status report (assembled)
+﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-02 17:46:24
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-04-05 20:56:36
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -15,7 +15,7 @@
 - `LAST_SYSTEM_STATUS.md`, `WORKLOG.md`
 
 ## 1) TASKS.md - Next (unchecked)
-- [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）**：兩台執行與功能一致——**新機／筆電首次**只跟 [`docs/overview/REMOTE_WORKSTATION_STARTUP.md`](docs/overview/REMOTE_WORKSTATION_STARTUP.md) **§1.5**（含 **§1.5.1**：Windows 本機 **MariaDB + PHP + WP-CLI** + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`；與 **Supabase／MCP** 分列，WordPress 仍需 MySQL 相容庫）；**之後每次開工**跟同檔 **§2**（`git pull`、`lobster-factory\packages\workflows` 之 `npm ci`、可選 wrappers、`verify-build-gates`、再 **`AO-RESUME`**）。要點：筆電安裝 **GitHub CLI**（`winget install --id GitHub.cli`；裝完重開終端或刷新 `PATH`）並 **`gh auth login`**；**Node** 大版本與桌機／CI 一致；**`scripts/secrets-vault.ps1`（DPAPI）與 Cursor `mcp.json`／MCP 為每台各自設定**（勿假設會跟著 `git pull`）。完成後勾選本項。 - [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3）：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`（先選 2 個試點：1 既有站接手 + 1 新站建置） - [ ] **既有站接手（Soulful Expression Art Therapy）**：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本） - [ ] **新站建置（Scenery Travel Mongolia）**：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊） - [ ] **既有站接手 Day 1（Soulful Expression）**：執行 `docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節，輸出權限與基線盤點 - [ ] **新站建置 Day 1（Scenery Travel Mongolia）**：執行 `docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md` 第 1~2 節，完成新站 staging 啟動條件 - [ ] `tenants/templates/` v2：試點 tenant 實填回饋後，再擴欄位與自動檢查（若有） - [ ] （Next-Gen 對齊）將 M3 控制台輸出映射到「17-20 部門」責任矩陣與模板欄位（避免 Pilot 成果與跨國企業目標脫鉤） - [ ] `lobster-factory` A10-2 商業閉環實跑（新客戶建立 -> 驗收 -> production 觸發證據鏈） - [ ] `lobster-factory` A7 全站自動建站補齊（hosting adapter + provision/shell guardrails 端到端） - [ ] Enterprise 工具層 Phase 1 正式串接（Clerk auth、env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts）
+- [ ] **明日優先：擴充其餘自行託管元件（stack 對照 `hetzner-self-host.env.example`）**：在 **Supabase 自架**之外，依序盤點／落地——**MinIO（S3 相容 Storage）**、**Redis**、**Trigger.dev 自架**、**n8n 自架**（各項之 DB／加密金鑰／公開 URL、TLS 或反代、備份與憑證輪替）。正本對照 **`docs/operations/hetzner-full-stack-self-host-runbook.md`**、**`docs/operations/supabase-self-hosted-cutover-checklist.md`**；編排邊界仍依 **`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`**（Trigger vs n8n）。DoD：每元件有可驗證 endpoint（或內網+文件說明）、secrets 只進 vault／`.env`（不入庫）、`WORKLOG`／runbook 有決策或狀態一行。 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）**：兩台執行與功能一致——**新機／筆電首次**只跟 [`docs/overview/REMOTE_WORKSTATION_STARTUP.md`](docs/overview/REMOTE_WORKSTATION_STARTUP.md) **§1.5**（含 **§1.5.1**：Windows 本機 **MariaDB + PHP + WP-CLI** + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`；與 **Supabase／MCP** 分列，WordPress 仍需 MySQL 相容庫）；**之後每次開工**跟同檔 **§2**（`git pull`、`lobster-factory\packages\workflows` 之 `npm ci`、可選 wrappers、`verify-build-gates`、再 **`AO-RESUME`**）。要點：筆電安裝 **GitHub CLI**（`winget install --id GitHub.cli`；裝完重開終端或刷新 `PATH`）並 **`gh auth login`**；**Node** 大版本與桌機／CI 一致；**`scripts/secrets-vault.ps1`（DPAPI）與 Cursor `mcp.json`／MCP 為每台各自設定**（勿假設會跟著 `git pull`）。完成後勾選本項。 - [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3）：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`（先選 2 個試點：1 既有站接手 + 1 新站建置） - [ ] **既有站接手（Soulful Expression Art Therapy）**：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本） - [ ] **新站建置（Scenery Travel Mongolia）**：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊） - [ ] **既有站接手 Day 1（Soulful Expression）**：執行 `docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節，輸出權限與基線盤點 - [ ] **新站建置 Day 1（Scenery Travel Mongolia）**：執行 `docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md` 第 1~2 節，完成新站 staging 啟動條件 - [ ] `tenants/templates/` v2：試點 tenant 實填回饋後，再擴欄位與自動檢查（若有） - [ ] （Next-Gen 對齊）將 M3 控制台輸出映射到「17-20 部門」責任矩陣與模板欄位（避免 Pilot 成果與跨國企業目標脫鉤） - [ ] `lobster-factory` A10-2 商業閉環實跑（新客戶建立 -> 驗收 -> production 觸發證據鏈） - [ ] `lobster-factory` A7 全站自動建站補齊（hosting adapter + provision/shell guardrails 端到端） - [ ] Enterprise 工具層 Phase 1 正式串接（Clerk auth、env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts）
 
 ## 2) TASKS.md - Backlog (unchecked)
 - [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核） - [ ] `lobster-factory` Enterprise 必備工具補強路線：Sentry/PostHog/Cloudflare/Secrets/Identity（已選型：Identity=Clerk；Secrets 暫採 env/mcp，待升級 secrets manager） - [ ] **`lobster-factory/packages/workflows` `npm audit`**（2026-04-01）：16 筆多為 **Trigger.dev CLI／`@trigger.dev/core` 傳遞依賴**（socket.io／cookie、esbuild dev、tar、giget、systeminformation 等）。**勿**對本目錄跑 `npm audit fix --force`（會把人帶到不相容 Trigger 版本）。**對策**：等官方 `@trigger.dev/sdk`／`trigger.dev` 小版修 upstream；或 Trigger 釋出安全修補後再 `npm update` + 回歸；本機勿將 Trigger **dev** 伺服器暴露公網。
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter） - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑） - [ ] C5-1. Observability：Sentry（錯誤追蹤）+ PostHog（產品分析） - [ ] C5-2. Edge/Security：Cloudflare（WAF/CDN/Rate limit） - [ ] C5-3. Secrets：1Password Secrets Automation（或同級） - [ ] C5-4. Identity/Org：Clerk/WorkOS/Auth0（三選一） - [ ] C5-5. Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails） - [ ] C5-6. 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -203,24 +203,32 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-02.md
-# 2026-04-02
+## 5) memory/daily/2026-04-05.md
+# 2026-04-05
 
-- **背景**：延續長期營運治理；補齊 ADR 006 與索引／影響矩陣／閘道銜接。
-- **已完成**：`decisions/README.md` 納入 006；`CHANGE_IMPACT_MATRIX`、`LONG_TERM_OPERATING_DISCIPLINE`、002/005 Related 更新；`WORKLOG`／`CONVERSATION_MEMORY` 記錄；`verify-adr-index` + `verify-build-gates` **ALL PASSED**（health 100%）。
-- **已完成（專案管理工具退役）**：已移除第三方議題看板與 repo 的同步腳本／playbook／專用報表與本機 MCP 對應條目；`doc-sync`、health、`verify-build-gates` 全綠後已推送到 `origin/main`。舊時點產生的報表快照另掃描清除，避免搜尋誤導。
-- **未完成**：無（本批）。
-- **風險／阻塞**：無。
-- **下一步**：Schema／migration 落地時對照 ADR 006 實作 RLS 與 Clerk 對照表；例行自 monorepo 根跑 `verify-build-gates`。
+## 背景
+- 使用者收工前 **AO-CLOSE**；並要求在進度檔寫入「明日擴充其他自行託管」。
 
-## AO-CLOSE（收工）
-- 將執行 `powershell -ExecutionPolicy Bypass -File .\\scripts\\ao-close.ps1` 產出最新 `reports/{closeout,health,guard,status}`，並在 PASS 後推送（公司機 `git pull` 可續接）。
+## 已完成
+- **RAG 本機管線**（monorepo 根）：`rag_seed_and_embedding.ts`、`rag_query.ts`、`setup-rag-env.ps1`、根 `package.json` 指令；`.env.local` 僅本機。
+- **進度回寫**：`TASKS.md` 新增明日 **MinIO／Redis／Trigger.dev／n8n** 自架盤點項；`WORKLOG.md`、`CONVERSATION_MEMORY.md`、本日記。
+
+## 未完成
+- 其餘 stack 自架落地（明日 TASK 項）。
+- **雙機環境對齊**（`TASKS` 既有項）仍待使用者於另一台完成 §1.5／audit 後勾選。
+
+## 風險／阻塞
+- 無（收工以 `ao-close.ps1` 閘道結果為準）。
+
+## 下一步
+- 執行 **`.\scripts\ao-close.ps1`**（預設 verify + guard + integrated report + commit/push）。
+- 明日依 **`hetzner-self-host.env.example`** 與 runbook 推進 **MinIO、Redis、Trigger、n8n** 自架。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-02 17:46:15`
+- Time: `2026-04-05 20:56:27`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -230,8 +238,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260402-174615.md`
-- Closeout: `reports/closeout/closeout-20260402-174612.md`
+- Health: `reports/health/health-20260405-205625.md`
+- Closeout: `reports/closeout/closeout-20260405-205619.md`
 
 ## Action
 - No blocking issue detected.

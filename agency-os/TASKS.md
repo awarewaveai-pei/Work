@@ -10,6 +10,7 @@
 - [x] 建立 `lobster-factory` Phase 1 底座骨架（Supabase migrations + wc-core manifest + workflow 安全骨架）
 
 ## Next
+- [ ] **明日優先：擴充其餘自行託管元件（stack 對照 `hetzner-self-host.env.example`）**：在 **Supabase 自架**之外，依序盤點／落地——**MinIO（S3 相容 Storage）**、**Redis**、**Trigger.dev 自架**、**n8n 自架**（各項之 DB／加密金鑰／公開 URL、TLS 或反代、備份與憑證輪替）。正本對照 **`docs/operations/hetzner-full-stack-self-host-runbook.md`**、**`docs/operations/supabase-self-hosted-cutover-checklist.md`**；編排邊界仍依 **`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`**（Trigger vs n8n）。DoD：每元件有可驗證 endpoint（或內網+文件說明）、secrets 只進 vault／`.env`（不入庫）、`WORKLOG`／runbook 有決策或狀態一行。
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）**：兩台執行與功能一致——**新機／筆電首次**只跟 [`docs/overview/REMOTE_WORKSTATION_STARTUP.md`](docs/overview/REMOTE_WORKSTATION_STARTUP.md) **§1.5**（含 **§1.5.1**：Windows 本機 **MariaDB + PHP + WP-CLI** + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`；與 **Supabase／MCP** 分列，WordPress 仍需 MySQL 相容庫）；**之後每次開工**跟同檔 **§2**（`git pull`、`lobster-factory\packages\workflows` 之 `npm ci`、可選 wrappers、`verify-build-gates`、再 **`AO-RESUME`**）。要點：筆電安裝 **GitHub CLI**（`winget install --id GitHub.cli`；裝完重開終端或刷新 `PATH`）並 **`gh auth login`**；**Node** 大版本與桌機／CI 一致；**`scripts/secrets-vault.ps1`（DPAPI）與 Cursor `mcp.json`／MCP 為每台各自設定**（勿假設會跟著 `git pull`）。完成後勾選本項。
 - [x] 建立 WordPress 客戶交付「雙模式 SOP」（既有站接手 + 新站從零）並明確雲端 staging 優先，避免跨機重工：`docs/operations/WORDPRESS_CLIENT_DELIVERY_MODELS.md`
 - [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3）：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`（先選 2 個試點：1 既有站接手 + 1 新站建置）
@@ -110,5 +111,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-05 06:12:34 UTC_
+_Last synced: 2026-04-05 12:56:19 UTC_
 

@@ -3,9 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "rag:embed": "tsx --env-file=.env.local scripts/rag_seed_and_embedding.ts"
+    "rag:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-rag-env.ps1",
+    "rag:embed": "tsx scripts/rag_seed_and_embedding.ts",
+    "rag:query": "tsx scripts/rag_query.ts"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "@supabase/supabase-js": "^2.49.1",
     "tsx": "^4.19.3"
   }
