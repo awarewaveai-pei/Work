@@ -4,6 +4,10 @@
 
 ## 2026-04-06
 
+### 人因：環境變數「統一管理」— `start-here` 唯一對照節 + 根 `.env.local.example`
+- **問題**：多個 `.env*` 讓操作者感覺東一塊西一塊。  
+- **處置**：**`hetzner-self-host-start-here.md`** 新增 **「環境變數唯一對照」**（本機 RAG vs Phase1 Docker vs 型別提醒；輪替同一輪四步）；**monorepo 根**新增可入庫 **`.env.local.example`**；**.gitignore** 放行該範本；**`hetzner-phase1-core/.env.example`**、**`hetzner-self-host.env.example`** 頂部指回該節；**矩陣／change-impact-map** 補連動。  
+
 ### CI：移除 Trigger Cloud deploy（只自託管、單一敘述）
 - **刪除**：`.github/workflows/release-trigger-prod.yml`。  
 - **新增**：`.github/workflows/lobster-workflows-validate-main.yml`（`packages/workflows/**` 變更於 `main` 僅跑 **`npm run validate`**）。  
@@ -335,7 +339,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 07:49:28 UTC_
+_Last synced: 2026-04-06 08:05:53 UTC_
 
 ## 2026-03-20
 
@@ -874,6 +878,7 @@ _Last synced: 2026-04-06 07:49:28 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-06 12:32:28 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

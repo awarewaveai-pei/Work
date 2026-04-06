@@ -32,7 +32,8 @@
     "docs/operations/hetzner-self-host-start-here.md",
     "docs/operations/hetzner-stack-rollout-index.md",
     "docs/operations/airtable-to-supabase-migration-playbook.md",
-    "../README.md"
+    "../README.md",
+    "../.env.local.example"
   ],
   "rules": [
     {
@@ -40,6 +41,9 @@
       "targets": [
         "docs/operations/hetzner-stack-rollout-index.md",
         "docs/operations/hetzner-full-stack-self-host-runbook.md",
+        "docs/operations/hetzner-self-host.env.example",
+        "../.env.local.example",
+        "../lobster-factory/infra/hetzner-phase1-core/.env.example",
         "README.md",
         "AGENTS.md",
         "docs/README.md",

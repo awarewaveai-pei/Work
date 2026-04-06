@@ -129,5 +129,5 @@
 - `docs/operations/hetzner-self-host-start-here.md`
 - `docs/operations/hetzner-stack-rollout-index.md`
 
-_Last synced: 2026-04-06 07:49:28 UTC_
+_Last synced: 2026-04-06 08:05:53 UTC_
 

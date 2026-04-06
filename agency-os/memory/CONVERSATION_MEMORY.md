@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-06（環境變數統一入口）**：**`hetzner-self-host-start-here.md`** 設 **「環境變數唯一對照」**；monorepo 根 **`.env.local.example`**（RAG）；伺服器仍用 **`hetzner-phase1-core/.env`** — 兩實體檔不可避免，**輪替／步驟只認該節**。  
 - **2026-04-06（Trigger：CI 與自託管單一說法）**：**已自 GitHub Actions 移除** Trigger Cloud **`deploy`**；**`lobster-workflows-validate-main.yml`** 僅 **`npm run validate`**。生產 Trigger **只走自託管**；SSOT **`github-actions-trigger-prod-deploy.md`**（檔名保留舊連結）。  
 - **2026-04-06（Hetzner 人因入口）**：**人類只書籤** **`docs/operations/hetzner-self-host-start-here.md`**（一表跳轉 runbook／compose／長週期維運／Trigger SSOT）；**工程定義與進度表 Owner** 仍為 **`hetzner-stack-rollout-index.md`**。  
 - **2026-04-06（Hetzner 堆疊索引）**：新增 **`agency-os/docs/operations/hetzner-stack-rollout-index.md`**（Phase A 10 + Phase B 4、平面、SSOT 連動、**必查** `CHANGE_IMPACT_MATRIX`／`change-impact-map.json`）；**現況**：Hetzner 上已完成 **Supabase**、**WordPress**；其餘見 **`TASKS.md` Next**。  
@@ -326,5 +327,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-06 07:49:28 UTC_
+_Last synced: 2026-04-06 08:05:53 UTC_
 
