@@ -1,7 +1,8 @@
 param(
     [string]$WorkRoot = "",
     [switch]$SkipVerify,
-    [switch]$AllowUnexpectedDirty
+    [switch]$AllowUnexpectedDirty,
+    [switch]$SkipNpmCi
 )
 
 Set-StrictMode -Version Latest
@@ -31,6 +32,7 @@ $syncArgs = @(
 )
 if ($SkipVerify) { $syncArgs += "-SkipVerify" }
 if ($AllowUnexpectedDirty) { $syncArgs += "-AllowUnexpectedDirty" }
+if ($SkipNpmCi) { $syncArgs += "-SkipNpmCi" }
 
 & powershell.exe @syncArgs
 if ($LASTEXITCODE -ne 0) {

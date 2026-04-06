@@ -130,14 +130,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
 ### 做完後
 
 1. 讀 `agency-os\LAST_SYSTEM_STATUS.md`、`agency-os\TASKS.md`、`agency-os\reports\status\integrated-status-LATEST.md`。  
-2. 在 Cursor 輸入 **`AO-RESUME`**（且 **已**完成本節的 `git pull` 與閘道）。  
+2. 在 Cursor 對 AI 輸入 **`AO-RESUME`**：代理應在 monorepo 根執行 **`.\scripts\ao-resume.ps1`**（內含與 §2 等價的 pull、`npm ci`、`verify-build-gates`）；**無 AI／無終端權限**時，請在本機先手動跑該腳本再打 `AO-RESUME`。  
 3. **下一趟起**：換機以外的**日常開機**請改依 **§2**（不必重跑 §1.5 全段；除非重新 clone、換機、或依賴損毀需重建）。
 
 ---
 
 ## 2) 開機後必做四件事（約 5–15 分鐘）
 
-> **與 §1.5 的關係**：若你為 **新機** 且尚未跑過 §1.5 的「工具與依賴」區塊，請 **先完成 §1.5**，再視 §2 為**之後每次**的節奏。若 `lobster-factory\packages\workflows\package-lock.json` 有更新，務必在該目錄 **再執行** `npm ci`。
+> **與 §1.5 的關係**：若你為 **新機** 且尚未跑過 §1.5 的「工具與依賴」區塊，請 **先完成 §1.5**，再視 §2 為**之後每次**的節奏。若 `lobster-factory\packages\workflows\package-lock.json` 有更新，務必在該目錄 **再執行** `npm ci`。  
+> **單指令等價（與下列 1～3 步相同）**：在 monorepo 根執行 **`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**（內建 `-AutoFix`：對齊 `origin/main`、`npm ci`、`verify-build-gates`）。**在 Cursor 打 `AO-RESUME`** 時，代理應先跑此腳本（見 **`agency-os/.cursor/rules/30-resume-keyword.mdc`**）。
 
 1. **同步主線（先收斂到遠端真相）**  
    ```powershell
@@ -174,8 +175,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
    - `agency-os\TASKS.md`  
    - `agency-os\reports\status\integrated-status-LATEST.md`  
 
-   **至此已完成 Git 同步**後，在 Cursor 對 AI 輸入 **`AO-RESUME`**。  
-   > **重要**：`AO-RESUME` 會先檢查並嘗試 `git pull --ff-only`；但若你本機已有未提交變更/衝突，pull 仍可能失敗。為了穩定，建議先手動完成 §2 第 1 步，再打 `AO-RESUME`。
+   **至此已完成 Git 同步**後，在 Cursor 對 AI 輸入 **`AO-RESUME`**（代理應先執行 **`.\scripts\ao-resume.ps1`** 含 §2 體檢；若本機未提交／衝突導致 pull 失敗，仍須先整理 `git status`）。  
+   > **Human-only**：若不用 AI，在 monorepo 根只跑 **`.\scripts\ao-resume.ps1`** 即可完成 §2 的 pull／`npm ci`／閘道（工程面與「打完 `AO-RESUME`」等價）。
 
 ## 2.5 日內 Git 節奏（checkpoint 與收工）— **單一真相（人類可讀）**
 
@@ -183,7 +184,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
 
 | 階段 | 誰做什麼 | Git |
 |------|-----------|-----|
-| **`AO-RESUME`（開工前檢）** | 你：在 Cursor 打關鍵字；代理：跑 `ao-resume.ps1` preflight、讀進度檔 | **不**為「開場」自動空 commit；僅對齊／閘道／列出自上次以來的 `agency-os/reports/*` 增量 |
+| **`AO-RESUME`（開工前檢）** | 你：在 Cursor 打關鍵字；代理：在 repo 根跑 **`ao-resume.ps1`**（`pull`、`npm ci`、**`verify-build-gates`**）、讀進度檔 | **不**為「開場」自動空 commit；並列出自上次 **`ao-resume-last.txt`** 以來的 `agency-os/reports/*` 增量 |
 | **工作中（至收工前）** | 你：下任務；代理：實作與驗證 | 每完成一個**可敘述、已驗證**的里程碑：代理**應自動**在 monorepo 根執行 **`scripts/commit-checkpoint.ps1`**（**本機 commit**，**不 push**）。**你不必手動**跑該腳本。 |
 | **`AO-CLOSE`（收工）** | 你：關鍵字或明示收工；代理：更新 `TASKS`／`WORKLOG`／`memory` 後跑 `ao-close.ps1` | 閘道 **PASS** 後 **`git add` → `commit`（收斂殘留）→ `git push`**；可一次推上當日**多顆**本機 commit。 |
 
@@ -209,6 +210,8 @@ git status -sb
 git rev-list --left-right --count HEAD...origin/main
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 ```
+
+（若**剛成功**跑過 **`.\scripts\ao-resume.ps1`** 且未再改檔，最後一行 **`verify-build-gates`** 可省略以避免重複。）
 
 判讀重點：
 - `git status -sb` 只看到 `## main...origin/main` 才是乾淨工作樹（有 `M`/`??` 就是 dirty）。

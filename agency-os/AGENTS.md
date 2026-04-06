@@ -38,9 +38,9 @@
 ## 快速續接關鍵字
 - **Hetzner 自架（人類單頁入口）**：`docs/operations/hetzner-self-host-start-here.md`（其餘路徑從表內跳轉；堆疊定義仍以 `hetzner-stack-rollout-index.md` 為 Owner）。
 - 跨系統運作模型（AO 治理 + 龍蝦執行）：`docs/overview/ao-lobster-operating-model.md`（作為事件節奏與責任分工的總入口）。
-- 使用者輸入 `AO-RESUME` 時，必須先讀取記憶與進度檔後再回覆。
-- **雙機協作硬性說明**：`AO-RESUME` 會先檢查遠端並**嘗試** `git pull --ff-only`；遇本機未提交變更／衝突仍可能失敗，**實務上建議**先在 monorepo 根手動 **`git fetch origin`** + **`git pull --ff-only origin main`**（必要時 **`git pull --rebase origin main`**），再續接讀檔；否則進度檔可能過期、`git push` 會被拒。完整開工順序、30 秒自檢：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**（含 `lobster-factory\packages\workflows` 之 `npm ci` 與閘道）。
-- 若已啟用 Autopilot Phase1，開機會自動執行 `scripts/ao-resume.ps1 -SkipVerify -AllowUnexpectedDirty`（**不**取代上述 `git pull`；Autopilot 只管本機 preflight，不管遠端是否超前）。
+- 使用者輸入 `AO-RESUME` 時：**可執行終端則先**在 monorepo 根跑 **`.\scripts\ao-resume.ps1`**（`git fetch`、必要時 **`pull --ff-only origin main`**、**`lobster-factory\packages\workflows`** 之 **`npm ci`**、可選 **`mcp-local-wrappers`** 之 **`npm ci`**、**`verify-build-gates`**），**PASS 後**再讀記憶與進度檔（細節見 **`.cursor/rules/30-resume-keyword.mdc`**）。無終端時請先手動跑同一腳本再打 `AO-RESUME`。
+- **雙機**：上述腳本已覆蓋「先手動 pull」慣例；**pull 失敗**（衝突／非快轉）仍須依 `git status` 整理後重試。步驟拆解：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **§1.5**、**§2**、§2.3。
+- 若已啟用 Autopilot Phase1，開機會自動執行 `scripts/ao-resume.ps1 -SkipVerify -AllowUnexpectedDirty`（仍會 **`git pull`**、**`npm ci`**；略過 **`verify-build-gates`**，與 Cursor 內人工 `AO-RESUME` 全閘道不同）。
 - 回覆格式固定為：`已完成`、`目前進度`、`下一步`。
 - `目前進度` 必須包含龍蝦工廠欄位：`目前 Milestone`、`今日 DoD`、`阻塞/風險`。
 - 使用者輸入 **`AO-CLOSE`**（關鍵字不變）或明確表達要關機/收工時，必須先執行 **closeout**，再輸出：`今日完成`、`今日未完成`、`連動檢查`、`明日優先`。

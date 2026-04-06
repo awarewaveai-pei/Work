@@ -1,7 +1,8 @@
 param(
     [string]$WorkRoot = "",
     [switch]$SkipVerify,
-    [switch]$AllowUnexpectedDirty
+    [switch]$AllowUnexpectedDirty,
+    [switch]$SkipNpmCi
 )
 
 Set-StrictMode -Version Latest

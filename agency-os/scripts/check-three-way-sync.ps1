@@ -3,7 +3,8 @@ param(
     [switch]$SkipVerify,
     [switch]$StrictDirty,
     [switch]$AutoFix,
-    [switch]$AllowUnexpectedDirty
+    [switch]$AllowUnexpectedDirty,
+    [switch]$SkipNpmCi
 )
 
 Set-StrictMode -Version Latest
@@ -43,6 +44,7 @@ try {
     Write-Host "Work root: $WorkRoot"
     Write-Host ""
 
+    # IDE / generator noise (safe to git restore). Do NOT list preflight scripts here — restore would wipe in-flight edits.
     $knownNoise = @(
         ".cursor/rules/00-session-bootstrap.mdc",
         ".cursor/rules/30-resume-keyword.mdc",
@@ -50,10 +52,6 @@ try {
         "agency-os/.cursor/rules/00-session-bootstrap.mdc",
         "agency-os/.cursor/rules/30-resume-keyword.mdc",
         "scripts/generate-integrated-status-report.ps1",
-        "scripts/check-three-way-sync.ps1",
-        "agency-os/scripts/check-three-way-sync.ps1",
-        "scripts/ao-resume.ps1",
-        "agency-os/scripts/ao-resume.ps1",
         "scripts/autopilot-phase1.ps1",
         "agency-os/scripts/autopilot-phase1.ps1",
         "scripts/notify-ops.ps1",
@@ -65,6 +63,14 @@ try {
         ".cursor/settings.json",
         "agency-os/.cursor/settings.json",
         "agency-os/settings/local.permissions.json"
+    )
+
+    # Local WIP on these must NOT be stashed by AutoFix (would lose work). If behind origin and only these are dirty, refuse pull — commit first.
+    $preflightScriptPaths = @(
+        "scripts/check-three-way-sync.ps1",
+        "agency-os/scripts/check-three-way-sync.ps1",
+        "scripts/ao-resume.ps1",
+        "agency-os/scripts/ao-resume.ps1"
     )
 
     function Get-DirtyPaths {
@@ -104,13 +110,20 @@ try {
 
         if (-not $isLatest) {
             $dirtyForPull = @(Get-DirtyPaths)
-            if ($dirtyForPull.Count -gt 0) {
+            $dirtyBlockingPull = @()
+            foreach ($p in $dirtyForPull) {
+                if ($preflightScriptPaths -notcontains $p) { $dirtyBlockingPull += $p }
+            }
+            if ($dirtyBlockingPull.Count -gt 0) {
                 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
                 git stash push -m "auto-sync-before-pull-$stamp" | Out-Null
+            } elseif ($dirtyForPull.Count -gt 0) {
+                Write-Result -Label "AutoFix pull" -Pass $false -Detail "Behind origin/main with local edits to preflight scripts only — commit or stash those files, then retry."
+                exit 1
             }
-            git pull --ff-only | Out-Null
+            git pull --ff-only origin main | Out-Null
             if ($LASTEXITCODE -ne 0) {
-                Write-Result -Label "AutoFix pull" -Pass $false -Detail "Unable to fast-forward pull"
+                Write-Result -Label "AutoFix pull" -Pass $false -Detail "Unable to fast-forward pull (origin main)"
                 exit 1
             }
             git fetch origin | Out-Null
@@ -122,7 +135,7 @@ try {
         $postFixDirty = @(Get-DirtyPaths)
         $postFixUnexpected = @()
         foreach ($p in $postFixDirty) {
-            if ($knownNoise -notcontains $p) { $postFixUnexpected += $p }
+            if ($knownNoise -notcontains $p -and $preflightScriptPaths -notcontains $p) { $postFixUnexpected += $p }
         }
         if (($postFixUnexpected.Count -gt 0) -and (-not $AllowUnexpectedDirty)) {
             $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -140,7 +153,7 @@ try {
     $dirtyPaths = @(Get-DirtyPaths)
     $unexpectedDirty = @()
     foreach ($p in $dirtyPaths) {
-        if ($knownNoise -notcontains $p) {
+        if ($knownNoise -notcontains $p -and $preflightScriptPaths -notcontains $p) {
             $unexpectedDirty += $p
         }
     }
@@ -154,10 +167,70 @@ try {
         if ($dirtyPaths.Count -eq 0) {
             Write-Result -Label "Working tree" -Pass $true -Detail "Clean"
         } else {
-            Write-Result -Label "Working tree" -Pass $true -Detail ("Only known noise: " + ($dirtyPaths -join ", "))
+            $onlyPreflight = (($dirtyPaths | Where-Object { $preflightScriptPaths -notcontains $_ }).Count -eq 0)
+            if ($onlyPreflight) {
+                Write-Result -Label "Working tree" -Pass $true -Detail ("Preflight script WIP (allowed): " + ($dirtyPaths -join ", "))
+            } else {
+                Write-Result -Label "Working tree" -Pass $true -Detail ("Only known noise: " + ($dirtyPaths -join ", "))
+            }
         }
     } else {
         Write-Result -Label "Working tree" -Pass $false -Detail ("Unexpected dirty files: " + ($unexpectedDirty -join ", "))
+    }
+
+    $npmPass = $true
+    if ($SkipNpmCi) {
+        Write-Result -Label "npm ci (workflows + optional wrappers)" -Pass $true -Detail "Skipped by -SkipNpmCi"
+    } elseif (-not $isLatest) {
+        Write-Result -Label "npm ci (workflows + optional wrappers)" -Pass $true -Detail "Skipped (HEAD != origin/main; FINAL will fail below)"
+    } elseif (-not $isCleanEnough) {
+        Write-Result -Label "npm ci (workflows + optional wrappers)" -Pass $true -Detail "Skipped (working tree; FINAL will fail below)"
+    } else {
+        $wfRoot = Join-Path $WorkRoot "lobster-factory\packages\workflows"
+        $wfLock = Join-Path $wfRoot "package-lock.json"
+        if (-not (Test-Path -LiteralPath $wfLock)) {
+            Write-Result -Label "npm ci (lobster workflows)" -Pass $false -Detail "Missing package-lock.json under lobster-factory/packages/workflows"
+            $npmPass = $false
+        } else {
+            Write-Host "== npm ci: lobster-factory/packages/workflows ==" -ForegroundColor Cyan
+            Push-Location $wfRoot
+            try {
+                $prevEap = $ErrorActionPreference
+                $ErrorActionPreference = "Continue"
+                & npm ci 2>&1 | Out-Host
+                $ErrorActionPreference = $prevEap
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Result -Label "npm ci (lobster workflows)" -Pass $false -Detail ("npm ci exit " + $LASTEXITCODE)
+                    $npmPass = $false
+                } else {
+                    Write-Result -Label "npm ci (lobster workflows)" -Pass $true -Detail "OK"
+                }
+            } finally {
+                Pop-Location
+            }
+        }
+        if ($npmPass) {
+            $wrapRoot = Join-Path $WorkRoot "mcp-local-wrappers"
+            $wrapLock = Join-Path $wrapRoot "package-lock.json"
+            if (Test-Path -LiteralPath $wrapLock) {
+                Write-Host "== npm ci: mcp-local-wrappers ==" -ForegroundColor Cyan
+                Push-Location $wrapRoot
+                try {
+                    $prevEap = $ErrorActionPreference
+                    $ErrorActionPreference = "Continue"
+                    & npm ci 2>&1 | Out-Host
+                    $ErrorActionPreference = $prevEap
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Result -Label "npm ci (mcp-local-wrappers)" -Pass $false -Detail ("npm ci exit " + $LASTEXITCODE)
+                        $npmPass = $false
+                    } else {
+                        Write-Result -Label "npm ci (mcp-local-wrappers)" -Pass $true -Detail "OK"
+                    }
+                } finally {
+                    Pop-Location
+                }
+            }
+        }
     }
 
     $verifyPass = $true
@@ -175,7 +248,7 @@ try {
         Write-Result -Label "Correctness gate (verify-build-gates)" -Pass $true -Detail "Skipped by -SkipVerify"
     }
 
-    $finalPass = $isLatest -and $isCleanEnough -and $verifyPass
+    $finalPass = $isLatest -and $isCleanEnough -and $npmPass -and $verifyPass
     Write-Host ""
     Write-Result -Label "FINAL (Latest + Correctness)" -Pass $finalPass -Detail $(if ($finalPass) { "Repo is synced and valid." } else { "Check failed items above." })
 

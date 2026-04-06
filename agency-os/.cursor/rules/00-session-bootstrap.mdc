@@ -19,8 +19,8 @@ If those files are not found in the current opened folder, retry under `agency-o
 with the same filenames before declaring context missing.
 
 ## 雙機協作（AO-RESUME 與 Git）
-- **`AO-RESUME` 會先檢查遠端並嘗試 `git pull --ff-only`**；若本機有未提交變更／衝突仍可能失敗。  
-- **建議**：在 **monorepo 根**先 `git fetch origin`，未與 `origin/main` 對齊則先 **`git pull --ff-only origin main`**（必要時 **`git pull --rebase origin main`**），再執行讀檔與後續工作。另一台 **AO-CLOSE** push 後，本機若不 pull，`TASKS`／`WORKLOG`／`memory` 可能落後，且 **push 會被拒**。  
+- **聊天關鍵字 `AO-RESUME`**：代理**先**在 monorepo 根執行 **`.\scripts\ao-resume.ps1`**（含 fetch、`pull --ff-only origin main`、workflows **`npm ci`**、**`verify-build-gates`**），再讀進度檔；見 **`30-resume-keyword.mdc`**。若本機有未提交變更／衝突，**pull** 仍可能失敗。  
+- **另一台 AO-CLOSE push 後**：本機若不 pull／不跑 preflight，`TASKS`／`WORKLOG`／`memory` 可能落後，且 **push 會被拒**。  
 - 完整步驟與 30 秒自檢：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**、§2.3。
 
 At the beginning of every new conversation, output this exact structure:
