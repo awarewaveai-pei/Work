@@ -1,6 +1,7 @@
 # Hetzner Phase 1 core stack (compose)
 
-**長期營運正本（多週期／可還原／可換人）**：[`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md) — 映像釘選、備份與 RPO/RTO、TLS、升級節奏、汰換判準。部署前先讀 §1～§3。
+**長期營運正本（多週期／可還原／可換人）**：[`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md) — 映像釘選、備份與 RPO/RTO、TLS、升級節奏、汰換判準。部署前先讀 §1～§3。  
+**維護日曆（週／月／季／年勾選）**：[`MAINTENANCE_CALENDAR.md`](./MAINTENANCE_CALENDAR.md)。
 
 **目的**：在 **Supabase 已另機／另 compose 運行** 的前提下，於同一台 Hetzner（或第二台）起 **Nginx + Redis + n8n + WordPress + Node API + Next.js Admin**，形成可驗收的第一階段底座。
 
@@ -84,7 +85,7 @@ chmod +x scripts/backup-phase1.sh   # Linux 上
 
 ## Related
 
-- **長期營運契約**：[`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md)
+- **長期營運契約**：[`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md) · [`MAINTENANCE_CALENDAR.md`](./MAINTENANCE_CALENDAR.md)
 - `agency-os/docs/operations/hetzner-self-host.env.example`
 - `agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`

@@ -2,7 +2,8 @@
 
 > **Owner（本檔）**：自架 **Phase 1 core compose**（Nginx / Redis / n8n / WordPress / Node API / Next Admin）在 **單機或小集群** 上如何**活得久、換人仍能接、出事能還原**。  
 > **誠實邊界**：沒有任何一組 `docker-compose.yml` 能在 **30 年內完全不改版**；本檔追求的是 **可替換零件、可審計流程、可演練還原**，而不是鎖死某一個供應商版本號。  
-> **上層紀律**：`agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`（全 monorepo）；**資料主權（SoR）**仍在 **Supabase／Postgres** — 見 `agency-os/docs/architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md`。
+> **上層紀律**：`agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`（全 monorepo）；**資料主權（SoR）**仍在 **Supabase／Postgres** — 見 `agency-os/docs/architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md`。  
+> **可複製核對表**：[`MAINTENANCE_CALENDAR.md`](./MAINTENANCE_CALENDAR.md)（週／月／季／年）。
 
 ---
 
@@ -89,6 +90,7 @@
 
 ## 8. Related（單句 + 連結，避免雙寫）
 
+- 週期勾選：`MAINTENANCE_CALENDAR.md`  
 - 操作入口：`README.md`  
 - 全棧階段：`agency-os/docs/operations/hetzner-full-stack-self-host-runbook.md`  
 - Supabase 切線：`agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`  
