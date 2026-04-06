@@ -6,7 +6,7 @@
 
 ### 雙機／遠端：`origin/main` 已與筆電對齊（公司機開工前必 pull）
 - **動作**：筆電於通過 **`verify-build-gates`**（含 `system-health-check` 100%）後 **`git push origin main`**。  
-- **`origin/main` HEAD**：`6783130`（至 `02d2b1f..6783130` 共 14 commit；含 CI 改 **validate-only**、`start-here`／env 對照、Hetzner 連動、`machine-environment-audit`／bootstrap 腳本健壯性等）。  
+- **對點（兩邊 repo 一致）**：公司機於 monorepo 根執行 **`git fetch origin`** 後，**`git rev-parse HEAD`** 應等於 **`git rev-parse origin/main`**（皆為 **`main`** 最新）。筆電收斂前曾落地之 **工作批次**（敘述用）：**`02d2b1f..6783130`**（14 commit：CI **validate-only**、`start-here`／env、Hetzner、audit／bootstrap 等）；其後另有 **handoff／紀錄連動** 之 **追加 commit** — **請以遠端 `main` 頂端為準，勿依賴手抄 SHA**。  
 - **公司桌機（必做，順序勿跳）**：在 **monorepo 根**執行 **`git fetch origin`** → **`git pull --ff-only origin main`** → **`Set-Location .\lobster-factory\packages\workflows; npm ci`** →（若有 `mcp-local-wrappers` 則同樣 `npm ci`）→ **`powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1`** → 再 **`AO-RESUME`**。正本：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§2**。  
 - **無法靠 Git 同步的項目（兩台各自一份，內容需你人工一致）**：**`.env.local`**、**DPAPI vault**、**`%USERPROFILE%\.cursor\mcp.json`**、本機 **MariaDB／PHP／WP 資料目錄**（策略見 **`hetzner-self-host-start-here.md`「環境變數唯一對照」** 與 **§1.5.1**）。  
 
