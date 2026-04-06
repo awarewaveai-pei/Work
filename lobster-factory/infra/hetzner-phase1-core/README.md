@@ -47,7 +47,7 @@ curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯
 - n8n：`http://YOUR_HOST/n8n/`
 - WordPress：`http://YOUR_HOST/wp/`
 
-WordPress 第一次安裝若耗時較長，`wordpress` 的 `healthcheck` 有較長 `start_period`；若 `nginx` 遲遲不起，看 `docker compose logs wordpress nginx`。
+WordPress 第一次安裝若耗時較長，`wordpress` 的 `healthcheck` 有較長 `start_period`；若 `nginx` 遲遲不起，看 `docker compose logs wordpress nginx`。若映像檔無 `curl`，將 compose 裡 WordPress `healthcheck` 改為 `wget -qO- http://127.0.0.1/` 同效。
 
 ## 備份（Phase 1 最小份）
 
