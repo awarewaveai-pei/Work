@@ -17,13 +17,13 @@
 
 - [ ] **基礎映像 CVE**：n8n、WordPress、MariaDB、Redis、Nginx — 有無 **緊急安全釋出**（有則 **staging 先**）  
 - [ ] **備份**：確認 `backup-phase1.sh` 或等效任務 **有執行**；抽查 **異地** 是否收到檔案  
-- [ ] **Supabase（SoR）**：依 `supabase-self-hosted-cutover-checklist.md`／營運 SOP 的備份與監控（**不在**本 compose 內）
+- [ ] **Supabase（SoR）**：依 monorepo **`agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`**／營運 SOP 的備份與監控（**不在**本 compose 內）
 
 ---
 
 ## 每季
 
-- [ ] **祕密輪替**：DB root／WP DB user／API keys（依 `security-secrets-policy.md`）  
+- [ ] **祕密輪替**：DB root／WP DB user／API keys（依 monorepo **`agency-os/docs/operations/security-secrets-policy.md`**）  
 - [ ] **`N8N_IMAGE_TAG`**（及其他第三方 tag）：是否仍 **刻意**使用 `latest`？production 應 **semver 或 digest**（見 `LONG_TERM_OPS.md` §3）  
 - [ ] **TLS／DNS**：憑證到期日、自動續期是否正常  
 - [ ] **防火牆**：SSH 仍限來源？未對外開 DB／Redis？

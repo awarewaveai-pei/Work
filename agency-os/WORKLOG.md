@@ -12,6 +12,9 @@
 ### Hetzner Phase 1：週期維護日曆 + TASKS 錨點
 - **新增**：`lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`（週／月／季／年可勾選）；`TASKS.md` **Next** 增加長週期營運一條；`memory/CONVERSATION_MEMORY.md` 補 2026-04-06 脈絡。
 
+### Hetzner Phase 1：連動文件稽核（路徑／缺漏收斂）
+- **修正**：`TASKS.md` 長週期項 **`LONG_TERM_OPS.md`** 改為 **完整 repo 路徑**；`LONG_TERM_OPERATING_DISCIPLINE.md` Related 補 **`MAINTENANCE_CALENDAR.md`**；`MAINTENANCE_CALENDAR.md` 內 **Supabase／security** 改為 **`agency-os/docs/operations/...` 可解析路徑**；full-stack runbook 階段 0 一併要求閱讀維護日曆；**`hetzner-self-host.env.example`** 指回 **`hetzner-phase1-core/.env.example`**；`CHANGE_IMPACT_MATRIX` **LONG_TERM_OPS** 列補 **`hetzner-self-host.env.example`**。
+
 ### Hetzner Phase 1 compose：production-hardening 一版
 - **路徑**：`lobster-factory/infra/hetzner-phase1-core/`  
 - **變更摘要**：`docker-compose` 改為 **Dockerfile 多階段建置**（Node API + Next standalone）、**Redis／MariaDB／n8n／WP／兩個 Node 服務** healthcheck、**Nginx 待 healthy 後**再啟；Nginx 補 **Forwarded** 標頭與基礎安全標頭；WordPress 以 **`WORDPRESS_PUBLIC_URL` + `WORDPRESS_CONFIG_EXTRA`** 對齊子路徑；新增 **`scripts/backup-phase1.sh`**（MariaDB + wp 目錄 tarball）；README 補 **rebuild next-admin** 說明、驗收、dev 附錄；runbook Related 標註備份腳本。  
@@ -313,7 +316,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 07:13:44 UTC_
+_Last synced: 2026-04-06 07:18:07 UTC_
 
 ## 2026-03-20
 
@@ -852,6 +855,7 @@ _Last synced: 2026-04-06 07:13:44 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-06 12:32:28 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

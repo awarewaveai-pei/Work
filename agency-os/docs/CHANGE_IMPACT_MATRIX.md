@@ -13,7 +13,7 @@
 | `docs/overview/agency-os-complete-system-introduction.md` | `README.md`, `docs/README.md`, `tenants/company-p1-pilot/01_COMMANDER_SYSTEM_GUIDE.md`, `tenants/company-p1-pilot/02_CLIENT_WORKSPACE_GUIDE.md`, `tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md`, `tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md` |
 | `docs/overview/EXECUTION_DASHBOARD.md` | `docs/overview/REMOTE_WORKSTATION_STARTUP.md`, `docs/overview/INTEGRATED_STATUS_REPORT.md`, `docs/operations/end-of-day-checklist.md`, `memory/CONVERSATION_MEMORY.md`, `AGENTS.md`, `RESUME_AFTER_REBOOT.md` |
 | `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md` | `AGENTS.md`, `README.md`, `docs/README.md`, `docs/overview/repo-template-locations.md`, `docs/architecture/decisions/README.md`, `tenants/templates/core/RELEASE_GATES_CHECKLIST.md`（§ 編號／Related）, `memory/CONVERSATION_MEMORY.md`, `TASKS.md`（若節奏表與 Next 對齊時）, `WORKLOG.md` |
-| `../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md` | `../../lobster-factory/infra/hetzner-phase1-core/README.md`, `../../lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`, `../../lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`, `../../lobster-factory/infra/hetzner-phase1-core/.env.example`, `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`, `docs/operations/hetzner-full-stack-self-host-runbook.md`, `TASKS.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `WORKLOG.md` |
+| `../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md` | `../../lobster-factory/infra/hetzner-phase1-core/README.md`, `../../lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`, `../../lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`, `../../lobster-factory/infra/hetzner-phase1-core/.env.example`, `docs/operations/hetzner-self-host.env.example`, `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`, `docs/operations/hetzner-full-stack-self-host-runbook.md`, `TASKS.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `WORKLOG.md` |
 | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md` | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md`, `README.md`, `docs/README.md`, `TASKS.md`, `WORKLOG.md` |
 | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md` | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`, `README.md`, `docs/README.md`, `TASKS.md`, `WORKLOG.md` |
 | `docs/architecture/decisions/README.md` | `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`, `docs/CHANGE_IMPACT_MATRIX.md`（若新增 ADR 影響治理時）, `WORKLOG.md` |
@@ -88,5 +88,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-06 07:13:44 UTC_
+_Last synced: 2026-04-06 07:18:07 UTC_
 

@@ -34,7 +34,7 @@
 
 ### 階段 0 — 決策與邊界（1 次定案）
 
-- [ ] 讀 **Phase 1 compose 長期營運契約**：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`（RPO/RTO、映像釘選、還原演練節奏）。  
+- [ ] 讀 **Phase 1 compose 長期營運**：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`（RPO/RTO、映像釘選、還原與汰換）＋ **`MAINTENANCE_CALENDAR.md`**（週／月／季／年勾選）。  
 - [ ] 資料是否必須留在自管機房（影響 **LLM / embedding 用雲端或自架**）。  
 - [ ] 網域規劃：`api.`、`db.` 不建議對外公開管理埠；僅 `app.` / `n8n.` / `wp.` 等經由 **443**。  
 - [ ] **備份 RPO/RTO**（Postgres + 物件儲存 + WordPress 檔案）。  
