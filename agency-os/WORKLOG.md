@@ -4,6 +4,12 @@
 
 ## 2026-04-06
 
+### 筆電 §1.5.1：PHP + VC++ + WP-CLI + 本機 WP bootstrap（腳本健壯性）
+- **winget**：`PHP.PHP.NTS.8.4`；**VC++** 升級至與 PHP 相容（修正 `VCRUNTIME140.dll` 版本警告）。  
+- **WP-CLI**：`setup-wp-cli-windows.ps1`；使用者 **PATH** 已 append `%LOCALAPPDATA%\Programs\wp-cli`。  
+- **bootstrap**：`bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`；**WP_ROOT** `D:\Work\.scratch\wordpress-pilot`。  
+- **腳本修正**：`Test-MysqlReady` 在 MariaDB 未啟動時不因 mysql stderr 終止；`wp core is-installed`／`install`／`option get` 段落避免 PHP Warning 走 stderr 觸發 **Stop**。  
+
 ### 人因：環境變數「統一管理」— `start-here` 唯一對照節 + 根 `.env.local.example`
 - **問題**：多個 `.env*` 讓操作者感覺東一塊西一塊。  
 - **處置**：**`hetzner-self-host-start-here.md`** 新增 **「環境變數唯一對照」**（本機 RAG vs Phase1 Docker vs 型別提醒；輪替同一輪四步）；**monorepo 根**新增可入庫 **`.env.local.example`**；**.gitignore** 放行該範本；**`hetzner-phase1-core/.env.example`**、**`hetzner-self-host.env.example`** 頂部指回該節；**矩陣／change-impact-map** 補連動。  
@@ -339,7 +345,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 08:05:53 UTC_
+_Last synced: 2026-04-06 08:49:35 UTC_
 
 ## 2026-03-20
 
@@ -878,6 +884,7 @@ _Last synced: 2026-04-06 08:05:53 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-06 12:32:28 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

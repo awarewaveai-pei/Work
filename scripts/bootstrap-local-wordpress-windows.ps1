@@ -51,8 +51,15 @@ function Get-RepoRoot {
 
 function Test-MysqlReady {
     param([string]$MysqlExe)
-    $probe = & $MysqlExe -u root -e "SELECT 1" 2>&1
-    return ($LASTEXITCODE -eq 0)
+    # mysql prints errors to stderr; with $ErrorActionPreference=Stop the probe would throw instead of returning $false.
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $null = & $MysqlExe -u root -e "SELECT 1" 2>&1
+        return ($LASTEXITCODE -eq 0)
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
 }
 
 function Wait-MysqlReady {
@@ -179,14 +186,22 @@ if (-not (Test-Path -LiteralPath (Join-Path $WpRoot "wp-config.php"))) {
     & wp config create --path="$WpRoot" --dbname=$DbName --dbuser=root --dbpass= --dbhost=127.0.0.1
 }
 
-$installed = & wp core is-installed --path="$WpRoot" 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Running wp core install..." -ForegroundColor Cyan
-    & wp core install --path="$WpRoot" --url=http://localhost --title=Pilot --admin_user=admin --admin_password=change-me --admin_email=dev@local.test
-} else {
-    Write-Host "WordPress already installed at $WpRoot" -ForegroundColor Green
-}
+# WP / PHP may emit boilerplate warnings to stderr; do not let them stop the script under $ErrorActionPreference Stop.
+$prevEapWp = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $null = & wp core is-installed --path="$WpRoot" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Running wp core install..." -ForegroundColor Cyan
+        $null = & wp core install --path="$WpRoot" --url=http://localhost --title=Pilot --admin_user=admin --admin_password=change-me --admin_email=dev@local.test 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "wp core install failed (exit $LASTEXITCODE)" }
+    } else {
+        Write-Host "WordPress already installed at $WpRoot" -ForegroundColor Green
+    }
 
-$siteUrl = & wp option get siteurl --path="$WpRoot"
+    $siteUrl = (& wp option get siteurl --path="$WpRoot" 2>&1 | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) -join ""
+} finally {
+    $ErrorActionPreference = $prevEapWp
+}
 Write-Host "siteurl: $siteUrl" -ForegroundColor Green
 Write-Host "WP_ROOT for lobster: $WpRoot" -ForegroundColor Cyan
