@@ -4,6 +4,11 @@
 
 ## 2026-04-06
 
+### CI：移除 Trigger Cloud deploy（只自託管、單一敘述）
+- **刪除**：`.github/workflows/release-trigger-prod.yml`。  
+- **新增**：`.github/workflows/lobster-workflows-validate-main.yml`（`packages/workflows/**` 變更於 `main` 僅跑 **`npm run validate`**）。  
+- **SSOT**：`docs/operations/github-actions-trigger-prod-deploy.md` 改寫；**`hetzner-stack-rollout-index`**／**`hetzner-self-host-start-here`**／**`TASKS` Next**／**`end-of-day-checklist`**／**`lobster-factory/README`**／**`.github/workflows/README`**／**`CHANGE_IMPACT_MATRIX`** 同步。**建議**：GitHub repo 可刪除 **`TRIGGER_*` Secrets**（CI 已不用），避免誤解。  
+
 ### Hetzner：`hetzner-self-host-start-here` 全庫入口接線（人因單頁）
 - **目的**：使用者要求「統管一處、不要東一塊西一塊」— **只書籤** `docs/operations/hetzner-self-host-start-here.md`。  
 - **接線**：`agency-os/README.md`（每天開工卡）、根 `README.md` 快速連結、`docs/README.md`、`AGENTS.md`（快速關鍵字）、`TASKS.md` Next（Hetzner 條首句）、`hetzner-full-stack-self-host-runbook.md` 頂部、`hetzner-stack-rollout-index.md` 檔頭、`CHANGE_IMPACT_MATRIX` 新增主檔列並擴充 rollout 列必查、`change-impact-map.json`（watch + rule + rollout targets 補 `start-here`）。
@@ -330,7 +335,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 07:44:32 UTC_
+_Last synced: 2026-04-06 07:49:28 UTC_
 
 ## 2026-03-20
 
@@ -869,6 +874,7 @@ _Last synced: 2026-04-06 07:44:32 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-06 12:32:28 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

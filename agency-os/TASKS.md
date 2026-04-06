@@ -11,7 +11,7 @@
 
 ## Next
 - [ ] **自架 Phase 1（Hetzner compose）長週期營運**：對照 **`lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`**（週／月／季／年）與 **`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`**；**本季至少一次**：`.env` 內 **`N8N_IMAGE_TAG`** 審核（production 避免無意義長期 `latest`）、備份 **異地**抽查、`WORKLOG` 一句留痕。**每年至少一次**：隔離 VM **還原演練**（WP + 本堆疊；Supabase 另依切線清單）。  
-- [ ] **Hetzner Phase A 核心補齊** — **人類只書籤**：**`docs/operations/hetzner-self-host-start-here.md`**（一表跳轉全文）。**工程正本**：**`docs/operations/hetzner-stack-rollout-index.md`**（Phase A 10 + Phase B 4、平面、連動列表；**變更時查** `docs/CHANGE_IMPACT_MATRIX.md` 該列）。**現況（2026-04-06）**：**Supabase**、**WordPress** 已在 Hetzner；**待部署／驗證**——**pgvector**（若尚未）、**Redis**、**n8n**、**Trigger.dev**（**雲端或自架**擇一，`WORKLOG` 註記）、**Node API**、**Next.js Admin**、**Nginx**（或由 **`lobster-factory/infra/hetzner-phase1-core`** 一次起除 Supabase/Trigger 外多項）、**備份＋還原演練**。**Phase B**（MinIO、Sentry、PostHog、Langfuse）延後但索引必同步。細部步驟 **`hetzner-full-stack-self-host-runbook.md`**；型別提示 **`hetzner-self-host.env.example`**；編排邊界 **`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`**。DoD：索引表「專案狀態」更新、`WORKLOG` 一句、每新元件有可驗證 endpoint、secrets 不入庫。
+- [ ] **Hetzner Phase A 核心補齊** — **人類只書籤**：**`docs/operations/hetzner-self-host-start-here.md`**（一表跳轉全文）。**工程正本**：**`docs/operations/hetzner-stack-rollout-index.md`**（Phase A 10 + Phase B 4、平面、連動列表；**變更時查** `docs/CHANGE_IMPACT_MATRIX.md` 該列）。**現況（2026-04-06）**：**Supabase**、**WordPress** 已在 Hetzner；**待部署／驗證**——**pgvector**（若尚未）、**Redis**、**n8n**、**Trigger.dev**（**僅自架**；`WORKLOG` 註記 deploy 流程）、**Node API**、**Next.js Admin**、**Nginx**（或由 **`lobster-factory/infra/hetzner-phase1-core`** 一次起除 Supabase/Trigger 外多項）、**備份＋還原演練**。**Phase B**（MinIO、Sentry、PostHog、Langfuse）延後但索引必同步。細部步驟 **`hetzner-full-stack-self-host-runbook.md`**；型別提示 **`hetzner-self-host.env.example`**；編排邊界 **`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`**。DoD：索引表「專案狀態」更新、`WORKLOG` 一句、每新元件有可驗證 endpoint、secrets 不入庫。
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）**：兩台執行與功能一致——**新機／筆電首次**只跟 [`docs/overview/REMOTE_WORKSTATION_STARTUP.md`](docs/overview/REMOTE_WORKSTATION_STARTUP.md) **§1.5**（含 **§1.5.1**：Windows 本機 **MariaDB + PHP + WP-CLI** + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`；與 **Supabase／MCP** 分列，WordPress 仍需 MySQL 相容庫）；**之後每次開工**跟同檔 **§2**（`git pull`、`lobster-factory\packages\workflows` 之 `npm ci`、可選 wrappers、`verify-build-gates`、再 **`AO-RESUME`**）。要點：筆電安裝 **GitHub CLI**（`winget install --id GitHub.cli`；裝完重開終端或刷新 `PATH`）並 **`gh auth login`**；**Node** 大版本與桌機／CI 一致；**`scripts/secrets-vault.ps1`（DPAPI）與 Cursor `mcp.json`／MCP 為每台各自設定**（勿假設會跟著 `git pull`）。完成後勾選本項。
 - [x] 建立 WordPress 客戶交付「雙模式 SOP」（既有站接手 + 新站從零）並明確雲端 staging 優先，避免跨機重工：`docs/operations/WORDPRESS_CLIENT_DELIVERY_MODELS.md`
 - [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3）：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`（先選 2 個試點：1 既有站接手 + 1 新站建置）
@@ -114,5 +114,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 07:44:32 UTC_
+_Last synced: 2026-04-06 07:49:28 UTC_
 

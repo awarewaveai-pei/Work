@@ -26,7 +26,7 @@
 | **Phase 1 這包的 `.env` 範本** | [`../../../lobster-factory/infra/hetzner-phase1-core/.env.example`](../../../lobster-factory/infra/hetzner-phase1-core/.env.example) |
 | **多週期備份／還原／誰負責** | [`../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`](../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md) |
 | **每週／月／季／年勾選** | [`../../../lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`](../../../lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md) |
-| **GitHub 上怎麼部署 Trigger** | [`docs/operations/github-actions-trigger-prod-deploy.md`](github-actions-trigger-prod-deploy.md)（含 **自託管時別讓 CI 還上雲**） |
+| **GitHub 上 `packages/workflows` 變更會跑什麼** | [`docs/operations/github-actions-trigger-prod-deploy.md`](github-actions-trigger-prod-deploy.md)（**僅 validate**；**無** Trigger Cloud deploy） |
 | **Trigger 跟 n8n 誰做什麼（硬規則）** | [`../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`](../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md) |
 
 ---
@@ -55,5 +55,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-06 07:44:32 UTC_
+_Last synced: 2026-04-06 07:49:28 UTC_
 

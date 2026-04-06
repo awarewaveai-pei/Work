@@ -4,7 +4,7 @@
 - 集中管理治理文件，避免根目錄文件散落
 
 ## 結構
-- `docs/operations/`：系統操作與執行流程（含 **Cursor 企業級規則索引**：[`operations/cursor-enterprise-rules-index.md`](operations/cursor-enterprise-rules-index.md)；**GitHub Actions × Trigger 生產部署**：[`operations/github-actions-trigger-prod-deploy.md`](operations/github-actions-trigger-prod-deploy.md)；**Hetzner 自架 — 人因單頁跳轉**：[`operations/hetzner-self-host-start-here.md`](operations/hetzner-self-host-start-here.md)；**工程 SSOT（堆疊定義／連動）**：[`operations/hetzner-stack-rollout-index.md`](operations/hetzner-stack-rollout-index.md)）
+- `docs/operations/`：系統操作與執行流程（含 **Cursor 企業級規則索引**：[`operations/cursor-enterprise-rules-index.md`](operations/cursor-enterprise-rules-index.md)；**GitHub Actions × `packages/workflows`（僅 validate；無 Cloud deploy）**：[`operations/github-actions-trigger-prod-deploy.md`](operations/github-actions-trigger-prod-deploy.md)；**Hetzner 自架 — 人因單頁跳轉**：[`operations/hetzner-self-host-start-here.md`](operations/hetzner-self-host-start-here.md)；**工程 SSOT（堆疊定義／連動）**：[`operations/hetzner-stack-rollout-index.md`](operations/hetzner-stack-rollout-index.md)）
 - `docs/sales/`：報價與變更核價規則
 - `docs/templates/`：合約與變更模板（**全庫各類「範本」路徑索引**：[`overview/repo-template-locations.md`](overview/repo-template-locations.md)）
 - `docs/standards/`：技術與開發標準
@@ -31,5 +31,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/overview/agency-os-complete-system-introduction.md`
 
-_Last synced: 2026-04-06 07:44:32 UTC_
+_Last synced: 2026-04-06 07:49:28 UTC_
 

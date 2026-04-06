@@ -1,0 +1,41 @@
+# When packages/workflows changes on main, run lobster validate (same idea as former gate job).
+# Trigger.dev Cloud deploy was removed from CI (2026-04-06). Production = self-host only — see
+# agency-os/docs/operations/github-actions-trigger-prod-deploy.md
+name: Lobster workflows package — validate (main)
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/packages/workflows/**'
+      - '.github/workflows/lobster-workflows-validate-main.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: lobster-workflows-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.x"
+      - name: Install dependencies
+        run: npm install
+        working-directory: lobster-factory
+      - name: Run lobster release gate
+        env:
+          LOBSTER_WORK_ROOT: ${{ github.workspace }}
+          LOBSTER_SKIP_AGENCY_CANONICAL: "1"
+        run: npm run validate
+        working-directory: lobster-factory

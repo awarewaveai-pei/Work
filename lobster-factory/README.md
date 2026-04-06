@@ -146,11 +146,11 @@ node D:\Work\lobster-factory\scripts\execute-apply-manifest-staging.mjs `
 - 深度解除安裝（**慎用**）：環境變數 `ROLLBACK_DEEP=1` 會對 plugin 加跑 `uninstall`。
 - **完整還原**仍建議依 hosting **snapshot / backup**（見 manifest `rollback.strategy`）。
 
-### GitHub Actions：Trigger.dev 生產部署
+### GitHub Actions：`packages/workflows` 變更時 validate（main）
 
-- **自動觸發**：`push` 到 **`main`** 且變更在 **`lobster-factory/packages/workflows/**`**（或調整 `release-trigger-prod.yml`）時，會跑 **gate + `trigger.dev deploy`**。  
-- **與 AO-CLOSE**：收工腳本**不**內嵌 deploy；純治理／`agency-os` 變更的 push **通常不會**啟動此 workflow。  
-- **SSOT**：`agency-os/docs/operations/github-actions-trigger-prod-deploy.md`（Secrets、`paths` 未來擴充、除錯）。
+- **自動觸發**：`push` 到 **`main`** 且變更在 **`lobster-factory/packages/workflows/**`**（或調整 **`lobster-workflows-validate-main.yml`**）時，會跑 **龍蝦 `npm run validate`**。**Trigger Cloud `deploy` 已自 CI 移除**（2026-04-06）；生產僅 **自託管** 部署。  
+- **與 AO-CLOSE**：收工腳本**不**內嵌 Trigger；純治理／`agency-os` 變更的 push **通常不會**啟動此 workflow。  
+- **SSOT**：`agency-os/docs/operations/github-actions-trigger-prod-deploy.md`（`paths` 擴充、除錯；GitHub **TRIGGER_*** Secrets **CI 已不需要**）。
 
 ## 下一個最佳步驟（建議）
 - 先在不開寫入的狀態下，拿你實際的 payload 跑出「db insert template + row payload」

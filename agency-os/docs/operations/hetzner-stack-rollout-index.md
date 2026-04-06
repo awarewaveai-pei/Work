@@ -14,7 +14,7 @@
 |------|-----|
 | **最後更新** | 2026-04-06 |
 | **已知已上 Hetzner** | **Supabase（自架）**、**WordPress** |
-| **下一優先（Phase A 缺口）** | 確認 **pgvector**；**Redis**；**n8n**；**Trigger.dev**（雲端或自架擇一並文件化）；**Node API** + **Next.js Admin**；**Nginx** 反代／TLS；**備份 + 還原演練** |
+| **下一優先（Phase A 缺口）** | 確認 **pgvector**；**Redis**；**n8n**；**Trigger.dev（僅自託管）**落地與 deploy 流程；**Node API** + **Next.js Admin**；**Nginx** 反代／TLS；**備份 + 還原演練** |
 | **捷徑** | 執行層與交付層可一次用 **`lobster-factory/infra/hetzner-phase1-core/`** compose 起 **Nginx、Redis、n8n、WP、Node API、Next Admin**（**不含** Supabase、**不含** Trigger）— 見該目錄 `README.md` |
 
 ---
@@ -29,7 +29,7 @@
 | 2 | **pgvector** | Data | RAG／向量（Postgres 擴充） | `supabase-self-hosted-cutover-checklist.md`（`CREATE EXTENSION vector`）；runbook 階段 2 |
 | 3 | **WordPress** | Delivery | 交付 runtime（非 SoR） | runbook 階段 4；**或** `hetzner-phase1-core` compose 內 WP |
 | 4 | **n8n** | Execution（膠水） | Webhook、通知、輕量同步 | runbook 階段 3；`hetzner-phase1-core`；**邊界** `MCP_TOOL_ROUTING_SPEC.md` |
-| 5 | **Trigger.dev** | Execution（長流程） | 重試、長編排、核准等待 | runbook 階段 3 + 官方 self-host；**或** Trigger Cloud。**注意**：現有 **`.github/workflows/release-trigger-prod.yml` 預設連 Cloud**；若全線改自架，須 **停用／改寫該 workflow 或撤掉 Cloud secrets**，見 `docs/operations/github-actions-trigger-prod-deploy.md` §自託管；**邊界** `MCP_TOOL_ROUTING_SPEC.md` |
+| 5 | **Trigger.dev** | Execution（長流程） | 重試、長編排、核准等待 | **僅自託管**（runbook 階段 3 + 官方 self-host）。**GitHub CI** 僅 **`lobster-workflows-validate-main.yml`**（`npm run validate`），**已移除** Cloud `deploy`；見 `docs/operations/github-actions-trigger-prod-deploy.md`。**邊界** `MCP_TOOL_ROUTING_SPEC.md` |
 | 6 | **Next.js Admin** | Control | 營運／租戶控制台表面 | `hetzner-phase1-core/apps/next-admin`（範例）；**正式產品路徑**另見藍圖／租戶 SOP |
 | 7 | **Node API** | Execution | RAG／BFF／複雜整合 | `hetzner-phase1-core/apps/node-api`（範例）；`hetzner-self-host.env.example` 類型提示 |
 | 8 | **Nginx** | Infra | 反代、TLS 終止（可換 Caddy／Traefik） | runbook 階段 1–6；`hetzner-phase1-core/nginx` |
@@ -112,5 +112,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-06 07:44:32 UTC_
+_Last synced: 2026-04-06 07:49:28 UTC_
 

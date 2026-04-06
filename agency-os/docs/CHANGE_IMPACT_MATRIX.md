@@ -32,7 +32,7 @@
 | `docs/operations/client-risk-scoring-model.md` | `docs/metrics/kpi-margin-dashboard-spec.md`, `docs/product/templates/monthly-report-template-en.md`, `README.md`, `TASKS.md` |
 | `docs/operations/outsourcing-vendor-scorecard.md` | `docs/operations/outsourcing-playbook.md`, `README.md`, `TASKS.md` |
 | `docs/operations/tenant-scheduling.md` | `README.md`, `tenants/README.md`, `tenants/NEW_TENANT_ONBOARDING_SOP.md`, `automation/README.md` |
-| `docs/operations/github-actions-trigger-prod-deploy.md` | `docs/operations/end-of-day-checklist.md`, `docs/overview/EXECUTION_DASHBOARD.md`, `docs/README.md`, `../../.github/workflows/release-trigger-prod.yml`, `../../.github/workflows/README.md`, `../../lobster-factory/README.md`, `WORKLOG.md` |
+| `docs/operations/github-actions-trigger-prod-deploy.md` | `docs/operations/end-of-day-checklist.md`, `docs/overview/EXECUTION_DASHBOARD.md`, `docs/README.md`, `../../.github/workflows/lobster-workflows-validate-main.yml`, `../../.github/workflows/README.md`, `../../lobster-factory/README.md`, `WORKLOG.md` |
 | `docs/operations/system-guard-and-notification.md` | `README.md`, `AGENTS.md`, `RESUME_AFTER_REBOOT.md`, `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`, `scripts/system-guard.ps1` |
 | `docs/operations/end-to-end-linkage-checklist.md` | `docs/operations/new-doc-linkage-checklist.md`, `scripts/system-guard.ps1`, `scripts/system-health-check.ps1`, `scripts/doc-sync-automation.ps1`, `README.md` |
 | `docs/operations/new-doc-linkage-checklist.md` | `docs/operations/end-to-end-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `docs/README.md`, `scripts/register-new-governance-doc.ps1`, `scripts/doc-sync-automation.ps1`, `scripts/system-health-check.ps1` |
@@ -92,5 +92,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-06 07:44:32 UTC_
+_Last synced: 2026-04-06 07:49:28 UTC_
 

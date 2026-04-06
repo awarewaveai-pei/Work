@@ -20,7 +20,7 @@
   - **任一步 FAIL**：**不會 push**
   - 今夜不推遠端：`-SkipPush`（仍跑閘道與產報）
   - 略過龍蝦閘（不建議）：`-SkipVerify`
-- [ ] （選知）**GitHub Actions × Trigger.dev**：`AO-CLOSE` **不會**在腳本裡 deploy Trigger；**`push` 到 `main` 後**若變更命中 `lobster-factory/packages/workflows/**`（或調整 `release-trigger-prod.yml`），才可能自動跑 **Deploy to Trigger.dev (prod)**。純 **`agency-os/**`／根目錄 `scripts/`** 收工 **通常不觸發**。細節、Secrets 與未來擴充 **`paths`**：[`github-actions-trigger-prod-deploy.md`](github-actions-trigger-prod-deploy.md)。
+- [ ] （選知）**GitHub Actions × `packages/workflows`**：`AO-CLOSE` **不會**在腳本裡跑 Trigger；**`push` 到 `main` 後**若變更命中 `lobster-factory/packages/workflows/**`（或調整 **`lobster-workflows-validate-main.yml`**），會自動跑 **龍蝦 validate**（**不再**含 Trigger Cloud deploy）。純 **`agency-os/**`／根目錄 `scripts/`** 收工 **通常不觸發**。細節：[`github-actions-trigger-prod-deploy.md`](github-actions-trigger-prod-deploy.md)。
 
 ### 1b) 手動三步（與 1a 擇一即可）
 在 `<WORK_ROOT>\agency-os` 目錄執行（與 1a **擇一**；**收工推薦 1a 於 repo 根**）：
@@ -65,5 +65,5 @@
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-06 06:15:31 UTC_
+_Last synced: 2026-04-06 07:49:28 UTC_
 
