@@ -2,7 +2,11 @@ param(
     [string]$WorkspaceRoot = "",
     [double]$MinHealthScore = 100.0,
     [ValidateSet("manual", "daily", "pre_shutdown", "startup")][string]$Mode = "manual",
-    [switch]$OpenStatusFile
+    [switch]$OpenStatusFile,
+    # 排程／無使用者工作階段：不跳 WScript.Popup、不強制開 LAST_SYSTEM_STATUS.md
+    [switch]$HideUi,
+    # 保守自動修復：只重跑 doc-sync + system-health-check（不做任何資料/程式碼變更）
+    [switch]$DisableAutoRepair
 )
 
 Set-StrictMode -Version Latest
@@ -48,6 +52,18 @@ function Parse-HealthScore {
     return 0.0
 }
 
+function Invoke-GuardChildPwsh {
+    param(
+        [string]$ScriptPath,
+        [string[]]$ScriptArgs = @()
+    )
+    $pre = @()
+    if ($HideUi -or ($env:AGENCYOS_SCHEDULED_QUIET -eq "1")) {
+        $pre = @("-WindowStyle", "Hidden", "-NonInteractive")
+    }
+    & powershell.exe @pre -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @ScriptArgs | Out-Null
+}
+
 function Show-DesktopPopup {
     param(
         [string]$Title,
@@ -65,12 +81,13 @@ function Show-DesktopPopup {
 }
 
 $root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
+$noUi = $HideUi -or ($env:AGENCYOS_SCHEDULED_QUIET -eq "1")
 
 # 1) Sync relationships
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "scripts/doc-sync-automation.ps1") -AutoDetect | Out-Null
+Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/doc-sync-automation.ps1") -ScriptArgs @("-AutoDetect")
 
 # 2) Health check
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "scripts/system-health-check.ps1") -WorkspaceRoot $root | Out-Null
+Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/system-health-check.ps1") -ScriptArgs @("-WorkspaceRoot", $root)
 $healthExitCode = $LASTEXITCODE
 
 $healthDir = Join-Path $root "reports/health"
@@ -84,6 +101,33 @@ $score = if ($latestHealth) { Parse-HealthScore -HealthReportPath $latestHealth.
 $closeoutExists = $null -ne $latestCloseout
 $gateOk = ($healthExitCode -eq 0) -and $closeoutExists
 $ok = ($score -ge $MinHealthScore) -and $gateOk
+
+$autoRepairAttempted = $false
+$autoRepairResult = "N/A"
+
+# Auto-repair (conservative): retry once with doc-sync + health check only.
+if (-not $ok -and -not $DisableAutoRepair) {
+    $autoRepairAttempted = $true
+    try {
+        Write-Host "System guard auto-repair: retry doc-sync + system-health-check once..." -ForegroundColor Yellow
+
+        Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/doc-sync-automation.ps1") -ScriptArgs @("-AutoDetect")
+        Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/system-health-check.ps1") -ScriptArgs @("-WorkspaceRoot", $root)
+        $healthExitCode = $LASTEXITCODE
+
+        $latestHealth = Get-LatestFile -Dir $healthDir -Filter "health-*.md"
+        $latestCloseout = Get-LatestFile -Dir $closeoutDir -Filter "closeout-*.md"
+        $score = if ($latestHealth) { Parse-HealthScore -HealthReportPath $latestHealth.FullName } else { 0.0 }
+        $closeoutExists = $null -ne $latestCloseout
+        $gateOk = ($healthExitCode -eq 0) -and $closeoutExists
+        $ok = ($score -ge $MinHealthScore) -and $gateOk
+
+        if ($ok) { $autoRepairResult = "PASS" } else { $autoRepairResult = "FAIL" }
+    } catch {
+        # 自動修復失敗時保守處理：仍沿用原本 FAIL 邏輯並生成 ALERT。
+        $autoRepairResult = "ERROR"
+    }
+}
 
 $stamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
 $guardReport = Join-Path $guardDir ("guard-" + $stamp + ".md")
@@ -100,6 +144,8 @@ $lines += ('- Threshold: **{0}%**' -f $MinHealthScore)
 $lines += ('- Health gate exit code: **{0}**' -f $healthExitCode)
 $lines += ('- Closeout report exists: **{0}**' -f ($(if ($closeoutExists) { "YES" } else { "NO" })))
 $lines += ('- Result: **{0}**' -f ($(if ($ok) { "PASS" } else { "FAIL" })))
+$lines += ('- Auto-repair attempted: **{0}**' -f ($(if ($autoRepairAttempted) { "YES" } else { "NO" })))
+$lines += ('- Auto-repair result: **{0}**' -f $autoRepairResult)
 $lines += ""
 $lines += "## Latest Reports"
 $healthRef = if ($latestHealth) { "reports/health/" + $latestHealth.Name } else { "N/A" }
@@ -123,14 +169,16 @@ if ($ok) {
     Set-Content -Path $alertFile -Value ("System Guard FAIL at " + (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")) -Encoding UTF8
 }
 
-$popupTitle = "AgencyOS System Guard - " + ($(if ($ok) { "PASS" } else { "FAIL" }))
-$popupMessage = "Health Score: " + $score + "%`r`nStatus: " + $(if ($ok) { "PASS" } else { "FAIL" }) + "`r`nSee: LAST_SYSTEM_STATUS.md"
-if (-not $ok) {
-    $popupMessage += "`r`nALERT_REQUIRED.txt generated."
+if (-not $noUi) {
+    $popupTitle = "AgencyOS System Guard - " + ($(if ($ok) { "PASS" } else { "FAIL" }))
+    $popupMessage = "Health Score: " + $score + "%`r`nStatus: " + $(if ($ok) { "PASS" } else { "FAIL" }) + "`r`nSee: LAST_SYSTEM_STATUS.md"
+    if (-not $ok) {
+        $popupMessage += "`r`nALERT_REQUIRED.txt generated."
+    }
+    Show-DesktopPopup -Title $popupTitle -Message $popupMessage -IsError:(-not $ok)
 }
-Show-DesktopPopup -Title $popupTitle -Message $popupMessage -IsError:(-not $ok)
 
-if ($OpenStatusFile -or $Mode -eq "startup") {
+if (($OpenStatusFile -or $Mode -eq "startup") -and -not $noUi) {
     try {
         Start-Process -FilePath $statusFile | Out-Null
     } catch {

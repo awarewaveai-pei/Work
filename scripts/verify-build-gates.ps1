@@ -6,6 +6,18 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Invoke-VerifyChildPwsh {
+    param(
+        [string]$File,
+        [string[]]$Args = @()
+    )
+    $pre = @()
+    if ($env:AGENCYOS_SCHEDULED_QUIET -eq "1") {
+        $pre = @("-WindowStyle", "Hidden", "-NonInteractive")
+    }
+    & powershell.exe @pre -NoProfile -ExecutionPolicy Bypass -File $File @Args
+}
+
 if (-not $WorkRoot) {
     $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 } else {
@@ -43,7 +55,7 @@ if ($LobsterOnly) {
 $syncEnt = Join-Path $WorkRoot "scripts\sync-enterprise-cursor-rules-to-monorepo-root.ps1"
 if (Test-Path -LiteralPath $syncEnt) {
     Write-Host "== Monorepo: sync Cursor rules (50-operator + 63-66) to repo root ==" -ForegroundColor Cyan
-    & powershell -ExecutionPolicy Bypass -NoProfile -File $syncEnt -MonorepoRoot $WorkRoot -Quiet
+    Invoke-VerifyChildPwsh -File $syncEnt -Args @("-MonorepoRoot", $WorkRoot, "-Quiet")
     if ($LASTEXITCODE -ne 0) {
         Write-Error "verify-build-gates: sync-enterprise-cursor-rules-to-monorepo-root failed (exit $LASTEXITCODE)"
         exit $LASTEXITCODE
@@ -60,7 +72,7 @@ if (-not (Test-Path $healthScript)) {
 $adrIdx = Join-Path $agencyRoot "scripts\verify-adr-index.ps1"
 if (Test-Path -LiteralPath $adrIdx) {
     Write-Host "== Agency OS: verify-adr-index ==" -ForegroundColor Cyan
-    & powershell -ExecutionPolicy Bypass -NoProfile -File $adrIdx
+    Invoke-VerifyChildPwsh -File $adrIdx
     if ($LASTEXITCODE -ne 0) {
         Write-Error "verify-build-gates: verify-adr-index failed (exit $LASTEXITCODE)"
         exit $LASTEXITCODE
@@ -68,7 +80,7 @@ if (Test-Path -LiteralPath $adrIdx) {
 }
 
 Write-Host "== Agency OS: system-health-check ==" -ForegroundColor Cyan
-& powershell -ExecutionPolicy Bypass -NoProfile -File $healthScript -WorkspaceRoot $agencyRoot
+Invoke-VerifyChildPwsh -File $healthScript -Args @("-WorkspaceRoot", $agencyRoot)
 if ($LASTEXITCODE -ne 0) {
     Write-Error "verify-build-gates: system-health-check failed (exit $LASTEXITCODE)"
     exit $LASTEXITCODE

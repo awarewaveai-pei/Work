@@ -34,7 +34,17 @@ function Quote-Arg {
     return '"' + $Value.Replace('"', '""') + '"'
 }
 
+function Encode-ExtraArgsB64 {
+    param([string]$Plain)
+    return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Plain))
+}
+
 $root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
+$monorepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$launcher = Join-Path $monorepoRoot "scripts\scheduled-task-launcher.ps1"
+if (-not (Test-Path -LiteralPath $launcher)) {
+    throw "Missing scheduled-task-launcher.ps1 at $launcher (expected monorepo root scripts)."
+}
 $tenantDir = Join-Path $root ("tenants/" + $TenantSlug)
 $schedulePath = Join-Path $tenantDir "OPERATIONS_SCHEDULE.json"
 if (-not (Test-Path $schedulePath)) { throw "Missing schedule file: $schedulePath" }
@@ -49,8 +59,9 @@ if ($null -ne $scheduler.adhoc_enabled) {
 
 $runnerPath = Join-Path $root "automation/TENANT_AUTOMATION_RUNNER.ps1"
 $runnerPathQuoted = Quote-Arg -Value $runnerPath
-$rootQuoted = Quote-Arg -Value $root
-$tenantSlugQuoted = Quote-Arg -Value $TenantSlug
+$launcherQuoted = Quote-Arg -Value $launcher
+$rootSq = $root.Replace("'", "''")
+$slugSq = $TenantSlug.Replace("'", "''")
 $taskBase = "AgencyOS-" + $TenantSlug
 
 $names = @{
@@ -69,15 +80,24 @@ if ($RemoveOnly) {
     exit 0
 }
 
-$trDaily = "powershell -NoProfile -ExecutionPolicy Bypass -File " + $runnerPathQuoted + " -TenantSlug " + $tenantSlugQuoted + " -Frequency daily -WorkspaceRoot " + $rootQuoted
-$trWeekly = "powershell -NoProfile -ExecutionPolicy Bypass -File " + $runnerPathQuoted + " -TenantSlug " + $tenantSlugQuoted + " -Frequency weekly -WorkspaceRoot " + $rootQuoted
-$trMonthly = "powershell -NoProfile -ExecutionPolicy Bypass -File " + $runnerPathQuoted + " -TenantSlug " + $tenantSlugQuoted + " -Frequency monthly -WorkspaceRoot " + $rootQuoted
+function New-TenantTr {
+    param([string]$Frequency, [string]$LogStem)
+    $plain = "-TenantSlug '$slugSq' -Frequency $Frequency -WorkspaceRoot '$rootSq'"
+    return "powershell -NoProfile -WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File " + $launcherQuoted +
+        " -TargetScript " + $runnerPathQuoted +
+        " -ExtraArgsB64 " + (Encode-ExtraArgsB64 -Plain $plain) +
+        " -LogStem " + (Quote-Arg $LogStem)
+}
+
+$trDaily = New-TenantTr -Frequency "daily" -LogStem ("Tenant-" + $TenantSlug + "-daily")
+$trWeekly = New-TenantTr -Frequency "weekly" -LogStem ("Tenant-" + $TenantSlug + "-weekly")
+$trMonthly = New-TenantTr -Frequency "monthly" -LogStem ("Tenant-" + $TenantSlug + "-monthly")
 
 Invoke-Schtasks -Args @("/Create", "/F", "/SC", "DAILY", "/TN", $names.daily, "/TR", $trDaily, "/ST", $scheduler.daily_time) | Out-Null
 Invoke-Schtasks -Args @("/Create", "/F", "/SC", "WEEKLY", "/D", $scheduler.weekly_day, "/TN", $names.weekly, "/TR", $trWeekly, "/ST", $scheduler.weekly_time) | Out-Null
 Invoke-Schtasks -Args @("/Create", "/F", "/SC", "MONTHLY", "/D", [string]$scheduler.monthly_day, "/TN", $names.monthly, "/TR", $trMonthly, "/ST", $scheduler.monthly_time) | Out-Null
 if ($adhocEnabled) {
-    $trAdhoc = "powershell -NoProfile -ExecutionPolicy Bypass -File " + $runnerPathQuoted + " -TenantSlug " + $tenantSlugQuoted + " -Frequency adhoc -WorkspaceRoot " + $rootQuoted
+    $trAdhoc = New-TenantTr -Frequency "adhoc" -LogStem ("Tenant-" + $TenantSlug + "-adhoc")
     Invoke-Schtasks -Args @("/Create", "/F", "/SC", "MINUTE", "/MO", [string]$scheduler.adhoc_interval_minutes, "/TN", $names.adhoc, "/TR", $trAdhoc) | Out-Null
 }
 

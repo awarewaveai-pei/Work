@@ -4,6 +4,11 @@
 
 ## 2026-04-05
 
+### GitHub Actions：`release-trigger-prod.yml` 觸發範圍收斂 + SSOT 文件
+- **問題**：舊 **`paths: lobster-factory/**`** 易讓人誤以為每次 **AO-CLOSE** 都會觸發 Trigger deploy；實務上多數收工只動 **`agency-os/**`**／根 **`scripts/`** 時，與 **Trigger 無關**。  
+- **變更**：改為僅 **`lobster-factory/packages/workflows/**`** + **`.github/workflows/release-trigger-prod.yml`**；新增 **`concurrency`**（同 ref 取消進行中 deploy）、**`permissions: contents: read`**。  
+- **文件**：新增 **`agency-os/docs/operations/github-actions-trigger-prod-deploy.md`**（Owner）；**`.github/workflows/README.md`**；連動 **`end-of-day-checklist.md`**、**`docs/README.md`**、**`CHANGE_IMPACT_MATRIX.md`**、**`lobster-factory/README.md`**。未來若 workflows 依賴其他套件，必須同步擴充 YAML **`paths`** 與 SSOT。
+
 ### Monorepo 根：RAG 本機腳本（embedding／語意查詢／env 設定）
 - **新增／更新**（路徑皆相對 monorepo 根）：`scripts/rag_seed_and_embedding.ts`（OpenAI embedding + 寫入 `knowledge_embeddings`；dotenv／無 BOM `.env.local`；vector 字串格式）、`scripts/rag_query.ts`（呼叫 `match_documents`；`MATCH_THRESHOLD`／CLI `--threshold`）、`scripts/setup-rag-env.ps1`（URL 迴圈驗證、剪貼簿讀金鑰、UTF-8 無 BOM 寫入）。根 **`package.json`**：`rag:setup`／`rag:embed`／`rag:query`、依賴 `dotenv`。**`.env.local` 不入庫**。
 - **營運**：PowerShell 下 `npm run rag:query` 傳參建議 **`npm run rag:query --% -- ...`** 或 **`npx tsx scripts/rag_query.ts`**。
@@ -293,7 +298,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-05 12:56:19 UTC_
+_Last synced: 2026-04-06 06:15:31 UTC_
 
 ## 2026-03-20
 
@@ -824,6 +829,14 @@ _Last synced: 2026-04-05 12:56:19 UTC_
 
 
 
+
+
+
+
+## 2026-04-06
+
+### Machine appendix (weekly-system-review)
+- 2026-04-06 12:32:28 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
 
 
 

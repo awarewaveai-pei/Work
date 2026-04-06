@@ -1,14 +1,27 @@
+# Deploy Trigger.dev (prod) — only when the workflows package (or this file) changes.
+# AO-CLOSE does not invoke this; see agency-os/docs/operations/github-actions-trigger-prod-deploy.md
 name: Deploy to Trigger.dev (prod)
 on:
   push:
     branches:
       - main
     paths:
-      - 'lobster-factory/**'
+      # Narrow: avoid running on agency-os-only / root scripts-only pushes (e.g. pure AO-CLOSE doc sync).
+      # If workflows later import shared packages, ADD those paths here and update the SSOT doc.
+      - 'lobster-factory/packages/workflows/**'
       - '.github/workflows/release-trigger-prod.yml'
   workflow_dispatch:
+
+concurrency:
+  group: trigger-prod-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   gate:
     runs-on: ubuntu-latest
@@ -18,7 +31,6 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22.x"
-      # Root package.json has no yarn.lock; align with release-gate-main.yml (npm).
       - name: Install dependencies
         run: npm install
         working-directory: lobster-factory

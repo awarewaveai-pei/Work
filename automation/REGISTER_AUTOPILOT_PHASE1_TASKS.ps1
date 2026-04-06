@@ -79,9 +79,9 @@ if ($RemoveOnly) {
 $autopilotQ = Quote-Arg -Value $autopilot
 $rootQ = Quote-Arg -Value $root
 
-$trStartup = "powershell -NoProfile -ExecutionPolicy Bypass -File $autopilotQ -Mode startup -WorkRoot $rootQ"
-$trAlert = "powershell -NoProfile -ExecutionPolicy Bypass -File $autopilotQ -Mode alert -WorkRoot $rootQ"
-$trLogoff = "powershell -NoProfile -ExecutionPolicy Bypass -File $autopilotQ -Mode closeout -WorkRoot $rootQ"
+$trStartup = "powershell -WindowStyle Hidden -NonInteractive -NoProfile -ExecutionPolicy Bypass -File $autopilotQ -Mode startup -WorkRoot $rootQ"
+$trAlert = "powershell -WindowStyle Hidden -NonInteractive -NoProfile -ExecutionPolicy Bypass -File $autopilotQ -Mode alert -WorkRoot $rootQ"
+$trLogoff = "powershell -WindowStyle Hidden -NonInteractive -NoProfile -ExecutionPolicy Bypass -File $autopilotQ -Mode closeout -WorkRoot $rootQ"
 if ($EnablePushOnLogoff) {
     $trLogoff += " -EnablePushOnCloseout"
 }

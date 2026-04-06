@@ -33,7 +33,7 @@ if (-not (Test-Path -LiteralPath $startupDir)) {
 # ao-resume runs every boot; Slack notify only on failure (exit code != 0).
 $startupCmd = @(
     "@echo off",
-    "powershell -NoProfile -ExecutionPolicy Bypass -File ""$WorkRoot\scripts\ao-resume.ps1"" -WorkRoot ""$WorkRoot"" -SkipVerify -AllowUnexpectedDirty",
+    "powershell -WindowStyle Hidden -NonInteractive -NoProfile -ExecutionPolicy Bypass -File ""$WorkRoot\scripts\ao-resume.ps1"" -WorkRoot ""$WorkRoot"" -SkipVerify -AllowUnexpectedDirty",
     "if errorlevel 1 (",
     "  powershell -NoProfile -ExecutionPolicy Bypass -File ""$WorkRoot\scripts\notify-ops.ps1"" -Title ""AO Startup Preflight FAIL"" -Message ""Startup preflight failed (ao-resume). Run AO-RESUME manually or check repo sync."" -Level error",
     ")"
@@ -42,7 +42,7 @@ Set-Content -LiteralPath $startupFile -Value $startupCmd -Encoding ASCII
 
 $loopCmd = @(
     "@echo off",
-    "powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File ""$WorkRoot\scripts\autopilot-alert-loop.ps1"" -WorkRoot ""$WorkRoot"" -IntervalSeconds 600"
+    "powershell -WindowStyle Hidden -NonInteractive -NoProfile -ExecutionPolicy Bypass -File ""$WorkRoot\scripts\autopilot-alert-loop.ps1"" -WorkRoot ""$WorkRoot"" -IntervalSeconds 600"
 ) -join "`r`n"
 Set-Content -LiteralPath $loopFile -Value $loopCmd -Encoding ASCII
 

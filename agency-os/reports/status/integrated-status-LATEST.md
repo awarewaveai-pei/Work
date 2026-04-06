@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-05 20:56:36
+- Generated: 2026-04-06 12:32:27
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,26 +203,8 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-05.md
-# 2026-04-05
-
-## 背景
-- 使用者收工前 **AO-CLOSE**；並要求在進度檔寫入「明日擴充其他自行託管」。
-
-## 已完成
-- **RAG 本機管線**（monorepo 根）：`rag_seed_and_embedding.ts`、`rag_query.ts`、`setup-rag-env.ps1`、根 `package.json` 指令；`.env.local` 僅本機。
-- **進度回寫**：`TASKS.md` 新增明日 **MinIO／Redis／Trigger.dev／n8n** 自架盤點項；`WORKLOG.md`、`CONVERSATION_MEMORY.md`、本日記。
-
-## 未完成
-- 其餘 stack 自架落地（明日 TASK 項）。
-- **雙機環境對齊**（`TASKS` 既有項）仍待使用者於另一台完成 §1.5／audit 後勾選。
-
-## 風險／阻塞
-- 無（收工以 `ao-close.ps1` 閘道結果為準）。
-
-## 下一步
-- 執行 **`.\scripts\ao-close.ps1`**（預設 verify + guard + integrated report + commit/push）。
-- 明日依 **`hetzner-self-host.env.example`** 與 runbook 推進 **MinIO、Redis、Trigger、n8n** 自架。
+## 5) memory/daily/2026-04-06.md
+_no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status

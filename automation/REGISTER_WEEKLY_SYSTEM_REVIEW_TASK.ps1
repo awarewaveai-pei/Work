@@ -18,10 +18,20 @@ function Resolve-WorkspaceRoot {
     return (Get-Location).Path
 }
 
+function Encode-ExtraArgsB64 {
+    param([string]$Plain)
+    return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Plain))
+}
+
 $root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
 $weeklyScript = Join-Path $root "scripts\weekly-system-review.ps1"
 if (-not (Test-Path $weeklyScript)) {
     throw "Missing weekly script: $weeklyScript"
+}
+$monorepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$launcher = Join-Path $monorepoRoot "scripts\scheduled-task-launcher.ps1"
+if (-not (Test-Path -LiteralPath $launcher)) {
+    throw "Missing scheduled-task-launcher.ps1 at $launcher (expected monorepo root scripts)."
 }
 
 $taskName = "AgencyOS-WeeklySystemReview"
@@ -54,7 +64,9 @@ $hour = [int]$parts[0]
 $minute = [int]$parts[1]
 $at = Get-Date -Hour $hour -Minute $minute -Second 0
 
-$arg = "-NoProfile -ExecutionPolicy Bypass -File `"$weeklyScript`" -AgencyOsRoot `"$root`""
+$rootSq = $root.Replace("'", "''")
+$b64 = Encode-ExtraArgsB64 -Plain ("-AgencyOsRoot '{0}'" -f $rootSq)
+$arg = "-NoProfile -WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File `"$launcher`" -TargetScript `"$weeklyScript`" -ExtraArgsB64 $b64 -LogStem WeeklySystemReview"
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $arg
 $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $dayEn -At $at
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
