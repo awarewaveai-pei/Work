@@ -4,6 +4,10 @@
 
 ## 2026-04-06
 
+### Hetzner：`hetzner-stack-rollout-index` 單一索引（牽一髮動全身）
+- **新增 Owner**：`agency-os/docs/operations/hetzner-stack-rollout-index.md`（Phase A 10／B 4、平面對照、repo 內既有檔案對照、**專案狀態表**；現況 **Supabase+WP 已上 Hetzner**、其餘待補）。  
+- **連動**：`CHANGE_IMPACT_MATRIX` 新增主檔列並回寫 `LONG_TERM_OPS` 列；`change-impact-map.json` 增 rule；`hetzner-full-stack-self-host-runbook.md` 頂部／Related、`docs/README.md`、`LONG_TERM_OPERATING_DISCIPLINE.md` Related、`hetzner-self-host.env.example`、`LONG_TERM_OPS`／`MAINTENANCE_CALENDAR`／`hetzner-phase1-core/README.md`、`lobster-factory/README.md`、`TASKS.md`（Next 改寫為本索引驅動）。  
+
 ### Hetzner Phase 1：`LONG_TERM_OPS` 長期營運契約 + compose 日誌輪替 + n8n 映像可釘選
 - **新增 Owner**：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`（RPO/RTO、備份範圍、TLS、升級日曆、汰換判準；與 `LONG_TERM_OPERATING_DISCIPLINE.md` 對齊）。  
 - **compose**：共用 **json-file** 日誌 **max-size**／**max-file**；**`N8N_IMAGE_TAG`**（`.env.example` + `docker-compose.yml`）。  
@@ -312,11 +316,12 @@
 - `.cursor/rules/40-shutdown-closeout.mdc`
 - `docs/metrics/kpi-margin-dashboard-spec.md`
 - `docs/operations/airtable-to-supabase-migration-playbook.md`
+- `docs/operations/hetzner-stack-rollout-index.md`
 - `docs/operations/system-operation-sop.md`
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 07:18:07 UTC_
+_Last synced: 2026-04-06 07:34:04 UTC_
 
 ## 2026-03-20
 
@@ -855,6 +860,7 @@ _Last synced: 2026-04-06 07:18:07 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-06 12:32:28 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

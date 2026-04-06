@@ -1,4 +1,4 @@
-# Hetzner Phase 1 — 長期營運契約（多週期）
+﻿# Hetzner Phase 1 — 長期營運契約（多週期）
 
 > **Owner（本檔）**：自架 **Phase 1 core compose**（Nginx / Redis / n8n / WordPress / Node API / Next Admin）在 **單機或小集群** 上如何**活得久、換人仍能接、出事能還原**。  
 > **誠實邊界**：沒有任何一組 `docker-compose.yml` 能在 **30 年內完全不改版**；本檔追求的是 **可替換零件、可審計流程、可演練還原**，而不是鎖死某一個供應商版本號。  
@@ -90,6 +90,7 @@
 
 ## 8. Related（單句 + 連結，避免雙寫）
 
+- 安裝順序／平面／連動索引：`agency-os/docs/operations/hetzner-stack-rollout-index.md`  
 - 週期勾選：`MAINTENANCE_CALENDAR.md`  
 - 操作入口：`README.md`  
 - 全棧階段：`agency-os/docs/operations/hetzner-full-stack-self-host-runbook.md`  
@@ -97,3 +98,9 @@
 - 祕密政策：`agency-os/docs/operations/security-secrets-policy.md`  
 - 工具邊界：`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`  
 - Monorepo 長期紀律：`agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`
+
+## Related Documents (Auto-Synced)
+- `docs/operations/hetzner-stack-rollout-index.md`
+
+_Last synced: 2026-04-06 07:34:04 UTC_
+

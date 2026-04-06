@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-06（Hetzner 堆疊索引）**：新增 **`agency-os/docs/operations/hetzner-stack-rollout-index.md`**（Phase A 10 + Phase B 4、平面、SSOT 連動、**必查** `CHANGE_IMPACT_MATRIX`／`change-impact-map.json`）；**現況**：Hetzner 上已完成 **Supabase**、**WordPress**；其餘見 **`TASKS.md` Next**。  
 - **2026-04-06（Hetzner Phase 1 × 長期）**：**`lobster-factory/infra/hetzner-phase1-core/`** 具 **`LONG_TERM_OPS.md`**（多週期營運契約）、**`MAINTENANCE_CALENDAR.md`**（週／月／季／年核對）、compose **日誌輪替**、**`N8N_IMAGE_TAG`** 可釘選；與 **`LONG_TERM_OPERATING_DISCIPLINE.md`**、full-stack runbook、**`TASKS.md` Next** 長週期項連動。  
 - **2026-04-05（自架 + RAG）**：**Supabase 自架**（VPS）已跑通 **`knowledge_chunks` → embedding → `knowledge_embeddings` → `match_documents`**；monorepo 根有 **`npm run rag:setup` / `rag:embed` / `rag:query`**（`.env.local` 僅本機）。**明日優先**：依 **`docs/operations/hetzner-self-host.env.example`** 類型擴充其餘自架——**MinIO、Redis、Trigger.dev、n8n**（見 **`TASKS.md` Next** 與 **`hetzner-full-stack-self-host-runbook.md`**）。
 - **2026-04-02（ADR 006 migration）**：已新增 **`lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql`**（Clerk↔org 對照表、JWT org claim、`user_has_org_access` 擴充、多表 SELECT RLS）；ADR 006 已補 JWT／staging 驗證說明。
@@ -318,8 +319,9 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `.cursor/rules/10-memory-maintenance.mdc`
 - `.cursor/rules/30-resume-keyword.mdc`
 - `.cursor/rules/40-shutdown-closeout.mdc`
+- `docs/operations/hetzner-stack-rollout-index.md`
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-06 07:13:44 UTC_
+_Last synced: 2026-04-06 07:34:04 UTC_
 

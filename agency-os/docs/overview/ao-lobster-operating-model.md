@@ -1,4 +1,4 @@
-# AO + Lobster Operating Model
+﻿# AO + Lobster Operating Model
 
 > Purpose: one operating model for how Agency OS governance and Lobster Factory execution run together, so daily work does not split across inconsistent docs.
 
@@ -79,3 +79,9 @@ These are known "must run in rhythm" items to convert configuration into real op
 - `../lobster-factory/README.md`
 - `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
 - `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+
+## Related Documents (Auto-Synced)
+- `docs/operations/hetzner-stack-rollout-index.md`
+
+_Last synced: 2026-04-06 07:34:04 UTC_
+

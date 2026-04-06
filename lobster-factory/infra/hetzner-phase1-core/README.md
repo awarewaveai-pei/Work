@@ -1,4 +1,4 @@
-# Hetzner Phase 1 core stack (compose)
+﻿# Hetzner Phase 1 core stack (compose)
 
 **長期營運正本（多週期／可還原／可換人）**：[`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md) — 映像釘選、備份與 RPO/RTO、TLS、升級節奏、汰換判準。部署前先讀 §1～§3。  
 **維護日曆（週／月／季／年勾選）**：[`MAINTENANCE_CALENDAR.md`](./MAINTENANCE_CALENDAR.md)。
@@ -7,7 +7,8 @@
 
 **本版預設為「可長期跑」取向**：Node 服務使用 **多階段 Dockerfile**（非每次啟動 `npm install`）、**健康檢查**、Nginx **等 app 健康後**才對外。開發熱重載見下方附錄。
 
-**對應治理文件**：`agency-os/docs/operations/hetzner-full-stack-self-host-runbook.md`
+**對應治理文件**：`agency-os/docs/operations/hetzner-full-stack-self-host-runbook.md`  
+**堆疊在整體中的位置（Phase A 10 項／平面／連動）**：`agency-os/docs/operations/hetzner-stack-rollout-index.md`
 
 ## 安全（必讀）
 
@@ -89,3 +90,9 @@ chmod +x scripts/backup-phase1.sh   # Linux 上
 - `agency-os/docs/operations/hetzner-self-host.env.example`
 - `agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
+
+## Related Documents (Auto-Synced)
+- `docs/operations/hetzner-stack-rollout-index.md`
+
+_Last synced: 2026-04-06 07:34:04 UTC_
+

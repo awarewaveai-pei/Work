@@ -1,4 +1,4 @@
-# 長期營運紀律（30 年級）
+﻿# 長期營運紀律（30 年級）
 
 > **單一用途**：把「能讓 monorepo **活得久、換人仍能接**」的取捨寫成 **短憲章**；細節仍在各 SSOT（`REMOTE_WORKSTATION_STARTUP`、`MCP_TOOL_ROUTING_SPEC`、`SECURITY` 等）。  
 > **非雞湯**：下面每條都應能對應 **可驗證動作**（閘道、檔案主人、或明確禁止）。
@@ -69,6 +69,7 @@
 
 ## Related
 
+- **Hetzner 自架堆疊（安裝順序／平面／連動索引）**：`../operations/hetzner-stack-rollout-index.md`  
 - **自架 Phase 1（Hetzner compose）長期營運契約**：`../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`  
 - **同上 · 週期維護核對表**：`../../../lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`
 - **§9 工具與核准平面**：`../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`、`../operations/cursor-mcp-and-plugin-inventory.md`
@@ -79,3 +80,9 @@
 - `docs/overview/repo-template-locations.md`
 - `docs/architecture/decisions/README.md`
 - `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
+
+## Related Documents (Auto-Synced)
+- `docs/operations/hetzner-stack-rollout-index.md`
+
+_Last synced: 2026-04-06 07:34:04 UTC_
+

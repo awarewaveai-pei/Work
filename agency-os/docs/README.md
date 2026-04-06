@@ -4,7 +4,7 @@
 - 集中管理治理文件，避免根目錄文件散落
 
 ## 結構
-- `docs/operations/`：系統操作與執行流程（含 **Cursor 企業級規則索引**：[`operations/cursor-enterprise-rules-index.md`](operations/cursor-enterprise-rules-index.md)；**GitHub Actions × Trigger 生產部署**：[`operations/github-actions-trigger-prod-deploy.md`](operations/github-actions-trigger-prod-deploy.md)）
+- `docs/operations/`：系統操作與執行流程（含 **Cursor 企業級規則索引**：[`operations/cursor-enterprise-rules-index.md`](operations/cursor-enterprise-rules-index.md)；**GitHub Actions × Trigger 生產部署**：[`operations/github-actions-trigger-prod-deploy.md`](operations/github-actions-trigger-prod-deploy.md)；**Hetzner 自架堆疊安裝順序／平面／連動索引**：[`operations/hetzner-stack-rollout-index.md`](operations/hetzner-stack-rollout-index.md)）
 - `docs/sales/`：報價與變更核價規則
 - `docs/templates/`：合約與變更模板（**全庫各類「範本」路徑索引**：[`overview/repo-template-locations.md`](overview/repo-template-locations.md)）
 - `docs/standards/`：技術與開發標準
@@ -26,8 +26,9 @@
 
 ## Related Documents (Auto-Synced)
 - `docs/operations/cursor-enterprise-rules-index.md`
+- `docs/operations/hetzner-stack-rollout-index.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/overview/agency-os-complete-system-introduction.md`
 
-_Last synced: 2026-04-06 06:15:31 UTC_
+_Last synced: 2026-04-06 07:34:04 UTC_
 

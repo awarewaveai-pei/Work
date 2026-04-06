@@ -1,4 +1,4 @@
-# Hetzner 全棧自託管 Runbook（Agency / Lobster 對齊版）
+﻿# Hetzner 全棧自託管 Runbook（Agency / Lobster 對齊版）
 
 ## 我能幫你做到哪裡、哪裡一定要你（或外包）動手
 
@@ -7,6 +7,10 @@
 | **本 repo / 助理** | 架構對齊、`MCP_TOOL_ROUTING_SPEC` 分工、分階段清單、`.env` 欄位規劃、與你現有腳本/治理文件的銜接說明 |
 | **你或受權工程師** | Hetzner 開機、SSH、防火牆、DNS、TLS 憑證、所有 **secret** 的產生與存放、實際 `docker compose up`、還原演練 |
 | **無法遠端代辦的原因** | 需要你的帳號憑證、網域、法遵邊界；誤設會導致資料外洩或生產事故，必須由責任人執行 |
+
+## 單一索引（安裝順序 × 平面 × 倉庫連動）
+
+- **主檔（牽一髮動全身）**：[**`hetzner-stack-rollout-index.md`**](hetzner-stack-rollout-index.md) — 第一階段 10 項／第二階段 4 項、Data／Execution／Delivery／Control／Infra 對照、**目前進度表**、與本 runbook／`hetzner-phase1-core` compose 的落點。修改堆疊定義或優先序時 **先改主檔**，再依 **`docs/CHANGE_IMPACT_MATRIX.md`** 該列同步。
 
 ---
 
@@ -113,8 +117,15 @@
 
 ## Related
 
+- **`hetzner-stack-rollout-index.md`**（Phase A/B、平面、連動索引）  
 - **Phase 1 compose（Nginx + Redis + n8n + WordPress + Node API + Next Admin，不含 Supabase）**：`lobster-factory/infra/hetzner-phase1-core/README.md`；**長期營運契約**：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`；**維護日曆**：`lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`；**備份範例**：`lobster-factory/infra/hetzner-phase1-core/scripts/backup-phase1.sh`
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`  
 - `agency-os/docs/operations/security-secrets-policy.md`  
 - `agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`（Cloud → 自架或自架換機時）  
 - `agency-os/docs/architecture/agency-command-center-v1.md`  
+
+## Related Documents (Auto-Synced)
+- `docs/operations/hetzner-stack-rollout-index.md`
+
+_Last synced: 2026-04-06 07:34:04 UTC_
+

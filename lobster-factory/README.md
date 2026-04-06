@@ -7,6 +7,7 @@
 - **操作手冊（完整步驟與環境變數）**：[`docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md`](docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md)
 
 ## Phase 1 目前已落地
+- **Hetzner 全堆疊索引（含 Supabase／Phase A·B 與平面）**：`../agency-os/docs/operations/hetzner-stack-rollout-index.md`  
 - **Hetzner 自架「執行／交付／Admin」compose（Supabase 另機）**：`infra/hetzner-phase1-core/README.md`；**多週期營運契約**：`infra/hetzner-phase1-core/LONG_TERM_OPS.md`；**週期維護核對**：`infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`
 - Supabase multi-tenant foundation（僅先提供 migration + catalog seeds）
   - `packages/db/migrations/0001_core.sql` ~ `0006_seed_catalog.sql`

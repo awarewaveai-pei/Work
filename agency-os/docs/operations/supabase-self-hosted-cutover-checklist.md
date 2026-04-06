@@ -1,4 +1,4 @@
-# Supabase 自託管切換清單（保留舊資料）
+﻿# Supabase 自託管切換清單（保留舊資料）
 
 > **用途**：從 **Supabase Cloud（或舊自架）** 遷到 **新自架 Supabase**，並更新所有連線與憑證。  
 > **原則**：SoR 仍在 **Postgres（Supabase）**；與 `[lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md](../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md)` 一致。
@@ -44,10 +44,7 @@
 - [ ] 龍蝦：`validate-db-write-resilience.mjs` 等（見 `lobster-factory/README.md`）在 **staging** 通過後再開 production 寫入。
 
 ## Related Documents (Auto-Synced)
+- `docs/operations/hetzner-stack-rollout-index.md`
 
-- `docs/operations/local-secrets-vault-dpapi.md`
-- `docs/operations/cursor-mcp-and-plugin-inventory.md`
-- `docs/operations/hetzner-full-stack-self-host-runbook.md`
-- `docs/operations/security-secrets-policy.md`
-- `mcp.json.template`（repo 根）
-- `lobster-factory/README.md`
+_Last synced: 2026-04-06 07:34:04 UTC_
+
