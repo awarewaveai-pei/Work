@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Optional Phase-1 backups (run on the VPS from hetzner-phase1-core directory).
 # Does NOT replace your Supabase backup strategy.
+#
+# Long-run: copy OFFSITE (object storage / second region); keep retention policy;
+#           restore drills per LONG_TERM_OPS.md (annual minimum).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -4,6 +4,11 @@
 
 ## 2026-04-06
 
+### Hetzner Phase 1：`LONG_TERM_OPS` 長期營運契約 + compose 日誌輪替 + n8n 映像可釘選
+- **新增 Owner**：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`（RPO/RTO、備份範圍、TLS、升級日曆、汰換判準；與 `LONG_TERM_OPERATING_DISCIPLINE.md` 對齊）。  
+- **compose**：共用 **json-file** 日誌 **max-size**／**max-file**；**`N8N_IMAGE_TAG`**（`.env.example` + `docker-compose.yml`）。  
+- **連動**：`hetzner-full-stack-self-host-runbook.md` 階段 0、`LONG_TERM_OPERATING_DISCIPLINE.md` Related、`CHANGE_IMPACT_MATRIX.md`、`lobster-factory/README.md`、`README.md`（phase1-core）。
+
 ### Hetzner Phase 1 compose：production-hardening 一版
 - **路徑**：`lobster-factory/infra/hetzner-phase1-core/`  
 - **變更摘要**：`docker-compose` 改為 **Dockerfile 多階段建置**（Node API + Next standalone）、**Redis／MariaDB／n8n／WP／兩個 Node 服務** healthcheck、**Nginx 待 healthy 後**再啟；Nginx 補 **Forwarded** 標頭與基礎安全標頭；WordPress 以 **`WORDPRESS_PUBLIC_URL` + `WORDPRESS_CONFIG_EXTRA`** 對齊子路徑；新增 **`scripts/backup-phase1.sh`**（MariaDB + wp 目錄 tarball）；README 補 **rebuild next-admin** 說明、驗收、dev 附錄；runbook Related 標註備份腳本。  
@@ -305,7 +310,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 06:15:31 UTC_
+_Last synced: 2026-04-06 07:10:13 UTC_
 
 ## 2026-03-20
 
@@ -844,6 +849,7 @@ _Last synced: 2026-04-06 06:15:31 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-06 12:32:28 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

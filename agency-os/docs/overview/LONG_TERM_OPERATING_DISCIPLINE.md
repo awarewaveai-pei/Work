@@ -69,6 +69,7 @@
 
 ## Related
 
+- **自架 Phase 1（Hetzner compose）長期營運契約**：`../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`
 - **§9 工具與核准平面**：`../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`、`../operations/cursor-mcp-and-plugin-inventory.md`
 - `docs/architecture/decisions/001-wordpress-manifest-and-shell-ssot.md`、`docs/architecture/decisions/002-clerk-identity-boundary.md`、`docs/architecture/decisions/003-no-automated-manifest-dual-sync.md`、`docs/architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md`、`docs/architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md`、`docs/architecture/decisions/006-supabase-tenant-isolation-and-clerk-mapping.md`
 - `AGENTS.md`

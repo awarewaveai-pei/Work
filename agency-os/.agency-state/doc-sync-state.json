@@ -1,23 +1,19 @@
 ﻿{
-    "last_run_utc":  "2026-04-06T06:15:31.5759288Z",
+    "last_run_utc":  "2026-04-06T07:10:14.0929220Z",
     "changed_files":  [
                           "docs/CHANGE_IMPACT_MATRIX.md",
-                          "docs/operations/end-of-day-checklist.md",
-                          "docs/operations/github-actions-trigger-prod-deploy.md",
-                          "docs/README.md",
+                          "docs/operations/hetzner-full-stack-self-host-runbook.md",
+                          "docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md",
                           "WORKLOG.md"
                       ],
     "impacted_files":  [
                            "docs/CHANGE_IMPACT_MATRIX.md",
-                           "docs/operations/end-of-day-checklist.md",
-                           "docs/operations/github-actions-trigger-prod-deploy.md",
-                           "docs/README.md",
+                           "docs/operations/hetzner-full-stack-self-host-runbook.md",
+                           "docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md",
                            "WORKLOG.md"
                        ],
     "auto_updated_files":  [
                                "docs/CHANGE_IMPACT_MATRIX.md",
-                               "docs/operations/end-of-day-checklist.md",
-                               "docs/README.md",
                                "WORKLOG.md"
                            ]
 }

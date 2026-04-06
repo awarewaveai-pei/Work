@@ -34,6 +34,7 @@
 
 ### 階段 0 — 決策與邊界（1 次定案）
 
+- [ ] 讀 **Phase 1 compose 長期營運契約**：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`（RPO/RTO、映像釘選、還原演練節奏）。  
 - [ ] 資料是否必須留在自管機房（影響 **LLM / embedding 用雲端或自架**）。  
 - [ ] 網域規劃：`api.`、`db.` 不建議對外公開管理埠；僅 `app.` / `n8n.` / `wp.` 等經由 **443**。  
 - [ ] **備份 RPO/RTO**（Postgres + 物件儲存 + WordPress 檔案）。  
@@ -112,7 +113,7 @@
 
 ## Related
 
-- **Phase 1 compose（Nginx + Redis + n8n + WordPress + Node API + Next Admin，不含 Supabase）**：`lobster-factory/infra/hetzner-phase1-core/README.md`（含 **備份範例**：`scripts/backup-phase1.sh`）
+- **Phase 1 compose（Nginx + Redis + n8n + WordPress + Node API + Next Admin，不含 Supabase）**：`lobster-factory/infra/hetzner-phase1-core/README.md`；**長期營運契約**：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`；**備份範例**：`lobster-factory/infra/hetzner-phase1-core/scripts/backup-phase1.sh`
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`  
 - `agency-os/docs/operations/security-secrets-policy.md`  
 - `agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`（Cloud → 自架或自架換機時）  
