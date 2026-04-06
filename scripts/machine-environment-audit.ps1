@@ -226,7 +226,14 @@ if (-not $ghOk) {
     Write-Audit -Level WARN -Message "GitHub CLI (gh) not found - install for Actions/dual machine parity (winget install GitHub.cli)."
     $warnCount++
 } else {
-    $auth = & gh auth status 2>&1 | Out-String
+    # gh prints "not logged in" to stderr; with $ErrorActionPreference=Stop that would terminate the script.
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $auth = (& gh auth status 2>&1 | ForEach-Object { "$_" }) -join [Environment]::NewLine
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
     if ($auth -match "Logged in") {
         Write-Audit -Level OK -Message "gh auth: logged in."
     } else {
