@@ -4,6 +4,12 @@
 
 ## 2026-04-06
 
+### 雙機／遠端：`origin/main` 已與筆電對齊（公司機開工前必 pull）
+- **動作**：筆電於通過 **`verify-build-gates`**（含 `system-health-check` 100%）後 **`git push origin main`**。  
+- **`origin/main` HEAD**：`6783130`（至 `02d2b1f..6783130` 共 14 commit；含 CI 改 **validate-only**、`start-here`／env 對照、Hetzner 連動、`machine-environment-audit`／bootstrap 腳本健壯性等）。  
+- **公司桌機（必做，順序勿跳）**：在 **monorepo 根**執行 **`git fetch origin`** → **`git pull --ff-only origin main`** → **`Set-Location .\lobster-factory\packages\workflows; npm ci`** →（若有 `mcp-local-wrappers` 則同樣 `npm ci`）→ **`powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1`** → 再 **`AO-RESUME`**。正本：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§2**。  
+- **無法靠 Git 同步的項目（兩台各自一份，內容需你人工一致）**：**`.env.local`**、**DPAPI vault**、**`%USERPROFILE%\.cursor\mcp.json`**、本機 **MariaDB／PHP／WP 資料目錄**（策略見 **`hetzner-self-host-start-here.md`「環境變數唯一對照」** 與 **§1.5.1**）。  
+
 ### 筆電 §1.5.1：PHP + VC++ + WP-CLI + 本機 WP bootstrap（腳本健壯性）
 - **winget**：`PHP.PHP.NTS.8.4`；**VC++** 升級至與 PHP 相容（修正 `VCRUNTIME140.dll` 版本警告）。  
 - **WP-CLI**：`setup-wp-cli-windows.ps1`；使用者 **PATH** 已 append `%LOCALAPPDATA%\Programs\wp-cli`。  
