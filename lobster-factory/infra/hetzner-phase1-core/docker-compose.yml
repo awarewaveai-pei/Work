@@ -49,8 +49,8 @@ services:
       N8N_PROXY_HOPS: "1"
     volumes:
       - n8n_data:/home/node/.n8n
-    expose:
-      - "5678"
+    ports:
+      - "127.0.0.1:5678:5678"
     networks:
       - lobster-net
 
@@ -81,8 +81,8 @@ services:
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
     volumes:
       - wordpress_data:/var/www/html
-    expose:
-      - "80"
+    ports:
+      - "127.0.0.1:8080:80"
     networks:
       - lobster-net
 
@@ -100,8 +100,8 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       REDIS_URL: redis://redis:6379
-    expose:
-      - "3001"
+    ports:
+      - "127.0.0.1:3001:3001"
     depends_on:
       - redis
     networks:
@@ -123,8 +123,8 @@ services:
       INTERNAL_API_BASE_URL: ${INTERNAL_API_BASE_URL}
       # Browser-side fetch to API via same-origin Nginx path
       NEXT_PUBLIC_API_BASE_PATH: /api
-    expose:
-      - "3000"
+    ports:
+      - "127.0.0.1:3000:3000"
     depends_on:
       - node-api
     networks:

@@ -31,8 +31,12 @@ docker compose --env-file .env up -d
 
 ```bash
 docker compose ps
+# 對外入口（Nginx :80）
 curl -sf http://127.0.0.1/health
 curl -sf http://127.0.0.1/api/health
+curl -sf http://127.0.0.1/
+# 本機除錯（僅綁 127.0.0.1，不對全世界開）
+curl -sf http://127.0.0.1:3001/health
 ```
 
 瀏覽器（把 `YOUR_VPS_IP` 換成實際 IP 或網域）：
