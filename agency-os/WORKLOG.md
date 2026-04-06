@@ -2,6 +2,13 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-06
+
+### Hetzner Phase 1 compose：production-hardening 一版
+- **路徑**：`lobster-factory/infra/hetzner-phase1-core/`  
+- **變更摘要**：`docker-compose` 改為 **Dockerfile 多階段建置**（Node API + Next standalone）、**Redis／MariaDB／n8n／WP／兩個 Node 服務** healthcheck、**Nginx 待 healthy 後**再啟；Nginx 補 **Forwarded** 標頭與基礎安全標頭；WordPress 以 **`WORDPRESS_PUBLIC_URL` + `WORDPRESS_CONFIG_EXTRA`** 對齊子路徑；新增 **`scripts/backup-phase1.sh`**（MariaDB + wp 目錄 tarball）；README 補 **rebuild next-admin** 說明、驗收、dev 附錄；runbook Related 標註備份腳本。  
+- **驗證**：本機已通過 **`next build`**（standalone）；VPS 上仍需 **`docker compose build && up`** 實測。
+
 ## 2026-04-05
 
 ### GitHub Actions：`release-trigger-prod.yml` 觸發範圍收斂 + SSOT 文件

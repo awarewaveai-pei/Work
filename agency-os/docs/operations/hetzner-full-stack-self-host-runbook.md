@@ -112,7 +112,7 @@
 
 ## Related
 
-- **Phase 1 compose（Nginx + Redis + n8n + WordPress + Node API + Next Admin，不含 Supabase）**：`lobster-factory/infra/hetzner-phase1-core/README.md`
+- **Phase 1 compose（Nginx + Redis + n8n + WordPress + Node API + Next Admin，不含 Supabase）**：`lobster-factory/infra/hetzner-phase1-core/README.md`（含 **備份範例**：`scripts/backup-phase1.sh`）
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`  
 - `agency-os/docs/operations/security-secrets-policy.md`  
 - `agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`（Cloud → 自架或自架換機時）  

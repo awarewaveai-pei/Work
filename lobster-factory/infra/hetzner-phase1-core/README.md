@@ -2,59 +2,86 @@
 
 **目的**：在 **Supabase 已另機／另 compose 運行** 的前提下，於同一台 Hetzner（或第二台）起 **Nginx + Redis + n8n + WordPress + Node API + Next.js Admin**，形成可驗收的第一階段底座。
 
+**本版預設為「可長期跑」取向**：Node 服務使用 **多階段 Dockerfile**（非每次啟動 `npm install`）、**健康檢查**、Nginx **等 app 健康後**才對外。開發熱重載見下方附錄。
+
 **對應治理文件**：`agency-os/docs/operations/hetzner-full-stack-self-host-runbook.md`
 
 ## 安全（必讀）
 
 - **不要**把 `.env` 或 **service role / root DB 密碼** 提交到 Git，也不要貼到聊天或 Issue。
-- 若曾把 **真實 IP、密碼或金鑰** 貼在公開場合，請 **立刻輪替**（DB、Supabase keys、OpenAI key）。
+- 若曾把 **真實 IP、密碼或金鑰** 貼在公開場合，請 **立刻輪替**。
 - 本目錄只提供 **`.env.example` 佔位符**；實機請 `cp .env.example .env` 後填入。
+- **127.0.0.1 映射**（3000/3001/5678/6379/8080）僅便於 SSH 除錯；對外公開服務應僅 **:80 / :443**，上線後可刪除這些 `ports` 區塊（僅保留 Nginx）。
 
-## 安裝順序（與 runbook 對齊）
-
-1. 主機：Docker / Compose、防火牆、（可選）基本 Nginx。
-2. **Data**：Supabase + pgvector（此 compose **不重複內嵌** Supabase）。
-3. **本 compose**：Redis → n8n / WordPress / API / Admin，對外由 **單一 Nginx :80** 反代。
-
-## 在主機上的目錄（建議）
-
-你可以把本 repo **同步到** `/opt/lobster-factory`（或讀-only clone），再：
+## 安裝與啟動
 
 ```bash
-cd /opt/lobster-factory/lobster-factory/infra/hetzner-phase1-core
+cd lobster-factory/infra/hetzner-phase1-core
 cp .env.example .env
-# 編輯 .env：SUPABASE_*、WORDPRESS_*、N8N_HOST、N8N_WEBHOOK_URL、OPENAI_API_KEY 等
+# 必填：WORDPRESS_PUBLIC_URL 須與瀏覽器實際網址一致（例如 http://YOUR_IP/wp）
+docker compose --env-file .env build
 docker compose --env-file .env up -d
 ```
 
-## 驗收（由簡到繁）
+**變更 `NEXT_PUBLIC_*` 後**必須 **重建 next-admin**（建置期間 baked in）：
+
+```bash
+docker compose --env-file .env build next-admin
+docker compose --env-file .env up -d next-admin
+```
+
+## 驗收
 
 ```bash
 docker compose ps
-# 對外入口（Nginx :80）
 curl -sf http://127.0.0.1/health
 curl -sf http://127.0.0.1/api/health
 curl -sf http://127.0.0.1/
-# 本機除錯（僅綁 127.0.0.1，不對全世界開）
-curl -sf http://127.0.0.1:3001/health
+curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯
 ```
 
-瀏覽器（把 `YOUR_VPS_IP` 換成實際 IP 或網域）：
+瀏覽器（將主機名換成實際 IP／網域）：
 
-- Admin（root）：`http://YOUR_VPS_IP/`
-- Node API（經 Nginx）：`http://YOUR_VPS_IP/api/health`
-- n8n：`http://YOUR_VPS_IP/n8n/`
-- WordPress：`http://YOUR_VPS_IP/wp/`（子路徑安裝見下）
+- Admin：`http://YOUR_HOST/`
+- API：`http://YOUR_HOST/api/health`
+- n8n：`http://YOUR_HOST/n8n/`
+- WordPress：`http://YOUR_HOST/wp/`
 
-## 已知限制（刻意第一版不收斂）
+WordPress 第一次安裝若耗時較長，`wordpress` 的 `healthcheck` 有較長 `start_period`；若 `nginx` 遲遲不起，看 `docker compose logs wordpress nginx`。
 
-- **無 HTTPS / Cloudflare** — 下一階段再加。
-- **WordPress 掛在 `/wp/`** — 常需在 WP 內設定 **WordPress 位址** / 或改 **子網域** 較省心；若 404／重導迴圈，優先改子網域方案。
-- **Trigger.dev** — 不在此 compose；接入時另照官方 self-host 或雲端部署，並對齊 `MCP_TOOL_ROUTING_SPEC.md`。
-- **Redis、DB 埠** — 範本為方便除錯可對外映射；上線請改為 **僅 Docker 網路內可連**。
-- **Next / Node 用 `npm run dev`** — 僅適合環境打通；production 應改 **build + 正式啟動**（若你選在 VPS 上跑）。
+## 備份（Phase 1 最小份）
+
+```bash
+chmod +x scripts/backup-phase1.sh   # Linux 上
+./scripts/backup-phase1.sh
+```
+
+產出壓縮 SQL + `wp-html.tgz`。**Supabase** 請仍依 `supabase-self-hosted-cutover-checklist.md` 等文件排程備份。
+
+## 已知／刻意邊界
+
+- **無 HTTPS** — 下一階段（Cloudflare / Let’s Encrypt）再接。
+- **WordPress 子路徑** — 已用 `WORDPRESS_PUBLIC_URL` + `WORDPRESS_CONFIG_EXTRA` 降低錯位；若仍異常，優先改 **子網域** 安裝。
+- **Trigger.dev** — 不在此 compose；對齊 `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` 另接。
+- **Next / Node production images** — 若要熱重載，請用附錄或在本機跑 `npm run dev`，不要強求與 production image 混用。
+
+---
+
+## 附錄 A：在 VPS 熱重載（可選，不建議與 production 混用）
+
+**建議**：應用程式在開發機 `npm run dev`，VPS 只跑 **build 過的 image**。
+
+若堅持在 VPS bind-mount 源碼，請在 **分支或本機副本** 手動將 `node-api`／`next-admin` 改回：
+
+- `image: node:20-alpine`（並 **移除** `build:`）
+- `volumes: ./apps/...:/app`
+- `command: sh -c "npm install && npm run dev"`
+- 將 `nginx` 對這兩個服務的 `depends_on` 改為 `service_started`，或暫時關閉對應服務的 `healthcheck`，避免 `nginx` 永遠等不到 `healthy`。
+
+佈署前務必在該主機執行 `docker compose config` 目視確認合併結果。
 
 ## Related
 
 - `agency-os/docs/operations/hetzner-self-host.env.example`
+- `agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`

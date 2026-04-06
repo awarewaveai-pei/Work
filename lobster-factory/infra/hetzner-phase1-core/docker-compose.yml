@@ -1,7 +1,8 @@
-# Phase 1: execution + delivery + admin behind Nginx.
-# Supabase is NOT included — point SUPABASE_* at your existing instance.
+# Phase 1 — production-oriented: multi-stage builds for Node apps, healthchecks, Nginx gates on app readiness.
+# Supabase is external; set SUPABASE_* in .env.
 #
-# Usage: docker compose --env-file .env up -d
+# Build & run: docker compose --env-file .env build --no-cache && docker compose --env-file .env up -d
+# After changing NEXT_PUBLIC_*: rebuild next-admin (baked at build time).
 
 services:
   nginx:
@@ -9,10 +10,14 @@ services:
     container_name: lobster-nginx
     restart: unless-stopped
     depends_on:
-      - next-admin
-      - node-api
-      - wordpress
-      - n8n
+      node-api:
+        condition: service_healthy
+      next-admin:
+        condition: service_healthy
+      wordpress:
+        condition: service_healthy
+      n8n:
+        condition: service_healthy
     ports:
       - "80:80"
     volumes:
@@ -27,9 +32,13 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    # Remove host port in production — keep Redis internal-only
     ports:
       - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - lobster-net
 
@@ -51,6 +60,16 @@ services:
       - n8n_data:/home/node/.n8n
     ports:
       - "127.0.0.1:5678:5678"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://127.0.0.1:5678/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     networks:
       - lobster-net
 
@@ -65,6 +84,18 @@ services:
       MYSQL_ROOT_PASSWORD: ${WORDPRESS_DB_ROOT_PASSWORD}
     volumes:
       - wordpress_db_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "healthcheck.sh",
+          "--connect",
+          "--innodb_initialized"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     networks:
       - lobster-net
 
@@ -73,27 +104,43 @@ services:
     container_name: lobster-wordpress
     restart: unless-stopped
     depends_on:
-      - wordpress-db
+      wordpress-db:
+        condition: service_healthy
     environment:
       WORDPRESS_DB_HOST: wordpress-db:3306
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_HOME', '${WORDPRESS_PUBLIC_URL}');
+        define('WP_SITEURL', '${WORDPRESS_PUBLIC_URL}');
+        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && $$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+          $$_SERVER['HTTPS'] = 'on';
+        }
     volumes:
       - wordpress_data:/var/www/html
     ports:
       - "127.0.0.1:8080:80"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1/ > /dev/null || exit 1"
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
     networks:
       - lobster-net
 
   node-api:
-    image: node:20-alpine
+    build:
+      context: ./apps/node-api
+      dockerfile: Dockerfile
+    image: lobster-phase1-node-api:local
     container_name: lobster-node-api
     restart: unless-stopped
-    working_dir: /app
-    command: sh -c "npm install && npm run dev"
-    volumes:
-      - ./apps/node-api:/app
     environment:
       PORT: "3001"
       SUPABASE_URL: ${SUPABASE_URL}
@@ -103,30 +150,54 @@ services:
     ports:
       - "127.0.0.1:3001:3001"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:3001/health > /dev/null || exit 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
     networks:
       - lobster-net
 
   next-admin:
-    image: node:20-alpine
+    build:
+      context: ./apps/next-admin
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_API_BASE_PATH: /api
+    image: lobster-phase1-next-admin:local
     container_name: lobster-next-admin
     restart: unless-stopped
-    working_dir: /app
-    command: sh -c "npm install && npm run dev"
-    volumes:
-      - ./apps/next-admin:/app
     environment:
       PORT: "3000"
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       INTERNAL_API_BASE_URL: ${INTERNAL_API_BASE_URL}
-      # Browser-side fetch to API via same-origin Nginx path
       NEXT_PUBLIC_API_BASE_PATH: /api
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
-      - node-api
+      node-api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:3000/ > /dev/null || exit 1"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 50s
     networks:
       - lobster-net
 
