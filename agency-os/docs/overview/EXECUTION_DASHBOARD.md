@@ -63,28 +63,28 @@
 ## 4) 每日 Runbook（最短路徑）
 ### 開工（AO-RESUME）
 0. **單一真相**：開工流程與 30 秒自檢統一看 `docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**、§2.3；**日內 Git（checkpoint / 收工 push）**只看 **§2.5**（本頁不重複第二套敘述）。  
-   **雙機必做**：在 monorepo 根先 `git fetch origin` → `git pull --ff-only origin main`（若 push 曾與遠端分叉則 `git pull --rebase origin main`）。
+   **雙機／每日**：在 monorepo 根由 Agent 執行 **`.\scripts\ao-resume.ps1`**（或你手動跑後再打關鍵字）— 內含 `fetch`、必要時 **`pull --ff-only origin main`**、workflows **`npm ci`**、**`verify-build-gates`**；與 §2 逐步驟**等價**。遇衝突／非快轉另依 `git status` 處理。
 1. 先看 `LAST_SYSTEM_STATUS.md`
 2. 打開 `TASKS.md`，只做 Next/Backlog 最高優先
-3. 在 Cursor 輸入 **`AO-RESUME`**（讀 `AGENTS.md` + 記憶檔 + 龍蝦 checklist／Completion Plan）
+3. 在 Cursor 輸入 **`AO-RESUME`**（規則 **`.cursor/rules/30-resume-keyword.mdc`**：先 **preflight 腳本 PASS**，再讀 `AGENTS.md` + 記憶檔 + 龍蝦 checklist／Completion Plan）
 4. 需要工程驗收就跑（Strict 或 Fast）：
    - 參考 `memory/CONVERSATION_MEMORY.md` 的 Runbook Commands
 
 ### 收工（AO-CLOSE）
 - **單一真相**：收工流程統一看 `docs/operations/end-of-day-checklist.md`（操作）與 `.cursor/rules/40-shutdown-closeout.mdc`（關鍵字規則）。本頁僅保留入口，不再重複維護整段命令細節。
 
-### 公司機／他處電腦（pull 後）
-**完整清單請固定看：`docs/overview/REMOTE_WORKSTATION_STARTUP.md`。** **新機／筆電第一次**用該檔 **§1.5**；**之後每次**用 **§2**。摘要（與 §2 一致）：
-1. monorepo 根：`git pull --ff-only origin main`（或先 `fetch`）
-2. `lobster-factory\packages\workflows`：`npm ci`（目前 lockfile 所在；見 `REMOTE_WORKSTATION_STARTUP` §2）
+### 公司機／他處電腦
+**完整清單請固定看：`docs/overview/REMOTE_WORKSTATION_STARTUP.md`。** **新機／筆電第一次**用該檔 **§1.5**；**之後每次**可用 **§2** 逐步驟，或 **單指令**：monorepo 根 **`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**（已包 `pull`／`npm ci`／`verify-build-gates`），再打 Cursor **`AO-RESUME`** 讀檔。摘要（與 §2 一致，供對照）：
+1. monorepo 根：對齊 `origin/main`（腳本內建 `pull --ff-only`）
+2. `lobster-factory\packages\workflows`：`npm ci`
 3. 可選：`mcp-local-wrappers` → `npm ci`
-4. `powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1`
+4. `verify-build-gates`
 5. 綜合狀態以 **`agency-os/reports/status/integrated-status-LATEST.md`** 為準（勿與根目錄 `reports/status` 混淆）
 - 手動核銷：仍可依 `docs/operations/end-of-day-checklist.md` 逐項打勾（與 §1b 對齊）。
 
 ### 離席會斷網（吃飯前）
 1. 在 **monorepo 根** `<WORK_ROOT>` 開終端機
-2. 若只暫停：直接離開；回來先 **`git pull --ff-only`** 對齊再打 `AO-RESUME`（與「開工」§0 一致）
+2. 若只暫停：直接離開；回來在 monorepo 根打 **`AO-RESUME`**（或跑 **`ao-resume.ps1`**）對齊並過閘（與「開工」§0 一致）
 3. 若要安全收工再離開：`powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1 -SkipPush`
 
 ### 每週（建議固定一天，例如週一）

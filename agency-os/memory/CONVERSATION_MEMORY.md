@@ -3,7 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
-- **2026-04-06（雙機／Git）**：筆電已 **`git push origin main`**；公司機 **`git pull --ff-only origin main`** 與 **`origin/main` 對齊** 後走 **§2**（`packages\workflows` **`npm ci`**、`verify-build-gates`、`AO-RESUME`）。**非 Git**（各機一致需人工）：`.env.local`、vault、`mcp.json`、本機 WP／DB。當日筆電遠端 tip 紀錄見 **`WORKLOG.md`「雙機／遠端」**。  
+- **2026-04-06（雙機／Git）**：筆電已 **`git push origin main`**；公司機在 monorepo 根 **`ao-resume.ps1`**（或手動 §2）與 **`origin/main` 對齊** 並過閘後 Cursor **`AO-RESUME`**。**非 Git**（各機一致需人工）：`.env.local`、vault、`mcp.json`、本機 WP／DB。細節見 **`WORKLOG.md`「雙機／遠端」**、**`REMOTE_WORKSTATION_STARTUP.md` §2**。  
 - **2026-04-06（環境變數統一入口）**：**`hetzner-self-host-start-here.md`** 設 **「環境變數唯一對照」**；monorepo 根 **`.env.local.example`**（RAG）；伺服器仍用 **`hetzner-phase1-core/.env`** — 兩實體檔不可避免，**輪替／步驟只認該節**。  
 - **2026-04-06（Trigger：CI 與自託管單一說法）**：**已自 GitHub Actions 移除** Trigger Cloud **`deploy`**；**`lobster-workflows-validate-main.yml`** 僅 **`npm run validate`**。生產 Trigger **只走自託管**；SSOT **`github-actions-trigger-prod-deploy.md`**（檔名保留舊連結）。  
 - **2026-04-06（Hetzner 人因入口）**：**人類只書籤** **`docs/operations/hetzner-self-host-start-here.md`**（一表跳轉 runbook／compose／長週期維運／Trigger SSOT）；**工程定義與進度表 Owner** 仍為 **`hetzner-stack-rollout-index.md`**。  
@@ -149,14 +149,8 @@
 你有兩種模式：`Strict`（安全最大）與 `Fast`（速度優先但仍有門檻）。
 以下命令中的 `<WORK_ROOT>` 請替換為本機實際路徑（例如 `D:\Work` 或 `C:\Users\USER\Work`）。
 
-### 開工前（雙機必做；早於 `AO-RESUME` 讀檔）
-`AO-RESUME` 會先檢查並嘗試 `git pull --ff-only`，但若本機有未提交變更/衝突仍可能失敗；為求穩定，另一台 **AO-CLOSE** push 後本機仍建議先手動對齊 `origin/main`：
-```
-cd <WORK_ROOT>
-git fetch origin
-git pull --ff-only origin main
-```
-（若 `push` 曾與遠端分叉：`git pull --rebase origin main`。完整說明：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**。）
+### 開工前（雙機；工程面已收斂為單一閘道）
+在 monorepo 根執行 **`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**（內含 `fetch`、必要時 **`pull --ff-only origin main`**、workflows **`npm ci`**、**`verify-build-gates`**）；Cursor 打 **`AO-RESUME`** 時 Agent 應先跑同一腳本再讀檔（見 **`.cursor/rules/30-resume-keyword.mdc`**）。若本機未提交／衝突，pull 仍可能失敗——先 **`git status`** 整理。完整說明：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**。
 
 ### Strict Mode（推薦，確保今天/明天不出問題）
 1. Phase 1 基線健檢

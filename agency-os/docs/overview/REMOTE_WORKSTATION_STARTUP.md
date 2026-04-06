@@ -11,7 +11,7 @@
 
 - **Monorepo 根目錄**（含 `agency-os\`、`lobster-factory\`、根目錄 `scripts\`）：請整包 clone，不要只拷子資料夾。
 - **路徑可不同**（例如筆電 `D:\Work`、公司機 `C:\Users\USER\Work`），流程都用**相對路徑**執行，不綁磁碟代號。
-- **Cursor / IDE**：可開 repo 根或 `agency-os`；若規則/連動檢查找不到 `.cursor`，請先確認開啟位置與 `.cursor` 實際存在。**IDE 行為與 MCP 職責（版控正本）** 見 `docs/operations/cursor-enterprise-rules-index.md`（與本頁 **先 pull 再 AO-RESUME** 無衝突：`AO` 關鍵字流程仍優先）。
+- **Cursor / IDE**：可開 repo 根或 `agency-os`；若規則/連動檢查找不到 `.cursor`，請先確認開啟位置與 `.cursor` 實際存在。**IDE 行為與 MCP 職責（版控正本）** 見 `docs/operations/cursor-enterprise-rules-index.md`（與本頁 **`ao-resume.ps1`／`AO-RESUME` 單一閘道**一致：內含對齊 `origin/main` 與閘道；MCP 仍只存本機。）
 
 ### 0.1 快速確認你在正確根目錄
 
@@ -240,13 +240,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 
 1. 在 **monorepo 根** `<WORK_ROOT>` 開終端機（例：`C:\Users\USER\Work` 或 `D:\Work`）
 2. 貼上：`git status --short`
-3. 若只想暫停、不收工：可直接離開；（**回來後**建議先 `git pull --ff-only origin main` 再打 `AO-RESUME`，與 §2 第 1 步一致）
+3. 若只想暫停、不收工：可直接離開；（**回來後**在 monorepo 根打 **`AO-RESUME`**（Agent 跑 **`ao-resume.ps1`**）或手動 **`git pull --ff-only origin main`**，與 §2 對齊方式一致）
 4. 若希望離開前做完整安全收工：`powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1 -SkipPush`
-5. 回來後在 **同一 repo 根**：可選 `powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1 -AllowUnexpectedDirty`（Autopilot preflight）；**仍須**自行確認已 `pull` 對齊遠端後再當真開工
+5. 回來後在 **同一 repo 根**：**自建議**直接 **`.\scripts\ao-resume.ps1`**（內含 `pull`/`npm ci`/閘道，與 Cursor **`AO-RESUME`** 同治）；若只用 **Autopilot** 的 **`ao-resume.ps1 -SkipVerify -AllowUnexpectedDirty`**，則**未**跑滿閘道，接真開工前請再跑 **`verify-build-gates`** 或再打一次**人工** `AO-RESUME`
 
 你會看到什麼（成功判斷）：
 - `ao-close`：會產生 closeout/health/guard 報告
-- `ao-resume.ps1`：preflight completed + 自上次以來 `agency-os/reports/{closeout,health,guard,status}` 增量列表（**不**取代 `git pull`）
+- `ao-resume.ps1`（預設 / Cursor **`AO-RESUME`**）：preflight completed；內含 **`git pull --ff-only origin main`**（在 `check-three-way-sync -AutoFix` 中）+ 自上次 **`ao-resume-last.txt`** 以來 `agency-os/reports/{closeout,health,guard,status}` 增量列表
 
 ## 3) 兩份「綜合狀態」路徑別搞混
 

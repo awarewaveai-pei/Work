@@ -6,7 +6,7 @@
 - **建議 monorepo 根**：`<WORK_ROOT>`（含 `agency-os`、`lobster-factory` 與根 `scripts`）
 - 或僅開：`<WORK_ROOT>\agency-os`
 
-**建議**：在 monorepo 根先執行 `git fetch origin` 與 **`git pull --ff-only origin main`**（`AO-RESUME` 會嘗試 pull，但遇到本機未提交變更/衝突仍可能失敗）。完整準備與自檢步驟詳 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`** §2、§2.3。
+**建議**：在 monorepo 根打 **`AO-RESUME`**（Agent 會跑 **`.\scripts\ao-resume.ps1`**：已含 `fetch`／必要時 **`pull --ff-only origin main`**／`npm ci`／`verify-build-gates`），或先手動執行同一腳本再在 Cursor 打 **`AO-RESUME`**。遇本機未提交／衝突仍可能失敗。完整說明：**`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`** §2、§2.3。
 
 貼上：**`AO-RESUME`**
 

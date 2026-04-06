@@ -33,7 +33,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 下列順序假設你已開在 **monorepo 根**（含 `agency-os`、`lobster-factory`、根 `scripts`）。若只開 `agency-os` 子資料夾，請先用相對連結回到本頁與 `docs/spec`。
 
 1. **本頁** — 結構、`verify-build-gates`、雙機與收工關鍵字。  
-2. **他機／首次接線** — [`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)（**先 `git pull` 再 `AO-RESUME`**；**筆電／新機最短指令見該檔 §1.5**）。  
+2. **他機／首次接線** — [`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)（**例行開工**：Cursor 打 **`AO-RESUME`** 或終端跑 **`.\scripts\ao-resume.ps1`** 即含對齊 `origin/main` 與閘道，見該檔 §2；**筆電／新機第一次**仍照 **§1.5**）。  
 3. **每日儀表板** — [`agency-os/docs/overview/EXECUTION_DASHBOARD.md`](agency-os/docs/overview/EXECUTION_DASHBOARD.md)（`TASKS` / 綜合狀態 / Gate）。  
 4. **人＋代理總則** — [`agency-os/AGENTS.md`](agency-os/AGENTS.md)（`AO-RESUME`／`AO-CLOSE`、MCP 清單入口）。  
 4b. **長期營運紀律（建置／換人仍可接）** — [`agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`](agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md)；重大分岔見 [`agency-os/docs/architecture/decisions/README.md`](agency-os/docs/architecture/decisions/README.md)。  
@@ -51,8 +51,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 
 ## 開工與雙機同步（AO-RESUME）
 
-- **`AO-RESUME`**：請 Agent 依 **`agency-os/.cursor/rules/30-resume-keyword.mdc`**（若工作區根僅為 `agency-os` 則為該目錄下 `.cursor/rules`）讀進度檔；流程上會先檢查遠端並**嘗試** `git pull --ff-only`（遇未提交變更／衝突仍可能失敗），**實務上建議**你先在 monorepo 根手動 **`git fetch`** + **`git pull --ff-only origin main`** 再開工。
-- **另一台已 AO-CLOSE push 時**：在本機 monorepo 根先 **`git fetch origin`**，再 **`git pull --ff-only origin main`**（必要時 **`git pull --rebase origin main`**），**然後**再打 `AO-RESUME`。完整清單：[`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)（**§1.5** 新機、**§2** 例行）。
+- **單一閘道**：Cursor 打 **`AO-RESUME`** 時，Agent 依 **`agency-os/.cursor/rules/30-resume-keyword.mdc`** **應先在 monorepo 根執行** **`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**（內含 `fetch`、必要時 **`pull --ff-only origin main`**、`npm ci`、`verify-build-gates`），**再**讀進度檔。**無終端**時請手動跑同一腳本後再打 `AO-RESUME`。正本：[`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)（**§1.5** 新機、**§2** 例行）。
+- **另一台已 AO-CLOSE push**：本機以 **`ao-resume.ps1`** 或 **`git pull --ff-only origin main`** 對齊 `origin/main` 後續接即可；遇衝突先整理 `git status`。
 
 ## 事件流程單一真相
 
