@@ -1,16 +1,8 @@
 ﻿{
-    "last_run_utc":  "2026-04-06T07:34:04.7882125Z",
+    "last_run_utc":  "2026-04-06T07:41:47.7021223Z",
     "changed_files":  [
-                          "docs/CHANGE_IMPACT_MATRIX.md",
-                          "docs/change-impact-map.json",
-                          "docs/operations/hetzner-full-stack-self-host-runbook.md",
-                          "docs/operations/hetzner-self-host.env.example",
+                          "docs/operations/github-actions-trigger-prod-deploy.md",
                           "docs/operations/hetzner-stack-rollout-index.md",
-                          "docs/operations/supabase-self-hosted-cutover-checklist.md",
-                          "docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md",
-                          "docs/README.md",
-                          "memory/CONVERSATION_MEMORY.md",
-                          "TASKS.md",
                           "WORKLOG.md"
                       ],
     "impacted_files":  [
@@ -18,7 +10,7 @@
                            "../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md",
                            "../lobster-factory/infra/hetzner-phase1-core/README.md",
                            "docs/CHANGE_IMPACT_MATRIX.md",
-                           "docs/change-impact-map.json",
+                           "docs/operations/github-actions-trigger-prod-deploy.md",
                            "docs/operations/hetzner-full-stack-self-host-runbook.md",
                            "docs/operations/hetzner-self-host.env.example",
                            "docs/operations/hetzner-stack-rollout-index.md",

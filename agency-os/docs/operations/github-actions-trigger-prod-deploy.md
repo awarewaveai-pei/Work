@@ -55,6 +55,21 @@
 2. 在本檔 **§ 什麼時候會自動跑** 表格補一行說明。  
 3. 在 PR／釋出習慣上仍建議：`lobster-factory` 大改可走 **`release-gate-main.yml`**（PR）再 merge。
 
+## 自託管 Trigger.dev：會不會跟 repo 裡「Cloud 設定」打架？
+
+**不會有兩邊自動互打的 runtime**，原因很單純：
+
+- **`lobster-factory/packages/workflows`** 裡的程式 **只會在「你 deploy 過去的地方」** 被排程執行；repo 裡躺著檔案 **不等於** Cloud 與自架同時各跑一套。
+- 可能混亂的只有 **人與 CI**：以為全面自架了，但 **GitHub Action 仍能拿 Cloud 的 token 成功 deploy**（本 workflow 目前語意是 **Trigger Cloud**：`deploy --env prod --project-ref ...`）。
+
+**若你確定將來只使用自架、且 Cloud 上也幾乎沒排程：**
+
+1. **先斷 CI 誤上雲**（不必急著刪 Trigger 帳號）：  
+   - 在 GitHub repo **停用** workflow **Deploy to Trigger.dev (prod)**，或 **移除／輪替** `TRIGGER_ACCESS_TOKEN`、`TRIGGER_SECRET_KEY`，讓 deploy job **無法**再對 Cloud 成功。  
+   - **`gate`（validate）** 若仍要保留，可日後拆成不含 Trigger 的 workflow；現況若整條停用，push workflows 路徑時就不會再跑 gate——取捨請記 `WORKLOG`。
+2. **Cloud 專案**：沒有實際 workload 時，**刪專案／降方案**可晚一步；與 monorepo **無強耦合**，除非你還留著可 deploy 的 secrets。  
+3. **自架就緒後**：改用官方建議的 **CLI + 自架 API URL**（或專用 CI）部署到 **同一套** `packages/workflows`；並更新本檔與 **`docs/operations/hetzner-stack-rollout-index.md`**（Trigger 列「正式目標＝自架」）。
+
 ## Related
 
 - `../overview/EXECUTION_DASHBOARD.md`（總覽節奏）  
