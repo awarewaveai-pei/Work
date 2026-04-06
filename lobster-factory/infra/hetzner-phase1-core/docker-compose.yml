@@ -1,0 +1,141 @@
+# Phase 1: execution + delivery + admin behind Nginx.
+# Supabase is NOT included — point SUPABASE_* at your existing instance.
+#
+# Usage: docker compose --env-file .env up -d
+
+services:
+  nginx:
+    image: nginx:stable
+    container_name: lobster-nginx
+    restart: unless-stopped
+    depends_on:
+      - next-admin
+      - node-api
+      - wordpress
+      - n8n
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - lobster-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: lobster-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    # Remove host port in production — keep Redis internal-only
+    ports:
+      - "127.0.0.1:6379:6379"
+    networks:
+      - lobster-net
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: lobster-n8n
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Taipei
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      N8N_PATH: /n8n/
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL}
+      GENERIC_TIMEZONE: Asia/Taipei
+      N8N_SECURE_COOKIE: "false"
+      N8N_PROXY_HOPS: "1"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    expose:
+      - "5678"
+    networks:
+      - lobster-net
+
+  wordpress-db:
+    image: mariadb:11
+    container_name: lobster-wordpress-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${WORDPRESS_DB_NAME}
+      MYSQL_USER: ${WORDPRESS_DB_USER}
+      MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${WORDPRESS_DB_ROOT_PASSWORD}
+    volumes:
+      - wordpress_db_data:/var/lib/mysql
+    networks:
+      - lobster-net
+
+  wordpress:
+    image: wordpress:php8.2-apache
+    container_name: lobster-wordpress
+    restart: unless-stopped
+    depends_on:
+      - wordpress-db
+    environment:
+      WORDPRESS_DB_HOST: wordpress-db:3306
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+    volumes:
+      - wordpress_data:/var/www/html
+    expose:
+      - "80"
+    networks:
+      - lobster-net
+
+  node-api:
+    image: node:20-alpine
+    container_name: lobster-node-api
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    volumes:
+      - ./apps/node-api:/app
+    environment:
+      PORT: "3001"
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      REDIS_URL: redis://redis:6379
+    expose:
+      - "3001"
+    depends_on:
+      - redis
+    networks:
+      - lobster-net
+
+  next-admin:
+    image: node:20-alpine
+    container_name: lobster-next-admin
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    volumes:
+      - ./apps/next-admin:/app
+    environment:
+      PORT: "3000"
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      INTERNAL_API_BASE_URL: ${INTERNAL_API_BASE_URL}
+      # Browser-side fetch to API via same-origin Nginx path
+      NEXT_PUBLIC_API_BASE_PATH: /api
+    expose:
+      - "3000"
+    depends_on:
+      - node-api
+    networks:
+      - lobster-net
+
+networks:
+  lobster-net:
+    driver: bridge
+
+volumes:
+  redis_data:
+  n8n_data:
+  wordpress_db_data:
+  wordpress_data:

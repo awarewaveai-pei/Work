@@ -1,0 +1,13 @@
+{
+  "name": "lobster-node-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
+    "express": "^4.21.2"
+  }
+}

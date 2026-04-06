@@ -1,0 +1,4 @@
+.env
+apps/*/node_modules
+apps/*/.next
+apps/*/dist
