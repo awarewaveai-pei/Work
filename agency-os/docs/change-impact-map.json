@@ -29,14 +29,31 @@
     "docs/operations/cursor-mcp-and-plugin-inventory.md",
     "docs/operations/cursor-enterprise-rules-index.md",
     "../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md",
+    "docs/operations/hetzner-self-host-start-here.md",
     "docs/operations/hetzner-stack-rollout-index.md",
     "docs/operations/airtable-to-supabase-migration-playbook.md",
     "../README.md"
   ],
   "rules": [
     {
+      "source": "docs/operations/hetzner-self-host-start-here.md",
+      "targets": [
+        "docs/operations/hetzner-stack-rollout-index.md",
+        "docs/operations/hetzner-full-stack-self-host-runbook.md",
+        "README.md",
+        "AGENTS.md",
+        "docs/README.md",
+        "TASKS.md",
+        "WORKLOG.md",
+        "docs/CHANGE_IMPACT_MATRIX.md",
+        "docs/change-impact-map.json",
+        "memory/CONVERSATION_MEMORY.md"
+      ]
+    },
+    {
       "source": "docs/operations/hetzner-stack-rollout-index.md",
       "targets": [
+        "docs/operations/hetzner-self-host-start-here.md",
         "docs/operations/hetzner-full-stack-self-host-runbook.md",
         "docs/operations/hetzner-self-host.env.example",
         "docs/operations/supabase-self-hosted-cutover-checklist.md",

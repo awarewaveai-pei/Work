@@ -7,6 +7,7 @@
 
 ## 每天開工必看（固定開工卡）
 - **總入口**：`docs/overview/ao-lobster-operating-model.md`
+- **Hetzner 自架（人類只書籤這一頁）**：`docs/operations/hetzner-self-host-start-here.md`
 - **開工事件 SSOT**：`docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - **收工事件 SSOT**：`docs/operations/end-of-day-checklist.md`
 - **關鍵字規則**：`.cursor/rules/30-resume-keyword.mdc`、`.cursor/rules/40-shutdown-closeout.mdc`
@@ -176,6 +177,7 @@
 - `docs/operations/client-risk-scoring-model.md`
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
 - `docs/operations/end-to-end-linkage-checklist.md`
+- `docs/operations/hetzner-self-host-start-here.md`
 - `docs/operations/outsourcing-vendor-scorecard.md`
 - `docs/operations/system-guard-and-notification.md`
 - `docs/operations/system-operation-sop.md`
@@ -195,5 +197,5 @@
 - `tenants/templates/tenant-template/03_TOOLS_CONFIGURATION_GUIDE.md`
 - `tenants/templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md`
 
-_Last synced: 2026-04-05 11:40:11 UTC_
+_Last synced: 2026-04-06 07:44:32 UTC_
 

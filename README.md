@@ -46,6 +46,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 
 - **龍蝦工廠**：[`lobster-factory/README.md`](lobster-factory/README.md)、[`lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`](lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md)、[`lobster-factory/docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md`](lobster-factory/docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md)、[`lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md`](lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md)（A10-1 營運劇本）
 - **AO 系統**：[`agency-os/AGENTS.md`](agency-os/AGENTS.md)、[`agency-os/TASKS.md`](agency-os/TASKS.md)、[`agency-os/docs/overview/EXECUTION_DASHBOARD.md`](agency-os/docs/overview/EXECUTION_DASHBOARD.md)
+- **Hetzner 自架（人類只書籤一頁）**：[`agency-os/docs/operations/hetzner-self-host-start-here.md`](agency-os/docs/operations/hetzner-self-host-start-here.md)（工程定義仍為 [`agency-os/docs/operations/hetzner-stack-rollout-index.md`](agency-os/docs/operations/hetzner-stack-rollout-index.md)）
 - **規格原文（長篇藍圖）**：[`docs/spec/README.md`](docs/spec/README.md)；**四份怎麼整合**：[`agency-os/docs/overview/company-os-four-sources-integration.md`](agency-os/docs/overview/company-os-four-sources-integration.md)
 
 ## 開工與雙機同步（AO-RESUME）
@@ -69,5 +70,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-04-05 06:12:34 UTC_
+_Last synced: 2026-04-06 07:44:13 UTC_
 

@@ -1,5 +1,6 @@
-﻿# Hetzner 自架堆疊：安裝順序 × 平面 × 連動索引（單一入口）
+﻿# Hetzner 自架堆疊：安裝順序 × 平面 × 連動索引（工程 SSOT）
 
+> **記性不好？** 你只要書籤 **`hetzner-self-host-start-here.md`**（一張表跳轉全文）；本檔給「改堆疊定義／連動驗收」用。  
 > **Owner（本檔）**：把「第一階段 10 項核心 + 第二階段觀測／儲存 4 項」與 **Data / Execution / Delivery / Control / Infra** 平面的對照、**實裝落點（compose）、與 repo 內 SSOT** 收斂在一處。  
 > **目的**：改安裝順序、改名稱、或增刪元件時，**先改本檔**，再依 **`docs/CHANGE_IMPACT_MATRIX.md`** 本列「必查」同步其他檔案 — **牽一髮動全身**。  
 > **實裝細節**：步驟級 runbook 仍以 **`hetzner-full-stack-self-host-runbook.md`** 為準；本檔不重複長流程。  
@@ -102,6 +103,7 @@
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/operations/hetzner-full-stack-self-host-runbook.md`
 - `docs/operations/hetzner-self-host.env.example`
+- `docs/operations/hetzner-self-host-start-here.md`
 - `docs/operations/supabase-self-hosted-cutover-checklist.md`
 - `docs/overview/ao-lobster-operating-model.md`
 - `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`
@@ -110,5 +112,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-06 07:41:47 UTC_
+_Last synced: 2026-04-06 07:44:32 UTC_
 

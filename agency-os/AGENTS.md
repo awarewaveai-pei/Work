@@ -36,6 +36,7 @@
    - `Confirm`：「今天先做哪一項？」
 
 ## 快速續接關鍵字
+- **Hetzner 自架（人類單頁入口）**：`docs/operations/hetzner-self-host-start-here.md`（其餘路徑從表內跳轉；堆疊定義仍以 `hetzner-stack-rollout-index.md` 為 Owner）。
 - 跨系統運作模型（AO 治理 + 龍蝦執行）：`docs/overview/ao-lobster-operating-model.md`（作為事件節奏與責任分工的總入口）。
 - 使用者輸入 `AO-RESUME` 時，必須先讀取記憶與進度檔後再回覆。
 - **雙機協作硬性說明**：`AO-RESUME` 會先檢查遠端並**嘗試** `git pull --ff-only`；遇本機未提交變更／衝突仍可能失敗，**實務上建議**先在 monorepo 根手動 **`git fetch origin`** + **`git pull --ff-only origin main`**（必要時 **`git pull --rebase origin main`**），再續接讀檔；否則進度檔可能過期、`git push` 會被拒。完整開工順序、30 秒自檢：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**（含 `lobster-factory\packages\workflows` 之 `npm ci` 與閘道）。
@@ -106,6 +107,7 @@
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
+- `docs/operations/hetzner-self-host-start-here.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/operations/system-guard-and-notification.md`
 - `docs/operations/system-operation-sop.md`
@@ -113,5 +115,5 @@
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-05 11:40:11 UTC_
+_Last synced: 2026-04-06 07:44:32 UTC_
 

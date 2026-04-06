@@ -10,6 +10,7 @@
 
 ## 單一索引（安裝順序 × 平面 × 倉庫連動）
 
+- **記性不好、只要一個書籤**：[**`hetzner-self-host-start-here.md`**](hetzner-self-host-start-here.md) — 一張表跳轉 runbook、compose、長週期維運與 Trigger 部署說明；**細節與進度表**仍以下列工程主檔為準。
 - **主檔（牽一髮動全身）**：[**`hetzner-stack-rollout-index.md`**](hetzner-stack-rollout-index.md) — 第一階段 10 項／第二階段 4 項、Data／Execution／Delivery／Control／Infra 對照、**目前進度表**、與本 runbook／`hetzner-phase1-core` compose 的落點。修改堆疊定義或優先序時 **先改主檔**，再依 **`docs/CHANGE_IMPACT_MATRIX.md`** 該列同步。
 
 ---
@@ -125,7 +126,8 @@
 - `agency-os/docs/architecture/agency-command-center-v1.md`  
 
 ## Related Documents (Auto-Synced)
+- `docs/operations/hetzner-self-host-start-here.md`
 - `docs/operations/hetzner-stack-rollout-index.md`
 
-_Last synced: 2026-04-06 07:41:47 UTC_
+_Last synced: 2026-04-06 07:44:32 UTC_
 

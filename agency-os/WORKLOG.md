@@ -4,6 +4,10 @@
 
 ## 2026-04-06
 
+### Hetzner：`hetzner-self-host-start-here` 全庫入口接線（人因單頁）
+- **目的**：使用者要求「統管一處、不要東一塊西一塊」— **只書籤** `docs/operations/hetzner-self-host-start-here.md`。  
+- **接線**：`agency-os/README.md`（每天開工卡）、根 `README.md` 快速連結、`docs/README.md`、`AGENTS.md`（快速關鍵字）、`TASKS.md` Next（Hetzner 條首句）、`hetzner-full-stack-self-host-runbook.md` 頂部、`hetzner-stack-rollout-index.md` 檔頭、`CHANGE_IMPACT_MATRIX` 新增主檔列並擴充 rollout 列必查、`change-impact-map.json`（watch + rule + rollout targets 補 `start-here`）。
+
 ### Trigger：自託管 vs Cloud「是否打架」— SSOT 補述
 - **`github-actions-trigger-prod-deploy.md`** 新增 §**自託管 Trigger.dev**：說明 repo 內程式不會雙邊自動互跑；風險在 **CI 仍帶 Cloud secrets 成功 deploy**；建議全面自架前 **停用 workflow 或撤 secrets**，自架就緒後再改 deploy 流程並更新 **`hetzner-stack-rollout-index.md`**。  
 - **`hetzner-stack-rollout-index.md`** Trigger 列補 **release-trigger-prod.yml 預設連 Cloud** 之注意事項。
@@ -320,12 +324,13 @@
 - `.cursor/rules/40-shutdown-closeout.mdc`
 - `docs/metrics/kpi-margin-dashboard-spec.md`
 - `docs/operations/airtable-to-supabase-migration-playbook.md`
+- `docs/operations/hetzner-self-host-start-here.md`
 - `docs/operations/hetzner-stack-rollout-index.md`
 - `docs/operations/system-operation-sop.md`
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 07:41:47 UTC_
+_Last synced: 2026-04-06 07:44:32 UTC_
 
 ## 2026-03-20
 
@@ -864,6 +869,8 @@ _Last synced: 2026-04-06 07:41:47 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-06 12:32:28 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+
 
 
 
