@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-06（AO-CLOSE 語意）**：使用者打 **AO-CLOSE** 時，代理**先**更新 **`TASKS`／`WORKLOG`／`memory`**，再跑 **`ao-close.ps1`**：`verify-build-gates` → **`system-guard`** → **`generate-integrated-status-report`** → 預設健康 **100%** 下 **`git commit`**（有變更）與 **`git push`**。**不入庫**之祕密／本機環境不同步屬設計邊界，非腳本缺失。
 - **2026-04-06（雙機／Git）**：筆電已 **`git push origin main`**；公司機在 monorepo 根 **`ao-resume.ps1`**（或手動 §2）與 **`origin/main` 對齊** 並過閘後 Cursor **`AO-RESUME`**。**非 Git**（各機一致需人工）：`.env.local`、vault、`mcp.json`、本機 WP／DB。細節見 **`WORKLOG.md`「雙機／遠端」**、**`REMOTE_WORKSTATION_STARTUP.md` §2**。  
 - **2026-04-06（環境變數統一入口）**：**`hetzner-self-host-start-here.md`** 設 **「環境變數唯一對照」**；monorepo 根 **`.env.local.example`**（RAG）；伺服器仍用 **`hetzner-phase1-core/.env`** — 兩實體檔不可避免，**輪替／步驟只認該節**。  
 - **2026-04-06（Trigger：CI 與自託管單一說法）**：**已自 GitHub Actions 移除** Trigger Cloud **`deploy`**；**`lobster-workflows-validate-main.yml`** 僅 **`npm run validate`**。生產 Trigger **只走自託管**；SSOT **`github-actions-trigger-prod-deploy.md`**（檔名保留舊連結）。  
@@ -322,5 +323,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-06 08:05:53 UTC_
+_Last synced: 2026-04-06 09:35:15 UTC_
 

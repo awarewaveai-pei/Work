@@ -53,6 +53,11 @@
 - **變更摘要**：`docker-compose` 改為 **Dockerfile 多階段建置**（Node API + Next standalone）、**Redis／MariaDB／n8n／WP／兩個 Node 服務** healthcheck、**Nginx 待 healthy 後**再啟；Nginx 補 **Forwarded** 標頭與基礎安全標頭；WordPress 以 **`WORDPRESS_PUBLIC_URL` + `WORDPRESS_CONFIG_EXTRA`** 對齊子路徑；新增 **`scripts/backup-phase1.sh`**（MariaDB + wp 目錄 tarball）；README 補 **rebuild next-admin** 說明、驗收、dev 附錄；runbook Related 標註備份腳本。  
 - **驗證**：本機已通過 **`next build`**（standalone）；VPS 上仍需 **`docker compose build && up`** 實測。
 
+### 程序與敘述：AO-RESUME 單一閘道對齊 + AO-CLOSE 語意釐清
+- **變更**：根 `README`、`REMOTE_WORKSTATION_STARTUP`、`RESUME_AFTER_REBOOT`、`EXECUTION_DASHBOARD`、`TASKS`（雙機擇一）、`WORKLOG`、`CONVERSATION_MEMORY`、根／`agency-os` 的 `.cursor/rules/README`、`memory/daily/2026-04-06` handoff — 與 **`scripts/ao-resume.ps1`**（內建 fetch／pull／workflows「與可選 wrappers」`npm ci`／`verify-build-gates`）一致；移除「`ao-resume` 不取代 `git pull`」類矛盾句。
+- **Git**：本機 checkpoint **`13c0747`**（`docs: align AO-RESUME/runbook with ao-resume.ps1 single-gate narrative`）；本次 **AO-CLOSE** 一併 **push** 與報告再生。
+- **對話**：確認 **AO-CLOSE** 在工作區有需提交變更時會 **`git commit`** 並 **`git push`**；Cursor 流程上由代理**先**更新 **`TASKS`／`WORKLOG`／`memory`** 再跑 **`ao-close.ps1`**（規則 40）。
+
 ## 2026-04-05
 
 ### GitHub Actions：`release-trigger-prod.yml` 觸發範圍收斂 + SSOT 文件
@@ -351,7 +356,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 08:49:35 UTC_
+_Last synced: 2026-04-06 09:35:15 UTC_
 
 ## 2026-03-20
 
@@ -890,6 +895,7 @@ _Last synced: 2026-04-06 08:49:35 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-06 12:32:28 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

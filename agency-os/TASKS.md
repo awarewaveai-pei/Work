@@ -36,6 +36,7 @@
 - [x] 建立可販售產品化藍圖與交接清單（`docs/product/*`）
 - [x] 建立對外販售打包腳本（`scripts/build-product-bundle.ps1`）
 - [x] 建立總控中心架構與多平台（WordPress-first）連動設計
+- [x] **（2026-04-06）** 開收工敘述與 **`ao-resume.ps1`** 單一閘道對齊（根／`agency-os` README、runbook、`EXECUTION_DASHBOARD`、`TASKS` 雙機、`WORKLOG`、`CONVERSATION_MEMORY`、`memory/daily/2026-04-06`、rules `README`）；本機 checkpoint **`13c0747`**；**AO-CLOSE** 收斂 push／integrated-status。
 - [x] AO-CLOSE 預設 100% health 閘道已落地（規則/文件/腳本三層）
 - [x] 用 1 個新客戶實跑 `tenants/NEW_TENANT_ONBOARDING_SOP.md`（`company-p1-pilot` 最小實跑完成，證據：`reports/e2e/onboarding-a10-2/20260331-214650-company-p1-pilot-2026-010-p1-pilot/`）
 - [x] 全面檢查並升級 `tenants/templates/`（v1）：新增 `core/DEPARTMENT_COVERAGE_MATRIX.md`、`core/CROSS_BORDER_GOVERNANCE.md`；強化 `PROFILE`／`FINANCIAL_LEDGER`；`NEW_TENANT_ONBOARDING_SOP`／`tenants/README` 已接上（2026-04-02）
@@ -114,5 +115,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 08:05:53 UTC_
+_Last synced: 2026-04-06 09:35:15 UTC_
 
