@@ -13,7 +13,7 @@
 7. **可擴充模組**：客戶可選需要的能力模組；交付/計價以固定矩陣歸桶口徑為準。
 
 ## 我們怎麼執行（每天/每次改版）
-1. 每天從 `AO-RESUME` 進入，先確保本機與時間接線一致（必要時先 `git pull --ff-only origin main`）。
+1. 每天先在 monorepo 根跑 **`ao-resume.ps1`** 對齊與閘道，再在 Cursor 打 **`AO-RESUME`** 讀檔接線（與 **`REMOTE_WORKSTATION_STARTUP`** 一致）。
 2. 政策/文件/連動矩陣改版：先 `doc-sync-automation -AutoDetect`，再以 `CHANGE_IMPACT_MATRIX` 驗證連動完整。
 3. 收工釋出前預設用 `AO-CLOSE`：先跑龍蝦 + 系統健康檢查，通過才 commit/push。
 

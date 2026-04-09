@@ -71,5 +71,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -Chan
 - `scripts/register-new-governance-doc.ps1`
 - `scripts/system-health-check.ps1`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 05:14:56 UTC_
 

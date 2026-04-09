@@ -51,6 +51,13 @@ alwaysApply: true
 - `memory/CONVERSATION_MEMORY.md`（長期記憶）
 - `memory/daily/YYYY-MM-DD.md`（當日脈絡）
 
+### TASKS：全自動打勾（使用者不必手動改 `- [ ]`）
+- **預設**：進度寫入與收工動作由**代理**代做；與 **`40-shutdown-closeout.mdc`** 一致。
+- **`AO-CLOSE` 單靠關鍵字即足夠**：使用者**不必**再補「把今天完成的寫進 AUTO_TASK_DONE」之類句子；代理在收工序列第 1 步**必須**主動從**當輪對話 + `TASKS` 開放項**（＋必要時 **今日 recap**）收斂 **`- AUTO_TASK_DONE: <子字串>`** 寫入當日 **`WORKLOG`**。
+- 本輪若已滿足 **`TASKS.md`** 某一未完成項的 **DoD**，代理在寫當日 **`WORKLOG.md`**（`## yyyy-MM-dd`）時**必須**加：`- AUTO_TASK_DONE: <子字串>`；該子字串須在**恰好一條**仍為 `- [ ]` 的任務行內可找到（含已 `[x]` 時改為 idempotent，收工仍會把標記收斂成 **`AUTO_TASK_DONE_APPLIED`**）。
+- **不要**要求使用者自己勾 `TASKS`；收工 **`ao-close.ps1`** 會跑 **`scripts/apply-closeout-task-checkmarks.ps1`** 套用。若要繞過自動規則，仍可手改 `TASKS.md` 或請求代理直接改方括號。
+- 選填：代理也可寫 gitignore 的 **`agency-os/.agency-state/pending-task-completions.txt`**（與上並列，同樣在收工套用）。
+
 ## 5) 成本與效益策略
 
 - 白天預設快速路徑（必要驗證），收工前再跑完整閘道。

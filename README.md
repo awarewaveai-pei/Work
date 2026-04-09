@@ -33,7 +33,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 下列順序假設你已開在 **monorepo 根**（含 `agency-os`、`lobster-factory`、根 `scripts`）。若只開 `agency-os` 子資料夾，請先用相對連結回到本頁與 `docs/spec`。
 
 1. **本頁** — 結構、`verify-build-gates`、雙機與收工關鍵字。  
-2. **他機／首次接線** — [`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)（**例行開工**：Cursor 打 **`AO-RESUME`** 或終端跑 **`.\scripts\ao-resume.ps1`** 即含對齊 `origin/main` 與閘道，見該檔 §2；**筆電／新機第一次**仍照 **§1.5**）。  
+2. **他機／首次接線** — [`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)（**正式開工**：monorepo 根 **`.\scripts\ao-resume.ps1` exit 0** 後再打 **`AO-RESUME`**；**筆電／新機最短指令見該檔 §1.5**）。  
 3. **每日儀表板** — [`agency-os/docs/overview/EXECUTION_DASHBOARD.md`](agency-os/docs/overview/EXECUTION_DASHBOARD.md)（`TASKS` / 綜合狀態 / Gate）。  
 4. **人＋代理總則** — [`agency-os/AGENTS.md`](agency-os/AGENTS.md)（`AO-RESUME`／`AO-CLOSE`、MCP 清單入口）。  
 4b. **長期營運紀律（建置／換人仍可接）** — [`agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`](agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md)；重大分岔見 [`agency-os/docs/architecture/decisions/README.md`](agency-os/docs/architecture/decisions/README.md)。  
@@ -46,13 +46,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 
 - **龍蝦工廠**：[`lobster-factory/README.md`](lobster-factory/README.md)、[`lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`](lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md)、[`lobster-factory/docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md`](lobster-factory/docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md)、[`lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md`](lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md)（A10-1 營運劇本）
 - **AO 系統**：[`agency-os/AGENTS.md`](agency-os/AGENTS.md)、[`agency-os/TASKS.md`](agency-os/TASKS.md)、[`agency-os/docs/overview/EXECUTION_DASHBOARD.md`](agency-os/docs/overview/EXECUTION_DASHBOARD.md)
-- **Hetzner 自架（人類只書籤一頁）**：[`agency-os/docs/operations/hetzner-self-host-start-here.md`](agency-os/docs/operations/hetzner-self-host-start-here.md)（工程定義仍為 [`agency-os/docs/operations/hetzner-stack-rollout-index.md`](agency-os/docs/operations/hetzner-stack-rollout-index.md)）
 - **規格原文（長篇藍圖）**：[`docs/spec/README.md`](docs/spec/README.md)；**四份怎麼整合**：[`agency-os/docs/overview/company-os-four-sources-integration.md`](agency-os/docs/overview/company-os-four-sources-integration.md)
 
 ## 開工與雙機同步（AO-RESUME）
 
-- **單一閘道**：Cursor 打 **`AO-RESUME`** 時，Agent 依 **`agency-os/.cursor/rules/30-resume-keyword.mdc`** **應先在 monorepo 根執行** **`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**（內含 `fetch`、必要時 **`pull --ff-only origin main`**、`npm ci`、`verify-build-gates`），**再**讀進度檔。**無終端**時請手動跑同一腳本後再打 `AO-RESUME`。正本：[`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)（**§1.5** 新機、**§2** 例行）。
-- **另一台已 AO-CLOSE push**：本機以 **`ao-resume.ps1`** 或 **`git pull --ff-only origin main`** 對齊 `origin/main` 後續接即可；遇衝突先整理 `git status`。
+- **`AO-RESUME`**：請 Agent 依 **`agency-os/.cursor/rules/30-resume-keyword.mdc`** 讀進度檔，並在 monorepo 根執行 **`.\scripts\ao-resume.ps1`**。**預設**該腳本含：`fetch`、落後時 `pull --ff-only`、`verify-build-gates`、workflows 依賴、`print-open-tasks`、**結尾 `machine-environment-audit -FetchOrigin -Strict`**（與 **`align-workstation.ps1`** 相同）。Autopilot 開機則為輕量（見 **AGENTS.md**）。
+- **另一台已 AO-CLOSE push 時**：在 monorepo 根 **`AO-RESUME`**（或 **`ao-resume.ps1`**）即可同步檢查；若 pull／髒樹失敗再手動整理。完整清單：[`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)。**勾選 `TASKS`「雙機環境對齊」**：兩台各跑一次通過預設 **`ao-resume.ps1`**（結尾 Strict 已含）或等價稽核即可。
 
 ## 事件流程單一真相
 
@@ -62,7 +61,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 
 ## 收工與同步
 
-- 關鍵字 **`AO-CLOSE`**：依 **`agency-os/.cursor/rules/40-shutdown-closeout.mdc`** 執行 **repo 根** `.\scripts\ao-close.ps1`（閘道、狀態報告、預設含 commit + push；**`system-health-check` 預設須 100%** 與 `AGENTS.md` 一致）。**勿**在僅 `lobster-factory` 子目錄執行（該路徑無此腳本）。
+- 關鍵字 **`AO-CLOSE`**：依 **`agency-os/.cursor/rules/40-shutdown-closeout.mdc`**；**repo 根**執行 **`.\scripts\ao-close.ps1`**（**正本**；**`agency-os\scripts\ao-close.ps1`** 僅 wrapper）。腳本含 **今日 recap**、**閘道**、**`apply-closeout-task-checkmarks`**（自 **`WORKLOG`** **`- AUTO_TASK_DONE:`** 打勾 **`TASKS`**）、預設 **commit + push**；health **100%** 與 **`AGENTS.md`** 一致。**勿**在僅 `lobster-factory` 子目錄執行。
+- **monorepo 根 `.cursor/rules`**（**`00`、`30`、`40`、`50`、`63–66`**）：正本在 **`agency-os/.cursor/rules`**；由 **`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 鏡像到根目錄（**`00`／`30`／`40`** 含路徑變換；**`verify-build-gates`** 預設會跑）。只改一邊會造成**規則分叉**。
 
 ## Related Documents (Auto-Synced)
 - `docs/operations/cursor-enterprise-rules-index.md`
@@ -70,5 +70,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 05:52:22 UTC_
 

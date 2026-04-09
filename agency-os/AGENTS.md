@@ -31,20 +31,19 @@
    - `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`
    - `../lobster-factory/docs/LOBSTER_FACTORY_COMPLETION_PLAN_V2.md`
 7. 先輸出啟動摘要（固定格式）：
-   - `Yesterday Recap`（Completed/Pending/Risks）
-   - `Today Plan`（Priority 1/2/3）
-   - `Confirm`：「今天先做哪一項？」
+   - **一般開場**（非 `AO-RESUME`）：`Yesterday Recap`（Completed/Pending/Risks）、`Today Plan`（Priority 1/2/3）、`Confirm`：「今天先做哪一項？」
+   - **關鍵字 `AO-RESUME`**：**優先**依 **`.cursor/rules/30-resume-keyword.mdc` 第 3 節**（五段式：**已完成／目前進度／未完成待辦全列／選填其他提醒／下一步**）。**禁止**用極短回覆取代「**每一條** `- [ ]` 待辦逐條列出」與「**實質**阻塞／風險盤點」（見該規則）。
 
 ## 快速續接關鍵字
-- **Hetzner 自架（人類單頁入口）**：`docs/operations/hetzner-self-host-start-here.md`（其餘路徑從表內跳轉；堆疊定義仍以 `hetzner-stack-rollout-index.md` 為 Owner）。
 - 跨系統運作模型（AO 治理 + 龍蝦執行）：`docs/overview/ao-lobster-operating-model.md`（作為事件節奏與責任分工的總入口）。
-- 使用者輸入 `AO-RESUME` 時：**可執行終端則先**在 monorepo 根跑 **`.\scripts\ao-resume.ps1`**（`git fetch`、必要時 **`pull --ff-only origin main`**、**`lobster-factory\packages\workflows`** 之 **`npm ci`**、可選 **`mcp-local-wrappers`** 之 **`npm ci`**、**`verify-build-gates`**），**PASS 後**再讀記憶與進度檔（細節見 **`.cursor/rules/30-resume-keyword.mdc`**）。無終端時請先手動跑同一腳本再打 `AO-RESUME`。
-- **雙機**：上述腳本已覆蓋「先手動 pull」慣例；**pull 失敗**（衝突／非快轉）仍須依 `git status` 整理後重試。步驟拆解：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **§1.5**、**§2**、§2.3。
-- 若已啟用 Autopilot Phase1，開機會自動執行 `scripts/ao-resume.ps1 -SkipVerify -AllowUnexpectedDirty`（仍會 **`git pull`**、**`npm ci`**；略過 **`verify-build-gates`**，與 Cursor 內人工 `AO-RESUME` 全閘道不同）。
-- 回覆格式固定為：`已完成`、`目前進度`、`下一步`。
-- `目前進度` 必須包含龍蝦工廠欄位：`目前 Milestone`、`今日 DoD`、`阻塞/風險`。
+- 使用者輸入 `AO-RESUME` 時：**可執行終端下**須先跑 **`scripts/ao-resume.ps1`（預設完整）至 exit 0**，再依 **`.cursor/rules/30-resume-keyword.mdc`** 讀取記憶、**`agency-os/.agency-state/open-tasks-snapshot.md`**（與 `print-open-tasks` 同步）與進度檔並回覆；**無終端**時改手動 Git 自檢並在回標註落差（見該規則第 1 節）。
+- **雙機協作硬性說明**：`AO-RESUME` 對應腳本 **`scripts/ao-resume.ps1`** 會 **`git fetch`**，且**僅在落後 `origin/main`（behind>0）** 時 **`git pull --ff-only origin main`**；若**落後且工作樹仍髒**，預設**不**自動 stash 可能失敗（見 `REMOTE` **2.5.1**）。**預設**同一腳本在 preflight 後會跑 **`machine-environment-audit -FetchOrigin -Strict`**（與 **`align-workstation.ps1`** 相同）；**Exit 0**＝機器裁決可開工，無需目視 `LAST_SYSTEM_STATUS`／`integrated-status`。完整開工順序、30 秒自檢：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**。
+- 若已啟用 Autopilot Phase1，開機會自動執行 `scripts/ao-resume.ps1 -SkipVerify -SkipStrictEnvironmentAudit -AllowUnexpectedDirty`（輕量 preflight；**不**跑完整閘道與 Strict 環境稽核；**不**取代你在桌機手動跑的完整 **`ao-resume.ps1`**）。
+- 回覆格式固定為 **`AO-RESUME` 五段式**（見 **`30-resume-keyword.mdc` 第 3 節**）：`已完成`、`目前進度`（含龍蝦 Milestone／今日 DoD／**實質**阻塞風險盤點＋Git 裁決一句）、**`未完成待辦（TASKS）` 逐條全列**、選填其他提醒、`下一步`。
+- **`阻塞／風險` 禁止**只回「無」二字；須依該規則綜合盤點並說明依據，或分點列出具體風險。
 - 使用者輸入 **`AO-CLOSE`**（關鍵字不變）或明確表達要關機/收工時，必須先執行 **closeout**，再輸出：`今日完成`、`今日未完成`、`連動檢查`、`明日優先`。
-  - **建議一鍵**（更新 `TASKS` / `WORKLOG` / `memory/**` 後）：`.\scripts\ao-close.ps1`（repo 根）或 `.\agency-os\scripts\ao-close.ps1`（fallback；**同邏輯雙複本**，請保持內容一致）  
+  - **只打 AO-CLOSE 即含義完整**：等同授權代理在跑 **`ao-close.ps1` 前**主動依**當輪對話 + `TASKS.md` 開放項**（＋必要時 **print-today-closeout-recap**）補齊 **`WORKLOG.md`** 當日 **`- AUTO_TASK_DONE: …`**（**不要**求使用者再加一句「照對話全寫進 AUTO_TASK_DONE」）；證據不足時**只問一題**。
+  - **建議一鍵**（更新 **`WORKLOG` / `memory/**`**；**`TASKS` 打勾**多由腳本依 **`AUTO_TASK_DONE`** 套用）：**正本** monorepo 根 **`.\scripts\ao-close.ps1`**；**`.\agency-os\scripts\ao-close.ps1`** 僅 **thin wrapper** 轉發參數（**勿**複製業務邏輯以免分叉）  
     → 預設依序：`verify-build-gates`（龍蝦 + 治理 health）→ `system-guard`（內含 doc-sync + health + guard）→ `generate-integrated-status-report` → **PASS 後** `git commit`／`git push`（公司機 `pull` 即完整）。不推：`-SkipPush`；略過龍蝦閘（不建議）：`-SkipVerify`。
   - 預設收工門檻：`system-health-check` **100%**（未達 100% 先修復再收工；僅在使用者明確允許時可放寬）。
   - **單一真相**：AO-CLOSE 的操作步驟以 `docs/operations/end-of-day-checklist.md` 為準，關鍵字行為以 `.cursor/rules/40-shutdown-closeout.mdc` 為準。
@@ -107,7 +106,6 @@
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
-- `docs/operations/hetzner-self-host-start-here.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/operations/system-guard-and-notification.md`
 - `docs/operations/system-operation-sop.md`
@@ -115,5 +113,5 @@
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 09:29:25 UTC_
 

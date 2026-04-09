@@ -41,6 +41,7 @@
 ## Related Documents (Auto-Synced)
 - `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md`
 - `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
+- `../lobster-factory/docs/ROUTING_MATRIX.md`
 - `../README.md`
 - `.cursor/rules/63-cursor-core-identity-risk.mdc`
 - `.cursor/rules/64-architecture-mcp-routing.mdc`
@@ -54,5 +55,5 @@
 - `docs/operations/security-secrets-policy.md`
 - `docs/README.md`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 09:29:25 UTC_
 

@@ -13,8 +13,8 @@
 - `00-session-bootstrap.mdc` — 新對話：昨日回顧 + 今日計畫 + 確認事項
 - `10-memory-maintenance.mdc` — 里程碑／長對話：寫回 `memory`
 - `20-doc-sync-closeout.mdc` — 改治理文件：doc-sync + health
-- `30-resume-keyword.mdc` — `AO-RESUME`：先 **`ao-resume.ps1` preflight**（pull／npm ci／閘道），再讀檔 + 固定續接格式
-- `40-shutdown-closeout.mdc` — `AO-CLOSE`：收工 + 閘道 + 日結格式
+- `30-resume-keyword.mdc` — `AO-RESUME`：讀檔 + 固定續接格式
+- `40-shutdown-closeout.mdc` — `AO-CLOSE`：收工 + 閘道 + 日結格式（**單關鍵字即授權**代理寫 **`WORKLOG`** **`- AUTO_TASK_DONE:`**；**`apply-closeout-task-checkmarks`**）
 - `50-operator-autopilot.mdc` — Autopilot 模式約定
 - `60-beginner-operation-format.mdc` — 小白操作（路徑／動作／預期）
 - `62-progress-heartbeat-15min.mdc` — 長任務 15 分鐘心跳

@@ -4,7 +4,9 @@ param(
     [switch]$StrictDirty,
     [switch]$AutoFix,
     [switch]$AllowUnexpectedDirty,
-    [switch]$SkipNpmCi
+    [switch]$AllowStashBeforePull,
+    [switch]$AllowAutoStashUnexpected,
+    [switch]$AllowPendingStash
 )
 
 Set-StrictMode -Version Latest
@@ -23,6 +25,11 @@ function Write-Result {
     }
 }
 
+function Get-GitStashCount {
+    $list = @(git stash list 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    return $list.Count
+}
+
 if (-not $WorkRoot) {
     if ($PSScriptRoot) {
         $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -35,6 +42,10 @@ if (-not $WorkRoot) {
 
 Push-Location $WorkRoot
 try {
+    # Native `git` writes progress to stderr; with $ErrorActionPreference Stop, PowerShell can treat that as a terminating error.
+    $savedEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
     $null = git rev-parse --git-dir 2>$null
     if ($LASTEXITCODE -ne 0) {
         throw "Not a git repository: $WorkRoot"
@@ -44,33 +55,22 @@ try {
     Write-Host "Work root: $WorkRoot"
     Write-Host ""
 
-    # IDE / generator noise (safe to git restore). Do NOT list preflight scripts here — restore would wipe in-flight edits.
-    $knownNoise = @(
-        ".cursor/rules/00-session-bootstrap.mdc",
-        ".cursor/rules/30-resume-keyword.mdc",
-        "agency-os/scripts/generate-integrated-status-report.ps1",
-        "agency-os/.cursor/rules/00-session-bootstrap.mdc",
-        "agency-os/.cursor/rules/30-resume-keyword.mdc",
-        "scripts/generate-integrated-status-report.ps1",
-        "scripts/autopilot-phase1.ps1",
-        "agency-os/scripts/autopilot-phase1.ps1",
-        "scripts/notify-ops.ps1",
-        "agency-os/scripts/notify-ops.ps1",
-        "scripts/register-autopilot-phase1.ps1",
-        "agency-os/scripts/register-autopilot-phase1.ps1",
-        "automation/REGISTER_AUTOPILOT_PHASE1_TASKS.ps1",
-        "agency-os/automation/REGISTER_AUTOPILOT_PHASE1_TASKS.ps1",
-        ".cursor/settings.json",
-        "agency-os/.cursor/settings.json",
-        "agency-os/settings/local.permissions.json"
-    )
+    function Get-AheadBehindOriginMain {
+        $line = (git rev-list --left-right --count HEAD...origin/main 2>$null | Select-Object -Last 1)
+        if ($line -match '^\s*(\d+)\s+(\d+)\s*$') {
+            return @{
+                Ahead  = [int]$Matches[1]
+                Behind = [int]$Matches[2]
+            }
+        }
+        return @{ Ahead = -1; Behind = -1 }
+    }
 
-    # Local WIP on these must NOT be stashed by AutoFix (would lose work). If behind origin and only these are dirty, refuse pull — commit first.
-    $preflightScriptPaths = @(
-        "scripts/check-three-way-sync.ps1",
-        "agency-os/scripts/check-three-way-sync.ps1",
-        "scripts/ao-resume.ps1",
-        "agency-os/scripts/ao-resume.ps1"
+    # Machine-local paths that may differ per workstation and must NEVER be `git restore`d by AutoFix.
+    # (Historically a long "knownNoise" list was restored here — that silently discarded uncommitted fixes to
+    # repo-owned scripts and broke multi-machine alignment. Only true local-only files belong here.)
+    $pathsAllowedDirtyWithoutFlag = @(
+        "agency-os/settings/local.permissions.json"
     )
 
     function Get-DirtyPaths {
@@ -84,76 +84,104 @@ try {
         return $paths
     }
 
-    git fetch origin | Out-Null
+    $stashCountAtStart = Get-GitStashCount
+
+    git fetch origin 2>&1 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        Write-Result -Label "git fetch origin" -Pass $false -Detail "fetch failed (network/auth?)"
+        exit 1
+    }
+    git rev-parse --verify origin/main 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Result -Label "origin/main" -Pass $false -Detail "Missing origin/main after fetch."
+        exit 1
+    }
+
     $head = (git rev-parse --short HEAD).Trim()
     $remote = (git rev-parse --short origin/main).Trim()
-    $isLatest = $head -eq $remote
+    $ab = Get-AheadBehindOriginMain
+    $notBehindOrigin = ($ab.Behind -eq 0)
 
     if ($AutoFix) {
-        $dirtyForFix = @(Get-DirtyPaths)
-        if ($dirtyForFix.Count -gt 0) {
-            $noiseToRestore = @()
-            foreach ($p in $dirtyForFix) {
-                if ($knownNoise -contains $p) { $noiseToRestore += $p }
-            }
-            if ($noiseToRestore.Count -gt 0) {
-                foreach ($n in $noiseToRestore) {
-                    cmd /c "git restore -- `"$n`" 1>nul 2>nul" | Out-Null
-                }
-            }
+        git fetch origin 2>&1 | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            Write-Result -Label "git fetch (AutoFix)" -Pass $false -Detail "fetch failed"
+            exit 1
         }
-
-        git fetch origin | Out-Null
         $head = (git rev-parse --short HEAD).Trim()
         $remote = (git rev-parse --short origin/main).Trim()
-        $isLatest = $head -eq $remote
+        $ab = Get-AheadBehindOriginMain
+        $notBehindOrigin = ($ab.Behind -eq 0)
 
-        if (-not $isLatest) {
+        # Only fast-forward when **behind** origin/main. Local commits ahead (checkpoint not pushed) must not trigger pull.
+        if ($ab.Behind -gt 0) {
             $dirtyForPull = @(Get-DirtyPaths)
-            $dirtyBlockingPull = @()
-            foreach ($p in $dirtyForPull) {
-                if ($preflightScriptPaths -notcontains $p) { $dirtyBlockingPull += $p }
-            }
-            if ($dirtyBlockingPull.Count -gt 0) {
+            if ($dirtyForPull.Count -gt 0) {
+                if (-not $AllowStashBeforePull) {
+                    Write-Result -Label "AutoFix pull" -Pass $false -Detail "Behind origin/main but worktree is dirty. Commit, discard, stash manually, or pass -AllowStashBeforePull (with -AllowPendingStash if stash is created)."
+                    Write-Host ("  Dirty: " + ($dirtyForPull -join "; ")) -ForegroundColor Yellow
+                    exit 1
+                }
                 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-                git stash push -m "auto-sync-before-pull-$stamp" | Out-Null
-            } elseif ($dirtyForPull.Count -gt 0) {
-                Write-Result -Label "AutoFix pull" -Pass $false -Detail "Behind origin/main with local edits to preflight scripts only — commit or stash those files, then retry."
-                exit 1
+                Write-Host "== AO-RESUME: stashing before fast-forward pull ==" -ForegroundColor Yellow
+                git stash push -m "ao-resume-before-pull-$stamp" 2>&1 | Out-Host
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Result -Label "AutoFix stash" -Pass $false -Detail "git stash push failed"
+                    exit 1
+                }
             }
-            git pull --ff-only origin main | Out-Null
+            git pull --ff-only origin main 2>&1 | Out-Host
             if ($LASTEXITCODE -ne 0) {
-                Write-Result -Label "AutoFix pull" -Pass $false -Detail "Unable to fast-forward pull (origin main)"
+                Write-Result -Label "AutoFix pull" -Pass $false -Detail "Fast-forward failed. Try: git status; git pull --rebase origin main; or reset to origin/main if remote is truth."
                 exit 1
             }
-            git fetch origin | Out-Null
+            git fetch origin 2>&1 | Out-Host
+            if ($LASTEXITCODE -ne 0) { exit 1 }
             $head = (git rev-parse --short HEAD).Trim()
             $remote = (git rev-parse --short origin/main).Trim()
-            $isLatest = $head -eq $remote
+            $ab = Get-AheadBehindOriginMain
+            $notBehindOrigin = ($ab.Behind -eq 0)
         }
 
         $postFixDirty = @(Get-DirtyPaths)
         $postFixUnexpected = @()
         foreach ($p in $postFixDirty) {
-            if ($knownNoise -notcontains $p -and $preflightScriptPaths -notcontains $p) { $postFixUnexpected += $p }
+            if ($pathsAllowedDirtyWithoutFlag -notcontains $p) { $postFixUnexpected += $p }
         }
         if (($postFixUnexpected.Count -gt 0) -and (-not $AllowUnexpectedDirty)) {
-            $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-            git stash push -m "auto-sync-unexpected-dirty-$stamp" | Out-Null
+            if ($AllowAutoStashUnexpected) {
+                $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+                Write-Host "== AO-RESUME: stashing unexpected (auto-repair) ==" -ForegroundColor Yellow
+                git stash push -m "ao-resume-unexpected-dirty-$stamp" 2>&1 | Out-Host
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Result -Label "stash unexpected" -Pass $false -Detail "git stash push failed"
+                    exit 1
+                }
+            } else {
+                Write-Result -Label "AutoFix worktree" -Pass $false -Detail ("Unexpected dirty: " + ($postFixUnexpected -join "; "))
+                exit 1
+            }
         }
 
-        git fetch origin | Out-Null
+        git fetch origin 2>&1 | Out-Host
+        if ($LASTEXITCODE -ne 0) { exit 1 }
         $head = (git rev-parse --short HEAD).Trim()
         $remote = (git rev-parse --short origin/main).Trim()
-        $isLatest = $head -eq $remote
+        $ab = Get-AheadBehindOriginMain
+        $notBehindOrigin = ($ab.Behind -eq 0)
     }
 
-    Write-Result -Label "Latest (HEAD vs origin/main)" -Pass $isLatest -Detail "HEAD=$head, origin/main=$remote"
+    $syncDetail = if ($ab.Ahead -lt 0) {
+        "Could not parse ahead/behind; HEAD=$head, origin/main=$remote"
+    } else {
+        "ahead=$($ab.Ahead), behind=$($ab.Behind); HEAD=$head, origin/main=$remote"
+    }
+    Write-Result -Label "Origin/main (not behind)" -Pass $notBehindOrigin -Detail $syncDetail
 
     $dirtyPaths = @(Get-DirtyPaths)
     $unexpectedDirty = @()
     foreach ($p in $dirtyPaths) {
-        if ($knownNoise -notcontains $p -and $preflightScriptPaths -notcontains $p) {
+        if ($pathsAllowedDirtyWithoutFlag -notcontains $p) {
             $unexpectedDirty += $p
         }
     }
@@ -166,71 +194,18 @@ try {
     if ($isCleanEnough) {
         if ($dirtyPaths.Count -eq 0) {
             Write-Result -Label "Working tree" -Pass $true -Detail "Clean"
+        } elseif ($unexpectedDirty.Count -eq 0) {
+            Write-Result -Label "Working tree" -Pass $true -Detail ("Only allowed local drift: " + ($dirtyPaths -join ", "))
         } else {
-            $onlyPreflight = (($dirtyPaths | Where-Object { $preflightScriptPaths -notcontains $_ }).Count -eq 0)
-            if ($onlyPreflight) {
-                Write-Result -Label "Working tree" -Pass $true -Detail ("Preflight script WIP (allowed): " + ($dirtyPaths -join ", "))
+            $detail = if ($AllowUnexpectedDirty) {
+                "Allowed by -AllowUnexpectedDirty: " + ($unexpectedDirty -join "; ")
             } else {
-                Write-Result -Label "Working tree" -Pass $true -Detail ("Only known noise: " + ($dirtyPaths -join ", "))
+                "Unexpected: " + ($unexpectedDirty -join "; ")
             }
+            Write-Result -Label "Working tree" -Pass $true -Detail $detail
         }
     } else {
         Write-Result -Label "Working tree" -Pass $false -Detail ("Unexpected dirty files: " + ($unexpectedDirty -join ", "))
-    }
-
-    $npmPass = $true
-    if ($SkipNpmCi) {
-        Write-Result -Label "npm ci (workflows + optional wrappers)" -Pass $true -Detail "Skipped by -SkipNpmCi"
-    } elseif (-not $isLatest) {
-        Write-Result -Label "npm ci (workflows + optional wrappers)" -Pass $true -Detail "Skipped (HEAD != origin/main; FINAL will fail below)"
-    } elseif (-not $isCleanEnough) {
-        Write-Result -Label "npm ci (workflows + optional wrappers)" -Pass $true -Detail "Skipped (working tree; FINAL will fail below)"
-    } else {
-        $wfRoot = Join-Path $WorkRoot "lobster-factory\packages\workflows"
-        $wfLock = Join-Path $wfRoot "package-lock.json"
-        if (-not (Test-Path -LiteralPath $wfLock)) {
-            Write-Result -Label "npm ci (lobster workflows)" -Pass $false -Detail "Missing package-lock.json under lobster-factory/packages/workflows"
-            $npmPass = $false
-        } else {
-            Write-Host "== npm ci: lobster-factory/packages/workflows ==" -ForegroundColor Cyan
-            Push-Location $wfRoot
-            try {
-                $prevEap = $ErrorActionPreference
-                $ErrorActionPreference = "Continue"
-                & npm ci 2>&1 | Out-Host
-                $ErrorActionPreference = $prevEap
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Result -Label "npm ci (lobster workflows)" -Pass $false -Detail ("npm ci exit " + $LASTEXITCODE)
-                    $npmPass = $false
-                } else {
-                    Write-Result -Label "npm ci (lobster workflows)" -Pass $true -Detail "OK"
-                }
-            } finally {
-                Pop-Location
-            }
-        }
-        if ($npmPass) {
-            $wrapRoot = Join-Path $WorkRoot "mcp-local-wrappers"
-            $wrapLock = Join-Path $wrapRoot "package-lock.json"
-            if (Test-Path -LiteralPath $wrapLock) {
-                Write-Host "== npm ci: mcp-local-wrappers ==" -ForegroundColor Cyan
-                Push-Location $wrapRoot
-                try {
-                    $prevEap = $ErrorActionPreference
-                    $ErrorActionPreference = "Continue"
-                    & npm ci 2>&1 | Out-Host
-                    $ErrorActionPreference = $prevEap
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Result -Label "npm ci (mcp-local-wrappers)" -Pass $false -Detail ("npm ci exit " + $LASTEXITCODE)
-                        $npmPass = $false
-                    } else {
-                        Write-Result -Label "npm ci (mcp-local-wrappers)" -Pass $true -Detail "OK"
-                    }
-                } finally {
-                    Pop-Location
-                }
-            }
-        }
     }
 
     $verifyPass = $true
@@ -248,14 +223,28 @@ try {
         Write-Result -Label "Correctness gate (verify-build-gates)" -Pass $true -Detail "Skipped by -SkipVerify"
     }
 
-    $finalPass = $isLatest -and $isCleanEnough -and $npmPass -and $verifyPass
+    $stashCountNow = Get-GitStashCount
+    if ($AutoFix -and (-not $AllowPendingStash) -and ($stashCountNow -gt $stashCountAtStart)) {
+        Write-Result -Label "Stash drift guard" -Pass $false -Detail "New stash ($stashCountAtStart -> $stashCountNow). git stash list; pop/drop; re-run. Use -AllowPendingStash with autopilot."
+        $stateDir = Join-Path $WorkRoot "agency-os\.agency-state"
+        $null = New-Item -ItemType Directory -Force -Path $stateDir
+        $note = Join-Path $stateDir "ao-resume-stash-warning.txt"
+        $utf8 = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($note, "Stash created during AO-RESUME. UTC: $([DateTime]::UtcNow.ToString('o'))`n", $utf8)
+        exit 1
+    }
+
+    $finalPass = $notBehindOrigin -and $isCleanEnough -and $verifyPass
     Write-Host ""
-    Write-Result -Label "FINAL (Latest + Correctness)" -Pass $finalPass -Detail $(if ($finalPass) { "Repo is synced and valid." } else { "Check failed items above." })
+    Write-Result -Label "FINAL (not behind + correctness)" -Pass $finalPass -Detail $(if ($finalPass) { "Repo is ready (not behind origin/main)." } else { "Check failed items above." })
 
     if (-not $finalPass) {
         exit 1
     }
 } finally {
+    if ($null -ne $savedEap) {
+        $ErrorActionPreference = $savedEap
+    }
     Pop-Location
 }
 

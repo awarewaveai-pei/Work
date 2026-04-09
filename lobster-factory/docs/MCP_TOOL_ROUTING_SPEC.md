@@ -79,16 +79,20 @@ Define enforceable tool routing for Lobster Factory so automation is predictable
 - **Agency OS** maintains a separate inventory of **Cursor `mcp.json` servers and extensions**: `agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md`.
 - That document does **not** override this spec for **Lobster production/staging orchestration**; it explains what each IDE MCP is *for* so agents do not route durable workflows through the wrong tool.
 - Cross-system operating cadence (AO events + Lobster execution): `../agency-os/docs/overview/ao-lobster-operating-model.md`.
+- One-page traceability map (tool split ↔ routing ↔ tasks): `../agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`.
 
 ## Out of Scope (for now)
 - Additional durable engines (Inngest, Temporal).
 - Browser automation specific runtimes.
 
 ## Related Documents (Auto-Synced)
+- `../lobster-factory/docs/ROUTING_MATRIX.md`
 - `.cursor/rules/64-architecture-mcp-routing.mdc`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
-- `docs/operations/hetzner-stack-rollout-index.md`
+- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
+- `README.md`
+- `TASKS.md`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 09:29:25 UTC_
 

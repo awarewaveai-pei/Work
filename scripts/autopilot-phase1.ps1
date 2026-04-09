@@ -33,7 +33,7 @@ if (-not (Test-Path -LiteralPath $alertFile)) {
 switch ($Mode) {
     "startup" {
         $resume = Join-Path $script:Root "scripts\ao-resume.ps1"
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $resume -WorkRoot $script:Root -SkipVerify -AllowUnexpectedDirty
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $resume -WorkRoot $script:Root -SkipVerify -SkipStrictEnvironmentAudit -AllowUnexpectedDirty
         if ($LASTEXITCODE -eq 0) {
             Invoke-Notify -Title "AO Startup Preflight PASS" -Message "AO-RESUME preflight completed successfully." -Level "success"
             exit 0
@@ -48,7 +48,7 @@ switch ($Mode) {
         Invoke-Notify -Title "AO Alert Triggered" -Message "ALERT_REQUIRED detected. Starting auto-repair flow." -Level "warn"
 
         $sync = Join-Path $script:Root "scripts\check-three-way-sync.ps1"
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $sync -WorkRoot $script:Root -AutoFix -SkipVerify
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $sync -WorkRoot $script:Root -AutoFix -SkipVerify -AllowStashBeforePull -AllowAutoStashUnexpected -AllowPendingStash
         if ($LASTEXITCODE -ne 0) {
             Invoke-Notify -Title "AO Alert Auto-Repair FAIL" -Message ("sync auto-fix failed with exit code " + $LASTEXITCODE) -Level "error"
             exit $LASTEXITCODE

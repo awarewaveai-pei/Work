@@ -3,18 +3,15 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
-- **2026-04-06（AO-CLOSE 語意）**：使用者打 **AO-CLOSE** 時，代理**先**更新 **`TASKS`／`WORKLOG`／`memory`**，再跑 **`ao-close.ps1`**：`verify-build-gates` → **`system-guard`** → **`generate-integrated-status-report`** → 預設健康 **100%** 下 **`git commit`**（有變更）與 **`git push`**。**不入庫**之祕密／本機環境不同步屬設計邊界，非腳本缺失。
-- **2026-04-06（雙機／Git）**：筆電已 **`git push origin main`**；公司機在 monorepo 根 **`ao-resume.ps1`**（或手動 §2）與 **`origin/main` 對齊** 並過閘後 Cursor **`AO-RESUME`**。**非 Git**（各機一致需人工）：`.env.local`、vault、`mcp.json`、本機 WP／DB。細節見 **`WORKLOG.md`「雙機／遠端」**、**`REMOTE_WORKSTATION_STARTUP.md` §2**。  
-- **2026-04-06（環境變數統一入口）**：**`hetzner-self-host-start-here.md`** 設 **「環境變數唯一對照」**；monorepo 根 **`.env.local.example`**（RAG）；伺服器仍用 **`hetzner-phase1-core/.env`** — 兩實體檔不可避免，**輪替／步驟只認該節**。  
-- **2026-04-06（Trigger：CI 與自託管單一說法）**：**已自 GitHub Actions 移除** Trigger Cloud **`deploy`**；**`lobster-workflows-validate-main.yml`** 僅 **`npm run validate`**。生產 Trigger **只走自託管**；SSOT **`github-actions-trigger-prod-deploy.md`**（檔名保留舊連結）。  
-- **2026-04-06（Hetzner 人因入口）**：**人類只書籤** **`docs/operations/hetzner-self-host-start-here.md`**（一表跳轉 runbook／compose／長週期維運／Trigger SSOT）；**工程定義與進度表 Owner** 仍為 **`hetzner-stack-rollout-index.md`**。  
-- **2026-04-06（Hetzner 堆疊索引）**：新增 **`agency-os/docs/operations/hetzner-stack-rollout-index.md`**（Phase A 10 + Phase B 4、平面、SSOT 連動、**必查** `CHANGE_IMPACT_MATRIX`／`change-impact-map.json`）；**現況**：Hetzner 上已完成 **Supabase**、**WordPress**；其餘見 **`TASKS.md` Next**。  
-- **2026-04-06（Hetzner Phase 1 × 長期）**：**`lobster-factory/infra/hetzner-phase1-core/`** 具 **`LONG_TERM_OPS.md`**（多週期營運契約）、**`MAINTENANCE_CALENDAR.md`**（週／月／季／年核對）、compose **日誌輪替**、**`N8N_IMAGE_TAG`** 可釘選；與 **`LONG_TERM_OPERATING_DISCIPLINE.md`**、full-stack runbook、**`TASKS.md` Next** 長週期項連動。  
-- **2026-04-05（自架 + RAG）**：**Supabase 自架**（VPS）已跑通 **`knowledge_chunks` → embedding → `knowledge_embeddings` → `match_documents`**；monorepo 根有 **`npm run rag:setup` / `rag:embed` / `rag:query`**（`.env.local` 僅本機）。**明日優先**：依 **`docs/operations/hetzner-self-host.env.example`** 類型擴充其餘自架——**MinIO、Redis、Trigger.dev、n8n**（見 **`TASKS.md` Next** 與 **`hetzner-full-stack-self-host-runbook.md`**）。
+- **2026-04-09（AO-CLOSE 規則鏡像）**：**`sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 已納入 **`40-shutdown-closeout.mdc`**（與 **`00`／`30`／`50`／`63–66`** 一併鏡像到 monorepo 根；**`40`** 含 **end-of-day-checklist** 路徑轉換）。**`agency-os/scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 僅轉呼叫 monorepo **`scripts/`** 正本。**health／README** 敘述為 **00 + 30 + 40 + 50 + 63–66**。
+- **2026-04-09（AO-RESUME 待辦可見性）**：**`print-open-tasks`** 會寫 **`agency-os/.agency-state/open-tasks-snapshot.md`**（gitignore）。**`AO-RESUME`** 代理須 **Read** 該檔並在聊天 **逐條全列** `- [ ]`（**`30-resume-keyword.mdc`**）；**>35 條**可同回合分段列完。**`sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 已納入 **`00-session-bootstrap` + `30-resume-keyword`**（根目錄鏡像含路徑轉換），**health gate** 會驗證。
+- **2026-04-09（AO-RESUME 預設＝完整檢查）**：**`scripts/ao-resume.ps1`** 預設即跑 **`machine-environment-audit -FetchOrigin -Strict`**（與 **`align-workstation.ps1`** 相同）；**`-SkipStrictEnvironmentAudit`** 僅 Autopilot／輕量開機。只打 **`AO-RESUME`** 時代理應跑此預設腳本。
+- **2026-04-09（雙機對齊根因修復）**：`check-three-way-sync -AutoFix` 已**移除**對「known noise」路徑的 **`git restore`**（舊行為會靜默丟棄 `scripts/*.ps1` 等未提交修改，導致多機反覆對齊失敗）；白名單僅剩 **`agency-os/settings/local.permissions.json`**。`TASKS` 雙機項、`30-resume-keyword`、`REMOTE` §1.5／§6.2 與 **`machine-environment-audit -FetchOrigin -Strict`**（無 WARN 方可勾）已對齊；新增 **`agency-os/scripts/machine-environment-audit.ps1`** wrapper。
+- **2026-04-07（AO-RESUME／AO-CLOSE 營運硬化）**：`check-three-way-sync` 與 `origin/main`、`ao-close` push 前落後攔截、**`ensure-lobster-workflows-deps`** 掛入 **`ao-resume`**、**`print-open-tasks`／`print-today-closeout-recap`／`apply-closeout-task-checkmarks`**（**WORKLOG `AUTO_TASK_DONE`**）；**單打 AO-CLOSE** 即授權代理代寫 **`AUTO_TASK_DONE`**（**40／50／AGENTS／TASKS 待辦原則**）；**REMOTE 2.5.1**、`40`／`30` **monorepo 根鏡像須與 `agency-os` 正本一致**；詳 **WORKLOG 2026-04-07**。
 - **2026-04-02（ADR 006 migration）**：已新增 **`lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql`**（Clerk↔org 對照表、JWT org claim、`user_has_org_access` 擴充、多表 SELECT RLS）；ADR 006 已補 JWT／staging 驗證說明。
 - **2026-04-02（長期 §9–10）**：`LONG_TERM_OPERATING_DISCIPLINE.md` **§9** 為 **AI／MCP 輔助邊界**；**§10** 為 **執行節奏表**（閘道／ADR／釋出／開收工／雙機／audit + 12 個月 ADR 006 錨點）。
 - **2026-04-02（ADR 006 + 閘道）**：**006** 多租戶 **RLS／租戶鍵** 與 **Clerk 對照** 原則。`verify-build-gates` 已內建 **`verify-adr-index.ps1`**。見 `docs/architecture/decisions/006-supabase-tenant-isolation-and-clerk-mapping.md`。
-- **2026-04-02（工具退役）**：已移除「第三方議題看板 ↔ repo」同步鏈（腳本、playbook、報表目錄、本機 MCP 條目）；以 `doc-sync` + health 100% + `verify-build-gates` PASS 驗證後推送 `origin/main`。任務真相仍以 `TASKS.md`／Checklist 為準。
+- **2026-04-02（工具退役）**：已將 **Linear** 從 repo **完全移除**（含腳本/文件/產物/`mcp.json` server/歷史文字），並以 `doc-sync` + health 100% + `verify-build-gates` PASS 驗證後推送 `origin/main`（避免再出現 401/衝突/殘留入口）。
 - **2026-04-02（ADR 004／005）**：**004** Trigger vs n8n 編排邊界（以 `MCP_TOOL_ROUTING_SPEC.md` 為準）。**005** Supabase SoR vs WordPress 執行期 DB。見 `docs/architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md`、`005-supabase-sor-vs-wordpress-runtime-db.md`。
 - **2026-04-02（ADR 002／003）**：**002** 應用層預設 **Clerk**，邊界見 `docs/architecture/decisions/002-clerk-identity-boundary.md`。**003** 否決 manifest **自動雙邊同步**，見 `003-no-automated-manifest-dual-sync.md`。
 - **2026-04-02（ADR 001）**：**Manifest SSOT** = `lobster-factory/packages/manifests/`；**install／rollback shell SSOT** = `lobster-factory/templates/woocommerce/scripts/`；**`agency-os/platform-templates/woocommerce/manifests/`** 僅輔材。見 **`docs/architecture/decisions/001-wordpress-manifest-and-shell-ssot.md`**。
@@ -31,7 +28,7 @@
 - **2026-03-31 補充**：已完成 P1/P2 跑道加速（Run ID 對照規格 + preflight 腳本 + 證據骨架初始化），可直接進入實跑。
 - **2026-03-31 補充**：P1 最小實跑已完成：舊 `company-a` 示範資料與舊骨架已清除，改用 `company-p1-pilot` 建立新 tenant/site/project，並產生新證據路徑 `reports/e2e/onboarding-a10-2/20260331-214650-company-p1-pilot-2026-010-p1-pilot/`。
 - **AO-RESUME 明日必回報提醒**：開場必先提醒並檢查 `reports/e2e/onboarding-a10-2/20260331-215507-company-p1-pilot-2026-010-p1-pilot/02-a10-2-evidence.md` 與同目錄 `03-run-id-map.md`（A10-2 pending 列），再決定是否直接啟動 A10-2。
-- **AO-RESUME 雙機提醒（使用者明示 + 未勾 `TASKS` 前持續報）**：**另一台電腦**須跑完 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5**（**含 §1.5.1**：Windows 筆電須補 **MariaDB.Server + PHP.PHP.NTS.8.4 + `setup-wp-cli-windows.ps1` + `bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`**，與 Supabase／MCP **分列**），然後在 **monorepo 根**執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin` 至 **PASS（無 WARN）**，再勾 **`TASKS.md` → Next**「（AO-RESUME 提醒）雙機環境對齊」。在該項**仍未勾選**期間，每次 `AO-RESUME` 回覆的 **「下一步」**（必要時 **「目前進度」**）**必含一行專門口頭提醒**上述 §1.5 + **§1.5.1** + audit（見 `.cursor/rules/30-resume-keyword.mdc` 第 7、8 點）。要點仍含：`gh`、vault／MCP 每台重設、**§2** 例行節奏。
+- **AO-RESUME 雙機提醒（使用者明示 + 未勾 `TASKS` 前持續報）**：**另一台電腦**須跑完 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5**（**含 §1.5.1**：Windows 筆電須補 **MariaDB.Server + PHP.PHP.NTS.8.4 + `setup-wp-cli-windows.ps1` + `bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`**，與 Supabase／MCP **分列**），然後在 **monorepo 根**執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict` 至 **PASS（無 WARN）**，再勾 **`TASKS.md` → Next**「（AO-RESUME 提醒）雙機環境對齊」。在該項**仍未勾選**期間，每次 `AO-RESUME` 回覆的 **「下一步」**（必要時 **「目前進度」**）**必含一行專門口頭提醒**上述 §1.5 + **§1.5.1** + audit（見 `.cursor/rules/30-resume-keyword.mdc` 第 7、8 點）。要點仍含：`gh`、vault／MCP 每台重設、**§2** 例行節奏。
 - **2026-04-01 補充（雙機／筆電）**：使用者已表明**公司桌機基樁較完整、筆電要補**——在「雙機環境對齊」未勾選前，**每次 `AO-RESUME` 務必**提醒筆電完成 **§1.5.1**（MariaDB／PHP／WP-CLI／bootstrap）；MCP 工具庫存旁註見 **`docs/operations/cursor-mcp-and-plugin-inventory.md` §4**（強調非 MCP、不取代 Supabase）。
 - **2026-04-01 補充（環境 SSOT）**：「可驗證的完美環境」定義與指令見 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §6.2**；稽核腳本 **`scripts/machine-environment-audit.ps1`**（`-FetchOrigin`、選用 `-RunVerifyGates`、`-Strict`）。例行 **`npm ci` 目錄為 `lobster-factory\packages\workflows`**（根目錄無 package-lock，舊文件寫「在 lobster-factory 根 npm ci」為誤）。
 
@@ -150,8 +147,13 @@
 你有兩種模式：`Strict`（安全最大）與 `Fast`（速度優先但仍有門檻）。
 以下命令中的 `<WORK_ROOT>` 請替換為本機實際路徑（例如 `D:\Work` 或 `C:\Users\USER\Work`）。
 
-### 開工前（雙機；工程面已收斂為單一閘道）
-在 monorepo 根執行 **`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**（內含 `fetch`、必要時 **`pull --ff-only origin main`**、workflows **`npm ci`**、**`verify-build-gates`**）；Cursor 打 **`AO-RESUME`** 時 Agent 應先跑同一腳本再讀檔（見 **`.cursor/rules/30-resume-keyword.mdc`**）。若本機未提交／衝突，pull 仍可能失敗——先 **`git status`** 整理。完整說明：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**。
+### 開工前（雙機必做；代理在 `AO-RESUME` 時應先跑腳本再讀檔）
+在 **monorepo 根**：
+```
+cd <WORK_ROOT>
+powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1
+```
+**預設**行為＝`fetch`、**僅 behind>0** 時 **`git pull --ff-only origin main`**、`verify-build-gates`、workflows 依賴、`print-open-tasks`、**`machine-environment-audit -FetchOrigin -Strict`**（見 `REMOTE_WORKSTATION_STARTUP` **2.5.1**）。**落後且工作樹仍有未提交變更時，預設不會自動 stash**——腳本會**非 0**；請先 commit／stash／捨棄後重跑，**勿**只打關鍵字假設已對齊。另一台 **AO-CLOSE** push 後，本機須**跑通**上述腳本（exit 0）或手動等價對齊再打 **`AO-RESUME`**。若 ff-only 失敗：`git pull --rebase origin main`（見 **REMOTE** **例行 §2**）。
 
 ### Strict Mode（推薦，確保今天/明天不出問題）
 1. Phase 1 基線健檢
@@ -206,8 +208,8 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `validate-package-install-runs-flow.mjs --execute=1`：PASS（`installRunId=ae8c6e48-fac9-4ac6-8721-d142c831c620`，`workflowRunId=73c91be3-3663-4977-aa9a-4c2b7e24dd97`，flow pending→running→completed）。
 - `bootstrap-validate.mjs`：PASS。主檢查清單 **C1-2** 已勾選。
 
-## Today (2026-03-26) - AO-CLOSE
-- **`AO-CLOSE` 關鍵字與四段收工回覆格式不變**；**`ao-close.ps1`**（雙路徑同內容）預設：`verify-build-gates` → `system-guard`（doc-sync+health+guard）→ `generate-integrated-status-report` → **PASS 後** `git commit`／`git push`，讓公司機 **`pull` 即完整**；`-SkipPush`／`-SkipVerify` 為選用。
+## Today (2026-03-26) - AO-CLOSE（歷史快照；**現行順序**見 **`.cursor/rules/40-shutdown-closeout.mdc` 第 2 步**）
+- **`AO-CLOSE` 關鍵字與四段收工回覆格式不變**；**monorepo 根 `scripts/ao-close.ps1`** 為正本（**`agency-os/scripts/ao-close.ps1`** 為 thin wrapper）。**現行**另含：**`print-today-closeout-recap`**、**`apply-closeout-task-checkmarks`**（**WORKLOG `AUTO_TASK_DONE`**）；閘道仍為 **`verify-build-gates` → `system-guard` → `generate-integrated-status-report`**；push 前 **`git fetch`**／落後攔截；旗標見 **`end-of-day-checklist`**。
 - AO-CLOSE 預設新增硬門檻：`system-health-check` 分數需為 **100%**，未達 100% 直接視為收工未完成（需修復或經使用者明確授權才可放寬）。
 - **他處電腦開機**：固定閱讀 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（**§1.5** 新機、**§2** 例行；與 `RESUME_AFTER_REBOOT.md` 分機情境）；綜合報告以 **`agency-os/reports/status/integrated-status-LATEST.md`** 為準。
 - **報表路徑收斂**：腳本已加 monorepo guardrail，從 repo 根執行也會強制寫入 `agency-os/reports/*`；root `reports/*` 已退役為相容用途。
@@ -318,10 +320,8 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `.cursor/rules/10-memory-maintenance.mdc`
 - `.cursor/rules/30-resume-keyword.mdc`
 - `.cursor/rules/40-shutdown-closeout.mdc`
-- `docs/operations/hetzner-self-host-start-here.md`
-- `docs/operations/hetzner-stack-rollout-index.md`
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 05:52:22 UTC_
 

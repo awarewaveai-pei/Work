@@ -1,34 +1,34 @@
 {
   "schema_version": "1",
   "tenant_slug_hint": "company-<slug>",
-  "notes": "複製到 tenants/company-*/core/DEPARTMENT_SELECTION.json 後依約填寫。cluster_id 見 DEPARTMENT_CLUSTER_CATALOG.md。",
+  "notes": "預設示例為全 20 部門啟用。若客戶預算/方案較小，請刪減 selected_cluster_ids 並在 excluded_explicit 註明原因。cluster_id 見 DEPARTMENT_CLUSTER_CATALOG.md。",
 
   "selected_cluster_ids": [
     "CLU_STRATEGY_GOVERN",
-    "CLU_FINANCE",
-    "CLU_SECURITY_IT",
+    "CLU_MARKETING",
+    "CLU_SALES_BD",
+    "CLU_CUSTOMER_SUCCESS",
+    "CLU_PRODUCT",
     "CLU_ENGINEERING",
-    "CLU_ORDER_OPS"
+    "CLU_DATA_AI",
+    "CLU_PROCUREMENT",
+    "CLU_LOGISTICS",
+    "CLU_ORDER_OPS",
+    "CLU_FINANCE",
+    "CLU_RISK_FRAUD",
+    "CLU_TAX_TRADE",
+    "CLU_LEGAL",
+    "CLU_HR",
+    "CLU_SECURITY_IT",
+    "CLU_PRIVACY_RETENTION",
+    "CLU_BRAND_COMMS",
+    "CLU_REGIONAL",
+    "CLU_IR"
   ],
 
-  "excluded_explicit": [
-    {
-      "cluster_id": "CLU_IR",
-      "reason": "N/A — SMB 無 IR 需求"
-    },
-    {
-      "cluster_id": "CLU_ECOSYSTEM",
-      "reason": "N/A — 未採購平台生態模組"
-    }
-  ],
+  "excluded_explicit": [],
 
-  "planned_future": [
-    {
-      "cluster_id": "CLU_REGIONAL",
-      "notes": "預計 Q3 開海外站後啟用",
-      "target_quarter": "2026-Q3"
-    }
-  ],
+  "planned_future": [],
 
   "last_reviewed_iso": "YYYY-MM-DD",
   "reviewed_by": ""

@@ -20,7 +20,7 @@
 7. **客戶模組化**：客戶選用哪些能力模組（catalog/selection）可日後擴充；但交付/計價歸桶以固定矩陣為準，避免頻繁重排導致合約口徑漂移。
 
 ## 2. 工程層執行（Execution）
-1. **每日續接**：預設從 `AO-RESUME` 進入，確保本機與時程接線一致；必要時先在 monorepo 根 `git pull --ff-only origin main` 再繼續。
+1. **每日續接**：預設在 monorepo 根跑 **`scripts/ao-resume.ps1`**（behind 時才 ff-only pull＋閘道＋Strict 稽核）**exit 0** 後，再在 Cursor 打 **`AO-RESUME`** 讀檔；髒樹／衝突時腳本會非 0，請先整理（見 **`REMOTE_WORKSTATION_STARTUP` 2.5.1**）。
 2. **治理/文件連動**：任何改版涉及政策、文件連動與矩陣語意時，先跑 `doc-sync-automation.ps1 -AutoDetect`，並以 `docs/CHANGE_IMPACT_MATRIX.md` 為硬約束。
 3. **收工閘道**：預設入口為 `AO-CLOSE`；閘道通過後才允許 commit/push。
 4. **觀測與健康**：`system-health-check` Critical Gate 必須達標；未達不得宣告整庫正常。

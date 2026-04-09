@@ -1,16 +1,11 @@
 # --- Secrets & local app state (never push) ---
 .claude/
 **/.claude/
-# Root MCP config + backups (API keys / tokens; never push)
-mcp.json
-**/mcp.json
-mcp-backups/
-.claude.json
-**/.claude.json.backup*
-**/.claude/backups/
 
 # AO-RESUME local stamp (see scripts/git-audit-tracked-remote.ps1 / check-three-way-sync knownNoise)
 agency-os/.agency-state/ao-resume-last.txt
+agency-os/.agency-state/pending-task-completions.txt
+agency-os/.agency-state/open-tasks-snapshot.md
 
 # --- Local scratch (wp-dummy paths for regression; never push) ---
 .scratch/
@@ -25,7 +20,6 @@ hostinger-recovery-codes.txt
 .env
 .env.*
 !.env.example
-!.env.local.example
 *.pem
 *.p12
 id_rsa

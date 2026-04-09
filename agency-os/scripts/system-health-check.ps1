@@ -116,7 +116,7 @@ if (Test-Path $wkPath) {
     if (-not $wkOk) { Add-CriticalFailure -Reason "weekly-system-review.ps1 failed sanity check" }
 }
 
-# 1c) Monorepo root `.cursor/rules` must mirror agency-os `50-operator` + enterprise 63-66 (SHA256)
+# 1c) Monorepo root `.cursor/rules` must mirror agency-os `00` + `30` + `40` (path-transformed) + `50-operator` + enterprise 63-66 (SHA256)
 $monoRoot = Split-Path -Path $root -Parent
 $syncVerifyScript = Join-Path $monoRoot "scripts\sync-enterprise-cursor-rules-to-monorepo-root.ps1"
 if (Test-Path -LiteralPath $syncVerifyScript) {
@@ -126,10 +126,10 @@ if (Test-Path -LiteralPath $syncVerifyScript) {
     $verExit = $LASTEXITCODE
     $ErrorActionPreference = $prevOk
     $verPass = ($verExit -eq 0)
-    Add-Check -Name "Monorepo root mirrors agency-os rules 50 + 63-66 (SHA256)" -Pass $verPass -Detail $(if ($verPass) { "OK" } else { "Mismatch or missing - run scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1 or verify-build-gates" })
-    if (-not $verPass) { Add-CriticalFailure -Reason "Cursor rules (50 / 63-66) differ between agency-os and monorepo root .cursor/rules" }
+    Add-Check -Name "Monorepo root mirrors agency-os rules 00 + 30 + 40 + 50 + 63-66 (SHA256 / transform)" -Pass $verPass -Detail $(if ($verPass) { "OK" } else { "Mismatch or missing - run scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1 or verify-build-gates" })
+    if (-not $verPass) { Add-CriticalFailure -Reason "Cursor rules (00 / 30 / 40 / 50 / 63-66) differ between agency-os and monorepo root .cursor/rules" }
 } else {
-    Add-Check -Name "Monorepo root mirrors agency-os rules 50 + 63-66 (SHA256)" -Pass $true -Detail "Skipped: no sync script at monorepo scripts/"
+    Add-Check -Name "Monorepo root mirrors agency-os rules 00 + 30 + 40 + 50 + 63-66 (SHA256 / transform)" -Pass $true -Detail "Skipped: no sync script at monorepo scripts/"
 }
 
 # 2) Map consistency

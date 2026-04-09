@@ -39,10 +39,10 @@ if ($LobsterOnly) {
     exit 0
 }
 
-# Keep monorepo root .cursor/rules 50-operator + 63–66 identical to agency-os canonical (SSOT).
+# Keep monorepo root .cursor/rules 00 + 30 + 40 (path-transformed) + 50-operator + 63–66 identical to agency-os canonical (SSOT).
 $syncEnt = Join-Path $WorkRoot "scripts\sync-enterprise-cursor-rules-to-monorepo-root.ps1"
 if (Test-Path -LiteralPath $syncEnt) {
-    Write-Host "== Monorepo: sync Cursor rules (50-operator + 63-66) to repo root ==" -ForegroundColor Cyan
+    Write-Host "== Monorepo: sync Cursor rules (00 + 30 + 40 + 50-operator + 63-66) to repo root ==" -ForegroundColor Cyan
     & powershell -ExecutionPolicy Bypass -NoProfile -File $syncEnt -MonorepoRoot $WorkRoot -Quiet
     if ($LASTEXITCODE -ne 0) {
         Write-Error "verify-build-gates: sync-enterprise-cursor-rules-to-monorepo-root failed (exit $LASTEXITCODE)"

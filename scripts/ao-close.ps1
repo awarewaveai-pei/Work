@@ -1,7 +1,10 @@
-# AO-CLOSE: monorepo verify-build-gates -> system-guard (doc-sync + health + guard) ->
-#   generate integrated-status report -> git commit + push.
+# AO-CLOSE: print-today-closeout-recap (see -SkipTodayRecap) -> verify-build-gates ->
+#   system-guard (doc-sync + health + guard) -> generate integrated-status report ->
+#   optional apply-closeout-task-checkmarks -> git commit + push.
 # Run AFTER updating TASKS.md, WORKLOG.md, and memory files so they are included in the commit.
-# May be invoked from monorepo root scripts\ OR agency-os\scripts\ (keep both copies identical).
+# apply-closeout-task-checkmarks: WORKLOG today "- AUTO_TASK_DONE: <substring>" + optional
+# agency-os/.agency-state/pending-task-completions.txt (gitignored).
+# Primary: monorepo root scripts\ao-close.ps1. agency-os\scripts\ao-close.ps1 is a thin wrapper (same flags).
 # -SkipPush: no git commit/push (still runs gates and reports).
 # -SkipVerify: skip verify-build-gates (faster; not recommended before company pull).
 
@@ -10,7 +13,10 @@ param(
     [string]$CommitMessage = "",
     [switch]$SkipPush,
     [switch]$SkipVerify,
-    [switch]$AllowNonPerfectHealth
+    [switch]$AllowNonPerfectHealth,
+    [switch]$AllowPushWhileBehind,
+    [switch]$SkipTodayRecap,
+    [switch]$SkipAutoTaskCheckmarks
 )
 
 Set-StrictMode -Version Latest
@@ -36,6 +42,55 @@ $guardScript = Join-Path $agencyRoot "scripts\system-guard.ps1"
 if (-not (Test-Path -LiteralPath $guardScript)) {
     Write-Error "ao-close: missing system-guard at $guardScript"
     exit 1
+}
+
+$recapScript = Join-Path $WorkRoot "scripts\print-today-closeout-recap.ps1"
+if (-not $SkipTodayRecap -and (Test-Path -LiteralPath $recapScript)) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $recapScript -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "ao-close: print-today-closeout-recap failed (exit $LASTEXITCODE)."
+        exit $LASTEXITCODE
+    }
+} elseif ($SkipTodayRecap) {
+    Write-Host "== AO-CLOSE: -SkipTodayRecap (略過今日機器摘要) ==" -ForegroundColor DarkYellow
+}
+
+if (-not $SkipPush -and -not $AllowPushWhileBehind) {
+    Write-Host "== AO-CLOSE: git fetch + push safety (ahead/behind vs origin) ==" -ForegroundColor Cyan
+    Push-Location $WorkRoot
+    try {
+        $null = git rev-parse --git-dir 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "ao-close: not a git repository at $WorkRoot"
+            exit 1
+        }
+        git fetch origin 2>&1 | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "ao-close: git fetch failed; fix network/auth or pass -SkipPush."
+            exit 1
+        }
+        $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+        if ($branch -ne "HEAD") {
+            $remoteRef = "origin/$branch"
+            git rev-parse --verify $remoteRef 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $lr = (git rev-list --left-right --count "${remoteRef}...HEAD").Trim()
+                $parts = @($lr -split '\s+' | Where-Object { $_ })
+                if ($parts.Count -ge 2) {
+                    $behind = [int]$parts[0]
+                    $ahead = [int]$parts[1]
+                    if ($behind -gt 0) {
+                        Write-Error "ao-close: $remoteRef is ahead by $behind commit(s). Run AO-RESUME or git pull --ff-only origin $branch (then resolve), then AO-CLOSE again. Or pass -AllowPushWhileBehind (unsafe)."
+                        exit 1
+                    }
+                }
+            }
+        }
+    } finally {
+        Pop-Location
+    }
+} elseif ($AllowPushWhileBehind) {
+    Write-Host "== AO-CLOSE: -AllowPushWhileBehind set; skipping behind-remote guard ==" -ForegroundColor Yellow
 }
 
 $verifyScript = Join-Path $WorkRoot "scripts\verify-build-gates.ps1"
@@ -91,6 +146,18 @@ if (Test-Path -LiteralPath $healthDir) {
             exit 1
         }
     }
+}
+
+$applyMarks = Join-Path $WorkRoot "scripts\apply-closeout-task-checkmarks.ps1"
+if (-not $SkipAutoTaskCheckmarks -and (Test-Path -LiteralPath $applyMarks)) {
+    Write-Host "== AO-CLOSE: TASKS checkmarks (WORKLOG AUTO_TASK_DONE + optional pending file) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $applyMarks -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "ao-close: apply-closeout-task-checkmarks failed (exit $LASTEXITCODE). Fix WORKLOG markers, pending file, or TASKS.md."
+        exit $LASTEXITCODE
+    }
+} elseif ($SkipAutoTaskCheckmarks) {
+    Write-Host "== AO-CLOSE: -SkipAutoTaskCheckmarks（略過自動打勾）==" -ForegroundColor DarkYellow
 }
 
 if ($SkipPush) {

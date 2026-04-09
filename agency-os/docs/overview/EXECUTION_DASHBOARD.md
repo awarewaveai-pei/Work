@@ -63,28 +63,27 @@
 ## 4) 每日 Runbook（最短路徑）
 ### 開工（AO-RESUME）
 0. **單一真相**：開工流程與 30 秒自檢統一看 `docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**、§2.3；**日內 Git（checkpoint / 收工 push）**只看 **§2.5**（本頁不重複第二套敘述）。  
-   **雙機／每日**：在 monorepo 根由 Agent 執行 **`.\scripts\ao-resume.ps1`**（或你手動跑後再打關鍵字）— 內含 `fetch`、必要時 **`pull --ff-only origin main`**、workflows **`npm ci`**、**`verify-build-gates`**；與 §2 逐步驟**等價**。遇衝突／非快轉另依 `git status` 處理。
-1. 先看 `LAST_SYSTEM_STATUS.md`
-2. 打開 `TASKS.md`，只做 Next/Backlog 最高優先
-3. 在 Cursor 輸入 **`AO-RESUME`**（規則 **`.cursor/rules/30-resume-keyword.mdc`**：先 **preflight 腳本 PASS**，再讀 `AGENTS.md` + 記憶檔 + 龍蝦 checklist／Completion Plan）
-4. 需要工程驗收就跑（Strict 或 Fast）：
-   - 參考 `memory/CONVERSATION_MEMORY.md` 的 Runbook Commands
+   **雙機／每日正式開工**：在 **monorepo 根**跑 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**（**預設**：fetch、behind 時 ff-only pull、`verify-build-gates`、workflows 依賴、`print-open-tasks`、**`machine-environment-audit -FetchOrigin -Strict`**）。**僅在 exit 0 後**再在 Cursor 輸入 **`AO-RESUME`**（代理依 `.cursor/rules/30-resume-keyword.mdc` 第 3 節**五段式**回覆，含待辦全列與實質風險盤點）。**Exit 非 0** 時依 **`REMOTE` 2.5.1** 整理髒樹／衝突後重跑，勿只先手動 pull 卻略過閘道／Strict。  
+   **可選人類掃視**：`LAST_SYSTEM_STATUS.md`、`TASKS.md`、`reports/status/integrated-status-LATEST.md`（不取代 Exit 0）。  
+1. 打開 `TASKS.md`，只做 Next/Backlog 最高優先（或由 **`print-open-tasks`** 已在終端列出）。  
+2. 需要工程驗收就跑（Strict 或 Fast）：參考 `memory/CONVERSATION_MEMORY.md` 的 Runbook Commands。
 
 ### 收工（AO-CLOSE）
-- **單一真相**：收工流程統一看 `docs/operations/end-of-day-checklist.md`（操作）與 `.cursor/rules/40-shutdown-closeout.mdc`（關鍵字規則）。本頁僅保留入口，不再重複維護整段命令細節。
+- **單一真相**：`docs/operations/end-of-day-checklist.md`（操作）+ `.cursor/rules/40-shutdown-closeout.mdc`（關鍵字；**單打 AO-CLOSE 即授權代理**寫 **`WORKLOG`** **`- AUTO_TASK_DONE:`**）。`ao-close.ps1` 內含 **recap**、閘道、**`apply-closeout-task-checkmarks`**、push；本頁不重複逐步指令。
 
-### 公司機／他處電腦
-**完整清單請固定看：`docs/overview/REMOTE_WORKSTATION_STARTUP.md`。** **新機／筆電第一次**用該檔 **§1.5**；**之後每次**可用 **§2** 逐步驟，或 **單指令**：monorepo 根 **`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**（已包 `pull`／`npm ci`／`verify-build-gates`），再打 Cursor **`AO-RESUME`** 讀檔。摘要（與 §2 一致，供對照）：
-1. monorepo 根：對齊 `origin/main`（腳本內建 `pull --ff-only`）
-2. `lobster-factory\packages\workflows`：`npm ci`
+### 公司機／他處電腦（對齊後）
+**完整清單請固定看：`docs/overview/REMOTE_WORKSTATION_STARTUP.md`。** **新機／筆電第一次**用該檔 **§1.5**；**之後每次**用 **§2** 或單跑 **`scripts/ao-resume.ps1`（預設）** 覆蓋同等檢查。摘要（與 §2 一致；手動分步僅補強理解）：
+1. monorepo 根：`git fetch`；僅 behind>0 時 `git pull --ff-only origin main`（或 **`ao-resume.ps1`** 代為處理）
+2. `lobster-factory\packages\workflows`：`npm ci`（或由 **`ao-resume.ps1`** 偵測後代跑）
 3. 可選：`mcp-local-wrappers` → `npm ci`
-4. `verify-build-gates`
-5. 綜合狀態以 **`agency-os/reports/status/integrated-status-LATEST.md`** 為準（勿與根目錄 `reports/status` 混淆）
+4. `powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1`（**`ao-resume.ps1` 預設**已含）
+5. **`machine-environment-audit.ps1 -FetchOrigin -Strict`**（**`ao-resume.ps1` 預設**已含）
+6. 綜合狀態以 **`agency-os/reports/status/integrated-status-LATEST.md`** 為準（勿與根目錄 `reports/status` 混淆）
 - 手動核銷：仍可依 `docs/operations/end-of-day-checklist.md` 逐項打勾（與 §1b 對齊）。
 
 ### 離席會斷網（吃飯前）
 1. 在 **monorepo 根** `<WORK_ROOT>` 開終端機
-2. 若只暫停：直接離開；回來在 monorepo 根打 **`AO-RESUME`**（或跑 **`ao-resume.ps1`**）對齊並過閘（與「開工」§0 一致）
+2. 若只暫停：直接離開；回來在 monorepo 根跑 **`scripts/ao-resume.ps1`** 或手動 `git pull --ff-only` 後再打 **`AO-RESUME`**
 3. 若要安全收工再離開：`powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1 -SkipPush`
 
 ### 每週（建議固定一天，例如週一）
@@ -100,7 +99,7 @@
 
 ## 5) 防漏 / 防重工規則（你要我遵守的）
 - **單一真實來源**：任務狀態只認 `TASKS.md`
-- **事實與狀態分離**：做了什麼寫 `WORKLOG.md`，待辦狀態改 `TASKS.md`
+- **事實 vs 狀態**：做了什麼寫 **`WORKLOG.md`**；**預設 Autopilot** 以 **`WORKLOG`** **`- AUTO_TASK_DONE:`** + 收工 **`apply-closeout-task-checkmarks`** 同步到 **`TASKS.md`**（見 **40／50**）；手動改 `TASKS` 仍允許
 - **Gate 先行**：未通過 gate 不進下一步（避免把錯誤帶到後面）
 - **收工必留證據**：closeout/health/guard report 檔名要寫進 `daily note`
 - **龍蝦工廠主軸固定追蹤**：每次 AO-RESUME 必須同步回報 Milestone（M1~M5）/ 今日 DoD / 阻塞
@@ -115,5 +114,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `memory/CONVERSATION_MEMORY.md`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 05:52:22 UTC_
 

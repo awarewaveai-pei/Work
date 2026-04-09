@@ -1,4 +1,4 @@
-# Routing Matrix (Phase 1)
+﻿# Routing Matrix (Phase 1)
 
 ## Purpose
 Define a deterministic routing policy for Lobster Factory requests so each request goes to the correct workflow/agent with guardrails.
@@ -28,3 +28,14 @@ Define a deterministic routing policy for Lobster Factory requests so each reque
 - This matrix is the canonical routing policy for current skeleton workflows.
 - Machine-readable policy is now available at `workflow-risk-matrix.json`.
 - Detailed cross-tool routing and boundary rules are documented in `docs/MCP_TOOL_ROUTING_SPEC.md`.
+
+## Related Documents (Auto-Synced)
+- `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
+- `docs/operations/cursor-enterprise-rules-index.md`
+- `docs/operations/cursor-mcp-and-plugin-inventory.md`
+- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
+- `README.md`
+- `TASKS.md`
+
+_Last synced: 2026-04-09 09:29:25 UTC_
+

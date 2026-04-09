@@ -12,10 +12,7 @@
 | `docs/architecture/multi-platform-delivery-architecture.md` | `docs/standards/wordpress-custom-dev-guidelines.md`, `docs/operations/end-to-end-linkage-checklist.md`, `README.md` |
 | `docs/overview/agency-os-complete-system-introduction.md` | `README.md`, `docs/README.md`, `tenants/company-p1-pilot/01_COMMANDER_SYSTEM_GUIDE.md`, `tenants/company-p1-pilot/02_CLIENT_WORKSPACE_GUIDE.md`, `tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md`, `tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md` |
 | `docs/overview/EXECUTION_DASHBOARD.md` | `docs/overview/REMOTE_WORKSTATION_STARTUP.md`, `docs/overview/INTEGRATED_STATUS_REPORT.md`, `docs/operations/end-of-day-checklist.md`, `memory/CONVERSATION_MEMORY.md`, `AGENTS.md`, `RESUME_AFTER_REBOOT.md` |
-| `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md` | `AGENTS.md`, `README.md`, `docs/README.md`, `docs/overview/repo-template-locations.md`, `docs/architecture/decisions/README.md`, `docs/operations/hetzner-stack-rollout-index.md`（若 Hetzner 堆疊敘述與長期節奏對齊時）, `tenants/templates/core/RELEASE_GATES_CHECKLIST.md`（§ 編號／Related）, `memory/CONVERSATION_MEMORY.md`, `TASKS.md`（若節奏表與 Next 對齊時）, `WORKLOG.md` |
-| `docs/operations/hetzner-self-host-start-here.md` | `docs/operations/hetzner-stack-rollout-index.md`, `docs/operations/hetzner-full-stack-self-host-runbook.md`, `docs/operations/hetzner-self-host.env.example`, `../../.env.local.example`, `../../lobster-factory/infra/hetzner-phase1-core/.env.example`, `README.md`, `AGENTS.md`, `docs/README.md`, `TASKS.md`, `WORKLOG.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `memory/CONVERSATION_MEMORY.md` |
-| `docs/operations/hetzner-stack-rollout-index.md` | `docs/operations/hetzner-self-host-start-here.md`, `docs/operations/hetzner-full-stack-self-host-runbook.md`, `docs/operations/hetzner-self-host.env.example`, `docs/operations/supabase-self-hosted-cutover-checklist.md`, `../../lobster-factory/infra/hetzner-phase1-core/README.md`, `../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`, `../../lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`, `../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `docs/overview/ao-lobster-operating-model.md`, `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`, `TASKS.md`, `WORKLOG.md`, `docs/README.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `memory/CONVERSATION_MEMORY.md` |
-| `../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md` | `../../lobster-factory/infra/hetzner-phase1-core/README.md`, `../../lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`, `../../lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`, `../../lobster-factory/infra/hetzner-phase1-core/.env.example`, `docs/operations/hetzner-self-host.env.example`, `docs/operations/hetzner-stack-rollout-index.md`, `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`, `docs/operations/hetzner-full-stack-self-host-runbook.md`, `TASKS.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `WORKLOG.md` |
+| `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md` | `AGENTS.md`, `README.md`, `docs/README.md`, `docs/overview/repo-template-locations.md`, `docs/architecture/decisions/README.md`, `tenants/templates/core/RELEASE_GATES_CHECKLIST.md`（§ 編號／Related）, `memory/CONVERSATION_MEMORY.md`, `TASKS.md`（若節奏表與 Next 對齊時）, `WORKLOG.md` |
 | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md` | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md`, `README.md`, `docs/README.md`, `TASKS.md`, `WORKLOG.md` |
 | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md` | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`, `README.md`, `docs/README.md`, `TASKS.md`, `WORKLOG.md` |
 | `docs/architecture/decisions/README.md` | `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`, `docs/CHANGE_IMPACT_MATRIX.md`（若新增 ADR 影響治理時）, `WORKLOG.md` |
@@ -32,17 +29,18 @@
 | `docs/operations/client-risk-scoring-model.md` | `docs/metrics/kpi-margin-dashboard-spec.md`, `docs/product/templates/monthly-report-template-en.md`, `README.md`, `TASKS.md` |
 | `docs/operations/outsourcing-vendor-scorecard.md` | `docs/operations/outsourcing-playbook.md`, `README.md`, `TASKS.md` |
 | `docs/operations/tenant-scheduling.md` | `README.md`, `tenants/README.md`, `tenants/NEW_TENANT_ONBOARDING_SOP.md`, `automation/README.md` |
-| `docs/operations/github-actions-trigger-prod-deploy.md` | `docs/operations/end-of-day-checklist.md`, `docs/overview/EXECUTION_DASHBOARD.md`, `docs/README.md`, `../../.github/workflows/lobster-workflows-validate-main.yml`, `../../.github/workflows/README.md`, `../../lobster-factory/README.md`, `WORKLOG.md` |
 | `docs/operations/system-guard-and-notification.md` | `README.md`, `AGENTS.md`, `RESUME_AFTER_REBOOT.md`, `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`, `scripts/system-guard.ps1` |
 | `docs/operations/end-to-end-linkage-checklist.md` | `docs/operations/new-doc-linkage-checklist.md`, `scripts/system-guard.ps1`, `scripts/system-health-check.ps1`, `scripts/doc-sync-automation.ps1`, `README.md` |
 | `docs/operations/new-doc-linkage-checklist.md` | `docs/operations/end-to-end-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `docs/README.md`, `scripts/register-new-governance-doc.ps1`, `scripts/doc-sync-automation.ps1`, `scripts/system-health-check.ps1` |
 | `AGENTS.md` | `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `scripts/register-new-governance-doc.ps1`, `README.md` |
 | `scripts/register-new-governance-doc.ps1` | `docs/operations/new-doc-linkage-checklist.md`, `docs/change-impact-map.json`, `docs/CHANGE_IMPACT_MATRIX.md`, `AGENTS.md` |
-| `docs/operations/cursor-enterprise-rules-index.md` | `AGENTS.md`, `docs/operations/cursor-mcp-and-plugin-inventory.md`, `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/security-secrets-policy.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `.cursor/rules/63-cursor-core-identity-risk.mdc`, `.cursor/rules/64-architecture-mcp-routing.mdc`, `.cursor/rules/65-build-standards-data-state.mdc`, `.cursor/rules/66-skills-observability-protocol.mdc`, `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `docs/README.md`, `../README.md` |
+| `docs/operations/cursor-enterprise-rules-index.md` | `AGENTS.md`, `docs/operations/cursor-mcp-and-plugin-inventory.md`, `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/security-secrets-policy.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md`, `.cursor/rules/63-cursor-core-identity-risk.mdc`, `.cursor/rules/64-architecture-mcp-routing.mdc`, `.cursor/rules/65-build-standards-data-state.mdc`, `.cursor/rules/66-skills-observability-protocol.mdc`, `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `docs/README.md`, `../README.md` |
 | `../README.md`（monorepo 根） | `docs/operations/cursor-enterprise-rules-index.md`, `agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`, `agency-os/docs/overview/EXECUTION_DASHBOARD.md` |
-| `docs/operations/cursor-mcp-and-plugin-inventory.md` | `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/tools-and-integrations.md`, `.cursor/rules/64-architecture-mcp-routing.mdc`, `AGENTS.md`, `README.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` |
+| `docs/operations/cursor-mcp-and-plugin-inventory.md` | `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/tools-and-integrations.md`, `.cursor/rules/64-architecture-mcp-routing.mdc`, `AGENTS.md`, `TASKS.md`, `README.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md` |
+| `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` | `../lobster-factory/docs/ROUTING_MATRIX.md`, `docs/operations/cursor-mcp-and-plugin-inventory.md`, `docs/operations/cursor-enterprise-rules-index.md`, `TASKS.md`, `README.md` |
+| `../lobster-factory/docs/ROUTING_MATRIX.md` | `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `docs/operations/cursor-mcp-and-plugin-inventory.md`, `docs/operations/cursor-enterprise-rules-index.md`, `TASKS.md`, `README.md` |
 | `.cursor/rules/63-cursor-core-identity-risk.mdc` | `docs/operations/cursor-enterprise-rules-index.md`, `AGENTS.md` |
-| `.cursor/rules/64-architecture-mcp-routing.mdc` | `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/cursor-mcp-and-plugin-inventory.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `docs/operations/security-secrets-policy.md` |
+| `.cursor/rules/64-architecture-mcp-routing.mdc` | `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/cursor-mcp-and-plugin-inventory.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md`, `docs/operations/security-secrets-policy.md` |
 | `.cursor/rules/65-build-standards-data-state.mdc` | `docs/operations/cursor-enterprise-rules-index.md` |
 | `.cursor/rules/66-skills-observability-protocol.mdc` | `docs/operations/cursor-enterprise-rules-index.md`, `.cursor/rules/62-progress-heartbeat-15min.mdc` |
 | `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md` | `docs/operations/cursor-enterprise-rules-index.md`, `.cursor/rules/63-cursor-core-identity-risk.mdc`, `.cursor/rules/64-architecture-mcp-routing.mdc`, `.cursor/rules/65-build-standards-data-state.mdc`, `.cursor/rules/66-skills-observability-protocol.mdc` |
@@ -74,6 +72,8 @@
 | `.cursor/rules/30-resume-keyword.mdc` | `AGENTS.md`, `README.md`, `memory/CONVERSATION_MEMORY.md`, `TASKS.md`, `WORKLOG.md`, `LAST_SYSTEM_STATUS.md` |
 | `.cursor/rules/40-shutdown-closeout.mdc` | `AGENTS.md`, `README.md`, `TASKS.md`, `WORKLOG.md`, `memory/CONVERSATION_MEMORY.md`, `scripts/doc-sync-automation.ps1`, `scripts/system-health-check.ps1`, `scripts/system-guard.ps1` |
 
+| `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` | `docs/operations/cursor-mcp-and-plugin-inventory.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md`, `TASKS.md`, `WORKLOG.md`, `docs/operations/tools-and-integrations.md`, `docs/operations/security-secrets-policy.md`, `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md` |
+
 ## 最小同步清單（每次改版）
 - [ ] `README.md` 路徑與入口已更新
 - [ ] `TASKS.md` 狀態已同步
@@ -87,10 +87,8 @@
 ## Related Documents (Auto-Synced)
 - `AGENTS.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
-- `docs/operations/hetzner-self-host-start-here.md`
-- `docs/operations/hetzner-stack-rollout-index.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 09:29:25 UTC_
 

@@ -1,7 +1,5 @@
 param(
     [string]$WorkRoot = "",
-    [switch]$SkipVerify,
-    [switch]$SkipStrictEnvironmentAudit,
     [switch]$AllowUnexpectedDirty,
     [switch]$AllowStashBeforePull,
     [switch]$AllowPendingStash,
@@ -12,10 +10,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Single-owner design: real implementation lives in monorepo root scripts\ao-resume.ps1.
-$ownerScript = Resolve-Path (Join-Path $PSScriptRoot "..\..\scripts\ao-resume.ps1")
+$ownerScript = Resolve-Path (Join-Path $PSScriptRoot "..\..\scripts\align-workstation.ps1")
 if (-not (Test-Path -LiteralPath $ownerScript)) {
-    Write-Error "ao-resume wrapper: owner script missing at $ownerScript"
+    Write-Error "align-workstation wrapper: owner missing at $ownerScript"
     exit 1
 }
 

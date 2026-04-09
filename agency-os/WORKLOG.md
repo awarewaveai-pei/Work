@@ -2,79 +2,81 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
-## 2026-04-06
+## 2026-04-09
 
-### 雙機／遠端：`origin/main` 已與筆電對齊（公司機開工前必 pull）
-- **動作**：筆電於通過 **`verify-build-gates`**（含 `system-health-check` 100%）後 **`git push origin main`**。  
-- **對點（兩邊 repo 一致）**：公司機於 monorepo 根執行 **`git fetch origin`** 後，**`git rev-parse HEAD`** 應等於 **`git rev-parse origin/main`**（皆為 **`main`** 最新）。筆電收斂前曾落地之 **工作批次**（敘述用）：**`02d2b1f..6783130`**（14 commit：CI **validate-only**、`start-here`／env、Hetzner、audit／bootstrap 等）；其後另有 **handoff／紀錄連動** 之 **追加 commit** — **請以遠端 `main` 頂端為準，勿依賴手抄 SHA**。  
-- **公司桌機（必做）**：在 **monorepo 根** **（建議）** **`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**——已內含 **`fetch`**／**`pull --ff-only origin main`**／workflows（與可選 **wrappers**）**`npm ci`**／**`verify-build-gates`**；腳本 **PASS** 後在 Cursor 打 **`AO-RESUME`** 讀檔。若需逐步核對：仍照 **`git pull`** → **`npm ci`** → **`verify-build-gates`** → **`AO-RESUME`**。正本：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§2**。
-- **無法靠 Git 同步的項目（兩台各自一份，內容需你人工一致）**：**`.env.local`**、**DPAPI vault**、**`%USERPROFILE%\.cursor\mcp.json`**、本機 **MariaDB／PHP／WP 資料目錄**（策略見 **`hetzner-self-host-start-here.md`「環境變數唯一對照」** 與 **§1.5.1**）。  
+### 雙機對齊反覆失敗：腳本根因與文件閉環
+- **根因**：`scripts/check-three-way-sync.ps1` 的 `-AutoFix` 曾對長串「known noise」路徑執行 **`git restore`**，會**靜默丟棄**未提交變更（含 `ao-resume`、`check-three-way-sync`、autopilot 等），與「多機靠 `origin/main` + 本機 commit」目標衝突。
+- **修正**：移除 AutoFix **`git restore`**；「不阻擋 AO-RESUME」的白名單縮為 **`agency-os/settings/local.permissions.json`** 單一路徑。`TASKS` 雙機項、**`30-resume-keyword`**（agency-os + monorepo 根鏡像）、**`REMOTE`** §1.5（收尾加跑 audit）、§2.5.1、§6.2、**`LONG_TERM_OPERATING_DISCIPLINE`**、**`MARIADB_MULTI_MACHINE_SYNC`** 與 **`machine-environment-audit -FetchOrigin -Strict`**（無 WARN 方得勾雙機）對齊。
+- **可發現性**：新增 **`agency-os/scripts/machine-environment-audit.ps1`** wrapper（與 `ao-resume` 同模式），避免僅開 `agency-os` 資料夾時找不到稽核腳本。
+- **追加**：`check-three-way-sync` 改以 **`git rev-list --left-right --count HEAD...origin/main`** 判斷——**僅在 behind>0 時**才 `pull --ff-only`（本機 checkpoint **超前**不再誤觸發 pull，避免 PowerShell 將 **git stderr** 當成終止錯誤）；同步將腳本內 **`$ErrorActionPreference` 設為 `Continue`** 以降低誤判。
 
-### 筆電 §1.5.1：PHP + VC++ + WP-CLI + 本機 WP bootstrap（腳本健壯性）
-- **winget**：`PHP.PHP.NTS.8.4`；**VC++** 升級至與 PHP 相容（修正 `VCRUNTIME140.dll` 版本警告）。  
-- **WP-CLI**：`setup-wp-cli-windows.ps1`；使用者 **PATH** 已 append `%LOCALAPPDATA%\Programs\wp-cli`。  
-- **bootstrap**：`bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`；**WP_ROOT** `D:\Work\.scratch\wordpress-pilot`。  
-- **腳本修正**：`Test-MysqlReady` 在 MariaDB 未啟動時不因 mysql stderr 終止；`wp core is-installed`／`install`／`option get` 段落避免 PHP Warning 走 stderr 觸發 **Stop**。  
+### 零手動對照狀態檔（機器裁決）
+- **`scripts/ao-resume.ps1`（預設）**：preflight（含 `verify-build-gates`）與依賴、`print-open-tasks` 後，再跑 **`machine-environment-audit -FetchOrigin -Strict`**；**Exit 0**＝不必目視 `LAST_SYSTEM_STATUS`／`integrated-status`。**`-SkipStrictEnvironmentAudit`** 僅給 Autopilot／極速路徑。
+- **`scripts/align-workstation.ps1`**：與預設 **`ao-resume.ps1`** 同行為（別名）。
+- **2026-04-09 晚**：將 **Strict 環境稽核**併入 **`ao-resume.ps1` 預設**（關鍵字 **`AO-RESUME`**＝同一支腳本完整檢查）；**`-SkipStrictEnvironmentAudit`** 僅 Autopilot／刻意輕量；**`-AutoVerifyAll`** 旗標已移除以避免「兩套流程」認知。
 
-### 人因：環境變數「統一管理」— `start-here` 唯一對照節 + 根 `.env.local.example`
-- **問題**：多個 `.env*` 讓操作者感覺東一塊西一塊。  
-- **處置**：**`hetzner-self-host-start-here.md`** 新增 **「環境變數唯一對照」**（本機 RAG vs Phase1 Docker vs 型別提醒；輪替同一輪四步）；**monorepo 根**新增可入庫 **`.env.local.example`**；**.gitignore** 放行該範本；**`hetzner-phase1-core/.env.example`**、**`hetzner-self-host.env.example`** 頂部指回該節；**矩陣／change-impact-map** 補連動。  
+### AO-RESUME 敘述掃齊（與「先手動 pull」脫鉤）
+- **目標**：所有活 SSOT 與 **GitHub `origin/main` 單一真相**一致——**桌機正式開工**＝monorepo 根 **`ao-resume.ps1` exit 0**（含 behind 時 ff-only pull、閘道、Strict）後再打 **`AO-RESUME`** 讀檔；**非**「必先手動 pull 再看狀態檔」。
+- **已改**：**`REMOTE_WORKSTATION_STARTUP`**（§0、§1.5 做完後、§2 捷徑、§2.2、§6.1）、**`EXECUTION_DASHBOARD`** §4、**`RESUME_AFTER_REBOOT.md`**、**`CONVERSATION_MEMORY`** Runbook、**`AGENTS`**（關鍵字順序）、**`00-session-bootstrap`**（agency-os + 根鏡像）、**`30-resume-keyword`** 第 5 點、**`end-of-day-checklist`** 註、**`LONG_TERM_OPERATING_DISCIPLINE`** 表、**`INTEGRATED_STATUS_REPORT`**、**`30_YEAR_*` 憲章**、根 **`README`** 他機條；**`verify-build-gates`** 已 PASS（含規則鏡像）。
 
-### CI：移除 Trigger Cloud deploy（只自託管、單一敘述）
-- **刪除**：`.github/workflows/release-trigger-prod.yml`。  
-- **新增**：`.github/workflows/lobster-workflows-validate-main.yml`（`packages/workflows/**` 變更於 `main` 僅跑 **`npm run validate`**）。  
-- **SSOT**：`docs/operations/github-actions-trigger-prod-deploy.md` 改寫；**`hetzner-stack-rollout-index`**／**`hetzner-self-host-start-here`**／**`TASKS` Next**／**`end-of-day-checklist`**／**`lobster-factory/README`**／**`.github/workflows/README`**／**`CHANGE_IMPACT_MATRIX`** 同步。**建議**：GitHub repo 可刪除 **`TRIGGER_*` Secrets**（CI 已不用），避免誤解。  
+### AO-RESUME「最完整」閉環（快照 + 規則鏡像）
+- **`print-open-tasks.ps1`**：預設寫入 **`agency-os/.agency-state/open-tasks-snapshot.md`**（已 **gitignore**），分段 Markdown + **Total open**，供代理 **Read** 與聊天「全列」交叉核對；**`-NoSnapshot`** 可略過。
+- **`sync-enterprise-cursor-rules-to-monorepo-root.ps1`**：鏡像清單擴充 **`00-session-bootstrap` + `30-resume-keyword`**；根目錄 **`00`/`30`** 經 **`Apply-MonorepoRootCursorPathTransforms`**；**`-VerifyOnly`** 對 **`00`/`30`** 改為「轉換後內容」字串比對（非與正本同 hash）。
+- **`system-health-check`**（agency-os 與 monorepo **`scripts/`** 兩份）：檢查名稱更新為 **00 + 30 + 50 + 63-66**。**`verify-build-gates`** 日誌字樣同步。
+- **`REMOTE` §2.5.1**、**`AGENTS`**、**`CONVERSATION_MEMORY`**、**`.gitignore`** 已補交叉引用。
 
-### Hetzner：`hetzner-self-host-start-here` 全庫入口接線（人因單頁）
-- **目的**：使用者要求「統管一處、不要東一塊西一塊」— **只書籤** `docs/operations/hetzner-self-host-start-here.md`。  
-- **接線**：`agency-os/README.md`（每天開工卡）、根 `README.md` 快速連結、`docs/README.md`、`AGENTS.md`（快速關鍵字）、`TASKS.md` Next（Hetzner 條首句）、`hetzner-full-stack-self-host-runbook.md` 頂部、`hetzner-stack-rollout-index.md` 檔頭、`CHANGE_IMPACT_MATRIX` 新增主檔列並擴充 rollout 列必查、`change-impact-map.json`（watch + rule + rollout targets 補 `start-here`）。
+### AO-RESUME 回覆豐富度（使用者回饋）
+- **根因**：**`30-resume-keyword`** 曾要求 **concise**；**`print-open-tasks`** 僅終端輸出，聊天裡易省略；**阻塞／風險**允許單字「無」→ 代理傾向過短。
+- **修正**：**`30-resume-keyword` 第 3 節**改為**五段式**（含 **TASKS 每一條 `- [ ]` 全文複製＋區塊標題**、**實質**阻塞／風險盤點禁止只寫「無」）；**`AGENTS.md`** 區分一般開場 vs **`AO-RESUME`**；**`.cursor/rules/README`** 索引一句更新；**monorepo 根** **`00`／`30`** 已納入 **`sync-enterprise-cursor-rules-to-monorepo-root.ps1`**（含路徑轉換），無需再手動複製。
 
-### Trigger：自託管 vs Cloud「是否打架」— SSOT 補述
-- **`github-actions-trigger-prod-deploy.md`** 新增 §**自託管 Trigger.dev**：說明 repo 內程式不會雙邊自動互跑；風險在 **CI 仍帶 Cloud secrets 成功 deploy**；建議全面自架前 **停用 workflow 或撤 secrets**，自架就緒後再改 deploy 流程並更新 **`hetzner-stack-rollout-index.md`**。  
-- **`hetzner-stack-rollout-index.md`** Trigger 列補 **release-trigger-prod.yml 預設連 Cloud** 之注意事項。
+### AO-CLOSE（本輪）：`40-shutdown-closeout` 自動鏡像 + 敘事一致
+- **`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`**：鏡像清單再納入 **`40-shutdown-closeout.mdc`**；根目錄版經轉換（**checklist** 句：先 **`agency-os/docs/operations/end-of-day-checklist.md`**，再註明僅開 **`agency-os` 子資料夾時為 **`docs/operations/...`**）；轉換以 **ASCII／`[char]` 拼 regex**，避免主機編碼毀掉 CJK pattern；**「與」**允許 **U+8207／U+4E0E** 兩種碼位。
+- **正本**：**`agency-os/.cursor/rules/40-shutdown-closeout.mdc`** line 29 之 **`（與`** 已與全文繁體「與」對齊（曾出現隱形同形字導致鏡像比對失敗）。
+- **單一主人**：**`agency-os/scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 改為 **轉呼叫** monorepo **`scripts/`** 正本，避免兩份邏輯漂移。
+- **對外敘述**：根 **`README.md`**（monorepo 根 `.cursor` 鏡像說明）、**`system-health-check`**／**`verify-build-gates`** 日誌與註解改為 **00 + 30 + 40 + 50 + 63–66**；**`verify-build-gates`** 已 **PASS（100% health）**；本機 checkpoint **`9c7b15d`**。
 
-### Hetzner：`hetzner-stack-rollout-index` 單一索引（牽一髮動全身）
-- **新增 Owner**：`agency-os/docs/operations/hetzner-stack-rollout-index.md`（Phase A 10／B 4、平面對照、repo 內既有檔案對照、**專案狀態表**；現況 **Supabase+WP 已上 Hetzner**、其餘待補）。  
-- **連動**：`CHANGE_IMPACT_MATRIX` 新增主檔列並回寫 `LONG_TERM_OPS` 列；`change-impact-map.json` 增 rule；`hetzner-full-stack-self-host-runbook.md` 頂部／Related、`docs/README.md`、`LONG_TERM_OPERATING_DISCIPLINE.md` Related、`hetzner-self-host.env.example`、`LONG_TERM_OPS`／`MAINTENANCE_CALENDAR`／`hetzner-phase1-core/README.md`、`lobster-factory/README.md`、`TASKS.md`（Next 改寫為本索引驅動）。  
+## 2026-04-07
 
-### Hetzner Phase 1：`LONG_TERM_OPS` 長期營運契約 + compose 日誌輪替 + n8n 映像可釘選
-- **新增 Owner**：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`（RPO/RTO、備份範圍、TLS、升級日曆、汰換判準；與 `LONG_TERM_OPERATING_DISCIPLINE.md` 對齊）。  
-- **compose**：共用 **json-file** 日誌 **max-size**／**max-file**；**`N8N_IMAGE_TAG`**（`.env.example` + `docker-compose.yml`）。  
-- **連動**：`hetzner-full-stack-self-host-runbook.md` 階段 0、`LONG_TERM_OPERATING_DISCIPLINE.md` Related、`CHANGE_IMPACT_MATRIX.md`、`lobster-factory/README.md`、`README.md`（phase1-core）。
+### AO-CLOSE（本輪）收工前同步
+- 今日已完成：AO-RESUME 全待辦列印、AO-CLOSE 今日 recap、自動 `TASKS` 勾選（`WORKLOG` `AUTO_TASK_DONE` 驅動）、`AO-CLOSE` 關鍵字即授權代理代寫。
+- SSOT 對齊：`40/50/30`（agency-os 與 monorepo 根鏡像）+ `AGENTS` + `README` + `EXECUTION_DASHBOARD` + `end-of-day-checklist` 已統一。
+- 本輪檢查：`doc-sync-automation -AutoDetect` 與 `system-health-check` 皆 PASS（100%）。
 
-### Hetzner Phase 1：週期維護日曆 + TASKS 錨點
-- **新增**：`lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`（週／月／季／年可勾選）；`TASKS.md` **Next** 增加長週期營運一條；`memory/CONVERSATION_MEMORY.md` 補 2026-04-06 脈絡。
+### AO-RESUME／AO-CLOSE 文件與規則掃齊（避免分叉）
+- **根因**：monorepo 根 `.cursor/rules/40-shutdown-closeout.mdc` 曾落後 **`agency-os`** 正本，與 **AO-CLOSE** 實際腳本順序矛盾。
+- **處理**：正本 **`agency-os/.cursor/rules/40`** 補齊 **`ao-close.ps1` 內部 8 步**；根目錄 **鏡像同文**；**`end-of-day-checklist`§1a**、**`EXECUTION_DASHBOARD`**、**`AGENTS`**（wrapper 敘述）、**`30-resume-keyword`**（**`print-open-tasks`**）、根 **`README` 收工**、**`LAST_AO_RESUME_BRIEF`**（改為非 SSOT 占位）、**`CONVERSATION_MEMORY`** 今日列同步；**health 100%**。
 
-### Hetzner Phase 1：連動文件稽核（路徑／缺漏收斂）
-- **修正**：`TASKS.md` 長週期項 **`LONG_TERM_OPS.md`** 改為 **完整 repo 路徑**；`LONG_TERM_OPERATING_DISCIPLINE.md` Related 補 **`MAINTENANCE_CALENDAR.md`**；`MAINTENANCE_CALENDAR.md` 內 **Supabase／security** 改為 **`agency-os/docs/operations/...` 可解析路徑**；full-stack runbook 階段 0 一併要求閱讀維護日曆；**`hetzner-self-host.env.example`** 指回 **`hetzner-phase1-core/.env.example`**；`CHANGE_IMPACT_MATRIX` **LONG_TERM_OPS** 列補 **`hetzner-self-host.env.example`**。
+### AO-CLOSE 關鍵字內含授權（代理代寫 AUTO_TASK_DONE）
+- 規則：**只打 `AO-CLOSE`／收工同義詞**即等同要求代理在跑 **`ao-close.ps1` 前**主動從**當輪對話 + TASKS 開放項**（＋必要時 recap）補 **`WORKLOG`** 之 **`- AUTO_TASK_DONE:`**；**禁止**要求使用者再加一句「照對話全寫進…」。正本：**`40-shutdown-closeout.mdc`**、**`50-operator-autopilot.mdc`**、**`AGENTS.md`**、**`TASKS.md`** 待辦原則。
 
-### Hetzner Phase 1 compose：production-hardening 一版
-- **路徑**：`lobster-factory/infra/hetzner-phase1-core/`  
-- **變更摘要**：`docker-compose` 改為 **Dockerfile 多階段建置**（Node API + Next standalone）、**Redis／MariaDB／n8n／WP／兩個 Node 服務** healthcheck、**Nginx 待 healthy 後**再啟；Nginx 補 **Forwarded** 標頭與基礎安全標頭；WordPress 以 **`WORDPRESS_PUBLIC_URL` + `WORDPRESS_CONFIG_EXTRA`** 對齊子路徑；新增 **`scripts/backup-phase1.sh`**（MariaDB + wp 目錄 tarball）；README 補 **rebuild next-admin** 說明、驗收、dev 附錄；runbook Related 標註備份腳本。  
-- **驗證**：本機已通過 **`next build`**（standalone）；VPS 上仍需 **`docker compose build && up`** 實測。
+### AO-CLOSE：今日完成「外接記憶」（給記性差／易斷線者）
+- **`scripts/print-today-closeout-recap.ps1`**：`AO-CLOSE` 預設**開頭**印 **今日 Git commit**、`git status`、**`WORKLOG`** 當日 `## yyyy-mm-dd` 區塊、`memory/daily` 尾端——**不必靠腦記**今天做過什麼；亦可單獨先跑再補四份進度檔。**`-SkipTodayRecap`** 可略過。
 
-### 程序與敘述：AO-RESUME 單一閘道對齊 + AO-CLOSE 語意釐清
-- **變更**：根 `README`、`REMOTE_WORKSTATION_STARTUP`、`RESUME_AFTER_REBOOT`、`EXECUTION_DASHBOARD`、`TASKS`（雙機擇一）、`WORKLOG`、`CONVERSATION_MEMORY`、根／`agency-os` 的 `.cursor/rules/README`、`memory/daily/2026-04-06` handoff — 與 **`scripts/ao-resume.ps1`**（內建 fetch／pull／workflows「與可選 wrappers」`npm ci`／`verify-build-gates`）一致；移除「`ao-resume` 不取代 `git pull`」類矛盾句。
-- **Git**：本機 checkpoint **`13c0747`**（`docs: align AO-RESUME/runbook with ao-resume.ps1 single-gate narrative`）；本次 **AO-CLOSE** 一併 **push** 與報告再生。
-- **對話**：確認 **AO-CLOSE** 在工作區有需提交變更時會 **`git commit`** 並 **`git push`**；Cursor 流程上由代理**先**更新 **`TASKS`／`WORKLOG`／`memory`** 再跑 **`ao-close.ps1`**（規則 40）。
+### AO-RESUME／AO-CLOSE：待辦可見性 + 全自動打勾（WORKLOG 驅動）
+- **`scripts/print-open-tasks.ps1`**：`AO-RESUME` 預設列出 **`TASKS.md`** 全部 `- [ ]`；**`-SkipOpenTasksList`** 可略過。
+- **`scripts/apply-closeout-task-checkmarks.ps1`**：`AO-CLOSE` 在 **`git add` 前**讀 **當日 `WORKLOG`** 之 **`- AUTO_TASK_DONE: <子字串>`**（＋選用 **`pending-task-completions.txt`**），將命中之 `- [ ]`→`- [x]`；`WORKLOG` 標記改為 **`AUTO_TASK_DONE_APPLIED`**；已 `[x]` 者 idempotent。legacy 呼叫仍可用 **`apply-pending-task-checkmarks.ps1`**（僅 pending 檔）。
 
-## 2026-04-05
+### TASKS.md：未完成／已完成分區 + 待辦原則
+- 檔首 **待辦原則**：單一清單、轉向寫 **`WORKLOG`**；**預設不必手動勾 `TASKS`**（見 **`50-operator-autopilot`**、`TASKS` 檔首）。
+- **Next／Backlog** 拆分為 **「未完成」**與 **「已完成歷程」**，使 **14** 條開放待辦（Next 11 + Backlog 3）一目可見，避免長列表埋沒 `- [ ]`。
 
-### GitHub Actions：`release-trigger-prod.yml` 觸發範圍收斂 + SSOT 文件
-- **問題**：舊 **`paths: lobster-factory/**`** 易讓人誤以為每次 **AO-CLOSE** 都會觸發 Trigger deploy；實務上多數收工只動 **`agency-os/**`**／根 **`scripts/`** 時，與 **Trigger 無關**。  
-- **變更**：改為僅 **`lobster-factory/packages/workflows/**`** + **`.github/workflows/release-trigger-prod.yml`**；新增 **`concurrency`**（同 ref 取消進行中 deploy）、**`permissions: contents: read`**。  
-- **文件**：新增 **`agency-os/docs/operations/github-actions-trigger-prod-deploy.md`**（Owner）；**`.github/workflows/README.md`**；連動 **`end-of-day-checklist.md`**、**`docs/README.md`**、**`CHANGE_IMPACT_MATRIX.md`**、**`lobster-factory/README.md`**。未來若 workflows 依賴其他套件，必須同步擴充 YAML **`paths`** 與 SSOT。
+### AO-CLOSE（收工推送）
+- 本日累積 **3** 顆本機 checkpoint（`bf567ab`、`fe6aeb0`、`cf307d4`）經 **`ao-close.ps1`**：`verify-build-gates` → `system-guard` → integrated-status；**PASS** 後 **push `origin/main`**。
 
-### Monorepo 根：RAG 本機腳本（embedding／語意查詢／env 設定）
-- **新增／更新**（路徑皆相對 monorepo 根）：`scripts/rag_seed_and_embedding.ts`（OpenAI embedding + 寫入 `knowledge_embeddings`；dotenv／無 BOM `.env.local`；vector 字串格式）、`scripts/rag_query.ts`（呼叫 `match_documents`；`MATCH_THRESHOLD`／CLI `--threshold`）、`scripts/setup-rag-env.ps1`（URL 迴圈驗證、剪貼簿讀金鑰、UTF-8 無 BOM 寫入）。根 **`package.json`**：`rag:setup`／`rag:embed`／`rag:query`、依賴 `dotenv`。**`.env.local` 不入庫**。
-- **營運**：PowerShell 下 `npm run rag:query` 傳參建議 **`npm run rag:query --% -- ...`** 或 **`npx tsx scripts/rag_query.ts`**。
-- **明日**：已於 **`TASKS.md` → Next** 新增「擴充 **MinIO／Redis／Trigger.dev／n8n** 自架」一條（對照 `hetzner-self-host.env.example` 與 full-stack runbook）。
+### 文件／wrapper 對齊複查（AO-RESUME／AO-CLOSE）
+- 修正 **`REMOTE`** §2.2「不取代 git pull」舊句（與 **`check-three-way-sync`/2.5.1** 矛盾）；補 **wrapper 參數**（`agency-os/scripts/ao-resume.ps1`、`ao-close.ps1` 與根腳本同旗標）；**`memory`** Runbook／`ao-close` 敘述與 **`-AllowPushWhileBehind`**；**`end-of-day-checklist`** 補例外旗標；**`40-shutdown-closeout.mdc`**（agency-os + 根）pull/npm ci 敘述與 REMOTE 一致。
 
-### Supabase 自託管切線：清單、`mcp.json` 模板、移除 Cloud-only MCP 假設
-- **新增**：`docs/operations/supabase-self-hosted-cutover-checklist.md`（資料遷移、vault、`mcp.json`、Trigger／n8n 盤點、輪替憑證）。  
-- **新增（可提交）**：repo 根 **`mcp.json.template`**（僅占位符）；**本機 `mcp.json`（gitignore）** 已改為同結構占位，**不含**明文 token——使用者需自各供應商／vault **重新填入**；並視為 **曾外洩之舊 token 應輪替**。  
-- **自架與 IDE**：`cursor-mcp-and-plugin-inventory.md` 註明 **`mcp.supabase.com?project_ref=` 僅適用 Supabase Cloud**；自架改以 Studio／psql／Postgres 類 MCP 等。  
-- **文件**：`lobster-factory/README.md`、`local-secrets-vault-dpapi.md`、`mcp-add-server-quickstart.md`、`hetzner-full-stack-self-host-runbook.md` Related 對齊。
+### AO-RESUME：小白友善的 workflows `npm ci`
+- 新增 **`scripts/ensure-lobster-workflows-deps.ps1`**：`AO-RESUME` 在 Git 同步通過後會自動呼叫（可用 **`-SkipWorkflowsDeps`** 略過）；缺 `node_modules` 或 `package-lock.json` 較新時自動 **`npm ci`**；終端機為**英文簡訊**（編碼相容），**繁中說明**見 **REMOTE §2**「`npm ci` 是什麼」。
+- **`REMOTE_WORKSTATION_STARTUP.md`** §2 補「小白：`npm ci` 是什麼」；**2.5.1** 補一句與本腳本對照。
+
+### AO-RESUME／AO-CLOSE：雙機與 `origin/main` 強制一致（減少靜默 stash／未 pull 即 push）
+- **`scripts/check-three-way-sync.ps1`**：`AutoFix` 預設在「落後且工作樹髒」時 **不**自動 stash（改為明確 FAIL）；`-AllowStashBeforePull` + `-AllowPendingStash` 給 Autopilot／明示鬆綁。pull 改為 **`git pull --ff-only origin main`**，fetch／pull 錯誤可見。移除「未預期髒檔→靜默 stash」；改 **FAIL** 或 `-AllowAutoStashUnexpected`（alert 自動修復）。**Stash drift guard**：若本次 run 新增 stash 且未 `-AllowPendingStash` → FAIL 並寫 `agency-os/.agency-state/ao-resume-stash-warning.txt`。
+- **`scripts/ao-resume.ps1`**：`-AllowUnexpectedDirty` 時連帶傳遞 `-AllowStashBeforePull`、`-AllowPendingStash`；另可加手動 `-AllowStashBeforePull`／`-AllowPendingStash`。
+- **`scripts/ao-close.ps1`**：push 前 **`git fetch`**；若目前分支落後 **`origin/<分支>`** → **中止**（`-AllowPushWhileBehind` 跳過）。
+- **`agency-os/scripts/check-three-way-sync.ps1`**：改為 **wrapper** 呼叫 monorepo 根正本（修正舊版錯用 `agency-os` 為 WorkRoot 的風險）。
+- **`autopilot-phase1.ps1`**（根與 agency-os）：alert 同步補 **`-AllowStashBeforePull -AllowAutoStashUnexpected -AllowPendingStash`**。
+- **文件**：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` 新增 **2.5.1**（腳本行為與單一真相）。
 
 ## 2026-04-02
 
@@ -93,10 +95,10 @@
 - 新增客戶精簡鏡像：`docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md`（非權威快速版；權威仍在主憲章）。
 - 補齊文件索引：`README.md`、`docs/README.md`；並在 `docs/CHANGE_IMPACT_MATRIX.md` 登記連動必查檔。
 
-### 工具退役：移除第三方議題看板同步（腳本／MCP／舊報表）
-- 依使用者決策：不再使用外部議題看板與 repo 的單向／雙向同步，避免權杖與流程殘留。
-- 已移除：相關 PowerShell 腳本、治理 playbook、專用報表目錄、以及本機 MCP 設定中的對應 server 條目（機密仍只放 vault／本機，不入庫）。
-- 驗證：`doc-sync` + `system-health-check` 100% + `verify-build-gates` PASS；並已推送 `origin/main`。歷史產物若有殘留字樣，另以報表歸檔／刪除策略清掉，避免搜尋誤導。
+### 工具退役：完全移除 Linear（含歷史文字）
+- 依使用者決策：永遠不再使用 Linear，避免任何 401/衝突與殘留入口。
+- 已移除：腳本（push/sync/debug）、治理文件、報表產物（`reports/linear/*`）、`mcp.json` Linear server、以及歷史 daily/憲章/raw spec 的所有 Linear 字樣。
+- 驗證：全 repo 搜索 `Linear/LINEAR_/linear.app` = **零命中**；`doc-sync` + `system-health-check` 100% + `verify-build-gates` PASS；並已推送 `origin/main`。
 
 ### System Guard：FAIL 後保守 auto-repair（doc-sync + health check 一次）
 - 修改 `scripts/system-guard.ps1`：當第一次 health/連動檢查 FAIL 時，若未傳 `-DisableAutoRepair`，會先保守重跑一次 `doc-sync-automation -AutoDetect` + `system-health-check`；仍 FAIL 才產生 `ALERT_REQUIRED.txt`。
@@ -350,13 +352,12 @@
 - `.cursor/rules/40-shutdown-closeout.mdc`
 - `docs/metrics/kpi-margin-dashboard-spec.md`
 - `docs/operations/airtable-to-supabase-migration-playbook.md`
-- `docs/operations/hetzner-self-host-start-here.md`
-- `docs/operations/hetzner-stack-rollout-index.md`
 - `docs/operations/system-operation-sop.md`
+- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 09:29:25 UTC_
 
 ## 2026-03-20
 
@@ -891,10 +892,6 @@ _Last synced: 2026-04-06 09:35:15 UTC_
 
 
 
-## 2026-04-06
-
-### Machine appendix (weekly-system-review)
-- 2026-04-06 12:32:28 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
 
 
 

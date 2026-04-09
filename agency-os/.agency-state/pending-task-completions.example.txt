@@ -1,0 +1,14 @@
+# Preferred (Autopilot): agent adds to WORKLOG under today's ## date:
+#   - AUTO_TASK_DONE: <unique substring of one open TASK line>
+#
+# This file is optional: copy to pending-task-completions.txt if you want the same
+# matching rules without touching WORKLOG. Both merge at AO-CLOSE.
+# automatic - [ ] -> - [x] in agency-os/TASKS.md.
+# Rules:
+# - One line per completed open task. Lines starting with # are ignored.
+# - Each line must appear as a substring of exactly ONE unchecked task line.
+# - Use distinctive text (e.g. a unique pilot name or doc path).
+#
+# Example (remove # to try):
+# Soulful Expression Art Therapy
+# NEXT_GEN_DELIVERY_BLUEPRINT_V1

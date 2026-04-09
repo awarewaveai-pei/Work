@@ -67,7 +67,7 @@
 - 在 `TASKS.md` 的「雙機環境對齊」未勾選前，`AO-RESUME` 必須提醒：
   - `REMOTE_WORKSTATION_STARTUP.md` §1.5（整體）
   - `REMOTE_WORKSTATION_STARTUP.md` §1.5.1（MariaDB/PHP/WP）
-  - `machine-environment-audit.ps1 -FetchOrigin` 至 PASS（無 WARN）
+  - `machine-environment-audit.ps1 -FetchOrigin -Strict` 至 PASS（無 WARN）
 
 ## Related
 

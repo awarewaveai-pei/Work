@@ -33,6 +33,7 @@
 - `.cursor/rules/64-architecture-mcp-routing.mdc`
 - `docs/international/global-compliance-baseline.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
+- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 09:29:25 UTC_
 

@@ -3,7 +3,10 @@ param(
     [string]$CommitMessage = "",
     [switch]$SkipPush,
     [switch]$SkipVerify,
-    [switch]$AllowNonPerfectHealth
+    [switch]$AllowNonPerfectHealth,
+    [switch]$AllowPushWhileBehind,
+    [switch]$SkipTodayRecap,
+    [switch]$SkipAutoTaskCheckmarks
 )
 
 Set-StrictMode -Version Latest

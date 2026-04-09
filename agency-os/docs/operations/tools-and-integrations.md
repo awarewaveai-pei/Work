@@ -36,8 +36,9 @@
 ## Related Documents (Auto-Synced)
 - `docs/operations/airtable-to-supabase-migration-playbook.md`
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
+- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 - `docs/standards/n8n-workflow-architecture.md`
 - `tenants/templates/tenant-template/03_TOOLS_CONFIGURATION_GUIDE.md`
 
-_Last synced: 2026-04-05 11:40:11 UTC_
+_Last synced: 2026-04-09 09:29:25 UTC_
 

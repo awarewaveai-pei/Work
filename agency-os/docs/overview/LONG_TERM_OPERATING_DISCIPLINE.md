@@ -1,4 +1,4 @@
-﻿# 長期營運紀律（30 年級）
+# 長期營運紀律（30 年級）
 
 > **單一用途**：把「能讓 monorepo **活得久、換人仍能接**」的取捨寫成 **短憲章**；細節仍在各 SSOT（`REMOTE_WORKSTATION_STARTUP`、`MCP_TOOL_ROUTING_SPEC`、`SECURITY` 等）。  
 > **非雞湯**：下面每條都應能對應 **可驗證動作**（閘道、檔案主人、或明確禁止）。
@@ -61,17 +61,14 @@
 | **合併／收工前** | `powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1` | 龍蝦 bootstrap、`verify-adr-index`、Agency `system-health-check` |
 | **跨平面或破壞性變更** | 新增／修訂 **ADR** + 更新 `docs/architecture/decisions/README.md` 索引 | 同上閘道；見 `CHANGE_IMPACT_MATRIX` |
 | **客戶釋出或重大變更** | 依 `tenants/templates/core/RELEASE_GATES_CHECKLIST.md`；備份與還原證據 | `BACKUP_RESTORE_PROOF.md` 模板與實填 |
-| **每日開工／收工** | `AO-RESUME`（含 Git 對齊）；`AO-CLOSE`（含 doc-sync／guard／integrated status） | `.cursor/rules/30-resume-keyword.mdc`、`40-shutdown-closeout.mdc` |
-| **新機／雙機** | `REMOTE_WORKSTATION_STARTUP` §1.5／§2；`machine-environment-audit.ps1 -FetchOrigin` | `TASKS.md`「雙機環境對齊」勾選條件 |
+| **每日開工／收工** | **`scripts/ao-resume.ps1`**（預設：Git、`verify-build-gates`、Strict 環境稽核）＋關鍵字 **`AO-RESUME`** 讀檔；**`scripts/ao-close.ps1`**（關鍵字 **`AO-CLOSE`**；含 recap／閘道／integrated status／預設 **push** `origin/main`） | `.cursor/rules/30-resume-keyword.mdc`、`40-shutdown-closeout.mdc`、`end-of-day-checklist.md` |
+| **新機／雙機** | `REMOTE_WORKSTATION_STARTUP` §1.5／§2；`machine-environment-audit.ps1 -FetchOrigin -Strict`（勾選 `TASKS` 雙機項前須無 WARN） | `TASKS.md`「雙機環境對齊」勾選條件 |
 | **依賴與 CVE** | 審閱 `npm audit`；**禁止**對 `lobster-factory/packages/workflows` 盲目 `npm audit fix --force` | `TASKS.md` Backlog（Trigger 傳遞依賴） |
 
 **12 個月內建議完成的工程錨點（與 ADR 006 一致）**：在 Supabase 落地 **RLS + 租戶鍵 + Clerk 組織對照表**（migrations），並於 **staging** 用自動化或手動測試證明 **無跨租戶讀寫**；未落地前不宣稱多租戶資料層「已封閉」。**已提供基線 migration**：`lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql`（須套用至遠端 DB 並配置 JWT org claim）。
 
 ## Related
 
-- **Hetzner 自架堆疊（安裝順序／平面／連動索引）**：`../operations/hetzner-stack-rollout-index.md`  
-- **自架 Phase 1（Hetzner compose）長期營運契約**：`../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`  
-- **同上 · 週期維護核對表**：`../../../lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`
 - **§9 工具與核准平面**：`../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`、`../operations/cursor-mcp-and-plugin-inventory.md`
 - `docs/architecture/decisions/001-wordpress-manifest-and-shell-ssot.md`、`docs/architecture/decisions/002-clerk-identity-boundary.md`、`docs/architecture/decisions/003-no-automated-manifest-dual-sync.md`、`docs/architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md`、`docs/architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md`、`docs/architecture/decisions/006-supabase-tenant-isolation-and-clerk-mapping.md`
 - `AGENTS.md`
@@ -80,9 +77,3 @@
 - `docs/overview/repo-template-locations.md`
 - `docs/architecture/decisions/README.md`
 - `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
-
-## Related Documents (Auto-Synced)
-- `docs/operations/hetzner-stack-rollout-index.md`
-
-_Last synced: 2026-04-06 07:49:28 UTC_
-
