@@ -1,7 +1,7 @@
 ﻿# System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-09 17:38:20`
+- Time: `2026-04-09 22:28:02`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -11,14 +11,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260409-173820.md`
-- Closeout: `reports/closeout/closeout-20260409-173818.md`
+- Health: `reports/health/health-20260409-222801.md`
+- Closeout: `reports/closeout/closeout-20260409-214949.md`
 
 ## Action
 - No blocking issue detected.
-
-## Related Documents (Auto-Synced)
-- `.cursor/rules/30-resume-keyword.mdc`
-
-_Last synced: 2026-04-09 13:49:49 UTC_
-
