@@ -94,5 +94,5 @@ Define enforceable tool routing for Lobster Factory so automation is predictable
 - `README.md`
 - `TASKS.md`
 
-_Last synced: 2026-04-09 13:49:49 UTC_
+_Last synced: 2026-04-09 14:47:16 UTC_
 

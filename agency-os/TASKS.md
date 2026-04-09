@@ -113,6 +113,10 @@
   - 腳本：`scripts/ao-resume.ps1` 新增規則版本/鏡像一致性 precheck（失敗即中止 + quick-fix）
   - 規則：`30-resume-keyword.mdc` 明確「未全列 `- [ ]` 視為無效回覆，必須重出」
   - 對齊：`rules/README` + `cursor-enterprise-rules-index.md` 已補 Owner 入口
+- [x] （2026-04-09）平台能力總表狀態欄位升級（含 emoji）
+  - 檔案：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
+  - 變更：新增「目前實際狀態」欄，並統一 `🟢 已上線 / 🟡 建置中 / ⚪ 未啟動` 圖例於能力總表與 P1-P7 建置順序表
+  - 驗證：`doc-sync-automation -AutoDetect` + `system-health-check` 100% PASS
 - [x] AO-CLOSE 預設 100% health 閘道已落地（規則/文件/腳本三層）
 - [x] 用 1 個新客戶實跑 `tenants/NEW_TENANT_ONBOARDING_SOP.md`
   - 客戶：`company-p1-pilot`
@@ -211,5 +215,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-09 13:49:49 UTC_
+_Last synced: 2026-04-09 14:49:43 UTC_
 

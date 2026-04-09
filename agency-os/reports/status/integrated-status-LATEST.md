@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-09 22:28:07
+- Generated: 2026-04-09 22:49:50
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -212,6 +212,8 @@
 ## 已完成
 - `40-shutdown-closeout.mdc` 納入 `sync-enterprise-cursor-rules-to-monorepo-root.ps1`；根目錄版 checklist 句路徑轉換；`與` 碼位／regex 穩定化；`agency-os` sync 腳本改轉發 SSOT；README／health／verify-build-gates 文案含 **40**；verify-build-gates PASS；checkpoint `9c7b15d`。
 - 規則防漂移硬化：新增 `docs/operations/rules-version-and-enforcement.md`（Version/Priority/Hard-fail）；`scripts/ao-resume.ps1` 新增規則一致性 precheck（Owner 版本標記 + root/agency 規則鏡像 VerifyOnly，失敗即中止 + quick-fix）；`30-resume-keyword.mdc` 補明確句「未全列 `- [ ]` 視為無效回覆，必須重出」。
+- 工具能力總表收斂：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` 已整合「平台能力（自託管/非自託管/時機）」與「工具建置順序 P1-P7」，並將內容統一為繁體中文。
+- 工具能力總表狀態可視化：新增「目前實際狀態」欄與圖例（`🟢 已上線 / 🟡 建置中 / ⚪ 未啟動`），同步到能力總表與 P1-P7 表；`doc-sync-automation -AutoDetect` 與 `system-health-check` 均 PASS（100%）。
 
 ## 未完成
 - `TASKS` 開放項（雙機、Pilot、Next-Gen 等）仍依板面；本輪未新增可勾之 DoD。
@@ -226,7 +228,7 @@
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-09 22:28:02`
+- Time: `2026-04-09 22:49:48`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -236,8 +238,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260409-222801.md`
-- Closeout: `reports/closeout/closeout-20260409-214949.md`
+- Health: `reports/health/health-20260409-224948.md`
+- Closeout: `reports/closeout/closeout-20260409-224944.md`
 
 ## Action
 - No blocking issue detected.

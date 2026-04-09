@@ -35,6 +35,15 @@
 - **規則硬判定**：根與 `agency-os` 的 `30-resume-keyword.mdc` 明確補句：**未全列 `- [ ]` 視為無效回覆，必須重出**。
 - **索引對齊**：`agency-os/docs/operations/cursor-enterprise-rules-index.md`、根／`agency-os` `.cursor/rules/README.md` 已新增 Owner 入口，避免多頭維護。
 
+### 工具能力全景收斂（自託管/非自託管/時機 + P1-P7）
+- **`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`** 升級為平台能力總表正本：整合「能力/是否可自託管/建議時機（P1-P3）」與「工具建置順序（P1-P7）」；全文改繁中。
+- 新增能力層清單（Supabase、n8n、Trigger、PostHog、Sentry、MinIO、Cloudflare、Clerk、GitHub Actions 等）與 `TASKS` 對應關係，避免只見任務不見全景。
+
+### 平台能力總表狀態可視化（emoji）
+- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` 新增「目前實際狀態」圖例與表格狀態值，統一為 `🟢 已上線 / 🟡 建置中 / ⚪ 未啟動`。
+- 能力總表與 P1-P7 建置順序表皆已套用狀態圖示，並縮短欄位文案以改善表格可讀性與欄寬平衡。
+- 驗證：`doc-sync-automation -AutoDetect` PASS；`system-health-check` 100% PASS（413/413）。
+
 ### AO-CLOSE（本輪）：`40-shutdown-closeout` 自動鏡像 + 敘事一致
 - **`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`**：鏡像清單再納入 **`40-shutdown-closeout.mdc`**；根目錄版經轉換（**checklist** 句：先 **`agency-os/docs/operations/end-of-day-checklist.md`**，再註明僅開 **`agency-os` 子資料夾時為 **`docs/operations/...`**）；轉換以 **ASCII／`[char]` 拼 regex**，避免主機編碼毀掉 CJK pattern；**「與」**允許 **U+8207／U+4E0E** 兩種碼位。
 - **正本**：**`agency-os/.cursor/rules/40-shutdown-closeout.mdc`** line 29 之 **`（與`** 已與全文繁體「與」對齊（曾出現隱形同形字導致鏡像比對失敗）。
@@ -363,7 +372,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-09 13:49:49 UTC_
+_Last synced: 2026-04-09 14:49:43 UTC_
 
 ## 2026-03-20
 
@@ -791,6 +800,10 @@ _Last synced: 2026-04-09 13:49:49 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
+
+
+
 
 
 
