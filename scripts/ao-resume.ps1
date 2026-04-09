@@ -13,6 +13,34 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Show-AoResumeQuickFix {
+    param(
+        [Parameter(Mandatory = $true)][string]$Step,
+        [Parameter(Mandatory = $true)][int]$ExitCode
+    )
+    Write-Host ""
+    Write-Host ("AO-RESUME quick fix ({0}, exit {1}):" -f $Step, $ExitCode) -ForegroundColor Yellow
+    switch ($Step) {
+        "preflight" {
+            Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1 -AllowUnexpectedDirty'
+            Write-Host "  (If still failing, run: git status -sb)"
+        }
+        "workflows-deps" {
+            Write-Host '  cd ".\lobster-factory\packages\workflows"; npm ci; cd "..\..\.."; powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1'
+        }
+        "open-tasks" {
+            Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\print-open-tasks.ps1 -WorkRoot .'
+        }
+        "strict-audit" {
+            Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -WorkRoot . -FetchOrigin'
+            Write-Host "  (Then re-run AO-RESUME after fixing WARN/FAIL)"
+        }
+        default {
+            Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1'
+        }
+    }
+}
+
 if ($WorkRoot) {
     $WorkRoot = (Resolve-Path $WorkRoot).Path
 } elseif ($PSScriptRoot) {
@@ -47,6 +75,7 @@ if ($AllowUnexpectedDirty -or $AllowPendingStash) { $syncArgs += "-AllowPendingS
 
 & powershell.exe @syncArgs
 if ($LASTEXITCODE -ne 0) {
+    Show-AoResumeQuickFix -Step "preflight" -ExitCode $LASTEXITCODE
     Write-Error "ao-resume: preflight check failed (exit $LASTEXITCODE)."
     exit $LASTEXITCODE
 }
@@ -57,6 +86,7 @@ $depsScript = Join-Path $WorkRoot "scripts\ensure-lobster-workflows-deps.ps1"
 if (-not $SkipWorkflowsDeps -and (Test-Path -LiteralPath $depsScript)) {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $depsScript -WorkRoot $WorkRoot
     if ($LASTEXITCODE -ne 0) {
+        Show-AoResumeQuickFix -Step "workflows-deps" -ExitCode $LASTEXITCODE
         Write-Error "ao-resume: workflows dependency step failed (exit $LASTEXITCODE)."
         exit $LASTEXITCODE
     }
@@ -68,6 +98,7 @@ $openTasksScript = Join-Path $WorkRoot "scripts\print-open-tasks.ps1"
 if (-not $SkipOpenTasksList -and (Test-Path -LiteralPath $openTasksScript)) {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $openTasksScript -WorkRoot $WorkRoot
     if ($LASTEXITCODE -ne 0) {
+        Show-AoResumeQuickFix -Step "open-tasks" -ExitCode $LASTEXITCODE
         Write-Error "ao-resume: print-open-tasks failed (exit $LASTEXITCODE)."
         exit $LASTEXITCODE
     }
@@ -85,6 +116,7 @@ if ($fullResume) {
     Write-Host "== AO-RESUME: 預設完整檢查（machine-environment-audit -FetchOrigin -Strict）==" -ForegroundColor Cyan
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $auditScript -WorkRoot $WorkRoot -FetchOrigin -Strict
     if ($LASTEXITCODE -ne 0) {
+        Show-AoResumeQuickFix -Step "strict-audit" -ExitCode $LASTEXITCODE
         Write-Error "ao-resume: machine-environment-audit -Strict failed (exit $LASTEXITCODE). Fix output above; no manual markdown checklist required."
         exit $LASTEXITCODE
     }
