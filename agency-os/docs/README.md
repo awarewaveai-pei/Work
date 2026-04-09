@@ -26,10 +26,8 @@
 
 ## Related Documents (Auto-Synced)
 - `docs/operations/cursor-enterprise-rules-index.md`
-- `docs/operations/hetzner-self-host-start-here.md`
-- `docs/operations/hetzner-stack-rollout-index.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/overview/agency-os-complete-system-introduction.md`
 
-_Last synced: 2026-04-06 09:35:15 UTC_
+_Last synced: 2026-04-09 13:49:49 UTC_
 

@@ -41,7 +41,7 @@ If opened folder is `agency-os` only, use paths as above; lobster paths are `../
      - **阻塞／風險／需注意**：**禁止**只寫單獨「無」或「沒有」二字。須綜合 **`TASKS` 開放項**、`WORKLOG`、`CONVERSATION_MEMORY`、`LAST_SYSTEM_STATUS`（若存在）、`LOBSTER_FACTORY_MASTER_CHECKLIST`／Completion Plan 開放語意、**當輪** `ao-resume.ps1`／Strict 稽核終端輸出（若代理有看到）。若有阻塞或風險：**分點**列出（含建議下一步或需使用者決策處）。若盤點後確無：**寫「本次盤點：未見需立即處理之阻塞」**，並**至少一句**說明依據（例如 Strict 結果、WORKLOG／memory 是否曾標記風險）。
      - **Git／開工裁決**：至少一句——例如 **`ao-resume.ps1` exit 0**、behind／ahead 摘要；若未跑腳本或非 0，**誠實標註**並給修復方向（見 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1**）。
 
-   - **未完成待辦（TASKS，`- [ ]` 全列）** — **必做**：以 **`open-tasks-snapshot.md`**（優先）與 **`agency-os/TASKS.md`** 對齊後，在聊天內**逐條**列出**每一行**仍為 `- [ ]` 的待辦，**完整複製該行原文**（checkbox 與文字均保留）；並標註其 **`##` 區塊**（與快照分段一致）。**禁止**只寫「見 TASKS」「共 N 條」而不列內文。**若** **Total open = 0**：寫「（0 條未完成）」**並**一句話確認。**條數必須**與快照／`print-open-tasks` **Total open** 一致（不一致須說明原因）。**若 Total open > 35**：仍**不得省略**任一行——可分段輸出（同一對話回合內接續貼上直至列完），並在首段註明「待辦較多，分 N 段列完」。
+   - **未完成待辦（TASKS，`- [ ]` 全列）** — **必做**：以 **`open-tasks-snapshot.md`**（優先）與 **`agency-os/TASKS.md`** 對齊後，在聊天內**逐條**列出**每一行**仍為 `- [ ]` 的待辦，**完整複製該行原文**（checkbox 與文字均保留）；並標註其 **`##` 區塊**（與快照分段一致）。**禁止**只寫「見 TASKS」「共 N 條」而不列內文。**若** **Total open = 0**：寫「（0 條未完成）」**並**一句話確認。**條數必須**與快照／`print-open-tasks` **Total open** 一致（不一致須說明原因）。**若 Total open > 35**：仍**不得省略**任一行——可分段輸出（同一對話回合內接續貼上直至列完），並在首段註明「待辦較多，分 N 段列完」。**未全列 `- [ ]` 視為無效回覆，必須重出**。
 
    - **其他提醒（選填）** — `integrated-status-LATEST`、當日 `memory/daily`、或 `CONVERSATION_MEMORY` 中需接續的**非 TASKS 行項目**；若無則省略本節標題。
 

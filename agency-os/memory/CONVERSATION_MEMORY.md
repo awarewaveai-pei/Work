@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-09（規則防漂移）**：新增單一正本 **`docs/operations/rules-version-and-enforcement.md`**（Version/Priority/Hard-fail）；`scripts/ao-resume.ps1` 新增規則一致性 precheck（驗 Owner 版本標記 + `sync-enterprise-cursor-rules-to-monorepo-root.ps1 -VerifyOnly`），失敗即中止；`30-resume-keyword.mdc` 明確：**未全列 `- [ ]` 視為無效回覆，必須重出**。
 - **2026-04-09（AO-CLOSE 規則鏡像）**：**`sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 已納入 **`40-shutdown-closeout.mdc`**（與 **`00`／`30`／`50`／`63–66`** 一併鏡像到 monorepo 根；**`40`** 含 **end-of-day-checklist** 路徑轉換）。**`agency-os/scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 僅轉呼叫 monorepo **`scripts/`** 正本。**health／README** 敘述為 **00 + 30 + 40 + 50 + 63–66**。
 - **2026-04-09（AO-RESUME 待辦可見性）**：**`print-open-tasks`** 會寫 **`agency-os/.agency-state/open-tasks-snapshot.md`**（gitignore）。**`AO-RESUME`** 代理須 **Read** 該檔並在聊天 **逐條全列** `- [ ]`（**`30-resume-keyword.mdc`**）；**>35 條**可同回合分段列完。**`sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 已納入 **`00-session-bootstrap` + `30-resume-keyword`**（根目錄鏡像含路徑轉換），**health gate** 會驗證。
 - **2026-04-09（AO-RESUME 預設＝完整檢查）**：**`scripts/ao-resume.ps1`** 預設即跑 **`machine-environment-audit -FetchOrigin -Strict`**（與 **`align-workstation.ps1`** 相同）；**`-SkipStrictEnvironmentAudit`** 僅 Autopilot／輕量開機。只打 **`AO-RESUME`** 時代理應跑此預設腳本。
@@ -323,5 +324,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-09 05:52:22 UTC_
+_Last synced: 2026-04-09 13:49:49 UTC_
 

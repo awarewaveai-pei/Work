@@ -25,6 +25,7 @@
 
 ## SSOT（權威文件）
 
+- **規則版本／強制判定（Owner）**：`docs/operations/rules-version-and-enforcement.md`
 - **龍蝦自動化路由（強制）**：`../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
 - **Cursor MCP 鍵名與分工**：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 - **憑證／祕鑰政策**：`docs/operations/security-secrets-policy.md`
@@ -55,5 +56,5 @@
 - `docs/operations/security-secrets-policy.md`
 - `docs/README.md`
 
-_Last synced: 2026-04-09 09:29:25 UTC_
+_Last synced: 2026-04-09 13:49:49 UTC_
 

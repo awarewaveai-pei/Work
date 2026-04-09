@@ -108,6 +108,11 @@
 - [x] 建立可販售產品化藍圖與交接清單（`docs/product/*`）
 - [x] 建立對外販售打包腳本（`scripts/build-product-bundle.ps1`）
 - [x] 建立總控中心架構與多平台（WordPress-first）連動設計
+- [x] （2026-04-09）AO-RESUME 規則防漂移硬化（單一 Owner + 腳本硬檢查 + 無效回覆判定）
+  - Owner：`docs/operations/rules-version-and-enforcement.md`
+  - 腳本：`scripts/ao-resume.ps1` 新增規則版本/鏡像一致性 precheck（失敗即中止 + quick-fix）
+  - 規則：`30-resume-keyword.mdc` 明確「未全列 `- [ ]` 視為無效回覆，必須重出」
+  - 對齊：`rules/README` + `cursor-enterprise-rules-index.md` 已補 Owner 入口
 - [x] AO-CLOSE 預設 100% health 閘道已落地（規則/文件/腳本三層）
 - [x] 用 1 個新客戶實跑 `tenants/NEW_TENANT_ONBOARDING_SOP.md`
   - 客戶：`company-p1-pilot`
@@ -206,5 +211,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-09 09:29:25 UTC_
+_Last synced: 2026-04-09 13:49:49 UTC_
 

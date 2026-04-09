@@ -35,10 +35,39 @@ function Show-AoResumeQuickFix {
             Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -WorkRoot . -FetchOrigin'
             Write-Host "  (Then re-run AO-RESUME after fixing WARN/FAIL)"
         }
+        "rules-consistency" {
+            Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-enterprise-cursor-rules-to-monorepo-root.ps1 -MonorepoRoot .'
+            Write-Host "  (Then re-run AO-RESUME)"
+        }
         default {
             Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1'
         }
     }
+}
+
+function Assert-AoResumeRuleConsistency {
+    param([Parameter(Mandatory = $true)][string]$Root)
+
+    $ownerSpec = Join-Path $Root "agency-os\docs\operations\rules-version-and-enforcement.md"
+    if (-not (Test-Path -LiteralPath $ownerSpec)) {
+        Write-Error "ao-resume: missing rule owner spec at $ownerSpec"
+        return 1
+    }
+    $ownerRaw = Get-Content -LiteralPath $ownerSpec -Raw -Encoding UTF8
+    if ($ownerRaw -notmatch 'Version:\s*`?\d{4}-\d{2}-\d{2}\.\d+`?') {
+        Write-Error "ao-resume: owner spec missing Version marker (rules-version-and-enforcement.md)."
+        return 1
+    }
+
+    $syncVerify = Join-Path $Root "scripts\sync-enterprise-cursor-rules-to-monorepo-root.ps1"
+    if (Test-Path -LiteralPath $syncVerify) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncVerify -MonorepoRoot $Root -VerifyOnly -Quiet
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "ao-resume: rules mirror consistency check failed (root .cursor/rules != agency-os canonical)."
+            return $LASTEXITCODE
+        }
+    }
+    return 0
 }
 
 if ($WorkRoot) {
@@ -53,6 +82,12 @@ $checkScript = Join-Path $WorkRoot "scripts\check-three-way-sync.ps1"
 if (-not (Test-Path -LiteralPath $checkScript)) {
     Write-Error "ao-resume: missing check script at $checkScript"
     exit 1
+}
+
+$rulesConsistencyExit = Assert-AoResumeRuleConsistency -Root $WorkRoot
+if ($rulesConsistencyExit -ne 0) {
+    Show-AoResumeQuickFix -Step "rules-consistency" -ExitCode $rulesConsistencyExit
+    exit $rulesConsistencyExit
 }
 
 Write-Host "== AO-RESUME: preflight auto-fix ==" -ForegroundColor Cyan

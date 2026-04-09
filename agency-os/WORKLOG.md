@@ -29,6 +29,12 @@
 - **根因**：**`30-resume-keyword`** 曾要求 **concise**；**`print-open-tasks`** 僅終端輸出，聊天裡易省略；**阻塞／風險**允許單字「無」→ 代理傾向過短。
 - **修正**：**`30-resume-keyword` 第 3 節**改為**五段式**（含 **TASKS 每一條 `- [ ]` 全文複製＋區塊標題**、**實質**阻塞／風險盤點禁止只寫「無」）；**`AGENTS.md`** 區分一般開場 vs **`AO-RESUME`**；**`.cursor/rules/README`** 索引一句更新；**monorepo 根** **`00`／`30`** 已納入 **`sync-enterprise-cursor-rules-to-monorepo-root.ps1`**（含路徑轉換），無需再手動複製。
 
+### 規則防漂移（Rule Drift）硬化：版本與執行一致性
+- **新增單一正本**：`docs/operations/rules-version-and-enforcement.md`（Version/Supersedes/Priority/Hard-fail/執行鉤子）。
+- **腳本硬檢查**：`scripts/ao-resume.ps1` 新增 `Assert-AoResumeRuleConsistency`；開工先驗 `rules-version-and-enforcement.md` 版本標記與 `sync-enterprise-cursor-rules-to-monorepo-root.ps1 -VerifyOnly`，失敗即中止並輸出一行 quick-fix。
+- **規則硬判定**：根與 `agency-os` 的 `30-resume-keyword.mdc` 明確補句：**未全列 `- [ ]` 視為無效回覆，必須重出**。
+- **索引對齊**：`agency-os/docs/operations/cursor-enterprise-rules-index.md`、根／`agency-os` `.cursor/rules/README.md` 已新增 Owner 入口，避免多頭維護。
+
 ### AO-CLOSE（本輪）：`40-shutdown-closeout` 自動鏡像 + 敘事一致
 - **`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`**：鏡像清單再納入 **`40-shutdown-closeout.mdc`**；根目錄版經轉換（**checklist** 句：先 **`agency-os/docs/operations/end-of-day-checklist.md`**，再註明僅開 **`agency-os` 子資料夾時為 **`docs/operations/...`**）；轉換以 **ASCII／`[char]` 拼 regex**，避免主機編碼毀掉 CJK pattern；**「與」**允許 **U+8207／U+4E0E** 兩種碼位。
 - **正本**：**`agency-os/.cursor/rules/40-shutdown-closeout.mdc`** line 29 之 **`（與`** 已與全文繁體「與」對齊（曾出現隱形同形字導致鏡像比對失敗）。
@@ -357,7 +363,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-09 09:29:25 UTC_
+_Last synced: 2026-04-09 13:49:49 UTC_
 
 ## 2026-03-20
 
@@ -785,6 +791,7 @@ _Last synced: 2026-04-09 09:29:25 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

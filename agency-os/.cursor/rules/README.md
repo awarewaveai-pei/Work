@@ -68,6 +68,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\system-guard.ps1 -Mode manual
 ## 維護規則時的原則
 
 - 一個規則只做一件事（避免互相覆蓋）
+- 規則版本與強制條件單一正本：`docs/operations/rules-version-and-enforcement.md`
 - 改規則後要同步檢查：
   - `AGENTS.md`
   - `docs/change-impact-map.json`
