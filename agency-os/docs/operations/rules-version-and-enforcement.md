@@ -5,7 +5,7 @@
 
 ## Version
 
-- Version: `2026-04-09.1`
+- Version: `2026-04-10.1`
 - Supersedes: ad-hoc verbal conventions and implicit "assistant memory" habits.
 - Effective from: immediately.
 
@@ -50,6 +50,7 @@ Any AO-RESUME reply is invalid unless it includes:
 - required sections per `30-resume-keyword.mdc`
 - complete "unchecked tasks full listing" with no omissions
 - explicit mention of preflight PASS/FAIL
+- **Git／開工裁決**（`30-resume-keyword.mdc` 第 3 節「目前進度」）：**`ao-resume.ps1` exit code**；**Strict** 是否 **`AUDIT RESULT: PASS (no warnings)`**（或誠實寫失敗原因）；**`ahead`／`behind` vs `origin/main`**
 
 ## Change Process (to avoid drift)
 

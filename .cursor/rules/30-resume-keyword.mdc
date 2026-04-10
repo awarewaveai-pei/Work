@@ -39,7 +39,11 @@ If opened folder is `agency-os` only, use paths as above; lobster paths are `lob
    - **目前進度** — **必含**：
      - **龍蝦工廠**：**目前 Milestone**（M1~M5；不確定時寫「待對照 `LOBSTER_FACTORY_MASTER_CHECKLIST`」）；**今日 DoD**。
      - **阻塞／風險／需注意**：**禁止**只寫單獨「無」或「沒有」二字。須綜合 **`TASKS` 開放項**、`WORKLOG`、`CONVERSATION_MEMORY`、`LAST_SYSTEM_STATUS`（若存在）、`LOBSTER_FACTORY_MASTER_CHECKLIST`／Completion Plan 開放語意、**當輪** `ao-resume.ps1`／Strict 稽核終端輸出（若代理有看到）。若有阻塞或風險：**分點**列出（含建議下一步或需使用者決策處）。若盤點後確無：**寫「本次盤點：未見需立即處理之阻塞」**，並**至少一句**說明依據（例如 Strict 結果、WORKLOG／memory 是否曾標記風險）。
-     - **Git／開工裁決**：至少一句——例如 **`ao-resume.ps1` exit 0**、behind／ahead 摘要；若未跑腳本或非 0，**誠實標註**並給修復方向（見 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1**）。
+     - **Git／開工裁決** — **必含**（以當輪 **`ao-resume.ps1` 終端輸出**為準，禁止憑記憶编造）：
+       - **`.\scripts\ao-resume.ps1`**：**exit code**（僅 **0** 得寫「預設完整開工路徑已跑完」）。
+       - **Strict 環境稽核**：是否出現 **`AUDIT RESULT: PASS (no warnings)`**（來自同次執行之 **`machine-environment-audit -FetchOrigin -Strict`**）。若腳本非 0 或無該行，**不得**宣稱 Strict PASS；**至少摘一行**失敗原因（例：工作樹 dirty、`ahead>0` 未 push、behind 需 pull、閘道／health 失敗）。
+       - **與 `origin/main`**：**`ahead`／`behind`** 數字或等價敘述（開工大改前 **behind 必須為 0**）。**註**：`machine-environment-audit -Strict` 會把多數 WARN（含常見的 **dirty**、**ahead>0**）視為 FAIL；若與 **`REMOTE_WORKSTATION_STARTUP.md` §2.3**「ahead 敘述」並存，**以稽核腳本實際輸出為準**。
+       - 若未跑腳本或 exit 非 0：明寫「未跑／exit ≠ 0」，並指 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §2.5.1** 的修復方向（commit／push／pull／`-AllowUnexpectedDirty` 等依終端 quick-fix）。
 
    - **未完成待辦（TASKS，`- [ ]` 全列）** — **必做**：以 **`open-tasks-snapshot.md`**（優先）與 **`agency-os/TASKS.md`** 對齊後，在聊天內**逐條**列出**每一行**仍為 `- [ ]` 的待辦，**完整複製該行原文**（checkbox 與文字均保留）；並標註其 **`##` 區塊**（與快照分段一致）。**禁止**只寫「見 TASKS」「共 N 條」而不列內文。**若** **Total open = 0**：寫「（0 條未完成）」**並**一句話確認。**條數必須**與快照／`print-open-tasks` **Total open** 一致（不一致須說明原因）。**若 Total open > 35**：仍**不得省略**任一行——可分段輸出（同一對話回合內接續貼上直至列完），並在首段註明「待辦較多，分 N 段列完」。**未全列 `- [ ]` 視為無效回覆，必須重出**。
 

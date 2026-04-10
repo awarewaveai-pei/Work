@@ -39,7 +39,7 @@
 - 使用者輸入 `AO-RESUME` 時：**可執行終端下**須先跑 **`scripts/ao-resume.ps1`（預設完整）至 exit 0**，再依 **`.cursor/rules/30-resume-keyword.mdc`** 讀取記憶、**`agency-os/.agency-state/open-tasks-snapshot.md`**（與 `print-open-tasks` 同步）與進度檔並回覆；**無終端**時改手動 Git 自檢並在回標註落差（見該規則第 1 節）。
 - **雙機協作硬性說明**：`AO-RESUME` 對應腳本 **`scripts/ao-resume.ps1`** 會 **`git fetch`**，且**僅在落後 `origin/main`（behind>0）** 時 **`git pull --ff-only origin main`**；若**落後且工作樹仍髒**，預設**不**自動 stash 可能失敗（見 `REMOTE` **2.5.1**）。**預設**同一腳本在 preflight 後會跑 **`machine-environment-audit -FetchOrigin -Strict`**（與 **`align-workstation.ps1`** 相同）；**Exit 0**＝機器裁決可開工，無需目視 `LAST_SYSTEM_STATUS`／`integrated-status`。完整開工順序、30 秒自檢：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**。
 - 若已啟用 Autopilot Phase1，開機會自動執行 `scripts/ao-resume.ps1 -SkipVerify -SkipStrictEnvironmentAudit -AllowUnexpectedDirty`（輕量 preflight；**不**跑完整閘道與 Strict 環境稽核；**不**取代你在桌機手動跑的完整 **`ao-resume.ps1`**）。
-- 回覆格式固定為 **`AO-RESUME` 五段式**（見 **`30-resume-keyword.mdc` 第 3 節**）：`已完成`、`目前進度`（含龍蝦 Milestone／今日 DoD／**實質**阻塞風險盤點＋Git 裁決一句）、**`未完成待辦（TASKS）` 逐條全列**、選填其他提醒、`下一步`。
+- 回覆格式固定為 **`AO-RESUME` 五段式**（見 **`30-resume-keyword.mdc` 第 3 節**）：`已完成`、`目前進度`（含龍蝦 Milestone／今日 DoD／**實質**阻塞風險盤點＋**Git／開工裁決**：`ao-resume.ps1` **exit code**、**`AUDIT RESULT: PASS (no warnings)`** 與否、`ahead`／`behind`），**`未完成待辦（TASKS）` 逐條全列**、選填其他提醒、`下一步`。
 - **`阻塞／風險` 禁止**只回「無」二字；須依該規則綜合盤點並說明依據，或分點列出具體風險。
 - 使用者輸入 **`AO-CLOSE`**（關鍵字不變）或明確表達要關機/收工時，必須先執行 **closeout**，再輸出：`今日完成`、`今日未完成`、`連動檢查`、`明日優先`。
   - **只打 AO-CLOSE 即含義完整**：等同授權代理在跑 **`ao-close.ps1` 前**主動依**當輪對話 + `TASKS.md` 開放項**（＋必要時 **print-today-closeout-recap**）補齊 **`WORKLOG.md`** 當日 **`- AUTO_TASK_DONE: …`**（**不要**求使用者再加一句「照對話全寫進 AUTO_TASK_DONE」）；證據不足時**只問一題**。
@@ -113,5 +113,5 @@
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-10 07:29:14 UTC_
+_Last synced: 2026-04-10 11:51:48 UTC_
 
