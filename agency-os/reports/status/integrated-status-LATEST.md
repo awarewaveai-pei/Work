@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-11 00:10:49
+- Generated: 2026-04-11 00:21:26
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -204,13 +204,35 @@
 > Full runbook: see `## Runbook Commands` in the source file.
 
 ## 5) memory/daily/2026-04-11.md
-_no file for today yet._
+# 2026-04-11
+
+## 背景
+- 機器本機日曆為 **2026-04-11**；`ao-close.ps1` 之 **`print-today-closeout-recap`** 已提示應有本檔。前一步收工紀要曾寫入 **`2026-04-10.md`**（跨日／代理未即時依日曆分檔），本檔補齊 **4/11** 當日脈絡。
+
+## 已完成
+- **`AO-CLOSE`** 已跑通：`verify-build-gates` PASS、system-guard、integrated status、`git push origin main`（commit **`a1e4461`** 區間，見當時終端輸出）。
+- 進度檔已更新：`WORKLOG.md`（含 **2026-04-10** 區塊內之 Cursor／Sentry／n8n 收工段）、`CONVERSATION_MEMORY.md`；infra：`hetzner-phase1-core` n8n Sentry 環境變數等已納入該次推送。
+
+## 未完成
+- 與 **`TASKS.md` Next** 開放項相同：無本日新增 **`AUTO_TASK_DONE`**（Sentry DoD、Secrets §2 等仍開放）。
+
+## 風險/阻塞
+- **日曆 vs 檔名**：若再跨日收工，應以 **recap 顯示之日期** 為準新建 **`memory/daily/YYYY-MM-DD.md`**，避免只堆在「對話開始那天的檔」。
+
+## 下一步
+- 下次 **`AO-RESUME`** 前：monorepo 根 **`.\scripts\ao-resume.ps1`** 至 exit 0；若當日仍有筆記，繼續用 **`2026-04-11.md`** 或 **`2026-04-12.md`** 依實際日曆。
+
+---
+
+## 同日補登（第二輪關鍵字 AO-CLOSE）
+- **使用者問**：為何先前未建 **`2026-04-11.md`** → **答**：代理未依機器日曆分檔，屬疏忽；已補檔並 **`commit-checkpoint`**。
+- **`WORKLOG`**：新增 **`## 2026-04-11`** 區塊與本節對齊；隨後再跑完整 **`ao-close.ps1`** 推上 **`origin/main`**。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-11 00:10:43`
+- Time: `2026-04-11 00:21:22`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -220,8 +242,8 @@ _no file for today yet._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260411-001043.md`
-- Closeout: `reports/closeout/closeout-20260411-001038.md`
+- Health: `reports/health/health-20260411-002122.md`
+- Closeout: `reports/closeout/closeout-20260411-002119.md`
 
 ## Action
 - No blocking issue detected.

@@ -2,6 +2,16 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-11
+
+### memory/daily 與機器日曆對齊
+- **補建**：`agency-os/memory/daily/2026-04-11.md`（因前次 **`AO-CLOSE`** 以對話日寫入 **`2026-04-10.md`**，未依 recap 之 **4/11** 分檔；已於本日補齊並註記防呆）。
+- **本機 checkpoint**：`ee5e57b`（`memory/daily/2026-04-11.md` create；**於本輪 `AO-CLOSE` 前**尚未 push）。
+
+### AO-CLOSE（2026-04-11 · 關鍵字收工）
+- 執行 **`scripts\ao-close.ps1`**：預設閘道、guard、integrated report、**`apply-closeout-task-checkmarks`**、**`git push`**（含併入未推送之 **checkpoint** 與本輪 WORKLOG／daily 更新）。
+- **不**新增 **`AUTO_TASK_DONE`**（**`TASKS.md` Next** 開放項無本輪新達成之完整 DoD）。
+
 ## 2026-04-10
 
 ### n8n staging client_onboarding E2E
@@ -433,7 +443,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-10 16:10:38 UTC_
+_Last synced: 2026-04-10 16:21:18 UTC_
 
 ## 2026-03-20
 
@@ -861,6 +871,7 @@ _Last synced: 2026-04-10 16:10:38 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 
