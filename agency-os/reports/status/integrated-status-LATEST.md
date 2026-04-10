@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-10 18:22:37
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-04-11 00:10:49
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter） - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑） - [ ] C5-1. Observability：Sentry（錯誤追蹤）+ PostHog（產品分析） - [ ] C5-2. Edge/Security：Cloudflare（WAF/CDN/Rate limit） - [ ] C5-3. Secrets：1Password Secrets Automation（或同級） - [ ] C5-4. Identity/Org：Clerk/WorkOS/Auth0（三選一） - [ ] C5-5. Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails） - [ ] C5-6. 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -203,43 +203,14 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-10.md
-# 2026-04-10
-
-## 背景
-- 使用者要求把三份核心關聯文件（Inventory / Routing Spec / Traceability）與路由矩陣整併到可長期維運等級，避免「東缺一塊、西缺一塊」。
-
-## 已完成
-- 對齊四檔語言與欄位：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`。
-- `ROUTING_MATRIX.md` 改為與 Spec 同語言（`task_type` / `risk_level` / `environment` / `approval_required`），並補上強制裁決規則。
-- 三檔補上跨文件契約與長期治理節奏（月/季/年），明確 Owner 與變更同提交要求。
-- `TASKS.md` 新增「三檔長期治理巡檢」待辦，`README.md` 與 `WORKLOG.md` 同步入口與決策紀錄。
-
-## 未完成
-- 尚未執行下一輪月度 drift 巡檢實跑（僅完成規格與流程收斂）。
-
-## 風險/阻塞
-- 若未按治理節奏巡檢，文件仍可能在未來因局部更新而再次分叉。
-
-## 下一步
-- 跑 `doc-sync-automation -AutoDetect` 與 `system-health-check` 驗證閉環。
-- 下次 AO-RESUME 後優先執行一次「三檔長期治理巡檢」待辦，產生可追溯證據。
-
----
-
-## 收工前（2026-04-10 晚，AO-CLOSE）
-- **已完成**：`agency-os/README.md` 導覽整理；`agency-os/scripts/doc-sync-automation.ps1` Related 跳過邏輯與根腳本對齊；釐清龍蝦 Related 風險與 Supabase 自架文件敘述。
-- **未完成**：`TASKS.md` **Next** 隊列各條仍開放；本輪未加 `AUTO_TASK_DONE`。
-- **AO-CLOSE**：預設跑閘道後 `git add -A` → commit（若有變更）→ push；**不**會把 gitignore 檔推上 GitHub；**不**代表所有業務待辦已做完。
-
-### 晚間補登（GitHub 身分）
-- **`gh`** 作用中帳號：**awarewaveai-pei**；**`git push origin main`** 已成功，**`main`** 與 **origin** 對齊。
+## 5) memory/daily/2026-04-11.md
+_no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-10 18:22:28`
+- Time: `2026-04-11 00:10:43`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -249,8 +220,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260410-182228.md`
-- Closeout: `reports/closeout/closeout-20260410-182226.md`
+- Health: `reports/health/health-20260411-001043.md`
+- Closeout: `reports/closeout/closeout-20260411-001038.md`
 
 ## Action
 - No blocking issue detected.

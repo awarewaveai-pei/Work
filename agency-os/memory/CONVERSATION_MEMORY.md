@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-10（Cursor：Sentry／n8n）**：對話釐清 Sentry 專案類型與 monorepo 對應（Next／Express／PHP／Trigger→Node）；**`hetzner-phase1-core`** 之 **compose n8n** 已可經 **`SENTRY_DSN_N8N`** 等注入官方 Sentry 變數；營運者實際 n8n 可能為 **CLI／雲端另架**，與該 compose **不一定同一實例**。**`next-admin`／`node-api`** 已有 Sentry SDK；**`packages/workflows`** 尚未接。
 - **2026-04-10（GitHub push）**：本機 **`gh`** 作用中帳號已設為 **awarewaveai-pei**（HTTPS）；對 **`awarewaveai-pei/Work`** 之 **`git push origin main`** 已通過；日後若再 **403** 先查 **`gh auth status`** 之 **Active account**。
 - **2026-04-10（晚：README 導覽 + doc-sync 雙拷貝）**：`agency-os/README.md` 表格化連結並明確「根目錄速查 vs `docs/overview`／`docs/operations` 導覽全集」；補 ADR 目錄入口。**`agency-os/scripts/doc-sync-automation.ps1`** 與 monorepo 根一致：自動 Related **不寫入** `../lobster-factory/`、根 **`README.md`**、**`tenants/README.md`**（避免路徑座標錯位／洗版）。文件層面：`hetzner-stack-rollout-index`、`TOOLS_DELIVERY_TRACEABILITY` 宣稱 Supabase 自架已在 Hetzner；實機與憑證仍須人類維運與稽核。
 - **2026-04-10（三檔長期治理收斂）**：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md` 已完成術語對齊（`task_type`/`risk_level`/`environment`/`approval_required`）與跨文件契約；新增月/季/年治理節奏與變更同提交要求，避免路由語意漂移。
@@ -329,5 +330,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-10 13:27:41 UTC_
+_Last synced: 2026-04-10 16:10:38 UTC_
 

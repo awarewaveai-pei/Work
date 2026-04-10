@@ -62,6 +62,20 @@ chmod +x scripts/backup-phase1.sh   # Linux 上
 
 產出壓縮 SQL + `wp-html.tgz`。**Supabase** 請仍依 `supabase-self-hosted-cutover-checklist.md` 等文件排程備份。
 
+## n8n × Sentry（自託管）
+
+n8n 映像讀取 **`N8N_SENTRY_DSN`**（後端）與選填 **`N8N_FRONTEND_SENTRY_DSN`**（編輯器前端）；可選 **`ENVIRONMENT`** / **`DEPLOYMENT_NAME`** 等（與 n8n 原始碼 `packages/@n8n/config/src/configs/sentry.config.ts` 一致）。
+
+1. 在 Sentry 建立專案（類型 **Node.js** 給後端；若要前端再建 **Browser** 或沿用同一專案視需求）。  
+2. 在伺服器 `.env` 填入 **`SENTRY_DSN_N8N`**（與選填 **`SENTRY_DSN_N8N_FRONTEND`**），見 **`.env.example`**。  
+3. **`docker compose --env-file .env up -d`**（或僅 **`docker compose --env-file .env up -d n8n`**）讓 n8n 重載環境。  
+
+**最小驗證**
+
+- `curl -sf http://127.0.0.1:5678/healthz`（容器本機）或經 Nginx 開啟 `/n8n/` 登入一次。  
+- 在 Sentry 該專案查看是否有來自 **`environment`** = `N8N_SENTRY_ENVIRONMENT` 的事件（首次可能僅在後端發生錯誤或特定操作後才有）。  
+- 刻意測試：在 n8n 建立一條 **Code** 節點丟錯誤並執行，或觀察執行失敗是否出現在 Sentry（依 n8n 版本與事件類型而定）。
+
 ## 已知／刻意邊界
 
 - **無 HTTPS** — 下一階段（Cloudflare / Let’s Encrypt）再接。
