@@ -56,6 +56,7 @@
 - [ ] `memory/CONVERSATION_MEMORY.md`
   - [ ] 更新 Today/Remaining/Tomorrow（保持可續接）
 - [ ] `memory/daily/YYYY-MM-DD.md`
+  - [ ] **`YYYY-MM-DD` = 收工當日本機日曆**（與 **`print-today-closeout-recap`**／**`40-shutdown-closeout.mdc`** 一致，不依對話開始日）
   - [ ] 補上 closeout 三步 PASS 的證據檔名（closeout/health/guard）
 
 ## 3) 防重工確認（關機前最後 30 秒）
@@ -67,5 +68,5 @@
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-10 13:27:41 UTC_
+_Last synced: 2026-04-10 16:26:00 UTC_
 

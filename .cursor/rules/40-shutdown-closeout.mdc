@@ -20,7 +20,7 @@ When the user indicates end of day or shutdown intent (examples: `AO-CLOSE`,
    - `TASKS.md`（**預設不必手動勾選**：由代理在 **`WORKLOG.md`** 當日區塊寫 **`- AUTO_TASK_DONE: <子字串>`**，**`ao-close`** 內 **`apply-closeout-task-checkmarks`** 自動翻 `- [ ]`→`- [x]`；**見上文：打 AO-CLOSE 即觸發代理代寫，無須使用者加句**）
    - `WORKLOG.md`
    - `memory/CONVERSATION_MEMORY.md`
-   - `memory/daily/YYYY-MM-DD.md` (create if missing, then write closeout summary)
+   - `memory/daily/YYYY-MM-DD.md`（**`YYYY-MM-DD` 必須與收工時本機系統日曆一致**，並與 **`print-today-closeout-recap`** 標題列之日期相同；**不得**僅依「對話開始日」或使用者口頭「今天」臆測。跨日長對話時仍寫入 **收工當日** 之檔名；`WORKLOG.md` 之 **`## yyyy-MM-dd`** 同則：收工摘要落在 **機器日** 對應區塊。）
    - **若使用者記不得今日完成**：**建議**先跑 **`scripts/print-today-closeout-recap.ps1`** 對照 **Git 今日 commit**／**`WORKLOG` 今日區塊**後再補齊上述檔案；**`ao-close.ps1` 開頭仍會再印同摘要**供複核。代理應依**當日對話 + 該摘要**代寫進度檔，再進第 2 步。
 2. Run **one-shot closeout + GitHub push** from the current repo root:
    `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`

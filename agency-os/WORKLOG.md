@@ -8,9 +8,25 @@
 - **補建**：`agency-os/memory/daily/2026-04-11.md`（因前次 **`AO-CLOSE`** 以對話日寫入 **`2026-04-10.md`**，未依 recap 之 **4/11** 分檔；已於本日補齊並註記防呆）。
 - **本機 checkpoint**：`ee5e57b`（`memory/daily/2026-04-11.md` create；**於本輪 `AO-CLOSE` 前**尚未 push）。
 
-### AO-CLOSE（2026-04-11 · 關鍵字收工）
+### AO-CLOSE（2026-04-11 · Cursor：Sentry／n8n／協作邊界）
+- **對話摘要**：Sentry 外掛／MCP 設定說明；依 monorepo 技術棧釐清 Sentry 精靈應選平台（Next／Express／PHP／Trigger 用 Node）；盤點 **`next-admin`**、**`node-api`** 已接 `@sentry/*`，**`packages/workflows`** 尚未接 Sentry。
+- **程式變更（repo）**：`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` 之 **n8n** 服務補上官方 **`N8N_SENTRY_DSN`** 等環境變數；**`.env.example`**、**`README.md`** 補 Sentry 與驗證要點。**邊界**：營運者表示實際 n8n 可能已由 **Claude CLI／雲端**另架，該變更僅影響 **Phase1 compose 自託管路徑**，與既有雲端實例無自動關聯。
+- **本輪未達** `TASKS.md` **Next** 任一開放項之完整 DoD（含 **`Sentry 觀測接入`** 之測試事件＋告警、**Secrets §2 輪替** 等）。
+- 該次關鍵字 **`AO-CLOSE`**：**不**新增 **`AUTO_TASK_DONE`**（無單一 `- [ ]` 行可唯一命中之已完成 DoD）。
+- **更正**：本節原誤置於 **`## 2026-04-10`**，已依 **`40-shutdown-closeout`**（收工摘要用 **機器日**）移至本日區塊。
+
+### AO-CLOSE（2026-04-11 · 關鍵字收工 · 第二輪）
 - 執行 **`scripts\ao-close.ps1`**：預設閘道、guard、integrated report、**`apply-closeout-task-checkmarks`**、**`git push`**（含併入未推送之 **checkpoint** 與本輪 WORKLOG／daily 更新）。
 - **不**新增 **`AUTO_TASK_DONE`**（**`TASKS.md` Next** 開放項無本輪新達成之完整 DoD）。
+
+### AO-CLOSE（2026-04-11 · 第三輪前）：`memory/daily` 與 **`40` 規則**對齊修復
+- **問題**：收工內容曾寫入 **`memory/daily/2026-04-10.md`**／**`WORKLOG ## 2026-04-10`**，與 **`print-today-closeout-recap`** 之 **機器日 4/11** 不一致。
+- **處置**：**`40-shutdown-closeout.mdc`** 明定 **`YYYY-MM-DD`＝收工當日本機日曆** 且 **`WORKLOG ##`** 收工摘要同則；**`end-of-day-checklist.md`** 補一句；**daily**／**WORKLOG** 搬移與 blockquote 更正；**`doc-sync-automation -AutoDetect`**、**`system-health-check` 100%**；**`sync-enterprise-cursor-rules-to-monorepo-root.ps1`**。
+- **不**新增 **`AUTO_TASK_DONE`**（無 **Next** 單項完整 DoD）。
+
+### AO-CLOSE（2026-04-11 · 關鍵字收工 · 第三輪）
+- 執行 **`scripts\ao-close.ps1`**：預設閘道、guard、integrated report、**`apply-closeout-task-checkmarks`**、**`git push`**（含本輪未提交之規則／記憶／清單變更）。
+- **不**新增 **`AUTO_TASK_DONE`**。
 
 ## 2026-04-10
 
@@ -67,11 +83,7 @@
 - 補上長期治理：三檔新增跨文件契約、月/季/年審核節奏、變更流程（新增/淘汰路由必須同變更集同步）。
 - `TASKS.md` 新增「三檔長期治理巡檢」開放任務，避免未來再漂移。
 
-### AO-CLOSE（2026-04-10 · Cursor：Sentry／n8n／協作邊界）
-- **對話摘要**：Sentry 外掛／MCP 設定說明；依 monorepo 技術棧釐清 Sentry 精靈應選平台（Next／Express／PHP／Trigger 用 Node）；盤點 **`next-admin`**、**`node-api`** 已接 `@sentry/*`，**`packages/workflows`** 尚未接 Sentry。
-- **程式變更（repo）**：`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` 之 **n8n** 服務補上官方 **`N8N_SENTRY_DSN`** 等環境變數；**`.env.example`**、**`README.md`** 補 Sentry 與驗證要點。**邊界**：營運者表示實際 n8n 可能已由 **Claude CLI／雲端**另架，該變更僅影響 **Phase1 compose 自託管路徑**，與既有雲端實例無自動關聯。
-- **本輪未達** `TASKS.md` **Next** 任一開放項之完整 DoD（含 **`Sentry 觀測接入`** 之測試事件＋告警、**Secrets §2 輪替** 等）。
-- 本輪關鍵字 **`AO-CLOSE`**：**不**新增 **`AUTO_TASK_DONE`**（無單一 `- [ ]` 行可唯一命中之已完成 DoD）。
+> **日曆對齊（更正）**：**Sentry／n8n／Cursor** 收工敘述已移至 **`## 2026-04-11`**「**AO-CLOSE（2026-04-11 · Cursor：Sentry／n8n／協作邊界）**」（機器日 **2026-04-11**）。
 
 ## 2026-04-09
 
@@ -443,7 +455,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-10 16:21:18 UTC_
+_Last synced: 2026-04-10 16:28:35 UTC_
 
 ## 2026-03-20
 
@@ -871,6 +883,8 @@ _Last synced: 2026-04-10 16:21:18 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
+
 
 
 
