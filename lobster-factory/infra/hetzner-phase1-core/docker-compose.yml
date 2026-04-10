@@ -193,6 +193,7 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_API_BASE_PATH: /api
+        NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN_NEXT}
     image: lobster-phase1-next-admin:local
     container_name: lobster-next-admin
     restart: unless-stopped
@@ -203,6 +204,7 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       INTERNAL_API_BASE_URL: ${INTERNAL_API_BASE_URL}
       NEXT_PUBLIC_API_BASE_PATH: /api
+      NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN_NEXT}
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:

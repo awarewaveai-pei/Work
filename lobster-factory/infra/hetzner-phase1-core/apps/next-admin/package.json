@@ -8,6 +8,7 @@
     "start": "next start -H 0.0.0.0 -p 3000"
   },
   "dependencies": {
+    "@sentry/nextjs": "^9",
     "@supabase/supabase-js": "^2.49.8",
     "next": "^15.2.4",
     "react": "^19.0.0",
