@@ -112,6 +112,8 @@
 
 ### `docs/overview/`
 
+**完整清單**以 [README.md](docs/overview/README.md) 為準（憲章、學習路徑、時程 JSON 等皆在該導覽）。下表僅列最常從首頁點的兩份。
+
 | 說明 | 檔案 |
 |:---|:---|
 | 完整系統介紹 | [agency-os-complete-system-introduction.md](docs/overview/agency-os-complete-system-introduction.md) |
@@ -123,8 +125,11 @@
 |:---|:---|
 | 總控中心 | [agency-command-center-v1.md](docs/architecture/agency-command-center-v1.md) |
 | 多平台架構 | [multi-platform-delivery-architecture.md](docs/architecture/multi-platform-delivery-architecture.md) |
+| 輕量 ADR（目錄與 001–006） | [README.md](docs/architecture/decisions/README.md) |
 
 ### `docs/operations/`
+
+**完整清單**以 [README.md](docs/operations/README.md) 為準（Hetzner、GHA、MCP 強化、Production Pilot Runbook、`ONBOARDING_A10_2` 等）。下表為常用子集，避免與導覽重複維護兩份全表。
 
 | 說明 | 檔案 |
 |:---|:---|
