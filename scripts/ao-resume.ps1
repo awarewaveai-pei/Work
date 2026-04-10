@@ -91,6 +91,14 @@ if ($rulesConsistencyExit -ne 0) {
 }
 
 Write-Host "== AO-RESUME: preflight auto-fix ==" -ForegroundColor Cyan
+
+# Script-scoped flag: survives nested powershell.exe -File (print-open-tasks). Compute here so StrictMode never reads an "unassigned" switch at script top.
+$skipStrictRequested = $false
+if ($PSBoundParameters.ContainsKey('SkipStrictEnvironmentAudit')) {
+    $skipStrictRequested = [bool]$SkipStrictEnvironmentAudit
+}
+$script:StrictEnvAudit = -not $skipStrictRequested
+
 $syncArgs = @(
     "-NoProfile",
     "-ExecutionPolicy", "Bypass",
@@ -99,11 +107,8 @@ $syncArgs = @(
     "-AutoFix"
 )
 # 預設＝完整開工（含 verify-build-gates + 結尾 Strict 環境稽核）。只有加上 -SkipStrictEnvironmentAudit 才允許「只跑輕量 preflight」。
-$fullResume = -not $SkipStrictEnvironmentAudit
-if ($SkipVerify -and $fullResume) {
-    Write-Host "== AO-RESUME: 預設完整檢查 — 忽略 -SkipVerify（仍跑 verify-build-gates）==" -ForegroundColor DarkYellow
-}
-if ($SkipVerify -and -not $fullResume) { $syncArgs += "-SkipVerify" }
+if ($SkipVerify -and $script:StrictEnvAudit) { Write-Host "== AO-RESUME: 預設完整檢查 — 忽略 -SkipVerify（仍跑 verify-build-gates）==" -ForegroundColor DarkYellow }
+if ($SkipVerify -and -not $script:StrictEnvAudit) { $syncArgs += "-SkipVerify" }
 if ($AllowUnexpectedDirty) { $syncArgs += "-AllowUnexpectedDirty" }
 if ($AllowUnexpectedDirty -or $AllowStashBeforePull) { $syncArgs += "-AllowStashBeforePull" }
 if ($AllowUnexpectedDirty -or $AllowPendingStash) { $syncArgs += "-AllowPendingStash" }
@@ -141,7 +146,7 @@ if (-not $SkipOpenTasksList -and (Test-Path -LiteralPath $openTasksScript)) {
     Write-Host "== AO-RESUME: -SkipOpenTasksList（略過列出 TASKS 未完成項）==" -ForegroundColor DarkYellow
 }
 
-if ($fullResume) {
+if ($script:StrictEnvAudit) {
     $auditScript = Join-Path $WorkRoot "scripts\machine-environment-audit.ps1"
     if (-not (Test-Path -LiteralPath $auditScript)) {
         Write-Error "ao-resume: machine-environment-audit missing at $auditScript"
