@@ -4,7 +4,7 @@
 **不是這一層**：系統介紹、雙機哲學、長篇憲章 → 請改去 [overview 導覽](../overview/README.md) · `README.md`
 
 **怎麼點連結**：在 Cursor／VS Code 裡，對下方連結 **Ctrl+Click**（Mac：**Cmd+Click**）即可開檔。  
-**檔名**：下列 **`…`** 僅為檔名；本頁所列操作文件皆在 **`docs/operations/`**（跨資料夾的連結請以藍字為準，例如多個 `README.md`）。
+**檔名**：反引號內僅為檔名；本頁所列操作文件皆在 **`docs/operations/`**（跨資料夾連結以藍字為準，例如多個 `README.md`）。
 
 ---
 
@@ -83,53 +83,6 @@
 
 - [Airtable → Supabase Playbook](airtable-to-supabase-migration-playbook.md) · `airtable-to-supabase-migration-playbook.md`
 
----
-
-<details>
-<summary><strong>展開：完整對照表（檔名）</strong></summary>
-
-| 檔案（可點） | 檔名 | 用途 |
-| --- | --- | --- |
-| [cursor-enterprise-rules-index.md](cursor-enterprise-rules-index.md) | `cursor-enterprise-rules-index.md` | 企業規則 SSOT 列表 |
-| [cursor-mcp-and-plugin-inventory.md](cursor-mcp-and-plugin-inventory.md) | `cursor-mcp-and-plugin-inventory.md` | `mcp.json` 鍵與龍蝦 routing |
-| [mcp-add-server-quickstart.md](mcp-add-server-quickstart.md) | `mcp-add-server-quickstart.md` | 新增 MCP |
-| [mcp-secrets-hardening-runbook.md](mcp-secrets-hardening-runbook.md) | `mcp-secrets-hardening-runbook.md` | MCP 憑證強化 |
-| [rules-version-and-enforcement.md](rules-version-and-enforcement.md) | `rules-version-and-enforcement.md` | 規則版本與強制判定 |
-| [new-doc-linkage-checklist.md](new-doc-linkage-checklist.md) | `new-doc-linkage-checklist.md` | 新文件連動 |
-| [end-to-end-linkage-checklist.md](end-to-end-linkage-checklist.md) | `end-to-end-linkage-checklist.md` | 端到端連動 |
-| [single-owner-registry.json](single-owner-registry.json) | `single-owner-registry.json` | Single-owner 機讀 |
-| [end-of-day-checklist.md](end-of-day-checklist.md) | `end-of-day-checklist.md` | 收工 |
-| [system-guard-and-notification.md](system-guard-and-notification.md) | `system-guard-and-notification.md` | 守護與通知 |
-| [system-operation-sop.md](system-operation-sop.md) | `system-operation-sop.md` | 系統操作 SOP |
-| [ONBOARDING_A10_2_RUN_ID_TRACEABILITY_SPEC.md](ONBOARDING_A10_2_RUN_ID_TRACEABILITY_SPEC.md) | `ONBOARDING_A10_2_RUN_ID_TRACEABILITY_SPEC.md` | Run ID 追溯 |
-| [hetzner-self-host-start-here.md](hetzner-self-host-start-here.md) | `hetzner-self-host-start-here.md` | Hetzner 入口 |
-| [hetzner-stack-rollout-index.md](hetzner-stack-rollout-index.md) | `hetzner-stack-rollout-index.md` | 堆疊索引 |
-| [hetzner-full-stack-self-host-runbook.md](hetzner-full-stack-self-host-runbook.md) | `hetzner-full-stack-self-host-runbook.md` | 全棧 Runbook |
-| [hetzner-self-host.env.example](hetzner-self-host.env.example) | `hetzner-self-host.env.example` | env 範例 |
-| [supabase-self-hosted-cutover-checklist.md](supabase-self-hosted-cutover-checklist.md) | `supabase-self-hosted-cutover-checklist.md` | Supabase 切換 |
-| [github-actions-trigger-prod-deploy.md](github-actions-trigger-prod-deploy.md) | `github-actions-trigger-prod-deploy.md` | GHA |
-| [MARIADB_MULTI_MACHINE_SYNC.md](MARIADB_MULTI_MACHINE_SYNC.md) | `MARIADB_MULTI_MACHINE_SYNC.md` | MariaDB 多機 |
-| [security-secrets-policy.md](security-secrets-policy.md) | `security-secrets-policy.md` | 祕鑰政策 |
-| [local-secrets-vault-dpapi.md](local-secrets-vault-dpapi.md) | `local-secrets-vault-dpapi.md` | DPAPI vault |
-| [TOOLS_DELIVERY_TRACEABILITY.md](TOOLS_DELIVERY_TRACEABILITY.md) | `TOOLS_DELIVERY_TRACEABILITY.md` | 工具追溯 |
-| [tools-and-integrations.md](tools-and-integrations.md) | `tools-and-integrations.md` | 工具整合 |
-| [NEXT_GEN_DELIVERY_BLUEPRINT_V1.md](NEXT_GEN_DELIVERY_BLUEPRINT_V1.md) | `NEXT_GEN_DELIVERY_BLUEPRINT_V1.md` | 次世代藍圖 |
-| [WORDPRESS_CLIENT_DELIVERY_MODELS.md](WORDPRESS_CLIENT_DELIVERY_MODELS.md) | `WORDPRESS_CLIENT_DELIVERY_MODELS.md` | WP 交付模型 |
-| [ecommerce-project-playbook.md](ecommerce-project-playbook.md) | `ecommerce-project-playbook.md` | 電商 Playbook |
-| [incident-response-runbook.md](incident-response-runbook.md) | `incident-response-runbook.md` | 事件應變 |
-| [PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md](PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md) | `PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` | Pilot A |
-| [PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md](PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md) | `PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md` | Pilot B |
-| [finance-operations.md](finance-operations.md) | `finance-operations.md` | 財務 |
-| [outsourcing-playbook.md](outsourcing-playbook.md) | `outsourcing-playbook.md` | 外包 |
-| [outsourcing-vendor-scorecard.md](outsourcing-vendor-scorecard.md) | `outsourcing-vendor-scorecard.md` | 供應商評分 |
-| [scope-change-policy.md](scope-change-policy.md) | `scope-change-policy.md` | 範圍變更 |
-| [client-risk-scoring-model.md](client-risk-scoring-model.md) | `client-risk-scoring-model.md` | 客戶風險 |
-| [tenant-scheduling.md](tenant-scheduling.md) | `tenant-scheduling.md` | 租戶排程 |
-| [airtable-to-supabase-migration-playbook.md](airtable-to-supabase-migration-playbook.md) | `airtable-to-supabase-migration-playbook.md` | Airtable 遷移 |
-
-</details>
-
----
 
 ## 若還要再整理目錄結構
 
@@ -140,3 +93,4 @@
 - [../README.md](../README.md) · `README.md`
 - [../overview/README.md](../overview/README.md) · `README.md`
 - [cursor-enterprise-rules-index.md](cursor-enterprise-rules-index.md) · `cursor-enterprise-rules-index.md`
+
