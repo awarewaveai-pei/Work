@@ -55,6 +55,13 @@ function Upsert-RelatedBlock {
         [string]$RelativeFile,
         [string[]]$Related
     )
+    $normRel = $RelativeFile.Replace('\', '/')
+    # change-impact-map Related paths are agency-os-root relative; writing them into
+    # lobster-factory (or other monorepo siblings) breaks relative links. Skip auto Related there.
+    if ($normRel -match '(?i)^\.\./lobster-factory/') {
+        return $false
+    }
+
     $full = Join-Path $Root $RelativeFile
     if (-not (Test-Path $full)) { return $false }
     if (-not $RelativeFile.EndsWith(".md")) { return $false }

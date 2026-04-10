@@ -5,18 +5,27 @@
 與 **Lobster Factory** 同庫時，monorepo 總覽見上層 [`../README.md`](../README.md)（含 `verify-build-gates`、龍蝦 README 入口）。  
 **整體公司 OS**：四份規格原文在上層 [`../docs/spec/README.md`](../docs/spec/README.md)；**四份怎麼整合、先讀誰** 見本目錄 [`docs/overview/company-os-four-sources-integration.md`](docs/overview/company-os-four-sources-integration.md)；**V3 §三 跳行表** 見 [`docs/overview/company-os-twenty-modules.md`](docs/overview/company-os-twenty-modules.md)。
 
-## 每天開工必看（固定開工卡）
-- **總入口**：`docs/overview/ao-lobster-operating-model.md`
-- **開工事件 SSOT**：`docs/overview/REMOTE_WORKSTATION_STARTUP.md`
-- **收工事件 SSOT**：`docs/operations/end-of-day-checklist.md`
-- **工具交付一頁追溯（顯眼入口）**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
-- **關鍵字規則**：`.cursor/rules/30-resume-keyword.mdc`、`.cursor/rules/40-shutdown-closeout.mdc`
-- **今日主線真相**：`TASKS.md`
-- **統整報告**：`reports/status/integrated-status-LATEST.md`（說明：`docs/overview/INTEGRATED_STATUS_REPORT.md`）
+## 文件導覽（可點連結；編輯器內 Ctrl+Click／Mac Cmd+Click 開檔）
+
+若目錄太多會眼花，**只要記三個入口**：
+
+- [**docs 總索引**](docs/README.md)（整棵 `docs/` 地圖）
+- [**operations 分類導覽**](docs/operations/README.md)（SOP／Runbook／基礎建設／資安，已分類＋可點）
+- [**overview 分類導覽**](docs/overview/README.md)（全貌／雙機／紀律／時程，已分類＋可點）
+
+## 每天開工必看（固定開工卡，可點）
+
+- **總入口**：[AO＋龍蝦運作模型](docs/overview/ao-lobster-operating-model.md)
+- **開工事件 SSOT**：[REMOTE 雙機開工](docs/overview/REMOTE_WORKSTATION_STARTUP.md)
+- **收工事件 SSOT**：[收工 Checklist](docs/operations/end-of-day-checklist.md)
+- **工具交付一頁追溯**：[TOOLS_DELIVERY_TRACEABILITY](docs/operations/TOOLS_DELIVERY_TRACEABILITY.md)
+- **關鍵字規則**：[30-resume-keyword.mdc](.cursor/rules/30-resume-keyword.mdc)、[40-shutdown-closeout.mdc](.cursor/rules/40-shutdown-closeout.mdc)
+- **今日主線真相**：[TASKS.md](TASKS.md)
+- **統整報告**：[integrated-status-LATEST.md](reports/status/integrated-status-LATEST.md)（說明：[INTEGRATED_STATUS_REPORT.md](docs/overview/INTEGRATED_STATUS_REPORT.md)）
 
 ## AO + 龍蝦工程圖（首頁）
 
-- 單一真相（SSOT）：`docs/overview/ao-lobster-operating-model.md#4-ao--lobster-event-flow-mermaid`
+- 單一真相（SSOT）：[流程圖錨點](docs/overview/ao-lobster-operating-model.md#4-ao--lobster-event-flow-mermaid)（同檔：[ao-lobster-operating-model.md](docs/overview/ao-lobster-operating-model.md)）
 - 首頁只放入口，不複製圖內容，避免多版本漂移與重工。
 
 ## 目標
@@ -30,69 +39,74 @@
 - **平台堆疊／Woo 對客範例／專案極簡骨架**：`platform-templates/`（`woocommerce`、`client-base`）— 說明見 [`platform-templates/README.md`](platform-templates/README.md)。
 - **合約／英文化對客範本、龍蝦 shell 等**：見 **索引正本** [`docs/overview/repo-template-locations.md`](docs/overview/repo-template-locations.md)（不建議無計畫遍歷改名）。
 
-## 核心文件
-- **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**：**他處電腦／公司機開機與 pull 後須知**（**§1.5** 新機最短序列、**§2** 例行；與 `RESUME_AFTER_REBOOT.md` 同列必讀）
-- `AGENTS.md`: AI 協作規則
-- `BOOTSTRAP.md`: 新環境初始化清單
-- `TASKS.md`: 全域任務看板
-- `WORKLOG.md`: 執行日誌與決策紀錄
-- `docs/operations/finance-operations.md`: 報價、收款、毛利流程
-- `docs/operations/outsourcing-playbook.md`: 外包協作與驗收機制
-- `docs/operations/incident-response-runbook.md`: 資安與故障事件應變
-- `docs/operations/scope-change-policy.md`: 客戶邊界與變更單制度
-- `docs/operations/security-secrets-policy.md`: 憑證與密鑰管理政策
-- `docs/operations/local-secrets-vault-dpapi.md`: 本機免費祕密庫（Windows DPAPI）
-- `docs/operations/mcp-add-server-quickstart.md`: MCP 新增快速手冊（常用）
-- **`docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`**：長期營運紀律（30 年級；可驗證、Single Owner、ADR 與節奏）
-- `docs/operations/WORDPRESS_CLIENT_DELIVERY_MODELS.md`: WordPress **雙模式交付 SOP**（既有站接手 + 新站從零，雲端 staging 優先）
-- `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`: Next-Gen 升級藍圖（M1/M2/M3、驗收標準、風險對策）
-- **`docs/operations/cursor-mcp-and-plugin-inventory.md`**: Cursor **MCP／外掛** 與龍蝦 Routing 對照（**建議與根目錄 `mcp.json` 同步維護**）
-- **`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`**: 工具分工 ↔ 強制路由 ↔ `TASKS.md` 一頁追溯（避免三份文件各說各話）
-- **`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`** + **`lobster-factory/docs/ROUTING_MATRIX.md`**: 路由強制語意與矩陣（與上列 Traceability 構成三檔一致性契約）
-- **`docs/operations/cursor-enterprise-rules-index.md`**: **Cursor 企業級 IDE 規則（版控）** — `63`–`66` `.mdc` 與 SSOT 導覽（與 `AO-RESUME`／`AO-CLOSE` 流程衝突時以 `00`／`30`／`40` 規則為準）
-- **`docs/operations/airtable-to-supabase-migration-playbook.md`**: **Airtable 停用後**功能如何落到 **Supabase**（建模、RLS、匯入、n8n 改接）
-- `docs/operations/tools-and-integrations.md`: 整合工具與環境變數規範
+## 核心文件（可點）
+
+- [**REMOTE 雙機開工**（他處電腦／公司機）](docs/overview/REMOTE_WORKSTATION_STARTUP.md)（§1.5 新機、§2 例行；與 [RESUME_AFTER_REBOOT.md](RESUME_AFTER_REBOOT.md) 同列必讀）
+- [AGENTS.md](AGENTS.md)：AI 協作規則
+- [BOOTSTRAP.md](BOOTSTRAP.md)：新環境初始化清單
+- [TASKS.md](TASKS.md)：全域任務看板
+- [WORKLOG.md](WORKLOG.md)：執行日誌與決策紀錄
+- [財務營運](docs/operations/finance-operations.md)：報價、收款、毛利流程
+- [外包 Playbook](docs/operations/outsourcing-playbook.md)：外包協作與驗收機制
+- [事件應變 Runbook](docs/operations/incident-response-runbook.md)：資安與故障
+- [範圍變更政策](docs/operations/scope-change-policy.md)：客戶邊界與變更單制度
+- [憑證與祕鑰政策](docs/operations/security-secrets-policy.md)
+- [本機 DPAPI 祕密庫](docs/operations/local-secrets-vault-dpapi.md)
+- [MCP 新增快速手冊](docs/operations/mcp-add-server-quickstart.md)
+- [**長期營運紀律**](docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md)（30 年級；Single Owner、ADR、節奏）
+- [WordPress 雙模式交付 SOP](docs/operations/WORDPRESS_CLIENT_DELIVERY_MODELS.md)
+- [Next-Gen 升級藍圖](docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md)
+- [**Cursor MCP／外掛與路由對照**](docs/operations/cursor-mcp-and-plugin-inventory.md)（建議與 monorepo 根 `mcp.json` 同步）
+- [**工具交付追溯一頁表**](docs/operations/TOOLS_DELIVERY_TRACEABILITY.md)（工具 ↔ 路由 ↔ TASKS）
+- [**龍蝦路由強制規格**](../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md) + [**路由矩陣**](../lobster-factory/docs/ROUTING_MATRIX.md)
+- [**Cursor 企業規則索引**](docs/operations/cursor-enterprise-rules-index.md)（`63`–`66`；與 AO 流程衝突時以 `00`／`30`／`40` 為準）
+- [**Airtable → Supabase Playbook**](docs/operations/airtable-to-supabase-migration-playbook.md)
+- [工具與整合總表](docs/operations/tools-and-integrations.md)
 
 ## 事件流程單一真相（避免重複維護）
-- **開工事件（AO-RESUME）**：`docs/overview/REMOTE_WORKSTATION_STARTUP.md`（含 Git 對齊 + 30 秒自檢）
-- **收工事件（AO-CLOSE）**：`docs/operations/end-of-day-checklist.md`（操作） + `.cursor/rules/40-shutdown-closeout.mdc`（規則）
-- **原則**：其他文件只放入口連結與一句摘要，不再維護第二套完整命令
-- **跨系統運作模型（AO + 龍蝦）**：`docs/overview/ao-lobster-operating-model.md`
 
-## Docs 分類入口
-- `docs/README.md`: 文件分層總索引
-- `docs/overview/agency-os-complete-system-introduction.md`: 完整系統介紹（總司令/客戶/團隊導讀）
-- **`docs/overview/company-os-twenty-modules.md`**: **Company OS 20 模組**一頁導覽（連到 `docs/spec/raw` 原文 §三；非程式功能，僅文件索引）
-- `docs/CHANGE_IMPACT_MATRIX.md`: 變更連動矩陣（改一份時要同步哪些）
-- `docs/architecture/agency-command-center-v1.md`: 總控中心完整架構
-- `docs/architecture/multi-platform-delivery-architecture.md`: WordPress-first 多平台架構
-- `docs/operations/system-operation-sop.md`: 全系統操作 SOP
-- `docs/operations/tenant-scheduling.md`: 每公司自動排程與執行
-- `docs/operations/system-guard-and-notification.md`: 關機前/每日主動守護與告知
-- `docs/operations/end-to-end-linkage-checklist.md`: 全鏈路連動檢查清單
-- `docs/operations/client-risk-scoring-model.md`: 客戶風險評分模型
-- `docs/operations/outsourcing-vendor-scorecard.md`: 外包評分卡
-- `docs/quality/delivery-qa-gate.md`: 交付品質放行關卡
-- `docs/international/global-delivery-model.md`: 跨時區交付模型
-- `docs/international/global-compliance-baseline.md`: 國際合規與資安基線
-- `docs/international/multi-currency-commercial-policy.md`: 多幣別商務與收款政策
-- `docs/sales/service-packages-standard.md`: 服務方案標準
-- `docs/sales/cr-pricing-rules.md`: CR 核價規則
-- `docs/templates/msa-template.md`
-- `docs/templates/sow-template.md`
-- `docs/templates/cr-template.md`
-- `docs/standards/wordpress-custom-dev-guidelines.md`
-- `docs/standards/n8n-workflow-architecture.md`
-- `docs/metrics/kpi-margin-dashboard-spec.md`
-- `docs/product/resell-package-blueprint.md`: 可販售產品化藍圖
-- `docs/product/buyer-handover-checklist.md`: 買方交接驗收清單
-- `docs/product/templates/proposal-template-en.md`: 英文化提案模板
-- `docs/product/templates/sow-template-en.md`: 英文化 SOW 模板
-- `docs/product/templates/monthly-report-template-en.md`: 英文化月報模板
-- `docs/compliance/leads-and-scraping-checklist.md`: leads/抓取合規檢查清單
-- `docs/releases/release-notes.md`: 版本發布紀錄
-- `docs/releases/upgrade-path.md`: 升級路徑
-- `docs/releases/migration-checklist.md`: 遷移檢查清單
+- **開工（AO-RESUME）**：[REMOTE_WORKSTATION_STARTUP](docs/overview/REMOTE_WORKSTATION_STARTUP.md)（Git 對齊 + 30 秒自檢）
+- **收工（AO-CLOSE）**：[收工 Checklist](docs/operations/end-of-day-checklist.md) + [40-shutdown-closeout.mdc](.cursor/rules/40-shutdown-closeout.mdc)
+- **原則**：其他文件只放入口連結與一句摘要，不再維護第二套完整命令
+- **跨系統運作模型**：[ao-lobster-operating-model.md](docs/overview/ao-lobster-operating-model.md)
+
+## Docs 分類入口（延伸索引，皆可點）
+
+> 已按類別整理的可點清單仍以 [operations 導覽](docs/operations/README.md)、[overview 導覽](docs/overview/README.md) 為主；下列為跨目錄速查。
+
+- [文件分層總索引](docs/README.md)
+- [完整系統介紹](docs/overview/agency-os-complete-system-introduction.md)（總司令／客戶／團隊導讀）
+- [**Company OS 20 模組**一頁導覽](docs/overview/company-os-twenty-modules.md)（連到 `docs/spec/raw` 原文；僅索引）
+- [變更連動矩陣](docs/CHANGE_IMPACT_MATRIX.md)（改一份時要同步哪些）
+- [總控中心完整架構](docs/architecture/agency-command-center-v1.md)
+- [WordPress-first 多平台架構](docs/architecture/multi-platform-delivery-architecture.md)
+- [全系統操作 SOP](docs/operations/system-operation-sop.md)
+- [每公司自動排程與執行](docs/operations/tenant-scheduling.md)
+- [關機前／每日守護與告知](docs/operations/system-guard-and-notification.md)
+- [全鏈路連動檢查清單](docs/operations/end-to-end-linkage-checklist.md)
+- [客戶風險評分模型](docs/operations/client-risk-scoring-model.md)
+- [外包評分卡](docs/operations/outsourcing-vendor-scorecard.md)
+- [交付品質放行關卡](docs/quality/delivery-qa-gate.md)
+- [跨時區交付模型](docs/international/global-delivery-model.md)
+- [國際合規與資安基線](docs/international/global-compliance-baseline.md)
+- [多幣別商務與收款政策](docs/international/multi-currency-commercial-policy.md)
+- [服務方案標準](docs/sales/service-packages-standard.md)
+- [CR 核價規則](docs/sales/cr-pricing-rules.md)
+- [MSA 模板](docs/templates/msa-template.md)
+- [SOW 模板](docs/templates/sow-template.md)
+- [CR 模板](docs/templates/cr-template.md)
+- [WordPress 客製開發準則](docs/standards/wordpress-custom-dev-guidelines.md)
+- [n8n 工作流架構](docs/standards/n8n-workflow-architecture.md)
+- [KPI 毛利儀表規格](docs/metrics/kpi-margin-dashboard-spec.md)
+- [可販售產品化藍圖](docs/product/resell-package-blueprint.md)
+- [買方交接驗收清單](docs/product/buyer-handover-checklist.md)
+- [英文化提案模板](docs/product/templates/proposal-template-en.md)
+- [英文化 SOW 模板](docs/product/templates/sow-template-en.md)
+- [英文化月報模板](docs/product/templates/monthly-report-template-en.md)
+- [leads／抓取合規檢查清單](docs/compliance/leads-and-scraping-checklist.md)
+- [版本發布紀錄](docs/releases/release-notes.md)
+- [升級路徑](docs/releases/upgrade-path.md)
+- [遷移檢查清單](docs/releases/migration-checklist.md)
 
 ## 自動同步與結案檢查
 - 一次同步：`powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -AutoDetect`
@@ -200,5 +214,5 @@
 - `tenants/templates/tenant-template/03_TOOLS_CONFIGURATION_GUIDE.md`
 - `tenants/templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md`
 
-_Last synced: 2026-04-10 07:32:05 UTC_
+_Last synced: 2026-04-10 07:36:39 UTC_
 

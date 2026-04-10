@@ -3,6 +3,8 @@
 ## 目的
 - 集中管理治理文件，避免根目錄文件散落
 
+**怎麼點連結**：在 Cursor／VS Code 內對連結 **Ctrl+Click**（Mac：**Cmd+Click**）即可開檔。若資訊太多，請改從 [operations 分類導覽](operations/README.md) 或 [overview 分類導覽](overview/README.md) 進入（已分類、可摺疊長表）。
+
 ## 結構
 - `docs/operations/`：系統操作與執行流程 — **目錄導覽（建議從這裡找檔）**：[`operations/README.md`](operations/README.md)（含 **Cursor 企業級規則索引** [`operations/cursor-enterprise-rules-index.md`](operations/cursor-enterprise-rules-index.md)、**GHA × workflows** [`operations/github-actions-trigger-prod-deploy.md`](operations/github-actions-trigger-prod-deploy.md)、**Hetzner 入口** [`operations/hetzner-self-host-start-here.md`](operations/hetzner-self-host-start-here.md)、**堆疊索引** [`operations/hetzner-stack-rollout-index.md`](operations/hetzner-stack-rollout-index.md) 等分群連結）
 - `docs/overview/`：整體介紹與導讀 — **目錄導覽**：[`overview/README.md`](overview/README.md)
@@ -29,5 +31,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/overview/agency-os-complete-system-introduction.md`
 
-_Last synced: 2026-04-10 07:32:05 UTC_
+_Last synced: 2026-04-10 07:36:39 UTC_
 

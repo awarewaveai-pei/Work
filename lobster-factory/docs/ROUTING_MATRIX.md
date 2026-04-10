@@ -58,5 +58,5 @@ If this matrix and `MCP_TOOL_ROUTING_SPEC.md` disagree, **update the spec first*
 - `../../README.md`
 - `../../agency-os/TASKS.md`
 
-_Last synced: 2026-04-10 07:32:05 UTC_
+_Last synced: 2026-04-10 07:36:39 UTC_
 

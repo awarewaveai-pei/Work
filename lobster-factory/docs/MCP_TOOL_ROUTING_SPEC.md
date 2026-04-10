@@ -125,7 +125,7 @@ The following maps **Cursor `mcpServers` names** (see inventory) to **this specâ
 ```
 
 ## Cursor IDE MCP layer (non-enforced)
-- **Agency OS** maintains a separate inventory of **Cursor `mcp.json` servers and extensions**: `agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md`.
+- **Agency OS** maintains a separate inventory of **Cursor `mcp.json` servers and extensions**: `../../agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md`.
 - That document does **not** override this spec for **Lobster production/staging orchestration**; it explains what each IDE MCP is *for* so agents do not route durable workflows through the wrong tool.
 - Cross-system operating cadence (AO events + Lobster execution): `../../agency-os/docs/overview/ao-lobster-operating-model.md`.
 - One-page traceability map (tool split â†” routing â†” tasks): `../../agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`.
@@ -145,5 +145,5 @@ The following maps **Cursor `mcpServers` names** (see inventory) to **this specâ
 - `../../README.md`
 - `../../agency-os/TASKS.md`
 
-_Last synced: 2026-04-10 07:32:05 UTC_
+_Last synced: 2026-04-10 07:36:39 UTC_
 
