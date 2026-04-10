@@ -1,4 +1,4 @@
-﻿# Routing Matrix (Phase 1)
+# Routing Matrix (Phase 1)
 
 ## Purpose
 Define a deterministic routing policy for Lobster Factory requests so each request goes to the correct workflow/agent with guardrails.
@@ -9,8 +9,8 @@ Define a deterministic routing policy for Lobster Factory requests so each reque
 | Enforced rules | `MCP_TOOL_ROUTING_SPEC.md` (same folder) | **Highest** — `task_type`, `primary_tool`, `allowed_envs`, risk, approval. |
 | This matrix | `ROUTING_MATRIX.md` | Human-friendly routes; **must match** the spec row-for-row on semantics. |
 | Machine check | `../workflow-risk-matrix.json` | Consumed by `scripts/validate-workflow-routing-policy.mjs` / bootstrap gates. |
-| IDE only | `../agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md` | `mcp.json` keys; **no** production routing override. |
-| Build / evidence | `../agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` | P1–P7, TASKS, DoD; **no new `task_type` names** without spec update. |
+| IDE only | `../../agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md` | `mcp.json` keys; **no** production routing override. |
+| Build / evidence | `../../agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` | P1–P7, TASKS, DoD; **no new `task_type` names** without spec update. |
 
 If this matrix and `MCP_TOOL_ROUTING_SPEC.md` disagree, **update the spec first**, then this file, then `workflow-risk-matrix.json`, in one change set.
 
@@ -49,12 +49,14 @@ If this matrix and `MCP_TOOL_ROUTING_SPEC.md` disagree, **update the spec first*
 - Column **`environment`**: comma-separated list; must remain consistent with spec **`allowed_envs`** for the same `task_type`.
 
 ## Related Documents (Auto-Synced)
-- `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
-- `docs/operations/cursor-enterprise-rules-index.md`
-- `docs/operations/cursor-mcp-and-plugin-inventory.md`
-- `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
-- `README.md`
-- `TASKS.md`
+- `MCP_TOOL_ROUTING_SPEC.md` (same directory)
+- `../workflow-risk-matrix.json`
+- `../../agency-os/docs/operations/cursor-enterprise-rules-index.md`
+- `../../agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md`
+- `../../agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
+- `../../agency-os/docs/architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md`
+- `../../README.md`
+- `../../agency-os/TASKS.md`
 
 _Last synced: 2026-04-10 07:29:14 UTC_
 
