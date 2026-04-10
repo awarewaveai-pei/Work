@@ -70,43 +70,82 @@
 - **原則**：其他文件只放入口連結與一句摘要，不再維護第二套完整命令
 - **跨系統運作模型**：[ao-lobster-operating-model.md](docs/overview/ao-lobster-operating-model.md)
 
-## Docs 分類入口（延伸索引，皆可點）
+## Docs 分類入口（延伸索引：分類 + 可點連結 + Path）
 
-> 已按類別整理的可點清單仍以 [operations 導覽](docs/operations/README.md)、[overview 導覽](docs/overview/README.md) 為主；下列為跨目錄速查。
+> **Path** 一律相對 **本目錄 `agency-os/` 根**（在 monorepo 裡即 `agency-os/…`）。  
+> 已分類的完整操作／導覽仍以 [operations 導覽](docs/operations/README.md)、[overview 導覽](docs/overview/README.md) 為主；下列為 **跨 `docs/` 子資料夾**速查。
 
-- [文件分層總索引](docs/README.md)
-- [完整系統介紹](docs/overview/agency-os-complete-system-introduction.md)（總司令／客戶／團隊導讀）
-- [**Company OS 20 模組**一頁導覽](docs/overview/company-os-twenty-modules.md)（連到 `docs/spec/raw` 原文；僅索引）
-- [變更連動矩陣](docs/CHANGE_IMPACT_MATRIX.md)（改一份時要同步哪些）
-- [總控中心完整架構](docs/architecture/agency-command-center-v1.md)
-- [WordPress-first 多平台架構](docs/architecture/multi-platform-delivery-architecture.md)
-- [全系統操作 SOP](docs/operations/system-operation-sop.md)
-- [每公司自動排程與執行](docs/operations/tenant-scheduling.md)
-- [關機前／每日守護與告知](docs/operations/system-guard-and-notification.md)
-- [全鏈路連動檢查清單](docs/operations/end-to-end-linkage-checklist.md)
-- [客戶風險評分模型](docs/operations/client-risk-scoring-model.md)
-- [外包評分卡](docs/operations/outsourcing-vendor-scorecard.md)
-- [交付品質放行關卡](docs/quality/delivery-qa-gate.md)
-- [跨時區交付模型](docs/international/global-delivery-model.md)
-- [國際合規與資安基線](docs/international/global-compliance-baseline.md)
-- [多幣別商務與收款政策](docs/international/multi-currency-commercial-policy.md)
-- [服務方案標準](docs/sales/service-packages-standard.md)
-- [CR 核價規則](docs/sales/cr-pricing-rules.md)
-- [MSA 模板](docs/templates/msa-template.md)
-- [SOW 模板](docs/templates/sow-template.md)
-- [CR 模板](docs/templates/cr-template.md)
-- [WordPress 客製開發準則](docs/standards/wordpress-custom-dev-guidelines.md)
-- [n8n 工作流架構](docs/standards/n8n-workflow-architecture.md)
-- [KPI 毛利儀表規格](docs/metrics/kpi-margin-dashboard-spec.md)
-- [可販售產品化藍圖](docs/product/resell-package-blueprint.md)
-- [買方交接驗收清單](docs/product/buyer-handover-checklist.md)
-- [英文化提案模板](docs/product/templates/proposal-template-en.md)
-- [英文化 SOW 模板](docs/product/templates/sow-template-en.md)
-- [英文化月報模板](docs/product/templates/monthly-report-template-en.md)
-- [leads／抓取合規檢查清單](docs/compliance/leads-and-scraping-checklist.md)
-- [版本發布紀錄](docs/releases/release-notes.md)
-- [升級路徑](docs/releases/upgrade-path.md)
-- [遷移檢查清單](docs/releases/migration-checklist.md)
+### `docs/` 根與連動
+
+- [文件分層總索引](docs/README.md) · Path: `docs/README.md`
+- [變更連動矩陣](docs/CHANGE_IMPACT_MATRIX.md) · Path: `docs/CHANGE_IMPACT_MATRIX.md`
+
+### `docs/overview/`（全貌／導讀）
+
+- [完整系統介紹](docs/overview/agency-os-complete-system-introduction.md) · Path: `docs/overview/agency-os-complete-system-introduction.md`
+- [Company OS 20 模組一頁導覽](docs/overview/company-os-twenty-modules.md) · Path: `docs/overview/company-os-twenty-modules.md`（連 `docs/spec/raw` 原文；僅索引）
+
+### `docs/architecture/`（架構）
+
+- [總控中心完整架構](docs/architecture/agency-command-center-v1.md) · Path: `docs/architecture/agency-command-center-v1.md`
+- [WordPress-first 多平台架構](docs/architecture/multi-platform-delivery-architecture.md) · Path: `docs/architecture/multi-platform-delivery-architecture.md`
+
+### `docs/operations/`（營運／SOP）
+
+- [全系統操作 SOP](docs/operations/system-operation-sop.md) · Path: `docs/operations/system-operation-sop.md`
+- [每公司自動排程與執行](docs/operations/tenant-scheduling.md) · Path: `docs/operations/tenant-scheduling.md`
+- [關機前／每日守護與告知](docs/operations/system-guard-and-notification.md) · Path: `docs/operations/system-guard-and-notification.md`
+- [全鏈路連動檢查清單](docs/operations/end-to-end-linkage-checklist.md) · Path: `docs/operations/end-to-end-linkage-checklist.md`
+- [客戶風險評分模型](docs/operations/client-risk-scoring-model.md) · Path: `docs/operations/client-risk-scoring-model.md`
+- [外包評分卡](docs/operations/outsourcing-vendor-scorecard.md) · Path: `docs/operations/outsourcing-vendor-scorecard.md`
+
+### `docs/quality/`（品質）
+
+- [交付品質放行關卡](docs/quality/delivery-qa-gate.md) · Path: `docs/quality/delivery-qa-gate.md`
+
+### `docs/international/`（跨境）
+
+- [跨時區交付模型](docs/international/global-delivery-model.md) · Path: `docs/international/global-delivery-model.md`
+- [國際合規與資安基線](docs/international/global-compliance-baseline.md) · Path: `docs/international/global-compliance-baseline.md`
+- [多幣別商務與收款政策](docs/international/multi-currency-commercial-policy.md) · Path: `docs/international/multi-currency-commercial-policy.md`
+
+### `docs/sales/`（報價／銷售）
+
+- [服務方案標準](docs/sales/service-packages-standard.md) · Path: `docs/sales/service-packages-standard.md`
+- [CR 核價規則](docs/sales/cr-pricing-rules.md) · Path: `docs/sales/cr-pricing-rules.md`
+
+### `docs/templates/`（合約範本）
+
+- [MSA 模板](docs/templates/msa-template.md) · Path: `docs/templates/msa-template.md`
+- [SOW 模板](docs/templates/sow-template.md) · Path: `docs/templates/sow-template.md`
+- [CR 模板](docs/templates/cr-template.md) · Path: `docs/templates/cr-template.md`
+
+### `docs/standards/`（技術標準）
+
+- [WordPress 客製開發準則](docs/standards/wordpress-custom-dev-guidelines.md) · Path: `docs/standards/wordpress-custom-dev-guidelines.md`
+- [n8n 工作流架構](docs/standards/n8n-workflow-architecture.md) · Path: `docs/standards/n8n-workflow-architecture.md`
+
+### `docs/metrics/`（指標）
+
+- [KPI 毛利儀表規格](docs/metrics/kpi-margin-dashboard-spec.md) · Path: `docs/metrics/kpi-margin-dashboard-spec.md`
+
+### `docs/product/`（產品化／對外）
+
+- [可販售產品化藍圖](docs/product/resell-package-blueprint.md) · Path: `docs/product/resell-package-blueprint.md`
+- [買方交接驗收清單](docs/product/buyer-handover-checklist.md) · Path: `docs/product/buyer-handover-checklist.md`
+- [英文化提案模板](docs/product/templates/proposal-template-en.md) · Path: `docs/product/templates/proposal-template-en.md`
+- [英文化 SOW 模板](docs/product/templates/sow-template-en.md) · Path: `docs/product/templates/sow-template-en.md`
+- [英文化月報模板](docs/product/templates/monthly-report-template-en.md) · Path: `docs/product/templates/monthly-report-template-en.md`
+
+### `docs/compliance/`（合規）
+
+- [leads／抓取合規檢查清單](docs/compliance/leads-and-scraping-checklist.md) · Path: `docs/compliance/leads-and-scraping-checklist.md`
+
+### `docs/releases/`（版本／遷移）
+
+- [版本發布紀錄](docs/releases/release-notes.md) · Path: `docs/releases/release-notes.md`
+- [升級路徑](docs/releases/upgrade-path.md) · Path: `docs/releases/upgrade-path.md`
+- [遷移檢查清單](docs/releases/migration-checklist.md) · Path: `docs/releases/migration-checklist.md`
 
 ## 自動同步與結案檢查
 - 一次同步：`powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -AutoDetect`
