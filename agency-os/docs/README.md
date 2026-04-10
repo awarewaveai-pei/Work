@@ -1,4 +1,4 @@
-# Docs Index
+﻿# Docs Index
 
 ## 目的
 - 集中管理治理文件，避免根目錄文件散落
@@ -31,5 +31,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/overview/agency-os-complete-system-introduction.md`
 
-_Last synced: 2026-04-10 07:36:39 UTC_
+_Last synced: 2026-04-10 10:03:50 UTC_
 
