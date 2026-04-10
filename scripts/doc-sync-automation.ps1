@@ -61,6 +61,10 @@ function Upsert-RelatedBlock {
     if ($normRel -match '(?i)^\.\./lobster-factory/') {
         return $false
     }
+    # agency-os/README.md is the human hub: keep curated categorized links (not a flat auto list).
+    if ($normRel -ieq 'README.md') {
+        return $false
+    }
 
     $full = Join-Path $Root $RelativeFile
     if (-not (Test-Path $full)) { return $false }

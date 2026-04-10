@@ -1,4 +1,4 @@
-﻿# Agency OS v1
+# Agency OS v1
 
 這是一套給多客戶網站建置、客製系統、維運與行銷整合的營運框架。
 
@@ -175,44 +175,73 @@
 7. 完成改版前跑一次 `scripts/doc-sync-automation.ps1`
 8. 若看到 `ALERT_REQUIRED.txt`，先修復再繼續交付
 
-## Related Documents (Auto-Synced)
-- `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
-- `../lobster-factory/docs/ROUTING_MATRIX.md`
-- `../README.md`
-- `.cursor/rules/00-session-bootstrap.mdc`
-- `.cursor/rules/10-memory-maintenance.mdc`
-- `.cursor/rules/20-doc-sync-closeout.mdc`
-- `.cursor/rules/30-resume-keyword.mdc`
-- `.cursor/rules/40-shutdown-closeout.mdc`
-- `AGENTS.md`
-- `docs/architecture/agency-command-center-v1.md`
-- `docs/architecture/multi-platform-delivery-architecture.md`
-- `docs/compliance/leads-and-scraping-checklist.md`
-- `docs/international/global-compliance-baseline.md`
-- `docs/international/global-delivery-model.md`
-- `docs/international/multi-currency-commercial-policy.md`
-- `docs/metrics/kpi-margin-dashboard-spec.md`
-- `docs/operations/client-risk-scoring-model.md`
-- `docs/operations/cursor-mcp-and-plugin-inventory.md`
-- `docs/operations/end-to-end-linkage-checklist.md`
-- `docs/operations/outsourcing-vendor-scorecard.md`
-- `docs/operations/system-guard-and-notification.md`
-- `docs/operations/system-operation-sop.md`
-- `docs/operations/tenant-scheduling.md`
-- `docs/overview/agency-os-complete-system-introduction.md`
-- `docs/product/resell-package-blueprint.md`
-- `docs/quality/delivery-qa-gate.md`
-- `docs/releases/release-notes.md`
-- `docs/releases/upgrade-path.md`
-- `docs/sales/service-packages-standard.md`
-- `docs/standards/n8n-workflow-architecture.md`
-- `docs/standards/wordpress-custom-dev-guidelines.md`
-- `docs/templates/msa-template.md`
-- `tenants/NEW_TENANT_ONBOARDING_SOP.md`
-- `tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md`
-- `tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md`
-- `tenants/templates/tenant-template/03_TOOLS_CONFIGURATION_GUIDE.md`
-- `tenants/templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md`
+## 相關文件（分類索引；可點連結）
 
-_Last synced: 2026-04-10 07:36:39 UTC_
+**這一節是不是機器自動寫的？**  
+`doc-sync-automation.ps1` 會對**多數**治理 Markdown 自動覆寫底部的「Related」平面清單（來源是 [`docs/change-impact-map.json`](docs/change-impact-map.json) 的連動規則）。那是**「推薦一併留意的檔名列表」**，不是幫你改各檔內文。  
+**本檔（`agency-os/README.md`）已從該自動覆寫排除**，改由人維護下面**分類＋連結**，避免長平面清單洗版；你改治理文件時仍應對照 `change-impact-map.json` 與 [`docs/CHANGE_IMPACT_MATRIX.md`](docs/CHANGE_IMPACT_MATRIX.md)。
+
+### Monorepo 與龍蝦路由
+
+- [monorepo 根 README](../README.md)
+- [龍蝦 MCP 路由規格](../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md)
+- [龍蝦路由矩陣](../lobster-factory/docs/ROUTING_MATRIX.md)
+
+### Cursor 專案規則（版控）
+
+- [00-session-bootstrap](.cursor/rules/00-session-bootstrap.mdc)
+- [10-memory-maintenance](.cursor/rules/10-memory-maintenance.mdc)
+- [20-doc-sync-closeout](.cursor/rules/20-doc-sync-closeout.mdc)
+- [30-resume-keyword](.cursor/rules/30-resume-keyword.mdc)
+- [40-shutdown-closeout](.cursor/rules/40-shutdown-closeout.mdc)
+
+### 人讀總則與文件樹
+
+- [AGENTS.md](AGENTS.md)
+- [docs 總索引](docs/README.md)
+- [變更連動矩陣](docs/CHANGE_IMPACT_MATRIX.md)
+
+### 架構
+
+- [總控中心 v1](docs/architecture/agency-command-center-v1.md)
+- [多平台交付架構](docs/architecture/multi-platform-delivery-architecture.md)
+
+### 合規與跨境
+
+- [leads／抓取合規](docs/compliance/leads-and-scraping-checklist.md)
+- [國際合規基線](docs/international/global-compliance-baseline.md)
+- [跨時區交付模型](docs/international/global-delivery-model.md)
+- [多幣別商務政策](docs/international/multi-currency-commercial-policy.md)
+
+### 營運（docs/operations）
+
+- [客戶風險評分](docs/operations/client-risk-scoring-model.md)
+- [Cursor MCP 與外掛 inventory](docs/operations/cursor-mcp-and-plugin-inventory.md)
+- [端到端連動 Checklist](docs/operations/end-to-end-linkage-checklist.md)
+- [外包評分卡](docs/operations/outsourcing-vendor-scorecard.md)
+- [系統守護與通知](docs/operations/system-guard-and-notification.md)
+- [系統操作 SOP](docs/operations/system-operation-sop.md)
+- [租戶排程](docs/operations/tenant-scheduling.md)
+
+### 介紹、指標、產品、品質、發布、銷售、標準、範本
+
+- [Agency OS 完整介紹](docs/overview/agency-os-complete-system-introduction.md)
+- [KPI 毛利儀表規格](docs/metrics/kpi-margin-dashboard-spec.md)
+- [可販售產品化藍圖](docs/product/resell-package-blueprint.md)
+- [交付品質放行關卡](docs/quality/delivery-qa-gate.md)
+- [版本發布紀錄](docs/releases/release-notes.md)
+- [升級路徑](docs/releases/upgrade-path.md)
+- [遷移檢查清單](docs/releases/migration-checklist.md)
+- [服務方案標準](docs/sales/service-packages-standard.md)
+- [n8n 工作流架構](docs/standards/n8n-workflow-architecture.md)
+- [WordPress 客製開發準則](docs/standards/wordpress-custom-dev-guidelines.md)
+- [MSA 範本](docs/templates/msa-template.md)
+
+### 租戶與新客戶
+
+- [新租戶 Onboarding SOP](tenants/NEW_TENANT_ONBOARDING_SOP.md)
+- [租戶範本 01 總司令指南](tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md)
+- [租戶範本 02 客戶工作區](tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md)
+- [租戶範本 03 工具設定](tenants/templates/tenant-template/03_TOOLS_CONFIGURATION_GUIDE.md)
+- [租戶範本 04 營運自動化](tenants/templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md)
 
