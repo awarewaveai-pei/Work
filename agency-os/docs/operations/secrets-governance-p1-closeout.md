@@ -8,12 +8,33 @@
 
 ### 1.1 Secret Owner（填人名／角色，不填 token）
 
+> **人名**：可離線維護（行事曆／Notion）；**git 內只保留角色**，避免人事變動時改歷史檔。
+
 | 範圍 | Owner（角色） | 存放處（類型） | 輪替節奏 |
 |------|----------------|----------------|----------|
-| GitHub（PAT／Fine-grained／Actions） | | 本機 vault／GitHub 後台 | 90 天或事件驅動 |
-| n8n（API／MCP Access Token） | | n8n 後台 + 本機 `mcp.json`（不入庫） | 90 天或事件驅動 |
-| Trigger.dev（專案金鑰等） | | vault／託管環境 secrets | 90 天或事件驅動 |
-| Supabase（service role 等） | | vault／託管環境 | 90 天或事件驅動 |
+| GitHub（PAT／Fine-grained／Actions） | Agency OS／龍蝦 **專案負責人（營運）** | 本機 DPAPI `secrets-vault`（鍵名見 §1.4）、GitHub 後台 token 管理；GitHub MCP 用 `mcp.json` 內 `GITHUB_PERSONAL_ACCESS_TOKEN`（**不入庫**） | 90 天或事件驅動 |
+| n8n（API／MCP Access Token） | **整合／流程負責人（營運）**（可與上列同一人） | n8n 後台 Instance MCP、本機 `N8N_AUTH_BEARER_TOKEN`（vault）＋ `mcp.json` n8n `Authorization`（**不入庫**） | 90 天或事件驅動 |
+| Trigger.dev（專案金鑰等） | **後端／workflow 負責人（工程）** | vault `TRIGGER_ACCESS_TOKEN`；Trigger 專案／環境 secrets；龍蝦 CI（見 `lobster-factory` Actions） | 90 天或事件驅動 |
+| Supabase（service role 等） | **SoR／後端負責人（工程）** | vault `LOBSTER_SUPABASE_*`、`SUPABASE_AUTH_BEARER_TOKEN`（若用外掛 MCP）；託管環境 secrets | 90 天或事件驅動 |
+
+### 1.4 本機 `secrets-vault` 鍵名對照（僅鍵名、不含值）
+
+對應 `scripts/secrets-vault.ps1`（monorepo 慣用路徑：`agency-os/scripts/secrets-vault.ps1` 或根目錄同功能腳本，以你機上為準）：
+
+| 範圍 | Vault 鍵名（`list` 可見） | 備註 |
+|------|---------------------------|------|
+| GitHub | `GITHUB_PERSONAL_ACCESS_TOKEN` | 與 `@modelcontextprotocol/server-github`／模板 `mcp.json.template` 一致 |
+| n8n | `N8N_AUTH_BEARER_TOKEN` | MCP Bearer 另可在 `mcp.json` 覆寫；輪替後兩處策略需一致（擇一為準或雙更新） |
+| Trigger | `TRIGGER_ACCESS_TOKEN` | 自託管／雲端後台輪替後同步 CI 與本機 vault |
+| Supabase | `LOBSTER_SUPABASE_URL`、`LOBSTER_SUPABASE_SERVICE_ROLE_KEY` 等 | 僅列龍蝦慣用鍵；其他 Supabase 外掛鍵依實際命名 |
+
+### 1.5 輪替後最短動作（不含祕密本身）
+
+1. 在供應商後台建立**新**憑證 → 更新 **vault**（`set`）與／或 **`mcp.json`**（**勿** `git add`）。  
+2. 適用時：`secrets-vault.ps1 -Action import-mcp`（將 MCP 環境變數回灌 vault，見 `local-secrets-vault-dpapi.md`）。  
+3. 重啟 Cursor 或重載 MCP → **驗證**一筆輕量操作（例如 GitHub MCP list、n8n MCP 連線、Trigger list runs）。  
+4. **撤銷舊**憑證。  
+5. 於 `WORKLOG.md` 當日區塊依 **§3** 填寫（**不要**貼 token 字串）。
 
 ### 1.2 最小讀取權限原則
 

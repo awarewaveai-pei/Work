@@ -23,12 +23,22 @@
 - **TASKS**：`（工具建置）Hetzner 自託管 n8n（staging）` **DoD 已達**——見**上方**「n8n staging client_onboarding E2E」與 **`AUTO_TASK_DONE`**；`TASKS.md` 已移至 **已完成歷程**。
 - **追溯總表**：`TOOLS_DELIVERY_TRACEABILITY.md` 已更新 n8n（staging）為 **E2E 已證**。
 
+### P1 Secrets 治理（基線落地；輪替演練仍待你執行 §2）
+
+| 欄位 | 值 |
+|------|-----|
+| `scope` | `baseline-only`（Owner 表 + vault 鍵名對照已入庫；**尚未**完成手冊 §2 之 A/B/C 輪替） |
+| `artifacts` | `docs/operations/secrets-governance-p1-closeout.md`（§1.1–§1.5）、`security-secrets-policy.md` Related |
+| `vault_keys_p1`（僅鍵名） | `GITHUB_PERSONAL_ACCESS_TOKEN`、`N8N_AUTH_BEARER_TOKEN`、`TRIGGER_ACCESS_TOKEN`、`LOBSTER_SUPABASE_SERVICE_ROLE_KEY`（`secrets-vault.ps1 -Action list` 可核） |
+| `gh_auth` | 本機 `gh auth status`：**未登入** GitHub host（若要以 Path A 用 `gh` 驗證需先 `gh auth login`；Path B n8n／Path C Trigger 不依賴 `gh`） |
+| `next_step` | 擇 **§2** 之 **A／B／C** 完成一輪輪替 → 於本節下補 `scope`（`github-pat`／`n8n-mcp`／`trigger-api`）、`verification`、`rollback_note` → `- AUTO_TASK_DONE: Secrets 治理升級` |
+
 ### P1 Secrets／n8n E2E 收斂手冊（文件交付）
 - **新增正本**：`docs/operations/secrets-governance-p1-closeout.md`（Owner 表、GitHub／n8n MCP／Trigger 首輪輪替三選一、WORKLOG 證據範本；**不含**明文祕密）。
 - **新增正本**：`docs/operations/n8n-staging-client-onboarding-e2e.md`（staging 最小 Webhook 型 `client_onboarding` 流程定義、觸發方式、WORKLOG 追溯欄位、`AUTO_TASK_DONE` 提示）。
 - **`TASKS.md`**：`Secrets 治理升級` 仍開放並附 **執行正本**；**`Hetzner 自託管 n8n（staging）`** 已歸檔至 **已完成歷程**（證據見上節 E2E）。
 - **`security-secrets-policy.md`**：Related 已連結 P1 收斂手冊。
-- **邊界**：**n8n staging E2E** 已於同日**上一節**達成；**P1 Secrets DoD**（輪替演練）仍開放，見 `secrets-governance-p1-closeout.md`。
+- **邊界**：**n8n staging E2E** 已於同日**上一節**達成；**P1 Secrets** §1 **基線**已入庫（見**再上一節**「P1 Secrets 治理（基線落地）」）；**DoD（一輪輪替）**仍開放，見 `secrets-governance-p1-closeout.md` §2。
 
 ### 2026-04-10（晚）README 導覽與 doc-sync 防漂移
 - **`agency-os/README.md`**：連結改表格、連結文字＝檔名；`docs/overview`／`docs/operations` 速查標註為**子集**，完整清單指回各自 **`README.md`**；補 **`docs/architecture/decisions/README.md`**（ADR 目錄）。
@@ -417,7 +427,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-10 13:45:38 UTC_
+_Last synced: 2026-04-10 13:52:22 UTC_
 
 ## 2026-03-20
 
@@ -845,6 +855,7 @@ _Last synced: 2026-04-10 13:45:38 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

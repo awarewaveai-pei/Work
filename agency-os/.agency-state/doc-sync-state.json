@@ -1,6 +1,8 @@
 ﻿{
-    "last_run_utc":  "2026-04-10T13:45:39.4572080Z",
+    "last_run_utc":  "2026-04-10T13:52:23.5039611Z",
     "changed_files":  [
+                          "docs/operations/secrets-governance-p1-closeout.md",
+                          "docs/operations/security-secrets-policy.md",
                           "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
                           "TASKS.md",
                           "WORKLOG.md"
@@ -10,6 +12,7 @@
                            "../lobster-factory/docs/ROUTING_MATRIX.md",
                            "docs/operations/cursor-mcp-and-plugin-inventory.md",
                            "docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md",
+                           "docs/operations/secrets-governance-p1-closeout.md",
                            "docs/operations/security-secrets-policy.md",
                            "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
                            "docs/operations/tools-and-integrations.md",

@@ -42,7 +42,7 @@
 
 | 階段 | 項目 | 目前狀態 | 對應 `TASKS` 關鍵字 |
 |---|---|---|---|
-| P1 | Secrets 治理升級 | ⚪ 未啟動 | `（工具建置）Secrets 治理升級`；執行手冊 `secrets-governance-p1-closeout.md` |
+| P1 | Secrets 治理升級 | 🟡 基線已文件化（Owner／vault 鍵名對照）；**輪替演練待 WORKLOG 證據** | `（工具建置）Secrets 治理升級`；執行手冊 `secrets-governance-p1-closeout.md` |
 | P2 | Hetzner 自託管 n8n（staging） | 🟢 E2E DoD 已證（2026-04-10） | `（工具建置）Hetzner 自託管 n8n（staging）`；E2E 正本 `n8n-staging-client-onboarding-e2e.md` |
 | P3 | Sentry 觀測接入 | ⚪ 未啟動 | `（工具建置）Sentry 觀測接入` |
 | P4 | PostHog 事件基線 | ⚪ 未啟動 | `（工具建置）PostHog 事件基線` |
@@ -103,5 +103,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-10 13:45:38 UTC_
+_Last synced: 2026-04-10 13:52:22 UTC_
 

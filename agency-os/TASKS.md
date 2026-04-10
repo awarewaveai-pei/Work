@@ -79,6 +79,7 @@
   - 處理：定義 secrets owner、輪替節奏、最小讀取權限；先覆蓋 Trigger/n8n/GitHub 相關高風險金鑰
   - DoD：完成一輪輪替演練，服務不中斷
   - **執行正本**：`docs/operations/secrets-governance-p1-closeout.md`（Owner 表、首輪輪替三選一、WORKLOG 證據、AUTO_TASK_DONE 子字串）。
+  - **進度（2026-04-10）**：§1 **Owner（角色）**、**vault 鍵名對照（§1.4）**、輪替後流程（§1.5）已寫入正本；`WORKLOG` 已記 **基線**與 `gh` 狀態。**仍缺**：手冊 **§2 擇一輪替** + §3 欄位與 `AUTO_TASK_DONE`（不可由代理代為在第三方後台按鈕）。
 
 ## Next — 已完成歷程（查詢用）
 - [x] **（工具建置）Hetzner 自託管 n8n（staging）**
@@ -221,5 +222,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-10 13:45:38 UTC_
+_Last synced: 2026-04-10 13:52:22 UTC_
 
