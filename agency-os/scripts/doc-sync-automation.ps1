@@ -55,6 +55,21 @@ function Upsert-RelatedBlock {
         [string]$RelativeFile,
         [string[]]$Related
     )
+    $normRel = $RelativeFile.Replace('\', '/')
+    # change-impact-map Related paths are agency-os-root relative; writing them into
+    # lobster-factory (or other monorepo siblings) breaks relative links. Skip auto Related there.
+    if ($normRel -match '(?i)^\.\./lobster-factory/') {
+        return $false
+    }
+    # agency-os/README.md is the human hub: keep curated categorized links (not a flat auto list).
+    if ($normRel -ieq 'README.md') {
+        return $false
+    }
+    # tenants/README.md: curated tenant hub; do not flatten Related.
+    if ($normRel -ieq 'tenants/README.md') {
+        return $false
+    }
+
     $full = Join-Path $Root $RelativeFile
     if (-not (Test-Path $full)) { return $false }
     if (-not $RelativeFile.EndsWith(".md")) { return $false }
