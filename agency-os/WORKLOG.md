@@ -10,6 +10,11 @@
 - **營運釐清（對話）**：`hetzner-stack-rollout-index`、`TOOLS_DELIVERY_TRACEABILITY` 記載 Supabase（自架）已上 Hetzner；遷移／切線程序仍以 **`supabase-self-hosted-cutover-checklist.md`** 為準。AI 無法代為 SSH／正式憑證操作，與「文件宣稱已上線」可並存，需以實機為準定期核對。
 - 本輪 **未** 寫入 **`AUTO_TASK_DONE`**（**Next** 隊列無任一條在本輪達完整 DoD）。
 
+### AO-CLOSE（2026-04-10 收工輪 · Git 與身分）
+- **`gh auth login`（HTTPS）**：作用中帳號改為 **awarewaveai-pei**（`peijingartstudio-pei` 仍存 keyring 但非 active）；解決對 **`awarewaveai-pei/Work`** 之 **403**。
+- **`git push origin main`**：已將本機超前之 **`main`** 同步至 **origin**（含先前 AO-CLOSE 產生之 **`a53361f`** 等）；複查 **up-to-date**。
+- 本輪關鍵字 **`AO-CLOSE`**：無新增 **`AUTO_TASK_DONE`**（**Next** 開放項未在本輪達 DoD）。
+
 ### 三檔收斂升級（可維運 30+ 年）
 - 完成四檔統一：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`。
 - 路由語意對齊：`ROUTING_MATRIX.md` 改為與 Spec 同語言（`task_type` / `risk_level` / `environment` / `approval_required`）。
@@ -386,7 +391,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-10 10:03:50 UTC_
+_Last synced: 2026-04-10 10:22:25 UTC_
 
 ## 2026-03-20
 
@@ -814,6 +819,7 @@ _Last synced: 2026-04-10 10:03:50 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

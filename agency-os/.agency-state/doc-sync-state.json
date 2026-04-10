@@ -1,41 +1,19 @@
 ﻿{
-    "last_run_utc":  "2026-04-10T10:03:51.5984172Z",
+    "last_run_utc":  "2026-04-10T10:22:26.4162068Z",
     "changed_files":  [
-                          "../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
-                          "../lobster-factory/docs/ROUTING_MATRIX.md",
-                          "docs/operations/README.md",
-                          "docs/overview/README.md",
-                          "docs/README.md",
+                          "docs/overview/PROGRAM_TIMELINE.md",
                           "memory/CONVERSATION_MEMORY.md",
                           "memory/daily/2026-04-10.md",
-                          "README.md",
-                          "scripts/doc-sync-automation.ps1",
-                          "TASKS.md",
-                          "tenants/README.md",
                           "WORKLOG.md"
                       ],
     "impacted_files":  [
-                           "../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
-                           "../lobster-factory/docs/ROUTING_MATRIX.md",
-                           "docs/operations/cursor-enterprise-rules-index.md",
-                           "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                           "docs/operations/README.md",
-                           "docs/overview/README.md",
-                           "docs/README.md",
+                           "docs/overview/PROGRAM_TIMELINE.md",
                            "memory/CONVERSATION_MEMORY.md",
                            "memory/daily/2026-04-10.md",
-                           "README.md",
-                           "scripts/doc-sync-automation.ps1",
-                           "TASKS.md",
-                           "tenants/README.md",
                            "WORKLOG.md"
                        ],
     "auto_updated_files":  [
-                               "docs/operations/cursor-enterprise-rules-index.md",
-                               "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                               "docs/README.md",
                                "memory/CONVERSATION_MEMORY.md",
-                               "TASKS.md",
                                "WORKLOG.md"
                            ]
 }
