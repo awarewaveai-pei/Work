@@ -48,6 +48,7 @@
 - `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`: Next-Gen 升級藍圖（M1/M2/M3、驗收標準、風險對策）
 - **`docs/operations/cursor-mcp-and-plugin-inventory.md`**: Cursor **MCP／外掛** 與龍蝦 Routing 對照（**建議與根目錄 `mcp.json` 同步維護**）
 - **`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`**: 工具分工 ↔ 強制路由 ↔ `TASKS.md` 一頁追溯（避免三份文件各說各話）
+- **`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`** + **`lobster-factory/docs/ROUTING_MATRIX.md`**: 路由強制語意與矩陣（與上列 Traceability 構成三檔一致性契約）
 - **`docs/operations/cursor-enterprise-rules-index.md`**: **Cursor 企業級 IDE 規則（版控）** — `63`–`66` `.mdc` 與 SSOT 導覽（與 `AO-RESUME`／`AO-CLOSE` 流程衝突時以 `00`／`30`／`40` 規則為準）
 - **`docs/operations/airtable-to-supabase-migration-playbook.md`**: **Airtable 停用後**功能如何落到 **Supabase**（建模、RLS、匯入、n8n 改接）
 - `docs/operations/tools-and-integrations.md`: 整合工具與環境變數規範
@@ -199,5 +200,5 @@
 - `tenants/templates/tenant-template/03_TOOLS_CONFIGURATION_GUIDE.md`
 - `tenants/templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md`
 
-_Last synced: 2026-04-09 13:49:49 UTC_
+_Last synced: 2026-04-10 07:29:14 UTC_
 

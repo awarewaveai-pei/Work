@@ -27,7 +27,11 @@
 
 - **規則版本／強制判定（Owner）**：`docs/operations/rules-version-and-enforcement.md`
 - **龍蝦自動化路由（強制）**：`../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
+- **龍蝦路由矩陣（人讀）**：`../lobster-factory/docs/ROUTING_MATRIX.md`
+- **龍蝦路由機讀閘道**：`../lobster-factory/workflow-risk-matrix.json`（驗證：`../lobster-factory/scripts/validate-workflow-routing-policy.mjs`）
 - **Cursor MCP 鍵名與分工**：`docs/operations/cursor-mcp-and-plugin-inventory.md`
+- **工具建置／能力追溯（TASKS ↔ 路由）**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
+- **Trigger vs n8n 編排邊界 ADR**：`docs/architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md`
 - **憑證／祕鑰政策**：`docs/operations/security-secrets-policy.md`
 - **人＋代理總則**：`AGENTS.md`
 - **新治理文件連動**：`docs/operations/new-doc-linkage-checklist.md`
@@ -56,5 +60,5 @@
 - `docs/operations/security-secrets-policy.md`
 - `docs/README.md`
 
-_Last synced: 2026-04-09 13:49:49 UTC_
+_Last synced: 2026-04-10 07:29:14 UTC_
 

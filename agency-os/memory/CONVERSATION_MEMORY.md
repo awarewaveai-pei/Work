@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-10（三檔長期治理收斂）**：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md` 已完成術語對齊（`task_type`/`risk_level`/`environment`/`approval_required`）與跨文件契約；新增月/季/年治理節奏與變更同提交要求，避免路由語意漂移。
 - **2026-04-09（總表狀態可視化）**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` 已新增「目前實際狀態」與 emoji 圖例（`🟢/🟡/⚪`），並同步到「平台能力總表」與「工具建置順序（P1-P7）」兩張表；`doc-sync` 與 `system-health-check` 均 PASS（100%）。
 - **2026-04-09（工具能力總表）**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` 已整合為「平台能力總表（自託管/非自託管/時機）」+「工具建置順序（P1-P7）」單一視圖（繁中）；用於補齊 `TASKS` 執行清單缺少全景能力地圖的落差。
 - **2026-04-09（規則防漂移）**：新增單一正本 **`docs/operations/rules-version-and-enforcement.md`**（Version/Priority/Hard-fail）；`scripts/ao-resume.ps1` 新增規則一致性 precheck（驗 Owner 版本標記 + `sync-enterprise-cursor-rules-to-monorepo-root.ps1 -VerifyOnly`），失敗即中止；`30-resume-keyword.mdc` 明確：**未全列 `- [ ]` 視為無效回覆，必須重出**。
@@ -326,5 +327,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-09 14:49:43 UTC_
+_Last synced: 2026-04-10 07:29:14 UTC_
 

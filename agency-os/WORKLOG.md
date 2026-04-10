@@ -2,6 +2,14 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-10
+
+### 三檔收斂升級（可維運 30+ 年）
+- 完成四檔統一：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`。
+- 路由語意對齊：`ROUTING_MATRIX.md` 改為與 Spec 同語言（`task_type` / `risk_level` / `environment` / `approval_required`）。
+- 補上長期治理：三檔新增跨文件契約、月/季/年審核節奏、變更流程（新增/淘汰路由必須同變更集同步）。
+- `TASKS.md` 新增「三檔長期治理巡檢」開放任務，避免未來再漂移。
+
 ## 2026-04-09
 
 ### 雙機對齊反覆失敗：腳本根因與文件閉環
@@ -372,7 +380,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-09 14:49:43 UTC_
+_Last synced: 2026-04-10 07:29:14 UTC_
 
 ## 2026-03-20
 
@@ -800,6 +808,8 @@ _Last synced: 2026-04-09 14:49:43 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
+
 
 
 

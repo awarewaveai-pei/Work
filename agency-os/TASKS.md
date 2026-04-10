@@ -45,6 +45,9 @@
 - [ ] Enterprise 工具層 Phase 1 正式串接
   - 範圍：Clerk auth、env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts
   - DoD：下列子任務全數完成且有對應證據連結（WORKLOG / report）
+- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）
+  - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
+  - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
 - [ ] （工具建置）Phase 1 建議順序（P1 -> P7）
   - P1：Secrets 治理升級（先處理金鑰與權限，避免後續返工）
   - P2：Hetzner 自託管 n8n（staging）（先把自動化骨幹架好）
@@ -215,5 +218,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-09 14:49:43 UTC_
+_Last synced: 2026-04-10 07:29:14 UTC_
 

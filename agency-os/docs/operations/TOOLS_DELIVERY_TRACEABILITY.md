@@ -6,12 +6,15 @@
 - 作為 `TASKS.md`、`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md` 之間的對照中樞。
 
 ## 單一視角（誰負責什麼）
-| 層級 | 正本檔案 | 回答問題 |
-|---|---|---|
-| 工具分工（IDE/MCP） | `docs/operations/cursor-mcp-and-plugin-inventory.md` | 在 Cursor 裡誰做什麼 |
-| 編排路由（強制） | `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` | 哪類工作必須走哪個引擎/核准 |
-| 平台能力與時機（本檔） | `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` | 這些能力要不要做、是否自託管、何時做 |
-| 執行狀態 | `TASKS.md` | 目前完成/未完成與下一步 |
+| 順序 | 層級 | 正本檔案（自 `agency-os/` 起算） | 回答問題 |
+|---:|---|---|---|
+| 1 | 編排路由（**強制**） | `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` | `task_type`、Owner 引擎、env、風險、核准 |
+| 2 | 機讀閘道 | `../lobster-factory/workflow-risk-matrix.json` + `../lobster-factory/scripts/validate-workflow-routing-policy.mjs` | CI／bootstrap 是否與 spec 結構一致 |
+| 3 | 人讀矩陣 | `../lobster-factory/docs/ROUTING_MATRIX.md` | 一眼對照路由（語意須與 spec 一致） |
+| 4 | 工具分工（IDE/MCP 鍵名） | `docs/operations/cursor-mcp-and-plugin-inventory.md` | Cursor `mcpServers` 做什麼；**不**覆寫生產編排 |
+| 5 | 編排邊界理由 | `docs/architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md` | 為何 Trigger vs n8n 如此切分 |
+| 6 | 平台能力與時機（本檔） | `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` | 能力要不要做、自託管、建置順序、證據欄位 |
+| 7 | 執行狀態 | `TASKS.md` | 目前完成/未完成與下一步 |
 
 ## 平台能力總表（你會用到的能力）
 > 說明：`自託管可行性` 是技術可行，不代表現在就應該上；仍以風險、維運成本與商業時機決定。
@@ -61,10 +64,29 @@
 ## 執行檢查清單（每完成一項都要做）
 - 在 `TASKS.md` 對應項有狀態更新（未完成/完成）。
 - 在 `WORKLOG.md` 留下當日證據路徑（至少一條）。
-- 若改變路由 Owner，必須同 commit 更新：
-  - `docs/operations/cursor-mcp-and-plugin-inventory.md`
-  - `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
-  - `TASKS.md`
+- 若改變路由 Owner 或新增 `task_type`，必須**同一變更集**更新（順序與 `MCP_TOOL_ROUTING_SPEC.md` 文件集一致）：
+  1. `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
+  2. `../lobster-factory/docs/ROUTING_MATRIX.md`
+  3. `../lobster-factory/workflow-risk-matrix.json`
+  4. `docs/operations/cursor-mcp-and-plugin-inventory.md`
+  5. 本檔與 `TASKS.md`（含可執行任務與 DoD）
+
+## 路由與工具四件套長期治理契約（30+ years）
+
+### A. 一致性不變量（Invariants）
+- `MCP_TOOL_ROUTING_SPEC.md` 的 `task_type` 命名是強制語意主鍵。
+- `ROUTING_MATRIX.md` 必須沿用同一語意欄位（`task_type`、`risk_level`、`environment`、`approval_required`）。
+- `workflow-risk-matrix.json` 必須通過 `validate-workflow-routing-policy.mjs`；與 spec 漂移視為 **gate FAIL**。
+- 本檔任何「任務追溯」若指向路由，必須引用上述主鍵，**不得**自創別名或隱含新 `task_type`。
+
+### B. 版本與審核節奏
+- 每月：術語/欄位 drift 檢查（Spec vs Matrix vs JSON vs Inventory vs 本檔 vs `TASKS`）。
+- 每季：風險分級、核准門檻、rollback 規則校準。
+- 每年：淘汰項（deprecated `task_type`／工具）清理，保留遷移對照表。
+
+### C. 變更流程（最小要求）
+- 新增或廢止路由語意時，至少同時更新上節清單 **1–5**；若只改 IDE 說明、不碰 `task_type`，可限於 **inventory**（並在 PR 註明「無 routing 語意變更」）。
+- 未完成 **1–3** 與驗證腳本綠燈前，不得標示路由相關項為「已完成」。
 
 ## 證據儲存慣例
 - 報告：`agency-os/reports/`
@@ -81,5 +103,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-09 14:47:16 UTC_
+_Last synced: 2026-04-10 07:29:14 UTC_
 

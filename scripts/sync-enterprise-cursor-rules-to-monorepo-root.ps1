@@ -26,8 +26,13 @@ function Apply-MonorepoRootCursorPathTransforms {
     param([string]$Text)
     # agency-os/.cursor/rules 內 `docs/...` 指 agency-os 樹；monorepo 根開啟時須加 `agency-os/` 前綴（lobster-factory 等不變）。
     $c = $Text
+    # agency-os-centric rules use ../lobster-factory/; monorepo-root readers need repo-relative lobster-factory/
+    $c = $c -replace '\.\./lobster-factory/', 'lobster-factory/'
     $c = $c -replace '`docs/overview/REMOTE_WORKSTATION_STARTUP\.md`', '`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`'
     $c = $c -replace '`docs/operations/cursor-mcp-and-plugin-inventory\.md`', '`agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md`'
+    $c = $c -replace '`docs/operations/TOOLS_DELIVERY_TRACEABILITY\.md`', '`agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`'
+    $c = $c -replace '`docs/operations/security-secrets-policy\.md`', '`agency-os/docs/operations/security-secrets-policy.md`'
+    $c = $c -replace '`docs/operations/cursor-enterprise-rules-index\.md`', '`agency-os/docs/operations/cursor-enterprise-rules-index.md`'
     # 例如：（見 **`REMOTE_WORKSTATION_STARTUP` 2.5.1**）
     $c = $c -replace '\*\*`REMOTE_WORKSTATION_STARTUP` 2\.5\.1\*\*', '**`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1**'
     # 40-shutdown: monorepo-root readers — agency-os path first, then subfolder-workspace hint
@@ -60,6 +65,7 @@ $transformForRoot = @{
     "00-session-bootstrap.mdc" = $true
     "30-resume-keyword.mdc"      = $true
     "40-shutdown-closeout.mdc"   = $true
+    "64-architecture-mcp-routing.mdc" = $true
 }
 
 if (-not (Test-Path -LiteralPath $sourceDir)) {

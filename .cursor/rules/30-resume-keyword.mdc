@@ -29,7 +29,7 @@ When the user message contains `AO-RESUME`, before proposing any new implementat
 - `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` (if exists)
 - `lobster-factory/docs/LOBSTER_FACTORY_COMPLETION_PLAN_V2.md` (if exists)
 
-If opened folder is `agency-os` only, use paths as above; lobster paths are `../lobster-factory/docs/...`.（**僅開 agency-os 時**：`.agency-state/open-tasks-snapshot.md` 路徑同左，無 `agency-os/` 前綴。）
+If opened folder is `agency-os` only, use paths as above; lobster paths are `lobster-factory/docs/...`.（**僅開 agency-os 時**：`.agency-state/open-tasks-snapshot.md` 路徑同左，無 `agency-os/` 前綴。）
 
 3. **回覆結構（`AO-RESUME` 專用；禁止「過度精簡」到省略待辦或風險）**  
    以下**五個頂層標題依序輸出**（繁中），每節都須有**可讀的實質內容**（禁止整節只剩一兩個字或「略」）：
