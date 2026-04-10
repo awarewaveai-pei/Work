@@ -1,0 +1,9 @@
+{
+  "require": {
+    "sentry/sentry": "^4"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "vendor-dir": "vendor"
+  }
+}
