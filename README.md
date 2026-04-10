@@ -70,5 +70,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-04-10 11:51:48 UTC_
+_Last synced: 2026-04-10 13:27:41 UTC_
 

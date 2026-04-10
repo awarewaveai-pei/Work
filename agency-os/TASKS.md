@@ -21,6 +21,8 @@
   - 之後每次開工：monorepo 根跑 `scripts/ao-resume.ps1` 至 exit 0（含 ff-only pull、gates、`print-open-tasks` 快照、Strict 稽核），再於 Cursor 使用 `AO-RESUME`。
   - 筆電需安裝並登入 GitHub CLI（`winget install --id GitHub.cli` + `gh auth login`），Node major 與桌機/CI 對齊；`secrets-vault` 與 `mcp.json` 皆為每台獨立設定。
   - 兩台都要在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict` 且 PASS（無 WARN）後才可勾選此項。
+  - **公司桌機（人在辦公室時）**：不必回想先前是否裝過；在該機 monorepo 根依序：`git fetch` → `git checkout main` → `git pull --ff-only origin main` → 跑上一行的 `machine-environment-audit -Strict`。若未 PASS，自上文 `REMOTE_WORKSTATION_STARTUP.md` **§1.5**「工具與依賴」起補齊（含 `lobster-factory\packages\workflows` 的 `npm ci`、可選 `mcp-local-wrappers`、`verify-build-gates`）後再重跑稽核；需與筆電同級「真 WP」則補 **§1.5.1**。FAIL/WARN 時保留終端輸出以利除錯。
+  - **筆電已 Strict PASS 時**：仍須待公司桌機也 PASS，本主項才可視為完成。
 - [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3）
   - 參考：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
   - 本項目標：先選 2 個試點（1 既有站接手 + 1 新站建置）
@@ -63,7 +65,9 @@
   - DoD：可建立 1 個測試客戶設定並在 UI 回顯成功
 - [ ] （工具建置）Hetzner 自託管 n8n（staging）
   - 處理：在 Hetzner 建立 n8n 節點（含 TLS、備份、最小權限），並接回現有 webhook/notification 路由
-  - DoD：`client_onboarding` 相關輕量流程可在 staging 端到端跑通 1 次
+  - 進度（2026-04-10）：營運者口述 **自託管 n8n 已完成**；請於 `WORKLOG` 同日補一句可對外說明的證據（例如 URL 範圍、TLS、備份策略、webhook 入口是否已指到新節點——**勿寫祕密**）。
+  - DoD（仍開放）：`client_onboarding` 相關輕量流程可在 **staging** 端到端跑通 1 次（跑通後本項才可 `[x]`，並在 WORKLOG 填 `workflow_run_id`／路由等追溯欄位，見 `TOOLS_DELIVERY_TRACEABILITY.md`）。
+  - **執行正本**：`docs/operations/n8n-staging-client-onboarding-e2e.md`（最小 Webhook 流程定義、觸發方式、WORKLOG 證據欄位、AUTO_TASK_DONE 子字串）。
 - [ ] （工具建置）Sentry 觀測接入
   - 處理：接入 API/workflow 錯誤上報 + release tag；定義 1 條告警規則
   - DoD：可人工觸發 1 筆測試錯誤並在 Sentry 收到告警
@@ -79,6 +83,7 @@
 - [ ] （工具建置）Secrets 治理升級（從 env/mcp 到集中管控）
   - 處理：定義 secrets owner、輪替節奏、最小讀取權限；先覆蓋 Trigger/n8n/GitHub 相關高風險金鑰
   - DoD：完成一輪輪替演練，服務不中斷
+  - **執行正本**：`docs/operations/secrets-governance-p1-closeout.md`（Owner 表、首輪輪替三選一、WORKLOG 證據、AUTO_TASK_DONE 子字串）。
 
 ## Next — 已完成歷程（查詢用）
 - [x] 建立 WordPress 客戶交付「雙模式 SOP」
@@ -218,5 +223,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-10 11:51:49 UTC_
+_Last synced: 2026-04-10 13:27:41 UTC_
 
