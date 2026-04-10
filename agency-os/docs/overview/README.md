@@ -59,5 +59,7 @@
 | 操作／SOP 導覽 | [README.md](../operations/README.md) |
 | docs 總索引 | [README.md](../README.md) |
 | 變更連動矩陣 | [CHANGE_IMPACT_MATRIX.md](../CHANGE_IMPACT_MATRIX.md) |
+| 龍蝦工廠（工程入口） | [README.md](../../../lobster-factory/README.md) |
+| 租戶（公司包） | [README.md](../../tenants/README.md) |
 | 技術標準（目錄） | [standards/](../standards/) |
 | 架構 ADR（目錄） | [decisions/](../architecture/decisions/) |

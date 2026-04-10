@@ -93,6 +93,8 @@
 |:---|:---|
 | 全貌／雙機導覽 | [README.md](../overview/README.md) |
 | docs 總索引 | [README.md](../README.md) |
+| 龍蝦工廠（工程入口） | [README.md](../../../lobster-factory/README.md) |
+| 租戶（公司包） | [README.md](../../tenants/README.md) |
 
 ---
 
