@@ -2,21 +2,33 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
-## 2026-04-11
+## 2026-04-10
+
+### n8n staging client_onboarding E2E
+
+| 欄位 | 值 |
+|------|----|
+| `environment` | `staging` |
+| `workflow_name` | `shared-notifications-client_onboarding-staging-ping` |
+| `workflow_id` | `LUEO8tirSCFaVGjH` |
+| `execution_id` | `1` |
+| `trigger_type` | `webhook` |
+| `route_summary` | `POST /webhook/client-onboarding/staging-ping` |
+| `result` | `{"ok":true,"event":"client_onboarding_staging_ping","received_at":"2026-04-10T21:42:38.572+08:00"}` |
+
+- AUTO_TASK_DONE: Hetzner 自託管 n8n（staging）
+
+### n8n 自託管（進度紀錄）
+- **口述狀態**：營運者表示 **Hetzner 自託管 n8n 已做好**（細節未在此輪留存）。
+- **TASKS**：`（工具建置）Hetzner 自託管 n8n（staging）` **DoD 已達**——見**上方**「n8n staging client_onboarding E2E」與 **`AUTO_TASK_DONE`**；`TASKS.md` 已移至 **已完成歷程**。
+- **追溯總表**：`TOOLS_DELIVERY_TRACEABILITY.md` 已更新 n8n（staging）為 **E2E 已證**。
 
 ### P1 Secrets／n8n E2E 收斂手冊（文件交付）
 - **新增正本**：`docs/operations/secrets-governance-p1-closeout.md`（Owner 表、GitHub／n8n MCP／Trigger 首輪輪替三選一、WORKLOG 證據範本；**不含**明文祕密）。
 - **新增正本**：`docs/operations/n8n-staging-client-onboarding-e2e.md`（staging 最小 Webhook 型 `client_onboarding` 流程定義、觸發方式、WORKLOG 追溯欄位、`AUTO_TASK_DONE` 提示）。
-- **`TASKS.md`**：`Secrets 治理升級`、`Hetzner 自託管 n8n（staging）` 兩條已補 **執行正本**連結。
+- **`TASKS.md`**：`Secrets 治理升級` 仍開放並附 **執行正本**；**`Hetzner 自託管 n8n（staging）`** 已歸檔至 **已完成歷程**（證據見上節 E2E）。
 - **`security-secrets-policy.md`**：Related 已連結 P1 收斂手冊。
-- **邊界**：本輪**未**宣告 P1 DoD 或 n8n E2E 已完成——須營運者依兩份手冊實作輪替與 n8n 執行後，再於當日 `WORKLOG` 填證據；收工時可寫 `AUTO_TASK_DONE` 觸發打勾。
-
-## 2026-04-10
-
-### n8n 自託管（進度紀錄）
-- **口述狀態**：營運者表示 **Hetzner 自託管 n8n 已做好**（細節未在此輪留存）。
-- **TASKS**：`（工具建置）Hetzner 自託管 n8n（staging）` 仍 **`- [ ]`**——**DoD** 為 `client_onboarding` 於 **staging** 端到端跑通 1 次；達成後補：`workflow_run_id`、`environment=staging`、webhook 路由摘要（**不含 token**），並可打勾該項。
-- **追溯總表**：`TOOLS_DELIVERY_TRACEABILITY.md` 已將 n8n 列為「節點就緒、E2E 待證」。
+- **邊界**：**n8n staging E2E** 已於同日**上一節**達成；**P1 Secrets DoD**（輪替演練）仍開放，見 `secrets-governance-p1-closeout.md`。
 
 ### 2026-04-10（晚）README 導覽與 doc-sync 防漂移
 - **`agency-os/README.md`**：連結改表格、連結文字＝檔名；`docs/overview`／`docs/operations` 速查標註為**子集**，完整清單指回各自 **`README.md`**；補 **`docs/architecture/decisions/README.md`**（ADR 目錄）。
@@ -405,7 +417,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-10 13:27:41 UTC_
+_Last synced: 2026-04-10 13:45:38 UTC_
 
 ## 2026-03-20
 
@@ -833,6 +845,7 @@ _Last synced: 2026-04-10 13:27:41 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

@@ -24,7 +24,7 @@
 |---|---|---|---|---|---|
 | Supabase（SoR） | 🟢 已上線（Hetzner） | 可（已採自架） | P1（立即） | `docs/operations/supabase-self-hosted-cutover-checklist.md` | migration/連線/權限驗證全通過 |
 | WordPress + MariaDB | 🟢 已上線（站台執行） | 可 | P1（立即） | `docs/operations/WORDPRESS_CLIENT_DELIVERY_MODELS.md`、`../lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md` | staging/prod 可用，回滾可驗證 |
-| n8n（staging） | 🟡 建置中（自託管節點已就緒；TASKS DoD／E2E 仍待證） | 可 | P2 | `docs/standards/n8n-workflow-architecture.md` | 至少 1 條 staging 流程端到端成功 |
+| n8n（staging） | 🟢 已上線（自託管；**staging E2E 已證** 2026-04-10，見 `WORKLOG.md`） | 可 | P2 | `docs/standards/n8n-workflow-architecture.md` | 至少 1 條 staging 流程端到端成功 |
 | Trigger.dev（自託管） | 🟡 建置中（路由已定） | 可 | P2 | `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` | 1 條生產級工作流可追蹤完成 |
 | Redis | ⚪ 未啟動（Phase A） | 可 | P2 | `docs/operations/hetzner-stack-rollout-index.md` | 服務健康檢查與應用連線成功 |
 | Nginx | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 路由/健康檢查/SSL 正常 |
@@ -43,7 +43,7 @@
 | 階段 | 項目 | 目前狀態 | 對應 `TASKS` 關鍵字 |
 |---|---|---|---|
 | P1 | Secrets 治理升級 | ⚪ 未啟動 | `（工具建置）Secrets 治理升級`；執行手冊 `secrets-governance-p1-closeout.md` |
-| P2 | Hetzner 自託管 n8n（staging） | 🟡 節點就緒；E2E DoD 待證 | `（工具建置）Hetzner 自託管 n8n（staging）`；E2E 正本 `n8n-staging-client-onboarding-e2e.md` |
+| P2 | Hetzner 自託管 n8n（staging） | 🟢 E2E DoD 已證（2026-04-10） | `（工具建置）Hetzner 自託管 n8n（staging）`；E2E 正本 `n8n-staging-client-onboarding-e2e.md` |
 | P3 | Sentry 觀測接入 | ⚪ 未啟動 | `（工具建置）Sentry 觀測接入` |
 | P4 | PostHog 事件基線 | ⚪ 未啟動 | `（工具建置）PostHog 事件基線` |
 | P5 | Cloudflare 邊界保護 | ⚪ 未啟動 | `（工具建置）Cloudflare 邊界保護` |
@@ -103,5 +103,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-10 13:27:41 UTC_
+_Last synced: 2026-04-10 13:45:38 UTC_
 

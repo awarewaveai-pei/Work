@@ -52,7 +52,7 @@
   - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
 - [ ] （工具建置）Phase 1 建議順序（P1 -> P7）
   - P1：Secrets 治理升級（先處理金鑰與權限，避免後續返工）
-  - P2：Hetzner 自託管 n8n（staging）（先把自動化骨幹架好）
+  - P2：Hetzner 自託管 n8n（staging）（先把自動化骨幹架好）— **staging `client_onboarding` E2E 已證**（2026-04-10，見 `WORKLOG`）
   - P3：Sentry 觀測接入（先看得到錯誤，後面才好除錯）
   - P4：PostHog 事件基線（建立可量測 funnel）
   - P5：Cloudflare 邊界保護（staging 先上防護）
@@ -63,11 +63,6 @@
 - [ ] （工具建置）Next.js 控制台 v1（Internal Ops）
   - 處理：建立 app skeleton、客戶清單頁、部門勾選頁（20 部門）、提交後寫出 `DEPARTMENT_SELECTION` payload
   - DoD：可建立 1 個測試客戶設定並在 UI 回顯成功
-- [ ] （工具建置）Hetzner 自託管 n8n（staging）
-  - 處理：在 Hetzner 建立 n8n 節點（含 TLS、備份、最小權限），並接回現有 webhook/notification 路由
-  - 進度（2026-04-10）：營運者口述 **自託管 n8n 已完成**；請於 `WORKLOG` 同日補一句可對外說明的證據（例如 URL 範圍、TLS、備份策略、webhook 入口是否已指到新節點——**勿寫祕密**）。
-  - DoD（仍開放）：`client_onboarding` 相關輕量流程可在 **staging** 端到端跑通 1 次（跑通後本項才可 `[x]`，並在 WORKLOG 填 `workflow_run_id`／路由等追溯欄位，見 `TOOLS_DELIVERY_TRACEABILITY.md`）。
-  - **執行正本**：`docs/operations/n8n-staging-client-onboarding-e2e.md`（最小 Webhook 流程定義、觸發方式、WORKLOG 證據欄位、AUTO_TASK_DONE 子字串）。
 - [ ] （工具建置）Sentry 觀測接入
   - 處理：接入 API/workflow 錯誤上報 + release tag；定義 1 條告警規則
   - DoD：可人工觸發 1 筆測試錯誤並在 Sentry 收到告警
@@ -86,6 +81,9 @@
   - **執行正本**：`docs/operations/secrets-governance-p1-closeout.md`（Owner 表、首輪輪替三選一、WORKLOG 證據、AUTO_TASK_DONE 子字串）。
 
 ## Next — 已完成歷程（查詢用）
+- [x] **（工具建置）Hetzner 自託管 n8n（staging）**
+  - DoD：`client_onboarding` 輕量流程於 **staging** Webhook 端到端成功；證據見 `WORKLOG.md` **`## 2026-04-10`** →「n8n staging client_onboarding E2E」（`workflow_id` `LUEO8tirSCFaVGjH`、`execution_id` `1`、`route_summary` `POST /webhook/client-onboarding/staging-ping`）。
+  - 正本：`docs/operations/n8n-staging-client-onboarding-e2e.md`
 - [x] 建立 WordPress 客戶交付「雙模式 SOP」
   - 內容：既有站接手 + 新站從零
   - 原則：雲端 staging 優先，避免跨機重工
@@ -223,5 +221,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-10 13:27:41 UTC_
+_Last synced: 2026-04-10 13:45:38 UTC_
 
