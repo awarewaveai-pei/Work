@@ -65,6 +65,10 @@ function Upsert-RelatedBlock {
     if ($normRel -ieq 'README.md') {
         return $false
     }
+    # tenants/README.md: curated tenant hub; do not flatten Related.
+    if ($normRel -ieq 'tenants/README.md') {
+        return $false
+    }
 
     $full = Join-Path $Root $RelativeFile
     if (-not (Test-Path $full)) { return $false }
