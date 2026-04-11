@@ -2,6 +2,15 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-12
+
+### Sentry 觀測接入完成
+- **DSN 填入**：server `/root/lobster-phase1/.env` 三個 DSN 確認（昨天已寫入）；本地 `infra/hetzner-phase1-core/.env` 同步建立。
+- **next-admin**：Docker build 成功（升級 Hetzner CX21→CX31 8GB 後）；`/api/sentry-test` route 觸發測試錯誤，Sentry `javascript-nextjs` project 確認收到。
+- **告警規則**：三個 project（`javascript-nextjs`、`node-api`、`php`）各建立一條「新 issue → Email 通知」規則（rule ID: 16904552/16904553/16904554）。
+- **Hetzner 升級**：CX21（4GB）→ CX31（8GB），因 Supabase 自架 + lobster stack 合計記憶體超過 3.5GB，build 時 OOM。
+- **AUTO_TASK_DONE: Sentry 觀測接入**
+
 ## 2026-04-11
 
 ### memory/daily 與機器日曆對齊
