@@ -62,6 +62,19 @@ chmod +x scripts/backup-phase1.sh   # Linux 上
 
 產出壓縮 SQL + `wp-html.tgz`。**Supabase** 請仍依 `supabase-self-hosted-cutover-checklist.md` 等文件排程備份。
 
+## 主機資源診斷（慢、卡、疑似 OOM）
+
+我無法從開發機代你 SSH 上 VPS；請在 **VPS 上**執行（**唯讀**，不改系統）：
+
+```bash
+cd /root/lobster-phase1   # 或你的實際 compose 目錄
+chmod +x scripts/diagnose-host-resources.sh
+./scripts/diagnose-host-resources.sh
+# 若 compose 不在當前目錄： ./scripts/diagnose-host-resources.sh /path/to/phase1
+```
+
+輸出含：`free -h`、`swap`、`df`、`docker stats`、`docker compose ps`、`dmesg` 尾段（OOM 線索）。把**完整輸出**貼回除錯即可判讀 swap／磁碟／哪個容器吃記憶體。
+
 ## n8n × Sentry（自託管）
 
 n8n 映像讀取 **`N8N_SENTRY_DSN`**（後端）與選填 **`N8N_FRONTEND_SENTRY_DSN`**（編輯器前端）；可選 **`ENVIRONMENT`** / **`DEPLOYMENT_NAME`** 等（與 n8n 原始碼 `packages/@n8n/config/src/configs/sentry.config.ts` 一致）。

@@ -9,7 +9,10 @@
 - **next-admin**：Docker build 成功（升級 Hetzner CX21→CX31 8GB 後）；`/api/sentry-test` route 觸發測試錯誤，Sentry `javascript-nextjs` project 確認收到。
 - **告警規則**：三個 project（`javascript-nextjs`、`node-api`、`php`）各建立一條「新 issue → Email 通知」規則（rule ID: 16904552/16904553/16904554）。
 - **Hetzner 升級**：CX21（4GB）→ CX31（8GB），因 Supabase 自架 + lobster stack 合計記憶體超過 3.5GB，build 時 OOM。
-- **AUTO_TASK_DONE: Sentry 觀測接入**
+- **AUTO_TASK_DONE: Sentry 觀測接入**（收工時由 `apply-closeout-task-checkmarks` 依此子字串勾選 `TASKS`；**勿**把 `AUTO_TASK_DONE` 寫進 `TASKS.md` 本文。）
+
+### VPS 資源診斷（repo）
+- 新增 **`lobster-factory/infra/hetzner-phase1-core/scripts/diagnose-host-resources.sh`**（唯讀：`free`／swap／`df`／`docker stats`／`docker compose ps`／`dmesg` 尾段）；**`hetzner-phase1-core/README.md`** 補「主機資源診斷」操作說明，供 SSH 上 VPS 自行執行後貼回除錯。
 
 ## 2026-04-11
 

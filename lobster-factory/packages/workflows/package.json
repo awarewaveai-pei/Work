@@ -4,10 +4,15 @@
     "private": true,
     "type": "module",
     "dependencies": {
-      "@trigger.dev/sdk": "4.4.3",
-      "zod": "^3.22.0"
+        "@trigger.dev/sdk": "4.4.3",
+        "zod": "^3.22.0"
+    },
+    "scripts": {
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "devDependencies": {
-      "trigger.dev": "4.4.3"
+        "trigger.dev": "4.4.3",
+        "vitest": "^4.1.4"
     }
-  }
+}
