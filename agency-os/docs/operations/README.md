@@ -14,6 +14,7 @@
 | 說明 | 檔案 |
 |:---|:---|
 | 收工／關機 Checklist | [end-of-day-checklist.md](end-of-day-checklist.md) |
+| `TASKS` 自動打勾（`WORKLOG` → `- [x]`） | monorepo [`scripts/apply-closeout-task-checkmarks.ps1`](../../../scripts/apply-closeout-task-checkmarks.ps1)（由 **`ao-close.ps1`** 呼叫；`AUTO_TASK_DONE` 機讀格式見 [end-of-day-checklist.md](end-of-day-checklist.md) §0） |
 | 系統守護與通知 | [system-guard-and-notification.md](system-guard-and-notification.md) |
 | 系統操作 SOP | [system-operation-sop.md](system-operation-sop.md) |
 | Run ID 追溯規格 | [ONBOARDING_A10_2_RUN_ID_TRACEABILITY_SPEC.md](ONBOARDING_A10_2_RUN_ID_TRACEABILITY_SPEC.md) |

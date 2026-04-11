@@ -10,6 +10,8 @@
 # contains docker-compose.yml and .env as the first argument.
 
 set -u
+# Pipelines must reflect upstream failure (e.g. dmesg EPERM), not only `tail`'s exit code.
+set -o pipefail
 
 PHASE1_DIR="${1:-}"
 if [[ -z "${PHASE1_DIR}" ]]; then
@@ -67,9 +69,9 @@ echo ""
 echo "=== dmesg (last 80 lines, OOM / kill hints) ==="
 if command -v dmesg >/dev/null 2>&1; then
   if dmesg -T 2>/dev/null | tail -n 80; then
-    :
+    true
   elif sudo dmesg -T 2>/dev/null | tail -n 80; then
-    :
+    true
   else
     echo "(dmesg not permitted — try: sudo dmesg -T | tail -80)"
   fi

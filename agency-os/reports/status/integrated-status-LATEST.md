@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-11 00:28:47
+- Generated: 2026-04-12 02:12:31
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,45 +203,30 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-11.md
-# 2026-04-11
+## 5) memory/daily/2026-04-12.md
+# 2026-04-12
 
 ## 背景
-- 本檔為 **機器日曆 2026-04-11** 之當日筆記與 **`AO-CLOSE`** 收工摘要（與 **`print-today-closeout-recap`**／**`40-shutdown-closeout`** 一致：**`memory/daily/YYYY-MM-DD.md` 使用收工當日日期**，不依對話開始日）。
+收工前收斂：Sentry 與 Phase1 文件已在前段完成；本輪補 **README／營運索引**、**`AUTO_TASK_DONE` 機讀說明**、**`diagnose-host-resources.sh` pipefail**、**`apply-closeout-task-checkmarks` StrictMode** 等，準備 **`AO-CLOSE`** 一次 push。
 
 ## 已完成
-- **Cursor 對話／收工（首輪 `AO-CLOSE`，機器日 4/11）**：Sentry 外掛與 MCP 脈絡說明；依 monorepo 釐清 Sentry 專案類型；盤點 **`next-admin`**／**`node-api`** 已接 `@sentry/*`，**`packages/workflows`** 尚未接。
-- **Infra**：`lobster-factory/infra/hetzner-phase1-core` 之 **`docker-compose` n8n** 補 **`N8N_SENTRY_DSN`** 等；**`.env.example`**、**`README.md`** 補述（僅 Phase1 自託管路徑；與雲端／CLI 另架之 n8n 無自動關聯）。
-- **`AO-CLOSE`**：`verify-build-gates` PASS、system-guard、integrated status、**`git push origin main`**（含 **`a1e4461`** 等；詳見當日終端／**`WORKLOG ## 2026-04-11`**）。
-- 進度檔：`WORKLOG.md`、`CONVERSATION_MEMORY.md` 已更新。
+- `WORKLOG ## 2026-04-12` 補「索引與 AO-CLOSE 機讀硬化」與診斷腳本修正說明。
+- 根／`agency-os`／`lobster-factory`／`docs/operations` 多處連結與 traceability 對齊（見 git diff）。
 
 ## 未完成
-- 與 **`TASKS.md` Next** 開放項相同：無本日新增 **`AUTO_TASK_DONE`**（Sentry DoD、Secrets §2 等仍開放）。
+- `TASKS.md` 其餘 `- [ ]`（PostHog、Secrets、雙機對齊等）仍開放。
 
-## 風險/阻塞
-- （已處理）曾誤將上列收工細節寫入 **`2026-04-10.md`**；已在 **`2026-04-10.md`** 留更正指向本檔。
+## 風險／阻塞
+- 本機 **`main` ahead of `origin/main`** 多顆 commit；**`ao-close`** 預設會 **fetch**、閘道通過後 **push**；若遠端超前需 **rebase** 後再推。
 
 ## 下一步
-- 下次 **`AO-RESUME`** 前：monorepo 根 **`.\scripts\ao-resume.ps1`** 至 exit 0；若當日仍有筆記，繼續用 **`2026-04-11.md`** 或 **`2026-04-12.md`** 依實際日曆。
-
----
-
-## 同日補登（第二輪關鍵字 AO-CLOSE）
-- **使用者問**：為何先前未建 **`2026-04-11.md`** → **答**：代理未依機器日曆分檔，屬疏忽；已補檔並 **`commit-checkpoint`**。
-- **`WORKLOG`**：新增 **`## 2026-04-11`** 區塊與本節對齊；隨後再跑完整 **`ao-close.ps1`** 推上 **`origin/main`**。
-
----
-
-## 第三輪前：收工日曆規則硬化（機器日仍 4/11）
-- **核實**：`AO-CLOSE` 應寫 **`memory/daily/YYYY-MM-DD.md`** 且 **YYMMDD＝recap／本機日**；誤寫已更正。
-- **落地**：**`40-shutdown-closeout.mdc`**、**`end-of-day-checklist.md`**、**`2026-04-10.md`** blockquote、**`2026-04-11.md`** 主文、**`WORKLOG ## 2026-04-11`** 搬移 Sentry／n8n 收工段；doc-sync；health **100%**；monorepo 根 **`.cursor/rules/40`** 鏡像。
-- **第三輪 `AO-CLOSE`**：併入上述未推送變更後 **`git push`**（見終端／**`WORKLOG`**「第三輪」節）。
+- 執行 **`.\scripts\ao-close.ps1`**；他機續接依 **`REMOTE_WORKSTATION_STARTUP`**。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-11 00:28:38`
+- Time: `2026-04-12 02:12:29`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -251,8 +236,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260411-002838.md`
-- Closeout: `reports/closeout/closeout-20260411-002836.md`
+- Health: `reports/health/health-20260412-021229.md`
+- Closeout: `reports/closeout/closeout-20260412-021226.md`
 
 ## Action
 - No blocking issue detected.

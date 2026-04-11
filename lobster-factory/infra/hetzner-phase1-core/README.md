@@ -44,6 +44,8 @@ curl -sf http://127.0.0.1/
 curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯
 ```
 
+**Sentry（next-admin，可選）**：部署並設定 DSN 後，可對外公開 URL 呼叫 **`GET /api/sentry-test`**（實作：[apps/next-admin/app/api/sentry-test/route.ts](apps/next-admin/app/api/sentry-test/route.ts)），於 Sentry 專案確認收到測試事件。
+
 瀏覽器（將主機名換成實際 IP／網域）：
 
 - Admin：`http://YOUR_HOST/`

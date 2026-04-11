@@ -31,6 +31,7 @@
 | 開工／雙機／ao-resume | [REMOTE_WORKSTATION_STARTUP.md](docs/overview/REMOTE_WORKSTATION_STARTUP.md) |
 | 收工／關機 | [end-of-day-checklist.md](docs/operations/end-of-day-checklist.md) |
 | 工具／路由／TASKS 一頁 | [TOOLS_DELIVERY_TRACEABILITY.md](docs/operations/TOOLS_DELIVERY_TRACEABILITY.md) |
+| **脈絡鏈（不重貼內文；依序鑽）** | **1** [TOOLS_DELIVERY_TRACEABILITY.md](docs/operations/TOOLS_DELIVERY_TRACEABILITY.md)（能力／P1–P7 DoD）→ **2** [WORKLOG.md](WORKLOG.md)（當日 `## yyyy-MM-dd` 敘事與收工證據）→ **3** Phase1 compose：[README.md](../lobster-factory/infra/hetzner-phase1-core/README.md) → **4** 收工機讀：[end-of-day-checklist.md](docs/operations/end-of-day-checklist.md) §0 · `docs/operations/` [README.md](docs/operations/README.md)（`AUTO_TASK_DONE`、`apply-closeout-task-checkmarks` 列） |
 | AO-RESUME 規則 | [30-resume-keyword.mdc](.cursor/rules/30-resume-keyword.mdc) |
 | AO-CLOSE 規則 | [40-shutdown-closeout.mdc](.cursor/rules/40-shutdown-closeout.mdc) |
 | 今日主線 | [TASKS.md](TASKS.md) |

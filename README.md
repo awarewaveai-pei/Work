@@ -12,7 +12,7 @@
 | [`lobster-factory/`](lobster-factory/) | migrations、manifests、`create-wp-site` / `apply-manifest`、`npm run validate` |
 | [`docs/spec/`](docs/spec/) | **規格原文**（長篇藍圖）：含 **20 個 Agency OS 模組**、`Master Spec v1`、企業級底座與 Cursor Pack——見 [`docs/spec/README.md`](docs/spec/README.md) |
 | **Cursor（IDE）企業級規則（版控正本）** | [`agency-os/docs/operations/cursor-enterprise-rules-index.md`](agency-os/docs/operations/cursor-enterprise-rules-index.md)（`63`–`66` `.mdc`、MCP／龍蝦 Routing 對齊說明） |
-| [`scripts/`](scripts/) | 跨專案腳本：`verify-build-gates.ps1`、`ao-close.ps1` 等 |
+| [`scripts/`](scripts/) | 跨專案腳本：`verify-build-gates.ps1`、`ao-close.ps1`、`apply-closeout-task-checkmarks.ps1`（收工依 `agency-os/WORKLOG.md` 的 `- AUTO_TASK_DONE:` 打勾 `agency-os/TASKS.md`）等 |
 
 ## 本機一次驗兩邊（推薦）
 
@@ -61,7 +61,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 
 ## 收工與同步
 
-- 關鍵字 **`AO-CLOSE`**：依 **`agency-os/.cursor/rules/40-shutdown-closeout.mdc`**；**repo 根**執行 **`.\scripts\ao-close.ps1`**（**正本**；**`agency-os\scripts\ao-close.ps1`** 僅 wrapper）。腳本含 **今日 recap**、**閘道**、**`apply-closeout-task-checkmarks`**（自 **`WORKLOG`** **`- AUTO_TASK_DONE:`** 打勾 **`TASKS`**）、預設 **commit + push**；health **100%** 與 **`AGENTS.md`** 一致。**勿**在僅 `lobster-factory` 子目錄執行。
+- 關鍵字 **`AO-CLOSE`**：依 **`agency-os/.cursor/rules/40-shutdown-closeout.mdc`**；**repo 根**執行 **`.\scripts\ao-close.ps1`**（**正本**；**`agency-os\scripts\ao-close.ps1`** 僅 wrapper）。腳本含 **今日 recap**、**閘道**、**`apply-closeout-task-checkmarks`**（自 **`WORKLOG`** **`- AUTO_TASK_DONE:`** 打勾 **`TASKS`**）、預設 **commit + push**；health **100%** 與 **`AGENTS.md`** 一致。**勿**在僅 `lobster-factory` 子目錄執行。**`AUTO_TASK_DONE` 須寫在當日 `WORKLOG` 的 `##` 區塊且為單行純文字**（細節見 [`end-of-day-checklist.md`](agency-os/docs/operations/end-of-day-checklist.md) §0）。
 - **monorepo 根 `.cursor/rules`**（**`00`、`30`、`40`、`50`、`63–66`**）：正本在 **`agency-os/.cursor/rules`**；由 **`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 鏡像到根目錄（**`00`／`30`／`40`** 含路徑變換；**`verify-build-gates`** 預設會跑）。只改一邊會造成**規則分叉**。
 
 ## Related Documents (Auto-Synced)
@@ -70,5 +70,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-04-10 13:27:41 UTC_
+_Last synced: 2026-04-11 18:03:12 UTC_
 

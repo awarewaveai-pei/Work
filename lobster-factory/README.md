@@ -23,6 +23,9 @@
 |:---|:---|
 | Hetzner 全堆疊索引（Agency OS 文件） | [hetzner-stack-rollout-index.md](../agency-os/docs/operations/hetzner-stack-rollout-index.md) |
 | Hetzner Phase1 compose／營運契約／維護曆 | [README.md](infra/hetzner-phase1-core/README.md)、[LONG_TERM_OPS.md](infra/hetzner-phase1-core/LONG_TERM_OPS.md)、[MAINTENANCE_CALENDAR.md](infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md) |
+| Phase1 主機唯讀診斷（OOM／慢） | [diagnose-host-resources.sh](infra/hetzner-phase1-core/scripts/diagnose-host-resources.sh)（操作說明見 [hetzner-phase1-core/README.md](infra/hetzner-phase1-core/README.md)「主機資源診斷」） |
+| Sentry 手動驗證（next-admin） | [sentry-test/route.ts](infra/hetzner-phase1-core/apps/next-admin/app/api/sentry-test/route.ts)；compose／DSN 見同目錄 `docker-compose.yml`、`.env.example`；**證據**見 `agency-os/WORKLOG.md` **`## 2026-04-12`** |
+| `packages/workflows` 單元測試（Vitest） | `packages/workflows/`（`npm test`；[`vitest.config.ts`](packages/workflows/vitest.config.ts)、`src/hosting/*.test.ts`） |
 | Supabase migrations + seeds | `packages/db/migrations/`（`0001_core.sql`～`0006_seed_catalog.sql`） |
 | WP manifest（Phase 1：`wc-core`） | `packages/manifests/wc-core.json` |
 | Durable workflow 骨架 | `packages/workflows/src/trigger/create-wp-site.ts`、`apply-manifest.ts`（adapter 合約見下表 **Hosting**） |

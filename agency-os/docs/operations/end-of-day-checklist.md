@@ -6,6 +6,7 @@
 - [ ] 若存在 `ALERT_REQUIRED.txt`：先處理/回報原因，**不可帶著 FAIL 收工**
 - [ ] **日內 Git（與 `REMOTE_WORKSTATION_STARTUP` §2.5 一致）**：開工後代理可能已代跑多顆**本機** checkpoint commit（未 push）；收工 `ao-close.ps1` 仍會做最後 **`git add`／`commit`／`push`**，把未推的 commits 一併送上（通過閘道後）。
 - [ ] **任務狀態**：`TASKS.md` 為真相；**預設 Autopilot** 由代理在 **`WORKLOG.md`** 寫 **`- AUTO_TASK_DONE:`** 後，**`ao-close`** 內 **`apply-closeout-task-checkmarks`** 套用打勾（見 **`.cursor/rules/40-shutdown-closeout.mdc`**）。手動改 `- [ ]`／`- [x]` 仍允許。
+  - **`AUTO_TASK_DONE` 機讀格式（必守）**：須落在**與本機當日日曆一致**的 **`## yyyy-MM-dd`** 區塊內（腳本只掃「今日」該段）；單獨一行 **`- AUTO_TASK_DONE: <子字串>`**，**勿**用 `**…**` 包住該行（否則正則掃不到）；子字串須在**恰好一條**仍為 `- [ ]` 的 `TASKS` 行內可找到。
 - [ ] （可選）送 PR / 大改 docs 前：在 **monorepo 根** `<WORK_ROOT>` 跑 `.\scripts\verify-build-gates.ps1`（工程 + doc + 治理 health 一次完成）
 - [ ] （可選）有註冊 **AgencyOS-WeeklySystemReview** 者：若本週排程曾跑過，確認未被寫入 `ALERT_REQUIRED.txt`；若有，表示週檢閘道曾 FAIL，須先處理再收工
 
@@ -68,5 +69,5 @@
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-10 16:26:00 UTC_
+_Last synced: 2026-04-11 17:59:41 UTC_
 
