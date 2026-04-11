@@ -8,14 +8,14 @@ const BASE_INPUT = {
 };
 
 describe("resolveStagingProvisioning", () => {
-  const originalEnv = process.env;
+  const originalEnv = Object.assign({}, process.env);
 
   beforeEach(() => {
-    process.env = { ...originalEnv };
+    process.env = Object.assign({}, originalEnv);
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    process.env = Object.assign({}, originalEnv);
   });
 
   it("returns idle when LOBSTER_HOSTING_ADAPTER is not set", async () => {

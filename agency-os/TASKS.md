@@ -1,4 +1,4 @@
-﻿# Global Task Board
+# Global Task Board
 
 > **待辦原則（給營運者）**  
 > - **單一清單**：所有「之後還要做」的事，應以本檔 **`Next — 未完成`** 或 **`Backlog — 未完成`** 的一條 `- [ ]` 表示；不要只放在聊天或腦裡。  
@@ -63,7 +63,7 @@
 - [ ] （工具建置）Next.js 控制台 v1（Internal Ops）
   - 處理：建立 app skeleton、客戶清單頁、部門勾選頁（20 部門）、提交後寫出 `DEPARTMENT_SELECTION` payload
   - DoD：可建立 1 個測試客戶設定並在 UI 回顯成功
-- [ ] （工具建置）Sentry 觀測接入
+- [x] （工具建置）Sentry 觀測接入
   - 處理：接入 API/workflow 錯誤上報 + release tag；定義 1 條告警規則
   - DoD：可人工觸發 1 筆測試錯誤並在 Sentry 收到告警
 - [ ] （工具建置）PostHog 事件基線

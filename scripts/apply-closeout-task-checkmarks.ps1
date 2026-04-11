@@ -112,7 +112,8 @@ $planned = @()
 $alreadyDone = New-Object System.Collections.Generic.List[string]
 
 foreach ($needle in $needlesOrdered) {
-    $openHits = Find-Hits $needle $rxUnchecked
+    # PS unwraps single-element collections from function return; @() preserves .Count under Set-StrictMode.
+    $openHits = @(Find-Hits $needle $rxUnchecked)
     if ($openHits.Count -eq 1) {
         $planned += [pscustomobject]@{ Index = $openHits[0]; Needle = $needle }
         continue
@@ -122,7 +123,7 @@ foreach ($needle in $needlesOrdered) {
         Write-Error ("apply-closeout-task-checkmarks: OPEN substring matches multiple tasks ({0}):`n{1}`nNeedle: {2}" -f $openHits.Count, $preview, $needle)
         exit 1
     }
-    $doneHits = Find-Hits $needle $rxChecked
+    $doneHits = @(Find-Hits $needle $rxChecked)
     if ($doneHits.Count -ge 1) {
         $alreadyDone.Add($needle) | Out-Null
         Write-Host ("apply-closeout-task-checkmarks: already [x], skip: {0}" -f $(if ($needle.Length -le 72) { $needle } else { $needle.Substring(0, 72) + "..." })) -ForegroundColor DarkGray
