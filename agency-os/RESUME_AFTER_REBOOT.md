@@ -2,9 +2,19 @@
 
 ## 下次開機提醒（輪替：有新事項只改本節）
 
-1. **開工單一路徑**：在 **monorepo 根**（`<WORK_ROOT>`）執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`** → **exit 0** → 再在 Cursor 打 **`AO-RESUME`**（見 `30-resume-keyword.mdc`）。  
-2. **雙機對齊（`TASKS` 仍開放）**：**另一台**須依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5／§1.5.1** 做完工具／憑證／（Windows）本機 WP 相容層，並跑 **`machine-environment-audit.ps1 -FetchOrigin -Strict`** 至 **PASS（無 WARN）**；兩台都達標後才勾 `TASKS`「雙機環境對齊」，並在當日 **`WORKLOG`** 寫 **`- AUTO_TASK_DONE:`** 命中該行。本機 WP 試跑紀錄：**`WORKLOG` 2026-04-13**；操作正本 **`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`**。  
-3. **Git**：若 **`git status`** 顯示 **ahead**，收工跑 **`AO-CLOSE`** 或手動 **`git push origin main`**，避免與 **`origin/main`** 漂移。
+> **寫法規則（給未來自己／代理）**：營運者**一次只會有一台電腦在身邊**。凡屬「**兩台都要做**」的設定（PATH、MariaDB、WP bootstrap、`gh`、vault、`mcp.json`、`npm ci`、Strict 稽核等），在本節**務必拆成兩句**：**（A）現在手上這台**當次要做什麼；**（B）另一台**下次開機／下次帶到身邊時要做什麼——**不要**只寫「請完成雙機」一句話。更新本節時刪舊輪替、只保留仍有效者。
+
+1. **開工單一路徑（兩台各自）**  
+   - **現在這台**：在 **monorepo 根**（`<WORK_ROOT>`）執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`** → **exit 0** → 再在 Cursor 打 **`AO-RESUME`**（見 `30-resume-keyword.mdc`）。  
+   - **另一台**：下次帶到身邊時同樣在該機 `<WORK_ROOT>` 跑 **`ao-resume.ps1` exit 0**（勿假設已與 GitHub 對齊而不跑）。
+
+2. **雙機對齊（`TASKS` 仍開放；兩台各自）**  
+   - **現在這台**：若尚未做 §1.5.1／Strict，依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5／§1.5.1**；MariaDB PATH 可選 **`.\scripts\ensure-mariadb-on-user-path.ps1`**；本機 WP 正本 **`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`**；試跑紀錄見 **`WORKLOG` 2026-04-13**（桌機範例）。  
+   - **另一台**：**筆電／公司機**到齊後**整段重做一遍**（含 **`machine-environment-audit.ps1 -FetchOrigin -Strict`** 至 **PASS（無 WARN）**）。**兩台**都達標後才勾 `TASKS`「雙機環境對齊」，並在當日 **`WORKLOG`** 單獨一行 **`- AUTO_TASK_DONE:`** 命中該條待辦。
+
+3. **Git（兩台各自看）**  
+   - **現在這台**：若 **`git status`** 顯示 **ahead**，收工 **`AO-CLOSE`** 或 **`git push origin main`**。  
+   - **另一台**：下次開工先 **`ao-resume`**（會 **fetch**／落後時 **ff-only pull**），避免以為自己還在舊 **`origin/main`**。
 
 ## 同一台電腦 — 重開機後
 
@@ -30,5 +40,5 @@
 - `docs/operations/system-guard-and-notification.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-13 01:17:52 UTC_
+_Last synced: 2026-04-10 (手動更新「下次開機提醒」寫法規則)_
 
