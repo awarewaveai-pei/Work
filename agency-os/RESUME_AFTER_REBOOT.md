@@ -3,7 +3,7 @@
 ## 下次開機提醒（輪替：有新事項只改本節）
 
 1. **開工單一路徑**：在 **monorepo 根**（`<WORK_ROOT>`）執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`** → **exit 0** → 再在 Cursor 打 **`AO-RESUME`**（見 `30-resume-keyword.mdc`）。  
-2. **雙機對齊（`TASKS` 仍開放）**：**另一台**須依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5／§1.5.1** 做完工具／憑證／（Windows）本機 WP 相容層，並跑 **`machine-environment-audit.ps1 -FetchOrigin -Strict`** 至 **PASS（無 WARN）**；兩台都達標後才勾 `TASKS`「雙機環境對齊」，並在當日 **`WORKLOG`** 寫 **`- AUTO_TASK_DONE:`** 命中該行。本機若缺 **MariaDB CLI**：見 **`WORKLOG` 2026-04-13** 與 **`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`**。  
+2. **雙機對齊（`TASKS` 仍開放）**：**另一台**須依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5／§1.5.1** 做完工具／憑證／（Windows）本機 WP 相容層，並跑 **`machine-environment-audit.ps1 -FetchOrigin -Strict`** 至 **PASS（無 WARN）**；兩台都達標後才勾 `TASKS`「雙機環境對齊」，並在當日 **`WORKLOG`** 寫 **`- AUTO_TASK_DONE:`** 命中該行。本機 WP 試跑紀錄：**`WORKLOG` 2026-04-13**；操作正本 **`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`**。  
 3. **Git**：若 **`git status`** 顯示 **ahead**，收工跑 **`AO-CLOSE`** 或手動 **`git push origin main`**，避免與 **`origin/main`** 漂移。
 
 ## 同一台電腦 — 重開機後
