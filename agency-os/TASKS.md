@@ -46,6 +46,10 @@
   - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
 - [ ] `lobster-factory` A7 全站自動建站補齊
   - 範圍：hosting adapter + provision/shell guardrails 端到端
+- [ ] **Trigger.dev 自託管上線（Hetzner compose）**
+  - **正本／順序**：`lobster-factory/infra/trigger/README.md`（含 SSH 救濟、先 `hetzner-phase1-core` 再起 `infra/trigger`、`lobster-net`）。
+  - **現況（repo 已就緒 ≠ VPS 已上線）**：compose、`.env.example`、`nginx/trigger.conf`、`packages/workflows/trigger.config.ts`（`triggerUrl`）已入庫；**VPS 端**常見缺口：SSH／`sshd` 重啟、`.env` 真值、`docker compose up`、DNS／TLS。
+  - **DoD**：自架 URL 可開 dashboard、可建 project；`trigger.config.ts` 的 `project` 與 dashboard 一致；本機／vault 具可 deploy 的 secret；`WORKLOG` 一句（無密鑰）。完成時收工在當日區塊單獨一行 `- AUTO_TASK_DONE: Trigger.dev 自託管上線（Hetzner compose）`。
 - [ ] Enterprise 工具層 Phase 1 正式串接
   - 範圍：Clerk auth、env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts
   - DoD：下列子任務全數完成且有對應證據連結（WORKLOG / report）
@@ -224,5 +228,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-13 02:32:42 UTC_
+_Last synced: 2026-04-13 07:12:24 UTC_
 

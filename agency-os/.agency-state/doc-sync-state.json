@@ -1,22 +1,24 @@
 ﻿{
-    "last_run_utc":  "2026-04-13T06:27:41.6906333Z",
+    "last_run_utc":  "2026-04-13T07:12:25.5001194Z",
     "changed_files":  [
-                          "docs/operations/hetzner-self-host-start-here.md",
-                          "docs/operations/hetzner-stack-rollout-index.md",
-                          "scripts/register-new-governance-doc.ps1"
+                          "scripts/register-new-governance-doc.ps1",
+                          "TASKS.md",
+                          "WORKLOG.md"
                       ],
     "impacted_files":  [
                            "AGENTS.md",
                            "docs/CHANGE_IMPACT_MATRIX.md",
                            "docs/change-impact-map.json",
-                           "docs/operations/hetzner-self-host-start-here.md",
-                           "docs/operations/hetzner-stack-rollout-index.md",
                            "docs/operations/new-doc-linkage-checklist.md",
-                           "scripts/register-new-governance-doc.ps1"
+                           "scripts/register-new-governance-doc.ps1",
+                           "TASKS.md",
+                           "WORKLOG.md"
                        ],
     "auto_updated_files":  [
                                "AGENTS.md",
                                "docs/CHANGE_IMPACT_MATRIX.md",
-                               "docs/operations/new-doc-linkage-checklist.md"
+                               "docs/operations/new-doc-linkage-checklist.md",
+                               "TASKS.md",
+                               "WORKLOG.md"
                            ]
 }

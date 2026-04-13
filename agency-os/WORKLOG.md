@@ -10,6 +10,12 @@
 - **§1.5.1（本機 WordPress 相容層）**：PATH 上已有 **`wp`**、**`php` 8.4**；**MariaDB 12.2** 已於 `C:\Program Files\MariaDB 12.2`（`mysqld.exe` 存在；`mysql` CLI 可不進 PATH，腳本用完整路徑）。已在 monorepo 根執行 **`scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`**：**exit 0**（背景啟動 `mysqld`、建庫 `wordpress_dev`、WP 已於 **`.scratch\wordpress-pilot`**，`siteurl` **http://localhost**）。龍蝦真 wp 路徑：**`C:\Users\USER\Work\.scratch\wordpress-pilot`**（勿提交 `.scratch`）。
 - **`TASKS`「雙機環境對齊」**：**未勾選**——依條款須**兩台**各完成 §1.5（含憑證）且各跑一次 **Strict PASS** 後方得勾；請在**另一台**重跑同段並保留終端輸出或於當日 `WORKLOG` 註記日期／主機名。
 
+### Trigger.dev 自託管 — 與 AO-CLOSE 提醒對齊
+- **為何收工仍提醒「未完成」**：`TOOLS_DELIVERY_TRACEABILITY.md` 將 **Trigger.dev（自託管）** 列為 **⚪ 自架尚未部署**，`hetzner-stack-rollout-index.md` 專案狀態同列；**AO-CLOSE／system-guard 讀到的是「VPS 尚未閉環」**，與 **repo 已 push compose** 可並存——**不是誤報**。
+- **repo**：`lobster-factory/infra/trigger/`（含 `README.md` SSH 救濟與啟動順序）、`hetzner-phase1-core` 掛載 `trigger.conf`、`trigger.config.ts` 之 **`triggerUrl`** 已於 **`origin/main`**。
+- **VPS 仍待**：Console 重啟 ssh、SSH 登入、填 `infra/trigger/.env`、`docker compose up`、瀏覽器驗證自架 URL（見 **正本** `lobster-factory/infra/trigger/README.md`）。
+- **`TASKS`**：已增 **`- [ ]`「Trigger.dev 自託管上線（Hetzner compose）」** 作為之後 **`AUTO_TASK_DONE`** 唯一命中子字串來源；**未達 DoD 前勿手勾**。
+
 ## 2026-04-12
 
 ### Sentry 觀測接入完成
@@ -487,7 +493,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-13 02:32:42 UTC_
+_Last synced: 2026-04-13 07:12:24 UTC_
 
 ## 2026-03-20
 
@@ -915,6 +921,7 @@ _Last synced: 2026-04-13 02:32:42 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 
