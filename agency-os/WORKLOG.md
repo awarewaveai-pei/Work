@@ -2,6 +2,14 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-13
+
+### 雙機環境對齊（§1.5 / §1.5.1）— 本機可驗證部分
+- **SSOT 修正**：`REMOTE_WORKSTATION_STARTUP.md` §1.5「從零 clone」範例 URL 誤為 `peijingartstudio-pei/Work`，已改為 **`https://github.com/awarewaveai-pei/Work.git`**（與 `origin` 單一真相一致），避免筆電／新機 clone 錯庫。
+- **本機（Windows）§1.5「工具與依賴」**：已與 **`ao-resume.ps1`（預設）** 對齊；最近一次 **`machine-environment-audit.ps1 -FetchOrigin -Strict`** 為 **PASS（無 WARN）**（含 `gh`、vault、`mcp.json` 存在性、乾淨樹、與 `origin/main` 0/0）。
+- **§1.5.1（本機 WordPress 相容層）**：PATH 上已有 **`wp`**（`%LOCALAPPDATA%\Programs\wp-cli\wp.cmd`）、**`php` 8.4**（winget 套件路徑）；**`mysql` / `mariadb` CLI 未在 PATH`**。若需與文件「真 wp + DB」完全一致，請依 **`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`** 補 **MariaDB.Server**（或確認服務已裝但僅缺 PATH），並在 monorepo 根跑 **`scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`** 驗證。
+- **`TASKS`「雙機環境對齊」**：**未勾選**——依條款須**兩台**各完成 §1.5（含憑證）且各跑一次 **Strict PASS** 後方得勾；請在**另一台**重跑同段並保留終端輸出或於當日 `WORKLOG` 註記日期／主機名。
+
 ## 2026-04-12
 
 ### Sentry 觀測接入完成
@@ -479,7 +487,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-11 18:12:26 UTC_
+_Last synced: 2026-04-13 01:17:52 UTC_
 
 ## 2026-03-20
 
@@ -907,6 +915,7 @@ _Last synced: 2026-04-11 18:12:26 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

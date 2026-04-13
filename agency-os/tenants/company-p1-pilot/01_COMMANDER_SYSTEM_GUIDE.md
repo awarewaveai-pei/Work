@@ -9,5 +9,5 @@
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 - `tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md`
 
-_Last synced: 2026-04-10 11:51:49 UTC_
+_Last synced: 2026-04-13 01:17:52 UTC_
 

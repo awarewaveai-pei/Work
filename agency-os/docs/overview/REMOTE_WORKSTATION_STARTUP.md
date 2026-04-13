@@ -50,7 +50,7 @@ git pull --ff-only origin main
 在**自選父目錄**開 PowerShell（路徑可與桌機不同，例如 `D:\Work`、`C:\Users\USER\Work`）：
 
 ```powershell
-git clone https://github.com/peijingartstudio-pei/Work.git
+git clone https://github.com/awarewaveai-pei/Work.git
 cd Work
 git checkout main
 git pull --ff-only origin main
@@ -338,5 +338,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1
 - `RESUME_AFTER_REBOOT.md`
 - `TASKS.md`
 
-_Last synced: 2026-04-11 18:03:13 UTC_
+_Last synced: 2026-04-13 01:17:52 UTC_
 
