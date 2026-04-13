@@ -1,29 +1,22 @@
 ﻿{
-    "last_run_utc":  "2026-04-13T02:32:43.3409248Z",
+    "last_run_utc":  "2026-04-13T06:27:41.6906333Z",
     "changed_files":  [
+                          "docs/operations/hetzner-self-host-start-here.md",
                           "docs/operations/hetzner-stack-rollout-index.md",
-                          "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
-                          "TASKS.md"
+                          "scripts/register-new-governance-doc.ps1"
                       ],
     "impacted_files":  [
-                           "../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
-                           "../lobster-factory/docs/ROUTING_MATRIX.md",
-                           "docs/operations/cursor-mcp-and-plugin-inventory.md",
+                           "AGENTS.md",
+                           "docs/CHANGE_IMPACT_MATRIX.md",
+                           "docs/change-impact-map.json",
+                           "docs/operations/hetzner-self-host-start-here.md",
                            "docs/operations/hetzner-stack-rollout-index.md",
-                           "docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md",
-                           "docs/operations/security-secrets-policy.md",
-                           "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
-                           "docs/operations/tools-and-integrations.md",
-                           "TASKS.md",
-                           "WORKLOG.md"
+                           "docs/operations/new-doc-linkage-checklist.md",
+                           "scripts/register-new-governance-doc.ps1"
                        ],
     "auto_updated_files":  [
-                               "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                               "docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md",
-                               "docs/operations/security-secrets-policy.md",
-                               "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
-                               "docs/operations/tools-and-integrations.md",
-                               "TASKS.md",
-                               "WORKLOG.md"
+                               "AGENTS.md",
+                               "docs/CHANGE_IMPACT_MATRIX.md",
+                               "docs/operations/new-doc-linkage-checklist.md"
                            ]
 }

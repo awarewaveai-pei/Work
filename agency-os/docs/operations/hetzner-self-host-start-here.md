@@ -1,4 +1,4 @@
-﻿# Hetzner 自架：只記這一頁（人因入口）
+# Hetzner 自架：只記這一頁（人因入口）
 
 > **給你自己**：記性不好沒關係 — **瀏覽器書籤只加這個檔**。其餘連結都在下面 **一張表**；不要到處記檔名。  
 > **路徑（monorepo）**：`agency-os/docs/operations/hetzner-self-host-start-here.md`  
@@ -44,9 +44,11 @@
 | **按步驟裝機（主機到服務）** | [`docs/operations/hetzner-full-stack-self-host-runbook.md`](hetzner-full-stack-self-host-runbook.md) |
 | **Supabase 自架／切線／pgvector** | [`docs/operations/supabase-self-hosted-cutover-checklist.md`](supabase-self-hosted-cutover-checklist.md) |
 | **一組 Docker 起 n8n + WP + Redis + Nginx + Node + Next**（**不含** Supabase、**不含** Trigger） | [`../../../lobster-factory/infra/hetzner-phase1-core/README.md`](../../../lobster-factory/infra/hetzner-phase1-core/README.md) |
+| **Trigger.dev 自託管**（compose、Nginx 反代、`lobster-net`、**SSH 救濟**、啟動順序） | [`../../../lobster-factory/infra/trigger/README.md`](../../../lobster-factory/infra/trigger/README.md) |
 | **`.env` 欄位類型提醒** | [`docs/operations/hetzner-self-host.env.example`](hetzner-self-host.env.example) |
 | **本機 RAG：`.env.local` 範本** | monorepo 根 [`../../../.env.local.example`](../../../.env.local.example)（先讀上方 **環境變數唯一對照**） |
 | **Phase 1 這包的 `.env` 範本** | [`../../../lobster-factory/infra/hetzner-phase1-core/.env.example`](../../../lobster-factory/infra/hetzner-phase1-core/.env.example) |
+| **Trigger 自託管這包的 `.env` 範本**（僅 VPS `infra/trigger`，勿與 phase1 `.env` 混檔） | [`../../../lobster-factory/infra/trigger/.env.example`](../../../lobster-factory/infra/trigger/.env.example) |
 | **多週期備份／還原／誰負責** | [`../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`](../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md) |
 | **每週／月／季／年勾選** | [`../../../lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`](../../../lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md) |
 | **GitHub 上 `packages/workflows` 變更會跑什麼** | [`docs/operations/github-actions-trigger-prod-deploy.md`](github-actions-trigger-prod-deploy.md)（**僅 validate**；**無** Trigger Cloud deploy） |

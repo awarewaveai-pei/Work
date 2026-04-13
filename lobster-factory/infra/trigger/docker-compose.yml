@@ -1,0 +1,151 @@
+# Trigger.dev v3 — Self-hosted platform
+#
+# Prerequisites:
+#   1. phase1-core must be running (or: docker network create lobster-net)
+#   2. Copy .env.example → .env and fill every value
+#   3. docker compose --env-file .env up -d
+#
+# After first boot:
+#   - Open https://trigger.aware-wave.com → create account + project
+#   - Copy the new project ref → update packages/workflows/trigger.config.ts
+#   - Copy TRIGGER_SECRET_KEY from dashboard → add to your local dev env + CI
+#   - Deploy workflows: TRIGGER_API_URL=https://trigger.aware-wave.com npx trigger.dev@latest deploy
+#
+# Official self-hosting docs: https://trigger.dev/docs/self-hosting
+# Operator steps (SSH rescue, order, workflows): ./README.md
+
+x-logging: &trigger-logging
+  driver: json-file
+  options:
+    max-size: "25m"
+    max-file: "5"
+
+services:
+  # ── Data layer ────────────────────────────────────────────────
+  trigger-postgres:
+    image: postgres:16
+    container_name: trigger-postgres
+    restart: unless-stopped
+    command: postgres -c wal_level=logical   # required for Electric SQL
+    environment:
+      POSTGRES_USER: trigger
+      POSTGRES_PASSWORD: ${TRIGGER_DB_PASSWORD}
+      POSTGRES_DB: trigger
+    volumes:
+      - trigger_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trigger -d trigger"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - trigger-net
+    logging: *trigger-logging
+
+  trigger-redis:
+    image: redis:7-alpine
+    container_name: trigger-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${TRIGGER_REDIS_PASSWORD}
+    volumes:
+      - trigger_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${TRIGGER_REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - trigger-net
+    logging: *trigger-logging
+
+  # ── Electric SQL (real-time sync) ─────────────────────────────
+  trigger-electric:
+    image: electricsql/electric:latest
+    container_name: trigger-electric
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://trigger:${TRIGGER_DB_PASSWORD}@trigger-postgres:5432/trigger
+      ELECTRIC_INSECURE: "true"
+    depends_on:
+      trigger-postgres:
+        condition: service_healthy
+    networks:
+      - trigger-net
+    logging: *trigger-logging
+
+  # ── Trigger.dev webapp (dashboard + API + coordinator) ────────
+  trigger-webapp:
+    image: ghcr.io/triggerdotdev/trigger.dev:latest
+    container_name: trigger-webapp
+    restart: unless-stopped
+    depends_on:
+      trigger-postgres:
+        condition: service_healthy
+      trigger-redis:
+        condition: service_healthy
+      trigger-electric:
+        condition: service_started
+    environment:
+      # Database
+      DATABASE_URL: postgresql://trigger:${TRIGGER_DB_PASSWORD}@trigger-postgres:5432/trigger
+      DIRECT_URL: postgresql://trigger:${TRIGGER_DB_PASSWORD}@trigger-postgres:5432/trigger
+      # Redis
+      REDIS_URL: redis://:${TRIGGER_REDIS_PASSWORD}@trigger-redis:6379
+      # Secrets — generate each with: openssl rand -hex 32
+      SESSION_SECRET: ${TRIGGER_SESSION_SECRET}
+      MAGIC_LINK_SECRET: ${TRIGGER_MAGIC_LINK_SECRET}
+      ENCRYPTION_KEY: ${TRIGGER_ENCRYPTION_KEY}
+      # Coordinator ↔ Docker provider shared secrets
+      COORDINATOR_SECRET: ${TRIGGER_COORDINATOR_SECRET}
+      PROVIDER_SECRET: ${TRIGGER_PROVIDER_SECRET}
+      # Public URLs
+      APP_ORIGIN: https://trigger.aware-wave.com
+      LOGIN_ORIGIN: https://trigger.aware-wave.com
+      API_ORIGIN: https://trigger.aware-wave.com
+      # Electric SQL (internal)
+      ELECTRIC_ORIGIN: http://trigger-electric:3000
+      # Misc
+      TRIGGER_TELEMETRY_DISABLED: "1"
+      NODE_ENV: production
+    networks:
+      - trigger-net
+      - lobster-net   # lets nginx (phase1-core) proxy to this container
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3030/healthcheck > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    logging: *trigger-logging
+
+  # ── Docker provider (runs task containers on this host) ───────
+  trigger-worker:
+    image: ghcr.io/triggerdotdev/provider/docker:latest
+    container_name: trigger-worker
+    restart: unless-stopped
+    depends_on:
+      trigger-webapp:
+        condition: service_healthy
+    environment:
+      COORDINATOR_HOST: trigger-webapp
+      COORDINATOR_PORT: "9020"
+      PROVIDER_SECRET: ${TRIGGER_PROVIDER_SECRET}
+      COORDINATOR_SECRET: ${TRIGGER_COORDINATOR_SECRET}
+      MACHINE_NAME: hetzner-docker-provider
+      # Network that task containers will join (must exist)
+      DOCKER_NETWORK: trigger_trigger-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - trigger-net
+    logging: *trigger-logging
+
+networks:
+  trigger-net:
+    driver: bridge
+  lobster-net:
+    external: true      # owned by phase1-core; start phase1-core first
+
+volumes:
+  trigger_pg_data:
+  trigger_redis_data:
