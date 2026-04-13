@@ -2,7 +2,7 @@
 
 ## 下次開機提醒（輪替：有新事項只改本節）
 
-> **寫法規則（給未來自己／代理）**：營運者**一次只會有一台電腦在身邊**。凡屬「**兩台都要做**」的設定（PATH、MariaDB、WP bootstrap、`gh`、vault、`mcp.json`、`npm ci`、Strict 稽核，以及**自託管營運工具在本機的消費端**：例如能觸發／驗證 **n8n staging Webhook**；**Trigger.dev 自託管**之 **`TRIGGER_*`／Worker API URL／deploy 目標**（見 **`lobster-factory/packages/workflows`** 與 **`docs/operations/github-actions-trigger-prod-deploy.md`**）；vault 內對應鍵；後續 **`TASKS`** 裡其他自託管／Phase 1 工具在本機的憑證與連通），在本節**務必拆成兩句**：**（A）現在手上這台**當次要做什麼；**（B）另一台**下次開機／下次帶到身邊時要做什麼——**不要**只寫「請完成雙機」一句話。更新本節時刪舊輪替、只保留仍有效者。
+> **寫法規則（給未來自己／代理）**：營運者**一次只會有一台電腦在身邊**。凡屬「**兩台都要做**」的設定（PATH、MariaDB、WP bootstrap、`gh`、vault、`mcp.json`、`npm ci`、Strict 稽核，以及**自託管營運工具在本機的消費端**：例如能觸發／驗證 **n8n staging Webhook**；**Trigger.dev 自託管**（**自架叢集尚未完成前**，本機 env 可能仍對 **雲端或過渡** 目標——以 repo 為準；**自架完成後**才談每台 **`TRIGGER_*`／Worker API URL** 對齊同一自架端點，見 **`lobster-factory/packages/workflows`** 與 **`docs/operations/github-actions-trigger-prod-deploy.md`**）；vault 內對應鍵；後續 **`TASKS`** 裡其他自託管／Phase 1 工具在本機的憑證與連通），在本節**務必拆成兩句**：**（A）現在手上這台**當次要做什麼；**（B）另一台**下次開機／下次帶到身邊時要做什麼——**不要**只寫「請完成雙機」一句話。更新本節時刪舊輪替、只保留仍有效者。
 
 1. **開工單一路徑（兩台各自）**  
    - **現在這台**：在 **monorepo 根**（`<WORK_ROOT>`）執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`** → **exit 0** → 再在 Cursor 打 **`AO-RESUME`**（見 `30-resume-keyword.mdc`）。  
@@ -18,9 +18,9 @@
 
 4. **自託管營運工具（伺服器一套、本機／CI 各自消費）**  
    - **n8n（staging，已證 E2E）**：**雲端實例**通常只維護一套，但**每台開發機**若要用 Webhook／除錯／放 **`secrets-vault`** 內相關值，仍須在**該機**補齊（不依 Git 同步）。正本：**`docs/operations/n8n-staging-client-onboarding-e2e.md`**；證據索引：**`WORKLOG` `## 2026-04-10`**。  
-   - **Trigger.dev（自託管；堆疊仍 🟡 建置中）**：政策為**僅自託管**（見 **`docs/operations/hetzner-stack-rollout-index.md`**、**`hetzner-full-stack-self-host-runbook.md`** 階段 3；官方 self-host 版本以官網為準）。能力狀態與 DoD 語意：**`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`**（列 **Trigger.dev（自託管）**）。**每台開發機**：`lobster-factory/packages/workflows` 須指向**同一自架** API／Worker（**vault** 內 `TRIGGER_SECRET_KEY`、base URL 等；不進 git）；**CI 是否仍對雲端 deploy、與自架叢集如何切線**見 **`docs/operations/github-actions-trigger-prod-deploy.md`**——勿與 n8n 混成一項「已做完」。  
-   - **現在這台**：n8n 依上段正本做 smoke；Trigger 依 runbook／總表核對本機 env 與（若負責）deploy 目標。  
-   - **另一台**：帶到身邊後**重做**上述消費端檢查，勿假設桌機上的 vault 已自動存在於筆電。往後若 **`TASKS`**「Enterprise 工具層 Phase 1」新增其他自託管項，**輪替本節時一併寫進來**。
+   - **Trigger.dev（自託管；營運確認：自架尚未完成）**：政策為**僅自託管**；**Hetzner／指定環境上的 Trigger 自架 Worker 尚未依 runbook 做完**（見 **`hetzner-stack-rollout-index.md`**「尚未自架」列、**`hetzner-full-stack-self-host-runbook.md`** 階段 3）。**在此之前**：勿把「雙機對齊」誤解成兩台都已接上自架叢集；`packages/workflows` 與 GHA 以 **`github-actions-trigger-prod-deploy.md`** 與 repo 內 env 範本為準。**自架完成後**：每台開發機再把 **`TRIGGER_SECRET_KEY`、Worker／API base URL** 寫入該機 **vault**（不進 git），並更新總表 **`TOOLS_DELIVERY_TRACEABILITY.md`**。  
+   - **現在這台**：n8n 依上段正本做 smoke；Trigger：**若尚未自架**，只確認你理解現況與下一步 runbook（不必假裝已連自架）；**若已自架**，才做本機 env smoke。  
+   - **另一台**：帶到身邊後**重做** n8n 消費端檢查；Trigger **自架完成前**與「另一台 vault」無強制對稱要求，**自架完成後**兩台再各自對齊自架 URL／`TRIGGER_*`。往後若 **`TASKS`**「Enterprise 工具層 Phase 1」新增其他自託管項，**輪替本節時一併寫進來**。
 
 ## 同一台電腦 — 重開機後
 
