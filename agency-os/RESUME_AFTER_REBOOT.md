@@ -2,7 +2,7 @@
 
 ## 下次開機提醒（輪替：有新事項只改本節）
 
-> **寫法規則（給未來自己／代理）**：營運者**一次只會有一台電腦在身邊**。凡屬「**兩台都要做**」的設定（PATH、MariaDB、WP bootstrap、`gh`、vault、`mcp.json`、`npm ci`、Strict 稽核等），在本節**務必拆成兩句**：**（A）現在手上這台**當次要做什麼；**（B）另一台**下次開機／下次帶到身邊時要做什麼——**不要**只寫「請完成雙機」一句話。更新本節時刪舊輪替、只保留仍有效者。
+> **寫法規則（給未來自己／代理）**：營運者**一次只會有一台電腦在身邊**。凡屬「**兩台都要做**」的設定（PATH、MariaDB、WP bootstrap、`gh`、vault、`mcp.json`、`npm ci`、Strict 稽核，以及**自託管營運工具在本機的消費端**：例如能觸發／驗證 **n8n staging Webhook**、vault 內對應鍵、後續 **`TASKS`** 裡其他自託管／Phase 1 工具在本機的憑證與連通），在本節**務必拆成兩句**：**（A）現在手上這台**當次要做什麼；**（B）另一台**下次開機／下次帶到身邊時要做什麼——**不要**只寫「請完成雙機」一句話。更新本節時刪舊輪替、只保留仍有效者。
 
 1. **開工單一路徑（兩台各自）**  
    - **現在這台**：在 **monorepo 根**（`<WORK_ROOT>`）執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`** → **exit 0** → 再在 Cursor 打 **`AO-RESUME`**（見 `30-resume-keyword.mdc`）。  
@@ -15,6 +15,11 @@
 3. **Git（兩台各自看）**  
    - **現在這台**：若 **`git status`** 顯示 **ahead**，收工 **`AO-CLOSE`** 或 **`git push origin main`**。  
    - **另一台**：下次開工先 **`ao-resume`**（會 **fetch**／落後時 **ff-only pull**），避免以為自己還在舊 **`origin/main`**。
+
+4. **自託管營運工具（伺服器一份、本機各自消費）**  
+   - **說明**：例如 **`TASKS`** 已證之 **Hetzner 自託管 n8n（staging）**——**雲端實例**通常只維護一套，但**每台開發機**若要用 Webhook／除錯／放 **`secrets-vault`** 內相關值，仍須在**該機**補齊（不依 Git 同步）。正本：**`docs/operations/n8n-staging-client-onboarding-e2e.md`**；證據索引：**`WORKLOG` `## 2026-04-10`**。往後若新增其他自託管項（見 **`TASKS`**「Enterprise 工具層 Phase 1」／「工具建置」），**輪替本節時一併寫進來**，並維持「現在這台／另一台」兩段。  
+   - **現在這台**：依正本完成本機 vault／連通驗證（必要時對 staging URL 做一次 smoke）。  
+   - **另一台**：帶到身邊後**重做**消費端檢查，勿假設桌機上的 vault 已自動存在於筆電。
 
 ## 同一台電腦 — 重開機後
 
@@ -40,5 +45,5 @@
 - `docs/operations/system-guard-and-notification.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-10 (手動更新「下次開機提醒」寫法規則)_
+_Last synced: 2026-04-10（手動：雙機寫法規則＋自託管營運工具消費端）_
 

@@ -1,4 +1,4 @@
-﻿# Global Task Board
+# Global Task Board
 
 > **待辦原則（給營運者）**  
 > - **單一清單**：所有「之後還要做」的事，應以本檔 **`Next — 未完成`** 或 **`Backlog — 未完成`** 的一條 `- [ ]` 表示；不要只放在聊天或腦裡。  
@@ -20,6 +20,7 @@
   - 新機/筆電首次：完成 Windows 本機 WordPress 相容層（MariaDB + PHP + WP-CLI + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`），此路徑與 Supabase/MCP 分列。
   - 之後每次開工：monorepo 根跑 `scripts/ao-resume.ps1` 至 exit 0（含 ff-only pull、gates、`print-open-tasks` 快照、Strict 稽核），再於 Cursor 使用 `AO-RESUME`。
   - 筆電需安裝並登入 GitHub CLI（`winget install --id GitHub.cli` + `gh auth login`），Node major 與桌機/CI 對齊；`secrets-vault` 與 `mcp.json` 皆為每台獨立設定。
+  - **自託管營運工具（消費端）**：雲上實例（例：**Hetzner 自託管 n8n staging**）為一套部署；**每台開發機**仍須各自具備可觸發／驗證 Webhook 的 **vault 鍵與連通**（見 **`docs/operations/n8n-staging-client-onboarding-e2e.md`**、**`WORKLOG` `## 2026-04-10`**）。後續 Phase 1 其他自託管／邊界工具亦同——**伺服器側**與**本機消費側**不要混成一項「已做完」。
   - 兩台都要在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict` 且 PASS（無 WARN）後才可勾選此項。
   - **公司桌機（人在辦公室時）**：不必回想先前是否裝過；在該機 monorepo 根依序：`git fetch` → `git checkout main` → `git pull --ff-only origin main` → 跑上一行的 `machine-environment-audit -Strict`。若未 PASS，自上文 `REMOTE_WORKSTATION_STARTUP.md` **§1.5**「工具與依賴」起補齊（含 `lobster-factory\packages\workflows` 的 `npm ci`、可選 `mcp-local-wrappers`、`verify-build-gates`）後再重跑稽核；需與筆電同級「真 WP」則補 **§1.5.1**。FAIL/WARN 時保留終端輸出以利除錯。
   - **筆電已 Strict PASS 時**：仍須待公司桌機也 PASS，本主項才可視為完成。
