@@ -25,7 +25,7 @@
 | Supabase（SoR） | 🟢 已上線（Hetzner） | 可（已採自架） | P1（立即） | `docs/operations/supabase-self-hosted-cutover-checklist.md` | migration/連線/權限驗證全通過 |
 | WordPress + MariaDB | 🟢 已上線（站台執行） | 可 | P1（立即） | `docs/operations/WORDPRESS_CLIENT_DELIVERY_MODELS.md`、`../lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md` | staging/prod 可用，回滾可驗證 |
 | n8n（staging） | 🟢 已上線（自託管；**staging E2E 已證** 2026-04-10，見 `WORKLOG.md`） | 可 | P2 | `docs/standards/n8n-workflow-architecture.md` | 至少 1 條 staging 流程端到端成功 |
-| Trigger.dev（自託管） | 🟡 建置中（路由已定） | 可 | P2 | `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` | 1 條生產級工作流可追蹤完成 |
+| Trigger.dev（自託管） | 🟡 建置中（路由已定；**自架 Worker／DB／Redis** 依 runbook 階段 3） | 可 | P2 | `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`；堆疊／步驟：`hetzner-stack-rollout-index.md`、`hetzner-full-stack-self-host-runbook.md`（階段 3）；**CI／deploy 與自架切線**：`github-actions-trigger-prod-deploy.md`；**雙機本機消費**（`TRIGGER_*`、每台 vault）：`../RESUME_AFTER_REBOOT.md`「下次開機提醒」§4、`TASKS` 雙機子項 | 1 條生產級工作流可追蹤完成；自架 API／Worker 與 `packages/workflows` env 一致 |
 | Redis | ⚪ 未啟動（Phase A） | 可 | P2 | `docs/operations/hetzner-stack-rollout-index.md` | 服務健康檢查與應用連線成功 |
 | Nginx | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 路由/健康檢查/SSL 正常 |
 | Node API | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 核心 API endpoint 驗證通過 |
@@ -103,5 +103,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-13 01:17:52 UTC_
+_Last synced: 2026-04-13 02:30:17 UTC_
 
