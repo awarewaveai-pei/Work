@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-12 03:16:22
+- Generated: 2026-04-16 22:58:02
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,30 +203,31 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-12.md
-# 2026-04-12
+## 5) memory/daily/2026-04-16.md
+# 2026-04-16
 
-## 背景
-收工前收斂：Sentry 與 Phase1 文件已在前段完成；本輪補 **README／營運索引**、**`AUTO_TASK_DONE` 機讀說明**、**`diagnose-host-resources.sh` pipefail**、**`apply-closeout-task-checkmarks` StrictMode** 等，準備 **`AO-CLOSE`** 一次 push。
+- 背景：使用者要求改為「完整自架自託管優先」，並將新增文件與既有 SSOT 去矛盾；最終邊界對齊為 Trigger durable owner、n8n glue、Supabase SoR。
+- 已完成：新增 `docs/operations/ARCHITECTURE_SPEC.md`、`TOOL_RESPONSIBILITY_MATRIX.md`、`IMPLEMENTATION_ORDER.md`、`DEPLOYMENT_BOUNDARY_RULES.md`、`NEXT_ACTIONS.md`，以及 `lobster-factory/infra/hetzner-phase1-core/docker-compose.recommended-ai-native.yml`（不含 secrets，含 network/volume/boundary 建議）。
+- 已完成（補充）：新增 `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`，並同步整合 `TASKS.md`、`TOOLS_DELIVERY_TRACEABILITY.md`、`NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`、`docs/operations/README.md`，作為 Next.js 介面層單一正本。
+- 已完成（Trigger v4 落地）：已 SSH 實機修復 `.env`（含 `CLICKHOUSE_URL`、`DEPLOY_REGISTRY_HOST`、`V4_DEPLOY_REGISTRY_HOST`）、清理舊 v3 容器衝突、建立 `lobster-net`，v4 全服務 healthy。
+- 已完成（域名/TLS）：`trigger.aware-wave.com` 已接主機 Nginx 反代與 Let's Encrypt；`https://trigger.aware-wave.com/login` 回應 200。
+- 已完成（第一個 project + deploy 驗證）：DB 建立 org/project/runtime env（`prod`/`stg`）與 access token；`trigger.config.ts` project ref 改為 `proj_6c4f24492a705729fc2c`；`trigger.dev deploy --detach` 成功建立 deployment。
+- 風險/阻塞：部署流程仍有 `s2_is_disabled` warning（不阻塞 deploy），後續可再決定是否啟用對應串流能力。
+- 下一步：在 dashboard 驗證部署版本與 task 執行一筆 smoke run，並把 `TRIGGER_ACCESS_TOKEN` 轉存 vault（避免聊天/終端長期留痕）。
 
-## 已完成
-- `WORKLOG ## 2026-04-12` 補「索引與 AO-CLOSE 機讀硬化」與診斷腳本修正說明。
-- 根／`agency-os`／`lobster-factory`／`docs/operations` 多處連結與 traceability 對齊（見 git diff）。
+## 晚間收工（AO-CLOSE）
 
-## 未完成
-- `TASKS.md` 其餘 `- [ ]`（PostHog、Secrets、雙機對齊等）仍開放。
-
-## 風險／阻塞
-- 本機 **`main` ahead of `origin/main`** 多顆 commit；**`ao-close`** 預設會 **fetch**、閘道通過後 **push**；若遠端超前需 **rebase** 後再推。
-
-## 下一步
-- 執行 **`.\scripts\ao-close.ps1`**；他機續接依 **`REMOTE_WORKSTATION_STARTUP`**。
+- 背景：使用者關鍵字收工；另補上 Trigger UI 導覽問題之交接說明（給其他代理／人類接手）。
+- 已完成：`LAST_SYSTEM_STATUS.md` 更新已 **commit**（`95596e8`）；準備跑 **`ao-close.ps1`**（verify、guard、integrated status、**`apply-closeout-task-checkmarks`**、push）。
+- 未完成：儀表板「一律導向新建／登入」若仍發生，須在 VPS 查 Cookie／Nginx `X-Forwarded-Proto`／Electric WS（見對話交接段落）。
+- 風險/阻塞：若 `.env` 曾出現在終端輸出，建議輪替 DB／session 類密鑰（不寫入本檔）。
+- 下一步：他機 **`AO-RESUME`**；Trigger 日常入口可優先書籤 `https://trigger.aware-wave.com/projects/proj_6c4f24492a705729fc2c`。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-12 03:16:19`
+- Time: `2026-04-16 22:58:00`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -236,8 +237,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260412-031619.md`
-- Closeout: `reports/closeout/closeout-20260412-031616.md`
+- Health: `reports/health/health-20260416-225759.md`
+- Closeout: `reports/closeout/closeout-20260416-225757.md`
 
 ## Action
 - No blocking issue detected.

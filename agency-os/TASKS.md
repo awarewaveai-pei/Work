@@ -1,4 +1,4 @@
-﻿# Global Task Board
+# Global Task Board
 
 > **待辦原則（給營運者）**  
 > - **單一清單**：所有「之後還要做」的事，應以本檔 **`Next — 未完成`** 或 **`Backlog — 未完成`** 的一條 `- [ ]` 表示；不要只放在聊天或腦裡。  
@@ -46,7 +46,7 @@
   - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
 - [ ] `lobster-factory` A7 全站自動建站補齊
   - 範圍：hosting adapter + provision/shell guardrails 端到端
-- [ ] **Trigger.dev 自託管上線（Hetzner compose）**
+- [x] **Trigger.dev 自託管上線（Hetzner compose）**
   - **正本／順序**：`lobster-factory/infra/trigger/README.md`（含 SSH 救濟、先 `hetzner-phase1-core` 再起 `infra/trigger`、`lobster-net`）。
   - **現況（repo 已就緒 ≠ VPS 已上線）**：compose、`.env.example`、`nginx/trigger.conf`、`packages/workflows/trigger.config.ts`（`triggerUrl`）已入庫；**VPS 端**常見缺口：SSH／`sshd` 重啟、`.env` 真值、`docker compose up`、DNS／TLS。
   - **DoD**：自架 URL 可開 dashboard、可建 project；`trigger.config.ts` 的 `project` 與 dashboard 一致；本機／vault 具可 deploy 的 secret；`WORKLOG` 一句（無密鑰）。完成時收工在當日區塊單獨一行 `- AUTO_TASK_DONE: Trigger.dev 自託管上線（Hetzner compose）`。
