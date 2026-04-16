@@ -1,24 +1,17 @@
 ﻿{
-    "last_run_utc":  "2026-04-13T07:12:25.5001194Z",
+    "last_run_utc":  "2026-04-16T13:28:51.7295065Z",
     "changed_files":  [
-                          "scripts/register-new-governance-doc.ps1",
-                          "TASKS.md",
+                          "memory/CONVERSATION_MEMORY.md",
+                          "memory/daily/2026-04-16.md",
                           "WORKLOG.md"
                       ],
     "impacted_files":  [
-                           "AGENTS.md",
-                           "docs/CHANGE_IMPACT_MATRIX.md",
-                           "docs/change-impact-map.json",
-                           "docs/operations/new-doc-linkage-checklist.md",
-                           "scripts/register-new-governance-doc.ps1",
-                           "TASKS.md",
+                           "memory/CONVERSATION_MEMORY.md",
+                           "memory/daily/2026-04-16.md",
                            "WORKLOG.md"
                        ],
     "auto_updated_files":  [
-                               "AGENTS.md",
-                               "docs/CHANGE_IMPACT_MATRIX.md",
-                               "docs/operations/new-doc-linkage-checklist.md",
-                               "TASKS.md",
+                               "memory/CONVERSATION_MEMORY.md",
                                "WORKLOG.md"
                            ]
 }

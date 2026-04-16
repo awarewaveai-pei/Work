@@ -1,4 +1,4 @@
-# Resume After Reboot
+﻿# Resume After Reboot
 
 ## 下次開機提醒（輪替：有新事項只改本節）
 
@@ -46,5 +46,5 @@
 - `docs/operations/system-guard-and-notification.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 手動（補 n8n＋Trigger.dev 自託管雙機消費端與正本連結）_
+_Last synced: 2026-04-16 12:07:03 UTC_
 

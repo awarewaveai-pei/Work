@@ -1,8 +1,20 @@
-# Trigger.dev 自託管（本 repo 內 compose）
+# Trigger.dev 自託管（v4，Docker Compose）
 
-**官方文件**（版本變動快，部署前請再對一次）：<https://trigger.dev/docs/self-hosting>  
-**本目錄**：`docker-compose.yml` + `.env.example`；**對外網域**由 `hetzner-phase1-core` 的 Nginx 反代（見 `../hetzner-phase1-core/nginx/trigger.conf`）。  
-**本機 workflows**：`packages/workflows/trigger.config.ts` 的 `triggerUrl`／`project` 須與自架 dashboard 一致。
+**官方文件（版本變動快）**：<https://trigger.dev/docs/self-hosting/docker>  
+**上游 compose 正本**：<https://github.com/triggerdotdev/trigger.dev/tree/main/hosting/docker>  
+
+本目錄提供 **與官方 v4 對齊** 的單一 `docker-compose.yml`（webapp + postgres + redis + **ClickHouse** + **registry** + **MinIO** + **Electric** + **supervisor** + **docker-socket-proxy**），並接上 `hetzner-phase1-core` 的 **`lobster-net`** 與 Nginx（`../hetzner-phase1-core/nginx/trigger.conf`）。
+
+**為何你會卡在 `V4_DEPLOY_REGISTRY_HOST` / `CLICKHOUSE_URL`？**  
+若 `ghcr.io/.../trigger.dev:latest` 拉到 **v4**，平台會硬性要求 **ClickHouse** 與 **deploy registry**（任務映像 push/pull）。舊版「只有 postgres + redis + electric + 單一 webapp」的 compose **無法**滿足 v4。  
+本 repo 的 **`packages/workflows`** 使用 **`@trigger.dev/sdk` 4.x**，**建議平台維持 v4**；若改回 v3 平台，須同步把 SDK 降到 v3（另開變更，不在此 README 展開）。
+
+---
+
+## 資源與機器規格（重要）
+
+官方建議 **webapp 機 6GB+ RAM**、**worker 機 8GB+ RAM**（見官方 Docker 文件）。  
+若你的 VPS **總 RAM 接近 4GB** 或可用記憶體只有約 3.x GB：本 compose 已加 **較緊的 `mem_limit` / ClickHouse override**，仍可能 **OOM 或啟動極慢**——務實解法是 **升級 Hetzner 方案** 或 **把 supervisor（worker）拆到第二台**（官方支援多 worker）。
 
 ---
 
@@ -10,107 +22,113 @@
 
 | 誰 | 能做 |
 |----|------|
-| **你（或受權工程師）** | Hetzner **Web / Serial console**、`service ssh restart` 或 `systemctl restart ssh`、SSH 登入、編輯 `/etc/ssh/sshd_config`、`docker compose`、產生 secret、DNS、TLS |
-| **本 repo／AI** | 維護 compose、nginx 片段、範本 env、操作順序文件；**無法**代你連進 VPS 或代按 Hetzner 主控台 |
-
-若 **SSH 完全進不去**：請用 **Hetzner Cloud → 該 VPS → Console**（瀏覽器終端機）登入，**不要**等本機 `ssh` 自己好。
+| **你（或受權工程師）** | Hetzner Console／SSH、`docker compose`、產生 secret、DNS、TLS、`htpasswd`、重啟 nginx |
+| **本 repo／AI** | 維護 compose、範本 `.env`、`registry`／`clickhouse` 靜態檔、操作順序；**無法**代你 SSH 進 VPS |
 
 ---
 
 ## 卡住時：先救 SSH（Console 內執行）
 
-改過 `sshd_config` 後**一定要重啟 sshd**，否則 `PermitRootLogin` 等選項不會生效。
+改過 `sshd_config` 後**一定要重啟 sshd**：
 
 ```bash
-#擇一（依 OS）
 systemctl restart ssh
-#或
+# 或
 service ssh restart
 ```
 
-**本機測試（Windows PowerShell）**（私鑰路徑請改成你的）：
-
-```powershell
-ssh -i "$env:USERPROFILE\.ssh\hetzner_trigger" root@<VPS_IP>
-```
-
-若仍失敗，在 **Console** 檢查：
-
-```bash
-ls -la /root/.ssh
-chmod 700 /root/.ssh
-chmod 600 /root/.ssh/authorized_keys
-grep -E '^PermitRootLogin|^#PermitRootLogin' /etc/ssh/sshd_config
-# 需要 root 金鑰登入時，應為：PermitRootLogin yes 或 prohibit-password（並確認用金鑰而非密碼）
-```
-
-確認 `authorized_keys` **內含你打算用的那把公鑰的一整行**（與本機對應私鑰成對）。改完再 `systemctl restart ssh` 一次。
+（與舊版相同；細節見本檔後半「本機測試」段落。）
 
 ---
 
-## 正常啟動順序（SSH 已通之後）
+## 正式啟動順序（SSH 已通）
 
 ### 0. 先決條件
 
-- **DNS**：`trigger.aware-wave.com` 的 **A 記錄**指向該 VPS（或你實際終止 TLS 的那台）。  
-- **TLS**：`trigger.conf` 目前為 **listen 80**；若對外要 **HTTPS**，須在 Nginx 前或 Nginx 上補證書（Let’s Encrypt 等）— 不在本 README 展開，但未上 TLS 時瀏覽器可能僅能用 `http://` 測試。  
-- **Docker network `lobster-net`**：由 **phase1-core** 建立（`docker-compose.yml` 內 `name: lobster-net`）。**Trigger 的 compose 依賴 `lobster-net` 為 external**，故須先起 phase1（或手動 `docker network create lobster-net`，不建議與正式 compose 混用）。
+- **DNS**：`trigger.aware-wave.com`（或你的網域）指向終止 TLS 的那台機器。  
+- **phase1-core 已啟動**：建立 **`lobster-net`**（在 `hetzner-phase1-core/docker-compose.yml` 內 `name: lobster-net`）。  
+- **Nginx**：`trigger.conf` 已掛進 nginx 容器；**v4 webapp 對內埠為 `3000`**（本 repo 已把 `proxy_pass` 指到 `http://trigger-webapp:3000`）。  
+- **外部 Docker 網路名稱**：若 `docker network ls` 顯示**不是** `lobster-net`，請在 `.env` 設 **`LOBSTER_DOCKER_NETWORK=<實際名稱>`**。
 
-### 1. 在 VPS 上取得 repo
+### 1. Registry 帳密（必做，否則 webapp 無法對 registry 驗證）
 
-依你慣用方式：`git clone`、或 `rsync`、或 CI 發版—**重點**是 VPS 上要有與本 repo 對齊的 `lobster-factory/infra/trigger` 與 `lobster-factory/infra/hetzner-phase1-core`。
-
-### 2. 啟動 phase1-core（建立 `lobster-net` + Nginx 掛載 `trigger.conf`）
+`registry/auth.htpasswd` 可提交的是**範例**；上線前請在 **`infra/trigger/`** 目錄執行（把密碼改成你自己的）：
 
 ```bash
-cd lobster-factory/infra/hetzner-phase1-core
+htpasswd -Bbn registry-user 'YOUR_STRONG_PASSWORD' > registry/auth.htpasswd
+```
+
+然後在 `.env` 內把 **`DEPLOY_REGISTRY_USERNAME`** / **`DEPLOY_REGISTRY_PASSWORD`** 設成**同一組**帳密。
+
+### 2. 建立 `.env`
+
+```bash
+cd ~/Work/lobster-factory/infra/trigger
 cp .env.example .env
-# 依 README 填好 .env 後：
+# 用編輯器依註解填滿；至少 DATABASE_URL / secrets / APP_ORIGIN / ClickHouse / Registry / MinIO
+```
+
+### 3. 若曾跑過舊版（v3 單一 webapp 或 `latest` 混用）— 資料庫與 volume
+
+v4 **schema 與舊自架單容器不一定相容**。若 `trigger-webapp` 持續重啟且日誌出現 migration／graphile 相關錯誤，請**備份後**考慮：
+
+```bash
+docker compose --env-file .env down
+# 備份 volume 或 pg_dump 後，再決定是否刪除舊 volume 重新初始化
 docker compose --env-file .env up -d
 ```
 
-### 3. 準備 Trigger 的 `.env`
+（**刪 volume 會毀資料**；沒把握先做備份。）
 
-```bash
-cd ../trigger
-cp .env.example .env
-# 依 .env.example 註解，用 openssl 產生每個 secret，全部替換成強隨機值（勿提交 .env）
-```
-
-### 4. 啟動 Trigger stack
+### 4. 啟動
 
 ```bash
 docker compose --env-file .env up -d
+docker compose --env-file .env ps
+docker compose --env-file .env logs -f webapp
 ```
 
-### 5. 驗證
+### 5. 驗證 dashboard
 
-```bash
-docker compose ps
-docker network ls | grep -E 'lobster|trigger'
-```
+瀏覽器開 **`https://trigger.aware-wave.com`**（或你的 `APP_ORIGIN`）。  
+首次登入若沒設 email provider，**magic link 會印在 webapp log**（官方行為）。
 
-在瀏覽器開 **你的公開 URL**（例如 `https://trigger.aware-wave.com`，視 TLS 是否已上就緒）。
+### 6. 本機 deploy 工作流程（`packages/workflows`）
 
-### 6. 與 `packages/workflows` 對齊
-
-1. 在 Trigger dashboard **建立帳號與 project**。  
-2. 把 **project ref** 寫入 `lobster-factory/packages/workflows/trigger.config.ts` 的 `project`。  
-3. 把 **TRIGGER_SECRET_KEY**（或當版儀表板顯示的 deploy key）放進本機／CI／`secrets-vault`（**勿**進 git）。  
-4. 依官方文件部署 workflows，例如（實際指令以官方為準）：
+1. 在 dashboard 建立 **project**，把 **`project`** 寫進 `packages/workflows/trigger.config.ts`。  
+2. 依官方說明登入自架 instance（`--api-url` / profile）。  
+3. **Deploy 機器**必須能 **docker login** 到你的 **registry**（預設只綁 `127.0.0.1:5000` 在 VPS 本機；從筆電 deploy 需 **SSH tunnel** 或改成僅內網可達的安全暴露方式—見官方 *registry setup*）。
 
 ```bash
 cd lobster-factory/packages/workflows
-# 範例：指向自架 API
-set TRIGGER_API_URL=https://trigger.aware-wave.com
+npx trigger.dev@latest login -a https://trigger.aware-wave.com
 npx trigger.dev@latest deploy
 ```
 
 ---
 
-## Docker provider 的 network 名稱
+## 常見卡點對照
 
-`docker-compose.yml` 內 **`DOCKER_NETWORK: trigger_trigger-net`** 對應 **預設 project 目錄名為 `trigger`** 時 Compose 產生的 bridge 網路名。若你使用 **`docker compose -p 其他名字`** 啟動，請用 `docker network ls` 查出實際名稱並改 `.env` 或 compose，否則 worker 起 task 容器時會找不到網路。
+| 現象 | 處理方向 |
+|------|----------|
+| 日誌要求 **`CLICKHOUSE_URL`** / **`V4_DEPLOY_REGISTRY_HOST`** | 確認使用**本目錄 v4 compose**；`.env` 內 **`CLICKHOUSE_URL`**、**`DOCKER_REGISTRY_URL`** 有值；`clickhouse` / `registry` 容器已起。 |
+| **`DOCKER_RUNNER_NETWORKS`** 相關錯誤 | 本 compose 固定網路名為 **`lf-trg-webapp`**、**`lf-trg-supervisor`**（勿隨意改名，除非同步改 supervisor 環境變數）。 |
+| **502 / 連不上** | `docker compose ps` 看 **`trigger-webapp`** 是否 healthy；nginx 是否指到 **`:3000`**；`lobster-net` 是否同一台／名稱正確。 |
+| **OOM / 一直被殺** | 升級 RAM 或把 **supervisor** 拆到另一台（官方 worker compose 路徑）。 |
+
+---
+
+## Docker provider → v4 supervisor
+
+v4 不再有獨立 **`provider/docker` + coordinator** 的舊拆法；改為 **supervisor** + **docker-socket-proxy**（見上游 `hosting/docker/worker/docker-compose.yml`，本 repo 已合併進同一檔）。
+
+---
+
+## 本機測試 SSH（Windows PowerShell）
+
+```powershell
+ssh -i "$env:USERPROFILE\.ssh\hetzner_trigger" root@<VPS_IP>
+```
 
 ---
 
@@ -118,10 +136,11 @@ npx trigger.dev@latest deploy
 
 | 檔案 | 用途 |
 |------|------|
-| `docker-compose.yml` | Postgres、Redis、Electric、webapp、docker-provider |
-| `.env.example` | 必填變數範本 |
-| `../hetzner-phase1-core/nginx/trigger.conf` | `server_name` + 反代 `trigger-webapp:3030` |
-| `../hetzner-phase1-core/docker-compose.yml` | `lobster-net`、掛載 `trigger.conf` |
-| `../../packages/workflows/trigger.config.ts` | CLI／dev 連線的 `triggerUrl` 與 `project` |
+| `docker-compose.yml` | v4 全 stack（含 ClickHouse、registry、MinIO、supervisor） |
+| `.env.example` | 必填變數範本（命名對齊官方） |
+| `clickhouse/override.xml` | 限縮 ClickHouse RAM（小 VPS） |
+| `registry/auth.htpasswd` | Registry 基本驗證（上線前請重產） |
+| `../hetzner-phase1-core/nginx/trigger.conf` | 反代 `trigger-webapp:3000` |
+| `../../packages/workflows/trigger.config.ts` | CLI `triggerUrl` / `project` |
 
 **治理入口（agency-os）**：`hetzner-stack-rollout-index.md`、`hetzner-self-host-start-here.md`、`github-actions-trigger-prod-deploy.md`（路徑以 `agency-os/docs/operations/` 為準）。

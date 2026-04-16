@@ -29,7 +29,7 @@
 | Redis | ⚪ 未啟動（Phase A） | 可 | P2 | `docs/operations/hetzner-stack-rollout-index.md` | 服務健康檢查與應用連線成功 |
 | Nginx | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 路由/健康檢查/SSL 正常 |
 | Node API | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 核心 API endpoint 驗證通過 |
-| Next.js 控制台 | ⚪ 未啟動（列入 P7） | 可 | P3 | `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md` | 可建立並回顯 1 個測試租戶設定 |
+| Next.js 控制台 | ⚪ 未啟動（列入 P7） | 可 | P3 | `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md` | 可建立並回顯 1 個測試租戶設定 |
 | Sentry | 🟢 已上線（Phase1：`next-admin`／`node-api`／`php` + n8n DSN；**2026-04-12** 驗證與告警，見 `agency-os/WORKLOG.md` **`## 2026-04-12`**） | 可（維運較重） | P3 | `docs/operations/tools-and-integrations.md`、`../lobster-factory/infra/hetzner-phase1-core/README.md` | 測試錯誤可上報與告警；手動路由 `../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/sentry-test/route.ts` |
 | PostHog | ⚪ 未啟動（列入 P4） | 可 | P3 | `docs/operations/tools-and-integrations.md` | 可看到完整測試 funnel |
 | MinIO（S3 相容） | ⚪ 未啟動（Phase B） | 可 | P3（需要時） | `docs/operations/hetzner-stack-rollout-index.md` | 上傳/下載/權限驗證通過 |
@@ -59,7 +59,7 @@
 | `（工具建置）PostHog 事件基線` | `docs/operations/tools-and-integrations.md` | 屬於分析平面（非控制平面） | 可見完整測試 funnel | `event_names`, `funnel_id`, `time_window`, `report_path` |
 | `（工具建置）Cloudflare 邊界保護` | `docs/operations/tools-and-integrations.md` | 邊界防護能力 | staging 防護生效且無回歸 | `zone`, `rule_ids`, `before_after_result`, `rollback_note` |
 | `（工具建置）Clerk 組織與角色` | `docs/architecture/decisions/002-clerk-identity-boundary.md` | 控制平面身分邊界不可破 | 兩個測試角色權限區隔成功 | `org_id`, `role_matrix_ref`, `test_accounts`, `result` |
-| `（工具建置）Next.js 控制台 v1` | `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md` | UI 不可繞過既有路由與核准 | 可由 UI 建立 1 筆測試配置 | `tenant_slug`, `department_selection_payload`, `submit_result`, `ui_capture` |
+| `（工具建置）Next.js 控制台 v1` | `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md` | UI 不可繞過既有路由與核准 | 可由 UI 建立 1 筆測試配置 | `tenant_slug`, `department_selection_payload`, `submit_result`, `ui_capture` |
 
 ## 執行檢查清單（每完成一項都要做）
 - 在 `TASKS.md` 對應項有狀態更新（未完成/完成）。
@@ -103,5 +103,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-13 02:32:42 UTC_
+_Last synced: 2026-04-16 12:28:15 UTC_
 

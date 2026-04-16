@@ -1,8 +1,11 @@
-﻿# Next-Gen 升級藍圖 v1（雲端優先、跨機零重工）
+﻿# Next-Gen 升級藍圖 v1（跨機零重工）
 
 > 目標：把目前可用流程升級成「更高階、可規模化」版本。  
 > 對象：你（營運者）、AI 代理、工程協作者。  
 > 成功定義：你在桌機/筆電/新機都能無痛續接，且每位客戶都可穩定 staging -> production。
+
+> **對齊說明（避免矛盾）**：本檔是 Next-Gen 升級藍圖；若涉及「Next.js 控制台 v1 功能範圍與 DoD」，以 `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md` 為正本。  
+> 流程主權仍以 `MCP_TOOL_ROUTING_SPEC.md` 為準（Trigger durable owner / n8n glue）。
 
 ## 0) 執行摘要（你先看這段）
 
@@ -171,5 +174,5 @@ _Last synced: 2026-04-01_
 ## Related Documents (Auto-Synced)
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 
-_Last synced: 2026-04-13 02:32:42 UTC_
+_Last synced: 2026-04-16 12:28:15 UTC_
 

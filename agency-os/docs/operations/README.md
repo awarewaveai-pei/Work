@@ -5,6 +5,13 @@
 
 在編輯器內 **Ctrl+Click**（Mac：**Cmd+Click**）可開檔。下表**連結文字即檔名**，路徑皆在 **`agency-os/docs/operations/`**（跨資料夾除外）。
 
+## 你現在看檔順序（固定入口）
+
+1. 今日執行先看 [`../../TASKS.md`](../../TASKS.md)（今天做什麼）。
+2. 近期優先再看 [`NEXT_ACTIONS.md`](NEXT_ACTIONS.md)（近期優先順序）。
+3. 階段藍圖最後看 [`IMPLEMENTATION_ORDER.md`](IMPLEMENTATION_ORDER.md)（階段藍圖）。
+4. Next.js 控制台功能正本看 [`NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`](NEXTJS_INTERNAL_OPS_CONSOLE_V1.md)。
+
 ---
 
 ## 依類別（每份只列一次）
@@ -55,6 +62,12 @@
 
 | 說明 | 檔案 |
 |:---|:---|
+| 系統架構規格（完整自架） | [ARCHITECTURE_SPEC.md](ARCHITECTURE_SPEC.md) |
+| 工具責任矩陣 | [TOOL_RESPONSIBILITY_MATRIX.md](TOOL_RESPONSIBILITY_MATRIX.md) |
+| 實作順序（分階段） | [IMPLEMENTATION_ORDER.md](IMPLEMENTATION_ORDER.md) |
+| 佈署邊界規則 | [DEPLOYMENT_BOUNDARY_RULES.md](DEPLOYMENT_BOUNDARY_RULES.md) |
+| 近期優先動作 | [NEXT_ACTIONS.md](NEXT_ACTIONS.md) |
+| Next.js 內部控制台 v1 正本 | [NEXTJS_INTERNAL_OPS_CONSOLE_V1.md](NEXTJS_INTERNAL_OPS_CONSOLE_V1.md) |
 | 工具交付追溯 | [TOOLS_DELIVERY_TRACEABILITY.md](TOOLS_DELIVERY_TRACEABILITY.md) |
 | 工具與整合總表 | [tools-and-integrations.md](tools-and-integrations.md) |
 | 次世代交付藍圖 | [NEXT_GEN_DELIVERY_BLUEPRINT_V1.md](NEXT_GEN_DELIVERY_BLUEPRINT_V1.md) |

@@ -68,6 +68,7 @@
   - 追溯總表：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（每一工具任務對回規格 + DoD + 證據欄位）
 - [ ] （工具建置）Next.js 控制台 v1（Internal Ops）
   - 處理：建立 app skeleton、客戶清單頁、部門勾選頁（20 部門）、提交後寫出 `DEPARTMENT_SELECTION` payload
+  - 正本：`docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`
   - DoD：可建立 1 個測試客戶設定並在 UI 回顯成功
 - [x] （工具建置）Sentry 觀測接入
   - 處理：接入 API/workflow 錯誤上報 + release tag；定義 1 條告警規則
@@ -228,5 +229,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-13 07:12:24 UTC_
+_Last synced: 2026-04-16 12:28:15 UTC_
 

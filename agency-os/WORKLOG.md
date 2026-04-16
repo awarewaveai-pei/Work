@@ -2,6 +2,25 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-16
+
+### Trigger.dev 自託管 v4：compose／Nginx／範本 env 對齊官方 hosting/docker
+- **問題根因**：`trigger.dev:latest` 拉到 **v4** 後硬性要求 **ClickHouse**、**deploy registry**（常見錯誤變數名含 `CLICKHOUSE_URL`、`V4_DEPLOY_REGISTRY_HOST`／`DEPLOY_REGISTRY_HOST`）；舊「單一 webapp + docker provider」架構不足以啟動。
+- **repo 處置**：`lobster-factory/infra/trigger/docker-compose.yml` 改為 **v4 合併 stack**（postgres/redis/electric/clickhouse/registry/minio/webapp/supervisor/docker-socket-proxy），補 **`clickhouse/override.xml`**、**`registry/auth.htpasswd`（須上線前重產）**；**`.env.example`／`README.md`** 改為官方命名與操作順序；**`hetzner-phase1-core/nginx/trigger.conf`** 反代改 **`trigger-webapp:3000`**（v4 內聽 3000）。
+- **與 SDK 對齊**：`packages/workflows` 使用 **@trigger.dev/sdk 4.x** → 平台維持 **v4**；小 RAM VPS 仍建議升級或拆 worker（見 README 資源段）。
+- **VPS**：仍需於主機 **`git pull`** 後 **`docker compose --env-file .env up -d`** 與瀏覽器驗證；若曾跑舊 schema，可能需要備份後重建 volume（README「若曾跑過舊版」段）。
+
+### 架構方向修正：由「低成本優先」改為「完整自架自託管優先」
+- 依使用者明確要求，將本日新增規劃文件改為「完整系統自架」方向：`ARCHITECTURE_SPEC.md`、`TOOL_RESPONSIBILITY_MATRIX.md`、`IMPLEMENTATION_ORDER.md`、`NEXT_ACTIONS.md` 已重寫為中文且與既有 SSOT 對齊。
+- 關鍵原則不變：**Trigger.dev = durable owner、n8n = glue/ingress、Supabase = SoR**；避免再出現雙主權矛盾。
+- `docker-compose.recommended-ai-native.yml` 註解已補充：本檔為 phase1-core 結構，Trigger 自架由 `infra/trigger` 管理；不在同檔混淆主權。
+- 補齊 **Next.js 介面層正本**：新增 `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`，並同步 `TASKS.md`、`TOOLS_DELIVERY_TRACEABILITY.md`、`NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`、`docs/operations/README.md` 的引用；全域掃描關鍵語意後未見主權矛盾。
+
+### AI-native stack implementation artifacts（依既定方向落地，不重設架構）
+- 新增可直接執行的 6 份交付文件：`docs/operations/ARCHITECTURE_SPEC.md`、`TOOL_RESPONSIBILITY_MATRIX.md`、`IMPLEMENTATION_ORDER.md`、`DEPLOYMENT_BOUNDARY_RULES.md`、`NEXT_ACTIONS.md`、`lobster-factory/infra/hetzner-phase1-core/docker-compose.recommended-ai-native.yml`。
+- 邊界採納（修正後）：維持 **WordPress + FluentCRM**（業務層）、**Trigger.dev**（durable owner）+ **n8n**（glue/ingress）、**Node worker**（執行層）、**Supabase**（SoR）、**Sentry**（觀測）。
+- 目標：先建立可 24/7 的完整自架基線、可回滾，並保留後續拆分路徑（先抽 orchestration/execution，不改 SoR 契約）。
+
 ## 2026-04-13
 
 ### 雙機環境對齊（§1.5 / §1.5.1）— 本機可驗證部分
@@ -493,7 +512,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-13 07:12:24 UTC_
+_Last synced: 2026-04-16 13:28:51 UTC_
 
 ## 2026-03-20
 
@@ -921,6 +940,10 @@ _Last synced: 2026-04-13 07:12:24 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
+
+
+
 
 
 
