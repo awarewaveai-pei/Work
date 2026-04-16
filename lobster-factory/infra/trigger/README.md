@@ -6,7 +6,7 @@
 本目錄提供 **與官方 v4 對齊** 的單一 `docker-compose.yml`（webapp + postgres + redis + **ClickHouse** + **registry** + **MinIO** + **Electric** + **supervisor** + **docker-socket-proxy**），並接上 `hetzner-phase1-core` 的 **`lobster-net`** 與 Nginx（`../hetzner-phase1-core/nginx/trigger.conf`）。
 
 **為何你會卡在 `V4_DEPLOY_REGISTRY_HOST` / `CLICKHOUSE_URL`？**  
-若 `ghcr.io/.../trigger.dev:latest` 拉到 **v4**，平台會硬性要求 **ClickHouse** 與 **deploy registry**（任務映像 push/pull）。舊版「只有 postgres + redis + electric + 單一 webapp」的 compose **無法**滿足 v4。  
+若 `ghcr.io/.../trigger.dev:latest` 拉到 **v4**，平台會硬性要求 **ClickHouse** 與 **deploy registry**（任務映像 push/pull），且 deploy 時還需要 **artifacts object store bucket**（預設 `packets`）。舊版「只有 postgres + redis + electric + 單一 webapp」的 compose **無法**滿足 v4。  
 本 repo 的 **`packages/workflows`** 使用 **`@trigger.dev/sdk` 4.x**，**建議平台維持 v4**；若改回 v3 平台，須同步把 SDK 降到 v3（另開變更，不在此 README 展開）。
 
 ---
