@@ -2,6 +2,14 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-17
+
+### Trigger.dev 儀表板可正常進入（登入／路由異常已排除）
+- 使用者回報目前 `trigger.aware-wave.com` 已可正常進入儀表板（先前「反覆導向 `/projects/new` 或 login」的體感問題已解除）。
+- 本輪處置：補齊本機開工基線（`AO-RESUME` strict PASS、Git `ahead=0/behind=0`、工作樹 clean），並完成跨機換行策略治理（repo 新增 `.gitattributes`）。
+- 驗證重點：`ao-resume.ps1` exit 0、`machine-environment-audit -FetchOrigin -Strict` 顯示 `AUDIT RESULT: PASS (no warnings)`。
+- 備註：本項為「可用性/穩定性回復」里程碑，無新增 Trigger 機密資訊。
+
 ## 2026-04-16
 
 ### Trigger.dev 自託管 v4：compose／Nginx／範本 env 對齊官方 hosting/docker

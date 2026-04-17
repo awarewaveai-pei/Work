@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-17（Trigger 儀表板恢復可用）**：使用者確認 Trigger.dev 已可正常進入（先前 `/projects/new`／login 體感問題已解）；本機開工基線亦重驗通過（`AO-RESUME` strict PASS、`ahead=0/behind=0`、working tree clean）。
 - **2026-04-16（Trigger 儀表板 UX／收工）**：使用者回報多數 URL 體感導向 **`/orgs/aware-wave/projects/new`** 或登入頁；DB 側 **`lobster-factory` / `proj_6c4f24492a705729fc2c`** 仍存在。交接重點：**未登入** vs **已登入但 Electric／WS 或 slug 路由**；建議優先書籤 **`/projects/proj_6c4f24492a705729fc2c`**。本日晚 **`AO-CLOSE`** 前已 **commit** `LAST_SYSTEM_STATUS`（`95596e8`）。
 - **2026-04-16（Trigger 自託管上線完成）**：已在 VPS 實機完成 v4 閉環（服務健康、Nginx + TLS、Dashboard 可開），並完成第一個 project/bootstrap token 與 `trigger.config.ts` ref 對齊；`trigger.dev deploy --detach` 已成功初始化 deployment（曾因 artifacts bucket/上傳路由失敗，已以 `ARTIFACTS_OBJECT_STORE_*` + Nginx `/packets` 代理修復）。
 - **2026-04-16（Trigger 自託管 v4）**：`lobster-factory/infra/trigger` 已對齊官方 **v4**（ClickHouse + registry + MinIO + supervisor + docker-socket-proxy）；`trigger.conf` 反代改 **3000**；`packages/workflows` 為 SDK **4.x** → 平台應跑 **v4**（小 RAM 仍建議升級或拆 worker）。VPS 需 `pull` 後依 README 重填 `.env`、重產 **registry htpasswd** 再 `docker compose up`。
