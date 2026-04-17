@@ -23,6 +23,27 @@
 - 例行輪替：每 90 天
 - 人員離職或合作終止：24 小時內撤銷
 
+## Service Secret Ownership Baseline (Phase 1)
+
+以下以「角色」為 owner，不在 git 儲存個人姓名：
+
+- `SENTRY_DSN_NODE_API`：後端/資料整合 owner
+- `SENTRY_DSN_TRIGGER_WORKFLOWS`：workflow owner
+- `SENTRY_DSN_N8N_BACKEND`、`SENTRY_DSN_N8N_FRONTEND`：automation owner
+- `SENTRY_DSN_NEXT_ADMIN`：frontend owner
+- `SENTRY_DSN_WORDPRESS`：wordpress owner
+
+所有 Sentry DSN 一律走「最小必要 project」與環境分離（staging vs production），不得共用單一高權限 DSN 橫跨全部服務。
+
+## Sentry Secret Governance Rules
+
+- DSN 變數命名以 `SENTRY_ALERT_POLICY.md` 契約為準，舊別名僅作過渡 fallback。
+- 每次 DSN 或告警路由調整，必須同步更新：
+  - `lobster-factory/infra/hetzner-phase1-core/.env.example`
+  - `lobster-factory/infra/hetzner-phase1-core/README.md`
+  - `agency-os/docs/operations/SENTRY_ALERT_POLICY.md`
+- `verify-build-gates` 必須能檢查到 Sentry 契約關鍵鍵名，否則視為治理回退。
+
 ## Incident Trigger
 任一明文憑證出現在文件或對話時，視為安全事件，需：
 1. 停用或輪替該憑證
@@ -35,5 +56,5 @@
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 
-_Last synced: 2026-04-16 12:28:15 UTC_
+_Last synced: 2026-04-17 09:20:38 UTC_
 

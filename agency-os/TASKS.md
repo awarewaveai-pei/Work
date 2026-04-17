@@ -1,4 +1,4 @@
-# Global Task Board
+﻿# Global Task Board
 
 > **待辦原則（給營運者）**  
 > - **單一清單**：所有「之後還要做」的事，應以本檔 **`Next — 未完成`** 或 **`Backlog — 未完成`** 的一條 `- [ ]` 表示；不要只放在聊天或腦裡。  
@@ -73,6 +73,7 @@
 - [x] （工具建置）Sentry 觀測接入
   - 處理：接入 API/workflow 錯誤上報 + release tag；定義 1 條告警規則
   - DoD：可人工觸發 1 筆測試錯誤並在 Sentry 收到告警
+  - 2026-04-17 補強：DSN 分流契約（6 服務命名）+ `SENTRY_ALERT_POLICY.md`（告警分級/P1-P3、smoke 基線、月季巡檢）+ `verify-build-gates` Sentry 契約檢查。
 - [ ] （工具建置）PostHog 事件基線
   - 處理：定義 core events（至少 onboarding_start / onboarding_completed / deploy_requested / deploy_result）
   - DoD：可在 PostHog 看到一筆完整測試 funnel
@@ -86,7 +87,7 @@
   - 處理：定義 secrets owner、輪替節奏、最小讀取權限；先覆蓋 Trigger/n8n/GitHub 相關高風險金鑰
   - DoD：完成一輪輪替演練，服務不中斷
   - **執行正本**：`docs/operations/secrets-governance-p1-closeout.md`（Owner 表、首輪輪替三選一、WORKLOG 證據、AUTO_TASK_DONE 子字串）。
-  - **進度（2026-04-10）**：§1 **Owner（角色）**、**vault 鍵名對照（§1.4）**、輪替後流程（§1.5）已寫入正本；`WORKLOG` 已記 **基線**與 `gh` 狀態。**仍缺**：手冊 **§2 擇一輪替** + §3 欄位與 `AUTO_TASK_DONE`（不可由代理代為在第三方後台按鈕）。
+  - **進度（2026-04-17）**：已完成手冊 §2 路徑 B（n8n MCP key 輪替 + 舊 key 刪除 + 連線驗證），`WORKLOG` 已補 §3 證據與 `AUTO_TASK_DONE: Secrets 治理升級`；勾選由 `AO-CLOSE` 腳本套用。
 
 ## Next — 已完成歷程（查詢用）
 - [x] **（工具建置）Hetzner 自託管 n8n（staging）**
@@ -229,5 +230,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-16 12:28:15 UTC_
+_Last synced: 2026-04-17 09:39:53 UTC_
 

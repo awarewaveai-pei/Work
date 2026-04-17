@@ -46,6 +46,8 @@ curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯
 
 **Sentry（next-admin，可選）**：部署並設定 DSN 後，可對外公開 URL 呼叫 **`GET /api/sentry-test`**（實作：[apps/next-admin/app/api/sentry-test/route.ts](apps/next-admin/app/api/sentry-test/route.ts)），於 Sentry 專案確認收到測試事件。
 
+**PostHog（next-admin，可選，建議雲端）**：於 `.env` 填入 **`NEXT_PUBLIC_POSTHOG_KEY`**（與選填 **`NEXT_PUBLIC_POSTHOG_HOST`**，預設 `https://us.i.posthog.com`）；留空則不初始化。變更後須 **`docker compose build next-admin`** 再 **`up -d next-admin`**（`NEXT_PUBLIC_*` 為建置期注入）。
+
 瀏覽器（將主機名換成實際 IP／網域）：
 
 - Admin：`http://YOUR_HOST/`
@@ -78,6 +80,54 @@ chmod +x scripts/diagnose-host-resources.sh
 輸出含：`free -h`、`swap`、`df`、`docker stats`、`docker compose ps`、`dmesg` 尾段（OOM 線索）。把**完整輸出**貼回除錯即可判讀 swap／磁碟／哪個容器吃記憶體。
 
 ## n8n × Sentry（自託管）
+
+### 建議 DSN 分流命名（清楚版）
+
+建議用「**服務 = 一條 DSN 變數**」命名，避免告警混在一起難查：
+
+- `SENTRY_DSN_NODE_API`：node-api 後端（含 Supabase 代理錯誤）
+- `SENTRY_DSN_TRIGGER_WORKFLOWS`：Trigger.dev workflows 任務錯誤（由 workflows 程式讀取）
+- `SENTRY_DSN_N8N_BACKEND`：n8n 後端執行錯誤
+- `SENTRY_DSN_N8N_FRONTEND`：n8n 編輯器前端錯誤（選填）
+- `SENTRY_DSN_NEXT_ADMIN`：Next.js admin 前端錯誤
+- `SENTRY_DSN_WORDPRESS`：WordPress/PHP 錯誤
+
+### 推薦 Sentry Project 命名（6 個）
+
+建議在 Sentry 用固定格式：`awarewave-lobster-<service>-<runtime>`，好處是搜尋與權限分組都直覺。
+
+- `awarewave-lobster-node-api-backend`（Node.js）
+- `awarewave-lobster-trigger-workflows-backend`（Node.js）
+- `awarewave-lobster-n8n-backend`（Node.js）
+- `awarewave-lobster-n8n-frontend`（Browser，選填）
+- `awarewave-lobster-next-admin-frontend`（Next.js / Browser）
+- `awarewave-lobster-wordpress-backend`（PHP）
+
+### `.env` 對照清單（可直接填）
+
+以下 6 條是建議主鍵（空值代表該路徑暫不啟用）：
+
+```dotenv
+SENTRY_DSN_NODE_API=
+SENTRY_DSN_TRIGGER_WORKFLOWS=
+SENTRY_DSN_N8N_BACKEND=
+SENTRY_DSN_N8N_FRONTEND=
+SENTRY_DSN_NEXT_ADMIN=
+SENTRY_DSN_WORDPRESS=
+```
+
+建議同步加上通用標籤（每個服務至少要有）：
+
+- `environment`: `staging` / `production`
+- `service`: `node-api` / `trigger-workflows` / `n8n` / `next-admin` / `wordpress`
+- `owner`: `lobster-factory`
+
+目前 compose 已做「新命名優先、舊命名相容」：
+
+- node-api：`SENTRY_DSN_NODE_API` → fallback `SENTRY_DSN`
+- Next.js：admin：`SENTRY_DSN_NEXT_ADMIN` → fallback `SENTRY_DSN_NEXT`
+- WordPress：`SENTRY_DSN_WORDPRESS` → fallback `SENTRY_DSN_WP`
+- n8n backend：`N8N_SENTRY_DSN` → `SENTRY_DSN_N8N_BACKEND` → `SENTRY_DSN_N8N`
 
 n8n 映像讀取 **`N8N_SENTRY_DSN`**（後端）與選填 **`N8N_FRONTEND_SENTRY_DSN`**（編輯器前端）；可選 **`ENVIRONMENT`** / **`DEPLOYMENT_NAME`** 等（與 n8n 原始碼 `packages/@n8n/config/src/configs/sentry.config.ts` 一致）。
 

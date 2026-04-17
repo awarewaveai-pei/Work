@@ -56,6 +56,7 @@
 | 說明 | 檔案 |
 |:---|:---|
 | 祕鑰政策 | [security-secrets-policy.md](security-secrets-policy.md) |
+| Sentry 告警政策（P1 基線） | [SENTRY_ALERT_POLICY.md](SENTRY_ALERT_POLICY.md) |
 | 本機 DPAPI vault | [local-secrets-vault-dpapi.md](local-secrets-vault-dpapi.md) |
 
 ### 交付／工具全景

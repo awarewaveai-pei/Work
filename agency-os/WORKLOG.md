@@ -1,8 +1,50 @@
-# Worklog
+﻿# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-04-17
+
+### Sentry 三路補齊驗證完成（n8n / Trigger / node-api）
+- **n8n**：VPS `.env` 已確認 `N8N_SENTRY_DSN`（相容 `SENTRY_DSN_N8N`），重啟後執行失敗 workflow（`sentry-failure-smoke`）成功產生錯誤事件。
+- **node-api**：`/rag/supabase-health` 已實機驗證；暫時置換錯誤 `SUPABASE_SERVICE_ROLE_KEY` 觸發 `500`（`[supabase] Unauthorized`）並上報，恢復正確 key 後回 `200` 正常。
+- **Trigger workflows**：`create-wp-site` / `apply-manifest` 已加 `try/catch + captureException`；並以相同 helper 送出 smoke 事件（`trigger sentry smoke failure (create-wp-site path)`）確認通道可用。
+- **Sentry UI 證據**：本輪可見三類新事件（Trigger smoke、Supabase unauthorized、n8n 新錯誤事件），符合本次補齊目標。
+- **備註**：為避免污染正式告警，建議將本輪 smoke 測試 issue 加上 `smoke-test` 標籤或標記 `Resolved`。
+
+### Sentry Phase 1 治理化（30 年級穩定化第一刀）
+- 新增正本：`agency-os/docs/operations/SENTRY_ALERT_POLICY.md`，封板 **DSN 分流契約**、**P1/P2/P3 告警分級**、**smoke baseline**、週/月/季巡檢節奏。
+- 入口同步：`agency-os/docs/operations/README.md` 已加「Sentry 告警政策（P1 基線）」連結，避免規則散落。
+- 資安對齊：`agency-os/docs/operations/security-secrets-policy.md` 新增 Sentry DSN owner/輪替契約與三檔同步要求，避免觀測與密鑰治理脫鉤。
+- Gate 接線：`scripts/verify-build-gates.ps1`（含 `agency-os/scripts` 鏡像）新增 Sentry 契約檢查：
+  - 必須存在 `SENTRY_ALERT_POLICY.md`
+  - `lobster-factory/infra/hetzner-phase1-core/.env.example` 必須含 `SENTRY_DSN_NODE_API`、`SENTRY_DSN_TRIGGER_WORKFLOWS`、`SENTRY_DSN_N8N_BACKEND`、`SENTRY_DSN_NEXT_ADMIN`、`SENTRY_DSN_WORDPRESS`
+- 結果：觀測能力由「一次性接入」提升為「可持續驗證的治理基線」，後續 secrets/DR/治理都可沿此基線擴充。
+
+### Phase 0 收斂：Nginx+SSL / n8n prod / Redis 驗證（2026-04-17）
+
+**Nginx + SSL 全通確認**
+- `trigger.aware-wave.com` HTTPS ✅（系統 nginx + Let's Encrypt，`/healthcheck` 200）
+- `n8n.aware-wave.com` HTTPS ✅（補執行 `certbot --nginx -d n8n.aware-wave.com`，已部署 TLS 憑證；已有 `/etc/letsencrypt/live/n8n.aware-wave.com/`）
+- `lobster-nginx` 狀態：`Created`（因系統 nginx 已佔用 port 80；Docker nginx 由系統 nginx 取代，phase1-core 服務目前透過系統 nginx 各自子域名路由）
+
+**n8n staging 推上 prod（驗證）**
+- 兩條 workflow 均 `active=true`：`shared-notifications-client_onboarding-staging-ping`（ID `LUEO8tirSCFaVGjH`）、`shared-error-handler-sentry-staging`（ID `fN5Q6QY3hezU3Y5A`）
+- 生產 webhook 端到端驗證：`POST https://n8n.aware-wave.com/webhook/client-onboarding/staging-ping` → `{"ok":true,"event":"client_onboarding_staging_ping","received_at":"2026-04-17T..."}`
+- n8n 容器異常退出後已 `docker start n8n` 恢復（exit 0，非崩潰；疑似外部觸發）
+
+**Redis 健康確認（Trigger.dev 串接）**
+- `trigger-redis` Up 19 h（healthy）；webapp log 無 redis 錯誤；`/engine/v1/worker-actions/dequeue 200` 定期回傳，supervisor 正常輪詢
+- `lobster-redis` Up 4 days（healthy）；phase1-core 服務無報錯
+
+**Secrets 輪替演練 — 現況（收斂完成）**
+- 盤點：`~/.cursor/mcp.json` 含多組明文憑證（github-pat、n8n-mcp-key、openai-key、anthropic-key 等）→ 與 `security-secrets-policy.md` 違規（禁止 AI 可見明文）；後續建議改 fine-grained PAT 並收斂本機檔案暴露面。
+- **已完成輪替**：
+  - `scope`: `n8n-api-key`；`date_utc`: 2026-04-17；`owner`: pei
+  - 新 key 已更新至 `~/.cursor/mcp.json`；舊兩組（`mcp`、`MCP Server API Key`）已於 n8n UI 刪除
+  - `rollback_note`: 舊 key 已撤銷；若需回滾需重建新 key（不可還原舊值）
+  - `verification`: 重啟 Cursor 後確認 n8n MCP 連線正常，且舊 key 不再可用
+- **待完成**：
+  1. GitHub PAT → 新建 fine-grained（`repo` scope）→ 撤銷現有全權限 PAT → 更新 `mcp.json`
 
 ### Trigger.dev 儀表板可正常進入（登入／路由異常已排除）
 - 使用者回報目前 `trigger.aware-wave.com` 已可正常進入儀表板（先前「反覆導向 `/projects/new` 或 login」的體感問題已解除）。
@@ -121,22 +163,31 @@
 - **TASKS**：`（工具建置）Hetzner 自託管 n8n（staging）` **DoD 已達**——見**上方**「n8n staging client_onboarding E2E」與 **`AUTO_TASK_DONE`**；`TASKS.md` 已移至 **已完成歷程**。
 - **追溯總表**：`TOOLS_DELIVERY_TRACEABILITY.md` 已更新 n8n（staging）為 **E2E 已證**。
 
-### P1 Secrets 治理（基線落地；輪替演練仍待你執行 §2）
+### P1 Secrets 治理（首輪輪替已完成）
 
 | 欄位 | 值 |
 |------|-----|
-| `scope` | `baseline-only`（Owner 表 + vault 鍵名對照已入庫；**尚未**完成手冊 §2 之 A/B/C 輪替） |
+| `scope` | `n8n-mcp`（手冊 §2 路徑 B：n8n MCP Access Token） |
 | `artifacts` | `docs/operations/secrets-governance-p1-closeout.md`（§1.1–§1.5）、`security-secrets-policy.md` Related |
 | `vault_keys_p1`（僅鍵名） | `GITHUB_PERSONAL_ACCESS_TOKEN`、`N8N_AUTH_BEARER_TOKEN`、`TRIGGER_ACCESS_TOKEN`、`LOBSTER_SUPABASE_SERVICE_ROLE_KEY`（`secrets-vault.ps1 -Action list` 可核） |
-| `gh_auth` | 本機 `gh auth status`：**未登入** GitHub host（若要以 Path A 用 `gh` 驗證需先 `gh auth login`；Path B n8n／Path C Trigger 不依賴 `gh`） |
-| `next_step` | 擇 **§2** 之 **A／B／C** 完成一輪輪替 → 於本節下補 `scope`（`github-pat`／`n8n-mcp`／`trigger-api`）、`verification`、`rollback_note` → `- AUTO_TASK_DONE: Secrets 治理升級` |
+| `verification` | n8n UI 舊 key（`mcp`、`MCP Server API Key`）已刪除；Cursor 重啟後 n8n MCP 以新 key 連線正常 |
+| `rollback_note` | 舊 key 不可復用；若異常需在 n8n 後台新建 key 並更新本機 `mcp.json` |
+| `next_step` | 持續完成 GitHub PAT fine-grained 輪替（強化項，非本輪 DoD 必要） |
+
+- AUTO_TASK_DONE: Secrets 治理升級
 
 ### P1 Secrets／n8n E2E 收斂手冊（文件交付）
 - **新增正本**：`docs/operations/secrets-governance-p1-closeout.md`（Owner 表、GitHub／n8n MCP／Trigger 首輪輪替三選一、WORKLOG 證據範本；**不含**明文祕密）。
 - **新增正本**：`docs/operations/n8n-staging-client-onboarding-e2e.md`（staging 最小 Webhook 型 `client_onboarding` 流程定義、觸發方式、WORKLOG 追溯欄位、`AUTO_TASK_DONE` 提示）。
-- **`TASKS.md`**：`Secrets 治理升級` 仍開放並附 **執行正本**；**`Hetzner 自託管 n8n（staging）`** 已歸檔至 **已完成歷程**（證據見上節 E2E）。
+- **`TASKS.md`**：`Secrets 治理升級` 進度已更新為「§2 路徑 B 完成」；**`Hetzner 自託管 n8n（staging）`** 已歸檔至 **已完成歷程**（證據見上節 E2E）。`- [x]` 勾選待下次 **`AO-CLOSE`** 由 `apply-closeout-task-checkmarks` 依 **`AUTO_TASK_DONE: Secrets 治理升級`** 套用。
 - **`security-secrets-policy.md`**：Related 已連結 P1 收斂手冊。
-- **邊界**：**n8n staging E2E** 已於同日**上一節**達成；**P1 Secrets** §1 **基線**已入庫（見**再上一節**「P1 Secrets 治理（基線落地）」）；**DoD（一輪輪替）**仍開放，見 `secrets-governance-p1-closeout.md` §2。
+- **邊界**：**n8n staging E2E** 已於同日**上一節**達成；**P1 Secrets** 手冊 §2 **路徑 B（n8n MCP）** 一輪輪替已於本日完成並見上表；GitHub PAT fine-grained 仍為建議後續項。
+
+### 2026-04-17 全日收斂（repo 變更 + 協作口述）
+
+- **本機／Cursor 代理**：Sentry 三路驗證與 Phase 1 治理（`SENTRY_ALERT_POLICY.md`、`verify-build-gates` 契約檢查、`security-secrets-policy` 對齊）；phase1 DSN 命名與 `docker-compose` fallback；`packages/workflows` Sentry helper 與依賴；Secrets 輪替落帳與 `AUTO_TASK_DONE`；`next-admin` PostHog 改為 **`NEXT_PUBLIC_POSTHOG_*` 環境變數**（不把 project key 寫入版控）。
+- **另一代理（Claude）／VPS（依使用者口述）**：Trigger 儀表板登入與路由問題已排除；Secrets Phase 2 協助；監控補盲（**Uptime Kuma** 自架、監控 WordPress／n8n／Trigger.dev／Supabase／Node API）；**Netdata** 自架；產品分析採 **PostHog 雲端免費版**（RAM 考量，不自架 PostHog）。
+- **Gate**：本輪提交前已跑 `doc-sync-automation`、`system-health-check`、`verify-build-gates`（見當日 `memory`／終端輸出）。
 
 ### 2026-04-10（晚）README 導覽與 doc-sync 防漂移
 - **`agency-os/README.md`**：連結改表格、連結文字＝檔名；`docs/overview`／`docs/operations` 速查標註為**子集**，完整清單指回各自 **`README.md`**；補 **`docs/architecture/decisions/README.md`**（ADR 目錄）。
@@ -527,7 +578,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-16 14:57:57 UTC_
+_Last synced: 2026-04-17 11:49:26 UTC_
 
 ## 2026-03-20
 
@@ -955,6 +1006,10 @@ _Last synced: 2026-04-16 14:57:57 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
+
+
+
 
 
 

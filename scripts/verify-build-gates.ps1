@@ -67,6 +67,34 @@ if (Test-Path -LiteralPath $adrIdx) {
     }
 }
 
+Write-Host "== Observability baseline: Sentry contract ==" -ForegroundColor Cyan
+$sentryPolicy = Join-Path $agencyRoot "docs\operations\SENTRY_ALERT_POLICY.md"
+if (-not (Test-Path -LiteralPath $sentryPolicy)) {
+    Write-Error "verify-build-gates: missing Sentry alert policy at $sentryPolicy"
+    exit 1
+}
+
+$phase1EnvExample = Join-Path $WorkRoot "lobster-factory\infra\hetzner-phase1-core\.env.example"
+if (-not (Test-Path -LiteralPath $phase1EnvExample)) {
+    Write-Error "verify-build-gates: missing phase1 .env.example at $phase1EnvExample"
+    exit 1
+}
+
+$envRaw = Get-Content -LiteralPath $phase1EnvExample -Raw
+$requiredSentryKeys = @(
+    "SENTRY_DSN_NODE_API",
+    "SENTRY_DSN_TRIGGER_WORKFLOWS",
+    "SENTRY_DSN_N8N_BACKEND",
+    "SENTRY_DSN_NEXT_ADMIN",
+    "SENTRY_DSN_WORDPRESS"
+)
+foreach ($key in $requiredSentryKeys) {
+    if ($envRaw -notmatch ("(?m)^" + [regex]::Escape($key) + "=")) {
+        Write-Error "verify-build-gates: missing required Sentry key in .env.example: $key"
+        exit 1
+    }
+}
+
 Write-Host "== Agency OS: system-health-check ==" -ForegroundColor Cyan
 & powershell -ExecutionPolicy Bypass -NoProfile -File $healthScript -WorkspaceRoot $agencyRoot
 if ($LASTEXITCODE -ne 0) {

@@ -3,6 +3,10 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-17（全日收斂 commit）**：`WORKLOG` 已寫「全日收斂」含另一代理（Claude）口述之 VPS／Uptime Kuma／Netdata／PostHog 雲端決策；`next-admin` PostHog 改 `NEXT_PUBLIC_POSTHOG_*` 不入庫；EOD 前再跑 doc-sync／health／verify-build-gates。
+- **2026-04-17（Secrets Phase 2 對齊完成）**：依使用者確認，n8n 舊 key 已刪除並驗證新 key 可用；`WORKLOG` 已補 §3 證據與 `AUTO_TASK_DONE: Secrets 治理升級`，`TASKS` 進度改為「待 AO-CLOSE 腳本套用勾選」。
+- **2026-04-17（30 年級穩定化啟動：Sentry 基線治理化）**：已新增 `SENTRY_ALERT_POLICY.md`（DSN 契約、P1-P3 告警分級、smoke baseline、巡檢節奏），並把 `verify-build-gates` 接入 Sentry 契約檢查（政策檔存在 + phase1 `.env.example` 必備 DSN keys）；`security-secrets-policy.md` 同步補上 Sentry DSN owner/輪替契約，避免觀測與密鑰治理分離。
+- **2026-04-17（Sentry 三路補齊已驗證）**：`n8n`（`N8N_SENTRY_DSN`）/ `node-api`（Supabase `Unauthorized`）/ Trigger workflow（`create-wp-site` 路徑 smoke）三者均已出現 Sentry 事件；目前觀測鏈路可用。
 - **2026-04-17（Trigger 儀表板恢復可用）**：使用者確認 Trigger.dev 已可正常進入（先前 `/projects/new`／login 體感問題已解）；本機開工基線亦重驗通過（`AO-RESUME` strict PASS、`ahead=0/behind=0`、working tree clean）。
 - **2026-04-16（Trigger 儀表板 UX／收工）**：使用者回報多數 URL 體感導向 **`/orgs/aware-wave/projects/new`** 或登入頁；DB 側 **`lobster-factory` / `proj_6c4f24492a705729fc2c`** 仍存在。交接重點：**未登入** vs **已登入但 Electric／WS 或 slug 路由**；建議優先書籤 **`/projects/proj_6c4f24492a705729fc2c`**。本日晚 **`AO-CLOSE`** 前已 **commit** `LAST_SYSTEM_STATUS`（`95596e8`）。
 - **2026-04-16（Trigger 自託管上線完成）**：已在 VPS 實機完成 v4 閉環（服務健康、Nginx + TLS、Dashboard 可開），並完成第一個 project/bootstrap token 與 `trigger.config.ts` ref 對齊；`trigger.dev deploy --detach` 已成功初始化 deployment（曾因 artifacts bucket/上傳路由失敗，已以 `ARTIFACTS_OBJECT_STORE_*` + Nginx `/packets` 代理修復）。
@@ -338,5 +342,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-16 14:57:57 UTC_
+_Last synced: 2026-04-17 11:49:26 UTC_
 

@@ -16,6 +16,7 @@ function initSentry() {
   }
 
   const dsn =
+    process.env.SENTRY_DSN_TRIGGER_WORKFLOWS ||
     process.env.LOBSTER_SENTRY_DSN ||
     process.env.TRIGGER_SENTRY_DSN ||
     process.env.SENTRY_DSN ||
