@@ -20,6 +20,12 @@
   - `lobster-factory/infra/hetzner-phase1-core/.env.example` 必須含 `SENTRY_DSN_NODE_API`、`SENTRY_DSN_TRIGGER_WORKFLOWS`、`SENTRY_DSN_N8N_BACKEND`、`SENTRY_DSN_NEXT_ADMIN`、`SENTRY_DSN_WORDPRESS`
 - 結果：觀測能力由「一次性接入」提升為「可持續驗證的治理基線」，後續 secrets/DR/治理都可沿此基線擴充。
 
+### Cloudflare 邊緣接入（repo：自架 Next + Nginx 正本）
+- **架構**：`next-admin` 仍為 **自架 Docker**，Cloudflare 僅作 DNS/WAF/TLS 邊緣；不需改為 Vercel。
+- **文件**：新增 `agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`（DNS、SSL Full/strict、Webhook/WS 驗收、與系統 Nginx 雙層說明）；`docs/operations/README.md` 已掛入口。
+- **Nginx**：新增 `lobster-factory/infra/hetzner-phase1-core/nginx/cloudflare-real-ip.conf`（官方 IPv4/IPv6 來源 + `CF-Connecting-IP`）；`docker-compose.yml` 掛載為 `00-cloudflare-real-ip.conf`。
+- **phase1 README**：補 Cloudflare 小節並連結 agency-os 正本。
+
 ### Phase 0 收斂：Nginx+SSL / n8n prod / Redis 驗證（2026-04-17）
 
 **Nginx + SSL 全通確認**
@@ -578,7 +584,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-17 11:49:26 UTC_
+_Last synced: 2026-04-17 11:58:44 UTC_
 
 ## 2026-03-20
 
@@ -1006,6 +1012,7 @@ _Last synced: 2026-04-17 11:49:26 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

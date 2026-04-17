@@ -10,6 +10,10 @@
 **對應治理文件**：`agency-os/docs/operations/hetzner-full-stack-self-host-runbook.md`  
 **堆疊在整體中的位置（Phase A 10 項／平面／連動）**：`agency-os/docs/operations/hetzner-stack-rollout-index.md`
 
+## Cloudflare 邊緣（DNS / WAF / TLS）
+
+Next.js 仍為 **自架 Docker + Nginx**；Cloudflare 只作 **邊緣**。操作步驟、SSL 模式與真實 IP 還原見：**[`agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`](../../../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md)**。本 compose 已掛載 **`nginx/cloudflare-real-ip.conf`**（`00-` 前綴確保先載入）。
+
 ## 安全（必讀）
 
 - **不要**把 `.env` 或 **service role / root DB 密碼** 提交到 Git，也不要貼到聊天或 Issue。

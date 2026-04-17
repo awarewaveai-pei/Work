@@ -48,6 +48,7 @@
 | 全棧自架 Runbook | [hetzner-full-stack-self-host-runbook.md](hetzner-full-stack-self-host-runbook.md) |
 | 環境變數範例 | [hetzner-self-host.env.example](hetzner-self-host.env.example) |
 | Supabase 自架切換 | [supabase-self-hosted-cutover-checklist.md](supabase-self-hosted-cutover-checklist.md) |
+| Cloudflare 邊緣（Phase 1 / 自架 Next） | [CLOUDFLARE_HETZNER_PHASE1.md](CLOUDFLARE_HETZNER_PHASE1.md) |
 | GitHub Actions × workflows | [github-actions-trigger-prod-deploy.md](github-actions-trigger-prod-deploy.md) |
 | 多機 MariaDB（WP） | [MARIADB_MULTI_MACHINE_SYNC.md](MARIADB_MULTI_MACHINE_SYNC.md) |
 
