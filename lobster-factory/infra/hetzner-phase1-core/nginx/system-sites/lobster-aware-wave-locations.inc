@@ -11,11 +11,8 @@
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location = /admin {
-        return 308 /admin/;
-    }
-
-    location /admin/ {
+    # Prefix match (no trailing-slash bounce) — Next basePath strips trailing slash with 308.
+    location ^~ /admin {
         proxy_pass http://127.0.0.1:3002;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
