@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-17（Phase1 apex：WP 根／Next `/admin`）**：`aware-wave.com` 系統 Nginx 已改為 **`/`→WordPress（8080）**、**`/admin`→next-admin（3002）**；共用 **`lobster-aware-wave-locations.inc`** 同時掛在 **:80 與 :443**；`WORDPRESS_PUBLIC_URL` 已改 **https://aware-wave.com**；`next-admin` 設 **`basePath=/admin`** 並於 VPS 重建映像；**`location ^~ /admin`** 修正與 Next 308 之迴圈。VPS `/root/lobster-phase1` 仍非 git，需手動與 repo 對齊。
 - **2026-04-17（全日收斂 commit）**：`WORKLOG` 已寫「全日收斂」含另一代理（Claude）口述之 VPS／Uptime Kuma／Netdata／PostHog 雲端決策；`next-admin` PostHog 改 `NEXT_PUBLIC_POSTHOG_*` 不入庫；EOD 前再跑 doc-sync／health／verify-build-gates。
 - **2026-04-17（Secrets Phase 2 對齊完成）**：依使用者確認，n8n 舊 key 已刪除並驗證新 key 可用；`WORKLOG` 已補 §3 證據與 `AUTO_TASK_DONE: Secrets 治理升級`，`TASKS` 進度改為「待 AO-CLOSE 腳本套用勾選」。
 - **2026-04-17（30 年級穩定化啟動：Sentry 基線治理化）**：已新增 `SENTRY_ALERT_POLICY.md`（DSN 契約、P1-P3 告警分級、smoke baseline、巡檢節奏），並把 `verify-build-gates` 接入 Sentry 契約檢查（政策檔存在 + phase1 `.env.example` 必備 DSN keys）；`security-secrets-policy.md` 同步補上 Sentry DSN owner/輪替契約，避免觀測與密鑰治理分離。
@@ -342,5 +343,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-17 11:49:26 UTC_
+_Last synced: 2026-04-17 12:55:38 UTC_
 
