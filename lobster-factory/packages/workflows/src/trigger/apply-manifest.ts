@@ -22,6 +22,7 @@ import {
   writeApplyManifestRemotePutArtifacts,
   writeApplyManifestRemotePutArtifactsFailure,
 } from "../artifacts/remotePutArtifactSink";
+import { captureWorkflowException } from "../observability/sentry";
 
 const InputSchema = z.object({
   // Used for multi-tenant FK fields when we later enable DB writes.
@@ -86,7 +87,8 @@ function buildInstallPlan(manifest: z.infer<typeof ManifestSchema>) {
 export const applyManifest = task({
   id: "apply-manifest",
   run: async (payload: unknown) => {
-    const input = InputSchema.parse(payload);
+    try {
+      const input = InputSchema.parse(payload);
 
     if (input.environmentType !== "staging") {
       throw new Error("Manifest install is blocked outside staging");
@@ -409,7 +411,7 @@ export const applyManifest = task({
           ? ("staging_shell_dry_run_complete" as const)
           : ("staging_shell_apply_complete" as const);
 
-    return {
+      return {
       status,
       manifest: {
         name: manifest.name,
@@ -434,7 +436,15 @@ export const applyManifest = task({
           patchedFinalStatus,
         },
       },
-    };
+      };
+    } catch (error) {
+      captureWorkflowException(error, {
+        workflowId: "apply-manifest",
+        route: "task.run",
+        payload,
+      });
+      throw error;
+    }
   },
 });
 

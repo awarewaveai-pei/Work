@@ -69,7 +69,7 @@ services:
       N8N_SECURE_COOKIE: "false"
       N8N_PROXY_HOPS: "1"
       # Sentry (self-hosted n8n) — see https://github.com/n8n-io/n8n/blob/master/packages/@n8n/config/src/configs/sentry.config.ts
-      N8N_SENTRY_DSN: ${SENTRY_DSN_N8N:-}
+      N8N_SENTRY_DSN: ${N8N_SENTRY_DSN:-${SENTRY_DSN_N8N:-}}
       N8N_FRONTEND_SENTRY_DSN: ${SENTRY_DSN_N8N_FRONTEND:-}
       ENVIRONMENT: ${N8N_SENTRY_ENVIRONMENT:-staging}
       DEPLOYMENT_NAME: ${N8N_DEPLOYMENT_NAME:-lobster-phase1-n8n}

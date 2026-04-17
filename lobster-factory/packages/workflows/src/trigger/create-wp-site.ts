@@ -6,6 +6,7 @@ import { buildWorkflowRunRow } from "../db/sql/workflowRunsSql";
 import { LobsterCatalogIds } from "../db/catalogIds";
 import { supabaseRestInsert } from "../db/supabase/supabaseRestInsert";
 import { resolveStagingProvisioning } from "../hosting/resolveStagingProvisioning";
+import { captureWorkflowException } from "../observability/sentry";
 
 const InputSchema = z.object({
   organizationId: z.string().uuid(),
@@ -25,15 +26,16 @@ const InputSchema = z.object({
 export const createWpSite = task({
   id: "create-wp-site",
   run: async (payload: unknown) => {
-    const input = InputSchema.parse(payload);
+    try {
+      const input = InputSchema.parse(payload);
 
-    logger.info("Starting WP site creation", input);
+      logger.info("Starting WP site creation", input);
 
-    const hosting = await resolveStagingProvisioning({
-      siteId: input.siteId,
-      siteName: input.siteName,
-      organizationId: input.organizationId,
-    });
+      const hosting = await resolveStagingProvisioning({
+        siteId: input.siteId,
+        siteName: input.siteName,
+        organizationId: input.organizationId,
+      });
 
     if (hosting.outcome === "blocked") {
       const workflowRunId = newUuid();
@@ -192,17 +194,25 @@ export const createWpSite = task({
           },
         };
 
-    return {
-      status: stagingRef
-        ? hosting.outcome === "mock"
-          ? ("mock_staging_provisioned" as const)
-          : ("vendor_staging_provisioned" as const)
-        : ("pending_next_step" as const),
-      input,
-      mockHosting: hosting.outcome === "mock" ? hosting.ref : null,
-      vendorStaging: hosting.outcome === "provisioned" ? hosting.ref : null,
-      next,
-    };
+      return {
+        status: stagingRef
+          ? hosting.outcome === "mock"
+            ? ("mock_staging_provisioned" as const)
+            : ("vendor_staging_provisioned" as const)
+          : ("pending_next_step" as const),
+        input,
+        mockHosting: hosting.outcome === "mock" ? hosting.ref : null,
+        vendorStaging: hosting.outcome === "provisioned" ? hosting.ref : null,
+        next,
+      };
+    } catch (error) {
+      captureWorkflowException(error, {
+        workflowId: "create-wp-site",
+        route: "task.run",
+        payload,
+      });
+      throw error;
+    }
   },
 });
 

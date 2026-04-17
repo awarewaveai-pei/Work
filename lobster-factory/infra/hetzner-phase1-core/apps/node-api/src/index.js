@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/node";
 import express from "express";
+import { createClient } from "@supabase/supabase-js";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
@@ -8,6 +9,14 @@ Sentry.init({
 
 const app = express();
 const port = process.env.PORT || 3001;
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const supabase =
+  supabaseUrl && supabaseServiceRoleKey
+    ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+    : null;
 
 app.use(express.json());
 
@@ -28,7 +37,59 @@ app.get("/rag/health", (_req, res) => {
   });
 });
 
+async function runSupabaseQueryWithSentry(operation, context) {
+  if (!supabase) {
+    const err = new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing");
+    Sentry.captureException(err, {
+      tags: { component: "node-api", integration: "supabase" },
+      extra: context,
+    });
+    throw err;
+  }
+
+  const result = await operation();
+  if (result?.error) {
+    const err = new Error(`[supabase] ${result.error.message}`);
+    Sentry.captureException(err, {
+      tags: { component: "node-api", integration: "supabase" },
+      extra: {
+        ...context,
+        code: result.error.code,
+        details: result.error.details,
+        hint: result.error.hint,
+      },
+    });
+    throw err;
+  }
+  return result;
+}
+
+app.get("/rag/supabase-health", async (_req, res, next) => {
+  try {
+    const { data } = await runSupabaseQueryWithSentry(
+      () => supabase.auth.admin.listUsers({ page: 1, perPage: 1 }),
+      { route: "/rag/supabase-health", operation: "auth.admin.listUsers" }
+    );
+
+    res.json({
+      ok: true,
+      service: "rag",
+      supabase: "reachable",
+      sampledUsers: Array.isArray(data?.users) ? data.users.length : 0,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 Sentry.setupExpressErrorHandler(app);
+
+app.use((err, _req, res, _next) => {
+  res.status(500).json({
+    ok: false,
+    error: err instanceof Error ? err.message : "Internal server error",
+  });
+});
 
 app.listen(port, "0.0.0.0", () => {
   console.log(`node-api listening on ${port}`);

@@ -4,6 +4,7 @@
     "private": true,
     "type": "module",
     "dependencies": {
+        "@sentry/node": "^10.49.0",
         "@trigger.dev/sdk": "4.4.3",
         "zod": "^3.22.0"
     },

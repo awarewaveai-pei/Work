@@ -82,7 +82,7 @@ chmod +x scripts/diagnose-host-resources.sh
 n8n 映像讀取 **`N8N_SENTRY_DSN`**（後端）與選填 **`N8N_FRONTEND_SENTRY_DSN`**（編輯器前端）；可選 **`ENVIRONMENT`** / **`DEPLOYMENT_NAME`** 等（與 n8n 原始碼 `packages/@n8n/config/src/configs/sentry.config.ts` 一致）。
 
 1. 在 Sentry 建立專案（類型 **Node.js** 給後端；若要前端再建 **Browser** 或沿用同一專案視需求）。  
-2. 在伺服器 `.env` 填入 **`SENTRY_DSN_N8N`**（與選填 **`SENTRY_DSN_N8N_FRONTEND`**），見 **`.env.example`**。  
+2. 在伺服器 `.env` 填入 **`N8N_SENTRY_DSN`**（或舊別名 **`SENTRY_DSN_N8N`**，與選填 **`SENTRY_DSN_N8N_FRONTEND`**），見 **`.env.example`**。  
 3. **`docker compose --env-file .env up -d`**（或僅 **`docker compose --env-file .env up -d n8n`**）讓 n8n 重載環境。  
 
 **最小驗證**
