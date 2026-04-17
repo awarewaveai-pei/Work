@@ -16,7 +16,7 @@ Next.js 仍為 **自架 Docker + Nginx**；Cloudflare 只作 **邊緣**。操作
 
 ## 系統 Nginx 已佔用 80/443 時（實機常態）
 
-若主機 **系統 nginx** 先佔了 `:80/:443`，`lobster-nginx` 可能無法啟動，但 **`next-admin` 仍可透過本機埠 `127.0.0.1:3002` 運行**。此時請在 **系統 nginx** 上複製與 `nginx/default.conf` 同構的路由（`/ → Next`、`/api/`、`/n8n/`、`/wp/`），範本見：**[`nginx/system-sites/aware-wave-phase1.conf`](./nginx/system-sites/aware-wave-phase1.conf)**（部署到 `/etc/nginx/sites-available/` 後 `ln -s` 至 `sites-enabled`，再 `certbot --nginx` 補 TLS）。
+若主機 **系統 nginx** 先佔了 `:80/:443`，`lobster-nginx` 可能無法啟動，但 **`next-admin` 仍可透過本機埠 `127.0.0.1:3002` 運行**。此時請在 **系統 nginx** 上複製與 `nginx/default.conf` 同構的路由（**`/` → WordPress**、**`/admin/` → Next**、`/api/`、`/n8n/`），範本見：**[`nginx/system-sites/aware-wave-phase1.conf`](./nginx/system-sites/aware-wave-phase1.conf)**（部署到 `/etc/nginx/sites-available/` 後 `ln -s` 至 `sites-enabled`，再 `certbot --nginx` 補 TLS）。
 
 ## 安全（必讀）
 
@@ -30,10 +30,12 @@ Next.js 仍為 **自架 Docker + Nginx**；Cloudflare 只作 **邊緣**。操作
 ```bash
 cd lobster-factory/infra/hetzner-phase1-core
 cp .env.example .env
-# 必填：WORDPRESS_PUBLIC_URL 須與瀏覽器實際網址一致（例如 http://YOUR_IP/wp）
+# 必填：WORDPRESS_PUBLIC_URL 須與瀏覽器實際網址一致（公開 origin，無路徑尾碼；例如 https://aware-wave.com）
 docker compose --env-file .env build
 docker compose --env-file .env up -d
 ```
+
+**已上線主機（系統 Nginx 對外）**：合併本 repo 的 `nginx/system-sites/aware-wave-phase1.conf` 到 `/etc/nginx/sites-available/…`，`nginx -t` 後 `systemctl reload nginx`；接著 **`WORDPRESS_PUBLIC_URL`** 改為 apex（無 `/wp`）、**重建並重啟** `next-admin`（`basePath=/admin`），再檢查 `https://<網域>/` 與 `https://<網域>/wp-admin/`。
 
 **變更 `NEXT_PUBLIC_*` 後**必須 **重建 next-admin**（建置期間 baked in）：
 
@@ -52,16 +54,16 @@ curl -sf http://127.0.0.1/
 curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯
 ```
 
-**Sentry（next-admin，可選）**：部署並設定 DSN 後，可對外公開 URL 呼叫 **`GET /api/sentry-test`**（實作：[apps/next-admin/app/api/sentry-test/route.ts](apps/next-admin/app/api/sentry-test/route.ts)），於 Sentry 專案確認收到測試事件。
+**Sentry（next-admin，可選）**：部署並設定 DSN 後，可對外公開 URL 呼叫 **`GET /admin/api/sentry-test`**（實作：[apps/next-admin/app/api/sentry-test/route.ts](apps/next-admin/app/api/sentry-test/route.ts)），於 Sentry 專案確認收到測試事件。
 
 **PostHog（next-admin，可選，建議雲端）**：於 `.env` 填入 **`NEXT_PUBLIC_POSTHOG_KEY`**（與選填 **`NEXT_PUBLIC_POSTHOG_HOST`**，預設 `https://us.i.posthog.com`）；留空則不初始化。變更後須 **`docker compose build next-admin`** 再 **`up -d next-admin`**（`NEXT_PUBLIC_*` 為建置期注入）。
 
 瀏覽器（將主機名換成實際 IP／網域）：
 
-- Admin：`http://YOUR_HOST/`
+- 公開網站（WordPress）：`http://YOUR_HOST/`
+- Next 管理介面：`http://YOUR_HOST/admin/`
 - API：`http://YOUR_HOST/api/health`
 - n8n：`http://YOUR_HOST/n8n/`
-- WordPress：`http://YOUR_HOST/wp/`
 
 WordPress 第一次安裝若耗時較長，`wordpress` 的 `healthcheck` 有較長 `start_period`；若 `nginx` 遲遲不起，看 `docker compose logs wordpress nginx`。若映像檔無 `curl`，將 compose 裡 WordPress `healthcheck` 改為 `wget -qO- http://127.0.0.1/` 同效。
 
@@ -152,7 +154,7 @@ n8n 映像讀取 **`N8N_SENTRY_DSN`**（後端）與選填 **`N8N_FRONTEND_SENTR
 ## 已知／刻意邊界
 
 - **無 HTTPS** — 下一階段（Cloudflare / Let’s Encrypt）再接。
-- **WordPress 子路徑** — 已用 `WORDPRESS_PUBLIC_URL` + `WORDPRESS_CONFIG_EXTRA` 降低錯位；若仍異常，優先改 **子網域** 安裝。
+- **WordPress 在網域根** — `WORDPRESS_PUBLIC_URL` 必須是公開 origin（**不要**加 `/wp`）；若先前裝在子路徑，請在 WP 後台或 `wp search-replace` 更新站台網址，或參考 WordPress「變更網址」文件。
 - **Trigger.dev** — 不在此 compose；對齊 `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` 另接。
 - **Next / Node production images** — 若要熱重載，請用附錄或在本機跑 `npm run dev`，不要強求與 production image 混用。
 

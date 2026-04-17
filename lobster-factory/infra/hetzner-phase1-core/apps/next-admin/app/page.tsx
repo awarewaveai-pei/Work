@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function HomePage() {
   return (
     <main style={{ padding: 24, fontFamily: "sans-serif" }}>
@@ -5,10 +7,10 @@ export default function HomePage() {
       <p>Next.js Admin is running.</p>
       <ul>
         <li>
-          <a href="/api-check">API Check (server → node-api)</a>
+          <Link href="/api-check">API Check (server → node-api)</Link>
         </li>
         <li>
-          <a href="/api-check-client">API Check (browser → /api)</a>
+          <Link href="/api-check-client">API Check (browser → /api)</Link>
         </li>
       </ul>
     </main>

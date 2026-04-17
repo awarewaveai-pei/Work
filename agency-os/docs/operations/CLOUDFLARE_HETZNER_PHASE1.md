@@ -2,7 +2,7 @@
 
 ## 架構先講清楚（你問的 Next.js）
 
-- **Next.js Admin（`next-admin`）是自架**：跑在 **Docker** 內，由 **phase1 的 Nginx** 反代到根路徑 `/`（見 `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`）。
+- **Next.js Admin（`next-admin`）是自架**：跑在 **Docker** 內，由 **phase1 的 Nginx** 反代到 **`/admin/`**（根路徑 `/` 為 WordPress；見 `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`）。
 - **Cloudflare 不做 Next.js 主機**：它只做 **DNS、代理（CDN/WAF）、TLS 邊緣**；流量仍落到你的 **VPS 上的 Nginx（或系統 Nginx）**。
 - **不要**把 Next.js 改成 Vercel 才算「接上 Cloudflare」；你現在這種 **自架 + CF 邊緣** 是正式、可長期用的模式。
 
@@ -39,7 +39,7 @@ repo 已提供：
 
 ## 驗收清單（最小）
 
-- 瀏覽器：`https://<你的網域>/` 與 `/api/health`、`/n8n/`、`/wp/` 行為與開 CF 前一致。
+- 瀏覽器：`https://<你的網域>/`（WordPress）、`/admin/`（Next）、`/api/health`、`/n8n/` 行為與開 CF 前一致。
 - `curl -I https://<網域>/` 回應標頭正常（HTTP/2 或 3 皆可）。
 - n8n：已知 Webhook URL 仍為公開 HTTPS；抽樣觸發一條測試 workflow **200**。
 - Trigger：儀表板與 WS 仍正常（若遇 WS，確認 Cloudflare **WebSockets** 已開、且源站超時足夠）。
