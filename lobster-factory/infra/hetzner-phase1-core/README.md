@@ -14,6 +14,10 @@
 
 Next.js 仍為 **自架 Docker + Nginx**；Cloudflare 只作 **邊緣**。操作步驟、SSL 模式與真實 IP 還原見：**[`agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`](../../../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md)**。本 compose 已掛載 **`nginx/cloudflare-real-ip.conf`**（`00-` 前綴確保先載入）。
 
+## 系統 Nginx 已佔用 80/443 時（實機常態）
+
+若主機 **系統 nginx** 先佔了 `:80/:443`，`lobster-nginx` 可能無法啟動，但 **`next-admin` 仍可透過本機埠 `127.0.0.1:3002` 運行**。此時請在 **系統 nginx** 上複製與 `nginx/default.conf` 同構的路由（`/ → Next`、`/api/`、`/n8n/`、`/wp/`），範本見：**[`nginx/system-sites/aware-wave-phase1.conf`](./nginx/system-sites/aware-wave-phase1.conf)**（部署到 `/etc/nginx/sites-available/` 後 `ln -s` 至 `sites-enabled`，再 `certbot --nginx` 補 TLS）。
+
 ## 安全（必讀）
 
 - **不要**把 `.env` 或 **service role / root DB 密碼** 提交到 Git，也不要貼到聊天或 Issue。

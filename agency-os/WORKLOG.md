@@ -26,6 +26,12 @@
 - **Nginx**：新增 `lobster-factory/infra/hetzner-phase1-core/nginx/cloudflare-real-ip.conf`（官方 IPv4/IPv6 來源 + `CF-Connecting-IP`）；`docker-compose.yml` 掛載為 `00-cloudflare-real-ip.conf`。
 - **phase1 README**：補 Cloudflare 小節並連結 agency-os 正本。
 
+### Phase1 apex：`aware-wave.com` 可看見 Next 管理介面（系統 Nginx 對齊 compose 路由）
+- **現象**：`lobster-next-admin` 在跑（本機 `127.0.0.1:3002`），`lobster-nginx` 維持 `Created`（主機 **系統 nginx** 已佔 `:80/:443`），故網際網路未進到 Docker 內 `default.conf` 的 `/`。
+- **處置**：於 VPS **系統 nginx** 新增 `sites-available/aware-wave-phase1`（repo 範本：`nginx/system-sites/aware-wave-phase1.conf`）→ `sites-enabled`，`server_name aware-wave.com www.aware-wave.com`；`/`→`127.0.0.1:3002`、`/api/`→`3001`、`/n8n/`→`5678`、`/wp/`→`8080`；`nginx -t` + `reload`。
+- **TLS**：`certbot --nginx -d aware-wave.com -d www.aware-wave.com --expand` 已成功部署（與既有 `aware-wave.com` 憑證合併）；`https://aware-wave.com/` 回 **200** 且首頁為 **Lobster Factory Admin**。
+- **備註**：Docker `lobster-nginx` 仍可不啟動；對外以系統 nginx 為準時，與 compose 路由需保持同構（見範本檔頭註解）。
+
 ### Phase 0 收斂：Nginx+SSL / n8n prod / Redis 驗證（2026-04-17）
 
 **Nginx + SSL 全通確認**
@@ -584,7 +590,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-17 11:58:44 UTC_
+_Last synced: 2026-04-17 12:17:55 UTC_
 
 ## 2026-03-20
 
@@ -1012,6 +1018,7 @@ _Last synced: 2026-04-17 11:58:44 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

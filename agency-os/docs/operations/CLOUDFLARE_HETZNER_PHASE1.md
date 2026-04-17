@@ -6,7 +6,7 @@
 - **Cloudflare 不做 Next.js 主機**：它只做 **DNS、代理（CDN/WAF）、TLS 邊緣**；流量仍落到你的 **VPS 上的 Nginx（或系統 Nginx）**。
 - **不要**把 Next.js 改成 Vercel 才算「接上 Cloudflare」；你現在這種 **自架 + CF 邊緣** 是正式、可長期用的模式。
 
-若你目前是 **系統 Nginx** 佔用 `:80/:443`、Docker `lobster-nginx` 僅內網或停用，請把下面「DNS / SSL」套在 **對外那一層 Nginx** 上；repo 內 Docker Nginx 的 snippet 則在 **Docker 那層真的對外** 時才掛載。
+若你目前是 **系統 Nginx** 佔用 `:80/:443`、Docker `lobster-nginx` 僅內網或停用，請把下面「DNS / SSL」套在 **對外那一層 Nginx** 上；repo 內 Docker Nginx 的 snippet 則在 **Docker 那層真的對外** 時才掛載。與 `default.conf` 同構的 **系統站台範本**（apex `aware-wave.com`）：`lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-phase1.conf`。
 
 ## 建議接入順序（staging 先、再 prod）
 
