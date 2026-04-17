@@ -16,7 +16,7 @@ Next.js 仍為 **自架 Docker + Nginx**；Cloudflare 只作 **邊緣**。操作
 
 ## 系統 Nginx 已佔用 80/443 時（實機常態）
 
-若主機 **系統 nginx** 先佔了 `:80/:443`，`lobster-nginx` 可能無法啟動，但 **`next-admin` 仍可透過本機埠 `127.0.0.1:3002` 運行**。此時請在 **系統 nginx** 上複製與 `nginx/default.conf` 同構的路由（**`/` → WordPress**、**`/admin/` → Next**、`/api/`、`/n8n/`），範本見：**[`nginx/system-sites/aware-wave-phase1.conf`](./nginx/system-sites/aware-wave-phase1.conf)**（部署到 `/etc/nginx/sites-available/` 後 `ln -s` 至 `sites-enabled`，再 `certbot --nginx` 補 TLS）。
+若主機 **系統 nginx** 先佔了 `:80/:443`，`lobster-nginx` 可能無法啟動，但 **`next-admin` 仍可透過本機埠 `127.0.0.1:3002` 運行**。此時請在 **系統 nginx** 上複製與 `nginx/default.conf` 同構的路由（**`/` → WordPress**、**`/admin/` → Next**、`/api/`、`/n8n/`）：[`nginx/system-sites/aware-wave-phase1.conf`](./nginx/system-sites/aware-wave-phase1.conf)（含 **`:80` 與 `:443` 兩段**，避免只改 HTTP、瀏覽器仍走舊 HTTPS 路由）與共用片段 [`nginx/system-sites/lobster-aware-wave-locations.inc`](./nginx/system-sites/lobster-aware-wave-locations.inc)（安裝路徑見 `aware-wave-phase1.conf` 檔首註解）。
 
 ## 安全（必讀）
 
@@ -35,7 +35,7 @@ docker compose --env-file .env build
 docker compose --env-file .env up -d
 ```
 
-**已上線主機（系統 Nginx 對外）**：合併本 repo 的 `nginx/system-sites/aware-wave-phase1.conf` 到 `/etc/nginx/sites-available/…`，`nginx -t` 後 `systemctl reload nginx`；接著 **`WORDPRESS_PUBLIC_URL`** 改為 apex（無 `/wp`）、**重建並重啟** `next-admin`（`basePath=/admin`），再檢查 `https://<網域>/` 與 `https://<網域>/wp-admin/`。
+**已上線主機（系統 Nginx 對外）**：依 `nginx/system-sites/aware-wave-phase1.conf` 檔首註解 **同時部署 `.inc` + `.conf`**；`nginx -t` 後 `systemctl reload nginx`。接著 **`WORDPRESS_PUBLIC_URL`** 改為 apex（無 `/wp`）、**`docker compose build next-admin && docker compose up -d next-admin`**。若仍「看起來沒變」，幾乎都是 **HTTPS 的 `server { listen 443 … }` 仍指向舊路由** — 請 **`sudo nginx -T | less`** 搜尋 `listen 443` 與 `location /`，確認根路徑已反代到 `127.0.0.1:8080`（WordPress），不是 `3002`（Next）。
 
 **變更 `NEXT_PUBLIC_*` 後**必須 **重建 next-admin**（建置期間 baked in）：
 
