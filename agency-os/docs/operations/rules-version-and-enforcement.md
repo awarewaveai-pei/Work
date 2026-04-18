@@ -5,9 +5,13 @@
 
 ## Version
 
-- Version: `2026-04-10.1`
+- Version: `2026-04-18.1`
 - Supersedes: ad-hoc verbal conventions and implicit "assistant memory" habits.
 - Effective from: immediately.
+
+## Commit subject line (tool attribution)
+
+- **SSOT（寫給代理）**：`agency-os/.cursor/rules/50-operator-autopilot.mdc` §7 — 所有 `git commit` 第一行須以 `[cursor]`、`[codex]`、`[claude]` 擇一為前缀，以便區分編輯／代理來源。
 
 ## Non-Negotiable Priority
 

@@ -75,7 +75,8 @@ alwaysApply: true
 
 **原則**：開工期間保留**可回滾的本地節點**；遠端 `main` 仍以**過收工閘道後的 push**為主，避免半成品上雲。
 
-- **里程碑完成時（`AO-RESUME` 之後～`AO-CLOSE` 之前）**：代理在交付一個**可敘述、已通過約定最小驗證**的單元後（例如一項 `TASKS` 子任務 DoD、一組檔案閉環、修復並跑過相關檢查），**應**在 monorepo 根**自動**執行本機 checkpoint（**僅本機，不 push**）——**使用者不必手動跑腳本**；由代理在可執行終端代跑 `powershell -ExecutionPolicy Bypass -File .\scripts\commit-checkpoint.ps1 -Message "checkpoint: <簡述>"`（或等價 `git add`/`git commit`）。若環境**無法執行 git**（權限／沙盒），才用**一句話**請使用者在本機執行同指令或授權終端。
+- **Commit 主題行（subject）工具識別（強制）**：凡 `git commit`，**第一行**必須以 **`[cursor]`**、**`[codex]`**、**`[claude]`** 三者擇一開頭（全小寫、半形方括號），後接**一個半形空白**，再接其餘說明（可再接 Conventional Commits，例如 `[cursor] fix: doc-sync arrays`）。意義：**`[cursor]`**＝本次主要在 Cursor（含 Agent）脈絡完成；**`[codex]`**＝主要在 Codex；**`[claude]`**＝主要在 Claude（Claude Code／API 等）。同次跨多工具時，選**產出主要 diff 或最後定稿**的那一方。純本機手動、或代理代跑 `commit-checkpoint` 而無其他產品參與時，**預設 `[cursor]`**。
+- **里程碑完成時（`AO-RESUME` 之後～`AO-CLOSE` 之前）**：代理在交付一個**可敘述、已通過約定最小驗證**的單元後（例如一項 `TASKS` 子任務 DoD、一組檔案閉環、修復並跑過相關檢查），**應**在 monorepo 根**自動**執行本機 checkpoint（**僅本機，不 push**）——**使用者不必手動跑腳本**；由代理在可執行終端代跑 `powershell -ExecutionPolicy Bypass -File .\scripts\commit-checkpoint.ps1 -Message "[cursor] checkpoint: <簡述>"`（或等價 `git add`/`git commit`，**訊息第一行仍須符合上一條前缀**）。若環境**無法執行 git**（權限／沙盒），才用**一句話**請使用者在本機執行同指令或授權終端。
 - **不要**在僅完成 **`AO-RESUME` 前檢**、或只有草稿／雜訊時為了習慣而**空 commit**。
 - **可略過 checkpoint**：疑似祕密未排除、使用者明示先不要 commit、純實驗性變更且將丟棄、或明知與即將收工閘道衝突的 WIP（應先說明風險）。
 - **收工**：**`AO-CLOSE`**（`ao-close.ps1`）仍為**預設**最終 **`commit`（收斂殘留變更）+ `push`** 的入口；通過閘道後再推。當日若已有多顆本地 checkpoint，**一次 push 可帶上多顆 commit**（無需 squash，除非使用者要）。

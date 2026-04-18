@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-17 20:55:49
+- Generated: 2026-04-18 22:54:47
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,65 +203,14 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-17.md
-# 2026-04-17
-
-- 背景：使用者確認 Trigger.dev 入口問題已由另一代理排除，現已可正常進入儀表板。
-- 已完成：本機 `AO-RESUME` 驗證通過（strict PASS），Git 狀態對齊 `origin/main` 且工作樹 clean。
-- 已完成：新增 repo 級 `.gitattributes`（LF/CRLF 策略）並推送，降低 Windows 環境反覆出現假 dirty tree 的機率。
-- 未完成：雙機環境對齊仍待公司桌機執行 `AO-RESUME` + `machine-environment-audit -FetchOrigin -Strict` 並 PASS。
-- 風險/阻塞：若 Trigger 儀表板再出現「導向 `/projects/new`」體感，優先檢查登入 session、反向代理標頭與 WS 連線。
-- 下一步：回公司桌機完成 strict 稽核，再回寫 `TASKS` 的「雙機環境對齊」。
-
-## Sentry 補齊驗證（n8n / Trigger / node-api）
-
-- 背景：使用者要求確認三項都實機生效：`N8N_SENTRY_DSN`、Trigger workflow 捕捉例外、node-api 捕捉 Supabase 錯誤。
-- 已完成：n8n `.env` DSN 補齊並重啟；失敗 workflow 執行後在 Sentry 出現對應錯誤事件。
-- 已完成：node-api 新增 `/rag/supabase-health` 驗證路由；故意打壞 Supabase key 觸發 `500` 與 `[supabase] Unauthorized` 上報，恢復後回 `200`。
-- 已完成：Trigger workflows 已加 `try/catch + captureException`，並用同 helper 送出 `create-wp-site` 路徑 smoke 事件，Sentry 可見。
-- 風險/阻塞：VPS 上 `lobster-phase1` 非 git repo，後續若要持續吃最新程式需建立同步流程（pull + deploy 或轉正規 CI/CD）。
-- 下一步：清理本輪 smoke issue（加 `smoke-test` 標籤或 `Resolved`），再進入 Next.js 控制台 v1 主線。
-
-## Sentry Phase 1 基線治理化
-
-- 背景：使用者要求「可跑 30 年不出大問題」；先從可觀測性基線制度化，避免只靠一次性接線。
-- 已完成：新增 `agency-os/docs/operations/SENTRY_ALERT_POLICY.md`，定義 DSN 分流契約、P1/P2/P3 告警分級、smoke 測試基線、週/月/季巡檢節奏。
-- 已完成：`agency-os/docs/operations/README.md` 已加入政策入口，避免日後遺漏。
-- 已完成：`verify-build-gates.ps1`（root + agency）已接入 Sentry 契約檢查（政策檔存在 + phase1 `.env.example` 必備 DSN keys）。
-- 已完成：`security-secrets-policy.md` 已補 Sentry DSN owner/輪替基線與同步要求，將告警與密鑰治理綁定。
-- 風險/阻塞：DR 還原演練仍待排程；GitHub PAT fine-grained 仍為建議後續項。
-- 下一步：`AO-CLOSE` 套用 `TASKS` Secrets 勾選後，排 DR drill 與 GitHub PAT 收斂。
-
-## Secrets Phase 2 落帳對齊
-
-- 背景：使用者確認「舊 n8n key 已刪除」已處理，需同步 `WORKLOG`/`TASKS`/`memory` 狀態。
-- 已完成：`WORKLOG` 已將 n8n 舊 key 刪除與驗證結果落帳，並補 `AUTO_TASK_DONE: Secrets 治理升級`。
-- 已完成：`TASKS` 的 Secrets 項進度更新為「§2 路徑 B 已完成，待 AO-CLOSE 腳本套用勾選」。
-- 已完成：本日記憶與長期記憶已同步，避免「已做完但文件仍顯示未完成」的狀態漂移。
-- 風險/阻塞：GitHub PAT fine-grained 輪替仍屬建議強化項，非本輪 Secrets DoD 必要條件。
-- 下一步：待本次 `AO-CLOSE` 時由 `apply-closeout-task-checkmarks` 依 `AUTO_TASK_DONE` 套用 `TASKS` 勾選。
-
-## Phase1 aware-wave apex（WP 根／Next `/admin`）
-
-- 背景：使用者要以 WordPress 作公開首頁；先前系統 Nginx 將 `/` 指到 Next，且僅改 HTTP 時 HTTPS 仍舊；另曾出現 `/admin` 重導迴圈。
-- 已完成：repo 範本與 `default.conf` 同構；VPS 已部署 snippet + 雙 listener、`WORDPRESS_PUBLIC_URL`、重建 `next-admin`（`basePath=/admin`）；`^~ /admin` 修正迴圈；實測 apex 為 WP、`/admin` 為 Next。
-- 未完成：WP 完成安裝精靈與內容仍屬使用者後續操作；VPS 目錄建議改為 git 同步。
-- 風險/阻塞：無（路由層已收斂）。
-- 下一步：`AO-CLOSE` 推上 `origin/main`；他機 `git pull` 續接。
-
-## 全日收斂與提交（EOD）
-
-- 背景：使用者要求將本日（含另一代理 Claude 於 VPS／監控之口述處置）完整落帳並 git commit。
-- 已完成：`WORKLOG` 新增「2026-04-17 全日收斂」；修正 Secrets 段落與 P1 邊界敘述；`next-admin` PostHog 改環境變數、Dockerfile／compose／`.env.example` 對齊（不把 PostHog project key 入庫）。
-- 已完成：`doc-sync-automation`、`system-health-check`、`verify-build-gates` 於提交前再跑一輪。
-- 風險/阻塞：VPS 實機與本 repo 仍可能不同步（`lobster-phase1` 非 git）；監控細節以實機為準定期核對。
-- 下一步：執行 `git push origin main`（若本機僅 commit）；桌機補雙機 strict。
+## 5) memory/daily/2026-04-18.md
+_no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-17 20:55:41`
+- Time: `2026-04-18 22:54:39`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -271,8 +220,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260417-205541.md`
-- Closeout: `reports/closeout/closeout-20260417-205538.md`
+- Health: `reports/health/health-20260418-225439.md`
+- Closeout: `reports/closeout/closeout-20260418-225436.md`
 
 ## Action
 - No blocking issue detected.

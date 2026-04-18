@@ -1,12 +1,19 @@
 ﻿{
-    "last_run_utc":  "2026-04-18T14:31:07.3762202Z",
+    "last_run_utc":  "2026-04-18T14:54:36.2610130Z",
     "changed_files":  [
-                          "docs/operations/CURSOR_AGENT_RUNTIME_PLAYBOOK.md"
+                          ".cursor/rules/50-operator-autopilot.mdc",
+                          "docs/operations/rules-version-and-enforcement.md",
+                          "memory/CONVERSATION_MEMORY.md",
+                          "WORKLOG.md"
                       ],
     "impacted_files":  [
-                           "docs/operations/CURSOR_AGENT_RUNTIME_PLAYBOOK.md"
+                           ".cursor/rules/50-operator-autopilot.mdc",
+                           "docs/operations/rules-version-and-enforcement.md",
+                           "memory/CONVERSATION_MEMORY.md",
+                           "WORKLOG.md"
                        ],
     "auto_updated_files":  [
-
+                               "memory/CONVERSATION_MEMORY.md",
+                               "WORKLOG.md"
                            ]
 }

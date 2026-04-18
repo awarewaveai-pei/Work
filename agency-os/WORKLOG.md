@@ -9,6 +9,11 @@
 - **repo 對齊**：新增系統 Nginx 範本 **`lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`**（**`api` → `127.0.0.1:3001`**；**`app` → 302 至 `https://aware-wave.com/admin/`**，與目前 Next **`basePath=/admin`**、公開網址以 apex 為準一致，避免換 Host 造成靜態資源／cookie 錯位）。**`CLOUDFLARE_HETZNER_PHASE1.md`** 增 §子網域表與驗收；**`hetzner-phase1-core/README.md`** 補連結。
 - **VPS**：若尚未部署，請將範本拷入 **`sites-available`** → **`sites-enabled`**，並以 **`certbot`** 為兩名簽 **SAN** 憑證後 **`nginx -t` + `reload`**（路徑依 `live/` 實際目錄調整範本內 `ssl_certificate`）。
 
+### Git commit 主題行：多工具識別（Cursor / Codex / Claude）
+- **規則**：`agency-os/.cursor/rules/50-operator-autopilot.mdc` §7 增列強制前缀 **`[cursor]`**、**`[codex]`**、**`[claude]`**（全小寫 + 空白後接說明）；`commit-checkpoint` 範例改為 **`[cursor] checkpoint: …`**。
+- **Owner 指針**：`docs/operations/rules-version-and-enforcement.md` 版本 **`2026-04-18.1`**，並加「Commit subject line」小節指回 §7；monorepo 根 `.cursor/rules` 已跑 **`sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 鏡像。
+- **說明**：Claude／Codex 預設不讀 `.mdc`；若要在該工具鏈也遵守，需在各自專案指示檔複製同條；硬擋需另加 **commit-msg hook** 或 CI。
+
 ## 2026-04-17
 
 ### Sentry 三路補齊驗證完成（n8n / Trigger / node-api）
@@ -603,7 +608,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-18 14:30:02 UTC_
+_Last synced: 2026-04-18 14:54:35 UTC_
 
 ## 2026-03-20
 
@@ -1031,6 +1036,7 @@ _Last synced: 2026-04-18 14:30:02 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

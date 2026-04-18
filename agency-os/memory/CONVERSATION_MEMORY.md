@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-18（Git commit 前缀）**：`50-operator-autopilot.mdc` §7 強制 **`[cursor]`／`[codex]`／`[claude]`** 第一行 subject；`rules-version-and-enforcement.md` **2026-04-18.1** 指回；Claude/Codex 不讀 `.mdc` 需另複製規則或 hook 才硬擋。
 - **2026-04-17（Phase1 apex：WP 根／Next `/admin`）**：`aware-wave.com` 系統 Nginx 已改為 **`/`→WordPress（8080）**、**`/admin`→next-admin（3002）**；共用 **`lobster-aware-wave-locations.inc`** 同時掛在 **:80 與 :443**；`WORDPRESS_PUBLIC_URL` 已改 **https://aware-wave.com**；`next-admin` 設 **`basePath=/admin`** 並於 VPS 重建映像；**`location ^~ /admin`** 修正與 Next 308 之迴圈。VPS `/root/lobster-phase1` 仍非 git，需手動與 repo 對齊。
 - **2026-04-17（全日收斂 commit）**：`WORKLOG` 已寫「全日收斂」含另一代理（Claude）口述之 VPS／Uptime Kuma／Netdata／PostHog 雲端決策；`next-admin` PostHog 改 `NEXT_PUBLIC_POSTHOG_*` 不入庫；EOD 前再跑 doc-sync／health／verify-build-gates。
 - **2026-04-17（Secrets Phase 2 對齊完成）**：依使用者確認，n8n 舊 key 已刪除並驗證新 key 可用；`WORKLOG` 已補 §3 證據與 `AUTO_TASK_DONE: Secrets 治理升級`，`TASKS` 進度改為「待 AO-CLOSE 腳本套用勾選」。
@@ -343,5 +344,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-18 14:30:02 UTC_
+_Last synced: 2026-04-18 14:54:35 UTC_
 

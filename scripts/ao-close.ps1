@@ -190,7 +190,7 @@ try {
     $hasStaged = $staged.Count -gt 0
     if ($hasStaged) {
         if (-not $CommitMessage) {
-            $CommitMessage = "chore: AO-CLOSE sync " + (Get-Date -Format "yyyy-MM-dd HHmm")
+            $CommitMessage = "[cursor] chore: AO-CLOSE sync " + (Get-Date -Format "yyyy-MM-dd HHmm")
         }
         git commit -m $CommitMessage
         if ($LASTEXITCODE -ne 0) {
