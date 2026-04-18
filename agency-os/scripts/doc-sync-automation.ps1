@@ -287,7 +287,8 @@ function Invoke-Once {
     }
 
     $impactedSet = Expand-Impacted -Changed $changed -Map $map
-    $impacted = @($impactedSet) | Sort-Object
+    # Force array: single-element pipeline output unwraps to scalar and breaks foreach + ConvertTo-Json.
+    $impacted = @(@($impactedSet) | Sort-Object)
     $relatedMap = Build-RelatedMap -Map $map
 
     $updated = @()
@@ -338,7 +339,7 @@ function Invoke-Once {
         if ($updated.Count -eq 0) {
             $report += "- No files required metadata sync updates."
         } else {
-            foreach ($f in ($updated | Sort-Object -Unique)) { $report += ('- Updated related block: `{0}`' -f $f) }
+            foreach ($f in @($updated | Sort-Object -Unique)) { $report += ('- Updated related block: `{0}`' -f $f) }
         }
         $report += ""
         $report += "## Manual Semantic Review"
@@ -366,17 +367,18 @@ function Invoke-Once {
         throw ($msg -join "`n")
     }
 
+    $autoUpdated = @($updated | Sort-Object -Unique)
     $newState = [ordered]@{
         last_run_utc = (Get-Date).ToUniversalTime().ToString("o")
-        changed_files = $changed
-        impacted_files = $impacted
-        auto_updated_files = ($updated | Sort-Object -Unique)
+        changed_files = @($changed)
+        impacted_files = @($impacted)
+        auto_updated_files = $autoUpdated
     }
     Save-Json -Path $statePath -Object $newState
 
     Write-Output ("Changed: " + ($changed -join ", "))
     Write-Output ("Impacted: " + ($impacted -join ", "))
-    Write-Output ("Auto-updated metadata blocks: " + (($updated | Sort-Object -Unique) -join ", "))
+    Write-Output ("Auto-updated metadata blocks: " + ($autoUpdated -join ", "))
 }
 
 $root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot

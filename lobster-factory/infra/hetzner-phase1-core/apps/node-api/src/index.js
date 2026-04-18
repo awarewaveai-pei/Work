@@ -15,6 +15,11 @@ if (sentryDsn) {
   });
 }
 
+function captureExceptionIfSentry(err, context) {
+  if (!sentryDsn) return;
+  Sentry.captureException(err, context);
+}
+
 const app = express();
 const port = process.env.PORT || 3001;
 const supabaseUrl = process.env.SUPABASE_URL || "";
@@ -48,7 +53,7 @@ app.get("/rag/health", (_req, res) => {
 async function runSupabaseQueryWithSentry(operation, context) {
   if (!supabase) {
     const err = new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing");
-    Sentry.captureException(err, {
+    captureExceptionIfSentry(err, {
       tags: { component: "node-api", integration: "supabase" },
       extra: context,
     });
@@ -58,7 +63,7 @@ async function runSupabaseQueryWithSentry(operation, context) {
   const result = await operation();
   if (result?.error) {
     const err = new Error(`[supabase] ${result.error.message}`);
-    Sentry.captureException(err, {
+    captureExceptionIfSentry(err, {
       tags: { component: "node-api", integration: "supabase" },
       extra: {
         ...context,

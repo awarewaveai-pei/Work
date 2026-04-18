@@ -35,7 +35,8 @@ function Get-PostHogCipherFromSecrets {
 }
 
 function Get-PostHogApiKey {
-    foreach ($envName in @("POSTHOG_API_KEY", "POSTHOG_PERSONAL_API_KEY")) {
+    # Same key names as Get-PostHogCipherFromSecrets / vault import-mcp (POSTHOG_AUTH_BEARER_TOKEN from PostHog MCP server).
+    foreach ($envName in @("POSTHOG_API_KEY", "POSTHOG_AUTH_BEARER_TOKEN", "POSTHOG_PERSONAL_API_KEY")) {
         $v = [Environment]::GetEnvironmentVariable($envName, "Process")
         if (-not [string]::IsNullOrWhiteSpace($v)) {
             return $v.Trim()
@@ -48,7 +49,7 @@ function Get-PostHogApiKey {
 
     $vaultPath = Join-Path $env:LOCALAPPDATA "AgencyOS\secrets\vault.json"
     if (-not (Test-Path -LiteralPath $vaultPath)) {
-        throw "PostHog API key not found in env and vault file is missing: $vaultPath. Set POSTHOG_API_KEY or run: .\scripts\secrets-vault.ps1 -Action import-mcp -McpPath `"$env:USERPROFILE\.cursor\mcp.json`""
+        throw "PostHog API key not found in env and vault file is missing: $vaultPath. Set POSTHOG_API_KEY, POSTHOG_AUTH_BEARER_TOKEN, or POSTHOG_PERSONAL_API_KEY; or run: .\scripts\secrets-vault.ps1 -Action import-mcp -McpPath `"$env:USERPROFILE\.cursor\mcp.json`""
     }
 
     $raw = Read-VaultJson -VaultPath $vaultPath

@@ -1,10 +1,12 @@
 ﻿{
-    "last_run_utc":  "2026-04-18T12:18:04.1384255Z",
+    "last_run_utc":  "2026-04-18T14:31:07.3762202Z",
     "changed_files":  [
                           "docs/operations/CURSOR_AGENT_RUNTIME_PLAYBOOK.md"
                       ],
-    "impacted_files":  "docs/operations/CURSOR_AGENT_RUNTIME_PLAYBOOK.md",
-    "auto_updated_files":  {
+    "impacted_files":  [
+                           "docs/operations/CURSOR_AGENT_RUNTIME_PLAYBOOK.md"
+                       ],
+    "auto_updated_files":  [
 
-                           }
+                           ]
 }
