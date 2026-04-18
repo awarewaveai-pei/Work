@@ -12,12 +12,13 @@
 
 ## Cloudflare 邊緣（DNS / WAF / TLS）
 
-Next.js 仍為 **自架 Docker + Nginx**；Cloudflare 只作 **邊緣**。操作步驟、SSL 模式與真實 IP 還原見：**[`agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`](../../../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md)**。本 compose 已掛載 **`nginx/cloudflare-real-ip.conf`**（`00-` 前綴確保先載入）。
+Next.js 仍為 **自架 Docker + Nginx**；Cloudflare 只作 **邊緣**。操作步驟、SSL 模式與真實 IP 還原見：**[`agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`](../../../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md)**。本 compose 已掛載 **`nginx/cloudflare-real-ip.conf`**（`00-` 前綴確保先載入）。  
+**`api.aware-wave.com`／`node-api` 演進計畫與子網域統管入口**（**git 唯一正文**，勿與 `~/.cursor/plans/` 重複全文）：[`agency-os/docs/edge-and-domains/README.md`](../../../agency-os/docs/edge-and-domains/README.md)。
 
 ## 系統 Nginx 已佔用 80/443 時（實機常態）
 
 若主機 **系統 nginx** 先佔了 `:80/:443`，`lobster-nginx` 可能無法啟動，但 **`next-admin` 仍可透過本機埠 `127.0.0.1:3002` 運行**。此時請在 **系統 nginx** 上複製與 `nginx/default.conf` 同構的路由（**`/` → WordPress**、**`/admin/` → Next**、`/api/`、`/n8n/`）：[`nginx/system-sites/aware-wave-phase1.conf`](./nginx/system-sites/aware-wave-phase1.conf)（含 **`:80` 與 `:443` 兩段**，避免只改 HTTP、瀏覽器仍走舊 HTTPS 路由）與共用片段 [`nginx/system-sites/lobster-aware-wave-locations.inc`](./nginx/system-sites/lobster-aware-wave-locations.inc)（安裝路徑見 `aware-wave-phase1.conf` 檔首註解）。  
-**Cloudflare 子網域 `api` / `app`（同機）**：[`nginx/system-sites/aware-wave-app-api-subdomains.conf`](./nginx/system-sites/aware-wave-app-api-subdomains.conf) + [`agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`](../../../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md) §子網域。
+**Cloudflare 子網域 `api` / `app`（同機）**：[`nginx/system-sites/aware-wave-app-api-subdomains.conf`](./nginx/system-sites/aware-wave-app-api-subdomains.conf) + [`agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`](../../../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md) §子網域；**邊界與路線圖**見 [`agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](../../../agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)。
 
 ## 安全（必讀）
 
@@ -126,6 +127,8 @@ SENTRY_DSN_N8N_FRONTEND=
 SENTRY_DSN_NEXT_ADMIN=
 SENTRY_DSN_WORDPRESS=
 ```
+
+**不用在這些「基礎設施本體」裝 Sentry SDK**：Supabase **Kong**（閘道）、**MinIO**（物件儲存）、**Uptime Kuma**（`uptime.*` 監控頁）— 它們不是你自己寫的應用程式；錯誤／可用性請看各服務日誌、健康檢查，或讓 **node-api / next-admin / WordPress** 的 Sentry 代表使用者可見錯誤。若要「斷線也進 Sentry」，可用 Sentry **Cron Monitors** 或監控告警 Webhook，而不是給 Kong 裝 Node SDK。
 
 建議同步加上通用標籤（每個服務至少要有）：
 

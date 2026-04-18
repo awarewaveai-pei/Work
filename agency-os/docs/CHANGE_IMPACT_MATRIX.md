@@ -71,8 +71,13 @@
 | `.cursor/rules/20-doc-sync-closeout.mdc` | `AGENTS.md`, `README.md`, `scripts/doc-sync-automation.ps1`, `TASKS.md`, `WORKLOG.md` |
 | `.cursor/rules/30-resume-keyword.mdc` | `AGENTS.md`, `README.md`, `memory/CONVERSATION_MEMORY.md`, `TASKS.md`, `WORKLOG.md`, `LAST_SYSTEM_STATUS.md` |
 | `.cursor/rules/40-shutdown-closeout.mdc` | `AGENTS.md`, `README.md`, `TASKS.md`, `WORKLOG.md`, `memory/CONVERSATION_MEMORY.md`, `scripts/doc-sync-automation.ps1`, `scripts/system-health-check.ps1`, `scripts/system-guard.ps1` |
-
-| `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` | `docs/operations/cursor-mcp-and-plugin-inventory.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md`, `TASKS.md`, `WORKLOG.md`, `docs/operations/tools-and-integrations.md`, `docs/operations/security-secrets-policy.md`, `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md` |
+| `docs/edge-and-domains/README.md` | `docs/README.md`, `AGENTS.md`, `docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`, `docs/operations/README.md`, `../lobster-factory/infra/hetzner-phase1-core/README.md`, `docs/overview/README.md`, `../README.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
+| `docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md` | `docs/edge-and-domains/README.md`, `docs/README.md`, `AGENTS.md`, `docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`, `../lobster-factory/infra/hetzner-phase1-core/README.md`, `TASKS.md`, `WORKLOG.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
+| `docs/governance-plans/README.md` | `docs/README.md`, `docs/operations/README.md`, `docs/edge-and-domains/README.md`, `AGENTS.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
+| `docs/governance-plans/PLAN_30Y_STABILITY_HARDENING.md` | `docs/governance-plans/README.md`, `docs/operations/SENTRY_ALERT_POLICY.md`, `docs/operations/security-secrets-policy.md`, `../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`, `TASKS.md`, `WORKLOG.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
+| `docs/governance-plans/PLAN_30_YEAR_RULE_CONSOLIDATION.md` | `docs/governance-plans/README.md`, `docs/governance-plans/PLAN_RULES_STABILITY_CONSOLIDATION.md`, `docs/operations/rules-version-and-enforcement.md`, `AGENTS.md`, `TASKS.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
+| `docs/governance-plans/PLAN_RULES_STABILITY_CONSOLIDATION.md` | `docs/governance-plans/README.md`, `docs/governance-plans/PLAN_30_YEAR_RULE_CONSOLIDATION.md`, `docs/operations/rules-version-and-enforcement.md`, `AGENTS.md`, `scripts/ao-resume.ps1`, `docs/CHANGE_IMPACT_MATRIX.md` |
+| `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` | `docs/operations/cursor-mcp-and-plugin-inventory.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md`, `TASKS.md`, `WORKLOG.md`, `docs/operations/tools-and-integrations.md`, `docs/operations/security-secrets-policy.md`, `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`, `docs/README.md`, `docs/operations/README.md`, `docs/edge-and-domains/README.md`, `docs/governance-plans/README.md`, `AGENTS.md`, `README.md`, `../README.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 
 ## 最小同步清單（每次改版）
 - [ ] `README.md` 路徑與入口已更新
@@ -90,5 +95,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-16 12:07:03 UTC_
+_Last synced: 2026-04-18 11:18:20 UTC_
 

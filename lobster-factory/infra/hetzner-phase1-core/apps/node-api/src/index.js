@@ -2,10 +2,18 @@ import * as Sentry from "@sentry/node";
 import express from "express";
 import { createClient } from "@supabase/supabase-js";
 
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.NODE_ENV || "staging",
-});
+// Compose injects SENTRY_DSN; local / docs may use SENTRY_DSN_NODE_API (see hetzner-phase1-core README).
+const sentryDsn = (
+  process.env.SENTRY_DSN_NODE_API ||
+  process.env.SENTRY_DSN ||
+  ""
+).trim();
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: process.env.NODE_ENV || "staging",
+  });
+}
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -82,7 +90,9 @@ app.get("/rag/supabase-health", async (_req, res, next) => {
   }
 });
 
-Sentry.setupExpressErrorHandler(app);
+if (sentryDsn) {
+  Sentry.setupExpressErrorHandler(app);
+}
 
 app.use((err, _req, res, _next) => {
   res.status(500).json({

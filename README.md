@@ -46,6 +46,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 
 - **龍蝦工廠**：[`lobster-factory/README.md`](lobster-factory/README.md)、[`lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`](lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md)、[`lobster-factory/docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md`](lobster-factory/docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md)、[`lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md`](lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md)（A10-1 營運劇本）
 - **AO 系統**：[`agency-os/AGENTS.md`](agency-os/AGENTS.md)、[`agency-os/TASKS.md`](agency-os/TASKS.md)、[`agency-os/docs/overview/EXECUTION_DASHBOARD.md`](agency-os/docs/overview/EXECUTION_DASHBOARD.md)
+- **子網域／`api.aware-wave.com`／`node-api` 計畫（git 唯一正文）**：[`agency-os/docs/edge-and-domains/README.md`](agency-os/docs/edge-and-domains/README.md) → [`agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)
+- **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）**：[`agency-os/docs/governance-plans/README.md`](agency-os/docs/governance-plans/README.md)
+- **平台能力＋工具總索引 §0（一句話＋專文／計畫；單一 Owner）**：[`agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`](agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md)
 - **規格原文（長篇藍圖）**：[`docs/spec/README.md`](docs/spec/README.md)；**四份怎麼整合**：[`agency-os/docs/overview/company-os-four-sources-integration.md`](agency-os/docs/overview/company-os-four-sources-integration.md)
 
 ## 開工與雙機同步（AO-RESUME）
@@ -70,5 +73,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-04-18 09:25:25 UTC_
+_Last synced: 2026-04-18 11:18:20 UTC_
 

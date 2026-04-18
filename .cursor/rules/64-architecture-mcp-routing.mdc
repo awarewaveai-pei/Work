@@ -12,7 +12,8 @@ alwaysApply: true
 3. **`lobster-factory/docs/ROUTING_MATRIX.md`** — 人讀矩陣；語意須與 spec 一致，**不得**單方面發明 `task_type`。  
 4. **`agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md`** — **實際 `mcp.json` 鍵名與職責**；不覆寫 spec 表格的生產編排。與 spec／矩陣不一致時，**以 spec + JSON 驗證為準**，並回寫 inventory。  
 5. **`agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`** — 平台能力、P1–P7、TASKS 證據；**不**新增 `task_type` 名稱而不改 spec。  
-6. **`agency-os/docs/operations/security-secrets-policy.md`** — 憑證、mcp template、禁止寫入記憶體／日誌。
+6. **`agency-os/docs/operations/security-secrets-policy.md`** — 憑證、mcp template、禁止寫入記憶體／日誌。  
+7. **`docs/operations/CURSOR_AGENT_RUNTIME_PLAYBOOK.md`** — **執行期**：以當前 runtime 暴露的工具為準；MCP 未可用時改走 **SSH／HTTPS API／專案 CLI**；**不**宣稱能代操作純 GUI 後台登入。
 
 ## Architecture planes (mental model)
 

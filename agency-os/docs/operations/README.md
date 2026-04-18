@@ -7,6 +7,7 @@
 
 ## 你現在看檔順序（固定入口）
 
+0. **平台／工具一句話＋專文與計畫（總索引 §0，與狀態同檔）**：[`TOOLS_DELIVERY_TRACEABILITY.md`](TOOLS_DELIVERY_TRACEABILITY.md)  
 1. 今日執行先看 [`../../TASKS.md`](../../TASKS.md)（今天做什麼）。
 2. 近期優先再看 [`NEXT_ACTIONS.md`](NEXT_ACTIONS.md)（近期優先順序）。
 3. 階段藍圖最後看 [`IMPLEMENTATION_ORDER.md`](IMPLEMENTATION_ORDER.md)（階段藍圖）。
@@ -32,6 +33,7 @@
 |:---|:---|
 | 企業規則索引 | [cursor-enterprise-rules-index.md](cursor-enterprise-rules-index.md) |
 | MCP 鍵名與分工 | [cursor-mcp-and-plugin-inventory.md](cursor-mcp-and-plugin-inventory.md) |
+| Agent 執行期：工具驗證與 MCP／SSH／API 備援 | [CURSOR_AGENT_RUNTIME_PLAYBOOK.md](CURSOR_AGENT_RUNTIME_PLAYBOOK.md) |
 | 新增 MCP 步驟 | [mcp-add-server-quickstart.md](mcp-add-server-quickstart.md) |
 | MCP 憑證強化 | [mcp-secrets-hardening-runbook.md](mcp-secrets-hardening-runbook.md) |
 | 規則版本與強制判定 | [rules-version-and-enforcement.md](rules-version-and-enforcement.md) |
@@ -49,6 +51,8 @@
 | 環境變數範例 | [hetzner-self-host.env.example](hetzner-self-host.env.example) |
 | Supabase 自架切換 | [supabase-self-hosted-cutover-checklist.md](supabase-self-hosted-cutover-checklist.md) |
 | Cloudflare 邊緣（Phase 1 / 自架 Next） | [CLOUDFLARE_HETZNER_PHASE1.md](CLOUDFLARE_HETZNER_PHASE1.md) |
+| **子網域／`api` 邊界／長期計畫（統管入口）** | [edge-and-domains/README.md](../edge-and-domains/README.md)（正文：[PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)） |
+| **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）** | [governance-plans/README.md](../governance-plans/README.md) |
 | GitHub Actions × workflows | [github-actions-trigger-prod-deploy.md](github-actions-trigger-prod-deploy.md) |
 | 多機 MariaDB（WP） | [MARIADB_MULTI_MACHINE_SYNC.md](MARIADB_MULTI_MACHINE_SYNC.md) |
 

@@ -1,7 +1,7 @@
 # docs/overview/ 導覽
 
 **這一層放什麼**：系統全貌、雙機開工、AO 與龍蝦怎麼接、長期紀律、憲章與高階時程。  
-**不放在這**：可照表操課的 Runbook、堆疊／憑證細節 → [operations 導覽](../operations/README.md)（檔名 `README.md`，資料夾 `docs/operations/`）。
+**不放在這**：可照表操課的 Runbook、堆疊／憑證細節 → [operations 導覽](../operations/README.md)（檔名 `README.md`，資料夾 `docs/operations/`）。**子網域、`api` 邊界、長期 API 計畫** → [edge-and-domains 統管入口](../edge-and-domains/README.md)。
 
 在編輯器內 **Ctrl+Click**（Mac：**Cmd+Click**）可開檔。下表**連結文字即檔名**，路徑皆在 **`agency-os/docs/overview/`**。
 

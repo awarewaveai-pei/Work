@@ -23,6 +23,9 @@
 
 ## Session 啟動順序（每次都做）
 1. 讀 `README.md`（本目錄）；若工作區含整個 monorepo，一併讀 `../README.md`（根目錄導覽：龍蝦工廠 + AO + `verify-build-gates`）
+1b. **子網域／`api.aware-wave.com`／`node-api` 邊界與長期計畫（git 唯一正文）**：`docs/edge-and-domains/README.md` → `docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`（**不要**在 `~/.cursor/plans/` 維護第二份相同正文）
+1c. **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）**：`docs/governance-plans/README.md`
+1d. **平台能力＋工具總索引 §0（一句話＋連到專文／計畫；與狀態同檔）**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 2. 讀 `AGENTS.md`
 3. 讀 `memory/CONVERSATION_MEMORY.md`（長期記憶）
 4. 讀 `memory/daily/` 的今日與昨日筆記（若存在）
@@ -113,5 +116,5 @@
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-18 09:25:25 UTC_
+_Last synced: 2026-04-18 12:01:28 UTC_
 
