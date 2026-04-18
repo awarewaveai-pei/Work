@@ -16,7 +16,8 @@ Next.js 仍為 **自架 Docker + Nginx**；Cloudflare 只作 **邊緣**。操作
 
 ## 系統 Nginx 已佔用 80/443 時（實機常態）
 
-若主機 **系統 nginx** 先佔了 `:80/:443`，`lobster-nginx` 可能無法啟動，但 **`next-admin` 仍可透過本機埠 `127.0.0.1:3002` 運行**。此時請在 **系統 nginx** 上複製與 `nginx/default.conf` 同構的路由（**`/` → WordPress**、**`/admin/` → Next**、`/api/`、`/n8n/`）：[`nginx/system-sites/aware-wave-phase1.conf`](./nginx/system-sites/aware-wave-phase1.conf)（含 **`:80` 與 `:443` 兩段**，避免只改 HTTP、瀏覽器仍走舊 HTTPS 路由）與共用片段 [`nginx/system-sites/lobster-aware-wave-locations.inc`](./nginx/system-sites/lobster-aware-wave-locations.inc)（安裝路徑見 `aware-wave-phase1.conf` 檔首註解）。
+若主機 **系統 nginx** 先佔了 `:80/:443`，`lobster-nginx` 可能無法啟動，但 **`next-admin` 仍可透過本機埠 `127.0.0.1:3002` 運行**。此時請在 **系統 nginx** 上複製與 `nginx/default.conf` 同構的路由（**`/` → WordPress**、**`/admin/` → Next**、`/api/`、`/n8n/`）：[`nginx/system-sites/aware-wave-phase1.conf`](./nginx/system-sites/aware-wave-phase1.conf)（含 **`:80` 與 `:443` 兩段**，避免只改 HTTP、瀏覽器仍走舊 HTTPS 路由）與共用片段 [`nginx/system-sites/lobster-aware-wave-locations.inc`](./nginx/system-sites/lobster-aware-wave-locations.inc)（安裝路徑見 `aware-wave-phase1.conf` 檔首註解）。  
+**Cloudflare 子網域 `api` / `app`（同機）**：[`nginx/system-sites/aware-wave-app-api-subdomains.conf`](./nginx/system-sites/aware-wave-app-api-subdomains.conf) + [`agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`](../../../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md) §子網域。
 
 ## 安全（必讀）
 

@@ -14,6 +14,19 @@
 2. **DNS 記錄**（依你實際子網域調整）：
    - **A / AAAA**：`@`、或 `app` / `admin` 等 → **Hetzner VPS 公網 IP**（Proxy 狀態先 **僅對要保護的主機名** 開橘雲）。
    - **Trigger / n8n** 等子網域：同樣 **A → 同一台 IP**（或 CNAME 到同一台），與你現有 `trigger.conf` / 系統 Nginx `server_name` 一致。
+
+### 子網域 **`api.aware-wave.com`** / **`app.aware-wave.com`**（與 apex 同機）
+
+典型用途（與 repo 範本一致，見 `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`）：
+
+| 主機名 | Cloudflare DNS | 源站（本 repo 預設） | 說明 |
+|--------|------------------|----------------------|------|
+| **api** | `A` `api` → VPS IP（橘雲與否依你 WAF 策略） | `127.0.0.1:3001`（`node-api`） | 瀏覽器／客戶端可打 **`https://api.aware-wave.com/health`** 等，路徑與容器根一致（不必再加 `/api` 前綴）。 |
+| **app** | `A` `app` → 同上 | **302** → **`https://aware-wave.com/admin/`** | 與目前 **Next `basePath=/admin`、公開網址以 apex 為準** 對齊；**`app.*` 僅作短網址／書籤入口**，避免換 `Host` 導致 `_next` 靜態資源與 cookie 錯位。若未來要「`app` 直出 Next」需另備建置與 `NEXT_PUBLIC_*`。 |
+
+**TLS**：對上述兩名建議 **`certbot`** 一次簽 **SAN**（例：`certbot certonly --nginx -d api.aware-wave.com -d app.aware-wave.com`），再把範本內 **`ssl_certificate`** 路徑改成 `certbot` 實際產生的 `live/` 目錄（常見為第一個 `-d` 主機名資料夾）。**Cloudflare** 仍建議 **Full (strict)**。
+
+**驗收**：`curl -sSI https://api.aware-wave.com/health` 為 **200**；`curl -sSI https://app.aware-wave.com/` 為 **302** 且 **`Location: https://aware-wave.com/admin/`**。
 3. **SSL/TLS 模式**（關鍵）：
    - **首選**：**Full (strict)** — 你的 **源站** 必須有 **有效憑證**（Let’s Encrypt 等），Cloudflare 到源站也用 HTTPS。
    - **可接受過渡**：**Full** — 源站自簽仍可行，但不如 strict 乾淨。
@@ -40,6 +53,7 @@ repo 已提供：
 ## 驗收清單（最小）
 
 - 瀏覽器：`https://<你的網域>/`（WordPress）、`/admin/`（Next）、`/api/health`、`/n8n/` 行為與開 CF 前一致。
+- 若有 **`api.*` / `app.*`**：`https://api.<網域>/health` 正常；`https://app.<網域>/` **302** 至 apex **`/admin/`**（與範本一致時）。
 - `curl -I https://<網域>/` 回應標頭正常（HTTP/2 或 3 皆可）。
 - n8n：已知 Webhook URL 仍為公開 HTTPS；抽樣觸發一條測試 workflow **200**。
 - Trigger：儀表板與 WS 仍正常（若遇 WS，確認 Cloudflare **WebSockets** 已開、且源站超時足夠）。
@@ -47,6 +61,8 @@ repo 已提供：
 ## 相關檔案
 
 - Phase1 Nginx 主設定：`lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`
+- Apex 系統站台（WP + `/admin` + `/api`）：`lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-phase1.conf`
+- **`api` / `app` 子網域範本**：`lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`
 - Trigger 子網域：`lobster-factory/infra/hetzner-phase1-core/nginx/trigger.conf`
 - Compose：`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`
 
