@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <clickhouse>
-  <!-- Bitnami ClickHouse：壓低 RAM 占用（小 VPS）；大機可刪除此檔或放寬數值。 -->
-  <max_server_memory_usage>600000000</max_server_memory_usage>
+  <!-- ClickHouse internal cap (keep below Docker mem_limit of 1024m) -->
+  <max_server_memory_usage>800000000</max_server_memory_usage>
+  <max_memory_usage>500000000</max_memory_usage>
 </clickhouse>
