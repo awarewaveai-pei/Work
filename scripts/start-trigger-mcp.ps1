@@ -18,7 +18,14 @@ if (-not (Test-Path -LiteralPath $vaultScript)) {
     throw "Missing secrets vault script: $vaultScript"
 }
 
-$command = "npx -y trigger.dev@latest mcp --project-ref `"$ProjectRef`""
+# Self-hosted: set TRIGGER_API_URL (e.g. https://trigger.example.com) on this MCP server env or machine env.
+# Nested `powershell -File secrets-vault.ps1` may not inherit all vars on some hosts — prefix the inner command.
+$prefix = ""
+if (-not [string]::IsNullOrWhiteSpace($env:TRIGGER_API_URL)) {
+    $u = $env:TRIGGER_API_URL.Replace("'", "''")
+    $prefix = "`$env:TRIGGER_API_URL='$u'; "
+}
+$command = $prefix + "npx -y trigger.dev@latest mcp --project-ref `"$ProjectRef`""
 
 & powershell -ExecutionPolicy Bypass -File $vaultScript `
     -Action run `

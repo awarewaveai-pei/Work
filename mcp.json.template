@@ -166,7 +166,7 @@
     },
     "copilot": {
       "type": "http",
-      "url": "https://api.githubcopilot.com/mcp/",
+      "url": "https://api.githubcopilot.com/mcp",
       "headers": {
         "Authorization": "Bearer ${env:COPILOT_MCP_BEARER_TOKEN}"
       }
@@ -181,7 +181,10 @@
         "${workspaceFolder}/scripts/start-trigger-mcp.ps1",
         "-ProjectRef",
         "<PASTE_TRIGGER_PROJECT_REF>"
-      ]
+      ],
+      "env": {
+        "TRIGGER_API_URL": "https://YOUR_TRIGGER_PUBLIC_ORIGIN"
+      }
     }
   }
 }
