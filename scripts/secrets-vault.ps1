@@ -199,8 +199,15 @@ switch ($Action) {
         if ([string]::IsNullOrWhiteSpace($McpPath)) {
             $repoRoot = Split-Path $PSScriptRoot -Parent
             $pref = Join-Path $repoRoot ".cursor\mcp.json"
+            $userMcp = Join-Path $env:USERPROFILE ".cursor\mcp.json"
             $fallback = Join-Path $repoRoot "mcp.json"
-            $McpPath = if (Test-Path -LiteralPath $pref) { $pref } else { $fallback }
+            if (Test-Path -LiteralPath $pref) {
+                $McpPath = $pref
+            } elseif (Test-Path -LiteralPath $userMcp) {
+                $McpPath = $userMcp
+            } else {
+                $McpPath = $fallback
+            }
         }
         if (-not (Test-Path -LiteralPath $McpPath)) {
             throw "MCP file not found: $McpPath"

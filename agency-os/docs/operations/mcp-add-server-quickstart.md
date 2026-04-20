@@ -5,8 +5,8 @@
 
 ## 路徑原則（先讀這段）
 
-- **專案 MCP 正本**：monorepo 根目錄的 **`.cursor/mcp.json`**（已用 **`${workspaceFolder}`**／**`${userHome}`**，換磁碟／換路徑不必改一堆絕對路徑）。  
-- **若你還有一份舊的 `%USERPROFILE%\.cursor\mcp.json`** 裡面寫死 **`D:\Work\...`**：請刪掉與專案重複的 server，或改成正確路徑，否則 Cursor 仍可能載入錯的 `args`，MCP 會整排紅燈。
+- **Cursor MCP 密鑰（本機）**：**`%USERPROFILE%\.cursor\mcp.json`**（全機一份；**勿**提交 git）。結構範本與無密版本見 repo 根 **`mcp.json.template`**；若你堅持在 repo 內放 **`.cursor/mcp.json`**，該檔名已列於 **`.gitignore`**，僅作本機覆寫用。  
+- **路徑**：LLM／Trigger 等請繼續使用 **`${workspaceFolder}`**／**`${userHome}`**（寫在使用者檔或本機 `.cursor/mcp.json` 皆可），避免寫死 **`D:\Work\...`**。
 
 ## Claude Code、Codex、Copilot（與 Cursor 對齊）
 
@@ -20,13 +20,13 @@
 
 ## 小白快速版（去哪裡 -> 做什麼 -> 看到什麼）
 
-1. 用 Cursor **開啟 monorepo 根**（含 **`mcp-local-wrappers/`** 的那層；底下要有 **`.cursor/mcp.json`**）。**勿**只開子資料夾 `agency-os/`，否則 **`${workspaceFolder}`** 會指錯層級，`node` 找不到 wrapper。
-2. 編輯 **`.cursor/mcp.json`**，把 `<PASTE_*>`、`YOUR_*` 改成你的真值（**勿**把含真值的檔案提交 git）。
-3. 若你是從零開始：可複製根目錄 **`mcp.json.template`** 覆蓋到 **`.cursor/mcp.json`** 再改密鑰。
+1. 用 Cursor **開啟 monorepo 根**（含 **`mcp-local-wrappers/`** 的那層）。**勿**只開子資料夾 `agency-os/`，否則 **`${workspaceFolder}`** 會指錯層級。  
+2. 編輯 **`%USERPROFILE%\.cursor\mcp.json`**（建議），或本機 **`mcp.json.template` → 複製為 `.cursor/mcp.json`** 再改密鑰（該路徑已 **gitignore**）。**勿**把含真值的檔案 `git add` 進遠端。  
+3. 若從零開始：複製 repo 根 **`mcp.json.template`** 到 **`%USERPROFILE%\.cursor\mcp.json`**，再替換 `<PASTE_*>`／`YOUR_*`。
 4. 在 **monorepo 根**開終端機（`scripts` 的上一層）。
 5. 貼上這行，按 Enter：  
    `.\scripts\secrets-vault.ps1 -Action import-mcp`  
-   （會自動優先讀 **`.cursor/mcp.json`**；若要指定檔案可加 `-McpPath "完整路徑"`）
+   （會自動優先讀專案 **`.cursor/mcp.json`**，若無則讀 **`%USERPROFILE%\.cursor\mcp.json`**；若要指定檔案可加 `-McpPath "完整路徑"`）
 6. 看到 `Imported/updated secrets from mcp: ...` 代表已匯入成功
 7. 再貼這行，按 Enter：  
    `.\scripts\secrets-vault.ps1 -Action list`
@@ -40,7 +40,7 @@
 3. 再檢查清單：  
    `.\scripts\secrets-vault.ps1 -Action list`
 4. 關掉 Cursor 再重開
-5. 看到 MCP 能正常使用就完成；若仍失敗，回到 **`.cursor/mcp.json`** 檢查 `url/command/args`，並確認 **使用者層** `~/.cursor/mcp.json` 沒有舊的絕對路徑覆蓋
+5. 看到 MCP 能正常使用就完成；若仍失敗，檢查 **`%USERPROFILE%\.cursor\mcp.json`**（或本機 `.cursor/mcp.json`）的 `url/command/args`，並確認沒有舊的 **`D:\Work\...`** 絕對路徑。
 
 ## 重灌/換機版（完整重建）
 
@@ -48,7 +48,7 @@
 2. 在 monorepo 根開終端機
 3. 先初始化 vault：  
    `.\scripts\secrets-vault.ps1 -Action init`
-4. 編好 **`.cursor/mcp.json`** 後匯入：  
+4. 編好 **`%USERPROFILE%\.cursor\mcp.json`**（或本機 `.cursor/mcp.json`）後匯入：  
    `.\scripts\secrets-vault.ps1 -Action import-mcp`
 5. 用 `list` 確認：  
    `.\scripts\secrets-vault.ps1 -Action list`
@@ -56,17 +56,18 @@
 
 ## 入口（先記這幾個）
 
-- **`.cursor/mcp.json`**：Cursor 專案 MCP（**`${workspaceFolder}`** 等插值）
+- **`%USERPROFILE%\.cursor\mcp.json`**：Cursor 建議的**本機** MCP（含密鑰；**勿**提交）
+- **（選）本機** `.cursor/mcp.json`：已列 **`.gitignore`**，僅供不想用使用者目錄時覆寫
 - **`.mcp.json`**：Claude Code 專案 MCP（**`${VAR}`** 環境變數展開）
 - **`.codex/config.toml`**：Codex 專案 MCP（TOML **`[mcp_servers.*]`**）
-- **`mcp.json.template`**：對照範本（與 **`.cursor/mcp.json`** 結構應一致）
+- **`mcp.json.template`**：對照範本（與本機 MCP 結構應一致）
 - **`scripts/run-llm-mcp.ps1`**：LLM stdio 啟動器（Cursor／Claude／Codex 共用）
 - **`scripts/secrets-vault.ps1`**：把機密進 vault 的工具
 - **`docs/operations/local-secrets-vault-dpapi.md`**：完整建置/復原手冊
 
 ## 一鍵流程（每次新增 MCP 都照跑）
 
-1. 編輯 **`.cursor/mcp.json`**，新增 server 區塊
+1. 編輯 **`%USERPROFILE%\.cursor\mcp.json`**（或本機 `.cursor/mcp.json`），新增 server 區塊
 2. 匯入機密到 vault：  
    `.\scripts\secrets-vault.ps1 -Action import-mcp`
 3. 檢查機密 key 名稱：  
