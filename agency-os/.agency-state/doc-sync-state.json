@@ -1,28 +1,19 @@
 ﻿{
-    "last_run_utc":  "2026-04-20T02:42:51.4517540Z",
+    "last_run_utc":  "2026-04-20T10:15:40.0700760Z",
     "changed_files":  [
-                          "docs/operations/CURSOR_AGENT_RUNTIME_PLAYBOOK.md",
-                          "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                          "docs/operations/mcp-add-server-quickstart.md"
+                          "docs/operations/mcp-add-server-quickstart.md",
+                          "memory/CONVERSATION_MEMORY.md",
+                          "memory/daily/2026-04-20.md",
+                          "WORKLOG.md"
                       ],
     "impacted_files":  [
-                           "../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
-                           "../lobster-factory/docs/ROUTING_MATRIX.md",
-                           ".cursor/rules/64-architecture-mcp-routing.mdc",
-                           "AGENTS.md",
-                           "docs/operations/CURSOR_AGENT_RUNTIME_PLAYBOOK.md",
-                           "docs/operations/cursor-enterprise-rules-index.md",
-                           "docs/operations/cursor-mcp-and-plugin-inventory.md",
                            "docs/operations/mcp-add-server-quickstart.md",
-                           "docs/operations/tools-and-integrations.md",
-                           "README.md",
-                           "TASKS.md"
+                           "memory/CONVERSATION_MEMORY.md",
+                           "memory/daily/2026-04-20.md",
+                           "WORKLOG.md"
                        ],
     "auto_updated_files":  [
-                               "AGENTS.md",
-                               "docs/operations/cursor-enterprise-rules-index.md",
-                               "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                               "docs/operations/tools-and-integrations.md",
-                               "TASKS.md"
+                               "memory/CONVERSATION_MEMORY.md",
+                               "WORKLOG.md"
                            ]
 }

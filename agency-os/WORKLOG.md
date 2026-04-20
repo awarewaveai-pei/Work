@@ -606,7 +606,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-20 01:43:05 UTC_
+_Last synced: 2026-04-20 10:15:39 UTC_
 
 ## 2026-03-20
 
@@ -1043,4 +1043,15 @@ _Last synced: 2026-04-20 01:43:05 UTC_
 
 ### Machine appendix（weekly-system-review；接續已 pull `origin/main`）
 - 2026-04-20 09:00:26 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+### MCP 整排紅燈排查（桌機）
+- **修復**：新增/更新 MCP 修復腳本（`scripts/patch-cursor-user-mcp-workspace.ps1`、`scripts/repair-user-mcp-json-escapes.ps1`、`scripts/patch-codex-user-mcp-config.ps1`），解決 user-level `mcp.json` 路徑插值與 Windows JSON 轉義問題（避免 `${workspaceFolder}` 留字面值或產生無效 JSON）。
+- **提示增強**：`scripts/secrets-vault.ps1`（含 `agency-os/scripts` 鏡像）在缺少 `TRIGGER_ACCESS_TOKEN` 時，改為輸出可直接執行的修復指令與說明；`mcp-add-server-quickstart.md` 補 Trigger/Copilot 常見紅燈判斷。
+- **提交**：`578be40`（`[cursor] fix(mcp): stabilize user-level path resolution and auth troubleshooting`）已建立；推送狀態由本次 `AO-CLOSE` 統一處理。
+
+### Hetzner SSH 故障排查（使用者即時操作）
+- **現況**：可連到 `5.223.93.113:22`，但 key/password 皆遭拒或被 server 主動關閉（`Permission denied` / `Connection closed`）；研判為帳密漂移、`authorized_keys` 缺失、或 SSHD/防護策略問題。
+- **現場協作**：已以「小白步驟」帶使用者走 Hetzner Web Console、`/root/.ssh` 權限修復、以及 root 登入排錯；目前仍待使用者完成 console 內最終修復並回貼驗證輸出。
+- **資安提醒**：本輪對話曾出現高敏感憑證（root 密碼、SSH 私鑰、token）；已建議視為外洩並全面輪替。
+
 
