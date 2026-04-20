@@ -8,6 +8,16 @@
 - **專案 MCP 正本**：monorepo 根目錄的 **`.cursor/mcp.json`**（已用 **`${workspaceFolder}`**／**`${userHome}`**，換磁碟／換路徑不必改一堆絕對路徑）。  
 - **若你還有一份舊的 `%USERPROFILE%\.cursor\mcp.json`** 裡面寫死 **`D:\Work\...`**：請刪掉與專案重複的 server，或改成正確路徑，否則 Cursor 仍可能載入錯的 `args`，MCP 會整排紅燈。
 
+## Claude Code、Codex、Copilot（與 Cursor 對齊）
+
+| 工具 | 專案內設定檔 | 路徑／機密慣例 |
+|:---|:---|:---|
+| **Cursor** | `.cursor/mcp.json` | **`${workspaceFolder}`**／**`${userHome}`**；Copilot 標頭 **`Bearer ${env:COPILOT_MCP_BEARER_TOKEN}`**（請在使用者／系統環境變數設好 **`COPILOT_MCP_BEARER_TOKEN`**，常可與 GitHub PAT 相同，依 Copilot MCP 實際要求為準）。 |
+| **Claude Code** | monorepo 根 **`.mcp.json`** | 與 Cursor 同樣的 server **名稱**；路徑走 **`scripts/run-llm-mcp.ps1`**（相對於專案根）。機密與路徑用 **`${VAR}`** 展開（見 [Claude MCP 說明](https://code.claude.com/docs/en/mcp)）。**`work-global`** 目前僅掛 **`${MONOREPO_ROOT}`** — 請在執行 Claude 的 shell 內 **`MONOREPO_ROOT`** 指向本 repo 根（例如 `C:\Users\你\Work`）。 |
+| **Codex CLI** | monorepo 根 **`.codex/config.toml`** | **`[mcp_servers.*]`**；HTTP MCP 用 **`bearer_token_env_var`**（例如 **`COPILOT_MCP_BEARER_TOKEN`**）。請在 **monorepo 根**執行 `codex`，讓 **`scripts/...`** 相對路徑正確。 |
+
+**共用的本機啟動器**：`scripts/run-llm-mcp.ps1`（`chatgpt-*`／`claude-*`／`gemini-*` 皆呼叫同一支 **`mcp-local-wrappers/llm-mcp.mjs`**，模型由各自 `env` 的 `*_MODEL` 決定）。
+
 ## 小白快速版（去哪裡 -> 做什麼 -> 看到什麼）
 
 1. 用 Cursor **開啟 monorepo 根**（含 **`mcp-local-wrappers/`** 的那層；底下要有 **`.cursor/mcp.json`**）。**勿**只開子資料夾 `agency-os/`，否則 **`${workspaceFolder}`** 會指錯層級，`node` 找不到 wrapper。
@@ -44,10 +54,13 @@
    `.\scripts\secrets-vault.ps1 -Action list`
 6. 重開 Cursor 後測一次 MCP，即完成
 
-## 入口（先記這三個）
+## 入口（先記這幾個）
 
-- **`.cursor/mcp.json`**：新增/調整 MCP server（專案內；路徑用插值）
-- **`mcp.json.template`**：無 Cursor 時的對照範本（與上者結構應一致）
+- **`.cursor/mcp.json`**：Cursor 專案 MCP（**`${workspaceFolder}`** 等插值）
+- **`.mcp.json`**：Claude Code 專案 MCP（**`${VAR}`** 環境變數展開）
+- **`.codex/config.toml`**：Codex 專案 MCP（TOML **`[mcp_servers.*]`**）
+- **`mcp.json.template`**：對照範本（與 **`.cursor/mcp.json`** 結構應一致）
+- **`scripts/run-llm-mcp.ps1`**：LLM stdio 啟動器（Cursor／Claude／Codex 共用）
 - **`scripts/secrets-vault.ps1`**：把機密進 vault 的工具
 - **`docs/operations/local-secrets-vault-dpapi.md`**：完整建置/復原手冊
 

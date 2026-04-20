@@ -10,7 +10,7 @@
       ],
       "env": {
         "WP_API_URL": "https://YOUR_WORDPRESS_SITE/",
-        "JWT_TOKEN": "<PASTE_WP_APPLICATION_PASSWORD>"
+        "JWT_TOKEN": "${WP_APPLICATION_PASSWORD}"
       }
     },
     "replicate": {
@@ -22,15 +22,15 @@
         "replicate-mcp"
       ],
       "env": {
-        "REPLICATE_API_TOKEN": "<PASTE_REPLICATE_TOKEN>",
-        "REPLICATE_WEBHOOK_SIGNING_KEY": "<PASTE_REPLICATE_WEBHOOK_SECRET>"
+        "REPLICATE_API_TOKEN": "${REPLICATE_API_TOKEN}",
+        "REPLICATE_WEBHOOK_SIGNING_KEY": "${REPLICATE_WEBHOOK_SIGNING_KEY}"
       }
     },
     "n8n": {
       "type": "http",
       "url": "https://YOUR_INSTANCE.app.n8n.cloud/mcp-server/http",
       "headers": {
-        "Authorization": "Bearer <PASTE_N8N_MCP_BEARER>"
+        "Authorization": "Bearer ${N8N_MCP_BEARER_TOKEN}"
       }
     },
     "github": {
@@ -42,7 +42,7 @@
         "@modelcontextprotocol/server-github"
       ],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "<PASTE_GITHUB_PAT>"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
       }
     },
     "work-global": {
@@ -52,8 +52,7 @@
         "npx",
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "${userHome}",
-        "${workspaceFolder}"
+        "${MONOREPO_ROOT}"
       ]
     },
     "chatgpt-fast": {
@@ -63,12 +62,12 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "scripts/run-llm-mcp.ps1",
         "-Provider",
         "openai"
       ],
       "env": {
-        "OPENAI_API_KEY": "<PASTE_OPENAI_KEY>",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
         "OPENAI_MODEL": "gpt-5.3-chat-latest"
       }
     },
@@ -79,12 +78,12 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "scripts/run-llm-mcp.ps1",
         "-Provider",
         "openai"
       ],
       "env": {
-        "OPENAI_API_KEY": "<PASTE_OPENAI_KEY>",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
         "OPENAI_MODEL": "gpt-5.4"
       }
     },
@@ -95,12 +94,12 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "scripts/run-llm-mcp.ps1",
         "-Provider",
         "anthropic"
       ],
       "env": {
-        "ANTHROPIC_API_KEY": "<PASTE_ANTHROPIC_KEY>",
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
         "ANTHROPIC_MODEL": "claude-haiku-4-5-20251001"
       }
     },
@@ -111,12 +110,12 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "scripts/run-llm-mcp.ps1",
         "-Provider",
         "anthropic"
       ],
       "env": {
-        "ANTHROPIC_API_KEY": "<PASTE_ANTHROPIC_KEY>",
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
         "ANTHROPIC_MODEL": "claude-sonnet-4-6"
       }
     },
@@ -129,7 +128,7 @@
         "@perplexity-ai/mcp-server"
       ],
       "env": {
-        "PERPLEXITY_API_KEY": "<PASTE_PERPLEXITY_KEY>"
+        "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}"
       }
     },
     "gemini-fast": {
@@ -139,12 +138,12 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "scripts/run-llm-mcp.ps1",
         "-Provider",
         "gemini"
       ],
       "env": {
-        "GEMINI_API_KEY": "<PASTE_GEMINI_KEY>",
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}",
         "GEMINI_MODEL": "gemini-2.5-flash"
       }
     },
@@ -155,12 +154,12 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "scripts/run-llm-mcp.ps1",
         "-Provider",
         "gemini"
       ],
       "env": {
-        "GEMINI_API_KEY": "<PASTE_GEMINI_KEY>",
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}",
         "GEMINI_MODEL": "gemini-3.1-pro-preview"
       }
     },
@@ -168,7 +167,7 @@
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp/",
       "headers": {
-        "Authorization": "Bearer ${env:COPILOT_MCP_BEARER_TOKEN}"
+        "Authorization": "Bearer ${COPILOT_MCP_BEARER_TOKEN}"
       }
     },
     "trigger": {
@@ -178,10 +177,11 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/scripts/start-trigger-mcp.ps1",
-        "-ProjectRef",
-        "<PASTE_TRIGGER_PROJECT_REF>"
-      ]
+        "scripts/start-trigger-mcp.ps1"
+      ],
+      "env": {
+        "TRIGGER_PROJECT_REF": "${TRIGGER_PROJECT_REF}"
+      }
     }
   }
 }
