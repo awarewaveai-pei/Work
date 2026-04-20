@@ -5,8 +5,11 @@
 
 ## 路徑原則（先讀這段）
 
-- **Cursor MCP 密鑰（本機）**：**`%USERPROFILE%\.cursor\mcp.json`**（全機一份；**勿**提交 git）。結構範本與無密版本見 repo 根 **`mcp.json.template`**；若你堅持在 repo 內放 **`.cursor/mcp.json`**，該檔名已列於 **`.gitignore`**，僅作本機覆寫用。  
-- **路徑**：LLM／Trigger 等請繼續使用 **`${workspaceFolder}`**／**`${userHome}`**（寫在使用者檔或本機 `.cursor/mcp.json` 皆可），避免寫死 **`D:\Work\...`**。
+- **Cursor MCP 密鑰（本機）**：**`%USERPROFILE%\.cursor\mcp.json`**（全機一份；**勿**提交 git）。結構範本見 repo 根 **`mcp.json.template`**。專案內 **`.cursor/mcp.json`** 可保留 **空 `mcpServers`**（已進版控）作 **`${workspaceFolder}`** 錨點；**含密鑰的覆寫仍只放使用者檔**。  
+- **路徑**：LLM／Trigger 等請繼續使用 **`${workspaceFolder}`**／**`${userHome}`**（寫在使用者檔或本機 `.cursor/mcp.json` 皆可），避免寫死 **`D:\Work\...`**。  
+- **`${workspaceFolder}` 必須能錨定**：專案根要有一份 **`.cursor/mcp.json`**（repo 內可為 **`{"mcpServers":{}}` 空物件**），Cursor 才會把插值解成你開啟的 monorepo 路徑；**僅** `%USERPROFILE%\.cursor\mcp.json` 而專案內沒有該檔時，`work-global`／`trigger` 等常會整排失敗。  
+- **Trigger.dev 自託管**：在 **`trigger`** 的 **`env`** 加上 **`TRIGGER_API_URL`**（公開 HTTPS 原點，例如 **`https://trigger.aware-wave.com`**，依你 Nginx／DNS 為準），並維持 vault 內 **`TRIGGER_ACCESS_TOKEN`**；`start-trigger-mcp.ps1` 會把此變數一併餵給內層 `npx … mcp`。  
+- **GitHub Copilot MCP**：`url` 建議 **`https://api.githubcopilot.com/mcp`**（**不要**結尾多一個 `/`）；Bearer 必須是 **Copilot MCP 允許的 GitHub token**（常見問題是拿一般 PAT 但帳號／權限不含 Copilot）。見 [GitHub 文件：Configure Copilot MCP](https://docs.github.com/en/copilot/how-tos/configure-personal-settings/configure-copilot-mcp)。
 
 ## Claude Code、Codex、Copilot（與 Cursor 對齊）
 
@@ -21,7 +24,7 @@
 ## 小白快速版（去哪裡 -> 做什麼 -> 看到什麼）
 
 1. 用 Cursor **開啟 monorepo 根**（含 **`mcp-local-wrappers/`** 的那層）。**勿**只開子資料夾 `agency-os/`，否則 **`${workspaceFolder}`** 會指錯層級。  
-2. 編輯 **`%USERPROFILE%\.cursor\mcp.json`**（建議），或本機 **`mcp.json.template` → 複製為 `.cursor/mcp.json`** 再改密鑰（該路徑已 **gitignore**）。**勿**把含真值的檔案 `git add` 進遠端。  
+2. 編輯 **`%USERPROFILE%\.cursor\mcp.json`**（建議；放密鑰與完整 server 清單）。專案 **`.cursor/mcp.json`** 請維持 repo 內範本（空物件即可），**勿**把含真值的內容 `git add` 進遠端。  
 3. 若從零開始：複製 repo 根 **`mcp.json.template`** 到 **`%USERPROFILE%\.cursor\mcp.json`**，再替換 `<PASTE_*>`／`YOUR_*`。
 4. 在 **monorepo 根**開終端機（`scripts` 的上一層）。
 5. 貼上這行，按 Enter：  
@@ -57,7 +60,7 @@
 ## 入口（先記這幾個）
 
 - **`%USERPROFILE%\.cursor\mcp.json`**：Cursor 建議的**本機** MCP（含密鑰；**勿**提交）
-- **（選）本機** `.cursor/mcp.json`：已列 **`.gitignore`**，僅供不想用使用者目錄時覆寫
+- **專案** `.cursor/mcp.json`：repo 內為 **`mcpServers` 空物件**（錨定 **`${workspaceFolder}`**）；密鑰仍放使用者檔
 - **`.mcp.json`**：Claude Code 專案 MCP（**`${VAR}`** 環境變數展開）
 - **`.codex/config.toml`**：Codex 專案 MCP（TOML **`[mcp_servers.*]`**）
 - **`mcp.json.template`**：對照範本（與本機 MCP 結構應一致）

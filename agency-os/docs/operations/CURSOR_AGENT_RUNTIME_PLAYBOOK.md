@@ -63,7 +63,8 @@
 | `CLOUDFLARE_API_TOKEN` | Wrangler／Cloudflare API |
 | `COPILOT_MCP_BEARER_TOKEN` | Cursor **copilot** HTTP MCP（`Authorization: Bearer ${env:…}`）；Claude／Codex 亦建議同名變數 |
 | `MONOREPO_ROOT` | Claude **work-global**（`.mcp.json`）與 Codex **`work-global`** 的 repo 根路徑（本機絕對路徑） |
-| `TRIGGER_PROJECT_REF` | **Codex／Claude** 的 `trigger` MCP（經 `start-trigger-mcp.ps1` 讀環境）；Cursor 仍以 **`.cursor/mcp.json`** 的 `-ProjectRef` 參數為主 |
+| `TRIGGER_PROJECT_REF` | **Codex／Claude** 的 `trigger` MCP（經 `start-trigger-mcp.ps1` 讀環境）；Cursor 仍以 **`-ProjectRef`** 或 **`TRIGGER_PROJECT_REF`** 環境為主 |
+| `TRIGGER_API_URL` | **自託管 Trigger** 的公開原點（例如 **`https://trigger…`**）；寫在 **`trigger` MCP 的 `env`**，供 `npx trigger.dev … mcp` 連到自架而非雲端預設 |
 
 匯入／輪替流程：[`mcp-add-server-quickstart.md`](mcp-add-server-quickstart.md)、[`mcp-secrets-hardening-runbook.md`](mcp-secrets-hardening-runbook.md)。
 
@@ -86,7 +87,7 @@
 
 | Runtime | 常見設定位置 | 說明 |
 |:---|:---|:---|
-| **Cursor（本 repo）** | **`%USERPROFILE%\.cursor\mcp.json`**（建議；密鑰放此）+ 可選本機 **`.cursor/mcp.json`**（已 **gitignore**）+ 範本 **`mcp.json.template`** | Settings → MCP 合併；路徑建議 **`${workspaceFolder}`**；見 [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §1。 |
+| **Cursor（本 repo）** | **`%USERPROFILE%\.cursor\mcp.json`**（密鑰與 server 清單）+ 專案 **`.cursor/mcp.json`**（可為空 **`mcpServers`**，用於 **`${workspaceFolder}`** 錨定）+ 範本 **`mcp.json.template`** | Settings → MCP 合併；自架 **Trigger** 需 **`TRIGGER_API_URL`**；見 [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §1。 |
 | **Claude Code（本 repo）** | monorepo 根 **`.mcp.json`**（`${VAR}` 展開；LLM 經 **`scripts/run-llm-mcp.ps1`**） | 與 Cursor **server 名稱**對齊便於對照；見 [Claude MCP](https://code.claude.com/docs/en/mcp)。 |
 | **Codex CLI（本 repo）** | monorepo 根 **`.codex/config.toml`**（合併於 **`%USERPROFILE%\.codex\config.toml`** 之上；以官方載入順序為準） | **`[mcp_servers.*]`**；HTTP 用 **`bearer_token_env_var`**；Windows stdio 維持 **`cmd /c`** 前綴；見 [Codex MCP](https://openai-codex.mintlify.app/configuration/mcp-servers)。 |
 

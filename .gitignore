@@ -49,4 +49,3 @@ reports/health/health-*.md
 reports/health/health-*.json
 reports/closeout/closeout-*.md
 reports/status/integrated-status-*.md
-.cursor/mcp.json
