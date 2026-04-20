@@ -44,6 +44,8 @@
    `.\scripts\secrets-vault.ps1 -Action list`
 4. 關掉 Cursor 再重開
 5. 看到 MCP 能正常使用就完成；若仍失敗，檢查 **`%USERPROFILE%\.cursor\mcp.json`**（或本機 `.cursor/mcp.json`）的 `url/command/args`，並確認沒有舊的 **`D:\Work\...`** 絕對路徑。
+6. **`trigger` 仍紅**：在 monorepo 根執行 `.\scripts\secrets-vault.ps1 -Action list`，清單裡**必須**有 **`TRIGGER_ACCESS_TOKEN`**（Trigger 後台建立的 Personal Access Token，用 `set` 寫入 vault；`import-mcp` 不會憑空生出這一筆）。自託管另需 **`trigger.env.TRIGGER_API_URL`** 與 **`start-trigger-mcp.ps1 -ProjectRef`**／**`TRIGGER_PROJECT_REF`** 正確。
+7. **`copilot` 仍紅**：`https://api.githubcopilot.com/mcp` **不要**多尾階 `/`；Bearer 須符合 [GitHub：設定 Copilot MCP](https://docs.github.com/en/copilot/customizing-copilot/extending-copilot-chat-with-mcp)（常見為 **Copilot 訂閱／權限** 或 **PAT 類型／scope** 不符，一般 `github` MCP 能用的 token 未必能過 Copilot MCP）。
 
 ## 重灌/換機版（完整重建）
 
