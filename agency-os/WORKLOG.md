@@ -116,11 +116,9 @@
 - **§1.5.1（本機 WordPress 相容層）**：PATH 上已有 **`wp`**、**`php` 8.4**；**MariaDB 12.2** 已於 `C:\Program Files\MariaDB 12.2`（`mysqld.exe` 存在；`mysql` CLI 可不進 PATH，腳本用完整路徑）。已在 monorepo 根執行 **`scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`**：**exit 0**（背景啟動 `mysqld`、建庫 `wordpress_dev`、WP 已於 **`.scratch\wordpress-pilot`**，`siteurl` **http://localhost**）。龍蝦真 wp 路徑：**`C:\Users\USER\Work\.scratch\wordpress-pilot`**（勿提交 `.scratch`）。
 - **`TASKS`「雙機環境對齊」**：**未勾選**——依條款須**兩台**各完成 §1.5（含憑證）且各跑一次 **Strict PASS** 後方得勾；請在**另一台**重跑同段並保留終端輸出或於當日 `WORKLOG` 註記日期／主機名。
 
-### Trigger.dev 自託管 — 與 AO-CLOSE 提醒對齊
-- **為何收工仍提醒「未完成」**：`TOOLS_DELIVERY_TRACEABILITY.md` 將 **Trigger.dev（自託管）** 列為 **⚪ 自架尚未部署**，`hetzner-stack-rollout-index.md` 專案狀態同列；**AO-CLOSE／system-guard 讀到的是「VPS 尚未閉環」**，與 **repo 已 push compose** 可並存——**不是誤報**。
-- **repo**：`lobster-factory/infra/trigger/`（含 `README.md` SSH 救濟與啟動順序）、`hetzner-phase1-core` 掛載 `trigger.conf`、`trigger.config.ts` 之 **`triggerUrl`** 已於 **`origin/main`**。
-- **VPS 仍待**：Console 重啟 ssh、SSH 登入、填 `infra/trigger/.env`、`docker compose up`、瀏覽器驗證自架 URL（見 **正本** `lobster-factory/infra/trigger/README.md`）。
-- **`TASKS`**：已增 **`- [ ]`「Trigger.dev 自託管上線（Hetzner compose）」** 作為之後 **`AUTO_TASK_DONE`** 唯一命中子字串來源；**未達 DoD 前勿手勾**。
+### Trigger.dev 自託管 — 與 AO-CLOSE 提醒對齊（歷史；已由 2026-04-20 定案取代）
+- **當時脈絡**：`TOOLS` 曾列 **⚪ 自架尚未部署** 與 **`TASKS` 開放項**並存，導致收工敘述與 **memory／4/16–4/17 `WORKLOG`** 看似打架。
+- **後續**：見 **`## 2026-04-20`「營運定案」** — 自 **2026-04-20** 起以 **已上線** 為單一真相，並已回寫 **`TOOLS`／`hetzner-stack-rollout-index`／`RESUME_AFTER_REBOOT`／`TASKS` 雙機子項**；**`TASKS`** 對應主項已 **`[x]`**。
 
 ## 2026-04-12
 
@@ -608,7 +606,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-18 14:54:35 UTC_
+_Last synced: 2026-04-20 01:43:05 UTC_
 
 ## 2026-03-20
 
@@ -1039,5 +1037,10 @@ _Last synced: 2026-04-18 14:54:35 UTC_
 
 ## 2026-04-20
 
+### 營運定案：Trigger.dev 自託管＝已上線（與 GitHub 敘述一致）
+- **定案**：自 **2026-04-20** 起，以 **`origin/main`** 入庫敘述為準；**`TOOLS_DELIVERY_TRACEABILITY.md`**、**`hetzner-stack-rollout-index.md`**、**`RESUME_AFTER_REBOOT.md`**、**`TASKS.md`**（含雙機子項）已改為 **已上線** 單一說法。
+- **證據索引**（不變）：**`memory/CONVERSATION_MEMORY.md`**（2026-04-16）、**`## 2026-04-17`**（`trigger.aware-wave.com` HTTPS 等）；實裝正本 **`lobster-factory/infra/trigger/README.md`**。
+
 ### Machine appendix（weekly-system-review；接續已 pull `origin/main`）
 - 2026-04-20 09:00:26 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+

@@ -12,11 +12,9 @@
 
 | 欄位 | 值 |
 |------|-----|
-| **最後更新** | 2026-04-13 |
-| **已知已上 Hetzner** | **Supabase（自架）**、**WordPress** |
-| **已證／staging 但非 Trigger 自架** | **n8n（staging）** E2E 已證（見 `WORKLOG`、`n8n-staging-client-onboarding-e2e.md`） |
-| **尚未自架（營運確認）** | **Trigger.dev Worker／自託管叢集** — 政策為僅自託管，**runbook 階段 3 尚未在 Hetzner 完成**；`lobster-factory/packages/workflows` 與 CI 切線以 **`github-actions-trigger-prod-deploy.md`** 現況為準，**勿假設已有自架 API URL**。 |
-| **下一優先（Phase A 缺口）** | 確認 **pgvector**；**Redis**；**n8n**；**Trigger.dev（僅自託管）**落地與 deploy 流程；**Node API** + **Next.js Admin**；**Nginx** 反代／TLS；**備份 + 還原演練** |
+| **最後更新** | 2026-04-20 |
+| **已知已上 Hetzner** | **Supabase（自架）**、**WordPress**、**n8n**（staging／prod 脈絡見 `WORKLOG.md` **`## 2026-04-10`／`## 2026-04-17`**）、**Trigger.dev（自託管，已上線）** — 營運定案 **2026-04-20** 與 **`TOOLS_DELIVERY_TRACEABILITY.md`**／**`origin/main`** 敘述一致；實裝正本 **`lobster-factory/infra/trigger/README.md`** |
+| **下一優先（Phase A 缺口）** | 確認 **pgvector**；**備份 + 還原演練**；**Node API** + **Next.js Admin** 與 repo 持續同步；**Nginx**／TLS 續期；**MinIO**／物件儲存與 Trigger v4 邊界（見 `infra/trigger/README.md`） |
 | **捷徑** | 執行層與交付層可一次用 **`lobster-factory/infra/hetzner-phase1-core/`** compose 起 **Nginx、Redis、n8n、WP、Node API、Next Admin**（**不含** Supabase、**不含** Trigger）— 見該目錄 `README.md` |
 
 ---

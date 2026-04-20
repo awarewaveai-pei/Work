@@ -21,7 +21,7 @@
   - 之後每次開工：monorepo 根跑 `scripts/ao-resume.ps1` 至 exit 0（含 ff-only pull、gates、`print-open-tasks` 快照、Strict 稽核），再於 Cursor 使用 `AO-RESUME`。
   - 筆電需安裝並登入 GitHub CLI（`winget install --id GitHub.cli` + `gh auth login`），Node major 與桌機/CI 對齊；`secrets-vault` 與 `mcp.json` 皆為每台獨立設定。
   - **自託管營運工具（消費端）**：雲上實例（例：**Hetzner 自託管 n8n staging**）為一套部署；**每台開發機**仍須各自具備可觸發／驗證 Webhook 的 **vault 鍵與連通**（見 **`docs/operations/n8n-staging-client-onboarding-e2e.md`**、**`WORKLOG` `## 2026-04-10`**）。後續 Phase 1 其他自託管／邊界工具亦同——**伺服器側**與**本機消費側**不要混成一項「已做完」。
-  - **Trigger.dev（自託管）**：**營運確認：自架 Worker 尚未部署**（非「已上線待對 secret」）。政策與序見 **`hetzner-stack-rollout-index.md`**（專案狀態表「尚未自架」列）、**`hetzner-full-stack-self-host-runbook.md`** 階段 3；能力總表 **`TOOLS_DELIVERY_TRACEABILITY.md`**。在此之前 **`lobster-factory/packages/workflows`**／CI 目標以 **`github-actions-trigger-prod-deploy.md`** 與 repo 為準（可能仍為雲端或過渡）。**自架完成後**：每台開發機再將 **`TRIGGER_SECRET_KEY`、API／Worker base URL** 寫入該機 **vault**／本機 env 對齊自架叢集。
+  - **Trigger.dev（自託管）**：**營運定案 2026-04-20：自託管視為已上線**（與 **`origin/main`**、**`TOOLS_DELIVERY_TRACEABILITY.md`**、**`hetzner-stack-rollout-index.md`** 敘述一致）。實裝正本 **`lobster-factory/infra/trigger/README.md`**；證據索引 **`WORKLOG` `## 2026-04-16`～`## 2026-04-17`**、**`memory/CONVERSATION_MEMORY.md`**。**每台開發機**仍須各自 **`TRIGGER_SECRET_KEY`、API／Worker base URL**（**vault**／本機 env）與 **`github-actions-trigger-prod-deploy.md`** 之 deploy 約定對齊，**不等於**「叢集已上線＝筆電不必設」。
   - 兩台都要在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict` 且 PASS（無 WARN）後才可勾選此項。
   - **公司桌機（人在辦公室時）**：不必回想先前是否裝過；在該機 monorepo 根依序：`git fetch` → `git checkout main` → `git pull --ff-only origin main` → 跑上一行的 `machine-environment-audit -Strict`。若未 PASS，自上文 `REMOTE_WORKSTATION_STARTUP.md` **§1.5**「工具與依賴」起補齊（含 `lobster-factory\packages\workflows` 的 `npm ci`、可選 `mcp-local-wrappers`、`verify-build-gates`）後再重跑稽核；需與筆電同級「真 WP」則補 **§1.5.1**。FAIL/WARN 時保留終端輸出以利除錯。
   - **筆電已 Strict PASS 時**：仍須待公司桌機也 PASS，本主項才可視為完成。
@@ -47,9 +47,9 @@
 - [ ] `lobster-factory` A7 全站自動建站補齊
   - 範圍：hosting adapter + provision/shell guardrails 端到端
 - [x] **Trigger.dev 自託管上線（Hetzner compose）**
-  - **正本／順序**：`lobster-factory/infra/trigger/README.md`（含 SSH 救濟、先 `hetzner-phase1-core` 再起 `infra/trigger`、`lobster-net`）。
-  - **現況（repo 已就緒 ≠ VPS 已上線）**：compose、`.env.example`、`nginx/trigger.conf`、`packages/workflows/trigger.config.ts`（`triggerUrl`）已入庫；**VPS 端**常見缺口：SSH／`sshd` 重啟、`.env` 真值、`docker compose up`、DNS／TLS。
-  - **DoD**：自架 URL 可開 dashboard、可建 project；`trigger.config.ts` 的 `project` 與 dashboard 一致；本機／vault 具可 deploy 的 secret；`WORKLOG` 一句（無密鑰）。完成時收工在當日區塊單獨一行 `- AUTO_TASK_DONE: Trigger.dev 自託管上線（Hetzner compose）`。
+  - **正本／順序**：`lobster-factory/infra/trigger/README.md`（v4 compose、`lobster-net`、Nginx、SSH 救濟）。
+  - **現況（營運定案 2026-04-20）**：自託管 **視為已上線**（與 **`TOOLS_DELIVERY_TRACEABILITY.md`**／**`hetzner-stack-rollout-index.md`** 一致）；歷程與驗收敘述見 **`WORKLOG` `## 2026-04-16`～`## 2026-04-17`**、**`memory/CONVERSATION_MEMORY.md`**。
+  - **DoD**（已達）：自架 URL／dashboard、`trigger.config.ts` 對齊、deploy secret 與 **`WORKLOG`** 證據鏈（無密鑰）；本項已 `[x]`。
 - [ ] Enterprise 工具層 Phase 1 正式串接
   - 範圍：Clerk auth、env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts
   - DoD：下列子任務全數完成且有對應證據連結（WORKLOG / report）
@@ -230,5 +230,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-18 14:30:02 UTC_
+_Last synced: 2026-04-20 01:43:05 UTC_
 
