@@ -186,6 +186,18 @@ switch ($Action) {
         if ($Names.Count -eq 0) { throw "Missing -Names for Action=run" }
         foreach ($n in $Names) {
             if (-not $store.secrets.Contains($n)) {
+                if ($n -eq "TRIGGER_ACCESS_TOKEN") {
+                    throw @"
+Secret not found: TRIGGER_ACCESS_TOKEN
+
+Trigger MCP reads the token only from the local vault (not from mcp.json by default).
+From monorepo root, after copying your Trigger.dev Personal Access Token from the dashboard:
+
+  .\scripts\secrets-vault.ps1 -Action set -Name TRIGGER_ACCESS_TOKEN -Value '<paste token here>'
+
+Then reload Cursor. See agency-os/docs/operations/mcp-add-server-quickstart.md (Trigger self-host + TRIGGER_API_URL).
+"@
+                }
                 throw "Secret not found: $n"
             }
             $plain = Unprotect-Secret -CipherText $store.secrets[$n].cipher

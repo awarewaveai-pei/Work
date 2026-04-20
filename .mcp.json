@@ -52,7 +52,8 @@
         "npx",
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "${MONOREPO_ROOT}"
+        "${userHome}",
+        "${workspaceFolder}"
       ]
     },
     "chatgpt-fast": {
@@ -62,7 +63,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "scripts/run-llm-mcp.ps1",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
         "-Provider",
         "openai"
       ],
@@ -78,7 +79,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "scripts/run-llm-mcp.ps1",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
         "-Provider",
         "openai"
       ],
@@ -94,7 +95,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "scripts/run-llm-mcp.ps1",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
         "-Provider",
         "anthropic"
       ],
@@ -110,7 +111,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "scripts/run-llm-mcp.ps1",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
         "-Provider",
         "anthropic"
       ],
@@ -138,7 +139,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "scripts/run-llm-mcp.ps1",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
         "-Provider",
         "gemini"
       ],
@@ -154,7 +155,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "scripts/run-llm-mcp.ps1",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
         "-Provider",
         "gemini"
       ],
@@ -165,9 +166,9 @@
     },
     "copilot": {
       "type": "http",
-      "url": "https://api.githubcopilot.com/mcp/",
+      "url": "https://api.githubcopilot.com/mcp",
       "headers": {
-        "Authorization": "Bearer ${COPILOT_MCP_BEARER_TOKEN}"
+        "Authorization": "Bearer ${env:COPILOT_MCP_BEARER_TOKEN}"
       }
     },
     "trigger": {
@@ -177,7 +178,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "scripts/start-trigger-mcp.ps1"
+        "${workspaceFolder}/scripts/start-trigger-mcp.ps1"
       ],
       "env": {
         "TRIGGER_PROJECT_REF": "${TRIGGER_PROJECT_REF}"
