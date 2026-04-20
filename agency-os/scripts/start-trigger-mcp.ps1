@@ -6,7 +6,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$vaultScript = "D:\Work\scripts\secrets-vault.ps1"
+$vaultScript = Join-Path $PSScriptRoot "secrets-vault.ps1"
 if (-not (Test-Path -LiteralPath $vaultScript)) {
     throw "Missing secrets vault script: $vaultScript"
 }

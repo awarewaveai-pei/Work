@@ -7,7 +7,7 @@ param(
     [string[]]$Names = @(),
     [string]$Command = "",
     [string]$StorePath = "",
-    [string]$McpPath = "D:\Work\mcp.json"
+    [string]$McpPath = ""
 )
 
 Set-StrictMode -Version Latest
@@ -196,6 +196,12 @@ switch ($Action) {
     }
 
     "import-mcp" {
+        if ([string]::IsNullOrWhiteSpace($McpPath)) {
+            $repoRoot = Split-Path $PSScriptRoot -Parent
+            $pref = Join-Path $repoRoot ".cursor\mcp.json"
+            $fallback = Join-Path $repoRoot "mcp.json"
+            $McpPath = if (Test-Path -LiteralPath $pref) { $pref } else { $fallback }
+        }
         if (-not (Test-Path -LiteralPath $McpPath)) {
             throw "MCP file not found: $McpPath"
         }

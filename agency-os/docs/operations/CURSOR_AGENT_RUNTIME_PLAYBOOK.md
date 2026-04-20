@@ -16,7 +16,7 @@
 
 ### 0.1 目標能力（對照「營運面」；不含 GUI 後台點按）
 
-在 §0 三層都成立時，Agent 合理目標包括：**讀寫 monorepo（如 `D:\Work`）**、經 MCP／API／CLI 操作 **GitHub、Supabase、WordPress、n8n、Trigger、Cloudflare、PostHog、Sentry**（及你另接的 **Canva** 等）、經 **SSH** 查 **Docker／Nginx／Redis／Uptime Kuma／Netdata** 等自託管元件，並以 **API／CLI** 補足沒有 MCP 的場景。  
+在 §0 三層都成立時，Agent 合理目標包括：**讀寫 monorepo 根（你本機 clone 路徑；Cursor 以工作區根為準）**、經 MCP／API／CLI 操作 **GitHub、Supabase、WordPress、n8n、Trigger、Cloudflare、PostHog、Sentry**（及你另接的 **Canva** 等）、經 **SSH** 查 **Docker／Nginx／Redis／Uptime Kuma／Netdata** 等自託管元件，並以 **API／CLI** 補足沒有 MCP 的場景。  
 **不**承諾：替你登入 `…/admin` 類網頁並操作 UI（見 §1 原則 3）。
 
 ### 0.2 Cursor MCP：建議至少涵蓋的設定鍵（名稱以 inventory／`mcp.json` 為準）
@@ -83,7 +83,7 @@
 
 | Runtime | 常見設定位置 | 說明 |
 |:---|:---|:---|
-| **Cursor（本 repo）** | `D:\Work\mcp.json` + 使用者層 MCP | Settings → MCP 合併；見 [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §1。 |
+| **Cursor（本 repo）** | **專案** `.cursor/mcp.json`（路徑建議用 `${workspaceFolder}`）+ **使用者** `~/.cursor/mcp.json` | Settings → MCP 合併；見 [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §1。 |
 | **Codex CLI** | `%USERPROFILE%\.codex\config.toml`（或官方文件載明路徑） | HTTP MCP 在 TOML 常見欄位為 **`bearer_token_env_var`**（把 secret 留在環境變數，不寫進檔案）。 |
 
 **Agent 動作**：接到任務時，若需 MCP，先確認**當前** runtime 讀的是哪一個設定來源，再查該檔是否存在、鍵名是否與 inventory 一致。
@@ -117,7 +117,7 @@
 
 | 能力 | 建議做法 | 備註 |
 |:---|:---|:---|
-| **PostHog** | `D:\Work\scripts\posthog-api.ps1`；環境變數 **`POSTHOG_API_KEY`** 或本機 vault 鍵名同左 | 腳本已內建從 vault 讀取邏輯，見腳本開頭。 |
+| **PostHog** | monorepo 根下 **`scripts/posthog-api.ps1`**；環境變數 **`POSTHOG_API_KEY`** 或本機 vault 鍵名同左 | 腳本已內建從 vault 讀取邏輯，見腳本開頭。 |
 | **Sentry** | 設定 **`SENTRY_AUTH_TOKEN`** 後使用 **`npx @sentry/cli`**（或專案內已安裝的 `sentry-cli`） | 以 `info`／`releases` 等子命令驗證；路徑隨 `npm install` 變動，**不要**在文件硬編唯一絕對路徑。 |
 | **Cloudflare** | **`wrangler`** 或 Cloudflare HTTP API + token（環境變數） | MCP 為加分項，非必要。 |
 | **Supabase** | 自託管：**SSH + 容器**檢查 stack；schema／migration 仍以 **repo migrations** 為準 | Supabase MCP（若接）僅輔助查 schema／除錯，見 inventory。 |
