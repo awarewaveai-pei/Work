@@ -86,7 +86,7 @@
 
 | Runtime | 常見設定位置 | 說明 |
 |:---|:---|:---|
-| **Cursor（本 repo）** | **專案** `.cursor/mcp.json`（路徑建議用 `${workspaceFolder}`）+ **使用者** `~/.cursor/mcp.json` | Settings → MCP 合併；見 [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §1。 |
+| **Cursor（本 repo）** | **`%USERPROFILE%\.cursor\mcp.json`**（建議；密鑰放此）+ 可選本機 **`.cursor/mcp.json`**（已 **gitignore**）+ 範本 **`mcp.json.template`** | Settings → MCP 合併；路徑建議 **`${workspaceFolder}`**；見 [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §1。 |
 | **Claude Code（本 repo）** | monorepo 根 **`.mcp.json`**（`${VAR}` 展開；LLM 經 **`scripts/run-llm-mcp.ps1`**） | 與 Cursor **server 名稱**對齊便於對照；見 [Claude MCP](https://code.claude.com/docs/en/mcp)。 |
 | **Codex CLI（本 repo）** | monorepo 根 **`.codex/config.toml`**（合併於 **`%USERPROFILE%\.codex\config.toml`** 之上；以官方載入順序為準） | **`[mcp_servers.*]`**；HTTP 用 **`bearer_token_env_var`**；Windows stdio 維持 **`cmd /c`** 前綴；見 [Codex MCP](https://openai-codex.mintlify.app/configuration/mcp-servers)。 |
 
