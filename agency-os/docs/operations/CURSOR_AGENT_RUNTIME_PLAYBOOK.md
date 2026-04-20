@@ -61,6 +61,9 @@
 | `SENTRY_AUTH_TOKEN` | `sentry-cli`／Sentry API |
 | `POSTHOG_API_KEY` | `scripts/posthog-api.ps1`、PostHog REST |
 | `CLOUDFLARE_API_TOKEN` | Wrangler／Cloudflare API |
+| `COPILOT_MCP_BEARER_TOKEN` | Cursor **copilot** HTTP MCP（`Authorization: Bearer ${env:…}`）；Claude／Codex 亦建議同名變數 |
+| `MONOREPO_ROOT` | Claude **work-global**（`.mcp.json`）與 Codex **`work-global`** 的 repo 根路徑（本機絕對路徑） |
+| `TRIGGER_PROJECT_REF` | **Codex／Claude** 的 `trigger` MCP（經 `start-trigger-mcp.ps1` 讀環境）；Cursor 仍以 **`.cursor/mcp.json`** 的 `-ProjectRef` 參數為主 |
 
 匯入／輪替流程：[`mcp-add-server-quickstart.md`](mcp-add-server-quickstart.md)、[`mcp-secrets-hardening-runbook.md`](mcp-secrets-hardening-runbook.md)。
 
@@ -84,7 +87,8 @@
 | Runtime | 常見設定位置 | 說明 |
 |:---|:---|:---|
 | **Cursor（本 repo）** | **專案** `.cursor/mcp.json`（路徑建議用 `${workspaceFolder}`）+ **使用者** `~/.cursor/mcp.json` | Settings → MCP 合併；見 [`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §1。 |
-| **Codex CLI** | `%USERPROFILE%\.codex\config.toml`（或官方文件載明路徑） | HTTP MCP 在 TOML 常見欄位為 **`bearer_token_env_var`**（把 secret 留在環境變數，不寫進檔案）。 |
+| **Claude Code（本 repo）** | monorepo 根 **`.mcp.json`**（`${VAR}` 展開；LLM 經 **`scripts/run-llm-mcp.ps1`**） | 與 Cursor **server 名稱**對齊便於對照；見 [Claude MCP](https://code.claude.com/docs/en/mcp)。 |
+| **Codex CLI（本 repo）** | monorepo 根 **`.codex/config.toml`**（合併於 **`%USERPROFILE%\.codex\config.toml`** 之上；以官方載入順序為準） | **`[mcp_servers.*]`**；HTTP 用 **`bearer_token_env_var`**；Windows stdio 維持 **`cmd /c`** 前綴；見 [Codex MCP](https://openai-codex.mintlify.app/configuration/mcp-servers)。 |
 
 **Agent 動作**：接到任務時，若需 MCP，先確認**當前** runtime 讀的是哪一個設定來源，再查該檔是否存在、鍵名是否與 inventory 一致。
 

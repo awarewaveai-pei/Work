@@ -57,9 +57,14 @@
       ]
     },
     "chatgpt-fast": {
-      "command": "node",
+      "command": "powershell",
       "args": [
-        "${workspaceFolder}/mcp-local-wrappers/llm-mcp.mjs",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "-Provider",
         "openai"
       ],
       "env": {
@@ -68,9 +73,14 @@
       }
     },
     "chatgpt-latest": {
-      "command": "node",
+      "command": "powershell",
       "args": [
-        "${workspaceFolder}/mcp-local-wrappers/llm-mcp.mjs",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "-Provider",
         "openai"
       ],
       "env": {
@@ -79,9 +89,14 @@
       }
     },
     "claude-fast": {
-      "command": "node",
+      "command": "powershell",
       "args": [
-        "${workspaceFolder}/mcp-local-wrappers/llm-mcp.mjs",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "-Provider",
         "anthropic"
       ],
       "env": {
@@ -90,9 +105,14 @@
       }
     },
     "claude-latest": {
-      "command": "node",
+      "command": "powershell",
       "args": [
-        "${workspaceFolder}/mcp-local-wrappers/llm-mcp.mjs",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "-Provider",
         "anthropic"
       ],
       "env": {
@@ -101,8 +121,10 @@
       }
     },
     "perplexity": {
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "@perplexity-ai/mcp-server"
       ],
@@ -111,9 +133,14 @@
       }
     },
     "gemini-fast": {
-      "command": "node",
+      "command": "powershell",
       "args": [
-        "${workspaceFolder}/mcp-local-wrappers/llm-mcp.mjs",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "-Provider",
         "gemini"
       ],
       "env": {
@@ -122,9 +149,14 @@
       }
     },
     "gemini-latest": {
-      "command": "node",
+      "command": "powershell",
       "args": [
-        "${workspaceFolder}/mcp-local-wrappers/llm-mcp.mjs",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/run-llm-mcp.ps1",
+        "-Provider",
         "gemini"
       ],
       "env": {
@@ -136,12 +168,13 @@
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp/",
       "headers": {
-        "Authorization": "Bearer <PASTE_COPILOT_OR_GITHUB_TOKEN>"
+        "Authorization": "Bearer ${env:COPILOT_MCP_BEARER_TOKEN}"
       }
     },
     "trigger": {
       "command": "powershell",
       "args": [
+        "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",
         "-File",
