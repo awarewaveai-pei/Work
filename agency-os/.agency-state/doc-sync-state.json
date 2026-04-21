@@ -1,19 +1,30 @@
 ﻿{
-    "last_run_utc":  "2026-04-20T10:15:40.0700760Z",
+    "last_run_utc":  "2026-04-21T09:30:15.1830305Z",
     "changed_files":  [
+                          ".cursor/rules/30-resume-keyword.mdc",
                           "docs/operations/mcp-add-server-quickstart.md",
+                          "docs/overview/PROGRAM_TIMELINE.md",
                           "memory/CONVERSATION_MEMORY.md",
                           "memory/daily/2026-04-20.md",
                           "WORKLOG.md"
                       ],
     "impacted_files":  [
+                           ".cursor/rules/30-resume-keyword.mdc",
+                           "AGENTS.md",
                            "docs/operations/mcp-add-server-quickstart.md",
+                           "docs/overview/PROGRAM_TIMELINE.md",
+                           "LAST_SYSTEM_STATUS.md",
                            "memory/CONVERSATION_MEMORY.md",
                            "memory/daily/2026-04-20.md",
+                           "README.md",
+                           "TASKS.md",
                            "WORKLOG.md"
                        ],
     "auto_updated_files":  [
+                               "AGENTS.md",
+                               "LAST_SYSTEM_STATUS.md",
                                "memory/CONVERSATION_MEMORY.md",
+                               "TASKS.md",
                                "WORKLOG.md"
                            ]
 }

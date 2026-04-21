@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-20 18:15:50
+- Generated: 2026-04-21 17:30:26
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,36 +203,14 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-20.md
-# Daily Memory - 2026-04-20
-
-## 今日完成
-- 釐清並修復桌機 MCP 紅燈主因：user-level `mcp.json` 在 Windows 下發生路徑插值/JSON 轉義問題，導致設定看似更新但實際未生效。
-- 新增修復腳本：
-  - `scripts/patch-cursor-user-mcp-workspace.ps1`
-  - `scripts/repair-user-mcp-json-escapes.ps1`
-  - `scripts/patch-codex-user-mcp-config.ps1`
-- 強化 `scripts/secrets-vault.ps1`（含 `agency-os/scripts` 鏡像）：若缺 `TRIGGER_ACCESS_TOKEN`，直接回傳可執行修復指令。
-- 補充文件 `agency-os/docs/operations/mcp-add-server-quickstart.md`：加入 Trigger/Copilot 紅燈排查重點。
-- 建立 commit：`578be40`（`[cursor] fix(mcp): stabilize user-level path resolution and auth troubleshooting`）。
-
-## 今日未完成
-- Trigger/Copilot MCP 仍待使用者在本機完成 token/權限與 reload 後最終驗證。
-- Hetzner SSH 尚未回到可穩定登入狀態（目前在 Web Console 排錯中）。
-
-## 風險與注意
-- 本輪對話曾暴露多組高敏感資訊（root 密碼、SSH 私鑰、API tokens）；需視為外洩事件並輪替。
-- Hetzner 若持續出現 `Connection closed`，需優先從 Web Console 檢查 `sshd_config`、`authorized_keys` 權限與 fail2ban。
-
-## 下一步
-- 依 `AO-CLOSE` 流程跑 `scripts/ao-close.ps1`，完成 verify/guard/integrated-status 與 push。
-- 明日優先確認：MCP 全綠（至少 Trigger/n8n/Copilot）與桌機 SSH 可重現登入。
+## 5) memory/daily/2026-04-21.md
+_no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-20 18:15:42`
+- Time: `2026-04-21 17:30:17`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -242,13 +220,32 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260420-181542.md`
-- Closeout: `reports/closeout/closeout-20260420-181540.md`
+- Health: `reports/health/health-20260421-173017.md`
+- Closeout: `reports/closeout/closeout-20260421-173015.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+- **`docs/overview/PROGRAM_SCHEDULE.json`**：三流（AO／LF／PJ）任務與日期；可複製到客戶專案或 `project-kit` 範本。
+- **`scripts/render-program-timeline-from-schedule.ps1`**：UTF-8 JSON → `PROGRAM_TIMELINE.md` 標記區（表 + Mermaid）；腳本本體 **ASCII-only** 以相容 PS 5.1。
+- **`generate-integrated-status-report.ps1`** 末尾**單次**呼叫渲染；**AO-CLOSE** 路徑因此每次收工會重渲時間軸（仍以 TASKS／Checklist／Discovery 為完成真相）。
+
+### 續接驗證（使用者授權「進行」）
+- `git pull origin main`：**Already up to date**。
+- `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
+- `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
+
+### AO-CLOSE（2026-03-27）
+- 已完成收工前進度同步（`TASKS.md`、`WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`memory/daily/2026-03-27.md`）。
+- 準備執行 `D:\Work\scripts\ao-close.ps1` 一鍵閘道與推送。
+
+### 他處電腦開機須知 + 缺席使用者授權之 AO-CLOSE
+- 新增 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（公司機／換機：`git pull`、`verify-build-gates`、`npm ci`、`integrated-status` 路徑說明、與根目錄 `reports/status` 區別）。
+- 更新 **`RESUME_AFTER_REBOOT.md`**（區分：同機重開 vs 他處開機）、**`README.md`**、**`EXECUTION_DASHBOARD.md`** 指向該須知。
+- 使用者授權代理於不在現場時執行 **`ao-close.ps1`**（含 push）；證據見本日 `memory/daily/2026-03-27.md`。
+- **AO-CLOSE 產出（agency-os/reports/）**：`health/health-20260326-084302.md`、`guard/guard-20260326-084306.md`、`closeout/closeout-20260326-084303.md`、`status/integrated-status-20260326-084315.md`；**Git**：主提交 `f726ce9`，補登 daily `70114fc`，TASKS 勾選 `5a7841b`（均已 `push origin main`）。
+
 ### Lobster Factory - C1-1 execute 驗證成功
 - Supabase `EdD Art-based` 已完成 `0001_core.sql` ~ `0006_seed_catalog.sql` 套用。
 - `validate-workflow-runs-write.mjs --execute=1` 實跑成功，回傳：`ok: true`、`insertedId: 1e53ec18-1c01-4547-9593-20feee6bdc2c`。
@@ -288,25 +285,6 @@
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
-
-## 2026-04-20
-
-### 營運定案：Trigger.dev 自託管＝已上線（與 GitHub 敘述一致）
-- **定案**：自 **2026-04-20** 起，以 **`origin/main`** 入庫敘述為準；**`TOOLS_DELIVERY_TRACEABILITY.md`**、**`hetzner-stack-rollout-index.md`**、**`RESUME_AFTER_REBOOT.md`**、**`TASKS.md`**（含雙機子項）已改為 **已上線** 單一說法。
-- **證據索引**（不變）：**`memory/CONVERSATION_MEMORY.md`**（2026-04-16）、**`## 2026-04-17`**（`trigger.aware-wave.com` HTTPS 等）；實裝正本 **`lobster-factory/infra/trigger/README.md`**。
-
-### Machine appendix（weekly-system-review；接續已 pull `origin/main`）
-- 2026-04-20 09:00:26 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-### MCP 整排紅燈排查（桌機）
-- **修復**：新增/更新 MCP 修復腳本（`scripts/patch-cursor-user-mcp-workspace.ps1`、`scripts/repair-user-mcp-json-escapes.ps1`、`scripts/patch-codex-user-mcp-config.ps1`），解決 user-level `mcp.json` 路徑插值與 Windows JSON 轉義問題（避免 `${workspaceFolder}` 留字面值或產生無效 JSON）。
-- **提示增強**：`scripts/secrets-vault.ps1`（含 `agency-os/scripts` 鏡像）在缺少 `TRIGGER_ACCESS_TOKEN` 時，改為輸出可直接執行的修復指令與說明；`mcp-add-server-quickstart.md` 補 Trigger/Copilot 常見紅燈判斷。
-- **提交**：`578be40`（`[cursor] fix(mcp): stabilize user-level path resolution and auth troubleshooting`）已建立；推送狀態由本次 `AO-CLOSE` 統一處理。
-
-### Hetzner SSH 故障排查（使用者即時操作）
-- **現況**：可連到 `5.223.93.113:22`，但 key/password 皆遭拒或被 server 主動關閉（`Permission denied` / `Connection closed`）；研判為帳密漂移、`authorized_keys` 缺失、或 SSHD/防護策略問題。
-- **現場協作**：已以「小白步驟」帶使用者走 Hetzner Web Console、`/root/.ssh` 權限修復、以及 root 登入排錯；目前仍待使用者完成 console 內最終修復並回貼驗證輸出。
-- **資安提醒**：本輪對話曾出現高敏感憑證（root 密碼、SSH 私鑰、token）；已建議視為外洩並全面輪替。
 
 
 
