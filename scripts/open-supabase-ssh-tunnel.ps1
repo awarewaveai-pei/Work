@@ -61,8 +61,13 @@ if ($Background) {
     Write-Host "Started in background. To stop: Get-Process ssh | Stop-Process" -ForegroundColor DarkGray
     Start-Sleep -Seconds 3
     $probe = Test-NetConnection -ComputerName 127.0.0.1 -Port 5432 -WarningAction SilentlyContinue
-    Write-Host ($(if ($probe.TcpTestSucceeded) { "Tunnel up — postgres at localhost:5432" } else { "Port 5432 not open yet, wait a moment." })) -ForegroundColor $(if ($probe.TcpTestSucceeded) { "Green" } else { "Yellow" })
-    exit 0
+    if ($probe.TcpTestSucceeded) {
+        Write-Host "Tunnel up — postgres at localhost:5432" -ForegroundColor Green
+        exit 0
+    } else {
+        Write-Host "Port 5432 not open yet — SSH may have failed. Check host alias '$SshHost' and key." -ForegroundColor Red
+        exit 1
+    }
 }
 
 & $sshExe @args
