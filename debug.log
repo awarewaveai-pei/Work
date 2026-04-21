@@ -1,0 +1,6 @@
+[0421/145428.382:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: 存取被拒。 (0x5)
+[0421/145434.817:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: 存取被拒。 (0x5)
+[0421/150011.520:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: 存取被拒。 (0x5)
+[0421/150338.997:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: 存取被拒。 (0x5)
+[0421/154038.885:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: 存取被拒。 (0x5)
+[0421/154038.885:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: 存取被拒。 (0x5)
