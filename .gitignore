@@ -15,6 +15,8 @@ node_modules/
 lobster-factory/packages/workflows/.trigger/
 
 # --- Environment & keys ---
+.mcp.json
+.codex/config.toml
 hostinger-recovery-codes.txt
 **/recovery-codes*.txt
 .env
