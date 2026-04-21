@@ -175,6 +175,7 @@ services:
       start_period: 25s
     networks:
       - lobster-net
+      - supabase_default
     logging: *lobster-logging
 
   next-admin:
@@ -222,6 +223,8 @@ services:
 
 networks:
   lobster-net:
+    external: true
+  supabase_default:
     external: true
 
 volumes:
