@@ -74,16 +74,16 @@
   - 處理：接入 API/workflow 錯誤上報 + release tag；定義 1 條告警規則
   - DoD：可人工觸發 1 筆測試錯誤並在 Sentry 收到告警
   - 2026-04-17 補強：DSN 分流契約（6 服務命名）+ `SENTRY_ALERT_POLICY.md`（告警分級/P1-P3、smoke 基線、月季巡檢）+ `verify-build-gates` Sentry 契約檢查。
-- [ ] （工具建置）PostHog 事件基線
+- [x] （工具建置）PostHog 事件基線
   - 處理：定義 core events（至少 onboarding_start / onboarding_completed / deploy_requested / deploy_result）
   - DoD：可在 PostHog 看到一筆完整測試 funnel
 - [ ] （工具建置）Clerk 組織與角色（B2B 多租戶）
   - 處理：建立 org + role 對照（owner/admin/operator/viewer）並映射到現有權限邏輯
   - DoD：2 個測試角色登入後，看到不同權限結果
-- [ ] （工具建置）Cloudflare 邊界保護
+- [x] （工具建置）Cloudflare 邊界保護
   - 處理：DNS / WAF / rate limit / 基本防護規則（先 staging）
   - DoD：staging 入口啟用防護且不影響正常流程
-- [ ] （工具建置）Secrets 治理升級（從 env/mcp 到集中管控）
+- [x] （工具建置）Secrets 治理升級（從 env/mcp 到集中管控）
   - 處理：定義 secrets owner、輪替節奏、最小讀取權限；先覆蓋 Trigger/n8n/GitHub 相關高風險金鑰
   - DoD：完成一輪輪替演練，服務不中斷
   - **執行正本**：`docs/operations/secrets-governance-p1-closeout.md`（Owner 表、首輪輪替三選一、WORKLOG 證據、AUTO_TASK_DONE 子字串）。
