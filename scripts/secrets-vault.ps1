@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp")]
+    [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp", "sync-copilot-mcp-env")]
     [string]$Action = "list",
     [string]$Name = "",
     [string]$Value = "",
@@ -272,6 +272,23 @@ Then reload Cursor. See agency-os/docs/operations/mcp-add-server-quickstart.md (
         $uniq = @($imported | Sort-Object -Unique)
         Write-Host ("Imported/updated secrets from mcp: {0}" -f $count) -ForegroundColor Green
         foreach ($n in $uniq) { Write-Output $n }
+        exit 0
+    }
+
+    "sync-copilot-mcp-env" {
+        $srcName = "COPILOT_AUTH_BEARER_TOKEN"
+        if (-not $store.secrets.Contains($srcName)) {
+            throw @"
+Vault missing $srcName. Fix:
+  1) Put a valid GitHub PAT in %USERPROFILE%\.cursor\mcp.json under copilot.headers.Authorization (Bearer ...), OR
+  2) Run: .\scripts\secrets-vault.ps1 -Action import-mcp
+Then run this action again. See docs/operations/mcp-add-server-quickstart.md (copilot).
+"@
+        }
+        $plain = Unprotect-Secret -CipherText $store.secrets[$srcName].cipher
+        [Environment]::SetEnvironmentVariable("COPILOT_MCP_BEARER_TOKEN", $plain, "User")
+        Write-Host "Set User-level env COPILOT_MCP_BEARER_TOKEN from vault $srcName." -ForegroundColor Green
+        Write-Host "Update copilot MCP header to: Bearer `${env:COPILOT_MCP_BEARER_TOKEN} then fully quit Cursor and reopen (new processes read User env)." -ForegroundColor Yellow
         exit 0
     }
 }
