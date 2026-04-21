@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-22（Observability 實機驗證與 Kuma 去重）**：已實機執行 `Netdata -> Slack` drill（webhook `200 ok` + Netdata `WARNING/CRITICAL/CLEAR` 測試皆成功）；以 Kuma socket API 新建 13 筆 monitor（6 public HTTP、6 SSL、1 heartbeat）且未直寫 DB；其後已做告警去重，保留 `endpoint-alert.sh -> Slack` 作 public outage 主告警，Kuma 僅保留 `SSL expiry`、`endpoint-alert-heartbeat` 與既有內部 monitor 的 Slack。`endpoint-alert.sh` 已新增 `HEARTBEAT_URL` 並同步上 VPS，heartbeat 已在 Kuma 顯示 `OK`。殘留風險：Kuma 內仍有一筆舊 monitor 的 `accepted_statuscodes_json` 歷史格式錯誤，需 UI 重存修復。
 - **2026-04-21（工具建置四項收斂）**：完成 Secrets 治理、PostHog 事件基線、Cloudflare 邊界保護、`packages/workflows` `npm audit`（Critical 0；其餘 High 為 Trigger 上游）；`WORKLOG` 已補 `AUTO_TASK_DONE` 待 AO-CLOSE 自動勾選。
 - **2026-04-20（MCP 紅燈修復進展）**：已建立 `578be40`（`[cursor] fix(mcp): stabilize user-level path resolution and auth troubleshooting`），內容含 user-level MCP 路徑修復腳本（Cursor/Codex）與 JSON 轉義修復、`secrets-vault` 缺 `TRIGGER_ACCESS_TOKEN` 的可執行錯誤提示、以及 quickstart 的 Trigger/Copilot 紅燈排查補充。重點根因：Windows 路徑插值與 JSON 反斜線轉義錯誤會讓 MCP 設定表面「有改但不生效」。
 - **2026-04-20（Trigger/Copilot）**：Trigger 紅燈高機率因 vault 缺 `TRIGGER_ACCESS_TOKEN`（`import-mcp` 不會自動生出）；Copilot 紅燈多為 token/訂閱/權限或 endpoint 細節，需看 MCP output 的 401/403 判讀。
@@ -350,4 +351,3 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
 _Last synced: 2026-04-21 12:47:00 UTC_
-

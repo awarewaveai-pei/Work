@@ -4,6 +4,23 @@
 
 ## 2026-04-22
 
+### Uptime Kuma／Netdata／Slack 告警實機驗證與去重
+
+- **Netdata → Slack drill**：已 SSH 到 Hetzner 執行 `/usr/local/bin/slack-alert-drill.sh`；兩則 webhook 測試皆回 `200 ok`，Netdata 官方 `alarm-notify.sh test` 之 `WARNING` / `CRITICAL` / `CLEAR` 三段告警亦成功送出。
+- **現況盤點（實機，不只看文件）**：
+  - `Cloudflare`：`aware-wave.com` zone 為 `active`；`ssl=full`、`always_use_https=on`、`browser_check=on`；已見 Managed Ruleset + Custom WAF Rules 與 3 條自訂 firewall rules。
+  - `Sentry`：容器實際帶 DSN 者為 `node-api`、`next-admin`、`wordpress`；`trigger-supervisor` 與 `n8n` 未見 Sentry env。`next-admin` 對外 `GET /admin/api/sentry-test` 當時回 `404`，代表 smoke route 與實際部署仍有落差。
+  - `PostHog`：雲端 project 存在，但當前僅見 sample insight / 自動事件；`next-admin` 容器的 `NEXT_PUBLIC_POSTHOG_KEY` 仍為空，typed `track()` registry 尚未在介面實際呼叫，故真實 funnel 仍缺。
+- **Uptime Kuma（只走 UI/API，不直寫 DB）**：
+  - 以 Kuma socket API 建立 13 筆 monitor：6 筆 public HTTP、6 筆 SSL expiry、1 筆 `endpoint-alert-heartbeat`。
+  - 既有 Slack notification（ID `1`，Slack）已先綁定全部 23 筆 monitor，之後為避免與 `endpoint-alert.sh` 對同一 public outage 雙重轟炸，再將新建的 6 筆 public HTTP monitor 自 Kuma Slack 移除，只保留 `endpoint-alert.sh` 告警；Kuma 繼續負責 6 筆 SSL 與 1 筆 heartbeat 的 Slack。
+  - 最終狀態：`monitor_notification` 已驗證為 `11..16` 無 Slack、`17..23` 仍綁 `notification_id=1`；舊有 `1..10` monitor 仍綁 Slack。
+- **Heartbeat 接線**：
+  - repo 正本 `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh` 新增可選 `HEARTBEAT_URL`，僅在「本輪所有 public URL 檢查成功」時送 Kuma push heartbeat。
+  - VPS 已同步新版 `/usr/local/bin/endpoint-alert.sh`，並於 `/etc/default/awarewave-endpoint-alert` 寫入 `HEARTBEAT_URL`；`awarewave-endpoint-alert.service` 手動執行 `status=0/SUCCESS`，`awarewave-endpoint-alert.timer` 維持 `active`。
+  - Uptime Kuma `endpoint-alert-heartbeat` 已收第一筆 `OK` heartbeat，前幾筆 `No heartbeat in the time window` 為接線前正常歷史。
+- **殘留風險**：Uptime Kuma `error.log` 仍有舊 monitor 的 `accepted_statuscodes_json` 解析錯誤（歷史資料格式問題，不是本輪新建 monitor 所致）；後續宜於 UI 將該舊 monitor 重新存一次，避免列表/統計時偶發報錯。
+
 ### Supabase 完整暴露與 AI 控制設定（Claude 執行）
 
 - **目標**：讓自架 Supabase 可被 Claude、Cursor、Codex 完整操作，並提供人類 Studio UI 入口。
@@ -14,11 +31,11 @@
 - **SSH tunnel script**：新增 `scripts/open-supabase-ssh-tunnel.ps1`，一次轉發 postgres:5432、studio:3000、kong:8000；`-Background` 模式會 probe 並在失敗時 exit 1（bug fix 也同步入庫）。
 - **MCP**：`supabase-postgres`（`@modelcontextprotocol/server-postgres` via localhost:5432）之連線與 **Supabase API keys** 只許以 **本機環境變數**／vault 提供；**不得**寫入 git 可追蹤檔（見同日 **§安全修補**）。
 - **驗證**：`https://supabase.aware-wave.com/rest/v1/` → HTTP 401（Kong JWT 保護正常）；`https://studio.aware-wave.com/` → HTTP 401（basic auth 正常）。
-- **AI 操控方式**：REST API 直打 `https://supabase.aware-wave.com` + Service Role Key（由 vault／環境注入，**不入庫**）；SQL 直連需先跑 tunnel script，Claude Code MCP `supabase-postgres` 讀 **`${SUPABASE_POSTGRES_MCP_DSN}`** 等占位。
+- **AI 操控方式**：REST API 直打 `https://supabase.aware-wave.com` + Service Role Key（由 vault／環境注入，**不入庫**）；SQL 直連需先跑 tunnel script；MCP **`supabase-postgres`** 經 **`scripts/run-postgres-mcp.ps1`** 讀 **`SUPABASE_POSTGRES_MCP_DSN`**（**勿**依賴 `args` 內 `${…}` 展開）。
 
 ### 安全修補（`.mcp.json`／Codex／tunnel 腳本）
 - **問題**：根 **`.mcp.json`** 曾被索引且含 **JWT／postgres DSN**；`scripts/open-supabase-ssh-tunnel.ps1` 註解與提示曾含 **DB 密碼**；`WORKLOG` 同日上文曾含 Studio basic auth 明文（已改為「僅 VPS／vault」敘述）。
-- **處置**：**`git rm --cached`** `.mcp.json`、`.codex/config.toml`（兩者已在 repo 根 **`.gitignore`**）；工作區 `.mcp.json` 改 **`${SUPABASE_POSTGRES_MCP_DSN}`** 與 **`${SUPABASE_*}`**；腳本改為不含密文；新增 **`.codex/config.toml.example`**、**`.codex/README.md`**；**`mcp.json.template`** 補 **supabase-postgres** 占位；**`security-secrets-policy.md`** 補誤提交後須 **輪替密鑰** 與可選清史。**若曾 push 含密文之 commit，仍須視為外洩**：輪替 Supabase **JWT secret**、**anon/service keys**、**postgres 密碼**（主防線）。
+- **處置**：**`git rm --cached`** `.mcp.json`、`.codex/config.toml`（兩者已在 repo 根 **`.gitignore`**）；工作區 `.mcp.json` 改經 **`run-postgres-mcp.ps1`** 讀 **`SUPABASE_POSTGRES_MCP_DSN`**／**`SUPABASE_*`** 環境變數；腳本改為不含密文；新增 **`.codex/config.toml.example`**、**`.codex/README.md`**；**`mcp.json.template`** 補 **supabase-postgres** 占位；**`security-secrets-policy.md`** 補誤提交後須 **輪替密鑰** 與可選清史。**若曾 push 含密文之 commit，仍須視為外洩**：輪替 Supabase **JWT secret**、**anon/service keys**、**postgres 密碼**（主防線）。
 
 ### 營運決策：取消預設採用 Clerk（IdP）
 - **決策**：**不**在 Phase 1／Enterprise 路線強制導入 **Clerk**。日後若要第三方應用層 IdP 再 **新開任務** 並可另發 **新 ADR**（Clerk、Auth0、WorkOS 等）。
@@ -1107,7 +1124,6 @@ _Last synced: 2026-04-21 17:59:20 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
-
 
 
 
