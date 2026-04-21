@@ -7,8 +7,8 @@
 #   2. cp .env.example .env && fill secrets + URLs
 #   3. docker compose --env-file .env up -d
 #
-# Nginx (hetzner-phase1-core/nginx/trigger.conf) proxies to trigger-webapp:3000 (v4 app port).
-# Repo workflows use @trigger.dev/sdk 4.x → keep platform on v4 (do not pin to v3 without downgrading SDK).
+# Apache (system) proxies trigger.aware-wave.com → localhost:8030 (trigger-webapp).
+# Repo workflows use @trigger.dev/sdk 4.x — keep platform on v4 (do not pin to v3 without downgrading SDK).
 
 name: trigger
 
@@ -101,7 +101,6 @@ services:
       REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
     ports:
       - ${REGISTRY_PUBLISH_IP:-127.0.0.1}:5000:5000
-    # registry:2 映像常不含 wget/curl；以「已啟動」為依賴即可。
 
   minio:
     image: bitnamilegacy/minio:${MINIO_IMAGE_TAG:-latest}
@@ -177,7 +176,6 @@ services:
       - lf-trg-supervisor
       - lobster-net
     ports:
-      # Local debug only; prod traffic should go via phase1 nginx + TLS.
       - ${WEBAPP_PUBLISH_IP:-127.0.0.1}:8030:3000
     healthcheck:
       test:
@@ -211,7 +209,6 @@ services:
       NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-1024}
       NODE_ENV: production
       TRIGGER_TELEMETRY_DISABLED: "1"
-      # Registry (task deploy images) — some builds also read V4_* aliases; mirror both.
       DEPLOY_REGISTRY_HOST: ${DOCKER_REGISTRY_URL}
       V4_DEPLOY_REGISTRY_HOST: ${DOCKER_REGISTRY_URL}
       DEPLOY_REGISTRY_NAMESPACE: ${DEPLOY_REGISTRY_NAMESPACE:-trigger}
@@ -222,7 +219,6 @@ services:
       OBJECT_STORE_ACCESS_KEY_ID: ${OBJECT_STORE_ACCESS_KEY_ID}
       OBJECT_STORE_SECRET_ACCESS_KEY: ${OBJECT_STORE_SECRET_ACCESS_KEY}
       OBJECT_STORE_SERVICE: ${OBJECT_STORE_SERVICE:-s3}
-      # Deployment artifacts upload target (separate from run payload object store).
       ARTIFACTS_OBJECT_STORE_BASE_URL: ${ARTIFACTS_OBJECT_STORE_BASE_URL:-http://minio:9000}
       ARTIFACTS_OBJECT_STORE_BUCKET: ${ARTIFACTS_OBJECT_STORE_BUCKET:-packets}
       ARTIFACTS_OBJECT_STORE_ACCESS_KEY_ID: ${ARTIFACTS_OBJECT_STORE_ACCESS_KEY_ID:-${OBJECT_STORE_ACCESS_KEY_ID}}
