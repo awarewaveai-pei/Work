@@ -9,6 +9,7 @@
   - add the required "run" subcommand for the Cloudflare stdio server
   - replace the archived PostHog npm package with the official remote MCP URL
   - normalize the Copilot MCP URL
+  - switch Supabase hosted MCP to OAuth login instead of bearer env auth
 
   This script is intentionally conservative and string-based so it can repair
   an existing file without reformatting unrelated sections.
@@ -70,6 +71,23 @@ $content = [regex]::Replace(
 $content = $content.Replace(
     'url = "https://api.githubcopilot.com/mcp/"',
     'url = "https://api.githubcopilot.com/mcp"'
+)
+
+# Supabase hosted MCP uses OAuth login in Codex; a service-role JWT in
+# bearer_token_env_var returns non-MCP error bodies during initialize.
+$content = [regex]::Replace(
+    $content,
+    '(?ms)\[mcp_servers\.supabase\]\s*url = "([^"]+)"\s*bearer_token_env_var = "SUPABASE_AUTH_BEARER_TOKEN"(?:\s*enabled = (true|false))?',
+    {
+        param($match)
+        $url = $match.Groups[1].Value
+        $enabled = $match.Groups[2].Value
+        if ([string]::IsNullOrWhiteSpace($enabled)) {
+            "[mcp_servers.supabase]`r`nurl = `"$url`""
+        } else {
+            "[mcp_servers.supabase]`r`nurl = `"$url`"`r`nenabled = $enabled"
+        }
+    }
 )
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
