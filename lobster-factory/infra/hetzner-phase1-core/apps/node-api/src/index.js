@@ -33,6 +33,14 @@ const supabase =
 
 app.use(express.json());
 
+app.get("/", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "node-api",
+    message: "API boundary is up. Try /health or /rag/health.",
+  });
+});
+
 app.get("/health", (_req, res) => {
   res.json({
     ok: true,
