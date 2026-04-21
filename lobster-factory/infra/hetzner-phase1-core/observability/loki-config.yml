@@ -1,0 +1,58 @@
+# Single-node Loki (pinned image 2.9.x). Tuned limits to avoid 429 on initial Promtail burst.
+# See: https://github.com/grafana/loki/blob/release-2.9.x/cmd/loki/loki-local-config.yaml
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://localhost:9093
+
+# Widen per-stream ordering window so Promtail can backfill Docker logs without 400 "too far behind"
+ingester:
+  max_chunk_age: 24h
+
+limits_config:
+  unordered_writes: true
+  ingestion_rate_mb: 32
+  ingestion_burst_size_mb: 64
+  max_streams_per_user: 50000
+  # High-volume Docker logs (e.g. clickhouse) need headroom per label stream
+  per_stream_rate_limit: 32M
+  per_stream_rate_limit_burst: 128M
+  reject_old_samples: true
+  reject_old_samples_max_age: 720h
+
+analytics:
+  reporting_enabled: false

@@ -1,0 +1,50 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "datasource", "uid": "-- Grafana --" },
+      "gridPos": { "h": 11, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "## AwareWave 觀測首頁（Loki + Grafana）\n\n本頁為 **登入後預設首頁**（與檔案佈建分開，避免 uid 衝突）。**Dashboards → Browse → AwareWave** 另有日誌儀表板；建議先開 **AwareWave 觀測範圍說明** 了解目前只有 Loki／沒有 Prometheus 指標的原因。\n\n| 想做什麼 | 去哪裡 |\n|----------|--------|\n| 查原始日誌 | **Explore** → 資料來源 **Loki** → 試 `{job='nginx'}`、`{job='syslog'}` |\n| 看資料來源 | **Connections → Data sources**（**Loki** 應為預設） |\n| Slack 通知 | **Alerting → Contact points** → **infra-alerts-slack**（本機跑 `sync-hetzner-grafana-alerting-slack.ps1`） |\n| 新增告警 | **Alerting → Alert rules → New alert rule** |\n\n**本機**：`scripts/open-grafana-ssh-tunnel.ps1` → `http://127.0.0.1:3009/`。文件：`agency-os/docs/operations/OBSERVABILITY_FIRST_TIME_SETUP_ZH.md`。",
+        "mode": "markdown"
+      },
+      "title": "導覽",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 14, "w": 12, "x": 0, "y": 11 },
+      "id": 2,
+      "options": { "dedupStrategy": "none", "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "{job=\"nginx\"}", "queryType": "range", "refId": "A" }],
+      "title": "Nginx access / error logs",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 14, "w": 12, "x": 12, "y": 11 },
+      "id": 3,
+      "options": { "dedupStrategy": "none", "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "{job=\"syslog\"}", "queryType": "range", "refId": "A" }],
+      "title": "Syslog",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["awarewave", "loki", "home"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AwareWave 觀測首頁",
+  "uid": "aw-obs-home",
+  "version": 1
+}

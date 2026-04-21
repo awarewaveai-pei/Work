@@ -1,0 +1,43 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [
+    {
+      "title": "AwareWave 儀表板",
+      "type": "dashboards",
+      "icon": "dashboard",
+      "tags": ["awarewave"],
+      "asDropdown": true,
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "datasource", "uid": "-- Grafana --" },
+      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "## 為什麼 AwareWave 資料夾裡看起來「只有幾個」？\n\n### 1. 登入首頁不在這個資料夾\n點左側 **Home**（或開根網址）應該是 **AwareWave 觀測首頁**（導覽 + Nginx / Syslog）。那是用 `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` 指到獨立目錄的 JSON，**刻意不**再放到 Browse 裡，避免與檔案佈建 **同一 uid 重複**。\n\n### 2. 目前 stack 只有「日誌」，沒有「主機／容器指標」\nVPS 上這套 observability **只有 Loki + Promtail**，且 Promtail 只掃 **主機** `/var/log` 的 **nginx** 與 **syslog**（見 `promtail-config.yml`）。**沒有**裝 Prometheus、Node Exporter、cAdvisor、Tempo 等，所以 **不會**自動出現 CPU、記憶體、容器、RPS、SLO 那一類現成儀表板——不是漏裝進 Grafana，而是 **後面根本還沒有那些資料來源**。\n\n若要那些圖：要在 `docker-compose` / 主機上 **加 exporter 或遠端 Prometheus**，再在 Grafana **Connections → Add data source** 接上，才能畫指標圖。\n\n### 3. 這個資料夾裡可以怎麼用\n- **本頁**：說明範圍；上方連結選單可跳到其他帶 `awarewave` 標籤的儀表板。\n- **日誌量快照 / Nginx 錯誤速查 / 合併日誌 / Syslog 速查**：都是 **Loki** 查詢，依你實際 log 格式可再改 LogQL。\n\n### 4. 告警\nSlack **Contact point** 需本機跑 `sync-hetzner-grafana-alerting-slack.ps1`；**Alert rules** 請在 UI 依流量自訂，避免預設規則誤報。",
+        "mode": "markdown"
+      },
+      "title": "範圍說明（請先看）",
+      "type": "text"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": ["awarewave", "loki"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AwareWave 觀測範圍說明",
+  "uid": "aw-obs-overview",
+  "version": 1
+}

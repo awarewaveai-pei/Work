@@ -121,7 +121,8 @@ if [[ "${notify}" == "true" ]]; then
   host="$(hostname)"
   ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   if [[ "${new_state}" == "fail" ]]; then
-    msg=":rotating_light: [aware-wave endpoint alert] ${host} ${ts}\n$(printf '%s\n' "${fail_lines[@]}")"
+    # Bash double quotes do not turn "\n" into a newline; build the body with printf only.
+    msg="$(printf ':rotating_light: [aware-wave endpoint alert] %s %s\n' "${host}" "${ts}")$(printf '%s\n' "${fail_lines[@]}")"
     detail_text="$(printf '%s\n' "${fail_lines[@]}")"
     send_webhook "${msg}"
     send_pagerduty "trigger" "[aware-wave] public endpoint check failed (${host})" "${detail_text}"

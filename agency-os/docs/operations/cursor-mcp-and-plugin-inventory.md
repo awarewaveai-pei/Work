@@ -9,6 +9,7 @@
 - **MCP 設定檔**：**Cursor** 建議 **`%USERPROFILE%\.cursor\mcp.json`**（密鑰）；專案 **`.cursor/mcp.json`**（可為空物件，用於 **`${workspaceFolder}`** 錨定，**可**進版控）；**Claude Code** 用 monorepo 根 **`.mcp.json`**；**Codex** 用 monorepo 根 **`.codex/config.toml`**。結構範本見 repo 根 **`mcp.json.template`**。機密只應透過 **template + vault／環境變數** 注入；**不得**把生效中的 token 寫進 `WORKLOG`、`memory` 或聊天。政策見 `**docs/operations/security-secrets-policy.md`**、`**docs/operations/local-secrets-vault-dpapi.md**`。
 - 下表 **「設定鍵」** 指 `mcpServers` 裡的 **名稱**（須與實際 JSON 一致）；新增／改名 MCP 時請 **同步更新本檔**。
 - **Cursor 畫面 vs repo**：若專案開在 monorepo 根，**Settings → MCP** 會合併 **使用者** `~/.cursor/mcp.json` 與 **專案** `.cursor/mcp.json`／外掛；路徑欄位建議用 Cursor 支援的 **`${workspaceFolder}`**／**`${userHome}`** 插值（見 [Cursor MCP 文件](https://cursor.com/docs/context/mcp)），避免綁死磁碟代號。
+- **`supabase-postgres`（stdio）**：多數 MCP 主機**不會**在 `args` 裡展開任意 **`${SUPABASE_POSTGRES_MCP_DSN}`**；請用 **`${workspaceFolder}/scripts/run-postgres-mcp.ps1`**，由腳本讀環境變數 **`SUPABASE_POSTGRES_MCP_DSN`** 再呼叫 `npx`（見 repo 根 **`mcp.json.template`**；`agency-os/scripts/run-postgres-mcp.ps1` 為鏡像）。
 - **執行期備援（Agent 必讀）**：[`CURSOR_AGENT_RUNTIME_PLAYBOOK.md`](CURSOR_AGENT_RUNTIME_PLAYBOOK.md) — 先驗證本 runtime 暴露的工具；MCP 未綠燈則走 **SSH／API／CLI**；釐清 **Cursor vs Codex** 設定檔差異。
 
 ## 2) Monorepo `mcp.json`／自訂 MCP（設定鍵 → 建議分工）

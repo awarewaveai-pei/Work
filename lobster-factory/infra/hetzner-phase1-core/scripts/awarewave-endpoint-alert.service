@@ -1,0 +1,12 @@
+[Unit]
+Description=AwareWave endpoint alert check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/awarewave-endpoint-alert
+# Optional: PAGERDUTY_ROUTING_KEY (Events API v2). Created by scripts/sync-hetzner-pagerduty-endpoint-alert.ps1
+EnvironmentFile=-/etc/default/awarewave-endpoint-alert.pagerduty
+ExecStart=/usr/local/bin/endpoint-alert.sh
+

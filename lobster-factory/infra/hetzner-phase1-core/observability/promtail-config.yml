@@ -1,0 +1,34 @@
+# Ship host logs to Loki. Requires: promtail command uses -config.expand-env=true
+# and HOST_LABEL set in compose (see docker-compose.observability.yml).
+#
+# Docker `docker_sd` is intentionally omitted here: full container log backfill
+# easily exceeds Loki per-stream ordering windows on a busy VPS. Re-enable only
+# after tuning `ingester.max_chunk_age` / retention for your workload; see
+# agency-os/docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/promtail-positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: nginx
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: nginx
+          host: ${HOST_LABEL}
+          __path__: /var/log/nginx/*.log
+
+  - job_name: syslog
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: syslog
+          host: ${HOST_LABEL}
+          __path__: /var/log/syslog
