@@ -11,7 +11,7 @@ When the user message contains `AO-RESUME`, before proposing any new implementat
    - **Agent 必做**：在可執行終端時，於 **monorepo 根**（`git rev-parse --show-toplevel`）執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**。  
      **預設行為**（勿再加「第二套」完整檢查）：`fetch`；**僅 behind>0** 時 `git pull --ff-only origin main`；**`verify-build-gates`**；workflows 依賴；**`print-open-tasks`**；**`machine-environment-audit -FetchOrigin -Strict`**（見 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1**）。與 **`align-workstation.ps1`** 同行為。  
    - **僅在 exit code 0 後**，再進行本規則第 2 步讀檔與第 3 步回覆；**exit 非 0** 時依終端輸出處置（髒樹／衝突／Strict 缺項），**不得**宣稱已與 GitHub 對齊可開工大改。  
-   - **待辦快照（與終端同源）**：`ao-resume.ps1` 預設會跑 **`print-open-tasks`**，並寫入 **`agency-os/.agency-state/open-tasks-snapshot.md`**（gitignore，本機即可）。**第 2 步讀檔時必 Read 該檔**（若不存在則以 **`agency-os/TASKS.md`** 為準），用 **Total open** 與分段內容核對，避免漏列。  
+   - **待辦快照（與終端同源）**：`ao-resume.ps1` 預設在 **git preflight 之前**即跑 **`print-open-tasks`**，寫入 **`agency-os/.agency-state/open-tasks-snapshot.md`**（gitignore）。因此 **preflight 失敗（exit≠0）時，時間戳仍應接近本次執行**；待辦條目以該檔與 **`agency-os/TASKS.md`** 對齊為準。**第 2 步讀檔時必 Read 該檔**（若不存在則以 **`agency-os/TASKS.md`** 為準），用 **Total open** 與分段內容核對。**exit≠0 時不得**宣稱已完成 fetch／閘道／Strict 等後段步驟。  
    - **無法執行終端**：改為手動 `git fetch` + `git status -sb` + `git rev-list --left-right --count HEAD...origin/main`；**behind>0** 時請使用者 **`git pull --ff-only origin main`**（必要時 **`git pull --rebase origin main`**），並在回覆標註「未跑完整 `ao-resume.ps1`」。  
    - **30 秒自檢（補強）**：腳本成功後可再跑 **REMOTE §2.3** 三指令；判讀 **ahead behind** 時 **behind 必須為 0**，**ahead>0** 不單獨阻斷（見 §2.3）。  
    - **Autopilot 開機**：**非**本節路徑——見 **`AGENTS.md`**（`-SkipVerify -SkipStrictEnvironmentAudit -AllowUnexpectedDirty`，輕量）。  
@@ -22,7 +22,7 @@ When the user message contains `AO-RESUME`, before proposing any new implementat
 - `agency-os/AGENTS.md`
 - `agency-os/memory/CONVERSATION_MEMORY.md`
 - `agency-os/memory/daily/` today and yesterday notes if present
-- **`agency-os/.agency-state/open-tasks-snapshot.md`**（若第 1 步已 exit 0 且檔案存在；與 `print-open-tasks` 同步）
+- **`agency-os/.agency-state/open-tasks-snapshot.md`**（`ao-resume` 開頭即更新；**exit 0 時必讀**；exit≠0 時若需列待辦亦可讀，但不得宣稱 Strict／sync 已完成）
 - `agency-os/TASKS.md`
 - `agency-os/WORKLOG.md`
 - `agency-os/LAST_SYSTEM_STATUS.md` (if exists)
