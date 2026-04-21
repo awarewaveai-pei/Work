@@ -4,6 +4,12 @@
 
 ## 2026-04-22
 
+### Monorepo 觀測與 MCP 啟動器收斂（已推送 `origin/main`）
+- 將先前未提交之 observability／Hetzner sync／`run-postgres-mcp.ps1`／`mcp.json.template`／`cursor-mcp-and-plugin-inventory` 等 **37 檔**收斂為單一 commit **`32c3c85`**（`[cursor] feat(observability): stack, sync scripts, postgres MCP wrapper`），並 **`git push origin main`**；遠端一併納入先前僅在本機之 **`d6dbb05`**（`[codex] feat(observability): wire uptime heartbeat and log alert rollout`）。
+- **`main`** 已 **`git branch -u origin/main`**，後續 **`git status`** 可直讀與 **`origin/main`** 之 ahead/behind。
+- Push 前 **`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -LobsterOnly`** → **ALL PASSED**。
+- 本日 **`TASKS.md`** 開放項無單一條目可宣告 **Enterprise Phase 1** 或 **三檔治理巡檢** 全 DoD；**未**新增 **`AUTO_TASK_DONE`**（避免誤勾）。
+
 ### Uptime Kuma／Netdata／Slack 告警實機驗證與去重
 
 - **Netdata → Slack drill**：已 SSH 到 Hetzner 執行 `/usr/local/bin/slack-alert-drill.sh`；兩則 webhook 測試皆回 `200 ok`，Netdata 官方 `alarm-notify.sh test` 之 `WARNING` / `CRITICAL` / `CLEAR` 三段告警亦成功送出。
@@ -696,7 +702,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-21 17:59:20 UTC_
+_Last synced: 2026-04-21 18:35:02 UTC_
 
 ## 2026-03-20
 
@@ -1124,6 +1130,7 @@ _Last synced: 2026-04-21 17:59:20 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

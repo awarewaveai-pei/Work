@@ -58,5 +58,5 @@
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 
-_Last synced: 2026-04-21 17:59:19 UTC_
+_Last synced: 2026-04-21 18:35:02 UTC_
 

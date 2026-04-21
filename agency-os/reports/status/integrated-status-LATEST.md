@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-21 20:47:05
+- Generated: 2026-04-22 02:35:10
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,27 +203,32 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-21.md
-# Daily Note - 2026-04-21
+## 5) memory/daily/2026-04-22.md
+# Daily Note - 2026-04-22
 
 ## 今日完成
-- 完成工具建置收斂四項：Secrets 治理、PostHog 事件基線、Cloudflare 邊界保護、`lobster-factory/packages/workflows` `npm audit`。
-- `api.aware-wave.com` 根路由修復並完成 VPS 部署，`/`、`/health` 可回應 JSON。
-- 雙機與 GitHub `main` 對齊，移除遠端分散分支，降低跨機遺漏風險。
+- Monorepo **`main`**：收斂未提交變更為 **`32c3c85`**，連同 **`d6dbb05`** 一併 **`git push origin main`**；分支已追蹤 **`origin/main`**；push 前 **`verify-build-gates -LobsterOnly`** PASS。
+- 實機跑完 `Netdata -> Slack` drill：VPS `slack-alert-drill.sh` 的 webhook 自測為 `200 ok`，Netdata `alarm-notify.sh test` 的 `WARNING / CRITICAL / CLEAR` 亦成功送達。
+- 以實機/API 盤點 `Cloudflare / Sentry / PostHog` 觀測面，而非只看文件：確認 Cloudflare 邊界設定已落地；Sentry 實際覆蓋為 `node-api / next-admin / wordpress`，`trigger / n8n` 仍缺；PostHog 專案存在但 `NEXT_PUBLIC_POSTHOG_KEY` 未進容器，真實 funnel 尚未啟用。
+- 只走 `Uptime Kuma` UI/API，不碰 DB，建立 13 筆 monitor：6 筆 public HTTP、6 筆 SSL、1 筆 `endpoint-alert-heartbeat`。
+- 將 `endpoint-alert.sh` 接上 Kuma heartbeat：repo 正本新增 `HEARTBEAT_URL`，VPS 同步更新並驗證 service 成功執行；Kuma heartbeat 已收到 `OK`。
+- 告警去重完成：保留 `endpoint-alert.sh -> Slack` 負責 public outage；Kuma 只保留 `SSL expiry + heartbeat + 既有內部 monitor` 的 Slack，避免同一 public outage 被兩套系統同時轟炸。
 
-## 風險與備註
-- `npm audit` 仍有 High 來自 `@trigger.dev` 上游依賴，當前無不破壞相容之本地修法，持續追上游版本。
-- SSH 私鑰曾在對話中暴露，需後續安排金鑰輪替。
+## 重要現況
+- `awarewave-endpoint-alert.timer` 仍為 `active`。
+- Uptime Kuma 共有 23 筆 monitor，其中新建 `11..23` 已到位；`11..16` 無 Slack、`17..23` 仍有 Slack。
+- Kuma `error.log` 仍殘留舊 monitor 的 `accepted_statuscodes_json` 解析錯誤，屬歷史資料格式問題，後續需在 UI 重新存一次該 monitor。
 
-## 明日優先
-- 追蹤 Trigger 上游安全更新並評估可升級窗口。
-- 依 TASKS 主線推進 Enterprise Phase 1 串接。
+## 下一步
+- 補 `trigger` / `n8n` 的 Sentry 實際接線與 smoke 驗證。
+- 把 `PostHog` 真正打開到執行中 `next-admin`，並補至少一條可驗證 funnel。
+- 視需要將 Kuma 與 `endpoint-alert.sh` 的告警規則再細分為 `P1` / `P2`。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-21 20:47:03`
+- Time: `2026-04-22 02:35:06`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -233,13 +238,21 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260421-204703.md`
-- Closeout: `reports/closeout/closeout-20260421-204700.md`
+- Health: `reports/health/health-20260422-023505.md`
+- Closeout: `reports/closeout/closeout-20260422-023502.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+- `git pull origin main`：**Already up to date**。
+- `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
+- `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
+
+### AO-CLOSE（2026-03-27）
+- 已完成收工前進度同步（`TASKS.md`、`WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`memory/daily/2026-03-27.md`）。
+- 準備執行 `D:\Work\scripts\ao-close.ps1` 一鍵閘道與推送。
+
 ### 他處電腦開機須知 + 缺席使用者授權之 AO-CLOSE
 - 新增 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（公司機／換機：`git pull`、`verify-build-gates`、`npm ci`、`integrated-status` 路徑說明、與根目錄 `reports/status` 區別）。
 - 更新 **`RESUME_AFTER_REBOOT.md`**（區分：同機重開 vs 他處開機）、**`README.md`**、**`EXECUTION_DASHBOARD.md`** 指向該須知。
@@ -287,17 +300,9 @@
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
 
 
-## 2026-04-21
 
-### 工具建置收斂（Secrets / PostHog / Cloudflare / npm audit）
-- Secrets 治理：`.mcp.json`、`.codex/config.toml` 移出 git tracking，並加入 `.gitignore`。
-- PostHog 事件基線：`providers.tsx` 完成 session recording 與 exception capture；建立 typed events registry 與 `track()` 封裝。
-- Cloudflare WAF：透過 API 套用 SSL Full、Always HTTPS、Browser Check、Managed Ruleset 與自訂阻擋規則（`xmlrpc`/`.env`/`.git`）。
-- `npm audit`：Critical 清零（`protobufjs` 修補完成）；剩餘 High 為 `@trigger.dev` 上游依賴風險，當前無不破壞相容的本地修法。
 
-- AUTO_TASK_DONE: （工具建置）Secrets 治理升級
-- AUTO_TASK_DONE: （工具建置）PostHog 事件基線
-- AUTO_TASK_DONE: （工具建置）Cloudflare 邊界保護
-- AUTO_TASK_DONE: `lobster-factory/packages/workflows` `npm audit`
+
+
 
 
