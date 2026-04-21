@@ -277,6 +277,8 @@ services:
         condition: service_healthy
     volumes:
       - trigger_shared:/home/node/shared
+    ports:
+      - "127.0.0.1:8020:8020"
     networks:
       - lf-trg-supervisor
       - lf-trg-docker-proxy
