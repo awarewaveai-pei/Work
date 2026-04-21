@@ -49,3 +49,8 @@ reports/health/health-*.md
 reports/health/health-*.json
 reports/closeout/closeout-*.md
 reports/status/integrated-status-*.md
+
+# --- Local artifact cleanup (do not commit) ---
+debug.log
+github.copilot-chat-*.vsix
+tmp-copilot-chat-vsix/
