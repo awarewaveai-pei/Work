@@ -2,6 +2,33 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-21
+
+### Hetzner／安全與觀測（事後與文件）
+- **事件摘要（不含密碼細節）**：`wordpress-ubuntu-4gb-sin-1` 出現異常負載與 **Netdata** 告警（例如 swap 高占用）；研判含 **Docker 同時啟動初始化**、既有 **ClickHouse OOM／重啟** 壓力，以及 **未授權活動（crypto miner）** 疊加。**PostgreSQL 對公網暴露埠 + 弱／預設密碼** 為已識別根因類型；處置為封鎖公網 DB、全量 rotate、根除或淨機重建（由負責人於主機執行，細節不入庫）。
+- **與 WordPress 內容無關**：公開站是否已有文章不影響主機層挖礦或 DB 被掃描；警報反映整機資源。
+- **文件**：`knowledge/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` 已自 `runbooks/` 對齊還原，**knowledge 版已去識別化**機敏欄位；事變補充見 **`runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md`**。`runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` 若仍含歷史明文，宜收斂至 vault 並改占位。
+- **WORKLOG**：本日起新日期置頂；**`## 2026-04-20`** 自檔尾上移至此前，避免「最新像停在 4/18」。
+
+## 2026-04-20
+
+### 營運定案：Trigger.dev 自託管＝已上線（與 GitHub 敘述一致）
+- **定案**：自 **2026-04-20** 起，以 **`origin/main`** 入庫敘述為準；**`TOOLS_DELIVERY_TRACEABILITY.md`**、**`hetzner-stack-rollout-index.md`**、**`RESUME_AFTER_REBOOT.md`**、**`TASKS.md`**（含雙機子項）已改為 **已上線** 單一說法。
+- **證據索引**（不變）：**`memory/CONVERSATION_MEMORY.md`**（2026-04-16）、**`## 2026-04-17`**（`trigger.aware-wave.com` HTTPS 等）；實裝正本 **`lobster-factory/infra/trigger/README.md`**。
+
+### Machine appendix（weekly-system-review；接續已 pull `origin/main`）
+- 2026-04-20 09:00:26 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+### MCP 整排紅燈排查（桌機）
+- **修復**：新增/更新 MCP 修復腳本（`scripts/patch-cursor-user-mcp-workspace.ps1`、`scripts/repair-user-mcp-json-escapes.ps1`、`scripts/patch-codex-user-mcp-config.ps1`），解決 user-level `mcp.json` 路徑插值與 Windows JSON 轉義問題（避免 `${workspaceFolder}` 留字面值或產生無效 JSON）。
+- **提示增強**：`scripts/secrets-vault.ps1`（含 `agency-os/scripts` 鏡像）在缺少 `TRIGGER_ACCESS_TOKEN` 時，改為輸出可直接執行的修復指令與說明；`mcp-add-server-quickstart.md` 補 Trigger/Copilot 常見紅燈判斷。
+- **提交**：`578be40`（`[cursor] fix(mcp): stabilize user-level path resolution and auth troubleshooting`）已建立；推送狀態由本次 `AO-CLOSE` 統一處理。
+
+### Hetzner SSH 故障排查（使用者即時操作）
+- **現況**：可連到 `5.223.93.113:22`，但 key/password 皆遭拒或被 server 主動關閉（`Permission denied` / `Connection closed`）；研判為帳密漂移、`authorized_keys` 缺失、或 SSHD/防護策略問題。
+- **現場協作**：已以「小白步驟」帶使用者走 Hetzner Web Console、`/root/.ssh` 權限修復、以及 root 登入排錯；目前仍待使用者完成 console 內最終修復並回貼驗證輸出。
+- **資安提醒**：本輪對話曾出現高敏感憑證（root 密碼、SSH 私鑰、token）；已建議視為外洩並全面輪替。
+
 ## 2026-04-18
 
 ### Cloudflare：`app.aware-wave.com` / `api.aware-wave.com` 接入（DNS／邊緣）
@@ -606,7 +633,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-20 01:43:05 UTC_
+_Last synced: 2026-04-21 09:30:14 UTC_
 
 ## 2026-03-20
 
@@ -1035,12 +1062,4 @@ _Last synced: 2026-04-20 01:43:05 UTC_
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
 
-## 2026-04-20
-
-### 營運定案：Trigger.dev 自託管＝已上線（與 GitHub 敘述一致）
-- **定案**：自 **2026-04-20** 起，以 **`origin/main`** 入庫敘述為準；**`TOOLS_DELIVERY_TRACEABILITY.md`**、**`hetzner-stack-rollout-index.md`**、**`RESUME_AFTER_REBOOT.md`**、**`TASKS.md`**（含雙機子項）已改為 **已上線** 單一說法。
-- **證據索引**（不變）：**`memory/CONVERSATION_MEMORY.md`**（2026-04-16）、**`## 2026-04-17`**（`trigger.aware-wave.com` HTTPS 等）；實裝正本 **`lobster-factory/infra/trigger/README.md`**。
-
-### Machine appendix（weekly-system-review；接續已 pull `origin/main`）
-- 2026-04-20 09:00:26 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
 

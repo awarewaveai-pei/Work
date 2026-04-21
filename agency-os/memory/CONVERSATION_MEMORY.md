@@ -3,6 +3,9 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-20（MCP 紅燈修復進展）**：已建立 `578be40`（`[cursor] fix(mcp): stabilize user-level path resolution and auth troubleshooting`），內容含 user-level MCP 路徑修復腳本（Cursor/Codex）與 JSON 轉義修復、`secrets-vault` 缺 `TRIGGER_ACCESS_TOKEN` 的可執行錯誤提示、以及 quickstart 的 Trigger/Copilot 紅燈排查補充。重點根因：Windows 路徑插值與 JSON 反斜線轉義錯誤會讓 MCP 設定表面「有改但不生效」。
+- **2026-04-20（Trigger/Copilot）**：Trigger 紅燈高機率因 vault 缺 `TRIGGER_ACCESS_TOKEN`（`import-mcp` 不會自動生出）；Copilot 紅燈多為 token/訂閱/權限或 endpoint 細節，需看 MCP output 的 401/403 判讀。
+- **2026-04-20（Hetzner SSH）**：桌機可連到 SSH 服務但認證失敗（`Permission denied`）且曾出現 `Connection closed by <ip> port 22`；已確認本機 `hetzner_trigger` 與 `.pub` 成對。使用者正在 Hetzner Web Console 進行 root/`authorized_keys` 修復流程；尚未完成最終 SSH 回歸驗證。
 - **2026-04-20（Trigger.dev 自託管 — 單一真相定案）**：營運裁定 **自託管＝已上線**（與 **`origin/main`** 一致）；已同步 **`TOOLS_DELIVERY_TRACEABILITY.md`**、**`hetzner-stack-rollout-index.md`**、**`RESUME_AFTER_REBOOT.md`**、**`TASKS.md`** 雙機子項敘述。證據索引維持 **`WORKLOG` `## 2026-04-16`～`## 2026-04-17`** 與本檔 **2026-04-16** 列；**雙機**仍指「每台 vault／`TRIGGER_*` 消費端」，非「叢集未上線」。
 - **2026-04-18（Git commit 前缀）**：`50-operator-autopilot.mdc` §7 強制 **`[cursor]`／`[codex]`／`[claude]`** 第一行 subject；`rules-version-and-enforcement.md` **2026-04-18.1** 指回；Claude/Codex 不讀 `.mdc` 需另複製規則或 hook 才硬擋。
 - **2026-04-17（Phase1 apex：WP 根／Next `/admin`）**：`aware-wave.com` 系統 Nginx 已改為 **`/`→WordPress（8080）**、**`/admin`→next-admin（3002）**；共用 **`lobster-aware-wave-locations.inc`** 同時掛在 **:80 與 :443**；`WORDPRESS_PUBLIC_URL` 已改 **https://aware-wave.com**；`next-admin` 設 **`basePath=/admin`** 並於 VPS 重建映像；**`location ^~ /admin`** 修正與 Next 308 之迴圈。VPS `/root/lobster-phase1` 仍非 git，需手動與 repo 對齊。
@@ -345,5 +348,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-20 01:43:05 UTC_
+_Last synced: 2026-04-21 09:30:14 UTC_
 
