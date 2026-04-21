@@ -90,6 +90,21 @@ if ($rulesConsistencyExit -ne 0) {
     exit $rulesConsistencyExit
 }
 
+# Refresh snapshot before git preflight so AO-RESUME / agents still see current TASKS.md
+# even when check-three-way-sync fails (dirty tree / behind / etc.).
+Write-Host "== AO-RESUME: refresh open-tasks snapshot (TASKS.md) ==" -ForegroundColor Cyan
+$openTasksScript = Join-Path $WorkRoot "scripts\print-open-tasks.ps1"
+if (-not $SkipOpenTasksList -and (Test-Path -LiteralPath $openTasksScript)) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $openTasksScript -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Show-AoResumeQuickFix -Step "open-tasks" -ExitCode $LASTEXITCODE
+        Write-Error "ao-resume: print-open-tasks failed (exit $LASTEXITCODE)."
+        exit $LASTEXITCODE
+    }
+} elseif ($SkipOpenTasksList) {
+    Write-Host "== AO-RESUME: -SkipOpenTasksList（略過待辦快照）==" -ForegroundColor DarkYellow
+}
+
 Write-Host "== AO-RESUME: preflight auto-fix ==" -ForegroundColor Cyan
 
 # Script-scoped flag: survives nested powershell.exe -File (print-open-tasks). Compute here so StrictMode never reads an "unassigned" switch at script top.
@@ -132,18 +147,6 @@ if (-not $SkipWorkflowsDeps -and (Test-Path -LiteralPath $depsScript)) {
     }
 } elseif ($SkipWorkflowsDeps) {
     Write-Host "== AO-RESUME: -SkipWorkflowsDeps（略過 npm ci 檢查）==" -ForegroundColor DarkYellow
-}
-
-$openTasksScript = Join-Path $WorkRoot "scripts\print-open-tasks.ps1"
-if (-not $SkipOpenTasksList -and (Test-Path -LiteralPath $openTasksScript)) {
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $openTasksScript -WorkRoot $WorkRoot
-    if ($LASTEXITCODE -ne 0) {
-        Show-AoResumeQuickFix -Step "open-tasks" -ExitCode $LASTEXITCODE
-        Write-Error "ao-resume: print-open-tasks failed (exit $LASTEXITCODE)."
-        exit $LASTEXITCODE
-    }
-} elseif ($SkipOpenTasksList) {
-    Write-Host "== AO-RESUME: -SkipOpenTasksList（略過列出 TASKS 未完成項）==" -ForegroundColor DarkYellow
 }
 
 if ($script:StrictEnvAudit) {
