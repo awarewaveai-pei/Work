@@ -2,5 +2,4 @@
 <clickhouse>
   <!-- ClickHouse internal cap (keep below Docker mem_limit of 1024m) -->
   <max_server_memory_usage>800000000</max_server_memory_usage>
-  <max_memory_usage>500000000</max_memory_usage>
 </clickhouse>
