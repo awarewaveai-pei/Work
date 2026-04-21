@@ -35,7 +35,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN = "${GITHUB_TOKEN}"
 
 [mcp_servers.work-global]
 command = "cmd"
-args = ["/c", "npx", "-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\user1115", "D:\\Work"]
+args = ["/c", "npx", "-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\USER", "C:\\Users\\USER\\Work"]
 enabled = true
 
 [mcp_servers.chatgpt-fast]
@@ -114,4 +114,5 @@ enabled = false
 TRIGGER_PROJECT_REF = "${TRIGGER_PROJECT_REF}"
 [mcp_servers.supabase]
 url = "https://mcp.supabase.com/mcp?project_ref=iknutyjsntaqktnnzgxl&read_only=true&features=database,docs,development,debugging"
-enabled = false
+bearer_token_env_var = "SUPABASE_AUTH_BEARER_TOKEN"
+enabled = true
