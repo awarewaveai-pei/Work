@@ -8,13 +8,17 @@
 
 - **目標**：讓自架 Supabase 可被 Claude、Cursor、Codex 完整操作，並提供人類 Studio UI 入口。
 - **Cloudflare DNS**：新增 A records（DNS-only，gray cloud）`supabase.aware-wave.com` → `5.223.93.113`、`studio.aware-wave.com` → `5.223.93.113`。
-- **nginx**：新增 `infra/hetzner-phase1-core/nginx/system-sites/supabase-subdomains.conf`，`supabase.aware-wave.com` → Kong API `127.0.0.1:8000`（JWT 保護）；`studio.aware-wave.com` → Studio `127.0.0.1:3000`（basic auth `awarewave / AwareWave2026!`）。部署至 VPS `/etc/nginx/sites-available/` 並 symlink 啟用。
+- **nginx**：新增 `infra/hetzner-phase1-core/nginx/system-sites/supabase-subdomains.conf`，`supabase.aware-wave.com` → Kong API `127.0.0.1:8000`（JWT 保護）；`studio.aware-wave.com` → Studio `127.0.0.1:3000`（basic auth 憑證僅存 VPS／vault，**不入庫**）。部署至 VPS `/etc/nginx/sites-available/` 並 symlink 啟用。
 - **SSL**：`certbot certonly --nginx -d supabase.aware-wave.com -d studio.aware-wave.com`，有效至 2026-07-20，自動續約。
 - **Supabase API_EXTERNAL_URL**：`/root/supabase/docker/.env` 由 `http://localhost:8000` 改為 `https://supabase.aware-wave.com`；重啟 kong + studio。
 - **SSH tunnel script**：新增 `scripts/open-supabase-ssh-tunnel.ps1`，一次轉發 postgres:5432、studio:3000、kong:8000；`-Background` 模式會 probe 並在失敗時 exit 1（bug fix 也同步入庫）。
-- **MCP**：`.mcp.json` 新增 `supabase-postgres`（`@modelcontextprotocol/server-postgres` via localhost:5432），env 含 `SUPABASE_URL`、`SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`。
+- **MCP**：`supabase-postgres`（`@modelcontextprotocol/server-postgres` via localhost:5432）之連線與 **Supabase API keys** 只許以 **本機環境變數**／vault 提供；**不得**寫入 git 可追蹤檔（見同日 **§安全修補**）。
 - **驗證**：`https://supabase.aware-wave.com/rest/v1/` → HTTP 401（Kong JWT 保護正常）；`https://studio.aware-wave.com/` → HTTP 401（basic auth 正常）。
-- **AI 操控方式**：REST API 直打 `https://supabase.aware-wave.com` + Service Role Key（不需 tunnel）；SQL 直連需先跑 tunnel script，Claude Code MCP `supabase-postgres` 自動接管。
+- **AI 操控方式**：REST API 直打 `https://supabase.aware-wave.com` + Service Role Key（由 vault／環境注入，**不入庫**）；SQL 直連需先跑 tunnel script，Claude Code MCP `supabase-postgres` 讀 **`${SUPABASE_POSTGRES_MCP_DSN}`** 等占位。
+
+### 安全修補（`.mcp.json`／Codex／tunnel 腳本）
+- **問題**：根 **`.mcp.json`** 曾被索引且含 **JWT／postgres DSN**；`scripts/open-supabase-ssh-tunnel.ps1` 註解與提示曾含 **DB 密碼**；`WORKLOG` 同日上文曾含 Studio basic auth 明文（已改為「僅 VPS／vault」敘述）。
+- **處置**：**`git rm --cached`** `.mcp.json`、`.codex/config.toml`（兩者已在 repo 根 **`.gitignore`**）；工作區 `.mcp.json` 改 **`${SUPABASE_POSTGRES_MCP_DSN}`** 與 **`${SUPABASE_*}`**；腳本改為不含密文；新增 **`.codex/config.toml.example`**、**`.codex/README.md`**；**`mcp.json.template`** 補 **supabase-postgres** 占位；**`security-secrets-policy.md`** 補誤提交後須 **輪替密鑰** 與可選清史。**若曾 push 含密文之 commit，仍須視為外洩**：輪替 Supabase **JWT secret**、**anon/service keys**、**postgres 密碼**（主防線）。
 
 ### 營運決策：取消預設採用 Clerk（IdP）
 - **決策**：**不**在 Phase 1／Enterprise 路線強制導入 **Clerk**。日後若要第三方應用層 IdP 再 **新開任務** 並可另發 **新 ADR**（Clerk、Auth0、WorkOS 等）。
@@ -675,7 +679,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-21 17:38:12 UTC_
+_Last synced: 2026-04-21 17:59:20 UTC_
 
 ## 2026-03-20
 
@@ -1103,6 +1107,7 @@ _Last synced: 2026-04-21 17:38:12 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

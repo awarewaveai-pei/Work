@@ -10,10 +10,11 @@
 
   This script forwards all three so local tools (MCP, psql, browser) can connect.
 
-  MCP postgres connection string (use after tunnel is up):
-    postgresql://postgres:o9B9NSUi7PCl3rBXk8jrKr3oc0njtDrRiyeMxNG5AGo@localhost:5432/postgres
+  After the tunnel is up, build a Postgres DSN from your **vault** or **self-host runbook**
+  (never commit passwords). Example shape:
+    postgresql://postgres:<POSTGRES_PASSWORD>@localhost:5432/postgres
 
-  Studio: http://localhost:3000  (or https://studio.aware-wave.com — basic auth: awarewave / AwareWave2026!)
+  Studio: http://localhost:3000 (or your deployed Studio URL; credentials are **not** documented here).
 
 .EXAMPLE
   # Foreground (keep terminal open; Ctrl+C closes tunnel)
@@ -42,8 +43,8 @@ Write-Host "  localhost:5432  -> Supabase PostgreSQL" -ForegroundColor DarkGray
 Write-Host "  localhost:3000  -> Supabase Studio (http://localhost:3000)" -ForegroundColor DarkGray
 Write-Host "  localhost:8000  -> Supabase Kong API" -ForegroundColor DarkGray
 Write-Host ""
-Write-Host "MCP postgres connection:" -ForegroundColor Yellow
-Write-Host "  postgresql://postgres:o9B9NSUi7PCl3rBXk8jrKr3oc0njtDrRiyeMxNG5AGo@localhost:5432/postgres" -ForegroundColor Green
+Write-Host "Postgres (local end of tunnel):" -ForegroundColor Yellow
+Write-Host "  postgresql://postgres:<password>@localhost:5432/postgres  (password from vault / Supabase host only)" -ForegroundColor DarkGray
 Write-Host ""
 
 try {

@@ -1,6 +1,5 @@
-# Codex MCP — monorepo 專案設定（與 `.cursor/mcp.json`、`.mcp.json` 對齊）
-# 在 monorepo 根執行 `codex`，並先設好環境變數（API keys、COPILOT_MCP_BEARER_TOKEN、TRIGGER_PROJECT_REF、MONOREPO_ROOT 等）。
-# Windows 上 `npx` 類 stdio server 請維持 `cmd /c` 前綴（Codex 官方說明）。
+# Codex MCP — copy to `config.toml` in this folder (the real file is gitignored).
+# Replace YOUR_* placeholders and paths; keep secrets in env vars or vault.
 
 [mcp_servers.wordpress]
 command = "cmd"
@@ -35,7 +34,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN = "${GITHUB_TOKEN}"
 
 [mcp_servers.work-global]
 command = "cmd"
-args = ["/c", "npx", "-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\USER", "C:\\Users\\USER\\Work"]
+args = ["/c", "npx", "-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\YOUR_USER", "C:\\path\\to\\monorepo"]
 enabled = true
 
 [mcp_servers.chatgpt-fast]
@@ -112,7 +111,7 @@ enabled = false
 
 [mcp_servers.trigger.env]
 TRIGGER_PROJECT_REF = "${TRIGGER_PROJECT_REF}"
+
 [mcp_servers.supabase]
-url = "https://mcp.supabase.com/mcp?project_ref=iknutyjsntaqktnnzgxl&read_only=true&features=database,docs,development,debugging"
-bearer_token_env_var = "SUPABASE_AUTH_BEARER_TOKEN"
-enabled = true
+url = "https://mcp.supabase.com/mcp?project_ref=YOUR_PROJECT_REF&read_only=true&features=database,docs,development,debugging"
+enabled = false

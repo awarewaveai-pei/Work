@@ -4,6 +4,8 @@
 - 不在 `.md`、`.txt`、聊天訊息中保存明文 API keys
 - 不把 token 寫進指令歷史或腳本
 - 不共享客戶憑證到不相關專案
+- **不得**將 monorepo 根 **`.mcp.json`**、**`.codex/config.toml`** 以含機密內容的形式 **commit**（兩者已在 repo 根 **`.gitignore`**；若檔案曾被 `git add -f` 或先追蹤後才 ignore，仍會留在索引與歷史）。結構範本用 **`mcp.json.template`**；實際值只放本機／**`secrets-vault.ps1`**／User 環境變數（例如 **`SUPABASE_POSTGRES_MCP_DSN`**、**`SUPABASE_ANON_KEY`**、**`SUPABASE_SERVICE_ROLE_KEY`**）。
+- 若 **JWT／DB 密碼／service_role** 曾出現在 **git 歷史或遠端**：除 **`git rm --cached`** 停止追蹤外，須依 **§Incident Trigger** **立即輪替**（Supabase：Dashboard 或自架之 **JWT Secret**、**API Keys**、資料庫 **`postgres` 密碼**；必要時 `git filter-repo`／BFG 清史，仍以 **輪替密鑰** 為主防線）。
 
 ## Required Controls
 - 每客戶獨立憑證與最小權限
@@ -56,5 +58,5 @@
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 
-_Last synced: 2026-04-21 12:46:59 UTC_
+_Last synced: 2026-04-21 17:59:19 UTC_
 
