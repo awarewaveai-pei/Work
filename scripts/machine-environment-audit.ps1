@@ -92,14 +92,6 @@ try {
     exit 1
 }
 
-$branch = (& git branch --show-current 2>&1).Trim()
-if ($branch -ne "main") {
-    Write-Audit -Level WARN -Message "Git branch is '$branch' (expected main for routine work)."
-    $warnCount++
-} else {
-    Write-Audit -Level OK -Message "Git branch: main"
-}
-
 $statusShort = (& git status --porcelain 2>&1)
 if ($statusShort) {
     Write-Audit -Level WARN -Message "Working tree is dirty (commit/stash before assuming reproducible env)."
@@ -117,18 +109,32 @@ if ($FetchOrigin) {
     }
 }
 
+$ahead = -1
+$behind = -1
 $counts = (& git rev-list --left-right --count HEAD...origin/main 2>&1) -join ""
 if ($counts -match '^\s*(\d+)\s+(\d+)\s*$') {
     $ahead = [int]$Matches[1]
     $behind = [int]$Matches[2]
     if ($ahead -eq 0 -and $behind -eq 0) {
         Write-Audit -Level OK -Message "Git vs origin/main: 0 ahead, 0 behind."
+    } elseif ($behind -eq 0 -and $ahead -gt 0) {
+        Write-Audit -Level OK -Message "Git vs origin/main: $ahead ahead, 0 behind (HEAD includes origin/main — feature branch or local commits on top)."
     } else {
         Write-Audit -Level WARN -Message "Git vs origin/main: $ahead ahead, $behind behind (pull/push as needed)."
         $warnCount++
     }
 } else {
     Write-Audit -Level WARN -Message "Could not parse ahead/behind vs origin/main (run -FetchOrigin or check remote)."
+    $warnCount++
+}
+
+$branch = (& git branch --show-current 2>&1).Trim()
+if ($branch -eq "main") {
+    Write-Audit -Level OK -Message "Git branch: main"
+} elseif ($behind -eq 0) {
+    Write-Audit -Level OK -Message "Git branch: '$branch' (includes origin/main — OK for AO-RESUME preflight parity)."
+} else {
+    Write-Audit -Level WARN -Message "Git branch is '$branch' (expected main for routine work) and HEAD is behind origin/main — pull/rebase first."
     $warnCount++
 }
 
