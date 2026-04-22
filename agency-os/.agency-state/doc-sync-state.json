@@ -1,44 +1,14 @@
 ﻿{
-    "last_run_utc":  "2026-04-22T18:34:24.1615553Z",
+    "last_run_utc":  "2026-04-22T18:44:23.8419097Z",
     "changed_files":  [
-                          ".cursor/rules/10-memory-maintenance.mdc",
-                          ".cursor/rules/40-shutdown-closeout.mdc",
-                          ".cursor/rules/50-operator-autopilot.mdc",
-                          "AGENTS.md",
-                          "docs/operations/end-of-day-checklist.md",
                           "docs/overview/PROGRAM_TIMELINE.md",
-                          "memory/CONVERSATION_MEMORY.md",
-                          "memory/README.md",
-                          "WORKLOG.md"
+                          "memory/CONVERSATION_MEMORY.md"
                       ],
     "impacted_files":  [
-                           ".cursor/rules/10-memory-maintenance.mdc",
-                           ".cursor/rules/40-shutdown-closeout.mdc",
-                           ".cursor/rules/50-operator-autopilot.mdc",
-                           "AGENTS.md",
-                           "docs/CHANGE_IMPACT_MATRIX.md",
-                           "docs/operations/cursor-enterprise-rules-index.md",
-                           "docs/operations/end-of-day-checklist.md",
-                           "docs/operations/new-doc-linkage-checklist.md",
                            "docs/overview/PROGRAM_TIMELINE.md",
-                           "memory/CONVERSATION_MEMORY.md",
-                           "memory/README.md",
-                           "README.md",
-                           "scripts/doc-sync-automation.ps1",
-                           "scripts/register-new-governance-doc.ps1",
-                           "scripts/system-guard.ps1",
-                           "scripts/system-health-check.ps1",
-                           "TASKS.md",
-                           "WORKLOG.md"
+                           "memory/CONVERSATION_MEMORY.md"
                        ],
     "auto_updated_files":  [
-                               "AGENTS.md",
-                               "docs/CHANGE_IMPACT_MATRIX.md",
-                               "docs/operations/cursor-enterprise-rules-index.md",
-                               "docs/operations/end-of-day-checklist.md",
-                               "docs/operations/new-doc-linkage-checklist.md",
-                               "memory/CONVERSATION_MEMORY.md",
-                               "TASKS.md",
-                               "WORKLOG.md"
+                               "memory/CONVERSATION_MEMORY.md"
                            ]
 }
