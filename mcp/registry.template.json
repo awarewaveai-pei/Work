@@ -4,14 +4,13 @@
     "work-global": {
       "enabled": true,
       "transport": "stdio",
-      "command": "cmd",
+      "command": "powershell",
       "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "${userHome}",
-        "${workspaceRoot}"
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-filesystem-mcp.ps1"
       ]
     },
     "canva": {
@@ -158,6 +157,19 @@
         "TRIGGER_API_URL": "${env:TRIGGER_API_URL}"
       }
     },
+    "supabase-b-postgres": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "${env:SUPABASE_B_POSTGRES_DSN}"
+      ],
+      "note": "Requires SSH tunnel: scripts/open-supabase-ssh-tunnel.ps1 -Background"
+    },
     "supabase": {
       "enabled": true,
       "transport": "http",
@@ -167,6 +179,11 @@
       },
       "codex": {
         "bearer_token_env_var": "SUPABASE_AUTH_BEARER_TOKEN"
+      },
+      "clients": {
+        "codex": {
+          "exclude": true
+        }
       }
     },
     "supabase-a": {

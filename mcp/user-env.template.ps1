@@ -33,6 +33,7 @@ $vars = @{
     SUPABASE_AUTH_BEARER_TOKEN   = "..."
     SUPABASE_B_URL               = "https://supabase.your-b-company.example.com"
     SUPABASE_B_SERVICE_ROLE_KEY  = "..."
+    SUPABASE_B_POSTGRES_DSN      = "postgresql://postgres:<PASTE_POSTGRES_PASSWORD>@localhost:5432/postgres"
     SUPABASE_A_MCP_URL           = "https://mcp.supabase.com/mcp?project_ref=YOUR_A_PROJECT_REF&features=database,docs,development,debugging"
     SUPABASE_A_AUTH_BEARER_TOKEN = "..."
     SUPABASE_A_URL               = "https://your-a-company-project.supabase.co"

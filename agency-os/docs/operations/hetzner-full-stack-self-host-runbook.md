@@ -122,7 +122,8 @@
 - **Phase 1 compose（Nginx + Redis + n8n + WordPress + Node API + Next Admin，不含 Supabase）**：`lobster-factory/infra/hetzner-phase1-core/README.md`；**長期營運契約**：`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`；**維護日曆**：`lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md`；**備份範例**：`lobster-factory/infra/hetzner-phase1-core/scripts/backup-phase1.sh`
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`  
 - `agency-os/docs/operations/security-secrets-policy.md`  
-- `agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`（Cloud → 自架或自架換機時）  
+- `agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`（Cloud → 自架或自架換機時）
+- `agency-os/docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`（**自架日常維運主文件**：containers、密鑰、AI 存取、輪替 SOP）  
 - `agency-os/docs/architecture/agency-command-center-v1.md`  
 
 ## Related Documents (Auto-Synced)
