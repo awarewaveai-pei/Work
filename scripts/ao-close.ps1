@@ -4,7 +4,7 @@
 #   optional apply-closeout-task-checkmarks -> git add -> verify-closeout-completeness -> git commit + push.
 # -CommitMessageFile: UTF-8 file passed to "git commit -F" (multiline safe). Staged diff must not contain +<<<<<<< conflict markers.
 # Inbox: guard runs before merge; merge appends verbatim payload to WORKLOG + memory/daily then resets inbox from TEMPLATE.
-# Optional: refine WORKLOG prose in Cursor after AO-CLOSE (not required for PASS).
+# CONVERSATION_MEMORY: agent must edit agency-os/memory/CONVERSATION_MEMORY.md before this script (10-memory + 40-closeout); merge script may add inbox pointer only.
 # apply-closeout-task-checkmarks: WORKLOG today "- AUTO_TASK_DONE: <substring>" + optional
 # agency-os/.agency-state/pending-task-completions.txt (gitignored).
 # Primary: monorepo root scripts\ao-close.ps1. agency-os\scripts\ao-close.ps1 is a thin wrapper (same flags).
@@ -256,8 +256,8 @@ if (-not $SkipAutoTaskCheckmarks -and (Test-Path -LiteralPath $applyMarks)) {
 Write-Host ""
 Write-Host "=== AO-CLOSE: automation boundary (every run) ===" -ForegroundColor Cyan
 Write-Host "SCRIPT DID: daily scaffold; inbox guard; merge-closeout-inbox (verbatim -> WORKLOG + memory/daily + CONVERSATION_MEMORY pointer); recap; verify/guard/report; apply AUTO_TASK_DONE -> TASKS; after git add, verify-closeout-completeness (default strict) before commit." -ForegroundColor Green
-Write-Host "SCRIPT DID NOT: infer task completion; write AUTO_TASK_DONE lines; write long-form CONVERSATION_MEMORY; touch LAST_AO_RESUME_BRIEF (AO-RESUME only) or SESSION_TEMPLATE." -ForegroundColor Yellow
-Write-Host "If you expected those, the Cursor agent must do them BEFORE this script in the same AO-CLOSE turn. Legend: agency-os/memory/README.md" -ForegroundColor DarkGray
+Write-Host "SCRIPT DID NOT: infer task completion; write AUTO_TASK_DONE lines; author CONVERSATION_MEMORY prose (agent must edit that file BEFORE this script, same AO-CLOSE turn); touch LAST_AO_RESUME_BRIEF (AO-RESUME only) or SESSION_TEMPLATE." -ForegroundColor Yellow
+Write-Host "Legend: agency-os/memory/README.md; rules: 10-memory-maintenance + 40-shutdown-closeout." -ForegroundColor DarkGray
 Write-Host ""
 
 if ($SkipPush) {

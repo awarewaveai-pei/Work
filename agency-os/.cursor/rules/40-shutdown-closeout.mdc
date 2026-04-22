@@ -10,7 +10,7 @@ alwaysApply: true
 
 **給使用者（你只要這樣）**：輸入 **`AO-CLOSE`**（或「收工」「關機」等同等意圖）即可；**不必學** PowerShell 參數（例如 **`-CompletenessGate`**、**`-SkipPush`** 僅限代理除錯或你明示特例外由代理代打）。
 
-**給代理（關鍵字 = 整包收工授權）**：收到 **`AO-CLOSE`** 後，**同一輪**內必須自行完成再呼叫腳本：**（1）**依 **`TASKS.md`**＋當輪可驗證事實，在當日 **`WORKLOG.md`** 補 **`- AUTO_TASK_DONE:`**（或已觸發 **`merge-closeout-inbox`** 所需之協作素材在 inbox）；**（2）**可選：濃縮 **`memory/CONVERSATION_MEMORY.md`**（長期敘事腳本不代寫）；**（3）**在 monorepo 根執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`** 至 **exit 0**；若 **`verify-closeout-completeness`** 擋下，**代理自修 WORKLOG 證據後重跑**，不要丟給使用者背指令。
+**給代理（關鍵字 = 整包收工授權）**：收到 **`AO-CLOSE`** 後，**同一輪**內必須自行完成再呼叫腳本：**（1）**依 **`TASKS.md`**＋當輪可驗證事實，在當日 **`WORKLOG.md`** 補 **`- AUTO_TASK_DONE:`**（或已觸發 **`merge-closeout-inbox`** 所需之協作素材在 inbox）；**（2）必須**：依 **`10-memory-maintenance.mdc`** 更新 **`agency-os/memory/CONVERSATION_MEMORY.md`**（精簡蒸餾即可；**操作者預設不寫長篇**；inbox merge 的**指標列**由腳本追加，**不取代**此敘事）；**（3）**在 monorepo 根執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`** 至 **exit 0**；若 **`verify-closeout-completeness`** 擋下，**代理自修 WORKLOG 證據後重跑**，不要丟給使用者背指令。
 
 **單一路徑（機械）**：**`ao-close.ps1`** 內含 scaffold、inbox guard、**`merge-closeout-inbox-into-progress`**（verbatim → **WORKLOG**／**daily**、**CONVERSATION_MEMORY** 指標、重置 inbox）、recap、閘道、**`apply-closeout-task-checkmarks`**、**`git add`**、**`verify-closeout-completeness`（預設 strict）**、commit／push。結尾會印 **`automation boundary`** 供對照。若 completeness **擋 commit**：**代理**補齊當日 **WORKLOG** 證據後**重跑**；操作者**不必**學 **`-CompletenessGate`**；僅你**明示特急**時由代理代下寬鬆旗標並在回覆**註明風險**。
 
@@ -21,7 +21,7 @@ alwaysApply: true
 When the user indicates end of day or shutdown intent (examples: `AO-CLOSE`,
 "要關機", "收工", "今天先到這"), run this closeout sequence before ending:
 
-1. **Before** invoking the script (same Cursor turn): 代理依 **`TASKS.md`**／當輪事實，在 **`WORKLOG.md`** 當日 **`## yyyy-MM-dd`** 補 **`- AUTO_TASK_DONE: <子字串>`**（可選更新 **`memory/CONVERSATION_MEMORY.md`**）。**日期**一律 **收工機器日**（與 **`print-today-closeout-recap`** 標題一致）。若記不得今日完成：可先跑 **`scripts/print-today-closeout-recap.ps1`** 對照；**`ao-close.ps1` 內也會再印 recap**。
+1. **Before** invoking the script (same Cursor turn): 代理依 **`TASKS.md`**／當輪事實，在 **`WORKLOG.md`** 當日 **`## yyyy-MM-dd`** 補 **`- AUTO_TASK_DONE: <子字串>`**；並**必須**更新 **`agency-os/memory/CONVERSATION_MEMORY.md`**（**`10-memory-maintenance.mdc`**；人類不預設代筆長篇）。**日期**一律 **收工機器日**（與 **`print-today-closeout-recap`** 標題一致）。若記不得今日完成：可先跑 **`scripts/print-today-closeout-recap.ps1`** 對照；**`ao-close.ps1` 內也會再印 recap**。
 2. Run **one-shot closeout + GitHub push** from the current repo root:
    `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`
    If `.\scripts\ao-close.ps1` is missing, retry:

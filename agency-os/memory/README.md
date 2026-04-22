@@ -4,7 +4,7 @@
 
 | 檔案 | 誰寫、何時寫 | 和 **AO-CLOSE**／**AO-RESUME** 的關係 |
 |:---|:---|:---|
-| **`CONVERSATION_MEMORY.md`** | **長期脈絡**；里程碑／長對話由**代理或你**依 **`.cursor/rules/10-memory-maintenance.mdc`** 補敘事。 | **AO-CLOSE** 僅可能加**一則指標列**（指到當日 **WORKLOG** 的 inbox verbatim 區塊），**不**等於當日完整長期摘要已寫完。 |
+| **`CONVERSATION_MEMORY.md`** | **長期脈絡**；**操作者預設不寫長篇**。每次僅 **`AO-CLOSE`** 時，**代理**在跑 **`ao-close.ps1` 之前**必須依 **`.cursor/rules/10-memory-maintenance.mdc`** 補一段**精簡蒸餾**（可很短）。 | **`ao-close`** 內 **`merge-closeout-inbox`** 可能再加**一則指標列**（指到當日 **WORKLOG** inbox verbatim），**不取代**代理敘事。 |
 | **`daily/YYYY-MM-DD.md`** | **當日草稿／細節**；可手寫，也可被 **inbox merge** 追加區塊。 | **AO-CLOSE** 的 **`merge-closeout-inbox-into-progress.ps1`** 可能追加 **Closeout inbox** 小節。 |
 | **`LAST_AO_RESUME_BRIEF.md`** | **上一次**你打 **`AO-RESUME`** 時，由代理**整檔覆寫**（只留最新一次）。 | **與 AO-CLOSE 無關**。沒打 AO-RESUME 就不會更新；**不是**任務真相 SSOT。 |
 | **`SESSION_TEMPLATE.md`** | **空白範本**，供複製結構用。 | **腳本不會改**。 |

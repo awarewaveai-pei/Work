@@ -13,6 +13,7 @@
   - **claude-sonnet**：補 MCP 憑證與環境、`registry.template.json` 增 **supabase-b-postgres**、`user-env.template.ps1` 增 `SUPABASE_B_POSTGRES_DSN` 範本、新建 `mcp/SERVICE_CREDENTIALS_MAP.md`、更新 `SUPABASE_SELF_HOSTED_RUNBOOK.md`；VPS 調整 Studio 預設專案與 **cron heartbeat**；本機憑證備份檔與 `branch-protection.js` 等（路徑見當日 inbox 區塊）。Inbox 註記 **`git push`** 與部分 API key 仍占位。
   - **codex**：Shared MCP 預設與 **AwareWave / SoulfulExpression** 命名對齊、`SUPABASE_AWAREWAVE_*`／`SUPABASE_SOULFULEXPRESSION_*` 與 **`SUPABASE_A_*`／`SUPABASE_B_*` fallback**；動及 `mcp/registry.template.json`、`mcp/user-env.template.ps1`、`mcp/README.md`、`mcp/SERVICE_MATRIX.md`、`mcp-local-wrappers/awarewave-ops-mcp.mjs`、`scripts/run-postgres-mcp.ps1`、`scripts/sync-mcp-config.ps1`、自架 runbook 與 **`TOOLS_DELIVERY_TRACEABILITY.md`**。Inbox 提醒：確認 **WORKLOG** 是否已完整記載 env migration／alias 與 **`supabase-b-postgres`** 對應關係（若文件仍缺則後續單開補段）。
 - **待辦（延續 inbox）**：`origin/main` 與本機未推送／未提交之關係以當下 **`git status`** 為準；Perplexity／Airtable 仍占位；SoulfulExpression → AwareWave 自架 Supabase 遷移仍規劃中。
+- **規則對齊（使用者不寫長篇 `CONVERSATION_MEMORY`）**：`40-shutdown-closeout`／`50-operator-autopilot`／`10-memory-maintenance`／`AGENTS.md`／`memory/README.md`／`end-of-day-checklist.md`／根 `.cursor/rules` 鏡像與 **`scripts/ao-close.ps1` automation boundary**——每次 **`AO-CLOSE`** 由**代理**在跑腳本前必須蒸餾更新 **`CONVERSATION_MEMORY.md`**；腳本僅 inbox 指標列。
 
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
@@ -766,7 +767,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-22 18:17:56 UTC_
+_Last synced: 2026-04-22 18:34:23 UTC_
 
 ## 2026-03-20
 
@@ -1194,4 +1195,5 @@ _Last synced: 2026-04-22 18:17:56 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 

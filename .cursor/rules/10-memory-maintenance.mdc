@@ -11,7 +11,10 @@ Maintain continuity across sessions by updating both:
 
 **`AO-CLOSE` mechanical note**: `merge-closeout-inbox-into-progress.ps1` may insert **one pointer bullet** under `## Current Operating Context` in `CONVERSATION_MEMORY.md` when inbox payload merges (points to WORKLOG verbatim block). That is **not** a substitute for milestone distill updates below.
 
+**`AO-CLOSE` agent duty (shell script does not write prose here)**: When the operator sends **`AO-CLOSE`** (or shutdown synonym), the **Cursor agent** must edit **`agency-os/memory/CONVERSATION_MEMORY.md` in the same turn before** running **`scripts/ao-close.ps1`**: add or refresh a compact distill using the structure below (short bullets are fine). **Do not assume the human will author long-form memory.** If nothing new is durable beyond that day’s **`WORKLOG`**, still append one dated line under **`## Current Operating Context`** (e.g. no new long-term decisions; see that day’s **`WORKLOG`**).
+
 When to update:
+- **Every `AO-CLOSE` turn** (agent-authored distill; see above)
 - After a milestone decision
 - After major scope changes
 - When conversation becomes long (roughly 8000+ Chinese characters)

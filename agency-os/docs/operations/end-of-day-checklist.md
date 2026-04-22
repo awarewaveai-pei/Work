@@ -20,7 +20,7 @@
 
 1. **指定唯一「收關代理」**（同一輪只由一個 Cursor／Claude 對話執行 **§2 的 `ao-close.ps1`**；其餘代理**不跑** `git push`／**不**對上述三檔做最終寫入）。
 2. **其他代理只交「素材」**：在 **`agency-os/.agency-state/closeout-inbox.md`**（**已納入版控**，可跟 `git pull` 同步）用 Markdown 條列：對話 ID／完成項一句／相關 commit hash 或檔案路徑。**禁止**多人同時改 `WORKLOG` 當日區塊當「草稿本」。
-3. **Inbox → 進度檔**：**`ao-close.ps1`** 內 **`merge-closeout-inbox-into-progress.ps1`** 會將可匯區塊 **verbatim** 併入當日 **`WORKLOG`**／**`memory/daily`** 並自範本**重置 inbox**（不必手動清空）。收關代理仍須在**呼叫腳本前**補 **`AUTO_TASK_DONE:`**（與可選 **`CONVERSATION_MEMORY`** 精簡），見 **rule 40**。
+3. **Inbox → 進度檔**：**`ao-close.ps1`** 內 **`merge-closeout-inbox-into-progress.ps1`** 會將可匯區塊 **verbatim** 併入當日 **`WORKLOG`**／**`memory/daily`** 並自範本**重置 inbox**（不必手動清空）。收關代理仍須在**呼叫腳本前**補 **`AUTO_TASK_DONE:`**，並依 **rule 40／10** 更新 **`CONVERSATION_MEMORY.md`**（操作者不預設手寫長篇）。
 4. **分支策略（強烈建議）**：並行開發用**不同 branch** 或至少不同 prefix commit；收關前 **`git merge`** / PR 合進當日工作分支，再跑 **`ao-close.ps1`**，降低同檔二頭馬。
 5. **長 commit 訊息**：用 **`-CommitMessageFile path\to\msg.txt`**（UTF-8）取代一行 `-CommitMessage`；`ao-close.ps1` 會在 commit 前擋 **staged diff 含 `<<<<<<<` 衝突標記**。
 6. **協作 AI 規則（給 Codex／其他 Cursor／Claude）**：[collaborator-ai-agent-rules.md](collaborator-ai-agent-rules.md)（內含一鍵貼上區塊）。
@@ -87,5 +87,5 @@
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-22 18:17:56 UTC_
+_Last synced: 2026-04-22 18:34:23 UTC_
 
