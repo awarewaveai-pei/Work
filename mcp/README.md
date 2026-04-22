@@ -13,6 +13,7 @@ This directory is the single source of truth for MCP server definitions that nee
 - `registry.template.json`: committed MCP server registry with no secrets
 - `user-env.template.ps1`: committed example for machine-local environment variables
 - `SERVICE_MATRIX.md`: which services use direct MCP versus the local AwareWave wrapper
+- `SHARED_MCP_API_SOP.md`: standard operating procedure for adding shared MCP/API entries safely
 
 ## Standard flow
 
@@ -44,6 +45,28 @@ This writes:
 - `~/.codex/config.toml` managed MCP block
 - `~/.copilot/mcp-config.json`
 - `~/.gemini/settings.json`
+
+## One-shot governance apply (recommended)
+
+To align shared MCP + closeout collaboration baseline in one command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\apply-shared-ai-governance.ps1
+```
+
+Or:
+
+```powershell
+npm run mcp:governance
+```
+
+This will:
+
+- seed `agency-os/.agency-state/closeout-inbox.md` when missing
+- sync shared MCP outputs (`.mcp.json`, Codex, Copilot, Gemini)
+- generate startup prompt packs for non-Cursor agents:
+  - `agency-os/.agency-state/agent-bootstrap-prompts.md`
+  - `agency-os/.agency-state/agent-bootstrap-prompt.txt`
 
 If a machine already has plaintext secrets in user-level Cursor or Claude MCP files, sanitize them before relying on the shared setup:
 

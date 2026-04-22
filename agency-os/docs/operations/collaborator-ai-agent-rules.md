@@ -28,6 +28,14 @@
 
 為準，並修正漂移，不要再額外發明第三套口頭規則。
 
+### 一鍵套用（shared baseline）
+
+在 monorepo 根可直接執行：
+
+`powershell -ExecutionPolicy Bypass -File .\scripts\apply-shared-ai-governance.ps1`
+
+它會同步共享 MCP、初始化 closeout inbox，並產生可貼給 Codex/Copilot/Gemini/Perplexity 的提示包。
+
 ---
 
 ## 一鍵貼給其他 AI（系統提示或對話開頭）
@@ -189,3 +197,4 @@
 
 - 可版控範本（複製到收件匣或給腳本 seed）：[closeout-inbox-TEMPLATE.md](closeout-inbox-TEMPLATE.md)  
 - 本機建立空收件匣：`powershell -ExecutionPolicy Bypass -File .\scripts\init-closeout-inbox.ps1`（monorepo 根）
+- 產生跨工具啟動提示包：`agency-os/.agency-state/agent-bootstrap-prompts.md`、`agency-os/.agency-state/agent-bootstrap-prompt.txt`（由 `scripts/apply-shared-ai-governance.ps1` 生成）

@@ -102,4 +102,15 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
+# Shared AI Governance gate
+$govScript = Join-Path $WorkRoot "scripts\verify-shared-ai-governance.ps1"
+if (Test-Path -LiteralPath $govScript) {
+    Write-Host "== Shared AI Governance: Verify SSOT and Sync ==" -ForegroundColor Cyan
+    & powershell -ExecutionPolicy Bypass -NoProfile -File $govScript -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "verify-build-gates: verify-shared-ai-governance failed (exit $LASTEXITCODE)"
+        exit $LASTEXITCODE
+    }
+}
+
 Write-Host "verify-build-gates: ALL PASSED" -ForegroundColor Green

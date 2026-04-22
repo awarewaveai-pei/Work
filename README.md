@@ -53,6 +53,13 @@ npm run mcp:sync
 ```
 
 詳細說明見 [`mcp/README.md`](mcp/README.md)。
+新增共享 MCP/API 的標準流程見 [`mcp/SHARED_MCP_API_SOP.md`](mcp/SHARED_MCP_API_SOP.md)。
+
+若要一次對齊「共享 MCP + 協作代理規則（closeout inbox / 啟動提示包）」：
+
+```powershell
+npm run mcp:governance
+```
 
 ## 建議閱讀與操作順序（降低矛盾、可賣可交付）
 
@@ -99,5 +106,5 @@ npm run mcp:sync
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-04-22 03:49:38 UTC_
+_Last synced: 2026-04-22 13:19:15 UTC_
 

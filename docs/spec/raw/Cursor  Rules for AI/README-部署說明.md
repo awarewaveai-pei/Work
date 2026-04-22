@@ -53,5 +53,5 @@
 - `.cursor/rules/66-skills-observability-protocol.mdc`
 - `docs/operations/cursor-enterprise-rules-index.md`
 
-_Last synced: 2026-04-22 03:49:38 UTC_
+_Last synced: 2026-04-22 13:19:15 UTC_
 

@@ -19,7 +19,10 @@ param(
     [switch]$AllowNonPerfectHealth,
     [switch]$AllowPushWhileBehind,
     [switch]$SkipTodayRecap,
-    [switch]$SkipAutoTaskCheckmarks
+    [switch]$SkipAutoTaskCheckmarks,
+    [switch]$SkipInboxGuard,
+    [ValidateSet("warn","strict","off")]
+    [string]$InboxGuardMode = "strict"
 )
 
 Set-StrictMode -Version Latest
@@ -94,6 +97,73 @@ if (-not $SkipPush -and -not $AllowPushWhileBehind) {
     }
 } elseif ($AllowPushWhileBehind) {
     Write-Host "== AO-CLOSE: -AllowPushWhileBehind set; skipping behind-remote guard ==" -ForegroundColor Yellow
+}
+
+# Inbox guard modes:
+# - strict (default): fail closeout when missing.
+# - warn: report missing inbox entry but do not block closeout.
+# - off: disable check entirely.
+if (-not $SkipInboxGuard -and $InboxGuardMode -ne "off") {
+    Write-Host "== AO-CLOSE: closeout inbox guard ($InboxGuardMode) ==" -ForegroundColor Cyan
+    Push-Location $WorkRoot
+    try {
+        $today = Get-Date
+        $dayStart = (Get-Date -Year $today.Year -Month $today.Month -Day $today.Day -Hour 0 -Minute 0 -Second 0)
+        $since = $dayStart.ToString("yyyy-MM-dd HH:mm:ss")
+        $branch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim()
+        if ([string]::IsNullOrWhiteSpace($branch) -or $branch -eq "HEAD") {
+            Write-Host "AO-CLOSE inbox guard: detached HEAD; skip commit coverage check." -ForegroundColor DarkGray
+            $todayCommits = @()
+        } else {
+            $remoteRef = "origin/$branch"
+            git rev-parse --verify $remoteRef 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $logRange = "$remoteRef..HEAD"
+            } else {
+                $logRange = "HEAD"
+            }
+            $todayCommits = @(
+                git log $logRange --since="$since" --pretty=format:"%h" 2>$null |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            )
+        }
+
+        if ($todayCommits.Count -gt 0) {
+            $inboxPath = Join-Path $WorkRoot "agency-os\.agency-state\closeout-inbox.md"
+            $inboxExists = Test-Path -LiteralPath $inboxPath
+            if (-not $inboxExists) {
+                $msg = "ao-close: closeout-inbox missing at $inboxPath. Run scripts\init-closeout-inbox.ps1 and append today's entries."
+                if ($InboxGuardMode -eq "strict") {
+                    Write-Error $msg
+                    exit 1
+                }
+                Write-Warning $msg
+            } else {
+                $inboxText = Get-Content -LiteralPath $inboxPath -Raw -Encoding UTF8
+                $todayToken = $today.ToString("yyyy-MM-dd")
+                $hasTodaySection = [regex]::IsMatch(
+                    $inboxText,
+                    "(?m)^###\s+(?!example-agent\b).*" + [regex]::Escape($todayToken) + ".*$",
+                    [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+                )
+
+                if (-not $hasTodaySection) {
+                    $msg = "ao-close: unpushed commits exist today ($($todayCommits.Count)), but closeout-inbox has no real section for $todayToken. Add: '### <AGENT_ID> <yyyy-MM-dd HH:mm>'."
+                    if ($InboxGuardMode -eq "strict") {
+                        Write-Error $msg
+                        exit 1
+                    }
+                    Write-Warning $msg
+                }
+            }
+        } else {
+            Write-Host "No unpushed commits today on current branch; inbox guard skipped." -ForegroundColor DarkGray
+        }
+    } finally {
+        Pop-Location
+    }
+} elseif ($SkipInboxGuard -or $InboxGuardMode -eq "off") {
+    Write-Host "== AO-CLOSE: inbox guard disabled ==" -ForegroundColor DarkYellow
 }
 
 $verifyScript = Join-Path $WorkRoot "scripts\verify-build-gates.ps1"

@@ -1,32 +1,12 @@
 ﻿{
-    "last_run_utc":  "2026-04-22T09:34:18.0001001Z",
+    "last_run_utc":  "2026-04-22T14:30:02.9714602Z",
     "changed_files":  [
-                          ".cursor/rules/67-shared-mcp-governance.mdc",
-                          "AGENTS.md",
-                          "docs/operations/collaborator-ai-agent-rules.md",
-                          "docs/operations/mcp-add-server-quickstart.md",
-                          "memory/CONVERSATION_MEMORY.md",
-                          "TASKS.md"
+                          "docs/overview/PROGRAM_TIMELINE.md"
                       ],
     "impacted_files":  [
-                           ".cursor/rules/67-shared-mcp-governance.mdc",
-                           "AGENTS.md",
-                           "docs/CHANGE_IMPACT_MATRIX.md",
-                           "docs/operations/collaborator-ai-agent-rules.md",
-                           "docs/operations/cursor-enterprise-rules-index.md",
-                           "docs/operations/mcp-add-server-quickstart.md",
-                           "docs/operations/new-doc-linkage-checklist.md",
-                           "memory/CONVERSATION_MEMORY.md",
-                           "README.md",
-                           "scripts/register-new-governance-doc.ps1",
-                           "TASKS.md"
+                           "docs/overview/PROGRAM_TIMELINE.md"
                        ],
     "auto_updated_files":  [
-                               "AGENTS.md",
-                               "docs/CHANGE_IMPACT_MATRIX.md",
-                               "docs/operations/cursor-enterprise-rules-index.md",
-                               "docs/operations/new-doc-linkage-checklist.md",
-                               "memory/CONVERSATION_MEMORY.md",
-                               "TASKS.md"
+
                            ]
 }

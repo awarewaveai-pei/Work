@@ -5,6 +5,7 @@
   "scripts": {
     "mcp:bootstrap": "powershell -ExecutionPolicy Bypass -File scripts/bootstrap-mcp-machine.ps1",
     "mcp:sync": "powershell -ExecutionPolicy Bypass -File scripts/sync-mcp-config.ps1",
+    "mcp:governance": "powershell -ExecutionPolicy Bypass -File scripts/apply-shared-ai-governance.ps1",
     "rag:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-rag-env.ps1",
     "rag:embed": "tsx scripts/rag_seed_and_embedding.ts",
     "rag:query": "tsx scripts/rag_query.ts"

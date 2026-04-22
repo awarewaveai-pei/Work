@@ -7,7 +7,10 @@ param(
     [switch]$AllowNonPerfectHealth,
     [switch]$AllowPushWhileBehind,
     [switch]$SkipTodayRecap,
-    [switch]$SkipAutoTaskCheckmarks
+    [switch]$SkipAutoTaskCheckmarks,
+    [switch]$SkipInboxGuard,
+    [ValidateSet("warn","strict","off")]
+    [string]$InboxGuardMode = "strict"
 )
 
 Set-StrictMode -Version Latest

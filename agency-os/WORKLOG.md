@@ -27,6 +27,17 @@
   - Uptime Kuma `endpoint-alert-heartbeat` 已收第一筆 `OK` heartbeat，前幾筆 `No heartbeat in the time window` 為接線前正常歷史。
 - **殘留風險**：Uptime Kuma `error.log` 仍有舊 monitor 的 `accepted_statuscodes_json` 解析錯誤（歷史資料格式問題，不是本輪新建 monitor 所致）；後續宜於 UI 將該舊 monitor 重新存一次，避免列表/統計時偶發報錯。
 
+### MCP 全憑證補全與 Supabase B AI 存取（Claude 執行，下午段）
+
+- **Netdata API Token**：使用者至 `app.netdata.cloud` 取得 `ndc.ZCx...`；依 SOP 寫入 `mcp/user-env.ps1` → `setx` 持久化 → `npm run mcp:governance` 廣播。
+- **Slack Bot Token**：使用者經 api.slack.com OAuth 取得 `xoxp-...`（非 rotating，不過期）；同步寫入 `SLACK_BOT_TOKEN`；早先 `xoxe.xoxp-` rotating token 與 `SLACK_REFRESH_TOKEN` 已清除。
+- **Supabase B AI 存取架構確認**：
+  - **REST（隨時可用）**：`awarewave-ops` MCP 的 `supabase_b` 服務已內建，接 `SUPABASE_B_URL` + `SUPABASE_B_SERVICE_ROLE_KEY`。
+  - **Postgres MCP（需 tunnel）**：`registry.template.json` 新增 `supabase-b-postgres`（`@modelcontextprotocol/server-postgres`）；`user-env.template.ps1` 新增 `SUPABASE_B_POSTGRES_DSN` 占位；`user-env.ps1` 填入真實 DSN；`setx` 持久化。
+  - 開 tunnel：`.\scripts\open-supabase-ssh-tunnel.ps1 -Background`
+- **Supabase 自架維運手冊**：新增 `agency-os/docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`（containers、port、三條存取路徑、AI 存取方式、密鑰清單、輪替 SOP、nginx、備份）；連結加入 `hetzner-full-stack-self-host-runbook.md`。
+- **AUTO_TASK_DONE**：`（工具建置）Uptime Kuma API Key 建立`；`（工具建置）Trigger.dev Project Ref 取得`；`（工具建置）Netdata API Token 填入`；`（工具建置）Slack Bot Token 填入`；`（文件）Supabase 自架維運手冊建立`
+
 ### MCP 憑證補全（Claude 執行）
 
 - **Trigger.dev Project Ref**：直查 VPS `trigger-postgres` DB (`docker exec trigger-postgres psql`)；`Project` 表取得 `prj_44dbea0704bed92a`（slug: `lobster-factory`）；已寫入 `mcp/user-env.ps1` 並 `setx` 持久化。
@@ -711,7 +722,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-22 03:49:38 UTC_
+_Last synced: 2026-04-22 13:19:15 UTC_
 
 ## 2026-03-20
 
@@ -1139,6 +1150,7 @@ _Last synced: 2026-04-22 03:49:38 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

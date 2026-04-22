@@ -527,13 +527,14 @@ if (-not $SkipCodex) {
 
     $managedSections = @()
     foreach ($name in ($servers.Keys | Sort-Object)) {
-        $serverBlock = Convert-ServerToCodexToml -Name $name -Server (ConvertTo-PlainObject $servers[$name])
+        $plainServer = ConvertTo-PlainObject $servers[$name]
+        $serverBlock = Convert-ServerToCodexToml -Name $name -Server $plainServer
         if (-not [string]::IsNullOrWhiteSpace($serverBlock)) {
             $managedSections += $serverBlock
             continue
         }
 
-        if ($existingBlocks.ContainsKey($name)) {
+        if ((Should-IncludeServer -Name $name -Server $plainServer -Client "codex") -and $existingBlocks.ContainsKey($name)) {
             $managedSections += $existingBlocks[$name]
             $script:Warnings.Add("Preserved existing Codex block for $name because the generated version was incomplete on this machine.")
         }

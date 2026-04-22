@@ -199,7 +199,7 @@
 
 ## Backlog — 未完成
 - [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
-- [ ] `lobster-factory` Enterprise 必備工具補強路線
+- [x] `lobster-factory` Enterprise 必備工具補強路線（已取消）
   - 範圍：Sentry / PostHog / Cloudflare / Secrets / Identity
   - 現況：Identity=Clerk；Secrets 暫採 env/mcp，後續升級 secrets manager
 - [ ] **`lobster-factory/packages/workflows` `npm audit`**（2026-04-01）
@@ -233,5 +233,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-22 09:34:17 UTC_
+_Last synced: 2026-04-22 13:19:15 UTC_
 
