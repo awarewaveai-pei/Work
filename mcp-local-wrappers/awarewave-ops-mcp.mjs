@@ -89,7 +89,13 @@ const services = {
   n8n_api: {
     label: "n8n REST API",
     baseUrlEnv: "N8N_API_BASE_URL",
-    auth: { type: "bearer", tokenEnv: "N8N_AUTH_BEARER_TOKEN" }
+    auth: {
+      type: "n8n",
+      bearerEnv: "N8N_AUTH_BEARER_TOKEN",
+      apiKeyEnv: "N8N_API_KEY",
+      userEnv: "N8N_BASIC_AUTH_USER",
+      passwordEnv: "N8N_BASIC_AUTH_PASSWORD"
+    }
   },
   trigger_api: {
     label: "Trigger.dev API",
@@ -130,6 +136,11 @@ function getServiceConfig(name) {
     authConfigured = true;
   } else if (auth.type === "basic_or_bearer") {
     authConfigured = !!readEnv(auth.tokenEnv) || (!!readEnv(auth.userEnv) && !!readEnv(auth.passwordEnv));
+  } else if (auth.type === "n8n") {
+    authConfigured =
+      !!readEnv(auth.apiKeyEnv) ||
+      !!readEnv(auth.bearerEnv) ||
+      (!!readEnv(auth.userEnv) && !!readEnv(auth.passwordEnv));
   } else if (auth.type === "supabase") {
     authConfigured = !!readEnv(auth.apiKeyEnv) && !!readEnv(auth.bearerEnv);
   }
@@ -162,6 +173,24 @@ function buildHeaders(serviceConfig, extraHeaders = {}) {
       }
       const basic = Buffer.from(`${user}:${password}`, "utf8").toString("base64");
       headers.Authorization = `Basic ${basic}`;
+    }
+  } else if (auth.type === "n8n") {
+    const apiKey = readEnv(auth.apiKeyEnv);
+    if (apiKey) {
+      headers["X-N8N-API-KEY"] = apiKey;
+    } else {
+      const bearer = readEnv(auth.bearerEnv);
+      if (bearer) {
+        headers.Authorization = `Bearer ${bearer}`;
+      } else {
+        const user = readEnv(auth.userEnv);
+        const password = readEnv(auth.passwordEnv);
+        if (!user || !password) {
+          throw new Error(`Missing required env vars: ${auth.apiKeyEnv}, ${auth.bearerEnv}, or (${auth.userEnv}, ${auth.passwordEnv})`);
+        }
+        const basic = Buffer.from(`${user}:${password}`, "utf8").toString("base64");
+        headers.Authorization = `Basic ${basic}`;
+      }
     }
   } else if (auth.type === "supabase") {
     const apiKey = readEnv(auth.apiKeyEnv);
