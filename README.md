@@ -33,13 +33,20 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -Lobst
 MCP 現在用 repo 內的單一來源管理，目標是讓桌機與筆電都能用同一份配置同步到 `Codex`、`GitHub Copilot CLI`、`Gemini CLI` 與工作區 `.mcp.json`。
 
 1. 先填機器本地的環境變數範本：[`mcp/user-env.template.ps1`](mcp/user-env.template.ps1)
-2. 再執行：
+2. 複製成 `mcp/user-env.ps1` 並填入該台機器的真實值
+3. 在新電腦直接執行：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
 ```
 
 或：
+
+```powershell
+npm run mcp:bootstrap
+```
+
+已經有本機 env 時，也可以只跑：
 
 ```powershell
 npm run mcp:sync

@@ -20,6 +20,7 @@ lobster-factory/packages/workflows/.trigger/
 .mcp.json
 mcp/registry.local.json
 mcp/user-env.ps1
+mcp/*.local.ps1
 .codex/config.toml
 .codex/*.bak*
 hostinger-recovery-codes.txt

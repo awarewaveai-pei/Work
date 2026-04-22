@@ -14,19 +14,43 @@ This directory is the single source of truth for MCP server definitions that nee
 
 ## Standard flow
 
-1. Set machine-local environment variables from `user-env.template.ps1`.
-2. Run:
+1. Copy `user-env.template.ps1` to `user-env.ps1` on that machine.
+2. Fill in the real secrets and endpoint values in `user-env.ps1`.
+3. Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
+```
+
+Or:
+
+```powershell
+npm run mcp:bootstrap
+```
+
+## Manual sync only
+
+If the machine-local environment is already present, you can skip bootstrap and just run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
 ```
 
-3. The script writes:
+This writes:
 
 - repo-local `.mcp.json`
 - `~/.codex/config.toml` managed MCP block
 - `~/.copilot/mcp-config.json`
 - `~/.gemini/settings.json`
+
+## New machine checklist
+
+1. Clone the repo.
+2. Install the client CLIs you actually use on that machine.
+3. Create `mcp/user-env.ps1` from the template.
+4. Run `npm run mcp:bootstrap`.
+5. Open a new terminal.
+6. Start `codex`, `copilot`, or `gemini`.
 
 ## Design rules
 

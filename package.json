@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "mcp:bootstrap": "powershell -ExecutionPolicy Bypass -File scripts/bootstrap-mcp-machine.ps1",
     "mcp:sync": "powershell -ExecutionPolicy Bypass -File scripts/sync-mcp-config.ps1",
     "rag:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-rag-env.ps1",
     "rag:embed": "tsx scripts/rag_seed_and_embedding.ts",
