@@ -12,6 +12,14 @@ function readEnv(name, fallback = "") {
   return trimmed;
 }
 
+function readFirstEnv(names, fallback = "") {
+  for (const name of names) {
+    const value = readEnv(name);
+    if (value) return value;
+  }
+  return fallback;
+}
+
 const services = {
   api_awarewave: {
     label: "api.aware-wave.com",
@@ -102,22 +110,40 @@ const services = {
     baseUrlEnv: "TRIGGER_API_URL",
     auth: { type: "bearer", tokenEnv: "TRIGGER_ACCESS_TOKEN" }
   },
-  supabase_a: {
-    label: "Supabase A company REST API",
-    baseUrlEnv: "SUPABASE_A_URL",
+  supabase_soulfulexpression: {
+    label: "Soulful Expression Supabase REST API",
+    baseUrlEnv: ["SUPABASE_SOULFULEXPRESSION_URL", "SUPABASE_A_URL"],
     auth: {
       type: "supabase",
-      apiKeyEnv: "SUPABASE_A_SERVICE_ROLE_KEY",
-      bearerEnv: "SUPABASE_A_SERVICE_ROLE_KEY"
+      apiKeyEnv: ["SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY", "SUPABASE_A_SERVICE_ROLE_KEY"],
+      bearerEnv: ["SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY", "SUPABASE_A_SERVICE_ROLE_KEY"]
+    }
+  },
+  supabase_awarewave: {
+    label: "AwareWave Supabase REST API",
+    baseUrlEnv: ["SUPABASE_AWAREWAVE_URL", "SUPABASE_B_URL"],
+    auth: {
+      type: "supabase",
+      apiKeyEnv: ["SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY", "SUPABASE_B_SERVICE_ROLE_KEY"],
+      bearerEnv: ["SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY", "SUPABASE_B_SERVICE_ROLE_KEY"]
+    }
+  },
+  supabase_a: {
+    label: "Legacy alias: Soulful Expression Supabase REST API",
+    baseUrlEnv: ["SUPABASE_SOULFULEXPRESSION_URL", "SUPABASE_A_URL"],
+    auth: {
+      type: "supabase",
+      apiKeyEnv: ["SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY", "SUPABASE_A_SERVICE_ROLE_KEY"],
+      bearerEnv: ["SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY", "SUPABASE_A_SERVICE_ROLE_KEY"]
     }
   },
   supabase_b: {
-    label: "Supabase B company REST API",
-    baseUrlEnv: "SUPABASE_B_URL",
+    label: "Legacy alias: AwareWave Supabase REST API",
+    baseUrlEnv: ["SUPABASE_AWAREWAVE_URL", "SUPABASE_B_URL"],
     auth: {
       type: "supabase",
-      apiKeyEnv: "SUPABASE_B_SERVICE_ROLE_KEY",
-      bearerEnv: "SUPABASE_B_SERVICE_ROLE_KEY"
+      apiKeyEnv: ["SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY", "SUPABASE_B_SERVICE_ROLE_KEY"],
+      bearerEnv: ["SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY", "SUPABASE_B_SERVICE_ROLE_KEY"]
     }
   }
 };
@@ -126,7 +152,9 @@ function getServiceConfig(name) {
   const service = services[name];
   if (!service) throw new Error(`Unknown service: ${name}`);
 
-  const baseUrl = readEnv(service.baseUrlEnv, service.defaultBaseUrl || "");
+  const baseUrl = Array.isArray(service.baseUrlEnv)
+    ? readFirstEnv(service.baseUrlEnv, service.defaultBaseUrl || "")
+    : readEnv(service.baseUrlEnv, service.defaultBaseUrl || "");
   const auth = service.auth || { type: "none" };
   let authConfigured = true;
 
@@ -142,7 +170,9 @@ function getServiceConfig(name) {
       !!readEnv(auth.bearerEnv) ||
       (!!readEnv(auth.userEnv) && !!readEnv(auth.passwordEnv));
   } else if (auth.type === "supabase") {
-    authConfigured = !!readEnv(auth.apiKeyEnv) && !!readEnv(auth.bearerEnv);
+    const apiKey = Array.isArray(auth.apiKeyEnv) ? readFirstEnv(auth.apiKeyEnv) : readEnv(auth.apiKeyEnv);
+    const bearer = Array.isArray(auth.bearerEnv) ? readFirstEnv(auth.bearerEnv) : readEnv(auth.bearerEnv);
+    authConfigured = !!apiKey && !!bearer;
   }
 
   return { ...service, baseUrl, authConfigured };
@@ -193,10 +223,12 @@ function buildHeaders(serviceConfig, extraHeaders = {}) {
       }
     }
   } else if (auth.type === "supabase") {
-    const apiKey = readEnv(auth.apiKeyEnv);
-    const bearer = readEnv(auth.bearerEnv);
+    const apiKey = Array.isArray(auth.apiKeyEnv) ? readFirstEnv(auth.apiKeyEnv) : readEnv(auth.apiKeyEnv);
+    const bearer = Array.isArray(auth.bearerEnv) ? readFirstEnv(auth.bearerEnv) : readEnv(auth.bearerEnv);
     if (!apiKey || !bearer) {
-      throw new Error(`Missing required env vars: ${auth.apiKeyEnv}, ${auth.bearerEnv}`);
+      const apiKeyNames = Array.isArray(auth.apiKeyEnv) ? auth.apiKeyEnv.join(", ") : auth.apiKeyEnv;
+      const bearerNames = Array.isArray(auth.bearerEnv) ? auth.bearerEnv.join(", ") : auth.bearerEnv;
+      throw new Error(`Missing required env vars: ${apiKeyNames}, ${bearerNames}`);
     }
     headers.apikey = apiKey;
     headers.Authorization = `Bearer ${bearer}`;
@@ -239,7 +271,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "call_service_api",
-      description: "Call a configured service API by service name, method, path, query, and optional JSON body. This wrapper covers api.aware-wave.com, app.aware-wave.com, Hetzner, Uptime Kuma, Grafana, Netdata, Slack Web API, Slack incoming webhooks, Sentry, Resend API, Cloudflare API, PostHog API, n8n REST API, Trigger API, Supabase A, and Supabase B.",
+      description: "Call a configured service API by service name, method, path, query, and optional JSON body. This wrapper covers api.aware-wave.com, app.aware-wave.com, Hetzner, Uptime Kuma, Grafana, Netdata, Slack Web API, Slack incoming webhooks, Sentry, Resend API, Cloudflare API, PostHog API, n8n REST API, Trigger API, Soulful Expression Supabase, and AwareWave Supabase.",
       inputSchema: {
         type: "object",
         properties: {

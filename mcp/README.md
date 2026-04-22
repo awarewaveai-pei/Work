@@ -97,8 +97,9 @@ Current official config locations this repo aligns with:
 The shared setup now covers:
 
 - `n8n`
-- `Supabase B`
-- `Supabase A`
+- `AwareWave Supabase REST` via `awarewave-ops -> supabase_awarewave`
+- `AwareWave Supabase Postgres` via `supabase-awarewave-postgres`
+- `Soulful Expression Supabase`
 - `Trigger.dev`
 - `Cloudflare`
 - `PostHog`
@@ -114,6 +115,21 @@ The shared setup now covers:
 - `Sentry`
 
 See [`SERVICE_MATRIX.md`](SERVICE_MATRIX.md) for how each one is connected.
+
+For `AwareWave Supabase` specifically, the standard paths are:
+
+- REST: `awarewave-ops -> supabase_awarewave`
+- SQL: `supabase-awarewave-postgres` after `.\scripts\open-supabase-ssh-tunnel.ps1 -Background`
+- Preferred env vars: `SUPABASE_AWAREWAVE_URL`, `SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY`, `SUPABASE_AWAREWAVE_POSTGRES_DSN`
+
+For `Soulful Expression Supabase`, prefer:
+
+- `SUPABASE_SOULFULEXPRESSION_MCP_URL`
+- `SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN`
+- `SUPABASE_SOULFULEXPRESSION_URL`
+- `SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`
+
+Do not configure self-hosted `AwareWave Supabase` as `mcp.supabase.com` hosted MCP.
 
 ## Design rules
 

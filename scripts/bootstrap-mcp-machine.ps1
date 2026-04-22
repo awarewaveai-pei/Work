@@ -55,6 +55,15 @@ if ($StrictEnv) {
 Write-Host "Running shared MCP sync..." -ForegroundColor Green
 & $syncScriptPath @syncParams
 
+$ensurePrompts = Join-Path $WorkspaceRoot "scripts\ensure-agent-bootstrap-prompts.ps1"
+if (Test-Path -LiteralPath $ensurePrompts) {
+    Write-Host "Ensuring agent bootstrap prompts (gitignored)..." -ForegroundColor Green
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ensurePrompts -WorkRoot $WorkspaceRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "ensure-agent-bootstrap-prompts.ps1 failed (exit $LASTEXITCODE)"
+    }
+}
+
 Write-Host ""
 Write-Host "Bootstrap finished." -ForegroundColor Green
 Write-Host "Use these clients after opening a new terminal if you changed persistent env vars:" -ForegroundColor Gray

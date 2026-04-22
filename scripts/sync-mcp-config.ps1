@@ -41,6 +41,37 @@ if (-not (Test-Path -LiteralPath $RegistryPath)) {
 $script:MissingVars = New-Object System.Collections.Generic.HashSet[string]
 $script:Warnings = New-Object System.Collections.Generic.List[string]
 
+$script:EnvAliases = @{
+    "SUPABASE_AWAREWAVE_URL" = @("SUPABASE_B_URL")
+    "SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY" = @("SUPABASE_B_SERVICE_ROLE_KEY")
+    "SUPABASE_AWAREWAVE_POSTGRES_DSN" = @("SUPABASE_B_POSTGRES_DSN", "SUPABASE_POSTGRES_MCP_DSN")
+    "SUPABASE_SOULFULEXPRESSION_MCP_URL" = @("SUPABASE_A_MCP_URL")
+    "SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN" = @("SUPABASE_A_AUTH_BEARER_TOKEN")
+    "SUPABASE_SOULFULEXPRESSION_URL" = @("SUPABASE_A_URL")
+    "SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY" = @("SUPABASE_A_SERVICE_ROLE_KEY")
+}
+
+function Get-EnvironmentValueWithAliases {
+    param([string]$Name)
+
+    $value = [Environment]::GetEnvironmentVariable($Name)
+    if (-not [string]::IsNullOrWhiteSpace($value) -and $value -notmatch '^\s*<PASTE_[A-Z0-9_]+>\s*$') {
+        return $value
+    }
+
+    if ($script:EnvAliases.ContainsKey($Name)) {
+        foreach ($alias in $script:EnvAliases[$Name]) {
+            $aliasValue = [Environment]::GetEnvironmentVariable($alias)
+            if (-not [string]::IsNullOrWhiteSpace($aliasValue) -and $aliasValue -notmatch '^\s*<PASTE_[A-Z0-9_]+>\s*$') {
+                $script:Warnings.Add("Resolved $Name from legacy env var $alias on this machine.")
+                return $aliasValue
+            }
+        }
+    }
+
+    return ""
+}
+
 function ConvertTo-PlainObject {
     param([Parameter(ValueFromPipeline = $true)]$InputObject)
 
@@ -120,8 +151,8 @@ function Resolve-EnvValue {
             $name = $match.Groups[1].Value
             switch ($Mode) {
                 "Concrete" {
-                    $value = [Environment]::GetEnvironmentVariable($name)
-                    if ([string]::IsNullOrWhiteSpace($value) -or $value -match '^\s*<PASTE_[A-Z0-9_]+>\s*$') {
+                    $value = Get-EnvironmentValueWithAliases -Name $name
+                    if ([string]::IsNullOrWhiteSpace($value)) {
                         $null = $script:MissingVars.Add($name)
                         return ""
                     }

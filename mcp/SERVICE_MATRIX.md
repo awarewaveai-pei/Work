@@ -7,8 +7,8 @@ This matrix describes how the shared MCP setup reaches each AwareWave service.
 ## Direct or official MCP
 
 - `GitHub`: official GitHub MCP server
-- `Supabase B`: hosted Supabase MCP (`supabase`)
-- `Supabase A`: hosted Supabase MCP (`supabase-a`)
+- `AwareWave Supabase Postgres`: local wrapper around `scripts/run-postgres-mcp.ps1` (`supabase-awarewave-postgres`, requires SSH tunnel)
+- `Soulful Expression Supabase`: hosted Supabase MCP (`supabase-soulfulexpression`)
 - `Trigger.dev`: local wrapper around `scripts/start-trigger-mcp.ps1`
 - `n8n`: remote HTTP MCP
 - `Cloudflare`: remote MCP endpoint
@@ -32,11 +32,14 @@ These services are exposed through the local `awarewave-ops` wrapper so any MCP-
 - `PostHog API`
 - `n8n REST API`
 - `Trigger API`
-- `Supabase A REST`
-- `Supabase B REST`
+- `Soulful Expression Supabase REST`
+- `AwareWave Supabase REST`
 
 ## Notes
 
+- `AwareWave Supabase` is self-hosted. Standard access is `awarewave-ops -> supabase_awarewave` for REST and `supabase-awarewave-postgres` for SQL after `scripts/open-supabase-ssh-tunnel.ps1 -Background`.
+  Preferred env vars: `SUPABASE_AWAREWAVE_URL`, `SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY`, `SUPABASE_AWAREWAVE_POSTGRES_DSN`.
+- Do not route `AwareWave Supabase` through `mcp.supabase.com`; that hosted MCP is only for Supabase Cloud projects.
 - `Slack` has an official MCP offering, but this repo currently standardizes on `awarewave-ops` for machine-to-machine API control.
 - `Grafana` supports MCP in some product areas, but your current control-plane workflows are better handled through the local wrapper plus repo scripts.
 - `Uptime Kuma`, `Hetzner`, and `Netdata` are treated as custom integrations in this repo.

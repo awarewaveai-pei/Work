@@ -9,9 +9,9 @@
 
 | 服務 | 對外 URL | 驗證方式 | 環境變數 |
 |---|---|---|---|
-| **Supabase Kong API** | `https://supabase.aware-wave.com` | Bearer JWT | `SUPABASE_B_SERVICE_ROLE_KEY` |
+| **Supabase Kong API** | `https://supabase.aware-wave.com` | Bearer JWT | `SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY` |
 | **Supabase Studio** | `https://studio.aware-wave.com` | Basic Auth | 見 memory/reference_vps_access.md |
-| **Supabase Postgres** | `localhost:5432`（需 SSH tunnel） | DSN | `SUPABASE_B_POSTGRES_DSN` |
+| **Supabase Postgres** | `localhost:5432`（需 SSH tunnel） | DSN | `SUPABASE_AWAREWAVE_POSTGRES_DSN` |
 | **n8n** | `https://n8n.aware-wave.com` | Basic Auth / JWT / API Key | `N8N_BASIC_AUTH_USER/PASSWORD` `N8N_AUTH_BEARER_TOKEN` `N8N_API_KEY` |
 | **n8n MCP** | `https://n8n.aware-wave.com/mcp-server/http` | Bearer JWT | `N8N_AUTH_BEARER_TOKEN` |
 | **Trigger.dev** | `https://trigger.aware-wave.com` | Bearer Token | `TRIGGER_ACCESS_TOKEN` |
@@ -27,8 +27,8 @@
 
 | 服務 | URL / Project | 驗證方式 | 環境變數 |
 |---|---|---|---|
-| **Supabase A（雲端）** | `https://mffjqjiidbeibilmxzef.supabase.co` | Service Role Key / PAT | `SUPABASE_A_SERVICE_ROLE_KEY` `SUPABASE_A_AUTH_BEARER_TOKEN` |
-| **Supabase A MCP** | `mcp.supabase.com/mcp?project_ref=mffjqjiidbeibilmxzef` | PAT | `SUPABASE_A_AUTH_BEARER_TOKEN` |
+| **Soulful Expression Supabase（雲端）** | `https://mffjqjiidbeibilmxzef.supabase.co` | Service Role Key / PAT | `SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY` `SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN` |
+| **Soulful Expression Supabase MCP** | `mcp.supabase.com/mcp?project_ref=mffjqjiidbeibilmxzef` | PAT | `SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN` |
 | **Cloudflare** | `api.cloudflare.com/client/v4` | API Token | `CLOUDFLARE_API_TOKEN` `CLOUDFLARE_AUTH_BEARER_TOKEN` |
 | **GitHub** | `api.github.com` | PAT | `GITHUB_PERSONAL_ACCESS_TOKEN` |
 | **GitHub Copilot MCP** | `api.githubcopilot.com/mcp` | Bearer | `COPILOT_MCP_BEARER_TOKEN` |
@@ -55,9 +55,9 @@
 | MCP 名稱 | 類型 | 服務 |
 |---|---|---|
 | `n8n` | HTTP | n8n MCP Server |
-| `supabase` | HTTP | 雲端 Supabase（預留） |
-| `supabase-a` | HTTP | Supabase A（Soulful Expression） |
-| `supabase-b-postgres` | stdio | 自架 Supabase Postgres（需 tunnel） |
+| `supabase` | HTTP | 雲端 Supabase（僅雲端專案預留；勿用於 AwareWave 自架） |
+| `supabase-soulfulexpression` | HTTP | Soulful Expression Supabase |
+| `supabase-awarewave-postgres` | stdio | 自架 AwareWave Supabase Postgres（需 tunnel） |
 | `awarewave-ops` | stdio | 所有自架 + 雲端 REST API 統一入口 |
 | `cloudflare` | HTTP | Cloudflare |
 | `posthog` | HTTP | PostHog |

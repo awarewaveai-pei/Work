@@ -157,17 +157,20 @@
         "TRIGGER_API_URL": "${env:TRIGGER_API_URL}"
       }
     },
-    "supabase-b-postgres": {
+    "supabase-awarewave-postgres": {
       "enabled": true,
       "transport": "stdio",
-      "command": "cmd",
+      "command": "powershell",
       "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-postgres",
-        "${env:SUPABASE_B_POSTGRES_DSN}"
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-postgres-mcp.ps1"
       ],
+      "env": {
+        "SUPABASE_AWAREWAVE_POSTGRES_DSN": "${env:SUPABASE_AWAREWAVE_POSTGRES_DSN}"
+      },
       "note": "Requires SSH tunnel: scripts/open-supabase-ssh-tunnel.ps1 -Background"
     },
     "supabase": {
@@ -186,12 +189,36 @@
         }
       }
     },
-    "supabase-a": {
+    "supabase-soulfulexpression": {
       "enabled": true,
       "transport": "http",
-      "url": "${env:SUPABASE_A_MCP_URL}",
+      "url": "${env:SUPABASE_SOULFULEXPRESSION_MCP_URL}",
       "headers": {
-        "Authorization": "Bearer ${env:SUPABASE_A_AUTH_BEARER_TOKEN}"
+        "Authorization": "Bearer ${env:SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
+      }
+    },
+    "supabase-b-postgres": {
+      "enabled": false,
+      "transport": "stdio",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-postgres-mcp.ps1"
+      ],
+      "env": {
+        "SUPABASE_AWAREWAVE_POSTGRES_DSN": "${env:SUPABASE_AWAREWAVE_POSTGRES_DSN}"
+      },
+      "note": "Legacy alias for supabase-awarewave-postgres"
+    },
+    "supabase-a": {
+      "enabled": false,
+      "transport": "http",
+      "url": "${env:SUPABASE_SOULFULEXPRESSION_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${env:SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
       }
     },
     "cloudflare": {
