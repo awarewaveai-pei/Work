@@ -50,6 +50,9 @@
     "replicate": {
       "enabled": true,
       "transport": "stdio",
+      "optional_env": [
+        "REPLICATE_WEBHOOK_SIGNING_KEY"
+      ],
       "command": "cmd",
       "args": [
         "/c",

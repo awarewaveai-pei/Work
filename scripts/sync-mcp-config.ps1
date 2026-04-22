@@ -121,7 +121,7 @@ function Resolve-EnvValue {
             switch ($Mode) {
                 "Concrete" {
                     $value = [Environment]::GetEnvironmentVariable($name)
-                    if ([string]::IsNullOrWhiteSpace($value)) {
+                    if ([string]::IsNullOrWhiteSpace($value) -or $value -match '^\s*<PASTE_[A-Z0-9_]+>\s*$') {
                         $null = $script:MissingVars.Add($name)
                         return ""
                     }
@@ -148,6 +148,34 @@ function Resolve-MapValues {
     $result = @{}
     foreach ($key in $Map.Keys) {
         $result[$key] = Resolve-EnvValue -StringValue ([string]$Map[$key]) -Mode $Mode
+    }
+    return $result
+}
+
+function Get-OptionalEnvKeys {
+    param([hashtable]$Server)
+
+    if (-not $Server.ContainsKey("optional_env")) {
+        return @()
+    }
+
+    return @($Server["optional_env"] | ForEach-Object { [string]$_ })
+}
+
+function Remove-EmptyOptionalEnv {
+    param(
+        [hashtable]$Map,
+        [string[]]$OptionalKeys
+    )
+
+    $result = @{}
+    foreach ($key in $Map.Keys) {
+        $isOptional = $OptionalKeys -contains $key
+        $value = [string]$Map[$key]
+        if ($isOptional -and [string]::IsNullOrWhiteSpace($value)) {
+            continue
+        }
+        $result[$key] = $Map[$key]
     }
     return $result
 }
@@ -180,10 +208,14 @@ function Test-ResolvedMap {
     param(
         [string]$ServerName,
         [hashtable]$Map,
-        [string]$Kind
+        [string]$Kind,
+        [string[]]$OptionalKeys = @()
     )
 
     foreach ($key in $Map.Keys) {
+        if ($OptionalKeys -contains $key) {
+            continue
+        }
         if ([string]::IsNullOrWhiteSpace([string]$Map[$key])) {
             $script:Warnings.Add("Skip $ServerName for $Kind because '$key' resolved to an empty value.")
             return $false
@@ -253,11 +285,12 @@ function Convert-ServerToCopilotConfig {
         }
         $out["args"] = $args
         if ($Server.ContainsKey("env")) {
+            $optionalKeys = Get-OptionalEnvKeys -Server $Server
             $envMap = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["env"]) -Mode "Concrete"
-            if (-not (Test-ResolvedMap -ServerName $Name -Map $envMap -Kind "Copilot")) {
+            if (-not (Test-ResolvedMap -ServerName $Name -Map $envMap -Kind "Copilot" -OptionalKeys $optionalKeys)) {
                 return $null
             }
-            $out["env"] = $envMap
+            $out["env"] = Remove-EmptyOptionalEnv -Map $envMap -OptionalKeys $optionalKeys
         } else {
             $out["env"] = @{}
         }
@@ -344,11 +377,12 @@ function Convert-ServerToCodexToml {
         }
         $lines += "args = [" + ($encodedArgs -join ", ") + "]"
         if ($Server.ContainsKey("env")) {
+            $optionalKeys = Get-OptionalEnvKeys -Server $Server
             $envMap = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["env"]) -Mode "Concrete"
-            if (-not (Test-ResolvedMap -ServerName $Name -Map $envMap -Kind "Codex")) {
+            if (-not (Test-ResolvedMap -ServerName $Name -Map $envMap -Kind "Codex" -OptionalKeys $optionalKeys)) {
                 return $null
             }
-            $lines += "env = " + (Convert-HashtableToTomlInlineTable -Map $envMap)
+            $lines += "env = " + (Convert-HashtableToTomlInlineTable -Map (Remove-EmptyOptionalEnv -Map $envMap -OptionalKeys $optionalKeys))
         }
     }
     if ($Server.ContainsKey("enabled") -and -not [bool]$Server["enabled"]) {
