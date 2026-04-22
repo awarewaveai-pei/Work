@@ -213,6 +213,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
   - Pull 為 **`git pull --ff-only origin main`**；若失敗，代表與遠端 **非快轉關係**，請 `git status` 後 **rebase** 或依上文 **`reset --hard origin/main`**（以 GitHub 為準時）處理。
 - **`scripts/ao-close.ps1`**（**AO-CLOSE**）：預設先 **`print-today-closeout-recap`**；**`-SkipTodayRecap`** 可略過。在未加 **`-SkipPush`** 時，會先 **`git fetch`** 並檢查是否落後 **`origin/<同一分支>`**；若落後則 **中止**。僅在明示風險且必要時使用 **`-AllowPushWhileBehind`**。在 **`git add` 前**會執行 **`apply-closeout-task-checkmarks.ps1`**（自 **`WORKLOG` 當日 `## yyyy-MM-dd`** 區塊解析 **`- AUTO_TASK_DONE:`** 行，並合併選用之 **`pending-task-completions.txt`**；**`-SkipAutoTaskCheckmarks`** 可略過）。
 - **「整台電腦目錄」仍不可能與 GitHub 完全相同**：`node_modules`、本機 MCP／vault 等多為 **`.gitignore`**，兩台需各依 **1.5** 與 **6.2** 建置。
+- **主線對齊 + 功能分支續作（推薦一鍵）**：`reset --hard` **一次只能對一個 ref**；不要寫成 `origin/main,origin/fix/...`。在 monorepo 根執行 **`scripts/git-align-main-aoresume-feature.ps1`**：`fetch` → **`git checkout main`** → **`git reset --hard origin/main`** → **`ao-resume.ps1`**（main 上 **0 ahead / 0 behind**）→ 切回 **`-FeatureBranch`（預設 `fix/trigger-clickhouse-oom`）** → 若尚未包含 **`origin/main`** 則 **`git merge --no-edit origin/main`** → 再跑一次 **`ao-resume.ps1`**。選項：**`-SkipFeature`**（只整理 main）、**`-PushFeature`**（功能分支超前時 push）、**`-AllowStash`**（髒樹先 stash，**不**自動 pop）。
 
 ## 2.1 失敗處置（不要硬做）
 
