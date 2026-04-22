@@ -10,6 +10,18 @@
 - [ ] （可選）送 PR / 大改 docs 前：在 **monorepo 根** `<WORK_ROOT>` 跑 `.\scripts\verify-build-gates.ps1`（工程 + doc + 治理 health 一次完成）
 - [ ] （可選）有註冊 **AgencyOS-WeeklySystemReview** 者：若本週排程曾跑過，確認未被寫入 `ALERT_REQUIRED.txt`；若有，表示週檢閘道曾 FAIL，須先處理再收工
 
+## 0.5) 多代理（並行 4–5 個 AI）時怎麼收工才「完善」
+
+**問題根因**：`WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`TASKS.md` 是**單檔單真相**；多個對話同時改會互蓋、合併衝突、`AUTO_TASK_DONE` 掃描錯日、commit 訊息變垃圾句。
+
+**建議協議（最省事）**：
+
+1. **指定唯一「收關代理」**（同一輪只由一個 Cursor／Claude 對話執行 **§2 的 `ao-close.ps1`**；其餘代理**不跑** `git push`／**不**對上述三檔做最終寫入）。
+2. **其他代理只交「素材」**：在 **`agency-os/.agency-state/closeout-inbox.md`**（**gitignore**，不進版控）用 Markdown 條列：對話 ID／完成項一句／相關 commit hash 或檔案路徑。**禁止**多人同時改 `WORKLOG` 當日區塊當「草稿本」。
+3. **收關代理合併**：讀 `closeout-inbox.md` + 各對話已 merge 的 **code** + `print-today-closeout-recap`，**一次寫** `WORKLOG`（含 `- AUTO_TASK_DONE:`）、`memory`、`daily`；必要時清空或歸檔 inbox。
+4. **分支策略（強烈建議）**：並行開發用**不同 branch** 或至少不同 prefix commit；收關前 **`git merge`** / PR 合進當日工作分支，再跑 **`ao-close.ps1`**，降低同檔二頭馬。
+5. **長 commit 訊息**：用 **`-CommitMessageFile path\to\msg.txt`**（UTF-8）取代一行 `-CommitMessage`；`ao-close.ps1` 會在 commit 前擋 **staged diff 含 `<<<<<<<` 衝突標記**。
+
 ## 1) 必跑三步（硬性 Gate）
 
 ### 1a) 一鍵收工 + 推 GitHub（推薦）
@@ -24,6 +36,7 @@
   - 遠端已超前仍強制 push（**高風險**，僅明示核准）：`-AllowPushWhileBehind`
   - 略過開頭「今日機器摘要」（進階／純 CI）：`-SkipTodayRecap`
   - 略過 **`TASKS` 自動打勾**（緊急除錯用）：`-SkipAutoTaskCheckmarks`
+  - 從檔讀 commit 訊息（多代理彙總／多行說明）：`-CommitMessageFile .\.agency-state\closeout-commit-msg.txt`（路徑相對 monorepo 根或絕對路徑皆可）
 
 ### 1b) 手動三步（與 1a 擇一即可）
 在 `<WORK_ROOT>\agency-os` 目錄執行（與 1a **擇一**；**收工推薦 1a 於 repo 根**）：

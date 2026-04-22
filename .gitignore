@@ -6,6 +6,7 @@
 agency-os/.agency-state/ao-resume-last.txt
 agency-os/.agency-state/pending-task-completions.txt
 agency-os/.agency-state/open-tasks-snapshot.md
+agency-os/.agency-state/closeout-inbox.md
 
 # --- Local scratch (wp-dummy paths for regression; never push) ---
 .scratch/

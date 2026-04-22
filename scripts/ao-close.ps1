@@ -1,6 +1,7 @@
 # AO-CLOSE: print-today-closeout-recap (see -SkipTodayRecap) -> verify-build-gates ->
 #   system-guard (doc-sync + health + guard) -> generate integrated-status report ->
 #   optional apply-closeout-task-checkmarks -> git commit + push.
+# -CommitMessageFile: UTF-8 file passed to "git commit -F" (multiline safe). Staged diff must not contain +<<<<<<< conflict markers.
 # Run AFTER updating TASKS.md, WORKLOG.md, and memory files so they are included in the commit.
 # apply-closeout-task-checkmarks: WORKLOG today "- AUTO_TASK_DONE: <substring>" + optional
 # agency-os/.agency-state/pending-task-completions.txt (gitignored).
@@ -11,6 +12,8 @@
 param(
     [string]$WorkRoot = "",
     [string]$CommitMessage = "",
+    # 多行／多代理彙總：`git commit -F`（若與 -CommitMessage 並存，**以檔案為準**）。
+    [string]$CommitMessageFile = "",
     [switch]$SkipPush,
     [switch]$SkipVerify,
     [switch]$AllowNonPerfectHealth,
@@ -160,6 +163,11 @@ if (-not $SkipAutoTaskCheckmarks -and (Test-Path -LiteralPath $applyMarks)) {
     Write-Host "== AO-CLOSE: -SkipAutoTaskCheckmarks（略過自動打勾）==" -ForegroundColor DarkYellow
 }
 
+$closeoutInbox = Join-Path $WorkRoot "agency-os\.agency-state\closeout-inbox.md"
+if (Test-Path -LiteralPath $closeoutInbox) {
+    Write-Host "== AO-CLOSE: agency-os/.agency-state/closeout-inbox.md exists (gitignored). Merge into WORKLOG/memory, then clear inbox to avoid stale multi-agent notes. ==" -ForegroundColor Yellow
+}
+
 if ($SkipPush) {
     Write-Host "== AO-CLOSE: -SkipPush set; skipping git commit/push ==" -ForegroundColor Yellow
     exit 0
@@ -187,12 +195,35 @@ try {
         }
     }
 
+    $patch = (& git diff --cached -U0 2>&1 | Out-String)
+    if ($patch -match '(?m)^\+<<<<<<< ') {
+        Write-Error "ao-close: staged diff contains merge conflict markers (+<<<<<<<). Resolve conflicts before commit."
+        exit 1
+    }
+
     $hasStaged = $staged.Count -gt 0
     if ($hasStaged) {
-        if (-not $CommitMessage) {
+        $resolvedMsgFile = $null
+        if ($CommitMessageFile) {
+            $resolvedMsgFile = if ([System.IO.Path]::IsPathRooted($CommitMessageFile)) { $CommitMessageFile } else { Join-Path $WorkRoot $CommitMessageFile }
+            if (-not (Test-Path -LiteralPath $resolvedMsgFile)) {
+                Write-Error "ao-close: -CommitMessageFile not found: $resolvedMsgFile"
+                exit 1
+            }
+            $fileBody = (Get-Content -LiteralPath $resolvedMsgFile -Raw -Encoding UTF8).Trim()
+            if ([string]::IsNullOrWhiteSpace($fileBody)) {
+                Write-Error "ao-close: -CommitMessageFile is empty: $resolvedMsgFile"
+                exit 1
+            }
+        }
+        if (-not $CommitMessage -and -not $resolvedMsgFile) {
             $CommitMessage = "[cursor] chore: AO-CLOSE sync " + (Get-Date -Format "yyyy-MM-dd HHmm")
         }
-        git commit -m $CommitMessage
+        if ($resolvedMsgFile) {
+            git commit -F $resolvedMsgFile
+        } else {
+            git commit -m $CommitMessage
+        }
         if ($LASTEXITCODE -ne 0) {
             Write-Error "ao-close: git commit failed"
             exit 1

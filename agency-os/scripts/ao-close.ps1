@@ -1,6 +1,7 @@
 param(
     [string]$WorkRoot = "",
     [string]$CommitMessage = "",
+    [string]$CommitMessageFile = "",
     [switch]$SkipPush,
     [switch]$SkipVerify,
     [switch]$AllowNonPerfectHealth,
