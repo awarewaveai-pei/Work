@@ -1,0 +1,26 @@
+---
+description: Shared MCP registry and config governance across Cursor, Claude, Codex, Copilot, and Gemini
+alwaysApply: true
+---
+
+# Shared MCP Governance
+
+## Authoritative sources
+
+1. `mcp/registry.template.json` — single source of truth for shared MCP server definitions
+2. `scripts/sync-mcp-config.ps1` — generates the supported client outputs from the shared registry
+3. `mcp/README.md` — current shared workflow and client targets
+4. `agency-os/docs/operations/mcp-add-server-quickstart.md` — operator-facing setup and recovery guide
+5. `agency-os/docs/operations/security-secrets-policy.md` — secret handling constraints
+
+## Required behavior
+
+- Do not invent a second shared MCP registry outside the repo-managed files above.
+- Claude project MCP uses repo-root `.mcp.json`.
+- Cursor project MCP uses `.cursor/mcp.json`; user/global overrides belong in `%USERPROFILE%\.cursor\mcp.json`.
+- Treat user-level Cursor or Claude MCP files as machine-local inputs only. If they contain useful server definitions, fold them back into the shared registry and docs without copying live secrets into git.
+- Do not treat `~/.claude/mcp.json` as the shared project path. For Claude Code, project instructions belong in `CLAUDE.md` and project MCP belongs in `.mcp.json`.
+- When MCP changes are needed, update the shared registry and related docs first, then regenerate client configs with `scripts/sync-mcp-config.ps1`.
+- If generated output differs from older hand-written MCP files, prefer the repo-managed shared flow unless the user explicitly chooses a different architecture.
+- Never write live tokens, API keys, JWTs, PATs, or passwords into tracked files, `WORKLOG`, `memory`, or chat.
+

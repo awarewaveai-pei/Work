@@ -22,6 +22,7 @@
 - **`64-architecture-mcp-routing.mdc`** — **企業級**：架構分層、MCP 路由（細節以 `MCP_TOOL_ROUTING_SPEC` + `cursor-mcp-and-plugin-inventory` 為準）
 - **`65-build-standards-data-state.mdc`** — **企業級**：DB／狀態機／結構（**globs**：supabase、sql、migrations、apps、packages）
 - **`66-skills-observability-protocol.mdc`** — **企業級**：Skills、可觀測性、與 62 心跳搭配
+- **`67-shared-mcp-governance.mdc`** — **企業級**：shared MCP registry、Cursor/Claude project config、禁止第二套本機真相
 
 **索引頁（給人看／賣方說明）**：`docs/operations/cursor-enterprise-rules-index.md`  
 **溯源包（多模型產出）**：`../docs/spec/raw/Cursor  Rules for AI/`（monorepo 根；請以本目錄 `63`–`66` 為部署正本）  

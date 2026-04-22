@@ -9,6 +9,7 @@
 #>
 
 $vars = @{
+    COPILOT_MCP_BEARER_TOKEN     = "github_pat_xxx"
     GITHUB_PERSONAL_ACCESS_TOKEN = "github_pat_xxx"
     AIRTABLE_API_KEY             = "pat_xxx"
     REPLICATE_API_TOKEN          = "r8_xxx"

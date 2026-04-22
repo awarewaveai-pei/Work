@@ -6,6 +6,28 @@
 **正本路徑**：`agency-os/docs/operations/collaborator-ai-agent-rules.md`（可版控）。  
 **本地收件匣**（不進 Git）：`agency-os/.agency-state/closeout-inbox.md`。
 
+## 永久載入入口（優先於手貼）
+
+本 repo 已有兩個**永久規則入口**，正常情況下應優先依這兩個入口自動載入，而不是每次手貼長提示：
+
+- **Claude Code**：repo 根 **`CLAUDE.md`**
+- **Cursor**：project rule **`.cursor/rules/67-shared-mcp-governance.mdc`**
+
+也就是說：
+
+- **Claude** 進這個 repo 時，應以 **`CLAUDE.md`** + repo 根 **`.mcp.json`** 為專案真相
+- **Cursor** 進這個 repo 時，應以 **`.cursor/rules/`** + **`.cursor/mcp.json`** 為專案真相
+- 本檔的「一鍵貼給其他 AI」區塊，主要是給 **Codex／ChatGPT／臨時協作視窗／尚未吃到專案規則的外部 AI** 使用
+
+若 Claude / Cursor 的實際行為與上述永久入口衝突，以：
+
+1. `CLAUDE.md`
+2. `.cursor/rules/67-shared-mcp-governance.mdc`
+3. `mcp/registry.template.json`
+4. `scripts/sync-mcp-config.ps1`
+
+為準，並修正漂移，不要再額外發明第三套口頭規則。
+
 ---
 
 ## 一鍵貼給其他 AI（系統提示或對話開頭）
@@ -29,6 +51,33 @@
 - commit 後將 hash 寫入 closeout-inbox；**push 由收關者（Cursor）透過 `ao-close.ps1` 統一執行**，協作代理不自行 push。
 
 完整說明見 repo：agency-os/docs/operations/collaborator-ai-agent-rules.md
+```
+
+### MCP 共用版（Claude / Cursor 建議再加貼這段）
+
+若該 AI 會使用 MCP，請在同一則規則或開場訊息後面再補這段：
+
+```text
+【MCP 共用規則】
+- 本 repo 的 MCP 單一真相是：`mcp/registry.template.json` + `scripts/sync-mcp-config.ps1`。
+- Claude Code 的 shared/project MCP 入口是 monorepo 根 `.mcp.json`。
+- Cursor 的 project MCP 入口是 `.cursor/mcp.json`；user/global MCP 是 `%USERPROFILE%\.cursor\mcp.json`。
+- 不要把 `~/.claude/mcp.json` 當成 shared 正本；Claude 官方最新 local/user scope 以 `~/.claude.json` 為準。
+- 不要自行發明第二套 MCP server 名稱、URL、路徑或認證格式；若需要新增或修改，先以 repo 內 shared registry / 文件為準。
+- 若看到本機 `Cursor` / `Claude` 有額外可用 MCP 設定，可以拿來「比對與收斂」，但不得直接把明文 token、API key、JWT、password 寫回 repo。
+- 需要調整 MCP 時，優先修改：
+  1. `mcp/registry.template.json`
+  2. `mcp/user-env.template.ps1`（若新增 env 名）
+  3. `mcp/README.md`
+  4. `agency-os/docs/operations/mcp-add-server-quickstart.md`
+- 修改後，執行：`powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1`
+- 預期輸出目標：
+  - repo 根 `.mcp.json`
+  - `%USERPROFILE%\.codex\config.toml`
+  - `%USERPROFILE%\.copilot\mcp-config.json`
+  - `%USERPROFILE%\.gemini\settings.json`
+- 若是 Cursor / Claude 本機私有設定，只能保留在使用者層設定檔或 env / vault；不要提交到 git。
+- 若發現 user-level MCP 檔含明文 secrets，應回報並建議收斂為 env / vault 引用。
 ```
 
 ---

@@ -5,7 +5,8 @@ This directory is the single source of truth for MCP server definitions that nee
 - Codex
 - GitHub Copilot CLI
 - Gemini CLI
-- workspace-level `.mcp.json` clients such as Cursor / VS Code
+- project-scoped `.mcp.json` clients such as Claude Code
+- workspace-level Cursor clients layered through `.cursor/mcp.json` and `~/.cursor/mcp.json`
 
 ## Files
 
@@ -43,6 +44,21 @@ This writes:
 - `~/.codex/config.toml` managed MCP block
 - `~/.copilot/mcp-config.json`
 - `~/.gemini/settings.json`
+
+If a machine already has plaintext secrets in user-level Cursor or Claude MCP files, sanitize them before relying on the shared setup:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
+```
+
+This creates a timestamped backup under `Backups/`, rewrites `~/.cursor/mcp.json` to env-based placeholders derived from the shared project config, rewrites legacy `~/.claude/mcp.json` to a minimal non-secret fallback, and clears stale project-scoped MCP entries from `~/.claude.json`.
+
+Current official config locations this repo aligns with:
+
+- Cursor: project `.cursor/mcp.json`, global `~/.cursor/mcp.json`
+- Claude Code: project `.mcp.json`, local/user scopes in `~/.claude.json`
+- Codex: `~/.codex/config.toml`
+- Gemini: `~/.gemini/settings.json`
 
 ## New machine checklist
 
@@ -82,3 +98,4 @@ See [`SERVICE_MATRIX.md`](SERVICE_MATRIX.md) for how each one is connected.
 - Workspace and home paths are resolved per machine at sync time.
 - Optional servers stay in the registry but are skipped unless enabled.
 - Existing non-MCP settings in `~/.codex/config.toml` and `~/.gemini/settings.json` are preserved.
+- Claude's shared team config should live in project `.mcp.json`; do not treat `~/.claude/mcp.json` as the primary shared path.

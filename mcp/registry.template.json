@@ -14,6 +14,18 @@
         "${workspaceRoot}"
       ]
     },
+    "canva": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "mcp-remote@latest",
+        "https://mcp.canva.com/mcp"
+      ]
+    },
     "awarewave-ops": {
       "enabled": true,
       "transport": "stdio",
@@ -21,6 +33,22 @@
       "args": [
         "${workspaceRoot}\\mcp-local-wrappers\\awarewave-ops-mcp.mjs"
       ]
+    },
+    "copilot": {
+      "enabled": true,
+      "transport": "http",
+      "url": "https://api.githubcopilot.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:COPILOT_MCP_BEARER_TOKEN}"
+      },
+      "codex": {
+        "bearer_token_env_var": "COPILOT_MCP_BEARER_TOKEN"
+      },
+      "clients": {
+        "copilot": {
+          "exclude": true
+        }
+      }
     },
     "github": {
       "enabled": true,
