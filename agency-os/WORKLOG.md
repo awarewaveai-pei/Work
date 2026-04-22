@@ -27,6 +27,15 @@
   - Uptime Kuma `endpoint-alert-heartbeat` 已收第一筆 `OK` heartbeat，前幾筆 `No heartbeat in the time window` 為接線前正常歷史。
 - **殘留風險**：Uptime Kuma `error.log` 仍有舊 monitor 的 `accepted_statuscodes_json` 解析錯誤（歷史資料格式問題，不是本輪新建 monitor 所致）；後續宜於 UI 將該舊 monitor 重新存一次，避免列表/統計時偶發報錯。
 
+### MCP 憑證補全（Claude 執行）
+
+- **Trigger.dev Project Ref**：直查 VPS `trigger-postgres` DB (`docker exec trigger-postgres psql`)；`Project` 表取得 `prj_44dbea0704bed92a`（slug: `lobster-factory`）；已寫入 `mcp/user-env.ps1` 並 `setx` 持久化。
+- **Uptime Kuma API Key**：安裝 `sqlite3` 於 VPS host，改用 Python `sqlite3` 模組直寫 `kuma.db`；插入 `api_key` 表（name: `mcp-claude`，key: `uk1_ea9cd26f…`，user_id: 1）；已寫入 `mcp/user-env.ps1` 並 `setx` 持久化。
+- **SSH libcrypto bug**：Git Bash 的 `ssh.exe` 將 `~` 展開為 `/c/Users/…` 導致 Ed25519 key load 失敗；改用 `C:\Windows\System32\OpenSSH\ssh.exe` + 原生 Windows 路徑解決。
+- **Netdata API Token**：需登入 `app.netdata.cloud` 手動建立；**留待使用者瀏覽器操作**。
+- **Slack Bot Token**：需 Slack App OAuth 流程；**留待使用者瀏覽器操作**。
+- **MCP sync**：跑 `sync-mcp-config.ps1`，`.mcp.json` 中佔位路徑 `C:\Users\USER\Work` 已替換為 `D:\Work`；同步產生 `~/.codex/config.toml`、`~/.copilot/mcp-config.json`、`~/.gemini/settings.json`。
+
 ### Supabase 完整暴露與 AI 控制設定（Claude 執行）
 
 - **目標**：讓自架 Supabase 可被 Claude、Cursor、Codex 完整操作，並提供人類 Studio UI 入口。

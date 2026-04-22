@@ -34,7 +34,7 @@
                                                          "-ExecutionPolicy",
                                                          "Bypass",
                                                          "-File",
-                                                         "C:\\Users\\USER\\Work\\scripts\\run-llm-mcp.ps1",
+                                                         "D:\\Work\\scripts\\run-llm-mcp.ps1",
                                                          "-Provider",
                                                          "openai"
                                                      ],
@@ -77,8 +77,8 @@
                                                         "npx",
                                                         "-y",
                                                         "@modelcontextprotocol/server-filesystem",
-                                                        "C:\\Users\\USER",
-                                                        "C:\\Users\\USER\\Work"
+                                                        "C:\\Users\\user1115",
+                                                        "D:\\Work"
                                                     ],
                                            "command":  "cmd"
                                        },
@@ -100,7 +100,7 @@
                                                         "-ExecutionPolicy",
                                                         "Bypass",
                                                         "-File",
-                                                        "C:\\Users\\USER\\Work\\scripts\\run-llm-mcp.ps1",
+                                                        "D:\\Work\\scripts\\run-llm-mcp.ps1",
                                                         "-Provider",
                                                         "anthropic"
                                                     ],
@@ -133,7 +133,7 @@
                                                            "-ExecutionPolicy",
                                                            "Bypass",
                                                            "-File",
-                                                           "C:\\Users\\USER\\Work\\scripts\\run-llm-mcp.ps1",
+                                                           "D:\\Work\\scripts\\run-llm-mcp.ps1",
                                                            "-Provider",
                                                            "openai"
                                                        ],
@@ -170,7 +170,7 @@
                                      },
                        "awarewave-ops":  {
                                              "args":  [
-                                                          "C:\\Users\\USER\\Work\\mcp-local-wrappers\\awarewave-ops-mcp.mjs"
+                                                          "D:\\Work\\mcp-local-wrappers\\awarewave-ops-mcp.mjs"
                                                       ],
                                              "command":  "node"
                                          },
@@ -180,7 +180,7 @@
                                                     "-ExecutionPolicy",
                                                     "Bypass",
                                                     "-File",
-                                                    "C:\\Users\\USER\\Work\\scripts\\start-trigger-mcp.ps1",
+                                                    "D:\\Work\\scripts\\start-trigger-mcp.ps1",
                                                     "-ProjectRef",
                                                     "${TRIGGER_PROJECT_REF}"
                                                 ],
@@ -214,7 +214,7 @@
                                                         "-ExecutionPolicy",
                                                         "Bypass",
                                                         "-File",
-                                                        "C:\\Users\\USER\\Work\\scripts\\run-llm-mcp.ps1",
+                                                        "D:\\Work\\scripts\\run-llm-mcp.ps1",
                                                         "-Provider",
                                                         "gemini"
                                                     ],
@@ -230,7 +230,7 @@
                                                           "-ExecutionPolicy",
                                                           "Bypass",
                                                           "-File",
-                                                          "C:\\Users\\USER\\Work\\scripts\\run-llm-mcp.ps1",
+                                                          "D:\\Work\\scripts\\run-llm-mcp.ps1",
                                                           "-Provider",
                                                           "anthropic"
                                                       ],
@@ -246,7 +246,7 @@
                                                           "-ExecutionPolicy",
                                                           "Bypass",
                                                           "-File",
-                                                          "C:\\Users\\USER\\Work\\scripts\\run-llm-mcp.ps1",
+                                                          "D:\\Work\\scripts\\run-llm-mcp.ps1",
                                                           "-Provider",
                                                           "gemini"
                                                       ],
