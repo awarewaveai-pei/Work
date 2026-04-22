@@ -23,6 +23,9 @@
 .PARAMETER AllowStash
   工作區不乾淨時，先 `git stash push` 再繼續（結束後**不**自動 pop，請自行處理）。
 
+.PARAMETER SkipAoResume
+  只做 Git 步驟（fetch／reset main／切回功能分支／merge），**不**呼叫 `ao-resume.ps1`（供 `ao-resume -FullMainlineParity` 內嵌呼叫，避免遞迴）。
+
 .EXAMPLE
   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\git-align-main-aoresume-feature.ps1
 
@@ -35,7 +38,8 @@ param(
     [string]$FeatureBranch = "fix/trigger-clickhouse-oom",
     [switch]$SkipFeature,
     [switch]$PushFeature,
-    [switch]$AllowStash
+    [switch]$AllowStash,
+    [switch]$SkipAoResume
 )
 
 Set-StrictMode -Version Latest
@@ -95,10 +99,14 @@ try {
     Invoke-Git @("reset", "--hard", "origin/main")
     Write-Host "== main is now identical to origin/main ==" -ForegroundColor Green
 
-    Write-Host "== AO-RESUME on main ==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $aoResume
-    if ($LASTEXITCODE -ne 0) {
-        throw "AO-RESUME on main failed (exit $LASTEXITCODE)."
+    if (-not $SkipAoResume) {
+        Write-Host "== AO-RESUME on main ==" -ForegroundColor Cyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $aoResume
+        if ($LASTEXITCODE -ne 0) {
+            throw "AO-RESUME on main failed (exit $LASTEXITCODE)."
+        }
+    } else {
+        Write-Host "== SkipAoResume: left on main (no nested ao-resume) ==" -ForegroundColor DarkGray
     }
 
     if ($SkipFeature) {
@@ -138,10 +146,14 @@ try {
         Write-Host "== $FeatureBranch already contains origin/main (skip merge) ==" -ForegroundColor DarkGray
     }
 
-    Write-Host "== AO-RESUME on $FeatureBranch ==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $aoResume
-    if ($LASTEXITCODE -ne 0) {
-        throw "AO-RESUME on $FeatureBranch failed (exit $LASTEXITCODE)."
+    if (-not $SkipAoResume) {
+        Write-Host "== AO-RESUME on $FeatureBranch ==" -ForegroundColor Cyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $aoResume
+        if ($LASTEXITCODE -ne 0) {
+            throw "AO-RESUME on $FeatureBranch failed (exit $LASTEXITCODE)."
+        }
+    } else {
+        Write-Host "== SkipAoResume: on $FeatureBranch (no nested ao-resume) ==" -ForegroundColor DarkGray
     }
 
     if ($PushFeature) {

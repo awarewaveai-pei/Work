@@ -7,7 +7,13 @@ param(
     [switch]$AllowStashBeforePull,
     [switch]$AllowPendingStash,
     [switch]$SkipWorkflowsDeps,
-    [switch]$SkipOpenTasksList
+    [switch]$SkipOpenTasksList,
+    # 與 GitHub 主線對齊：`fetch` → `checkout main` → `reset --hard origin/main` → 切回功能分支並 `merge origin/main`（若需要）。**不**與 Autopilot（`-SkipStrictEnvironmentAudit`）併用。關鍵字 **AO-RESUME** 由 `.cursor/rules/30-resume-keyword.mdc` 預設傳此旗標。
+    [switch]$FullMainlineParity,
+    [string]$FullMainlineFeatureBranch = "fix/trigger-clickhouse-oom",
+    [switch]$FullMainlinePushFeature,
+    [switch]$FullMainlineMainOnly,
+    [switch]$FullMainlineAllowStash
 )
 
 Set-StrictMode -Version Latest
@@ -88,6 +94,40 @@ $rulesConsistencyExit = Assert-AoResumeRuleConsistency -Root $WorkRoot
 if ($rulesConsistencyExit -ne 0) {
     Show-AoResumeQuickFix -Step "rules-consistency" -ExitCode $rulesConsistencyExit
     exit $rulesConsistencyExit
+}
+
+# Optional: hard-reset local main to origin/main, then ensure feature branch contains main (no nested ao-resume — we run once below).
+if ($FullMainlineParity) {
+    if ($SkipStrictEnvironmentAudit) {
+        Write-Host "== AO-RESUME: -FullMainlineParity ignored with -SkipStrictEnvironmentAudit (Autopilot / lightweight path) ==" -ForegroundColor DarkYellow
+    } else {
+        $alignScript = Join-Path $WorkRoot "scripts\git-align-main-aoresume-feature.ps1"
+        if (-not (Test-Path -LiteralPath $alignScript)) {
+            Write-Error "ao-resume: missing $alignScript (required for -FullMainlineParity)."
+            exit 1
+        }
+        Write-Host "== AO-RESUME: FullMainlineParity (git align via git-align-main-aoresume-feature.ps1 -SkipAoResume) ==" -ForegroundColor Cyan
+        $alignArgs = @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", $alignScript,
+            "-WorkRoot", $WorkRoot,
+            "-SkipAoResume"
+        )
+        if ($FullMainlineMainOnly) {
+            $alignArgs += "-SkipFeature"
+        } else {
+            $alignArgs += "-FeatureBranch", $FullMainlineFeatureBranch
+        }
+        if ($FullMainlinePushFeature) { $alignArgs += "-PushFeature" }
+        $alignStash = $FullMainlineAllowStash -or $AllowStashBeforePull -or $AllowUnexpectedDirty
+        if ($alignStash) { $alignArgs += "-AllowStash" }
+        & powershell.exe @alignArgs
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "ao-resume: FullMainlineParity git align failed (exit $LASTEXITCODE). Fix dirty tree or pass -FullMainlineAllowStash / -AllowUnexpectedDirty."
+            exit $LASTEXITCODE
+        }
+    }
 }
 
 # Refresh snapshot before git preflight so AO-RESUME / agents still see current TASKS.md

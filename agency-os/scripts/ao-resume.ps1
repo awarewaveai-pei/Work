@@ -6,7 +6,12 @@ param(
     [switch]$AllowStashBeforePull,
     [switch]$AllowPendingStash,
     [switch]$SkipWorkflowsDeps,
-    [switch]$SkipOpenTasksList
+    [switch]$SkipOpenTasksList,
+    [switch]$FullMainlineParity,
+    [string]$FullMainlineFeatureBranch = "fix/trigger-clickhouse-oom",
+    [switch]$FullMainlinePushFeature,
+    [switch]$FullMainlineMainOnly,
+    [switch]$FullMainlineAllowStash
 )
 
 Set-StrictMode -Version Latest

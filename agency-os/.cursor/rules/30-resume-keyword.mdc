@@ -8,8 +8,8 @@ alwaysApply: true
 When the user message contains `AO-RESUME`, before proposing any new implementation:
 
 1. **開工單一路徑（關鍵字 `AO-RESUME`＝跑正本腳本）**  
-   - **Agent 必做**：在可執行終端時，於 **monorepo 根**（`git rev-parse --show-toplevel`）執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**。  
-     **預設行為**（勿再加「第二套」完整檢查）：`fetch`；**僅 behind>0** 時 `git pull --ff-only origin main`；**`verify-build-gates`**；workflows 依賴；**`print-open-tasks`**；**`machine-environment-audit -FetchOrigin -Strict`**（見 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1**）。與 **`align-workstation.ps1`** 同行為。  
+   - **Agent 必做**：在可執行終端時，於 **monorepo 根**（`git rev-parse --show-toplevel`）執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1 -FullMainlineParity`**（**必含** `-FullMainlineParity`：先 **`git-align-main-aoresume-feature.ps1 -SkipAoResume`** 對齊本機 **`main`=`origin/main`** 並切回 **`fix/trigger-clickhouse-oom`** 必要時 **`merge origin/main`**，再跑原本一輪開工；見 **`REMOTE_WORKSTATION_STARTUP.md` §2.5.1**）。  
+     **同一輪腳本內後續**（勿再加「第二套」完整檢查）：`fetch`（對齊段已 fetch 仍會再跑）；**僅 behind>0** 時 `git pull --ff-only origin main`；**`verify-build-gates`**；workflows 依賴；**`print-open-tasks`**；**`machine-environment-audit -FetchOrigin -Strict`**（見 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1**）。**不帶** `-FullMainlineParity` 時與 **`align-workstation.ps1`** 同行為（僅 preflight 軟對齊）。  
    - **僅在 exit code 0 後**，再進行本規則第 2 步讀檔與第 3 步回覆；**exit 非 0** 時依終端輸出處置（髒樹／衝突／Strict 缺項），**不得**宣稱已與 GitHub 對齊可開工大改。  
    - **待辦快照（與終端同源）**：`ao-resume.ps1` 預設在 **git preflight 之前**即跑 **`print-open-tasks`**，寫入 **`agency-os/.agency-state/open-tasks-snapshot.md`**（gitignore）。因此 **preflight 失敗（exit≠0）時，時間戳仍應接近本次執行**；待辦條目以該檔與 **`agency-os/TASKS.md`** 對齊為準。**第 2 步讀檔時必 Read 該檔**（若不存在則以 **`agency-os/TASKS.md`** 為準），用 **Total open** 與分段內容核對。**exit≠0 時不得**宣稱已完成 fetch／閘道／Strict 等後段步驟。  
    - **無法執行終端**：改為手動 `git fetch` + `git status -sb` + `git rev-list --left-right --count HEAD...origin/main`；**behind>0** 時請使用者 **`git pull --ff-only origin main`**（必要時 **`git pull --rebase origin main`**），並在回覆標註「未跑完整 `ao-resume.ps1`」。  
