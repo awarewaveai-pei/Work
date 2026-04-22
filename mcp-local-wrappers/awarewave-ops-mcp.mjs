@@ -39,12 +39,17 @@ const services = {
   grafana: {
     label: "Grafana API",
     baseUrlEnv: "GRAFANA_BASE_URL",
-    auth: { type: "bearer", tokenEnv: "GRAFANA_SERVICE_ACCOUNT_TOKEN" }
+    auth: {
+      type: "basic_or_bearer",
+      tokenEnv: "GRAFANA_SERVICE_ACCOUNT_TOKEN",
+      userEnv: "GRAFANA_BASIC_USER",
+      passwordEnv: "GRAFANA_BASIC_PASSWORD"
+    }
   },
   netdata: {
     label: "Netdata API",
     baseUrlEnv: "NETDATA_BASE_URL",
-    auth: { type: "bearer", tokenEnv: "NETDATA_API_TOKEN" }
+    auth: { type: "optional_bearer", tokenEnv: "NETDATA_API_TOKEN" }
   },
   slack: {
     label: "Slack Web API",
@@ -121,6 +126,10 @@ function getServiceConfig(name) {
 
   if (auth.type === "bearer") {
     authConfigured = !!readEnv(auth.tokenEnv);
+  } else if (auth.type === "optional_bearer") {
+    authConfigured = true;
+  } else if (auth.type === "basic_or_bearer") {
+    authConfigured = !!readEnv(auth.tokenEnv) || (!!readEnv(auth.userEnv) && !!readEnv(auth.passwordEnv));
   } else if (auth.type === "supabase") {
     authConfigured = !!readEnv(auth.apiKeyEnv) && !!readEnv(auth.bearerEnv);
   }
@@ -136,6 +145,24 @@ function buildHeaders(serviceConfig, extraHeaders = {}) {
     const token = readEnv(auth.tokenEnv);
     if (!token) throw new Error(`Missing required env var: ${auth.tokenEnv}`);
     headers.Authorization = `Bearer ${token}`;
+  } else if (auth.type === "optional_bearer") {
+    const token = readEnv(auth.tokenEnv);
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  } else if (auth.type === "basic_or_bearer") {
+    const token = readEnv(auth.tokenEnv);
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    } else {
+      const user = readEnv(auth.userEnv);
+      const password = readEnv(auth.passwordEnv);
+      if (!user || !password) {
+        throw new Error(`Missing required env vars: ${auth.tokenEnv} or (${auth.userEnv}, ${auth.passwordEnv})`);
+      }
+      const basic = Buffer.from(`${user}:${password}`, "utf8").toString("base64");
+      headers.Authorization = `Basic ${basic}`;
+    }
   } else if (auth.type === "supabase") {
     const apiKey = readEnv(auth.apiKeyEnv);
     const bearer = readEnv(auth.bearerEnv);
