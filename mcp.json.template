@@ -185,6 +185,21 @@
       "env": {
         "TRIGGER_API_URL": "https://YOUR_TRIGGER_PUBLIC_ORIGIN"
       }
+    },
+    "supabase-postgres": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "${SUPABASE_POSTGRES_MCP_DSN}"
+      ],
+      "env": {
+        "SUPABASE_URL": "${SUPABASE_URL}",
+        "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}",
+        "SUPABASE_SERVICE_ROLE_KEY": "${SUPABASE_SERVICE_ROLE_KEY}"
+      }
     }
   }
 }

@@ -1,0 +1,81 @@
+# Optional stack: Loki (logs) + Promtail (ship) + Grafana (query).
+# Bind to loopback only — reach via SSH tunnel: ssh -L 3009:127.0.0.1:3009 hetzner
+#
+# Deploy (on VPS, from this directory):
+#   cp observability/env.observability.example observability/.env.observability   # optional
+#   docker compose --env-file observability/.env.observability -f docker-compose.observability.yml up -d
+#
+# Docs: agency-os/docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md
+
+x-logging: &obs-logging
+  driver: json-file
+  options:
+    max-size: "25m"
+    max-file: "3"
+
+services:
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: lobster-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/config.yml
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - loki_data:/loki
+      - ./observability/loki-config.yml:/etc/loki/config.yml:ro
+    networks:
+      - observability
+    logging: *obs-logging
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: lobster-promtail
+    restart: unless-stopped
+    depends_on:
+      - loki
+    command: -config.file=/etc/promtail/config.yml -config.expand-env=true
+    environment:
+      - HOST_LABEL=${OBSERVABILITY_HOST_LABEL:-hetzner-phase1}
+    volumes:
+      - ./observability/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+    networks:
+      - observability
+    logging: *obs-logging
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: lobster-grafana-obs
+    restart: unless-stopped
+    depends_on:
+      - loki
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-immediately}
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://127.0.0.1:3009}
+      # Replace empty "Welcome to Grafana" home (separate mount from file-provisioned dashboards to avoid uid clash).
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards-home/aw-obs-home.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      # Unified Alerting (contact points / policies under provisioning/alerting/)
+      GF_ALERTING_ENABLED: "true"
+    ports:
+      - "127.0.0.1:3009:3000"
+    volumes:
+      - grafana_obs_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./observability/grafana/dashboards-home:/etc/grafana/dashboards-home:ro
+    networks:
+      - observability
+    logging: *obs-logging
+
+volumes:
+  loki_data:
+  grafana_obs_data:
+
+networks:
+  observability:
+    driver: bridge

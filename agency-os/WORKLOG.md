@@ -2,6 +2,52 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-22
+
+### Monorepo 觀測與 MCP 啟動器收斂（已推送 `origin/main`）
+- 將先前未提交之 observability／Hetzner sync／`run-postgres-mcp.ps1`／`mcp.json.template`／`cursor-mcp-and-plugin-inventory` 等 **37 檔**收斂為單一 commit **`32c3c85`**（`[cursor] feat(observability): stack, sync scripts, postgres MCP wrapper`），並 **`git push origin main`**；遠端一併納入先前僅在本機之 **`d6dbb05`**（`[codex] feat(observability): wire uptime heartbeat and log alert rollout`）。
+- **`main`** 已 **`git branch -u origin/main`**，後續 **`git status`** 可直讀與 **`origin/main`** 之 ahead/behind。
+- Push 前 **`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -LobsterOnly`** → **ALL PASSED**。
+- 本日 **`TASKS.md`** 開放項無單一條目可宣告 **Enterprise Phase 1** 或 **三檔治理巡檢** 全 DoD；**未**新增 **`AUTO_TASK_DONE`**（避免誤勾）。
+
+### Uptime Kuma／Netdata／Slack 告警實機驗證與去重
+
+- **Netdata → Slack drill**：已 SSH 到 Hetzner 執行 `/usr/local/bin/slack-alert-drill.sh`；兩則 webhook 測試皆回 `200 ok`，Netdata 官方 `alarm-notify.sh test` 之 `WARNING` / `CRITICAL` / `CLEAR` 三段告警亦成功送出。
+- **現況盤點（實機，不只看文件）**：
+  - `Cloudflare`：`aware-wave.com` zone 為 `active`；`ssl=full`、`always_use_https=on`、`browser_check=on`；已見 Managed Ruleset + Custom WAF Rules 與 3 條自訂 firewall rules。
+  - `Sentry`：容器實際帶 DSN 者為 `node-api`、`next-admin`、`wordpress`；`trigger-supervisor` 與 `n8n` 未見 Sentry env。`next-admin` 對外 `GET /admin/api/sentry-test` 當時回 `404`，代表 smoke route 與實際部署仍有落差。
+  - `PostHog`：雲端 project 存在，但當前僅見 sample insight / 自動事件；`next-admin` 容器的 `NEXT_PUBLIC_POSTHOG_KEY` 仍為空，typed `track()` registry 尚未在介面實際呼叫，故真實 funnel 仍缺。
+- **Uptime Kuma（只走 UI/API，不直寫 DB）**：
+  - 以 Kuma socket API 建立 13 筆 monitor：6 筆 public HTTP、6 筆 SSL expiry、1 筆 `endpoint-alert-heartbeat`。
+  - 既有 Slack notification（ID `1`，Slack）已先綁定全部 23 筆 monitor，之後為避免與 `endpoint-alert.sh` 對同一 public outage 雙重轟炸，再將新建的 6 筆 public HTTP monitor 自 Kuma Slack 移除，只保留 `endpoint-alert.sh` 告警；Kuma 繼續負責 6 筆 SSL 與 1 筆 heartbeat 的 Slack。
+  - 最終狀態：`monitor_notification` 已驗證為 `11..16` 無 Slack、`17..23` 仍綁 `notification_id=1`；舊有 `1..10` monitor 仍綁 Slack。
+- **Heartbeat 接線**：
+  - repo 正本 `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh` 新增可選 `HEARTBEAT_URL`，僅在「本輪所有 public URL 檢查成功」時送 Kuma push heartbeat。
+  - VPS 已同步新版 `/usr/local/bin/endpoint-alert.sh`，並於 `/etc/default/awarewave-endpoint-alert` 寫入 `HEARTBEAT_URL`；`awarewave-endpoint-alert.service` 手動執行 `status=0/SUCCESS`，`awarewave-endpoint-alert.timer` 維持 `active`。
+  - Uptime Kuma `endpoint-alert-heartbeat` 已收第一筆 `OK` heartbeat，前幾筆 `No heartbeat in the time window` 為接線前正常歷史。
+- **殘留風險**：Uptime Kuma `error.log` 仍有舊 monitor 的 `accepted_statuscodes_json` 解析錯誤（歷史資料格式問題，不是本輪新建 monitor 所致）；後續宜於 UI 將該舊 monitor 重新存一次，避免列表/統計時偶發報錯。
+
+### Supabase 完整暴露與 AI 控制設定（Claude 執行）
+
+- **目標**：讓自架 Supabase 可被 Claude、Cursor、Codex 完整操作，並提供人類 Studio UI 入口。
+- **Cloudflare DNS**：新增 A records（DNS-only，gray cloud）`supabase.aware-wave.com` → `5.223.93.113`、`studio.aware-wave.com` → `5.223.93.113`。
+- **nginx**：新增 `infra/hetzner-phase1-core/nginx/system-sites/supabase-subdomains.conf`，`supabase.aware-wave.com` → Kong API `127.0.0.1:8000`（JWT 保護）；`studio.aware-wave.com` → Studio `127.0.0.1:3000`（basic auth 憑證僅存 VPS／vault，**不入庫**）。部署至 VPS `/etc/nginx/sites-available/` 並 symlink 啟用。
+- **SSL**：`certbot certonly --nginx -d supabase.aware-wave.com -d studio.aware-wave.com`，有效至 2026-07-20，自動續約。
+- **Supabase API_EXTERNAL_URL**：`/root/supabase/docker/.env` 由 `http://localhost:8000` 改為 `https://supabase.aware-wave.com`；重啟 kong + studio。
+- **SSH tunnel script**：新增 `scripts/open-supabase-ssh-tunnel.ps1`，一次轉發 postgres:5432、studio:3000、kong:8000；`-Background` 模式會 probe 並在失敗時 exit 1（bug fix 也同步入庫）。
+- **MCP**：`supabase-postgres`（`@modelcontextprotocol/server-postgres` via localhost:5432）之連線與 **Supabase API keys** 只許以 **本機環境變數**／vault 提供；**不得**寫入 git 可追蹤檔（見同日 **§安全修補**）。
+- **驗證**：`https://supabase.aware-wave.com/rest/v1/` → HTTP 401（Kong JWT 保護正常）；`https://studio.aware-wave.com/` → HTTP 401（basic auth 正常）。
+- **AI 操控方式**：REST API 直打 `https://supabase.aware-wave.com` + Service Role Key（由 vault／環境注入，**不入庫**）；SQL 直連需先跑 tunnel script；MCP **`supabase-postgres`** 經 **`scripts/run-postgres-mcp.ps1`** 讀 **`SUPABASE_POSTGRES_MCP_DSN`**（**勿**依賴 `args` 內 `${…}` 展開）。
+
+### 安全修補（`.mcp.json`／Codex／tunnel 腳本）
+- **問題**：根 **`.mcp.json`** 曾被索引且含 **JWT／postgres DSN**；`scripts/open-supabase-ssh-tunnel.ps1` 註解與提示曾含 **DB 密碼**；`WORKLOG` 同日上文曾含 Studio basic auth 明文（已改為「僅 VPS／vault」敘述）。
+- **處置**：**`git rm --cached`** `.mcp.json`、`.codex/config.toml`（兩者已在 repo 根 **`.gitignore`**）；工作區 `.mcp.json` 改經 **`run-postgres-mcp.ps1`** 讀 **`SUPABASE_POSTGRES_MCP_DSN`**／**`SUPABASE_*`** 環境變數；腳本改為不含密文；新增 **`.codex/config.toml.example`**、**`.codex/README.md`**；**`mcp.json.template`** 補 **supabase-postgres** 占位；**`security-secrets-policy.md`** 補誤提交後須 **輪替密鑰** 與可選清史。**若曾 push 含密文之 commit，仍須視為外洩**：輪替 Supabase **JWT secret**、**anon/service keys**、**postgres 密碼**（主防線）。
+
+### 營運決策：取消預設採用 Clerk（IdP）
+- **決策**：**不**在 Phase 1／Enterprise 路線強制導入 **Clerk**。日後若要第三方應用層 IdP 再 **新開任務** 並可另發 **新 ADR**（Clerk、Auth0、WorkOS 等）。
+- **文件**：**ADR 002** 修訂；**ADR 006** 補註（RLS／JWT 原則不變；`clerk_org_id` 等為相容命名）；**`TASKS.md`**（`（工具建置）Clerk…` 歸檔已完成＋Enterprise／Backlog 敘述同步）；**`TOOLS_DELIVERY_TRACEABILITY.md`**（能力表、P6、追溯列）；**`PROGRAM_TIMELINE.md`**（OP-2、LF-C54）；**`EXECUTION_DASHBOARD.md`**。
+- **備註**：DB migration **`0010_clerk_org_mapping_and_rls_expansion.sql`** 檔名與函式名保留；語意見 **ADR 006**。
+
 ## 2026-04-21
 
 ### Hetzner／安全與觀測（事後與文件）
@@ -9,6 +55,29 @@
 - **與 WordPress 內容無關**：公開站是否已有文章不影響主機層挖礦或 DB 被掃描；警報反映整機資源。
 - **文件**：`knowledge/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` 已自 `runbooks/` 對齊還原，**knowledge 版已去識別化**機敏欄位；事變補充見 **`runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md`**。`runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` 若仍含歷史明文，宜收斂至 vault 並改占位。
 - **WORKLOG**：本日起新日期置頂；**`## 2026-04-20`** 自檔尾上移至此前，避免「最新像停在 4/18」。
+
+### 事故復盤：`uptime.aware-wave.com` Cloudflare 502（Host Error）
+- **根因**：系統 Nginx 的 `uptime.aware-wave.com` upstream 仍指向 `127.0.0.1:3003`，但實際 `uptime-kuma` 服務在 `3050`（容器 `UPTIME_KUMA_PORT=3050`）；導致 Nginx `connect() failed (111: Connection refused)`，Cloudflare 對外回 502。
+- **修復**：VPS `sites-available/uptime` upstream 改為 `127.0.0.1:3050`，`nginx -t` + `systemctl reload nginx`；同步將 `n8n` 反代由 `localhost:5678` 固定為 `127.0.0.1:5678`（避免 IPv6 `::1` 偶發拒連）。
+- **告警補強（避免再 silent failure）**：
+  - 新增 `scripts/public-endpoint-smoke.ps1`，並接入 `scripts/verify-build-gates.ps1`（含 `agency-os/scripts` 鏡像）。
+  - 新增 VPS 每分鐘端點檢查：`/usr/local/bin/endpoint-alert.sh` + `awarewave-endpoint-alert.service` + `awarewave-endpoint-alert.timer`，異常/恢復送 Slack。
+  - Netdata 補 `health_alarm_notify.conf`（Slack 通道已驗證 `200`）。
+- **補丁（env 檔格式）**：`/etc/default/awarewave-endpoint-alert` 的 `CHECK_URLS` 必須整段加引號（含空白 URL 清單），否則 `source` 會被拆詞誤判為指令；已修正並以 `slack-webhook-selftest.sh` 驗證 Slack 回 `200 ok`。
+- **輪替指引（不入庫密鑰）**：新增 monorepo `scripts/sync-hetzner-slack-alert-webhooks.ps1`（從本機 vault 讀 `AGENCY_OS_SLACK_WEBHOOK_URL`，同步寫入 VPS `/etc/default/awarewave-endpoint-alert` + `/etc/netdata/health_alarm_notify.conf` 並重啟 netdata；Webhook URL **不得**貼進聊天或 git）。
+- **驗證**：外網 `https://uptime.aware-wave.com/dashboard` 連續回 `200`；`public-endpoint-smoke.ps1` 全數 PASS（uptime/app/api/n8n）；timer 狀態 `active (waiting)`。
+- **P1/P2 觀測 rollout（repo）**：新增 [`docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md`](docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md)（PagerDuty 可選、`scripts/sync-hetzner-pagerduty-endpoint-alert.ps1`、外部探測／Loki／SLO 驗收清單）；`endpoint-alert.sh` 修正 **首次執行誤發「恢復」**、HTTP 判斷改為 **2xx/3xx**、可選 **PD Events API trigger/resolve**；`awarewave-endpoint-alert.service` 增載可選 `awarewave-endpoint-alert.pagerduty`；可選 **`docker-compose.observability.yml`**（Loki + Promtail + Grafana，僅 `127.0.0.1`）。
+- **P1/P2 觀測 rollout（VPS 實作）**：已 **SSH 部署** 更新後之 `endpoint-alert.sh`、`awarewave-endpoint-alert.service`（含可選 PD env）；`/root/lobster-phase1` 啟動 **Loki + Promtail + Grafana**（`127.0.0.1:3100` / `:3009`），`observability/.env.observability` 由 `deploy-observability-vps.sh` 產生（**Grafana admin 密碼僅在該檔**，請 SSH 查看勿外洩）；Promtail 預設 **nginx + syslog**（避免 Docker 全量回溯灌爆 Loki）；已重跑 **`sync-hetzner-slack-alert-webhooks.ps1`**；本機 **`public-endpoint-smoke`** 全 PASS。**PagerDuty**：vault 尚無 `PAGERDUTY_ROUTING_KEY_ENDPOINT_ALERT`，已以 `-SkipIfMissing` 略過；補鍵後執行 `sync-hetzner-pagerduty-endpoint-alert.ps1`。**外部多地探測**（Better Stack / UptimeRobot）需帳號控制台手動建立，見正本 §P1。
+- **觀測「不會做」補救包**：新增繁中逐步 **[`docs/operations/OBSERVABILITY_FIRST_TIME_SETUP_ZH.md`](docs/operations/OBSERVABILITY_FIRST_TIME_SETUP_ZH.md)**（PD、UptimeRobot/Better Stack、Grafana tunnel、n8n 週報）；**`scripts/open-grafana-ssh-tunnel.ps1`**；n8n 匯入 **`lobster-factory/infra/n8n/exports/slo-weekly-slack-probe.json`** + **`README-SLO-WEEKLY.md`**。
+- **Grafana 通知完善**：新增 **`scripts/sync-hetzner-grafana-alerting-slack.ps1`**（vault → VPS `provisioning/alerting/awarewave-slack-contact-and-policy.yaml` + 修正目錄權限避免容器 `permission denied`）；Loki datasource 佈建補 **`uid: loki`**；`docker-compose.observability.yml` 設 **`GF_ALERTING_ENABLED`**；已於 VPS 執行同步並驗證 provisioning 無錯誤。
+
+### 工具建置收斂（Secrets / PostHog / Cloudflare / npm audit）
+- Secrets 治理：`.mcp.json`、`.codex/config.toml` 移出 git tracking，並加入 `.gitignore`。
+- PostHog 事件基線：`providers.tsx` 完成 session recording 與 exception capture；建立 typed events registry 與 `track()` 封裝。
+- Cloudflare WAF：透過 API 套用 SSL Full、Always HTTPS、Browser Check、Managed Ruleset 與自訂阻擋規則（`xmlrpc`/`.env`/`.git`）。
+- `npm audit`：Critical 清零（`protobufjs` 修補完成）；剩餘 High 為 `@trigger.dev` 上游依賴風險，當前無不破壞相容的本地修法。
+- **AUTO_TASK_DONE**：`（工具建置）Secrets 治理升級`；`（工具建置）PostHog 事件基線`；`（工具建置）Cloudflare 邊界保護`；`lobster-factory/packages/workflows` `npm audit`。
+- **2026-04-22**：併入本日區塊（移除檔案後段重複 `## 2026-04-21` 標題）；**`TOOLS_DELIVERY_TRACEABILITY.md`** 平台能力表與 P1／P4／P5 列與 **`TASKS.md`** `[x]` 對齊。
 
 ## 2026-04-20
 
@@ -633,7 +702,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-21 09:30:14 UTC_
+_Last synced: 2026-04-21 18:35:02 UTC_
 
 ## 2026-03-20
 
@@ -1061,5 +1130,10 @@ _Last synced: 2026-04-21 09:30:14 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
+
+
+
+
 
 

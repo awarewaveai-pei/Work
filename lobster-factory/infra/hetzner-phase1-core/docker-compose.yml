@@ -1,8 +1,14 @@
-# Phase 1 — production-oriented: multi-stage builds for Node apps, healthchecks, Nginx gates on app readiness.
+# Phase 1 — production-oriented: multi-stage builds for Node apps, healthchecks.
 # Supabase is external; set SUPABASE_* in .env.
 #
+# Routing: System Apache2 handles ports 80/443 (NOT Docker nginx).
+#   Apache vhosts live in: infra/hetzner-phase1-core/apache/sites-available/
+#   Deploy with: sudo cp apache/sites-available/*.conf /etc/apache2/sites-available/
+#                sudo a2ensite <name> && sudo systemctl reload apache2
+#
 # Build & run: docker compose --env-file .env build --no-cache && docker compose --env-file .env up -d
-# After changing NEXT_PUBLIC_*: rebuild next-admin (baked at build time).
+# Deploy update: ./deploy.sh [service-name]
+# After changing NEXT_PUBLIC_*: rebuild next-admin (baked at build time): ./deploy.sh next-admin
 #
 # Long-run: image pin policy, backups, DR drills — see LONG_TERM_OPS.md (Owner).
 # Log rotation via json-file limits avoids filling disk over years of uptime.
@@ -14,29 +20,6 @@ x-logging: &lobster-logging
     max-file: "5"
 
 services:
-  nginx:
-    image: nginx:stable
-    container_name: lobster-nginx
-    restart: unless-stopped
-    depends_on:
-      node-api:
-        condition: service_healthy
-      next-admin:
-        condition: service_healthy
-      wordpress:
-        condition: service_healthy
-      n8n:
-        condition: service_healthy
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/cloudflare-real-ip.conf:/etc/nginx/conf.d/00-cloudflare-real-ip.conf:ro
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/trigger.conf:/etc/nginx/conf.d/trigger.conf:ro
-    networks:
-      - lobster-net
-    logging: *lobster-logging
-
   redis:
     image: redis:7-alpine
     container_name: lobster-redis
@@ -192,6 +175,7 @@ services:
       start_period: 25s
     networks:
       - lobster-net
+      - supabase_default
     logging: *lobster-logging
 
   next-admin:
@@ -227,7 +211,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://127.0.0.1:3000/admin/ > /dev/null || exit 1"
+          "wget -qO- http://127.0.0.1:3000/ > /dev/null || exit 1"
         ]
       interval: 15s
       timeout: 5s
@@ -239,6 +223,8 @@ services:
 
 networks:
   lobster-net:
+    external: true
+  supabase_default:
     external: true
 
 volumes:

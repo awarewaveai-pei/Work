@@ -1,0 +1,48 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "datasource", "uid": "-- Grafana --" },
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "content": "用規則式粗篩 **可能**與登入、權限、錯誤有關的行；請依你實際 syslog 格式微調 `|~`。",
+        "mode": "markdown"
+      },
+      "title": "說明",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 17, "w": 24, "x": 0, "y": 4 },
+      "id": 2,
+      "options": { "dedupStrategy": "none", "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "{job=\"syslog\"} |~ \"(?i)(sshd|sudo|fail|error|crit|alert)\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Syslog 粗篩（安全／錯誤向）",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["awarewave", "loki", "syslog"],
+  "templating": { "list": [] },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AwareWave Syslog 速查",
+  "uid": "aw-obs-syslog-triage",
+  "version": 1
+}

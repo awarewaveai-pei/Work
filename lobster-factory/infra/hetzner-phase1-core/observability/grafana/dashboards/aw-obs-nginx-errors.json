@@ -1,0 +1,48 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "datasource", "uid": "-- Grafana --" },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "content": "## Nginx 4xx / 5xx（關鍵字過濾）\n依 **access log 格式** 調整 `|~` 規則式；若格式不同可能查不到。",
+        "mode": "markdown"
+      },
+      "title": "說明",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 5 },
+      "id": 2,
+      "options": { "dedupStrategy": "none", "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "{job=\"nginx\"} |~ \" (4[0-9][0-9]|5[0-9][0-9]) \"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Nginx 可能異常狀態碼",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["awarewave", "loki", "nginx"],
+  "templating": { "list": [] },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AwareWave Nginx 錯誤速查",
+  "uid": "aw-obs-nginx-errors",
+  "version": 1
+}

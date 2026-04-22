@@ -1,0 +1,139 @@
+{
+  "name": "slo-weekly-slack-probe",
+  "active": false,
+  "versionId": "1",
+  "meta": {
+    "description": "Weekly HTTP probe of public endpoints + Slack summary (minimal SLO signal).",
+    "owner": "agency-os",
+    "environment": "staging-or-prod",
+    "setup": "Fill slackWebhookUrl in Set node; activate; test with Manual Trigger."
+  },
+  "nodes": [
+    {
+      "id": "manualTrigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {}
+    },
+    {
+      "id": "scheduleWeekly",
+      "name": "Weekly Mon 01:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 480],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 1 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "setWebhook",
+      "name": "Set Slack webhook + optional note",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [520, 380],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "slackWebhookUrl",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "name": "runNote",
+              "value": "Replace slackWebhookUrl with your Slack Incoming Webhook (do not commit).",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "probeCode",
+      "name": "Probe endpoints + build summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 380],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first().json;\nconst webhook = String(item.slackWebhookUrl || '').trim();\nif (!webhook) {\n  throw new Error('Set slackWebhookUrl in the previous node (Slack Incoming Webhook URL).');\n}\nconst pairs = [\n  ['uptime', 'https://uptime.aware-wave.com/dashboard'],\n  ['app', 'https://app.aware-wave.com/'],\n  ['api', 'https://api.aware-wave.com/health'],\n  ['n8n', 'https://n8n.aware-wave.com/healthz'],\n];\nconst rows = [];\nfor (const [name, url] of pairs) {\n  let code = 200;\n  let err = '';\n  try {\n    await this.helpers.httpRequest({ method: 'GET', url, timeout: 15000 });\n  } catch (e) {\n    code = 599;\n    err = String(e.message || e).slice(0, 240);\n  }\n  const ok = code >= 200 && code < 400;\n  rows.push({ name, url, code, ok, err });\n}\nconst lines = rows.map((r) => {\n  const mark = r.ok ? 'OK' : 'FAIL';\n  return mark + ' ' + r.name + ' ' + r.code + ' ' + r.url;\n});\nconst summary = '*SLO weekly probe* (UTC ' + new Date().toISOString() + ')\\n' + lines.join('\\n');\nreturn [{ json: { summary, slackWebhookUrl: webhook, rows } }];"
+      }
+    },
+    {
+      "id": "postSlack",
+      "name": "Post Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 380],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.slackWebhookUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.summary }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Slack webhook + optional note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Mon 01:00 UTC": {
+      "main": [
+        [
+          {
+            "node": "Set Slack webhook + optional note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Slack webhook + optional note": {
+      "main": [
+        [
+          {
+            "node": "Probe endpoints + build summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probe endpoints + build summary": {
+      "main": [
+        [
+          {
+            "node": "Post Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
