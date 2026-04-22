@@ -8,17 +8,20 @@ alwaysApply: true
 **`AO-CLOSE` 關鍵字與收工回覆格式（今日完成／未完成／連動檢查／明日優先）維持不變。**  
 目標：使用者收工前打 `AO-CLOSE` 後，**本機通過完整閘道、產出報告、並推上 GitHub**，公司電腦 **`git pull` 即得完整可續接狀態**（含龍蝦治理 + Agency 連動 + 綜合狀態檔）。
 
+**使用者仍只打 `AO-CLOSE`（或同等收工意圖）即可；不必改口說「先合併 inbox」**——**收關代理**須自動做完下方 **第 1 步**（進度檔，**含**多代理時讀取並消化 `closeout-inbox.md`）再跑 **第 2 步** `ao-close.ps1`。
+
 **預設操作者模型**：流程與檔案寫入**由 AI 代理執行**；規則下文「代理必須…」即對本輪代理的硬性要求。
 
 **`AO-CLOSE` 關鍵字 = 內含授權（無須再加一句口頭指令）**：使用者只須打 **`AO-CLOSE`**（或「收工／關機」等同等意圖），等同要求代理在跑 **`ao-close.ps1` 之前**已做完：併讀 **`TASKS.md`** 尚未 `- [x]` 之項、**當輪對話中可驗證之完成事實**（＋必要時先跑／對照 **`scripts/print-today-closeout-recap.ps1`** 輸出），對**每一項本輪已達 DoD** 者在 **`WORKLOG.md`** 當日 **`## yyyy-MM-dd`** 下補 **`- AUTO_TASK_DONE: <唯一子字串>`**。**禁止**要求使用者再打字如「照對話全寫進 AUTO_TASK_DONE」才動手。  
 - 若證據不足、無法判定是否完成：**只問一個**針對性確認題；仍由代理代寫 **`AUTO_TASK_DONE`**（或明示留待下一輪），**不要求**使用者親編 WORKLOG 機器行。
 
-**多代理（並行 4–5 個 AI）**：**唯一收關者**跑 **`ao-close.ps1`**；其餘代理**不**同時改 `WORKLOG.md`／`memory/CONVERSATION_MEMORY.md`／`TASKS.md` 當日定稿——只往 **`agency-os/.agency-state/closeout-inbox.md`**（gitignore）append 素材（對話標記、完成一句、commit／路徑）。收關者合併後再進下方第 1 步。長 commit 用 **`-CommitMessageFile`**（見 **`docs/operations/end-of-day-checklist.md` §0.5**）。**給非 Cursor 協作 AI 的全文規則**：**`docs/operations/collaborator-ai-agent-rules.md`**（可貼進 Codex／他工具）；本機無 inbox 時 **`scripts/init-closeout-inbox.ps1`**（monorepo 根）。
+**多代理（並行 4–5 個 AI）**：**唯一收關者**跑 **`ao-close.ps1`**；其餘代理**不**同時改 `WORKLOG.md`／`memory/CONVERSATION_MEMORY.md`／`TASKS.md` 當日定稿——只往 **`agency-os/.agency-state/closeout-inbox.md`**（gitignore；工作區根僅 `agency-os` 時為 **`.agency-state/closeout-inbox.md`**）append 素材（對話標記、完成一句、commit／路徑）。**收關者在第 1 步**寫入 WORKLOG／memory／daily／`AUTO_TASK_DONE` 時，**須一併讀取並消化**該 inbox（若存在）；**push 成功後**清空或刪除 inbox，避免隔夜誤用。**無** inbox 時第 1 步仍照常。長 commit 用 **`-CommitMessageFile`**（見 **`docs/operations/end-of-day-checklist.md` §0.5**）。**給非收關協作 AI 的全文規則**：**`docs/operations/collaborator-ai-agent-rules.md`**（Codex／ChatGPT／**非收關之**其他 Cursor 視窗可貼用）；本機無 inbox 時 **`scripts/init-closeout-inbox.ps1`**（monorepo 根）。
 
 When the user indicates end of day or shutdown intent (examples: `AO-CLOSE`,
 "要關機", "收工", "今天先到這"), run this closeout sequence before ending:
 
 1. **First** update progress files (so the next step can commit them):
+   - **協作收件匣（若存在）**：monorepo 根視角為 **`agency-os/.agency-state/closeout-inbox.md`**；工作區根若**僅**為 **`agency-os`** 資料夾則為 **`.agency-state/closeout-inbox.md`**。讀取後將條目併入當日 **`WORKLOG.md`**／**`memory/CONVERSATION_MEMORY.md`**／**`memory/daily/YYYY-MM-DD.md`** 與 **`AUTO_TASK_DONE`** 所需內容（與上文「多代理」一致）；**不得**把 inbox 當唯一紀錄而不寫進版控進度檔。
    - `TASKS.md`（**預設不必手動勾選**：由代理在 **`WORKLOG.md`** 當日區塊寫 **`- AUTO_TASK_DONE: <子字串>`**，**`ao-close`** 內 **`apply-closeout-task-checkmarks`** 自動翻 `- [ ]`→`- [x]`；**見上文：打 AO-CLOSE 即觸發代理代寫，無須使用者加句**）
    - `WORKLOG.md`
    - `memory/CONVERSATION_MEMORY.md`
@@ -28,7 +31,7 @@ When the user indicates end of day or shutdown intent (examples: `AO-CLOSE`,
    `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`
    If `.\scripts\ao-close.ps1` is missing, retry:
    `powershell -ExecutionPolicy Bypass -File .\agency-os\scripts\ao-close.ps1`
-   - **`ao-close.ps1` 內部順序**（與 **`docs/operations/end-of-day-checklist.md`** §1a 一致——自 monorepo 根讀 **`agency-os/docs/operations/end-of-day-checklist.md`**；細節以腳本為準）：
+   - **`ao-close.ps1` 內部順序**（與 Checklist **§1a** 一致；正本 **`agency-os/docs/operations/end-of-day-checklist.md`**；細節以腳本為準）：
      1. **`print-today-closeout-recap`**（`-SkipTodayRecap` 略過）
      2. （未 `-SkipPush`）**`git fetch`**；若落後 **`origin/<目前分支>`** → **中止**（`-AllowPushWhileBehind` 僅例外）
      3. **`verify-build-gates`**（`-SkipVerify` 略過；**不建議**跨機前略過）

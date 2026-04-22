@@ -18,7 +18,7 @@
 
 1. **指定唯一「收關代理」**（同一輪只由一個 Cursor／Claude 對話執行 **§2 的 `ao-close.ps1`**；其餘代理**不跑** `git push`／**不**對上述三檔做最終寫入）。
 2. **其他代理只交「素材」**：在 **`agency-os/.agency-state/closeout-inbox.md`**（**gitignore**，不進版控）用 Markdown 條列：對話 ID／完成項一句／相關 commit hash 或檔案路徑。**禁止**多人同時改 `WORKLOG` 當日區塊當「草稿本」。
-3. **收關代理合併**：讀 `closeout-inbox.md` + 各對話已 merge 的 **code** + `print-today-closeout-recap`，**一次寫** `WORKLOG`（含 `- AUTO_TASK_DONE:`）、`memory`、`daily`；必要時清空或歸檔 inbox。
+3. **收關代理合併（仍由使用者只在收關 Cursor 打 `AO-CLOSE` 觸發；不必另下指令）**：讀協作收件匣（`agency-os/.agency-state/closeout-inbox.md`，工作區根僅 `agency-os` 時為 `.agency-state/closeout-inbox.md`）+ 各對話已 merge 的 **code** +（必要時）`print-today-closeout-recap`，在 **rule 40 第 1 步** **一次寫** `WORKLOG`（含 `- AUTO_TASK_DONE:`）、`memory`、`daily`；**`ao-close.ps1` 成功 push 後**清空或刪除 inbox。
 4. **分支策略（強烈建議）**：並行開發用**不同 branch** 或至少不同 prefix commit；收關前 **`git merge`** / PR 合進當日工作分支，再跑 **`ao-close.ps1`**，降低同檔二頭馬。
 5. **長 commit 訊息**：用 **`-CommitMessageFile path\to\msg.txt`**（UTF-8）取代一行 `-CommitMessage`；`ao-close.ps1` 會在 commit 前擋 **staged diff 含 `<<<<<<<` 衝突標記**。
 6. **協作 AI 規則（給 Codex／其他 Cursor／Claude）**：[collaborator-ai-agent-rules.md](collaborator-ai-agent-rules.md)（內含一鍵貼上區塊）。
@@ -29,6 +29,7 @@
 ### 1a) 一鍵收工 + 推 GitHub（推薦）
 在 **monorepo 根** `<WORK_ROOT>` 執行（**先**依 **`.cursor/rules/40-shutdown-closeout.mdc`** 更新 **`WORKLOG`／`memory/**`**；**`TASKS` 勾選**預設由腳本自 **`WORKLOG`** 的 **`AUTO_TASK_DONE`** 套用。**若記不得今天做了什麼**：腳本開頭會印 **今日 recap**）：
 
+- **使用者**：在**收關** Cursor 對話打 **`AO-CLOSE`** 即可（與單代理相同）。**收關代理**須在執行腳本前完成 rule **第 1 步**（**含**：若存在協作收件匣，讀取並併入進度檔；**勿**僅留 inbox 不寫 WORKLOG／memory）。
 - [ ] `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`
   - 預設順序（詳見腳本與 **`.cursor/rules/40-shutdown-closeout.mdc` 第 2 步**）：**`print-today-closeout-recap`** →（push 模式）**`git fetch`／落後攔截**→ **`verify-build-gates`** → **`system-guard`** → **`generate-integrated-status-report`** → health **100%** 檢查 → **`apply-closeout-task-checkmarks`** → **`git add`／`commit`／`push`**
   - **全程 PASS**：推上後**公司機 `pull` 即完整**
@@ -38,7 +39,7 @@
   - 遠端已超前仍強制 push（**高風險**，僅明示核准）：`-AllowPushWhileBehind`
   - 略過開頭「今日機器摘要」（進階／純 CI）：`-SkipTodayRecap`
   - 略過 **`TASKS` 自動打勾**（緊急除錯用）：`-SkipAutoTaskCheckmarks`
-  - 從檔讀 commit 訊息（多代理彙總／多行說明）：`-CommitMessageFile .\.agency-state\closeout-commit-msg.txt`（路徑相對 monorepo 根或絕對路徑皆可）
+  - 從檔讀 commit 訊息（多代理彙總／多行說明）：`-CommitMessageFile agency-os\.agency-state\closeout-commit-msg.txt`（UTF-8；路徑相對 monorepo 根或絕對路徑皆可；與 inbox 同目錄便於管理）
 
 ### 1b) 手動三步（與 1a 擇一即可）
 在 `<WORK_ROOT>\agency-os` 目錄執行（與 1a **擇一**；**收工推薦 1a 於 repo 根**）：
