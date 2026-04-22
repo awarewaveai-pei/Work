@@ -52,6 +52,11 @@ const services = {
     defaultBaseUrl: "https://slack.com/api",
     auth: { type: "bearer", tokenEnv: "SLACK_BOT_TOKEN" }
   },
+  slack_webhook: {
+    label: "Slack Incoming Webhook",
+    baseUrlEnv: "SLACK_WEBHOOK_URL",
+    auth: { type: "none" }
+  },
   sentry: {
     label: "Sentry API",
     baseUrlEnv: "SENTRY_API_BASE_URL",
@@ -178,7 +183,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "call_service_api",
-      description: "Call a configured service API by service name, method, path, query, and optional JSON body. This wrapper covers api.aware-wave.com, app.aware-wave.com, Hetzner, Uptime Kuma, Grafana, Netdata, Slack, Sentry, Resend API, Cloudflare API, PostHog API, n8n REST API, Trigger API, Supabase A, and Supabase B.",
+      description: "Call a configured service API by service name, method, path, query, and optional JSON body. This wrapper covers api.aware-wave.com, app.aware-wave.com, Hetzner, Uptime Kuma, Grafana, Netdata, Slack Web API, Slack incoming webhooks, Sentry, Resend API, Cloudflare API, PostHog API, n8n REST API, Trigger API, Supabase A, and Supabase B.",
       inputSchema: {
         type: "object",
         properties: {

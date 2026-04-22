@@ -54,6 +54,7 @@ $vars = @{
     NETDATA_API_TOKEN            = ""
     SLACK_API_BASE_URL           = "https://slack.com/api"
     SLACK_BOT_TOKEN              = ""
+    SLACK_WEBHOOK_URL            = ""
     SENTRY_API_BASE_URL          = "https://sentry.io/api/0"
     SENTRY_AUTH_TOKEN            = ""
     API_AWAREWAVE_BASE_URL       = "https://api.aware-wave.com"
