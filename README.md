@@ -28,6 +28,25 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -LobsterOnly
 ```
 
+## 多台電腦共用 MCP 設定
+
+MCP 現在用 repo 內的單一來源管理，目標是讓桌機與筆電都能用同一份配置同步到 `Codex`、`GitHub Copilot CLI`、`Gemini CLI` 與工作區 `.mcp.json`。
+
+1. 先填機器本地的環境變數範本：[`mcp/user-env.template.ps1`](mcp/user-env.template.ps1)
+2. 再執行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
+```
+
+或：
+
+```powershell
+npm run mcp:sync
+```
+
+詳細說明見 [`mcp/README.md`](mcp/README.md)。
+
 ## 建議閱讀與操作順序（降低矛盾、可賣可交付）
 
 下列順序假設你已開在 **monorepo 根**（含 `agency-os`、`lobster-factory`、根 `scripts`）。若只開 `agency-os` 子資料夾，請先用相對連結回到本頁與 `docs/spec`。

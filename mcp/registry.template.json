@@ -1,0 +1,264 @@
+{
+  "version": 1,
+  "servers": {
+    "work-global": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${userHome}",
+        "${workspaceRoot}"
+      ]
+    },
+    "github": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "clients": {
+        "copilot": {
+          "exclude": true
+        }
+      }
+    },
+    "airtable": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@loticdigital/airtable-mcp-server"
+      ],
+      "env": {
+        "AIRTABLE_API_KEY": "${env:AIRTABLE_API_KEY}"
+      }
+    },
+    "replicate": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "replicate-mcp"
+      ],
+      "env": {
+        "REPLICATE_API_TOKEN": "${env:REPLICATE_API_TOKEN}",
+        "REPLICATE_WEBHOOK_SIGNING_KEY": "${env:REPLICATE_WEBHOOK_SIGNING_KEY}"
+      }
+    },
+    "perplexity": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@perplexity-ai/mcp-server"
+      ],
+      "env": {
+        "PERPLEXITY_API_KEY": "${env:PERPLEXITY_API_KEY}"
+      }
+    },
+    "wordpress": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@automattic/mcp-wordpress-remote@latest"
+      ],
+      "env": {
+        "WP_API_URL": "${env:WP_API_URL}",
+        "JWT_TOKEN": "${env:WORDPRESS_JWT_TOKEN}"
+      }
+    },
+    "n8n": {
+      "enabled": true,
+      "transport": "http",
+      "url": "${env:N8N_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${env:N8N_AUTH_BEARER_TOKEN}"
+      },
+      "codex": {
+        "bearer_token_env_var": "N8N_AUTH_BEARER_TOKEN"
+      }
+    },
+    "trigger": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\start-trigger-mcp.ps1",
+        "-ProjectRef",
+        "${env:TRIGGER_PROJECT_REF}"
+      ],
+      "env": {
+        "TRIGGER_API_URL": "${env:TRIGGER_API_URL}"
+      }
+    },
+    "supabase": {
+      "enabled": true,
+      "transport": "http",
+      "url": "${env:SUPABASE_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${env:SUPABASE_AUTH_BEARER_TOKEN}"
+      },
+      "codex": {
+        "bearer_token_env_var": "SUPABASE_AUTH_BEARER_TOKEN"
+      }
+    },
+    "cloudflare": {
+      "enabled": false,
+      "transport": "http",
+      "url": "${env:CLOUDFLARE_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${env:CLOUDFLARE_AUTH_BEARER_TOKEN}"
+      },
+      "codex": {
+        "bearer_token_env_var": "CLOUDFLARE_AUTH_BEARER_TOKEN"
+      }
+    },
+    "posthog": {
+      "enabled": false,
+      "transport": "http",
+      "url": "${env:POSTHOG_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${env:POSTHOG_API_KEY}"
+      },
+      "codex": {
+        "bearer_token_env_var": "POSTHOG_API_KEY"
+      }
+    },
+    "chatgpt-fast": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-llm-mcp.ps1",
+        "-Provider",
+        "openai"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "${env:OPENAI_API_KEY}",
+        "OPENAI_MODEL": "gpt-5.3-chat-latest"
+      }
+    },
+    "chatgpt-latest": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-llm-mcp.ps1",
+        "-Provider",
+        "openai"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "${env:OPENAI_API_KEY}",
+        "OPENAI_MODEL": "gpt-5.4"
+      }
+    },
+    "claude-fast": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-llm-mcp.ps1",
+        "-Provider",
+        "anthropic"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}",
+        "ANTHROPIC_MODEL": "claude-haiku-4-5-20251001"
+      }
+    },
+    "claude-latest": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-llm-mcp.ps1",
+        "-Provider",
+        "anthropic"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}",
+        "ANTHROPIC_MODEL": "claude-sonnet-4-6"
+      }
+    },
+    "gemini-fast": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-llm-mcp.ps1",
+        "-Provider",
+        "gemini"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "${env:GEMINI_API_KEY}",
+        "GEMINI_MODEL": "gemini-2.5-flash"
+      }
+    },
+    "gemini-latest": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-llm-mcp.ps1",
+        "-Provider",
+        "gemini"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "${env:GEMINI_API_KEY}",
+        "GEMINI_MODEL": "gemini-3.1-pro-preview"
+      }
+    }
+  }
+}
