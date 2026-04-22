@@ -21,6 +21,8 @@
 3. **收關代理合併**：讀 `closeout-inbox.md` + 各對話已 merge 的 **code** + `print-today-closeout-recap`，**一次寫** `WORKLOG`（含 `- AUTO_TASK_DONE:`）、`memory`、`daily`；必要時清空或歸檔 inbox。
 4. **分支策略（強烈建議）**：並行開發用**不同 branch** 或至少不同 prefix commit；收關前 **`git merge`** / PR 合進當日工作分支，再跑 **`ao-close.ps1`**，降低同檔二頭馬。
 5. **長 commit 訊息**：用 **`-CommitMessageFile path\to\msg.txt`**（UTF-8）取代一行 `-CommitMessage`；`ao-close.ps1` 會在 commit 前擋 **staged diff 含 `<<<<<<<` 衝突標記**。
+6. **協作 AI 規則（給 Codex／其他 Cursor／Claude）**：[collaborator-ai-agent-rules.md](collaborator-ai-agent-rules.md)（內含一鍵貼上區塊）。
+7. **收件匣範本與初始化**：可版控範本 [closeout-inbox-TEMPLATE.md](closeout-inbox-TEMPLATE.md)；本機若尚無 `closeout-inbox.md`，在 monorepo 根執行 **`.\scripts\init-closeout-inbox.ps1`**。
 
 ## 1) 必跑三步（硬性 Gate）
 
@@ -82,5 +84,5 @@
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-21 18:35:02 UTC_
+_Last synced: 2026-04-22 02:27:49 UTC_
 

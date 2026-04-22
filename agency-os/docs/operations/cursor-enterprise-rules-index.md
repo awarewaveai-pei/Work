@@ -33,6 +33,7 @@
 - **工具建置／能力追溯（TASKS ↔ 路由）**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 - **Trigger vs n8n 編排邊界 ADR**：`docs/architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md`
 - **憑證／祕鑰政策**：`docs/operations/security-secrets-policy.md`
+- **多代理協作（Codex／他工具；非收關者）**：`docs/operations/collaborator-ai-agent-rules.md`
 - **人＋代理總則**：`AGENTS.md`
 - **新治理文件連動**：`docs/operations/new-doc-linkage-checklist.md`
 
@@ -60,5 +61,5 @@
 - `docs/operations/security-secrets-policy.md`
 - `docs/README.md`
 
-_Last synced: 2026-04-21 18:35:02 UTC_
+_Last synced: 2026-04-22 02:27:49 UTC_
 

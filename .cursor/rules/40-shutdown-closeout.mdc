@@ -13,7 +13,7 @@ alwaysApply: true
 **`AO-CLOSE` 關鍵字 = 內含授權（無須再加一句口頭指令）**：使用者只須打 **`AO-CLOSE`**（或「收工／關機」等同等意圖），等同要求代理在跑 **`ao-close.ps1` 之前**已做完：併讀 **`TASKS.md`** 尚未 `- [x]` 之項、**當輪對話中可驗證之完成事實**（＋必要時先跑／對照 **`scripts/print-today-closeout-recap.ps1`** 輸出），對**每一項本輪已達 DoD** 者在 **`WORKLOG.md`** 當日 **`## yyyy-MM-dd`** 下補 **`- AUTO_TASK_DONE: <唯一子字串>`**。**禁止**要求使用者再打字如「照對話全寫進 AUTO_TASK_DONE」才動手。  
 - 若證據不足、無法判定是否完成：**只問一個**針對性確認題；仍由代理代寫 **`AUTO_TASK_DONE`**（或明示留待下一輪），**不要求**使用者親編 WORKLOG 機器行。
 
-**多代理（並行 4–5 個 AI）**：**唯一收關者**跑 **`ao-close.ps1`**；其餘代理**不**同時改 `WORKLOG.md`／`memory/CONVERSATION_MEMORY.md`／`TASKS.md` 當日定稿——只往 **`agency-os/.agency-state/closeout-inbox.md`**（gitignore）append 素材（對話標記、完成一句、commit／路徑）。收關者合併後再進下方第 1 步。長 commit 用 **`-CommitMessageFile`**（見 **`agency-os/docs/operations/end-of-day-checklist.md` §0.5**）。
+**多代理（並行 4–5 個 AI）**：**唯一收關者**跑 **`ao-close.ps1`**；其餘代理**不**同時改 `WORKLOG.md`／`memory/CONVERSATION_MEMORY.md`／`TASKS.md` 當日定稿——只往 **`agency-os/.agency-state/closeout-inbox.md`**（gitignore）append 素材（對話標記、完成一句、commit／路徑）。收關者合併後再進下方第 1 步。長 commit 用 **`-CommitMessageFile`**（見 **`docs/operations/end-of-day-checklist.md` §0.5**）。**給非 Cursor 協作 AI 的全文規則**：**`docs/operations/collaborator-ai-agent-rules.md`**（可貼進 Codex／他工具）；本機無 inbox 時 **`scripts/init-closeout-inbox.ps1`**（monorepo 根）。
 
 When the user indicates end of day or shutdown intent (examples: `AO-CLOSE`,
 "要關機", "收工", "今天先到這"), run this closeout sequence before ending:
@@ -40,7 +40,7 @@ When the user indicates end of day or shutdown intent (examples: `AO-CLOSE`,
    - Execute from a folder that is the git repository root (or contains `agency-os/`).
 3. Confirm：`verify-build-gates` 與 guard 路徑皆 **PASS**，且 push 成功（或依使用者要求正確使用 `-SkipPush`）。
 
-**公司機／另一台續接**：`AO-CLOSE` push 成功後，他處開工依 `agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`：**新機／筆電第一次 §1.5**。**之後每次（單一路徑）**：在 monorepo 根跑 **`scripts/ao-resume.ps1 -FullMainlineParity` 至 exit 0**（見 **`30-resume-keyword.mdc`** 與 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §2.5.1**），再在 Cursor 打 **`AO-RESUME`**。**僅**需手動逐步理解或除錯時，才照 **§2** 分步。`node_modules` 不入庫。
+**公司機／另一台續接**：`AO-CLOSE` push 成功後，他處開工依 `agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`：**新機／筆電第一次 §1.5**。**之後每次（單一路徑）**：在 monorepo 根跑 **`scripts/ao-resume.ps1 -FullMainlineParity` 至 exit 0**（見 **`30-resume-keyword.mdc`** 與 **`REMOTE_WORKSTATION_STARTUP.md` §2.5.1**），再在 Cursor 打 **`AO-RESUME`**。**僅**需手動逐步理解或除錯時，才照 **§2** 分步。`node_modules` 不入庫。
 
 **若 `git push` 被拒（遠端超前）**：在 repo 根執行 `git pull --rebase origin main`，解決衝突後 `git rebase --continue`，再推送。
 
