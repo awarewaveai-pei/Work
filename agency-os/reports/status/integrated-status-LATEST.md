@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-22 21:21:52
+- Generated: 2026-04-23 01:36:01
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,32 +203,14 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-22.md
-# Daily Note - 2026-04-22
-
-## 今日完成
-- Monorepo **`main`**：收斂未提交變更為 **`32c3c85`**，連同 **`d6dbb05`** 一併 **`git push origin main`**；分支已追蹤 **`origin/main`**；push 前 **`verify-build-gates -LobsterOnly`** PASS。
-- 實機跑完 `Netdata -> Slack` drill：VPS `slack-alert-drill.sh` 的 webhook 自測為 `200 ok`，Netdata `alarm-notify.sh test` 的 `WARNING / CRITICAL / CLEAR` 亦成功送達。
-- 以實機/API 盤點 `Cloudflare / Sentry / PostHog` 觀測面，而非只看文件：確認 Cloudflare 邊界設定已落地；Sentry 實際覆蓋為 `node-api / next-admin / wordpress`，`trigger / n8n` 仍缺；PostHog 專案存在但 `NEXT_PUBLIC_POSTHOG_KEY` 未進容器，真實 funnel 尚未啟用。
-- 只走 `Uptime Kuma` UI/API，不碰 DB，建立 13 筆 monitor：6 筆 public HTTP、6 筆 SSL、1 筆 `endpoint-alert-heartbeat`。
-- 將 `endpoint-alert.sh` 接上 Kuma heartbeat：repo 正本新增 `HEARTBEAT_URL`，VPS 同步更新並驗證 service 成功執行；Kuma heartbeat 已收到 `OK`。
-- 告警去重完成：保留 `endpoint-alert.sh -> Slack` 負責 public outage；Kuma 只保留 `SSL expiry + heartbeat + 既有內部 monitor` 的 Slack，避免同一 public outage 被兩套系統同時轟炸。
-
-## 重要現況
-- `awarewave-endpoint-alert.timer` 仍為 `active`。
-- Uptime Kuma 共有 23 筆 monitor，其中新建 `11..23` 已到位；`11..16` 無 Slack、`17..23` 仍有 Slack。
-- Kuma `error.log` 仍殘留舊 monitor 的 `accepted_statuscodes_json` 解析錯誤，屬歷史資料格式問題，後續需在 UI 重新存一次該 monitor。
-
-## 下一步
-- 補 `trigger` / `n8n` 的 Sentry 實際接線與 smoke 驗證。
-- 把 `PostHog` 真正打開到執行中 `next-admin`，並補至少一條可驗證 funnel。
-- 視需要將 Kuma 與 `endpoint-alert.sh` 的告警規則再細分為 `P1` / `P2`。
+## 5) memory/daily/2026-04-23.md
+_no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-22 21:21:43`
+- Time: `2026-04-23 01:35:58`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -238,14 +220,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260422-212143.md`
-- Closeout: `reports/closeout/closeout-20260422-212140.md`
+- Health: `reports/health/health-20260423-013558.md`
+- Closeout: `reports/closeout/closeout-20260423-013555.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-
 ### AO-CLOSE（2026-03-27）
 - 已完成收工前進度同步（`TASKS.md`、`WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`memory/daily/2026-03-27.md`）。
 - 準備執行 `D:\Work\scripts\ao-close.ps1` 一鍵閘道與推送。
@@ -295,6 +276,7 @@
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
 

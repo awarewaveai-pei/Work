@@ -118,10 +118,44 @@ function Get-ServerNamesFromObjectOrFail {
     return @($names | Sort-Object -Unique)
 }
 
+function Test-RegistryServerIncludedForWorkspace {
+    param($ServerEntry)
+    if ($null -eq $ServerEntry) { return $false }
+    # Mirror scripts/sync-mcp-config.ps1 Should-IncludeServer(..., Client "workspace") with IncludeDisabled = false.
+    $names = @($ServerEntry.PSObject.Properties | ForEach-Object { $_.Name })
+    if ($names -contains "enabled") {
+        $en = $ServerEntry.enabled
+        if (-not [bool]$en) { return $false }
+    }
+    if ($names -contains "clients") {
+        $clients = $ServerEntry.clients
+        if ($null -ne $clients -and $clients -is [System.Management.Automation.PSCustomObject]) {
+            $cNames = @($clients.PSObject.Properties | ForEach-Object { $_.Name })
+            if ($cNames -contains "workspace") {
+                $ws = $clients.workspace
+                if ($null -ne $ws -and $ws -is [System.Management.Automation.PSCustomObject]) {
+                    $wsNames = @($ws.PSObject.Properties | ForEach-Object { $_.Name })
+                    if ($wsNames -contains "exclude" -and [bool]$ws.exclude) { return $false }
+                }
+            }
+        }
+    }
+    return $true
+}
+
 $registryJson = Read-JsonFileOrFail -LiteralPath $registryPath -Label "MCP registry template"
 $mcpJson = Read-JsonFileOrFail -LiteralPath $currentMcpPath -Label "workspace .mcp.json"
 
-$registryServers = @(Get-ServerNamesFromObjectOrFail -Root $registryJson -PropertyName "servers" -FileLabel "registry.template.json" -LiteralPath $registryPath)
+$registryBag = $registryJson.servers
+if ($null -eq $registryBag -or $registryBag -isnot [System.Management.Automation.PSCustomObject]) {
+    Write-Error "CRITICAL: registry.template.json missing servers object. Path: $registryPath"
+    exit 1
+}
+$registryServers = @(
+    foreach ($p in $registryBag.PSObject.Properties) {
+        if (Test-RegistryServerIncludedForWorkspace $p.Value) { $p.Name }
+    }
+) | Sort-Object -Unique
 $mcpServers = @(Get-ServerNamesFromObjectOrFail -Root $mcpJson -PropertyName "mcpServers" -FileLabel ".mcp.json" -LiteralPath $currentMcpPath)
 
 $diff = Compare-Object -ReferenceObject $registryServers -DifferenceObject $mcpServers
