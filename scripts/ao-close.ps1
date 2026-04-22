@@ -236,7 +236,7 @@ if (-not $SkipAutoTaskCheckmarks -and (Test-Path -LiteralPath $applyMarks)) {
 $closeoutInbox = Join-Path $WorkRoot "agency-os\.agency-state\closeout-inbox.md"
 $collabRules = Join-Path $WorkRoot "agency-os\docs\operations\collaborator-ai-agent-rules.md"
 if (Test-Path -LiteralPath $closeoutInbox) {
-    Write-Host "== AO-CLOSE: agency-os/.agency-state/closeout-inbox.md exists (gitignored). Merge into WORKLOG/memory, then clear inbox to avoid stale multi-agent notes. ==" -ForegroundColor Yellow
+    Write-Host "== AO-CLOSE: agency-os/.agency-state/closeout-inbox.md exists. Merge into WORKLOG/memory, then clear inbox to avoid stale notes. ==" -ForegroundColor Yellow
     if (Test-Path -LiteralPath $collabRules) {
         Write-Host "   (multi-agent rules for other AIs: agency-os/docs/operations/collaborator-ai-agent-rules.md)" -ForegroundColor DarkYellow
     }

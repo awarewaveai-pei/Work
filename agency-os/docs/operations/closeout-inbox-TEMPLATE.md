@@ -1,8 +1,8 @@
-# Closeout inbox（本地、gitignore）
+# Closeout inbox（可版控）
 
-**用途**：並行協作 AI 只對本檔 **append** 區塊；**Cursor 收關者**合併進 `WORKLOG.md`／`memory` 後清空本檔。  
+**用途**：協作 AI 只對本檔 **append** 區塊；**Cursor 收關者**合併進 `WORKLOG.md`／`memory` 後可清空本檔。  
 **實際路徑**（勿改檔名）：`agency-os/.agency-state/closeout-inbox.md`  
-**說明**：本檔為範本（可版控）；實際 `closeout-inbox.md` 在 `.gitignore`，不進遠端。
+**說明**：本檔為範本；實際 `closeout-inbox.md` **已納入版控**，換機 `git pull` 即同步（收關後清空仍可避免殘稿堆疊）。
 
 ---
 

@@ -17,7 +17,7 @@
 **建議協議（最省事）**：
 
 1. **指定唯一「收關代理」**（同一輪只由一個 Cursor／Claude 對話執行 **§2 的 `ao-close.ps1`**；其餘代理**不跑** `git push`／**不**對上述三檔做最終寫入）。
-2. **其他代理只交「素材」**：在 **`agency-os/.agency-state/closeout-inbox.md`**（**gitignore**，不進版控）用 Markdown 條列：對話 ID／完成項一句／相關 commit hash 或檔案路徑。**禁止**多人同時改 `WORKLOG` 當日區塊當「草稿本」。
+2. **其他代理只交「素材」**：在 **`agency-os/.agency-state/closeout-inbox.md`**（**已納入版控**，可跟 `git pull` 同步）用 Markdown 條列：對話 ID／完成項一句／相關 commit hash 或檔案路徑。**禁止**多人同時改 `WORKLOG` 當日區塊當「草稿本」。
 3. **收關代理合併（仍由使用者只在收關 Cursor 打 `AO-CLOSE` 觸發；不必另下指令）**：讀協作收件匣（`agency-os/.agency-state/closeout-inbox.md`，工作區根僅 `agency-os` 時為 `.agency-state/closeout-inbox.md`）+ 各對話已 merge 的 **code** +（必要時）`print-today-closeout-recap`，在 **rule 40 第 1 步** **一次寫** `WORKLOG`（含 `- AUTO_TASK_DONE:`）、`memory`、`daily`；**`ao-close.ps1` 成功 push 後**清空或刪除 inbox。
 4. **分支策略（強烈建議）**：並行開發用**不同 branch** 或至少不同 prefix commit；收關前 **`git merge`** / PR 合進當日工作分支，再跑 **`ao-close.ps1`**，降低同檔二頭馬。
 5. **長 commit 訊息**：用 **`-CommitMessageFile path\to\msg.txt`**（UTF-8）取代一行 `-CommitMessage`；`ao-close.ps1` 會在 commit 前擋 **staged diff 含 `<<<<<<<` 衝突標記**。

@@ -4,7 +4,7 @@
 **收關者**：通常是**其中一個** Cursor 對話；該對話有權在收工前**定稿** `WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`memory/daily/*.md`，並在 monorepo 根執行 **`scripts/ao-close.ps1`**（見 **`.cursor/rules/40-shutdown-closeout.mdc`**）。**使用者對該對話仍只打 `AO-CLOSE`**，無須因多代理改打別的關鍵字。
 
 **正本路徑**：`agency-os/docs/operations/collaborator-ai-agent-rules.md`（可版控）。  
-**本地收件匣**（不進 Git）：`agency-os/.agency-state/closeout-inbox.md`。
+**收件匣**（已納入版控，換機跟 `git pull` 同步）：`agency-os/.agency-state/closeout-inbox.md`。
 
 ## 永久載入入口（優先於手貼）
 

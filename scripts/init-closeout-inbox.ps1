@@ -35,9 +35,9 @@ if (Test-Path -LiteralPath $template) {
     Write-Host "init-closeout-inbox: created from template: $inbox" -ForegroundColor Green
 } else {
     $stub = @"
-# Closeout inbox (local, gitignored)
+# Closeout inbox
 
-Append-only blocks for multi-agent handoff. See agency-os/docs/operations/collaborator-ai-agent-rules.md
+Append-only blocks for handoff. See agency-os/docs/operations/collaborator-ai-agent-rules.md
 
 "@
     Set-Content -LiteralPath $inbox -Value $stub -Encoding UTF8
