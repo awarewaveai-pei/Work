@@ -39,6 +39,7 @@
 
 ## 快速續接關鍵字
 - 跨系統運作模型（AO 治理 + 龍蝦執行）：`docs/overview/ao-lobster-operating-model.md`（作為事件節奏與責任分工的總入口）。
+- **雙機前提（固定）**：目前預設使用者有 **公司桌機 + 回家筆電** 兩台工作機。凡提到環境、MCP、AI 客戶端、Secrets、依賴、`AO-RESUME` 對齊，皆必須以「**repo 共用結構 + 各機器獨立 env/vault/user-level config**」處理，不得假設單機，也不得建議直接複製另一台的明文本機設定檔。
 - 使用者輸入 `AO-RESUME` 時：**可執行終端下**須先跑 **`scripts/ao-resume.ps1`（預設完整）至 exit 0**，再依 **`.cursor/rules/30-resume-keyword.mdc`** 讀取記憶、**`agency-os/.agency-state/open-tasks-snapshot.md`**（與 `print-open-tasks` 同步）與進度檔並回覆；**無終端**時改手動 Git 自檢並在回標註落差（見該規則第 1 節）。
 - **雙機協作硬性說明**：`AO-RESUME` 對應腳本 **`scripts/ao-resume.ps1`** 會 **`git fetch`**，且**僅在落後 `origin/main`（behind>0）** 時 **`git pull --ff-only origin main`**；若**落後且工作樹仍髒**，預設**不**自動 stash 可能失敗（見 `REMOTE` **2.5.1**）。**預設**同一腳本在 preflight 後會跑 **`machine-environment-audit -FetchOrigin -Strict`**（與 **`align-workstation.ps1`** 相同）；**Exit 0**＝機器裁決可開工，無需目視 `LAST_SYSTEM_STATUS`／`integrated-status`。完整開工順序、30 秒自檢：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**。
 - 若已啟用 Autopilot Phase1，開機會自動執行 `scripts/ao-resume.ps1 -SkipVerify -SkipStrictEnvironmentAudit -AllowUnexpectedDirty`（輕量 preflight；**不**跑完整閘道與 Strict 環境稽核；**不**取代你在桌機手動跑的完整 **`ao-resume.ps1`**）。
@@ -116,5 +117,5 @@
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-22 03:49:38 UTC_
+_Last synced: 2026-04-22 09:34:17 UTC_
 
