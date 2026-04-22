@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-23 01:43:20
+- Generated: 2026-04-23 02:18:14
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -204,13 +204,56 @@
 > Full runbook: see `## Runbook Commands` in the source file.
 
 ## 5) memory/daily/2026-04-23.md
-_no file for today yet._
+# Daily Note - 2026-04-23
+
+## 今日完成
+- 釐清 **closeout-inbox** 與 **AO-CLOSE**：inbox 是 append 交接面；敘事合併進 `WORKLOG`／`memory` 是收關者（人或代理）責任，腳本先前未代做。
+- 落地 **每日骨架**：`ensure-daily-progress-scaffold.ps1` + `ao-close` 先跑 scaffold（只補標題／檔案，不合併 inbox）。
+- **合併 inbox 可讀內容** 進本日紀錄：Claude 段（MCP／Supabase B postgres／憑證地圖／runbook／VPS Studio＋heartbeat 等）；Codex 段（AwareWave／SoulfulExpression 命名、`SUPABASE_*` fallback、run-postgres-mcp、traceability 等）— 細節在 `WORKLOG` §2026-04-23。
+
+## 重要現況
+- 工作樹尚有 **closeout 相關**未提交檔案（`WORKLOG`、`ao-close`、scaffold、`memory/daily`）；inbox 曾寫某 commit **待 push**，實際與 **`8247e47`** 等遠端狀態請以 **`git status`／`git log`** 為準。
+- 部分第三方 key（Perplexity、Airtable）inbox 標為仍占位。
+
+## 下一步
+- 執行 **`AO-CLOSE`**（或手動）：確認 gate、將今日 `WORKLOG`／`memory`／腳本變更 **commit + push**。
+- 若 Codex inbox 所列「WORKLOG 是否已寫 env migration／alias」仍不足，於 `WORKLOG` 或 traceability 單開一小節補上對照表。
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:b6ffeefd59d7e6b0d386b6ada348e69ebeb75b1db6ae8665760666a33538b33e -->
+
+### system-backfill 2026-04-22 20:10
+
+- **完成（一句）**: 回填今日已執行之共享 MCP/治理與 AO 流程相關變更，避免 closeout-inbox 空白
+- **變更路徑**:
+  - `mcp/registry.template.json`
+  - `mcp/user-env.template.ps1`
+  - `mcp/README.md`
+  - `scripts/sync-mcp-config.ps1`
+  - `scripts/bootstrap-mcp-machine.ps1`
+  - `scripts/sanitize-user-mcp-config.ps1`
+  - `agency-os/docs/operations/collaborator-ai-agent-rules.md`
+  - `agency-os/docs/operations/closeout-inbox-TEMPLATE.md`
+  - `scripts/init-closeout-inbox.ps1`
+- **Git**:
+  - `0a6ab6d`, `95e6c5b`, `aec38cb`, `1908f2b`, `27fddb3`, `299d7a8`
+- **對應 TASKS 子字串（可選）**:
+  - `（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）`
+  - `Enterprise 工具層 Phase 1 正式串接`
+  - `三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）`
+- **風險／待辦（可選）**:
+  - `mcp/user-env.ps1` 尚未補齊所有必填 env，`mcp:governance` 會持續提示缺項
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:e1bae1cbbbde7615f401e62d14587d93cd50466f437c9463ea845896206c8b18 -->
+
+（以下可刪除；為當日第一則範例占位）
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-23 01:43:12`
+- Time: `2026-04-23 02:18:00`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -220,13 +263,24 @@ _no file for today yet._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260423-014312.md`
-- Closeout: `reports/closeout/closeout-20260423-014309.md`
+- Health: `reports/health/health-20260423-021759.md`
+- Closeout: `reports/closeout/closeout-20260423-021757.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+### 排程單一來源 + AO-CLOSE 聯動甘特
+- **`docs/overview/PROGRAM_SCHEDULE.json`**：三流（AO／LF／PJ）任務與日期；可複製到客戶專案或 `project-kit` 範本。
+- **`scripts/render-program-timeline-from-schedule.ps1`**：UTF-8 JSON → `PROGRAM_TIMELINE.md` 標記區（表 + Mermaid）；腳本本體 **ASCII-only** 以相容 PS 5.1。
+- **`generate-integrated-status-report.ps1`** 末尾**單次**呼叫渲染；**AO-CLOSE** 路徑因此每次收工會重渲時間軸（仍以 TASKS／Checklist／Discovery 為完成真相）。
+
+### 續接驗證（使用者授權「進行」）
+- `git pull origin main`：**Already up to date**。
+- `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
+- `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
+
+### AO-CLOSE（2026-03-27）
 - 已完成收工前進度同步（`TASKS.md`、`WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`memory/daily/2026-03-27.md`）。
 - 準備執行 `D:\Work\scripts\ao-close.ps1` 一鍵閘道與推送。
 
@@ -275,16 +329,5 @@ _no file for today yet._
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
-
-
-
-
-
-
-
-
-
-
-
 
 

@@ -9,6 +9,8 @@ Maintain continuity across sessions by updating both:
 - `memory/CONVERSATION_MEMORY.md` (long-term distilled memory)
 - `memory/daily/YYYY-MM-DD.md` (daily raw notes)
 
+**`AO-CLOSE` mechanical note**: `merge-closeout-inbox-into-progress.ps1` may insert **one pointer bullet** under `## Current Operating Context` in `CONVERSATION_MEMORY.md` when inbox payload merges (points to WORKLOG verbatim block). That is **not** a substitute for milestone distill updates below.
+
 When to update:
 - After a milestone decision
 - After major scope changes

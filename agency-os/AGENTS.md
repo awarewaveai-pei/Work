@@ -7,7 +7,8 @@
 - 使用者與客戶視為新手（小白）時，操作說明必須改成「去哪裡、做什麼動作」格式
 - 避免只講概念；每個操作至少要有：路徑/畫面位置 + 點擊/貼上動作 + 預期結果
 - 指令能貼就貼完整可執行版本（避免使用者自行補路徑）
-- 使用者授權 Autopilot 時，進度以「對話視窗即時回報」為主，不要求持續寫入專用進度檔
+- 使用者授權 Autopilot 時，進度以「對話視窗即時回報」為主，不要求**任務進行中**持續寫入專用進度檔；**收工關鍵字 `AO-CLOSE`** 時仍須依 **`.cursor/rules/40-shutdown-closeout.mdc`** 回寫 **`WORKLOG`／`memory`**（多代理時由 **`merge-closeout-inbox-into-progress.ps1`** 併入 **`closeout-inbox.md`**），與本句不衝突
+- **`CONVERSATION_MEMORY.md`**：**`AO-CLOSE`** 流程會在有可匯 inbox 內容時，於 **`## Current Operating Context`** 自動加**一則指標列**（指到當日 **WORKLOG** 的 verbatim 小節）；**里程碑／長對話濃縮**仍依 **`.cursor/rules/10-memory-maintenance.mdc`** 手動或代理補寫，兩者不互斥
 
 ## 長任務回報防呆（固定執行）
 - 採用「3 層防呆」避免使用者呆等：
@@ -27,7 +28,7 @@
 1c. **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）**：`docs/governance-plans/README.md`
 1d. **平台能力＋工具總索引 §0（一句話＋連到專文／計畫；與狀態同檔）**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 2. 讀 `AGENTS.md`
-3. 讀 `memory/CONVERSATION_MEMORY.md`（長期記憶）
+3. 讀 `memory/CONVERSATION_MEMORY.md`（長期記憶）；若易混淆 **`LAST_AO_RESUME_BRIEF`**／**`SESSION_TEMPLATE`**／**inbox 機械匯入**，先掃 **`memory/README.md`**
 4. 讀 `memory/daily/` 的今日與昨日筆記（若存在）
 5. 讀 `TASKS.md` 與 `WORKLOG.md`
 6. 讀龍蝦工廠主軸文件（若存在）：
@@ -48,7 +49,7 @@
 - 使用者輸入 **`AO-CLOSE`**（關鍵字不變）或明確表達要關機/收工時，必須先執行 **closeout**，再輸出：`今日完成`、`今日未完成`、`連動檢查`、`明日優先`。
   - **只打 AO-CLOSE 即含義完整**：等同授權代理在跑 **`ao-close.ps1` 前**主動依**當輪對話 + `TASKS.md` 開放項**（＋必要時 **print-today-closeout-recap**）補齊 **`WORKLOG.md`** 當日 **`- AUTO_TASK_DONE: …`**（**不要**求使用者再加一句「照對話全寫進 AUTO_TASK_DONE」）；證據不足時**只問一題**。
   - **建議一鍵**（更新 **`WORKLOG` / `memory/**`**；**`TASKS` 打勾**多由腳本依 **`AUTO_TASK_DONE`** 套用）：**正本** monorepo 根 **`.\scripts\ao-close.ps1`**；**`.\agency-os\scripts\ao-close.ps1`** 僅 **thin wrapper** 轉發參數（**勿**複製業務邏輯以免分叉）  
-    → 預設依序：`verify-build-gates`（龍蝦 + 治理 health）→ `system-guard`（內含 doc-sync + health + guard）→ `generate-integrated-status-report` → **PASS 後** `git commit`／`git push`（公司機 `pull` 即完整）。不推：`-SkipPush`；略過龍蝦閘（不建議）：`-SkipVerify`。
+    → 預設依序（細節以 **`40-shutdown-closeout.mdc`**／**`end-of-day-checklist.md` §1a** 為準）：**`ensure-daily-progress-scaffold`** → **inbox guard**（預設 **warn**）→ **`merge-closeout-inbox-into-progress`**（**WORKLOG** + **memory/daily** + **`CONVERSATION_MEMORY` 指標列**）→ **`print-today-closeout-recap`** → **`verify-build-gates`** → **`system-guard`** → **`generate-integrated-status-report`** → **`apply-closeout-task-checkmarks`** → **`git add`** → **`verify-closeout-completeness`**（預設 **strict**，擋無證據之 commit）→ **`git commit`／`git push`**。緊急：**`-CompletenessGate warn|off`** 或 **`-SkipCompletenessGate`**。不推：`-SkipPush`；略過龍蝦閘（不建議）：`-SkipVerify`。
   - 預設收工門檻：`system-health-check` **100%**（未達 100% 先修復再收工；僅在使用者明確允許時可放寬）。
   - **單一真相**：AO-CLOSE 的操作步驟以 `docs/operations/end-of-day-checklist.md` 為準，關鍵字行為以 `.cursor/rules/40-shutdown-closeout.mdc` 為準。
   - **或分部手動**（與一鍵擇一）：`doc-sync-automation -AutoDetect` → `system-health-check` → `system-guard -Mode manual` → 再自行 `git push`（見 `docs/operations/end-of-day-checklist.md`）。
@@ -117,5 +118,5 @@
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-22 17:43:08 UTC_
+_Last synced: 2026-04-22 18:17:56 UTC_
 

@@ -2,6 +2,50 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-23
+
+### Closeout 紀錄與腳本（收關者合併敘事）
+- **背景**：操作者要求「讀當日各 AI 區塊＋本人實際進度」寫入 `WORKLOG`／`memory/daily`，而非僅機械占位；此前 `ao-close` 只做 gate／git，**不會**自動把 `closeout-inbox.md` 併入正式紀錄，造成落差。
+- **本日 repo 變更（未提交前工作樹）**：
+  - 新增 `scripts/ensure-daily-progress-scaffold.ps1`：若缺當日 `## yyyy-MM-dd` 則插入、`agency-os/memory/daily/yyyy-MM-dd.md` 不存在則建立；**字面量用 ASCII** 以相容 Windows PowerShell 5.1 解析 UTF-8 無 BOM 之 `.ps1`。
+  - `scripts/ao-close.ps1` 於 `print-today-closeout-recap` **之前**呼叫上述 scaffold（僅補結構，**不**讀取／合併 inbox）。
+- **自 `closeout-inbox.md` 合併（摘要，無密鑰細節）**：
+  - **claude-sonnet**：補 MCP 憑證與環境、`registry.template.json` 增 **supabase-b-postgres**、`user-env.template.ps1` 增 `SUPABASE_B_POSTGRES_DSN` 範本、新建 `mcp/SERVICE_CREDENTIALS_MAP.md`、更新 `SUPABASE_SELF_HOSTED_RUNBOOK.md`；VPS 調整 Studio 預設專案與 **cron heartbeat**；本機憑證備份檔與 `branch-protection.js` 等（路徑見當日 inbox 區塊）。Inbox 註記 **`git push`** 與部分 API key 仍占位。
+  - **codex**：Shared MCP 預設與 **AwareWave / SoulfulExpression** 命名對齊、`SUPABASE_AWAREWAVE_*`／`SUPABASE_SOULFULEXPRESSION_*` 與 **`SUPABASE_A_*`／`SUPABASE_B_*` fallback**；動及 `mcp/registry.template.json`、`mcp/user-env.template.ps1`、`mcp/README.md`、`mcp/SERVICE_MATRIX.md`、`mcp-local-wrappers/awarewave-ops-mcp.mjs`、`scripts/run-postgres-mcp.ps1`、`scripts/sync-mcp-config.ps1`、自架 runbook 與 **`TOOLS_DELIVERY_TRACEABILITY.md`**。Inbox 提醒：確認 **WORKLOG** 是否已完整記載 env migration／alias 與 **`supabase-b-postgres`** 對應關係（若文件仍缺則後續單開補段）。
+- **待辦（延續 inbox）**：`origin/main` 與本機未推送／未提交之關係以當下 **`git status`** 為準；Perplexity／Airtable 仍占位；SoulfulExpression → AwareWave 自架 Supabase 遷移仍規劃中。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:b6ffeefd59d7e6b0d386b6ada348e69ebeb75b1db6ae8665760666a33538b33e -->
+
+### system-backfill 2026-04-22 20:10
+
+- **完成（一句）**: 回填今日已執行之共享 MCP/治理與 AO 流程相關變更，避免 closeout-inbox 空白
+- **變更路徑**:
+  - `mcp/registry.template.json`
+  - `mcp/user-env.template.ps1`
+  - `mcp/README.md`
+  - `scripts/sync-mcp-config.ps1`
+  - `scripts/bootstrap-mcp-machine.ps1`
+  - `scripts/sanitize-user-mcp-config.ps1`
+  - `agency-os/docs/operations/collaborator-ai-agent-rules.md`
+  - `agency-os/docs/operations/closeout-inbox-TEMPLATE.md`
+  - `scripts/init-closeout-inbox.ps1`
+- **Git**:
+  - `0a6ab6d`, `95e6c5b`, `aec38cb`, `1908f2b`, `27fddb3`, `299d7a8`
+- **對應 TASKS 子字串（可選）**:
+  - `（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）`
+  - `Enterprise 工具層 Phase 1 正式串接`
+  - `三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）`
+- **風險／待辦（可選）**:
+  - `mcp/user-env.ps1` 尚未補齊所有必填 env，`mcp:governance` 會持續提示缺項
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:e1bae1cbbbde7615f401e62d14587d93cd50466f437c9463ea845896206c8b18 -->
+
+（以下可刪除；為當日第一則範例占位）
+
 ## 2026-04-22
 
 ### Monorepo 觀測與 MCP 啟動器收斂（已推送 `origin/main`）
@@ -722,7 +766,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-22 17:43:08 UTC_
+_Last synced: 2026-04-22 18:17:56 UTC_
 
 ## 2026-03-20
 
@@ -1150,15 +1194,4 @@ _Last synced: 2026-04-22 17:43:08 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
-
-
-
-
-
-
-
-
-
-
-
 

@@ -97,7 +97,7 @@ npm run mcp:governance
 
 ## 收工與同步
 
-- 關鍵字 **`AO-CLOSE`**：依 **`agency-os/.cursor/rules/40-shutdown-closeout.mdc`**；**repo 根**執行 **`.\scripts\ao-close.ps1`**（**正本**；**`agency-os\scripts\ao-close.ps1`** 僅 wrapper）。腳本含 **今日 recap**、**閘道**、**`apply-closeout-task-checkmarks`**（自 **`WORKLOG`** **`- AUTO_TASK_DONE:`** 打勾 **`TASKS`**）、預設 **commit + push**；health **100%** 與 **`AGENTS.md`** 一致。**勿**在僅 `lobster-factory` 子目錄執行。**`AUTO_TASK_DONE` 須寫在當日 `WORKLOG` 的 `##` 區塊且為單行純文字**（細節見 [`end-of-day-checklist.md`](agency-os/docs/operations/end-of-day-checklist.md) §0）。
+- 關鍵字 **`AO-CLOSE`**：**操作者只打這三字（或說收工／關機）**；**不必學** PowerShell 參數。細節與代理責任由 **`agency-os/.cursor/rules/40-shutdown-closeout.mdc`** 定義；實際收斂為在 monorepo 根由**代理**執行 **`.\scripts\ao-close.ps1`**（**正本**；**`agency-os\scripts\ao-close.ps1`** 僅 wrapper）。腳本含 scaffold、inbox 合併、recap、閘道、**`TASKS` 打勾**、completeness 檢查、預設 **commit + push**。**勿**在僅 `lobster-factory` 子目錄執行。補充說明見 [`end-of-day-checklist.md`](agency-os/docs/operations/end-of-day-checklist.md) §0、[`agency-os/memory/README.md`](agency-os/memory/README.md)。
 - **monorepo 根 `.cursor/rules`**（**`00`、`30`、`40`、`50`、`63–66`**）：正本在 **`agency-os/.cursor/rules`**；由 **`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 鏡像到根目錄（**`00`／`30`／`40`** 含路徑變換；**`verify-build-gates`** 預設會跑）。只改一邊會造成**規則分叉**。
 
 ## Related Documents (Auto-Synced)
@@ -106,5 +106,5 @@ npm run mcp:governance
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-04-22 17:29:51 UTC_
+_Last synced: 2026-04-22 18:17:56 UTC_
 

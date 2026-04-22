@@ -9,8 +9,11 @@ param(
     [switch]$SkipTodayRecap,
     [switch]$SkipAutoTaskCheckmarks,
     [switch]$SkipInboxGuard,
-    [ValidateSet("warn","strict","off")]
-    [string]$InboxGuardMode = "strict"
+    [ValidateSet("warn", "strict", "off")]
+    [string]$InboxGuardMode = "warn",
+    [ValidateSet("off", "warn", "strict")]
+    [string]$CompletenessGate = "strict",
+    [switch]$SkipCompletenessGate
 )
 
 Set-StrictMode -Version Latest

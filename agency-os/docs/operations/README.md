@@ -26,6 +26,9 @@
 | 協作 AI 規則（非收關者：inbox only） | [collaborator-ai-agent-rules.md](collaborator-ai-agent-rules.md) |
 | 多代理收件匣範本／初始化 | [closeout-inbox-TEMPLATE.md](closeout-inbox-TEMPLATE.md) · monorepo [`scripts/init-closeout-inbox.ps1`](../../../scripts/init-closeout-inbox.ps1) |
 | `TASKS` 自動打勾（`WORKLOG` → `- [x]`） | monorepo [`scripts/apply-closeout-task-checkmarks.ps1`](../../../scripts/apply-closeout-task-checkmarks.ps1)（由 **`ao-close.ps1`** 呼叫；`AUTO_TASK_DONE` 機讀格式見 [end-of-day-checklist.md](end-of-day-checklist.md) §0） |
+| 當日 **`WORKLOG` `##`**／**`memory/daily`** 機械補齊（占位） | monorepo [`scripts/ensure-daily-progress-scaffold.ps1`](../../../scripts/ensure-daily-progress-scaffold.ps1)（**`ao-close.ps1`** 開頭呼叫） |
+| **`closeout-inbox.md` → WORKLOG／daily（verbatim）+ CONVERSATION_MEMORY 指標** | monorepo [`scripts/merge-closeout-inbox-into-progress.ps1`](../../../scripts/merge-closeout-inbox-into-progress.ps1)（**`ao-close.ps1`** 於 recap 前呼叫；略過 `merged-to-worklog`／`example-agent` 區塊；**`CONVERSATION_MEMORY`** 僅加一行指到 **WORKLOG**） |
+| 收關證據閘（擋「有改檔卻無 WORKLOG 證據」） | monorepo [`scripts/verify-closeout-completeness.ps1`](../../../scripts/verify-closeout-completeness.ps1)（**`git add` 後**、**`commit` 前**；預設 **strict**；`-CompletenessGate`／`-SkipCompletenessGate`） |
 | 系統守護與通知 | [system-guard-and-notification.md](system-guard-and-notification.md) |
 | 系統操作 SOP | [system-operation-sop.md](system-operation-sop.md) |
 | Run ID 追溯規格 | [ONBOARDING_A10_2_RUN_ID_TRACEABILITY_SPEC.md](ONBOARDING_A10_2_RUN_ID_TRACEABILITY_SPEC.md) |

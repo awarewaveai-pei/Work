@@ -2,6 +2,8 @@
 
 > 目的：每次關機前**逐項打勾**，確保不疏漏、不重工，並留下可追溯證據（reports + 進度文件）。
 
+**給操作者（最簡版）**：只打 **`AO-CLOSE`**；**不要**自己記 `-CompletenessGate` 等參數。由 **Cursor 代理**依 **`40-shutdown-closeout.mdc`** 代寫 **WORKLOG** 證據、代跑 **`ao-close.ps1`**、代處理被擋下的重跑。下列清單給**要手動逐步對照**的人用，與一鍵不衝突。
+
 ## 0) 先決條件（遇到阻塞先停）
 - [ ] 若存在 `ALERT_REQUIRED.txt`：先處理/回報原因，**不可帶著 FAIL 收工**
 - [ ] **日內 Git（與 `REMOTE_WORKSTATION_STARTUP` §2.5 一致）**：開工後代理可能已代跑多顆**本機** checkpoint commit（未 push）；收工 `ao-close.ps1` 仍會做最後 **`git add`／`commit`／`push`**，把未推的 commits 一併送上（通過閘道後）。
@@ -18,7 +20,7 @@
 
 1. **指定唯一「收關代理」**（同一輪只由一個 Cursor／Claude 對話執行 **§2 的 `ao-close.ps1`**；其餘代理**不跑** `git push`／**不**對上述三檔做最終寫入）。
 2. **其他代理只交「素材」**：在 **`agency-os/.agency-state/closeout-inbox.md`**（**已納入版控**，可跟 `git pull` 同步）用 Markdown 條列：對話 ID／完成項一句／相關 commit hash 或檔案路徑。**禁止**多人同時改 `WORKLOG` 當日區塊當「草稿本」。
-3. **收關代理合併（仍由使用者只在收關 Cursor 打 `AO-CLOSE` 觸發；不必另下指令）**：讀協作收件匣（`agency-os/.agency-state/closeout-inbox.md`，工作區根僅 `agency-os` 時為 `.agency-state/closeout-inbox.md`）+ 各對話已 merge 的 **code** +（必要時）`print-today-closeout-recap`，在 **rule 40 第 1 步** **一次寫** `WORKLOG`（含 `- AUTO_TASK_DONE:`）、`memory`、`daily`；**`ao-close.ps1` 成功 push 後**清空或刪除 inbox。
+3. **Inbox → 進度檔**：**`ao-close.ps1`** 內 **`merge-closeout-inbox-into-progress.ps1`** 會將可匯區塊 **verbatim** 併入當日 **`WORKLOG`**／**`memory/daily`** 並自範本**重置 inbox**（不必手動清空）。收關代理仍須在**呼叫腳本前**補 **`AUTO_TASK_DONE:`**（與可選 **`CONVERSATION_MEMORY`** 精簡），見 **rule 40**。
 4. **分支策略（強烈建議）**：並行開發用**不同 branch** 或至少不同 prefix commit；收關前 **`git merge`** / PR 合進當日工作分支，再跑 **`ao-close.ps1`**，降低同檔二頭馬。
 5. **長 commit 訊息**：用 **`-CommitMessageFile path\to\msg.txt`**（UTF-8）取代一行 `-CommitMessage`；`ao-close.ps1` 會在 commit 前擋 **staged diff 含 `<<<<<<<` 衝突標記**。
 6. **協作 AI 規則（給 Codex／其他 Cursor／Claude）**：[collaborator-ai-agent-rules.md](collaborator-ai-agent-rules.md)（內含一鍵貼上區塊）。
@@ -31,7 +33,7 @@
 
 - **使用者**：在**收關** Cursor 對話打 **`AO-CLOSE`** 即可（與單代理相同）。**收關代理**須在執行腳本前完成 rule **第 1 步**（**含**：若存在協作收件匣，讀取並併入進度檔；**勿**僅留 inbox 不寫 WORKLOG／memory）。
 - [ ] `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`
-  - 預設順序（詳見腳本與 **`.cursor/rules/40-shutdown-closeout.mdc` 第 2 步**）：**`print-today-closeout-recap`** →（push 模式）**`git fetch`／落後攔截**→ **`verify-build-gates`** → **`system-guard`** → **`generate-integrated-status-report`** → health **100%** 檢查 → **`apply-closeout-task-checkmarks`** → **`git add`／`commit`／`push`**
+  - 預設順序（詳見腳本與 **`.cursor/rules/40-shutdown-closeout.mdc` 第 2 步**）：**`ensure-daily-progress-scaffold`** → **closeout inbox guard**（預設 **warn**）→ **`merge-closeout-inbox-into-progress`**（verbatim 併入後重置 inbox）→ **`print-today-closeout-recap`** →（push 模式）**`git fetch`／落後攔截**→ **`verify-build-gates`** → **`system-guard`** → **`generate-integrated-status-report`** → health **100%** 檢查 → **`apply-closeout-task-checkmarks`** → **`git add`** → **`verify-closeout-completeness`**（預設 **strict**）→ **`commit`／`push`**
   - **全程 PASS**：推上後**公司機 `pull` 即完整**
   - **任一步 FAIL**：**不會 push**
   - 今夜不推遠端：`-SkipPush`（仍跑閘道與產報）
@@ -71,7 +73,7 @@
 - [ ] `WORKLOG.md`
   - [ ] 寫下今天「做了什麼」與 closeout 證據檔名
 - [ ] `memory/CONVERSATION_MEMORY.md`
-  - [ ] 更新 Today/Remaining/Tomorrow（保持可續接）
+  - [ ] 更新 Today/Remaining/Tomorrow（保持可續接）；**若當日有協作 inbox 匯入**：**`ao-close.ps1`** 內 **`merge-closeout-inbox-into-progress.ps1`** 會在 **`## Current Operating Context`** 自動插入**一則指標列**（指向當日 **WORKLOG** 的 verbatim 區塊），**不取代**你手寫的長期濃縮敘事
 - [ ] `memory/daily/YYYY-MM-DD.md`
   - [ ] **`YYYY-MM-DD` = 收工當日本機日曆**（與 **`print-today-closeout-recap`**／**`40-shutdown-closeout.mdc`** 一致，不依對話開始日）
   - [ ] 補上 closeout 三步 PASS 的證據檔名（closeout/health/guard）
@@ -85,5 +87,5 @@
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-22 17:43:08 UTC_
+_Last synced: 2026-04-22 18:17:56 UTC_
 

@@ -285,6 +285,7 @@
 
 | 檔案 | 用途 |
 |:---|:---|
+| [memory/README.md](memory/README.md) | **本目錄各檔誰寫、AO-CLOSE／AO-RESUME 會不會動**（建議先讀） |
 | [CONVERSATION_MEMORY.md](memory/CONVERSATION_MEMORY.md) | 跨會話摘要 |
 | [SESSION_TEMPLATE.md](memory/SESSION_TEMPLATE.md) | 摘要模板 |
 

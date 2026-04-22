@@ -8,38 +8,36 @@ alwaysApply: true
 **`AO-CLOSE` 關鍵字與收工回覆格式（今日完成／未完成／連動檢查／明日優先）維持不變。**  
 目標：使用者收工前打 `AO-CLOSE` 後，**本機通過完整閘道、產出報告、並推上 GitHub**，公司電腦 **`git pull` 即得完整可續接狀態**（含龍蝦治理 + Agency 連動 + 綜合狀態檔）。
 
-**使用者仍只打 `AO-CLOSE`（或同等收工意圖）即可；不必改口說「先合併 inbox」**——**收關代理**須自動做完下方 **第 1 步**（進度檔，**含**多代理時讀取並消化 `closeout-inbox.md`）再跑 **第 2 步** `ao-close.ps1`。
+**給使用者（你只要這樣）**：輸入 **`AO-CLOSE`**（或「收工」「關機」等同等意圖）即可；**不必學** PowerShell 參數（例如 **`-CompletenessGate`**、**`-SkipPush`** 僅限代理除錯或你明示特例外由代理代打）。
 
-**預設操作者模型**：流程與檔案寫入**由 AI 代理執行**；規則下文「代理必須…」即對本輪代理的硬性要求。
+**給代理（關鍵字 = 整包收工授權）**：收到 **`AO-CLOSE`** 後，**同一輪**內必須自行完成再呼叫腳本：**（1）**依 **`TASKS.md`**＋當輪可驗證事實，在當日 **`WORKLOG.md`** 補 **`- AUTO_TASK_DONE:`**（或已觸發 **`merge-closeout-inbox`** 所需之協作素材在 inbox）；**（2）**可選：濃縮 **`memory/CONVERSATION_MEMORY.md`**（長期敘事腳本不代寫）；**（3）**在 monorepo 根執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`** 至 **exit 0**；若 **`verify-closeout-completeness`** 擋下，**代理自修 WORKLOG 證據後重跑**，不要丟給使用者背指令。
 
-**`AO-CLOSE` 關鍵字 = 內含授權（無須再加一句口頭指令）**：使用者只須打 **`AO-CLOSE`**（或「收工／關機」等同等意圖），等同要求代理在跑 **`ao-close.ps1` 之前**已做完：併讀 **`TASKS.md`** 尚未 `- [x]` 之項、**當輪對話中可驗證之完成事實**（＋必要時先跑／對照 **`scripts/print-today-closeout-recap.ps1`** 輸出），對**每一項本輪已達 DoD** 者在 **`WORKLOG.md`** 當日 **`## yyyy-MM-dd`** 下補 **`- AUTO_TASK_DONE: <唯一子字串>`**。**禁止**要求使用者再打字如「照對話全寫進 AUTO_TASK_DONE」才動手。  
-- 若證據不足、無法判定是否完成：**只問一個**針對性確認題；仍由代理代寫 **`AUTO_TASK_DONE`**（或明示留待下一輪），**不要求**使用者親編 WORKLOG 機器行。
+**單一路徑（機械）**：**`ao-close.ps1`** 內含 scaffold、inbox guard、**`merge-closeout-inbox-into-progress`**（verbatim → **WORKLOG**／**daily**、**CONVERSATION_MEMORY** 指標、重置 inbox）、recap、閘道、**`apply-closeout-task-checkmarks`**、**`git add`**、**`verify-closeout-completeness`（預設 strict）**、commit／push。結尾會印 **`automation boundary`** 供對照。若 completeness **擋 commit**：**代理**補齊當日 **WORKLOG** 證據後**重跑**；操作者**不必**學 **`-CompletenessGate`**；僅你**明示特急**時由代理代下寬鬆旗標並在回覆**註明風險**。
 
-**多代理（並行 4–5 個 AI）**：**唯一收關者**跑 **`ao-close.ps1`**；其餘代理**不**同時改 `WORKLOG.md`／`memory/CONVERSATION_MEMORY.md`／`TASKS.md` 當日定稿——只往 **`agency-os/.agency-state/closeout-inbox.md`**（可版控；工作區根僅 `agency-os` 時為 **`.agency-state/closeout-inbox.md`**）append 素材（對話標記、完成一句、commit／路徑）。**收關者在第 1 步**寫入 WORKLOG／memory／daily／`AUTO_TASK_DONE` 時，**須一併讀取並消化**該 inbox（若存在）；**push 成功後**清空或刪除 inbox，避免隔夜誤用。**無** inbox 時第 1 步仍照常。長 commit 用 **`-CommitMessageFile`**（見 **`docs/operations/end-of-day-checklist.md` §0.5**）。**給非收關協作 AI 的全文規則**：**`docs/operations/collaborator-ai-agent-rules.md`**（Codex／ChatGPT／**非收關之**其他 Cursor 視窗可貼用）；本機無 inbox 時 **`scripts/init-closeout-inbox.ps1`**（monorepo 根）。
+**`AO-CLOSE` 關鍵字 = 內含授權**：**禁止**要求使用者再加一句「去寫 AUTO_TASK_DONE」才動手；證據不足時代理**只問一題**。
+
+**多代理**：非收關者**只 append** **`agency-os/.agency-state/closeout-inbox.md`**；**`ao-close.ps1`** 會在開頭將可匯區塊 **verbatim** 併入 **`WORKLOG`**／**`memory/daily`**，並在 **`memory/CONVERSATION_MEMORY.md`** 的 **`## Current Operating Context`** 加**一則指標列**，然後自範本**重置 inbox**（見 **`docs/operations/collaborator-ai-agent-rules.md`**）。長 commit：**`-CommitMessageFile`**（**`end-of-day-checklist.md` §0.5**）。
 
 When the user indicates end of day or shutdown intent (examples: `AO-CLOSE`,
 "要關機", "收工", "今天先到這"), run this closeout sequence before ending:
 
-1. **First** update progress files (so the next step can commit them):
-   - **協作收件匣（若存在）**：monorepo 根視角為 **`agency-os/.agency-state/closeout-inbox.md`**；工作區根若**僅**為 **`agency-os`** 資料夾則為 **`.agency-state/closeout-inbox.md`**。讀取後將條目併入當日 **`WORKLOG.md`**／**`memory/CONVERSATION_MEMORY.md`**／**`memory/daily/YYYY-MM-DD.md`** 與 **`AUTO_TASK_DONE`** 所需內容（與上文「多代理」一致）；**不得**把 inbox 當唯一紀錄而不寫進版控進度檔。
-   - `TASKS.md`（**預設不必手動勾選**：由代理在 **`WORKLOG.md`** 當日區塊寫 **`- AUTO_TASK_DONE: <子字串>`**，**`ao-close`** 內 **`apply-closeout-task-checkmarks`** 自動翻 `- [ ]`→`- [x]`；**見上文：打 AO-CLOSE 即觸發代理代寫，無須使用者加句**）
-   - `WORKLOG.md`
-   - `memory/CONVERSATION_MEMORY.md`
-   - `memory/daily/YYYY-MM-DD.md`（**`YYYY-MM-DD` 必須與收工時本機系統日曆一致**，並與 **`print-today-closeout-recap`** 標題列之日期相同；**不得**僅依「對話開始日」或使用者口頭「今天」臆測。跨日長對話時仍寫入 **收工當日** 之檔名；`WORKLOG.md` 之 **`## yyyy-MM-dd`** 同則：收工摘要落在 **機器日** 對應區塊。）
-   - **若使用者記不得今日完成**：**建議**先跑 **`scripts/print-today-closeout-recap.ps1`** 對照 **Git 今日 commit**／**`WORKLOG` 今日區塊**後再補齊上述檔案；**`ao-close.ps1` 開頭仍會再印同摘要**供複核。代理應依**當日對話 + 該摘要**代寫進度檔，再進第 2 步。
+1. **Before** invoking the script (same Cursor turn): 代理依 **`TASKS.md`**／當輪事實，在 **`WORKLOG.md`** 當日 **`## yyyy-MM-dd`** 補 **`- AUTO_TASK_DONE: <子字串>`**（可選更新 **`memory/CONVERSATION_MEMORY.md`**）。**日期**一律 **收工機器日**（與 **`print-today-closeout-recap`** 標題一致）。若記不得今日完成：可先跑 **`scripts/print-today-closeout-recap.ps1`** 對照；**`ao-close.ps1` 內也會再印 recap**。
 2. Run **one-shot closeout + GitHub push** from the current repo root:
    `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`
    If `.\scripts\ao-close.ps1` is missing, retry:
    `powershell -ExecutionPolicy Bypass -File .\agency-os\scripts\ao-close.ps1`
-   - **`ao-close.ps1` 內部順序**（與 Checklist **§1a** 一致；正本 **`agency-os/docs/operations/end-of-day-checklist.md`**；細節以腳本為準）：
-     1. **`print-today-closeout-recap`**（`-SkipTodayRecap` 略過）
-     2. （未 `-SkipPush`）**`git fetch`**；若落後 **`origin/<目前分支>`** → **中止**（`-AllowPushWhileBehind` 僅例外）
-     3. **`verify-build-gates`**（`-SkipVerify` 略過；**不建議**跨機前略過）
-     4. **`system-guard -Mode manual`**（內含 doc-sync + health + guard + `LAST_SYSTEM_STATUS.md`）
-     5. **`generate-integrated-status-report`** → `reports/status/integrated-status-LATEST.md`
-     6. 預設 health **100%**（`-AllowNonPerfectHealth` 僅明示核准）
-     7. **`apply-closeout-task-checkmarks`**（`-SkipAutoTaskCheckmarks` 略過；讀 **WORKLOG `AUTO_TASK_DONE`** ± **pending 檔**）
-     8. （未 `-SkipPush`）**`git add -A`** → 有變更則 **`commit`** → **`git push origin <branch>`**
+   - **`ao-close.ps1` 內部順序**（與 Checklist **§1a** 一致；細節以腳本註解與原始碼為準）：
+     1. **`ensure-daily-progress-scaffold.ps1`**（有則跑；補當日 **`WORKLOG` `##`**／**`memory/daily`** 檔；占位可為 `(TBD)`）
+     2. **closeout inbox guard**（`-SkipInboxGuard`／`-InboxGuardMode`；預設 **warn**）
+     3. **`merge-closeout-inbox-into-progress.ps1`**（有則跑；**verbatim** 併入 **WORKLOG**／**`memory/daily`**，並在 **`CONVERSATION_MEMORY.md`** 的 **`## Current Operating Context`** 下插入**指標列**（非全文重寫）；然後自範本重置 inbox）
+     4. **`print-today-closeout-recap`**（`-SkipTodayRecap` 略過）
+     5. （未 `-SkipPush`）**`git fetch`**；若落後 **`origin/<目前分支>`** → **中止**（`-AllowPushWhileBehind` 僅例外）
+     6. **`verify-build-gates`**（`-SkipVerify` 略過；**不建議**跨機前略過）
+     7. **`system-guard -Mode manual`**（內含 doc-sync + health + guard + `LAST_SYSTEM_STATUS.md`）
+     8. **`generate-integrated-status-report`** → `reports/status/integrated-status-LATEST.md`
+     9. 預設 health **100%**（`-AllowNonPerfectHealth` 僅明示核准）
+     10. **`apply-closeout-task-checkmarks`**（`-SkipAutoTaskCheckmarks` 略過；讀 **WORKLOG `AUTO_TASK_DONE`** ± **pending 檔**）
+     11. （未 `-SkipPush`）**`git add -A`** → **`verify-closeout-completeness.ps1`**（預設 **`-CompletenessGate strict`**；可 **`-SkipCompletenessGate`**）→ 有變更則 **`commit`** → **`git push origin <branch>`**
    - Execute from a folder that is the git repository root (or contains `agency-os/`).
 3. Confirm：`verify-build-gates` 與 guard 路徑皆 **PASS**，且 push 成功（或依使用者要求正確使用 `-SkipPush`）。
 

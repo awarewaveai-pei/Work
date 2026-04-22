@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-23 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-23 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:e1bae1cbbbde7615f401e62d14587d93cd50466f437c9463ea845896206c8b18 -->
 - **2026-04-22（雙機前提固定）**：使用者目前為 **雙機模式**：**公司桌機** + **回家筆電**。後續凡涉及 **MCP／AI 客戶端／本機環境／AO-RESUME 對齊／Secrets／依賴安裝**，一律以「**repo 共用結構、兩台機器各自持有 env/vault/user-level config**」為前提；**不得**再假設只有單機，亦**不得**建議直接複製另一台機器的明文設定檔（如 `~/.cursor/mcp.json`、`~/.claude.json`）到本機。Shared MCP 真相為 **`mcp/registry.template.json` + `scripts/sync-mcp-config.ps1`**；舊機明文清理腳本為 **`scripts/sanitize-user-mcp-config.ps1`**。
 - **2026-04-22（晚：monorepo 推送與收工）**：已將 observability／sync／`run-postgres-mcp.ps1`／template 等變更收斂為 **`32c3c85`** 並 **`git push origin main`**（含先前未推之 **`d6dbb05`**）；**`main`** 已設 **`origin/main`** upstream。本輪 **`TASKS`** 無可機讀 **`AUTO_TASK_DONE`** 之單項 DoD 完成宣告（Enterprise Phase 1／三檔巡檢仍為開放項）。收工跑 **`AO-CLOSE`** → **`ao-close.ps1`** 以產 closeout／health／guard 報告並再 push（若有 doc-sync 變更）。
 - **2026-04-22（Observability 實機驗證與 Kuma 去重）**：已實機執行 `Netdata -> Slack` drill（webhook `200 ok` + Netdata `WARNING/CRITICAL/CLEAR` 測試皆成功）；以 Kuma socket API 新建 13 筆 monitor（6 public HTTP、6 SSL、1 heartbeat）且未直寫 DB；其後已做告警去重，保留 `endpoint-alert.sh -> Slack` 作 public outage 主告警，Kuma 僅保留 `SSL expiry`、`endpoint-alert-heartbeat` 與既有內部 monitor 的 Slack。`endpoint-alert.sh` 已新增 `HEARTBEAT_URL` 並同步上 VPS，heartbeat 已在 Kuma 顯示 `OK`。殘留風險：Kuma 內仍有一筆舊 monitor 的 `accepted_statuscodes_json` 歷史格式錯誤，需 UI 重存修復。
@@ -352,5 +353,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-22 17:43:08 UTC_
+_Last synced: 2026-04-22 18:17:56 UTC_
 

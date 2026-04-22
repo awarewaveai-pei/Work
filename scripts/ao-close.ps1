@@ -1,8 +1,10 @@
-# AO-CLOSE: print-today-closeout-recap (see -SkipTodayRecap) -> verify-build-gates ->
+# AO-CLOSE: ensure-daily-progress-scaffold -> closeout inbox guard -> merge-closeout-inbox-into-progress ->
+#   print-today-closeout-recap (see -SkipTodayRecap) -> verify-build-gates ->
 #   system-guard (doc-sync + health + guard) -> generate integrated-status report ->
-#   optional apply-closeout-task-checkmarks -> git commit + push.
+#   optional apply-closeout-task-checkmarks -> git add -> verify-closeout-completeness -> git commit + push.
 # -CommitMessageFile: UTF-8 file passed to "git commit -F" (multiline safe). Staged diff must not contain +<<<<<<< conflict markers.
-# Run AFTER updating TASKS.md, WORKLOG.md, and memory files so they are included in the commit.
+# Inbox: guard runs before merge; merge appends verbatim payload to WORKLOG + memory/daily then resets inbox from TEMPLATE.
+# Optional: refine WORKLOG prose in Cursor after AO-CLOSE (not required for PASS).
 # apply-closeout-task-checkmarks: WORKLOG today "- AUTO_TASK_DONE: <substring>" + optional
 # agency-os/.agency-state/pending-task-completions.txt (gitignored).
 # Primary: monorepo root scripts\ao-close.ps1. agency-os\scripts\ao-close.ps1 is a thin wrapper (same flags).
@@ -22,7 +24,10 @@ param(
     [switch]$SkipAutoTaskCheckmarks,
     [switch]$SkipInboxGuard,
     [ValidateSet("warn","strict","off")]
-    [string]$InboxGuardMode = "strict"
+    [string]$InboxGuardMode = "warn",
+    [ValidateSet("off", "warn", "strict")]
+    [string]$CompletenessGate = "strict",
+    [switch]$SkipCompletenessGate
 )
 
 Set-StrictMode -Version Latest
@@ -48,6 +53,88 @@ $guardScript = Join-Path $agencyRoot "scripts\system-guard.ps1"
 if (-not (Test-Path -LiteralPath $guardScript)) {
     Write-Error "ao-close: missing system-guard at $guardScript"
     exit 1
+}
+
+$scaffoldScript = Join-Path $WorkRoot "scripts\ensure-daily-progress-scaffold.ps1"
+if (Test-Path -LiteralPath $scaffoldScript) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scaffoldScript -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "ao-close: ensure-daily-progress-scaffold failed (exit $LASTEXITCODE)."
+        exit $LASTEXITCODE
+    }
+}
+
+# Inbox guard (before merge resets inbox). Default warn: do not block solo second close after auto-merge.
+if (-not $SkipInboxGuard -and $InboxGuardMode -ne "off") {
+    Write-Host "== AO-CLOSE: closeout inbox guard ($InboxGuardMode) ==" -ForegroundColor Cyan
+    Push-Location $WorkRoot
+    try {
+        $today = Get-Date
+        $dayStart = (Get-Date -Year $today.Year -Month $today.Month -Day $today.Day -Hour 0 -Minute 0 -Second 0)
+        $since = $dayStart.ToString("yyyy-MM-dd HH:mm:ss")
+        $branch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim()
+        if ([string]::IsNullOrWhiteSpace($branch) -or $branch -eq "HEAD") {
+            Write-Host "AO-CLOSE inbox guard: detached HEAD; skip commit coverage check." -ForegroundColor DarkGray
+            $todayCommits = @()
+        } else {
+            $remoteRef = "origin/$branch"
+            git rev-parse --verify $remoteRef 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $logRange = "$remoteRef..HEAD"
+            } else {
+                $logRange = "HEAD"
+            }
+            $todayCommits = @(
+                git log $logRange --since="$since" --pretty=format:"%h" 2>$null |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            )
+        }
+
+        if ($todayCommits.Count -gt 0) {
+            $inboxPath = Join-Path $WorkRoot "agency-os\.agency-state\closeout-inbox.md"
+            $inboxExists = Test-Path -LiteralPath $inboxPath
+            if (-not $inboxExists) {
+                $msg = "ao-close: closeout-inbox missing at $inboxPath. Run scripts\init-closeout-inbox.ps1 and append today's entries."
+                if ($InboxGuardMode -eq "strict") {
+                    Write-Error $msg
+                    exit 1
+                }
+                Write-Warning $msg
+            } else {
+                $inboxText = Get-Content -LiteralPath $inboxPath -Raw -Encoding UTF8
+                $todayToken = $today.ToString("yyyy-MM-dd")
+                $hasTodaySection = [regex]::IsMatch(
+                    $inboxText,
+                    "(?m)^###\s+(?!example-agent\b).*" + [regex]::Escape($todayToken) + ".*$",
+                    [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+                )
+
+                if (-not $hasTodaySection) {
+                    $msg = "ao-close: unpushed commits exist today ($($todayCommits.Count)), but closeout-inbox has no real section for $todayToken. Add: '### <AGENT_ID> <yyyy-MM-dd HH:mm>' (or rely on merge after other agents append)."
+                    if ($InboxGuardMode -eq "strict") {
+                        Write-Error $msg
+                        exit 1
+                    }
+                    Write-Warning $msg
+                }
+            }
+        } else {
+            Write-Host "No unpushed commits today on current branch; inbox guard skipped." -ForegroundColor DarkGray
+        }
+    } finally {
+        Pop-Location
+    }
+} elseif ($SkipInboxGuard -or $InboxGuardMode -eq "off") {
+    Write-Host "== AO-CLOSE: inbox guard disabled ==" -ForegroundColor DarkYellow
+}
+
+$mergeInboxScript = Join-Path $WorkRoot "scripts\merge-closeout-inbox-into-progress.ps1"
+if (Test-Path -LiteralPath $mergeInboxScript) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mergeInboxScript -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "ao-close: merge-closeout-inbox-into-progress failed (exit $LASTEXITCODE)."
+        exit $LASTEXITCODE
+    }
 }
 
 $recapScript = Join-Path $WorkRoot "scripts\print-today-closeout-recap.ps1"
@@ -97,73 +184,6 @@ if (-not $SkipPush -and -not $AllowPushWhileBehind) {
     }
 } elseif ($AllowPushWhileBehind) {
     Write-Host "== AO-CLOSE: -AllowPushWhileBehind set; skipping behind-remote guard ==" -ForegroundColor Yellow
-}
-
-# Inbox guard modes:
-# - strict (default): fail closeout when missing.
-# - warn: report missing inbox entry but do not block closeout.
-# - off: disable check entirely.
-if (-not $SkipInboxGuard -and $InboxGuardMode -ne "off") {
-    Write-Host "== AO-CLOSE: closeout inbox guard ($InboxGuardMode) ==" -ForegroundColor Cyan
-    Push-Location $WorkRoot
-    try {
-        $today = Get-Date
-        $dayStart = (Get-Date -Year $today.Year -Month $today.Month -Day $today.Day -Hour 0 -Minute 0 -Second 0)
-        $since = $dayStart.ToString("yyyy-MM-dd HH:mm:ss")
-        $branch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim()
-        if ([string]::IsNullOrWhiteSpace($branch) -or $branch -eq "HEAD") {
-            Write-Host "AO-CLOSE inbox guard: detached HEAD; skip commit coverage check." -ForegroundColor DarkGray
-            $todayCommits = @()
-        } else {
-            $remoteRef = "origin/$branch"
-            git rev-parse --verify $remoteRef 2>$null | Out-Null
-            if ($LASTEXITCODE -eq 0) {
-                $logRange = "$remoteRef..HEAD"
-            } else {
-                $logRange = "HEAD"
-            }
-            $todayCommits = @(
-                git log $logRange --since="$since" --pretty=format:"%h" 2>$null |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-            )
-        }
-
-        if ($todayCommits.Count -gt 0) {
-            $inboxPath = Join-Path $WorkRoot "agency-os\.agency-state\closeout-inbox.md"
-            $inboxExists = Test-Path -LiteralPath $inboxPath
-            if (-not $inboxExists) {
-                $msg = "ao-close: closeout-inbox missing at $inboxPath. Run scripts\init-closeout-inbox.ps1 and append today's entries."
-                if ($InboxGuardMode -eq "strict") {
-                    Write-Error $msg
-                    exit 1
-                }
-                Write-Warning $msg
-            } else {
-                $inboxText = Get-Content -LiteralPath $inboxPath -Raw -Encoding UTF8
-                $todayToken = $today.ToString("yyyy-MM-dd")
-                $hasTodaySection = [regex]::IsMatch(
-                    $inboxText,
-                    "(?m)^###\s+(?!example-agent\b).*" + [regex]::Escape($todayToken) + ".*$",
-                    [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
-                )
-
-                if (-not $hasTodaySection) {
-                    $msg = "ao-close: unpushed commits exist today ($($todayCommits.Count)), but closeout-inbox has no real section for $todayToken. Add: '### <AGENT_ID> <yyyy-MM-dd HH:mm>'."
-                    if ($InboxGuardMode -eq "strict") {
-                        Write-Error $msg
-                        exit 1
-                    }
-                    Write-Warning $msg
-                }
-            }
-        } else {
-            Write-Host "No unpushed commits today on current branch; inbox guard skipped." -ForegroundColor DarkGray
-        }
-    } finally {
-        Pop-Location
-    }
-} elseif ($SkipInboxGuard -or $InboxGuardMode -eq "off") {
-    Write-Host "== AO-CLOSE: inbox guard disabled ==" -ForegroundColor DarkYellow
 }
 
 $verifyScript = Join-Path $WorkRoot "scripts\verify-build-gates.ps1"
@@ -233,14 +253,12 @@ if (-not $SkipAutoTaskCheckmarks -and (Test-Path -LiteralPath $applyMarks)) {
     Write-Host "== AO-CLOSE: -SkipAutoTaskCheckmarks（略過自動打勾）==" -ForegroundColor DarkYellow
 }
 
-$closeoutInbox = Join-Path $WorkRoot "agency-os\.agency-state\closeout-inbox.md"
-$collabRules = Join-Path $WorkRoot "agency-os\docs\operations\collaborator-ai-agent-rules.md"
-if (Test-Path -LiteralPath $closeoutInbox) {
-    Write-Host "== AO-CLOSE: agency-os/.agency-state/closeout-inbox.md exists. Merge into WORKLOG/memory, then clear inbox to avoid stale notes. ==" -ForegroundColor Yellow
-    if (Test-Path -LiteralPath $collabRules) {
-        Write-Host "   (multi-agent rules for other AIs: agency-os/docs/operations/collaborator-ai-agent-rules.md)" -ForegroundColor DarkYellow
-    }
-}
+Write-Host ""
+Write-Host "=== AO-CLOSE: automation boundary (every run) ===" -ForegroundColor Cyan
+Write-Host "SCRIPT DID: daily scaffold; inbox guard; merge-closeout-inbox (verbatim -> WORKLOG + memory/daily + CONVERSATION_MEMORY pointer); recap; verify/guard/report; apply AUTO_TASK_DONE -> TASKS; after git add, verify-closeout-completeness (default strict) before commit." -ForegroundColor Green
+Write-Host "SCRIPT DID NOT: infer task completion; write AUTO_TASK_DONE lines; write long-form CONVERSATION_MEMORY; touch LAST_AO_RESUME_BRIEF (AO-RESUME only) or SESSION_TEMPLATE." -ForegroundColor Yellow
+Write-Host "If you expected those, the Cursor agent must do them BEFORE this script in the same AO-CLOSE turn. Legend: agency-os/memory/README.md" -ForegroundColor DarkGray
+Write-Host ""
 
 if ($SkipPush) {
     Write-Host "== AO-CLOSE: -SkipPush set; skipping git commit/push ==" -ForegroundColor Yellow
@@ -273,6 +291,16 @@ try {
     if ($patch -match '(?m)^\+<<<<<<< ') {
         Write-Error "ao-close: staged diff contains merge conflict markers (+<<<<<<<). Resolve conflicts before commit."
         exit 1
+    }
+
+    $complScript = Join-Path $WorkRoot "scripts\verify-closeout-completeness.ps1"
+    if (-not $SkipCompletenessGate -and (Test-Path -LiteralPath $complScript)) {
+        Write-Host "== AO-CLOSE: verify-closeout-completeness ($CompletenessGate) ==" -ForegroundColor Cyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $complScript -WorkRoot $WorkRoot -Gate $CompletenessGate
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "ao-close: verify-closeout-completeness failed (exit $LASTEXITCODE). Add today WORKLOG evidence (- AUTO_TASK_DONE: and/or inbox merge block) or use -CompletenessGate warn / -SkipCompletenessGate."
+            exit $LASTEXITCODE
+        }
     }
 
     $hasStaged = $staged.Count -gt 0
@@ -314,6 +342,7 @@ try {
         exit 1
     }
     Write-Host "ao-close: done (verify + guard + integrated report + push OK)." -ForegroundColor Green
+    Write-Host "Re-read the automation boundary block above if anything feels missing." -ForegroundColor DarkGray
 } finally {
     Pop-Location
 }
