@@ -11,6 +11,7 @@ This directory is the single source of truth for MCP server definitions that nee
 
 - `registry.template.json`: committed MCP server registry with no secrets
 - `user-env.template.ps1`: committed example for machine-local environment variables
+- `SERVICE_MATRIX.md`: which services use direct MCP versus the local AwareWave wrapper
 
 ## Standard flow
 
@@ -51,6 +52,29 @@ This writes:
 4. Run `npm run mcp:bootstrap`.
 5. Open a new terminal.
 6. Start `codex`, `copilot`, or `gemini`.
+
+## AwareWave Fleet Control
+
+The shared setup now covers:
+
+- `n8n`
+- `Supabase B`
+- `Supabase A`
+- `Trigger.dev`
+- `Cloudflare`
+- `PostHog`
+- `Resend`
+- `GitHub`
+- `api.aware-wave.com`
+- `app.aware-wave.com`
+- `Hetzner`
+- `Uptime Kuma`
+- `Grafana`
+- `Netdata`
+- `Slack`
+- `Sentry`
+
+See [`SERVICE_MATRIX.md`](SERVICE_MATRIX.md) for how each one is connected.
 
 ## Design rules
 
