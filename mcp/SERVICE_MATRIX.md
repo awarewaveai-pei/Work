@@ -2,6 +2,8 @@
 
 This matrix describes how the shared MCP setup reaches each AwareWave service.
 
+**Narrative SSOT (部署型態、人讀步驟、憑證欄位名)**: `agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` **§0.1**. If this file and §0.1 disagree on **naming or policy**, **§0.1 + `cursor-mcp-and-plugin-inventory.md` win**; update this matrix in the same PR.
+
 ## Direct or official MCP
 
 - `GitHub`: official GitHub MCP server

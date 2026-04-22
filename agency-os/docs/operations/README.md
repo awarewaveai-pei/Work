@@ -22,6 +22,7 @@
 | 說明 | 檔案 |
 |:---|:---|
 | 收工／關機 Checklist | [end-of-day-checklist.md](end-of-day-checklist.md) |
+| AI／代理操作路徑（MCP·API·SSH） | [TOOLS_DELIVERY_TRACEABILITY.md](TOOLS_DELIVERY_TRACEABILITY.md) **§0.1**、monorepo 根 `mcp/SERVICE_MATRIX.md` |
 | 協作 AI 規則（非收關者：inbox only） | [collaborator-ai-agent-rules.md](collaborator-ai-agent-rules.md) |
 | 多代理收件匣範本／初始化 | [closeout-inbox-TEMPLATE.md](closeout-inbox-TEMPLATE.md) · monorepo [`scripts/init-closeout-inbox.ps1`](../../../scripts/init-closeout-inbox.ps1) |
 | `TASKS` 自動打勾（`WORKLOG` → `- [x]`） | monorepo [`scripts/apply-closeout-task-checkmarks.ps1`](../../../scripts/apply-closeout-task-checkmarks.ps1)（由 **`ao-close.ps1`** 呼叫；`AUTO_TASK_DONE` 機讀格式見 [end-of-day-checklist.md](end-of-day-checklist.md) §0） |

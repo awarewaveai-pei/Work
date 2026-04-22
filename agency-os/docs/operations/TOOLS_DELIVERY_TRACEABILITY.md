@@ -39,8 +39,37 @@
 | **全庫穩定化（觀測／DR／gate）** | 30 年級底座 | 本檔能力表＋[`PLAN_30Y_STABILITY_HARDENING.md`](../governance-plans/PLAN_30Y_STABILITY_HARDENING.md) | 同左 |
 | **規則治理（Cursor／AO）** | 單一 Owner、鏡像 | [`rules-version-and-enforcement.md`](rules-version-and-enforcement.md) | [`PLAN_30_YEAR_RULE_CONSOLIDATION.md`](../governance-plans/PLAN_30_YEAR_RULE_CONSOLIDATION.md)、[`PLAN_RULES_STABILITY_CONSOLIDATION.md`](../governance-plans/PLAN_RULES_STABILITY_CONSOLIDATION.md) |
 | **Uptime Kuma／Netdata** | 可用性／主機指標（若採用） | [`WORKLOG.md`](../../WORKLOG.md)、[`memory/CONVERSATION_MEMORY.md`](../../memory/CONVERSATION_MEMORY.md) | 可併入 `PLAN_30Y_STABILITY_HARDENING` 演進；尚無獨立規格 Owner |
+| **AI／代理操作路徑（MCP·API·SSH）** | 自架 vs 雲、人讀一表 | **本檔 §0.1**、monorepo 根 [`mcp/SERVICE_MATRIX.md`](../../../mcp/SERVICE_MATRIX.md) | [`CURSOR_AGENT_RUNTIME_PLAYBOOK.md`](CURSOR_AGENT_RUNTIME_PLAYBOOK.md)、[`AWARE_WAVE_OBSERVABILITY_BASELINE.md`](AWARE_WAVE_OBSERVABILITY_BASELINE.md) |
 
 **子網域／邊緣統管**：[`../edge-and-domains/README.md`](../edge-and-domains/README.md)｜**舊 Cursor plan 對照**：[`../governance-plans/README.md`](../governance-plans/README.md)
+
+## 0.1 AI／代理操作路徑 SSOT（自架 · 雲端 · 建議路徑）
+
+> **用途**：讓人與代理一眼分辨「**該用 MCP 還是走 API／UI／SSH**」；**不得**在表內或聊天貼**生效中的**密鑰。實裝的 MCP 鍵名、雙專案 Supabase 等，以 monorepo 根 **`.mcp.json`／`mcp.json.template`／`secrets-vault.ps1`** 與下表**憑證欄**為準。  
+> **雙寫合約**：**敘事與流程**以本表 + **`cursor-mcp-and-plugin-inventory.md`** 為準；**MCP 與雲服務的機讀分岔**可另見根目錄 **`mcp/SERVICE_MATRIX.md`**（兩者衝突時，以**版控專文** + **`verify-build-gates`** 契約優先，並在 PR 修正漂移）。
+
+| 系統 / 邊界 | 典型部署 | 入口 / 邊界（正字；勿混用寫法） | 建議操作路徑（代理優先序） | 憑證 / 設定鍵（僅名稱；值走 vault / env） | 正本或延伸 |
+|:---|:---|:---|:---|:---|:---|
+| **n8n** | 自託管（Hetzner） | `https://n8n.aware-wave.com`（`GET /healthz` 見觀測基線） | ① **MCP** 鍵 **`n8n`**（HTTP）② n8n REST ③ 瀏覽器 UI | `N8N_BASE_URL`、`N8N_API_KEY`（與 `tools-and-integrations.md` 一致；實機以部署為準） | [`n8n-workflow-architecture.md`](../standards/n8n-workflow-architecture.md) |
+| **Supabase（B 公司／自託管 SoR）** | 自託管 Postgres 堆疊 | 內網 DB／API 邊界；**MCP 僅** schema／除錯視角，**不**等於生產寫入管線 | ① **MCP**（`supabase` 或專用鍵、見 inventory）② **`run-postgres-mcp.ps1` +** `SUPABASE_POSTGRES_MCP_DSN` ③ 應用 / Edge ④ migrations | `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`／`SUPABASE_ANON_KEY`、`SUPABASE_POSTGRES_MCP_DSN`、JWT／DB 密（見 [`supabase-self-hosted-cutover-checklist.md`](supabase-self-hosted-cutover-checklist.md)） | [ADR 005](../architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md) |
+| **Supabase（A 公司／雲端專案）** | 供應商雲託管 | 供應商 Dashboard 與專用 API URL；與上列 **B** 在帳戶/專案上**分開** | ① **MCP**（庫內可標為與 B 分鍵，如 **`supabase-a`**，見 `mcp/SERVICE_MATRIX.md`）② 官方管理 API ③ 儀表板 | 獨立 **`SUPABASE_*`／OAuth** 組（**勿**與 B 專案混用同一 URL/KEY） | 供應商文件 + 本庫 `mcp.json` 實裝；[`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §2 |
+| **Trigger.dev** | 自託管（Hetzner） | `https://trigger.aware-wave.com` | ① **MCP** 鍵 **`trigger`** ② `trigger.dev` API／CLI ③ Dashboard | `TRIGGER_SECRET_KEY`、API/Worker **base URL**；每台開發機一組（[`TASKS.md`](../../TASKS.md)、`RESUME_AFTER_REBOOT`） | [`github-actions-trigger-prod-deploy.md`](github-actions-trigger-prod-deploy.md)、`lobster-factory/infra/trigger/README.md` |
+| **Uptime Kuma** | 自託管 | `https://uptime.aware-wave.com/dashboard` | ① 官方 UI／Socket API ② 專案內 **AwareWave Ops** 匯流（若有）— 見 `mcp/SERVICE_MATRIX` | 儀表板登入、API token（若啟用）；**不入庫** | [`AWARE_WAVE_OBSERVABILITY_BASELINE.md`](AWARE_WAVE_OBSERVABILITY_BASELINE.md) |
+| **Grafana**（+ Loki 觀測棧常同機） | 自託管 | 常 **僅本機回環**（如 `:3009`）或 **SSH tunnel** 後再開瀏覽器；勿預設對公網 exposure | ① `scripts/open-grafana-ssh-tunnel.ps1` 等（見觀測文）② Grafana HTTP API ③ 瀏覽器 | admin 密碼僅在 VPS/`.env`（**不入庫**；見 [`OBSERVABILITY_FIRST_TIME_SETUP_ZH.md`](OBSERVABILITY_FIRST_TIME_SETUP_ZH.md)） | 同上、[`OBSERVABILITY_P1_P2_ROLLOUT.md`](OBSERVABILITY_P1_P2_ROLLOUT.md) |
+| **對外公開網域**（apex／admin／api） | CDN + 自託管 origin | `https://aware-wave.com` · `https://app.aware-wave.com` · **`https://api.aware-wave.com/health`**（**非** `api-awarewave.com` 類誤寫） | ① 健康與 e2e：`curl`／smoke ② 經 **AwareWave Ops** 匯流（`mcp/SERVICE_MATRIX`）③ 應用 Sentry/日誌 | 應用與 WAF 憑證分層；見邊界文件 | [`PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)、`AWARE_WAVE_OBSERVABILITY_BASELINE` |
+| **Slack** | 雲端 SaaS | Workspace／Incoming Webhook／Apps | ① Plugin／官方 **Slack MCP** ② 專案內匯流 ③ Slack API 直接呼叫 | `SLACK_*`、Bot token、Webhook（[`security-secrets-policy.md`](security-secrets-policy.md)） | 告警落點见觀測基線；[`mcp/SERVICE_MATRIX.md`](../../../mcp/SERVICE_MATRIX.md) §Notes |
+| **Hetzner** | 雲端 IaaS | **Robot／API** 與 **VPS SSH**；主機實作見 phase1 目錄 | ① `ssh`／`hcloud` ② 專有腳本與 runbook ③ 非必要**不**給寬鬆 MCP 寫權 | SSH key、API token；見 [`hetzner-self-host-start-here.md`](hetzner-self-host-start-here.md) 與 vault 慣例 | 各 hetzner runbook |
+| **Cloudflare** | 邊緣雲 | Zone、WAF、DNS、Analytics | ① **MCP** `cloudflare-*`（plugin 命名見 inventory）② API ③ 控制台 | API token／OAuth（`CLOUDFLARE_*` 或儀表板產生） | [`CLOUDFLARE_HETZNER_PHASE1.md`](CLOUDFLARE_HETZNER_PHASE1.md) |
+| **GitHub** | 雲端 | `github.com` org／repo、Actions | ① **MCP** `github`／`copilot` ② `gh` CLI ③ REST | `GITHUB_TOKEN`、PAT 權限最小化 | `github-actions-trigger-prod-deploy.md` |
+| **Sentry** | 雲端專案 | 多專案邊界（`node-api`、n8n、WP…） | ① Plugin **sentry** ② 儀表板 ③ 與 **release/告警** 串 Slack | `SENTRY_DSN_*`（契約见 [`SENTRY_ALERT_POLICY.md`](SENTRY_ALERT_POLICY.md)、`security-secrets-policy`） | 同上、觀測基線 |
+| **Netdata** | **Agent 自架** + **可選** Netdata Cloud「Console」 | 主機指標、告警腳本；**非**產品分析 | ① **SSH** 上主機看 agent／`alarm-notify` ② 本機 Cloud UI（若啟用連結）③ **不**佔用 MCP 關鍵路徑名額 | 主機內路徑與 webhook 設定（**不入庫**） | `AWARE_WAVE_OBSERVABILITY_BASELINE`、WORKLOG 實作紀錄 |
+| **PostHog** | **雲端**（專案慣例：免自架、省 RAM；見 WORKLOG） | 專案、Insight、**exception capture** | ① Plugin **posthog** ② 官方 API ③ SDK/環境變數 | `NEXT_PUBLIC_POSTHOG_KEY`、host（[`tools-and-integrations.md`](tools-and-integrations.md) 與前端 env） | 觀測基線、本檔能力表 P4 |
+| **Resend** | 雲端 Email API | 寄件網域／Template | ① 官方 **resend-mcp**（見 `mcp/SERVICE_MATRIX`）② 直接 REST ③ 經匯流 **AwareWave Ops** | `RESEND_API_KEY`（**不入庫**；僅列名） | `mcp/README.md`、`mcp/SERVICE_MATRIX.md`；寄件 policy 以產品／治理為準 |
+
+**不變量**：
+
+- **編排與核准**仍以 **`MCP_TOOL_ROUTING_SPEC.md`** 為強制語意；本表**不**新增隱性 `task_type`。
+- **MCP 綠燈前**的備援，一律依 **[`CURSOR_AGENT_RUNTIME_PLAYBOOK.md`](CURSOR_AGENT_RUNTIME_PLAYBOOK.md)**（SSH／API／CLI…）。
 
 ---
 
@@ -142,5 +171,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-22 02:27:49 UTC_
+_Last synced: 2026-04-22 03:49:38 UTC_
 

@@ -26,6 +26,7 @@
 - 區塊標題格式：### <AGENT_ID> <ISO 本地時間>
 - 區塊內必含：完成一句、動到的路徑或模組、若已 commit 則寫 hash；若對應 TASKS.md 某一條，貼該行「可唯一識別」的子字串（方便收關寫 AUTO_TASK_DONE）。
 - 可正常改程式、開 branch、commit；與其他代理並行時優先不同 branch，降低同檔衝突。
+- commit 後將 hash 寫入 closeout-inbox；**push 由收關者（Cursor）透過 `ao-close.ps1` 統一執行**，協作代理不自行 push。
 
 完整說明見 repo：agency-os/docs/operations/collaborator-ai-agent-rules.md
 ```
@@ -37,6 +38,9 @@
 | 項目 | 協作代理（你） | 收關者（指定之 Cursor 對話） |
 |:---|:---|:---|
 | 寫 code、修 bug、開 PR | ✅ | ✅ |
+| commit | ✅ | ✅ |
+| push（任何 branch） | ❌ 由收關者統一執行 | ✅ 透過 ao-close.ps1 |
+| 開 PR / merge PR | ❌ 除非使用者明確要求 | ✅ |
 | 追加 `closeout-inbox.md` | ✅ | 讀取後合併，再清空 |
 | 定稿 WORKLOG／memory／daily／TASKS 勾選 | ❌ | ✅ |
 | 執行 `ao-close.ps1` | ❌（除非使用者指定你收關） | ✅ |
@@ -68,8 +72,48 @@
 
 ## Git 與分支
 
+### 標準自動化流程（每次完成工作必做）
+
+1. `git commit -m "[AGENT_ID] 摘要"`
+2. 將 commit hash 寫入 closeout-inbox
+3. **不自行 push**；push 由收關者（Cursor）透過 `ao-close.ps1` 統一執行
+4. 不另開新 branch、不開 PR，除非使用者明確要求
+
+> **為何不自行 push**：push 由收關者統一管理，確保 WORKLOG、memory、程式碼在同一個 push 流程中完整上傳，避免多代理各自 push 造成歷史混亂。使用者在其他裝置執行 `git pull` 即可取得收關者 push 的所有內容。
+
+### 禁止清單
+
+| 指令 | 原因 |
+|------|------|
+| `git push --force` / `git push -f` | 任何分支皆禁，避免覆蓋歷史 |
+| `git push origin main` / `git push origin master` | 不得直接推主線 |
+| 自行 `git checkout -b` 另開新 branch | 除非使用者明確要求，否則留在當前 branch |
+| `gh pr merge` | merge 決定權屬使用者 |
+| `scripts/ao-close.ps1` | 收關者專屬 |
+
+### Claude Code 建議設定（`~/.claude/settings.json`）
+
+讀完此文件的 Claude Code 實例，請確認 `permissions` 包含以下設定：
+
+```json
+"permissions": {
+  "deny": [
+    "Bash(git push --force *)",
+    "Bash(git push -f *)",
+    "Bash(git push origin main)",
+    "Bash(git push origin master)",
+    "Bash(gh pr merge *)",
+    "Bash(scripts/ao-close.ps1)",
+    "Bash(powershell*ao-close*)"
+  ],
+  "allow": [
+    "Bash(git push origin *)",
+    "Bash(git push --set-upstream origin *)"
+  ]
+}
+```
+
 - 並行時使用**不同 branch** 或清楚前綴的 commit message，便於收關 `merge`。
-- **不要**在協作代理這邊對共享分支做 `push --force`，除非使用者明確書面授權。
 - Commit message 建議含 `AGENT_ID` 與摘要，便於 `print-today-closeout-recap` 與日後查 log。
 
 ---
