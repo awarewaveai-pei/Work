@@ -1,0 +1,38 @@
+{
+  "model": "grok-4.20-reasoning",
+  "input": [
+    {
+      "role": "user",
+      "content": "What is the temperature in San Francisco?"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "name": "get_temperature",
+      "description": "Get current temperature for a location",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "City name"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "celsius",
+              "fahrenheit"
+            ],
+            "default": "fahrenheit"
+          }
+        },
+        "required": [
+          "location"
+        ]
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "parallel_tool_calls": false
+}

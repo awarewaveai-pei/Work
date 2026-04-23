@@ -1,0 +1,15 @@
+{
+  "model": "grok-4.20-reasoning",
+  "input": [
+    {
+      "role": "user",
+      "content": "Find today's most important AI infrastructure updates and summarize them with links."
+    }
+  ],
+  "tools": [
+    {
+      "type": "web_search"
+    }
+  ],
+  "tool_choice": "auto"
+}

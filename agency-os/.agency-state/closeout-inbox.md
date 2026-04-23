@@ -36,3 +36,21 @@
 - **Git**: （填 hash 或「未 commit」）
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**:
+
+### codex 2026-04-23 17:30
+
+- **完成（一句）**: 新增本機 Perplexity / Grok CLI、xAI agent 模板，並整理一份給筆電 Codex 的 Grok 安裝提示文件
+- **變更路徑**:
+  - `scripts/perplexity-cli.ps1`
+  - `bin/perplexity.cmd`
+  - `bin/pplx.cmd`
+  - `scripts/grok-cli.ps1`
+  - `bin/grok.cmd`
+  - `bin/xai.cmd`
+  - `examples/xai-web-search-template.json`
+  - `examples/xai-function-calling-template.json`
+  - `GROK_LAPTOP_CODEX_INSTALL_PROMPT.md`
+  - `agency-os/.agency-state/closeout-inbox.md`
+- **Git**: 未 commit
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: Perplexity API key 已確認回 `insufficient_quota`；Grok CLI 已用現有 `XAI_API_KEY` 實測成功，若新 shell 找不到 `grok` 需重開 PowerShell 或暫時補 `$env:Path += ";C:\Users\USER\Work\bin"`
