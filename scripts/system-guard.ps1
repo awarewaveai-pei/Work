@@ -81,6 +81,10 @@ function Show-DesktopPopup {
 }
 
 $root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
+$healthUtils = Join-Path (Split-Path $root -Parent) "scripts\health-report-utils.ps1"
+if (Test-Path -LiteralPath $healthUtils) {
+    . (Resolve-Path $healthUtils).Path
+}
 $noUi = $HideUi -or ($env:AGENCYOS_SCHEDULED_QUIET -eq "1")
 
 # 1) Sync relationships
@@ -97,7 +101,14 @@ Ensure-Dir -Path $guardDir
 
 $latestHealth = Get-LatestFile -Dir $healthDir -Filter "health-*.md"
 $latestCloseout = Get-LatestFile -Dir $closeoutDir -Filter "closeout-*.md"
-$score = if ($latestHealth) { Parse-HealthScore -HealthReportPath $latestHealth.FullName } else { 0.0 }
+$score = $null
+if (Get-Command Get-LatestHealthScorePercent -ErrorAction SilentlyContinue) {
+    $score = Get-LatestHealthScorePercent -HealthDir $healthDir
+}
+if ($null -eq $score -and $latestHealth) {
+    $score = Parse-HealthScore -HealthReportPath $latestHealth.FullName
+}
+if ($null -eq $score) { $score = 0.0 }
 $closeoutExists = $null -ne $latestCloseout
 $gateOk = ($healthExitCode -eq 0) -and $closeoutExists
 $ok = ($score -ge $MinHealthScore) -and $gateOk
@@ -117,7 +128,14 @@ if (-not $ok -and -not $DisableAutoRepair) {
 
         $latestHealth = Get-LatestFile -Dir $healthDir -Filter "health-*.md"
         $latestCloseout = Get-LatestFile -Dir $closeoutDir -Filter "closeout-*.md"
-        $score = if ($latestHealth) { Parse-HealthScore -HealthReportPath $latestHealth.FullName } else { 0.0 }
+        $score = $null
+        if (Get-Command Get-LatestHealthScorePercent -ErrorAction SilentlyContinue) {
+            $score = Get-LatestHealthScorePercent -HealthDir $healthDir
+        }
+        if ($null -eq $score -and $latestHealth) {
+            $score = Parse-HealthScore -HealthReportPath $latestHealth.FullName
+        }
+        if ($null -eq $score) { $score = 0.0 }
         $closeoutExists = $null -ne $latestCloseout
         $gateOk = ($healthExitCode -eq 0) -and $closeoutExists
         $ok = ($score -ge $MinHealthScore) -and $gateOk

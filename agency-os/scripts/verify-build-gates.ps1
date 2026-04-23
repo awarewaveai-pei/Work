@@ -50,10 +50,14 @@ if (Test-Path -LiteralPath $syncEnt) {
     }
 }
 
-$agencyRoot = Join-Path $WorkRoot "agency-os"
-$healthScript = Join-Path $agencyRoot "scripts\system-health-check.ps1"
-if (-not (Test-Path $healthScript)) {
-    Write-Error "verify-build-gates: missing agency-os health script at $healthScript (use -LobsterOnly to skip)"
+if (Test-Path (Join-Path $WorkRoot "agency-os")) {
+    $agencyRoot = Join-Path $WorkRoot "agency-os"
+} else {
+    $agencyRoot = $WorkRoot
+}
+$healthScript = Join-Path $WorkRoot "scripts\system-health-check.ps1"
+if (-not (Test-Path -LiteralPath $healthScript)) {
+    Write-Error "verify-build-gates: missing system-health-check.ps1 under scripts (use -LobsterOnly to skip)"
     exit 1
 }
 

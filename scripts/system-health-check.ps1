@@ -261,36 +261,60 @@ foreach ($uf in $utf8Files) {
     }
 }
 
-# 5) Mojibake scan in docs and key markdown files
+# 5) Mojibake scan (single aggregated check — avoids hundreds of per-file rows and unstable score math)
+$mojibakeFailures = New-Object "System.Collections.Generic.List[string]"
+$mojibakeScanned = 0
 $scanPaths = @(
     (Join-Path $root "docs"),
     (Join-Path $root "README.md"),
     (Join-Path $root "AGENTS.md")
 )
-
 foreach ($sp in $scanPaths) {
     if (-not (Test-Path $sp)) { continue }
     if ((Get-Item $sp).PSIsContainer) {
         $files = Get-ChildItem -Path $sp -Recurse -File -Filter "*.md"
         foreach ($f in $files) {
+            $mojibakeScanned++
             $text = Get-Content -Raw -Encoding UTF8 -Path $f.FullName
-            $bad = Contains-Mojibake -Text $text
-            Add-Check -Name ("Mojibake scan: " + $f.FullName.Replace($root + "\", "")) -Pass (-not $bad) -Detail ($(if ($bad) { "Suspicious encoding artifacts found" } else { "OK" }))
+            if (Contains-Mojibake -Text $text) {
+                $rel = $f.FullName
+                $rootNorm = [System.IO.Path]::GetFullPath($root)
+                $fullNorm = [System.IO.Path]::GetFullPath($rel)
+                if ($fullNorm.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $rel = $fullNorm.Substring($rootNorm.Length).TrimStart([char]'\', [char]'/')
+                }
+                $mojibakeFailures.Add($rel) | Out-Null
+            }
         }
     } else {
+        $mojibakeScanned++
         $text = Get-Content -Raw -Encoding UTF8 -Path $sp
-        $bad = Contains-Mojibake -Text $text
-        Add-Check -Name ("Mojibake scan: " + $sp.Replace($root + "\", "")) -Pass (-not $bad) -Detail ($(if ($bad) { "Suspicious encoding artifacts found" } else { "OK" }))
+        if (Contains-Mojibake -Text $text) {
+            $rel = [System.IO.Path]::GetFullPath($sp)
+            $rootNorm = [System.IO.Path]::GetFullPath($root)
+            if ($rel.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $rel = $rel.Substring($rootNorm.Length).TrimStart([char]'\', [char]'/')
+            }
+            $mojibakeFailures.Add($rel) | Out-Null
+        }
     }
 }
+$mojPass = ($mojibakeFailures.Count -eq 0)
+$mojDetail = if ($mojPass) {
+    ("OK (" + $mojibakeScanned + " markdown file(s) scanned)")
+} else {
+    $show = @($mojibakeFailures | Select-Object -First 25)
+    ("FAIL: " + $mojibakeFailures.Count + " file(s) — " + ($show -join "; "))
+}
+Add-Check -Name "Mojibake scan (docs + README + AGENTS)" -Pass $mojPass -Detail $mojDetail
 
-# 6) Scheduled task command path checks
+# 6) Scheduled tasks (optional): laptops / CI without AgencyOS-* tasks must not fail health.
 try {
     $tasks = Get-ScheduledTask -TaskName "AgencyOS-*" -ErrorAction Stop
     if ($null -eq $tasks -or @($tasks).Count -eq 0) {
-        Add-Check -Name "AgencyOS scheduled tasks exist" -Pass $false -Detail "No AgencyOS-* tasks found"
+        Add-Check -Name "AgencyOS scheduled tasks (optional)" -Pass $true -Detail "No AgencyOS-* tasks (skipped; not required for repo health)"
     } else {
-        Add-Check -Name "AgencyOS scheduled tasks exist" -Pass $true -Detail ("Found " + @($tasks).Count + " tasks")
+        Add-Check -Name "AgencyOS scheduled tasks present" -Pass $true -Detail ("Found " + @($tasks).Count + " task(s); validating paths")
         foreach ($task in @($tasks)) {
             foreach ($action in @($task.Actions)) {
                 $args = $action.Arguments
@@ -311,7 +335,7 @@ try {
         }
     }
 } catch {
-    Add-Check -Name "AgencyOS scheduled tasks inspectable" -Pass $false -Detail $_.Exception.Message
+    Add-Check -Name "AgencyOS scheduled tasks (optional)" -Pass $true -Detail ("Skipped (not available or not configured): " + $_.Exception.Message)
 }
 
 $total = $checks.Count
@@ -359,7 +383,18 @@ $lines += "- Resolve failed checks before major delivery milestones."
 $lines += "- Critical Gate must be PASS for release readiness."
 
 Set-Content -Path $reportPath -Value ($lines -join "`r`n") -Encoding UTF8
-Set-Content -Path $jsonPath -Value ($checks | ConvertTo-Json -Depth 8) -Encoding UTF8
+$summary = [ordered]@{
+    schemaVersion     = 1
+    generatedAtUtc    = (Get-Date).ToUniversalTime().ToString("o")
+    score             = $score
+    passed            = $passed
+    failed            = $failed
+    total             = $total
+    critical_gate     = if ($criticalFailures.Count -eq 0) { "PASS" } else { "FAIL" }
+    critical_failures = @($criticalFailures | Sort-Object -Unique)
+    checks            = $checks
+}
+Set-Content -Path $jsonPath -Value ($summary | ConvertTo-Json -Depth 12) -Encoding UTF8
 
 Write-Output ("Health report: reports/health/" + [System.IO.Path]::GetFileName($reportPath))
 Write-Output ("Score: " + $score + "% (" + $passed + "/" + $total + ")")
