@@ -57,12 +57,12 @@ if (-not (Test-Path -LiteralPath $aoResume)) {
 }
 
 function Invoke-Git {
-    param([string[]]$Args)
+    param([string[]]$GitArgs)
     Push-Location -LiteralPath $WorkRoot
     try {
-        & git @Args
+        & git @GitArgs
         if ($LASTEXITCODE -ne 0) {
-            throw ("git {0} failed (exit {1})" -f ($Args -join " "), $LASTEXITCODE)
+            throw ("git {0} failed (exit {1})" -f ($GitArgs -join " "), $LASTEXITCODE)
         }
     } finally {
         Pop-Location
