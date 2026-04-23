@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-23 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-23 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:c9268e3d7c8d372582c3d43d956711bc66d646645aededda3e696ea4a5d02be9 -->
+- **2026-04-23（MCP 全端一致 + Grok）**：Shared MCP 已收斂為六端同清單（workspace/cursor/claude/codex/copilot/gemini 皆 `count=27 / missing=0`）；`sync-mcp-config.ps1` 已納入 `~/.claude/mcp.json`；Grok（xAI）已接入 `run-llm-mcp.ps1`、`llm-mcp.mjs` 與 registry（`grok-fast`/`grok-latest`），本機 API smoke test 正常。`TASKS` 已新增「安裝 Grok CLI（筆電/Codex）」待辦供下次 AO-RESUME 追蹤。
 - **2026-04-23（本輪 AO-CLOSE）**：使用者僅關鍵字收工；對話無新長期決策；細節見 **`WORKLOG` `## 2026-04-23`** 既有列與 **Closeout inbox** 區塊。
 - **2026-04-23（AO-CLOSE = 代理必寫長期記憶）**：操作者預設**不**手寫 **`CONVERSATION_MEMORY` 長篇**；每次僅 **`AO-CLOSE`** 時，**代理**在跑 **`scripts/ao-close.ps1` 之前**必須依 **`10-memory-maintenance.mdc`** 補一段精簡蒸餾（可很短；無新長期決策時至少一行註記並指 **`WORKLOG`**）。**`merge-closeout-inbox`** 的指標列仍由腳本機械追加，**不取代**此義務。已改 **`40-shutdown-closeout`／`50-operator-autopilot`／`AGENTS.md`／`memory/README.md`／`end-of-day-checklist.md`** 與根 **`.cursor/rules`** 鏡像；**`ao-close.ps1`** 的 **automation boundary** 文案同步。
 - **2026-04-23 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-23 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:e1bae1cbbbde7615f401e62d14587d93cd50466f437c9463ea845896206c8b18 -->
@@ -355,5 +357,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-22 18:44:23 UTC_
+_Last synced: 2026-04-23 09:45:38 UTC_
 

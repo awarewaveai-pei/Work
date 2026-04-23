@@ -76,10 +76,48 @@ async function callGemini(prompt, model) {
   return text || "(empty response)";
 }
 
+async function callXai(prompt, model) {
+  const apiKey = requiredEnv("XAI_API_KEY");
+  const chosenModel = model || process.env.GROK_MODEL || "grok-4.20-reasoning";
+
+  const res = await fetch("https://api.x.ai/v1/responses", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: chosenModel,
+      input: prompt
+    })
+  });
+
+  if (!res.ok) throw new Error(`xAI error ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  if (typeof data?.output_text === "string" && data.output_text.trim()) {
+    return data.output_text;
+  }
+  const output = data?.output || [];
+  const segments = [];
+  for (const item of output) {
+    const content = item?.content || [];
+    for (const c of content) {
+      if (typeof c?.text === "string" && c.text.trim()) {
+        segments.push(c.text);
+      }
+    }
+  }
+  if (segments.length > 0) {
+    return segments.join("\n");
+  }
+  return "(empty response)";
+}
+
 async function callProvider(prompt, model) {
   if (provider === "openai") return callOpenAI(prompt, model);
   if (provider === "anthropic") return callAnthropic(prompt, model);
   if (provider === "gemini") return callGemini(prompt, model);
+  if (provider === "xai") return callXai(prompt, model);
   throw new Error(`Unsupported provider: ${provider}`);
 }
 

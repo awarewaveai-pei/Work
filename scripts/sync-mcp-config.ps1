@@ -20,6 +20,7 @@ param(
     [switch]$IncludeDisabled,
     [switch]$StrictEnv,
     [switch]$SkipWorkspaceConfig,
+    [switch]$SkipClaude,
     [switch]$SkipCodex,
     [switch]$SkipCopilot,
     [switch]$SkipGemini
@@ -330,6 +331,48 @@ function Convert-ServerToCopilotConfig {
     return $out
 }
 
+function Convert-ServerToClaudeConfig {
+    param([string]$Name, [hashtable]$Server)
+
+    if (-not (Should-IncludeServer -Name $Name -Server $Server -Client "claude")) {
+        return $null
+    }
+
+    $out = @{}
+    $transport = [string]$Server["transport"]
+    if ($transport -eq "http") {
+        $out["type"] = "http"
+        $out["url"] = Resolve-EnvValue -StringValue ([string]$Server["url"]) -Mode "Concrete"
+        if ([string]::IsNullOrWhiteSpace([string]$out["url"])) {
+            $script:Warnings.Add("Skip $Name for Claude because the URL resolved to an empty value.")
+            return $null
+        }
+        if ($Server.ContainsKey("headers")) {
+            $headers = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["headers"]) -Mode "Concrete"
+            if (-not (Test-ResolvedMap -ServerName $Name -Map $headers -Kind "Claude")) {
+                return $null
+            }
+            $out["headers"] = $headers
+        }
+    } else {
+        $out["command"] = Resolve-EnvValue -StringValue ([string]$Server["command"]) -Mode "Concrete"
+        $args = @()
+        foreach ($arg in $Server["args"]) {
+            $args += ,(Resolve-EnvValue -StringValue ([string]$arg) -Mode "Concrete")
+        }
+        $out["args"] = $args
+        if ($Server.ContainsKey("env")) {
+            $optionalKeys = Get-OptionalEnvKeys -Server $Server
+            $envMap = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["env"]) -Mode "Concrete"
+            if (-not (Test-ResolvedMap -ServerName $Name -Map $envMap -Kind "Claude" -OptionalKeys $optionalKeys)) {
+                return $null
+            }
+            $out["env"] = Remove-EmptyOptionalEnv -Map $envMap -OptionalKeys $optionalKeys
+        }
+    }
+    return $out
+}
+
 function Convert-ServerToGeminiConfig {
     param([string]$Name, [hashtable]$Server)
 
@@ -513,6 +556,19 @@ if (-not $SkipWorkspaceConfig) {
     Write-Utf8NoBomFile -Path $workspacePath -Content ($workspaceDoc | ConvertTo-Json -Depth 20)
 }
 
+if (-not $SkipClaude) {
+    $claudeServers = @{}
+    foreach ($name in ($servers.Keys | Sort-Object)) {
+        $serverConfig = Convert-ServerToClaudeConfig -Name $name -Server (ConvertTo-PlainObject $servers[$name])
+        if ($null -ne $serverConfig) {
+            $claudeServers[$name] = $serverConfig
+        }
+    }
+    $claudeDoc = @{ mcpServers = $claudeServers }
+    $claudePath = Join-Path $env:USERPROFILE ".claude\mcp.json"
+    Write-Utf8NoBomFile -Path $claudePath -Content ($claudeDoc | ConvertTo-Json -Depth 20)
+}
+
 if (-not $SkipCopilot) {
     $copilotServers = @{}
     foreach ($name in ($servers.Keys | Sort-Object)) {
@@ -589,6 +645,7 @@ if ($StrictEnv -and $script:MissingVars.Count -gt 0) {
 
 Write-Host "MCP sync complete." -ForegroundColor Green
 Write-Host "  workspace : $(if ($SkipWorkspaceConfig) { 'skipped' } else { Join-Path $WorkspaceRoot '.mcp.json' })" -ForegroundColor Gray
+Write-Host "  claude    : $(if ($SkipClaude) { 'skipped' } else { Join-Path $env:USERPROFILE '.claude\mcp.json' })" -ForegroundColor Gray
 Write-Host "  codex     : $(if ($SkipCodex) { 'skipped' } else { Join-Path $env:USERPROFILE '.codex\config.toml' })" -ForegroundColor Gray
 Write-Host "  copilot   : $(if ($SkipCopilot) { 'skipped' } else { Join-Path $env:USERPROFILE '.copilot\mcp-config.json' })" -ForegroundColor Gray
 Write-Host "  gemini    : $(if ($SkipGemini) { 'skipped' } else { Join-Path $env:USERPROFILE '.gemini\settings.json' })" -ForegroundColor Gray

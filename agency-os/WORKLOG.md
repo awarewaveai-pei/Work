@@ -4,6 +4,13 @@
 
 ## 2026-04-23
 
+### Shared MCP 全端對齊 + Grok 接入（本輪）
+- **MCP 全端對齊**：`sync-mcp-config.ps1` 增加同步 `~/.claude/mcp.json`；`registry.template.json` 取消先前 client exclude 與 legacy alias disabled，`mcp:governance` 後六端（workspace/cursor/claude/codex/copilot/gemini）清單皆對齊（count=27, missing=0）。
+- **Grok 接入**：`run-llm-mcp.ps1` provider 增 `xai`；`mcp-local-wrappers/llm-mcp.mjs` 新增 `callXai()`（Responses API）；`registry.template.json` 新增 `grok-fast`、`grok-latest`；`mcp/user-env.template.ps1` 新增 `XAI_API_KEY`、`GROK_MODEL`。
+- **本機驗證**：`npm run mcp:governance` 與 `verify-shared-ai-governance.ps1` 皆 PASS；xAI smoke test（Responses API）回應正常。
+- **營運文件同步（機器外）**：更新 `C:\Users\USER\AwareWave_ALL_CREDENTIALS_BACKUP.md`，新增 Grok（xAI）區塊並修正檔案實際路徑說明（不在 repo 追蹤範圍）。
+- **任務板**：`TASKS.md` 新增未完成項 `（工具建置）安裝 Grok CLI（筆電 / Codex）`，供下次 `AO-RESUME` 追蹤 DoD（`grok help` / `grok templates` / `grok chat`）。
+
 ### Closeout 紀錄與腳本（收關者合併敘事）
 - **背景**：操作者要求「讀當日各 AI 區塊＋本人實際進度」寫入 `WORKLOG`／`memory/daily`，而非僅機械占位；此前 `ao-close` 只做 gate／git，**不會**自動把 `closeout-inbox.md` 併入正式紀錄，造成落差。
 - **本日 repo 變更（未提交前工作樹）**：
@@ -46,6 +53,31 @@
 <!-- ao-close-inbox-sha256:e1bae1cbbbde7615f401e62d14587d93cd50466f437c9463ea845896206c8b18 -->
 
 （以下可刪除；為當日第一則範例占位）
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:c9268e3d7c8d372582c3d43d956711bc66d646645aededda3e696ea4a5d02be9 -->
+
+（以下可刪除；為當日第一則範例占位）
+
+
+### codex 2026-04-23 17:30
+
+- **完成（一句）**: 新增本機 Perplexity / Grok CLI、xAI agent 模板，並整理一份給筆電 Codex 的 Grok 安裝提示文件
+- **變更路徑**:
+  - `scripts/perplexity-cli.ps1`
+  - `bin/perplexity.cmd`
+  - `bin/pplx.cmd`
+  - `scripts/grok-cli.ps1`
+  - `bin/grok.cmd`
+  - `bin/xai.cmd`
+  - `examples/xai-web-search-template.json`
+  - `examples/xai-function-calling-template.json`
+  - `GROK_LAPTOP_CODEX_INSTALL_PROMPT.md`
+  - `agency-os/.agency-state/closeout-inbox.md`
+- **Git**: 未 commit
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: Perplexity API key 已確認回 `insufficient_quota`；Grok CLI 已用現有 `XAI_API_KEY` 實測成功，若新 shell 找不到 `grok` 需重開 PowerShell 或暫時補 `$env:Path += ";C:\Users\USER\Work\bin"`
 
 ## 2026-04-22
 
@@ -767,7 +799,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-22 18:34:23 UTC_
+_Last synced: 2026-04-23 09:45:38 UTC_
 
 ## 2026-03-20
 
@@ -1195,5 +1227,4 @@ _Last synced: 2026-04-22 18:34:23 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
-
 

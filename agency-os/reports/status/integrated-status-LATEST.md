@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-23 02:44:35
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-04-23 17:45:47
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter） - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑） - [ ] C5-1. Observability：Sentry（錯誤追蹤）+ PostHog（產品分析） - [ ] C5-2. Edge/Security：Cloudflare（WAF/CDN/Rate limit） - [ ] C5-3. Secrets：1Password Secrets Automation（或同級） - [ ] C5-4. Identity/Org：Clerk/WorkOS/Auth0（三選一） - [ ] C5-5. Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails） - [ ] C5-6. 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -249,11 +249,35 @@
 
 （以下可刪除；為當日第一則範例占位）
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:c9268e3d7c8d372582c3d43d956711bc66d646645aededda3e696ea4a5d02be9 -->
+
+（以下可刪除；為當日第一則範例占位）
+
+
+### codex 2026-04-23 17:30
+
+- **完成（一句）**: 新增本機 Perplexity / Grok CLI、xAI agent 模板，並整理一份給筆電 Codex 的 Grok 安裝提示文件
+- **變更路徑**:
+  - `scripts/perplexity-cli.ps1`
+  - `bin/perplexity.cmd`
+  - `bin/pplx.cmd`
+  - `scripts/grok-cli.ps1`
+  - `bin/grok.cmd`
+  - `bin/xai.cmd`
+  - `examples/xai-web-search-template.json`
+  - `examples/xai-function-calling-template.json`
+  - `GROK_LAPTOP_CODEX_INSTALL_PROMPT.md`
+  - `agency-os/.agency-state/closeout-inbox.md`
+- **Git**: 未 commit
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: Perplexity API key 已確認回 `insufficient_quota`；Grok CLI 已用現有 `XAI_API_KEY` 實測成功，若新 shell 找不到 `grok` 需重開 PowerShell 或暫時補 `$env:Path += ";C:\Users\USER\Work\bin"`
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-23 02:44:26`
+- Time: `2026-04-23 17:45:41`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -263,13 +287,14 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260423-024426.md`
-- Closeout: `reports/closeout/closeout-20260423-024423.md`
+- Health: `reports/health/health-20260423-174541.md`
+- Closeout: `reports/closeout/closeout-20260423-174539.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+### 排程單一來源 + AO-CLOSE 聯動甘特
 - **`docs/overview/PROGRAM_SCHEDULE.json`**：三流（AO／LF／PJ）任務與日期；可複製到客戶專案或 `project-kit` 範本。
 - **`scripts/render-program-timeline-from-schedule.ps1`**：UTF-8 JSON → `PROGRAM_TIMELINE.md` 標記區（表 + Mermaid）；腳本本體 **ASCII-only** 以相容 PS 5.1。
 - **`generate-integrated-status-report.ps1`** 末尾**單次**呼叫渲染；**AO-CLOSE** 路徑因此每次收工會重渲時間軸（仍以 TASKS／Checklist／Discovery 為完成真相）。
@@ -328,6 +353,5 @@
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
-
 
 

@@ -42,11 +42,6 @@
       },
       "codex": {
         "bearer_token_env_var": "COPILOT_MCP_BEARER_TOKEN"
-      },
-      "clients": {
-        "copilot": {
-          "exclude": true
-        }
       }
     },
     "github": {
@@ -61,11 +56,6 @@
       ],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
-      },
-      "clients": {
-        "copilot": {
-          "exclude": true
-        }
       }
     },
     "airtable": {
@@ -182,11 +172,6 @@
       },
       "codex": {
         "bearer_token_env_var": "SUPABASE_AUTH_BEARER_TOKEN"
-      },
-      "clients": {
-        "codex": {
-          "exclude": true
-        }
       }
     },
     "supabase-soulfulexpression": {
@@ -198,7 +183,7 @@
       }
     },
     "supabase-b-postgres": {
-      "enabled": false,
+      "enabled": true,
       "transport": "stdio",
       "command": "powershell",
       "args": [
@@ -214,7 +199,7 @@
       "note": "Legacy alias for supabase-awarewave-postgres"
     },
     "supabase-a": {
-      "enabled": false,
+      "enabled": true,
       "transport": "http",
       "url": "${env:SUPABASE_SOULFULEXPRESSION_MCP_URL}",
       "headers": {
@@ -369,6 +354,42 @@
       "env": {
         "GEMINI_API_KEY": "${env:GEMINI_API_KEY}",
         "GEMINI_MODEL": "gemini-3.1-pro-preview"
+      }
+    },
+    "grok-fast": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-llm-mcp.ps1",
+        "-Provider",
+        "xai"
+      ],
+      "env": {
+        "XAI_API_KEY": "${env:XAI_API_KEY}",
+        "GROK_MODEL": "grok-4.20-reasoning"
+      }
+    },
+    "grok-latest": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceRoot}\\scripts\\run-llm-mcp.ps1",
+        "-Provider",
+        "xai"
+      ],
+      "env": {
+        "XAI_API_KEY": "${env:XAI_API_KEY}",
+        "GROK_MODEL": "grok-4.20-reasoning"
       }
     }
   }

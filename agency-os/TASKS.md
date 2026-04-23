@@ -28,6 +28,9 @@
   - 兩台都要在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict` 且 PASS（無 WARN）後才可勾選此項。
   - **公司桌機（人在辦公室時）**：不必回想先前是否裝過；在該機 monorepo 根依序：`git fetch` → `git checkout main` → `git pull --ff-only origin main` → 跑上一行的 `machine-environment-audit -Strict`。若未 PASS，自上文 `REMOTE_WORKSTATION_STARTUP.md` **§1.5**「工具與依賴」起補齊（含 `lobster-factory\packages\workflows` 的 `npm ci`、可選 `mcp-local-wrappers`、`verify-build-gates`）後再重跑稽核；需與筆電同級「真 WP」則補 **§1.5.1**。FAIL/WARN 時保留終端輸出以利除錯。
   - **筆電已 Strict PASS 時**：仍須待公司桌機也 PASS，本主項才可視為完成。
+- [ ] **（工具建置）安裝 Grok CLI（筆電 / Codex）**
+  - 參考：`../GROK_LAPTOP_CODEX_INSTALL_PROMPT.md`
+  - DoD：`grok help`、`grok templates` 成功；若 `XAI_API_KEY` 已存在，`grok chat "Reply with exactly: ready"` 回傳 `ready`
 - [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3）
   - 參考：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
   - 本項目標：先選 2 個試點（1 既有站接手 + 1 新站建置）
@@ -233,5 +236,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-22 18:34:23 UTC_
+_Last synced: 2026-04-23 09:45:38 UTC_
 

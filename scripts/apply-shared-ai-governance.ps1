@@ -67,4 +67,4 @@ Write-Host ""
 Write-Host "Shared AI governance applied." -ForegroundColor Green
 Write-Host "  Prompt pack : $promptPackPath" -ForegroundColor Gray
 Write-Host "  Quick prompt: $quickPromptPath" -ForegroundColor Gray
-Write-Host "  MCP outputs : .mcp.json / ~/.codex/config.toml / ~/.copilot/mcp-config.json / ~/.gemini/settings.json" -ForegroundColor Gray
+Write-Host "  MCP outputs : .mcp.json / ~/.claude/mcp.json / ~/.codex/config.toml / ~/.copilot/mcp-config.json / ~/.gemini/settings.json" -ForegroundColor Gray
