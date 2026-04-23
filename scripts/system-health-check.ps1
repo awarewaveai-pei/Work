@@ -111,14 +111,37 @@ if (Test-Path -LiteralPath $ltPath) {
     Add-CriticalFailure -Reason "Missing docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md"
 }
 
-# 1a2) agency-os health entrypoint must stay a thin wrapper (canonical body is monorepo scripts\)
-$wrapPath = Join-Path $root "scripts\system-health-check.ps1"
-if (Test-Path -LiteralPath $wrapPath) {
+# 1a2) agency-os health entrypoint must stay a thin wrapper (canonical body is monorepo scripts\).
+# Validate only the agency-os copy, never the monorepo canonical file (it does not contain ..\..\scripts).
+# Covers both layouts: $root at agency-os package, or $root at monorepo parent when wrapper resolution falls back.
+$canonicalHealth = $null
+$wrapPath = $null
+if (Test-Path -LiteralPath (Join-Path $root "agency-os\AGENTS.md")) {
+    $canonicalHealth = Join-Path $root "scripts\system-health-check.ps1"
+    $wrapPath = Join-Path $root "agency-os\scripts\system-health-check.ps1"
+} elseif (Test-Path -LiteralPath (Join-Path $root "AGENTS.md")) {
+    $monoParent = Split-Path -Path $root -Parent
+    if ($monoParent) {
+        $canonicalHealth = Join-Path $monoParent "scripts\system-health-check.ps1"
+    }
+    $wrapPath = Join-Path $root "scripts\system-health-check.ps1"
+}
+$distinctWrapper = $false
+if ($canonicalHealth -and $wrapPath -and (Test-Path -LiteralPath $canonicalHealth) -and (Test-Path -LiteralPath $wrapPath)) {
+    try {
+        $distinctWrapper = ((Resolve-Path -LiteralPath $canonicalHealth).Path -ne (Resolve-Path -LiteralPath $wrapPath).Path)
+    } catch {
+        $distinctWrapper = $false
+    }
+}
+if ($distinctWrapper) {
     $wrapRaw = Get-Content -LiteralPath $wrapPath -Raw -Encoding UTF8
     $wrapThin = ($wrapRaw.Length -lt 4000) -and ($wrapRaw -match '(?i)single-owner|canonical implementation') -and ($wrapRaw -match '\.\.[\\/]\.\.[\\/]scripts[\\/]system-health-check\.ps1')
     $wrapDetail = if ($wrapThin) { "OK (thin wrapper -> monorepo scripts)" } else { "Looks like a full duplicate or missing forwarder; use monorepo scripts/system-health-check.ps1 only" }
     Add-Check -Name "Script sanity: agency-os scripts/system-health-check.ps1 (thin wrapper)" -Pass $wrapThin -Detail $wrapDetail
     if (-not $wrapThin) { Add-CriticalFailure -Reason "agency-os system-health-check.ps1 must remain a thin wrapper to monorepo scripts" }
+} elseif ($wrapPath -and (Test-Path -LiteralPath $wrapPath)) {
+    Add-Check -Name "Script sanity: agency-os scripts/system-health-check.ps1 (thin wrapper)" -Pass $true -Detail "Skipped: same file as monorepo canonical or layout has no split copy (wrapper rule N/A)"
 }
 
 # 1b) Critical script bodies (detect accidental wrapper-only overwrite)
