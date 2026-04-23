@@ -8,7 +8,8 @@ enabled = false
 
 [mcp_servers.wordpress.env]
 WP_API_URL = "https://YOUR_WORDPRESS_SITE/"
-JWT_TOKEN = "${WP_APPLICATION_PASSWORD}"
+OAUTH_ENABLED = "false"
+JWT_TOKEN = "${WORDPRESS_JWT_TOKEN}"
 
 [mcp_servers.replicate]
 command = "cmd"

@@ -181,6 +181,48 @@
                                              "args":  [
                                                           "D:\\Work\\mcp-local-wrappers\\awarewave-ops-mcp.mjs"
                                                       ],
+                                             "env":  {
+                                                         "GRAFANA_SERVICE_ACCOUNT_TOKEN":  "${GRAFANA_SERVICE_ACCOUNT_TOKEN}",
+                                                         "N8N_BASIC_AUTH_PASSWORD":  "${N8N_BASIC_AUTH_PASSWORD}",
+                                                         "SENTRY_API_BASE_URL":  "${SENTRY_API_BASE_URL}",
+                                                         "N8N_AUTH_BEARER_TOKEN":  "${N8N_AUTH_BEARER_TOKEN}",
+                                                         "SLACK_BOT_TOKEN":  "${SLACK_BOT_TOKEN}",
+                                                         "POSTHOG_API_BASE_URL":  "${POSTHOG_API_BASE_URL}",
+                                                         "APP_AWAREWAVE_BASE_URL":  "${APP_AWAREWAVE_BASE_URL}",
+                                                         "SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY":  "${SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY}",
+                                                         "CLOUDFLARE_API_BASE_URL":  "${CLOUDFLARE_API_BASE_URL}",
+                                                         "UPTIME_KUMA_BASE_URL":  "${UPTIME_KUMA_BASE_URL}",
+                                                         "SUPABASE_B_SERVICE_ROLE_KEY":  "${SUPABASE_B_SERVICE_ROLE_KEY}",
+                                                         "SUPABASE_B_URL":  "${SUPABASE_B_URL}",
+                                                         "SLACK_API_BASE_URL":  "${SLACK_API_BASE_URL}",
+                                                         "API_AWAREWAVE_BEARER_TOKEN":  "${API_AWAREWAVE_BEARER_TOKEN}",
+                                                         "SUPABASE_AWAREWAVE_URL":  "${SUPABASE_AWAREWAVE_URL}",
+                                                         "HETZNER_API_TOKEN":  "${HETZNER_API_TOKEN}",
+                                                         "POSTHOG_PERSONAL_API_KEY":  "${POSTHOG_PERSONAL_API_KEY}",
+                                                         "TRIGGER_API_URL":  "${TRIGGER_API_URL}",
+                                                         "GRAFANA_BASIC_PASSWORD":  "${GRAFANA_BASIC_PASSWORD}",
+                                                         "UPTIME_KUMA_API_KEY":  "${UPTIME_KUMA_API_KEY}",
+                                                         "API_AWAREWAVE_BASE_URL":  "${API_AWAREWAVE_BASE_URL}",
+                                                         "TRIGGER_ACCESS_TOKEN":  "${TRIGGER_ACCESS_TOKEN}",
+                                                         "N8N_API_BASE_URL":  "${N8N_API_BASE_URL}",
+                                                         "GRAFANA_BASIC_USER":  "${GRAFANA_BASIC_USER}",
+                                                         "NETDATA_BASE_URL":  "${NETDATA_BASE_URL}",
+                                                         "SUPABASE_A_URL":  "${SUPABASE_A_URL}",
+                                                         "N8N_BASIC_AUTH_USER":  "${N8N_BASIC_AUTH_USER}",
+                                                         "RESEND_API_KEY":  "${RESEND_API_KEY}",
+                                                         "GRAFANA_BASE_URL":  "${GRAFANA_BASE_URL}",
+                                                         "SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY":  "${SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY}",
+                                                         "HETZNER_API_BASE_URL":  "${HETZNER_API_BASE_URL}",
+                                                         "SUPABASE_SOULFULEXPRESSION_URL":  "${SUPABASE_SOULFULEXPRESSION_URL}",
+                                                         "APP_AWAREWAVE_BEARER_TOKEN":  "${APP_AWAREWAVE_BEARER_TOKEN}",
+                                                         "NETDATA_API_TOKEN":  "${NETDATA_API_TOKEN}",
+                                                         "SUPABASE_A_SERVICE_ROLE_KEY":  "${SUPABASE_A_SERVICE_ROLE_KEY}",
+                                                         "RESEND_API_BASE_URL":  "${RESEND_API_BASE_URL}",
+                                                         "SENTRY_AUTH_TOKEN":  "${SENTRY_AUTH_TOKEN}",
+                                                         "N8N_API_KEY":  "${N8N_API_KEY}",
+                                                         "SLACK_WEBHOOK_URL":  "${SLACK_WEBHOOK_URL}",
+                                                         "CLOUDFLARE_API_TOKEN":  "${CLOUDFLARE_API_TOKEN}"
+                                                     },
                                              "command":  "node"
                                          },
                        "github":  {
@@ -316,7 +358,7 @@
                        "posthog":  {
                                        "url":  "${POSTHOG_MCP_URL}",
                                        "headers":  {
-                                                       "Authorization":  "Bearer ${POSTHOG_API_KEY}"
+                                                       "Authorization":  "Bearer ${POSTHOG_PERSONAL_API_KEY}"
                                                    },
                                        "type":  "http"
                                    }

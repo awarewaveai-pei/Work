@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-24 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-24 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:0ac1688c67e446a20bb1c003ac978fab0cbb604031436b22e483bdaf39b33093 -->
+- **2026-04-24（AO-CLOSE 前）**：`system-health-check` 的 **1a2 thin-wrapper** 檢查已改為依版面區分 monorepo canonical 與 `agency-os\scripts` 轉發檔、僅在兩者為不同實體路徑時驗證，避免 monorepo 根當作 `$root` 時誤套 `..\..\scripts` 正則而假失敗；詳 **`WORKLOG` `## 2026-04-24`**、commit **`8f3c0b6`**。
 - **2026-04-23 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-23 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:c9268e3d7c8d372582c3d43d956711bc66d646645aededda3e696ea4a5d02be9 -->
 - **2026-04-23（MCP 全端一致 + Grok）**：Shared MCP 已收斂為六端同清單（workspace/cursor/claude/codex/copilot/gemini 皆 `count=27 / missing=0`）；`sync-mcp-config.ps1` 已納入 `~/.claude/mcp.json`；Grok（xAI）已接入 `run-llm-mcp.ps1`、`llm-mcp.mjs` 與 registry（`grok-fast`/`grok-latest`），本機 API smoke test 正常。`TASKS` 已新增「安裝 Grok CLI（筆電/Codex）」待辦供下次 AO-RESUME 追蹤。
 - **2026-04-23（本輪 AO-CLOSE）**：使用者僅關鍵字收工；對話無新長期決策；細節見 **`WORKLOG` `## 2026-04-23`** 既有列與 **Closeout inbox** 區塊。
@@ -357,5 +359,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-23 09:45:38 UTC_
+_Last synced: 2026-04-23 16:34:17 UTC_
 

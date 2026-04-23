@@ -19,7 +19,7 @@
 | **Grafana** | `http://localhost:3009`（SSH tunnel） | Basic Auth | `GRAFANA_BASIC_USER` `GRAFANA_BASIC_PASSWORD` |
 | **api.aware-wave.com** | `https://api.aware-wave.com` | Bearer | `API_AWAREWAVE_BEARER_TOKEN` |
 | **app.aware-wave.com** | `https://app.aware-wave.com` | Bearer | `APP_AWAREWAVE_BEARER_TOKEN` |
-| **WordPress** | `https://aware-wave.com` | JWT | `WORDPRESS_JWT_TOKEN` |
+| **WordPress** | `https://aware-wave.com` | JWT or application password | `WORDPRESS_JWT_TOKEN` |
 
 ---
 

@@ -61,5 +61,5 @@
 - `docs/operations/security-secrets-policy.md`
 - `docs/README.md`
 
-_Last synced: 2026-04-23 09:45:38 UTC_
+_Last synced: 2026-04-23 16:00:17 UTC_
 

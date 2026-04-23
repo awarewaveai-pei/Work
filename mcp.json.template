@@ -10,7 +10,8 @@
       ],
       "env": {
         "WP_API_URL": "https://YOUR_WORDPRESS_SITE/",
-        "JWT_TOKEN": "<PASTE_WP_APPLICATION_PASSWORD>"
+        "OAUTH_ENABLED": "false",
+        "JWT_TOKEN": "<PASTE_WP_JWT_TOKEN_IF_USING_JWT>"
       }
     },
     "replicate": {

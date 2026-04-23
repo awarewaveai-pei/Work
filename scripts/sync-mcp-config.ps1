@@ -628,9 +628,8 @@ if (-not $SkipCodex) {
             continue
         }
 
-        if ((Should-IncludeServer -Name $name -Server $plainServer -Client "codex") -and $existingBlocks.ContainsKey($name)) {
-            $managedSections += $existingBlocks[$name]
-            $script:Warnings.Add("Preserved existing Codex block for $name because the generated version was incomplete on this machine.")
+        if (Should-IncludeServer -Name $name -Server $plainServer -Client "codex") {
+            $script:Warnings.Add("Skipped Codex block for $name because the generated version was incomplete on this machine.")
         }
     }
 

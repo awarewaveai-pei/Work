@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-23 17:45:47
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-04-24 00:35:06
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter） - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑） - [ ] C5-1. Observability：Sentry（錯誤追蹤）+ PostHog（產品分析） - [ ] C5-2. Edge/Security：Cloudflare（WAF/CDN/Rate limit） - [ ] C5-3. Secrets：1Password Secrets Automation（或同級） - [ ] C5-4. Identity/Org：Clerk/WorkOS/Auth0（三選一） - [ ] C5-5. Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails） - [ ] C5-6. 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -203,81 +203,38 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-23.md
-# Daily Note - 2026-04-23
+## 5) memory/daily/2026-04-24.md
+# Daily Note - 2026-04-24
 
-## 今日完成
-- 釐清 **closeout-inbox** 與 **AO-CLOSE**：inbox 是 append 交接面；敘事合併進 `WORKLOG`／`memory` 是收關者（人或代理）責任，腳本先前未代做。
-- 落地 **每日骨架**：`ensure-daily-progress-scaffold.ps1` + `ao-close` 先跑 scaffold（只補標題／檔案，不合併 inbox）。
-- **合併 inbox 可讀內容** 進本日紀錄：Claude 段（MCP／Supabase B postgres／憑證地圖／runbook／VPS Studio＋heartbeat 等）；Codex 段（AwareWave／SoulfulExpression 命名、`SUPABASE_*` fallback、run-postgres-mcp、traceability 等）— 細節在 `WORKLOG` §2026-04-23。
+## Done today
+- (TBD)
 
-## 重要現況
-- 工作樹尚有 **closeout 相關**未提交檔案（`WORKLOG`、`ao-close`、scaffold、`memory/daily`）；inbox 曾寫某 commit **待 push**，實際與 **`8247e47`** 等遠端狀態請以 **`git status`／`git log`** 為準。
-- 部分第三方 key（Perplexity、Airtable）inbox 標為仍占位。
+## Current state
+- (TBD)
 
-## 下一步
-- 執行 **`AO-CLOSE`**（或手動）：確認 gate、將今日 `WORKLOG`／`memory`／腳本變更 **commit + push**。
-- 若 Codex inbox 所列「WORKLOG 是否已寫 env migration／alias」仍不足，於 `WORKLOG` 或 traceability 單開一小節補上對照表。
+## Next steps
+- (TBD)
 
 ## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:b6ffeefd59d7e6b0d386b6ada348e69ebeb75b1db6ae8665760666a33538b33e -->
+<!-- ao-close-inbox-sha256:0ac1688c67e446a20bb1c003ac978fab0cbb604031436b22e483bdaf39b33093 -->
 
-### system-backfill 2026-04-22 20:10
+### claude-sonnet-4-6 2026-04-23 15:30
 
-- **完成（一句）**: 回填今日已執行之共享 MCP/治理與 AO 流程相關變更，避免 closeout-inbox 空白
+- **完成（一句）**: 診斷並修復伺服器 CPU 暴衝（ClickHouse MergeTree 大合併），清理 Supabase 測試表格與安全警告
 - **變更路徑**:
-  - `mcp/registry.template.json`
-  - `mcp/user-env.template.ps1`
-  - `mcp/README.md`
-  - `scripts/sync-mcp-config.ps1`
-  - `scripts/bootstrap-mcp-machine.ps1`
-  - `scripts/sanitize-user-mcp-config.ps1`
-  - `agency-os/docs/operations/collaborator-ai-agent-rules.md`
-  - `agency-os/docs/operations/closeout-inbox-TEMPLATE.md`
-  - `scripts/init-closeout-inbox.ps1`
-- **Git**:
-  - `0a6ab6d`, `95e6c5b`, `aec38cb`, `1908f2b`, `27fddb3`, `299d7a8`
-- **對應 TASKS 子字串（可選）**:
-  - `（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）`
-  - `Enterprise 工具層 Phase 1 正式串接`
-  - `三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）`
+  - `lobster-factory/infra/trigger/docker-compose.yml` — trigger-clickhouse 加 `cpus: 1.5`、`mem_limit: 2048m`
+- **Git**: `54c92a7` (cpus limit), `bc74aa3` (mem_limit 2048m)
+- **對應 TASKS 子字串（可選）**: server stability, security cleanup
 - **風險／待辦（可選）**:
-  - `mcp/user-env.ps1` 尚未補齊所有必填 env，`mcp:governance` 會持續提示缺項
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:e1bae1cbbbde7615f401e62d14587d93cd50466f437c9463ea845896206c8b18 -->
-
-（以下可刪除；為當日第一則範例占位）
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:c9268e3d7c8d372582c3d43d956711bc66d646645aededda3e696ea4a5d02be9 -->
-
-（以下可刪除；為當日第一則範例占位）
-
-
-### codex 2026-04-23 17:30
-
-- **完成（一句）**: 新增本機 Perplexity / Grok CLI、xAI agent 模板，並整理一份給筆電 Codex 的 Grok 安裝提示文件
-- **變更路徑**:
-  - `scripts/perplexity-cli.ps1`
-  - `bin/perplexity.cmd`
-  - `bin/pplx.cmd`
-  - `scripts/grok-cli.ps1`
-  - `bin/grok.cmd`
-  - `bin/xai.cmd`
-  - `examples/xai-web-search-template.json`
-  - `examples/xai-function-calling-template.json`
-  - `GROK_LAPTOP_CODEX_INSTALL_PROMPT.md`
-  - `agency-os/.agency-state/closeout-inbox.md`
-- **Git**: 未 commit
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: Perplexity API key 已確認回 `insufficient_quota`；Grok CLI 已用現有 `XAI_API_KEY` 實測成功，若新 shell 找不到 `grok` 需重開 PowerShell 或暫時補 `$env:Path += ";C:\Users\USER\Work\bin"`
+  - ClickHouse MergeTree merge 背景仍在跑，預計今晚前完成，Load avg 屆時會降回正常
+  - Supabase 已刪 19 張測試表（profiles, organizations, workspaces, roles, permissions, role_permissions, user_role_assignments, organization_memberships, workspace_memberships, projects, sites, environments, approvals, audit_logs, knowledge_sources, knowledge_documents, knowledge_chunks, knowledge_embeddings, knowledge_queries）、刪孤兒 function（match_knowledge_chunks, match_documents）、刪 vector extension、修 set_updated_at search_path、workflow_runs 開 RLS
+  - 伺服器 git（/root/Work）沒有 GitHub push 權限，需要手動設定 deploy key 或 PAT 才能從伺服器直接 push
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-23 17:45:41`
+- Time: `2026-04-24 00:35:04`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -287,14 +244,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260423-174541.md`
-- Closeout: `reports/closeout/closeout-20260423-174539.md`
+- Health: `reports/health/health-20260424-003504.md`
+- Closeout: `reports/closeout/closeout-20260424-003501.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-### 排程單一來源 + AO-CLOSE 聯動甘特
 - **`docs/overview/PROGRAM_SCHEDULE.json`**：三流（AO／LF／PJ）任務與日期；可複製到客戶專案或 `project-kit` 範本。
 - **`scripts/render-program-timeline-from-schedule.ps1`**：UTF-8 JSON → `PROGRAM_TIMELINE.md` 標記區（表 + Mermaid）；腳本本體 **ASCII-only** 以相容 PS 5.1。
 - **`generate-integrated-status-report.ps1`** 末尾**單次**呼叫渲染；**AO-CLOSE** 路徑因此每次收工會重渲時間軸（仍以 TASKS／Checklist／Discovery 為完成真相）。
@@ -353,5 +309,6 @@
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 

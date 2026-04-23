@@ -28,10 +28,94 @@
     "awarewave-ops": {
       "enabled": true,
       "transport": "stdio",
+      "optional_env": [
+        "API_AWAREWAVE_BASE_URL",
+        "API_AWAREWAVE_BEARER_TOKEN",
+        "APP_AWAREWAVE_BASE_URL",
+        "APP_AWAREWAVE_BEARER_TOKEN",
+        "HETZNER_API_BASE_URL",
+        "HETZNER_API_TOKEN",
+        "UPTIME_KUMA_BASE_URL",
+        "UPTIME_KUMA_API_KEY",
+        "GRAFANA_BASE_URL",
+        "GRAFANA_SERVICE_ACCOUNT_TOKEN",
+        "GRAFANA_BASIC_USER",
+        "GRAFANA_BASIC_PASSWORD",
+        "NETDATA_BASE_URL",
+        "NETDATA_API_TOKEN",
+        "SLACK_API_BASE_URL",
+        "SLACK_BOT_TOKEN",
+        "SLACK_WEBHOOK_URL",
+        "SENTRY_API_BASE_URL",
+        "SENTRY_AUTH_TOKEN",
+        "RESEND_API_BASE_URL",
+        "RESEND_API_KEY",
+        "CLOUDFLARE_API_BASE_URL",
+        "CLOUDFLARE_API_TOKEN",
+        "POSTHOG_API_BASE_URL",
+        "POSTHOG_PERSONAL_API_KEY",
+        "N8N_API_BASE_URL",
+        "N8N_AUTH_BEARER_TOKEN",
+        "N8N_API_KEY",
+        "N8N_BASIC_AUTH_USER",
+        "N8N_BASIC_AUTH_PASSWORD",
+        "TRIGGER_API_URL",
+        "TRIGGER_ACCESS_TOKEN",
+        "SUPABASE_SOULFULEXPRESSION_URL",
+        "SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY",
+        "SUPABASE_A_URL",
+        "SUPABASE_A_SERVICE_ROLE_KEY",
+        "SUPABASE_AWAREWAVE_URL",
+        "SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY",
+        "SUPABASE_B_URL",
+        "SUPABASE_B_SERVICE_ROLE_KEY"
+      ],
       "command": "node",
       "args": [
         "${workspaceRoot}\\mcp-local-wrappers\\awarewave-ops-mcp.mjs"
-      ]
+      ],
+      "env": {
+        "API_AWAREWAVE_BASE_URL": "${env:API_AWAREWAVE_BASE_URL}",
+        "API_AWAREWAVE_BEARER_TOKEN": "${env:API_AWAREWAVE_BEARER_TOKEN}",
+        "APP_AWAREWAVE_BASE_URL": "${env:APP_AWAREWAVE_BASE_URL}",
+        "APP_AWAREWAVE_BEARER_TOKEN": "${env:APP_AWAREWAVE_BEARER_TOKEN}",
+        "HETZNER_API_BASE_URL": "${env:HETZNER_API_BASE_URL}",
+        "HETZNER_API_TOKEN": "${env:HETZNER_API_TOKEN}",
+        "UPTIME_KUMA_BASE_URL": "${env:UPTIME_KUMA_BASE_URL}",
+        "UPTIME_KUMA_API_KEY": "${env:UPTIME_KUMA_API_KEY}",
+        "GRAFANA_BASE_URL": "${env:GRAFANA_BASE_URL}",
+        "GRAFANA_SERVICE_ACCOUNT_TOKEN": "${env:GRAFANA_SERVICE_ACCOUNT_TOKEN}",
+        "GRAFANA_BASIC_USER": "${env:GRAFANA_BASIC_USER}",
+        "GRAFANA_BASIC_PASSWORD": "${env:GRAFANA_BASIC_PASSWORD}",
+        "NETDATA_BASE_URL": "${env:NETDATA_BASE_URL}",
+        "NETDATA_API_TOKEN": "${env:NETDATA_API_TOKEN}",
+        "SLACK_API_BASE_URL": "${env:SLACK_API_BASE_URL}",
+        "SLACK_BOT_TOKEN": "${env:SLACK_BOT_TOKEN}",
+        "SLACK_WEBHOOK_URL": "${env:SLACK_WEBHOOK_URL}",
+        "SENTRY_API_BASE_URL": "${env:SENTRY_API_BASE_URL}",
+        "SENTRY_AUTH_TOKEN": "${env:SENTRY_AUTH_TOKEN}",
+        "RESEND_API_BASE_URL": "${env:RESEND_API_BASE_URL}",
+        "RESEND_API_KEY": "${env:RESEND_API_KEY}",
+        "CLOUDFLARE_API_BASE_URL": "${env:CLOUDFLARE_API_BASE_URL}",
+        "CLOUDFLARE_API_TOKEN": "${env:CLOUDFLARE_API_TOKEN}",
+        "POSTHOG_API_BASE_URL": "${env:POSTHOG_API_BASE_URL}",
+        "POSTHOG_PERSONAL_API_KEY": "${env:POSTHOG_PERSONAL_API_KEY}",
+        "N8N_API_BASE_URL": "${env:N8N_API_BASE_URL}",
+        "N8N_AUTH_BEARER_TOKEN": "${env:N8N_AUTH_BEARER_TOKEN}",
+        "N8N_API_KEY": "${env:N8N_API_KEY}",
+        "N8N_BASIC_AUTH_USER": "${env:N8N_BASIC_AUTH_USER}",
+        "N8N_BASIC_AUTH_PASSWORD": "${env:N8N_BASIC_AUTH_PASSWORD}",
+        "TRIGGER_API_URL": "${env:TRIGGER_API_URL}",
+        "TRIGGER_ACCESS_TOKEN": "${env:TRIGGER_ACCESS_TOKEN}",
+        "SUPABASE_SOULFULEXPRESSION_URL": "${env:SUPABASE_SOULFULEXPRESSION_URL}",
+        "SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY": "${env:SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY}",
+        "SUPABASE_A_URL": "${env:SUPABASE_A_URL}",
+        "SUPABASE_A_SERVICE_ROLE_KEY": "${env:SUPABASE_A_SERVICE_ROLE_KEY}",
+        "SUPABASE_AWAREWAVE_URL": "${env:SUPABASE_AWAREWAVE_URL}",
+        "SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY": "${env:SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY}",
+        "SUPABASE_B_URL": "${env:SUPABASE_B_URL}",
+        "SUPABASE_B_SERVICE_ROLE_KEY": "${env:SUPABASE_B_SERVICE_ROLE_KEY}"
+      }
     },
     "copilot": {
       "enabled": true,
@@ -166,6 +250,11 @@
     "supabase": {
       "enabled": true,
       "transport": "http",
+      "clients": {
+        "codex": {
+          "exclude": true
+        }
+      },
       "url": "${env:SUPABASE_MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${env:SUPABASE_AUTH_BEARER_TOKEN}"
@@ -177,6 +266,11 @@
     "supabase-soulfulexpression": {
       "enabled": true,
       "transport": "http",
+      "clients": {
+        "codex": {
+          "exclude": true
+        }
+      },
       "url": "${env:SUPABASE_SOULFULEXPRESSION_MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${env:SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
@@ -201,6 +295,11 @@
     "supabase-a": {
       "enabled": true,
       "transport": "http",
+      "clients": {
+        "codex": {
+          "exclude": true
+        }
+      },
       "url": "${env:SUPABASE_SOULFULEXPRESSION_MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${env:SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
@@ -222,10 +321,10 @@
       "transport": "http",
       "url": "${env:POSTHOG_MCP_URL}",
       "headers": {
-        "Authorization": "Bearer ${env:POSTHOG_API_KEY}"
+        "Authorization": "Bearer ${env:POSTHOG_PERSONAL_API_KEY}"
       },
       "codex": {
-        "bearer_token_env_var": "POSTHOG_API_KEY"
+        "bearer_token_env_var": "POSTHOG_PERSONAL_API_KEY"
       }
     },
     "resend": {
