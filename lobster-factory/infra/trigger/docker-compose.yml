@@ -64,6 +64,7 @@ services:
     restart: unless-stopped
     logging: *trigger-logging
     mem_limit: 1024m
+    cpus: 1.5
     environment:
       CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_USER:-default}
       CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_PASSWORD:-password}
