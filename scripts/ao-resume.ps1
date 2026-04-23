@@ -125,7 +125,8 @@ if ($FullMainlineParity) {
         }
         if ($FullMainlinePushFeature) { $alignArgs += "-PushFeature" }
         if ($FullMainlineRequireFeatureBranch) { $alignArgs += "-RequireFeatureBranch" }
-        $alignArgs += "-AllowMissingFeatureBranch", $FullMainlineAllowMissingFeatureBranch
+        # PowerShell.exe -File parsing is positional for some arg patterns; pass switches as `-Name:$bool`.
+        $alignArgs += "-AllowMissingFeatureBranch:$FullMainlineAllowMissingFeatureBranch"
         $alignStash = $FullMainlineAllowStash -or $AllowStashBeforePull -or $AllowUnexpectedDirty
         if ($alignStash) { $alignArgs += "-AllowStash" }
         & powershell.exe @alignArgs
