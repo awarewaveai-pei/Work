@@ -42,6 +42,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
 This writes:
 
 - repo-local `.mcp.json`
+- `.cursor/mcp.json` (**Cursor** project MCP; keep in sync with root file)
 - `~/.codex/config.toml` managed MCP block
 - `~/.copilot/mcp-config.json`
 - `~/.gemini/settings.json`

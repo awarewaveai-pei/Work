@@ -1,3 +1,324 @@
 {
-  "mcpServers": {}
+    "mcpServers":  {
+                       "grok-fast":  {
+                                         "args":  [
+                                                      "-NoProfile",
+                                                      "-ExecutionPolicy",
+                                                      "Bypass",
+                                                      "-File",
+                                                      "D:\\Work\\scripts\\run-llm-mcp.ps1",
+                                                      "-Provider",
+                                                      "xai"
+                                                  ],
+                                         "env":  {
+                                                     "GROK_MODEL":  "grok-4.20-reasoning",
+                                                     "XAI_API_KEY":  "${XAI_API_KEY}"
+                                                 },
+                                         "command":  "powershell"
+                                     },
+                       "supabase":  {
+                                        "url":  "${SUPABASE_MCP_URL}",
+                                        "headers":  {
+                                                        "Authorization":  "Bearer ${SUPABASE_AUTH_BEARER_TOKEN}"
+                                                    },
+                                        "type":  "http"
+                                    },
+                       "grok-latest":  {
+                                           "args":  [
+                                                        "-NoProfile",
+                                                        "-ExecutionPolicy",
+                                                        "Bypass",
+                                                        "-File",
+                                                        "D:\\Work\\scripts\\run-llm-mcp.ps1",
+                                                        "-Provider",
+                                                        "xai"
+                                                    ],
+                                           "env":  {
+                                                       "GROK_MODEL":  "grok-4.20-reasoning",
+                                                       "XAI_API_KEY":  "${XAI_API_KEY}"
+                                                   },
+                                           "command":  "powershell"
+                                       },
+                       "claude-fast":  {
+                                           "args":  [
+                                                        "-NoProfile",
+                                                        "-ExecutionPolicy",
+                                                        "Bypass",
+                                                        "-File",
+                                                        "D:\\Work\\scripts\\run-llm-mcp.ps1",
+                                                        "-Provider",
+                                                        "anthropic"
+                                                    ],
+                                           "env":  {
+                                                       "ANTHROPIC_MODEL":  "claude-haiku-4-5-20251001",
+                                                       "ANTHROPIC_API_KEY":  "${ANTHROPIC_API_KEY}"
+                                                   },
+                                           "command":  "powershell"
+                                       },
+                       "supabase-awarewave-postgres":  {
+                                                           "args":  [
+                                                                        "-NoProfile",
+                                                                        "-ExecutionPolicy",
+                                                                        "Bypass",
+                                                                        "-File",
+                                                                        "D:\\Work\\scripts\\run-postgres-mcp.ps1"
+                                                                    ],
+                                                           "env":  {
+                                                                       "SUPABASE_AWAREWAVE_POSTGRES_DSN":  "${SUPABASE_AWAREWAVE_POSTGRES_DSN}"
+                                                                   },
+                                                           "command":  "powershell"
+                                                       },
+                       "canva":  {
+                                     "args":  [
+                                                  "/c",
+                                                  "npx",
+                                                  "-y",
+                                                  "mcp-remote@latest",
+                                                  "https://mcp.canva.com/mcp"
+                                              ],
+                                     "command":  "cmd"
+                                 },
+                       "perplexity":  {
+                                          "args":  [
+                                                       "/c",
+                                                       "npx",
+                                                       "-y",
+                                                       "@perplexity-ai/mcp-server"
+                                                   ],
+                                          "env":  {
+                                                      "PERPLEXITY_API_KEY":  "${PERPLEXITY_API_KEY}"
+                                                  },
+                                          "command":  "cmd"
+                                      },
+                       "replicate":  {
+                                         "args":  [
+                                                      "/c",
+                                                      "npx",
+                                                      "-y",
+                                                      "replicate-mcp"
+                                                  ],
+                                         "env":  {
+                                                     "REPLICATE_API_TOKEN":  "${REPLICATE_API_TOKEN}",
+                                                     "REPLICATE_WEBHOOK_SIGNING_KEY":  "${REPLICATE_WEBHOOK_SIGNING_KEY}"
+                                                 },
+                                         "command":  "cmd"
+                                     },
+                       "gemini-latest":  {
+                                             "args":  [
+                                                          "-NoProfile",
+                                                          "-ExecutionPolicy",
+                                                          "Bypass",
+                                                          "-File",
+                                                          "D:\\Work\\scripts\\run-llm-mcp.ps1",
+                                                          "-Provider",
+                                                          "gemini"
+                                                      ],
+                                             "env":  {
+                                                         "GEMINI_MODEL":  "gemini-3.1-pro-preview",
+                                                         "GEMINI_API_KEY":  "${GEMINI_API_KEY}"
+                                                     },
+                                             "command":  "powershell"
+                                         },
+                       "n8n":  {
+                                   "url":  "${N8N_MCP_URL}",
+                                   "headers":  {
+                                                   "Authorization":  "Bearer ${N8N_AUTH_BEARER_TOKEN}"
+                                               },
+                                   "type":  "http"
+                               },
+                       "chatgpt-fast":  {
+                                            "args":  [
+                                                         "-NoProfile",
+                                                         "-ExecutionPolicy",
+                                                         "Bypass",
+                                                         "-File",
+                                                         "D:\\Work\\scripts\\run-llm-mcp.ps1",
+                                                         "-Provider",
+                                                         "openai"
+                                                     ],
+                                            "env":  {
+                                                        "OPENAI_MODEL":  "gpt-5.3-chat-latest",
+                                                        "OPENAI_API_KEY":  "${OPENAI_API_KEY}"
+                                                    },
+                                            "command":  "powershell"
+                                        },
+                       "trigger":  {
+                                       "args":  [
+                                                    "-NoProfile",
+                                                    "-ExecutionPolicy",
+                                                    "Bypass",
+                                                    "-File",
+                                                    "D:\\Work\\scripts\\start-trigger-mcp.ps1",
+                                                    "-ProjectRef",
+                                                    "${TRIGGER_PROJECT_REF}"
+                                                ],
+                                       "env":  {
+                                                   "TRIGGER_API_URL":  "${TRIGGER_API_URL}"
+                                               },
+                                       "command":  "powershell"
+                                   },
+                       "supabase-soulfulexpression":  {
+                                                          "url":  "${SUPABASE_SOULFULEXPRESSION_MCP_URL}",
+                                                          "headers":  {
+                                                                          "Authorization":  "Bearer ${SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
+                                                                      },
+                                                          "type":  "http"
+                                                      },
+                       "supabase-b-postgres":  {
+                                                   "args":  [
+                                                                "-NoProfile",
+                                                                "-ExecutionPolicy",
+                                                                "Bypass",
+                                                                "-File",
+                                                                "D:\\Work\\scripts\\run-postgres-mcp.ps1"
+                                                            ],
+                                                   "env":  {
+                                                               "SUPABASE_AWAREWAVE_POSTGRES_DSN":  "${SUPABASE_AWAREWAVE_POSTGRES_DSN}"
+                                                           },
+                                                   "command":  "powershell"
+                                               },
+                       "awarewave-ops":  {
+                                             "args":  [
+                                                          "D:\\Work\\mcp-local-wrappers\\awarewave-ops-mcp.mjs"
+                                                      ],
+                                             "command":  "node"
+                                         },
+                       "github":  {
+                                      "args":  [
+                                                   "/c",
+                                                   "npx",
+                                                   "-y",
+                                                   "@modelcontextprotocol/server-github"
+                                               ],
+                                      "env":  {
+                                                  "GITHUB_PERSONAL_ACCESS_TOKEN":  "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+                                              },
+                                      "command":  "cmd"
+                                  },
+                       "copilot":  {
+                                       "url":  "https://api.githubcopilot.com/mcp",
+                                       "headers":  {
+                                                       "Authorization":  "Bearer ${COPILOT_MCP_BEARER_TOKEN}"
+                                                   },
+                                       "type":  "http"
+                                   },
+                       "gemini-fast":  {
+                                           "args":  [
+                                                        "-NoProfile",
+                                                        "-ExecutionPolicy",
+                                                        "Bypass",
+                                                        "-File",
+                                                        "D:\\Work\\scripts\\run-llm-mcp.ps1",
+                                                        "-Provider",
+                                                        "gemini"
+                                                    ],
+                                           "env":  {
+                                                       "GEMINI_MODEL":  "gemini-2.5-flash",
+                                                       "GEMINI_API_KEY":  "${GEMINI_API_KEY}"
+                                                   },
+                                           "command":  "powershell"
+                                       },
+                       "airtable":  {
+                                        "args":  [
+                                                     "/c",
+                                                     "npx",
+                                                     "-y",
+                                                     "@loticdigital/airtable-mcp-server"
+                                                 ],
+                                        "env":  {
+                                                    "AIRTABLE_API_KEY":  "${AIRTABLE_API_KEY}"
+                                                },
+                                        "command":  "cmd"
+                                    },
+                       "supabase-a":  {
+                                          "url":  "${SUPABASE_SOULFULEXPRESSION_MCP_URL}",
+                                          "headers":  {
+                                                          "Authorization":  "Bearer ${SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
+                                                      },
+                                          "type":  "http"
+                                      },
+                       "work-global":  {
+                                           "args":  [
+                                                        "-NoProfile",
+                                                        "-ExecutionPolicy",
+                                                        "Bypass",
+                                                        "-File",
+                                                        "D:\\Work\\scripts\\run-filesystem-mcp.ps1"
+                                                    ],
+                                           "command":  "powershell"
+                                       },
+                       "resend":  {
+                                      "args":  [
+                                                   "/c",
+                                                   "npx",
+                                                   "-y",
+                                                   "resend-mcp"
+                                               ],
+                                      "env":  {
+                                                  "SENDER_EMAIL_ADDRESS":  "${RESEND_SENDER_EMAIL_ADDRESS}",
+                                                  "RESEND_API_KEY":  "${RESEND_API_KEY}",
+                                                  "REPLY_TO_EMAIL_ADDRESSES":  "${RESEND_REPLY_TO_EMAIL_ADDRESSES}"
+                                              },
+                                      "command":  "cmd"
+                                  },
+                       "cloudflare":  {
+                                          "url":  "${CLOUDFLARE_MCP_URL}",
+                                          "headers":  {
+                                                          "Authorization":  "Bearer ${CLOUDFLARE_AUTH_BEARER_TOKEN}"
+                                                      },
+                                          "type":  "http"
+                                      },
+                       "chatgpt-latest":  {
+                                              "args":  [
+                                                           "-NoProfile",
+                                                           "-ExecutionPolicy",
+                                                           "Bypass",
+                                                           "-File",
+                                                           "D:\\Work\\scripts\\run-llm-mcp.ps1",
+                                                           "-Provider",
+                                                           "openai"
+                                                       ],
+                                              "env":  {
+                                                          "OPENAI_MODEL":  "gpt-5.4",
+                                                          "OPENAI_API_KEY":  "${OPENAI_API_KEY}"
+                                                      },
+                                              "command":  "powershell"
+                                          },
+                       "wordpress":  {
+                                         "args":  [
+                                                      "/c",
+                                                      "npx",
+                                                      "-y",
+                                                      "@automattic/mcp-wordpress-remote@latest"
+                                                  ],
+                                         "env":  {
+                                                     "JWT_TOKEN":  "${WORDPRESS_JWT_TOKEN}",
+                                                     "WP_API_URL":  "${WP_API_URL}"
+                                                 },
+                                         "command":  "cmd"
+                                     },
+                       "claude-latest":  {
+                                             "args":  [
+                                                          "-NoProfile",
+                                                          "-ExecutionPolicy",
+                                                          "Bypass",
+                                                          "-File",
+                                                          "D:\\Work\\scripts\\run-llm-mcp.ps1",
+                                                          "-Provider",
+                                                          "anthropic"
+                                                      ],
+                                             "env":  {
+                                                         "ANTHROPIC_MODEL":  "claude-sonnet-4-6",
+                                                         "ANTHROPIC_API_KEY":  "${ANTHROPIC_API_KEY}"
+                                                     },
+                                             "command":  "powershell"
+                                         },
+                       "posthog":  {
+                                       "url":  "${POSTHOG_MCP_URL}",
+                                       "headers":  {
+                                                       "Authorization":  "Bearer ${POSTHOG_API_KEY}"
+                                                   },
+                                       "type":  "http"
+                                   }
+                   }
 }

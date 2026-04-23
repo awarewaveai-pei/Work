@@ -7,6 +7,7 @@
   syncs the result into:
 
   - .mcp.json at the repo root
+  - .cursor\mcp.json (Cursor project MCP; same server set as root `.mcp.json`)
   - %USERPROFILE%\.codex\config.toml (managed MCP block only)
   - %USERPROFILE%\.copilot\mcp-config.json
   - %USERPROFILE%\.gemini\settings.json
@@ -554,6 +555,12 @@ if (-not $SkipWorkspaceConfig) {
     $workspaceDoc = @{ mcpServers = $workspaceServers }
     $workspacePath = Join-Path $WorkspaceRoot ".mcp.json"
     Write-Utf8NoBomFile -Path $workspacePath -Content ($workspaceDoc | ConvertTo-Json -Depth 20)
+    $cursorMcpDir = Join-Path $WorkspaceRoot ".cursor"
+    if (-not (Test-Path -LiteralPath $cursorMcpDir)) {
+        New-Item -ItemType Directory -Path $cursorMcpDir | Out-Null
+    }
+    $cursorMcpPath = Join-Path $cursorMcpDir "mcp.json"
+    Write-Utf8NoBomFile -Path $cursorMcpPath -Content ($workspaceDoc | ConvertTo-Json -Depth 20)
 }
 
 if (-not $SkipClaude) {
@@ -645,6 +652,7 @@ if ($StrictEnv -and $script:MissingVars.Count -gt 0) {
 
 Write-Host "MCP sync complete." -ForegroundColor Green
 Write-Host "  workspace : $(if ($SkipWorkspaceConfig) { 'skipped' } else { Join-Path $WorkspaceRoot '.mcp.json' })" -ForegroundColor Gray
+Write-Host "  cursor    : $(if ($SkipWorkspaceConfig) { 'skipped' } else { Join-Path $WorkspaceRoot '.cursor\mcp.json' })" -ForegroundColor Gray
 Write-Host "  claude    : $(if ($SkipClaude) { 'skipped' } else { Join-Path $env:USERPROFILE '.claude\mcp.json' })" -ForegroundColor Gray
 Write-Host "  codex     : $(if ($SkipCodex) { 'skipped' } else { Join-Path $env:USERPROFILE '.codex\config.toml' })" -ForegroundColor Gray
 Write-Host "  copilot   : $(if ($SkipCopilot) { 'skipped' } else { Join-Path $env:USERPROFILE '.copilot\mcp-config.json' })" -ForegroundColor Gray
