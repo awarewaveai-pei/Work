@@ -56,6 +56,12 @@
 
 > 目標：30 年後仍能 **照表操課**；下列命令以 **monorepo 根**為準（路徑見 `REMOTE_WORKSTATION_STARTUP`）。
 
+## 11. Repo 與工具契約（可機器驗證；與閘道對齊）
+
+- **健康檢查單一主人**：完整邏輯只在 monorepo **`scripts/system-health-check.ps1`**；**`agency-os/scripts/system-health-check.ps1` 只能**是轉發 wrapper（健康閘道會防「整份貼回」造成雙頭馬車）。
+- **健康報告 JSON**：寫出檔含 **`schemaVersion`** 與 **`score`**（及其他摘要欄位）；**讀分**統一走 **`scripts/health-report-utils.ps1`**（`AO-CLOSE`、`system-guard`、`verify-build-gates` 同一套）。若未來改 JSON 形狀，**同一 PR** 內須同時升級 `schemaVersion`、寫報告端、與 utils 讀取端，避免「報告寫得出、關閉讀不到」。
+- **路徑與文件**：治理正文、對外 runbook 以 **`<WORK_ROOT>`／相對於 repo 根的路徑** 表達；**禁止**把單機絕對路徑當唯一真相寫進憲章級文件（新機與 CI 會直接失敗或誤導）。本檔與 **`00-session-bootstrap.mdc`** 亦用於衝突檢查：發現 `D:\Work` 等硬編碼應改為占位符或敘述「於 monorepo 根執行」。
+
 | 時機 | 做什麼 | 驗證／產物 |
 |------|--------|------------|
 | **合併／收工前** | `powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1` | 龍蝦 bootstrap、`verify-adr-index`、Agency `system-health-check` |

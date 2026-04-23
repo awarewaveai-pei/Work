@@ -16,7 +16,7 @@ function Resolve-WorkspaceRoot {
         $resolved = (Get-Location).Path
     }
 
-    # Monorepo guardrail: if invoked from D:\Work, force canonical agency root.
+    # Monorepo guardrail: if this path is the monorepo parent of agency-os, use agency-os as workspace root.
     $agencyCandidate = Join-Path $resolved "agency-os"
     if (Test-Path (Join-Path $agencyCandidate "scripts\system-health-check.ps1")) {
         return (Resolve-Path $agencyCandidate).Path
@@ -95,6 +95,30 @@ $coreFiles = @(
 foreach ($f in $coreFiles) {
     $ok = Test-Path (Join-Path $root $f)
     Add-Check -Name ("Core file exists: " + $f) -Pass $ok -Detail ($(if ($ok) { "OK" } else { "Missing" }))
+}
+
+# 1a) Long-term governance anchor (human charter + gate alignment; must not shrink to a stub)
+$ltPath = Join-Path $root "docs\overview\LONG_TERM_OPERATING_DISCIPLINE.md"
+if (Test-Path -LiteralPath $ltPath) {
+    $ltRaw = Get-Content -LiteralPath $ltPath -Raw -Encoding UTF8
+    # ASCII-only pattern: title uses CJK "30 + year-tier" (avoid non-UTF8-with-BOM script encoding issues on Windows PS 5.1)
+    $ltOk = ($ltRaw.Length -ge 1800) -and ($ltRaw -match 'verify-build-gates') -and ($ltRaw -match '30\s*\u5E74\u7D1A')
+    $ltDetail = if ($ltOk) { "OK (charter present)" } else { "Too small or missing expected anchors (gates / 30-year intent)" }
+    Add-Check -Name "Governance anchor: docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md" -Pass $ltOk -Detail $ltDetail
+    if (-not $ltOk) { Add-CriticalFailure -Reason "LONG_TERM_OPERATING_DISCIPLINE.md failed integrity anchor check" }
+} else {
+    Add-Check -Name "Governance anchor: docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md" -Pass $false -Detail "Missing"
+    Add-CriticalFailure -Reason "Missing docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md"
+}
+
+# 1a2) agency-os health entrypoint must stay a thin wrapper (canonical body is monorepo scripts\)
+$wrapPath = Join-Path $root "scripts\system-health-check.ps1"
+if (Test-Path -LiteralPath $wrapPath) {
+    $wrapRaw = Get-Content -LiteralPath $wrapPath -Raw -Encoding UTF8
+    $wrapThin = ($wrapRaw.Length -lt 4000) -and ($wrapRaw -match '(?i)single-owner|canonical implementation') -and ($wrapRaw -match '\.\.[\\/]\.\.[\\/]scripts[\\/]system-health-check\.ps1')
+    $wrapDetail = if ($wrapThin) { "OK (thin wrapper -> monorepo scripts)" } else { "Looks like a full duplicate or missing forwarder; use monorepo scripts/system-health-check.ps1 only" }
+    Add-Check -Name "Script sanity: agency-os scripts/system-health-check.ps1 (thin wrapper)" -Pass $wrapThin -Detail $wrapDetail
+    if (-not $wrapThin) { Add-CriticalFailure -Reason "agency-os system-health-check.ps1 must remain a thin wrapper to monorepo scripts" }
 }
 
 # 1b) Critical script bodies (detect accidental wrapper-only overwrite)

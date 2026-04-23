@@ -1,5 +1,9 @@
 # Shared helpers for system-health-check reports (JSON + Markdown).
 # Dot-source from ao-close.ps1 / system-guard.ps1: . (Join-Path $PSScriptRoot "health-report-utils.ps1")
+#
+# Contract (long-lived consumers):
+# - Preferred: health-*.json with top-level numeric "schemaVersion" >= 1 and numeric "score" (percent).
+# - When bumping JSON shape, increment schemaVersion in scripts/system-health-check.ps1 and extend this reader in the same commit.
 
 function Get-LatestHealthScorePercent {
     param(
@@ -23,8 +27,16 @@ function Get-LatestHealthScorePercent {
     if ($preferJson -and $latestJson) {
         try {
             $j = Get-Content -LiteralPath $latestJson.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($null -ne $j.PSObject.Properties["schemaVersion"] -and $null -ne $j.PSObject.Properties["score"]) {
-                return [double]$j.score
+            # Summary object: top-level numeric score when schemaVersion is absent or >= 1 (v1 today; same shape for future bumps if score remains).
+            if ($null -ne $j.PSObject.Properties["score"]) {
+                try {
+                    $sv = $j.schemaVersion
+                    if ($null -eq $sv -or [double]$sv -ge 1) {
+                        return [double]$j.score
+                    }
+                } catch {
+                    # fall through to legacy array / markdown
+                }
             }
             if ($j -is [System.Collections.IEnumerable] -and $j -isnot [string]) {
                 $arr = @($j)
