@@ -14,9 +14,8 @@ param(
     [switch]$FullMainlinePushFeature,
     [switch]$FullMainlineMainOnly,
     [switch]$FullMainlineAllowStash,
-    # Passed through to `git-align-main-aoresume-feature.ps1`. Default: if the default feature branch is missing
-    # locally and on origin, stay on `main` (do not fail the whole AO-RESUME).
-    [bool]$FullMainlineAllowMissingFeatureBranch = $true,
+    # Passed through to `git-align-main-aoresume-feature.ps1`.
+    # Default: missing feature branch (no local, no origin) does not fail the whole AO-RESUME; use `-FullMainlineRequireFeatureBranch` for legacy hard-fail.
     [switch]$FullMainlineRequireFeatureBranch
 )
 
@@ -125,8 +124,6 @@ if ($FullMainlineParity) {
         }
         if ($FullMainlinePushFeature) { $alignArgs += "-PushFeature" }
         if ($FullMainlineRequireFeatureBranch) { $alignArgs += "-RequireFeatureBranch" }
-        # PowerShell.exe -File parsing is positional for some arg patterns; pass switches as `-Name:$bool`.
-        $alignArgs += "-AllowMissingFeatureBranch:$FullMainlineAllowMissingFeatureBranch"
         $alignStash = $FullMainlineAllowStash -or $AllowStashBeforePull -or $AllowUnexpectedDirty
         if ($alignStash) { $alignArgs += "-AllowStash" }
         & powershell.exe @alignArgs

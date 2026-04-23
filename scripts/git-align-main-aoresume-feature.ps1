@@ -43,12 +43,16 @@ param(
     # If the feature branch does not exist locally and there is no origin/<FeatureBranch>, do not fail the whole
     # align step (common after a hotfix is merged to main and the branch is deleted on GitHub). Stay on `main` and
     # print a clear one-line follow-up. Use `-RequireFeatureBranch` to keep the old hard-fail behavior.
-    [bool]$AllowMissingFeatureBranch = $true,
     [switch]$RequireFeatureBranch
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+# NOTE (Windows PowerShell 5.1):
+# Passing a [bool] parameter through `powershell.exe -File` using `-Name:$true/$false` is unreliable in some hosts.
+# Use switches only, and compute the effective behavior in-script.
+$AllowMissingFeatureBranch = -not $RequireFeatureBranch
 
 if (-not $WorkRoot) {
     $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -114,8 +118,6 @@ try {
         Write-Host "== SkipAoResume: left on main (no nested ao-resume) ==" -ForegroundColor DarkGray
     }
 
-    if ($RequireFeatureBranch) { $AllowMissingFeatureBranch = $false }
-
     if ($SkipFeature) {
         Write-Host "== Done (-SkipFeature: left on main) ==" -ForegroundColor Green
         return
@@ -144,7 +146,7 @@ try {
                     Write-Host "== Done: main aligned; feature branch not present (skipped). ==" -ForegroundColor Green
                     return
                 }
-                throw "No local branch '$FeatureBranch' and no origin/$FeatureBranch. Push the branch first or fix -FeatureBranch. (Or pass -AllowMissingFeatureBranch to stay on main when the branch is intentionally removed.)"
+                throw "No local branch '$FeatureBranch' and no origin/$FeatureBranch. Push the branch first or fix -FeatureBranch. (If the branch was merged and deleted on purpose, omit -RequireFeatureBranch / do not pass it from ao-resume.)"
             }
         } finally {
             Pop-Location

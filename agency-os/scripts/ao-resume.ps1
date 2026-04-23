@@ -12,7 +12,6 @@ param(
     [switch]$FullMainlinePushFeature,
     [switch]$FullMainlineMainOnly,
     [switch]$FullMainlineAllowStash,
-    [bool]$FullMainlineAllowMissingFeatureBranch = $true,
     [switch]$FullMainlineRequireFeatureBranch
 )
 
