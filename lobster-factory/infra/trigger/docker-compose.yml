@@ -63,7 +63,7 @@ services:
     container_name: trigger-clickhouse
     restart: unless-stopped
     logging: *trigger-logging
-    mem_limit: 1024m
+    mem_limit: 2048m
     cpus: 1.5
     environment:
       CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_USER:-default}
