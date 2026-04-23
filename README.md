@@ -86,7 +86,7 @@ npm run mcp:governance
 
 ## 開工與雙機同步（AO-RESUME）
 
-- **`AO-RESUME`**：請 Agent 依 **`agency-os/.cursor/rules/30-resume-keyword.mdc`** 讀進度檔，並在 monorepo 根執行 **`.\scripts\ao-resume.ps1 -FullMainlineParity`**（主線 **`main`=`origin/main`**，並在預設功能分支 **`fix/trigger-clickhouse-oom`** 仍存在（本機或 `origin`）時切回該分支並併入 main；若該 hotfix 分支已刪，**預設留在 `main` 不因此失敗**；再跑 preflight／閘道／Strict；見 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §2.5.1**）。**不帶** `-FullMainlineParity` 時行為同 **`align-workstation.ps1`**（僅 fetch／behind 時 ff-only pull 等）。Autopilot 開機則為輕量（見 **AGENTS.md**）。
+- **`AO-RESUME`**：請 Agent 依 **`agency-os/.cursor/rules/30-resume-keyword.mdc`** 讀進度檔，並在 monorepo 根執行 **`.\scripts\ao-resume.ps1 -FullMainlineParity`**（主線 **`main`=`origin/main`**；**預設不切功能分支、留在 `main`**，避免誤切分支。若你刻意要舊的「對齊 main 後回到功能分支再 `merge origin/main`」流程，改用 **`-FullMainlineFeature`**（或 **`-FullMainlineMainOnly:$false`**）並可搭配 **`-FullMainlineFeatureBranch <name>`**；再跑 preflight／閘道／Strict；見 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §2.5.1**）。**不帶** `-FullMainlineParity` 時行為同 **`align-workstation.ps1`**（僅 fetch／behind 時 ff-only pull 等）。Autopilot 開機則為輕量（見 **AGENTS.md**）。
 - **另一台已 AO-CLOSE push 時**：在 monorepo 根 **`AO-RESUME`**（或 **`ao-resume.ps1`**）即可同步檢查；若 pull／髒樹失敗再手動整理。完整清單：[`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)。**勾選 `TASKS`「雙機環境對齊」**：兩台各跑一次通過預設 **`ao-resume.ps1`**（結尾 Strict 已含）或等價稽核即可。
 
 ## 事件流程單一真相

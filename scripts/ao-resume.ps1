@@ -8,11 +8,14 @@ param(
     [switch]$AllowPendingStash,
     [switch]$SkipWorkflowsDeps,
     [switch]$SkipOpenTasksList,
-    # 與 GitHub 主線對齊：`fetch` → `checkout main` → `reset --hard origin/main` → 切回功能分支並 `merge origin/main`（若需要）。**不**與 Autopilot（`-SkipStrictEnvironmentAudit`）併用。關鍵字 **AO-RESUME** 由 `.cursor/rules/30-resume-keyword.mdc` 預設傳此旗標。
+    # 與 GitHub 主線對齊：`fetch` → `checkout main` → `reset --hard origin/main` →（**預設不切功能分支**；可選切回功能分支並 `merge origin/main`）。**不**與 Autopilot（`-SkipStrictEnvironmentAudit`）併用。關鍵字 **AO-RESUME** 由 `.cursor/rules/30-resume-keyword.mdc` 預設傳此旗標。
     [switch]$FullMainlineParity,
     [string]$FullMainlineFeatureBranch = "fix/trigger-clickhouse-oom",
     [switch]$FullMainlinePushFeature,
-    [switch]$FullMainlineMainOnly,
+    # Default: $true (main-only). Use `-FullMainlineMainOnly:$false` or `-FullMainlineFeature` to re-enable the feature-branch continuation flow.
+    [bool]$FullMainlineMainOnly = $true,
+    # Optional explicit opt-in for feature-branch flow (works well with nested `powershell -File` calls).
+    [switch]$FullMainlineFeature,
     [switch]$FullMainlineAllowStash,
     # Passed through to `git-align-main-aoresume-feature.ps1`.
     # Default: missing feature branch (no local, no origin) does not fail the whole AO-RESUME; use `-FullMainlineRequireFeatureBranch` for legacy hard-fail.
@@ -117,7 +120,29 @@ if ($FullMainlineParity) {
             "-WorkRoot", $WorkRoot,
             "-SkipAoResume"
         )
-        if ($FullMainlineMainOnly) {
+        # Prefer main-only by default.
+        # NOTE: older versions used `[switch]$FullMainlineMainOnly` (presence == main-only). New default is `[bool]$FullMainlineMainOnly = $true`.
+        $mainOnlyBound = $PSBoundParameters.ContainsKey("FullMainlineMainOnly")
+        $mainOnlyVal = $true
+        if ($mainOnlyBound) {
+            if ($FullMainlineMainOnly -is [System.Management.Automation.SwitchParameter]) {
+                $mainOnlyVal = [bool][int]$FullMainlineMainOnly
+            } else {
+                $mainOnlyVal = [bool]$FullMainlineMainOnly
+            }
+        }
+
+        $includeFeature = $false
+        if ($FullMainlineFeature) {
+            $includeFeature = $true
+            if ($mainOnlyBound -and $mainOnlyVal) {
+                Write-Host "== AO-RESUME: -FullMainlineFeature overrides -FullMainlineMainOnly (feature-branch continuation enabled) ==" -ForegroundColor DarkYellow
+            }
+        } elseif ($mainOnlyBound -and -not $mainOnlyVal) {
+            $includeFeature = $true
+        }
+
+        if (-not $includeFeature) {
             $alignArgs += "-SkipFeature"
         } else {
             $alignArgs += "-FeatureBranch", $FullMainlineFeatureBranch

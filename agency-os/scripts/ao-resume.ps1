@@ -10,7 +10,8 @@ param(
     [switch]$FullMainlineParity,
     [string]$FullMainlineFeatureBranch = "fix/trigger-clickhouse-oom",
     [switch]$FullMainlinePushFeature,
-    [switch]$FullMainlineMainOnly,
+    [bool]$FullMainlineMainOnly = $true,
+    [switch]$FullMainlineFeature,
     [switch]$FullMainlineAllowStash,
     [switch]$FullMainlineRequireFeatureBranch
 )
