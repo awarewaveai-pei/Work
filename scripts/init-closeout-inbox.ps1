@@ -1,4 +1,5 @@
 # Seeds agency-os/.agency-state/closeout-inbox.md from the tracked template when missing.
+# Convention: new ### blocks go immediately after the first `---` in the file (newest on top). See closeout-inbox-TEMPLATE.md.
 # Run from monorepo root: powershell -ExecutionPolicy Bypass -File .\scripts\init-closeout-inbox.ps1
 
 param(
@@ -37,7 +38,7 @@ if (Test-Path -LiteralPath $template) {
     $stub = @"
 # Closeout inbox
 
-Append-only blocks for handoff. See agency-os/docs/operations/collaborator-ai-agent-rules.md
+New ### blocks: after the first ---, insert at the top (newest first). See agency-os/docs/operations/collaborator-ai-agent-rules.md
 
 "@
     Set-Content -LiteralPath $inbox -Value $stub -Encoding UTF8

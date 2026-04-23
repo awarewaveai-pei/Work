@@ -4,7 +4,11 @@
 
 .DESCRIPTION
   ASCII-only script body for Windows PowerShell 5.1. UTF-8 no BOM for .md writes.
-  Skips: sections ### merged-to-worklog*, ### example-agent*. Idempotent per SHA256 of payload.
+  Inbox file uses the *last* "---" in the file; everything after that line is the payload. Convention:
+  new "### ..." blocks are **prepended** immediately after that "---" (newest entry first, older blocks below).
+  Skips: sections ### merged-to-worklog*, ### example-agent*. Drops any text before the first "###" in the
+  tail (legacy templates that put instructions between "---" and the first block).
+  Idempotent per SHA256 of payload.
   CONVERSATION_MEMORY: one bullet under ## Current Operating Context (pointer to WORKLOG); not a full distill.
 #>
 param(
@@ -119,6 +123,17 @@ if ($dash -lt 0) {
 $tail = @()
 if ($dash + 1 -lt $inboxLines.Length) {
     $tail = $inboxLines[($dash + 1)..($inboxLines.Length - 1)]
+}
+# If legacy/accidental prose appears before the first ### in the tail, drop it (do not merge into WORKLOG).
+$firstH3 = -1
+for ($ti = 0; $ti -lt $tail.Length; $ti++) {
+    if ($tail[$ti] -match '^\s*###\s+') {
+        $firstH3 = $ti
+        break
+    }
+}
+if ($firstH3 -gt 0) {
+    $tail = $tail[$firstH3..($tail.Length - 1)]
 }
 
 $sections = Get-InboxPayloadSections -TailLines $tail

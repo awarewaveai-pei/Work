@@ -16,7 +16,7 @@ alwaysApply: true
 
 **`AO-CLOSE` 關鍵字 = 內含授權**：**禁止**要求使用者再加一句「去寫 AUTO_TASK_DONE」才動手；證據不足時代理**只問一題**。
 
-**多代理**：非收關者**只 append** **`agency-os/.agency-state/closeout-inbox.md`**；**`ao-close.ps1`** 會在開頭將可匯區塊 **verbatim** 併入 **`WORKLOG`**／**`memory/daily`**，並在 **`memory/CONVERSATION_MEMORY.md`** 的 **`## Current Operating Context`** 加**一則指標列**，然後自範本**重置 inbox**（見 **`docs/operations/collaborator-ai-agent-rules.md`**）。長 commit：**`-CommitMessageFile`**（**`end-of-day-checklist.md` §0.5**）。
+**多代理**：非收關者**只寫入** **`agency-os/.agency-state/closeout-inbox.md`**（**`---` 分隔線之後、新 `###` 區塊一律置頂**，**最新一則在最上**；見 **`docs/operations/collaborator-ai-agent-rules.md`**）；**`ao-close.ps1`** 會在開頭將可匯區塊 **verbatim** 併入 **`WORKLOG`**／**`memory/daily`**，並在 **`memory/CONVERSATION_MEMORY.md`** 的 **`## Current Operating Context`** 加**一則指標列**，然後自範本**重置 inbox**。長 commit：**`-CommitMessageFile`**（**`end-of-day-checklist.md` §0.5**）。
 
 When the user indicates end of day or shutdown intent (examples: `AO-CLOSE`,
 "要關機", "收工", "今天先到這"), run this closeout sequence before ending:

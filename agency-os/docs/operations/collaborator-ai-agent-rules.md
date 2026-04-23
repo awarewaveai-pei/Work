@@ -51,7 +51,7 @@
 - 不要在任何檔案或對話中寫入 token、私鑰、還原後的 MCP 備份內容。
 
 【必做】
-- 每完成一塊可驗收工作，在收件匣檔案末尾追加一個區塊（UTF-8、Markdown）。路徑：monorepo 根下 **`agency-os/.agency-state/closeout-inbox.md`**（工作區根若僅 **`agency-os`** 資料夾則 **`.agency-state/closeout-inbox.md`**）。
+- 每完成一塊可驗收工作，在收件匣 **`closeout-inbox.md`** 裡、**`---` 分隔線之後**新增一個 **`###` 區塊**（UTF-8、Markdown）。**新區塊一律插在 `---` 正下方、整段內容的最上方**（**最新一則在最上面**；舊區塊留在下面，不要改寫舊內文除非修正錯字）。路徑：monorepo 根下 **`agency-os/.agency-state/closeout-inbox.md`**（工作區根若僅 **`agency-os`** 資料夾則 **`.agency-state/closeout-inbox.md`**）。
   若目錄或檔案不存在：先建立目錄 .agency-state，再建立檔案；或請使用者執行：powershell -ExecutionPolicy Bypass -File .\scripts\init-closeout-inbox.ps1
 - 區塊標題格式：### <AGENT_ID> <ISO 本地時間>
 - 區塊內必含：完成一句、動到的路徑或模組、若已 commit 則寫 hash；若對應 TASKS.md 某一條，貼該行「可唯一識別」的子字串（方便收關寫 AUTO_TASK_DONE）。
@@ -98,7 +98,7 @@
 | commit | ✅ | ✅ |
 | push（任何 branch） | ❌ 由收關者統一執行 | ✅ 透過 ao-close.ps1 |
 | 開 PR / merge PR | ❌ 除非使用者明確要求 | ✅ |
-| 追加 `closeout-inbox.md` | ✅ | 讀取後合併，再清空 |
+| 寫入 `closeout-inbox.md`（`---` 後置頂） | ✅ | 讀取後合併，再清空 |
 | 定稿 WORKLOG／memory／daily／TASKS 勾選 | ❌ | ✅ |
 | 執行 `ao-close.ps1` | ❌（除非使用者指定你收關） | ✅ |
 
@@ -108,7 +108,7 @@
 
 ## 收件匣格式（強制欄位）
 
-每完成一段工作就**追加**一個區塊（勿整檔覆寫）：
+每完成一段工作就寫一個新區塊；在 **`---` 之後、於最上方插入**（**最新一則在上**；勿整檔覆寫；勿改寫舊區塊內文除非修錯字）：
 
 ```markdown
 ### <AGENT_ID> <yyyy-MM-dd HH:mm>
@@ -184,7 +184,7 @@
 
 ## 與收關流程的銜接
 
-1. 協作代理整日／整輪 **只 append** `closeout-inbox.md`。  
+1. 協作代理整日／整輪 **只寫入** `closeout-inbox.md`（**`---` 之後、新區塊置頂**，**最新日期在上**）。  
 2. 收關前由使用者或代理把各 branch **合併**到當日工作線。  
 3. **收關 Cursor**：使用者對該對話打 **`AO-CLOSE`**；該代理讀 inbox + `git log` +（必要時）`scripts/print-today-closeout-recap.ps1`，在 rule 40 **第 1 步**寫定 WORKLOG／memory／daily，必要時寫 `AUTO_TASK_DONE`，再執行 **第 2 步** `ao-close.ps1`（長訊息用 `-CommitMessageFile`）。  
 4. **Push 成功後**收關者應**清空或刪除** `closeout-inbox.md`，避免隔天誤用。
