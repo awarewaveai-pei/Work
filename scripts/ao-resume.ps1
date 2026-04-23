@@ -13,7 +13,11 @@ param(
     [string]$FullMainlineFeatureBranch = "fix/trigger-clickhouse-oom",
     [switch]$FullMainlinePushFeature,
     [switch]$FullMainlineMainOnly,
-    [switch]$FullMainlineAllowStash
+    [switch]$FullMainlineAllowStash,
+    # Passed through to `git-align-main-aoresume-feature.ps1`. Default: if the default feature branch is missing
+    # locally and on origin, stay on `main` (do not fail the whole AO-RESUME).
+    [bool]$FullMainlineAllowMissingFeatureBranch = $true,
+    [switch]$FullMainlineRequireFeatureBranch
 )
 
 Set-StrictMode -Version Latest
@@ -120,6 +124,8 @@ if ($FullMainlineParity) {
             $alignArgs += "-FeatureBranch", $FullMainlineFeatureBranch
         }
         if ($FullMainlinePushFeature) { $alignArgs += "-PushFeature" }
+        if ($FullMainlineRequireFeatureBranch) { $alignArgs += "-RequireFeatureBranch" }
+        $alignArgs += "-AllowMissingFeatureBranch", $FullMainlineAllowMissingFeatureBranch
         $alignStash = $FullMainlineAllowStash -or $AllowStashBeforePull -or $AllowUnexpectedDirty
         if ($alignStash) { $alignArgs += "-AllowStash" }
         & powershell.exe @alignArgs

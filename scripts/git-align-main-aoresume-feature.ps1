@@ -39,7 +39,12 @@ param(
     [switch]$SkipFeature,
     [switch]$PushFeature,
     [switch]$AllowStash,
-    [switch]$SkipAoResume
+    [switch]$SkipAoResume,
+    # If the feature branch does not exist locally and there is no origin/<FeatureBranch>, do not fail the whole
+    # align step (common after a hotfix is merged to main and the branch is deleted on GitHub). Stay on `main` and
+    # print a clear one-line follow-up. Use `-RequireFeatureBranch` to keep the old hard-fail behavior.
+    [bool]$AllowMissingFeatureBranch = $true,
+    [switch]$RequireFeatureBranch
 )
 
 Set-StrictMode -Version Latest
@@ -109,6 +114,8 @@ try {
         Write-Host "== SkipAoResume: left on main (no nested ao-resume) ==" -ForegroundColor DarkGray
     }
 
+    if ($RequireFeatureBranch) { $AllowMissingFeatureBranch = $false }
+
     if ($SkipFeature) {
         Write-Host "== Done (-SkipFeature: left on main) ==" -ForegroundColor Green
         return
@@ -127,7 +134,17 @@ try {
         try {
             $null = & git show-ref --verify --quiet "refs/remotes/origin/$FeatureBranch" 2>&1
             if ($LASTEXITCODE -ne 0) {
-                throw "No local branch '$FeatureBranch' and no origin/$FeatureBranch. Push the branch first or fix -FeatureBranch."
+                if ($AllowMissingFeatureBranch) {
+                    Write-Host "== Feature branch missing: '$FeatureBranch' (no local, no origin/$FeatureBranch). Staying on main. ==" -ForegroundColor Yellow
+                    Write-Host "   Fix options:" -ForegroundColor DarkYellow
+                    Write-Host "   - Re-run with -SkipFeature, or" -ForegroundColor DarkYellow
+                    Write-Host "   - Pass -FeatureBranch <name> to match an existing branch, or" -ForegroundColor DarkYellow
+                    Write-Host "   - Create/push the branch on origin, then re-run, or" -ForegroundColor DarkYellow
+                    Write-Host "   - Add -RequireFeatureBranch to hard-fail (legacy behavior)." -ForegroundColor DarkYellow
+                    Write-Host "== Done: main aligned; feature branch not present (skipped). ==" -ForegroundColor Green
+                    return
+                }
+                throw "No local branch '$FeatureBranch' and no origin/$FeatureBranch. Push the branch first or fix -FeatureBranch. (Or pass -AllowMissingFeatureBranch to stay on main when the branch is intentionally removed.)"
             }
         } finally {
             Pop-Location

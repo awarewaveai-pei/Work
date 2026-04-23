@@ -11,7 +11,9 @@ param(
     [string]$FullMainlineFeatureBranch = "fix/trigger-clickhouse-oom",
     [switch]$FullMainlinePushFeature,
     [switch]$FullMainlineMainOnly,
-    [switch]$FullMainlineAllowStash
+    [switch]$FullMainlineAllowStash,
+    [bool]$FullMainlineAllowMissingFeatureBranch = $true,
+    [switch]$FullMainlineRequireFeatureBranch
 )
 
 Set-StrictMode -Version Latest
