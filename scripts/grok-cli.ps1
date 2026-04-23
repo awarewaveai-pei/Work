@@ -248,9 +248,12 @@ switch ($command) {
         exit 0
     }
     "templates" {
+        $workRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+        $ex1 = Join-Path $workRoot "examples\xai-web-search-template.json"
+        $ex2 = Join-Path $workRoot "examples\xai-function-calling-template.json"
         Write-Output "Templates:"
-        Write-Output "- C:\Users\USER\Work\examples\xai-web-search-template.json"
-        Write-Output "- C:\Users\USER\Work\examples\xai-function-calling-template.json"
+        Write-Output "- $ex1"
+        Write-Output "- $ex2"
         exit 0
     }
     "models" {

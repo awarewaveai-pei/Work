@@ -1,2 +1,3 @@
 @echo off
-powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\USER\Work\scripts\grok-cli.ps1" %*
+set "GROK_CLI=%~dp0..\scripts\grok-cli.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%GROK_CLI%" %*
