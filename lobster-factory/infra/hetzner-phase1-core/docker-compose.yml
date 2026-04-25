@@ -1,14 +1,8 @@
-# Phase 1 — production-oriented: multi-stage builds for Node apps, healthchecks.
+# Phase 1 — production-oriented: multi-stage builds for Node apps, healthchecks, Nginx gates on app readiness.
 # Supabase is external; set SUPABASE_* in .env.
 #
-# Routing: System Apache2 handles ports 80/443 (NOT Docker nginx).
-#   Apache vhosts live in: infra/hetzner-phase1-core/apache/sites-available/
-#   Deploy with: sudo cp apache/sites-available/*.conf /etc/apache2/sites-available/
-#                sudo a2ensite <name> && sudo systemctl reload apache2
-#
 # Build & run: docker compose --env-file .env build --no-cache && docker compose --env-file .env up -d
-# Deploy update: ./deploy.sh [service-name]
-# After changing NEXT_PUBLIC_*: rebuild next-admin (baked at build time): ./deploy.sh next-admin
+# After changing NEXT_PUBLIC_*: rebuild next-admin (baked at build time).
 #
 # Long-run: image pin policy, backups, DR drills — see LONG_TERM_OPS.md (Owner).
 # Log rotation via json-file limits avoids filling disk over years of uptime.
@@ -20,6 +14,25 @@ x-logging: &lobster-logging
     max-file: "5"
 
 services:
+  nginx:
+    image: nginx:stable
+    container_name: lobster-nginx
+    restart: unless-stopped
+    depends_on:
+      node-api:
+        condition: service_healthy
+      next-admin:
+        condition: service_healthy
+      wordpress:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - lobster-net
+    logging: *lobster-logging
+
   redis:
     image: redis:7-alpine
     container_name: lobster-redis
@@ -53,7 +66,7 @@ services:
       N8N_SECURE_COOKIE: "false"
       N8N_PROXY_HOPS: "1"
       # Sentry (self-hosted n8n) — see https://github.com/n8n-io/n8n/blob/master/packages/@n8n/config/src/configs/sentry.config.ts
-      N8N_SENTRY_DSN: ${N8N_SENTRY_DSN:-${SENTRY_DSN_N8N_BACKEND:-${SENTRY_DSN_N8N:-}}}
+      N8N_SENTRY_DSN: ${N8N_SENTRY_DSN:-${SENTRY_DSN_N8N:-}}
       N8N_FRONTEND_SENTRY_DSN: ${SENTRY_DSN_N8N_FRONTEND:-}
       ENVIRONMENT: ${N8N_SENTRY_ENVIRONMENT:-staging}
       DEPLOYMENT_NAME: ${N8N_DEPLOYMENT_NAME:-lobster-phase1-n8n}
@@ -67,7 +80,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "node -e \"require('http').get('http://127.0.0.1:5678/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""
+          "nc -z 127.0.0.1 3000 || exit 1"
         ]
       interval: 15s
       timeout: 5s
@@ -119,7 +132,7 @@ services:
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      SENTRY_DSN: ${SENTRY_DSN_WORDPRESS:-${SENTRY_DSN_WP:-}}
+      SENTRY_DSN: ${SENTRY_DSN_WP}
       WORDPRESS_CONFIG_EXTRA: |
         define('WP_HOME', '${WORDPRESS_PUBLIC_URL}');
         define('WP_SITEURL', '${WORDPRESS_PUBLIC_URL}');
@@ -157,7 +170,7 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       REDIS_URL: redis://redis:6379
-      SENTRY_DSN: ${SENTRY_DSN_NODE_API:-${SENTRY_DSN:-}}
+      SENTRY_DSN: ${SENTRY_DSN}
     ports:
       - "127.0.0.1:3001:3001"
     depends_on:
@@ -175,7 +188,6 @@ services:
       start_period: 25s
     networks:
       - lobster-net
-      - supabase_default
     logging: *lobster-logging
 
   next-admin:
@@ -186,9 +198,9 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_API_BASE_PATH: /api
-        NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN_NEXT_ADMIN:-${SENTRY_DSN_NEXT:-}}
-        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
-        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://us.i.posthog.com}
+        NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN_NEXT}
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST}
     image: lobster-phase1-next-admin:local
     container_name: lobster-next-admin
     restart: unless-stopped
@@ -199,9 +211,7 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       INTERNAL_API_BASE_URL: ${INTERNAL_API_BASE_URL}
       NEXT_PUBLIC_API_BASE_PATH: /api
-      NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN_NEXT_ADMIN:-${SENTRY_DSN_NEXT:-}}
-      NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
-      NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://us.i.posthog.com}
+      NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN_NEXT}
     ports:
       - "127.0.0.1:3002:3000"
     depends_on:
@@ -211,7 +221,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://127.0.0.1:3000/ > /dev/null || exit 1"
+          "nc -z 127.0.0.1 3000 || exit 1"
         ]
       interval: 15s
       timeout: 5s
@@ -223,8 +233,7 @@ services:
 
 networks:
   lobster-net:
-    external: true
-  supabase_default:
+    name: lobster-net
     external: true
 
 volumes:
