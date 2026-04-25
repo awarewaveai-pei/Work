@@ -30,6 +30,46 @@
 
   "planned_future": [],
 
+  "content_ops_scope": {
+    "blog": true,
+    "website_content": true,
+    "product_content": true,
+    "social_media": true,
+    "owner_cluster_ids": [
+      "CLU_MARKETING",
+      "CLU_PRODUCT",
+      "CLU_BRAND_COMMS"
+    ],
+    "notes": "若不含內容代操，將各布林改為 false 並在 excluded_explicit 註記原因。"
+  },
+
+  "supply_chain_scope": {
+    "upstream_vendor_management": false,
+    "downstream_channel_fulfillment": false,
+    "self_manufacturing": false,
+    "traceability_and_risk_monitoring": false,
+    "owner_cluster_ids": [
+      "CLU_PROCUREMENT",
+      "CLU_ORDER_OPS",
+      "CLU_LOGISTICS"
+    ],
+    "notes": "若啟用跨境採購/進出口，建議加上 CLU_TAX_TRADE；若有自製排產，再加 CLU_FINANCE 與 CLU_ENGINEERING。"
+  },
+
+  "partner_ecosystem_scope": {
+    "outsourcing_vendors": false,
+    "influencers_bloggers": false,
+    "affiliate_program": false,
+    "affiliate_plugin_in_wordpress": false,
+    "owner_cluster_ids": [
+      "CLU_PROCUREMENT",
+      "CLU_MARKETING",
+      "CLU_PRODUCT",
+      "CLU_ENGINEERING"
+    ],
+    "notes": "若啟用 affiliate_plugin_in_wordpress，需同步填寫 site-template/SYSTEM_REQUIREMENTS.md（外掛名稱/版本/回滾方案）與 CROSS_BORDER_GOVERNANCE（追蹤/同意/跨境）。"
+  },
+
   "last_reviewed_iso": "YYYY-MM-DD",
   "reviewed_by": ""
 }

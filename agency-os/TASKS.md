@@ -72,10 +72,13 @@
   - P7：Next.js 控制台 v1（把前面能力做成可操作介面）
   - 依賴說明：P7 會依賴 P1/P3/P4/P6 的資料與權限設計
   - 追溯總表：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（每一工具任務對回規格 + DoD + 證據欄位）
-- [ ] （工具建置）Next.js 控制台 v1（Internal Ops）
-  - 處理：建立 app skeleton、客戶清單頁、部門勾選頁（20 部門）、提交後寫出 `DEPARTMENT_SELECTION` payload
-  - 正本：`docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`
-  - DoD：可建立 1 個測試客戶設定並在 UI 回顯成功
+ - [ ] （工具建置）Next.js 控制台 v1（Internal Ops）
+   - 處理：建立 app skeleton、客戶清單頁、部門勾選頁（20 部門）、提交後寫出 `DEPARTMENT_SELECTION` payload
+   - 2026-04-25 進度：控制平面 migration 已新增 `0011_ops_console_control_plane.sql`（`ops_action_runs` / `ai_image_jobs` / `media_assets` / `ops_audit_events`）
+   - 2026-04-25 進度：`next-admin` 已新增 `/ops-console` 與 `POST /api/ops/ai-image-jobs`（`queued` job + 審計；viewer 雙層擋）與 `GET /api/ops/summary`（讀 `organizations` 或安全 fallback）
+   - 媒體分層固定：AI 生圖走 R2；WordPress 商品圖/部落格圖維持 WP 媒體庫（`wp-content/uploads` + MySQL）
+   - 正本：`docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`
+   - DoD：可建立 1 個測試客戶設定並在 UI 回顯成功
 - [x] （工具建置）Sentry 觀測接入
   - 處理：接入 API/workflow 錯誤上報 + release tag；定義 1 條告警規則
   - DoD：可人工觸發 1 筆測試錯誤並在 Sentry 收到告警
@@ -236,5 +239,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-23 16:34:17 UTC_
+_Last synced: 2026-04-25 10:17:36 UTC_
 

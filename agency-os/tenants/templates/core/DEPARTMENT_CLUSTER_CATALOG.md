@@ -85,6 +85,92 @@
   來做降配，避免「只付一點錢卻看起來全包」。
 - **報價建議**：用 `cluster_id` 組合成 Basic / Growth / Enterprise 三層，不改 ID，只改選取集合。
 
+## 內容生產線能力映射（不新增第 21 部門）
+
+> 你提到的「部落格、網站、產品、社群媒體管理」屬於高頻交付能力。  
+> 為維持 **20 部門上限** 與既有 `cluster_id` 穩定性，以下採 **跨簇映射**，不另外創建新 ID。
+
+| 內容生產能力 | 主要 cluster_id | 次要 cluster_id | 對應矩陣列鍵 |
+|--------------|------------------|------------------|--------------|
+| 部落格內容企劃／排程／發佈 | `CLU_MARKETING` | `CLU_BRAND_COMMS`、`CLU_ORDER_OPS` | `marketing_growth`、`brand_comms`、`operations_delivery` |
+| 網站內容營運（頁面更新、Landing Page 文案） | `CLU_PRODUCT` | `CLU_ENGINEERING`、`CLU_MARKETING` | `product_digital`、`engineering`、`marketing_growth` |
+| 產品內容管理（目錄、規格、商品敘述） | `CLU_PRODUCT` | `CLU_ORDER_OPS`、`CLU_CUSTOMER_SUCCESS` | `product_digital`、`operations_delivery` |
+| 社群媒體內容與社群營運 | `CLU_MARKETING` | `CLU_BRAND_COMMS`、`CLU_CUSTOMER_SUCCESS` | `marketing_growth`、`brand_comms`、`operations_delivery` |
+
+**實務建議（選型）**
+- 若客戶「有內容生產代操」：至少啟用 `CLU_MARKETING` + `CLU_PRODUCT` + `CLU_BRAND_COMMS`。  
+- 若含電商商品內容維運：再加 `CLU_ORDER_OPS`。  
+- 若要求社群互動 SLA / 留存閉環：再加 `CLU_CUSTOMER_SUCCESS`。
+
+### 內容生產線 RACI（長期穩定版）
+
+| 能力域 | R（主責） | A（核准） | C（協作） | I（知會） |
+|--------|-----------|-----------|-----------|-----------|
+| 部落格內容企劃/發佈 | `CLU_MARKETING` | `CLU_BRAND_COMMS` | `CLU_ORDER_OPS`、`CLU_PRODUCT` | `CLU_STRATEGY_GOVERN` |
+| 網站頁面內容營運 | `CLU_PRODUCT` | `CLU_BRAND_COMMS` | `CLU_ENGINEERING`、`CLU_MARKETING` | `CLU_STRATEGY_GOVERN` |
+| 產品內容（SKU/規格/敘述） | `CLU_PRODUCT` | `CLU_ORDER_OPS` | `CLU_CUSTOMER_SUCCESS`、`CLU_MARKETING` | `CLU_FINANCE` |
+| 社群內容與社群營運 | `CLU_MARKETING` | `CLU_BRAND_COMMS` | `CLU_CUSTOMER_SUCCESS` | `CLU_STRATEGY_GOVERN` |
+
+## 供應鏈／製造能力映射（上下游與自製）
+
+> 「上下游廠商管理」與「自行製造」也維持在既有 20 部門框架，不增新 `cluster_id`。
+
+| 供應鏈/製造能力 | 主要 cluster_id | 次要 cluster_id | 對應矩陣列鍵 |
+|----------------|------------------|------------------|--------------|
+| 上游供應商管理（原料、代工、外包） | `CLU_PROCUREMENT` | `CLU_FINANCE`、`CLU_LEGAL` | `procurement`、`finance_ma`、`legal` |
+| 下游渠道/履約管理（物流、倉配、退換） | `CLU_LOGISTICS` | `CLU_ORDER_OPS`、`CLU_CUSTOMER_SUCCESS` | `operations_delivery`、`tax_customs` |
+| 自行製造（排產、製程、品保） | `CLU_ORDER_OPS` | `CLU_ENGINEERING`、`CLU_FINANCE` | `operations_delivery`、`engineering`、`finance_ma` |
+| 供應鏈風險與追溯（斷料、品質、合規） | `CLU_RISK_FRAUD` | `CLU_DATA_AI`、`CLU_TAX_TRADE` | `risk_security`、`data_privacy`、`tax_customs` |
+
+**實務建議（選型）**
+- 有跨境採購或進出口：至少加 `CLU_TAX_TRADE`，並在 `CROSS_BORDER_GOVERNANCE` 填責任邊界。  
+- 有自有工廠或委外製造：`CLU_ORDER_OPS` + `CLU_PROCUREMENT` + `CLU_FINANCE` 為最小集合。  
+- 若要求批次追溯與異常預警：再加 `CLU_DATA_AI` + `CLU_RISK_FRAUD`。
+
+### 供應鏈／製造 RACI（長期穩定版）
+
+| 能力域 | R（主責） | A（核准） | C（協作） | I（知會） |
+|--------|-----------|-----------|-----------|-----------|
+| 上游供應商管理（採購/OEM） | `CLU_PROCUREMENT` | `CLU_FINANCE` | `CLU_LEGAL`、`CLU_ORDER_OPS` | `CLU_STRATEGY_GOVERN` |
+| 下游履約（倉配/物流/退換） | `CLU_LOGISTICS` | `CLU_ORDER_OPS` | `CLU_CUSTOMER_SUCCESS` | `CLU_FINANCE` |
+| 自行製造（排產/製程/品保） | `CLU_ORDER_OPS` | `CLU_STRATEGY_GOVERN` | `CLU_ENGINEERING`、`CLU_FINANCE` | `CLU_PROCUREMENT` |
+| 追溯與供應鏈風險事件 | `CLU_RISK_FRAUD` | `CLU_STRATEGY_GOVERN` | `CLU_DATA_AI`、`CLU_TAX_TRADE` | `CLU_LEGAL`、`CLU_FINANCE` |
+
+## 模組生命週期規則（可擴充、可刪減、不可衝突）
+
+1. **ID 穩定原則**：既有 `cluster_id` 不改名、不重複、不挪作他用。  
+2. **新增能力先映射**：優先映射到現有 20 部門；只有在無法映射時才提新增（需變更單）。  
+3. **刪減只關閉，不硬刪歷史**：在 `selected_cluster_ids` 移除即可；歷史決策放 `excluded_explicit`。  
+4. **RACI 單一 A 原則**：同一能力域同一時期只允許一個 `A`，避免責任衝突。  
+5. **矩陣同步原則**：任何啟用/關閉變更，必同步 `DEPARTMENT_COVERAGE_MATRIX.md` Notes。  
+6. **跨境與合規護欄**：涉及跨境、稅務、法務時，必同步 `CROSS_BORDER_GOVERNANCE.md`。  
+
+## 夥伴生態能力映射（外包／KOL／聯盟行銷）
+
+> 外部合作生態採「映射既有 20 部門」策略，不新增新部門、不拆第二套模型。
+
+| 夥伴類型 | 主要 cluster_id | 次要 cluster_id | 對應矩陣列鍵 |
+|----------|------------------|------------------|--------------|
+| 外包廠商（開發/設計/代營運） | `CLU_PROCUREMENT` | `CLU_LEGAL`、`CLU_FINANCE`、`CLU_ORDER_OPS` | `procurement`、`legal`、`finance_ma`、`operations_delivery` |
+| 合作網紅/部落客（KOL/KOC） | `CLU_MARKETING` | `CLU_BRAND_COMMS`、`CLU_LEGAL`、`CLU_FINANCE` | `marketing_growth`、`brand_comms`、`legal`、`finance_ma` |
+| 聯盟行銷（含 WordPress affiliate 外掛） | `CLU_MARKETING` | `CLU_PRODUCT`、`CLU_ENGINEERING`、`CLU_RISK_FRAUD`、`CLU_PRIVACY_RETENTION` | `marketing_growth`、`product_digital`、`engineering`、`risk_security`、`data_privacy` |
+
+### 夥伴生態 RACI（穩定版）
+
+| 能力域 | R（主責） | A（核准） | C（協作） | I（知會） |
+|--------|-----------|-----------|-----------|-----------|
+| 外包廠商准入與續約 | `CLU_PROCUREMENT` | `CLU_STRATEGY_GOVERN` | `CLU_LEGAL`、`CLU_FINANCE`、`CLU_ORDER_OPS` | `CLU_SECURITY_IT` |
+| KOL/KOC 合作內容審核與發佈 | `CLU_MARKETING` | `CLU_BRAND_COMMS` | `CLU_LEGAL`、`CLU_CUSTOMER_SUCCESS` | `CLU_FINANCE` |
+| 聯盟行銷方案與分潤規則 | `CLU_MARKETING` | `CLU_FINANCE` | `CLU_PRODUCT`、`CLU_LEGAL`、`CLU_RISK_FRAUD` | `CLU_STRATEGY_GOVERN` |
+| 聯盟外掛/追蹤技術運維（WordPress） | `CLU_ENGINEERING` | `CLU_PRODUCT` | `CLU_MARKETING`、`CLU_PRIVACY_RETENTION` | `CLU_SECURITY_IT` |
+
+### 夥伴生態治理最低要求
+
+- 合作對象必有唯一識別（`partner_slug` 或等價鍵）與責任窗口。  
+- 涉及個資追蹤、cookie、跨境傳輸時，必回填 `CROSS_BORDER_GOVERNANCE.md`。  
+- 聯盟行銷若啟用外掛，需在 `SYSTEM_REQUIREMENTS.md` 記錄外掛名稱、版本、責任人與回滾方案。  
+- 佣金／分潤規則由 `FINANCIAL_LEDGER.md` 保留計算口徑，不在行銷檔內重複定義。  
+
 ## 降配常見分組（可選）
 
 - **供應鏈深度**：`CLU_PROCUREMENT`、`CLU_LOGISTICS`

@@ -97,7 +97,7 @@
 | Redis | ⚪ 未啟動（Phase A） | 可 | P2 | `docs/operations/hetzner-stack-rollout-index.md` | 服務健康檢查與應用連線成功 |
 | Nginx | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 路由/健康檢查/SSL 正常 |
 | Node API | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 核心 API endpoint 驗證通過 |
-| Next.js 控制台 | ⚪ 未啟動（列入 P7） | 可 | P3 | `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md` | 可建立並回顯 1 個測試租戶設定 |
+| Next.js 控制台 | 🟡 建置中（P7；控制平面 migration 已落地） | 可 | P3 | `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`、`../lobster-factory/packages/db/migrations/0011_ops_console_control_plane.sql` | 可建立並回顯 1 個測試租戶設定；AI 生圖落 R2 並可於 SoR 追蹤；WP 商品/部落格圖維持 WP 媒體庫 |
 | Sentry | 🟢 已上線（Phase1：`next-admin`／`node-api`／`php` + n8n DSN；**2026-04-12** 驗證與告警，見 `agency-os/WORKLOG.md` **`## 2026-04-12`**） | 可（維運較重） | P3 | `docs/operations/tools-and-integrations.md`、`../lobster-factory/infra/hetzner-phase1-core/README.md` | 測試錯誤可上報與告警；手動路由 `../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/sentry-test/route.ts` |
 | PostHog | ⚪ 未啟動（列入 P4） | 可 | P3 | `docs/operations/tools-and-integrations.md` | 可看到完整測試 funnel |
 | MinIO（S3 相容） | ⚪ 未啟動（Phase B） | 可 | P3（需要時） | `docs/operations/hetzner-stack-rollout-index.md` | 上傳/下載/權限驗證通過 |
@@ -171,5 +171,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-23 16:00:17 UTC_
+_Last synced: 2026-04-25 10:17:36 UTC_
 
