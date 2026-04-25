@@ -1,9 +1,10 @@
 <#
 .SYNOPSIS
-  Open SSH tunnels to self-hosted Supabase on the VPS (postgres + studio).
+  Open SSH tunnels to self-hosted Supabase on the EU VPS (postgres + studio).
 
 .DESCRIPTION
-  Supabase listens locally on the VPS:
+  Supabase runs on the EU server (hetzner-eu, 204.168.175.41).
+  Services listen locally on the EU VPS:
     - PostgreSQL: 127.0.0.1:5432
     - Supabase Studio: 127.0.0.1:3000
     - Kong API: 127.0.0.1:8000 (usually accessed via https://supabase.aware-wave.com)
@@ -14,7 +15,7 @@
   (never commit passwords). Example shape:
     postgresql://postgres:<POSTGRES_PASSWORD>@localhost:5432/postgres
 
-  Studio: http://localhost:3000 (or your deployed Studio URL; credentials are **not** documented here).
+  Studio: http://localhost:3000 (or https://studio.aware-wave.com; credentials are **not** documented here).
 
 .EXAMPLE
   # Foreground (keep terminal open; Ctrl+C closes tunnel)
@@ -25,7 +26,7 @@
   .\scripts\open-supabase-ssh-tunnel.ps1 -Background
 #>
 param(
-    [string]$SshHost = "hetzner",
+    [string]$SshHost = "hetzner-eu",
     [switch]$Background
 )
 
@@ -38,7 +39,7 @@ $tunnels = @(
     "127.0.0.1:8000:127.0.0.1:8000"    # Kong API
 )
 
-Write-Host "Supabase SSH tunnels via $SshHost" -ForegroundColor Cyan
+Write-Host "Supabase SSH tunnels via $SshHost (EU: 204.168.175.41)" -ForegroundColor Cyan
 Write-Host "  localhost:5432  -> Supabase PostgreSQL" -ForegroundColor DarkGray
 Write-Host "  localhost:3000  -> Supabase Studio (http://localhost:3000)" -ForegroundColor DarkGray
 Write-Host "  localhost:8000  -> Supabase Kong API" -ForegroundColor DarkGray
