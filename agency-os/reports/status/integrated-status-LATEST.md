@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-24 00:35:06
+- Generated: 2026-04-27 01:50:32
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,8 +203,8 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-24.md
-# Daily Note - 2026-04-24
+## 5) memory/daily/2026-04-27.md
+# Daily Note - 2026-04-27
 
 ## Done today
 - (TBD)
@@ -216,25 +216,74 @@
 - (TBD)
 
 ## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:0ac1688c67e446a20bb1c003ac978fab0cbb604031436b22e483bdaf39b33093 -->
+<!-- ao-close-inbox-sha256:0ac0309b67da13821a1c2a9f9882a9b5f099c88f5f15b091465cb7f50b046604 -->
 
-### claude-sonnet-4-6 2026-04-23 15:30
+### claude-sonnet-4-6 2026-04-27 01:00
 
-- **完成（一句）**: 診斷並修復伺服器 CPU 暴衝（ClickHouse MergeTree 大合併），清理 Supabase 測試表格與安全警告
+- **完成（一句）**: Uptime Kuma 擴充至 20 個監控、修復 4 個失效項、trigger-webapp OOM 修復、EU 伺服器重開機、兩台 Netdata Slack 告警上線、憑證總覽文件建立。
 - **變更路徑**:
-  - `lobster-factory/infra/trigger/docker-compose.yml` — trigger-clickhouse 加 `cpus: 1.5`、`mem_limit: 2048m`
-- **Git**: `54c92a7` (cpus limit), `bc74aa3` (mem_limit 2048m)
-- **對應 TASKS 子字串（可選）**: server stability, security cleanup
+  - 遠端 EU `/var/lib/docker/volumes/uptime-kuma/_data/kuma.db` — 新增 14 個監控（app, API, Uptime自身, SG/EU Ping, Cloudflare/PostHog/Resend/Sentry status, Netdata x2, Supabase Storage/REST, Redis）；修正 4 個失效監控（Ping→HTTP, Redis TCP→API health, Supabase REST 加 apikey header）
+  - 遠端 EU `/root/trigger/docker-compose.yml` — trigger-webapp mem_limit 1280m→1792m；trigger-clickhouse cpus 1.5→2.0
+  - 遠端 EU `/etc/netdata/health_alarm_notify.conf` — 啟用 Slack 通知（#alerts-infra）
+  - 遠端 SG `/etc/netdata/health_alarm_notify.conf` — 啟用 Slack 通知（#alerts-infra）
+  - 本機 deploy SSH 私鑰 — 已修正 CRLF 並 chmod 600（路徑僅本機／vault，**不入庫**）。
+  - **憑證索引**：若有本機明文總表，須遷入 1Password／Bitwarden 後刪除原檔；**不得**納入 git 或貼進 WORKLOG。
+- **Git**: `1e70800`（Cursor docs）為本段唯一本機 commit；伺服器端變更均為 SSH 直改，未納版控
+- **對應 TASKS 子字串（可選）**: Uptime Kuma 監控擴充、Netdata 通知、trigger-webapp OOM
 - **風險／待辦（可選）**:
-  - ClickHouse MergeTree merge 背景仍在跑，預計今晚前完成，Load avg 屆時會降回正常
-  - Supabase 已刪 19 張測試表（profiles, organizations, workspaces, roles, permissions, role_permissions, user_role_assignments, organization_memberships, workspace_memberships, projects, sites, environments, approvals, audit_logs, knowledge_sources, knowledge_documents, knowledge_chunks, knowledge_embeddings, knowledge_queries）、刪孤兒 function（match_knowledge_chunks, match_documents）、刪 vector extension、修 set_updated_at search_path、workflow_runs 開 RLS
-  - 伺服器 git（/root/Work）沒有 GitHub push 權限，需要手動設定 deploy key 或 PAT 才能從伺服器直接 push
+  - Slack `#infra-alerts` 舊訊息批次刪除尚未完成（User Token scope 問題，需 reinstall app 取得 channels:read 等 scope 再重試）
+  - Netdata Centralized Cloud Notifications 尚未設定（目前為 Agent Dispatched）
+  - Netdata SG port 19999 外部不可達（防火牆），Uptime Kuma 改以 /health 替代監控
+  - Redis TCP 外部不可達（127.0.0.1 綁定），改以 api /health 替代
+  - 憑證文件建議轉存 1Password/Bitwarden 後刪除桌面明文檔
+
+
+### claude-sonnet-4-6 2026-04-26 23:30
+
+- **完成（一句）**: SG 伺服器 Redis maxmemory、Promtail 標籤、Nginx 域名分拆（WordPress vs Next Admin）、Cloudflare WAF wp-login managed_challenge、WordPress 2FA（TOTP）、Redis Object Cache 連線、PostHog/Sentry/Slack env 串接完成。
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` — Redis maxmemory 256mb/allkeys-lru（commit `2158085`）
+  - `lobster-factory/infra/hetzner-phase1-core/observability/promtail-config.yml` — 加 env: production 標籤（commit `2158085`）
+  - `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` — 拆分為兩個 server block：aware-wave.com→WordPress, app.aware-wave.com→next-admin（commit `dbb4262`）
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` — next-admin/n8n healthcheck 修正、Sentry DSN fallback（commit `90c4067`）
+  - `lobster-factory/apps/next-admin/` — PostHog analytics 整合、Slack/Resend env 串接（commit `87a5ab9`）
+  - 遠端 SG WordPress 容器 `/var/www/html/wp-config.php` — 加 WP_REDIS_HOST=redis、WP_REDIS_PORT=6379、WP_CACHE=true
+  - Cloudflare WAF ruleset `f290fd58` — wp-login rule 改為 managed_challenge（原 block），移除誤加的 /wp-admin
+  - 遠端 EU Netdata Cloud — SG/EU 兩節點均已 claim 並加入 Space
+- **Git**: `87a5ab9`, `90c4067`, `2158085`, `dbb4262`（均 push origin main）；WP config 與 Cloudflare WAF 為直改未納版控
+- **對應 TASKS 子字串（可選）**: Redis cache、Nginx routing、Cloudflare WAF、WordPress 2FA、PostHog
+- **風險／待辦（可選）**:
+  - WordPress 2FA 已對所有使用者強制啟用（TOTP via Authy + backup codes）；新增使用者需完成 2FA wizard 才能正常登入
+  - Redis Object Cache 已連線（redis:6379），需在 WP 後台確認「Connected」狀態
+  - n8n service block 仍在 SG docker-compose.yml（container 已停），可擇日清除
+
+
+### claude-sonnet-4-6 2026-04-25 13:10
+
+- **完成（一句）**: SG/EU 架構分拆完整完成：EU Helsinki CPX32 承接 Supabase、n8n、Trigger.dev、Uptime Kuma，SG 降規至 CPX22，5 個 subdomain SSL 上線，所有服務健康。
+- **變更路徑**:
+  - `agency-os/.agency-state/closeout-inbox.md` （本檔）
+  - 遠端 SG `/root/lobster-phase1/docker-compose.yml` — 移除 n8n depends_on、trigger.conf volume、修正 next-admin healthcheck、Nginx 加 resolver
+  - 遠端 SG `/root/lobster-phase1/nginx/default.conf` — 加 Docker DNS resolver、移除 /n8n/ route
+  - 遠端 SG `/root/lobster-phase1/.env` — SUPABASE_URL/keys 改指向 EU
+  - 遠端 EU `/root/supabase/docker/.env` — 新 EU Supabase 配置
+  - 遠端 EU `/root/trigger/.env` — Trigger.dev EU 配置
+  - 遠端 EU `/etc/nginx/sites-available/*` — 5 個 HTTPS reverse proxy configs
+  - 遠端 EU `/etc/letsencrypt/` — Let's Encrypt certs (5 domains, 2026-07-24)
+- **Git**: 本 commit 為 closeout inbox；伺服器端 infra 變更直接 apply，未納版控（生產伺服器 SSH 直改慣例）
+- **對應 TASKS 子字串（可選）**: EU 伺服器遷移、SG 降規、Supabase 遷移、n8n 遷移、Trigger.dev 遷移
+- **風險／待辦（可選）**:
+  - Uptime Kuma EU：Supabase API（ID 5）和 Studio（ID 6）監控需在 UI 手動加 accepted status 401
+  - Netdata EU 尚未加入 Netdata Cloud Space（需 claim token）
+  - SSH tunnel script `open-supabase-ssh-tunnel.ps1` 若仍指向舊 SG，需改指向 **EU Supabase** 主機（實際 IP／host 僅寫 vault／runbook）。
+  - SG 系統 nginx 已 stop/disable（Docker nginx 接管 port 80），重開機後應正常（Docker nginx restart:unless-stopped）
+  - n8n 在 SG docker-compose.yml 仍定義（service block 存在，但 container 已停），可擇日清除該 service block
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-24 00:35:04`
+- Time: `2026-04-27 01:50:23`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -244,13 +293,14 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260424-003504.md`
-- Closeout: `reports/closeout/closeout-20260424-003501.md`
+- Health: `reports/health/health-20260427-015023.md`
+- Closeout: `reports/closeout/closeout-20260427-015020.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+### 排程單一來源 + AO-CLOSE 聯動甘特
 - **`docs/overview/PROGRAM_SCHEDULE.json`**：三流（AO／LF／PJ）任務與日期；可複製到客戶專案或 `project-kit` 範本。
 - **`scripts/render-program-timeline-from-schedule.ps1`**：UTF-8 JSON → `PROGRAM_TIMELINE.md` 標記區（表 + Mermaid）；腳本本體 **ASCII-only** 以相容 PS 5.1。
 - **`generate-integrated-status-report.ps1`** 末尾**單次**呼叫渲染；**AO-CLOSE** 路徑因此每次收工會重渲時間軸（仍以 TASKS／Checklist／Discovery 為完成真相）。
@@ -309,6 +359,5 @@
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
-
 
 
