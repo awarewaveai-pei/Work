@@ -5,6 +5,8 @@ alwaysApply: true
 
 # AO Resume Keyword
 
+**操作者硬性要求（已定調；預設體驗）**：使用者只打 **`AO-RESUME`** 即表示「**凡本機 monorepo 內可由代理＋腳本自動完成的事，一律由代理執行**」，**不要**把可一次跑完的步驟改寫成「請你先手動 pull／請你先開終端貼指令」才把對話接下去。具 **Shell** 且工作區可解析到 **repo 根**時，代理**必須**先執行 **`ao-resume.ps1 -FullMainlineParity`** 再產出第 3 步結構化回覆。**只有**（a）環境**完全無終端**、（b）`exit≠0` 且需人類決策（合併策略、刪檔、憑證輸入）、或（c）工作發生在**另一台實體電腦**（見第 6、7 點）時，才用最少文字說明卡點；仍**禁止**要求使用者重複做「代理剛剛若自跑即可成功」的同一輪動作。
+
 When the user message contains `AO-RESUME`, before proposing any new implementation:
 
 1. **開工單一路徑（關鍵字 `AO-RESUME`＝跑正本腳本）**  
@@ -12,10 +14,10 @@ When the user message contains `AO-RESUME`, before proposing any new implementat
      **同一輪腳本內後續**（勿再加「第二套」完整檢查）：`fetch`（對齊段已 fetch 仍會再跑）；**僅 behind>0** 時 `git pull --ff-only origin main`；**`verify-build-gates`**；workflows 依賴；**`print-open-tasks`**；**`machine-environment-audit -FetchOrigin -Strict`**（見 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1**）。**不帶** `-FullMainlineParity` 時與 **`align-workstation.ps1`** 同行為（僅 preflight 軟對齊）。  
    - **僅在 exit code 0 後**，再進行本規則第 2 步讀檔與第 3 步回覆；**exit 非 0** 時依終端輸出處置（髒樹／衝突／Strict 缺項），**不得**宣稱已與 GitHub 對齊可開工大改。  
    - **待辦快照（與終端同源）**：`ao-resume.ps1` 預設在 **git preflight 之前**即跑 **`print-open-tasks`**，寫入 **`agency-os/.agency-state/open-tasks-snapshot.md`**（gitignore）。因此 **preflight 失敗（exit≠0）時，時間戳仍應接近本次執行**；待辦條目以該檔與 **`agency-os/TASKS.md`** 對齊為準。**第 2 步讀檔時必 Read 該檔**（若不存在則以 **`agency-os/TASKS.md`** 為準），用 **Total open** 與分段內容核對。**exit≠0 時不得**宣稱已完成 fetch／閘道／Strict 等後段步驟。  
-   - **無法執行終端**：改為手動 `git fetch` + `git status -sb` + `git rev-list --left-right --count HEAD...origin/main`；**behind>0** 時請使用者 **`git pull --ff-only origin main`**（必要時 **`git pull --rebase origin main`**），並在回覆標註「未跑完整 `ao-resume.ps1`」。  
+   - **無法執行終端（極窄義 fallback）**：先確認是否僅為工作目錄錯誤——**必須** `cd` 到 monorepo 根再試一次 `ao-resume.ps1`。**仍**無 Shell 時，代理**自己**用其仍可用的方式完成 `fetch`／`status`／`rev-list` 等價檢查並在回覆標註「未跑完整 `ao-resume.ps1`」；**禁止**在下一輪已恢復終端時仍叫使用者代替代理重跑。  
    - **30 秒自檢（補強）**：腳本成功後可再跑 **REMOTE §2.3** 三指令；判讀 **ahead behind** 時 **behind 必須為 0**，**ahead>0** 不單獨阻斷（見 §2.3）。  
    - **Autopilot 開機**：**非**本節路徑——見 **`AGENTS.md`**（`-SkipVerify -SkipStrictEnvironmentAudit -AllowUnexpectedDirty`，輕量）。  
-   - **GitHub／雙機**：遠端真相 **`origin/main`**；他機 **`AO-CLOSE` push** 後，本機必須跑通 **`ao-resume.ps1`**（或手動 pull）再工作，否則進度檔過期、`push` 會被拒。
+   - **GitHub／雙機**：遠端真相 **`origin/main`**；他機 **`AO-CLOSE` push** 後，**每一台要開工的 clone** 在開大改前須與 **`origin/main` 對齊**——在**當前機器、當前對話**上**優先**由代理執行 **`ao-resume.ps1`** 完成；**勿**把此句解讀成「使用者在聊天裡仍須另開終端再手動 pull 一次才算數」。
 
 2. Read these files in order:
 - `README.md`（根或 `agency-os` 視工作區而定）
@@ -51,10 +53,10 @@ If opened folder is `agency-os` only, use paths as above; lobster paths are `lob
 
    - **下一步** — 具體、可執行；並保留下方第 6、7 點之雙機／筆電提醒（若適用）。
 
-4. In `已完成` 或 `目前進度` 中，若剛才 **`ao-resume.ps1` 或 Git 自檢**有執行，可一句話標註 **Git 已對齊 origin/main**，或 **提醒使用者**在 monorepo 根重跑 **`.\scripts\ao-resume.ps1`**（behind 時才會 pull）直至 exit 0。
+4. In `已完成` 或 `目前進度` 中：若本輪 **`ao-resume.ps1` 已執行且 exit 0**，**只**用終端輸出標註 **Git／Strict／ahead-behind**，**禁止**再請使用者「請你再跑一次 `ao-resume.ps1`」；僅在**本輪未跑**或 **exit≠0** 時，由代理在**同一或下一回合**自跑至成功或明確報告阻塞（無終端／需人類決策）。
 
 5. Ask one focused confirmation question only if a blocker or ambiguity exists.
 
-6. **雙機 §1.5 + audit 口頭提醒**：讀過 `TASKS.md` 後，若 **「（AO-RESUME 提醒）雙機環境對齊」** 仍為 **未勾選**，則本次回覆的 **「下一步」**（必要時 **「目前進度」**）**必含一行**，明確提醒使用者：**另一台**須依 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5** 完成首次接線，並在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict` 至 **PASS（無 WARN）** 後再勾該項。已勾選則無需重複。
+6. **雙機 §1.5 + audit（僅「另一台實體機」人類操作面）**：讀過 `TASKS.md` 後，若 **「（AO-RESUME 提醒）雙機環境對齊」** 仍為 **未勾選**，則 **「下一步」**（必要時 **「目前進度」**）**必含一行**說明：**另一台電腦**須依 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5** 完成首次接線；在**該台機器**的 monorepo 根，**優先**由**該台**上的代理／終端執行 `machine-environment-audit.ps1 -FetchOrigin -Strict` 至 **PASS（無 WARN）**。**在當前機器、當前 repo**：凡代理能執行 audit／腳本者**不得**改寫成「請使用者離開 Cursor 自行操作才算」。
 
-7. **Windows 筆電／本機 WordPress（MariaDB）對齊**：若 **「雙機環境對齊」** 仍 **未勾選**，或 `memory/CONVERSATION_MEMORY.md` 已記載使用者**桌機已裝、筆電要補**，則本次回覆 **「下一步」** 除第 6 點外 **須再加一句**，要求依 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5.1** 完成：**MariaDB.Server**、**PHP.PHP.NTS.8.4**、`scripts/setup-wp-cli-windows.ps1`、`scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`；並註明此為 **WordPress 專用 MySQL 相容層**，**非 MCP**、**不取代 Supabase**。操作正本：`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`；與 IDE MCP 分工對照：`agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md` §4。
+7. **Windows 筆電／本機 WordPress（MariaDB）**：若 **「雙機環境對齊」** 仍 **未勾選**，或 `memory/CONVERSATION_MEMORY.md` 已記載**筆電要補**真 WP 相容層，則 **「下一步」** 除第 6 點外 **須再加一句**指 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5.1** 與 **`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`**（MariaDB／PHP／WP-CLI bootstrap）。**若當前開著的 repo 就在該筆電且代理具 elevated／套件安裝能力**，由代理**盡力自動執行**可腳本化步驟；**僅**在 OS 權限不允許無人值守安裝時，才列「需人類點一次 UAC／winget」之最小差異。與 MCP 分工：`agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md` §4。
