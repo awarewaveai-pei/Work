@@ -133,7 +133,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
 ### 做完後
 
 1. 你已在上方跑過 **`verify-build-gates`** 與 **`machine-environment-audit -FetchOrigin -Strict`**（與 **`ao-resume.ps1` 預設**內含步驟對齊；若略過 Strict，不應勾選 `TASKS` 雙機項）。  
-2. **下一趟起（日常）**：在 monorepo 根跑 **`scripts/ao-resume.ps1`**（或 Cursor 打 **`AO-RESUME`** 由代理代跑同一支腳本）即可；**Exit 0**＝未落後（必要時已 ff-only pull）＋閘道＋依賴＋Strict 無 WARN，**不必**為了「再對齊一次」重複手動 `pull`／閘道。  
+2. **下一趟起（日常）**：在 Cursor 開 monorepo 根工作區並送出 **`AO-RESUME`**；**`.cursor/hooks.json`** 會先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（與 **`30-resume-keyword.mdc`** 一致）。**Exit 0**＝未落後（必要時已 ff-only pull）＋閘道＋依賴＋Strict 無 WARN，**不必**為了「再對齊一次」重複手動 `pull`／閘道。**除錯／無 hook** 時才改在 monorepo 根手動跑 **`scripts/ao-resume.ps1`（預設或 `-FullMainlineParity`）**。  
 3. **人類掃一眼（可選）**：`agency-os\LAST_SYSTEM_STATUS.md`、`agency-os\TASKS.md`、`agency-os\reports\status\integrated-status-LATEST.md`。  
 4. **下一趟起**：換機以外的**日常開機**請改依 **§2**（不必重跑 §1.5 全段；除非重新 clone、換機、或依賴損毀需重建）。
 
@@ -141,7 +141,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
 
 ## 2) 開機後必做四件事（約 5–15 分鐘）
 
-> **捷徑（與關鍵字 `AO-RESUME` 對齊）**：在 monorepo 根執行 **`scripts/ao-resume.ps1`（預設）**＝下列第 1～4 步的**機器裁決版**（fetch、behind 時 ff-only pull、`npm ci` 由腳本在需要時觸發、`verify-build-gates`、**`print-open-tasks`**、**`machine-environment-audit -FetchOrigin -Strict`**）。**Exit 0** 後再開 Cursor 打 **`AO-RESUME`** 讀檔即可。下列分步保留給除錯或想手動理解內部者。
+> **捷徑（與關鍵字 `AO-RESUME` 對齊）**：在 Cursor 開 monorepo 根並**送出 `AO-RESUME`**，**`beforeSubmitPrompt` hook** 會先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**＝下列第 1～4 步的**機器裁決版**（fetch、behind 時 ff-only pull、`npm ci` 由腳本在需要時觸發、`verify-build-gates`、**`print-open-tasks`**、**`machine-environment-audit -FetchOrigin -Strict`**）。代理再讀檔五段式即可。**除錯／理解內部**時才在 monorepo 根手動跑 **`scripts/ao-resume.ps1`（預設）** 對照下列分步。
 >
 > **與 §1.5 的關係**：若你為 **新機** 且尚未跑過 §1.5 的「工具與依賴」區塊，請 **先完成 §1.5**，再視 §2 為**之後每次**的節奏。若 `lobster-factory\packages\workflows\package-lock.json` 有更新，務必在該目錄 **再執行** `npm ci`（或由 **`ao-resume.ps1`** 偵測後代跑）。
 
@@ -180,10 +180,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
    須已安裝 **Node.js**（給 `lobster-factory` 的檢驗腳本用）。**Critical Gate 必須 PASS** 再開始改大範圍。
 
 4. **對話續接（擇一）**  
-   - **機器裁決（預設，與只打 `AO-RESUME` 一致）**：代理／終端在 monorepo 根跑 **`.\scripts\ao-resume.ps1`**（**預設**即含 **`verify-build-gates` + 結尾 `machine-environment-audit -FetchOrigin -Strict`**）。**Exit 0**＝未落後遠端（必要時已 ff-only pull）+ 閘道 + 依賴檢查 + 嚴格環境稽核無 WARN；**不必**再開三件套 markdown 目視。別名：**`.\scripts\align-workstation.ps1`**（與上一行同行為）。  
+   - **機器裁決（預設，與只打 `AO-RESUME` 一致）**：在 Cursor 送出 **`AO-RESUME`** 時，**專案 hook** 會先在 monorepo 根跑 **`.\scripts\ao-resume.ps1 -FullMainlineParity`**（**預設**即含 **`verify-build-gates` + 結尾 `machine-environment-audit -FetchOrigin -Strict`**）。**Exit 0**＝未落後遠端（必要時已 ff-only pull）+ 閘道 + 依賴檢查 + 嚴格環境稽核無 WARN；**不必**再開三件套 markdown 目視。代理依 **`30-resume-keyword.mdc`** 讀 **`ao-resume-hook-last.json`**／log 與快照，**不必**為形式再重跑同一輪腳本（見該規則「hook 去重」）。**除錯**時可改在終端手動跑 **`.\scripts\ao-resume.ps1`**。別名：**`.\scripts\align-workstation.ps1`**（與手動 `ao-resume` 無 `-FullMainlineParity` 時同行為）。  
      **進階略過（非人類日常開工）**：**`-SkipStrictEnvironmentAudit`**（Autopilot 開機會加；並常搭配 **`-SkipVerify`**）；**不要**在桌機正式開工時隨意省略。  
      **做不到全自動的邊界**：`gh` 登入、DPAPI vault、`mcp.json` 等**不可進庫**，腳本只驗證「有／無」，缺了會 **Strict FAIL**——仍要你在該機做一次設定（見 **§1.5** 憑證段）。  
-   - **人類掃一眼（可選）**：讀 `agency-os\LAST_SYSTEM_STATUS.md`、`agency-os\TASKS.md`、`agency-os\reports\status\integrated-status-LATEST.md` 後，在 Cursor 對 AI 輸入 **`AO-RESUME`**；代理仍應在可執行終端時跑 **`ao-resume.ps1`**（帶預設完整檢查）。  
+   - **人類掃一眼（可選）**：讀 `agency-os\LAST_SYSTEM_STATUS.md`、`agency-os\TASKS.md`、`agency-os\reports\status\integrated-status-LATEST.md` 後，在 Cursor 送 **`AO-RESUME`** 即可（hook＋代理已銜接 **`ao-resume.ps1`**）。  
    > **重要**：`ao-resume`／`align-workstation` 會 `fetch`；**僅在落後 `origin/main`（behind>0）** 時 **`git pull --ff-only`**。**若落後且工作樹仍有未提交變更**，預設 **不**自動 stash（見 **2.5.1**）；Autopilot 路徑可鬆綁 stash（見 **AGENTS.md**）。
 
 ## 2.5 日內 Git 節奏（checkpoint 與收工）— **單一真相（人類可讀）**
@@ -192,7 +192,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
 
 | 階段 | 誰做什麼 | Git |
 |------|-----------|-----|
-| **`AO-RESUME`（開工前檢）** | 你：在 Cursor 打關鍵字；代理：跑 **`scripts/ao-resume.ps1`**（**預設完整**：preflight 含 `verify-build-gates`、依賴、`print-open-tasks`、**結尾 `machine-environment-audit -FetchOrigin -Strict`**）、讀進度檔 | **不**為「開場」自動空 commit。進階略過：**`-SkipOpenTasksList`**、**`-SkipStrictEnvironmentAudit`**（與 Autopilot／輕量開機）；**勿**在正式開工隨意略過 Strict。 |
+| **`AO-RESUME`（開工前檢）** | 你：在 Cursor **送出**關鍵字；**hook**：先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（完整：preflight 含 `verify-build-gates`、依賴、`print-open-tasks`、**結尾 `machine-environment-audit -FetchOrigin -Strict`**）；**代理**：讀 **`ao-resume-hook-last.json`**／log、`open-tasks-snapshot.md` 等並五段式（見 **`30-resume-keyword.mdc`**） | **不**為「開場」自動空 commit。進階略過：**`-SkipOpenTasksList`**、**`-SkipStrictEnvironmentAudit`**（與 Autopilot／輕量開機）；**勿**在正式開工隨意略過 Strict。 |
 | **工作中（至收工前）** | 你：下任務；代理：實作與驗證 | 每完成一個**可敘述、已驗證**的里程碑：代理**應自動**在 monorepo 根執行 **`scripts/commit-checkpoint.ps1`**（**本機 commit**，**不 push**）。**你不必手動**跑該腳本。 |
 | **`AO-CLOSE`（收工）** | 你：關鍵字或明示收工；代理：更新 **`WORKLOG`**／`memory`（**不必手動勾 `TASKS`**）後跑 `ao-close.ps1` | **開頭** **`print-today-closeout-recap`**；閘道 **PASS** 後、**`git add` 前**：**`apply-closeout-task-checkmarks`** 讀取當日 **`WORKLOG`** 之 **`- AUTO_TASK_DONE: …`**（＋選用 **`pending-task-completions.txt`**）自動打勾 **`TASKS`**。略過：**`-SkipAutoTaskCheckmarks`**。其餘略過旗標見 **`end-of-day-checklist`**。再 **`git add` → `commit` → `git push`**。 |
 
@@ -213,7 +213,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
   - Pull 為 **`git pull --ff-only origin main`**；若失敗，代表與遠端 **非快轉關係**，請 `git status` 後 **rebase** 或依上文 **`reset --hard origin/main`**（以 GitHub 為準時）處理。
 - **`scripts/ao-close.ps1`**（**AO-CLOSE**）：預設先 **`print-today-closeout-recap`**；**`-SkipTodayRecap`** 可略過。在未加 **`-SkipPush`** 時，會先 **`git fetch`** 並檢查是否落後 **`origin/<同一分支>`**；若落後則 **中止**。僅在明示風險且必要時使用 **`-AllowPushWhileBehind`**。在 **`git add` 前**會執行 **`apply-closeout-task-checkmarks.ps1`**（自 **`WORKLOG` 當日 `## yyyy-MM-dd`** 區塊解析 **`- AUTO_TASK_DONE:`** 行，並合併選用之 **`pending-task-completions.txt`**；**`-SkipAutoTaskCheckmarks`** 可略過）。
 - **「整台電腦目錄」仍不可能與 GitHub 完全相同**：`node_modules`、本機 MCP／vault 等多為 **`.gitignore`**，兩台需各依 **1.5** 與 **6.2** 建置。
-- **主線對齊（預設 `main`-only）+（可選）功能分支續作（已併入關鍵字 `AO-RESUME`）**：`reset --hard` **一次只能對一個 ref**；不要寫成 `origin/main,origin/fix/...`。Cursor 打 **`AO-RESUME`** 時，代理應執行 **`scripts/ao-resume.ps1 -FullMainlineParity`**（規則見 **`.cursor/rules/30-resume-keyword.mdc`**）：內部先呼叫 **`git-align-main-aoresume-feature.ps1 -SkipAoResume -SkipFeature`**（`fetch` → **`checkout main`** → **`reset --hard origin/main`**，**預設停在 `main`**，避免誤切功能分支），再跑**同一支** `ao-resume.ps1` 的 preflight／閘道／Strict（**不重複**嵌套 `ao-resume`）。若你刻意要舊的「切回功能分支再 `merge origin/main`」流程：加 **`-FullMainlineFeature`**（或 **`-FullMainlineMainOnly:$false`**）並可搭配 **`-FullMainlineFeatureBranch <name>`**、**`-FullMainlinePushFeature`**、**`-FullMainlineAllowStash`**；若要「找不到功能分支就硬失敗」用 **`-FullMainlineRequireFeatureBranch`**。Autopilot（**`-SkipStrictEnvironmentAudit`**）**不**跑主線 hard reset。仍可直接執行 **`scripts/git-align-main-aoresume-feature.ps1`**（內含兩次 `ao-resume`）作獨立維運。
+- **主線對齊（預設 `main`-only）+（可選）功能分支續作（已併入關鍵字 `AO-RESUME`）**：`reset --hard` **一次只能對一個 ref**；不要寫成 `origin/main,origin/fix/...`。Cursor **送出 `AO-RESUME`** 時，**hook** 會跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（規則見 **`.cursor/rules/30-resume-keyword.mdc`**）：內部先呼叫 **`git-align-main-aoresume-feature.ps1 -SkipAoResume -SkipFeature`**（`fetch` → **`checkout main`** → **`reset --hard origin/main`**，**預設停在 `main`**，避免誤切功能分支），再跑**同一支** `ao-resume.ps1` 的 preflight／閘道／Strict（**不重複**嵌套 `ao-resume`）。**代理**若見 **`ao-resume-hook-last.json` 新鮮**則依該檔去重、**勿**再開終端重跑同一輪。若你刻意要舊的「切回功能分支再 `merge origin/main`」流程：加 **`-FullMainlineFeature`**（或 **`-FullMainlineMainOnly:$false`**）並可搭配 **`-FullMainlineFeatureBranch <name>`**、**`-FullMainlinePushFeature`**、**`-FullMainlineAllowStash`**；若要「找不到功能分支就硬失敗」用 **`-FullMainlineRequireFeatureBranch`**。Autopilot（**`-SkipStrictEnvironmentAudit`**）**不**跑主線 hard reset。仍可直接執行 **`scripts/git-align-main-aoresume-feature.ps1`**（內含兩次 `ao-resume`）作獨立維運。
 
 ## 2.1 失敗處置（不要硬做）
 
@@ -259,9 +259,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 
 1. 在 **monorepo 根** `<WORK_ROOT>` 開終端機（例：`C:\Users\USER\Work` 或 `D:\Work`）
 2. 貼上：`git status --short`
-3. 若只想暫停、不收工：可直接離開；（**回來後**建議在 monorepo 根跑 **`scripts/ao-resume.ps1`**，或手動 `git pull --ff-only origin main` 後再打 **`AO-RESUME`**）
+3. 若只想暫停、不收工：可直接離開；（**回來後**在 Cursor 送 **`AO-RESUME`** 即可由 hook 跑 **`ao-resume.ps1 -FullMainlineParity`**；或 monorepo 根手動 **`scripts/ao-resume.ps1`**／`git pull --ff-only origin main` 後再續接）
 4. 若希望離開前做完整安全收工：`powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1 -SkipPush`
-5. 回來後在 **同一 repo 根**：桌機正式開工請跑 **`ao-resume.ps1`（預設，無 `-SkipVerify`）**；Autopilot 可選 `-AllowUnexpectedDirty` 等（見 **2.5.1**）。**Exit 0** 即表示已處理 fetch／必要時 ff-only pull／閘道／Strict（預設路徑）。
+5. 回來後在 **同一 repo 根**：桌機正式開工以 **Cursor 送 `AO-RESUME`**（hook 跑完整 **`ao-resume.ps1 -FullMainlineParity`**）為主；Autopilot 可選 `-AllowUnexpectedDirty` 等（見 **2.5.1**）。**Exit 0** 即表示已處理 fetch／必要時 ff-only pull／閘道／Strict（預設路徑）。
 
 你會看到什麼（成功判斷）：
 - `ao-close`：會產生 closeout/health/guard 報告
@@ -339,5 +339,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1
 - `RESUME_AFTER_REBOOT.md`
 - `TASKS.md`
 
-_Last synced: 2026-04-26 17:50:20 UTC_
+_Last synced: 2026-04-26 18:08:14 UTC_
 

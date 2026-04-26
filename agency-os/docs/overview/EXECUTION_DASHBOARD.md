@@ -63,7 +63,7 @@
 ## 4) 每日 Runbook（最短路徑）
 ### 開工（AO-RESUME）
 0. **單一真相**：開工流程與 30 秒自檢統一看 `docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**、§2.3；**日內 Git（checkpoint / 收工 push）**只看 **§2.5**（本頁不重複第二套敘述）。  
-   **雙機／每日正式開工**：在 **monorepo 根**跑 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**（**預設**：fetch、behind 時 ff-only pull、`verify-build-gates`、workflows 依賴、`print-open-tasks`、**`machine-environment-audit -FetchOrigin -Strict`**）。**僅在 exit 0 後**再在 Cursor 輸入 **`AO-RESUME`**（代理依 `.cursor/rules/30-resume-keyword.mdc` 第 3 節**五段式**回覆，含待辦全列與實質風險盤點）。**Exit 非 0** 時依 **`REMOTE` 2.5.1** 整理髒樹／衝突後重跑，勿只先手動 pull 卻略過閘道／Strict。  
+   **雙機／每日正式開工**：在 Cursor 開 **monorepo 根**並送出 **`AO-RESUME`**；**`.cursor/hooks.json`** 會先跑 **`scripts\ao-resume.ps1 -FullMainlineParity`**（fetch、behind 時 ff-only pull、`verify-build-gates`、workflows 依賴、`print-open-tasks`、**`machine-environment-audit -FetchOrigin -Strict`**）。代理依 `.cursor/rules/30-resume-keyword.mdc` 讀 **`ao-resume-hook-last.json`**／快照並**五段式**回覆（含待辦全列與實質風險盤點）。**Exit 非 0** 時依 **`REMOTE` 2.5.1** 整理髒樹／衝突後**再送 `AO-RESUME`** 或手動重跑腳本；勿只先手動 pull 卻略過閘道／Strict。**除錯／無 hook** 時才改在 monorepo 根手動跑 **`ao-resume.ps1`**。  
    **可選人類掃視**：`LAST_SYSTEM_STATUS.md`、`TASKS.md`、`reports/status/integrated-status-LATEST.md`（不取代 Exit 0）。  
 1. 打開 `TASKS.md`，只做 Next/Backlog 最高優先（或由 **`print-open-tasks`** 已在終端列出）。  
 2. 需要工程驗收就跑（Strict 或 Fast）：參考 `memory/CONVERSATION_MEMORY.md` 的 Runbook Commands。
@@ -83,7 +83,7 @@
 
 ### 離席會斷網（吃飯前）
 1. 在 **monorepo 根** `<WORK_ROOT>` 開終端機
-2. 若只暫停：直接離開；回來在 monorepo 根跑 **`scripts/ao-resume.ps1`** 或手動 `git pull --ff-only` 後再打 **`AO-RESUME`**
+2. 若只暫停：直接離開；回來在 Cursor 送 **`AO-RESUME`**（hook 跑 **`ao-resume.ps1`**），或 monorepo 根手動 **`scripts/ao-resume.ps1`**／`git pull --ff-only` 後再續接
 3. 若要安全收工再離開：`powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1 -SkipPush`
 
 ### 每週（建議固定一天，例如週一）
@@ -114,5 +114,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `memory/CONVERSATION_MEMORY.md`
 
-_Last synced: 2026-04-26 17:50:20 UTC_
+_Last synced: 2026-04-26 18:08:14 UTC_
 

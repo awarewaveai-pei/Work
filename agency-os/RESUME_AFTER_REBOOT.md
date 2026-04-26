@@ -5,8 +5,8 @@
 > **寫法規則（給未來自己／代理）**：營運者**一次只會有一台電腦在身邊**。凡屬「**兩台都要做**」的設定（PATH、MariaDB、WP bootstrap、`gh`、vault、`mcp.json`、`npm ci`、Strict 稽核，以及**自託管營運工具在本機的消費端**：例如能觸發／驗證 **n8n staging Webhook**；**Trigger.dev 自託管**（**營運定案 2026-04-20：自架叢集視為已上線**，見 **`TOOLS_DELIVERY_TRACEABILITY.md`**；**每台開發機**仍須把 **`TRIGGER_*`／Worker API URL** 寫進該機 **vault**／本機 env 對齊 **`packages/workflows`** 與 **`github-actions-trigger-prod-deploy.md`**）；vault 內對應鍵；後續 **`TASKS`** 裡其他自託管／Phase 1 工具在本機的憑證與連通），在本節**務必拆成兩句**：**（A）現在手上這台**當次要做什麼；**（B）另一台**下次開機／下次帶到身邊時要做什麼——**不要**只寫「請完成雙機」一句話。更新本節時刪舊輪替、只保留仍有效者。
 
 1. **開工單一路徑（兩台各自）**  
-   - **現在這台**：在 **monorepo 根**（`<WORK_ROOT>`）執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`** → **exit 0** → 再在 Cursor 打 **`AO-RESUME`**（見 `30-resume-keyword.mdc`）。  
-   - **另一台**：下次帶到身邊時同樣在該機 `<WORK_ROOT>` 跑 **`ao-resume.ps1` exit 0**（勿假設已與 GitHub 對齊而不跑）。
+   - **現在這台**：在 Cursor 開 **monorepo 根**工作區（`<WORK_ROOT>`），對話裡**輸入並送出 `AO-RESUME`**；repo 根的 **`.cursor/hooks.json`**（`beforeSubmitPrompt`）會先跑 **`scripts\ao-resume.ps1 -FullMainlineParity`**，代理再依 **`30-resume-keyword.mdc`** 五段式讀檔（見 **`AGENTS.md`**）。**除錯、hook 未載入、或離開 Cursor 操作**時，才改在 monorepo 根手動：`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1 -FullMainlineParity` 至 **exit 0**。  
+   - **另一台**：下次帶到身邊時同樣在該機 `<WORK_ROOT>` 用 Cursor 送 **`AO-RESUME`**（或手動跑上段腳本至 exit 0）；勿假設已與 GitHub 對齊而不做。
 
 2. **雙機對齊（`TASKS` 仍開放；兩台各自）**  
    - **現在這台**：若尚未做 §1.5.1／Strict，依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5／§1.5.1**；MariaDB PATH 可選 **`.\scripts\ensure-mariadb-on-user-path.ps1`**；本機 WP 正本 **`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`**；試跑紀錄見 **`WORKLOG` 2026-04-13**（桌機範例）。  
@@ -28,9 +28,9 @@
 - **建議 monorepo 根**：`<WORK_ROOT>`（含 `agency-os`、`lobster-factory` 與根 `scripts`）
 - 或僅開：`<WORK_ROOT>\agency-os`
 
-**建議**：在 monorepo 根執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1`**（**預設**含 fetch、behind 時 ff-only pull、閘道、workflows 依賴、`print-open-tasks`、**`machine-environment-audit -FetchOrigin -Strict`**）。遇本機未提交變更／衝突時會**非 0**，請依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1** 處理後重跑。完整準備與 §2.3 三指令自檢亦見該檔 §2、§2.3。
+**建議（日常）**：在 Cursor 開 monorepo 根工作區後，對話送出 **`AO-RESUME`**；專案 **hook** 會先跑 **`ao-resume.ps1 -FullMainlineParity`**（含 fetch、behind 時 ff-only pull、閘道、workflows 依賴、`print-open-tasks`、**`machine-environment-audit -FetchOrigin -Strict`**）。遇本機未提交變更／衝突時腳本會**非 0**，請依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1** 整理後**再送一次 `AO-RESUME`** 或手動重跑腳本。完整準備與 §2.3 三指令自檢亦見該檔 §2、§2.3。
 
-腳本 **exit 0** 後，在 Cursor 貼上：**`AO-RESUME`**（代理依 **`30-resume-keyword.mdc` 第 3 節**給**五段式**匯報，含 **`open-tasks-snapshot.md`**／**`TASKS.md`** 待辦全列）。
+**除錯／無 Cursor**：在 monorepo 根手動 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1 -FullMainlineParity`** 至 **exit 0**，之後若仍用 Cursor 續接可再送 **`AO-RESUME`**（代理依 **`30-resume-keyword.mdc` 第 3 節**給**五段式**匯報，含 **`open-tasks-snapshot.md`**／**`TASKS.md`** 待辦全列）。
 
 可選人類掃視：
 - `LAST_SYSTEM_STATUS.md`（在 `agency-os` 根目錄）
@@ -46,5 +46,5 @@
 - `docs/operations/system-guard-and-notification.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-26 17:50:20 UTC_
+_Last synced: 2026-04-26 18:08:14 UTC_
 

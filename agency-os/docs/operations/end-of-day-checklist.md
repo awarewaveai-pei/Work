@@ -64,7 +64,7 @@
   - 若今天刻意不推：在 `WORKLOG.md` 寫一句原因（例如等待審查、只在私機）
 - [ ] 推送前快速掃描：diff 與暫存區**不得**含 token、私钥、還原後的 MCP/IDE 備份路徑內敏感檔
 
-> 與舊版「只做三步」相比：收工不僅要本機 PASS，還要**遠端有同款快照**，隔天或另一台電腦須在 monorepo 根 **`scripts/ao-resume.ps1` exit 0**（或手動 `git pull` 達成等價對齊）後再打 **`AO-RESUME`** 才不會斷線。若 `push` 被拒（遠端超前），請先 **`git pull --rebase origin main`** 解衝突再推。
+> 與舊版「只做三步」相比：收工不僅要本機 PASS，還要**遠端有同款快照**；隔天或另一台在 Cursor 開 monorepo 根並送 **`AO-RESUME`**（hook 會跑 **`ao-resume.ps1 -FullMainlineParity`** 至 exit 0／或失敗依 **REMOTE 2.5.1** 修復），或手動 **`git pull`／`ao-resume.ps1`** 達成等價對齊，才不會斷線。若 `push` 被拒（遠端超前），請先 **`git pull --rebase origin main`** 解衝突再推。
 
 ## 2) 四份文件必回寫（避免明天斷線）
 - [ ] `TASKS.md`
@@ -87,5 +87,5 @@
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-26 17:50:20 UTC_
+_Last synced: 2026-04-26 18:08:14 UTC_
 

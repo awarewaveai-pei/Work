@@ -41,7 +41,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\generate-integrated-status-re
 ## 與其他「一頁」的關係
 
 - **`docs/overview/EXECUTION_DASHBOARD.md`**：儀表板與 Gate、每日路徑（仍建議每天先掃一眼）。
-- **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**：雙機／換機開工順序與 AO-RESUME 30 秒自檢（開工事件單一真相）；**新機 §1.5**、**例行 §2**、**§2.5 日內 Git**（checkpoint / 收工 push）；**`scripts/ao-resume.ps1`（預設）**涵蓋 fetch／behind 時 ff-only pull、`npm ci`（需時）、閘道、**Strict** 稽核，exit 0 後再打 **`AO-RESUME`** 讀檔（與儀表板 §4 一致）。
+- **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**：雙機／換機開工順序與 AO-RESUME 30 秒自檢（開工事件單一真相）；**新機 §1.5**、**例行 §2**、**§2.5 日內 Git**（checkpoint / 收工 push）；在 Cursor **送出 `AO-RESUME`** 時 **hook** 先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（fetch／behind 時 ff-only pull、`npm ci`（需時）、閘道、**Strict** 稽核），代理再讀檔五段式（與儀表板 §4 一致）。
 - **`docs/operations/end-of-day-checklist.md`**：AO-CLOSE 收工流程（收工事件單一真相）。
 - **本頁 + `integrated-status-LATEST.md`**：要把「待辦 + 工廠 + 記憶 + 今日」**塞進同一視窗**時用。
 
@@ -58,5 +58,5 @@ _Last updated: manual doc; report body is script-generated._
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-26 17:50:20 UTC_
+_Last synced: 2026-04-26 18:08:14 UTC_
 

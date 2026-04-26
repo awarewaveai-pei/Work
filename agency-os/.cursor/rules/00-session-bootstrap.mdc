@@ -19,8 +19,8 @@ If those files are not found in the current opened folder, retry under `agency-o
 with the same filenames before declaring context missing.
 
 ## 雙機協作（AO-RESUME 與 Git）
-- **單一路徑**：在 **monorepo 根**執行 **`scripts/ao-resume.ps1`**（對應關鍵字流程見 **`.cursor/rules/30-resume-keyword.mdc`**）— **預設**含 fetch、behind 時 ff-only pull、`verify-build-gates`、嚴格環境稽核等。**exit 非 0** 時常有髒樹／衝突，須先依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1** 整理再重跑。  
-- **另一台 `AO-CLOSE` push 後**：本機須跑通 **`ao-resume.ps1`**（exit 0）或手動等價對齊，否則 `TASKS`／`WORKLOG`／`memory` 可能落後、**push 會被拒**。  
+- **單一路徑**：在 Cursor 開 **monorepo 根**並送出 **`AO-RESUME`**；**`.cursor/hooks.json`** 會先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（細節見 **`.cursor/rules/30-resume-keyword.mdc`**）— **預設**含 fetch、behind 時 ff-only pull、`verify-build-gates`、嚴格環境稽核等。**exit 非 0** 時常有髒樹／衝突，須先依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1** 整理再重送 **`AO-RESUME`** 或手動重跑腳本。  
+- **另一台 `AO-CLOSE` push 後**：本機在 Cursor 送 **`AO-RESUME`** 至腳本 exit 0（或手動等價對齊），否則 `TASKS`／`WORKLOG`／`memory` 可能落後、**push 會被拒**。  
 - 完整步驟：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **§1.5**、**§2**、§2.3。
 
 At the beginning of every new conversation, output this exact structure:

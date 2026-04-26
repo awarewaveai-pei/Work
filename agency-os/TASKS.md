@@ -18,7 +18,7 @@
 ## Next — 未完成（目前正式隊列）
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）**（詳見 `docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 / §1.5.1）
   - 新機/筆電首次：完成 Windows 本機 WordPress 相容層（MariaDB + PHP + WP-CLI + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`），此路徑與 Supabase/MCP 分列。
-  - 之後每次開工：monorepo 根跑 `scripts/ao-resume.ps1` 至 exit 0（含 ff-only pull、gates、`print-open-tasks` 快照、Strict 稽核），再於 Cursor 使用 `AO-RESUME`。
+  - 之後每次開工：在 Cursor 開 monorepo 根並送出 **`AO-RESUME`**（專案 **hook** 先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`** 至 exit 0／失敗則依 **REMOTE 2.5.1** 整理後重送）；除錯時可改在 monorepo 根手動跑同指令。
   - 筆電需安裝並登入 GitHub CLI（`winget install --id GitHub.cli` + `gh auth login`），Node major 與桌機/CI 對齊；`secrets-vault` 與 `mcp.json` 皆為每台獨立設定。
   - **Shared MCP/AI 結構（固定）**：兩台共用 repo 內 **`mcp/registry.template.json`**、**`scripts/sync-mcp-config.ps1`**、**`CLAUDE.md`**、**`.cursor/rules/67-shared-mcp-governance.mdc`**；各自持有本機 env / vault / user-level config，**不得**直接複製另一台的明文 `~/.cursor/mcp.json`、`~/.claude.json`。
   - **筆電全功能接線**：建立 `mcp/user-env.ps1`（依 `mcp/user-env.template.ps1` 補齊全部 env），在 monorepo 根執行 **`scripts/bootstrap-mcp-machine.ps1`**；若筆電曾有舊明文 MCP，再執行 **`scripts/sanitize-user-mcp-config.ps1`** 後重開 Cursor / Claude Code。
@@ -239,5 +239,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-26 17:50:20 UTC_
+_Last synced: 2026-04-26 18:08:14 UTC_
 
