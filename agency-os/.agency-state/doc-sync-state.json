@@ -1,18 +1,35 @@
 ﻿{
-    "last_run_utc":  "2026-04-25T10:28:28.8741169Z",
+    "last_run_utc":  "2026-04-26T15:34:24.0507519Z",
     "changed_files":  [
-                          "tenants/templates/core/DEPARTMENT_CLUSTER_CATALOG.md",
-                          "tenants/templates/core/DEPARTMENT_COVERAGE_MATRIX.md",
-                          "tenants/templates/core/DEPARTMENT_SELECTION.example.json",
-                          "tenants/templates/site-template/SYSTEM_REQUIREMENTS.md"
+                          ".cursor/rules/00-session-bootstrap.mdc",
+                          "docs/overview/REMOTE_WORKSTATION_STARTUP.md"
                       ],
     "impacted_files":  [
-                           "tenants/templates/core/DEPARTMENT_CLUSTER_CATALOG.md",
-                           "tenants/templates/core/DEPARTMENT_COVERAGE_MATRIX.md",
-                           "tenants/templates/core/DEPARTMENT_SELECTION.example.json",
-                           "tenants/templates/site-template/SYSTEM_REQUIREMENTS.md"
+                           "../README.md",
+                           ".cursor/rules/00-session-bootstrap.mdc",
+                           ".cursor/rules/30-resume-keyword.mdc",
+                           ".cursor/rules/40-shutdown-closeout.mdc",
+                           "AGENTS.md",
+                           "docs/operations/end-of-day-checklist.md",
+                           "docs/overview/EXECUTION_DASHBOARD.md",
+                           "docs/overview/INTEGRATED_STATUS_REPORT.md",
+                           "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
+                           "memory/CONVERSATION_MEMORY.md",
+                           "README.md",
+                           "RESUME_AFTER_REBOOT.md",
+                           "TASKS.md",
+                           "WORKLOG.md"
                        ],
     "auto_updated_files":  [
-
+                               "../README.md",
+                               "AGENTS.md",
+                               "docs/operations/end-of-day-checklist.md",
+                               "docs/overview/EXECUTION_DASHBOARD.md",
+                               "docs/overview/INTEGRATED_STATUS_REPORT.md",
+                               "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
+                               "memory/CONVERSATION_MEMORY.md",
+                               "RESUME_AFTER_REBOOT.md",
+                               "TASKS.md",
+                               "WORKLOG.md"
                            ]
 }
