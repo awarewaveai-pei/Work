@@ -22,6 +22,7 @@ scrape_configs:
       - targets: [localhost]
         labels:
           job: nginx
+          env: production
           host: ${HOST_LABEL}
           __path__: /var/log/nginx/*.log
 
@@ -30,5 +31,6 @@ scrape_configs:
       - targets: [localhost]
         labels:
           job: syslog
+          env: production
           host: ${HOST_LABEL}
           __path__: /var/log/syslog
