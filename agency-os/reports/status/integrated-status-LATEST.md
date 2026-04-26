@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-27 01:50:32
+- Generated: 2026-04-27 02:11:57
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -283,7 +283,7 @@
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-27 01:50:23`
+- Time: `2026-04-27 02:11:55`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -293,15 +293,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260427-015023.md`
-- Closeout: `reports/closeout/closeout-20260427-015020.md`
+- Health: `reports/health/health-20260427-021155.md`
+- Closeout: `reports/closeout/closeout-20260427-021152.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-### 排程單一來源 + AO-CLOSE 聯動甘特
-- **`docs/overview/PROGRAM_SCHEDULE.json`**：三流（AO／LF／PJ）任務與日期；可複製到客戶專案或 `project-kit` 範本。
 - **`scripts/render-program-timeline-from-schedule.ps1`**：UTF-8 JSON → `PROGRAM_TIMELINE.md` 標記區（表 + Mermaid）；腳本本體 **ASCII-only** 以相容 PS 5.1。
 - **`generate-integrated-status-report.ps1`** 末尾**單次**呼叫渲染；**AO-CLOSE** 路徑因此每次收工會重渲時間軸（仍以 TASKS／Checklist／Discovery 為完成真相）。
 
@@ -359,5 +357,7 @@
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
+
 
 
