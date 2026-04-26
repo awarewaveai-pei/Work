@@ -9,6 +9,8 @@ agency-os/.agency-state/open-tasks-snapshot.md
 agency-os/.agency-state/closeout-commit-msg.txt
 agency-os/.agency-state/agent-bootstrap-prompt.txt
 agency-os/.agency-state/agent-bootstrap-prompts.md
+agency-os/.agency-state/ao-resume-hook-last.json
+agency-os/.agency-state/ao-resume-hook-last.log
 
 # --- Local scratch (wp-dummy paths for regression; never push) ---
 .scratch/

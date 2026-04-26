@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/run-ao-resume-on-prompt.ps1",
+        "timeout": 1200,
+        "failClosed": false
+      }
+    ]
+  }
+}
