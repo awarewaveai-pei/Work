@@ -1,5 +1,12 @@
 import Link from "next/link";
 
+/** Avoid blank dashboard when INTERNAL_API_BASE_URL is set but empty in compose/.env (?? does not replace ""). */
+function getInternalApiBase(): string {
+  const raw = process.env.INTERNAL_API_BASE_URL?.trim();
+  if (raw) return raw.replace(/\/$/, "");
+  return "http://node-api:3001";
+}
+
 interface HealthResult {
   ok?: boolean;
   service?: string;
@@ -9,17 +16,28 @@ interface HealthResult {
   error?: string;
 }
 
+const FETCH_TIMEOUT_MS = 6000;
+
 async function fetchHealth(path: string): Promise<HealthResult> {
-  const base =
-    (process.env.INTERNAL_API_BASE_URL ?? "http://node-api:3001").replace(/\/$/, "");
+  const base = getInternalApiBase();
+  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
   try {
-    const res = await fetch(`${base}${path}`, { cache: "no-store" });
+    const res = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!res.ok) return { error: `HTTP ${res.status}` };
     return res.json();
   } catch (e) {
+    const name = e instanceof Error ? e.name : "";
+    if (name === "TimeoutError" || name === "AbortError") {
+      return { error: `timeout (${FETCH_TIMEOUT_MS}ms)` };
+    }
     return { error: e instanceof Error ? e.message : "unreachable" };
   }
 }
+
+export const dynamic = "force-dynamic";
 
 function StatusBadge({ ok }: { ok: boolean }) {
   return (
