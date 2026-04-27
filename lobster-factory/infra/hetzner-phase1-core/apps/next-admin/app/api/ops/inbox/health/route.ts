@@ -9,8 +9,8 @@ export async function GET() {
   if (!supabase) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
 
   const today = new Date().toISOString().slice(0, 10);
-  const [open, critical, high, quota, lastIngest] = await Promise.all([
-    supabase.from("ops_incidents").select("id", { count: "exact", head: true }).eq("status", "open"),
+  const [active, critical, high, quota, lastIngest] = await Promise.all([
+    supabase.from("ops_incidents").select("id", { count: "exact", head: true }).in("status", ["open", "investigating"]),
     supabase.from("ops_incidents").select("id", { count: "exact", head: true }).in("status", ["open", "investigating"]).eq("severity", "critical"),
     supabase.from("ops_incidents").select("id", { count: "exact", head: true }).in("status", ["open", "investigating"]).eq("severity", "high"),
     supabase.from("ops_inbox_gemini_quota").select("count").eq("date", today).maybeSingle(),
@@ -19,7 +19,7 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    open_count: open.count ?? 0,
+    open_count: active.count ?? 0,
     critical_count: critical.count ?? 0,
     high_count: high.count ?? 0,
     gemini_quota_used: quota.data?.count ?? 0,

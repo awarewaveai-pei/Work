@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 export function OpsInboxBadge() {
-  const [counts, setCounts] = useState<{ critical: number; high: number } | null>(null);
+  const [counts, setCounts] = useState<{ critical: number; total: number } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -12,7 +12,7 @@ export function OpsInboxBadge() {
         const r = await fetch("/api/ops/inbox/health");
         if (!alive || !r.ok) return;
         const j = await r.json();
-        setCounts({ critical: j.critical_count ?? 0, high: j.high_count ?? 0 });
+        setCounts({ critical: j.critical_count ?? 0, total: j.open_count ?? 0 });
       } catch {}
     };
     void tick();
@@ -23,20 +23,12 @@ export function OpsInboxBadge() {
     };
   }, []);
 
-  if (!counts) return null;
-  if (counts.critical > 0) {
-    return (
-      <span style={{ marginLeft: 8, padding: "2px 6px", background: "var(--severity-critical)", color: "#fff", borderRadius: 999, fontSize: 11 }}>
-        {counts.critical}
-      </span>
-    );
-  }
-  if (counts.high > 0) {
-    return (
-      <span style={{ marginLeft: 8, padding: "2px 6px", background: "var(--severity-high)", color: "#fff", borderRadius: 999, fontSize: 11 }}>
-        {counts.high}
-      </span>
-    );
-  }
-  return null;
+  if (!counts || counts.total === 0) return null;
+
+  const bg = counts.critical > 0 ? "var(--severity-critical)" : "#64748b";
+  return (
+    <span style={{ marginLeft: 8, padding: "2px 6px", background: bg, color: "#fff", borderRadius: 999, fontSize: 11 }}>
+      {counts.total}
+    </span>
+  );
 }

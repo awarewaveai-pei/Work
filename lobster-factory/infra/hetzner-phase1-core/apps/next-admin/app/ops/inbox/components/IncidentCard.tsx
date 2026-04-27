@@ -4,7 +4,7 @@ import { OpenInCursorButton } from "./OpenInCursorButton";
 
 const SOURCE_LABEL: Record<string, string> = {
   sentry: "Sentry",
-  uptime_kuma: "Uptime",
+  uptime_kuma: "Uptime Kuma",
   grafana: "Grafana",
   netdata: "Netdata",
   posthog: "PostHog",
@@ -32,6 +32,35 @@ const SEV_BG: Record<string, string> = {
   low: "#f0f9ff",
 };
 
+function getSourceUrl(incident: Incident): string | null {
+  const r = incident.raw as any;
+  switch (incident.source) {
+    case "sentry":
+      return r?.data?.url ?? r?.url ?? r?.event?.web_url ?? null;
+    case "uptime_kuma":
+      return "https://uptime.aware-wave.com";
+    case "grafana":
+      return r?.alerts?.[0]?.generatorURL ?? r?.externalURL ?? "https://grafana.aware-wave.com";
+    case "netdata":
+      return r?.alarm_url ?? "https://app.netdata.cloud";
+    case "posthog":
+      return "https://us.posthog.com";
+    default:
+      return null;
+  }
+}
+
+function getSourceAdminLabel(source: string): string {
+  const map: Record<string, string> = {
+    sentry: "Sentry →",
+    uptime_kuma: "Uptime Kuma →",
+    grafana: "Grafana →",
+    netdata: "Netdata →",
+    posthog: "PostHog →",
+  };
+  return map[source] ?? `${source} →`;
+}
+
 export function IncidentCard({ incident, canAct }: { incident: Incident; canAct: boolean }) {
   const sevColor = SEV_COLOR[incident.severity] ?? "#64748b";
   const sevBg = SEV_BG[incident.severity] ?? "#f8fafc";
@@ -39,6 +68,7 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
   const aiSummary = incident.ai_diagnoses?.find((d) => d.role === "auto-classify")?.summary;
   const isResolved = incident.status === "resolved";
   const isIgnored = incident.status === "ignored";
+  const sourceUrl = getSourceUrl(incident);
 
   return (
     <article
@@ -79,23 +109,48 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
             {incident.severity}
           </span>
 
-          {/* Source badge */}
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              padding: "2px 7px",
-              borderRadius: 4,
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              background: src.bg,
-              color: src.text,
-            }}
-          >
-            {SOURCE_LABEL[incident.source] ?? incident.source}
-          </span>
+          {/* Source badge — clickable if we have a URL */}
+          {sourceUrl ? (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "2px 7px",
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                background: src.bg,
+                color: src.text,
+                textDecoration: "none",
+                gap: 3,
+              }}
+            >
+              {SOURCE_LABEL[incident.source] ?? incident.source}
+              <span style={{ opacity: 0.6, fontSize: 9 }}>↗</span>
+            </a>
+          ) : (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "2px 7px",
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                background: src.bg,
+                color: src.text,
+              }}
+            >
+              {SOURCE_LABEL[incident.source] ?? incident.source}
+            </span>
+          )}
 
           {/* Service or host context */}
           {incident.service ? (
@@ -191,11 +246,21 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
         )}
 
         {/* Footer meta */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, color: "#94a3b8" }}>
             {incident.occurrence_count} occurrence{incident.occurrence_count !== 1 ? "s" : ""}
           </span>
           <OpenInCursorButton incident={incident} primary={false} />
+          {sourceUrl && (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 12, color: src.text, textDecoration: "none", fontWeight: 500 }}
+            >
+              {getSourceAdminLabel(incident.source)}
+            </a>
+          )}
           {canAct && (
             <Link
               href={`/ops/inbox/${incident.id}`}

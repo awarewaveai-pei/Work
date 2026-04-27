@@ -6,9 +6,8 @@ import { useTransition } from "react";
 const STATUS_TABS = [
   { key: "active", label: "進行中", param: null as string | null },
   { key: "all", label: "全部", param: "all" },
-  { key: "open", label: "open", param: "open" },
-  { key: "investigating", label: "investigating", param: "investigating" },
-  { key: "resolved", label: "resolved", param: "resolved" },
+  { key: "resolved", label: "已解決", param: "resolved" },
+  { key: "ignored", label: "已忽略", param: "ignored" },
 ] as const;
 
 function effectiveStatusKey(status: string | undefined): string {
