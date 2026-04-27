@@ -113,3 +113,8 @@ $$;
 alter table ops_incidents enable row level security;
 alter table ops_inbox_gemini_quota enable row level security;
 -- 故意不寫 policy（next-admin 用 service role 讀寫，無 RLS policy 等於 anon 全擋 + service role bypass）
+
+-- ─── 部署注意：New table → PostgREST schema cache ─────────────
+-- 若 Kong/REST 回 PGRST205「table not in schema cache」：在 DB 內執行
+--   NOTIFY pgrst, 'reload schema';
+-- 或重啟容器 supabase-rest（EU：`docker restart supabase-rest`）。
