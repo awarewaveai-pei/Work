@@ -56,14 +56,26 @@ $script:EnvAliases = @{
 function Get-EnvironmentValueWithAliases {
     param([string]$Name)
 
-    $value = [Environment]::GetEnvironmentVariable($Name)
+    $value = [Environment]::GetEnvironmentVariable($Name, "Process")
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        $value = [Environment]::GetEnvironmentVariable($Name, "User")
+    }
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        $value = [Environment]::GetEnvironmentVariable($Name, "Machine")
+    }
     if (-not [string]::IsNullOrWhiteSpace($value) -and $value -notmatch '^\s*<PASTE_[A-Z0-9_]+>\s*$') {
         return $value
     }
 
     if ($script:EnvAliases.ContainsKey($Name)) {
         foreach ($alias in $script:EnvAliases[$Name]) {
-            $aliasValue = [Environment]::GetEnvironmentVariable($alias)
+            $aliasValue = [Environment]::GetEnvironmentVariable($alias, "Process")
+            if ([string]::IsNullOrWhiteSpace($aliasValue)) {
+                $aliasValue = [Environment]::GetEnvironmentVariable($alias, "User")
+            }
+            if ([string]::IsNullOrWhiteSpace($aliasValue)) {
+                $aliasValue = [Environment]::GetEnvironmentVariable($alias, "Machine")
+            }
             if (-not [string]::IsNullOrWhiteSpace($aliasValue) -and $aliasValue -notmatch '^\s*<PASTE_[A-Z0-9_]+>\s*$') {
                 $script:Warnings.Add("Resolved $Name from legacy env var $alias on this machine.")
                 return $aliasValue
