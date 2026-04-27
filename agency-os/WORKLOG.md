@@ -8,6 +8,7 @@
 - **Cursor**：向使用者整理 **AO-RESUME** 主流程（**`.cursor/hooks.json` → `beforeSubmitPrompt` → `scripts/ao-resume.ps1 -FullMainlineParity`** → 代理讀 **`ao-resume-hook-last.json`／`open-tasks-snapshot.md`／`TASKS.md`** 五段式；**非**開機全自動）。
 - **Git**：本輪對話未新增檔案變更；**`main`** 已與 **`origin/main`** 對齊至 **`74c4044`**（前次已推：AO-RESUME hook 敘述與 doc-sync 連動）。
 - **TASKS**：無單一 **`- [ ]`** 子字串可機讀命中本輪敘事，故未加 **`- AUTO_TASK_DONE:`**（與 **`WORKLOG` `## 2026-04-24`** 先例一致）。
+- **待辦補記（使用者指定）**：已新增兩條到 `TASKS.md`（ClickHouse TTL 3-day 調整、筆電回家後 `user-env.ps1` + `sync-mcp-config.ps1`）。
 
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
@@ -73,6 +74,25 @@
   - SSH tunnel script `open-supabase-ssh-tunnel.ps1` 若仍指向舊 SG，需改指向 **EU Supabase** 主機（實際 IP／host 僅寫 vault／runbook）。
   - SG 系統 nginx 已 stop/disable（Docker nginx 接管 port 80），重開機後應正常（Docker nginx restart:unless-stopped）
   - n8n 在 SG docker-compose.yml 仍定義（service block 存在，但 container 已停），可擇日清除該 service block
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:3b1bebdf56cc5a6317e5e79bbc1034469b8df3382ed3138d0958a5eed578090c -->
+
+### claude-code 2026-04-27 00:30
+
+- **完成（一句）**: 修復 EU ClickHouse 195% CPU（刪除 562MB 系統日誌 store）、修復 Uptime Kuma SQLite JSON 格式錯誤＋Slack 欄位改名問題、重建 AWARE_WAVE_CREDENTIALS.md 並新增 Section 22（MCP Agent Token），補齊 user-env.ps1 三個缺漏 MCP env var。
+- **變更路徑**:
+  - `C:\Users\USER\Work\mcp\user-env.ps1`（gitignored，機器本機）
+  - `C:\Users\USER\AWARE_WAVE_CREDENTIALS.md`（repo 外，credentials 參考檔）
+  - EU server `/var/lib/docker/volumes/trigger_trigger_clickhouse_data/_data/data/store/`（已刪 metric_log / trace_log / text_log / 其他 system log store dirs；562MB）
+  - EU server Uptime Kuma SQLite `/var/lib/docker/volumes/uptime-kuma/_data/kuma.db`（monitor #16 disabled；monitors #5/#6/#19 accepted_statuscodes_json 修正；notification slackWebhookURL 欄位補入）
+- **Git**: 未 commit（user-env.ps1 gitignored；credentials 與 EU server 變更均在 repo 外）
+- **對應 TASKS 子字串（可選）**: SG server alert / Uptime Kuma / EU CPU / MCP env vars / ClickHouse TTL
+- **風險／待辦（可選）**:
+  - ClickHouse TTL 尚未設定：待執行 `ALTER TABLE system.metric_log MODIFY TTL event_date + INTERVAL 3 DAY`（及其他 system log table），避免下次重新堆積
+  - API_AWAREWAVE_BEARER_TOKEN / APP_AWAREWAVE_BEARER_TOKEN 目前以 Supabase service role key 暫代；待 Node API 實作 auth 後需換成正式 token
+  - 筆電需執行 `user-env.ps1` + `sync-mcp-config.ps1` 以同步三個新 token（重開 Cursor / Claude Code 後生效）
 
 ## 2026-04-24
 
@@ -893,7 +913,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-26 18:11:51 UTC_
+_Last synced: 2026-04-27 09:57:10 UTC_
 
 ## 2026-03-20
 
@@ -1321,6 +1341,4 @@ _Last synced: 2026-04-26 18:11:51 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
-
-
 

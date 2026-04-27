@@ -31,6 +31,16 @@
 - [ ] **（工具建置）安裝 Grok CLI（筆電 / Codex）**
   - 參考：`../GROK_LAPTOP_CODEX_INSTALL_PROMPT.md`
   - DoD：`grok help`、`grok templates` 成功；若 `XAI_API_KEY` 已存在，`grok chat "Reply with exactly: ready"` 回傳 `ready`
+- [ ] ClickHouse TTL（下次方便時，EU server）
+  - SSH 進 EU server 後執行：
+    - `docker exec -it trigger-trigger-clickhouse-1 clickhouse-client`
+    - `ALTER TABLE system.metric_log MODIFY TTL event_date + INTERVAL 3 DAY;`
+    - `ALTER TABLE system.trace_log MODIFY TTL event_date + INTERVAL 3 DAY;`
+    - `ALTER TABLE system.text_log MODIFY TTL event_date + INTERVAL 3 DAY;`
+- [ ] 筆電回家後重載 MCP 環境
+  - 依序執行：
+    - `. .\mcp\user-env.ps1`
+    - `powershell -File .\scripts\sync-mcp-config.ps1`
 - [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3）
   - 參考：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
   - 本項目標：先選 2 個試點（1 既有站接手 + 1 新站建置）
@@ -239,5 +249,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-26 18:08:14 UTC_
+_Last synced: 2026-04-27 09:57:10 UTC_
 

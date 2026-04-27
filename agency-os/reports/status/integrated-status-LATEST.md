@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-27 02:11:57
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-04-27 17:57:22
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter） - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑） - [ ] C5-1. Observability：Sentry（錯誤追蹤）+ PostHog（產品分析） - [ ] C5-2. Edge/Security：Cloudflare（WAF/CDN/Rate limit） - [ ] C5-3. Secrets：1Password Secrets Automation（或同級） - [ ] C5-4. Identity/Org：Clerk/WorkOS/Auth0（三選一） - [ ] C5-5. Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails） - [ ] C5-6. 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -279,11 +279,29 @@
   - SG 系統 nginx 已 stop/disable（Docker nginx 接管 port 80），重開機後應正常（Docker nginx restart:unless-stopped）
   - n8n 在 SG docker-compose.yml 仍定義（service block 存在，但 container 已停），可擇日清除該 service block
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:3b1bebdf56cc5a6317e5e79bbc1034469b8df3382ed3138d0958a5eed578090c -->
+
+### claude-code 2026-04-27 00:30
+
+- **完成（一句）**: 修復 EU ClickHouse 195% CPU（刪除 562MB 系統日誌 store）、修復 Uptime Kuma SQLite JSON 格式錯誤＋Slack 欄位改名問題、重建 AWARE_WAVE_CREDENTIALS.md 並新增 Section 22（MCP Agent Token），補齊 user-env.ps1 三個缺漏 MCP env var。
+- **變更路徑**:
+  - `C:\Users\USER\Work\mcp\user-env.ps1`（gitignored，機器本機）
+  - `C:\Users\USER\AWARE_WAVE_CREDENTIALS.md`（repo 外，credentials 參考檔）
+  - EU server `/var/lib/docker/volumes/trigger_trigger_clickhouse_data/_data/data/store/`（已刪 metric_log / trace_log / text_log / 其他 system log store dirs；562MB）
+  - EU server Uptime Kuma SQLite `/var/lib/docker/volumes/uptime-kuma/_data/kuma.db`（monitor #16 disabled；monitors #5/#6/#19 accepted_statuscodes_json 修正；notification slackWebhookURL 欄位補入）
+- **Git**: 未 commit（user-env.ps1 gitignored；credentials 與 EU server 變更均在 repo 外）
+- **對應 TASKS 子字串（可選）**: SG server alert / Uptime Kuma / EU CPU / MCP env vars / ClickHouse TTL
+- **風險／待辦（可選）**:
+  - ClickHouse TTL 尚未設定：待執行 `ALTER TABLE system.metric_log MODIFY TTL event_date + INTERVAL 3 DAY`（及其他 system log table），避免下次重新堆積
+  - API_AWAREWAVE_BEARER_TOKEN / APP_AWAREWAVE_BEARER_TOKEN 目前以 Supabase service role key 暫代；待 Node API 實作 auth 後需換成正式 token
+  - 筆電需執行 `user-env.ps1` + `sync-mcp-config.ps1` 以同步三個新 token（重開 Cursor / Claude Code 後生效）
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-27 02:11:55`
+- Time: `2026-04-27 17:57:13`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -293,13 +311,15 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260427-021155.md`
-- Closeout: `reports/closeout/closeout-20260427-021152.md`
+- Health: `reports/health/health-20260427-175713.md`
+- Closeout: `reports/closeout/closeout-20260427-175711.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+### 排程單一來源 + AO-CLOSE 聯動甘特
+- **`docs/overview/PROGRAM_SCHEDULE.json`**：三流（AO／LF／PJ）任務與日期；可複製到客戶專案或 `project-kit` 範本。
 - **`scripts/render-program-timeline-from-schedule.ps1`**：UTF-8 JSON → `PROGRAM_TIMELINE.md` 標記區（表 + Mermaid）；腳本本體 **ASCII-only** 以相容 PS 5.1。
 - **`generate-integrated-status-report.ps1`** 末尾**單次**呼叫渲染；**AO-CLOSE** 路徑因此每次收工會重渲時間軸（仍以 TASKS／Checklist／Discovery 為完成真相）。
 
@@ -357,7 +377,5 @@
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
-
-
 
 
