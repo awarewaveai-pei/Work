@@ -68,3 +68,12 @@ export function canWriteTenantConfig(role: OpsRole): boolean {
 export function canCreateAiImageJob(role: OpsRole): boolean {
   return role === "owner" || role === "admin" || role === "operator";
 }
+
+// === 路線 B Ops Inbox 新增（docs/Ops_Observability_PathB_Plan.md §5.4） ===
+export function canTriggerAiDiagnose(role: OpsRole): boolean {
+  return role === "owner" || role === "admin" || role === "operator";
+}
+
+export function canModifyIncidentStatus(role: OpsRole): boolean {
+  return role === "owner" || role === "admin" || role === "operator";
+}
