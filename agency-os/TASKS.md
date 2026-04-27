@@ -209,9 +209,9 @@
   - 範圍：Sentry / PostHog / Cloudflare / Secrets / Identity
   - 現況：Identity=Clerk；Secrets 暫採 env/mcp，後續升級 secrets manager
 - [ ] **`lobster-factory/packages/workflows` `npm audit`**（2026-04-01）
-  - 現況：16 筆多為 Trigger.dev CLI / `@trigger.dev/core` 傳遞依賴（socket.io、cookie、esbuild dev、tar、giget、systeminformation）。
+  - 現況：已做相依升級與 `overrides` 收斂；目前剩 2 筆 moderate，皆來自 `@trigger.dev/sdk` -> `uuid`（`<14.0.0`）上游傳遞依賴。
   - 禁止：勿在本目錄執行 `npm audit fix --force`（會導向不相容 Trigger 版本）。
-  - 對策：等待官方 `@trigger.dev/sdk` / `trigger.dev` 小版修補，或官方釋出後再 `npm update` + 回歸；本機勿將 Trigger dev server 暴露公網。
+  - 對策：持續追 Trigger 官方修補（`@trigger.dev/sdk`/`trigger.dev`）；每次升版後執行 `npm run test` + `npm audit` 回歸；本機勿將 Trigger dev server 暴露公網。
 
 ## Backlog — 已完成歷程
 - [x] 客戶分級與風險評分模型

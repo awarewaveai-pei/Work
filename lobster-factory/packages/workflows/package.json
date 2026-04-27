@@ -4,8 +4,8 @@
     "private": true,
     "type": "module",
     "dependencies": {
-        "@sentry/node": "^10.49.0",
-        "@trigger.dev/sdk": "4.4.3",
+        "@sentry/node": "^10.50.0",
+        "@trigger.dev/sdk": "^4.4.4",
         "zod": "^3.22.0"
     },
     "scripts": {
@@ -13,8 +13,14 @@
         "test:watch": "vitest"
     },
     "devDependencies": {
-        "trigger.dev": "4.4.3",
+        "trigger.dev": "^4.4.4",
         "tsx": "^4.21.0",
-        "vitest": "^4.1.4"
+        "vitest": "^4.1.5"
+    },
+    "overrides": {
+        "systeminformation": "^5.31.5",
+        "tar": "^7.5.13",
+        "cookie": "^1.1.1",
+        "esbuild": "^0.28.0"
     }
 }
