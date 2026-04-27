@@ -119,7 +119,7 @@ function NotificationLogPanel({ log }: { log: Incident["notification_log"] }) {
       <ul style={{ fontSize: 12 }}>
         {log.map((e, i) => (
           <li key={i}>
-            {e.status === "sent" ? "✓" : e.status === "throttled" ? "⊘" : "✗"} {e.channel} · {e.rule}
+            {e.status === "sent" ? "✓" : e.status === "skipped" ? "○" : e.status === "throttled" ? "⊘" : "✗"} {e.channel} · {e.rule}
             {e.reason && <span> ({e.reason})</span>}
           </li>
         ))}

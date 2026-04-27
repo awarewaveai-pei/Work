@@ -19,9 +19,14 @@ export interface AiDiagnosis {
   created_by?: string;
 }
 
-export type NotificationStatus = "sent" | "failed" | "throttled";
+export type NotificationStatus = "sent" | "failed" | "throttled" | "skipped";
 
-export type NotificationRule = "new_incident_first_occurrence" | "severity_escalation" | "reopen" | "critical_immediate";
+export type NotificationRule =
+  | "new_incident_first_occurrence"
+  | "severity_escalation"
+  | "reopen"
+  | "critical_immediate"
+  | "notify_skipped";
 
 export interface NotificationLogEntry {
   channel: string;

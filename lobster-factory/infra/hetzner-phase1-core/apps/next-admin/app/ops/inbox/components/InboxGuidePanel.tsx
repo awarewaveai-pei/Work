@@ -30,6 +30,13 @@ export function InboxGuidePanel({ publicBaseUrl }: { publicBaseUrl: string }) {
         <strong>AI 協助修復</strong>在<strong>點進某一筆事件</strong>後的詳情頁：可一鍵帶上下文到 ChatGPT / Claude / Gemini，或貼回診斷到時間軸。
         沒有任何事件時，下方不會出現那些按鈕。
       </p>
+      <p style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 12, lineHeight: 1.55 }}>
+        <strong>四來源合成測試</strong>（Sentry / Uptime Kuma / Grafana / Netdata）：在 monorepo 執行{" "}
+        <code style={{ fontSize: 12 }}>lobster-factory/infra/hetzner-phase1-core/scripts/test-ops-inbox-webhooks.ps1</code> 或{" "}
+        <code style={{ fontSize: 12 }}>test-ops-inbox-webhooks.sh</code>
+        （需設定 <code style={{ fontSize: 12 }}>OPS_INBOX_TEST_BASE_URL</code> 與 <code style={{ fontSize: 12 }}>OPS_INBOX_INGEST_TOKEN</code>
+        ）。Slack 需在部署環境開啟 <code style={{ fontSize: 12 }}>OPS_INBOX_NOTIFY_ENABLED=true</code> 並設定 Incoming Webhook。
+      </p>
       {base ? (
         <>
           <h3 style={{ fontSize: 13, marginBottom: 8 }}>Webhook 端點（複製到監控後台）</h3>

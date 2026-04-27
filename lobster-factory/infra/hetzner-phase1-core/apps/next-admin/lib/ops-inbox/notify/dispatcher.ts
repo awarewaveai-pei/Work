@@ -18,8 +18,8 @@ export async function dispatchNotifications(args: { incident: Incident; transiti
   if (!decision.shouldSend) {
     await appendLog(args.incident.id, {
       channel: NOTIFIERS[0]?.id ?? "unknown",
-      rule: "new_incident_first_occurrence",
-      status: "throttled",
+      rule: "notify_skipped",
+      status: "skipped",
       ts: new Date().toISOString(),
       reason: decision.reason,
     });
