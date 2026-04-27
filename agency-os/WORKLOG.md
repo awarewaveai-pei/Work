@@ -5,10 +5,24 @@
 ## 2026-04-27
 
 ### Daily
-- **Cursor**：向使用者整理 **AO-RESUME** 主流程（**`.cursor/hooks.json` → `beforeSubmitPrompt` → `scripts/ao-resume.ps1 -FullMainlineParity`** → 代理讀 **`ao-resume-hook-last.json`／`open-tasks-snapshot.md`／`TASKS.md`** 五段式；**非**開機全自動）。
-- **Git**：本輪對話未新增檔案變更；**`main`** 已與 **`origin/main`** 對齊至 **`74c4044`**（前次已推：AO-RESUME hook 敘述與 doc-sync 連動）。
-- **TASKS**：無單一 **`- [ ]`** 子字串可機讀命中本輪敘事，故未加 **`- AUTO_TASK_DONE:`**（與 **`WORKLOG` `## 2026-04-24`** 先例一致）。
+- **白天回補（09:30-18:00，依 git commit 證據）**：
+  - `09:59` `1ba61e5`：`lobster-factory/packages/workflows` 依賴風險硬化（`package.json`/`package-lock.json`）並同步 `TASKS.md`。
+  - `10:28` `a028d5f`：修正 `scripts/sync-mcp-config.ps1`，使 MCP env 解析可覆蓋 process/user/machine scope。
+  - `14:56` `36a5232`：新增/更新 ops-inbox Day 0 路線文件（`docs/Ops_Observability_*` 三檔）。
+  - `16:28` `2431747`：落地 ops-inbox foundations 與 DB migration 草案 `lobster-factory/packages/db/migrations/0013_ops_inbox.sql`，並更新 next-admin middleware/role 基礎。
+  - `17:57` `ec20634`：執行 AO-CLOSE sync，更新 `README`、`AGENTS`、`TASKS`、`WORKLOG`、`LAST_SYSTEM_STATUS` 與多份 operations 文件。
+- **主線文件（今天整天核心）**：
+  - `14:56` `36a5232` 一次提交 3 份 observability 主文件（共 `8112` 行新增）：
+    - `docs/Ops_Observability_OS_Master_Blueprint.md`
+    - `docs/Ops_Observability_PathB_Implementation.md`
+    - `docs/Ops_Observability_PathB_Plan.md`
+  - `01:34` `1e70800`：WordPress 架構草案改名與分析補充：
+    - `docs/Other AI-aware-wave-wordpress-architecture.md`
+- **Cursor（晚間）**：完成 AO-RESUME 機械自救修補（dirty 先 checkpoint 再 parity）、開機漏報回補、closeout gate 補強（daily `(TBD)` 會擋下）。
+- **Git（晚間）**：新增本地未推送修補檔（AO-RESUME hook/rules、closeout guard、記錄回補）；明日依 AO-CLOSE 收斂推送。
+- **TASKS（晚間）**：`（工具建置）安裝 Grok CLI（筆電 / Codex）` 已改 `[x]`；新增公司桌機兩條未完成（Slack `#infra-alerts` 歷史訊息清理、Netdata Centralized Cloud Notifications）。
 - **待辦補記（使用者指定）**：已新增兩條到 `TASKS.md`（ClickHouse TTL 3-day 調整、筆電回家後 `user-env.ps1` + `sync-mcp-config.ps1`）。
+- **回補（使用者回報開工報告漏項）**：根因為提醒只落在 `WORKLOG/closeout-inbox`，未落到 `TASKS.md - [ ]`，`AO-RESUME` 報告不保證會帶出。已修正：`（工具建置）安裝 Grok CLI（筆電 / Codex）` 改 `[x]`，並新增公司桌機兩條未完成待辦（Slack `#infra-alerts` 歷史訊息清理、Netdata Centralized Cloud Notifications）。
 
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)

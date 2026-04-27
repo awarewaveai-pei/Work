@@ -43,6 +43,19 @@ function Test-IsAoResumePrompt {
     return ($Prompt.Trim() -match '(?i)^AO-RESUME\b')
 }
 
+function Get-GitDirtyEntries {
+    param([string]$RepoRoot)
+    Push-Location -LiteralPath $RepoRoot
+    try {
+        $out = @(git status --porcelain)
+        if ($LASTEXITCODE -ne 0) { return @() }
+        return @($out | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    }
+    finally {
+        Pop-Location | Out-Null
+    }
+}
+
 try {
     $raw = [Console]::In.ReadToEnd()
     if ([string]::IsNullOrWhiteSpace($raw)) {
@@ -83,16 +96,54 @@ try {
     $convId = $null
     if ($obj.PSObject.Properties.Name -contains "conversation_id") { $convId = [string]$obj.conversation_id }
 
+    $autoCheckpointAttempted = $false
+    $autoCheckpointCommitted = $false
+    $autoCheckpointExit = 0
+    $autoCheckpointSummary = ""
+    $allLogLines = New-Object System.Collections.Generic.List[string]
+
+    $dirtyBefore = Get-GitDirtyEntries -RepoRoot $root
+    if ($dirtyBefore.Count -gt 0) {
+        $autoCheckpointAttempted = $true
+        $checkpointScript = Join-Path $root "scripts\commit-checkpoint.ps1"
+        if (Test-Path -LiteralPath $checkpointScript) {
+            Push-Location -LiteralPath $root
+            try {
+                $allLogLines.Add("== AO-RESUME hook: dirty tree detected; auto-checkpoint before FullMainlineParity ==") | Out-Null
+                $cpOut = @(
+                    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[cursor] checkpoint: auto-save dirty tree before AO-RESUME hook" *>&1
+                )
+                $autoCheckpointExit = $LASTEXITCODE
+                foreach ($line in $cpOut) { $allLogLines.Add([string]$line) | Out-Null }
+            }
+            finally {
+                Pop-Location | Out-Null
+            }
+
+            $dirtyAfterCp = Get-GitDirtyEntries -RepoRoot $root
+            $autoCheckpointCommitted = ($dirtyAfterCp.Count -lt $dirtyBefore.Count)
+            $autoCheckpointSummary = "dirty_before=$($dirtyBefore.Count); dirty_after=$($dirtyAfterCp.Count)"
+        }
+        else {
+            $autoCheckpointExit = 1
+            $autoCheckpointSummary = "commit-checkpoint script missing"
+            $allLogLines.Add("AO-RESUME hook warning: scripts/commit-checkpoint.ps1 not found; continue without checkpoint.") | Out-Null
+        }
+    }
+
     Push-Location -LiteralPath $root
     try {
-        # PS 5.1: redirect all streams to log (avoid Tee-Object -Encoding which needs PS 6+).
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $resumeScript -FullMainlineParity *>&1 |
-            Set-Content -LiteralPath $logFile -Encoding UTF8
+        $resumeOut = @(
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $resumeScript -FullMainlineParity *>&1
+        )
         $exit = $LASTEXITCODE
+        foreach ($line in $resumeOut) { $allLogLines.Add([string]$line) | Out-Null }
     }
     finally {
         Pop-Location | Out-Null
     }
+
+    ($allLogLines -join "`r`n") | Set-Content -LiteralPath $logFile -Encoding UTF8
 
     $meta = [ordered]@{
         hook_event        = "beforeSubmitPrompt"
@@ -102,6 +153,10 @@ try {
         exit_code         = $exit
         finished_utc      = (Get-Date).ToUniversalTime().ToString("o")
         log_relative      = "agency-os/.agency-state/ao-resume-hook-last.log"
+        auto_checkpoint_attempted = $autoCheckpointAttempted
+        auto_checkpoint_committed = $autoCheckpointCommitted
+        auto_checkpoint_exit_code = $autoCheckpointExit
+        auto_checkpoint_summary   = $autoCheckpointSummary
         agent_skip_rerun_seconds = 120
         note              = "If this file mtime is within agent_skip_rerun_seconds of agent handling AO-RESUME, do not re-run ao-resume.ps1; read log_tail in this JSON and TASKS/snapshot."
     }

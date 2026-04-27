@@ -28,9 +28,13 @@
   - 兩台都要在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict` 且 PASS（無 WARN）後才可勾選此項。
   - **公司桌機（人在辦公室時）**：不必回想先前是否裝過；在該機 monorepo 根依序：`git fetch` → `git checkout main` → `git pull --ff-only origin main` → 跑上一行的 `machine-environment-audit -Strict`。若未 PASS，自上文 `REMOTE_WORKSTATION_STARTUP.md` **§1.5**「工具與依賴」起補齊（含 `lobster-factory\packages\workflows` 的 `npm ci`、可選 `mcp-local-wrappers`、`verify-build-gates`）後再重跑稽核；需與筆電同級「真 WP」則補 **§1.5.1**。FAIL/WARN 時保留終端輸出以利除錯。
   - **筆電已 Strict PASS 時**：仍須待公司桌機也 PASS，本主項才可視為完成。
-- [ ] **（工具建置）安裝 Grok CLI（筆電 / Codex）**
+- [x] **（工具建置）安裝 Grok CLI（筆電 / Codex）**
   - 參考：`../GROK_LAPTOP_CODEX_INSTALL_PROMPT.md`
   - DoD：`grok help`、`grok templates` 成功；若 `XAI_API_KEY` 已存在，`grok chat "Reply with exactly: ready"` 回傳 `ready`
+- [ ] （公司桌機未完成）Slack `#infra-alerts` 歷史訊息批次清理
+  - 依賴：Slack App 需補 scope（如 `channels:read`）後重新安裝，再重試清理
+- [ ] （公司桌機未完成）Netdata Centralized Cloud Notifications 設定
+  - 目標：完成 centralized notifications，避免目前僅 Agent Dispatched 的落差
 - [ ] ClickHouse TTL（下次方便時，EU server）
   - SSH 進 EU server 後執行：
     - `docker exec -it trigger-trigger-clickhouse-1 clickhouse-client`

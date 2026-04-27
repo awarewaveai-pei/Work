@@ -24,7 +24,7 @@ param(
     [switch]$SkipAutoTaskCheckmarks,
     [switch]$SkipInboxGuard,
     [ValidateSet("warn","strict","off")]
-    [string]$InboxGuardMode = "warn",
+    [string]$InboxGuardMode = "strict",
     [ValidateSet("off", "warn", "strict")]
     [string]$CompletenessGate = "strict",
     [switch]$SkipCompletenessGate

@@ -3,11 +3,10 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-27（主線與回補）**：白天主線為 observability/架構文件（`1ba61e5`、`a028d5f`、`36a5232`、`2431747`、`ec20634`，另含 `1e70800` 文檔改名與分析）；原先開機報告漏項已回補到 `WORKLOG` 與 `memory/daily/2026-04-27.md`。
+- **2026-04-27（流程修補）**：AO-RESUME 改為 dirty 自救（checkpoint -> parity）；提醒事項必須同步落到 `TASKS.md - [ ]`；AO-CLOSE 新增 strict inbox guard，daily 含 `(TBD)` 會被 closeout gate 擋下。
+- **2026-04-27（TASKS 對齊）**：`（工具建置）安裝 Grok CLI（筆電 / Codex）` 已改 `[x]`；新增公司桌機兩條未完成（Slack `#infra-alerts` 歷史訊息清理、Netdata Centralized Cloud Notifications）。
 - **2026-04-27 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-27 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:3b1bebdf56cc5a6317e5e79bbc1034469b8df3382ed3138d0958a5eed578090c -->
-- **2026-04-27（Cursor：AO-RESUME 流程 + AO-CLOSE）**：使用者要的是「**只打 AO-RESUME**」即觸發腳本（**hook**），非開機全自動；已口述主路徑與除錯時手動跑腳本退路。本輪無新 commit；收工跑 **`ao-close.ps1`**。
-- **2026-04-27（AO-CLOSE 前）**：依使用者指定新增兩條跨機待辦：ClickHouse `system.*_log` TTL 調整（EU server）與筆電回家後重載 MCP（`mcp/user-env.ps1` + `scripts/sync-mcp-config.ps1`）。
-- **2026-04-27 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-27 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:0ac0309b67da13821a1c2a9f9882a9b5f099c88f5f15b091465cb7f50b046604 -->
-- **2026-04-27（AO-CLOSE 前，Cursor）**：`closeout-inbox` 已先去識別化（本機路徑／明文憑證索引不進 WORKLOG）；本機 **`main` 曾 ahead of `origin/main` 2 commits**（`1e70800`、`6d81c01`），收工將跑 **`ao-close`** 合併 inbox 並 **push**，供明日 **`git pull --ff-only`** 對齊。
 - **2026-04-24 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-24 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:0ac1688c67e446a20bb1c003ac978fab0cbb604031436b22e483bdaf39b33093 -->
 - **2026-04-24（AO-CLOSE 前）**：`system-health-check` 的 **1a2 thin-wrapper** 檢查已改為依版面區分 monorepo canonical 與 `agency-os\scripts` 轉發檔、僅在兩者為不同實體路徑時驗證，避免 monorepo 根當作 `$root` 時誤套 `..\..\scripts` 正則而假失敗；詳 **`WORKLOG` `## 2026-04-24`**、commit **`8f3c0b6`**。
 - **2026-04-23 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-23 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:c9268e3d7c8d372582c3d43d956711bc66d646645aededda3e696ea4a5d02be9 -->

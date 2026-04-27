@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSupabaseReadClient } from "@/lib/supabase-server";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const supabase = getSupabaseReadClient();
+  const supabase = getSupabaseServerClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
 
   const today = new Date().toISOString().slice(0, 10);

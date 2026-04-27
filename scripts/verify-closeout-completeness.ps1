@@ -107,6 +107,21 @@ try {
         }
         Write-Warning $msg
     }
+
+    # Daily note quality gate: block closeout if today's scaffold placeholders remain.
+    $dailyPath = Join-Path $WorkRoot ("agency-os\memory\daily\{0}.md" -f $today)
+    if (Test-Path -LiteralPath $dailyPath) {
+        $dailyText = [System.IO.File]::ReadAllText($dailyPath, $utf8)
+        $hasTbd = ($dailyText -match '(?m)^\s*-\s*\(TBD\)\s*$')
+        if ($hasTbd) {
+            $msg = "verify-closeout-completeness: daily note still contains scaffold placeholders `(TBD)` in $dailyPath. Fill Done today / Current state / Next steps before closeout. Gate=$Gate"
+            if ($Gate -eq "strict") {
+                Write-Error $msg
+                exit 1
+            }
+            Write-Warning $msg
+        }
+    }
 } finally {
     Pop-Location
 }
