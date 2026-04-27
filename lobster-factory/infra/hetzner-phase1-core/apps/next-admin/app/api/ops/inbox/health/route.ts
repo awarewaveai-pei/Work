@@ -25,5 +25,9 @@ export async function GET() {
     gemini_quota_used: quota.data?.count ?? 0,
     gemini_quota_limit: Number(process.env.OPS_INBOX_GEMINI_DAILY_LIMIT ?? 1400),
     last_ingest_at: (lastIngest.data as any)?.last_seen_at ?? null,
+    /** Booleans only — no secret values (for curl / smoke checks). */
+    ingest_token_configured: Boolean(process.env.OPS_INBOX_INGEST_TOKEN?.trim()),
+    notify_enabled: process.env.OPS_INBOX_NOTIFY_ENABLED === "true",
+    slack_webhook_configured: Boolean(process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK?.trim()),
   });
 }
