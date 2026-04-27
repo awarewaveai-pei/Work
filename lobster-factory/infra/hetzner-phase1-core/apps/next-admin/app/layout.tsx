@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import "./globals.css";
 import { PHProvider } from "./providers";
+import { OpsInboxBadge } from "./ops/inbox/components/OpsInboxBadge";
 
 export const metadata = { title: "Lobster Factory Admin" };
 
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </Link>
                 <Link href="/ops/inbox" className="sidebar-link">
                   <span className="icon">📥</span> Ops Inbox
+                  <OpsInboxBadge />
                 </Link>
                 <Link href="/api-check" className="sidebar-link">
                   <span className="icon">⬡</span> API Health

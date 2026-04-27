@@ -8,6 +8,7 @@
     "start": "next start -H 0.0.0.0 -p 3000"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@sentry/nextjs": "^9",
     "@supabase/supabase-js": "^2.49.8",
     "next": "^15.2.4",
