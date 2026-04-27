@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { getSupabaseReadClient } from "@/lib/supabase-server";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canModifyIncidentStatus, readOpsRole } from "@/lib/ops-role";
 import { IncidentCard } from "./components/IncidentCard";
 import { IncidentFilterBar } from "./components/IncidentFilterBar";
@@ -18,7 +18,7 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
   const role = readOpsRole(new Request("http://localhost", { headers: await headers() }));
   const canAct = canModifyIncidentStatus(role);
 
-  const supabase = getSupabaseReadClient();
+  const supabase = getSupabaseServerClient();
   if (!supabase) return <ConnectionError />;
 
   let query = supabase.from("ops_incidents").select("*").order("last_seen_at", { ascending: false }).limit(200);
@@ -45,23 +45,67 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
   const proto = h.get("x-forwarded-proto") ?? "https";
   const publicBaseUrl = host ? `${proto}://${host}` : "";
 
+  const critical = incidents?.filter((i) => i.severity === "critical" && i.status !== "resolved" && i.status !== "ignored").length ?? 0;
+  const high = incidents?.filter((i) => i.severity === "high" && i.status !== "resolved" && i.status !== "ignored").length ?? 0;
+  const total = incidents?.length ?? 0;
+
   return (
-    <div style={{ background: "var(--bg-canvas)", minHeight: "100vh", padding: "24px" }}>
-      <header style={{ marginBottom: 16 }}>
-        <h1 style={{ color: "var(--text-primary)" }}>Ops Inbox</h1>
-        <p style={{ color: "var(--text-secondary)" }}>警報收件匣（非監控儀表）· {incidents?.length ?? 0} 筆</p>
-      </header>
-      <InboxGuidePanel publicBaseUrl={publicBaseUrl} />
+    <div style={{ background: "var(--bg-canvas)", minHeight: "100vh", padding: "28px 32px" }}>
+      {/* ── Page header ─────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>Ops Inbox</h1>
+          <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>警報收件匣（非監控儀表）</p>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {critical > 0 && (
+            <StatPill count={critical} label="critical" color="#dc2626" bg="#fef2f2" />
+          )}
+          {high > 0 && (
+            <StatPill count={high} label="high" color="#ea580c" bg="#fff7ed" />
+          )}
+          <StatPill count={total} label={rawStatus === "all" ? "total" : "active"} color="#475569" bg="#f1f5f9" />
+        </div>
+      </div>
+
+      {/* ── Filter bar ──────────────────────────────────────────── */}
       <IncidentFilterBar current={sp} />
+
+      {/* ── Guide panel ─────────────────────────────────────────── */}
+      <InboxGuidePanel publicBaseUrl={publicBaseUrl} />
+
+      {/* ── List ────────────────────────────────────────────────── */}
       {!incidents || incidents.length === 0 ? (
         <EmptyState rawStatus={rawStatus} />
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {incidents.map((i) => (
             <IncidentCard key={i.id} incident={i as Incident} canAct={canAct} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function StatPill({ count, label, color, bg }: { count: number; label: string; color: string; bg: string }) {
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "4px 10px",
+        borderRadius: 20,
+        background: bg,
+        border: `1px solid ${color}22`,
+        fontSize: 12,
+        fontWeight: 600,
+        color,
+      }}
+    >
+      <span style={{ fontSize: 14, fontWeight: 700 }}>{count}</span>
+      <span style={{ fontWeight: 500, opacity: 0.85 }}>{label}</span>
     </div>
   );
 }
@@ -77,19 +121,22 @@ function EmptyState({ rawStatus }: { rawStatus?: string }) {
   return (
     <div
       style={{
-        background: "var(--bg-card)",
+        background: "#fff",
         border: "1px solid var(--border-subtle)",
-        padding: 40,
-        textAlign: "center",
         borderRadius: 12,
-        maxWidth: 560,
-        margin: "0 auto",
+        padding: "56px 40px",
+        textAlign: "center",
+        maxWidth: 520,
+        margin: "32px auto 0",
       }}
     >
-      <h3 style={{ marginBottom: 8 }}>目前沒有符合條件的事件</h3>
-      <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>{hint}</p>
-      <p style={{ color: "var(--text-muted)", fontSize: 13, lineHeight: 1.55 }}>
-        有事件後，點卡片進詳情頁即可使用 <strong>ChatGPT / Claude / Gemini</strong> 與貼回診斷。
+      <div style={{ fontSize: 32, marginBottom: 16 }}>📭</div>
+      <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 8, color: "var(--text-primary)" }}>
+        目前沒有符合條件的事件
+      </h3>
+      <p style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.7, marginBottom: 10 }}>{hint}</p>
+      <p style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.6 }}>
+        有事件後，點卡片進詳情頁即可使用 <strong>ChatGPT / Claude / Gemini</strong> 貼回診斷。
       </p>
     </div>
   );
@@ -97,9 +144,22 @@ function EmptyState({ rawStatus }: { rawStatus?: string }) {
 
 function ConnectionError({ message }: { message?: string }) {
   return (
-    <div style={{ background: "#fee2e2", color: "#991b1b", padding: 24, borderRadius: 12 }}>
-      <strong>無法連線到 Supabase</strong>
-      {message && <pre style={{ marginTop: 8, fontSize: 12 }}>{message}</pre>}
+    <div
+      style={{
+        background: "#fef2f2",
+        border: "1px solid #fecaca",
+        color: "#991b1b",
+        padding: "20px 24px",
+        borderRadius: 10,
+        margin: 32,
+      }}
+    >
+      <strong style={{ fontSize: 14 }}>無法連線到 Supabase</strong>
+      {message && (
+        <pre style={{ marginTop: 8, fontSize: 11, background: "transparent", color: "#b91c1c", padding: 0 }}>
+          {message}
+        </pre>
+      )}
     </div>
   );
 }
