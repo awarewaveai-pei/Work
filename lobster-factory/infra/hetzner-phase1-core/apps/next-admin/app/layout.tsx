@@ -29,10 +29,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/ops-console" className="sidebar-link">
                   <span className="icon">▣</span> Ops Console v1
                 </Link>
-                <Link href="/ops/inbox" className="sidebar-link">
+                <Link href="/ops/inbox" className="sidebar-link" title="警報寫入後的列表；監控在 Uptime Kuma 等">
                   <span className="icon">📥</span> Ops Inbox
                   <OpsInboxBadge />
                 </Link>
+                <div className="sidebar-hint">收件匣（非儀表）；監看 → Uptime / Grafana 等</div>
                 <Link href="/api-check" className="sidebar-link">
                   <span className="icon">⬡</span> API Health
                 </Link>

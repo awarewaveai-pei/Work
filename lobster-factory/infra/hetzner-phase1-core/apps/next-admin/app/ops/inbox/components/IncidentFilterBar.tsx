@@ -3,10 +3,25 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
+/** Default list = open + investigating (same as no `status` query). */
+const STATUS_TABS = [
+  { key: "active", label: "進行中", param: null as string | null },
+  { key: "all", label: "全部", param: "all" },
+  { key: "open", label: "open", param: "open" },
+  { key: "investigating", label: "investigating", param: "investigating" },
+  { key: "resolved", label: "resolved", param: "resolved" },
+] as const;
+
+function effectiveStatusKey(status: string | undefined): string {
+  if (!status) return "active";
+  return status;
+}
+
 export function IncidentFilterBar({ current }: { current: { status?: string; severity?: string; source?: string; q?: string } }) {
   const router = useRouter();
   const sp = useSearchParams();
   const [, start] = useTransition();
+  const eff = effectiveStatusKey(current.status);
 
   const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(sp.toString());
@@ -16,21 +31,23 @@ export function IncidentFilterBar({ current }: { current: { status?: string; sev
   };
 
   return (
-    <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-      {["all", "open", "investigating", "resolved"].map((s) => (
+    <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+      {STATUS_TABS.map((tab) => (
         <button
-          key={s}
-          onClick={() => setParam("status", s === "all" ? null : s)}
+          key={tab.key}
+          type="button"
+          onClick={() => setParam("status", tab.param)}
           style={{
             padding: "6px 12px",
             borderRadius: 6,
-            background: (current.status ?? "open") === s || (s === "all" && !current.status) ? "var(--btn-primary-bg)" : "var(--btn-secondary-bg)",
-            color: (current.status ?? "open") === s ? "#fff" : "var(--text-primary)",
+            background: eff === tab.key ? "var(--btn-primary-bg)" : "var(--btn-secondary-bg)",
+            color: eff === tab.key ? "#fff" : "var(--text-primary)",
             border: "1px solid var(--btn-secondary-border)",
             cursor: "pointer",
+            fontSize: 13,
           }}
         >
-          {s}
+          {tab.label}
         </button>
       ))}
       <input
