@@ -4,7 +4,11 @@ import { sentryProjectSlugToService } from "../registry/sourceMapping";
 export function normalizeSentry(raw: any): IncidentDraft {
   const issue = raw?.data?.issue ?? {};
   const event = raw?.data?.event ?? raw?.event ?? {};
-  const projectSlug: string | undefined = raw?.data?.project_slug ?? raw?.project_slug;
+  const projectSlug: string | undefined =
+    raw?.data?.project_slug ??
+    raw?.data?.project?.slug ??
+    raw?.project_slug ??
+    raw?.project?.slug;
 
   const level: string = event.level ?? issue.level ?? "error";
   const severity: IncidentSeverity =

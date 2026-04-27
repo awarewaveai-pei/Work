@@ -97,10 +97,27 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
             {SOURCE_LABEL[incident.source] ?? incident.source}
           </span>
 
-          {/* Service */}
-          {incident.service && (
+          {/* Service or host context */}
+          {incident.service ? (
             <span style={{ fontSize: 12, color: "#64748b" }}>{incident.service}</span>
-          )}
+          ) : incident.source === "netdata" && (incident.tags as any)?.host ? (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: "#b45309",
+                background: "#fef3c7",
+                padding: "1px 6px",
+                borderRadius: 4,
+              }}
+            >
+              {(incident.tags as any).host === "sg" ? "SG Server" : "EU Server"}
+            </span>
+          ) : incident.source === "uptime_kuma" && (incident.tags as any)?.hostname ? (
+            <span style={{ fontSize: 11, color: "#64748b", fontFamily: "ui-monospace, monospace" }}>
+              {String((incident.tags as any).hostname).replace(/^https?:\/\//, "").split("/")[0]}
+            </span>
+          ) : null}
 
           {/* Environment */}
           {incident.environment !== "production" && (
