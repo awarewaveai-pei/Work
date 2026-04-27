@@ -70,7 +70,7 @@ JSON
 post uptime_kuma /api/webhooks/uptime-kuma "$(cat <<JSON
 {
   "monitor": {
-    "id": ${RUN_ID},
+    "id": "${RUN_ID}",
     "name": "OpsInboxProbe-${RUN_ID}",
     "hostname": "https://example.com",
     "type": "http",

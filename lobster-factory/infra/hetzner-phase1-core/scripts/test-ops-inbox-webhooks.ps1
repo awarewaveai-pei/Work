@@ -65,7 +65,7 @@ Invoke-Probe "sentry" "/api/webhooks/sentry" @{
 
 Invoke-Probe "uptime_kuma" "/api/webhooks/uptime-kuma" @{
   monitor   = @{
-    id       = [int]$RunId
+    id       = $RunId
     name     = "OpsInboxProbe-$RunId"
     hostname = "https://example.com"
     type     = "http"
