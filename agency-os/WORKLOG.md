@@ -2,6 +2,39 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-28
+
+### Daily
+- **Ops Inbox / 收工**：於 `TASKS.md` **Next — 未完成** 新增「（Ops Inbox Path B）生產收斂未完成 — 明日 `AO-RESUME` 須口頭＋書面報告」並列明驗收項（health 旗標、ingest token、四來源合成腳本、Inbox、Slack／Notify Log）；營運者明日開機以 **`AO-RESUME`** 回覆時須帶出此條進度。
+- **Closeout inbox (AO-CLOSE auto, verbatim)**  
+  - 操作者關鍵字收工；本輪僅補 TASKS／WORKLOG／memory，無新密鑰寫入。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:970fdda2d2b61eb458ffa2b76cf5bc8c34f9ebb9df281994b4ac0ce1939c6424 -->
+
+### claude 2026-04-28 02:10
+
+- **完成（一句）**: Ops Inbox Path B 端到端測試全通 + 修復兩個 bug（health route 服務端程式碼過舊、test script RUN_ID JSON 無效）
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/scripts/test-ops-inbox-webhooks.sh`（monitor.id 加引號）
+  - `lobster-factory/infra/hetzner-phase1-core/scripts/test-ops-inbox-webhooks.ps1`（移除 [int] 強制轉型）
+  - `/root/lobster-phase1/apps/next-admin/app/api/ops/inbox/health/route.ts`（伺服器直接改為 getSupabaseServerClient，rebuild）
+  - `/root/lobster-phase1/.env`（設定 OPS_INBOX_INGEST_TOKEN、OPS_INBOX_NOTIFY_ENABLED=true、OPS_INBOX_SLACK_INCIDENTS_WEBHOOK）
+- **Git**: da3db86
+- **對應 TASKS 子字串（可選）**: ops-inbox, Path B, webhook test
+- **風險／待辦（可選）**: 伺服器 /root/lobster-phase1/ 原始碼與 repo 有落差（至少 health route），建議下次 git pull 補齊；Slack 通知需確認實際頻道是否收到訊息
+
+
+### claude 2026-04-27 23:59
+
+- **完成（一句）**: Cloudflare SSL → Full Strict、SG/EU reverse proxy 全驗證、所有 admin 工具登入保護確認、AWARE_WAVE_CREDENTIALS.md 最新版對照完成
+- **變更路徑**:
+  - `~/.claude/projects/d--Work/memory/reference_cloudflare.md`（更新 MCP Token、WAF wp-login 狀態、SSL=Strict）
+- **Git**: 未 commit（本 session 僅更新 memory；repo 本體無程式碼變更）
+- **對應 TASKS 子字串（可選）**: Cloudflare SSL Full Strict, proxy verification, admin login protection
+- **風險／待辦（可選）**: Slack #infra-alerts 批次刪除已取消（不再需要）
+
 ## 2026-04-27
 
 ### Daily
@@ -927,7 +960,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-27 09:57:10 UTC_
+_Last synced: 2026-04-27 19:20:40 UTC_
 
 ## 2026-03-20
 

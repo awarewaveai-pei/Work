@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-28 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-28 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:970fdda2d2b61eb458ffa2b76cf5bc8c34f9ebb9df281994b4ac0ce1939c6424 -->
+- **2026-04-28（AO-CLOSE）**：`TASKS.md` 已新增 **（Ops Inbox Path B）生產收斂未完成 — 明日 `AO-RESUME` 須口頭＋書面報告**（health 旗標、ingest token、四來源合成腳本、Inbox「全部」、Slack／Notify Log）；細節見 **`WORKLOG` `## 2026-04-28`** 與 **`memory/daily/2026-04-28.md`**。
 - **2026-04-27（主線與回補）**：白天主線為 observability/架構文件（`1ba61e5`、`a028d5f`、`36a5232`、`2431747`、`ec20634`，另含 `1e70800` 文檔改名與分析）；原先開機報告漏項已回補到 `WORKLOG` 與 `memory/daily/2026-04-27.md`。
 - **2026-04-27（流程修補）**：AO-RESUME 改為 dirty 自救（checkpoint -> parity）；提醒事項必須同步落到 `TASKS.md - [ ]`；AO-CLOSE 新增 strict inbox guard，daily 含 `(TBD)` 會被 closeout gate 擋下。
 - **2026-04-27（TASKS 對齊）**：`（工具建置）安裝 Grok CLI（筆電 / Codex）` 已改 `[x]`；新增公司桌機兩條未完成（Slack `#infra-alerts` 歷史訊息清理、Netdata Centralized Cloud Notifications）。
@@ -363,5 +365,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-27 09:57:10 UTC_
+_Last synced: 2026-04-27 19:20:40 UTC_
 

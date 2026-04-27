@@ -16,6 +16,9 @@
 - [x] 建立 `lobster-factory` Phase 1 底座骨架（Supabase migrations + wc-core manifest + workflow 安全骨架）
 
 ## Next — 未完成（目前正式隊列）
+- [ ] **（Ops Inbox Path B）生產收斂未完成 — 明日 `AO-RESUME` 須口頭＋書面報告**
+  - 報告須含：`GET /api/ops/inbox/health` 之 `ingest_token_configured`／`notify_enabled`／`slack_webhook_configured`；`OPS_INBOX_INGEST_TOKEN` 是否已寫入 SG `.env` 並 `docker compose up -d next-admin`；`scripts/test-ops-inbox-webhooks.sh` 四來源（sentry／uptime_kuma／grafana／netdata）各一輪 HTTP 與 `incident_id`；Inbox UI 篩「全部」是否見事件；Slack 是否收到或 Notify Log 之 `skipped` 原因。
+  - 測試委託範本：`lobster-factory/infra/hetzner-phase1-core/docs/OPS_INBOX_CLAUDE_TEST_PROMPT.md`
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）**（詳見 `docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 / §1.5.1）
   - 新機/筆電首次：完成 Windows 本機 WordPress 相容層（MariaDB + PHP + WP-CLI + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`），此路徑與 Supabase/MCP 分列。
   - 之後每次開工：在 Cursor 開 monorepo 根並送出 **`AO-RESUME`**（專案 **hook** 先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`** 至 exit 0／失敗則依 **REMOTE 2.5.1** 整理後重送）；除錯時可改在 monorepo 根手動跑同指令。
@@ -253,5 +256,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-27 09:57:10 UTC_
+_Last synced: 2026-04-27 19:20:40 UTC_
 
