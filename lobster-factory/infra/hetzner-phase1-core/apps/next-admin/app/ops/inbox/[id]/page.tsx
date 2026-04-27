@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSupabaseReadClient } from "@/lib/supabase-server";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canModifyIncidentStatus, readOpsRole } from "@/lib/ops-role";
 import { getService } from "@/lib/ops-inbox/registry/services";
 import { OpenInCursorButton } from "../components/OpenInCursorButton";
@@ -11,6 +11,7 @@ import { StatusActions } from "../components/StatusActions";
 import { AskChatGPTButton } from "../components/AskChatGPTButton";
 import { AskClaudeButton } from "../components/AskClaudeButton";
 import { AskGeminiButton } from "../components/AskGeminiButton";
+import { CopyForTerminalButton } from "../components/CopyForTerminalButton";
 import { PasteAiResultBox } from "../components/PasteAiResultBox";
 import { AiDiagnosisTimeline } from "../components/AiDiagnosisTimeline";
 import type { Incident } from "@/lib/ops-inbox/types";
@@ -20,7 +21,7 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
   const role = readOpsRole(new Request("http://localhost", { headers: await headers() }));
   const canAct = canModifyIncidentStatus(role);
 
-  const supabase = getSupabaseReadClient();
+  const supabase = getSupabaseServerClient();
   if (!supabase) return <div>DB unavailable</div>;
 
   const { data: incident, error } = await supabase.from("ops_incidents").select("*").eq("id", id).single();
@@ -62,6 +63,9 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
               <AskChatGPTButton incident={inc} />
               <AskClaudeButton incident={inc} />
               <AskGeminiButton incident={inc} />
+              <CopyForTerminalButton incident={inc} tool="codex" />
+              <CopyForTerminalButton incident={inc} tool="copilot" />
+              <CopyForTerminalButton incident={inc} tool="gemini-cli" />
             </div>
           </section>
 
