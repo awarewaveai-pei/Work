@@ -3,6 +3,13 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-28 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-28 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:249d049468fe96e3908975a0b27baffe356a5455c9fdc60a1b47b9e466d9f3ae -->
+- **2026-04-28（Cursor 晚間／收工前）**
+  - **背景**：操作者要一次收斂 MCP（awarewave-ops）與 SSH；先前對話曾含 Netdata 磁碟警報與憑證曝光風險。
+  - **已完成**：本機 **`mcp/user-env.ps1`** + **`bootstrap-mcp-machine.ps1`**；**`hetzner-sg`** SSH 別名與連線驗證；repo 內 **`endpoint-alert.sh`** 避免因空 **`WEBHOOK_URL`** 每分鐘失敗。
+  - **未完成**：`HETZNER_API_TOKEN` 等仍待補入 env；憑證輪換與 Cursor 重載後確認 **`awarewave-ops`** 可用仍待人類執行。
+  - **風險**：曾貼出之明文憑證應視為需輪換；勿再整份貼入聊天。
+  - **下一步**：重開 Cursor → 用 MCP 拉 Netdata；補 Hetzner／Kuma API token；VPS 部署更新後之 `endpoint-alert.sh`。
 - **2026-04-28 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-28 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:970fdda2d2b61eb458ffa2b76cf5bc8c34f9ebb9df281994b4ac0ce1939c6424 -->
 - **2026-04-28（AO-CLOSE）**：`TASKS.md` 已新增 **（Ops Inbox Path B）生產收斂未完成 — 明日 `AO-RESUME` 須口頭＋書面報告**（health 旗標、ingest token、四來源合成腳本、Inbox「全部」、Slack／Notify Log）；細節見 **`WORKLOG` `## 2026-04-28`** 與 **`memory/daily/2026-04-28.md`**。
 - **2026-04-27（主線與回補）**：白天主線為 observability/架構文件（`1ba61e5`、`a028d5f`、`36a5232`、`2431747`、`ec20634`，另含 `1e70800` 文檔改名與分析）；原先開機報告漏項已回補到 `WORKLOG` 與 `memory/daily/2026-04-27.md`。
@@ -365,5 +372,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-27 19:20:40 UTC_
+_Last synced: 2026-04-28 01:35:04 UTC_
 

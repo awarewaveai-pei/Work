@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-28 03:20:52
+- Generated: 2026-04-28 09:35:54
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -241,11 +241,40 @@
 - **對應 TASKS 子字串（可選）**: Cloudflare SSL Full Strict, proxy verification, admin login protection
 - **風險／待辦（可選）**: Slack #infra-alerts 批次刪除已取消（不再需要）
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:249d049468fe96e3908975a0b27baffe356a5455c9fdc60a1b47b9e466d9f3ae -->
+
+### claude-sonnet-4-6 2026-04-28 09:30
+
+- **完成（一句）**: Ops Inbox UI 全面修正（去重連結、加 signal_type badge、message 預覽、全 AI 工具、tools 管理頁）、endpoint-alert 修復停止 journal spam、server 磁碟清理釋放 13GB
+- **變更路徑**:
+  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/components/IncidentCard.tsx` — 移除 footer 重複 source 連結；加 signal_type 彩色 badge；加 message 預覽（無 AI summary 時顯示）
+  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/[id]/page.tsx` — OpenInCursorButton 改為對所有事件顯示（移除 local-repo 條件）
+  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/page.tsx` — header 加 ⚙️ Tools 連結；補 Link import（build fix）
+  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/tools/page.tsx` — 新建 /ops/tools 頁面，列出 7 個 AI 工具 + 1 個 Slack 通知頻道，提供表單新增自訂工具/頻道（localStorage）
+  - `infra/hetzner-phase1-core/scripts/endpoint-alert.sh` — 空 WEBHOOK_URL 改為只警告一次（stamp file）、繼續跑 HTTP 檢查，不再每分鐘 exit 1 刷 journal
+- **Git**:
+  - `53b70c7` fix(ops-inbox): improve source clarity for Netdata/Kuma/Sentry
+  - `881edb1` feat(ops-inbox): add all 5 AI tool buttons to incident detail page
+  - `566161f` fix(ops-inbox): fix Supabase URL, badge count, source links, filter tabs
+  - `431e1c5` feat(ops-inbox): fix duplicate link, add error context, always show all 5 AI tools, add tools management page
+  - `036b977` fix(ops-inbox): add missing Link import in inbox page
+  - `0bff54c` fix(endpoint-alert): skip Slack when WEBHOOK_URL empty, prevent journal spam
+- **伺服器操作（無 commit）**:
+  - `journalctl --vacuum-time=7d` → 釋放 591MB journal
+  - `docker system prune -f` → 釋放 12.5GB build cache + 舊 network
+  - `truncate -s 0 /var/log/btmp` → 清 52MB SSH 暴力掃描記錄
+  - 磁碟使用率：45% → 28%（剩 52G 可用）
+- **對應 TASKS 子字串（可選）**: ops-inbox UI, endpoint-alert, disk cleanup
+- **風險／待辦（可選）**:
+  - `0bff54c` 尚未 push（git push origin main 被拒）；需手動 push 後在 server 更新 endpoint-alert.sh（`sudo cp` 或重跑 provision）
+  - /ops/tools 頁自訂項目存 localStorage，不寫入 DB，換瀏覽器後消失（已在頁面內說明）
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-28 03:20:44`
+- Time: `2026-04-28 09:35:45`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -255,14 +284,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260428-032043.md`
-- Closeout: `reports/closeout/closeout-20260428-032040.md`
+- Health: `reports/health/health-20260428-093545.md`
+- Closeout: `reports/closeout/closeout-20260428-093543.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-### 排程單一來源 + AO-CLOSE 聯動甘特
 - **`docs/overview/PROGRAM_SCHEDULE.json`**：三流（AO／LF／PJ）任務與日期；可複製到客戶專案或 `project-kit` 範本。
 - **`scripts/render-program-timeline-from-schedule.ps1`**：UTF-8 JSON → `PROGRAM_TIMELINE.md` 標記區（表 + Mermaid）；腳本本體 **ASCII-only** 以相容 PS 5.1。
 - **`generate-integrated-status-report.ps1`** 末尾**單次**呼叫渲染；**AO-CLOSE** 路徑因此每次收工會重渲時間軸（仍以 TASKS／Checklist／Discovery 為完成真相）。
@@ -321,5 +349,6 @@
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 

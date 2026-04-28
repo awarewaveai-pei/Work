@@ -1,10 +1,12 @@
-﻿# Worklog
+# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-04-28
 
 ### Daily
+- AUTO_TASK_DONE_APPLIED (2026-04-28T01:35:55Z): 筆電回家後重載 MCP 環境
+- **Cursor 晚間補充**：已於本機建立 `mcp/user-env.ps1`（gitignored）、執行 `bootstrap-mcp-machine.ps1` 同步六端 MCP；驗證 `ssh hetzner-sg`／`hetzner-eu`；SSH config 增 `hetzner-sg` 別名。另：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh` 修正 WEBHOOK_URL 為空時不再 exit 1（避免每分鐘 systemd 失敗刷 journal）。提醒：桌面憑證總表曾貼入對話，仍建議輪換並收進 vault。
 - **Ops Inbox / 收工**：於 `TASKS.md` **Next — 未完成** 新增「（Ops Inbox Path B）生產收斂未完成 — 明日 `AO-RESUME` 須口頭＋書面報告」並列明驗收項（health 旗標、ingest token、四來源合成腳本、Inbox、Slack／Notify Log）；營運者明日開機以 **`AO-RESUME`** 回覆時須帶出此條進度。
 - **Closeout inbox (AO-CLOSE auto, verbatim)**  
   - 操作者關鍵字收工；本輪僅補 TASKS／WORKLOG／memory，無新密鑰寫入。
@@ -34,6 +36,36 @@
 - **Git**: 未 commit（本 session 僅更新 memory；repo 本體無程式碼變更）
 - **對應 TASKS 子字串（可選）**: Cloudflare SSL Full Strict, proxy verification, admin login protection
 - **風險／待辦（可選）**: Slack #infra-alerts 批次刪除已取消（不再需要）
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:249d049468fe96e3908975a0b27baffe356a5455c9fdc60a1b47b9e466d9f3ae -->
+
+### claude-sonnet-4-6 2026-04-28 09:30
+
+- **完成（一句）**: Ops Inbox UI 全面修正（去重連結、加 signal_type badge、message 預覽、全 AI 工具、tools 管理頁）、endpoint-alert 修復停止 journal spam、server 磁碟清理釋放 13GB
+- **變更路徑**:
+  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/components/IncidentCard.tsx` — 移除 footer 重複 source 連結；加 signal_type 彩色 badge；加 message 預覽（無 AI summary 時顯示）
+  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/[id]/page.tsx` — OpenInCursorButton 改為對所有事件顯示（移除 local-repo 條件）
+  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/page.tsx` — header 加 ⚙️ Tools 連結；補 Link import（build fix）
+  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/tools/page.tsx` — 新建 /ops/tools 頁面，列出 7 個 AI 工具 + 1 個 Slack 通知頻道，提供表單新增自訂工具/頻道（localStorage）
+  - `infra/hetzner-phase1-core/scripts/endpoint-alert.sh` — 空 WEBHOOK_URL 改為只警告一次（stamp file）、繼續跑 HTTP 檢查，不再每分鐘 exit 1 刷 journal
+- **Git**:
+  - `53b70c7` fix(ops-inbox): improve source clarity for Netdata/Kuma/Sentry
+  - `881edb1` feat(ops-inbox): add all 5 AI tool buttons to incident detail page
+  - `566161f` fix(ops-inbox): fix Supabase URL, badge count, source links, filter tabs
+  - `431e1c5` feat(ops-inbox): fix duplicate link, add error context, always show all 5 AI tools, add tools management page
+  - `036b977` fix(ops-inbox): add missing Link import in inbox page
+  - `0bff54c` fix(endpoint-alert): skip Slack when WEBHOOK_URL empty, prevent journal spam
+- **伺服器操作（無 commit）**:
+  - `journalctl --vacuum-time=7d` → 釋放 591MB journal
+  - `docker system prune -f` → 釋放 12.5GB build cache + 舊 network
+  - `truncate -s 0 /var/log/btmp` → 清 52MB SSH 暴力掃描記錄
+  - 磁碟使用率：45% → 28%（剩 52G 可用）
+- **對應 TASKS 子字串（可選）**: ops-inbox UI, endpoint-alert, disk cleanup
+- **風險／待辦（可選）**:
+  - `0bff54c` 尚未 push（git push origin main 被拒）；需手動 push 後在 server 更新 endpoint-alert.sh（`sudo cp` 或重跑 provision）
+  - /ops/tools 頁自訂項目存 localStorage，不寫入 DB，換瀏覽器後消失（已在頁面內說明）
 
 ## 2026-04-27
 
@@ -960,7 +992,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-27 19:20:40 UTC_
+_Last synced: 2026-04-28 01:35:42 UTC_
 
 ## 2026-03-20
 
@@ -1388,4 +1420,5 @@ _Last synced: 2026-04-27 19:20:40 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
