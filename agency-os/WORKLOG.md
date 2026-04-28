@@ -7,6 +7,7 @@
 ### Daily
 - AUTO_TASK_DONE_APPLIED (2026-04-28T01:35:55Z): 筆電回家後重載 MCP 環境
 - **Cursor 晚間補充**：已於本機建立 `mcp/user-env.ps1`（gitignored）、執行 `bootstrap-mcp-machine.ps1` 同步六端 MCP；驗證 `ssh hetzner-sg`／`hetzner-eu`；SSH config 增 `hetzner-sg` 別名。另：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh` 修正 WEBHOOK_URL 為空時不再 exit 1（避免每分鐘 systemd 失敗刷 journal）。提醒：桌面憑證總表曾貼入對話，仍建議輪換並收進 vault。
+- **Cursor（第二次收工前補記）**：closeout inbox **六欄契約**已寫入 **`docs/operations/closeout-inbox-TEMPLATE.md`** 與 **`collaborator-ai-agent-rules.md`**；歷史併入區（WORKLOG／memory／integrated-status-LATEST）已對齊「無第七欄、對應 TASKS 單子字串」；**`6ecd0fd`**。
 - **Ops Inbox / 收工**：於 `TASKS.md` **Next — 未完成** 新增「（Ops Inbox Path B）生產收斂未完成 — 明日 `AO-RESUME` 須口頭＋書面報告」並列明驗收項（health 旗標、ingest token、四來源合成腳本、Inbox、Slack／Notify Log）；營運者明日開機以 **`AO-RESUME`** 回覆時須帶出此條進度。
 - **Closeout inbox (AO-CLOSE auto, verbatim)**  
   - 操作者關鍵字收工；本輪僅補 TASKS／WORKLOG／memory，無新密鑰寫入。
@@ -988,7 +989,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-28 01:35:42 UTC_
+_Last synced: 2026-04-28 01:39:35 UTC_
 
 ## 2026-03-20
 
@@ -1416,5 +1417,6 @@ _Last synced: 2026-04-28 01:35:42 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
 
 
