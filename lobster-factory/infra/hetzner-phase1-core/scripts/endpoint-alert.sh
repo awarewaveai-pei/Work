@@ -3,6 +3,7 @@ set -euo pipefail
 
 STATE_DIR="/var/lib/awarewave-alert"
 STATE_FILE="${STATE_DIR}/last_state"
+WEBHOOK_WARN_STAMP="${STATE_DIR}/.warned_missing_webhook"
 
 WEBHOOK_URL="${WEBHOOK_URL:-}"
 CHECK_URLS="${CHECK_URLS:-https://aware-wave.com/ https://app.aware-wave.com/ https://api.aware-wave.com/health https://n8n.aware-wave.com/healthz https://trigger.aware-wave.com/ https://uptime.aware-wave.com/dashboard}"
@@ -14,14 +15,19 @@ PAGERDUTY_ROUTING_KEY="${PAGERDUTY_ROUTING_KEY:-}"
 # Stable per-host dedup key so trigger/resolve match the same incident.
 PAGERDUTY_DEDUP_KEY="${PAGERDUTY_DEDUP_KEY:-awarewave-endpoint-$(hostname)}"
 
-if [[ -z "${WEBHOOK_URL}" ]]; then
-  echo "endpoint-alert: WEBHOOK_URL is required" >&2
-  exit 1
-fi
-
 mkdir -p "${STATE_DIR}"
 
+# Empty WEBHOOK_URL used to exit 1 every run → systemd oneshot failures every minute and huge journal
+# growth. Prefer: still run HTTP checks; skip Slack notifications until configured.
+if [[ -z "${WEBHOOK_URL}" ]]; then
+  if [[ ! -f "${WEBHOOK_WARN_STAMP}" ]]; then
+    echo "endpoint-alert: WEBHOOK_URL is empty; Slack notifications disabled. Set WEBHOOK_URL in /etc/default/awarewave-endpoint-alert" >&2
+    : >"${WEBHOOK_WARN_STAMP}"
+  fi
+fi
+
 send_webhook() {
+  [[ -z "${WEBHOOK_URL}" ]] && return 0
   local text="$1"
   local payload
   payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "${text}")"
