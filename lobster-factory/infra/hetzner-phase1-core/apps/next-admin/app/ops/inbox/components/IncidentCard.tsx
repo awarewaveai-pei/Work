@@ -50,25 +50,34 @@ function getSourceUrl(incident: Incident): string | null {
   }
 }
 
-function getSourceAdminLabel(source: string): string {
-  const map: Record<string, string> = {
-    sentry: "Sentry →",
-    uptime_kuma: "Uptime Kuma →",
-    grafana: "Grafana →",
-    netdata: "Netdata →",
-    posthog: "PostHog →",
-  };
-  return map[source] ?? `${source} →`;
-}
+const SIGNAL_LABEL: Record<string, string> = {
+  error: "Error",
+  uptime: "Uptime",
+  latency: "Latency",
+  resource: "Resource",
+  business: "Business",
+  deployment: "Deploy",
+};
+
+const SIGNAL_COLOR: Record<string, { bg: string; text: string }> = {
+  error: { bg: "#fef2f2", text: "#991b1b" },
+  uptime: { bg: "#ecfdf5", text: "#065f46" },
+  latency: { bg: "#eff6ff", text: "#1e40af" },
+  resource: { bg: "#fefce8", text: "#713f12" },
+  business: { bg: "#f0fdf4", text: "#166534" },
+  deployment: { bg: "#f0f9ff", text: "#0c4a6e" },
+};
 
 export function IncidentCard({ incident, canAct }: { incident: Incident; canAct: boolean }) {
   const sevColor = SEV_COLOR[incident.severity] ?? "#64748b";
   const sevBg = SEV_BG[incident.severity] ?? "#f8fafc";
   const src = SOURCE_COLOR[incident.source] ?? { bg: "#f1f5f9", text: "#475569" };
+  const sig = SIGNAL_COLOR[incident.signal_type] ?? { bg: "#f1f5f9", text: "#475569" };
   const aiSummary = incident.ai_diagnoses?.find((d) => d.role === "auto-classify")?.summary;
   const isResolved = incident.status === "resolved";
   const isIgnored = incident.status === "ignored";
   const sourceUrl = getSourceUrl(incident);
+  const msgPreview = incident.message?.slice(0, 120);
 
   return (
     <article
@@ -107,6 +116,24 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
             }}
           >
             {incident.severity}
+          </span>
+
+          {/* Signal type badge */}
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "2px 7px",
+              borderRadius: 4,
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              background: sig.bg,
+              color: sig.text,
+            }}
+          >
+            {SIGNAL_LABEL[incident.signal_type] ?? incident.signal_type}
           </span>
 
           {/* Source badge — clickable if we have a URL */}
@@ -227,6 +254,24 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
           </h3>
         </Link>
 
+        {/* Message preview */}
+        {!aiSummary && msgPreview && (
+          <div
+            style={{
+              fontSize: 12,
+              color: "#64748b",
+              lineHeight: 1.5,
+              marginBottom: 8,
+              overflow: "hidden",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+            } as React.CSSProperties}
+          >
+            {msgPreview}{incident.message && incident.message.length > 120 ? "…" : ""}
+          </div>
+        )}
+
         {/* AI summary */}
         {aiSummary && (
           <div
@@ -251,16 +296,6 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
             {incident.occurrence_count} occurrence{incident.occurrence_count !== 1 ? "s" : ""}
           </span>
           <OpenInCursorButton incident={incident} primary={false} />
-          {sourceUrl && (
-            <a
-              href={sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: 12, color: src.text, textDecoration: "none", fontWeight: 500 }}
-            >
-              {getSourceAdminLabel(incident.source)}
-            </a>
-          )}
           {canAct && (
             <Link
               href={`/ops/inbox/${incident.id}`}

@@ -57,7 +57,7 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
           <section style={{ background: "var(--bg-card)", padding: 16, borderRadius: 12, border: "1px solid var(--border-subtle)" }}>
             <h3>Choose your AI</h3>
             <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-              {svc?.type === "local-repo" && <OpenInCursorButton incident={inc} primary />}
+              <OpenInCursorButton incident={inc} primary />
               {svc?.type === "remote-ui-n8n" && <OpenRemoteUIButton incident={inc} target="n8n" primary />}
               {svc?.type === "remote-ui-supabase" && <OpenRemoteUIButton incident={inc} target="supabase" primary />}
               <AskChatGPTButton incident={inc} />

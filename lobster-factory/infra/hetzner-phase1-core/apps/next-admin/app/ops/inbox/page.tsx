@@ -65,6 +65,24 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
             <StatPill count={high} label="high" color="#ea580c" bg="#fff7ed" />
           )}
           <StatPill count={total} label={rawStatus === "all" ? "total" : "active"} color="#475569" bg="#f1f5f9" />
+          <Link
+            href="/ops/tools"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "5px 12px",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#475569",
+              textDecoration: "none",
+            }}
+          >
+            ⚙️ Tools
+          </Link>
         </div>
       </div>
 
