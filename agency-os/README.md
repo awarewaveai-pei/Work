@@ -17,11 +17,11 @@
 
 | 導覽 | 檔案 |
 |:---|:---|
-| 整棵 `docs/` 地圖 | [README.md](docs/README.md)（`docs/` 根） |
-| 操作／SOP／Runbook | [README.md](docs/operations/README.md) |
-| 全貌／雙機／紀律 | [README.md](docs/overview/README.md) |
-| **邊緣、子網域、`api.aware-wave.com` 計畫（git 正文）** | [README.md](docs/edge-and-domains/README.md) |
-| **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）** | [README.md](docs/governance-plans/README.md) |
+| 整棵 `docs/` 地圖 | [DOCS_INDEX.md](docs/DOCS_INDEX.md)（`docs/` 根） |
+| 操作／SOP／Runbook | [OPS_DOCS_INDEX.md](docs/operations/OPS_DOCS_INDEX.md) |
+| 全貌／雙機／紀律 | [OVERVIEW_INDEX.md](docs/overview/OVERVIEW_INDEX.md) |
+| **邊緣、子網域、`api.aware-wave.com` 計畫（git 正文）** | [EDGE_DOMAINS_INDEX.md](docs/edge-and-domains/EDGE_DOMAINS_INDEX.md) |
+| **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）** | [GOVERNANCE_PLANS_INDEX.md](docs/governance-plans/GOVERNANCE_PLANS_INDEX.md) |
 
 ---
 
@@ -33,7 +33,7 @@
 | 開工／雙機／ao-resume | [REMOTE_WORKSTATION_STARTUP.md](docs/overview/REMOTE_WORKSTATION_STARTUP.md) |
 | 收工／關機 | [end-of-day-checklist.md](docs/operations/end-of-day-checklist.md) |
 | 工具／路由／TASKS 一頁 | [TOOLS_DELIVERY_TRACEABILITY.md](docs/operations/TOOLS_DELIVERY_TRACEABILITY.md) |
-| **脈絡鏈（不重貼內文；依序鑽）** | **1** [TOOLS_DELIVERY_TRACEABILITY.md](docs/operations/TOOLS_DELIVERY_TRACEABILITY.md)（**§0** 總索引＋能力表／P1–P7 DoD）→ **2** [WORKLOG.md](WORKLOG.md)（當日 `## yyyy-MM-dd` 敘事與收工證據）→ **3** Phase1 compose：[README.md](../lobster-factory/infra/hetzner-phase1-core/README.md) → **4** 收工機讀：[end-of-day-checklist.md](docs/operations/end-of-day-checklist.md) §0 · `docs/operations/` [README.md](docs/operations/README.md)（`AUTO_TASK_DONE`、`apply-closeout-task-checkmarks` 列） |
+| **脈絡鏈（不重貼內文；依序鑽）** | **1** [TOOLS_DELIVERY_TRACEABILITY.md](docs/operations/TOOLS_DELIVERY_TRACEABILITY.md)（**§0** 總索引＋能力表／P1–P7 DoD）→ **2** [WORKLOG.md](WORKLOG.md)（當日 `## yyyy-MM-dd` 敘事與收工證據）→ **3** Phase1 compose：[README.md](../lobster-factory/infra/hetzner-phase1-core/README.md) → **4** 收工機讀：[end-of-day-checklist.md](docs/operations/end-of-day-checklist.md) §0 · `docs/operations/` [OPS_DOCS_INDEX.md](docs/operations/OPS_DOCS_INDEX.md)（`AUTO_TASK_DONE`、`apply-closeout-task-checkmarks` 列） |
 | AO-RESUME 規則 | [30-resume-keyword.mdc](.cursor/rules/30-resume-keyword.mdc) |
 | AO-CLOSE 規則 | [40-shutdown-closeout.mdc](.cursor/rules/40-shutdown-closeout.mdc) |
 | 今日主線 | [TASKS.md](TASKS.md) |
@@ -86,7 +86,7 @@
 | MCP／外掛與路由對照 | [cursor-mcp-and-plugin-inventory.md](docs/operations/cursor-mcp-and-plugin-inventory.md) |
 | 長期營運紀律 | [LONG_TERM_OPERATING_DISCIPLINE.md](docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md) |
 
-其餘營運／合約／技術文件見下方 **「docs 分類速查」**（與 [README.md](docs/operations/README.md) 同步思路）。
+其餘營運／合約／技術文件見下方 **「docs 分類速查」**（與 [OPS_DOCS_INDEX.md](docs/operations/OPS_DOCS_INDEX.md) 同步思路）。
 
 ---
 
@@ -104,18 +104,18 @@
 
 ## docs 分類速查（延伸）
 
-> 與 [README.md](docs/operations/README.md)、[README.md](docs/overview/README.md) 同層整理；此處按 **`docs/` 子資料夾**列檔。**檔名**即連結文字。
+> 與 [OPS_DOCS_INDEX.md](docs/operations/OPS_DOCS_INDEX.md)、[OVERVIEW_INDEX.md](docs/overview/OVERVIEW_INDEX.md) 同層整理；此處按 **`docs/` 子資料夾**列檔。**檔名**即連結文字。
 
 ### `docs/` 根與連動
 
 | 說明 | 檔案 |
 |:---|:---|
-| 文件總索引 | [README.md](docs/README.md) |
+| 文件總索引 | [DOCS_INDEX.md](docs/DOCS_INDEX.md) |
 | 變更連動矩陣 | [CHANGE_IMPACT_MATRIX.md](docs/CHANGE_IMPACT_MATRIX.md) |
 
 ### `docs/overview/`
 
-**完整清單**以 [README.md](docs/overview/README.md) 為準（憲章、學習路徑、時程 JSON 等皆在該導覽）。下表僅列最常從首頁點的兩份。
+**完整清單**以 [OVERVIEW_INDEX.md](docs/overview/OVERVIEW_INDEX.md) 為準（憲章、學習路徑、時程 JSON 等皆在該導覽）。下表僅列最常從首頁點的兩份。
 
 | 說明 | 檔案 |
 |:---|:---|
@@ -128,11 +128,11 @@
 |:---|:---|
 | 總控中心 | [agency-command-center-v1.md](docs/architecture/agency-command-center-v1.md) |
 | 多平台架構 | [multi-platform-delivery-architecture.md](docs/architecture/multi-platform-delivery-architecture.md) |
-| 輕量 ADR（目錄與 001–006） | [README.md](docs/architecture/decisions/README.md) |
+| 輕量 ADR（目錄與 001–006） | [ADR_INDEX.md](docs/architecture/decisions/ADR_INDEX.md) |
 
 ### `docs/operations/`
 
-**完整清單**以 [README.md](docs/operations/README.md) 為準（Hetzner、GHA、MCP 強化、Production Pilot Runbook、`ONBOARDING_A10_2` 等）。下表為常用子集，避免與導覽重複維護兩份全表。
+**完整清單**以 [OPS_DOCS_INDEX.md](docs/operations/OPS_DOCS_INDEX.md) 為準（Hetzner、GHA、MCP 強化、Production Pilot Runbook、`ONBOARDING_A10_2` 等）。下表為常用子集，避免與導覽重複維護兩份全表。
 
 | 說明 | 檔案 |
 |:---|:---|
@@ -144,7 +144,7 @@
 | 外包評分卡 | [outsourcing-vendor-scorecard.md](docs/operations/outsourcing-vendor-scorecard.md) |
 | 財務營運 | [finance-operations.md](docs/operations/finance-operations.md) |
 | 外包 Playbook | [outsourcing-playbook.md](docs/operations/outsourcing-playbook.md) |
-| 事件應變 | [incident-response-runbook.md](docs/operations/incident-response-runbook.md) |
+| 事件應變 | [RUNBOOK_INCIDENT_RESPONSE.md](docs/operations/RUNBOOK_INCIDENT_RESPONSE.md) |
 | 範圍變更 | [scope-change-policy.md](docs/operations/scope-change-policy.md) |
 | 祕鑰政策 | [security-secrets-policy.md](docs/operations/security-secrets-policy.md) |
 | DPAPI vault | [local-secrets-vault-dpapi.md](docs/operations/local-secrets-vault-dpapi.md) |
@@ -285,7 +285,7 @@
 
 | 檔案 | 用途 |
 |:---|:---|
-| [memory/README.md](memory/README.md) | **本目錄各檔誰寫、AO-CLOSE／AO-RESUME 會不會動**（建議先讀） |
+| [memory/MEMORY_INDEX.md](memory/MEMORY_INDEX.md) | **本目錄各檔誰寫、AO-CLOSE／AO-RESUME 會不會動**（建議先讀） |
 | [CONVERSATION_MEMORY.md](memory/CONVERSATION_MEMORY.md) | 跨會話摘要 |
 | [SESSION_TEMPLATE.md](memory/SESSION_TEMPLATE.md) | 摘要模板 |
 

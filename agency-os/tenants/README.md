@@ -67,4 +67,4 @@
 | 新租戶 Onboarding | [NEW_TENANT_ONBOARDING_SOP.md](NEW_TENANT_ONBOARDING_SOP.md) |
 | 範本指南 01～04 | [01_COMMANDER_SYSTEM_GUIDE.md](templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md)、[02_CLIENT_WORKSPACE_GUIDE.md](templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md)、[03_TOOLS_CONFIGURATION_GUIDE.md](templates/tenant-template/03_TOOLS_CONFIGURATION_GUIDE.md)、[04_OPERATIONS_AUTOMATION_GUIDE.md](templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md) |
 
-**全庫操作導覽**：[docs/operations/README.md](../docs/operations/README.md)
+**全庫操作導覽**：[docs/operations/OPS_DOCS_INDEX.md](../docs/operations/OPS_DOCS_INDEX.md)

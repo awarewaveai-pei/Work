@@ -26,7 +26,9 @@
   .\scripts\open-supabase-ssh-tunnel.ps1 -Background
 #>
 param(
-    [string]$SshHost = "hetzner-eu",
+    [string]$SshHost = "5.223.93.113",
+    [string]$SshUser = "root",
+    [string]$PrivateKeyPath = "$env:USERPROFILE\.ssh\hetzner_trigger",
     [switch]$Background
 )
 
@@ -39,7 +41,8 @@ $tunnels = @(
     "127.0.0.1:8000:127.0.0.1:8000"    # Kong API
 )
 
-Write-Host "Supabase SSH tunnels via $SshHost (EU: 204.168.175.41)" -ForegroundColor Cyan
+$sshTarget = "$SshUser@$SshHost"
+Write-Host "Supabase SSH tunnels via $sshTarget" -ForegroundColor Cyan
 Write-Host "  localhost:5432  -> Supabase PostgreSQL" -ForegroundColor DarkGray
 Write-Host "  localhost:3000  -> Supabase Studio (http://localhost:3000)" -ForegroundColor DarkGray
 Write-Host "  localhost:8000  -> Supabase Kong API" -ForegroundColor DarkGray
@@ -55,19 +58,24 @@ try {
 }
 
 $args = @("-N")
+if (Test-Path -LiteralPath $PrivateKeyPath) {
+    $args += @("-i", $PrivateKeyPath)
+} else {
+    Write-Host "Private key not found at $PrivateKeyPath - fallback to ssh default key lookup." -ForegroundColor Yellow
+}
 foreach ($t in $tunnels) { $args += @("-L", $t) }
-$args += $SshHost
+$args += $sshTarget
 
 if ($Background) {
     Start-Process -FilePath $sshExe -ArgumentList $args -WindowStyle Minimized
     Write-Host "Started in background. To stop: Get-Process ssh | Stop-Process" -ForegroundColor DarkGray
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 5
     $probe = Test-NetConnection -ComputerName 127.0.0.1 -Port 5432 -WarningAction SilentlyContinue
     if ($probe.TcpTestSucceeded) {
-        Write-Host "Tunnel up — postgres at localhost:5432" -ForegroundColor Green
+        Write-Host "Tunnel up - postgres at localhost:5432 and Kong at localhost:8000" -ForegroundColor Green
         exit 0
     } else {
-        Write-Host "Port 5432 not open yet — SSH may have failed. Check host alias '$SshHost' and key." -ForegroundColor Red
+        Write-Host "Tunnel probe failed - check SSH connectivity/key for $sshTarget." -ForegroundColor Red
         exit 1
     }
 }

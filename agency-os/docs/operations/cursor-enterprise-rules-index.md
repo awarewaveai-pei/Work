@@ -59,7 +59,7 @@
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/operations/security-secrets-policy.md`
-- `docs/README.md`
+- `docs/DOCS_INDEX.md`
 
 _Last synced: 2026-04-27 19:20:40 UTC_
 

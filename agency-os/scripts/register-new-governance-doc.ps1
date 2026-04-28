@@ -117,7 +117,7 @@ Set-Content -Path $matrixPath -Value $newMatrix -Encoding UTF8
 Write-Output ("Updated docs/change-impact-map.json (new rule for " + $normSource + ")")
 Write-Output "Updated docs/CHANGE_IMPACT_MATRIX.md (new row)"
 Write-Output ""
-Write-Output "Next: add README / docs/README entry if needed, then doc-sync and health:"
+Write-Output "Next: add README / docs/DOCS_INDEX entry if needed, then doc-sync and health:"
 
 $cfArg = '@("' + $normSource + '")'
 Write-Output ('  powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -ChangedFiles ' + $cfArg)

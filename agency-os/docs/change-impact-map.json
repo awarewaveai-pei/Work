@@ -50,7 +50,7 @@
                       "source":  "docs/overview/agency-os-complete-system-introduction.md",
                       "targets":  [
                                       "README.md",
-                                      "docs/README.md",
+                                      "docs/DOCS_INDEX.md",
                                       "tenants/company-p1-pilot/01_COMMANDER_SYSTEM_GUIDE.md",
                                       "tenants/company-p1-pilot/02_CLIENT_WORKSPACE_GUIDE.md",
                                       "tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md",
@@ -128,7 +128,7 @@
                                       "docs/operations/cursor-enterprise-rules-index.md",
                                       "docs/CHANGE_IMPACT_MATRIX.md",
                                       "docs/change-impact-map.json",
-                                      "docs/README.md",
+                                      "docs/DOCS_INDEX.md",
                                       "scripts/register-new-governance-doc.ps1",
                                       "scripts/doc-sync-automation.ps1",
                                       "scripts/system-health-check.ps1"
@@ -166,7 +166,7 @@
                       "source":  "docs/international/global-compliance-baseline.md",
                       "targets":  [
                                       "docs/operations/security-secrets-policy.md",
-                                      "docs/operations/incident-response-runbook.md",
+                                      "docs/operations/RUNBOOK_INCIDENT_RESPONSE.md",
                                       "README.md"
                                   ]
                   },
@@ -460,7 +460,7 @@
                                       "../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md",
                                       "docs/CHANGE_IMPACT_MATRIX.md",
                                       "docs/change-impact-map.json",
-                                      "docs/README.md",
+                                      "docs/DOCS_INDEX.md",
                                       "../README.md"
                                   ]
                   },

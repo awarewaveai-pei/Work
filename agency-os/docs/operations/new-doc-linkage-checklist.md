@@ -11,7 +11,7 @@
 ## 必做四件事（賣人品質最小集合）
 
 1. **入口**  
-   - 在 `docs/README.md`（或根目錄 `README.md`）加一句連結，讓人找得到這份新文件。
+   - 在 `docs/DOCS_INDEX.md`（或根目錄 `README.md`）加一句連結，讓人找得到這份新文件。
 
 2. **人看的關係表**  
    - 在 `docs/CHANGE_IMPACT_MATRIX.md` **加一列**：`主文件` = 新檔；`必查/必同步文件` = 改這份時一定要一起看的舊檔（至少 1～3 個）。
@@ -26,7 +26,7 @@
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\register-new-governance-doc.ps1 `
   -Source "docs/operations/你的新檔.md" `
-  -Targets @("README.md", "docs/README.md", "docs/operations/end-to-end-linkage-checklist.md")
+  -Targets @("README.md", "docs/DOCS_INDEX.md", "docs/operations/end-to-end-linkage-checklist.md")
 ```
 
    - 先看參數是否正確：加 `-DryRun`。目標檔尚未建立時：`-SkipTargetExistCheck`（release 前建議補齊並再跑 health）。
@@ -66,7 +66,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -Chan
 - `docs/change-impact-map.json`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/end-to-end-linkage-checklist.md`
-- `docs/README.md`
+- `docs/DOCS_INDEX.md`
 - `scripts/doc-sync-automation.ps1`
 - `scripts/register-new-governance-doc.ps1`
 - `scripts/system-health-check.ps1`

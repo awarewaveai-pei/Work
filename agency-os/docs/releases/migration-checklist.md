@@ -10,7 +10,7 @@
 - [ ] Apply release files
 - [ ] Update `docs/change-impact-map.json` if new governance docs were added（步驟細項：`docs/operations/new-doc-linkage-checklist.md`）
 - [ ] Update `docs/CHANGE_IMPACT_MATRIX.md` for new dependencies
-- [ ] Update `README.md` and `docs/README.md` indexes
+- [ ] Update `README.md` and `docs/DOCS_INDEX.md` indexes
 - [ ] Run document sync (`scripts/doc-sync-automation.ps1 -AutoDetect`)
 
 ## Validation

@@ -1,7 +1,7 @@
 # 邊緣、主機名與子網域（統管入口）
 
 **這一層放什麼**：對外公開的主機名、子網域職責、DNS／TLS／Nginx 範本連結，以及 **`api.aware-wave.com`（phase1 `node-api`）的長期演進計畫**之單一正文入口。  
-**不放在這**：可逐步照做的 Hetzner 裝機 Runbook、收工 Gate → [`../operations/README.md`](../operations/README.md)；系統全貌 → [`../overview/README.md`](../overview/README.md)。
+**不放在這**：可逐步照做的 Hetzner 裝機 Runbook、收工 Gate → [`../operations/OPS_DOCS_INDEX.md`](../operations/OPS_DOCS_INDEX.md)；系統全貌 → [`../overview/OVERVIEW_INDEX.md`](../overview/OVERVIEW_INDEX.md)。
 
 **單一真相原則**：與 `api`／`app` 子網域、apex `/api/` 雙入口、`node-api` 邊界相關的**長篇計畫**只維護 **[`PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)**。請**不要**在 monorepo 外（例如本機 `~/.cursor/plans/`）再複製一份全文；IDE 若自動產生舊 plan，以本 repo 路徑為準。
 
@@ -33,10 +33,10 @@
 | `node-api` 路由、版本、Auth、Webhook 藍圖 | [`PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md) | **唯一長篇計畫** |
 | 實際程式與 compose | `lobster-factory/infra/hetzner-phase1-core/` | 實作；計畫內有驗收與邊界 |
 
-變更 **`PLAN_PHASE1_*`** 時請同步檢查：`docs/README.md`、`AGENTS.md`、`docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`、`lobster-factory/infra/hetzner-phase1-core/README.md`、`docs/CHANGE_IMPACT_MATRIX.md`（見矩陣列「`docs/edge-and-domains/*`」）。
+變更 **`PLAN_PHASE1_*`** 時請同步檢查：`docs/DOCS_INDEX.md`、`AGENTS.md`、`docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`、`lobster-factory/infra/hetzner-phase1-core/README.md`、`docs/CHANGE_IMPACT_MATRIX.md`（見矩陣列「`docs/edge-and-domains/*`」）。
 
 ---
 
 ## 其他長篇計畫（非 API 邊界）
 
-**穩定化、規則治理**等舊 Cursor plan 的 repo 正文與對照表：[`../governance-plans/README.md`](../governance-plans/README.md)。
+**穩定化、規則治理**等舊 Cursor plan 的 repo 正文與對照表：[`../governance-plans/GOVERNANCE_PLANS_INDEX.md`](../governance-plans/GOVERNANCE_PLANS_INDEX.md)。

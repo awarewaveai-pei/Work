@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp", "sync-copilot-mcp-env")]
+    [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp", "sync-copilot-mcp-env", "sync-cursor-mcp-user-env")]
     [string]$Action = "list",
     [string]$Name = "",
     [string]$Value = "",
@@ -289,6 +289,41 @@ Then run this action again. See docs/operations/mcp-add-server-quickstart.md (co
         [Environment]::SetEnvironmentVariable("COPILOT_MCP_BEARER_TOKEN", $plain, "User")
         Write-Host "Set User-level env COPILOT_MCP_BEARER_TOKEN from vault $srcName." -ForegroundColor Green
         Write-Host "Update copilot MCP header to: Bearer `${env:COPILOT_MCP_BEARER_TOKEN} then fully quit Cursor and reopen (new processes read User env)." -ForegroundColor Yellow
+        exit 0
+    }
+
+    "sync-cursor-mcp-user-env" {
+        # Cursor resolves HTTP MCP url/headers using ${env:NAME} — secrets only in vault are invisible until synced to User env.
+        $repoRoot = Split-Path $PSScriptRoot -Parent
+        $pref = Join-Path $repoRoot ".cursor\mcp.json"
+        $target = $pref
+        if (-not [string]::IsNullOrWhiteSpace($McpPath)) {
+            $target = $McpPath
+        }
+        if (-not (Test-Path -LiteralPath $target)) {
+            throw "MCP file not found: $target"
+        }
+        $raw = Get-Content -LiteralPath $target -Raw -Encoding UTF8
+        $matches = [regex]::Matches($raw, '\$\{env:([A-Z][A-Z0-9_]*)\}')
+        $names = @($matches | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+        $set = 0
+        $missing = New-Object System.Collections.Generic.List[string]
+        foreach ($n in $names) {
+            if (-not $store.secrets.Contains($n)) {
+                $missing.Add($n) | Out-Null
+                continue
+            }
+            $plain = Unprotect-Secret -CipherText $store.secrets[$n].cipher
+            if ([string]::IsNullOrWhiteSpace($plain)) { continue }
+            [Environment]::SetEnvironmentVariable($n, $plain, "User")
+            $set++
+            Write-Host "Set User env: $n" -ForegroundColor Green
+        }
+        if ($missing.Count -gt 0) {
+            Write-Host ("Vault missing {0} name(s) referenced in {1}: {2}" -f $missing.Count, $target, ($missing -join ", ")) -ForegroundColor Yellow
+            Write-Host "Add with: .\scripts\secrets-vault.ps1 -Action set -Name <NAME> -Value '<value>'" -ForegroundColor Yellow
+        }
+        Write-Host ("Synced {0} variable(s) to Windows User environment. Fully quit Cursor and reopen." -f $set) -ForegroundColor Cyan
         exit 0
     }
 }

@@ -24,11 +24,11 @@
 
 ## Session 啟動順序（每次都做）
 1. 讀 `README.md`（本目錄）；若工作區含整個 monorepo，一併讀 `../README.md`（根目錄導覽：龍蝦工廠 + AO + `verify-build-gates`）
-1b. **子網域／`api.aware-wave.com`／`node-api` 邊界與長期計畫（git 唯一正文）**：`docs/edge-and-domains/README.md` → `docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`（**不要**在 `~/.cursor/plans/` 維護第二份相同正文）
-1c. **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）**：`docs/governance-plans/README.md`
+1b. **子網域／`api.aware-wave.com`／`node-api` 邊界與長期計畫（git 唯一正文）**：`docs/edge-and-domains/EDGE_DOMAINS_INDEX.md` → `docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`（**不要**在 `~/.cursor/plans/` 維護第二份相同正文）
+1c. **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）**：`docs/governance-plans/GOVERNANCE_PLANS_INDEX.md`
 1d. **平台能力＋工具總索引 §0（一句話＋連到專文／計畫；與狀態同檔）**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 2. 讀 `AGENTS.md`
-3. 讀 `memory/CONVERSATION_MEMORY.md`（長期記憶）；若易混淆 **`LAST_AO_RESUME_BRIEF`**／**`SESSION_TEMPLATE`**／**inbox 機械匯入**，先掃 **`memory/README.md`**
+3. 讀 `memory/CONVERSATION_MEMORY.md`（長期記憶）；若易混淆 **`LAST_AO_RESUME_BRIEF`**／**`SESSION_TEMPLATE`**／**inbox 機械匯入**，先掃 **`memory/MEMORY_INDEX.md`**
 4. 讀 `memory/daily/` 的今日與昨日筆記（若存在）
 5. 讀 `TASKS.md` 與 `WORKLOG.md`
 6. 讀龍蝦工廠主軸文件（若存在）：
@@ -94,7 +94,7 @@
 
 ## 長期營運紀律（30 年級）
 - **憲章級原則（短、可對照閘道）**：`docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`
-- **重大分岔留下 ADR 骨架**：`docs/architecture/decisions/README.md`（採輕量格式；細節仍回寫 `WORKLOG`）
+- **重大分岔留下 ADR 骨架**：`docs/architecture/decisions/ADR_INDEX.md`（採輕量格式；細節仍回寫 `WORKLOG`）
 
 ## 執行安全
 - 不做不可逆破壞操作

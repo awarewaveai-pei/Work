@@ -20,7 +20,8 @@ $vars = @{
     RESEND_REPLY_TO_EMAIL_ADDRESSES = "ops@example.com"
     WP_API_URL                   = "https://example.com/"
     WORDPRESS_JWT_TOKEN          = "jwt-token-only"
-    N8N_MCP_URL                  = "https://your-n8n.example.com/mcp-server/http"
+    # Cursor `.cursor/mcp.json` 已固定 n8n MCP URL；此變數給 Codex／腳本／awarewave-ops 用
+    N8N_MCP_URL                  = "https://n8n.aware-wave.com/mcp-server/http"
     N8N_AUTH_BEARER_TOKEN        = "..."
     N8N_API_BASE_URL             = "https://your-n8n.example.com/api/v1"
     N8N_API_KEY                  = ""
@@ -29,14 +30,13 @@ $vars = @{
     TRIGGER_API_URL              = "https://trigger.example.com"
     TRIGGER_PROJECT_REF          = "prj_xxx"
     TRIGGER_ACCESS_TOKEN         = "tr_xxx"
-    # AwareWave Supabase is self-hosted. Use SUPABASE_AWAREWAVE_URL + SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY
-    # for REST and SUPABASE_AWAREWAVE_POSTGRES_DSN for Postgres MCP after opening the SSH tunnel.
-    SUPABASE_MCP_URL             = "https://mcp.supabase.com/mcp?project_ref=YOUR_CLOUD_PROJECT_REF&features=database,docs,development,debugging"
+    # AwareWave 自架：Cursor 已固定 `https://supabase.aware-wave.com/mcp`；此變數給其他工具／舊腳本相容
+    SUPABASE_MCP_URL             = "https://supabase.aware-wave.com/mcp"
     SUPABASE_AUTH_BEARER_TOKEN   = "..."
     SUPABASE_AWAREWAVE_URL       = "https://supabase.aware-wave.com"
     SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY = "..."
     SUPABASE_AWAREWAVE_POSTGRES_DSN = "postgresql://postgres:<PASTE_POSTGRES_PASSWORD>@localhost:5432/postgres"
-    SUPABASE_SOULFULEXPRESSION_MCP_URL = "https://mcp.supabase.com/mcp?project_ref=YOUR_SOULFULEXPRESSION_PROJECT_REF&features=database,docs,development,debugging"
+    SUPABASE_SOULFULEXPRESSION_MCP_URL = "https://mcp.supabase.com/mcp?project_ref=mffjqjiidbeibilmxzef&features=database,docs,development,debugging"
     SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN = "..."
     SUPABASE_SOULFULEXPRESSION_URL = "https://your-soulfulexpression-project.supabase.co"
     SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY = "..."

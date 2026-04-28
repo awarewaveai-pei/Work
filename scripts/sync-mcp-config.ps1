@@ -155,7 +155,12 @@ function Resolve-EnvValue {
         return $null
     }
 
-    $resolved = $StringValue.Replace('${workspaceRoot}', $WorkspaceRoot).Replace('${workspaceFolder}', $WorkspaceRoot).Replace('${userHome}', $env:USERPROFILE)
+    if ($Mode -eq "JsonPlaceholder") {
+        # Cursor `.mcp.json` / `.cursor/mcp.json`: keep portable `${workspaceFolder}` / `${userHome}`; env must stay `${env:NAME}` per Cursor docs.
+        $resolved = $StringValue.Replace('${workspaceRoot}', '${workspaceFolder}').Replace('${workspaceFolder}', '${workspaceFolder}').Replace('${userHome}', '${userHome}')
+    } else {
+        $resolved = $StringValue.Replace('${workspaceRoot}', $WorkspaceRoot).Replace('${workspaceFolder}', $WorkspaceRoot).Replace('${userHome}', $env:USERPROFILE)
+    }
     $pattern = '\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}'
     return [regex]::Replace(
         $resolved,
@@ -173,7 +178,7 @@ function Resolve-EnvValue {
                     return $value
                 }
                 "JsonPlaceholder" {
-                    return '${' + $name + '}'
+                    return '${env:' + $name + '}'
                 }
                 "GeminiPlaceholder" {
                     return '${' + $name + '}'

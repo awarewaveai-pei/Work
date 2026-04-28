@@ -34,7 +34,7 @@
 - 變更紀錄可追溯
 
 ## 異常處理入口
-- 事件：`docs/operations/incident-response-runbook.md`
+- 事件：`docs/operations/RUNBOOK_INCIDENT_RESPONSE.md`
 - 變更：`docs/operations/scope-change-policy.md`
 - 憑證：`docs/operations/security-secrets-policy.md`
 

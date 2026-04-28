@@ -18,7 +18,7 @@
 | `30-year-rule-consolidation`（規則治理收斂） | [`PLAN_30_YEAR_RULE_CONSOLIDATION.md`](PLAN_30_YEAR_RULE_CONSOLIDATION.md) |
 | `rules-stability-consolidation`（規則整併，與上同軌） | [`PLAN_RULES_STABILITY_CONSOLIDATION.md`](PLAN_RULES_STABILITY_CONSOLIDATION.md)（與上一檔**並列**；執行時擇一為 sprint 主檔或合併 PR 時對齊） |
 
-**邊緣／子網域統管入口**（含 `api` 連結表）：[`../edge-and-domains/README.md`](../edge-and-domains/README.md)
+**邊緣／子網域統管入口**（含 `api` 連結表）：[`../edge-and-domains/EDGE_DOMAINS_INDEX.md`](../edge-and-domains/EDGE_DOMAINS_INDEX.md)
 
 ---
 

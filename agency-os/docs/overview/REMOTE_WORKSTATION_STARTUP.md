@@ -128,7 +128,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
 ### 憑證（無法一鍵複製：每台各做一次）
 
 - **DPAPI vault**（Trigger 等腳本用）：`scripts/secrets-vault.ps1` — 手冊 **`docs/operations/local-secrets-vault-dpapi.md`**。  
-- **Cursor MCP／`mcp.json`**：只存在本機，換機後依 **`docs/operations/mcp-add-server-quickstart.md`** 重建；**勿**把 token 提交進 repo。
+- **Cursor MCP**：**版控正本**為 monorepo 根 **`.cursor/mcp.json`**（路徑用 **`${workspaceFolder}`**，值只含 **`${VAR}`**）；**`%USERPROFILE%\.cursor\mcp.json`** 維持 **`{"mcpServers":{}}`** 以免與專案合併重複。換機後 **`git pull`** 即得同一份結構，再依 **`docs/operations/mcp-add-server-quickstart.md`** 做 vault／環境變數；**勿**把明文 token 提交進 repo。
 
 ### 做完後
 
@@ -278,7 +278,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 
 - **勿**把 `.env`、API key、Claude OAuth 等放進 Git（見 `docs/operations/security-secrets-policy.md`）。
 - `.claude\`、`node_modules\` 已被 `.gitignore`；新機要**各自重新登入** Claude / MCP / GitHub（本機憑證管理員）。
-- MCP 若因換機路徑失效，請只改本機設定（例如 `C:\Users\USER\.cursor\mcp.json`），不要把秘密值提交到 repo。
+- MCP 路徑若失效：應先檢查是否開錯資料夾（必須 **monorepo 根**）、repo 內 **`.cursor/mcp.json`** 是否仍用 **`${workspaceFolder}`**；**勿**再寫死 `D:\`／`C:\Users\…`。不要把秘密值提交到 repo。
 - 密鑰庫建置與復原手冊：`docs/operations/local-secrets-vault-dpapi.md`（換機時先照手冊重建 vault）
 - MCP 常用新增流程：`docs/operations/mcp-add-server-quickstart.md`
 
@@ -308,7 +308,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 | **GitHub CLI** | `gh` 已安裝並 `gh auth login`（雙機各自一次）。 |
 | **乾淨工作樹** | `git status` 無未提交變更再宣告環境穩定（避免與 pull/rebase 拉扯）。 |
 | **DPAPI vault** | `%LOCALAPPDATA%\AgencyOS\secrets\vault.json` 已依手冊建立，且含腳本所需鍵名（見 `agency-os/docs/operations/local-secrets-vault-dpapi.md`）。 |
-| **Cursor MCP** | `%USERPROFILE%\.cursor\mcp.json` 存在；token／OAuth 仅存本機（見 `agency-os/docs/operations/mcp-add-server-quickstart.md`）。 |
+| **Cursor MCP** | monorepo 根 **`.cursor/mcp.json`**（SSOT）存在且已 **`git pull`**；**`%USERPROFILE%\.cursor\mcp.json`** 可為空 **`{"mcpServers":{}}`**；token／OAuth 仅存本機／vault（見 `agency-os/docs/operations/mcp-add-server-quickstart.md`）。 |
 | **（僅 Windows）本機 WP 真路徑** | 若需與他機一致跑 **真 `wp`**：已依 **§1.5.1** 安裝 **MariaDB + PHP + WP-CLI**，並能成功執行 `bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`；詳 `lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`（**與 Supabase 分工不同**）。 |
 
 **一鍵稽核**（不讀取密鑰內容；可加上 `-FetchOrigin` 讓 ahead/behind 較準）：

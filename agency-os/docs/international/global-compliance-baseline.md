@@ -30,7 +30,7 @@
 - Ensure subprocessors meet equivalent security baseline
 
 ## Incident and Breach
-- Security incident process follows `docs/operations/incident-response-runbook.md`
+- Security incident process follows `docs/operations/RUNBOOK_INCIDENT_RESPONSE.md`
 - For potential breach:
   - preserve evidence
   - scope impact
@@ -45,7 +45,7 @@
 ## Related Documents (Auto-Synced)
 - `docs/compliance/leads-and-scraping-checklist.md`
 - `docs/international/global-delivery-model.md`
-- `docs/operations/incident-response-runbook.md`
+- `docs/operations/RUNBOOK_INCIDENT_RESPONSE.md`
 - `docs/operations/security-secrets-policy.md`
 - `README.md`
 

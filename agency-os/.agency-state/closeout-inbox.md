@@ -28,6 +28,21 @@
 
 ---
 
+### claude-code 2026-04-28 00:00
+
+- **完成（一句）**: 啟用 Gemini auto-classify（`OPS_INBOX_GEMINI_ENABLED=true` + `GEMINI_API_KEY`）、改善 prompt 格式、rebuild SG next-admin；新增 `ops-inbox-user-guide.md`，更新 README 與 incident-response-runbook 連結。
+- **變更路徑**:
+  - `agency-os/docs/operations/ops-inbox-user-guide.md`（新建）
+  - `agency-os/docs/operations/README.md`（Ops Inbox 條目）
+  - `agency-os/docs/operations/incident-response-runbook.md`（Related Documents）
+  - SG `/root/lobster-phase1/.env`（`OPS_INBOX_GEMINI_ENABLED=true`、`GEMINI_API_KEY` 填入）
+  - SG `/root/lobster-phase1/apps/next-admin/lib/ops-inbox/ai/gemini.ts`（prompt 結構化）
+- **Git**: 未 commit（server 側在 repo 外；本地文件待 ao-close）
+- **對應 TASKS 子字串（可選）**: Ops Inbox / Gemini auto-classify / ops-inbox-user-guide
+- **風險／待辦（可選）**:
+  - SG server `gemini.ts` prompt 改動未進 git；若重新部署需重改或從 server 拉回 `/app/ops/` 整包
+  - EU server `.env` 未設 Gemini（ops inbox 只跑在 SG，無影響）
+
 ### example-agent <yyyy-MM-dd 09:00>
 
 - **完成（一句）**: 已依範本建立收件匣流程

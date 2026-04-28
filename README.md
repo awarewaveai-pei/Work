@@ -69,7 +69,7 @@ npm run mcp:governance
 2. **他機／首次接線** — [`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)（**正式開工**：monorepo 根 **`.\scripts\ao-resume.ps1` exit 0** 後再打 **`AO-RESUME`**；**筆電／新機最短指令見該檔 §1.5**）。  
 3. **每日儀表板** — [`agency-os/docs/overview/EXECUTION_DASHBOARD.md`](agency-os/docs/overview/EXECUTION_DASHBOARD.md)（`TASKS` / 綜合狀態 / Gate）。  
 4. **人＋代理總則** — [`agency-os/AGENTS.md`](agency-os/AGENTS.md)（`AO-RESUME`／`AO-CLOSE`、MCP 清單入口）。  
-4b. **長期營運紀律（建置／換人仍可接）** — [`agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`](agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md)；重大分岔見 [`agency-os/docs/architecture/decisions/README.md`](agency-os/docs/architecture/decisions/README.md)。  
+4b. **長期營運紀律（建置／換人仍可接）** — [`agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`](agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md)；重大分岔見 [`agency-os/docs/architecture/decisions/ADR_INDEX.md`](agency-os/docs/architecture/decisions/ADR_INDEX.md)。  
 4c. **30 年級 AI/coding/專案管理短憲章（跨國企業版）** — [`agency-os/docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`](agency-os/docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md)。
 4d. **30 年級 AI/coding/專案管理短憲章（客戶精簡鏡像）** — [`agency-os/docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md`](agency-os/docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md)。
 5. **Cursor 企業規則（版控）** — [`agency-os/docs/operations/cursor-enterprise-rules-index.md`](agency-os/docs/operations/cursor-enterprise-rules-index.md)（**若與 AO 關鍵字流程衝突，以 `agency-os/.cursor/rules` 之 `00`／`30`／`40` 為準**）。
@@ -79,8 +79,8 @@ npm run mcp:governance
 
 - **龍蝦工廠**：[`lobster-factory/README.md`](lobster-factory/README.md)、[`lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`](lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md)、[`lobster-factory/docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md`](lobster-factory/docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md)、[`lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md`](lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md)（A10-1 營運劇本）
 - **AO 系統**：[`agency-os/AGENTS.md`](agency-os/AGENTS.md)、[`agency-os/TASKS.md`](agency-os/TASKS.md)、[`agency-os/docs/overview/EXECUTION_DASHBOARD.md`](agency-os/docs/overview/EXECUTION_DASHBOARD.md)
-- **子網域／`api.aware-wave.com`／`node-api` 計畫（git 唯一正文）**：[`agency-os/docs/edge-and-domains/README.md`](agency-os/docs/edge-and-domains/README.md) → [`agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)
-- **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）**：[`agency-os/docs/governance-plans/README.md`](agency-os/docs/governance-plans/README.md)
+- **子網域／`api.aware-wave.com`／`node-api` 計畫（git 唯一正文）**：[`agency-os/docs/edge-and-domains/EDGE_DOMAINS_INDEX.md`](agency-os/docs/edge-and-domains/EDGE_DOMAINS_INDEX.md) → [`agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)
+- **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）**：[`agency-os/docs/governance-plans/GOVERNANCE_PLANS_INDEX.md`](agency-os/docs/governance-plans/GOVERNANCE_PLANS_INDEX.md)
 - **平台能力＋工具總索引 §0（一句話＋專文／計畫；單一 Owner）**：[`agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`](agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md)
 - **規格原文（長篇藍圖）**：[`docs/spec/README.md`](docs/spec/README.md)；**四份怎麼整合**：[`agency-os/docs/overview/company-os-four-sources-integration.md`](agency-os/docs/overview/company-os-four-sources-integration.md)
 
@@ -97,7 +97,7 @@ npm run mcp:governance
 
 ## 收工與同步
 
-- 關鍵字 **`AO-CLOSE`**：**操作者只打這三字（或說收工／關機）**；**不必學** PowerShell 參數。細節與代理責任由 **`agency-os/.cursor/rules/40-shutdown-closeout.mdc`** 定義；實際收斂為在 monorepo 根由**代理**執行 **`.\scripts\ao-close.ps1`**（**正本**；**`agency-os\scripts\ao-close.ps1`** 僅 wrapper）。腳本含 scaffold、inbox 合併、recap、閘道、**`TASKS` 打勾**、completeness 檢查、預設 **commit + push**。**勿**在僅 `lobster-factory` 子目錄執行。補充說明見 [`end-of-day-checklist.md`](agency-os/docs/operations/end-of-day-checklist.md) §0、[`agency-os/memory/README.md`](agency-os/memory/README.md)。
+- 關鍵字 **`AO-CLOSE`**：**操作者只打這三字（或說收工／關機）**；**不必學** PowerShell 參數。細節與代理責任由 **`agency-os/.cursor/rules/40-shutdown-closeout.mdc`** 定義；實際收斂為在 monorepo 根由**代理**執行 **`.\scripts\ao-close.ps1`**（**正本**；**`agency-os\scripts\ao-close.ps1`** 僅 wrapper）。腳本含 scaffold、inbox 合併、recap、閘道、**`TASKS` 打勾**、completeness 檢查、預設 **commit + push**。**勿**在僅 `lobster-factory` 子目錄執行。補充說明見 [`end-of-day-checklist.md`](agency-os/docs/operations/end-of-day-checklist.md) §0、[`agency-os/memory/MEMORY_INDEX.md`](agency-os/memory/MEMORY_INDEX.md)。
 - **monorepo 根 `.cursor/rules`**（**`00`、`30`、`40`、`50`、`63–66`**）：正本在 **`agency-os/.cursor/rules`**；由 **`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 鏡像到根目錄（**`00`／`30`／`40`** 含路徑變換；**`verify-build-gates`** 預設會跑）。只改一邊會造成**規則分叉**。
 
 ## Related Documents (Auto-Synced)

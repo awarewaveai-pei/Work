@@ -13,7 +13,8 @@
 | **Supabase Studio** | `https://studio.aware-wave.com` | Basic Auth | 見 memory/reference_vps_access.md |
 | **Supabase Postgres** | `localhost:5432`（需 SSH tunnel） | DSN | `SUPABASE_AWAREWAVE_POSTGRES_DSN` |
 | **n8n** | `https://n8n.aware-wave.com` | Basic Auth / JWT / API Key | `N8N_BASIC_AUTH_USER/PASSWORD` `N8N_AUTH_BEARER_TOKEN` `N8N_API_KEY` |
-| **n8n MCP** | `https://n8n.aware-wave.com/mcp-server/http` | Bearer JWT | `N8N_AUTH_BEARER_TOKEN` |
+| **n8n MCP** | `https://n8n.aware-wave.com/mcp-server/http`（自託管：原點 + `/mcp-server/http`） | Bearer JWT | `N8N_MCP_URL` `N8N_AUTH_BEARER_TOKEN` |
+| **Supabase MCP（自架 AwareWave）** | **`https://supabase.aware-wave.com/mcp`**（已寫入 repo **`.cursor/mcp.json`** 鍵 **`supabase`**） | 依 [Enable MCP（自架）](https://supabase.com/docs/guides/self-hosting/enable-mcp)；Bearer：`SUPABASE_AUTH_BEARER_TOKEN`（`sync-cursor-mcp-user-env`） | `SUPABASE_AUTH_BEARER_TOKEN` |
 | **Trigger.dev** | `https://trigger.aware-wave.com` | Bearer Token | `TRIGGER_ACCESS_TOKEN` |
 | **Uptime Kuma** | `https://uptime.aware-wave.com` | API Key | `UPTIME_KUMA_API_KEY` |
 | **Grafana** | `http://localhost:3009`（SSH tunnel） | Basic Auth | `GRAFANA_BASIC_USER` `GRAFANA_BASIC_PASSWORD` |

@@ -206,13 +206,14 @@
     "n8n": {
       "enabled": true,
       "transport": "http",
-      "url": "${env:N8N_MCP_URL}",
+      "url": "http://localhost:5678/mcp-server/http",
       "headers": {
         "Authorization": "Bearer ${env:N8N_AUTH_BEARER_TOKEN}"
       },
       "codex": {
         "bearer_token_env_var": "N8N_AUTH_BEARER_TOKEN"
-      }
+      },
+      "note": "Requires SSH tunnel: ssh -N -L 127.0.0.1:5678:127.0.0.1:5678 root@<your-vps-ip>"
     },
     "trigger": {
       "enabled": true,
@@ -255,13 +256,14 @@
           "exclude": true
         }
       },
-      "url": "${env:SUPABASE_MCP_URL}",
+      "url": "http://localhost:8000/mcp",
       "headers": {
         "Authorization": "Bearer ${env:SUPABASE_AUTH_BEARER_TOKEN}"
       },
       "codex": {
         "bearer_token_env_var": "SUPABASE_AUTH_BEARER_TOKEN"
-      }
+      },
+      "note": "Requires tunnel: scripts/open-supabase-ssh-tunnel.ps1 -Background (self-hosted /mcp is IP-restricted externally)"
     },
     "supabase-soulfulexpression": {
       "enabled": true,
@@ -271,36 +273,7 @@
           "exclude": true
         }
       },
-      "url": "${env:SUPABASE_SOULFULEXPRESSION_MCP_URL}",
-      "headers": {
-        "Authorization": "Bearer ${env:SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
-      }
-    },
-    "supabase-b-postgres": {
-      "enabled": true,
-      "transport": "stdio",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceRoot}\\scripts\\run-postgres-mcp.ps1"
-      ],
-      "env": {
-        "SUPABASE_AWAREWAVE_POSTGRES_DSN": "${env:SUPABASE_AWAREWAVE_POSTGRES_DSN}"
-      },
-      "note": "Legacy alias for supabase-awarewave-postgres"
-    },
-    "supabase-a": {
-      "enabled": true,
-      "transport": "http",
-      "clients": {
-        "codex": {
-          "exclude": true
-        }
-      },
-      "url": "${env:SUPABASE_SOULFULEXPRESSION_MCP_URL}",
+      "url": "https://mcp.supabase.com/mcp?project_ref=mffjqjiidbeibilmxzef&features=database,docs,development,debugging",
       "headers": {
         "Authorization": "Bearer ${env:SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
       }
@@ -308,7 +281,7 @@
     "cloudflare": {
       "enabled": true,
       "transport": "http",
-      "url": "${env:CLOUDFLARE_MCP_URL}",
+      "url": "https://mcp.cloudflare.com/mcp",
       "headers": {
         "Authorization": "Bearer ${env:CLOUDFLARE_AUTH_BEARER_TOKEN}"
       },
@@ -319,13 +292,24 @@
     "posthog": {
       "enabled": true,
       "transport": "http",
-      "url": "${env:POSTHOG_MCP_URL}",
+      "url": "https://mcp.posthog.com/mcp",
       "headers": {
         "Authorization": "Bearer ${env:POSTHOG_PERSONAL_API_KEY}"
       },
       "codex": {
         "bearer_token_env_var": "POSTHOG_PERSONAL_API_KEY"
       }
+    },
+    "hetzner-ssh": {
+      "enabled": true,
+      "transport": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "mcp-server-ssh"
+      ]
     },
     "resend": {
       "enabled": true,

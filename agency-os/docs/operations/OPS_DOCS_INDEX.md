@@ -1,7 +1,7 @@
 # docs/operations/ 導覽
 
 **這一層放什麼**：Checklist、Runbook、基礎建設、工具與 Cursor／MCP、資安政策。  
-**不放在這**：系統全貌、雙機哲學、長篇憲章 → [overview 導覽](../overview/README.md)（檔名 `README.md`，資料夾 `docs/overview/`）。
+**不放在這**：系統全貌、雙機哲學、長篇憲章 → [overview 導覽](../overview/OVERVIEW_INDEX.md)（檔名 `OVERVIEW_INDEX.md`，資料夾 `docs/overview/`）。
 
 在編輯器內 **Ctrl+Click**（Mac：**Cmd+Click**）可開檔。下表**連結文字即檔名**，路徑皆在 **`agency-os/docs/operations/`**（跨資料夾除外）。
 
@@ -57,8 +57,8 @@
 | 環境變數範例 | [hetzner-self-host.env.example](hetzner-self-host.env.example) |
 | Supabase 自架切換 | [supabase-self-hosted-cutover-checklist.md](supabase-self-hosted-cutover-checklist.md) |
 | Cloudflare 邊緣（Phase 1 / 自架 Next） | [CLOUDFLARE_HETZNER_PHASE1.md](CLOUDFLARE_HETZNER_PHASE1.md) |
-| **子網域／`api` 邊界／長期計畫（統管入口）** | [edge-and-domains/README.md](../edge-and-domains/README.md)（正文：[PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)） |
-| **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）** | [governance-plans/README.md](../governance-plans/README.md) |
+| **子網域／`api` 邊界／長期計畫（統管入口）** | [edge-and-domains/EDGE_DOMAINS_INDEX.md](../edge-and-domains/EDGE_DOMAINS_INDEX.md)（正文：[PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)） |
+| **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）** | [governance-plans/GOVERNANCE_PLANS_INDEX.md](../governance-plans/GOVERNANCE_PLANS_INDEX.md) |
 | GitHub Actions × workflows | [github-actions-trigger-prod-deploy.md](github-actions-trigger-prod-deploy.md) |
 | 多機 MariaDB（WP） | [MARIADB_MULTI_MACHINE_SYNC.md](MARIADB_MULTI_MACHINE_SYNC.md) |
 
@@ -90,7 +90,8 @@
 
 | 說明 | 檔案 |
 |:---|:---|
-| 事件應變 | [incident-response-runbook.md](incident-response-runbook.md) |
+| **Ops Inbox 操作手冊**（UI 流程、AI 診斷、Webhook 端點） | [ops-inbox-user-guide.md](ops-inbox-user-guide.md) |
+| 事件應變（分級、SLA、RCA 格式） | [RUNBOOK_INCIDENT_RESPONSE.md](RUNBOOK_INCIDENT_RESPONSE.md) |
 | Production Pilot A | [PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md](PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md) |
 | Production Pilot B | [PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md](PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md) |
 
@@ -117,8 +118,8 @@
 
 | 去哪 | 檔案 |
 |:---|:---|
-| 全貌／雙機導覽 | [README.md](../overview/README.md) |
-| docs 總索引 | [README.md](../README.md) |
+| 全貌／雙機導覽 | [OVERVIEW_INDEX.md](../overview/OVERVIEW_INDEX.md) |
+| docs 總索引 | [DOCS_INDEX.md](../DOCS_INDEX.md) |
 | 龍蝦工廠（工程入口） | [README.md](../../../lobster-factory/README.md) |
 | 租戶（公司包） | [README.md](../../tenants/README.md) |
 

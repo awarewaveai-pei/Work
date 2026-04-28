@@ -5,9 +5,10 @@
 
 ## 路徑原則（先讀這段）
 
-- **Cursor MCP 密鑰（本機）**：官方最新仍分 **project** 與 **global** 兩層。建議 **project** 用 repo 內 **`.cursor/mcp.json`** 做 **`${workspaceFolder}`** 錨點，**global** 用 **`%USERPROFILE%\.cursor\mcp.json`** 放只屬於該機器的覆寫；**勿**提交含密鑰內容到 git。結構範本見 repo 根 **`mcp.json.template`**。  
-- **路徑**：LLM／Trigger 等請繼續使用 **`${workspaceFolder}`**／**`${userHome}`**（寫在使用者檔或本機 `.cursor/mcp.json` 皆可），避免寫死 **`D:\Work\...`**。  
-- **`${workspaceFolder}` 必須能錨定**：專案根要有一份 **`.cursor/mcp.json`**（repo 內可為 **`{"mcpServers":{}}` 空物件**），Cursor 才會把插值解成你開啟的 monorepo 路徑；**僅** `%USERPROFILE%\.cursor\mcp.json` 而專案內沒有該檔時，`work-global`／`trigger` 等常會整排失敗。  
+- **Cursor MCP（唯一 SSOT）**：**monorepo 根** **`.cursor/mcp.json`** 放 **完整** `mcpServers`（路徑 **`${workspaceFolder}/scripts/...`**，機密 **`${VAR}`**）；**勿**把明文 token 提交到 git。結構範本見 repo 根 **`mcp.json.template`**。  
+- **`%USERPROFILE%\.cursor\mcp.json`**：請維持 **`{"mcpServers":{}}`**，避免與專案檔 **合併** 後 **同一鍵重複**（UI 會像每個 MCP 出現兩次）。僅當某 MCP **絕不能進 repo** 時，才在使用者檔加入 **與專案不重複的鍵名**。  
+- **路徑**：LLM／Trigger／filesystem wrapper 等 **只** 寫在專案 **`.cursor/mcp.json`**，使用 **`${workspaceFolder}`**／**`${userHome}`**，禁止寫死 **`D:\Work\...`** 或 **`C:\Users\...\Work\...`**。  
+- **`${workspaceFolder}` 必須能錨定**：用 Cursor **開啟 monorepo 根**（含 **`scripts/`**、**`.cursor/mcp.json`** 的那一層）；**勿**只開子資料夾，否則插值指錯層級、`trigger`／`work-global` 等會失敗。  
 - **Trigger.dev 自託管**：在 **`trigger`** 的 **`env`** 加上 **`TRIGGER_API_URL`**（公開 HTTPS 原點，例如 **`https://trigger.aware-wave.com`**，依你 Nginx／DNS 為準），並維持 vault 內 **`TRIGGER_ACCESS_TOKEN`**；`start-trigger-mcp.ps1` 會把此變數一併餵給內層 `npx … mcp`。  
 - **GitHub Copilot MCP**：`url` 建議 **`https://api.githubcopilot.com/mcp`**（**不要**結尾多一個 `/`）；Bearer 必須是 **Copilot MCP 允許的 GitHub token**（常見問題是拿一般 PAT 但帳號／權限不含 Copilot）。見 [GitHub 文件：Configure Copilot MCP](https://docs.github.com/en/copilot/how-tos/configure-personal-settings/configure-copilot-mcp)。
 
@@ -24,8 +25,8 @@
 ## 小白快速版（去哪裡 -> 做什麼 -> 看到什麼）
 
 1. 用 Cursor **開啟 monorepo 根**（含 **`mcp-local-wrappers/`** 的那層）。**勿**只開子資料夾 `agency-os/`，否則 **`${workspaceFolder}`** 會指錯層級。  
-2. 編輯 **`%USERPROFILE%\.cursor\mcp.json`**（建議；放密鑰與完整 server 清單）。專案 **`.cursor/mcp.json`** 請維持 repo 內範本（空物件即可），**勿**把含真值的內容 `git add` 進遠端。  
-3. 若從零開始：複製 repo 根 **`mcp.json.template`** 到 **`%USERPROFILE%\.cursor\mcp.json`**，再替換 `<PASTE_*>`／`YOUR_*`。
+2. **伺服器清單** 只維護在 **monorepo 根** **`.cursor/mcp.json`**（已用 **`${workspaceFolder}`**，機密僅 **`${VAR}`**）。**`%USERPROFILE%\.cursor\mcp.json`** 設為 **`{"mcpServers":{}}`**，避免與專案 **重複合併**。  
+3. 若從零開始：以 repo 根 **`mcp.json.template`** 對照鍵名與 env，必要時合併進 **`.cursor/mcp.json`**；**勿**在 template 裡留下真 token 再提交。
 4. 在 **monorepo 根**開終端機（`scripts` 的上一層）。
 5. 貼上這行，按 Enter：  
    `.\scripts\secrets-vault.ps1 -Action import-mcp`  
@@ -44,6 +45,10 @@
    `.\scripts\secrets-vault.ps1 -Action list`
 4. 關掉 Cursor 再重開
 5. 看到 MCP 能正常使用就完成；若仍失敗，檢查 **`%USERPROFILE%\.cursor\mcp.json`**（或本機 `.cursor/mcp.json`）的 `url/command/args`，並確認沒有舊的 **`D:\Work\...`** 絕對路徑。
+5.1 **遠端 HTTP（`type: http`：Supabase / n8n / posthog / cloudflare 等）紅黃亂跳、或綠但寫 `No tools`**：專案 **`.cursor/mcp.json`** 已用 **`${env:變數名}`**（[Cursor 文件](https://cursor.com/docs/context/mcp) 用系統／使用者環境變數）。**`import-mcp` 只寫入 vault，不會讓 Cursor 讀到** — 在 monorepo 根執行：  
+   `.\scripts\secrets-vault.ps1 -Action sync-cursor-mcp-user-env`  
+   會掃描 **`.cursor/mcp.json`** 裡所有 **`${env:…}`**，把 vault 裡同名密鑰寫入 **Windows 使用者環境變數**，再 **完全結束並重開 Cursor**。缺哪個變數，腳本會列出；可用 **`secrets-vault.ps1 -Action set -Name … -Value …`** 補進 vault 後再跑一次 sync。
+5.2 **`SUPABASE_*`／`CLOUDFLARE_*`／`POSTHOG_*`**：若 vault 根本沒有對應鍵名，請依各服後台填入真值 **`set`** 進 vault，勿把明文留在聊天。
 6. **`trigger` 仍紅**：在 monorepo 根執行 `.\scripts\secrets-vault.ps1 -Action list`，清單裡**必須**有 **`TRIGGER_ACCESS_TOKEN`**（Trigger 後台建立的 Personal Access Token，用 `set` 寫入 vault；`import-mcp` 不會憑空生出這一筆）。自託管另需 **`trigger.env.TRIGGER_API_URL`** 與 **`start-trigger-mcp.ps1 -ProjectRef`**／**`TRIGGER_PROJECT_REF`** 正確。
 7. **`copilot` 仍紅**：`https://api.githubcopilot.com/mcp` **不要**多尾階 `/`；Bearer 須符合 [GitHub：設定 Copilot MCP](https://docs.github.com/en/copilot/customizing-copilot/extending-copilot-chat-with-mcp)（常見為 **Copilot 訂閱／權限** 或 **PAT 類型／scope** 不符，一般 `github` MCP 能用的 token 未必能過 Copilot MCP）。建議 **`Authorization`: `Bearer ${env:COPILOT_MCP_BEARER_TOKEN}`**，再執行 **`.\scripts\secrets-vault.ps1 -Action sync-copilot-mcp-env`**（自 vault 的 **`COPILOT_AUTH_BEARER_TOKEN`** 寫入使用者環境變數），**完全結束 Cursor 後重開** 才會載入新的 User env。
 
@@ -70,11 +75,22 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sanitize-user-mcp-config.ps1
 2. 在 monorepo 根開終端機
 3. 先初始化 vault：  
    `.\scripts\secrets-vault.ps1 -Action init`
-4. 編好 **`%USERPROFILE%\.cursor\mcp.json`**（或本機 `.cursor/mcp.json`）後匯入：  
+4. 編好 **monorepo 根** **`.cursor/mcp.json`**（專案 SSOT）後匯入：  
    `.\scripts\secrets-vault.ps1 -Action import-mcp`
 5. 用 `list` 確認：  
    `.\scripts\secrets-vault.ps1 -Action list`
 6. 重開 Cursor 後測一次 MCP，即完成
+
+## 單一真相（registry → 同步）
+
+- **AwareWave 自託管 n8n／自架 Supabase／Cloudflare／PostHog MCP 的公開 URL** 寫在 **`mcp/registry.template.json`**；同步到 **`.cursor/mcp.json`** 與 **`.mcp.json`** 請在 monorepo 根執行：  
+  `.\scripts\sync-mcp-config.ps1`  
+  **勿**只手改 **`.cursor/mcp.json`** 而不同步 registry，否則下次 sync 會被覆蓋。
+
+## Hetzner：Cloud API vs SSH
+
+- **Cloud API（機器／Floating IP／防火牆）**：**`awarewave-ops`** 內 **`hetzner`** 服務 + `HETZNER_API_TOKEN`（見 vault／`import-mcp`）。
+- **SSH（VPS 上跑指令／SFTP）**：專案 MCP 鍵 **`hetzner-ssh`** → `npx -y mcp-server-ssh`。連線用工具 **`ssh_connect`**（host、user、port、金鑰路徑或密碼），**不要**把密碼寫進 `mcp.json`。
 
 ## 入口（先記這幾個）
 

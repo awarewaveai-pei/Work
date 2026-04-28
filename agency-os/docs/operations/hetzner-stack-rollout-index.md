@@ -107,7 +107,7 @@
 - `docs/operations/supabase-self-hosted-cutover-checklist.md`
 - `docs/overview/ao-lobster-operating-model.md`
 - `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`
-- `docs/README.md`
+- `docs/DOCS_INDEX.md`
 - `memory/CONVERSATION_MEMORY.md`
 - `TASKS.md`
 - `WORKLOG.md`

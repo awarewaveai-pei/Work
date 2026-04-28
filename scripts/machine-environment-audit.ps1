@@ -8,7 +8,7 @@
   - Git 在 main、建議乾淨、與 origin/main 對齊（可 -FetchOrigin）
   - Node：滿足 lobster engines (>=18)，且建議與 GitHub Actions 相同大版本（目前 22）
   - lobster-factory packages/workflows（及可選 mcp-local-wrappers）已 npm ci
-  - 建議：GitHub CLI 已登入、DPAPI vault 與 Cursor mcp.json 存在（雙機各做一次）
+  - 建議：GitHub CLI 已登入、DPAPI vault、專案 `.cursor/mcp.json`（SSOT）與使用者 `.cursor/mcp.json`（可為空）存在（雙機各做一次）
 
 .PARAMETER WorkRoot
   Monorepo 根（預設為本腳本上一層目錄）。
@@ -273,13 +273,21 @@ if (-not (Test-Path -LiteralPath $vaultPath)) {
     }
 }
 
-# --- Cursor MCP config placeholder ---
-$mcpUser = Join-Path $env:USERPROFILE ".cursor\mcp.json"
-if (-not (Test-Path -LiteralPath $mcpUser)) {
-    Write-Audit -Level WARN -Message "Cursor mcp.json not found at $mcpUser - rebuild per agency-os/docs/operations/mcp-add-server-quickstart.md"
+# --- Cursor MCP: repo SSOT + optional empty user file (avoid duplicate merge) ---
+$mcpProject = Join-Path $WorkRoot ".cursor\mcp.json"
+if (-not (Test-Path -LiteralPath $mcpProject)) {
+    Write-Audit -Level WARN -Message "Project .cursor/mcp.json missing at $mcpProject — MCP server list should live at monorepo root (see agency-os/docs/operations/mcp-add-server-quickstart.md)."
     $warnCount++
 } else {
-    Write-Audit -Level OK -Message "Cursor mcp.json present (per-user; not audited for contents)."
+    Write-Audit -Level OK -Message "Project .cursor/mcp.json present (SSOT; paths should use `${workspaceFolder} in JSON)."
+}
+
+$mcpUser = Join-Path $env:USERPROFILE ".cursor\mcp.json"
+if (-not (Test-Path -LiteralPath $mcpUser)) {
+    Write-Audit -Level WARN -Message "User .cursor/mcp.json not found at $mcpUser — create minimal {""mcpServers"":{}} per agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md"
+    $warnCount++
+} else {
+    Write-Audit -Level OK -Message "User .cursor/mcp.json present (use empty mcpServers unless adding keys that are not in project SSOT)."
 }
 
 # --- Optional full gate ---

@@ -77,7 +77,7 @@
 - `docs/operations/hetzner-full-stack-self-host-runbook.md`
 - `docs/operations/hetzner-self-host.env.example`
 - `docs/operations/hetzner-stack-rollout-index.md`
-- `docs/README.md`
+- `docs/DOCS_INDEX.md`
 - `memory/CONVERSATION_MEMORY.md`
 - `README.md`
 - `TASKS.md`

@@ -276,7 +276,7 @@ Write-Host ""
 Write-Host "=== AO-CLOSE: automation boundary (every run) ===" -ForegroundColor Cyan
 Write-Host "SCRIPT DID: daily scaffold; inbox guard; merge-closeout-inbox (verbatim -> WORKLOG + memory/daily + CONVERSATION_MEMORY pointer); recap; verify/guard/report; apply AUTO_TASK_DONE -> TASKS; after git add, verify-closeout-completeness (default strict) before commit." -ForegroundColor Green
 Write-Host "SCRIPT DID NOT: infer task completion; write AUTO_TASK_DONE lines; author CONVERSATION_MEMORY prose (agent must edit that file BEFORE this script, same AO-CLOSE turn); touch LAST_AO_RESUME_BRIEF (AO-RESUME only) or SESSION_TEMPLATE." -ForegroundColor Yellow
-Write-Host "Legend: agency-os/memory/README.md; rules: 10-memory-maintenance + 40-shutdown-closeout." -ForegroundColor DarkGray
+Write-Host "Legend: agency-os/memory/MEMORY_INDEX.md; rules: 10-memory-maintenance + 40-shutdown-closeout." -ForegroundColor DarkGray
 Write-Host ""
 
 if ($SkipPush) {

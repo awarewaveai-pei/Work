@@ -6,7 +6,7 @@
 ## A. Governance Linkage
 - [ ] **New doc onboarding（新增／大改版治理文件時必跑）**：`docs/operations/new-doc-linkage-checklist.md`（矩陣 + `change-impact-map.json` + 入口 + health）
 - [ ] `README.md` includes all new operational entry points
-- [ ] `docs/README.md` includes all new domain folders
+- [ ] `docs/DOCS_INDEX.md` includes all new domain folders
 - [ ] `docs/change-impact-map.json` includes new source/target links
 - [ ] `docs/CHANGE_IMPACT_MATRIX.md` updated with new linkage rows
 

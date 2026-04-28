@@ -10,7 +10,7 @@
 |---|---|
 | `docs/architecture/agency-command-center-v1.md` | `docs/architecture/multi-platform-delivery-architecture.md`, `docs/operations/system-operation-sop.md`, `docs/operations/tenant-scheduling.md`, `README.md`, `TASKS.md` |
 | `docs/architecture/multi-platform-delivery-architecture.md` | `docs/standards/wordpress-custom-dev-guidelines.md`, `docs/operations/end-to-end-linkage-checklist.md`, `README.md` |
-| `docs/overview/agency-os-complete-system-introduction.md` | `README.md`, `docs/README.md`, `tenants/company-a/01_COMMANDER_SYSTEM_GUIDE.md`, `tenants/company-a/02_CLIENT_WORKSPACE_GUIDE.md`, `tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md`, `tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md` |
+| `docs/overview/agency-os-complete-system-introduction.md` | `README.md`, `docs/DOCS_INDEX.md`, `tenants/company-a/01_COMMANDER_SYSTEM_GUIDE.md`, `tenants/company-a/02_CLIENT_WORKSPACE_GUIDE.md`, `tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md`, `tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md` |
 | `docs/operations/system-operation-sop.md` | `README.md`, `AGENTS.md`, `TASKS.md`, `WORKLOG.md` |
 | `docs/operations/client-risk-scoring-model.md` | `docs/metrics/kpi-margin-dashboard-spec.md`, `docs/product/templates/monthly-report-template-en.md`, `README.md`, `TASKS.md` |
 | `docs/operations/outsourcing-vendor-scorecard.md` | `docs/operations/outsourcing-playbook.md`, `README.md`, `TASKS.md` |
@@ -18,7 +18,7 @@
 | `docs/operations/system-guard-and-notification.md` | `README.md`, `AGENTS.md`, `RESUME_AFTER_REBOOT.md`, `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`, `scripts/system-guard.ps1` |
 | `docs/operations/end-to-end-linkage-checklist.md` | `scripts/system-guard.ps1`, `scripts/system-health-check.ps1`, `scripts/doc-sync-automation.ps1`, `README.md` |
 | `docs/international/global-delivery-model.md` | `docs/international/global-compliance-baseline.md`, `docs/international/multi-currency-commercial-policy.md`, `docs/operations/tenant-scheduling.md`, `README.md` |
-| `docs/international/global-compliance-baseline.md` | `docs/operations/security-secrets-policy.md`, `docs/operations/incident-response-runbook.md`, `README.md` |
+| `docs/international/global-compliance-baseline.md` | `docs/operations/security-secrets-policy.md`, `docs/operations/RUNBOOK_INCIDENT_RESPONSE.md`, `README.md` |
 | `docs/international/multi-currency-commercial-policy.md` | `docs/operations/finance-operations.md`, `docs/metrics/kpi-margin-dashboard-spec.md`, `README.md` |
 | `docs/sales/service-packages-standard.md` | `docs/operations/finance-operations.md`, `docs/sales/cr-pricing-rules.md`, `README.md` |
 | `docs/sales/cr-pricing-rules.md` | `docs/operations/scope-change-policy.md`, `docs/templates/cr-template.md`, 專案 `01_SCOPE_AND_CR.md` |

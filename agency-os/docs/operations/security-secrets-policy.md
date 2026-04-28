@@ -50,7 +50,7 @@
 任一明文憑證出現在文件或對話時，視為安全事件，需：
 1. 停用或輪替該憑證
 2. 盤點使用範圍
-3. 記錄於 `docs/operations/incident-response-runbook.md` 事件流程
+3. 記錄於 `docs/operations/RUNBOOK_INCIDENT_RESPONSE.md` 事件流程
 
 ## Related Documents (Auto-Synced)
 - `.cursor/rules/64-architecture-mcp-routing.mdc`

@@ -1,7 +1,7 @@
 # docs/overview/ 導覽
 
 **這一層放什麼**：系統全貌、雙機開工、AO 與龍蝦怎麼接、長期紀律、憲章與高階時程。  
-**不放在這**：可照表操課的 Runbook、堆疊／憑證細節 → [operations 導覽](../operations/README.md)（檔名 `README.md`，資料夾 `docs/operations/`）。**子網域、`api` 邊界、長期 API 計畫** → [edge-and-domains 統管入口](../edge-and-domains/README.md)。
+**不放在這**：可照表操課的 Runbook、堆疊／憑證細節 → [operations 導覽](../operations/OPS_DOCS_INDEX.md)（檔名 `OPS_DOCS_INDEX.md`，資料夾 `docs/operations/`）。**子網域、`api` 邊界、長期 API 計畫** → [edge-and-domains 統管入口](../edge-and-domains/EDGE_DOMAINS_INDEX.md)。
 
 在編輯器內 **Ctrl+Click**（Mac：**Cmd+Click**）可開檔。下表**連結文字即檔名**，路徑皆在 **`agency-os/docs/overview/`**。
 
@@ -56,8 +56,8 @@
 
 | 去哪 | 檔案 |
 |:---|:---|
-| 操作／SOP 導覽 | [README.md](../operations/README.md) |
-| docs 總索引 | [README.md](../README.md) |
+| 操作／SOP 導覽 | [OPS_DOCS_INDEX.md](../operations/OPS_DOCS_INDEX.md) |
+| docs 總索引 | [DOCS_INDEX.md](../DOCS_INDEX.md) |
 | 變更連動矩陣 | [CHANGE_IMPACT_MATRIX.md](../CHANGE_IMPACT_MATRIX.md) |
 | 龍蝦工廠（工程入口） | [README.md](../../../lobster-factory/README.md) |
 | 租戶（公司包） | [README.md](../../tenants/README.md) |

@@ -26,7 +26,7 @@
 ## 決策邊界
 - 超範圍需求：走 `docs/operations/scope-change-policy.md`
 - 憑證事件：走 `docs/operations/security-secrets-policy.md`
-- 事故事件：走 `docs/operations/incident-response-runbook.md`
+- 事故事件：走 `docs/operations/RUNBOOK_INCIDENT_RESPONSE.md`
 
 ## Related Documents (Auto-Synced)
 - `docs/overview/agency-os-complete-system-introduction.md`
