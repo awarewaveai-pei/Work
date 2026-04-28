@@ -26,22 +26,13 @@
 - **風險／待辦（可選）**:
 ```
 
+**欄位約束（與 `collaborator-ai-agent-rules.md` 一致）**
+
+- **僅**上述六個頂層欄位（標題字串須與範本一致）。**禁止**新增第七類頂層項目（例如 `- **伺服器操作（無 commit）**`）；`merge-closeout-inbox-into-progress.ps1` 雖以區塊 verbatim 合併、不逐欄解析，但若混入未約定欄位會造成 **AUTO_TASK_DONE**／人工對照 **TASKS** 時格式漂移。
+- **無 git commit 的遠端／伺服器操作**：請寫入 **風險／待辦（可選）**（建議首行括註「遠端／無 commit」），或併入 **變更路徑**／**完成（一句）** 之敘述，勿另立欄位。
+- **對應 TASKS 子字串（可選）**：僅填 **一行**，且為 `TASKS.md` 裡**恰好一條**仍為 `- [ ]` 之項目上的**唯一可識別子字串**；**勿**以逗號並列多項、勿對應多條待辦（多項進度請拆成多個 `###` 區塊或只選主線一條）。
+
 ---
-
-### claude-code 2026-04-28 00:00
-
-- **完成（一句）**: 啟用 Gemini auto-classify（`OPS_INBOX_GEMINI_ENABLED=true` + `GEMINI_API_KEY`）、改善 prompt 格式、rebuild SG next-admin；新增 `ops-inbox-user-guide.md`，更新 README 與 incident-response-runbook 連結。
-- **變更路徑**:
-  - `agency-os/docs/operations/ops-inbox-user-guide.md`（新建）
-  - `agency-os/docs/operations/README.md`（Ops Inbox 條目）
-  - `agency-os/docs/operations/incident-response-runbook.md`（Related Documents）
-  - SG `/root/lobster-phase1/.env`（`OPS_INBOX_GEMINI_ENABLED=true`、`GEMINI_API_KEY` 填入）
-  - SG `/root/lobster-phase1/apps/next-admin/lib/ops-inbox/ai/gemini.ts`（prompt 結構化）
-- **Git**: 未 commit（server 側在 repo 外；本地文件待 ao-close）
-- **對應 TASKS 子字串（可選）**: Ops Inbox / Gemini auto-classify / ops-inbox-user-guide
-- **風險／待辦（可選）**:
-  - SG server `gemini.ts` prompt 改動未進 git；若重新部署需重改或從 server 拉回 `/app/ops/` 整包
-  - EU server `.env` 未設 Gemini（ops inbox 只跑在 SG，無影響）
 
 ### example-agent <yyyy-MM-dd 09:00>
 

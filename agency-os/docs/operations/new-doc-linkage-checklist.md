@@ -64,12 +64,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -Chan
 - `AGENTS.md`
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/change-impact-map.json`
+- `docs/DOCS_INDEX.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/end-to-end-linkage-checklist.md`
-- `docs/DOCS_INDEX.md`
 - `scripts/doc-sync-automation.ps1`
 - `scripts/register-new-governance-doc.ps1`
 - `scripts/system-health-check.ps1`
 
-_Last synced: 2026-04-27 19:20:40 UTC_
+_Last synced: 2026-04-28 09:39:47 UTC_
 

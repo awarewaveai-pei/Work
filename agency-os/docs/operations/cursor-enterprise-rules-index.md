@@ -56,10 +56,10 @@
 - `AGENTS.md`
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/change-impact-map.json`
+- `docs/DOCS_INDEX.md`
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/operations/security-secrets-policy.md`
-- `docs/DOCS_INDEX.md`
 
-_Last synced: 2026-04-27 19:20:40 UTC_
+_Last synced: 2026-04-28 09:39:47 UTC_
 

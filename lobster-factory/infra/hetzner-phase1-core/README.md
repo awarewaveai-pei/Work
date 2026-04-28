@@ -13,7 +13,7 @@
 ## Cloudflare 邊緣（DNS / WAF / TLS）
 
 Next.js 仍為 **自架 Docker + Nginx**；Cloudflare 只作 **邊緣**。操作步驟、SSL 模式與真實 IP 還原見：**[`agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`](../../../agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md)**。本 compose 已掛載 **`nginx/cloudflare-real-ip.conf`**（`00-` 前綴確保先載入）。  
-**`api.aware-wave.com`／`node-api` 演進計畫與子網域統管入口**（**git 唯一正文**，勿與 `~/.cursor/plans/` 重複全文）：[`agency-os/docs/edge-and-domains/README.md`](../../../agency-os/docs/edge-and-domains/README.md)。
+**`api.aware-wave.com`／`node-api` 演進計畫與子網域統管入口**（**git 唯一正文**，勿與 `~/.cursor/plans/` 重複全文）：[`agency-os/docs/edge-and-domains/EDGE_DOMAINS_INDEX.md`](../../../agency-os/docs/edge-and-domains/EDGE_DOMAINS_INDEX.md)。
 
 ## 系統 Nginx 已佔用 80/443 時（實機常態）
 

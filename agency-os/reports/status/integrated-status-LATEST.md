@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-28 09:39:47
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-04-28 17:39:52
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter） - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑） - [ ] C5-1. Observability：Sentry（錯誤追蹤）+ PostHog（產品分析） - [ ] C5-2. Edge/Security：Cloudflare（WAF/CDN/Rate limit） - [ ] C5-3. Secrets：1Password Secrets Automation（或同級） - [ ] C5-4. Identity/Org：Clerk/WorkOS/Auth0（三選一） - [ ] C5-5. Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails） - [ ] C5-6. 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -266,11 +266,29 @@
   - `0bff54c` 尚未 push（git push origin main 被拒）；需手動 push 後在 server 更新 endpoint-alert.sh（`sudo cp` 或重跑 provision）
   - /ops/tools 頁自訂項目存 localStorage，不寫入 DB，換瀏覽器後消失（已在頁面內說明）
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:c049b96016c25d4e9c6ead4b41aae65d20ad1049bd3b45620fbc98c9e64b1ab4 -->
+
+### claude-code 2026-04-28 00:00
+
+- **完成（一句）**: 啟用 Gemini auto-classify（`OPS_INBOX_GEMINI_ENABLED=true` + `GEMINI_API_KEY`）、改善 prompt 格式、rebuild SG next-admin；新增 `ops-inbox-user-guide.md`，更新 README 與 incident-response-runbook 連結。
+- **變更路徑**:
+  - `agency-os/docs/operations/ops-inbox-user-guide.md`（新建）
+  - `agency-os/docs/operations/README.md`（Ops Inbox 條目）
+  - `agency-os/docs/operations/incident-response-runbook.md`（Related Documents）
+  - SG `/root/lobster-phase1/.env`（`OPS_INBOX_GEMINI_ENABLED=true`、`GEMINI_API_KEY` 填入）
+  - SG `/root/lobster-phase1/apps/next-admin/lib/ops-inbox/ai/gemini.ts`（prompt 結構化）
+- **Git**: 未 commit（server 側在 repo 外；本地文件待 ao-close）
+- **對應 TASKS 子字串（可選）**: Ops Inbox / Gemini auto-classify / ops-inbox-user-guide
+- **風險／待辦（可選）**:
+  - SG server `gemini.ts` prompt 改動未進 git；若重新部署需重改或從 server 拉回 `/app/ops/` 整包
+  - EU server `.env` 未設 Gemini（ops inbox 只跑在 SG，無影響）
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-28 09:39:38`
+- Time: `2026-04-28 17:39:50`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -280,13 +298,15 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260428-093938.md`
-- Closeout: `reports/closeout/closeout-20260428-093936.md`
+- Health: `reports/health/health-20260428-173950.md`
+- Closeout: `reports/closeout/closeout-20260428-173948.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+### 排程單一來源 + AO-CLOSE 聯動甘特
+- **`docs/overview/PROGRAM_SCHEDULE.json`**：三流（AO／LF／PJ）任務與日期；可複製到客戶專案或 `project-kit` 範本。
 - **`scripts/render-program-timeline-from-schedule.ps1`**：UTF-8 JSON → `PROGRAM_TIMELINE.md` 標記區（表 + Mermaid）；腳本本體 **ASCII-only** 以相容 PS 5.1。
 - **`generate-integrated-status-report.ps1`** 末尾**單次**呼叫渲染；**AO-CLOSE** 路徑因此每次收工會重渲時間軸（仍以 TASKS／Checklist／Discovery 為完成真相）。
 
@@ -344,7 +364,5 @@
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
-
-
 
 

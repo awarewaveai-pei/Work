@@ -4,7 +4,7 @@
 
 **路徑約定**：下文 **`lobster-factory/`** 指本目錄；**`<WORK_ROOT>`** 指 monorepo 根（含 `agency-os/`、`lobster-factory/`、`scripts/`）。在編輯器內對 Markdown 連結 **Ctrl+Click**（Mac：**Cmd+Click**）可開檔。
 
-**與 Agency OS 分工**：治理、雙機、收工閘道、租戶 SOP → [`agency-os/docs/overview/README.md`](../agency-os/docs/overview/README.md)、[`agency-os/docs/operations/README.md`](../agency-os/docs/operations/README.md)。本 README 以 **龍蝦工程與 `lobster-factory/docs/`** 為主。
+**與 Agency OS 分工**：治理、雙機、收工閘道、租戶 SOP → [`agency-os/docs/overview/OVERVIEW_INDEX.md`](../agency-os/docs/overview/OVERVIEW_INDEX.md)、[`agency-os/docs/operations/OPS_DOCS_INDEX.md`](../agency-os/docs/operations/OPS_DOCS_INDEX.md)。本 README 以 **龍蝦工程與 `lobster-factory/docs/`** 為主。
 
 ---
 

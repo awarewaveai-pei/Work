@@ -32,8 +32,7 @@
 - SOP 更新項目
 
 ## Related Documents (Auto-Synced)
-- `docs/operations/ops-inbox-user-guide.md` — Ops Inbox UI 操作手冊（警報收件匣、Gemini 診斷、Webhook 端點）
 - `docs/international/global-compliance-baseline.md`
 
-_Last synced: 2026-03-20 04:57:15 UTC_
+_Last synced: 2026-04-28 09:39:47 UTC_
 

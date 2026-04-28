@@ -1,5 +1,5 @@
 > **Owner（git SSOT）**：本檔為 `api.aware-wave.com`／phase1 **`node-api`** 邊界、路由演進與驗收之**唯一長篇正文**。  
-> **統管入口**（子網域、DNS、Nginx、相關連結）：[`README.md`](README.md)。  
+> **統管入口**（子網域、DNS、Nginx、相關連結）：[`EDGE_DOMAINS_INDEX.md`](EDGE_DOMAINS_INDEX.md)。
 > **不要**在 `~/.cursor/plans/` 另存一份相同正文；若 IDE 留有舊 `.plan.md` 全文，以本路徑為準更新，舊檔改 stub 或刪除。
 
 # `api.aware-wave.com` 詳盡用途與演進計畫
@@ -9,7 +9,7 @@
 | 角色 | 檔案 |
 |------|------|
 | **API／`node-api`／子網域邊界 — 唯一執行正文** | 本檔 |
-| **統管入口（主機名／連結匯總）** | [`README.md`](README.md) |
+| **統管入口（主機名／連結匯總）** | [`EDGE_DOMAINS_INDEX.md`](EDGE_DOMAINS_INDEX.md) |
 | **DNS／TLS／子網域操作表** | [`../operations/CLOUDFLARE_HETZNER_PHASE1.md`](../operations/CLOUDFLARE_HETZNER_PHASE1.md) |
 | **平行 workstream** | 觀測／告警：[`../operations/SENTRY_ALERT_POLICY.md`](../operations/SENTRY_ALERT_POLICY.md)；規則：[`../operations/rules-version-and-enforcement.md`](../operations/rules-version-and-enforcement.md) |
 

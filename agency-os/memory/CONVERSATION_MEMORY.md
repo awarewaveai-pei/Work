@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-28 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-28 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:c049b96016c25d4e9c6ead4b41aae65d20ad1049bd3b45620fbc98c9e64b1ab4 -->
 - **2026-04-28（收件匣契約補強）**：closeout 僅六個頂層欄位；遠端無 commit 操作併入 **風險／待辦**；**對應 TASKS** 僅一行單子字串（見範本與協作規則）；歷史併入區已對齊，**`6ecd0fd`**。
 - **2026-04-28 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-28 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:249d049468fe96e3908975a0b27baffe356a5455c9fdc60a1b47b9e466d9f3ae -->
 - **2026-04-28（Cursor 晚間／收工前）**
@@ -373,5 +374,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-28 01:39:35 UTC_
+_Last synced: 2026-04-28 09:39:47 UTC_
 
