@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canModifyIncidentStatus, readOpsRole } from "@/lib/ops-role";
