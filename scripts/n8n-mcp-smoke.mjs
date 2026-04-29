@@ -18,6 +18,9 @@
  */
 const token = process.env.N8N_AUTH_BEARER_TOKEN;
 const url = process.env.N8N_MCP_URL;
+const DEFAULT_MCP_PROTOCOL_VERSION = "2025-11-25";
+const rawProtocolVersion = process.env.MCP_PROTOCOL_VERSION;
+const MCP_PROTOCOL_VERSION = rawProtocolVersion?.trim() || DEFAULT_MCP_PROTOCOL_VERSION;
 
 if (!url || typeof url !== "string" || !url.trim()) {
   console.error("ERR=missing N8N_MCP_URL");
@@ -25,6 +28,12 @@ if (!url || typeof url !== "string" || !url.trim()) {
 }
 if (!token || typeof token !== "string" || !token.trim()) {
   console.error("ERR=missing N8N_AUTH_BEARER_TOKEN");
+  process.exit(1);
+}
+if (!/^\d{4}-\d{2}-\d{2}$/.test(MCP_PROTOCOL_VERSION)) {
+  console.error(
+    `ERR=invalid MCP_PROTOCOL_VERSION format: "${MCP_PROTOCOL_VERSION}" (expected YYYY-MM-DD)`
+  );
   process.exit(1);
 }
 
@@ -50,7 +59,7 @@ const headers = {
   Authorization: `Bearer ${token}`,
   "Content-Type": "application/json",
   Accept: "application/json, text/event-stream",
-  "MCP-Protocol-Version": "2025-06-18",
+  "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
 };
 
 async function post(body) {
@@ -81,7 +90,7 @@ try {
     id: 1,
     method: "initialize",
     params: {
-      protocolVersion: "2025-06-18",
+      protocolVersion: MCP_PROTOCOL_VERSION,
       capabilities: {},
       clientInfo: { name: "n8n-mcp-smoke", version: "1.0.0" },
     },

@@ -1,3 +1,23 @@
+import { writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const MCP_PROTOCOL_VERSION = "2025-11-25";
+const INIT_REQUEST = {
+  jsonrpc: "2.0",
+  id: 1,
+  method: "initialize",
+  params: {
+    protocolVersion: MCP_PROTOCOL_VERSION,
+    capabilities: {},
+    clientInfo: { name: "cursor-verify", version: "1.0" },
+  },
+};
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const initPayloadPath = resolve(__dirname, "mcp-init.json");
+writeFileSync(initPayloadPath, `${JSON.stringify(INIT_REQUEST)}\n`, "utf8");
+
 const token = process.env.N8N_AUTH_BEARER_TOKEN;
 if (!token) {
   console.error("ERR=missing N8N_AUTH_BEARER_TOKEN");
@@ -9,7 +29,7 @@ const headers = {
   Authorization: `Bearer ${token}`,
   "Content-Type": "application/json",
   Accept: "application/json, text/event-stream",
-  "MCP-Protocol-Version": "2025-06-18",
+  "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
 };
 
 async function post(body) {
@@ -32,16 +52,7 @@ async function post(body) {
   return { status: res.status, text, json };
 }
 
-const init = await post({
-  jsonrpc: "2.0",
-  id: 1,
-  method: "initialize",
-  params: {
-    protocolVersion: "2025-06-18",
-    capabilities: {},
-    clientInfo: { name: "cursor-local-probe", version: "1.0.0" },
-  },
-});
+const init = await post(INIT_REQUEST);
 
 const tools = await post({
   jsonrpc: "2.0",

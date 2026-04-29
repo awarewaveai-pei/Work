@@ -1,334 +1,355 @@
 {
-  "mcpServers": {
-    "posthog": {
-      "url": "https://mcp.posthog.com/mcp",
-      "headers": {
-        "Authorization": "Bearer ${env:POSTHOG_PERSONAL_API_KEY}"
-      },
-      "type": "http"
-    },
-    "copilot": {
-      "url": "https://api.githubcopilot.com/mcp",
-      "headers": {
-        "Authorization": "Bearer ${env:COPILOT_MCP_BEARER_TOKEN}"
-      },
-      "type": "http"
-    },
-    "chatgpt-fast": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-        "-Provider",
-        "openai"
-      ],
-      "env": {
-        "OPENAI_MODEL": "gpt-5.3-chat-latest",
-        "OPENAI_API_KEY": "${env:OPENAI_API_KEY}"
-      },
-      "command": "powershell"
-    },
-    "supabase-awarewave-postgres": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\run-postgres-mcp.ps1"
-      ],
-      "env": {
-        "SUPABASE_AWAREWAVE_POSTGRES_DSN": "${env:SUPABASE_AWAREWAVE_POSTGRES_DSN}"
-      },
-      "command": "powershell"
-    },
-    "supabase": {
-      "url": "http://localhost:8000/mcp",
-      "headers": {
-        "Authorization": "Bearer ${env:SUPABASE_AUTH_BEARER_TOKEN}"
-      },
-      "type": "http"
-    },
-    "grok-fast": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-        "-Provider",
-        "xai"
-      ],
-      "env": {
-        "GROK_MODEL": "grok-4.20-reasoning",
-        "XAI_API_KEY": "${env:XAI_API_KEY}"
-      },
-      "command": "powershell"
-    },
-    "cloudflare": {
-      "url": "https://mcp.cloudflare.com/mcp",
-      "headers": {
-        "Authorization": "Bearer ${env:CLOUDFLARE_AUTH_BEARER_TOKEN}"
-      },
-      "type": "http"
-    },
-    "work-global": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\run-filesystem-mcp.ps1"
-      ],
-      "command": "powershell"
-    },
-    "airtable": {
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@loticdigital/airtable-mcp-server"
-      ],
-      "env": {
-        "AIRTABLE_API_KEY": "${env:AIRTABLE_API_KEY}"
-      },
-      "command": "cmd"
-    },
-    "claude-fast": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-        "-Provider",
-        "anthropic"
-      ],
-      "env": {
-        "ANTHROPIC_MODEL": "claude-haiku-4-5-20251001",
-        "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}"
-      },
-      "command": "powershell"
-    },
-    "wordpress": {
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@automattic/mcp-wordpress-remote@latest"
-      ],
-      "env": {
-        "JWT_TOKEN": "${env:WORDPRESS_JWT_TOKEN}",
-        "WP_API_URL": "${env:WP_API_URL}"
-      },
-      "command": "cmd"
-    },
-    "canva": {
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "mcp-remote@latest",
-        "https://mcp.canva.com/mcp"
-      ],
-      "command": "cmd"
-    },
-    "perplexity": {
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@perplexity-ai/mcp-server"
-      ],
-      "env": {
-        "PERPLEXITY_API_KEY": "${env:PERPLEXITY_API_KEY}"
-      },
-      "command": "cmd"
-    },
-    "chatgpt-latest": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-        "-Provider",
-        "openai"
-      ],
-      "env": {
-        "OPENAI_MODEL": "gpt-5.4",
-        "OPENAI_API_KEY": "${env:OPENAI_API_KEY}"
-      },
-      "command": "powershell"
-    },
-    "grok-latest": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-        "-Provider",
-        "xai"
-      ],
-      "env": {
-        "GROK_MODEL": "grok-4.20-reasoning",
-        "XAI_API_KEY": "${env:XAI_API_KEY}"
-      },
-      "command": "powershell"
-    },
-    "github": {
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-github"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
-      },
-      "command": "cmd"
-    },
-    "replicate": {
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "replicate-mcp"
-      ],
-      "env": {
-        "REPLICATE_API_TOKEN": "${env:REPLICATE_API_TOKEN}",
-        "REPLICATE_WEBHOOK_SIGNING_KEY": "${env:REPLICATE_WEBHOOK_SIGNING_KEY}"
-      },
-      "command": "cmd"
-    },
-    "awarewave-ops": {
-      "args": [
-        "${workspaceFolder}\\mcp-local-wrappers\\awarewave-ops-mcp.mjs"
-      ],
-      "env": {
-        "GRAFANA_SERVICE_ACCOUNT_TOKEN": "${env:GRAFANA_SERVICE_ACCOUNT_TOKEN}",
-        "N8N_BASIC_AUTH_PASSWORD": "${env:N8N_BASIC_AUTH_PASSWORD}",
-        "SENTRY_API_BASE_URL": "${env:SENTRY_API_BASE_URL}",
-        "N8N_AUTH_BEARER_TOKEN": "${env:N8N_AUTH_BEARER_TOKEN}",
-        "SLACK_BOT_TOKEN": "${env:SLACK_BOT_TOKEN}",
-        "POSTHOG_API_BASE_URL": "${env:POSTHOG_API_BASE_URL}",
-        "APP_AWAREWAVE_BASE_URL": "${env:APP_AWAREWAVE_BASE_URL}",
-        "SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY": "${env:SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY}",
-        "CLOUDFLARE_API_BASE_URL": "${env:CLOUDFLARE_API_BASE_URL}",
-        "UPTIME_KUMA_BASE_URL": "${env:UPTIME_KUMA_BASE_URL}",
-        "SUPABASE_B_SERVICE_ROLE_KEY": "${env:SUPABASE_B_SERVICE_ROLE_KEY}",
-        "SUPABASE_B_URL": "${env:SUPABASE_B_URL}",
-        "SLACK_API_BASE_URL": "${env:SLACK_API_BASE_URL}",
-        "API_AWAREWAVE_BEARER_TOKEN": "${env:API_AWAREWAVE_BEARER_TOKEN}",
-        "SUPABASE_AWAREWAVE_URL": "${env:SUPABASE_AWAREWAVE_URL}",
-        "HETZNER_API_TOKEN": "${env:HETZNER_API_TOKEN}",
-        "POSTHOG_PERSONAL_API_KEY": "${env:POSTHOG_PERSONAL_API_KEY}",
-        "TRIGGER_API_URL": "${env:TRIGGER_API_URL}",
-        "GRAFANA_BASIC_PASSWORD": "${env:GRAFANA_BASIC_PASSWORD}",
-        "UPTIME_KUMA_API_KEY": "${env:UPTIME_KUMA_API_KEY}",
-        "API_AWAREWAVE_BASE_URL": "${env:API_AWAREWAVE_BASE_URL}",
-        "TRIGGER_ACCESS_TOKEN": "${env:TRIGGER_ACCESS_TOKEN}",
-        "N8N_API_BASE_URL": "${env:N8N_API_BASE_URL}",
-        "GRAFANA_BASIC_USER": "${env:GRAFANA_BASIC_USER}",
-        "NETDATA_BASE_URL": "${env:NETDATA_BASE_URL}",
-        "SUPABASE_A_URL": "${env:SUPABASE_A_URL}",
-        "N8N_BASIC_AUTH_USER": "${env:N8N_BASIC_AUTH_USER}",
-        "RESEND_API_KEY": "${env:RESEND_API_KEY}",
-        "GRAFANA_BASE_URL": "${env:GRAFANA_BASE_URL}",
-        "SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY": "${env:SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY}",
-        "HETZNER_API_BASE_URL": "${env:HETZNER_API_BASE_URL}",
-        "SUPABASE_SOULFULEXPRESSION_URL": "${env:SUPABASE_SOULFULEXPRESSION_URL}",
-        "APP_AWAREWAVE_BEARER_TOKEN": "${env:APP_AWAREWAVE_BEARER_TOKEN}",
-        "NETDATA_API_TOKEN": "${env:NETDATA_API_TOKEN}",
-        "SUPABASE_A_SERVICE_ROLE_KEY": "${env:SUPABASE_A_SERVICE_ROLE_KEY}",
-        "RESEND_API_BASE_URL": "${env:RESEND_API_BASE_URL}",
-        "SENTRY_AUTH_TOKEN": "${env:SENTRY_AUTH_TOKEN}",
-        "N8N_API_KEY": "${env:N8N_API_KEY}",
-        "SLACK_WEBHOOK_URL": "${env:SLACK_WEBHOOK_URL}",
-        "CLOUDFLARE_API_TOKEN": "${env:CLOUDFLARE_API_TOKEN}"
-      },
-      "command": "node"
-    },
-    "trigger": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\start-trigger-mcp.ps1",
-        "-ProjectRef",
-        "${env:TRIGGER_PROJECT_REF}"
-      ],
-      "env": {
-        "TRIGGER_API_URL": "${env:TRIGGER_API_URL}"
-      },
-      "command": "powershell"
-    },
-    "hetzner-ssh": {
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "mcp-server-ssh"
-      ],
-      "command": "cmd"
-    },
-    "n8n": {
-      "url": "http://localhost:5678/mcp-server/http",
-      "headers": {
-        "Authorization": "Bearer ${env:N8N_AUTH_BEARER_TOKEN}"
-      },
-      "type": "http"
-    },
-    "gemini-fast": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-        "-Provider",
-        "gemini"
-      ],
-      "env": {
-        "GEMINI_MODEL": "gemini-2.5-flash",
-        "GEMINI_API_KEY": "${env:GEMINI_API_KEY}"
-      },
-      "command": "powershell"
-    },
-    "claude-latest": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-        "-Provider",
-        "anthropic"
-      ],
-      "env": {
-        "ANTHROPIC_MODEL": "claude-sonnet-4-6",
-        "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}"
-      },
-      "command": "powershell"
-    },
-    "gemini-latest": {
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-        "-Provider",
-        "gemini"
-      ],
-      "env": {
-        "GEMINI_MODEL": "gemini-3.1-pro-preview",
-        "GEMINI_API_KEY": "${env:GEMINI_API_KEY}"
-      },
-      "command": "powershell"
-    }
-  }
+    "mcpServers":  {
+                       "posthog":  {
+                                       "url":  "https://mcp.posthog.com/mcp",
+                                       "headers":  {
+                                                       "Authorization":  "Bearer ${env:POSTHOG_PERSONAL_API_KEY}"
+                                                   },
+                                       "type":  "http"
+                                   },
+                       "copilot":  {
+                                       "url":  "https://api.githubcopilot.com/mcp",
+                                       "headers":  {
+                                                       "Authorization":  "Bearer ${env:COPILOT_MCP_BEARER_TOKEN}"
+                                                   },
+                                       "type":  "http"
+                                   },
+                       "resend":  {
+                                      "args":  [
+                                                   "/c",
+                                                   "npx",
+                                                   "-y",
+                                                   "resend-mcp"
+                                               ],
+                                      "env":  {
+                                                  "SENDER_EMAIL_ADDRESS":  "${env:RESEND_SENDER_EMAIL_ADDRESS}",
+                                                  "RESEND_API_KEY":  "${env:RESEND_API_KEY}",
+                                                  "REPLY_TO_EMAIL_ADDRESSES":  "${env:RESEND_REPLY_TO_EMAIL_ADDRESSES}"
+                                              },
+                                      "command":  "cmd"
+                                  },
+                       "chatgpt-fast":  {
+                                            "args":  [
+                                                         "-NoProfile",
+                                                         "-ExecutionPolicy",
+                                                         "Bypass",
+                                                         "-File",
+                                                         "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
+                                                         "-Provider",
+                                                         "openai"
+                                                     ],
+                                            "env":  {
+                                                        "OPENAI_MODEL":  "gpt-5.3-chat-latest",
+                                                        "OPENAI_API_KEY":  "${env:OPENAI_API_KEY}"
+                                                    },
+                                            "command":  "powershell"
+                                        },
+                       "supabase-awarewave-postgres":  {
+                                                           "args":  [
+                                                                        "-NoProfile",
+                                                                        "-ExecutionPolicy",
+                                                                        "Bypass",
+                                                                        "-File",
+                                                                        "${workspaceFolder}\\scripts\\run-postgres-mcp.ps1"
+                                                                    ],
+                                                           "env":  {
+                                                                       "SUPABASE_AWAREWAVE_POSTGRES_DSN":  "${env:SUPABASE_AWAREWAVE_POSTGRES_DSN}"
+                                                                   },
+                                                           "command":  "powershell"
+                                                       },
+                       "supabase":  {
+                                        "url":  "http://localhost:8000/mcp",
+                                        "headers":  {
+                                                        "Authorization":  "Bearer ${env:SUPABASE_AUTH_BEARER_TOKEN}"
+                                                    },
+                                        "type":  "http"
+                                    },
+                       "grok-fast":  {
+                                         "args":  [
+                                                      "-NoProfile",
+                                                      "-ExecutionPolicy",
+                                                      "Bypass",
+                                                      "-File",
+                                                      "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
+                                                      "-Provider",
+                                                      "xai"
+                                                  ],
+                                         "env":  {
+                                                     "GROK_MODEL":  "grok-4.20-reasoning",
+                                                     "XAI_API_KEY":  "${env:XAI_API_KEY}"
+                                                 },
+                                         "command":  "powershell"
+                                     },
+                       "cloudflare":  {
+                                          "url":  "https://mcp.cloudflare.com/mcp",
+                                          "headers":  {
+                                                          "Authorization":  "Bearer ${env:CLOUDFLARE_AUTH_BEARER_TOKEN}"
+                                                      },
+                                          "type":  "http"
+                                      },
+                       "work-global":  {
+                                           "args":  [
+                                                        "-NoProfile",
+                                                        "-ExecutionPolicy",
+                                                        "Bypass",
+                                                        "-File",
+                                                        "${workspaceFolder}\\scripts\\run-filesystem-mcp.ps1"
+                                                    ],
+                                           "command":  "powershell"
+                                       },
+                       "airtable":  {
+                                        "args":  [
+                                                     "/c",
+                                                     "npx",
+                                                     "-y",
+                                                     "@loticdigital/airtable-mcp-server"
+                                                 ],
+                                        "env":  {
+                                                    "AIRTABLE_API_KEY":  "${env:AIRTABLE_API_KEY}"
+                                                },
+                                        "command":  "cmd"
+                                    },
+                       "claude-fast":  {
+                                           "args":  [
+                                                        "-NoProfile",
+                                                        "-ExecutionPolicy",
+                                                        "Bypass",
+                                                        "-File",
+                                                        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
+                                                        "-Provider",
+                                                        "anthropic"
+                                                    ],
+                                           "env":  {
+                                                       "ANTHROPIC_MODEL":  "claude-haiku-4-5-20251001",
+                                                       "ANTHROPIC_API_KEY":  "${env:ANTHROPIC_API_KEY}"
+                                                   },
+                                           "command":  "powershell"
+                                       },
+                       "wordpress":  {
+                                         "args":  [
+                                                      "/c",
+                                                      "npx",
+                                                      "-y",
+                                                      "@automattic/mcp-wordpress-remote@latest"
+                                                  ],
+                                         "env":  {
+                                                     "JWT_TOKEN":  "${env:WORDPRESS_JWT_TOKEN}",
+                                                     "WP_API_URL":  "${env:WP_API_URL}"
+                                                 },
+                                         "command":  "cmd"
+                                     },
+                       "canva":  {
+                                     "args":  [
+                                                  "/c",
+                                                  "npx",
+                                                  "-y",
+                                                  "mcp-remote@latest",
+                                                  "https://mcp.canva.com/mcp"
+                                              ],
+                                     "command":  "cmd"
+                                 },
+                       "perplexity":  {
+                                          "args":  [
+                                                       "/c",
+                                                       "npx",
+                                                       "-y",
+                                                       "@perplexity-ai/mcp-server"
+                                                   ],
+                                          "env":  {
+                                                      "PERPLEXITY_API_KEY":  "${env:PERPLEXITY_API_KEY}"
+                                                  },
+                                          "command":  "cmd"
+                                      },
+                       "chatgpt-latest":  {
+                                              "args":  [
+                                                           "-NoProfile",
+                                                           "-ExecutionPolicy",
+                                                           "Bypass",
+                                                           "-File",
+                                                           "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
+                                                           "-Provider",
+                                                           "openai"
+                                                       ],
+                                              "env":  {
+                                                          "OPENAI_MODEL":  "gpt-5.4",
+                                                          "OPENAI_API_KEY":  "${env:OPENAI_API_KEY}"
+                                                      },
+                                              "command":  "powershell"
+                                          },
+                       "grok-latest":  {
+                                           "args":  [
+                                                        "-NoProfile",
+                                                        "-ExecutionPolicy",
+                                                        "Bypass",
+                                                        "-File",
+                                                        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
+                                                        "-Provider",
+                                                        "xai"
+                                                    ],
+                                           "env":  {
+                                                       "GROK_MODEL":  "grok-4.20-reasoning",
+                                                       "XAI_API_KEY":  "${env:XAI_API_KEY}"
+                                                   },
+                                           "command":  "powershell"
+                                       },
+                       "github":  {
+                                      "args":  [
+                                                   "/c",
+                                                   "npx",
+                                                   "-y",
+                                                   "@modelcontextprotocol/server-github"
+                                               ],
+                                      "env":  {
+                                                  "GITHUB_PERSONAL_ACCESS_TOKEN":  "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+                                              },
+                                      "command":  "cmd"
+                                  },
+                       "supabase-soulfulexpression":  {
+                                                          "url":  "https://mcp.supabase.com/mcp?project_ref=mffjqjiidbeibilmxzef\u0026features=database,docs,development,debugging",
+                                                          "headers":  {
+                                                                          "Authorization":  "Bearer ${env:SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
+                                                                      },
+                                                          "type":  "http"
+                                                      },
+                       "replicate":  {
+                                         "args":  [
+                                                      "/c",
+                                                      "npx",
+                                                      "-y",
+                                                      "replicate-mcp"
+                                                  ],
+                                         "env":  {
+                                                     "REPLICATE_API_TOKEN":  "${env:REPLICATE_API_TOKEN}",
+                                                     "REPLICATE_WEBHOOK_SIGNING_KEY":  "${env:REPLICATE_WEBHOOK_SIGNING_KEY}"
+                                                 },
+                                         "command":  "cmd"
+                                     },
+                       "awarewave-ops":  {
+                                             "args":  [
+                                                          "${workspaceFolder}\\mcp-local-wrappers\\awarewave-ops-mcp.mjs"
+                                                      ],
+                                             "env":  {
+                                                         "GRAFANA_SERVICE_ACCOUNT_TOKEN":  "${env:GRAFANA_SERVICE_ACCOUNT_TOKEN}",
+                                                         "N8N_BASIC_AUTH_PASSWORD":  "${env:N8N_BASIC_AUTH_PASSWORD}",
+                                                         "SENTRY_API_BASE_URL":  "${env:SENTRY_API_BASE_URL}",
+                                                         "N8N_AUTH_BEARER_TOKEN":  "${env:N8N_AUTH_BEARER_TOKEN}",
+                                                         "SLACK_BOT_TOKEN":  "${env:SLACK_BOT_TOKEN}",
+                                                         "POSTHOG_API_BASE_URL":  "${env:POSTHOG_API_BASE_URL}",
+                                                         "APP_AWAREWAVE_BASE_URL":  "${env:APP_AWAREWAVE_BASE_URL}",
+                                                         "SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY":  "${env:SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY}",
+                                                         "CLOUDFLARE_API_BASE_URL":  "${env:CLOUDFLARE_API_BASE_URL}",
+                                                         "UPTIME_KUMA_BASE_URL":  "${env:UPTIME_KUMA_BASE_URL}",
+                                                         "SUPABASE_B_SERVICE_ROLE_KEY":  "${env:SUPABASE_B_SERVICE_ROLE_KEY}",
+                                                         "SUPABASE_B_URL":  "${env:SUPABASE_B_URL}",
+                                                         "SLACK_API_BASE_URL":  "${env:SLACK_API_BASE_URL}",
+                                                         "API_AWAREWAVE_BEARER_TOKEN":  "${env:API_AWAREWAVE_BEARER_TOKEN}",
+                                                         "SUPABASE_AWAREWAVE_URL":  "${env:SUPABASE_AWAREWAVE_URL}",
+                                                         "HETZNER_API_TOKEN":  "${env:HETZNER_API_TOKEN}",
+                                                         "POSTHOG_PERSONAL_API_KEY":  "${env:POSTHOG_PERSONAL_API_KEY}",
+                                                         "TRIGGER_API_URL":  "${env:TRIGGER_API_URL}",
+                                                         "GRAFANA_BASIC_PASSWORD":  "${env:GRAFANA_BASIC_PASSWORD}",
+                                                         "UPTIME_KUMA_API_KEY":  "${env:UPTIME_KUMA_API_KEY}",
+                                                         "API_AWAREWAVE_BASE_URL":  "${env:API_AWAREWAVE_BASE_URL}",
+                                                         "TRIGGER_ACCESS_TOKEN":  "${env:TRIGGER_ACCESS_TOKEN}",
+                                                         "N8N_API_BASE_URL":  "${env:N8N_API_BASE_URL}",
+                                                         "GRAFANA_BASIC_USER":  "${env:GRAFANA_BASIC_USER}",
+                                                         "NETDATA_BASE_URL":  "${env:NETDATA_BASE_URL}",
+                                                         "SUPABASE_A_URL":  "${env:SUPABASE_A_URL}",
+                                                         "N8N_BASIC_AUTH_USER":  "${env:N8N_BASIC_AUTH_USER}",
+                                                         "RESEND_API_KEY":  "${env:RESEND_API_KEY}",
+                                                         "GRAFANA_BASE_URL":  "${env:GRAFANA_BASE_URL}",
+                                                         "SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY":  "${env:SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY}",
+                                                         "HETZNER_API_BASE_URL":  "${env:HETZNER_API_BASE_URL}",
+                                                         "SUPABASE_SOULFULEXPRESSION_URL":  "${env:SUPABASE_SOULFULEXPRESSION_URL}",
+                                                         "APP_AWAREWAVE_BEARER_TOKEN":  "${env:APP_AWAREWAVE_BEARER_TOKEN}",
+                                                         "NETDATA_API_TOKEN":  "${env:NETDATA_API_TOKEN}",
+                                                         "SUPABASE_A_SERVICE_ROLE_KEY":  "${env:SUPABASE_A_SERVICE_ROLE_KEY}",
+                                                         "RESEND_API_BASE_URL":  "${env:RESEND_API_BASE_URL}",
+                                                         "SENTRY_AUTH_TOKEN":  "${env:SENTRY_AUTH_TOKEN}",
+                                                         "N8N_API_KEY":  "${env:N8N_API_KEY}",
+                                                         "SLACK_WEBHOOK_URL":  "${env:SLACK_WEBHOOK_URL}",
+                                                         "CLOUDFLARE_API_TOKEN":  "${env:CLOUDFLARE_API_TOKEN}"
+                                                     },
+                                             "command":  "node"
+                                         },
+                       "trigger":  {
+                                       "args":  [
+                                                    "-NoProfile",
+                                                    "-ExecutionPolicy",
+                                                    "Bypass",
+                                                    "-File",
+                                                    "${workspaceFolder}\\scripts\\start-trigger-mcp.ps1",
+                                                    "-ProjectRef",
+                                                    "${env:TRIGGER_PROJECT_REF}"
+                                                ],
+                                       "env":  {
+                                                   "TRIGGER_API_URL":  "${env:TRIGGER_API_URL}"
+                                               },
+                                       "command":  "powershell"
+                                   },
+                       "hetzner-ssh":  {
+                                           "args":  [
+                                                        "/c",
+                                                        "npx",
+                                                        "-y",
+                                                        "mcp-server-ssh"
+                                                    ],
+                                           "command":  "cmd"
+                                       },
+                       "n8n":  {
+                                   "url":  "${env:N8N_MCP_URL}",
+                                   "headers":  {
+                                                   "Authorization":  "Bearer ${env:N8N_AUTH_BEARER_TOKEN}"
+                                               },
+                                   "type":  "http"
+                               },
+                       "gemini-fast":  {
+                                           "args":  [
+                                                        "-NoProfile",
+                                                        "-ExecutionPolicy",
+                                                        "Bypass",
+                                                        "-File",
+                                                        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
+                                                        "-Provider",
+                                                        "gemini"
+                                                    ],
+                                           "env":  {
+                                                       "GEMINI_MODEL":  "gemini-2.5-flash",
+                                                       "GEMINI_API_KEY":  "${env:GEMINI_API_KEY}"
+                                                   },
+                                           "command":  "powershell"
+                                       },
+                       "claude-latest":  {
+                                             "args":  [
+                                                          "-NoProfile",
+                                                          "-ExecutionPolicy",
+                                                          "Bypass",
+                                                          "-File",
+                                                          "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
+                                                          "-Provider",
+                                                          "anthropic"
+                                                      ],
+                                             "env":  {
+                                                         "ANTHROPIC_MODEL":  "claude-sonnet-4-6",
+                                                         "ANTHROPIC_API_KEY":  "${env:ANTHROPIC_API_KEY}"
+                                                     },
+                                             "command":  "powershell"
+                                         },
+                       "gemini-latest":  {
+                                             "args":  [
+                                                          "-NoProfile",
+                                                          "-ExecutionPolicy",
+                                                          "Bypass",
+                                                          "-File",
+                                                          "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
+                                                          "-Provider",
+                                                          "gemini"
+                                                      ],
+                                             "env":  {
+                                                         "GEMINI_MODEL":  "gemini-3.1-pro-preview",
+                                                         "GEMINI_API_KEY":  "${env:GEMINI_API_KEY}"
+                                                     },
+                                             "command":  "powershell"
+                                         }
+                   }
 }

@@ -206,7 +206,7 @@
     "n8n": {
       "enabled": true,
       "transport": "http",
-      "url": "http://localhost:5678/mcp-server/http",
+      "url": "${env:N8N_MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${env:N8N_AUTH_BEARER_TOKEN}"
       },
