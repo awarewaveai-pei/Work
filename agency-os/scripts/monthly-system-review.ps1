@@ -51,6 +51,7 @@ $agencyPhysical = Resolve-PhysicalDirectory -Path $agencyRoot
 $workRoot = Resolve-MonorepoRoot -AgencyPhysicalPath $agencyPhysical
 $verifyScript = Join-Path $workRoot "scripts\verify-build-gates.ps1"
 $genScript = Join-Path $agencyRoot "scripts\generate-integrated-status-report.ps1"
+$memScript = Join-Path $agencyRoot "scripts\check-supabase-memory-monthly.ps1"
 $worklogPath = Join-Path $agencyRoot "WORKLOG.md"
 $alertFile = Join-Path $agencyRoot "ALERT_REQUIRED.txt"
 
@@ -91,6 +92,31 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 $reportLabel = "OK"
+$memStatus = "SKIPPED"
+$memSummary = "memory check script missing"
+
+if (Test-Path -LiteralPath $memScript) {
+    $memOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $memScript -AgencyOsRoot $agencyRoot 2>&1)
+    $memExit = $LASTEXITCODE
+    $memStatusLine = $memOutput | Where-Object { "$_" -like "RESULT_STATUS=*" } | Select-Object -First 1
+    $memSummaryLine = $memOutput | Where-Object { "$_" -like "RESULT_SUMMARY=*" } | Select-Object -First 1
+
+    if ($memStatusLine) {
+        $memStatus = ("$memStatusLine" -replace "^RESULT_STATUS=", "").Trim()
+    } elseif ($memExit -eq 0) {
+        $memStatus = "PASS"
+    } else {
+        $memStatus = "ERROR"
+    }
+
+    if ($memSummaryLine) {
+        $memSummary = ("$memSummaryLine" -replace "^RESULT_SUMMARY=", "").Trim()
+    } elseif ($memOutput.Count -gt 0) {
+        $memSummary = ("$memOutput" | Select-Object -Last 1).ToString().Trim()
+    } else {
+        $memSummary = "no output"
+    }
+}
 
 if ($gatesRan -and (Test-Path -LiteralPath $alertFile)) {
     Remove-Item -LiteralPath $alertFile -Force
@@ -106,7 +132,7 @@ if (-not $SkipWorklog) {
         $dateHeading,
         "",
         "### Machine appendix (monthly-system-review)",
-        "- $stampLocal : $gateSummary ; integrated-status: generate-integrated-status-report.ps1 $reportLabel",
+        "- $stampLocal : $gateSummary ; integrated-status: generate-integrated-status-report.ps1 $reportLabel ; supabase-memory: $memStatus ($memSummary)",
         ""
     ) -join "`r`n"
     Add-Content -LiteralPath $worklogPath -Value $append -Encoding UTF8

@@ -1,18 +1,14 @@
 ﻿{
-    "last_run_utc":  "2026-04-29T18:24:39.7056194Z",
+    "last_run_utc":  "2026-04-29T18:34:17.9115711Z",
     "changed_files":  [
-                          "automation/REGISTER_MONTHLY_SYSTEM_REVIEW_TASK.ps1",
                           "automation/REGISTER_TENANT_TASKS.ps1",
-                          "automation/TENANT_AUTOMATION_RUNNER.ps1",
-                          "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
-                          "docs/operations/weekly-automation-framework.md"
+                          "docs/operations/weekly-automation-framework.md",
+                          "docs/overview/PROGRAM_TIMELINE.md"
                       ],
     "impacted_files":  [
-                           "automation/REGISTER_MONTHLY_SYSTEM_REVIEW_TASK.ps1",
                            "automation/REGISTER_TENANT_TASKS.ps1",
-                           "automation/TENANT_AUTOMATION_RUNNER.ps1",
-                           "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
-                           "docs/operations/weekly-automation-framework.md"
+                           "docs/operations/weekly-automation-framework.md",
+                           "docs/overview/PROGRAM_TIMELINE.md"
                        ],
     "auto_updated_files":  [
 

@@ -3,6 +3,7 @@
 This framework is the single place for all weekly automated jobs.
 
 For global monthly review, use a separate task: `AgencyOS-MonthlySystemReview` (`scripts/register-monthly-system-review-task.ps1`).
+Monthly flow includes `scripts/check-supabase-memory-monthly.ps1` and writes `agency-os/reports/monthly/supabase-memory-check-LATEST.md`.
 
 ## Canonical files
 
