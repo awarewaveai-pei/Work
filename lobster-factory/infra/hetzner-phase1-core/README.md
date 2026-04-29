@@ -69,6 +69,20 @@ curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯
 
 **專用子網域 `n8n.aware-wave.com`**（Apache 反代根路徑）與 **`N8N_PATH=/n8n/`** 不一致時，Cursor MCP 會對 **`/mcp-server/http`** 拿到 **404**——請在 **`.env`** 設 **`N8N_PATH=/`** 並對齊 **`N8N_WEBHOOK_URL`**，詳 **`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md`**（Hetzner 一節）。
 
+### n8n 映像升級（Docker）
+
+本 repo 以 **`.env` 的 `N8N_IMAGE_TAG`** 釘選 semver（預設見 **`.env.example`**；與 [npm 最新 stable](https://www.npmjs.com/package/n8n) 對齊時可一併更新該行）。升級前請先掃 [Release notes](https://docs.n8n.io/release-notes/)（跨多個 minor 時注意 DB migration／breaking changes）；備份策略見 **`LONG_TERM_OPS.md`**。
+
+在 **VPS**、Phase 1 compose 目錄內：
+
+```bash
+# 編輯 .env → N8N_IMAGE_TAG=<新版本>（與 git pull 後的 .env.example 對齊亦可）
+docker compose --env-file .env pull n8n && docker compose --env-file .env up -d n8n
+curl -sf http://127.0.0.1:5678/healthz && echo OK
+```
+
+升級後請開 n8n UI 抽檢 workflow；若使用 Cursor MCP，於 monorepo 根跑 **`n8n-mcp-smoke`**（見 **`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md`**）。
+
 WordPress 第一次安裝若耗時較長，`wordpress` 的 `healthcheck` 有較長 `start_period`；若 `nginx` 遲遲不起，看 `docker compose logs wordpress nginx`。若映像檔無 `curl`，將 compose 裡 WordPress `healthcheck` 改為 `wget -qO- http://127.0.0.1/` 同效。
 
 ## 備份（Phase 1 最小份）

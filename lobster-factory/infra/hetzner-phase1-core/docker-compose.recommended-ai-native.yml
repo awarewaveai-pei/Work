@@ -72,7 +72,7 @@ services:
       - internal_net
 
   n8n:
-    image: docker.n8n.io/n8nio/n8n:2.15.1
+    image: docker.n8n.io/n8nio/n8n:2.18.5
     container_name: aos-n8n
     restart: unless-stopped
     environment:

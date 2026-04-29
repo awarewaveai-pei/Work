@@ -52,7 +52,7 @@ services:
     logging: *lobster-logging
 
   n8n:
-    image: docker.n8n.io/n8nio/n8n:${N8N_IMAGE_TAG:-2.15.1}
+    image: docker.n8n.io/n8nio/n8n:${N8N_IMAGE_TAG:-2.18.5}
     container_name: lobster-n8n
     restart: unless-stopped
     environment:
