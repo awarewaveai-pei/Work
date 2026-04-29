@@ -89,6 +89,20 @@ try {
     console.error(
       "HINT=404 on MCP endpoint — enable Instance-level MCP in n8n, expose workflows, check reverse proxy /mcp-server/ — see agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md"
     );
+    try {
+      const u = new URL(url.trim());
+      const p = u.pathname.replace(/\/+$/, "") || "/";
+      if (p === "/mcp-server/http" || p.endsWith("/mcp-server/http")) {
+        if (!p.includes("/n8n/")) {
+          const alt = new URL(u.origin + "/n8n/mcp-server/http");
+          console.error(
+            `TRY_ALT_MCP_URL=${alt.href} (use when Docker still has N8N_PATH=/n8n/ — or fix server: N8N_PATH=/ for n8n.* subdomain)`
+          );
+        }
+      }
+    } catch {
+      /* ignore URL parse */
+    }
     if (init.text) console.error(`INIT_BODY_SNIPPET=${init.text.slice(0, 240)}`);
     process.exit(3);
   }

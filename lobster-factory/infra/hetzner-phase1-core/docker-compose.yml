@@ -60,7 +60,9 @@ services:
       N8N_HOST: ${N8N_HOST}
       N8N_PORT: "5678"
       N8N_PROTOCOL: http
-      N8N_PATH: /n8n/
+      # Default /n8n/ matches apex `aware-wave.com/n8n/` (see nginx lobster-aware-wave-locations.inc).
+      # Dedicated subdomain `n8n.aware-wave.com` with Apache ProxyPass `/` → 5678 root MUST use N8N_PATH=/ (set in .env).
+      N8N_PATH: ${N8N_PATH:-/n8n/}
       WEBHOOK_URL: ${N8N_WEBHOOK_URL}
       GENERIC_TIMEZONE: Asia/Taipei
       N8N_SECURE_COOKIE: "false"

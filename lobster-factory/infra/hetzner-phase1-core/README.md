@@ -67,6 +67,8 @@ curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯
 - API：`http://YOUR_HOST/api/health`
 - n8n：`http://YOUR_HOST/n8n/`
 
+**專用子網域 `n8n.aware-wave.com`**（Apache 反代根路徑）與 **`N8N_PATH=/n8n/`** 不一致時，Cursor MCP 會對 **`/mcp-server/http`** 拿到 **404**——請在 **`.env`** 設 **`N8N_PATH=/`** 並對齊 **`N8N_WEBHOOK_URL`**，詳 **`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md`**（Hetzner 一節）。
+
 WordPress 第一次安裝若耗時較長，`wordpress` 的 `healthcheck` 有較長 `start_period`；若 `nginx` 遲遲不起，看 `docker compose logs wordpress nginx`。若映像檔無 `curl`，將 compose 裡 WordPress `healthcheck` 改為 `wget -qO- http://127.0.0.1/` 同效。
 
 ## 備份（Phase 1 最小份）

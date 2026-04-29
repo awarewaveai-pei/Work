@@ -39,12 +39,33 @@ npm run n8n:mcp-smoke
    編輯 workflow → 設為 **Available in MCP**（或將 workflow 加入 MCP 可見清單），並視需要 **Active**。
 
 3. **n8n 版本**  
-   MCP HTTP 端點隨版本演進；若仍 404，對照官方 release notes／社群 issue，必要時 **升級** 至文件建議版本。
+   MCP HTTP 端點隨版本演進；若仍 404，對照官方 release notes／社群 issue，必要時 **升級** 至文件建議版本。持續維運節奏見下方〈保持 n8n 版本更新〉。
 
 4. **反向代理**  
    前方若有 **Nginx／Apache／Cloudflare**：須把 **`/mcp-server/`**（以及文件要求的 **`/mcp/`**、**`/webhook/`** 等）轉到 n8n 監聽埠（常見 **5678**），並避免錯誤的 **buffering** 導致 SSE／串流失敗（現象有時近似 404／中斷）。  
    Repo 內 Apache 範例：`lobster-factory/infra/hetzner-phase1-core/apache/sites-available/n8n.conf`（`ProxyPass /` → `http://localhost:5678/`）。  
    Staging E2E 與 proxy 注意：`n8n-staging-client-onboarding-e2e.md`（反向代理一節）。
+
+## 保持 n8n 版本更新（自託管）
+
+維持較新版本可取得最新功能與修正；長期落後再一次性大跳版，風險通常較高。
+
+### 升級習慣（官方建議要點）
+
+1. **經常升級**：盡量避免一次跨多個大版本；建議至少 **約每月** 檢視並安排升級，縮小每次變更範圍。
+2. **先看 Release notes**：升級前閱讀 [Release notes](https://docs.n8n.io/release-notes/)（breaking changes、資料庫 migration、手動步驟）。
+3. **先用測試環境**：使用 n8n **Environments**（或獨立 staging）複製／演練升級，確認 workflow 與 MCP 正常後再上 production。
+
+### 依安裝方式的官方更新說明
+
+具體指令與注意事項以官方為準：
+
+| 安裝方式 | 文件 |
+|----------|------|
+| **npm**（全域／更新指令） | [Hosting → Installation → npm](https://docs.n8n.io/hosting/installation/npm/)（頁內 **Updating** 一節） |
+| **Docker** | [Hosting → Installation → Docker](https://docs.n8n.io/hosting/installation/docker/) |
+
+升級完成後建議再跑本文件〈本機一鍵探測〉，確認 **`INIT_STATUS`**／**`TOOLS_COUNT`** 仍符合預期。
 
 ## 客戶端（Cursor／環境）
 

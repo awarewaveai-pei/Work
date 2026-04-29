@@ -20,7 +20,8 @@ $vars = @{
     RESEND_REPLY_TO_EMAIL_ADDRESSES = "ops@example.com"
     WP_API_URL                   = "https://example.com/"
     WORDPRESS_JWT_TOKEN          = "jwt-token-only"
-    # Cursor `.cursor/mcp.json` 已固定 n8n MCP URL；此變數給 Codex／腳本／awarewave-ops 用
+    # n8n MCP URL（shared registry 會同步到 Cursor/Codex/Copilot/Gemini/Claude）
+    # Subdomain root: …/mcp-server/http. Apex path /n8n/: …/n8n/mcp-server/http — see hetzner-phase1-core/.env.example Pattern A/B.
     N8N_MCP_URL                  = "https://n8n.aware-wave.com/mcp-server/http"
     N8N_AUTH_BEARER_TOKEN        = "..."
     N8N_API_BASE_URL             = "https://your-n8n.example.com/api/v1"
