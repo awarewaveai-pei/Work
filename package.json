@@ -8,7 +8,8 @@
     "mcp:governance": "powershell -ExecutionPolicy Bypass -File scripts/apply-shared-ai-governance.ps1",
     "rag:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-rag-env.ps1",
     "rag:embed": "tsx scripts/rag_seed_and_embedding.ts",
-    "rag:query": "tsx scripts/rag_query.ts"
+    "rag:query": "tsx scripts/rag_query.ts",
+    "n8n:mcp-smoke": "node scripts/n8n-mcp-smoke.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

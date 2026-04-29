@@ -42,6 +42,7 @@
 | MCP 鍵名與分工 | [cursor-mcp-and-plugin-inventory.md](cursor-mcp-and-plugin-inventory.md) |
 | Agent 執行期：工具驗證與 MCP／SSH／API 備援 | [CURSOR_AGENT_RUNTIME_PLAYBOOK.md](CURSOR_AGENT_RUNTIME_PLAYBOOK.md) |
 | 新增 MCP 步驟 | [mcp-add-server-quickstart.md](mcp-add-server-quickstart.md) |
+| **自託管 n8n MCP（404／連線）** | [n8n-self-hosted-mcp-troubleshooting.md](n8n-self-hosted-mcp-troubleshooting.md) |
 | MCP 憑證強化 | [mcp-secrets-hardening-runbook.md](mcp-secrets-hardening-runbook.md) |
 | 規則版本與強制判定 | [rules-version-and-enforcement.md](rules-version-and-enforcement.md) |
 | 新文件連動 Checklist | [new-doc-linkage-checklist.md](new-doc-linkage-checklist.md) |

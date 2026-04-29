@@ -77,6 +77,7 @@ curl -sS -X POST "https://<你的-staging-n8n>/webhook/<webhook-path>" \
 
 ## Related Documents
 
+- `docs/operations/n8n-self-hosted-mcp-troubleshooting.md`（MCP **404**／自託管連線）
 - `docs/standards/n8n-workflow-architecture.md`
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 - `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`（n8n 僅膠水邊界）

@@ -39,6 +39,16 @@ If the machine-local environment is already present, you can skip bootstrap and 
 powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
 ```
 
+### n8n MCP smoke test（自託管）
+
+若 **`N8N_MCP_URL`**／**`N8N_AUTH_BEARER_TOKEN`** 已設定（見 **`user-env.ps1`**），可在 monorepo 根執行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\n8n-mcp-smoke.ps1
+```
+
+或 **`npm run n8n:mcp-smoke`**。詳見 **`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md`**。
+
 This writes:
 
 - repo-local `.mcp.json`
