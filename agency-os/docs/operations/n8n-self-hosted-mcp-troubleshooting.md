@@ -28,6 +28,10 @@
 - **`lobster-factory/infra/hetzner-phase1-core/README.md`**：n8n **映像升級**與驗收指令。
 - **勿**在第三份文件複製整段表格——本檔為 **IDE／營運速查**；數值以伺服器 **`.env`** 為準。
 
+### Production EU（`/root/n8n`，與 Phase1 monorepo compose 分離）
+
+AwareWave 生產機上另有一份獨立 **`/root/n8n/docker-compose.yml`**（常接 **`supabase_default`** 等 **external** network，與 repo 內 **`hetzner-phase1-core/docker-compose.yml`** 不是同一份檔）。此部署應採上表 **Pattern B**：**`N8N_PATH=/`**、**`N8N_MCP_URL=https://n8n.aware-wave.com/mcp-server/http`**。營運驗收：對該 URL **POST**（**無** Bearer）應回 **401** `Authorization header not sent`（**有**路由）；若 **404** 再查反代與 **`N8N_PATH`**。映像宜**固定 semver**（例如 **`2.15.1`**），避免 **`latest`** 漂移。
+
 ## 本機一鍵探測（推薦）
 
 於 **monorepo 根**：

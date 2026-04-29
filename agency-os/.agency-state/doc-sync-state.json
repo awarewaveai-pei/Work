@@ -1,29 +1,12 @@
 ﻿{
-    "last_run_utc":  "2026-04-29T16:12:03.1776244Z",
+    "last_run_utc":  "2026-04-29T16:14:43.8884273Z",
     "changed_files":  [
-                          "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                          "docs/operations/n8n-self-hosted-mcp-troubleshooting.md",
-                          "docs/standards/n8n-workflow-architecture.md"
+                          "docs/operations/n8n-self-hosted-mcp-troubleshooting.md"
                       ],
     "impacted_files":  [
-                           "../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
-                           "../lobster-factory/docs/ROUTING_MATRIX.md",
-                           ".cursor/rules/64-architecture-mcp-routing.mdc",
-                           "AGENTS.md",
-                           "docs/operations/cursor-enterprise-rules-index.md",
-                           "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                           "docs/operations/n8n-self-hosted-mcp-troubleshooting.md",
-                           "docs/operations/tools-and-integrations.md",
-                           "docs/standards/n8n-workflow-architecture.md",
-                           "README.md",
-                           "TASKS.md"
+                           "docs/operations/n8n-self-hosted-mcp-troubleshooting.md"
                        ],
     "auto_updated_files":  [
-                               "AGENTS.md",
-                               "docs/operations/cursor-enterprise-rules-index.md",
-                               "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                               "docs/operations/tools-and-integrations.md",
-                               "docs/standards/n8n-workflow-architecture.md",
-                               "TASKS.md"
+
                            ]
 }
