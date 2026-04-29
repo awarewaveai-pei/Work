@@ -184,6 +184,27 @@ cd /root/supabase
 docker compose down && docker compose up -d
 ```
 
+### SSH tunnel: `channel N: open failed: administratively prohibited`
+
+本機跑 **`scripts/open-supabase-ssh-tunnel.ps1`** 時若出現此行，代表 **EU 的 `sshd` 拒絕 `-L` 轉發**（常見：`AllowTcpForwarding no`，或 **`PermitOpen`** 白名單未包含 `127.0.0.1:5432` / `:3000` / `:8000`）。
+
+**在 EU VPS（已 SSH 登入）檢查並修正**（需 root）：
+
+```bash
+grep -nE '^(AllowTcpForwarding|PermitOpen|GatewayPorts)' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null
+```
+
+- 若為 **`AllowTcpForwarding no`** → 改為 **`AllowTcpForwarding yes`**（或刪除該行採預設）。
+- 若有 **`PermitOpen`** 且過窄 → 註解掉、改寬，或明確列出：`127.0.0.1:5432 127.0.0.1:3000 127.0.0.1:8000`（語法以 `man sshd_config` 為準）。
+
+然後：
+
+```bash
+sshd -t && systemctl reload ssh
+```
+
+**不改 sshd 的繞道**：直接用 **`https://studio.aware-wave.com`**（不需 tunnel）。
+
 After editing `.env`:
 
 ```bash
