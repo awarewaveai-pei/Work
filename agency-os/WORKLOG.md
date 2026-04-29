@@ -9,6 +9,42 @@
 - 新增可重複稽核腳本 `lobster-factory/scripts/audit-workflows-security.mjs` 與 npm script `audit:workflows-security`，輸出到 `agency-os/reports/security/workflows-npm-audit-LATEST.md`。
 - 治理決策：此議題暫列 acceptable risk，採「每週巡檢 + 上游升版觸發重驗」策略，並回寫 `TASKS.md` 對應 backlog 條目。
 
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:25e58843f664d42542eab0888a7bcb1310588227b8e6eda82e50c801d2623323 -->
+
+### cursor 2026-04-29 17:44
+
+- **完成（一句）**: 建立每週自動化框架（單一排程＋可配置 jobs）並完成首輪安全稽核報告自動化。
+- **變更路徑**:
+  - `scripts/weekly-automation-config.json`
+  - `scripts/run-weekly-automation.ps1`
+  - `scripts/register-weekly-automation-task.ps1`
+  - `lobster-factory/scripts/audit-workflows-security.mjs`
+  - `agency-os/docs/operations/weekly-automation-framework.md`
+  - `agency-os/reports/weekly/weekly-automation-LATEST.md`
+  - `agency-os/reports/security/workflows-npm-audit-LATEST.md`
+- **Git**: b50935b
+- **對應 TASKS 子字串（可選）**: `lobster-factory/packages/workflows` `npm audit`
+- **風險／待辦（可選）**: 週排程已註冊 `AgencyOS-WeeklyAutomation` 並停用舊任務；若後續擴充每週工作，僅修改 `scripts/weekly-automation-config.json` 以避免衝突與重工。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:079cb9a0b98e15c48fb261277fe2049ed1c4450029bf4751e194e8ab8798edd5 -->
+
+### cursor 2026-04-29 17:47
+
+- **完成（一句）**: 完成每週自動化框架落地、排程註冊、報告輸出與收工閘道修復（daily 補齊）。
+- **變更路徑**:
+  - `scripts/weekly-automation-config.json`
+  - `scripts/run-weekly-automation.ps1`
+  - `scripts/register-weekly-automation-task.ps1`
+  - `agency-os/reports/weekly/weekly-automation-LATEST.md`
+  - `agency-os/memory/daily/2026-04-29.md`
+- **Git**: b50935b
+- **對應 TASKS 子字串（可選）**: `lobster-factory/packages/workflows` `npm audit`
+- **風險／待辦（可選）**: 今日 AO-CLOSE 曾因 inbox guard 與 daily `(TBD)` 兩道 strict gate 擋下；已修復後重跑，後續仍維持先補 inbox 再 AO-CLOSE 的節奏。
+
 ## 2026-04-28
 
 ### Daily
@@ -1015,7 +1051,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-28 09:39:47 UTC_
+_Last synced: 2026-04-29 09:45:39 UTC_
 
 ## 2026-03-20
 

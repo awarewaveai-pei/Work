@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-29 15:06:35
+- Generated: 2026-04-29 17:45:51
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -204,13 +204,63 @@
 > Full runbook: see `## Runbook Commands` in the source file.
 
 ## 5) memory/daily/2026-04-29.md
-_no file for today yet._
+# Daily Note - 2026-04-29
+
+## Done today
+- 建立每週自動化框架：`weekly-automation-config.json` + `run-weekly-automation.ps1` + `register-weekly-automation-task.ps1`。
+- 新增 workflows 安全稽核腳本 `audit-workflows-security.mjs`，並接入 `npm run audit:workflows-security`。
+- 實際註冊 Windows 排程 `AgencyOS-WeeklyAutomation`（每週一 09:10），停用舊 `AgencyOS-WeeklySystemReview` 避免重複執行。
+- 報告已集中輸出到 `agency-os/reports/weekly/`，安全報告輸出到 `agency-os/reports/security/`。
+
+## Current state
+- 每週自動化已可無人值守執行，採單一 config 管理 jobs，可擴充/停用而不需改多處腳本。
+- `packages/workflows` 安全議題目前為 2 筆 moderate（`@trigger.dev/sdk` -> `uuid`），無 high/critical，且上游 `fixAvailable=false`，暫列 acceptable risk。
+- AO-CLOSE gate 與文檔索引已對齊，後續可直接透過 `weekly-automation-framework.md` 維護。
+
+## Next steps
+- 下次 AO-RESUME 檢查 `agency-os/reports/weekly/weekly-automation-LATEST.md` 是否按週更新。
+- 若新增每週任務，僅修改 `scripts/weekly-automation-config.json`，並保留舊 job `enabled=false` 1 週觀察後再刪除。
+- 追蹤 Trigger 官方升版後重跑 `npm run audit:workflows-security`，若 `fixAvailable=true` 立即排入升級。
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:25e58843f664d42542eab0888a7bcb1310588227b8e6eda82e50c801d2623323 -->
+
+### cursor 2026-04-29 17:44
+
+- **完成（一句）**: 建立每週自動化框架（單一排程＋可配置 jobs）並完成首輪安全稽核報告自動化。
+- **變更路徑**:
+  - `scripts/weekly-automation-config.json`
+  - `scripts/run-weekly-automation.ps1`
+  - `scripts/register-weekly-automation-task.ps1`
+  - `lobster-factory/scripts/audit-workflows-security.mjs`
+  - `agency-os/docs/operations/weekly-automation-framework.md`
+  - `agency-os/reports/weekly/weekly-automation-LATEST.md`
+  - `agency-os/reports/security/workflows-npm-audit-LATEST.md`
+- **Git**: b50935b
+- **對應 TASKS 子字串（可選）**: `lobster-factory/packages/workflows` `npm audit`
+- **風險／待辦（可選）**: 週排程已註冊 `AgencyOS-WeeklyAutomation` 並停用舊任務；若後續擴充每週工作，僅修改 `scripts/weekly-automation-config.json` 以避免衝突與重工。
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:079cb9a0b98e15c48fb261277fe2049ed1c4450029bf4751e194e8ab8798edd5 -->
+
+### cursor 2026-04-29 17:47
+
+- **完成（一句）**: 完成每週自動化框架落地、排程註冊、報告輸出與收工閘道修復（daily 補齊）。
+- **變更路徑**:
+  - `scripts/weekly-automation-config.json`
+  - `scripts/run-weekly-automation.ps1`
+  - `scripts/register-weekly-automation-task.ps1`
+  - `agency-os/reports/weekly/weekly-automation-LATEST.md`
+  - `agency-os/memory/daily/2026-04-29.md`
+- **Git**: b50935b
+- **對應 TASKS 子字串（可選）**: `lobster-factory/packages/workflows` `npm audit`
+- **風險／待辦（可選）**: 今日 AO-CLOSE 曾因 inbox guard 與 daily `(TBD)` 兩道 strict gate 擋下；已修復後重跑，後續仍維持先補 inbox 再 AO-CLOSE 的節奏。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-28 17:39:50`
+- Time: `2026-04-29 17:45:42`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -220,19 +270,13 @@ _no file for today yet._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260428-173950.md`
-- Closeout: `reports/closeout/closeout-20260428-173948.md`
+- Health: `reports/health/health-20260429-174542.md`
+- Closeout: `reports/closeout/closeout-20260429-174540.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-### 排程單一來源 + AO-CLOSE 聯動甘特
-- **`docs/overview/PROGRAM_SCHEDULE.json`**：三流（AO／LF／PJ）任務與日期；可複製到客戶專案或 `project-kit` 範本。
-- **`scripts/render-program-timeline-from-schedule.ps1`**：UTF-8 JSON → `PROGRAM_TIMELINE.md` 標記區（表 + Mermaid）；腳本本體 **ASCII-only** 以相容 PS 5.1。
-- **`generate-integrated-status-report.ps1`** 末尾**單次**呼叫渲染；**AO-CLOSE** 路徑因此每次收工會重渲時間軸（仍以 TASKS／Checklist／Discovery 為完成真相）。
-
-### 續接驗證（使用者授權「進行」）
 - `git pull origin main`：**Already up to date**。
 - `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
 - `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
@@ -286,5 +330,11 @@ _no file for today yet._
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
+
+## 2026-04-29
+
+### Machine appendix (weekly-system-review)
+- 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
 
 

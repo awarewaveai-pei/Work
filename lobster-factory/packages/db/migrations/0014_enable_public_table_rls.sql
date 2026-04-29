@@ -1,59 +1,74 @@
--- Supabase security lint: rls_disabled_in_public
+-- Supabase security lint: rls_disabled_in_public.
 --
 -- Service-role jobs bypass RLS; client-side access must go through explicit
 -- policies. Enabling RLS without adding broad policies makes previously
 -- unprotected public tables default-deny for anon/authenticated users.
+--
+-- This project may have only part of the numbered migration stack applied, so
+-- each named table is checked before altering. The final sweep covers any
+-- manually-created public table, such as user_settings.
 
-alter table organizations enable row level security;
-alter table workspaces enable row level security;
-alter table profiles enable row level security;
-alter table organization_memberships enable row level security;
-alter table workspace_memberships enable row level security;
-alter table roles enable row level security;
-alter table permissions enable row level security;
-alter table role_permissions enable row level security;
-alter table user_role_assignments enable row level security;
-alter table projects enable row level security;
-alter table sites enable row level security;
-alter table environments enable row level security;
-
-alter table packages enable row level security;
-alter table package_versions enable row level security;
-alter table manifests enable row level security;
-alter table workflows enable row level security;
-alter table workflow_versions enable row level security;
-alter table workflow_runs enable row level security;
-alter table package_install_runs enable row level security;
-
-alter table policies enable row level security;
-alter table policy_versions enable row level security;
-alter table approval_policies enable row level security;
-alter table approvals enable row level security;
-alter table approval_steps enable row level security;
-alter table agents enable row level security;
-alter table tool_policies enable row level security;
-alter table agent_versions enable row level security;
-alter table agent_runs enable row level security;
-alter table incidents enable row level security;
-alter table error_events enable row level security;
-
-alter table sales_leads enable row level security;
-alter table marketing_campaigns enable row level security;
-alter table partner_referrals enable row level security;
-alter table media_assets enable row level security;
-alter table decision_scores enable row level security;
-alter table merchandising_insights enable row level security;
-alter table decision_recommendations enable row level security;
-alter table cx_retention_runs enable row level security;
-alter table cx_upsell_opportunities enable row level security;
-
-alter table clerk_organization_mappings enable row level security;
-alter table ops_action_catalog enable row level security;
-alter table ops_action_runs enable row level security;
-alter table ai_image_jobs enable row level security;
-alter table ops_audit_events enable row level security;
-alter table ops_incidents enable row level security;
-alter table ops_inbox_gemini_quota enable row level security;
+do $$
+declare
+  table_name text;
+  known_public_tables text[] := array[
+    'organizations',
+    'workspaces',
+    'profiles',
+    'organization_memberships',
+    'workspace_memberships',
+    'roles',
+    'permissions',
+    'role_permissions',
+    'user_role_assignments',
+    'projects',
+    'sites',
+    'environments',
+    'packages',
+    'package_versions',
+    'manifests',
+    'workflows',
+    'workflow_versions',
+    'workflow_runs',
+    'package_install_runs',
+    'policies',
+    'policy_versions',
+    'approval_policies',
+    'approvals',
+    'approval_steps',
+    'agents',
+    'tool_policies',
+    'agent_versions',
+    'agent_runs',
+    'incidents',
+    'error_events',
+    'sales_leads',
+    'marketing_campaigns',
+    'partner_referrals',
+    'media_assets',
+    'decision_scores',
+    'merchandising_insights',
+    'decision_recommendations',
+    'cx_retention_runs',
+    'cx_upsell_opportunities',
+    'clerk_organization_mappings',
+    'ops_action_catalog',
+    'ops_action_runs',
+    'ai_image_jobs',
+    'ops_audit_events',
+    'ops_incidents',
+    'ops_inbox_gemini_quota',
+    'user_settings'
+  ];
+begin
+  foreach table_name in array known_public_tables
+  loop
+    if to_regclass(format('public.%I', table_name)) is not null then
+      execute format('alter table public.%I enable row level security', table_name);
+    end if;
+  end loop;
+end
+$$;
 
 do $$
 declare
