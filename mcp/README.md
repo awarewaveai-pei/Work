@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\n8n-mcp-smoke.ps1
 ```
 
-或 **`npm run n8n:mcp-smoke`**。詳見 **`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md`**。
+或 **`npm run n8n:mcp-smoke`**。詳見 **`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md`**。若 **exit 3（404）** 且出現 **`TRY_ALT_MCP_URL`**，代表可能誤用了 apex URL 而伺服器為 **`N8N_PATH=/n8n/`**——仍以該文件對照表與伺服器 **`.env`** 為準。
 
 This writes:
 

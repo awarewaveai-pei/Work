@@ -61,6 +61,7 @@
 - **實作選型（長期 boring）**：Let’s Encrypt + **自動續期**（Certbot、Caddy、或 Traefik）— **定稿與證據**留在獨立 runbook 或 `WORKLOG`；本 repo 不綁死單一工具，以免文件與上游生命週期脫節。  
 - **續期失敗**：需有 **監控或 cron 告警**（信箱／Slack／現有 system-guard）；憑證過期屬 **P1 incident**。  
 - **`WORDPRESS_PUBLIC_URL`**、**`N8N_WEBHOOK_URL`**：改 **https** 時必同步 `.env` 並 **重建／重啟**依賴公開 URL 的服務（Next 的 `NEXT_PUBLIC_*` 須 **rebuild**）。
+- **Cursor／IDE MCP**：營運機 **`.env` 的 `N8N_PATH`** 與反代（Pattern A／B）若變更，請同步本機 **`N8N_MCP_URL`**（對照 **`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md`**），避免 **404** 與「文件一套、實機一套」漂移。
 
 ---
 

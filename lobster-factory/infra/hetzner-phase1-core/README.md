@@ -67,7 +67,7 @@ curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯
 - API：`http://YOUR_HOST/api/health`
 - n8n：`http://YOUR_HOST/n8n/`
 
-**專用子網域 `n8n.aware-wave.com`**（Apache 反代根路徑）與 **`N8N_PATH=/n8n/`** 不一致時，Cursor MCP 會對 **`/mcp-server/http`** 拿到 **404**——請在 **`.env`** 設 **`N8N_PATH=/`** 並對齊 **`N8N_WEBHOOK_URL`**，詳 **`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md`**（Hetzner 一節）。
+**`N8N_PATH`／`N8N_WEBHOOK_URL`／Cursor `N8N_MCP_URL`** 須與 **`.env.example` Pattern A 或 B** 擇一對齊；對照表與 **404／`TRY_ALT`** 說明見 **`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md`**（勿與反代假設混用兩種型態）。
 
 ### n8n 映像升級（Docker）
 

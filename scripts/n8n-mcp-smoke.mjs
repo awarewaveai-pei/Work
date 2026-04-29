@@ -12,6 +12,9 @@
  *   3 — HTTP 404 (usually instance MCP off, proxy path, or unsupported n8n version)
  *
  * Does not print secret values.
+ *
+ * N8N_PATH / TRY_ALT hint rules (apex vs n8n.* subdomain):
+ *   agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md
  */
 const token = process.env.N8N_AUTH_BEARER_TOKEN;
 const url = process.env.N8N_MCP_URL;
@@ -23,6 +26,24 @@ if (!url || typeof url !== "string" || !url.trim()) {
 if (!token || typeof token !== "string" || !token.trim()) {
   console.error("ERR=missing N8N_AUTH_BEARER_TOKEN");
   process.exit(1);
+}
+
+/**
+ * Suggest TRY_ALT `…/n8n/mcp-server/http` only for apex-style hosts where n8n may be
+ * mounted under `/n8n/` (Pattern A). Pattern B uses a dedicated host (e.g. `n8n.example.com`)
+ * with `N8N_PATH=/` — MCP stays at `/mcp-server/http`; prepending `/n8n/` is wrong.
+ * Loopback is typically direct-to-n8n at root; do not suggest path prefix there.
+ */
+function shouldSuggestApexN8nPathPrefix(hostname) {
+  const h = String(hostname).toLowerCase();
+  if (h === "localhost" || h === "127.0.0.1" || h === "::1") {
+    return false;
+  }
+  const first = h.split(".")[0] || "";
+  if (first === "n8n") {
+    return false;
+  }
+  return true;
 }
 
 const headers = {
@@ -93,10 +114,10 @@ try {
       const u = new URL(url.trim());
       const p = u.pathname.replace(/\/+$/, "") || "/";
       if (p === "/mcp-server/http" || p.endsWith("/mcp-server/http")) {
-        if (!p.includes("/n8n/")) {
+        if (!p.includes("/n8n/") && shouldSuggestApexN8nPathPrefix(u.hostname)) {
           const alt = new URL(u.origin + "/n8n/mcp-server/http");
           console.error(
-            `TRY_ALT_MCP_URL=${alt.href} (use when Docker still has N8N_PATH=/n8n/ — or fix server: N8N_PATH=/ for n8n.* subdomain)`
+            `TRY_ALT_MCP_URL=${alt.href} (apex / main-site URL missing /n8n/ prefix while server uses N8N_PATH=/n8n/ — on n8n.* subdomain use root /mcp-server/http with N8N_PATH=/)`
           );
         }
       }
