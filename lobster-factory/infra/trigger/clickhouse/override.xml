@@ -11,34 +11,36 @@
     MEMORY_LIMIT_EXCEEDED on every trigger-webapp startup (crash-loop).
     Raised 2026-04-29.
 
-    TTL policies below keep all system log tables bounded to 7 days so RSS
-    never creeps back up without action.
+    TTL policies below keep system logs bounded by retention windows so RSS
+    does not creep up without action.
   -->
   <max_server_memory_usage>1717986918</max_server_memory_usage>
 
-  <!-- ── System log TTL: auto-delete entries older than 7 days ── -->
+  <!-- ── System log TTL: tiered retention policy ──────────────────────────
+       Rationale:
+         7d  — high-volume traces/metrics (replaced by Netdata for long-term)
+         14d — query & text logs (useful for post-incident perf regression)
+         30d — error log (recurring / rare bugs need a month of history)
+  ──────────────────────────────────────────────────────────────────────── -->
   <trace_log>
     <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
   </trace_log>
-  <text_log>
-    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
-  </text_log>
   <metric_log>
     <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
   </metric_log>
   <asynchronous_metric_log>
     <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
   </asynchronous_metric_log>
-  <query_log>
-    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
-  </query_log>
   <processors_profile_log>
     <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
   </processors_profile_log>
-  <latency_log>
-    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
-  </latency_log>
+  <text_log>
+    <ttl>event_date + INTERVAL 14 DAY DELETE</ttl>
+  </text_log>
+  <query_log>
+    <ttl>event_date + INTERVAL 14 DAY DELETE</ttl>
+  </query_log>
   <error_log>
-    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+    <ttl>event_date + INTERVAL 30 DAY DELETE</ttl>
   </error_log>
 </clickhouse>

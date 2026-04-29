@@ -24,6 +24,8 @@ services:
     container_name: trigger-postgres
     restart: unless-stopped
     logging: *trigger-logging
+    mem_limit: 512m
+    cpus: "1.0"
     command:
       - -c
       - wal_level=logical
@@ -37,7 +39,7 @@ services:
       - lf-trg-webapp
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 15s
@@ -47,19 +49,21 @@ services:
     container_name: trigger-redis
     restart: unless-stopped
     logging: *trigger-logging
+    mem_limit: 256m
+    cpus: "0.3"
     volumes:
       - trigger_redis_data:/data
     networks:
       - lf-trg-webapp
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 10s
 
   clickhouse:
-    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-latest}
+    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-24.8.8-debian-12-r0}
     container_name: trigger-clickhouse
     restart: unless-stopped
     logging: *trigger-logging
@@ -82,10 +86,30 @@ services:
           "CMD-SHELL",
           "clickhouse-client --host localhost --port 9000 --user \"$$CLICKHOUSE_ADMIN_USER\" --password \"$$CLICKHOUSE_ADMIN_PASSWORD\" --query 'SELECT 1'",
         ]
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  clickhouse-config-check:
+    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-24.8.8-debian-12-r0}
+    container_name: trigger-clickhouse-config-check
+    profiles: ["preflight"]
+    restart: "no"
+    logging: *trigger-logging
+    command:
+      [
+        "/bin/sh",
+        "-lc",
+        "clickhouse-server --config-file=/bitnami/clickhouse/etc/config.xml --check-config",
+      ]
+    environment:
+      CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_PASSWORD:-password}
+    volumes:
+      - ./clickhouse/override.xml:/bitnami/clickhouse/etc/config.d/override.xml:ro
+    networks:
+      - lf-trg-webapp
 
   registry:
     image: registry:${REGISTRY_IMAGE_TAG:-2}
@@ -109,6 +133,7 @@ services:
     restart: unless-stopped
     logging: *trigger-logging
     mem_limit: 384m
+    cpus: "0.3"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-very-safe-password}
@@ -123,7 +148,7 @@ services:
       - ${MINIO_PUBLISH_IP:-127.0.0.1}:9001:9001
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
+      interval: 30s
       timeout: 10s
       retries: 5
       start_period: 20s
@@ -133,6 +158,8 @@ services:
     container_name: trigger-electric
     restart: unless-stopped
     logging: *trigger-logging
+    mem_limit: 384m
+    cpus: "0.5"
     depends_on:
       postgres:
         condition: service_healthy
@@ -144,7 +171,7 @@ services:
       - lf-trg-webapp
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/v1/health"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 20s
@@ -245,6 +272,8 @@ services:
     container_name: trigger-docker-proxy
     restart: unless-stopped
     logging: *trigger-logging
+    mem_limit: 64m
+    cpus: "0.1"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -271,6 +300,7 @@ services:
     user: root
     command: sh -c "chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start"
     mem_limit: 1280m
+    cpus: "1.0"
     depends_on:
       docker-proxy:
         condition: service_healthy
