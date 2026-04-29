@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "taskName": "AgencyOS-WeeklyAutomation",
+  "schedule": {
+    "dayOfWeek": "Monday",
+    "time": "09:10"
+  },
+  "reportDirectory": "agency-os/reports/weekly",
+  "jobs": [
+    {
+      "id": "weekly-system-review",
+      "enabled": true,
+      "type": "powershellFile",
+      "path": "scripts/weekly-system-review.ps1",
+      "arguments": [
+        "-AgencyOsRoot",
+        "agency-os"
+      ],
+      "description": "Run weekly build gates and integrated status report."
+    },
+    {
+      "id": "workflows-security-audit",
+      "enabled": true,
+      "type": "process",
+      "workingDirectory": "lobster-factory",
+      "filePath": "npm",
+      "arguments": [
+        "run",
+        "audit:workflows-security"
+      ],
+      "description": "Run workflows npm audit and emit security report."
+    }
+  ]
+}

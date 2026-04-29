@@ -2,6 +2,13 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-29
+
+### Daily
+- `lobster-factory/packages/workflows` 進行 `npm audit --json` + `npm outdated` 複核：目前僅 2 筆 moderate（`@trigger.dev/sdk` -> `uuid`），無 high/critical，且上游 `fixAvailable=false`（最新仍 `4.4.4`）。
+- 新增可重複稽核腳本 `lobster-factory/scripts/audit-workflows-security.mjs` 與 npm script `audit:workflows-security`，輸出到 `agency-os/reports/security/workflows-npm-audit-LATEST.md`。
+- 治理決策：此議題暫列 acceptable risk，採「每週巡檢 + 上游升版觸發重驗」策略，並回寫 `TASKS.md` 對應 backlog 條目。
+
 ## 2026-04-28
 
 ### Daily
@@ -1436,4 +1443,10 @@ _Last synced: 2026-04-28 09:39:47 UTC_
 - 要點摘要：`gh` + `gh auth login`（筆電）；Node／`lobster-factory\packages\workflows` `npm ci`；**DPAPI vault 與 MCP 每台各自設定**；開工見 `REMOTE_WORKSTATION_STARTUP.md`。
 - **最短指令正本**：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§1.5**（筆電／新機複製貼上序列）；根 `README.md` 他機接線條目已連到 §1.5；`TASKS` 雙機項已連回 §1.5。
 - **2026-04-01 整合** — 避免 §1／§1.5／§2 重工與邏輯矛盾：`§1` 僅剩「已 clone 之 `pull`」並指向 §1.5；`§2` 例行步驟補上 **`packages/workflows` `npm ci`**（與 lockfile 位置一致；非舊的錯誤 `lobster-factory` 根目錄 `npm ci`）；`§2.1`／`§6`／`§5` 與 **§1.5 做完後** 指引對齊；**EXECUTION_DASHBOARD**（公司機摘要）、**RESUME_AFTER_REBOOT**（換機段）、**AGENTS**（雙機）、**CONVERSATION_MEMORY**、根 **README** 一併與 `REMOTE_WORKSTATION_STARTUP` 單一真相對齊。
+
+
+## 2026-04-29
+
+### Machine appendix (weekly-system-review)
+- 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
 

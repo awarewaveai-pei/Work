@@ -20,6 +20,7 @@
     "validate:docs": "node scripts/validate-doc-integrity.mjs",
     "validate:operable-e2e": "node scripts/validate-operable-e2e-skeleton.mjs",
     "validate:artifacts-governance": "node scripts/validate-artifacts-governance.mjs",
-    "audit:artifacts-governance": "node scripts/audit-artifacts-governance.mjs"
+    "audit:artifacts-governance": "node scripts/audit-artifacts-governance.mjs",
+    "audit:workflows-security": "node scripts/audit-workflows-security.mjs"
   }
 }

@@ -32,6 +32,7 @@
 | 系統守護與通知 | [system-guard-and-notification.md](system-guard-and-notification.md) |
 | 系統操作 SOP | [system-operation-sop.md](system-operation-sop.md) |
 | Run ID 追溯規格 | [ONBOARDING_A10_2_RUN_ID_TRACEABILITY_SPEC.md](ONBOARDING_A10_2_RUN_ID_TRACEABILITY_SPEC.md) |
+| 每週自動化框架（可擴充 jobs + 自動出報告） | [weekly-automation-framework.md](weekly-automation-framework.md) |
 
 ### Cursor／IDE／文件連動
 

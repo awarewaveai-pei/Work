@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-28 17:39:52
+- Generated: 2026-04-29 15:06:35
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,86 +203,8 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-28.md
-# Daily Note - 2026-04-28
-
-## Done today
-- `TASKS.md`：新增 **（Ops Inbox Path B）生產收斂未完成 — 明日 `AO-RESUME` 須口頭＋書面報告**（含 health／ingest token／四來源腳本／Inbox／Slack 驗收項與 `OPS_INBOX_CLAUDE_TEST_PROMPT.md` 連結）。
-- `WORKLOG.md`：新增 `## 2026-04-28` 與 Closeout 證據列；收工對齊明日開機報告義務。
-
-## Current state
-- Ops Inbox UI 已上新版，但 **ingest token／Slack 環境** 仍待營運在 SG 補齊；合成測試腳本已於 repo，需 token 後才可驗四來源寫入。
-
-## Next steps
-- 明日 **`AO-RESUME`**：依新增 TASKS 條目口頭＋書面報告 Ops Inbox 收斂狀態（health JSON、腳本結果、Slack／Notify Log）。
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:970fdda2d2b61eb458ffa2b76cf5bc8c34f9ebb9df281994b4ac0ce1939c6424 -->
-
-### claude 2026-04-28 02:10
-
-- **完成（一句）**: Ops Inbox Path B 端到端測試全通 + 修復兩個 bug（health route 服務端程式碼過舊、test script RUN_ID JSON 無效）
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/scripts/test-ops-inbox-webhooks.sh`（monitor.id 加引號）
-  - `lobster-factory/infra/hetzner-phase1-core/scripts/test-ops-inbox-webhooks.ps1`（移除 [int] 強制轉型）
-  - `/root/lobster-phase1/apps/next-admin/app/api/ops/inbox/health/route.ts`（伺服器直接改為 getSupabaseServerClient，rebuild）
-  - `/root/lobster-phase1/.env`（設定 OPS_INBOX_INGEST_TOKEN、OPS_INBOX_NOTIFY_ENABLED=true、OPS_INBOX_SLACK_INCIDENTS_WEBHOOK）
-- **Git**: da3db86
-- **對應 TASKS 子字串（可選）**: ops-inbox, Path B, webhook test
-- **風險／待辦（可選）**: 伺服器 /root/lobster-phase1/ 原始碼與 repo 有落差（至少 health route），建議下次 git pull 補齊；Slack 通知需確認實際頻道是否收到訊息
-
-
-### claude 2026-04-27 23:59
-
-- **完成（一句）**: Cloudflare SSL → Full Strict、SG/EU reverse proxy 全驗證、所有 admin 工具登入保護確認、AWARE_WAVE_CREDENTIALS.md 最新版對照完成
-- **變更路徑**:
-  - `~/.claude/projects/d--Work/memory/reference_cloudflare.md`（更新 MCP Token、WAF wp-login 狀態、SSL=Strict）
-- **Git**: 未 commit（本 session 僅更新 memory；repo 本體無程式碼變更）
-- **對應 TASKS 子字串（可選）**: Cloudflare SSL Full Strict, proxy verification, admin login protection
-- **風險／待辦（可選）**: Slack #infra-alerts 批次刪除已取消（不再需要）
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:249d049468fe96e3908975a0b27baffe356a5455c9fdc60a1b47b9e466d9f3ae -->
-
-### claude-sonnet-4-6 2026-04-28 09:30
-
-- **完成（一句）**: Ops Inbox UI 全面修正（去重連結、加 signal_type badge、message 預覽、全 AI 工具、tools 管理頁）、endpoint-alert 修復停止 journal spam、server 磁碟清理釋放 13GB
-- **變更路徑**:
-  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/components/IncidentCard.tsx` — 移除 footer 重複 source 連結；加 signal_type 彩色 badge；加 message 預覽（無 AI summary 時顯示）
-  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/[id]/page.tsx` — OpenInCursorButton 改為對所有事件顯示（移除 local-repo 條件）
-  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/page.tsx` — header 加 ⚙️ Tools 連結；補 Link import（build fix）
-  - `infra/hetzner-phase1-core/apps/next-admin/app/ops/tools/page.tsx` — 新建 /ops/tools 頁面，列出 7 個 AI 工具 + 1 個 Slack 通知頻道，提供表單新增自訂工具/頻道（localStorage）
-  - `infra/hetzner-phase1-core/scripts/endpoint-alert.sh` — 空 WEBHOOK_URL 改為只警告一次（stamp file）、繼續跑 HTTP 檢查，不再每分鐘 exit 1 刷 journal
-- **Git**:
-  - `53b70c7` fix(ops-inbox): improve source clarity for Netdata/Kuma/Sentry
-  - `881edb1` feat(ops-inbox): add all 5 AI tool buttons to incident detail page
-  - `566161f` fix(ops-inbox): fix Supabase URL, badge count, source links, filter tabs
-  - `431e1c5` feat(ops-inbox): fix duplicate link, add error context, always show all 5 AI tools, add tools management page
-  - `036b977` fix(ops-inbox): add missing Link import in inbox page
-  - `0bff54c` fix(endpoint-alert): skip Slack when WEBHOOK_URL empty, prevent journal spam
-- **對應 TASKS 子字串（可選）**: （Ops Inbox Path B）生產收斂未完成
-- **風險／待辦（可選）**:
-  - 遠端 SG（無 git commit；應急清碟）：`journalctl --vacuum-time=7d` 約釋放 591MB journal；`docker system prune -f` 約釋放 12.5GB build cache／舊 network；`truncate -s 0 /var/log/btmp` 約清 52MB；磁碟使用率由約 45% 降至約 28%（剩約 52G 可用）。
-  - `0bff54c` 尚未 push（git push origin main 被拒）；需手動 push 後在 server 更新 endpoint-alert.sh（`sudo cp` 或重跑 provision）
-  - /ops/tools 頁自訂項目存 localStorage，不寫入 DB，換瀏覽器後消失（已在頁面內說明）
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:c049b96016c25d4e9c6ead4b41aae65d20ad1049bd3b45620fbc98c9e64b1ab4 -->
-
-### claude-code 2026-04-28 00:00
-
-- **完成（一句）**: 啟用 Gemini auto-classify（`OPS_INBOX_GEMINI_ENABLED=true` + `GEMINI_API_KEY`）、改善 prompt 格式、rebuild SG next-admin；新增 `ops-inbox-user-guide.md`，更新 README 與 incident-response-runbook 連結。
-- **變更路徑**:
-  - `agency-os/docs/operations/ops-inbox-user-guide.md`（新建）
-  - `agency-os/docs/operations/README.md`（Ops Inbox 條目）
-  - `agency-os/docs/operations/incident-response-runbook.md`（Related Documents）
-  - SG `/root/lobster-phase1/.env`（`OPS_INBOX_GEMINI_ENABLED=true`、`GEMINI_API_KEY` 填入）
-  - SG `/root/lobster-phase1/apps/next-admin/lib/ops-inbox/ai/gemini.ts`（prompt 結構化）
-- **Git**: 未 commit（server 側在 repo 外；本地文件待 ao-close）
-- **對應 TASKS 子字串（可選）**: Ops Inbox / Gemini auto-classify / ops-inbox-user-guide
-- **風險／待辦（可選）**:
-  - SG server `gemini.ts` prompt 改動未進 git；若重新部署需重改或從 server 拉回 `/app/ops/` 整包
-  - EU server `.env` 未設 Gemini（ops inbox 只跑在 SG，無影響）
+## 5) memory/daily/2026-04-29.md
+_no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
