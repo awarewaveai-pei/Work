@@ -79,6 +79,8 @@ services:
       N8N_HOST: ${N8N_HOST}
       N8N_PORT: "5678"
       N8N_PROTOCOL: http
+      # Same rule as docker-compose.yml — explicit .env only (Pattern A /n8n/ vs Pattern B /).
+      N8N_PATH: ${N8N_PATH:?N8N_PATH is required in .env - set /n8n/ (Pattern A) or / (Pattern B); see .env.example}
       WEBHOOK_URL: ${N8N_WEBHOOK_URL}
       GENERIC_TIMEZONE: Asia/Taipei
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
