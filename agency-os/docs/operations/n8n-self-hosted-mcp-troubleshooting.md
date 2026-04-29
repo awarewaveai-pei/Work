@@ -28,9 +28,12 @@
 - **`lobster-factory/infra/hetzner-phase1-core/README.md`**：n8n **映像升級**與驗收指令。
 - **勿**在第三份文件複製整段表格——本檔為 **IDE／營運速查**；數值以伺服器 **`.env`** 為準。
 
-### Production EU（`/root/n8n`，與 Phase1 monorepo compose 分離）
+### 另有獨立 compose（例：主機上 `/root/n8n`）
 
-AwareWave 生產機上另有一份獨立 **`/root/n8n/docker-compose.yml`**（常接 **`supabase_default`** 等 **external** network，與 repo 內 **`hetzner-phase1-core/docker-compose.yml`** 不是同一份檔）。此部署應採上表 **Pattern B**：**`N8N_PATH=/`**、**`N8N_MCP_URL=https://n8n.aware-wave.com/mcp-server/http`**。營運驗收：對該 URL **POST**（**無** Bearer）應回 **401** `Authorization header not sent`（**有**路由）；若 **404** 再查反代與 **`N8N_PATH`**。映像宜**固定 semver**（例如 **`2.15.1`**），避免 **`latest`** 漂移。
+與 **`hetzner-phase1-core/docker-compose.yml` 可並存**另一份營運用 compose（常見 **`/root/n8n/docker-compose.yml`**，可能接 **external** network）。**路徑規則仍為上文對照表**；生產常為 **Pattern B**（**`N8N_PATH=/`**，**`N8N_MCP_URL`** 形如 **`https://n8n.<網域>/mcp-server/http`**，以實際網域為準）。
+
+- **映像／semver**：**不得**用本檔或 **`hetzner-phase1-core/.env.example`** 的 **`N8N_IMAGE_TAG` 預設**當作該機唯一真相——**以該 compose 與該機 `.env` 釘選為準**（兩套 stack 版本可合理不同）；升級節奏見 **`lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`** 與 **`WORKLOG`** 留痕。
+- **路由快驗**（無 Bearer）：對 **`N8N_MCP_URL` POST** 空 body，預期 **401**（例如含 `Authorization` 未送／header not sent 等語意）代表 **路由存在**；若 **404** 再查 **`N8N_PATH`**、反代、Instance MCP。
 
 ## 本機一鍵探測（推薦）
 

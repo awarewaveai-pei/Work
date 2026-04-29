@@ -1,12 +1,17 @@
 ﻿{
-    "last_run_utc":  "2026-04-29T16:14:43.8884273Z",
+    "last_run_utc":  "2026-04-29T16:16:00.2597274Z",
     "changed_files":  [
-                          "docs/operations/n8n-self-hosted-mcp-troubleshooting.md"
+                          "docs/operations/n8n-self-hosted-mcp-troubleshooting.md",
+                          "docs/standards/n8n-workflow-architecture.md"
                       ],
     "impacted_files":  [
-                           "docs/operations/n8n-self-hosted-mcp-troubleshooting.md"
+                           "docs/operations/n8n-self-hosted-mcp-troubleshooting.md",
+                           "docs/operations/tools-and-integrations.md",
+                           "docs/standards/n8n-workflow-architecture.md",
+                           "README.md"
                        ],
     "auto_updated_files":  [
-
+                               "docs/operations/tools-and-integrations.md",
+                               "docs/standards/n8n-workflow-architecture.md"
                            ]
 }
