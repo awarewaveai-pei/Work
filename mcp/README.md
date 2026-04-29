@@ -135,8 +135,6 @@ For `AwareWave Supabase` specifically, the standard paths are:
 
 For `Soulful Expression Supabase`, prefer:
 
-- `SUPABASE_SOULFULEXPRESSION_MCP_URL`
-- `SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN`
 - `SUPABASE_SOULFULEXPRESSION_URL`
 - `SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`
 

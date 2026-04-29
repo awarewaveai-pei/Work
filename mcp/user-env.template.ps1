@@ -37,8 +37,6 @@ $vars = @{
     SUPABASE_AWAREWAVE_URL       = "https://supabase.aware-wave.com"
     SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY = "..."
     SUPABASE_AWAREWAVE_POSTGRES_DSN = "postgresql://postgres:<PASTE_POSTGRES_PASSWORD>@localhost:5432/postgres"
-    SUPABASE_SOULFULEXPRESSION_MCP_URL = "https://mcp.supabase.com/mcp?project_ref=mffjqjiidbeibilmxzef&features=database,docs,development,debugging"
-    SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN = "..."
     SUPABASE_SOULFULEXPRESSION_URL = "https://your-soulfulexpression-project.supabase.co"
     SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY = "..."
     # Legacy aliases retained for backward compatibility during migration:

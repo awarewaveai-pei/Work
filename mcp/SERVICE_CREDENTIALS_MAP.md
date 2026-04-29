@@ -28,8 +28,7 @@
 
 | 服務 | URL / Project | 驗證方式 | 環境變數 |
 |---|---|---|---|
-| **Soulful Expression Supabase（雲端）** | `https://mffjqjiidbeibilmxzef.supabase.co` | Service Role Key / PAT | `SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY` `SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN` |
-| **Soulful Expression Supabase MCP** | `mcp.supabase.com/mcp?project_ref=mffjqjiidbeibilmxzef` | PAT | `SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN` |
+| **Soulful Expression Supabase（雲端）** | `https://mffjqjiidbeibilmxzef.supabase.co` | Service Role Key / PAT | `SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY` |
 | **Cloudflare** | `api.cloudflare.com/client/v4` | API Token | `CLOUDFLARE_API_TOKEN` `CLOUDFLARE_AUTH_BEARER_TOKEN` |
 | **GitHub** | `api.github.com` | PAT | `GITHUB_PERSONAL_ACCESS_TOKEN` |
 | **GitHub Copilot MCP** | `api.githubcopilot.com/mcp` | Bearer | `COPILOT_MCP_BEARER_TOKEN` |
@@ -57,7 +56,6 @@
 |---|---|---|
 | `n8n` | HTTP | n8n MCP Server |
 | `supabase` | HTTP | 雲端 Supabase（僅雲端專案預留；勿用於 AwareWave 自架） |
-| `supabase-soulfulexpression` | HTTP | Soulful Expression Supabase（registry **預設 disabled**；啟用後需 `sync-mcp-config.ps1`） |
 | `supabase-awarewave-postgres` | stdio | 自架 AwareWave Supabase Postgres（需 tunnel） |
 | `awarewave-ops` | stdio | 所有自架 + 雲端 REST API 統一入口 |
 | `cloudflare` | HTTP | Cloudflare |

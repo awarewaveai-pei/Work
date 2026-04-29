@@ -1,7 +1,9 @@
 ﻿{
-    "last_run_utc":  "2026-04-29T18:00:43.4417405Z",
+    "last_run_utc":  "2026-04-29T18:02:23.6321771Z",
     "changed_files":  [
-                          "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md"
+                          "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
+                          "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
+                          "WORKLOG.md"
                       ],
     "impacted_files":  [
                            "../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
@@ -9,6 +11,7 @@
                            "docs/operations/cursor-mcp-and-plugin-inventory.md",
                            "docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md",
                            "docs/operations/security-secrets-policy.md",
+                           "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
                            "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
                            "docs/operations/tools-and-integrations.md",
                            "TASKS.md",

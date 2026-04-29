@@ -2,6 +2,12 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-04-30
+
+### Daily
+- 架構期告警收斂：`lobster-factory/infra/supabase/docker-compose.yml` 將 `supabase-studio` `mem_limit` 由 `256m` 調整為 `512m`（避免無資料情境下因 Node baseline 觸發 >90% cgroup 記憶體 warning）。
+- MCP 治理收斂：因 Soulful Expression 已改用 Cursor Supabase 外掛，從 shared MCP registry 移除 `supabase-soulfulexpression`，並同步更新 `mcp/*` 與 traceability/runbook 文字，避免 plugin 與 repo MCP 重複配置造成漂移與重工。
+
 ## 2026-04-29
 
 ### Daily
@@ -1051,7 +1057,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-29 18:00:42 UTC_
+_Last synced: 2026-04-29 18:02:22 UTC_
 
 ## 2026-03-20
 
@@ -1485,6 +1491,7 @@ _Last synced: 2026-04-29 18:00:42 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

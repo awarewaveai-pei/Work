@@ -138,7 +138,6 @@ Do not configure self-hosted AwareWave Supabase through `mcp.supabase.com`; that
 | `SUPABASE_AWAREWAVE_URL` | Kong REST base URL | vault / user env |
 | `SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY` | REST API service role key | vault / user env |
 | `SUPABASE_AWAREWAVE_POSTGRES_DSN` | Postgres DSN for MCP / SQL tools | vault / user env |
-| `SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN` | Soulful Expression Supabase cloud MCP token | vault |
 | `JWT_SECRET` | JWT signing secret | VPS `/root/supabase/docker/.env` |
 | `S3_PROTOCOL_ACCESS_KEY_ID` / `S3_PROTOCOL_ACCESS_KEY_SECRET` | Storage S3 access | VPS `.env` |
 
