@@ -68,4 +68,8 @@ Assert-NoMatch -Path $resolvedClickHouseOverrideFile -Pattern '<latency_log>' -M
 # Guardrail 3: preflight checker service must remain present.
 Assert-Match -Path $resolvedComposeFile -Pattern 'clickhouse-config-check:' -Message "clickhouse-config-check service missing"
 
+# Guardrail 4: CLICKHOUSE_URL must stay parseable by Trigger webapp (no unknown query keys); CH 25.3+ needs no experimental_json_type in URL.
+Assert-Match -Path $resolvedEnvExampleFile -Pattern 'CLICKHOUSE_URL=http://default:change_this_clickhouse_password@clickhouse:8123?secure=false' -Message "CLICKHOUSE_URL in .env.example must use ?secure=false (see README)"
+Assert-Match -Path $resolvedEnvExampleFile -Pattern 'RUN_REPLICATION_CLICKHOUSE_URL=http://default:change_this_clickhouse_password@clickhouse:8123' -Message "RUN_REPLICATION_CLICKHOUSE_URL in .env.example must match documented base URL"
+
 Write-Host "Trigger config validation passed." -ForegroundColor Green

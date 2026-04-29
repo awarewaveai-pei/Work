@@ -1,5 +1,12 @@
 <?xml version="1.0"?>
 <clickhouse>
+  <!-- v4 Goose migrations (e.g. task_runs_v1) use JSON columns; CH 24.x requires this -->
+  <profiles>
+    <default>
+      <allow_experimental_json_type>1</allow_experimental_json_type>
+    </default>
+  </profiles>
+
   <!--
     Docker mem_limit for clickhouse service = 2048m.
     Internal cap is set to ~1.6 GiB (1717986918 bytes) to leave ~400 MiB headroom

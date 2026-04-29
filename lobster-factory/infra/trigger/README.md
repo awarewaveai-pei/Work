@@ -68,7 +68,9 @@ cp .env.example .env
 # 用編輯器依註解填滿；至少 DATABASE_URL / secrets / APP_ORIGIN / ClickHouse / Registry / MinIO
 ```
 
-> `CLICKHOUSE_IMAGE_TAG` 請維持固定版本（預設 `24.8.8-debian-12-r0`），不要用 `latest`，避免新版本移除舊設定鍵導致啟動失敗。
+> `CLICKHOUSE_IMAGE_TAG` 請維持固定版本（預設 `25.7.5-debian-12-r0`），不要用 `latest`，避免新版本移除舊設定鍵導致啟動失敗。  
+> **Trigger.dev v4.4.x** 的 ClickHouse Goose 遷移（例如 `003_create_task_runs_v1`）會在 **ReplacingMergeTree** 上使用 **`enable_json_type`**，此設定自 **ClickHouse 25.3** 起才有；若鏡像停在 **24.x**，會出現 `Unknown setting 'enable_json_type'`。請使用本目錄預設的 **`CLICKHOUSE_IMAGE_TAG`（25.7.x）**。  
+> **勿**在 **`CLICKHOUSE_URL`** 加上 **`allow_experimental_json_type`**：自 CH 25 起 Trigger webapp 會校驗連線 URL 參數，該鍵會被視為未知而中止啟動（舊版 CH 24 曾需在 URL 加實驗旗標的情況已不再適用）。
 
 ### 3. 若曾跑過舊版（v3 單一 webapp 或 `latest` 混用）— 資料庫與 volume
 
@@ -84,13 +86,21 @@ docker compose --env-file .env up -d
 
 ### 4. 啟動前先做 ClickHouse config preflight（建議必做）
 
-先跑靜態防回歸檢查（會擋掉 `latency_log` 與 `latest` 漂移）：
+**Windows（PowerShell）建議一鍵跑**（會先確認 Docker 引擎已起、再跑靜態檢查與容器內 **Bitnami setup + `extract-from-config`**，合併驗證 `override.xml`）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\preflight-clickhouse.ps1
+```
+
+若出現 `npipe://.../docker_engine` /「找不到 pipe」：代表 **Docker Desktop 尚未起來**——請先開啟 Docker Desktop，等鯨魚圖示 **Running** 後再執行。**勿**在 PowerShell 單獨貼 `--profile preflight`（那不是完整指令，會Syntax 錯誤）。
+
+**手動兩段式（macOS／Linux／CI 也可）** — 先跑靜態防回歸檢查（會擋掉 `latency_log` 與 `latest` 漂移）：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\validate-config.ps1
 ```
 
-再跑容器內 config 檢查：
+再跑容器內 config 檢查（**整行**複製；須在含 `.env` 的本目錄）：
 
 ```bash
 docker compose --env-file .env --profile preflight run --rm clickhouse-config-check
