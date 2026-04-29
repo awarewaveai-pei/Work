@@ -7,6 +7,16 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Resolve-ScriptRelativePath {
+  param([string]$Path)
+
+  if ([System.IO.Path]::IsPathRooted($Path)) {
+    return $Path
+  }
+
+  return Join-Path -Path $PSScriptRoot -ChildPath $Path
+}
+
 function Assert-FileExists {
   param([string]$Path)
   if (-not (Test-Path -LiteralPath $Path)) {
@@ -40,18 +50,22 @@ function Assert-Match {
   }
 }
 
-Assert-FileExists -Path $ComposeFile
-Assert-FileExists -Path $EnvExampleFile
-Assert-FileExists -Path $ClickHouseOverrideFile
+$resolvedComposeFile = Resolve-ScriptRelativePath -Path $ComposeFile
+$resolvedEnvExampleFile = Resolve-ScriptRelativePath -Path $EnvExampleFile
+$resolvedClickHouseOverrideFile = Resolve-ScriptRelativePath -Path $ClickHouseOverrideFile
+
+Assert-FileExists -Path $resolvedComposeFile
+Assert-FileExists -Path $resolvedEnvExampleFile
+Assert-FileExists -Path $resolvedClickHouseOverrideFile
 
 # Guardrail 1: never use floating ClickHouse tags in trigger compose defaults.
-Assert-NoMatch -Path $ComposeFile -Pattern 'bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-latest}' -Message "Floating ClickHouse tag is not allowed"
-Assert-NoMatch -Path $EnvExampleFile -Pattern 'CLICKHOUSE_IMAGE_TAG=latest' -Message "Floating CLICKHOUSE_IMAGE_TAG in .env.example is not allowed"
+Assert-NoMatch -Path $resolvedComposeFile -Pattern 'bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-latest}' -Message "Floating ClickHouse tag is not allowed"
+Assert-NoMatch -Path $resolvedEnvExampleFile -Pattern 'CLICKHOUSE_IMAGE_TAG=latest' -Message "Floating CLICKHOUSE_IMAGE_TAG in .env.example is not allowed"
 
 # Guardrail 2: deprecated latency_log must not exist in config override.
-Assert-NoMatch -Path $ClickHouseOverrideFile -Pattern '<latency_log>' -Message "Deprecated ClickHouse latency_log found"
+Assert-NoMatch -Path $resolvedClickHouseOverrideFile -Pattern '<latency_log>' -Message "Deprecated ClickHouse latency_log found"
 
 # Guardrail 3: preflight checker service must remain present.
-Assert-Match -Path $ComposeFile -Pattern 'clickhouse-config-check:' -Message "clickhouse-config-check service missing"
+Assert-Match -Path $resolvedComposeFile -Pattern 'clickhouse-config-check:' -Message "clickhouse-config-check service missing"
 
 Write-Host "Trigger config validation passed." -ForegroundColor Green
