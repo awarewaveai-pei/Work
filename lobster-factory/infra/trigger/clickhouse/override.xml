@@ -1,5 +1,44 @@
 <?xml version="1.0"?>
 <clickhouse>
-  <!-- ClickHouse internal cap (keep below Docker mem_limit of 1024m) -->
-  <max_server_memory_usage>800000000</max_server_memory_usage>
+  <!--
+    Docker mem_limit for clickhouse service = 2048m.
+    Internal cap is set to ~1.6 GiB (1717986918 bytes) to leave ~400 MiB headroom
+    for OS page cache and Docker overhead.
+
+    History: originally set to 800 MB (800000000) which was too low once
+    ClickHouse system logs accumulate — trace_log alone grew to 324 MiB,
+    text_log to 263 MiB, causing RSS to exceed the cap and trigger
+    MEMORY_LIMIT_EXCEEDED on every trigger-webapp startup (crash-loop).
+    Raised 2026-04-29.
+
+    TTL policies below keep all system log tables bounded to 7 days so RSS
+    never creeps back up without action.
+  -->
+  <max_server_memory_usage>1717986918</max_server_memory_usage>
+
+  <!-- ── System log TTL: auto-delete entries older than 7 days ── -->
+  <trace_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+  </trace_log>
+  <text_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+  </text_log>
+  <metric_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+  </metric_log>
+  <asynchronous_metric_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+  </asynchronous_metric_log>
+  <query_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+  </query_log>
+  <processors_profile_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+  </processors_profile_log>
+  <latency_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+  </latency_log>
+  <error_log>
+    <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+  </error_log>
 </clickhouse>

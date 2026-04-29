@@ -156,7 +156,7 @@ services:
     logging: *trigger-logging
     user: root
     command: sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
-    mem_limit: 1280m
+    mem_limit: 2048m
     depends_on:
       postgres:
         condition: service_healthy
