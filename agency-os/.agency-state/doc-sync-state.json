@@ -1,17 +1,26 @@
 ﻿{
-    "last_run_utc":  "2026-04-29T16:16:00.2597274Z",
+    "last_run_utc":  "2026-04-29T18:00:43.4417405Z",
     "changed_files":  [
-                          "docs/operations/n8n-self-hosted-mcp-troubleshooting.md",
-                          "docs/standards/n8n-workflow-architecture.md"
+                          "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md"
                       ],
     "impacted_files":  [
-                           "docs/operations/n8n-self-hosted-mcp-troubleshooting.md",
+                           "../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
+                           "../lobster-factory/docs/ROUTING_MATRIX.md",
+                           "docs/operations/cursor-mcp-and-plugin-inventory.md",
+                           "docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md",
+                           "docs/operations/security-secrets-policy.md",
+                           "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
                            "docs/operations/tools-and-integrations.md",
-                           "docs/standards/n8n-workflow-architecture.md",
-                           "README.md"
+                           "TASKS.md",
+                           "WORKLOG.md"
                        ],
     "auto_updated_files":  [
+                               "docs/operations/cursor-mcp-and-plugin-inventory.md",
+                               "docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md",
+                               "docs/operations/security-secrets-policy.md",
+                               "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
                                "docs/operations/tools-and-integrations.md",
-                               "docs/standards/n8n-workflow-architecture.md"
+                               "TASKS.md",
+                               "WORKLOG.md"
                            ]
 }

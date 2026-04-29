@@ -204,13 +204,6 @@
                                               },
                                       "command":  "cmd"
                                   },
-                       "supabase-soulfulexpression":  {
-                                                          "url":  "https://mcp.supabase.com/mcp?project_ref=mffjqjiidbeibilmxzef\u0026features=database,docs,development,debugging",
-                                                          "headers":  {
-                                                                          "Authorization":  "Bearer ${env:SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
-                                                                      },
-                                                          "type":  "http"
-                                                      },
                        "replicate":  {
                                          "args":  [
                                                       "/c",

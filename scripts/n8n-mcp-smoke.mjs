@@ -7,7 +7,7 @@
  *   N8N_AUTH_BEARER_TOKEN  — MCP access token from n8n (Connection details)
  *
  * Exit codes:
- *   0 — initialize returned a result (healthy MCP handshake)
+ *   0 — initialize and tools/list returned valid results
  *   1 — missing env, fetch error, or unexpected failure
  *   3 — HTTP 404 (usually instance MCP off, proxy path, or unsupported n8n version)
  *
@@ -142,9 +142,20 @@ try {
     process.exit(1);
   }
 
+  if (tools.status >= 400) {
+    if (tools.text) console.error(`TOOLS_BODY_SNIPPET=${tools.text.slice(0, 400)}`);
+    process.exit(1);
+  }
+
   if (!init.json?.result) {
     console.error("ERR=initialize did not return result");
     if (init.text) console.error(`INIT_BODY_SNIPPET=${init.text.slice(0, 400)}`);
+    process.exit(1);
+  }
+
+  if (!tools.json?.result) {
+    console.error("ERR=tools/list did not return result");
+    if (tools.text) console.error(`TOOLS_BODY_SNIPPET=${tools.text.slice(0, 400)}`);
     process.exit(1);
   }
 

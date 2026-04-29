@@ -8,7 +8,7 @@ This matrix describes how the shared MCP setup reaches each AwareWave service.
 
 - `GitHub`: official GitHub MCP server
 - `AwareWave Supabase Postgres`: local wrapper around `scripts/run-postgres-mcp.ps1` (`supabase-awarewave-postgres`, requires SSH tunnel)
-- `Soulful Expression Supabase`: hosted Supabase MCP (`supabase-soulfulexpression`)
+- `Soulful Expression Supabase`: hosted Supabase MCP (`supabase-soulfulexpression`; **registry default off** — enable in `mcp/registry.template.json` + sync when needed)
 - `Trigger.dev`: local wrapper around `scripts/start-trigger-mcp.ps1`
 - `n8n`: remote HTTP MCP
 - `Cloudflare`: remote MCP endpoint

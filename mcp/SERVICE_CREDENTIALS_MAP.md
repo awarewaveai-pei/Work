@@ -57,7 +57,7 @@
 |---|---|---|
 | `n8n` | HTTP | n8n MCP Server |
 | `supabase` | HTTP | 雲端 Supabase（僅雲端專案預留；勿用於 AwareWave 自架） |
-| `supabase-soulfulexpression` | HTTP | Soulful Expression Supabase |
+| `supabase-soulfulexpression` | HTTP | Soulful Expression Supabase（registry **預設 disabled**；啟用後需 `sync-mcp-config.ps1`） |
 | `supabase-awarewave-postgres` | stdio | 自架 AwareWave Supabase Postgres（需 tunnel） |
 | `awarewave-ops` | stdio | 所有自架 + 雲端 REST API 統一入口 |
 | `cloudflare` | HTTP | Cloudflare |

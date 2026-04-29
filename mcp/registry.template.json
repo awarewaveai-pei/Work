@@ -265,19 +265,6 @@
       },
       "note": "Requires tunnel: scripts/open-supabase-ssh-tunnel.ps1 -Background (self-hosted /mcp is IP-restricted externally)"
     },
-    "supabase-soulfulexpression": {
-      "enabled": true,
-      "transport": "http",
-      "clients": {
-        "codex": {
-          "exclude": true
-        }
-      },
-      "url": "https://mcp.supabase.com/mcp?project_ref=mffjqjiidbeibilmxzef&features=database,docs,development,debugging",
-      "headers": {
-        "Authorization": "Bearer ${env:SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN}"
-      }
-    },
     "cloudflare": {
       "enabled": true,
       "transport": "http",

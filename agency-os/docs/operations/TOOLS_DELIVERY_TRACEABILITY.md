@@ -52,7 +52,7 @@
 |:---|:---|:---|:---|:---|:---|
 | **n8n** | 自託管（Hetzner） | `https://n8n.aware-wave.com`（`GET /healthz` 見觀測基線） | ① **MCP** 鍵 **`n8n`**（HTTP）② n8n REST ③ 瀏覽器 UI | `N8N_BASE_URL`、`N8N_API_KEY`（與 `tools-and-integrations.md` 一致；實機以部署為準） | [`n8n-workflow-architecture.md`](../standards/n8n-workflow-architecture.md) |
 | **Supabase（AwareWave／自託管 SoR）** | 自託管 Postgres 堆疊 | 內網 DB／API 邊界；**MCP 僅** schema／除錯視角，**不**等於生產寫入管線 | ① **REST**：`awarewave-ops` → `supabase_awarewave` ② **SQL MCP**：`supabase-awarewave-postgres` + `run-postgres-mcp.ps1` + `SUPABASE_AWAREWAVE_POSTGRES_DSN`（先開 tunnel）③ 應用 / Edge ④ migrations | `SUPABASE_AWAREWAVE_URL`、`SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY`、`SUPABASE_AWAREWAVE_POSTGRES_DSN`、JWT／DB 密（見 [`supabase-self-hosted-cutover-checklist.md`](supabase-self-hosted-cutover-checklist.md)） | [ADR 005](../architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md) |
-| **Supabase（Soulful Expression／雲端專案）** | 供應商雲託管 | 供應商 Dashboard 與專用 API URL；與上列 AwareWave 在帳戶/專案上分開 | ① **MCP**（庫內鍵 **`supabase-soulfulexpression`**；`mcp.supabase.com` URL 已寫入 **`.cursor/mcp.json`**）② 官方管理 API ③ 儀表板 | **`SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN`**（Bearer）、`SUPABASE_SOULFULEXPRESSION_URL`、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`；勿與 AwareWave 專案混用 | 供應商文件 + 本庫 `mcp.json`；[`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §2 |
+| **Supabase（Soulful Expression／雲端專案）** | 供應商雲託管 | 供應商 Dashboard 與專用 API URL；與上列 AwareWave 在帳戶/專案上分開 | ① **MCP**（鍵 **`supabase-soulfulexpression`**；**registry 預設 `enabled: false`**，需時改 **`mcp/registry.template.json`** 並跑 **`scripts/sync-mcp-config.ps1`** 才會進 `.cursor/mcp.json`／`.mcp.json`）② 官方管理 API ③ 儀表板 | **`SUPABASE_SOULFULEXPRESSION_AUTH_BEARER_TOKEN`**（Bearer）、`SUPABASE_SOULFULEXPRESSION_URL`、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`；勿與 AwareWave 專案混用 | 供應商文件 + 本庫 `mcp/registry.template.json`；[`cursor-mcp-and-plugin-inventory.md`](cursor-mcp-and-plugin-inventory.md) §2 |
 | **Trigger.dev** | 自託管（Hetzner） | `https://trigger.aware-wave.com` | ① **MCP** 鍵 **`trigger`** ② `trigger.dev` API／CLI ③ Dashboard | `TRIGGER_SECRET_KEY`、API/Worker **base URL**；每台開發機一組（[`TASKS.md`](../../TASKS.md)、`RESUME_AFTER_REBOOT`） | [`github-actions-trigger-prod-deploy.md`](github-actions-trigger-prod-deploy.md)、`lobster-factory/infra/trigger/README.md` |
 | **Uptime Kuma** | 自託管 | `https://uptime.aware-wave.com/dashboard` | ① 官方 UI／Socket API ② 專案內 **AwareWave Ops** 匯流（若有）— 見 `mcp/SERVICE_MATRIX` | 儀表板登入、API token（若啟用）；**不入庫** | [`AWARE_WAVE_OBSERVABILITY_BASELINE.md`](AWARE_WAVE_OBSERVABILITY_BASELINE.md) |
 | **Grafana**（+ Loki 觀測棧常同機） | 自託管 | 常 **僅本機回環**（如 `:3009`）或 **SSH tunnel** 後再開瀏覽器；勿預設對公網 exposure | ① `scripts/open-grafana-ssh-tunnel.ps1` 等（見觀測文）② Grafana HTTP API ③ 瀏覽器 | admin 密碼僅在 VPS/`.env`（**不入庫**；見 [`OBSERVABILITY_FIRST_TIME_SETUP_ZH.md`](OBSERVABILITY_FIRST_TIME_SETUP_ZH.md)） | 同上、[`OBSERVABILITY_P1_P2_ROLLOUT.md`](OBSERVABILITY_P1_P2_ROLLOUT.md) |
@@ -171,5 +171,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-04-29 14:30:02 UTC_
+_Last synced: 2026-04-29 18:00:42 UTC_
 
