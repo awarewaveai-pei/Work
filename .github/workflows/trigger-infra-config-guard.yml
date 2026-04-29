@@ -1,0 +1,30 @@
+name: Trigger infra config guard
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "lobster-factory/infra/trigger/**"
+      - ".github/workflows/trigger-infra-config-guard.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "lobster-factory/infra/trigger/**"
+      - ".github/workflows/trigger-infra-config-guard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-trigger-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Guard deprecated and floating config
+        shell: pwsh
+        run: |
+          ./lobster-factory/infra/trigger/validate-config.ps1

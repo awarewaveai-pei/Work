@@ -68,6 +68,8 @@ cp .env.example .env
 # 用編輯器依註解填滿；至少 DATABASE_URL / secrets / APP_ORIGIN / ClickHouse / Registry / MinIO
 ```
 
+> `CLICKHOUSE_IMAGE_TAG` 請維持固定版本（預設 `24.8.8-debian-12-r0`），不要用 `latest`，避免新版本移除舊設定鍵導致啟動失敗。
+
 ### 3. 若曾跑過舊版（v3 單一 webapp 或 `latest` 混用）— 資料庫與 volume
 
 v4 **schema 與舊自架單容器不一定相容**。若 `trigger-webapp` 持續重啟且日誌出現 migration／graphile 相關錯誤，請**備份後**考慮：
@@ -80,7 +82,23 @@ docker compose --env-file .env up -d
 
 （**刪 volume 會毀資料**；沒把握先做備份。）
 
-### 4. 啟動
+### 4. 啟動前先做 ClickHouse config preflight（建議必做）
+
+先跑靜態防回歸檢查（會擋掉 `latency_log` 與 `latest` 漂移）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\validate-config.ps1
+```
+
+再跑容器內 config 檢查：
+
+```bash
+docker compose --env-file .env --profile preflight run --rm clickhouse-config-check
+```
+
+若 preflight 失敗，先修正 `clickhouse/override.xml` 或版本標籤，再進行正式啟動。
+
+### 5. 啟動
 
 ```bash
 docker compose --env-file .env up -d
@@ -88,12 +106,12 @@ docker compose --env-file .env ps
 docker compose --env-file .env logs -f webapp
 ```
 
-### 5. 驗證 dashboard
+### 6. 驗證 dashboard
 
 瀏覽器開 **`https://trigger.aware-wave.com`**（或你的 `APP_ORIGIN`）。  
 首次登入若沒設 email provider，**magic link 會印在 webapp log**（官方行為）。
 
-### 6. 本機 deploy 工作流程（`packages/workflows`）
+### 7. 本機 deploy 工作流程（`packages/workflows`）
 
 1. 在 dashboard 建立 **project**，把 **`project`** 寫進 `packages/workflows/trigger.config.ts`。  
 2. 依官方說明登入自架 instance（`--api-url` / profile）。  
