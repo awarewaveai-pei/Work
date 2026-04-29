@@ -2,6 +2,8 @@
 
 This framework is the single place for all weekly automated jobs.
 
+For global monthly review, use a separate task: `AgencyOS-MonthlySystemReview` (`scripts/register-monthly-system-review-task.ps1`).
+
 ## Canonical files
 
 - Config: `scripts/weekly-automation-config.json`

@@ -53,8 +53,12 @@ $results = @()
 
 if ($Frequency -ne "adhoc") {
     $tasks = @()
-    if ($schedule.tasks -and $schedule.tasks.$Frequency) {
-        $tasks = @($schedule.tasks.$Frequency)
+    $tasksProp = $schedule.PSObject.Properties["tasks"]
+    if ($null -ne $tasksProp -and $tasksProp.Value -and $tasksProp.Value.$Frequency) {
+        $tasks = @($tasksProp.Value.$Frequency)
+    } elseif ($schedule.$Frequency) {
+        # Backward-compatible path for legacy schedule schema.
+        $tasks = @($schedule.$Frequency)
     }
     foreach ($task in $tasks) {
         if ($task.enabled -eq $false) { continue }

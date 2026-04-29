@@ -50,11 +50,24 @@ $schedulePath = Join-Path $tenantDir "OPERATIONS_SCHEDULE.json"
 if (-not (Test-Path $schedulePath)) { throw "Missing schedule file: $schedulePath" }
 
 $conf = Read-Json -Path $schedulePath
-$scheduler = $conf.scheduler
-if (-not $scheduler) { throw "Missing scheduler config in OPERATIONS_SCHEDULE.json" }
+$scheduler = $conf.PSObject.Properties["scheduler"]
+if ($null -eq $scheduler -or $null -eq $scheduler.Value) {
+    # Backward-compatible defaults for legacy tenant schedule files.
+    $schedulerObj = [pscustomobject]@{
+        daily_time = "09:00"
+        weekly_day = "MON"
+        weekly_time = "09:30"
+        monthly_day = 1
+        monthly_time = "10:00"
+        adhoc_interval_minutes = 15
+    }
+} else {
+    $schedulerObj = $scheduler.Value
+}
 $adhocEnabled = $true
-if ($null -ne $scheduler.adhoc_enabled) {
-    $adhocEnabled = [bool]$scheduler.adhoc_enabled
+$adhocProp = $schedulerObj.PSObject.Properties["adhoc_enabled"]
+if ($null -ne $adhocProp -and $null -ne $adhocProp.Value) {
+    $adhocEnabled = [bool]$adhocProp.Value
 }
 
 $runnerPath = Join-Path $root "automation/TENANT_AUTOMATION_RUNNER.ps1"
@@ -93,12 +106,12 @@ $trDaily = New-TenantTr -Frequency "daily" -LogStem ("Tenant-" + $TenantSlug + "
 $trWeekly = New-TenantTr -Frequency "weekly" -LogStem ("Tenant-" + $TenantSlug + "-weekly")
 $trMonthly = New-TenantTr -Frequency "monthly" -LogStem ("Tenant-" + $TenantSlug + "-monthly")
 
-Invoke-Schtasks -Args @("/Create", "/F", "/SC", "DAILY", "/TN", $names.daily, "/TR", $trDaily, "/ST", $scheduler.daily_time) | Out-Null
-Invoke-Schtasks -Args @("/Create", "/F", "/SC", "WEEKLY", "/D", $scheduler.weekly_day, "/TN", $names.weekly, "/TR", $trWeekly, "/ST", $scheduler.weekly_time) | Out-Null
-Invoke-Schtasks -Args @("/Create", "/F", "/SC", "MONTHLY", "/D", [string]$scheduler.monthly_day, "/TN", $names.monthly, "/TR", $trMonthly, "/ST", $scheduler.monthly_time) | Out-Null
+Invoke-Schtasks -Args @("/Create", "/F", "/SC", "DAILY", "/TN", $names.daily, "/TR", (Quote-Arg $trDaily), "/ST", $schedulerObj.daily_time) | Out-Null
+Invoke-Schtasks -Args @("/Create", "/F", "/SC", "WEEKLY", "/D", $schedulerObj.weekly_day, "/TN", $names.weekly, "/TR", (Quote-Arg $trWeekly), "/ST", $schedulerObj.weekly_time) | Out-Null
+Invoke-Schtasks -Args @("/Create", "/F", "/SC", "MONTHLY", "/D", [string]$schedulerObj.monthly_day, "/TN", $names.monthly, "/TR", (Quote-Arg $trMonthly), "/ST", $schedulerObj.monthly_time) | Out-Null
 if ($adhocEnabled) {
     $trAdhoc = New-TenantTr -Frequency "adhoc" -LogStem ("Tenant-" + $TenantSlug + "-adhoc")
-    Invoke-Schtasks -Args @("/Create", "/F", "/SC", "MINUTE", "/MO", [string]$scheduler.adhoc_interval_minutes, "/TN", $names.adhoc, "/TR", $trAdhoc) | Out-Null
+    Invoke-Schtasks -Args @("/Create", "/F", "/SC", "MINUTE", "/MO", [string]$schedulerObj.adhoc_interval_minutes, "/TN", $names.adhoc, "/TR", (Quote-Arg $trAdhoc)) | Out-Null
 }
 
 Invoke-Schtasks -Args @("/Query", "/TN", $names.daily) | Out-Null
