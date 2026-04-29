@@ -26,7 +26,7 @@
   .\scripts\open-supabase-ssh-tunnel.ps1 -Background
 #>
 param(
-    [string]$SshHost = "5.223.93.113",
+    [string]$SshHost = "204.168.175.41",
     [string]$SshUser = "root",
     [string]$PrivateKeyPath = "$env:USERPROFILE\.ssh\hetzner_trigger",
     [switch]$Background

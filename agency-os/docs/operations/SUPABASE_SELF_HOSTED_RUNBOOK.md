@@ -1,7 +1,7 @@
 # Supabase Self-Hosted Runbook
 
 > Owner: `awarewaveai`  
-> VPS: `5.223.93.113` (Hetzner `wordpress-ubuntu-4gb-sin-1`)  
+> **Supabase stack (EU)**: `204.168.175.41` (Hetzner Helsinki; SG host `5.223.93.113` no longer carries `/root/supabase` compose — lobster-phase1 only).  
 > Secrets policy: live tokens and passwords stay in vault or machine-local env only; do not commit them into repo-tracked files.
 
 ---
@@ -18,8 +18,8 @@ Windows clients reach the self-hosted stack in two ways:
   - `https://supabase.aware-wave.com` -> VPS `127.0.0.1:8000` (Kong API)
   - `https://studio.aware-wave.com` -> VPS `127.0.0.1:3000` (Studio, Basic Auth)
 
-Docker stack path: `/root/supabase/docker/`  
-Compose command: `cd /root/supabase/docker && docker compose up -d`
+Docker stack path (EU): `/root/supabase/` (`docker-compose.yml` lives next to `.env`; not a `git` checkout — **`git pull` does not apply** unless you manage deploy from a repo).  
+Compose command: `cd /root/supabase && docker compose up -d`
 
 ---
 
@@ -138,7 +138,7 @@ Do not configure self-hosted AwareWave Supabase through `mcp.supabase.com`; that
 | `SUPABASE_AWAREWAVE_URL` | Kong REST base URL | vault / user env |
 | `SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY` | REST API service role key | vault / user env |
 | `SUPABASE_AWAREWAVE_POSTGRES_DSN` | Postgres DSN for MCP / SQL tools | vault / user env |
-| `JWT_SECRET` | JWT signing secret | VPS `/root/supabase/docker/.env` |
+| `JWT_SECRET` | JWT signing secret | VPS `/root/supabase/.env` |
 | `S3_PROTOCOL_ACCESS_KEY_ID` / `S3_PROTOCOL_ACCESS_KEY_SECRET` | Storage S3 access | VPS `.env` |
 
 When keys rotate:
@@ -153,7 +153,7 @@ When keys rotate:
 SSH to VPS:
 
 ```bash
-ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113
+ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41
 ```
 
 List containers:
@@ -171,7 +171,7 @@ docker logs supabase-kong --tail=50
 Restart selected services:
 
 ```bash
-cd /root/supabase/docker
+cd /root/supabase
 docker compose restart supabase-kong
 docker compose restart supabase-studio
 docker compose restart supabase-db
@@ -180,14 +180,14 @@ docker compose restart supabase-db
 Restart full stack:
 
 ```bash
-cd /root/supabase/docker
+cd /root/supabase
 docker compose down && docker compose up -d
 ```
 
 After editing `.env`:
 
 ```bash
-cd /root/supabase/docker
+cd /root/supabase
 docker compose up -d --force-recreate
 ```
 
@@ -199,7 +199,7 @@ docker compose up -d --force-recreate
 
 1. SSH to VPS.
 2. Generate a new secret: `openssl rand -hex 40`
-3. Update `/root/supabase/docker/.env`:
+3. Update `/root/supabase/.env`:
    - `JWT_SECRET`
    - `ANON_KEY`
    - `SERVICE_ROLE_KEY`
