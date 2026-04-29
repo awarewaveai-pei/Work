@@ -1,6 +1,8 @@
 # Cloudflare WAF 設定清單（aware-wave.com）
 
-**Zone:** `aware-wave.com` → VPS `5.223.93.113`
+**Zone:** `aware-wave.com`
+
+**Origin 注意**：主站／phase1 常指向 **SG `5.223.93.113`**；**`supabase.aware-wave.com`、`studio.aware-wave.com`** 等 Supabase 相關 hostname 之 **A／proxy 應對 EU**（AwareWave 自架 Supabase 已在 EU），見 **`agency-os/docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`**。
 
 ---
 

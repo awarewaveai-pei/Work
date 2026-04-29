@@ -385,7 +385,7 @@
 ### Supabase 完整暴露與 AI 控制設定（Claude 執行）
 
 - **目標**：讓自架 Supabase 可被 Claude、Cursor、Codex 完整操作，並提供人類 Studio UI 入口。
-- **Cloudflare DNS**：新增 A records（DNS-only，gray cloud）`supabase.aware-wave.com` → `5.223.93.113`、`studio.aware-wave.com` → `5.223.93.113`。
+- **Cloudflare DNS**：新增 A records（DNS-only，gray cloud）`supabase.aware-wave.com` → `5.223.93.113`、`studio.aware-wave.com` → `5.223.93.113`。**（更正／架構已遷移：** SG **已不再承載** Supabase compose；上述 hostname 應指向 **EU Supabase** VPS，見 **`SUPABASE_SELF_HOSTED_RUNBOOK`**、`204.168.175.41`。）**
 - **nginx**：新增 `infra/hetzner-phase1-core/nginx/system-sites/supabase-subdomains.conf`，`supabase.aware-wave.com` → Kong API `127.0.0.1:8000`（JWT 保護）；`studio.aware-wave.com` → Studio `127.0.0.1:3000`（basic auth 憑證僅存 VPS／vault，**不入庫**）。部署至 VPS `/etc/nginx/sites-available/` 並 symlink 啟用。
 - **SSL**：`certbot certonly --nginx -d supabase.aware-wave.com -d studio.aware-wave.com`，有效至 2026-07-20，自動續約。
 - **Supabase API_EXTERNAL_URL**：`/root/supabase/docker/.env` 由 `http://localhost:8000` 改為 `https://supabase.aware-wave.com`；重啟 kong + studio。
@@ -1057,7 +1057,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-29 18:02:22 UTC_
+_Last synced: 2026-04-29 18:11:58 UTC_
 
 ## 2026-03-20
 
@@ -1491,6 +1491,7 @@ _Last synced: 2026-04-29 18:02:22 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

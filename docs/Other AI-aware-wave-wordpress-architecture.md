@@ -483,6 +483,6 @@ scrape_configs:
 ### 未來升級路徑
 
 1. **流量變大**：SG 升級到 CX32（8GB），或把 MariaDB 獨立到第三台
-2. **Supabase 成為瓶頸**：將 Supabase 從 EU 搬到 SG，減少跨洲延遲
+2. **Supabase 成為瓶頸**：AwareWave 自架 **Supabase 固定 EU**（與 SG WordPress 分離）；跨洲延遲優先考慮 **連線池／API 快取／读副本**，而非把 SoR 搬回 SG
 3. **HA 需求**：Cloudflare Load Balancer + 兩台 SG origin（目前不需要）
 4. **搜尋功能**：可在 EU 加 Meilisearch，WooCommerce 搜尋走 Supabase vector

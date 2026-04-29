@@ -5,7 +5,9 @@
 
 ---
 
-## 自架服務（Hetzner VPS 5.223.93.113）
+## 自架服務（AwareWave DNS；後端分區）
+
+**現況（營運）**：**Supabase（Kong／Studio／Postgres stack）僅在 EU VPS `204.168.175.41`**（compose：`/root/supabase`）。**SG `5.223.93.113`**（`wordpress-ubuntu-4gb-sin-1`）為 **phase1**（例如 WordPress、node-api、nginx 等），**已不再部署 `/root/supabase`** — 舊「Studio 打 SG IP:3000」類連線一律視為錯誤。公開入口仍為下列 **HTTPS hostname**（詳見 `agency-os/docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`）。
 
 | 服務 | 對外 URL | 驗證方式 | 環境變數 |
 |---|---|---|---|
