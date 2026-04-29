@@ -3,6 +3,12 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-30（AO-CLOSE）**
+  - 背景：使用者要求「月檢 + 收工」，並明確要保留「明天提醒：n8n / Supabase MCP 還沒好」。
+  - 已完成：新增 `AgencyOS-MonthlySystemReview` 與 tenant monthly 排程基線；月檢已接入 `check-supabase-memory-monthly.ps1`，可產報告與狀態摘要。
+  - 未完成：`n8n` / `Supabase` MCP 連線穩定化尚未完成，已落到 `TASKS` 未完成隊列。
+  - 風險/阻塞：EU SSH forwarding 仍可能出現 `administratively prohibited`；若未先修，Supabase tunnel 路徑會不穩。
+  - 下一步：明日 `AO-RESUME` 先跑 MCP smoke/tunnel 修復，再回頭處理其餘隊列。
 - **2026-04-29 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-29 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:079cb9a0b98e15c48fb261277fe2049ed1c4450029bf4751e194e8ab8798edd5 -->
 - **2026-04-29 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-29 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:25e58843f664d42542eab0888a7bcb1310588227b8e6eda82e50c801d2623323 -->
 - **2026-04-28 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-28 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:c049b96016c25d4e9c6ead4b41aae65d20ad1049bd3b45620fbc98c9e64b1ab4 -->
@@ -376,5 +382,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-29 14:30:02 UTC_
+_Last synced: 2026-04-29 18:38:46 UTC_
 

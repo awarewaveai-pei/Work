@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-29 17:45:51
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-04-30 02:39:46
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter） - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑） - [ ] C5-1. Observability：Sentry（錯誤追蹤）+ PostHog（產品分析） - [ ] C5-2. Edge/Security：Cloudflare（WAF/CDN/Rate limit） - [ ] C5-3. Secrets：1Password Secrets Automation（或同級） - [ ] C5-4. Identity/Org：Clerk/WorkOS/Auth0（三選一） - [ ] C5-5. Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails） - [ ] C5-6. 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -203,64 +203,22 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-29.md
-# Daily Note - 2026-04-29
+## 5) memory/daily/2026-04-30.md
+# 2026-04-30
 
-## Done today
-- 建立每週自動化框架：`weekly-automation-config.json` + `run-weekly-automation.ps1` + `register-weekly-automation-task.ps1`。
-- 新增 workflows 安全稽核腳本 `audit-workflows-security.mjs`，並接入 `npm run audit:workflows-security`。
-- 實際註冊 Windows 排程 `AgencyOS-WeeklyAutomation`（每週一 09:10），停用舊 `AgencyOS-WeeklySystemReview` 避免重複執行。
-- 報告已集中輸出到 `agency-os/reports/weekly/`，安全報告輸出到 `agency-os/reports/security/`。
+## Summary
+- 完成全域 `AgencyOS-MonthlySystemReview` + tenant monthly 排程基線。
+- 月檢流程接入 Supabase memory 檢查腳本，會輸出 `reports/monthly/supabase-memory-check-LATEST.md`。
+- 明日優先：`n8n` / `Supabase` MCP 連線穩定化（已寫入 `TASKS` 未完成）。
 
-## Current state
-- 每週自動化已可無人值守執行，採單一 config 管理 jobs，可擴充/停用而不需改多處腳本。
-- `packages/workflows` 安全議題目前為 2 筆 moderate（`@trigger.dev/sdk` -> `uuid`），無 high/critical，且上游 `fixAvailable=false`，暫列 acceptable risk。
-- AO-CLOSE gate 與文檔索引已對齊，後續可直接透過 `weekly-automation-framework.md` 維護。
-
-## Next steps
-- 下次 AO-RESUME 檢查 `agency-os/reports/weekly/weekly-automation-LATEST.md` 是否按週更新。
-- 若新增每週任務，僅修改 `scripts/weekly-automation-config.json`，並保留舊 job `enabled=false` 1 週觀察後再刪除。
-- 追蹤 Trigger 官方升版後重跑 `npm run audit:workflows-security`，若 `fixAvailable=true` 立即排入升級。
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:25e58843f664d42542eab0888a7bcb1310588227b8e6eda82e50c801d2623323 -->
-
-### cursor 2026-04-29 17:44
-
-- **完成（一句）**: 建立每週自動化框架（單一排程＋可配置 jobs）並完成首輪安全稽核報告自動化。
-- **變更路徑**:
-  - `scripts/weekly-automation-config.json`
-  - `scripts/run-weekly-automation.ps1`
-  - `scripts/register-weekly-automation-task.ps1`
-  - `lobster-factory/scripts/audit-workflows-security.mjs`
-  - `agency-os/docs/operations/weekly-automation-framework.md`
-  - `agency-os/reports/weekly/weekly-automation-LATEST.md`
-  - `agency-os/reports/security/workflows-npm-audit-LATEST.md`
-- **Git**: b50935b
-- **對應 TASKS 子字串（可選）**: `lobster-factory/packages/workflows` `npm audit`
-- **風險／待辦（可選）**: 週排程已註冊 `AgencyOS-WeeklyAutomation` 並停用舊任務；若後續擴充每週工作，僅修改 `scripts/weekly-automation-config.json` 以避免衝突與重工。
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:079cb9a0b98e15c48fb261277fe2049ed1c4450029bf4751e194e8ab8798edd5 -->
-
-### cursor 2026-04-29 17:47
-
-- **完成（一句）**: 完成每週自動化框架落地、排程註冊、報告輸出與收工閘道修復（daily 補齊）。
-- **變更路徑**:
-  - `scripts/weekly-automation-config.json`
-  - `scripts/run-weekly-automation.ps1`
-  - `scripts/register-weekly-automation-task.ps1`
-  - `agency-os/reports/weekly/weekly-automation-LATEST.md`
-  - `agency-os/memory/daily/2026-04-29.md`
-- **Git**: b50935b
-- **對應 TASKS 子字串（可選）**: `lobster-factory/packages/workflows` `npm audit`
-- **風險／待辦（可選）**: 今日 AO-CLOSE 曾因 inbox guard 與 daily `(TBD)` 兩道 strict gate 擋下；已修復後重跑，後續仍維持先補 inbox 再 AO-CLOSE 的節奏。
+## Risks
+- Supabase SSH tunnel 仍可能遭遇 `administratively prohibited`，需先修 EU sshd forwarding 設定。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-29 17:45:42`
+- Time: `2026-04-30 02:39:39`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -270,19 +228,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260429-174542.md`
-- Closeout: `reports/closeout/closeout-20260429-174540.md`
+- Health: `reports/health/health-20260430-023938.md`
+- Closeout: `reports/closeout/closeout-20260430-023936.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- `git pull origin main`：**Already up to date**。
-- `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
-- `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
-
-### AO-CLOSE（2026-03-27）
-- 已完成收工前進度同步（`TASKS.md`、`WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`memory/daily/2026-03-27.md`）。
 - 準備執行 `D:\Work\scripts\ao-close.ps1` 一鍵閘道與推送。
 
 ### 他處電腦開機須知 + 缺席使用者授權之 AO-CLOSE
@@ -336,5 +288,11 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+
+
+
+
+
 
 

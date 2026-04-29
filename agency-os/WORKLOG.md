@@ -7,6 +7,12 @@
 ### Daily
 - 架構期告警收斂：`lobster-factory/infra/supabase/docker-compose.yml` 將 `supabase-studio` `mem_limit` 由 `256m` 調整為 `512m`（避免無資料情境下因 Node baseline 觸發 >90% cgroup 記憶體 warning）。
 - MCP 治理收斂：因 Soulful Expression 已改用 Cursor Supabase 外掛，從 shared MCP registry 移除 `supabase-soulfulexpression`，並同步更新 `mcp/*` 與 traceability/runbook 文字，避免 plugin 與 repo MCP 重複配置造成漂移與重工。
+- 月檢自動化收斂：已落地 `AgencyOS-MonthlySystemReview` + tenant monthly 任務，並把 Supabase memory 檢查接入月檢流程（產出 `reports/monthly/supabase-memory-check-LATEST.md`）。
+- 明日提醒：`n8n` / `Supabase` MCP 連線仍未完全穩定，已寫入 `TASKS.md`（`AO-RESUME` 優先修復）。
+- AUTO_TASK_DONE_APPLIED (2026-04-29T18:39:00Z): 建立全域月檢 `AgencyOS-MonthlySystemReview` 與 tenant monthly 排程基線
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+- AO-CLOSE 補記：明日優先處理 `n8n` / `Supabase` MCP 連線，避免卡住 AO-RESUME 開工路徑。
 
 ## 2026-04-29
 
@@ -1057,7 +1063,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-29 18:11:58 UTC_
+_Last synced: 2026-04-29 18:39:35 UTC_
 
 ## 2026-03-20
 
@@ -1491,6 +1497,8 @@ _Last synced: 2026-04-29 18:11:58 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+
 
 
 

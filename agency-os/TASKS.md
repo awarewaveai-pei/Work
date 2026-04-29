@@ -16,6 +16,10 @@
 - [x] 建立 `lobster-factory` Phase 1 底座骨架（Supabase migrations + wc-core manifest + workflow 安全骨架）
 
 ## Next — 未完成（目前正式隊列）
+- [ ] **（明日提醒）n8n / Supabase MCP 連線仍未完成，明日 `AO-RESUME` 優先修復**
+  - 檢查：`scripts/n8n-mcp-smoke.ps1`、`scripts/open-supabase-ssh-tunnel.ps1`（若出現 `administratively prohibited` 先修 EU sshd forwarding）
+  - 驗收：Cursor MCP 兩者連線綠燈 + 有一次成功 `tools/list` / SQL 連通
+- [x] **（已完成待套用）建立全域月檢 `AgencyOS-MonthlySystemReview` 與 tenant monthly 排程基線**
 - [ ] **（Ops Inbox Path B）生產收斂未完成 — 明日 `AO-RESUME` 須口頭＋書面報告**
   - 報告須含：`GET /api/ops/inbox/health` 之 `ingest_token_configured`／`notify_enabled`／`slack_webhook_configured`；`OPS_INBOX_INGEST_TOKEN` 是否已寫入 SG `.env` 並 `docker compose up -d next-admin`；`scripts/test-ops-inbox-webhooks.sh` 四來源（sentry／uptime_kuma／grafana／netdata）各一輪 HTTP 與 `incident_id`；Inbox UI 篩「全部」是否見事件；Slack 是否收到或 Notify Log 之 `skipped` 原因。
   - 測試委託範本：`lobster-factory/infra/hetzner-phase1-core/docs/OPS_INBOX_CLAUDE_TEST_PROMPT.md`
@@ -258,5 +262,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-29 18:02:22 UTC_
+_Last synced: 2026-04-29 18:39:35 UTC_
 
