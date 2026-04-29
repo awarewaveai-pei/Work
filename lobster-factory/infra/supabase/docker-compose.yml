@@ -20,7 +20,6 @@ services:
     mem_limit: 256m
     cpus: "0.3"
     restart: unless-stopped
-    profiles: ["optional"]  # disabled by default; start with --profile optional
     ports:
       - "127.0.0.1:3000:3000"
     healthcheck:
@@ -34,9 +33,6 @@ services:
       timeout: 10s
       interval: 30s
       retries: 3
-    depends_on:
-      analytics:
-        condition: service_healthy
     environment:
       # Binds nestjs listener to both IPv4 and IPv6 network interfaces
       HOSTNAME: "::"
