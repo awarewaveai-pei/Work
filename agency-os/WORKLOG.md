@@ -14,6 +14,31 @@
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 - AO-CLOSE 補記：明日優先處理 `n8n` / `Supabase` MCP 連線，避免卡住 AO-RESUME 開工路徑。
 
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:68ccb8e525ff628ed06624d482c7b037952fe12ae0215db8f864793df15b6079 -->
+
+### claude-sonnet-4-6 2026-04-30 11:00
+
+- **完成（一句）**: 修復 n8n/supabase MCP 連線根因、修正 endpoint-alert journal 暴噴、優化 Ops Inbox UI、清理 EU VPS 磁碟空間，並建立桌機對齊指引
+- **變更路徑**:
+  - `mcp/registry.template.json` — supabase 停用(no /mcp endpoint)、n8n 移除錯誤 SSH tunnel note
+  - `mcp/user-env.template.ps1` — GRAFANA_BASE_URL 改 localhost:3009、廢棄 SUPABASE_MCP_URL
+  - `mcp/user-env.ps1` — 補 N8N_MCP_URL、RESEND_API_BASE_URL（本機 gitignored）
+  - `mcp/SERVICE_CREDENTIALS_MAP.md` — supabase MCP 標為停用
+  - `mcp/DESKTOP_MCP_SETUP.md` — 新增桌機環境對齊指引（新檔）
+  - `.cursor/mcp.json` — sync-mcp-config.ps1 重新產生，supabase 條目已移除
+  - `scripts/open-supabase-ssh-tunnel.ps1` — 回復 SshHost 為 204.168.175.41（EU Supabase）
+  - `lobster-factory/infra/trigger/docker-compose.yml` — ClickHouse 降版至 24.8.8
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/components/IncidentCard.tsx` — signal_type badge + message preview，移除重複 source 連結
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/[id]/page.tsx` — Cursor 按鈕顯示於所有 incident
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/page.tsx` — 加 Tools 入口按鈕
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/tools/page.tsx` — 新增 AI Tools 管理頁
+  - `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh` — 空 WEBHOOK_URL 改用 stamp file，停止 journal 每分鐘噴錯
+- **Git**: efe41aa fix(mcp): disable supabase MCP + fix n8n URL + grafana base url / 8c9677e fix(trigger): downgrade clickhouse / 20d522d docs(mcp): add desktop setup guide / 431e1c5 feat(ops-inbox): signal badge + tools page / 036b977 fix(ops-inbox): add missing Link import / 0bff54c fix(endpoint-alert): stamp-file guard for empty WEBHOOK_URL
+- **對應 TASKS 子字串（可選）**: MCP 連線穩定化
+- **風險／待辦（可選）**: [待辦] git push origin main 尚未執行（需使用者手動或授權）；桌機需依 mcp/DESKTOP_MCP_SETUP.md 執行並重啟 Cursor；空值 env vars（HETZNER_API_TOKEN、SENTRY_AUTH_TOKEN、TRIGGER_ACCESS_TOKEN、UPTIME_KUMA_API_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY）待補齊；[遠端/無 commit] EU VPS 204.168.175.41 磁碟清理（journal + docker cache + btmp，45%→28%）
+
 ## 2026-04-29
 
 ### Daily
@@ -1063,7 +1088,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-29 18:39:35 UTC_
+_Last synced: 2026-04-30 01:34:29 UTC_
 
 ## 2026-03-20
 
@@ -1497,10 +1522,4 @@ _Last synced: 2026-04-29 18:39:35 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
-
-
-
-
 
