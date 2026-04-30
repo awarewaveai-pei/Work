@@ -34,6 +34,21 @@
 
 ---
 
+### claude-code 2026-04-30 16:00
+
+- **完成（一句）**: 在 VPS (5.223.93.113) 執行 Rollback 演練、確認 Observability 已運行、完成 Staging 統一上線，並修復 docker-compose.yml host port 競合問題
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（host port 全部 env-var 化，default 維持現行值）
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`（精簡為僅 container_name + image override；port 由 .env.staging 控制）
+  - `lobster-factory/infra/hetzner-phase1-core/.env.staging.example`（新增 NGINX/REDIS/N8N/WORDPRESS/NODE_API/NEXT_ADMIN _HOST_PORT staging vars）
+  - VPS `/root/lobster-phase1/scripts/rollback-phase1.sh`（部署）
+  - VPS `/root/lobster-phase1/docker-compose.staging.yml`（部署）
+  - VPS `/root/lobster-phase1/.env.staging`（生成，DB 名 staging 分離）
+  - VPS `/root/lobster-phase1/rollback.log`（save+restore+health PASS 記錄）
+- **Git**: 0fb46af（feat/infra-rollback-staging-log-gaps）
+- **對應 TASKS 子字串（可選）**: Staging 統一 — next-admin / node-api staging 環境上線
+- **風險／待辦（可選）**: 三項 DoD 全數通過。VPS 上 staging stack (`lobster-staging-*`) 現正運行，可用 `docker compose -p lobster-staging ... down` 停止。Observability 在 port 3009。feature branch 待 AO-CLOSE 時由收關者 push + merge to main。
+
 ### claude-code 2026-04-30 17:00
 
 - **完成（一句）**: 補齊 Rollback 機制、Staging 統一、Log 聚合三項缺口（腳本建立 + compose override + runbook + 7 份文件連動更新）
