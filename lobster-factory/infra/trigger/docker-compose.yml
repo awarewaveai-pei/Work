@@ -63,7 +63,7 @@ services:
       start_period: 10s
 
   clickhouse:
-    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-25.7.5-debian-12-r0}
+    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-24.8.8-debian-12-r0}
     container_name: trigger-clickhouse
     restart: unless-stopped
     logging: *trigger-logging
@@ -92,20 +92,16 @@ services:
       start_period: 20s
 
   clickhouse-config-check:
-    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-25.7.5-debian-12-r0}
+    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-24.8.8-debian-12-r0}
     container_name: trigger-clickhouse-config-check
     profiles: ["preflight"]
     restart: "no"
     logging: *trigger-logging
-    # Bitnami: overriding `command` skips run.sh/setup unless we invoke setup explicitly.
-    # Upstream ClickHouse 24.x unified binary no longer exposes `--check-config` on this image.
-    # `extract-from-config` merges includes + config.d (override.xml) and fails on invalid XML/keys.
-    # Compose `$$` → literal `$` for bash (see compose variable escaping).
     command:
       [
-        "/bin/bash",
+        "/bin/sh",
         "-lc",
-        "/opt/bitnami/scripts/clickhouse/setup.sh && . /opt/bitnami/scripts/clickhouse-env.sh && /opt/bitnami/clickhouse/bin/clickhouse extract-from-config --config-file=$$CLICKHOUSE_CONF_FILE --key=logger",
+        "clickhouse-server --config-file=/bitnami/clickhouse/etc/config.xml --check-config",
       ]
     environment:
       CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_USER:-default}
