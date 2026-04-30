@@ -15,6 +15,7 @@
 | 部署前快照 | `./scripts/rollback-phase1.sh save <service>` |
 | 查可用快照 | `./scripts/rollback-phase1.sh list [service]` |
 | 一鍵回滾 | `./scripts/rollback-phase1.sh restore <service> [snapshot-tag]` |
+| 清理舊快照 | `./scripts/rollback-phase1.sh clean <service> [days]`（預設 30 天） |
 | n8n 版本回滾 | `./scripts/rollback-phase1.sh n8n-pin <old-semver>` |
 | 部署後驗收 | `docker compose ps && curl -sf http://127.0.0.1/health && curl -sf http://127.0.0.1/api/health` |
 
@@ -146,15 +147,20 @@ docker compose -p lobster-staging \
 ## 6. 快照清理（防磁碟堆積）
 
 ```bash
-# 列出所有快照
-./scripts/rollback-phase1.sh list
+# 一鍵清理 30 天前的快照
+./scripts/rollback-phase1.sh clean node-api
+./scripts/rollback-phase1.sh clean next-admin
+./scripts/rollback-phase1.sh clean wordpress
 
-# 手動刪除舊快照
+# 自訂天數（例如保留 14 天內）
+./scripts/rollback-phase1.sh clean node-api 14
+
+# 手動刪除單一快照
 docker rmi lobster-phase1-node-api:rollback-20260101-000000
 ```
 
-**建議節奏**：每月清理 30 天前的快照，每服務保留最新 2 個。  
-對應 `LONG_TERM_OPS.md` §6 每月維護動作。
+**建議節奏**：每月執行一次 `clean` 清理 30 天前快照。  
+對應 `LONG_TERM_OPS.md` §6 每月維護動作。月曆已在 `MAINTENANCE_CALENDAR.md`。
 
 ---
 
