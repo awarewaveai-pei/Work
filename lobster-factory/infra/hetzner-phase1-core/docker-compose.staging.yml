@@ -56,3 +56,10 @@ services:
   next-admin:
     container_name: lobster-staging-next-admin
     image: lobster-phase1-next-admin:staging
+
+# Staging network isolation: redirect the lobster-net key to a fresh
+# lobster-staging-net bridge so staging services never touch prod lobster-net.
+networks:
+  lobster-net:
+    name: lobster-staging-net
+    external: false
