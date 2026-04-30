@@ -32,6 +32,15 @@ param(
     [switch]$SkipCompletenessGate
 )
 
+# Partial splats (e.g. agency-os wrapper only forwarding @PSBoundParameters) can omit keys; under
+# StrictMode, reading an uninitialized param binder throws VariableIsUndefined. Normalize before StrictMode.
+if (-not (Get-Variable -Name CommitMessage -Scope Script -ErrorAction SilentlyContinue)) {
+    New-Variable -Name CommitMessage -Scope Script -Value ""
+}
+if (-not (Get-Variable -Name CommitMessageFile -Scope Script -ErrorAction SilentlyContinue)) {
+    New-Variable -Name CommitMessageFile -Scope Script -Value ""
+}
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 

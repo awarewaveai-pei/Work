@@ -2,6 +2,25 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-01
+
+### n8n MCP Cursor 狀態抖動修復（green→yellow→red、"No tools"）
+
+**根本原因**：`mcp/registry.template.json` 的 `n8n` 條目使用 `transport: "http"`，Cursor MCP 客戶端在 POST initialize 成功後，會再對同一端點發 **GET 請求**嘗試建立 SSE 持久串流。n8n 的 `/mcp-server/http` **不支援 GET**（回 `404`），導致 Cursor 報錯重連迴圈，狀態不斷閃爍並顯示 "No tools"。後端本身完全正常（6 次連續 smoke test 皆 `TOOLS_COUNT=18`）。
+
+**修復**：
+
+| 項目 | 做法 |
+|------|------|
+| `scripts/run-n8n-mcp.mjs` | 新增 stdio→HTTP 橋接腳本，直接 POST 給 n8n，完全跳過 GET 問題；同時處理 n8n 回傳的 JSON 與 SSE 格式 |
+| `mcp/registry.template.json` | n8n 從 `transport: "http"` 改為 `transport: "stdio"` + `command: "node"` + `args: run-n8n-mcp.mjs` |
+| `.cursor/mcp.json` | 由 `sync-mcp-config.ps1` 重新生成，n8n 現在用 `command: "node"` |
+
+**文件**：`agency-os/docs/operations/n8n-self-hosted-mcp-troubleshooting.md`（新增段落「Cursor MCP 狀態抖動」，含根因表格、修法、判斷矩陣；後續已修正 TOOLS_COUNT 為「> 0」敘述、補 repo compose 正本路徑）。
+
+- **TASKS 對齊**：已將 **`TASKS`** 未完成隊列拆成 **Supabase tunnel／MCP** 與 **n8n MCP（Cursor）** 兩列；今日 DoD 命中 **n8n** 列（見上表）。
+- AUTO_TASK_DONE_APPLIED (2026-04-30T17:27:52Z): n8n MCP（Cursor）：HTTP 運輸改 stdio 橋接並驗證（抖動／No tools）
+
 ## 2026-04-30
 
 ### Daily
@@ -1088,7 +1107,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-04-30 01:34:29 UTC_
+_Last synced: 2026-04-30 17:28:35 UTC_
 
 ## 2026-03-20
 
@@ -1522,4 +1541,7 @@ _Last synced: 2026-04-30 01:34:29 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+
+
 

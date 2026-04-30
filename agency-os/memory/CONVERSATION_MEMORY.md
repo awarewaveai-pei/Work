@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-01（AO-CLOSE 前摘要）**：n8n MCP 在 Cursor 改 **stdio 橋接**（`scripts/run-n8n-mcp.mjs`），避開 HTTP 運輸下 **POST initialize 後 GET → 404** 造成的 MCP 面板抖動；runbook **`docs/operations/n8n-self-hosted-mcp-troubleshooting.md`** 已補段落；**`TASKS`** 已拆項——**n8n（Cursor）** 已達 DoD 並可由收工勾選，`Supabase MCP／SSH tunnel` 仍為開放。另：**`scripts/ao-close.ps1`** 補 Splatted 繫結／StrictMode 下 **`CommitMessageFile`** 安全預設。細節見 **`WORKLOG` `## 2026-05-01`**。
 - **2026-04-30 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-30 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:68ccb8e525ff628ed06624d482c7b037952fe12ae0215db8f864793df15b6079 -->
 - **2026-04-30（AO-CLOSE）**
   - 背景：使用者要求「月檢 + 收工」，並明確要保留「明天提醒：n8n / Supabase MCP 還沒好」。
@@ -383,5 +384,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-30 01:34:29 UTC_
+_Last synced: 2026-04-30 17:30:07 UTC_
 

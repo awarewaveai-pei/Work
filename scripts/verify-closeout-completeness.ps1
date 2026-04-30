@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   ASCII-only for Windows PowerShell 5.1.
-  Evidence = WORKLOG today section contains AUTO_TASK_DONE line OR merged inbox verbatim block.
+  Evidence = WORKLOG today section contains `- AUTO_TASK_DONE:`, `- AUTO_TASK_DONE_APPLIED`, or merged inbox verbatim block.
   Excludes generated-only paths (reports, integrated-status snapshot, etc.).
 #>
 param(
@@ -92,6 +92,9 @@ try {
 
     $hasEvidence = $false
     if ($section -match '(?m)^\s*-\s*AUTO_TASK_DONE:') {
+        $hasEvidence = $true
+    }
+    if ($section -match '(?m)^\s*-\s*AUTO_TASK_DONE_APPLIED') {
         $hasEvidence = $true
     }
     if ($section -match 'Closeout inbox \(AO-CLOSE auto') {

@@ -6,11 +6,12 @@ param(
     [switch]$SkipVerify,
     [switch]$AllowNonPerfectHealth,
     [switch]$AllowPushWhileBehind,
+    [switch]$AllowAheadCommits,
     [switch]$SkipTodayRecap,
     [switch]$SkipAutoTaskCheckmarks,
     [switch]$SkipInboxGuard,
     [ValidateSet("warn", "strict", "off")]
-    [string]$InboxGuardMode = "warn",
+    [string]$InboxGuardMode = "strict",
     [ValidateSet("off", "warn", "strict")]
     [string]$CompletenessGate = "strict",
     [switch]$SkipCompletenessGate

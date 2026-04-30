@@ -205,10 +205,14 @@
     },
     "n8n": {
       "enabled": true,
-      "transport": "http",
-      "url": "${env:N8N_MCP_URL}",
-      "headers": {
-        "Authorization": "Bearer ${env:N8N_AUTH_BEARER_TOKEN}"
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceRoot}\\scripts\\run-n8n-mcp.mjs"
+      ],
+      "env": {
+        "N8N_MCP_URL": "${env:N8N_MCP_URL}",
+        "N8N_AUTH_BEARER_TOKEN": "${env:N8N_AUTH_BEARER_TOKEN}"
       },
       "codex": {
         "bearer_token_env_var": "N8N_AUTH_BEARER_TOKEN"

@@ -283,11 +283,14 @@
                                            "command":  "cmd"
                                        },
                        "n8n":  {
-                                   "url":  "${env:N8N_MCP_URL}",
-                                   "headers":  {
-                                                   "Authorization":  "Bearer ${env:N8N_AUTH_BEARER_TOKEN}"
-                                               },
-                                   "type":  "http"
+                                   "args":  [
+                                                "${workspaceFolder}\\scripts\\run-n8n-mcp.mjs"
+                                            ],
+                                   "env":  {
+                                               "N8N_MCP_URL":  "${env:N8N_MCP_URL}",
+                                               "N8N_AUTH_BEARER_TOKEN":  "${env:N8N_AUTH_BEARER_TOKEN}"
+                                           },
+                                   "command":  "node"
                                },
                        "gemini-fast":  {
                                            "args":  [
