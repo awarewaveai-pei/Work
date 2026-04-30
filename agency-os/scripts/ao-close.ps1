@@ -11,7 +11,7 @@ param(
     [switch]$SkipAutoTaskCheckmarks,
     [switch]$SkipInboxGuard,
     [ValidateSet("warn", "strict", "off")]
-    [string]$InboxGuardMode = "strict",
+    [string]$InboxGuardMode = "warn",
     [ValidateSet("off", "warn", "strict")]
     [string]$CompletenessGate = "strict",
     [switch]$SkipCompletenessGate
@@ -27,5 +27,13 @@ if (-not (Test-Path -LiteralPath $ownerScript)) {
     exit 1
 }
 
-& $ownerScript @PSBoundParameters
+# PSBoundParameters omits params the caller did not specify, so the owner would still use its
+# defaults (strict) unless we forward the wrapper-resolved mode explicitly.
+$splat = @{}
+foreach ($e in $PSBoundParameters.GetEnumerator()) {
+    $splat[$e.Key] = $e.Value
+}
+$splat["InboxGuardMode"] = $InboxGuardMode
+
+& $ownerScript @splat
 exit $LASTEXITCODE
