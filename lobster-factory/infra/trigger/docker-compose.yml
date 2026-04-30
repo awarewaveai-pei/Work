@@ -67,8 +67,8 @@ services:
     container_name: trigger-clickhouse
     restart: unless-stopped
     logging: *trigger-logging
-    mem_limit: 2048m
-    cpus: 1.5
+    mem_limit: 1024m
+    cpus: "1.0"
     environment:
       CLICKHOUSE_ADMIN_USER: ${CLICKHOUSE_USER:-default}
       CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_PASSWORD:-password}
@@ -184,6 +184,7 @@ services:
     user: root
     command: sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
     mem_limit: 2048m
+    cpus: "1.5"
     depends_on:
       postgres:
         condition: service_healthy
