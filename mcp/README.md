@@ -11,6 +11,7 @@ This directory is the single source of truth for MCP server definitions that nee
 ## Files
 
 - `registry.template.json`: committed MCP server registry with no secrets
+- `DESKTOP_MCP_SETUP.md`: Windows **desktop** machine MCP alignment (Chinese runbook; use with any `<WORK_ROOT>`)
 - `user-env.template.ps1`: committed example for machine-local environment variables
 - `SERVICE_MATRIX.md`: which services use direct MCP versus the local AwareWave wrapper
 - `SHARED_MCP_API_SOP.md`: standard operating procedure for adding shared MCP/API entries safely

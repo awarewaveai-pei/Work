@@ -1,7 +1,10 @@
 # 桌機 MCP 環境對齊指引
 
+> **檔案位置**：`mcp/DESKTOP_MCP_SETUP.md`（與 `registry.template.json` 同目錄；**不是**子資料夾 `DESKTOP_MCP_SETUP/`）。
+>
 > **給 Cursor AI 看的**：讀完這份文件後，直接照步驟執行，不需要詢問使用者。
-> 執行環境：Windows，monorepo 根目錄為 `D:\Work`（或使用者實際路徑）。
+>
+> **執行環境**：Windows。以下 **`<WORK_ROOT>`** ＝ monorepo 根（等同 `git rev-parse --show-toplevel`）。常見實例：`C:\Users\USER\Work`、`D:\Work`—請替換成你本機 clone 根目錄。
 
 ---
 
@@ -19,7 +22,7 @@
 ## 步驟 1：pull 最新 repo
 
 ```powershell
-cd D:\Work
+cd <WORK_ROOT>   # 例：cd C:\Users\USER\Work
 git pull origin main
 ```
 
@@ -34,7 +37,8 @@ git pull origin main
 ### 2a. 若此機器還沒有 user-env.ps1
 
 ```powershell
-copy D:\Work\mcp\user-env.template.ps1 D:\Work\mcp\user-env.ps1
+cd <WORK_ROOT>
+copy .\mcp\user-env.template.ps1 .\mcp\user-env.ps1
 ```
 
 ### 2b. 打開 `mcp/user-env.ps1`，填入以下值
@@ -123,7 +127,7 @@ SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY = "<Soulful Expression service role 
 ## 步驟 3：執行 user-env.ps1，寫入 Windows 環境變數
 
 ```powershell
-cd D:\Work
+cd <WORK_ROOT>
 powershell -ExecutionPolicy Bypass -File .\mcp\user-env.ps1
 ```
 
@@ -138,10 +142,11 @@ powershell -ExecutionPolicy Bypass -File .\mcp\user-env.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
 ```
 
-成功輸出：
+成功輸出（路徑隨 `<WORK_ROOT>` 與使用者目錄而變）：
 ```
 MCP sync complete.
-  cursor    : D:\Work\.cursor\mcp.json
+  workspace : <WORK_ROOT>\.mcp.json
+  cursor    : <WORK_ROOT>\.cursor\mcp.json
   claude    : C:\Users\...\mcp.json
   codex     : C:\Users\...\.codex\config.toml
   copilot   : C:\Users\...\.copilot\mcp-config.json
