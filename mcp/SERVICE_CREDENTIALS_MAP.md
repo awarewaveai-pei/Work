@@ -16,7 +16,7 @@
 | **Supabase Postgres** | `localhost:5432`（需 SSH tunnel） | DSN | `SUPABASE_AWAREWAVE_POSTGRES_DSN` |
 | **n8n** | `https://n8n.aware-wave.com` | Basic Auth / JWT / API Key | `N8N_BASIC_AUTH_USER/PASSWORD` `N8N_AUTH_BEARER_TOKEN` `N8N_API_KEY` |
 | **n8n MCP** | `https://n8n.aware-wave.com/mcp-server/http`（子網域根 + **`N8N_PATH=/`**）；若 compose 仍為 **`N8N_PATH=/n8n/`**（僅 apex `/n8n/` 部署），則為 `…/n8n/mcp-server/http` | Bearer JWT | `N8N_MCP_URL` `N8N_AUTH_BEARER_TOKEN` |
-| **Supabase MCP（自架 AwareWave）** | **`https://supabase.aware-wave.com/mcp`**（已寫入 repo **`.cursor/mcp.json`** 鍵 **`supabase`**） | 依 [Enable MCP（自架）](https://supabase.com/docs/guides/self-hosting/enable-mcp)；Bearer：`SUPABASE_AUTH_BEARER_TOKEN`（`sync-cursor-mcp-user-env`） | `SUPABASE_AUTH_BEARER_TOKEN` |
+| **Supabase MCP（自架 AwareWave）** | **已停用** — 自架 Kong 無 `/mcp` endpoint（回 403）。REST 用 `awarewave-ops`；SQL 用 `supabase-awarewave-postgres`（需 SSH tunnel） | N/A | N/A |
 | **Trigger.dev** | `https://trigger.aware-wave.com` | Bearer Token | `TRIGGER_ACCESS_TOKEN` |
 | **Uptime Kuma** | `https://uptime.aware-wave.com` | API Key | `UPTIME_KUMA_API_KEY` |
 | **Grafana** | `http://localhost:3009`（SSH tunnel） | Basic Auth | `GRAFANA_BASIC_USER` `GRAFANA_BASIC_PASSWORD` |
@@ -57,7 +57,7 @@
 | MCP 名稱 | 類型 | 服務 |
 |---|---|---|
 | `n8n` | HTTP | n8n MCP Server |
-| `supabase` | HTTP | 雲端 Supabase（僅雲端專案預留；勿用於 AwareWave 自架） |
+| `supabase` | HTTP | **已停用**（自架無 /mcp endpoint；see registry note） |
 | `supabase-awarewave-postgres` | stdio | 自架 AwareWave Supabase Postgres（需 tunnel） |
 | `awarewave-ops` | stdio | 所有自架 + 雲端 REST API 統一入口 |
 | `cloudflare` | HTTP | Cloudflare |

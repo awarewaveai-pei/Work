@@ -31,9 +31,10 @@ $vars = @{
     TRIGGER_API_URL              = "https://trigger.example.com"
     TRIGGER_PROJECT_REF          = "prj_xxx"
     TRIGGER_ACCESS_TOKEN         = "tr_xxx"
-    # AwareWave 自架：Cursor 已固定 `https://supabase.aware-wave.com/mcp`；此變數給其他工具／舊腳本相容
-    SUPABASE_MCP_URL             = "https://supabase.aware-wave.com/mcp"
-    SUPABASE_AUTH_BEARER_TOKEN   = "..."
+    # DEPRECATED: self-hosted Supabase has no /mcp endpoint. supabase MCP entry is disabled in registry.
+    # Use awarewave-ops (REST) or supabase-awarewave-postgres (SQL via tunnel) instead.
+    # SUPABASE_MCP_URL           = ""   # unused
+    # SUPABASE_AUTH_BEARER_TOKEN = ""   # unused
     SUPABASE_AWAREWAVE_URL       = "https://supabase.aware-wave.com"
     SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY = "..."
     SUPABASE_AWAREWAVE_POSTGRES_DSN = "postgresql://postgres:<PASTE_POSTGRES_PASSWORD>@localhost:5432/postgres"
@@ -64,7 +65,8 @@ $vars = @{
     HETZNER_API_TOKEN            = ""
     UPTIME_KUMA_BASE_URL         = "https://uptime.aware-wave.com"
     UPTIME_KUMA_API_KEY          = ""
-    GRAFANA_BASE_URL             = "https://grafana.aware-wave.com"
+    # SSH tunnel required: .\scripts\open-grafana-ssh-tunnel.ps1 -Background
+    GRAFANA_BASE_URL             = "http://localhost:3009"
     GRAFANA_SERVICE_ACCOUNT_TOKEN = ""
     GRAFANA_BASIC_USER           = ""
     GRAFANA_BASIC_PASSWORD       = ""

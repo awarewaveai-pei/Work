@@ -57,13 +57,19 @@
                                                                    },
                                                            "command":  "powershell"
                                                        },
-                       "supabase":  {
-                                        "url":  "http://localhost:8000/mcp",
-                                        "headers":  {
-                                                        "Authorization":  "Bearer ${env:SUPABASE_AUTH_BEARER_TOKEN}"
-                                                    },
-                                        "type":  "http"
-                                    },
+                       "wordpress":  {
+                                         "args":  [
+                                                      "/c",
+                                                      "npx",
+                                                      "-y",
+                                                      "@automattic/mcp-wordpress-remote@latest"
+                                                  ],
+                                         "env":  {
+                                                     "JWT_TOKEN":  "${env:WORDPRESS_JWT_TOKEN}",
+                                                     "WP_API_URL":  "${env:WP_API_URL}"
+                                                 },
+                                         "command":  "cmd"
+                                     },
                        "grok-fast":  {
                                          "args":  [
                                                       "-NoProfile",
@@ -125,19 +131,6 @@
                                                    },
                                            "command":  "powershell"
                                        },
-                       "wordpress":  {
-                                         "args":  [
-                                                      "/c",
-                                                      "npx",
-                                                      "-y",
-                                                      "@automattic/mcp-wordpress-remote@latest"
-                                                  ],
-                                         "env":  {
-                                                     "JWT_TOKEN":  "${env:WORDPRESS_JWT_TOKEN}",
-                                                     "WP_API_URL":  "${env:WP_API_URL}"
-                                                 },
-                                         "command":  "cmd"
-                                     },
                        "canva":  {
                                      "args":  [
                                                   "/c",

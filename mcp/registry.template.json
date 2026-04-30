@@ -212,8 +212,7 @@
       },
       "codex": {
         "bearer_token_env_var": "N8N_AUTH_BEARER_TOKEN"
-      },
-      "note": "Requires SSH tunnel: ssh -N -L 127.0.0.1:5678:127.0.0.1:5678 root@<your-vps-ip>"
+      }
     },
     "trigger": {
       "enabled": true,
@@ -249,21 +248,13 @@
       "note": "Requires SSH tunnel: scripts/open-supabase-ssh-tunnel.ps1 -Background"
     },
     "supabase": {
-      "enabled": true,
+      "enabled": false,
       "transport": "http",
-      "clients": {
-        "codex": {
-          "exclude": true
-        }
-      },
       "url": "http://localhost:8000/mcp",
       "headers": {
         "Authorization": "Bearer ${env:SUPABASE_AUTH_BEARER_TOKEN}"
       },
-      "codex": {
-        "bearer_token_env_var": "SUPABASE_AUTH_BEARER_TOKEN"
-      },
-      "note": "Requires tunnel: scripts/open-supabase-ssh-tunnel.ps1 -Background (self-hosted /mcp is IP-restricted externally)"
+      "note": "DISABLED: self-hosted Supabase Kong has no /mcp endpoint (returns 403). Use awarewave-ops for REST API and supabase-awarewave-postgres (requires SSH tunnel) for SQL. Re-enable only if Supabase officially adds self-hosted /mcp support."
     },
     "cloudflare": {
       "enabled": true,
