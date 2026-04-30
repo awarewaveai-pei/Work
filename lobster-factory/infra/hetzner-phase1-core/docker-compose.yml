@@ -26,7 +26,7 @@ services:
       wordpress:
         condition: service_healthy
     ports:
-      - "80:80"
+      - "${NGINX_HOST_PORT:-80}:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
@@ -41,7 +41,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "127.0.0.1:6379:6379"
+      - "${REDIS_HOST_PORT:-127.0.0.1:6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -77,7 +77,7 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
     ports:
-      - "127.0.0.1:5678:5678"
+      - "${N8N_HOST_PORT:-127.0.0.1:5678}:5678"
     healthcheck:
       test:
         [
@@ -144,7 +144,7 @@ services:
     volumes:
       - wordpress_data:/var/www/html
     ports:
-      - "127.0.0.1:8080:80"
+      - "${WORDPRESS_HOST_PORT:-127.0.0.1:8080}:80"
     healthcheck:
       test:
         [
@@ -174,7 +174,7 @@ services:
       REDIS_URL: redis://redis:6379
       SENTRY_DSN: ${SENTRY_DSN_NODE_API:-${SENTRY_DSN:-}}
     ports:
-      - "127.0.0.1:3001:3001"
+      - "${NODE_API_HOST_PORT:-127.0.0.1:3001}:3001"
     depends_on:
       redis:
         condition: service_healthy
@@ -229,7 +229,7 @@ services:
       OPS_ROLE_RESOLUTION_MODE: ${OPS_ROLE_RESOLUTION_MODE:-}
       INTERNAL_ADMIN_BASE_URL: ${INTERNAL_ADMIN_BASE_URL:-}
     ports:
-      - "127.0.0.1:3002:3000"
+      - "${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000"
     depends_on:
       node-api:
         condition: service_healthy
