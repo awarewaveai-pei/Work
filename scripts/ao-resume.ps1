@@ -109,7 +109,7 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
     }
 
     $checkpointMsg = "[cursor] checkpoint: auto-save dirty tree before FullMainlineParity retry"
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message $checkpointMsg
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message $checkpointMsg -WorkRoot $Root
     if ($LASTEXITCODE -ne 0) {
         Write-Host "AO-RESUME: auto-checkpoint failed (exit $LASTEXITCODE)." -ForegroundColor DarkYellow
         return $LASTEXITCODE
