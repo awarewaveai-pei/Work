@@ -63,6 +63,7 @@
 | **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）** | [governance-plans/GOVERNANCE_PLANS_INDEX.md](../governance-plans/GOVERNANCE_PLANS_INDEX.md) |
 | GitHub Actions × workflows | [github-actions-trigger-prod-deploy.md](github-actions-trigger-prod-deploy.md) |
 | **部署前快照、滾動更新、一鍵回滾、Staging 操作** | [DEPLOY_ROLLBACK_RUNBOOK.md](DEPLOY_ROLLBACK_RUNBOOK.md) |
+| **同機 Staging 隔離（Port env-var、container_name、VPS 目錄結構）** | [`SAME_VPS_STAGING_RUNBOOK.md`](../../../lobster-factory/infra/hetzner-phase1-core/SAME_VPS_STAGING_RUNBOOK.md) |
 | 多機 MariaDB（WP） | [MARIADB_MULTI_MACHINE_SYNC.md](MARIADB_MULTI_MACHINE_SYNC.md) |
 
 ### 資安／祕密

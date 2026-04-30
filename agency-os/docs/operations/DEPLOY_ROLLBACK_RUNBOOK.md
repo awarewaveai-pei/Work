@@ -179,6 +179,7 @@ docker rmi lobster-phase1-node-api:rollback-20260101-000000
 - `lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh`
 - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`
 - `lobster-factory/infra/hetzner-phase1-core/scripts/backup-phase1.sh`
+- `lobster-factory/infra/hetzner-phase1-core/SAME_VPS_STAGING_RUNBOOK.md`（同機隔離詳解）
 - `agency-os/docs/governance-plans/PLAN_30Y_STABILITY_HARDENING.md`
 - `agency-os/docs/operations/hetzner-stack-rollout-index.md`
 - `agency-os/TASKS.md`
