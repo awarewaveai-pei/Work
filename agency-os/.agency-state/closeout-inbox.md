@@ -34,6 +34,18 @@
 
 ---
 
+### claude-code 2026-04-30 18:00
+
+- **完成（一句）**: 部署 staging network 隔離修復、調高 Supabase studio/kong 記憶體上限、加設兩台 VPS 每週自動重啟 cron、處理 n8n EventLoopBlocked（近 6h 無重現，加 weekly restart 防護）
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`（network override 正式部署至 VPS `/root/lobster-phase1/`）
+  - VPS `5.223.93.113` crontab（新增 `30 3 * * 0` n8n weekly restart）
+  - VPS `204.168.175.41` `/root/supabase/docker-compose.yml`（studio 256m→512m、kong 512m→768m；備份於 `.bak.20260430-*`）
+  - VPS `204.168.175.41` crontab（新增 `0 3 * * 0` supabase studio+kong weekly restart）
+- **Git**: e1f4702（fix/staging network isolation，feat/infra-rollback-staging-log-gaps 分支）
+- **對應 TASKS 子字串（可選）**: Staging 統一 — next-admin / node-api staging 環境上線
+- **風險／待辦（可選）**: 遠端無 commit — Supabase VPS docker-compose.yml 已改（mem_limit 調高）但僅在 VPS 本機；建議在下次 AO-CLOSE 後把 Supabase compose 納入 git 備份。n8n 建議升版 2.17+（EventLoopBlocked readable-stream 根本修復）排入下次 maintenance window。
+
 ### claude-code 2026-04-30 16:00
 
 - **完成（一句）**: 在 VPS (5.223.93.113) 執行 Rollback 演練、確認 Observability 已運行、完成 Staging 統一上線，並修復 docker-compose.yml host port 競合問題
