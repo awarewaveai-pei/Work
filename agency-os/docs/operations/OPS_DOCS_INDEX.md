@@ -62,6 +62,7 @@
 | **子網域／`api` 邊界／長期計畫（統管入口）** | [edge-and-domains/EDGE_DOMAINS_INDEX.md](../edge-and-domains/EDGE_DOMAINS_INDEX.md)（正文：[PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)） |
 | **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）** | [governance-plans/GOVERNANCE_PLANS_INDEX.md](../governance-plans/GOVERNANCE_PLANS_INDEX.md) |
 | GitHub Actions × workflows | [github-actions-trigger-prod-deploy.md](github-actions-trigger-prod-deploy.md) |
+| **部署前快照、滾動更新、一鍵回滾、Staging 操作** | [DEPLOY_ROLLBACK_RUNBOOK.md](DEPLOY_ROLLBACK_RUNBOOK.md) |
 | 多機 MariaDB（WP） | [MARIADB_MULTI_MACHINE_SYNC.md](MARIADB_MULTI_MACHINE_SYNC.md) |
 
 ### 資安／祕密

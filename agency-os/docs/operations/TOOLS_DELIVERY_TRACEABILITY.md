@@ -29,7 +29,6 @@
 | **Nginx（系統／容器）** | 反代、TLS、路由 | `lobster-factory/infra/hetzner-phase1-core/nginx/`、`aware-wave-app-api-subdomains.conf` | [`edge-and-domains/EDGE_DOMAINS_INDEX.md`](../edge-and-domains/EDGE_DOMAINS_INDEX.md) 快速導覽 |
 | **Sentry** | 錯誤與效能訊號 | [`SENTRY_ALERT_POLICY.md`](SENTRY_ALERT_POLICY.md)、[`tools-and-integrations.md`](tools-and-integrations.md) | [`PLAN_30Y_STABILITY_HARDENING.md`](../governance-plans/PLAN_30Y_STABILITY_HARDENING.md) Phase 1 |
 | **PostHog** | 產品分析／funnel | `hetzner-phase1-core/README`（`NEXT_PUBLIC_POSTHOG_*`）、[`ARCHITECTURE_SPEC.md`](ARCHITECTURE_SPEC.md) | 本檔 P4；[`PROGRAM_TIMELINE.md`](../overview/PROGRAM_TIMELINE.md) OP-6 |
-| **Clerk** | B2B 身分邊界 | [ADR 002](../architecture/decisions/002-clerk-identity-boundary.md) | 本檔 P6；API PLAN P1 |
 | **GitHub Actions** | CI、Trigger 部署等 | [`github-actions-trigger-prod-deploy.md`](github-actions-trigger-prod-deploy.md) | 本檔「平台能力總表」列為已上線能力 |
 | **Redis** | 快取、冪等、限流（預留） | [`hetzner-stack-rollout-index.md`](hetzner-stack-rollout-index.md) | API PLAN P2 |
 | **Replicate** | 推論／影像（API） | [`tools-and-integrations.md`](tools-and-integrations.md)、`cursor-mcp-and-plugin-inventory` **replicate** | 規格長文：`docs/spec/raw/LOBSTER_FACTORY_MASTER_SPEC_V1.md` §10.6 |
@@ -97,13 +96,15 @@
 | Redis | ⚪ 未啟動（Phase A） | 可 | P2 | `docs/operations/hetzner-stack-rollout-index.md` | 服務健康檢查與應用連線成功 |
 | Nginx | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 路由/健康檢查/SSL 正常 |
 | Node API | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 核心 API endpoint 驗證通過 |
-| Next.js 控制台 | 🟡 建置中（P7；控制平面 migration 已落地） | 可 | P3 | `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`、`../lobster-factory/packages/db/migrations/0011_ops_console_control_plane.sql` | 可建立並回顯 1 個測試租戶設定；AI 生圖落 R2 並可於 SoR 追蹤；WP 商品/部落格圖維持 WP 媒體庫 |
+| Next.js 控制台 | 🟡 建置中（P6；控制平面 migration 已落地） | 可 | P3 | `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`、`../lobster-factory/packages/db/migrations/0011_ops_console_control_plane.sql` | 可建立並回顯 1 個測試租戶設定；AI 生圖落 R2 並可於 SoR 追蹤；WP 商品/部落格圖維持 WP 媒體庫 |
 | Sentry | 🟢 已上線（Phase1：`next-admin`／`node-api`／`php` + n8n DSN；**2026-04-12** 驗證與告警，見 `agency-os/WORKLOG.md` **`## 2026-04-12`**） | 可（維運較重） | P3 | `docs/operations/tools-and-integrations.md`、`../lobster-factory/infra/hetzner-phase1-core/README.md` | 測試錯誤可上報與告警；手動路由 `../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/sentry-test/route.ts` |
 | PostHog | ⚪ 未啟動（列入 P4） | 可 | P3 | `docs/operations/tools-and-integrations.md` | 可看到完整測試 funnel |
 | MinIO（S3 相容） | ⚪ 未啟動（Phase B） | 可 | P3（需要時） | `docs/operations/hetzner-stack-rollout-index.md` | 上傳/下載/權限驗證通過 |
 | Cloudflare | ⚪ 未啟動（列入 P5） | 以 SaaS 為主 | P2-P3 | `docs/operations/tools-and-integrations.md` | 規則生效且無回歸 |
-| Clerk（或替代） | ⚪ 未啟動（列入 P6） | Clerk 為 SaaS；可改自架替代 | P3 | `docs/architecture/decisions/002-clerk-identity-boundary.md` | 角色權限測試通過 |
 | GitHub Actions | 🟢 已上線（CI 正在使用） | SaaS（可改自建 CI） | P1-P2 | `docs/operations/github-actions-trigger-prod-deploy.md` | gate 與部署流程驗證通過 |
+| **Rollback（映像回版）** | ⚪ 腳本已建立；待演練 | 可（`rollback-phase1.sh` + Docker tag） | P3 | `docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`；腳本：`lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh` | VPS 上完成 save→deploy→restore 演練，WORKLOG 有 `ROLLBACK:` 紀錄 |
+| **Staging（next-admin / node-api）** | ⚪ compose override 已建立；待部署 | 可（同 VPS，`-p lobster-staging` 隔離） | P3 | `docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §5；`lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml` | staging stack running；port 9001/9002 健康驗收 PASS |
+| **Loki/Promtail/Grafana（Log 聚合）** | ⚪ compose 已建立（`docker-compose.observability.yml`）；待部署 | 可（loopback only + SSH tunnel） | P3 | `docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md` P2；`docs/operations/OBSERVABILITY_STACK_STANCE.md` | Grafana Explore 可查 nginx access log；Loki health PASS |
 
 ## 工具建置順序（建議）
 > 先穩定核心，再補可觀測，再做控制台；避免先做 UI 但底層未穩定。
@@ -115,10 +116,9 @@
 | P3 | Sentry 觀測接入 | 🟢 DoD 已證（2026-04-12；`WORKLOG.md`、`TASKS.md`） | `（工具建置）Sentry 觀測接入` |
 | P4 | PostHog 事件基線 | ⚪ 未啟動 | `（工具建置）PostHog 事件基線` |
 | P5 | Cloudflare 邊界保護 | ⚪ 未啟動 | `（工具建置）Cloudflare 邊界保護` |
-| P6 | Clerk 組織與角色（B2B 多租戶） | ⚪ 未啟動 | `（工具建置）Clerk 組織與角色（B2B 多租戶）` |
-| P7 | Next.js 控制台 v1（Internal Ops） | ⚪ 未啟動 | `（工具建置）Next.js 控制台 v1（Internal Ops）` |
+| P6 | Next.js 控制台 v1（Internal Ops） | ⚪ 未啟動 | `（工具建置）Next.js 控制台 v1（Internal Ops）` |
 
-## 任務到規格追溯（P1-P7）
+## 任務到規格追溯（P1-P6）
 | `TASKS` 關鍵字 | 主要規格正本 | 路由錨點 | 完成判定（需可觀測） | 證據欄位 |
 |---|---|---|---|---|
 | `（工具建置）Secrets 治理升級` | `docs/operations/security-secrets-policy.md` | `MCP_TOOL_ROUTING_SPEC.md` Guardrails + Tool Boundaries | 輪替演練完成且無中斷 | `date`, `owner`, `rotated_scopes`, `rollback_note`, `report_path` |

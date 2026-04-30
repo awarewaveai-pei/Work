@@ -16,6 +16,19 @@
 - [x] 建立 `lobster-factory` Phase 1 底座骨架（Supabase migrations + wc-core manifest + workflow 安全骨架）
 
 ## Next — 未完成（目前正式隊列）
+- [ ] **（工具建置）Rollback 機制 — phase1 compose 回版腳本演練**
+  - 腳本：`lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh`
+  - DoD：在 VPS 完成一次 `save → deploy → restore` 演練（任一本地映像服務），`curl` 驗收 PASS，結果寫入 `WORKLOG`
+  - 參考：`agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`
+- [ ] **（工具建置）Log 聚合 — Loki/Promtail/Grafana 觀測堆疊部署**
+  - compose 已就緒：`lobster-factory/infra/hetzner-phase1-core/docker-compose.observability.yml`
+  - DoD：VPS 上 `docker compose -f docker-compose.observability.yml ps` 全部 running；SSH tunnel 後 Grafana Explore 可查 nginx access log
+  - 部署步驟：`agency-os/docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md` P2 節
+- [ ] **（工具建置）Staging 統一 — next-admin / node-api staging 環境上線**
+  - compose override：`lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`
+  - env 範本：`lobster-factory/infra/hetzner-phase1-core/.env.staging.example`
+  - DoD：VPS 以 `-p lobster-staging` 起 staging stack；`curl http://127.0.0.1:9001/health`（node-api）與 `curl http://127.0.0.1:9002/`（next-admin）PASS；結果寫入 `WORKLOG`
+  - 操作指令見 `docker-compose.staging.yml` 檔頭
 - [ ] **（明日提醒）n8n / Supabase MCP 連線仍未完成，明日 `AO-RESUME` 優先修復**
   - 檢查：`scripts/n8n-mcp-smoke.ps1`、`scripts/open-supabase-ssh-tunnel.ps1`（若出現 `administratively prohibited` 先修 EU sshd forwarding）
   - 驗收：Cursor MCP 兩者連線綠燈 + 有一次成功 `tools/list` / SQL 連通

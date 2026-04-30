@@ -34,6 +34,25 @@
 
 ---
 
+### claude-code 2026-04-30 17:00
+
+- **完成（一句）**: 補齊 Rollback 機制、Staging 統一、Log 聚合三項缺口（腳本建立 + compose override + runbook + 7 份文件連動更新）
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh`（新增）
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`（新增）
+  - `lobster-factory/infra/hetzner-phase1-core/.env.staging.example`（新增）
+  - `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`（新增）
+  - `lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`（§3 §1 §8 更新）
+  - `agency-os/TASKS.md`（新增 3 項 Rollback/LogAgg/Staging 任務）
+  - `agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（新增 3 行能力列）
+  - `agency-os/docs/governance-plans/PLAN_30Y_STABILITY_HARDENING.md`（Phase 3 + Checklist 更新）
+  - `agency-os/docs/CHANGE_IMPACT_MATRIX.md`（新增 DEPLOY_ROLLBACK_RUNBOOK 行）
+  - `agency-os/docs/operations/hetzner-stack-rollout-index.md`（Phase B 新增 #15 Grafana/Loki）
+  - `agency-os/docs/operations/OPS_DOCS_INDEX.md`（基礎建設區塊新增入口）
+- **Git**: 未 commit
+- **對應 TASKS 子字串（可選）**: Rollback 機制 — phase1 compose 回版腳本演練
+- **風險／待辦（可選）**: 三項缺口的「DoD」均需在 VPS 實際演練後才算完成；腳本與 compose 已就緒，演練步驟見各 TASKS 項目說明。Loki 部署需 VPS 上執行 observability compose。
+
 ### example-agent <yyyy-MM-dd 09:00>
 
 - **完成（一句）**: 已依範本建立收件匣流程

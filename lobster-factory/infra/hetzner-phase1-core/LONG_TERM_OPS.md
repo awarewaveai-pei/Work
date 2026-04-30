@@ -15,7 +15,7 @@
 | **RTO**（多久要復線） | 例如：**4 小時內**恢復對外只讀或核心 API；**24 小時內**完整恢復 |
 | **備份存放** | **異地**：第二機房、物件儲存、或加密冷存；**禁止**只留在同一顆 VPS 磁碟 |
 | **責任人** | 誰有權 **SSH／DNS／憑證／root DB**；輪值與 **escalation** |
-| **staging** | **永遠**先升級／遷移 **staging**，再 **production**（見 §6） |
+| **staging** | **永遠**先升級／遷移 **staging**，再 **production**（見 §6）；compose override：`docker-compose.staging.yml` + `.env.staging`；操作：`agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §5 |
 
 ---
 
@@ -39,6 +39,7 @@
    - **B. digest 釘選**（最硬）：`image: repo/name@sha256:...` — 在 **WORKLOG** 記「為何在這天升級／回滾方式」。  
 3. **龍蝦自有 image**（`lobster-phase1-*:local`）：以 **Git commit SHA** 或 **日曆版本** 在 `WORKLOG` 標記「當前 production 對應哪個 repo 版本」。  
 4. **PHP / MariaDB / WordPress**：大版本跳躍（例如 PHP 8.2 → 8.4）前，必做 **staging 外掛相容矩陣**（WP 生態最易卡這裡）。
+5. **回滾快照（deploy 前必做）**：部署本地映像（`wordpress`、`node-api`、`next-admin`）前，先執行 `scripts/rollback-phase1.sh save <service>`，將 `:local` 快照存為 `:rollback-YYYYMMDD-HHMMSS`；出問題時 `restore` 一鍵還原。操作正本：`agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`。
 
 ---
 
@@ -93,7 +94,8 @@
 
 - 安裝順序／平面／連動索引：`agency-os/docs/operations/hetzner-stack-rollout-index.md`  
 - 週期勾選：`MAINTENANCE_CALENDAR.md`  
-- 操作入口：`README.md`  
+- 操作入口：`README.md`
+- 部署與回滾：`agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`
 - 全棧階段：`agency-os/docs/operations/hetzner-full-stack-self-host-runbook.md`  
 - Supabase 切線：`agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`  
 - 祕密政策：`agency-os/docs/operations/security-secrets-policy.md`  

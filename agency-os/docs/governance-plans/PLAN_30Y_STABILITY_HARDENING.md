@@ -42,9 +42,11 @@
 ### Phase 3（2–3 天）：備援與災難復原
 
 - 定義 RPO/RTO（先給現實版：例如 RPO 24h / RTO 4h，後續再收緊）。
-- 建立「可重複還原演練」：從備份檔在乾淨環境復原一次。
+- 建立「可重複還原演練」：從備份檔在乾淨環境復原一次（資料層）。
+- 補 **部署前快照 + 映像回滾演練**（程式層）：`scripts/rollback-phase1.sh save → deploy → restore`，WORKLOG 留 `ROLLBACK:` 紀錄。
 - 交付：
-  - 更新 [`LONG_TERM_OPS.md`](../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md)
+  - 更新 [`LONG_TERM_OPS.md`](../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md)（已補 §3 rollback 說明）
+  - [`DEPLOY_ROLLBACK_RUNBOOK.md`](../operations/DEPLOY_ROLLBACK_RUNBOOK.md)（已建立；含 staging §5）
   - 新增 `DR_RESTORE_DRILL_RUNBOOK.md`（`agency-os/docs/operations/`）
   - 在 `verify-build-gates` 增加「最近一次 restore drill 證據存在」檢查
 
@@ -78,7 +80,7 @@
 
 - [ ] **P1**：封板 Sentry 分流契約、告警規則與 smoke 驗證流程。
 - [ ] **P2**：高風險密鑰 owner/輪替/審計，完成一次不中斷演練。
-- [ ] **P3**：定義 RPO/RTO 並完成一次備份還原演練（含證據）。
+- [ ] **P3**：定義 RPO/RTO；完成一次資料備份還原演練（`backup-phase1.sh`）+ 一次映像回滾演練（`rollback-phase1.sh`），含 WORKLOG 證據。
 - [ ] **P4**：把 routing/inventory/traceability 月季巡檢掛入 gate。
 - [ ] **P5**：完善故障定位與值班 runbook（5 分鐘可定位責任服務）。
 

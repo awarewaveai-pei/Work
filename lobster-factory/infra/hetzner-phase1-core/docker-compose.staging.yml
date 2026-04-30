@@ -1,0 +1,62 @@
+# Staging compose override — run with Docker Compose project name lobster-staging.
+#
+# Usage (from hetzner-phase1-core/):
+#
+#   Build:
+#     docker compose -p lobster-staging --env-file .env.staging \
+#       -f docker-compose.yml -f docker-compose.staging.yml build
+#
+#   Up:
+#     docker compose -p lobster-staging --env-file .env.staging \
+#       -f docker-compose.yml -f docker-compose.staging.yml up -d
+#
+#   Down:
+#     docker compose -p lobster-staging --env-file .env.staging \
+#       -f docker-compose.yml -f docker-compose.staging.yml down
+#
+#   Status:
+#     docker compose -p lobster-staging -f docker-compose.yml -f docker-compose.staging.yml ps
+#
+# The -p flag namespaces all containers (lobster-staging-*), volumes, and networks
+# so staging and production never collide on the same VPS.
+#
+# Local images use :staging tag so staging and prod builds are independent —
+# rebuilding staging never overwrites the prod :local image.
+#
+# SSH tunnel for local access (from dev machine):
+#   ssh -L 9080:127.0.0.1:9080 -L 9001:127.0.0.1:9001 -L 9002:127.0.0.1:9002 hetzner
+#
+# Docs: agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md §staging
+#       lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md §1
+
+services:
+  nginx:
+    ports:
+      - "127.0.0.1:9080:80"
+
+  n8n:
+    ports:
+      - "127.0.0.1:9678:5678"
+
+  wordpress:
+    image: lobster-phase1-wordpress:staging
+    ports:
+      - "127.0.0.1:9008:80"
+
+  wordpress-db:
+    ports:
+      - "127.0.0.1:9306:3306"
+
+  node-api:
+    image: lobster-phase1-node-api:staging
+    ports:
+      - "127.0.0.1:9001:3001"
+
+  next-admin:
+    image: lobster-phase1-next-admin:staging
+    ports:
+      - "127.0.0.1:9002:3000"
+
+  redis:
+    ports:
+      - "127.0.0.1:9379:6379"
