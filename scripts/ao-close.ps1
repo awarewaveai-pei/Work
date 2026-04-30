@@ -10,6 +10,7 @@
 # Primary: monorepo root scripts\ao-close.ps1. agency-os\scripts\ao-close.ps1 is a thin wrapper (same flags).
 # -SkipPush: no git commit/push (still runs gates and reports).
 # -SkipVerify: skip verify-build-gates (faster; not recommended before company pull).
+# -AllowAheadCommits: required override when local branch is already ahead of origin before AO-CLOSE starts.
 
 param(
     [string]$WorkRoot = "",
@@ -20,6 +21,7 @@ param(
     [switch]$SkipVerify,
     [switch]$AllowNonPerfectHealth,
     [switch]$AllowPushWhileBehind,
+    [switch]$AllowAheadCommits,
     [switch]$SkipTodayRecap,
     [switch]$SkipAutoTaskCheckmarks,
     [switch]$SkipInboxGuard,
@@ -57,6 +59,96 @@ $guardScript = Join-Path $agencyRoot "scripts\system-guard.ps1"
 if (-not (Test-Path -LiteralPath $guardScript)) {
     Write-Error "ao-close: missing system-guard at $guardScript"
     exit 1
+}
+
+function Get-GitPreflightSnapshot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    Push-Location $RepoRoot
+    try {
+        $null = git rev-parse --git-dir 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            return [pscustomobject]@{
+                IsGitRepo   = $false
+                Branch      = ""
+                StatusLine  = ""
+                Ahead       = $null
+                Behind      = $null
+                Dirty       = $null
+                RemoteRef   = ""
+                RemoteFound = $false
+            }
+        }
+
+        $statusLine = (git status -sb 2>$null | Select-Object -First 1)
+        if ($null -eq $statusLine) {
+            $statusLine = ""
+        } else {
+            $statusLine = $statusLine.Trim()
+        }
+
+        $branch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim()
+        $remoteRef = if ([string]::IsNullOrWhiteSpace($branch) -or $branch -eq "HEAD") { "" } else { "origin/$branch" }
+        $remoteFound = $false
+        $ahead = $null
+        $behind = $null
+
+        if (-not [string]::IsNullOrWhiteSpace($remoteRef)) {
+            git rev-parse --verify $remoteRef 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $remoteFound = $true
+                $lr = (git rev-list --left-right --count "${remoteRef}...HEAD" 2>$null).Trim()
+                $parts = @($lr -split '\s+' | Where-Object { $_ })
+                if ($parts.Count -ge 2) {
+                    $behind = [int]$parts[0]
+                    $ahead = [int]$parts[1]
+                }
+            }
+        }
+
+        $dirty = @(
+            git status --porcelain 2>$null |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        ).Count -gt 0
+
+        return [pscustomobject]@{
+            IsGitRepo   = $true
+            Branch      = $branch
+            StatusLine  = $statusLine
+            Ahead       = $ahead
+            Behind      = $behind
+            Dirty       = $dirty
+            RemoteRef   = $remoteRef
+            RemoteFound = $remoteFound
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
+Write-Host "== AO-CLOSE: preflight git snapshot (branch/ahead/behind/dirty) ==" -ForegroundColor Cyan
+$preflight = Get-GitPreflightSnapshot -RepoRoot $WorkRoot
+if (-not $preflight.IsGitRepo) {
+    Write-Error "ao-close: not a git repository at $WorkRoot"
+    exit 1
+}
+if (-not [string]::IsNullOrWhiteSpace($preflight.StatusLine)) {
+    Write-Host "  status: $($preflight.StatusLine)" -ForegroundColor DarkGray
+}
+if ($preflight.RemoteFound -and $null -ne $preflight.Ahead -and $null -ne $preflight.Behind) {
+    Write-Host "  branch: $($preflight.Branch) | remote: $($preflight.RemoteRef) | ahead=$($preflight.Ahead) behind=$($preflight.Behind) | dirty=$($preflight.Dirty)" -ForegroundColor DarkGray
+    if ($preflight.Ahead -gt 0 -and -not $AllowAheadCommits) {
+        Write-Error "ao-close: preflight blocked because local branch is already ahead by $($preflight.Ahead) commit(s). Re-run with -AllowAheadCommits to acknowledge and continue."
+        exit 1
+    }
+    if ($preflight.Ahead -gt 0 -and $AllowAheadCommits) {
+        Write-Host "  note: -AllowAheadCommits acknowledged; continuing with existing ahead=$($preflight.Ahead)." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "  branch: $($preflight.Branch) | remote ref not found yet (no ahead/behind snapshot) | dirty=$($preflight.Dirty)" -ForegroundColor DarkGray
 }
 
 $scaffoldScript = Join-Path $WorkRoot "scripts\ensure-daily-progress-scaffold.ps1"
