@@ -82,6 +82,43 @@ function Assert-AoResumeRuleConsistency {
     return 0
 }
 
+function Invoke-FullMainlineAlignWithAutoCheckpoint {
+    param(
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][string[]]$AlignArgs
+    )
+
+    & powershell.exe @AlignArgs
+    if ($LASTEXITCODE -eq 0) {
+        return 0
+    }
+
+    $statusShort = @(
+        git -C $Root status --short 2>$null |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+    if ($statusShort.Count -eq 0) {
+        return $LASTEXITCODE
+    }
+
+    Write-Host "== AO-RESUME: FullMainlineParity detected dirty tree; run one auto-checkpoint retry ==" -ForegroundColor Yellow
+    $checkpointScript = Join-Path $Root "scripts\commit-checkpoint.ps1"
+    if (-not (Test-Path -LiteralPath $checkpointScript)) {
+        Write-Host "AO-RESUME: checkpoint script not found, cannot auto-heal dirty tree." -ForegroundColor DarkYellow
+        return $LASTEXITCODE
+    }
+
+    $checkpointMsg = "[cursor] checkpoint: auto-save dirty tree before FullMainlineParity retry"
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message $checkpointMsg
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "AO-RESUME: auto-checkpoint failed (exit $LASTEXITCODE)." -ForegroundColor DarkYellow
+        return $LASTEXITCODE
+    }
+
+    & powershell.exe @AlignArgs
+    return $LASTEXITCODE
+}
+
 if ($WorkRoot) {
     $WorkRoot = (Resolve-Path $WorkRoot).Path
 } elseif ($PSScriptRoot) {
@@ -151,10 +188,10 @@ if ($FullMainlineParity) {
         if ($FullMainlineRequireFeatureBranch) { $alignArgs += "-RequireFeatureBranch" }
         $alignStash = $FullMainlineAllowStash -or $AllowStashBeforePull -or $AllowUnexpectedDirty
         if ($alignStash) { $alignArgs += "-AllowStash" }
-        & powershell.exe @alignArgs
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "ao-resume: FullMainlineParity git align failed (exit $LASTEXITCODE). Fix dirty tree or pass -FullMainlineAllowStash / -AllowUnexpectedDirty."
-            exit $LASTEXITCODE
+        $alignExit = Invoke-FullMainlineAlignWithAutoCheckpoint -Root $WorkRoot -AlignArgs $alignArgs
+        if ($alignExit -ne 0) {
+            Write-Error "ao-resume: FullMainlineParity git align failed (exit $alignExit). Fix dirty tree or pass -FullMainlineAllowStash / -AllowUnexpectedDirty."
+            exit $alignExit
         }
     }
 }
