@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-04-30 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-30 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:2292d436ed4893363b5ce44030cf7d55fc67fbf88f9370befedf7ad51340bf5e -->
+- **2026-04-30（AO-CLOSE 前補記）**：本輪已完成 claude 交接 commit（`3bf272a`，closeout-inbox 新增 18:00 區塊）；staging network isolation 已在 VPS 部署，並完成 Supabase studio/kong 記憶體上調與兩台 VPS weekly restart 防護。待續事項：Supabase VPS compose 仍屬遠端未入庫配置、n8n 建議升版 2.17+ 以根治 EventLoopBlocked。
 - **2026-04-30 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-30 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:68ccb8e525ff628ed06624d482c7b037952fe12ae0215db8f864793df15b6079 -->
 - **2026-04-30（AO-CLOSE）**
   - 背景：使用者要求「月檢 + 收工」，並明確要保留「明天提醒：n8n / Supabase MCP 還沒好」。
@@ -383,5 +385,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-04-30 01:34:29 UTC_
+_Last synced: 2026-04-30 09:24:59 UTC_
 

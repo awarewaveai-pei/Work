@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-30 09:34:38
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-04-30 17:25:11
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter） - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑） - [ ] C5-1. Observability：Sentry（錯誤追蹤）+ PostHog（產品分析） - [ ] C5-2. Edge/Security：Cloudflare（WAF/CDN/Rate limit） - [ ] C5-3. Secrets：1Password Secrets Automation（或同級） - [ ] C5-4. Identity/Org：Clerk/WorkOS/Auth0（三選一） - [ ] C5-5. Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails） - [ ] C5-6. 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -238,11 +238,62 @@
 - **對應 TASKS 子字串（可選）**: MCP 連線穩定化
 - **風險／待辦（可選）**: [待辦] git push origin main 尚未執行（需使用者手動或授權）；桌機需依 mcp/DESKTOP_MCP_SETUP.md 執行並重啟 Cursor；空值 env vars（HETZNER_API_TOKEN、SENTRY_AUTH_TOKEN、TRIGGER_ACCESS_TOKEN、UPTIME_KUMA_API_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY）待補齊；[遠端/無 commit] EU VPS 204.168.175.41 磁碟清理（journal + docker cache + btmp，45%→28%）
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:2292d436ed4893363b5ce44030cf7d55fc67fbf88f9370befedf7ad51340bf5e -->
+
+### claude-code 2026-04-30 18:00
+
+- **完成（一句）**: 部署 staging network 隔離修復、調高 Supabase studio/kong 記憶體上限、加設兩台 VPS 每週自動重啟 cron、處理 n8n EventLoopBlocked（近 6h 無重現，加 weekly restart 防護）
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`（network override 正式部署至 VPS `/root/lobster-phase1/`）
+  - VPS `5.223.93.113` crontab（新增 `30 3 * * 0` n8n weekly restart）
+  - VPS `204.168.175.41` `/root/supabase/docker-compose.yml`（studio 256m→512m、kong 512m→768m；備份於 `.bak.20260430-*`）
+  - VPS `204.168.175.41` crontab（新增 `0 3 * * 0` supabase studio+kong weekly restart）
+- **Git**: e1f4702（fix/staging network isolation，feat/infra-rollback-staging-log-gaps 分支）
+- **對應 TASKS 子字串（可選）**: Staging 統一 — next-admin / node-api staging 環境上線
+- **風險／待辦（可選）**: 遠端無 commit — Supabase VPS docker-compose.yml 已改（mem_limit 調高）但僅在 VPS 本機；建議在下次 AO-CLOSE 後把 Supabase compose 納入 git 備份。n8n 建議升版 2.17+（EventLoopBlocked readable-stream 根本修復）排入下次 maintenance window。
+
+
+### claude-code 2026-04-30 16:00
+
+- **完成（一句）**: 在 VPS (5.223.93.113) 執行 Rollback 演練、確認 Observability 已運行、完成 Staging 統一上線，並修復 docker-compose.yml host port 競合問題
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（host port 全部 env-var 化，default 維持現行值）
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`（精簡為僅 container_name + image override；port 由 .env.staging 控制）
+  - `lobster-factory/infra/hetzner-phase1-core/.env.staging.example`（新增 NGINX/REDIS/N8N/WORDPRESS/NODE_API/NEXT_ADMIN _HOST_PORT staging vars）
+  - VPS `/root/lobster-phase1/scripts/rollback-phase1.sh`（部署）
+  - VPS `/root/lobster-phase1/docker-compose.staging.yml`（部署）
+  - VPS `/root/lobster-phase1/.env.staging`（生成，DB 名 staging 分離）
+  - VPS `/root/lobster-phase1/rollback.log`（save+restore+health PASS 記錄）
+- **Git**: 0fb46af（feat/infra-rollback-staging-log-gaps）
+- **對應 TASKS 子字串（可選）**: Staging 統一 — next-admin / node-api staging 環境上線
+- **風險／待辦（可選）**: 三項 DoD 全數通過。VPS 上 staging stack (`lobster-staging-*`) 現正運行，可用 `docker compose -p lobster-staging ... down` 停止。Observability 在 port 3009。feature branch 待 AO-CLOSE 時由收關者 push + merge to main。
+
+
+### claude-code 2026-04-30 17:00
+
+- **完成（一句）**: 補齊 Rollback 機制、Staging 統一、Log 聚合三項缺口（腳本建立 + compose override + runbook + 7 份文件連動更新）
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh`（新增）
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`（新增）
+  - `lobster-factory/infra/hetzner-phase1-core/.env.staging.example`（新增）
+  - `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`（新增）
+  - `lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`（§3 §1 §8 更新）
+  - `agency-os/TASKS.md`（新增 3 項 Rollback/LogAgg/Staging 任務）
+  - `agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（新增 3 行能力列）
+  - `agency-os/docs/governance-plans/PLAN_30Y_STABILITY_HARDENING.md`（Phase 3 + Checklist 更新）
+  - `agency-os/docs/CHANGE_IMPACT_MATRIX.md`（新增 DEPLOY_ROLLBACK_RUNBOOK 行）
+  - `agency-os/docs/operations/hetzner-stack-rollout-index.md`（Phase B 新增 #15 Grafana/Loki）
+  - `agency-os/docs/operations/OPS_DOCS_INDEX.md`（基礎建設區塊新增入口）
+- **Git**: 未 commit
+- **對應 TASKS 子字串（可選）**: Rollback 機制 — phase1 compose 回版腳本演練
+- **風險／待辦（可選）**: 三項缺口的「DoD」均需在 VPS 實際演練後才算完成；腳本與 compose 已就緒，演練步驟見各 TASKS 項目說明。Loki 部署需 VPS 上執行 observability compose。
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-04-30 09:34:33`
+- Time: `2026-04-30 17:25:02`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -252,8 +303,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260430-093432.md`
-- Closeout: `reports/closeout/closeout-20260430-093430.md`
+- Health: `reports/health/health-20260430-172502.md`
+- Closeout: `reports/closeout/closeout-20260430-172500.md`
 
 ## Action
 - No blocking issue detected.
