@@ -8,6 +8,7 @@ COPY composer.json ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 COPY mu-plugins/sentry.php ./sentry.php
+COPY mu-plugins/posthog.php ./posthog.php
 
 # Register entrypoint hook (WordPress image runs scripts in /docker-entrypoint.d/)
 COPY docker-entrypoint-sentry.sh /docker-entrypoint.d/99-sentry-init.sh
