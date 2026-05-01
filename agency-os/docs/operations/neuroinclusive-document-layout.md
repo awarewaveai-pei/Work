@@ -108,13 +108,14 @@
 | 長規約不打臉 | `<details>` 摺疊 **`待辦原則`** |
 | 單一未完成真相 | 規約：未完成區僅 `- [ ]`，已完成移到 **`已完成歷程`** |
 | 可複製的一句話給代理 | **`閱讀輔助`** 區塊 |
+| 超長子項遷出 | **雙機**細項 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**；`TASKS` 只留一行 + 連結 |
 
 ---
 
 ## 仍可改進（若你要繼續優化）
 
-1. **雙機條目**：子項過長 → 移到獨立 Owner（例如 `REMOTE_DUAL_MACHINE_CHECKLIST.md`），`TASKS` 只留一行 **進度／下一步** + 連結。  
-2. **Plain-language 副檔**：同一隊列的 **`TASKS-PLAIN.md`**（極短句、無表格），由代理同步或每週生成——需約定 Single Owner 避免漂移。  
+1. ~~**雙機條目**~~：**已遷出** → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**；`TASKS` 只保留一行 + 連結。
+2. **Plain-language 副檔**：同一隊列的 **`TASKS-PLAIN.md`**（極短句、無表格），由代理同步或每週生成——需約定 Single Owner 避免漂移。
 3. **IDE**：Cursor / VS Code 使用較大字級、行距、主題對比；属使用者設定，不與 repo 衝突。
 
 ---

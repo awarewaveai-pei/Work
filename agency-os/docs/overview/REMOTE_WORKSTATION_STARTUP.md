@@ -42,7 +42,7 @@ git pull --ff-only origin main
 ## 1.5) 筆電／新機：首次開機最短指令序列（複製貼上）
 
 > **角色分工**：**§1.5**＝新機／筆電首次（含 `clone`、工具、`lobster-factory` 依賴、閘道）；**§2**＝之後每次開機的**例行**流程（會再 `pull`、`npm ci`、閘道）。  
-> **連動**：`TASKS.md` → Next「（AO-RESUME 提醒）雙機環境對齊」、根 `README.md`「他機／首次接線」均指向本節。  
+> **連動**：`TASKS.md` →「（AO-RESUME 提醒）雙機環境對齊」（一行隊列）；細項 checklist Owner → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。根 `README.md`「他機／首次接線」指向本節。  
 > **前置**：已安裝 **Git**、**Node.js**（建議與桌機／CI 同大版本）；可選 **winget**（裝 `gh` 用）。
 
 ### 從零 clone（這台從未載過 repo）
@@ -369,5 +369,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1
 - `RESUME_AFTER_REBOOT.md`
 - `TASKS.md`
 
-_Last synced: 2026-05-01 07:28:43 UTC_
+_Last synced: 2026-05-01 11:39:18 UTC_
 

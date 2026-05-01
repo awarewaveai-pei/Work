@@ -68,7 +68,7 @@
 | **跨平面或破壞性變更** | 新增／修訂 **ADR** + 更新 `docs/architecture/decisions/ADR_INDEX.md` 索引 | 同上閘道；見 `CHANGE_IMPACT_MATRIX` |
 | **客戶釋出或重大變更** | 依 `tenants/templates/core/RELEASE_GATES_CHECKLIST.md`；備份與還原證據 | `BACKUP_RESTORE_PROOF.md` 模板與實填 |
 | **每日開工／收工** | 開工：Cursor 送 **`AO-RESUME`** → **hook** 跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**（Git、`verify-build-gates`、Strict 環境稽核）→ 代理讀檔；收工：**`scripts/ao-close.ps1`**（關鍵字 **`AO-CLOSE`**；含 recap／閘道／integrated status／預設 **push** `origin/main`） | `.cursor/hooks.json`、`.cursor/rules/30-resume-keyword.mdc`、`40-shutdown-closeout.mdc`、`end-of-day-checklist.md` |
-| **新機／雙機** | `REMOTE_WORKSTATION_STARTUP` §1.5／§2；`machine-environment-audit.ps1 -FetchOrigin -Strict`（勾選 `TASKS` 雙機項前須無 WARN） | `TASKS.md`「雙機環境對齊」勾選條件 |
+| **新機／雙機** | `REMOTE_WORKSTATION_STARTUP` §1.5／§2；`machine-environment-audit.ps1 -FetchOrigin -Strict`（勾選 `TASKS` 雙機項前須無 WARN） | `TASKS.md` 一行隊列；細項 **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`** |
 | **依賴與 CVE** | 審閱 `npm audit`；**禁止**對 `lobster-factory/packages/workflows` 盲目 `npm audit fix --force` | `TASKS.md` Backlog（Trigger 傳遞依賴） |
 
 **12 個月內建議完成的工程錨點（與 ADR 006 一致）**：在 Supabase 落地 **RLS + 租戶鍵 + Clerk 組織對照表**（migrations），並於 **staging** 用自動化或手動測試證明 **無跨租戶讀寫**；未落地前不宣稱多租戶資料層「已封閉」。**已提供基線 migration**：`lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql`（須套用至遠端 DB 並配置 JWT org claim）。
@@ -80,6 +80,7 @@
 - `AGENTS.md`
 - `TASKS.md`（動態優先序與試點）
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
+- `docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`（雙機細項；`TASKS` 一行隊列之展開）
 - `docs/overview/repo-template-locations.md`
 - `docs/architecture/decisions/ADR_INDEX.md`
 - `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`

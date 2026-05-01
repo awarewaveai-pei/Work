@@ -61,5 +61,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/operations/security-secrets-policy.md`
 
-_Last synced: 2026-04-29 16:12:02 UTC_
+_Last synced: 2026-05-01 11:39:18 UTC_
 
