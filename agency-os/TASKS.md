@@ -86,7 +86,7 @@
 - [ ] （工具建置）Next.js 控制台 v1（Internal Ops） —— **【進行中】** **進度（2026-04-25）：**DB migration、`/ops-console`、`POST /api/ops/ai-image-jobs`、`GET /api/ops/summary` 等 **已在 repo**。**下一步：**滿足 DoD——建立 **1 個測試客戶**並在 **UI 成功回顯**。
   - 處理：建立 app skeleton、客戶清單頁、部門勾選頁（20 部門）、提交後寫出 `DEPARTMENT_SELECTION` payload
   - 2026-04-25 進度：控制平面 migration 已新增 `0011_ops_console_control_plane.sql`（`ops_action_runs` / `ai_image_jobs` / `media_assets` / `ops_audit_events`）
-  - 2026-05-01 進度：**`0018` + `0019`** 已入 repo（`0018`＝helpers + `(select …)` + `workflow_runs` 去重；`0019`＝政策改委派 **`current_user_id()`** 以符合 Splinter 對 policy 文字之檢查）；**須在 Supabase SQL Editor 依序套用後** Advisor 才會消 WARN
+  - 2026-05-01 進度：**`0018` → `0019` → `0020`** 已入 repo（`0020`＝Splinter 對齊之 **`workflow_runs` 去重** + **清掉四表全部 policy 後重建 0019** 以移除儀表板殘留）；診斷腳本 **`lobster-factory/packages/db/scripts/diag-splinter-auth-rls-initplan.sql`**；**須在 Supabase SQL Editor 依序套用**後 Advisor 才會消 WARN
   - 2026-04-25 進度：`next-admin` 已新增 `/ops-console` 與 `POST /api/ops/ai-image-jobs`（`queued` job + 審計；viewer 雙層擋）與 `GET /api/ops/summary`（讀 `organizations` 或安全 fallback）
   - 媒體分層固定：AI 生圖走 R2；WordPress 商品圖/部落格圖維持 WP 媒體庫（`wp-content/uploads` + MySQL）
   - 正本：`docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`

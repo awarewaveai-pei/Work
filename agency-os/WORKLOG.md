@@ -8,7 +8,9 @@
 
 - **`lobster-factory/packages/db/migrations/0018_rls_initplan_and_workflow_runs_index_dedupe.sql`**：政策與 helper 將 **`auth.uid()` / `auth.jwt()`** 改為 **`(select …)`** 形式；`workflow_runs` 以 **`pg_get_indexdef` 分組**刪除冗餘索引（保留 **`idx_workflow_runs_org`** / **`idx_workflow_runs_site`**）；末段重設 **`search_path`**（與 **0017** 一致）。
 - **`0019_rls_policies_delegate_to_current_user_id.sql`**：profiles／memberships／user_role_assignments 政策改為只呼叫 **`current_user_id()`**，使 **`qual`／`with_check` 不含字面 `auth.uid()`**（對齊 Splinter **`0003_auth_rls_initplan`** 只掃 policy 文字；避免仍顯示 6 則 WARN）。
-- **須在 Supabase Dashboard → SQL Editor 依序執行 `0018`、`0019`**（或 CI／CLI 等同套用）後，Performance Advisor 才會更新；僅改 repo、未連線執行 SQL，雲端 WARN 不會消失。
+- **`0020_splinter_duplicate_indexes_and_rls_stray_policies.sql`**：**(A)** `workflow_runs` 重複索引改用與 Splinter **0009** 相同的 **`replace(indexdef, indexname, '')`** 分組後刪冗餘（修正 **0018** 只用完整 `pg_get_indexdef` 導致同名不同定義無法合併的問題）；**(B)** 對 **`profiles`／organization_memberships／workspace_memberships／user_role_assignments` 先 **`DROP` 該表全部 policy** 再重建 **0019**，清掉 Dashboard／範本留下的 **`auth.uid()`** policy。
+- **診斷**：`lobster-factory/packages/db/scripts/diag-splinter-auth-rls-initplan.sql` 可在 SQL Editor 列出仍會被 **0003** 命中的 policy（與 Splinter 同源條件）。
+- **須在 Dashboard → SQL Editor 依序執行 `0018` → `0019` → `0020`**（或 CI／CLI）後再開 Performance Advisor；僅改 repo 不會消除雲端 WARN。
 
 ### git push origin main — 2026-05-01 完成
 
