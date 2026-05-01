@@ -118,5 +118,5 @@
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-29 16:12:02 UTC_
+_Last synced: 2026-05-01 05:37:08 UTC_
 

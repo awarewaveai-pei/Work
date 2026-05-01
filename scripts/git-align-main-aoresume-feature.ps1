@@ -26,6 +26,9 @@
 .PARAMETER SkipAoResume
   只做 Git 步驟（fetch／reset main／切回功能分支／merge），**不**呼叫 `ao-resume.ps1`（供 `ao-resume -FullMainlineParity` 內嵌呼叫，避免遞迴）。
 
+.PARAMETER AllowResetAheadOfOrigin
+  允許在 **本機 main 尚未推送、超前 origin/main** 時仍執行 `reset --hard origin/main`（會**丟棄**未推送的 commits）。預設：**中止**並提示先 `git push origin main`，避免自動 checkpoint 後被對齊沖掉。
+
 .EXAMPLE
   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\git-align-main-aoresume-feature.ps1
 
@@ -43,7 +46,8 @@ param(
     # If the feature branch does not exist locally and there is no origin/<FeatureBranch>, do not fail the whole
     # align step (common after a hotfix is merged to main and the branch is deleted on GitHub). Stay on `main` and
     # print a clear one-line follow-up. Use `-RequireFeatureBranch` to keep the old hard-fail behavior.
-    [switch]$RequireFeatureBranch
+    [switch]$RequireFeatureBranch,
+    [switch]$AllowResetAheadOfOrigin
 )
 
 Set-StrictMode -Version Latest
@@ -105,6 +109,31 @@ try {
 
     # --- Mainline parity ---
     Invoke-Git @("checkout", "main")
+
+    $aheadMain = 0
+    Push-Location -LiteralPath $WorkRoot
+    try {
+        $aheadStr = (& git rev-list --count "origin/main..HEAD" 2>&1 | Select-Object -Last 1)
+        if ($LASTEXITCODE -eq 0 -and $aheadStr -match '^\s*(\d+)\s*$') {
+            $aheadMain = [int]$Matches[1]
+        }
+    }
+    finally {
+        Pop-Location | Out-Null
+    }
+
+    if ($aheadMain -gt 0 -and -not $AllowResetAheadOfOrigin) {
+        throw @"
+git-align: local branch main is ahead of origin/main by $aheadMain unpublished commit(s).
+Push first: git push origin main
+Then re-run this script (or AO-RESUME / FullMainlineParity).
+To intentionally discard those commits (destructive): pass -AllowResetAheadOfOrigin.
+"@
+    }
+    if ($aheadMain -gt 0 -and $AllowResetAheadOfOrigin) {
+        Write-Host "== WARNING: reset --hard will DROP $aheadMain local commit(s) not on origin (-AllowResetAheadOfOrigin). ==" -ForegroundColor Yellow
+    }
+
     Invoke-Git @("reset", "--hard", "origin/main")
     Write-Host "== main is now identical to origin/main ==" -ForegroundColor Green
 

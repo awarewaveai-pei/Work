@@ -19,7 +19,9 @@ param(
     [switch]$FullMainlineAllowStash,
     # Passed through to `git-align-main-aoresume-feature.ps1`.
     # Default: missing feature branch (no local, no origin) does not fail the whole AO-RESUME; use `-FullMainlineRequireFeatureBranch` for legacy hard-fail.
-    [switch]$FullMainlineRequireFeatureBranch
+    [switch]$FullMainlineRequireFeatureBranch,
+    # Destructive: passed to git-align as `-AllowResetAheadOfOrigin` — allows reset --hard to drop unpublished commits on main.
+    [switch]$FullMainlineAllowResetAheadOfOrigin
 )
 
 Set-StrictMode -Version Latest
@@ -119,6 +121,23 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
         return $checkpointExit
     }
 
+    Write-Host "== AO-RESUME: git push (publish checkpoint before align reset; avoids orphan local-only commits) ==" -ForegroundColor Yellow
+    Push-Location -LiteralPath $Root
+    try {
+        $null = git rev-parse --git-dir 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            & git push 2>&1 | Out-Host
+            $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+            if ($pushExit -ne 0) {
+                Write-Host "AO-RESUME: git push failed (exit $pushExit). Fix auth/network/upstream, run git push, then re-run AO-RESUME. Align retry skipped so checkpoint is not reset away." -ForegroundColor Yellow
+                return $pushExit
+            }
+        }
+    }
+    finally {
+        Pop-Location | Out-Null
+    }
+
     & powershell.exe @AlignArgs | Out-Host
     $exit2 = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
     return $exit2
@@ -191,6 +210,7 @@ if ($FullMainlineParity) {
         }
         if ($FullMainlinePushFeature) { $alignArgs += "-PushFeature" }
         if ($FullMainlineRequireFeatureBranch) { $alignArgs += "-RequireFeatureBranch" }
+        if ($FullMainlineAllowResetAheadOfOrigin) { $alignArgs += "-AllowResetAheadOfOrigin" }
         $alignStash = $FullMainlineAllowStash -or $AllowStashBeforePull -or $AllowUnexpectedDirty
         if ($alignStash) { $alignArgs += "-AllowStash" }
         $alignExit = Invoke-FullMainlineAlignWithAutoCheckpoint -Root $WorkRoot -AlignArgs $alignArgs

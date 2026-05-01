@@ -120,7 +120,7 @@ if (-not (Test-Path -LiteralPath $aoResumeScript)) {
     exit 1
 }
 $aoResumeRaw = Get-Content -LiteralPath $aoResumeScript -Raw -Encoding UTF8
-$autoCheckpointCallPattern = '(?m)^\s*&\s*powershell\.exe\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+-File\s+\$checkpointScript\s+-Message\s+\$checkpointMsg\s+-WorkRoot\s+\$Root\s*$'
+$autoCheckpointCallPattern = '(?m)^\s*&\s*powershell\.exe\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+-File\s+\$checkpointScript\s+-Message\s+\$checkpointMsg\s+-WorkRoot\s+\$Root(?:\s*\|\s*Out-Host)?\s*$'
 if ($aoResumeRaw -notmatch $autoCheckpointCallPattern) {
     Write-Error "verify-build-gates: ao-resume auto-checkpoint call must pass -WorkRoot `$Root (contract guard)."
     exit 1
