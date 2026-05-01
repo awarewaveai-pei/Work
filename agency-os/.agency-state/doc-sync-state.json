@@ -1,40 +1,14 @@
 ﻿{
-    "last_run_utc":  "2026-05-01T07:28:44.6522537Z",
+    "last_run_utc":  "2026-05-01T07:33:19.6737147Z",
     "changed_files":  [
-                          "docs/operations/GITHUB_ACTIONS_ARCHITECTURE.md",
-                          "docs/operations/github-actions-trigger-prod-deploy.md",
                           "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
-                          "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
-                          "WORKLOG.md"
+                          "TASKS.md"
                       ],
     "impacted_files":  [
-                           "../README.md",
-                           ".cursor/rules/00-session-bootstrap.mdc",
-                           ".cursor/rules/30-resume-keyword.mdc",
-                           ".cursor/rules/40-shutdown-closeout.mdc",
-                           "AGENTS.md",
-                           "docs/operations/end-of-day-checklist.md",
-                           "docs/operations/GITHUB_ACTIONS_ARCHITECTURE.md",
-                           "docs/operations/github-actions-trigger-prod-deploy.md",
                            "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
-                           "docs/overview/EXECUTION_DASHBOARD.md",
-                           "docs/overview/INTEGRATED_STATUS_REPORT.md",
-                           "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
-                           "memory/CONVERSATION_MEMORY.md",
-                           "RESUME_AFTER_REBOOT.md",
-                           "TASKS.md",
-                           "WORKLOG.md"
+                           "TASKS.md"
                        ],
     "auto_updated_files":  [
-                               "../README.md",
-                               "AGENTS.md",
-                               "docs/operations/end-of-day-checklist.md",
-                               "docs/overview/EXECUTION_DASHBOARD.md",
-                               "docs/overview/INTEGRATED_STATUS_REPORT.md",
-                               "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
-                               "memory/CONVERSATION_MEMORY.md",
-                               "RESUME_AFTER_REBOOT.md",
-                               "TASKS.md",
-                               "WORKLOG.md"
+                               "TASKS.md"
                            ]
 }

@@ -129,64 +129,72 @@ Get-Process ssh | Stop-Process
 
 症狀：TCP `5432/3000/8000` 已通，`smoke --sql` 或客戶端連 pooler 時出現 **`pgbouncer.get_auth`** 失敗、`pg_shadow` 權限錯誤。
 
-原因：pooler 會在 Postgres 內呼叫 **`pgbouncer.get_auth(text)`** 查密碼；此函式必須對 **`pg_catalog.pg_shadow`** 以 **`SECURITY DEFINER`** 並由 **superuser（通常 `postgres`）owned**，與 **[supabase/postgres：`pgbouncer_auth_schema.sql`](https://github.com/supabase/postgres/blob/develop/ansible/files/pgbouncer_config/pgbouncer_auth_schema.sql)** 一致。若過去手動變更 owner／定義不完整，會變成你看到的 **`permission denied for view pg_shadow`**。
+原因（官方 **docker** 鏡像與 vanilla Postgres 不同）：
 
-**在 EU**（備份／維護窗後），以 superuser 進 **`postgres` 資料庫修復**。與 **[supabase/postgres：`pgbouncer_auth_schema.sql`](https://github.com/supabase/postgres/blob/develop/ansible/files/pgbouncer_config/pgbouncer_auth_schema.sql)** 同構；請先 `\df pgbouncer.*` 確認現有簽章。
+- 在 **`supabase/postgres` docker 映像**裡，`**postgres**` **不是** **`rolsuper`**，**無法讀 **`pg_catalog.pg_shadow`**，即使 **`get_auth`** 標了 **`SECURITY DEFINER`** 但若 **owner** 仍是 **`postgres`**，執行時身分仍無權限 → **`permission denied for view pg_shadow`**。
+- 請在 DB 內確認：`SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres','supabase_admin');` —— 典型結果是 **僅 **`supabase_admin`** 為 superuser**。
+- **`pgbouncer`** schema 若 owner 為 **`pgbouncer`**，以 **`postgres`** 連進去做 **`CREATE OR REPLACE FUNCTION … IN SCHEMA pgbouncer`** 也會出現 **`permission denied for schema pgbouncer`**。
 
-建議用互動式 `psql` 貼上（避免 heredoc／Windows 終端轉義問題）：
+修復原則：**`pgbouncer`** schema 與 **`pgbouncer.get_auth`** 的 **OWNER 改為 **`supabase_admin`****，函式 **`SECURITY DEFINER` + `SET search_path = ''`**，並 **`REVOKE` PUBLIC / `GRANT EXECUTE` 給 `pgbouncer`（若該 role 存在）**；完成後 **`docker restart supabase-pooler`**。
+
+**在 EU**（備份／維護窗後），取得 **`/root/supabase/.env`** 的 **`POSTGRES_PASSWORD`**（僅在伺服器上使用，**不入庫／不貼聊天**），並以 **`supabase_admin`** 執行：
 
 ```bash
-docker exec -it supabase-db psql -U postgres -d postgres
-```
-
-在 `psql` 內：
-
-```sql
+PW=$(grep -E '^POSTGRES_PASSWORD=' /root/supabase/.env | tail -n1 | cut -d= -f2- | tr -d '\r')
+docker exec -i -e PGPASSWORD="$PW" supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 <<'EOSQL'
 BEGIN;
 
-CREATE SCHEMA IF NOT EXISTS pgbouncer AUTHORIZATION postgres;
+ALTER SCHEMA pgbouncer OWNER TO supabase_admin;
 
 CREATE OR REPLACE FUNCTION pgbouncer.get_auth(p_usename TEXT)
 RETURNS TABLE(username TEXT, password TEXT)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $$
+AS $func$
 BEGIN
   RETURN QUERY
   SELECT usename::TEXT, passwd::TEXT
   FROM pg_catalog.pg_shadow
   WHERE usename = p_usename;
 END;
-$$;
+$func$;
 
-ALTER FUNCTION pgbouncer.get_auth(TEXT) OWNER TO postgres;
+ALTER FUNCTION pgbouncer.get_auth(TEXT) OWNER TO supabase_admin;
 
 REVOKE ALL ON FUNCTION pgbouncer.get_auth(TEXT) FROM PUBLIC;
-DO $$
+
+DO $grant$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pgbouncer') THEN
     GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(TEXT) TO pgbouncer;
   END IF;
-END $$;
+END;
+$grant$;
 
 COMMIT;
+EOSQL
+
+docker restart supabase-pooler >/dev/null
 ```
 
 驗證：
 
 ```sql
-SELECT n.nspname, p.proname, pg_get_userbyid(p.proowner) AS owner, p.prosecdef
+SELECT proname::text, pg_get_userbyid(proowner)::text AS owner, prosecdef
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'pgbouncer' AND p.proname = 'get_auth';
+
+SELECT n.nspname::text, pg_get_userbyid(n.nspowner)::text AS schema_owner
+FROM pg_namespace n WHERE n.nspname = 'pgbouncer';
 ```
 
-預期：**owner = postgres**、`prosecdef = t`。
+預期：**`get_auth` 的 owner = `supabase_admin`**、`prosecdef = t`；**`pgbouncer` schema owner** 亦為 **`supabase_admin`**（或可寫入／維護之 superuser）。
 
-修完後通常 **無需重建** `supabase-db`；若 pooler 仍報舊錯：在 **`/root/supabase`** 執行 `docker compose restart supabase-pooler`。
+**請勿**再以 **`docker exec … psql -U postgres`** 套用上述替換並期望能讀 **`pg_shadow`**——在該鏡像下 **`postgres` 非 superuser**。上游 **`pgbouncer_auth_schema.sql`** 仍以 vanilla superuser **`postgres`** 為敘述；自託管 docker 請以 **`supabase_admin`** 為準。
 
----
+修完後若 pooler 仍報舊錯：在 **`/root/supabase`** 亦可嘗試 **`docker compose restart supabase-pooler`**（與 **`docker restart supabase-pooler`** 等價於單容器名時）。
 
 ## 4. AI Access Model
 
