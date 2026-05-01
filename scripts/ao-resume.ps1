@@ -88,8 +88,11 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
         [Parameter(Mandatory = $true)][string[]]$AlignArgs
     )
 
-    & powershell.exe @AlignArgs
-    if ($LASTEXITCODE -eq 0) {
+    # Nested powershell.exe writes stdout to the success stream; when this function is invoked as
+    # `$x = Invoke-...`, that output would fuse with `return`, producing bogus non-numeric exits.
+    & powershell.exe @AlignArgs | Out-Host
+    $exit1 = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+    if ($exit1 -eq 0) {
         return 0
     }
 
@@ -98,25 +101,27 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     )
     if ($statusShort.Count -eq 0) {
-        return $LASTEXITCODE
+        return $exit1
     }
 
     Write-Host "== AO-RESUME: FullMainlineParity detected dirty tree; run one auto-checkpoint retry ==" -ForegroundColor Yellow
     $checkpointScript = Join-Path $Root "scripts\commit-checkpoint.ps1"
     if (-not (Test-Path -LiteralPath $checkpointScript)) {
         Write-Host "AO-RESUME: checkpoint script not found, cannot auto-heal dirty tree." -ForegroundColor DarkYellow
-        return $LASTEXITCODE
+        return $exit1
     }
 
     $checkpointMsg = "[cursor] checkpoint: auto-save dirty tree before FullMainlineParity retry"
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message $checkpointMsg -WorkRoot $Root
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "AO-RESUME: auto-checkpoint failed (exit $LASTEXITCODE)." -ForegroundColor DarkYellow
-        return $LASTEXITCODE
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message $checkpointMsg -WorkRoot $Root | Out-Host
+    $checkpointExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+    if ($checkpointExit -ne 0) {
+        Write-Host "AO-RESUME: auto-checkpoint failed (exit $checkpointExit)." -ForegroundColor DarkYellow
+        return $checkpointExit
     }
 
-    & powershell.exe @AlignArgs
-    return $LASTEXITCODE
+    & powershell.exe @AlignArgs | Out-Host
+    $exit2 = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+    return $exit2
 }
 
 if ($WorkRoot) {
