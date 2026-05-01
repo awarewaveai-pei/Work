@@ -42,10 +42,10 @@
 - [x] **（工具建置）安裝 Grok CLI（筆電 / Codex）**
   - 參考：`../GROK_LAPTOP_CODEX_INSTALL_PROMPT.md`
   - DoD：`grok help`、`grok templates` 成功；若 `XAI_API_KEY` 已存在，`grok chat "Reply with exactly: ready"` 回傳 `ready`
-- [ ] （公司桌機未完成）Slack `#infra-alerts` 歷史訊息批次清理
-  - 依賴：Slack App 需補 scope（如 `channels:read`）後重新安裝，再重試清理
-- [ ] （公司桌機未完成）Netdata Centralized Cloud Notifications 設定
-  - 目標：完成 centralized notifications，避免目前僅 Agent Dispatched 的落差
+- [x] Slack `#infra-alerts` 歷史訊息批次清理 — 2026-05-01 完成（公司桌機）
+  - Slack App scope／重新安裝後已完成歷史訊息批次清理。
+- [x] Netdata Centralized Cloud Notifications 設定 — 2026-05-01 完成（公司桌機）
+  - centralized notifications 已設定並對齊營運需求。
 - [x] ClickHouse TTL（EU server）— 2026-05-01 完成
   - 三表全部設定 TTL 3 天：metric_log（9 MiB）、text_log（22 MiB）、trace_log（19 MiB）
   - 容器：`trigger-clickhouse`（非 `trigger-trigger-clickhouse-1`）
