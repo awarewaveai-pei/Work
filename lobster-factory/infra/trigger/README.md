@@ -49,7 +49,7 @@ service ssh restart
 
 ### 0. 先決條件
 
-- **DNS**：`trigger.aware-wave.com`（或你的網域）指向終止 TLS 的那台機器。  
+- **DNS**：`trigger.aware-wave.com`（或你的網域）指向終止 TLS 的那台機器。**現網**與 **`agency-os/docs/operations/SG_PHASE1_DOCKER_LAYOUT.md`** 對齊：**A 記錄／流量落在 EU `204.168.175.41`**（勿與 SG `5.223.93.113` 混淆）。  
 - **External Docker 網路**：compose 依賴 **external `lobster-net`**（可在 **`infra/trigger/.env`** 用 **`LOBSTER_DOCKER_NETWORK`** 改名）。請在 **跑 Trigger stack 的那台機器**上對齊 `docker network ls`。**EU／SG 分離時不必假設 SG phase1-core 已起**網路才會存在——見 **`agency-os/docs/operations/SG_PHASE1_DOCKER_LAYOUT.md`**（進階「跨機共用同名網路」須另案設計，避免此文臆測現場）。  
 - **Nginx**：`trigger.conf` 掛在 **對外終止 TLS／反代 Trigger** 的那台（通常與 Trigger webapp 可路由）；**v4 webapp 對內埠為 `3000`**（本 repo 預設 `proxy_pass` → `http://trigger-webapp:3000`）。
 
