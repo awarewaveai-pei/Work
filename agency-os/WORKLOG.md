@@ -4,6 +4,11 @@
 
 ## 2026-05-01
 
+### Supabase Advisor（RLS initplan + workflow_runs 重複索引）— migration 入 repo
+
+- **`lobster-factory/packages/db/migrations/0018_rls_initplan_and_workflow_runs_index_dedupe.sql`**：政策與 helper 將 **`auth.uid()` / `auth.jwt()`** 改為 **`(select …)`** 形式；`workflow_runs` 以 **`pg_get_indexdef` 分組**刪除冗餘索引（保留 **`idx_workflow_runs_org`** / **`idx_workflow_runs_site`**）；末段重設 **`search_path`**（與 **0017** 一致）。
+- **尚未對託管 DB 套用**：須在 **staging** 執行專案慣例 migration 流程 → Advisor 複查 → 再 **production**。
+
 ### git push origin main — 2026-05-01 完成
 
 - 7 個 commit 推送完成（6 Cursor + 1 Claude），`origin/main` 已對齊本地 `main`
@@ -36,6 +41,7 @@
 
 - **不重複**：repo 已有 **`30_YEAR_AI_CODING_EXEC_CHARTER.md`**（Single Owner）；本次僅新增 **§4**（可稽核真相順序、聊天不作數、禁雙寫、三十年誠實範圍），避免第二套「完美文件」造成漂移。
 - **連動**：`cursor-enterprise-rules-index.md` SSOT 表、`TASKS.md` 現況快照表、`neuroinclusive-document-layout.md`、`30_YEAR_*_CLIENT_SHORT.md`、`CHANGE_IMPACT_MATRIX`／`change-impact-map.json` 已對齊。
+- **抗文件增殖（使用者要求）**：**未新增任何新檔**；於既有 **`new-doc-linkage-checklist.md`** 頂部加「預設不要新增檔」三問；**`cursor-enterprise-rules-index`** 維護步驟 **0**；**`30_YEAR` §4.3** 一句指向——降低平行長文與連動地獄。
 
 ### ClickHouse TTL 3 天（EU server）完成
 
@@ -1208,7 +1214,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-01 11:55:55 UTC_
+_Last synced: 2026-05-01 11:58:21 UTC_
 
 ## 2026-03-20
 
@@ -1642,6 +1648,7 @@ _Last synced: 2026-05-01 11:55:55 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 
