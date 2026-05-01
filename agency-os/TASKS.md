@@ -6,7 +6,22 @@
 > - **`Next — 已完成歷程`**：僅供查說：曾經排過、已完成者；**新工作請不要加在這裡**。  
 > - **收工與打勾（預設全自動）**：**不必手動**改 `TASKS`。**只打 `AO-CLOSE`（或收工同義詞）即觸發代理**依當輪對話與 **`TASKS` 開放項**在當日 **`WORKLOG.md`**（`## yyyy-MM-dd`）寫 **`- AUTO_TASK_DONE: <唯一子字串>`**（須只命中一條仍為 `- [ ]` 的待辦；已 `[x]` 時略過並收斂標記），**不必再口頭重複指令**。收工腳本會跑 **`scripts/apply-closeout-task-checkmarks.ps1`** 打勾並改為 **`AUTO_TASK_DONE_APPLIED (UTC): …`**。選填： **`pending-task-completions.txt`**（見 **`pending-task-completions.example.txt`**）。`AO-CLOSE` 開頭會印 **`print-today-closeout-recap.ps1`** 摘要。
 
-## In Progress
+## 現況快照（怎麼看懂：做過／沒做／做到哪）
+
+| 你想查… | 請看 |
+|--------|------|
+| **還有什麼沒做完** | **`### 未完成`**（僅 `- [ ]`，一條一個開放責任）。 |
+| **某件事結案了沒** | 編輯器 **搜尋標題關鍵字**。出現在 **`## Next — 已完成歷程`** 且為 `- [x]` → **已結案**；只出現在 **`### 未完成`** → **仍開放**。 |
+| **進行到一半嗎** | 看該條是否含 **`—— 進度：`**；子項裡的日期／DoD 是細節證據。 |
+
+**狀態 prefix（選用，方便掃描）**：**【未開始】**＝尚未動或尚未達第一個可驗證里程碑；**【進行中】**＝已有部分交付／PR／部署，但未達該條 DoD；**【卡住】**＝依賴外部決策或環境，見子項說明。
+
+**機讀待辦快照**：開工時 **`scripts/ao-resume.ps1`** 會寫 **`agency-os/.agency-state/open-tasks-snapshot.md`**（gitignore），與本檔 **`### 未完成`** 應對齊。
+
+## 歷史封存 — In Progress（早期項目，均已結案）
+
+> 以下 **`- [x]`** 為存檔；**不要**用這段判斷「現在還要做什麼」——請看 **`### 未完成`**。
+
 - [x] 建立多租戶案場資料夾結構（company -> site -> project）
 - [x] 設計標準報價包（建置/維運/行銷/客製）
 - [x] 定義變更單（CR）流程與核價規則
@@ -24,7 +39,7 @@
 
 ### 未完成
 
-- [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）**（詳見 `docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 / §1.5.1）
+- [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：**兩台皆須 **`machine-environment-audit -Strict` PASS（無 WARN）**；公司桌機／筆電任一台未 PASS 則本條不結案。（詳見 `docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 / §1.5.1）
   - 新機/筆電首次：完成 Windows 本機 WordPress 相容層（MariaDB + PHP + WP-CLI + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`），此路徑與 Supabase/MCP 分列。
   - 之後每次開工：在 Cursor 開 monorepo 根並送出 **`AO-RESUME`**（專案 **hook** 先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`** 至 exit 0／失敗則依 **REMOTE 2.5.1** 整理後重送）；除錯時可改在 monorepo 根手動跑同指令。
   - 筆電需安裝並登入 GitHub CLI（`winget install --id GitHub.cli` + `gh auth login`），Node major 與桌機/CI 對齊；`secrets-vault` 與 `mcp.json` 皆為每台獨立設定。
@@ -36,54 +51,46 @@
   - 兩台都要在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict` 且 PASS（無 WARN）後才可勾選此項。
   - **公司桌機（人在辦公室時）**：不必回想先前是否裝過；在該機 monorepo 根依序：`git fetch` → `git checkout main` → `git pull --ff-only origin main` → 跑上一行的 `machine-environment-audit -Strict`。若未 PASS，自上文 `REMOTE_WORKSTATION_STARTUP.md` **§1.5**「工具與依賴」起補齊（含 `lobster-factory\packages\workflows` 的 `npm ci`、可選 `mcp-local-wrappers`、`verify-build-gates`）後再重跑稽核；需與筆電同級「真 WP」則補 **§1.5.1**。FAIL/WARN 時保留終端輸出以利除錯。
   - **筆電已 Strict PASS 時**：仍須待公司桌機也 PASS，本主項才可視為完成。
-- [ ] **Git：`main` 未推送 commits → `git push origin main`**（含 Trigger／PostHog／WP MU／WORKLOG 等；以 `git log origin/main..HEAD` 為準）
-- [ ] **Trigger workflows 完整 deploy**：於 **EU `204.168.175.41`**（或依 **`lobster-factory/infra/trigger/README.md` §7a** 打通 **`registry:5000`**）執行 **`deploy-workflows.ps1`** 或 **`npx trigger.dev@4.4.4 deploy`**（映像 push；環境變數同步見該 README）
-- [ ] **phase1 WordPress（SG）PostHog MU**：`hetzner-phase1-core` 已入庫 MU `posthog.php` — 於伺服器 **`docker compose build wordpress && docker compose up -d wordpress`**（或等價）並驗證公開頁載入
-- [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3）
+- [ ] **Git：`main` 未推送 commits → `git push origin main`** —— **【進行中】** **進度：**本地已有多次 commit（Trigger／PostHog／TASKS／WP MU 等）；**下一步：**`git fetch` → `git log origin/main..HEAD` → **`git push origin main`**。
+- [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度：**repo 已 **`syncEnvVars`**、鎖 CLI **`4.4.4`**、README／腳本齊；曾完成 **環境變數同步**，**缺**在 **EU** 對 **`registry:5000`** **映像 push**（見 **`lobster-factory/infra/trigger/README.md` §7a**）。**下一步：**於 EU 或 tunnel 就緒後跑 **`deploy-workflows.ps1`** 或 **`npx trigger.dev@4.4.4 deploy`**。
+- [ ] **phase1 WordPress（SG）PostHog MU** —— **【進行中】** **進度：****repo** 已入 MU **`posthog.php`** + compose **`NEXT_PUBLIC_POSTHOG_*`**。**下一步：**SG **`docker compose build wordpress && docker compose up -d wordpress`**（或等價）→ 公開頁驗證載入。
+- [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3） —— **【未開始】** **進度：**藍圖文件已定；尚未選定試點正式開跑。
   - 參考：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
   - 本項目標：先選 2 個試點（1 既有站接手 + 1 新站建置）
-- [ ] **既有站接手（Soulful Expression Art Therapy）**
+- [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【未開始】** **進度：**台帳／前置實填見 **`已完成歷程`**；M1 正式閉環仍開放。
   - 本項目標：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）
-- [ ] **新站建置（Scenery Travel Mongolia）**
+- [ ] **新站建置（Scenery Travel Mongolia）** —— **【未開始】** **進度：**同上；待選定開跑日期與 staging。
   - 本項目標：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊）
-- [ ] **既有站接手 Day 1（Soulful Expression）**
+- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【未開始】** **下一步：**跑 Runbook 第 1~2 節並把產出連結到 WORKLOG。
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節
   - 產出：權限與基線盤點
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）**
+- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【未開始】**
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md` 第 1~2 節
   - 產出：新站 staging 啟動條件
-- [ ] `tenants/templates/` v2
+- [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
   - 本項目標：試點 tenant 實填回饋後，再擴欄位與自動檢查（若有）
-- [ ] （Next-Gen 對齊）M3 控制台輸出映射到「20 部門」責任矩陣與模板欄位
+- [ ] （Next-Gen 對齊）M3 控制台輸出映射到「20 部門」責任矩陣與模板欄位 —— **【未開始】**
   - 目的：避免 Pilot 成果與跨國企業目標脫鉤
-- [ ] `lobster-factory` A10-2 商業閉環實跑
+- [ ] `lobster-factory` A10-2 商業閉環實跑 —— **【未開始】**
   - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
-- [ ] `lobster-factory` A7 全站自動建站補齊
+- [ ] `lobster-factory` A7 全站自動建站補齊 —— **【未開始】**
   - 範圍：hosting adapter + provision/shell guardrails 端到端
-- [ ] Enterprise 工具層 Phase 1 正式串接
+- [ ] Enterprise 工具層 Phase 1 正式串接 —— **【進行中】** **進度：**Secrets／Sentry／PostHog／Cloudflare／Slack 等 **已結案** → 見 **`已完成歷程`** **§2026-05-01**。**仍缺：**Clerk 組織與角色（＝下方獨立條目）、以及本項 **DoD** 要求的「端到端正式串接」**WORKLOG／report 證據鏈**。
   - 範圍：Clerk auth、env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts
   - DoD：下列子任務全數完成且有對應證據連結（WORKLOG / report）
-- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）
+- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
   - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
   - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
-- [ ] （工具建置）Phase 1 建議順序（P1 -> P7）
-  - P1：Secrets 治理升級（先處理金鑰與權限，避免後續返工）
-  - P2：Hetzner 自託管 n8n（staging）（先把自動化骨幹架好）— **staging `client_onboarding` E2E 已證**（2026-04-10，見 `WORKLOG`）
-  - P3：Sentry 觀測接入（先看得到錯誤，後面才好除錯）
-  - P4：PostHog 事件基線（建立可量測 funnel）
-  - P5：Cloudflare 邊界保護（staging 先上防護）
-  - P6：Clerk 組織與角色（B2B 多租戶權限落地）
-  - P7：Next.js 控制台 v1（把前面能力做成可操作介面）
-  - 依賴說明：P7 會依賴 P1/P3/P4/P6 的資料與權限設計
+- [ ] （工具建置）Phase 1 建議順序（P1 -> P7） —— **【進行中】** **進度：****P1～P5、P2（n8n staging）** 已結案 → **`已完成歷程` §2026-05-01**。**仍開放：****P6**＝下方 **Clerk** 條目；**P7**＝下方 **Next.js 控制台**條目。本條為「總賬」，**結案時須 P6 + P7 + 上方 Enterprise 串接敘述一併滿足**。
   - 追溯總表：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（每一工具任務對回規格 + DoD + 證據欄位）
-- [ ] （工具建置）Next.js 控制台 v1（Internal Ops）
+- [ ] （工具建置）Next.js 控制台 v1（Internal Ops） —— **【進行中】** **進度（2026-04-25）：**DB migration、`/ops-console`、`POST /api/ops/ai-image-jobs`、`GET /api/ops/summary` 等 **已在 repo**。**下一步：**滿足 DoD——建立 **1 個測試客戶**並在 **UI 成功回顯**。
   - 處理：建立 app skeleton、客戶清單頁、部門勾選頁（20 部門）、提交後寫出 `DEPARTMENT_SELECTION` payload
   - 2026-04-25 進度：控制平面 migration 已新增 `0011_ops_console_control_plane.sql`（`ops_action_runs` / `ai_image_jobs` / `media_assets` / `ops_audit_events`）
   - 2026-04-25 進度：`next-admin` 已新增 `/ops-console` 與 `POST /api/ops/ai-image-jobs`（`queued` job + 審計；viewer 雙層擋）與 `GET /api/ops/summary`（讀 `organizations` 或安全 fallback）
   - 媒體分層固定：AI 生圖走 R2；WordPress 商品圖/部落格圖維持 WP 媒體庫（`wp-content/uploads` + MySQL）
   - 正本：`docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`
   - DoD：可建立 1 個測試客戶設定並在 UI 回顯成功
-- [ ] （工具建置）Clerk 組織與角色（B2B 多租戶）
+- [ ] （工具建置）Clerk 組織與角色（B2B 多租戶） —— **【未開始】**（對照 Phase 1 **P6**） **進度：**規格與依賴已定；尚無「兩測試角色權限分流」的端到端證據。
   - 處理：建立 org + role 對照（owner/admin/operator/viewer）並映射到現有權限邏輯
   - DoD：2 個測試角色登入後，看到不同權限結果
 

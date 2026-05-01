@@ -83,6 +83,7 @@
 - **2026-05-01 批次**：將 Supabase MCP／n8n／月檢／Ops Inbox／Grok／Slack／Netdata／ClickHouse／筆電 MCP／Trigger 上線敘述／Sentry／PostHog／CF／Secrets 等 **已結案列** 移至 **`Next — 已完成歷程`** 小節「2026-05-01 — 自 Next 隊列移入」。
 - **新增可追蹤未完成**：**`git push origin main`**、**Trigger 完整 deploy（EU／registry）**、**SG WordPress 重建以載入 PostHog MU**（對齊近期 Cursor 工作）。
 - **修正**：Next.js 控制台子項 **縮排**（避免 ` - [ ]` 錯位）。
+- **可讀性**：新增 **`## 現況快照`**（表格式：去哪查做完／沒做／進度）；未完成條目補 **`—— 【進行中｜未開始】進度：…下一步：…`**；**Phase 1 P1–P7** 縮成「P1–P5 已結案見 §2026-05-01；開放＝P6+P7」避免誤以為 Sentry/PostHog 仍未做。
 
 ## 2026-04-30
 
