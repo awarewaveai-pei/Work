@@ -3,6 +3,7 @@
 import posthog from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
 import { useEffect } from 'react'
+import { identifyFromEnvBootstrap } from '@/lib/analytics'
 
 const posthogHost =
   process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
@@ -14,7 +15,8 @@ export function PHProvider({ children }: { children: React.ReactNode }) {
 
     posthog.init(key, {
       api_host: posthogHost,
-      capture_pageview: true,
+      // App Router client navigations — aligns with PostHog SPA guidance (vs load-only pageviews).
+      capture_pageview: "history_change",
       capture_pageleave: true,
       autocapture: false,
       capture_exceptions: true,
@@ -25,6 +27,7 @@ export function PHProvider({ children }: { children: React.ReactNode }) {
       persistence: 'localStorage',
       loaded: (ph) => {
         if (process.env.NODE_ENV === 'development') ph.debug()
+        identifyFromEnvBootstrap()
       },
     })
   }, [])

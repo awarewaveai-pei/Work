@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import "./globals.css";
 import { PHProvider } from "./providers";
+import { PostHogAnalytics } from "./posthog-analytics";
 import { OpsInboxBadge } from "./ops/inbox/components/OpsInboxBadge";
 
 export const metadata = { title: "Lobster Factory Admin" };
@@ -11,6 +12,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="zh-TW">
       <body>
         <PHProvider>
+          <PostHogAnalytics />
           <div className="shell">
             <nav className="sidebar">
               <div className="sidebar-logo">

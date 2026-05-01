@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Events, track } from "@/lib/analytics";
 
 const path = process.env.NEXT_PUBLIC_API_BASE_PATH ?? "/api";
 
@@ -9,15 +10,21 @@ export default function ApiCheckClientPage() {
   const [ok, setOk] = useState<boolean | null>(null);
 
   useEffect(() => {
+    track(Events.API_CHECK_TRIGGERED, { mode: "browser" });
     fetch(`${path}/health`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => {
-        setOk(j.ok === true);
+        const success = j.ok === true;
+        setOk(success);
         setBody(JSON.stringify(j, null, 2));
+        track(success ? Events.API_CHECK_SUCCEEDED : Events.API_CHECK_FAILED, {
+          mode: "browser",
+        });
       })
       .catch((e) => {
         setOk(false);
         setBody(String(e));
+        track(Events.API_CHECK_FAILED, { mode: "browser", error: String(e) });
       });
   }, []);
 

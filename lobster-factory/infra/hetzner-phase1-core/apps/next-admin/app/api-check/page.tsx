@@ -1,3 +1,5 @@
+import { ApiCheckTelemetry } from "./ApiCheckTelemetry";
+
 async function getHealth() {
   const base =
     (process.env.INTERNAL_API_BASE_URL ?? "http://node-api:3001").replace(/\/$/, "");
@@ -25,6 +27,7 @@ export default async function ApiCheckPage() {
       </div>
 
       <div className="page">
+        <ApiCheckTelemetry ok={ok} />
         <p style={{ color: "var(--text-muted)", marginBottom: 16, fontSize: 13 }}>
           Server-side fetch via <code>INTERNAL_API_BASE_URL</code> (Docker hostname <code>node-api:3001</code>).
         </p>

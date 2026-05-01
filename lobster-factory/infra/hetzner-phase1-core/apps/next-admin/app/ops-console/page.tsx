@@ -1,6 +1,7 @@
 import type { MediaBoundaryRule, OpsAction, OpsTenant, TenantConfig, WorkflowRun } from "../../lib/ops-contracts";
 import AiJobForm from "./AiJobForm";
 import TenantConfigForm from "./TenantConfigForm";
+import { OpsConsoleTelemetry } from "./OpsConsoleTelemetry";
 
 interface OpsSummary {
   generatedAt: string;
@@ -74,6 +75,7 @@ export default async function OpsConsolePage() {
 
   return (
     <>
+      <OpsConsoleTelemetry />
       <div className="topbar">
         <span className="topbar-title">Ops Console v1</span>
         <span className="topbar-env">

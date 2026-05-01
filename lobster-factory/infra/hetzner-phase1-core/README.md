@@ -68,7 +68,7 @@ curl -sf http://127.0.0.1:3001/health   # SSH 本機除錯
 
 **Sentry（next-admin，可選）**：部署並設定 DSN 後，可對外公開 URL 呼叫 **`GET /admin/api/sentry-test`**（實作：[apps/next-admin/app/api/sentry-test/route.ts](apps/next-admin/app/api/sentry-test/route.ts)），於 Sentry 專案確認收到測試事件。
 
-**PostHog（next-admin，可選，建議雲端）**：於 `.env` 填入 **`NEXT_PUBLIC_POSTHOG_KEY`**（與選填 **`NEXT_PUBLIC_POSTHOG_HOST`**，預設 `https://us.i.posthog.com`）；留空則不初始化。變更後須 **`docker compose build next-admin`** 再 **`up -d next-admin`**（`NEXT_PUBLIC_*` 為建置期注入）。
+**PostHog（next-admin，可選，建議雲端）**：於 `.env` 填入 **`NEXT_PUBLIC_POSTHOG_KEY`**（與選填 **`NEXT_PUBLIC_POSTHOG_HOST`**，預設 `https://us.i.posthog.com`）；留空則不初始化。變更後須 **`docker compose build next-admin`** 再 **`up -d next-admin`**（`NEXT_PUBLIC_*` 為建置期注入）。啟用後：`capture_pageview` 使用 **`history_change`**（適配 App Router 客戶端導覽）、**不自動 autocapture**；並會送出 **`ops_console_viewed` / `ops_inbox_viewed` / `api_check_*`** 等自訂事件，以及經 **`GET /api/ops/analytics-context`** 附加的 **`ops_role`** super-property（無 PII）。單人內網除錯可選 **`NEXT_PUBLIC_POSTHOG_DISTINCT_ID`**（見 `.env.example`）。
 
 瀏覽器（將主機名換成實際 IP／網域）：
 
