@@ -134,8 +134,9 @@ Get-Process ssh | Stop-Process
 - 在 **`supabase/postgres` docker 映像**裡，`**postgres**` **不是** **`rolsuper`**，**無法讀 **`pg_catalog.pg_shadow`**，即使 **`get_auth`** 標了 **`SECURITY DEFINER`** 但若 **owner** 仍是 **`postgres`**，執行時身分仍無權限 → **`permission denied for view pg_shadow`**。
 - 請在 DB 內確認：`SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres','supabase_admin');` —— 典型結果是 **僅 **`supabase_admin`** 為 superuser**。
 - **`pgbouncer`** schema 若 owner 為 **`pgbouncer`**，以 **`postgres`** 連進去做 **`CREATE OR REPLACE FUNCTION … IN SCHEMA pgbouncer`** 也會出現 **`permission denied for schema pgbouncer`**。
+- **`auth_query`** 由 pooler／驅動以 **`pgbouncer`** 角色對 **`postgres` DB** 呼叫 **`pgbouncer.get_auth($1)`**；除 **`EXECUTE` on function** 外，尚需 **`USAGE` on schema **`pgbouncer`**。若將 schema owner 調整為 **`supabase_admin`** 後仍見 **`permission denied for schema pgbouncer`（Postgrex / `:42501`**），補：**`GRANT USAGE ON SCHEMA pgbouncer TO pgbouncer;`**。
 
-修復原則：**`pgbouncer`** schema 與 **`pgbouncer.get_auth`** 的 **OWNER 改為 **`supabase_admin`****，函式 **`SECURITY DEFINER` + `SET search_path = ''`**，並 **`REVOKE` PUBLIC / `GRANT EXECUTE` 給 `pgbouncer`（若該 role 存在）**；完成後 **`docker restart supabase-pooler`**。
+修復原則：**`pgbouncer`** schema 與 **`pgbouncer.get_auth`** 的 **OWNER 改為 **`supabase_admin`****，函式 **`SECURITY DEFINER` + `SET search_path = ''`**，並 **`REVOKE` PUBLIC**，再對 **`pgbouncer`** role：**`GRANT USAGE ON SCHEMA pgbouncer` + `GRANT EXECUTE ON FUNCTION`**；完成後 **`docker restart supabase-pooler`**。
 
 **在 EU**（備份／維護窗後），取得 **`/root/supabase/.env`** 的 **`POSTGRES_PASSWORD`**（僅在伺服器上使用，**不入庫／不貼聊天**），並以 **`supabase_admin`** 執行：
 
@@ -167,6 +168,7 @@ REVOKE ALL ON FUNCTION pgbouncer.get_auth(TEXT) FROM PUBLIC;
 DO $grant$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pgbouncer') THEN
+    GRANT USAGE ON SCHEMA pgbouncer TO pgbouncer;
     GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(TEXT) TO pgbouncer;
   END IF;
 END;
