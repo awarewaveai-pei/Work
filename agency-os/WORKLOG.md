@@ -11,6 +11,7 @@
 - **`0020_splinter_duplicate_indexes_and_rls_stray_policies.sql`**：**(A)** `workflow_runs` 重複索引改用與 Splinter **0009** 相同的 **`replace(indexdef, indexname, '')`** 分組後刪冗餘（修正 **0018** 只用完整 `pg_get_indexdef` 導致同名不同定義無法合併的問題）；**(B)** 對 **`profiles`／organization_memberships／workspace_memberships／user_role_assignments` 先 **`DROP` 該表全部 policy** 再重建 **0019**，清掉 Dashboard／範本留下的 **`auth.uid()`** policy。
 - **診斷**：`lobster-factory/packages/db/scripts/diag-splinter-auth-rls-initplan.sql` 可在 SQL Editor 列出仍會被 **0003** 命中的 policy（與 Splinter 同源條件）。
 - **須在 Dashboard → SQL Editor 依序執行 `0018` → `0019` → `0020`**（或 CI／CLI）後再開 Performance Advisor；僅改 repo 不會消除雲端 WARN。
+- **CLI 一鍵**：`npm run apply:supabase-splinter-fixes`（執行 **`lobster-factory/packages/db/scripts/apply-splinter-fixes-one-shot.sql`** + post-check）。自託管常見：**函數 owner = `supabase_admin`**、連線 **`postgres` 非 superuser** → 會 **preflight exit 3**；請設 **`SUPABASE_SPLINTER_FIX_DSN`** 為 **`postgresql://supabase_admin:…@127.0.0.1:5432/postgres`**（密碼見 VPS **`/root/supabase/.env`**，不入庫）或見 **`SUPABASE_SELF_HOSTED_RUNBOOK.md`** §3.4。
 
 ### git push origin main — 2026-05-01 完成
 

@@ -1,4 +1,6 @@
 -- ONE paste into Supabase Dashboard → SQL Editor → Run (same project as Performance Advisor).
+-- Self-hosted: functions may be owned by supabase_admin — if role `postgres` fails with
+-- "must be owner", use `-U supabase_admin` / DSN user supabase_admin (see SUPABASE_SELF_HOSTED_RUNBOOK §3.4).
 -- Fixes Splinter 0003 (auth RLS initplan) + 0009 (duplicate indexes on workflow_runs).
 --
 -- Contents: 0018 (functions + interim policies + search_path) then 0020 (Splinter-aligned

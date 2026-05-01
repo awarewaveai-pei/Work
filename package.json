@@ -12,7 +12,8 @@
     "n8n:mcp-smoke": "node scripts/n8n-mcp-smoke.mjs",
     "smoke:supabase-tunnel": "node scripts/supabase-tunnel-smoke.mjs",
     "smoke:supabase-rls-advisor": "node scripts/supabase-tunnel-smoke.mjs --rls-advisor",
-    "apply:lobster-rls-eu": "node scripts/apply-lobster-rls-migrations-eu.mjs"
+    "apply:lobster-rls-eu": "node scripts/apply-lobster-rls-migrations-eu.mjs",
+    "apply:supabase-splinter-fixes": "node scripts/apply-supabase-splinter-fixes.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
