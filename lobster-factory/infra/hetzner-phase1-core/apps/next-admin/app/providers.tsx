@@ -26,6 +26,10 @@ export function PHProvider({ children }: { children: React.ReactNode }) {
       },
       persistence: 'localStorage',
       loaded: (ph) => {
+        ph.register({
+          site_domain: window.location.hostname,
+          app_surface: 'next-admin',
+        })
         if (process.env.NODE_ENV === 'development') ph.debug()
         identifyFromEnvBootstrap()
       },
