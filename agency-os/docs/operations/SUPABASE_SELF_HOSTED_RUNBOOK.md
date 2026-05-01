@@ -246,6 +246,21 @@ When keys rotate:
 
 ## 6. Common Ops
 
+### 6.1 Lobster DB migrations (`lobster-factory/packages/db/migrations`)
+
+Numbered `*.sql` files are the **authoritative** DDL/RLS sequence for the Lobster/AwareWave schema on top of stock Supabase Postgres.
+
+| Topic | Guidance |
+| --- | --- |
+| Location | Monorepo `lobster-factory/packages/db/migrations/` (`0001_*.sql` … `0016_*.sql`). |
+| Apply on EU | Only in a **maintenance window** with a **verified backup** and explicit approval. Run files **in numeric order** exactly once each (no skipping): `psql -v ON_ERROR_STOP=1 -f <file>`. |
+| Docker entrypoint | Example: `docker exec -i -e PGPASSWORD="$PW" supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -f /tmp/0016_….sql` after copying the file onto the host/container. Prefer **`supabase_admin`** when `postgres` cannot own DDL (see §3.4). |
+| Drift / linter | Partial stacks produce Studio **RLS disabled in public** and runtime surprises; redeploy from repo order instead of hand-fixing individual tables. |
+| RLS vs policies | `0014` enables RLS broadly; `0016_ops_console_and_permission_catalog_rls_policies.sql` adds **authenticated** policies for ops-console tables and permission catalogs so JWT clients keep intended reads; **`service_role` bypasses RLS** for jobs and admin automation. |
+| PostgREST | After new tables or renames: `NOTIFY pgrst, 'reload schema';` or `docker compose restart supabase-rest` (see `0013_ops_inbox.sql`). |
+
+Do **not** run production DDL from IDE agents without the same gates as human operators.
+
 SSH to VPS:
 
 ```bash

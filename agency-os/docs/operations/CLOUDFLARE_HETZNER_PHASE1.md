@@ -29,7 +29,7 @@ AwareWave 目前有 **兩台公網 VPS**：**新加坡 phase1**（WordPress／`n
 |--------------|--------------|------|
 | `@`（apex）、**api**、**app** | **`5.223.93.113`（SG）** | 官網 WordPress、[`api.aware-wave.com`](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)（node-api）、[`app.aware-wave.com`](./CLOUDFLARE_HETZNER_PHASE1.md)（Next 入口／302 策略依範本） |
 | **www** | **CNAME → apex**（或與 apex 同 IP） | 與橘雲／SEO 策略一致即可 |
-| **supabase**、**studio**、**n8n**、**trigger**、**uptime** | **`204.168.175.41`（EU）** | 平台層：Kong／Studio、自動化、編排、監控（見 [`SUPABASE_SELF_HOSTED_RUNBOOK.md`](SUPABASE_SELF_HOSTED_RUNBOOK.md)、[`mcp/SERVICE_CREDENTIALS_MAP.md`](../../mcp/SERVICE_CREDENTIALS_MAP.md)） |
+| **supabase**、**studio**、**n8n**、**trigger**、**uptime** | **`204.168.175.41`（EU）** | 平台層：Kong／Studio、自動化、編排、監控（見 [`SUPABASE_SELF_HOSTED_RUNBOOK.md`](SUPABASE_SELF_HOSTED_RUNBOOK.md)、[`mcp/SERVICE_CREDENTIALS_MAP.md`](../../../mcp/SERVICE_CREDENTIALS_MAP.md)） |
 
 **禁止**：只因「SG 上只剩 WordPress／api／app」就把 **指向 EU 的上述 A 記錄刪掉** — 會造成 Supabase／n8n MCP／Trigger／監控告警全面失效；SG「業務入口精簡」與 **EU 平台 DNS** 是分工，不是二選一。
 
