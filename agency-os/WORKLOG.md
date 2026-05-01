@@ -7,7 +7,8 @@
 ### Supabase Advisor（RLS initplan + workflow_runs 重複索引）— migration 入 repo
 
 - **`lobster-factory/packages/db/migrations/0018_rls_initplan_and_workflow_runs_index_dedupe.sql`**：政策與 helper 將 **`auth.uid()` / `auth.jwt()`** 改為 **`(select …)`** 形式；`workflow_runs` 以 **`pg_get_indexdef` 分組**刪除冗餘索引（保留 **`idx_workflow_runs_org`** / **`idx_workflow_runs_site`**）；末段重設 **`search_path`**（與 **0017** 一致）。
-- **尚未對託管 DB 套用**：須在 **staging** 執行專案慣例 migration 流程 → Advisor 複查 → 再 **production**。
+- **`0019_rls_policies_delegate_to_current_user_id.sql`**：profiles／memberships／user_role_assignments 政策改為只呼叫 **`current_user_id()`**，使 **`qual`／`with_check` 不含字面 `auth.uid()`**（對齊 Splinter **`0003_auth_rls_initplan`** 只掃 policy 文字；避免仍顯示 6 則 WARN）。
+- **須在 Supabase Dashboard → SQL Editor 依序執行 `0018`、`0019`**（或 CI／CLI 等同套用）後，Performance Advisor 才會更新；僅改 repo、未連線執行 SQL，雲端 WARN 不會消失。
 
 ### git push origin main — 2026-05-01 完成
 
