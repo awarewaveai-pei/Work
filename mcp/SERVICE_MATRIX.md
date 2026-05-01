@@ -7,7 +7,7 @@ This matrix describes how the shared MCP setup reaches each AwareWave service.
 ## Direct or official MCP
 
 - `GitHub`: official GitHub MCP server
-- `AwareWave Supabase Postgres`: local wrapper around `scripts/run-postgres-mcp.ps1` (`supabase-awarewave-postgres`, requires SSH tunnel)
+- `AwareWave Supabase Postgres`: `scripts/run-postgres-mcp.ps1` → `mcp-local-wrappers/postgres-full-access-mcp.mjs` (full SQL; optional `POSTGRES_MCP_READ_ONLY=true`; `npm install` in `mcp-local-wrappers/`; SSH tunnel required)
 - `Soulful Expression Supabase`: use Cursor Supabase plugin (not shared registry MCP)
 - `Trigger.dev`: local wrapper around `scripts/start-trigger-mcp.ps1`
 - `n8n`: remote HTTP MCP
