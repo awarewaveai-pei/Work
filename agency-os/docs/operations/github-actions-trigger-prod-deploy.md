@@ -1,6 +1,6 @@
 # GitHub Actions：`lobster-workflows-validate-main.yml`（僅 validate；已移除 Trigger Cloud deploy）
 
-> **Owner**：本檔為 **AO / 龍蝦** 與 **CI** 交界之單一入口。  
+> **注意**：本檔保留「移除 Trigger Cloud deploy」的歷史脈絡。**架構設計正文**（Gate 架構、分工邊界、30年原則）請見 → **[`GITHUB_ACTIONS_ARCHITECTURE.md`](./GITHUB_ACTIONS_ARCHITECTURE.md)**  
 > **檔名說明**：沿用舊檔名 `github-actions-trigger-prod-deploy.md` 以免既連結失效；**內容已改** — CI **不再**對 Trigger Cloud 執行 `deploy`。  
 > **生產 Trigger**：你只使用 **自託管**；部署請在自架環境依官方文件操作（流程就緒後可補 **專用 workflow**，與本檔同步更新）。  
 > **編排邊界**：Runbook 與 **Trigger vs n8n** 仍依 `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` 與 ADR 004。
