@@ -1,7 +1,7 @@
 ﻿# Global Task Board
 
 > **待辦原則（給營運者）**  
-> - **單一清單**：所有「之後還要做」的事，應以本檔 **`Next — 未完成`** 或 **`Backlog — 未完成`** 的一條 `- [ ]` 表示；不要只放在聊天或腦裡。  
+> - **單一清單**：所有「之後還要做」的事，應以 **`### 未完成`**（或 **`Backlog — 未完成`**）的一條 `- [ ]` 表示；不要只放在聊天或腦裡。**勿**在「未完成」區混放 `- [x]`（已完成請移到 **`Next — 已完成歷程`**）。  
 > - **當天做不完／臨時改做別的**：在當日 **`WORKLOG.md`** 寫一句（做了什麼、停在哪、為何轉向）；若承諾仍有效，**留在下面未完成清單**；若作廢，把該條刪除或改成「已取消／改路由至…」。  
 > - **`Next — 已完成歷程`**：僅供查說：曾經排過、已完成者；**新工作請不要加在這裡**。  
 > - **收工與打勾（預設全自動）**：**不必手動**改 `TASKS`。**只打 `AO-CLOSE`（或收工同義詞）即觸發代理**依當輪對話與 **`TASKS` 開放項**在當日 **`WORKLOG.md`**（`## yyyy-MM-dd`）寫 **`- AUTO_TASK_DONE: <唯一子字串>`**（須只命中一條仍為 `- [ ]` 的待辦；已 `[x]` 時略過並收斂標記），**不必再口頭重複指令**。收工腳本會跑 **`scripts/apply-closeout-task-checkmarks.ps1`** 打勾並改為 **`AUTO_TASK_DONE_APPLIED (UTC): …`**。選填： **`pending-task-completions.txt`**（見 **`pending-task-completions.example.txt`**）。`AO-CLOSE` 開頭會印 **`print-today-closeout-recap.ps1`** 摘要。
@@ -16,17 +16,14 @@
 - [x] 建立 `lobster-factory` Phase 1 底座骨架（Supabase migrations + wc-core manifest + workflow 安全骨架）
 
 ## Next — 未完成（目前正式隊列）
-- [x] **Supabase Postgres MCP（AwareWave）／EU SSH tunnel — 穩定 smoke** — 2026-05-01 完成
-  - `npm run smoke:supabase-tunnel`：PASS Postgres 127.0.0.1:5432 / PASS Studio :3000 / PASS Kong :8000
-  - Cursor 完成 tunnel TLS 修復（`95b2ef9`）、pgbouncer get_auth 修復（`3b16bf8`）、Supavisor runbook（`19779f8`）
-- [x] **n8n MCP（Cursor）：HTTP 運輸改 stdio 橋接並驗證（抖動／No tools）**
-  - 證據：`scripts/run-n8n-mcp.mjs`、`mcp/registry.template.json`、`docs/operations/n8n-self-hosted-mcp-troubleshooting.md`；smoke：`node scripts/n8n-mcp-smoke.mjs`
-- [x] **（已完成待套用）建立全域月檢 `AgencyOS-MonthlySystemReview` 與 tenant monthly 排程基線**
-- [x] **（Ops Inbox Path B）生產收斂完成 — 2026-05-01 實機驗證**
-  - `ingest_token_configured: true`、`notify_enabled: true`、`slack_webhook_configured: true`
-  - 四來源 smoke 全 HTTP 200：sentry／uptime_kuma／grafana／netdata（各有新 incident_id）
-  - Health open_count 12→16，last_ingest_at 2026-05-01T07:21:54Z 確認
-  - 測試腳本：`lobster-factory/infra/hetzner-phase1-core/scripts/test-ops-inbox-webhooks.sh`
+
+> **版面規約（減少漏勾／誤判）**  
+> - **本節只保留 `- [ ]`。**已結案請移到 **`## Next — 已完成歷程（查詢用）`**，不要留在這裡。  
+> - **代理**：完成某一條 DoD 時，當日 **`WORKLOG`** 必須有 **`- AUTO_TASK_DONE: <子字串>`**（命中該條待辦）；`AO-CLOSE` 會跑 **`apply-closeout-task-checkmarks`**。  
+> - **縮排**：子項一律 **兩個空白**，勿使用單獨一字的 ` - [ ]`（易與清單錯位）。
+
+### 未完成
+
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）**（詳見 `docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 / §1.5.1）
   - 新機/筆電首次：完成 Windows 本機 WordPress 相容層（MariaDB + PHP + WP-CLI + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`），此路徑與 Supabase/MCP 分列。
   - 之後每次開工：在 Cursor 開 monorepo 根並送出 **`AO-RESUME`**（專案 **hook** 先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`** 至 exit 0／失敗則依 **REMOTE 2.5.1** 整理後重送）；除錯時可改在 monorepo 根手動跑同指令。
@@ -39,20 +36,9 @@
   - 兩台都要在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict` 且 PASS（無 WARN）後才可勾選此項。
   - **公司桌機（人在辦公室時）**：不必回想先前是否裝過；在該機 monorepo 根依序：`git fetch` → `git checkout main` → `git pull --ff-only origin main` → 跑上一行的 `machine-environment-audit -Strict`。若未 PASS，自上文 `REMOTE_WORKSTATION_STARTUP.md` **§1.5**「工具與依賴」起補齊（含 `lobster-factory\packages\workflows` 的 `npm ci`、可選 `mcp-local-wrappers`、`verify-build-gates`）後再重跑稽核；需與筆電同級「真 WP」則補 **§1.5.1**。FAIL/WARN 時保留終端輸出以利除錯。
   - **筆電已 Strict PASS 時**：仍須待公司桌機也 PASS，本主項才可視為完成。
-- [x] **（工具建置）安裝 Grok CLI（筆電 / Codex）**
-  - 參考：`../GROK_LAPTOP_CODEX_INSTALL_PROMPT.md`
-  - DoD：`grok help`、`grok templates` 成功；若 `XAI_API_KEY` 已存在，`grok chat "Reply with exactly: ready"` 回傳 `ready`
-- [x] Slack `#infra-alerts` 歷史訊息批次清理 — 2026-05-01 完成（公司桌機）
-  - Slack App scope／重新安裝後已完成歷史訊息批次清理。
-- [x] Netdata Centralized Cloud Notifications 設定 — 2026-05-01 完成（公司桌機）
-  - centralized notifications 已設定並對齊營運需求。
-- [x] ClickHouse TTL（EU server）— 2026-05-01 完成
-  - 三表全部設定 TTL 3 天：metric_log（9 MiB）、text_log（22 MiB）、trace_log（19 MiB）
-  - 容器：`trigger-clickhouse`（非 `trigger-trigger-clickhouse-1`）
-- [x] 筆電回家後重載 MCP 環境
-  - 依序執行：
-    - `. .\mcp\user-env.ps1`
-    - `powershell -File .\scripts\sync-mcp-config.ps1`
+- [ ] **Git：`main` 未推送 commits → `git push origin main`**（含 Trigger／PostHog／WP MU／WORKLOG 等；以 `git log origin/main..HEAD` 為準）
+- [ ] **Trigger workflows 完整 deploy**：於 **EU `204.168.175.41`**（或依 **`lobster-factory/infra/trigger/README.md` §7a** 打通 **`registry:5000`**）執行 **`deploy-workflows.ps1`** 或 **`npx trigger.dev@4.4.4 deploy`**（映像 push；環境變數同步見該 README）
+- [ ] **phase1 WordPress（SG）PostHog MU**：`hetzner-phase1-core` 已入庫 MU `posthog.php` — 於伺服器 **`docker compose build wordpress && docker compose up -d wordpress`**（或等價）並驗證公開頁載入
 - [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3）
   - 參考：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
   - 本項目標：先選 2 個試點（1 既有站接手 + 1 新站建置）
@@ -74,10 +60,6 @@
   - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
 - [ ] `lobster-factory` A7 全站自動建站補齊
   - 範圍：hosting adapter + provision/shell guardrails 端到端
-- [x] **Trigger.dev 自託管上線（Hetzner compose）**
-  - **正本／順序**：`lobster-factory/infra/trigger/README.md`（v4 compose、`lobster-net`、Nginx、SSH 救濟）。
-  - **現況（營運定案 2026-04-20）**：自託管 **視為已上線**（與 **`TOOLS_DELIVERY_TRACEABILITY.md`**／**`hetzner-stack-rollout-index.md`** 一致）；歷程與驗收敘述見 **`WORKLOG` `## 2026-04-16`～`## 2026-04-17`**、**`memory/CONVERSATION_MEMORY.md`**。
-  - **DoD**（已達）：自架 URL／dashboard、`trigger.config.ts` 對齊、deploy secret 與 **`WORKLOG`** 證據鏈（無密鑰）；本項已 `[x]`。
 - [ ] Enterprise 工具層 Phase 1 正式串接
   - 範圍：Clerk auth、env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts
   - DoD：下列子任務全數完成且有對應證據連結（WORKLOG / report）
@@ -94,33 +76,39 @@
   - P7：Next.js 控制台 v1（把前面能力做成可操作介面）
   - 依賴說明：P7 會依賴 P1/P3/P4/P6 的資料與權限設計
   - 追溯總表：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（每一工具任務對回規格 + DoD + 證據欄位）
- - [ ] （工具建置）Next.js 控制台 v1（Internal Ops）
-   - 處理：建立 app skeleton、客戶清單頁、部門勾選頁（20 部門）、提交後寫出 `DEPARTMENT_SELECTION` payload
-   - 2026-04-25 進度：控制平面 migration 已新增 `0011_ops_console_control_plane.sql`（`ops_action_runs` / `ai_image_jobs` / `media_assets` / `ops_audit_events`）
-   - 2026-04-25 進度：`next-admin` 已新增 `/ops-console` 與 `POST /api/ops/ai-image-jobs`（`queued` job + 審計；viewer 雙層擋）與 `GET /api/ops/summary`（讀 `organizations` 或安全 fallback）
-   - 媒體分層固定：AI 生圖走 R2；WordPress 商品圖/部落格圖維持 WP 媒體庫（`wp-content/uploads` + MySQL）
-   - 正本：`docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`
-   - DoD：可建立 1 個測試客戶設定並在 UI 回顯成功
-- [x] （工具建置）Sentry 觀測接入
-  - 處理：接入 API/workflow 錯誤上報 + release tag；定義 1 條告警規則
-  - DoD：可人工觸發 1 筆測試錯誤並在 Sentry 收到告警
-  - 2026-04-17 補強：DSN 分流契約（6 服務命名）+ `SENTRY_ALERT_POLICY.md`（告警分級/P1-P3、smoke 基線、月季巡檢）+ `verify-build-gates` Sentry 契約檢查。
-- [x] （工具建置）PostHog 事件基線
-  - 處理：定義 core events（至少 onboarding_start / onboarding_completed / deploy_requested / deploy_result）
-  - DoD：可在 PostHog 看到一筆完整測試 funnel
+- [ ] （工具建置）Next.js 控制台 v1（Internal Ops）
+  - 處理：建立 app skeleton、客戶清單頁、部門勾選頁（20 部門）、提交後寫出 `DEPARTMENT_SELECTION` payload
+  - 2026-04-25 進度：控制平面 migration 已新增 `0011_ops_console_control_plane.sql`（`ops_action_runs` / `ai_image_jobs` / `media_assets` / `ops_audit_events`）
+  - 2026-04-25 進度：`next-admin` 已新增 `/ops-console` 與 `POST /api/ops/ai-image-jobs`（`queued` job + 審計；viewer 雙層擋）與 `GET /api/ops/summary`（讀 `organizations` 或安全 fallback）
+  - 媒體分層固定：AI 生圖走 R2；WordPress 商品圖/部落格圖維持 WP 媒體庫（`wp-content/uploads` + MySQL）
+  - 正本：`docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`
+  - DoD：可建立 1 個測試客戶設定並在 UI 回顯成功
 - [ ] （工具建置）Clerk 組織與角色（B2B 多租戶）
   - 處理：建立 org + role 對照（owner/admin/operator/viewer）並映射到現有權限邏輯
   - DoD：2 個測試角色登入後，看到不同權限結果
-- [x] （工具建置）Cloudflare 邊界保護
-  - 處理：DNS / WAF / rate limit / 基本防護規則（先 staging）
-  - DoD：staging 入口啟用防護且不影響正常流程
-- [x] （工具建置）Secrets 治理升級（從 env/mcp 到集中管控）
-  - 處理：定義 secrets owner、輪替節奏、最小讀取權限；先覆蓋 Trigger/n8n/GitHub 相關高風險金鑰
-  - DoD：完成一輪輪替演練，服務不中斷
-  - **執行正本**：`docs/operations/secrets-governance-p1-closeout.md`（Owner 表、首輪輪替三選一、WORKLOG 證據、AUTO_TASK_DONE 子字串）。
-  - **進度（2026-04-17）**：已完成手冊 §2 路徑 B（n8n MCP key 輪替 + 舊 key 刪除 + 連線驗證），`WORKLOG` 已補 §3 證據與 `AUTO_TASK_DONE: Secrets 治理升級`；勾選由 `AO-CLOSE` 腳本套用。
 
 ## Next — 已完成歷程（查詢用）
+
+### 2026-05-01 — 自 Next 隊列移入（整理版面）
+
+- [x] **Supabase Postgres MCP（AwareWave）／EU SSH tunnel — 穩定 smoke**
+  - `npm run smoke:supabase-tunnel`：PASS Postgres 127.0.0.1:5432 / PASS Studio :3000 / PASS Kong :8000
+- [x] **n8n MCP（Cursor）：HTTP 運輸改 stdio 橋接並驗證（抖動／No tools）**
+  - 證據：`scripts/run-n8n-mcp.mjs`、`mcp/registry.template.json`、`docs/operations/n8n-self-hosted-mcp-troubleshooting.md`
+- [x] **建立全域月檢 `AgencyOS-MonthlySystemReview` 與 tenant monthly 排程基線**
+- [x] **（Ops Inbox Path B）生產收斂完成 — 2026-05-01 實機驗證**
+- [x] **（工具建置）安裝 Grok CLI（筆電 / Codex）**
+- [x] Slack `#infra-alerts` 歷史訊息批次清理 — 2026-05-01（公司桌機）
+- [x] Netdata Centralized Cloud Notifications — 2026-05-01（公司桌機）
+- [x] ClickHouse TTL（EU server）— 2026-05-01
+- [x] 筆電回家後重載 MCP 環境（`user-env.ps1` + `sync-mcp-config.ps1`）
+- [x] **Trigger.dev 自託管上線（Hetzner compose）** — 營運定案 2026-04-20；正本 `lobster-factory/infra/trigger/README.md`
+- [x] （工具建置）Sentry 觀測接入（含 `SENTRY_ALERT_POLICY.md`、gate 契約）
+- [x] （工具建置）PostHog 事件基線
+- [x] （工具建置）Cloudflare 邊界保護
+- [x] （工具建置）Secrets 治理升級（含 n8n MCP key 輪替證據與 `AUTO_TASK_DONE`）
+
+### 更早 — 查詢用
 - [x] **（工具建置）Hetzner 自託管 n8n（staging）**
   - DoD：`client_onboarding` 輕量流程於 **staging** Webhook 端到端成功；證據見 `WORKLOG.md` **`## 2026-04-10`** →「n8n staging client_onboarding E2E」（`workflow_id` `LUEO8tirSCFaVGjH`、`execution_id` `1`、`route_summary` `POST /webhook/client-onboarding/staging-ping`）。
   - 正本：`docs/operations/n8n-staging-client-onboarding-e2e.md`
@@ -263,5 +251,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-01 09:42:27 UTC_
+_Last synced: 2026-05-01 (TASKS 未完成區僅 `[ ]` 治理) UTC_
 

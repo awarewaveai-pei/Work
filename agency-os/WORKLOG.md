@@ -77,6 +77,13 @@
 - **未推送 commits**：**`git log origin/main..HEAD`** 應含 **`7d51ac1`～`287d086`** 與 **`aaee266`**（以實際 **`git status`**／log 為準）；需 **`git push origin main`**。
 - **憑證 hygiene**：若曾將**完整** `.env` 或明文金鑰送入對話／他人可讀渠道，依 **`security-secrets-policy`** **輪替**（不作業細節與值不落 WORKLOG）。
 
+### TASKS.md 版面治理（減少「醜／漏勾／已完成占位」）
+
+- **`Next — 未完成`**：改為 **僅 `- [ ]`**；區塊頂加 **版面規約**（代理必寫 **`WORKLOG` `AUTO_TASK_DONE`**、縮排兩空白、已完成移至 **`已完成歷程`**）。
+- **2026-05-01 批次**：將 Supabase MCP／n8n／月檢／Ops Inbox／Grok／Slack／Netdata／ClickHouse／筆電 MCP／Trigger 上線敘述／Sentry／PostHog／CF／Secrets 等 **已結案列** 移至 **`Next — 已完成歷程`** 小節「2026-05-01 — 自 Next 隊列移入」。
+- **新增可追蹤未完成**：**`git push origin main`**、**Trigger 完整 deploy（EU／registry）**、**SG WordPress 重建以載入 PostHog MU**（對齊近期 Cursor 工作）。
+- **修正**：Next.js 控制台子項 **縮排**（避免 ` - [ ]` 錯位）。
+
 ## 2026-04-30
 
 ### Daily
