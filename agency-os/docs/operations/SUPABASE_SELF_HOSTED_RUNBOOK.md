@@ -83,10 +83,24 @@ Start tunnel:
 .\scripts\open-supabase-ssh-tunnel.ps1 -Background
 ```
 
-DSN:
+#### 3.3.1 你連到的是 **Supavisor（pooler）**，不是裸露的 `supabase-db`
+
+在官方 **`docker-compose.yml` 版型**（與 **`lobster-factory/infra/supabase/docker-compose.yml`** 對齊思考）裡，**對外綁在 EU 宿主機 `127.0.0.1:5432` 的通常是 `supabase-pooler`（Supavisor）**，**不是**把 `supabase-db` 裸露在宿主機 `:5432`。
+
+因此經過 `open-supabase-ssh-tunnel.ps1` 打到本機 `localhost:5432` 的流量，多半是 **進 pooler**。Supavisor 會用形如 **`postgres.<POOLER_TENANT_ID>`** 的使用者名稱做租戶路由；若只看見 **`Tenant or user not found`**，先核對 VPS **`/root/supabase/.env`** 的 **`POOLER_TENANT_ID`**（與 URI 使用者名 **`postgres`** 後半段一致）。
+
+較安全的 **MCP／IDE DSN（經預設 tunnel）** 形狀（密碼仍只放 vault／`user-env`，**不入庫**）：
 
 ```text
-postgresql://postgres:<POSTGRES_PASSWORD>@localhost:5432/postgres
+postgresql://postgres.<POOLER_TENANT_ID>:<POSTGRES_PASSWORD>@127.0.0.1:5432/postgres
+```
+
+若要 **繞過 pooler**、直接用角色 **`postgres`** 連資料庫，必須在 **EU** 另行把 **`supabase-db` 綁回 `127.0.0.1`（建議次要埠，例如 15432）** 並在 SSH `-L` 多轉一條次要本機埠—此為進階 hardening／操作話題，本篇不強制。
+
+#### 3.3.2 仍舊的備援形狀（僅在未啟用 pooler 對外、或你已改埠對 `db` 時）
+
+```text
+postgresql://postgres:<POSTGRES_PASSWORD>@127.0.0.1:5432/postgres
 ```
 
 Machine-local env:
@@ -94,11 +108,83 @@ Machine-local env:
 - Preferred: `SUPABASE_AWAREWAVE_POSTGRES_DSN`
 - Legacy fallback: `SUPABASE_B_POSTGRES_DSN`
 
+#### 3.3.3 Smoke（本機）
+
+```powershell
+npm run smoke:supabase-tunnel
+npm run smoke:supabase-tunnel -- --sql
+```
+
+`-sql` 需 **`SUPABASE_AWAREWAVE_POSTGRES_DSN`** 已載入（與 MCP 同源）；預期最後 **`SQL smoke: SELECT 1 ok`**。
+
 Stop tunnel:
 
 ```powershell
 Get-Process ssh | Stop-Process
 ```
+
+---
+
+### 3.4 Supavisor auth：`permission denied for view pg_shadow` / `pgbouncer.get_auth`
+
+症狀：TCP `5432/3000/8000` 已通，`smoke --sql` 或客戶端連 pooler 時出現 **`pgbouncer.get_auth`** 失敗、`pg_shadow` 權限錯誤。
+
+原因：pooler 會在 Postgres 內呼叫 **`pgbouncer.get_auth(text)`** 查密碼；此函式必須對 **`pg_catalog.pg_shadow`** 以 **`SECURITY DEFINER`** 並由 **superuser（通常 `postgres`）owned**，與 **[supabase/postgres：`pgbouncer_auth_schema.sql`](https://github.com/supabase/postgres/blob/develop/ansible/files/pgbouncer_config/pgbouncer_auth_schema.sql)** 一致。若過去手動變更 owner／定義不完整，會變成你看到的 **`permission denied for view pg_shadow`**。
+
+**在 EU**（備份／維護窗後），以 superuser 進 **`postgres` 資料庫修復**。與 **[supabase/postgres：`pgbouncer_auth_schema.sql`](https://github.com/supabase/postgres/blob/develop/ansible/files/pgbouncer_config/pgbouncer_auth_schema.sql)** 同構；請先 `\df pgbouncer.*` 確認現有簽章。
+
+建議用互動式 `psql` 貼上（避免 heredoc／Windows 終端轉義問題）：
+
+```bash
+docker exec -it supabase-db psql -U postgres -d postgres
+```
+
+在 `psql` 內：
+
+```sql
+BEGIN;
+
+CREATE SCHEMA IF NOT EXISTS pgbouncer AUTHORIZATION postgres;
+
+CREATE OR REPLACE FUNCTION pgbouncer.get_auth(p_usename TEXT)
+RETURNS TABLE(username TEXT, password TEXT)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT usename::TEXT, passwd::TEXT
+  FROM pg_catalog.pg_shadow
+  WHERE usename = p_usename;
+END;
+$$;
+
+ALTER FUNCTION pgbouncer.get_auth(TEXT) OWNER TO postgres;
+
+REVOKE ALL ON FUNCTION pgbouncer.get_auth(TEXT) FROM PUBLIC;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pgbouncer') THEN
+    GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(TEXT) TO pgbouncer;
+  END IF;
+END $$;
+
+COMMIT;
+```
+
+驗證：
+
+```sql
+SELECT n.nspname, p.proname, pg_get_userbyid(p.proowner) AS owner, p.prosecdef
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'pgbouncer' AND p.proname = 'get_auth';
+```
+
+預期：**owner = postgres**、`prosecdef = t`。
+
+修完後通常 **無需重建** `supabase-db`；若 pooler 仍報舊錯：在 **`/root/supabase`** 執行 `docker compose restart supabase-pooler`。
 
 ---
 

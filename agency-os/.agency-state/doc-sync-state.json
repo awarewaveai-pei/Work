@@ -1,9 +1,10 @@
 ﻿{
-    "last_run_utc":  "2026-05-01T05:58:33.0621715Z",
+    "last_run_utc":  "2026-05-01T07:28:44.6522537Z",
     "changed_files":  [
+                          "docs/operations/GITHUB_ACTIONS_ARCHITECTURE.md",
+                          "docs/operations/github-actions-trigger-prod-deploy.md",
                           "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
                           "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
-                          "TASKS.md",
                           "WORKLOG.md"
                       ],
     "impacted_files":  [
@@ -13,6 +14,8 @@
                            ".cursor/rules/40-shutdown-closeout.mdc",
                            "AGENTS.md",
                            "docs/operations/end-of-day-checklist.md",
+                           "docs/operations/GITHUB_ACTIONS_ARCHITECTURE.md",
+                           "docs/operations/github-actions-trigger-prod-deploy.md",
                            "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
                            "docs/overview/EXECUTION_DASHBOARD.md",
                            "docs/overview/INTEGRATED_STATUS_REPORT.md",

@@ -4,6 +4,46 @@
 
 ## 2026-05-01
 
+### ClickHouse TTL 3 天（EU server）完成
+
+- **三張 system 表全部設定 TTL = event_date + 3 DAY**：`metric_log`、`trace_log`、`text_log`
+- ALTER TABLE 執行後資料立即清理：三表合計從數 GB 縮至 **< 50 MiB**（metric_log 9 MiB / text_log 22 MiB / trace_log 19 MiB）
+- Oldest data: 2026-04-30（距今 ≤ 2 天，TTL 正常運作）
+- 容器：`trigger-clickhouse`（bitnamilegacy/clickhouse:24.8.8）
+- **注意（pre-existing）**：`trigger_dev.metrics_v1` 有 schema 問題（attributes column missing），不影響 system 表 TTL，Trigger.dev 服務本身 healthy
+
+### Ops Inbox Path B — 四個 webhook 全部 smoke test 通過
+
+- **端點確認**：`/api/webhooks/{sentry,uptime-kuma,grafana,netdata}`；Auth: `Authorization: Bearer <token>`
+- **測試結果**：全部 HTTP 200，各回傳新 `incident_id`（transition: "new"）
+  - sentry: `ca060e2b-...` ✅
+  - uptime_kuma: `d791a278-...` ✅
+  - grafana: `fbe77fd8-...` ✅
+  - netdata: `cdeb5313-...` ✅
+- **Health 確認**：open_count 12 → 16（+4），last_ingest_at 更新至 2026-05-01T07:21:54Z
+- `ingest_token_configured: true`、`notify_enabled: true`、`slack_webhook_configured: true`
+- 本機測試腳本（完整 payload 格式）：`lobster-factory/infra/hetzner-phase1-core/scripts/test-ops-inbox-webhooks.sh`
+
+### GitHub Actions 設定完成
+
+- `lobster-workflows-validate-main.yml` 修正（YAML 重複 key、Windows 腳本）已推送
+- `GITHUB_ACTIONS_ARCHITECTURE.md` 新建 SSOT
+- Deprecated secrets 確認不存在（2026-05-01 實機驗證）
+- 文件更新 commit：`4c1c1be`（待 push）
+
+### Docker weekly cleanup — 入庫 + 兩台伺服器部署完成
+
+- **新增腳本**（入 repo，commit `0170b91` + `b42c708`）：
+  - `lobster-factory/infra/hetzner-phase1-core/scripts/docker-weekly-cleanup.sh`：每週安全清理（dangling images、停止容器、build cache）；含 log rotation 5MB×4；`docker system df` before/after 可視化。
+  - `lobster-factory/infra/hetzner-phase1-core/scripts/install-maintenance-crons.sh`：冪等安裝器，自動偵測 sg/eu（含 `*sin*`/`*hel*` hostname 後綴）；**duplicate-safe**：若 root crontab 已有條目，只升級 script 本體，不重建 `/etc/cron.d/`。
+- **發現**：兩台伺服器 root crontab 已有舊版 script（449B/248B 簡單版）+ 正確排程（SG 03:00、EU 03:30 UTC），是前次工作留下的。
+- **部署**：SFTP 上傳 → 執行 installer → script 升級至 1.7K 版（有 log rotation + df）→ crontab 未動（無重複）。
+- **Smoke test 結果**：
+  - SG：釋放 **4.438 GB**（build cache）；After: 11 images active, build cache 1.679 GB reclaimable。
+  - EU：釋放 **3.461 MB**（2 個停止容器）；After: 22 active containers, 3.874 GB image reclaimable。
+- **文件更新**：`LONG_TERM_OPS.md` 威脅表加 Docker 垃圾堆積條目；`MAINTENANCE_CALENDAR.md` 加自動標注 + rebuild 後重建指令。
+- **Server rebuild 後**：`bash scripts/install-maintenance-crons.sh --host sg|eu` 一鍵恢復。
+
 ### P1：Supabase EU SSH tunnel／Postgres MCP smoke 路徑
 
 - **`scripts/open-supabase-ssh-tunnel.ps1`**：`ExitOnForwardFailure=yes` + `ServerAlive*`；背景模式若 ssh 早退會讀 stderr 並提示 **administratively prohibited** → **`SUPABASE_SELF_HOSTED_RUNBOOK.md`**；支援 **`SUPABASE_EU_SSH_HOST` / `SUPABASE_EU_SSH_USER` / `SUPABASE_EU_SSH_KEY`**。
@@ -1112,7 +1152,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-01 05:58:32 UTC_
+_Last synced: 2026-05-01 07:28:43 UTC_
 
 ## 2026-03-20
 
@@ -1546,6 +1586,7 @@ _Last synced: 2026-05-01 05:58:32 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

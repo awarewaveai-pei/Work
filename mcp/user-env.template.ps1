@@ -37,13 +37,15 @@ $vars = @{
     # SUPABASE_AUTH_BEARER_TOKEN = ""   # unused
     SUPABASE_AWAREWAVE_URL       = "https://supabase.aware-wave.com"
     SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY = "..."
-    SUPABASE_AWAREWAVE_POSTGRES_DSN = "postgresql://postgres:<PASTE_POSTGRES_PASSWORD>@localhost:5432/postgres"
+    # SQL MCP：`supabase-awarewave-postgres` — 經 **`open-supabase-ssh-tunnel.ps1`** 時，EU 對外 `:5432` 多為 **Supavisor**。DSN **使用者名** 通常為 **`postgres.<POOLER_TENANT_ID>`**（與 VPS **`/root/supabase/.env`** 的 **`POOLER_TENANT_ID`** 一致）；見 **`docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md` §3.3**。
+    SUPABASE_AWAREWAVE_POSTGRES_DSN = "postgresql://postgres.<POOLER_TENANT_ID>:<PASTE_POSTGRES_PASSWORD>@127.0.0.1:5432/postgres"
     SUPABASE_SOULFULEXPRESSION_URL = "https://your-soulfulexpression-project.supabase.co"
     SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY = "..."
     # Legacy aliases retained for backward compatibility during migration:
     SUPABASE_B_URL               = "https://supabase.aware-wave.com"
     SUPABASE_B_SERVICE_ROLE_KEY  = "..."
-    SUPABASE_B_POSTGRES_DSN      = "postgresql://postgres:<PASTE_POSTGRES_PASSWORD>@localhost:5432/postgres"
+    # 同上預設形狀（Supavisor + POOLER_TENANT_ID）。
+    SUPABASE_B_POSTGRES_DSN      = "postgresql://postgres.<POOLER_TENANT_ID>:<PASTE_POSTGRES_PASSWORD>@127.0.0.1:5432/postgres"
     SUPABASE_A_MCP_URL           = "https://mcp.supabase.com/mcp?project_ref=YOUR_SOULFULEXPRESSION_PROJECT_REF&features=database,docs,development,debugging"
     SUPABASE_A_AUTH_BEARER_TOKEN = "..."
     SUPABASE_A_URL               = "https://your-soulfulexpression-project.supabase.co"

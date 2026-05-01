@@ -127,7 +127,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
 
 ### 1.5.2 AwareWave 自託管 Supabase：`supabase-awarewave-postgres`（EU SSH tunnel｜選用）
 
-> **適用**：要在 Cursor 使用 **`supabase-awarewave-postgres`**（`@modelcontextprotocol/server-postgres`）連 **EU 機上 Postgres**，路徑是 **SSH 區域轉發** 到本機 `127.0.0.1:5432`。與 **`https://studio.aware-wave.com`**／REST（`SUPABASE_AWAREWAVE_URL`）**分工不同**——見 **`docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`**、`docs/operations/cursor-mcp-and-plugin-inventory.md`。
+> **適用**：要在 Cursor 使用 **`supabase-awarewave-postgres`**（`@modelcontextprotocol/server-postgres`）連 **EU**，路徑是 **SSH 區域轉發** 到本機 **`127.0.0.1:5432`**（常見版型下此埠為 **Supavisor**，非裸露 `postgres`）。
+
+> **DSN（與 MCP 同源）**：`SUPABASE_AWAREWAVE_POSTGRES_DSN` 的使用者名多為 **`postgres.<POOLER_TENANT_ID>`**（對齊 VPS **`/root/supabase/.env`**）。完整說明、伺服器側 **`pgbouncer.get_auth`／`pg_shadow`** 修復見 **`docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`** §3.3–§3.4。（若你把 **`supabase-db` 僅對本機次要埠裸露並據此改 tunnel**，才可能用單純 **`postgres`／密碼** 形狀。）
+
+與 **`https://studio.aware-wave.com`**／REST（`SUPABASE_AWAREWAVE_URL`）**分工不同**——見該 **runbook**、`docs/operations/cursor-mcp-and-plugin-inventory.md`。
 
 **每台開發機**（monorepo 根；憑證只在 vault／`mcp/user-env.ps1`，**不入庫**）：
 
@@ -365,5 +369,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1
 - `RESUME_AFTER_REBOOT.md`
 - `TASKS.md`
 
-_Last synced: 2026-05-01 05:58:32 UTC_
+_Last synced: 2026-05-01 07:28:43 UTC_
 
