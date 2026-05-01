@@ -80,13 +80,13 @@
 |---|---|---|
 | 無 | 現有三個 workflow 不需要 repo secrets | — |
 
-### 已廢棄（可從 GitHub 刪除）
+### 已廢棄（2026-05-01 實機驗證：GitHub 上不存在，無需處理）
 
 | 名稱 | 說明 |
 |---|---|
-| `TRIGGER_ACCESS_TOKEN` | CI 已不使用，自託管本機用 vault |
+| `TRIGGER_ACCESS_TOKEN` | CI 已不使用；GitHub repo 已確認不存在；本機用 vault |
 | `TRIGGER_SECRET_KEY` | 同上 |
-| `TRIGGER_PROJECT_REF` | 同上 |
+| `TRIGGER_PROJECT_REF` | 同上（Variables tab 亦不存在） |
 
 ---
 
@@ -120,4 +120,4 @@
 - [`hetzner-stack-rollout-index.md`](./hetzner-stack-rollout-index.md) — 自託管部署全景
 - [`TOOL_RESPONSIBILITY_MATRIX.md`](./TOOL_RESPONSIBILITY_MATRIX.md) — 各工具責任矩陣
 
-_建立：2026-04-30 | Owner: awarewaveai-pei_
+_建立：2026-04-30 | 最後更新：2026-05-01 | Owner: awarewaveai-pei_

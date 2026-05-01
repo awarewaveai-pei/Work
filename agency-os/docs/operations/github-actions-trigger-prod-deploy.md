@@ -32,10 +32,10 @@
 
 ## GitHub Secrets／Variables（repository）
 
-| 名稱 | 還需要嗎？ |
-|------|------------|
-| `TRIGGER_ACCESS_TOKEN`、`TRIGGER_SECRET_KEY` | **CI 已不再使用**。若你確定只用自託管、且不想誤用，可在 GitHub repo **刪除或輪替**這兩個 Secrets（本機／MCP 仍可用 vault／環境變數，**勿**寫入庫內）。 |
-| `TRIGGER_PROJECT_REF` | **CI 已不再使用**；可自 Variables 移除以免混淆。 |
+| 名稱 | 狀態 |
+|------|------|
+| `TRIGGER_ACCESS_TOKEN`、`TRIGGER_SECRET_KEY` | **CI 已不使用**；**2026-05-01 實機確認：GitHub repo 不存在**，無需任何操作。本機仍用 vault／環境變數（勿寫入庫內）。 |
+| `TRIGGER_PROJECT_REF` | **CI 已不使用**；**2026-05-01 實機確認：Variables tab 不存在**，無需任何操作。 |
 
 ## 失敗排查（短）
 
@@ -65,4 +65,4 @@
 - `../../../lobster-factory/README.md`  
 - `../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
 
-_Last updated: 2026-04-06_
+_Last updated: 2026-05-01_
