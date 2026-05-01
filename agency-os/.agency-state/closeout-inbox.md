@@ -42,3 +42,16 @@
 - **Git**: （填 hash 或「未 commit」）
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**:
+
+---
+
+### codex 2026-05-01 19:55
+
+- **完成（一句）**: 完成 PostHog public/admin 站點命名與 live 驗證，讓 Aware Wave Website、Aware Wave Admin、Soulful Expression 可用一致屬性分流。
+- **證據／檔案**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/wordpress/mu-plugins/posthog.php`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/providers.tsx`
+  - Live SG：`lobster-wordpress` / `lobster-next-admin` 均 healthy；`aware-wave.com` HTML 已含 `site_name: "Aware Wave Website"`；`next-admin` bundle 已含 `site_name:"Aware Wave Admin"`。
+- **Git**: pending commit in this turn.
+- **對應 TASKS 條目若未打勾**: 無，本輪為 PostHog/observability 設定收斂，未對應單一未完成 TASKS 勾選。
+- **風險／待辦若未完成**: `soulfulexpression.org` 仍需在 Hostinger WordPress 透過 WPCode/Header injection 或同等 MU plugin 貼入 PostHog snippet，才能開始送事件；本 repo 已預留 `Soulful Expression` site_name 映射。
