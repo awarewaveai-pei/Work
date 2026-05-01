@@ -3,6 +3,10 @@
 > 用途：記錄 Day 1 盤點結果（接手基線）。  
 > 填寫方式：在 Hostinger + WordPress 後台執行後，逐欄填入。
 
+> **Who fills this（重要）**  
+> **§1.1–§1.2 的欄位（WP／PHP／外掛／第三方）須由持有 Hostinger + WP 管理員權限的「操作者」填入**；IDE 代理無法代登入。流程對照：`docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` **§1.1 權限**、**§1.2 基線**。  
+> 填完本檔後，請把同一組 **production** 基線數字抄到 `core/ENVIRONMENT_REGISTRY.md`（同一次 commit 最佳）。
+
 ## 客戶概況
 - 客戶名稱：Soulful Expression Art Therapy
 - Production URL：https://soulfulexpression.org/

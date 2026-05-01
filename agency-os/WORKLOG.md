@@ -27,6 +27,11 @@
 - - AUTO_TASK_DONE: 啟動 Next-Gen 升級藍圖 v1
 - - AUTO_TASK_DONE: 新站建置 Day 1（Scenery Travel Mongolia）
 
+### TASKS／Claude／「自動 checklist」— 機制澄清（書面）
+
+- **聊天不會自動進 repo**：Claude（或其他 AI）在對話裡說「已寫入 TASKS」若**未**實際改檔並 **commit／push**，則 **`TASKS.md` 不會出現**；**`open-tasks-snapshot`** 只複製本檔 **`### 未完成`**，**不讀聊天**。
+- **已落地**：`TASKS.md`「現況快照」下增「聊天≠入庫」一行；Soulful `10_DISCOVERY`／`ENVIRONMENT_REGISTRY` 註明須操作者登入填寫與同步；Mongolia `10_DISCOVERY`「未解問題」擴為 **7 條**（網域權限、主機偏好）。
+
 ### ClickHouse TTL 3 天（EU server）完成
 
 - **三張 system 表全部設定 TTL = event_date + 3 DAY**：`metric_log`、`trace_log`、`text_log`
@@ -1197,7 +1202,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-01 11:39:18 UTC_
+_Last synced: 2026-05-01 11:48:55 UTC_
 
 ## 2026-03-20
 
@@ -1631,6 +1636,7 @@ _Last synced: 2026-05-01 11:39:18 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

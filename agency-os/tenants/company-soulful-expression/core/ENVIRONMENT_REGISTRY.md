@@ -1,5 +1,7 @@
 # Environment Registry - Soulful Expression Art Therapy
 
+> **與 Discovery 同步**：`production` 列的 **WP／PHP／DB Engine** 應與 `projects/2026-011-existing-site-handover-soulful/10_DISCOVERY.md` 的「環境基線」**一致**（Day 1 盤點同一輪填入）。
+
 ## Environment Inventory
 
 | Environment | URL | Hosting Provider | Region | WP Version | PHP Version | DB Engine | Backup Location | Last Backup | Last Restore Test | Owner | Notes |

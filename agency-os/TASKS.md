@@ -45,6 +45,8 @@
 
 **機讀待辦快照**：開工時 **`scripts/ao-resume.ps1`** 會寫 **`agency-os/.agency-state/open-tasks-snapshot.md`**（gitignore），與本檔 **`### 未完成`** 應對齊。
 
+**聊天 ≠ 入庫**：其他 AI（含 Claude）對話裡答應的待辦**不會**自動進 `TASKS`、也不會自動進任何 checklist 檔；若你看不到條目，代表**尚未寫入本 repo 並 commit**（或寫在別台機器未 push）。要生效：**請同一輪請代理／自己改 `TASKS.md`（或對應 Owner 檔）+ checkpoint／push**。
+
 ## 歷史封存 — In Progress（早期項目，均已結案）
 
 > 以下 **`- [x]`** 為存檔；**不要**用這段判斷「現在還要做什麼」——請看 **`### 未完成`**。
@@ -274,5 +276,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-01 11:39:18 UTC_
+_Last synced: 2026-05-01 11:48:55 UTC_
 
