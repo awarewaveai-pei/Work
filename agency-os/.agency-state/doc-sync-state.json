@@ -1,8 +1,10 @@
 ﻿{
-    "last_run_utc":  "2026-05-01T05:44:22.3832201Z",
+    "last_run_utc":  "2026-05-01T05:58:33.0621715Z",
     "changed_files":  [
-                          ".cursor/rules/30-resume-keyword.mdc",
-                          "docs/overview/REMOTE_WORKSTATION_STARTUP.md"
+                          "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
+                          "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
+                          "TASKS.md",
+                          "WORKLOG.md"
                       ],
     "impacted_files":  [
                            "../README.md",
@@ -11,12 +13,11 @@
                            ".cursor/rules/40-shutdown-closeout.mdc",
                            "AGENTS.md",
                            "docs/operations/end-of-day-checklist.md",
+                           "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
                            "docs/overview/EXECUTION_DASHBOARD.md",
                            "docs/overview/INTEGRATED_STATUS_REPORT.md",
                            "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
-                           "LAST_SYSTEM_STATUS.md",
                            "memory/CONVERSATION_MEMORY.md",
-                           "README.md",
                            "RESUME_AFTER_REBOOT.md",
                            "TASKS.md",
                            "WORKLOG.md"
@@ -28,7 +29,6 @@
                                "docs/overview/EXECUTION_DASHBOARD.md",
                                "docs/overview/INTEGRATED_STATUS_REPORT.md",
                                "docs/overview/REMOTE_WORKSTATION_STARTUP.md",
-                               "LAST_SYSTEM_STATUS.md",
                                "memory/CONVERSATION_MEMORY.md",
                                "RESUME_AFTER_REBOOT.md",
                                "TASKS.md",

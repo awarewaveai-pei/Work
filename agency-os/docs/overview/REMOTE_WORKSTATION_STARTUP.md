@@ -125,6 +125,30 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-local-wordpress-win
 
 `-EnsurePhpIni` 會在 `php.exe` 同目錄建立／調整本機 `php.ini`（`extension_dir`、`curl`/`openssl`/`mysqli`、`memory_limit`），避免 `wp core download`／DB 連線失敗。**憑證與 DB root 密碼不入庫**；本機開發僅限自用。
 
+### 1.5.2 AwareWave 自託管 Supabase：`supabase-awarewave-postgres`（EU SSH tunnel｜選用）
+
+> **適用**：要在 Cursor 使用 **`supabase-awarewave-postgres`**（`@modelcontextprotocol/server-postgres`）連 **EU 機上 Postgres**，路徑是 **SSH 區域轉發** 到本機 `127.0.0.1:5432`。與 **`https://studio.aware-wave.com`**／REST（`SUPABASE_AWAREWAVE_URL`）**分工不同**——見 **`docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`**、`docs/operations/cursor-mcp-and-plugin-inventory.md`。
+
+**每台開發機**（monorepo 根；憑證只在 vault／`mcp/user-env.ps1`，**不入庫**）：
+
+```powershell
+# 1) 載入本機 MCP／DSN 環境（依你站台慣例；正本見 mcp/user-env.template.ps1）
+. .\mcp\user-env.ps1   # 若此檔存在
+
+# 2) 開 tunnel（EU sshd 必須允許 TCP forwarding；若被拒見 runbook「administratively prohibited」）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\open-supabase-ssh-tunnel.ps1 -Background
+
+# 3) 可選：根目錄依賴含 smoke 用套件
+npm ci
+npm run smoke:supabase-tunnel
+npm run smoke:supabase-tunnel -- --sql
+```
+
+若第 3 步 **FAIL** 且 SSH／腳本訊息含 **`administratively prohibited`**：在 **EU VPS** 修正 **`sshd_config`**（`AllowTcpForwarding` / `PermitOpen` / `Match` 區塊），**不要**在客戶端硬繞；細節與 reload 指令見 **`docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`**。  
+可選 host／user／金鑰路徑：**環境變數** `SUPABASE_EU_SSH_HOST`、`SUPABASE_EU_SSH_USER`、`SUPABASE_EU_SSH_KEY`（見 **`scripts/open-supabase-ssh-tunnel.ps1`**）。
+
+**驗收（Cursor）**：tunnel + `SUPABASE_AWAREWAVE_POSTGRES_DSN` 正確時，設定裡 **`supabase-awarewave-postgres`** 應綠燈；並完成一次 MCP SQL／schema 操作或上述 **`--sql`** smoke。
+
 ### 憑證（無法一鍵複製：每台各做一次）
 
 - **DPAPI vault**（Trigger 等腳本用）：`scripts/secrets-vault.ps1` — 手冊 **`docs/operations/local-secrets-vault-dpapi.md`**。  
@@ -341,5 +365,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1
 - `RESUME_AFTER_REBOOT.md`
 - `TASKS.md`
 
-_Last synced: 2026-05-01 05:44:21 UTC_
+_Last synced: 2026-05-01 05:58:32 UTC_
 

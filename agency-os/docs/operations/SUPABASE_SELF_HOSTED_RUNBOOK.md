@@ -186,16 +186,25 @@ docker compose down && docker compose up -d
 
 ### SSH tunnel: `channel N: open failed: administratively prohibited`
 
-本機跑 **`scripts/open-supabase-ssh-tunnel.ps1`** 時若出現此行，代表 **EU 的 `sshd` 拒絕 `-L` 轉發**（常見：`AllowTcpForwarding no`，或 **`PermitOpen`** 白名單未包含 `127.0.0.1:5432` / `:3000` / `:8000`）。
+本機跑 **`scripts/open-supabase-ssh-tunnel.ps1`** 時若出現此行，代表 **EU 的 `sshd` 拒絕 `-L` 本機端口轉發**（TCP forward）。
+
+Common causes:
+
+- **`AllowTcpForwarding no`** (global or inside a **`Match`** block — `Match` can override loose defaults).
+- **`PermitOpen`** allowlist omitting **`127.0.0.1:5432`**, **`127.0.0.1:3000`**, **`127.0.0.1:8000`** (spaces between host:port pairs; see `man sshd_config`).
+- Rare: **`DisableForwarding yes`** — must be cleared for `-L` to work.
 
 **在 EU VPS（已 SSH 登入）檢查並修正**（需 root）：
 
 ```bash
-grep -nE '^(AllowTcpForwarding|PermitOpen|GatewayPorts)' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null
+grep -nE '^(AllowTcpForwarding|PermitOpen|GatewayPorts|DisableForwarding|Match)' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null
 ```
 
-- 若為 **`AllowTcpForwarding no`** → 改為 **`AllowTcpForwarding yes`**（或刪除該行採預設）。
-- 若有 **`PermitOpen`** 且過窄 → 註解掉、改寬，或明確列出：`127.0.0.1:5432 127.0.0.1:3000 127.0.0.1:8000`（語法以 `man sshd_config` 為準）。
+- 若為 **`AllowTcpForwarding no`**（含 **`Match User …`** 區塊內）→ 改為 **`AllowTcpForwarding yes`** 或刪除該行採預設 **yes**。
+- 若有 **`PermitOpen`** 且過窄 → 註解掉、改寬，或明確列出：`127.0.0.1:5432 127.0.0.1:3000 127.0.0.1:8000`。
+- 若設定 **`AllowStreamLocalForwarding no`** 僅影響 Unix socket 轉發；Supabase 腳本使用 TCP **`-L`**，仍以 **`AllowTcpForwarding`** / **`PermitOpen`** 為主。
+
+**客戶端（本機）**： tunnel 腳本已帶 **`ExitOnForwardFailure=yes`**，轉發被拒時會**快速失敗**，不必猜測「以為連上但其實沒轉發」。
 
 然後：
 
@@ -203,7 +212,16 @@ grep -nE '^(AllowTcpForwarding|PermitOpen|GatewayPorts)' /etc/ssh/sshd_config /e
 sshd -t && systemctl reload ssh
 ```
 
-**不改 sshd 的繞道**：直接用 **`https://studio.aware-wave.com`**（不需 tunnel）。
+**穩定 smoke（本機，tunnel 已開）** — monorepo 根：
+
+```powershell
+npm ci
+npm run smoke:supabase-tunnel
+# 若已設定 SUPABASE_AWAREWAVE_POSTGRES_DSN（vault / user-env）：
+npm run smoke:supabase-tunnel -- --sql
+```
+
+**不改 sshd 的繞道**：直接用 **`https://studio.aware-wave.com`**（不需 tunnel）；SQL 工具仍建議 tunnel + DSN 或 REST 路徑（`awarewave-ops`）。
 
 After editing `.env`:
 
@@ -300,4 +318,4 @@ docker run --rm -v supabase_db-config:/data -v /root/backups:/backup \
 
 ---
 
-_Last updated: 2026-04-23_
+_Last updated: 2026-05-01_

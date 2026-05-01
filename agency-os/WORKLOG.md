@@ -4,9 +4,14 @@
 
 ## 2026-05-01
 
-### n8n MCP Cursor 狀態抖動修復（green→yellow→red、"No tools"）
+### P1：Supabase EU SSH tunnel／Postgres MCP smoke 路徑
 
-**根本原因**：`mcp/registry.template.json` 的 `n8n` 條目使用 `transport: "http"`，Cursor MCP 客戶端在 POST initialize 成功後，會再對同一端點發 **GET 請求**嘗試建立 SSE 持久串流。n8n 的 `/mcp-server/http` **不支援 GET**（回 `404`），導致 Cursor 報錯重連迴圈，狀態不斷閃爍並顯示 "No tools"。後端本身完全正常（6 次連續 smoke test 皆 `TOOLS_COUNT=18`）。
+- **`scripts/open-supabase-ssh-tunnel.ps1`**：`ExitOnForwardFailure=yes` + `ServerAlive*`；背景模式若 ssh 早退會讀 stderr 並提示 **administratively prohibited** → **`SUPABASE_SELF_HOSTED_RUNBOOK.md`**；支援 **`SUPABASE_EU_SSH_HOST` / `SUPABASE_EU_SSH_USER` / `SUPABASE_EU_SSH_KEY`**。
+- **`scripts/supabase-tunnel-smoke.mjs`** + root **`npm run smoke:supabase-tunnel`**（`-- --sql` 需 DSN）；root **`package.json`** 新增依賴 **`postgres`**。
+- **文件**：**`REMOTE_WORKSTATION_STARTUP.md` §1.5.2**；**`SUPABASE_SELF_HOSTED_RUNBOOK.md`** 擴充 sshd／`Match`／smoke 段落；**`TASKS`** 首項改寫為具體 DoD。
+- **`agency-os/scripts/run-postgres-mcp.ps1`**：與 repo 根鏡像一致，優先讀 **`SUPABASE_AWAREWAVE_POSTGRES_DSN`**。
+
+### n8n MCP Cursor 狀態抖動修復（green→yellow→red、"No tools"）`mcp/registry.template.json` 的 `n8n` 條目使用 `transport: "http"`，Cursor MCP 客戶端在 POST initialize 成功後，會再對同一端點發 **GET 請求**嘗試建立 SSE 持久串流。n8n 的 `/mcp-server/http` **不支援 GET**（回 `404`），導致 Cursor 報錯重連迴圈，狀態不斷閃爍並顯示 "No tools"。後端本身完全正常（6 次連續 smoke test 皆 `TOOLS_COUNT=18`）。
 
 **修復**：
 
@@ -1107,7 +1112,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-01 05:44:21 UTC_
+_Last synced: 2026-05-01 05:58:32 UTC_
 
 ## 2026-03-20
 
@@ -1541,6 +1546,7 @@ _Last synced: 2026-05-01 05:44:21 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

@@ -9,11 +9,13 @@
     "rag:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-rag-env.ps1",
     "rag:embed": "tsx scripts/rag_seed_and_embedding.ts",
     "rag:query": "tsx scripts/rag_query.ts",
-    "n8n:mcp-smoke": "node scripts/n8n-mcp-smoke.mjs"
+    "n8n:mcp-smoke": "node scripts/n8n-mcp-smoke.mjs",
+    "smoke:supabase-tunnel": "node scripts/supabase-tunnel-smoke.mjs"
   },
   "dependencies": {
-    "dotenv": "^16.4.7",
     "@supabase/supabase-js": "^2.49.1",
+    "dotenv": "^16.4.7",
+    "postgres": "^3.4.9",
     "tsx": "^4.19.3"
   }
 }

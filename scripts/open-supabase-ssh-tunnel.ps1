@@ -3,7 +3,7 @@
   Open SSH tunnels to self-hosted Supabase on the EU VPS (postgres + studio).
 
 .DESCRIPTION
-  Supabase runs on the EU server (hetzner-eu, 204.168.175.41).
+  Target host defaults to the EU Supabase VPS unless overridden (see `-SshHost` or env `SUPABASE_EU_SSH_HOST`).
   Services listen locally on the EU VPS:
     - PostgreSQL: 127.0.0.1:5432
     - Supabase Studio: 127.0.0.1:3000
@@ -26,14 +26,24 @@
   .\scripts\open-supabase-ssh-tunnel.ps1 -Background
 #>
 param(
-    [string]$SshHost = "204.168.175.41",
-    [string]$SshUser = "root",
-    [string]$PrivateKeyPath = "$env:USERPROFILE\.ssh\hetzner_trigger",
+    [string]$SshHost = "",
+    [string]$SshUser = "",
+    [string]$PrivateKeyPath = "",
     [switch]$Background
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($SshHost)) {
+    $SshHost = if ($env:SUPABASE_EU_SSH_HOST) { $env:SUPABASE_EU_SSH_HOST } else { "204.168.175.41" }
+}
+if ([string]::IsNullOrWhiteSpace($SshUser)) {
+    $SshUser = if ($env:SUPABASE_EU_SSH_USER) { $env:SUPABASE_EU_SSH_USER } else { "root" }
+}
+if ([string]::IsNullOrWhiteSpace($PrivateKeyPath)) {
+    $PrivateKeyPath = if ($env:SUPABASE_EU_SSH_KEY) { $env:SUPABASE_EU_SSH_KEY } else { "$env:USERPROFILE\.ssh\hetzner_trigger" }
+}
 
 $tunnels = @(
     "127.0.0.1:5432:127.0.0.1:5432",   # PostgreSQL
@@ -50,6 +60,8 @@ Write-Host ""
 Write-Host "Postgres (local end of tunnel):" -ForegroundColor Yellow
 Write-Host "  postgresql://postgres:<password>@localhost:5432/postgres  (password from vault / Supabase host only)" -ForegroundColor DarkGray
 Write-Host ""
+Write-Host "Env overrides: SUPABASE_EU_SSH_HOST, SUPABASE_EU_SSH_USER, SUPABASE_EU_SSH_KEY" -ForegroundColor DarkGray
+Write-Host ""
 
 try {
     $sshExe = (Get-Command ssh -ErrorAction Stop).Source
@@ -57,7 +69,14 @@ try {
     throw "ssh not found in PATH."
 }
 
-$args = @("-N")
+# ExitOnForwardFailure: fail fast when sshd rejects -L (e.g. administratively prohibited).
+# ServerAlive*: reduce silent drops on long IDE sessions.
+$args = @(
+    "-N",
+    "-o", "ExitOnForwardFailure=yes",
+    "-o", "ServerAliveInterval=30",
+    "-o", "ServerAliveCountMax=6"
+)
 if (Test-Path -LiteralPath $PrivateKeyPath) {
     $args += @("-i", $PrivateKeyPath)
 } else {
@@ -66,18 +85,53 @@ if (Test-Path -LiteralPath $PrivateKeyPath) {
 foreach ($t in $tunnels) { $args += @("-L", $t) }
 $args += $sshTarget
 
+function Test-SupabaseTunnelPorts {
+    $ok5432 = (Test-NetConnection -ComputerName 127.0.0.1 -Port 5432 -WarningAction SilentlyContinue).TcpTestSucceeded
+    return $ok5432
+}
+
 if ($Background) {
-    Start-Process -FilePath $sshExe -ArgumentList $args -WindowStyle Minimized
-    Write-Host "Started in background. To stop: Get-Process ssh | Stop-Process" -ForegroundColor DarkGray
-    Start-Sleep -Seconds 5
-    $probe = Test-NetConnection -ComputerName 127.0.0.1 -Port 5432 -WarningAction SilentlyContinue
-    if ($probe.TcpTestSucceeded) {
-        Write-Host "Tunnel up - postgres at localhost:5432 and Kong at localhost:8000" -ForegroundColor Green
-        exit 0
-    } else {
-        Write-Host "Tunnel probe failed - check SSH connectivity/key for $sshTarget." -ForegroundColor Red
+    $stderrFile = Join-Path $env:TEMP ("supabase-ssh-tunnel-{0}.stderr.log" -f [Guid]::NewGuid().ToString("N").Substring(0, 12))
+    $stdoutFile = Join-Path $env:TEMP ("supabase-ssh-tunnel-{0}.stdout.log" -f [Guid]::NewGuid().ToString("N").Substring(0, 12))
+
+    $p = Start-Process -FilePath $sshExe -ArgumentList $args -PassThru -WindowStyle Minimized `
+        -RedirectStandardError $stderrFile -RedirectStandardOutput $stdoutFile
+    Write-Host "Started SSH (PID $($p.Id)). Stderr log: $stderrFile" -ForegroundColor DarkGray
+    Write-Host "To stop tunnels: Stop-Process -Id $($p.Id)  (or: Get-Process ssh | Stop-Process)" -ForegroundColor DarkGray
+    Start-Sleep -Seconds 6
+
+    if ($p.HasExited) {
+        $errTail = ""
+        if (Test-Path -LiteralPath $stderrFile) {
+            $errTail = (Get-Content -LiteralPath $stderrFile -Raw -ErrorAction SilentlyContinue)
+        }
+        Write-Host "SSH exited early (exit $($p.ExitCode))." -ForegroundColor Red
+        if ($errTail -match "administratively prohibited") {
+            Write-Host ""
+            Write-Host "sshd refused TCP forwarding (-L). On the EU VPS fix AllowTcpForwarding / PermitOpen, then reload sshd." -ForegroundColor Yellow
+            Write-Host "Runbook: agency-os/docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md  (section: administratively prohibited)" -ForegroundColor Yellow
+        } elseif ($errTail) {
+            Write-Host "--- ssh stderr (tail) ---" -ForegroundColor DarkGray
+            Write-Host $errTail.Substring([Math]::Max(0, $errTail.Length - 2000))
+        }
         exit 1
     }
+
+    if (Test-SupabaseTunnelPorts) {
+        Write-Host "Tunnel up - postgres reachable at localhost:5432" -ForegroundColor Green
+        Write-Host "Smoke: npm run smoke:supabase-tunnel   (add -- --sql if DSN env is set)" -ForegroundColor DarkGray
+        exit 0
+    }
+
+    Write-Host "Tunnel probe failed - port 5432 not accepting. Check key, firewall, or whether another process holds the local port." -ForegroundColor Red
+    if (Test-Path -LiteralPath $stderrFile) {
+        $errTail = Get-Content -LiteralPath $stderrFile -Raw -ErrorAction SilentlyContinue
+        if ($errTail) {
+            Write-Host "--- ssh stderr (tail) ---" -ForegroundColor DarkGray
+            Write-Host $errTail.Substring([Math]::Max(0, $errTail.Length - 2000))
+        }
+    }
+    exit 1
 }
 
 & $sshExe @args

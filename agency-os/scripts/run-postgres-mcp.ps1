@@ -15,15 +15,18 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$dsn = $env:SUPABASE_B_POSTGRES_DSN
+$dsn = $env:SUPABASE_AWAREWAVE_POSTGRES_DSN
+if ([string]::IsNullOrWhiteSpace($dsn)) {
+    $dsn = $env:SUPABASE_B_POSTGRES_DSN
+}
 if ([string]::IsNullOrWhiteSpace($dsn)) {
     # Backward compatibility for older local env setups.
     $dsn = $env:SUPABASE_POSTGRES_MCP_DSN
 }
 if ([string]::IsNullOrWhiteSpace($dsn)) {
     throw @"
-Neither SUPABASE_B_POSTGRES_DSN nor SUPABASE_POSTGRES_MCP_DSN is set.
-Define SUPABASE_B_POSTGRES_DSN in User environment variables or in the MCP server env block.
+None of SUPABASE_AWAREWAVE_POSTGRES_DSN, SUPABASE_B_POSTGRES_DSN, or SUPABASE_POSTGRES_MCP_DSN is set.
+Define SUPABASE_AWAREWAVE_POSTGRES_DSN in User environment variables or in the MCP server env block (see mcp/registry.template.json).
 "@
 }
 

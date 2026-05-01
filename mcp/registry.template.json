@@ -249,7 +249,7 @@
       "env": {
         "SUPABASE_AWAREWAVE_POSTGRES_DSN": "${env:SUPABASE_AWAREWAVE_POSTGRES_DSN}"
       },
-      "note": "Requires SSH tunnel: scripts/open-supabase-ssh-tunnel.ps1 -Background"
+      "note": "Requires SSH tunnel: scripts/open-supabase-ssh-tunnel.ps1 -Background; smoke from monorepo root: npm run smoke:supabase-tunnel (after npm ci)"
     },
     "supabase": {
       "enabled": false,
