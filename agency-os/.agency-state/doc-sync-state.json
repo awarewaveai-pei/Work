@@ -1,20 +1,14 @@
 ﻿{
-    "last_run_utc":  "2026-05-01T09:42:28.5025051Z",
+    "last_run_utc":  "2026-05-01T09:51:30.8422919Z",
     "changed_files":  [
-                          "docs/edge-and-domains/EDGE_DOMAINS_INDEX.md",
                           "docs/operations/CLOUDFLARE_HETZNER_PHASE1.md",
-                          "docs/operations/SG_PHASE1_DOCKER_LAYOUT.md",
-                          "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
-                          "TASKS.md"
+                          "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md"
                       ],
     "impacted_files":  [
-                           "docs/edge-and-domains/EDGE_DOMAINS_INDEX.md",
                            "docs/operations/CLOUDFLARE_HETZNER_PHASE1.md",
-                           "docs/operations/SG_PHASE1_DOCKER_LAYOUT.md",
-                           "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md",
-                           "TASKS.md"
+                           "docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md"
                        ],
     "auto_updated_files":  [
-                               "TASKS.md"
+
                            ]
 }
