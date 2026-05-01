@@ -7,6 +7,7 @@ import { LobsterCatalogIds } from "../db/catalogIds";
 import { supabaseRestInsert } from "../db/supabase/supabaseRestInsert";
 import { resolveStagingProvisioning } from "../hosting/resolveStagingProvisioning";
 import { captureWorkflowException } from "../observability/sentry";
+import { captureWorkflowEvent } from "../observability/posthog";
 
 const InputSchema = z.object({
   organizationId: z.string().uuid(),
@@ -31,6 +32,14 @@ export const createWpSite = task({
 
       logger.info("Starting WP site creation", input);
 
+      captureWorkflowEvent("workflow started", {
+        workflowId: "create-wp-site",
+        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        siteId: input.siteId,
+      });
+
       const hosting = await resolveStagingProvisioning({
         siteId: input.siteId,
         siteName: input.siteName,
@@ -38,6 +47,14 @@ export const createWpSite = task({
       });
 
     if (hosting.outcome === "blocked") {
+      captureWorkflowEvent("workflow blocked", {
+        workflowId: "create-wp-site",
+        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        siteId: input.siteId,
+        reason: "hosting_configuration",
+      });
       const workflowRunId = newUuid();
       const dbWorkflowRunInsert = buildWorkflowRunInsertSql({
         id: workflowRunId,
@@ -194,18 +211,34 @@ export const createWpSite = task({
           },
         };
 
+      const finalStatus = stagingRef
+        ? hosting.outcome === "mock"
+          ? ("mock_staging_provisioned" as const)
+          : ("vendor_staging_provisioned" as const)
+        : ("pending_next_step" as const);
+
+      captureWorkflowEvent("workflow completed", {
+        workflowId: "create-wp-site",
+        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        siteId: input.siteId,
+        status: finalStatus,
+        hostingOutcome: hosting.outcome,
+      });
+
       return {
-        status: stagingRef
-          ? hosting.outcome === "mock"
-            ? ("mock_staging_provisioned" as const)
-            : ("vendor_staging_provisioned" as const)
-          : ("pending_next_step" as const),
+        status: finalStatus,
         input,
         mockHosting: hosting.outcome === "mock" ? hosting.ref : null,
         vendorStaging: hosting.outcome === "provisioned" ? hosting.ref : null,
         next,
       };
     } catch (error) {
+      captureWorkflowEvent("workflow errored", {
+        workflowId: "create-wp-site",
+        error: error instanceof Error ? error.message : String(error),
+      });
       captureWorkflowException(error, {
         workflowId: "create-wp-site",
         route: "task.run",

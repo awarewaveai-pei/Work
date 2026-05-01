@@ -6,6 +6,7 @@
     "dependencies": {
         "@sentry/node": "^10.50.0",
         "@trigger.dev/sdk": "^4.4.4",
+        "posthog-node": "^5.32.0",
         "zod": "^3.22.0"
     },
     "scripts": {

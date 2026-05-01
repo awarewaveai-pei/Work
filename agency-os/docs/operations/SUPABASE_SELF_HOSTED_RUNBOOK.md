@@ -252,7 +252,7 @@ Numbered `*.sql` files are the **authoritative** DDL/RLS sequence for the Lobste
 
 | Topic | Guidance |
 | --- | --- |
-| Location | Monorepo `lobster-factory/packages/db/migrations/` (`0001_*.sql` … `0016_*.sql`). |
+| Location | Monorepo `lobster-factory/packages/db/migrations/` (`0001_*.sql` … `0017_*.sql`). |
 | Apply on EU | Only in a **maintenance window** with a **verified backup** and explicit approval. Run files **in numeric order** exactly once each (no skipping): `psql -v ON_ERROR_STOP=1 -f <file>`. |
 | Docker entrypoint | Example: `docker exec -i -e PGPASSWORD="$PW" supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -f /tmp/0016_….sql` after copying the file onto the host/container. Prefer **`supabase_admin`** when `postgres` cannot own DDL (see §3.4). |
 | Studio Security Advisor (`0013_rls_disabled_in_public`) | Flags **`public` tables with RLS off** (`relrowsecurity = false`) where **`anon` or `authenticated` has SELECT** (same idea as the linter). **`git` 裡有 `0014` 不代表 EU 資料庫已套用**；若從未對 EU Postgres 跑過 `0014`，Advisor 會一直顯示約 17 筆 ERROR。套用 **`0014`**（再 **`0016`**）後，到 Studio **Security Advisor 手動重新整理／稍候重掃**；套用前後可用 repo 內 **`lobster-factory/packages/db/scripts/verify-public-rls-supabase-advisor.sql`** 在 SQL Editor 跑，結果應為 **0 rows**。 |

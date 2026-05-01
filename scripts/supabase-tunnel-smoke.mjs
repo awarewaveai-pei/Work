@@ -4,6 +4,7 @@
  *
  *   node scripts/supabase-tunnel-smoke.mjs
  *   node scripts/supabase-tunnel-smoke.mjs --sql
+ *   node scripts/supabase-tunnel-smoke.mjs --rls-advisor   # lists public tables matching Studio 0013_rls_disabled_in_public
  */
 import net from "node:net";
 
@@ -65,11 +66,11 @@ function printSupavisorTenantHint(dbUser) {
   }
 }
 
-async function sqlSmoke() {
+async function connectSql(label) {
   const dsn = pickDsn();
   if (!dsn) {
     console.error(
-      "SQL smoke: set SUPABASE_AWAREWAVE_POSTGRES_DSN (or legacy SUPABASE_B_POSTGRES_DSN / SUPABASE_POSTGRES_MCP_DSN).",
+      `${label}: set SUPABASE_AWAREWAVE_POSTGRES_DSN (or legacy SUPABASE_B_POSTGRES_DSN / SUPABASE_POSTGRES_MCP_DSN).`,
     );
     process.exit(2);
   }
@@ -92,6 +93,11 @@ async function sqlSmoke() {
     connect_timeout: 30,
     ssl: false,
   });
+  return { sql, dsn, dbUser };
+}
+
+async function sqlSmoke() {
+  const { sql, dbUser } = await connectSql("SQL smoke");
   try {
     const rows = await sql`select 1::int as ok`;
     if (rows?.[0]?.ok !== 1) {
@@ -113,7 +119,48 @@ async function sqlSmoke() {
   }
 }
 
+/** Same idea as Supabase linter 0013_rls_disabled_in_public (public + RLS off + anon|authenticated SELECT). */
+async function rlsAdvisorSmoke() {
+  const { sql, dbUser } = await connectSql("RLS advisor check");
+  try {
+    const rows = await sql`
+      SELECT c.relname AS table_name
+      FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind = 'r'
+        AND n.nspname = 'public'
+        AND NOT c.relrowsecurity
+        AND (
+          pg_catalog.has_table_privilege('anon', c.oid, 'SELECT')
+          OR pg_catalog.has_table_privilege('authenticated', c.oid, 'SELECT')
+        )
+      ORDER BY c.relname
+    `;
+    if (!rows.length) {
+      console.log("RLS advisor check: 0 tables (Studio 0013 should be clear after refresh).");
+      return;
+    }
+    console.error(`RLS advisor check: ${rows.length} table(s) still missing RLS — apply 0014 (+0016) on EU DB:`);
+    for (const r of rows) {
+      console.error(`  - ${r.table_name}`);
+    }
+    process.exit(1);
+  } catch (err) {
+    const msg = err?.message ?? String(err);
+    if (/Tenant or user not found/i.test(msg)) {
+      console.error("RLS advisor check: FATAL — Tenant or user not found (Supavisor rejected login / tenant).");
+      printSupavisorTenantHint(dbUser);
+    } else {
+      console.error("RLS advisor check:", msg);
+    }
+    process.exit(1);
+  } finally {
+    await sql.end({ timeout: 2 }).catch(() => {});
+  }
+}
+
 const wantSql = process.argv.includes("--sql");
+const wantRlsAdvisor = process.argv.includes("--rls-advisor");
 let failures = 0;
 for (const { port, name } of ports) {
   const ok = await probe(port);
@@ -130,7 +177,9 @@ if (failures) {
   process.exit(1);
 }
 
-if (wantSql) {
+if (wantRlsAdvisor) {
+  await rlsAdvisorSmoke();
+} else if (wantSql) {
   await sqlSmoke();
 }
 

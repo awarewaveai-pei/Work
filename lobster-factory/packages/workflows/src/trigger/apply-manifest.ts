@@ -23,6 +23,7 @@ import {
   writeApplyManifestRemotePutArtifactsFailure,
 } from "../artifacts/remotePutArtifactSink";
 import { captureWorkflowException } from "../observability/sentry";
+import { captureWorkflowEvent } from "../observability/posthog";
 
 const InputSchema = z.object({
   // Used for multi-tenant FK fields when we later enable DB writes.
@@ -89,6 +90,16 @@ export const applyManifest = task({
   run: async (payload: unknown) => {
     try {
       const input = InputSchema.parse(payload);
+
+      captureWorkflowEvent("workflow started", {
+        workflowId: "apply-manifest",
+        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        siteId: input.siteId,
+        environmentId: input.environmentId,
+        environmentType: input.environmentType,
+      });
 
     if (input.environmentType !== "staging") {
       throw new Error("Manifest install is blocked outside staging");
@@ -411,6 +422,19 @@ export const applyManifest = task({
           ? ("staging_shell_dry_run_complete" as const)
           : ("staging_shell_apply_complete" as const);
 
+      captureWorkflowEvent("workflow completed", {
+        workflowId: "apply-manifest",
+        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        siteId: input.siteId,
+        environmentId: input.environmentId,
+        status,
+        execMode,
+        manifestName: manifest.name,
+        manifestVersion: manifest.version,
+      });
+
       return {
       status,
       manifest: {
@@ -438,6 +462,10 @@ export const applyManifest = task({
       },
       };
     } catch (error) {
+      captureWorkflowEvent("workflow errored", {
+        workflowId: "apply-manifest",
+        error: error instanceof Error ? error.message : String(error),
+      });
       captureWorkflowException(error, {
         workflowId: "apply-manifest",
         route: "task.run",

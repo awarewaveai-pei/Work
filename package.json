@@ -10,7 +10,9 @@
     "rag:embed": "tsx scripts/rag_seed_and_embedding.ts",
     "rag:query": "tsx scripts/rag_query.ts",
     "n8n:mcp-smoke": "node scripts/n8n-mcp-smoke.mjs",
-    "smoke:supabase-tunnel": "node scripts/supabase-tunnel-smoke.mjs"
+    "smoke:supabase-tunnel": "node scripts/supabase-tunnel-smoke.mjs",
+    "smoke:supabase-rls-advisor": "node scripts/supabase-tunnel-smoke.mjs --rls-advisor",
+    "apply:lobster-rls-eu": "node scripts/apply-lobster-rls-migrations-eu.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

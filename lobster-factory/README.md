@@ -26,7 +26,7 @@
 | Phase1 主機唯讀診斷（OOM／慢） | [diagnose-host-resources.sh](infra/hetzner-phase1-core/scripts/diagnose-host-resources.sh)（操作說明見 [hetzner-phase1-core/README.md](infra/hetzner-phase1-core/README.md)「主機資源診斷」） |
 | Sentry 手動驗證（next-admin） | [sentry-test/route.ts](infra/hetzner-phase1-core/apps/next-admin/app/api/sentry-test/route.ts)；compose／DSN 見同目錄 `docker-compose.yml`、`.env.example`；**證據**見 `agency-os/WORKLOG.md` **`## 2026-04-12`** |
 | `packages/workflows` 單元測試（Vitest） | `packages/workflows/`（`npm test`；[`vitest.config.ts`](packages/workflows/vitest.config.ts)、`src/hosting/*.test.ts`） |
-| Supabase migrations + seeds | `packages/db/migrations/`（編號 `0001`…`0016`；自託管 EU 套用順序見 [`SUPABASE_SELF_HOSTED_RUNBOOK.md`](../agency-os/docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md) §6.1） |
+| Supabase migrations + seeds | `packages/db/migrations/`（編號 `0001`…`0017`；自託管 EU 套用順序見 [`SUPABASE_SELF_HOSTED_RUNBOOK.md`](../agency-os/docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md) §6.1） |
 | WP manifest（Phase 1：`wc-core`） | `packages/manifests/wc-core.json` |
 | Durable workflow 骨架 | `packages/workflows/src/trigger/create-wp-site.ts`、`apply-manifest.ts`（adapter 合約見下表 **Hosting**） |
 | 安全 | manifest schema 驗證、governance JSON 驗證（`npm run validate` 一併檢查） |
