@@ -86,7 +86,12 @@ async function sqlSmoke() {
     console.error('SQL smoke: run "npm ci" in monorepo root (package "postgres" required for --sql).');
     process.exit(2);
   }
-  const sql = postgres(dsn, { max: 1, idle_timeout: 2, connect_timeout: 10 });
+  const sql = postgres(dsn, {
+    max: 1,
+    idle_timeout: 2,
+    connect_timeout: 30,
+    ssl: false,
+  });
   try {
     const rows = await sql`select 1::int as ok`;
     if (rows?.[0]?.ok !== 1) {
