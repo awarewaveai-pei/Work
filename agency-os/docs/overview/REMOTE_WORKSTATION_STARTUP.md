@@ -237,6 +237,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 - `git status -sb` 只看到 `## main...origin/main` 才是乾淨工作樹（有 `M`/`??` 就是 dirty）。
 - `git rev-list --left-right --count HEAD...origin/main` 輸出 **`ahead behind`**（兩個數字）：**第二個數字（behind）必須為 `0`** 才表示未落後遠端；第一個數字（ahead）可大於 `0`（本機已有未 push 的 checkpoint，與 **§2.5** 一致）。若 **behind > 0**，先 §2 第 1 步 `pull` 再開工大改。
 - `verify-build-gates` 要 PASS（避免「版本對齊但行為錯」的邏輯 bug 持續擴散）。
+- （選）想清掉**已合併進 `origin/main`** 的**本機**多餘分支：在 monorepo 根執行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\git-prune-merged-local-branches.ps1`（**預設只列名單**；加 **`-Delete`** 才刪；正 checkout 到要刪的分支時會略過，請先 `git checkout main`）。**不**刪遠端；**不**刪未合併分支（若需強刪用 **`-Delete -Force`**，等同 `git branch -D`）。
 
 ## 2.4 大量刪檔後：怎麼避免「pull 又長回來」？
 
@@ -340,5 +341,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1
 - `RESUME_AFTER_REBOOT.md`
 - `TASKS.md`
 
-_Last synced: 2026-05-01 05:37:08 UTC_
+_Last synced: 2026-05-01 05:44:21 UTC_
 
