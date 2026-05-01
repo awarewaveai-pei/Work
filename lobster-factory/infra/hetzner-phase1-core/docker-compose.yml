@@ -51,19 +51,24 @@ services:
       - lobster-net
     logging: *lobster-logging
 
+  # Canonical self-hosted n8n for AwareWave is on EU (see SERVICE_CREDENTIALS_MAP.md).
+  # SG phase1 does not run local n8n by default — avoids duplicate workflows/RAM vs DNS (n8n.aware-wave.com → EU).
+  # To start it on a host: COMPOSE_PROFILES=local-n8n docker compose --env-file .env up -d
   n8n:
+    profiles:
+      - local-n8n
     image: docker.n8n.io/n8nio/n8n:${N8N_IMAGE_TAG:-2.18.5}
     container_name: lobster-n8n
     restart: unless-stopped
     environment:
       TZ: Asia/Taipei
-      N8N_HOST: ${N8N_HOST}
+      # Defaults allow `docker compose config` when profile `local-n8n` is off; with profile on, set real values in `.env` (see `.env.example`).
+      N8N_HOST: ${N8N_HOST:-localhost}
       N8N_PORT: "5678"
       N8N_PROTOCOL: http
-      # REQUIRED in .env — no compose default (silent /n8n/ broke Pattern B when omitted). Pattern A: /n8n/. Pattern B: /
-      # Apex: nginx lobster-aware-wave-locations.inc. Dedicated subdomain: Apache n8n.conf ProxyPass / → N8N_PATH=/
-      N8N_PATH: ${N8N_PATH:?N8N_PATH is required in .env - set /n8n/ (Pattern A) or / (Pattern B); see .env.example}
-      WEBHOOK_URL: ${N8N_WEBHOOK_URL}
+      # Pattern A: /n8n/. Pattern B: / (dedicated subdomain).
+      N8N_PATH: ${N8N_PATH:-/}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://127.0.0.1:5678/}
       GENERIC_TIMEZONE: Asia/Taipei
       N8N_SECURE_COOKIE: "false"
       N8N_PROXY_HOPS: "1"

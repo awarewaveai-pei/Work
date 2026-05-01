@@ -1,5 +1,16 @@
 # Cloudflare 接入（Hetzner Phase 1 + 自架 Next.js）
 
+## AwareWave：兩台 VPS 的 DNS 分工（勿刪 EU 記錄）
+
+| 指向 IP | 用途（對外 hostname 範例） | 備註 |
+|--------|---------------------------|------|
+| **SG `5.223.93.113`** | **apex WordPress**、`www`、`api`、`app`（phase1：對外網站 + `node-api` + `next-admin`） | 見 `nginx/system-sites/aware-wave-app-api-subdomains.conf` |
+| **EU `204.168.175.41`** | **`supabase`**、`studio`、`n8n`、`trigger`、`uptime`**…（平台／自動化／觀測入口） | 見 `SUPABASE_SELF_HOSTED_RUNBOOK.md`、`SERVICE_CREDENTIALS_MAP.md` |
+
+**不要在 Cloudflare 刪除指向 EU 的 A 記錄**——那是現行平台入口；僅 SG 主機可下架 **本地** n8n／staging／舊 observability 容器與 Apache 上已無 DNS 指向的反代。
+
+---
+
 ## 架構先講清楚（你問的 Next.js）
 
 - **Next.js Admin（`next-admin`）是自架**：跑在 **Docker** 內，由 **phase1 的 Nginx** 反代到 **`/admin/`**（根路徑 `/` 為 WordPress；見 `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`）。
@@ -7,6 +18,24 @@
 - **不要**把 Next.js 改成 Vercel 才算「接上 Cloudflare」；你現在這種 **自架 + CF 邊緣** 是正式、可長期用的模式。
 
 **`api`／`app` 子網域的長期用途、路由版本、Auth 與 BFF 邊界**（與本檔 DNS 表互補、**git 唯一長篇正文**）：[`../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)；統管入口（連結匯總）：[`../edge-and-domains/EDGE_DOMAINS_INDEX.md`](../edge-and-domains/EDGE_DOMAINS_INDEX.md)。
+
+---
+
+## DNS 雙機對照（SG phase1 vs EU 平台）— 勿誤刪
+
+AwareWave 目前有 **兩台公網 VPS**：**新加坡 phase1**（WordPress／`node-api`／`next-admin` 對外入口）與 **赫爾辛基 EU**（自架 Supabase、自架 n8n、Trigger.dev、Uptime Kuma 等）。**Cloudflare 上出現兩個不同 A 記錄目標 IP 是刻意的**，不是重複或垃圾記錄。
+
+| 子網域（例） | A 記錄應指向 | 說明 |
+|--------------|--------------|------|
+| `@`（apex）、**api**、**app** | **`5.223.93.113`（SG）** | 官網 WordPress、[`api.aware-wave.com`](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)（node-api）、[`app.aware-wave.com`](./CLOUDFLARE_HETZNER_PHASE1.md)（Next 入口／302 策略依範本） |
+| **www** | **CNAME → apex**（或與 apex 同 IP） | 與橘雲／SEO 策略一致即可 |
+| **supabase**、**studio**、**n8n**、**trigger**、**uptime** | **`204.168.175.41`（EU）** | 平台層：Kong／Studio、自動化、編排、監控（見 [`SUPABASE_SELF_HOSTED_RUNBOOK.md`](SUPABASE_SELF_HOSTED_RUNBOOK.md)、[`mcp/SERVICE_CREDENTIALS_MAP.md`](../../mcp/SERVICE_CREDENTIALS_MAP.md)） |
+
+**禁止**：只因「SG 上只剩 WordPress／api／app」就把 **指向 EU 的上述 A 記錄刪掉** — 會造成 Supabase／n8n MCP／Trigger／監控告警全面失效；SG「業務入口精簡」與 **EU 平台 DNS** 是分工，不是二選一。
+
+**可清理**：同一主機名 **重複的舊 A**（例如曾誤指 SG 的 `studio`／`supabase`）、已廢棄主機名、或 **PTR／測試用** 記錄；刪除前用 `dig +short <name>` 與本表交叉確認。
+
+---
 
 若你目前是 **系統 Nginx** 佔用 `:80/:443`、Docker `lobster-nginx` 僅內網或停用，請把下面「DNS / SSL」套在 **對外那一層 Nginx** 上；repo 內 Docker Nginx 的 snippet 則在 **Docker 那層真的對外** 時才掛載。與 `default.conf` 同構的 **系統站台範本**（apex `aware-wave.com`）：`lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-phase1.conf`。
 

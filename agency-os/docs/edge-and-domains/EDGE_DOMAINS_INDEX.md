@@ -22,6 +22,7 @@
 | **phase1 compose 與本機驗收** | [`../../../lobster-factory/infra/hetzner-phase1-core/README.md`](../../../lobster-factory/infra/hetzner-phase1-core/README.md) |
 | **龍蝦 MCP／工具路由（人讀矩陣）** | [`../../../lobster-factory/docs/ROUTING_MATRIX.md`](../../../lobster-factory/docs/ROUTING_MATRIX.md) |
 | **長期營運（RPO／備份／升級節奏）** | [`../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`](../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md) |
+| **SG Phase1 Docker 雙目錄／勿刪 EU DNS** | [`../operations/SG_PHASE1_DOCKER_LAYOUT.md`](../operations/SG_PHASE1_DOCKER_LAYOUT.md) |
 
 ---
 

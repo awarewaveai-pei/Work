@@ -3,7 +3,17 @@
 **長期營運正本（多週期／可還原／可換人）**：[`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md) — 映像釘選、備份與 RPO/RTO、TLS、升級節奏、汰換判準。部署前先讀 §1～§3。  
 **維護日曆（週／月／季／年勾選）**：[`MAINTENANCE_CALENDAR.md`](./MAINTENANCE_CALENDAR.md)。
 
-**目的**：在 **Supabase 已另機／另 compose 運行** 的前提下，於同一台 Hetzner（或第二台）起 **Nginx + Redis + n8n + WordPress + Node API + Next.js Admin**，形成可驗收的第一階段底座。
+**目的**：在 **Supabase 已另機／另 compose 運行** 的前提下，於 Hetzner 起 **Nginx + Redis + WordPress + Node API + Next.js Admin**（可選本地 **n8n**），形成可驗收的第一階段底座。
+
+### n8n（預設不在本機跑）
+
+對外公開 **`https://n8n.aware-wave.com`** 為 **EU** 自架實例時，**不要在 SG phase1 再跑第二套 n8n**（重複耗 RAM、workflow 分叉）。本 compose 將 **`n8n` 服務標為 profile `local-n8n`**：`docker compose up -d` **預設不會啟動** lobster-n8n。若你確實要在該主機跑本地 n8n（開發或過渡）：
+
+```bash
+COMPOSE_PROFILES=local-n8n docker compose --env-file .env up -d
+```
+
+見 **`mcp/SERVICE_CREDENTIALS_MAP.md`**（AwareWave DNS／後端分區）。
 
 **本版預設為「可長期跑」取向**：Node 服務使用 **多階段 Dockerfile**（非每次啟動 `npm install`）、**健康檢查**、Nginx **等 app 健康後**才對外。開發熱重載見下方附錄。
 
