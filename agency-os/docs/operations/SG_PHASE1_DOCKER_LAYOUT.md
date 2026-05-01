@@ -38,5 +38,6 @@ Cloudflare **勿刪除**指向 EU 的 A 記錄（會直接打斷平台）。詳�
 ## Related
 
 - `lobster-factory/infra/hetzner-phase1-core/README.md`
+- **Trigger workflow CLI deploy（registry、EU SSH、筆電 tunnel）**：操作正文單一 Owner → [`../../../lobster-factory/infra/trigger/README.md`](../../../lobster-factory/infra/trigger/README.md)（此檔不複製指令，避免漂移）。
 - `mcp/SERVICE_CREDENTIALS_MAP.md`
 - `agency-os/docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`

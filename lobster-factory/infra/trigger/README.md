@@ -5,6 +5,10 @@
 
 本目錄提供 **與官方 v4 對齊** 的單一 `docker-compose.yml`（webapp + postgres + redis + **ClickHouse** + **registry** + **MinIO** + **Electric** + **supervisor** + **docker-socket-proxy**），並接上 `hetzner-phase1-core` 的 **`lobster-net`** 與 Nginx（`../hetzner-phase1-core/nginx/trigger.conf`）。
 
+**地理／機器邊界（與 SG phase1 不混淆）**  
+依 **`agency-os/docs/operations/SG_PHASE1_DOCKER_LAYOUT.md`**：**Trigger（含本 compose 內的 `registry:5000`）與 DNS `trigger.*` 屬 EU**；**不在**新加坡 phase1-core 那台。對 SG 查不到 `trigger-*` 容器是**預期**，不代表 Trigger 壞掉。  
+Deploy 時 CLI 會把映像 **push 到名為 `registry` 的 host（埠 5000）** — 該名稱只在「EU 上跑著的 Trigger stack」或「你已打通的 tunnel」語意下可解析。
+
 **為何你會卡在 `V4_DEPLOY_REGISTRY_HOST` / `CLICKHOUSE_URL`？**  
 若 `ghcr.io/.../trigger.dev:latest` 拉到 **v4**，平台會硬性要求 **ClickHouse** 與 **deploy registry**（任務映像 push/pull），且 deploy 時還需要 **artifacts object store bucket**（預設 `packets`）。舊版「只有 postgres + redis + electric + 單一 webapp」的 compose **無法**滿足 v4。  
 本 repo 的 **`packages/workflows`** 使用 **`@trigger.dev/sdk` 4.x**，**建議平台維持 v4**；若改回 v3 平台，須同步把 SDK 降到 v3（另開變更，不在此 README 展開）。
@@ -46,9 +50,8 @@ service ssh restart
 ### 0. 先決條件
 
 - **DNS**：`trigger.aware-wave.com`（或你的網域）指向終止 TLS 的那台機器。  
-- **phase1-core 已啟動**：建立 **`lobster-net`**（在 `hetzner-phase1-core/docker-compose.yml` 內 `name: lobster-net`）。  
-- **Nginx**：`trigger.conf` 已掛進 nginx 容器；**v4 webapp 對內埠為 `3000`**（本 repo 已把 `proxy_pass` 指到 `http://trigger-webapp:3000`）。  
-- **外部 Docker 網路名稱**：若 `docker network ls` 顯示**不是** `lobster-net`，請在 `.env` 設 **`LOBSTER_DOCKER_NETWORK=<實際名稱>`**。
+- **External Docker 網路**：compose 依賴 **external `lobster-net`**（可在 **`infra/trigger/.env`** 用 **`LOBSTER_DOCKER_NETWORK`** 改名）。請在 **跑 Trigger stack 的那台機器**上對齊 `docker network ls`。**EU／SG 分離時不必假設 SG phase1-core 已起**網路才會存在——見 **`agency-os/docs/operations/SG_PHASE1_DOCKER_LAYOUT.md`**（進階「跨機共用同名網路」須另案設計，避免此文臆測現場）。  
+- **Nginx**：`trigger.conf` 掛在 **對外終止 TLS／反代 Trigger** 的那台（通常與 Trigger webapp 可路由）；**v4 webapp 對內埠為 `3000`**（本 repo 預設 `proxy_pass` → `http://trigger-webapp:3000`）。
 
 ### 1. Registry 帳密（必做，否則 webapp 無法對 registry 驗證）
 
@@ -123,22 +126,48 @@ docker compose --env-file .env logs -f webapp
 
 ### 7. 本機 deploy 工作流程（`packages/workflows`）
 
+**CLI 版本**：與 `packages/workflows/package.json` 內 **`@trigger.dev/sdk`** 對齊（目前 **4.4.4**）。請使用 **`npx trigger.dev@4.4.4`**（勿隨意 `@latest`，避免與已鎖 SDK 漂移）。
+
 1. 在 dashboard 建立 **project**，把 **`project`** 寫進 `packages/workflows/trigger.config.ts`。  
-2. 依官方說明登入自架 instance（`--api-url` / profile）。  
-3. **Deploy 機器**必須能 **docker login** 到你的 **registry**（預設只綁 `127.0.0.1:5000` 在 VPS 本機；從筆電 deploy 需 **SSH tunnel** 或改成僅內網可達的安全暴露方式—見官方 *registry setup*）。
+2. 依官方說明登入自架 instance（**一次性**：`login -a <APP_ORIGIN>`；需要 **`tr_pat_`** Personal Access Token）。  
+3. **Deploy 機器**必須能對 **`registry:5000`** 完成 **push** — 見下方 **§7a**。
 
 ```bash
 cd lobster-factory/packages/workflows
-npx trigger.dev@latest login -a https://trigger.aware-wave.com
-npx trigger.dev@latest deploy
+npx trigger.dev@4.4.4 login -a https://trigger.aware-wave.com
+# 見 §7a；勿用整包 phase1 .env 當 --env-file（會污染 TRIGGER_ACCESS_TOKEN）
+npx trigger.dev@4.4.4 deploy -p "<project ref>" -a https://trigger.aware-wave.com --env-file <僅含 POSTHOG_API_KEY、POSTHOG_HOST 的檔案>
 ```
+
+**Windows（推薦封裝）**：在 **`infra/trigger`** 目錄執行（自動從 `trigger.config.ts` / `package.json` 讀取 ref 與 CLI 版本，並只萃取 PostHog 兩鍵）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy-workflows.ps1
+# 可選：-PosthogEnvSource "D:\path\to\hetzner-phase1-core\.env"
+```
+
+### 7a 完整 deploy：`registry:5000` 為何會失敗／怎麼做才對
+
+自架 v4 會在本機 **build** 後 **push** 到 **`https://registry:5000/...`**（映像倉庫在主機名 **`registry`**）。  
+**筆電 Windows** 若未處理 DNS／網路，會出現 **`lookup registry ... no such host`** — 這與 Docker Desktop 是否正常無關。
+
+**路徑 A（首選，最簡運維）**：在 **EU 上跑 Trigger stack 的那台 VPS** SSH 進去，於 repo 內執行 **`deploy-workflows.ps1`（若裝了 PowerShell／複製腳本）** 或上面的 **`npx trigger.dev@4.4.4 deploy`**；並先在該機對 **`127.0.0.1:5000`**（或 compose 公布的 registry 位址）**`docker login`**，帳密與 **`DEPLOY_REGISTRY_USERNAME` / `DEPLOY_REGISTRY_PASSWORD`**（`registry/auth.htpasswd`）一致。
+
+**路徑 B（堅持在筆電 build）** 需同時滿足：
+
+1. **SSH tunnel**（背景執行）：把本機 **5000** 轉發到 EU 上 registry 監聽埠（一般等同 EU 上 **`127.0.0.1:5000`**）：
+   `ssh -N -L 5000:127.0.0.1:5000 root@<EU_TRIGGER_HOST>`
+2. **讓 Docker build 能解析主機名 `registry`**：在 **tunnel 連線期間**，於本機加上 **`127.0.0.1 registry`**（Windows：`C:\Windows\System32\drivers\etc\hosts`，需系統管理員；**deploy 結束後建議移除**，避免與其他專案撞名）。
+3. **`docker login registry:5000`**（使用者／密碼同上）。
+
+**長期維運**：映像與 volume 應由 **registry／Trigger 官方升級路徑**與 **備份策略**治理；本 repo 透過 **鎖版 SDK／CLI**、**單一 Owner 文件**、**腳本不重複貼秘條**，降低十年級漂移與誤操作成本 — 「三十年」在工程上等同 **可演進、可審計、可輪替憑證與映像**，而非凍結某一組密鑰。
 
 ### PostHog（workflow 事件）
 
 `packages/workflows` 內 `captureWorkflowEvent` 使用 **`posthog-node`**，於任務執行時讀 **`process.env.POSTHOG_API_KEY`** 與 **`POSTHOG_HOST`**（見 `src/observability/posthog.ts`）。這些必須出現在 **Trigger 專案的環境變數**（prod／staging），而不是 phase1-core 的 `.env`。
 
 - **方式 A（儀表板）**：Project → **Environment Variables** → 新增 **`POSTHOG_API_KEY`**（可標為 Secret）、**`POSTHOG_HOST`**（例如 `https://us.i.posthog.com`）。  
-- **方式 B（deploy 時同步）**：本 repo 已在 `packages/workflows/trigger.config.ts` 設定 **`syncEnvVars`**。在本機 deploy 前匯出與 phase1 相同的兩個變數（或由 `--env-file` 載入），再執行 **`npx trigger.dev@latest deploy`**，會把值同步到 Trigger（見 [Trigger env docs](https://trigger.dev/docs/deploy-environment-variables)）。若兩個變數皆未設定，extension 不會寫入任何 PostHog 鍵。
+- **方式 B（deploy 時同步）**：本 repo 已在 `packages/workflows/trigger.config.ts` 設定 **`syncEnvVars`**。在本機 deploy 前匯出與 phase1 相同的兩個變數（或由 `--env-file` 載入），再執行 **`npx trigger.dev@4.4.4 deploy`**（並遵守 §7a **registry** 可達性），會把值同步到 Trigger（見 [Trigger env docs](https://trigger.dev/docs/deploy-environment-variables)）。若兩個變數皆未設定，extension 不會寫入任何 PostHog 鍵。
 
 ---
 
@@ -171,6 +200,7 @@ ssh -i "$env:USERPROFILE\.ssh\hetzner_trigger" root@<VPS_IP>
 
 | 檔案 | 用途 |
 |------|------|
+| `deploy-workflows.ps1` | Windows：安全萃取 PostHOG、`deploy` 讀取鎖版 CLI／project ref（見 §7） |
 | `docker-compose.yml` | v4 全 stack（含 ClickHouse、registry、MinIO、supervisor） |
 | `.env.example` | 必填變數範本（命名對齊官方） |
 | `clickhouse/override.xml` | 限縮 ClickHouse RAM（小 VPS） |
