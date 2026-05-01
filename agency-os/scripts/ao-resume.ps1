@@ -8,12 +8,13 @@ param(
     [switch]$SkipWorkflowsDeps,
     [switch]$SkipOpenTasksList,
     [switch]$FullMainlineParity,
-    [string]$FullMainlineFeatureBranch = "fix/trigger-clickhouse-oom",
+    [string]$FullMainlineFeatureBranch = "",
     [switch]$FullMainlinePushFeature,
     [bool]$FullMainlineMainOnly = $true,
     [switch]$FullMainlineFeature,
     [switch]$FullMainlineAllowStash,
-    [switch]$FullMainlineRequireFeatureBranch
+    [switch]$FullMainlineRequireFeatureBranch,
+    [switch]$FullMainlineAllowResetAheadOfOrigin
 )
 
 Set-StrictMode -Version Latest

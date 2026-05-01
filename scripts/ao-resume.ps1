@@ -10,7 +10,7 @@ param(
     [switch]$SkipOpenTasksList,
     # 與 GitHub 主線對齊：`fetch` → `checkout main` → `reset --hard origin/main` →（**預設不切功能分支**；可選切回功能分支並 `merge origin/main`）。**不**與 Autopilot（`-SkipStrictEnvironmentAudit`）併用。關鍵字 **AO-RESUME** 由 `.cursor/rules/30-resume-keyword.mdc` 預設傳此旗標。
     [switch]$FullMainlineParity,
-    [string]$FullMainlineFeatureBranch = "fix/trigger-clickhouse-oom",
+    [string]$FullMainlineFeatureBranch = "",
     [switch]$FullMainlinePushFeature,
     # Default: $true (main-only). Use `-FullMainlineMainOnly:$false` or `-FullMainlineFeature` to re-enable the feature-branch continuation flow.
     [bool]$FullMainlineMainOnly = $true,
@@ -203,9 +203,12 @@ if ($FullMainlineParity) {
             $includeFeature = $true
         }
 
-        if (-not $includeFeature) {
-            $alignArgs += "-SkipFeature"
-        } else {
+        if ($includeFeature) {
+            if ([string]::IsNullOrWhiteSpace($FullMainlineFeatureBranch)) {
+                Write-Error "ao-resume: -FullMainlineFeature (or main-only:`$false) requires -FullMainlineFeatureBranch <branch-name>. Repo policy: stay on main unless you explicitly name a branch."
+                exit 1
+            }
+            $alignArgs += "-ContinueWithFeatureBranch"
             $alignArgs += "-FeatureBranch", $FullMainlineFeatureBranch
         }
         if ($FullMainlinePushFeature) { $alignArgs += "-PushFeature" }

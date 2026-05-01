@@ -1,21 +1,21 @@
 <#
 .SYNOPSIS
-  一鍵：fetch → 本機 main 與 origin/main 完全一致 → AO-RESUME →（可選）回到功能分支並併入最新 main 再 AO-RESUME。
+  一鍵：fetch → 本機 main 與 origin/main 完全一致 →（可選）nested AO-RESUME。**預設永遠停在 main**，不切換到其他 Git 分支。
 
 .DESCRIPTION
   你手寫的 `git reset --hard origin/main,origin/fix/...` 在 Git 裡不合法（reset 只能接一個目標）。
   正確心智模型：
   1) `origin/main` 是主線單一真相（routine / AO-RESUME 在 main 上 = 0 ahead 0 behind）。
-  2) 功能分支（例如 fix/trigger-clickhouse-oom）在開工前應 **包含** `origin/main`（behind=0），再跑 AO-RESUME。
+  2) **預設不做任何「功能分支」流程**。若你真的需要（罕見），才加 **`-ContinueWithFeatureBranch`** 並指定 **`-FeatureBranch`**。
 
 .PARAMETER WorkRoot
   Monorepo 根（預設為本腳本上一層）。
 
 .PARAMETER FeatureBranch
-  結束 main 流程後要切回的分支名（預設 fix/trigger-clickhouse-oom）。
+  僅在 **`-ContinueWithFeatureBranch`** 時有效：要切換過去的分支名（**無預設值**；必須自行指定）。
 
-.PARAMETER SkipFeature
-  只做 main 對齊 + 一次 AO-RESUME，不切回功能分支。
+.PARAMETER ContinueWithFeatureBranch
+  **選填、預設關閉**。僅在傳入時：main 對齊後才會切到 `-FeatureBranch` 並 merge `origin/main`。日常 **AO-RESUME** 請勿使用——預設僅對齊 **main**。
 
 .PARAMETER PushFeature
   若功能分支比遠端超前，在合併 main 後執行 `git push -u origin <branch>`。
@@ -33,13 +33,14 @@
   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\git-align-main-aoresume-feature.ps1
 
 .EXAMPLE
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\git-align-main-aoresume-feature.ps1 -FeatureBranch "fix/trigger-clickhouse-oom" -PushFeature
+  # 罕見：對齊 main 後還要回到某功能分支（須明示分支名）
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\git-align-main-aoresume-feature.ps1 -ContinueWithFeatureBranch -FeatureBranch "fix/my-topic" -PushFeature
 #>
 
 param(
     [string]$WorkRoot = "",
-    [string]$FeatureBranch = "fix/trigger-clickhouse-oom",
-    [switch]$SkipFeature,
+    [string]$FeatureBranch = "",
+    [switch]$ContinueWithFeatureBranch,
     [switch]$PushFeature,
     [switch]$AllowStash,
     [switch]$SkipAoResume,
@@ -147,9 +148,13 @@ To intentionally discard those commits (destructive): pass -AllowResetAheadOfOri
         Write-Host "== SkipAoResume: left on main (no nested ao-resume) ==" -ForegroundColor DarkGray
     }
 
-    if ($SkipFeature) {
-        Write-Host "== Done (-SkipFeature: left on main) ==" -ForegroundColor Green
+    if (-not $ContinueWithFeatureBranch) {
+        Write-Host "== Done (main only; no feature-branch continuation) ==" -ForegroundColor Green
         return
+    }
+
+    if ([string]::IsNullOrWhiteSpace($FeatureBranch)) {
+        throw "git-align: -ContinueWithFeatureBranch requires a non-empty -FeatureBranch name."
     }
 
     # Local feature branch: create from origin/<same> if missing
@@ -168,7 +173,7 @@ To intentionally discard those commits (destructive): pass -AllowResetAheadOfOri
                 if ($AllowMissingFeatureBranch) {
                     Write-Host "== Feature branch missing: '$FeatureBranch' (no local, no origin/$FeatureBranch). Staying on main. ==" -ForegroundColor Yellow
                     Write-Host "   Fix options:" -ForegroundColor DarkYellow
-                    Write-Host "   - Re-run with -SkipFeature, or" -ForegroundColor DarkYellow
+                    Write-Host "   - Omit -ContinueWithFeatureBranch (stay on main), or" -ForegroundColor DarkYellow
                     Write-Host "   - Pass -FeatureBranch <name> to match an existing branch, or" -ForegroundColor DarkYellow
                     Write-Host "   - Create/push the branch on origin, then re-run, or" -ForegroundColor DarkYellow
                     Write-Host "   - Add -RequireFeatureBranch to hard-fail (legacy behavior)." -ForegroundColor DarkYellow
