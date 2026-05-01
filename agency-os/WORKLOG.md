@@ -4,6 +4,24 @@
 
 ## 2026-05-01
 
+### Next-Gen 升級藍圖 v1 啟動 + 兩試點 tenant 骨架建立完成
+
+- **試點確認**：Soulful Expression（既有站接手）+ Scenery Travel Mongolia（新站建置）
+- **Soulful Expression — 補齊缺漏**（7 個新檔）：
+  - `sites/soulfulexpression-org/`：SITE_PROFILE、SYSTEM_REQUIREMENTS、OPS_GROWTH_PLAN
+  - `projects/2026-011-existing-site-handover-soulful/`：10_DISCOVERY、01_SCOPE_AND_CR、02_EXECUTION_PLAN、03_HANDOVER_CRITERIA
+  - **阻塞：** Day 1 盤點欄位（WP 版本、PHP、外掛清單）需操作者登入 Hostinger/WP 填入
+- **Scenery Travel Mongolia — 從零建立**（19 個新檔）：
+  - tenant root：PROFILE、SITES_INDEX、ACCESS_REGISTER、FINANCIAL_LEDGER、SERVICE_CATALOG、01–04 guide
+  - `core/`：ENVIRONMENT_REGISTRY、BACKUP_RESTORE_PROOF、RELEASE_GATES_CHECKLIST、DEPARTMENT_COVERAGE_MATRIX、CROSS_BORDER_GOVERNANCE
+  - `industry/travel/`：MANDATORY_QA_SCENARIOS、REGULATORY_AND_OPERATIONAL_REQUIREMENTS
+  - `sites/scenery-travel-mn/`：SITE_PROFILE、SYSTEM_REQUIREMENTS、OPS_GROWTH_PLAN
+  - `projects/2026-012-new-site-scenery-travel-mongolia/`：00_PROJECT_BRIEF、10_DISCOVERY、01_SCOPE_AND_CR、02_EXECUTION_PLAN、03_HANDOVER_CRITERIA
+  - **注意：** 10_DISCOVERY 骨架完成；客戶欄位需與客戶訪談後填入
+- **PostHog super-properties**：`next-admin/app/providers.tsx` 加入 `ph.register({ site_domain, app_surface: 'next-admin' })` (commit `cebb8aa`)
+- - AUTO_TASK_DONE: 啟動 Next-Gen 升級藍圖 v1
+- - AUTO_TASK_DONE: 新站建置 Day 1（Scenery Travel Mongolia）
+
 ### ClickHouse TTL 3 天（EU server）完成
 
 - **三張 system 表全部設定 TTL = event_date + 3 DAY**：`metric_log`、`trace_log`、`text_log`
