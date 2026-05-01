@@ -85,6 +85,7 @@
 - **修正**：Next.js 控制台子項 **縮排**（避免 ` - [ ]` 錯位）。
 - **可讀性**：新增 **`## 現況快照`**（表格式：去哪查做完／沒做／進度）；未完成條目補 **`—— 【進行中｜未開始】進度：…下一步：…`**；**Phase 1 P1–P7** 縮成「P1–P5 已結案見 §2026-05-01；開放＝P6+P7」避免誤以為 Sentry/PostHog 仍未做。
 - **閱讀負荷**：新增 **`## 閱讀輔助（神經多元／感官敏感／閱讀疲勞時）`**（許可略過全文、三步驟儀式、可複製的一句話給代理）；長段 **待辦原則** 改為 `<details>` 摺疊，預覽時較不壓迫。
+- **神經包容版面（研究對照）**：新增 `docs/operations/neuroinclusive-document-layout.md`（ADHD／自閉症譜系／OCD 敏感／HSP／創傷知情等公開 UX／易讀指引整理＋出處連結；`TASKS` 閱讀輔助區一鍵可連）。
 
 ## 2026-04-30
 
@@ -1172,7 +1173,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-01 07:28:43 UTC_
+_Last synced: 2026-05-01 11:35:40 UTC_
 
 ## 2026-03-20
 
@@ -1606,6 +1607,7 @@ _Last synced: 2026-05-01 07:28:43 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

@@ -13,8 +13,10 @@
 **若要降低刺激／強迫檢查衝動：**
 
 - **已完成 ≠ 你的責任**：結案在 **`## Next — 已完成歷程`**；不必為了「確認沒漏」而把整份刷完。
-- **固定詞彙**：**【未開始】** 還沒動／【進行中】** 已有一部分／**【卡住】** 缺人決策或環境；不代表你做錯。
-- **编辑器**：用大綱／摺疊 **`### 未完成`** 以外區塊；搜尋 **`進度：`** 可快速跳到「做到哪」。
+- **固定詞彙**：**【未開始】**＝還沒動；**【進行中】**＝已有一部分；**【卡住】**＝缺人決策或環境；不代表你做錯。
+- **編輯器**：用大綱／摺疊 **`### 未完成`** 以外區塊；搜尋 **`進度：`** 可快速跳到「做到哪」。
+
+**為什麼要這樣排版（研究對照、含出處）**：`docs/operations/neuroinclusive-document-layout.md`
 
 **一句話交給代理（可複製）：**「請依 `agency-os/TASKS.md` 的 **`### 未完成`**，列出仍開放的 `- [ ]`，並對每一條只用一句話說 **進度** 與 **下一步**，不要貼長文件。」
 
@@ -79,17 +81,17 @@
 - [ ] **Git：`main` 未推送 commits → `git push origin main`** —— **【進行中】** **進度：**本地已有多次 commit（Trigger／PostHog／TASKS／WP MU 等）；**下一步：**`git fetch` → `git log origin/main..HEAD` → **`git push origin main`**。
 - [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度：**repo 已 **`syncEnvVars`**、鎖 CLI **`4.4.4`**、README／腳本齊；曾完成 **環境變數同步**，**缺**在 **EU** 對 **`registry:5000`** **映像 push**（見 **`lobster-factory/infra/trigger/README.md` §7a**）。**下一步：**於 EU 或 tunnel 就緒後跑 **`deploy-workflows.ps1`** 或 **`npx trigger.dev@4.4.4 deploy`**。
 - [ ] **phase1 WordPress（SG）PostHog MU** —— **【進行中】** **進度：****repo** 已入 MU **`posthog.php`** + compose **`NEXT_PUBLIC_POSTHOG_*`**。**下一步：**SG **`docker compose build wordpress && docker compose up -d wordpress`**（或等價）→ 公開頁驗證載入。
-- [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3） —— **【未開始】** **進度：**藍圖文件已定；尚未選定試點正式開跑。
+- [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3） —— **【進行中】** **進度（2026-05-01）：**試點已選定：Soulful Expression（既有站接手）+ Scenery Travel Mongolia（新站建置）；兩站 tenant 骨架已建立。**下一步：**兩站各完成 Day 2（staging 建立）。
   - 參考：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
   - 本項目標：先選 2 個試點（1 既有站接手 + 1 新站建置）
-- [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【未開始】** **進度：**台帳／前置實填見 **`已完成歷程`**；M1 正式閉環仍開放。
+- [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-01）：**tenant 骨架完整（sites/ + projects/ 全部檔案建立）；Day 1 盤點項目需 **操作者** 登入 Hostinger/WP 填入。**下一步：**操作者執行 Runbook §1.1–1.3（權限＋基線盤點）並回填 10_DISCOVERY + ENVIRONMENT_REGISTRY。
   - 本項目標：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）
-- [ ] **新站建置（Scenery Travel Mongolia）** —— **【未開始】** **進度：**同上；待選定開跑日期與 staging。
+- [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-01）：**tenant 骨架完整（19 個檔案）；Discovery 骨架建立，客戶資料欄位待補（需與客戶訪談）；Day 2 staging 待選定主機商後執行。
   - 本項目標：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊）
-- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【未開始】** **下一步：**跑 Runbook 第 1~2 節並把產出連結到 WORKLOG。
+- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中】** **進度（2026-05-01）：**專案骨架（10_DISCOVERY、01–03 文件、sites/ 三檔）已建立。**阻塞（操作者必做）：**需登入 Hostinger + WP 後台執行 §1.1–1.2 並回填 `10_DISCOVERY.md`、`core/ENVIRONMENT_REGISTRY.md`。
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節
   - 產出：權限與基線盤點
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【未開始】**
+- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-01）：**tenant 骨架 + Discovery 骨架完成（Runbook §1 骨架部分完成）。**下一步：**與客戶確認素材，選定主機商 → Day 2 staging 建立。
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md` 第 1~2 節
   - 產出：新站 staging 啟動條件
 - [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
@@ -283,5 +285,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-01 (TASKS 未完成區僅 `[ ]` 治理) UTC_
+_Last synced: 2026-05-01 11:35:40 UTC_
 
