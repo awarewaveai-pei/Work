@@ -36,6 +36,35 @@ function pickDsn() {
   );
 }
 
+/** Best-effort DSN username (never logs password). Fails closed on malformed URIs with @/: in passwords. */
+function parseDsnUser(dsn) {
+  const raw = typeof dsn === "string" ? dsn.trim() : "";
+  if (!raw) return null;
+  const withScheme = /^postgres(ql)?:\/\//i.test(raw) ? raw : `postgresql://${raw}`;
+  try {
+    const parsed = new URL(withScheme.replace(/^postgres(ql)?:/i, "http:"));
+    const user = decodeURIComponent((parsed.username || "").replace(/\+/g, " "));
+    return user || null;
+  } catch {
+    try {
+      const m = /^postgres(?:ql)?:\/\/([^:@/]+)(?::[^@]*)?@/i.exec(raw);
+      return m ? decodeURIComponent(m[1]) : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function printSupavisorTenantHint(dbUser) {
+  console.log("");
+  console.log("Supavisor (pooler) uses tenant-scoped usernames. On EU read POOLER_TENANT_ID from /root/supabase/.env.");
+  console.log("DSN user should look like:  postgres.<POOLER_TENANT_ID>");
+  console.log("See agency-os/docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md §3.3.1");
+  if (dbUser) {
+    console.log(`(parsed DSN username: "${dbUser}" — no password shown)`);
+  }
+}
+
 async function sqlSmoke() {
   const dsn = pickDsn();
   if (!dsn) {
@@ -43,6 +72,12 @@ async function sqlSmoke() {
       "SQL smoke: set SUPABASE_AWAREWAVE_POSTGRES_DSN (or legacy SUPABASE_B_POSTGRES_DSN / SUPABASE_POSTGRES_MCP_DSN).",
     );
     process.exit(2);
+  }
+  const dbUser = parseDsnUser(dsn);
+  if (dbUser === "postgres") {
+    console.warn(
+      'SQL smoke: DSN username is exactly "postgres". For default EU tunnel :5432 (Supavisor), use postgres.<POOLER_TENANT_ID> instead.',
+    );
   }
   let postgres;
   try {
@@ -59,6 +94,15 @@ async function sqlSmoke() {
       process.exit(1);
     }
     console.log("SQL smoke: SELECT 1 ok");
+  } catch (err) {
+    const msg = err?.message ?? String(err);
+    if (/Tenant or user not found/i.test(msg)) {
+      console.error("SQL smoke: FATAL — Tenant or user not found (Supavisor rejected login / tenant).");
+      printSupavisorTenantHint(dbUser);
+    } else {
+      console.error("SQL smoke:", msg);
+    }
+    process.exit(1);
   } finally {
     await sql.end({ timeout: 2 }).catch(() => {});
   }
