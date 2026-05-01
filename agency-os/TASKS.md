@@ -16,10 +16,9 @@
 - [x] 建立 `lobster-factory` Phase 1 底座骨架（Supabase migrations + wc-core manifest + workflow 安全骨架）
 
 ## Next — 未完成（目前正式隊列）
-- [ ] **Supabase Postgres MCP（AwareWave）／EU SSH tunnel — 穩定 smoke**
-  - Tunnel：`scripts/open-supabase-ssh-tunnel.ps1 -Background`（腳本含 `ExitOnForwardFailure`；被拒時對照 **`docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md`**「administratively prohibited」修 EU `sshd`）
-  - Smoke（monorepo 根）：`npm ci` → `npm run smoke:supabase-tunnel` → `npm run smoke:supabase-tunnel -- --sql`（後者需 **`SUPABASE_AWAREWAVE_POSTGRES_DSN`** 已載入；見 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5.2**）
-  - 驗收：Cursor **`supabase-awarewave-postgres`** 綠燈 + 上述 smoke 通過（至少 TCP 三埠；`--sql` 建議在可設 DSN 的機器上做）
+- [x] **Supabase Postgres MCP（AwareWave）／EU SSH tunnel — 穩定 smoke** — 2026-05-01 完成
+  - `npm run smoke:supabase-tunnel`：PASS Postgres 127.0.0.1:5432 / PASS Studio :3000 / PASS Kong :8000
+  - Cursor 完成 tunnel TLS 修復（`95b2ef9`）、pgbouncer get_auth 修復（`3b16bf8`）、Supavisor runbook（`19779f8`）
 - [x] **n8n MCP（Cursor）：HTTP 運輸改 stdio 橋接並驗證（抖動／No tools）**
   - 證據：`scripts/run-n8n-mcp.mjs`、`mcp/registry.template.json`、`docs/operations/n8n-self-hosted-mcp-troubleshooting.md`；smoke：`node scripts/n8n-mcp-smoke.mjs`
 - [x] **（已完成待套用）建立全域月檢 `AgencyOS-MonthlySystemReview` 與 tenant monthly 排程基線**
