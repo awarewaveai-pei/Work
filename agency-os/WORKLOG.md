@@ -66,6 +66,17 @@
 - **TASKS 對齊**：已將 **`TASKS`** 未完成隊列拆成 **Supabase tunnel／MCP** 與 **n8n MCP（Cursor）** 兩列；今日 DoD 命中 **n8n** 列（見上表）。
 - AUTO_TASK_DONE_APPLIED (2026-04-30T17:27:52Z): n8n MCP（Cursor）：HTTP 運輸改 stdio 橋接並驗證（抖動／No tools）
 
+### Cursor／phase1／Trigger／PostHog（Cursor Agent）
+
+- **Trigger workflows**：`packages/workflows/trigger.config.ts` 新增 **`syncEnvVars`**（deploy 時可把 **`POSTHOG_API_KEY`／`POSTHOG_HOST`** 寫入 Trigger 專案環境）；**`@trigger.dev/sdk`、`@trigger.dev/build`、`trigger.dev` 鎖 `4.4.4`**（commits **`7d51ac1`**、**`1f6285d`**）。
+- **單一 Owner（長流程）**：**`lobster-factory/infra/trigger/README.md`** — **EU `204.168.175.41`** vs SG、**`registry:5000`**／筆電 **tunnel + hosts**、§7a；新增 **`deploy-workflows.ps1`**（僅萃取 PostHOG 兩鍵、解析 `trigger.config.ts`／`package.json`）；**`packages/workflows/README.md`** 僅連結 Owner；**`SG_PHASE1_DOCKER_LAYOUT.md`** Related 一行避免雙寫（**`82b354d`**、**`287d086`**）。
+- **SG `next-admin`**：**`docker compose build next-admin`**；**`up -d next-admin --no-deps`**（避 **`lobster-redis`** 與他 stack 容器名衝突）；服務 **healthy**（`.env` 細節不落本文）。
+- **筆電 `trigger.dev deploy`**：Docker **build** 可過；**push** 需指向 **EU** 上 registry 或依 README 打通 **`registry` 解析**；完整映像 deploy 仍須在對的主機／網路完成。
+- **SG repo**：與 main 已對齊之冗餘 **git stash** 已 **drop**。
+- **WordPress（phase1-core）**：MU **`mu-plugins/posthog.php`** + Dockerfile／entrypoint／compose 注入 **`NEXT_PUBLIC_POSTHOG_*`**；**.env.example** 註解（**`aaee266`**）。
+- **未推送 commits**：**`git log origin/main..HEAD`** 應含 **`7d51ac1`～`287d086`** 與 **`aaee266`**（以實際 **`git status`**／log 為準）；需 **`git push origin main`**。
+- **憑證 hygiene**：若曾將**完整** `.env` 或明文金鑰送入對話／他人可讀渠道，依 **`security-secrets-policy`** **輪替**（不作業細節與值不落 WORKLOG）。
+
 ## 2026-04-30
 
 ### Daily
