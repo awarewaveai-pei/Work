@@ -39,6 +39,8 @@ $vars = @{
     SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY = "..."
     # SQL MCP：`supabase-awarewave-postgres` — 經 **`open-supabase-ssh-tunnel.ps1`** 時，EU 對外 `:5432` 多為 **Supavisor**。DSN **使用者名** 通常為 **`postgres.<POOLER_TENANT_ID>`**（與 VPS **`/root/supabase/.env`** 的 **`POOLER_TENANT_ID`** 一致）；見 **`docs/operations/SUPABASE_SELF_HOSTED_RUNBOOK.md` §3.3**。
     SUPABASE_AWAREWAVE_POSTGRES_DSN = "postgresql://postgres.<POOLER_TENANT_ID>:<PASTE_POSTGRES_PASSWORD>@127.0.0.1:5432/postgres"
+    # Optional: set to "true" to use READ ONLY transactions in Postgres MCP (default = full SQL).
+    POSTGRES_MCP_READ_ONLY         = ""
     SUPABASE_SOULFULEXPRESSION_URL = "https://your-soulfulexpression-project.supabase.co"
     SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY = "..."
     # Legacy aliases retained for backward compatibility during migration:
@@ -65,6 +67,12 @@ $vars = @{
     GEMINI_API_KEY               = "AIza..."
     HETZNER_API_BASE_URL         = "https://api.hetzner.cloud/v1"
     HETZNER_API_TOKEN            = ""
+    # Hostinger SSH — Soulful Expression (soulfulexpression.org)
+    # hetzner-ssh MCP passes these at runtime via ssh_connect; stored here for documentation only
+    HOSTINGER_SOULFUL_SSH_HOST   = "191.101.230.176"
+    HOSTINGER_SOULFUL_SSH_PORT   = "65002"
+    HOSTINGER_SOULFUL_SSH_USER   = "u942075013"
+    # Private key path (machine-local): C:\Users\<you>\.ssh\hostinger_soulful
     UPTIME_KUMA_BASE_URL         = "https://uptime.aware-wave.com"
     UPTIME_KUMA_API_KEY          = ""
     # SSH tunnel required: .\scripts\open-grafana-ssh-tunnel.ps1 -Background

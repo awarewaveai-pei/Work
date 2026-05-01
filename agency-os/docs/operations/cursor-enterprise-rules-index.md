@@ -40,6 +40,7 @@
 
 ## 維護時
 
+0. **抗文件增殖**：開新治理／對外 `.md` **前**，必須先通過 `docs/operations/new-doc-linkage-checklist.md` 頂部「**預設：不要新增檔案**」三問；新增檔僅限最後手段（無 Owner 可 append）。
 1. 改任一份 `.mdc` 或本索引：依 `docs/operations/new-doc-linkage-checklist.md` 更新矩陣／`change-impact-map.json`（或 `register-new-governance-doc.ps1`）。  
 2. 改 **monorepo 根** `README.md` 關於開工／雙機／收工／Cursor 規則時：同步核對本索引、`REMOTE_WORKSTATION_STARTUP`、`EXECUTION_DASHBOARD`，避免敘述分叉。  
 3. 跑 `doc-sync-automation.ps1 -AutoDetect` 與 `system-health-check.ps1`。  
@@ -63,5 +64,5 @@
 - `docs/operations/security-secrets-policy.md`
 - `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
 
-_Last synced: 2026-05-01 11:55:55 UTC_
+_Last synced: 2026-05-01 12:30:40 UTC_
 

@@ -246,10 +246,13 @@
         "-File",
         "${workspaceRoot}\\scripts\\run-postgres-mcp.ps1"
       ],
+      "optional_env": [
+        "POSTGRES_MCP_READ_ONLY"
+      ],
       "env": {
         "SUPABASE_AWAREWAVE_POSTGRES_DSN": "${env:SUPABASE_AWAREWAVE_POSTGRES_DSN}"
       },
-      "note": "Requires SSH tunnel: scripts/open-supabase-ssh-tunnel.ps1 -Background; smoke from monorepo root: npm run smoke:supabase-tunnel (after npm ci)"
+      "note": "DSN via env; `run-postgres-mcp.ps1` runs `mcp-local-wrappers/postgres-full-access-mcp.mjs` (SELECT/DDL/DML; not upstream read-only). Set `POSTGRES_MCP_READ_ONLY=true` to lock read-only. Requires `npm install` in `mcp-local-wrappers/`. SSH tunnel: scripts/open-supabase-ssh-tunnel.ps1 -Background; smoke: npm run smoke:supabase-tunnel (after npm ci in repo root)"
     },
     "supabase": {
       "enabled": false,

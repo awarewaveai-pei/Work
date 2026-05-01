@@ -52,6 +52,7 @@
 `.md` **不會**因 AI 對話自動更新。若沒有 **有意識的 edit + commit（或代理代寫並 checkpoint／push）**，repo 內就沒有記錄——問題在**入庫動作缺席**，不是 Markdown 無效。
 
 ### 4.3 禁止重工、矛盾與雙寫
+- **預設不新增檔**：見 `docs/operations/new-doc-linkage-checklist.md` 開頭「**預設：不要新增檔案**」——先 append Owner，禁止為偏好開平行長文檔。
 - **隊列**：`TASKS` 只保留 **一行**責任敘述 + **進度／下一步** + **連結到 Owner**；長細項不得堆在 `TASKS` 重複貼全文。
 - **細項與案例**：只在對應 **Owner 檔** 維護正文；他處 **一句摘要 + 連結**（見 `.cursor/rules/63-cursor-core-identity-risk.mdc` Single Owner）。
 - **租戶／試點**：事實以 `tenants/<company>/...` 該案檔為準；與全局政策衝突時，先對照 ADR／Routing Spec／營運 SSOT，**禁止**在 tenant 內複製第二套長篇政策正文。
@@ -69,5 +70,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-05-01 11:55:55 UTC_
+_Last synced: 2026-05-01 11:58:21 UTC_
 

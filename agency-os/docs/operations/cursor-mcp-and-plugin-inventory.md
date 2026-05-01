@@ -9,7 +9,7 @@
 - **MCP 設定檔（Cursor / 長期 SSOT）**：**monorepo 根** **`.cursor/mcp.json`** 為 **唯一完整伺服器清單**（路徑一律 **`${workspaceFolder}/…`**／HTTP 標頭 **`Bearer ${VAR}`**，**勿**寫死 `D:\`／`C:\Users\…`）；**可**進版控；機密只出現在 **`${…}`** 名稱，不含明文。**`%USERPROFILE%\.cursor\mcp.json`** 請維持 **`{"mcpServers":{}}`**（空物件），避免與專案檔 **合併後同一鍵重複**、工具列表 **每個出現兩次**。若需「僅本機、不進 repo」的 MCP，才在使用者檔新增 **與專案不重複的鍵名**。**Claude Code** 用 monorepo 根 **`.mcp.json`**；**Codex** 用 monorepo 根 **`.codex/config.toml`**。結構範本見 repo 根 **`mcp.json.template`**。政策見 `**docs/operations/security-secrets-policy.md`**、`**docs/operations/local-secrets-vault-dpapi.md**`。
 - 下表 **「設定鍵」** 指 `mcpServers` 裡的 **名稱**（須與實際 JSON 一致）；新增／改名 MCP 時請 **同步更新本檔**。
 - **Cursor 畫面 vs repo**：**Settings → MCP** 會合併 **使用者** `~/.cursor/mcp.json` 與 **專案** `.cursor/mcp.json`／外掛——故 **使用者檔必須空或僅含補充鍵**，否則與本 repo 的 SSOT 重疊會 **重複顯示**。路徑僅在 **專案** `.cursor/mcp.json` 使用 **`${workspaceFolder}`**／**`${userHome}`**（見 [Cursor MCP 文件](https://cursor.com/docs/context/mcp)）。
-- **`supabase-postgres`（stdio）**：多數 MCP 主機**不會**在 `args` 裡展開任意 **`${SUPABASE_POSTGRES_MCP_DSN}`**；請用 **`${workspaceFolder}/scripts/run-postgres-mcp.ps1`**，由腳本讀環境變數 **`SUPABASE_POSTGRES_MCP_DSN`** 再呼叫 `npx`（見 repo 根 **`mcp.json.template`**；`agency-os/scripts/run-postgres-mcp.ps1` 為鏡像）。
+- **`supabase-awarewave-postgres`（stdio）**：由 **`run-postgres-mcp.ps1`** 啟動 **`mcp-local-wrappers/postgres-full-access-mcp.mjs`**，讀 **`SUPABASE_AWAREWAVE_POSTGRES_DSN`**（及既有 fallback）；**可執行完整 SQL**（非舊版 `npx @modelcontextprotocol/server-postgres` 之唯讀）。可選 **`POSTGRES_MCP_READ_ONLY=true`** 還原唯讀。需先於 **`mcp-local-wrappers/`** 執行 **`npm install`**。多數 MCP 主機不會在 `args` 內展開任意 **`${…}`**，仍須依賴腳本／環境注入 DSN。
 - **執行期備援（Agent 必讀）**：[`CURSOR_AGENT_RUNTIME_PLAYBOOK.md`](CURSOR_AGENT_RUNTIME_PLAYBOOK.md) — 先驗證本 runtime 暴露的工具；MCP 未綠燈則走 **SSH／API／CLI**；釐清 **Cursor vs Codex** 設定檔差異。
 
 ## 2) Monorepo `mcp.json`／自訂 MCP（設定鍵 → 建議分工）
@@ -145,5 +145,5 @@ perplexity → 內建 + **work-global** → 雲商 MCP → **龍蝦寫入**只�
 - `README.md`
 - `TASKS.md`
 
-_Last synced: 2026-05-01 11:55:55 UTC_
+_Last synced: 2026-05-01 12:30:40 UTC_
 

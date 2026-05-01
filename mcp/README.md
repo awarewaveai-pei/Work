@@ -131,7 +131,7 @@ See [`SERVICE_MATRIX.md`](SERVICE_MATRIX.md) for how each one is connected.
 For `AwareWave Supabase` specifically, the standard paths are:
 
 - REST: `awarewave-ops -> supabase_awarewave`
-- SQL: `supabase-awarewave-postgres` after `.\scripts\open-supabase-ssh-tunnel.ps1 -Background`
+- SQL: `supabase-awarewave-postgres` after `.\scripts\open-supabase-ssh-tunnel.ps1 -Background` (uses `mcp-local-wrappers/postgres-full-access-mcp.mjs` — **SELECT/DDL/DML**; not the upstream read-only `server-postgres`. Run `npm install` in `mcp-local-wrappers/` once. Set `POSTGRES_MCP_READ_ONLY=true` to lock read-only.)
 - Preferred env vars: `SUPABASE_AWAREWAVE_URL`, `SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY`, `SUPABASE_AWAREWAVE_POSTGRES_DSN`
 
 For `Soulful Expression Supabase`, prefer:

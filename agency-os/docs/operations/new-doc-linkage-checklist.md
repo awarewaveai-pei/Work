@@ -1,5 +1,19 @@
 ﻿# 新文件連動檢查清單（小白版）
 
+## 預設：不要新增檔案（抗增殖）
+
+**預設答案是：不要新增 `.md`。** 維護痛苦與錯亂，多半來自「同一議題的第二份長文」——連動再認真也會跟不住。
+
+在動念開新檔之前，先做這三步；**任一步為「可以」，就不得新建檔**：
+
+1. **能不能只在既有 Owner 加一小節？**（例：`docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`、`REMOTE_WORKSTATION_STARTUP.md`、`TOOLS_DELIVERY_TRACEABILITY.md`、`TASKS.md`、租戶案場內對應檔）
+2. **能不能只在 `TASKS` 留一行隊列 + 連結到既有細項？**（隊列不重複貼全文）
+3. **能不能用表格或 `<details>` 摺疊塞回同一 Owner？**
+
+只有 **主題全新**、且 **沒有任何現有檔案可掛鉤** 時，才進入下方「必做四件事」。「覺得好整理」**不是**新建檔的理由。
+
+---
+
 ## 為什麼會「沒連動」？
 
 同一件事若寫在多份檔案，或只改內文、沒更新「誰和誰一組」，時間久了就會漂移。要靠 **清單 + 機器可驗證的地圖** 補上，而不是靠記憶。
@@ -71,5 +85,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -Chan
 - `scripts/register-new-governance-doc.ps1`
 - `scripts/system-health-check.ps1`
 
-_Last synced: 2026-05-01 11:55:55 UTC_
+_Last synced: 2026-05-01 11:58:21 UTC_
 
