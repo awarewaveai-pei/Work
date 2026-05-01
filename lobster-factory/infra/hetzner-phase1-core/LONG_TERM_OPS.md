@@ -26,6 +26,7 @@
 | **祕密外洩** | `.env` 不入庫；用 vault；**季度**輪替 DB／JWT／API key | `security-secrets-policy.md` |
 | **單點機器掛了** | 備份可還原；DNS／TLS 可切換；**年度**全流程還原演練 | §5、`BACKUP_RESTORE_PROOF` 類模板 |
 | **日誌塞滿磁碟** | json-file **rotate**（compose 已設 `max-size`／`max-file`） | `df -h`、Docker log 目錄 |
+| **Docker 垃圾堆積（dangling 映像、殘留 layer、build cache）** | `scripts/docker-weekly-cleanup.sh` 每週日 03:00–03:30 UTC 自動執行；由 `scripts/install-maintenance-crons.sh` 安裝（**server rebuild 後需重跑**）；log 在 `/var/log/docker-weekly-cleanup.log` | `docker system df`、cleanup log |
 | **橫向移動** | SSH **鎖 IP**、關密碼登入；Redis／DB **不對 0.0.0.0**；上線後關閉 **127.0.0.1 除錯埠**（見 `README.md`） | `ss -lntp`、雲防火牆 |
 | **共應弱點（CVE）** | **月度**審視基礎映像；**staging** 先拉新版本 | WORKLOG 留痕 |
 

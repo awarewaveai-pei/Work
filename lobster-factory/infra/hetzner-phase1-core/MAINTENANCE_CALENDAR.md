@@ -9,7 +9,8 @@
 
 - [ ] 主機 **`df -h`**、inode、Docker 儲存空間正常  
 - [ ] **`docker compose ps`** 無異常重啟循環；必要時 `docker compose logs -f --tail=200 <service>`  
-- [ ] 安全更新／重開機窗（若使用 `unattended-upgrades` 等）無待處理失敗
+- [ ] 安全更新／重開機窗（若使用 `unattended-upgrades` 等）無待處理失敗  
+- [ ] *(自動)* **Docker weekly cleanup** 每週日自動執行（SG 03:00 UTC、EU 03:30 UTC）；抽查 `tail -30 /var/log/docker-weekly-cleanup.log` 確認無異常
 
 ---
 
@@ -44,6 +45,23 @@
 docker compose ps
 docker system df
 ./scripts/backup-phase1.sh
+```
+
+### Server rebuild 後重建 cron
+
+```bash
+# SG 機器（phase1 stack）
+bash scripts/install-maintenance-crons.sh --host sg
+
+# EU 機器（Supabase/Trigger stack）
+bash scripts/install-maintenance-crons.sh --host eu
+```
+
+### 手動觸發 Docker cleanup（立即執行）
+
+```bash
+bash /usr/local/bin/docker-weekly-cleanup.sh
+tail -50 /var/log/docker-weekly-cleanup.log
 ```
 
 ---
