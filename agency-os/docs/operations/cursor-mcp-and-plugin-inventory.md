@@ -145,5 +145,5 @@ perplexity → 內建 + **work-global** → 雲商 MCP → **龍蝦寫入**只�
 - `README.md`
 - `TASKS.md`
 
-_Last synced: 2026-04-29 18:02:22 UTC_
+_Last synced: 2026-05-01 11:55:55 UTC_
 

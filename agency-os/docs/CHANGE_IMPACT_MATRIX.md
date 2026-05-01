@@ -13,7 +13,7 @@
 | `docs/overview/agency-os-complete-system-introduction.md` | `README.md`, `docs/DOCS_INDEX.md`, `tenants/company-p1-pilot/01_COMMANDER_SYSTEM_GUIDE.md`, `tenants/company-p1-pilot/02_CLIENT_WORKSPACE_GUIDE.md`, `tenants/templates/tenant-template/01_COMMANDER_SYSTEM_GUIDE.md`, `tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md` |
 | `docs/overview/EXECUTION_DASHBOARD.md` | `docs/overview/REMOTE_WORKSTATION_STARTUP.md`, `docs/overview/INTEGRATED_STATUS_REPORT.md`, `docs/operations/end-of-day-checklist.md`, `memory/CONVERSATION_MEMORY.md`, `AGENTS.md`, `RESUME_AFTER_REBOOT.md` |
 | `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md` | `AGENTS.md`, `README.md`, `docs/DOCS_INDEX.md`, `docs/overview/repo-template-locations.md`, `docs/architecture/decisions/ADR_INDEX.md`, `tenants/templates/core/RELEASE_GATES_CHECKLIST.md`（§ 編號／Related）, `memory/CONVERSATION_MEMORY.md`, `TASKS.md`（若節奏表與 Next 對齊時）, `WORKLOG.md` |
-| `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md` | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md`, `README.md`, `docs/DOCS_INDEX.md`, `TASKS.md`, `WORKLOG.md` |
+| `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md` | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/neuroinclusive-document-layout.md`, `README.md`, `docs/DOCS_INDEX.md`, `TASKS.md`, `WORKLOG.md` |
 | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md` | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`, `README.md`, `docs/DOCS_INDEX.md`, `TASKS.md`, `WORKLOG.md` |
 | `docs/architecture/decisions/ADR_INDEX.md` | `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`, `docs/CHANGE_IMPACT_MATRIX.md`（若新增 ADR 影響治理時）, `WORKLOG.md` |
 | `platform-templates/README.md` | `docs/overview/repo-template-locations.md`, `docs/architecture/decisions/001-wordpress-manifest-and-shell-ssot.md`, `platform-templates/SSOT_LINKS.md`, `platform-templates/SYNC_EXAMPLES_FROM_LOBSTER.md`, `platform-templates/client-base/README.md`, `platform-templates/woocommerce/manifests/README.md`, `WORKLOG.md` |
@@ -95,5 +95,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-04-29 14:30:02 UTC_
+_Last synced: 2026-05-01 11:55:55 UTC_
 

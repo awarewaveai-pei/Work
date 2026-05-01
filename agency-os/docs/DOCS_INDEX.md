@@ -31,7 +31,8 @@
 ## Related Documents (Auto-Synced)
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/new-doc-linkage-checklist.md`
+- `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
 - `docs/overview/agency-os-complete-system-introduction.md`
 
-_Last synced: 2026-04-29 14:30:02 UTC_
+_Last synced: 2026-05-01 11:55:55 UTC_
 

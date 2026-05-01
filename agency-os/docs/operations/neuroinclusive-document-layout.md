@@ -1,4 +1,4 @@
-# Neuro-inclusive document layout（研究對照摘要）
+﻿# Neuro-inclusive document layout（研究對照摘要）
 
 > **用途**：說明為何 `TASKS.md` 等營運文件採用「短句、清單、摺疊、留白」等作法；與個人醫療建議無關。  
 > **原則**：降低認知負荷、提高可預測性、減少感官與情緒上的不必要刺激。
@@ -121,3 +121,11 @@
 ---
 
 **Maintainer**：與 `agency-os/TASKS.md` 同步調整時，更新本檔「本 repo 已對齊」一節即可。
+
+**治理總锚**（信任邊界、禁雙寫）：`docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md` **§4**。
+
+## Related Documents (Auto-Synced)
+- `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
+
+_Last synced: 2026-05-01 11:55:55 UTC_
+

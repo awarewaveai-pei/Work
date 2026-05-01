@@ -25,6 +25,7 @@
 
 ## SSOT（權威文件）
 
+- **長期治理口徑／文件與聊天信任邊界（Owner）**：`docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`（**§4** 可稽核真相順序、禁雙寫、三十年誠實範圍）；對外精簡：`docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md`
 - **規則版本／強制判定（Owner）**：`docs/operations/rules-version-and-enforcement.md`
 - **龍蝦自動化路由（強制）**：`../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
 - **龍蝦路由矩陣（人讀）**：`../lobster-factory/docs/ROUTING_MATRIX.md`
@@ -60,6 +61,7 @@
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/operations/security-secrets-policy.md`
+- `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
 
-_Last synced: 2026-05-01 11:39:18 UTC_
+_Last synced: 2026-05-01 11:55:55 UTC_
 

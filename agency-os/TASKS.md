@@ -1,26 +1,6 @@
 ﻿# Global Task Board
 
-## 閱讀輔助（神經多元／感官敏感／閱讀疲勞時）
 
-**你不必一次讀完這個檔案。** 這份檔案同時服務「人類掃一眼」與「代理／腳本機械打勾」，所以有些地方會偏長；長段落不是你的問題。
-
-**若現在注意力或耐受度有限，只做這三件事（順序固定）：**
-
-1. **往下捲到** **`### 未完成`**（約在本檔前段）。
-2. **只看每一行的第一行**（粗體標題 + **【未開始／進行中／卡住】** + **`進度：`** / **`下一步：`**）。子項目細節可以整段略過，等你真的要動手再展開。
-3. **「今天只做一條」**：選 **唯一一條** `- [ ]`，只做該行寫的 **`下一步：`**；沒寫 **`下一步：`** 時，把該條 **標題** 複製貼給代理，請對方拆成「下一個可驗證小步」。
-
-**若要降低刺激／強迫檢查衝動：**
-
-- **已完成 ≠ 你的責任**：結案在 **`## Next — 已完成歷程`**；不必為了「確認沒漏」而把整份刷完。
-- **固定詞彙**：**【未開始】**＝還沒動；**【進行中】**＝已有一部分；**【卡住】**＝缺人決策或環境；不代表你做錯。
-- **編輯器**：用大綱／摺疊 **`### 未完成`** 以外區塊；搜尋 **`進度：`** 可快速跳到「做到哪」。
-
-**為什麼要這樣排版（研究對照、含出處）**：`docs/operations/neuroinclusive-document-layout.md`
-
-**一句話交給代理（可複製）：**「請依 `agency-os/TASKS.md` 的 **`### 未完成`**，列出仍開放的 `- [ ]`，並對每一條只用一句話說 **進度** 與 **下一步**，不要貼長文件。」
-
----
 
 <details>
 <summary><strong>待辦原則（給營運者）— 細節較長，可稍後再讀</strong></summary>
@@ -46,6 +26,8 @@
 **機讀待辦快照**：開工時 **`scripts/ao-resume.ps1`** 會寫 **`agency-os/.agency-state/open-tasks-snapshot.md`**（gitignore），與本檔 **`### 未完成`** 應對齊。
 
 **聊天 ≠ 入庫**：其他 AI（含 Claude）對話裡答應的待辦**不會**自動進 `TASKS`、也不會自動進任何 checklist 檔；若你看不到條目，代表**尚未寫入本 repo 並 commit**（或寫在別台機器未 push）。要生效：**請同一輪請代理／自己改 `TASKS.md`（或對應 Owner 檔）+ checkpoint／push**。
+
+| **長期可稽核紀律（含「MD 為何可信」）** | **`docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`** **§4**（真相順序、禁雙寫、演進範圍） |
 
 ## 歷史封存 — In Progress（早期項目，均已結案）
 
@@ -273,8 +255,9 @@
 - `docs/operations/outsourcing-vendor-scorecard.md`
 - `docs/operations/system-operation-sop.md`
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
+- `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-01 11:48:55 UTC_
+_Last synced: 2026-05-01 11:55:55 UTC_
 

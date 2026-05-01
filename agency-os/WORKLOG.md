@@ -32,6 +32,11 @@
 - **聊天不會自動進 repo**：Claude（或其他 AI）在對話裡說「已寫入 TASKS」若**未**實際改檔並 **commit／push**，則 **`TASKS.md` 不會出現**；**`open-tasks-snapshot`** 只複製本檔 **`### 未完成`**，**不讀聊天**。
 - **已落地**：`TASKS.md`「現況快照」下增「聊天≠入庫」一行；Soulful `10_DISCOVERY`／`ENVIRONMENT_REGISTRY` 註明須操作者登入填寫與同步；Mongolia `10_DISCOVERY`「未解問題」擴為 **7 條**（網域權限、主機偏好）。
 
+### 長期治理：不重複新憲章、擴充既有 30 年 Owner
+
+- **不重複**：repo 已有 **`30_YEAR_AI_CODING_EXEC_CHARTER.md`**（Single Owner）；本次僅新增 **§4**（可稽核真相順序、聊天不作數、禁雙寫、三十年誠實範圍），避免第二套「完美文件」造成漂移。
+- **連動**：`cursor-enterprise-rules-index.md` SSOT 表、`TASKS.md` 現況快照表、`neuroinclusive-document-layout.md`、`30_YEAR_*_CLIENT_SHORT.md`、`CHANGE_IMPACT_MATRIX`／`change-impact-map.json` 已對齊。
+
 ### ClickHouse TTL 3 天（EU server）完成
 
 - **三張 system 表全部設定 TTL = event_date + 3 DAY**：`metric_log`、`trace_log`、`text_log`
@@ -1199,10 +1204,11 @@
 - `docs/operations/airtable-to-supabase-migration-playbook.md`
 - `docs/operations/system-operation-sop.md`
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
+- `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-01 11:48:55 UTC_
+_Last synced: 2026-05-01 11:55:55 UTC_
 
 ## 2026-03-20
 
@@ -1636,6 +1642,7 @@ _Last synced: 2026-05-01 11:48:55 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

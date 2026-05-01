@@ -523,6 +523,18 @@
                                       "docs/operations/security-secrets-policy.md",
                                       "docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md"
                                   ]
+                  },
+                  {
+                      "source":  "docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md",
+                      "targets":  [
+                                      "docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md",
+                                      "docs/operations/cursor-enterprise-rules-index.md",
+                                      "docs/operations/neuroinclusive-document-layout.md",
+                                      "README.md",
+                                      "docs/DOCS_INDEX.md",
+                                      "TASKS.md",
+                                      "WORKLOG.md"
+                                  ]
                   }
               ]
 }
