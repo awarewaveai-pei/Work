@@ -114,6 +114,11 @@ export interface BuildPlan {
   nextActions: string[];
 }
 
+/** Optional result from POST /api/build/runs when Trigger kick is used — see `lib/kick-dispatcher.ts`. */
+export type DispatcherKickInfo =
+  | { attempted: false; reason: "no_secret" }
+  | { attempted: true; ok: boolean; httpStatus: number; detail?: string };
+
 export interface BuildRunResult {
   id: string;
   traceId: string;
@@ -129,6 +134,8 @@ export interface BuildRunResult {
     table: "ops_action_runs" | null;
     error?: string;
   };
+  /** Present when executionMode was enqueue and DB write succeeded */
+  dispatcherKick?: DispatcherKickInfo;
 }
 
 export interface BuildRunResponse {

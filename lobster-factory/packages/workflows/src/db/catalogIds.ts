@@ -1,5 +1,7 @@
 /**
- * Deterministic catalog IDs (must match SQL seeds in packages/db/migrations/0006_seed_catalog.sql).
+ * Deterministic catalog IDs — must match SQL seeds:
+ * - `0006_seed_catalog.sql` (wc-core baseline)
+ * - `0023_dispatcher_enum_and_catalog_seeds.sql` (wp-basic, wp-business, adopt-client-os, ao-infrastructure-check)
  *
  * These IDs allow workflow_runs/package_install_runs to reference known workflow_versions/manifests
  * without having to query the catalog first.

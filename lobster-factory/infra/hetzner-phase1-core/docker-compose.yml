@@ -235,6 +235,9 @@ services:
       OPS_ALLOW_SIMULATED_ROLE_FALLBACK: ${OPS_ALLOW_SIMULATED_ROLE_FALLBACK:-}
       OPS_ROLE_RESOLUTION_MODE: ${OPS_ROLE_RESOLUTION_MODE:-}
       INTERNAL_ADMIN_BASE_URL: ${INTERNAL_ADMIN_BASE_URL:-}
+      # Build Console: optional immediate Trigger.dev dispatcher kick (see apps/next-admin/lib/kick-dispatcher.ts)
+      TRIGGER_SECRET_KEY: ${TRIGGER_SECRET_KEY:-}
+      TRIGGER_API_URL: ${TRIGGER_API_URL:-https://api.trigger.dev}
     ports:
       - "127.0.0.1:3002:3000"
     depends_on:

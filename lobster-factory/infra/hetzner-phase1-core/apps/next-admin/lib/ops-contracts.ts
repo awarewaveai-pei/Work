@@ -33,12 +33,23 @@ export interface TenantConfig {
   defaultTimezone: string;
 }
 
+/** Matches `ops_action_runs.status` check — see migration `0023_dispatcher_enum_and_catalog_seeds.sql`. */
+export type OpsActionRunStatus =
+  | "pending"
+  | "running"
+  | "dispatched"
+  | "dispatch_failed"
+  | "completed"
+  | "failed"
+  | "blocked"
+  | "cancelled";
+
 export interface WorkflowRun {
   id: string;
   organizationId: string;
   organizationSlug: string;
   actionId: string;
-  status: "pending" | "running" | "completed" | "failed" | "blocked" | "cancelled";
+  status: OpsActionRunStatus;
   approvalStatus: "none" | "pending" | "approved" | "rejected";
   traceId: string;
   startedAt: string;

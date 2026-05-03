@@ -4,6 +4,12 @@
 Provide a single source-of-truth map so routing, workflow, and governance rules stay centralized and non-duplicated.
 
 ## Canonical Documents (source of truth)
+- Build Console profiles vs colloquial “AO-agent” naming (product layer vs Profile A/B/C routing):
+  - `docs/ONE_CLICK_BUILD_SYSTEM.md` §1.1
+  - `docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md` Section 41
+- `ops_action_runs.status` enum + dispatcher lifecycle (`dispatched`, `dispatch_failed`, `trigger_run_id`):
+  - `packages/db/migrations/0023_dispatcher_enum_and_catalog_seeds.sql`
+  - `infra/hetzner-phase1-core/apps/next-admin/lib/ops-contracts.ts` (`OpsActionRunStatus`)
 - Tool routing and boundaries:
   - `docs/MCP_TOOL_ROUTING_SPEC.md`
 - WordPress Factory execution channel:

@@ -4,6 +4,10 @@
 -- 3. Seed wp-basic and wp-business packages/versions/manifests
 -- 4. Seed adopt-client-os and ao-infrastructure-check workflow versions
 -- Safe to run multiple times (idempotent).
+--
+-- Manifest JSON embedded below must stay aligned with:
+--   packages/manifests/wp-basic.json  |  wp-business.json
+-- CI: scripts/validate-manifests.mjs  |  workflow IDs: packages/workflows/src/db/catalogIds.ts
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. Extend ops_action_runs status CHECK constraint

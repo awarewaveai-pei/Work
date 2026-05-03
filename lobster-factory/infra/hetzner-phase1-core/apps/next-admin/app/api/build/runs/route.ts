@@ -8,6 +8,7 @@ import {
 } from "../../../../lib/build-console/contracts";
 import { resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
+import { kickActionRunDispatcher } from "../../../../lib/kick-dispatcher";
 
 function canCreateBuildRun(role: string): boolean {
   return role === "owner" || role === "admin" || role === "operator";
@@ -135,6 +136,7 @@ export async function POST(request: Request) {
           workflow_id: plan.workflowId,
           apply_mode: plan.applyMode,
           smoke_profile: plan.smokeProfile,
+          action_key: plan.actionKey,
         },
       })
       .select("id")
@@ -176,6 +178,11 @@ export async function POST(request: Request) {
     status = "queued";
   }
 
+  let dispatcherKick: Awaited<ReturnType<typeof kickActionRunDispatcher>> | undefined;
+  if (requestedMode === "enqueue" && dbWrite.executed) {
+    dispatcherKick = await kickActionRunDispatcher();
+  }
+
   return NextResponse.json({
     ok: true,
     run: {
@@ -188,6 +195,7 @@ export async function POST(request: Request) {
       inputSnapshot: input,
       supabaseRunId,
       dbWrite,
+      dispatcherKick,
     },
   });
 }
