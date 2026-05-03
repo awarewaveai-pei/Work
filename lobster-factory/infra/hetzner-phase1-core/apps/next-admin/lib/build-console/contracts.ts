@@ -6,6 +6,61 @@ export type BuildProvider = "awarewave-internal" | "hostinger" | "cloudways" | "
 export type BuildRiskLevel = "low" | "medium" | "high";
 export type BuildRunStatus = "planned" | "queued" | "blocked";
 
+// ─────────────────────────────────────────────
+// Integration configs — passed through to workflow so they can call each
+// service's API directly during the run. All fields are optional so the
+// form works even when a service isn't configured yet.
+// ─────────────────────────────────────────────
+
+export interface UptimeKumaConfig {
+  /** Base URL of your Uptime Kuma instance, e.g. https://uptime.aware-wave.com */
+  url: string;
+  /** Uptime Kuma API key (Settings → API Keys) */
+  apiKey: string;
+  /** Optional group to put the monitor in (integer ID or name) */
+  groupName?: string;
+}
+
+export interface SentryConfig {
+  /** Sentry organization slug, e.g. aware-wave */
+  org: string;
+  /** Sentry auth token (Project → Settings → Auth Tokens) */
+  authToken: string;
+  /** Team slug to assign the project to */
+  team?: string;
+}
+
+export interface PostHogConfig {
+  /** PostHog project API key (Project → Settings → Project API Key) */
+  projectApiKey: string;
+  /** PostHog ingest host — defaults to https://app.posthog.com */
+  host?: string;
+}
+
+export interface N8nConfig {
+  /** n8n webhook URL for the client onboarding flow */
+  onboardingWebhookUrl: string;
+  /** Optional bearer token if the webhook is protected */
+  bearerToken?: string;
+}
+
+export interface MainWpConfig {
+  /** URL of your MainWP Dashboard, e.g. https://mainwp.aware-wave.com */
+  dashboardUrl: string;
+  /** MainWP Consumer Key */
+  consumerKey: string;
+  /** MainWP Consumer Secret */
+  consumerSecret: string;
+}
+
+export interface BuildIntegrations {
+  uptimeKuma?: UptimeKumaConfig;
+  sentry?: SentryConfig;
+  postHog?: PostHogConfig;
+  n8n?: N8nConfig;
+  mainWp?: MainWpConfig;
+}
+
 export interface BuildRunRequest {
   profile?: BuildProfile;
   executionMode?: BuildExecutionMode;
@@ -26,6 +81,8 @@ export interface BuildRunRequest {
   backupRef?: string;
   backupConfirmed?: boolean;
   notes?: string;
+  /** Service integrations to wire up during the workflow run */
+  integrations?: BuildIntegrations;
 }
 
 export interface BuildPlanStage {

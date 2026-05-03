@@ -1,8 +1,7 @@
 /**
  * Dispatcher: ops_action_runs → Trigger.dev durable workflows.
  *
- * This task is triggered by a Trigger.dev scheduled job (or a Supabase webhook).
- * It polls for pending ops_action_runs records and routes each one to the
+ * Polls for pending ops_action_runs records and routes each one to the
  * correct durable workflow based on action_key.
  *
  * Action key → workflow mapping:
@@ -29,11 +28,13 @@ const ACTION_KEY_TO_TASK_ID: Record<string, string> = {
 // Shape of an ops_action_runs row (only fields we need)
 const ActionRunSchema = z.object({
   id:              z.string().uuid(),
-  action_key:      z.string(),
+  action_key:      z.string().optional(),   // joined from ops_action_catalog if needed
+  action_id:       z.string().uuid(),
   organization_id: z.string().uuid().nullish(),
-  input_snapshot:  z.record(z.unknown()).default({}),
+  input_payload:   z.record(z.unknown()).default({}),  // correct column name
   status:          z.string(),
   trace_id:        z.string().nullish(),
+  metadata:        z.record(z.unknown()).default({}),
 });
 
 type ActionRun = z.infer<typeof ActionRunSchema>;
@@ -42,12 +43,32 @@ type ActionRun = z.infer<typeof ActionRunSchema>;
 // Helper: get Supabase credentials from env
 // ─────────────────────────────────────────────
 function getSupabaseCreds() {
-  const supabaseUrl     = process.env.LOBSTER_SUPABASE_URL || "";
-  const serviceRoleKey  = process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY || "";
+  const supabaseUrl    = process.env.LOBSTER_SUPABASE_URL || "";
+  const serviceRoleKey = process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY || "";
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error("Missing LOBSTER_SUPABASE_URL or LOBSTER_SUPABASE_SERVICE_ROLE_KEY");
   }
   return { supabaseUrl, serviceRoleKey };
+}
+
+// ─────────────────────────────────────────────
+// Lookup action_key from ops_action_catalog
+// ─────────────────────────────────────────────
+async function resolveActionKey(
+  creds: ReturnType<typeof getSupabaseCreds>,
+  actionId: string
+): Promise<string | null> {
+  try {
+    const rows = await supabaseRestQuery(creds, "ops_action_catalog", {
+      id: `eq.${actionId}`,
+      select: "action_key",
+      limit: 1,
+    });
+    const row = rows[0] as Record<string, unknown> | undefined;
+    return typeof row?.action_key === "string" ? row.action_key : null;
+  } catch {
+    return null;
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -56,7 +77,7 @@ function getSupabaseCreds() {
 async function updateRunStatus(
   creds: ReturnType<typeof getSupabaseCreds>,
   runId: string,
-  status: "dispatched" | "dispatch_failed" | "running",
+  status: "running" | "dispatched" | "dispatch_failed",
   extra: Record<string, unknown> = {}
 ) {
   await supabaseRestPatch(
@@ -72,22 +93,37 @@ async function updateRunStatus(
 // Dispatch a single action run
 // ─────────────────────────────────────────────
 async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: ActionRun) {
-  const taskId = ACTION_KEY_TO_TASK_ID[run.action_key];
-  if (!taskId) {
-    logger.warn("dispatcher: unknown action_key, skipping", { runId: run.id, actionKey: run.action_key });
+  // Resolve action_key from metadata (set by Build Console) or look up from catalog
+  const actionKeyFromMeta =
+    typeof run.metadata?.action_key === "string" ? run.metadata.action_key : null;
+  const actionKey = actionKeyFromMeta ?? (await resolveActionKey(creds, run.action_id));
+
+  if (!actionKey) {
+    logger.warn("dispatcher: could not resolve action_key, skipping", { runId: run.id });
     await updateRunStatus(creds, run.id, "dispatch_failed", {
-      dispatch_error: `unknown action_key: ${run.action_key}`,
+      error_summary: "could not resolve action_key from catalog",
     });
     return;
   }
 
-  // Mark as running before triggering so a crash doesn't leave it in 'queued'
+  const taskId = ACTION_KEY_TO_TASK_ID[actionKey];
+  if (!taskId) {
+    logger.warn("dispatcher: unknown action_key, skipping", { runId: run.id, actionKey });
+    await updateRunStatus(creds, run.id, "dispatch_failed", {
+      error_summary: `unknown action_key: ${actionKey}`,
+    });
+    return;
+  }
+
+  // Mark running before triggering so a crash doesn't leave it in 'pending'
   await updateRunStatus(creds, run.id, "running");
 
+  // Build trigger payload: merge input_payload + dispatcher metadata
   const triggerPayload = {
-    ...run.input_snapshot,
+    ...run.input_payload,
     _dispatchedFromActionRunId: run.id,
     _traceId: run.trace_id,
+    _actionKey: actionKey,
   };
 
   try {
@@ -102,7 +138,7 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
     });
     captureWorkflowEvent("dispatcher dispatched", {
       actionRunId: run.id,
-      actionKey: run.action_key,
+      actionKey,
       taskId,
       triggerId: handle.id,
     });
@@ -110,7 +146,7 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
     const message = err instanceof Error ? err.message : String(err);
     logger.error("dispatcher: trigger failed", { runId: run.id, taskId, error: message });
     await updateRunStatus(creds, run.id, "dispatch_failed", {
-      dispatch_error: message,
+      error_summary: message,
     });
     captureWorkflowException(err, {
       workflowId: "dispatch-action-run",
@@ -129,11 +165,11 @@ export const dispatchActionRun = task({
   run: async (payload: unknown) => {
     const creds = getSupabaseCreds();
 
-    // Fetch pending queued runs (max 10 per invocation to stay within time limits)
+    // Fetch pending runs (max 10 per invocation)
     const rows = await supabaseRestQuery(
       creds,
       "ops_action_runs",
-      { status: "eq.queued", limit: 10, order: "created_at.asc" }
+      { status: "eq.pending", limit: 10, order: "started_at.asc" }
     );
 
     const runs = z.array(ActionRunSchema).parse(rows ?? []);
@@ -143,7 +179,7 @@ export const dispatchActionRun = task({
       return { dispatched: 0 };
     }
 
-    logger.info(`dispatcher: found ${runs.length} queued run(s)`);
+    logger.info(`dispatcher: found ${runs.length} pending run(s)`);
 
     let dispatched = 0;
     for (const run of runs) {
@@ -156,11 +192,11 @@ export const dispatchActionRun = task({
 });
 
 // ─────────────────────────────────────────────
-// Scheduled dispatcher — polls every 30 seconds
+// Scheduled dispatcher — polls every minute
 // ─────────────────────────────────────────────
 export const dispatchActionRunSchedule = schedules.task({
   id: "dispatch-action-run-schedule",
-  cron: "*/1 * * * *",   // every minute; for real-time use webhook trigger instead
+  cron: "*/1 * * * *",
   run: async () => {
     return tasks.trigger("dispatch-action-run", {});
   },

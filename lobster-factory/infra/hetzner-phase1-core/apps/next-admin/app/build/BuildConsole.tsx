@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildConsolePlan,
   type BuildExecutionMode,
+  type BuildIntegrations,
   type BuildPackageSlug,
   type BuildProfile,
   type BuildProvider,
@@ -111,28 +112,98 @@ function SelectInput<T extends string>({
   );
 }
 
+type LiveRunStatus = {
+  id: string;
+  status: string;
+  trigger_run_id?: string | null;
+  error_summary?: string | null;
+  started_at?: string | null;
+  ended_at?: string | null;
+};
+
+const TERMINAL_STATUSES = new Set(["completed", "failed", "dispatch_failed", "cancelled", "blocked"]);
+
 export default function BuildConsole() {
   const [profile, setProfile] = useState<BuildProfile>("profile_b");
   const [form, setForm] = useState<BuildRunRequest>(PROFILE_DEFAULTS.profile_b);
   const [actorRole, setActorRole] = useState<OpsRole>("operator");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<BuildRunResponse | null>(null);
+  const [pollingRunId, setPollingRunId] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<LiveRunStatus | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [showIntegrations, setShowIntegrations] = useState(false);
 
   const plan = useMemo(() => buildConsolePlan(form), [form]);
+
+  // Start/stop polling based on pollingRunId
+  useEffect(() => {
+    if (!pollingRunId) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/build/runs/${pollingRunId}`);
+        if (!res.ok) return;
+        const json = (await res.json()) as { ok: boolean; run?: LiveRunStatus };
+        if (json.ok && json.run) {
+          setLiveStatus(json.run);
+          if (TERMINAL_STATUSES.has(json.run.status)) {
+            // Stop polling once we reach a terminal state
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+        }
+      } catch {
+        // ignore transient network errors during polling
+      }
+    };
+
+    poll(); // immediate first poll
+    pollRef.current = setInterval(poll, 3000);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [pollingRunId]);
 
   const selectProfile = (nextProfile: BuildProfile) => {
     setProfile(nextProfile);
     setForm(PROFILE_DEFAULTS[nextProfile]);
     setResponse(null);
+    setPollingRunId(null);
+    setLiveStatus(null);
   };
 
   const update = <K extends keyof BuildRunRequest>(key: K, value: BuildRunRequest[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
+  // Deep-merge a partial value into form.integrations[service][field]
+  const updateIntegration = <
+    S extends keyof BuildIntegrations,
+    F extends keyof NonNullable<BuildIntegrations[S]>,
+  >(
+    service: S,
+    field: F,
+    value: NonNullable<BuildIntegrations[S]>[F]
+  ) => {
+    setForm((current) => ({
+      ...current,
+      integrations: {
+        ...current.integrations,
+        [service]: {
+          ...(current.integrations?.[service] as object | undefined),
+          [field]: value,
+        },
+      },
+    }));
+  };
+
   const submit = async () => {
     setLoading(true);
     setResponse(null);
+    setPollingRunId(null);
+    setLiveStatus(null);
     try {
       const res = await fetch("/api/build/runs", {
         method: "POST",
@@ -141,6 +212,10 @@ export default function BuildConsole() {
       });
       const json = (await res.json()) as BuildRunResponse;
       setResponse(json);
+      // Start polling if a run was enqueued in Supabase
+      if (json.ok && json.run?.supabaseRunId) {
+        setPollingRunId(json.run.supabaseRunId);
+      }
     } catch (error) {
       setResponse({ ok: false, error: error instanceof Error ? error.message : "request_failed" });
     } finally {
@@ -307,6 +382,146 @@ export default function BuildConsole() {
             </>
           ) : null}
 
+          {/* ── Integrations ──────────────────────────────────────────────── */}
+          <div className="build-integrations-toggle">
+            <button
+              type="button"
+              className="build-integrations-toggle-btn"
+              onClick={() => setShowIntegrations((v) => !v)}
+            >
+              <span>{showIntegrations ? "▼" : "▶"}</span>
+              Integrations
+              <span className="build-integrations-hint">
+                {[
+                  form.integrations?.uptimeKuma?.url       ? "Uptime Kuma" : null,
+                  form.integrations?.sentry?.org           ? "Sentry" : null,
+                  form.integrations?.postHog?.projectApiKey ? "PostHog" : null,
+                  form.integrations?.n8n?.onboardingWebhookUrl ? "n8n" : null,
+                  form.integrations?.mainWp?.dashboardUrl  ? "MainWP" : null,
+                ].filter(Boolean).join(" · ") || "none configured"}
+              </span>
+            </button>
+          </div>
+
+          {showIntegrations ? (
+            <div className="build-integrations-body">
+
+              {/* Uptime Kuma */}
+              <div className="build-integration-group">
+                <div className="build-integration-label">Uptime Kuma</div>
+                <div className="build-form-grid">
+                  <TextInput
+                    label="URL"
+                    value={form.integrations?.uptimeKuma?.url}
+                    onChange={(v) => updateIntegration("uptimeKuma", "url", v)}
+                    placeholder="https://uptime.aware-wave.com"
+                  />
+                  <TextInput
+                    label="API Key"
+                    value={form.integrations?.uptimeKuma?.apiKey}
+                    onChange={(v) => updateIntegration("uptimeKuma", "apiKey", v)}
+                    placeholder="uk1_xxxxxxxxxxxx"
+                  />
+                  <TextInput
+                    label="Group (optional)"
+                    value={form.integrations?.uptimeKuma?.groupName}
+                    onChange={(v) => updateIntegration("uptimeKuma", "groupName", v)}
+                    placeholder="Clients"
+                  />
+                </div>
+              </div>
+
+              {/* Sentry */}
+              <div className="build-integration-group">
+                <div className="build-integration-label">Sentry</div>
+                <div className="build-form-grid">
+                  <TextInput
+                    label="Org slug"
+                    value={form.integrations?.sentry?.org}
+                    onChange={(v) => updateIntegration("sentry", "org", v)}
+                    placeholder="aware-wave"
+                  />
+                  <TextInput
+                    label="Auth Token"
+                    value={form.integrations?.sentry?.authToken}
+                    onChange={(v) => updateIntegration("sentry", "authToken", v)}
+                    placeholder="sntrys_xxxxxxxxxxxx"
+                  />
+                  <TextInput
+                    label="Team (optional)"
+                    value={form.integrations?.sentry?.team}
+                    onChange={(v) => updateIntegration("sentry", "team", v)}
+                    placeholder="client-sites"
+                  />
+                </div>
+              </div>
+
+              {/* PostHog */}
+              <div className="build-integration-group">
+                <div className="build-integration-label">PostHog</div>
+                <div className="build-form-grid">
+                  <TextInput
+                    label="Project API Key"
+                    value={form.integrations?.postHog?.projectApiKey}
+                    onChange={(v) => updateIntegration("postHog", "projectApiKey", v)}
+                    placeholder="phc_xxxxxxxxxxxx"
+                  />
+                  <TextInput
+                    label="Host (optional)"
+                    value={form.integrations?.postHog?.host}
+                    onChange={(v) => updateIntegration("postHog", "host", v)}
+                    placeholder="https://app.posthog.com"
+                  />
+                </div>
+              </div>
+
+              {/* n8n */}
+              <div className="build-integration-group">
+                <div className="build-integration-label">n8n — Client Onboarding Webhook</div>
+                <div className="build-form-grid">
+                  <TextInput
+                    label="Webhook URL"
+                    value={form.integrations?.n8n?.onboardingWebhookUrl}
+                    onChange={(v) => updateIntegration("n8n", "onboardingWebhookUrl", v)}
+                    placeholder="https://n8n.aware-wave.com/webhook/client-onboarding"
+                  />
+                  <TextInput
+                    label="Bearer Token (optional)"
+                    value={form.integrations?.n8n?.bearerToken}
+                    onChange={(v) => updateIntegration("n8n", "bearerToken", v)}
+                    placeholder="webhook_secret"
+                  />
+                </div>
+              </div>
+
+              {/* MainWP */}
+              <div className="build-integration-group">
+                <div className="build-integration-label">MainWP Dashboard</div>
+                <div className="build-form-grid">
+                  <TextInput
+                    label="Dashboard URL"
+                    value={form.integrations?.mainWp?.dashboardUrl}
+                    onChange={(v) => updateIntegration("mainWp", "dashboardUrl", v)}
+                    placeholder="https://mainwp.aware-wave.com"
+                  />
+                  <TextInput
+                    label="Consumer Key"
+                    value={form.integrations?.mainWp?.consumerKey}
+                    onChange={(v) => updateIntegration("mainWp", "consumerKey", v)}
+                    placeholder="ck_xxxxxxxxxxxx"
+                  />
+                  <TextInput
+                    label="Consumer Secret"
+                    value={form.integrations?.mainWp?.consumerSecret}
+                    onChange={(v) => updateIntegration("mainWp", "consumerSecret", v)}
+                    placeholder="cs_xxxxxxxxxxxx"
+                  />
+                </div>
+              </div>
+
+            </div>
+          ) : null}
+
           <div className="form-row">
             <label className="form-label">notes</label>
             <textarea className="form-textarea" value={form.notes ?? ""} onChange={(event) => update("notes", event.target.value)} />
@@ -388,6 +603,61 @@ export default function BuildConsole() {
             </span>
           </div>
           <pre>{JSON.stringify(response, null, 2)}</pre>
+        </div>
+      ) : null}
+
+      {pollingRunId ? (
+        <div className="build-panel build-output">
+          <div className="build-panel-head">
+            <div>
+              <div className="section-title">Live run status</div>
+              <h2>{liveStatus?.status ?? "polling…"}</h2>
+            </div>
+            <span
+              className={`card-badge ${
+                !liveStatus ? "badge-gray"
+                : liveStatus.status === "completed" ? "badge-green"
+                : liveStatus.status === "failed" || liveStatus.status === "dispatch_failed" ? "badge-red"
+                : liveStatus.status === "dispatched" || liveStatus.status === "running" ? "badge-yellow"
+                : "badge-gray"
+              }`}
+            >
+              {liveStatus ? liveStatus.status : "…"}
+            </span>
+          </div>
+
+          <div className="build-kv-grid">
+            <div><span>run id</span><strong>{pollingRunId}</strong></div>
+            {liveStatus?.trigger_run_id ? (
+              <div><span>trigger run</span><strong>{liveStatus.trigger_run_id}</strong></div>
+            ) : null}
+            {liveStatus?.started_at ? (
+              <div><span>started</span><strong>{new Date(liveStatus.started_at).toLocaleTimeString()}</strong></div>
+            ) : null}
+            {liveStatus?.ended_at ? (
+              <div><span>ended</span><strong>{new Date(liveStatus.ended_at).toLocaleTimeString()}</strong></div>
+            ) : null}
+            {liveStatus?.error_summary ? (
+              <div><span>error</span><strong className="text-red-500">{liveStatus.error_summary}</strong></div>
+            ) : null}
+          </div>
+
+          {!liveStatus || !TERMINAL_STATUSES.has(liveStatus.status) ? (
+            <div className="build-alert build-alert-ok">
+              Polling every 3 s — waiting for dispatcher to pick up run…
+            </div>
+          ) : liveStatus.status === "completed" ? (
+            <div className="build-alert build-alert-ok">Run completed successfully.</div>
+          ) : liveStatus.status === "dispatched" ? (
+            <div className="build-alert build-alert-ok">
+              Dispatched to Trigger.dev. Workflow is now running.
+            </div>
+          ) : (
+            <div className="build-alert build-alert-blocked">
+              Run ended with status: {liveStatus.status}
+              {liveStatus.error_summary ? ` — ${liveStatus.error_summary}` : ""}
+            </div>
+          )}
         </div>
       ) : null}
     </div>

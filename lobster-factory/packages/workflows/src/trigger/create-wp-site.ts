@@ -3,11 +3,24 @@ import { z } from "zod";
 import { newUuid } from "../utils/uid";
 import { buildWorkflowRunInsertSql } from "../db/sql/workflowRunsSql";
 import { buildWorkflowRunRow } from "../db/sql/workflowRunsSql";
-import { LobsterCatalogIds } from "../db/catalogIds";
+import { LobsterCatalogIds, catalogIdsForManifest } from "../db/catalogIds";
 import { supabaseRestInsert } from "../db/supabase/supabaseRestInsert";
 import { resolveStagingProvisioning } from "../hosting/resolveStagingProvisioning";
 import { captureWorkflowException } from "../observability/sentry";
 import { captureWorkflowEvent } from "../observability/posthog";
+import { runAllIntegrations, type BuildIntegrations } from "../integrations/integration-steps";
+
+const SUPPORTED_MANIFEST_SLUGS = ["wp-basic", "wp-business", "wc-core"] as const;
+type ManifestSlug = typeof SUPPORTED_MANIFEST_SLUGS[number];
+
+// Integration sub-schema (all optional — skipped if not provided)
+const IntegrationsSchema = z.object({
+  uptimeKuma: z.object({ url: z.string(), apiKey: z.string(), groupName: z.string().optional() }).optional(),
+  sentry:     z.object({ org: z.string(), authToken: z.string(), team: z.string().optional() }).optional(),
+  postHog:    z.object({ projectApiKey: z.string(), host: z.string().optional() }).optional(),
+  n8n:        z.object({ onboardingWebhookUrl: z.string(), bearerToken: z.string().optional() }).optional(),
+  mainWp:     z.object({ dashboardUrl: z.string(), consumerKey: z.string(), consumerSecret: z.string() }).optional(),
+}).optional();
 
 const InputSchema = z.object({
   organizationId: z.string().uuid(),
@@ -15,7 +28,15 @@ const InputSchema = z.object({
   projectId: z.string().uuid(),
   siteId: z.string().uuid(),
   siteName: z.string().min(1),
-  manifestSlug: z.literal("wc-core"),
+  manifestSlug: z.enum(SUPPORTED_MANIFEST_SLUGS).default("wp-basic"),
+  domain: z.string().optional(),
+  provider: z.string().optional(),
+  locale: z.string().optional(),
+  integrations: IntegrationsSchema,
+  // dispatcher passthrough fields (ignored by this workflow but safe to accept)
+  _dispatchedFromActionRunId: z.string().optional(),
+  _traceId: z.string().optional(),
+  _actionKey: z.string().optional(),
 });
 
 /**
@@ -217,6 +238,26 @@ export const createWpSite = task({
           : ("vendor_staging_provisioned" as const)
         : ("pending_next_step" as const);
 
+      // ── Integrations: register with Uptime Kuma, Sentry, PostHog, n8n, MainWP ──
+      const siteUrl  = stagingRef?.stagingSiteUrl ?? (input.domain ? `https://${input.domain}` : "");
+      const adminUrl = stagingRef?.wpAdminUrl     ?? (siteUrl ? `${siteUrl}/wp-admin` : "");
+      logger.info("create-wp-site: running integrations", {
+        siteUrl, integrationsProvided: !!input.integrations,
+      });
+      const integrationResults = await runAllIntegrations(
+        input.integrations as BuildIntegrations | undefined,
+        {
+          siteUrl,
+          adminUrl,
+          clientName: input.siteName,
+          profile: "profile_b",
+        }
+      );
+      const integrationErrors = integrationResults.filter((r) => r.status === "error");
+      if (integrationErrors.length > 0) {
+        logger.warn("create-wp-site: some integrations failed", { errors: integrationErrors });
+      }
+
       captureWorkflowEvent("workflow completed", {
         workflowId: "create-wp-site",
         organizationId: input.organizationId,
@@ -225,6 +266,7 @@ export const createWpSite = task({
         siteId: input.siteId,
         status: finalStatus,
         hostingOutcome: hosting.outcome,
+        integrationResults,
       });
 
       return {
@@ -233,6 +275,7 @@ export const createWpSite = task({
         mockHosting: hosting.outcome === "mock" ? hosting.ref : null,
         vendorStaging: hosting.outcome === "provisioned" ? hosting.ref : null,
         next,
+        integrations: integrationResults,
       };
     } catch (error) {
       captureWorkflowEvent("workflow errored", {

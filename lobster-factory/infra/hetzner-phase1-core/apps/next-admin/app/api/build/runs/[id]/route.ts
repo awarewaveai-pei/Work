@@ -1,0 +1,35 @@
+import { NextResponse } from "next/server";
+import { getSupabaseWriteClient } from "../../../../../lib/supabase-server";
+
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+  if (!id) {
+    return NextResponse.json({ ok: false, error: "missing_id" }, { status: 400 });
+  }
+
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) {
+    return NextResponse.json(
+      { ok: false, error: "supabase_not_configured" },
+      { status: 503 }
+    );
+  }
+
+  const { data: run, error } = await supabase
+    .from("ops_action_runs")
+    .select("id, status, trigger_run_id, error_summary, started_at, ended_at, metadata, output_payload")
+    .eq("id", id)
+    .single();
+
+  if (error || !run) {
+    return NextResponse.json(
+      { ok: false, error: "not_found", detail: error?.message },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({ ok: true, run });
+}
