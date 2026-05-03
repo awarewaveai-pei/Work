@@ -1,7 +1,7 @@
 # Lobster Factory — Operator Runbook（Phase 1）
 
 > 目標：每日／接案前用**最少指令**確認管線與產物一致；出事時有固定排查順序。  
-> 單一真實來源仍為 `docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` 與 `docs/e2e/STAGING_PIPELINE_E2E_PAYLOAD.md`。
+> 單一真實來源：`docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`（細項勾選）、`docs/LOBSTER_FACTORY_CHECKLIST.md`（v3 日課合併版）、`docs/e2e/STAGING_PIPELINE_E2E_PAYLOAD.md`。設計／Gate 另見 `LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md`、`LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST_v1.4.md`。
 
 ## 1) 每日健康檢查（本機）
 

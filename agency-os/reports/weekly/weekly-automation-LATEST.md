@@ -40,7 +40,7 @@ Dryrun apply-manifest validation PASSED ??(mode=fast)
 Files: lobster-factory\docs\e2e\OPERABLE_E2E_PLAYBOOK.md, lobster-factory\docs\operations\LOBSTER_FACTORY_OPERATOR_RUNBOOK.md, agency-os\docs\overview\REMOTE_WORKSTATION_STARTUP.md
   powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 
-Files: lobster-factory\docs\e2e\OPERABLE_E2E_PLAYBOOK.md, lobster-factory\docs\e2e\STAGING_PIPELINE_E2E_PAYLOAD.md, lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md
+Files: lobster-factory\docs\e2e\OPERABLE_E2E_PLAYBOOK.md, lobster-factory\docs\e2e\STAGING_PIPELINE_E2E_PAYLOAD.md, lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md
   node D:\Work\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast
 
 Files: lobster-factory\docs\e2e\OPERABLE_E2E_PLAYBOOK.md, lobster-factory\docs\e2e\STAGING_PIPELINE_E2E_PAYLOAD.md
@@ -76,7 +76,7 @@ Artifacts governance validation PASSED ??Running doc link + canonical integrity.
 Files: lobster-factory\docs\e2e\OPERABLE_E2E_PLAYBOOK.md, lobster-factory\docs\operations\LOBSTER_FACTORY_OPERATOR_RUNBOOK.md, agency-os\docs\overview\REMOTE_WORKSTATION_STARTUP.md
   powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 
-Files: lobster-factory\docs\e2e\OPERABLE_E2E_PLAYBOOK.md, lobster-factory\docs\e2e\STAGING_PIPELINE_E2E_PAYLOAD.md, lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md
+Files: lobster-factory\docs\e2e\OPERABLE_E2E_PLAYBOOK.md, lobster-factory\docs\e2e\STAGING_PIPELINE_E2E_PAYLOAD.md, lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md
   node D:\Work\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast
 
 Files: lobster-factory\docs\e2e\OPERABLE_E2E_PLAYBOOK.md, lobster-factory\docs\e2e\STAGING_PIPELINE_E2E_PAYLOAD.md

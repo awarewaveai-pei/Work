@@ -180,7 +180,7 @@
 2. **真寫入是「顯式開關」**：要有環境變數與你的意圖，沒有就不要假設已寫入。  
 3. **Manifest**：「這次要裝／做什麼」的清單；變更 manifest 通常要過 **validate**。  
 4. **`verify-build-gates.ps1`**：工程 + 治理一鍵；適合你每週或送 PR 前跑一次。  
-5. **主清單**：`lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` — 看不懂細節沒關係，先看 **A 區到哪、C 區卡哪**。
+5. **主清單**：`lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md` — 看不懂細節沒關係，先看 **A 區到哪、C 區卡哪**。
 
 ---
 
@@ -283,10 +283,11 @@
 - `docs/overview/EXECUTION_DASHBOARD.md`  
 - `docs/overview/INTEGRATED_STATUS_REPORT.md`  
 - `memory/CONVERSATION_MEMORY.md`  
-- `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+- `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## Related Documents (Auto-Synced)
 - `docs/overview/EXECUTION_DASHBOARD.md`
 
 _Last synced: 2026-04-29 14:30:02 UTC_
+
 

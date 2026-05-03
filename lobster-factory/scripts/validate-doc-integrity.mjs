@@ -89,7 +89,10 @@ function scanRoot(label, absRoot) {
 function assertCanonical() {
   const required = [
     path.join(lobsterRoot, "README.md"),
-    path.join(lobsterRoot, "docs", "LOBSTER_FACTORY_MASTER_CHECKLIST.md"),
+    path.join(lobsterRoot, "docs", "LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md"),
+    path.join(lobsterRoot, "docs", "LOBSTER_FACTORY_CHECKLIST.md"),
+    path.join(lobsterRoot, "docs", "LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md"),
+    path.join(lobsterRoot, "docs", "LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST_v1.4.md"),
     path.join(lobsterRoot, "docs", "C1_EXECUTION_RUNBOOK.md"),
     path.join(lobsterRoot, "docs", "LOBSTER_FACTORY_COMPLETION_PLAN_V2.md"),
     path.join(lobsterRoot, "docs", "LOBSTER_FACTORY_MASTER_V3_INTEGRATION_PLAN.md"),

@@ -32,7 +32,7 @@
 4. 讀 `memory/daily/` 的今日與昨日筆記（若存在）
 5. 讀 `TASKS.md` 與 `WORKLOG.md`
 6. 讀龍蝦工廠主軸文件（若存在）：
-   - `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+   - `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
    - `../lobster-factory/docs/LOBSTER_FACTORY_COMPLETION_PLAN_V2.md`
 7. 先輸出啟動摘要（固定格式）：
    - **一般開場**（非 `AO-RESUME`）：`Yesterday Recap`（Completed/Pending/Risks）、`Today Plan`（Priority 1/2/3）、`Confirm`：「今天先做哪一項？」
@@ -119,4 +119,5 @@
 - `scripts/register-new-governance-doc.ps1`
 
 _Last synced: 2026-05-01 12:30:40 UTC_
+
 

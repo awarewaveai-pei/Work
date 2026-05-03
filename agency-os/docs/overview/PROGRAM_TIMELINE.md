@@ -1,6 +1,6 @@
 ﻿# Program timeline（營運 + 龍蝦 + 客戶案｜細項版）
 
-> **用途**：把「還沒勾的」工作拆成**可排程、可驗收**的細項；**仍不**取代 `TASKS.md`、`LOBSTER_FACTORY_MASTER_CHECKLIST.md`、客戶 Discovery——本檔是**規劃鏡像**，真相以勾選檔為準。
+> **用途**：把「還沒勾的」工作拆成**可排程、可驗收**的細項；**仍不**取代 `TASKS.md`、`LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`、客戶 Discovery——本檔是**規劃鏡像**，真相以勾選檔為準。
 
 ---
 
@@ -23,7 +23,7 @@
 | 流 | 勾選與細項 | 拼裝懶人包 |
 |----|------------|------------|
 | 營運 | [`TASKS.md`](../../TASKS.md) | [`integrated-status-LATEST.md`](../../reports/status/integrated-status-LATEST.md) §1–2 |
-| 龍蝦 | [`LOBSTER_FACTORY_MASTER_CHECKLIST.md`](../../../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md) | 同上 §3 |
+| 龍蝦 | [`LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`](../../../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md) | 同上 §3 |
 | 客戶 | [`10_DISCOVERY.md`](../../tenants/company-p1-pilot/projects/2026-010-p1-pilot/10_DISCOVERY.md) 等 | 專案資料夾；並列 [`PROGRAM_SCHEDULE.json`](PROGRAM_SCHEDULE.json) **客戶流**（可複製到專案內維護） |
 
 ---

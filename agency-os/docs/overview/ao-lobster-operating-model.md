@@ -78,10 +78,11 @@ These are known "must run in rhythm" items to convert configuration into real op
 - `docs/overview/agency-os-complete-system-introduction.md`
 - `../lobster-factory/README.md`
 - `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
-- `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+- `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## Related Documents (Auto-Synced)
 - `docs/operations/hetzner-stack-rollout-index.md`
 
 _Last synced: 2026-04-06 07:49:28 UTC_
+
 

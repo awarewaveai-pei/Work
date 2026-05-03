@@ -1,4 +1,4 @@
-# Onboarding + A10-2 Run ID Traceability Spec
+﻿# Onboarding + A10-2 Run ID Traceability Spec
 
 ## Purpose
 Define one consistent traceability chain for new tenant onboarding and A10-2 business loop execution so evidence is complete and searchable across Agency OS + Lobster Factory.
@@ -48,4 +48,5 @@ For each meaningful run, add one row to the run map in the evidence folder:
 ## Related
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 - `../lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md`
-- `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+- `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+

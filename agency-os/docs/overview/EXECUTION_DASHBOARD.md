@@ -28,7 +28,7 @@
 ### B. Lobster Factory（「一人跨國公司」底座工程）
 - **工程本體**：`<WORK_ROOT>\lobster-factory\`
 - **規格來源**：`<WORK_ROOT>\docs\spec\raw\`
-- **主追蹤清單**：`<WORK_ROOT>\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md`
+- **主追蹤清單**：`<WORK_ROOT>\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 - **整合路線圖**：`<WORK_ROOT>\lobster-factory\docs\LOBSTER_FACTORY_MASTER_V3_INTEGRATION_PLAN.md`
 
 ## 2) 目前進度（你要掌握的結論版）
@@ -115,4 +115,5 @@
 - `memory/CONVERSATION_MEMORY.md`
 
 _Last synced: 2026-05-01 11:39:18 UTC_
+
 

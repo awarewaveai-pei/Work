@@ -31,7 +31,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\generate-integrated-status-re
 | 報告章節 | 對應真實來源 | 你記的分類 |
 |----------|----------------|------------|
 | §1–2 `TASKS.md - Next / Backlog` | `TASKS.md` 未勾選項 | 待辦狀態 · 全公司 |
-| §3 Lobster checklist open items | `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`（A～C，不含 D 儀表勾選） | 待辦狀態 · 工廠 |
+| §3 Lobster checklist open items | `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`（A～C，不含 D 儀表勾選） | 待辦狀態 · 工廠 |
 | §4 `CONVERSATION_MEMORY` excerpts | `memory/CONVERSATION_MEMORY.md`（Next / Today / Remaining / Tomorrow） | 今天從哪接 |
 | §5 `memory/daily/…` | 當日 `memory/daily/YYYY-MM-DD.md`（過長會截斷） | 今日細節 |
 | §6–7 | `LAST_SYSTEM_STATUS.md`、`WORKLOG.md` 尾端（約末 60 行，避免整檔載入過慢） | 狀態／日誌附錄 |
@@ -49,7 +49,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\generate-integrated-status-re
 
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `TASKS.md`
-- `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`（monorepo 路徑）
+- `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`（monorepo 路徑）
 
 _Last updated: manual doc; report body is script-generated._
 
@@ -59,4 +59,5 @@ _Last updated: manual doc; report body is script-generated._
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
 _Last synced: 2026-05-01 11:39:18 UTC_
+
 

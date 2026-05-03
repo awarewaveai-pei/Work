@@ -50,12 +50,6 @@
 
 ### 未完成
 
-- [ ] **龍蝦 SSOT 四檔 + 合併版 — 全 repo 索引連結收口（版本化檔為 Owner）** —— **【進行中】** **進度（2026-05-03）：**檔已改為版本化檔名 + 新增 `LOBSTER_FACTORY_CHECKLIST.md`（v3.0 合併版）。**正本路徑**（均為 `lobster-factory/docs/`）：
-  - `LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md`（Master System／設計 SSOT）
-  - `LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST_v1.4.md`（Phase Gate／驗收／evidence）
-  - `LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`（細項勾選／區塊 A～）
-  - `LOBSTER_FACTORY_CHECKLIST.md`（**日常開工／部署**單一入口 — Part 1～3）
-  **DoD：**（1）monorepo 內 **無** 仍指向已移除之無後綴檔（例如 `LOBSTER_FACTORY_MASTER_CHECKLIST.md`、`LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM.md`）之**連結**（歷史 `WORKLOG`／memory 可不改）；（2）根 `README.md`、`lobster-factory/README.md`、`agency-os/docs/overview/EXECUTION_DASHBOARD.md`、`PROGRAM_TIMELINE.md`、`agency-os-complete-system-introduction.md`、`LOBSTER_FACTORY_OPERATOR_RUNBOOK.md`、`C1_EXECUTION_RUNBOOK.md`、`INTEGRATED_STATUS_REPORT.md` 等索引已更新；（3）`LOBSTER_FACTORY_CHECKLIST.md` 首段「對齊主文件」與 **`_v1.3.md`** 一致；（4）**WORKLOG** 一行決策：日常勾選以 **`LOBSTER_FACTORY_CHECKLIST.md`** 為準／或以 **`MASTER_CHECKLIST_v2`** 為準（擇一公告避免雙寫）。**下一步：**`rg "LOBSTER_FACTORY_MASTER_CHECKLIST\\.md"`、`rg "LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM\\.md"`（限定 `*.md` 治理／索引檔）→ 批量修正 → checkpoint commit → `git push`。
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：**兩台皆須 **`machine-environment-audit -Strict` PASS（無 WARN）**；任一台未 PASS 則本條不結案。**下一步：**在**每一台** monorepo 根跑該稽核；細項與證據索引 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。開機／hook／pull 敘事正本 → **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（§1.5、§2.5.1）。
 - [ ] **Git：`main` 未推送 commits → `git push origin main`** —— **【進行中】** **進度：**本地已有多次 commit（Trigger／PostHog／TASKS／WP MU 等）；**下一步：**`git fetch` → `git log origin/main..HEAD` → **`git push origin main`**。
 - [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度：**repo 已 **`syncEnvVars`**、鎖 CLI **`4.4.4`**、README／腳本齊；曾完成 **環境變數同步**，**缺**在 **EU** 對 **`registry:5000`** **映像 push**（見 **`lobster-factory/infra/trigger/README.md` §7a**）。**下一步：**於 EU 或 tunnel 就緒後跑 **`deploy-workflows.ps1`** 或 **`npx trigger.dev@4.4.4 deploy`**。
@@ -102,6 +96,10 @@
   - DoD：2 個測試角色登入後，看到不同權限結果
 
 ## Next — 已完成歷程（查詢用）
+
+### 2026-05-03 — 龍蝦 SSOT 連結收口
+
+- [x] **龍蝦 SSOT 四檔 + 合併版 — 全域索引／腳本連結替換（`_v1.3`／`_v1.4`／`_v2`）** — 根／`lobster-factory` README、AO 導覽、`generate-integrated-status-report.ps1`、`validate-doc-integrity.mjs`、`DEPLOYMENT_CHECKLIST_v1.4` §0、`OPERATOR_RUNBOOK`；**刻意不改**：`WORKLOG`、舊 `memory/daily`、`.claude/sessions`。**日常入口**：`LOBSTER_FACTORY_CHECKLIST.md`（v3）；細項勾選：`MASTER_CHECKLIST_v2.md`。
 
 ### 2026-05-01 — 自 Next 隊列移入（整理版面）
 
@@ -267,4 +265,5 @@
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
 _Last synced: 2026-05-01 12:30:40 UTC_
+
 

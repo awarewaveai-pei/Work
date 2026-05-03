@@ -6,8 +6,6 @@
 定位：**單一真相來源 Single Source of Truth**
 目標：**可部署、可擴充、可刪減、可替換工具、可長期維護 30 年**
 
-> **Repo 路徑：** `lobster-factory/docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM.md`（連結與 `LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST.md` 標頭「對齊主文件」一致；勿另存 `_v1.3.md` 複製檔以免分叉）。
-
 > **v1.1 修訂說明：** 修正全文 Markdown 逃脫字符、Phase 編號對齊、補全資料模型缺漏表、wp-basic manifest 範例、handoff report 結構、Decision Engine 評分邏輯、SLA 等級定義。
 
 > **v1.2 修訂說明：** 修正 4 個架構矛盾；新增 12 個長期營運制度章節（Canonical Naming / Environment Release / Backup & DR / Idempotency & Locking / Plugin Governance / Domain & DNS & Email / Testing Strategy / Client Data Lifecycle / Cost & Profitability / Client Communication Policy / ADR）。

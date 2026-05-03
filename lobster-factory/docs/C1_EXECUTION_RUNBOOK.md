@@ -1,4 +1,4 @@
-# C1 Execution Runbook (DB Write Path)
+﻿# C1 Execution Runbook (DB Write Path)
 
 > Scope: C1-1 / C1-2 / C1-3  
 > Goal: execute the full DB write validation path in a deterministic order with minimal risk.
@@ -42,8 +42,9 @@
 
 ## 5) After Successful Run
 - Update:
-  - `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` (mark C1 tasks)
+  - `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md` (mark C1 tasks)
   - `agency-os/TASKS.md`
   - `agency-os/WORKLOG.md`
   - `agency-os/memory/CONVERSATION_MEMORY.md`
   - `agency-os/memory/daily/YYYY-MM-DD.md`
+

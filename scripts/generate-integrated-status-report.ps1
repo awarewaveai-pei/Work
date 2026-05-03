@@ -137,9 +137,9 @@ $dailyName = (Get-Date).ToString("yyyy-MM-dd")
 $dailyPath = Join-Path $root "memory\daily\$dailyName.md"
 $statusPath = Join-Path $root "LAST_SYSTEM_STATUS.md"
 $worklogPath = Join-Path $root "WORKLOG.md"
-$lobsterPath = Join-Path $root "..\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md"
+$lobsterPath = Join-Path $root "..\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md"
 if (-not (Test-Path $lobsterPath)) {
-    $lobsterPath = Join-Path $root "lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST.md"
+    $lobsterPath = Join-Path $root "lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md"
 }
 
 $stamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
@@ -160,7 +160,7 @@ $sb = [System.Text.StringBuilder]::new()
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("## Source index")
 [void]$sb.AppendLine("- ``TASKS.md``")
-[void]$sb.AppendLine("- ``../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md``")
+[void]$sb.AppendLine("- ``../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md``")
 [void]$sb.AppendLine("- ``memory/CONVERSATION_MEMORY.md``")
 [void]$sb.AppendLine("- ``memory/daily/YYYY-MM-DD.md``")
 [void]$sb.AppendLine("- ``LAST_SYSTEM_STATUS.md``, ``WORKLOG.md``")

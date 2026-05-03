@@ -3,12 +3,10 @@
 副標：Cloud-first One-click Client OS Factory — 30 年穩定部署驗收清單
 
 版本：`v1.4`
-對齊主文件：`docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM.md`（檔內標頭版本 **v1.3**）
-對齊進度追蹤：`docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md`（勾選進度；並見 `agency-os/TASKS.md`）
+對齊主文件：`LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md`
+對齊追蹤文件：`LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 定位：**Execution Checklist / Gate Checklist / Evidence Checklist**
 
-> **路徑校正（2026-05-03）：** 主／追蹤文件改為 **repo 實際檔名**（無 `_v1.3`／`_v2` 後綴）；與 `lobster-factory/README.md` 連結一致。
->
 > **v1.4 修訂說明：** 新增 Section 24A「Deployment Profile Identification Gate」，正式定義 Profile A（AO-agent 自架）/ Profile B（新客戶全雲端）/ Profile C（已有 WordPress 接管）三種部署路徑的完整驗收 Gate。對應 Master System v1.3 Section 41。
 >
 > **v1.3 修訂說明（基於 GPT v1.2.1 補強）：**
@@ -33,9 +31,10 @@
 Master Plan 管「系統設計」；本 checklist 管「是否真的完成、是否有證據、是否可進下一關」。
 
 ```
-Master System          = docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM.md（設計與架構真相）
-Deployment Checklist   = docs/LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST.md（執行與驗收真相）
-Master Checklist       = docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md（實作進度勾選）＋ ../../agency-os/TASKS.md（跨系統任務板）
+Master System          = docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md
+Deployment Checklist   = docs/LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST_v1.4.md（本文件）
+Master Checklist       = docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md
+日課合併版（可選）   = docs/LOBSTER_FACTORY_CHECKLIST.md
 ```
 
 **三份文件必須一致，不可矛盾。任何衝突發現必須先更新 Known Conflicts Log（v1.2 Section 39）再繼續。**
@@ -108,7 +107,7 @@ deferred
 - [ ] TypeScript 用 camelCase（e.g. `applyManifest`）
 - [ ] JSON manifest 檔名用 kebab-case（e.g. `wp-basic.json`）
 - [ ] Policy JSON 檔名用 kebab-case（e.g. `production-deploy-policy.json`）
-- [ ] 命名對照表（`docs/CANONICAL_NAMING_POLICY.md` 或 `docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` I 區）已建立
+- [ ] 命名對照表（`docs/CANONICAL_NAMING_POLICY.md` 或 MASTER_CHECKLIST v2 I 區）已建立
 
 ### 1.2 Safety
 
@@ -156,7 +155,7 @@ deferred
 
 ### 必備文件
 
-- [ ] `docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM.md`（設計 SSOT；檔內版本見標頭。若另維護索引檔 `docs/MASTER_SYSTEM.md`，語意須與本檔對齊）
+- [ ] `docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md`（設計 SSOT；若另建索引 `docs/MASTER_SYSTEM.md` 須與本檔語意一致）
 - [ ] `docs/DATA_MODEL.md`
 - [ ] `docs/WORKFLOW_ROUTING.md`
 - [ ] `docs/APPROVAL_POLICY.md`
@@ -441,7 +440,7 @@ Evidence:
 - [ ] `decision_id`（Decision Engine 觸發時）
 - [ ] `rollback_ref`（rollback 存在時）
 
-### Artifact Storage Gate（對應 v1.2 Section 30 + `LOBSTER_FACTORY_MASTER_CHECKLIST.md` B5）
+### Artifact Storage Gate（對應 v1.2 Section 30 + MASTER_CHECKLIST v2 B5）
 
 - [ ] `localArtifactSink` 可在本機儲存 artifacts
 - [ ] `remotePutArtifactSink` 可上傳至遠端（Object Storage / S3-compatible）
@@ -1378,11 +1377,11 @@ Evidence:
 
 > 確認三份 Single Source of Truth 文件保持一致。
 
-| 文件（路徑相對 `lobster-factory/`） | 版本 | 最後確認日期 |
+| 文件 | 版本 | 最後確認日期 |
 |---|---|---|
-| `docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM.md` | v1.3（見檔首） | |
-| `docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` | rolling（區塊勾選） | |
-| `docs/LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST.md`（本文件） | v1.4 | |
+| `LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM` | v1.3 | |
+| `LOBSTER_FACTORY_MASTER_CHECKLIST` | v2.0 | |
+| `LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST`（本文件）| v1.4 | |
 
 ### 同步確認項目
 
@@ -1390,7 +1389,7 @@ Evidence:
 - [ ] Canonical Naming 定義在三份文件完全一致
 - [ ] `approval_policies` / `approval_requests` 命名在三份文件完全一致
 - [ ] No-Go 條件在三份文件沒有矛盾
-- [ ] `LOBSTER_FACTORY_MASTER_CHECKLIST.md` J 區的對齊進度與本 checklist gate 狀態一致
+- [ ] MASTER_CHECKLIST v2 J 區的對齊進度與本 checklist gate 狀態一致
 - [ ] `package_install_runs` 已同步更新至 Master System Section 15.4（待更新）
 - [ ] Artifact storage pattern 已同步更新至 Master System Section 30（待更新）
 

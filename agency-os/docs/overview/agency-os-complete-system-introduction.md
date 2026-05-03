@@ -90,7 +90,7 @@ Agency OS 是一套給接案公司使用的營運系統，核心目標是把「�
 ## 9) AO + 龍蝦如何一起運作（事件節奏）
 - 開工事件：以 `docs/overview/REMOTE_WORKSTATION_STARTUP.md` + `AO-RESUME` 為入口。
 - 收工事件：以 `docs/operations/end-of-day-checklist.md` + `AO-CLOSE` 為入口。
-- 工廠執行：以 `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` 和 `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` 追蹤。
+- 工廠執行：以 `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` 和 `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md` 追蹤。
 - 單一運作模型：`docs/overview/ao-lobster-operating-model.md`（避免跨檔案重複維護）。
 
 ## Related Documents (Auto-Synced)
@@ -103,4 +103,5 @@ Agency OS 是一套給接案公司使用的營運系統，核心目標是把「�
 - `tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md`
 
 _Last synced: 2026-04-29 14:30:02 UTC_
+
 

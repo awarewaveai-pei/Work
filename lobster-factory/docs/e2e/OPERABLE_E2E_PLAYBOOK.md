@@ -1,8 +1,8 @@
-# Operable E2E playbook（Phase 1 — staging）
+﻿# Operable E2E playbook（Phase 1 — staging）
 
 > **A10 baseline**：從「本機可驗證」到「可留證據」的**固定順序**。  
 > 欄位與 UUID 仍以 [`STAGING_PIPELINE_E2E_PAYLOAD.md`](STAGING_PIPELINE_E2E_PAYLOAD.md) 為準。  
-> 真 Trigger 生產全鏈、新客戶商業驗收 → 見 **A10-2**（`LOBSTER_FACTORY_MASTER_CHECKLIST.md`）。  
+> 真 Trigger 生產全鏈、新客戶商業驗收 → 見 **A10-2**（`LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`）。  
 > 新客戶導入時請與 Agency **`NEW_TENANT_ONBOARDING_SOP.md` Step 7** 一併執行（monorepo：`agency-os/tenants/…`）。
 
 ## 0) 一次綠燈（必跑）
@@ -85,3 +85,4 @@ npm run drill:staging-report
 - [`WORDPRESS_FACTORY_EXECUTION_SPEC.md`](../WORDPRESS_FACTORY_EXECUTION_SPEC.md)
 - [`HOSTING_ADAPTER_CONTRACT.md`](../hosting/HOSTING_ADAPTER_CONTRACT.md)
 - [`REMOTE_PUT_ARTIFACTS.md`](../operations/REMOTE_PUT_ARTIFACTS.md)
+
