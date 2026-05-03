@@ -13,15 +13,22 @@ export default defineConfig({
       // Source: same POSTHOG_* as phase1 `.env` / vault — export before `npx trigger.dev deploy`.
       // See `infra/trigger/README.md` § PostHog（workflow 事件）.
       syncEnvVars(async () => {
+        const out: Record<string, string> = {};
         const apiKey = process.env.POSTHOG_API_KEY ?? "";
         const host = process.env.POSTHOG_HOST ?? "";
-        if (!apiKey.trim() || !host.trim()) {
-          return {};
+        if (apiKey.trim() && host.trim()) {
+          out.POSTHOG_API_KEY = apiKey;
+          out.POSTHOG_HOST = host;
         }
-        return {
-          POSTHOG_API_KEY: apiKey,
-          POSTHOG_HOST: host,
-        };
+        const ingest = process.env.OPS_INBOX_INGEST_TOKEN ?? "";
+        if (ingest.trim()) {
+          out.OPS_INBOX_INGEST_TOKEN = ingest.trim();
+        }
+        const awBase = process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "";
+        if (awBase.trim()) {
+          out.AWAREWAVE_WEBHOOK_BASE_URL = awBase.trim().replace(/\/$/, "");
+        }
+        return out;
       }),
     ],
   },

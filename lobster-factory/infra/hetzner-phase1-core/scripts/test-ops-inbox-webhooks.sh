@@ -6,6 +6,9 @@
 #   OPS_INBOX_TEST_BASE_URL  e.g. https://app.aware-wave.com
 #   OPS_INBOX_INGEST_TOKEN   Bearer secret (same as monitoring webhooks)
 #
+# Optional (also runs POST /api/webhooks/tenant-integration):
+#   TENANT_INTEGRATION_ORG_ID  real organizations.id UUID (after migration 0024)
+#
 # Slack (optional, for real Slack posts):
 #   OPS_INBOX_NOTIFY_ENABLED=true
 #   OPS_INBOX_SLACK_INCIDENTS_WEBHOOK=https://hooks.slack.com/...
@@ -113,5 +116,32 @@ post netdata /api/webhooks/netdata "$(cat <<JSON
 }
 JSON
 )"
+
+if [[ -n "${TENANT_INTEGRATION_ORG_ID:-}" ]]; then
+  echo "=== tenant-integration (tenant_integration_bindings) ==="
+  body=$(curl -sS -w "\n%{http_code}" -X POST "${BASE}/api/webhooks/tenant-integration" \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "$(cat <<JSON
+{
+  "organization_id": "${TENANT_INTEGRATION_ORG_ID}",
+  "provider": "github",
+  "provisioning_source": "n8n",
+  "status": "active",
+  "secret_ref": "vault://probe/${RUN_ID}",
+  "api_metadata": { "probe": true, "run_id": "${RUN_ID}" }
+}
+JSON
+)" || true)
+  code=$(echo "$body" | tail -n1)
+  body=$(echo "$body" | sed '$d')
+  echo "$body"
+  echo "HTTP $code"
+  if [[ "$code" != "200" ]]; then
+    echo "FAIL: tenant-integration expected 200 (check migration 0024 + FK organization_id)" >&2
+    exit 1
+  fi
+  echo ""
+fi
 
 echo "Done. RUN_ID=${RUN_ID} — open Ops Inbox (status: all) and check each incident Notify Log + Slack."
