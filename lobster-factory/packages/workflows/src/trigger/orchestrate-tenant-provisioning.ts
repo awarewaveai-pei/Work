@@ -1,6 +1,15 @@
 /**
  * Single entry: fan-out per provider, land everything in tenant_integration_bindings via next-admin webhook.
  * Google in the payload is identity/audit only — each vendor still needs its own OAuth/API trust model.
+ *
+ * Worker env (non-exhaustive; see `src/lib/tenant-provisioning/providers/*`):
+ * Sentry: SENTRY_AUTH_TOKEN, SENTRY_ORG_SLUG, optional SENTRY_TEAM_SLUG, SENTRY_API_BASE_URL
+ * GitHub: TENANT_PROVISION_GITHUB_TOKEN (or GITHUB_TOKEN), optional TENANT_PROVISION_GITHUB_ORG
+ * PostHog: POSTHOG_HOST, POSTHOG_PERSONAL_API_KEY
+ * n8n: N8N_API_BASE_URL, N8N_API_KEY, TENANT_PROVISION_N8N_TEMPLATE_WORKFLOW_ID
+ * Supabase Cloud: TENANT_PROVISION_SUPABASE_ACCESS_TOKEN, hints.supabaseBillingOrgId (or pin hints.supabaseProjectRef)
+ * Trigger: optional TENANT_PROVISION_TRIGGER_PROJECT_REF
+ * Uptime: UPTIME_KUMA_BASE_URL, UPTIME_KUMA_API_KEY
  */
 
 import { task, logger } from "@trigger.dev/sdk";
@@ -19,12 +28,32 @@ const ProviderEnum = z.enum([
   "posthog",
 ]);
 
+const HintsSchema = z
+  .object({
+    sentryProjectSlug: z.string().min(1).max(64).optional(),
+    sentryProjectName: z.string().max(128).optional(),
+    sentryPlatform: z.string().max(64).optional(),
+    githubRepoName: z.string().min(1).max(90).optional(),
+    githubRepoDescription: z.string().max(512).optional(),
+    posthogProjectName: z.string().max(128).optional(),
+    posthogProjectSlug: z.string().max(128).optional(),
+    n8nWorkflowSuffix: z.string().max(64).optional(),
+    supabaseBillingOrgId: z.string().uuid().optional(),
+    supabaseRegion: z.string().max(32).optional(),
+    supabaseProjectRef: z.string().max(64).optional(),
+    uptimeMonitorUrl: z.string().url().optional(),
+    uptimeMonitorName: z.string().max(128).optional(),
+  })
+  .strict()
+  .optional();
+
 const InputSchema = z.object({
   organizationId: z.string().uuid(),
   workspaceId: z.string().uuid().optional(),
   customerEmail: z.string().email(),
   googleSubject: z.string().min(1).optional(),
   providers: z.array(ProviderEnum).min(1),
+  hints: HintsSchema,
 });
 
 export const orchestrateTenantProvisioning = task({
@@ -36,6 +65,7 @@ export const orchestrateTenantProvisioning = task({
       workspaceId: input.workspaceId,
       customerEmail: input.customerEmail,
       googleSubject: input.googleSubject,
+      hints: input.hints ?? undefined,
     };
 
     const results: Array<{ provider: ProvisioningProvider; ok: boolean; detail?: string }> = [];
