@@ -1,35 +1,16 @@
 ﻿{
-    "last_run_utc":  "2026-05-01T12:30:41.1108811Z",
+    "last_run_utc":  "2026-05-03T05:12:25.7094468Z",
     "changed_files":  [
-                          "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                          "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
-                          "TASKS.md",
+                          "tenants/company-soulful-expression/sites/soulfulexpression-org/OBSERVABILITY_HOSTINGER.md",
+                          "tenants/company-soulful-expression/sites/soulfulexpression-org/SITE_PROFILE.md",
                           "WORKLOG.md"
                       ],
     "impacted_files":  [
-                           "../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
-                           "../lobster-factory/docs/ROUTING_MATRIX.md",
-                           ".cursor/rules/64-architecture-mcp-routing.mdc",
-                           "AGENTS.md",
-                           "docs/operations/cursor-enterprise-rules-index.md",
-                           "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                           "docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md",
-                           "docs/operations/security-secrets-policy.md",
-                           "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
-                           "docs/operations/tools-and-integrations.md",
-                           "README.md",
-                           "TASKS.md",
+                           "tenants/company-soulful-expression/sites/soulfulexpression-org/OBSERVABILITY_HOSTINGER.md",
+                           "tenants/company-soulful-expression/sites/soulfulexpression-org/SITE_PROFILE.md",
                            "WORKLOG.md"
                        ],
     "auto_updated_files":  [
-                               "AGENTS.md",
-                               "docs/operations/cursor-enterprise-rules-index.md",
-                               "docs/operations/cursor-mcp-and-plugin-inventory.md",
-                               "docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md",
-                               "docs/operations/security-secrets-policy.md",
-                               "docs/operations/TOOLS_DELIVERY_TRACEABILITY.md",
-                               "docs/operations/tools-and-integrations.md",
-                               "TASKS.md",
                                "WORKLOG.md"
                            ]
 }
