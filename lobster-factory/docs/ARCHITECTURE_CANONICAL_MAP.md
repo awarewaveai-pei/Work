@@ -10,6 +10,7 @@ Provide a single source-of-truth map so routing, workflow, and governance rules 
 - `ops_action_runs.status` enum + dispatcher lifecycle (`dispatched`, `dispatch_failed`, `trigger_run_id`):
   - `packages/db/migrations/0023_dispatcher_enum_and_catalog_seeds.sql`
   - `infra/hetzner-phase1-core/apps/next-admin/lib/ops-contracts.ts` (`OpsActionRunStatus`)
+- Per-tenant tool accounts (n8n/Trigger → one SoR): `public.tenant_integration_bindings` + `POST /api/webhooks/tenant-integration` (Bearer `OPS_INBOX_INGEST_TOKEN`) + tasks `record-tenant-integration`, `orchestrate-tenant-provisioning`
 - Tool routing and boundaries:
   - `docs/MCP_TOOL_ROUTING_SPEC.md`
 - WordPress Factory execution channel:

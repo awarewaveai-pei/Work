@@ -5,6 +5,7 @@
 
 import { task, logger } from "@trigger.dev/sdk";
 import { z } from "zod";
+import { postTenantIntegrationWebhook } from "../lib/tenant-provisioning/postTenantIntegrationWebhook";
 
 const PROVIDER_RE = /^[a-z][a-z0-9_]{0,63}$/;
 
@@ -29,45 +30,19 @@ export const recordTenantIntegration = task({
   id: "record-tenant-integration",
   run: async (payload: unknown) => {
     const input = PayloadSchema.parse(payload);
-    const token = process.env.OPS_INBOX_INGEST_TOKEN?.trim();
-    const base = (process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "https://app.aware-wave.com").replace(/\/$/, "");
-    if (!token) {
-      throw new Error("OPS_INBOX_INGEST_TOKEN is required on Trigger worker");
-    }
-
-    const url = `${base}/api/webhooks/tenant-integration`;
-    const body = {
-      organization_id: input.organizationId,
-      workspace_id: input.workspaceId ?? null,
+    const out = await postTenantIntegrationWebhook({
+      organizationId: input.organizationId,
+      workspaceId: input.workspaceId,
       provider: input.provider,
-      secret_ref: input.secretRef ?? null,
-      external_hint: input.externalHint ?? null,
-      api_metadata: input.apiMetadata ?? {},
-      provisioning_source: input.provisioningSource,
+      secretRef: input.secretRef,
+      externalHint: input.externalHint,
+      apiMetadata: input.apiMetadata ?? {},
+      provisioningSource: input.provisioningSource,
       status: input.status,
-      last_error: input.lastError ?? null,
-    };
-
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
+      lastError: input.lastError,
     });
 
-    const text = await res.text();
-    if (!res.ok) {
-      logger.error("record-tenant-integration failed", { status: res.status, text: text.slice(0, 500) });
-      throw new Error(`webhook ${res.status}: ${text.slice(0, 300)}`);
-    }
-
     logger.info("record-tenant-integration ok", { provider: input.provider, organizationId: input.organizationId });
-    try {
-      return JSON.parse(text) as { ok?: boolean; id?: string };
-    } catch {
-      return { raw: text };
-    }
+    return out;
   },
 });
