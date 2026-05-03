@@ -49,7 +49,7 @@
     - `OPS_ROLE_RESOLUTION_MODE=claims_only|claims_with_simulated_fallback`
     - `OPS_ALLOW_SIMULATED_ROLE_FALLBACK=true|false`
     - `OPS_PROXY_SHARED_SECRET=<shared-secret>`（由 trusted proxy 注入 `x-ops-proxy-auth` 才接受 claims）。
-  - `next-admin` middleware 會對 `/api/ops/*` 做 header 清洗：
+  - `next-admin` middleware 會對 `/api/ops/*` 與 `/api/build/*` 做 header 清洗：
     - 非 trusted proxy 來源：移除 claims header，production 也會移除 simulated header。
     - trusted proxy 且 claims 合法：正規化為 `x-ops-claims-role` 再交由 API 層授權。
 

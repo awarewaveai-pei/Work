@@ -13,7 +13,7 @@
 
 ## 架構先講清楚（你問的 Next.js）
 
-- **Next.js Admin（`next-admin`）是自架**：跑在 **Docker** 內，由 **phase1 的 Nginx** 反代到 **`/admin/`**（根路徑 `/` 為 WordPress；見 `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`）。
+- **Next.js Admin（`next-admin`）是自架**：跑在 **Docker** 內，由 **phase1 的 Nginx / Apache vhost** 反代到 **`https://app.aware-wave.com/`**（工具總入口；Build Console 在 `/build`）。apex 根路徑 `/` 仍為 WordPress；見 `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 與 `nginx/system-sites/aware-wave-app-api-subdomains.conf`。
 - **Cloudflare 不做 Next.js 主機**：它只做 **DNS、代理（CDN/WAF）、TLS 邊緣**；流量仍落到你的 **VPS 上的 Nginx（或系統 Nginx）**。
 - **不要**把 Next.js 改成 Vercel 才算「接上 Cloudflare」；你現在這種 **自架 + CF 邊緣** 是正式、可長期用的模式。
 
@@ -27,7 +27,7 @@ AwareWave 目前有 **兩台公網 VPS**：**新加坡 phase1**（WordPress／`n
 
 | 子網域（例） | A 記錄應指向 | 說明 |
 |--------------|--------------|------|
-| `@`（apex）、**api**、**app** | **`5.223.93.113`（SG）** | 官網 WordPress、[`api.aware-wave.com`](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)（node-api）、[`app.aware-wave.com`](./CLOUDFLARE_HETZNER_PHASE1.md)（Next 入口／302 策略依範本） |
+| `@`（apex）、**api**、**app** | **`5.223.93.113`（SG）** | 官網 WordPress、[`api.aware-wave.com`](../edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)（node-api）、[`app.aware-wave.com`](./CLOUDFLARE_HETZNER_PHASE1.md)（Next 工具入口，含 `/build`） |
 | **www** | **CNAME → apex**（或與 apex 同 IP） | 與橘雲／SEO 策略一致即可 |
 | **supabase**、**studio**、**n8n**、**trigger**、**uptime** | **`204.168.175.41`（EU）** | 平台層：Kong／Studio、自動化、編排、監控（見 [`SUPABASE_SELF_HOSTED_RUNBOOK.md`](SUPABASE_SELF_HOSTED_RUNBOOK.md)、[`mcp/SERVICE_CREDENTIALS_MAP.md`](../../../mcp/SERVICE_CREDENTIALS_MAP.md)） |
 
@@ -53,11 +53,11 @@ AwareWave 目前有 **兩台公網 VPS**：**新加坡 phase1**（WordPress／`n
 | 主機名 | Cloudflare DNS | 源站（本 repo 預設） | 說明 |
 |--------|------------------|----------------------|------|
 | **api** | `A` `api` → VPS IP（橘雲與否依你 WAF 策略） | `127.0.0.1:3001`（`node-api`） | 瀏覽器／客戶端可打 **`https://api.aware-wave.com/health`** 等，路徑與容器根一致（不必再加 `/api` 前綴）。 |
-| **app** | `A` `app` → 同上 | **302** → **`https://aware-wave.com/admin/`** | 與目前 **Next `basePath=/admin`、公開網址以 apex 為準** 對齊；**`app.*` 僅作短網址／書籤入口**，避免換 `Host` 導致 `_next` 靜態資源與 cookie 錯位。若未來要「`app` 直出 Next」需另備建置與 `NEXT_PUBLIC_*`。 |
+| **app** | `A` `app` → 同上 | `127.0.0.1:3002`（`next-admin`） | 正式工具入口：`https://app.aware-wave.com/`；Build Console：`https://app.aware-wave.com/build`。舊 `/admin` 書籤可 redirect 到 `/`，但不再作為主要入口。 |
 
 **TLS**：對上述兩名建議 **`certbot`** 一次簽 **SAN**（例：`certbot certonly --nginx -d api.aware-wave.com -d app.aware-wave.com`），再把範本內 **`ssl_certificate`** 路徑改成 `certbot` 實際產生的 `live/` 目錄（常見為第一個 `-d` 主機名資料夾）。**Cloudflare** 仍建議 **Full (strict)**。
 
-**驗收**：`curl -sSI https://api.aware-wave.com/health` 為 **200**；`curl -sSI https://app.aware-wave.com/` 為 **302** 且 **`Location: https://aware-wave.com/admin/`**。
+**驗收**：`curl -sSI https://api.aware-wave.com/health` 為 **200**；`curl -sSI https://app.aware-wave.com/` 或 `/build` 若未帶內部工具憑證，可能回 **401**（例如 Basic realm `Aware Wave Admin`），這是可接受的保護層。帶憑證或瀏覽器登入後，`https://app.aware-wave.com/build` 應開啟 `next-admin` Build Console。
 3. **SSL/TLS 模式**（關鍵）：
    - **首選**：**Full (strict)** — 你的 **源站** 必須有 **有效憑證**（Let’s Encrypt 等），Cloudflare 到源站也用 HTTPS。
    - **可接受過渡**：**Full** — 源站自簽仍可行，但不如 strict 乾淨。
@@ -83,8 +83,8 @@ repo 已提供：
 
 ## 驗收清單（最小）
 
-- 瀏覽器：`https://<你的網域>/`（WordPress）、`/admin/`（Next）、`/api/health`、`/n8n/` 行為與開 CF 前一致。
-- 若有 **`api.*` / `app.*`**：`https://api.<網域>/health` 正常；`https://app.<網域>/` **302** 至 apex **`/admin/`**（與範本一致時）。
+- 瀏覽器：`https://<你的網域>/`（WordPress）、`https://app.<網域>/`（Next 工具入口）、`https://app.<網域>/build`（Build Console，需通過工具保護層）、`/api/health`、`/n8n/` 行為與開 CF 前一致。
+- 若有 **`api.*` / `app.*`**：`https://api.<網域>/health` 正常；`https://app.<網域>/` 直接服務受保護的 `next-admin`，不是 302 到 apex `/admin/`。
 - `curl -I https://<網域>/` 回應標頭正常（HTTP/2 或 3 皆可）。
 - n8n：已知 Webhook URL 仍為公開 HTTPS；抽樣觸發一條測試 workflow **200**。
 - Trigger：儀表板與 WS 仍正常（若遇 WS，確認 Cloudflare **WebSockets** 已開、且源站超時足夠）。

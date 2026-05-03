@@ -111,6 +111,10 @@ export default async function DashboardPage() {
 
         <div className="section-title" style={{ marginTop: 8 }}>Quick Links</div>
         <div className="link-list">
+          <Link href="/build" className="link-card">
+            <span>Build Console</span>
+            <span className="link-card-arrow">›</span>
+          </Link>
           <Link href="/api-check" className="link-card">
             <span>⬡ API Health (server)</span>
             <span className="link-card-arrow">›</span>

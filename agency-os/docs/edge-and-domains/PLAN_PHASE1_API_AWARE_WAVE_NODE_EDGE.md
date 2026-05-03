@@ -61,9 +61,9 @@ flowchart TB
 
 下列為 **預設假設**；若與未來商業決策不一致，以 **新 ADR 或 README 一句覆寫** 即可（不當成對話必答題）。
 
-- **主路線**：**內部與受控呼叫方**——`next-admin`（`/admin`）、未來 **Internal Ops 控制台**（TASKS 已列）、n8n／Trigger 經 Nginx **伺服器側** 呼叫 `node-api`。**不是**預設對外公開給任意 mobile／匿名流量（該路線需 rate limit、金鑰、資料分類 ADR）。
+- **主路線**：**內部與受控呼叫方**——`next-admin`（`https://app.aware-wave.com/`，含 `/build`、`/ops-console`、`/ops/inbox`）、未來 **Internal Ops 控制台**（TASKS 已列）、n8n／Trigger 經 Nginx **伺服器側** 呼叫 `node-api`。**不是**預設對外公開給任意 mobile／匿名流量（該路線需 rate limit、金鑰、資料分類 ADR）。
 - **Auth 預設**：與 **ADR 002（Clerk）** 與 Enterprise 工具層敘事一致——**B2B 營運身分**由 Clerk／JWT 在 `node-api` 驗簽；**不**預設自建帳密 DB 為主身分。
-- **`app.aware-wave.com`**：與目前 Nginx 範本一致，視為 **導向 apex `https://aware-wave.com/admin/` 的入口**（書籤／短網址），**不**預設為第二套獨立前端主機，除非另開 ADR。
+- **`app.aware-wave.com`**：正式工具入口，直接反代到 `next-admin`。Build Console 的 canonical URL 是 **`https://app.aware-wave.com/build`**；舊 `/admin` 書籤只保留 redirect，不再作為主要入口。
 
 ### 1.3 功能分層（層 0／1／2）與本計畫 P0～P4 對照
 
@@ -110,7 +110,7 @@ flowchart TB
 ### 階段 P1 — 內部身分與邊界（與 TASKS「控制台／Enterprise」銜接）
 
 - **Clerk JWT 中介層**：Express middleware：**驗簽** → 解析 `org`／`user` → 注入 `req.auth`；**未帶合法 JWT 的 `/v1/*`（除 health/ready/meta）** 回 **401**。
-- **CORS**：白名單 **`https://aware-wave.com`**（含 `/admin` 來源）、必要時 staging 主機；**禁止** `*` + credentials 組合踩雷。
+- **CORS**：白名單 **`https://app.aware-wave.com`**（next-admin 工具入口）與必要時 `https://aware-wave.com`／staging 主機；**禁止** `*` + credentials 組合踩雷。
 - **`/rag/*` 收斂**：改掛 **`/v1/internal/rag/*`** 或加 **JWT + IP 限制**；對外公開文件中標 **internal**，避免被誤當產品 API。
 
 ### 階段 P2 — BFF：Trigger／Supabase 窄能力

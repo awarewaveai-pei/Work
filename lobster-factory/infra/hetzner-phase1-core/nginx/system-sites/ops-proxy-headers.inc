@@ -5,6 +5,8 @@
 # 1) Replace __OPS_PROXY_SHARED_SECRET__ with the same value as app env OPS_PROXY_SHARED_SECRET.
 # 2) Set x-ops-claims-role from a trusted auth source only (SSO/auth_request/Lua/etc.).
 #    Keep it empty if not available. In claims_only mode, writes will be rejected.
+#    Route blocks may set a narrow fallback role after this include, for example
+#    x-ops-claims-role=operator for the Basic Auth / Cloudflare Access protected Build Console API.
 
 # Prevent inbound spoofed values from clients.
 proxy_set_header x-ops-proxy-auth "";

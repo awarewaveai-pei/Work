@@ -7,10 +7,10 @@
 ## Environment
 | Variable | Required | Default |
 |----------|----------|---------|
-| `LOBSTER_HOSTING_PROVIDER_BASE_URL` | Yes | — |
-| `LOBSTER_HOSTING_API_TOKEN` | Yes | — |
+| `LOBSTER_HOSTING_PROVIDER_BASE_URL` | Yes | - |
+| `LOBSTER_HOSTING_API_TOKEN` | Yes | - |
 | `LOBSTER_HOSTING_PROVISION_PATH` | No | `/v1/lobster/staging-provision` |
-| `LOBSTER_HOSTING_HTTP_TIMEOUT_MS` | No | `45000` (clamped 1000–120000) |
+| `LOBSTER_HOSTING_HTTP_TIMEOUT_MS` | No | `45000` (clamped 1000-120000) |
 
 ## Request
 `POST` to `new URL(LOBSTER_HOSTING_PROVISION_PATH, LOBSTER_HOSTING_PROVIDER_BASE_URL)`.
