@@ -50,7 +50,7 @@ else
     log "Rebuilding $SERVICE..."
     docker compose --env-file .env build "$SERVICE"
     log "Restarting $SERVICE..."
-    docker compose --env-file .env up -d "$SERVICE"
+    docker compose --env-file .env up -d --no-deps "$SERVICE"
 fi
 
 # ── Status ────────────────────────────────────────────────────────────────
