@@ -146,3 +146,38 @@ export async function supabaseRestPatch(
   );
 }
 
+/**
+ * GET rows from a table using PostgREST filter params.
+ * filters: e.g. { status: "eq.queued", limit: 10, order: "created_at.asc" }
+ */
+export async function supabaseRestQuery(
+  config: SupabaseRestConfig,
+  table: string,
+  filters: Record<string, string | number> = {}
+): Promise<unknown[]> {
+  const fetchImpl = (globalThis as any).fetch as typeof fetch;
+  if (!fetchImpl) throw new Error("global fetch is not available in this runtime");
+
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(filters)) {
+    params.set(k, String(v));
+  }
+  const url = `${config.supabaseUrl}/rest/v1/${table}?${params.toString()}`;
+
+  const res = await fetchImpl(url, {
+    method: "GET",
+    headers: {
+      "apikey":        config.serviceRoleKey,
+      "Authorization": `Bearer ${config.serviceRoleKey}`,
+      "Accept":        "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Supabase REST query failed for ${table}: ${res.status} ${text}`);
+  }
+
+  return res.json() as Promise<unknown[]>;
+}
+

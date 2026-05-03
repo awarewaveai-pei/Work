@@ -7,7 +7,7 @@ import { buildWorkflowRunInsertSql } from "../db/sql/workflowRunsSql";
 import { buildPackageInstallRunInsertSql } from "../db/sql/packageInstallRunsSql";
 import { buildWorkflowRunRow } from "../db/sql/workflowRunsSql";
 import { buildPackageInstallRunRow } from "../db/sql/packageInstallRunsSql";
-import { LobsterCatalogIds } from "../db/catalogIds";
+import { LobsterCatalogIds, catalogIdsForManifest } from "../db/catalogIds";
 import { supabaseRestInsert, supabaseRestPatch } from "../db/supabase/supabaseRestInsert";
 import {
   getManifestExecutionMode,
@@ -25,6 +25,9 @@ import {
 import { captureWorkflowException } from "../observability/sentry";
 import { captureWorkflowEvent } from "../observability/posthog";
 
+const SUPPORTED_MANIFESTS = ["wp-basic", "wp-business", "wc-core"] as const;
+type ManifestSlug = (typeof SUPPORTED_MANIFESTS)[number];
+
 const InputSchema = z.object({
   // Used for multi-tenant FK fields when we later enable DB writes.
   organizationId: z.string().uuid(),
@@ -34,6 +37,7 @@ const InputSchema = z.object({
   environmentId: z.string().uuid(),
   wpRootPath: z.string().min(1),
   manifestPath: z.string().min(1),
+  manifestSlug: z.enum(SUPPORTED_MANIFESTS).optional(),
   environmentType: z.enum(["staging", "production"]),
 });
 
@@ -109,12 +113,13 @@ export const applyManifest = task({
     const parsedRaw = JSON.parse(raw) as unknown;
     const manifest = ManifestSchema.parse(parsedRaw);
 
-    // Phase 1 currently seeds only wc-core catalog IDs.
-    if (manifest.name !== "wc-core") {
+    // Validate manifest name is a supported slug.
+    if (!(SUPPORTED_MANIFESTS as readonly string[]).includes(manifest.name)) {
       throw new Error(
-        `Phase 1 apply-manifest only supports manifest.name="wc-core" (got "${manifest.name}")`
+        `apply-manifest: unsupported manifest name "${manifest.name}". Supported: ${SUPPORTED_MANIFESTS.join(", ")}`
       );
     }
+    const manifestSlug = manifest.name as ManifestSlug;
 
     // Extra guardrails beyond environmentType, so even a caller bug can't slip through.
     if (!manifest.guardrails.blockIfProduction) {
@@ -195,14 +200,15 @@ export const applyManifest = task({
       artifacts: [],
     });
 
+    const manifestCatalog = catalogIdsForManifest(manifestSlug);
     const dbPackageInstallRunInsert = buildPackageInstallRunInsertSql({
       id: packageInstallRunId,
       organizationId: input.organizationId,
       workspaceId: input.workspaceId,
       siteId: input.siteId,
       environmentId: input.environmentId,
-      packageVersionId: LobsterCatalogIds.wcCore.packageVersionId,
-      manifestId: LobsterCatalogIds.wcCore.manifestId,
+      packageVersionId: manifestCatalog.packageVersionId,
+      manifestId: manifestCatalog.manifestId,
       workflowRunId,
       triggeredByUserId: null,
       triggeredByAgentId: null,
