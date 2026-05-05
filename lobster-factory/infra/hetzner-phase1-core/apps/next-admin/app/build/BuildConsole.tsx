@@ -135,6 +135,76 @@ export default function BuildConsole() {
   const [showIntegrations, setShowIntegrations] = useState(true);
   const [showPrerequisites, setShowPrerequisites] = useState(true);
 
+  // ── Service Provisioning (new client) ──────────────────────────────────────
+  const [provForm, setProvForm] = useState({
+    organizationId: "",
+    workspaceId: "",
+    customerEmail: "",
+    providers: ["sentry", "posthog", "uptime_kuma", "n8n"] as string[],
+    hints: {
+      sentryProjectSlug: "",
+      sentryProjectName: "",
+      posthogProjectName: "",
+      githubRepoName: "",
+      uptimeMonitorUrl: "",
+      uptimeMonitorName: "",
+      n8nWorkflowSuffix: "",
+    },
+  });
+  const [provLoading, setProvLoading] = useState(false);
+  const [provResult, setProvResult] = useState<{
+    ok: boolean;
+    runId?: string | null;
+    providers?: string[];
+    error?: string;
+    detail?: string;
+  } | null>(null);
+
+  const ALL_PROVIDERS: Array<{ id: string; label: string; desc: string }> = [
+    { id: "sentry",     label: "Sentry",      desc: "建立 project + DSN" },
+    { id: "posthog",    label: "PostHog",      desc: "建立 project + API key" },
+    { id: "uptime_kuma",label: "Uptime Kuma",  desc: "建立 HTTP monitor" },
+    { id: "n8n",        label: "n8n",          desc: "複製 onboarding workflow" },
+    { id: "github",     label: "GitHub",       desc: "建立 client repo" },
+    { id: "trigger",    label: "Trigger.dev",  desc: "建立 project + token" },
+    { id: "supabase",   label: "Supabase",     desc: "建立 cloud project" },
+  ];
+
+  const toggleProvider = (id: string) => {
+    setProvForm((f) => ({
+      ...f,
+      providers: f.providers.includes(id)
+        ? f.providers.filter((p) => p !== id)
+        : [...f.providers, id],
+    }));
+  };
+
+  const submitProvisioning = async () => {
+    setProvLoading(true);
+    setProvResult(null);
+    try {
+      const res = await fetch("/api/build/provision-services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader(actorRole) },
+        body: JSON.stringify({
+          organizationId: provForm.organizationId,
+          workspaceId: provForm.workspaceId || undefined,
+          customerEmail: provForm.customerEmail,
+          providers: provForm.providers,
+          hints: Object.fromEntries(
+            Object.entries(provForm.hints).filter(([, v]) => v.trim() !== "")
+          ),
+        }),
+      });
+      const json = await res.json() as typeof provResult;
+      setProvResult(json);
+    } catch (err) {
+      setProvResult({ ok: false, error: err instanceof Error ? err.message : "request_failed" });
+    } finally {
+      setProvLoading(false);
+    }
+  };
+
   const plan = useMemo(() => buildConsolePlan(form), [form]);
 
   // Start/stop polling based on pollingRunId
@@ -719,6 +789,105 @@ export default function BuildConsole() {
           )}
         </div>
       ) : null}
+
+      {/* ── Service Provisioning ─────────────────────────────────────── */}
+      <div className="build-panel build-provision-panel">
+        <div className="build-panel-head">
+          <div>
+            <div className="section-title">新客戶 — 一鍵開通服務</div>
+            <h2>Service Provisioning</h2>
+          </div>
+          <span className="card-badge badge-gray">orchestrate-tenant-provisioning</span>
+        </div>
+
+        <div className="build-alert build-alert-warning" style={{ marginBottom: 12 }}>
+          前置：先在各平台建好主帳號與 Master API Token，填入 Trigger worker 環境變數後，此處一鍵為每位新客戶建立獨立 project／monitor／DSN，結果自動寫進 Supabase <code>tenant_integration_bindings</code>。
+        </div>
+
+        <div className="build-form-grid">
+          <TextInput
+            label="organizationId (UUID)"
+            value={provForm.organizationId}
+            onChange={(v) => setProvForm((f) => ({ ...f, organizationId: v }))}
+            placeholder="00000000-0000-0000-0000-000000000000"
+          />
+          <TextInput
+            label="customerEmail"
+            value={provForm.customerEmail}
+            onChange={(v) => setProvForm((f) => ({ ...f, customerEmail: v }))}
+            placeholder="client@example.com"
+          />
+          <TextInput
+            label="workspaceId (optional)"
+            value={provForm.workspaceId}
+            onChange={(v) => setProvForm((f) => ({ ...f, workspaceId: v }))}
+            placeholder="留空可選"
+          />
+        </div>
+
+        <div className="section-title" style={{ marginTop: 12, marginBottom: 6 }}>選擇服務</div>
+        <div className="build-provider-grid">
+          {ALL_PROVIDERS.map((p) => (
+            <label key={p.id} className={`build-provider-card ${provForm.providers.includes(p.id) ? "selected" : ""}`}>
+              <input
+                type="checkbox"
+                checked={provForm.providers.includes(p.id)}
+                onChange={() => toggleProvider(p.id)}
+              />
+              <span className="build-provider-name">{p.label}</span>
+              <span className="build-provider-desc">{p.desc}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="section-title" style={{ marginTop: 12, marginBottom: 6 }}>選填 Hints（留空使用預設）</div>
+        <div className="build-form-grid">
+          <TextInput label="Sentry project slug" value={provForm.hints.sentryProjectSlug}
+            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, sentryProjectSlug: v } }))}
+            placeholder="client-slug" />
+          <TextInput label="PostHog project name" value={provForm.hints.posthogProjectName}
+            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, posthogProjectName: v } }))}
+            placeholder="Client Name" />
+          <TextInput label="GitHub repo name" value={provForm.hints.githubRepoName}
+            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, githubRepoName: v } }))}
+            placeholder="client-site" />
+          <TextInput label="Uptime monitor URL" value={provForm.hints.uptimeMonitorUrl}
+            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, uptimeMonitorUrl: v } }))}
+            placeholder="https://client-site.com" />
+          <TextInput label="n8n workflow suffix" value={provForm.hints.n8nWorkflowSuffix}
+            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, n8nWorkflowSuffix: v } }))}
+            placeholder="client-name" />
+        </div>
+
+        <button
+          type="button"
+          className="btn-primary build-submit"
+          disabled={provLoading || provForm.providers.length === 0}
+          onClick={submitProvisioning}
+        >
+          <span aria-hidden="true">&gt;</span>
+          {provLoading ? "Provisioning…" : `一鍵開通 ${provForm.providers.length} 個服務`}
+        </button>
+
+        {provResult ? (
+          <div className={`build-alert ${provResult.ok ? "build-alert-ok" : "build-alert-blocked"}`} style={{ marginTop: 12 }}>
+            {provResult.ok ? (
+              <>
+                Trigger.dev 已接受 — runId: <code>{provResult.runId ?? "unknown"}</code>
+                <br />
+                Providers: {provResult.providers?.join(", ")}
+                <br />
+                結果將在 Trigger.dev 跑完後自動寫入 Supabase <code>tenant_integration_bindings</code>。
+              </>
+            ) : (
+              <>
+                Error: {provResult.error}
+                {provResult.detail ? <><br />{provResult.detail}</> : null}
+              </>
+            )}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

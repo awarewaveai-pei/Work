@@ -524,6 +524,51 @@ pre {
   font-weight: 600;
 }
 
+/* ── Service Provisioning panel ─────────────────────────────────────────── */
+.build-provision-panel {
+  margin-top: 24px;
+}
+
+.build-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.build-provider-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--bg-card);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.build-provider-card input[type="checkbox"] {
+  margin-bottom: 4px;
+  accent-color: var(--accent, #2563eb);
+}
+
+.build-provider-card.selected {
+  border-color: var(--accent, #2563eb);
+  background: #eff6ff;
+}
+
+.build-provider-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.build-provider-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 /* ── Integrations section ──────────────────────────────────────────────── */
 .build-integrations-toggle {
   margin: 12px 0 0;
