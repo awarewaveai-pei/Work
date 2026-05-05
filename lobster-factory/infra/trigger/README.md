@@ -179,6 +179,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy-workflows.ps1
 | **`DOCKER_RUNNER_NETWORKS`** 相關錯誤 | 本 compose 固定網路名為 **`lf-trg-webapp`**、**`lf-trg-supervisor`**（勿隨意改名，除非同步改 supervisor 環境變數）。 |
 | **502 / 連不上** | `docker compose ps` 看 **`trigger-webapp`** 是否 healthy；nginx 是否指到 **`:3000`**；`lobster-net` 是否同一台／名稱正確。 |
 | **OOM / 一直被殺** | 升級 RAM 或把 **supervisor** 拆到另一台（官方 worker compose 路徑）。 |
+| **Netdata `cgroup_trigger-webapp.mem_usage`** | 整機 RAM 從常態「五十多 %」飆高時，多半是 **webapp 容器 RSS** 逼近 **`mem_limit`**。請將 **`docker-compose.yml` 的 `webapp.mem_limit`／`NODE_MAX_OLD_SPACE_SIZE`** 與 repo 對齊後，於 EU：`cd /root/trigger && git pull && docker compose --env-file .env up -d webapp`。 |
 
 ---
 

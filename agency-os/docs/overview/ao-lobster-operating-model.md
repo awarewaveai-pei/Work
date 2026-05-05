@@ -1,8 +1,10 @@
-﻿# AO + Lobster Operating Model
+# AO + Lobster Operating Model
 
 > Purpose: one operating model for how Agency OS governance and Lobster Factory execution run together, so daily work does not split across inconsistent docs.
 
 ## 1) System Roles (Who owns what)
+
+**Terms (avoid overload):** “AO-agent” in **Master §41 / Build Console** means **Profile A** (internal control plane only). The **whole** Aware Wave + Lobster + AO stack that delivers **client** systems uses **Profile B/C** workflows and §0 product narrative. Single write-up: [`../../../lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md`](../../../lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md) §1.1.
 
 - `Agency OS`: governance, policies, task board, worklog, memory, closeout evidence.
 - `Lobster Factory`: engineering execution pipeline, workflow/routing enforcement, factory validation gates.
@@ -76,9 +78,10 @@ These are known "must run in rhythm" items to convert configuration into real op
 - `README.md`
 - `AGENTS.md`
 - `docs/overview/agency-os-complete-system-introduction.md`
-- `../lobster-factory/README.md`
-- `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
-- `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+- `../../../lobster-factory/README.md`
+- `../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
+- `../../../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+- `../../../lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md` §1.1 (profile naming SSOT)
 
 ## Related Documents (Auto-Synced)
 - `docs/operations/hetzner-stack-rollout-index.md`

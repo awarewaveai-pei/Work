@@ -33,6 +33,8 @@
 | `agency-os/` | 治理、租戶、SOP、健康、任務、記憶 | **公司怎麼運營**；對齊 V3 的 Agency OS 與交付治理 |
 | `lobster-factory/` | migrations、workflows、routing | **工廠怎麼自動化**；對齊 V3 的 Factory／部分 Data／Decision；工程對照 [V3_INTEGRATION_PLAN](../../../lobster-factory/docs/LOBSTER_FACTORY_MASTER_V3_INTEGRATION_PLAN.md) |
 
+Build Console **Profile A/B/C** 與口語「AO-agent」分層（避免與 Master §41 混用）：**不重複貼正文**，見 [ONE_CLICK_BUILD_SYSTEM.md §1.1](../../../lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md)。
+
 強制執行面上自動化誰能跑：另見 [MCP_TOOL_ROUTING_SPEC.md](../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md)（**不是** 20 模組清單，是 `task_type` 閘道）。
 
 ## 「20 模組一頁導覽」算整合嗎？

@@ -1,10 +1,23 @@
 # Lobster Factory Master Checklist
 
-> **版本：v2.0（2026-05-03 對齊 MASTER_DEPLOYMENT_SYSTEM v1.2）**
+> **版本：v2.0（進度表欄位仍含歷史 v1.2 編號；架構真相以 `LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md` 為準）**
 > 用途：集中追蹤「一人跨國公司底座」的完整建置流程、目前進度、未完成項目，避免遺漏與重工。
 > 單一真實來源：本檔 + [`agency-os/TASKS.md`](../../agency-os/TASKS.md)（跨系統任務板）。
 >
 > **v2.0 改版說明：** 對齊 MASTER_DEPLOYMENT_SYSTEM v1.2；解決 7 個命名/架構衝突；補追 12 個制度治理項目（C6）；補追 6 個 DB migration（C7）；新增 I) 命名對照表；新增 J) v1.2 對齊進度表；更新驗收命令。
+>
+> **2026-05-03 定案補述：** Profile／「AO-agent」命名層級與 handoff 邊界見 [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md) **§1.1**、§3 規則 12、§7；Master §41 與 `ARCHITECTURE_CANONICAL_MAP.md`。細節不重貼——見下方 **「定案紀錄（2026-05-03）」** 與 **I5**。
+
+---
+
+## 定案紀錄（2026-05-03）
+
+| 決議 | 說明 | 正本（不重複全文） |
+|------|------|-------------------|
+| 命名兩層 | **產品／公司敘事**（整體交付 Client OS）與 **Build Console `profile_a\|b\|c` 路由** 不可混成同一個「AO-agent」 | [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md) §1.1 |
+| §41「AO-agent」 | 僅指 **Profile A**（自家控制面）；**非**客戶站部署 | [`LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md`](LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md) §41 |
+| Handoff | Profile A：**內部**驗收／狀態報告；Profile B/C：**客戶** structured handoff | 同上 §41.2；[`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md) §3.12、§7、§20 驗收項 |
+| 索引 | 路由／命名機讀入口 | [`ARCHITECTURE_CANONICAL_MAP.md`](ARCHITECTURE_CANONICAL_MAP.md) |
 
 ---
 
@@ -281,7 +294,7 @@
 - [ ] 今日改動是否更新到本檔（B/C 區勾選）
 - [ ] 今日證據是否回寫到 `agency-os/WORKLOG.md` 與 `memory/daily/YYYY-MM-DD.md`
 - [ ] 今日是否已跑對應 gate（至少 `dryrun + validate`）
-- [ ] 若有新命名決定，是否更新到 I 區命名對照表
+- [ ] 若有新命名決定，是否更新到 I 區命名對照表（含 **I5** Profile／AO-agent）
 
 ### C1 專用流程
 
@@ -429,6 +442,16 @@ API endpoint  → kebab-case REST        (/api/workflow-runs, /api/sites)
 JSON file     → kebab-case            (wc-core.json, wp-basic.json)
 Policy file   → kebab-case            (production-deploy-policy.json)
 ```
+
+### I5. Profile /「AO-agent」用語（2026-05-03 定案）
+
+| 用語 | 正確含義 | 常見誤用 |
+|------|----------|----------|
+| **Profile A / B / C** | Build Console 與 Master §41 的**互斥執行路徑**（workflow、gate、artifact 不同） | 與「整間公司產品」混為一談 |
+| **AO-agent**（§41 / `/build`） | **僅 Profile A**：Aware Wave 內部控制面 | 誤當成「所有客戶交付都叫 AO-agent」 |
+| **客戶交付** | **Profile B**（新站）／**Profile C**（既有 WP）+ `provision_client_os` / `adopt_client_os` | 與 Profile A 的 infra 驗收混用 handoff 規則 |
+
+**正本一句話：** [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md) §1.1。
 
 ---
 

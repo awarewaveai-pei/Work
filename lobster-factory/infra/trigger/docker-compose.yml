@@ -176,6 +176,9 @@ services:
       retries: 5
       start_period: 20s
 
+  # Netdata: cgroup_trigger-webapp.mem_usage fires on % of THIS limit. If steady RSS
+  # grew (workload) or the host shows ~70%+ RAM, raise mem_limit and redeploy; keep
+  # NODE_MAX_OLD_SPACE_SIZE ~55–65% of mem_limit for the Node process heap headroom.
   webapp:
     image: ghcr.io/triggerdotdev/trigger.dev:${TRIGGER_IMAGE_TAG:-v4.4.4}
     container_name: trigger-webapp
@@ -183,7 +186,7 @@ services:
     logging: *trigger-logging
     user: root
     command: sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
-    mem_limit: 2048m
+    mem_limit: 2560m
     cpus: "1.5"
     depends_on:
       postgres:
@@ -235,7 +238,7 @@ services:
       REDIS_TLS_DISABLED: "true"
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-info}
       DEV_OTEL_EXPORTER_OTLP_ENDPOINT: ${DEV_OTEL_EXPORTER_OTLP_ENDPOINT:-http://webapp:3000/otel}
-      NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-1024}
+      NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-1536}
       NODE_ENV: production
       TRIGGER_TELEMETRY_DISABLED: "1"
       DEPLOY_REGISTRY_HOST: ${DOCKER_REGISTRY_URL}

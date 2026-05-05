@@ -9,6 +9,8 @@
 
 > **v1.4 修訂說明：** 新增 Section 24A「Deployment Profile Identification Gate」，正式定義 Profile A（AO-agent 自架）/ Profile B（新客戶全雲端）/ Profile C（已有 WordPress 接管）三種部署路徑的完整驗收 Gate。對應 Master System v1.3 Section 41。
 >
+> **2026-05-03 定案補述：** 「AO-agent」在 §24A 與 Master §41 中等於 **Profile A（自家控制面）**；**整體產品**交付客戶系統仍含 Profile B/C。口語 vs 路由標籤不可混用——**單一正文** [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md) **v2.1 §1.1**；Master 頂部修訂說明同日補述；handoff 規則 Profile A 見 §24A Profile A Gate（無客戶 handoff），B/C 見 `ONE_CLICK_BUILD_SYSTEM.md` §3 規則 12。
+>
 > **v1.3 修訂說明（基於 GPT v1.2.1 補強）：**
 > - 補全 ADR-0006 至 ADR-0010（GPT 版只到 ADR-0005）
 > - 新增 `package_install_runs` 至 Phase 1 Core Tables
@@ -1232,6 +1234,8 @@ Evidence:
 ## 24A. Deployment Profile Identification Gate
 
 > **每次部署開始前必須先確認 Profile。** 不同 Profile 有完全不同的 workflow、manifest 模式、風險等級。對應 v1.3 Master Section 41。
+
+> **命名提示（2026-05-03 定案）：** 本節「AO-agent」＝**Profile A**。若需區分「整體 Aware Wave + Lobster 客戶交付」與「路由標籤」，只讀 [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md) §1.1，勿在本檔重複長文。
 
 ### Profile 識別（必選一）
 

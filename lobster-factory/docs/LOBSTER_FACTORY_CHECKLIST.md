@@ -11,6 +11,19 @@
 
 ---
 
+## 定案紀錄（2026-05-03）
+
+與 `LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md`、`LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST_v1.4.md`、`LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md` **同步**，不重貼全文：
+
+| 項目 | 決議 |
+|------|------|
+| 命名 SSOT | [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md) **v2.1 §1.1**（產品層 vs `Profile A\|B\|C`） |
+| §41「AO-agent」 | 僅 **Profile A**；客戶路徑 **B/C** |
+| Handoff | A：內部驗收；B/C：客戶 handoff（見 ONE_CLICK §3.12） |
+| Master 補述 | `LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md` 頂部 **2026-05-03 定案補述** |
+
+---
+
 # PART 1：系統建置進度（每天開工/收工）
 
 > 事件流程單一真相：開工以 `agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` 為準；收工以 `agency-os/docs/operations/end-of-day-checklist.md` 為準。
@@ -346,6 +359,7 @@ JSON file   → kebab-case          (wp-basic.json)
 ### Profile 規則（v1.3 Section 41）
 
 - 每次部署前先確認 Profile（A / B / C）
+- **用語正本**（口語「AO-agent」vs 路由）：[`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md) §1.1
 - Profile C（已有 WP）備份強制，不可跳過
 - Profile C 只能用 `adopt_delta` 模式，不可用 `full_install`
 - Profile C smoke test 必須確認現有內容未被破壞

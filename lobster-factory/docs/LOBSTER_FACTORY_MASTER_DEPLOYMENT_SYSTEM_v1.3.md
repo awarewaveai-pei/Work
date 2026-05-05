@@ -12,6 +12,8 @@
 
 > **v1.3 修訂說明：** 新增 Section 41「三種部署 Profile」—— AO-agent（自架控制平面）/ Profile B（新客戶全雲端）/ Profile C（已有 WordPress 接管）。新增 `adopt_delta` manifest 模式、`adopt-client-os` workflow、`adopt_audits` / `adopt_audit_items` DB 表、`site_type` / `apply_mode` 欄位（migration 0016）、Adopt Smoke Test Profile、ProviderAdapter adopt 方法擴充。
 
+> **2026-05-03 定案補述（文件層；不升主版本號）：** Profile／「AO-agent」**兩層語意**與 Build Console 對照之**單一正文**為同 repo `docs/ONE_CLICK_BUILD_SYSTEM.md` **v2.1 §1.1**（產品／公司敘事 vs `Profile A|B|C` 路由）。§41 標題「AO-agent」＝**Profile A**；客戶從零／既有站＝**Profile B/C**。Profile A **不**使用客戶交付 `handoff_report` 規則；B/C 依 `ONE_CLICK_BUILD_SYSTEM.md` §3 規則 12。機讀索引：`docs/ARCHITECTURE_CANONICAL_MAP.md`。
+
 ---
 
 # **0. 最重要的定案**
@@ -2728,6 +2730,8 @@ v1.2 = 公司可長期跑
 
 > **v1.3 新增。** 本系統服務三種完全不同的部署情境，每種 Profile 有不同的風險等級、manifest 策略、smoke test 標準、備份要求。Cursor 在開始任何部署任務前，必須先確認是哪個 Profile。
 
+> **命名與層級（避免口語與路由標籤混用）— 正本：** 同目錄 `ONE_CLICK_BUILD_SYSTEM.md` **§1.1**（對 `agency-os` 交叉索引見該檔開頭 Related）。本節標題中的「AO-agent」指 **Profile A（自家控制平面）**；**客戶從零／既有站交付**是 **Profile B / C**，整體產品願景仍見 **§0**（一鍵生成雲端版 Client OS）。
+
 ## **41.1 Profile 總表**
 
 | 維度 | Profile A：AO-agent（自己公司） | Profile B：新客戶（全雲端） | Profile C：已有 WordPress 客戶 |
@@ -2750,6 +2754,8 @@ v1.2 = 公司可長期跑
 ### 定義
 
 AO-agent 是你自己公司的控制平面。部署對象是 Lobster Factory 本身的基礎設施，而不是任何客戶網站。
+
+口語上「用 AO / 龍蝦 / Aware Wave 幫客戶一鍵交付」指的是**整體產品與營運平台**（§0、`provision_client_os`／Profile B／C）。**本節與 Build Console 所稱的「AO-agent」專指 Profile A**：僅內部控制面與 infra／CI 驗收，不套用客戶 onboarding 與客戶 handoff 規則。
 
 ### 包含的工具
 

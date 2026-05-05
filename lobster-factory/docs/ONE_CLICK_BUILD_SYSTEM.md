@@ -1,6 +1,6 @@
-﻿# One-Click Build System
+# One-Click Build System
 
-> Version: v2.0
+> Version: v2.1
 > Date: 2026-05-03
 > Owner: Lobster Factory / AO
 > Status: implementation spec, not marketing copy
@@ -38,6 +38,19 @@ The app must support three deployment profiles:
 | Profile C | Existing WordPress adoption, for example Soulful Expression | Existing live WP with real content | `adopt_delta` | `adopt_client_os` | `adopt` | High |
 
 The Build Console is an operator surface. The system of record is Supabase/Postgres. Trigger.dev is the long-running workflow layer. WordPress is the delivery surface, not the control plane.
+
+### 1.1 Naming and scope layers (SSOT for “AO-agent”)
+
+Two layers must stay separate in specs, tickets, and automation. **Do not merge them into one overloaded term.**
+
+| Layer | Meaning | Authoritative text |
+|------|---------|--------------------|
+| **Product / company** | Aware Wave + Lobster Factory + Agency OS deliver **Client OS** end-to-end (new site, adopt existing site, internal control plane). This is the **whole business system** described in `LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md` §0 and `agency-os/docs/overview/ao-lobster-operating-model.md`. | §0 “一鍵生成雲端版 Client OS”; AO+Lobster operating model |
+| **Build Console routing** | **`Profile A` / `Profile B` / `Profile C`** are **mutually exclusive execution paths** in `/build`: different workflows, smoke tests, gates, and artifacts. | This file §1 table; Master §41 |
+
+**Invariant:** In code and DB records, use **`profile_a` | `profile_b` | `profile_c`** (or the same labels in UI copy). When someone says “AO-agent” in conversation, confirm whether they mean **(a)** the whole agency automation stack **or** **(b)** **Profile A only** (internal control plane). In Master §41 and in this document, **`AO-agent` names Profile A**—the path that **does not** run `provision_client_os` and **does not** emit a **client** `handoff_report` (see Master §41.2 and §7 below).
+
+**Related:** `LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md` Section 41; `agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` §0 (platform map).
 
 ## 2. Current Implementation
 
@@ -87,7 +100,7 @@ ops.profile-c.adopt-client-os
 9. Failed required smoke tests block handoff.
 10. Secrets must never appear in handoff reports, logs, artifacts, or UI output.
 11. Provider failure creates `operator_task`; it does not silently succeed.
-12. All final delivery output must include a structured handoff report.
+12. **Profile B and Profile C** client-facing completion must include a structured handoff report. **Profile A** completes with an **internal** infrastructure status report (no client handoff); see §1.1 and §7.
 
 ## 4. Build Console User Flow
 
@@ -741,7 +754,7 @@ Before calling this system usable:
 - [ ] Profile B can trigger `create_wp_site`
 - [ ] Profile C can trigger `adopt_client_os`
 - [ ] required smoke tests are persisted
-- [ ] handoff report is generated and linked to run
+- [ ] Profile B/C: client handoff report is generated and linked to run; Profile A: internal status report is generated and linked (see §1.1)
 - [ ] secrets are redacted
 
 ## 21. Known Gaps

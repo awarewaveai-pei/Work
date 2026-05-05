@@ -132,7 +132,8 @@ export default function BuildConsole() {
   const [pollingRunId, setPollingRunId] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<LiveRunStatus | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [showIntegrations, setShowIntegrations] = useState(false);
+  const [showIntegrations, setShowIntegrations] = useState(true);
+  const [showPrerequisites, setShowPrerequisites] = useState(true);
 
   const plan = useMemo(() => buildConsolePlan(form), [form]);
 
@@ -249,6 +250,64 @@ export default function BuildConsole() {
               <h2>{plan.label}</h2>
             </div>
             <span className={`build-risk build-risk-${plan.riskLevel}`}>{plan.riskLevel}</span>
+          </div>
+
+          <div className="build-prerequisites">
+            <button
+              type="button"
+              className="build-prerequisites-toggle-btn"
+              onClick={() => setShowPrerequisites((v) => !v)}
+            >
+              <span>{showPrerequisites ? "▼" : "▶"}</span>
+              前置：帳號／專案（填 Integrations API 之前）
+            </button>
+            {showPrerequisites ? (
+              <div className="build-prerequisites-body">
+                <p>
+                  沒有任何一家提供「從本頁一鍵代你在六個平台建立帳號」的聯合 API；請在各家網站註冊／登入（雲端服務通常可選
+                  <strong>以 Google 繼續</strong>
+                  ）。下列為 Aware Wave 現網入口與常用雲端註冊連結；取得 Token／API Key 後再展開 Integrations。
+                </p>
+                <ul className="build-prerequisites-list">
+                  <li>
+                    <a href="https://sentry.io/signup/" target="_blank" rel="noopener noreferrer">
+                      Sentry（雲端註冊）
+                    </a>
+                    — 建立 org／team，稍後在 Settings 建立 Auth Token。
+                  </li>
+                  <li>
+                    <a href="https://app.posthog.com/signup" target="_blank" rel="noopener noreferrer">
+                      PostHog Cloud（註冊）
+                    </a>
+                    — 若用 EU 請改登入你選的區域；之後取 Project API Key。
+                  </li>
+                  <li>
+                    <a href="https://studio.aware-wave.com" target="_blank" rel="noopener noreferrer">
+                      Supabase Studio（自架 EU）
+                    </a>
+                    — 現網專案／Service Role 金鑰由既有部署治理；非 supabase.com 新開雲端專案流程。
+                  </li>
+                  <li>
+                    <a href="https://uptime.aware-wave.com" target="_blank" rel="noopener noreferrer">
+                      Uptime Kuma（自架）
+                    </a>
+                    — 首次開站建立管理員，再到 Settings → API Keys。
+                  </li>
+                  <li>
+                    <a href="https://n8n.aware-wave.com" target="_blank" rel="noopener noreferrer">
+                      n8n（自架）
+                    </a>
+                    — 建立可登入使用者後設定 webhook／認證。
+                  </li>
+                  <li>
+                    <a href="https://trigger.aware-wave.com" target="_blank" rel="noopener noreferrer">
+                      Trigger.dev（自架 web）
+                    </a>
+                    — 建立／登入組織與專案（與 CLI／worker 部署見 infra/trigger README）。
+                  </li>
+                </ul>
+              </div>
+            ) : null}
           </div>
 
           <div className="build-form-grid">

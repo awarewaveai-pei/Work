@@ -470,6 +470,60 @@ pre {
   gap: 0 14px;
 }
 
+/* ── Build prerequisites (before API keys) ─────────────────────────────── */
+.build-prerequisites {
+  margin: 0 0 16px;
+}
+
+.build-prerequisites-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--bg-subtle, #f0f7ff);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.build-prerequisites-toggle-btn:hover {
+  background: #e8f2fe;
+}
+
+.build-prerequisites-body {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  background: #fafcff;
+}
+
+.build-prerequisites-body p {
+  margin: 0 0 10px;
+}
+
+.build-prerequisites-list {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.build-prerequisites-list li {
+  margin-bottom: 6px;
+}
+
+.build-prerequisites-list a {
+  color: var(--accent, #2563eb);
+  font-weight: 600;
+}
+
 /* ── Integrations section ──────────────────────────────────────────────── */
 .build-integrations-toggle {
   margin: 12px 0 0;
