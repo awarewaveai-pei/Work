@@ -2,6 +2,64 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-06
+
+### Daily
+- tenant 補 `OPERATIONS_SCHEDULE.json`／`OPS_QUEUE.json`；health 100%；closeout-inbox merge；收工重跑中。
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:5998d546ad0aa731fbb0789c2181f67c848b626d6c9248e89f8753d38e9bc1af -->
+
+### codex 2026-05-01 19:55
+
+- **完成（一句）**: 完成 PostHog public/admin 站點命名與 live 驗證，讓 Aware Wave Website、Aware Wave Admin、Soulful Expression 可用一致屬性分流。
+- **證據／檔案**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/wordpress/mu-plugins/posthog.php`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/providers.tsx`
+  - Live SG：`lobster-wordpress` / `lobster-next-admin` 均 healthy；`aware-wave.com` HTML 已含 `site_name: "Aware Wave Website"`；`next-admin` bundle 已含 `site_name:"Aware Wave Admin"`。
+- **Git**: pending commit in this turn.
+- **對應 TASKS 條目若未打勾**: 無，本輪為 PostHog/observability 設定收斂，未對應單一未完成 TASKS 勾選。
+- **風險／待辦若未完成**: `soulfulexpression.org` 仍需在 Hostinger WordPress 透過 WPCode/Header injection 或同等 MU plugin 貼入 PostHog snippet，才能開始送事件；本 repo 已預留 `Soulful Expression` site_name 映射。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:8d7a99e64ffa6e3a1daf164db4bf776d97be98c34222849a0a07e16062795eec -->
+
+### cursor-agent 2026-05-06 07:25
+
+- **完成（一句）**: 補齊 tenant `company-scenery-travel-mongolia` 的 `OPERATIONS_SCHEDULE.json`、`OPS_QUEUE.json` 以解除 health Critical gate；並先手寫 WORKLOG `## 2026-05-03`／CONVERSATION_MEMORY  tenant provisioning 摘要。
+- **變更路徑**:
+  - `agency-os/tenants/company-scenery-travel-mongolia/OPERATIONS_SCHEDULE.json`
+  - `agency-os/tenants/company-scenery-travel-mongolia/OPS_QUEUE.json`
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+- **Git**: 待 AO-CLOSE commit／push
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:b0d50a564ef79b38210b6f9b39e2bcd6e57f3b1d1e9cb82f23d93f0889414ab8 -->
+
+### cursor-agent 2026-05-06 07:35
+
+- **完成（一句）**: 解除 strict completeness：`memory/daily/2026-05-06.md` 與 WORKLOG `### Daily` 已取代 `(TBD)`；準備再次 AO-CLOSE commit／push。
+- **變更路徑**:
+  - `agency-os/memory/daily/2026-05-06.md`
+  - `agency-os/WORKLOG.md`
+- **Git**: dirty — 本輪 ao-close 將一併提交
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
+
+## 2026-05-03
+
+### lobster-factory — `tenant_integration_bindings` SoR + 多供應商開通（Trigger workflows）
+
+- **編排**：`orchestrate-tenant-provisioning` + `packages/workflows/src/lib/tenant-provisioning/providers/` — Sentry（建專案 + client key）、GitHub（建 private repo）、PostHog（建 project）、n8n（複製 template workflow）、Supabase Cloud（Management API 可選）、Trigger／Uptime（策略性 metadata／metrics 探測同上輪架構說明）。
+- **驗證**：`packages/workflows` → `npm test`（含 Sentry mock）；monorepo `npm run validate` PASS。
+- **產品／協作澄清**：「Sign up with Google」＝互動式 OAuth；後端無法在零使用者同意下代開七家平台帳號；已提供可貼 GPT／Claude 的 prompt 草稿。
+- **Git**：相關 commits 已於本輪對話期間 push `origin/main`（收工腳本將再對齊一次）。
+
 ## 2026-05-01
 
 ### Supabase Advisor（RLS initplan + workflow_runs 重複索引）— migration 入 repo
@@ -1218,7 +1276,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-03 05:12:24 UTC_
+_Last synced: 2026-05-05 23:17:01 UTC_
 
 ## 2026-03-20
 
@@ -1652,17 +1710,4 @@ _Last synced: 2026-05-03 05:12:24 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
-
-
-
-
-
-
-
-
-
-
-
 

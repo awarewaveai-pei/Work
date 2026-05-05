@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-03 15:39:12
+- Generated: 2026-05-06 07:17:13
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,14 +203,65 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-03.md
-_no file for today yet._
+## 5) memory/daily/2026-05-06.md
+# Daily Note - 2026-05-06
+
+## Done today
+- AO-CLOSE 前置：補 `company-scenery-travel-mongolia` 必填 JSON；health gate 100%；merge closeout-inbox。
+
+## Current state
+- `system-health-check` 359/359；main 仍 ahead of origin 直至 ao-close commit／push 完成。
+
+## Next steps
+- 完成 ao-close commit／push；他機 `git pull` 後 `AO-RESUME`。
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:5998d546ad0aa731fbb0789c2181f67c848b626d6c9248e89f8753d38e9bc1af -->
+
+### codex 2026-05-01 19:55
+
+- **完成（一句）**: 完成 PostHog public/admin 站點命名與 live 驗證，讓 Aware Wave Website、Aware Wave Admin、Soulful Expression 可用一致屬性分流。
+- **證據／檔案**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/wordpress/mu-plugins/posthog.php`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/providers.tsx`
+  - Live SG：`lobster-wordpress` / `lobster-next-admin` 均 healthy；`aware-wave.com` HTML 已含 `site_name: "Aware Wave Website"`；`next-admin` bundle 已含 `site_name:"Aware Wave Admin"`。
+- **Git**: pending commit in this turn.
+- **對應 TASKS 條目若未打勾**: 無，本輪為 PostHog/observability 設定收斂，未對應單一未完成 TASKS 勾選。
+- **風險／待辦若未完成**: `soulfulexpression.org` 仍需在 Hostinger WordPress 透過 WPCode/Header injection 或同等 MU plugin 貼入 PostHog snippet，才能開始送事件；本 repo 已預留 `Soulful Expression` site_name 映射。
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:8d7a99e64ffa6e3a1daf164db4bf776d97be98c34222849a0a07e16062795eec -->
+
+### cursor-agent 2026-05-06 07:25
+
+- **完成（一句）**: 補齊 tenant `company-scenery-travel-mongolia` 的 `OPERATIONS_SCHEDULE.json`、`OPS_QUEUE.json` 以解除 health Critical gate；並先手寫 WORKLOG `## 2026-05-03`／CONVERSATION_MEMORY  tenant provisioning 摘要。
+- **變更路徑**:
+  - `agency-os/tenants/company-scenery-travel-mongolia/OPERATIONS_SCHEDULE.json`
+  - `agency-os/tenants/company-scenery-travel-mongolia/OPS_QUEUE.json`
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+- **Git**: 待 AO-CLOSE commit／push
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:b0d50a564ef79b38210b6f9b39e2bcd6e57f3b1d1e9cb82f23d93f0889414ab8 -->
+
+### cursor-agent 2026-05-06 07:35
+
+- **完成（一句）**: 解除 strict completeness：`memory/daily/2026-05-06.md` 與 WORKLOG `### Daily` 已取代 `(TBD)`；準備再次 AO-CLOSE commit／push。
+- **變更路徑**:
+  - `agency-os/memory/daily/2026-05-06.md`
+  - `agency-os/WORKLOG.md`
+- **Git**: dirty — 本輪 ao-close 將一併提交
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-01 01:30:11`
+- Time: `2026-05-06 07:17:05`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -220,23 +271,31 @@ _no file for today yet._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260501-013011.md`
-- Closeout: `reports/closeout/closeout-20260501-013008.md`
+- Health: `reports/health/health-20260506-071705.md`
+- Closeout: `reports/closeout/closeout-20260506-071702.md`
 
 ## Action
 - No blocking issue detected.
 
-## Related Documents (Auto-Synced)
-- `.cursor/rules/30-resume-keyword.mdc`
-
-_Last synced: 2026-05-01 05:44:21 UTC_
-
 ## 7) WORKLOG.md tail (~60 lines)
+- `git pull origin main`：**Already up to date**。
+- `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
+- `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
+
+### AO-CLOSE（2026-03-27）
+- 已完成收工前進度同步（`TASKS.md`、`WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`memory/daily/2026-03-27.md`）。
+- 準備執行 `D:\Work\scripts\ao-close.ps1` 一鍵閘道與推送。
+
+### 他處電腦開機須知 + 缺席使用者授權之 AO-CLOSE
+- 新增 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（公司機／換機：`git pull`、`verify-build-gates`、`npm ci`、`integrated-status` 路徑說明、與根目錄 `reports/status` 區別）。
+- 更新 **`RESUME_AFTER_REBOOT.md`**（區分：同機重開 vs 他處開機）、**`README.md`**、**`EXECUTION_DASHBOARD.md`** 指向該須知。
+- 使用者授權代理於不在現場時執行 **`ao-close.ps1`**（含 push）；證據見本日 `memory/daily/2026-03-27.md`。
+- **AO-CLOSE 產出（agency-os/reports/）**：`health/health-20260326-084302.md`、`guard/guard-20260326-084306.md`、`closeout/closeout-20260326-084303.md`、`status/integrated-status-20260326-084315.md`；**Git**：主提交 `f726ce9`，補登 daily `70114fc`，TASKS 勾選 `5a7841b`（均已 `push origin main`）。
 
 ### Lobster Factory - C1-1 execute 驗證成功
 - Supabase `EdD Art-based` 已完成 `0001_core.sql` ~ `0006_seed_catalog.sql` 套用。
 - `validate-workflow-runs-write.mjs --execute=1` 實跑成功，回傳：`ok: true`、`insertedId: 1e53ec18-1c01-4547-9593-20feee6bdc2c`。
-- 已將 `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md` 的 `C1-1` 由未完成改為完成。
+- 已將 `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` 的 `C1-1` 由未完成改為完成。
 
 ### Enterprise 工具層（C5）落地決策與授權驗收
 - 已安裝與可用：`Cloudflare`、`Sentry`、`PostHog`、`Slack`、`Clerk`（`Supabase` plugin OAuth 仍有 `Unrecognized client_id`，暫用既有 `mcp.json` 連線）。
@@ -278,18 +337,5 @@ _Last synced: 2026-05-01 05:44:21 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

@@ -3,6 +3,10 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-06 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-06 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:b0d50a564ef79b38210b6f9b39e2bcd6e57f3b1d1e9cb82f23d93f0889414ab8 -->
+- **2026-05-06 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-06 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:8d7a99e64ffa6e3a1daf164db4bf776d97be98c34222849a0a07e16062795eec -->
+- **2026-05-06 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-06 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:5998d546ad0aa731fbb0789c2181f67c848b626d6c9248e89f8753d38e9bc1af -->
+- **2026-05-03（AO-CLOSE 前 — tenant integration / OAuth 澄清）**：**`tenant_integration_bindings`** 編排落地：`orchestrate-tenant-provisioning` + 真 API adapters（Sentry／GitHub／PostHog／n8n／Supabase Mgmt 等），secrets 僅 **`secret_ref`**；OAuth「用 Google 註冊」仍須使用者瀏覽器同意，不可無互動代開帳。細節 **`WORKLOG` `## 2026-05-03`**。
 - **2026-05-01（Trigger／PostHog／phase1 — Cursor Agent）**：Workflows **`syncEnvVars`** + **`@trigger.dev/*` 鎖 4.4.4**；**`lobster-factory/infra/trigger/README.md`** 為 EU **`204.168.175.41`**／**`registry:5000`**／deploy 唯一長文；**`deploy-workflows.ps1`**；SG **`next-admin`** **`--no-deps`** 重啟；WP **`posthog.php` MU** + compose **`NEXT_PUBLIC_POSTHOG_*`**（**`aaee266`**）。未 push 之 **`7d51ac1`～`287d086`** 與 **`aaee266`** 需 **`git push`**；完整 **`trigger.dev deploy`** 須 EU 或 tunnel。細節 **`WORKLOG` `## 2026-05-01`**「Cursor／phase1／Trigger／PostHog」。
 - **2026-05-01（AO-CLOSE 前摘要）**：n8n MCP 在 Cursor 改 **stdio 橋接**（`scripts/run-n8n-mcp.mjs`），避開 HTTP 運輸下 **POST initialize 後 GET → 404** 造成的 MCP 面板抖動；runbook **`docs/operations/n8n-self-hosted-mcp-troubleshooting.md`** 已補段落；**`TASKS`** 已拆項——**n8n（Cursor）** 已達 DoD 並可由收工勾選，`Supabase MCP／SSH tunnel` 仍為開放。另：**`scripts/ao-close.ps1`** 補 Splatted 繫結／StrictMode 下 **`CommitMessageFile`** 安全預設。細節見 **`WORKLOG` `## 2026-05-01`**。
 - **2026-04-30 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-04-30 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:68ccb8e525ff628ed06624d482c7b037952fe12ae0215db8f864793df15b6079 -->
@@ -385,5 +389,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-01 11:39:18 UTC_
+_Last synced: 2026-05-05 23:17:01 UTC_
 
