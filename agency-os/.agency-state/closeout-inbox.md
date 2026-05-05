@@ -34,6 +34,44 @@
 
 ---
 
+### claude-sonnet-4-6 2026-05-06 18:30
+
+- **完成（一句）**: Build Console 前置帳號區段 + integrations 預設展開 + 部署至伺服器 + deploy.sh --no-deps 修正
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/build/BuildConsole.tsx`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css`
+  - `lobster-factory/infra/hetzner-phase1-core/deploy.sh`
+  - `lobster-factory/packages/workflows/src/integrations/integration-steps.ts`（新）
+  - `lobster-factory/packages/workflows/src/trigger/adopt-client-os.ts`（新）
+  - `lobster-factory/packages/workflows/src/trigger/ao-infrastructure-check.ts`（新）
+  - `lobster-factory/packages/workflows/src/trigger/dispatch-action-run.ts`（新）
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/build/runs/[id]/route.ts`（新）
+  - `lobster-factory/packages/db/migrations/0023_dispatcher_enum_and_catalog_seeds.sql`（新）
+- **Git**: 204ccfb（本輪 prerequisites + integrations open）; 04bc560（deploy.sh --no-deps）; b0e8c3b（上輪 workflows + UI 大批）
+- **對應 TASKS 子字串（可選）**: Build Console one-click integrations
+- **風險／待辦（可選）**: 遠端伺服器已 git pull + docker rebuild 完成（無單獨 commit）；migration 0023 尚未在 Supabase SQL Editor 執行（ops_action_runs status enum + trigger_run_id 欄位 + wp-basic/wp-business seeds 未入庫）；https://app.aware-wave.com/build 已上線可見前置帳號區與 integrations 欄位
+
+### codex 2026-05-06 07:05
+
+- **Summary**: Hardened and deployed the guarded Build Console path for `https://app.aware-wave.com/build`; the console supports Profile A `internal_setup`, Profile B `full_install`, and Profile C `adopt_delta` with plan/enqueue separation and audit-oriented queues.
+- **Evidence**:
+  - `npm run build` passed in `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`.
+  - `npm run validate` passed in `lobster-factory` after rerunning with the approved environment.
+  - Local API smoke passed for Profile A, Profile B, Profile C blocked preflight, viewer rejection, and forged role rejection in production-like mode.
+  - Supabase action catalog seed applied for the three Build Console actions.
+  - Production Next Admin was rebuilt/restarted; active Nginx config includes `/api/build/` trusted-proxy headers; unauthenticated `https://app.aware-wave.com/build` returns `401`.
+- **Git**:
+  - Build Console hardening landed earlier as `60601c5 Harden Build Console deployment path`.
+  - Current HEAD before this closeout entry: `204ccfb [claude] feat(build-console): prerequisites section + integrations open by default`.
+- **Changed files in this closeout commit**:
+  - `agency-os/.agency-state/closeout-inbox.md`
+- **Not committed / follow-up**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/tsconfig.tsbuildinfo` is a generated build-info delta.
+  - `Temp/next-admin-build-console.*.log` are local run logs.
+  - `agency-os/ALERT_REQUIRED.txt` reports `verify-build-gates` failed on 2026-05-04 and should be handled separately.
+
+---
+
 ### example-agent <yyyy-MM-dd 09:00>
 
 - **完成（一句）**: 已依範本建立收件匣流程
