@@ -62,8 +62,19 @@ If task-specific, also read the owner file first (for example, `agency-os/docs/o
    - working tree clean or intentionally scoped
    - `verify-build-gates` PASS
    - strict environment audit PASS (`AUDIT RESULT: PASS (no warnings)`)
-4. Read `agency-os/.agency-state/open-tasks-snapshot.md` (or `agency-os/TASKS.md` if snapshot missing).
-5. Report current state with:
+4. Run the daily ops-console DoD mechanical check (replaces manual memory):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\ops-console-smoke.ps1 `
+     -BaseUrl https://app.aware-wave.com `
+     -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops `
+     -ExpectedMinWorkflowRuns 1 -ExpectedWorkflowSources trigger,n8n `
+     -EnableWriteChecks -EnableRoleChecks `
+     -ReportPath .\agency-os\reports\status\ops-console-smoke-LATEST.json
+   ```
+   Slash command shortcut: `/smoke-test`  
+   If any check fails, address before starting other work.
+5. Read `agency-os/.agency-state/open-tasks-snapshot.md` (or `agency-os/TASKS.md` if snapshot missing).
+6. Report current state with:
    - completed context
    - current progress/risk
    - full open checklist items (`- [ ]`)
@@ -141,11 +152,20 @@ Pick applicable checks by scope. All commands can also be invoked via Claude Cod
 - `powershell -ExecutionPolicy Bypass -File .\scripts\system-health-check.ps1`
 - Slash command shortcuts: `/doc-sync`, `/health`
 
-### Ops-console line (example)
-- `powershell -ExecutionPolicy Bypass -File .\scripts\ops-console-smoke.ps1 ...`
-- Validate expected tenant reflection
-- Validate workflow run minimum if required
-- Validate audit event mapping for write actions
+### Ops-console DoD (daily mechanical check — runs automatically in §3)
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\ops-console-smoke.ps1 `
+  -BaseUrl https://app.aware-wave.com `
+  -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops `
+  -ExpectedMinWorkflowRuns 1 -ExpectedWorkflowSources trigger,n8n `
+  -EnableWriteChecks -EnableRoleChecks `
+  -ReportPath .\agency-os\reports\status\ops-console-smoke-LATEST.json
+```
+This single command covers all 4 DoD checks:
+1. **tenant** — `/api/ops/summary` reflects the expected tenant
+2. **source** — workflow runs include `trigger` and `n8n` sources (`runSource` from `metadata.source`)
+3. **permissions** — `viewer` gets 403 on writes; `admin` succeeds
+4. **audit events** — AI job creation leaves a traceable `ai_image_job_created` audit record
 - Slash command shortcut: `/smoke-test`
 
 ### Final status check
