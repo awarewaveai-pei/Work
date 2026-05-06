@@ -1,6 +1,6 @@
 ﻿# Weekly automation report
 
-- Generated: 2026-04-29 15:06:40
+- Generated: 2026-05-04 16:37:45
 - Work root: C:\Users\USER\Work
 - Config: C:\Users\USER\Work\scripts\weekly-automation-config.json
 - Result: PASS
@@ -10,8 +10,8 @@
 ### weekly-system-review - PASS
 - Description: Run weekly build gates and integrated status report.
 - Type: powershellFile
-- Started: 2026-04-29T15:06:25
-- Ended: 2026-04-29T15:06:36
+- Started: 2026-05-04T16:36:41
+- Ended: 2026-05-04T16:37:28
 - Exit code: 0
 - Command: powershell.exe 
 
@@ -104,8 +104,8 @@ Bootstrap validation PASSED ??== Monorepo: sync Cursor rules (00 + 30 + 40 + 50-
 verify-adr-index: OK (6 ADR file(s))
 == Observability baseline: Sentry contract ==
 == Agency OS: system-health-check ==
-Health report: reports/health/health-20260429-150630.md
-Score: 100% (333/333)
+Health report: reports/health/health-20260504-163653.md
+Score: 100% (334/334)
 == Shared AI Governance: Verify SSOT and Sync ==
 == Shared AI Governance: Checking SSOT Consistency ==
   [OK] Canonical rules found and unique.
@@ -115,7 +115,7 @@ Score: 100% (333/333)
   [OK] .mcp.json server list matches registry template.
 Shared AI Governance verification passed.
 verify-build-gates: ALL PASSED
-Integrated status report: reports/status/integrated-status-20260429-150635.md
+Integrated status report: reports/status/integrated-status-20260504-163712.md
 Also written to: reports/status/integrated-status-LATEST.md
 == generate-integrated-status-report: render PROGRAM_TIMELINE from PROGRAM_SCHEDULE.json ==
 render-program-timeline: updated C:\Users\USER\Work\agency-os\docs\overview\PROGRAM_TIMELINE.md
@@ -125,8 +125,8 @@ weekly-system-review: done (gates=PASS (exit 0), report OK).
 ### workflows-security-audit - PASS
 - Description: Run workflows npm audit and emit security report.
 - Type: process
-- Started: 2026-04-29T15:06:36
-- Ended: 2026-04-29T15:06:40
+- Started: 2026-05-04T16:37:28
+- Ended: 2026-05-04T16:37:45
 - Exit code: 0
 - Command: npm 
 
@@ -136,8 +136,17 @@ weekly-system-review: done (gates=PASS (exit 0), report OK).
 > audit:workflows-security
 > node scripts/audit-workflows-security.mjs
 
-Wrote: C:\Users\USER\Work\agency-os\reports\security\workflows-npm-audit-2026-04-29-070639.md
+Wrote: C:\Users\USER\Work\agency-os\reports\security\workflows-npm-audit-2026-05-04-083745.md
 Wrote: C:\Users\USER\Work\agency-os\reports\security\workflows-npm-audit-LATEST.md
+```
+
+#### stderr
+```text
+npm notice
+npm notice New minor version of npm available! 11.9.0 -> 11.13.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.13.0
+npm notice To update run: npm install -g npm@11.13.0
+npm notice
 ```
 
 

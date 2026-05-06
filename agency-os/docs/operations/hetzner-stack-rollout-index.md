@@ -56,6 +56,7 @@
 | 12 | **Sentry** | 錯誤、trace、incident | `TASKS.md` Enterprise；`PROGRAM_TIMELINE.md`；`tools-and-integrations.md` |
 | 13 | **PostHog** | Analytics、flags、實驗 | 同上 |
 | 14 | **Langfuse** | LLM observability、prompt、eval | `PROGRAM_TIMELINE.md`（評估項）；可晚於核心路径 |
+| 15 | **Grafana + Loki + Promtail（Log 聚合）** | 跨容器日誌時間軸查詢；loopback + SSH tunnel | compose 已就緒：`lobster-factory/infra/hetzner-phase1-core/docker-compose.observability.yml`；部署步驟：`docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md` P2；立場：`docs/operations/OBSERVABILITY_STACK_STANCE.md` |
 
 與 **`docs/overview/ao-lobster-operating-model.md`** 圖中的 **Observability** 平面一致；**未上線前**不要求一次備齊，但索引與 `TASKS` 應保持對齊。
 

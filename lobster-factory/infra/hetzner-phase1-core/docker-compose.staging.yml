@@ -1,0 +1,65 @@
+# Staging compose override — run with Docker Compose project name lobster-staging.
+#
+# Usage (from hetzner-phase1-core/):
+#
+#   Build:
+#     docker compose -p lobster-staging --env-file .env.staging \
+#       -f docker-compose.yml -f docker-compose.staging.yml build
+#
+#   Up:
+#     docker compose -p lobster-staging --env-file .env.staging \
+#       -f docker-compose.yml -f docker-compose.staging.yml up -d
+#
+#   Down:
+#     docker compose -p lobster-staging -f docker-compose.yml -f docker-compose.staging.yml down
+#
+#   Status:
+#     docker compose -p lobster-staging -f docker-compose.yml -f docker-compose.staging.yml ps
+#
+# Port isolation: host ports are env-var templated in docker-compose.yml.
+# Set NGINX_HOST_PORT / REDIS_HOST_PORT / N8N_HOST_PORT / WORDPRESS_HOST_PORT /
+# NODE_API_HOST_PORT / NEXT_ADMIN_HOST_PORT in .env.staging to 9xxx values.
+# See .env.staging.example for the full list.
+#
+# Container name isolation: overrides below prevent naming conflicts with
+# prod containers (which also carry container_name in docker-compose.yml).
+#
+# Local images use :staging tag — rebuilding staging never overwrites prod :local.
+#
+# SSH tunnel for local access (from dev machine):
+#   ssh -L 9080:127.0.0.1:9080 -L 9001:127.0.0.1:9001 -L 9002:127.0.0.1:9002 hetzner
+#
+# Docs: agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md §staging
+#       lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md §1
+
+services:
+  nginx:
+    container_name: lobster-staging-nginx
+
+  redis:
+    container_name: lobster-staging-redis
+
+  n8n:
+    container_name: lobster-staging-n8n
+
+  wordpress-db:
+    container_name: lobster-staging-wordpress-db
+
+  wordpress:
+    container_name: lobster-staging-wordpress
+    image: lobster-phase1-wordpress:staging
+
+  node-api:
+    container_name: lobster-staging-node-api
+    image: lobster-phase1-node-api:staging
+
+  next-admin:
+    container_name: lobster-staging-next-admin
+    image: lobster-phase1-next-admin:staging
+
+# Staging network isolation: redirect the lobster-net key to a fresh
+# lobster-staging-net bridge so staging services never touch prod lobster-net.
+networks:
+  lobster-net:
+    name: lobster-staging-net
+    external: false

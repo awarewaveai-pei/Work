@@ -31,6 +31,7 @@ hostinger-recovery-codes.txt
 .env
 .env.*
 !.env.example
+!.env.staging.example
 *.pem
 *.p12
 id_rsa
