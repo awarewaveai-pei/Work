@@ -83,7 +83,12 @@
 
 ## Claude Code Hook：AO-RESUME
 
-`.claude/settings.json` 已設定 `UserPromptSubmit` hook → `.claude/hooks/ao-resume-on-prompt.ps1`。  
-行為與 `.cursor/hooks.json` 的 `beforeSubmitPrompt` 等效：偵測 `^AO-RESUME` 即自動執行 `ao-resume.ps1 -FullMainlineParity`，結果寫入 `agency-os/.agency-state/ao-resume-hook-last.json`。
+`~/.claude/settings.json` 的 `UserPromptSubmit` hook → `~/.claude/hooks/ao-resume-on-prompt.ps1`（user-level，不進 git）。  
+行為與 `.cursor/hooks.json` 的 `beforeSubmitPrompt` 完全等效：偵測 `^AO-RESUME` 即自動執行 `ao-resume.ps1 -FullMainlineParity`，結果寫入 `agency-os/.agency-state/ao-resume-hook-last.json`（120 秒去重，兩 IDE 共用同一狀態檔）。
+
+## 雙 IDE 並存（Cursor + Claude Code）
+
+本 repo 同時支援兩套 IDE，隨時可切換，不需遷移。完整架構見：  
+`agency-os/docs/operations/dual-ide-coexistence-strategy.md`
 
 

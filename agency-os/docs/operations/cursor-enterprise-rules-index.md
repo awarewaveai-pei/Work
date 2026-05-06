@@ -1,6 +1,22 @@
-﻿# Cursor 企業級規則（可賣系統／版控正本）
+﻿# IDE 企業級規則索引（Cursor + Claude Code 並存）
 
-## 這是什麼？
+> **架構原則（30 年）**：本 repo 同時支援 **Cursor** 與 **Claude Code** 兩套 IDE，互不干擾，隨時可切換。  
+> 完整雙 IDE 並存說明：`docs/operations/dual-ide-coexistence-strategy.md`
+
+## § Claude Code 對應一覽
+
+| 機制 | Cursor | Claude Code |
+|------|--------|------------|
+| 專案規則 | `agency-os/.cursor/rules/*.mdc` | `CLAUDE.md` + `@agency-os/AGENTS.md`（自動載入） |
+| Hook：AO-RESUME | `.cursor/hooks.json` `beforeSubmitPrompt` | `~/.claude/settings.json` `UserPromptSubmit` |
+| Hook 腳本 | `.cursor/hooks/run-ao-resume-on-prompt.ps1` | `~/.claude/hooks/ao-resume-on-prompt.ps1` |
+| MCP 伺服器 | `.cursor/mcp.json`（project-scoped） | `.mcp.json`（共用 SSOT，兩邊都讀） |
+| Commit prefix | `[cursor]` | `[claude]` |
+| 狀態輸出 | `agency-os/.agency-state/ao-resume-hook-last.json` | **同一檔案**（共用，120 秒去重） |
+
+---
+
+## § Cursor 企業級規則（原始正本）
 
 整合多模型產出的 **IDE 行為規範**（身分、風險、架構面、MCP 路由、資料／狀態機紀律、Skill／可觀測性），**以本 repo 為單一真相**，與 **AO 關鍵字、收工閘道、龍蝦 Routing** 對齊，避免「Settings 貼一大段卻沒進 git」的交付風險。
 
@@ -64,5 +80,5 @@
 - `docs/operations/security-secrets-policy.md`
 - `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
 
-_Last synced: 2026-05-06 09:38:32 UTC_
+_Last synced: 2026-05-06 11:12:02 UTC_
 

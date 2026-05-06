@@ -1,8 +1,9 @@
-﻿# Cursor MCP、外掛與工具分工（Agency OS + Monorepo）
+﻿# MCP、外掛與工具分工（Agency OS + Monorepo）
 
-> **目的**：補齊「IDE 裡接了什麼 MCP／外掛」與「龍蝦自動化 Routing」之間的空隙。  
-> **職責邊界**：**龍蝦執行面**仍以 `[lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md](../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md)` 為 **強制規格**；本檔描述 **Cursor 對話／本機代理** 可用的 MCP 及其**建議用途**，不作為略過 staging／核准的理由。
-> **一頁追溯總表**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（工具分工 ↔ 強制路由 ↔ TASKS 對照）
+> **適用範圍**：**Cursor 與 Claude Code 均適用**。MCP 伺服器清單以 monorepo 根 **`.mcp.json`** 為共用 SSOT；本檔描述各 MCP 的建議用途與 IDE 設定對照。  
+> **職責邊界**：**龍蝦執行面**仍以 `[lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md](../../../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md)` 為 **強制規格**；本檔描述 **IDE 對話／本機代理** 可用的 MCP 及其**建議用途**，不作為略過 staging／核准的理由。  
+> **一頁追溯總表**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（工具分工 ↔ 強制路由 ↔ TASKS 對照）  
+> **雙 IDE 並存架構**：`docs/operations/dual-ide-coexistence-strategy.md`
 
 ## 1) 憑證與設定（必讀）
 
@@ -145,5 +146,5 @@ perplexity → 內建 + **work-global** → 雲商 MCP → **龍蝦寫入**只�
 - `README.md`
 - `TASKS.md`
 
-_Last synced: 2026-05-06 09:38:32 UTC_
+_Last synced: 2026-05-06 11:12:02 UTC_
 
