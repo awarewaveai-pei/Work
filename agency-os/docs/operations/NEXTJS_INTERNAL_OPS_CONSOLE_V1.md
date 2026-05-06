@@ -85,6 +85,7 @@
 6. 可用 `scripts/ops-console-smoke.ps1` 做快速驗收（server ready 後）：
    - 唯讀：`pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl https://app.aware-wave.com`
    - 含寫入：`pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl https://app.aware-wave.com -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops -EnableWriteChecks`
+   - 含報告輸出：`pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl https://app.aware-wave.com -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops -ExpectedMinWorkflowRuns 1 -EnableWriteChecks -ReportPath ./agency-os/reports/status/ops-console-smoke-LATEST.json`
    - 內建檢查：`/api/ops/summary` 必須含指定 tenant；建立 AI job 後會驗證 `/api/ops/audit-events` 內存在 `ai_image_job_created` 且對應相同 `job_id/trace_id`。
 7. 若尚未有 `tenant_id` 或不確定 migration，先跑 bootstrap：
    - `powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ops-console-bootstrap.ps1 -SupabaseUrl <supabase-url> -SupabaseServiceRoleKey <service-role-key> -TenantSlug awarewave-ops -TenantName "AwareWave Ops"`
@@ -94,6 +95,14 @@
 9. 最小種子（v1 smoke）：
    - `lobster-factory/packages/db/migrations/0012_seed_ops_console_minimal.sql`
    - 目的：補 `awarewave-ops` organization 與 `ops_action_catalog` 測試 action（可重複執行，不重複建垃圾資料）。
+
+## 最小可重跑清單（dev / staging / prod）
+- dev（本機）：
+  - `pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl http://127.0.0.1:3000 -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops -ExpectedMinWorkflowRuns 1 -EnableWriteChecks -ReportPath ./agency-os/reports/status/ops-console-smoke-LATEST.json`
+- staging（受控寫入）：
+  - `pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl https://<staging-admin-domain> -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops -ExpectedMinWorkflowRuns 1 -EnableWriteChecks -ReportPath ./agency-os/reports/status/ops-console-smoke-staging-LATEST.json`
+- prod（唯讀預檢，避免未核准寫入）：
+  - `pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl https://app.aware-wave.com -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops -ReportPath ./agency-os/reports/status/ops-console-smoke-prod-readonly-LATEST.json`
 
 ## 實作順序（建議）
 1. 租戶總覽頁（唯讀）

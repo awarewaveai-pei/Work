@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getSupabaseReadClient } from "../../../../lib/supabase-server";
+import { getSupabaseServerClient } from "../../../../lib/supabase-server";
 
 export async function GET(request: Request) {
-  const supabase = getSupabaseReadClient();
+  const supabase = getSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.json({ ok: false, error: "supabase_read_not_configured" }, { status: 503 });
+    return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
   }
 
   const { searchParams } = new URL(request.url);

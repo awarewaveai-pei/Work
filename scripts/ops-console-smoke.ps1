@@ -7,7 +7,9 @@ param(
     [ValidateSet("owner", "admin", "operator", "viewer")]
     [string]$OpsRole = "admin",
     [switch]$EnableWriteChecks,
-    [int]$TimeoutSec = 20
+    [int]$TimeoutSec = 20,
+    [int]$ExpectedMinWorkflowRuns = 0,
+    [string]$ReportPath = ""
 )
 
 Set-StrictMode -Version Latest
@@ -102,6 +104,27 @@ function Print-Check {
 
 $root = $BaseUrl.TrimEnd("/")
 $failed = New-Object System.Collections.Generic.List[string]
+$report = [ordered]@{
+    baseUrl = $root
+    generatedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
+    checks = @()
+    expected = [ordered]@{
+        tenantId = $ExpectedTenantId
+        tenantSlug = $ExpectedTenantSlug
+        minWorkflowRuns = $ExpectedMinWorkflowRuns
+    }
+    evidence = [ordered]@{
+        tenantCount = $null
+        workflowRunsCount = $null
+        jobId = $null
+        traceId = $null
+        auditEventId = $null
+        auditEventTargetId = $null
+        auditEventTraceId = $null
+    }
+    result = "pending"
+    failedChecks = @()
+}
 
 $getHeaders = @{ "Accept" = "application/json" }
 
@@ -109,6 +132,14 @@ $summary = Invoke-JsonRequest -Method GET -Url "$root/api/ops/summary" -Headers 
 $summaryPass = $summary.ok -and $summary.json -and ($summary.json.sourceOfTruth -ne $null)
 Print-Check -Name "GET /api/ops/summary" -Result $summary -Pass $summaryPass
 if (-not $summaryPass) { $failed.Add("summary") | Out-Null }
+if ($summaryPass) {
+    $report.evidence.tenantCount = @($summary.json.tenants).Count
+}
+$report.checks += [ordered]@{
+    name = "summary"
+    pass = $summaryPass
+    status = $summary.status
+}
 
 if ($summaryPass -and (-not [string]::IsNullOrWhiteSpace($ExpectedTenantId) -or -not [string]::IsNullOrWhiteSpace($ExpectedTenantSlug))) {
     $tenants = @($summary.json.tenants)
@@ -135,12 +166,53 @@ if ($summaryPass -and (-not [string]::IsNullOrWhiteSpace($ExpectedTenantId) -or 
     }
     Print-Check -Name "UI datasource reflects expected tenant (/api/ops/summary)" -Result $reflectResult -Pass $tenantReflectPass
     if (-not $tenantReflectPass) { $failed.Add("summary-tenant-reflect") | Out-Null }
+    $report.checks += [ordered]@{
+        name = "summary-tenant-reflect"
+        pass = $tenantReflectPass
+        status = $summary.status
+        details = [ordered]@{
+            expectedTenantId = $ExpectedTenantId
+            expectedTenantSlug = $ExpectedTenantSlug
+            sourceOfTruth = $summary.json.sourceOfTruth
+            tenantCount = $tenants.Count
+        }
+    }
 }
 
 $runs = Invoke-JsonRequest -Method GET -Url "$root/api/ops/workflow-runs?limit=5" -Headers $getHeaders
 $runsPass = $runs.ok -and $runs.json -and ($runs.json.ok -eq $true)
 Print-Check -Name "GET /api/ops/workflow-runs" -Result $runs -Pass $runsPass
 if (-not $runsPass) { $failed.Add("workflow-runs") | Out-Null }
+if ($runsPass) {
+    $runsCount = [int]$runs.json.count
+    $report.evidence.workflowRunsCount = $runsCount
+    if ($ExpectedMinWorkflowRuns -gt 0) {
+        $hasEnoughRuns = $runsCount -ge $ExpectedMinWorkflowRuns
+        $workflowCountResult = @{
+            ok = $runs.ok
+            status = $runs.status
+            json = [pscustomobject]@{
+                expectedMinWorkflowRuns = $ExpectedMinWorkflowRuns
+                actualWorkflowRuns = $runsCount
+                hint = if ($hasEnoughRuns) { "ok" } else { "No ops_action_runs rows yet. Trigger one staging action first." }
+            }
+            error = ""
+        }
+        Print-Check -Name "Workflow runs count >= expected minimum" -Result $workflowCountResult -Pass $hasEnoughRuns
+        if (-not $hasEnoughRuns) { $failed.Add("workflow-runs-min-count") | Out-Null }
+        $report.checks += [ordered]@{
+            name = "workflow-runs-min-count"
+            pass = $hasEnoughRuns
+            status = $runs.status
+            details = $workflowCountResult.json
+        }
+    }
+}
+$report.checks += [ordered]@{
+    name = "workflow-runs"
+    pass = $runsPass
+    status = $runs.status
+}
 
 if ($EnableWriteChecks) {
     if ([string]::IsNullOrWhiteSpace($TenantId)) {
@@ -173,10 +245,17 @@ if ($EnableWriteChecks) {
     $jobPass = $job.ok -and $job.json -and ($job.json.ok -eq $true)
     Print-Check -Name "POST /api/ops/ai-image-jobs" -Result $job -Pass $jobPass
     if (-not $jobPass) { $failed.Add("ai-image-jobs") | Out-Null }
+    $report.checks += [ordered]@{
+        name = "ai-image-jobs"
+        pass = $jobPass
+        status = $job.status
+    }
 
     if ($jobPass) {
         $jobTraceId = [string](Get-NestedValue -Object $job.json -Path "job.trace_id")
         $jobId = [string](Get-NestedValue -Object $job.json -Path "job.id")
+        $report.evidence.traceId = $jobTraceId
+        $report.evidence.jobId = $jobId
         $audit = Invoke-JsonRequest -Method GET -Url "$root/api/ops/audit-events?trace_id=$jobTraceId&event_type=ai_image_job_created&limit=5" -Headers $getHeaders
         $auditPass = $audit.ok -and $audit.json -and ($audit.json.ok -eq $true) -and (@($audit.json.events).Count -gt 0)
         Print-Check -Name "GET /api/ops/audit-events (ai_image_job_created)" -Result $audit -Pass $auditPass
@@ -184,6 +263,9 @@ if ($EnableWriteChecks) {
             $failed.Add("audit-events") | Out-Null
         } else {
             $event = @($audit.json.events)[0]
+            $report.evidence.auditEventId = $event.id
+            $report.evidence.auditEventTargetId = $event.target_id
+            $report.evidence.auditEventTraceId = $event.trace_id
             $targetPass = ($event.target_id -eq $jobId) -or ($event.trace_id -eq $jobTraceId)
             $targetResult = @{
                 ok = $audit.ok
@@ -198,14 +280,36 @@ if ($EnableWriteChecks) {
             }
             Print-Check -Name "Audit event maps to created AI job" -Result $targetResult -Pass $targetPass
             if (-not $targetPass) { $failed.Add("audit-event-target") | Out-Null }
+            $report.checks += [ordered]@{
+                name = "audit-event-target"
+                pass = $targetPass
+                status = $audit.status
+                details = $targetResult.json
+            }
+        }
+        $report.checks += [ordered]@{
+            name = "audit-events"
+            pass = $auditPass
+            status = $audit.status
         }
     }
 }
 
 if ($failed.Count -gt 0) {
+    $report.result = "failed"
+    $report.failedChecks = @($failed)
+    if (-not [string]::IsNullOrWhiteSpace($ReportPath)) {
+        $report | ConvertTo-Json -Depth 10 | Out-File -FilePath $ReportPath -Encoding utf8
+        Write-Host ("report_path={0}" -f $ReportPath)
+    }
     Write-Error ("ops-console-smoke failed: {0}" -f ($failed -join ","))
     exit 1
 }
 
+$report.result = "passed"
+if (-not [string]::IsNullOrWhiteSpace($ReportPath)) {
+    $report | ConvertTo-Json -Depth 10 | Out-File -FilePath $ReportPath -Encoding utf8
+    Write-Host ("report_path={0}" -f $ReportPath)
+}
 Write-Host "ops-console-smoke: ALL PASSED" -ForegroundColor Green
 exit 0

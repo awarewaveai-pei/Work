@@ -22,6 +22,15 @@
 - `scripts/ops-console-smoke.ps1` 新增 `-ExpectedTenantId` / `-ExpectedTenantSlug`，可機械驗證 UI datasource 是否包含指定 tenant。
 - `/api/ops/summary` 改用 `getSupabaseServerClient()`，避免僅 anon client 受 RLS 影響導致 `tenants` 空陣列（寫入端已可用但列表不回顯）。
 - 新增 `GET /api/ops/audit-events`，並讓 smoke 在建立 `ai_image_jobs` 後自動驗證 `ai_image_job_created` 審計事件與 `job_id/trace_id` 對應一致（DoD #3 可重跑前置證據）。
+- `ops-console-smoke.ps1` 新增 `-ExpectedMinWorkflowRuns` 與 `-ReportPath`，可輸出機械報告 JSON（含 `trace_id/job_id/audit_event_id`）；`/api/ops/workflow-runs` 改用 `getSupabaseServerClient()`，避免匿名讀取看不到 `ops_action_runs` 導致 DoD #2 假陰性。
+
+### Next.js Ops Console v1 — DoD #2/#3 機械驗證（本輪）
+
+- seed_org_id: `39ad4149-5044-4077-8d9a-b6b916de0e21`
+- seed_action_id: `2e3017f1-68ae-4623-8f9e-daa8dc76bb69`
+- seed_trace_id: `af5a67fd-50bf-4bdb-8ed0-c48c16666a8c`
+- ui_capture_path: `agency-os/reports/status/ops-console-smoke-LATEST.json`
+- result: PASS（`ExpectedMinWorkflowRuns=1` + audit-event mapping all passed）
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:5998d546ad0aa731fbb0789c2181f67c848b626d6c9248e89f8753d38e9bc1af -->
