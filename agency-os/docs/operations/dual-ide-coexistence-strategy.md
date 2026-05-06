@@ -65,8 +65,12 @@
 | 檔案 | 用途 |
 |------|------|
 | `CLAUDE.md` | 專案指令（自動讀取 `@AGENTS.md`） |
-| `~/.claude/settings.json` | hooks + permissions（user-level） |
-| `~/.claude/hooks/ao-resume-on-prompt.ps1` | Claude Code AO-RESUME hook 腳本 |
+| `.claude/commands/*.md` | Slash commands（`/ao-resume`、`/ao-close`、`/health` 等） |
+| `.claude/agents/repair-agent.md` | 系統診斷 subagent |
+| `.claude/agents/site-builder.md` | 租戶佈建 subagent |
+| `~/.claude/settings.json` | hooks + permissions（user-level，不進 git） |
+| `~/.claude/hooks/ao-resume-on-prompt.ps1` | Claude Code AO-RESUME hook 腳本（user-level，不進 git） |
+| `~/.claude/hooks/branch-protection.js` | 分支保護 hook（user-level，不進 git） |
 | `.mcp.json` | 共用 MCP（同共用層） |
 
 ---
@@ -107,6 +111,57 @@
 ### 兩個同時開啟
 可以。兩邊讀不同的 config 檔案，不互相干擾。  
 唯一共用的是 `agency-os/.agency-state/ao-resume-hook-last.json`（120 秒去重防止重複跑）。
+
+---
+
+## 新機器 / 桌機快速啟動
+
+### 從 git repo 自動同步的（不需手動複製）
+
+`git clone` 或 `git pull` 後即可用：
+- `.claude/commands/` — 所有 slash commands（`/ao-resume`、`/ao-close` 等）
+- `.claude/agents/` — 專案 subagents（`repair-agent`、`site-builder`）
+- `CLAUDE.md`、`agency-os/AGENTS.md` — 指令與治理規則
+- `scripts/ao-resume.ps1`、`scripts/ao-close.ps1` — 開工收工腳本
+- `.mcp.json` — MCP 伺服器定義（機密由環境變數填入）
+
+### 需要手動複製的（user-level，3 個檔案）
+
+將以下檔案從舊機複製到新機（路徑換成新機的帳號）：
+
+```
+來源（舊機）                                       目標（新機）
+────────────────────────────────────────────────────────────────
+C:\Users\<舊帳號>\.claude\settings.json        → C:\Users\<新帳號>\.claude\settings.json
+C:\Users\<舊帳號>\.claude\hooks\ao-resume-on-prompt.ps1
+                                                → C:\Users\<新帳號>\.claude\hooks\ao-resume-on-prompt.ps1
+C:\Users\<舊帳號>\.claude\hooks\branch-protection.js
+                                                → C:\Users\<新帳號>\.claude\hooks\branch-protection.js
+```
+
+如果 `~\.claude\hooks\` 目錄不存在，先建立：
+```powershell
+New-Item -ItemType Directory -Path "$env:USERPROFILE\.claude\hooks" -Force
+```
+
+### MCP secrets（每台機器獨立設定）
+
+```powershell
+# 1. 複製範本
+Copy-Item .\mcp\user-env.template.ps1 .\mcp\user-env.ps1
+# 2. 填入真實 token（用文字編輯器開 mcp\user-env.ps1）
+# 3. 執行 bootstrap
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
+```
+
+### 驗證新機器是否正常
+
+```powershell
+# 跑系統健康檢查
+powershell -ExecutionPolicy Bypass -File .\scripts\system-health-check.ps1
+# 跑 MCP 煙霧測試
+powershell -ExecutionPolicy Bypass -File .\scripts\n8n-mcp-smoke.ps1
+```
 
 ---
 

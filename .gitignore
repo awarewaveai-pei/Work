@@ -1,6 +1,48 @@
-# --- Secrets & local app state (never push) ---
-.claude/
-**/.claude/
+# --- Claude Code: runtime data & built-in files (project .claude/ is partially tracked) ---
+# Root-level ephemeral files
+.claude/.credentials.json
+.claude/.update.lock
+.claude/bash-commands.log
+.claude/history.jsonl
+.claude/mcp-health-cache.json
+.claude/mcp-needs-auth-cache.json
+.claude/mcp.json
+.claude/settings.json
+.claude/settings.local.json
+# Runtime subdirectories (Claude Code internal state, not project source)
+.claude/backups/
+.claude/cache/
+.claude/debug/
+.claude/downloads/
+.claude/file-history/
+.claude/hooks/
+.claude/ide/
+.claude/paste-cache/
+.claude/plans/
+.claude/plugins/
+.claude/projects/
+.claude/session-env/
+.claude/sessions/
+.claude/shell-snapshots/
+.claude/skills/
+.claude/telemetry/
+.claude/worktrees/
+# Built-in agents installed by Claude Code runtime (not project-authored)
+.claude/agents/README.md
+.claude/agents/README.zh-TW.md
+.claude/agents/critic.md
+.claude/agents/db-expert.md
+.claude/agents/debugger.md
+.claude/agents/frontend-designer.md
+.claude/agents/fullstack-engineer.md
+.claude/agents/migration-engineer.md
+.claude/agents/onboarder.md
+.claude/agents/planner.md
+.claude/agents/refactor-specialist.md
+.claude/agents/tool-expert.md
+.claude/agents/vuln-verifier.md
+.claude/agents/web-researcher.md
+# .claude/commands/ and project-custom agents in .claude/agents/ ARE tracked in git
 
 # AO-RESUME local stamp (see scripts/git-audit-tracked-remote.ps1 / check-three-way-sync knownNoise)
 agency-os/.agency-state/ao-resume-last.txt
@@ -55,6 +97,8 @@ agency-os/reports/closeout/closeout-*.md
 agency-os/reports/guard/guard-*.md
 agency-os/reports/status/integrated-status-*.md
 !agency-os/reports/status/integrated-status-LATEST.md
+# ops-console smoke evidence reports are local/re-runnable artifacts.
+agency-os/reports/status/ops-console-smoke-*.json
 
 # --- Legacy root-level reports (deprecated; canonical is agency-os/reports) ---
 reports/health/health-*.md
@@ -66,3 +110,4 @@ reports/status/integrated-status-*.md
 debug.log
 github.copilot-chat-*.vsix
 tmp-copilot-chat-vsix/
+n8n-hetzner/

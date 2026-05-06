@@ -91,4 +91,44 @@
 本 repo 同時支援兩套 IDE，隨時可切換，不需遷移。完整架構見：  
 `agency-os/docs/operations/dual-ide-coexistence-strategy.md`
 
+## Slash Commands（`/command-name`）
+
+專案級 slash commands 存放於 `.claude/commands/`（已進 git）。在對話輸入框打 `/` 即可呼叫：
+
+| 指令 | 用途 |
+|------|------|
+| `/ao-resume` | 手動觸發 AO-RESUME 五段式摘要（hook 已失效時備用） |
+| `/ao-close` | 手動觸發 AO-CLOSE 完整收工流程 |
+| `/health` | 執行 `system-health-check.ps1` 並報告結果 |
+| `/doc-sync` | 執行 `doc-sync-automation.ps1 -AutoDetect` |
+| `/verify` | 執行 `verify-build-gates.ps1` |
+| `/build-tenant` | 引導新客戶租戶佈建（Lobster Factory） |
+| `/smoke-test` | 執行 n8n MCP + 核心服務煙霧測試 |
+
+## Project Subagents
+
+專案級 subagents 存放於 `.claude/agents/`（已進 git）。Claude Code 在需要時自動選用：
+
+| Agent | 觸發時機 |
+|-------|---------|
+| `repair-agent` | 健康檢查失敗、腳本報錯、MCP 連不上、文件交叉引用斷掉 |
+| `site-builder` | 新客戶租戶佈建（GitHub / Sentry / PostHog / Supabase / n8n） |
+
+## 桌機 / 換機設定（user-level 3 個檔案）
+
+repo 內所有東西（commands、agents、CLAUDE.md、AGENTS.md、scripts）`git pull` 自動同步。  
+**只有下列 3 個 user-level 檔案需要手動複製到新機器**（路徑換成新機的帳號）：
+
+```
+~\.claude\settings.json            # UserPromptSubmit hook 設定
+~\.claude\hooks\ao-resume-on-prompt.ps1   # AO-RESUME hook 腳本
+~\.claude\hooks\branch-protection.js      # 分支保護 hook
+```
+
+複製後在新機器 monorepo 根執行一次：
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
+```
+
+完整桌機快速啟動：`agency-os/docs/operations/dual-ide-coexistence-strategy.md` §新機器快速啟動
 
