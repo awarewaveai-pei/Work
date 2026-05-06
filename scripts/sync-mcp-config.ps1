@@ -596,7 +596,7 @@ if (-not $registry.ContainsKey("servers")) {
 $servers = ConvertTo-PlainObject $registry["servers"]
 
 if (-not $SkipWorkspaceConfig) {
-    # .mcp.json — Claude Code project MCP; uses ${env:MONOREPO_ROOT} so paths resolve from env var
+    # .mcp.json — Claude Code project MCP; uses ${env:MONOREPO_ROOT} for portable script paths
     $claudeProjectServers = @{}
     foreach ($name in ($servers.Keys | Sort-Object)) {
         $serverConfig = Convert-ServerToClaudeProjectConfig -Name $name -Server (ConvertTo-PlainObject $servers[$name])
