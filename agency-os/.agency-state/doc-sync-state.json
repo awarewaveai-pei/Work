@@ -1,30 +1,20 @@
 ﻿{
-    "last_run_utc":  "2026-05-06T12:02:16.5598302Z",
+    "last_run_utc":  "2026-05-06T14:50:22.5738168Z",
     "changed_files":  [
-                          "AGENTS.md",
                           "docs/CHANGE_IMPACT_MATRIX.md",
                           "docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md",
-                          "docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md",
-                          "docs/operations/OPS_DOCS_INDEX.md",
-                          "WORKLOG.md"
+                          "docs/operations/dual-ide-coexistence-strategy.md",
+                          "docs/overview/ao-lobster-operating-model.md",
+                          "docs/overview/company-os-four-sources-integration.md"
                       ],
     "impacted_files":  [
-                           "AGENTS.md",
                            "docs/CHANGE_IMPACT_MATRIX.md",
                            "docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md",
-                           "docs/operations/cursor-enterprise-rules-index.md",
-                           "docs/operations/new-doc-linkage-checklist.md",
-                           "docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md",
-                           "docs/operations/OPS_DOCS_INDEX.md",
-                           "README.md",
-                           "scripts/register-new-governance-doc.ps1",
-                           "WORKLOG.md"
+                           "docs/operations/dual-ide-coexistence-strategy.md",
+                           "docs/overview/ao-lobster-operating-model.md",
+                           "docs/overview/company-os-four-sources-integration.md"
                        ],
     "auto_updated_files":  [
-                               "AGENTS.md",
-                               "docs/CHANGE_IMPACT_MATRIX.md",
-                               "docs/operations/cursor-enterprise-rules-index.md",
-                               "docs/operations/new-doc-linkage-checklist.md",
-                               "WORKLOG.md"
+                               "docs/CHANGE_IMPACT_MATRIX.md"
                            ]
 }
