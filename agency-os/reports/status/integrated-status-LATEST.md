@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-04-30 17:25:11
+- Generated: 2026-05-04 16:37:12
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -203,91 +203,8 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-04-30.md
-# 2026-04-30
-
-## Summary
-- 完成全域 `AgencyOS-MonthlySystemReview` + tenant monthly 排程基線。
-- 月檢流程接入 Supabase memory 檢查腳本，會輸出 `reports/monthly/supabase-memory-check-LATEST.md`。
-- 明日優先：`n8n` / `Supabase` MCP 連線穩定化（已寫入 `TASKS` 未完成）。
-
-## Risks
-- Supabase SSH tunnel 仍可能遭遇 `administratively prohibited`，需先修 EU sshd forwarding 設定。
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:68ccb8e525ff628ed06624d482c7b037952fe12ae0215db8f864793df15b6079 -->
-
-### claude-sonnet-4-6 2026-04-30 11:00
-
-- **完成（一句）**: 修復 n8n/supabase MCP 連線根因、修正 endpoint-alert journal 暴噴、優化 Ops Inbox UI、清理 EU VPS 磁碟空間，並建立桌機對齊指引
-- **變更路徑**:
-  - `mcp/registry.template.json` — supabase 停用(no /mcp endpoint)、n8n 移除錯誤 SSH tunnel note
-  - `mcp/user-env.template.ps1` — GRAFANA_BASE_URL 改 localhost:3009、廢棄 SUPABASE_MCP_URL
-  - `mcp/user-env.ps1` — 補 N8N_MCP_URL、RESEND_API_BASE_URL（本機 gitignored）
-  - `mcp/SERVICE_CREDENTIALS_MAP.md` — supabase MCP 標為停用
-  - `mcp/DESKTOP_MCP_SETUP.md` — 新增桌機環境對齊指引（新檔）
-  - `.cursor/mcp.json` — sync-mcp-config.ps1 重新產生，supabase 條目已移除
-  - `scripts/open-supabase-ssh-tunnel.ps1` — 回復 SshHost 為 204.168.175.41（EU Supabase）
-  - `lobster-factory/infra/trigger/docker-compose.yml` — ClickHouse 降版至 24.8.8
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/components/IncidentCard.tsx` — signal_type badge + message preview，移除重複 source 連結
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/[id]/page.tsx` — Cursor 按鈕顯示於所有 incident
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/inbox/page.tsx` — 加 Tools 入口按鈕
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/tools/page.tsx` — 新增 AI Tools 管理頁
-  - `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh` — 空 WEBHOOK_URL 改用 stamp file，停止 journal 每分鐘噴錯
-- **Git**: efe41aa fix(mcp): disable supabase MCP + fix n8n URL + grafana base url / 8c9677e fix(trigger): downgrade clickhouse / 20d522d docs(mcp): add desktop setup guide / 431e1c5 feat(ops-inbox): signal badge + tools page / 036b977 fix(ops-inbox): add missing Link import / 0bff54c fix(endpoint-alert): stamp-file guard for empty WEBHOOK_URL
-- **對應 TASKS 子字串（可選）**: MCP 連線穩定化
-- **風險／待辦（可選）**: [待辦] git push origin main 尚未執行（需使用者手動或授權）；桌機需依 mcp/DESKTOP_MCP_SETUP.md 執行並重啟 Cursor；空值 env vars（HETZNER_API_TOKEN、SENTRY_AUTH_TOKEN、TRIGGER_ACCESS_TOKEN、UPTIME_KUMA_API_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY）待補齊；[遠端/無 commit] EU VPS 204.168.175.41 磁碟清理（journal + docker cache + btmp，45%→28%）
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:2292d436ed4893363b5ce44030cf7d55fc67fbf88f9370befedf7ad51340bf5e -->
-
-### claude-code 2026-04-30 18:00
-
-- **完成（一句）**: 部署 staging network 隔離修復、調高 Supabase studio/kong 記憶體上限、加設兩台 VPS 每週自動重啟 cron、處理 n8n EventLoopBlocked（近 6h 無重現，加 weekly restart 防護）
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`（network override 正式部署至 VPS `/root/lobster-phase1/`）
-  - VPS `5.223.93.113` crontab（新增 `30 3 * * 0` n8n weekly restart）
-  - VPS `204.168.175.41` `/root/supabase/docker-compose.yml`（studio 256m→512m、kong 512m→768m；備份於 `.bak.20260430-*`）
-  - VPS `204.168.175.41` crontab（新增 `0 3 * * 0` supabase studio+kong weekly restart）
-- **Git**: e1f4702（fix/staging network isolation，feat/infra-rollback-staging-log-gaps 分支）
-- **對應 TASKS 子字串（可選）**: Staging 統一 — next-admin / node-api staging 環境上線
-- **風險／待辦（可選）**: 遠端無 commit — Supabase VPS docker-compose.yml 已改（mem_limit 調高）但僅在 VPS 本機；建議在下次 AO-CLOSE 後把 Supabase compose 納入 git 備份。n8n 建議升版 2.17+（EventLoopBlocked readable-stream 根本修復）排入下次 maintenance window。
-
-
-### claude-code 2026-04-30 16:00
-
-- **完成（一句）**: 在 VPS (5.223.93.113) 執行 Rollback 演練、確認 Observability 已運行、完成 Staging 統一上線，並修復 docker-compose.yml host port 競合問題
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`（host port 全部 env-var 化，default 維持現行值）
-  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`（精簡為僅 container_name + image override；port 由 .env.staging 控制）
-  - `lobster-factory/infra/hetzner-phase1-core/.env.staging.example`（新增 NGINX/REDIS/N8N/WORDPRESS/NODE_API/NEXT_ADMIN _HOST_PORT staging vars）
-  - VPS `/root/lobster-phase1/scripts/rollback-phase1.sh`（部署）
-  - VPS `/root/lobster-phase1/docker-compose.staging.yml`（部署）
-  - VPS `/root/lobster-phase1/.env.staging`（生成，DB 名 staging 分離）
-  - VPS `/root/lobster-phase1/rollback.log`（save+restore+health PASS 記錄）
-- **Git**: 0fb46af（feat/infra-rollback-staging-log-gaps）
-- **對應 TASKS 子字串（可選）**: Staging 統一 — next-admin / node-api staging 環境上線
-- **風險／待辦（可選）**: 三項 DoD 全數通過。VPS 上 staging stack (`lobster-staging-*`) 現正運行，可用 `docker compose -p lobster-staging ... down` 停止。Observability 在 port 3009。feature branch 待 AO-CLOSE 時由收關者 push + merge to main。
-
-
-### claude-code 2026-04-30 17:00
-
-- **完成（一句）**: 補齊 Rollback 機制、Staging 統一、Log 聚合三項缺口（腳本建立 + compose override + runbook + 7 份文件連動更新）
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh`（新增）
-  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`（新增）
-  - `lobster-factory/infra/hetzner-phase1-core/.env.staging.example`（新增）
-  - `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`（新增）
-  - `lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`（§3 §1 §8 更新）
-  - `agency-os/TASKS.md`（新增 3 項 Rollback/LogAgg/Staging 任務）
-  - `agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（新增 3 行能力列）
-  - `agency-os/docs/governance-plans/PLAN_30Y_STABILITY_HARDENING.md`（Phase 3 + Checklist 更新）
-  - `agency-os/docs/CHANGE_IMPACT_MATRIX.md`（新增 DEPLOY_ROLLBACK_RUNBOOK 行）
-  - `agency-os/docs/operations/hetzner-stack-rollout-index.md`（Phase B 新增 #15 Grafana/Loki）
-  - `agency-os/docs/operations/OPS_DOCS_INDEX.md`（基礎建設區塊新增入口）
-- **Git**: 未 commit
-- **對應 TASKS 子字串（可選）**: Rollback 機制 — phase1 compose 回版腳本演練
-- **風險／待辦（可選）**: 三項缺口的「DoD」均需在 VPS 實際演練後才算完成；腳本與 compose 已就緒，演練步驟見各 TASKS 項目說明。Loki 部署需 VPS 上執行 observability compose。
+## 5) memory/daily/2026-05-04.md
+_no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
