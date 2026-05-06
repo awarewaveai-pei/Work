@@ -103,7 +103,6 @@
 - 客戶新增需求先判定是否需走 `docs/operations/scope-change-policy.md`
 
 ## Related Documents (Auto-Synced)
-- `docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md`
 - `.cursor/rules/00-session-bootstrap.mdc`
 - `.cursor/rules/10-memory-maintenance.mdc`
 - `.cursor/rules/20-doc-sync-closeout.mdc`
@@ -120,5 +119,5 @@
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-05-06 11:12:02 UTC_
+_Last synced: 2026-05-06 12:02:15 UTC_
 

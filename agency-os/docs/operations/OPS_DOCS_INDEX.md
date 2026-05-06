@@ -38,7 +38,9 @@
 
 | 說明 | 檔案 |
 |:---|:---|
-| 企業規則索引 | [cursor-enterprise-rules-index.md](cursor-enterprise-rules-index.md) |
+| 企業規則索引（Cursor + Claude Code） | [cursor-enterprise-rules-index.md](cursor-enterprise-rules-index.md) |
+| **Claude Code 執行合約（30 年）** | [CLAUDE_EXECUTION_BLUEPRINT_30Y.md](CLAUDE_EXECUTION_BLUEPRINT_30Y.md) |
+| 雙 IDE 並存策略（Cursor + Claude Code） | [dual-ide-coexistence-strategy.md](dual-ide-coexistence-strategy.md) |
 | MCP 鍵名與分工 | [cursor-mcp-and-plugin-inventory.md](cursor-mcp-and-plugin-inventory.md) |
 | Agent 執行期：工具驗證與 MCP／SSH／API 備援 | [CURSOR_AGENT_RUNTIME_PLAYBOOK.md](CURSOR_AGENT_RUNTIME_PLAYBOOK.md) |
 | 新增 MCP 步驟 | [mcp-add-server-quickstart.md](mcp-add-server-quickstart.md) |

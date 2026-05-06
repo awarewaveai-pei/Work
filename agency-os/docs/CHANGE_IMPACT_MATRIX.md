@@ -35,6 +35,8 @@
 | `docs/operations/new-doc-linkage-checklist.md` | `docs/operations/end-to-end-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `docs/DOCS_INDEX.md`, `scripts/register-new-governance-doc.ps1`, `scripts/doc-sync-automation.ps1`, `scripts/system-health-check.ps1` |
 | `AGENTS.md` | `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `scripts/register-new-governance-doc.ps1`, `README.md` |
 | `scripts/register-new-governance-doc.ps1` | `docs/operations/new-doc-linkage-checklist.md`, `docs/change-impact-map.json`, `docs/CHANGE_IMPACT_MATRIX.md`, `AGENTS.md` |
+| `docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md` | `CLAUDE.md`, `AGENTS.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/dual-ide-coexistence-strategy.md`, `docs/operations/OPS_DOCS_INDEX.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
+| `docs/operations/dual-ide-coexistence-strategy.md` | `CLAUDE.md`, `AGENTS.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md`, `docs/operations/OPS_DOCS_INDEX.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `docs/operations/cursor-enterprise-rules-index.md` | `AGENTS.md`, `docs/operations/cursor-mcp-and-plugin-inventory.md`, `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/security-secrets-policy.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md`, `.cursor/rules/63-cursor-core-identity-risk.mdc`, `.cursor/rules/64-architecture-mcp-routing.mdc`, `.cursor/rules/65-build-standards-data-state.mdc`, `.cursor/rules/66-skills-observability-protocol.mdc`, `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `docs/DOCS_INDEX.md`, `../README.md` |
 | `../README.md`（monorepo 根） | `docs/operations/cursor-enterprise-rules-index.md`, `agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`, `agency-os/docs/overview/EXECUTION_DASHBOARD.md` |
 | `docs/operations/cursor-mcp-and-plugin-inventory.md` | `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/tools-and-integrations.md`, `.cursor/rules/64-architecture-mcp-routing.mdc`, `AGENTS.md`, `TASKS.md`, `README.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md` |
@@ -97,5 +99,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-05-06 11:12:02 UTC_
+_Last synced: 2026-05-06 12:02:15 UTC_
 
