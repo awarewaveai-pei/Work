@@ -7,6 +7,7 @@ param(
     [ValidateSet("owner", "admin", "operator", "viewer")]
     [string]$OpsRole = "admin",
     [switch]$EnableWriteChecks,
+    [switch]$EnableRoleChecks,
     [int]$TimeoutSec = 20,
     [int]$ExpectedMinWorkflowRuns = 0,
     [string]$ReportPath = ""
@@ -224,6 +225,43 @@ if ($EnableWriteChecks) {
         "Accept" = "application/json"
         "x-ops-simulated-role" = $OpsRole
         "x-ops-claims-role" = $OpsRole
+    }
+    $viewerHeaders = @{
+        "Accept" = "application/json"
+        "x-ops-simulated-role" = "viewer"
+        "x-ops-claims-role" = "viewer"
+    }
+
+    if ($EnableRoleChecks) {
+        $viewerTenantPatch = @{
+            defaultLocale = "en"
+            defaultTimezone = "UTC"
+        }
+        $viewerTenant = Invoke-JsonRequest -Method PATCH -Url "$root/api/ops/tenants/$TenantId/config" -Headers $viewerHeaders -Body $viewerTenantPatch
+        $viewerTenantPass = (-not $viewerTenant.ok) -and ($viewerTenant.status -eq 403)
+        Print-Check -Name "PATCH /api/ops/tenants/:id/config as viewer should be forbidden" -Result $viewerTenant -Pass $viewerTenantPass
+        if (-not $viewerTenantPass) { $failed.Add("role-check-viewer-tenant") | Out-Null }
+        $report.checks += [ordered]@{
+            name = "role-check-viewer-tenant"
+            pass = $viewerTenantPass
+            status = $viewerTenant.status
+        }
+
+        $viewerAiJob = @{
+            organizationId = $TenantId
+            prompt = "viewer should be forbidden"
+            modelName = "xai-image-1"
+            provider = "xai"
+        }
+        $viewerJob = Invoke-JsonRequest -Method POST -Url "$root/api/ops/ai-image-jobs" -Headers $viewerHeaders -Body $viewerAiJob
+        $viewerJobPass = (-not $viewerJob.ok) -and ($viewerJob.status -eq 403)
+        Print-Check -Name "POST /api/ops/ai-image-jobs as viewer should be forbidden" -Result $viewerJob -Pass $viewerJobPass
+        if (-not $viewerJobPass) { $failed.Add("role-check-viewer-ai-job") | Out-Null }
+        $report.checks += [ordered]@{
+            name = "role-check-viewer-ai-job"
+            pass = $viewerJobPass
+            status = $viewerJob.status
+        }
     }
 
     $tenantPatch = @{

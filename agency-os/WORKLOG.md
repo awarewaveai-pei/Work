@@ -32,6 +32,12 @@
 - ui_capture_path: `agency-os/reports/status/ops-console-smoke-LATEST.json`
 - result: PASS（`ExpectedMinWorkflowRuns=1` + audit-event mapping all passed）
 
+### Next.js Ops Console v1 — DoD #4 角色差異驗證（本輪）
+
+- tenant_id: `39ad4149-5044-4077-8d9a-b6b916de0e21`
+- ui_capture_path: `agency-os/reports/status/ops-console-smoke-LATEST.json`
+- result: PASS（`-EnableRoleChecks`：`viewer` 對 tenant patch / ai-image-jobs 均 403；`admin` 寫入成功並可追審計事件）
+
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:5998d546ad0aa731fbb0789c2181f67c848b626d6c9248e89f8753d38e9bc1af -->
 
