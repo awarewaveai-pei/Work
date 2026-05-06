@@ -1,4 +1,5 @@
 @agency-os/AGENTS.md
+@agency-os/docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md
 @mcp/README.md
 @agency-os/docs/operations/mcp-add-server-quickstart.md
 @scripts/README.md
