@@ -21,6 +21,7 @@
 
 - `scripts/ops-console-smoke.ps1` 新增 `-ExpectedTenantId` / `-ExpectedTenantSlug`，可機械驗證 UI datasource 是否包含指定 tenant。
 - `/api/ops/summary` 改用 `getSupabaseServerClient()`，避免僅 anon client 受 RLS 影響導致 `tenants` 空陣列（寫入端已可用但列表不回顯）。
+- 新增 `GET /api/ops/audit-events`，並讓 smoke 在建立 `ai_image_jobs` 後自動驗證 `ai_image_job_created` 審計事件與 `job_id/trace_id` 對應一致（DoD #3 可重跑前置證據）。
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:5998d546ad0aa731fbb0789c2181f67c848b626d6c9248e89f8753d38e9bc1af -->
@@ -1343,7 +1344,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-06 09:38:32 UTC_
+_Last synced: 2026-05-06 11:12:02 UTC_
 
 ## 2026-03-20
 
@@ -1777,5 +1778,6 @@ _Last synced: 2026-05-06 09:38:32 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 

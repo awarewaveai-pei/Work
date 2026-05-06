@@ -34,5 +34,5 @@
 ## Related Documents (Auto-Synced)
 - `docs/international/global-compliance-baseline.md`
 
-_Last synced: 2026-05-06 09:38:32 UTC_
+_Last synced: 2026-05-06 11:12:02 UTC_
 

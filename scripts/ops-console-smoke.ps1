@@ -63,6 +63,26 @@ function Invoke-JsonRequest {
     }
 }
 
+function Get-NestedValue {
+    param(
+        [Parameter(Mandatory = $true)][object]$Object,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+    $current = $Object
+    foreach ($segment in $Path -split '\.') {
+        if ($null -eq $current) { return $null }
+        if ($current -is [System.Collections.IDictionary]) {
+            if (-not $current.Contains($segment)) { return $null }
+            $current = $current[$segment]
+            continue
+        }
+        $prop = $current.PSObject.Properties[$segment]
+        if ($null -eq $prop) { return $null }
+        $current = $prop.Value
+    }
+    return $current
+}
+
 function Print-Check {
     param(
         [string]$Name,
@@ -153,6 +173,33 @@ if ($EnableWriteChecks) {
     $jobPass = $job.ok -and $job.json -and ($job.json.ok -eq $true)
     Print-Check -Name "POST /api/ops/ai-image-jobs" -Result $job -Pass $jobPass
     if (-not $jobPass) { $failed.Add("ai-image-jobs") | Out-Null }
+
+    if ($jobPass) {
+        $jobTraceId = [string](Get-NestedValue -Object $job.json -Path "job.trace_id")
+        $jobId = [string](Get-NestedValue -Object $job.json -Path "job.id")
+        $audit = Invoke-JsonRequest -Method GET -Url "$root/api/ops/audit-events?trace_id=$jobTraceId&event_type=ai_image_job_created&limit=5" -Headers $getHeaders
+        $auditPass = $audit.ok -and $audit.json -and ($audit.json.ok -eq $true) -and (@($audit.json.events).Count -gt 0)
+        Print-Check -Name "GET /api/ops/audit-events (ai_image_job_created)" -Result $audit -Pass $auditPass
+        if (-not $auditPass) {
+            $failed.Add("audit-events") | Out-Null
+        } else {
+            $event = @($audit.json.events)[0]
+            $targetPass = ($event.target_id -eq $jobId) -or ($event.trace_id -eq $jobTraceId)
+            $targetResult = @{
+                ok = $audit.ok
+                status = $audit.status
+                json = [pscustomobject]@{
+                    jobId = $jobId
+                    traceId = $jobTraceId
+                    eventTargetId = $event.target_id
+                    eventTraceId = $event.trace_id
+                }
+                error = ""
+            }
+            Print-Check -Name "Audit event maps to created AI job" -Result $targetResult -Pass $targetPass
+            if (-not $targetPass) { $failed.Add("audit-event-target") | Out-Null }
+        }
+    }
 }
 
 if ($failed.Count -gt 0) {

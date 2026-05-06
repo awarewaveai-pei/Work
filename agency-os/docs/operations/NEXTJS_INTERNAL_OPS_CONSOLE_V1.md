@@ -60,6 +60,7 @@
   - `GET /ops/tenants/:id`
   - `PATCH /ops/tenants/:id/config`
   - `GET /ops/workflow-runs?tenant_id=...`
+  - `GET /ops/audit-events?trace_id=...&event_type=...`
   - `POST /ops/actions/:action_id/trigger`（僅 staging allowlist）
 - `POST /ops/ai-image-jobs`
 - `GET /ops/ai-image-jobs?tenant_id=...`
@@ -83,7 +84,8 @@
 5. 在 production/staging 驗證：未帶 claims role header 時，寫入 API 應拒絕（角色落為 `viewer` 或 `forbidden_role`）。
 6. 可用 `scripts/ops-console-smoke.ps1` 做快速驗收（server ready 後）：
    - 唯讀：`pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl https://app.aware-wave.com`
-   - 含寫入：`pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl https://app.aware-wave.com -TenantId <org-uuid> -EnableWriteChecks`
+   - 含寫入：`pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl https://app.aware-wave.com -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops -EnableWriteChecks`
+   - 內建檢查：`/api/ops/summary` 必須含指定 tenant；建立 AI job 後會驗證 `/api/ops/audit-events` 內存在 `ai_image_job_created` 且對應相同 `job_id/trace_id`。
 7. 若尚未有 `tenant_id` 或不確定 migration，先跑 bootstrap：
    - `powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ops-console-bootstrap.ps1 -SupabaseUrl <supabase-url> -SupabaseServiceRoleKey <service-role-key> -TenantSlug awarewave-ops -TenantName "AwareWave Ops"`
    - 腳本會：檢查 `0011` 需要的表是否存在、補一筆 organization（若缺）、輸出可直接回報的 5 行內容。
