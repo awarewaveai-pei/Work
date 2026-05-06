@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-06 17:38:44
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-05-07 01:29:18
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -203,65 +203,44 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-06.md
-# Daily Note - 2026-05-06
+## 5) memory/daily/2026-05-07.md
+# Daily Note - 2026-05-07
 
 ## Done today
-- AO-CLOSE 前置：補 `company-scenery-travel-mongolia` 必填 JSON；health gate 100%；merge closeout-inbox。
+- Secrets vault 大批次補齊（36+ 密鑰），Windows user env 45 個變數已同步
+- 新增 HETZNER_API_TOKEN、SENTRY_AUTH_TOKEN、UPTIME_KUMA_API_KEY、TRIGGER_ACCESS_TOKEN（新 token）
+- 更新 AWARE_WAVE_CREDENTIALS.md：填入 Hetzner/Sentry token，移除已補待補項
+- 確認桌機換機所需複製的 5 類檔案清單
 
 ## Current state
-- `system-health-check` 359/359；main 仍 ahead of origin 直至 ao-close commit／push 完成。
+- Vault 45/48 完整（缺 SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY）
+- Desktop app MCP：trigger 已修復；posthog/cloudflare 受 app 限制（HTTP type 不支援）
+- main 領先 origin/main 14 commits，尚未 push
 
 ## Next steps
-- 完成 ao-close commit／push；他機 `git pull` 後 `AO-RESUME`。
+- 視需要補 SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY（Supabase cloud 專案 API key）
+- git push origin main（14 commits 累積）
+- 桌機設置：複製 5 類檔案後執行 bootstrap-mcp-machine.ps1
 
 ## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:5998d546ad0aa731fbb0789c2181f67c848b626d6c9248e89f8753d38e9bc1af -->
+<!-- ao-close-inbox-sha256:a0864551d4aa2c1c063c13bf1ea131ccad51b79ec6948ab12ee03b5243e5efd7 -->
 
-### codex 2026-05-01 19:55
+### claude 2026-05-07 23:00
 
-- **完成（一句）**: 完成 PostHog public/admin 站點命名與 live 驗證，讓 Aware Wave Website、Aware Wave Admin、Soulful Expression 可用一致屬性分流。
-- **證據／檔案**:
-  - `lobster-factory/infra/hetzner-phase1-core/apps/wordpress/mu-plugins/posthog.php`
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/providers.tsx`
-  - Live SG：`lobster-wordpress` / `lobster-next-admin` 均 healthy；`aware-wave.com` HTML 已含 `site_name: "Aware Wave Website"`；`next-admin` bundle 已含 `site_name:"Aware Wave Admin"`。
-- **Git**: pending commit in this turn.
-- **對應 TASKS 條目若未打勾**: 無，本輪為 PostHog/observability 設定收斂，未對應單一未完成 TASKS 勾選。
-- **風險／待辦若未完成**: `soulfulexpression.org` 仍需在 Hostinger WordPress 透過 WPCode/Header injection 或同等 MU plugin 貼入 PostHog snippet，才能開始送事件；本 repo 已預留 `Soulful Expression` site_name 映射。
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:8d7a99e64ffa6e3a1daf164db4bf776d97be98c34222849a0a07e16062795eec -->
-
-### cursor-agent 2026-05-06 07:25
-
-- **完成（一句）**: 補齊 tenant `company-scenery-travel-mongolia` 的 `OPERATIONS_SCHEDULE.json`、`OPS_QUEUE.json` 以解除 health Critical gate；並先手寫 WORKLOG `## 2026-05-03`／CONVERSATION_MEMORY  tenant provisioning 摘要。
+- **完成（一句）**: MCP/憑證全棧補齊：vault 45 個 Windows user env 已同步，新增 HETZNER_API_TOKEN、SENTRY_AUTH_TOKEN、UPTIME_KUMA_API_KEY、TRIGGER_ACCESS_TOKEN，並更新 AWARE_WAVE_CREDENTIALS.md。
 - **變更路徑**:
-  - `agency-os/tenants/company-scenery-travel-mongolia/OPERATIONS_SCHEDULE.json`
-  - `agency-os/tenants/company-scenery-travel-mongolia/OPS_QUEUE.json`
-  - `agency-os/WORKLOG.md`
-  - `agency-os/memory/CONVERSATION_MEMORY.md`
-- **Git**: 待 AO-CLOSE commit／push
+  - `agency-os/WORKLOG.md`（2026-05-07 區段新增）
+  - `agency-os/memory/CONVERSATION_MEMORY.md`（蒸餾補記）
+  - `C:\Users\user1115\Desktop\AWARE_WAVE_CREDENTIALS.md`（Hetzner、Sentry token 填入；待補表移除已補項）
+- **Git**: 本輪無 repo 內容變更需額外 commit；WORKLOG+memory 更新將由 ao-close 統一 commit
 - **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**:
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:b0d50a564ef79b38210b6f9b39e2bcd6e57f3b1d1e9cb82f23d93f0889414ab8 -->
-
-### cursor-agent 2026-05-06 07:35
-
-- **完成（一句）**: 解除 strict completeness：`memory/daily/2026-05-06.md` 與 WORKLOG `### Daily` 已取代 `(TBD)`；準備再次 AO-CLOSE commit／push。
-- **變更路徑**:
-  - `agency-os/memory/daily/2026-05-06.md`
-  - `agency-os/WORKLOG.md`
-- **Git**: dirty — 本輪 ao-close 將一併提交
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**:
+- **風險／待辦（可選）**: Desktop app 的 posthog/cloudflare MCP 仍為 npm stdio（HTTP type 不被 desktop app 支援，無解）。剩餘 vault 待補：SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY。main 仍有 14 commits 未 push。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-06 17:38:36`
+- Time: `2026-05-07 01:29:15`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -271,13 +250,14 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260506-173836.md`
-- Closeout: `reports/closeout/closeout-20260506-173833.md`
+- Health: `reports/health/health-20260507-012914.md`
+- Closeout: `reports/closeout/closeout-20260507-012911.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+- `git pull origin main`：**Already up to date**。
 - `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
 - `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
 
@@ -336,6 +316,5 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
 
 
