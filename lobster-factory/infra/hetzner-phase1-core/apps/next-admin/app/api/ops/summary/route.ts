@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { MediaBoundaryRule, OpsAction, OpsTenant } from "../../../../lib/ops-contracts";
-import { getSupabaseReadClient } from "../../../../lib/supabase-server";
+import { getSupabaseServerClient } from "../../../../lib/supabase-server";
 
 const tenants: OpsTenant[] = [
   {
@@ -67,7 +67,7 @@ const actions: OpsAction[] = [
 ];
 
 export async function GET() {
-  const supabase = getSupabaseReadClient();
+  const supabase = getSupabaseServerClient();
   if (supabase) {
     const { data, error } = await supabase
       .from("organizations")

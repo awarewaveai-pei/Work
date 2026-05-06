@@ -22,8 +22,15 @@ interface TenantConfigResponse {
 }
 
 function apiEndpoint(path: string): string {
-  const base = (process.env.INTERNAL_ADMIN_BASE_URL ?? "").replace(/\/$/, "");
-  return base ? `${base}${path}` : `http://127.0.0.1:3002${path}`;
+  const internalBase = (process.env.INTERNAL_ADMIN_BASE_URL ?? "").replace(/\/$/, "");
+  if (internalBase) return `${internalBase}${path}`;
+
+  if (process.env.NODE_ENV !== "production") {
+    return `http://127.0.0.1:3000${path}`;
+  }
+
+  const publicBase = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
+  return publicBase ? `${publicBase}${path}` : `http://127.0.0.1:3000${path}`;
 }
 
 async function fetchSummary(): Promise<OpsSummary | null> {

@@ -2,6 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$BaseUrl,
     [string]$TenantId = "",
+    [string]$ExpectedTenantId = "",
+    [string]$ExpectedTenantSlug = "",
     [ValidateSet("owner", "admin", "operator", "viewer")]
     [string]$OpsRole = "admin",
     [switch]$EnableWriteChecks,
@@ -87,6 +89,33 @@ $summary = Invoke-JsonRequest -Method GET -Url "$root/api/ops/summary" -Headers 
 $summaryPass = $summary.ok -and $summary.json -and ($summary.json.sourceOfTruth -ne $null)
 Print-Check -Name "GET /api/ops/summary" -Result $summary -Pass $summaryPass
 if (-not $summaryPass) { $failed.Add("summary") | Out-Null }
+
+if ($summaryPass -and (-not [string]::IsNullOrWhiteSpace($ExpectedTenantId) -or -not [string]::IsNullOrWhiteSpace($ExpectedTenantSlug))) {
+    $tenants = @($summary.json.tenants)
+    $tenantReflectPass = $false
+    foreach ($tenant in $tenants) {
+        $idMatch = [string]::IsNullOrWhiteSpace($ExpectedTenantId) -or ($tenant.id -eq $ExpectedTenantId)
+        $slugMatch = [string]::IsNullOrWhiteSpace($ExpectedTenantSlug) -or ($tenant.slug -eq $ExpectedTenantSlug)
+        if ($idMatch -and $slugMatch) {
+            $tenantReflectPass = $true
+            break
+        }
+    }
+
+    $reflectResult = @{
+        ok = $summary.ok
+        status = $summary.status
+        json = [pscustomobject]@{
+            expectedTenantId = $ExpectedTenantId
+            expectedTenantSlug = $ExpectedTenantSlug
+            sourceOfTruth = $summary.json.sourceOfTruth
+            tenantCount = $tenants.Count
+        }
+        error = ""
+    }
+    Print-Check -Name "UI datasource reflects expected tenant (/api/ops/summary)" -Result $reflectResult -Pass $tenantReflectPass
+    if (-not $tenantReflectPass) { $failed.Add("summary-tenant-reflect") | Out-Null }
+}
 
 $runs = Invoke-JsonRequest -Method GET -Url "$root/api/ops/workflow-runs?limit=5" -Headers $getHeaders
 $runsPass = $runs.ok -and $runs.json -and ($runs.json.ok -eq $true)
