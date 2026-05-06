@@ -92,6 +92,18 @@
 本 repo 同時支援兩套 IDE，隨時可切換，不需遷移。完整架構見：  
 `agency-os/docs/operations/dual-ide-coexistence-strategy.md`
 
+## Cursor 停訂閱時的作業模式（Claude Only Fallback）
+
+若未來停止 Cursor 訂閱，專案仍可完整運作；請採以下模式：
+
+1. **主控 IDE 改為 Claude Code**（`CLAUDE.md` + `AGENTS.md` + `CLAUDE_EXECUTION_BLUEPRINT_30Y.md`）。
+2. **流程不變**：開工與收工仍使用同一組 repo 腳本：
+   - 開工：`scripts/ao-resume.ps1 -FullMainlineParity`
+   - 收工：`scripts/ao-close.ps1`
+3. **驗證不變**：持續使用 `verify-build-gates`、`system-health-check`、功能 smoke（例如 `ops-console-smoke.ps1`）。
+4. **MCP 不變**：共享 SSOT 仍是 `mcp/registry.template.json` + `scripts/sync-mcp-config.ps1` + repo `.mcp.json`。
+5. **不要重建第二套規則**：維持單一真相，避免為「無 Cursor」再複製一份平行 runbook。
+
 ## Slash Commands（`/command-name`）
 
 專案級 slash commands 存放於 `.claude/commands/`（已進 git）。在對話輸入框打 `/` 即可呼叫：

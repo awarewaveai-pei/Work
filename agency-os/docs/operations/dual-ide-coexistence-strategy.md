@@ -112,6 +112,18 @@
 可以。兩邊讀不同的 config 檔案，不互相干擾。  
 唯一共用的是 `agency-os/.agency-state/ao-resume-hook-last.json`（120 秒去重防止重複跑）。
 
+### Cursor 停訂閱（Claude-only）模式
+
+若 Cursor 方案停用，請直接轉為 Claude-only，**不需要**重建專案流程：
+
+1. 保留共用層（`.mcp.json`、`scripts/ao-resume.ps1`、`scripts/ao-close.ps1`、`AGENTS.md`）不變。
+2. 以 Claude Code 執行既有流程：
+   - 開工：`ao-resume.ps1 -FullMainlineParity`
+   - 驗證：`verify-build-gates` / `system-health-check` / 專案 smoke
+   - 收工：`ao-close.ps1`
+3. Cursor 專屬能力可停用，但**不要刪除** `.cursor/rules` 與 `.cursor/hooks.json`（作為相容回切與規則鏡像）。
+4. 維持單一真相：不要新增「無 Cursor 專用第二套 SOP」。
+
 ---
 
 ## 新機器 / 桌機快速啟動

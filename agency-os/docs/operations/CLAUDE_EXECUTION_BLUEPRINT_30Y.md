@@ -130,20 +130,23 @@ If a new generated artifact appears repeatedly and is not canonical:
 
 ## 7) Verification Matrix (Must Pass Before Claiming Done)
 
-Pick applicable checks by scope:
+Pick applicable checks by scope. All commands can also be invoked via Claude Code slash commands (type `/` in the chat input).
 
 ### Core baseline
 - `powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1`
+- Slash command shortcut: `/verify`
 
 ### Doc/governance-heavy changes
 - `powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -AutoDetect`
 - `powershell -ExecutionPolicy Bypass -File .\scripts\system-health-check.ps1`
+- Slash command shortcuts: `/doc-sync`, `/health`
 
 ### Ops-console line (example)
 - `powershell -ExecutionPolicy Bypass -File .\scripts\ops-console-smoke.ps1 ...`
 - Validate expected tenant reflection
 - Validate workflow run minimum if required
 - Validate audit event mapping for write actions
+- Slash command shortcut: `/smoke-test`
 
 ### Final status check
 - `git status --short`
@@ -225,7 +228,7 @@ Design each change for long-term operations:
 
 ## 13) Claude Handover Prompt (Copy/Paste)
 
-Use this as the first instruction in Claude when handing over:
+> **Note:** This Blueprint is auto-loaded via `CLAUDE.md` `@`-include. A new session does not need a manual paste — the instruction below is only needed when handing off to a Claude instance that does NOT have `CLAUDE.md` in scope.
 
 ```text
 Follow `agency-os/docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md` and `CLAUDE.md` as execution contract.
@@ -244,4 +247,49 @@ Do not claim completion unless validation commands pass and WORKLOG evidence is 
   - git/governance policy changes
   - new recurring verification patterns are added
 - Keep it compact, executable, and link-first to SSOT files.
+
+---
+
+## 15) Cursor-Unsubscribed Fallback (Claude-Only)
+
+If Cursor subscription is stopped, Claude must continue operations without creating a parallel governance system.
+
+Mandatory behavior:
+
+1. **Keep same operational entrypoints**
+   - Startup: `scripts/ao-resume.ps1 -FullMainlineParity`
+   - Closeout: `scripts/ao-close.ps1`
+2. **Keep same verification gates**
+   - `verify-build-gates`
+   - `system-health-check`
+   - task-specific smoke scripts (for example `ops-console-smoke.ps1`)
+3. **Keep same MCP SSOT**
+   - `mcp/registry.template.json`
+   - `scripts/sync-mcp-config.ps1`
+   - repo `.mcp.json`
+4. **Do not fork docs/rules**
+   - No "Cursor-off special SOP" copy.
+   - Update existing owner docs only.
+5. **Preserve reversibility**
+   - Do not delete `.cursor/*` rule/hook assets; keep them as dormant compatibility layer.
+
+Outcome target: functionality parity with less tooling, zero governance drift.
+
+---
+
+## Related Documents (Auto-Synced)
+
+- `CLAUDE.md` — project instructions that @-include this Blueprint (auto-load)
+- `agency-os/AGENTS.md` — full operating rules, AO-RESUME/AO-CLOSE protocols
+- `agency-os/docs/operations/dual-ide-coexistence-strategy.md` — Cursor + Claude Code parallel setup
+- `agency-os/docs/operations/cursor-enterprise-rules-index.md` — IDE rules index
+- `agency-os/docs/operations/end-of-day-checklist.md` — AO-CLOSE step-by-step
+- `agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` — machine startup + AO-RESUME
+- `agency-os/TASKS.md` — open tasks
+- `agency-os/WORKLOG.md` — evidence log
+- `.claude/commands/` — slash command definitions (`/ao-resume`, `/ao-close`, `/verify`, `/health`, `/doc-sync`, `/build-tenant`, `/smoke-test`)
+- `.claude/agents/repair-agent.md` — system diagnostic subagent
+- `.claude/agents/site-builder.md` — tenant provisioning subagent
+
+_Last updated: 2026-05-06_
 
