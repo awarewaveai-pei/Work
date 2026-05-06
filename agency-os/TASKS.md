@@ -50,6 +50,7 @@
 
 ### 未完成
 
+- [ ] **（AO-RESUME 提醒）補齊剩餘 Vault 憑證** —— **【未完成】** **缺：** `OPS_INBOX_INGEST_TOKEN`（自產強隨機字串，寫入 SG `hetzner-phase1-core/.env` + Trigger 專案 env）、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`（Supabase cloud dashboard → 該專案 → Settings → API → service_role）、`XAI_API_KEY`（console.x.ai）。**下一步：**取得後執行 `.\scripts\secrets-vault.ps1 -Action set -Name <NAME> -Value '<value>'` 再 `sync-cursor-mcp-user-env`，並補入 `C:\Users\user1115\Desktop\AWARE_WAVE_CREDENTIALS.md`。
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：**兩台皆須 **`machine-environment-audit -Strict` PASS（無 WARN）**；任一台未 PASS 則本條不結案。**下一步：**在**每一台** monorepo 根跑該稽核；細項與證據索引 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。開機／hook／pull 敘事正本 → **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（§1.5、§2.5.1）。
 - [ ] **Git：`main` 未推送 commits → `git push origin main`** —— **【進行中】** **進度：**本地已有多次 commit（Trigger／PostHog／TASKS／WP MU 等）；**下一步：**`git fetch` → `git log origin/main..HEAD` → **`git push origin main`**。
 - [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度：**repo 已 **`syncEnvVars`**、鎖 CLI **`4.4.4`**、README／腳本齊；曾完成 **環境變數同步**，**缺**在 **EU** 對 **`registry:5000`** **映像 push**（見 **`lobster-factory/infra/trigger/README.md` §7a**）。**下一步：**於 EU 或 tunnel 就緒後跑 **`deploy-workflows.ps1`** 或 **`npx trigger.dev@4.4.4 deploy`**。
