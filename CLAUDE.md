@@ -1,6 +1,7 @@
 @agency-os/AGENTS.md
 @mcp/README.md
 @agency-os/docs/operations/mcp-add-server-quickstart.md
+@scripts/README.md
 
 # Claude Code Project Instructions
 
@@ -44,6 +45,41 @@
 | **High — STOP** | prod deploy、破壞性 migration、大量刪、金流、身分權限/RLS、憑證、無法乾淨回滾 | **停止**，說明風險，要求明示 go ahead |
 
 **一律拒絕**：跳錯處、硬編密鑰、直衝 prod、一次蓋整個系統。
+
+## Git 分支原則（強制）
+
+**預設直接在 `main` 上 commit／push。禁止建立新 branch**，除非使用者在同一則訊息中明確要求。
+
+- 不得執行 `git checkout -b`、`git switch -c`、`git switch --create`、`git branch <newbranch>`
+- `.claude/settings.json` deny 規則已硬性擋住上述指令
+- 理由：避免多代理切換後歷史混亂、減少 merge 衝突、保持 `git pull` 簡單
+
+## Runbooks（緊急應變）
+
+事故、入侵、伺服器 OOM、WAF 設定問題時，查 `runbooks/`：
+- `HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` — 伺服器 502/OOM
+- `HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md` — 加密挖礦入侵
+- `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` — 一般安全事件
+- `CLOUDFLARE-WAF-SETUP.md` — Cloudflare WAF
+- `CODEX-CONFIG-ERRORS-FIXES.md` — Codex 設定錯誤
+
+## 自動開工偵測（不需要記關鍵字）
+
+**對話開頭如果使用者的第一句話是下列任一情況，直接執行 AO-RESUME 流程，再回應他的問題：**
+
+- 問候語：「嗨」「hi」「早」「你好」「hey」「在嗎」「我來了」「開工了」「繼續」「回來了」「好了我來了」「掉線了」「我又來了」
+- 不知道從哪裡開始：「然後呢」「接著做什麼」「現在做什麼」「繼續哪裡」「然後」「接下來」「現在哪裡」
+- 短句且沒有指定具體任務（< 15 字，沒有明確目標）
+
+不需要使用者打 `AO-RESUME`。判斷到上述情況，直接做：跑 `ao-resume.ps1`、讀狀態檔、輸出五段式摘要。
+
+## 自動收工偵測（不需要記關鍵字）
+
+**以下任何表達都等同 `AO-CLOSE`，直接觸發完整收工流程：**
+
+「收工」「關機」「要睡了」「晚安」「掰掰」「bye」「好了」「今天先這樣」「先這樣」「今天到這」「可以了」「done」「ok done」「結束了」「不做了」「走了」「要出門了」「先關」「關掉」「ok today」「that's it」「夠了」「差不多了」「關閉」
+
+不需要使用者打 `AO-CLOSE`。
 
 ## Claude Code Hook：AO-RESUME
 

@@ -34,5 +34,5 @@
 - `docs/releases/release-notes.md`
 - `docs/releases/upgrade-path.md`
 
-_Last synced: 2026-04-30 09:24:59 UTC_
+_Last synced: 2026-05-06 09:38:32 UTC_
 
