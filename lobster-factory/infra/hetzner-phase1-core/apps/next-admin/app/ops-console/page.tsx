@@ -79,6 +79,15 @@ export default async function OpsConsolePage() {
     fetchWorkflowRuns(),
     defaultOrgId ? fetchTenantConfig(defaultOrgId) : Promise.resolve(null),
   ]);
+  const workflowSourceCounts = workflowRuns.reduce<Record<string, number>>((acc, run) => {
+    const key = run.runSource || "unknown";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+  const workflowSourceSummary = Object.entries(workflowSourceCounts)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([source, count]) => `${source}:${count}`)
+    .join(" · ");
 
   return (
     <>
@@ -158,12 +167,15 @@ export default async function OpsConsolePage() {
         </div>
 
         <div className="section-title" style={{ marginTop: 24 }}>Workflow runs (read-only)</div>
+        <p className="form-hint" style={{ marginBottom: 12, maxWidth: 640 }}>
+          Source summary: <code>{workflowSourceSummary || "none"}</code>
+        </p>
         <div className="link-list">
           {workflowRuns.map((run) => (
             <div className="link-card" key={run.id}>
               <span>{run.organizationSlug}</span>
               <span className="link-card-arrow">
-                {run.status} · approval:{run.approvalStatus} · trace:{run.traceId}
+                {run.status} · source:{run.runSource} · approval:{run.approvalStatus} · trace:{run.traceId}
               </span>
             </div>
           ))}

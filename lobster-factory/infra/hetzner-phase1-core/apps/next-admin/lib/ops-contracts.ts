@@ -52,6 +52,7 @@ export interface WorkflowRun {
   status: OpsActionRunStatus;
   approvalStatus: "none" | "pending" | "approved" | "rejected";
   traceId: string;
+  runSource: string;
   startedAt: string;
   endedAt: string | null;
 }
