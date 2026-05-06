@@ -145,7 +145,7 @@ function Write-Utf8NoBomFile {
 function Resolve-EnvValue {
     param(
         [string]$StringValue,
-        [ValidateSet("Concrete", "JsonPlaceholder", "GeminiPlaceholder")]
+        [ValidateSet("Concrete", "JsonPlaceholder", "ClaudeProjectPlaceholder", "GeminiPlaceholder")]
         [string]$Mode
     )
 
@@ -154,8 +154,11 @@ function Resolve-EnvValue {
     }
 
     if ($Mode -eq "JsonPlaceholder") {
-        # Cursor `.mcp.json` / `.cursor/mcp.json`: keep portable `${workspaceFolder}` / `${userHome}`; env must stay `${env:NAME}` per Cursor docs.
+        # Cursor `.cursor/mcp.json`: keep portable `${workspaceFolder}` / `${userHome}`; env must stay `${env:NAME}` per Cursor docs.
         $resolved = $StringValue.Replace('${workspaceRoot}', '${workspaceFolder}').Replace('${workspaceFolder}', '${workspaceFolder}').Replace('${userHome}', '${userHome}')
+    } elseif ($Mode -eq "ClaudeProjectPlaceholder") {
+        # Claude Code `.mcp.json`: use `${env:MONOREPO_ROOT}` so Claude resolves it from the environment; env stays `${env:NAME}`.
+        $resolved = $StringValue.Replace('${workspaceRoot}', '${env:MONOREPO_ROOT}').Replace('${workspaceFolder}', '${env:MONOREPO_ROOT}').Replace('${userHome}', '${userHome}')
     } else {
         $resolved = $StringValue.Replace('${workspaceRoot}', $WorkspaceRoot).Replace('${workspaceFolder}', $WorkspaceRoot).Replace('${userHome}', $env:USERPROFILE)
     }
@@ -176,6 +179,9 @@ function Resolve-EnvValue {
                     return $value
                 }
                 "JsonPlaceholder" {
+                    return '${env:' + $name + '}'
+                }
+                "ClaudeProjectPlaceholder" {
                     return '${env:' + $name + '}'
                 }
                 "GeminiPlaceholder" {
@@ -296,6 +302,36 @@ function Convert-ServerToWorkspaceConfig {
         $out["args"] = $args
         if ($Server.ContainsKey("env")) {
             $out["env"] = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["env"]) -Mode "JsonPlaceholder"
+        }
+    }
+    return $out
+}
+
+function Convert-ServerToClaudeProjectConfig {
+    # Generates Claude Code project `.mcp.json` entries using ${env:MONOREPO_ROOT} for script paths.
+    param([string]$Name, [hashtable]$Server)
+
+    if (-not (Should-IncludeServer -Name $Name -Server $Server -Client "workspace")) {
+        return $null
+    }
+
+    $out = @{}
+    $transport = [string]$Server["transport"]
+    if ($transport -eq "http") {
+        $out["type"] = "http"
+        $out["url"] = Resolve-EnvValue -StringValue ([string]$Server["url"]) -Mode "ClaudeProjectPlaceholder"
+        if ($Server.ContainsKey("headers")) {
+            $out["headers"] = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["headers"]) -Mode "ClaudeProjectPlaceholder"
+        }
+    } else {
+        $out["command"] = Resolve-EnvValue -StringValue ([string]$Server["command"]) -Mode "ClaudeProjectPlaceholder"
+        $args = @()
+        foreach ($arg in $Server["args"]) {
+            $args += ,(Resolve-EnvValue -StringValue ([string]$arg) -Mode "ClaudeProjectPlaceholder")
+        }
+        $out["args"] = $args
+        if ($Server.ContainsKey("env")) {
+            $out["env"] = Resolve-MapValues -Map (ConvertTo-PlainObject $Server["env"]) -Mode "ClaudeProjectPlaceholder"
         }
     }
     return $out
@@ -560,6 +596,19 @@ if (-not $registry.ContainsKey("servers")) {
 $servers = ConvertTo-PlainObject $registry["servers"]
 
 if (-not $SkipWorkspaceConfig) {
+    # .mcp.json — Claude Code project MCP; uses ${env:MONOREPO_ROOT} so paths resolve from env var
+    $claudeProjectServers = @{}
+    foreach ($name in ($servers.Keys | Sort-Object)) {
+        $serverConfig = Convert-ServerToClaudeProjectConfig -Name $name -Server (ConvertTo-PlainObject $servers[$name])
+        if ($null -ne $serverConfig) {
+            $claudeProjectServers[$name] = $serverConfig
+        }
+    }
+    $claudeProjectDoc = @{ mcpServers = $claudeProjectServers }
+    $workspacePath = Join-Path $WorkspaceRoot ".mcp.json"
+    Write-Utf8NoBomFile -Path $workspacePath -Content ($claudeProjectDoc | ConvertTo-Json -Depth 20)
+
+    # .cursor/mcp.json — Cursor project MCP; uses ${workspaceFolder} per Cursor docs
     $workspaceServers = @{}
     foreach ($name in ($servers.Keys | Sort-Object)) {
         $serverConfig = Convert-ServerToWorkspaceConfig -Name $name -Server (ConvertTo-PlainObject $servers[$name])
@@ -568,8 +617,6 @@ if (-not $SkipWorkspaceConfig) {
         }
     }
     $workspaceDoc = @{ mcpServers = $workspaceServers }
-    $workspacePath = Join-Path $WorkspaceRoot ".mcp.json"
-    Write-Utf8NoBomFile -Path $workspacePath -Content ($workspaceDoc | ConvertTo-Json -Depth 20)
     $cursorMcpDir = Join-Path $WorkspaceRoot ".cursor"
     if (-not (Test-Path -LiteralPath $cursorMcpDir)) {
         New-Item -ItemType Directory -Path $cursorMcpDir | Out-Null
