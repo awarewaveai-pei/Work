@@ -58,6 +58,7 @@
 - **人類可讀單一流程表**：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` **§2.5**（`AO-RESUME` → 日內里程碑 → `AO-CLOSE`）。
 - **代理何時自動本機 commit、何時略過**：`.cursor/rules/50-operator-autopilot.mdc` §7（與 repo 根 `.cursor/rules` 同檔應同文）；實作腳本：`scripts/commit-checkpoint.ps1`（**由代理代跑**，你不必手動；無可提交內容時會安靜結束）。
 - **收工 push**：仍只預設在 **`AO-CLOSE`**（`ao-close.ps1`）閘道 PASS 後；例外為你**明確一句話**要求立即推送。
+- **合併／衝突：以較新修改為準（強制）**：同一檔案在兩條歷史上都有改動時，**不得以**機械式 `git merge -X ours` 或 `-X theirs` 取代判斷。代理必須比對兩側「該檔最後一次提交」時間（例如 **`git log -1 --format=%ci <ref> -- path`**，必要時再用 **`%ai` author date** 輔助），**優先採用時間較晚的版本**；若兩側改在不同段落且皆需保留，則**手動合併**非重疊內容，並在當日 **`WORKLOG`** 用一行註記合併依據。**預設**：所有工作直接在 **`main`** commit／push，避免長期 feature 分支再度大型合併。
 
 ## First Run
 - 若有 `BOOTSTRAP.md`，先照檔案完成初始化再開始任務。
@@ -118,5 +119,5 @@
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-05-05 23:15:50 UTC_
+_Last synced: 2026-05-06 05:20:00 UTC_
 
