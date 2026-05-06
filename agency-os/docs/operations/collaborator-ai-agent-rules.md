@@ -1,7 +1,7 @@
-# 協作 AI 代理規則（非 Cursor 收關者）
+# 協作 AI 代理規則
 
-**適用**：Codex、Claude Code、**非收關之**其他 Cursor 視窗、外包助理用的 ChatGPT——凡**不是**當日指定之 **收關者（closer）** 者，皆遵守本檔。  
-**收關者**：通常是**其中一個** Cursor 對話；該對話有權在收工前**定稿** `WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`memory/daily/*.md`，並在 monorepo 根執行 **`scripts/ao-close.ps1`**（見 **`.cursor/rules/40-shutdown-closeout.mdc`**）。**使用者對該對話仍只打 `AO-CLOSE`**，無須因多代理改打別的關鍵字。
+**適用**：Codex、**非收關之**其他 AI 視窗、外包助理用的 ChatGPT——凡**不是**當日指定之 **收關者（closer）** 者，皆遵守本檔。  
+**收關者**：預設為 **Claude Code**（primary agent）；該代理有權在收工前**定稿** `WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`memory/daily/*.md`，並在 monorepo 根執行 **`scripts/ao-close.ps1`**（見 `CLAUDE.md` + `agency-os/AGENTS.md`）。**使用者仍只打 `AO-CLOSE`**，無須因多代理改打別的關鍵字。
 
 **正本路徑**：`agency-os/docs/operations/collaborator-ai-agent-rules.md`（可版控）。  
 **收件匣**（已納入版控，換機跟 `git pull` 同步）：`agency-os/.agency-state/closeout-inbox.md`。
@@ -92,7 +92,7 @@
 
 ## 角色與目標
 
-| 項目 | 協作代理（你） | 收關者（指定之 Cursor 對話） |
+| 項目 | 協作代理（Codex/ChatGPT 等） | 收關者（Claude Code primary） |
 |:---|:---|:---|
 | 寫 code、修 bug、開 PR | ✅ | ✅ |
 | commit | ✅ | ✅ |
@@ -135,7 +135,7 @@
 
 1. `git commit -m "[AGENT_ID] 摘要"`
 2. 將 commit hash 寫入 closeout-inbox
-3. **不自行 push**；push 由收關者（Cursor）透過 `ao-close.ps1` 統一執行
+3. **不自行 push**；push 由收關者（Claude Code）透過 `ao-close.ps1` 統一執行
 4. 不另開新 branch、不開 PR，除非使用者明確要求
 
 > **為何不自行 push**：push 由收關者統一管理，確保 WORKLOG、memory、程式碼在同一個 push 流程中完整上傳，避免多代理各自 push 造成歷史混亂。使用者在其他裝置執行 `git pull` 即可取得收關者 push 的所有內容。
@@ -152,7 +152,7 @@
 
 ### Claude Code 建議設定（`~/.claude/settings.json`）
 
-讀完此文件的 Claude Code 實例，請確認 `permissions` 包含以下設定：
+**Claude Code 為 primary/收關者時**（預設），只保留以下 deny：
 
 ```json
 "permissions": {
@@ -161,9 +161,7 @@
     "Bash(git push -f *)",
     "Bash(git push origin main)",
     "Bash(git push origin master)",
-    "Bash(gh pr merge *)",
-    "Bash(scripts/ao-close.ps1)",
-    "Bash(powershell*ao-close*)"
+    "Bash(gh pr merge *)"
   ],
   "allow": [
     "Bash(git push origin *)",
@@ -171,6 +169,8 @@
   ]
 }
 ```
+
+**Claude Code 為協作代理時**（非 primary），另加 deny：`"Bash(scripts/ao-close.ps1)"` 和 `"Bash(powershell*ao-close*)"`。
 
 - 並行時使用**不同 branch** 或清楚前綴的 commit message，便於收關 `merge`。
 - Commit message 建議含 `AGENT_ID` 與摘要，便於 `print-today-closeout-recap` 與日後查 log。
@@ -188,7 +188,7 @@
 
 1. 協作代理整日／整輪 **只寫入** `closeout-inbox.md`（**`---` 之後、新區塊置頂**，**最新日期在上**）。  
 2. 收關前由使用者或代理把各 branch **合併**到當日工作線。  
-3. **收關 Cursor**：使用者對該對話打 **`AO-CLOSE`**；該代理讀 inbox + `git log` +（必要時）`scripts/print-today-closeout-recap.ps1`，在 rule 40 **第 1 步**寫定 WORKLOG／memory／daily，必要時寫 `AUTO_TASK_DONE`，再執行 **第 2 步** `ao-close.ps1`（長訊息用 `-CommitMessageFile`）。  
+3. **收關 Claude Code**：使用者對 Claude Code 打 **`AO-CLOSE`**；Claude Code 讀 inbox + `git log` +（必要時）`scripts/print-today-closeout-recap.ps1`，依 `AGENTS.md` §40 **第 1 步**寫定 WORKLOG／memory／daily，必要時寫 `AUTO_TASK_DONE`，再執行 **第 2 步** `ao-close.ps1`（長訊息用 `-CommitMessageFile`）。  
 4. **Push 成功後**收關者應**清空或刪除** `closeout-inbox.md`，避免隔天誤用。
 
 更細收工步驟：**[end-of-day-checklist.md](end-of-day-checklist.md)** §0.5、§1a。
