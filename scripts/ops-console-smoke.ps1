@@ -10,6 +10,7 @@ param(
     [switch]$EnableRoleChecks,
     [int]$TimeoutSec = 20,
     [int]$ExpectedMinWorkflowRuns = 0,
+    [string]$ExpectedWorkflowSources = "",
     [string]$ReportPath = ""
 )
 
@@ -113,10 +114,12 @@ $report = [ordered]@{
         tenantId = $ExpectedTenantId
         tenantSlug = $ExpectedTenantSlug
         minWorkflowRuns = $ExpectedMinWorkflowRuns
+        workflowSources = $ExpectedWorkflowSources
     }
     evidence = [ordered]@{
         tenantCount = $null
         workflowRunsCount = $null
+        workflowRunSources = @()
         jobId = $null
         traceId = $null
         auditEventId = $null
@@ -187,6 +190,15 @@ if (-not $runsPass) { $failed.Add("workflow-runs") | Out-Null }
 if ($runsPass) {
     $runsCount = [int]$runs.json.count
     $report.evidence.workflowRunsCount = $runsCount
+    $actualSources = @()
+    foreach ($run in @($runs.json.runs)) {
+        $source = [string](Get-NestedValue -Object $run -Path "runSource")
+        if (-not [string]::IsNullOrWhiteSpace($source)) {
+            $actualSources += $source.ToLower()
+        }
+    }
+    $actualSources = @($actualSources | Sort-Object -Unique)
+    $report.evidence.workflowRunSources = $actualSources
     if ($ExpectedMinWorkflowRuns -gt 0) {
         $hasEnoughRuns = $runsCount -ge $ExpectedMinWorkflowRuns
         $workflowCountResult = @{
@@ -206,6 +218,36 @@ if ($runsPass) {
             pass = $hasEnoughRuns
             status = $runs.status
             details = $workflowCountResult.json
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedWorkflowSources)) {
+        $expectedSources = @($ExpectedWorkflowSources -split ',' | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ -ne "" } | Sort-Object -Unique)
+        $missingSources = @()
+        foreach ($source in $expectedSources) {
+            if (-not ($actualSources -contains $source)) {
+                $missingSources += $source
+            }
+        }
+        $sourcePass = $missingSources.Count -eq 0
+        $sourceResult = @{
+            ok = $runs.ok
+            status = $runs.status
+            json = [pscustomobject]@{
+                expectedSources = $expectedSources
+                actualSources = $actualSources
+                missingSources = $missingSources
+                hint = if ($sourcePass) { "ok" } else { "Insert ops_action_runs with metadata.source for missing engines." }
+            }
+            error = ""
+        }
+        Print-Check -Name "Workflow runs include expected sources" -Result $sourceResult -Pass $sourcePass
+        if (-not $sourcePass) { $failed.Add("workflow-runs-sources") | Out-Null }
+        $report.checks += [ordered]@{
+            name = "workflow-runs-sources"
+            pass = $sourcePass
+            status = $runs.status
+            details = $sourceResult.json
         }
     }
 }

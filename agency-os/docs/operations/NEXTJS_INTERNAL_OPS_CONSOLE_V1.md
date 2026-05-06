@@ -87,6 +87,7 @@
    - 含寫入：`pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl https://app.aware-wave.com -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops -EnableWriteChecks`
    - 含角色差異驗證：在前述命令加 `-EnableRoleChecks`（會檢查 `viewer` 對 tenant patch/ai job 皆為 403，`admin` 可成功寫入）。
    - 含報告輸出：`pwsh ./scripts/ops-console-smoke.ps1 -BaseUrl https://app.aware-wave.com -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops -ExpectedMinWorkflowRuns 1 -EnableWriteChecks -ReportPath ./agency-os/reports/status/ops-console-smoke-LATEST.json`
+   - 含流程來源驗證（DoD #2）：在前述命令加 `-ExpectedWorkflowSources trigger,n8n`（會檢查 workflow runs 至少包含兩種來源）。
    - 內建檢查：`/api/ops/summary` 必須含指定 tenant；建立 AI job 後會驗證 `/api/ops/audit-events` 內存在 `ai_image_job_created` 且對應相同 `job_id/trace_id`。
 7. 若尚未有 `tenant_id` 或不確定 migration，先跑 bootstrap：
    - `powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/ops-console-bootstrap.ps1 -SupabaseUrl <supabase-url> -SupabaseServiceRoleKey <service-role-key> -TenantSlug awarewave-ops -TenantName "AwareWave Ops"`

@@ -38,6 +38,13 @@
 - ui_capture_path: `agency-os/reports/status/ops-console-smoke-LATEST.json`
 - result: PASS（`-EnableRoleChecks`：`viewer` 對 tenant patch / ai-image-jobs 均 403；`admin` 寫入成功並可追審計事件）
 
+### Next.js Ops Console v1 — DoD #2 來源級驗證（Trigger + n8n）
+
+- seed_source: `trigger`（trace: `140d6cf2-82d9-4be6-afd3-3a7bd68e7ca2`）
+- seed_source: `n8n`（trace: `ac1dc8fd-2cfc-4999-a76b-4ac2899f5b71`）
+- ui_capture_path: `agency-os/reports/status/ops-console-smoke-LATEST.json`
+- result: PASS（`-ExpectedWorkflowSources trigger,n8n` 驗證通過）
+
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:5998d546ad0aa731fbb0789c2181f67c848b626d6c9248e89f8753d38e9bc1af -->
 
@@ -1359,7 +1366,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-06 11:49:51 UTC_
+_Last synced: 2026-05-06 12:02:15 UTC_
 
 ## 2026-03-20
 
@@ -1793,6 +1800,7 @@ _Last synced: 2026-05-06 11:49:51 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
 

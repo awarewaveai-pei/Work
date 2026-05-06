@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("ops_action_runs")
-    .select("id,organization_id,action_id,status,approval_status,trace_id,started_at,ended_at,organizations(slug)")
+    .select("id,organization_id,action_id,status,approval_status,trace_id,started_at,ended_at,metadata,organizations(slug)")
     .order("started_at", { ascending: false })
     .limit(limit);
 
@@ -32,6 +32,13 @@ export async function GET(request: Request) {
     status: row.status,
     approvalStatus: row.approval_status,
     traceId: row.trace_id,
+    runSource:
+      typeof row.metadata === "object" &&
+      row.metadata &&
+      "source" in row.metadata &&
+      typeof row.metadata.source === "string"
+        ? String(row.metadata.source).toLowerCase()
+        : "unknown",
     startedAt: row.started_at,
     endedAt: row.ended_at,
   }));
