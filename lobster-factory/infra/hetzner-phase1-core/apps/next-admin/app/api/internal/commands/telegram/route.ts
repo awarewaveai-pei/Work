@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   // 1) Header secret check.
   const secret = verifyTelegramSecret(req);
-  if (!secret.ok) {
+  if (secret.ok === false) {
     Sentry.captureMessage(`telegram secret check failed: ${secret.reason}`, {
       level: "warning",
       tags: { component: "command-plane", phase: "ingress" },
@@ -55,14 +55,16 @@ export async function POST(req: Request) {
   // 3) Actor allowlist.
   const message = raw.message;
   const actor = verifyTelegramActor(message);
-  if (!actor.ok || !message) {
+  if (actor.ok === false || !message) {
+    const failureReason: string =
+      actor.ok === false ? actor.reason : "missing_message";
     const supabase = getSupabaseWriteClient();
     await reportCommandError(supabase, {
       organizationId: process.env.COMMAND_PLANE_DEFAULT_ORG_ID ?? null,
       source_type: "telegram_auth_failed",
       source_ref: `update:${raw.update_id}`,
-      error_code: actor.ok ? "missing_message" : actor.reason,
-      error_message: actor.ok ? "missing_message" : actor.reason,
+      error_code: failureReason,
+      error_message: failureReason,
       event_payload: { redacted },
     });
     return NextResponse.json({ ok: true });
