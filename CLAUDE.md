@@ -112,11 +112,16 @@
 |------|------|
 | `/ao-resume` | 手動觸發 AO-RESUME 五段式摘要（hook 已失效時備用） |
 | `/ao-close` | 手動觸發 AO-CLOSE 完整收工流程 |
+| `/checkpoint` | Mid-session git checkpoint（不 push） |
+| `/recap` | 顯示今日完成摘要（關機前回顧用） |
+| `/tasks` | 列出所有未完成 `- [ ]` 任務 |
 | `/health` | 執行 `system-health-check.ps1` 並報告結果 |
 | `/doc-sync` | 執行 `doc-sync-automation.ps1 -AutoDetect` |
 | `/verify` | 執行 `verify-build-gates.ps1` |
 | `/build-tenant` | 引導新客戶租戶佈建（Lobster Factory） |
 | `/smoke-test` | 執行 n8n MCP + 核心服務煙霧測試 |
+| `/vault-sync` | 同步 vault → Windows user env，列出仍缺的 key |
+| `/vault-status` | 顯示 vault 所有 key 名稱 + `.cursor/mcp.json` 缺漏清單 |
 
 ## Project Subagents
 
@@ -124,8 +129,9 @@
 
 | Agent | 觸發時機 |
 |-------|---------|
-| `repair-agent` | 健康檢查失敗、腳本報錯、MCP 連不上、文件交叉引用斷掉 |
+| `repair-agent` | 健康檢查失敗、腳本報錯、MCP 連不上、文件交叉引用斷掉、vault/env 對齊問題 |
 | `site-builder` | 新客戶租戶佈建（GitHub / Sentry / PostHog / Supabase / n8n） |
+| `trigger-deploy-agent` | Trigger.dev EU 工作流部署（需提供 `tr_pat_*` Personal Access Token） |
 
 ## 桌機 / 換機設定（user-level 複製清單）
 
