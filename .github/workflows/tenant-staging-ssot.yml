@@ -1,0 +1,21 @@
+name: Tenant staging SSOT
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "agency-os/tenants/**"
+      - "agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1"
+      - "scripts/system-health-check.ps1"
+  workflow_dispatch:
+
+jobs:
+  sites-index-vs-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify SITES_INDEX staging URLs vs ENVIRONMENT_REGISTRY
+        shell: pwsh
+        run: ./agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1 -WorkspaceRoot "${{ github.workspace }}/agency-os"
