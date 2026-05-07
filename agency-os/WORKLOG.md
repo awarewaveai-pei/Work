@@ -4,6 +4,18 @@
 
 ## 2026-05-07
 
+### phase1 WordPress（SG）PostHog MU — 完成部署
+
+- **根本問題修正**：WordPress Docker image 的 ENTRYPOINT 不執行 `/docker-entrypoint.d/` 腳本（nginx 慣例，非 WordPress 慣例）。原 `99-sentry-init.sh` 從未被呼叫，`mu-plugins/` 從未建立。
+- **修正方式**：
+  1. `docker-entrypoint-sentry.sh` 加入 `exec apache2-foreground`，改為 `CMD` 入口
+  2. `Dockerfile` 改用 `COPY ... CMD ["/usr/local/bin/lobster-init.sh"]` 取代 `docker-entrypoint.d/`
+  3. 新增 `RUN mkdir -p /usr/src/wordpress/wp-content/mu-plugins && COPY ... /usr/src/wordpress/...` 種子層，確保 first-run volume population 也包含 mu-plugins
+- **SG 部署流程**：`git pull` → sync posthog.php → `docker compose build wordpress --no-cache` → `docker stop/rm` → `docker compose up -d --no-deps wordpress`
+- **驗證通過**：`curl -sL http://aware-wave.com/ | grep "posthog.init"` 回傳 key `phc_vKX...`；`site_name: "Aware Wave Website"`、`site_domain: "aware-wave.com"`、`app_surface: "wordpress-public"` 均正確輸出
+- **Commit**：`f9e666b`（Dockerfile + entrypoint fix），已 push origin/main；SG `/root/Work` reset 至 origin/main 對齊
+- AUTO_TASK_DONE: phase1 WordPress（SG）PostHog MU
+
 ### MCP 全棧憑證補齊與環境對齊
 
 - **Secrets vault 大批次補齊**：從 `AWARE_WAVE_CREDENTIALS.md` + `mcp/user-env.ps1` 批次寫入 36+ 個密鑰（SUPABASE、CLOUDFLARE、N8N、SLACK、RESEND、POSTHOG、NETDATA、GRAFANA、AI keys 等）；`API_AWAREWAVE_BEARER_TOKEN`、`APP_AWAREWAVE_BEARER_TOKEN`、`SUPABASE_AWAREWAVE_POSTGRES_DSN` 從 user-env.ps1 補入。
