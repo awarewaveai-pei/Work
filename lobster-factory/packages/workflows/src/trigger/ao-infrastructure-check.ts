@@ -9,9 +9,9 @@
  *   1. Supabase REST health
  *   2. Trigger.dev API reachability
  *   3. n8n reachability
- *   4. Sentry base URL reachability (via ping)
- *   5. PostHog ingest reachability
- *   6. Uptime Kuma / monitoring endpoint
+ *   4. Uptime Kuma / monitoring endpoint
+ *   5. Sentry API reachability (/api/0/)
+ *   6. PostHog reachability (/_health on API host, not ingest subdomain)
  *   7. RLS isolation smoke (no cross-tenant data leak)
  */
 
@@ -149,9 +149,11 @@ export const aoInfrastructureCheck = task({
         checks.push({ name: "sentry_api", status: "skip", detail: "SENTRY_URL not set" });
       }
 
-      // 6. PostHog ingest reachability — GET /_health returns {"status":"ok"} on healthy instance
+      // 6. PostHog reachability — /_health exists on the main API host, not the ingest subdomain.
+      // us.i.posthog.com is the ingest-only subdomain; derive the API host by removing ".i.".
       if (posthogHost) {
-        checks.push(await pingUrl(`${posthogHost.replace(/\/$/, "")}/_health`, "posthog_ingest"));
+        const phBase = posthogHost.replace(/\/$/, "").replace(/\.i\.posthog\.com$/i, ".posthog.com");
+        checks.push(await pingUrl(`${phBase}/_health`, "posthog_ingest"));
       } else {
         checks.push({ name: "posthog_ingest", status: "skip", detail: "POSTHOG_HOST not set" });
       }
