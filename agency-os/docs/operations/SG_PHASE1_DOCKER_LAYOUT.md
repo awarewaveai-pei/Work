@@ -25,6 +25,8 @@ Cloudflare **勿刪除**指向 EU 的 A 記錄（會直接打斷平台）。詳�
 
 **禁忌**：在任一目錄對「完整版」`docker-compose.yml` 盲目執行 `docker compose up -d`（未指定服務／未讀 runbook），可能造成 **重複建立同名容器／volume**。
 
+**source-of-truth（2026-05-08 起）**：`/root/Work/` 為 **git SSOT**，`/root/lobster-phase1/` 為 **deploy staging**。標準部署走 `/root/lobster-phase1/scripts/sg-deploy.sh`（rsync git → staging，保留本機 `.env*`，rebuild+healthcheck，寫入 `.deployed-commit`）。詳見 `DEPLOY_ROLLBACK_RUNBOOK.md` §2.1。
+
 ## n8n／staging／observability（SG 應卸載）
 
 - **n8n**：對外公開 **`https://n8n.aware-wave.com`** 以 **EU** 為準時，SG **不要**長跑第二套 n8n。repo 內 **`lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`** 已將 **`n8n` 標為 profile `local-n8n`**；Work 樹上的 compose 亦應同步（可用 **`scripts/patch-compose-n8n-profile.py`**）。

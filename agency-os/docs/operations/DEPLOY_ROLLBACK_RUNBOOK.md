@@ -37,34 +37,104 @@
 
 ## 2. 標準部署流程（本地映像）
 
-以 `node-api` + `next-admin` 為例（VPS 上操作）：
+> **2026-05-08 起，SG 預設走一鍵腳本 `sg-deploy.sh`**。它把 `git pull → rsync source → build → up -d → health gate → 寫入 `.deployed-commit`` 全包。手動逐步指令僅作為腳本損壞時的 fallback。
+
+### 2.1 一鍵部署（推薦／預設）
 
 ```bash
-cd lobster-factory/infra/hetzner-phase1-core
+# SSH 到 SG（5.223.93.113，需 hetzner_trigger key）
+# 一鍵：拉 git + 同步源碼到 /root/lobster-phase1 + rebuild + healthcheck + 記錄 commit
+/root/lobster-phase1/scripts/sg-deploy.sh next-admin
 
-# 步驟 1 — 部署前快照（務必執行）
-./scripts/rollback-phase1.sh save node-api
+# 多 app 同時：
+/root/lobster-phase1/scripts/sg-deploy.sh next-admin node-api wordpress
+
+# 預演：
+/root/lobster-phase1/scripts/sg-deploy.sh next-admin --dry-run
+
+# 跳過 git pull（用本機已 fetch 的版本）：
+/root/lobster-phase1/scripts/sg-deploy.sh next-admin --skip-pull
+```
+
+腳本內部行為（按順序）：
+
+| 步驟 | 動作 | 失敗處置 |
+|------|------|---------|
+| 1 | `cd /root/Work && git fetch + git pull --ff-only origin main` | 非 fast-forward → 立即 fail（保留現狀，需要人介入） |
+| 2 | `rsync -av --delete --exclude='.env*' --exclude='node_modules' --exclude='.next' /root/Work/...//apps/<APP>/ /root/lobster-phase1/apps/<APP>/` | rsync 錯誤 → fail，staging 保持原狀 |
+| 3 | `docker compose build <APP>` | build fail → fail，舊 image 還在跑 |
+| 4 | `docker compose up -d <APP>` | up fail → fail（容器名衝突時要 `docker compose stop && rm -f` 後重來） |
+| 5 | 等 healthcheck 60s | unhealthy → fail（用第 3 節 rollback） |
+| 6 | 寫 `/root/lobster-phase1/.deployed-commit`（client-side `check-deploy-drift.ps1` 比對用） | — |
+
+### 2.2 客戶端 drift 檢查
+
+部署完從 client（任何工作機）執行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check-deploy-drift.ps1
+# PASS = 與 origin/main 對齊；WARN = 落後 1+ commit；FAIL = 落後 ≥ 6 commits
+```
+
+`system-health-check.ps1` 已自動帶這項（warn-only，不擋 AO-CLOSE）。
+
+### 2.3 手動逐步部署（fallback；當 sg-deploy.sh 損壞時用）
+
+```bash
+# 1. 部署前快照
+cd /root/lobster-phase1
 ./scripts/rollback-phase1.sh save next-admin
-# WordPress 有 Dockerfile 更動時也快照
-# ./scripts/rollback-phase1.sh save wordpress
 
-# 步驟 2 — 拉最新程式碼
+# 2. 拉最新程式碼到 /root/Work（git source of truth）
+cd /root/Work
 git pull --ff-only origin main
 
-# 步驟 3 — 重建映像
-docker compose --env-file .env build node-api next-admin
+# 3. 同步源碼到 staging（保留本機 .env*）
+rsync -av --delete \
+  --exclude='.env*' --exclude='node_modules' --exclude='.next' --exclude='tsconfig.tsbuildinfo' \
+  /root/Work/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/ \
+  /root/lobster-phase1/apps/next-admin/
 
-# 步驟 4 — 滾動更新
-docker compose --env-file .env up -d node-api next-admin
+# 4. Build + 部署
+cd /root/lobster-phase1
+docker compose build next-admin
+docker compose up -d next-admin
 
-# 步驟 5 — 驗收
-docker compose ps
-curl -sf http://127.0.0.1/api/health
-curl -sf http://127.0.0.1/admin/
+# 5. 驗收
+docker ps --filter name=lobster-next-admin
+curl -sf http://127.0.0.1/ -H 'Host: app.aware-wave.com' | grep -c "Build Console"  # 預期 ≥ 1
 
-# 步驟 6 — WORKLOG 留一行（不含密鑰）
-# "deployed node-api + next-admin, snapshot saved, health PASS"
+# 6. WORKLOG 留一行
+# "manual deploy next-admin <commit>, health PASS"
 ```
+
+### 2.4 自動 drift 告警（cron + Slack）
+
+**為什麼不用 Claude Cloud routine**：routine 在 Anthropic 雲跑，沒辦法 SSH 上 SG 而不把 `hetzner_trigger` 私鑰外帶（新增攻擊面，違反 30 年不外流原則）。改在 SG 本地 cron 跑 + 用既有 Slack webhook 通知，零雲端依賴。
+
+| 項目 | 值 |
+|------|-----|
+| Owner script | `/root/lobster-phase1/scripts/check-drift-and-alert.sh` |
+| Cron | `0 1 * * *`（01:00 UTC = 09:00 Asia/Taipei，每日一次） |
+| Webhook source | `/root/lobster-phase1/.env` 的 `SLACK_WEBHOOK_URL`（沿用既有 §九 Slack） |
+| State file | `/root/lobster-phase1/.drift-alert-state`（紀錄 `(deployed, origin) pair`，dedupe 用） |
+| Log | `/var/log/sg-deploy-drift.log` |
+| Threshold | `BEHIND ≥ 1` 即告警；同一 pair 不會重發（直到 deploy 動了或 origin/main 動了） |
+| Manual run | `/root/lobster-phase1/scripts/check-drift-and-alert.sh --force`（測試或重發告警） |
+
+**訊息格式**：附 `behind` 數字、deployed/origin commit short hash、最近 3 個未上線 commit subject、修法提示（`/sg-deploy`）。
+
+### 2.5 已知行為與 bug 修正紀錄
+
+- **2026-05-08**：sg-deploy.sh 首版把寫 `.deployed-commit` 放在 healthcheck wait 之後，若 `docker compose up -d` 撞容器名 race condition 失敗，drift 偵測會失明。修正：(a) `up -d` 失敗若是 race condition 自動 `stop && rm -f && up -d` 重試一次；(b) 寫 `.deployed-commit` 提前到 build 成功 + up 成功之後（healthcheck 失敗仍保留紀錄，因為 image 已 build、容器已起，drift 角度看部署已落地）。
+
+### 2.6 為什麼有兩個目錄（架構決定）
+
+- `/root/Work/`（git clone）— **源碼單一真相（SSOT）**；隨 `git pull` 自動更新；不直接 build
+- `/root/lobster-phase1/`（staging）— 部署艦面；持有本機獨有的 `docker-compose.yml`、`.env`、`nginx/`、`scripts/`；`apps/` 由 `sg-deploy.sh` rsync 自 git
+- 中間 rsync `--exclude='.env*'` 確保本機機密永遠不被 git 覆蓋
+
+> 歷史背景：2026-05-07 之前無此 rsync 機制，staging `apps/next-admin/` 自 4/27 凍結 10 天（Build Console、New Client、always-on Command Plane Phase 1 等 19 個 commit、3,785 行更新堆積未上線）。`sg-deploy.sh` 即為此機械化解法。
 
 ---
 

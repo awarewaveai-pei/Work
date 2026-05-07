@@ -134,6 +134,20 @@
 - **4 個原始待補憑證全數完成**：OPS_INBOX / SUPABASE_SOULFULEXPRESSION / SUPABASE_A_SERVICE_ROLE_KEY / XAI_API_KEY。
 - AUTO_TASK_DONE: 補齊剩餘 Vault 憑證
 
+### SG next-admin 部署 drift 根因 + 機械化解法（sg-deploy.sh + check-deploy-drift.ps1）
+
+- **症狀**：使用者在 `app.aware-wave.com` 看到 sidebar 只有 5 項（Dashboard / Ops Console v1 / Ops Inbox / API Health × 2），預期 7 項（缺 New Client、Build Console）。
+- **根因（git 紀錄無刪除事件）**：`/root/lobster-phase1/apps/next-admin/` 為 staging build context，但**自 2026-04-27 17:15 起未自 git source 同步**；2026-05-03 加入 Build Console、2026-05-07 14:44 加入 New Client 等共 **19 commit、3,785 行 next-admin 改動 + 9 commit workflows 改動** 全數堆積在 `/root/Work/`（git clone）但從未進入 build。15:39 雖剛 rebuild，因 build context 仍是 4/27 凍結 source，新版未上線。
+- **機械化解法**：
+  - **新增 `/root/lobster-phase1/scripts/sg-deploy.sh`**：`git fetch + pull --ff-only` → `rsync --exclude='.env*' --exclude='node_modules' --exclude='.next'` 同步 source → `docker compose build` → `up -d` → 等 healthcheck 60s → 寫入 `.deployed-commit`。預設 next-admin；可指定多 app；支援 `--dry-run` / `--skip-pull`。
+  - **新增 `scripts/check-deploy-drift.ps1`**（client-side）：SSH 上 SG 讀 `.deployed-commit`，比對 `origin/main` 計算 behind；exit 0/1/2 = PASS/WARN/FAIL；`-Strict` 把 WARN 升級為 FAIL（給 `verify-build-gates` 用）。
+  - **掛入 `scripts/system-health-check.ps1`**：新增 §7 deploy drift 檢查（warn-only，不擋 AO-CLOSE）；今日 health 100%（361/361）含此項。
+- **首次 deploy 結果**：build 成功（log 顯示 `/build`、`/onboard`、`/api/ops/audit-events`、`/api/internal/commands/telegram` 等所有新 route 都進去）；container `lobster-next-admin` healthy；nginx → `app.aware-wave.com` 回傳 HTTP 200 含 7 項 sidebar；Cloudflare `cf-cache-status: DYNAMIC`（origin `Cache-Control: no-store` 不快取）。
+- **Docs 更新**（單一主人原則）：`agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2 重寫為「sg-deploy.sh 一鍵 / drift 檢查 / fallback 手動 / 雙目錄架構說明」；`SG_PHASE1_DOCKER_LAYOUT.md` 加一段 source-of-truth 註腳指向 §2.1。**未新建** runbook（避免雙軌）。
+- **使用者文件 `C:\Users\user1115\Desktop\AWARE_WAVE_CREDENTIALS.md` §二十四 待修**（不在 git）：原文「需要 SSH 到 EU `204.168.175.41` 做 next-admin docker compose」混淆 EU/SG；next-admin 在 SG `5.223.93.113`；migration 才在 EU。**未自動編輯使用者桌面檔**，候使用者授權後再代修。
+- **Server 證據**：`/root/backups/lobster-phase1-apps-next-admin-20260507-154953.tar.gz`（419MB，已排除 node_modules/.next）；`/root/lobster-phase1/.env.next-admin.local.backup-20260507-154953`（第二層保險）；`/root/lobster-phase1/.deployed-commit` = `1d11a27...`。
+- AUTO_TASK_DONE: SG next-admin 部署 drift 根因排除 + sg-deploy.sh / check-deploy-drift.ps1 機械化
+
 ## 2026-05-07
 
 ### Trigger workflows deploy to EU — 完成
@@ -1598,7 +1612,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-07 14:30:03 UTC_
+_Last synced: 2026-05-07 16:14:09 UTC_
 
 ## 2026-03-20
 
@@ -2032,5 +2046,6 @@ _Last synced: 2026-05-07 14:30:03 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
