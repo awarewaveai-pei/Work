@@ -50,6 +50,7 @@
 
 ### 未完成
 
+- [ ] **（明日提醒）`/strategy-review` skill demo 實測** —— **【未完成】** **明日（2026-05-08）試跑：**用今天 Hermes Agent 的問題（要不要採用、值不值得整合）作為第一個 strategy-review 案例，跑 **Mode 1（four-role-collaboration）**驗證並行 subagent 真的有獨立 context、不會互相污染。**操作：**在 Claude Code 輸入 `/strategy-review 要不要採用 Hermes Agent` 或自然語觸發。**DoD：**(1) 4 個 `general-purpose` subagent 並行返回 4 份結構化 finding／bias_check／must_investigate；(2) 產出 `agency-os/reports/strategy-review/2026-05-08-adopt-hermes-agent.md`；(3) `INDEX.md` 自動補一行；(4) 確認 4 份報告**真的不同**（沒有 context contamination — 例：相同 finding 用相同 framing 出現在 2+ 份 = 失敗，要回頭調 mode 檔案）。**背景：**`.claude/skills/strategy-review/SKILL.md`、`.claude/skills/strategy-review/README.md` §Testing the skill；範本 `templates/decision-record.md`。
 - [ ] **（AO-RESUME 提醒）桌機開工後跑 Claude user-level 對齊腳本** —— **【未完成】** 2026-05-07 筆電已建立 `mcp/claude-userlevel/` SSOT + `scripts/sync-claude-userlevel.ps1`，並對齊筆電 `~/.claude/`。**桌機下一步**：`git pull` 後在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge`，使 `~/.claude/{hooks,settings.json,mcp.json}` 對齊 SSOT。**驗收**：跑 `-Mode verify` 應 exit 0（PASS）。背景：`mcp/claude-userlevel/README.md`、`CLAUDE.md` § 桌機/換機設定。
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：桌機 2026-05-07 `machine-environment-audit -Strict` PASS（no warnings）✓**；筆電尚未執行。任一台未 PASS 則本條不結案。**筆電下一步：**依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 + §1.5.1**（WP 棧）逐步執行後，在筆電 monorepo 根跑 `machine-environment-audit.ps1 -FetchOrigin -Strict`；細項 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。
 - [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
@@ -297,5 +298,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-07 08:18:14 UTC_
+_Last synced: 2026-05-07 14:30:03 UTC_
 
