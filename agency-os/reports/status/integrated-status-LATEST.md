@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-07 16:18:26
+- Generated: 2026-05-07 16:19:47
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -237,11 +237,32 @@
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**: Desktop app 的 posthog/cloudflare MCP 仍為 npm stdio（HTTP type 不被 desktop app 支援，無解）。剩餘 vault 待補：SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY。`main` 已與 `origin/main` 對齊（ahead／behind 皆 0）。
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:91a66f0b3f303c58769c9d8bd1537896f764f711ce35a55e6722b4a50a712099 -->
+
+### claude 2026-05-07 23:59
+
+- **完成（一句）**: /onboard 4 步驟精靈完整實作 + M3 department-catalog.ts（20 部門映射）+ /build 改版（Service Provisioning 移除 + URL pre-fill）+ nginx Basic Auth 事故修復（htpasswd volume mount + 暫時停用）。
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/` (新增 page.tsx + OnboardWizard.tsx)
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/department-catalog.ts` (新增)
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops-console/DepartmentSelector.tsx` (新增)
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/build/BuildConsole.tsx` (改版)
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/layout.tsx` (新增 /onboard 連結)
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css` (新增 onboard 樣式)
+  - `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` (同步生產 config；auth_basic 暫時 comment out)
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` (nginx htpasswd volume mount)
+  - `agency-os/WORKLOG.md` (AUTO_TASK_DONE 補記)
+  - `agency-os/memory/CONVERSATION_MEMORY.md` (蒸餾補記)
+- **Git**: ca4438a（fix: nginx htpasswd mount + sync production config，已 push）
+- **對應 TASKS 子字串（可選）**: /onboard 新客戶入職精靈
+- **風險／待辦（可選）**: Basic Auth 目前停用中（nginx auth_basic comment out）；再開啟需確保 vault GRAFANA_BASIC_PASSWORD 與 /etc/nginx/.htpasswd_studio hash 一致再 docker compose restart nginx。筆電雙機環境對齊仍為 TASKS 開放項。
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-07 16:18:18`
+- Time: `2026-05-07 16:19:43`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -251,13 +272,15 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260507-161818.md`
-- Closeout: `reports/closeout/closeout-20260507-161815.md`
+- Health: `reports/health/health-20260507-161943.md`
+- Closeout: `reports/closeout/closeout-20260507-161940.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+- `git pull origin main`：**Already up to date**。
+- `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
 - `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
 
 ### AO-CLOSE（2026-03-27）
@@ -315,7 +338,5 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
 
 

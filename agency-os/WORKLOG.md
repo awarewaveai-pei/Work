@@ -1,4 +1,4 @@
-# Worklog
+﻿# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
@@ -211,6 +211,28 @@
 - **Git**: 本輪無 repo 內容變更需額外 commit；WORKLOG+memory 更新將由 ao-close 統一 commit
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**: Desktop app 的 posthog/cloudflare MCP 仍為 npm stdio（HTTP type 不被 desktop app 支援，無解）。剩餘 vault 待補：`OPS_INBOX_INGEST_TOKEN`、SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY。`main` 已與 `origin/main` 對齊（ahead／behind 皆 0）。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:91a66f0b3f303c58769c9d8bd1537896f764f711ce35a55e6722b4a50a712099 -->
+
+### claude 2026-05-07 23:59
+
+- **完成（一句）**: /onboard 4 步驟精靈完整實作 + M3 department-catalog.ts（20 部門映射）+ /build 改版（Service Provisioning 移除 + URL pre-fill）+ nginx Basic Auth 事故修復（htpasswd volume mount + 暫時停用）。
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/` (新增 page.tsx + OnboardWizard.tsx)
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/department-catalog.ts` (新增)
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops-console/DepartmentSelector.tsx` (新增)
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/build/BuildConsole.tsx` (改版)
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/layout.tsx` (新增 /onboard 連結)
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css` (新增 onboard 樣式)
+  - `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` (同步生產 config；auth_basic 暫時 comment out)
+  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` (nginx htpasswd volume mount)
+  - `agency-os/WORKLOG.md` (AUTO_TASK_DONE 補記)
+  - `agency-os/memory/CONVERSATION_MEMORY.md` (蒸餾補記)
+- **Git**: ca4438a（fix: nginx htpasswd mount + sync production config，已 push）
+- **對應 TASKS 子字串（可選）**: /onboard 新客戶入職精靈
+- **風險／待辦（可選）**: Basic Auth 目前停用中（nginx auth_basic comment out）；再開啟需確保 vault GRAFANA_BASIC_PASSWORD 與 /etc/nginx/.htpasswd_studio hash 一致再 docker compose restart nginx。筆電雙機環境對齊仍為 TASKS 開放項。
 
 ## 2026-05-06
 
@@ -1576,7 +1598,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-07 08:18:14 UTC_
+_Last synced: 2026-05-07 08:19:39 UTC_
 
 ## 2026-03-20
 
@@ -2010,6 +2032,4 @@ _Last synced: 2026-05-07 08:18:14 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
 
