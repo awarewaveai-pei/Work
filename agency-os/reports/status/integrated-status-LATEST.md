@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-07 09:54:29
+- Generated: 2026-05-07 16:18:26
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -214,7 +214,7 @@
 - AO-RESUME 收口：`.claude/commands` 三檔納入版控、`TASKS`／日記與 **`origin/main`** 對齊敘述更新
 
 ## Current state
-- Vault 45/48 完整（缺 SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY）
+- Vault：已知缺 **4** 項（見 **`TASKS.md`** Vault 隊列）：`OPS_INBOX_INGEST_TOKEN`、`SUPABASE_A_SERVICE_ROLE_KEY`、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`、`XAI_API_KEY`
 - Desktop app MCP：trigger 已修復；posthog/cloudflare 受 app 限制（HTTP type 不支援）
 - **`main` 已與 `origin/main` 對齊**（2026-05-07：`git rev-list --left-right --count origin/main...HEAD` → `0  0`）
 
@@ -241,7 +241,7 @@
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-07 01:29:15`
+- Time: `2026-05-07 16:18:18`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -251,15 +251,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260507-012914.md`
-- Closeout: `reports/closeout/closeout-20260507-012911.md`
+- Health: `reports/health/health-20260507-161818.md`
+- Closeout: `reports/closeout/closeout-20260507-161815.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- `git pull origin main`：**Already up to date**。
-- `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
 - `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
 
 ### AO-CLOSE（2026-03-27）
@@ -317,5 +315,7 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+
 
 

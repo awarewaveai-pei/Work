@@ -1,8 +1,30 @@
-﻿# Worklog
+# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-05-07 (continued)
+
+### /onboard 新客戶入職精靈（4步驟）+ M3 部門目錄 + /build 改版
+
+- **`app/onboard/`**：新增 `page.tsx`（Server Component）+ `OnboardWizard.tsx`（641 行 client）4 步驟精靈：Step1 ClientInfo（UUID 自動生成、profile A/B/C 選擇）、Step2 DepartmentSelector（20 部門複選格）、Step3 服務佈建（7 providers 核取）、Step4 Summary + 一鍵跳至 `/build`（帶 14 個 URL param）。
+- **`lib/department-catalog.ts`**（M3）：20 `DepartmentCluster`、15 `MatrixRowKey`、`DEPARTMENT_CATALOG` 陣列、`buildDepartmentSelection()`、`getRequiredTemplateFiles()`、`SMB_DEFAULT_CLUSTERS`、`GROUP_LABELS`；型別安全、為 30 年 SSOT。
+- **`app/ops-console/DepartmentSelector.tsx`**：client component 20 部門複選格，依 category 分組，色碼區分 `smbDefault`；嵌入 /onboard Step 2 + 可重用於 ops-console。
+- **`app/build/BuildConsole.tsx`** 改版：移除全部 Service Provisioning（`provForm`、`provLoading`、`ALL_PROVIDERS`、`toggleProvider`、`submitProvisioning`）；加入 `useSearchParams()` pre-fill `useEffect`（profile + 12 個 client field）；Service Provisioning 面板改為 contextual banner（有 `?profile=` 時顯示成功；無時引導前往 /onboard）。
+- **`app/layout.tsx`**：sidebar 新增 `/onboard` 連結（`✦` icon），置於 Build Console 上方。
+- **`app/globals.css`**：新增所有 onboard-wizard、progress bar、step badge（active/done/idle）、onboard-uuid-block、btn-secondary 樣式。
+- AUTO_TASK_DONE: /onboard 4 步驟精靈完整實作
+- AUTO_TASK_DONE: M3 department-catalog.ts（20 部門機器可讀映射）+ DepartmentSelector
+
+### nginx Basic Auth 事故修復 + Basic Auth 暫時停用
+
+- **根本問題**：`/etc/nginx/.htpasswd_studio` 在 `docker-compose.yml` 從未掛入 nginx container，container 找不到檔案 → 所有請求 401。
+- **其次問題**：即使掛入後，vault 的 `GRAFANA_BASIC_PASSWORD` 與 htpasswd hash 不符（不同時間設定的不同密碼）。
+- **修正 1 — docker-compose.yml**：nginx service volumes 新增 `/etc/nginx/.htpasswd_studio:/etc/nginx/.htpasswd_studio:ro`（永久掛載，已 commit `ca4438a` + push）。
+- **修正 2 — 生產 nginx config 同步**：`lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 同步生產版本：`auth_basic` 已暫時 comment out（讓 `app.aware-wave.com` 可無密碼訪問）；新增 `/api/webhooks/` bypass block（Bearer-protected，不需 basic auth）。
+- **暫時停用 Basic Auth**：生產 `default.conf` 的 `auth_basic "Aware Wave Admin";` 已 comment out（`#auth_basic`），`docker compose restart nginx` 生效。`app.aware-wave.com` 已 HTTP 200 可正常訪問。
+- **再開啟方式（日後）**：取消 `nginx/default.conf` 的 `#auth_basic` 行注釋，確保 htpasswd 與 vault `GRAFANA_BASIC_PASSWORD` 一致，`docker compose restart nginx`。
+- **側記（已調試）**：`sed -i` 在 host 創新 inode → container bind mount 仍指舊 inode（container 內看不到更改）；PowerShell DPAPI 解密需 `ConvertTo-SecureString` + `SecureStringToBSTR`；Base64 嵌入 bash 腳本方式可繞過 SSH 跨機密碼傳遞的 escaping 問題。
+- AUTO_TASK_DONE: nginx Basic Auth 事故修復（htpasswd 掛載 + production config 同步）
 
 ### P7 Next.js 控制台 v1 — DoD 完整驗收（ops-console-smoke ALL PASSED）
 
@@ -125,7 +147,7 @@
 - **Deploy 指令**（EU VPS）：`TRIGGER_ACCESS_TOKEN=<pat> npx trigger.dev@4.4.4 deploy -p proj_6c4f24492a705729fc2c -a https://trigger.aware-wave.com --skip-telemetry`
 - **結果**：version `20260507.3`，8 tasks detected，PASS。Dashboard：`https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/rgv3a4bo`
 - **Cleanup**：EU temp files 已刪；local temp token files 已刪
-- AUTO_TASK_DONE: Trigger workflows 完整 deploy
+- AUTO_TASK_DONE_APPLIED (2026-05-07T08:18:27Z): Trigger workflows 完整 deploy
 
 ### phase1 WordPress（SG）PostHog MU — 完成部署
 
@@ -137,7 +159,7 @@
 - **SG 部署流程**：`git pull` → sync posthog.php → `docker compose build wordpress --no-cache` → `docker stop/rm` → `docker compose up -d --no-deps wordpress`
 - **驗證通過**：`curl -sL http://aware-wave.com/ | grep "posthog.init"` 回傳 key `phc_vKX...`；`site_name: "Aware Wave Website"`、`site_domain: "aware-wave.com"`、`app_surface: "wordpress-public"` 均正確輸出
 - **Commit**：`f9e666b`（Dockerfile + entrypoint fix），已 push origin/main；SG `/root/Work` reset 至 origin/main 對齊
-- AUTO_TASK_DONE: phase1 WordPress（SG）PostHog MU
+- AUTO_TASK_DONE_APPLIED (2026-05-07T08:18:27Z): phase1 WordPress（SG）PostHog MU
 
 ### MCP 全棧憑證補齊與環境對齊
 
@@ -1554,7 +1576,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-07 06:27:39 UTC_
+_Last synced: 2026-05-07 08:18:14 UTC_
 
 ## 2026-03-20
 
@@ -1988,5 +2010,6 @@ _Last synced: 2026-05-07 06:27:39 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
