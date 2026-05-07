@@ -53,7 +53,6 @@
 - [ ] **（AO-RESUME 提醒）補齊剩餘 Vault 憑證** —— **【進行中】** **已補：** `OPS_INBOX_INGEST_TOKEN`（2026-05-07）、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`（2026-05-07）、`SUPABASE_A_SERVICE_ROLE_KEY` + `SUPABASE_AWAREWAVE_URL` + `SUPABASE_A_URL`（2026-05-08，alias 從 vault 複製）；25 vars synced to Windows env。**仍缺：** `XAI_API_KEY`（console.x.ai）；另有 33 base-URL / API key 待補（見 sync-cursor-mcp-user-env 輸出清單）。**下一步：** `XAI_API_KEY` 取得後執行 `.\scripts\secrets-vault.ps1 -Action set -Name XAI_API_KEY -Value '<value>'` 再 `sync-cursor-mcp-user-env`。
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：桌機 2026-05-07 `machine-environment-audit -Strict` PASS（no warnings）✓**；筆電尚未執行。任一台未 PASS 則本條不結案。**筆電下一步：**依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 + §1.5.1**（WP 棧）逐步執行後，在筆電 monorepo 根跑 `machine-environment-audit.ps1 -FetchOrigin -Strict`；細項 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。
 - [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度（2026-05-07）：**已在 **EU `204.168.175.41`** 完成 `registry:5000` DNS 對齊與 `docker login`（PASS），並可進入 `/root/Work/lobster-factory/packages/workflows` 觸發 `npx trigger.dev@4.4.4 deploy`。**目前唯一阻塞：**CLI 明確回報 `TRIGGER_ACCESS_TOKEN` 不是 PAT（需 **`tr_pat_*`**，現值為 `tr_prod_*`）。**下一步（操作者）**：產生 Personal Access Token（`tr_pat_*`）後，在 EU 以 `export TRIGGER_ACCESS_TOKEN=<tr_pat_...>`（或寫入 `/root/trigger/.env`）重跑 deploy。
-- [ ] **phase1 WordPress（SG）PostHog MU** —— **【進行中】** **進度：****repo** 已入 MU **`posthog.php`** + compose **`NEXT_PUBLIC_POSTHOG_*`**。**下一步：**SG **`docker compose build wordpress && docker compose up -d wordpress`**（或等價）→ 公開頁驗證載入。
 - [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
   - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（**URL／lifecycle SSOT**）、`SITES_INDEX.md`（須與 registry 對齊）、各案 `02_EXECUTION_PLAN.md` Day 2、`SITE_PROFILE.md`；Runbook §2 對齊框：`PRODUCTION_RUNBOOK_PILOT_*`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
   - **自動漂移閘道**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（比對 **`SITES_INDEX`**、含 HTTPS 之 **`sites/*/SITE_PROFILE`**、以及 `projects/*/02_EXECUTION_PLAN.md` 的 staging URL；`scripts/system-health-check.ps1` → **`verify-build-gates`**；PR `.github/workflows/tenant-staging-ssot.yml`）。
@@ -108,6 +107,13 @@
   - **機械檢查**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1` 單一腳本擴充；本機與 CI 共用，不開平行實作。
   - **閘道接入**：`scripts/system-health-check.ps1` Critical Gate + `.github/workflows/tenant-staging-ssot.yml`（PR 路徑觸發）；
   - **驗證**：`system-health-check` 100% PASS（354/354）。
+
+### 2026-05-07 — phase1 WordPress（SG）PostHog MU 完成部署
+
+- [x] **phase1 WordPress（SG）PostHog MU**
+  - **交付**：`posthog.php` MU 已部署至 SG；`curl -sL http://aware-wave.com/ | grep "posthog.init"` 驗證回傳 key `phc_vKX…`；`site_name`, `site_domain`, `app_surface` 均正確。
+  - **根本修正**：Dockerfile 改用 `CMD` 入口取代 `docker-entrypoint.d/`（nginx 慣例問題）；`mu-plugins/` 在 image build 時正確植入。
+  - **Commit**: `f9e666b`（push origin/main）
 
 ### 2026-05-07 — Git `main` 與 `origin/main` 對齊（滯後文案收口）
 

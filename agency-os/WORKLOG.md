@@ -11,7 +11,7 @@
 - **sync-cursor-mcp-user-env**：25 vars synced；仍缺 33（主要為 base URL config + API key，含 `XAI_API_KEY`）。
 - **CLAUDE.md 換機指引**：更新「桌機 / 換機設定」為完整 hooks 目錄 + settings.json + memory 三類複製清單；新增「筆電 WordPress 棧」subsection。
 - **TASKS.md 更新**：Vault 條「仍缺」移除已補 SUPABASE 兩項；剩 `XAI_API_KEY` + 33 base-URL 待補。
-- AUTO_TASK_DONE: 補齊剩餘 Vault 憑證
+- 注意：Vault 任務尚未結案（`XAI_API_KEY` 仍缺），本條不加 AUTO_TASK_DONE。
 
 ## 2026-05-07
 
