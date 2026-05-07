@@ -126,4 +126,44 @@ if ($aoResumeRaw -notmatch $autoCheckpointCallPattern) {
     exit 1
 }
 
+# --- Claude Code user-level SSOT contract (mechanical, not doc-only) ---
+Write-Host "== Claude user-level SSOT contract: required files exist ==" -ForegroundColor Cyan
+$claudeUserlevelDir = Join-Path $WorkRoot "mcp\claude-userlevel"
+$requiredClaudeUserlevelFiles = @(
+    "manifest.json",
+    "settings.template.json",
+    "mcp.template.json",
+    "README.md",
+    "hooks\hooks.json",
+    "hooks\ao-resume-on-prompt.ps1",
+    "hooks\branch-protection.js"
+)
+foreach ($rel in $requiredClaudeUserlevelFiles) {
+    $abs = Join-Path $claudeUserlevelDir $rel
+    if (-not (Test-Path -LiteralPath $abs)) {
+        Write-Error "verify-build-gates: missing Claude user-level SSOT file: $abs"
+        exit 1
+    }
+}
+$claudeSyncScript = Join-Path $WorkRoot "scripts\sync-claude-userlevel.ps1"
+if (-not (Test-Path -LiteralPath $claudeSyncScript)) {
+    Write-Error "verify-build-gates: missing sync-claude-userlevel.ps1 (Claude user-level enforcement engine)"
+    exit 1
+}
+# bootstrap-mcp-machine.ps1 must wire the sync (so new machines auto-align)
+$bootstrapRaw = Get-Content -LiteralPath (Join-Path $WorkRoot "scripts\bootstrap-mcp-machine.ps1") -Raw -Encoding UTF8
+if ($bootstrapRaw -notmatch 'sync-claude-userlevel\.ps1') {
+    Write-Error "verify-build-gates: bootstrap-mcp-machine.ps1 must invoke sync-claude-userlevel.ps1 -Mode install (contract guard)."
+    exit 1
+}
+# ao-resume.ps1 must invoke the verify-mode warn-only check (anchored on contract marker)
+if ($aoResumeRaw -notmatch '#\s*CONTRACT:\s*invoke\s+sync-claude-userlevel\.ps1\s+-Mode\s+verify') {
+    Write-Error "verify-build-gates: ao-resume.ps1 must invoke sync-claude-userlevel.ps1 -Mode verify (warn-only drift detector). Missing contract marker."
+    exit 1
+}
+if ($aoResumeRaw -notmatch '-Mode verify') {
+    Write-Error "verify-build-gates: ao-resume.ps1 missing actual '-Mode verify' invocation."
+    exit 1
+}
+
 Write-Host "verify-build-gates: ALL PASSED" -ForegroundColor Green

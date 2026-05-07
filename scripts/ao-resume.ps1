@@ -299,6 +299,26 @@ if ($script:StrictEnvAudit) {
     }
 }
 
+# --- Claude Code user-level alignment (warn-only; mechanical drift detector) ---
+# CONTRACT: invoke sync-claude-userlevel.ps1 -Mode verify (warn-only)
+# This is a warn-only check so AO-RESUME never gets blocked by user-level drift.
+# If drift is detected, prints the one-liner to fix it. Cross-machine SSOT lives
+# in mcp/claude-userlevel/ — see that README for details.
+$claudeUserlevelSync = Join-Path $WorkRoot "scripts\sync-claude-userlevel.ps1"
+if (Test-Path -LiteralPath $claudeUserlevelSync) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: Claude user-level drift check (warn-only) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $claudeUserlevelSync -Mode verify -NoBackup
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "WARN: ~/.claude/ drifted from SSOT (mcp/claude-userlevel/)." -ForegroundColor Yellow
+        Write-Host "      Fix:  powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge" -ForegroundColor Yellow
+        Write-Host ""
+    }
+    # Reset exit code (warn-only must not poison parent script's success path)
+    $global:LASTEXITCODE = 0
+}
+
 # Report delta since last AO-RESUME (local stamp under agency-os/.agency-state/)
 $stateDir = Join-Path $WorkRoot "agency-os\.agency-state"
 $stampPath = Join-Path $stateDir "ao-resume-last.txt"
