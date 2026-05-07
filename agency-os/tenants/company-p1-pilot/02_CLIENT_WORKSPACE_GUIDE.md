@@ -9,5 +9,5 @@
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 - `tenants/templates/tenant-template/02_CLIENT_WORKSPACE_GUIDE.md`
 
-_Last synced: 2026-05-07 06:27:39 UTC_
+_Last synced: 2026-05-07 14:30:03 UTC_
 
