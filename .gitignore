@@ -9,6 +9,10 @@
 .claude/mcp.json
 .claude/settings.json
 .claude/settings.local.json
+
+# --- Local backup directory (machine-local snapshots; never commit) ---
+Backups/
+
 # Runtime subdirectories (Claude Code internal state, not project source)
 .claude/backups/
 .claude/cache/
@@ -24,7 +28,10 @@
 .claude/session-env/
 .claude/sessions/
 .claude/shell-snapshots/
-.claude/skills/
+.claude/skills/*
+# Project-owned skills are tracked via explicit negation below.
+!.claude/skills/strategy-review/
+
 .claude/telemetry/
 .claude/worktrees/
 # Built-in agents installed by Claude Code runtime (not project-authored)
