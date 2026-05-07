@@ -31,6 +31,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/ops-console" className="sidebar-link">
                   <span className="icon">▣</span> Ops Console v1
                 </Link>
+                <Link href="/onboard" className="sidebar-link">
+                  <span className="icon">✦</span> New Client
+                </Link>
                 <Link href="/build" className="sidebar-link">
                   <span className="icon">B</span> Build Console
                 </Link>

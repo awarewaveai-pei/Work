@@ -955,3 +955,126 @@ pre {
   max-height: 300px;
   overflow-y: auto;
 }
+
+/* ── Onboard Wizard ───────────────────────────────────────────── */
+.onboard-wizard {
+  max-width: 860px;
+}
+
+.onboard-progress {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+
+.onboard-progress-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted, #64748b);
+}
+
+.onboard-progress-item.active { color: var(--text-primary, #0f172a); font-weight: 600; }
+.onboard-progress-item.done   { color: #16a34a; }
+
+.onboard-progress-label { font-size: 13px; }
+
+.onboard-progress-sep {
+  color: var(--text-muted, #94a3b8);
+  font-size: 12px;
+  margin: 0 4px;
+}
+
+.onboard-step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--body-bg, #f1f5f9);
+  color: var(--text-muted, #64748b);
+  border: 1px solid var(--card-border, #e2e8f0);
+}
+
+.onboard-step-badge.active {
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border-color: var(--accent, #6366f1);
+}
+
+.onboard-step-badge.done {
+  background: #16a34a;
+  color: #fff;
+  border-color: #16a34a;
+}
+
+.onboard-step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  border-bottom: 1px solid var(--card-border, #e2e8f0);
+}
+
+.onboard-step-header.active {
+  color: var(--text-primary, #0f172a);
+}
+
+.onboard-step-body {
+  padding: 20px;
+}
+
+.onboard-uuid-block {
+  margin-top: 20px;
+  padding: 14px;
+  background: var(--body-bg, #f8fafc);
+  border-radius: 8px;
+  border: 1px solid var(--card-border, #e2e8f0);
+}
+
+.onboard-regen-btn {
+  margin-top: 10px;
+  font-size: 12px;
+  background: none;
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--text-muted, #64748b);
+}
+
+.onboard-regen-btn:hover {
+  background: var(--sidebar-hover, #1e293b);
+  color: #fff;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--btn-secondary-bg, #fff);
+  border: 1px solid var(--btn-secondary-border, #cbd5e1);
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--btn-secondary-text, #0f172a);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  background: var(--body-bg, #f1f5f9);
+}

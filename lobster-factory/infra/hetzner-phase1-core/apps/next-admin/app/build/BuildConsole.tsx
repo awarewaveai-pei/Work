@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   buildConsolePlan,
   type BuildExecutionMode,
@@ -124,6 +125,7 @@ type LiveRunStatus = {
 const TERMINAL_STATUSES = new Set(["completed", "failed", "dispatch_failed", "cancelled", "blocked"]);
 
 export default function BuildConsole() {
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<BuildProfile>("profile_b");
   const [form, setForm] = useState<BuildRunRequest>(PROFILE_DEFAULTS.profile_b);
   const [actorRole, setActorRole] = useState<OpsRole>("operator");
@@ -135,75 +137,32 @@ export default function BuildConsole() {
   const [showIntegrations, setShowIntegrations] = useState(true);
   const [showPrerequisites, setShowPrerequisites] = useState(true);
 
-  // ── Service Provisioning (new client) ──────────────────────────────────────
-  const [provForm, setProvForm] = useState({
-    organizationId: "",
-    workspaceId: "",
-    customerEmail: "",
-    providers: ["sentry", "posthog", "uptime_kuma", "n8n"] as string[],
-    hints: {
-      sentryProjectSlug: "",
-      sentryProjectName: "",
-      posthogProjectName: "",
-      githubRepoName: "",
-      uptimeMonitorUrl: "",
-      uptimeMonitorName: "",
-      n8nWorkflowSuffix: "",
-    },
-  });
-  const [provLoading, setProvLoading] = useState(false);
-  const [provResult, setProvResult] = useState<{
-    ok: boolean;
-    runId?: string | null;
-    providers?: string[];
-    error?: string;
-    detail?: string;
-  } | null>(null);
-
-  const ALL_PROVIDERS: Array<{ id: string; label: string; desc: string }> = [
-    { id: "sentry",     label: "Sentry",      desc: "建立 project + DSN" },
-    { id: "posthog",    label: "PostHog",      desc: "建立 project + API key" },
-    { id: "uptime_kuma",label: "Uptime Kuma",  desc: "建立 HTTP monitor" },
-    { id: "n8n",        label: "n8n",          desc: "複製 onboarding workflow" },
-    { id: "github",     label: "GitHub",       desc: "建立 client repo" },
-    { id: "trigger",    label: "Trigger.dev",  desc: "建立 project + token" },
-    { id: "supabase",   label: "Supabase",     desc: "建立 cloud project" },
-  ];
-
-  const toggleProvider = (id: string) => {
-    setProvForm((f) => ({
-      ...f,
-      providers: f.providers.includes(id)
-        ? f.providers.filter((p) => p !== id)
-        : [...f.providers, id],
-    }));
-  };
-
-  const submitProvisioning = async () => {
-    setProvLoading(true);
-    setProvResult(null);
-    try {
-      const res = await fetch("/api/build/provision-services", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...roleHeader(actorRole) },
-        body: JSON.stringify({
-          organizationId: provForm.organizationId,
-          workspaceId: provForm.workspaceId || undefined,
-          customerEmail: provForm.customerEmail,
-          providers: provForm.providers,
-          hints: Object.fromEntries(
-            Object.entries(provForm.hints).filter(([, v]) => v.trim() !== "")
-          ),
-        }),
-      });
-      const json = await res.json() as typeof provResult;
-      setProvResult(json);
-    } catch (err) {
-      setProvResult({ ok: false, error: err instanceof Error ? err.message : "request_failed" });
-    } finally {
-      setProvLoading(false);
+  // Pre-fill from /onboard Step 4 URL params
+  useEffect(() => {
+    const p = searchParams.get("profile") as BuildProfile | null;
+    if (!p || !PROFILE_DEFAULTS[p]) return;
+    const base = { ...PROFILE_DEFAULTS[p] };
+    const str = (key: string) => searchParams.get(key) ?? undefined;
+    base.clientName    = str("clientName")    ?? base.clientName;
+    base.environment   = (str("environment") as "staging" | "production") ?? base.environment;
+    base.organizationId = str("organizationId") ?? base.organizationId;
+    base.workspaceId   = str("workspaceId")   ?? base.workspaceId;
+    base.projectId     = str("projectId")     ?? base.projectId;
+    base.siteId        = str("siteId")        ?? base.siteId;
+    if (p === "profile_b") {
+      base.domain      = str("domain")        ?? base.domain;
+      base.provider    = (str("provider") as BuildProvider) ?? base.provider;
+      base.packageSlug = (str("packageSlug") as BuildPackageSlug) ?? base.packageSlug;
+      base.locale      = str("locale")        ?? base.locale;
     }
-  };
+    if (p === "profile_c") {
+      base.siteUrl     = str("siteUrl")       ?? base.siteUrl;
+      base.wpAdminUrl  = str("wpAdminUrl")    ?? base.wpAdminUrl;
+    }
+    setProfile(p);
+    setForm({ ...base, executionMode: "enqueue" });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const plan = useMemo(() => buildConsolePlan(form), [form]);
 
