@@ -132,12 +132,13 @@
 - Day 4：串 AO-CLOSE 狀態欄位
 - Day 5：跑一次完整演練（staging -> production 模擬）
 
-## 6) 本輪已指定試點客戶（2026-04-01）
+## 6) 本輪已指定試點客戶（2026-04-01；狀態補記 **2026-05-07**）
 
 ### 既有站接手：Soulful Expression Art Therapy
 - **客戶名稱**：Soulful Expression Art Therapy
 - **類型**：既有網站代操（Production 已運行）
 - **地理/營運**：台灣辦公，規劃跨國組織
+- **Canonical staging URL（repo／ENVIRONMENT_REGISTRY）**：**https://staging.soulfulexpression.org/** — **2026-05-07**：書面台帳與 lifecycle=`provision_pending` 已登記；**雲端實機**仍須操作者依 Pilot A Runbook §2 建立並驗收。
 - **M1 首要動作**：
   1. 建立/確認雲端 `staging`（若 Hostinger 有 staging 功能優先使用）
   2. 盤點 production 版本與外掛，建立 baseline 台帳
@@ -147,15 +148,16 @@
 - **客戶名稱**：Scenery Travel Mongolia
 - **類型**：新客戶（目前僅 IG，尚無正式站）
 - **地理/營運**：公司與團隊在蒙古，客群國際化
+- **Canonical staging URL（repo／提案）**：**https://staging.scenery-travel.mn/** — 網域／主機商拍板後若調整須同步改 registry／SITE_PROFILE；**2026-05-07**：書面已登記；**雲端實機**待 Pilot B Runbook §2。
 - **M1 首要動作**：
-  1. 建立 tenant/site/project 骨架
-  2. 建立雲端 `staging` 站（多語與時區需求先納入）
+  1. 建立 tenant/site/project 骨架 ✅（骨架已完成）
+  2. 建立雲端 `staging` 站（多語與時區需求先納入） 🟡 書面就緒，實機待建立
   3. 補 Discovery：國際客群、語系、付款/法遵、旅遊季節波動
 
 ### 試點成功判定（M1）
-- [ ] Soulful Expression 完成 staging/prod 台帳與 baseline
-- [ ] Scenery Travel Mongolia 完成 tenant 啟動與 staging 可用
-- [ ] AO-RESUME 可直接回報兩案「今日主路徑」（staging/local）
+- [ ] Soulful Expression **書面** staging／prod 台帳齊備（✅ **staging canonical URL 已入 ENVIRONMENT_REGISTRY**）；**baseline（WP／外掛）**仍待 Day 1 盤點；**staging 實機可用**仍待 Runbook §2
+- [ ] Scenery Travel Mongolia tenant 啟動 ✅；**staging 實機可用**仍待 Runbook §2；Discovery 國際欄位仍待客戶訪談
+- [ ] AO-RESUME 可直接回報兩案「今日主路徑」（staging/local）（仍部分依賴本機／隊列敘述）
 
 ### 上線級 Runbook（已建立）
 - `docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md`
@@ -169,7 +171,7 @@
 - `docs/operations/end-of-day-checklist.md`
 - `docs/overview/EXECUTION_DASHBOARD.md`
 
-_Last synced: 2026-04-01_
+_Last synced: 2026-05-07（§6 試點狀態補記）_
 
 ## Related Documents (Auto-Synced)
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`

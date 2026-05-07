@@ -26,6 +26,11 @@
 - **`TASKS.md`**：雙機隊列列補上稽核**完整指令列**與 **`AUDIT RESULT: PASS (no warnings)`** 結案判讀。
 - **本機（桌機）**：工作樹乾淨時複跑 **`machine-environment-audit.ps1 -FetchOrigin -Strict`** → **`AUDIT RESULT: PASS (no warnings)`**。**筆電／另一台**仍須依 §1.5 獨立達成同等 PASS 後，`TASKS`「雙機環境對齊」方可結案。
 
+### Next-Gen v1 試點 — Day 2 書面收口（兩站 staging URL／registry）
+
+- **Soulful**：`https://staging.soulfulexpression.org/` 登入 **`ENVIRONMENT_REGISTRY`**、`SITE_PROFILE`、`02_EXECUTION_PLAN`（🟡；實機仍待 Pilot A §2）。
+- **Scenery**：`https://staging.scenery-travel.mn/` 為 **提案** canonical（待客戶網域確認）；同上檔案補記。**`TASKS`**：原「啟動 Next-Gen…」移至 **`已完成歷程 §2026-05-07`**；新增未完成項「**Day 2 雲端 staging 實機驗收**」。**`NEXT_GEN_DELIVERY_BLUEPRINT_V1.md` §6** 已對齊敘述。
+
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:a0864551d4aa2c1c063c13bf1ea131ccad51b79ec6948ab12ee03b5243e5efd7 -->

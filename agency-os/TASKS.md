@@ -54,17 +54,16 @@
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：**兩台皆須在 **monorepo 根**執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict`**，且輸出為 **`AUDIT RESULT: PASS (no warnings)`**（`-Strict` 下 dirty tree／缺 gh／缺 vault 等常見項會變 FAIL）；任一台未 PASS 則本條不結案。**另一台實體機：**請該機操作者依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5** 全文逐步做（代理無法遠端代跑）；濃縮順序 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**「另一台實體機 — 執行順序（摘要）」。開機／hook／pull 敘事正本 → **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（§2、§2.5.1）。
 - [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度：**repo 已 **`syncEnvVars`**、鎖 CLI **`4.4.4`**、README／腳本齊；曾完成 **環境變數同步**，**缺**在 **EU** 對 **`registry:5000`** **映像 push**（見 **`lobster-factory/infra/trigger/README.md` §7a**）。**阻塞：**須 **EU 主機 SSH／registry 連線**（或 tunnel）由操作者就緒後方能 **`deploy-workflows.ps1`**／**`npx trigger.dev@4.4.4 deploy`**；代理無法代替登入 VPS。
 - [ ] **phase1 WordPress（SG）PostHog MU** —— **【進行中】** **進度：****repo** 已入 MU **`posthog.php`** + compose **`NEXT_PUBLIC_POSTHOG_*`**。**下一步：**SG **`docker compose build wordpress && docker compose up -d wordpress`**（或等價）→ 公開頁驗證載入。
-- [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3） —— **【進行中】** **進度（2026-05-01）：**試點已選定：Soulful Expression（既有站接手）+ Scenery Travel Mongolia（新站建置）；兩站 tenant 骨架已建立。**下一步：**兩站各完成 Day 2（staging 建立）。
-  - 參考：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
-  - 本項目標：先選 2 個試點（1 既有站接手 + 1 新站建置）
-- [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-01）：**tenant 骨架完整（sites/ + projects/ 全部檔案建立）；Day 1 盤點項目需 **操作者** 登入 Hostinger/WP 填入。**下一步：**操作者執行 Runbook §1.1–1.3（權限＋基線盤點）並回填 10_DISCOVERY + ENVIRONMENT_REGISTRY。
+- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
+  - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（兩 tenant）、各案 `02_EXECUTION_PLAN.md` Day 2 記錄、`SITE_PROFILE.md`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
+- [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。
   - 本項目標：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）
-- [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-01）：**tenant 骨架完整（19 個檔案）；Discovery 骨架建立，客戶資料欄位待補（需與客戶訪談）；Day 2 staging 待選定主機商後執行。
+- [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。**下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
   - 本項目標：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊）
 - [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中】** **進度（2026-05-01）：**專案骨架（10_DISCOVERY、01–03 文件、sites/ 三檔）已建立。**阻塞（操作者必做）：**需登入 Hostinger + WP 後台執行 §1.1–1.2 並回填 `10_DISCOVERY.md`、`core/ENVIRONMENT_REGISTRY.md`（**代理無法代登入**第三方主機／WP）。
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節
   - 產出：權限與基線盤點
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-01）：**tenant 骨架 + Discovery 骨架完成（Runbook §1 骨架部分完成）。**下一步：**與客戶確認素材，選定主機商 → Day 2 staging 建立。
+- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架 + Discovery 骨架完成。**下一步：**與客戶確認素材與頂級網域，選定主機商 → 銜接 **`TASKS`**「Day 2 雲端 staging 實機驗收」。
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md` 第 1~2 節
   - 產出：新站 staging 啟動條件
 - [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
@@ -96,6 +95,13 @@
   - DoD：2 個測試角色登入後，看到不同權限結果
 
 ## Next — 已完成歷程（查詢用）
+
+### 2026-05-07 — Next-Gen v1 試點：Day 2 書面子交付（registry／URL）
+
+- [x] **啟動 Next-Gen 升級藍圖 v1（M1→M3）— M1 試點 + Day 2「書面 staging」階段（2026-05-07）**
+  - **試點：**Soulful Expression（既有站接手）+ Scenery Travel Mongolia（新站建置）；tenant 骨架先前已建立。
+  - **本輪交付：**兩站 **canonical staging URL** 寫入各 tenant **`core/ENVIRONMENT_REGISTRY.md`**、`sites/*/SITE_PROFILE.md`、專案 **`02_EXECUTION_PLAN.md` Day 2**；**`NEXT_GEN_DELIVERY_BLUEPRINT_V1.md` §6** 補記現況（🟡＝書面就緒，實機待 Runbook）。
+  - **未宣稱完成：**雲端 staging **實機**（DNS／SSL／WP 可登入）——見 **`### 未完成`**「**Next-Gen 試點 — Day 2 雲端 staging 實機驗收**」。
 
 ### 2026-05-07 — Git `main` 與 `origin/main` 對齊（滯後文案收口）
 

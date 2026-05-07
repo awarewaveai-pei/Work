@@ -8,7 +8,7 @@
 | Day | 目標 | 狀態 | 完成日期 |
 |-----|------|------|---------|
 | Day 1 | tenant/site/project 骨架 + Discovery | ✅ 骨架完成（2026-05-01）| 2026-05-01 |
-| Day 2 | 建立雲端 Staging + WP 基線 | 🔲 待執行 | 待補 |
+| Day 2 | 建立雲端 Staging + WP 基線 | 🟡 **台帳／canonical staging URL 已登記（2026-05-07）**；主機與實機仍待 Runbook §2 | 2026-05-07（書面） |
 | Day 3 | 內容 + 轉換路徑驗證 | 🔲 待執行 | 待補 |
 | Day 4 | Pre-Production Gate 全通過 | 🔲 待執行 | 待補 |
 | Day 5 | Production 首次上線 | 🔲 待執行 | 待補 |
@@ -22,10 +22,10 @@
 - WORKLOG 連結：`WORKLOG.md ## 2026-05-01`
 
 ### Day 2 記錄
-- Staging URL：待補
-- 主機供應商：待確定
-- WP 安裝方式：待補
-- 驗收結果：待補
+- **Canonical staging URL（repo 提案）**：`https://staging.scenery-travel.mn/` — 見 `core/ENVIRONMENT_REGISTRY.md`（網域若調整請同步改 registry／SITE_PROFILE）
+- 主機供應商：仍待選定（與客戶／Discovery §網域欄位對齊後決策）
+- WP 安裝方式：待主機商確定後依 Runbook Pilot B §2
+- **驗收結果**：🔲 待實機（後台可登入 + 首頁渲染）
 
 ## 阻塞記錄
 | 日期 | 阻塞描述 | 解法 / 決策 |

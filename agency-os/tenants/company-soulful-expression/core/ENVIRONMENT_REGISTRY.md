@@ -6,16 +6,16 @@
 
 | Environment | URL | Hosting Provider | Region | WP Version | PHP Version | DB Engine | Backup Location | Last Backup | Last Restore Test | Owner | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| staging | 待補（Day 2） | Hostinger (planned) | APAC | 待補 | 待補 | MySQL/MariaDB (planned) | 待補 | 待補 | 待補 | Agency OS | 建立後作為唯一變更入口 |
+| staging | **https://staging.soulfulexpression.org/**（canonical） | Hostinger（預設） | APAC | 待實機 | 待實機 | MySQL/MariaDB | 待實機 | 待實機 | 待實機 | Agency OS | **lifecycle=`provision_pending`**（Runbook Pilot A §2）；實機建立後改 `live` 並回填 WP/PHP。**禁止**在未備份前直接改 production。 |
 | production | https://soulfulexpression.org/ | Hostinger | APAC | 待盤點 | 待盤點 | 待盤點 | 待盤點 | 待盤點 | 待盤點 | Client + Agency OS | 既有運行站 |
 
 ## DNS and SSL
 
 | Item | Staging | Production | Owner | Verified Date |
 |---|---|---|---|---|
-| DNS zone access | 待補 | 待補 | 待補 |  |
-| SSL certificate valid | 待補 | 待補 | 待補 |  |
-| CDN/cache config | 待補 | 待補 | 待補 |  |
+| DNS zone access | **預期**：`staging.soulfulexpression.org` → Hostinger／CDN（§2） | Hostinger | 待補 |  |
+| SSL certificate valid | 待實機建立後驗證 | 待盤點 | 待補 |  |
+| CDN/cache config | 建議 Basic Auth／access rule（§2） | 待盤點 | 待補 |  |
 
 ## Change Control
 

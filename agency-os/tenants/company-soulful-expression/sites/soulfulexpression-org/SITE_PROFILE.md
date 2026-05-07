@@ -4,7 +4,7 @@
 - Site: soulfulexpression-org
 - Stage: Live
 - Production URL: https://soulfulexpression.org/
-- Staging URL: 待補（Day 2 建立）
+- Staging URL（canonical，見 `core/ENVIRONMENT_REGISTRY.md`）: **https://staging.soulfulexpression.org/** — **lifecycle：**書面已登記；雲端實機仍待 Runbook Pilot A §2
 - Hosting: Hostinger
 - Region: APAC
 - WP Version: 待補（Day 1 盤點）
