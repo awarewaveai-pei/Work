@@ -192,9 +192,10 @@ The smoke test runs eight checks (see script header). Exit 0 = all green.
 
 ## 12. Related documents
 
+- `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE_OPERATIONS.md` — **operator manual** (roles / functions / settings / troubleshooting)
+- `agency-os/docs/operations/TELEGRAM_COMMAND_POLICY.md` — Telegram-specific authentication and rate-limiting policy
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` — tool / MCP boundary spec
 - `agency-os/docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md` — 30-year execution contract
-- `agency-os/docs/operations/TELEGRAM_COMMAND_POLICY.md` — Telegram-specific authentication and rate-limiting policy
 - `agency-os/docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md` — Sentry / PostHog / Uptime Kuma baseline this plane reuses
 
 _Last updated: 2026-05-07_
