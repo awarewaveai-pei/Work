@@ -4,6 +4,16 @@
 
 ## 2026-05-08
 
+### Trigger.dev Workflows 補強（env sync + infra schedule + TASK_REFERENCE）
+
+- **問題**：`trigger.config.ts` `syncEnvVars` 僅同步 4 個變數（PostHog + OPS_INBOX + AWAREWAVE_URL），`LOBSTER_SUPABASE_URL` / `LOBSTER_SUPABASE_SERVICE_ROLE_KEY` / `N8N_URL` / `TRIGGER_API_URL` 等核心 env 未自動同步至 Trigger.dev server，導致所有 DB-write task 在雲端無法執行。
+- **修正 1 — `trigger.config.ts` syncEnvVars 擴充**：新增 18 個 env var 分組（Supabase、Lobster flags、infra endpoints、tenant provisioning 各 provider、AO org ID）。Pattern 一致：只在本機有值時才 push，不覆蓋空值，不破壞既有 Trigger 環境變數設定。
+- **修正 2 — `ao-infrastructure-check.ts` 新增每日排程**：`aoInfrastructureCheckSchedule`（`0 4 * * *` = 每日 04:00 UTC / 12:00 TPE）自動觸發基礎設施健檢，結果留存 Trigger.dev Runs。
+- **修正 3 — `index.ts` 補出口**：加入 `aoInfrastructureCheckSchedule` export，使其出現於 Trigger.dev Schedules tab。
+- **新增 `lobster-factory/infra/trigger/TASK_REFERENCE.md`**：每個 task 的用途說明、所需 env vars 表格、copy-paste 測試 payload、chaining 流程（`create-wp-site` → `apply-manifest` 手動鏈）、deploy 指令。
+- **不做的事（記錄）**：`create-wp-site` → `apply-manifest` 自動鏈 — Phase 2 才做，因 shell 執行需 Trigger worker 與 WP 在同機；`adopt-client-os` audit stub — Phase 2 SSH/WP-CLI 問題；`dispatch-action-run-schedule` 每分鐘 — 設計正確，不動。
+- AUTO_TASK_DONE: Trigger.dev workflows 補強（syncEnvVars + ao-infra-schedule + TASK_REFERENCE）
+
 ### validate-doc-integrity.mjs — 機器獨立路徑修正
 
 - **問題**：`lobster-factory/docs/` 下多個檔案含硬編 `D:\Work\...` 路徑（舊桌機），新機器執行時指向不存在位置。
