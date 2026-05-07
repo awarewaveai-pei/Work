@@ -1,6 +1,6 @@
 # Lobster Factory Master V3 Integration Plan
 
-> Source: `D:\Work\docs\spec\raw\LOBSTER_FACTORY_MASTER_V3.md`  
+> Source: `<WORK_ROOT>\docs\spec\raw\LOBSTER_FACTORY_MASTER_V3.md`  
 > Purpose: convert V3 vision spec into executable milestones in current repo.
 
 ## 1) Integration Principles

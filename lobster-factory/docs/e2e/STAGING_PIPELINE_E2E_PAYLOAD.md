@@ -38,9 +38,9 @@
 一鍵輸出（同欄位）：
 
 ```powershell
-cd D:\Work\lobster-factory
+cd <WORK_ROOT>\lobster-factory
 npm run payload:create-wp-site -- --siteName=demo-staging-site
-npm run payload:apply-manifest -- --wpRootPath="D:\Work\dummy"
+npm run payload:apply-manifest -- --wpRootPath="<WORK_ROOT>\dummy"
 ```
 
 ## Trigger `apply-manifest` JSON body（範例）
@@ -52,7 +52,7 @@ npm run payload:apply-manifest -- --wpRootPath="D:\Work\dummy"
   "projectId": "33333333-3333-3333-3333-333333333333",
   "siteId": "44444444-4444-4444-4444-444444444444",
   "environmentId": "55555555-5555-5555-5555-555555555555",
-  "wpRootPath": "D:\\\\path\\\\to\\\\wordpress",
+  "wpRootPath": "<path\\\\to\\\\wordpress>",
   "manifestPath": "packages/manifests/wc-core.json",
   "environmentType": "staging"
 }
@@ -70,11 +70,11 @@ npm run payload:apply-manifest -- --wpRootPath="D:\Work\dummy"
 ## 一鍵回歸（不需 WP）
 
 ```powershell
-node D:\Work\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast
+node <WORK_ROOT>\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast
 ```
 
 ## 含 shell 預覽（需 bash + 有效 `wpRootPath`）
 
 ```powershell
-node D:\Work\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast --wpRootPath="D:\path\to\wordpress"
+node <WORK_ROOT>\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast --wpRootPath="<path\to\wordpress>"
 ```

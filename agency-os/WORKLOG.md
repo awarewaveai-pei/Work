@@ -4,6 +4,23 @@
 
 ## 2026-05-08
 
+### validate-doc-integrity.mjs — 機器獨立路徑修正
+
+- **問題**：`lobster-factory/docs/` 下多個檔案含硬編 `D:\Work\...` 路徑（舊桌機），新機器執行時指向不存在位置。
+- **修正範圍**：`OPERABLE_E2E_PLAYBOOK.md`、`STAGING_PIPELINE_E2E_PAYLOAD.md`、`LOBSTER_FACTORY_CHECKLIST.md`、`LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`、`ONE_CLICK_BUILD_SOP.md`、`ONE_CLICK_BUILD_SYSTEM.md`、`C1_EXECUTION_RUNBOOK.md`、`LOBSTER_FACTORY_MASTER_V3_INTEGRATION_PLAN.md`、`operations/LOCAL_ARTIFACTS_SINK.md`、`operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md`。
+- **替換規則**：`D:\Work\lobster-factory` → `<WORK_ROOT>\lobster-factory`；`D:\Work` 獨立 → `<WORK_ROOT>`；`D:\Work\dummy` → `<WORK_ROOT>\dummy`；`D:\path\to\wordpress` → `<path\to\wordpress>`。
+- **驗證**：`node lobster-factory/scripts/validate-doc-integrity.mjs` → `Doc integrity PASSED`。
+- AUTO_TASK_DONE: validate-doc-integrity 機器路徑修正（`D:\Work` → `<WORK_ROOT>`）
+
+### Claude 自動化強化（新增 slash commands + agents + Remote Routine）
+
+- **新增 slash commands**：`/vault-sync`、`/vault-status`、`/checkpoint`、`/tasks`、`/recap`（`.claude/commands/`）。
+- **新增 agents**：`trigger-deploy-agent`（Trigger.dev EU 部署，`tr_pat_*` PAT 防呆）；`repair-agent` 補強 vault/env 對齊診斷。
+- **更新 CLAUDE.md**：commands table 7→12；agents table 新增 trigger-deploy-agent；repair-agent 描述更新。
+- **ao-close.md**：補 Step 4「更新 memory/daily/YYYY-MM-DD.md」。
+- **Remote Routine 建立**：`AgencyOS-DailyBriefing`（ID: `trig_01XoSCqJQu6DDKVJw6Lvobpd`）— 每日 08:00 TPE 建立 daily scaffold + open tasks，commit + push。
+- AUTO_TASK_DONE: Claude automation 強化（新 commands、agents、daily briefing routine）
+
 ### Trigger.dev `infra/trigger/README.md`（金鑰命名釐清）
 
 - **§7**：與 [Trigger API keys](https://trigger.dev/docs/apikeys) 對齊——**`tr_prod_*`**（Production secret）→ 應用／SDK 的 **`TRIGGER_SECRET_KEY`**；**`tr_pat_*`**（PAT）→ **`TRIGGER_ACCESS_TOKEN`**（`login`／`deploy`／CI）；建立 PAT 於 **`{APP_ORIGIN}/account/tokens`**。

@@ -307,20 +307,20 @@
 ### E1. 現有驗收命令（保留）
 
 ```powershell
-node D:\Work\lobster-factory\scripts\bootstrap-validate.mjs
-node D:\Work\lobster-factory\scripts\validate-manifests.mjs
-node D:\Work\lobster-factory\scripts\validate-governance-configs.mjs
-node D:\Work\lobster-factory\scripts\validate-workflow-runs-write.mjs --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --projectId=33333333-3333-3333-3333-333333333333 --siteId=44444444-4444-4444-4444-444444444444
-node D:\Work\lobster-factory\scripts\validate-package-install-runs-flow.mjs --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --siteId=44444444-4444-4444-4444-444444444444 --environmentId=55555555-5555-5555-5555-555555555555 --workflowRunId=66666666-6666-6666-6666-666666666666
-node D:\Work\lobster-factory\scripts\validate-db-write-resilience.mjs
-node D:\Work\lobster-factory\scripts\dryrun-apply-manifest.mjs --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --projectId=33333333-3333-3333-3333-333333333333 --siteId=44444444-4444-4444-4444-444444444444 --environmentId=55555555-5555-5555-5555-555555555555 --wpRootPath="D:\Work\dummy" --environmentType=staging
-node D:\Work\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mode=strict --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --projectId=33333333-3333-3333-3333-333333333333 --siteId=44444444-4444-4444-4444-444444444444 --environmentId=55555555-5555-5555-5555-555555555555 --wpRootPath="D:\Work\dummy" --environmentType=staging
-node D:\Work\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast
-node D:\Work\lobster-factory\scripts\emit-staging-drill-report.mjs
-node D:\Work\lobster-factory\scripts\print-create-wp-site-payload.mjs
-node D:\Work\lobster-factory\scripts\print-apply-manifest-payload.mjs
-cd D:\Work\lobster-factory; npm run operator:sanity
-node D:\Work\lobster-factory\scripts\validate-operable-e2e-skeleton.mjs
+node <WORK_ROOT>\lobster-factory\scripts\bootstrap-validate.mjs
+node <WORK_ROOT>\lobster-factory\scripts\validate-manifests.mjs
+node <WORK_ROOT>\lobster-factory\scripts\validate-governance-configs.mjs
+node <WORK_ROOT>\lobster-factory\scripts\validate-workflow-runs-write.mjs --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --projectId=33333333-3333-3333-3333-333333333333 --siteId=44444444-4444-4444-4444-444444444444
+node <WORK_ROOT>\lobster-factory\scripts\validate-package-install-runs-flow.mjs --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --siteId=44444444-4444-4444-4444-444444444444 --environmentId=55555555-5555-5555-5555-555555555555 --workflowRunId=66666666-6666-6666-6666-666666666666
+node <WORK_ROOT>\lobster-factory\scripts\validate-db-write-resilience.mjs
+node <WORK_ROOT>\lobster-factory\scripts\dryrun-apply-manifest.mjs --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --projectId=33333333-3333-3333-3333-333333333333 --siteId=44444444-4444-4444-4444-444444444444 --environmentId=55555555-5555-5555-5555-555555555555 --wpRootPath="<WORK_ROOT>\dummy" --environmentType=staging
+node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mode=strict --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --projectId=33333333-3333-3333-3333-333333333333 --siteId=44444444-4444-4444-4444-444444444444 --environmentId=55555555-5555-5555-5555-555555555555 --wpRootPath="<WORK_ROOT>\dummy" --environmentType=staging
+node <WORK_ROOT>\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast
+node <WORK_ROOT>\lobster-factory\scripts\emit-staging-drill-report.mjs
+node <WORK_ROOT>\lobster-factory\scripts\print-create-wp-site-payload.mjs
+node <WORK_ROOT>\lobster-factory\scripts\print-apply-manifest-payload.mjs
+cd <WORK_ROOT>\lobster-factory; npm run operator:sanity
+node <WORK_ROOT>\lobster-factory\scripts\validate-operable-e2e-skeleton.mjs
 ```
 
 ### E2. v1.2 新增驗收命令（待建立，對應 C6）
@@ -329,22 +329,22 @@ node D:\Work\lobster-factory\scripts\validate-operable-e2e-skeleton.mjs
 
 ```powershell
 # C6-1：命名規範稽核
-node D:\Work\lobster-factory\scripts\audit-naming-conventions.mjs
+node <WORK_ROOT>\lobster-factory\scripts\audit-naming-conventions.mjs
 
 # C6-4：Idempotency Key 結構驗證
-node D:\Work\lobster-factory\scripts\validate-idempotency-keys.mjs
+node <WORK_ROOT>\lobster-factory\scripts\validate-idempotency-keys.mjs
 
 # C6-5：Plugin Registry 完整性驗證（manifest 中的 slug 是否都已登錄）
-node D:\Work\lobster-factory\scripts\validate-plugin-registry.mjs
+node <WORK_ROOT>\lobster-factory\scripts\validate-plugin-registry.mjs
 
 # C6-7：Provider Adapter Contract Tests
-cd D:\Work\lobster-factory; npx vitest run packages/workflows/src/hosting/__tests__/providerAdapterContract.test.ts
+cd <WORK_ROOT>\lobster-factory; npx vitest run packages/workflows/src/hosting/__tests__/providerAdapterContract.test.ts
 
 # C6-3：Restore Test（staging 環境）
-node D:\Work\lobster-factory\scripts\run-restore-test.mjs --siteId=44444444-4444-4444-4444-444444444444 --environment=staging
+node <WORK_ROOT>\lobster-factory\scripts\run-restore-test.mjs --siteId=44444444-4444-4444-4444-444444444444 --environment=staging
 
 # C6-8：Client Offboarding Dry Run
-node D:\Work\lobster-factory\scripts\dryrun-client-offboarding.mjs --clientId=CLIENT_UUID
+node <WORK_ROOT>\lobster-factory\scripts\dryrun-client-offboarding.mjs --clientId=CLIENT_UUID
 ```
 
 ---
@@ -385,7 +385,7 @@ node D:\Work\lobster-factory\scripts\dryrun-client-offboarding.mjs --clientId=CL
 
 ## H) MASTER V3 整合追蹤（2026-03 啟用）
 
-- [x] H1. 匯入來源文件：`D:\Work\docs\spec\raw\LOBSTER_FACTORY_MASTER_V3.md`
+- [x] H1. 匯入來源文件：`<WORK_ROOT>\docs\spec\raw\LOBSTER_FACTORY_MASTER_V3.md`
 - [x] H2. 建立整合計畫：`docs/LOBSTER_FACTORY_MASTER_V3_INTEGRATION_PLAN.md`
 - [x] H3. 依 V3 建立缺口模組骨架（Sales/Marketing/Partner/Media/Decision Engine/Merchandising；`0007_v3_skeleton_modules.sql` + `v3-skeleton.ts` + `v3-module-skeleton-workflows.ts` + `V3_MODULE_SKELETONS.md`）→ v1.2 Section 6.2
 - [x] H4. 補 Decision Engine baseline（recommendations schema + workflow skeleton；`0008_decision_engine_recommendations.sql` + `decision-engine-baseline.ts`）→ v1.2 Section 25

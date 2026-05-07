@@ -782,14 +782,14 @@ If the tools host is protected by Basic Auth or Cloudflare Access, unauthenticat
 Next app build:
 
 ```powershell
-cd D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin
+cd <WORK_ROOT>\lobster-factory\infra\hetzner-phase1-core\apps\next-admin
 cmd /c npm run build
 ```
 
 Run dev server:
 
 ```powershell
-cd D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin
+cd <WORK_ROOT>\lobster-factory\infra\hetzner-phase1-core\apps\next-admin
 cmd /c node node_modules\next\dist\bin\next dev -H 127.0.0.1 -p 3002
 ```
 

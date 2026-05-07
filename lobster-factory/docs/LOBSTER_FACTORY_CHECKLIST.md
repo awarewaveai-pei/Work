@@ -213,25 +213,25 @@
 ### 現有命令
 
 ```powershell
-node D:\Work\lobster-factory\scripts\bootstrap-validate.mjs
-node D:\Work\lobster-factory\scripts\validate-manifests.mjs
-node D:\Work\lobster-factory\scripts\validate-governance-configs.mjs
-node D:\Work\lobster-factory\scripts\dryrun-apply-manifest.mjs --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --projectId=33333333-3333-3333-3333-333333333333 --siteId=44444444-4444-4444-4444-444444444444 --environmentId=55555555-5555-5555-5555-555555555555 --wpRootPath="D:\Work\dummy" --environmentType=staging
-node D:\Work\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mode=strict --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --projectId=33333333-3333-3333-3333-333333333333 --siteId=44444444-4444-4444-4444-444444444444 --environmentId=55555555-5555-5555-5555-555555555555 --wpRootPath="D:\Work\dummy" --environmentType=staging
-node D:\Work\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast
-node D:\Work\lobster-factory\scripts\emit-staging-drill-report.mjs
-cd D:\Work\lobster-factory; npm run operator:sanity
-node D:\Work\lobster-factory\scripts\validate-operable-e2e-skeleton.mjs
+node <WORK_ROOT>\lobster-factory\scripts\bootstrap-validate.mjs
+node <WORK_ROOT>\lobster-factory\scripts\validate-manifests.mjs
+node <WORK_ROOT>\lobster-factory\scripts\validate-governance-configs.mjs
+node <WORK_ROOT>\lobster-factory\scripts\dryrun-apply-manifest.mjs --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --projectId=33333333-3333-3333-3333-333333333333 --siteId=44444444-4444-4444-4444-444444444444 --environmentId=55555555-5555-5555-5555-555555555555 --wpRootPath="<WORK_ROOT>\dummy" --environmentType=staging
+node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mode=strict --organizationId=11111111-1111-1111-1111-111111111111 --workspaceId=22222222-2222-2222-2222-222222222222 --projectId=33333333-3333-3333-3333-333333333333 --siteId=44444444-4444-4444-4444-444444444444 --environmentId=55555555-5555-5555-5555-555555555555 --wpRootPath="<WORK_ROOT>\dummy" --environmentType=staging
+node <WORK_ROOT>\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast
+node <WORK_ROOT>\lobster-factory\scripts\emit-staging-drill-report.mjs
+cd <WORK_ROOT>\lobster-factory; npm run operator:sanity
+node <WORK_ROOT>\lobster-factory\scripts\validate-operable-e2e-skeleton.mjs
 ```
 
 ### 待建立命令（C6 完成後）
 
 ```powershell
-node D:\Work\lobster-factory\scripts\audit-naming-conventions.mjs
-node D:\Work\lobster-factory\scripts\validate-idempotency-keys.mjs
-node D:\Work\lobster-factory\scripts\validate-plugin-registry.mjs
-node D:\Work\lobster-factory\scripts\run-restore-test.mjs --siteId=44444444-4444-4444-4444-444444444444 --environment=staging
-node D:\Work\lobster-factory\scripts\dryrun-client-offboarding.mjs --clientId=CLIENT_UUID
+node <WORK_ROOT>\lobster-factory\scripts\audit-naming-conventions.mjs
+node <WORK_ROOT>\lobster-factory\scripts\validate-idempotency-keys.mjs
+node <WORK_ROOT>\lobster-factory\scripts\validate-plugin-registry.mjs
+node <WORK_ROOT>\lobster-factory\scripts\run-restore-test.mjs --siteId=44444444-4444-4444-4444-444444444444 --environment=staging
+node <WORK_ROOT>\lobster-factory\scripts\dryrun-client-offboarding.mjs --clientId=CLIENT_UUID
 ```
 
 ## F) 重讀結論

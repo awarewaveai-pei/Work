@@ -16,7 +16,7 @@ npm run operator:sanity
 - **PASS**：代表結構、manifest/governance、dryrun 合約、hosting/artifact 閘道、**A10 E2E 劇本骨架**、regression 皆綠。
 - **FAIL**：先看最後一段錯誤訊息；常見為某檔被刪、doc 連結斷、或 dryrun 合約與 catalog UUID 不一致。
 
-全 monorepo（含 Agency health）在 `D:\Work`：
+全 monorepo（含 Agency health）在 `<WORK_ROOT>`：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1

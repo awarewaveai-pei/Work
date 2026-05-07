@@ -9,7 +9,7 @@ LOBSTER_ARTIFACTS_MODE=local
 ```
 
 Plus one of:
-- `LOBSTER_WORK_ROOT=D:\Work` → writes under `agency-os/reports/artifacts/lobster/apply-manifest/<workflowRunId>/`
+- `LOBSTER_WORK_ROOT=<WORK_ROOT>` → writes under `agency-os/reports/artifacts/lobster/apply-manifest/<workflowRunId>/`
 - or `LOBSTER_ARTIFACTS_BASE_DIR=<absolute path>` (full control)
 
 ## Layout

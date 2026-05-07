@@ -52,9 +52,9 @@ https://app.aware-wave.com/build
 - `LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM`嚗身閮?
 - `LOBSTER_FACTORY_MASTER_CHECKLIST_v2`嚗祕雿脣漲嚗?- `LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST_v1.4`嚗銵?撽嚗?
 ### 3.2 ?祆?/Repo ?亙熒嚗obster-factory嚗?
-撌乩??桅?嚗D:\Work\lobster-factory`嚗?雿?clone ?祕?楝敺???
+撌乩??桅?嚗<WORK_ROOT>\lobster-factory`嚗?雿?clone ?祕?楝敺???
 ```powershell
-cd D:\Work\lobster-factory
+cd <WORK_ROOT>\lobster-factory
 npm run operator:sanity
 ```
 
@@ -62,7 +62,7 @@ npm run operator:sanity
 ### 3.3 頝?Repo Gate嚗?賂?Work ?寧??
 
 ```powershell
-cd D:\Work
+cd <WORK_ROOT>
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 ```
 
@@ -124,7 +124,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 
 ### 6.3 銝?萇??Trigger payload嚗葫閰?CI嚗?
 ```powershell
-cd D:\Work\lobster-factory
+cd <WORK_ROOT>\lobster-factory
 npm run payload:create-wp-site
 npm run payload:apply-manifest
 ```

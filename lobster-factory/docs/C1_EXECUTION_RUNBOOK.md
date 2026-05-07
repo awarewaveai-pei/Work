@@ -4,7 +4,7 @@
 > Goal: execute the full DB write validation path in a deterministic order with minimal risk.
 
 ## 0) Prerequisites
-- Run from `D:\Work\lobster-factory`
+- Run from `<WORK_ROOT>\lobster-factory`
 - Node runtime available
 - Supabase credentials ready for execute mode:
   - `LOBSTER_SUPABASE_URL`

@@ -10,14 +10,14 @@
 在 `lobster-factory`：
 
 ```powershell
-cd D:\Work\lobster-factory
+cd <WORK_ROOT>\lobster-factory
 npm run operator:sanity
 ```
 
 或 monorepo 根（含 Agency health）：
 
 ```powershell
-cd D:\Work
+cd <WORK_ROOT>
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 ```
 
@@ -26,9 +26,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
 ## 1) 產出 Trigger／手動測試用 JSON
 
 ```powershell
-cd D:\Work\lobster-factory
+cd <WORK_ROOT>\lobster-factory
 npm run payload:create-wp-site -- --siteName=demo-staging-site
-npm run payload:apply-manifest -- --wpRootPath="D:\Work\dummy"
+npm run payload:apply-manifest -- --wpRootPath="<WORK_ROOT>\dummy"
 ```
 
 **證據**：兩段 stdout 皆為合法 JSON（可貼 Trigger 測試面板或存成 artifact）。
@@ -38,7 +38,7 @@ npm run payload:apply-manifest -- --wpRootPath="D:\Work\dummy"
 已含在 `operator:sanity` 內之 regression。單獨重跑：
 
 ```powershell
-node D:\Work\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast
+node <WORK_ROOT>\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast
 ```
 
 **證據**：exit **0**；最後一行含 `PASSED` 或腳本慣例成功訊息。
@@ -46,7 +46,7 @@ node D:\Work\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=
 ## 3) 可選 — 真 shell 預覽（bash + 有效 `wpRootPath`）
 
 ```powershell
-node D:\Work\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast --wpRootPath="D:\path\to\wordpress"
+node <WORK_ROOT>\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=fast --wpRootPath="<path\to\wordpress>"
 ```
 
 **證據**：同上；若有 `execute-apply-manifest-staging` DRY 輸出，保留 log 片段。
@@ -68,7 +68,7 @@ node D:\Work\lobster-factory\scripts\run-staging-pipeline-regression.mjs --mode=
 等同執行 `scripts/emit-staging-drill-report.mjs`：
 
 ```powershell
-cd D:\Work\lobster-factory
+cd <WORK_ROOT>\lobster-factory
 npm run drill:staging-report
 ```
 
