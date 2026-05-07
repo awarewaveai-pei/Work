@@ -8,6 +8,8 @@ import type { CommandSource, PolicyDecision, RiskLevel } from "./types";
 // only accepts [a-z0-9_] for the slash-menu. Keep parser lenient elsewhere.
 const RISK_TABLE: Record<string, RiskLevel> = {
   // low: read-only or text-producing, safe from any source
+  "/start": "low",
+  "/help": "low",
   "/status": "low",
   "/health": "low",
   "/daily_review": "low",
