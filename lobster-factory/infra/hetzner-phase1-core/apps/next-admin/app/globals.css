@@ -526,7 +526,36 @@ pre {
 
 /* ── Service Provisioning panel ─────────────────────────────────────────── */
 .build-provision-panel {
-  margin-top: 24px;
+  margin-top: 8px;
+}
+
+.build-step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 32px;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.build-step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--accent, #3b82f6);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .build-provider-grid {

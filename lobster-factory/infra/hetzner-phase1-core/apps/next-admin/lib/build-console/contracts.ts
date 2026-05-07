@@ -259,10 +259,12 @@ function profileAPlan(input: BuildRunRequest, environment: BuildEnvironment): Bu
     smokeProfile: "internal",
     stages: [
       { id: "precheck", label: "Control-plane precheck", gate: "Required env and service endpoints are present", automation: "automated" },
+      { id: "supabase_sep", label: "Supabase staging/production separation check", gate: "Staging and production Supabase projects are confirmed separate with no shared service role keys", automation: "automated" },
       { id: "rls", label: "Tenant isolation smoke", gate: "Supabase RLS smoke returns no cross-tenant leak", automation: "automated" },
       { id: "edge", label: "Cloudflare Access check", gate: "Internal tools are behind Access or an equivalent policy", automation: "automated" },
-      { id: "monitoring", label: "Monitoring check", gate: "Sentry, PostHog, Uptime Kuma, and Netdata rules match hosting mode", automation: "automated" },
-      { id: "report", label: "AO status report", gate: "ao_health_checks evidence is written or exported", automation: "automated" },
+      { id: "monitoring", label: "Service health check", gate: "Trigger.dev, n8n, Sentry, PostHog, and Uptime Kuma health checks pass", automation: "automated" },
+      { id: "netdata", label: "Netdata check (self-managed servers)", gate: "Netdata alerts and dashboards are configured for AO-managed infrastructure", automation: "automated" },
+      { id: "report", label: "AO infrastructure status report", gate: "ao_health_checks evidence is written or exported", automation: "automated" },
     ],
     requiredEvidence: [
       "Supabase staging and production separation",
@@ -318,6 +320,7 @@ function profileBPlan(input: BuildRunRequest, environment: BuildEnvironment): Bu
       { id: "monitoring", label: "Register monitoring", gate: "Uptime Kuma, SSL, and tracking checks pass", automation: "automated" },
       { id: "smoke", label: "Run smoke tests", gate: `${smokeProfile} smoke profile is all green`, automation: "automated" },
       { id: "handoff", label: "Generate handoff", gate: "handoff report JSON is available", automation: "automated" },
+      { id: "approval_gate", label: "Request approval before production promotion", gate: "Production promotion is approval-gated; owner or admin must approve before any production deploy", automation: "approval" },
     ],
     requiredEvidence: [
       "confirmed no existing WordPress site",
