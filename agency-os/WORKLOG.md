@@ -43,7 +43,7 @@
 - **Soulful**：`https://staging.soulfulexpression.org/` 已寫入 **`ENVIRONMENT_REGISTRY`**、`SITE_PROFILE`、`02_EXECUTION_PLAN`、`SITES_INDEX`（🟡；實機仍待 Pilot A §2）。
 - **Scenery**：`https://staging.scenery-travel.mn/` 為 **提案** canonical（待客戶網域確認）；已寫入 **`ENVIRONMENT_REGISTRY`**、`SITE_PROFILE`、`02_EXECUTION_PLAN`、`SITES_INDEX`、`ACCESS_REGISTER`（staging 列備註）。**`TASKS`**：原「啟動 Next-Gen…」移至 **`已完成歷程 §2026-05-07`**；新增未完成項「**Day 2 雲端 staging 實機驗收**」。**`NEXT_GEN_DELIVERY_BLUEPRINT_V1.md` §6** 已對齊敘述。
 - **SSOT 全鏈收斂（避免重工／矛盾）**：兩租戶 **`core/ENVIRONMENT_REGISTRY.md`** 標頭宣告 URL／lifecycle 唯一真相；**`SITES_INDEX`**、`Pilot Runbook` §2 對齊框、`RELEASE_GATES_CHECKLIST`、`CROSS_BORDER_GOVERNANCE`（Hostinger 列）、**`30_YEAR_AI_CODING_EXEC_CHARTER` §4.1／§4.3**、`TASKS` 未完成項證據鏈一致。**不重複**另建新長文檔。
-- **自動漂移閘道**：**`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`** 擴充為同檢 **`sites/*/SITE_PROFILE.md`**（**Staging URL** 行若含 HTTPS 須對齊 **`ENVIRONMENT_REGISTRY`**）；仍由 **`scripts/system-health-check.ps1`** Critical Gate 與 **`.github/workflows/tenant-staging-ssot.yml`**（含 `pwsh` 前置檢查）執行。
+- **自動漂移閘道**：**`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`** 擴充為同檢 **`sites/*/SITE_PROFILE.md`** 與 `projects/*/02_EXECUTION_PLAN.md`（出現 staging 且含 HTTPS 即納入比對，皆須對齊 **`ENVIRONMENT_REGISTRY`**）；仍由 **`scripts/system-health-check.ps1`** Critical Gate 與 **`.github/workflows/tenant-staging-ssot.yml`**（含 `pwsh` 前置檢查）執行。
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:a0864551d4aa2c1c063c13bf1ea131ccad51b79ec6948ab12ee03b5243e5efd7 -->
