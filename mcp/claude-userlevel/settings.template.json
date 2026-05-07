@@ -1,0 +1,156 @@
+{
+  "_comment": "AwareWave Claude Code user-level settings template (cross-machine SSOT). Variables: ${USERPROFILE}, ${USERPROFILE_FORWARD}, ${MONOREPO_ROOT}, ${MONOREPO_ROOT_FORWARD}. Sync via scripts/sync-claude-userlevel.ps1.",
+  "autoUpdatesChannel": "latest",
+  "theme": "light",
+  "permissions": {
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(gh pr merge *)",
+      "Bash(git checkout -b *)",
+      "Bash(git switch -c *)",
+      "Bash(git switch --create *)",
+      "Bash(git branch *)"
+    ],
+    "additionalDirectories": [
+      "${USERPROFILE}\\AppData\\Roaming\\Claude",
+      "${USERPROFILE}",
+      "${MONOREPO_ROOT}",
+      "\\tmp"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ~/.claude/hooks/ao-resume-on-prompt.ps1",
+            "timeout": 1200
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/branch-protection.js"
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/commit-quality.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/config-protection.js"
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/suggest-compact.js"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/mcp-health.js pre"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/large-file-warner.js"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/log-error.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/audit-log.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/accumulator.js"
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/design-quality.js",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/test-runner.js",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "mcp__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/mcp-health.js failure"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/batch-format.js",
+            "timeout": 300
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/check-console.js"
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/cost-tracker.js"
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/session-summary.js"
+          }
+        ]
+      }
+    ]
+  }
+}

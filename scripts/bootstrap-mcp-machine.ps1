@@ -64,9 +64,20 @@ if (Test-Path -LiteralPath $ensurePrompts) {
     }
 }
 
+$syncClaudeUserlevel = Join-Path $WorkspaceRoot "scripts\sync-claude-userlevel.ps1"
+if (Test-Path -LiteralPath $syncClaudeUserlevel) {
+    Write-Host "Aligning Claude Code user-level files (hooks/, settings.json, mcp.json)..." -ForegroundColor Green
+    # On bootstrap we use install mode so hooks/settings/mcp all align to SSOT.
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncClaudeUserlevel -Mode install
+    if ($LASTEXITCODE -ne 0) {
+        throw "sync-claude-userlevel.ps1 failed (exit $LASTEXITCODE)"
+    }
+}
+
 Write-Host ""
 Write-Host "Bootstrap finished." -ForegroundColor Green
 Write-Host "Use these clients after opening a new terminal if you changed persistent env vars:" -ForegroundColor Gray
 Write-Host "  - Codex" -ForegroundColor Gray
 Write-Host "  - copilot" -ForegroundColor Gray
 Write-Host "  - gemini" -ForegroundColor Gray
+Write-Host "  - Claude Code (restart to reload settings.json/hooks)" -ForegroundColor Gray

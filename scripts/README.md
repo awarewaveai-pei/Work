@@ -46,6 +46,7 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | Script | Purpose |
 |--------|---------|
 | `sync-mcp-config.ps1` | Sync registry.template.json → .mcp.json / Codex / Copilot / Gemini |
+| `sync-claude-userlevel.ps1` | Sync `mcp/claude-userlevel/` SSOT → `~/.claude/{hooks,settings.json,mcp.json}` (modes: install/merge/verify/dry-run) |
 | `apply-shared-ai-governance.ps1` | One-shot: MCP sync + closeout inbox seed + bootstrap prompts |
 | `verify-shared-ai-governance.ps1` | Verify MCP governance state |
 | `sanitize-user-mcp-config.ps1` | Remove plaintext secrets from user-level MCP files |

@@ -137,24 +137,28 @@
 - `scripts/ao-resume.ps1`、`scripts/ao-close.ps1` — 開工收工腳本
 - `.mcp.json` — MCP 伺服器定義（機密由環境變數填入）
 
-### 需要手動複製的（user-level，3 個檔案）
+### user-level 對齊（**自動化版**，2026-05-07 起）
 
-將以下檔案從舊機複製到新機（路徑換成新機的帳號）：
+過去：手動複製 3 個檔案。  
+現在：跑一個指令，全自動。
 
-```
-來源（舊機）                                       目標（新機）
-────────────────────────────────────────────────────────────────
-C:\Users\<舊帳號>\.claude\settings.json        → C:\Users\<新帳號>\.claude\settings.json
-C:\Users\<舊帳號>\.claude\hooks\ao-resume-on-prompt.ps1
-                                                → C:\Users\<新帳號>\.claude\hooks\ao-resume-on-prompt.ps1
-C:\Users\<舊帳號>\.claude\hooks\branch-protection.js
-                                                → C:\Users\<新帳號>\.claude\hooks\branch-protection.js
-```
-
-如果 `~\.claude\hooks\` 目錄不存在，先建立：
 ```powershell
-New-Item -ItemType Directory -Path "$env:USERPROFILE\.claude\hooks" -Force
+powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode install
 ```
+
+SSOT 在 `mcp/claude-userlevel/`：
+- `hooks/`（19 檔，跨機完全一致；用 `${CLAUDE_PLUGIN_ROOT}` 與 `~/.claude/` 變數，無機器路徑）
+- `settings.template.json`（hooks 段、`permissions.deny`、`additionalDirectories`、theme、autoUpdatesChannel）
+- `mcp.template.json`（強制 `{"mcpServers":{}}`，per CLAUDE.md）
+- `manifest.json`（宣告式治理清單；新增/刪減項目改這裡）
+
+`bootstrap-mcp-machine.ps1` 已自動串接，新機器**只跑 bootstrap 一條指令**即可全部對齊：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
+```
+
+詳細：`mcp/claude-userlevel/README.md`
 
 ### MCP secrets（每台機器獨立設定）
 

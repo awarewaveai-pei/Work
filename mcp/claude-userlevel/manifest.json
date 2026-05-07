@@ -1,0 +1,43 @@
+{
+  "_comment": "Manifest for cross-machine Claude Code user-level alignment. Defines what files in ~/.claude/ are governed by this SSOT. scripts/sync-claude-userlevel.ps1 reads this. Edit this file to add/remove governed files.",
+  "version": "1.0.0",
+  "userLevelRoot": "${USERPROFILE}\\.claude",
+  "files": {
+    "hooks": {
+      "type": "directory",
+      "source": "mcp/claude-userlevel/hooks",
+      "target": "${USERPROFILE}\\.claude\\hooks",
+      "syncMode": "mirror",
+      "description": "Cross-machine identical hooks (uses ${CLAUDE_PLUGIN_ROOT} and ~ paths, no machine-specific values)"
+    },
+    "settings": {
+      "type": "merge-json",
+      "source": "mcp/claude-userlevel/settings.template.json",
+      "target": "${USERPROFILE}\\.claude\\settings.json",
+      "syncMode": "merge",
+      "preserveKeys": [
+        "permissions.allow"
+      ],
+      "overwriteKeys": [
+        "autoUpdatesChannel",
+        "theme",
+        "permissions.deny",
+        "permissions.additionalDirectories",
+        "hooks"
+      ],
+      "description": "Cross-machine settings; allow list stays per-machine (auto-accumulated, may contain ephemeral entries)"
+    },
+    "mcp": {
+      "type": "replace-json",
+      "source": "mcp/claude-userlevel/mcp.template.json",
+      "target": "${USERPROFILE}\\.claude\\mcp.json",
+      "syncMode": "replace",
+      "description": "Per CLAUDE.md, ~/.claude/mcp.json must be empty; project-scoped .mcp.json is the SSOT"
+    }
+  },
+  "excludeFromHash": [
+    "_comment",
+    "_generatedAt",
+    "_machineId"
+  ]
+}

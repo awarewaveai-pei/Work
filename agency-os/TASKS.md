@@ -50,6 +50,7 @@
 
 ### 未完成
 
+- [ ] **（AO-RESUME 提醒）桌機開工後跑 Claude user-level 對齊腳本** —— **【未完成】** 2026-05-07 筆電已建立 `mcp/claude-userlevel/` SSOT + `scripts/sync-claude-userlevel.ps1`，並對齊筆電 `~/.claude/`。**桌機下一步**：`git pull` 後在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge`，使 `~/.claude/{hooks,settings.json,mcp.json}` 對齊 SSOT。**驗收**：跑 `-Mode verify` 應 exit 0（PASS）。背景：`mcp/claude-userlevel/README.md`、`CLAUDE.md` § 桌機/換機設定。
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：桌機 2026-05-07 `machine-environment-audit -Strict` PASS（no warnings）✓**；筆電尚未執行。任一台未 PASS 則本條不結案。**筆電下一步：**依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 + §1.5.1**（WP 棧）逐步執行後，在筆電 monorepo 根跑 `machine-environment-audit.ps1 -FetchOrigin -Strict`；細項 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。
 - [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
   - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（**URL／lifecycle SSOT**）、`SITES_INDEX.md`（須與 registry 對齊）、各案 `02_EXECUTION_PLAN.md` Day 2、`SITE_PROFILE.md`；Runbook §2 對齊框：`PRODUCTION_RUNBOOK_PILOT_*`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`

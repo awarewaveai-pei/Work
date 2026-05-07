@@ -111,3 +111,6 @@ debug.log
 github.copilot-chat-*.vsix
 tmp-copilot-chat-vsix/
 n8n-hetzner/
+
+# --- Local backups created by sync-claude-userlevel.ps1 etc. ---
+agency-os/Backups/

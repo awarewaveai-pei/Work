@@ -133,34 +133,51 @@
 | `site-builder` | 新客戶租戶佈建（GitHub / Sentry / PostHog / Supabase / n8n） |
 | `trigger-deploy-agent` | Trigger.dev EU 工作流部署（需提供 `tr_pat_*` Personal Access Token） |
 
-## 桌機 / 換機設定（user-level 複製清單）
+## 桌機 / 換機設定（**自動化版**，2026-05-07 起）
 
 repo 內所有東西（commands、agents、CLAUDE.md、AGENTS.md、scripts）`git pull` 自動同步。  
-下列 user-level 資料夾/檔案**不進 git**，需從舊機手動複製到新機器：
+**user-level 內容（hooks、settings.json、mcp.json）也已治理化** — `mcp/claude-userlevel/` 是 SSOT，由 `scripts/sync-claude-userlevel.ps1` 同步到 `~/.claude/`，不再手動複製。
 
-```
-# 1. 整個 hooks 目錄（16 支腳本，含 AO-RESUME、分支保護、品質守門等）
-~\.claude\hooks\                       # 整個目錄複製
+### 換機 / 新機（一鍵）
 
-# 2. 使用者級設定（hooks wiring + deny rules）
-~\.claude\settings.json               # 複製後只需更新 additionalDirectories 路徑
-
-# 3. 跨 session 記憶（含 MEMORY.md index + feedback/project/user 記憶檔）
-~\.claude\projects\c--Users-USER-Work\memory\   # 若筆電路徑相同則直接覆蓋；不同則建對應目錄
+```powershell
+git clone <repo> Work
+cd Work
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
 ```
 
-> **`additionalDirectories` 筆電範本**（settings.json 中唯一需要改的欄位）：
-> ```json
-> "additionalDirectories": [
->   "C:\\Users\\<筆電帳號>",
->   "C:\\Users\\<筆電帳號>\\Work"
-> ]
-> ```
+`bootstrap-mcp-machine.ps1` 會自動：
+1. 載入機器本地 env（`mcp/user-env.ps1`）
+2. 跑 `sync-mcp-config.ps1` 同步 MCP 設定
+3. 跑 `sync-claude-userlevel.ps1 -Mode install` 對齊 `~/.claude/hooks/`、`~/.claude/settings.json`、`~/.claude/mcp.json`
 
-> **Secrets vault（DPAPI）無法跨機複製**：DPAPI 金鑰綁定本機帳號，必須在筆電重新執行：
-> ```powershell
-> powershell -ExecutionPolicy Bypass -File .\scripts\secrets-vault.ps1 -Action import-mcp
-> ```
+### 日常同步（git pull 帶下 hooks/template 更新時）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge
+```
+
+`merge` 模式會：
+- mirror 整個 `hooks/` 目錄
+- 強制覆蓋 settings.json 的 `hooks` 段、`permissions.deny`、`permissions.additionalDirectories`、`theme`、`autoUpdatesChannel`
+- **保留** `permissions.allow`（每機自己累積，不互相覆蓋）
+- 把 `~/.claude/mcp.json` 規範化為 `{"mcpServers":{}}`（per CLAUDE.md，shared MCP 走 repo `.mcp.json`）
+
+### 巡檢
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode verify
+```
+
+exit 0 = 對齊；exit 1 = drift。完整 SSOT 與擴充方法見 `mcp/claude-userlevel/README.md`。
+
+### 仍需各機獨立操作
+
+- **Secrets vault（DPAPI）無法跨機複製**：DPAPI 金鑰綁定本機帳號，必須在每台機器執行：
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\scripts\secrets-vault.ps1 -Action import-mcp
+  ```
+- **memory（`~/.claude/projects/<repo>/memory/`）**：跨機 session 記憶，git 不追蹤；目前仍需手動複製（候補加入治理範圍）。
 
 複製後在新機器 monorepo 根執行一次：
 ```powershell

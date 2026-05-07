@@ -1,0 +1,4 @@
+{
+  "_comment": "AwareWave Claude Code user-level mcp.json normalization template. Per CLAUDE.md governance, ~/.claude/mcp.json must be empty; the SSOT for shared MCP servers is the project-scoped repo-root .mcp.json (generated from mcp/registry.template.json by scripts/sync-mcp-config.ps1). Sync via scripts/sync-claude-userlevel.ps1.",
+  "mcpServers": {}
+}
