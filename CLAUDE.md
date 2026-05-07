@@ -127,21 +127,50 @@
 | `repair-agent` | 健康檢查失敗、腳本報錯、MCP 連不上、文件交叉引用斷掉 |
 | `site-builder` | 新客戶租戶佈建（GitHub / Sentry / PostHog / Supabase / n8n） |
 
-## 桌機 / 換機設定（user-level 3 個檔案）
+## 桌機 / 換機設定（user-level 複製清單）
 
 repo 內所有東西（commands、agents、CLAUDE.md、AGENTS.md、scripts）`git pull` 自動同步。  
-**只有下列 3 個 user-level 檔案需要手動複製到新機器**（路徑換成新機的帳號）：
+下列 user-level 資料夾/檔案**不進 git**，需從舊機手動複製到新機器：
 
 ```
-~\.claude\settings.json            # UserPromptSubmit hook 設定
-~\.claude\hooks\ao-resume-on-prompt.ps1   # AO-RESUME hook 腳本
-~\.claude\hooks\branch-protection.js      # 分支保護 hook
+# 1. 整個 hooks 目錄（16 支腳本，含 AO-RESUME、分支保護、品質守門等）
+~\.claude\hooks\                       # 整個目錄複製
+
+# 2. 使用者級設定（hooks wiring + deny rules）
+~\.claude\settings.json               # 複製後只需更新 additionalDirectories 路徑
+
+# 3. 跨 session 記憶（含 MEMORY.md index + feedback/project/user 記憶檔）
+~\.claude\projects\c--Users-USER-Work\memory\   # 若筆電路徑相同則直接覆蓋；不同則建對應目錄
 ```
+
+> **`additionalDirectories` 筆電範本**（settings.json 中唯一需要改的欄位）：
+> ```json
+> "additionalDirectories": [
+>   "C:\\Users\\<筆電帳號>",
+>   "C:\\Users\\<筆電帳號>\\Work"
+> ]
+> ```
+
+> **Secrets vault（DPAPI）無法跨機複製**：DPAPI 金鑰綁定本機帳號，必須在筆電重新執行：
+> ```powershell
+> powershell -ExecutionPolicy Bypass -File .\scripts\secrets-vault.ps1 -Action import-mcp
+> ```
 
 複製後在新機器 monorepo 根執行一次：
 ```powershell
+# 設定 Windows 使用者環境變數（必須）
+[System.Environment]::SetEnvironmentVariable('MONOREPO_ROOT','C:\Users\<筆電帳號>\Work','User')
+# 完整 MCP + 環境初始化
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
 ```
+
+### 筆電 Windows 本機 WordPress 棧（龍蝦 staging 需要）
+
+若 TASKS「雙機環境對齊」尚未勾選，或 memory 載明筆電須補 WP 層，**遵守以下正本**（不重複步驟）：
+
+- 操作步驟：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5.1
+- 詳細說明：`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`
+- 一鍵腳本：`scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`
 
 完整桌機快速啟動：`agency-os/docs/operations/dual-ide-coexistence-strategy.md` §新機器快速啟動
 
