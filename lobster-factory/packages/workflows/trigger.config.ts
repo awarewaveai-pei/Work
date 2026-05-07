@@ -9,25 +9,72 @@ export default defineConfig({
   dirs: ["./src/trigger"],
   build: {
     extensions: [
-      // Sync PostHog server-side keys into Trigger prod/staging on each deploy when set locally.
-      // Source: same POSTHOG_* as phase1 `.env` / vault — export before `npx trigger.dev deploy`.
-      // See `infra/trigger/README.md` § PostHog（workflow 事件）.
+      // Sync runtime env vars into Trigger prod/staging on each deploy.
+      // Source: export from vault / local env before `npx trigger.dev deploy`.
+      // Only pushes a key if the local value is non-empty — never clears existing Trigger vars.
+      // See `infra/trigger/TASK_REFERENCE.md` for required vars per task.
       syncEnvVars(async () => {
         const out: Record<string, string> = {};
-        const apiKey = process.env.POSTHOG_API_KEY ?? "";
-        const host = process.env.POSTHOG_HOST ?? "";
-        if (apiKey.trim() && host.trim()) {
-          out.POSTHOG_API_KEY = apiKey;
-          out.POSTHOG_HOST = host;
+
+        // ── Observability ────────────────────────────────────────────────────
+        const posthogKey  = process.env.POSTHOG_API_KEY ?? "";
+        const posthogHost = process.env.POSTHOG_HOST ?? "";
+        if (posthogKey.trim() && posthogHost.trim()) {
+          out.POSTHOG_API_KEY = posthogKey;
+          out.POSTHOG_HOST    = posthogHost;
         }
+
+        // ── Ops Inbox / webhook auth ─────────────────────────────────────────
         const ingest = process.env.OPS_INBOX_INGEST_TOKEN ?? "";
-        if (ingest.trim()) {
-          out.OPS_INBOX_INGEST_TOKEN = ingest.trim();
-        }
+        if (ingest.trim()) out.OPS_INBOX_INGEST_TOKEN = ingest.trim();
+
         const awBase = process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "";
-        if (awBase.trim()) {
-          out.AWAREWAVE_WEBHOOK_BASE_URL = awBase.trim().replace(/\/$/, "");
-        }
+        if (awBase.trim()) out.AWAREWAVE_WEBHOOK_BASE_URL = awBase.trim().replace(/\/$/, "");
+
+        // ── Supabase (Lobster DB writes) ─────────────────────────────────────
+        const supabaseUrl = process.env.LOBSTER_SUPABASE_URL ?? "";
+        const supabaseSrk = process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY ?? "";
+        if (supabaseUrl.trim())  out.LOBSTER_SUPABASE_URL                = supabaseUrl.trim();
+        if (supabaseSrk.trim())  out.LOBSTER_SUPABASE_SERVICE_ROLE_KEY   = supabaseSrk.trim();
+
+        // ── Lobster runtime flags ────────────────────────────────────────────
+        // LOBSTER_ENABLE_DB_WRITES: "true"|"1" → enables DB inserts in tasks.
+        // LOBSTER_MANIFEST_EXECUTION_MODE: "off"|"dry_run"|"apply" (default: "off").
+        const dbWrites  = process.env.LOBSTER_ENABLE_DB_WRITES ?? "";
+        const execMode  = process.env.LOBSTER_MANIFEST_EXECUTION_MODE ?? "";
+        if (dbWrites.trim())  out.LOBSTER_ENABLE_DB_WRITES           = dbWrites.trim();
+        if (execMode.trim())  out.LOBSTER_MANIFEST_EXECUTION_MODE    = execMode.trim();
+
+        // ── Infrastructure endpoints (ao-infrastructure-check) ───────────────
+        const triggerApiUrl  = process.env.TRIGGER_API_URL  ?? "";
+        const n8nUrl         = process.env.N8N_URL          ?? "";
+        const uptimeKumaUrl  = process.env.UPTIME_KUMA_URL  ?? "";
+        if (triggerApiUrl.trim())  out.TRIGGER_API_URL  = triggerApiUrl.trim();
+        if (n8nUrl.trim())         out.N8N_URL          = n8nUrl.trim();
+        if (uptimeKumaUrl.trim())  out.UPTIME_KUMA_URL  = uptimeKumaUrl.trim();
+
+        // ── Tenant provisioning (orchestrate-tenant-provisioning) ────────────
+        const sentryToken   = process.env.SENTRY_AUTH_TOKEN                    ?? "";
+        const sentryOrg     = process.env.SENTRY_ORG_SLUG                      ?? "";
+        const ghToken       = process.env.TENANT_PROVISION_GITHUB_TOKEN         ?? "";
+        const posthogPat    = process.env.POSTHOG_PERSONAL_API_KEY              ?? "";
+        const n8nApiKey     = process.env.N8N_API_KEY                           ?? "";
+        const n8nApiBase    = process.env.N8N_API_BASE_URL                      ?? "";
+        const uptimeApiKey  = process.env.UPTIME_KUMA_API_KEY                   ?? "";
+        const supAccessTkn  = process.env.TENANT_PROVISION_SUPABASE_ACCESS_TOKEN ?? "";
+        if (sentryToken.trim())   out.SENTRY_AUTH_TOKEN                          = sentryToken.trim();
+        if (sentryOrg.trim())     out.SENTRY_ORG_SLUG                            = sentryOrg.trim();
+        if (ghToken.trim())       out.TENANT_PROVISION_GITHUB_TOKEN              = ghToken.trim();
+        if (posthogPat.trim())    out.POSTHOG_PERSONAL_API_KEY                   = posthogPat.trim();
+        if (n8nApiKey.trim())     out.N8N_API_KEY                                = n8nApiKey.trim();
+        if (n8nApiBase.trim())    out.N8N_API_BASE_URL                           = n8nApiBase.trim();
+        if (uptimeApiKey.trim())  out.UPTIME_KUMA_API_KEY                        = uptimeApiKey.trim();
+        if (supAccessTkn.trim())  out.TENANT_PROVISION_SUPABASE_ACCESS_TOKEN     = supAccessTkn.trim();
+
+        // ── AO org ID for scheduled infra checks ─────────────────────────────
+        const aoOrgId = process.env.LOBSTER_AO_ORG_ID ?? "";
+        if (aoOrgId.trim()) out.LOBSTER_AO_ORG_ID = aoOrgId.trim();
+
         return out;
       }),
     ],
