@@ -13,6 +13,20 @@
 
 ---
 
+## 另一台實體機 — 執行順序（摘要）
+
+> **代理邊界**：Cursor 無法代替你在「不在此工作區的另一台電腦」上點擊或輸入密碼；該機須由**該機使用者**開終端機／Cursor 操作。下列為**最短鏈**；**可複製貼上的 PowerShell 區塊與段落標題**仍以 **`REMOTE_WORKSTATION_STARTUP.md` §1.5** 為**唯一長文正本**（本篇不重複貼全文，避免雙寫漂移）。
+
+1. **取得 repo**：依 §1.5 **「從零 clone」**（`git clone` → `checkout main` → `pull --ff-only origin main`）。
+2. **工具與依賴**：依 §1.5 **「工具與依賴」**— `lobster-factory\packages\workflows` 下 **`npm ci`**、可選 **`mcp-local-wrappers`** 之 **`npm ci`**、**`verify-build-gates.ps1`**。
+3. **每台獨立憑證與 MCP**：依 §1.5 **「憑證（無法一鍵複製）」**— DPAPI vault、`mcp/user-env.ps1`（自 template）、monorepo 根 **`bootstrap-mcp-machine.ps1`**；細項見下方 Checklist。**禁止**整份複製他機 **`~/.cursor/mcp.json`**／明文 token。
+4. **須與桌機同級「真 wp」時**：§**1.5.1** + **`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`**。
+5. **選用 EU Postgres MCP**：§**1.5.2**（tunnel／smoke；失敗時先看 **`SUPABASE_SELF_HOSTED_RUNBOOK.md`**）。
+6. **結案判定（該機）**：在該機 monorepo 根執行上方 DoD 指令；輸出結尾須為 **`== AUDIT RESULT: PASS (no warnings) ==`**。建議（可選）將終端最後 **30** 行貼入該機 **`agency-os/memory/daily/當日.md`** 或 **`WORKLOG.md`** 該日小節，利於雙機事後稽核。
+7. **TASKS 勾選**：僅當**兩台**皆已達 Pass，才勾選 **`TASKS.md`**「（AO-RESUME 提醒）雙機環境對齊」— 或由 **`AO-CLOSE`** 搭配 **`AUTO_TASK_DONE`** 機制機械套用。
+
+---
+
 ## Checklist
 
 - **新機／筆電首次**：完成 Windows 本機 WordPress 相容層（MariaDB + PHP + WP-CLI + `scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`），此路徑與 Supabase／MCP 分列。

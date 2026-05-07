@@ -20,6 +20,12 @@
 - **`memory/daily/2026-05-07.md`**：更正「main 領先 14 commits」為已與 **`origin/main`** 對齊。
 - **`reports/status/integrated-status-LATEST.md`**：為組裝報告，曾嵌入舊版日記摘錄而短暫與 **`git`** 現況矛盾；已 **`scripts/generate-integrated-status-report.ps1`** 重產（時間戳記更新）。長期判讀：**`CONVERSATION_MEMORY.md` → `Current Operating Context` → 2026-05-07（長期編纂規則）**。
 
+### 雙機對齊 — 文件與桌機複核（另一台須自行跑 §1.5）
+
+- **`DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**：新增「**另一台實體機 — 執行順序（摘要）**」，鏈到 **`REMOTE_WORKSTATION_STARTUP.md` §1.5** 為長文正本，並標明代理無法在他機代操作。
+- **`TASKS.md`**：雙機隊列列補上稽核**完整指令列**與 **`AUDIT RESULT: PASS (no warnings)`** 結案判讀。
+- **本機（桌機）**：工作樹乾淨時複跑 **`machine-environment-audit.ps1 -FetchOrigin -Strict`** → **`AUDIT RESULT: PASS (no warnings)`**。**筆電／另一台**仍須依 §1.5 獨立達成同等 PASS 後，`TASKS`「雙機環境對齊」方可結案。
+
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:a0864551d4aa2c1c063c13bf1ea131ccad51b79ec6948ab12ee03b5243e5efd7 -->
