@@ -290,6 +290,36 @@ if (Test-Path $tenantsRoot) {
     Add-CriticalFailure -Reason "Missing tenants/ root"
 }
 
+# 3b) Tenant staging URL SSOT (SITES_INDEX vs ENVIRONMENT_REGISTRY)
+$ssotGate = Join-Path $root "scripts\verify-tenant-staging-sites-index-ssot.ps1"
+if (Test-Path -LiteralPath $ssotGate) {
+    $prevEapSsot = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $ssotOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $ssotGate -WorkspaceRoot $root *>&1 | Out-String
+        $ssotExit = $LASTEXITCODE
+        $ssotTrim = $ssotOutput.Trim()
+        $ssotPass = ($ssotExit -eq 0)
+        $ssotDetail = if ($ssotPass) {
+            if ($ssotTrim.Length -gt 0) { $ssotTrim } else { "OK" }
+        } else {
+            $(if ($ssotTrim.Length -gt 0) { $ssotTrim } else { "FAIL (exit $ssotExit)" })
+        }
+        Add-Check -Name "Tenant SSOT: SITES_INDEX staging URL vs ENVIRONMENT_REGISTRY" -Pass $ssotPass -Detail $ssotDetail
+        if (-not $ssotPass) {
+            Add-CriticalFailure -Reason "Tenant staging URL drift: SITES_INDEX vs core/ENVIRONMENT_REGISTRY (run scripts/verify-tenant-staging-sites-index-ssot.ps1)"
+        }
+    } catch {
+        Add-Check -Name "Tenant SSOT: SITES_INDEX staging URL vs ENVIRONMENT_REGISTRY" -Pass $false -Detail $_.Exception.Message
+        Add-CriticalFailure -Reason "Tenant staging SSOT gate threw: $($_.Exception.Message)"
+    } finally {
+        $ErrorActionPreference = $prevEapSsot
+    }
+} else {
+    Add-Check -Name "Tenant SSOT: SITES_INDEX staging URL vs ENVIRONMENT_REGISTRY" -Pass $false -Detail "Missing script at scripts/verify-tenant-staging-sites-index-ssot.ps1"
+    Add-CriticalFailure -Reason "Missing verify-tenant-staging-sites-index-ssot.ps1 under agency-os/scripts"
+}
+
 # 4) Encoding spot check
 $utf8Files = @(
     "docs/operations/system-operation-sop.md",
