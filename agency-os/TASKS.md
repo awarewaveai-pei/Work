@@ -50,7 +50,6 @@
 
 ### 未完成
 
-- [ ] **（AO-RESUME 提醒）補齊剩餘 Vault 憑證** —— **【進行中】** **已補：** `OPS_INBOX_INGEST_TOKEN`（2026-05-07）、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`（2026-05-07）、`SUPABASE_A_SERVICE_ROLE_KEY` + `SUPABASE_AWAREWAVE_URL` + `SUPABASE_A_URL`（2026-05-08，alias 從 vault 複製）；25 vars synced to Windows env。**仍缺：** `XAI_API_KEY`（console.x.ai）；另有 33 base-URL / API key 待補（見 sync-cursor-mcp-user-env 輸出清單）。**下一步：** `XAI_API_KEY` 取得後執行 `.\scripts\secrets-vault.ps1 -Action set -Name XAI_API_KEY -Value '<value>'` 再 `sync-cursor-mcp-user-env`。
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：桌機 2026-05-07 `machine-environment-audit -Strict` PASS（no warnings）✓**；筆電尚未執行。任一台未 PASS 則本條不結案。**筆電下一步：**依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 + §1.5.1**（WP 棧）逐步執行後，在筆電 monorepo 根跑 `machine-environment-audit.ps1 -FetchOrigin -Strict`；細項 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。
 - [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度（2026-05-07）：**已在 **EU `204.168.175.41`** 完成 `registry:5000` DNS 對齊與 `docker login`（PASS），並可進入 `/root/Work/lobster-factory/packages/workflows` 觸發 `npx trigger.dev@4.4.4 deploy`。**目前唯一阻塞：**CLI 明確回報 `TRIGGER_ACCESS_TOKEN` 不是 PAT（需 **`tr_pat_*`**，現值為 `tr_prod_*`）。**下一步（操作者）**：產生 Personal Access Token（`tr_pat_*`）後，在 EU 以 `export TRIGGER_ACCESS_TOKEN=<tr_pat_...>`（或寫入 `/root/trigger/.env`）重跑 deploy。
 - [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
@@ -107,6 +106,15 @@
   - **機械檢查**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1` 單一腳本擴充；本機與 CI 共用，不開平行實作。
   - **閘道接入**：`scripts/system-health-check.ps1` Critical Gate + `.github/workflows/tenant-staging-ssot.yml`（PR 路徑觸發）；
   - **驗證**：`system-health-check` 100% PASS（354/354）。
+
+### 2026-05-08 — Vault 憑證補齊：4 個原始待補項全數完成
+
+- [x] **（AO-RESUME 提醒）補齊剩餘 Vault 憑證**
+  - **OPS_INBOX_INGEST_TOKEN**（2026-05-07）：從 SG `/root/lobster-phase1/.env` 讀取，已入 vault。
+  - **SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY**（2026-05-07）：Supabase cloud `mffjqjiidbeibilmxzef`，7 keys 已入 vault。
+  - **SUPABASE_A_SERVICE_ROLE_KEY** + **SUPABASE_AWAREWAVE_URL** + **SUPABASE_A_URL**（2026-05-08）：alias 從 vault 複製。
+  - **XAI_API_KEY**（2026-05-08）：`xai-X5nRy…XrRg`，已入 vault + Windows env。
+  - **最終狀態**：`sync-cursor-mcp-user-env` → 26 vars synced；剩 32 base-URL / API 設定（非原始待補項，見 sync 輸出清單，可按需補齊）。
 
 ### 2026-05-07 — phase1 WordPress（SG）PostHog MU 完成部署
 
