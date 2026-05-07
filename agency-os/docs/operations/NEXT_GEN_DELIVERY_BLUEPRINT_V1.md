@@ -162,7 +162,7 @@
 ### 上線級 Runbook（已建立）
 - `docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md`
 - `docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md`
-- **索引對齊**：各試點 `SITES_INDEX.md` 與 `core/ENVIRONMENT_REGISTRY.md` 須一致；§2 具「Repo 對齊」摘錄（**2026-05-07**）。
+- **索引對齊**：各試點 `SITES_INDEX.md`、會寫入 HTTPS 之 `sites/*/SITE_PROFILE.md`（**Staging URL** 行）須與 `core/ENVIRONMENT_REGISTRY.md` 一致；§2 具「Repo 對齊」摘錄（**2026-05-07**）。閘道：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`。
 
 ## Related
 
@@ -172,10 +172,8 @@
 - `docs/operations/end-of-day-checklist.md`
 - `docs/overview/EXECUTION_DASHBOARD.md`
 
-_Last synced: 2026-05-07（§6 試點狀態補記）_
-
 ## Related Documents (Auto-Synced)
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 
-_Last synced: 2026-05-07（§6／Runbook 索引對齊；沿用 TOOLS_DELIVERY_TRACEABILITY 連結）_
+_Last synced: 2026-05-07 — §6 試點狀態；Runbook／SITES_INDEX 索引對齊；TOOLS_DELIVERY_TRACEABILITY 連結_
 

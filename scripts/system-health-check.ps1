@@ -305,9 +305,9 @@ if (Test-Path -LiteralPath $ssotGate) {
         } else {
             $(if ($ssotTrim.Length -gt 0) { $ssotTrim } else { "FAIL (exit $ssotExit)" })
         }
-        Add-Check -Name "Tenant SSOT: SITES_INDEX staging URL vs ENVIRONMENT_REGISTRY" -Pass $ssotPass -Detail $ssotDetail
+        Add-Check -Name "Tenant SSOT: staging URLs (SITES_INDEX + SITE_PROFILE) vs ENVIRONMENT_REGISTRY" -Pass $ssotPass -Detail $ssotDetail
         if (-not $ssotPass) {
-            Add-CriticalFailure -Reason "Tenant staging URL drift: SITES_INDEX vs core/ENVIRONMENT_REGISTRY (run scripts/verify-tenant-staging-sites-index-ssot.ps1)"
+            Add-CriticalFailure -Reason "Tenant staging URL drift vs core/ENVIRONMENT_REGISTRY (run agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1 from repo root)"
         }
     } catch {
         Add-Check -Name "Tenant SSOT: SITES_INDEX staging URL vs ENVIRONMENT_REGISTRY" -Pass $false -Detail $_.Exception.Message
@@ -316,7 +316,7 @@ if (Test-Path -LiteralPath $ssotGate) {
         $ErrorActionPreference = $prevEapSsot
     }
 } else {
-    Add-Check -Name "Tenant SSOT: SITES_INDEX staging URL vs ENVIRONMENT_REGISTRY" -Pass $false -Detail "Missing script at scripts/verify-tenant-staging-sites-index-ssot.ps1"
+    Add-Check -Name "Tenant SSOT: staging URLs (SITES_INDEX + SITE_PROFILE) vs ENVIRONMENT_REGISTRY" -Pass $false -Detail "Missing script at scripts/verify-tenant-staging-sites-index-ssot.ps1"
     Add-CriticalFailure -Reason "Missing verify-tenant-staging-sites-index-ssot.ps1 under agency-os/scripts"
 }
 

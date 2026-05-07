@@ -16,6 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Verify SITES_INDEX staging URLs vs ENVIRONMENT_REGISTRY
+      - name: Confirm PowerShell Core
+        run: command -v pwsh && pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+
+      - name: Verify staging URLs vs ENVIRONMENT_REGISTRY (SITES_INDEX + SITE_PROFILE)
         shell: pwsh
         run: ./agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1 -WorkspaceRoot "${{ github.workspace }}/agency-os"

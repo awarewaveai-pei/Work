@@ -57,6 +57,10 @@
 
 **排程註冊**：在 `agency-os/` 根執行 `automation/REGISTER_TENANT_TASKS.ps1`（見 [automation/README.md](../automation/README.md)）。
 
+### Staging URL（單一真相＋機械閘道）
+
+`core/ENVIRONMENT_REGISTRY.md` 之 **staging** 列為 HTTPS canonical。`SITES_INDEX.md`（若有 **Staging URL** 欄）與 `sites/<slug>/SITE_PROFILE.md`（若在 **Staging URL** 行含 `https://`）必須與該列一致，**不可**另起第二套 URL。**檢查**：[`scripts/verify-tenant-staging-sites-index-ssot.ps1`](../scripts/verify-tenant-staging-sites-index-ssot.ps1)（`verify-build-gates` / `system-health-check`；PR：monorepo `.github/workflows/tenant-staging-ssot.yml`）。
+
 ---
 
 ## 連動文件（手動維護；不跑 doc-sync 平面覆寫）

@@ -4,18 +4,19 @@ param(
 
 <#
 .SYNOPSIS
-  Verifies tenant staging URL SSOT: SITES_INDEX.md Staging URL column matches
-  core/ENVIRONMENT_REGISTRY.md staging row (first https URL in each).
+  Verifies tenant staging URL SSOT against core/ENVIRONMENT_REGISTRY.md (staging row).
 
 .DESCRIPTION
-  - Skips tenants without ENVIRONMENT_REGISTRY.md or SITES_INDEX.md.
-  - Skips tenants whose SITES_INDEX table has no "Staging URL" column (e.g. drill skeleton).
-  - If registry staging row has a canonical https URL, every sites-index row must use the same URL (lifecycle suffix OK).
-  - If registry has no https in staging row, sites-index rows must not carry an https staging URL.
+  Compares the registry staging row’s canonical HTTPS URL to:
+  - SITES_INDEX.md — "Staging URL" column (per site row), when that column exists.
+  - sites/<site>/SITE_PROFILE.md — any bullet line containing "Staging URL" with an HTTPS URL.
+  Skips tenants without ENVIRONMENT_REGISTRY.md.
+  Skips SITES_INDEX when there is no "Staging URL" column (e.g. drill skeleton).
+  Skips SITE_PROFILE lines that mention Staging URL but contain no https:// (e.g. "見 registry").
 
 .NOTES
-  Owner: agency-os/scripts/system-health-check.ps1 invokes this gate.
-  Encoding: UTF-8 (paths/content).
+  Single implementation: local health + CI (no duplicate bash copy).
+  Owner: monorepo scripts/system-health-check.ps1 invokes this gate.
 #>
 
 Set-StrictMode -Version Latest
@@ -98,6 +99,18 @@ function Get-SitesIndexDataRows {
     return $rows
 }
 
+function Get-StagingHttpsFromSiteProfile {
+    param([string]$FilePath)
+    if (-not (Test-Path -LiteralPath $FilePath)) { return $null }
+    $lines = @(Get-Content -LiteralPath $FilePath -Encoding UTF8)
+    foreach ($line in $lines) {
+        if ($line -notmatch '(?i)staging\s+url') { continue }
+        $u = Extract-NormalizedHttpsUrl -Text $line
+        if ($u) { return $u }
+    }
+    return $null
+}
+
 $failures = New-Object System.Collections.Generic.List[string]
 $tenantsRoot = Join-Path $WorkspaceRoot "tenants"
 
@@ -114,41 +127,65 @@ foreach ($tenant in $tenantDirs) {
     $sitesPath = Join-Path $tenant.FullName "SITES_INDEX.md"
 
     if (-not (Test-Path -LiteralPath $regPath)) { continue }
-    if (-not (Test-Path -LiteralPath $sitesPath)) { continue }
-
-    $lines = @(Get-Content -LiteralPath $sitesPath -Encoding UTF8)
-    $stagingIdx = Find-StagingColumnIndex -Lines $lines
-
-    if ($stagingIdx -lt 0) {
-        Write-Host "verify-tenant-staging-sites-index-ssot: skip $tenantName (no Staging URL column)"
-        continue
-    }
 
     $regCell = Get-RegistryStagingCell -FilePath $regPath
     $regUrl = Extract-NormalizedHttpsUrl -Text $regCell
 
-    $rows = @(Get-SitesIndexDataRows -Lines $lines -StagingIdx $stagingIdx)
+    # --- SITES_INDEX (when table has Staging URL column)
+    if (Test-Path -LiteralPath $sitesPath) {
+        $lines = @(Get-Content -LiteralPath $sitesPath -Encoding UTF8)
+        $stagingIdx = Find-StagingColumnIndex -Lines $lines
 
-    if ($rows.Count -eq 0) {
-        [void]$failures.Add("${tenantName}: SITES_INDEX has Staging URL column but no data rows parsed.")
-        continue
+        if ($stagingIdx -ge 0) {
+            $rows = @(Get-SitesIndexDataRows -Lines $lines -StagingIdx $stagingIdx)
+
+            if ($rows.Count -eq 0) {
+                [void]$failures.Add("${tenantName}: SITES_INDEX has Staging URL column but no data rows parsed.")
+            }
+
+            foreach ($row in $rows) {
+                $cellUrl = Extract-NormalizedHttpsUrl -Text $row.StagingCell
+
+                if ($regUrl) {
+                    if ($cellUrl -ne $regUrl) {
+                        [void]$failures.Add(
+                            "${tenantName} site $($row.Site): SITES_INDEX staging must match ENVIRONMENT_REGISTRY — registry='$regUrl' cell='$($row.StagingCell)'."
+                        )
+                    }
+                }
+                elseif ($cellUrl) {
+                    [void]$failures.Add(
+                        "${tenantName} site $($row.Site): SITES_INDEX has staging HTTPS but ENVIRONMENT_REGISTRY staging row has no canonical HTTPS URL."
+                    )
+                }
+            }
+        } else {
+            Write-Host "verify-tenant-staging-sites-index-ssot: skip $tenantName SITES_INDEX (no Staging URL column)"
+        }
     }
 
-    foreach ($row in $rows) {
-        $cellUrl = Extract-NormalizedHttpsUrl -Text $row.StagingCell
+    # --- sites/*/SITE_PROFILE.md (when inline Staging URL carries https)
+    $sitesRoot = Join-Path $tenant.FullName "sites"
+    if (-not (Test-Path -LiteralPath $sitesRoot)) { continue }
 
+    foreach ($siteDir in @(Get-ChildItem -Path $sitesRoot -Directory)) {
+        $profPath = Join-Path $siteDir.FullName "SITE_PROFILE.md"
+        if (-not (Test-Path -LiteralPath $profPath)) { continue }
+
+        $profUrl = Get-StagingHttpsFromSiteProfile -FilePath $profPath
+        if (-not $profUrl) { continue }
+
+        $rel = "${tenantName}/sites/$($siteDir.Name)/SITE_PROFILE.md"
         if ($regUrl) {
-            if ($cellUrl -ne $regUrl) {
+            if ($profUrl -ne $regUrl) {
                 [void]$failures.Add(
-                    "${tenantName} site $($row.Site): SITES_INDEX staging must match ENVIRONMENT_REGISTRY — registry='$regUrl' cell='$($row.StagingCell)'."
+                    "${rel}: SITE_PROFILE Staging URL '$profUrl' must match ENVIRONMENT_REGISTRY staging '$regUrl'."
                 )
             }
         } else {
-            if ($cellUrl) {
-                [void]$failures.Add(
-                    "${tenantName} site $($row.Site): SITES_INDEX has staging HTTPS but ENVIRONMENT_REGISTRY staging row has no canonical HTTPS URL."
-                )
-            }
+            [void]$failures.Add(
+                "${rel}: SITE_PROFILE declares staging HTTPS but ENVIRONMENT_REGISTRY staging row has no canonical HTTPS URL."
+            )
         }
     }
 }
@@ -158,5 +195,5 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-Write-Host "verify-tenant-staging-sites-index-ssot: PASS (tenants with Staging URL column)"
+Write-Host "verify-tenant-staging-sites-index-ssot: PASS"
 exit 0
