@@ -153,6 +153,33 @@ powershell -ExecutionPolicy Bypass -File .\deploy-workflows.ps1
 
 **路徑 A（首選，最簡運維）**：在 **EU 上跑 Trigger stack 的那台 VPS** SSH 進去，於 repo 內執行 **`deploy-workflows.ps1`（若裝了 PowerShell／複製腳本）** 或上面的 **`npx trigger.dev@4.4.4 deploy`**；並先在該機對 **`127.0.0.1:5000`**（或 compose 公布的 registry 位址）**`docker login`**，帳密與 **`DEPLOY_REGISTRY_USERNAME` / `DEPLOY_REGISTRY_PASSWORD`**（`registry/auth.htpasswd`）一致。
 
+> **EU VPS 一次性前置設定**（已完成，2026-05-07）：registry hostname 只在 Docker 內部 DNS 可解析，從 VPS host 部署需額外三步：
+>
+> ```bash
+> # 1. /etc/hosts — 讓 VPS host 能解析 registry
+> echo "127.0.0.1 registry" >> /etc/hosts
+>
+> # 2. Docker daemon — registry 為純 HTTP（無 TLS），加入 insecure list
+> echo '{"insecure-registries":["registry:5000"]}' > /etc/docker/daemon.json
+> kill -HUP $(pidof dockerd)   # 熱載入，不重啟容器
+>
+> # 3. buildkitd config + 重建 trigger buildx builder（host networking + 允許 HTTP registry）
+> mkdir -p /etc/buildkit && cat > /etc/buildkit/buildkitd.toml << 'EOF'
+> [registry."registry:5000"]
+>   http = true
+>   insecure = true
+> EOF
+> docker buildx rm trigger 2>/dev/null || true
+> docker buildx create --name trigger --driver docker-container \
+>   --driver-opt network=host \
+>   --config /etc/buildkit/buildkitd.toml --use
+> docker buildx inspect --bootstrap trigger
+> ```
+>
+> 上述設定在 EU VPS 持久化（`/etc/hosts`、`/etc/docker/daemon.json`、`/etc/buildkit/buildkitd.toml`）；**換機或重建 VPS** 時需重做。
+
+> **CLI 認證**：CLI 需要 `tr_pat_` Personal Access Token（非 `tr_prod_` worker token）。PAT 從 `https://trigger.aware-wave.com/account/tokens` 取得，或從 DB `PersonalAccessToken.encryptedToken`（AES-256-GCM raw key）解密。已存入 vault 的 `TRIGGER_ACCESS_TOKEN` 為 `tr_prod_` worker token — 部署前須用正確 PAT 覆蓋環境變數。
+
 **路徑 B（堅持在筆電 build）** 需同時滿足：
 
 1. **SSH tunnel**（背景執行）：把本機 **5000** 轉發到 EU 上 registry 監聽埠（一般等同 EU 上 **`127.0.0.1:5000`**）：
