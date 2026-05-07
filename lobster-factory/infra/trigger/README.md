@@ -129,8 +129,11 @@ docker compose --env-file .env logs -f webapp
 **CLI 版本**：與 `packages/workflows/package.json` 內 **`@trigger.dev/sdk`** 對齊（目前 **4.4.4**）。請使用 **`npx trigger.dev@4.4.4`**（勿隨意 `@latest`，避免與已鎖 SDK 漂移）。
 
 1. 在 dashboard 建立 **project**，把 **`project`** 寫進 `packages/workflows/trigger.config.ts`。  
-2. 依官方說明登入自架 instance（**一次性**：`login -a <APP_ORIGIN>`；需要 **`tr_pat_`** Personal Access Token）。  
-3. **Deploy 機器**必須能對 **`registry:5000`** 完成 **push** — 見下方 **§7a**。
+2. **兩種金鑰勿混用**（與 [官方 API keys](https://trigger.dev/docs/apikeys) 一致）：  
+   - **Project → API keys → Production secret key（`tr_prod_*`）**：給後端／SDK 設 **`TRIGGER_SECRET_KEY`**，用於 **從你的 App 觸發已部署的 task**。**不要**把它設成 CLI 的 **`TRIGGER_ACCESS_TOKEN`**。  
+   - **Account → Personal Access Tokens（`tr_pat_*`）**：在 **`{APP_ORIGIN}/account/tokens`** 建立（例：`https://trigger.aware-wave.com/account/tokens`）。用於 **`login`／`deploy`／CI** 的 **`TRIGGER_ACCESS_TOKEN`**（自架另可設 **`TRIGGER_API_URL`**，見 [CLI deploy](https://trigger.dev/docs/cli-deploy-commands#self-hosting)）。若儀表板只突出 **Secret key** 一欄，請改到 **帳號／Account** 區找 **PAT**。  
+3. **互動式登入（一次性）**：`npx trigger.dev@4.4.4 login -a <APP_ORIGIN>`（瀏覽器／magic link；無需在指令列預先貼 `tr_pat_*`）。**CI／無頭機**才需事先匯出 **`TRIGGER_ACCESS_TOKEN`（`tr_pat_*`）**。  
+4. **Deploy 機器**必須能對 **`registry:5000`** 完成 **push** — 見下方 **§7a**。
 
 ```bash
 cd lobster-factory/packages/workflows
@@ -178,7 +181,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy-workflows.ps1
 >
 > 上述設定在 EU VPS 持久化（`/etc/hosts`、`/etc/docker/daemon.json`、`/etc/buildkit/buildkitd.toml`）；**換機或重建 VPS** 時需重做。
 
-> **CLI 認證**：CLI 需要 `tr_pat_` Personal Access Token（非 `tr_prod_` worker token）。PAT 從 `https://trigger.aware-wave.com/account/tokens` 取得，或從 DB `PersonalAccessToken.encryptedToken`（AES-256-GCM raw key）解密。已存入 vault 的 `TRIGGER_ACCESS_TOKEN` 為 `tr_prod_` worker token — 部署前須用正確 PAT 覆蓋環境變數。
+> **CLI 認證**：`deploy` 使用的 **`TRIGGER_ACCESS_TOKEN`** 必須是 **`tr_pat_*`（PAT）**，不是 Project 頁的 **`tr_prod_*`**。PAT 請到 **`{APP_ORIGIN}/account/tokens`** 建立。若 vault／本機曾把 **`tr_prod_*` 誤存成變數名 `TRIGGER_ACCESS_TOKEN`**，請改為 **`TRIGGER_SECRET_KEY`**（語意才與 Trigger 文件一致），並另存 PAT 至 **`TRIGGER_ACCESS_TOKEN`**。
 
 **路徑 B（堅持在筆電 build）** 需同時滿足：
 

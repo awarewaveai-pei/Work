@@ -51,7 +51,6 @@
 ### 未完成
 
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：桌機 2026-05-07 `machine-environment-audit -Strict` PASS（no warnings）✓**；筆電尚未執行。任一台未 PASS 則本條不結案。**筆電下一步：**依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 + §1.5.1**（WP 棧）逐步執行後，在筆電 monorepo 根跑 `machine-environment-audit.ps1 -FetchOrigin -Strict`；細項 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。
-- [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度（2026-05-07）：**已在 **EU `204.168.175.41`** 完成 `registry:5000` DNS 對齊與 `docker login`（PASS），並可進入 `/root/Work/lobster-factory/packages/workflows` 觸發 `npx trigger.dev@4.4.4 deploy`。**目前唯一阻塞：**CLI 明確回報 `TRIGGER_ACCESS_TOKEN` 不是 PAT（需 **`tr_pat_*`**，現值為 `tr_prod_*`）。**下一步（操作者）**：產生 Personal Access Token（`tr_pat_*`）後，在 EU 以 `export TRIGGER_ACCESS_TOKEN=<tr_pat_...>`（或寫入 `/root/trigger/.env`）重跑 deploy。
 - [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
   - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（**URL／lifecycle SSOT**）、`SITES_INDEX.md`（須與 registry 對齊）、各案 `02_EXECUTION_PLAN.md` Day 2、`SITE_PROFILE.md`；Runbook §2 對齊框：`PRODUCTION_RUNBOOK_PILOT_*`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
   - **自動漂移閘道**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（比對 **`SITES_INDEX`**、含 HTTPS 之 **`sites/*/SITE_PROFILE`**、以及 `projects/*/02_EXECUTION_PLAN.md` 的 staging URL；`scripts/system-health-check.ps1` → **`verify-build-gates`**；PR `.github/workflows/tenant-staging-ssot.yml`）。
@@ -94,6 +93,12 @@
   - DoD：2 個測試角色登入後，看到不同權限結果
 
 ## Next — 已完成歷程（查詢用）
+
+### 2026-05-07 — Trigger workflows EU deploy（結案）
+
+- [x] **Trigger workflows 完整 deploy**
+  - **證據**：`WORKLOG.md` §「Trigger workflows deploy to EU — 完成」（version **`20260507.3`**，dashboard deployment 連結同該節）。
+  - **金鑰對照**：Project **`tr_prod_*`** → 後端 **`TRIGGER_SECRET_KEY`**（觸發任務）；Account **`tr_pat_*`** → **`TRIGGER_ACCESS_TOKEN`**（`deploy`／CI／無頭機）；路徑 **`{APP_ORIGIN}/account/tokens`**。見 **`lobster-factory/infra/trigger/README.md`** §7、blockquote §7a。
 
 ### 2026-05-07 — Next-Gen v1 試點：Day 2 書面子交付（registry／URL）
 
