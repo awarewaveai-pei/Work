@@ -3,6 +3,9 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-08 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-08 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:f51105af91f8da83f3587bec273986d7cf30f90b1cc8de6160d932a81cb34272 -->
+- **2026-05-08 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-08 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:0f3972e67288d57fe834037f0601d542267564222b93def6cc303d836131853f -->
+- **2026-05-08 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-08 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:14943f18e8160246d1f98a522a83de76378d5d7f52918d9db68a0fee23f5238e -->
 - **2026-05-07 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-07 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:91a66f0b3f303c58769c9d8bd1537896f764f711ce35a55e6722b4a50a712099 -->
 - **2026-05-07（/onboard 精靈 + M3 + nginx 事故）**：新增 `/onboard` 4 步驟 New Client Onboarding Wizard（Step1 ClientInfo + UUID 自動生成、Step2 20 部門 DepartmentSelector、Step3 7 providers 服務佈建、Step4 summary → /build URL param 跳轉）。同步 `/build` BuildConsole 改版：Service Provisioning 整段移除，改為 URL pre-fill `useEffect`（14 params from /onboard）+ contextual banner。M3 `lib/department-catalog.ts` 為 20 部門機器可讀 SSOT（`ClusterId` / `MatrixRowKey` union types；`SMB_DEFAULT_CLUSTERS` / `buildDepartmentSelection()` / `getRequiredTemplateFiles()`）。nginx 事故：`/etc/nginx/.htpasswd_studio` 從未掛入 container（401 全站），docker-compose.yml 補永久 volume mount，生產 config 同步並暫時 comment out Basic Auth 讓 `app.aware-wave.com` 可訪問。Commit `ca4438a` 已 push。**Basic Auth 再開啟**：取消 `nginx/default.conf` `#auth_basic` 注釋，確保 htpasswd hash 與 vault 一致，`docker compose restart nginx`。
 - **2026-05-07（PostHog MU SG 部署 — 根本問題修正）**：WordPress Docker image **不執行** `/docker-entrypoint.d/` 腳本（nginx 慣例，非 WP 慣例）——`mu-plugins/` 從未建立。修正：`docker-entrypoint-sentry.sh` 加 `exec apache2-foreground` 改為 **CMD** 入口；`Dockerfile` 改 `CMD ["/usr/local/bin/lobster-init.sh"]`；新增 `/usr/src/wordpress/wp-content/mu-plugins/` 種子層供 first-run volume。SG 驗證：`curl -sL http://aware-wave.com/ | grep "posthog.init"` 通過；`site_name: "Aware Wave Website"`、`app_surface: "wordpress-public"` 正確。Commits：`f9e666b`（Dockerfile+entrypoint）、`0381606`（WORKLOG 證據）。**TASKS `phase1 WordPress（SG）PostHog MU` 結案**（`AUTO_TASK_DONE` 已寫入 WORKLOG）。
@@ -388,6 +391,15 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `LOBSTER_HOSTING_ADAPTER=http_json` + `HTTP_JSON_HOSTING_ADAPTER.md`；`provisionHttpJsonStaging`；`create-wp-site` 支援 `vendor_staging_provisioned` 與 `vendorStaging`；`resolveStagingProvisioning` 為 async。
 - **互動偏好**：可驗證範圍內代理自主推進、減少選項式追問；不可逆決策仍單點確認。
 
+## Today (2026-05-08) - SG deploy drift 根因排除 + 機械化 + 自動告警
+- **症狀**：`app.aware-wave.com` sidebar 預期 7 項只看到 5 項（缺 New Client / Build Console）。
+- **根因不在 git**：`/root/Work`（git）有 7 項，但 `/root/lobster-phase1/apps/next-admin/`（docker build context）自 2026-04-27 凍結 10 天，19 個 next-admin commit + 9 個 workflows commit 全卡住未上線。SG 兩個目錄無自動同步機制是長期 bug。
+- **Server 落地**：`/root/lobster-phase1/scripts/sg-deploy.sh`（rsync git→staging，`--exclude='.env*'` 保留本機機密，build + up + 寫 `.deployed-commit`）；`/root/lobster-phase1/scripts/check-drift-and-alert.sh`（每日 01:00 UTC cron，dedupe，curl 既有 Slack webhook）。
+- **Client 落地**：`scripts/check-deploy-drift.ps1`、掛 `system-health-check.ps1` §7（warn-only）；`.claude/commands/sg-deploy.md`、`.claude/commands/check-drift.md` 兩個 slash command。
+- **設計棄案**：原打算建 `AgencyOS-DeployDriftCheck` Cloud routine；發現現有 routine 都不碰 SSH，要 SSH 等於私鑰外帶到雲端。改 SG 本地 cron 後，零雲端依賴、私鑰永不出 SG，30 年穩固性更佳。
+- **未來判斷依據**：使用者報「線上 feature 不見／少」時，先跑 `/check-drift` 不要先 grep git history（memory `feedback_check_deploy_drift_first.md`）。
+- **使用者桌面 `AWARE_WAVE_CREDENTIALS.md` §24** 仍有 EU/SG 描述錯誤（next-admin 在 SG 不在 EU）；不在 git，候授權後代修。
+
 ## Related Documents (Auto-Synced)
 - `.cursor/rules/00-session-bootstrap.mdc`
 - `.cursor/rules/10-memory-maintenance.mdc`
@@ -396,5 +408,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-07 16:14:09 UTC_
+_Last synced: 2026-05-07 16:48:32 UTC_
 

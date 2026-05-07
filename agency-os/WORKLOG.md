@@ -148,6 +148,72 @@
 - **Server 證據**：`/root/backups/lobster-phase1-apps-next-admin-20260507-154953.tar.gz`（419MB，已排除 node_modules/.next）；`/root/lobster-phase1/.env.next-admin.local.backup-20260507-154953`（第二層保險）；`/root/lobster-phase1/.deployed-commit` = `1d11a27...`。
 - AUTO_TASK_DONE: SG next-admin 部署 drift 根因排除 + sg-deploy.sh / check-deploy-drift.ps1 機械化
 
+### SG drift 自動告警 + slash 化（cron + Slack；取代 Cloud routine 方案）
+
+- **背景**：drift 機械化第一輪是 client-side `check-deploy-drift.ps1` + `system-health-check.ps1` §7 整合（warn-only）。但若使用者數天不 AO-CLOSE，drift 仍會沉默累積。需要每日自動告警。
+- **方案選擇**：原計畫建 `AgencyOS-DeployDriftCheck` Claude Cloud routine；盤點現有 routine（DailyBriefing/Weekly/Monthly）後發現它們**全是純 git 操作，無一觸 SSH**——Claude Cloud runner 沒裝 `hetzner_trigger` 私鑰、無放鑰匙的標準機制。要 SSH 等於把私鑰外帶到雲端 secrets（30 年攻擊面新風險）。**改為 SG 本地 cron + 既有 Slack webhook**，零雲端依賴、私鑰永不出 SG。
+- **Server 落地**：
+  - `/root/lobster-phase1/scripts/check-drift-and-alert.sh`：5 行核心邏輯（git fetch → 比對 `.deployed-commit` 與 `origin/main` → curl Slack）；含 dedupe（state file 記錄 (deployed,origin) pair，同對不重發）；`--force` flag 用於測試重發。
+  - `crontab` 加 `0 1 * * * /root/lobster-phase1/scripts/check-drift-and-alert.sh`（01:00 UTC = 09:00 TPE）。Idempotent 安裝（grep 既有再決定是否新增）。
+  - Webhook 從既有 `/root/lobster-phase1/.env` 的 `SLACK_WEBHOOK_URL` 讀；不重存第二份。
+  - Log: `/var/log/sg-deploy-drift.log`。
+- **sg-deploy.sh bug 修正**（首版發現的問題）：
+  - **問題 1**：`.deployed-commit` 寫入時機在 healthcheck wait 之後；若 `docker compose up -d` 撞「previous container removal in progress」race condition exit non-zero，整個腳本因 `set -e` 提前 exit，`.deployed-commit` **永不被寫**——drift detector 失明。
+  - **問題 2**：race condition 本身使首次 deploy 留下 `<id>_lobster-next-admin` 異常容器名稱，需手動 cleanup。
+  - **修正**：(a) `up -d` 失敗若 stderr 含 "removal of container .* is already in progress" 自動 `stop && rm -f && up -d` 重試一次；(b) 寫 `.deployed-commit` 提前到 build 成功 + up 成功立即執行（healthcheck 即使後續 fail 也已留紀錄，因 image 已 build、容器已起，drift 角度看部署已落地）。腳本 backup 自動產生於 `sg-deploy.sh.bak-<timestamp>`。
+- **Client-side slash 化**：`.claude/commands/sg-deploy.md`（透過 hetzner-ssh MCP 一鍵 deploy + 容器名 race 提示）、`.claude/commands/check-drift.md`（包 `check-deploy-drift.ps1` 並列出未上線 commit 摘要）。Risk tier 標 Medium / Low 對應 CLAUDE.md 規範。
+- **驗證**：`check-drift-and-alert.sh --force` 實測 HTTP 200，Slack 收到「behind=5」附最近 3 commit 摘要；重跑無 `--force` 正確 dedupe；cron service active，下次 firing 為 2026-05-08 01:00 UTC。
+- **Docs**：`DEPLOY_ROLLBACK_RUNBOOK.md` §2.4 增「自動 drift 告警（cron + Slack）」、§2.5 增「已知行為與 bug 修正紀錄」、§2.6 維持「為什麼有兩個目錄」（從原 §2.4 升序）。維持單一主人，不另建 doc。
+- AUTO_TASK_DONE: SG drift 自動告警上線（cron + Slack）+ /sg-deploy /check-drift slash + sg-deploy.sh race 修正
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:14943f18e8160246d1f98a522a83de76378d5d7f52918d9db68a0fee23f5238e -->
+
+### claude-opus-4.7 <2026-05-08 00:25>
+
+- **完成（一句）**: SG next-admin 部署 drift 根因排除（19 commit 卡 staging 4/27 起未上線）+ 機械化 sg-deploy.sh / check-deploy-drift.ps1 / SG 本地 cron + Slack alert / 兩個 slash command；維持單一 owner doc 不另建。
+- **變更路徑**:
+  - `scripts/check-deploy-drift.ps1`
+  - `scripts/system-health-check.ps1`
+  - `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`
+  - `agency-os/docs/operations/SG_PHASE1_DOCKER_LAYOUT.md`
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+  - `.claude/commands/sg-deploy.md`
+  - `.claude/commands/check-drift.md`
+  - 遠端／無 commit：`/root/lobster-phase1/scripts/sg-deploy.sh`、`/root/lobster-phase1/scripts/check-drift-and-alert.sh`、`/root/lobster-phase1/.deployed-commit`、SG `crontab` 加入 `0 1 * * *` drift check
+- **Git**: ee204ec（含早 d85fe22 / 5be0f34 兩個 checkpoint；本輪會由 ao-close 一併 push）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 使用者桌面 `AWARE_WAVE_CREDENTIALS.md` §24「需要 SSH 到 EU」描述錯誤（next-admin 在 SG），不在 git，候授權後代修。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:0f3972e67288d57fe834037f0601d542267564222b93def6cc303d836131853f -->
+
+### claude-opus-4.7 <2026-05-08 00:42>
+
+- **完成（一句）**: AO-CLOSE 第二輪 — 將 WORKLOG/memory 補登的 SG drift 機械化變更走完 ao-close 閘道並推送至 origin/main。
+- **變更路徑**:
+  - `agency-os/WORKLOG.md` (第二段 AUTO_TASK_DONE)
+  - `agency-os/memory/CONVERSATION_MEMORY.md` (今日蒸餾段)
+- **Git**: ee204ec（本 push 後追加 ao-close 自動 commit）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 第一輪 ao-close 因 apply-closeout-task-checkmarks 偵測到不在 TASKS 的早段 AUTO_TASK_DONE（其它 session 留下）而 fail；本輪以 -SkipAutoTaskCheckmarks 跳過該 step。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:f51105af91f8da83f3587bec273986d7cf30f90b1cc8de6160d932a81cb34272 -->
+
+### claude-opus-4.7 <2026-05-08 00:48>
+
+- **完成（一句）**: AO-CLOSE 第三輪閘道循環完成（前兩輪卡 apply-checkmarks 與 daily-note TBD；本輪 daily-note 已填，inbox section 補回）。
+- **變更路徑**:
+  - `agency-os/memory/daily/2026-05-08.md` (Done/Current/Next 三段補齊)
+- **Git**: ee204ec (will be superseded by ao-close auto commit)
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
+
 ## 2026-05-07
 
 ### Trigger workflows deploy to EU — 完成
@@ -1612,7 +1678,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-07 16:14:09 UTC_
+_Last synced: 2026-05-07 16:48:32 UTC_
 
 ## 2026-03-20
 
@@ -2046,6 +2112,4 @@ _Last synced: 2026-05-07 16:14:09 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
 

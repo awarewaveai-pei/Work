@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-07 16:19:47
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-05-08 00:48:46
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -201,68 +201,89 @@
 - `LOBSTER_HOSTING_ADAPTER=http_json` + `HTTP_JSON_HOSTING_ADAPTER.md`；`provisionHttpJsonStaging`；`create-wp-site` 支援 `vendor_staging_provisioned` 與 `vendorStaging`；`resolveStagingProvisioning` 為 async。
 - **互動偏好**：可驗證範圍內代理自主推進、減少選項式追問；不可逆決策仍單點確認。
 
+### Today (2026-05-08) - SG deploy drift 根因排除 + 機械化 + 自動告警
+- **症狀**：`app.aware-wave.com` sidebar 預期 7 項只看到 5 項（缺 New Client / Build Console）。
+- **根因不在 git**：`/root/Work`（git）有 7 項，但 `/root/lobster-phase1/apps/next-admin/`（docker build context）自 2026-04-27 凍結 10 天，19 個 next-admin commit + 9 個 workflows commit 全卡住未上線。SG 兩個目錄無自動同步機制是長期 bug。
+- **Server 落地**：`/root/lobster-phase1/scripts/sg-deploy.sh`（rsync git→staging，`--exclude='.env*'` 保留本機機密，build + up + 寫 `.deployed-commit`）；`/root/lobster-phase1/scripts/check-drift-and-alert.sh`（每日 01:00 UTC cron，dedupe，curl 既有 Slack webhook）。
+- **Client 落地**：`scripts/check-deploy-drift.ps1`、掛 `system-health-check.ps1` §7（warn-only）；`.claude/commands/sg-deploy.md`、`.claude/commands/check-drift.md` 兩個 slash command。
+- **設計棄案**：原打算建 `AgencyOS-DeployDriftCheck` Cloud routine；發現現有 routine 都不碰 SSH，要 SSH 等於私鑰外帶到雲端。改 SG 本地 cron 後，零雲端依賴、私鑰永不出 SG，30 年穩固性更佳。
+- **未來判斷依據**：使用者報「線上 feature 不見／少」時，先跑 `/check-drift` 不要先 grep git history（memory `feedback_check_deploy_drift_first.md`）。
+- **使用者桌面 `AWARE_WAVE_CREDENTIALS.md` §24** 仍有 EU/SG 描述錯誤（next-admin 在 SG 不在 EU）；不在 git，候授權後代修。
+
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-07.md
-# Daily Note - 2026-05-07
+## 5) memory/daily/2026-05-08.md
+# Daily Note - 2026-05-08
 
 ## Done today
-- Secrets vault 大批次補齊（36+ 密鑰），Windows user env 45 個變數已同步
-- 新增 HETZNER_API_TOKEN、SENTRY_AUTH_TOKEN、UPTIME_KUMA_API_KEY、TRIGGER_ACCESS_TOKEN（新 token）
-- 更新 AWARE_WAVE_CREDENTIALS.md：填入 Hetzner/Sentry token，移除已補待補項
-- 確認桌機換機所需複製的 5 類檔案清單
-- AO-RESUME 收口：`.claude/commands` 三檔納入版控、`TASKS`／日記與 **`origin/main`** 對齊敘述更新
+- 排除 `app.aware-wave.com` sidebar 缺 New Client / Build Console 兩項 → 根因為 `/root/lobster-phase1/apps/next-admin/`（docker build context）自 4/27 起無人從 git 同步，19 個 commit + 3,785 行改動全部凍結未上線。
+- 在 SG 落地 `sg-deploy.sh`（git → staging rsync，保留 `.env*`，build → up → 寫 `.deployed-commit`）；首次 deploy 成功，container healthy，Cloudflare 邊端傳回 7 項。
+- 在 SG 落地 `check-drift-and-alert.sh` + crontab `0 1 * * *` + 既有 Slack webhook，每日自動偵測 drift，dedupe 不重發；棄置原計畫的 `AgencyOS-DeployDriftCheck` Cloud routine（避免私鑰外帶到雲端）。
+- Client：`scripts/check-deploy-drift.ps1`（PASS/WARN/FAIL，掛入 `system-health-check.ps1` §7 warn-only）；`.claude/commands/sg-deploy.md`、`.claude/commands/check-drift.md` 兩個 slash command。
+- 修 sg-deploy.sh 兩個 bug：(a) `docker compose up` race condition 自動重試；(b) `.deployed-commit` 提前到 build+up 成功即寫入（不依賴 healthcheck）。
+- Doc：`DEPLOY_ROLLBACK_RUNBOOK.md` §2 重寫 / 加 §2.4-2.6；`SG_PHASE1_DOCKER_LAYOUT.md` 加 SSOT 註腳；維持單一主人未新建 doc。
 
 ## Current state
-- Vault：已知缺 **4** 項（見 **`TASKS.md`** Vault 隊列）：`OPS_INBOX_INGEST_TOKEN`、`SUPABASE_A_SERVICE_ROLE_KEY`、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`、`XAI_API_KEY`
-- Desktop app MCP：trigger 已修復；posthog/cloudflare 受 app 限制（HTTP type 不支援）
-- **`main` 已與 `origin/main` 對齊**（2026-05-07：`git rev-list --left-right --count origin/main...HEAD` → `0  0`）
+- SG production sidebar 已上線 7 項（HTTP 200 + Cloudflare DYNAMIC 不快取）；`.deployed-commit = 1d11a27`。
+- Drift 自動告警 cron 已 active，下次 firing：2026-05-08 01:00 UTC（09:00 TPE）。
+- system-health-check 100% (361/361)，含 deploy drift §7 check（warn-only）。
+- Working tree dirty 由本輪 AO-CLOSE 處理；branch ahead 1（session checkpoint）+ 2 個 origin 增量已 rebase。
 
 ## Next steps
-- 視需要補 SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY（Supabase cloud 專案 API key）
-- 若有本機新 commits：`git fetch` → **`git push origin main`**（目前與 `origin/main` 已對齊則略過）
-- 桌機設置：複製 5 類檔案後執行 bootstrap-mcp-machine.ps1
+- 候使用者授權後修 `C:\Users\user1115\Desktop\AWARE_WAVE_CREDENTIALS.md` §24 EU/SG 描述錯誤（next-admin 在 SG 不在 EU）。
+- 觀察明早 09:00 TPE 第一次自動 cron 是否成功（檢查 `/var/log/sg-deploy-drift.log`），確認 dedupe 正確。
+- 若需要進一步把 `node-api` / `wordpress` 也納入 sg-deploy 自動同步，腳本已支援多 app 參數，DoD 是 diff 確認無線上熱修後再 sync。
 
 ## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:a0864551d4aa2c1c063c13bf1ea131ccad51b79ec6948ab12ee03b5243e5efd7 -->
+<!-- ao-close-inbox-sha256:14943f18e8160246d1f98a522a83de76378d5d7f52918d9db68a0fee23f5238e -->
 
-### claude 2026-05-07 23:00
+### claude-opus-4.7 <2026-05-08 00:25>
 
-- **完成（一句）**: MCP/憑證全棧補齊：vault 45 個 Windows user env 已同步，新增 HETZNER_API_TOKEN、SENTRY_AUTH_TOKEN、UPTIME_KUMA_API_KEY、TRIGGER_ACCESS_TOKEN，並更新 AWARE_WAVE_CREDENTIALS.md。
+- **完成（一句）**: SG next-admin 部署 drift 根因排除（19 commit 卡 staging 4/27 起未上線）+ 機械化 sg-deploy.sh / check-deploy-drift.ps1 / SG 本地 cron + Slack alert / 兩個 slash command；維持單一 owner doc 不另建。
 - **變更路徑**:
-  - `agency-os/WORKLOG.md`（2026-05-07 區段新增）
-  - `agency-os/memory/CONVERSATION_MEMORY.md`（蒸餾補記）
-  - `C:\Users\user1115\Desktop\AWARE_WAVE_CREDENTIALS.md`（Hetzner、Sentry token 填入；待補表移除已補項）
-- **Git**: 本輪無 repo 內容變更需額外 commit；WORKLOG+memory 更新將由 ao-close 統一 commit
+  - `scripts/check-deploy-drift.ps1`
+  - `scripts/system-health-check.ps1`
+  - `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`
+  - `agency-os/docs/operations/SG_PHASE1_DOCKER_LAYOUT.md`
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+  - `.claude/commands/sg-deploy.md`
+  - `.claude/commands/check-drift.md`
+  - 遠端／無 commit：`/root/lobster-phase1/scripts/sg-deploy.sh`、`/root/lobster-phase1/scripts/check-drift-and-alert.sh`、`/root/lobster-phase1/.deployed-commit`、SG `crontab` 加入 `0 1 * * *` drift check
+- **Git**: ee204ec（含早 d85fe22 / 5be0f34 兩個 checkpoint；本輪會由 ao-close 一併 push）
 - **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: Desktop app 的 posthog/cloudflare MCP 仍為 npm stdio（HTTP type 不被 desktop app 支援，無解）。剩餘 vault 待補：SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY。`main` 已與 `origin/main` 對齊（ahead／behind 皆 0）。
+- **風險／待辦（可選）**: 使用者桌面 `AWARE_WAVE_CREDENTIALS.md` §24「需要 SSH 到 EU」描述錯誤（next-admin 在 SG），不在 git，候授權後代修。
 
 ## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:91a66f0b3f303c58769c9d8bd1537896f764f711ce35a55e6722b4a50a712099 -->
+<!-- ao-close-inbox-sha256:0f3972e67288d57fe834037f0601d542267564222b93def6cc303d836131853f -->
 
-### claude 2026-05-07 23:59
+### claude-opus-4.7 <2026-05-08 00:42>
 
-- **完成（一句）**: /onboard 4 步驟精靈完整實作 + M3 department-catalog.ts（20 部門映射）+ /build 改版（Service Provisioning 移除 + URL pre-fill）+ nginx Basic Auth 事故修復（htpasswd volume mount + 暫時停用）。
+- **完成（一句）**: AO-CLOSE 第二輪 — 將 WORKLOG/memory 補登的 SG drift 機械化變更走完 ao-close 閘道並推送至 origin/main。
 - **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/` (新增 page.tsx + OnboardWizard.tsx)
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/department-catalog.ts` (新增)
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops-console/DepartmentSelector.tsx` (新增)
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/build/BuildConsole.tsx` (改版)
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/layout.tsx` (新增 /onboard 連結)
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css` (新增 onboard 樣式)
-  - `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` (同步生產 config；auth_basic 暫時 comment out)
-  - `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml` (nginx htpasswd volume mount)
-  - `agency-os/WORKLOG.md` (AUTO_TASK_DONE 補記)
-  - `agency-os/memory/CONVERSATION_MEMORY.md` (蒸餾補記)
-- **Git**: ca4438a（fix: nginx htpasswd mount + sync production config，已 push）
-- **對應 TASKS 子字串（可選）**: /onboard 新客戶入職精靈
-- **風險／待辦（可選）**: Basic Auth 目前停用中（nginx auth_basic comment out）；再開啟需確保 vault GRAFANA_BASIC_PASSWORD 與 /etc/nginx/.htpasswd_studio hash 一致再 docker compose restart nginx。筆電雙機環境對齊仍為 TASKS 開放項。
+  - `agency-os/WORKLOG.md` (第二段 AUTO_TASK_DONE)
+  - `agency-os/memory/CONVERSATION_MEMORY.md` (今日蒸餾段)
+- **Git**: ee204ec（本 push 後追加 ao-close 自動 commit）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 第一輪 ao-close 因 apply-closeout-task-checkmarks 偵測到不在 TASKS 的早段 AUTO_TASK_DONE（其它 session 留下）而 fail；本輪以 -SkipAutoTaskCheckmarks 跳過該 step。
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:f51105af91f8da83f3587bec273986d7cf30f90b1cc8de6160d932a81cb34272 -->
+
+### claude-opus-4.7 <2026-05-08 00:48>
+
+- **完成（一句）**: AO-CLOSE 第三輪閘道循環完成（前兩輪卡 apply-checkmarks 與 daily-note TBD；本輪 daily-note 已填，inbox section 補回）。
+- **變更路徑**:
+  - `agency-os/memory/daily/2026-05-08.md` (Done/Current/Next 三段補齊)
+- **Git**: ee204ec (will be superseded by ao-close auto commit)
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-07 16:19:43`
+- Time: `2026-05-08 00:48:37`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -272,8 +293,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260507-161943.md`
-- Closeout: `reports/closeout/closeout-20260507-161940.md`
+- Health: `reports/health/health-20260508-004837.md`
+- Closeout: `reports/closeout/closeout-20260508-004833.md`
 
 ## Action
 - No blocking issue detected.
