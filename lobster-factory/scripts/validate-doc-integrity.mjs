@@ -1,3 +1,12 @@
+/**
+ * Doc integrity gate (invoked from agency-os system-health-check + lobster bootstrap).
+ *
+ * Flags:
+ *   --strict-duplicates          Fail when the same long powershell/node command line appears in 2+ markdown files.
+ *   --strict-canonical-dupes     Fail when charter-grade SSOT filenames appear outside approved doc trees (see scan).
+ *   --skip-agency-canonical      Skip agency-os EXECUTION_DASHBOARD canonical assert (or LOBSTER_SKIP_AGENCY_CANONICAL=1).
+ *   --workRoot=<abs path>        Monorepo root (parent of lobster-factory/). Default: parent of this script dir.
+ */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,6 +49,13 @@ function walkMarkdownFiles(rootDir, out = []) {
 
 const linkRe = /\[([^\]]*)\]\(([^)]+)\)/g;
 
+/** Repo-relative markdown paths that commonly fork (Single Owner / charter §4.3). Warn-only unless --strict-canonical-dupes */
+const canonicalDupPatterns = [
+  { label: "30_YEAR_AI_CODING_EXEC_CHARTER", re: /30_YEAR_AI_CODING_EXEC_CHARTER\.md/i },
+  { label: "REMOTE_WORKSTATION_STARTUP", re: /REMOTE_WORKSTATION_STARTUP\.md/i },
+  { label: "LONG_TERM_OPERATING_DISCIPLINE", re: /LONG_TERM_OPERATING_DISCIPLINE\.md/i },
+];
+
 function extractLinks(mdContent) {
   const links = [];
   let m;
@@ -62,6 +78,23 @@ function resolveLink(fromFile, href) {
 const broken = [];
 const scannedRoots = [];
 
+function scanMarkdownFile(absFile) {
+  if (!fs.existsSync(absFile) || !absFile.endsWith(".md")) return;
+  const content = fs.readFileSync(absFile, "utf8");
+  for (const href of extractLinks(content)) {
+    const target = resolveLink(absFile, href);
+    if (!target) continue;
+    if (!fs.existsSync(target)) {
+      broken.push({
+        type: "broken_link",
+        from: path.relative(workRoot, absFile),
+        href,
+        resolved: path.relative(workRoot, target),
+      });
+    }
+  }
+}
+
 function scanRoot(label, absRoot) {
   if (!fs.existsSync(absRoot)) {
     return;
@@ -69,21 +102,130 @@ function scanRoot(label, absRoot) {
   scannedRoots.push(label);
   const files = walkMarkdownFiles(absRoot);
   for (const file of files) {
-    const content = fs.readFileSync(file, "utf8");
-    for (const href of extractLinks(content)) {
-      const target = resolveLink(file, href);
-      if (!target) continue;
-      if (!fs.existsSync(target)) {
+    scanMarkdownFile(file);
+  }
+}
+
+/** Catch disk-corruption / aborted writes (e.g. 0-byte README). */
+function assertNonEmptyMarkdownTrees() {
+  const rootReadme = path.join(workRoot, "README.md");
+  if (fs.existsSync(rootReadme)) {
+    const raw = fs.readFileSync(rootReadme, "utf8");
+    if (raw.trim().length === 0) {
+      broken.push({
+        type: "empty_md",
+        detail: path.relative(workRoot, rootReadme),
+        reason: "empty_or_whitespace_only",
+      });
+    }
+  }
+
+  const dirs = [
+    path.join(workRoot, "agency-os", "docs"),
+    path.join(workRoot, "agency-os", "tenants"),
+    path.join(lobsterRoot, "docs"),
+    path.join(lobsterRoot, "infra", "trigger"),
+  ];
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    const files = walkMarkdownFiles(dir);
+    for (const file of files) {
+      let raw;
+      try {
+        raw = fs.readFileSync(file, "utf8");
+      } catch {
         broken.push({
-          type: "broken_link",
-          from: path.relative(workRoot, file),
-          href,
-          resolved: path.relative(workRoot, target),
+          type: "empty_md",
+          detail: path.relative(workRoot, file),
+          reason: "unreadable",
+        });
+        continue;
+      }
+      if (raw.trim().length === 0) {
+        broken.push({
+          type: "empty_md",
+          detail: path.relative(workRoot, file),
+          reason: "empty_or_whitespace_only",
+        });
+      }
+    }
+  }
+
+  const agencyOs = path.join(workRoot, "agency-os");
+  if (fs.existsSync(agencyOs)) {
+    const topMd = fs
+      .readdirSync(agencyOs, { withFileTypes: true })
+      .filter((e) => e.isFile() && e.name.endsWith(".md"))
+      .map((e) => path.join(agencyOs, e.name));
+    for (const file of topMd) {
+      const raw = fs.readFileSync(file, "utf8");
+      if (raw.trim().length === 0) {
+        broken.push({
+          type: "empty_md",
+          detail: path.relative(workRoot, file),
+          reason: "empty_or_whitespace_only",
         });
       }
     }
   }
 }
+
+/** Detect parallel copies of charter-grade SSOT filenames outside approved pockets (warn vs strict). */
+function findCanonicalFilenameDuplicates() {
+  const approvedPrefixes = [
+    path.join(workRoot, "agency-os", "docs"),
+    path.join(workRoot, "agency-os", "memory"),
+    path.join(lobsterRoot, "docs"),
+    path.join(workRoot, "docs"),
+  ]
+    .filter((p) => fs.existsSync(p))
+    .map((p) => path.resolve(p) + path.sep);
+  const hits = new Map();
+  const roots = [workRoot].filter((r) => fs.existsSync(r));
+
+  function visit(dir, depth, maxDepth) {
+    if (depth > maxDepth) return;
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        if (
+          ent.name === "node_modules" ||
+          ent.name === ".git" ||
+          ent.name === "dist" ||
+          ent.name === ".next" ||
+          ent.name === "coverage"
+        ) {
+          continue;
+        }
+        visit(full, depth + 1, maxDepth);
+      } else if (ent.isFile() && ent.name.endsWith(".md")) {
+        for (const { label, re } of canonicalDupPatterns) {
+          if (!re.test(ent.name)) continue;
+          const rel = path.relative(workRoot, full);
+          const resolvedFull = path.resolve(full);
+          const ok = approvedPrefixes.some((pre) => resolvedFull.startsWith(pre));
+          if (!ok) {
+            if (!hits.has(label)) hits.set(label, []);
+            hits.get(label).push(rel);
+          }
+        }
+      }
+    }
+  }
+
+  for (const r of roots) {
+    visit(r, 0, 14);
+  }
+  return hits;
+}
+
+const strictCanonicalDupes = process.argv.includes("--strict-canonical-dupes");
 
 /** Canonical files that must exist (lobster-factory + cross-links) */
 function assertCanonical() {
@@ -156,13 +298,45 @@ function findDuplicateCommandLines() {
 }
 
 assertCanonical();
+assertNonEmptyMarkdownTrees();
 
 scanRoot("lobster-factory", lobsterRoot);
 scanRoot("agency-os/docs", path.join(workRoot, "agency-os", "docs"));
 scanRoot("agency-os/memory", path.join(workRoot, "agency-os", "memory"));
+const tenantsMd = path.join(workRoot, "agency-os", "tenants");
+if (fs.existsSync(tenantsMd)) {
+  scanRoot("agency-os/tenants", tenantsMd);
+}
+
+const agencyOsTop = path.join(workRoot, "agency-os");
+if (fs.existsSync(agencyOsTop)) {
+  scannedRoots.push("agency-os/*.md (top-level)");
+  for (const ent of fs.readdirSync(agencyOsTop, { withFileTypes: true })) {
+    if (ent.isFile() && ent.name.endsWith(".md")) {
+      scanMarkdownFile(path.join(agencyOsTop, ent.name));
+    }
+  }
+}
+
 const specRaw = path.join(workRoot, "docs", "spec", "raw");
 if (fs.existsSync(specRaw)) {
   scanRoot("docs/spec/raw", specRaw);
+}
+
+const canonicalDupHits = findCanonicalFilenameDuplicates();
+let canonicalDupIssue = false;
+if (canonicalDupHits.size > 0) {
+  console.log("\n--- Canonical-looking SSOT filenames outside approved doc trees (charter §4.3) ---");
+  for (const [label, paths] of canonicalDupHits) {
+    if (!paths || paths.length === 0) continue;
+    canonicalDupIssue = true;
+    console.log(`${label}:`);
+    for (const p of paths) console.log(`  - ${p}`);
+  }
+  if (strictCanonicalDupes) {
+    console.error("strict-canonical-dupes: failing due to duplicate SSOT filename pockets");
+    process.exitCode = 1;
+  }
 }
 
 const dups = findDuplicateCommandLines();
@@ -184,6 +358,8 @@ if (broken.length > 0) {
   for (const b of broken) {
     if (b.type === "broken_link") {
       console.error(`  broken_link: ${b.from} -> ${b.href} (resolved: ${b.resolved})`);
+    } else if (b.type === "empty_md") {
+      console.error(`  empty_md: ${b.detail} (${b.reason})`);
     } else {
       console.error(`  ${b.type}: ${b.detail || JSON.stringify(b)}`);
     }
@@ -195,6 +371,11 @@ if (broken.length > 0) {
   );
   if (dups.length > 0 && !strictDuplicates) {
     console.log(`Note: ${dups.length} duplicate command patterns (warnings only; use --strict-duplicates to fail)`);
+  }
+  if (canonicalDupIssue && !strictCanonicalDupes) {
+    console.log(
+      "Note: canonical SSOT filename pockets detected outside approved trees (warnings only; use --strict-canonical-dupes to fail)"
+    );
   }
 }
 
