@@ -3,6 +3,9 @@
   "autoUpdatesChannel": "latest",
   "theme": "light",
   "permissions": {
+    "_defaultMode_comment": "bypassPermissions = no per-command prompts. Only valid in user-level ~/.claude/settings.json (Claude Code ignores it in project-shared .claude/settings.json for safety). 'skipDangerousModePermissionPrompt' suppresses the one-time entry confirmation. Hard guardrails come from 'deny' below + hooks/branch-protection.js + hooks/hooks.json's PreToolUse rm-rf block. See mcp/claude-userlevel/README.md.",
+    "defaultMode": "bypassPermissions",
+    "skipDangerousModePermissionPrompt": true,
     "deny": [
       "Bash(git push --force *)",
       "Bash(git push -f *)",
@@ -10,7 +13,20 @@
       "Bash(git checkout -b *)",
       "Bash(git switch -c *)",
       "Bash(git switch --create *)",
-      "Bash(git branch *)"
+      "Bash(git branch *)",
+      "Bash(rm -rf *)",
+      "Bash(rm -fr *)",
+      "Bash(rm --recursive --force *)",
+      "Bash(git reset --hard origin/*)",
+      "Bash(git reset --hard HEAD~*)",
+      "Bash(git clean -fd*)",
+      "Bash(git clean -df*)",
+      "Bash(sudo *)",
+      "Bash(rmdir /s *)",
+      "Bash(rd /s *)",
+      "Bash(format *)",
+      "Bash(mkfs.* *)",
+      "Bash(:(){ *)"
     ],
     "additionalDirectories": [
       "${USERPROFILE}\\AppData\\Roaming\\Claude",
