@@ -10,8 +10,15 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 COPY mu-plugins/sentry.php ./sentry.php
 COPY mu-plugins/posthog.php ./posthog.php
 
-# Register entrypoint hook (WordPress image runs scripts in /docker-entrypoint.d/)
-COPY docker-entrypoint-sentry.sh /docker-entrypoint.d/99-sentry-init.sh
-RUN chmod +x /docker-entrypoint.d/99-sentry-init.sh
+# Seed /usr/src/wordpress so mu-plugins are included when WordPress populates the volume on first run.
+RUN mkdir -p /usr/src/wordpress/wp-content/mu-plugins
+COPY mu-plugins/sentry.php /usr/src/wordpress/wp-content/mu-plugins/sentry.php
+COPY mu-plugins/posthog.php /usr/src/wordpress/wp-content/mu-plugins/posthog.php
+
+# CMD wrapper: runs after WordPress ENTRYPOINT init, overwrites mu-plugins in volume, then starts Apache.
+# WordPress image ENTRYPOINT = docker-entrypoint.sh; CMD replaces the default apache2-foreground.
+COPY docker-entrypoint-sentry.sh /usr/local/bin/lobster-init.sh
+RUN chmod +x /usr/local/bin/lobster-init.sh
 
 WORKDIR /var/www/html
+CMD ["/usr/local/bin/lobster-init.sh"]
