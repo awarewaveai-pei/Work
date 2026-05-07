@@ -4,33 +4,35 @@
 
 import type { CommandSource, PolicyDecision, RiskLevel } from "./types";
 
+// Command names use underscore (not hyphen) because Telegram setMyCommands
+// only accepts [a-z0-9_] for the slash-menu. Keep parser lenient elsewhere.
 const RISK_TABLE: Record<string, RiskLevel> = {
   // low: read-only or text-producing, safe from any source
   "/status": "low",
   "/health": "low",
-  "/daily-review": "low",
-  "/weekly-review": "low",
-  "/list-failed-runs": "low",
+  "/daily_review": "low",
+  "/weekly_review": "low",
+  "/list_failed_runs": "low",
   "/runbook": "low",
-  "/draft-cursor-task": "low",
+  "/draft_cursor_task": "low",
 
   // medium: deferred to Phase 2 (Trigger.dev dispatch)
-  "/replay-dead-letter": "medium",
-  "/trigger-staging-workflow": "medium",
-  "/create-issue": "medium",
+  "/replay_dead_letter": "medium",
+  "/trigger_staging_workflow": "medium",
+  "/create_issue": "medium",
 
   // high: requires approval (ops console SSO)
-  "/deploy-production": "high",
+  "/deploy_production": "high",
   "/refund": "high",
-  "/dns-change": "high",
-  "/rotate-secrets": "high",
+  "/dns_change": "high",
+  "/rotate_secrets": "high",
 
   // critical: never permitted from command plane (must come from ops console + 2FA)
-  "/drop-table": "critical",
-  "/read-secrets": "critical",
-  "/destructive-migration": "critical",
-  "/cross-tenant-export": "critical",
-  "/disable-killswitch": "critical",
+  "/drop_table": "critical",
+  "/read_secrets": "critical",
+  "/destructive_migration": "critical",
+  "/cross_tenant_export": "critical",
+  "/disable_killswitch": "critical",
 };
 
 // Sources that can NEVER execute high or critical risk commands.

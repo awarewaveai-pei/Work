@@ -11,7 +11,7 @@ import { listFailedRunsHandler } from "./listFailedRuns";
 export const phase1Handlers: Record<string, CommandHandler> = {
   "/status": statusHandler,
   "/health": healthHandler,
-  "/daily-review": dailyReviewHandler,
-  "/weekly-review": weeklyReviewHandler,
-  "/list-failed-runs": listFailedRunsHandler,
+  "/daily_review": dailyReviewHandler,
+  "/weekly_review": weeklyReviewHandler,
+  "/list_failed_runs": listFailedRunsHandler,
 };

@@ -163,7 +163,7 @@ try {
 # --- Check 5: hard block (/deploy-production from telegram) ----------------
 try {
   $uid3 = 992000 + (Get-Random -Minimum 1 -Maximum 9999)
-  Send-TelegramUpdate -UpdateId $uid3 -Text '/deploy-production' | Out-Null
+  Send-TelegramUpdate -UpdateId $uid3 -Text '/deploy_production' | Out-Null
   $rows = Get-Request-By-Source-Event -SourceEventId $uid3
   $st = ($rows | Select-Object -First 1).status
   Add-Check -Name 'hard_block_from_telegram' -Pass ($st -eq 'blocked_by_policy') -Detail "status=$st"

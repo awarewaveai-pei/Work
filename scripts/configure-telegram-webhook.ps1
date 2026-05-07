@@ -79,12 +79,13 @@ $resp = Invoke-RestMethod -Method POST `
 Write-Host "setWebhook -> ok=$($resp.ok)  description=$($resp.description)  url=$webhookUrl"
 
 # Register the slash-menu Telegram shows when typing '/'.
+# Telegram only accepts [a-z0-9_] for command names — no hyphens.
 $commands = @(
   @{ command = 'status'           ; description = 'System status: mode + recent commands + open incidents' },
   @{ command = 'health'           ; description = 'Open incidents + 24h error counts' },
-  @{ command = 'daily-review'     ; description = 'AI summary of last 24h activity' },
-  @{ command = 'weekly-review'    ; description = 'AI summary of last 7 days activity' },
-  @{ command = 'list-failed-runs' ; description = 'Recent failed command_requests + workflow_runs' }
+  @{ command = 'daily_review'     ; description = 'AI summary of last 24h activity' },
+  @{ command = 'weekly_review'    ; description = 'AI summary of last 7 days activity' },
+  @{ command = 'list_failed_runs' ; description = 'Recent failed command_requests + workflow_runs' }
 )
 $cmdResp = Invoke-RestMethod -Method POST `
   -Uri "https://api.telegram.org/bot$token/setMyCommands" `
