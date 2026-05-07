@@ -29,6 +29,7 @@ services:
       - "${NGINX_HOST_PORT:-80}:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/nginx/.htpasswd_studio:/etc/nginx/.htpasswd_studio:ro
     networks:
       - lobster-net
     logging: *lobster-logging
