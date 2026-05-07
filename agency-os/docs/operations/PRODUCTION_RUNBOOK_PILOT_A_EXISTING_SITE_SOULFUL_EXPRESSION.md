@@ -30,7 +30,9 @@
 
 ## 2) Day 2：建立 Staging（必做）
 
-- [ ] 建立 staging 子網域（例：`staging.<domain>`）
+> **Repo 對齊（2026-05-07）**：canonical staging URL 已登記於 `tenants/company-soulful-expression/core/ENVIRONMENT_REGISTRY.md` — **`https://staging.soulfulexpression.org/`**，目前 **`lifecycle=provision_pending`**。下列為實作步驟；**驗收通過後**請於該檔將 lifecycle 改為 **`live`**，並回填 WP／PHP／備份等欄位（與 `SITES_INDEX.md` 同步）。
+
+- [ ] 建立 staging 子網域（**應對齊 registry**：`staging.soulfulexpression.org`；若主機商限制再開 CR 修 registry／DNS）
 - [ ] 由 production 複製內容到 staging
 - [ ] 啟用存取保護（密碼/白名單）
 - [ ] 關閉 staging 對正式分析/正式寄信污染

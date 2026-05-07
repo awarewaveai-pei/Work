@@ -1,5 +1,7 @@
 # Environment Registry - Soulful Expression Art Therapy
 
+> **URL／lifecycle SSOT**：本檔為本租戶 **staging／production canonical URL** 與 **`lifecycle`** 唯一真相；`SITES_INDEX.md`、`sites/*/SITE_PROFILE.md`、`NEXT_GEN_DELIVERY_BLUEPRINT_V1.md` §6 為衍生摘要——**變更網址或 lifecycle 時先改本檔**，再同步索引。
+>
 > **與 Discovery 同步**：`production` 列的 **WP／PHP／DB Engine** 應與 `projects/2026-011-existing-site-handover-soulful/10_DISCOVERY.md` 的「環境基線」**一致**（Day 1 盤點同一輪填入）。
 
 ## Environment Inventory

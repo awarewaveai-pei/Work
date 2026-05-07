@@ -22,7 +22,7 @@
 
 | Vendor / service | Purpose | Data touched? | Contract ref (path/issue) | Reviewed date |
 |------------------|---------|---------------|---------------------------|--------------|
-| Hostinger | Hosting / WP（prod；staging **待建**） | Y（站台／流量／可能表單） | **待補** | 待補 |
+| Hostinger | Hosting / WP（prod；staging **canonical 已定**於 `core/ENVIRONMENT_REGISTRY.md`，**實機**仍待 Runbook §2） | Y（站台／流量／可能表單） | **待補** | 待補 |
 | Lobster / Agency 工具鏈 | 建置／維運自動化（若啟用） | 依實際整合 | 專案 `02_EXECUTION_PLAN` **待補** | 待補 |
 | Analytics / marketing（若有） | 轉換與追蹤 | 待評估 | **待補** | 待補 |
 

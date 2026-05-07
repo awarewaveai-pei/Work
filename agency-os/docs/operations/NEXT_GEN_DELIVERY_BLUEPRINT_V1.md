@@ -162,6 +162,7 @@
 ### 上線級 Runbook（已建立）
 - `docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md`
 - `docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md`
+- **索引對齊**：各試點 `SITES_INDEX.md` 與 `core/ENVIRONMENT_REGISTRY.md` 須一致；§2 具「Repo 對齊」摘錄（**2026-05-07**）。
 
 ## Related
 
@@ -176,5 +177,5 @@ _Last synced: 2026-05-07（§6 試點狀態補記）_
 ## Related Documents (Auto-Synced)
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 
-_Last synced: 2026-05-06 11:12:02 UTC_
+_Last synced: 2026-05-07（§6／Runbook 索引對齊；沿用 TOOLS_DELIVERY_TRACEABILITY 連結）_
 

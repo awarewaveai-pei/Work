@@ -55,7 +55,7 @@
 - [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度：**repo 已 **`syncEnvVars`**、鎖 CLI **`4.4.4`**、README／腳本齊；曾完成 **環境變數同步**，**缺**在 **EU** 對 **`registry:5000`** **映像 push**（見 **`lobster-factory/infra/trigger/README.md` §7a**）。**阻塞：**須 **EU 主機 SSH／registry 連線**（或 tunnel）由操作者就緒後方能 **`deploy-workflows.ps1`**／**`npx trigger.dev@4.4.4 deploy`**；代理無法代替登入 VPS。
 - [ ] **phase1 WordPress（SG）PostHog MU** —— **【進行中】** **進度：****repo** 已入 MU **`posthog.php`** + compose **`NEXT_PUBLIC_POSTHOG_*`**。**下一步：**SG **`docker compose build wordpress && docker compose up -d wordpress`**（或等價）→ 公開頁驗證載入。
 - [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
-  - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（兩 tenant）、各案 `02_EXECUTION_PLAN.md` Day 2 記錄、`SITE_PROFILE.md`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
+  - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（**URL／lifecycle SSOT**）、`SITES_INDEX.md`（須與 registry 對齊）、各案 `02_EXECUTION_PLAN.md` Day 2、`SITE_PROFILE.md`；Runbook §2 對齊框：`PRODUCTION_RUNBOOK_PILOT_*`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
 - [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。
   - 本項目標：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）
 - [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。**下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
@@ -102,6 +102,7 @@
   - **試點：**Soulful Expression（既有站接手）+ Scenery Travel Mongolia（新站建置）；tenant 骨架先前已建立。
   - **本輪交付：**兩站 **canonical staging URL** 寫入各 tenant **`core/ENVIRONMENT_REGISTRY.md`**、`sites/*/SITE_PROFILE.md`、專案 **`02_EXECUTION_PLAN.md` Day 2**；**`NEXT_GEN_DELIVERY_BLUEPRINT_V1.md` §6** 補記現況（🟡＝書面就緒，實機待 Runbook）。
   - **未宣稱完成：**雲端 staging **實機**（DNS／SSL／WP 可登入）——見 **`### 未完成`**「**Next-Gen 試點 — Day 2 雲端 staging 實機驗收**」。
+  - **SSOT 收斂（避免矛盾）：**`SITES_INDEX`、兩份 **Pilot Runbook §2（Repo 對齊框）**、`RELEASE_GATES_CHECKLIST`、`CROSS_BORDER_GOVERNANCE`、`BACKUP_RESTORE_PROOF`、`ACCESS_REGISTER`、`30_YEAR_AI_CODING_EXEC_CHARTER` §4.1／§4.3、`TASKS` 證據鏈——均以 **`core/ENVIRONMENT_REGISTRY.md`** 為 URL／lifecycle 先決；**未新增**獨立長文檔。
 
 ### 2026-05-07 — Git `main` 與 `origin/main` 對齊（滯後文案收口）
 

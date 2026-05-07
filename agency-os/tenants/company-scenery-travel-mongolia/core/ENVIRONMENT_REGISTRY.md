@@ -1,5 +1,7 @@
 # Environment Registry - Scenery Travel Mongolia
 
+> **URL／lifecycle SSOT**：本檔為本租戶 **staging／production canonical URL**（含 **提案**網域）與 **`lifecycle`** 唯一真相；`SITES_INDEX.md`、`sites/*/SITE_PROFILE.md`、藍圖 §6 為衍生摘要——**變更網址或 lifecycle 時先改本檔**，再同步索引。
+
 ## Environment Inventory
 
 | Environment | URL | Hosting Provider | Region | WP Version | PHP Version | DB Engine | Backup Location | Last Backup | Last Restore Test | Owner | Notes |

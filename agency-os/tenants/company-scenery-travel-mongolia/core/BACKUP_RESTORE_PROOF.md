@@ -7,7 +7,7 @@
 - Tenant: Scenery Travel Mongolia
 - Site: scenery-travel-mn
 - Environment: **staging**（production 上線後另列一筆）
-- Backup timestamp: **待補**（Day 2 建立後填入）
+- Backup timestamp: **待補**（**staging 實機**就緒後首次備份時填入；staging **canonical URL** 已定見 `ENVIRONMENT_REGISTRY.md`）
 - Backup scope: DB / uploads / full snapshot
 - Storage location: **待補**（UpdraftPlus + cloud storage 路徑）
 - Retention policy: **待補**（建議：30 天）

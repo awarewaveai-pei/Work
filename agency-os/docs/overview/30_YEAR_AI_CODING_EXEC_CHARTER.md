@@ -43,7 +43,7 @@
 ### 4.1 真相順序（結案／對外宣告只認這條鏈）
 1. **已 merge 的 git**（含可在 `origin/main` 對照的 commit）。
 2. **`TASKS.md` → `### 未完成`**（全域隊列：仍開放的責任）。
-3. **該主題 Owner 檔**（例：`REMOTE_WORKSTATION_STARTUP.md`、`DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`、`tenants/.../10_DISCOVERY.md`；清單見 `docs/operations/cursor-enterprise-rules-index.md` SSOT 表）。
+3. **該主題 Owner 檔**（例：`REMOTE_WORKSTATION_STARTUP.md`、`DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`、`tenants/<company>/core/ENVIRONMENT_REGISTRY.md`（環境 URL／lifecycle）、`tenants/.../10_DISCOVERY.md`；清單見 `docs/operations/cursor-enterprise-rules-index.md` SSOT 表）。
 4. **`WORKLOG.md` 當日證據**（含收工時 `- AUTO_TASK_DONE:` 命中規則時）。
 
 **不得單獨作為結案依據**：聊天室內容、截圖、未 push 的本機檔、口頭約定。
@@ -55,7 +55,7 @@
 - **預設不新增檔**：見 `docs/operations/new-doc-linkage-checklist.md` 開頭「**預設：不要新增檔案**」——先 append Owner，禁止為偏好開平行長文檔。
 - **隊列**：`TASKS` 只保留 **一行**責任敘述 + **進度／下一步** + **連結到 Owner**；長細項不得堆在 `TASKS` 重複貼全文。
 - **細項與案例**：只在對應 **Owner 檔** 維護正文；他處 **一句摘要 + 連結**（見 `.cursor/rules/63-cursor-core-identity-risk.mdc` Single Owner）。
-- **租戶／試點**：事實以 `tenants/<company>/...` 該案檔為準；與全局政策衝突時，先對照 ADR／Routing Spec／營運 SSOT，**禁止**在 tenant 內複製第二套長篇政策正文。
+- **租戶／試點**：事實以 `tenants/<company>/...` 該案檔為準（**環境 URL**：`core/ENVIRONMENT_REGISTRY.md`；**站點索引**：`SITES_INDEX.md` 須與 registry 對齊）；與全局政策衝突時，先對照 ADR／Routing Spec／營運 SSOT，**禁止**在 tenant 內複製第二套長篇政策正文。
 
 ### 4.4 「三十年」的誠實範圍（安全、可演進）
 - **在此承諾**：本檔所述 **治理原則**、**證據鏈**（閘道、health、`AO-CLOSE`）可長期作為組織紀律；**缺失即不可宣稱完成**。
@@ -70,5 +70,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-05-06 11:12:02 UTC_
+_Last synced: 2026-05-07（§4.1／§4.3 租戶環境 SSOT 補例）_
 

@@ -17,7 +17,9 @@
 
 ## 2) Day 2：建立雲端 Staging 基底
 
-- [ ] 建立 staging 網址（可公開測試但需保護）
+> **Repo 對齊（2026-05-07）**：canonical staging URL **提案**已登記於 `tenants/company-scenery-travel-mongolia/core/ENVIRONMENT_REGISTRY.md` — **`https://staging.scenery-travel.mn/`**（客戶頂級網域若不同，**建立實機前先改 registry** 再架站）。目前 **`lifecycle=provision_pending`**；驗收通過後改 **`live`** 並同步 `SITES_INDEX.md`。
+
+- [ ] 建立 staging 網址（可公開測試但需保護；**DNS 須與 registry 一致**）
 - [ ] 安裝 WP + 必要外掛基線
 - [ ] 設定語系策略（至少 EN + 目標語系計畫）
 - [ ] 設定時區、郵件、基礎 SEO、分析碼策略
