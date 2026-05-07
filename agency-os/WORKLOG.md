@@ -56,6 +56,12 @@
 - **SSOT 全鏈收斂（避免重工／矛盾）**：兩租戶 **`core/ENVIRONMENT_REGISTRY.md`** 標頭宣告 URL／lifecycle 唯一真相；**`SITES_INDEX`**、`Pilot Runbook` §2 對齊框、`RELEASE_GATES_CHECKLIST`、`CROSS_BORDER_GOVERNANCE`（Hostinger 列）、**`30_YEAR_AI_CODING_EXEC_CHARTER` §4.1／§4.3**、`TASKS` 未完成項證據鏈一致。**不重複**另建新長文檔。
 - **自動漂移閘道**：**`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`** 擴充為同檢 **`sites/*/SITE_PROFILE.md`** 與 `projects/*/02_EXECUTION_PLAN.md`（出現 staging 且含 HTTPS 即納入比對，皆須對齊 **`ENVIRONMENT_REGISTRY`**）；仍由 **`scripts/system-health-check.ps1`** Critical Gate 與 **`.github/workflows/tenant-staging-ssot.yml`**（含 `pwsh` 前置檢查）執行。
 
+### Trigger workflows（EU）實跑進度
+
+- 連線：已用 SSH 進 **EU `204.168.175.41`**（`/root/Work`、`/root/trigger` 皆在位；Trigger stack healthy）。
+- Registry：已在 EU 完成 `registry:5000` 可解析與 `docker login` 成功（依 `DEPLOY_REGISTRY_USERNAME` / `DEPLOY_REGISTRY_PASSWORD`）。
+- Deploy：`/root/Work/lobster-factory/packages/workflows` 執行 `npx trigger.dev@4.4.4 deploy -p proj_6c4f24492a705729fc2c -a <APP_ORIGIN>` 已打到 Trigger CLI，回報唯一阻塞：`TRIGGER_ACCESS_TOKEN` 需 **`tr_pat_*`**，目前值為 `tr_prod_*`（非 PAT）。
+
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:a0864551d4aa2c1c063c13bf1ea131ccad51b79ec6948ab12ee03b5243e5efd7 -->
 
