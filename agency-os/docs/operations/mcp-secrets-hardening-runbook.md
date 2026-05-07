@@ -56,3 +56,102 @@
 - `docs/operations/local-secrets-vault-dpapi.md`
 - `docs/operations/end-of-day-checklist.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
+
+
+## Local Plaintext Scanner（每次 verify-build-gates 自動跑）
+
+**目的**：補上 `mcp/claude-userlevel/hooks/commit-quality.js` 的盲區。那個 hook 只在 `git commit` 時掃 `.js/.ts/.py`；本機 gitignored 的 config（`.claude/settings.json`、`.cursor/mcp.json`、`mcp/user-env.ps1`）它看不到，但這些檔案會在磁碟上累積明文 secret。
+
+### 自動觸發
+
+每次 `verify-build-gates.ps1` 都會自動跑 `scripts/scan-local-config-for-secrets.ps1`。
+
+| 結果 | 含意 | 對 verify-build-gates 的影響 |
+|------|------|------|
+| **PASS** (exit 0) | 全部本機 config 乾淨 | 繼續往下跑 |
+| **WARN** (exit 1) | 在 gitignored 檔案找到明文 secret | 印警告，但**不阻擋**閘道（這些檔案不會進 git） |
+| **FAIL** (exit 2) | 在 git-tracked 檔案找到明文 secret | **阻擋**閘道，要求清理才能繼續 |
+
+### 手動跑
+
+```powershell
+# 預設模式（gitignored secrets 只警告）
+powershell -ExecutionPolicy Bypass -File .scriptsscan-local-config-for-secrets.ps1
+
+# 嚴格模式（gitignored secrets 也算 FAIL）
+powershell -ExecutionPolicy Bypass -File .scriptsscan-local-config-for-secrets.ps1 -Strict
+
+# 指定額外掃描路徑
+powershell -ExecutionPolicy Bypass -File .scriptsscan-local-config-for-secrets.ps1 -Path "extra/file.json","another/path.ps1"
+```
+
+### 涵蓋的 token 類型（schema v1）
+
+| 類型 | Pattern 名稱 |
+|------|---------|
+| Supabase service_role / 一般 JWT | `JWT (Supabase / generic)` |
+| GitHub PAT (classic / fine-grained / OAuth) | `GitHub PAT` × 3 變體 |
+| Anthropic | `sk-ant-*` |
+| OpenAI | `sk-*` |
+| Google API key | `AIza*` |
+| AWS access key | `AKIA*` |
+| Trigger.dev | `tr_(prod|dev)_*` |
+| Uptime Kuma | `uk1_*` |
+| Postgres DSN with password | `postgresql://user:pass@` |
+| Google app password (4×4 字組) | `prefix:abcd efgh ijkl mnop qrst uvwx` |
+
+### 預設掃描檔案
+
+```
+.claude/settings.json
+.claude/settings.local.json
+.cursor/mcp.json
+.mcp.json
+mcp/user-env.ps1
+```
+
+### 擴充 Pattern（30 年穩定的擴充協議）
+
+新增 token 類型：
+
+1. 編 `scripts/scan-local-config-for-secrets.ps1`，找 `# PATTERN REGISTRY` 區塊
+2. 加一行：`@{ Name = "Provider Y token"; Regex = '<unique-prefix>[A-Za-z0-9_-]{N,}' }`
+3. 跑 `scripts/scan-local-config-for-secrets.ps1` 確認沒誤判
+4. 跑 `scripts/verify-build-gates.ps1` 確認沒破壞閘道
+
+新增掃描路徑：
+
+- 暫時：用 `-Path` 參數
+- 永久：編腳本 `# DEFAULT SCAN PATHS` 區塊加入
+
+### 移除 Pattern / 路徑
+
+直接從清單移除即可。腳本是 stateless，不需要 migration。Schema 不變動，不必升版。
+
+### 處置 Findings
+
+**FAIL（tracked 檔案有明文）**：
+
+1. 立刻 `git diff --cached <file>` 確認 secret 確實在 staged 裡
+2. **不要 commit**
+3. 把 secret 移進 `scripts/secrets-vault.ps1 -Action set`
+4. 從原檔案移除（用環境變數 `${env:VAR_NAME}` 取代）
+5. 重新跑 scanner 確認 PASS
+
+**WARN（gitignored 檔案有明文）**：
+
+不會阻擋，但建議定期清理：
+
+1. 把該 secret 移進 vault：`.scriptssecrets-vault.ps1 -Action set -Name FOO -Value <value>`
+2. 從本機檔案改用環境變數
+3. 跑 `.scriptssecrets-vault.ps1 -Action sync-cursor-mcp-user-env` 注入到 Windows User env
+4. **完全結束 Cursor / Claude Code 後重開**（讓新 env 生效）
+5. 再跑 scanner 確認
+
+### Related
+
+- `scripts/scan-local-config-for-secrets.ps1`（本掃描器）
+- `scripts/secrets-vault.ps1`（DPAPI vault）
+- `mcp/claude-userlevel/hooks/commit-quality.js`（commit-time, code-files-only）
+- `agency-os/docs/operations/local-secrets-vault-dpapi.md`（vault 完整手冊）
+- `agency-os/docs/operations/security-secrets-policy.md`（policy 正本）

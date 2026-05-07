@@ -67,6 +67,22 @@ if (Test-Path -LiteralPath $adrIdx) {
     }
 }
 
+# Scan local config files (Claude/Cursor/MCP) for plaintext secrets.
+# Tracked-file hits FAIL (block); gitignored-file hits WARN (continue).
+# See: agency-os/docs/operations/mcp-secrets-hardening-runbook.md
+$secretScan = Join-Path $WorkRoot "scripts\scan-local-config-for-secrets.ps1"
+if (Test-Path -LiteralPath $secretScan) {
+    Write-Host "== Local config: scan-for-secrets ==" -ForegroundColor Cyan
+    & powershell -ExecutionPolicy Bypass -NoProfile -File $secretScan -WorkRoot $WorkRoot -Quiet
+    if ($LASTEXITCODE -eq 2) {
+        Write-Error "verify-build-gates: scan-local-config-for-secrets FAIL (secret in tracked file). See runbook."
+        exit $LASTEXITCODE
+    }
+    if ($LASTEXITCODE -eq 1) {
+        Write-Host "verify-build-gates: scan-local-config-for-secrets WARN (gitignored plaintext; non-blocking). See runbook." -ForegroundColor Yellow
+    }
+}
+
 Write-Host "== Observability baseline: Sentry contract ==" -ForegroundColor Cyan
 $sentryPolicy = Join-Path $agencyRoot "docs\operations\SENTRY_ALERT_POLICY.md"
 if (-not (Test-Path -LiteralPath $sentryPolicy)) {
