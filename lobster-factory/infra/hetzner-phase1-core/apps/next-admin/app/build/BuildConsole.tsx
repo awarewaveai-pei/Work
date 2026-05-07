@@ -258,120 +258,18 @@ export default function BuildConsole() {
   return (
     <div className="build-console">
 
-      {/* ── Step 1: Service Provisioning ─────────────────────────────────── */}
-      <div className="build-step-header">
-        <span className="build-step-badge">Step 1</span>
-        新客戶 — 一鍵開通服務帳號
-      </div>
-      <div className="build-panel build-provision-panel">
-        <div className="build-panel-head">
-          <div>
-            <div className="section-title">新客戶 — 一鍵開通服務</div>
-            <h2>Service Provisioning</h2>
-          </div>
-          <span className="card-badge badge-gray">orchestrate-tenant-provisioning</span>
+      {/* ── Onboard hint banner ──────────────────────────────────────────── */}
+      {searchParams.get("profile") ? (
+        <div className="build-alert build-alert-ok" style={{ marginBottom: 16 }}>
+          ✓ 已從 New Client Onboarding 帶入客戶資料 — 確認欄位後選擇 <code>enqueue</code> 模式執行。
         </div>
-
-        <div className="build-alert build-alert-warning" style={{ marginBottom: 12 }}>
-          前置：先在各平台建好主帳號與 Master API Token，填入 Trigger worker 環境變數後，此處一鍵為每位新客戶建立獨立 project／monitor／DSN，結果自動寫進 Supabase <code>tenant_integration_bindings</code>。
+      ) : (
+        <div className="build-alert build-alert-warning" style={{ marginBottom: 16 }}>
+          新客戶請先完成{" "}
+          <a href="/onboard" style={{ color: "inherit", fontWeight: 600 }}>New Client Onboarding</a>
+          {" "}流程（部門選型 + 服務開通），再從該頁啟動 Build Console。
         </div>
-
-        <div className="build-form-grid">
-          <TextInput
-            label="organizationId (UUID)"
-            value={provForm.organizationId}
-            onChange={(v) => setProvForm((f) => ({ ...f, organizationId: v }))}
-            placeholder="00000000-0000-0000-0000-000000000000"
-          />
-          <TextInput
-            label="customerEmail"
-            value={provForm.customerEmail}
-            onChange={(v) => setProvForm((f) => ({ ...f, customerEmail: v }))}
-            placeholder="client@example.com"
-          />
-          <TextInput
-            label="workspaceId (optional)"
-            value={provForm.workspaceId}
-            onChange={(v) => setProvForm((f) => ({ ...f, workspaceId: v }))}
-            placeholder="留空可選"
-          />
-        </div>
-
-        <div className="section-title" style={{ marginTop: 12, marginBottom: 6 }}>選擇服務</div>
-        <div className="build-provider-grid">
-          {ALL_PROVIDERS.map((p) => (
-            <label key={p.id} className={`build-provider-card ${provForm.providers.includes(p.id) ? "selected" : ""}`}>
-              <input
-                type="checkbox"
-                checked={provForm.providers.includes(p.id)}
-                onChange={() => toggleProvider(p.id)}
-              />
-              <span className="build-provider-name">{p.label}</span>
-              <span className="build-provider-desc">{p.desc}</span>
-            </label>
-          ))}
-        </div>
-
-        <div className="section-title" style={{ marginTop: 12, marginBottom: 6 }}>選填 Hints（留空使用預設）</div>
-        <div className="build-form-grid">
-          <TextInput label="Sentry project slug" value={provForm.hints.sentryProjectSlug}
-            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, sentryProjectSlug: v } }))}
-            placeholder="client-slug" />
-          <TextInput label="Sentry project name" value={provForm.hints.sentryProjectName}
-            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, sentryProjectName: v } }))}
-            placeholder="Client Name" />
-          <TextInput label="PostHog project name" value={provForm.hints.posthogProjectName}
-            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, posthogProjectName: v } }))}
-            placeholder="Client Name" />
-          <TextInput label="GitHub repo name" value={provForm.hints.githubRepoName}
-            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, githubRepoName: v } }))}
-            placeholder="client-site" />
-          <TextInput label="Uptime monitor URL" value={provForm.hints.uptimeMonitorUrl}
-            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, uptimeMonitorUrl: v } }))}
-            placeholder="https://client-site.com" />
-          <TextInput label="Uptime monitor name" value={provForm.hints.uptimeMonitorName}
-            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, uptimeMonitorName: v } }))}
-            placeholder="Client Site" />
-          <TextInput label="n8n workflow suffix" value={provForm.hints.n8nWorkflowSuffix}
-            onChange={(v) => setProvForm((f) => ({ ...f, hints: { ...f.hints, n8nWorkflowSuffix: v } }))}
-            placeholder="client-name" />
-        </div>
-
-        <button
-          type="button"
-          className="btn-primary build-submit"
-          disabled={provLoading || provForm.providers.length === 0}
-          onClick={submitProvisioning}
-        >
-          <span aria-hidden="true">&gt;</span>
-          {provLoading ? "Provisioning…" : `一鍵開通 ${provForm.providers.length} 個服務`}
-        </button>
-
-        {provResult ? (
-          <div className={`build-alert ${provResult.ok ? "build-alert-ok" : "build-alert-blocked"}`} style={{ marginTop: 12 }}>
-            {provResult.ok ? (
-              <>
-                Trigger.dev 已接受 — runId: <code>{provResult.runId ?? "unknown"}</code>
-                <br />
-                Providers: {provResult.providers?.join(", ")}
-                <br />
-                結果將在 Trigger.dev 跑完後自動寫入 Supabase <code>tenant_integration_bindings</code>。
-              </>
-            ) : (
-              <>
-                Error: {provResult.error}
-                {provResult.detail ? <><br />{provResult.detail}</> : null}
-              </>
-            )}
-          </div>
-        ) : null}
-      </div>
-
-      {/* ── Step 2: Build Run ─────────────────────────────────────────────── */}
-      <div className="build-step-header">
-        <span className="build-step-badge">Step 2</span>
-        部署站點 — 選擇 Profile 並執行 Build
-      </div>
+      )}
 
       <div className="build-profile-grid">
         {(["profile_a", "profile_b", "profile_c"] as BuildProfile[]).map((item) => (
