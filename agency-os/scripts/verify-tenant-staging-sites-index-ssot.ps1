@@ -10,9 +10,11 @@ param(
   Compares the registry staging row’s canonical HTTPS URL to:
   - SITES_INDEX.md — "Staging URL" column (per site row), when that column exists.
   - sites/<site>/SITE_PROFILE.md — any bullet line containing "Staging URL" with an HTTPS URL.
+  - projects/*/02_EXECUTION_PLAN.md — lines that mention "staging" and contain HTTPS URL.
   Skips tenants without ENVIRONMENT_REGISTRY.md.
   Skips SITES_INDEX when there is no "Staging URL" column (e.g. drill skeleton).
   Skips SITE_PROFILE lines that mention Staging URL but contain no https:// (e.g. "見 registry").
+  Skips 02_EXECUTION_PLAN lines without https://.
 
 .NOTES
   Single implementation: local health + CI (no duplicate bash copy).
@@ -111,6 +113,19 @@ function Get-StagingHttpsFromSiteProfile {
     return $null
 }
 
+function Get-StagingRefsFromExecutionPlan {
+    param([string]$FilePath)
+    $refs = New-Object System.Collections.Generic.List[string]
+    if (-not (Test-Path -LiteralPath $FilePath)) { return $refs }
+    $lines = @(Get-Content -LiteralPath $FilePath -Encoding UTF8)
+    foreach ($line in $lines) {
+        if ($line -notmatch '(?i)staging') { continue }
+        $u = Extract-NormalizedHttpsUrl -Text $line
+        if ($u) { [void]$refs.Add($u) }
+    }
+    return $refs
+}
+
 $failures = New-Object System.Collections.Generic.List[string]
 $tenantsRoot = Join-Path $WorkspaceRoot "tenants"
 
@@ -186,6 +201,33 @@ foreach ($tenant in $tenantDirs) {
             [void]$failures.Add(
                 "${rel}: SITE_PROFILE declares staging HTTPS but ENVIRONMENT_REGISTRY staging row has no canonical HTTPS URL."
             )
+        }
+    }
+
+    # --- projects/*/02_EXECUTION_PLAN.md (only lines carrying https)
+    $projectsRoot = Join-Path $tenant.FullName "projects"
+    if (-not (Test-Path -LiteralPath $projectsRoot)) { continue }
+
+    foreach ($projDir in @(Get-ChildItem -Path $projectsRoot -Directory)) {
+        $planPath = Join-Path $projDir.FullName "02_EXECUTION_PLAN.md"
+        if (-not (Test-Path -LiteralPath $planPath)) { continue }
+
+        $planRefs = @(Get-StagingRefsFromExecutionPlan -FilePath $planPath)
+        if ($planRefs.Count -eq 0) { continue }
+
+        $rel = "${tenantName}/projects/$($projDir.Name)/02_EXECUTION_PLAN.md"
+        foreach ($planUrl in $planRefs) {
+            if ($regUrl) {
+                if ($planUrl -ne $regUrl) {
+                    [void]$failures.Add(
+                        "${rel}: execution plan staging URL '$planUrl' must match ENVIRONMENT_REGISTRY staging '$regUrl'."
+                    )
+                }
+            } else {
+                [void]$failures.Add(
+                    "${rel}: execution plan declares staging HTTPS but ENVIRONMENT_REGISTRY staging row has no canonical HTTPS URL."
+                )
+            }
         }
     }
 }
