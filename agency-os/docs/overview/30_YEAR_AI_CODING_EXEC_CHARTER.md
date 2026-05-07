@@ -70,5 +70,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-05-07（§4.3 租戶 Staging：`SITES_INDEX` + `SITE_PROFILE` + 機械閘道）_
+_Last synced: 2026-05-07 06:27:39 UTC_
 

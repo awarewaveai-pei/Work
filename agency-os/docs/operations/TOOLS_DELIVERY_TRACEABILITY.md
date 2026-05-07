@@ -126,7 +126,7 @@
 | `（工具建置）Sentry 觀測接入` | `docs/operations/tools-and-integrations.md` | 屬於可觀測平面（非控制平面） | 測試錯誤可觸發告警 | `release_tag`, `alert_rule`, `event_id`, `screenshot_path` |
 | `（工具建置）PostHog 事件基線` | `docs/operations/tools-and-integrations.md` | 屬於分析平面（非控制平面） | 可見完整測試 funnel | `event_names`, `funnel_id`, `time_window`, `report_path` |
 | `（工具建置）Cloudflare 邊界保護` | `docs/operations/tools-and-integrations.md` | 邊界防護能力 | staging 防護生效且無回歸 | `zone`, `rule_ids`, `before_after_result`, `rollback_note` |
-| `（工具建置）Clerk 組織與角色` | `docs/architecture/decisions/002-clerk-identity-boundary.md` | 控制平面身分邊界不可破 | 兩個測試角色權限區隔成功 | `org_id`, `role_matrix_ref`, `test_accounts`, `result` |
+| `（工具建置）Identity 組織與角色（不綁 Clerk）` | `docs/architecture/decisions/002-clerk-identity-boundary.md`（歷史 ADR，待新 ADR 取代） | 控制平面身分邊界不可破 | 兩個測試角色權限區隔成功 | `org_id`, `role_matrix_ref`, `test_accounts`, `result` |
 | `（工具建置）Next.js 控制台 v1` | `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md` | UI 不可繞過既有路由與核准 | 可由 UI 建立 1 筆測試配置 | `tenant_slug`, `department_selection_payload`, `submit_result`, `ui_capture` |
 
 ## 執行檢查清單（每完成一項都要做）
@@ -171,5 +171,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-05-06 11:12:02 UTC_
+_Last synced: 2026-05-07 06:27:39 UTC_
 

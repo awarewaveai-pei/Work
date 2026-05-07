@@ -52,7 +52,7 @@
 | UI 名稱                                | 建議負責的事                                                                                                   | 與龍蝦 Routing                                                                                                                                  |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | **cloudflare-***                     | 文件／bindings／builds／observability                                                                         | 輔助交付                                                                                                                                         |
-| **clerk** / **sentry** / **posthog** | 各雲商維度                                                                                                    | 輔助                                                                                                                                           |
+| **sentry** / **posthog** | 各雲商維度                                                                                                    | 輔助                                                                                                                                           |
 | **slack**（plugin）                    | 依外掛                                                                                                      | `**notifications`** 類                                                                                                                        |
 | **supabase**（plugin）                 | 與 §2 **supabase** 相同：**Postgres SoR** 為權威資料；Plugin 多 **OAuth** 連官方 MCP；IDE 內查 schema／文件／除錯，**不**等同生產寫入管線 | 與 §2 **supabase** 右欄相同：**SoR** 支撐 Trigger 持久化；`**crm_sync` / `webhook_ingress` / `notifications`** 觸及的表仍在 **Postgres**；MCP **無** `task_type` |
 
@@ -116,7 +116,7 @@ perplexity → 內建 + **work-global** → 雲商 MCP → **龍蝦寫入**只�
 | `runtime_content_ops`, `runtime_plugin_change` | wordpress | **wordpress** | 交付執行面。 |
 | （無）— SoR 檢視／除錯 | — | **supabase** | **不**對應任何 `task_type`；不可當略過核准的藉口。 |
 | （無）— 草擬／搜尋／本機讀檔 | — | **replicate**, **perplexity**, **chatgpt-***, **claude-***, **gemini-***, **work-global** | 不寫入生產權威狀態。 |
-| （無）— 雲商維度輔助 | — | **cloudflare-***, **clerk**, **sentry**, **posthog**, **slack**（plugin／MCP） | 與 `TOOLS_DELIVERY_TRACEABILITY` 建置任務對齊；新增「可執行路由」須回寫 spec。 |
+| （無）— 雲商維度輔助 | — | **cloudflare-***, **sentry**, **posthog**, **slack**（plugin／MCP） | 與 `TOOLS_DELIVERY_TRACEABILITY` 建置任務對齊；新增「可執行路由」須回寫 spec。 |
 
 ## 9) 四件套一致性契約（30+ 年維運）
 
@@ -146,5 +146,5 @@ perplexity → 內建 + **work-global** → 雲商 MCP → **龍蝦寫入**只�
 - `README.md`
 - `TASKS.md`
 
-_Last synced: 2026-05-06 11:12:02 UTC_
+_Last synced: 2026-05-07 06:27:39 UTC_
 

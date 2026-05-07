@@ -38,13 +38,13 @@
         },
         {
           "id": "OP-2",
-          "name": "Enterprise P1：**Clerk** auth 串應用流程",
+          "name": "Enterprise P1：Identity/JWT auth 串應用流程（不綁 Clerk）",
           "start": "2026-04-01",
           "end": "2026-04-21",
           "depends": "專案／redirect、`secrets`",
           "acceptance": "可登入／可區分環境；錯誤可追",
           "gantt_group": "Enterprise P1",
-          "gantt_label": "Clerk OP-2",
+          "gantt_label": "Identity_OP-2",
           "gantt_id": "op2",
           "crit": false
         },
@@ -276,7 +276,7 @@
         },
         {
           "id": "LF-C54",
-          "name": "**C5-4** Identity（Clerk 已定）— 與 org／RBAC 邊界",
+          "name": "**C5-4** Identity（不綁特定供應商）— 與 org／RBAC 邊界",
           "start": "2026-04-01",
           "end": "2026-05-31",
           "depends": "OP-2",

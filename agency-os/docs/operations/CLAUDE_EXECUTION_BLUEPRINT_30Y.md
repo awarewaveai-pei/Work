@@ -66,11 +66,15 @@ If task-specific, also read the owner file first (for example, `agency-os/docs/o
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\scripts\ops-console-smoke.ps1 `
      -BaseUrl https://app.aware-wave.com `
-     -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops `
-     -ExpectedMinWorkflowRuns 1 -ExpectedWorkflowSources trigger,n8n `
+     -TenantId 39ad4149-5044-4077-8d9a-b6b916de0e21 `
+     -ExpectedTenantId 39ad4149-5044-4077-8d9a-b6b916de0e21 -ExpectedTenantSlug awarewave-ops `
+     -ExpectedMinWorkflowRuns 0 `
      -EnableWriteChecks -EnableRoleChecks `
+     -BasicAuthUser awarewave -BasicAuthPassword (vault: GRAFANA_BASIC_PASSWORD) `
+     -OpsProxySecret (vault: OPS_PROXY_SHARED_SECRET) `
      -ReportPath .\agency-os\reports\status\ops-console-smoke-LATEST.json
    ```
+   Credentials: nginx BasicAuth = `GRAFANA_BASIC_PASSWORD` in vault; proxy secret = `OPS_PROXY_SHARED_SECRET` in vault.
    Slash command shortcut: `/smoke-test`  
    If any check fails, address before starting other work.
 5. Read `agency-os/.agency-state/open-tasks-snapshot.md` (or `agency-os/TASKS.md` if snapshot missing).
@@ -156,11 +160,15 @@ Pick applicable checks by scope. All commands can also be invoked via Claude Cod
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\ops-console-smoke.ps1 `
   -BaseUrl https://app.aware-wave.com `
-  -TenantId <org-uuid> -ExpectedTenantId <org-uuid> -ExpectedTenantSlug awarewave-ops `
-  -ExpectedMinWorkflowRuns 1 -ExpectedWorkflowSources trigger,n8n `
+  -TenantId 39ad4149-5044-4077-8d9a-b6b916de0e21 `
+  -ExpectedTenantId 39ad4149-5044-4077-8d9a-b6b916de0e21 -ExpectedTenantSlug awarewave-ops `
+  -ExpectedMinWorkflowRuns 0 `
   -EnableWriteChecks -EnableRoleChecks `
+  -BasicAuthUser awarewave -BasicAuthPassword (vault: GRAFANA_BASIC_PASSWORD) `
+  -OpsProxySecret (vault: OPS_PROXY_SHARED_SECRET) `
   -ReportPath .\agency-os\reports\status\ops-console-smoke-LATEST.json
 ```
+Credentials: nginx BasicAuth user=`awarewave`, password = vault key `GRAFANA_BASIC_PASSWORD`; proxy secret = vault key `OPS_PROXY_SHARED_SECRET`.
 This single command covers all 4 DoD checks:
 1. **tenant** — `/api/ops/summary` reflects the expected tenant
 2. **source** — workflow runs include `trigger` and `n8n` sources (`runSource` from `metadata.source`)

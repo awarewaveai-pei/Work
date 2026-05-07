@@ -175,5 +175,5 @@
 ## Related Documents (Auto-Synced)
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 
-_Last synced: 2026-05-07 — §6 試點狀態；Runbook／SITES_INDEX 索引對齊；TOOLS_DELIVERY_TRACEABILITY 連結_
+_Last synced: 2026-05-07 06:27:39 UTC_
 

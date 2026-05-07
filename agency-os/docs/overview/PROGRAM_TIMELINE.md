@@ -39,7 +39,7 @@
 | ID | 工作項 | 預計起 | 預計迄 | 依賴 | 驗收（DoD） |
 |----|--------|--------|--------|------|------------|
 | **OP-1** | 用 1 個新客戶實跑 `NEW_TENANT_ONBOARDING_SOP.md` | 2026-04-07 | 2026-05-15 | 真實 tenant／窗口；與 A10-2 | SOP 步驟跑完 + 證據進 `WORKLOG`；`TASKS` 可勾 |
-| **OP-2** | Enterprise P1：**Clerk** auth 串應用流程 | 2026-04-01 | 2026-04-21 | 專案／redirect、`secrets` | 可登入／可區分環境；錯誤可追 |
+| **OP-2** | Enterprise P1：Identity/JWT auth 串應用流程（不綁 Clerk） | 2026-04-01 | 2026-04-21 | 專案／redirect、`secrets` | 可登入／可區分環境；錯誤可追 |
 | **OP-3** | Enterprise P1：**env／mcp secrets** 治理（輪替／不可入庫） | 2026-04-08 | 2026-04-28 | vault 路徑、`AGENTS` 政策 | 文件與實機一致；關鍵不在明文 repo |
 | **OP-4** | Enterprise P1：**Cloudflare** WAF／rate-limit 最小設 | 2026-04-01 | 2026-05-01 | 帳號／zone | 規則截圖或導出 + `WORKLOG` |
 | **OP-5** | Enterprise P1：**Sentry** error ingest | 2026-04-15 | 2026-05-06 | DSN／release | 測試事件抵達專案 |
@@ -60,7 +60,7 @@ section 新客戶
 SOP 實跑 OP-1 : crit, op1, 2026-04-07, 2026-05-15
 
 section Enterprise P1
-Clerk OP-2 : op2, 2026-04-01, 2026-04-21
+Identity_OP-2 : op2, 2026-04-01, 2026-04-21
 secrets_OP-3 : op3, 2026-04-08, 2026-04-28
 Cloudflare_WAF_OP-4 : op4, 2026-04-01, 2026-05-01
 Sentry_OP-5 : op5, 2026-04-15, 2026-05-06
@@ -90,7 +90,7 @@ section Backlog
 | **LF-C51** | **C5-1** Sentry + PostHog（與 OP-5/6 對齊；此處為**工程側**到位） | 2026-04-15 | 2026-05-30 | 專案開通 | staging／prod 分流策略文件 |
 | **LF-C52** | **C5-2** Cloudflare 工程側（與 OP-4） | 2026-04-01 | 2026-05-15 | zone | Workers／WAF 與 repo 設定一致 |
 | **LF-C53** | **C5-3** Secrets manager（1Password 或同級）若升級 | TBD | TBD | 付費／IT | 與 `TASKS` Backlog 同步決策 |
-| **LF-C54** | **C5-4** Identity（Clerk 已定）— 與 org／RBAC 邊界 | 2026-04-01 | 2026-05-31 | OP-2 | 角色矩陣一頁 |
+| **LF-C54** | **C5-4** Identity（不綁特定供應商）— 與 org／RBAC 邊界 | 2026-04-01 | 2026-05-31 | OP-2 | 角色矩陣一頁 |
 | **LF-C55** | **C5-5** Cost／Decision 可觀測 | TBD | TBD | PostHog／帳單 API | budget 告警 PoC |
 | **LF-C56** | **C5-6** 後續工具（Langfuse 等）評估清單 | 2026-06-01 | 2026-06-30 | C51–55 | 決策記 `WORKLOG` |
 

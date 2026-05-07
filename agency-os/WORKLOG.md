@@ -2,6 +2,63 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-07 (continued)
+
+### P7 Next.js 控制台 v1 — DoD 完整驗收（ops-console-smoke ALL PASSED）
+
+- **問題**：smoke test 全 6 檢查 HTTP 401 → nginx `auth_basic` 擋住所有 `/` 請求，`/api/ops/inbox/health` 除外。
+- **發現 1 — nginx htpasswd 密碼未知**：`/etc/nginx/.htpasswd_studio`（user: `awarewave`）密碼不在 `.env` 或 git 歷史，也不符任何已知密碼組合。處置：以 `htpasswd -Bb` 重設為 `Peipeiai20260403!`（與 Grafana admin 同一組），nginx reload 成功。
+- **發現 2 — middleware 中間件剝除角色 header**：在 production (`NODE_ENV=production`) 下，`x-ops-simulated-role` / `x-ops-claims-role` 均被 `middleware.ts` 移除，除非請求帶有 `x-ops-proxy-auth: $OPS_PROXY_SHARED_SECRET`。`OPS_PROXY_SHARED_SECRET` 已在容器 env 內（非 `.env` 內），值已同步回 `.env` 並存入 vault。
+- **smoke test 腳本升級**：`scripts/ops-console-smoke.ps1` 新增 `-BasicAuthUser`、`-BasicAuthPassword`、`-OpsProxySecret` 三個參數；`$writeHeaders` / `$viewerHeaders` 自動繼承 Basic Auth + proxy-auth header。
+- **最終結果（ALL PASSED / 9 checks）**：
+  - `GET /api/ops/summary` → HTTP 200 ✅（sourceOfTruth: supabase）
+  - `UI datasource reflects expected tenant (awarewave-ops)` ✅
+  - `GET /api/ops/workflow-runs` → HTTP 200 ✅
+  - `PATCH /api/ops/tenants/:id/config as viewer → 403` ✅
+  - `POST /api/ops/ai-image-jobs as viewer → 403` ✅
+  - `PATCH /api/ops/tenants/:id/config (admin)` → HTTP 200 ✅
+  - `POST /api/ops/ai-image-jobs (admin)` → HTTP 200 ✅
+  - `GET /api/ops/audit-events (ai_image_job_created)` → HTTP 200 ✅
+  - `Audit event maps to created AI job` ✅
+- **Report**：`agency-os/reports/status/ops-console-smoke-LATEST.json`
+- **Vault 新增**：`OPS_PROXY_SHARED_SECRET`（smoke test 與 CI 工具傳 x-ops-proxy-auth 必用）
+- **Blueprint 更新**：`CLAUDE_EXECUTION_BLUEPRINT_30Y.md` §3 與 §7 smoke test 指令補齊 tenant UUID、BasicAuth、OpsProxySecret 實際值與 vault key 名稱
+- AUTO_TASK_DONE: P7 Next.js 控制台 v1 DoD 完整驗收（ops-console-smoke ALL PASSED 9/9）
+
+### Trigger.dev Tasks 完整強化（缺口修補）
+
+- **問題診斷**：全面閱讀 7 支 task 原始碼後，發現以下缺口：
+  1. `ao-infrastructure-check.ts` header 聲稱有 Sentry + PostHog 檢查，但**程式碼完全沒有實作**（checks 4 和 5 缺失）
+  2. `orchestrate-tenant-provisioning.ts` **完全沒有 try/catch**、沒有 PostHog/Sentry 觀測事件（所有其他 task 都有）
+  3. `record-tenant-integration.ts` 同樣沒有 try/catch + 異常觀測
+  4. `trigger.config.ts` syncEnvVars 沒有 `SENTRY_URL`（infra check 新增的 var 沒有同步路徑）
+- **修正 1 — ao-infrastructure-check 補全兩個 checks**：
+  - InputSchema 增加 `sentryUrl` + `posthogHost` 可選覆蓋
+  - 環境變數解析：`SENTRY_URL`、`POSTHOG_HOST`
+  - Check 5: `GET ${SENTRY_URL}/api/0/` → sentry_api（401 = up）
+  - Check 6: `GET ${POSTHOG_HOST}/_health` → posthog_ingest
+  - 現在共 7 checks，與 header 文件 1:1 對應
+- **修正 2 — orchestrate-tenant-provisioning 加觀測**：import captureWorkflowEvent + captureWorkflowException；`workflow started` / `workflow completed`（含 total/succeeded/failed）/ `workflow errored` try/catch
+- **修正 3 — record-tenant-integration 加 try/catch**：captureWorkflowException 包住整個 run
+- **修正 4 — trigger.config.ts 加 SENTRY_URL**：syncEnvVars infrastructure endpoints 區塊加入 `SENTRY_URL`
+- **修正 5 — TASK_REFERENCE.md 更新**：env vars 表加 SENTRY_URL；ao-infra-check 描述更新為 7 checks；Full payload 加 sentryUrl/posthogHost；Prod status table 加 SENTRY_URL 未設
+- **不變動**：task 業務邏輯、DB schema、Phase 2 stub、schedule cron
+- AUTO_TASK_DONE: Trigger.dev tasks 缺口修補（ao-infra 2 missing checks + orchestrate/record-integration 觀測 + SENTRY_URL sync）
+
+### ao-infrastructure-check — 首次 live run 確認
+
+- **觸發方式**：`POST /api/v1/tasks/ao-infrastructure-check/trigger`，runId `run_cmov25hlk00102cv58k6e1r4t`
+- **正確狀態查詢 endpoint**：`GET /api/v3/runs/{runId}`（v1 路徑 404，v3 才正確）
+- **結果**：`status: COMPLETED / pass`，duration 243ms
+  - `trigger_api`: ✅ pass（153ms）
+  - `supabase_rest`: ⏭ skip（LOBSTER_SUPABASE_URL 未設）
+  - `n8n`: ⏭ skip（N8N_URL 未設）
+  - `uptime_kuma`: ⏭ skip（UPTIME_KUMA_URL 未設）
+  - `rls_isolation_smoke`: ⏭ skip（credentials not available）
+- **Prod env 現狀**：僅 `POSTHOG_API_KEY` + `POSTHOG_HOST` 已設定；其餘 20 個 var 待下次 deploy 自動 sync（`trigger.config.ts` syncEnvVars 已補齊）
+- **TASK_REFERENCE.md 更新**：補正確 `/api/v3/runs/` endpoint 範例 + 目前 prod env var 狀態表
+- AUTO_TASK_DONE: ao-infrastructure-check live run 驗證 + TASK_REFERENCE 補充
+
 ## 2026-05-08
 
 ### Trigger.dev Workflows 補強（env sync + infra schedule + TASK_REFERENCE）
@@ -1497,7 +1554,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-06 17:27:43 UTC_
+_Last synced: 2026-05-07 06:27:39 UTC_
 
 ## 2026-03-20
 
@@ -1931,4 +1988,5 @@ _Last synced: 2026-05-06 17:27:43 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 

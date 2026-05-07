@@ -62,7 +62,7 @@ flowchart TB
 下列為 **預設假設**；若與未來商業決策不一致，以 **新 ADR 或 README 一句覆寫** 即可（不當成對話必答題）。
 
 - **主路線**：**內部與受控呼叫方**——`next-admin`（`https://app.aware-wave.com/`，含 `/build`、`/ops-console`、`/ops/inbox`）、未來 **Internal Ops 控制台**（TASKS 已列）、n8n／Trigger 經 Nginx **伺服器側** 呼叫 `node-api`。**不是**預設對外公開給任意 mobile／匿名流量（該路線需 rate limit、金鑰、資料分類 ADR）。
-- **Auth 預設**：與 **ADR 002（Clerk）** 與 Enterprise 工具層敘事一致——**B2B 營運身分**由 Clerk／JWT 在 `node-api` 驗簽；**不**預設自建帳密 DB 為主身分。
+- **Auth 預設**：與 Enterprise 工具層敘事一致——**B2B 營運身分**由 **JWT/OIDC** 在 `node-api` 驗簽（不綁 Clerk）；**不**預設自建帳密 DB 為主身分。
 - **`app.aware-wave.com`**：正式工具入口，直接反代到 `next-admin`。Build Console 的 canonical URL 是 **`https://app.aware-wave.com/build`**；舊 `/admin` 書籤只保留 redirect，不再作為主要入口。
 
 ### 1.3 功能分層（層 0／1／2）與本計畫 P0～P4 對照
@@ -70,7 +70,7 @@ flowchart TB
 | 分層 | 含義 | 對應本計畫 |
 |------|------|------------|
 | **層 0** | 營運與契約：存活／就緒、meta、Sentry、版本前綴、OpenAPI 雛形 | **P0**（`/v1/health`、`/v1/ready`、`/v1/meta`、README、openapi） |
-| **層 1** | 內部 BFF：Clerk、CORS、Trigger 薄代理、Supabase 窄代理、Webhook 入站、Redis 冪等／限流 | **P1～P3** |
+| **層 1** | 內部 BFF：Identity middleware（JWT/OIDC）、CORS、Trigger 薄代理、Supabase 窄代理、Webhook 入站、Redis 冪等／限流 | **P1～P3** |
 | **層 2** | 對外產品 API（可選） | **P4**；**預設不啟動**，先 ADR 再路由 |
 
 ## 2. 現況盤點（已具備／缺口）
@@ -81,7 +81,7 @@ flowchart TB
 | `GET /health` | 已存在；compose healthcheck 依賴此端點 |
 | `GET /rag/*` | 已存在（探測 OpenAI／Supabase）；偏 **營運／除錯**，不應無限制當「公開產品 API」 |
 | Redis `REDIS_URL` | compose 已注入；`index.js` **尚未使用**（預留 rate limit、idempotency、session 外掛） |
-| 版本前綴、OpenAPI、Clerk 驗簽、Trigger 薄代理 | **尚未**；屬本計畫主交付 |
+| 版本前綴、OpenAPI、Identity 驗簽（JWT/OIDC）、Trigger 薄代理 | **尚未**；屬本計畫主交付 |
 
 ## 3. 邊界憲法（任何新路由不得違反）
 
@@ -89,7 +89,7 @@ flowchart TB
 |------|------|
 | 耐久編排、重試、核准 | **Trigger**；n8n 僅黏著 | [ADR 004](../architecture/decisions/004-trigger-vs-n8n-orchestration-boundary.md) |
 | 結構化真相、RLS | **Supabase**；WP 為站內執行期 | [ADR 005](../architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md) |
-| B2B 身分 | **Clerk**（控制台路線） | [ADR 002](../architecture/decisions/002-clerk-identity-boundary.md) |
+| B2B 身分 | **JWT/OIDC 身分供應商**（控制台路線，不綁 Clerk） | `TASKS.md`（Enterprise 工具層 P1） |
 | 長期營運節奏 | RPO/RTO、備份、升級 staging 先行 | [`LONG_TERM_OPS.md`](../../../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md) |
 
 **`node-api` 不擁有**：長狀態機、人工核准等待佇列、跨日重試排程（→ Trigger）；**不擁有**跨租戶報表真相（→ Supabase 查詢／物化視角）。
@@ -109,7 +109,7 @@ flowchart TB
 
 ### 階段 P1 — 內部身分與邊界（與 TASKS「控制台／Enterprise」銜接）
 
-- **Clerk JWT 中介層**：Express middleware：**驗簽** → 解析 `org`／`user` → 注入 `req.auth`；**未帶合法 JWT 的 `/v1/*`（除 health/ready/meta）** 回 **401**。
+- **Identity JWT/OIDC 中介層**：Express middleware：**驗簽** → 解析 `org`／`user` → 注入 `req.auth`；**未帶合法 JWT 的 `/v1/*`（除 health/ready/meta）** 回 **401**。
 - **CORS**：白名單 **`https://app.aware-wave.com`**（next-admin 工具入口）與必要時 `https://aware-wave.com`／staging 主機；**禁止** `*` + credentials 組合踩雷。
 - **`/rag/*` 收斂**：改掛 **`/v1/internal/rag/*`** 或加 **JWT + IP 限制**；對外公開文件中標 **internal**，避免被誤當產品 API。
 
@@ -127,7 +127,7 @@ flowchart TB
 
 ### 階段 P4 — 可選：對外公開 API（僅在商業需要時）
 
-- **前置**：新 ADR — API key 或 OAuth、配額、日誌保留、個資分類、與 Clerk 內部路由分離。
+- **前置**：新 ADR — API key 或 OAuth、配額、日誌保留、個資分類、與內部 Identity 路由分離。
 - **實作**：獨立 **`/public/v1`** 或 **獨立 service**（較乾淨），避免與內部 `service role` 路徑混在同一 middleware 鏈上難以審計。
 
 ## 5. 與前端的連線策略（避免雙入口踩雷）
@@ -135,7 +135,7 @@ flowchart TB
 - **現狀**：`next-admin` 使用 **`NEXT_PUBLIC_API_BASE_PATH: /api`**，瀏覽器打 **同源 `/api/...`**（見 [`docker-compose.yml`](../../../lobster-factory/infra/hetzner-phase1-core/docker-compose.yml)）。
 - **建議演進**（擇一寫進 README 並貫徹）：
   - **A（保守）**：瀏覽器繼續用 **`/api/`**；**`api.aware-wave.com`** 給 **伺服器對伺服器**、CLI、合作方（未來）。
-  - **B（統一主機型）**：`NEXT_PUBLIC_API_BASE_URL=https://api.aware-wave.com`，CORS + Clerk 允許來源一併調整；好處是 **Cookie／第三方整合** 語意清楚。
+  - **B（統一主機型）**：`NEXT_PUBLIC_API_BASE_URL=https://api.aware-wave.com`，CORS + Identity 允許來源一併調整；好處是 **Cookie／第三方整合** 語意清楚。
 
 ## 6. 營運與安全（與功能同等重要）
 
@@ -154,7 +154,7 @@ flowchart TB
 | 階段 | 核心產出 | 驗收 |
 |------|-----------|------|
 | P0 | `/v1/*`、ready、meta、README（含 §1.2）、OpenAPI 雛形、營運／VPS 對齊 | 雙入口 curl + Sentry |
-| P1 | Clerk middleware、CORS、rag 收斂 | 無 JWT 拒絕、有 JWT 可通 |
+| P1 | Identity middleware（JWT/OIDC）、CORS、rag 收斂 | 無 JWT 拒絕、有 JWT 可通 |
 | P2 | Trigger 薄代理、Supabase 窄代理、Redis 限流 | 不複製 Trigger 狀態 |
 | P3 | Webhook 驗簽 + 冪等 | 偽簽／重放行為符合契約 |
 | P4 | 可選公開 API | ADR + 分離路由或服務 |
@@ -199,7 +199,7 @@ flowchart LR
 - [ ] **P0**：新增 `/v1/health`、`/v1/ready`、`/v1/meta`；Dockerfile build-arg 注入 git sha；保留 `/health` 過渡。
 - [ ] **P0**：`apps/node-api` README + `openapi.yaml` 雛形；寫死 §1.2；說明 apex `/api/` 與 `api` 子網域雙入口。
 - [ ] **P0**：`WORKLOG`／營運落實 `LONG_TERM_OPS`；`api` 納入監控與還原演練。
-- [ ] **P1**：Clerk JWT middleware、CORS 白名單、`/rag` 收斂為 `/v1/internal/rag` 或 JWT+IP。
+- [ ] **P1**：Identity JWT/OIDC middleware、CORS 白名單、`/rag` 收斂為 `/v1/internal/rag` 或 JWT+IP。
 - [ ] **P2**：Trigger 薄代理、Supabase 窄代理、Redis idempotency + rate limit。
 - [ ] **P3**：`POST /v1/webhooks/:provider` 驗簽 + 冪等 + 轉發 n8n/Trigger。
 - [ ] **Deploy**：VPS phase1 可追蹤 repo；監控改打 `/v1/ready`。

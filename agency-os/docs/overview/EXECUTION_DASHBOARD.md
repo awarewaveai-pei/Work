@@ -41,7 +41,7 @@
 - **全自動建站**：真 hosting 長期治理（非僅 `mock` / `http_json` 控制面）、WordPress 從零 install 仍待與 hosting 對齊
 - **A9 治理細節**：artifacts 生命週期、存取控管、長期留存政策（`remote_put` / `local` 已可用）
 - **A10**：可運營 E2E（新客戶到驗收）與固定證據鏈仍待收斂（已有 staging regression + drill 模板）
-- **Enterprise 正式串接**：Clerk / Cloudflare WAF / Sentry ingest / PostHog 等（選型已有，落地見 `TASKS.md` Next）
+- **Enterprise 正式串接**：Identity/JWT（不綁 Clerk）/ Cloudflare WAF / Sentry ingest / PostHog 等（選型已有，落地見 `TASKS.md` Next）
 - **營運**：用 1 個新客戶實跑 `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
 > 已完成摘要（避免本頁過期）：C1 寫入鏈路、`http_json` hosting、`remote_put` artifacts、H3–H6 baseline、C3 release gate、營運 runbook — 見 `WORKLOG.md` 近期條目。
@@ -114,5 +114,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `memory/CONVERSATION_MEMORY.md`
 
-_Last synced: 2026-05-06 11:12:02 UTC_
+_Last synced: 2026-05-07 06:27:39 UTC_
 

@@ -72,13 +72,13 @@
   - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
 - [ ] `lobster-factory` A7 全站自動建站補齊 —— **【未開始】**
   - 範圍：hosting adapter + provision/shell guardrails 端到端
-- [ ] Enterprise 工具層 Phase 1 正式串接 —— **【進行中】** **進度：**Secrets／Sentry／PostHog／Cloudflare／Slack 等 **已結案** → 見 **`已完成歷程`** **§2026-05-01**。**仍缺：**Clerk 組織與角色（＝下方獨立條目）、以及本項 **DoD** 要求的「端到端正式串接」**WORKLOG／report 證據鏈**。
-  - 範圍：Clerk auth、env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts
+- [ ] Enterprise 工具層 Phase 1 正式串接 —— **【進行中】** **進度：**Secrets／Sentry／PostHog／Cloudflare／Slack 等 **已結案** → 見 **`已完成歷程`** **§2026-05-01**。**仍缺：**本項 **DoD** 要求的「端到端正式串接」**WORKLOG／report 證據鏈**（不綁特定身分供應商）。
+  - 範圍：env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts（身分層採 JWT/OIDC）
   - DoD：下列子任務全數完成且有對應證據連結（WORKLOG / report）
 - [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
   - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
   - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
-- [ ] （工具建置）Phase 1 建議順序（P1 -> P7） —— **【進行中】** **進度：****P1～P5、P2（n8n staging）** 已結案 → **`已完成歷程` §2026-05-01**。**仍開放：****P6**＝下方 **Clerk** 條目；**P7**＝下方 **Next.js 控制台**條目。本條為「總賬」，**結案時須 P6 + P7 + 上方 Enterprise 串接敘述一併滿足**。
+- [ ] （工具建置）Phase 1 建議順序（P1 -> P7） —— **【進行中】** **進度：****P1～P5、P2（n8n staging）** 已結案 → **`已完成歷程` §2026-05-01**。**仍開放：**以 **`Next.js 控制台 v1`** 與 **Enterprise 串接證據鏈** 作為本條總賬收口（不綁特定身分供應商）。本條結案時須同時滿足兩者 DoD。
   - 追溯總表：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（每一工具任務對回規格 + DoD + 證據欄位）
 - [ ] （工具建置）Next.js 控制台 v1（Internal Ops） —— **【進行中】** **進度（2026-04-25）：**DB migration、`/ops-console`、`POST /api/ops/ai-image-jobs`、`GET /api/ops/summary` 等 **已在 repo**。**下一步：**滿足 DoD——建立 **1 個測試客戶**並在 **UI 成功回顯**。
   - 處理：建立 app skeleton、客戶清單頁、部門勾選頁（20 部門）、提交後寫出 `DEPARTMENT_SELECTION` payload
@@ -88,10 +88,6 @@
   - 媒體分層固定：AI 生圖走 R2；WordPress 商品圖/部落格圖維持 WP 媒體庫（`wp-content/uploads` + MySQL）
   - 正本：`docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`
   - DoD：可建立 1 個測試客戶設定並在 UI 回顯成功
-- [ ] （工具建置）Clerk 組織與角色（B2B 多租戶） —— **【未開始】**（對照 Phase 1 **P6**） **進度：**規格與依賴已定；尚無「兩測試角色權限分流」的端到端證據。
-  - 處理：建立 org + role 對照（owner/admin/operator/viewer）並映射到現有權限邏輯
-  - DoD：2 個測試角色登入後，看到不同權限結果
-
 ## Next — 已完成歷程（查詢用）
 
 ### 2026-05-07 — Trigger workflows EU deploy（結案）
@@ -226,7 +222,7 @@
 - [x] 建立 reports 歸檔腳本（`scripts/archive-old-reports.ps1`）與 README 操作入口
 - [x] 他處／公司機開機須知（`docs/overview/REMOTE_WORKSTATION_STARTUP.md` + `RESUME_AFTER_REBOOT.md` 分機情境）
 - [x] Enterprise 工具層選型/安裝完成
-  - 主工具：Sentry / PostHog / Cloudflare / Clerk
+  - 主工具：Sentry / PostHog / Cloudflare / Identity/JWT（不綁特定供應商）
   - Secrets：先採 env/mcp（後續可升級）
   - 輔助：Supabase / Slack
 - [x] 啟用 Operator Autopilot 規則與 Phase1 自動化腳本（startup preflight / alert auto-repair / closeout optional push / Slack notify）
@@ -266,7 +262,7 @@
 - [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
 - [x] `lobster-factory` Enterprise 必備工具補強路線（已取消）
   - 範圍：Sentry / PostHog / Cloudflare / Secrets / Identity
-  - 現況：Identity=Clerk；Secrets 暫採 env/mcp，後續升級 secrets manager
+  - 現況：Identity 採 JWT/OIDC（不綁特定供應商）；Secrets 暫採 env/mcp，後續升級 secrets manager
 - [ ] **`lobster-factory/packages/workflows` `npm audit`**（2026-04-01）
   - 現況：已做相依升級與 `overrides` 收斂；目前剩 2 筆 moderate，皆來自 `@trigger.dev/sdk` -> `uuid`（`<14.0.0`）上游傳遞依賴。
   - 2026-04-29 決策：`npm audit`/`npm outdated` 複核，`@trigger.dev/sdk` 與 `trigger.dev` 最新仍為 `4.4.4`，`fixAvailable=false`；暫列 **acceptable risk**（僅 moderate，無 high/critical）。
@@ -301,5 +297,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-06 11:12:02 UTC_
+_Last synced: 2026-05-07 06:27:39 UTC_
 

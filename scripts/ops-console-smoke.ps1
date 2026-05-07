@@ -11,7 +11,10 @@ param(
     [int]$TimeoutSec = 20,
     [int]$ExpectedMinWorkflowRuns = 0,
     [string]$ExpectedWorkflowSources = "",
-    [string]$ReportPath = ""
+    [string]$ReportPath = "",
+    [string]$BasicAuthUser = "",
+    [string]$BasicAuthPassword = "",
+    [string]$OpsProxySecret = ""
 )
 
 Set-StrictMode -Version Latest
@@ -131,6 +134,11 @@ $report = [ordered]@{
 }
 
 $getHeaders = @{ "Accept" = "application/json" }
+if (-not [string]::IsNullOrWhiteSpace($BasicAuthUser)) {
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes("${BasicAuthUser}:${BasicAuthPassword}")
+    $encoded = [Convert]::ToBase64String($bytes)
+    $getHeaders["Authorization"] = "Basic $encoded"
+}
 
 $summary = Invoke-JsonRequest -Method GET -Url "$root/api/ops/summary" -Headers $getHeaders
 $summaryPass = $summary.ok -and $summary.json -and ($summary.json.sourceOfTruth -ne $null)
@@ -272,6 +280,14 @@ if ($EnableWriteChecks) {
         "Accept" = "application/json"
         "x-ops-simulated-role" = "viewer"
         "x-ops-claims-role" = "viewer"
+    }
+    if ($getHeaders.ContainsKey("Authorization")) {
+        $writeHeaders["Authorization"] = $getHeaders["Authorization"]
+        $viewerHeaders["Authorization"] = $getHeaders["Authorization"]
+    }
+    if (-not [string]::IsNullOrWhiteSpace($OpsProxySecret)) {
+        $writeHeaders["x-ops-proxy-auth"] = $OpsProxySecret
+        $viewerHeaders["x-ops-proxy-auth"] = $OpsProxySecret
     }
 
     if ($EnableRoleChecks) {

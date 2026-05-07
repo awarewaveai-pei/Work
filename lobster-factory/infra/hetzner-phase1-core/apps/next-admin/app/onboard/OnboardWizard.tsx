@@ -1,0 +1,640 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import {
+  DEPARTMENT_CATALOG,
+  GROUP_LABELS,
+  SMB_DEFAULT_CLUSTERS,
+  buildDepartmentSelection,
+  getRequiredTemplateFiles,
+  type ClusterId,
+  type DepartmentCluster,
+} from "../../lib/department-catalog";
+import type { BuildPackageSlug, BuildProvider } from "../../lib/build-console/contracts";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type WizardStep = 1 | 2 | 3 | 4;
+type OnboardProfile = "profile_b" | "profile_c";
+
+interface ClientInfo {
+  tenantSlug: string;
+  clientName: string;
+  customerEmail: string;
+  profile: OnboardProfile;
+  // Profile B
+  domain: string;
+  provider: BuildProvider;
+  packageSlug: BuildPackageSlug;
+  locale: string;
+  // Profile C
+  siteUrl: string;
+  wpAdminUrl: string;
+  // Generated
+  organizationId: string;
+  workspaceId: string;
+  projectId: string;
+  siteId: string;
+}
+
+interface ProvResult {
+  ok: boolean;
+  runId?: string | null;
+  providers?: string[];
+  error?: string;
+  detail?: string;
+}
+
+const PROVIDERS = [
+  { id: "sentry",      label: "Sentry",      desc: "建立 project + DSN" },
+  { id: "posthog",     label: "PostHog",      desc: "建立 project + API key" },
+  { id: "uptime_kuma", label: "Uptime Kuma",  desc: "建立 HTTP monitor" },
+  { id: "n8n",         label: "n8n",          desc: "複製 onboarding workflow" },
+  { id: "github",      label: "GitHub",       desc: "建立 client repo" },
+  { id: "trigger",     label: "Trigger.dev",  desc: "建立 project + token" },
+  { id: "supabase",    label: "Supabase",     desc: "建立 cloud project" },
+];
+
+const GROUP_ORDER: DepartmentCluster["group"][] = [
+  "core", "revenue", "supply_chain", "platform", "support", "horizontal", "cross_border",
+];
+
+function randomUUID(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+function makeDefaultClient(): ClientInfo {
+  return {
+    tenantSlug: "",
+    clientName: "",
+    customerEmail: "",
+    profile: "profile_b",
+    domain: "",
+    provider: "hostinger",
+    packageSlug: "wp-basic",
+    locale: "en_US",
+    siteUrl: "",
+    wpAdminUrl: "",
+    organizationId: randomUUID(),
+    workspaceId: randomUUID(),
+    projectId: randomUUID(),
+    siteId: randomUUID(),
+  };
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StepBadge({ step, current }: { step: WizardStep; current: WizardStep }) {
+  const done = step < current;
+  const active = step === current;
+  return (
+    <span
+      className={`onboard-step-badge ${active ? "active" : done ? "done" : "idle"}`}
+    >
+      {done ? "✓" : step}
+    </span>
+  );
+}
+
+function StepHeader({
+  step,
+  current,
+  label,
+}: {
+  step: WizardStep;
+  current: WizardStep;
+  label: string;
+}) {
+  return (
+    <div className={`onboard-step-header ${current === step ? "active" : ""}`}>
+      <StepBadge step={step} current={current} />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+// ── Step 1: Client Info ───────────────────────────────────────────────────────
+
+function Step1({
+  info,
+  onChange,
+  onNext,
+}: {
+  info: ClientInfo;
+  onChange: (patch: Partial<ClientInfo>) => void;
+  onNext: () => void;
+}) {
+  const valid =
+    info.tenantSlug.trim() &&
+    info.clientName.trim() &&
+    info.customerEmail.trim() &&
+    (info.profile === "profile_b" ? info.domain.trim() : info.siteUrl.trim() && info.wpAdminUrl.trim());
+
+  return (
+    <div className="onboard-step-body">
+      <div className="build-form-grid">
+        <div className="form-row">
+          <label className="form-label">Client name</label>
+          <input className="form-input" value={info.clientName}
+            onChange={(e) => onChange({ clientName: e.target.value })}
+            placeholder="Mongolia Travel" />
+        </div>
+        <div className="form-row">
+          <label className="form-label">Tenant slug</label>
+          <input className="form-input" value={info.tenantSlug}
+            onChange={(e) => onChange({ tenantSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })}
+            placeholder="company-mongoliatravel" />
+        </div>
+        <div className="form-row">
+          <label className="form-label">Customer email</label>
+          <input className="form-input" type="email" value={info.customerEmail}
+            onChange={(e) => onChange({ customerEmail: e.target.value })}
+            placeholder="client@example.com" />
+        </div>
+        <div className="form-row">
+          <label className="form-label">Deployment profile</label>
+          <select className="form-select" value={info.profile}
+            onChange={(e) => onChange({ profile: e.target.value as OnboardProfile })}>
+            <option value="profile_b">Profile B — New cloud WordPress</option>
+            <option value="profile_c">Profile C — Adopt existing WordPress</option>
+          </select>
+        </div>
+      </div>
+
+      {info.profile === "profile_b" && (
+        <div className="build-form-grid">
+          <div className="form-row">
+            <label className="form-label">Domain</label>
+            <input className="form-input" value={info.domain}
+              onChange={(e) => onChange({ domain: e.target.value })}
+              placeholder="scenerytravelmongolia.com" />
+          </div>
+          <div className="form-row">
+            <label className="form-label">Hosting provider</label>
+            <select className="form-select" value={info.provider}
+              onChange={(e) => onChange({ provider: e.target.value as BuildProvider })}>
+              <option value="hostinger">Hostinger</option>
+              <option value="cloudways">Cloudways</option>
+              <option value="generic-wordpress">Generic WordPress</option>
+              <option value="manual">Manual</option>
+            </select>
+          </div>
+          <div className="form-row">
+            <label className="form-label">Package</label>
+            <select className="form-select" value={info.packageSlug}
+              onChange={(e) => onChange({ packageSlug: e.target.value as BuildPackageSlug })}>
+              <option value="wp-basic">wp-basic</option>
+              <option value="wp-business">wp-business</option>
+              <option value="wc-core">wc-core</option>
+            </select>
+          </div>
+          <div className="form-row">
+            <label className="form-label">Locale</label>
+            <input className="form-input" value={info.locale}
+              onChange={(e) => onChange({ locale: e.target.value })}
+              placeholder="en_US" />
+          </div>
+        </div>
+      )}
+
+      {info.profile === "profile_c" && (
+        <div className="build-form-grid">
+          <div className="form-row">
+            <label className="form-label">Site URL</label>
+            <input className="form-input" value={info.siteUrl}
+              onChange={(e) => onChange({ siteUrl: e.target.value })}
+              placeholder="https://soulfulexpression.com/" />
+          </div>
+          <div className="form-row">
+            <label className="form-label">WP Admin URL</label>
+            <input className="form-input" value={info.wpAdminUrl}
+              onChange={(e) => onChange({ wpAdminUrl: e.target.value })}
+              placeholder="https://soulfulexpression.com/wp-admin" />
+          </div>
+        </div>
+      )}
+
+      <div className="onboard-uuid-block">
+        <div className="section-title" style={{ marginBottom: 8 }}>Auto-generated IDs（記錄到 Supabase）</div>
+        <div className="build-kv-grid">
+          {[
+            ["organizationId", info.organizationId],
+            ["workspaceId",    info.workspaceId],
+            ["projectId",      info.projectId],
+            ["siteId",         info.siteId],
+          ].map(([k, v]) => (
+            <div key={k}><span>{k}</span><strong style={{ fontSize: 11, fontFamily: "monospace" }}>{v}</strong></div>
+          ))}
+        </div>
+        <button type="button" className="onboard-regen-btn"
+          onClick={() => onChange({
+            organizationId: randomUUID(),
+            workspaceId: randomUUID(),
+            projectId: randomUUID(),
+            siteId: randomUUID(),
+          })}>
+          ↺ 重新生成 UUID
+        </button>
+      </div>
+
+      <button type="button" className="btn-primary" disabled={!valid} onClick={onNext}
+        style={{ marginTop: 20 }}>
+        下一步 → 部門選型
+      </button>
+    </div>
+  );
+}
+
+// ── Step 2: Department Selection ──────────────────────────────────────────────
+
+function Step2({
+  tenantSlug,
+  selected,
+  onChange,
+  onNext,
+  onBack,
+}: {
+  tenantSlug: string;
+  selected: Set<ClusterId>;
+  onChange: (next: Set<ClusterId>) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const selectedIds = Array.from(selected) as ClusterId[];
+  const payload = buildDepartmentSelection(selectedIds, tenantSlug || "company-<slug>");
+  const requiredFiles = getRequiredTemplateFiles(selectedIds);
+
+  const toggle = (id: ClusterId) => {
+    const next = new Set(selected);
+    next.has(id) ? next.delete(id) : next.add(id);
+    onChange(next);
+  };
+
+  const copyJson = () => {
+    void navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const grouped = GROUP_ORDER.map((group) => ({
+    group,
+    label: GROUP_LABELS[group],
+    clusters: DEPARTMENT_CATALOG.filter((d) => d.group === group),
+  }));
+
+  return (
+    <div className="onboard-step-body">
+      <p className="form-hint" style={{ marginBottom: 16 }}>
+        勾選客戶本次採購的能力模組。預設已選 SMB 核心 5 項。完成後複製 JSON 貼進{" "}
+        <code>tenants/{tenantSlug || "<slug>"}/core/DEPARTMENT_SELECTION.json</code>。
+      </p>
+
+      <div className="dept-legend">
+        <span className="dept-legend-item dept-on">SMB 預設 on</span>
+        <span className="dept-legend-item dept-by-industry">視業態</span>
+        <span className="dept-legend-item dept-off">預設 off</span>
+      </div>
+
+      {grouped.map(({ group, label, clusters }) => (
+        <div key={group} className="dept-group">
+          <div className="dept-group-label">{label}</div>
+          <div className="dept-cluster-grid">
+            {clusters.map((cluster) => {
+              const isSelected = selected.has(cluster.clusterId);
+              return (
+                <label
+                  key={cluster.clusterId}
+                  className={`dept-cluster-card ${isSelected ? "selected" : ""} dept-smb-${cluster.smbDefault.replace("_", "-")}`}
+                >
+                  <input type="checkbox" checked={isSelected} onChange={() => toggle(cluster.clusterId)} />
+                  <span className="dept-cluster-name">{cluster.label}</span>
+                  <span className="dept-cluster-rows">{cluster.matrixRows.join(" · ")}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {requiredFiles.length > 0 && (
+        <div className="dept-summary" style={{ marginTop: 16 }}>
+          <div className="section-title" style={{ marginBottom: 8 }}>
+            已選 {selected.size} / 20 — 需填寫 {requiredFiles.length} 個模板檔案
+          </div>
+          <div className="dept-file-list">
+            {requiredFiles.map((f) => (
+              <div key={f.path} className="dept-file-row">
+                <code className="dept-file-path">{f.path}</code>
+                <span className="dept-file-fields">
+                  必填：{f.mandatoryFields?.join("、") || "—"}
+                  {f.recommendedFields?.length ? (
+                    <span className="dept-file-recommended"> ／ 建議：{f.recommendedFields.join("、")}</span>
+                  ) : null}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+        <button type="button" className="btn-secondary" onClick={onBack}>← 返回</button>
+        <button type="button" className="btn-secondary" onClick={copyJson}>
+          {copied ? "✓ 已複製 JSON" : "複製 DEPARTMENT_SELECTION JSON"}
+        </button>
+        <button type="button" className="btn-primary" onClick={onNext}>
+          下一步 → 開通服務
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 3: Service Provisioning ──────────────────────────────────────────────
+
+function Step3({
+  info,
+  providers,
+  onProvidersChange,
+  hints,
+  onHintsChange,
+  provResult,
+  loading,
+  onSubmit,
+  onNext,
+  onBack,
+}: {
+  info: ClientInfo;
+  providers: string[];
+  onProvidersChange: (providers: string[]) => void;
+  hints: Record<string, string>;
+  onHintsChange: (hints: Record<string, string>) => void;
+  provResult: ProvResult | null;
+  loading: boolean;
+  onSubmit: () => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const toggle = (id: string) => {
+    onProvidersChange(
+      providers.includes(id) ? providers.filter((p) => p !== id) : [...providers, id]
+    );
+  };
+
+  return (
+    <div className="onboard-step-body">
+      <p className="form-hint" style={{ marginBottom: 16 }}>
+        選擇要為此客戶建立的外部服務帳號。系統使用 master token（已存於 Trigger worker 環境變數），
+        為每位客戶建立獨立 project／monitor／DSN，結果寫入 Supabase{" "}
+        <code>tenant_integration_bindings</code>。
+      </p>
+
+      <div className="dept-cluster-grid" style={{ marginBottom: 16 }}>
+        {PROVIDERS.map((p) => (
+          <label
+            key={p.id}
+            className={`dept-cluster-card ${providers.includes(p.id) ? "selected" : ""}`}
+          >
+            <input type="checkbox" checked={providers.includes(p.id)} onChange={() => toggle(p.id)} />
+            <span className="dept-cluster-name">{p.label}</span>
+            <span className="dept-cluster-rows">{p.desc}</span>
+          </label>
+        ))}
+      </div>
+
+      <div className="section-title" style={{ marginBottom: 8 }}>選填 Hints（留空使用預設）</div>
+      <div className="build-form-grid">
+        {[
+          { key: "sentryProjectSlug",   label: "Sentry project slug",  ph: "client-slug" },
+          { key: "sentryProjectName",   label: "Sentry project name",  ph: info.clientName || "Client Name" },
+          { key: "posthogProjectName",  label: "PostHog project name", ph: info.clientName || "Client Name" },
+          { key: "githubRepoName",      label: "GitHub repo name",     ph: info.tenantSlug || "client-site" },
+          { key: "uptimeMonitorUrl",    label: "Uptime monitor URL",   ph: info.profile === "profile_b" ? `https://${info.domain || "client.com"}` : info.siteUrl || "https://client.com" },
+          { key: "uptimeMonitorName",   label: "Uptime monitor name",  ph: info.clientName || "Client Site" },
+          { key: "n8nWorkflowSuffix",   label: "n8n workflow suffix",  ph: info.tenantSlug || "client-name" },
+        ].map(({ key, label, ph }) => (
+          <div key={key} className="form-row">
+            <label className="form-label">{label}</label>
+            <input className="form-input" value={hints[key] ?? ""}
+              onChange={(e) => onHintsChange({ ...hints, [key]: e.target.value })}
+              placeholder={ph} />
+          </div>
+        ))}
+      </div>
+
+      {provResult ? (
+        <div className={`build-alert ${provResult.ok ? "build-alert-ok" : "build-alert-blocked"}`}
+          style={{ marginTop: 12 }}>
+          {provResult.ok ? (
+            <>
+              ✓ Trigger.dev 已接受 — runId: <code>{provResult.runId ?? "unknown"}</code>
+              <br />Providers: {provResult.providers?.join(", ")}
+            </>
+          ) : (
+            <>Error: {provResult.error}{provResult.detail ? <><br />{provResult.detail}</> : null}</>
+          )}
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+        <button type="button" className="btn-secondary" onClick={onBack}>← 返回</button>
+        <button type="button" className="btn-secondary" disabled={loading || providers.length === 0} onClick={onSubmit}>
+          {loading ? "開通中…" : `一鍵開通 ${providers.length} 個服務`}
+        </button>
+        <button type="button" className="btn-primary" onClick={onNext}>
+          {provResult?.ok ? "下一步 → 啟動 Build ✓" : "跳過，直接啟動 Build →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 4: Launch ────────────────────────────────────────────────────────────
+
+function Step4({
+  info,
+  selectedDepts,
+  providers,
+  provResult,
+  onBack,
+}: {
+  info: ClientInfo;
+  selectedDepts: Set<ClusterId>;
+  providers: string[];
+  provResult: ProvResult | null;
+  onBack: () => void;
+}) {
+  const params = new URLSearchParams({
+    profile: info.profile,
+    clientName: info.clientName,
+    environment: "staging",
+    organizationId: info.organizationId,
+    workspaceId: info.workspaceId,
+    projectId: info.projectId,
+    siteId: info.siteId,
+    ...(info.profile === "profile_b"
+      ? { domain: info.domain, provider: info.provider, packageSlug: info.packageSlug, locale: info.locale }
+      : { siteUrl: info.siteUrl, wpAdminUrl: info.wpAdminUrl }
+    ),
+  });
+
+  const buildUrl = `/build?${params.toString()}`;
+
+  return (
+    <div className="onboard-step-body">
+      <div className="build-alert build-alert-ok" style={{ marginBottom: 20 }}>
+        客戶設定完成。以下是本次上線的摘要。
+      </div>
+
+      <div className="build-kv-grid">
+        <div><span>Client</span><strong>{info.clientName || "—"}</strong></div>
+        <div><span>Slug</span><strong>{info.tenantSlug || "—"}</strong></div>
+        <div><span>Email</span><strong>{info.customerEmail || "—"}</strong></div>
+        <div><span>Profile</span><strong>{info.profile}</strong></div>
+        <div><span>Departments</span><strong>{selectedDepts.size} / 20</strong></div>
+        <div><span>Services</span><strong>{provResult?.ok ? `${provResult.providers?.join(", ")}` : providers.length > 0 ? "待開通" : "跳過"}</strong></div>
+        <div><span>organizationId</span><strong style={{ fontSize: 11, fontFamily: "monospace" }}>{info.organizationId}</strong></div>
+        <div><span>workspaceId</span><strong style={{ fontSize: 11, fontFamily: "monospace" }}>{info.workspaceId}</strong></div>
+      </div>
+
+      <div className="section-title" style={{ marginTop: 20, marginBottom: 8 }}>下一步</div>
+      <ol style={{ paddingLeft: 20, lineHeight: 2 }}>
+        <li>將 <code>DEPARTMENT_SELECTION.json</code>（Step 2 複製的 JSON）貼入 <code>tenants/{info.tenantSlug || "<slug>"}/core/</code></li>
+        <li>在 Supabase 建立 organization / workspace / project / site 記錄（使用上方 UUID）</li>
+        <li>點擊「啟動 Build Console」→ 選擇 <code>enqueue</code> 模式執行部署</li>
+      </ol>
+
+      <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+        <button type="button" className="btn-secondary" onClick={onBack}>← 返回</button>
+        <a href={buildUrl} className="btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
+          ▶ 啟動 Build Console（{info.profile}）
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Wizard ───────────────────────────────────────────────────────────────
+
+const STEPS: { step: WizardStep; label: string }[] = [
+  { step: 1, label: "客戶資訊" },
+  { step: 2, label: "部門選型（M3）" },
+  { step: 3, label: "開通服務" },
+  { step: 4, label: "啟動 Build" },
+];
+
+export default function OnboardWizard() {
+  const [step, setStep] = useState<WizardStep>(1);
+  const [info, setInfo] = useState<ClientInfo>(makeDefaultClient);
+  const [selectedDepts, setSelectedDepts] = useState<Set<ClusterId>>(new Set(SMB_DEFAULT_CLUSTERS));
+  const [providers, setProviders] = useState<string[]>(["sentry", "posthog", "uptime_kuma", "n8n"]);
+  const [hints, setHints] = useState<Record<string, string>>({});
+  const [provLoading, setProvLoading] = useState(false);
+  const [provResult, setProvResult] = useState<ProvResult | null>(null);
+
+  const patchInfo = useCallback((patch: Partial<ClientInfo>) => {
+    setInfo((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const submitProvisioning = async () => {
+    setProvLoading(true);
+    setProvResult(null);
+    try {
+      const res = await fetch("/api/build/provision-services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-ops-simulated-role": "operator" },
+        body: JSON.stringify({
+          organizationId: info.organizationId,
+          workspaceId: info.workspaceId || undefined,
+          customerEmail: info.customerEmail,
+          providers,
+          hints: Object.fromEntries(Object.entries(hints).filter(([, v]) => v.trim() !== "")),
+        }),
+      });
+      const json = (await res.json()) as ProvResult;
+      setProvResult(json);
+    } catch (err) {
+      setProvResult({ ok: false, error: err instanceof Error ? err.message : "request_failed" });
+    } finally {
+      setProvLoading(false);
+    }
+  };
+
+  return (
+    <div className="onboard-wizard">
+      {/* Progress bar */}
+      <div className="onboard-progress">
+        {STEPS.map(({ step: s, label }) => (
+          <div key={s} className={`onboard-progress-item ${step === s ? "active" : step > s ? "done" : ""}`}>
+            <StepBadge step={s} current={step} />
+            <span className="onboard-progress-label">{label}</span>
+            {s < 4 && <span className="onboard-progress-sep">→</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Steps */}
+      <div className="build-panel" style={{ marginTop: 20 }}>
+        <StepHeader step={1} current={step} label="Step 1 — 客戶基本資訊" />
+        {step === 1 && (
+          <Step1 info={info} onChange={patchInfo} onNext={() => setStep(2)} />
+        )}
+      </div>
+
+      {step >= 2 && (
+        <div className="build-panel" style={{ marginTop: 16 }}>
+          <StepHeader step={2} current={step} label="Step 2 — 部門選型（M3 · 20 部門）" />
+          {step === 2 && (
+            <Step2
+              tenantSlug={info.tenantSlug}
+              selected={selectedDepts}
+              onChange={setSelectedDepts}
+              onNext={() => setStep(3)}
+              onBack={() => setStep(1)}
+            />
+          )}
+        </div>
+      )}
+
+      {step >= 3 && (
+        <div className="build-panel" style={{ marginTop: 16 }}>
+          <StepHeader step={3} current={step} label="Step 3 — 開通外部服務帳號" />
+          {step === 3 && (
+            <Step3
+              info={info}
+              providers={providers}
+              onProvidersChange={setProviders}
+              hints={hints}
+              onHintsChange={setHints}
+              provResult={provResult}
+              loading={provLoading}
+              onSubmit={submitProvisioning}
+              onNext={() => setStep(4)}
+              onBack={() => setStep(2)}
+            />
+          )}
+        </div>
+      )}
+
+      {step >= 4 && (
+        <div className="build-panel" style={{ marginTop: 16 }}>
+          <StepHeader step={4} current={step} label="Step 4 — 啟動 Build Console" />
+          {step === 4 && (
+            <Step4
+              info={info}
+              selectedDepts={selectedDepts}
+              providers={providers}
+              provResult={provResult}
+              onBack={() => setStep(3)}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

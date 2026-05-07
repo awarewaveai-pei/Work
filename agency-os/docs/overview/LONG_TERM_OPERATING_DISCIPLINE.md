@@ -71,7 +71,7 @@
 | **新機／雙機** | `REMOTE_WORKSTATION_STARTUP` §1.5／§2；`machine-environment-audit.ps1 -FetchOrigin -Strict`（勾選 `TASKS` 雙機項前須無 WARN） | `TASKS.md` 一行隊列；細項 **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`** |
 | **依賴與 CVE** | 審閱 `npm audit`；**禁止**對 `lobster-factory/packages/workflows` 盲目 `npm audit fix --force` | `TASKS.md` Backlog（Trigger 傳遞依賴） |
 
-**12 個月內建議完成的工程錨點（與 ADR 006 一致）**：在 Supabase 落地 **RLS + 租戶鍵 + Clerk 組織對照表**（migrations），並於 **staging** 用自動化或手動測試證明 **無跨租戶讀寫**；未落地前不宣稱多租戶資料層「已封閉」。**已提供基線 migration**：`lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql`（須套用至遠端 DB 並配置 JWT org claim）。
+**12 個月內建議完成的工程錨點（與 ADR 006 一致）**：在 Supabase 落地 **RLS + 租戶鍵 + IdP 組織對照表**（migrations），並於 **staging** 用自動化或手動測試證明 **無跨租戶讀寫**；未落地前不宣稱多租戶資料層「已封閉」。**已提供基線 migration（檔名沿用歷史）**：`lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql`（須套用至遠端 DB 並配置 JWT org claim）。
 
 ## Related
 

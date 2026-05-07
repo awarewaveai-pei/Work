@@ -18,7 +18,7 @@
 - [ ] **Compatibility Gate**: WP/theme/plugins version compatibility confirmed.
 - [ ] **Function Gate**: key user flows pass on staging.
 - [ ] **Rollback Gate**: rollback steps tested or validated with evidence.
-- [ ] **Data / multi-tenant Gate**（**僅當**本次釋出含 Supabase schema、RLS、Clerk↔租戶對照或 API 越戶風險時 **必勾**）：staging 已套用對應 migration；以 **兩個不同租戶** 身分（JWT／session）做 **讀寫不得越戶** 抽測 **PASS**；IdP JWT 之 **org claim** 與執行環境一致。詳 **ADR 006** 與 `lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql`。
+- [ ] **Data / multi-tenant Gate**（**僅當**本次釋出含 Supabase schema、RLS、IdP↔租戶對照或 API 越戶風險時 **必勾**）：staging 已套用對應 migration；以 **兩個不同租戶** 身分（JWT／session）做 **讀寫不得越戶** 抽測 **PASS**；IdP JWT 之 **org claim** 與執行環境一致。詳 **ADR 006** 與 `lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql`。
 
 ## Deployment Decision
 
