@@ -7,7 +7,7 @@
 ### MCP 全棧憑證補齊與環境對齊
 
 - **Secrets vault 大批次補齊**：從 `AWARE_WAVE_CREDENTIALS.md` + `mcp/user-env.ps1` 批次寫入 36+ 個密鑰（SUPABASE、CLOUDFLARE、N8N、SLACK、RESEND、POSTHOG、NETDATA、GRAFANA、AI keys 等）；`API_AWAREWAVE_BEARER_TOKEN`、`APP_AWAREWAVE_BEARER_TOKEN`、`SUPABASE_AWAREWAVE_POSTGRES_DSN` 從 user-env.ps1 補入。
-- **Windows 使用者環境變數**：最終 `sync-cursor-mcp-user-env` 成功寫入 **45 個**變數（含新增的 HETZNER_API_TOKEN、SENTRY_AUTH_TOKEN）；缺 3 個已知待補項（`SUPABASE_A_SERVICE_ROLE_KEY`、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`、`XAI_API_KEY`）。
+- **Windows 使用者環境變數**：最終 `sync-cursor-mcp-user-env` 成功寫入 **45 個**變數（含新增的 HETZNER_API_TOKEN、SENTRY_AUTH_TOKEN）；缺 **4** 個已知待補項（與 **`TASKS.md`** Vault 隊列一致：`OPS_INBOX_INGEST_TOKEN`、`SUPABASE_A_SERVICE_ROLE_KEY`、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`、`XAI_API_KEY`）。
 - **新增憑證**：`UPTIME_KUMA_API_KEY`（`uk1_ZFxelX3...`）、`TRIGGER_ACCESS_TOKEN`（`tr_prod_81d2...`，新 token；舊 March-27 token 已失效）、`HETZNER_API_TOKEN`（`x5zWudZq...`）、`SENTRY_AUTH_TOKEN`（`sntryu_416b...`），均已入 vault + 寫入 Windows User env。
 - **AWARE_WAVE_CREDENTIALS.md 更新**：補 Resend sender/reply email（`awarewaveai@gmail.com`）、API/APP_AWAREWAVE_BEARER_TOKEN（=Supabase service role）、Uptime Kuma API key、Trigger access token、Hetzner API token、Sentry auth token；§二十四待補表移除已補項。
 - **Claude desktop app MCP**：修復 `trigger` MCP（補 `TRIGGER_API_URL` env）；`posthog`/`cloudflare` 的 HTTP type 在 desktop app 不被支援（每次重啟 app 自動 revert 回 npm stdio），此限制無解於 desktop app 端。
@@ -18,6 +18,7 @@
 - **`.claude/commands/`**：將 **`checkpoint.md`／`recap.md`／`tasks.md`** 納入版控（與根 `.gitignore` 註記「commands 應追蹤」一致），解除 **`check-three-way-sync` Unexpected dirty（未追蹤）**。
 - **`TASKS`**：`Git：main 未推送…` 隊列敘述已結案並移至 **`已完成歷程 §2026-05-07`**（驗證 `origin/main...HEAD` count **0／0**）；**Vault** 條補上 **`SUPABASE_A_SERVICE_ROLE_KEY`** 與 **`OPS_INBOX_INGEST_TOKEN`** 自產提示；**Trigger deploy** 條加上 EU／SSH **阻塞**說明。
 - **`memory/daily/2026-05-07.md`**：更正「main 領先 14 commits」為已與 **`origin/main`** 對齊。
+- **`reports/status/integrated-status-LATEST.md`**：為組裝報告，曾嵌入舊版日記摘錄而短暫與 **`git`** 現況矛盾；已 **`scripts/generate-integrated-status-report.ps1`** 重產（時間戳記更新）。長期判讀：**`CONVERSATION_MEMORY.md` → `Current Operating Context` → 2026-05-07（長期編纂規則）**。
 
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
@@ -32,7 +33,7 @@
   - `C:\Users\user1115\Desktop\AWARE_WAVE_CREDENTIALS.md`（Hetzner、Sentry token 填入；待補表移除已補項）
 - **Git**: 本輪無 repo 內容變更需額外 commit；WORKLOG+memory 更新將由 ao-close 統一 commit
 - **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: Desktop app 的 posthog/cloudflare MCP 仍為 npm stdio（HTTP type 不被 desktop app 支援，無解）。剩餘 vault 待補：SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY。`main` 已與 `origin/main` 對齊（ahead／behind 皆 0）。
+- **風險／待辦（可選）**: Desktop app 的 posthog/cloudflare MCP 仍為 npm stdio（HTTP type 不被 desktop app 支援，無解）。剩餘 vault 待補：`OPS_INBOX_INGEST_TOKEN`、SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY。`main` 已與 `origin/main` 對齊（ahead／behind 皆 0）。
 
 ## 2026-05-06
 

@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-07 01:29:18
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-05-07 09:54:29
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -211,15 +211,16 @@
 - 新增 HETZNER_API_TOKEN、SENTRY_AUTH_TOKEN、UPTIME_KUMA_API_KEY、TRIGGER_ACCESS_TOKEN（新 token）
 - 更新 AWARE_WAVE_CREDENTIALS.md：填入 Hetzner/Sentry token，移除已補待補項
 - 確認桌機換機所需複製的 5 類檔案清單
+- AO-RESUME 收口：`.claude/commands` 三檔納入版控、`TASKS`／日記與 **`origin/main`** 對齊敘述更新
 
 ## Current state
 - Vault 45/48 完整（缺 SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY）
 - Desktop app MCP：trigger 已修復；posthog/cloudflare 受 app 限制（HTTP type 不支援）
-- main 領先 origin/main 14 commits，尚未 push
+- **`main` 已與 `origin/main` 對齊**（2026-05-07：`git rev-list --left-right --count origin/main...HEAD` → `0  0`）
 
 ## Next steps
 - 視需要補 SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY（Supabase cloud 專案 API key）
-- git push origin main（14 commits 累積）
+- 若有本機新 commits：`git fetch` → **`git push origin main`**（目前與 `origin/main` 已對齊則略過）
 - 桌機設置：複製 5 類檔案後執行 bootstrap-mcp-machine.ps1
 
 ## Closeout inbox (AO-CLOSE auto, verbatim)
@@ -234,7 +235,7 @@
   - `C:\Users\user1115\Desktop\AWARE_WAVE_CREDENTIALS.md`（Hetzner、Sentry token 填入；待補表移除已補項）
 - **Git**: 本輪無 repo 內容變更需額外 commit；WORKLOG+memory 更新將由 ao-close 統一 commit
 - **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: Desktop app 的 posthog/cloudflare MCP 仍為 npm stdio（HTTP type 不被 desktop app 支援，無解）。剩餘 vault 待補：SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY。main 仍有 14 commits 未 push。
+- **風險／待辦（可選）**: Desktop app 的 posthog/cloudflare MCP 仍為 npm stdio（HTTP type 不被 desktop app 支援，無解）。剩餘 vault 待補：SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY。`main` 已與 `origin/main` 對齊（ahead／behind 皆 0）。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
