@@ -120,6 +120,7 @@
 | `/verify` | 執行 `verify-build-gates.ps1` |
 | `/build-tenant` | 引導新客戶租戶佈建（Lobster Factory） |
 | `/smoke-test` | 執行 n8n MCP + 核心服務煙霧測試 |
+| `/strategy-review` | 多角度策略決策審查（4 角色協作 / 紅藍辯論 / Pre-Mortem） |
 | `/vault-sync` | 同步 vault → Windows user env，列出仍缺的 key |
 | `/vault-status` | 顯示 vault 所有 key 名稱 + `.cursor/mcp.json` 缺漏清單 |
 
