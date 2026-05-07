@@ -316,6 +316,18 @@ function Sync-Json-Merge($spec, [string]$mode) {
 
   Backup-Path $tgt 'settings.json.before'
   $merged | ConvertTo-Json -Depth 30 | Set-Content -Path $tgt -Encoding UTF8
+  # Workaround PS5.1 ConvertTo-Json bug: 1-element arrays serialize as bare objects.
+  # The Node helper rewrites every always-array path (hooks.* + nested matcher.hooks
+  # + permissions.{allow,deny,additionalDirectories}) back to array form. Idempotent.
+  $normalizer = Join-Path $MonorepoRoot 'scripts\normalize-claude-settings.mjs'
+  if (Test-Path $normalizer) {
+    & node $normalizer $tgt
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "  WARN: normalize-claude-settings exited $LASTEXITCODE; settings.json may have structural drift" -ForegroundColor Yellow
+    }
+  } else {
+    Write-Host "  WARN: normalizer missing at $normalizer (PS5.1 ConvertTo-Json may have flattened 1-element arrays)" -ForegroundColor Yellow
+  }
   Write-Host "  -> settings.json synced" -ForegroundColor Green
 }
 

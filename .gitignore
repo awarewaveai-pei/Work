@@ -2,6 +2,7 @@
 # Root-level ephemeral files
 .claude/.credentials.json
 .claude/.update.lock
+.claude/.last-cleanup
 .claude/bash-commands.log
 .claude/history.jsonl
 .claude/mcp-health-cache.json

@@ -133,6 +133,67 @@ powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mo
 
 ---
 
+
+## 為什麼有 `scripts/normalize-claude-settings.mjs`（PowerShell ConvertTo-Json 1-element-array bug）
+
+### 症狀
+
+舊版（沒接 normalizer）跑 `sync-claude-userlevel.ps1 -Mode merge` 後，Claude Code 啟動跳：
+
+> Settings file failed to parse: `~/.claude/settings.json` — Expected array, but received object
+
+結果：所有 hooks 失效，permissions allow 不生效。
+
+### 根因
+
+**PowerShell 5.1 `ConvertTo-Json` 已知 bug**：1-element array 序列化會被拆成單一 object，
+所以 `hooks.UserPromptSubmit: [{...}]`（1 個 matcher）寫檔時被改成 `hooks.UserPromptSubmit: {...}`。
+
+中招的層級不只一層：
+
+- 頂層：`hooks.{Event}` 若只有 1 個 matcher → 變 object
+- 嵌套：`hooks.{Event}[N].hooks` 若只有 1 個 hook → 變 object
+
+`permissions.allow` / `permissions.deny` / `permissions.additionalDirectories` 只有 1 個元素時也會中。
+
+### 修法（不改 PowerShell，新增 Node 後處理）
+
+`Sync-Json-Merge` 在 `Set-Content` 後 **立刻** 呼叫 `scripts/normalize-claude-settings.mjs`：
+
+- 走訪 `HOOK_EVENTS` 清單裡每個事件的頂層 + 嵌套 `.hooks` 欄位
+- 走訪 `PERMISSION_ARRAY_KEYS`（allow/deny/additionalDirectories/ask）
+- 任何「應該是 array 卻是 object」的位置 → 包成 `[obj]`
+- 完全 idempotent：跑在已經正確的檔案上是 no-op
+- 失敗會 WARN（不阻擋 sync），訊息明確指引
+
+### 為什麼不直接改 PowerShell 序列化
+
+- PS 5.1 `ConvertTo-Json` 沒有 `-AsArray` 旗標（PS 7+ 才有；本機是 5.1）
+- 用 `,$value` 強制保 array 在巢狀深層不可靠
+- 換用 Newtonsoft.Json 需要 DLL，違反「無外部依賴」
+- Node 已是本 repo 既有依賴（`run-llm-mcp.ps1`、`apply-lobster-rls-migrations-eu.mjs` 等都用），新增 normalizer 不增加維運面積
+
+### 擴充 normalizer 的 schema
+
+若 Claude Code 將來加新 hook event（例如 `OnError`）：
+
+1. 編 `scripts/normalize-claude-settings.mjs`，把新事件加進 `HOOK_EVENTS` 清單
+2. 跑 `sync-claude-userlevel.ps1 -Mode dry-run` 確認沒誤判
+3. 不需要動 SSOT 模板（除非你也要在 SSOT 加新 hook）
+
+### 驗收
+
+```powershell
+# 1. 先故意弄壞（模擬 PS bug）
+node -e "const fs=require('fs');const f='C:/Users/USER/.claude/settings.json';let r=fs.readFileSync(f,'utf8').replace(/^﻿/,'');const c=JSON.parse(r);['UserPromptSubmit','Stop'].forEach(e=>{if(Array.isArray(c.hooks[e])&&c.hooks[e].length===1)c.hooks[e]=c.hooks[e][0];});fs.writeFileSync(f,JSON.stringify(c,null,2)+'
+');"
+
+# 2. 跑 sync
+powershell -ExecutionPolicy Bypass -File .scriptssync-claude-userlevel.ps1 -Mode merge
+
+# 3. 確認 normalizer fired（看 stdout 出現 [normalize] FIXED N structural issue(s)）
+# 4. 重開 Claude Code，無 parse error
+```
 ## Related
 
 - `mcp/registry.template.json` — Shared MCP server SSOT
