@@ -9,6 +9,14 @@
 - **§7**：與 [Trigger API keys](https://trigger.dev/docs/apikeys) 對齊——**`tr_prod_*`**（Production secret）→ 應用／SDK 的 **`TRIGGER_SECRET_KEY`**；**`tr_pat_*`**（PAT）→ **`TRIGGER_ACCESS_TOKEN`**（`login`／`deploy`／CI）；建立 PAT 於 **`{APP_ORIGIN}/account/tokens`**。
 - **先前**：磁碟滿曾導致該 README 被截成 **0 bytes**，已自 git **`restore`**；本輪補齊 §7／§7a 敘述以免 **`tr_prod`** 與 **`tr_pat`** 混用。
 
+### EU VPS — Netdata「pending reboot」結案（核心更新）
+
+- **主機**：`awarewave-eu-hel1-cpx32`，**`204.168.175.41`**（Hetzner EU；與 **`SG_PHASE1_DOCKER_LAYOUT`**／Trigger Owner 所述 EU 角色一致）。
+- **告警**：Netdata **System requires reboot after package updates**；伺服器 **`/run/reboot-required`** 存在，**`reboot-required.pkgs`** 含 **`linux-image-5.15.0-177-generic`**。
+- **處置**：SSH 確認主要容器運行後執行 **`sync`** + **`shutdown -r +2`**（排程重開）；避免立即斷線、必要時可用 **`shutdown -c`** 取消。
+- **驗證（重開後）**：**`uname -r`** → **`5.15.0-177-generic`**；**`/run/reboot-required` 已清除**（Netdata Raised 應隨採集收斂）；**Docker** 約 **25** 個容器已自拉起——抽验 **`trigger-webapp`**（healthy）、**`trigger-registry`**、**`supabase-kong`**（healthy）、**`n8n`**、**`uptime-kuma`**（healthy）皆為 **`Up`** 與重開時間對齊。
+- **備註**：本項為例行維運收口；**無**對應 **`TASKS`** 開放項，故不生 **`AUTO_TASK_DONE`**。
+
 ### Vault 憑證補齊（續）— SUPABASE aliases + AWAREWAVE_URL
 
 - **新增 vault keys**：`SUPABASE_A_SERVICE_ROLE_KEY`（alias of `SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY`，cipher 直接複製）、`SUPABASE_AWAREWAVE_URL`（`https://supabase.aware-wave.com`）、`SUPABASE_A_URL`（同上）。
