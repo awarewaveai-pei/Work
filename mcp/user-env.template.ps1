@@ -93,6 +93,14 @@ $vars = @{
     API_AWAREWAVE_BEARER_TOKEN   = ""
     APP_AWAREWAVE_BASE_URL       = "https://app.aware-wave.com"
     APP_AWAREWAVE_BEARER_TOKEN   = ""
+    # Always-On Command Plane (Telegram ingress + kill switch).
+    # See agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md and TELEGRAM_COMMAND_POLICY.md.
+    TELEGRAM_BOT_TOKEN           = ""   # from BotFather /newbot
+    TELEGRAM_WEBHOOK_SECRET      = ""   # random 32+ bytes; pass to setWebhook secret_token
+    TELEGRAM_ALLOWED_USER_IDS    = ""   # csv of numeric user ids permitted to issue commands
+    TELEGRAM_ALLOWED_CHAT_IDS    = ""   # csv of numeric chat ids the bot listens on
+    COMMAND_PLANE_DEFAULT_ORG_ID = ""   # uuid of organizations row representing the operator
+    COMMAND_PLANE_DEFAULT_WORKSPACE_ID = ""  # optional uuid; null lets routes work org-wide
 }
 
 foreach ($entry in $vars.GetEnumerator()) {

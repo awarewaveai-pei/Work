@@ -111,6 +111,14 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `supabase-set-pooler-tenant-on-host.sh` | Set Supabase pooler tenant on host |
 | `notify-ops.ps1` | Send ops notification |
 
+## Always-On Command Plane
+
+| Script | Purpose |
+|--------|---------|
+| `setup-command-plane.ps1` | One-shot client-side setup (vault → user env → setWebhook). Pass `-BotToken -UserId -OrgId` |
+| `configure-telegram-webhook.ps1` | Standalone setWebhook + setMyCommands (use `-Clear` to disable) |
+| `command-plane-smoke.ps1` | 8-check smoke (Telegram ingress + kill switch + idempotency) — see `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md` |
+
 ## Autopilot
 
 | Script | Purpose |
