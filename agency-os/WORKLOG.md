@@ -2,6 +2,17 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-08
+
+### Vault 憑證補齊（續）— SUPABASE aliases + AWAREWAVE_URL
+
+- **新增 vault keys**：`SUPABASE_A_SERVICE_ROLE_KEY`（alias of `SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY`，cipher 直接複製）、`SUPABASE_AWAREWAVE_URL`（`https://supabase.aware-wave.com`）、`SUPABASE_A_URL`（同上）。
+- **SoulfulExpression**：`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`（eyJh…rimI）、相關 7 keys 已在前一 session 補齊；`AWARE_WAVE_CREDENTIALS.md` §十八 已更新完整憑證。
+- **sync-cursor-mcp-user-env**：25 vars synced；仍缺 33（主要為 base URL config + API key，含 `XAI_API_KEY`）。
+- **CLAUDE.md 換機指引**：更新「桌機 / 換機設定」為完整 hooks 目錄 + settings.json + memory 三類複製清單；新增「筆電 WordPress 棧」subsection。
+- **TASKS.md 更新**：Vault 條「仍缺」移除已補 SUPABASE 兩項；剩 `XAI_API_KEY` + 33 base-URL 待補。
+- AUTO_TASK_DONE: 補齊剩餘 Vault 憑證
+
 ## 2026-05-07
 
 ### phase1 WordPress（SG）PostHog MU — 完成部署
