@@ -37,6 +37,14 @@ export async function POST(req: Request) {
       level: "warning",
       tags: { component: "command-plane", phase: "ingress" },
     });
+    const supabase = getSupabaseWriteClient();
+    await reportCommandError(supabase, {
+      organizationId: process.env.COMMAND_PLANE_DEFAULT_ORG_ID ?? null,
+      source_type: "telegram_auth_failed",
+      source_ref: null,
+      error_code: secret.reason,
+      error_message: `secret check failed: ${secret.reason}`,
+    });
     // Return 200 OK to avoid leaking that the endpoint exists.
     return NextResponse.json({ ok: true });
   }
