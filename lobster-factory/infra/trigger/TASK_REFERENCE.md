@@ -20,6 +20,7 @@ Set these in Trigger.dev → Project → **Environment Variables** (or they are 
 | `TRIGGER_API_URL` | `ao-infrastructure-check` | `https://trigger.aware-wave.com` |
 | `N8N_URL` | `ao-infrastructure-check` | n8n base URL |
 | `UPTIME_KUMA_URL` | `ao-infrastructure-check` | Uptime Kuma base URL |
+| `SENTRY_URL` | `ao-infrastructure-check` | Sentry base URL e.g. `https://sentry.aware-wave.com` |
 | `POSTHOG_API_KEY` | all tasks | PostHog server-side project API key |
 | `POSTHOG_HOST` | all tasks | `https://us.i.posthog.com` or self-hosted |
 | `OPS_INBOX_INGEST_TOKEN` | `record-tenant-integration`, `orchestrate-tenant-provisioning` | Bearer token for AW webhook ingest |
@@ -39,7 +40,9 @@ Set these in Trigger.dev → Project → **Environment Variables** (or they are 
 
 ### `ao-infrastructure-check`
 
-**What it does**: Pings all AwareWave control-plane services (Supabase, Trigger, n8n, Uptime Kuma) and runs an RLS isolation smoke test. No side effects — read-only. Safe to run at any time.
+**What it does**: Pings all AwareWave control-plane services and runs an RLS isolation smoke test. No side effects — read-only. Safe to run at any time.
+
+Checks (7 total): Supabase REST, Trigger.dev API, n8n, Uptime Kuma, Sentry (`/api/0/`), PostHog (`/_health`), RLS isolation smoke. Each check is `"skip"` if the corresponding env var is not set — no env var ever causes a failure by itself.
 
 **Minimum payload** (can test immediately, no env vars required):
 ```json
@@ -56,7 +59,9 @@ Set these in Trigger.dev → Project → **Environment Variables** (or they are 
   "supabaseUrl": "https://supabase.aware-wave.com",
   "triggerApiUrl": "https://trigger.aware-wave.com",
   "n8nUrl": "https://n8n.aware-wave.com",
-  "uptimeKumaUrl": "https://uptime.aware-wave.com"
+  "uptimeKumaUrl": "https://uptime.aware-wave.com",
+  "sentryUrl": "https://sentry.aware-wave.com",
+  "posthogHost": "https://us.i.posthog.com"
 }
 ```
 
@@ -243,6 +248,43 @@ The easiest task to run first (no env vars required):
 4. Check the output — service checks marked `"skip"` mean the env vars aren't set yet on the Trigger.dev server
 
 Once `LOBSTER_SUPABASE_URL` + `LOBSTER_SUPABASE_SERVICE_ROLE_KEY` are set in Environment Variables, the `rls_isolation_smoke` check will also run.
+
+**Via REST API** (confirmed working 2026-05-07):
+```bash
+# Trigger a run
+curl -X POST "https://trigger.aware-wave.com/api/v1/tasks/ao-infrastructure-check/trigger" \
+  -H "Authorization: Bearer tr_prod_<key>" \
+  -H "Content-Type: application/json" \
+  -d '{"payload": {"organizationId": "11111111-1111-1111-1111-111111111111"}}'
+# → {"id": "run_xxx", "isCached": false}
+
+# Poll run status (use /api/v3/runs/, NOT /api/v1/runs/)
+curl "https://trigger.aware-wave.com/api/v3/runs/run_xxx" \
+  -H "Authorization: Bearer tr_prod_<key>"
+# → {"status": "COMPLETED", "output": {...}, ...}
+```
+
+---
+
+## Current Prod Env Var Status
+
+As of 2026-05-07, the following vars are set in the Trigger.dev prod environment:
+
+| Variable | Status |
+|---|---|
+| `POSTHOG_API_KEY` | ✅ set |
+| `POSTHOG_HOST` | ✅ set |
+| `LOBSTER_SUPABASE_URL` | ❌ missing — sync on next deploy |
+| `LOBSTER_SUPABASE_SERVICE_ROLE_KEY` | ❌ missing — sync on next deploy |
+| `LOBSTER_ENABLE_DB_WRITES` | ❌ missing — sync on next deploy |
+| `TRIGGER_API_URL` | ❌ missing — sync on next deploy |
+| `N8N_URL` | ❌ missing — sync on next deploy |
+| `UPTIME_KUMA_URL` | ❌ missing — sync on next deploy |
+| `SENTRY_URL` | ❌ missing — sync on next deploy |
+| `LOBSTER_AO_ORG_ID` | ❌ missing — must be set before next deploy |
+| All tenant provisioning vars | ❌ missing — sync on next deploy |
+
+To sync all vars, export them locally then run `npx trigger.dev@4.4.4 deploy` (see §Deploy below).
 
 ---
 

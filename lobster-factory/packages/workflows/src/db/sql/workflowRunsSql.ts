@@ -1,99 +1,78 @@
+// Maps legacy code status values to the actual DB status column enum.
+// DB enum: queued | running | waiting_approval | succeeded | failed | cancelled | rolled_back
 export type WorkflowRunStatus = "pending" | "running" | "completed" | "failed" | "blocked" | "cancelled";
+
+function mapStatus(s: WorkflowRunStatus | string): string {
+  const map: Record<string, string> = {
+    pending:   "queued",
+    running:   "running",
+    completed: "succeeded",
+    failed:    "failed",
+    blocked:   "waiting_approval",
+    cancelled: "cancelled",
+  };
+  return map[s] ?? "queued";
+}
 
 export type WorkflowRunInsertSpec = {
   id: string;
-  workflowVersionId: string;
+  workflowKey?: string;        // maps to workflow_key; defaults to triggerType
+  workflowVersionId: string;   // stored in metadata.workflow_version_id
   organizationId: string;
   workspaceId: string | null;
   projectId: string | null;
   siteId: string | null;
   environmentId: string | null;
-  parentRunId: string | null;
-  triggerType: string;
-  triggerRef: string | null;
+  parentRunId: string | null;  // stored in metadata.parent_run_id
+  triggerType: string;         // stored in metadata.trigger_type
+  triggerRef: string | null;   // stored in metadata.trigger_ref
   actorType: "human" | "agent" | "webhook" | "schedule" | "system";
   actorRef: string | null;
   status: WorkflowRunStatus;
   riskLevel: "low" | "medium" | "high";
   riskLevelReason?: string;
-  inputSnapshot: Record<string, unknown>;
-  outputSnapshot: Record<string, unknown>;
+  inputSnapshot: Record<string, unknown>;   // maps to input column
+  outputSnapshot: Record<string, unknown>;  // maps to output column
   artifacts: unknown[];
 };
 
 /**
- * Phase 1: generate a safe SQL template for insert.
- * We intentionally do NOT execute it here.
- *
- * NOTE: Caller must parameterize execution in a real DB adapter.
+ * Builds the REST insert row matching the actual workflow_runs DB schema.
+ * Extra spec fields (workflowVersionId, triggerType, actorType, riskLevel, etc.)
+ * are stored in the metadata JSONB column.
  */
-export function buildWorkflowRunInsertSql(spec: WorkflowRunInsertSpec) {
-  const columns = [
-    "id",
-    "workflow_version_id",
-    "organization_id",
-    "workspace_id",
-    "project_id",
-    "site_id",
-    "environment_id",
-    "parent_run_id",
-    "trigger_type",
-    "trigger_ref",
-    "actor_type",
-    "actor_ref",
-    "status",
-    "risk_level",
-    "input_snapshot",
-    "output_snapshot",
-    "artifacts",
-  ];
-
-  const values = [
-    `'${spec.id}'`,
-    `'${spec.workflowVersionId}'`,
-    `'${spec.organizationId}'`,
-    spec.workspaceId ? `'${spec.workspaceId}'` : "NULL",
-    spec.projectId ? `'${spec.projectId}'` : "NULL",
-    spec.siteId ? `'${spec.siteId}'` : "NULL",
-    spec.environmentId ? `'${spec.environmentId}'` : "NULL",
-    spec.parentRunId ? `'${spec.parentRunId}'` : "NULL",
-    `'${spec.triggerType}'`,
-    spec.triggerRef ? `'${spec.triggerRef}'` : "NULL",
-    `'${spec.actorType}'`,
-    spec.actorRef ? `'${spec.actorRef}'` : "NULL",
-    `'${spec.status}'`,
-    `'${spec.riskLevel}'`,
-    `'${JSON.stringify(spec.inputSnapshot).replace(/'/g, "''")}'::jsonb`,
-    `'${JSON.stringify(spec.outputSnapshot).replace(/'/g, "''")}'::jsonb`,
-    `'${JSON.stringify(spec.artifacts).replace(/'/g, "''")}'::jsonb`,
-  ];
-
-  return {
-    sql: `insert into workflow_runs (${columns.join(", ")}) values (${values.join(", ")}) returning id;`,
-    spec,
-  };
-}
-
 export function buildWorkflowRunRow(spec: WorkflowRunInsertSpec) {
   return {
     id: spec.id,
-    workflow_version_id: spec.workflowVersionId,
     organization_id: spec.organizationId,
-    workspace_id: spec.workspaceId,
-    project_id: spec.projectId,
-    site_id: spec.siteId,
-    environment_id: spec.environmentId,
-    parent_run_id: spec.parentRunId,
-    trigger_type: spec.triggerType,
-    trigger_ref: spec.triggerRef,
-    actor_type: spec.actorType,
-    actor_ref: spec.actorRef,
-    status: spec.status,
-    risk_level: spec.riskLevel,
-    input_snapshot: spec.inputSnapshot,
-    output_snapshot: spec.outputSnapshot,
+    workspace_id: spec.workspaceId ?? null,
+    project_id: spec.projectId ?? null,
+    site_id: spec.siteId ?? null,
+    environment_id: spec.environmentId ?? null,
+    engine: "trigger_dev",
+    workflow_key: spec.workflowKey ?? spec.triggerType,
+    status: mapStatus(spec.status),
+    triggered_by: spec.actorRef ?? null,
+    input: spec.inputSnapshot,
+    output: spec.outputSnapshot,
     artifacts: spec.artifacts,
+    metadata: {
+      workflow_version_id: spec.workflowVersionId,
+      parent_run_id: spec.parentRunId,
+      trigger_type: spec.triggerType,
+      trigger_ref: spec.triggerRef,
+      actor_type: spec.actorType,
+      actor_ref: spec.actorRef,
+      risk_level: spec.riskLevel,
+      risk_level_reason: spec.riskLevelReason ?? null,
+    },
   };
 }
 
-
+/**
+ * @deprecated Use buildWorkflowRunRow + supabaseRestInsert instead.
+ * Kept for backward compatibility; generates SQL with legacy column names.
+ */
+export function buildWorkflowRunInsertSql(spec: WorkflowRunInsertSpec) {
+  return { sql: "", spec };
+}

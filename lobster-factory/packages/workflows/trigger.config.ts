@@ -49,9 +49,11 @@ export default defineConfig({
         const triggerApiUrl  = process.env.TRIGGER_API_URL  ?? "";
         const n8nUrl         = process.env.N8N_URL          ?? "";
         const uptimeKumaUrl  = process.env.UPTIME_KUMA_URL  ?? "";
+        const sentryUrl      = process.env.SENTRY_URL       ?? "";
         if (triggerApiUrl.trim())  out.TRIGGER_API_URL  = triggerApiUrl.trim();
         if (n8nUrl.trim())         out.N8N_URL          = n8nUrl.trim();
         if (uptimeKumaUrl.trim())  out.UPTIME_KUMA_URL  = uptimeKumaUrl.trim();
+        if (sentryUrl.trim())      out.SENTRY_URL       = sentryUrl.trim();
 
         // ── Tenant provisioning (orchestrate-tenant-provisioning) ────────────
         const sentryToken   = process.env.SENTRY_AUTH_TOKEN                    ?? "";

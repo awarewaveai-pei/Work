@@ -17,6 +17,8 @@ import { z } from "zod";
 import { postTenantIntegrationWebhook } from "../lib/tenant-provisioning/postTenantIntegrationWebhook";
 import { runProviderStep } from "../lib/tenant-provisioning/providers/registry";
 import type { ProvisioningProvider } from "../lib/tenant-provisioning/types";
+import { captureWorkflowEvent } from "../observability/posthog";
+import { captureWorkflowException } from "../observability/sentry";
 
 const ProviderEnum = z.enum([
   "github",
@@ -59,52 +61,77 @@ const InputSchema = z.object({
 export const orchestrateTenantProvisioning = task({
   id: "orchestrate-tenant-provisioning",
   run: async (payload: unknown) => {
-    const input = InputSchema.parse(payload);
-    const ctx = {
-      organizationId: input.organizationId,
-      workspaceId: input.workspaceId,
-      customerEmail: input.customerEmail,
-      googleSubject: input.googleSubject,
-      hints: input.hints ?? undefined,
-    };
+    try {
+      const input = InputSchema.parse(payload);
+      const ctx = {
+        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
+        customerEmail: input.customerEmail,
+        googleSubject: input.googleSubject,
+        hints: input.hints ?? undefined,
+      };
 
-    const results: Array<{ provider: ProvisioningProvider; ok: boolean; detail?: string }> = [];
+      captureWorkflowEvent("workflow started", {
+        workflowId: "orchestrate-tenant-provisioning",
+        organizationId: input.organizationId,
+        providers: input.providers,
+      });
 
-    const providers = [...new Set(input.providers)];
-    for (const provider of providers) {
-      const step = await runProviderStep(provider, ctx);
-      if (step.ok) {
-        await postTenantIntegrationWebhook({
-          organizationId: input.organizationId,
-          workspaceId: input.workspaceId,
-          provider,
-          secretRef: step.secretRef,
-          externalHint: step.externalHint,
-          apiMetadata: step.apiMetadata,
-          provisioningSource: "trigger",
-          status: step.status ?? "active",
-        });
-        results.push({ provider, ok: true });
-        logger.info("provision row written", { provider });
-      } else {
-        await postTenantIntegrationWebhook({
-          organizationId: input.organizationId,
-          workspaceId: input.workspaceId,
-          provider,
-          apiMetadata: {
-            customer_email: input.customerEmail,
-            ...(input.googleSubject ? { google_sub: input.googleSubject } : {}),
-            automation: "orchestrate-tenant-provisioning",
-          },
-          provisioningSource: "trigger",
-          status: "failed",
-          lastError: step.error,
-        });
-        results.push({ provider, ok: false, detail: step.error });
-        logger.warn("provision step failed (recorded)", { provider, error: step.error });
+      const results: Array<{ provider: ProvisioningProvider; ok: boolean; detail?: string }> = [];
+
+      const providers = [...new Set(input.providers)];
+      for (const provider of providers) {
+        const step = await runProviderStep(provider, ctx);
+        if (step.ok) {
+          await postTenantIntegrationWebhook({
+            organizationId: input.organizationId,
+            workspaceId: input.workspaceId,
+            provider,
+            secretRef: step.secretRef,
+            externalHint: step.externalHint,
+            apiMetadata: step.apiMetadata,
+            provisioningSource: "trigger",
+            status: step.status ?? "active",
+          });
+          results.push({ provider, ok: true });
+          logger.info("provision row written", { provider });
+        } else {
+          await postTenantIntegrationWebhook({
+            organizationId: input.organizationId,
+            workspaceId: input.workspaceId,
+            provider,
+            apiMetadata: {
+              customer_email: input.customerEmail,
+              ...(input.googleSubject ? { google_sub: input.googleSubject } : {}),
+              automation: "orchestrate-tenant-provisioning",
+            },
+            provisioningSource: "trigger",
+            status: "failed",
+            lastError: step.error,
+          });
+          results.push({ provider, ok: false, detail: step.error });
+          logger.warn("provision step failed (recorded)", { provider, error: step.error });
+        }
       }
-    }
 
-    return { organizationId: input.organizationId, results };
+      const allOk = results.every((r) => r.ok);
+      captureWorkflowEvent("workflow completed", {
+        workflowId: "orchestrate-tenant-provisioning",
+        organizationId: input.organizationId,
+        total: results.length,
+        succeeded: results.filter((r) => r.ok).length,
+        failed: results.filter((r) => !r.ok).length,
+        allOk,
+      });
+
+      return { organizationId: input.organizationId, results };
+    } catch (error) {
+      captureWorkflowException(error, {
+        workflowId: "orchestrate-tenant-provisioning",
+        route: "task.run",
+        payload,
+      });
+      throw error;
+    }
   },
 });

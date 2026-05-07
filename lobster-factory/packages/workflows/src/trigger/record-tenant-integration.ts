@@ -6,6 +6,7 @@
 import { task, logger } from "@trigger.dev/sdk";
 import { z } from "zod";
 import { postTenantIntegrationWebhook } from "../lib/tenant-provisioning/postTenantIntegrationWebhook";
+import { captureWorkflowException } from "../observability/sentry";
 
 const PROVIDER_RE = /^[a-z][a-z0-9_]{0,63}$/;
 
@@ -29,20 +30,29 @@ const PayloadSchema = z.object({
 export const recordTenantIntegration = task({
   id: "record-tenant-integration",
   run: async (payload: unknown) => {
-    const input = PayloadSchema.parse(payload);
-    const out = await postTenantIntegrationWebhook({
-      organizationId: input.organizationId,
-      workspaceId: input.workspaceId,
-      provider: input.provider,
-      secretRef: input.secretRef,
-      externalHint: input.externalHint,
-      apiMetadata: input.apiMetadata ?? {},
-      provisioningSource: input.provisioningSource,
-      status: input.status,
-      lastError: input.lastError,
-    });
+    try {
+      const input = PayloadSchema.parse(payload);
+      const out = await postTenantIntegrationWebhook({
+        organizationId: input.organizationId,
+        workspaceId: input.workspaceId,
+        provider: input.provider,
+        secretRef: input.secretRef,
+        externalHint: input.externalHint,
+        apiMetadata: input.apiMetadata ?? {},
+        provisioningSource: input.provisioningSource,
+        status: input.status,
+        lastError: input.lastError,
+      });
 
-    logger.info("record-tenant-integration ok", { provider: input.provider, organizationId: input.organizationId });
-    return out;
+      logger.info("record-tenant-integration ok", { provider: input.provider, organizationId: input.organizationId });
+      return out;
+    } catch (error) {
+      captureWorkflowException(error, {
+        workflowId: "record-tenant-integration",
+        route: "task.run",
+        payload,
+      });
+      throw error;
+    }
   },
 });

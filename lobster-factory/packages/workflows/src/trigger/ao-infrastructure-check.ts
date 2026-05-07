@@ -9,7 +9,7 @@
  *   1. Supabase REST health
  *   2. Trigger.dev API reachability
  *   3. n8n reachability
- *   4. Sentry DSN reachability (via ping)
+ *   4. Sentry base URL reachability (via ping)
  *   5. PostHog ingest reachability
  *   6. Uptime Kuma / monitoring endpoint
  *   7. RLS isolation smoke (no cross-tenant data leak)
@@ -32,6 +32,8 @@ const InputSchema = z.object({
   triggerApiUrl: z.string().optional(),
   n8nUrl: z.string().optional(),
   uptimeKumaUrl: z.string().optional(),
+  sentryUrl: z.string().optional(),
+  posthogHost: z.string().optional(),
   // dispatcher passthrough
   _dispatchedFromActionRunId: z.string().optional(),
   _traceId: z.string().optional(),
@@ -97,6 +99,8 @@ export const aoInfrastructureCheck = task({
       const triggerApiUrl  = input.triggerApiUrl  ?? process.env.TRIGGER_API_URL          ?? "";
       const n8nUrl         = input.n8nUrl         ?? process.env.N8N_URL                  ?? "";
       const uptimeKumaUrl  = input.uptimeKumaUrl  ?? process.env.UPTIME_KUMA_URL          ?? "";
+      const sentryUrl      = input.sentryUrl      ?? process.env.SENTRY_URL               ?? "";
+      const posthogHost    = input.posthogHost    ?? process.env.POSTHOG_HOST             ?? "";
 
       logger.info("ao-infrastructure-check: starting", {
         organizationId: input.organizationId,
@@ -138,7 +142,21 @@ export const aoInfrastructureCheck = task({
         checks.push({ name: "uptime_kuma", status: "skip", detail: "UPTIME_KUMA_URL not set" });
       }
 
-      // 5. RLS isolation smoke — attempt a cross-tenant query that must return empty
+      // 5. Sentry base URL reachability — GET /api/0/ returns 200 JSON or 401 (auth required = still up)
+      if (sentryUrl) {
+        checks.push(await pingUrl(`${sentryUrl.replace(/\/$/, "")}/api/0/`, "sentry_api"));
+      } else {
+        checks.push({ name: "sentry_api", status: "skip", detail: "SENTRY_URL not set" });
+      }
+
+      // 6. PostHog ingest reachability — GET /_health returns {"status":"ok"} on healthy instance
+      if (posthogHost) {
+        checks.push(await pingUrl(`${posthogHost.replace(/\/$/, "")}/_health`, "posthog_ingest"));
+      } else {
+        checks.push({ name: "posthog_ingest", status: "skip", detail: "POSTHOG_HOST not set" });
+      }
+
+      // 7. RLS isolation smoke — cross-tenant query must return empty
       if (supabaseUrl && serviceRoleKey) {
         try {
           // Query sites with a bogus org_id — expect 0 rows under RLS
