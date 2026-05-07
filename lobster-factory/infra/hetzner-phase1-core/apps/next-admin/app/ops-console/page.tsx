@@ -2,6 +2,7 @@ import type { MediaBoundaryRule, OpsAction, OpsTenant, TenantConfig, WorkflowRun
 import AiJobForm from "./AiJobForm";
 import TenantConfigForm from "./TenantConfigForm";
 import { OpsConsoleTelemetry } from "./OpsConsoleTelemetry";
+import DepartmentSelector from "./DepartmentSelector";
 
 interface OpsSummary {
   generatedAt: string;
@@ -200,6 +201,14 @@ export default async function OpsConsolePage() {
             <span className="link-card-arrow">select tenant data source first</span>
           </div>
         )}
+
+        <div className="section-title" style={{ marginTop: 32 }}>M3 — 部門選型（20 部門）</div>
+        <p className="form-hint" style={{ marginBottom: 12, maxWidth: 640 }}>
+          勾選客戶啟用的部門能力模組。右側即時顯示需填寫的模板檔案與必填欄位。
+          按「複製 JSON」可貼入 <code>core/DEPARTMENT_SELECTION.json</code>。
+          對照表：<code>DEPARTMENT_CLUSTER_CATALOG.md</code> → <code>DEPARTMENT_COVERAGE_MATRIX.md</code>。
+        </p>
+        <DepartmentSelector tenantSlug={data?.tenants?.[0]?.id ?? ""} />
 
         <div className="section-title" style={{ marginTop: 32 }}>Controlled write — AI image job</div>
         <p className="form-hint" style={{ marginBottom: 12, maxWidth: 640 }}>
