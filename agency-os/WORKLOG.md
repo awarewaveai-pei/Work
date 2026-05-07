@@ -13,6 +13,12 @@
 - **Claude desktop app MCP**：修復 `trigger` MCP（補 `TRIGGER_API_URL` env）；`posthog`/`cloudflare` 的 HTTP type 在 desktop app 不被支援（每次重啟 app 自動 revert 回 npm stdio），此限制無解於 desktop app 端。
 - **桌機換機指引**：確認需手動複製 5 類檔案（`.claude` hooks 3 個、SSH keys 2 組、credentials 1 個、user-env.ps1 1 個），repo 其餘部分 `git pull` 自動同步；桌機執行 `bootstrap-mcp-machine.ps1` 一次即完成。
 
+### AO-RESUME 阻塞收口（工作樹／TASKS／日記）
+
+- **`.claude/commands/`**：將 **`checkpoint.md`／`recap.md`／`tasks.md`** 納入版控（與根 `.gitignore` 註記「commands 應追蹤」一致），解除 **`check-three-way-sync` Unexpected dirty（未追蹤）**。
+- **`TASKS`**：`Git：main 未推送…` 隊列敘述已結案並移至 **`已完成歷程 §2026-05-07`**（驗證 `origin/main...HEAD` count **0／0**）；**Vault** 條補上 **`SUPABASE_A_SERVICE_ROLE_KEY`** 與 **`OPS_INBOX_INGEST_TOKEN`** 自產提示；**Trigger deploy** 條加上 EU／SSH **阻塞**說明。
+- **`memory/daily/2026-05-07.md`**：更正「main 領先 14 commits」為已與 **`origin/main`** 對齊。
+
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:a0864551d4aa2c1c063c13bf1ea131ccad51b79ec6948ab12ee03b5243e5efd7 -->
@@ -26,7 +32,7 @@
   - `C:\Users\user1115\Desktop\AWARE_WAVE_CREDENTIALS.md`（Hetzner、Sentry token 填入；待補表移除已補項）
 - **Git**: 本輪無 repo 內容變更需額外 commit；WORKLOG+memory 更新將由 ao-close 統一 commit
 - **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: Desktop app 的 posthog/cloudflare MCP 仍為 npm stdio（HTTP type 不被 desktop app 支援，無解）。剩餘 vault 待補：SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY。main 仍有 14 commits 未 push。
+- **風險／待辦（可選）**: Desktop app 的 posthog/cloudflare MCP 仍為 npm stdio（HTTP type 不被 desktop app 支援，無解）。剩餘 vault 待補：SUPABASE_A_SERVICE_ROLE_KEY、SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY、XAI_API_KEY。`main` 已與 `origin/main` 對齊（ahead／behind 皆 0）。
 
 ## 2026-05-06
 

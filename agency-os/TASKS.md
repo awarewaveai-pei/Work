@@ -50,10 +50,9 @@
 
 ### 未完成
 
-- [ ] **（AO-RESUME 提醒）補齊剩餘 Vault 憑證** —— **【未完成】** **缺：** `OPS_INBOX_INGEST_TOKEN`（自產強隨機字串，寫入 SG `hetzner-phase1-core/.env` + Trigger 專案 env）、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`（Supabase cloud dashboard → 該專案 → Settings → API → service_role）、`XAI_API_KEY`（console.x.ai）。**下一步：**取得後執行 `.\scripts\secrets-vault.ps1 -Action set -Name <NAME> -Value '<value>'` 再 `sync-cursor-mcp-user-env`，並補入 `C:\Users\user1115\Desktop\AWARE_WAVE_CREDENTIALS.md`。
+- [ ] **（AO-RESUME 提醒）補齊剩餘 Vault 憑證** —— **【未完成】** **缺：** `OPS_INBOX_INGEST_TOKEN`（本機可先用 `openssl rand -hex 32` 或同等指令自產；再寫入 SG `hetzner-phase1-core/.env` + Trigger 專案 env）、`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`／`SUPABASE_A_SERVICE_ROLE_KEY`（Supabase dashboard → 該專案 → Settings → API → **service_role**，須操作者自行複製）、`XAI_API_KEY`（console.x.ai）。**下一步：**取得後執行 `.\scripts\secrets-vault.ps1 -Action set -Name <NAME> -Value '<value>'` 再 `sync-cursor-mcp-user-env`，並補入桌面憑證整理檔（見該檔路徑）。
 - [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：**兩台皆須 **`machine-environment-audit -Strict` PASS（無 WARN）**；任一台未 PASS 則本條不結案。**下一步：**在**每一台** monorepo 根跑該稽核；細項與證據索引 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。開機／hook／pull 敘事正本 → **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（§1.5、§2.5.1）。
-- [ ] **Git：`main` 未推送 commits → `git push origin main`** —— **【進行中】** **進度：**本地已有多次 commit（Trigger／PostHog／TASKS／WP MU 等）；**下一步：**`git fetch` → `git log origin/main..HEAD` → **`git push origin main`**。
-- [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度：**repo 已 **`syncEnvVars`**、鎖 CLI **`4.4.4`**、README／腳本齊；曾完成 **環境變數同步**，**缺**在 **EU** 對 **`registry:5000`** **映像 push**（見 **`lobster-factory/infra/trigger/README.md` §7a**）。**下一步：**於 EU 或 tunnel 就緒後跑 **`deploy-workflows.ps1`** 或 **`npx trigger.dev@4.4.4 deploy`**。
+- [ ] **Trigger workflows 完整 deploy** —— **【進行中】** **進度：**repo 已 **`syncEnvVars`**、鎖 CLI **`4.4.4`**、README／腳本齊；曾完成 **環境變數同步**，**缺**在 **EU** 對 **`registry:5000`** **映像 push**（見 **`lobster-factory/infra/trigger/README.md` §7a**）。**阻塞：**須 **EU 主機 SSH／registry 連線**（或 tunnel）由操作者就緒後方能 **`deploy-workflows.ps1`**／**`npx trigger.dev@4.4.4 deploy`**；代理無法代替登入 VPS。
 - [ ] **phase1 WordPress（SG）PostHog MU** —— **【進行中】** **進度：****repo** 已入 MU **`posthog.php`** + compose **`NEXT_PUBLIC_POSTHOG_*`**。**下一步：**SG **`docker compose build wordpress && docker compose up -d wordpress`**（或等價）→ 公開頁驗證載入。
 - [ ] 啟動 Next-Gen 升級藍圖 v1（M1→M3） —— **【進行中】** **進度（2026-05-01）：**試點已選定：Soulful Expression（既有站接手）+ Scenery Travel Mongolia（新站建置）；兩站 tenant 骨架已建立。**下一步：**兩站各完成 Day 2（staging 建立）。
   - 參考：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
@@ -62,7 +61,7 @@
   - 本項目標：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）
 - [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-01）：**tenant 骨架完整（19 個檔案）；Discovery 骨架建立，客戶資料欄位待補（需與客戶訪談）；Day 2 staging 待選定主機商後執行。
   - 本項目標：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊）
-- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中】** **進度（2026-05-01）：**專案骨架（10_DISCOVERY、01–03 文件、sites/ 三檔）已建立。**阻塞（操作者必做）：**需登入 Hostinger + WP 後台執行 §1.1–1.2 並回填 `10_DISCOVERY.md`、`core/ENVIRONMENT_REGISTRY.md`。
+- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中】** **進度（2026-05-01）：**專案骨架（10_DISCOVERY、01–03 文件、sites/ 三檔）已建立。**阻塞（操作者必做）：**需登入 Hostinger + WP 後台執行 §1.1–1.2 並回填 `10_DISCOVERY.md`、`core/ENVIRONMENT_REGISTRY.md`（**代理無法代登入**第三方主機／WP）。
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節
   - 產出：權限與基線盤點
 - [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-01）：**tenant 骨架 + Discovery 骨架完成（Runbook §1 骨架部分完成）。**下一步：**與客戶確認素材，選定主機商 → Day 2 staging 建立。
@@ -97,6 +96,12 @@
   - DoD：2 個測試角色登入後，看到不同權限結果
 
 ## Next — 已完成歷程（查詢用）
+
+### 2026-05-07 — Git `main` 與 `origin/main` 對齊（滯後文案收口）
+
+- [x] **Git：`main` 未推送 commits → `git push origin main`（隊列滯後敘述結案）**
+  - **驗證（本機）：**`git fetch` 後 **`git rev-list --left-right --count origin/main...HEAD`** 為 **`0  0`**（ahead／behind 皆 0）；先前累積 commits 已反映在遠端。
+  - **備註：**若之後又出現 ahead，仍依 **`REMOTE_WORKSTATION_STARTUP.md` §2.5** 於 **`AO-CLOSE`** 閘道後推送。
 
 ### 2026-05-03 — 龍蝦 SSOT 連結收口
 
