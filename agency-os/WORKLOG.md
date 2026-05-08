@@ -2,6 +2,26 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-08
+
+### Always-On Command Plane Phase 2a + 2b 完成 + 3 項 polish
+
+- **2a — Kill switch 從手機**（commit `a329335` + `e20386e`）：新增 `/emergency_stop` `/maintenance_mode` `/read_only_mode` 為 medium-risk inline handler；`/normal_mode` 設 high-risk → Telegram hard-block（解鎖必須 Supabase Studio SQL editor 或 Phase 2c ops console SSO）。`lib/command-plane/handlers/systemModeControl.ts` 用 factory pattern 輸入目標 mode。Smoke 9/9（含 `emergency_stop_via_telegram - cmd=completed mode=emergency_stop`）。
+- **2b — Trigger.dev medium-risk dispatch**（commit `8b8d54e`）：lightweight inline pattern — `/trigger_staging_workflow <task>` 直接 HTTP POST 到 Trigger.dev REST API（allowlist 目前僅 `ao-infrastructure-check`），handler 立即回 run_id；`/replay_dead_letter <uuid>` 為診斷模式（lookup `error_events` 回傳細節），自動 re-execution 排到 Phase 3（需先處理 idempotency rewrite + side-effect rollback hooks）。SG `.env` 加入 `TRIGGER_API_URL` + `TRIGGER_ACCESS_TOKEN`，docker-compose env block 已 wire。Smoke 11/11。
+- **3 項 audit polish**（commit `4801b54`）：(1) ops manual §2.1 補齊全 12 個 handler；(2) owner doc §5 風險表更新（medium=inline、high 加 `/normal_mode`、low 加 `/start /help`）；(3) `triggerWorkflow.ts` 30s AbortController timeout 防 Trigger API hang 卡 Telegram webhook。
+- **手動解鎖路徑驗證**：操作者在 Supabase Studio 跑 `update system_modes set mode='normal' ...` PASS，作為 kill switch 解鎖人工備援（不依賴 ops console UI）— 因此 Phase 2c.1 system_modes UI **不必再做**（已 over-engineering）。
+- **AUTO_TASK_DONE**: Always-On Command Plane Phase 2a Kill switch 從手機控
+- **AUTO_TASK_DONE**: Always-On Command Plane Phase 2b Trigger.dev medium-risk dispatch
+
+### Soulful Expression Day 1 §1.2 baseline 機讀盤點
+
+- **方法修正**：先前 TASKS 標記「代理無法代登入」過於保守；操作者已提供 Hostinger SSH key (`hostinger_soulful`)，且 server 上 wp-cli 可用 (`/usr/local/bin/wp`)。Day 1 §1.2 環境基線 + 外掛 + 第三方整合 + cron 全部可走 SSH，無需登入 panel。§1.1 帳號層級權限（Hostinger panel / DNS / WP admin browser login）仍須操作者親自確認。
+- **環境**：WP 6.9.4、PHP 8.2.30、MariaDB 11.8.6、Kadence 主題 1.3.6（1.4.5 可用）、35 active 外掛 + 1 must-use（16 有更新）。Hostinger SG shared host (`sg-nme-web624.main-hosting.eu`)，4.7TB used。
+- **內容量**：34 posts / 75 pages / 2 products / 0 orders / 3 users（2 admin: Admin + peijingartstudio）。Currency AUD、Language en_AU、permalink `/insights/%category%/%postname%/`。
+- **風險 Top 3**：(1) Ultimate Member ecosystem 12 個外掛 + WC Points & Rewards 落後 10+ 版（Auth + 點數歷史 CVE 重災區）；(2) 無 staging 環境（Day 2 必先建）；(3) 無代管備份證據（還原時點未驗證）。
+- **檔案落地**：`tenants/company-soulful-expression/projects/2026-011-existing-site-handover-soulful/10_DISCOVERY.md`（完整盤點表）、`core/ENVIRONMENT_REGISTRY.md`（production row 已填）、`sites/soulfulexpression-org/SITE_PROFILE.md`（WP/PHP/theme/lang）。
+- **AUTO_TASK_DONE**: 既有站接手 Day 1（Soulful Expression）
+
 ## 2026-05-07 (continued)
 
 ### /onboard 新客戶入職精靈（4步驟）+ M3 部門目錄 + /build 改版

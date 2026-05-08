@@ -9,7 +9,7 @@
 | Environment | URL | Hosting Provider | Region | WP Version | PHP Version | DB Engine | Backup Location | Last Backup | Last Restore Test | Owner | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | staging | **https://staging.soulfulexpression.org/**（canonical） | Hostinger（預設） | APAC | 待實機 | 待實機 | MySQL/MariaDB | 待實機 | 待實機 | 待實機 | Agency OS | **lifecycle=`provision_pending`**（Runbook Pilot A §2）；實機建立後改 `live` 並回填 WP/PHP。**禁止**在未備份前直接改 production。 |
-| production | https://soulfulexpression.org/ | Hostinger | APAC | 待盤點 | 待盤點 | 待盤點 | 待盤點 | 待盤點 | 待盤點 | Client + Agency OS | 既有運行站 |
+| production | https://soulfulexpression.org/ | Hostinger（host: `sg-nme-web624.main-hosting.eu`） | APAC | 6.9.4 | 8.2.30 | MariaDB 11.8.6 | Hostinger 自動備份（panel 內，未驗證還原） | **未驗證** | **未驗證** | Client + Agency OS | 既有運行站；Day 1 §1.2 機讀盤點 2026-05-08 完成（10_DISCOVERY） |
 
 ## DNS and SSL
 
