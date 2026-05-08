@@ -95,14 +95,24 @@ curl -sf http://127.0.0.1:5678/healthz && echo OK
 
 WordPress 第一次安裝若耗時較長，`wordpress` 的 `healthcheck` 有較長 `start_period`；若 `nginx` 遲遲不起，看 `docker compose logs wordpress nginx`。若映像檔無 `curl`，將 compose 裡 WordPress `healthcheck` 改為 `wget -qO- http://127.0.0.1/` 同效。
 
-## 備份（Phase 1 最小份）
+## 備份（自動化，daily cron）
+
+每日 **02:00 UTC** 自動備份 WordPress DB + uploads + n8n volume，**02:30 UTC** 自動驗證完整性（失敗時 Slack 告警）。本機保留 7 天，超過自動清除。
 
 ```bash
-chmod +x scripts/backup-phase1.sh   # Linux 上
-./scripts/backup-phase1.sh
+# 安裝 cron（首次或 server rebuild 後）
+bash scripts/install-maintenance-crons.sh --host sg
+
+# 手動執行
+./scripts/backup-phase1.sh          # 備份
+./scripts/verify-backup.sh          # 驗證
+tail -100 /var/log/lobster-backup.log  # 查看日誌
+
+# 啟用異地備份（一次性設定）
+bash scripts/setup-offsite-backup.sh <access-key> <secret-key> <bucket-name>
 ```
 
-產出壓縮 SQL + `wp-html.tgz`。**Supabase** 請仍依 `supabase-self-hosted-cutover-checklist.md` 等文件排程備份。
+備份還原演練證據：[`BACKUP_RESTORE_PROOF.md`](./BACKUP_RESTORE_PROOF.md)。**Supabase** 請仍依 `supabase-self-hosted-cutover-checklist.md` 等文件排程備份。
 
 ## 主機資源診斷（慢、卡、疑似 OOM）
 
@@ -205,7 +215,7 @@ n8n 映像讀取 **`N8N_SENTRY_DSN`**（後端）與選填 **`N8N_FRONTEND_SENTR
 
 ## Related
 
-- **長期營運契約**：[`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md) · [`MAINTENANCE_CALENDAR.md`](./MAINTENANCE_CALENDAR.md)
+- **長期營運契約**：[`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md) · [`MAINTENANCE_CALENDAR.md`](./MAINTENANCE_CALENDAR.md) · [`BACKUP_RESTORE_PROOF.md`](./BACKUP_RESTORE_PROOF.md)
 - `agency-os/docs/operations/hetzner-self-host.env.example`
 - `agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
