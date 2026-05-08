@@ -13,6 +13,14 @@
 - **AUTO_TASK_DONE**: Always-On Command Plane Phase 2a Kill switch 從手機控
 - **AUTO_TASK_DONE**: Always-On Command Plane Phase 2b Trigger.dev medium-risk dispatch
 
+### Soulful Expression Day 1 §1.3 DB 備份 + Day 2/3 準備文件
+
+- **DB dump via mysqldump SSH**：`wp db export` 在 Hostinger 共享主機報 `exec()` disabled，改用直接 `mysqldump -h 127.0.0.1 -u ... | gzip`，成功產出 15 MB `.sql.gz`。SHA256 `849db7848992308dd4dd0b7a88c19add60b9b737463a90ba19a93da9566264b1`，本機備份 `tenants/company-soulful-expression/backups/soulful_db_20260508_160734.sql.gz`（不入 git，`.gitignore` 已設定）。伺服器 temp 檔已清除。
+- **BACKUP_RESTORE_PROOF.md #1** 填入：dump 細節、位置、checksum、restore drill 待 staging 建立後執行。`ENVIRONMENT_REGISTRY.md` production 列 Backup + Last Backup 欄位同步更新。
+- **DAY2_STAGING_OPERATOR_GUIDE.md**（新建）：8 步驟操作員指引（Hostinger hPanel 子網域 → WP Auto Installer → All-in-One WP Migration 匯出/匯入 → 關閉污染外掛 → SSL → 驗收清單 → 回填文件）。估時 20–40 分鐘。
+- **DAY3_SECURITY_PATCH_PLAN.md**（新建）：Wave 1 高風險 4 個外掛（ACF Pro / Ultimate Member / WooCommerce / WC Points & Rewards）→ Wave 2 中風險 5 個 → Wave 3 低風險 7 個 → 主題 Kadence 1.3.6→1.4.5；含每波 gate、permalink-manager 特別注意事項、不建議更新的核心外掛清單。
+- **AUTO_TASK_DONE**: Soulful §1.3 DB dump + BACKUP_RESTORE_PROOF
+
 ### Soulful Expression Day 1 §1.2 baseline 機讀盤點
 
 - **方法修正**：先前 TASKS 標記「代理無法代登入」過於保守；操作者已提供 Hostinger SSH key (`hostinger_soulful`)，且 server 上 wp-cli 可用 (`/usr/local/bin/wp`)。Day 1 §1.2 環境基線 + 外掛 + 第三方整合 + cron 全部可走 SSH，無需登入 panel。§1.1 帳號層級權限（Hostinger panel / DNS / WP admin browser login）仍須操作者親自確認。
