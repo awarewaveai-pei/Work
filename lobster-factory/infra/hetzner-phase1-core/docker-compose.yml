@@ -239,6 +239,9 @@ services:
       # Build Console: optional immediate Trigger.dev dispatcher kick (see apps/next-admin/lib/kick-dispatcher.ts)
       TRIGGER_SECRET_KEY: ${TRIGGER_SECRET_KEY:-}
       TRIGGER_API_URL: ${TRIGGER_API_URL:-https://api.trigger.dev}
+      # SSH keys for web-UI one-click WP plugin updates (base64-encoded private key per client)
+      # Naming: SSH_KEY_<ssh_key_name uppercase> — must match client_config.ssh_key_name in Supabase
+      SSH_KEY_HOSTINGER_SOULFUL: ${SSH_KEY_HOSTINGER_SOULFUL:-}
     ports:
       - "${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000"
     depends_on:
