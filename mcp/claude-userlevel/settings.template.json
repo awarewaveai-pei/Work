@@ -2,6 +2,7 @@
   "_comment": "AwareWave Claude Code user-level settings template (cross-machine SSOT). Variables: ${USERPROFILE}, ${USERPROFILE_FORWARD}, ${MONOREPO_ROOT}, ${MONOREPO_ROOT_FORWARD}. Sync via scripts/sync-claude-userlevel.ps1.",
   "autoUpdatesChannel": "latest",
   "theme": "light",
+  "model": "claude-sonnet-4-6",
   "permissions": {
     "_defaultMode_comment": "bypassPermissions = no per-command prompts. Only valid in user-level ~/.claude/settings.json (Claude Code ignores it in project-shared .claude/settings.json for safety). 'skipDangerousModePermissionPrompt' suppresses the one-time entry confirmation. Hard guardrails come from 'deny' below + hooks/branch-protection.js + hooks/hooks.json's PreToolUse rm-rf block. See mcp/claude-userlevel/README.md.",
     "defaultMode": "bypassPermissions",
