@@ -117,10 +117,11 @@ curl -sf http://127.0.0.1/ -H 'Host: app.aware-wave.com' | grep -c "Build Consol
 | Owner script | `/root/lobster-phase1/scripts/check-drift-and-alert.sh` |
 | Cron | `0 1 * * *`（01:00 UTC = 09:00 Asia/Taipei，每日一次） |
 | Webhook source | `/root/lobster-phase1/.env` 的 `SLACK_WEBHOOK_URL`（沿用既有 §九 Slack） |
+| Telegram fallback（**2026-05-08 加**） | 同檔的 `TELEGRAM_BOT_TOKEN` + `TELEGRAM_ALLOWED_CHAT_IDS` 第一個 ID；同訊息以純文字寄到 Telegram bot DM；獨立於 Slack 成敗，best-effort | 雙通道冗餘 — 出國若 Slack mobile 靜音/漫遊，Telegram 仍會收到 |
 | State file | `/root/lobster-phase1/.drift-alert-state`（紀錄 `(deployed, origin) pair`，dedupe 用） |
-| Log | `/var/log/sg-deploy-drift.log` |
+| Log | `/var/log/sg-deploy-drift.log`（含 `telegram alert sent/FAILED` 欄）|
 | Threshold | `BEHIND ≥ 1` 即告警；同一 pair 不會重發（直到 deploy 動了或 origin/main 動了） |
-| Manual run | `/root/lobster-phase1/scripts/check-drift-and-alert.sh --force`（測試或重發告警） |
+| Manual run | `/root/lobster-phase1/scripts/check-drift-and-alert.sh --force`（測試或重發告警；同時測 Slack + Telegram） |
 
 **訊息格式**：附 `behind` 數字、deployed/origin commit short hash、最近 3 個未上線 commit subject、修法提示（`/sg-deploy`）。
 

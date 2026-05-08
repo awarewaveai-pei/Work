@@ -384,6 +384,30 @@ $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $rptFile   -Encodin
 $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $latestFile -Encoding UTF8
 
 Write-Host "Report  : $rptFile"
+
+# ── Sync report to ops dashboard (non-fatal) ─────────────────────────────────
+# Reads OPS_PROXY_SHARED_SECRET from env (set via secrets-vault.ps1 sync-cursor-mcp-user-env).
+# Server strips backup_path before storing. Failure here does NOT abort the run.
+$syncKey = $env:OPS_PROXY_SHARED_SECRET
+if ($syncKey) {
+  $dashboardUrl = "https://app.aware-wave.com/api/ops/clients/$ClientSlug/wp-report"
+  try {
+    $syncBody = $report | ConvertTo-Json -Depth 5
+    $syncResp = Invoke-RestMethod -Uri $dashboardUrl -Method POST `
+      -ContentType 'application/json' -Body $syncBody `
+      -Headers @{ 'X-Ops-Sync-Key' = $syncKey } `
+      -ErrorAction Stop
+    if ($syncResp.ok) {
+      Write-Host "Synced  : Dashboard updated ($dashboardUrl  synced_at: $($syncResp.synced_at))"
+    } else {
+      Write-Warning "Dashboard sync returned ok=false: $($syncResp | ConvertTo-Json -Compress)"
+    }
+  } catch {
+    Write-Warning "Dashboard sync failed (non-fatal): $($_.Exception.Message)"
+  }
+} else {
+  Write-Verbose "OPS_PROXY_SHARED_SECRET not set — skipping dashboard sync (set via secrets-vault.ps1)"
+}
 Write-Host "`n=== SUMMARY ==="
 Write-Host ("Updated : {0}   Skipped(license): {1}   Failed: {2}   Rollback: {3}" -f `
   $report.updated_count, $report.skipped_license_count, $report.failed_count, $rollback)

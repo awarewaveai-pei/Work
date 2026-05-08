@@ -29,6 +29,7 @@
 |------|------|---------|
 | **Telegram bot** `@awarewave_ops_bot` | 🎮 遙控器（你下指令）| ✅ 任何網路 |
 | **Slack** `#ops` | 📢 對講機（系統通知你）| ✅ |
+| **Telegram bot DM**（自 2026-05-08 起，雙通道冗餘） | 📢 對講機備用 — drift cron 同時也發到這 | ✅ Slack 漫遊 / 靜音時的保險 |
 | **Web ops console**（`app.aware-wave.com/ops/...`）| 🛠️ 工具箱（複雜操作 + 高風險簽核）| ✅ 手機瀏覽器 + Clerk SSO 登入 |
 | **Termius**（手機 SSH）| 🔧 螺絲起子（部署、看 log、跑腳本）| ✅ 任何網路 |
 

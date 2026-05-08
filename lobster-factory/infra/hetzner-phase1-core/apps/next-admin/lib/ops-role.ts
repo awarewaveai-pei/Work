@@ -90,3 +90,9 @@ export function canApproveCommand(role: OpsRole): boolean {
 export function canChangeSystemMode(role: OpsRole): boolean {
   return role === "owner" || role === "admin";
 }
+
+// === Phase 2c: WP plugin report sync (from update-client-wp-plugins.ps1) ===
+// operator can sync WP plugin update reports; viewer is read-only.
+export function canSyncWpReport(role: OpsRole): boolean {
+  return role === "owner" || role === "admin" || role === "operator";
+}

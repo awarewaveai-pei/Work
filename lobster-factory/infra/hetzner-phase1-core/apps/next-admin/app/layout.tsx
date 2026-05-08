@@ -48,6 +48,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/ops/system-modes" className="sidebar-link" title="全域 kill switch / 系統模式">
                   <span className="icon">◐</span> 系統模式
                 </Link>
+                <Link href="/ops/clients" className="sidebar-link" title="統一客戶管理：健康、WordPress 外掛更新">
+                  <span className="icon">👥</span> Clients
+                </Link>
                 <Link href="/api-check" className="sidebar-link">
                   <span className="icon">⬡</span> API Health
                 </Link>
