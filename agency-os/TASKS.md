@@ -51,7 +51,11 @@
 ### 未完成
 
 - [x] **（2026-05-08 09:00 TPE 之後驗證）SG drift cron 第一次自動 firing** —— **【AUTO_TASK_DONE_APPLIED 2026-05-08T09:xx TPE】** log: `[2026-05-08T01:00:03Z] alert sent: HTTP 200, behind=7`；cron daemon active/enabled；結案條件已達（drift>0 + HTTP 2xx）。
-- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】** 2026-05-08 規劃完整路徑；本任務由**操作者親自手機操作**，代理無法代執行。**owner doc**: `agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md` §0 & §8。**DoD**:
+- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】**
+  - 📖 **完整步驟讀這個（單一主人）**：[`agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`](docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md) — §0（5 步驗證）+ §5（4 條 Snippets）+ §8（key 上手機 3 方法）
+  - 📅 **規劃日期**：2026-05-08
+  - 👤 **執行者**：**操作者親自手機操作**，代理無法代執行
+  - 🎯 **DoD**:
   - **(1) SSH key 弄到手機 Termius**（3 種方法擇一；推薦 B1 = iCloud Universal Clipboard）：
     - **方法 A（最安全）**：電腦裝 7-Zip（https://www.7-zip.org/）→ 對 `C:\Users\user1115\.ssh\hetzner_trigger` 7-Zip → 加入壓縮檔 → 加密 AES-256 + 設密碼 → 上傳 iCloud Drive / Google Drive → 手機下載 + 解壓 + Termius Keychain → New Key → import
     - **方法 B1（最快，iPhone + Mac 同 Apple ID）**：電腦記事本打開 `hetzner_trigger` → 全選複製 → iPhone Universal Clipboard 取得 → 備忘錄貼上 → Termius Keychain 貼上 → 用後**刪備忘錄**
