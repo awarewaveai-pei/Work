@@ -39,25 +39,46 @@
 
 ---
 
-## 二、功能（5 個指令的實用情境）
+## 二、功能（全部 12 個 handler / 10 個 Telegram menu 入口）
 
-| 指令 | 用途 | 何時用 | 回應內容 |
+### 2.1 Phase 1 — 唯讀查詢 / AI 摘要（low risk）
+
+| 指令 | 用途 | 何時用 | 回應 |
 |---|---|---|---|
-| `/start` 或 `/help` | 顯示完整指令選單 | 第一次用 / 忘記指令 | 列出 5 個指令 |
+| `/start` 或 `/help` | 完整選單 | 第一次用 / 忘記指令 | 列出指令 |
 | `/status` | 系統健康快照 | 「現在怎樣？」 | mode + 最近 5 指令 + 開放 incidents |
 | `/health` | 細部健康指標 | 「有沒有冒煙？」 | 開放 incident 數 + 24h 錯誤數 |
-| `/daily_review` | 24h AI 摘要 | 早上起床看昨夜 | 2-3 句摘要 + 變化 + 建議下一步 |
+| `/daily_review` | 24h AI 摘要 | 早上看昨夜 | 2-3 句摘要 + 變化 + 下一步 |
 | `/weekly_review` | 7d AI 摘要 | 週末/週一回顧 | 同上但週級 |
-| `/list_failed_runs` | 最近失敗清單 | 想找特定失敗 trace_id | 10 筆 command_requests + workflow_runs |
+| `/list_failed_runs` | 最近失敗清單 | 找特定失敗 trace_id | 10 筆 command_requests + workflow_runs |
 
-### 風險分級（誰可以做什麼）
+### 2.2 Phase 2a — Kill switch ENABLE（medium risk；解鎖必走 SQL/SSO）
 
-| 風險 | 範例 | Telegram | Slack | ops console SSO |
+| 指令 | 用途 | 設定 mode | 影響 |
+|---|---|---|---|
+| `/emergency_stop` | 🛑 緊急鎖死所有指令 | `emergency_stop` | 後續所有指令 → `blocked_by_killswitch` |
+| `/maintenance_mode` | 🔧 例行維運期 | `maintenance` | 阻擋非 low-risk |
+| `/read_only_mode` | 🔒 只允許讀 | `read_only` | 只 low-risk 通過 |
+
+> **解鎖**：`/normal_mode` 從 Telegram 永遠 hard-block。必須 (a) Supabase Studio SQL editor 改 `mode='normal'`（見 §3.5），或 (b) Phase 2c 上線後 ops console SSO 簽核。設計理由：鎖系統要快、解鎖要慢，非對稱授權。
+
+### 2.3 Phase 2b — Trigger.dev 工作流 dispatch（medium risk）
+
+| 指令 | 用法 | 回應 | 備註 |
+|---|---|---|---|
+| `/trigger_staging_workflow <task>` | `/trigger_staging_workflow ao-infrastructure-check` | 📤 `run_id` + Trigger.dev URL | Allowlist 在 `triggerWorkflow.ts:ALLOWED_TASKS`（目前僅 `ao-infrastructure-check`） |
+| `/replay_dead_letter <uuid>` | `/replay_dead_letter <error_event_id>` | 📋 error_event 細節 | **診斷模式**；自動 re-execution 是 Phase 3 |
+
+> **新增 Trigger.dev 任務到 allowlist**：編輯 `lib/command-plane/handlers/triggerWorkflow.ts` 的 `ALLOWED_TASKS` Set → commit + redeploy。故意 hardcode 在 source — 每次新增需 PR review，符合「最小授權 + 可審計」。
+
+### 2.4 風險分級（誰可以做什麼）
+
+| 風險 | 範例 | Telegram | Slack（未實作） | ops console SSO |
 |---|---|---|---|---|
 | **low** | `/status` `/health` `/daily_review` 等 | ✅ 直接跑 | ✅ | ✅ |
-| **medium** | `/replay_dead_letter` `/trigger_staging_workflow`（Phase 2） | ⏸️ 排隊 | ⏸️ | ✅ |
-| **high** | `/deploy_production` `/refund` `/dns_change` | 🚫 永久擋 | 🚫 | ⏸️ approval |
-| **critical** | `/drop_table` `/read_secrets` `/cross_tenant_export` | 🚫 任何 source | 🚫 | 🚫 |
+| **medium** | `/emergency_stop` `/trigger_staging_workflow` `/replay_dead_letter` | ✅ inline（Phase 2a/2b） | ⏸️ | ✅ |
+| **high** | `/normal_mode` `/deploy_production` `/refund` `/dns_change` | 🚫 永久擋 | 🚫 | ⏸️ approval |
+| **critical** | `/drop_table` `/read_secrets` `/cross_tenant_export` `/disable_killswitch` | 🚫 任何 source | 🚫 | 🚫 |
 | 未知 | `/asdf` | 🚫 預設 deny | 🚫 | 🚫 |
 
 ### 失敗時系統做什麼（不用你操心）

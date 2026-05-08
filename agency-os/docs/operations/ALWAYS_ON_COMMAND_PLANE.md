@@ -76,9 +76,9 @@ Source: `lib/command-plane/policyEngine.ts:RISK_TABLE`. Adding a command is a on
 
 | Risk | Examples | Telegram | Slack | Webhook | Internal/Schedule |
 |---|---|---|---|---|---|
-| low | `/status` `/health` `/daily_review` `/weekly_review` `/list_failed_runs` `/runbook` `/draft_cursor_task` | ✅ run | ✅ run | ✅ run | ✅ run |
-| medium | `/replay_dead_letter` `/trigger_staging_workflow` | ⏸️ queued (Phase 2) | ⏸️ queued | ✅ run | ✅ run |
-| high | `/deploy_production` `/refund` `/dns_change` `/rotate_secrets` | 🚫 hard-block | 🚫 hard-block | ⏸️ approval | ⏸️ approval |
+| low | `/start` `/help` `/status` `/health` `/daily_review` `/weekly_review` `/list_failed_runs` `/runbook` `/draft_cursor_task` | ✅ run | ✅ run | ✅ run | ✅ run |
+| medium | `/emergency_stop` `/maintenance_mode` `/read_only_mode` `/trigger_staging_workflow` `/replay_dead_letter` `/create_issue` | ✅ run inline (Phase 2a/2b) | ⏸️ queued | ✅ run | ✅ run |
+| high | `/normal_mode` `/deploy_production` `/refund` `/dns_change` `/rotate_secrets` | 🚫 hard-block | 🚫 hard-block | ⏸️ approval | ⏸️ approval |
 | critical | `/drop_table` `/read_secrets` `/destructive_migration` `/cross_tenant_export` `/disable_killswitch` | 🚫 hard-block | 🚫 hard-block | 🚫 hard-block | 🚫 hard-block |
 
 Unknown commands default to `risk='high'`, `outcome='block'`, `rejection_reason='unknown_command'` (deny by default).

@@ -48,22 +48,38 @@ export const triggerWorkflowHandler: CommandHandler = async (request) => {
     throw new Error("TRIGGER_API_URL / TRIGGER_ACCESS_TOKEN not configured in container env");
   }
 
+  // 30s budget: Telegram webhook will retry after 60s, so we want to fail
+  // fast and let the user retry from the chat rather than risk Telegram dupes.
   const triggerUrl = `${apiUrl.replace(/\/$/, "")}/api/v1/tasks/${encodeURIComponent(taskName)}/trigger`;
-  const response = await fetch(triggerUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      payload: {
-        organizationId: request.organization_id,
-        triggeredBy: "command-plane",
-        commandRequestId: request.id,
-        actorRef: request.actor_ref,
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), 30_000);
+
+  let response: Response;
+  try {
+    response = await fetch(triggerUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        payload: {
+          organizationId: request.organization_id,
+          triggeredBy: "command-plane",
+          commandRequestId: request.id,
+          actorRef: request.actor_ref,
+        },
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if ((err as { name?: string }).name === "AbortError") {
+      throw new Error("trigger_api_timeout: Trigger.dev did not respond within 30s");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
 
   const responseText = await response.text();
   if (!response.ok) {
