@@ -252,6 +252,70 @@ try {
   Add-Check -Name 'replay_dead_letter_validation' -Pass $false -Detail $_.Exception.Message
 }
 
+# --- Check 12: Phase 2c — /normal_mode from Telegram is hard-blocked --------
+# /normal_mode is risk='high'; policyEngine HARD_BLOCK_FROM['telegram'] includes
+# 'high' and 'critical'. So Telegram cannot unlock the killswitch even when the
+# bot is allowed-listed. Expect status='blocked_by_policy'.
+try {
+  $uid10 = 991000 + (Get-Random -Minimum 1 -Maximum 999)
+  Send-TelegramUpdate -UpdateId $uid10 -Text '/normal_mode' | Out-Null
+  Start-Sleep -Milliseconds 800
+  $rows = Get-Request-By-Source-Event -SourceEventId $uid10
+  $st = ($rows | Select-Object -First 1).status
+  $reason = ($rows | Select-Object -First 1).rejection_reason
+  Add-Check -Name 'normal_mode_hard_blocked_from_telegram' -Pass ($st -eq 'blocked_by_policy') -Detail "status=$st reason=$reason"
+} catch {
+  Add-Check -Name 'normal_mode_hard_blocked_from_telegram' -Pass $false -Detail $_.Exception.Message
+}
+
+# --- Check 13: Phase 2c — GET /api/ops/approvals responds with valid shape --
+# Read-only smoke. Confirms the API endpoint is wired and returns role+pending list.
+try {
+  $resp = Invoke-WebRequest -Uri "$BaseUrl/api/ops/approvals?limit=10" -UseBasicParsing -TimeoutSec 10
+  $json = $resp.Content | ConvertFrom-Json
+  $hasShape = ($json.ok -eq $true) -and ($null -ne $json.role) -and ($null -ne $json.pending) -and ($null -ne $json.count)
+  Add-Check -Name 'approvals_list_endpoint_shape' -Pass $hasShape -Detail "role=$($json.role) count=$($json.count)"
+} catch {
+  Add-Check -Name 'approvals_list_endpoint_shape' -Pass $false -Detail $_.Exception.Message
+}
+
+# --- Check 14: Phase 2c — GET /api/ops/system-modes responds with current ----
+try {
+  $resp = Invoke-WebRequest -Uri "$BaseUrl/api/ops/system-modes" -UseBasicParsing -TimeoutSec 10
+  $json = $resp.Content | ConvertFrom-Json
+  $hasShape = ($json.ok -eq $true) -and ($null -ne $json.current) -and ($null -ne $json.current.mode)
+  Add-Check -Name 'system_modes_get_shape' -Pass $hasShape -Detail "mode=$($json.current.mode)"
+} catch {
+  Add-Check -Name 'system_modes_get_shape' -Pass $false -Detail $_.Exception.Message
+}
+
+# --- Check 15: Phase 2c — POST /api/ops/approvals/<random-uuid>/approve = 404 -
+# Proves the dynamic route is wired and validates UUID + 404 path. Doesn't
+# create or run anything. RBAC default 'operator' will trigger 403 unless we
+# pass simulated role; but we WANT 404 (not 403) to prove the logic ordering
+# (RBAC fail-fast at owner/admin gate). So we simulate admin role via header.
+try {
+  $bogus = [guid]::NewGuid().ToString()
+  $resp = Invoke-WebRequest -Uri "$BaseUrl/api/ops/approvals/$bogus/approve" `
+    -Method Post -UseBasicParsing -TimeoutSec 10 `
+    -Headers @{ 'x-ops-simulated-role' = 'admin' } `
+    -ErrorAction SilentlyContinue
+  $json = $resp.Content | ConvertFrom-Json
+  $passes = ($resp.StatusCode -eq 404) -or ($json.error -eq 'command_request_not_found')
+  Add-Check -Name 'approve_404_for_unknown_id' -Pass $passes -Detail "status=$($resp.StatusCode) error=$($json.error)"
+} catch {
+  # Invoke-WebRequest throws on non-2xx; inspect exception response.
+  $errResp = $_.Exception.Response
+  if ($errResp) {
+    $reader = New-Object System.IO.StreamReader($errResp.GetResponseStream())
+    $body = $reader.ReadToEnd()
+    $passes = ($errResp.StatusCode.value__ -eq 404) -or ($body -match 'command_request_not_found')
+    Add-Check -Name 'approve_404_for_unknown_id' -Pass $passes -Detail "status=$($errResp.StatusCode.value__) body=$($body.Substring(0, [Math]::Min(120,$body.Length)))"
+  } else {
+    Add-Check -Name 'approve_404_for_unknown_id' -Pass $false -Detail $_.Exception.Message
+  }
+}
+
 # --- Cleanup: drop smoke rows -----------------------------------------------
 try {
   $smokeIds = @(990000..998999) -join ','
