@@ -135,6 +135,12 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `apply-supabase-splinter-fixes.mjs` | Apply Supabase splinter schema fixes |
 | `ensure-lobster-workflows-deps.ps1` | Ensure Lobster workflows npm deps are installed |
 
+## WordPress Management (Managed Client Sites)
+
+| Script | Purpose |
+|--------|---------|
+| `update-client-wp-plugins.ps1` | Safe one-command plugin updater: backup-first → wave update → health check → auto-rollback. Config per client at `tenants/*/core/wp-update-config.json`. Owner doc: `agency-os/docs/operations/WP_MANAGED_UPDATES.md` |
+
 ## WordPress / Local Dev
 
 | Script | Purpose |

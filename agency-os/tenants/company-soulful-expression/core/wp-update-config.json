@@ -1,0 +1,67 @@
+{
+  "_comment": "Config for scripts/update-client-wp-plugins.ps1. No secrets here — DB creds read live from wp-config.php via WP-CLI.",
+  "clientSlug": "soulful",
+  "clientName": "Soulful Expression Art Therapy",
+  "tenantFolder": "company-soulful-expression",
+
+  "ssh": {
+    "host": "191.101.230.176",
+    "port": 65002,
+    "user": "u942075013",
+    "keyName": "hostinger_soulful"
+  },
+
+  "sshHost": "191.101.230.176",
+  "sshPort": 65002,
+  "sshUser": "u942075013",
+  "sshKeyName": "hostinger_soulful",
+
+  "wpPath": "/home/u942075013/domains/soulfulexpression.org/public_html",
+  "siteUrl": "https://soulfulexpression.org",
+
+  "healthCheck": {
+    "url": "https://soulfulexpression.org",
+    "timeoutSec": 30,
+    "retries": 2
+  },
+
+  "backup": {
+    "localDir": "agency-os/tenants/company-soulful-expression/backups",
+    "retainCount": 5
+  },
+
+  "waves": {
+    "_comment": "wave1=high-risk one-by-one, wave2=medium-risk one-by-one, wave3=low-risk batch",
+    "wave1": [
+      "advanced-custom-fields-pro",
+      "ultimate-member",
+      "woocommerce",
+      "woocommerce-points-and-rewards"
+    ],
+    "wave2": [
+      "fluentform",
+      "kadence-blocks-pro",
+      "litespeed-cache",
+      "permalink-manager-pro"
+    ],
+    "wave3": [
+      "akismet",
+      "astra-portfolio",
+      "cartflows",
+      "code-snippets",
+      "google-site-kit",
+      "hostinger",
+      "kadence-blocks",
+      "seo-by-rank-math"
+    ]
+  },
+
+  "notes": {
+    "fluentsmtp": "NOT in any wave — handles transactional email; update only after staging smoke test confirms mail flow",
+    "fluentcrm": "NOT in any wave — email core; hold for client-scheduled maintenance window",
+    "permalink-manager-pro": "wave2 — URL structure; health check after update is CRITICAL (broken = all URLs 404)",
+    "ultimate-member": "wave1 — auth core with known CVE history; update solo with immediate health check",
+    "woocommerce-points-and-rewards": "wave1 — 10+ versions behind; confirm no schema migration errors post-update",
+    "akismet": "wave3 — already tested 5.6→5.7 on 2026-05-08; may show no pending update on next run"
+  }
+}
