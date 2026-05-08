@@ -56,13 +56,23 @@ function Unprotect-VaultSecret {
 }
 
 function Test-VaultSecret {
+    # Returns $true only when the entry exists AND has a non-empty value.
+    # Use -RequireNonEmpty:$false to revert to existence-only check (rare).
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] $Store,
-        [Parameter(Mandatory)][string]$Name
+        [Parameter(Mandatory)][string]$Name,
+        [switch]$RequireNonEmpty = $true
     )
     $entry = $Store.secrets.PSObject.Properties[$Name]
     if (-not $entry) { return $false }
+    if (-not $RequireNonEmpty) { return $true }
+    try {
+        $plain = Unprotect-VaultSecret -CipherText $entry.Value.cipher
+    } catch {
+        return $false
+    }
+    if ([string]::IsNullOrWhiteSpace($plain)) { return $false }
     return $true
 }
 

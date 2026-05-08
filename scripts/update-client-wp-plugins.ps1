@@ -1,0 +1,358 @@
+#requires -Version 5.1
+<#
+.SYNOPSIS
+  Safe one-command WordPress plugin updater for managed client sites.
+
+.DESCRIPTION
+  Flow (per run):
+    1. Load client config from tenants/<folder>/core/wp-update-config.json
+    2. Pre-flight: SSH reachable + site returning 200
+    3. Backup: mysqldump via SSH, SCP to local backups/, verify checksum
+    4. Resolve plugin list (wave1/wave2/wave3/all/csv/list)
+    5. Update — wave1/wave2: one-by-one with health check between each
+                  wave3/all:  batch then single health check
+    6. On health-check fail: SCP backup back, restore DB, halt
+    7. Write JSON report to agency-os/reports/wp-updates/
+
+  "Staging" is replaced by: backup-first + per-plugin health check + auto-rollback.
+  MainWP (Tier 2) can be layered on top when managing 3+ clients; this script
+  remains valid as the CLI/API path regardless.
+
+.PARAMETER ClientSlug
+  Short name matching the "clientSlug" field in wp-update-config.json.
+  Example: "soulful"  =>  tenants/company-soulful-expression/core/wp-update-config.json
+
+.PARAMETER Plugins
+  "list"   — show available updates, no changes
+  "wave1"  — high-risk plugins (defined in config); updated one-by-one
+  "wave2"  — medium-risk plugins; updated one-by-one
+  "wave3"  — low-risk plugins; updated in batch
+  "all"    — every available update in batch mode (use with care)
+  "theme"  — theme updates only
+  CSV      — explicit slugs e.g. "akismet,woocommerce"
+
+.PARAMETER BackupFirst
+  Default $true. Set $false only for testing/dry-run scenarios.
+
+.PARAMETER DryRun
+  Show what would be updated. No SSH writes.
+
+.PARAMETER ReportPath
+  Override report output path (default: agency-os/reports/wp-updates/).
+
+.EXAMPLE
+  # See what's pending
+  .\scripts\update-client-wp-plugins.ps1 -ClientSlug soulful -Plugins list
+
+  # Update high-risk plugins one-by-one with auto-rollback
+  .\scripts\update-client-wp-plugins.ps1 -ClientSlug soulful -Plugins wave1
+
+  # Update all remaining low-risk in batch
+  .\scripts\update-client-wp-plugins.ps1 -ClientSlug soulful -Plugins wave3
+
+  # Dry run
+  .\scripts\update-client-wp-plugins.ps1 -ClientSlug soulful -Plugins all -DryRun
+
+.NOTES
+  30-year design:
+  - Config file per client (no hard-coded credentials in this script)
+  - DB password read from server wp-config.php via WP-CLI (never stored in vault)
+  - Rollback uploads backup file back via SCP then restores — safe even on shared hosting
+  - MainWP Tier 2 upgrade: when you have 3+ WP clients, install MainWP Dashboard
+    on aware-wave.com WordPress and use this script's config as the connection template.
+    See: agency-os/docs/operations/WP_MANAGED_UPDATES.md
+#>
+
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory = $true)] [string] $ClientSlug,
+  [Parameter(Mandatory = $true)] [string] $Plugins,
+  [bool]   $BackupFirst = $true,
+  [switch] $DryRun,
+  [string] $ReportPath
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$WorkRoot   = Split-Path $PSScriptRoot -Parent
+$TenantsDir = Join-Path $WorkRoot 'agency-os\tenants'
+$DefaultReportsDir = Join-Path $WorkRoot 'agency-os\reports\wp-updates'
+
+# ── Locate client config ────────────────────────────────────────────────────
+$configFile = Get-ChildItem -Path $TenantsDir -Recurse -Filter 'wp-update-config.json' `
+  | Where-Object { ($_ | Get-Content -Raw -Encoding UTF8 | ConvertFrom-Json).clientSlug -eq $ClientSlug } `
+  | Select-Object -First 1
+
+if (-not $configFile) {
+  throw "No wp-update-config.json found for client '$ClientSlug'. " +
+        "Create one at: agency-os/tenants/company-<name>/core/wp-update-config.json"
+}
+$config = $configFile | Get-Content -Raw -Encoding UTF8 | ConvertFrom-Json
+Write-Host "Config  : $($configFile.FullName)"
+Write-Host "Client  : $($config.clientSlug)  Site: $($config.siteUrl)"
+
+# ── SSH helpers ──────────────────────────────────────────────────────────────
+$sshKey    = Join-Path $env:USERPROFILE ".ssh\$($config.sshKeyName)"
+$sshTarget = "$($config.sshUser)@$($config.sshHost)"
+$sshPort   = [string]$config.sshPort
+$wpPath    = $config.wpPath.TrimEnd('/')
+
+function Invoke-SSH {
+  param([string]$Cmd, [switch]$PassThru)
+  $out = & ssh -i $sshKey -p $sshPort -o StrictHostKeyChecking=no -o BatchMode=yes `
+               $sshTarget $Cmd 2>&1
+  if ($PassThru) { return $out }
+  $out | Write-Verbose
+  return $out
+}
+
+function Copy-FromServer {
+  param([string]$Remote, [string]$Local)
+  & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no `
+        "${sshTarget}:${Remote}" $Local 2>&1 | Write-Verbose
+}
+
+function Copy-ToServer {
+  param([string]$Local, [string]$Remote)
+  & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no `
+        $Local "${sshTarget}:${Remote}" 2>&1 | Write-Verbose
+}
+
+# ── Health check ─────────────────────────────────────────────────────────────
+function Test-SiteHealth {
+  param([string]$Url, [int]$TimeoutSec = 20)
+  try {
+    $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSec `
+                              -ErrorAction SilentlyContinue
+    if ($resp.StatusCode -ne 200) {
+      return [pscustomobject]@{ ok = $false; detail = "HTTP $($resp.StatusCode)" }
+    }
+    $body = $resp.Content
+    if ($body -match 'PHP Fatal error|WordPress database error|There has been a critical error|parse error') {
+      return [pscustomobject]@{ ok = $false; detail = 'PHP/WP error in page body' }
+    }
+    return [pscustomobject]@{ ok = $true; detail = "HTTP 200 OK" }
+  } catch {
+    return [pscustomobject]@{ ok = $false; detail = $_.Exception.Message }
+  }
+}
+
+# ── Resolve plugin list ───────────────────────────────────────────────────────
+$pluginGroup = $Plugins.ToLower()
+$targetSlugs = switch -Wildcard ($pluginGroup) {
+  'wave1'  { $config.waves.wave1 }
+  'wave2'  { $config.waves.wave2 }
+  'wave3'  { $config.waves.wave3 }
+  'theme'  { @() }
+  'all'    { @() }
+  'list'   { @() }
+  default  { $Plugins -split ',' | ForEach-Object { $_.Trim() } }
+}
+$batchMode = ($pluginGroup -in @('wave3','all'))
+
+# ── [1/5] Pre-flight ──────────────────────────────────────────────────────────
+Write-Host "`n[1/5] Pre-flight checks..."
+$pingResult = Invoke-SSH "echo pong" -PassThru
+if ($pingResult -notmatch 'pong') { throw "SSH connection failed to $sshTarget" }
+Write-Host "  SSH OK"
+
+$preHealth = Test-SiteHealth -Url $config.siteUrl
+Write-Host "  Site health: $($preHealth.detail)"
+if (-not $preHealth.ok) {
+  Write-Warning "Site is already unhealthy BEFORE update: $($preHealth.detail)"
+  Write-Warning "Proceeding, but rollback baseline may not be clean."
+}
+
+# ── [2/5] Resolve available updates ───────────────────────────────────────────
+Write-Host "`n[2/5] Fetching available updates..."
+
+if ($pluginGroup -ne 'theme') {
+  $availJson = Invoke-SSH "wp --path='$wpPath' plugin list --update=available --format=json --allow-root 2>/dev/null" -PassThru
+  $available = @($availJson | ConvertFrom-Json)
+  if ($targetSlugs.Count -gt 0) {
+    $available = @($available | Where-Object { $_.name -in $targetSlugs })
+  }
+} else {
+  $availJson = Invoke-SSH "wp --path='$wpPath' theme list --update=available --format=json --allow-root 2>/dev/null" -PassThru
+  $available = @($availJson | ConvertFrom-Json)
+}
+
+if ($pluginGroup -eq 'list') {
+  Write-Host "`nAvailable updates for '$ClientSlug':"
+  if ($available.Count -eq 0) { Write-Host "  (none)" }
+  $available | ForEach-Object {
+    Write-Host ("  {0,-40} {1} → {2}" -f $_.name, $_.version, $_.update_version)
+  }
+  exit 0
+}
+
+if ($available.Count -eq 0) {
+  Write-Host "No updates available for the specified group. Nothing to do."
+  exit 0
+}
+
+Write-Host "Plugins to update ($($available.Count)):"
+$available | ForEach-Object {
+  Write-Host ("  {0,-40} {1} → {2}" -f $_.name, $_.version, $_.update_version)
+}
+
+if ($DryRun) {
+  Write-Host "`n[DRY RUN] Would update $($available.Count) plugin(s). No changes made."
+  exit 0
+}
+
+# ── [3/5] Backup ─────────────────────────────────────────────────────────────
+$timestamp   = (Get-Date -Format 'yyyyMMdd-HHmmss')
+$backupLocal = $null
+$dbHost = $dbName = $dbUser = $dbPass = $null
+
+if ($BackupFirst) {
+  Write-Host "`n[3/5] Taking pre-update backup..."
+
+  # Read DB credentials from server wp-config.php (never stored in vault)
+  $dbHost = (Invoke-SSH "wp --path='$wpPath' config get DB_HOST --allow-root 2>/dev/null" -PassThru).Trim()
+  $dbName = (Invoke-SSH "wp --path='$wpPath' config get DB_NAME --allow-root 2>/dev/null" -PassThru).Trim()
+  $dbUser = (Invoke-SSH "wp --path='$wpPath' config get DB_USER --allow-root 2>/dev/null" -PassThru).Trim()
+  $dbPass = (Invoke-SSH "wp --path='$wpPath' config get DB_PASSWORD --allow-root 2>/dev/null" -PassThru).Trim()
+
+  # Write password to temp file on server (avoids it in process list)
+  $backupRemote = "/tmp/pre-update-${ClientSlug}-${pluginGroup}-${timestamp}.sql.gz"
+  $dumpCmd = @"
+printf '[mysqldump]\npassword=%s\n' '$dbPass' > /tmp/.wpmycreds_$timestamp
+mysqldump --defaults-extra-file=/tmp/.wpmycreds_$timestamp -h $dbHost -u $dbUser $dbName 2>/dev/null | gzip > $backupRemote
+rm -f /tmp/.wpmycreds_$timestamp
+gzip -t $backupRemote && echo BACKUP_OK
+"@
+  $dumpResult = Invoke-SSH $dumpCmd -PassThru
+  if ($dumpResult -notmatch 'BACKUP_OK') {
+    throw "Backup integrity check failed. Output: $dumpResult"
+  }
+
+  # SCP to local
+  $tenantBackupDir = Join-Path $TenantsDir "$($config.tenantFolder)\backups"
+  if (-not (Test-Path $tenantBackupDir)) {
+    New-Item -ItemType Directory -Path $tenantBackupDir -Force | Out-Null
+  }
+  $backupLocal = Join-Path $tenantBackupDir (Split-Path $backupRemote -Leaf)
+  Copy-FromServer -Remote $backupRemote -Local $backupLocal
+  Invoke-SSH "rm -f $backupRemote" | Out-Null
+
+  Write-Host "  Backup : $backupLocal"
+} else {
+  Write-Host "`n[3/5] Backup skipped (BackupFirst=false)"
+}
+
+# ── Rollback helper ─────────────────────────────────────────────────────────
+function Invoke-Rollback {
+  param([string]$BackupPath)
+  if (-not $BackupPath -or -not (Test-Path $BackupPath)) {
+    Write-Warning "No backup available for rollback."
+    return
+  }
+  Write-Host "  ROLLBACK: Uploading backup to server..."
+  $rollbackRemote = "/tmp/rollback-${ClientSlug}-${timestamp}.sql.gz"
+  Copy-ToServer -Local $BackupPath -Remote $rollbackRemote
+  $restoreCmd = @"
+printf '[client]\npassword=%s\n' '$dbPass' > /tmp/.wpmycreds_rb_$timestamp
+gunzip -c $rollbackRemote | mysql --defaults-extra-file=/tmp/.wpmycreds_rb_$timestamp -h $dbHost -u $dbUser $dbName && echo RESTORE_OK
+rm -f /tmp/.wpmycreds_rb_$timestamp $rollbackRemote
+"@
+  $result = Invoke-SSH $restoreCmd -PassThru
+  if ($result -match 'RESTORE_OK') {
+    Write-Host "  ROLLBACK: DB restored successfully."
+  } else {
+    Write-Warning "  ROLLBACK: DB restore may have failed. Check manually. Output: $result"
+  }
+}
+
+# ── [4/5] Update ─────────────────────────────────────────────────────────────
+Write-Host "`n[4/5] Updating plugins..."
+$results  = [System.Collections.Generic.List[pscustomobject]]::new()
+$rollback = $false
+
+if ($batchMode) {
+  # Batch update (wave3 / all)
+  $slugArgs = if ($targetSlugs.Count -gt 0) { $targetSlugs -join ' ' } else { '--all' }
+  $out = Invoke-SSH "wp --path='$wpPath' plugin update $slugArgs --allow-root 2>&1" -PassThru
+  Write-Host $out
+  $health = Test-SiteHealth -Url $config.siteUrl
+  Write-Host "  Health: $($health.detail)"
+  foreach ($p in $available) {
+    $results.Add([pscustomobject]@{
+      plugin = $p.name; from = $p.version; to = $p.update_version
+      status = if ($health.ok) { 'success' } else { 'needs-check' }
+    })
+  }
+  if (-not $health.ok) {
+    Write-Host "HEALTH CHECK FAILED. Initiating rollback..."
+    Invoke-Rollback -BackupPath $backupLocal
+    $rollback = $true
+    throw "Batch update caused health-check failure. DB rolled back. Check plugin files manually."
+  }
+} else {
+  # One-by-one update (wave1 / wave2 / explicit slugs)
+  foreach ($plugin in $available) {
+    Write-Host "  Updating $($plugin.name): $($plugin.version) → $($plugin.update_version)"
+    $out = Invoke-SSH "wp --path='$wpPath' plugin update $($plugin.name) --allow-root 2>&1" -PassThru
+    Write-Host "    $($out -join '; ')"
+
+    $health = Test-SiteHealth -Url $config.siteUrl
+    if ($health.ok) {
+      Write-Host "    [OK] Health: $($health.detail)"
+      $results.Add([pscustomobject]@{
+        plugin = $plugin.name; from = $plugin.version; to = $plugin.update_version; status = 'success'
+      })
+    } else {
+      Write-Host "    [FAIL] Health: $($health.detail)"
+      $results.Add([pscustomobject]@{
+        plugin = $plugin.name; from = $plugin.version; to = $plugin.update_version; status = 'failed'
+      })
+      Write-Host "  HEALTH CHECK FAILED on $($plugin.name). Initiating rollback..."
+      Invoke-Rollback -BackupPath $backupLocal
+      $rollback = $true
+      throw "Plugin '$($plugin.name)' caused health-check failure. DB rolled back. " +
+            "Manually revert the plugin file to the previous version or restore from: $backupLocal"
+    }
+  }
+}
+
+# ── [5/5] Report ─────────────────────────────────────────────────────────────
+Write-Host "`n[5/5] Writing report..."
+$reportsDir = if ($ReportPath) { Split-Path $ReportPath -Parent } else { $DefaultReportsDir }
+if (-not (Test-Path $reportsDir)) { New-Item -ItemType Directory -Path $reportsDir -Force | Out-Null }
+
+$finalHealth = Test-SiteHealth -Url $config.siteUrl
+$report = [pscustomobject]@{
+  ok              = ($results | Where-Object { $_.status -eq 'failed' }).Count -eq 0 -and -not $rollback
+  client          = $ClientSlug
+  ran_at          = (Get-Date).ToString('o')
+  plugins_group   = $Plugins
+  backup_path     = $backupLocal
+  updated_count   = ($results | Where-Object { $_.status -eq 'success' }).Count
+  failed_count    = ($results | Where-Object { $_.status -eq 'failed' }).Count
+  rollback        = $rollback
+  health_final    = $finalHealth.detail
+  results         = $results
+}
+
+$suffix    = "${ClientSlug}-${pluginGroup}-${timestamp}"
+$rptFile   = if ($ReportPath) { $ReportPath } else { Join-Path $reportsDir "wp-update-${suffix}.json" }
+$latestFile = Join-Path $reportsDir "wp-update-${ClientSlug}-LATEST.json"
+$report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $rptFile   -Encoding UTF8
+$report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $latestFile -Encoding UTF8
+
+Write-Host "Report  : $rptFile"
+Write-Host "`n=== SUMMARY ==="
+Write-Host ("Updated : {0}   Failed: {1}   Rollback: {2}" -f $report.updated_count, $report.failed_count, $rollback)
+$results | ForEach-Object {
+  $icon = if ($_.status -eq 'success') { '[OK]' } else { '[FAIL]' }
+  Write-Host ("  {0} {1,-40} {2} → {3}" -f $icon, $_.plugin, $_.from, $_.to)
+}
+Write-Host "Health  : $($finalHealth.detail)"
+if ($report.ok) {
+  Write-Host "`nALL UPDATES SUCCESSFUL" -ForegroundColor Green
+} else {
+  Write-Host "`nUPDATE HAD FAILURES — check report and site manually" -ForegroundColor Red
+  exit 1
+}

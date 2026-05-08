@@ -1,3 +1,36 @@
+#requires -Version 5.1
+<#
+.SYNOPSIS
+  Sync the Slack webhook URL from local DPAPI vault to the SG VPS.
+
+.DESCRIPTION
+  Writes /etc/default/awarewave-endpoint-alert (just WEBHOOK_URL +
+  TIMEOUT_SEC) and /etc/netdata/health_alarm_notify.conf, then restarts
+  Netdata + the endpoint-alert oneshot.
+
+  Single-source design (2026-05-08 refactor):
+    - CHECK_URLS is NOT written here. The endpoint-alert.sh built-in default
+      list is the only source of truth. If an operator wants a custom list,
+      they put a CHECK_URLS line in /etc/default/awarewave-endpoint-alert.local
+      (drop-in survives this sync).
+    - HEARTBEAT_URL belongs in .local too — managed by
+      scripts/sync-hetzner-endpoint-alert-heartbeat.ps1.
+    - This sync is now narrowly scoped to "Slack webhook + Netdata Slack
+      transport" — no overlap with any other sync.
+
+.PARAMETER VaultSecretName
+  Vault key. Default: AGENCY_OS_SLACK_WEBHOOK_URL.
+.PARAMETER SshTarget
+  SSH alias for the SG VPS. Default: hetzner.
+.PARAMETER StorePath
+  Optional override for the vault file path.
+
+.NOTES
+  Risk tier: Medium (rewrites two prod env files, restarts netdata + alerter).
+  Idempotent: writes deterministic content, atomic where possible.
+#>
+
+[CmdletBinding()]
 param(
     [string]$VaultSecretName = "AGENCY_OS_SLACK_WEBHOOK_URL",
     [string]$SshTarget = "hetzner",
@@ -7,55 +40,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Resolve-VaultPath([string]$Custom) {
-    if ($Custom) { return $Custom }
-    return (Join-Path $env:LOCALAPPDATA "AgencyOS\secrets\vault.json")
-}
+. (Join-Path $PSScriptRoot "_vault-helpers.ps1")
 
-function Read-VaultStore([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) {
-        throw "Secrets vault not found: $Path"
-    }
-    $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
-    if (-not $raw.Trim()) {
-        throw "Secrets vault is empty: $Path"
-    }
-    $obj = $raw | ConvertFrom-Json
-    if (-not $obj.PSObject.Properties.Name.Contains("secrets") -or -not $obj.secrets) {
-        throw "Secrets vault missing secrets map: $Path"
-    }
-    if (-not ($obj.secrets -is [System.Collections.IDictionary])) {
-        $map = @{}
-        foreach ($p in $obj.secrets.PSObject.Properties) {
-            $map[$p.Name] = $p.Value
-        }
-        $obj.secrets = $map
-    }
-    return $obj
-}
-
-function Unprotect-Secret([string]$CipherText) {
-    $secure = ConvertTo-SecureString -String $CipherText
-    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-    try {
-        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-    } finally {
-        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-    }
-}
-
-$vaultPath = Resolve-VaultPath -Custom $StorePath
-$store = Read-VaultStore -Path $vaultPath
-if (-not $store.secrets.ContainsKey($VaultSecretName)) {
+$store = Read-VaultStore (Resolve-VaultPath -Custom $StorePath)
+if (-not (Test-VaultSecret -Store $store -Name $VaultSecretName)) {
     throw "Vault missing secret: $VaultSecretName (run secrets-vault.ps1 -Action set-prompt -Name $VaultSecretName)"
 }
-
-$hook = Unprotect-Secret -CipherText $store.secrets[$VaultSecretName].cipher
-if ([string]::IsNullOrWhiteSpace($hook)) {
-    throw "Vault secret is empty: $VaultSecretName"
-}
+$hook = Get-VaultSecret -Store $store -Name $VaultSecretName
 if ($hook -notmatch '^https://hooks\.slack\.com/services/') {
-    throw "Unexpected Slack webhook URL format for $VaultSecretName"
+    throw "Unexpected Slack webhook URL format for ${VaultSecretName}: $($hook.Substring(0,[Math]::Min(40,$hook.Length)))..."
 }
 
 $hookB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($hook))
@@ -64,20 +57,19 @@ $remote = @'
 set -euo pipefail
 HOOK="$(printf '%s' "__HOOK_B64__" | base64 -d)"
 
+# /etc/default/awarewave-endpoint-alert: just WEBHOOK_URL + TIMEOUT_SEC.
+# CHECK_URLS comes from endpoint-alert.sh's hard-coded default (single source).
+# Operator extension keys (HEARTBEAT_URL, RENOTIFY_AFTER_SEC, custom CHECK_URLS
+# overrides) live in /etc/default/awarewave-endpoint-alert.local — managed by
+# scripts/sync-hetzner-endpoint-alert-heartbeat.ps1 and survives this sync.
 umask 077
 {
   printf '%s\n' "WEBHOOK_URL=\"${HOOK}\""
-  # CHECK_URLS must stay aligned with endpoint-alert.sh default (6 public surfaces).
-  # If you add/remove a public URL, update both this line AND the script's default.
-  printf '%s\n' 'CHECK_URLS="https://aware-wave.com/ https://app.aware-wave.com/ https://api.aware-wave.com/health https://n8n.aware-wave.com/healthz https://trigger.aware-wave.com/ https://uptime.aware-wave.com/dashboard"'
   printf '%s\n' 'TIMEOUT_SEC=12'
-  # NOTE: this file is rewritten on every sync. Operator-managed extension keys
-  # (HEARTBEAT_URL, RENOTIFY_AFTER_SEC, custom CHECK_URLS overrides, etc.) MUST
-  # live in /etc/default/awarewave-endpoint-alert.local — the systemd unit reads
-  # that drop-in via EnvironmentFile=- so it survives this sync.
 } > /etc/default/awarewave-endpoint-alert
 chmod 600 /etc/default/awarewave-endpoint-alert
 
+# Netdata Slack transport
 umask 077
 {
   printf '%s\n' 'SEND_SLACK="YES"'
@@ -100,8 +92,13 @@ systemctl restart awarewave-endpoint-alert.service || true
 
 $remote = $remote.Replace("__HOOK_B64__", $hookB64).Replace([string][char]13, "")
 
+# PowerShell pipe-to-native converts to CRLF, which busybox/bash chokes on.
+# Wrap in base64 + decode-and-run on the far side.
+$remoteB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remote))
+$wrapper = "echo $remoteB64 | base64 -d | sudo bash"
+
 Write-Host "== sync: writing VPS env + netdata slack config + restart ==" -ForegroundColor Cyan
-$remote | ssh $SshTarget "sudo bash -s"
+& ssh $SshTarget $wrapper
 if ($LASTEXITCODE -ne 0) {
     throw "Remote sync failed (ssh exit $LASTEXITCODE)"
 }

@@ -4,6 +4,7 @@ Chronological log of all strategy reviews. Latest at top.
 
 | Date | Slug | Mode(s) | Recommendation | Promoted to ADR? | Link |
 |------|------|---------|----------------|------------------|------|
+| 2026-05-08 | keep-slack-telegram-separate | four-role-collaboration | reject 合併 + proceed-with-modifications C+（保留兩個 + 角色契約化） | no | [link](2026-05-08-keep-slack-telegram-separate.md) |
 | 2026-05-08 | adopt-hermes-agent | four-role-collaboration | rejected (operator final 2026-05-08; analytical was proceed-with-modifications) | no | [link](2026-05-08-adopt-hermes-agent.md) |
 
 ---
