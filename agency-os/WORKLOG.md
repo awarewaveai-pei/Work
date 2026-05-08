@@ -235,6 +235,34 @@
 - **不在 git**：user-level skill mirror（auto-synced lockstep）+ user-level memory entry。
 - AUTO_TASK_DONE: /strategy-review skill demo 實測
 
+### Phase 2c — Always-On Command Plane ops console approval UI + system_modes UI（完成）
+
+- **背景**：TASKS「Always-On Command Plane Phase 2 → 2c」最後一塊。Phase 2a（kill switch from Telegram）+ 2b（Trigger.dev dispatch）已於 2026-05-08 上線；2c 解鎖「高 risk 指令從 Telegram 觸發 → ops console SSO 簽核 → command_request 推進到 dispatch」端到端。
+- **Backend**（commit `6b7b525`）：
+  - `lib/ops-role.ts` 加 `canApproveCommand` / `canChangeSystemMode`（owner+admin only — 對應 CLAUDE.md High-STOP / 今日新加的 systems-thinker red lines「auth/identity」）
+  - `lib/command-plane/handlers/normalMode.ts` 新增；`handlers/index.ts` 註冊 `/normal_mode`（高 risk，Telegram 端 policy 仍 hard-block；只能由 approval API 觸發）
+  - `app/api/ops/approvals/route.ts`（GET 列出 queued+high/critical command_requests）
+  - `app/api/ops/approvals/[id]/approve/route.ts`（POST RBAC → run handler 直接觸發，**繞過 commandRouter 的 killswitch check**——這是有意的，因為 `/normal_mode` 本身就是解鎖路徑；status dispatched → completed/failed；approver 紀錄在 metadata `approved_by_role`/`approved_at`/`approval_action`）
+  - `app/api/ops/approvals/[id]/reject/route.ts`（POST RBAC → status='blocked_by_policy' + reason）
+  - `app/api/ops/system-modes/route.ts`（GET 讀當前 global mode；POST RBAC → upsert）
+- **Frontend**（同 commit）：
+  - `/ops/approvals` server component + `ApprovalList` client 元件（Approve/Reject 雙確認 modal；非 owner/admin 顯示 read-only）
+  - `/ops/system-modes` server component + `SystemModeControl` client 元件（4 mode 下拉；emergency_stop 與 unlock-to-normal 路徑各加強化 confirm dialog）
+  - `app/layout.tsx` Overview 側欄加 `/ops/approvals`（✓）與 `/ops/system-modes`（◐）
+- **Smoke test 加 4 case**（§12-15）：normal_mode_hard_blocked_from_telegram / approvals_list_endpoint_shape / system_modes_get_shape / approve_404_for_unknown_id
+- **RLS 修正**（commit `c09a529`）：`command_requests` 與 `system_modes` 兩表都 enable RLS，初版 GET 用 `getSupabaseReadClient()`（anon）讀不到。修：4 個檔（2 API + 2 page）改 `getSupabaseServerClient()`（service role bypass RLS）。RBAC 仍在 API 層強制，service role 是底層 DB 訪問機制不是授權繞過。
+- **MVP scope（不做）**：approval_policies / approval_steps 多步流程；ops_audit_events 寫入（紀錄留在 command_requests.metadata）；email/Slack 等待中通知；其它高 risk 指令（deploy_production / refund / dns_change / rotate_secrets）的 handler——本期只 wire `/normal_mode` 一條路徑。
+- **Deploy 證據**：`sg-deploy.sh next-admin` 兩次成功（6b7b525 + c09a529 RLS fix），每次 `lobster-next-admin healthy after 7s`。Browser 驗證（內部 IP 直連繞過 CF）：
+  - GET `/ops/approvals` → HTTP 200，HTML 含 "Pending Approvals" + RBAC 提示
+  - GET `/ops/system-modes` → HTTP 200，HTML 含 "Current Mode" + 4 modes effects panel
+  - GET `/api/ops/approvals` → 200, `{ok:true, role:"admin", count:0}`
+  - GET `/api/ops/system-modes` → 200, 讀到實際 row `{mode:"normal", reason:"phase 2c first row seed"}`
+  - POST `/api/ops/approvals/<bogus>/approve` 無 proxy auth → 403 forbidden_role（RBAC 邊界正確）
+  - POST `/api/ops/approvals/<bogus>/approve` 帶 trusted-proxy + claims admin → 404 command_request_not_found（DB lookup OK）
+  - POST `/api/ops/system-modes` 帶 trusted-proxy + claims admin → 200，建立首份全域 system_modes row
+- **修改檔（in git）**：`lib/ops-role.ts`、`lib/command-plane/handlers/normalMode.ts` (新)、`lib/command-plane/handlers/index.ts`、`app/api/ops/approvals/route.ts` (新)、`app/api/ops/approvals/[id]/approve/route.ts` (新)、`app/api/ops/approvals/[id]/reject/route.ts` (新)、`app/api/ops/system-modes/route.ts` (新)、`app/ops/approvals/page.tsx` (新) + `ApprovalList.tsx` (新)、`app/ops/system-modes/page.tsx` (新) + `SystemModeControl.tsx` (新)、`app/layout.tsx`、`scripts/command-plane-smoke.ps1`。13 檔總計 ~1200 行。
+- AUTO_TASK_DONE: Always-On Command Plane Phase 2c — ops console approval UI
+
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:14943f18e8160246d1f98a522a83de76378d5d7f52918d9db68a0fee23f5238e -->
