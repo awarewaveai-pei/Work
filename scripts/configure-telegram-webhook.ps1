@@ -86,6 +86,7 @@ $commands = @(
   @{ command = 'daily_review'     ; description = 'AI summary of last 24h activity' },
   @{ command = 'weekly_review'    ; description = 'AI summary of last 7 days activity' },
   @{ command = 'list_failed_runs' ; description = 'Recent failed command_requests + workflow_runs' },
+  @{ command = 'client_status'    ; description = 'Health + WP update status for all clients (or /client_status <slug>)' },
   @{ command = 'emergency_stop'   ; description = 'Lock all commands (unlock via SQL/ops console only)' },
   @{ command = 'maintenance_mode' ; description = 'Block non-low commands (e.g. during ops work)' },
   @{ command = 'read_only_mode'   ; description = 'Allow only low-risk read commands' },

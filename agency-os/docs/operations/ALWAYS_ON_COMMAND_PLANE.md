@@ -76,7 +76,7 @@ Source: `lib/command-plane/policyEngine.ts:RISK_TABLE`. Adding a command is a on
 
 | Risk | Examples | Telegram | Slack | Webhook | Internal/Schedule |
 |---|---|---|---|---|---|
-| low | `/start` `/help` `/status` `/health` `/daily_review` `/weekly_review` `/list_failed_runs` `/runbook` `/draft_cursor_task` | ✅ run | ✅ run | ✅ run | ✅ run |
+| low | `/start` `/help` `/status` `/health` `/daily_review` `/weekly_review` `/list_failed_runs` `/runbook` `/draft_cursor_task` `/client_status` | ✅ run | ✅ run | ✅ run | ✅ run |
 | medium | `/emergency_stop` `/maintenance_mode` `/read_only_mode` `/trigger_staging_workflow` `/replay_dead_letter` `/create_issue` | ✅ run inline (Phase 2a/2b) | ⏸️ queued | ✅ run | ✅ run |
 | high | `/normal_mode` `/deploy_production` `/refund` `/dns_change` `/rotate_secrets` | 🚫 hard-block | 🚫 hard-block | ⏸️ approval | ⏸️ approval |
 | critical | `/drop_table` `/read_secrets` `/destructive_migration` `/cross_tenant_export` `/disable_killswitch` | 🚫 hard-block | 🚫 hard-block | 🚫 hard-block | 🚫 hard-block |
@@ -168,7 +168,101 @@ select error_message, event_payload, occurred_at
 
 To replay, send the same command from Telegram with a fresh message (Telegram update_id will differ, so idempotency does not block replay).
 
-## 10. Verification
+## 10. Client Management
+
+This section covers the full tooling stack for WordPress and SaaS client operations.
+
+### 10.1 Ops Dashboard — `/ops/clients`
+
+Web UI at `https://app.aware-wave.com/ops/clients`. Shows for each client:
+- Real-time health probe (HTTP HEAD → status code + latency)
+- Platform and hosting type
+- Last WP plugin update run (updated / failed / license counts, date)
+- WP update wave buttons (wave1 / wave2 / wave3) — SSH only; buttons hidden when `ssh_host` is not set
+
+Source: `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/clients/`  
+API: `apps/next-admin/app/api/ops/clients/route.ts`  
+Data store: `organizations.metadata.client_config` + `organizations.metadata.wp_update_latest` (Supabase)
+
+### 10.2 Telegram — `/client_status`
+
+Risk: **low** (read-only). Available from Telegram at any time, any kill-switch mode except `emergency_stop`.
+
+```
+/client_status              # all clients — compact summary table
+/client_status soulful      # single client — full detail + wave assignments + last update results
+```
+
+Handler: `lib/command-plane/handlers/clientStatus.ts`  
+Policy: `policyEngine.ts:RISK_TABLE["/client_status"] = "low"`  
+Data: same `organizations.metadata` queried by the web dashboard.
+
+**All-clients output** — one block per client:
+- health emoji + HTTP status
+- last WP update: updated count, failed, license-blocked, days since run
+- link to `/ops/clients`
+
+**Single-client output** — full detail:
+- platform / hosting type / site URL
+- health status + latency
+- WP update results: last 8 plugin records (✅ updated / ❌ failed / 🔑 license)
+- wave assignments (wave1 / wave2 / wave3 plugin slugs)
+- link to `/ops/clients/<slug>`
+
+### 10.3 Client Onboarding — `client-onboarding` subagent
+
+Claude Code subagent at `.claude/agents/client-onboarding.md`.  
+Triggers automatically when asked to add a new client. Handles two paths:
+
+| Path | When to use | Key steps |
+|---|---|---|
+| **§SSH** | Agency manages the server (has SSH credentials) | SQL `INSERT` → SSH key stored on SG as `SSH_KEY_<LABEL>` env var → wave classification via `wp plugin list` |
+| **§MainWP** | Client manages their own server | SQL `INSERT` → MainWP Dashboard plugin → Client's Child plugin → webhook to `/api/ops/clients/<slug>/wp-report` |
+
+SQL seed templates: `agency-os/reports/sql-seeds/`  
+Owner doc for this subagent: `.claude/agents/client-onboarding.md` (self-contained)
+
+### 10.4 WP Plugin Updates — SSH streaming
+
+Endpoint: `POST /api/ops/clients/[slug]/wp-update?wave=wave1|wave2|wave3`  
+Transport: SSE (`text/event-stream`) — progress streams live to the browser.
+
+Wave-based risk classification:
+
+| Wave | Risk | Plugins | Update behaviour |
+|---|---|---|---|
+| wave1 | High | WooCommerce, auth, payment, security | One-by-one; HTTP health check after each; stop on first failure |
+| wave2 | Medium | Forms, SEO, caching, URL structure | One-by-one |
+| wave3 | Low | Utilities, analytics, widgets | Batch (`--all`) |
+
+SSH key storage on SG:
+```bash
+# Key stored as base64 env var in docker-compose environment section:
+SSH_KEY_HOSTINGER_SOULFUL: ${SSH_KEY_HOSTINGER_SOULFUL:-}
+
+# Key loaded by the API route:
+const keyB64 = process.env[`SSH_KEY_${cfg.ssh_key_name.toUpperCase()}`]
+```
+
+Config fields in `organizations.metadata.client_config`:
+- `ssh_host`, `ssh_port`, `ssh_user`, `ssh_key_name`, `wp_path`
+- `waves.wave1`, `waves.wave2`, `waves.wave3` (arrays of WP plugin slugs)
+
+Results written to `organizations.metadata.wp_update_latest` at run completion.
+
+### 10.5 Weekly WP Scan (Phase 3 — planned)
+
+An Anthropic Routine (`AgencyOS-WpWeeklyScan`) will:
+1. Run every Monday 08:00 Asia/Taipei
+2. For each WP client: SSH → `wp plugin list --update=available --format=json`
+3. If pending updates found: Telegram message listing plugin names and risk wave
+4. Log to `command_requests` with `source='schedule'`
+
+**Status: planned.** Current workaround: send `/client_status` from Telegram or view the Ops Dashboard.
+
+---
+
+## 11. Verification
 
 Run from monorepo root after any deploy:
 
@@ -185,12 +279,12 @@ Run from monorepo root after any deploy:
 
 The smoke test runs eight checks (see script header). Exit 0 = all green.
 
-## 11. Phase 2 / 3 roadmap
+## 12. Phase 2 / 3 roadmap
 
 - **Phase 2**: wire `/api/internal/commands/dispatch` to Trigger.dev's `dispatch-action-run` task; lift medium-risk commands; ops console UI for approvals + system_modes.
 - **Phase 3**: Slack / Email ingress, Anthropic Routines integration (replace parts of `run-weekly-automation.ps1`), automated monthly restore drills, kill-switch one-click UI.
 
-## 12. Related documents
+## 13. Related documents
 
 - `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE_OPERATIONS.md` — **operator manual** (roles / functions / settings / troubleshooting)
 - `agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md` — **出國 / 沒筆電 必看**（5 步出國前驗證、緊急 SOP、Termius 設定、解鎖路徑）
@@ -199,4 +293,4 @@ The smoke test runs eight checks (see script header). Exit 0 = all green.
 - `agency-os/docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md` — 30-year execution contract
 - `agency-os/docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md` — Sentry / PostHog / Uptime Kuma baseline this plane reuses
 
-_Last updated: 2026-05-07_
+_Last updated: 2026-05-08_

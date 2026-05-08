@@ -8,6 +8,7 @@ import { healthHandler } from "./health";
 import { dailyReviewHandler } from "./dailyReview";
 import { weeklyReviewHandler } from "./weeklyReview";
 import { listFailedRunsHandler } from "./listFailedRuns";
+import { clientStatusHandler } from "./clientStatus";
 import { setSystemModeHandler } from "./systemModeControl";
 import { triggerWorkflowHandler } from "./triggerWorkflow";
 import { replayDeadLetterHandler } from "./replayDeadLetter";
@@ -21,6 +22,7 @@ export const phase1Handlers: Record<string, CommandHandler> = {
   "/daily_review": dailyReviewHandler,
   "/weekly_review": weeklyReviewHandler,
   "/list_failed_runs": listFailedRunsHandler,
+  "/client_status": clientStatusHandler,  // Phase 2c: client health + WP update summary
   // Phase 2a — kill-switch ENABLE (medium risk; unlock requires SSO/SQL).
   "/emergency_stop":   setSystemModeHandler("emergency_stop"),
   "/maintenance_mode": setSystemModeHandler("maintenance"),

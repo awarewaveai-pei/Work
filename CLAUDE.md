@@ -136,6 +136,7 @@ ssh hetzner-sg 'stat -c "mtime=%y" /etc/default/awarewave-endpoint-alert.local; 
 | `/check-drift` | 跑 `check-deploy-drift.ps1`，回報 SG production vs `origin/main` 落後幾個 commit |
 | `/vault-sync` | 同步 vault → Windows user env，列出仍缺的 key |
 | `/vault-status` | 顯示 vault 所有 key 名稱 + `.cursor/mcp.json` 缺漏清單 |
+| `/client-status` | 查詢所有客戶（或單一）健康 + WP 更新狀態（呼叫 `/api/ops/clients` + Telegram `/client_status` 同源） |
 
 ## Project Subagents
 
@@ -146,6 +147,7 @@ ssh hetzner-sg 'stat -c "mtime=%y" /etc/default/awarewave-endpoint-alert.local; 
 | `repair-agent` | 健康檢查失敗、腳本報錯、MCP 連不上、文件交叉引用斷掉、vault/env 對齊問題 |
 | `site-builder` | 新客戶租戶佈建（GitHub / Sentry / PostHog / Supabase / n8n） |
 | `trigger-deploy-agent` | Trigger.dev EU 工作流部署（需提供 `tr_pat_*` Personal Access Token） |
+| `client-onboarding` | 新客戶 onboarding（Supabase SQL seed + SSH 金鑰存放 + Wave 分類 / MainWP 連線）|
 
 ## 桌機 / 換機設定（**自動化版**，2026-05-07 起）
 

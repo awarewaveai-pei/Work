@@ -17,6 +17,7 @@ const RISK_TABLE: Record<string, RiskLevel> = {
   "/list_failed_runs": "low",
   "/runbook": "low",
   "/draft_cursor_task": "low",
+  "/client_status": "low",   // health + WP update summary for all/one client (Phase 2c)
 
   // medium: kill-switch enable (self-defence) + deferred Phase 2 dispatch.
   // Worst case if abused: system locks itself; recoverable via SQL editor.
