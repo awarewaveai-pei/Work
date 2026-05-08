@@ -1,0 +1,181 @@
+"use client";
+
+import { useState } from "react";
+
+interface CommandRequestRow {
+  id: string;
+  organization_id: string;
+  source: string;
+  actor_type: string;
+  actor_ref: string | null;
+  command: string;
+  args: Record<string, unknown>;
+  risk_level: string;
+  status: string;
+  trace_id: string;
+  received_at: string;
+  metadata: Record<string, unknown>;
+}
+
+interface Props {
+  items: CommandRequestRow[];
+  canAct: boolean;
+}
+
+export function ApprovalList({ items, canAct }: Props) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, { ok: boolean; msg: string }>>({});
+
+  async function approve(id: string) {
+    if (!confirm("Approve this command? It will run immediately and cannot be reverted.")) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/ops/approvals/${id}/approve`, { method: "POST" });
+      const json = await res.json();
+      setResults((r) => ({
+        ...r,
+        [id]: { ok: json.ok === true, msg: json.ok ? `OK status=${json.status}` : `FAIL ${json.error}` },
+      }));
+    } catch (e) {
+      setResults((r) => ({
+        ...r,
+        [id]: { ok: false, msg: `Exception ${(e as Error).message}` },
+      }));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function reject(id: string) {
+    const reason = prompt("Reject reason (optional):") ?? "";
+    if (reason === null) return; // cancelled
+    if (!confirm("Reject this command?")) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/ops/approvals/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const json = await res.json();
+      setResults((r) => ({
+        ...r,
+        [id]: { ok: json.ok === true, msg: json.ok ? `Rejected: ${json.reason ?? ""}` : `FAIL ${json.error}` },
+      }));
+    } catch (e) {
+      setResults((r) => ({
+        ...r,
+        [id]: { ok: false, msg: `Exception ${(e as Error).message}` },
+      }));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {items.map((it) => {
+        const result = results[it.id];
+        const argsPreview =
+          Object.keys(it.args ?? {}).length === 0
+            ? "(no args)"
+            : JSON.stringify(it.args).slice(0, 200);
+        return (
+          <div
+            key={it.id}
+            style={{
+              background: "#fff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              padding: "16px 20px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                  <span
+                    style={{
+                      fontFamily: "monospace",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#0f172a",
+                    }}
+                  >
+                    {it.command}
+                  </span>
+                  <span
+                    style={{
+                      background: it.risk_level === "critical" ? "#fee2e2" : "#fef3c7",
+                      color: it.risk_level === "critical" ? "#991b1b" : "#854d0e",
+                      fontSize: 11,
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.4,
+                    }}
+                  >
+                    {it.risk_level}
+                  </span>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>
+                    {it.source} · {it.actor_type}
+                    {it.actor_ref ? ` ${it.actor_ref}` : ""}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: "#475569", marginBottom: 4 }}>
+                  args: <code>{argsPreview}</code>
+                </div>
+                <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>
+                  trace: {it.trace_id} · received: {new Date(it.received_at).toLocaleString()}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                {canAct ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => approve(it.id)}
+                      disabled={busyId === it.id}
+                      className="btn-primary"
+                      style={{ minWidth: 100 }}
+                    >
+                      {busyId === it.id ? "..." : "Approve"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => reject(it.id)}
+                      disabled={busyId === it.id}
+                      className="btn-secondary"
+                      style={{ minWidth: 100 }}
+                    >
+                      Reject
+                    </button>
+                  </>
+                ) : (
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Read-only</span>
+                )}
+              </div>
+            </div>
+            {result && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "8px 12px",
+                  borderRadius: 4,
+                  fontSize: 13,
+                  background: result.ok ? "#ecfdf5" : "#fef2f2",
+                  color: result.ok ? "#065f46" : "#991b1b",
+                  border: `1px solid ${result.ok ? "#a7f3d0" : "#fecaca"}`,
+                }}
+              >
+                {result.ok ? "✅" : "❌"} {result.msg}
+                <span style={{ marginLeft: 8, fontSize: 11, color: "#64748b" }}>
+                  (refresh to update list)
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
