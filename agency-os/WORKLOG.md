@@ -4,6 +4,51 @@
 
 ## 2026-05-08
 
+### Phase 2c 收尾 — WpUpdateButtons + Dockerfile + Telegram + ONBOARDING
+
+#### Bug Fixes（commit 31ad905 → 8d681b3）
+
+- **WpUpdateButtons.tsx 遺失**：`page.tsx` import 找不到 → TS2307。原因：前一 session 標記「已建立」但 file 不在磁碟。重建完整 `"use client"` 元件（三波 SSE streaming + AbortController + router.refresh）。
+- **clientStatus.ts import 路徑錯誤**：`../../../../app/api/ops/clients/route` 多一層 → 改 `../../../app/api/ops/clients/route`。修正後 TS typecheck PASS。
+- **wp-update/route.ts 意外刪除**：fullstack-engineer commit agent 把 route.ts 暫存為 deletion（見 git diff）。debugger agent 從 commit `7364d7a` 還原，commit `f91bec0`。
+
+#### Dockerfile 修正（commit 8d681b3）
+
+- **Next.js standalone tracer 遺漏 runtime-only imports**：`@anthropic-ai/sdk` + `ssh2` 未被 tracer 追蹤 → standalone image 缺模組 → `/daily_review` / `/weekly_review` 在 production 拋 MODULE_NOT_FOUND。
+- 修正：在 Dockerfile runner stage 加兩行顯式 COPY：
+  ```
+  COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@anthropic-ai ./node_modules/@anthropic-ai
+  COPY --from=builder --chown=nextjs:nodejs /app/node_modules/ssh2 ./node_modules/ssh2
+  ```
+- 重新部署 SG next-admin（`sg-deploy.sh`），container healthy。
+
+#### Anthropic API Key 更新
+
+- 舊 key 401（revoked）。新 key `sk-ant-api03-xWkyvy8V9…` 寫入 SG container `.env`（`sed -i`）+ 本機 vault（`secrets-vault.ps1 -Action set`）+ `AWARE_WAVE_CREDENTIALS.md §十九`。
+- 驗證：`curl https://api.anthropic.com/v1/messages -H "x-api-key: ..."` → HTTP 200。
+
+#### Telegram Webhook 修正
+
+- 舊 vault token 是 placeholder → `setWebhook` 401。從 CREDENTIALS.md §二十四 取得真實 token，重設 vault，重跑 `configure-telegram-webhook.ps1`。
+- 結果：`setWebhook ok=True`、`setMyCommands ok=True`（11 指令）。
+
+- **AUTO_TASK_DONE**: Phase 2c WP Update buttons + Dockerfile standalone fix + Telegram webhook
+
+#### ALWAYS_ON_COMMAND_PLANE → COMMAND_PLANE_RUNBOOK 改名（commit 7c5cad5）
+
+- `git mv` rename（100% similarity），refactor-specialist 更新 14 個交叉引用檔（含 README、AGENTS、CHANGE_IMPACT_MATRIX、credentials 等）。
+- 新增 **§10 Client Management**：Ops Dashboard 操作路徑、`/client_status` Telegram 行為、client-onboarding subagent 流程、SSH streaming WP 更新、Phase 3 weekly scan 計畫。
+- `CLAUDE.md`：slash commands 表加 `/client-status`；subagents 表加 `client-onboarding`。
+- `AWARE_WAVE_CREDENTIALS.md §二十四`：owner doc 路徑改名 + 指令列從 5 個展開至 11 個。
+- **AUTO_TASK_DONE**: COMMAND_PLANE_RUNBOOK 改名 + §10 Client Management + CLAUDE.md 更新
+
+#### `/team-onboarding` ONBOARDING.md 完成
+
+- Claude Code 內建 `/team-onboarding` 指令分析過去 30 天使用記錄並生成 `D:\Work\ONBOARDING.md`。
+- 補齊：Team Tips（7 條 AwareWave 特定提示：monorepo 根目錄、DPAPI vault、commit prefix、禁建 branch、Telegram bot、health 100%、migration 不可動）+ Get Started（6 步驟）。
+- ShareOnboardingGuide 更新分享連結：**https://claude.ai/claude-code/onboard/O3clJrMsjeQ5**
+- **AUTO_TASK_DONE**: ONBOARDING.md 完成並發布（team-onboarding share link）
+
 ### SG drift cron 第一次自動 firing 驗證完成
 
 - **cron 觸發紀錄**（`/var/log/sg-deploy-drift.log`）：
@@ -1809,7 +1854,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-08 08:33:57 UTC_
+_Last synced: 2026-05-08 15:55:16 UTC_
 
 ## 2026-03-20
 
@@ -2243,5 +2288,6 @@ _Last synced: 2026-05-08 08:33:57 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
