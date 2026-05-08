@@ -51,6 +51,17 @@
 ### 未完成
 
 - [x] **（2026-05-08 09:00 TPE 之後驗證）SG drift cron 第一次自動 firing** —— **【AUTO_TASK_DONE_APPLIED 2026-05-08T09:xx TPE】** log: `[2026-05-08T01:00:03Z] alert sent: HTTP 200, behind=7`；cron daemon active/enabled；結案條件已達（drift>0 + HTTP 2xx）。
+- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】** 2026-05-08 規劃完整路徑；本任務由**操作者親自手機操作**，代理無法代執行。**owner doc**: `agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md` §0 & §8。**DoD**:
+  - **(1) SSH key 弄到手機 Termius**（3 種方法擇一；推薦 B1 = iCloud Universal Clipboard）：
+    - **方法 A（最安全）**：電腦裝 7-Zip（https://www.7-zip.org/）→ 對 `C:\Users\user1115\.ssh\hetzner_trigger` 7-Zip → 加入壓縮檔 → 加密 AES-256 + 設密碼 → 上傳 iCloud Drive / Google Drive → 手機下載 + 解壓 + Termius Keychain → New Key → import
+    - **方法 B1（最快，iPhone + Mac 同 Apple ID）**：電腦記事本打開 `hetzner_trigger` → 全選複製 → iPhone Universal Clipboard 取得 → 備忘錄貼上 → Termius Keychain 貼上 → 用後**刪備忘錄**
+    - **方法 B2（其它情況）**：Email 自寄 key 純文字 → 手機收信複製 → Termius 貼上 → 收件匣+寄件備份+垃圾桶**全刪**
+  - **(2) Termius 加 SG host**：Hostname `5.223.93.113` / Username `root` / Port `22` / Private Key 選 `hetzner_trigger`
+  - **(3) 跑 §0 5 步驗證**（**手機關 wifi 切 4G 模擬國外**）：(a) 連線見 `root@wordpress-ubuntu-4gb-sin-1:~#`；(b) `whoami` → `root`；(c) `ls /root/lobster-phase1/scripts/sg-deploy.sh` 存在；(d) `/root/lobster-phase1/scripts/sg-deploy.sh next-admin --dry-run` 印 `DRY RUN complete`；(e) `docker ps --format '{{.Names}} {{.Status}}'` 看到 `lobster-next-admin Up X (healthy)` — **5 步全綠才算 PASS**
+  - **(4) Termius 加 4 條 Snippets**：`🔍 status` (`docker ps`) / `📋 deploy next-admin` (`sg-deploy.sh next-admin`) / `📋 dry-run` (加 `--dry-run`) / `📊 drift log` (`tail -50 /var/log/sg-deploy-drift.log`)
+  - **(5) 手機加書籤**: cheat sheet（`https://github.com/awarewaveai-pei/Work/blob/main/agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`）+ ops console (`app.aware-wave.com/ops/system-modes` / `/ops/approvals` / `/ops/inbox`)；建議「加到主畫面」+ 離線備份（raw markdown 複製進備忘錄）
+  - **(6) 出國前一晚再跑 §0 5 步**確認還能連（不重做設定，只測連線）
+  - **失敗時找代理**：說明哪步、什麼錯誤訊息（如 `Permission denied` / connection timeout / sg-deploy.sh 跑出非 dry-run 動作等），代理會幫拆。
 - [ ] **（明日提醒）`/strategy-review` skill demo 實測** —— **【未完成】** **明日（2026-05-08）試跑：**用今天 Hermes Agent 的問題（要不要採用、值不值得整合）作為第一個 strategy-review 案例，跑 **Mode 1（four-role-collaboration）**驗證並行 subagent 真的有獨立 context、不會互相污染。**操作：**在 Claude Code 輸入 `/strategy-review 要不要採用 Hermes Agent` 或自然語觸發。**DoD：**(1) 4 個 `general-purpose` subagent 並行返回 4 份結構化 finding／bias_check／must_investigate；(2) 產出 `agency-os/reports/strategy-review/2026-05-08-adopt-hermes-agent.md`；(3) `INDEX.md` 自動補一行；(4) 確認 4 份報告**真的不同**（沒有 context contamination — 例：相同 finding 用相同 framing 出現在 2+ 份 = 失敗，要回頭調 mode 檔案）。**背景：**`.claude/skills/strategy-review/SKILL.md`、`.claude/skills/strategy-review/README.md` §Testing the skill；範本 `templates/decision-record.md`。
 - [ ] **Always-On Command Plane Phase 2** —— **【未開始】** Phase 1 已 production live（`@awarewave_ops_bot` 5 個 low-risk 指令 + 8/8 smoke + 端到端驗收，2026-05-07）。Phase 2 解鎖「手機可執行任務」，是 vs Slack 的真正差異點。**owner doc**：`agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md` §13；**ops manual**：`ALWAYS_ON_COMMAND_PLANE_OPERATIONS.md`。
   - **2a — Kill switch 從手機控** —— **【已完成 2026-05-08】** ✅ commit `a329335`（feat）+ `e20386e`（smoke 動態 count）。已 deploy 到 SG `lobster-next-admin`（Up healthy），smoke **9/9 PASSED** 含 `emergency_stop_via_telegram - cmd=completed mode=emergency_stop`。Telegram setMyCommands 已含 8 個指令。**驗收路徑**：手機 `/emergency_stop` → `system_modes.mode='emergency_stop'` ✅；後續 `/status` → `blocked_by_killswitch` ✅；SQL editor 改 mode='normal' 後恢復 ✅。`/normal_mode` 從 Telegram 永遠擋 ✅。
@@ -87,6 +98,15 @@
   - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
 - [ ] （工具建置）Phase 1 建議順序（P1 -> P7） —— **【進行中】** **進度：****P1～P5、P2（n8n staging）** 已結案 → **`已完成歷程` §2026-05-01**。**仍開放：**以 **`Next.js 控制台 v1`** 與 **Enterprise 串接證據鏈** 作為本條總賬收口（不綁特定身分供應商）。本條結案時須同時滿足兩者 DoD。
   - 追溯總表：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（每一工具任務對回規格 + DoD + 證據欄位）
+- [ ] **（下次 AO-RESUME 提醒）AwareWave 自動告警維修系統 v3.2 — 計畫書執行** —— **【未開始】** **計畫書 owner doc**：`docs/awarewave-auto-repair-plan-v3.2-final.md`（v3.2 Final 2026-05-08，33 KB）。**目標**：Sentry／Uptime Kuma／Netdata 偵測到問題 → Slack 推播 → 你按 2 下（Approve + Merge）+ 1 個 `/sg-deploy` 即修復。**3 種告警差別處理**：Sentry→自動修；Kuma→AI 只分析；Netdata→AI 只寫 issue 不修。**4 層保護**：CI 綠勾／中文摘要／部署後 health-check 自動 rollback／Sentry 持續監控。
+  - **Phase 1（你做，30 分鐘）**：建 3 個 Slack 頻道（`#alerts-critical`／`#alerts-info`／`#github-prs`）+ 推播偏好；建 Slack App（拿 Bot Token / Signing Secret / Webhook URL）；GitHub repo 設 4 個 Secrets（`ANTHROPIC_API_KEY`／`SLACK_WEBHOOK_URL`／`SLACK_BOT_TOKEN`／`SLACK_SIGNING_SECRET`）；啟用 main branch protection。
+  - **Phase 2（Claude Code 做，2-3 小時）**：擴充 `app/api/webhooks/sentry/route.ts`（fingerprint dedup + Slack Block Kit）；新增 `webhooks/uptime-kuma`／`webhooks/netdata` route；新增 `app/api/internal/commands/slack/route.ts`（Approve → 備份 → GitHub Issue）；新增 `.github/workflows/auto-repair-claude.yml` + `auto-repair-pr-notify.yml`；補強 `sg-deploy.sh` health-check + Slack 通知；CLAUDE.md 追加自動維修紅線。
+  - **Phase 3（驗收 1 小時）**：22 步端到端（Sentry test error → Slack → Approve → 備份 → Issue → Claude PR → CI → Merge → `/sg-deploy` → health-check → Slack 完成）+ Phase 3-B（rollback drill）+ Phase 3-C（備份失敗阻擋驗收）。
+  - **Phase 4（觀察期 30 天）**：每週日 5 分鐘巡檢（重複修同一 bug？`needs-human-review` PR？BACKUP_RESTORE_PROOF 最新一筆超過 7 天？）；每月初 10 分鐘指標複盤。
+  - **Phase 5（多客戶擴展 + Dashboard）**：Phase 4 完成後啟動，計畫書第十五節有完整任務清單。
+  - **不衝突宣告**：計畫書 §二明列「不可更動」既有架構（lobster-* 容器、GitHub Actions 4 個 workflow、CLAUDE.md、`system-health-check`、`rollback-phase1.sh`、`backup-eu-stack.sh`、Sentry／Kuma／Netdata、`sg-deploy.sh`、ops console）；不採用 Telegram／n8n Slack 中間層／自動 deploy on merge（多人工關卡更安全）。Telegram Phase 1+2 仍保留（與本計畫並行不互斥）。
+  - **DoD（總）**：(1) Phase 1+2+3 全綠（22 步端到端 PASS）；(2) `BACKUP_RESTORE_PROOF` 含一筆 auto-repair 觸發的 backup ID；(3) Phase 4 第一週巡檢報告；(4) WORKLOG 留 `AUTO_TASK_DONE` evidence。
+  - **下一步建議**：先讀計畫書全文（`Read d:/Work/docs/awarewave-auto-repair-plan-v3.2-final.md`），確認 Phase 1 的 Slack 頻道命名 + Bot 名稱，再開工。
 ## Next — 已完成歷程（查詢用）
 
 ### 2026-05-07 — Next.js 控制台 v1（P7）DoD 結案
