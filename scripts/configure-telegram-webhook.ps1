@@ -88,7 +88,9 @@ $commands = @(
   @{ command = 'list_failed_runs' ; description = 'Recent failed command_requests + workflow_runs' },
   @{ command = 'emergency_stop'   ; description = 'Lock all commands (unlock via SQL/ops console only)' },
   @{ command = 'maintenance_mode' ; description = 'Block non-low commands (e.g. during ops work)' },
-  @{ command = 'read_only_mode'   ; description = 'Allow only low-risk read commands' }
+  @{ command = 'read_only_mode'   ; description = 'Allow only low-risk read commands' },
+  @{ command = 'trigger_staging_workflow' ; description = 'Kick off allowlisted Trigger.dev task (e.g. ao-infrastructure-check)' },
+  @{ command = 'replay_dead_letter'       ; description = 'Diagnostic lookup of error_event by uuid' }
 )
 $cmdResp = Invoke-RestMethod -Method POST `
   -Uri "https://api.telegram.org/bot$token/setMyCommands" `

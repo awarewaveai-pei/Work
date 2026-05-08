@@ -227,9 +227,34 @@ try {
   } catch {}
 }
 
+# --- Check 10: /trigger_staging_workflow with bad task -> error path -------
+# We do NOT trigger an allowlisted task in smoke (would consume real Trigger.dev
+# resources). Instead we send an unknown task name and verify the handler
+# returns gracefully (status='completed' with error in result, not crash).
+try {
+  $uid8 = 997000 + (Get-Random -Minimum 1 -Maximum 9999)
+  Send-TelegramUpdate -UpdateId $uid8 -Text '/trigger_staging_workflow no-such-task' | Out-Null
+  $rows = Get-Request-By-Source-Event -SourceEventId $uid8
+  $st = ($rows | Select-Object -First 1).status
+  Add-Check -Name 'trigger_workflow_allowlist' -Pass ($st -eq 'completed') -Detail "status=$st"
+} catch {
+  Add-Check -Name 'trigger_workflow_allowlist' -Pass $false -Detail $_.Exception.Message
+}
+
+# --- Check 11: /replay_dead_letter with invalid uuid -> error path ---------
+try {
+  $uid9 = 998000 + (Get-Random -Minimum 1 -Maximum 9999)
+  Send-TelegramUpdate -UpdateId $uid9 -Text '/replay_dead_letter not-a-uuid' | Out-Null
+  $rows = Get-Request-By-Source-Event -SourceEventId $uid9
+  $st = ($rows | Select-Object -First 1).status
+  Add-Check -Name 'replay_dead_letter_validation' -Pass ($st -eq 'completed') -Detail "status=$st"
+} catch {
+  Add-Check -Name 'replay_dead_letter_validation' -Pass $false -Detail $_.Exception.Message
+}
+
 # --- Cleanup: drop smoke rows -----------------------------------------------
 try {
-  $smokeIds = @(990000..996999) -join ','
+  $smokeIds = @(990000..998999) -join ','
   Invoke-Supabase -Method DELETE -Path "command_requests?source=eq.telegram&source_event_id=in.($smokeIds)" | Out-Null
 } catch {}
 

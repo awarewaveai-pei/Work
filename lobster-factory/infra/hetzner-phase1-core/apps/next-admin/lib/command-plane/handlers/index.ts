@@ -9,6 +9,8 @@ import { dailyReviewHandler } from "./dailyReview";
 import { weeklyReviewHandler } from "./weeklyReview";
 import { listFailedRunsHandler } from "./listFailedRuns";
 import { setSystemModeHandler } from "./systemModeControl";
+import { triggerWorkflowHandler } from "./triggerWorkflow";
+import { replayDeadLetterHandler } from "./replayDeadLetter";
 
 export const phase1Handlers: Record<string, CommandHandler> = {
   "/start": startHandler,
@@ -22,4 +24,7 @@ export const phase1Handlers: Record<string, CommandHandler> = {
   "/emergency_stop":   setSystemModeHandler("emergency_stop"),
   "/maintenance_mode": setSystemModeHandler("maintenance"),
   "/read_only_mode":   setSystemModeHandler("read_only"),
+  // Phase 2b — Trigger.dev medium-risk dispatch (workflow kick-off + DLQ diag).
+  "/trigger_staging_workflow": triggerWorkflowHandler,
+  "/replay_dead_letter":       replayDeadLetterHandler,
 };
