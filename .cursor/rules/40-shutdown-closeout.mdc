@@ -36,7 +36,7 @@ When the user indicates end of day or shutdown intent (examples: `AO-CLOSE`,
      7. **`system-guard -Mode manual`**（內含 doc-sync + health + guard + `LAST_SYSTEM_STATUS.md`）
      8. **`generate-integrated-status-report`** → `reports/status/integrated-status-LATEST.md`
      9. 預設 health **100%**（`-AllowNonPerfectHealth` 僅明示核准）
-     10. **`apply-closeout-task-checkmarks`**（`-SkipAutoTaskCheckmarks` 略過；讀 **WORKLOG `AUTO_TASK_DONE`** ± **pending 檔**）
+     10. **`apply-closeout-task-checkmarks`**（`-SkipAutoTaskCheckmarks` 略過；讀 **WORKLOG `AUTO_TASK_DONE`** ± **pending 檔**）— **預設寬容**：unmatched needle（ad-hoc／未列入 TASKS 的工作）只發 **warn** 不擋 close；多重命中仍 fatal（語意歧義）；若需舊嚴格行為加 **`-StrictUnmatched`**
      11. （未 `-SkipPush`）**`git add -A`** → **`verify-closeout-completeness.ps1`**（預設 **`-CompletenessGate strict`**；可 **`-SkipCompletenessGate`**）→ 有變更則 **`commit`** → **`git push origin <branch>`**
    - Execute from a folder that is the git repository root (or contains `agency-os/`).
 3. Confirm：`verify-build-gates` 與 guard 路徑皆 **PASS**，且 push 成功（或依使用者要求正確使用 `-SkipPush`）。

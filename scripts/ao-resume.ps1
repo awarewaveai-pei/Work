@@ -173,6 +173,13 @@ if ($FullMainlineParity) {
             Write-Error "ao-resume: missing $alignScript (required for -FullMainlineParity)."
             exit 1
         }
+        # Stat-cache refresh: clear false-dirty entries (CRLF/mode noise that produces "M" with empty diff).
+        # Without this, git-align rejects a working tree that is materially clean. Cheap, idempotent, no side effects.
+        Push-Location $WorkRoot
+        try {
+            & git update-index --really-refresh 2>&1 | Out-Null
+        } finally { Pop-Location }
+
         Write-Host "== AO-RESUME: FullMainlineParity (git align via git-align-main-aoresume-feature.ps1 -SkipAoResume) ==" -ForegroundColor Cyan
         $alignArgs = @(
             "-NoProfile",

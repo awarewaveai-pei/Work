@@ -200,6 +200,31 @@ try {
     exit 0
 }
 catch {
+    # Observability: write the exception to a fail log so silent failures are diagnosable.
+    # Best-effort — we still always return continue=true so chat is never blocked by the hook.
+    try {
+        $failRoot = $null
+        try {
+            if ($obj -and $obj.PSObject.Properties.Name -contains "workspace_roots" -and $obj.workspace_roots) {
+                foreach ($w in @($obj.workspace_roots)) {
+                    if ($w -and (Test-Path -LiteralPath (Join-Path $w "agency-os"))) { $failRoot = $w; break }
+                }
+            }
+        } catch { }
+        if (-not $failRoot) { try { $failRoot = (Get-Location).Path } catch { } }
+        if ($failRoot) {
+            $failDir = Join-Path $failRoot "agency-os\.agency-state"
+            if (-not (Test-Path -LiteralPath $failDir)) {
+                try { New-Item -ItemType Directory -Path $failDir -Force | Out-Null } catch { }
+            }
+            $failLog = Join-Path $failDir "ao-resume-hook-fail.log"
+            $now = (Get-Date).ToUniversalTime().ToString("o")
+            $msg = if ($_ -and $_.Exception) { $_.Exception.Message } else { "<no exception object>" }
+            $stack = if ($_ -and $_.ScriptStackTrace) { $_.ScriptStackTrace } else { "" }
+            $payload = "[$now] HOOK EXCEPTION`r`nMessage: $msg`r`nStack:`r`n$stack`r`n---`r`n"
+            try { Add-Content -LiteralPath $failLog -Value $payload -Encoding UTF8 } catch { }
+        }
+    } catch { }
     try {
         Write-HookResponse '{"continue":true}'
     }

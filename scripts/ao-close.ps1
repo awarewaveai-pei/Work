@@ -439,7 +439,21 @@ try {
             }
         }
         if (-not $CommitMessage -and -not $resolvedMsgFile) {
-            $CommitMessage = "[cursor] chore: AO-CLOSE sync " + (Get-Date -Format "yyyy-MM-dd HHmm")
+            # Commit prefix per CLAUDE.md "Commit Prefix（強制）". Detect actor from env signals.
+            # Default [claude] (per CLAUDE.md "全面切換至 Claude Code 後，預設使用 [claude]").
+            # Override via env AO_CLOSE_COMMIT_PREFIX or by passing -CommitMessage / -CommitMessageFile.
+            $autoPrefix = "[claude]"
+            $envPrefix = $env:AO_CLOSE_COMMIT_PREFIX
+            if (-not [string]::IsNullOrWhiteSpace($envPrefix)) {
+                $autoPrefix = $envPrefix.Trim()
+            } elseif ($env:CLAUDECODE -eq "1" -or ($env:AI_AGENT -and $env:AI_AGENT.StartsWith("claude-code"))) {
+                $autoPrefix = "[claude]"
+            } elseif ($env:CURSOR_TRACE_ID -or $env:CURSOR_LAYOUT) {
+                # Cursor signals present without Claude Code → assume Cursor agent context.
+                # NOTE: Claude Code running inside Cursor's IDE shell sets BOTH; CLAUDECODE check above wins.
+                $autoPrefix = "[cursor]"
+            }
+            $CommitMessage = "$autoPrefix chore: AO-CLOSE sync " + (Get-Date -Format "yyyy-MM-dd HHmm")
         }
         if ($resolvedMsgFile) {
             git commit -F $resolvedMsgFile

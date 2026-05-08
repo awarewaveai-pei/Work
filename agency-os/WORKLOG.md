@@ -166,6 +166,23 @@
 - **Docs**：`DEPLOY_ROLLBACK_RUNBOOK.md` §2.4 增「自動 drift 告警（cron + Slack）」、§2.5 增「已知行為與 bug 修正紀錄」、§2.6 維持「為什麼有兩個目錄」（從原 §2.4 升序）。維持單一主人，不另建 doc。
 - AUTO_TASK_DONE: SG drift 自動告警上線（cron + Slack）+ /sg-deploy /check-drift slash + sg-deploy.sh race 修正
 
+### AO-CLOSE/AO-RESUME 流程硬化 + Hook 觀測性修補（6 風險點同批）
+
+- **背景**：今早 AO-CLOSE 跑了 4 次 retry 才走完，暴露 ao-close / ao-resume / hook 三層的小毛病；`AO-RESUME` 五段式回報後 user 授權一次處理。
+- **Risk 1 — `ao-resume.ps1` stat cache 假髒擋 git-align**：working tree 對 git 是乾淨的但 stat cache 顯示 `M`（CRLF/mode 噪音），`git-align-main-aoresume-feature.ps1` 拒做。修：在呼叫 align 前加 `git update-index --really-refresh`（idempotent，無副作用）。
+- **Risk 2 — `apply-closeout-task-checkmarks.ps1` 對 ad-hoc 任務太嚴**：早段 `AUTO_TASK_DONE: Trigger.dev workflows 補強...`（其它 session 留下，TASKS 無對應條目）整輪 close fail。修：預設改 unmatched needle → `Write-Warning + 繼續`；多重命中（語意歧義）仍 fatal；新增 `-StrictUnmatched` flag 保留舊嚴格行為。
+- **Risk 3 — `ao-close.ps1` commit prefix 違反 CLAUDE.md**：硬寫 `[cursor]`。修：以 env 判斷自動 prefix — `CLAUDECODE=1` 或 `AI_AGENT^=claude-code` → `[claude]`；只有 Cursor signals → `[cursor]`；可由 env `AO_CLOSE_COMMIT_PREFIX` override；fallback `[claude]`。
+- **Risk 4 — SG drift cron 首次 firing 待驗**：`agency-os/TASKS.md` 加一條 open item，含完整驗證步驟（SSH → `tail /var/log/sg-deploy-drift.log`）+ 結案條件 + 失敗處理；明早 09:00 TPE 後 AO-RESUME 自然列出。
+- **Risk 5 — 桌面 `AWARE_WAVE_CREDENTIALS.md` §24 EU/SG 描述錯誤**：§24 改寫為 Step 1（EU migration）/ Step 2（SG `sg-deploy.sh` 標準路徑），footer 加修正紀錄；memory `reference_aware_wave_credentials.md` 同步更新「FIXED」狀態。
+- **Risk 6 — tenant 任務阻外部登入**：已在 TASKS 列為「進行中／阻 操作者登入」，無動作。
+- **Hook silent fail 診斷 + 觀測性修補**：發現 SSOT `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` line 202-208 的外層 `catch { try { Write-HookResponse '{"continue":true}' } catch {} exit 0 }` 吞所有 exception、零 log，使用者打 AO-RESUME 即使 hook 內部炸了也只會看到 chat 正常進行、`ao-resume-hook-last.json` 永不產出。修：catch 改成「best-effort 寫 `agency-os/.agency-state/ao-resume-hook-fail.log`（含 ISO timestamp + Exception.Message + ScriptStackTrace），仍回 `continue:true` 不擋 chat」；`scripts/sync-claude-userlevel.ps1 -Mode merge` PASS 同步 `~/.claude/hooks/`。
+- **規則同步**：`.cursor/rules/30-resume-keyword.mdc` 加「Hook silent fail 診斷」一條；`.cursor/rules/40-shutdown-closeout.mdc` line 39 加「預設寬容」+「`-StrictUnmatched`」註記。
+- **驗證**：`verify-build-gates` ALL PASSED；`system-health-check` 100% (361/361)。
+- **修改檔（in git）**：`scripts/ao-resume.ps1` / `scripts/ao-close.ps1` / `scripts/apply-closeout-task-checkmarks.ps1` / `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` / `agency-os/TASKS.md` / `.cursor/rules/30-resume-keyword.mdc` / `.cursor/rules/40-shutdown-closeout.mdc`。
+- **不在 git**：桌面 CREDENTIALS.md §24、user-level memory entry。
+- **順手清理**：`.tmp-check-tg.ps1`（早些 session 殘留）unstage + 刪。
+- AUTO_TASK_DONE: AO-CLOSE/AO-RESUME 6 風險點硬化 + hook fail-log 觀測性 + cursor rules 同步
+
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:14943f18e8160246d1f98a522a83de76378d5d7f52918d9db68a0fee23f5238e -->

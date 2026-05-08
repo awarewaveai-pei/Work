@@ -1,7 +1,8 @@
 param(
     [string]$WorkRoot = "",
     [switch]$PendingFileOnly,
-    [switch]$WorklogMarkersOnly
+    [switch]$WorklogMarkersOnly,
+    [switch]$StrictUnmatched
 )
 
 # Applies - [ ] -> - [x] in agency-os/TASKS.md from:
@@ -9,8 +10,12 @@ param(
 #       "- AUTO_TASK_DONE: <unique substring matching one open task>"
 #   (2) Optional agency-os/.agency-state/pending-task-completions.txt (same as legacy; gitignored)
 # -PendingFileOnly / -WorklogMarkersOnly: narrow sources (for tests / manual recovery).
+# -StrictUnmatched: fail when an AUTO_TASK_DONE substring matches no OPEN or DONE task. Default
+#   is lenient (WARN + continue) so ad-hoc work (incident response, hot-fix) that was never
+#   pre-listed in TASKS does not block AO-CLOSE. Multi-match on OPEN items is still always fatal
+#   (it's ambiguous, not unmatched).
 # Idempotent: substring already satisfied by a checked [x] line → skip TASKS change, still clear WORKLOG marker.
-# All-or-nothing for ambiguous UNKNOWN needles (typo / multi-match on OPEN items).
+# Multi-match on OPEN: always fatal regardless of -StrictUnmatched (ambiguous needle).
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -129,8 +134,11 @@ foreach ($needle in $needlesOrdered) {
         Write-Host ("apply-closeout-task-checkmarks: already [x], skip: {0}" -f $(if ($needle.Length -le 72) { $needle } else { $needle.Substring(0, 72) + "..." })) -ForegroundColor DarkGray
         continue
     }
-    Write-Error ("apply-closeout-task-checkmarks: no OPEN or DONE task contains substring: {0}" -f $needle)
-    exit 1
+    if ($StrictUnmatched) {
+        Write-Error ("apply-closeout-task-checkmarks: no OPEN or DONE task contains substring: {0}" -f $needle)
+        exit 1
+    }
+    Write-Warning ("apply-closeout-task-checkmarks: no OPEN or DONE task matches AUTO_TASK_DONE substring (likely ad-hoc work not pre-listed in TASKS): {0}" -f $needle)
 }
 
 $idxDup = $planned | Group-Object Index | Where-Object { $_.Count -gt 1 }
