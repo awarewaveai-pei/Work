@@ -1,7 +1,7 @@
 // /ops/system-modes — view + change global system_modes (kill switch).
 // Phase 2c (2026-05-08).
 import { headers } from "next/headers";
-import { getSupabaseReadClient } from "@/lib/supabase-server";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canChangeSystemMode, readOpsRole } from "@/lib/ops-role";
 import { SystemModeControl } from "./SystemModeControl";
 
@@ -22,12 +22,12 @@ export default async function SystemModesPage() {
   const role = readOpsRole(new Request("http://localhost", { headers: await headers() }));
   const canAct = canChangeSystemMode(role);
 
-  const supabase = getSupabaseReadClient();
+  const supabase = getSupabaseServerClient();
   let current: ModeRow | null = null;
   let dbError: string | null = null;
 
   if (!supabase) {
-    dbError = "Supabase read client not configured.";
+    dbError = "Supabase client not configured.";
   } else {
     const { data, error } = await supabase
       .from("system_modes")

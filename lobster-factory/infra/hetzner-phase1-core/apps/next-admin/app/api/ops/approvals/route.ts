@@ -7,14 +7,16 @@
 // (any role including viewer) can SEE pending approvals; only owner/admin can act.
 
 import { NextResponse } from "next/server";
-import { getSupabaseReadClient } from "../../../../lib/supabase-server";
+import { getSupabaseServerClient } from "../../../../lib/supabase-server";
 import { resolveOpsRole } from "../../../../lib/ops-role";
 
+// Use server client (service role) because command_requests has RLS enabled and
+// the anon role cannot read it. RBAC is enforced at API/page layer above this.
 export async function GET(request: Request) {
-  const supabase = getSupabaseReadClient();
+  const supabase = getSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json(
-      { ok: false, error: "supabase_read_not_configured" },
+      { ok: false, error: "supabase_not_configured" },
       { status: 503 },
     );
   }

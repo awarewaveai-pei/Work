@@ -7,15 +7,17 @@
 
 import { NextResponse } from "next/server";
 import { canChangeSystemMode, resolveOpsRole } from "../../../../lib/ops-role";
-import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
+import { getSupabaseServerClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
 
 const VALID_MODES = ["normal", "maintenance", "read_only", "emergency_stop"] as const;
 type Mode = (typeof VALID_MODES)[number];
 
+// GET uses server client (service role) because system_modes has RLS enabled.
+// RBAC is not required for read (operators with read access can view current mode).
 export async function GET(request: Request) {
-  const supabase = getSupabaseReadClient();
+  const supabase = getSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.json({ ok: false, error: "supabase_read_not_configured" }, { status: 503 });
+    return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
   }
 
   const { data, error } = await supabase

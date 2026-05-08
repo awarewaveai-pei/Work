@@ -2,7 +2,7 @@
 // Phase 2c (2026-05-08).
 import { headers } from "next/headers";
 import Link from "next/link";
-import { getSupabaseReadClient } from "@/lib/supabase-server";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canApproveCommand, readOpsRole } from "@/lib/ops-role";
 import { ApprovalList } from "./ApprovalList";
 
@@ -27,12 +27,12 @@ export default async function ApprovalsPage() {
   const role = readOpsRole(new Request("http://localhost", { headers: await headers() }));
   const canAct = canApproveCommand(role);
 
-  const supabase = getSupabaseReadClient();
+  const supabase = getSupabaseServerClient();
   let pending: CommandRequestRow[] = [];
   let dbError: string | null = null;
 
   if (!supabase) {
-    dbError = "Supabase read client not configured.";
+    dbError = "Supabase client not configured.";
   } else {
     const { data, error } = await supabase
       .from("command_requests")
