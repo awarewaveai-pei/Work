@@ -5,7 +5,7 @@
 ## 2026-05-09
 
 ### Daily
-- (TBD)
+- `/team-onboarding` skill 生成 `ONBOARDING.md`（work type breakdown + MCP server checklist + skills list），user 補寫 7 條 Team Tips + 6 步 Get Started，發布至 https://claude.ai/claude-code/onboard/O3clJrMsjeQ5（short_code: O3clJrMsjeQ5）。
 
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
@@ -1878,7 +1878,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-08 17:01:47 UTC_
+_Last synced: 2026-05-08 17:10:53 UTC_
 
 ## 2026-03-20
 
@@ -2312,4 +2312,5 @@ _Last synced: 2026-05-08 17:01:47 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 

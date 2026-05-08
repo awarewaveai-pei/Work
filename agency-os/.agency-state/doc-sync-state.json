@@ -1,28 +1,19 @@
 ﻿{
-    "last_run_utc":  "2026-05-08T17:01:47.9773189Z",
+    "last_run_utc":  "2026-05-08T17:10:54.4627909Z",
     "changed_files":  [
-                          "docs/operations/ALWAYS_ON_COMMAND_PLANE_OPERATIONS.md",
-                          "docs/operations/AUTO_REPAIR_SYSTEM_V2_LIGHT.md",
-                          "docs/operations/TELEGRAM_COMMAND_POLICY.md",
-                          "docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md",
+                          "docs/overview/PROGRAM_TIMELINE.md",
                           "memory/CONVERSATION_MEMORY.md",
                           "memory/daily/2026-05-09.md",
-                          "TASKS.md",
                           "WORKLOG.md"
                       ],
     "impacted_files":  [
-                           "docs/operations/ALWAYS_ON_COMMAND_PLANE_OPERATIONS.md",
-                           "docs/operations/AUTO_REPAIR_SYSTEM_V2_LIGHT.md",
-                           "docs/operations/TELEGRAM_COMMAND_POLICY.md",
-                           "docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md",
+                           "docs/overview/PROGRAM_TIMELINE.md",
                            "memory/CONVERSATION_MEMORY.md",
                            "memory/daily/2026-05-09.md",
-                           "TASKS.md",
                            "WORKLOG.md"
                        ],
     "auto_updated_files":  [
                                "memory/CONVERSATION_MEMORY.md",
-                               "TASKS.md",
                                "WORKLOG.md"
                            ]
 }
