@@ -100,7 +100,10 @@ $wpPath    = $config.wpPath.TrimEnd('/')
 
 function Invoke-SSH {
   param([string]$Cmd, [switch]$PassThru)
-  $out = & ssh -i $sshKey -p $sshPort -o StrictHostKeyChecking=no -o BatchMode=yes `
+  # LogLevel=QUIET suppresses benign SSH warnings (e.g. post-quantum key exchange advisory)
+  # that would be caught as NativeCommandError with $ErrorActionPreference=Stop
+  $out = & ssh -i $sshKey -p $sshPort `
+               -o StrictHostKeyChecking=no -o BatchMode=yes -o LogLevel=QUIET `
                $sshTarget $Cmd 2>&1
   if ($PassThru) { return $out }
   $out | Write-Verbose
@@ -109,13 +112,13 @@ function Invoke-SSH {
 
 function Copy-FromServer {
   param([string]$Remote, [string]$Local)
-  & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no `
+  & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no -o LogLevel=QUIET `
         "${sshTarget}:${Remote}" $Local 2>&1 | Write-Verbose
 }
 
 function Copy-ToServer {
   param([string]$Local, [string]$Remote)
-  & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no `
+  & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no -o LogLevel=QUIET `
         $Local "${sshTarget}:${Remote}" 2>&1 | Write-Verbose
 }
 
@@ -167,15 +170,39 @@ if (-not $preHealth.ok) {
 # ── [2/5] Resolve available updates ───────────────────────────────────────────
 Write-Host "`n[2/5] Fetching available updates..."
 
+function Parse-WpCliJson {
+  param([object]$RawOutput)
+  # RawOutput may be a string or a string[] (one element per SSH output line).
+  # Join into one string, then extract the JSON array portion (handles WP-CLI
+  # notices/warnings that may appear before the JSON on stdout).
+  $joined = ($RawOutput | Out-String).Trim()
+  # Find the JSON array: everything from first '[' to last ']'
+  $start = $joined.IndexOf('[')
+  $end   = $joined.LastIndexOf(']')
+  if ($start -lt 0 -or $end -lt $start) {
+    Write-Verbose "WP-CLI raw output: $joined"
+    return @()
+  }
+  $jsonStr = $joined.Substring($start, $end - $start + 1)
+  try {
+    return @($jsonStr | ConvertFrom-Json)
+  } catch {
+    Write-Warning "JSON parse failed. Raw: $joined"
+    return @()
+  }
+}
+
 if ($pluginGroup -ne 'theme') {
-  $availJson = Invoke-SSH "wp --path='$wpPath' plugin list --update=available --format=json --allow-root 2>/dev/null" -PassThru
-  $available = @($availJson | ConvertFrom-Json)
-  if ($targetSlugs.Count -gt 0) {
-    $available = @($available | Where-Object { $_.name -in $targetSlugs })
+  $availRaw  = Invoke-SSH "wp --path='$wpPath' plugin list --update=available --format=json --allow-root 2>/dev/null" -PassThru
+  $available = Parse-WpCliJson $availRaw
+  if ($null -eq $available) { $available = @() }
+  if ([array]$targetSlugs | Measure-Object | Select-Object -ExpandProperty Count) {
+    $available = @($available | Where-Object { $targetSlugs -contains $_.name })
   }
 } else {
-  $availJson = Invoke-SSH "wp --path='$wpPath' theme list --update=available --format=json --allow-root 2>/dev/null" -PassThru
-  $available = @($availJson | ConvertFrom-Json)
+  $availRaw  = Invoke-SSH "wp --path='$wpPath' theme list --update=available --format=json --allow-root 2>/dev/null" -PassThru
+  $available = Parse-WpCliJson $availRaw
+  if ($null -eq $available) { $available = @() }
 }
 
 if ($pluginGroup -eq 'list') {
@@ -273,7 +300,7 @@ $rollback = $false
 
 if ($batchMode) {
   # Batch update (wave3 / all)
-  $slugArgs = if ($targetSlugs.Count -gt 0) { $targetSlugs -join ' ' } else { '--all' }
+  $slugArgs = if (@($targetSlugs).Count -gt 0) { $targetSlugs -join ' ' } else { '--all' }
   $out = Invoke-SSH "wp --path='$wpPath' plugin update $slugArgs --allow-root 2>&1" -PassThru
   Write-Host $out
   $health = Test-SiteHealth -Url $config.siteUrl
@@ -295,13 +322,22 @@ if ($batchMode) {
   foreach ($plugin in $available) {
     Write-Host "  Updating $($plugin.name): $($plugin.version) → $($plugin.update_version)"
     $out = Invoke-SSH "wp --path='$wpPath' plugin update $($plugin.name) --allow-root 2>&1" -PassThru
-    Write-Host "    $($out -join '; ')"
+    $outStr = $out -join '; '
+    Write-Host "    $outStr"
+
+    # Detect WP-CLI outcome: distinguish actual update from license-blocked skip
+    $wpcliUpdated = $outStr -match 'Plugin updated successfully\.|Updated \d+ of \d+ plugins'
+    $wpcliLicBlocked = $outStr -match 'Failed to update plugin.*license|Payment Required|Download failed'
+    $updateStatus = if ($wpcliUpdated)    { 'updated' }
+                    elseif ($wpcliLicBlocked) { 'skipped_license' }
+                    else                  { 'updated' }   # fallback: health check is the real gate
 
     $health = Test-SiteHealth -Url $config.siteUrl
     if ($health.ok) {
-      Write-Host "    [OK] Health: $($health.detail)"
+      $icon = if ($wpcliLicBlocked) { '[SKIP]' } else { '[OK]' }
+      Write-Host "    $icon Health: $($health.detail)$(if ($wpcliLicBlocked) { ' — license-gated; update via WP admin' })"
       $results.Add([pscustomobject]@{
-        plugin = $plugin.name; from = $plugin.version; to = $plugin.update_version; status = 'success'
+        plugin = $plugin.name; from = $plugin.version; to = $plugin.update_version; status = $updateStatus
       })
     } else {
       Write-Host "    [FAIL] Health: $($health.detail)"
@@ -322,18 +358,23 @@ Write-Host "`n[5/5] Writing report..."
 $reportsDir = if ($ReportPath) { Split-Path $ReportPath -Parent } else { $DefaultReportsDir }
 if (-not (Test-Path $reportsDir)) { New-Item -ItemType Directory -Path $reportsDir -Force | Out-Null }
 
-$finalHealth = Test-SiteHealth -Url $config.siteUrl
+$finalHealth    = Test-SiteHealth -Url $config.siteUrl
+# @() wrapper prevents $null.Count PropertyNotFoundException in StrictMode when Where-Object returns no matches
+$failedItems    = @($results | Where-Object { $_.status -eq 'failed' })
+$updatedItems   = @($results | Where-Object { $_.status -eq 'updated' })
+$skippedItems   = @($results | Where-Object { $_.status -eq 'skipped_license' })
 $report = [pscustomobject]@{
-  ok              = ($results | Where-Object { $_.status -eq 'failed' }).Count -eq 0 -and -not $rollback
-  client          = $ClientSlug
-  ran_at          = (Get-Date).ToString('o')
-  plugins_group   = $Plugins
-  backup_path     = $backupLocal
-  updated_count   = ($results | Where-Object { $_.status -eq 'success' }).Count
-  failed_count    = ($results | Where-Object { $_.status -eq 'failed' }).Count
-  rollback        = $rollback
-  health_final    = $finalHealth.detail
-  results         = $results
+  ok                    = ($failedItems.Count -eq 0) -and (-not $rollback)
+  client                = $ClientSlug
+  ran_at                = (Get-Date).ToString('o')
+  plugins_group         = $Plugins
+  backup_path           = $backupLocal
+  updated_count         = $updatedItems.Count
+  skipped_license_count = $skippedItems.Count
+  failed_count          = $failedItems.Count
+  rollback              = $rollback
+  health_final          = $finalHealth.detail
+  results               = $results
 }
 
 $suffix    = "${ClientSlug}-${pluginGroup}-${timestamp}"
@@ -344,12 +385,17 @@ $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $latestFile -Encodi
 
 Write-Host "Report  : $rptFile"
 Write-Host "`n=== SUMMARY ==="
-Write-Host ("Updated : {0}   Failed: {1}   Rollback: {2}" -f $report.updated_count, $report.failed_count, $rollback)
+Write-Host ("Updated : {0}   Skipped(license): {1}   Failed: {2}   Rollback: {3}" -f `
+  $report.updated_count, $report.skipped_license_count, $report.failed_count, $rollback)
 $results | ForEach-Object {
-  $icon = if ($_.status -eq 'success') { '[OK]' } else { '[FAIL]' }
+  $icon = switch ($_.status) { 'updated' { '[OK]' } 'skipped_license' { '[SKIP]' } default { '[FAIL]' } }
   Write-Host ("  {0} {1,-40} {2} → {3}" -f $icon, $_.plugin, $_.from, $_.to)
 }
 Write-Host "Health  : $($finalHealth.detail)"
+if ($skippedItems.Count -gt 0) {
+  Write-Host "`nNOTE: $($skippedItems.Count) plugin(s) skipped (license required) — update via WP admin dashboard:" -ForegroundColor Yellow
+  $skippedItems | ForEach-Object { Write-Host "  - $($_.plugin)" -ForegroundColor Yellow }
+}
 if ($report.ok) {
   Write-Host "`nALL UPDATES SUCCESSFUL" -ForegroundColor Green
 } else {

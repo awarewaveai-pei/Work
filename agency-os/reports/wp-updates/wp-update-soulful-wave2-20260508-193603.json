@@ -1,0 +1,37 @@
+﻿{
+    "ok":  true,
+    "client":  "soulful",
+    "ran_at":  "2026-05-08T19:38:02.9853912+08:00",
+    "plugins_group":  "wave2",
+    "backup_path":  "D:\\Work\\agency-os\\tenants\\company-soulful-expression\\backups\\pre-update-soulful-wave2-20260508-193603.sql.gz",
+    "updated_count":  4,
+    "failed_count":  0,
+    "rollback":  false,
+    "health_final":  "HTTP 200 OK",
+    "results":  [
+                    {
+                        "plugin":  "fluentform",
+                        "from":  "6.1.20",
+                        "to":  "6.2.2",
+                        "status":  "success"
+                    },
+                    {
+                        "plugin":  "kadence-blocks-pro",
+                        "from":  "2.7.8",
+                        "to":  "2.8.14",
+                        "status":  "success"
+                    },
+                    {
+                        "plugin":  "litespeed-cache",
+                        "from":  "7.8.0.1",
+                        "to":  "7.8.1",
+                        "status":  "success"
+                    },
+                    {
+                        "plugin":  "permalink-manager-pro",
+                        "from":  "2.5.1.4",
+                        "to":  "2.5.3.3",
+                        "status":  "success"
+                    }
+                ]
+}

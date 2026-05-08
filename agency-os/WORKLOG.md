@@ -31,6 +31,22 @@
 - **AUTO_TASK_DONE**: Always-On Command Plane Phase 2a Kill switch 從手機控
 - **AUTO_TASK_DONE**: Always-On Command Plane Phase 2b Trigger.dev medium-risk dispatch
 
+### Soulful Expression 外掛更新系統上線 + 11/16 外掛成功更新
+
+- **架構決策**：採 Tier 1（SSH+WP-CLI）+ Tier 2（MainWP，≥3 客戶時啟動）雙層架構。備份優先 + 逐一健康檢查 + 自動 DB rollback 取代「先更新 staging」流程。
+- **新增交付物**：
+  - `scripts/update-client-wp-plugins.ps1`（~260 行，Tier 1 主腳本）
+  - `agency-os/tenants/company-soulful-expression/core/wp-update-config.json`（客戶設定，含 SSH + wave 分組）
+  - `agency-os/docs/operations/WP_MANAGED_UPDATES.md`（owner doc，含 MainWP Tier 2 升級路徑）
+  - `scripts/README.md`：新增「WordPress Management」分類
+- **Soulful Expression 更新結果**（2026-05-08，SSH → 191.101.230.176:65002）：
+  - ✅ **11 個外掛成功更新**：akismet 5.7、cartflows 3.0.1、code-snippets 3.9.6、hostinger 3.0.66、kadence-blocks 3.6.7、seo-by-rank-math 1.0.269、google-site-kit 1.178.0、fluentform 6.2.2、litespeed-cache 7.8.1、**ultimate-member 2.11.4**（高風險安全更新 ✅）、**woocommerce 10.7.0**（高風險安全更新 ✅）
+  - 🔑 **5 個授權鎖定（需 WP admin 操作）**：advanced-custom-fields-pro（ACF Pro 授權）、kadence-blocks-pro（Kadence 授權）、permalink-manager-pro（付費授權）、woocommerce-points-and-rewards（WooCommerce.com 訂閱）、astra-portfolio（Astra Pro 授權）
+  - **全程健康檢查**：每次更新後 `soulfulexpression.org` 回傳 HTTP 200 ✅，無回滾觸發。
+  - **備份**：wave3/wave2/wave1 各自在更新前建立 pre-update mysqldump，共 3 份，存於 `backups/` 目錄。
+- **腳本修正紀錄**：SSH LogLevel=QUIET（壓制量子金鑰警告）、WP-CLI JSON 解析改用 `Parse-WpCliJson`（多行 stdout 處理）、`.Count` StrictMode 修正（`@()` wrapper）、一次性更新結果辨識（`updated` vs `skipped_license` vs `failed`）。
+- **AUTO_TASK_DONE**: Soulful Expression 外掛更新基礎建設 + 安全更新 ultimate-member + woocommerce
+
 ### Soulful Expression Day 1 §1.3 DB 備份 + Day 2/3 準備文件
 
 - **DB dump via mysqldump SSH**：`wp db export` 在 Hostinger 共享主機報 `exec()` disabled，改用直接 `mysqldump -h 127.0.0.1 -u ... | gzip`，成功產出 15 MB `.sql.gz`。SHA256 `849db7848992308dd4dd0b7a88c19add60b9b737463a90ba19a93da9566264b1`，本機備份 `tenants/company-soulful-expression/backups/soulful_db_20260508_160734.sql.gz`（不入 git，`.gitignore` 已設定）。伺服器 temp 檔已清除。
