@@ -216,7 +216,7 @@ If all pass → onboarding complete. Log to `agency-os/WORKLOG.md`:
 
 ## Owner doc
 
-`agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md` §10 — Client Management
+`agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md` §10 — Client Management
 
 Related:
 - `agency-os/reports/sql-seeds/` — seed SQL templates
