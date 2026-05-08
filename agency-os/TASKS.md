@@ -65,7 +65,7 @@
   - 本項目標：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）
 - [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。**下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
   - 本項目標：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊）
-- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中】** **進度（2026-05-01）：**專案骨架（10_DISCOVERY、01–03 文件、sites/ 三檔）已建立。**阻塞（操作者必做）：**需登入 Hostinger + WP 後台執行 §1.1–1.2 並回填 `10_DISCOVERY.md`、`core/ENVIRONMENT_REGISTRY.md`（**代理無法代登入**第三方主機／WP）。
+- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中 2026-05-08】§1.2 機讀基線完成 ✅**（commit `b5cef4c`：WP 6.9.4 / PHP 8.2.30 / MariaDB 11.8.6 / Kadence 1.3.6 / 35 active plugins (16 有更新) / 2 admins / 138MB DB / 風險 Top 3；走 Hostinger SSH + wp-cli，先前「代理無法代登入」評估太保守）。**仍開放（操作者必做）**：§1.1 帳號層級權限確認（Hostinger panel / DNS panel / WP admin browser login，純 SSH 無法驗證 panel-level access）+ §1.3 BACKUP_RESTORE_PROOF 第一筆（建議 Day 2 staging 同步時測一次還原）。
   - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節
   - 產出：權限與基線盤點
 - [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架 + Discovery 骨架完成。**下一步：**與客戶確認素材與頂級網域，選定主機商 → 銜接 **`TASKS`**「Day 2 雲端 staging 實機驗收」。
