@@ -9,32 +9,44 @@
 |-------------|---------|
 | 備份整體怎麼運作？ | 本目錄 [`README.md`](./README.md) §備份 |
 | cron 幾點跑？腳本在哪？ | [`MAINTENANCE_CALENDAR.md`](./MAINTENANCE_CALENDAR.md) §每日 |
-| 上次 restore drill 結果？ | **本文件** §Restore Drill Record |
+| 上次 restore drill 結果？ | **本文件** §Restore Drill Record（SG）/ §EU Restore Drill（EU） |
 | RPO/RTO 是多少？ | [`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md) §1 + §4 |
 | Hetzner 自動備份有開嗎？ | 有。SG 18-22 UTC / EU 22-02 UTC（API 查證 2026-05-08） |
 | 堆疊全景中 Backup 在哪？ | `agency-os/docs/operations/hetzner-stack-rollout-index.md` #10 |
-| 怎麼裝異地備份？ | VPS: `bash scripts/setup-offsite-backup.sh <key> <secret> <bucket>` |
-| server rebuild 後怎麼恢復 cron？ | `bash scripts/install-maintenance-crons.sh --host sg` |
+| server rebuild 後怎麼恢復 cron？ | SG: `bash scripts/install-maintenance-crons.sh --host sg`；EU: 見下方 EU 區塊 |
 
-### 三層保護
+### 三層保護（2026-05-08 全部到位）
 
-| 層 | 機制 | 位置 | RPO | 還原時間 |
-|----|------|------|-----|---------|
-| L1 | Hetzner 自動 server backup | Hetzner 基礎設施（非 VPS 磁碟） | ~24h | ~30 min（Console） |
-| L2 | `backup-phase1.sh` daily cron | VPS `/root/lobster-phase1/backups/` | ~24h | < 5 min |
-| L3 | rclone offsite（待啟用 R2） | Cloudflare R2 或 Hetzner Object Storage | ~24h | 視大小 |
+| 層 | 機制 | SG VPS (5.223.93.113) | EU VPS (204.168.175.41) |
+|----|------|----------------------|------------------------|
+| L1 | Hetzner 自動 server backup | 每日 18-22 UTC | 每日 22-02 UTC |
+| L2 | DB-level daily cron | 02:00 UTC：WP DB + uploads + n8n | 02:30 UTC：Supabase + Trigger + Uptime Kuma |
+| L3 | 跨洲異地備份 | → EU `/root/backups/from-sg/` | → SG `/root/lobster-phase1/backups/from-eu/` |
 
-### VPS 關鍵路徑
+### SG VPS 關鍵路徑
 
 | 項目 | 路徑 |
 |------|------|
 | Cron 定義 | `/etc/cron.d/lobster-backup` |
 | 備份目錄 | `/root/lobster-phase1/backups/`（mode 700, 7 天 retention） |
+| 從 EU 收到的異地備份 | `/root/lobster-phase1/backups/from-eu/` |
 | 日誌 | `/var/log/lobster-backup.log` |
 | 備份腳本 | `/root/lobster-phase1/scripts/backup-phase1.sh` |
 | 驗證腳本 | `/root/lobster-phase1/scripts/verify-backup.sh` |
-| 異地設定 | `/root/lobster-phase1/scripts/setup-offsite-backup.sh` |
 | cron 安裝器 | `/root/lobster-phase1/scripts/install-maintenance-crons.sh` |
+| 異地 SSH key（SG→EU） | `/root/.ssh/backup_to_eu` |
+
+### EU VPS 關鍵路徑
+
+| 項目 | 路徑 |
+|------|------|
+| Cron 定義 | `/etc/cron.d/eu-backup` |
+| 備份目錄 | `/root/backups/`（7 天 retention） |
+| 從 SG 收到的異地備份 | `/root/backups/from-sg/` |
+| 日誌 | `/var/log/eu-backup.log` |
+| 備份腳本 | `/root/scripts/backup-eu-stack.sh` |
+| 驗證腳本 | `/root/scripts/verify-backup-eu.sh` |
+| 異地 SSH key（EU→SG） | `/root/.ssh/backup_to_sg` |
 
 ---
 
