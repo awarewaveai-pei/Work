@@ -1,23 +1,29 @@
 #!/usr/bin/env bash
 # Idempotent maintenance cron installer for Phase 1 VPS hosts.
 # Safe to re-run on fresh servers AND on existing servers that already have
-# cron entries in root's crontab (the script upgrades the binary in place
-# and does NOT create a duplicate entry in /etc/cron.d/).
+# cron entries in root's crontab (the script upgrades binaries in place
+# and does NOT create duplicate entries in /etc/cron.d/).
 #
 # Usage (run as root on the target VPS):
 #   bash /path/to/hetzner-phase1-core/scripts/install-maintenance-crons.sh [--host sg|eu]
 #
 # If --host is omitted, the script auto-detects based on `hostname`.
-# SG (phase1 stack)  : docker-weekly-cleanup Sunday 03:00 UTC
-# EU (Supabase stack): docker-weekly-cleanup Sunday 03:30 UTC
+#
+# Installed schedules (UTC):
+#   SG (phase1 stack):
+#     Daily  02:00 — backup-phase1.sh
+#     Daily  02:30 — verify-backup.sh
+#     Sunday 03:00 — docker-weekly-cleanup.sh
+#   EU (Supabase/Trigger stack):
+#     Daily  02:30 — backup-phase1.sh
+#     Daily  03:00 — verify-backup.sh
+#     Sunday 03:30 — docker-weekly-cleanup.sh
 #
 # After a server rebuild, re-run this script to restore all maintenance crons.
-# The cleanup script itself must be present at CLEANUP_SCRIPT_SRC path (see below).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLEANUP_SCRIPT_SRC="${SCRIPT_DIR}/docker-weekly-cleanup.sh"
-CLEANUP_SCRIPT_DEST="/usr/local/bin/docker-weekly-cleanup.sh"
+COMPOSE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # ── detect host ───────────────────────────────────────────────────────────────
 HOST_TYPE="${1:-}"
@@ -32,79 +38,201 @@ if [[ -z "$HOST_TYPE" ]]; then
     *sg*|*phase1*|*lobster*|*sin*) HOST_TYPE="sg" ;;
     *eu*|*supabase*|*trigger*|*hel*) HOST_TYPE="eu" ;;
     *) HOST_TYPE="sg"
-       echo "WARN: cannot detect host type from hostname '${HN}', defaulting to sg (03:00 UTC)." ;;
+       echo "WARN: cannot detect host type from hostname '${HN}', defaulting to sg." ;;
   esac
 fi
 
 case "$HOST_TYPE" in
-  sg) CRON_MINUTE=0;  CRON_HOUR=3  ;;
-  eu) CRON_MINUTE=30; CRON_HOUR=3  ;;
+  sg) CLEANUP_MIN=0;  CLEANUP_HOUR=3;  BACKUP_MIN=0;  BACKUP_HOUR=2;  VERIFY_MIN=30; VERIFY_HOUR=2  ;;
+  eu) CLEANUP_MIN=30; CLEANUP_HOUR=3;  BACKUP_MIN=30; BACKUP_HOUR=2;  VERIFY_MIN=0;  VERIFY_HOUR=3  ;;
   *)  echo "ERROR: unknown host type '${HOST_TYPE}'. Use --host sg|eu." >&2; exit 1 ;;
 esac
 
-CRON_ENTRY="${CRON_MINUTE} ${CRON_HOUR} * * 0 root ${CLEANUP_SCRIPT_DEST} >> /var/log/docker-weekly-cleanup.log 2>&1"
-CRON_FILE="/etc/cron.d/docker-weekly-cleanup"
-CRON_MARKER="docker-weekly-cleanup.sh"
-
 echo "=== install-maintenance-crons START $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
-echo "Host type : ${HOST_TYPE}"
-echo "Schedule  : ${CRON_HOUR}:$(printf '%02d' "${CRON_MINUTE}") UTC every Sunday"
+echo "Host type    : ${HOST_TYPE}"
+echo "Compose root : ${COMPOSE_ROOT}"
+echo ""
 
-# ── install cleanup script ────────────────────────────────────────────────────
-if [[ ! -f "$CLEANUP_SCRIPT_SRC" ]]; then
-  echo "ERROR: source not found: ${CLEANUP_SCRIPT_SRC}" >&2
-  echo "Run this script from within the cloned repo, or copy docker-weekly-cleanup.sh to ${CLEANUP_SCRIPT_DEST} manually." >&2
-  exit 1
-fi
+# ── helper: install a script to /usr/local/bin/ ───────────────────────────────
+install_script() {
+  local name="$1"
+  local src="${SCRIPT_DIR}/${name}"
+  local dest="/usr/local/bin/${name}"
+  if [[ ! -f "$src" ]]; then
+    echo "  WARN: ${src} not found — skipping ${name}"
+    return 1
+  fi
+  install -m 0755 "$src" "$dest"
+  echo "  Installed ${dest}"
+  return 0
+}
 
-echo "Installing ${CLEANUP_SCRIPT_DEST} ..."
-install -m 0755 "$CLEANUP_SCRIPT_SRC" "$CLEANUP_SCRIPT_DEST"
+# ── helper: write or update /etc/cron.d/ entry (idempotent) ───────────────────
+# Also checks root's personal crontab for legacy entries.
+ensure_cron() {
+  local cron_file="$1"    # e.g. /etc/cron.d/lobster-backup
+  local marker="$2"       # unique string to grep for (e.g. backup-phase1.sh)
+  local entry="$3"        # full cron line
+  local label="$4"        # human label for logging
 
-# ── install cron entry (duplicate-safe) ──────────────────────────────────────
-# Check all possible locations where the cron entry might already exist:
-#   1. /etc/cron.d/docker-weekly-cleanup  (written by this script on fresh servers)
-#   2. root's personal crontab            (legacy: installed in an earlier session)
-IN_CROND=false
-IN_ROOT_CRONTAB=false
+  local in_crond=false
+  local in_root=false
 
-[[ -f "$CRON_FILE" ]] && grep -q "$CRON_MARKER" "$CRON_FILE" 2>/dev/null && IN_CROND=true
-crontab -l 2>/dev/null | grep -q "$CRON_MARKER" 2>/dev/null && IN_ROOT_CRONTAB=true
+  [[ -f "$cron_file" ]] && grep -q "$marker" "$cron_file" 2>/dev/null && in_crond=true
+  crontab -l 2>/dev/null | grep -q "$marker" 2>/dev/null && in_root=true
 
-if $IN_ROOT_CRONTAB && ! $IN_CROND; then
-  # Entry lives in root's personal crontab — do NOT duplicate to /etc/cron.d/.
-  # The binary has already been upgraded above; the schedule is already correct.
-  echo "INFO: cron entry found in root crontab — skipping /etc/cron.d/ (no duplicate)."
-  echo "      To migrate to /etc/cron.d/ (optional): remove the root crontab line,"
-  echo "      then re-run this script."
-elif $IN_CROND; then
-  echo "Cron entry already present in ${CRON_FILE} — updating schedule."
-  sed -i "/${CRON_MARKER}/c\\${CRON_ENTRY}" "$CRON_FILE"
+  if $in_root && ! $in_crond; then
+    echo "  INFO: ${label} found in root crontab — skipping /etc/cron.d/ (no duplicate)."
+    echo "        To migrate: remove root crontab line, then re-run this script."
+  elif $in_crond; then
+    # Update existing entry (schedule may have changed)
+    sed -i "/${marker}/c\\${entry}" "$cron_file"
+    echo "  Updated: ${label} in ${cron_file}"
+  else
+    # Append to cron file
+    echo "${entry}" >> "$cron_file"
+    echo "  Added: ${label}"
+  fi
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. Docker weekly cleanup (existing)
+# ══════════════════════════════════════════════════════════════════════════════
+echo "--- Docker weekly cleanup ---"
+install_script "docker-weekly-cleanup.sh" || true
+
+CLEANUP_CRON_FILE="/etc/cron.d/docker-weekly-cleanup"
+CLEANUP_ENTRY="${CLEANUP_MIN} ${CLEANUP_HOUR} * * 0 root /usr/local/bin/docker-weekly-cleanup.sh >> /var/log/docker-weekly-cleanup.log 2>&1"
+
+if [[ ! -f "$CLEANUP_CRON_FILE" ]] || ! grep -q "docker-weekly-cleanup" "$CLEANUP_CRON_FILE" 2>/dev/null; then
+  # Check root crontab for legacy
+  if crontab -l 2>/dev/null | grep -q "docker-weekly-cleanup" 2>/dev/null; then
+    echo "  INFO: cleanup found in root crontab — skipping /etc/cron.d/"
+  else
+    cat > "$CLEANUP_CRON_FILE" <<CREOF
+# Managed by install-maintenance-crons.sh — do not edit manually.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+${CLEANUP_ENTRY}
+CREOF
+    chmod 0644 "$CLEANUP_CRON_FILE"
+    echo "  Written: ${CLEANUP_CRON_FILE}"
+  fi
 else
-  # Fresh server: install to /etc/cron.d/ (preferred, auditable, no personal crontab needed).
-  echo "Writing ${CRON_FILE} ..."
-  cat > "$CRON_FILE" <<EOF
+  sed -i "/docker-weekly-cleanup/c\\${CLEANUP_ENTRY}" "$CLEANUP_CRON_FILE"
+  echo "  Updated: ${CLEANUP_CRON_FILE}"
+fi
+echo "  Schedule: Sunday ${CLEANUP_HOUR}:$(printf '%02d' ${CLEANUP_MIN}) UTC"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 2. Daily backup + verification
+# ══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "--- Daily backup & verification ---"
+
+# Scripts run from compose root (they source .env from there)
+BACKUP_SCRIPT="${COMPOSE_ROOT}/scripts/backup-phase1.sh"
+VERIFY_SCRIPT="${COMPOSE_ROOT}/scripts/verify-backup.sh"
+
+for SCRIPT in "$BACKUP_SCRIPT" "$VERIFY_SCRIPT"; do
+  if [[ -f "$SCRIPT" ]]; then
+    chmod +x "$SCRIPT"
+    echo "  Executable: ${SCRIPT}"
+  else
+    echo "  WARN: ${SCRIPT} not found"
+  fi
+done
+
+BACKUP_CRON_FILE="/etc/cron.d/lobster-backup"
+BACKUP_ENTRY="${BACKUP_MIN} ${BACKUP_HOUR} * * * root ${BACKUP_SCRIPT} >> /var/log/lobster-backup.log 2>&1"
+VERIFY_ENTRY="${VERIFY_MIN} ${VERIFY_HOUR} * * * root ${VERIFY_SCRIPT} >> /var/log/lobster-backup.log 2>&1"
+
+# Write or update the cron file
+cat > "$BACKUP_CRON_FILE" <<CREOF
 # Managed by install-maintenance-crons.sh — do not edit manually.
 # Re-run the script to change schedule or recover after server rebuild.
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-${CRON_ENTRY}
-EOF
-  chmod 0644 "$CRON_FILE"
+
+# Daily backup: WordPress DB + uploads + n8n volume
+${BACKUP_ENTRY}
+
+# Daily verification: integrity + offsite check (30 min after backup)
+${VERIFY_ENTRY}
+CREOF
+chmod 0644 "$BACKUP_CRON_FILE"
+
+echo "  Written: ${BACKUP_CRON_FILE}"
+echo "  Backup:  daily ${BACKUP_HOUR}:$(printf '%02d' ${BACKUP_MIN}) UTC"
+echo "  Verify:  daily ${VERIFY_HOUR}:$(printf '%02d' ${VERIFY_MIN}) UTC"
+echo "  Log:     /var/log/lobster-backup.log"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 3. Security hardening
+# ══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "--- Security hardening ---"
+
+# .env files: restrict to owner-only (644 → 600)
+ENV_FILES=("${COMPOSE_ROOT}/.env")
+# Also check for staging and backup .env files
+for CANDIDATE in "${COMPOSE_ROOT}/.env.staging" "${COMPOSE_ROOT}/.env.local"; do
+  [[ -f "$CANDIDATE" ]] && ENV_FILES+=("$CANDIDATE")
+done
+
+for ENV_FILE in "${ENV_FILES[@]}"; do
+  if [[ -f "$ENV_FILE" ]]; then
+    CURRENT_PERM=$(stat -c '%a' "$ENV_FILE")
+    if [[ "$CURRENT_PERM" != "600" ]]; then
+      chmod 600 "$ENV_FILE"
+      echo "  Fixed: ${ENV_FILE} (${CURRENT_PERM} -> 600)"
+    else
+      echo "  OK: ${ENV_FILE} already 600"
+    fi
+  fi
+done
+
+# Backup directory: restrict to owner-only
+if [[ -f "${COMPOSE_ROOT}/.env" ]]; then
+  # shellcheck disable=SC1091
+  set -a && source "${COMPOSE_ROOT}/.env" && set +a
+fi
+BACKUP_DIR="${BACKUP_DIR:-${COMPOSE_ROOT}/backups}"
+if [[ -d "$BACKUP_DIR" ]]; then
+  chmod 700 "$BACKUP_DIR"
+  echo "  OK: ${BACKUP_DIR} mode 700"
+else
+  mkdir -p "$BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR"
+  echo "  Created: ${BACKUP_DIR} (mode 700)"
 fi
 
-# ── verify ────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. Summary
+# ══════════════════════════════════════════════════════════════════════════════
 echo ""
-echo "--- active cron sources ---"
-echo "  /etc/cron.d/:"
-grep "$CRON_MARKER" "$CRON_FILE" 2>/dev/null && echo "    ↑ /etc/cron.d/docker-weekly-cleanup" || echo "    (not in /etc/cron.d/)"
-echo "  root crontab:"
-crontab -l 2>/dev/null | grep "$CRON_MARKER" && echo "    ↑ root crontab" || echo "    (not in root crontab)"
-echo ""
-echo "Cleanup script:"
-ls -lh "$CLEANUP_SCRIPT_DEST"
-
 echo "=== install-maintenance-crons DONE $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
 echo ""
-echo "To test immediately (output goes to log):"
-echo "  bash ${CLEANUP_SCRIPT_DEST}"
-echo "  tail -50 /var/log/docker-weekly-cleanup.log"
+echo "Active cron files:"
+for CF in /etc/cron.d/docker-weekly-cleanup /etc/cron.d/lobster-backup; do
+  if [[ -f "$CF" ]]; then
+    echo "  ${CF}:"
+    grep -v '^#' "$CF" | grep -v '^$' | grep -v '^SHELL' | grep -v '^PATH' | sed 's/^/    /'
+  fi
+done
+echo ""
+echo "Root crontab entries (if any):"
+crontab -l 2>/dev/null | grep -E "backup|cleanup|verify" | sed 's/^/    /' || echo "    (none)"
+echo ""
+echo "To test backup immediately:"
+echo "  ${BACKUP_SCRIPT}"
+echo "  ${VERIFY_SCRIPT}"
+echo "  tail -50 /var/log/lobster-backup.log"
+echo ""
+echo "To enable offsite backup:"
+echo "  1. apt install rclone"
+echo "  2. rclone config  (add B2/S3/Hetzner Object Storage remote)"
+echo "  3. Add to ${COMPOSE_ROOT}/.env:"
+echo "       RCLONE_REMOTE=remote:your-bucket/lobster-phase1"
+echo "  4. Test: rclone ls remote:your-bucket/"
+echo "  5. Next daily backup will auto-upload"

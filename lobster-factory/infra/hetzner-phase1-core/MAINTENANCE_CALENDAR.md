@@ -14,10 +14,16 @@
 
 ---
 
+## 每日（自動）
+
+- [x] **Daily backup** `02:00 UTC (SG)` — `backup-phase1.sh` 自動執行：WordPress DB + uploads + n8n volume → 本機 `${BACKUP_DIR}`；若設定 `RCLONE_REMOTE` 則同步異地
+- [x] **Daily verify** `02:30 UTC (SG)` — `verify-backup.sh` 自動驗證檔案完整性（gzip/tar integrity）；失敗時發 Slack 告警
+- [x] **Retention** — 自動清除超過 `BACKUP_RETAIN_DAYS`（預設 7 天）的本機備份
+
 ## 每月
 
-- [ ] **基礎映像 CVE**：n8n、WordPress、MariaDB、Redis、Nginx — 有無 **緊急安全釋出**（有則 **staging 先**）  
-- [ ] **備份**：確認 `backup-phase1.sh` 或等效任務 **有執行**；抽查 **異地** 是否收到檔案  
+- [ ] **基礎映像 CVE**：n8n、WordPress、MariaDB、Redis、Nginx — 有無 **緊急安全釋出**（有則 **staging 先**）
+- [ ] **備份**：`tail -200 /var/log/lobster-backup.log` 確認無 FAIL；抽查 **異地** 是否收到檔案（`rclone ls $RCLONE_REMOTE/`）
 - [ ] **Supabase（SoR）**：依 monorepo **`agency-os/docs/operations/supabase-self-hosted-cutover-checklist.md`**／營運 SOP 的備份與監控（**不在**本 compose 內）
 
 ---
@@ -44,10 +50,12 @@
 ```bash
 docker compose ps
 docker system df
-./scripts/backup-phase1.sh
+./scripts/backup-phase1.sh          # 手動備份
+./scripts/verify-backup.sh          # 手動驗證
+tail -100 /var/log/lobster-backup.log  # 查看備份日誌
 ```
 
-### Server rebuild 後重建 cron
+### Server rebuild 後重建所有 cron（備份 + 清理 + .env 權限）
 
 ```bash
 # SG 機器（phase1 stack）
@@ -57,11 +65,26 @@ bash scripts/install-maintenance-crons.sh --host sg
 bash scripts/install-maintenance-crons.sh --host eu
 ```
 
+此命令會安裝：
+- `/etc/cron.d/lobster-backup` — 每日備份 + 驗證
+- `/etc/cron.d/docker-weekly-cleanup` — 每週 Docker 清理
+- `.env` 權限修正為 600
+- 備份目錄建立（mode 700）
+
 ### 手動觸發 Docker cleanup（立即執行）
 
 ```bash
 bash /usr/local/bin/docker-weekly-cleanup.sh
 tail -50 /var/log/docker-weekly-cleanup.log
+```
+
+### 啟用異地備份（首次設定）
+
+```bash
+apt install rclone
+rclone config                    # 新增 B2/S3 remote
+# 在 .env 加入：RCLONE_REMOTE=remote:bucket/lobster-phase1
+# 下次 daily backup 會自動上傳
 ```
 
 ---
