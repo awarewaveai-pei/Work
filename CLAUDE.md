@@ -37,6 +37,17 @@
 全面切換至 Claude Code 後，預設使用 `[claude]`。  
 範例：`[claude] fix: sync-mcp-config ClaudeProjectPlaceholder path`
 
+## 並行 session 編輯衝突偵測（Cursor + Claude 同時跑）
+
+修改 SG/EU 上的 drop-in 檔案（`/etc/default/*.local`、systemd unit override 等）後，**若回頭使用該檔超過 5 分鐘**（例如等待 reboot、等下個 cron tick），動作前先重看一次：
+
+```bash
+ssh hetzner-sg 'stat -c "mtime=%y" /etc/default/awarewave-endpoint-alert.local; grep "^HEARTBEAT_URL" /etc/default/awarewave-endpoint-alert.local'
+```
+
+若 mtime 比你最後一次寫的時間更新，懷疑並行 session 蓋掉了。`journalctl --since '<mtime - 2m>' --until '<mtime + 2m>' | grep -E "(crontab|REPLACE|sshd.*Accepted)"` 找肇事 session。
+歷史案例：2026-05-08 我 08:29 uncomment 的 HEARTBEAT_URL 在 08:38 被另一個 cursor session 重新 commented，導致 reboot 後 Kuma 8 分鐘無 heartbeat。memory: `reference_recurring_ops_recipes.md §3`。
+
 ## Risk-Tiered Confirmation（操作風險分級）
 
 | 等級 | 說明 | 處置 |

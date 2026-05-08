@@ -415,6 +415,103 @@ try {
     Add-Check -Name "AgencyOS scheduled tasks (optional)" -Pass $true -Detail ("Skipped (not available or not configured): " + $_.Exception.Message)
 }
 
+# 8) Critical vault keys + remote-API health (Kuma push monitor + PostgREST schema cache).
+#    Runs LAST so a transient external-API hiccup at the very end does not block earlier
+#    informational checks. All external-API failures are non-fatal (Pass=$true with
+#    "Skipped: <reason>") to avoid breaking AO-CLOSE on transient network issues.
+#    Only an *unambiguous* error (200 OK with monitor_status != 1, or 404 PGRST205)
+#    fails the check.
+$vaultHelper = Join-Path $PSScriptRoot "_vault-helpers.ps1"
+if (Test-Path $vaultHelper) {
+    try {
+        . $vaultHelper
+        $store = Read-VaultStore (Resolve-VaultPath)
+
+        # --- 8a) Critical vault keys present ---
+        # Closes the "vault wipe / new-machine bootstrap forgets to import" failure mode.
+        $criticalKeys = @(
+            'KUMA_HEARTBEAT_SG_ENDPOINT_ALERT',
+            'TELEGRAM_BOT_TOKEN', 'TELEGRAM_WEBHOOK_SECRET',
+            'TELEGRAM_ALLOWED_USER_IDS', 'TELEGRAM_ALLOWED_CHAT_IDS',
+            'COMMAND_PLANE_DEFAULT_ORG_ID', 'ANTHROPIC_API_KEY',
+            'SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY', 'SUPABASE_AWAREWAVE_URL',
+            'AGENCY_OS_SLACK_WEBHOOK_URL', 'UPTIME_KUMA_BASE_URL', 'UPTIME_KUMA_API_KEY',
+            'SENTRY_AUTH_TOKEN'
+        )
+        $missing = @()
+        foreach ($k in $criticalKeys) {
+            if (-not (Test-VaultSecret -Store $store -Name $k)) { $missing += $k }
+        }
+        if ($missing.Count -eq 0) {
+            Add-Check -Name "Vault: critical keys present" -Pass $true -Detail ("OK (" + $criticalKeys.Count + " keys verified)")
+        } else {
+            Add-Check -Name "Vault: critical keys present" -Pass $false -Detail ("Missing " + $missing.Count + ": " + ($missing -join ', '))
+        }
+
+        # --- 8b) Uptime Kuma push monitor for endpoint-alert healthy ---
+        # Detects "alerter timer stopped" before Slack/Sentry can.
+        try {
+            $kumaBase = Get-VaultSecret -Store $store -Name 'UPTIME_KUMA_BASE_URL' -AllowMissing
+            $kumaKey  = Get-VaultSecret -Store $store -Name 'UPTIME_KUMA_API_KEY'  -AllowMissing
+            if ($kumaBase -and $kumaKey) {
+                $auth = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(':' + $kumaKey))
+                $resp = Invoke-WebRequest -Uri ($kumaBase.TrimEnd('/') + '/metrics') -Headers @{ Authorization = $auth } -UseBasicParsing -TimeoutSec 10
+                $line = ($resp.Content -split "`n") | Where-Object { $_ -match 'monitor_status\{[^\}]*monitor_name="AwareWave endpoint-alert \(SG\)"' } | Select-Object -First 1
+                if (-not $line) {
+                    Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor present" -Pass $false -Detail "Monitor not found in Kuma /metrics — was it deleted?"
+                } elseif ($line -match '\}\s+(\d+)\s*$') {
+                    $val = [int]$matches[1]
+                    $statusName = switch ($val) { 0 {'DOWN'} 1 {'UP'} 2 {'PENDING'} 3 {'MAINTENANCE'} default {"UNKNOWN($val)"} }
+                    if ($val -eq 1) {
+                        Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor healthy" -Pass $true -Detail "UP"
+                    } else {
+                        Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor healthy" -Pass $false -Detail ("Status=" + $statusName + " — SG endpoint-alert.timer may have stopped")
+                    }
+                } else {
+                    Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor healthy" -Pass $true -Detail "Skipped: could not parse monitor_status value"
+                }
+            } else {
+                Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor healthy" -Pass $true -Detail "Skipped: UPTIME_KUMA_BASE_URL or UPTIME_KUMA_API_KEY missing"
+            }
+        } catch {
+            Add-Check -Name "Kuma: AwareWave endpoint-alert (SG) push monitor healthy" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(100, $_.Exception.Message.Length)))
+        }
+
+        # --- 8c) PostgREST schema cache freshness for Phase 2 tables ---
+        # Detects the "migration applied but PostgREST never NOTIFY'd" trap.
+        try {
+            $supaUrl = Get-VaultSecret -Store $store -Name 'SUPABASE_AWAREWAVE_URL'                 -AllowMissing
+            $supaKey = Get-VaultSecret -Store $store -Name 'SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY' -AllowMissing
+            if ($supaUrl -and $supaKey) {
+                $endpoint = $supaUrl.TrimEnd('/') + '/rest/v1/command_requests?select=id&limit=1'
+                try {
+                    $r = Invoke-WebRequest -Uri $endpoint -Headers @{ apikey = $supaKey; Authorization = "Bearer $supaKey" } -UseBasicParsing -TimeoutSec 10
+                    if ($r.StatusCode -eq 200) {
+                        Add-Check -Name "PostgREST: public.command_requests reachable" -Pass $true -Detail "200 OK"
+                    } else {
+                        Add-Check -Name "PostgREST: public.command_requests reachable" -Pass $false -Detail ("HTTP " + $r.StatusCode)
+                    }
+                } catch [System.Net.WebException] {
+                    $code = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
+                    if ($code -eq 404) {
+                        Add-Check -Name "PostgREST: public.command_requests reachable" -Pass $false -Detail "HTTP 404 PGRST205 — schema cache stale; run: docker exec supabase-db psql -U postgres -d postgres -c \"NOTIFY pgrst, 'reload schema';\" on EU"
+                    } else {
+                        Add-Check -Name "PostgREST: public.command_requests reachable" -Pass $true -Detail ("Skipped: HTTP " + $code + " (transient or auth)")
+                    }
+                }
+            } else {
+                Add-Check -Name "PostgREST: public.command_requests reachable" -Pass $true -Detail "Skipped: SUPABASE_AWAREWAVE_URL or service role key missing"
+            }
+        } catch {
+            Add-Check -Name "PostgREST: public.command_requests reachable" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(100, $_.Exception.Message.Length)))
+        }
+    } catch {
+        Add-Check -Name "Section 8 runtime checks" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(100, $_.Exception.Message.Length)))
+    }
+} else {
+    Add-Check -Name "Section 8 runtime checks" -Pass $true -Detail "Skipped: scripts/_vault-helpers.ps1 not present"
+}
+
 # 7) Deploy drift (informational): SG production vs origin/main.
 $driftScript = Join-Path $root "scripts/check-deploy-drift.ps1"
 if (Test-Path $driftScript) {

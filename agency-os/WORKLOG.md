@@ -4,6 +4,16 @@
 
 ## 2026-05-08
 
+### SG drift cron 第一次自動 firing 驗證完成
+
+- **cron 觸發紀錄**（`/var/log/sg-deploy-drift.log`）：
+  - `[2026-05-08T01:00:03Z] check: deployed=1d11a27 origin=8d982e2 behind=7 ahead=0`
+  - `[2026-05-08T01:00:03Z] alert sent: HTTP 200, behind=7`
+- **結案條件**：log 紀錄存在 + drift>0 → alert HTTP 200 ✅（兩條都滿足）
+- **cron daemon 狀態**：`active (running)` ，`enabled` 自啟，無錯誤
+- **背景說明**：drift=7 是在本次 session 修正前（session 中 deploy 已更新 `.deployed-commit` 至 `a22de2b`；今日後續 3 個 commit 均為 client-side 腳本/文件，不需重新 deploy next-admin）
+- **AUTO_TASK_DONE**: SG drift cron 第一次自動 firing
+
 ### Command Plane smoke test 15/15 — Phase 2c endpoints 驗證完成
 
 - **root cause**：smoke test 在 SG VPS 同步前就跑，9 commits behind 時 `/api/ops/approvals` + `/api/ops/system-modes` 路由不存在 → 404。VPS pull + deploy 後端點工作，但 smoke test 結果快取顯示舊失敗。
