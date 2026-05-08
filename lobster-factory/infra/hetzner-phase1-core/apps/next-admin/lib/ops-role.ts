@@ -77,3 +77,16 @@ export function canTriggerAiDiagnose(role: OpsRole): boolean {
 export function canModifyIncidentStatus(role: OpsRole): boolean {
   return role === "owner" || role === "admin" || role === "operator";
 }
+
+// === Phase 2c: Command Plane approval + system_modes (governance red line) ===
+// These guard high-risk command approvals and global mode changes (incl. unlocking
+// the kill switch via /normal_mode). Per CLAUDE.md High-STOP risk tier and the
+// systems-thinker red-lines matrix, these are auth/identity boundary decisions —
+// owner + admin only. operator / viewer cannot approve or change global modes.
+export function canApproveCommand(role: OpsRole): boolean {
+  return role === "owner" || role === "admin";
+}
+
+export function canChangeSystemMode(role: OpsRole): boolean {
+  return role === "owner" || role === "admin";
+}

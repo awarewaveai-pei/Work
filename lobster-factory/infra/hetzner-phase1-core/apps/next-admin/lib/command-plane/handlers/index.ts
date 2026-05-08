@@ -11,6 +11,7 @@ import { listFailedRunsHandler } from "./listFailedRuns";
 import { setSystemModeHandler } from "./systemModeControl";
 import { triggerWorkflowHandler } from "./triggerWorkflow";
 import { replayDeadLetterHandler } from "./replayDeadLetter";
+import { normalModeHandler } from "./normalMode";
 
 export const phase1Handlers: Record<string, CommandHandler> = {
   "/start": startHandler,
@@ -27,4 +28,9 @@ export const phase1Handlers: Record<string, CommandHandler> = {
   // Phase 2b — Trigger.dev medium-risk dispatch (workflow kick-off + DLQ diag).
   "/trigger_staging_workflow": triggerWorkflowHandler,
   "/replay_dead_letter":       replayDeadLetterHandler,
+  // Phase 2c — kill-switch UNLOCK (high-risk; ops console approval only).
+  // Registered here so the approval API can look it up; Telegram source is
+  // hard-blocked from high-risk commands by policyEngine, so this entry is
+  // not reachable from Telegram even though it appears in the registry.
+  "/normal_mode":      normalModeHandler,
 };
