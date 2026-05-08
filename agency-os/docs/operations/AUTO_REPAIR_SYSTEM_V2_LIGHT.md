@@ -1059,7 +1059,7 @@ NETDATA_SECRET               # Netdata notification.conf 自訂
 - `CLAUDE.md`（會 append §自動維修規則）
 - `agency-os/AGENTS.md`（§長期營運紀律 加註）
 - `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`（§2.1 sg-deploy.sh 是本系統 deploy step；§2.4 drift cron 設計概念延伸至此）
-- `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md`（Phase 2 三件套 — 本系統與其平行運作）
+- `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md`（Phase 2 三件套 — 本系統與其平行運作）
 - `agency-os/docs/operations/SG_PHASE1_DOCKER_LAYOUT.md`（部署環境 SG/EU 邊界）
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`（強制路由 — 本系統不影響此規格）
 - `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md`（Uptime Kuma triage 模板會 cross-ref）

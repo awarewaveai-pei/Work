@@ -304,7 +304,7 @@ Label:     EU-Supabase-Database
 
 技術／設計文件（不是給操作者看的）：
 
-- `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md` — owner doc，整體架構
+- `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md` — owner doc，整體架構
 - `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE_OPERATIONS.md` — 維運手冊（換 token、smoke test）
 - `agency-os/docs/operations/TELEGRAM_COMMAND_POLICY.md` — 25 個指令 policy 詳細
 - `lobster-factory/packages/db/migrations/0025_always_on_command_plane.sql` — schema

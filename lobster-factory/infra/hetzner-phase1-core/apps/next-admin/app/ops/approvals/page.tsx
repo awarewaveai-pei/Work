@@ -53,8 +53,8 @@ export default async function ApprovalsPage() {
       <p style={{ color: "#64748b", fontSize: 14, marginBottom: 24 }}>
         從 Telegram 等外部入口發來的高風險／關鍵指令會排隊在此，等待 owner / admin 簽核後才會實際執行。
         owner 文件：{" "}
-        <Link href="https://github.com/awarewaveai-pei/Work/blob/main/agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md">
-          ALWAYS_ON_COMMAND_PLANE.md
+        <Link href="https://github.com/awarewaveai-pei/Work/blob/main/agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md">
+          COMMAND_PLANE_RUNBOOK.md
         </Link>
         。
       </p>

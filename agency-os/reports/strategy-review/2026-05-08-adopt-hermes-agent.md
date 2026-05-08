@@ -168,7 +168,7 @@ Copy-pasteable line for `agency-os/WORKLOG.md` at AO-CLOSE:
 - Related WORKLOG entries: 2026-05-07 § Always-On Command Plane Phase 1 production live; 2026-05-08 § Phase 2a/2b deploy + Phase 2 hardening
 - Source materials cited: 
   - Hermes Agent web research: hermes-agent.nousresearch.com, github.com/nousresearch/hermes-agent
-  - User stack context: agency-os/AGENTS.md, CLAUDE.md, MEMORY.md (`feedback_no_wasteful_work`, `feedback_check_deploy_drift_first`), docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md, docs/operations/ALWAYS_ON_COMMAND_PLANE.md
+  - User stack context: agency-os/AGENTS.md, CLAUDE.md, MEMORY.md (`feedback_no_wasteful_work`, `feedback_check_deploy_drift_first`), docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md, docs/operations/COMMAND_PLANE_RUNBOOK.md
   - Subagent IDs (this run): critical=acd20296f27573136, creative=ae88ebd16d3256ceb, systems=a00c2ed14bbb58791, communication=a82c9c09237276b45
 
 ## 13. DoD verification (skill demo run)

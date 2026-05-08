@@ -10,7 +10,7 @@
     3. Calling Telegram setWebhook + setMyCommands
 
   Server-side deployment (migration + env injection + container rebuild) is a
-  separate step — see agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md §10.
+  separate step — see agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md §10.
 
 .PARAMETER BotToken
   Token from BotFather, format `123456789:ABC-DEF...`.

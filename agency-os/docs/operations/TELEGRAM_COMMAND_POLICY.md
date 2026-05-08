@@ -1,6 +1,6 @@
 # Telegram Command Policy
 
-> Companion to `ALWAYS_ON_COMMAND_PLANE.md`. This file is owner-of-truth for Telegram-specific authentication, allowlist, hard blocks, audit, and rate-limiting rules. The general routing / risk table lives in the command plane doc.
+> Companion to `COMMAND_PLANE_RUNBOOK.md`. This file is owner-of-truth for Telegram-specific authentication, allowlist, hard blocks, audit, and rate-limiting rules. The general routing / risk table lives in the command plane doc.
 
 ## 1. Authentication (request-level)
 
@@ -81,7 +81,7 @@ Telegram's API does **not** allow programmatic bot creation. The operator must:
 
 ## 7. Related documents
 
-- `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md` — owner doc for the full plane
+- `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md` — owner doc for the full plane
 - `lobster-factory/packages/db/migrations/0025_always_on_command_plane.sql` — schema
 - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/command-plane/` — implementation
 

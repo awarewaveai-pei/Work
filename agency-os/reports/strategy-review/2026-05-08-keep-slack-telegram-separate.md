@@ -60,7 +60,7 @@ stakeholders: 唯一操作者（peijing）+ 未來潛在團隊／tenant
   - critical: framing 把 alert 與 command 當可互換通路——這個前提本身未證
 
 - **Finding E — 真正可做的小修是「角色契約化」（不是合併）** _(roles: creative, communication)_ ★ Action item
-  - creative: 提出 **C+ asymmetric option** — 保留兩個但明確契約化分工寫進 ALWAYS_ON_COMMAND_PLANE.md：Slack=read-only firehose、Telegram=write-path control plane
+  - creative: 提出 **C+ asymmetric option** — 保留兩個但明確契約化分工寫進 COMMAND_PLANE_RUNBOOK.md：Slack=read-only firehose、Telegram=write-path control plane
   - communication: 主導敘事「command channel + alert channel」（命名即定位）；先發制人擋掉「合併＝簡化」的誤框
 
 ## 4. Divergence
@@ -75,7 +75,7 @@ stakeholders: 唯一操作者（peijing）+ 未來潛在團隊／tenant
 
 4 roles 自我點名共 11 條 bias，去重併入 6 條：
 
-- **Simplicity bias / Marie Kondo fallacy**（4 roles 共同點名）→ Mitigation：以「角色分離（modality separation）」概念取代「工具數量最少」概念；narrative 鎖在 ALWAYS_ON_COMMAND_PLANE.md
+- **Simplicity bias / Marie Kondo fallacy**（4 roles 共同點名）→ Mitigation：以「角色分離（modality separation）」概念取代「工具數量最少」概念；narrative 鎖在 COMMAND_PLANE_RUNBOOK.md
 - **Solo-operator myopia**（creative + communication）→ Mitigation：決策必須經得起「未來 12 月可能加第 2 位 operator 或 tenant-facing alert」這個假設；分頻架構在 scale-out 時零重工（這正是 C+ 勝出原因）
 - **Status quo bias**（critical 自覺）→ Mitigation：本案 cost_of_being_wrong 對稱性確認——合併錯（重工＋escape hatch 失）＞保留錯（極小，幾乎為零），偏向 C 有 asymmetric payoff 的客觀理由，不是惰性
 - **Recency bias / Phase 2c overweight**（systems）→ Mitigation：Slack 的 alert 角色比 Telegram bot 更老更穩定；不該因 Phase 2c 剛 ship 就誇大 Telegram 中心性
@@ -100,7 +100,7 @@ stakeholders: 唯一操作者（peijing）+ 未來潛在團隊／tenant
 ### 立即執行 (do now)
 
 - [ ] **拒絕合併（A 與 B 都不採）**——保留 Slack + Telegram 雙通路。本場 review 即決議。
-- [ ] **角色契約化**：在 `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md` 加一段「Channel separation contract」明文寫：
+- [ ] **角色契約化**：在 `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md` 加一段「Channel separation contract」明文寫：
   - **Slack** = read-only alert sink（PagerDuty / Sentry / Uptime Kuma / Netdata / Grafana / drift cron）
   - **Telegram** = write-path control plane（@awarewave_ops_bot；指令與簽核回應）
   - **禁止**將 ops 對話內容（含可能的 client PII）流入 Telegram；若未來有 tenant-facing ops，必須切第二個 bot 隔離
@@ -133,14 +133,14 @@ stakeholders: 唯一操作者（peijing）+ 未來潛在團隊／tenant
 **The decisive consideration**: cost_of_being_wrong 強烈不對稱——合併錯（重工 + escape hatch 失 + auth 邊界錯置）遠 > 保留錯（一年改兩個 token 的低度負擔）。30Y constraint 下 C+ 是唯一不違反任何 rule 的 path。
 
 **Required preconditions（C+ 的小修）**:
-- [ ] 在 `ALWAYS_ON_COMMAND_PLANE.md` 加一段 §「Channel separation contract」明文角色分工（10 分鐘內完成；本決議書 §7 已列具體文字）
+- [ ] 在 `COMMAND_PLANE_RUNBOOK.md` 加一段 §「Channel separation contract」明文角色分工（10 分鐘內完成；本決議書 §7 已列具體文字）
 - [ ] 若操作者回憶或紀錄顯示「曾發生過單通路漏接」→ 觸發 30 天 mirror experiment（否則跳過）
 
 ## 9. CHANGE_IMPACT_MATRIX hits
 
 If proceed (C+):
 
-- `agency-os/docs/CHANGE_IMPACT_MATRIX.md` 影響行：低——僅 ALWAYS_ON_COMMAND_PLANE.md 加一段，不破壞既有 cross-ref
+- `agency-os/docs/CHANGE_IMPACT_MATRIX.md` 影響行：低——僅 COMMAND_PLANE_RUNBOOK.md 加一段，不破壞既有 cross-ref
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` impact: **no**（兩通路屬 IDE 對話 / ops alert 範疇，非 Lobster orchestration）
 - `agency-os/docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md` 30-year stability rules touched: 無——C+ 是讓現狀**對齊** 30Y rules 而非更動，特別是 #1（deterministic entry）、#3（narrow interfaces）、#5（low-friction extensibility）三條因 C+ 而被加強
 - `agency-os/docs/international/global-compliance-baseline.md`：未來若引入 tenant-facing ops，Telegram 用法要重評 GDPR Art 28 / EU AI Act Art 50（已列 Investigation Queue #5）
@@ -172,7 +172,7 @@ This decision should be promoted to a numbered ADR if any of the following are t
 - Subagent IDs: critical=a2af978b2122f7837, creative=acea86d6bdde86fdc, systems=a9733a9eb9ebdc1e8, communication=a67a9882f4356fbf0
 - Related WORKLOG entries: 2026-05-07 § Always-On Command Plane Phase 1 production live; 2026-05-08 § Phase 2c ops console approval UI
 - Source materials cited:
-  - Owner doc: `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md`
+  - Owner doc: `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md`
   - CLAUDE.md §Risk-Tiered Confirmation
   - CLAUDE_EXECUTION_BLUEPRINT_30Y.md 6 stability rules
   - 0025_always_on_command_plane.sql migration（command_requests.source 7 個值）

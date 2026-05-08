@@ -1,7 +1,7 @@
 # Always-On Command Plane — 操作手冊（小白版）
 
 > 角色／功能／設定／故障 一站式日常使用指南。
-> 技術 SSOT 在 `ALWAYS_ON_COMMAND_PLANE.md`；驗證/政策在 `TELEGRAM_COMMAND_POLICY.md`。本檔只給日常用。
+> 技術 SSOT 在 `COMMAND_PLANE_RUNBOOK.md`；驗證/政策在 `TELEGRAM_COMMAND_POLICY.md`。本檔只給日常用。
 
 ---
 
@@ -196,7 +196,7 @@ update public.system_modes
 
 | 主題 | 檔案 |
 |---|---|
-| 技術 SSOT（架構、API、schema 設計理由） | `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md` |
+| 技術 SSOT（架構、API、schema 設計理由） | `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md` |
 | 驗證 / 政策（Telegram auth 規則） | `agency-os/docs/operations/TELEGRAM_COMMAND_POLICY.md` |
 | Schema | `lobster-factory/packages/db/migrations/0025_always_on_command_plane.sql` |
 | Code（lib + handlers） | `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/command-plane/` |

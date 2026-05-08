@@ -1,6 +1,6 @@
 -- 0025_always_on_command_plane.sql
 -- Always-On Command Plane: ingress layer + kill switch + idempotency.
--- Owner doc: agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md
+-- Owner doc: agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md
 -- Design rule: do NOT rebuild existing tables (workflow_runs / approvals /
 -- error_events / ops_audit_events). Only add the missing ingress layer and
 -- the global kill switch. Idempotency uses native PostgreSQL unique constraints.
@@ -52,7 +52,7 @@ alter table public.command_requests enable row level security;
 -- Pattern matches public.tenant_integration_bindings (0024).
 
 comment on table public.command_requests is
-  'Standardised ingress for Telegram/Slack/Webhook/Schedule commands. Created BEFORE workflow_runs; FK-linked to workflow_runs.command_request_id once dispatched. See ALWAYS_ON_COMMAND_PLANE.md.';
+  'Standardised ingress for Telegram/Slack/Webhook/Schedule commands. Created BEFORE workflow_runs; FK-linked to workflow_runs.command_request_id once dispatched. See COMMAND_PLANE_RUNBOOK.md.';
 
 -- 2) system_modes: kill switch (one active mode per scope).
 create table if not exists public.system_modes (
@@ -77,7 +77,7 @@ create index if not exists system_modes_scope_idx on public.system_modes(scope_t
 alter table public.system_modes enable row level security;
 
 comment on table public.system_modes is
-  'Global / agency / client scoped kill switch. Read by command-plane ingress; modifications must go through ops console SSO (never Telegram). See ALWAYS_ON_COMMAND_PLANE.md §Hard Blocks.';
+  'Global / agency / client scoped kill switch. Read by command-plane ingress; modifications must go through ops console SSO (never Telegram). See COMMAND_PLANE_RUNBOOK.md §Hard Blocks.';
 
 -- Seed the global "normal" row only if no global mode exists.
 insert into public.system_modes (scope_type, scope_id, mode, reason, set_at, metadata)

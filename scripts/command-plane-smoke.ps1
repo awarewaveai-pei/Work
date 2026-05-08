@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   Runs the 9 verification checks defined in
-  `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md` (mirrored from the
+  `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md` (mirrored from the
   approved plan, §9.1):
 
   1. Migration applied (command_requests + system_modes exist)

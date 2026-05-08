@@ -94,7 +94,7 @@ $vars = @{
     APP_AWAREWAVE_BASE_URL       = "https://app.aware-wave.com"
     APP_AWAREWAVE_BEARER_TOKEN   = ""
     # Always-On Command Plane (Telegram ingress + kill switch).
-    # See agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md and TELEGRAM_COMMAND_POLICY.md.
+    # See agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md and TELEGRAM_COMMAND_POLICY.md.
     TELEGRAM_BOT_TOKEN           = ""   # from BotFather /newbot
     TELEGRAM_WEBHOOK_SECRET      = ""   # random 32+ bytes; pass to setWebhook secret_token
     TELEGRAM_ALLOWED_USER_IDS    = ""   # csv of numeric user ids permitted to issue commands
