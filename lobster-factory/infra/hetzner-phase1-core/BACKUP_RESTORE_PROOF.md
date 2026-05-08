@@ -3,6 +3,41 @@
 > Infrastructure-level backup evidence for the Phase 1 compose stack.
 > Per LONG_TERM_OPS.md §4: annual minimum restore drill required.
 
+## Quick Reference — 備份地圖
+
+| 你想知道什麼 | 去哪裡找 |
+|-------------|---------|
+| 備份整體怎麼運作？ | 本目錄 [`README.md`](./README.md) §備份 |
+| cron 幾點跑？腳本在哪？ | [`MAINTENANCE_CALENDAR.md`](./MAINTENANCE_CALENDAR.md) §每日 |
+| 上次 restore drill 結果？ | **本文件** §Restore Drill Record |
+| RPO/RTO 是多少？ | [`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md) §1 + §4 |
+| Hetzner 自動備份有開嗎？ | 有。SG 18-22 UTC / EU 22-02 UTC（API 查證 2026-05-08） |
+| 堆疊全景中 Backup 在哪？ | `agency-os/docs/operations/hetzner-stack-rollout-index.md` #10 |
+| 怎麼裝異地備份？ | VPS: `bash scripts/setup-offsite-backup.sh <key> <secret> <bucket>` |
+| server rebuild 後怎麼恢復 cron？ | `bash scripts/install-maintenance-crons.sh --host sg` |
+
+### 三層保護
+
+| 層 | 機制 | 位置 | RPO | 還原時間 |
+|----|------|------|-----|---------|
+| L1 | Hetzner 自動 server backup | Hetzner 基礎設施（非 VPS 磁碟） | ~24h | ~30 min（Console） |
+| L2 | `backup-phase1.sh` daily cron | VPS `/root/lobster-phase1/backups/` | ~24h | < 5 min |
+| L3 | rclone offsite（待啟用 R2） | Cloudflare R2 或 Hetzner Object Storage | ~24h | 視大小 |
+
+### VPS 關鍵路徑
+
+| 項目 | 路徑 |
+|------|------|
+| Cron 定義 | `/etc/cron.d/lobster-backup` |
+| 備份目錄 | `/root/lobster-phase1/backups/`（mode 700, 7 天 retention） |
+| 日誌 | `/var/log/lobster-backup.log` |
+| 備份腳本 | `/root/lobster-phase1/scripts/backup-phase1.sh` |
+| 驗證腳本 | `/root/lobster-phase1/scripts/verify-backup.sh` |
+| 異地設定 | `/root/lobster-phase1/scripts/setup-offsite-backup.sh` |
+| cron 安裝器 | `/root/lobster-phase1/scripts/install-maintenance-crons.sh` |
+
+---
+
 ## Backup Record
 
 - Stack: Phase 1 compose (Nginx + Redis + WordPress + MariaDB + Node API + Next Admin)
