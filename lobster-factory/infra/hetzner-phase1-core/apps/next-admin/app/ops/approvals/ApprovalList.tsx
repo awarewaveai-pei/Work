@@ -27,19 +27,19 @@ export function ApprovalList({ items, canAct }: Props) {
   const [results, setResults] = useState<Record<string, { ok: boolean; msg: string }>>({});
 
   async function approve(id: string) {
-    if (!confirm("Approve this command? It will run immediately and cannot be reverted.")) return;
+    if (!confirm("核准這條指令？將會立刻執行，無法復原。")) return;
     setBusyId(id);
     try {
       const res = await fetch(`/api/ops/approvals/${id}/approve`, { method: "POST" });
       const json = await res.json();
       setResults((r) => ({
         ...r,
-        [id]: { ok: json.ok === true, msg: json.ok ? `OK status=${json.status}` : `FAIL ${json.error}` },
+        [id]: { ok: json.ok === true, msg: json.ok ? `成功 status=${json.status}` : `失敗 ${json.error}` },
       }));
     } catch (e) {
       setResults((r) => ({
         ...r,
-        [id]: { ok: false, msg: `Exception ${(e as Error).message}` },
+        [id]: { ok: false, msg: `例外 ${(e as Error).message}` },
       }));
     } finally {
       setBusyId(null);
@@ -47,9 +47,9 @@ export function ApprovalList({ items, canAct }: Props) {
   }
 
   async function reject(id: string) {
-    const reason = prompt("Reject reason (optional):") ?? "";
+    const reason = prompt("拒絕理由（可選填）：") ?? "";
     if (reason === null) return; // cancelled
-    if (!confirm("Reject this command?")) return;
+    if (!confirm("拒絕這條指令？")) return;
     setBusyId(id);
     try {
       const res = await fetch(`/api/ops/approvals/${id}/reject`, {
@@ -60,12 +60,12 @@ export function ApprovalList({ items, canAct }: Props) {
       const json = await res.json();
       setResults((r) => ({
         ...r,
-        [id]: { ok: json.ok === true, msg: json.ok ? `Rejected: ${json.reason ?? ""}` : `FAIL ${json.error}` },
+        [id]: { ok: json.ok === true, msg: json.ok ? `已拒絕：${json.reason ?? ""}` : `失敗 ${json.error}` },
       }));
     } catch (e) {
       setResults((r) => ({
         ...r,
-        [id]: { ok: false, msg: `Exception ${(e as Error).message}` },
+        [id]: { ok: false, msg: `例外 ${(e as Error).message}` },
       }));
     } finally {
       setBusyId(null);
@@ -122,10 +122,10 @@ export function ApprovalList({ items, canAct }: Props) {
                   </span>
                 </div>
                 <div style={{ fontSize: 12, color: "#475569", marginBottom: 4 }}>
-                  args: <code>{argsPreview}</code>
+                  參數：<code>{argsPreview}</code>
                 </div>
                 <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>
-                  trace: {it.trace_id} · received: {new Date(it.received_at).toLocaleString()}
+                  追蹤碼：{it.trace_id} · 收到時間：{new Date(it.received_at).toLocaleString("zh-TW")}
                 </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
@@ -138,7 +138,7 @@ export function ApprovalList({ items, canAct }: Props) {
                       className="btn-primary"
                       style={{ minWidth: 100 }}
                     >
-                      {busyId === it.id ? "..." : "Approve"}
+                      {busyId === it.id ? "處理中..." : "核准"}
                     </button>
                     <button
                       type="button"
@@ -147,11 +147,11 @@ export function ApprovalList({ items, canAct }: Props) {
                       className="btn-secondary"
                       style={{ minWidth: 100 }}
                     >
-                      Reject
+                      拒絕
                     </button>
                   </>
                 ) : (
-                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Read-only</span>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>唯讀</span>
                 )}
               </div>
             </div>
@@ -169,7 +169,7 @@ export function ApprovalList({ items, canAct }: Props) {
               >
                 {result.ok ? "✅" : "❌"} {result.msg}
                 <span style={{ marginLeft: 8, fontSize: 11, color: "#64748b" }}>
-                  (refresh to update list)
+                  （重新整理頁面看更新後的列表）
                 </span>
               </div>
             )}

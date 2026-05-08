@@ -42,11 +42,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <OpsInboxBadge />
                 </Link>
                 <div className="sidebar-hint">收件匣（非儀表）；監看 → Uptime / Grafana 等</div>
-                <Link href="/ops/approvals" className="sidebar-link" title="高風險指令需經 owner/admin 簽核">
-                  <span className="icon">✓</span> Approvals
+                <Link href="/ops/approvals" className="sidebar-link" title="高風險指令需經 owner / admin 簽核">
+                  <span className="icon">✓</span> 待簽核指令
                 </Link>
-                <Link href="/ops/system-modes" className="sidebar-link" title="kill switch / 全域系統模式">
-                  <span className="icon">◐</span> System Modes
+                <Link href="/ops/system-modes" className="sidebar-link" title="全域 kill switch / 系統模式">
+                  <span className="icon">◐</span> 系統模式
                 </Link>
                 <Link href="/api-check" className="sidebar-link">
                   <span className="icon">⬡</span> API Health

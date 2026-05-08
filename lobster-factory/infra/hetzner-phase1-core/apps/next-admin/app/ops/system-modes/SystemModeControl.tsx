@@ -20,14 +20,14 @@ export function SystemModeControl({ currentMode }: Props) {
 
   async function submit() {
     if (target === currentMode) {
-      setResult({ ok: false, msg: "Target mode is same as current; nothing to change." });
+      setResult({ ok: false, msg: "目標模式跟目前一樣，沒得切。" });
       return;
     }
-    let confirmMsg = `Change mode from "${currentMode}" to "${target}"?`;
+    let confirmMsg = `將模式從「${currentMode}」改成「${target}」？`;
     if (isUnlock) {
-      confirmMsg = `🔓 UNLOCK from "${currentMode}" → "normal".\n\nThis re-enables all command dispatch. Continue?`;
+      confirmMsg = `🔓 解鎖：從「${currentMode}」→「normal」。\n\n這會重新開放所有指令執行。確定？`;
     } else if (isLock) {
-      confirmMsg = `🛑 EMERGENCY STOP — all commands will be blocked immediately.\n\nContinue?`;
+      confirmMsg = `🛑 緊急停止 — 所有指令會立刻被擋下。\n\n確定？`;
     }
     if (!confirm(confirmMsg)) return;
 
@@ -41,12 +41,12 @@ export function SystemModeControl({ currentMode }: Props) {
       });
       const json = await res.json();
       if (json.ok) {
-        setResult({ ok: true, msg: `Mode changed to "${json.current.mode}". Refresh to see updated state.` });
+        setResult({ ok: true, msg: `已切換到「${json.current.mode}」。重新整理頁面看更新狀態。` });
       } else {
-        setResult({ ok: false, msg: `${json.error}${json.details ? ": " + json.details : ""}` });
+        setResult({ ok: false, msg: `${json.error}${json.details ? "：" + json.details : ""}` });
       }
     } catch (e) {
-      setResult({ ok: false, msg: `Exception: ${(e as Error).message}` });
+      setResult({ ok: false, msg: `例外：${(e as Error).message}` });
     } finally {
       setBusy(false);
     }
@@ -62,12 +62,12 @@ export function SystemModeControl({ currentMode }: Props) {
       }}
     >
       <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>
-        Change Mode
+        切換模式
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <label style={{ fontSize: 13, color: "#0f172a" }}>
-          Target mode
+          目標模式
           <select
             value={target}
             onChange={(e) => setTarget(e.target.value as Mode)}
@@ -83,24 +83,24 @@ export function SystemModeControl({ currentMode }: Props) {
             {MODES.map((m) => (
               <option key={m} value={m}>
                 {m}
-                {m === currentMode ? " (current)" : ""}
+                {m === currentMode ? "（目前）" : ""}
               </option>
             ))}
           </select>
         </label>
 
         <label style={{ fontSize: 13, color: "#0f172a" }}>
-          Reason (optional, max 500 chars)
+          切換原因（可選填，最多 500 字）
           <input
             type="text"
             value={reason}
             onChange={(e) => setReason(e.target.value.slice(0, 500))}
             placeholder={
               isUnlock
-                ? "e.g. resolved upstream incident, ready to re-enable"
+                ? "例：上游事故已解決，可以重新開放"
                 : isLock
-                  ? "e.g. suspicious activity, locking until investigation"
-                  : "Brief context for audit"
+                  ? "例：發現異常活動，先鎖系統等查清"
+                  : "簡短說明，留給未來審計用"
             }
             style={{
               display: "block",
@@ -130,12 +130,12 @@ export function SystemModeControl({ currentMode }: Props) {
             }}
           >
             {busy
-              ? "..."
+              ? "處理中..."
               : isUnlock
-                ? `🔓 Unlock to normal`
+                ? `🔓 解鎖為 normal`
                 : isLock
-                  ? `🛑 Emergency Stop`
-                  : `Change to "${target}"`}
+                  ? `🛑 緊急停止`
+                  : `切換為「${target}」`}
           </button>
         </div>
 

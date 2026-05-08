@@ -49,14 +49,14 @@ export default async function ApprovalsPage() {
 
   return (
     <div style={{ padding: "32px 40px", maxWidth: 1200 }}>
-      <h1 style={{ marginBottom: 6 }}>Pending Approvals</h1>
+      <h1 style={{ marginBottom: 6 }}>待簽核指令</h1>
       <p style={{ color: "#64748b", fontSize: 14, marginBottom: 24 }}>
-        High/critical-risk commands queued from Telegram or other ingress sources, waiting for owner/admin
-        approval before dispatch. Owner doc:{" "}
+        從 Telegram 等外部入口發來的高風險／關鍵指令會排隊在此，等待 owner / admin 簽核後才會實際執行。
+        owner 文件：{" "}
         <Link href="https://github.com/awarewaveai-pei/Work/blob/main/agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md">
           ALWAYS_ON_COMMAND_PLANE.md
         </Link>
-        .
+        。
       </p>
 
       <div
@@ -70,11 +70,11 @@ export default async function ApprovalsPage() {
           color: "#475569",
         }}
       >
-        Your role: <strong>{role}</strong>{" "}
+        你的角色：<strong>{role}</strong>{" "}
         {canAct ? (
-          <span style={{ color: "#059669" }}>(can approve / reject)</span>
+          <span style={{ color: "#059669" }}>（可核准／拒絕）</span>
         ) : (
-          <span style={{ color: "#b91c1c" }}>(read-only — owner / admin required to act)</span>
+          <span style={{ color: "#b91c1c" }}>（唯讀 — 需 owner / admin 才能操作）</span>
         )}
       </div>
 
@@ -89,7 +89,7 @@ export default async function ApprovalsPage() {
             marginBottom: 24,
           }}
         >
-          DB error: {dbError}
+          資料庫錯誤：{dbError}
         </div>
       )}
 
@@ -104,7 +104,7 @@ export default async function ApprovalsPage() {
             textAlign: "center",
           }}
         >
-          ✅ No pending approvals. The queue is empty.
+          ✅ 目前沒有待簽核項目，佇列是空的。
         </div>
       )}
 

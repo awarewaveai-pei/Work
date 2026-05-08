@@ -44,10 +44,9 @@ export default async function SystemModesPage() {
 
   return (
     <div style={{ padding: "32px 40px", maxWidth: 800 }}>
-      <h1 style={{ marginBottom: 6 }}>System Modes</h1>
+      <h1 style={{ marginBottom: 6 }}>系統模式（Kill Switch）</h1>
       <p style={{ color: "#64748b", fontSize: 14, marginBottom: 24 }}>
-        Global kill switch and operating mode. Affects which commands can dispatch via
-        the Always-On Command Plane.
+        全域系統開關。影響 Always-On Command Plane（指令面板）允許哪些指令執行。
       </p>
 
       <div
@@ -61,11 +60,11 @@ export default async function SystemModesPage() {
           color: "#475569",
         }}
       >
-        Your role: <strong>{role}</strong>{" "}
+        你的角色：<strong>{role}</strong>{" "}
         {canAct ? (
-          <span style={{ color: "#059669" }}>(can change mode)</span>
+          <span style={{ color: "#059669" }}>（可切換模式）</span>
         ) : (
-          <span style={{ color: "#b91c1c" }}>(read-only — owner / admin required)</span>
+          <span style={{ color: "#b91c1c" }}>（唯讀 — 需 owner / admin 才能切換）</span>
         )}
       </div>
 
@@ -80,7 +79,7 @@ export default async function SystemModesPage() {
             marginBottom: 24,
           }}
         >
-          DB error: {dbError}
+          資料庫錯誤：{dbError}
         </div>
       )}
 
@@ -94,7 +93,7 @@ export default async function SystemModesPage() {
         }}
       >
         <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
-          Current Mode
+          目前模式
         </div>
         <div style={{ fontSize: 28, fontWeight: 700, color: isLocked ? "#991b1b" : "#065f46", marginBottom: 8 }}>
           {effectiveMode === "emergency_stop" && "🛑 "}
@@ -105,12 +104,13 @@ export default async function SystemModesPage() {
         </div>
         {current?.reason && (
           <div style={{ fontSize: 13, color: "#475569", marginTop: 8 }}>
-            <strong>Reason:</strong> {current.reason}
+            <strong>切換原因：</strong>
+            {current.reason}
           </div>
         )}
         {current?.set_at && (
           <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
-            Set at: {new Date(current.set_at).toLocaleString()}
+            最後切換時間：{new Date(current.set_at).toLocaleString("zh-TW")}
           </div>
         )}
       </div>
@@ -128,25 +128,25 @@ export default async function SystemModesPage() {
           lineHeight: 1.7,
         }}
       >
-        <strong>Effects:</strong>
+        <strong>各模式效果：</strong>
         <ul style={{ margin: "8px 0 0 20px", padding: 0 }}>
           <li>
-            <code>normal</code> — All commands allowed.
+            <code>normal</code> — 全部指令允許執行。
           </li>
           <li>
-            <code>read_only</code> — Only low-risk read commands allowed.
+            <code>read_only</code> — 只允許 low-risk 讀取類指令（例：/status、/health）。
           </li>
           <li>
-            <code>maintenance</code> — All non-low commands blocked.
+            <code>maintenance</code> — 所有非 low-risk 指令被擋下。
           </li>
           <li>
-            <code>emergency_stop</code> — All commands blocked. Recovery: this page (owner/admin) or SQL editor.
+            <code>emergency_stop</code> — 🛑 所有指令全部擋下。解鎖路徑：<strong>本頁（owner / admin）</strong>或 SQL editor。
           </li>
         </ul>
         <div style={{ marginTop: 12 }}>
-          <strong>Note:</strong> Telegram cannot unlock from <code>emergency_stop</code> back to{" "}
-          <code>normal</code> (policy hard-block on <code>/normal_mode</code>). Use this page or the
-          ops console approval flow at <code>/ops/approvals</code>.
+          <strong>重要：</strong>從 <code>emergency_stop</code> 解鎖回 <code>normal</code>，{" "}
+          <strong>Telegram 永遠不能直接做</strong>（<code>/normal_mode</code> 被 policy 硬擋）。只能用本頁或從{" "}
+          <code>/ops/approvals</code> 經 ops console 簽核流程。
         </div>
       </div>
     </div>
