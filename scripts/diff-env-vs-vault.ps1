@@ -110,9 +110,10 @@ $shellScriptB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($shel
 $wrapper = "echo $shellScriptB64 | base64 -d | sh"
 
 if ($useSsh) {
-    $rawOutput = & ssh $sshAlias "docker exec lobster-next-admin sh -c `"$wrapper`"" 2>&1
-    # Note: container name is templated by replacing the literal 'lobster-next-admin' below
-    $rawOutput = & ssh $sshAlias "docker exec $container sh -c `"$wrapper`"" 2>&1
+    # Single-string outer + single-quoted inner is the only form that ssh +
+    # OpenSSH on Windows reliably forwards intact. Base64 contains no single
+    # quotes so this is safe.
+    $rawOutput = & ssh $sshAlias "docker exec $container sh -c '$wrapper'" 2>&1
 } else {
     $rawOutput = & docker exec $container sh -c $wrapper 2>&1
 }
@@ -166,7 +167,7 @@ foreach ($key in ($Mapping.Keys | Sort-Object)) {
 
 $rows | Format-Table -AutoSize Status, VaultKey, EnvVar, VaultSha12, ContSha12
 
-$diffCount = ($rows | Where-Object { $_.Status -ne '[MATCH]' }).Count
+$diffCount = @($rows | Where-Object { $_.Status -ne '[MATCH]' }).Count
 if ($diffCount -eq 0) {
     Write-Host "All $($rows.Count) entries match." -ForegroundColor Green
     exit 0

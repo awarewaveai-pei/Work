@@ -125,8 +125,14 @@ fi
 
 $remoteScript = $remoteScript.Replace("__B64__", $contentB64).Replace("__DEST__", $RemoteFile).Replace([string][char]13, "")
 
+# PowerShell pipe-to-native converts to CRLF, which busybox/bash chokes on.
+# Wrap the whole script in base64 + decode-and-run on the far side. The outer
+# `ssh` invocation only carries one line of base64 (no CRLF problem).
+$remoteB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
+$wrapper = "echo $remoteB64 | base64 -d | sudo bash"
+
 Write-Host ("== sync {0} -> {1}:{2} ==" -f $VaultKey, $SshTarget, $RemoteFile) -ForegroundColor Cyan
-$remoteScript | ssh $SshTarget "sudo bash -s"
+& ssh $SshTarget $wrapper
 $exit = $LASTEXITCODE
 if ($exit -ne 0) {
     throw "Remote sync exited $exit. Inspect output above."
