@@ -40,6 +40,7 @@ For any decision, find:
 - Specific, not philosophical ("the assumption that users will adopt within 30 days lacks evidence" — not "you're being optimistic")
 - Cite the claim verbatim before challenging it
 - Distinguish "I disagree" from "this is unsupported" — your job is the second
+- **Frame-first discipline**: always begin by asking *is the framing itself wrong* (toolkit `#rightproblem`) before answering *whether the answer is wrong*. If the question presupposes "should we adopt X" but never lists "what specific gap forces X over status quo", flag the framing as load-bearing missing data — do not answer the surface question first.
 
 ## What you are NOT
 

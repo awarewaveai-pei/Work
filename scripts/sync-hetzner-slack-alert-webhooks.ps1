@@ -67,8 +67,14 @@ HOOK="$(printf '%s' "__HOOK_B64__" | base64 -d)"
 umask 077
 {
   printf '%s\n' "WEBHOOK_URL=\"${HOOK}\""
-  printf '%s\n' 'CHECK_URLS="https://uptime.aware-wave.com/dashboard https://app.aware-wave.com/ https://api.aware-wave.com/health https://n8n.aware-wave.com/healthz"'
+  # CHECK_URLS must stay aligned with endpoint-alert.sh default (6 public surfaces).
+  # If you add/remove a public URL, update both this line AND the script's default.
+  printf '%s\n' 'CHECK_URLS="https://aware-wave.com/ https://app.aware-wave.com/ https://api.aware-wave.com/health https://n8n.aware-wave.com/healthz https://trigger.aware-wave.com/ https://uptime.aware-wave.com/dashboard"'
   printf '%s\n' 'TIMEOUT_SEC=12'
+  # NOTE: this file is rewritten on every sync. Operator-managed extension keys
+  # (HEARTBEAT_URL, RENOTIFY_AFTER_SEC, custom CHECK_URLS overrides, etc.) MUST
+  # live in /etc/default/awarewave-endpoint-alert.local — the systemd unit reads
+  # that drop-in via EnvironmentFile=- so it survives this sync.
 } > /etc/default/awarewave-endpoint-alert
 chmod 600 /etc/default/awarewave-endpoint-alert
 

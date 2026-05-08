@@ -1,8 +1,23 @@
 #!/usr/bin/env bash
+# AwareWave public endpoint check + Slack/PagerDuty alerter (systemd oneshot, fired every minute).
+#
+# Design rules:
+#  1. State file is the source of truth for dedup. It MUST be persisted before any
+#     side effect (Slack / PagerDuty / heartbeat) so a side-effect crash cannot
+#     regress the state machine and re-trigger the same alert.
+#  2. Same set of failing URLs => same fingerprint => one Slack message, not many.
+#     Only a different fingerprint (or transition to/from ok) re-notifies.
+#  3. Heartbeat is observability for THIS alerter; a heartbeat failure must never
+#     crash the alerter itself.
+#  4. RENOTIFY_AFTER_SEC is opt-in periodic re-up for ongoing incidents.
+#     Default 0 = silent forever for the same fingerprint.
+#  5. Backwards compatible: legacy state files containing plain "ok" or "fail"
+#     are read correctly; new writes use "ok" or "fail:<sha256>".
 set -euo pipefail
 
 STATE_DIR="/var/lib/awarewave-alert"
 STATE_FILE="${STATE_DIR}/last_state"
+LAST_NOTIFY_FILE="${STATE_DIR}/last_notify_at"
 WEBHOOK_WARN_STAMP="${STATE_DIR}/.warned_missing_webhook"
 
 WEBHOOK_URL="${WEBHOOK_URL:-}"
@@ -10,14 +25,19 @@ CHECK_URLS="${CHECK_URLS:-https://aware-wave.com/ https://app.aware-wave.com/ ht
 TIMEOUT_SEC="${TIMEOUT_SEC:-12}"
 HEARTBEAT_URL="${HEARTBEAT_URL:-}"
 
-# Optional: PagerDuty Events API v2 integration key (same host as "Routing key" in PD UI).
+# Optional: PagerDuty Events API v2 integration key.
 PAGERDUTY_ROUTING_KEY="${PAGERDUTY_ROUTING_KEY:-}"
-# Stable per-host dedup key so trigger/resolve match the same incident.
 PAGERDUTY_DEDUP_KEY="${PAGERDUTY_DEDUP_KEY:-awarewave-endpoint-$(hostname)}"
+
+# Optional: re-notify the same fingerprint after this many seconds. 0 = never.
+RENOTIFY_AFTER_SEC="${RENOTIFY_AFTER_SEC:-0}"
+case "${RENOTIFY_AFTER_SEC}" in
+  ''|*[!0-9]*) RENOTIFY_AFTER_SEC=0 ;;
+esac
 
 mkdir -p "${STATE_DIR}"
 
-# Empty WEBHOOK_URL used to exit 1 every run → systemd oneshot failures every minute and huge journal
+# Empty WEBHOOK_URL used to exit 1 every run -> systemd oneshot failures every minute and huge journal
 # growth. Prefer: still run HTTP checks; skip Slack notifications until configured.
 if [[ -z "${WEBHOOK_URL}" ]]; then
   if [[ ! -f "${WEBHOOK_WARN_STAMP}" ]]; then
@@ -25,6 +45,14 @@ if [[ -z "${WEBHOOK_URL}" ]]; then
     : >"${WEBHOOK_WARN_STAMP}"
   fi
 fi
+
+write_atomic() {
+  # write_atomic <path> <content>
+  local path="$1"
+  local content="$2"
+  printf "%s" "${content}" >"${path}.tmp"
+  mv -f "${path}.tmp" "${path}"
+}
 
 send_webhook() {
   [[ -z "${WEBHOOK_URL}" ]] && return 0
@@ -95,11 +123,18 @@ except urllib.error.HTTPError as e:
 PY
 }
 
+# Heartbeat is observability for THIS alerter. Must NEVER take down the alerter.
+# No -f: HTTP non-2xx is logged as a warning but does not affect exit status.
 send_heartbeat() {
   [[ -z "${HEARTBEAT_URL}" ]] && return 0
-  curl -fsS --max-time "${TIMEOUT_SEC}" "${HEARTBEAT_URL}" >/dev/null
+  local code
+  code="$(curl -sS -o /dev/null --max-time "${TIMEOUT_SEC}" -w '%{http_code}' "${HEARTBEAT_URL}" 2>/dev/null || echo '000')"
+  if [[ ! "${code}" =~ ^2[0-9]{2}$ ]]; then
+    echo "endpoint-alert: heartbeat returned HTTP ${code} (non-fatal); check HEARTBEAT_URL token" >&2
+  fi
 }
 
+# --- HTTP checks ---
 fail_lines=()
 for url in ${CHECK_URLS}; do
   code="$(curl -sS -o /dev/null -L -w "%{http_code}" --max-time "${TIMEOUT_SEC}" "${url}" || true)"
@@ -109,38 +144,78 @@ for url in ${CHECK_URLS}; do
   fi
 done
 
+# --- Fingerprint + state machine ---
+# new_state is "ok" or "fail:<sha256-of-sorted-failures>"
+fingerprint=""
+if [[ ${#fail_lines[@]} -gt 0 ]]; then
+  fingerprint="$(printf '%s\n' "${fail_lines[@]}" | LC_ALL=C sort -u | sha256sum | awk '{print $1}')"
+fi
 new_state="ok"
-[[ ${#fail_lines[@]} -gt 0 ]] && new_state="fail"
-old_state="$(cat "${STATE_FILE}" 2>/dev/null || true)"
+[[ -n "${fingerprint}" ]] && new_state="fail:${fingerprint}"
 
-# Avoid false "recovered" on first run (empty state file + all checks ok).
+old_state="$(cat "${STATE_FILE}" 2>/dev/null || true)"
+last_notify_at="$(cat "${LAST_NOTIFY_FILE}" 2>/dev/null || echo 0)"
+case "${last_notify_at}" in
+  ''|*[!0-9]*) last_notify_at=0 ;;
+esac
+now_epoch="$(date +%s)"
+
+# Classify into categories the rest of the script understands.
+# old_kind / new_kind: ok | fail (legacy "fail" treated as a fingerprint of "<legacy>")
+old_kind="ok"
+[[ -n "${old_state}" && "${old_state}" != "ok" ]] && old_kind="fail"
+new_kind="ok"
+[[ -n "${fingerprint}" ]] && new_kind="fail"
+
 notify=false
+notify_kind=""
+
 if [[ "${new_state}" != "${old_state}" ]]; then
-  if [[ "${new_state}" == "fail" ]]; then
+  if [[ "${new_kind}" == "fail" ]]; then
+    # ok -> fail OR fail:A -> fail:B (different failure set). Always notify.
     notify=true
-  elif [[ "${new_state}" == "ok" && -n "${old_state}" ]]; then
+    notify_kind="alert"
+  elif [[ "${new_kind}" == "ok" && -n "${old_state}" ]]; then
+    # fail -> ok. Recovered.
     notify=true
+    notify_kind="recovered"
+  fi
+elif [[ "${new_kind}" == "fail" && "${RENOTIFY_AFTER_SEC}" -gt 0 ]]; then
+  # Same failure ongoing: optional periodic re-up.
+  if (( now_epoch - last_notify_at >= RENOTIFY_AFTER_SEC )); then
+    notify=true
+    notify_kind="alert-reminder"
   fi
 fi
+
+# CRITICAL: persist state BEFORE any side effect. If the next line crashes the
+# script (heartbeat 404, Slack rate-limit, PagerDuty timeout), the state machine
+# must not regress and re-trigger the same alert.
+write_atomic "${STATE_FILE}" "${new_state}"
 
 if [[ "${notify}" == "true" ]]; then
   host="$(hostname)"
   ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-  if [[ "${new_state}" == "fail" ]]; then
-    # Bash double quotes do not turn "\n" into a newline; build the body with printf only.
-    msg="$(printf ':rotating_light: [aware-wave endpoint alert] %s %s\n' "${host}" "${ts}")$(printf '%s\n' "${fail_lines[@]}")"
-    detail_text="$(printf '%s\n' "${fail_lines[@]}")"
-    send_webhook "${msg}"
-    send_pagerduty "trigger" "[aware-wave] public endpoint check failed (${host})" "${detail_text}"
-  else
+  if [[ "${new_kind}" == "ok" ]]; then
     msg=":white_check_mark: [aware-wave endpoint recovered] ${host} ${ts}"
     send_webhook "${msg}"
     send_pagerduty "resolve" "[aware-wave] public endpoint check recovered (${host})" ""
+  else
+    prefix=":rotating_light:"
+    [[ "${notify_kind}" == "alert-reminder" ]] && prefix=":warning: [reminder]"
+    msg="$(printf '%s [aware-wave endpoint alert] %s %s\n' "${prefix}" "${host}" "${ts}")$(printf '%s\n' "${fail_lines[@]}")"
+    detail_text="$(printf '%s\n' "${fail_lines[@]}")"
+    send_webhook "${msg}"
+    # Reminders do not re-trigger PagerDuty (the incident is already open;
+    # PagerDuty's own dedup_key would absorb it anyway).
+    if [[ "${notify_kind}" != "alert-reminder" ]]; then
+      send_pagerduty "trigger" "[aware-wave] public endpoint check failed (${host})" "${detail_text}"
+    fi
   fi
+  write_atomic "${LAST_NOTIFY_FILE}" "${now_epoch}"
 fi
 
-if [[ "${new_state}" == "ok" ]]; then
-  send_heartbeat
+# Heartbeat last; failure non-fatal (see send_heartbeat).
+if [[ "${new_kind}" == "ok" ]]; then
+  send_heartbeat || true
 fi
-
-printf "%s" "${new_state}" > "${STATE_FILE}"
