@@ -249,7 +249,7 @@ if ($ReportPath) {
 
 if ($report.ok) {
   Write-Host ""
-  Write-Host "command-plane smoke: ALL 8 CHECKS PASSED" -ForegroundColor Green
+  Write-Host ("command-plane smoke: ALL {0} CHECKS PASSED" -f $script:Results.Count) -ForegroundColor Green
   exit 0
 } else {
   Write-Host ""
