@@ -183,6 +183,30 @@
 - **順手清理**：`.tmp-check-tg.ps1`（早些 session 殘留）unstage + 刪。
 - AUTO_TASK_DONE: AO-CLOSE/AO-RESUME 6 風險點硬化 + hook fail-log 觀測性 + cursor rules 同步
 
+### `/strategy-review` skill demo 實測（首跑）+ skill 4-role 健全性檢核 + 補強 + Hermes 結案
+
+- **背景**：TASKS.md「（明日提醒）`/strategy-review` skill demo 實測」首跑日。DoD 為「4 個 general-purpose subagent 並行返回獨立 finding/bias_check/must_investigate；產出 decision record；INDEX.md 補一行；確認 4 份真的不同（無 context contamination）」。
+- **Demo 對象**：要不要採用 NousResearch Hermes Agent（v0.2.0，Feb 2026 開源 autonomous AI agent）。
+- **執行**：4 個 general-purpose subagent 在同一 message 並行 spawn（agentId: critical=acd20296、creative=ae88ebd1、systems=a00c2ed1、communication=a82c9c09）；各 pass 獨立 role file content（critical-thinker / creative-thinker / systems-thinker / communication-thinker）+ framed decision；皆於 ~25-30 秒內返回完整結構化輸出（findings + bias_check + confidence + must_investigate）。
+- **DoD 4/4 PASS**：(1) 4 份結構化輸出 ✅；(2) `agency-os/reports/strategy-review/2026-05-08-adopt-hermes-agent.md` 產出 ✅；(3) INDEX.md 補一行 ✅；(4) 4 份**真的不同**（critical 找 load-bearing assumption + 驗 evidence + #rightproblem；creative 給 Postgres-pgvector 類比 + reframe + Auditable-Self-Improving-Agent moat 為 constraint-as-feature；systems 跨 6/12/18/24 月時間軸 + 30Y rules #1/#2/#6 按編號引用；communication 4 stakeholder hears-map + zh-TW operator chatter「又要拆」+ legal-disclosure 暗線）✅
+- **Role 健全性檢核**（meta：本次 demo 主目的）：4 roles 全 5/5 contribution coverage；lane discipline 全達標；style 紀律全達標；special concerns 觸發完整（systems 30Y rules / communication bilingual）。**No mode-file revision needed** — 4-role separation 設計如預期。
+- **Skill 補強（依 demo 觀察直接落地）**：
+  - **Critical role**: `roles/critical-thinker.md` style 加「Frame-first discipline」一行（避免 `#rightproblem` 隱性觸發；確保未來框架預設答案的問題被優先質疑）
+  - **Systems role**: `roles/systems-thinker.md` 加 §「governance red lines」special concern matrix — security/secrets、multi-tenant isolation、auth/identity、data SoR、production destructive 5 個 trigger，對應 CLAUDE.md High-STOP 紅線；觸發時必為 first-order finding 而非埋在 must_investigate
+  - **Communication role**: `roles/communication-thinker.md` 加 §「legal/regulatory disclosure」special concern — AI-agent answers tenants（GDPR Art 22 / EU AI Act Art 50）、cross-region data flow（GDPR Art 44+）、self-improving agent training data、multi-tenant 法律 vs 技術隔離、messaging vendor DPA 5 個 trigger
+  - **SKILL.md**: 加 §「Demo / training / non-decisive runs」明確化 demo 模式 cost_of_being_wrong assumption 路徑（recommendation tier ceiling = `proceed-with-modifications`；assumed fields 列為 preconditions；DoD verification §13 為操作者 audit trail）
+- **二處同步驗證**：`d:/Work/.claude/skills/strategy-review/` 與 `~/.claude/skills/strategy-review/` 4 個檔案 lockstep PASS（diff 全空）。
+- **Hermes Agent 結案**：操作者明確表示**不採用**（連 sandbox probe 也不進）。Decision record 加 §14 Operator decision 記錄；INDEX.md recommendation 改「rejected (operator final 2026-05-08; analytical was proceed-with-modifications)」；memory 新增 `project_hermes_evaluation_declined.md` 提供未來 sessions baseline。Investigation Queue 不執行；Required preconditions 作廢。
+- **修改檔（in git）**：
+  - `.claude/skills/strategy-review/SKILL.md`
+  - `.claude/skills/strategy-review/roles/critical-thinker.md`
+  - `.claude/skills/strategy-review/roles/systems-thinker.md`
+  - `.claude/skills/strategy-review/roles/communication-thinker.md`
+  - `agency-os/reports/strategy-review/2026-05-08-adopt-hermes-agent.md`（新檔）
+  - `agency-os/reports/strategy-review/INDEX.md`
+- **不在 git**：user-level skill mirror（auto-synced lockstep）+ user-level memory entry。
+- AUTO_TASK_DONE: /strategy-review skill demo 實測
+
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:14943f18e8160246d1f98a522a83de76378d5d7f52918d9db68a0fee23f5238e -->

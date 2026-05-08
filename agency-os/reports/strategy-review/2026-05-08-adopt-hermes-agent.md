@@ -2,7 +2,8 @@
 
 - **Date**: 2026-05-08
 - **Mode(s) run**: four-role-collaboration (Mode 1)
-- **Recommendation**: **proceed-with-modifications** (sandbox probe path only — no production touch)
+- **Recommendation (analytical)**: **proceed-with-modifications** (sandbox probe path only — no production touch)
+- **Operator final decision (2026-05-08)**: **REJECTED — not adopting**. See §14.
 - **Reversibility**: medium（probe 模式可撤；production adoption 則 hard）
 - **Cost of being wrong**: 採用後失敗 ~ 拆既有 Phase 2a/2b production + 1–2 週工程消耗 + ops 多一個系統要學；不採用後悔 ~ miss 自我改進 agent infrastructure（市場有 LangGraph、smolagents 等替代）。**Note**: 此 cost 由 main agent 推論而非操作者明確 stated；skill 規範要求 `cost_of_being_wrong unstated → stop and ask`，本次為 demo 場景以推論值繼續，但 final adoption 決策前須由操作者確認量化。
 - **Schema version**: 1
@@ -182,6 +183,24 @@ This was the inaugural strategy-review skill run. DoD per TASKS.md item:
 | 確認 4 份報告**真的不同**（無 context contamination） | ✅ — 各 role 命中其專責角度（critical 找漏洞 / creative 給類比與 reframe / systems 跨 6/12/18/24 月時間軸 + 30Y rules / communication thesis 與 stakeholder hears-map）；convergence 點都從不同 lens 切入 |
 
 **No mode-file revision needed** — 4-role separation works as designed.
+
+## 14. Operator decision (final)
+
+- **Date**: 2026-05-08
+- **Decision**: **不採用 Hermes Agent**（不進 sandbox probe，不進 production adoption）
+- **Rationale (operator)**: 此次 review 主要目的為**驗證 strategy-review skill 的 4-role 機制**（DoD 為「4 份報告真的不同、無 context contamination」）。Skill 機制驗證 PASS。對 Hermes 本身的採用提案不接受。
+- **Implications**:
+  - Investigation Queue（§6）**不執行** — 既然不採用，無需投入 web research / operator gap-list
+  - Required preconditions（§8）**作廢**
+  - Kill criteria（§8）**不適用**
+  - CHANGE_IMPACT_MATRIX 影響行（§9）**不觸發**
+  - 本檔案保留為**歷史紀錄**，未來如重新評估時提供完整 framing + 4-role 分析基線
+- **Skill 補強動作（同日落地）**：依本次 demo 觀察到的可加強處，已直接套用：
+  - Critical role：加 frame-first discipline style line（避免 `#rightproblem` 隱性觸發）
+  - Systems role：加 §「governance red lines」special concern matrix（security / multi-tenant / auth-identity / data SoR / production destructive — 對應 CLAUDE.md High-STOP 紅線）
+  - Communication role：加 §「legal / regulatory disclosure」special concern（GDPR Art 22/44+、EU AI Act Art 50、multi-tenant 法律 vs 技術隔離、messaging vendor DPA）
+  - SKILL.md：加 §「Demo / training / non-decisive runs」明確化 demo 模式 cost_of_being_wrong assumption 路徑
+- **Cross-ref**：操作者最終立場；INDEX.md 已更新；memory project entry `project_hermes_evaluation_declined.md` 已建立。
 
 ---
 

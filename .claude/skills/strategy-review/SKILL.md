@@ -139,6 +139,26 @@ If `reversibility: low` AND `cost_of_being_wrong: low` → recommend skipping th
 
 ---
 
+## Demo / training / non-decisive runs
+
+If the user's intent is to **test the skill** (skill demo, dry-run, training), or to **explore a hypothetical** without committing, you may proceed with assumed values for missing framing fields, BUT must:
+
+1. **Mark each assumed field** with `(assumed; demo run)` or `(assumed; not operator-stated)` in §2 Framing of the decision record
+2. **Prepend §8 Verdict** with: "This was a non-decisive run. Final adoption requires the operator to confirm: <list of assumed fields>"
+3. **Recommendation tier ceiling**: `proceed-with-modifications` or `defer-pending-investigation`. Never `proceed` outright when key framing fields are assumed
+4. **List assumptions as preconditions**: any assumed field becomes a `Required precondition` in §8
+
+Triggers for "demo / training" mode:
+- `TASKS.md` item explicitly references skill demo / 試跑 / dry-run
+- User says "test the skill", "dry run", "練習", "demo", "驗證 skill 機制"
+- Decision is hypothetical (about a tool/option not yet under operator commitment)
+
+Outside these triggers, `cost_of_being_wrong` unstated still requires **stop and ask**.
+
+When the run *is* a demo, also write a §13 "DoD verification" section in the decision record listing which DoD criteria the demo was meant to verify and whether each PASSED — this is the operator's audit trail that the skill mechanism (not the recommendation) was the actual subject of evaluation.
+
+---
+
 ## Adding / removing modes (extension protocol)
 
 To add a new mode (e.g., `04-bayesian-update.md`):

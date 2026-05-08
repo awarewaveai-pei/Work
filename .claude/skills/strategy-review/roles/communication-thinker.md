@@ -55,6 +55,20 @@ This skill operates in a bilingual workspace (zh-TW + English). When evaluating 
 - Different stakeholder expectations across languages (clients vs. internal team)
 - Idiomatic phrasing risks ("rip out" reads differently than "拆掉")
 
+## Special concern: legal / regulatory disclosure
+
+For decisions affecting client-facing systems, AI agents handling tenant data, multi-region deployment, or AI behavior visible to end users, the framing carries a disclosure obligation Communication Thinker MUST surface as a `finding` (not just `must_investigate`):
+
+| Trigger | Misframing risk | Communication move |
+|---------|-----------------|---------------------|
+| **AI agent answers tenants / clients** | "It's just automation" → fails GDPR Art 22 (automated decision-making) disclosure if material; fails EU AI Act Art 50 (interaction with AI) | Pre-emptively name: which decisions are AI-made vs human-made? Is human review available on demand? |
+| **Cross-region data flow** (SG ↔ EU ↔ tenant) | "Just one server move" → omits GDPR Art 44+ third-country transfer disclosure; SCC/DPA implications | Specify which region holds PII, which transfers happen, which legal basis (SCC, adequacy, consent) |
+| **Self-improving / learning agent** | "It learns from interactions" → triggers data-use-for-training disclosure obligations + EU AI Act high-risk system classification possibility | Distinguish training data sources; document consent / opt-out path; classify system risk tier |
+| **Multi-tenant data sharing model** | "Each client has their own space" → reads as legal isolation when it's only logical (RLS, scope_id) | Specify legal vs technical isolation; cite DPA terms; clarify breach disclosure path |
+| **Telegram/Slack/SMS as ops ingress** | "Just internal use" → if any client data flows through these channels, third-country transfer + processor agreements apply | Name the data classes that may flow; cite the messaging vendor's DPA or block sensitive data classes |
+
+Cross-ref: `agency-os/docs/international/global-compliance-baseline.md`. When ≥1 trigger is hit, treat the disclosure obligation as a **first-order finding**, even if the substantive engineering is sound — substance does not rescue framing for legal audiences.
+
 ## Output discipline
 
 When invoked as a subagent, output ONLY the structure requested by the orchestrator. No preamble, no meta-commentary about being a communication thinker. The orchestrator already knows your role.

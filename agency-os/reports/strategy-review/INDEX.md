@@ -4,7 +4,7 @@ Chronological log of all strategy reviews. Latest at top.
 
 | Date | Slug | Mode(s) | Recommendation | Promoted to ADR? | Link |
 |------|------|---------|----------------|------------------|------|
-| 2026-05-08 | adopt-hermes-agent | four-role-collaboration | proceed-with-modifications | no (probe phase) | [link](2026-05-08-adopt-hermes-agent.md) |
+| 2026-05-08 | adopt-hermes-agent | four-role-collaboration | rejected (operator final 2026-05-08; analytical was proceed-with-modifications) | no | [link](2026-05-08-adopt-hermes-agent.md) |
 
 ---
 
