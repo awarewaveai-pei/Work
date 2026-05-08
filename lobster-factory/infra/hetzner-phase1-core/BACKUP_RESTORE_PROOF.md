@@ -15,13 +15,14 @@
 | 堆疊全景中 Backup 在哪？ | `agency-os/docs/operations/hetzner-stack-rollout-index.md` #10 |
 | server rebuild 後怎麼恢復 cron？ | SG: `bash scripts/install-maintenance-crons.sh --host sg`；EU: 見下方 EU 區塊 |
 
-### 三層保護（2026-05-08 全部到位）
+### 四層保護（2026-05-08 全部到位）
 
 | 層 | 機制 | SG VPS (5.223.93.113) | EU VPS (204.168.175.41) |
 |----|------|----------------------|------------------------|
 | L1 | Hetzner 自動 server backup | 每日 18-22 UTC | 每日 22-02 UTC |
 | L2 | DB-level daily cron | 02:00 UTC：WP DB + uploads + n8n | 02:30 UTC：Supabase + Trigger + Uptime Kuma |
-| L3 | 跨洲異地備份 | → EU `/root/backups/from-sg/` | → SG `/root/lobster-phase1/backups/from-eu/` |
+| L3 | 跨洲 VPS 互備（Hetzner 內） | → EU `/root/backups/from-sg/` | → SG `/root/lobster-phase1/backups/from-eu/` |
+| L4 | Cloudflare R2（跨供應商） | → `lobster-backup/sg/<date>/` | → `lobster-backup/eu/<date>/` |
 
 ### SG VPS 關鍵路徑
 
