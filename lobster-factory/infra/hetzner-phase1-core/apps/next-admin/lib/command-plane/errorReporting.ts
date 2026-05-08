@@ -21,17 +21,25 @@ export interface CommandErrorReport {
   error_message: string;
   event_payload?: Record<string, unknown>;
   trace_ref?: string | null;
+  // When true, write the error_events row but do NOT raise a Sentry event.
+  // Use for high-volume / low-signal classes that flood the Sentry inbox
+  // without operator value (e.g. random internet scanners hitting the
+  // Telegram webhook without the secret header). The error_events row is
+  // still the system of record for audit / replay.
+  silentSentry?: boolean;
 }
 
 export async function reportCommandError(
   client: SupabaseClient | null,
   report: CommandErrorReport,
 ): Promise<void> {
-  Sentry.captureMessage(`[command-plane] ${report.source_type}: ${report.error_message}`, {
-    level: "error",
-    tags: { component: "command-plane", source_type: report.source_type },
-    extra: { source_ref: report.source_ref, payload: report.event_payload },
-  });
+  if (!report.silentSentry) {
+    Sentry.captureMessage(`[command-plane] ${report.source_type}: ${report.error_message}`, {
+      level: "error",
+      tags: { component: "command-plane", source_type: report.source_type },
+      extra: { source_ref: report.source_ref, payload: report.event_payload },
+    });
+  }
 
   if (!client || !report.organizationId) return; // auth failures may have no org context
 

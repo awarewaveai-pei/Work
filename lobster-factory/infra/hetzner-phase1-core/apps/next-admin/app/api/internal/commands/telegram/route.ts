@@ -34,18 +34,11 @@ export async function POST(req: Request) {
   const secret = verifyTelegramSecret(req);
   if (secret.ok === false) {
     // Sentry policy: missing_secret_header is high-volume / low-signal noise
-    // (random internet scanners + the command-plane-smoke test deliberately hits
-    // the endpoint without the header to verify silent-200 + audit-row behavior).
-    // Only emit a Sentry event when the failure carries real signal:
-    //   - secret_mismatch: header present but wrong (possible secret leak / forgery)
-    //   - config_missing: server side env var is missing (deployment broken)
-    // missing_secret_header still writes to error_events for audit trail.
-    if (secret.reason !== "missing_secret_header") {
-      Sentry.captureMessage(`telegram secret check failed: ${secret.reason}`, {
-        level: "warning",
-        tags: { component: "command-plane", phase: "ingress" },
-      });
-    }
+    // (random internet scanners + the command-plane-smoke test deliberately
+    // hits without the header to verify silent-200 + audit-row behavior).
+    // The error_events row is still written as audit; only the Sentry event
+    // is suppressed for that one reason. secret_mismatch and config_missing
+    // are real signals and still surface in Sentry via reportCommandError.
     const supabase = getSupabaseWriteClient();
     await reportCommandError(supabase, {
       organizationId: process.env.COMMAND_PLANE_DEFAULT_ORG_ID ?? null,
@@ -53,6 +46,7 @@ export async function POST(req: Request) {
       source_ref: null,
       error_code: secret.reason,
       error_message: `secret check failed: ${secret.reason}`,
+      silentSentry: secret.reason === "missing_secret_header",
     });
     // Return 200 OK to avoid leaking that the endpoint exists.
     return NextResponse.json({ ok: true });
