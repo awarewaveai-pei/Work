@@ -16,6 +16,23 @@ export interface ClientConfig {
   tenant_folder?: string;     // agency-os/tenants folder name
   wp_slug?: string;           // slug used in update-client-wp-plugins.ps1
   notes?: string;
+
+  // SSH-based remote update (web UI one-click path)
+  ssh_host?: string;          // server hostname/IP
+  ssh_port?: number;          // SSH port (default 22; Hostinger shared = 65002)
+  ssh_user?: string;          // SSH username
+  ssh_key_name?: string;      // lookup key: SSH_KEY_<NAME> env var holds base64 private key
+  wp_path?: string;           // absolute path to WP root on server (e.g. /home/user/public_html)
+
+  // Wave assignment — which plugins belong to each risk tier
+  // wave1: high-risk, updated one-by-one with health check after each; stops on first failure
+  // wave2: medium-risk, updated one-by-one
+  // wave3: low-risk, batch update
+  waves?: {
+    wave1?: string[];
+    wave2?: string[];
+    wave3?: string[];
+  };
 }
 
 export interface WpUpdateLatest {

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
+import { WpUpdateButtons } from "./WpUpdateButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +130,14 @@ export default async function ClientDetailPage({
 
         {/* ── Left: WP plugin update status ─────────────────────── */}
         <div>
+
+          {/* One-click update buttons — only when SSH is configured */}
+          {cfg.platform === "wordpress" && cfg.ssh_host && (
+            <WpUpdateButtons
+              slug={org.slug}
+              waves={cfg.waves ?? {}}
+            />
+          )}
 
           {/* Plugin update card */}
           {cfg.platform === "wordpress" ? (
