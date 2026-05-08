@@ -34,7 +34,7 @@
 | 7 | **Node API** | Execution | RAG／BFF／複雜整合 | `hetzner-phase1-core/apps/node-api`（範例）；`hetzner-self-host.env.example` 類型提示 |
 | 8 | **Nginx** | Infra | 反代、TLS 終止（可換 Caddy／Traefik） | runbook 階段 1–6；`hetzner-phase1-core/nginx` |
 | 9 | **Redis** | Infra | 快取／鎖；Trigger 自架常需 | runbook 階段 3；`hetzner-phase1-core` |
-| 10 | **Backup** | Infra | DB、卷、異地、還原演練 | `lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`、`MAINTENANCE_CALENDAR.md`；`lobster-factory/infra/hetzner-phase1-core/scripts/backup-phase1.sh`（**僅** Phase 1 compose 邊界內）；**Supabase** 備份另依切線清單 |
+| 10 | **Backup** | Infra | DB、卷、異地、還原演練 | `lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`、`MAINTENANCE_CALENDAR.md`；`scripts/backup-phase1.sh`（daily cron 02:00 UTC）+ `scripts/verify-backup.sh`（02:30 UTC, Slack alert on fail）+ `scripts/setup-offsite-backup.sh`（rclone one-shot）；cron 由 `scripts/install-maintenance-crons.sh` 安裝；還原演練證據 `BACKUP_RESTORE_PROOF.md`；Hetzner server-level 自動備份已啟用（SG 18-22 UTC / EU 22-02 UTC）；**Supabase** 備份另依切線清單 |
 
 **平面對照（你的分類）：**
 
