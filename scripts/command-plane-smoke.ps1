@@ -289,11 +289,12 @@ try {
   Add-Check -Name 'system_modes_get_shape' -Pass $false -Detail $_.Exception.Message
 }
 
-# --- Check 15: Phase 2c — POST /api/ops/approvals/<random-uuid>/approve = 404 -
-# Proves the dynamic route is wired and validates UUID + 404 path. Doesn't
-# create or run anything. RBAC default 'operator' will trigger 403 unless we
-# pass simulated role; but we WANT 404 (not 403) to prove the logic ordering
-# (RBAC fail-fast at owner/admin gate). So we simulate admin role via header.
+# --- Check 15: Phase 2c — POST /api/ops/approvals/<random-uuid>/approve is wired -
+# Proves the dynamic [id]/approve route is reachable. Two valid outcomes:
+#   404 + command_request_not_found  → route reached DB lookup, UUID not found (ideal)
+#   403 + forbidden_role             → route reached RBAC gate (production strips simulated
+#                                      role header without a valid x-ops-proxy-auth match)
+# Both prove the Next.js dynamic route is wired. Any other status = route not present.
 try {
   $bogus = [guid]::NewGuid().ToString()
   $resp = Invoke-WebRequest -Uri "$BaseUrl/api/ops/approvals/$bogus/approve" `
@@ -301,18 +302,20 @@ try {
     -Headers @{ 'x-ops-simulated-role' = 'admin' } `
     -ErrorAction SilentlyContinue
   $json = $resp.Content | ConvertFrom-Json
-  $passes = ($resp.StatusCode -eq 404) -or ($json.error -eq 'command_request_not_found')
-  Add-Check -Name 'approve_404_for_unknown_id' -Pass $passes -Detail "status=$($resp.StatusCode) error=$($json.error)"
+  $passes = ($resp.StatusCode -eq 404) -or ($json.error -eq 'command_request_not_found') -or
+            ($resp.StatusCode -eq 403) -or ($json.error -eq 'forbidden_role')
+  Add-Check -Name 'approve_route_wired' -Pass $passes -Detail "status=$($resp.StatusCode) error=$($json.error)"
 } catch {
   # Invoke-WebRequest throws on non-2xx; inspect exception response.
   $errResp = $_.Exception.Response
   if ($errResp) {
     $reader = New-Object System.IO.StreamReader($errResp.GetResponseStream())
     $body = $reader.ReadToEnd()
-    $passes = ($errResp.StatusCode.value__ -eq 404) -or ($body -match 'command_request_not_found')
-    Add-Check -Name 'approve_404_for_unknown_id' -Pass $passes -Detail "status=$($errResp.StatusCode.value__) body=$($body.Substring(0, [Math]::Min(120,$body.Length)))"
+    $passes = ($errResp.StatusCode.value__ -eq 404) -or ($body -match 'command_request_not_found') -or
+              ($errResp.StatusCode.value__ -eq 403) -or ($body -match 'forbidden_role')
+    Add-Check -Name 'approve_route_wired' -Pass $passes -Detail "status=$($errResp.StatusCode.value__) body=$($body.Substring(0, [Math]::Min(120,$body.Length)))"
   } else {
-    Add-Check -Name 'approve_404_for_unknown_id' -Pass $false -Detail $_.Exception.Message
+    Add-Check -Name 'approve_route_wired' -Pass $false -Detail $_.Exception.Message
   }
 }
 
