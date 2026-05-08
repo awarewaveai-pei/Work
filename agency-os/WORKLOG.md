@@ -2,6 +2,30 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-09
+
+### Daily
+- (TBD)
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:ad5c8b10ec026a69dff870de57623cbf5677ee0651324828988830a551a383f1 -->
+
+### claude-opus-4.7 <2026-05-09 00:00>
+
+- **完成（一句）**: Phase 2c 全線收尾 — WpUpdateButtons 重建、Dockerfile @anthropic-ai 補 COPY、Telegram webhook 修正、COMMAND_PLANE_RUNBOOK 改名 + §10 Client Management、ONBOARDING.md 發布（share link O3clJrMsjeQ5）
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/clients/[slug]/WpUpdateButtons.tsx`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/command-plane/handlers/clientStatus.ts`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/Dockerfile`
+  - `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md`
+  - `CLAUDE.md`
+  - `ONBOARDING.md`
+  - `agency-os/WORKLOG.md`
+- **Git**: bdac9ec (ONBOARDING + WORKLOG), 8d681b3 (Dockerfile), 7c5cad5 (rename), f91bec0 (restore route), 31ad905 (Phase 2c)
+- **對應 TASKS 子字串（可選）**: Phase 2c
+- **風險／待辦（可選）**: /daily_review /weekly_review 在新 Anthropic key + Dockerfile 修正後應已正常；用戶尚未手動確認回覆正常
+
 ## 2026-05-08
 
 ### Phase 2c 收尾 — WpUpdateButtons + Dockerfile + Telegram + ONBOARDING
@@ -1854,7 +1878,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-08 15:55:16 UTC_
+_Last synced: 2026-05-08 17:01:47 UTC_
 
 ## 2026-03-20
 
@@ -2288,6 +2312,4 @@ _Last synced: 2026-05-08 15:55:16 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
 

@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-08 00:48:46
+- Generated: 2026-05-09 01:02:01
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -212,78 +212,41 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-08.md
-# Daily Note - 2026-05-08
+## 5) memory/daily/2026-05-09.md
+# Daily Note - 2026-05-09
 
 ## Done today
-- 排除 `app.aware-wave.com` sidebar 缺 New Client / Build Console 兩項 → 根因為 `/root/lobster-phase1/apps/next-admin/`（docker build context）自 4/27 起無人從 git 同步，19 個 commit + 3,785 行改動全部凍結未上線。
-- 在 SG 落地 `sg-deploy.sh`（git → staging rsync，保留 `.env*`，build → up → 寫 `.deployed-commit`）；首次 deploy 成功，container healthy，Cloudflare 邊端傳回 7 項。
-- 在 SG 落地 `check-drift-and-alert.sh` + crontab `0 1 * * *` + 既有 Slack webhook，每日自動偵測 drift，dedupe 不重發；棄置原計畫的 `AgencyOS-DeployDriftCheck` Cloud routine（避免私鑰外帶到雲端）。
-- Client：`scripts/check-deploy-drift.ps1`（PASS/WARN/FAIL，掛入 `system-health-check.ps1` §7 warn-only）；`.claude/commands/sg-deploy.md`、`.claude/commands/check-drift.md` 兩個 slash command。
-- 修 sg-deploy.sh 兩個 bug：(a) `docker compose up` race condition 自動重試；(b) `.deployed-commit` 提前到 build+up 成功即寫入（不依賴 healthcheck）。
-- Doc：`DEPLOY_ROLLBACK_RUNBOOK.md` §2 重寫 / 加 §2.4-2.6；`SG_PHASE1_DOCKER_LAYOUT.md` 加 SSOT 註腳；維持單一主人未新建 doc。
+- (TBD)
 
 ## Current state
-- SG production sidebar 已上線 7 項（HTTP 200 + Cloudflare DYNAMIC 不快取）；`.deployed-commit = 1d11a27`。
-- Drift 自動告警 cron 已 active，下次 firing：2026-05-08 01:00 UTC（09:00 TPE）。
-- system-health-check 100% (361/361)，含 deploy drift §7 check（warn-only）。
-- Working tree dirty 由本輪 AO-CLOSE 處理；branch ahead 1（session checkpoint）+ 2 個 origin 增量已 rebase。
+- (TBD)
 
 ## Next steps
-- 候使用者授權後修 `C:\Users\user1115\Desktop\AWARE_WAVE_CREDENTIALS.md` §24 EU/SG 描述錯誤（next-admin 在 SG 不在 EU）。
-- 觀察明早 09:00 TPE 第一次自動 cron 是否成功（檢查 `/var/log/sg-deploy-drift.log`），確認 dedupe 正確。
-- 若需要進一步把 `node-api` / `wordpress` 也納入 sg-deploy 自動同步，腳本已支援多 app 參數，DoD 是 diff 確認無線上熱修後再 sync。
+- (TBD)
 
 ## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:14943f18e8160246d1f98a522a83de76378d5d7f52918d9db68a0fee23f5238e -->
+<!-- ao-close-inbox-sha256:ad5c8b10ec026a69dff870de57623cbf5677ee0651324828988830a551a383f1 -->
 
-### claude-opus-4.7 <2026-05-08 00:25>
+### claude-opus-4.7 <2026-05-09 00:00>
 
-- **完成（一句）**: SG next-admin 部署 drift 根因排除（19 commit 卡 staging 4/27 起未上線）+ 機械化 sg-deploy.sh / check-deploy-drift.ps1 / SG 本地 cron + Slack alert / 兩個 slash command；維持單一 owner doc 不另建。
+- **完成（一句）**: Phase 2c 全線收尾 — WpUpdateButtons 重建、Dockerfile @anthropic-ai 補 COPY、Telegram webhook 修正、COMMAND_PLANE_RUNBOOK 改名 + §10 Client Management、ONBOARDING.md 發布（share link O3clJrMsjeQ5）
 - **變更路徑**:
-  - `scripts/check-deploy-drift.ps1`
-  - `scripts/system-health-check.ps1`
-  - `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`
-  - `agency-os/docs/operations/SG_PHASE1_DOCKER_LAYOUT.md`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/clients/[slug]/WpUpdateButtons.tsx`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/command-plane/handlers/clientStatus.ts`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/Dockerfile`
+  - `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md`
+  - `CLAUDE.md`
+  - `ONBOARDING.md`
   - `agency-os/WORKLOG.md`
-  - `agency-os/memory/CONVERSATION_MEMORY.md`
-  - `.claude/commands/sg-deploy.md`
-  - `.claude/commands/check-drift.md`
-  - 遠端／無 commit：`/root/lobster-phase1/scripts/sg-deploy.sh`、`/root/lobster-phase1/scripts/check-drift-and-alert.sh`、`/root/lobster-phase1/.deployed-commit`、SG `crontab` 加入 `0 1 * * *` drift check
-- **Git**: ee204ec（含早 d85fe22 / 5be0f34 兩個 checkpoint；本輪會由 ao-close 一併 push）
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: 使用者桌面 `AWARE_WAVE_CREDENTIALS.md` §24「需要 SSH 到 EU」描述錯誤（next-admin 在 SG），不在 git，候授權後代修。
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:0f3972e67288d57fe834037f0601d542267564222b93def6cc303d836131853f -->
-
-### claude-opus-4.7 <2026-05-08 00:42>
-
-- **完成（一句）**: AO-CLOSE 第二輪 — 將 WORKLOG/memory 補登的 SG drift 機械化變更走完 ao-close 閘道並推送至 origin/main。
-- **變更路徑**:
-  - `agency-os/WORKLOG.md` (第二段 AUTO_TASK_DONE)
-  - `agency-os/memory/CONVERSATION_MEMORY.md` (今日蒸餾段)
-- **Git**: ee204ec（本 push 後追加 ao-close 自動 commit）
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: 第一輪 ao-close 因 apply-closeout-task-checkmarks 偵測到不在 TASKS 的早段 AUTO_TASK_DONE（其它 session 留下）而 fail；本輪以 -SkipAutoTaskCheckmarks 跳過該 step。
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:f51105af91f8da83f3587bec273986d7cf30f90b1cc8de6160d932a81cb34272 -->
-
-### claude-opus-4.7 <2026-05-08 00:48>
-
-- **完成（一句）**: AO-CLOSE 第三輪閘道循環完成（前兩輪卡 apply-checkmarks 與 daily-note TBD；本輪 daily-note 已填，inbox section 補回）。
-- **變更路徑**:
-  - `agency-os/memory/daily/2026-05-08.md` (Done/Current/Next 三段補齊)
-- **Git**: ee204ec (will be superseded by ao-close auto commit)
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**:
+- **Git**: bdac9ec (ONBOARDING + WORKLOG), 8d681b3 (Dockerfile), 7c5cad5 (rename), f91bec0 (restore route), 31ad905 (Phase 2c)
+- **對應 TASKS 子字串（可選）**: Phase 2c
+- **風險／待辦（可選）**: /daily_review /weekly_review 在新 Anthropic key + Dockerfile 修正後應已正常；用戶尚未手動確認回覆正常
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-08 00:48:37`
+- Time: `2026-05-09 01:01:53`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -293,8 +256,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260508-004837.md`
-- Closeout: `reports/closeout/closeout-20260508-004833.md`
+- Health: `reports/health/health-20260509-010152.md`
+- Closeout: `reports/closeout/closeout-20260509-010147.md`
 
 ## Action
 - No blocking issue detected.
