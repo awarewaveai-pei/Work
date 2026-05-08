@@ -13,7 +13,9 @@
 | RPO/RTO 是多少？ | [`LONG_TERM_OPS.md`](./LONG_TERM_OPS.md) §1 + §4 |
 | Hetzner 自動備份有開嗎？ | 有。SG 18-22 UTC / EU 22-02 UTC（API 查證 2026-05-08） |
 | 堆疊全景中 Backup 在哪？ | `agency-os/docs/operations/hetzner-stack-rollout-index.md` #10 |
-| server rebuild 後怎麼恢復 cron？ | SG: `bash scripts/install-maintenance-crons.sh --host sg`；EU: 見下方 EU 區塊 |
+| Cloudflare R2 怎麼查？ | Dashboard → R2 → `lobster-backup` bucket；`sg/` + `eu/` 子目錄按日期；credentials 見 `AWARE_WAVE_CREDENTIALS.md` §二十五 |
+| R2 token / endpoint | Token: `lobster-backup-r2-token`；Endpoint: `aea1a836...r2.cloudflarestorage.com`；VPS env: SG `.env` / EU `/etc/default/eu-backup` 的 `R2_API_TOKEN` |
+| server rebuild 後怎麼恢復 cron？ | SG: `bash scripts/install-maintenance-crons.sh --host sg`；EU: 重建 `/etc/cron.d/eu-backup`（見下方 EU 區塊） |
 
 ### 四層保護（2026-05-08 全部到位）
 
@@ -34,8 +36,10 @@
 | 日誌 | `/var/log/lobster-backup.log` |
 | 備份腳本 | `/root/lobster-phase1/scripts/backup-phase1.sh` |
 | 驗證腳本 | `/root/lobster-phase1/scripts/verify-backup.sh` |
+| R2 上傳腳本 | `/root/lobster-phase1/scripts/upload-to-r2.sh` |
 | cron 安裝器 | `/root/lobster-phase1/scripts/install-maintenance-crons.sh` |
 | 異地 SSH key（SG→EU） | `/root/.ssh/backup_to_eu` |
+| R2 config | `.env` 內 `R2_API_TOKEN` / `R2_PREFIX=sg` |
 
 ### EU VPS 關鍵路徑
 
@@ -46,8 +50,10 @@
 | 從 SG 收到的異地備份 | `/root/backups/from-sg/` |
 | 日誌 | `/var/log/eu-backup.log` |
 | 備份腳本 | `/root/scripts/backup-eu-stack.sh` |
+| R2 上傳腳本 | `/root/scripts/upload-to-r2.sh` |
 | 驗證腳本 | `/root/scripts/verify-backup-eu.sh` |
 | 異地 SSH key（EU→SG） | `/root/.ssh/backup_to_sg` |
+| R2 config | `/etc/default/eu-backup` 內 `R2_API_TOKEN` / `R2_PREFIX=eu` |
 
 ---
 
