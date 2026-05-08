@@ -326,6 +326,22 @@ if (Test-Path -LiteralPath $claudeUserlevelSync) {
     $global:LASTEXITCODE = 0
 }
 
+# --- Backup health snapshot (warn-only; AO-RESUME companion report) ---
+$backupHealthScript = Join-Path $WorkRoot "scripts\check-backup-health.ps1"
+if (Test-Path -LiteralPath $backupHealthScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: backup health snapshot (warn-only) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $backupHealthScript -WorkRoot $WorkRoot
+    $backupExit = $LASTEXITCODE
+    if ($backupExit -ne 0) {
+        Write-Host "WARN: backup health snapshot returned non-zero (see agency-os/reports/status/backup-health-LATEST.md)." -ForegroundColor Yellow
+        Write-Host "      AO-RESUME continues because this check is warn-only." -ForegroundColor Yellow
+        Write-Host ""
+    }
+    # Warn-only: prevent poisoning AO-RESUME success path.
+    $global:LASTEXITCODE = 0
+}
+
 # Report delta since last AO-RESUME (local stamp under agency-os/.agency-state/)
 $stateDir = Join-Path $WorkRoot "agency-os\.agency-state"
 $stampPath = Join-Path $stateDir "ao-resume-last.txt"
