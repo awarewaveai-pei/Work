@@ -4,7 +4,7 @@
   Always-On Command Plane smoke test.
 
 .DESCRIPTION
-  Runs the 8 verification checks defined in
+  Runs the 9 verification checks defined in
   `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE.md` (mirrored from the
   approved plan, §9.1):
 
@@ -12,12 +12,14 @@
   2. Kill switch seeded (global mode='normal')
   3. Idempotency (duplicate update_id stays as one row)
   4. Kill switch blocks (emergency_stop -> blocked_by_killswitch)
-  5. Hard block from telegram (/deploy-production -> blocked_by_policy)
+  5. Hard block from telegram (/deploy_production -> blocked_by_policy)
   6. Low-risk handler dispatches (/status -> completed)
   7. Failure-path writes error_events (unknown command rejected; we do not
      synthesise a handler crash to keep this test side-effect free)
   8. Auth: missing secret header is silently accepted (200) but writes
      telegram_auth_failed to error_events.
+  9. Phase 2a: /emergency_stop via Telegram completes AND updates
+     system_modes.mode='emergency_stop' (then restored to 'normal').
 
   Cleanup: clears all command_requests rows with source_event_id starting with
   'smoke-' and restores system_modes global to 'normal'.
@@ -206,9 +208,28 @@ try {
   Add-Check -Name 'auth_missing_secret_logged' -Pass $false -Detail $_.Exception.Message
 }
 
+# --- Check 9: /emergency_stop via Telegram updates system_modes (Phase 2a) -
+try {
+  $uid7 = 996000 + (Get-Random -Minimum 1 -Maximum 9999)
+  Send-TelegramUpdate -UpdateId $uid7 -Text '/emergency_stop' | Out-Null
+  Start-Sleep -Milliseconds 1500
+  $rows = Get-Request-By-Source-Event -SourceEventId $uid7
+  $cmdStatus = ($rows | Select-Object -First 1).status
+  $modeRows = Invoke-Supabase -Method GET -Path 'system_modes?scope_type=eq.global&select=mode'
+  $globalMode = ($modeRows | Select-Object -First 1).mode
+  $pass = ($cmdStatus -eq 'completed' -and $globalMode -eq 'emergency_stop')
+  Add-Check -Name 'emergency_stop_via_telegram' -Pass $pass -Detail "cmd=$cmdStatus mode=$globalMode"
+} catch {
+  Add-Check -Name 'emergency_stop_via_telegram' -Pass $false -Detail $_.Exception.Message
+} finally {
+  try {
+    Invoke-Supabase -Method PATCH -Path 'system_modes?scope_type=eq.global' -Body @{ mode = 'normal' } | Out-Null
+  } catch {}
+}
+
 # --- Cleanup: drop smoke rows -----------------------------------------------
 try {
-  $smokeIds = @(990000..995999) -join ','
+  $smokeIds = @(990000..996999) -join ','
   Invoke-Supabase -Method DELETE -Path "command_requests?source=eq.telegram&source_event_id=in.($smokeIds)" | Out-Null
 } catch {}
 

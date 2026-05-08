@@ -18,12 +18,19 @@ const RISK_TABLE: Record<string, RiskLevel> = {
   "/runbook": "low",
   "/draft_cursor_task": "low",
 
-  // medium: deferred to Phase 2 (Trigger.dev dispatch)
+  // medium: kill-switch enable (self-defence) + deferred Phase 2 dispatch.
+  // Worst case if abused: system locks itself; recoverable via SQL editor.
+  "/emergency_stop": "medium",
+  "/maintenance_mode": "medium",
+  "/read_only_mode": "medium",
   "/replay_dead_letter": "medium",
   "/trigger_staging_workflow": "medium",
   "/create_issue": "medium",
 
-  // high: requires approval (ops console SSO)
+  // high: requires approval (ops console SSO).
+  // /normal_mode is high so Telegram cannot unlock the killswitch — that path
+  // must come from ops console SSO or SQL editor.
+  "/normal_mode": "high",
   "/deploy_production": "high",
   "/refund": "high",
   "/dns_change": "high",
