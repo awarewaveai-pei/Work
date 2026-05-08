@@ -82,6 +82,45 @@
 
 ---
 
+---
+
+## EU VPS (204.168.175.41) — Backup Record
+
+- Stack: Supabase (Postgres 15.8 + Auth + Storage + Studio) + Trigger.dev v4.4.4 + n8n + Uptime Kuma
+- Backup script: `/root/scripts/backup-eu-stack.sh` (cron daily 02:30 UTC)
+- Verify script: `/root/scripts/verify-backup-eu.sh` (cron daily 03:00 UTC)
+- Cron file: `/etc/cron.d/eu-backup`
+- Log: `/var/log/eu-backup.log`
+- Local retention: 7 days
+- Offsite: rsync to SG VPS (`/root/lobster-phase1/backups/from-eu/`) via SSH key `/root/.ssh/backup_to_sg`
+
+### EU Restore Drill #1 — 2026-05-08
+
+- Drill date: 2026-05-08T08:36Z
+- Operator: Claude Code (automated)
+
+| Check | Result |
+|-------|--------|
+| Supabase dump integrity (gzip -t) | PASS |
+| Supabase dump content: 208 CREATE TABLE, 2 CREATE DATABASE (_supabase, n8n) | PASS |
+| Supabase dump size: 3.1M gzip | PASS (plausible for 83MB raw) |
+| Trigger.dev DB restore to test DB | PASS |
+| Trigger.dev table count: production = 77, restored = 77 | PASS (match) |
+| Trigger.dev restore: 784 DDL/DML statements | PASS |
+| Uptime Kuma archive integrity (tar) | PASS |
+| Uptime Kuma archive size: 16M | PASS |
+| Offsite rsync to SG VPS | PASS (3 files received) |
+| SG→EU offsite rsync | PASS (2 files received on EU) |
+
+## Cross-VPS Offsite Summary
+
+| Direction | Mechanism | Key | Schedule |
+|-----------|-----------|-----|----------|
+| SG → EU | rclone SFTP (`eu-backup:`) | `/root/.ssh/backup_to_eu` | daily with backup |
+| EU → SG | rsync over SSH | `/root/.ssh/backup_to_sg` | daily with backup |
+
+---
+
 ## Next scheduled drill
 
 - Annual minimum per LONG_TERM_OPS.md §4 + §6
