@@ -121,6 +121,8 @@
 | `/build-tenant` | 引導新客戶租戶佈建（Lobster Factory） |
 | `/smoke-test` | 執行 n8n MCP + 核心服務煙霧測試 |
 | `/strategy-review` | 多角度策略決策審查（4 角色協作 / 紅藍辯論 / Pre-Mortem） |
+| `/sg-deploy` | SSH 上 SG VPS 跑 `sg-deploy.sh`（git → staging rsync → build → up → 寫 `.deployed-commit`） |
+| `/check-drift` | 跑 `check-deploy-drift.ps1`，回報 SG production vs `origin/main` 落後幾個 commit |
 | `/vault-sync` | 同步 vault → Windows user env，列出仍缺的 key |
 | `/vault-status` | 顯示 vault 所有 key 名稱 + `.cursor/mcp.json` 缺漏清單 |
 

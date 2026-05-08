@@ -16,3 +16,9 @@
 
 ## Action
 - No blocking issue detected.
+
+## Related Documents (Auto-Synced)
+- `.cursor/rules/30-resume-keyword.mdc`
+
+_Last synced: 2026-05-08 08:33:57 UTC_
+

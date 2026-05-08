@@ -96,6 +96,8 @@
 ## 長期營運紀律（30 年級）
 - **憲章級原則（短、可對照閘道）**：`docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`
 - **重大分岔留下 ADR 骨架**：`docs/architecture/decisions/ADR_INDEX.md`（採輕量格式；細節仍回寫 `WORKLOG`）
+- **部署 drift 雙層偵測（2026-05-08 起）**：(a) **客戶端**：`scripts/check-deploy-drift.ps1` 比對 SG production `/root/lobster-phase1/.deployed-commit` 與 `origin/main`，掛入 `system-health-check.ps1` §7（warn-only）；slash command `/check-drift`。(b) **伺服器端**：SG cron `0 1 * * *`（09:00 TPE）跑 `/root/lobster-phase1/scripts/check-drift-and-alert.sh`，drift > 0 即 Slack alert（dedupe by `(deployed,origin)` pair）。Owner doc：`docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2.1-2.6。
+- **治理檔月度 drift 巡檢（2026-05-08 起）**：`scripts/check-governance-docs-drift.ps1` 對 4 個長期治理檔（Inventory / Routing Spec / Routing Matrix / Traceability）做 cross-ref + MCP 名單 + mtime + footer 一致性檢查，輸出 `reports/governance/drift-YYYY-MM.md`。每月 1 號由 `AgencyOS-MonthlyReview` routine 自動跑（Claude Cloud），亦可手動觸發。informational snapshot，非 build gate。
 
 ## 執行安全
 - 不做不可逆破壞操作
@@ -119,5 +121,5 @@
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-05-07 16:41:55 UTC_
+_Last synced: 2026-05-08 08:33:57 UTC_
 

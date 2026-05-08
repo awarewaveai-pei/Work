@@ -99,5 +99,5 @@
 - `docs/operations/new-doc-linkage-checklist.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-05-07 16:41:55 UTC_
+_Last synced: 2026-05-08 08:33:57 UTC_
 
