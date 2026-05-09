@@ -51,17 +51,19 @@ function Get-GitDirtyEntries {
     param([string]$RepoRoot)
     Push-Location -LiteralPath $RepoRoot
     try {
-        $out = @(git status --porcelain)
+        $out = @(git status --porcelain 2>$null)
         if ($LASTEXITCODE -ne 0) { return @() }
         return @($out | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     }
+    catch { return @() }
     finally {
         Pop-Location | Out-Null
     }
 }
 
 try {
-    $raw = [Console]::In.ReadToEnd()
+    $stdin = New-Object System.IO.StreamReader([Console]::OpenStandardInput(), [System.Text.Encoding]::UTF8)
+    $raw = $stdin.ReadToEnd()
     if ([string]::IsNullOrWhiteSpace($raw)) {
         Write-HookResponse '{"continue":true}'
         exit 0
@@ -86,7 +88,7 @@ try {
     # This ensures untracked/modified files are never left behind even when
     # the user doesn't type AO-RESUME or AO-CLOSE.
     $dirtyCheck = Get-GitDirtyEntries -RepoRoot $root
-    if ($dirtyCheck.Count -gt 0 -and -not $isAoResume) {
+    if (@($dirtyCheck).Count -gt 0 -and -not $isAoResume) {
         $checkpointScript = Join-Path $root "scripts\commit-checkpoint.ps1"
         if (Test-Path -LiteralPath $checkpointScript) {
             Push-Location -LiteralPath $root
@@ -126,7 +128,7 @@ try {
     $allLogLines = New-Object System.Collections.Generic.List[string]
 
     $dirtyBefore = Get-GitDirtyEntries -RepoRoot $root
-    if ($dirtyBefore.Count -gt 0) {
+    if (@($dirtyBefore).Count -gt 0) {
         $autoCheckpointAttempted = $true
         $checkpointScript = Join-Path $root "scripts\commit-checkpoint.ps1"
         if (Test-Path -LiteralPath $checkpointScript) {
@@ -144,8 +146,8 @@ try {
             }
 
             $dirtyAfterCp = Get-GitDirtyEntries -RepoRoot $root
-            $autoCheckpointCommitted = ($dirtyAfterCp.Count -lt $dirtyBefore.Count)
-            $autoCheckpointSummary = "dirty_before=$($dirtyBefore.Count); dirty_after=$($dirtyAfterCp.Count)"
+            $autoCheckpointCommitted = (@($dirtyAfterCp).Count -lt @($dirtyBefore).Count)
+            $autoCheckpointSummary = "dirty_before=$(@($dirtyBefore).Count); dirty_after=$(@($dirtyAfterCp).Count)"
         }
         else {
             $autoCheckpointExit = 1
