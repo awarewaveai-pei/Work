@@ -26,6 +26,7 @@ export type NotificationRule =
   | "severity_escalation"
   | "reopen"
   | "critical_immediate"
+  | "duplicate_occurrence"
   | "notify_skipped";
 
 export interface NotificationLogEntry {

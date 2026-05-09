@@ -148,11 +148,12 @@ Netdata: ops_inbox_probe_1777312398 = 99 on probe-host-1777312398
 **Q：看到 `probe-host-` 開頭的 host 名稱**
 → 合成探針，直接 Ignore。
 
-**Q：Incident 一直是 open 狀態 / 找不到「已解決」**
-→ 列表每張卡片底部或詳情頁右上角可點「標記已解決」（以及「標記調查中」「標記忽略」）。若顯示「唯讀，無法變更狀態」，代表 SSO 角色為 `viewer`，需 `operator` 以上才有 `canModifyIncidentStatus`。
+**Q：Incident 一直是 open / 在哪裡按「已解決」？**
+→ 列表卡片最下方或詳情頁右上角，按「標記已解決」。只要能正常登入並開啟 Ops Inbox（含最輕的 `viewer` 角色），都可以改狀態。
 
-**Q：Slack 都沒收到**
-→ 詳情頁右欄 **Notify Log**：若出現 `notify_skipped (globally_disabled)`，代表通知總開關關閉；**已設定 `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK` 且未設 `OPS_INBOX_NOTIFY_ENABLED=false` 時預設會發送**。非 `critical` 的重複事件預設不會再推（節流／去重）。
+**Q：Slack 什麼時候會跳通知？**
+→ **第一次出現**該事件：會發。同一個事件 **再三發生**（同一 fingerprint）：**每隔約 15 分鐘最多發一次**，以免一秒刷十則；Slack 上會標 **REPEAT**（非 critical）或維持 **CRITICAL**（critical）。  
+若 Notify Log 出現 `globally_disabled`，代表總開關關了（請確認 webhook 與 `OPS_INBOX_NOTIFY_ENABLED`）。
 
 **Q：Ops Inbox UI 可開，但實際 webhook 壞掉卻沒告警**
 → 改看 `GET /api/ops/inbox/health` 的 `ingest_fresh` / `ingest_age_minutes`。  
@@ -166,4 +167,4 @@ Netdata: ops_inbox_probe_1777312398 = 99 on probe-host-1777312398
 - `docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md` — 監控架構全貌
 - `docs/operations/OBSERVABILITY_FIRST_TIME_SETUP_ZH.md` — 初次設定 Webhook
 
-_Last updated: 2026-04-28_
+_Last updated: 2026-05-09_

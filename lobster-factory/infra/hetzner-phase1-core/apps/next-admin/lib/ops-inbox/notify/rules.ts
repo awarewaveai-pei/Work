@@ -43,13 +43,14 @@ export function decideNotification(args: DecideArgs): Decision {
     return { shouldSend: true, rule: "new_incident_first_occurrence" };
   }
 
+  // Repeat webhook hits same fingerprint: notify every severity, but throttle so Slack is not flooded.
   if (transition.kind === "duplicate") {
-    if (incident.severity !== "critical") return { shouldSend: false, reason: "duplicate_non_critical" };
     const lastSend = lastSentAt(incident);
     if (lastSend && now.getTime() - lastSend.getTime() < THROTTLE_WINDOW_MS) {
       return { shouldSend: false, reason: "within_throttle_window" };
     }
-    return { shouldSend: true, rule: "critical_immediate" };
+    if (incident.severity === "critical") return { shouldSend: true, rule: "critical_immediate" };
+    return { shouldSend: true, rule: "duplicate_occurrence" };
   }
 
   return { shouldSend: false, reason: "unknown_transition" };

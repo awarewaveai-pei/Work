@@ -20,7 +20,9 @@ export class SlackNotifier implements Notifier {
           ? " · REOPENED"
           : ctx.rule === "critical_immediate"
             ? " · CRITICAL"
-            : "";
+            : ctx.rule === "duplicate_occurrence"
+              ? " · REPEAT"
+              : "";
     const here = ctx.rule === "critical_immediate" ? "<!here> " : "";
 
     const body = {

@@ -74,8 +74,9 @@ export function canTriggerAiDiagnose(role: OpsRole): boolean {
   return role === "owner" || role === "admin" || role === "operator";
 }
 
+/** Anyone who reaches Ops Inbox (logged-in) may resolve/ignore/reopen incidents — includes viewer. */
 export function canModifyIncidentStatus(role: OpsRole): boolean {
-  return role === "owner" || role === "admin" || role === "operator";
+  return role === "owner" || role === "admin" || role === "operator" || role === "viewer";
 }
 
 // === Phase 2c: Command Plane approval + system_modes (governance red line) ===
