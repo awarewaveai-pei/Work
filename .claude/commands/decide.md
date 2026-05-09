@@ -4,14 +4,16 @@ This is the slash-command entry point for the `decision-intelligence` agent (`.c
 
 ## Usage
 
-Type `/decide` followed by your decision question:
+Type `/decide` followed by your decision question (Chinese or English both work):
 
 - `/decide should I use Sidekiq, GoodJob, or Solid Queue?`
 - `/decide compare Snowflake vs BigQuery vs Redshift for our analytics`
-- `/decide help me choose a WordPress management approach for 30 client sites`
+- `/decide 為管理 30 個客戶 WP 站的 1-3 人代理商，在 Hetzner SG/EU 與客戶自有主機混合環境下選擇統一站台管理平台`
 - `/decide should we build our own AI pipeline or use an existing platform`
 - `/decide review my microservices architecture`
 - `/decide rollout strategy for our new auth system`
+
+**Language:** The output language matches the question language. Chinese question → Chinese report. English question → English report.
 
 ## What happens
 
@@ -19,16 +21,17 @@ Type `/decide` followed by your decision question:
 2. Classifies the decision (tool_selection / architecture_review / implementation / business_strategy)
 3. Asks at most 3 clarifying questions if context is missing
 4. Assigns fixed + dynamic agents and specialists
-5. Runs the full 18-stage pipeline:
+5. Runs the full 19-stage pipeline:
    - Stage 1-5: Classification, clarification, candidate discovery
    - Stage 6-7: Structured debate (Advocates R1 + R2 cross-exam)
    - Stage 8-9: Specialist reviews + Skeptic pass
    - Stage 10-11: Tradeoff matrix + Judge synthesis
-   - Stage 12: Confidence check (POC protocol if needed)
-   - Stage 13: Final recommendation (primary + why-not + switch conditions)
-   - Stage 14-16: Installation plan + rollout plan + risk register
-   - Stage 17: Observability plan (how to detect success/failure)
-   - Stage 18: Decision review cadence (when to revisit)
+   - Stage 12: **Pre-mortem** — assumes winner fails 18 months from now; finds what the debate missed
+   - Stage 13: Confidence check (recalibrated after pre-mortem; POC protocol if needed)
+   - Stage 14: Final recommendation (primary + why-not + switch conditions)
+   - Stage 15-17: Installation plan + rollout plan + risk register (augmented by pre-mortem)
+   - Stage 18: Observability plan (success metrics + pre-mortem early warnings)
+   - Stage 19: Decision review cadence (when to revisit)
    - + ADR skeleton for long-term decisions
 6. Outputs a complete decision document: readable in 5-15 minutes, TL;DR in 30 seconds
 
@@ -36,32 +39,33 @@ Type `/decide` followed by your decision question:
 
 | Use `/decide` when | Use `/strategy-review` when |
 |-------------------|----------------------------|
-| Technical tool selection (A vs B vs C) | Exploratory strategic exploration |
-| Architecture review ("is this design good?") | Four-role collaboration brainstorm |
+| Technical tool selection (A vs B vs C) | Exploratory strategic brainstorm |
+| Architecture review ("is this design good?") | Four-role collaboration |
 | Implementation / rollout planning | Red-blue adversarial pressure test |
-| Build vs buy with technical depth needed | Pre-mortem for irreversible decisions |
-| Decision needs Installation + Rollout + Observability plans | Decision is primarily non-technical |
-| You want a detailed, staged debate with 8-13 agents | You want a quick 3-5 agent structured perspective |
+| Build vs buy with technical depth needed | **Pre-mortem on an already-made decision** |
+| Business strategy with structured tradeoffs | Quick 3-5 agent perspective |
+| You want Installation + Rollout + Observability plans | Decision is primarily non-technical |
 
-For highest-stakes decisions, run `/decide` first (for technical depth), then `/strategy-review` pre-mortem (for failure mode analysis).
+Note: `/decide` now includes its own Pre-mortem stage (Stage 12). Use `/strategy-review` pre-mortem only for decisions already committed to (not under evaluation).
 
 ## Output format
 
 The final document includes:
-1. TL;DR (30-second read)
+1. TL;DR (30-second read, includes pre-mortem primary risk)
 2. Recommendation + why-not-others + switch conditions
 3. Tradeoff Matrix (scored comparatively)
-4. Installation Plan (phased, executable)
-5. Rollout Plan (wave-based)
-6. Risk Register
-7. Observability Plan (metrics, alerts, instrumentation)
-8. Decision Review Cadence (30/90/365 day checkpoints)
-9. ADR Skeleton (for governance tracking)
-10. Full Debate Transcript (collapsible)
+4. **Pre-mortem Analysis** (Stage 12 — what would kill this decision 18 months from now)
+5. Installation Plan (phased, executable)
+6. Rollout Plan (wave-based)
+7. Risk Register (augmented by pre-mortem findings)
+8. Observability Plan (metrics, alerts, instrumentation + pre-mortem early warnings)
+9. Decision Review Cadence (30/90/365 day checkpoints)
+10. ADR Skeleton (for governance tracking)
+11. Full Debate Transcript (collapsible)
 
 ## Agent roster
 
-**Fixed (always run):** Topic Analyzer, Research Agent, Advocates (1 per candidate), Security Reviewer, DevOps Reviewer, Cost Reviewer, Product Reviewer, Skeptic, Judge, Installation Planner, Rollout Planner
+**Fixed (always run):** Topic Analyzer, Research Agent, Advocates (1 per candidate), Security Reviewer, DevOps Reviewer, Cost Reviewer, Product Reviewer, Skeptic, Judge, **Pre-mortem**, Installation Planner, Rollout Planner
 
 **Dynamic (added by topic):**
 - Customer Voice — when decision affects end users or has migration impact
@@ -73,13 +77,13 @@ The final document includes:
 - WordPress Specialist — for WP/WooCommerce decisions
 - (+ more in specialists/)
 
-## Auto-save (always runs after Stage 18)
+## Auto-save (always runs after Stage 19)
 
 After the full report is displayed, the agent automatically:
 
 1. Saves the complete report to `agency-os/reports/decisions/YYYY-MM-DD-<slug>.md`
 2. Appends one line to `agency-os/reports/decisions/INDEX.md`
-3. Confirms the saved path in the conversation
+3. Confirms the saved path in the conversation (in the same language as the document)
 
 You do **not** need to ask for this — it happens automatically every run.
 
