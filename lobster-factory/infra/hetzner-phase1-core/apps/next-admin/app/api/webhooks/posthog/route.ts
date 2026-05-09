@@ -71,14 +71,18 @@ export async function POST(req: Request) {
     return new NextResponse("db write failed", { status: 500 });
   }
 
-  void (async () => {
+  if (transition.kind === "new") {
     try {
-      if (transition.kind === "new") await triggerAutoClassify(upserted.id);
-      await dispatchNotifications({ incident: upserted as Incident, transition });
+      await triggerAutoClassify(upserted.id);
     } catch (e) {
       Sentry.captureException(e);
     }
-  })();
+  }
+  try {
+    await dispatchNotifications({ incident: upserted as Incident, transition });
+  } catch (e) {
+    Sentry.captureException(e);
+  }
 
   return NextResponse.json({
     incident_id: upserted.id,

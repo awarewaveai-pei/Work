@@ -54,10 +54,26 @@ export async function dispatchNotifications(args: { incident: Incident; transiti
 async function appendLog(incidentId: string, entry: NotificationLogEntry): Promise<void> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return;
-  const { data: cur } = await supabase.from("ops_incidents").select("notification_log").eq("id", incidentId).single();
-  if (!cur) return;
-  await supabase
-    .from("ops_incidents")
-    .update({ notification_log: [...((cur as any).notification_log as NotificationLogEntry[]), entry] })
-    .eq("id", incidentId);
+  try {
+    const { data: cur, error: readError } = await supabase
+      .from("ops_incidents")
+      .select("notification_log")
+      .eq("id", incidentId)
+      .single();
+    if (readError || !cur) {
+      if (readError) Sentry.captureException(readError);
+      return;
+    }
+
+    const existing = Array.isArray((cur as any).notification_log)
+      ? ((cur as any).notification_log as NotificationLogEntry[])
+      : [];
+    const { error: writeError } = await supabase
+      .from("ops_incidents")
+      .update({ notification_log: [...existing, entry] })
+      .eq("id", incidentId);
+    if (writeError) Sentry.captureException(writeError);
+  } catch (e) {
+    Sentry.captureException(e);
+  }
 }

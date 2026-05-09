@@ -130,6 +130,8 @@ Netdata: ops_inbox_probe_1777312398 = 99 on probe-host-1777312398
 | `OPS_INBOX_NOTIFY_ENABLED` | 啟用 Slack 通知 | `true` |
 | `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK` | Slack webhook URL | 已設定 |
 | `OPS_INBOX_POSTHOG_ENABLED` | 接收 PostHog 警報 | `true`（SG）|
+| `OPS_INBOX_REQUIRE_RECENT_INGEST` | 要求最近有新事件（stale 防呆） | `true`（建議） |
+| `OPS_INBOX_MAX_INGEST_AGE_MINUTES` | 允許無新 ingest 的最長分鐘數 | `1440`（可調 30~120） |
 
 設定檔位置（SG server）：`/root/lobster-phase1/.env`
 
@@ -148,6 +150,10 @@ Netdata: ops_inbox_probe_1777312398 = 99 on probe-host-1777312398
 
 **Q：Incident 一直是 open 狀態**
 → 只有有 ops 角色的使用者可以更改狀態（`canModifyIncidentStatus`）。
+
+**Q：Ops Inbox UI 可開，但實際 webhook 壞掉卻沒告警**
+→ 改看 `GET /api/ops/inbox/health` 的 `ingest_fresh` / `ingest_age_minutes`。  
+若 `ingest_fresh=false`（且 `ingest_token_configured=true`）就代表事件流停更，health 會回 `503`，應立即檢查 Sentry/Uptime Kuma/Netdata 的 webhook Bearer 與路由。
 
 ---
 

@@ -12,8 +12,8 @@
 
 1. **驗證公開健康檢查**  
    - 對 `https://app.aware-wave.com/api/ops/inbox/health` 發 `GET`。  
-   - 確認 JSON 含：`ok`、`open_count`、`last_ingest_at`、`ingest_token_configured`、`notify_enabled`、`slack_webhook_configured`。  
-   - **解讀**：若 `ingest_token_configured` 為 `false`，則所有需 `Authorization: Bearer` 的 webhook **不可能**成功寫入 Inbox；若 `notify_enabled` 或 `slack_webhook_configured` 為 `false`，則不應預期 Slack 會收到訊息。
+   - 確認 JSON 含：`ok`、`open_count`、`last_ingest_at`、`ingest_age_minutes`、`ingest_fresh`、`max_ingest_age_minutes`、`ingest_token_configured`、`notify_enabled`、`slack_webhook_configured`。  
+   - **解讀**：若 `ingest_token_configured` 為 `false`，則所有需 `Authorization: Bearer` 的 webhook **不可能**成功寫入 Inbox；若 `notify_enabled` 或 `slack_webhook_configured` 為 `false`，則不應預期 Slack 會收到訊息。若 `ingest_fresh=false`，代表事件流已停更（常見為 webhook/token/路由中斷），健康端點應回 `503`。
 
 2. **驗證 Webhook 認證行為（不洩漏祕密）**  
    - 對 `POST https://app.aware-wave.com/api/webhooks/sentry`：  
