@@ -31,7 +31,7 @@
    - 預期：四個來源（`sentry`、`uptime_kuma`、`grafana`、`netdata`）各回 **HTTP 200**，body 含 `incident_id`、`transition`（新事件多為 `new`）。
 
 4. **驗證 UI**  
-   - 瀏覽器開 `https://app.aware-wave.com/ops/inbox`，篩選 **「全部」**（URL 應含 `?status=all` 或等同行為）。  
+   - 瀏覽器開 `https://app.aware-wave.com/ops/inbox`（預設即「全部」，或 `?status=all`）。「進行中」為 `?status=active`，僅列出 **investigating**（須先按「標記調查中」）。  
    - 預期：合成測試後可看到**最多四筆**新事件（標題含 probe／Synthetic 等）；頁面上方應有**說明區**（警報收件匣、Webhook 列表、測試腳本提示）。若仍為舊版文案（例如 “Unified incident inbox”），表示 **next-admin 映像未更新**，需重新部署後再測。
 
 5. **驗證 Slack（若營運要求）**  

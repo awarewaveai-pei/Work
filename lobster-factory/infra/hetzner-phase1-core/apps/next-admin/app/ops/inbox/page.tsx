@@ -26,10 +26,11 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
   let query = supabase.from("ops_incidents").select("*").order("last_seen_at", { ascending: false }).limit(200);
 
   const rawStatus = sp.status?.trim();
-  if (!rawStatus || rawStatus === "active") {
-    query = query.in("status", ["open", "investigating"] as IncidentStatus[]);
-  } else if (rawStatus === "all") {
-    /* no status filter */
+  if (!rawStatus || rawStatus === "all") {
+    /* 全部：不篩狀態 */
+  } else if (rawStatus === "active") {
+    /** 進行中：僅 investigating（按過「標記調查中」） */
+    query = query.eq("status", "investigating");
   } else {
     const parts = rawStatus.split(",") as IncidentStatus[];
     query = query.in("status", parts);
@@ -67,7 +68,22 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
           {high > 0 && (
             <StatPill count={high} label="high" color="#ea580c" bg="#fff7ed" />
           )}
-          <StatPill count={total} label={rawStatus === "all" ? "total" : "active"} color="#475569" bg="#f1f5f9" />
+          <StatPill
+            count={total}
+            label={
+              !rawStatus || rawStatus === "all"
+                ? "total"
+                : rawStatus === "active"
+                  ? "進行中"
+                  : rawStatus === "resolved"
+                    ? "已解決"
+                    : rawStatus === "ignored"
+                      ? "已忽略"
+                      : "total"
+            }
+            color="#475569"
+            bg="#f1f5f9"
+          />
           <Link
             href="/ops/tools"
             style={{
@@ -133,11 +149,11 @@ function StatPill({ count, label, color, bg }: { count: number; label: string; c
 
 function EmptyState({ rawStatus }: { rawStatus?: string }) {
   const hint =
-    !rawStatus || rawStatus === "active"
-      ? "目前篩選為「進行中」（open + investigating）。若曾結案，請點「全部」查看歷史。"
-      : rawStatus === "all"
-        ? "資料庫尚無任何事件紀錄。請確認 Webhook 已設定且帶正確 Bearer。"
-        : "此篩選條件下沒有資料。可改點「進行中」或「全部」。";
+    !rawStatus || rawStatus === "all"
+      ? "資料庫尚無任何事件紀錄。請確認 Webhook 已設定且帶正確 Bearer。"
+      : rawStatus === "active"
+        ? "尚無「調查中」事件。新警報在「全部」；點卡片上的「標記調查中」後會出現在「進行中」。"
+        : "此篩選條件下沒有資料。可改點「全部」或其他狀態。";
 
   return (
     <div

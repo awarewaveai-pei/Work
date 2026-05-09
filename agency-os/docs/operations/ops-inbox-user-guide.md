@@ -12,7 +12,7 @@
 
 | 區塊 | 說明 |
 |---|---|
-| 上方 Filter Bar | 依嚴重程度（critical / warning / info）、狀態（open / investigating / resolved / ignored）篩選 |
+| 上方 Filter Bar | **全部**（預設）→ 所有狀態；**進行中**→ 僅 `investigating`（須先按「標記調查中」）；已解決／已忽略 |
 | Incident Card | 每一張卡顯示：標題、來源（netdata / sentry 等）、服務名稱、環境、發生次數（N×）、最後時間、狀態 |
 | Badge 顏色 | 🔴 critical　🟡 warning　🔵 info |
 

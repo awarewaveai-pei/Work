@@ -3,16 +3,18 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
+/** Default URL has no `status` → 全部. 「進行中」= 僅 investigating（須先按「標記調查中」）。 */
 const STATUS_TABS = [
-  { key: "active", label: "進行中", param: null as string | null },
-  { key: "all", label: "全部", param: "all" },
+  { key: "all", label: "全部", param: null as string | null },
+  { key: "active", label: "進行中", param: "active" },
   { key: "resolved", label: "已解決", param: "resolved" },
   { key: "ignored", label: "已忽略", param: "ignored" },
 ] as const;
 
 function effectiveStatusKey(status: string | undefined): string {
-  if (!status) return "active";
-  return status;
+  const s = status?.trim();
+  if (!s || s === "all") return "all";
+  return s;
 }
 
 export function IncidentFilterBar({
