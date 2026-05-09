@@ -1,4 +1,4 @@
-# MainWP + WPvivid Client Backup Runbook
+﻿# MainWP + WPvivid Client Backup Runbook
 
 > Owner file for MainWP-managed WordPress client backups, WPvivid storage configuration, and the backup gate before plugin updates.
 > Last updated: 2026-05-09
@@ -124,12 +124,12 @@ Rules:
 - After remote storage is added, set it as default and run one real backup.
 - For sites larger than 1 GB, do not rely on Dropbox Basic for full-site retention.
 
-Current baseline as of 2026-05-09:
+Current baseline as of 2026-05-09 (updated 2026-05-09 by maintenance agent):
 
-| Site | Remote | Backup scope | Notes |
-|---|---|---|---|
-| `aware-wave.com` | Dropbox `UpdateBackup` | files + DB | Working, but should migrate to larger storage when available |
-| `soulfulexpression.org` | Dropbox `SoulfulDBBackup` | DB-only | Full-site backup needs larger remote storage |
+| Site | Remote | Backup scope | Schedule | Last verified backup | Notes |
+|---|---|---|---|---|---|
+| `aware-wave.com` | Google Drive `Update_Backup` (remote id: `wpvivid-remote-69ff09b7329dd`) | files + DB | weekly, enabled | 2026-05-09 11:04 UTC - 30.14 MB zip - result: success | Migrated from Dropbox; Dropbox remote retained as fallback |
+| `soulfulexpression.org` | Google Drive `Update_Backup` (remote id: `wpvivid-remote-69ff0a63b77ab`) | files + DB | weekly, enabled | 2026-05-09 11:08 UTC - 141 MB zip - result: success | Migrated from DB-only Dropbox to full-site Google Drive |
 
 ## 8. Backup Policy
 
@@ -260,3 +260,4 @@ The agent must refuse or stop production updates if backup proof is missing.
 - `docs/wordpress_mainwp_plan.md`
 - `.claude/agents/wordpress-maintenance-agent.md`
 - `.claude/commands/wp-maintenance.md`
+
