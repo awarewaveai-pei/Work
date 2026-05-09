@@ -73,6 +73,15 @@ function Badge({ text }: { text: string }) {
   return <span className="card-badge badge-gray">{text}</span>;
 }
 
+function EmptyRow({ label }: { label: string }) {
+  return (
+    <div className="ops-row">
+      <div className="ops-row-key" style={{ color: "var(--text-muted)", fontWeight: 500 }}>—</div>
+      <div className="ops-row-val">{label}</div>
+    </div>
+  );
+}
+
 export default async function OpsConsolePage() {
   const data = await fetchSummary();
   const defaultOrgId = data?.tenants?.[0]?.id ?? "";
@@ -87,14 +96,14 @@ export default async function OpsConsolePage() {
   }, {});
   const workflowSourceSummary = Object.entries(workflowSourceCounts)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([source, count]) => `${source}:${count}`)
+    .map(([source, count]) => `${source}: ${count}`)
     .join(" · ");
 
   return (
     <>
       <OpsConsoleTelemetry />
       <div className="topbar">
-        <span className="topbar-title">Ops Console v1</span>
+        <span className="topbar-title">Ops Console</span>
         <span className="topbar-env">
           <span className="dot dot-green" />
           control-plane
@@ -102,93 +111,99 @@ export default async function OpsConsolePage() {
       </div>
 
       <div className="page">
-        <div className="section-title">Architecture boundary (fixed)</div>
-        <div className="card-grid">
+
+        {/* ── Architecture Boundary ───────────────────── */}
+        <div className="section-title">Architecture Boundary</div>
+        <div className="card-grid" style={{ marginBottom: 28 }}>
           <div className="card">
             <div className="card-header">
-              <span className="card-label">AI generated images</span>
+              <span className="card-label">AI Generated Images</span>
               <Badge text="R2" />
             </div>
             <div className="card-sub">Cloudflare R2 is the only storage backend for AI-generated assets.</div>
           </div>
           <div className="card">
             <div className="card-header">
-              <span className="card-label">WordPress product/blog images</span>
+              <span className="card-label">WP Product / Blog Images</span>
               <Badge text="wp_uploads + mysql" />
             </div>
             <div className="card-sub">WordPress media library remains the canonical storage path.</div>
           </div>
           <div className="card">
             <div className="card-header">
-              <span className="card-label">Control plane</span>
+              <span className="card-label">Control Plane</span>
               <Badge text={data?.sourceOfTruth ?? "supabase"} />
             </div>
             <div className="card-sub">Jobs, approvals, audit logs, and run lineage are stored in Supabase.</div>
           </div>
         </div>
 
-        <div className="section-title">Tenants snapshot</div>
-        <div className="link-list">
+        {/* ── Tenants Snapshot ────────────────────────── */}
+        <div className="section-title">Tenants Snapshot</div>
+        <div className="ops-table" style={{ marginBottom: 28 }}>
           {(data?.tenants ?? []).map((tenant) => (
-            <div className="link-card" key={tenant.id}>
-              <span>{tenant.name}</span>
-              <span className="link-card-arrow">
-                {tenant.status} · run:{tenant.lastRunStatus} · risk:{tenant.riskLevel}
-              </span>
+            <div className="ops-row" key={tenant.id}>
+              <div className="ops-row-key">{tenant.name}</div>
+              <div className="ops-row-val">
+                <span className="ops-row-badge">status: {tenant.status}</span>
+                <span className="ops-row-badge">run: {tenant.lastRunStatus}</span>
+                <span className="ops-row-badge">risk: {tenant.riskLevel}</span>
+              </div>
             </div>
           ))}
-          {!data?.tenants?.length && (
-            <div className="link-card">
-              <span>No tenant snapshot available</span>
-              <span className="link-card-arrow">seed pending</span>
-            </div>
-          )}
+          {!data?.tenants?.length && <EmptyRow label="No tenant snapshot available — seed pending" />}
         </div>
 
-        <div className="section-title" style={{ marginTop: 24 }}>Media boundary rules</div>
-        <div className="link-list">
+        {/* ── Media Boundary Rules ─────────────────────── */}
+        <div className="section-title">Media Boundary Rules</div>
+        <div className="ops-table" style={{ marginBottom: 28 }}>
           {(data?.mediaRules ?? []).map((rule) => (
-            <div className="link-card" key={`${rule.domain}-${rule.backend}`}>
-              <span>{rule.domain}</span>
-              <span className="link-card-arrow">{rule.backend}</span>
+            <div className="ops-row" key={`${rule.domain}-${rule.backend}`}>
+              <div className="ops-row-key">{rule.domain}</div>
+              <div className="ops-row-val">{rule.backend}</div>
             </div>
           ))}
+          {!data?.mediaRules?.length && <EmptyRow label="No media boundary rules configured" />}
         </div>
 
-        <div className="section-title" style={{ marginTop: 24 }}>Action allowlist</div>
-        <div className="link-list">
+        {/* ── Action Allowlist ─────────────────────────── */}
+        <div className="section-title">Action Allowlist</div>
+        <div className="ops-table" style={{ marginBottom: 28 }}>
           {(data?.actions ?? []).map((action) => (
-            <div className="link-card" key={action.id}>
-              <span>{action.displayName}</span>
-              <span className="link-card-arrow">
-                {action.environmentScope} · {action.riskLevel} · approval:{action.requiresApproval ? "yes" : "no"}
-              </span>
+            <div className="ops-row" key={action.id}>
+              <div className="ops-row-key">{action.displayName}</div>
+              <div className="ops-row-val">
+                <span className="ops-row-badge">{action.environmentScope}</span>
+                <span className="ops-row-badge">risk: {action.riskLevel}</span>
+                <span className="ops-row-badge">approval: {action.requiresApproval ? "required" : "not required"}</span>
+              </div>
             </div>
           ))}
+          {!data?.actions?.length && <EmptyRow label="No actions in allowlist" />}
         </div>
 
-        <div className="section-title" style={{ marginTop: 24 }}>Workflow runs (read-only)</div>
+        {/* ── Workflow Runs ────────────────────────────── */}
+        <div className="section-title">Workflow Runs (read-only)</div>
         <p className="form-hint" style={{ marginBottom: 12, maxWidth: 640 }}>
           Source summary: <code>{workflowSourceSummary || "none"}</code>
         </p>
-        <div className="link-list">
+        <div className="ops-table" style={{ marginBottom: 28 }}>
           {workflowRuns.map((run) => (
-            <div className="link-card" key={run.id}>
-              <span>{run.organizationSlug}</span>
-              <span className="link-card-arrow">
-                {run.status} · source:{run.runSource} · approval:{run.approvalStatus} · trace:{run.traceId}
-              </span>
+            <div className="ops-row" key={run.id}>
+              <div className="ops-row-key">{run.organizationSlug}</div>
+              <div className="ops-row-val">
+                <span className="ops-row-badge">{run.status}</span>
+                <span className="ops-row-badge">source: {run.runSource}</span>
+                <span className="ops-row-badge">approval: {run.approvalStatus}</span>
+                <span className="ops-row-badge" style={{ fontFamily: "monospace", fontSize: 10 }}>trace: {run.traceId}</span>
+              </div>
             </div>
           ))}
-          {!workflowRuns.length && (
-            <div className="link-card">
-              <span>No workflow runs available</span>
-              <span className="link-card-arrow">waiting for first execution</span>
-            </div>
-          )}
+          {!workflowRuns.length && <EmptyRow label="No workflow runs — waiting for first execution" />}
         </div>
 
-        <div className="section-title" style={{ marginTop: 32 }}>Tenant config (controlled patch)</div>
+        {/* ── Tenant Config ────────────────────────────── */}
+        <div className="section-title">Tenant Config (controlled patch)</div>
         <p className="form-hint" style={{ marginBottom: 12, maxWidth: 640 }}>
           PATCH allowlist is fixed to <code>status</code>, <code>defaultLocale</code>, and <code>defaultTimezone</code>.
           Only <code>owner/admin</code> role header can mutate.
@@ -196,12 +211,10 @@ export default async function OpsConsolePage() {
         {defaultTenantConfig ? (
           <TenantConfigForm tenant={defaultTenantConfig} />
         ) : (
-          <div className="link-card">
-            <span>Tenant config unavailable</span>
-            <span className="link-card-arrow">select tenant data source first</span>
-          </div>
+          <EmptyRow label="Tenant config unavailable — select tenant data source first" />
         )}
 
+        {/* ── M3 Department Selector ───────────────────── */}
         <div className="section-title" style={{ marginTop: 32 }}>M3 — 部門選型（20 部門）</div>
         <p className="form-hint" style={{ marginBottom: 12, maxWidth: 640 }}>
           勾選客戶啟用的部門能力模組。右側即時顯示需填寫的模板檔案與必填欄位。
@@ -210,13 +223,15 @@ export default async function OpsConsolePage() {
         </p>
         <DepartmentSelector tenantSlug={data?.tenants?.[0]?.id ?? ""} />
 
-        <div className="section-title" style={{ marginTop: 32 }}>Controlled write — AI image job</div>
+        {/* ── AI Job Form ──────────────────────────────── */}
+        <div className="section-title" style={{ marginTop: 32 }}>Controlled Write — AI Image Job</div>
         <p className="form-hint" style={{ marginBottom: 12, maxWidth: 640 }}>
-          Creates a <code>queued</code> row in <code>ai_image_jobs</code> and an audit event. Requires server env
-          <code> SUPABASE_URL</code> + <code>SUPABASE_SERVICE_ROLE_KEY</code> (or anon key for dev) and applied migration{" "}
+          Creates a <code>queued</code> row in <code>ai_image_jobs</code> and an audit event. Requires server env{" "}
+          <code>SUPABASE_URL</code> + <code>SUPABASE_SERVICE_ROLE_KEY</code> (or anon key for dev) and applied migration{" "}
           <code>0011_ops_console_control_plane.sql</code>.
         </p>
         <AiJobForm defaultOrganizationId={defaultOrgId} />
+
       </div>
     </>
   );
