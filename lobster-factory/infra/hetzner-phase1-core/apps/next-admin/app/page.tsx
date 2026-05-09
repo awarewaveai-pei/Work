@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-/** Avoid blank dashboard when INTERNAL_API_BASE_URL is set but empty in compose/.env (?? does not replace ""). */
 function getInternalApiBase(): string {
   const raw = process.env.INTERNAL_API_BASE_URL?.trim();
   if (raw) return raw.replace(/\/$/, "");
@@ -48,16 +47,21 @@ function StatusBadge({ ok }: { ok: boolean }) {
   );
 }
 
-interface NavCardProps {
+function NavCard({
+  href,
+  icon,
+  iconClass,
+  title,
+  desc,
+  external,
+}: {
   href: string;
   icon: string;
   iconClass: string;
   title: string;
   desc: string;
   external?: boolean;
-}
-
-function NavCard({ href, icon, iconClass, title, desc, external }: NavCardProps) {
+}) {
   const inner = (
     <>
       <span className={`link-card-icon-wrap ${iconClass}`}>{icon}</span>
@@ -99,7 +103,7 @@ export default async function DashboardPage() {
 
       <div className="page">
 
-        {/* ── System Status ───────────────────────────────────── */}
+        {/* ── System Status ───────────────────────────── */}
         <div className="card-grid">
           <div className="card">
             <div className="card-header">
@@ -142,8 +146,8 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Operations ──────────────────────────────────────── */}
-        <div className="section-title" style={{ marginTop: 8 }}>Operations</div>
+        {/* ── Monitoring ──────────────────────────────── */}
+        <div className="section-title" style={{ marginTop: 8 }}>Monitoring</div>
         <div className="link-list" style={{ marginBottom: 28 }}>
           <NavCard
             href="/ops/inbox"
@@ -160,22 +164,34 @@ export default async function DashboardPage() {
             desc="全客戶健康狀態 + WordPress 外掛更新"
           />
           <NavCard
+            href="/api-check"
+            icon="⬡"
+            iconClass="icon-infra"
+            title="API Health"
+            desc="Node API 即時健康狀態"
+          />
+        </div>
+
+        {/* ── Actions ─────────────────────────────────── */}
+        <div className="section-title">Actions</div>
+        <div className="link-list" style={{ marginBottom: 28 }}>
+          <NavCard
             href="/ops/approvals"
             icon="✓"
             iconClass="icon-ops"
             title="Pending Approvals"
-            desc="高風險指令簽核佇列"
+            desc="高風險指令等待簽核"
           />
           <NavCard
             href="/ops/system-modes"
             icon="◐"
             iconClass="icon-ops"
             title="System Modes"
-            desc="全域 Kill Switch · 維護模式"
+            desc="全域 Kill Switch · 維護模式切換"
           />
         </div>
 
-        {/* ── Provisioning ────────────────────────────────────── */}
+        {/* ── Provisioning ────────────────────────────── */}
         <div className="section-title">Provisioning</div>
         <div className="link-list" style={{ marginBottom: 28 }}>
           <NavCard
@@ -183,44 +199,18 @@ export default async function DashboardPage() {
             icon="✦"
             iconClass="icon-prov"
             title="New Client Onboarding"
-            desc="逐步精靈：資訊 → 部門 → 服務開通 → Build"
+            desc="逐步精靈：資訊 → 部門選型 → 服務開通 → Build"
           />
           <NavCard
             href="/build"
             icon="⚡"
             iconClass="icon-prov"
             title="Build Console"
-            desc="部署執行：plan_only 或 enqueue 到 Trigger.dev"
+            desc="部署執行：plan_only 預覽或 enqueue 送 Trigger.dev"
           />
         </div>
 
-        {/* ── Infrastructure ──────────────────────────────────── */}
-        <div className="section-title">Infrastructure</div>
-        <div className="link-list" style={{ marginBottom: 28 }}>
-          <NavCard
-            href="/ops-console"
-            icon="▣"
-            iconClass="icon-infra"
-            title="Ops Console"
-            desc="架構邊界 · Tenant 設定 · M3 部門 · AI Job"
-          />
-          <NavCard
-            href="/api-check"
-            icon="⬡"
-            iconClass="icon-infra"
-            title="API Health (server)"
-            desc="Node API server-side fetch 健康檢查"
-          />
-          <NavCard
-            href="/api-check-client"
-            icon="⬡"
-            iconClass="icon-infra"
-            title="API Health (browser)"
-            desc="Node API browser-side fetch 健康檢查"
-          />
-        </div>
-
-        {/* ── External Services ───────────────────────────────── */}
+        {/* ── External Services ───────────────────────── */}
         <div className="section-title">External Services</div>
         <div className="link-list">
           <NavCard
@@ -228,7 +218,7 @@ export default async function DashboardPage() {
             icon="⚙"
             iconClass="icon-ext"
             title="n8n Workflows"
-            desc="自動化工作流程"
+            desc="自動化工作流程引擎"
             external
           />
           <NavCard
@@ -244,7 +234,7 @@ export default async function DashboardPage() {
             icon="▶"
             iconClass="icon-ext"
             title="Trigger.dev"
-            desc="背景任務與排程"
+            desc="背景任務與排程系統"
             external
           />
           <NavCard
