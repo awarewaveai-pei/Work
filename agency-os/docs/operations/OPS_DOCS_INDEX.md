@@ -90,6 +90,7 @@
 | 工具與整合總表 | [tools-and-integrations.md](tools-and-integrations.md) |
 | 次世代交付藍圖 | [NEXT_GEN_DELIVERY_BLUEPRINT_V1.md](NEXT_GEN_DELIVERY_BLUEPRINT_V1.md) |
 | WordPress 客戶交付模型 | [WORDPRESS_CLIENT_DELIVERY_MODELS.md](WORDPRESS_CLIENT_DELIVERY_MODELS.md) |
+| MainWP + WPvivid 備份 gate / safe update | [MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md](MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md) |
 | 電商專案 Playbook | [ecommerce-project-playbook.md](ecommerce-project-playbook.md) |
 
 ### 事件／上線 Runbook（專案級）

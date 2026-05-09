@@ -40,6 +40,33 @@
 - **最終設定**：FluentSMTP → `smtp.resend.com:587 STARTTLS`，sender `noreply@aware-wave.com`，API key `re_6wtQKAuf_*`
 - **驗證**：`wp_mail()` 回傳 `SENT`，`peijingartstudio@gmail.com` 實際收到信 ✅
 
+### MainWP WPvivid extension 連線修復 <2026-05-09>
+
+- **目標頁**：`https://mainwp.aware-wave.com/wp-admin/admin.php?page=Extensions-Wpvivid-Backup-Mainwp`
+- **根因**：MainWP Dashboard DB 仍有 `aware-wave.com`、`soulfulexpression.org` 兩個 child site，但 `/wp-content/uploads/mainwp/pk/` 遺失對應 private-key decrypt files，導致 Dashboard sync 時無法簽署 child-site request。
+- **修復**：重新產生兩站 MainWP connection key pair；private key 只留在 MainWP Dashboard，child site 僅更新 `mainwp_child_pubkey` 與 connected admin。
+- **同步結果**：MainWP `sync_website()` 對兩站成功；`wpvivid-backup-mainwp` 狀態表已同步兩站 remote/schedule。
+- **驗證**：
+  - `get_websites()` 回傳 2 sites，兩站 WPvivid Backup v0.9.126 均為 installed + active + latest version。
+  - MainWP authenticated `wpvivid_get_backup_schedule_mainwp` 對兩站皆成功，回傳 schedule keys。
+  - MainWP 已讀到 Dropbox remote：Aware Wave `UpdateBackup`、Soulful `SoulfulDBBackup`。
+
+### MainWP + WPvivid runbook / maintenance agent scaffold <2026-05-09>
+
+- **完成（一句）**：把今日 MainWP + WPvivid 備份、同步、safe update 判斷沉澱為正式 runbook，並接到 Command Plane、Telegram cheatsheet、Claude slash command 與 subagent。
+- **新增／更新文件**：
+  - `agency-os/docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md`
+  - `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md`
+  - `agency-os/docs/operations/WP_MANAGED_UPDATES.md`
+  - `agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`
+  - `agency-os/docs/operations/OPS_DOCS_INDEX.md`
+  - `.claude/agents/wordpress-maintenance-agent.md`
+  - `.claude/commands/wp-maintenance.md`
+  - `.claude/agents/README.md`
+  - `CLAUDE.md`
+- **操作邊界**：Telegram 新增的是規劃中指令說明；尚未把 `/wp_backup_status`、`/wp_update_plan`、`/mainwp_sync_status`、`/wpvivid_storage_audit`、`/wp_safe_update` 加進 live handler 或 `RISK_TABLE`。
+- **資安註記**：未寫入使用者提供的任何密碼或 OAuth 憑證；remote storage OAuth 仍要求操作者在 browser 完成人工授權。
+
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:ad5c8b10ec026a69dff870de57623cbf5677ee0651324828988830a551a383f1 -->
@@ -2345,5 +2372,3 @@ _Last synced: 2026-05-08 17:10:53 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-

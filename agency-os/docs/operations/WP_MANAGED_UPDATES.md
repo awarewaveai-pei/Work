@@ -1,7 +1,7 @@
 # WordPress Managed Plugin Updates
 
 > **Owner file** — single source of truth for managed WordPress plugin update policy and runbook.  
-> **Last updated**: 2026-05-08  
+> **Last updated**: 2026-05-09
 > **Script**: `scripts/update-client-wp-plugins.ps1`  
 > **Client configs**: `agency-os/tenants/*/core/wp-update-config.json`
 
@@ -26,10 +26,11 @@ Tier 1 (today): scripts/update-client-wp-plugins.ps1
   └── Rollback: SCP backup back → gunzip | mysql
   └── Report: agency-os/reports/wp-updates/<client>-YYYYMMDD.json
 
-Tier 2 (deferred — activate when 3+ WP clients):
-  └── MainWP Dashboard on aware-wave.com WordPress
-  └── Tier 1 script config becomes the connection template
-  └── See §7 for upgrade path
+Tier 2 (active visual/control plane):
+  └── MainWP Dashboard at mainwp.aware-wave.com
+  └── WPvivid Backup for MainWP extension
+  └── Backup gate owner: agency-os/docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md
+  └── Tier 1 remains the automation/emergency CLI path where SSH is available
 ```
 
 **Why not staging-first?**  
@@ -196,22 +197,25 @@ Based on `projects/2026-011-existing-site-handover-soulful/10_DISCOVERY.md` (202
 
 ---
 
-## 10. Tier 2 Upgrade: MainWP Dashboard
+## 10. Tier 2: MainWP Dashboard + WPvivid
 
-**Trigger**: when managing 3+ WordPress client sites.
+**Status**: active for visual management and backup verification.
 
-**Setup**:
-1. Install MainWP Dashboard plugin on `aware-wave.com` WordPress (separate WP install, not Soulful)
-2. Install MainWP Child plugin on each client WordPress site
-3. Add each client to MainWP using the same SSH/FTP credentials from their `wp-update-config.json`
-4. Configure MainWP extension for automatic update staging and rollback
+Primary dashboard: `https://mainwp.aware-wave.com/wp-admin/admin.php?page=Extensions-Wpvivid-Backup-Mainwp`
 
-**Why defer**:
-- MainWP adds infrastructure overhead (another WP instance to maintain)
-- ROI only positive at 3+ clients — one client is faster via CLI
-- Tier 1 script remains valid as the CLI/API path even after MainWP is live
+**Setup baseline**:
+1. MainWP Dashboard runs on `mainwp.aware-wave.com`.
+2. MainWP Child plugin is installed on each connected client WordPress site.
+3. WPvivid Backup for MainWP extension is installed on the dashboard.
+4. Each client has a remote-storage-backed WPvivid schedule before production updates are allowed.
+5. The owner runbook for backup setup, sync checks, storage policy, and safe-update gates is `agency-os/docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md`.
 
-**Coexistence**: both Tier 1 and Tier 2 can coexist — Tier 1 handles emergencies and automation; MainWP handles scheduled updates and visual reporting.
+**Current split of responsibility**:
+- Tier 1 script remains the automation and emergency rollback path where SSH/WP-CLI access exists.
+- MainWP handles visual site inventory, plugin visibility, client-site sync, and operator-driven updates.
+- WPvivid provides the backup proof required before safe updates.
+
+**Coexistence**: both Tier 1 and Tier 2 remain valid. When both are available, use MainWP/WPvivid to verify backup readiness, then use the lowest-risk update path for the client and wave.
 
 ---
 
@@ -253,6 +257,7 @@ Report schema:
 - `tenants/company-soulful-expression/projects/2026-011-existing-site-handover-soulful/10_DISCOVERY.md` — plugin risk baseline
 - `tenants/company-soulful-expression/core/BACKUP_RESTORE_PROOF.md` — backup records
 - `tenants/company-soulful-expression/core/ENVIRONMENT_REGISTRY.md` — environment SSOT
+- `agency-os/docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md` — MainWP + WPvivid backup gate and safe-update routine
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` — tool routing constraints
 
-_Last updated: 2026-05-08_
+_Last updated: 2026-05-09_

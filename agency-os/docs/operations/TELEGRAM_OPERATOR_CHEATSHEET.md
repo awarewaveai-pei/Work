@@ -73,6 +73,8 @@ Slack 推播警報
 | `/daily_review` | 24h AI 摘要（會花 ~10 秒）|
 | `/weekly_review` | 7 天 AI 摘要（會花 ~20 秒）|
 | `/list_failed_runs` | 最近失敗的 workflow runs |
+| `/client_status` | 全部客戶健康狀態 + WordPress 更新摘要 |
+| `/client_status soulful` | 單一客戶詳細狀態、plugin wave、最近更新結果 |
 
 ### 3.2 緊急鎖（中風險，但你只能鎖自己系統）🟡
 
@@ -91,7 +93,21 @@ Slack 推播警報
 | `/trigger_staging_workflow ao-infrastructure-check` | 觸發 staging workflow（白名單只有這條） |
 | `/replay_dead_letter <uuid>` | 看某個失敗的 dead-letter event 細節（不會自動 retry） |
 
-### 3.4 高風險（**永遠**從 Telegram 擋下）🔴
+### 3.4 WordPress 維護指令（規劃中，尚未上線）
+
+這些是 MainWP + WPvivid safe update routine 的預定 Telegram 介面。現在先不要期待 bot 選單會出現；handler 上線前，未知指令仍會被 policy 擋下。
+
+| 指令 | 風險 | 用途 |
+|------|------|------|
+| `/wp_backup_status [client]` | 低 | 查 WPvivid 最近備份、備份範圍、遠端儲存狀態 |
+| `/wp_update_plan <client>` | 低 | 查待更新 plugin 與 wave 分類，不執行更新 |
+| `/mainwp_sync_status` | 低 | 查 MainWP child sites 是否能同步 |
+| `/wpvivid_storage_audit` | 低 | 查 Dropbox/Google Drive/S3 空間是否快滿 |
+| `/wp_safe_update <client> <wave>` | 高 | 只建立簽核請求；不能從 Telegram 直接更新 production |
+
+操作原則：production plugin update 前必須先通過 `agency-os/docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md` 的 backup gate。
+
+### 3.5 高風險（**永遠**從 Telegram 擋下）🔴
 
 從 Telegram 打這些指令，**只會 queue 在 ops console** 等簽核，不會直接執行：
 
@@ -99,7 +115,7 @@ Slack 推播警報
 - `/deploy_production`（尚無 handler，目前任何 deploy 走 Termius SSH）
 - `/refund` / `/dns_change` / `/rotate_secrets`（尚無 handler）
 
-### 3.5 危險指令（**永遠**擋下，連 queue 都不會）⛔
+### 3.6 危險指令（**永遠**擋下，連 queue 都不會）⛔
 
 ```
 /drop_table /read_secrets /destructive_migration
@@ -306,6 +322,7 @@ Label:     EU-Supabase-Database
 
 - `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md` — owner doc，整體架構
 - `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE_OPERATIONS.md` — 維運手冊（換 token、smoke test）
+- `agency-os/docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md` — MainWP + WPvivid 備份 gate / WordPress safe update routine
 - `agency-os/docs/operations/TELEGRAM_COMMAND_POLICY.md` — 25 個指令 policy 詳細
 - `lobster-factory/packages/db/migrations/0025_always_on_command_plane.sql` — schema
 - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/command-plane/policyEngine.ts` — RISK_TABLE 真相
@@ -339,4 +356,4 @@ Label:     EU-Supabase-Database
 
 ---
 
-_Last updated: 2026-05-08 · 出國前必讀 · 印一份在皮夾錢包都不為過_
+_Last updated: 2026-05-09 · 出國前必讀 · 印一份在皮夾錢包都不為過_

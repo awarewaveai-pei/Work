@@ -138,6 +138,7 @@ ssh hetzner-sg 'stat -c "mtime=%y" /etc/default/awarewave-endpoint-alert.local; 
 | `/vault-sync` | 同步 vault → Windows user env，列出仍缺的 key |
 | `/vault-status` | 顯示 vault 所有 key 名稱 + `.cursor/mcp.json` 缺漏清單 |
 | `/client-status` | 查詢所有客戶（或單一）健康 + WP 更新狀態（呼叫 `/api/ops/clients` + Telegram `/client_status` 同源） |
+| `/wp-maintenance` | WordPress 維護入口：MainWP/WPvivid 備份狀態、更新計畫、backup-gated safe update routine |
 
 ## Project Subagents
 
@@ -149,6 +150,7 @@ ssh hetzner-sg 'stat -c "mtime=%y" /etc/default/awarewave-endpoint-alert.local; 
 | `site-builder` | 新客戶租戶佈建（GitHub / Sentry / PostHog / Supabase / n8n） |
 | `trigger-deploy-agent` | Trigger.dev EU 工作流部署（需提供 `tr_pat_*` Personal Access Token） |
 | `client-onboarding` | 新客戶 onboarding（Supabase SQL seed + SSH 金鑰存放 + Wave 分類 / MainWP 連線）|
+| `wordpress-maintenance-agent` | WordPress 客戶維護（MainWP/WPvivid 備份 gate、MainWP sync、plugin wave 更新計畫 / safe update）|
 | `decision-intelligence` | 18 階段多代理決策評審（工具選型、架構審查、商業策略）；使用 `ai-decision-intelligence` skill；`/decide` 觸發 |
 
 ## 桌機 / 換機設定（**自動化版**，2026-05-07 起）
@@ -214,4 +216,3 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
 - 一鍵腳本：`scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`
 
 完整桌機快速啟動：`agency-os/docs/operations/dual-ide-coexistence-strategy.md` §新機器快速啟動
-

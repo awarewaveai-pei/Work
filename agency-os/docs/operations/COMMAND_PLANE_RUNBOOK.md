@@ -260,6 +260,34 @@ An Anthropic Routine (`AgencyOS-WpWeeklyScan`) will:
 
 **Status: planned.** Current workaround: send `/client_status` from Telegram or view the Ops Dashboard.
 
+### 10.6 MainWP + WPvivid Backup Gate (safe update routine)
+
+Owner runbook: `agency-os/docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md`.
+
+Safe WordPress updates must pass the backup gate before any production plugin update:
+1. Confirm MainWP can sync the client site and shows the site as connected.
+2. Confirm WPvivid has a recent successful backup for the client.
+3. Confirm backup scope is enough for the planned update:
+   - DB-only backup is acceptable for content/config-only risk.
+   - Full-site backup is required for plugin/theme/core file changes unless there is a separate file rollback path.
+4. Classify updates by wave (`wave1`, `wave2`, `wave3`) using §10.4.
+5. Execute the update through the lowest-risk available path:
+   - SSH/WP-CLI streaming update when agency has SSH.
+   - MainWP visual update when MainWP is the active management path.
+6. Re-check HTTP health, login/admin access when relevant, and WPvivid/MainWP status after the update.
+
+Planned Telegram command surface:
+
+| Command | Risk | Status | Purpose |
+|---|---:|---|---|
+| `/wp_backup_status [client]` | low | planned | Read-only backup freshness and storage status |
+| `/wp_update_plan <client>` | low | planned | Read-only pending update wave plan |
+| `/mainwp_sync_status` | low | planned | Read-only MainWP child-site connection status |
+| `/wpvivid_storage_audit` | low | planned | Read-only storage quota / backup scope review |
+| `/wp_safe_update <client> <wave>` | high | planned | Approval-queued safe update request, never direct Telegram execution |
+
+Do not add planned WordPress maintenance commands to `RISK_TABLE` or `setMyCommands` until handlers exist. Unknown commands are high-risk blocked by default (§5), so documenting the future command names here does not make them executable.
+
 ---
 
 ## 11. Verification
@@ -288,9 +316,10 @@ The smoke test runs eight checks (see script header). Exit 0 = all green.
 
 - `agency-os/docs/operations/ALWAYS_ON_COMMAND_PLANE_OPERATIONS.md` — **operator manual** (roles / functions / settings / troubleshooting)
 - `agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md` — **出國 / 沒筆電 必看**（5 步出國前驗證、緊急 SOP、Termius 設定、解鎖路徑）
+- `agency-os/docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md` — MainWP + WPvivid backup gate and safe WordPress update routine
 - `agency-os/docs/operations/TELEGRAM_COMMAND_POLICY.md` — Telegram-specific authentication and rate-limiting policy
 - `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` — tool / MCP boundary spec
 - `agency-os/docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md` — 30-year execution contract
 - `agency-os/docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md` — Sentry / PostHog / Uptime Kuma baseline this plane reuses
 
-_Last updated: 2026-05-08_
+_Last updated: 2026-05-09_
