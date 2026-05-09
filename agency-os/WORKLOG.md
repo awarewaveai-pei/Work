@@ -32,6 +32,14 @@
   - **待操作者**：MainWP Dashboard 後台初始化精靈 + 接入第一個客戶
 - **文件更新**：`D:\Work\docs\wordpress_mainwp_plan.md` §25 部署紀錄新增
 
+### MainWP Email (FluentSMTP) 修復 <2026-05-09>
+
+- **根因**：`fluentmail-settings` 的 `connections.connection_1.provider_settings` 缺少 `provider` key，導致 `Factory::make("")` → `ReflectionException: Class "" does not exist`
+- **Port**：465 (SSL) 被 EU VPS 封鎖，改用 587 (STARTTLS)
+- **Resend 域名驗證**：`aware-wave.com` 新增至 Resend，DNS 3 筆（DKIM TXT + SPF MX + SPF TXT）加入 Cloudflare，全部 verified
+- **最終設定**：FluentSMTP → `smtp.resend.com:587 STARTTLS`，sender `noreply@aware-wave.com`，API key `re_6wtQKAuf_*`
+- **驗證**：`wp_mail()` 回傳 `SENT`，`peijingartstudio@gmail.com` 實際收到信 ✅
+
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:ad5c8b10ec026a69dff870de57623cbf5677ee0651324828988830a551a383f1 -->

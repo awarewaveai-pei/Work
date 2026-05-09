@@ -1174,3 +1174,24 @@ docker exec mainwp-web wp option update blog_public 1 --allow-root
 輸出：`/root/mainwp/backups/mainwp-db-<timestamp>.sql` + `mainwp-files-<timestamp>.tar.gz`
 
 還原：`/root/mainwp/scripts/migrate-to-vps.sh restore <db.sql> <files.tar.gz>`
+
+### 25.5 Email（FluentSMTP）設定 <2026-05-09>
+
+**狀態：運作中 ✅**
+
+| 欄位 | 值 |
+|------|-----|
+| Plugin | FluentSMTP 2.2.95 |
+| Provider | Generic SMTP (`smtp` key → `Smtp` handler) |
+| Host | `smtp.resend.com` |
+| Port | `587` (STARTTLS；465 被 EU VPS 封鎖) |
+| 認證 | username=`resend` / password=Resend API key |
+| Sender | `noreply@aware-wave.com` |
+| Force from email | yes |
+
+**Resend 域名驗證（aware-wave.com）**：
+- Domain ID: `54f1cc8b-b4c0-44a4-a94d-a383509b5fea`
+- Cloudflare DNS 新增：DKIM TXT (`resend._domainkey`) + SPF MX (`send`) + SPF TXT (`send`)
+- 狀態：`verified` ✅
+
+**關鍵修正紀錄**：`provider_settings` 內必須有 `"provider" => "smtp"`，否則 FluentSMTP Factory 會嘗試建立空字串類別（`ReflectionException: Class "" does not exist`）。
