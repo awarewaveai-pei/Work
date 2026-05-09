@@ -1,19 +1,47 @@
 ﻿{
-    "last_run_utc":  "2026-05-08T17:10:54.4627909Z",
+    "last_run_utc":  "2026-05-09T12:51:07.2535961Z",
     "changed_files":  [
+                          "docs/CHANGE_IMPACT_MATRIX.md",
+                          "docs/operations/COMMAND_PLANE_RUNBOOK.md",
+                          "docs/operations/COMMAND_PLANE_RUNBOOK.zh-TW.md",
+                          "docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md",
+                          "docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md",
+                          "docs/operations/OPS_DOCS_INDEX.md",
+                          "docs/operations/ops-inbox-user-guide.md",
+                          "docs/operations/TELEGRAM_COMMAND_POLICY.zh-TW.md",
+                          "docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md",
+                          "docs/operations/WP_MANAGED_UPDATES.md",
+                          "docs/overview/ao-lobster-operating-model.md",
+                          "docs/overview/company-os-four-sources-integration.md",
                           "docs/overview/PROGRAM_TIMELINE.md",
                           "memory/CONVERSATION_MEMORY.md",
                           "memory/daily/2026-05-09.md",
+                          "TASKS.md",
                           "WORKLOG.md"
                       ],
     "impacted_files":  [
+                           "docs/CHANGE_IMPACT_MATRIX.md",
+                           "docs/operations/COMMAND_PLANE_RUNBOOK.md",
+                           "docs/operations/COMMAND_PLANE_RUNBOOK.zh-TW.md",
+                           "docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md",
+                           "docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md",
+                           "docs/operations/OPS_DOCS_INDEX.md",
+                           "docs/operations/ops-inbox-user-guide.md",
+                           "docs/operations/TELEGRAM_COMMAND_POLICY.zh-TW.md",
+                           "docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md",
+                           "docs/operations/WP_MANAGED_UPDATES.md",
+                           "docs/overview/ao-lobster-operating-model.md",
+                           "docs/overview/company-os-four-sources-integration.md",
                            "docs/overview/PROGRAM_TIMELINE.md",
                            "memory/CONVERSATION_MEMORY.md",
                            "memory/daily/2026-05-09.md",
+                           "TASKS.md",
                            "WORKLOG.md"
                        ],
     "auto_updated_files":  [
+                               "docs/CHANGE_IMPACT_MATRIX.md",
                                "memory/CONVERSATION_MEMORY.md",
+                               "TASKS.md",
                                "WORKLOG.md"
                            ]
 }

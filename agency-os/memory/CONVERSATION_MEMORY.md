@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-09 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-09 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:a0732676aeba440afe79a57c88a354091525aeafc081a8bc4b9c4147bdc0dd8a -->
+- **2026-05-09（next-admin UI 配色層級重做）**：用戶指 sidebar 顏色大配＋Build 頁無層級。根因：sidebar 所有顏色同一 blue-gray 系，active state 白色 bar 疊白字不可見；Build 左右 panel 外觀相同，無主次。修正：sidebar section label 改極淡 `rgba(255,255,255,0.28)`，普通連結 `rgba(255,255,255,0.60)`，active 改 indigo bg+bar；Build profile grid 包成 step 1 區塊，右 gates panel 改 bg-subtle sticky，step headers 加 border-top；Submit CTA 更強陰影。Commit `241b062`，SG deploy `ff1ef68` healthy。
 - **2026-05-09（ONBOARDING 發布）**：`/team-onboarding` skill 生成 `ONBOARDING.md`（30 天使用資料：Build Feature 55% / Debug Fix 20% / Plan Design 15% / Analyze Data 10%；MCP: hetzner-ssh 427 calls / awarewave-ops 84 calls）。User 補寫 7 條 Team Tips（monorepo 根目錄、vault 機器獨立、commit prefix `[claude]`、main-only、Telegram bot、health 100%、migration 不改舊檔）+ 6 步 Get Started。Share URL: https://claude.ai/claude-code/onboard/O3clJrMsjeQ5（short_code: O3clJrMsjeQ5）。
 - **2026-05-09 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-09 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:ad5c8b10ec026a69dff870de57623cbf5677ee0651324828988830a551a383f1 -->
 - **2026-05-08 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-08 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:f51105af91f8da83f3587bec273986d7cf30f90b1cc8de6160d932a81cb34272 -->
@@ -410,5 +412,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-08 17:10:53 UTC_
+_Last synced: 2026-05-09 12:51:06 UTC_
 

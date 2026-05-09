@@ -4,6 +4,24 @@
 
 ## 2026-05-09
 
+### next-admin UI 配色＋層級重做 <2026-05-09>
+
+- **問題**：Sidebar 所有顏色同一 blue-gray 系（section label `#8ab0cc` ≈ nav text `#b8cfdf`，active state 白色 bar 在白字上不可見）；Build `/build` 頁左右 panel 外觀完全相同，無主次，section header 過小
+- **改動 — Sidebar**：
+  - Section 標籤：`rgba(255,255,255,0.28)` — 極淡，明確是「分類標籤」而非連結
+  - 普通連結：`rgba(255,255,255,0.60)` — 可讀但偏次要
+  - Active：indigo 背景 `rgba(99,102,241,0.22)` + indigo 左條 `#818cf8`（原本白色疊白字，看不出來）
+  - Disabled：直接 `rgba(255,255,255,0.22)` — 不再靠 opacity cascade
+- **改動 — Build 頁**：
+  - Profile grid 包成 `bg-subtle` 區塊 + `STEP 1 — SELECT PROFILE` CSS `::before` 標籤
+  - 右 panel（gates）改 `bg-subtle + 無 shadow + sticky top:72px`，明確是「參考 sidebar」非主表單
+  - `build-step-header` 加 `border-top + full contrast text`，有感覺的 section break
+  - Prerequisites、Integrations toggle 改 `text-muted`，明確選填次要
+  - Submit CTA 更多 margin + 更強 shadow + hover lift
+- **File**：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css`
+- **Commit**：`241b062`（80 insertions, 36 deletions）
+- **SG deploy**：`sg-deploy.sh next-admin`，deployed commit `ff1ef68`，`lobster-next-admin` Up healthy
+
 ### Daily
 - `/team-onboarding` skill 生成 `ONBOARDING.md`（work type breakdown + MCP server checklist + skills list），user 補寫 7 條 Team Tips + 6 步 Get Started，發布至 https://claude.ai/claude-code/onboard/O3clJrMsjeQ5（short_code: O3clJrMsjeQ5）。
 
@@ -97,6 +115,19 @@
 - **Git**: bdac9ec (ONBOARDING + WORKLOG), 8d681b3 (Dockerfile), 7c5cad5 (rename), f91bec0 (restore route), 31ad905 (Phase 2c)
 - **對應 TASKS 子字串（可選）**: Phase 2c
 - **風險／待辦（可選）**: /daily_review /weekly_review 在新 Anthropic key + Dockerfile 修正後應已正常；用戶尚未手動確認回覆正常
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:a0732676aeba440afe79a57c88a354091525aeafc081a8bc4b9c4147bdc0dd8a -->
+
+### claude-sonnet-4-6 <2026-05-09 20:45>
+
+- **完成（一句）**: next-admin UI 配色重做 — sidebar 四層色彩層次 + Build 頁左右 panel 視覺主次 + SG deploy healthy
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css`
+- **Git**: 241b062（UI redesign）；SG deployed commit ff1ef68
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 遠端 SG next-admin 已 Up healthy；UI 為視覺調整，無 DB/auth/RLS 邊界異動
 
 ## 2026-05-08
 
@@ -1950,7 +1981,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-08 17:10:53 UTC_
+_Last synced: 2026-05-09 12:51:06 UTC_
 
 ## 2026-03-20
 
@@ -2384,3 +2415,4 @@ _Last synced: 2026-05-08 17:10:53 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
