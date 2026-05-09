@@ -131,6 +131,7 @@ ssh hetzner-sg 'stat -c "mtime=%y" /etc/default/awarewave-endpoint-alert.local; 
 | `/verify` | 執行 `verify-build-gates.ps1` |
 | `/build-tenant` | 引導新客戶租戶佈建（Lobster Factory） |
 | `/smoke-test` | 執行 n8n MCP + 核心服務煙霧測試 |
+| `/decide` | 18 階段多代理決策評審（工具選型 / 架構審查 / 商業策略）產出完整決策文件含可觀測性計畫 |
 | `/strategy-review` | 多角度策略決策審查（4 角色協作 / 紅藍辯論 / Pre-Mortem） |
 | `/sg-deploy` | SSH 上 SG VPS 跑 `sg-deploy.sh`（git → staging rsync → build → up → 寫 `.deployed-commit`） |
 | `/check-drift` | 跑 `check-deploy-drift.ps1`，回報 SG production vs `origin/main` 落後幾個 commit |
@@ -148,6 +149,7 @@ ssh hetzner-sg 'stat -c "mtime=%y" /etc/default/awarewave-endpoint-alert.local; 
 | `site-builder` | 新客戶租戶佈建（GitHub / Sentry / PostHog / Supabase / n8n） |
 | `trigger-deploy-agent` | Trigger.dev EU 工作流部署（需提供 `tr_pat_*` Personal Access Token） |
 | `client-onboarding` | 新客戶 onboarding（Supabase SQL seed + SSH 金鑰存放 + Wave 分類 / MainWP 連線）|
+| `decision-intelligence` | 18 階段多代理決策評審（工具選型、架構審查、商業策略）；使用 `ai-decision-intelligence` skill；`/decide` 觸發 |
 
 ## 桌機 / 換機設定（**自動化版**，2026-05-07 起）
 
