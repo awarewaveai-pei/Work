@@ -32,6 +32,8 @@
 | `nginx` | `nginx:stable`（upstream tag） | 改 compose image tag → `docker compose pull nginx && up -d nginx` |
 | `redis` | `redis:7-alpine`（upstream tag） | 同上 |
 | `wordpress-db` | `mariadb:11`（upstream tag） | **大版本升級需 DR drill**；非緊急不輕易回滾 |
+| `mainwp-web` (EU) | `wordpress:6.7-apache`（upstream tag） | `/root/mainwp/scripts/migrate-to-vps.sh backup` → 改 compose image tag → `docker compose up -d` → restore DB/files。Owner doc: `docs/wordpress_mainwp_plan.md` §25.4 |
+| `mainwp-db` (EU) | `mysql:8.0`（upstream tag） | mysqldump 備份優先；大版本升級需 DR drill |
 
 ---
 
