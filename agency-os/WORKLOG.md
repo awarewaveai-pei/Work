@@ -24,11 +24,12 @@
   - WP-Cron → host crontab `*/5 * * * *` curl `http://127.0.0.1:8090/wp-cron.php`
   - Uptime Kuma Monitor ID 22：`MainWP Dashboard (EU)`，60s 間隔
   - 備份腳本：`/root/mainwp/scripts/migrate-to-vps.sh`
-- **待操作者完成**：
-  1. Cloudflare DNS A: `mainwp.aware-wave.com → 204.168.175.41`（灰雲）
-  2. DNS 傳播後：`certbot --expand -d ... -d mainwp.aware-wave.com --nginx`
-  3. SSL 完成後：`wp option update blog_public 1`
-  4. MainWP Dashboard 後台初始化精靈
+- **SSL 完成（2026-05-09）**：
+  1. ✅ Cloudflare DNS A: `mainwp.aware-wave.com → 204.168.175.41`
+  2. ✅ `certbot --expand` — 憑證核發，到期 2026-08-07，6 個域名
+  3. ✅ `blog_public = 1`（搜尋引擎索引開啟）
+  4. ✅ HTTPS smoke: wp-login 200 / wp-admin 302 / xmlrpc 403
+  - **待操作者**：MainWP Dashboard 後台初始化精靈 + 接入第一個客戶
 - **文件更新**：`D:\Work\docs\wordpress_mainwp_plan.md` §25 部署紀錄新增
 
 
