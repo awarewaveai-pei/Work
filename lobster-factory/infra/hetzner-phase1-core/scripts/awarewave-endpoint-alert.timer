@@ -7,7 +7,7 @@ Description=Run AwareWave endpoint alert check every minute (wall-clock aligned)
 # exceeds common Kuma push windows (60s) and causes striped DOWN/PENDING history.
 OnBootSec=45sec
 OnCalendar=*-*-* *:*:00
-AccuracySec=30s
+AccuracySec=1s
 Persistent=true
 Unit=awarewave-endpoint-alert.service
 

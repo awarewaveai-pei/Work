@@ -216,6 +216,6 @@ if [[ "${notify}" == "true" ]]; then
 fi
 
 # Heartbeat last; failure non-fatal (see send_heartbeat).
-if [[ "${new_kind}" == "ok" ]]; then
-  send_heartbeat || true
-fi
+# Always send regardless of endpoint health — this push monitor tracks that
+# THIS alerter process is running. Endpoint failures surface via Slack/PagerDuty.
+send_heartbeat || true
