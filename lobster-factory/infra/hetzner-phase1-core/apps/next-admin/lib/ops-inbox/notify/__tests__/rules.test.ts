@@ -11,10 +11,26 @@ const baseIncident: any = {
 describe("decideNotification", () => {
   beforeEach(() => {
     process.env.OPS_INBOX_NOTIFY_ENABLED = "true";
+    delete process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK;
   });
 
   it("respects globally_disabled", () => {
     process.env.OPS_INBOX_NOTIFY_ENABLED = "false";
+    delete process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK;
+    expect(decideNotification({ incident: baseIncident, transition: { kind: "new" }, now: new Date() }).shouldSend).toBe(false);
+  });
+
+  it("implicitly enables notify when webhook is set and OPS_INBOX_NOTIFY_ENABLED unset", () => {
+    delete process.env.OPS_INBOX_NOTIFY_ENABLED;
+    process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK = "https://hooks.slack.com/services/FAKE/FAKE/FAKE";
+    const d = decideNotification({ incident: baseIncident, transition: { kind: "new" }, now: new Date() });
+    expect(d.shouldSend).toBe(true);
+    delete process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK;
+  });
+
+  it("stays disabled when neither flag nor webhook", () => {
+    delete process.env.OPS_INBOX_NOTIFY_ENABLED;
+    delete process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK;
     expect(decideNotification({ incident: baseIncident, transition: { kind: "new" }, now: new Date() }).shouldSend).toBe(false);
   });
 

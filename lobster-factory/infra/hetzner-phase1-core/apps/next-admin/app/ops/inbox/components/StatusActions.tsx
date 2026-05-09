@@ -5,7 +5,8 @@ import { acknowledgeIncident, ignoreIncident, reopenIncident, resolveIncident } 
 
 export function StatusActions({ incidentId, status, canAct }: { incidentId: string; status: string; canAct: boolean }) {
   const [pending, start] = useTransition();
-  if (!canAct) return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>(view only)</span>;
+  if (!canAct)
+    return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>（唯讀，無法變更狀態）</span>;
   const btn = {
     padding: "6px 12px",
     borderRadius: 6,
@@ -14,25 +15,25 @@ export function StatusActions({ incidentId, status, canAct }: { incidentId: stri
     cursor: "pointer",
   } as const;
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
       {status === "open" && (
         <button style={btn} disabled={pending} onClick={() => start(() => acknowledgeIncident(incidentId))}>
-          Acknowledge
+          標記調查中
         </button>
       )}
       {(status === "open" || status === "investigating") && (
         <button style={btn} disabled={pending} onClick={() => start(() => resolveIncident(incidentId))}>
-          Mark resolved
+          標記已解決
         </button>
       )}
       {(status === "open" || status === "investigating") && (
         <button style={btn} disabled={pending} onClick={() => start(() => ignoreIncident(incidentId))}>
-          Mark ignored
+          標記忽略
         </button>
       )}
       {(status === "resolved" || status === "ignored") && (
         <button style={btn} disabled={pending} onClick={() => start(() => reopenIncident(incidentId))}>
-          Reopen
+          重新開啟
         </button>
       )}
     </div>

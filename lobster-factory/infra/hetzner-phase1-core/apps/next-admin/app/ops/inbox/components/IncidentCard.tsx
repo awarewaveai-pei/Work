@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Incident } from "@/lib/ops-inbox/types";
 import { OpenInCursorButton } from "./OpenInCursorButton";
+import { StatusActions } from "./StatusActions";
 
 const SOURCE_LABEL: Record<string, string> = {
   sentry: "Sentry",
@@ -219,12 +220,12 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
           {/* Status (non-open) */}
           {isResolved && (
             <span style={{ fontSize: 11, color: "#16a34a", background: "#dcfce7", padding: "1px 6px", borderRadius: 4 }}>
-              resolved
+              已解決
             </span>
           )}
           {isIgnored && (
             <span style={{ fontSize: 11, color: "#6b7280", background: "#f3f4f6", padding: "1px 6px", borderRadius: 4 }}>
-              ignored
+              已忽略
             </span>
           )}
 
@@ -296,14 +297,15 @@ export function IncidentCard({ incident, canAct }: { incident: Incident; canAct:
             {incident.occurrence_count} occurrence{incident.occurrence_count !== 1 ? "s" : ""}
           </span>
           <OpenInCursorButton incident={incident} primary={false} />
-          {canAct && (
-            <Link
-              href={`/ops/inbox/${incident.id}`}
-              style={{ fontSize: 12, color: "#6366f1", textDecoration: "none", fontWeight: 500 }}
-            >
-              Details →
-            </Link>
-          )}
+          <Link
+            href={`/ops/inbox/${incident.id}`}
+            style={{ fontSize: 12, color: "#6366f1", textDecoration: "none", fontWeight: 500 }}
+          >
+            詳情 →
+          </Link>
+        </div>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9", width: "100%" }}>
+          <StatusActions incidentId={incident.id} status={incident.status} canAct={canAct} />
         </div>
       </div>
     </article>

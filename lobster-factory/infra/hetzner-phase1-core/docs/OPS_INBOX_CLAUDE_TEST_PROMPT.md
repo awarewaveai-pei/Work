@@ -36,8 +36,7 @@
 
 5. **驗證 Slack（若營運要求）**  
    - 容器／compose 環境需同時滿足（同樣從 vault 讀取，**不要**貼進聊天）：  
-     - `OPS_INBOX_NOTIFY_ENABLED=true`  
-     - `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK=<Slack Incoming Webhook URL>`  
+     - `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK=<Slack Incoming Webhook URL>`（已設 webhook 且未設 `OPS_INBOX_NOTIFY_ENABLED=false` 時即會發 Slack；若要明確開關可設 `OPS_INBOX_NOTIFY_ENABLED=true`）  
      - `OPS_INBOX_PUBLIC_URL=https://app.aware-wave.com`（與實際對外網域一致，供訊息內連結）  
    - 合成測試觸發 **新事件** 後，預期 Slack 頻道出現含嚴重度與「Open in Inbox」連結的訊息；並在該筆事件詳情頁 **Notify Log** 看到 `sent`（或若關閉通知則為 `skipped` + `reason`）。
 

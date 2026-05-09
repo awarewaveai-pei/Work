@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { isOpsInboxNotifyGloballyEnabled } from "@/lib/ops-inbox/notify/rules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export async function GET() {
   const maxIngestAgeMinutes = parsePositiveIntEnv("OPS_INBOX_MAX_INGEST_AGE_MINUTES", 1440);
   const requireRecentIngest = parseBooleanEnv("OPS_INBOX_REQUIRE_RECENT_INGEST", true);
   const ingestTokenConfigured = Boolean(process.env.OPS_INBOX_INGEST_TOKEN?.trim());
-  const notifyEnabled = process.env.OPS_INBOX_NOTIFY_ENABLED === "true";
+  const notifyEnabled = isOpsInboxNotifyGloballyEnabled();
   const slackWebhookConfigured = Boolean(process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK?.trim());
 
   let ingestAgeMinutes: number | null = null;

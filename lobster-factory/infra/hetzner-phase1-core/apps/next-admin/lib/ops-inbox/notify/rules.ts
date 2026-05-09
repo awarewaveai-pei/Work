@@ -1,5 +1,19 @@
 import type { Incident, IncidentTransition, NotificationRule } from "../types";
 
+/**
+ * Slack (and future notifiers) honor this gate:
+ * - Explicit `OPS_INBOX_NOTIFY_ENABLED=false` (or 0/no/off) → off
+ * - Explicit `true` → on
+ * - Unset/empty → on **if** `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK` is set (avoids "webhook configured but zero messages")
+ * - Otherwise off
+ */
+export function isOpsInboxNotifyGloballyEnabled(): boolean {
+  const raw = process.env.OPS_INBOX_NOTIFY_ENABLED?.trim().toLowerCase();
+  if (raw === "false" || raw === "0" || raw === "no" || raw === "off") return false;
+  if (raw === "true" || raw === "1" || raw === "yes" || raw === "on") return true;
+  return Boolean(process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK?.trim());
+}
+
 interface DecideArgs {
   incident: Incident;
   transition: IncidentTransition;
@@ -17,7 +31,7 @@ const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
 export function decideNotification(args: DecideArgs): Decision {
   const { incident, transition, now } = args;
 
-  if (process.env.OPS_INBOX_NOTIFY_ENABLED !== "true") return { shouldSend: false, reason: "globally_disabled" };
+  if (!isOpsInboxNotifyGloballyEnabled()) return { shouldSend: false, reason: "globally_disabled" };
   if (incident.environment === "development") return { shouldSend: false, reason: "env_development" };
   if (incident.status === "ignored") return { shouldSend: false, reason: "status_ignored" };
 

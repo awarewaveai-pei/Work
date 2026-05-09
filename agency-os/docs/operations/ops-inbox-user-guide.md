@@ -127,7 +127,7 @@ Netdata: ops_inbox_probe_1777312398 = 99 on probe-host-1777312398
 | `OPS_INBOX_GEMINI_ENABLED` | 啟用 Gemini auto-classify | `true` |
 | `OPS_INBOX_GEMINI_DAILY_LIMIT` | 每日最多分類數（quota 保護） | `1400` |
 | `GEMINI_API_KEY` | Gemini API 金鑰 | 已設定 |
-| `OPS_INBOX_NOTIFY_ENABLED` | 啟用 Slack 通知 | `true` |
+| `OPS_INBOX_NOTIFY_ENABLED` | Slack 總開關；設 `false` 可強制關閉。**未設定但已設 webhook 時視同啟用** | `true`（或留空亦可，只要有 webhook） |
 | `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK` | Slack webhook URL | 已設定 |
 | `OPS_INBOX_POSTHOG_ENABLED` | 接收 PostHog 警報 | `true`（SG）|
 | `OPS_INBOX_REQUIRE_RECENT_INGEST` | 要求最近有新事件（stale 防呆） | `true`（建議） |
@@ -148,8 +148,11 @@ Netdata: ops_inbox_probe_1777312398 = 99 on probe-host-1777312398
 **Q：看到 `probe-host-` 開頭的 host 名稱**
 → 合成探針，直接 Ignore。
 
-**Q：Incident 一直是 open 狀態**
-→ 只有有 ops 角色的使用者可以更改狀態（`canModifyIncidentStatus`）。
+**Q：Incident 一直是 open 狀態 / 找不到「已解決」**
+→ 列表每張卡片底部或詳情頁右上角可點「標記已解決」（以及「標記調查中」「標記忽略」）。若顯示「唯讀，無法變更狀態」，代表 SSO 角色為 `viewer`，需 `operator` 以上才有 `canModifyIncidentStatus`。
+
+**Q：Slack 都沒收到**
+→ 詳情頁右欄 **Notify Log**：若出現 `notify_skipped (globally_disabled)`，代表通知總開關關閉；**已設定 `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK` 且未設 `OPS_INBOX_NOTIFY_ENABLED=false` 時預設會發送**。非 `critical` 的重複事件預設不會再推（節流／去重）。
 
 **Q：Ops Inbox UI 可開，但實際 webhook 壞掉卻沒告警**
 → 改看 `GET /api/ops/inbox/health` 的 `ingest_fresh` / `ingest_age_minutes`。  
