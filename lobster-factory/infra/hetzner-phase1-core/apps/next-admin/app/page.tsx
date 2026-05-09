@@ -109,20 +109,40 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="section-title" style={{ marginTop: 8 }}>Quick Links</div>
+        <div className="section-title" style={{ marginTop: 8 }}>Operations</div>
         <div className="link-list">
+          <Link href="/ops/inbox" className="link-card">
+            <span>📥 Ops Inbox</span>
+            <span className="link-card-arrow">›</span>
+          </Link>
+          <Link href="/ops/clients" className="link-card">
+            <span>👥 Clients</span>
+            <span className="link-card-arrow">›</span>
+          </Link>
+          <Link href="/ops/approvals" className="link-card">
+            <span>✓ 待簽核指令</span>
+            <span className="link-card-arrow">›</span>
+          </Link>
+          <Link href="/ops/system-modes" className="link-card">
+            <span>◐ 系統模式</span>
+            <span className="link-card-arrow">›</span>
+          </Link>
+        </div>
+
+        <div className="section-title" style={{ marginTop: 16 }}>Provisioning</div>
+        <div className="link-list">
+          <Link href="/onboard" className="link-card">
+            <span>✦ New Client Onboarding</span>
+            <span className="link-card-arrow">›</span>
+          </Link>
           <Link href="/build" className="link-card">
-            <span>Build Console</span>
+            <span>B Build Console</span>
             <span className="link-card-arrow">›</span>
           </Link>
-          <Link href="/api-check" className="link-card">
-            <span>⬡ API Health (server)</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
-          <Link href="/api-check-client" className="link-card">
-            <span>⬡ API Health (browser)</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
+        </div>
+
+        <div className="section-title" style={{ marginTop: 16 }}>External Services</div>
+        <div className="link-list">
           <a href="https://n8n.aware-wave.com" target="_blank" rel="noreferrer" className="link-card">
             <span>⚙ n8n Workflows</span>
             <span className="link-card-arrow">↗</span>
@@ -139,6 +159,22 @@ export default async function DashboardPage() {
             <span>◻ WordPress Site</span>
             <span className="link-card-arrow">↗</span>
           </a>
+        </div>
+
+        <div className="section-title" style={{ marginTop: 16 }}>Dev / Debug</div>
+        <div className="link-list">
+          <Link href="/api-check" className="link-card">
+            <span>⬡ API Health (server)</span>
+            <span className="link-card-arrow">›</span>
+          </Link>
+          <Link href="/api-check-client" className="link-card">
+            <span>⬡ API Health (browser)</span>
+            <span className="link-card-arrow">›</span>
+          </Link>
+          <Link href="/ops-console" className="link-card">
+            <span>▣ Ops Console</span>
+            <span className="link-card-arrow">›</span>
+          </Link>
         </div>
       </div>
     </>
