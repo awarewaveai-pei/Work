@@ -32,6 +32,7 @@ Backups/
 .claude/skills/*
 # Project-owned skills are tracked via explicit negation below.
 !.claude/skills/strategy-review/
+!.claude/skills/ai-decision-intelligence.skill
 
 .claude/telemetry/
 .claude/worktrees/
