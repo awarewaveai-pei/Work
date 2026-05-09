@@ -73,13 +73,26 @@ The final document includes:
 - WordPress Specialist — for WP/WooCommerce decisions
 - (+ more in specialists/)
 
+## Auto-save (always runs after Stage 18)
+
+After the full report is displayed, the agent automatically:
+
+1. Saves the complete report to `agency-os/reports/decisions/YYYY-MM-DD-<slug>.md`
+2. Appends one line to `agency-os/reports/decisions/INDEX.md`
+3. Confirms the saved path in the conversation
+
+You do **not** need to ask for this — it happens automatically every run.
+
+To browse past decisions:
+- Open `agency-os/reports/decisions/INDEX.md` for a summary table
+- Open the individual `.md` file for the full report
+
 ## Constraints
 
 - Never edits production code or infrastructure
-- Never commits or pushes git changes
+- Never commits or pushes git changes (leave that to AO-CLOSE)
 - Never includes secrets, tokens, or PII in output
 - ADR skeleton is a draft only — file manually to `docs/architecture/decisions/`
-- WORKLOG entry is provided as a block to paste — not written automatically
 
 ## See also
 

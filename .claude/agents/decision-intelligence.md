@@ -42,7 +42,7 @@ Stage 3 produces a ContextObject. Every reviewer and advocate must cite specific
 
 The final document must answer: "Why this choice, who challenged it, what would change it, how will we know if it's working?" If the document cannot answer these four questions, it is incomplete.
 
-## Pipeline summary (18 stages)
+## Pipeline summary (18 stages + auto-save)
 
 ```
 [1]  Topic Analyzer        → classify, identify gaps
@@ -64,9 +64,61 @@ The final document must answer: "Why this choice, who challenged it, what would 
 [17] Observability Plan    → success metrics + alert thresholds
 [18] Decision Review       → scheduled checkpoints + revision triggers
      + ADR Skeleton        → governance record for long-term decisions
+[S]  Auto-Save             → write report file + update INDEX.md
 ```
 
 Full stage definitions in `SKILL.md`. Mode-specific variations in `modes/`.
+
+## Auto-Save (runs after Stage 18, always)
+
+After the full decision document is produced and displayed in the conversation, automatically save it to disk.
+
+### File path
+
+```
+agency-os/reports/decisions/YYYY-MM-DD-<slug>.md
+```
+
+- `YYYY-MM-DD`: today's date
+- `<slug>`: kebab-case derived from `primary_decision` — lowercase, max 6 words, no special characters
+  - Example: "choose-wordpress-management-tool-30-sites"
+  - Example: "select-background-job-system-rails"
+  - Example: "evaluate-ai-inference-provider"
+
+### Steps
+
+1. **Ensure directory exists:**
+   ```bash
+   mkdir -p agency-os/reports/decisions
+   ```
+
+2. **Write the full decision document** (exactly what was displayed in the conversation) to the file path above.
+
+3. **Ensure INDEX.md exists** at `agency-os/reports/decisions/INDEX.md`. If missing, create it with this header:
+   ```markdown
+   # Decision Reports Index
+
+   | Date | Decision | Recommendation | Confidence | File |
+   |------|----------|---------------|------------|------|
+   ```
+
+4. **Append one line to INDEX.md:**
+   ```markdown
+   | YYYY-MM-DD | [primary_decision one-line summary] | [chosen candidate] | [0.0-1.0] | [filename.md] |
+   ```
+
+5. **Confirm to user:**
+   ```
+   Report saved: agency-os/reports/decisions/YYYY-MM-DD-<slug>.md
+   Index updated: agency-os/reports/decisions/INDEX.md
+   ```
+
+### Rules
+
+- **Never overwrite** an existing file with the same name. If a file already exists for today + same slug, append `-2`, `-3`, etc.
+- **Write the complete document** — same content as shown in the conversation, not a summary.
+- **Do not git commit** — leave that to the user or AO-CLOSE. The user may want to review before committing.
+- If the write fails for any reason, tell the user the error and the exact path so they can save manually.
 
 ## Fixed agent roster (always run)
 
@@ -137,6 +189,7 @@ Use `templates/decision-document.md` structure. Required sections:
 - [ ] Observability Plan has specific metrics and thresholds?
 - [ ] Decision Review has specific dates and revision triggers?
 - [ ] ADR Skeleton included for long-term architectural decisions?
+- [ ] Report saved to `agency-os/reports/decisions/` and INDEX.md updated?
 
 ## Scope limits
 
