@@ -301,9 +301,12 @@ export default function OpsToolsPage() {
           lineHeight: 1.6,
         }}
       >
-        <strong>注意：</strong>自訂工具與頻道儲存於瀏覽器 localStorage，不寫入資料庫。<br />
-        內建工具的實際行為由程式碼控制（<code>/ops/inbox/components/</code>），<br />
-        通知 Webhook 需設定伺服器環境變數 <code>OPS_INBOX_SLACK_INCIDENTS_WEBHOOK</code>。
+        <strong>重要說明（兩層分離）：</strong><br />
+        <strong>① 實際通知路由（伺服器端）：</strong>由環境變數 <code>OPS_INBOX_SLACK_INCIDENTS_WEBHOOK</code> 控制，
+        決定警報真正發送到哪個 Slack 頻道。此處 UI 無法影響伺服器行為。<br />
+        <strong>② 自訂工具 / 頻道（本機記憶體）：</strong>僅存於此瀏覽器的 localStorage，
+        用於記錄你個人偏好的 AI 工具或備用頻道資訊，不寫入資料庫，也不會觸發任何通知。<br />
+        內建 AI 工具（Cursor、ChatGPT、Claude、Gemini 等）的行為由程式碼固定（<code>/ops/inbox/components/</code>）。
       </div>
     </div>
   );
