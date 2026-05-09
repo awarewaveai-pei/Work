@@ -113,6 +113,8 @@
   - **不衝突宣告**：計畫書 §二明列「不可更動」既有架構（lobster-* 容器、GitHub Actions 4 個 workflow、CLAUDE.md、`system-health-check`、`rollback-phase1.sh`、`backup-eu-stack.sh`、Sentry／Kuma／Netdata、`sg-deploy.sh`、ops console）；不採用 Telegram／n8n Slack 中間層／自動 deploy on merge（多人工關卡更安全）。Telegram Phase 1+2 仍保留（與本計畫並行不互斥）。
   - **DoD（總）**：(1) Phase 1+2+3 全綠（22 步端到端 PASS）；(2) `BACKUP_RESTORE_PROOF` 含一筆 auto-repair 觸發的 backup ID；(3) Phase 4 第一週巡檢報告；(4) WORKLOG 留 `AUTO_TASK_DONE` evidence。
   - **下一步建議**：先讀計畫書全文（`Read d:/Work/docs/awarewave-auto-repair-plan-v3.2-final.md`），確認 Phase 1 的 Slack 頻道命名 + Bot 名稱，再開工。
+- [ ] **製作外掛包一鍵加入** —— **【未開始】** 將龍蝦工廠／租戶常用的 WordPress 外掛（含 mu-plugins 與第三方授權外掛）打包，提供「一鍵加入新客戶站」的流程，避免每個新案重複下載／設定。**範圍待釐清**（占位，下次討論補 DoD）：(a) 外掛清單來源（哪些必備、哪些選配）；(b) 打包方式（zip／composer.json／wp-cli script／lobster build profile）；(c) 一鍵入口（next-admin `/onboard` 增加按鈕？或 `/build` profile？）；(d) 授權處理（付費外掛 license key 的 secrets 治理路徑，禁明文進 git）；(e) 與既有 `client-onboarding` subagent／MainWP child site 流程的銜接。**Owner doc 待建**。**下一步**：先把上述 (a)–(e) 對齊一輪，再決定要不要開新 owner doc 或直接擴充 `lobster-factory/docs/` 既有文件。
+
 ## Next — 已完成歷程（查詢用）
 
 ### 2026-05-07 — Next.js 控制台 v1（P7）DoD 結案
