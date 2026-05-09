@@ -112,6 +112,23 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
           {cfg.notes && <Tag label={cfg.notes} muted />}
         </div>
 
+        {/* Row 3b: quick action links */}
+        {cfg.platform !== "saas" && (
+          <div style={{ marginBottom: 12 }}>
+            <Link
+              href={`/ops/inbox?client_slug=${org.slug}`}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500,
+                background: "#f1f5f9", color: "#475569",
+                border: "1px solid #e2e8f0", textDecoration: "none",
+              }}
+            >
+              ⚑ 查看警報
+            </Link>
+          </div>
+        )}
+
         {/* Row 4: WP plugin update summary */}
         {cfg.platform === "wordpress" && (
           <div style={{

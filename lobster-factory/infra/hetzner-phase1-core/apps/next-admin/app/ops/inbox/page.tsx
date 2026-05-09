@@ -13,6 +13,7 @@ interface SearchParams {
   severity?: string;
   source?: string;
   q?: string;
+  client_slug?: string;
 }
 
 export default async function OpsInboxListPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -39,6 +40,7 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
   if (sp.severity) query = query.in("severity", sp.severity.split(",") as IncidentSeverity[]);
   if (sp.source) query = query.in("source", sp.source.split(",") as IncidentSource[]);
   if (sp.q) query = query.or(`title.ilike.%${sp.q}%,message.ilike.%${sp.q}%`);
+  if (sp.client_slug) query = query.eq("client_slug", sp.client_slug);
 
   const { data: incidents, error } = await query;
   if (error) return <ConnectionError message={error.message} />;
@@ -104,6 +106,23 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
           </Link>
         </div>
       </div>
+
+      {/* ── Client filter banner ────────────────────────────────── */}
+      {sp.client_slug && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8,
+          padding: "8px 14px", marginBottom: 16, fontSize: 13, color: "#1d4ed8",
+        }}>
+          <span>篩選客戶：<strong>{sp.client_slug}</strong></span>
+          <Link
+            href="/ops/inbox"
+            style={{ marginLeft: "auto", fontSize: 11, color: "#64748b", textDecoration: "none" }}
+          >
+            ✕ 清除篩選
+          </Link>
+        </div>
+      )}
 
       {/* ── Filter bar ──────────────────────────────────────────── */}
       <IncidentFilterBar current={sp} />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   buildConsolePlan,
@@ -749,7 +750,12 @@ export default function BuildConsole() {
               Polling every 3 s — waiting for dispatcher to pick up run…
             </div>
           ) : liveStatus.status === "completed" ? (
-            <div className="build-alert build-alert-ok">Run completed successfully.</div>
+            <div className="build-alert build-alert-ok">
+              Run completed successfully.{" "}
+              <Link href="/ops/clients" style={{ color: "inherit", fontWeight: 600 }}>
+                → 查看客戶狀態
+              </Link>
+            </div>
           ) : liveStatus.status === "dispatched" ? (
             <div className="build-alert build-alert-ok">
               Dispatched to Trigger.dev. Workflow is now running.

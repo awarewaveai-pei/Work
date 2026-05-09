@@ -536,10 +536,49 @@ export default function OnboardWizard() {
   const [hints, setHints] = useState<Record<string, string>>({});
   const [provLoading, setProvLoading] = useState(false);
   const [provResult, setProvResult] = useState<ProvResult | null>(null);
+  const [orgCreating, setOrgCreating] = useState(false);
 
   const patchInfo = useCallback((patch: Partial<ClientInfo>) => {
     setInfo((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  // Auto-register client in Supabase organizations table when entering Step 4.
+  // Non-blocking: wizard advances regardless of result.
+  const createOrgRecord = async () => {
+    if (!info.tenantSlug.trim() || !info.clientName.trim()) return;
+    setOrgCreating(true);
+    try {
+      const clientConfig: Record<string, unknown> = { platform: "wordpress" };
+      if (info.profile === "profile_b") {
+        clientConfig.hosting_type = info.provider;
+        if (info.domain) clientConfig.site_url = `https://${info.domain}`;
+      } else if (info.profile === "profile_c") {
+        if (info.siteUrl) clientConfig.site_url = info.siteUrl;
+        if (info.wpAdminUrl) clientConfig.wp_admin_url = info.wpAdminUrl;
+        clientConfig.hosting_type = info.provider;
+      }
+      await fetch("/api/ops/organizations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: info.organizationId,
+          slug: info.tenantSlug,
+          name: info.clientName,
+          type: "client",
+          metadata: { client_config: clientConfig },
+        }),
+      });
+    } catch {
+      // non-blocking — wizard advances regardless
+    } finally {
+      setOrgCreating(false);
+    }
+  };
+
+  const goToStep4 = async () => {
+    await createOrgRecord();
+    setStep(4);
+  };
 
   const submitProvisioning = async () => {
     setProvLoading(true);
@@ -612,9 +651,9 @@ export default function OnboardWizard() {
               hints={hints}
               onHintsChange={setHints}
               provResult={provResult}
-              loading={provLoading}
+              loading={provLoading || orgCreating}
               onSubmit={submitProvisioning}
-              onNext={() => setStep(4)}
+              onNext={() => { void goToStep4(); }}
               onBack={() => setStep(2)}
             />
           )}
