@@ -48,6 +48,37 @@ function StatusBadge({ ok }: { ok: boolean }) {
   );
 }
 
+interface NavCardProps {
+  href: string;
+  icon: string;
+  iconClass: string;
+  title: string;
+  desc: string;
+  external?: boolean;
+}
+
+function NavCard({ href, icon, iconClass, title, desc, external }: NavCardProps) {
+  const inner = (
+    <>
+      <span className={`link-card-icon-wrap ${iconClass}`}>{icon}</span>
+      <span className="link-card-body">
+        <span className="link-card-title">{title}</span>
+        <span className="link-card-sub">{desc}</span>
+      </span>
+      <span className="link-card-arrow">{external ? "↗" : "›"}</span>
+    </>
+  );
+
+  if (external) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer" className="link-card">
+        {inner}
+      </a>
+    );
+  }
+  return <Link href={href} className="link-card">{inner}</Link>;
+}
+
 export default async function DashboardPage() {
   const [api, rag] = await Promise.all([
     fetchHealth("/health"),
@@ -67,6 +98,8 @@ export default async function DashboardPage() {
       </div>
 
       <div className="page">
+
+        {/* ── System Status ───────────────────────────────────── */}
         <div className="card-grid">
           <div className="card">
             <div className="card-header">
@@ -109,73 +142,121 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {/* ── Operations ──────────────────────────────────────── */}
         <div className="section-title" style={{ marginTop: 8 }}>Operations</div>
-        <div className="link-list">
-          <Link href="/ops/inbox" className="link-card">
-            <span>📥 Ops Inbox</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
-          <Link href="/ops/clients" className="link-card">
-            <span>👥 Clients</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
-          <Link href="/ops/approvals" className="link-card">
-            <span>✓ 待簽核指令</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
-          <Link href="/ops/system-modes" className="link-card">
-            <span>◐ 系統模式</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
+        <div className="link-list" style={{ marginBottom: 28 }}>
+          <NavCard
+            href="/ops/inbox"
+            icon="📥"
+            iconClass="icon-ops"
+            title="Ops Inbox"
+            desc="Sentry · Uptime Kuma · Grafana 警報收件匣"
+          />
+          <NavCard
+            href="/ops/clients"
+            icon="👥"
+            iconClass="icon-ops"
+            title="Clients"
+            desc="全客戶健康狀態 + WordPress 外掛更新"
+          />
+          <NavCard
+            href="/ops/approvals"
+            icon="✓"
+            iconClass="icon-ops"
+            title="Pending Approvals"
+            desc="高風險指令簽核佇列"
+          />
+          <NavCard
+            href="/ops/system-modes"
+            icon="◐"
+            iconClass="icon-ops"
+            title="System Modes"
+            desc="全域 Kill Switch · 維護模式"
+          />
         </div>
 
-        <div className="section-title" style={{ marginTop: 16 }}>Provisioning</div>
-        <div className="link-list">
-          <Link href="/onboard" className="link-card">
-            <span>✦ New Client Onboarding</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
-          <Link href="/build" className="link-card">
-            <span>B Build Console</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
+        {/* ── Provisioning ────────────────────────────────────── */}
+        <div className="section-title">Provisioning</div>
+        <div className="link-list" style={{ marginBottom: 28 }}>
+          <NavCard
+            href="/onboard"
+            icon="✦"
+            iconClass="icon-prov"
+            title="New Client Onboarding"
+            desc="逐步精靈：資訊 → 部門 → 服務開通 → Build"
+          />
+          <NavCard
+            href="/build"
+            icon="⚡"
+            iconClass="icon-prov"
+            title="Build Console"
+            desc="部署執行：plan_only 或 enqueue 到 Trigger.dev"
+          />
         </div>
 
-        <div className="section-title" style={{ marginTop: 16 }}>External Services</div>
-        <div className="link-list">
-          <a href="https://n8n.aware-wave.com" target="_blank" rel="noreferrer" className="link-card">
-            <span>⚙ n8n Workflows</span>
-            <span className="link-card-arrow">↗</span>
-          </a>
-          <a href="https://uptime.aware-wave.com" target="_blank" rel="noreferrer" className="link-card">
-            <span>◉ Uptime Kuma</span>
-            <span className="link-card-arrow">↗</span>
-          </a>
-          <a href="https://trigger.aware-wave.com" target="_blank" rel="noreferrer" className="link-card">
-            <span>▶ Trigger.dev</span>
-            <span className="link-card-arrow">↗</span>
-          </a>
-          <a href="https://aware-wave.com" target="_blank" rel="noreferrer" className="link-card">
-            <span>◻ WordPress Site</span>
-            <span className="link-card-arrow">↗</span>
-          </a>
+        {/* ── Infrastructure ──────────────────────────────────── */}
+        <div className="section-title">Infrastructure</div>
+        <div className="link-list" style={{ marginBottom: 28 }}>
+          <NavCard
+            href="/ops-console"
+            icon="▣"
+            iconClass="icon-infra"
+            title="Ops Console"
+            desc="架構邊界 · Tenant 設定 · M3 部門 · AI Job"
+          />
+          <NavCard
+            href="/api-check"
+            icon="⬡"
+            iconClass="icon-infra"
+            title="API Health (server)"
+            desc="Node API server-side fetch 健康檢查"
+          />
+          <NavCard
+            href="/api-check-client"
+            icon="⬡"
+            iconClass="icon-infra"
+            title="API Health (browser)"
+            desc="Node API browser-side fetch 健康檢查"
+          />
         </div>
 
-        <div className="section-title" style={{ marginTop: 16 }}>Dev / Debug</div>
+        {/* ── External Services ───────────────────────────────── */}
+        <div className="section-title">External Services</div>
         <div className="link-list">
-          <Link href="/api-check" className="link-card">
-            <span>⬡ API Health (server)</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
-          <Link href="/api-check-client" className="link-card">
-            <span>⬡ API Health (browser)</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
-          <Link href="/ops-console" className="link-card">
-            <span>▣ Ops Console</span>
-            <span className="link-card-arrow">›</span>
-          </Link>
+          <NavCard
+            href="https://n8n.aware-wave.com"
+            icon="⚙"
+            iconClass="icon-ext"
+            title="n8n Workflows"
+            desc="自動化工作流程"
+            external
+          />
+          <NavCard
+            href="https://uptime.aware-wave.com"
+            icon="◉"
+            iconClass="icon-ext"
+            title="Uptime Kuma"
+            desc="服務正常運行監控"
+            external
+          />
+          <NavCard
+            href="https://trigger.aware-wave.com"
+            icon="▶"
+            iconClass="icon-ext"
+            title="Trigger.dev"
+            desc="背景任務與排程"
+            external
+          />
+          <NavCard
+            href="https://aware-wave.com"
+            icon="◻"
+            iconClass="icon-ext"
+            title="WordPress"
+            desc="客戶主網站"
+            external
+          />
         </div>
+
       </div>
     </>
   );
