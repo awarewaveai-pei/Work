@@ -68,6 +68,18 @@
 - **資安註記**：未寫入使用者提供的任何密碼或 OAuth 憑證；remote storage OAuth 仍要求操作者在 browser 完成人工授權。
 
 
+### Fluent Forms 防垃圾設定（soulfulexpression.org）<2026-05-09>
+
+- **背景**：客戶 soulfulexpression.org Fluent Forms 收到機器人垃圾提交（亂碼名字、俄文內容、假電郵網域）。
+- **操作方式**：SSH 進 Hostinger (191.101.230.176:65002)，WP-CLI + PHP eval-file 寫入資料庫，無本機檔案變更。
+- **套用表單（全部 6 個）**：Contact Form (#1)、Art Therapy Creation Submission (#5)、Contact Form Demo (#9)、Newsletter Form (#11)、WuSheng Assessment (#49)、Contact Form - Partners Inquiry (#50)。
+- **啟用防護**：
+  1. **Honeypot**：全部 6 個表單加入 honeypot 隱藏欄位（機器人填入即被擋）
+  2. **關鍵字封鎖**：casino, poker, viagra, cialis, crypto, bitcoin, investment opportunity, loan offer, forex, cheap seo, backlinks, make money fast, free money, earn cash, buy followers, adult, xxx, gambling；補充俄文詞（В этом、захватывающих）、假網域（duhastmail、bekommenmail）、垃圾主旨（collaboration proposal、speaking invitation）
+  3. **空白提交封鎖**：`denyEmptySubmission` 全部開啟
+- **無使用者干擾**：三層保護均為背景運作，真正訪客完全感受不到，無驗證碼。
+- **驗證**：DB query 確認所有表單 `has_honeypot=YES`、`has_keywords=YES`；最新提交為 2026-04-30，垃圾記錄均為事前舊資料。
+
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:ad5c8b10ec026a69dff870de57623cbf5677ee0651324828988830a551a383f1 -->
 
