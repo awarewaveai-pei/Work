@@ -7,6 +7,30 @@
 ### Daily
 - `/team-onboarding` skill 生成 `ONBOARDING.md`（work type breakdown + MCP server checklist + skills list），user 補寫 7 條 Team Tips + 6 步 Get Started，發布至 https://claude.ai/claude-code/onboard/O3clJrMsjeQ5（short_code: O3clJrMsjeQ5）。
 
+### MainWP Dashboard — EU Hetzner 部署完成 <2026-05-09>
+
+- AUTO_TASK_DONE: MainWP EU 計畫啟動核對 — Dashboard 已部署於 EU (204.168.175.41)，mainwp.aware-wave.com
+- **Hook 系統修復**：`ao-resume-on-prompt.ps1` 兩個 bug 修正（UTF-8 stdin + StrictMode `@(...).Count`），~70 次靜默失敗歸零，`ao-resume-hook-last.json` 現可正常寫入。同步至 `~/.claude/hooks/`。
+- **SG deploy drift 修復**：4 commits behind，`sg-deploy.sh` 跑完，container healthy @ `22db98c`。
+- **MainWP EU 部署**（`/root/mainwp/`，EU 204.168.175.41）：
+  - `docker-compose.yml`：`wordpress:6.7-apache` + `mysql:8.0`，port 8090，mainwp_internal 網路
+  - `.env` (chmod 600)：所有密鑰 openssl rand 生成，不進 git
+  - nginx vhost：`/etc/nginx/sites-enabled/mainwp.aware-wave.com`，HTTP-only（等 DNS + certbot）
+  - rate-limit zones：`wp-login.php` 5r/m，`wp-admin/` 30r/m
+  - fail2ban：`wordpress-nginx` jail，filter `/var/log/nginx/access.log`，429 + POST /wp-login 觸發
+  - WordPress 6.x 安裝完成：admin `awmainwp`，table prefix `mwp_`
+  - MainWP Dashboard 6.0.12 安裝啟動，唯一外掛
+  - 資安：DISALLOW_FILE_EDIT, DISABLE_WP_CRON, FORCE_SSL_ADMIN, WP_AUTO_UPDATE_CORE=minor
+  - WP-Cron → host crontab `*/5 * * * *` curl `http://127.0.0.1:8090/wp-cron.php`
+  - Uptime Kuma Monitor ID 22：`MainWP Dashboard (EU)`，60s 間隔
+  - 備份腳本：`/root/mainwp/scripts/migrate-to-vps.sh`
+- **待操作者完成**：
+  1. Cloudflare DNS A: `mainwp.aware-wave.com → 204.168.175.41`（灰雲）
+  2. DNS 傳播後：`certbot --expand -d ... -d mainwp.aware-wave.com --nginx`
+  3. SSL 完成後：`wp option update blog_public 1`
+  4. MainWP Dashboard 後台初始化精靈
+- **文件更新**：`D:\Work\docs\wordpress_mainwp_plan.md` §25 部署紀錄新增
+
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:ad5c8b10ec026a69dff870de57623cbf5677ee0651324828988830a551a383f1 -->

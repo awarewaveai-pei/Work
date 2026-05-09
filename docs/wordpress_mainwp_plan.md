@@ -1093,3 +1093,84 @@ type:corp|shop|blog  例：type:shop
 - 不會一次炸全部客戶
 - 出問題時可精準回滾
 - 維護品質可稽核、可交付、可長期擴張
+
+---
+
+## 25. 部署紀錄（EU Hetzner — 2026-05-09）
+
+### 25.1 部署完成狀態
+
+| 項目 | 狀態 | 細節 |
+|------|------|------|
+| Docker Compose | ✅ | `/root/mainwp/docker-compose.yml` — `wordpress:6.7-apache` + `mysql:8.0` |
+| 容器狀態 | ✅ | `mainwp-web` Up, `mainwp-db` Up (healthy) |
+| 內部端口 | ✅ | `127.0.0.1:8090:80`（僅本機可達） |
+| WordPress 安裝 | ✅ | 核心安裝完成，管理員 `awmainwp` |
+| MainWP Dashboard | ✅ | 版本 6.0.12，已激活，唯一外掛 |
+| nginx vhost | ✅ | `/etc/nginx/sites-enabled/mainwp.aware-wave.com`（HTTP-only，等 DNS） |
+| 速率限制 | ✅ | `wp-login.php` 5r/m，`wp-admin/` 30r/m |
+| xmlrpc.php | ✅ | nginx 層完全封鎖 |
+| fail2ban | ✅ | `wordpress-nginx` jail 監控 nginx access.log，8 次觸發 |
+| DISABLE_WP_CRON | ✅ | 由 host crontab `*/5 * * * *` 替代 |
+| DISALLOW_FILE_EDIT | ✅ | wp-config 層強制 |
+| FORCE_SSL_ADMIN | ✅ | wp-config 層強制，X-Forwarded-Proto pass-through |
+| Uptime Kuma | ✅ | Monitor ID 22：`MainWP Dashboard (EU)` — 60s 間隔 |
+| 備份腳本 | ✅ | `/root/mainwp/scripts/migrate-to-vps.sh` |
+
+### 25.2 資安強化清單
+
+- `DISALLOW_FILE_EDIT` = true（禁止後台直接編輯檔案）
+- `WP_DEBUG` = false（不暴露錯誤訊息）
+- `DISABLE_WP_CRON` = true（host cron 替代，避免偽造 HTTP 觸發）
+- `WP_AUTO_UPDATE_CORE` = 'minor'（小版本自動更新）
+- `WP_POST_REVISIONS` = 3（限制版本數量）
+- xmlrpc.php → nginx 403 封鎖
+- `wp-login.php` → fail2ban + nginx rate-limit 雙層保護
+- `wp-admin/` → nginx rate-limit 保護
+- 容器資源限制：web 256M/0.25 CPU，db 384M/0.25 CPU
+- 容器日誌 JSON file driver，max 10m×3 輪轉
+
+### 25.3 待操作（需操作者介入）
+
+**Step 1 — 在 Cloudflare 新增 DNS A 記錄：**
+
+```
+mainwp.aware-wave.com → 204.168.175.41 (EU Hetzner)
+Proxy: DNS only (灰雲)，等 SSL 建立後可開橘雲
+TTL: Auto
+```
+
+**Step 2 — DNS 傳播後 SSH 至 EU，執行 certbot expand：**
+
+```bash
+ssh root@204.168.175.41
+certbot --expand \
+  -d supabase.aware-wave.com \
+  -d n8n.aware-wave.com \
+  -d studio.aware-wave.com \
+  -d trigger.aware-wave.com \
+  -d uptime.aware-wave.com \
+  -d mainwp.aware-wave.com \
+  --nginx --non-interactive --agree-tos
+```
+
+certbot 會自動更新 `/etc/nginx/sites-enabled/mainwp.aware-wave.com`，加上 SSL 區塊。
+
+**Step 3 — 驗證 SSL 後開啟搜尋引擎索引：**
+
+```bash
+docker exec mainwp-web wp option update blog_public 1 --allow-root
+```
+
+**Step 4 — 在 MainWP Dashboard 後台完成初始化：**
+
+- 登入 `https://mainwp.aware-wave.com/wp-admin`（帳號：`awmainwp`，密碼見 vault/`.env`）
+- 完成 MainWP 設定精靈
+- 新增第一個客戶網站（安裝 MainWP Child 外掛）
+
+### 25.4 備份與還原
+
+備份腳本：`/root/mainwp/scripts/migrate-to-vps.sh backup`
+輸出：`/root/mainwp/backups/mainwp-db-<timestamp>.sql` + `mainwp-files-<timestamp>.tar.gz`
+
+還原：`/root/mainwp/scripts/migrate-to-vps.sh restore <db.sql> <files.tar.gz>`
