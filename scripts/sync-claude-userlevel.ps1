@@ -254,6 +254,11 @@ function Set-NestedKey($obj, [string]$path, $value) {
   }
 }
 
+function Write-Utf8NoBom([string]$Path, [string]$Content) {
+  $encoding = New-Object System.Text.UTF8Encoding $false
+  [System.IO.File]::WriteAllText($Path, $Content, $encoding)
+}
+
 function Sync-Json-Merge($spec, [string]$mode) {
   $src = Join-Path $MonorepoRoot ($spec.source -replace '/','\')
   $tgt = Expand-Vars $spec.target
@@ -315,7 +320,7 @@ function Sync-Json-Merge($spec, [string]$mode) {
   if ($mode -eq 'dry-run') { return }
 
   Backup-Path $tgt 'settings.json.before'
-  $merged | ConvertTo-Json -Depth 30 | Set-Content -Path $tgt -Encoding UTF8
+  Write-Utf8NoBom $tgt ($merged | ConvertTo-Json -Depth 30)
   # Workaround PS5.1 ConvertTo-Json bug: 1-element arrays serialize as bare objects.
   # The Node helper rewrites every always-array path (hooks.* + nested matcher.hooks
   # + permissions.{allow,deny,additionalDirectories}) back to array form. Idempotent.
@@ -361,7 +366,7 @@ function Sync-Json-Replace($spec, [string]$mode) {
   if ($mode -eq 'dry-run') { return }
 
   Backup-Path $tgt 'mcp.json.before'
-  $tpl | ConvertTo-Json -Depth 20 | Set-Content -Path $tgt -Encoding UTF8
+  Write-Utf8NoBom $tgt ($tpl | ConvertTo-Json -Depth 20)
   Write-Host "  -> mcp.json normalized to {} (project .mcp.json is real SSOT)" -ForegroundColor Green
 }
 

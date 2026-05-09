@@ -126,7 +126,7 @@ function processFile(filePath) {
     return 0;
   }
 
-  const out = (hadBom ? '﻿' : '') + JSON.stringify(cfg, null, 2) + '\n';
+  const out = JSON.stringify(cfg, null, 2) + '\n';
   try {
     fs.writeFileSync(filePath, out, 'utf8');
   } catch (e) {
