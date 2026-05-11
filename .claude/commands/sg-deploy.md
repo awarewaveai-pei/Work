@@ -6,10 +6,10 @@ Default app is `next-admin`. Pass extra args after `/sg-deploy` to override:
 - `/sg-deploy next-admin --dry-run` — preview rsync without rebuilding
 - `/sg-deploy next-admin --skip-pull` — skip the upstream `git pull` step
 
-Use the `hetzner-ssh` MCP server. The SG private key is at `C:\Users\user1115\.ssh\hetzner_trigger`. Connection details:
+Use the `hetzner-ssh` MCP server. Connection details:
 - host: `5.223.93.113`
 - user: `root`
-- privateKeyPath: `C:\Users\user1115\.ssh\hetzner_trigger`
+- privateKeyPath: `$env:USERPROFILE\.ssh\hetzner_trigger`（Claude 須先展開為絕對路徑，例如 `C:\Users\USER\.ssh\hetzner_trigger`）
 
 Steps:
 1. `ssh_connect` to SG with the credentials above (name the connection `sg-prod`).

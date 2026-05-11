@@ -8,7 +8,7 @@ Use when:
 Use the `hetzner-ssh` MCP server. Connection:
 - host: `5.223.93.113`
 - user: `root`
-- privateKeyPath: `C:\Users\user1115\.ssh\hetzner_trigger`
+- privateKeyPath: `$env:USERPROFILE\.ssh\hetzner_trigger`（Claude 須先展開為絕對路徑）
 
 ## Step 1 — Pre-flight (read-only; ABORT if any line fails)
 1. `cat /var/run/reboot-required.pkgs` — confirm there IS a pending reboot reason; if file missing, ABORT (nothing to do).
@@ -47,6 +47,6 @@ Output:
 
 If anything fails post-flight: do NOT attempt remediation autonomously. Report immediately and let the operator decide between rollback (`grub-set-default '0>1'` to use previous kernel + reboot) or forward fix.
 
-Owner doc: `C:\Users\user1115\.claude\projects\d--Work\memory\reference_recurring_ops_recipes.md` §2. Do not duplicate the procedure here — link, not copy.
+Owner: this file is the canonical procedure. WORKLOG `2026-05-11` 記錄歷史案例（SG VPS inode bug + nginx reload）。
 
 Risk tier: **Medium** in name, **Low** in practice when the pre-flight checklist passes (downtime < 1 minute, all containers `restart=unless-stopped`, no container holds long-lived state outside docker volumes). Confirm with operator before running unless they explicitly authorized autopilot for this turn.
