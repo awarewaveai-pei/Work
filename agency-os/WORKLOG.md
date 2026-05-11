@@ -96,6 +96,30 @@
 
 **commits**: `2522010`、`0d7a90f`、`5a25079`、`9e16329`、`422cddc`、`de7adae`
 
+### 機型修正 + memory 搬移 + 跨機同步自動化 <2026-05-11>
+
+**任務**：使用者指出「兩台桌機」描述有誤；同時發現 memory 檔在 git 外、跨機須手動複製；要求 AO-CLOSE 自動匯出、AO-RESUME 自動匯入，零手動步驟。
+
+**修正（6 項）**：
+1. **機型錯誤**（5 處）：`AGENTS.md`、`user_devices.md`、`REMOTE_WORKSTATION_STARTUP.md`、`DESKTOP_MCP_SETUP.md`、`DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md` — 「兩台桌機」→「個人筆電 + 公司桌機」
+2. **memory 檔搬入 repo**：`feedback_git_push.md`、`feedback_trigger_deploy.md`、`user_devices.md` 從 `~/.claude/.../memory/` 移入 `agency-os/memory/`（git-tracked，`git pull` 自動同步）
+3. **MEMORY.md index 更新**：指向 repo 路徑；user-level `~/.claude/.../memory/` 下只留 `MEMORY.md` 本身（index，非內容）
+4. **新建 `scripts/export-cross-machine-memory.ps1`**：AO-CLOSE 後自動把 `MEMORY.md` 複製到 `Desktop\AO-SYNC-<date>\memory\`，附 `IMPORT_INSTRUCTIONS.md`
+5. **新建 `scripts/import-cross-machine-memory.ps1`**：找最新 `Desktop\AO-SYNC-*` 資料夾；比對時間戳；匯入 MEMORY.md；寫 `.imported` flag 避免重複匯入；無 AO-SYNC 時靜默不做（對筆電是正常）
+6. **ao-resume.ps1 升級**：verify（warn-only）→ merge（auto-fix）；新增 `sync-mcp-config.ps1` 自動呼叫；新增 `import-cross-machine-memory.ps1` 自動呼叫；全部 non-blocking（`$global:LASTEXITCODE = 0`）
+7. **ao-close.ps1**：末尾加 `export-cross-machine-memory.ps1` 呼叫
+8. **新建 `docs/operations/CROSS_MACHINE_SYNC_RUNBOOK.md`**：說明架構、每日例行、AO-RESUME 一鍵自動流程、一次性設定項目（SSH key、DPAPI vault）
+
+**結果**：兩台機器操作模式完全對稱。AO-CLOSE 在公司桌機自動導出 → 帶 AO-SYNC 到家 → AO-RESUME 自動匯入，零手動。
+
+**避免再發生**：user_devices.md 已入 repo；機器描述統一為「個人筆電 + 公司桌機」；下次換機只需 `AO-RESUME`。
+
+- AUTO_TASK_DONE: 機型描述修正（5 個檔案，個人筆電+公司桌機）
+- AUTO_TASK_DONE: memory 檔搬入 repo git-tracked（feedback_git_push.md、feedback_trigger_deploy.md、user_devices.md）
+- AUTO_TASK_DONE: 跨機同步自動化（export-cross-machine-memory.ps1 + import-cross-machine-memory.ps1 + ao-close/ao-resume 整合）
+- AUTO_TASK_DONE: AO-RESUME 全自動升級（sync-userlevel merge + sync-mcp + import MEMORY.md）
+- AUTO_TASK_DONE: CROSS_MACHINE_SYNC_RUNBOOK.md 新建
+
 ---
 
 ## 2026-05-09
@@ -2077,7 +2101,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-09 12:51:06 UTC_
+_Last synced: 2026-05-11 03:52:20 UTC_
 
 ## 2026-03-20
 
@@ -2511,4 +2535,5 @@ _Last synced: 2026-05-09 12:51:06 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 

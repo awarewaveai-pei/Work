@@ -307,8 +307,9 @@ if ($script:StrictEnvAudit) {
 }
 
 # --- Claude Code user-level alignment (auto-merge; idempotent, non-blocking) ---
-# -Mode merge: overwrites only governed keys (hooks/deny/additionalDirs/theme) and PRESERVES
-# permissions.allow (machine-specific). Idempotent: same result every run.
+# CONTRACT: invoke sync-claude-userlevel.ps1 -Mode merge
+# -Mode merge is a superset of -Mode verify: auto-fixes governed keys AND detects drift.
+# Overwrites only governed keys (hooks/deny/additionalDirs/theme), PRESERVES permissions.allow.
 # normalizer auto-fixes PS 5.1 1-element-array bug — no manual patching needed.
 $claudeUserlevelSync = Join-Path $WorkRoot "scripts\sync-claude-userlevel.ps1"
 if (Test-Path -LiteralPath $claudeUserlevelSync) {

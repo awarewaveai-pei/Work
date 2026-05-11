@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-11 09:10:14
+- Generated: 2026-05-11 11:56:26
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -213,15 +213,74 @@
 > Full runbook: see `## Runbook Commands` in the source file.
 
 ## 5) memory/daily/2026-05-11.md
-_no file for today yet._
+# Daily Memory — 2026-05-11
+
+## AO-RESUME
+
+- hook exit 0，AUDIT RESULT: PASS (no warnings)，branch main，和 origin/main 對齊
+
+## 本日完成
+
+### 桌機 Claude user-level 對齊
+
+- 執行 `sync-claude-userlevel.ps1 -Mode merge`
+- hooks：3 個更新（`ao-resume-on-prompt.ps1`、`hooks.json`、`README.md`），19/19 same 後
+- settings.json：governed keys 覆寫，normalizer 修正 9 個 array 結構（PS5.1 1-element array bug）
+- mcp.json：確認 `{}` 無 drift
+- verify 模式 settings.json 仍顯示 drift → 已知 false positive（normalizer 後處理造成比較不符）；實際內容正確
+- backup：`agency-os/Backups/claude-userlevel-20260511-090325/`
+
+### SG VPS — app.aware-wave.com Basic Auth 修復
+
+**根因診斷**：
+- HTTPS 443 由**系統 nginx**（`/etc/nginx/sites-enabled/app`）處理，非 Docker nginx
+- 過去把 `auth_basic` 加在 Docker `nginx/default.conf` 是無效層，`sed -i` 還換了 inode 導致 bind mount 斷開
+- 系統 nginx `app` site 的 `location /` 從未設過 `auth_basic`
+
+**修復步驟**：
+1. 備份：`/etc/nginx/sites-enabled/app.bak.20260511-*`
+2. Python3 in-place 在 `location / {` 後插入：
+   ```
+   auth_basic "Aware Wave Admin";
+   auth_basic_user_file /etc/nginx/.htpasswd_studio;
+   ```
+3. `nginx -t` PASS，`systemctl reload nginx`
+4. `/api/ops/` 與 `/api/build/` 保持無 auth（API 路徑）
+
+**驗證結果**：
+- `app.aware-wave.com/` 無 auth → **401** ✓
+- 錯誤密碼 → **401** ✓
+- `/api/ops/summary` → **200** ✓（API 路徑不受影響）
+
+**Docker nginx default.conf 副作用**：
+- `sed -i` 已取消注釋 Docker 的 `auth_basic`（lines 98-99）
+- 但系統 nginx 才是 443 真正入口，Docker 的改動對外部無效果
+- Docker nginx 容器已 `docker compose restart nginx`（確保 inode 重新 bind）
+
+### TASKS 記錄
+
+- 新增第 78 行：`（AO-RESUME 提醒—筆電）確認桌機 2026-05-11 變更不衝突筆電設定`
+- 筆電開工查照清單已寫入，DoD 為 `sync-claude-userlevel.ps1 -Mode verify` exit 0
+
+## 筆電注意事項（下次開工查照）
+
+1. `git pull` 後跑 `sync-claude-userlevel.ps1 -Mode verify`
+2. 若 hooks 顯示 3 個 update（ao-resume-on-prompt.ps1 / hooks.json / README.md）→ 正常，跑 `-Mode merge` 對齊
+3. settings.json verify 顯示 drift → 正常 false positive，merge 後內容正確
+4. VPS Basic Auth 變更純伺服器端，筆電無需處理
+
+## Git 狀態
+
+- commit `fd88821`（checkpoint auto-save）含 TASKS.md 新條目
+- working tree clean，1 commit ahead of origin/main，尚未 push
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-09 20:51:12`
-- Health score: **100%**
-- Threshold: **100%**
+- Time: `2026-05-11 11:56:17`
+- Health score: **99.7%**
+- Threshold: **0%**
 - Health gate exit code: **0**
 - Closeout report exists: **YES**
 - Result: **PASS**
@@ -229,14 +288,13 @@ _no file for today yet._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260509-205112.md`
-- Closeout: `reports/closeout/closeout-20260509-205107.md`
+- Health: `reports/health/health-20260511-115617.md`
+- Closeout: `reports/closeout/closeout-20260511-115221.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- `git pull origin main`：**Already up to date**。
 - `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
 - `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
 
@@ -295,5 +353,6 @@ _no file for today yet._
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 

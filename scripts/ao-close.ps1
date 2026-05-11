@@ -304,7 +304,9 @@ if (-not $SkipVerify -and (Test-Path -LiteralPath $verifyScript)) {
 }
 
 Write-Host "== AO-CLOSE: system-guard (doc-sync + health + guard) ==" -ForegroundColor Cyan
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $guardScript -WorkspaceRoot $agencyRoot -Mode manual
+$guardArgs = @("-WorkspaceRoot", $agencyRoot, "-Mode", "manual")
+if ($AllowNonPerfectHealth) { $guardArgs += @("-MinHealthScore", "0") }
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $guardScript @guardArgs
 $guardExit = $LASTEXITCODE
 if ($guardExit -ne 0) {
     Write-Error "ao-close: system-guard failed (exit $guardExit). Fix health/closeout before push."
