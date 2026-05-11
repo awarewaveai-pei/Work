@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-09 20:51:21
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-05-11 09:10:14
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -212,56 +212,8 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-09.md
-# Daily Note - 2026-05-09
-
-## Done today
-- **next-admin UI 配色＋層級重做**：Sidebar 四層色彩系統重建（section label 極淡、普通連結中亮、active indigo bg+bar、disabled 直接 dim）；Build `/build` 頁 profile grid 包成 Step 1 區塊、右側 gates panel 改 bg-subtle sticky secondary feel、step headers 加 border-top、submit CTA 更強陰影。Commit `241b062`，SG deployed `ff1ef68` Up healthy
-- 生成並發布 `ONBOARDING.md`：`/team-onboarding` skill 自動分析 30 天使用資料（19 sessions，work type breakdown：Build Feature 55% / Debug Fix 20% / Plan Design 15% / Analyze Data 10%），產出 MCP server checklist + skills 清單草稿
-- User 補寫 7 條 Team Tips（monorepo 根目錄規則、vault 機器獨立、commit prefix 強制、禁建新 branch、Telegram bot 24/7 面板、health-check 100% 收工要求、migration 不能動）
-- User 補寫 6 步 Get Started（clone → bootstrap → vault import → sync → Claude Code AO-RESUME → Telegram smoke test）
-- ShareOnboardingGuide 兩次（draft → update），最終 share URL：https://claude.ai/claude-code/onboard/O3clJrMsjeQ5
-
-## Current state
-- `ONBOARDING.md` 已在 monorepo 根，內容完整（含 HTML comment onboarding instruction）
-- 分享連結已更新至最終版本
-- TASKS.md 無對應待辦，本輪無 AUTO_TASK_DONE 需套用
-
-## Next steps
-- （出國前）Termius 手機 SSH 設定 + cheat sheet 書籤（TASKS 第一優先，操作者親自執行）
-- MainWP EU 計畫啟動核對（2026-05-09 提醒）
-- 開工先讀 Telegram 未讀
-- 桌機 Claude user-level 對齊（`sync-claude-userlevel.ps1 -Mode merge`）
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:ad5c8b10ec026a69dff870de57623cbf5677ee0651324828988830a551a383f1 -->
-
-### claude-opus-4.7 <2026-05-09 00:00>
-
-- **完成（一句）**: Phase 2c 全線收尾 — WpUpdateButtons 重建、Dockerfile @anthropic-ai 補 COPY、Telegram webhook 修正、COMMAND_PLANE_RUNBOOK 改名 + §10 Client Management、ONBOARDING.md 發布（share link O3clJrMsjeQ5）
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/clients/[slug]/WpUpdateButtons.tsx`
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/command-plane/handlers/clientStatus.ts`
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/Dockerfile`
-  - `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md`
-  - `CLAUDE.md`
-  - `ONBOARDING.md`
-  - `agency-os/WORKLOG.md`
-- **Git**: bdac9ec (ONBOARDING + WORKLOG), 8d681b3 (Dockerfile), 7c5cad5 (rename), f91bec0 (restore route), 31ad905 (Phase 2c)
-- **對應 TASKS 子字串（可選）**: Phase 2c
-- **風險／待辦（可選）**: /daily_review /weekly_review 在新 Anthropic key + Dockerfile 修正後應已正常；用戶尚未手動確認回覆正常
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:a0732676aeba440afe79a57c88a354091525aeafc081a8bc4b9c4147bdc0dd8a -->
-
-### claude-sonnet-4-6 <2026-05-09 20:45>
-
-- **完成（一句）**: next-admin UI 配色重做 — sidebar 四層色彩層次 + Build 頁左右 panel 視覺主次 + SG deploy healthy
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css`
-- **Git**: 241b062（UI redesign）；SG deployed commit ff1ef68
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: 遠端 SG next-admin 已 Up healthy；UI 為視覺調整，無 DB/auth/RLS 邊界異動
+## 5) memory/daily/2026-05-11.md
+_no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
