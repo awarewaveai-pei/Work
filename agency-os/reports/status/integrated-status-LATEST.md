@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-09 20:51:21
+- Generated: 2026-05-11 22:42:28
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -212,56 +212,8 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-09.md
-# Daily Note - 2026-05-09
-
-## Done today
-- **next-admin UI 配色＋層級重做**：Sidebar 四層色彩系統重建（section label 極淡、普通連結中亮、active indigo bg+bar、disabled 直接 dim）；Build `/build` 頁 profile grid 包成 Step 1 區塊、右側 gates panel 改 bg-subtle sticky secondary feel、step headers 加 border-top、submit CTA 更強陰影。Commit `241b062`，SG deployed `ff1ef68` Up healthy
-- 生成並發布 `ONBOARDING.md`：`/team-onboarding` skill 自動分析 30 天使用資料（19 sessions，work type breakdown：Build Feature 55% / Debug Fix 20% / Plan Design 15% / Analyze Data 10%），產出 MCP server checklist + skills 清單草稿
-- User 補寫 7 條 Team Tips（monorepo 根目錄規則、vault 機器獨立、commit prefix 強制、禁建新 branch、Telegram bot 24/7 面板、health-check 100% 收工要求、migration 不能動）
-- User 補寫 6 步 Get Started（clone → bootstrap → vault import → sync → Claude Code AO-RESUME → Telegram smoke test）
-- ShareOnboardingGuide 兩次（draft → update），最終 share URL：https://claude.ai/claude-code/onboard/O3clJrMsjeQ5
-
-## Current state
-- `ONBOARDING.md` 已在 monorepo 根，內容完整（含 HTML comment onboarding instruction）
-- 分享連結已更新至最終版本
-- TASKS.md 無對應待辦，本輪無 AUTO_TASK_DONE 需套用
-
-## Next steps
-- （出國前）Termius 手機 SSH 設定 + cheat sheet 書籤（TASKS 第一優先，操作者親自執行）
-- MainWP EU 計畫啟動核對（2026-05-09 提醒）
-- 開工先讀 Telegram 未讀
-- 桌機 Claude user-level 對齊（`sync-claude-userlevel.ps1 -Mode merge`）
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:ad5c8b10ec026a69dff870de57623cbf5677ee0651324828988830a551a383f1 -->
-
-### claude-opus-4.7 <2026-05-09 00:00>
-
-- **完成（一句）**: Phase 2c 全線收尾 — WpUpdateButtons 重建、Dockerfile @anthropic-ai 補 COPY、Telegram webhook 修正、COMMAND_PLANE_RUNBOOK 改名 + §10 Client Management、ONBOARDING.md 發布（share link O3clJrMsjeQ5）
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/clients/[slug]/WpUpdateButtons.tsx`
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/command-plane/handlers/clientStatus.ts`
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/Dockerfile`
-  - `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md`
-  - `CLAUDE.md`
-  - `ONBOARDING.md`
-  - `agency-os/WORKLOG.md`
-- **Git**: bdac9ec (ONBOARDING + WORKLOG), 8d681b3 (Dockerfile), 7c5cad5 (rename), f91bec0 (restore route), 31ad905 (Phase 2c)
-- **對應 TASKS 子字串（可選）**: Phase 2c
-- **風險／待辦（可選）**: /daily_review /weekly_review 在新 Anthropic key + Dockerfile 修正後應已正常；用戶尚未手動確認回覆正常
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:a0732676aeba440afe79a57c88a354091525aeafc081a8bc4b9c4147bdc0dd8a -->
-
-### claude-sonnet-4-6 <2026-05-09 20:45>
-
-- **完成（一句）**: next-admin UI 配色重做 — sidebar 四層色彩層次 + Build 頁左右 panel 視覺主次 + SG deploy healthy
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css`
-- **Git**: 241b062（UI redesign）；SG deployed commit ff1ef68
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: 遠端 SG next-admin 已 Up healthy；UI 為視覺調整，無 DB/auth/RLS 邊界異動
+## 5) memory/daily/2026-05-11.md
+_no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
