@@ -115,7 +115,7 @@ Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。
 `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `lobster-factory/workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md` — 任一改動必須三份同步，否則 routing drift。
 
 ### 龍蝦自動化安全預設
-Supabase 寫入**預設 OFF**（需 `-EnableWrites`）；Manifest 執行**預設 OFF**（需 `-ExecuteManifest`）。
+Supabase 寫入**預設 OFF**（env: `LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 執行**預設 `off`**（env: `LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）。
 
 ### Trigger.dev 憑證（不可互換）
 `tr_pat_*` = CLI deploy（vault key: `TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（vault key: `TRIGGER_ACCESS_TOKEN`）。
