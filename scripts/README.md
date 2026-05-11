@@ -19,6 +19,7 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `apply-pending-task-checkmarks.ps1` | Apply pending checkmarks (legacy wrapper) |
 | `init-closeout-inbox.ps1` | Initialise closeout-inbox.md |
 | `verify-closeout-completeness.ps1` | Gate: confirm WORKLOG has evidence before commit |
+| `export-cross-machine-memory.ps1` | Export non-git memory files to Desktop\AO-SYNC-<date>\ (called by ao-close) |
 
 ## Build / Health / Gates
 

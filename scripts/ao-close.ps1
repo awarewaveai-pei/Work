@@ -477,6 +477,13 @@ try {
     }
     Write-Host "ao-close: done (verify + guard + integrated report + push OK)." -ForegroundColor Green
     Write-Host "Re-read the automation boundary block above if anything feels missing." -ForegroundColor DarkGray
+
+    # Cross-machine memory export — non-blocking; failure does not affect AO-CLOSE exit code.
+    $exportScript = Join-Path $WorkRoot "scripts\export-cross-machine-memory.ps1"
+    if (Test-Path -LiteralPath $exportScript) {
+        Write-Host "== AO-CLOSE: cross-machine memory export ==" -ForegroundColor Cyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $exportScript -WorkRoot $WorkRoot
+    }
 } finally {
     Pop-Location
 }
