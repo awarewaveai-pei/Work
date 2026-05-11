@@ -10,7 +10,7 @@
 
 ## 背景說明
 
-筆電側已完成以下 MCP 設定修正（commits `efe41aa`、`8c9677e`），桌機需要對齊：
+第一台桌機已完成以下 MCP 設定修正（commits `efe41aa`、`8c9677e`），第二台桌機需要對齊：
 
 - `supabase` MCP 條目已停用（自架 Supabase 無 `/mcp` endpoint，永遠黃燈）
 - `n8n` MCP 正常運作，需要 `N8N_MCP_URL` 環境變數

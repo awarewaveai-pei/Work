@@ -95,7 +95,7 @@ Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claud
 
 ## 雙機換機
 Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。  
-筆電 WP 棧：`bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`（詳：`REMOTE_WORKSTATION_STARTUP.md §1.5.1`）。
+本地 WP 棧（若需要）：`bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`（詳：`REMOTE_WORKSTATION_STARTUP.md §1.5.1`）。
 
 ## 雙 IDE / Cursor Fallback
 雙 IDE 架構：`dual-ide-coexistence-strategy.md`。停 Cursor 時用同一組腳本（ao-resume / ao-close / verify），不重建第二套規則。

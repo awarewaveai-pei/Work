@@ -1,6 +1,6 @@
 # Claude Code user-level SSOT
 
-**單一目的**：讓每台機器的 `~/.claude/` 內容（hooks、settings.json、mcp.json、commands/）能透過 git pull + 一個指令對齊，達成「**桌機與筆電的 Claude Code 行為完全一致**」，且不靠手動複製整個資料夾。
+**單一目的**：讓每台機器的 `~/.claude/` 內容（hooks、settings.json、mcp.json、commands/）能透過 git pull + 一個指令對齊，達成「**兩台桌機的 Claude Code 行為完全一致**」，且不靠手動複製整個資料夾。
 
 > 本目錄是 30 年級的 SSOT。要新增、修改、刪除被治理的檔案，**只**改這裡 → commit → 兩台跑 `sync-claude-userlevel.ps1 -Mode merge`。
 
