@@ -1,12 +1,14 @@
-// /health — Phase 1 reads ops_incidents counters directly (mirrors logic of
-// /api/ops/inbox/health without an internal HTTP roundtrip).
+// /health — reads ops_incidents counters + ops_health_probes heartbeat.
 //
-// Ingest-freshness logic: stale ingest (no new incidents) is WARN, not CRITICAL.
-// Rationale: a healthy system with no alerts produces zero new incidents — treating
-// that as CRITICAL is a false positive. CRITICAL is reserved for active open incidents
-// with critical severity. A dedicated probe heartbeat (ops_health_probes table, updated
-// by /api/ops/probe on a schedule) should replace the ops_incidents freshness check
-// once that table exists.
+// Ingest-freshness: checked against ops_health_probes('ops-inbox'), updated every
+// 30 min by /api/ops/probe (called by SG cron). This correctly separates pipeline
+// liveness from incident volume — a healthy system with no alerts has zero incidents
+// but should still have a fresh probe heartbeat.
+//
+// Status ladder:
+//   CRITICAL  — active critical-severity incidents
+//   WARN      — active non-critical incidents OR stale probe heartbeat
+//   OK        — no open incidents AND probe is fresh
 
 import type { CommandHandler } from "../commandRouter";
 
@@ -20,7 +22,7 @@ function parsePositiveIntEnv(name: string, fallback: number): number {
 export const healthHandler: CommandHandler = async (_request, { supabase }) => {
   const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
 
-  const [active, critical, lastIngest, recentErrors] = await Promise.all([
+  const [active, critical, probeRow, recentErrors] = await Promise.all([
     supabase
       .from("ops_incidents")
       .select("id", { count: "exact", head: true })
@@ -31,10 +33,9 @@ export const healthHandler: CommandHandler = async (_request, { supabase }) => {
       .eq("severity", "critical")
       .in("status", ["open", "investigating"]),
     supabase
-      .from("ops_incidents")
-      .select("created_at")
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .from("ops_health_probes")
+      .select("checked_at, status, latency_ms")
+      .eq("probe_key", "ops-inbox")
       .maybeSingle(),
     supabase
       .from("error_events")
@@ -42,25 +43,19 @@ export const healthHandler: CommandHandler = async (_request, { supabase }) => {
       .gte("occurred_at", dayAgo),
   ]);
 
-  const lastIngestAt =
-    lastIngest.data && "created_at" in lastIngest.data ? lastIngest.data.created_at : null;
+  const lastProbeAt = probeRow.data?.checked_at ?? null;
   const maxIngestAgeMinutes = parsePositiveIntEnv("OPS_INBOX_MAX_INGEST_AGE_MINUTES", 1440);
   let ingestAgeMinutes: number | null = null;
-  let ingestFresh = true;
-  if (lastIngestAt) {
-    const ts = Date.parse(lastIngestAt);
+  let ingestFresh = false;
+
+  if (lastProbeAt) {
+    const ts = Date.parse(lastProbeAt);
     if (Number.isFinite(ts)) {
       ingestAgeMinutes = Math.floor((Date.now() - ts) / 60000);
-      ingestFresh = ingestAgeMinutes <= maxIngestAgeMinutes;
-    } else {
-      ingestFresh = false;
+      ingestFresh = ingestAgeMinutes <= maxIngestAgeMinutes && probeRow.data?.status === "ok";
     }
-  } else {
-    ingestFresh = false;
   }
-  // CRITICAL only when there are active critical-severity incidents.
-  // Stale ingest = WARN (not CRITICAL): no recent incidents means the system is
-  // healthy, not that the pipeline is broken.
+
   const status =
     (critical.count ?? 0) > 0
       ? "critical"
@@ -70,13 +65,14 @@ export const healthHandler: CommandHandler = async (_request, { supabase }) => {
           ? "warn"
           : "ok";
 
+  const probeLatency = probeRow.data?.latency_ms != null ? `${probeRow.data.latency_ms}ms` : "n/a";
   const lines = [
     `*Health: ${status.toUpperCase()}*`,
     `open incidents: ${active.count ?? 0}`,
     `critical: ${critical.count ?? 0}`,
     `errors (24h): ${recentErrors.count ?? 0}`,
-    `last ingest: ${lastIngestAt ?? "_no data_"}`,
-    `ingest fresh: ${ingestFresh ? "yes" : "no"} (age=${ingestAgeMinutes ?? "n/a"}m, max=${maxIngestAgeMinutes}m)`,
+    `probe: ${ingestFresh ? "✅" : "⚠️"} (age=${ingestAgeMinutes ?? "n/a"}m, latency=${probeLatency}, max=${maxIngestAgeMinutes}m)`,
+    `last probe: ${lastProbeAt ?? "_never — run /api/ops/probe to seed_"}`,
   ];
 
   return {
