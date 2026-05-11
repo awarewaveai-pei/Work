@@ -49,7 +49,7 @@ Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claud
 任何關機/結束表達（「收工」「晚安」「bye」「done」「先這樣」「走了」等）→ 直接觸發完整 AO-CLOSE 流程。
 
 ## VPS 並行衝突（drop-in 檔案）
-修改 `/etc/default/*.local` 後 > 5 分鐘才再使用：`stat -c "mtime=%y" <file>` 確認 mtime 未被另一 session 覆蓋（案例：`reference_recurring_ops_recipes.md §3`）。
+修改 `/etc/default/*.local` 後 > 5 分鐘才再使用：`stat -c "mtime=%y" <file>` 確認 mtime 未被另一 session 覆蓋。
 
 ## 緊急 Runbooks
 `runbooks/`：502/OOM、加密挖礦入侵、安全事件、Cloudflare WAF、Codex 設定錯誤。
@@ -67,7 +67,9 @@ Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claud
 | `/verify` | verify-build-gates.ps1 |
 | `/smoke-test` | 核心服務煙霧測試 |
 | `/sg-deploy` | SG VPS sg-deploy.sh |
+| `/sg-reboot` | SG VPS 安全重啟（pre/post-flight） |
 | `/check-drift` | SG prod vs origin/main drift |
+| `/client-onboarding` | 新客戶 onboarding（Supabase + SSH + MainWP） |
 | `/vault-sync` | vault → Windows env |
 | `/vault-status` | vault key 清單 |
 | `/client-status` | 客戶健康 + WP 更新狀態 |
@@ -96,7 +98,7 @@ Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。
 ## 系統架構速查（Claude 必讀）
 
 ### 目錄分工
-`agency-os/` — AO 治理（TASKS/WORKLOG/memory/docs/runbooks）；`lobster-factory/` — 龍蝦工廠（clients/infra/packages/workflows）；`scripts/` — 全域腳本；`mcp/` — MCP registry + user-level SSOT；`tenants/` — 每客戶設定（`core/ENVIRONMENT_REGISTRY.md` = Staging URL SSOT）。
+`agency-os/` — AO 治理（TASKS/WORKLOG/memory/docs/runbooks）；`lobster-factory/` — 龍蝦工廠（clients/infra/packages/workflows）；`scripts/` — 全域腳本；`mcp/` — MCP registry + user-level SSOT；`agency-os/tenants/` — 每客戶設定（`<slug>/core/ENVIRONMENT_REGISTRY.md` = Staging URL SSOT）。
 
 ### 伺服器邊界（**不可混用**）
 | 代號 | IP | 服務 |
