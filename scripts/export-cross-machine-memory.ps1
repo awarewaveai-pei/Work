@@ -70,5 +70,5 @@ Write-Host "匯入完成" -ForegroundColor Green
 $instructions | Out-File -FilePath (Join-Path $destBase "IMPORT_INSTRUCTIONS.md") -Encoding UTF8 -Force
 
 Write-Host ""
-Write-Host "== cross-machine export: MEMORY.md → $destBase ==" -ForegroundColor Cyan
-Write-Host "   帶到另一台機器後，照 IMPORT_INSTRUCTIONS.md 執行三個步驟（git pull + sync + 匯入 index）。" -ForegroundColor DarkGray
+Write-Host "== cross-machine export: MEMORY.md -> $destBase ==" -ForegroundColor Cyan
+Write-Host "   See IMPORT_INSTRUCTIONS.md in the AO-SYNC folder for 3-step import guide." -ForegroundColor DarkGray
