@@ -167,9 +167,9 @@ npm run smoke:supabase-tunnel -- --sql
 
 ---
 
-## 2) 開機後必做四件事（約 5–15 分鐘）
+## 2) 開機後必做五件事（約 5–15 分鐘）
 
-> **捷徑（與關鍵字 `AO-RESUME` 對齊）**：在 Cursor 開 monorepo 根並**送出 `AO-RESUME`**，**`beforeSubmitPrompt` hook** 會先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**＝下列第 1～4 步的**機器裁決版**（fetch、behind 時 ff-only pull、`npm ci` 由腳本在需要時觸發、`verify-build-gates`、**`print-open-tasks`**、**`machine-environment-audit -FetchOrigin -Strict`**）。代理再讀檔五段式即可。**除錯／理解內部**時才在 monorepo 根手動跑 **`scripts/ao-resume.ps1`（預設）** 對照下列分步。
+> **捷徑（與關鍵字 `AO-RESUME` 對齊）**：在 Cursor 開 monorepo 根並**送出 `AO-RESUME`**，**`beforeSubmitPrompt` hook** 會先跑 **`scripts/ao-resume.ps1 -FullMainlineParity`**＝下列第 1、3～5 步的**機器裁決版**（fetch、behind 時 ff-only pull、`npm ci` 由腳本在需要時觸發、`verify-build-gates`、**`print-open-tasks`**、**`machine-environment-audit -FetchOrigin -Strict`**、**Claude user-level drift 偵測**）。代理再讀檔五段式即可。**第 2 步**（AI 工具對齊）若 drift WARN 出現則手動補跑；**除錯／理解內部**時才在 monorepo 根手動跑 **`scripts/ao-resume.ps1`（預設）** 對照下列分步。
 >
 > **與 §1.5 的關係**：若你為 **新機** 且尚未跑過 §1.5 的「工具與依賴」區塊，請 **先完成 §1.5**，再視 §2 為**之後每次**的節奏。若 `lobster-factory\packages\workflows\package-lock.json` 有更新，務必在該目錄 **再執行** `npm ci`（或由 **`ao-resume.ps1`** 偵測後代跑）。
 
@@ -181,7 +181,23 @@ npm run smoke:supabase-tunnel -- --sql
    ```
    若失敗，先處理本機未提交或衝突，再往下走。
 
-2. **依賴還原（`node_modules` 不入庫）**  
+2. **AI 工具對齊（公司桌機 git pull 後必做；筆電看到 drift WARN 時補跑）**
+
+   `ao-resume.ps1` 已內建 `sync-claude-userlevel.ps1 -Mode verify`（偵測漂移並印出警告）。看到 `WARN: ~/.claude/ drifted` 或剛在公司桌機 git pull 後，補跑：
+
+   ```powershell
+   # Claude Code hooks / settings.json / commands（SSOT: mcp/claude-userlevel/）
+   powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge
+
+   # MCP 設定（SSOT: mcp/registry.template.json → .mcp.json / .cursor/mcp.json 等）
+   powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
+   ```
+
+   > `sync-claude-userlevel.ps1 -Mode verify` 後 exit 0 = 無漂移 = 不必補跑 merge。  
+   > normalizer 自動修正 PS 5.1 的 1-element array bug，**不需手動修補**。  
+   > 若要確認對齊後狀態：`sync-claude-userlevel.ps1 -Mode verify`（PASS 即完成）。
+
+3. **依賴還原（`node_modules` 不入庫）**  
 
    **（小白）`npm ci` 是什麼？** 可以想成：照著 **`package-lock.json` 這份購物清單**，把要用到的 JavaScript 套件裝進本機的 **`node_modules`** 資料夾。清單會跟著 GitHub；`node_modules` 太大通常不入庫，所以**每一台電腦**至少要裝一次；**`git pull` 之後若清單有更新**，也要再裝一次才跟筆電／CI 一致。  
    **現在打 `AO-RESUME`（跑 `ao-resume.ps1`）時，若偵測到還沒裝過或清單變新了，會自動替你執行 `npm ci`**（腳本會印簡短英文說明；npm 本身可能出現黃色 **英文警告**，多數可忽略，只要最後顯示完成即可）。想略過可傳 **`-SkipWorkflowsDeps`**（進階用）。亦可手動貼上：  
@@ -200,14 +216,14 @@ npm run smoke:supabase-tunnel -- --sql
      cd ..
      ```
 
-3. **一次跑滿「工程 + 治理」閘道（強烈建議）**  
+4. **一次跑滿「工程 + 治理」閘道（強烈建議）**  
    在 **monorepo 根**：
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
    ```
    須已安裝 **Node.js**（給 `lobster-factory` 的檢驗腳本用）。**Critical Gate 必須 PASS** 再開始改大範圍。
 
-4. **對話續接（擇一）**  
+5. **對話續接（擇一）**  
    - **機器裁決（預設，與只打 `AO-RESUME` 一致）**：在 Cursor 送出 **`AO-RESUME`** 時，**專案 hook** 會先在 monorepo 根跑 **`.\scripts\ao-resume.ps1 -FullMainlineParity`**（**預設**即含 **`verify-build-gates` + 結尾 `machine-environment-audit -FetchOrigin -Strict`**）。**Exit 0**＝未落後遠端（必要時已 ff-only pull）+ 閘道 + 依賴檢查 + 嚴格環境稽核無 WARN；**不必**再開三件套 markdown 目視。代理依 **`30-resume-keyword.mdc`** 讀 **`ao-resume-hook-last.json`**／log 與快照，**不必**為形式再重跑同一輪腳本（見該規則「hook 去重」）。**除錯**時可改在終端手動跑 **`.\scripts\ao-resume.ps1`**。別名：**`.\scripts\align-workstation.ps1`**（與手動 `ao-resume` 無 `-FullMainlineParity` 時同行為）。  
      **進階略過（非人類日常開工）**：**`-SkipStrictEnvironmentAudit`**（Autopilot 開機會加；並常搭配 **`-SkipVerify`**）；**不要**在桌機正式開工時隨意省略。  
      **做不到全自動的邊界**：`gh` 登入、DPAPI vault、`mcp.json` 等**不可進庫**，腳本只驗證「有／無」，缺了會 **Strict FAIL**——仍要你在該機做一次設定（見 **§1.5** 憑證段）。  
