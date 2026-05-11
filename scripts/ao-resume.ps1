@@ -306,23 +306,45 @@ if ($script:StrictEnvAudit) {
     }
 }
 
-# --- Claude Code user-level alignment (warn-only; mechanical drift detector) ---
-# CONTRACT: invoke sync-claude-userlevel.ps1 -Mode verify (warn-only)
-# This is a warn-only check so AO-RESUME never gets blocked by user-level drift.
-# If drift is detected, prints the one-liner to fix it. Cross-machine SSOT lives
-# in mcp/claude-userlevel/ — see that README for details.
+# --- Claude Code user-level alignment (auto-merge; idempotent, non-blocking) ---
+# -Mode merge: overwrites only governed keys (hooks/deny/additionalDirs/theme) and PRESERVES
+# permissions.allow (machine-specific). Idempotent: same result every run.
+# normalizer auto-fixes PS 5.1 1-element-array bug — no manual patching needed.
 $claudeUserlevelSync = Join-Path $WorkRoot "scripts\sync-claude-userlevel.ps1"
 if (Test-Path -LiteralPath $claudeUserlevelSync) {
     Write-Host ""
-    Write-Host "== AO-RESUME: Claude user-level drift check (warn-only) ==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $claudeUserlevelSync -Mode verify -NoBackup
+    Write-Host "== AO-RESUME: Claude user-level sync (auto-merge) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $claudeUserlevelSync -Mode merge
     if ($LASTEXITCODE -ne 0) {
-        Write-Host ""
-        Write-Host "WARN: ~/.claude/ drifted from SSOT (mcp/claude-userlevel/)." -ForegroundColor Yellow
-        Write-Host "      Fix:  powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge" -ForegroundColor Yellow
-        Write-Host ""
+        Write-Host "WARN: sync-claude-userlevel -Mode merge returned non-zero; hooks/settings may be stale." -ForegroundColor Yellow
     }
-    # Reset exit code (warn-only must not poison parent script's success path)
+    $global:LASTEXITCODE = 0
+}
+
+# --- MCP config sync (auto-regenerate from SSOT; idempotent, non-blocking) ---
+# Regenerates .mcp.json / .cursor/mcp.json / Codex / Gemini from mcp/registry.template.json.
+$mcpSyncScript = Join-Path $WorkRoot "scripts\sync-mcp-config.ps1"
+if (Test-Path -LiteralPath $mcpSyncScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: MCP config sync (auto) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mcpSyncScript
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARN: sync-mcp-config returned non-zero; MCP settings may be stale." -ForegroundColor Yellow
+    }
+    $global:LASTEXITCODE = 0
+}
+
+# --- Cross-machine memory import (auto; non-blocking) ---
+# Imports MEMORY.md from Desktop\AO-SYNC-*\ if a newer version exists.
+# Silent no-op when no AO-SYNC folder is present (normal for primary/laptop machine).
+$importMemScript = Join-Path $WorkRoot "scripts\import-cross-machine-memory.ps1"
+if (Test-Path -LiteralPath $importMemScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: cross-machine memory import (auto) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $importMemScript -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARN: import-cross-machine-memory returned non-zero." -ForegroundColor Yellow
+    }
     $global:LASTEXITCODE = 0
 }
 

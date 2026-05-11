@@ -34,21 +34,29 @@ Desktop\
 
 ---
 
-## 帶到另一台機器後的三個步驟
+## 帶到另一台機器後 — 只需一件事
+
+把 AO-SYNC 資料夾放到**目標機器的桌面**，然後直接打：
+
+```
+AO-RESUME
+```
+
+`ao-resume.ps1` 自動完成：
+1. `git pull origin main`（取得所有 memory 內容、rules、WORKLOG）
+2. `sync-claude-userlevel.ps1 -Mode merge`（Claude hooks/settings 對齊）
+3. `sync-mcp-config.ps1`（MCP 設定重生）
+4. `import-cross-machine-memory.ps1`（偵測桌面 AO-SYNC 資料夾 → 自動匯入 MEMORY.md）
+
+> **注意**：AO-SYNC 資料夾放桌面後，AO-RESUME 執行時會自動匯入並寫入 `.imported` 標記，之後不再重複匯入同一份。
+
+---
+
+### 萬一 hook 失效（手動備案）
 
 ```powershell
-# Step 1: 取得最新 repo（包含所有 memory 內容、rules、WORKLOG）
 git pull origin main
-
-# Step 2: AI 工具對齊（公司桌機 git pull 後必做；筆電看到 drift WARN 時補跑）
-powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge
-powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
-
-# Step 3: 匯入 MEMORY.md index
-$dest = "$env:USERPROFILE\.claude\projects\c--Users-USER-Work\memory"
-if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest -Force }
-Copy-Item "$env:USERPROFILE\Desktop\AO-SYNC-*\memory\MEMORY.md" "$dest\MEMORY.md" -Force
-Write-Host "完成" -ForegroundColor Green
+powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1 -FullMainlineParity
 ```
 
 ---

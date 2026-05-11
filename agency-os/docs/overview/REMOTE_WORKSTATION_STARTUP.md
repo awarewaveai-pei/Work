@@ -181,21 +181,18 @@ npm run smoke:supabase-tunnel -- --sql
    ```
    若失敗，先處理本機未提交或衝突，再往下走。
 
-2. **AI 工具對齊（公司桌機 git pull 後必做；筆電看到 drift WARN 時補跑）**
+2. **AI 工具對齊 ← `AO-RESUME` 已自動處理（無須手動）**
 
-   `ao-resume.ps1` 已內建 `sync-claude-userlevel.ps1 -Mode verify`（偵測漂移並印出警告）。看到 `WARN: ~/.claude/ drifted` 或剛在公司桌機 git pull 後，補跑：
+   送出 `AO-RESUME` 時，`ao-resume.ps1` 自動執行：
 
-   ```powershell
-   # Claude Code hooks / settings.json / commands（SSOT: mcp/claude-userlevel/）
-   powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge
+   | 步驟 | 腳本 | 說明 |
+   |------|------|------|
+   | Claude user-level sync | `sync-claude-userlevel.ps1 -Mode merge` | hooks/settings 對齊，保留 permissions.allow |
+   | MCP 設定 | `sync-mcp-config.ps1` | .mcp.json / .cursor/mcp.json 從 SSOT 重生 |
+   | 記憶匯入 | `import-cross-machine-memory.ps1` | 若 Desktop 有新的 AO-SYNC 資料夾則自動匯入 MEMORY.md |
 
-   # MCP 設定（SSOT: mcp/registry.template.json → .mcp.json / .cursor/mcp.json 等）
-   powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1
-   ```
-
-   > `sync-claude-userlevel.ps1 -Mode verify` 後 exit 0 = 無漂移 = 不必補跑 merge。  
-   > normalizer 自動修正 PS 5.1 的 1-element array bug，**不需手動修補**。  
-   > 若要確認對齊後狀態：`sync-claude-userlevel.ps1 -Mode verify`（PASS 即完成）。
+   **全部為 non-blocking（任一失敗不阻擋 AO-RESUME）、idempotent（重跑無副作用）。**  
+   只在 hook 完全失效時才需手動跑：`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1 -FullMainlineParity`
 
 3. **依賴還原（`node_modules` 不入庫）**  
 
