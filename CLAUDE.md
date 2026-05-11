@@ -26,9 +26,9 @@
 (a) 已有 SSOT？先讀，不重建。　(b) 破壞單一 Owner 原則？　(c) 30 秒能找到並理解？
 
 ### R4：修改即驗證（強制，每次寫檔）
-**寫入前**：每個路徑 / 腳本名 / 檔名引用 → Glob 或 Grep 確認存在，不存在不寫。  
-**寫入後**：同類問題 grep 全 repo（`.claude/` / `runbooks/` / `scripts/` / `agency-os/docs/` / `mcp/`）掃一遍，命中的一起修正，同一個 commit。  
-**禁止**：只改被問到的那份；留下已知的死引用或舊路徑。
+**寫入前**：每個路徑 / 腳本名 / 引用 → Glob 確認存在，不存在不寫。  
+**寫入後**：grep **你剛修的確切字串**（非全域掃描），範圍限 `.claude/ runbooks/ scripts/ agency-os/docs/ mcp/`，命中的一起修，同一 commit。  
+**原則**：改了什麼 → grep 那個字串；不做無目標全域掃描（浪費 token）。
 
 ## MCP 治理
 SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`。  
