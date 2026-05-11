@@ -1,6 +1,12 @@
 # export-cross-machine-memory.ps1
-# Exports the Claude Code project memory INDEX to Desktop\AO-SYNC-<date>\ for cross-machine transfer.
+# Exports the Claude Code project memory INDEX to AO-SYNC-<date>\ for cross-machine transfer.
 # Called automatically at end of AO-CLOSE after git push. Non-blocking.
+#
+# Priority order for export destination:
+#   1. -DestRoot param (explicit override)
+#   2. $env:AO_SYNC_ROOT env var (machine-specific config)
+#   3. G:\我的雲端硬碟\AO-SYNC (Google Drive default, if drive exists)
+#   4. Desktop\AO-SYNC-<date> (legacy fallback)
 #
 # All memory CONTENT files (feedback_*.md, user_devices.md) are now in repo (agency-os/memory/)
 # and synced automatically via git pull — no manual copy needed for those.
@@ -14,8 +20,20 @@ param(
     [string]$DestRoot = ""
 )
 
-$today    = Get-Date -Format "yyyy-MM-dd"
-$destBase = if ($DestRoot) { $DestRoot } else { Join-Path $env:USERPROFILE "Desktop\AO-SYNC-$today" }
+$today = Get-Date -Format "yyyy-MM-dd"
+
+# Resolve sync root: param > env var > Google Drive > Desktop
+$syncRoot = if ($DestRoot) {
+    $DestRoot
+} elseif ($env:AO_SYNC_ROOT) {
+    $env:AO_SYNC_ROOT
+} elseif (Test-Path "G:\我的雲端硬碟") {
+    "G:\我的雲端硬碟\AO-SYNC"
+} else {
+    Join-Path $env:USERPROFILE "Desktop"
+}
+
+$destBase = if ($DestRoot) { $DestRoot } else { Join-Path $syncRoot "AO-SYNC-$today" }
 $memSrc   = Join-Path $env:USERPROFILE ".claude\projects\c--Users-USER-Work\memory"
 $memIndex = Join-Path $memSrc "MEMORY.md"
 

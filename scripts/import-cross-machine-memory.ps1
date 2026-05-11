@@ -1,23 +1,38 @@
 # import-cross-machine-memory.ps1
-# Auto-imports MEMORY.md from Desktop\AO-SYNC-*\ if a newer version is found.
-# Called by ao-resume.ps1 (non-blocking). Silent no-op when no AO-SYNC folder exists
-# (normal for the primary/laptop machine that generates the export).
+# Auto-imports MEMORY.md from AO-SYNC-*\ if a newer version is found.
+# Called by ao-resume.ps1 (non-blocking). Silent no-op when no AO-SYNC folder exists.
+#
+# Search order for AO-SYNC folders:
+#   1. $env:AO_SYNC_ROOT (machine-specific config)
+#   2. G:\我的雲端硬碟\AO-SYNC (Google Drive default, if drive exists)
+#   3. Desktop (legacy fallback)
+# Searches ALL available locations and picks the latest folder by name.
 #
 # Logic:
-#   1. Find latest AO-SYNC-<date> folder on Desktop (by folder name, descending)
+#   1. Find latest AO-SYNC-<date> folder across all search paths (by name, descending)
 #   2. Skip if .imported flag exists in that folder (already processed this export)
 #   3. Skip if destination MEMORY.md is already newer than source
 #   4. Import and write .imported flag so next AO-RESUME doesn't re-import same file
 
 param([string]$WorkRoot = "")
 
-$memDest    = "$env:USERPROFILE\.claude\projects\c--Users-USER-Work\memory"
-$desktopDir = [Environment]::GetFolderPath('Desktop')
+$memDest = "$env:USERPROFILE\.claude\projects\c--Users-USER-Work\memory"
 
+# Build list of directories to search
+$searchRoots = @()
+if ($env:AO_SYNC_ROOT) { $searchRoots += $env:AO_SYNC_ROOT }
+if (Test-Path "G:\我的雲端硬碟\AO-SYNC") { $searchRoots += "G:\我的雲端硬碟\AO-SYNC" }
+$searchRoots += [Environment]::GetFolderPath('Desktop')
+$searchRoots = $searchRoots | Select-Object -Unique
+
+# Collect AO-SYNC-* folders across all roots, pick latest by name
 $syncFolders = @(
-    Get-ChildItem -Path $desktopDir -Filter "AO-SYNC-*" -Directory -ErrorAction SilentlyContinue |
-    Sort-Object Name -Descending
-)
+    foreach ($root in $searchRoots) {
+        if (Test-Path $root) {
+            Get-ChildItem -Path $root -Filter "AO-SYNC-*" -Directory -ErrorAction SilentlyContinue
+        }
+    }
+) | Sort-Object Name -Descending
 
 if ($syncFolders.Count -eq 0) {
     # Normal for primary machine — no AO-SYNC to import
