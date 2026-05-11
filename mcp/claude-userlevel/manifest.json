@@ -35,6 +35,13 @@
       "target": "${USERPROFILE}\\.claude\\mcp.json",
       "syncMode": "replace",
       "description": "Per CLAUDE.md, ~/.claude/mcp.json must be empty; project-scoped .mcp.json is the SSOT"
+    },
+    "commands": {
+      "type": "directory",
+      "source": ".claude/commands",
+      "target": "${USERPROFILE}\\.claude\\commands",
+      "syncMode": "mirror",
+      "description": "Slash commands mirrored from project SSOT (.claude/commands/) to user-level. Project-level takes priority when repo is open; user-level serves as fallback. Never create standalone copies in ~/.claude/commands/ directly."
     }
   },
   "excludeFromHash": [

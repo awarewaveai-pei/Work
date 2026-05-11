@@ -146,8 +146,8 @@ function Get-FileMd5([string]$Path) {
   return (Get-FileHash -Path $Path -Algorithm MD5).Hash
 }
 
-# ---------- DIRECTORY MIRROR (hooks/) ----------
-function Sync-Directory-Mirror($spec, [string]$mode) {
+# ---------- DIRECTORY MIRROR (hooks/, commands/, …) ----------
+function Sync-Directory-Mirror($spec, [string]$mode, [string]$label = 'dir') {
   $src = Join-Path $MonorepoRoot ($spec.source -replace '/','\')
   $tgt = Expand-Vars $spec.target
   if (-not (Test-Path $src)) { throw "Source dir missing: $src" }
@@ -186,7 +186,7 @@ function Sync-Directory-Mirror($spec, [string]$mode) {
   $colorUpdate = if ($action.update.Count -gt 0) {'Yellow'} else {'Gray'}
   $colorCreate = if ($action.create.Count -gt 0) {'Yellow'} else {'Gray'}
   $colorExtra  = if ($action.extra.Count  -gt 0) {'Magenta'} else {'Gray'}
-  Write-Host "[hooks] target=$tgt" -ForegroundColor Yellow
+  Write-Host "[$label] target=$tgt" -ForegroundColor Yellow
   Write-Host ("  same    : {0}" -f $action.same.Count)
   Write-Host ("  update  : {0}" -f $action.update.Count) -ForegroundColor $colorUpdate
   $action.update | ForEach-Object { Write-Host "    ~ $_" }
@@ -206,7 +206,7 @@ function Sync-Directory-Mirror($spec, [string]$mode) {
   }
 
   # install / merge => write
-  Backup-Path $tgt 'hooks-before'
+  Backup-Path $tgt "$label-before"
   if (-not (Test-Path $tgt)) { New-Item -ItemType Directory -Path $tgt -Force | Out-Null }
   foreach ($f in $srcFiles) {
     $tgtFile = Join-Path $tgt $f.rel
@@ -220,7 +220,7 @@ function Sync-Directory-Mirror($spec, [string]$mode) {
       Remove-Item -Path $rmPath -Force -ErrorAction SilentlyContinue
     }
   }
-  Write-Host "  -> hooks synced" -ForegroundColor Green
+  Write-Host "  -> $label synced" -ForegroundColor Green
 }
 
 # ---------- JSON MERGE (settings.json) ----------
@@ -376,7 +376,7 @@ foreach ($name in $manifest.files.PSObject.Properties.Name) {
   Write-Host ""
   Write-Host "----- governing: $name ($($spec.type)) -----" -ForegroundColor Cyan
   switch ($spec.type) {
-    'directory'    { Sync-Directory-Mirror $spec $Mode }
+    'directory'    { Sync-Directory-Mirror $spec $Mode $name }
     'merge-json'   { Sync-Json-Merge $spec $Mode }
     'replace-json' { Sync-Json-Replace $spec $Mode }
     default        { Write-Host "  SKIP unknown type: $($spec.type)" -ForegroundColor Magenta }

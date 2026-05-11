@@ -37,6 +37,35 @@
 全面切換至 Claude Code 後，預設使用 `[claude]`。  
 範例：`[claude] fix: sync-mcp-config ClaudeProjectPlaceholder path`
 
+## 常設規範（3 條強制，每次都適用）
+
+### R1：雙機 Claude 設定自動同步清單
+
+| 項目 | 路徑（SSOT） | 同步方式 |
+|------|------------|---------|
+| slash commands / skills | `repo/.claude/commands/` | `git pull` 自動 ✓ |
+| subagents | `repo/.claude/agents/` | `git pull` 自動 ✓ |
+| runbooks / scripts / docs | `agency-os/`, `scripts/`, `lobster-factory/docs/` | `git pull` 自動 ✓ |
+| hooks / settings.json | `mcp/claude-userlevel/` SSOT | `git pull` + `sync-claude-userlevel.ps1 -Mode merge` |
+| ~/.claude/commands/ | 從 `repo/.claude/commands/` mirror | 同上（manifest.json 治理） |
+| memory | `~/.claude/projects/*/memory/` | ❌ 手動複製（不進 git） |
+
+**禁止**：在任一機器的 `~/.claude/commands/` 或 `~/.claude/agents/` 建立不在 repo 裡的副本。
+
+### R2：每任務完成後強制 commit + 文件
+
+1. **`git commit`**：message 寫根因 + 驗證結果 = 30 秒故障手冊
+2. **`WORKLOG.md`**：根因 / 步驟 / 驗證證據 / 「避免再發生」規則
+3. 若引入新 pattern → 更新對應 runbook/template（不得只留在 WORKLOG 不更新原始 doc）
+
+### R3：30 年品質基準（操作前問 3 題）
+
+- (a) 是否已有 SSOT？先讀，不重建。
+- (b) 是否破壞「單一 Owner」或「不重複」原則？
+- (c) 未來的人能在 30 秒找到並理解嗎？
+
+---
+
 ## 並行 session 編輯衝突偵測（Cursor + Claude 同時跑）
 
 修改 SG/EU 上的 drop-in 檔案（`/etc/default/*.local`、systemd unit override 等）後，**若回頭使用該檔超過 5 分鐘**（例如等待 reboot、等下個 cron tick），動作前先重看一次：
