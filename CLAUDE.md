@@ -108,11 +108,11 @@ Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。
 ### 伺服器邊界（**不可混用**）
 | 代號 | IP | 服務 |
 |------|-----|------|
-| **SG** | 5.223.93.113 | phase1-core Docker（nginx / next-admin / n8n / Supabase / Trigger v3） |
-| **EU** | 204.168.175.41 | Trigger.dev **v4** + ClickHouse **25.7.x**（禁升 latest / 24.x）+ registry:5000 |
+| **SG** | 5.223.93.113 | phase1-core Docker（nginx / next-admin / node-api / wordpress / redis） |
+| **EU** | 204.168.175.41 | Trigger.dev **v4** + ClickHouse **25.7.x**（禁升 latest / 24.x）+ Supabase + n8n + registry:5000 |
 
 ### 龍蝦 Routing 三件套（同一 PR 必須同步）
-`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + routing matrix JSON + routing matrix doc — 任一改動必須三份同步，否則 routing drift。
+`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `lobster-factory/workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md` — 任一改動必須三份同步，否則 routing drift。
 
 ### 龍蝦自動化安全預設
 Supabase 寫入**預設 OFF**（需 `-EnableWrites`）；Manifest 執行**預設 OFF**（需 `-ExecuteManifest`）。
