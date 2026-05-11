@@ -25,6 +25,11 @@
 ### R3：30 年品質（操作前問）
 (a) 已有 SSOT？先讀，不重建。　(b) 破壞單一 Owner 原則？　(c) 30 秒能找到並理解？
 
+### R4：修改即驗證（強制，每次寫檔）
+**寫入前**：每個路徑 / 腳本名 / 檔名引用 → Glob 或 Grep 確認存在，不存在不寫。  
+**寫入後**：同類問題 grep 全 repo（`.claude/` / `runbooks/` / `scripts/` / `agency-os/docs/` / `mcp/`）掃一遍，命中的一起修正，同一個 commit。  
+**禁止**：只改被問到的那份；留下已知的死引用或舊路徑。
+
 ## MCP 治理
 SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`。  
 `~/.claude/mcp.json` 強制為 `{}`；shared MCP 走 repo `.mcp.json`。禁止 commit secrets。
