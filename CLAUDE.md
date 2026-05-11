@@ -27,8 +27,7 @@
 
 ## MCP 治理
 SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`。  
-`~/.claude/mcp.json` 強制為 `{}`；shared MCP 走 repo `.mcp.json`。禁止 commit secrets。  
-詳：`mcp/README.md`、`agency-os/docs/operations/mcp-add-server-quickstart.md`。
+`~/.claude/mcp.json` 強制為 `{}`；shared MCP 走 repo `.mcp.json`。禁止 commit secrets。
 
 ## 操作風險分級（強制）
 | 等級 | 說明 | 處置 |
@@ -50,7 +49,7 @@ Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claud
 任何關機/結束表達（「收工」「晚安」「bye」「done」「先這樣」「走了」等）→ 直接觸發完整 AO-CLOSE 流程。
 
 ## VPS 並行衝突（drop-in 檔案）
-修改 `/etc/default/*.local` 後 > 5 分鐘才再使用：`stat -c "mtime=%y" <file>` 確認 mtime 未被另一 session 覆蓋。歷史案例 + 排查指令：`reference_recurring_ops_recipes.md §3`。
+修改 `/etc/default/*.local` 後 > 5 分鐘才再使用：`stat -c "mtime=%y" <file>` 確認 mtime 未被另一 session 覆蓋（案例：`reference_recurring_ops_recipes.md §3`）。
 
 ## 緊急 Runbooks
 `runbooks/`：502/OOM、加密挖礦入侵、安全事件、Cloudflare WAF、Codex 設定錯誤。
@@ -88,8 +87,6 @@ Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claud
 | `decision-intelligence` | 18 階段決策評審（`/decide` 觸發） |
 
 ## 雙機換機
-日常：`git pull` + `sync-claude-userlevel.ps1 -Mode merge`（hooks + settings + commands 全對齊）。  
-新機：`bootstrap-mcp-machine.ps1`（詳：`mcp/claude-userlevel/README.md`）。  
 Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。  
 筆電 WP 棧：`bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`（詳：`REMOTE_WORKSTATION_STARTUP.md §1.5.1`）。
 
