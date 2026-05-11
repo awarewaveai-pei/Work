@@ -2,6 +2,56 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-11
+
+### 桌機 Claude user-level 對齊 <2026-05-11>
+
+- 執行 `sync-claude-userlevel.ps1 -Mode merge` on 桌機
+- hooks：3 個更新（`ao-resume-on-prompt.ps1`、`hooks.json`、`README.md`），19/19 same 後
+- settings.json：governed keys 覆寫，normalizer 修正 9 個 array 結構（PS5.1 1-element array bug）
+- mcp.json：確認 `{}` 無 drift
+- verify 模式仍顯示 settings.json drift → 已知 false positive（normalizer 後處理造成比較不符）；實際內容正確
+- backup：`agency-os/Backups/claude-userlevel-20260511-090325/`
+
+### SG VPS — app.aware-wave.com Basic Auth 修復 + 衍生事件處理 <2026-05-11>
+
+**根因鏈**：2026-05-11 重新啟用 Basic Auth 時，`/api/` 路徑未豁免 → Telegram webhook `/api/internal/commands/telegram` 被 401 擋住 → bot 11 則指令排隊靜默 → 監控誤報（CHECK_URLS 含 `/` 返回 401）。
+
+**修復 — 系統 nginx（system nginx `app` site）**：
+- 路徑：`/etc/nginx/sites-enabled/app`（canonical repo: `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`）
+- 新增 `location ^~ /api/` block（無 auth）放在 `location /`（有 auth_basic）之前
+- `location /`：加 `auth_basic "Aware Wave Admin"` + `auth_basic_user_file /etc/nginx/.htpasswd_studio`
+- nginx 優先順序：`^~ /api/ops/` → `^~ /api/build/` → `^~ /api/` → `location /`（auth）
+- `nginx -t` PASS，`systemctl reload nginx`
+- 驗證：`app.aware-wave.com/` → 401 ✓；錯誤密碼 → 401 ✓；`/api/ops/summary` → 200 ✓；Telegram `pending_update_count` 11 → 0 ✓
+
+**修復 — Telegram bot**：
+- 根因：nginx `/api/` 豁免後，Telegram webhook 恢復收到指令
+- bot 排隊 11 則全數消化（getWebhookInfo `pending_update_count: 0`）
+
+**修復 — 雙頻道告警（#infra-alerts + #ops-incidents）**：
+- `endpoint-alert.sh`：`send_webhook()` 改為同時 POST `WEBHOOK_URL`（#infra-alerts）和 `OPS_INCIDENTS_WEBHOOK_URL`（#ops-incidents）
+- `check-drift-and-alert.sh`：新增 step 9b 讀取 `.env` 的 `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`，獨立 POST #ops-incidents
+- `awarewave-endpoint-alert.local.template`：新檔，記錄 drop-in 覆蓋模式（`CHECK_URLS` 改用 `/api/ops/summary`，`OPS_INCIDENTS_WEBHOOK_URL` 設定說明）
+- VPS drop-in：`/etc/default/awarewave-endpoint-alert.local` 已 `CHECK_URLS` 改用 `app.aware-wave.com/api/ops/summary`（避免 `/` 401 誤報）
+
+**VPS commit**：`0b252be`（SG VPS `/root/Work`，無法推 GitHub → 本機 apply 後統一 push）
+**本機 commits**：`fd88821`、`11f0942`（checkpoint/memory）
+**推送**：本 commit 統一推 origin/main，VPS 再 `git pull`
+
+**避免再發生**：
+- nginx conf 已明文列出「所有 /api/ 路徑無 auth，location / 才有 auth」，任何未來改 auth 層級時須先看此規則
+- monitoring CHECK_URLS 不得用 `/`（有 auth 的路徑），改用 `/api/ops/summary`（已在 template 記錄）
+- ops-incidents 靜默根因：只掛了一個 Slack webhook；現雙頻道 pattern 已成 convention
+
+**相關文件**：
+- `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`
+- `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`
+- `lobster-factory/infra/hetzner-phase1-core/scripts/check-drift-and-alert.sh`（新增）
+- `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/awarewave-endpoint-alert.local.template`（新增）
+
+---
+
 ## 2026-05-09
 
 ### next-admin UI 配色＋層級重做 <2026-05-09>

@@ -55,13 +55,21 @@ write_atomic() {
 }
 
 send_webhook() {
-  [[ -z "${WEBHOOK_URL}" ]] && return 0
-  local text="$1"
-  local payload
-  payload="$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "${text}")"
-  curl -fsS -X POST -H "Content-Type: application/json" \
-    --data "${payload}" \
-    "${WEBHOOK_URL}" >/dev/null
+  # Primary channel (e.g. #infra-alerts)
+  if [[ -n "${WEBHOOK_URL:-}" ]]; then
+    local text="$1"
+    local payload
+    payload=$(printf '{"text":%s}' "$(echo "$text" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')")
+    curl -sS -o /dev/null -w "" -X POST -H 'Content-Type: application/json' --data "$payload" "${WEBHOOK_URL}" 2>/dev/null || true
+  fi
+  # Secondary channel (#ops-incidents — superset of all alerts)
+  if [[ -n "${OPS_INCIDENTS_WEBHOOK_URL:-}" ]]; then
+    local text="$1"
+    local payload
+    payload=$(printf '{"text":%s}' "$(echo "$text" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')")
+    curl -sS -o /dev/null -w "" -X POST -H 'Content-Type: application/json' --data "$payload" "${OPS_INCIDENTS_WEBHOOK_URL}" 2>/dev/null || true
+  fi
+  return 0
 }
 
 send_pagerduty() {
@@ -216,6 +224,5 @@ if [[ "${notify}" == "true" ]]; then
 fi
 
 # Heartbeat last; failure non-fatal (see send_heartbeat).
-# Always send regardless of endpoint health — this push monitor tracks that
-# THIS alerter process is running. Endpoint failures surface via Slack/PagerDuty.
+# Always send — alerter-running monitor; endpoint health via Slack/PD
 send_heartbeat || true

@@ -1,0 +1,13 @@
+# /etc/default/awarewave-endpoint-alert.local
+# Drop-in override — survives sync-hetzner-slack-alert-webhooks.ps1 rewrites.
+# Install: copy this to /etc/default/awarewave-endpoint-alert.local on VPS.
+#
+# WHY app.aware-wave.com path is /api/ops/summary (not /):
+#   Basic Auth protects the UI root. /api/ops/summary is behind location ^~ /api/ops/
+#   (no auth_basic in system nginx) and returns HTTP 200 from next-admin.
+#   Do NOT check / directly — it returns 401 and triggers false alerts.
+CHECK_URLS="https://aware-wave.com/ https://app.aware-wave.com/api/ops/summary https://api.aware-wave.com/health https://n8n.aware-wave.com/healthz https://trigger.aware-wave.com/ https://uptime.aware-wave.com/dashboard"
+
+# OPS_INCIDENTS_WEBHOOK_URL: send all infra alerts to #ops-incidents (superset channel).
+# Get value from vault: scripts/secrets-vault.ps1 -Action get -Name OPS_INBOX_SLACK_INCIDENTS_WEBHOOK
+OPS_INCIDENTS_WEBHOOK_URL="<from vault: OPS_INBOX_SLACK_INCIDENTS_WEBHOOK>"
