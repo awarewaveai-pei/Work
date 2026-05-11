@@ -50,6 +50,30 @@
 - `lobster-factory/infra/hetzner-phase1-core/scripts/check-drift-and-alert.sh`（新增）
 - `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/awarewave-endpoint-alert.local.template`（新增）
 
+### CLAUDE.md 系統全知優化 <2026-05-11>
+
+**任務**：掃 Work repo 所有 README（28 份，排除 node_modules），找 Claude 不知道但會影響操作決策的關鍵事實，以最省 token 方式補入 CLAUDE.md。
+
+**已移除（節省 ~650 行/session）**：
+- `@agency-os/docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md`（~150 行，內容已在 AGENTS.md 覆蓋）
+- `@mcp/README.md`（~100 行，日常不需要細節）
+- `@agency-os/docs/operations/mcp-add-server-quickstart.md`（~200 行，按需讀取）
+
+**新增 §系統架構速查（25 行）** — 9 個關鍵事實：
+1. 目錄分工（agency-os / lobster-factory / scripts / mcp / tenants）
+2. SG（5.223.93.113）vs EU（204.168.175.41）伺服器邊界（不可混用）
+3. ClickHouse 固定在 25.7.x（禁升 latest/24.x）
+4. 龍蝦 Routing 三件套必須同 PR 同步
+5. Supabase 寫入預設 OFF；Manifest 執行預設 OFF
+6. Trigger.dev `tr_pat_*`（deploy）vs `tr_prod_*`（SDK）不可互換
+7. Cursor rules 正本在 `agency-os/.cursor/rules/`（repo 根是 mirror）
+8. Staging URL SSOT：`tenants/<slug>/core/ENVIRONMENT_REGISTRY.md`
+9. 監控端點用 `/api/ops/summary`（非 `/`），drop-in pattern
+
+**結果**：CLAUDE.md 97 → 123 行；session 載入節省約 450 行；新增的 25 行覆蓋 9 個會造成操作錯誤的知識盲區。
+
+**commit**: `d5a707a`
+
 ---
 
 ## 2026-05-09
