@@ -1,7 +1,10 @@
 # Hetzner Server 502 / OOM 緊急處理手冊
 
-**伺服器：** `wordpress-ubuntu-4gb-sin-1` — IP `5.223.93.113`
-**網站：** `trigger.aware-wave.com`
+> **適用範圍**：此手冊針對 **EU Trigger stack**（IP `204.168.175.41`，`trigger.aware-wave.com`）。  
+> SG phase1 stack（IP `5.223.93.113`，`aware-wave.com` / `app.aware-wave.com`）的 docker compose 路徑為 `/root/lobster-phase1/`，其餘步驟相同。
+
+**伺服器：** EU Trigger — IP `204.168.175.41`（`trigger.aware-wave.com`）  
+**SG 補充：** `wordpress-ubuntu-4gb-sin-1` — IP `5.223.93.113`（`aware-wave.com`）
 
 ---
 
@@ -105,7 +108,7 @@ curl -X POST -H "Authorization: Bearer <HETZNER_API_TOKEN>" \
 | Server ID | `125887340` |
 | SSH Key (private) | `C:\Users\USER\.ssh\hetzner_trigger` |
 | SSH Public Key | `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK4ihPieknnd+m8VVWEm9SOvLY1JPXTlgmup1D+aivDP user@DESKTOP-N33595I` |
-| Root 密碼 | `UcxTUVkPdkfP`（原始）/ `PLxPNRueadaw`（2026-04-20 重設） |
+| Root 密碼 | 見 vault：`scripts/secrets-vault.ps1 -Action get -Name HETZNER_ROOT_PASSWORD` |
 | Hetzner API Token | 見 `.env` 或 secrets vault |
 | Repo 路徑（伺服器） | `/root/Work/lobster-factory/infra/trigger/` |
 
