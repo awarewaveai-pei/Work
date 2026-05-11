@@ -120,6 +120,51 @@
 - AUTO_TASK_DONE: AO-RESUME 全自動升級（sync-userlevel merge + sync-mcp + import MEMORY.md）
 - AUTO_TASK_DONE: CROSS_MACHINE_SYNC_RUNBOOK.md 新建
 
+### Telegram Command Plane emergency_stop 解除 + bot 回覆修復 <2026-05-11>
+
+**根因**：使用者 5/9 晚上傳 `/emergency_stop` 把 Command Plane 的 kill switch 關掉，之後完全忘記（`system_modes` 表 `mode='emergency_stop'`）。所有 Telegram 指令被靜默攔截（`blocked_by_killswitch`），bot 不回覆但 Telegram 看不出任何錯誤。
+
+**修復**：
+- EU Supabase psql 直接 `UPDATE system_modes SET mode='normal'` — 確認 `UPDATE 1`
+- 驗證：新的 `/status` 指令進 DB → `status=completed`；bot 成功回覆
+
+**補充說明文件**：
+- `emergency_stop` 只停 Telegram Command Plane（不影響服務）；只能用 SQL/ops console 解除（不能從 Telegram 解鎖，防止帳號被盜後被還原）
+- 相關狀態等級：`emergency_stop > maintenance > read_only > normal`
+
+**避免再發生**：`/emergency_stop` 是真正的緊急停機，使用前須確認有辦法用 SQL/ops console 解除。
+
+- AUTO_TASK_DONE: Telegram Command Plane kill switch 解除（emergency_stop → normal）
+
+### /health CRITICAL 誤報修復 + ops probe heartbeat 建立 <2026-05-11>
+
+**根因**：`health.ts` 用 `ops_incidents.created_at` 最新時間判斷 ingest 新鮮度。系統完全健康時沒有新 incident → `ingestFresh=false` → 誤報 `CRITICAL`。設計根本性錯誤。
+
+**另發現**：
+- `AwareWave Ops` 客戶在 `/client_status` 顯示 DOWN：`site_url` 設為 `https://app.aware-wave.com`（root，Basic Auth 保護返回 401），誤判 DOWN → 修正為 `/api/ops/summary`（200）
+- `/weeklyreview`、`/dailyreview` 5/7~5/8 失敗：Anthropic API key 過期，容器 5/11 01:46 重啟後新 key 已生效，歷史問題不需處理
+
+**修復（三層）**：
+
+1. **狀態邏輯修正**（`health.ts`）：stale ingest → WARN（非 CRITICAL）；CRITICAL 保留給有 active critical incident 的情況
+2. **ops_health_probes 表**（EU Supabase）：`probe_key PRIMARY KEY, status, checked_at, latency_ms, detail, metadata`
+3. **`/api/ops/probe` 端點**（next-admin）：POST + Bearer token → upsert `ops_health_probes('ops-inbox')`；`health.ts` 改查此表而非 `ops_incidents`
+4. **SG cron** `0 */6 * * *`：每 6 小時打一次 probe，日誌 `/root/lobster-phase1/logs/probe.log`
+
+**commits**：`5a3d87f`（status logic）、`f718518`（probe endpoint + health.ts 改查 heartbeat）
+**deploy**：`sg-deploy.sh next-admin` commit `f718518`，容器健康 ✓
+
+**副作用**：n8n admin 密碼在本 session 被意外重設為 `PeiAI20260405!`（peijingartstudio@gmail.com）；`user-management:reset` 清除了原始 email/password，無法還原。
+
+**避免再發生**：
+- health check 的「新鮮度」指標必須用獨立 heartbeat，不能依賴 incident 有無
+- monitoring `site_url` 不能用有 auth 的路徑（`/` 有 Basic Auth）
+
+- AUTO_TASK_DONE: /health CRITICAL 誤報修復（health.ts 狀態邏輯）
+- AUTO_TASK_DONE: ops_health_probes 表建立 + /api/ops/probe 端點
+- AUTO_TASK_DONE: AwareWave Ops client site_url 修正（/ → /api/ops/summary）
+- AUTO_TASK_DONE: SG cron 每 6 小時 probe heartbeat
+
 ---
 
 ## 2026-05-09
@@ -2101,7 +2146,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-11 03:52:20 UTC_
+_Last synced: 2026-05-11 10:02:33 UTC_
 
 ## 2026-03-20
 
@@ -2535,5 +2580,6 @@ _Last synced: 2026-05-11 03:52:20 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 

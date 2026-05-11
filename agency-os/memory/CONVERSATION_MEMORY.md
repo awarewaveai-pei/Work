@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-11（Telegram Command Plane 修復 + /health 誤報根本修法）**：kill switch `emergency_stop`（使用者 5/9 自己設的）→ SQL reset `normal`。Bot 回覆路徑（sendTelegramMessage）確認全程正常（DB completed、API ok、reply_to_message_id ok）。`/health CRITICAL` 誤報：根因 `health.ts` 用 `ops_incidents` 有無當 freshness 指標，健康系統零 incident 卻報 CRITICAL。根本修法：建 `ops_health_probes` 表（EU Supabase）+ `/api/ops/probe` 端點 + `health.ts` 改查 heartbeat + SG cron `0 */6 * * *`。另 `AwareWave Ops` 客戶 DOWN 誤報：`site_url` 設 `/`（401）→ 改 `/api/ops/summary`（200）。n8n 密碼意外重設為 `PeiAI20260405!`（peijingartstudio@gmail.com）。Commits `5a3d87f`、`f718518`。
 - **2026-05-11（機型修正 + memory 搬移 + 跨機同步自動化）**：使用者指出「兩台桌機」描述錯誤 → 修正為「個人筆電 + 公司桌機」（5 個檔案）。`feedback_git_push.md`、`feedback_trigger_deploy.md`、`user_devices.md` 從 user-level memory 搬入 `agency-os/memory/`（git-tracked）。新建 `export-cross-machine-memory.ps1`（AO-CLOSE 自動匯出 MEMORY.md → Desktop\AO-SYNC-date\）與 `import-cross-machine-memory.ps1`（AO-RESUME 自動匯入，有 `.imported` flag 防重複）。`ao-resume.ps1` 升級：sync-userlevel 改 merge 模式 + 新增 sync-mcp + 新增 import MEMORY.md（全 non-blocking）。兩機操作完全對稱，AO-RESUME 單指令完成一切。`CROSS_MACHINE_SYNC_RUNBOOK.md` 已建。
 - **2026-05-11（CLAUDE.md 全系統精確性驗證）**：8 項修正（非存在旗標名→實際 env var、SG/EU 服務清單、死亡路徑、硬編用戶名、明文密碼→vault 指令、機器類型、Routing JSON 檔名）；新增 R4 rule（grep 精確字串而非全域掃描，省 token）。
 - **2026-05-09 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-09 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:a0732676aeba440afe79a57c88a354091525aeafc081a8bc4b9c4147bdc0dd8a -->
@@ -414,5 +415,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-11 03:52:20 UTC_
+_Last synced: 2026-05-11 10:02:33 UTC_
 
