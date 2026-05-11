@@ -1,5 +1,12 @@
 // /health — Phase 1 reads ops_incidents counters directly (mirrors logic of
 // /api/ops/inbox/health without an internal HTTP roundtrip).
+//
+// Ingest-freshness logic: stale ingest (no new incidents) is WARN, not CRITICAL.
+// Rationale: a healthy system with no alerts produces zero new incidents — treating
+// that as CRITICAL is a false positive. CRITICAL is reserved for active open incidents
+// with critical severity. A dedicated probe heartbeat (ops_health_probes table, updated
+// by /api/ops/probe on a schedule) should replace the ops_incidents freshness check
+// once that table exists.
 
 import type { CommandHandler } from "../commandRouter";
 
@@ -51,13 +58,17 @@ export const healthHandler: CommandHandler = async (_request, { supabase }) => {
   } else {
     ingestFresh = false;
   }
-  const status = !ingestFresh
-    ? "critical"
-    : (critical.count ?? 0) > 0
+  // CRITICAL only when there are active critical-severity incidents.
+  // Stale ingest = WARN (not CRITICAL): no recent incidents means the system is
+  // healthy, not that the pipeline is broken.
+  const status =
+    (critical.count ?? 0) > 0
       ? "critical"
       : (active.count ?? 0) > 0
         ? "warn"
-        : "ok";
+        : !ingestFresh
+          ? "warn"
+          : "ok";
 
   const lines = [
     `*Health: ${status.toUpperCase()}*`,
