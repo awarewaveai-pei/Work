@@ -95,3 +95,28 @@ Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。
 
 ## 雙 IDE / Cursor Fallback
 雙 IDE 架構：`dual-ide-coexistence-strategy.md`。停 Cursor 時用同一組腳本（ao-resume / ao-close / verify），不重建第二套規則。
+
+## 系統架構速查（Claude 必讀）
+
+### 目錄分工
+`agency-os/` — AO 治理（TASKS/WORKLOG/memory/docs/runbooks）；`lobster-factory/` — 龍蝦工廠（clients/infra/packages/workflows）；`scripts/` — 全域腳本；`mcp/` — MCP registry + user-level SSOT；`tenants/` — 每客戶設定（`core/ENVIRONMENT_REGISTRY.md` = Staging URL SSOT）。
+
+### 伺服器邊界（**不可混用**）
+| 代號 | IP | 服務 |
+|------|-----|------|
+| **SG** | 5.223.93.113 | phase1-core Docker（nginx / next-admin / n8n / Supabase / Trigger v3） |
+| **EU** | 204.168.175.41 | Trigger.dev **v4** + ClickHouse **25.7.x**（禁升 latest / 24.x）+ registry:5000 |
+
+### 龍蝦 Routing 三件套（同一 PR 必須同步）
+`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + routing matrix JSON + routing matrix doc — 任一改動必須三份同步，否則 routing drift。
+
+### 龍蝦自動化安全預設
+Supabase 寫入**預設 OFF**（需 `-EnableWrites`）；Manifest 執行**預設 OFF**（需 `-ExecuteManifest`）。
+
+### Trigger.dev 憑證（不可互換）
+`tr_pat_*` = CLI deploy（vault key: `TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（vault key: `TRIGGER_ACCESS_TOKEN`）。
+
+### 其他 SSOT
+- Cursor rules 正本：`agency-os/.cursor/rules/`（repo 根 `.cursor/rules/` 是 mirror，不改正本）
+- 監控端點：用 `/api/ops/summary`（非 `/`，root 有 auth_basic 保護）
+- nginx 監控 drop-in：`/etc/default/awarewave-endpoint-alert.local`（SG VPS 本地，sync 不覆蓋）
