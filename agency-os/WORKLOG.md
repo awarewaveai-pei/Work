@@ -74,6 +74,28 @@
 
 **commit**: `d5a707a`
 
+### CLAUDE.md 全系統精確性驗證＋修正 <2026-05-11>
+
+**任務**：系統性驗證 CLAUDE.md 每一條目是否符合 repo 實況；找到不符合就修正並做跨檔 R4 掃描。
+
+**發現並修正的問題（8 項）**：
+1. **非存在旗標名**（CLAUDE.md 118）：`-EnableWrites`/`-ExecuteManifest` 不存在任何腳本 → 改為實際 env var `LOBSTER_ENABLE_DB_WRITES=true`、`LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`（確認自 `trigger.config.ts`、`installManifestStaging.ts`）
+2. **SG 服務清單錯誤**：原含 n8n/Supabase/Trigger v3（實際都在 EU）→ 更正為 nginx/next-admin/node-api/wordpress/redis（docker-compose.yml 驗證）
+3. **EU 服務清單不完整**：漏 Supabase、n8n、MainWP、Uptime Kuma → 補入（Cloudflare DNS 截圖確認 204.168.175.41）
+4. **死亡路徑 `reference_recurring_ops_recipes.md`**：3 處引用（CLAUDE.md、sg-reboot.md、SERVICE_CREDENTIALS_MAP.md）→ 全部移除或改為正確描述
+5. **硬編使用者名稱 `user1115`**：sg-deploy.md、sg-reboot.md、trigger-deploy-agent.md → 改為 `$env:USERPROFILE`
+6. **Runbook 明文密碼**：`HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` 含 `UcxTUVkPdkfP`/`PLxPNRueadaw` → 改為 vault 指令
+7. **「筆電」誤稱**：AGENTS.md、claude-userlevel README、DESKTOP_MCP_SETUP.md、DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md → 改為「兩台桌機」/「個人桌機+公司桌機」
+8. **Routing JSON 名模糊**：「routing matrix JSON」→ `workflow-risk-matrix.json`（實際檔名確認）
+
+**新增 R4 規則**：每次寫檔後 grep 剛改的確切字串（限 `.claude/ runbooks/ scripts/ agency-os/docs/ mcp/` 範圍）→ 一次 commit 修完同類問題；避免全域掃描浪費 token。
+
+**根因**：CLAUDE.md 部分內容為「概念描述」而非「可執行指令」，與實際腳本 API 漂移。
+
+**避免再發生**：R4 rule 已入 CLAUDE.md；任何更新 CLAUDE.md 的操作須先 Glob 確認路徑/旗標存在。
+
+**commits**: `2522010`、`0d7a90f`、`5a25079`、`9e16329`、`422cddc`、`de7adae`
+
 ---
 
 ## 2026-05-09
