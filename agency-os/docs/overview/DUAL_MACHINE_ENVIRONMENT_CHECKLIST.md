@@ -5,7 +5,7 @@
 
 ## DoD（結案條件）
 
-兩台電腦（個人桌機＋公司桌機）皆已在 **monorepo 根**執行：
+兩台電腦（個人筆電＋公司桌機）皆已在 **monorepo 根**執行：
 
 `powershell -ExecutionPolicy Bypass -File .\scripts\machine-environment-audit.ps1 -FetchOrigin -Strict`
 
