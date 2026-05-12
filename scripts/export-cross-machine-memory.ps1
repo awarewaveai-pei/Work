@@ -47,7 +47,9 @@ $syncRoot = if ($DestRoot) {
 }
 
 $destBase = if ($DestRoot) { $DestRoot } else { Join-Path $syncRoot "AO-SYNC-$today" }
-$memSrc   = Join-Path $env:USERPROFILE ".claude\projects\c--Users-USER-Work\memory"
+# Derive Claude Code project key from WorkRoot (works across machines with different usernames).
+$projectKey = $WorkRoot.Substring(0,1).ToLower() + ($WorkRoot.Substring(1) -replace ':', '-' -replace '\\', '-')
+$memSrc   = Join-Path $env:USERPROFILE ".claude\projects\$projectKey\memory"
 $memIndex = Join-Path $memSrc "MEMORY.md"
 
 if (-not (Test-Path -LiteralPath $memIndex)) {

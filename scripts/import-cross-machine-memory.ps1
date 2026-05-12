@@ -22,7 +22,11 @@ if (-not $WorkRoot) {
 }
 
 # ── 1. MEMORY.md import ───────────────────────────────────────────────────────
-$memDest = "$env:USERPROFILE\.claude\projects\c--Users-USER-Work\memory"
+# Derive Claude Code project key from WorkRoot (works across machines with different usernames).
+# Rule: lowercase drive letter, replace ':' and '\' with '-'
+# e.g. C:\Users\USER\Work → c--Users-USER-Work
+$projectKey = $WorkRoot.Substring(0,1).ToLower() + ($WorkRoot.Substring(1) -replace ':', '-' -replace '\\', '-')
+$memDest = Join-Path $env:USERPROFILE ".claude\projects\$projectKey\memory"
 
 $searchRoots = @()
 if ($env:AO_SYNC_ROOT) {
