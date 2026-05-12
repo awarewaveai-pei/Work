@@ -16,11 +16,13 @@ function buildNotifiers(): Notifier[] {
   const raw = process.env.OPS_INBOX_TELEGRAM_NOTIFY_ENABLED?.trim().toLowerCase();
   const telegramEnabled = raw === "true" || raw === "1" || raw === "yes" || raw === "on";
   if (telegramEnabled) {
+    const telegramChatIds =
+      process.env.OPS_INBOX_TELEGRAM_CHAT_IDS?.trim() || process.env.TELEGRAM_ALLOWED_CHAT_IDS?.trim() || "";
     notifiers.push(
       new TelegramNotifier(
         "telegram:operator",
         process.env.TELEGRAM_BOT_TOKEN ?? "",
-        process.env.OPS_INBOX_TELEGRAM_CHAT_IDS ?? process.env.TELEGRAM_ALLOWED_CHAT_IDS ?? "",
+        telegramChatIds,
         parseTelegramMinSeverity(process.env.OPS_INBOX_TELEGRAM_NOTIFY_MIN_SEVERITY),
       ),
     );
