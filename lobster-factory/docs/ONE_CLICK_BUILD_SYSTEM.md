@@ -156,6 +156,7 @@ type BuildProfile = "profile_a" | "profile_b" | "profile_c";
 type BuildExecutionMode = "plan_only" | "enqueue";
 type BuildEnvironment = "staging" | "production";
 type BuildPackageSlug = "wp-basic" | "wp-business" | "wc-core";
+type WpSiteType = "tourism" | "brand" | "ecommerce"; // planned — see PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md
 
 interface BuildRunRequest {
   profile: BuildProfile;
@@ -170,15 +171,21 @@ interface BuildRunRequest {
   domain?: string;
   siteUrl?: string;
   wpAdminUrl?: string;
-  packageSlug?: BuildPackageSlug;
+  packageSlug?: BuildPackageSlug;       // derived from wpSiteType + hasEcommerce when both present
+  wpSiteType?: WpSiteType;              // planned: tourism | brand | ecommerce
+  hasEcommerce?: boolean;               // planned: drives ecommerce module inclusion
+  pluginSlugs?: string[];               // planned: resolved installable slug list
   provider?: "awarewave-internal" | "hostinger" | "cloudways" | "generic-wordpress" | "manual";
   locale?: string;
   credentialsRef?: string;
   backupRef?: string;
   backupConfirmed?: boolean;
   notes?: string;
+  integrations?: BuildIntegrations;     // service wiring: Uptime Kuma, Sentry, PostHog, n8n, MainWP
 }
 ```
+
+> **Planned fields** (`wpSiteType`, `hasEcommerce`, `pluginSlugs`): not yet implemented. Design and file-level changes tracked in `PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`.
 
 Validation rules:
 
@@ -496,6 +503,8 @@ Tables or fields still required for full one-click delivery:
 |---|---|
 | `sites.site_type` | `new_client` / `existing_wp` / `ao_internal` |
 | `sites.apply_mode` | `full_install` / `adopt_delta` / `internal_setup` |
+| `sites.wp_site_type` | `tourism` / `brand` / `ecommerce` — planned, see `PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md` |
+| `package_install_runs` (extend) | Add `plugin_slug`, `status` (`installed`/`skipped_license`/`failed`), `version` per-plugin row |
 | `adopt_audits` | Profile C audit header |
 | `adopt_audit_items` | Profile C item-level classification |
 | `smoke_test_results` | Smoke test results per run |
@@ -716,6 +725,8 @@ This is enough to deliver Mongolia Travel with controlled manual fallback.
 - Provider adapter contract tests
 - Hostinger or ManualTaskAdapter path
 - `create_wp_site` end-to-end staging run
+- **Plugin stack selection** (Wizard Step 2: site type + hasEcommerce → resolved slugs) — see `PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
+- **`apply_manifest` / Stage 3**: WP-CLI plugin install from `pluginSlugs[]`, results written to `package_install_runs`
 - MainWP connection
 - Basic smoke tests
 - Handoff report
@@ -767,6 +778,7 @@ These are not bugs in the Build Console; they are remaining system work:
 - Full Profile B provider automation depends on provider credentials/adapters.
 - Profile C requires new adopt tables and rollback workflow.
 - `site_type` / `apply_mode` DB migration still needs canonical implementation.
+- **Plugin stack auto-install not yet implemented**: `wpSiteType` / `hasEcommerce` / `pluginSlugs` are planned fields; Wizard has no site type step; Stage 3 `apply_manifest` has no WP-CLI plugin logic. Full design: `PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`.
 - `docs/hosting/*` is the canonical hosting adapter documentation path required by `npm run validate`; do not move those files under `docs/e2e/hosting`.
 
 ## 22. Verification Commands

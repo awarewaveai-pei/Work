@@ -176,6 +176,13 @@ export default async function DashboardPage() {
         <div className="section-title">Actions</div>
         <div className="link-list" style={{ marginBottom: 28 }}>
           <NavCard
+            href="/ops/repairs"
+            icon="🛠"
+            iconClass="icon-ops"
+            title="Repair Center"
+            desc="Auto-repair 控制面：incident → PR → deploy gate"
+          />
+          <NavCard
             href="/ops/approvals"
             icon="✓"
             iconClass="icon-ops"

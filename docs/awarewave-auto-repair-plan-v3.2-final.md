@@ -379,6 +379,10 @@ Slack 設定 → 勿擾：23:00 — 08:00。
 [✅ Approve — 叫 AI 修]  [👀 只看不修]
 ```
 
+### Source of Truth
+
+通知分流與驗收規則以 `agency-os/docs/operations/slack-notification-routing.md` 為準。本文件負責 auto-repair 的施工順序與交接，不得另寫一套不同的 Slack / Telegram 路由規則。
+
 ---
 
 ## 十、技術實作細節
@@ -614,7 +618,44 @@ Commit：abc1234
 
 ---
 
-## 十一、GitHub 設定
+## 十一、Phase 2 Guardrails
+
+Claude Code 或任何代理做 Phase 2 時，必須遵守以下硬限制：
+
+| Guardrail | 要求 |
+|------|------|
+| 不可新建第二套路由 | 不可重建 `#alerts-critical` / `#alerts-info`，也不可把 Telegram 變成主事故通道 |
+| 不可重寫 dedup / throttle | 若已有 Ops Inbox 規則，應延用，不可在各 webhook route 各寫一份 |
+| 不可重寫 severity mapping | Sentry / Kuma / Netdata 的嚴重度轉換必須集中管理，避免同事件不同規則 |
+| 不可讓單一事件多重 fan-out | 同一 incident 不能同時被 raw 路徑與 curated 路徑各自重複通知到同一人 |
+| 不可把 secrets 擴散 | Telegram token 不進 GitHub Secrets；只放 SG host / next-admin env |
+| 不可把 failure 變成 silence | 任一路徑失敗時，要記 log、保留主線、可 drill，不可靜默失效 |
+
+### Failure Mode 與 Rollback 原則
+
+| 情境 | 系統行為 |
+|------|------|
+| Telegram 壞掉 | Slack 主線照常；incident log 必須可看到 Telegram failed |
+| Ops Inbox 壞掉 | `#infra-alerts` 仍必須收到 raw endpoint / Netdata direct 訊號 |
+| Slack webhook 壞掉 | health / drill 要能看出配置異常，不可假裝成功 |
+| 備份失敗 | 自動維修流程立即停止，不建 Issue、不開 PR |
+| deploy 後 health check 失敗 | `rollback-phase1.sh` 自動執行，並回報 `#ops-incidents` + Telegram 備援 |
+
+### Acceptance Gates
+
+Phase 2 完成前，必須至少通過以下門檻，否則不得宣稱可上線：
+
+| Gate | 驗收標準 |
+|------|------|
+| Endpoint alert gate | public endpoint 故障 / 恢復時，Slack 與 Telegram 都能收到 |
+| Ops Inbox gate | synthetic incident 進來後，`#ops-incidents` 與 Telegram 都能收到 |
+| Deploy drift gate | drift cron 觸發時，Slack 與 Telegram 都能收到 |
+| Health gate | `/api/ops/inbox/health` 回 `ok:true`，且顯示 Telegram config 為 enabled / configured |
+| Backup gate | pre-repair 備份失敗時，流程明確中止，不建 Issue、不開 PR |
+
+---
+
+## 十二、GitHub 設定
 
 ### Secrets（repo → Settings → Secrets）
 
@@ -635,7 +676,7 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 
 ---
 
-## 十二、與已有系統的關係
+## 十三、與已有系統的關係
 
 ### 不衝突清單
 
@@ -662,7 +703,13 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 
 ---
 
-## 十三、執行計劃
+## 十四、執行計劃
+
+### 執行計劃前置說明
+
+Phase 1 的目的不是「建幾個頻道」，而是建立唯一、可驗收、可交接的控制面。Phase 2 的目的不是自由發揮，而是沿著既有通知契約把 webhook、Approve、PR、自動維修串起來。
+
+只有當 `#ops-incidents`、Telegram backup、`#github-prs`、health endpoint 都已經可驗證，Phase 2 才算有正式施工前提。
 
 ### Phase 1：你做（30 分鐘）
 
@@ -673,7 +720,8 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 | 1.3 | 建立 Slack App：拿到 Bot Token + Signing Secret + Webhook URL；Webhook 指向 #ops-incidents | 三個值都拿到 |
 | 1.4 | 在 GitHub repo 設定 4 個 Secrets：ANTHROPIC_API_KEY、SLACK_WEBHOOK_URL、SLACK_BOT_TOKEN、SLACK_SIGNING_SECRET | Secrets 頁面看到 4 個 |
 | 1.5 | 保留 Telegram bot；不要把 Telegram token 加到 GitHub Secrets，Telegram 只在 SG host / next-admin env 作備援 | Telegram DM smoke test 通過 |
-| 1.6 | 設定 Branch Protection（main branch） | Protection rules 啟用 |
+| 1.6 | 驗證 `/api/ops/inbox/health` 顯示 `notify_enabled=true`、`telegram_notify_enabled=true`、`telegram_configured=true` | health gate 通過 |
+| 1.7 | 設定 Branch Protection（main branch） | Protection rules 啟用 |
 
 ### Phase 2：Claude Code 做（2-3 小時）
 
@@ -687,6 +735,7 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 | 2.6 | 新建 auto-repair-pr-notify.yml | .github/workflows/auto-repair-pr-notify.yml |
 | 2.7 | 確認 sg-deploy.sh 有 health check + Slack 通知 | sg-deploy.sh |
 | 2.8 | 在 CLAUDE.md 尾部追加自動維修規則 + PR 格式 + 紅線 | CLAUDE.md |
+| 2.9 | 不得新建第二套路由；必須沿用 `#infra-alerts` / `#ops-incidents` / Telegram backup 的既有契約 | 全部改動符合 guardrails |
 
 ### Phase 3：端到端驗收（1 小時）
 
@@ -708,6 +757,17 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 | 14 | Slack #ops-incidents 收到完成報告 | 有結果 + 備份 ID + commit | |
 | 15 | 在 Sentry 確認 test error 不再出現 | 錯誤消失或被 resolve | |
 
+### Phase 3-A：通知路由驗收
+
+| # | 測試步驟 | 預期結果 | ✅/❌ |
+|---|----------|----------|-------|
+| A1 | 人工觸發 endpoint 故障 drill | `#infra-alerts` 收到 raw alert | |
+| A2 | 同一次 endpoint drill | `#ops-incidents` 收到 secondary alert | |
+| A3 | 同一次 endpoint drill | Telegram 收到手機備援 | |
+| A4 | 丟一筆 Ops Inbox synthetic incident | `#ops-incidents` 收到 curated incident | |
+| A5 | 同一筆 synthetic incident | Telegram 收到同事件備援 | |
+| A6 | 重送同 fingerprint 事件 | throttle / dedup 生效，不重複轟炸 | |
+
 ### Phase 3-B：驗收 rollback
 
 | # | 測試步驟 | 預期結果 | ✅/❌ |
@@ -727,7 +787,7 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 
 ---
 
-## 十四、Phase 4 — 觀察期（30 天）
+## 十五、Phase 4 — 觀察期（30 天）
 
 ### 每週日做（5 分鐘）
 
@@ -742,9 +802,16 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 2. 看 /root/backups/ 目錄 → 備份檔案有在長（SG 和 EU 都要看）
 3. 看 GitHub Actions → auto-repair 相關的 action 有沒有異常失敗率
 
+### 每月 drill（不可省）
+
+1. 跑一次通知 smoke：endpoint、Ops Inbox synthetic、deploy drift
+2. 看 `/api/ops/inbox/health`
+3. 確認 Telegram 備援仍有收到
+4. 確認沒有新文件或新代理偷偷把路由改回多中心
+
 ---
 
-## 十五、Phase 5 — 多客戶擴展 + Dashboard（Phase 4 完成後做）
+## 十六、Phase 5 — 多客戶擴展 + Dashboard（Phase 4 完成後做）
 
 ### 前置條件
 
@@ -990,7 +1057,7 @@ Dashboard 資料來源：直接讀 supabase-db 的 incidents 和 incidents_confi
 
 ---
 
-## 十六、未來擴充方向（Phase 5 之後）
+## 十七、未來擴充方向（Phase 5 之後）
 
 | 方向 | 什麼時候做 | 風險 |
 |------|-----------|------|
@@ -1004,10 +1071,11 @@ Dashboard 資料來源：直接讀 supabase-db 的 incidents 和 incidents_confi
 
 ---
 
-## 十七、這份文件的使用方式
+## 十八、這份文件的使用方式
 
 1. **Phase 1**：你自己照表做，30 分鐘
 2. **Phase 2**：把「第十節：技術實作細節」整段貼給 Claude Code，叫它照著建
+   並同時附上 `docs/awarewave-auto-repair-phase2-handoff.md`，避免代理重建第二套路由
 3. **Phase 3**：跑驗收清單，22 步全綠才算完成
 4. **Phase 4**：每週日 5 分鐘、每月初 10 分鐘，持續觀察 30 天
 5. **Phase 5**：30 天穩定後，把「第十五節：Phase 5」整段貼給 Claude Code，建多客戶 + Dashboard
