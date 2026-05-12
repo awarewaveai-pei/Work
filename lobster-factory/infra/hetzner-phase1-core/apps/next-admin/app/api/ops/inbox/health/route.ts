@@ -46,6 +46,11 @@ export async function GET() {
   const ingestTokenConfigured = Boolean(process.env.OPS_INBOX_INGEST_TOKEN?.trim());
   const notifyEnabled = isOpsInboxNotifyGloballyEnabled();
   const slackWebhookConfigured = Boolean(process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK?.trim());
+  const telegramNotifyEnabled = parseBooleanEnv("OPS_INBOX_TELEGRAM_NOTIFY_ENABLED", false);
+  const telegramConfigured = Boolean(
+    process.env.TELEGRAM_BOT_TOKEN?.trim() &&
+      (process.env.OPS_INBOX_TELEGRAM_CHAT_IDS?.trim() || process.env.TELEGRAM_ALLOWED_CHAT_IDS?.trim()),
+  );
 
   let ingestAgeMinutes: number | null = null;
   let ingestFresh = true;
@@ -83,5 +88,7 @@ export async function GET() {
     ingest_token_configured: ingestTokenConfigured,
     notify_enabled: notifyEnabled,
     slack_webhook_configured: slackWebhookConfigured,
+    telegram_notify_enabled: telegramNotifyEnabled,
+    telegram_configured: telegramConfigured,
   }, { status: ok ? 200 : 503 });
 }
