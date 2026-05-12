@@ -2,7 +2,7 @@
 
 > **Owner File** — WordPress 外掛堆疊自動安裝功能實作計畫。  
 > **所屬系統**：`app.aware-wave.com` Build System（Lobster Factory Phase 1）  
-> **不涵蓋**：Build System 整體架構 → [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md)；外掛選型依據 → [`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`](../../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md)  
+> **不涵蓋**：Build System 整體架構 → [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md)；外掛選型依據 → [`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md)  
 > **Last updated**: 2026-05-12  
 > **Status**: Planning — not yet implemented
 

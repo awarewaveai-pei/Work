@@ -3,6 +3,9 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-12 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-12 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:c8396eba5bbc07efb99d13c0b355bb2b0495589f6a3ab357c7a6e876708d7203 -->
+- **2026-05-12 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-12 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:af2f48e17e8fb139ea47fca7f95f2a09291276d8254e4a59cb062612d7cb27bf -->
+- **2026-05-12（WP Plugin Stack — 文件品質修訂 + Phase 0 實作）**：三份文件全修：`WP_CLIENT_PLUGIN_STACK.md`（加 WP.org Slug 欄、★/↩/† 標記）、`PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`（3 處 `plugin_install_runs`→`package_install_runs`、補 `alternativeSlug`／`resolvePaidPlugins`）、`BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`（Phase 1 WizardStep 型別、URL params、smokeProfileFor 位置、接受標準修正）。Phase 0：新建 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts`（36 entries，`resolvePluginStack`／`resolveInstallableSlugs`／`resolvePaidPlugins`，TypeScript SSOT）。`TASKS.md` 補 Phase 1 開工清單（5 必讀檔）。Phase 1（OnboardWizard Step 2 + 新 WizardStep type）明日開始。Commits `5dff4ce`（文件）、`b205f40`（catalog.ts）。
 - **2026-05-12 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-12 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:436e906aac028720dbe07cc89a7b39e028dd16450270f443de765e8360e86cf3 -->
 - **2026-05-12 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-12 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:7b9f61f39c447cd2cf4fbcaf23ba070e2309f36dc4cfd8aacad3fc1a56fac3cd -->
 - **2026-05-11（Telegram Command Plane 修復 + /health 誤報根本修法）**：kill switch `emergency_stop`（使用者 5/9 自己設的）→ SQL reset `normal`。Bot 回覆路徑（sendTelegramMessage）確認全程正常（DB completed、API ok、reply_to_message_id ok）。`/health CRITICAL` 誤報：根因 `health.ts` 用 `ops_incidents` 有無當 freshness 指標，健康系統零 incident 卻報 CRITICAL。根本修法：建 `ops_health_probes` 表（EU Supabase）+ `/api/ops/probe` 端點 + `health.ts` 改查 heartbeat + SG cron `0 */6 * * *`。另 `AwareWave Ops` 客戶 DOWN 誤報：`site_url` 設 `/`（401）→ 改 `/api/ops/summary`（200）。n8n 密碼意外重設為 `PeiAI20260405!`（peijingartstudio@gmail.com）。Commits `5a3d87f`、`f718518`。
@@ -417,5 +420,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-12 05:19:55 UTC_
+_Last synced: 2026-05-12 09:46:59 UTC_
 

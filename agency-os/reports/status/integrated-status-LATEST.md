@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-12 13:20:10
+- Generated: 2026-05-12 17:47:14
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -231,6 +231,10 @@
 - 完成 AO-CLOSE（git push）並確認 EverydayPW 內容
 - 回家筆電：設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT → 測試 AO-RESUME 匯入流程
 
+- WP plugin stack 文件品質修訂（第二輪，稍晚）：三份文件（WP_CLIENT_PLUGIN_STACK.md / PLAN / BRIEF）10 個關鍵缺漏全部修復
+- Phase 0 實作：新建 `lib/wp-plugin-stack-catalog.ts`（36 entries，3 exported functions，TypeScript SSOT）
+- TASKS.md 更新：WP 外掛任務 未開始→進行中，Phase 0 打完成，Phase 1 開工清單（5 必讀檔）寫入
+
 ## Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:7b9f61f39c447cd2cf4fbcaf23ba070e2309f36dc4cfd8aacad3fc1a56fac3cd -->
 
@@ -262,11 +266,41 @@
 - **對應 TASKS 子字串（可選）**: AO-SYNC 環境變數設定
 - **風險／待辦（可選）**: 筆電須設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT（D:\Work）並測試 AO-RESUME 匯入
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:af2f48e17e8fb139ea47fca7f95f2a09291276d8254e4a59cb062612d7cb27bf -->
+
+### claude 2026-05-12 22:00
+
+- **完成（一句）**: WP plugin stack 文件品質修訂（10 個缺漏全修）+ Phase 0 `wp-plugin-stack-catalog.ts`（36 entries，3 functions，TypeScript SSOT）+ TASKS.md Phase 1 開工清單（5 必讀檔）
+- **變更路徑**:
+  - `agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`
+  - `lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
+  - `lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts`
+  - `agency-os/TASKS.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+  - `agency-os/memory/daily/2026-05-12.md`
+- **Git**: b205f40, 5dff4ce, 59dccca, 5e4014e（本 closeout 前已 commit；closeout 再 push）
+- **對應 TASKS 子字串（可選）**: WP 外掛自動安裝
+- **風險／待辦（可選）**: Phase 1（OnboardWizard 新 Step 2）明日開始；開始前依 TASKS 必讀清單順序讀 5 個檔案
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:c8396eba5bbc07efb99d13c0b355bb2b0495589f6a3ab357c7a6e876708d7203 -->
+
+### claude 2026-05-12 22:15
+
+- **完成（一句）**: 修復 PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md 中 broken link（`../../../` → `../../` 指向 WP_CLIENT_PLUGIN_STACK.md）；doc integrity gate 通過
+- **變更路徑**:
+  - `lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
+- **Git**: 本 closeout commit 前修復
+- **對應 TASKS 子字串（可選）**: WP 外掛自動安裝
+- **風險／待辦（可選）**:
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-12 13:20:01`
+- Time: `2026-05-12 17:47:05`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -276,8 +310,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260512-132001.md`
-- Closeout: `reports/closeout/closeout-20260512-131956.md`
+- Health: `reports/health/health-20260512-174705.md`
+- Closeout: `reports/closeout/closeout-20260512-174700.md`
 
 ## Action
 - No blocking issue detected.

@@ -5,7 +5,10 @@
 ## 2026-05-12
 
 ### Daily
-- (TBD)
+- 品質修訂：WP 外掛文件三份（WP_CLIENT_PLUGIN_STACK.md / PLAN / BRIEF），修復 10 個關鍵缺漏（WP.org Slug 欄、★/↩/† 標記體系、Complianz 矛盾、plugin_install_runs×3→package_install_runs、alternativeSlug 欄位、resolvePaidPlugins 補入、resolvedPaidPlugins 補入、Phase 1 WizardStep 型別、URL params 傳遞、smokeProfileFor 位置說明）
+- Phase 0 實作：新建 `lib/wp-plugin-stack-catalog.ts`（36 entries，base 16 + ecommerce 12 + tourism 5 + brand 3，三個 exported functions，TypeScript 通過）
+- TASKS.md 更新：WP 外掛自動安裝任務狀態 未開始→進行中，Phase 0 打完成，Phase 1 開工清單（5 個必讀檔）寫入
+- 本日稍早（另一輪）：AO-SYNC 雙機同步修復（export/import 腳本動態 project key + UTF-8 BOM + env var）
 
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
@@ -39,6 +42,38 @@
 - **Git**: 9 commits ahead of origin/main（checkpoint 系列 + 本次修復）
 - **對應 TASKS 子字串（可選）**: AO-SYNC 環境變數設定
 - **風險／待辦（可選）**: 筆電須設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT（D:\Work）並測試 AO-RESUME 匯入
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:af2f48e17e8fb139ea47fca7f95f2a09291276d8254e4a59cb062612d7cb27bf -->
+
+### claude 2026-05-12 22:00
+
+- **完成（一句）**: WP plugin stack 文件品質修訂（10 個缺漏全修）+ Phase 0 `wp-plugin-stack-catalog.ts`（36 entries，3 functions，TypeScript SSOT）+ TASKS.md Phase 1 開工清單（5 必讀檔）
+- **變更路徑**:
+  - `agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`
+  - `lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
+  - `lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts`
+  - `agency-os/TASKS.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+  - `agency-os/memory/daily/2026-05-12.md`
+- **Git**: b205f40, 5dff4ce, 59dccca, 5e4014e（本 closeout 前已 commit；closeout 再 push）
+- **對應 TASKS 子字串（可選）**: WP 外掛自動安裝
+- **風險／待辦（可選）**: Phase 1（OnboardWizard 新 Step 2）明日開始；開始前依 TASKS 必讀清單順序讀 5 個檔案
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:c8396eba5bbc07efb99d13c0b355bb2b0495589f6a3ab357c7a6e876708d7203 -->
+
+### claude 2026-05-12 22:15
+
+- **完成（一句）**: 修復 PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md 中 broken link（`../../../` → `../../` 指向 WP_CLIENT_PLUGIN_STACK.md）；doc integrity gate 通過
+- **變更路徑**:
+  - `lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
+- **Git**: 本 closeout commit 前修復
+- **對應 TASKS 子字串（可選）**: WP 外掛自動安裝
+- **風險／待辦（可選）**:
 
 ## 2026-05-11
 
@@ -2184,7 +2219,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-12 05:19:55 UTC_
+_Last synced: 2026-05-12 09:46:59 UTC_
 
 ## 2026-03-20
 
