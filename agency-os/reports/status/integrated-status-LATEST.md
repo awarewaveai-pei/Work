@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-11 18:02:47
+- Generated: 2026-05-12 13:20:10
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -212,75 +212,63 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-11.md
-# Daily Memory — 2026-05-11
+## 5) memory/daily/2026-05-12.md
+# Daily Note - 2026-05-12
 
-## AO-RESUME
+## Done today
+- 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）
+- export/import 腳本改為動態 project key 推導（適用 C: 桌機 + D: 筆電）
+- 加 UTF-8 BOM 解決 PowerShell 5.x 中文路徑讀取失敗問題
+- 設定 AO_SYNC_ROOT / AO_SYNC_SECRETS_ROOT env var 指向 EverydayPW
+- 修復 mcp/user-env.ps1 重複 key（UPTIME_KUMA_BASE_URL / _API_KEY / GRAFANA_BASE_URL）
+- 四項同步檔案確認：MEMORY.md、user-env.ps1、SSH keys、AWARE_WAVE_CREDENTIALS.md
 
-- hook exit 0，AUDIT RESULT: PASS (no warnings)，branch main，和 origin/main 對齊
+## Current state
+- 桌機 AO-SYNC export 流程修復完畢，export 目標正確指向 Google Drive EverydayPW
+- 9 commits ahead of origin/main，準備 push
 
-## 本日完成
+## Next steps
+- 完成 AO-CLOSE（git push）並確認 EverydayPW 內容
+- 回家筆電：設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT → 測試 AO-RESUME 匯入流程
 
-### 桌機 Claude user-level 對齊
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:7b9f61f39c447cd2cf4fbcaf23ba070e2309f36dc4cfd8aacad3fc1a56fac3cd -->
 
-- 執行 `sync-claude-userlevel.ps1 -Mode merge`
-- hooks：3 個更新（`ao-resume-on-prompt.ps1`、`hooks.json`、`README.md`），19/19 same 後
-- settings.json：governed keys 覆寫，normalizer 修正 9 個 array 結構（PS5.1 1-element array bug）
-- mcp.json：確認 `{}` 無 drift
-- verify 模式 settings.json 仍顯示 drift → 已知 false positive（normalizer 後處理造成比較不符）；實際內容正確
-- backup：`agency-os/Backups/claude-userlevel-20260511-090325/`
+### claude 2026-05-12 18:00
 
-### SG VPS — app.aware-wave.com Basic Auth 修復
+- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）——export/import 腳本改為動態 project key 推導 + UTF-8 BOM + AO_SYNC_ROOT/AO_SYNC_SECRETS_ROOT env var；四項檔案（MEMORY.md、user-env.ps1、SSH keys、AWARE_WAVE_CREDENTIALS.md）完整同步
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+  - `scripts/import-cross-machine-memory.ps1`
+  - `mcp/user-env.ps1`
+  - `agency-os/TASKS.md`
+- **Git**: 9 commits ahead of origin/main（checkpoint 系列）
+- **對應 TASKS 子字串（可選）**: AO-SYNC 環境變數設定
+- **風險／待辦（可選）**: 筆電須設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT 環境變數（D:\Work, key=d--Work）並測試 AO-RESUME 匯入流程
 
-**根因診斷**：
-- HTTPS 443 由**系統 nginx**（`/etc/nginx/sites-enabled/app`）處理，非 Docker nginx
-- 過去把 `auth_basic` 加在 Docker `nginx/default.conf` 是無效層，`sed -i` 還換了 inode 導致 bind mount 斷開
-- 系統 nginx `app` site 的 `location /` 從未設過 `auth_basic`
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:436e906aac028720dbe07cc89a7b39e028dd16450270f443de765e8360e86cf3 -->
 
-**修復步驟**：
-1. 備份：`/etc/nginx/sites-enabled/app.bak.20260511-*`
-2. Python3 in-place 在 `location / {` 後插入：
-   ```
-   auth_basic "Aware Wave Admin";
-   auth_basic_user_file /etc/nginx/.htpasswd_studio;
-   ```
-3. `nginx -t` PASS，`systemctl reload nginx`
-4. `/api/ops/` 與 `/api/build/` 保持無 auth（API 路徑）
+### claude 2026-05-12 18:30
 
-**驗證結果**：
-- `app.aware-wave.com/` 無 auth → **401** ✓
-- 錯誤密碼 → **401** ✓
-- `/api/ops/summary` → **200** ✓（API 路徑不受影響）
-
-**Docker nginx default.conf 副作用**：
-- `sed -i` 已取消注釋 Docker 的 `auth_basic`（lines 98-99）
-- 但系統 nginx 才是 443 真正入口，Docker 的改動對外部無效果
-- Docker nginx 容器已 `docker compose restart nginx`（確保 inode 重新 bind）
-
-### TASKS 記錄
-
-- 新增第 78 行：`（AO-RESUME 提醒—筆電）確認桌機 2026-05-11 變更不衝突筆電設定`
-- 筆電開工查照清單已寫入，DoD 為 `sync-claude-userlevel.ps1 -Mode verify` exit 0
-
-## 筆電注意事項（下次開工查照）
-
-1. `git pull` 後跑 `sync-claude-userlevel.ps1 -Mode verify`
-2. 若 hooks 顯示 3 個 update（ao-resume-on-prompt.ps1 / hooks.json / README.md）→ 正常，跑 `-Mode merge` 對齊
-3. settings.json verify 顯示 drift → 正常 false positive，merge 後內容正確
-4. VPS Basic Auth 變更純伺服器端，筆電無需處理
-
-## Git 狀態
-
-- commit `fd88821`（checkpoint auto-save）含 TASKS.md 新條目
-- working tree clean，1 commit ahead of origin/main，尚未 push
+- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）——動態 project key + UTF-8 BOM + env vars；mcp/user-env.ps1 duplicate keys 修復；daily note 補齊
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+  - `scripts/import-cross-machine-memory.ps1`
+  - `mcp/user-env.ps1`
+  - `agency-os/TASKS.md`
+  - `agency-os/memory/daily/2026-05-12.md`
+- **Git**: 9 commits ahead of origin/main（checkpoint 系列 + 本次修復）
+- **對應 TASKS 子字串（可選）**: AO-SYNC 環境變數設定
+- **風險／待辦（可選）**: 筆電須設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT（D:\Work）並測試 AO-RESUME 匯入
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-11 18:02:38`
-- Health score: **99.7%**
-- Threshold: **0%**
+- Time: `2026-05-12 13:20:01`
+- Health score: **100%**
+- Threshold: **100%**
 - Health gate exit code: **0**
 - Closeout report exists: **YES**
 - Result: **PASS**
@@ -288,13 +276,15 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260511-180238.md`
-- Closeout: `reports/closeout/closeout-20260511-180234.md`
+- Health: `reports/health/health-20260512-132001.md`
+- Closeout: `reports/closeout/closeout-20260512-131956.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+- `git pull origin main`：**Already up to date**。
+- `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
 - `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
 
 ### AO-CLOSE（2026-03-27）
@@ -352,7 +342,5 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
 
 

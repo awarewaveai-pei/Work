@@ -2,6 +2,44 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-12
+
+### Daily
+- (TBD)
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:7b9f61f39c447cd2cf4fbcaf23ba070e2309f36dc4cfd8aacad3fc1a56fac3cd -->
+
+### claude 2026-05-12 18:00
+
+- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）——export/import 腳本改為動態 project key 推導 + UTF-8 BOM + AO_SYNC_ROOT/AO_SYNC_SECRETS_ROOT env var；四項檔案（MEMORY.md、user-env.ps1、SSH keys、AWARE_WAVE_CREDENTIALS.md）完整同步
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+  - `scripts/import-cross-machine-memory.ps1`
+  - `mcp/user-env.ps1`
+  - `agency-os/TASKS.md`
+- **Git**: 9 commits ahead of origin/main（checkpoint 系列）
+- **對應 TASKS 子字串（可選）**: AO-SYNC 環境變數設定
+- **風險／待辦（可選）**: 筆電須設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT 環境變數（D:\Work, key=d--Work）並測試 AO-RESUME 匯入流程
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:436e906aac028720dbe07cc89a7b39e028dd16450270f443de765e8360e86cf3 -->
+
+### claude 2026-05-12 18:30
+
+- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）——動態 project key + UTF-8 BOM + env vars；mcp/user-env.ps1 duplicate keys 修復；daily note 補齊
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+  - `scripts/import-cross-machine-memory.ps1`
+  - `mcp/user-env.ps1`
+  - `agency-os/TASKS.md`
+  - `agency-os/memory/daily/2026-05-12.md`
+- **Git**: 9 commits ahead of origin/main（checkpoint 系列 + 本次修復）
+- **對應 TASKS 子字串（可選）**: AO-SYNC 環境變數設定
+- **風險／待辦（可選）**: 筆電須設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT（D:\Work）並測試 AO-RESUME 匯入
+
 ## 2026-05-11
 
 ### 桌機 Claude user-level 對齊 <2026-05-11>
@@ -2146,7 +2184,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-11 10:02:33 UTC_
+_Last synced: 2026-05-12 05:19:55 UTC_
 
 ## 2026-03-20
 
@@ -2580,6 +2618,4 @@ _Last synced: 2026-05-11 10:02:33 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
 
