@@ -2,7 +2,7 @@
 
 > **這份文件的用途**：直接交給 Claude / Codex 執行。  
 > 每次只交一個 Phase。不要一次交全部。  
-> Last updated: 2026-05-12
+> Last updated: 2026-05-12（品質修訂：Phase 0 加 alternativeSlug + resolveInstallableSlugs 邏輯；Phase 1 補 WizardStep 型別 + URL params 傳遞 + 驗收條件修正；Phase 2 補 useEffect 讀取 + smokeProfileFor 位置說明；Phase 3 補前置檔案確認）
 
 ---
 
@@ -42,11 +42,12 @@ export type WpSiteType = "tourism" | "brand" | "ecommerce";
 export type WpPluginModule = "base" | "ecommerce" | "tourism" | "brand";
 
 export interface WpPlugin {
-  slug: string;        // WP-CLI install 用（wp plugin install <slug>）
-  label: string;       // 顯示名稱（中文或英文）
-  free: boolean;       // false = 付費外掛，WP-CLI 無法自動安裝
-  required: boolean;   // false = 選配
+  slug: string;               // WP-CLI install 用（wp plugin install <slug>）
+  label: string;              // 顯示名稱（中文或英文）
+  free: boolean;              // false = 付費外掛，WP-CLI 無法自動安裝
+  required: boolean;          // false = 選配（如 Complianz †）
   module: WpPluginModule;
+  alternativeSlug?: string;   // 替代外掛 slug（↩）；供 resolveInstallableSlugs 在 free: false 時改用
 }
 ```
 
@@ -62,11 +63,24 @@ export function resolveInstallableSlugs(siteType: WpSiteType, hasEcommerce: bool
 export function resolvePaidPlugins(siteType: WpSiteType, hasEcommerce: boolean): WpPlugin[]
 ```
 
-**外掛資料來源**：完全對應 `WP_CLIENT_PLUGIN_STACK.md`：
-- `module: "base"` → 文件「一、基礎全員必裝」表格（16 個）
-- `module: "ecommerce"` → 文件「二、電商模組」表格（12 個）
-- `module: "tourism"` → 文件「三、站型專屬模組 3.1」表格（5 個）
-- `module: "brand"` → 文件「三、站型專屬模組 3.2」表格（3 個）
+**外掛資料來源**：完全對應 `WP_CLIENT_PLUGIN_STACK.md` 的 `WP.org Slug` 欄：
+- `module: "base"` → 文件「一、基礎全員必裝」（16 個功能位）
+- `module: "ecommerce"` → 文件「二、電商模組」（12 個功能位）
+- `module: "tourism"` → 文件「三、站型專屬模組 3.1」（5 個功能位）
+- `module: "brand"` → 文件「三、站型專屬模組 3.2」（3 個功能位）
+
+**★ / ↩ 處理規則**：
+- 表格「★首選」行 → `slug` 欄；若付費（PAID）同時填入 `free: false`
+- 表格「↩替代」行 → 對應 ★ 條目的 `alternativeSlug`（不另建獨立條目）
+- `DIRECT`（如 ECPay）→ `slug: "ecpay-payment-gateway"`, `free: false`（無 WP.org，需手動安裝）
+
+**`resolveInstallableSlugs` 邏輯**（必須實作）：
+```
+for each plugin in resolvePluginStack(siteType, hasEcommerce):
+  if plugin.free === true  → push plugin.slug
+  if plugin.free === false && plugin.alternativeSlug → push plugin.alternativeSlug
+  if plugin.free === false && !plugin.alternativeSlug → skip（進 resolvePaidPlugins）
+```
 
 **組合規則**：
 - `siteType: "ecommerce"` → `hasEcommerce` 強制為 `true`（忽略傳入值）
@@ -77,10 +91,11 @@ export function resolvePaidPlugins(siteType: WpSiteType, hasEcommerce: boolean):
 - `siteType: "ecommerce"` → base + ecommerce（無 tourism/brand）
 
 ### 驗收條件
-- [ ] `resolvePluginStack("tourism", true)` 回傳 base(16) + ecommerce(12) + tourism(5) = 33 個外掛
-- [ ] `resolvePluginStack("ecommerce", false)` 等同 `("ecommerce", true)` = base + ecommerce = 28 個
-- [ ] `resolveInstallableSlugs("brand", false)` 只回傳 `free: true` 的 slug 字串陣列
-- [ ] `resolvePaidPlugins` 回傳的外掛全部 `free === false`
+- [ ] `resolvePluginStack("tourism", true)` 回傳 base(16) + ecommerce(12) + tourism(5) = **33 個外掛物件**（含付費）
+- [ ] `resolvePluginStack("ecommerce", false)` 等同 `("ecommerce", true)` = base(16) + ecommerce(12) = 28 個
+- [ ] `resolveInstallableSlugs("brand", false)` 回傳 slug **字串陣列**，每個項目皆可直接傳給 WP-CLI（包含以 `alternativeSlug` 替換的條目）
+- [ ] `resolveInstallableSlugs` 不含 `free: false` 且無 `alternativeSlug` 的外掛 slug
+- [ ] `resolvePaidPlugins` 回傳的外掛全部 `free === false` 且無 `alternativeSlug`（真正需要手動安裝的）
 - [ ] TypeScript 編譯無錯誤：`cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit`
 
 ### 不要做的事
@@ -138,23 +153,43 @@ resolvedPaidPlugins: resolvePaidPlugins("brand", false),
 - `wpSiteType` 或 `hasEcommerce` 變動時 → 重新呼叫 `resolveInstallableSlugs` 和 `resolvePaidPlugins` 更新 `ClientInfo`
 - Step 2 一定要選站型才能進入 Step 3
 
-**Step 編號更新：**
+**Step 編號更新（必須同步更新所有相關型別和邏輯）：**
+```typescript
+// 原本：type WizardStep = 1 | 2 | 3 | 4
+// 改為：
+type WizardStep = 1 | 2 | 3 | 4 | 5;
+```
 - 舊 Step 2（部門選型）→ 新 Step 3
 - 舊 Step 3（開通服務）→ 新 Step 4
 - 舊 Step 4（啟動 Build）→ 新 Step 5
 - Progress bar 更新為 5 步
+- 任何 `step === 4` 的條件判斷都要改成 `step === 5`
 
-**Step 5（原 Step 4）新增摘要欄位：**
+**Step 5（原 Step 4）新增摘要欄位顯示：**
 ```
 網站類型：旅遊業 + 電商
-外掛總數：33（自動 28 / 手動 5）
+外掛總數：33（可自動安裝 N / 需手動授權 M）
+```
+> 「外掛總數」= `resolvePluginStack().length`；「可自動安裝 N」= `resolvedPluginSlugs.length`；「需手動授權 M」= `resolvedPaidPlugins.length`
+
+**Step 5 跳轉 BuildConsole 時，URL 參數必須傳遞新欄位：**
+
+找到現有 Step 4（新 Step 5）的 `/build` URL 建構邏輯（約 `OnboardWizard.tsx` lines 472–488），在 URL SearchParams 新增：
+```typescript
+params.set("wpSiteType", clientInfo.wpSiteType);
+params.set("hasEcommerce", String(clientInfo.hasEcommerce));
+params.set("pluginSlugs", clientInfo.resolvedPluginSlugs.join(","));
+params.set("paidPluginCount", String(clientInfo.resolvedPaidPlugins.length));
 ```
 
 ### 驗收條件
 - [ ] 選「一般電商」→ `hasEcommerce` 自動為 true，checkbox 不可取消
-- [ ] 選「旅遊業」+ 勾電商 → resolvedPluginSlugs 有 33 個 slug
-- [ ] 選「形象站」不勾電商 → resolvedPluginSlugs 有 19 個 slug
-- [ ] Step 5 摘要顯示站型和外掛數量
+- [ ] 選「旅遊業」+ 勾電商 → `resolvePluginStack("tourism", true).length === 33`（總外掛物件數）
+- [ ] 選「旅遊業」+ 勾電商 → `resolvedPluginSlugs` 只含可 WP-CLI 安裝的 slug（每個 `free: true` 或有 `alternativeSlug` 的）
+- [ ] 選「形象站」不勾電商 → `resolvePluginStack("brand", false).length === 19`（total）
+- [ ] Step 5 摘要顯示站型、總外掛數、可自動安裝數、需手動授權數
+- [ ] 跳轉 `/build` 的 URL 包含 `wpSiteType`, `hasEcommerce`, `pluginSlugs`, `paidPluginCount` 參數
+- [ ] `type WizardStep = 1 | 2 | 3 | 4 | 5` 已更新
 - [ ] TypeScript 編譯無錯誤
 
 ### 不要做的事
@@ -195,6 +230,13 @@ paidPluginCount?: number;   // 需手動安裝的付費外掛數量
 ```
 
 `smokeProfileFor` 函式更新（改用新欄位）：
+
+> **位置**：`smokeProfileFor` 定義在 `contracts.ts` 內部，由 `profileBPlan()` 呼叫，形如：
+> ```typescript
+> smokeProfile: smokeProfileFor(req),
+> ```
+> 找到這個函式定義並更新簽名與邏輯（不要在 Profile A 的路徑裡呼叫它）：
+
 ```typescript
 function smokeProfileFor(req: BuildRunRequest): BuildPlan["smokeProfile"] {
   if (req.hasEcommerce || req.wpSiteType === "ecommerce") return "woocommerce";
@@ -211,6 +253,21 @@ packageSlug: payload.packageSlug
 ```
 
 **2. `app/build/BuildConsole.tsx`**
+
+先找到現有 `useEffect`（約 lines 143–166），它讀取 URL SearchParams 來初始化表單。在此 `useEffect` 內新增對新參數的讀取：
+```typescript
+const wpSiteType = searchParams.get("wpSiteType") as WpSiteType | null;
+const hasEcommerce = searchParams.get("hasEcommerce") === "true";
+const pluginSlugsRaw = searchParams.get("pluginSlugs");
+const pluginSlugs = pluginSlugsRaw ? pluginSlugsRaw.split(",").filter(Boolean) : undefined;
+const paidPluginCount = Number(searchParams.get("paidPluginCount") ?? "0") || undefined;
+
+// 加入 setForm 呼叫中：
+// wpSiteType: wpSiteType ?? undefined,
+// hasEcommerce: hasEcommerce || undefined,
+// pluginSlugs: pluginSlugs,
+// paidPluginCount: paidPluginCount,
+```
 
 在 Profile B/C 的表單區塊下方（Integrations 上方）新增外掛摘要區塊：
 
@@ -260,10 +317,16 @@ packageSlug: payload.packageSlug
 4. `lobster-factory/packages/workflows/src/trigger/apply-manifest.ts` — 現有 manifest workflow
 5. `agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md` — 了解哪些外掛是付費的
 
+### 開始前先確認這些檔案存在（用 Glob 或 Read 確認，不存在則停下來報告）
+```
+lobster-factory/packages/workflows/src/trigger/create-wp-site.ts
+lobster-factory/packages/workflows/src/trigger/apply-manifest.ts
+```
+
 ### 修改 / 新建這些檔案
 ```
 lobster-factory/packages/workflows/src/tasks/wp-install-plugins.ts  （新建）
-lobster-factory/packages/workflows/src/trigger/create-wp-site.ts    （修改）
+lobster-factory/packages/workflows/src/trigger/create-wp-site.ts    （修改 Stage 3 佔位）
 ```
 
 ### wp-install-plugins task 規格

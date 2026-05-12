@@ -81,7 +81,7 @@
   Stage 3: Apply package manifest
     → 接收 pluginSlugs[]
     → SSH + WP-CLI: wp plugin install {slug} --activate
-    → 逐一記錄結果 → Supabase plugin_install_runs
+    → 逐一記錄結果 → Supabase package_install_runs（擴充欄位）
            │
            ▼
 [/ops/clients/[slug]]
@@ -98,7 +98,7 @@
 | 外掛選型邏輯（人類可讀）| `WP_CLIENT_PLUGIN_STACK.md` | 開發者參考 |
 | 外掛 WP slug 清單（機器可讀）| `lib/wp-plugin-stack-catalog.ts`（新建）| Wizard、contracts、workflow |
 | 站型選擇狀態 | `BuildRunRequest.wpSiteType` + `hasEcommerce` | Build Console、Trigger.dev |
-| 安裝結果 | Supabase `plugin_install_runs` 表（新增）| Client Detail Page |
+| 安裝結果 | Supabase `package_install_runs` 表（擴充）| Client Detail Page |
 
 ---
 
@@ -115,27 +115,38 @@
 export type WpSiteType = "tourism" | "brand" | "ecommerce";
 
 export interface WpPlugin {
-  slug: string;           // WP.org / 付費外掛 slug（wp plugin install 用）
-  label: string;          // 顯示名稱
-  free: boolean;          // false = 需授權，自動安裝會跳過
-  required: boolean;      // false = 選配
+  slug: string;                // WP.org / 付費外掛 slug（wp plugin install 用）
+  label: string;               // 顯示名稱
+  free: boolean;               // false = 需授權，自動安裝會跳過
+  required: boolean;           // false = 選配（如 Complianz †）
   module: "base" | "ecommerce" | "tourism" | "brand";
+  alternativeSlug?: string;    // 替代外掛 slug（↩）；free: false 時 resolveInstallableSlugs 改用此值
 }
 
 // 模組定義（對應 WP_CLIENT_PLUGIN_STACK.md）
+// ★ 首選填 slug；↩ 替代填 alternativeSlug；† 選配填 required: false
 export const WP_PLUGIN_CATALOG: WpPlugin[] = [ ... ];
 
-// 組合函式：站型 + 電商旗標 → 外掛清單
+// 組合函式：站型 + 電商旗標 → 完整外掛物件陣列（含付費）
 export function resolvePluginStack(
   siteType: WpSiteType,
   hasEcommerce: boolean
 ): WpPlugin[] { ... }
 
-// 只回傳免費外掛 slug（可直接 wp plugin install 的）
+// 只回傳可直接 wp plugin install 的 slug 清單：
+//   free: true  → 使用 slug
+//   free: false + alternativeSlug → 使用 alternativeSlug（替代免費版）
+//   free: false + 無 alternativeSlug → 跳過（進 resolvePaidPlugins）
 export function resolveInstallableSlugs(
   siteType: WpSiteType,
   hasEcommerce: boolean
 ): string[] { ... }
+
+// 回傳無法自動安裝的付費外掛（free: false 且無免費替代）→ UI 顯示「需手動安裝」
+export function resolvePaidPlugins(
+  siteType: WpSiteType,
+  hasEcommerce: boolean
+): WpPlugin[] { ... }
 ```
 
 **驗收條件**：
@@ -176,9 +187,10 @@ export function resolveInstallableSlugs(
 
 **新增到 `ClientInfo` 的欄位**：
 ```typescript
-wpSiteType: WpSiteType;       // "tourism" | "brand" | "ecommerce"
+wpSiteType: WpSiteType;          // "tourism" | "brand" | "ecommerce"
 hasEcommerce: boolean;
-resolvedPluginSlugs: string[]; // 由 resolveInstallableSlugs() 計算
+resolvedPluginSlugs: string[];   // 由 resolveInstallableSlugs() 計算（可 WP-CLI 安裝的）
+resolvedPaidPlugins: WpPlugin[]; // 由 resolvePaidPlugins() 計算（需手動安裝的）
 ```
 
 **邏輯規則**：
@@ -248,7 +260,7 @@ export const wpInstallPlugins = task({
   }) => {
     // 1. SSH 連線（從 vault 讀取憑證）
     // 2. 逐一: wp plugin install {slug} --activate
-    // 3. 記錄每個外掛的安裝結果 → Supabase plugin_install_runs
+    // 3. 記錄每個外掛的安裝結果 → Supabase package_install_runs
     // 4. 付費外掛（slug 不在 WP.org）→ 記錄為 skipped_license
     // 5. 回傳 { installed: [], skipped: [], failed: [] }
   }
@@ -343,7 +355,7 @@ Phase 4 需要 Phase 3 已有安裝結果資料。
 
 - [ ] Wizard Step 2：選旅遊 + 電商 → 自動顯示 33 個外掛，其中付費 N 個標示橘色
 - [ ] Build Console：enqueue 後 `BuildRunRequest` 包含 `wpSiteType`, `hasEcommerce`, `pluginSlugs[]`
-- [ ] Trigger.dev：Stage 3 完成後 `plugin_install_runs` 有對應記錄
+- [ ] Trigger.dev：Stage 3 完成後 `package_install_runs` 有對應記錄
 - [ ] Client Detail：`/ops/clients/[slug]` 顯示已安裝外掛清單 + 需授權清單
 - [ ] 付費外掛不嘗試安裝，記錄為 `skipped_license`
 - [ ] `resolvePluginStack("ecommerce", true)` 只回傳 base + ecommerce（不含旅遊/形象）
@@ -355,3 +367,4 @@ Phase 4 需要 Phase 3 已有安裝結果資料。
 | 日期 | 變更說明 |
 |------|---------|
 | 2026-05-12 | 初版建立：4個 Phase + 架構圖 + 所有需修改檔案清單 |
+| 2026-05-12 | 品質修訂：架構圖 plugin_install_runs→package_install_runs；WpPlugin 介面加 alternativeSlug；補 resolvePaidPlugins；Phase 1 ClientInfo 補 resolvedPaidPlugins |
