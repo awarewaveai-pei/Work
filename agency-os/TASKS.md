@@ -141,17 +141,21 @@
   - **不衝突宣告**：計畫書 §二明列「不可更動」既有架構（lobster-* 容器、GitHub Actions 4 個 workflow、CLAUDE.md、`system-health-check`、`rollback-phase1.sh`、`backup-eu-stack.sh`、Sentry／Kuma／Netdata、`sg-deploy.sh`、ops console）；不採用 n8n Slack 中間層／自動 deploy on merge。Telegram 保留為手機備援通知 + command plane，與本計畫並行但不擔任主 incident bus。
   - **DoD（總）**：(1) Phase 1+2+3 全綠（22 步端到端 PASS）；(2) `BACKUP_RESTORE_PROOF` 含一筆 auto-repair 觸發的 backup ID；(3) Phase 4 第一週巡檢報告；(4) WORKLOG 留 `AUTO_TASK_DONE` evidence。
   - **下一步建議**：先讀計畫書全文（`Read d:/Work/docs/awarewave-auto-repair-plan-v3.2-final.md`）+ handoff brief（`Read d:/Work/docs/awarewave-auto-repair-phase2-handoff.md`），再開始 Phase 1；交代理時兩份一起附上。
-- [ ] **WordPress 外掛堆疊自動安裝（app.aware-wave.com Onboard Wizard）** —— **【未開始】** 在 `/onboard` Wizard 填入客戶站型（旅遊／形象／電商）後，系統自動組合外掛模組清單，透過 Trigger.dev + WP-CLI 一鍵安裝到客戶 WordPress 站。**Owner docs（2026-05-12 已建立）**：
+- [ ] **WordPress 外掛堆疊自動安裝（app.aware-wave.com Onboard Wizard）** —— **【進行中】** —— 進度：2026-05-12 文件品質修訂完成（WP_CLIENT_PLUGIN_STACK.md 加 WP.org Slug 欄 + ★/↩/† 標記；PLAN/BRIEF 修復 10 個關鍵缺漏）；**Phase 0 ✅ 完成**（`lib/wp-plugin-stack-catalog.ts` commit b205f40，36 entries，3 exported functions，TypeScript 通過）。**下一步（明日）：Phase 1 — OnboardWizard 新增站型選擇 Step**。
   - 外掛選型：`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`
   - 實作計畫：`lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
   - **AI 執行 Brief**：`lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`（直接交給 Claude / Codex，每次一個 Phase）
   - Build System 規則：`lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md`
-  **實作順序**（4 個 Phase，依序執行）：
-  - Phase 0：`lib/wp-plugin-stack-catalog.ts`（TypeScript 外掛 SSOT）
-  - Phase 1：`OnboardWizard.tsx`（新增站型選擇 Step）
-  - Phase 2：`contracts.ts` + `BuildConsole.tsx`（欄位擴充 + 摘要顯示）
-  - Phase 3：Trigger.dev `wp-install-plugins` task（WP-CLI 執行層）
+  **實作順序**（依賴鏈，依序執行）：
+  - ~~Phase 0：`lib/wp-plugin-stack-catalog.ts`（TypeScript 外掛 SSOT）~~ **✅ 2026-05-12 完成**
+  - **Phase 1（明日開始）**：`OnboardWizard.tsx`（新增站型選擇 Step 2，原 Step 2-4 → 3-5，WizardStep 型別更新）
+  - Phase 2：`contracts.ts` + `BuildConsole.tsx`（欄位擴充 + URL params + 摘要顯示）
+  - Phase 3：Trigger.dev `wp-install-plugins` task（WP-CLI 執行層，先確認 workflow 檔存在）
   - Phase 4：`/ops/clients/[slug]` 顯示安裝結果
+  **Phase 1 明日交代理時必附**：
+  1. `lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md` — Phase 1 區段
+  2. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/OnboardWizard.tsx`（完整讀完）
+  3. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts`（Phase 0 產出）
   **DoD（全部 Phase 完成）**：(1) Wizard 選站型後顯示外掛清單；(2) enqueue 後 `BuildRunRequest` 含 `wpSiteType`/`hasEcommerce`/`pluginSlugs[]`；(3) Trigger.dev Stage 3 安裝完成，`package_install_runs` 有記錄；(4) Client Detail 顯示已安裝／需手動清單；(5) 付費外掛記錄為 `skipped_license` 不報錯。
 
 ## Next — 已完成歷程（查詢用）
