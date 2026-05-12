@@ -60,6 +60,39 @@ New-Item -ItemType Directory -Path $memDest -Force | Out-Null
 Copy-Item -LiteralPath $memIndex -Destination (Join-Path $memDest "MEMORY.md") -Force
 Write-Host "  copied: MEMORY.md" -ForegroundColor Green
 
+# ── Secrets export (AO_SYNC_SECRETS_ROOT) ────────────────────────────────────
+# Exports mcp/user-env.ps1 and SSH keys to a separate encrypted folder.
+# Set AO_SYNC_SECRETS_ROOT on each machine to the encrypted/hidden folder path.
+$secretsRoot = $env:AO_SYNC_SECRETS_ROOT
+if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
+    # mcp/user-env.ps1
+    $userEnvSrc = Join-Path $WorkRoot "mcp\user-env.ps1"
+    if ($WorkRoot -and (Test-Path -LiteralPath $userEnvSrc)) {
+        Copy-Item -LiteralPath $userEnvSrc -Destination (Join-Path $secretsRoot "user-env.ps1") -Force
+        Write-Host "  copied: mcp/user-env.ps1 -> $secretsRoot\user-env.ps1" -ForegroundColor Green
+    }
+
+    # SSH private keys
+    $sshSrc = Join-Path $env:USERPROFILE ".ssh"
+    $sshDest = Join-Path $secretsRoot ".ssh"
+    New-Item -ItemType Directory -Path $sshDest -Force | Out-Null
+    $sshKeys = @("hetzner_trigger", "id_ed25519", "hostinger_soulful",
+                 "hetzner_trigger.pub", "id_ed25519.pub", "hostinger_soulful.pub", "config")
+    foreach ($key in $sshKeys) {
+        $src = Join-Path $sshSrc $key
+        if (Test-Path -LiteralPath $src) {
+            Copy-Item -LiteralPath $src -Destination (Join-Path $sshDest $key) -Force
+            Write-Host "  copied: .ssh/$key" -ForegroundColor Green
+        }
+    }
+    Write-Host "== secrets export -> $secretsRoot ==" -ForegroundColor Cyan
+} elseif ($secretsRoot) {
+    Write-Host "  AO_SYNC_SECRETS_ROOT set but path not found: $secretsRoot" -ForegroundColor Yellow
+} else {
+    Write-Host "  AO_SYNC_SECRETS_ROOT not set; skipping secrets export (mcp/user-env.ps1 + SSH keys)" -ForegroundColor DarkGray
+}
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Write import instructions
 $memDestPath = Join-Path $memDest "MEMORY.md"
 $instructions = @"
