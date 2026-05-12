@@ -152,10 +152,12 @@
   - Phase 2：`contracts.ts` + `BuildConsole.tsx`（欄位擴充 + URL params + 摘要顯示）
   - Phase 3：Trigger.dev `wp-install-plugins` task（WP-CLI 執行層，先確認 workflow 檔存在）
   - Phase 4：`/ops/clients/[slug]` 顯示安裝結果
-  **Phase 1 明日交代理時必附**：
-  1. `lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md` — Phase 1 區段
-  2. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/OnboardWizard.tsx`（完整讀完）
-  3. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts`（Phase 0 產出）
+  **Phase 1 — 開始前必讀（照順序交給 Claude / Codex）**：
+  1. `lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`（Phase 1 區段）— 完整讀完再動手
+  2. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/OnboardWizard.tsx` — 完整讀完，了解現有 4 步驟架構
+  3. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts` — Phase 0 建立的 catalog（必須先完成）
+  4. `lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md`（§3 紅線規則）— 禁止踩的地雷
+  5. `agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md` — 外掛選型依據（了解 ★/↩/† 含義）
   **DoD（全部 Phase 完成）**：(1) Wizard 選站型後顯示外掛清單；(2) enqueue 後 `BuildRunRequest` 含 `wpSiteType`/`hasEcommerce`/`pluginSlugs[]`；(3) Trigger.dev Stage 3 安裝完成，`package_install_runs` 有記錄；(4) Client Detail 顯示已安裝／需手動清單；(5) 付費外掛記錄為 `skipped_license` 不報錯。
 
 ## Next — 已完成歷程（查詢用）
