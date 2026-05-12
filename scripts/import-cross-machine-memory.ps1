@@ -1,30 +1,34 @@
 ﻿# import-cross-machine-memory.ps1
-# Auto-imports MEMORY.md from AO-SYNC-*\ if a newer version is found.
+# Auto-imports all cross-machine files from EverydayPW on AO-RESUME.
 # Called by ao-resume.ps1 (non-blocking). Silent no-op when no AO-SYNC folder exists.
 #
-# Search order for AO-SYNC folders:
-#   1. $env:AO_SYNC_ROOT (machine-specific config)
-#   2. G:\我的雲端硬碟\AO-SYNC (Google Drive default, if drive exists)
-#   3. Desktop (legacy fallback)
-# Searches ALL available locations and picks the latest folder by name.
+# MEMORY.md source:  $env:AO_SYNC_ROOT\AO-SYNC-<date>\memory\MEMORY.md
+# Secrets source:    $env:AO_SYNC_SECRETS_ROOT\  (user-env.ps1, .ssh\*, AWARE_WAVE_CREDENTIALS.md)
 #
-# Logic:
-#   1. Find latest AO-SYNC-<date> folder across all search paths (by name, descending)
-#   2. Skip if .imported flag exists in that folder (already processed this export)
-#   3. Skip if destination MEMORY.md is already newer than source
-#   4. Import and write .imported flag so next AO-RESUME doesn't re-import same file
+# Desktop is always the source of truth — all files are overwritten on import.
+# MEMORY.md skips re-import if already processed today (via .imported flag).
 
 param([string]$WorkRoot = "")
 
+# ── Resolve WorkRoot ──────────────────────────────────────────────────────────
+if (-not $WorkRoot) {
+    $fromWorkScripts   = Join-Path $PSScriptRoot "..\agency-os\scripts\system-guard.ps1"
+    $fromAgencyScripts = Join-Path $PSScriptRoot "system-guard.ps1"
+    if (Test-Path -LiteralPath $fromWorkScripts) {
+        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    } elseif (Test-Path -LiteralPath $fromAgencyScripts) {
+        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+    }
+}
+
+# ── 1. MEMORY.md import ───────────────────────────────────────────────────────
 $memDest = "$env:USERPROFILE\.claude\projects\c--Users-USER-Work\memory"
 
-# Build list of directories to search
-# Priority: env var > Google Drive auto-detect (scan G:\ to avoid non-ASCII hardcoding) > Desktop
 $searchRoots = @()
 if ($env:AO_SYNC_ROOT) {
     $searchRoots += $env:AO_SYNC_ROOT
 } else {
-    # Auto-detect: scan G:\ for first child directory (avoids hardcoding non-ASCII folder names)
+    # Auto-detect Google Drive by scanning G:\ (avoids hardcoding non-ASCII folder names)
     if (Test-Path "G:\") {
         $gdRoot = Get-ChildItem "G:\" -Directory -ErrorAction SilentlyContinue |
                   Select-Object -First 1 -ExpandProperty FullName
@@ -34,7 +38,6 @@ if ($env:AO_SYNC_ROOT) {
 $searchRoots += [Environment]::GetFolderPath('Desktop')
 $searchRoots = $searchRoots | Select-Object -Unique
 
-# Collect AO-SYNC-* folders across all roots, pick latest by name
 $syncFolders = @(
     foreach ($root in $searchRoots) {
         if (Test-Path $root) {
@@ -43,46 +46,68 @@ $syncFolders = @(
     }
 ) | Sort-Object Name -Descending
 
-if ($syncFolders.Count -eq 0) {
-    # Normal for primary machine — no AO-SYNC to import
-    exit 0
-}
+if ($syncFolders.Count -gt 0) {
+    $latest   = $syncFolders[0]
+    $srcFile  = Join-Path $latest.FullName "memory\MEMORY.md"
+    $doneFlag = Join-Path $latest.FullName ".imported"
 
-$latest   = $syncFolders[0]
-$srcFile  = Join-Path $latest.FullName "memory\MEMORY.md"
-$doneFlag = Join-Path $latest.FullName ".imported"
-
-if (-not (Test-Path -LiteralPath $srcFile)) {
-    exit 0
-}
-
-# Already imported this export
-if (Test-Path -LiteralPath $doneFlag) {
-    exit 0
-}
-
-# Compare timestamps
-$destFile = Join-Path $memDest "MEMORY.md"
-$srcTime  = (Get-Item -LiteralPath $srcFile).LastWriteTimeUtc
-
-if (Test-Path -LiteralPath $destFile) {
-    $destTime = (Get-Item -LiteralPath $destFile).LastWriteTimeUtc
-    if ($srcTime -le $destTime) {
-        # Destination already current — mark flag and exit
-        "already-current $(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')" |
+    if ((Test-Path -LiteralPath $srcFile) -and -not (Test-Path -LiteralPath $doneFlag)) {
+        if (-not (Test-Path -LiteralPath $memDest)) {
+            New-Item -ItemType Directory -Path $memDest -Force | Out-Null
+        }
+        Copy-Item -LiteralPath $srcFile -Destination (Join-Path $memDest "MEMORY.md") -Force
+        "imported $(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')" |
             Out-File -FilePath $doneFlag -Encoding UTF8 -Force
-        Write-Host "  cross-machine import: MEMORY.md already current ($(($latest).Name))" -ForegroundColor DarkGray
-        exit 0
+        Write-Host "  cross-machine import: MEMORY.md imported from $($latest.Name)" -ForegroundColor Green
+    } elseif (Test-Path -LiteralPath $doneFlag) {
+        Write-Host "  cross-machine import: MEMORY.md already current ($($latest.Name))" -ForegroundColor DarkGray
     }
 }
 
-if (-not (Test-Path -LiteralPath $memDest)) {
-    New-Item -ItemType Directory -Path $memDest -Force | Out-Null
+# ── 2. Secrets import (AO_SYNC_SECRETS_ROOT) ─────────────────────────────────
+# Desktop is source of truth — always overwrite so both machines are identical.
+$secretsRoot = $env:AO_SYNC_SECRETS_ROOT
+if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
+
+    # user-env.ps1 → mcp\user-env.ps1 (then run it to apply env vars)
+    $userEnvSrc = Join-Path $secretsRoot "user-env.ps1"
+    if ((Test-Path -LiteralPath $userEnvSrc) -and $WorkRoot) {
+        $userEnvDest = Join-Path $WorkRoot "mcp\user-env.ps1"
+        Copy-Item -LiteralPath $userEnvSrc -Destination $userEnvDest -Force
+        Write-Host "  cross-machine import: user-env.ps1 restored" -ForegroundColor Green
+        # Apply env vars to current session + persist via setx
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $userEnvDest
+        Write-Host "  cross-machine import: env vars applied" -ForegroundColor Green
+    }
+
+    # SSH keys → ~/.ssh\  (overwrite — desktop is source of truth)
+    $sshSrc  = Join-Path $secretsRoot ".ssh"
+    $sshDest = Join-Path $env:USERPROFILE ".ssh"
+    if (Test-Path -LiteralPath $sshSrc) {
+        if (-not (Test-Path -LiteralPath $sshDest)) {
+            New-Item -ItemType Directory -Path $sshDest -Force | Out-Null
+        }
+        $sshKeys = @("hetzner_trigger", "id_ed25519", "hostinger_soulful",
+                     "hetzner_trigger.pub", "id_ed25519.pub", "hostinger_soulful.pub", "config")
+        foreach ($key in $sshKeys) {
+            $src = Join-Path $sshSrc $key
+            if (Test-Path -LiteralPath $src) {
+                Copy-Item -LiteralPath $src -Destination (Join-Path $sshDest $key) -Force
+                Write-Host "  cross-machine import: .ssh/$key restored" -ForegroundColor Green
+            }
+        }
+    }
+
+    # AWARE_WAVE_CREDENTIALS.md → user home
+    $credsSrc = Join-Path $secretsRoot "AWARE_WAVE_CREDENTIALS.md"
+    if (Test-Path -LiteralPath $credsSrc) {
+        Copy-Item -LiteralPath $credsSrc -Destination (Join-Path $env:USERPROFILE "AWARE_WAVE_CREDENTIALS.md") -Force
+        Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md restored" -ForegroundColor Green
+    }
+
+    Write-Host "== cross-machine import: secrets restored from $secretsRoot ==" -ForegroundColor Cyan
+} elseif ($secretsRoot) {
+    Write-Host "  AO_SYNC_SECRETS_ROOT set but path not found: $secretsRoot" -ForegroundColor Yellow
 }
-Copy-Item -LiteralPath $srcFile -Destination $destFile -Force
 
-"imported $(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')" |
-    Out-File -FilePath $doneFlag -Encoding UTF8 -Force
-
-Write-Host "  cross-machine import: MEMORY.md imported from $(($latest).Name)" -ForegroundColor Green
 exit 0
