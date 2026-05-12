@@ -141,7 +141,18 @@
   - **不衝突宣告**：計畫書 §二明列「不可更動」既有架構（lobster-* 容器、GitHub Actions 4 個 workflow、CLAUDE.md、`system-health-check`、`rollback-phase1.sh`、`backup-eu-stack.sh`、Sentry／Kuma／Netdata、`sg-deploy.sh`、ops console）；不採用 n8n Slack 中間層／自動 deploy on merge。Telegram 保留為手機備援通知 + command plane，與本計畫並行但不擔任主 incident bus。
   - **DoD（總）**：(1) Phase 1+2+3 全綠（22 步端到端 PASS）；(2) `BACKUP_RESTORE_PROOF` 含一筆 auto-repair 觸發的 backup ID；(3) Phase 4 第一週巡檢報告；(4) WORKLOG 留 `AUTO_TASK_DONE` evidence。
   - **下一步建議**：先讀計畫書全文（`Read d:/Work/docs/awarewave-auto-repair-plan-v3.2-final.md`）+ handoff brief（`Read d:/Work/docs/awarewave-auto-repair-phase2-handoff.md`），再開始 Phase 1；交代理時兩份一起附上。
-- [ ] **製作外掛包一鍵加入** —— **【未開始】** 將龍蝦工廠／租戶常用的 WordPress 外掛（含 mu-plugins 與第三方授權外掛）打包，提供「一鍵加入新客戶站」的流程，避免每個新案重複下載／設定。**範圍待釐清**（占位，下次討論補 DoD）：(a) 外掛清單來源（哪些必備、哪些選配）；(b) 打包方式（zip／composer.json／wp-cli script／lobster build profile）；(c) 一鍵入口（next-admin `/onboard` 增加按鈕？或 `/build` profile？）；(d) 授權處理（付費外掛 license key 的 secrets 治理路徑，禁明文進 git）；(e) 與既有 `client-onboarding` subagent／MainWP child site 流程的銜接。**Owner doc 待建**。**下一步**：先把上述 (a)–(e) 對齊一輪，再決定要不要開新 owner doc 或直接擴充 `lobster-factory/docs/` 既有文件。
+- [ ] **WordPress 外掛堆疊自動安裝（app.aware-wave.com Onboard Wizard）** —— **【未開始】** 在 `/onboard` Wizard 填入客戶站型（旅遊／形象／電商）後，系統自動組合外掛模組清單，透過 Trigger.dev + WP-CLI 一鍵安裝到客戶 WordPress 站。**Owner docs（2026-05-12 已建立）**：
+  - 外掛選型：`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`
+  - 實作計畫：`lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
+  - **AI 執行 Brief**：`lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`（直接交給 Claude / Codex，每次一個 Phase）
+  - Build System 規則：`lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md`
+  **實作順序**（4 個 Phase，依序執行）：
+  - Phase 0：`lib/wp-plugin-stack-catalog.ts`（TypeScript 外掛 SSOT）
+  - Phase 1：`OnboardWizard.tsx`（新增站型選擇 Step）
+  - Phase 2：`contracts.ts` + `BuildConsole.tsx`（欄位擴充 + 摘要顯示）
+  - Phase 3：Trigger.dev `wp-install-plugins` task（WP-CLI 執行層）
+  - Phase 4：`/ops/clients/[slug]` 顯示安裝結果
+  **DoD（全部 Phase 完成）**：(1) Wizard 選站型後顯示外掛清單；(2) enqueue 後 `BuildRunRequest` 含 `wpSiteType`/`hasEcommerce`/`pluginSlugs[]`；(3) Trigger.dev Stage 3 安裝完成，`package_install_runs` 有記錄；(4) Client Detail 顯示已安裝／需手動清單；(5) 付費外掛記錄為 `skipped_license` 不報錯。
 
 ## Next — 已完成歷程（查詢用）
 
