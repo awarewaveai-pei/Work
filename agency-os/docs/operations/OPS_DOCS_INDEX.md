@@ -90,6 +90,7 @@
 | 工具與整合總表 | [tools-and-integrations.md](tools-and-integrations.md) |
 | 次世代交付藍圖 | [NEXT_GEN_DELIVERY_BLUEPRINT_V1.md](NEXT_GEN_DELIVERY_BLUEPRINT_V1.md) |
 | WordPress 客戶交付模型 | [WORDPRESS_CLIENT_DELIVERY_MODELS.md](WORDPRESS_CLIENT_DELIVERY_MODELS.md) |
+| **WordPress 客戶站外掛標準堆疊**（選型 + 組合邏輯） | [WP_CLIENT_PLUGIN_STACK.md](WP_CLIENT_PLUGIN_STACK.md) |
 | MainWP + WPvivid 備份 gate / safe update | [MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md](MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md) |
 | 電商專案 Playbook | [ecommerce-project-playbook.md](ecommerce-project-playbook.md) |
 
@@ -98,7 +99,7 @@
 | 說明 | 檔案 |
 |:---|:---|
 | **Ops Inbox 操作手冊**（UI 流程、AI 診斷、Webhook 端點） | [ops-inbox-user-guide.md](ops-inbox-user-guide.md) |
-| **Slack 通知路由契約**（`#infra-alerts` / `#ops-incidents` 分層、驗證、不可混流規則） | [slack-notification-routing.md](slack-notification-routing.md) |
+| **Slack / Telegram 通知路由契約**（`#infra-alerts` / `#ops-incidents` 分層、Telegram 手機備援、驗證、不可混流規則） | [slack-notification-routing.md](slack-notification-routing.md) |
 | 事件應變（分級、SLA、RCA 格式） | [RUNBOOK_INCIDENT_RESPONSE.md](RUNBOOK_INCIDENT_RESPONSE.md) |
 | Production Pilot A | [PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md](PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md) |
 | Production Pilot B | [PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md](PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md) |
