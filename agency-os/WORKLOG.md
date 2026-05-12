@@ -9,6 +9,7 @@
 - Phase 0 實作：新建 `lib/wp-plugin-stack-catalog.ts`（36 entries，base 16 + ecommerce 12 + tourism 5 + brand 3，三個 exported functions，TypeScript 通過）
 - TASKS.md 更新：WP 外掛自動安裝任務狀態 未開始→進行中，Phase 0 打完成，Phase 1 開工清單（5 個必讀檔）寫入
 - 本日稍早（另一輪）：AO-SYNC 雙機同步修復（export/import 腳本動態 project key + UTF-8 BOM + env var）
+- AUTO_TASK_DONE: export-cross-machine-memory secrets 時間戳修復（LastWriteTime 蓋成 sync 時間）
 
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
@@ -73,6 +74,19 @@
   - `lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
 - **Git**: 本 closeout commit 前修復
 - **對應 TASKS 子字串（可選）**: WP 外掛自動安裝
+- **風險／待辦（可選）**:
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:9557a101b7a3e92660aa0e45572c6ff6078efaba3c9e1e6d3dbd596ab5a0db44 -->
+
+### claude 2026-05-12 22:45
+
+- **完成（一句）**: 修復 export-cross-machine-memory.ps1 — secrets 複製後強制 LastWriteTime = sync 時間，Google Drive 顯示正確上傳時間
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+- **Git**: 5aa753c（已 push）
+- **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**:
 
 ## 2026-05-11
@@ -2219,7 +2233,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-12 09:46:59 UTC_
+_Last synced: 2026-05-12 10:04:37 UTC_
 
 ## 2026-03-20
 

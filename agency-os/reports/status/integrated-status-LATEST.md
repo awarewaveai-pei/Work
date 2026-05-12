@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-12 17:47:14
+- Generated: 2026-05-12 18:04:45
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -296,11 +296,23 @@
 - **對應 TASKS 子字串（可選）**: WP 外掛自動安裝
 - **風險／待辦（可選）**:
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:9557a101b7a3e92660aa0e45572c6ff6078efaba3c9e1e6d3dbd596ab5a0db44 -->
+
+### claude 2026-05-12 22:45
+
+- **完成（一句）**: 修復 export-cross-machine-memory.ps1 — secrets 複製後強制 LastWriteTime = sync 時間，Google Drive 顯示正確上傳時間
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+- **Git**: 5aa753c（已 push）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-12 17:47:05`
+- Time: `2026-05-12 18:04:43`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -310,8 +322,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260512-174705.md`
-- Closeout: `reports/closeout/closeout-20260512-174700.md`
+- Health: `reports/health/health-20260512-180443.md`
+- Closeout: `reports/closeout/closeout-20260512-180438.md`
 
 ## Action
 - No blocking issue detected.

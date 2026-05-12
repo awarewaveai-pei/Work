@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-12 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-12 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:9557a101b7a3e92660aa0e45572c6ff6078efaba3c9e1e6d3dbd596ab5a0db44 -->
 - **2026-05-12 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-12 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:c8396eba5bbc07efb99d13c0b355bb2b0495589f6a3ab357c7a6e876708d7203 -->
 - **2026-05-12 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-12 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:af2f48e17e8fb139ea47fca7f95f2a09291276d8254e4a59cb062612d7cb27bf -->
 - **2026-05-12（WP Plugin Stack — 文件品質修訂 + Phase 0 實作）**：三份文件全修：`WP_CLIENT_PLUGIN_STACK.md`（加 WP.org Slug 欄、★/↩/† 標記）、`PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`（3 處 `plugin_install_runs`→`package_install_runs`、補 `alternativeSlug`／`resolvePaidPlugins`）、`BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`（Phase 1 WizardStep 型別、URL params、smokeProfileFor 位置、接受標準修正）。Phase 0：新建 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts`（36 entries，`resolvePluginStack`／`resolveInstallableSlugs`／`resolvePaidPlugins`，TypeScript SSOT）。`TASKS.md` 補 Phase 1 開工清單（5 必讀檔）。Phase 1（OnboardWizard Step 2 + 新 WizardStep type）明日開始。Commits `5dff4ce`（文件）、`b205f40`（catalog.ts）。
@@ -420,5 +421,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-12 09:46:59 UTC_
+_Last synced: 2026-05-12 10:04:37 UTC_
 
