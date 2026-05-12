@@ -14,6 +14,17 @@
 
 **這份文件可以直接交給 Claude Code 執行。**
 
+### 2026-05-12 Routing Baseline
+
+本文件自 2026-05-12 起以目前正式營運中的通知契約為唯一基準：
+
+- `#infra-alerts`：raw infrastructure / monitor firehose
+- `#ops-incidents`：curated incident channel，供人優先處理
+- `#github-prs`：auto-repair PR 通知
+- Telegram：手機備援通知 + command plane，不是第三套 incident bus
+
+舊版 `#alerts-critical` / `#alerts-info` 設計視為作廢。後續任何代理、文件、workflow、webhook route 都不得重新建立第二套路由中心。
+
 ---
 
 ## 二、你的現有架構（已確認，不可更動）
@@ -67,6 +78,19 @@ EU 機 (204.168.175.41) — 資料 + 工作流
 | 自動 deploy on merge | 多一道人工關卡更安全（`/sg-deploy`）|
 
 > 2026-05-12 修正：Telegram 已經不是「剛裝、無整合」狀態。正式契約是 Slack 做主要分流，Telegram 做手機備援通知與 Command Plane，不新增 Telegram 作為第三套事故資料庫。
+
+### 長期 Invariants
+
+以下規則視為 30 年都不應改變的核心邊界，除非整套通知系統重構：
+
+| Invariant | 定義 |
+|------|------|
+| Ops Inbox 是唯一 curated decision layer | dedup、throttle、severity escalation、reopen 規則只能收斂在這裡 |
+| Slack 是主事故面 | 人工事故處理、Approve、triage 都以 `#ops-incidents` 為準 |
+| Telegram 是手機備援 | 只接人工需要知道的訊號，不承擔主事故路由 |
+| raw 與 curated 必須分層 | raw monitor 可進 `#infra-alerts`；curated incident 必須走 `Ops Inbox -> #ops-incidents` |
+| 降級優先於整體失效 | Telegram 壞掉時 Slack 主線要活著；Ops Inbox 壞掉時 raw infra 仍要能進 `#infra-alerts` |
+| secrets 不出 repo | Slack webhook、Telegram token、chat id、ingest token 不進 git，不複製到不必要的 CI/Action secret |
 
 ---
 
