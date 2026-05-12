@@ -132,14 +132,15 @@
 #### 下一期計畫（未開始）
 
 - [ ] **（下次 AO-RESUME 提醒）AwareWave 自動告警維修系統 v3.2 — 計畫書執行** —— **【未開始】** **計畫書 owner doc**：`docs/awarewave-auto-repair-plan-v3.2-final.md`（v3.2 Final 2026-05-08，33 KB）。**目標**：Sentry／Uptime Kuma／Netdata 偵測到問題 → Slack 推播 → 你按 2 下（Approve + Merge）+ 1 個 `/sg-deploy` 即修復。**3 種告警差別處理**：Sentry→自動修；Kuma→AI 只分析；Netdata→AI 只寫 issue 不修。**4 層保護**：CI 綠勾／中文摘要／部署後 health-check 自動 rollback／Sentry 持續監控。
-  - **Phase 1（你做，30 分鐘）**：建 3 個 Slack 頻道（`#alerts-critical`／`#alerts-info`／`#github-prs`）+ 推播偏好；建 Slack App（拿 Bot Token / Signing Secret / Webhook URL）；GitHub repo 設 4 個 Secrets（`ANTHROPIC_API_KEY`／`SLACK_WEBHOOK_URL`／`SLACK_BOT_TOKEN`／`SLACK_SIGNING_SECRET`）；啟用 main branch protection。
-  - **Phase 2（Claude Code 做，2-3 小時）**：擴充 `app/api/webhooks/sentry/route.ts`（fingerprint dedup + Slack Block Kit）；新增 `webhooks/uptime-kuma`／`webhooks/netdata` route；新增 `app/api/internal/commands/slack/route.ts`（Approve → 備份 → GitHub Issue）；新增 `.github/workflows/auto-repair-claude.yml` + `auto-repair-pr-notify.yml`；補強 `sg-deploy.sh` health-check + Slack 通知；CLAUDE.md 追加自動維修紅線。
+  - **2026-05-12 基線更新**：owner docs 已收斂為 `docs/awarewave-auto-repair-plan-v3.2-final.md` + `docs/awarewave-auto-repair-phase2-handoff.md` + `docs/awarewave-repair-center-app-architecture.md` + `agency-os/docs/operations/slack-notification-routing.md`。**路由基線**：`#infra-alerts` = raw infra、`#ops-incidents` = curated incident、`#github-prs` = PR 通知、Telegram = 手機備援；舊 `#alerts-critical` / `#alerts-info` 已作廢。
+  - **Phase 1（你做，30 分鐘）**：確認既有 `#infra-alerts` / `#ops-incidents`，只新增 `#github-prs`；建 Slack App（Webhook 指向 `#ops-incidents`）；GitHub repo 設 4 個 Secrets（`ANTHROPIC_API_KEY`／`SLACK_WEBHOOK_URL`／`SLACK_BOT_TOKEN`／`SLACK_SIGNING_SECRET`）；**不要**把 Telegram token 放進 GitHub Secrets；驗證 `/api/ops/inbox/health` 顯示 `telegram_notify_enabled=true`；啟用 main branch protection。
+  - **Phase 2（Claude Code 做，2-3 小時）**：擴充 `app/api/webhooks/sentry/route.ts`（fingerprint dedup + Slack Block Kit）；新增 `webhooks/uptime-kuma`／`webhooks/netdata` route；新增 `app/api/internal/commands/slack/route.ts`（Approve → 備份 → GitHub Issue）；新增 `.github/workflows/auto-repair-claude.yml` + `auto-repair-pr-notify.yml`；補強 `sg-deploy.sh` health-check + Slack 通知；CLAUDE.md 追加自動維修紅線；**新增 app 路由骨架**：`app.aware-wave.com/ops/repairs` 作為 Repair Center orchestration layer，不可另建第二套 inbox / approval / deploy UI。
   - **Phase 3（驗收 1 小時）**：22 步端到端（Sentry test error → Slack → Approve → 備份 → Issue → Claude PR → CI → Merge → `/sg-deploy` → health-check → Slack 完成）+ Phase 3-B（rollback drill）+ Phase 3-C（備份失敗阻擋驗收）。
   - **Phase 4（觀察期 30 天）**：每週日 5 分鐘巡檢（重複修同一 bug？`needs-human-review` PR？BACKUP_RESTORE_PROOF 最新一筆超過 7 天？）；每月初 10 分鐘指標複盤。
   - **Phase 5（多客戶擴展 + Dashboard）**：Phase 4 完成後啟動，計畫書第十五節有完整任務清單。
-  - **不衝突宣告**：計畫書 §二明列「不可更動」既有架構（lobster-* 容器、GitHub Actions 4 個 workflow、CLAUDE.md、`system-health-check`、`rollback-phase1.sh`、`backup-eu-stack.sh`、Sentry／Kuma／Netdata、`sg-deploy.sh`、ops console）；不採用 Telegram／n8n Slack 中間層／自動 deploy on merge（多人工關卡更安全）。Telegram Phase 1+2 仍保留（與本計畫並行不互斥）。
+  - **不衝突宣告**：計畫書 §二明列「不可更動」既有架構（lobster-* 容器、GitHub Actions 4 個 workflow、CLAUDE.md、`system-health-check`、`rollback-phase1.sh`、`backup-eu-stack.sh`、Sentry／Kuma／Netdata、`sg-deploy.sh`、ops console）；不採用 n8n Slack 中間層／自動 deploy on merge。Telegram 保留為手機備援通知 + command plane，與本計畫並行但不擔任主 incident bus。
   - **DoD（總）**：(1) Phase 1+2+3 全綠（22 步端到端 PASS）；(2) `BACKUP_RESTORE_PROOF` 含一筆 auto-repair 觸發的 backup ID；(3) Phase 4 第一週巡檢報告；(4) WORKLOG 留 `AUTO_TASK_DONE` evidence。
-  - **下一步建議**：先讀計畫書全文（`Read d:/Work/docs/awarewave-auto-repair-plan-v3.2-final.md`），確認 Phase 1 的 Slack 頻道命名 + Bot 名稱，再開工。
+  - **下一步建議**：先讀計畫書全文（`Read d:/Work/docs/awarewave-auto-repair-plan-v3.2-final.md`）+ handoff brief（`Read d:/Work/docs/awarewave-auto-repair-phase2-handoff.md`），再開始 Phase 1；交代理時兩份一起附上。
 - [ ] **製作外掛包一鍵加入** —— **【未開始】** 將龍蝦工廠／租戶常用的 WordPress 外掛（含 mu-plugins 與第三方授權外掛）打包，提供「一鍵加入新客戶站」的流程，避免每個新案重複下載／設定。**範圍待釐清**（占位，下次討論補 DoD）：(a) 外掛清單來源（哪些必備、哪些選配）；(b) 打包方式（zip／composer.json／wp-cli script／lobster build profile）；(c) 一鍵入口（next-admin `/onboard` 增加按鈕？或 `/build` profile？）；(d) 授權處理（付費外掛 license key 的 secrets 治理路徑，禁明文進 git）；(e) 與既有 `client-onboarding` subagent／MainWP child site 流程的銜接。**Owner doc 待建**。**下一步**：先把上述 (a)–(e) 對齊一輪，再決定要不要開新 owner doc 或直接擴充 `lobster-factory/docs/` 既有文件。
 
 ## Next — 已完成歷程（查詢用）
@@ -369,4 +370,3 @@
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
 _Last synced: 2026-05-12 05:18:40 UTC_
-
