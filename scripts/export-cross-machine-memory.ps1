@@ -116,10 +116,14 @@ Write-Host "  tagged: .exported-by=$($env:COMPUTERNAME)" -ForegroundColor DarkGr
 $secretsRoot = $env:AO_SYNC_SECRETS_ROOT
 if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
 
+    $syncNow = Get-Date
+
     # mcp/user-env.ps1 -> $AO_SYNC_SECRETS_ROOT\user-env.ps1
     $userEnvSrc = Join-Path $WorkRoot "mcp\user-env.ps1"
     if (Test-Path -LiteralPath $userEnvSrc) {
-        Copy-Item -LiteralPath $userEnvSrc -Destination (Join-Path $secretsRoot "user-env.ps1") -Force
+        $userEnvDest = Join-Path $secretsRoot "user-env.ps1"
+        Copy-Item -LiteralPath $userEnvSrc -Destination $userEnvDest -Force
+        (Get-Item -LiteralPath $userEnvDest).LastWriteTime = $syncNow
         Write-Host "  copied: mcp/user-env.ps1" -ForegroundColor Green
     }
 
@@ -132,7 +136,9 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     foreach ($key in $sshKeys) {
         $src = Join-Path $sshSrc $key
         if (Test-Path -LiteralPath $src) {
-            Copy-Item -LiteralPath $src -Destination (Join-Path $sshDest $key) -Force
+            $keyDest = Join-Path $sshDest $key
+            Copy-Item -LiteralPath $src -Destination $keyDest -Force
+            (Get-Item -LiteralPath $keyDest).LastWriteTime = $syncNow
             Write-Host "  copied: .ssh/$key" -ForegroundColor Green
         }
     }
@@ -140,7 +146,9 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     # ~/AWARE_WAVE_CREDENTIALS.md -> $AO_SYNC_SECRETS_ROOT\AWARE_WAVE_CREDENTIALS.md
     $credsSrc = Join-Path $env:USERPROFILE "AWARE_WAVE_CREDENTIALS.md"
     if (Test-Path -LiteralPath $credsSrc) {
-        Copy-Item -LiteralPath $credsSrc -Destination (Join-Path $secretsRoot "AWARE_WAVE_CREDENTIALS.md") -Force
+        $credsDest = Join-Path $secretsRoot "AWARE_WAVE_CREDENTIALS.md"
+        Copy-Item -LiteralPath $credsSrc -Destination $credsDest -Force
+        (Get-Item -LiteralPath $credsDest).LastWriteTime = $syncNow
         Write-Host "  copied: AWARE_WAVE_CREDENTIALS.md" -ForegroundColor Green
     }
 
