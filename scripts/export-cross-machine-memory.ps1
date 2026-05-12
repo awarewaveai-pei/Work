@@ -25,6 +25,18 @@ param(
 
 $today = Get-Date -Format "yyyy-MM-dd"
 
+# Load AO_SYNC_ROOT / AO_SYNC_SECRETS_ROOT from User registry if not in process env.
+# This handles the case where the script is spawned as a subprocess from a terminal
+# session that pre-dates the setx calls that persisted these vars.
+if (-not $env:AO_SYNC_ROOT) {
+    $regVal = [System.Environment]::GetEnvironmentVariable('AO_SYNC_ROOT', 'User')
+    if ($regVal) { $env:AO_SYNC_ROOT = $regVal }
+}
+if (-not $env:AO_SYNC_SECRETS_ROOT) {
+    $regVal = [System.Environment]::GetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'User')
+    if ($regVal) { $env:AO_SYNC_SECRETS_ROOT = $regVal }
+}
+
 # Resolve sync root: param > env var > Google Drive scan > Desktop
 $syncRoot = if ($DestRoot) {
     $DestRoot
