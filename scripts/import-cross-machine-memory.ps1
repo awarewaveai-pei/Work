@@ -1,4 +1,4 @@
-# import-cross-machine-memory.ps1
+﻿# import-cross-machine-memory.ps1
 # Auto-imports MEMORY.md from AO-SYNC-*\ if a newer version is found.
 # Called by ao-resume.ps1 (non-blocking). Silent no-op when no AO-SYNC folder exists.
 #
@@ -19,9 +19,18 @@ param([string]$WorkRoot = "")
 $memDest = "$env:USERPROFILE\.claude\projects\c--Users-USER-Work\memory"
 
 # Build list of directories to search
+# Priority: env var > Google Drive auto-detect (scan G:\ to avoid non-ASCII hardcoding) > Desktop
 $searchRoots = @()
-if ($env:AO_SYNC_ROOT) { $searchRoots += $env:AO_SYNC_ROOT }
-if (Test-Path "G:\我的雲端硬碟\AO-SYNC") { $searchRoots += "G:\我的雲端硬碟\AO-SYNC" }
+if ($env:AO_SYNC_ROOT) {
+    $searchRoots += $env:AO_SYNC_ROOT
+} else {
+    # Auto-detect: scan G:\ for first child directory (avoids hardcoding non-ASCII folder names)
+    if (Test-Path "G:\") {
+        $gdRoot = Get-ChildItem "G:\" -Directory -ErrorAction SilentlyContinue |
+                  Select-Object -First 1 -ExpandProperty FullName
+        if ($gdRoot) { $searchRoots += (Join-Path $gdRoot "AO-SYNC") }
+    }
+}
 $searchRoots += [Environment]::GetFolderPath('Desktop')
 $searchRoots = $searchRoots | Select-Object -Unique
 
