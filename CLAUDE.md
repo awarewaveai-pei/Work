@@ -82,6 +82,7 @@ Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claud
 | `/wp-maintenance` | WordPress 維護入口 |
 | `/decide` | 18 階段多代理決策評審 |
 | `/strategy-review` | 多角度策略決策審查 |
+| `/fix-sidebars` | 修復 Cursor 側邊欄消失（Codex / Claude Code 圖示不見） |
 
 ## Project Subagents（`.claude/agents/`，git 追蹤）
 | Agent | 觸發時機 |

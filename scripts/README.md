@@ -182,6 +182,12 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `rag_seed_and_embedding.ts` | RAG seed and embedding (TypeScript) |
 | `setup-rag-env.ps1` | Set up RAG environment |
 
+## Cursor / IDE Tooling
+
+| Script | Purpose |
+|--------|---------|
+| `fix-cursor-ai-sidebars.mjs` | Patch Codex + Claude Code extension package.json to force activity bar placement; run after sidebar icons vanish |
+
 ---
 
 ## Adding a new script
