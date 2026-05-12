@@ -130,8 +130,17 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
             Write-Host "  cross-machine import: user-env.ps1 updated" -ForegroundColor Green
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $userEnvDest
             Write-Host "  cross-machine import: env vars applied (open a new terminal to inherit)" -ForegroundColor Green
+
+            # Sync updated keys into vault so health check stays at 100%.
+            # Vault (DPAPI) and user-env.ps1 (setx) are separate stores;
+            # this bridges them automatically after every content change.
+            $vaultScript = Join-Path $WorkRoot "scripts\secrets-vault.ps1"
+            if (Test-Path -LiteralPath $vaultScript) {
+                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $vaultScript -Action import-user-env -McpPath $userEnvDest
+                Write-Host "  cross-machine import: vault synced from user-env.ps1" -ForegroundColor Green
+            }
         } else {
-            Write-Host "  cross-machine import: user-env.ps1 unchanged (setx skipped)" -ForegroundColor DarkGray
+            Write-Host "  cross-machine import: user-env.ps1 unchanged (setx + vault skipped)" -ForegroundColor DarkGray
         }
     }
 
