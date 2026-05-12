@@ -43,7 +43,7 @@ export class TelegramNotifier implements Notifier {
     if (errors.length) {
       return { status: "failed", error: errors.join(";") };
     }
-    return { status: "sent", externalRef: chats.join(",") };
+    return { status: "sent", externalRef: `telegram:${chats.length}` };
   }
 }
 
