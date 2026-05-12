@@ -50,6 +50,14 @@
 
 ### 未完成
 
+- [ ] **（筆電必做）AO-SYNC 環境變數設定** —— **【未開始】** 桌機已設好，筆電需要同步設定兩個環境變數才能讓 AO-CLOSE 正確匯出。在筆電 PowerShell 執行：
+  ```powershell
+  [System.Environment]::SetEnvironmentVariable('AO_SYNC_ROOT', 'G:\我的雲端硬碟\EverydayPW\AO-SYNC', 'User')
+  [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'G:\我的雲端硬碟\EverydayPW', 'User')
+  ```
+  設完後測試：`& scripts\export-cross-machine-memory.ps1 -WorkRoot (Get-Location).Path`，應看到 MEMORY.md + user-env.ps1 + SSH keys + AWARE_WAVE_CREDENTIALS.md 全部寫入 EverydayPW。
+  **DoD：** 筆電跑 export 後 `G:\我的雲端硬碟\EverydayPW\` 出現上述四類檔案。
+
 - [x] **（2026-05-08 09:00 TPE 之後驗證）SG drift cron 第一次自動 firing** —— **【AUTO_TASK_DONE_APPLIED 2026-05-08T09:xx TPE】** log: `[2026-05-08T01:00:03Z] alert sent: HTTP 200, behind=7`；cron daemon active/enabled；結案條件已達（drift>0 + HTTP 2xx）。
 - [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】**
   - 📖 **完整步驟讀這個（單一主人）**：[`agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`](docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md) — §0（5 步驗證）+ §5（4 條 Snippets）+ §8（key 上手機 3 方法）

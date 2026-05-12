@@ -85,6 +85,13 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
             Write-Host "  copied: .ssh/$key" -ForegroundColor Green
         }
     }
+    # AWARE_WAVE_CREDENTIALS.md (root of user home)
+    $credsSrc = Join-Path $env:USERPROFILE "AWARE_WAVE_CREDENTIALS.md"
+    if (Test-Path -LiteralPath $credsSrc) {
+        Copy-Item -LiteralPath $credsSrc -Destination (Join-Path $secretsRoot "AWARE_WAVE_CREDENTIALS.md") -Force
+        Write-Host "  copied: AWARE_WAVE_CREDENTIALS.md" -ForegroundColor Green
+    }
+
     Write-Host "== secrets export -> $secretsRoot ==" -ForegroundColor Cyan
 } elseif ($secretsRoot) {
     Write-Host "  AO_SYNC_SECRETS_ROOT set but path not found: $secretsRoot" -ForegroundColor Yellow
