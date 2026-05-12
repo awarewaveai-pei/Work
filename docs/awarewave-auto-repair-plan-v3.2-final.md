@@ -54,17 +54,19 @@ EU 機 (204.168.175.41) — 資料 + 工作流
 | Sentry | ✅ 有在收錯誤 | 需接 webhook |
 | Uptime Kuma | ✅ uptime.aware-wave.com | 需接 webhook |
 | Netdata | ✅ 已設定 | 需接 webhook |
-| Slack workspace | ✅ 已有 #infra-alerts | 需建新頻道 + 設 App |
+| Slack workspace | ✅ 已有 #infra-alerts / #ops-incidents | 只新增 #github-prs；Slack App 綁現有事故路由 |
 | Web ops console | ✅ app.aware-wave.com/ops | 高風險指令核准在這（不動）|
 | sg-deploy.sh | ✅ 已有 | 整合，不重寫 |
+| Telegram bot | ✅ 已有 @awarewave_ops_bot | 保留作手機備援通知與指令入口 |
 
 ### 不使用
 
 | 工具 | 原因 |
 |------|------|
-| Telegram | 剛裝、無整合、多一個維護點 |
 | n8n 做 Slack 中間層 | 直接用 Next.js route 更簡潔、少一個跳轉 |
 | 自動 deploy on merge | 多一道人工關卡更安全（`/sg-deploy`）|
+
+> 2026-05-12 修正：Telegram 已經不是「剛裝、無整合」狀態。正式契約是 Slack 做主要分流，Telegram 做手機備援通知與 Command Plane，不新增 Telegram 作為第三套事故資料庫。
 
 ---
 
@@ -73,7 +75,7 @@ EU 機 (204.168.175.41) — 資料 + 工作流
 ```
 1.  Sentry / Uptime Kuma / Netdata 偵測到問題
                     ↓
-2.  Slack #alerts-critical 收到通知
+2.  Slack #ops-incidents 收到通知；Telegram 收到手機備援（符合嚴重度門檻時）
     （問題摘要 + 嚴重度 + Approve 按鈕）
                     ↓
 3.  ★ 你按「Approve — 叫 AI 修」           ← 你的第 1 下
@@ -333,14 +335,14 @@ pre-repair-20260508-1430-sentry-58291-wp.sql.gz
 
 | 頻道 | 用途 | 通知設定 |
 |------|------|----------|
-| #alerts-critical | Sentry error、Uptime Kuma DOWN、部署失敗 | 每則推播 + 聲音 |
-| #alerts-info | 部署成功、備份完成、一般資訊 | 靜音 |
+| #infra-alerts | endpoint / Netdata / raw infra monitor | 可吵，作為原始監控層 |
+| #ops-incidents | Sentry、Kuma、Grafana、Netdata、PostHog、deploy drift、endpoint secondary | 主要人工事故處理頻道 |
 | #github-prs | Claude 開的 PR 通知 | 只有 @你 才響 |
 
 ### 勿擾時段
 
-Slack 設定 → 勿擾：23:00 — 08:00
-但 #alerts-critical 穿透勿擾。
+Slack 設定 → 勿擾：23:00 — 08:00。
+`#ops-incidents` 和 Telegram bot DM 是需要手機看到的事故面；`#infra-alerts` 不作為人工第一入口。
 
 ### Slack 訊息格式（告警帶按鈕）
 
@@ -383,8 +385,8 @@ POST /api/webhooks/sentry
 POST /api/webhooks/uptime-kuma
   → 驗證 secret
   → 解析 payload
-  → DOWN → 送 #alerts-critical + Approve 按鈕
-  → UP → 送 #alerts-info「✅ 恢復了」
+  → DOWN → 送 #ops-incidents + Telegram 備援 + Approve 按鈕
+  → UP → 送 #ops-incidents「恢復了」
 ```
 
 #### Netdata webhook route
@@ -396,8 +398,8 @@ POST /api/webhooks/uptime-kuma
 POST /api/webhooks/netdata
   → 驗證 secret
   → 解析 payload
-  → critical → #alerts-critical（只有「已讀」按鈕，沒有 Approve）
-  → warning → #alerts-info
+  → critical → #ops-incidents + Telegram 備援（只有「已讀」按鈕，沒有 Approve）
+  → warning → #ops-incidents（依 Telegram 嚴重度門檻決定是否備援）
 ```
 
 ### 10-B. Slack Approve callback → 備份 → GitHub Issue
@@ -547,14 +549,14 @@ for endpoint in "https://app.aware-wave.com" "https://aware-wave.com" "https://a
     bash rollback-phase1.sh
     # Slack 通知
     curl -X POST "$SLACK_WEBHOOK" -H 'Content-Type: application/json' \
-      -d '{"channel":"#alerts-critical","text":"⚠️ 部署失敗，已自動 Rollback"}'
+      -d '{"channel":"#ops-incidents","text":"部署失敗，已自動 Rollback"}'
     exit 1
   fi
 done
 
 # 3. 成功通知
 curl -X POST "$SLACK_WEBHOOK" -H 'Content-Type: application/json' \
-  -d "{\"channel\":\"#alerts-info\",\"text\":\"✅ 部署完成，三個端點全部正常\"}"
+  -d "{\"channel\":\"#ops-incidents\",\"text\":\"部署完成，三個端點全部正常\"}"
 ```
 
 ### 10-F. 完成報告
@@ -631,7 +633,7 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 | 不新建 rollback 腳本 | 已有 rollback-phase1.sh |
 | 不新建備份腳本 | 已有 backup-eu-stack.sh |
 | 不用 n8n 接 Slack | 直接在 Next.js 寫 route |
-| 不用 Telegram | 剛裝、無整合、多一個維護點 |
+| 不把 Telegram 當主要事故匯流排 | Slack/Ops Inbox 是主線；Telegram 只做手機備援與指令入口 |
 | 不做 auto-merge / auto-deploy | /sg-deploy 手動觸發更安全 |
 
 ---
@@ -642,11 +644,12 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 
 | 步驟 | 動作 | 完成標準 |
 |------|------|----------|
-| 1.1 | 在 Slack 建 3 個頻道：#alerts-critical、#alerts-info、#github-prs | 頻道存在 |
-| 1.2 | 設定各頻道通知偏好（critical 推播+聲音、info 靜音、prs 只@提及）| 手機通知設定完成 |
-| 1.3 | 建立 Slack App：拿到 Bot Token + Signing Secret + Webhook URL | 三個值都拿到 |
+| 1.1 | 確認 Slack 已有 #infra-alerts、#ops-incidents；只新建 #github-prs | 不新增 #alerts-critical / #alerts-info，避免通知分裂 |
+| 1.2 | 設定通知偏好：#ops-incidents 推播+聲音，#infra-alerts 視情況靜音，#github-prs 只 @ 提及 | 手機通知設定完成 |
+| 1.3 | 建立 Slack App：拿到 Bot Token + Signing Secret + Webhook URL；Webhook 指向 #ops-incidents | 三個值都拿到 |
 | 1.4 | 在 GitHub repo 設定 4 個 Secrets：ANTHROPIC_API_KEY、SLACK_WEBHOOK_URL、SLACK_BOT_TOKEN、SLACK_SIGNING_SECRET | Secrets 頁面看到 4 個 |
-| 1.5 | 設定 Branch Protection（main branch） | Protection rules 啟用 |
+| 1.5 | 保留 Telegram bot；不要把 Telegram token 加到 GitHub Secrets，Telegram 只在 SG host / next-admin env 作備援 | Telegram DM smoke test 通過 |
+| 1.6 | 設定 Branch Protection（main branch） | Protection rules 啟用 |
 
 ### Phase 2：Claude Code 做（2-3 小時）
 
@@ -666,7 +669,7 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 | # | 測試步驟 | 預期結果 | ✅/❌ |
 |---|----------|----------|-------|
 | 1 | 手動在 Sentry 觸發 test error | Sentry 收到 | |
-| 2 | 等 Slack #alerts-critical | 收到通知 + Approve 按鈕 | |
+| 2 | 等 Slack #ops-incidents | 收到通知 + Approve 按鈕；符合門檻時 Telegram 也收到 | |
 | 3 | 按「✅ Approve — 叫 AI 修」 | 按鈕消失，顯示「處理中」 | |
 | 4 | 等備份 | Slack 顯示「備份完成」 | |
 | 5 | 等 GitHub Issue | Issue 建立，有 auto-repair label | |
@@ -678,7 +681,7 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 | 11 | 在 GitHub 按 Merge | PR merged | |
 | 12 | 在 Slack 打 /sg-deploy | 開始部署 | |
 | 13 | 等 health check | 三個端點都 200 | |
-| 14 | Slack #alerts-info 收到完成報告 | 有結果 + 備份 ID + commit | |
+| 14 | Slack #ops-incidents 收到完成報告 | 有結果 + 備份 ID + commit | |
 | 15 | 在 Sentry 確認 test error 不再出現 | 錯誤消失或被 resolve | |
 
 ### Phase 3-B：驗收 rollback
@@ -687,7 +690,7 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 |---|----------|----------|-------|
 | 16 | 故意部署一個壞的 commit | deploy 成功但 health check 失敗 | |
 | 17 | 等 rollback | rollback-phase1.sh 自動執行 | |
-| 18 | 等 Slack | #alerts-critical 收到「部署失敗，已 Rollback」 | |
+| 18 | 等 Slack | #ops-incidents 收到「部署失敗，已 Rollback」；Telegram 備援收到 | |
 | 19 | 確認網站正常 | 三個端點都 200（回到上一版）| |
 
 ### Phase 3-C：驗收備份失敗阻擋
@@ -773,7 +776,7 @@ create table incidents_config (
   auto_repair_enabled boolean default false,
   deploy_command text,                   -- '/client-a-deploy' 或 null
   backup_script_path text,              -- '/root/scripts/backup-client-a.sh' 或 null
-  slack_channel text default '#alerts-critical',
+  slack_channel text default '#ops-incidents',
   notes text,                            -- 備註
   is_active boolean default true,
   created_at timestamptz default now(),
@@ -832,7 +835,7 @@ Sentry webhook 進來
   → 從 payload 取出 sentry_project
   → 查 incidents_config：哪個客戶？
   → 找到 → 帶客戶名稱的 Slack 通知
-  → 找不到 → 送 #alerts-info「未知 Sentry project，請檢查設定」
+  → 找不到 → 送 #ops-incidents「未知 Sentry project，請檢查設定」
 
 Slack 訊息格式：
   🚨 *[客戶A] Sentry Error*

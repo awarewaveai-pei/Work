@@ -15,7 +15,7 @@
 
 ## 自動化節奏
 - n8n 工作流：Phase 2（詢問表單 → email 通知 → CRM）
-- 失敗重試與告警：Uptime Kuma → Ops Inbox → Slack `#infra-alerts`
+- 失敗重試與告警：Uptime Kuma → Ops Inbox → Slack `#ops-incidents`
 - API 用量與成本：依實際整合後評估
 
 ## 成長里程碑（初估）

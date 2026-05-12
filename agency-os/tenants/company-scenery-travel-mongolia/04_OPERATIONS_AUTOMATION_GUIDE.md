@@ -11,7 +11,7 @@
 - 保留：30 天
 
 ## 通知流程
-- 主機告警 → Uptime Kuma → Ops Inbox → Slack `#infra-alerts`
+- 主機告警 → Uptime Kuma → Ops Inbox → Slack `#ops-incidents`
 - 備份失敗 → UpdraftPlus email → Agency OS 主要聯絡人
 
 ## 未來自動化（Phase 2）

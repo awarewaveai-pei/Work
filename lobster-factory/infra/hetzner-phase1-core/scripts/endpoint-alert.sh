@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# AwareWave public endpoint check + Slack/PagerDuty alerter (systemd oneshot, fired every minute).
+# AwareWave public endpoint check + Slack/PagerDuty/Telegram alerter (systemd oneshot, fired every minute).
 #
 # Design rules:
 #  1. State file is the source of truth for dedup. It MUST be persisted before any
-#     side effect (Slack / PagerDuty / heartbeat) so a side-effect crash cannot
+#     side effect (Slack / PagerDuty / Telegram / heartbeat) so a side-effect crash cannot
 #     regress the state machine and re-trigger the same alert.
 #  2. Same set of failing URLs => same fingerprint => one Slack message, not many.
 #     Only a different fingerprint (or transition to/from ok) re-notifies.
@@ -24,6 +24,9 @@ WEBHOOK_URL="${WEBHOOK_URL:-}"
 CHECK_URLS="${CHECK_URLS:-https://aware-wave.com/ https://app.aware-wave.com/ https://api.aware-wave.com/health https://n8n.aware-wave.com/healthz https://trigger.aware-wave.com/ https://uptime.aware-wave.com/dashboard}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-12}"
 HEARTBEAT_URL="${HEARTBEAT_URL:-}"
+TELEGRAM_NOTIFY_ENABLED="${TELEGRAM_NOTIFY_ENABLED:-false}"
+TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+TELEGRAM_ALLOWED_CHAT_IDS="${TELEGRAM_ALLOWED_CHAT_IDS:-}"
 
 # Optional: PagerDuty Events API v2 integration key.
 PAGERDUTY_ROUTING_KEY="${PAGERDUTY_ROUTING_KEY:-}"
@@ -131,6 +134,26 @@ except urllib.error.HTTPError as e:
 PY
 }
 
+send_telegram() {
+  local text="$1"
+  local enabled
+  enabled="$(printf '%s' "${TELEGRAM_NOTIFY_ENABLED}" | tr '[:upper:]' '[:lower:]')"
+  [[ "${enabled}" == "true" || "${enabled}" == "1" || "${enabled}" == "yes" || "${enabled}" == "on" ]] || return 0
+  [[ -n "${TELEGRAM_BOT_TOKEN}" && -n "${TELEGRAM_ALLOWED_CHAT_IDS}" ]] || return 0
+
+  local chat_id
+  for chat_id in ${TELEGRAM_ALLOWED_CHAT_IDS//,/ }; do
+    [[ -z "${chat_id}" ]] && continue
+    curl -sS -o /dev/null -w "" \
+      -X POST \
+      -H 'Content-Type: application/x-www-form-urlencoded' \
+      --data-urlencode "chat_id=${chat_id}" \
+      --data-urlencode "text=${text}" \
+      --data-urlencode "disable_web_page_preview=true" \
+      "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" 2>/dev/null || true
+  done
+}
+
 # Heartbeat is observability for THIS alerter. Must NEVER take down the alerter.
 # No -f: HTTP non-2xx is logged as a warning but does not affect exit status.
 send_heartbeat() {
@@ -207,6 +230,7 @@ if [[ "${notify}" == "true" ]]; then
   if [[ "${new_kind}" == "ok" ]]; then
     msg=":white_check_mark: [aware-wave endpoint recovered] ${host} ${ts}"
     send_webhook "${msg}"
+    send_telegram "${msg}"
     send_pagerduty "resolve" "[aware-wave] public endpoint check recovered (${host})" ""
   else
     prefix=":rotating_light:"
@@ -214,6 +238,7 @@ if [[ "${notify}" == "true" ]]; then
     msg="$(printf '%s [aware-wave endpoint alert] %s %s\n' "${prefix}" "${host}" "${ts}")$(printf '%s\n' "${fail_lines[@]}")"
     detail_text="$(printf '%s\n' "${fail_lines[@]}")"
     send_webhook "${msg}"
+    send_telegram "${msg}"
     # Reminders do not re-trigger PagerDuty (the incident is already open;
     # PagerDuty's own dedup_key would absorb it anyway).
     if [[ "${notify_kind}" != "alert-reminder" ]]; then

@@ -27,9 +27,9 @@
 
 | 工具 | 角色 | 國外能用？ |
 |------|------|---------|
-| **Telegram bot** `@awarewave_ops_bot` | 🎮 遙控器（你下指令）| ✅ 任何網路 |
-| **Slack** `#ops` | 📢 對講機（系統通知你）| ✅ |
-| **Telegram bot DM**（自 2026-05-08 起，雙通道冗餘） | 📢 對講機備用 — drift cron 同時也發到這 | ✅ Slack 漫遊 / 靜音時的保險 |
+| **Telegram bot** `@awarewave_ops_bot` | 遙控器（你下指令）+ 手機備援通知 | ✅ 任何網路 |
+| **Slack** `#infra-alerts` / `#ops-incidents` | 系統主要通知面；`#ops-incidents` 是人工第一入口 | ✅ |
+| **Telegram bot DM** | 對講機備用：endpoint 掛掉/恢復、deploy drift、Ops Inbox 中高優先事故 | ✅ Slack 漫遊 / 靜音時的保險 |
 | **Web ops console**（`app.aware-wave.com/ops/...`）| 🛠️ 工具箱（複雜操作 + 高風險簽核）| ✅ 手機瀏覽器 + Clerk SSO 登入 |
 | **Termius**（手機 SSH）| 🔧 螺絲起子（部署、看 log、跑腳本）| ✅ 任何網路 |
 
@@ -40,7 +40,7 @@
 ## 2. 緊急 SOP（出事按順序試）
 
 ```
-Slack 推播警報
+Slack #ops-incidents 或 Telegram 推播警報
         ↓
 ① 手機 Telegram /status
         ↓ 看狀況

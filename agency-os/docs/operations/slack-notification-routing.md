@@ -1,0 +1,108 @@
+# Slack and Telegram Notification Routing
+
+This is the current AwareWave notification contract. Keep this page aligned with:
+
+- `scripts/sync-hetzner-slack-alert-webhooks.ps1`
+- `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`
+- `lobster-factory/infra/hetzner-phase1-core/scripts/check-drift-and-alert.sh`
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/notify/*`
+
+## Channel Contract
+
+| Channel | Role | Expected producers | Notes |
+| --- | --- | --- | --- |
+| `#infra-alerts` | Tier 1 firehose for infrastructure signals | endpoint-alert, Netdata direct Slack, Grafana contact point, other raw infra monitors | Noisy is acceptable. This channel must not depend on Ops Inbox being healthy. |
+| `#ops-incidents` | Tier 2 curated incident stream | endpoint-alert secondary webhook, SG deploy drift, Ops Inbox notifications | Deduped/throttled where possible. This is the channel humans should triage first. |
+
+Telegram is not a third Slack channel. It is the phone backup for operator-critical signals:
+
+| Surface | Role | Expected producers | Notes |
+| --- | --- | --- | --- |
+| Telegram bot DM | Phone backup and command plane | endpoint-alert, SG deploy drift, Ops Inbox notifications, Telegram command ingress | Use only for human-actionable signals. It must not become the raw firehose. |
+
+Do not route Ops Inbox notifications back into `#infra-alerts`. A monitor may feed both layers from the same source event, but the direction must stay one-way:
+
+```text
+raw monitor -> #infra-alerts
+raw monitor -> Ops Inbox -> #ops-incidents
+```
+
+This avoids notification loops, duplicate fan-out, and ambiguous ownership.
+
+## Current Producers
+
+### endpoint-alert
+
+- Checks the public URL set in `CHECK_URLS`.
+- Sends failure/recovery to `WEBHOOK_URL` (`#infra-alerts`).
+- Also sends the same failure/recovery to `OPS_INCIDENTS_WEBHOOK_URL` (`#ops-incidents`) when configured.
+- Also sends the same failure/recovery to Telegram when `/etc/default/awarewave-endpoint-alert.telegram` sets `TELEGRAM_NOTIFY_ENABLED=true`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_ALLOWED_CHAT_IDS`.
+- State lives under `/var/lib/awarewave-alert` to dedupe repeated identical failures.
+
+### Netdata
+
+- Direct Slack path: Netdata sends host-level alerts to `#infra-alerts`.
+- Secondary curated path: Netdata `custom_sender()` calls `/usr/local/bin/netdata-ops-inbox-notify.sh`, which posts to `/api/webhooks/netdata`; Ops Inbox then notifies `#ops-incidents`.
+- Secrets live in `/etc/netdata/ops-inbox-webhook.env`, owned `root:netdata` with mode `0640`.
+
+### Ops Inbox
+
+- Accepts Sentry, Grafana, Uptime Kuma, Netdata, and PostHog webhooks.
+- Sends to `#ops-incidents` via `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`.
+- Sends a phone backup to Telegram when `OPS_INBOX_TELEGRAM_NOTIFY_ENABLED=true`.
+- Telegram minimum severity is `OPS_INBOX_TELEGRAM_NOTIFY_MIN_SEVERITY` and defaults to `medium`.
+- Telegram uses `OPS_INBOX_TELEGRAM_CHAT_IDS`, or falls back to `TELEGRAM_ALLOWED_CHAT_IDS`.
+- Notification rules:
+  - new incident: send
+  - severity escalation: send
+  - reopened incident: send
+  - duplicate: send only after the throttle window
+  - development environment: skip
+  - ignored incident: skip
+
+### SG deploy drift
+
+- Cron runs `/root/lobster-phase1/scripts/check-drift-and-alert.sh` daily at `01:00 UTC` (`09:00 Asia/Taipei`).
+- Alerts when production is at least one commit behind `origin/main`.
+- Posts to the primary Slack webhook, independently to `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`, and to Telegram when the Telegram bot env is present.
+
+## Health Contract
+
+`/api/ops/probe` is the liveness heartbeat for Ops Inbox ingest. It upserts `ops_health_probes('ops-inbox')`.
+
+`/api/ops/inbox/health` must read that probe row, not the latest incident. A healthy system can have zero incidents for days.
+
+SG cron should call `/api/ops/probe` every 30 minutes. Health is expected to return:
+
+```json
+{
+  "ok": true,
+  "ingest_fresh": true,
+  "probe_status": "ok"
+}
+```
+
+## Validation
+
+Run on SG:
+
+```bash
+/root/lobster-phase1/scripts/slack-alert-drill.sh
+curl -fsS https://app.aware-wave.com/api/ops/inbox/health
+```
+
+Expected:
+
+- `#infra-alerts` receives endpoint/Netdata drill messages.
+- `#ops-incidents` receives endpoint secondary and Ops Inbox Netdata drill messages.
+- Telegram receives endpoint failures/recoveries and curated Ops Inbox incidents at or above the configured severity.
+- `/api/ops/inbox/health` returns HTTP 200.
+
+## Invariants
+
+- Never commit Slack webhook URLs or ingest tokens.
+- Never commit Telegram bot tokens or chat IDs.
+- Sync scripts must recreate both Netdata routes, not only the Slack route.
+- Keep `/etc/default/awarewave-endpoint-alert.local` as the operator override file for secondary webhook, custom `CHECK_URLS`, heartbeat, and renotify settings.
+- Keep `/etc/default/awarewave-endpoint-alert.telegram` as the host-local phone backup secret file.
+- Treat `#infra-alerts` as raw signal durability and `#ops-incidents` as human triage quality.

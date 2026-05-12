@@ -98,6 +98,7 @@
 | 說明 | 檔案 |
 |:---|:---|
 | **Ops Inbox 操作手冊**（UI 流程、AI 診斷、Webhook 端點） | [ops-inbox-user-guide.md](ops-inbox-user-guide.md) |
+| **Slack 通知路由契約**（`#infra-alerts` / `#ops-incidents` 分層、驗證、不可混流規則） | [slack-notification-routing.md](slack-notification-routing.md) |
 | 事件應變（分級、SLA、RCA 格式） | [RUNBOOK_INCIDENT_RESPONSE.md](RUNBOOK_INCIDENT_RESPONSE.md) |
 | Production Pilot A | [PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md](PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md) |
 | Production Pilot B | [PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md](PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md) |

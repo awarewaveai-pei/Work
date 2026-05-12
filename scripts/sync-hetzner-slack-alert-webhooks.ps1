@@ -6,7 +6,9 @@
 .DESCRIPTION
   Writes /etc/default/awarewave-endpoint-alert (just WEBHOOK_URL +
   TIMEOUT_SEC) and /etc/netdata/health_alarm_notify.conf, then restarts
-  Netdata + the endpoint-alert oneshot.
+  Netdata + the endpoint-alert oneshot. Netdata keeps the primary Slack route
+  for #infra-alerts and also feeds Ops Inbox so #ops-incidents receives the
+  same curated incident stream.
 
   Single-source design (2026-05-08 refactor):
     - CHECK_URLS is NOT written here. The endpoint-alert.sh built-in default
@@ -16,7 +18,8 @@
     - HEARTBEAT_URL belongs in .local too — managed by
       scripts/sync-hetzner-endpoint-alert-heartbeat.ps1.
     - This sync is now narrowly scoped to "Slack webhook + Netdata Slack
-      transport" — no overlap with any other sync.
+      transport + Netdata -> Ops Inbox secondary route" — no overlap with any
+      other sync.
 
 .PARAMETER VaultSecretName
   Vault key. Default: AGENCY_OS_SLACK_WEBHOOK_URL.
@@ -74,10 +77,112 @@ umask 077
 {
   printf '%s\n' 'SEND_SLACK="YES"'
   printf '%s\n' "SLACK_WEBHOOK_URL=\"${HOOK}\""
-  printf '%s\n' 'DEFAULT_RECIPIENT_SLACK="#"'
+  printf '%s\n' 'DEFAULT_RECIPIENT_SLACK="#infra-alerts"'
+  printf '%s\n' ''
+  printf '%s\n' '# AwareWave Ops Inbox custom notification (secondary route to #ops-incidents).'
+  printf '%s\n' '# Keep Slack configured above for #infra-alerts; this custom sender feeds Ops Inbox.'
+  printf '%s\n' 'SEND_CUSTOM="YES"'
+  printf '%s\n' 'DEFAULT_RECIPIENT_CUSTOM="ops-inbox"'
+  cat <<'NETDATA_CUSTOM_SENDER'
+custom_sender() {
+  env \
+    status="${status:-}" \
+    old_status="${old_status:-}" \
+    host="${host:-}" \
+    args_host="${args_host:-}" \
+    alarm="${alarm:-}" \
+    name="${name:-}" \
+    chart="${chart:-}" \
+    value="${value:-}" \
+    value_string="${value_string:-}" \
+    old_value="${old_value:-}" \
+    old_value_string="${old_value_string:-}" \
+    info="${info:-}" \
+    severity="${severity:-}" \
+    status_message="${status_message:-}" \
+    raised_for="${raised_for:-}" \
+    unique_id="${unique_id:-}" \
+    alarm_id="${alarm_id:-}" \
+    event_id="${event_id:-}" \
+    when="${when:-}" \
+    goto_url="${goto_url:-}" \
+    /usr/local/bin/netdata-ops-inbox-notify.sh || true
+}
+NETDATA_CUSTOM_SENDER
 } > /etc/netdata/health_alarm_notify.conf
 chown root:netdata /etc/netdata/health_alarm_notify.conf
 chmod 640 /etc/netdata/health_alarm_notify.conf
+
+cat > /usr/local/bin/netdata-ops-inbox-notify.sh <<'NETDATA_OPS_INBOX_NOTIFY'
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENV_FILE="/etc/netdata/ops-inbox-webhook.env"
+if [[ -f "${ENV_FILE}" ]]; then
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+fi
+
+: "${OPS_INBOX_INGEST_TOKEN:=}"
+: "${OPS_INBOX_WEBHOOK_URL:=https://app.aware-wave.com/api/webhooks/netdata}"
+
+if [[ -z "${OPS_INBOX_INGEST_TOKEN}" ]]; then
+  echo "netdata-ops-inbox-notify: OPS_INBOX_INGEST_TOKEN missing" >&2
+  exit 0
+fi
+
+payload="$(python3 - <<'PY'
+import json, os, time
+
+def env(name, default=""):
+    return os.environ.get(name, default)
+
+alarm = env("alarm") or env("name")
+value_string = env("value_string") or env("value")
+payload = {
+    "status": env("status", "UNKNOWN"),
+    "old_status": env("old_status"),
+    "host": env("host") or env("args_host") or "unknown-host",
+    "alarm": alarm or "unknown-alarm",
+    "name": env("name"),
+    "chart": env("chart"),
+    "value": env("value"),
+    "value_string": value_string,
+    "old_value": env("old_value"),
+    "old_value_string": env("old_value_string"),
+    "info": env("info") or env("status_message") or "Netdata notification",
+    "severity": env("severity"),
+    "status_message": env("status_message"),
+    "raised_for": env("raised_for"),
+    "unique_id": env("unique_id") or f"netdata-{int(time.time())}",
+    "alarm_id": env("alarm_id"),
+    "event_id": env("event_id"),
+    "when": env("when"),
+    "goto_url": env("goto_url"),
+    "source": "netdata-custom-sender",
+}
+print(json.dumps(payload, ensure_ascii=False))
+PY
+)"
+
+curl -sS -o /dev/null -w '%{http_code}' \
+  -X POST \
+  -H "Authorization: Bearer ${OPS_INBOX_INGEST_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  --data "${payload}" \
+  "${OPS_INBOX_WEBHOOK_URL}" | grep -Eq '^2' || true
+NETDATA_OPS_INBOX_NOTIFY
+chown root:root /usr/local/bin/netdata-ops-inbox-notify.sh
+chmod 755 /usr/local/bin/netdata-ops-inbox-notify.sh
+
+OPS_TOKEN="$(grep -E '^OPS_INBOX_INGEST_TOKEN=' /root/lobster-phase1/.env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' ')"
+install -o root -g netdata -m 0640 /dev/null /etc/netdata/ops-inbox-webhook.env
+{
+  printf '%s\n' "OPS_INBOX_INGEST_TOKEN=${OPS_TOKEN}"
+  printf '%s\n' 'OPS_INBOX_WEBHOOK_URL=https://app.aware-wave.com/api/webhooks/netdata'
+} > /etc/netdata/ops-inbox-webhook.env
+chown root:netdata /etc/netdata/ops-inbox-webhook.env
+chmod 640 /etc/netdata/ops-inbox-webhook.env
 
 systemctl restart netdata
 

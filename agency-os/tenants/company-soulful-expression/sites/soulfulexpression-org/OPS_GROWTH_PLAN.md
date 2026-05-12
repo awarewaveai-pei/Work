@@ -12,7 +12,7 @@
 
 ## 自動化節奏
 - n8n 工作流：待設定（諮詢表單通知、預約確認）
-- 失敗重試與告警：Ops Inbox → Slack `#infra-alerts`
+- 失敗重試與告警：Ops Inbox → Slack `#ops-incidents`
 - API 用量與成本：待補（依實際整合決定）
 
 ## 國際化路線圖
