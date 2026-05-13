@@ -13,7 +13,7 @@ function toRole(value: string | null | undefined): OpsRole | null {
 }
 
 function shouldAllowSimulatedFallback(): boolean {
-  return process.env.OPS_ALLOW_SIMULATED_ROLE_FALLBACK !== "false";
+  return process.env.OPS_ALLOW_SIMULATED_ROLE_FALLBACK === "true";
 }
 
 function isProductionLike(): boolean {

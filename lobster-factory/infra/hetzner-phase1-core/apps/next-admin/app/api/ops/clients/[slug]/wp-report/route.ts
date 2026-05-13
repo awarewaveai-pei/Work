@@ -14,6 +14,7 @@ import {
   getSupabaseServerClient,
   getSupabaseWriteClient,
 } from "../../../../../../lib/supabase-server";
+import { timingSafeEqual } from "../../../../../../lib/ops-inbox/verifyIngestToken";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +29,8 @@ function isAuthorized(request: Request): boolean {
   if (canModifyIncidentStatus(role)) return true;
 
   // Path 2: script sends X-Ops-Sync-Key matching OPS_PROXY_SHARED_SECRET
-  const syncKey = request.headers.get("x-ops-sync-key");
-  return !!(SYNC_KEY && syncKey === SYNC_KEY);
+  const syncKey = request.headers.get("x-ops-sync-key") ?? "";
+  return !!(SYNC_KEY && timingSafeEqual(syncKey, SYNC_KEY));
 }
 
 export async function POST(

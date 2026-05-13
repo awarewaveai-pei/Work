@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "../../../../lib/supabase-server";
+import { resolveOpsRole, canWriteTenantConfig } from "../../../../lib/ops-role";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,11 @@ interface OrgCreateBody {
 }
 
 export async function POST(req: NextRequest) {
+  const { role } = resolveOpsRole(req);
+  if (!canWriteTenantConfig(role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
   const supabase = getSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });

@@ -8,18 +8,16 @@
 
 import { NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { verifyIngestToken } from "@/lib/ops-inbox/verifyIngestToken";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const token = process.env.OPS_INBOX_INGEST_TOKEN?.trim();
-  const auth = req.headers.get("authorization") ?? "";
-
-  if (!token) {
+  if (!process.env.OPS_INBOX_INGEST_TOKEN?.trim()) {
     return NextResponse.json({ ok: false, error: "probe_not_configured" }, { status: 503 });
   }
-  if (auth !== `Bearer ${token}`) {
+  if (!verifyIngestToken(req)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
