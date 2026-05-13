@@ -9,6 +9,14 @@ import { notFound } from "next/navigation";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
 import { WpUpdateButtons } from "./WpUpdateButtons";
+import { DepartmentCoveragePanel } from "./DepartmentCoveragePanel";
+import type { DepartmentSummaryPayload } from "@/app/api/ops/clients/[slug]/department-summary/route";
+import {
+  DEPARTMENT_CATALOG,
+  SMB_DEFAULT_CLUSTERS,
+  GROUP_LABELS,
+  type ClusterId,
+} from "@/lib/department-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -64,8 +72,8 @@ export default async function ClientDetailPage({
   const cfg = ((org.metadata as Record<string, unknown>)?.client_config as ClientConfig) ?? {};
   const wp = ((org.metadata as Record<string, unknown>)?.wp_update_latest as WpUpdateLatest) ?? null;
 
-  // Parallel: health probe + last 10 workflow runs for this org
-  const [health, runsResult] = await Promise.all([
+  // Parallel: health probe + last 10 workflow runs + initial plugin installs
+  const [health, runsResult, installRunsResult] = await Promise.all([
     probeHealth(cfg.site_url),
     supabase
       .from("ops_action_runs")
@@ -73,9 +81,68 @@ export default async function ClientDetailPage({
       .eq("organization_id", org.id)
       .order("started_at", { ascending: false })
       .limit(10),
+    supabase
+      .from("package_install_runs")
+      .select("id,status,result_summary,created_at")
+      .eq("organization_id", org.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
   ]);
 
+  // ── M3: compute department coverage (server-side, no extra fetch) ──────────
+  const selectedIds: ClusterId[] = Array.isArray(cfg.department_selection)
+    ? (cfg.department_selection as ClusterId[])
+    : [];
+  const activeSet = new Set(selectedIds);
+  const deptSummary: DepartmentSummaryPayload = (() => {
+    type EnterpriseTier = "not_configured" | "smb" | "growth" | "enterprise";
+    const computeTier = (n: number, ids: ClusterId[]): EnterpriseTier => {
+      if (n === 0) return "not_configured";
+      const cross = ids.some((id) => ["CLU_TAX_TRADE", "CLU_LEGAL", "CLU_REGIONAL"].includes(id));
+      if (n >= 14 || cross) return "enterprise";
+      if (n >= 8) return "growth";
+      return "smb";
+    };
+    type GroupKey = (typeof DEPARTMENT_CATALOG)[0]["group"];
+    const groupMap = new Map<GroupKey, { groupKey: GroupKey; groupLabel: string; total: number; active: number; clusters: unknown[] }>();
+    for (const cluster of DEPARTMENT_CATALOG) {
+      const g = cluster.group;
+      if (!groupMap.has(g)) groupMap.set(g, { groupKey: g, groupLabel: GROUP_LABELS[g], total: 0, active: 0, clusters: [] });
+      const ge = groupMap.get(g)!;
+      ge.clusters.push({
+        clusterId: cluster.clusterId, label: cluster.label, group: g,
+        active: activeSet.has(cluster.clusterId),
+        matrixRows: cluster.matrixRows,
+        requiredTemplateFiles: cluster.templateFiles.filter((f) => f.mandatoryFields?.length).map((f) => f.path),
+        recommendedTemplateFiles: cluster.templateFiles.filter((f) => f.recommendedFields?.length).map((f) => f.path),
+      });
+      ge.total += 1;
+      if (activeSet.has(cluster.clusterId)) ge.active += 1;
+    }
+    const matrixRowsCovered = Array.from(new Set(DEPARTMENT_CATALOG.filter((c) => activeSet.has(c.clusterId)).flatMap((c) => c.matrixRows)));
+    const allRequiredTemplateFiles = Array.from(new Set(DEPARTMENT_CATALOG.filter((c) => activeSet.has(c.clusterId)).flatMap((c) => c.templateFiles.filter((f) => f.mandatoryFields?.length).map((f) => f.path))));
+    const isDefaultSelection = selectedIds.length === SMB_DEFAULT_CLUSTERS.length && SMB_DEFAULT_CLUSTERS.every((id) => activeSet.has(id));
+    return {
+      slug: org.slug, name: org.name,
+      activeCount: selectedIds.length, totalCount: 20 as const,
+      coveragePercent: Math.round((selectedIds.length / 20) * 100),
+      enterpriseTier: computeTier(selectedIds.length, selectedIds),
+      activeClusterIds: selectedIds,
+      inactiveClusterIds: DEPARTMENT_CATALOG.filter((c) => !activeSet.has(c.clusterId)).map((c) => c.clusterId),
+      byGroup: Array.from(groupMap.values()) as DepartmentSummaryPayload["byGroup"],
+      matrixRowsCovered, allRequiredTemplateFiles, isDefaultSelection,
+      lastReviewedAt: cfg.department_selection_reviewed_at ?? null,
+    };
+  })();
+
   const runs = runsResult.data ?? [];
+
+  // Partition initial plugin install results
+  type InstallRunSummary = { plugin_slug?: string; status?: string; version?: string | null; error_message?: string | null };
+  const installRuns = (installRunsResult.data ?? []) as Array<{ id: string; status: string; result_summary: unknown; created_at: string | null }>;
+  const pluginInstalled = installRuns.filter(r => (r.result_summary as InstallRunSummary)?.status === "installed");
+  const pluginSkipped   = installRuns.filter(r => (r.result_summary as InstallRunSummary)?.status === "skipped_license");
+  const pluginFailed    = installRuns.filter(r => (r.result_summary as InstallRunSummary)?.status === "failed");
 
   // Partition WP results
   const updated = wp?.results?.filter((r) => r.status === "updated") ?? [];
@@ -137,6 +204,41 @@ export default async function ClientDetailPage({
               slug={org.slug}
               waves={cfg.waves ?? {}}
             />
+          )}
+
+          {/* Initial plugin install card */}
+          {cfg.platform === "wordpress" && (
+            <Section title="初始外掛堆疊安裝" badge={installRuns.length > 0 ? `${installRuns.length} 筆` : "尚無記錄"} style={{ marginBottom: 16 }}>
+              {installRuns.length === 0 ? (
+                <NoData>尚未執行初始安裝（透過 Onboard Wizard 觸發 Build 後自動安裝）</NoData>
+              ) : (
+                <>
+                  <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+                    <SummaryMetric label="已安裝" value={pluginInstalled.length} color="#16a34a" />
+                    <SummaryMetric label="需手動授權" value={pluginSkipped.length} color="#ca8a04" />
+                    <SummaryMetric label="失敗" value={pluginFailed.length} color="#dc2626" />
+                  </div>
+                  {pluginInstalled.length > 0 && (
+                    <>
+                      <SubTitle>✅ 已安裝</SubTitle>
+                      <PluginInstallTable rows={pluginInstalled.map(r => r.result_summary as InstallRunSummary)} statusColor="#16a34a" />
+                    </>
+                  )}
+                  {pluginSkipped.length > 0 && (
+                    <>
+                      <SubTitle style={{ marginTop: 12 }}>⚠️ 需手動授權（付費外掛）</SubTitle>
+                      <PluginInstallTable rows={pluginSkipped.map(r => r.result_summary as InstallRunSummary)} statusColor="#ca8a04" />
+                    </>
+                  )}
+                  {pluginFailed.length > 0 && (
+                    <>
+                      <SubTitle style={{ marginTop: 12 }}>❌ 安裝失敗</SubTitle>
+                      <PluginInstallTable rows={pluginFailed.map(r => r.result_summary as InstallRunSummary)} statusColor="#dc2626" />
+                    </>
+                  )}
+                </>
+              )}
+            </Section>
           )}
 
           {/* Plugin update card */}
@@ -235,6 +337,11 @@ export default async function ClientDetailPage({
               </div>
             )}
           </Section>
+
+          {/* M3: Department coverage panel */}
+          <div style={{ marginTop: 16 }}>
+            <DepartmentCoveragePanel summary={deptSummary} />
+          </div>
         </div>
 
         {/* ── Right sidebar: links + raw config ─────────────────── */}
@@ -432,6 +539,42 @@ function NoData({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "12px 0", lineHeight: 1.7 }}>
       {children}
+    </div>
+  );
+}
+
+function PluginInstallTable({
+  rows,
+  statusColor,
+}: {
+  rows: Array<{ plugin_slug?: string; version?: string | null; error_message?: string | null }>;
+  statusColor: string;
+}) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+            {["外掛 Slug", "版本 / 說明"].map((h) => (
+              <th key={h} style={{ textAlign: "left", padding: "5px 8px", color: "var(--text-muted)", fontWeight: 500 }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.plugin_slug ?? i} style={{ borderBottom: "1px solid #f8fafc" }}>
+              <td style={{ padding: "5px 8px", fontFamily: "monospace", fontSize: 11, color: statusColor, fontWeight: 600 }}>
+                {r.plugin_slug ?? "—"}
+              </td>
+              <td style={{ padding: "5px 8px", color: "var(--text-muted)", fontSize: 11 }}>
+                {r.version ?? (r.error_message ? r.error_message.slice(0, 80) : "—")}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

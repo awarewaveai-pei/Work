@@ -5,6 +5,10 @@
 > Version: **v1.0 — Day 0 ready**
 > Companion to: `docs/Ops_Observability_PathB_Plan.md` v2.0
 > Last sync: 2026-04-27
+>
+> Current routing note (2026-05-12): Tier 1 is `#infra-alerts`, Tier 2 is
+> `#ops-incidents`. The authoritative current contract is
+> `agency-os/docs/operations/slack-notification-routing.md`.
 
 ---
 
@@ -72,7 +76,7 @@
    吃使用者既有 Plus/Pro 訂閱。唯一新增依賴 = @google/generative-ai（Gemini Free）。
 
 5. Slack 通知走兩層拓撲：
-   - 既有 #alerts-infra（Tier 1 firehose，Netdata/Kuma 直連）— 永遠不動
+   - 既有 #infra-alerts（Tier 1 firehose，Netdata/Kuma 直連）— 永遠不動
    - 新建 #ops-incidents（Tier 2 curated，Inbox 專用）
    兩層永不混流。
 
@@ -89,7 +93,7 @@ URL（UI）:    /ops/inbox, /ops/inbox/[id]
 Files:        apps/next-admin/lib/ops-inbox/**
 Env vars:     OPS_INBOX_*（所有 inbox 專屬變數一律此前綴；既有變數沿用）
 TS types:     apps/next-admin/lib/ops-inbox/types.ts（不放 packages/shared）
-Slack:        #ops-incidents（Tier 2，新）；#alerts-infra（Tier 1，既有不動）
+Slack:        #ops-incidents（Tier 2，新）；#infra-alerts（Tier 1，既有不動）
 ```
 
 ### 1.4 既有檔的「角色」與「可不可動」
@@ -228,7 +232,7 @@ OPS_INBOX_POSTHOG_ENABLED          # "false"（v1 預設關）
 
 - [ ] `next-admin` 本地 `npm run dev` 起得來，`/api-check` 綠燈
 - [ ] Supabase awarewave 連得上、service role key 有效（`/rest/v1/` 200，能 GET `workflow_runs`）
-- [ ] Slack `#alerts-infra` 過去 24h 內有 Netdata 訊息（驗證 Tier 1 firehose 仍正常）
+- [ ] Slack `#infra-alerts` 過去 24h 內有 Netdata 訊息（驗證 Tier 1 firehose 仍正常）
 - [ ] Slack `#ops-incidents` 已建立、webhook smoke test 過（中文不亂碼）
 
 **已知（2026-04-27 體檢結果，不擋 B-0）**：
@@ -2762,7 +2766,7 @@ export async function POST(req: Request) {
 ## §9 工作包 B-5：通知層（Notifier 抽象 + SlackNotifier + dispatcher）
 
 ### TL;DR
-寫 Notifier interface + SlackNotifier + 通知規則 + dispatcher，把 5 個 webhook handler 的「TODO B-5」hook 接上。Slack 走新建的 `#ops-incidents`，不碰 `#alerts-infra`。
+寫 Notifier interface + SlackNotifier + 通知規則 + dispatcher，把 5 個 webhook handler 的「TODO B-5」hook 接上。Slack 走新建的 `#ops-incidents`，不碰 `#infra-alerts`。
 
 ### Estimated time
 3–4 小時
@@ -3100,7 +3104,7 @@ describe('decideNotification', () => {
 - [ ] `npm run build` 通過
 - [ ] vitest `rules.test.ts` 全綠
 - [ ] 觸發 1 個全新 Sentry incident → `#ops-incidents` 收到 1 條 Slack（含 fp 短碼 + Inbox 連結）
-- [ ] **`#alerts-infra` 沒收到** Inbox 發的訊息（用 channel history 確認）
+- [ ] **`#infra-alerts` 沒收到** Inbox 發的訊息（用 channel history 確認）
 - [ ] 同 fingerprint 連送 5 次 → `#ops-incidents` 只收 1 條，DB `notification_log` 4 筆 `throttled` + 1 筆 `sent`
 - [ ] severity 從 medium 升 critical 觸發 → 再發 1 條，message text 含 `ESCALATED`，log 規則 = `severity_escalation`
 - [ ] 在 detail 頁手動 resolve 然後再送同 fingerprint → 收 1 條 `REOPENED`，`reopen_count` +1

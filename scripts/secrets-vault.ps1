@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp", "sync-copilot-mcp-env", "sync-cursor-mcp-user-env")]
+    [ValidateSet("init", "set", "set-prompt", "get", "list", "remove", "run", "import-mcp", "import-user-env", "sync-copilot-mcp-env", "sync-cursor-mcp-user-env")]
     [string]$Action = "list",
     [string]$Name = "",
     [string]$Value = "",
@@ -289,6 +289,37 @@ Then run this action again. See docs/operations/mcp-add-server-quickstart.md (co
         [Environment]::SetEnvironmentVariable("COPILOT_MCP_BEARER_TOKEN", $plain, "User")
         Write-Host "Set User-level env COPILOT_MCP_BEARER_TOKEN from vault $srcName." -ForegroundColor Green
         Write-Host "Update copilot MCP header to: Bearer `${env:COPILOT_MCP_BEARER_TOKEN} then fully quit Cursor and reopen (new processes read User env)." -ForegroundColor Yellow
+        exit 0
+    }
+
+    "import-user-env" {
+        # Reads a user-env.ps1 file (hashtable format: $vars = @{ KEY = "value" ... })
+        # and batch-imports all non-empty key=value pairs into the vault.
+        # Use this to keep the vault in sync with user-env.ps1 after any update.
+        # Called automatically by import-cross-machine-memory.ps1 when user-env.ps1 changes.
+        if ([string]::IsNullOrWhiteSpace($McpPath)) {
+            $repoRoot = Split-Path $PSScriptRoot -Parent
+            $McpPath = Join-Path $repoRoot "mcp\user-env.ps1"
+        }
+        if (-not (Test-Path -LiteralPath $McpPath)) {
+            throw "user-env.ps1 not found: $McpPath"
+        }
+        # Parse hashtable with regex — avoids running setx side effects.
+        # Matches: whitespace KEY = "value"  (double-quoted values, may contain any chars except ")
+        $raw = Get-Content -LiteralPath $McpPath -Raw -Encoding UTF8
+        $pattern = '(?m)^\s+([A-Z][A-Z0-9_]+)\s*=\s*"([^"]*)"'
+        $matches2 = [regex]::Matches($raw, $pattern)
+        $count = 0; $skipped = 0
+        foreach ($m in $matches2) {
+            $k = $m.Groups[1].Value
+            $v = $m.Groups[2].Value
+            if ([string]::IsNullOrWhiteSpace($v)) { $skipped++; continue }
+            Set-SecretEntry -Store $store -SecretName $k -SecretValue $v -SecretNote "import-user-env"
+            $count++
+        }
+        Write-Store -Path $resolvedPath -Store $store
+        Write-Host "  vault import-user-env: $count imported, $skipped empty skipped" -ForegroundColor Green
+        Write-Host "  source: $McpPath" -ForegroundColor DarkGray
         exit 0
     }
 

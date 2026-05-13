@@ -50,7 +50,26 @@
 
 ### 未完成
 
-- [x] **（2026-05-08 09:00 TPE 之後驗證）SG drift cron 第一次自動 firing** —— **【AUTO_TASK_DONE_APPLIED 2026-05-08T09:xx TPE】** log: `[2026-05-08T01:00:03Z] alert sent: HTTP 200, behind=7`；cron daemon active/enabled；結案條件已達（drift>0 + HTTP 2xx）。
+#### 雙機環境 / 日常開工
+
+- [ ] **（AO-RESUME 提醒）開工後閱讀 Telegram 內容** —— **【未完成】** 每次開工（含送出 `AO-RESUME` 後）先開 Telegram：營運／告警／`@awarewave_ops_bot` 等相關對話，處理未讀與待回覆。**DoD：**(1) 未讀已消化（回覆、存檔或標記稍後）；(2) 需追蹤事項已寫入當日 `WORKLOG.md` 或對應 tenant／`TASKS`；(3) 若有指令錯誤或告警，已對照 `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md`／`TELEGRAM_OPERATOR_CHEATSHEET.md` 排查或記錄阻塞。**敏感：**勿將 token／對話全文貼進 git 或聊天留存檔。
+- [ ] **（AO-RESUME 提醒）桌機開工後跑 Claude user-level 對齊腳本** —— **【未完成】** 2026-05-07 筆電已建立 `mcp/claude-userlevel/` SSOT + `scripts/sync-claude-userlevel.ps1`，並對齊筆電 `~/.claude/`。**桌機下一步**：`git pull` 後在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge`，使 `~/.claude/{hooks,settings.json,mcp.json}` 對齊 SSOT。**驗收**：跑 `-Mode verify` 應 exit 0（PASS）。背景：`mcp/claude-userlevel/README.md`、`CLAUDE.md` § 桌機/換機設定。
+- [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：桌機 2026-05-07 `machine-environment-audit -Strict` PASS（no warnings）✓**；筆電尚未執行。任一台未 PASS 則本條不結案。**筆電下一步：**依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 + §1.5.1**（WP 棧）逐步執行後，在筆電 monorepo 根跑 `machine-environment-audit.ps1 -FetchOrigin -Strict`；細項 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。
+- [ ] **（AO-RESUME 提醒—筆電）確認桌機 2026-05-11 變更不衝突筆電設定** —— **【待筆電開工時查照】** **本輪桌機改動（代理查照）：** (1) `sync-claude-userlevel.ps1 -Mode merge` 更新 `~/.claude/hooks/` 3 個檔（`ao-resume-on-prompt.ps1`、`hooks.json`、`README.md`），覆寫 `settings.json` governed keys，normalize 9 個 array 結構；SSOT `mcp/claude-userlevel/` 本身未改，git 含最新版。(2) SG VPS `app.aware-wave.com` Basic Auth：加入系統 nginx `/etc/nginx/sites-enabled/app` 的 `location /` block（`auth_basic "Aware Wave Admin"` + user_file `/etc/nginx/.htpasswd_studio`）；Docker `nginx/default.conf` 的 `auth_basic` 也已取消注釋（但系統 nginx 才是 443 真正入口）。**筆電開工查照清單：** (a) `git pull` 後執行 `sync-claude-userlevel.ps1 -Mode verify`——若 hooks 顯示 3 個 update（同桌機），跑 `-Mode merge` 對齊，再 verify exit 0；(b) 確認 `settings.json` `additionalDirectories` 含筆電正確 USERPROFILE 路徑（merge 自動展開 `${USERPROFILE}`，通常無問題）；(c) VPS 變更純伺服器端，不影響筆電。**DoD：筆電 `verify` exit 0（PASS）後本條結案。**
+- [ ] **（筆電必做）AO-SYNC 環境變數設定** —— **【未開始】** 桌機已設好，筆電需要同步設定兩個環境變數才能讓 AO-CLOSE 正確匯出。
+  **筆電環境**：repo 在 `D:\Work`，帳號家目錄在 `C:\Users\<帳號>`，project key = `d--Work`。
+  在筆電 PowerShell（從 `D:\Work` 執行）：
+  ```powershell
+  [System.Environment]::SetEnvironmentVariable('AO_SYNC_ROOT', 'G:\我的雲端硬碟\EverydayPW\AO-SYNC', 'User')
+  [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'G:\我的雲端硬碟\EverydayPW', 'User')
+  ```
+  設完後測試（**只做一次**，之後 AO-CLOSE / AO-RESUME 全自動）：
+  ```powershell
+  & scripts\export-cross-machine-memory.ps1 -WorkRoot (Get-Location).Path
+  ```
+  應看到 MEMORY.md + user-env.ps1 + SSH keys + AWARE_WAVE_CREDENTIALS.md 全部寫入 EverydayPW。
+  **DoD：** export 成功 + MEMORY.md 寫到 `G:\我的雲端硬碟\EverydayPW\AO-SYNC\AO-SYNC-<date>\memory\`。
+- [ ] **（筆電必做）確認 Cryptomator vault 掛載路徑，將 AO-SYNC 秘密檔案移入加密區** —— **【未開始】** **背景：** 目前 `.ssh/`、`user-env`、`AWARE_WAVE_CREDENTIALS` 存在 Google Drive `EverydayPW/` 根目錄（vault 外面），只有 Google 伺服器端加密，無端對端加密。`EverydayPW/` 內已有 `vault.cryptomator`＋`masterkey.cryptomator`，Cryptomator 設定是在筆電上做的。**筆電開工時步驟：** (1) 打開 Cryptomator → 解鎖 EverydayPW vault → 記下掛載路徑（例如 `Z:\` 或某資料夾）；(2) 告訴代理掛載路徑；(3) 代理會：把 `.ssh/`、`user-env.ps1`、`AWARE_WAVE_CREDENTIALS.md` 移進 vault 內的對應子資料夾、更新兩台機器的 `AO_SYNC_SECRETS_ROOT` env var 指向 vault 內路徑、確認 AO-CLOSE / AO-RESUME 腳本正常讀寫。**DoD：** AO-CLOSE 成功將秘密檔案寫入 Cryptomator 加密路徑（非 vault 外面的明文位置）；兩台機器 `AO_SYNC_SECRETS_ROOT` 已更新並驗證。
 - [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】**
   - 📖 **完整步驟讀這個（單一主人）**：[`agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`](docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md) — §0（5 步驗證）+ §5（4 條 Snippets）+ §8（key 上手機 3 方法）
   - 📅 **規劃日期**：2026-05-08
@@ -66,56 +85,110 @@
   - **(5) 手機加書籤**: cheat sheet（`https://github.com/awarewaveai-pei/Work/blob/main/agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`）+ ops console (`app.aware-wave.com/ops/system-modes` / `/ops/approvals` / `/ops/inbox`)；建議「加到主畫面」+ 離線備份（raw markdown 複製進備忘錄）
   - **(6) 出國前一晚再跑 §0 5 步**確認還能連（不重做設定，只測連線）
   - **失敗時找代理**：說明哪步、什麼錯誤訊息（如 `Permission denied` / connection timeout / sg-deploy.sh 跑出非 dry-run 動作等），代理會幫拆。
+
+#### 客戶試點 — Soulful Expression（既有站接手）
+
+- [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。
+  - 本項目標：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）
+- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中 2026-05-08】§1.2 ✅ §1.3 DB dump ✅**。§1.2 機讀基線完成（commit `b5cef4c`：WP 6.9.4 / PHP 8.2.30 / MariaDB 11.8.6 / Kadence 1.3.6 / 35 active plugins (16 有更新) / 2 admins / 138MB DB / 風險 Top 3）。§1.3 DB dump 完成（`soulful_db_20260508_160734.sql.gz`，15 MB，SHA256 `849db784…`，本機 + `BACKUP_RESTORE_PROOF.md #1`；restore drill 待 staging 建立後執行）。**仍開放（操作者必做）**：§1.1 帳號層級權限確認（Hostinger panel / DNS panel / WP admin browser login，純 SSH 無法驗證 panel-level access）。Day 2 staging 操作指引已備：`DAY2_STAGING_OPERATOR_GUIDE.md`；Day 3 更新計劃已備：`DAY3_SECURITY_PATCH_PLAN.md`。
+  - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節
+  - 產出：§1.2 ✅ §1.3 DB dump ✅ §1.1 待操作者 §restore drill 待 Day 2
+
+#### 客戶試點 — Scenery Travel Mongolia（新站建置）
+
+- [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。**下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
+  - 本項目標：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊）
+- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架 + Discovery 骨架完成。**下一步：**與客戶確認素材與頂級網域，選定主機商 → 銜接 **`TASKS`**「Day 2 雲端 staging 實機驗收」。
+  - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md` 第 1~2 節
+  - 產出：新站 staging 啟動條件
+
+#### Next-Gen 對齊（兩案共用）
+
+- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
+  - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（**URL／lifecycle SSOT**）、`SITES_INDEX.md`（須與 registry 對齊）、各案 `02_EXECUTION_PLAN.md` Day 2、`SITE_PROFILE.md`；Runbook §2 對齊框：`PRODUCTION_RUNBOOK_PILOT_*`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
+  - **自動漂移閘道**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（比對 **`SITES_INDEX`**、含 HTTPS 之 **`sites/*/SITE_PROFILE`**、以及 `projects/*/02_EXECUTION_PLAN.md` 的 staging URL；`scripts/system-health-check.ps1` → **`verify-build-gates`**；PR `.github/workflows/tenant-staging-ssot.yml`）。
+- [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
+  - 本項目標：試點 tenant 實填回饋後，再擴欄位與自動檢查（若有）
+- [x] （Next-Gen 對齊）M3 控制台輸出映射到「20 部門」責任矩陣與模板欄位 —— **【完成 2026-05-13】**
+  - 目的：避免 Pilot 成果與跨國企業目標脫鉤
+  - **交付**：`department-summary` API + `DepartmentCoveragePanel` UI + `ClientCard` badge + `generate-customer-delivery-status.ps1` + `DEPARTMENT_COVERAGE_MATRIX.md` 四份更新
+
+#### 龍蝦工廠（lobster-factory）
+
+- [ ] `lobster-factory` A10-2 商業閉環實跑 —— **【未開始】**
+  - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
+- [ ] `lobster-factory` A7 全站自動建站補齊 —— **【未開始】**
+  - 範圍：hosting adapter + provision/shell guardrails 端到端
+
+#### 工具層 / 基礎建設 / 治理
+
+- [x] Enterprise 工具層 Phase 1 正式串接 —— **【完成 2026-05-13】** 五層工具全數結案＋端到端串接路徑驗收，見 `WORKLOG.md §2026-05-13「Enterprise 工具層 Phase 1 — 端到端串接結案驗收」`。
+  - [x] Secrets 治理（env/mcp vault + n8n key 輪替）— 2026-05-01
+  - [x] Sentry 錯誤觀測（next-admin／node-api／php）— 2026-04-12
+  - [x] PostHog 事件基線（三站命名 + live 驗證）— 2026-05-01
+  - [x] Cloudflare DNS／WAF／rate-limit 邊界保護 — 2026-05-01
+  - [x] Slack 告警通道（Netdata `#infra-alerts` + n8n Sentry handler）— 2026-05-01
+  - [x] 端到端串接驗收：Telegram → Cloudflare → JWT/RLS ops console → Supabase → Slack，Command Plane Phase 2c smoke 15/15 PASS（2026-05-08）；`WORKLOG.md §2026-05-13`
+- [x] （工具建置）Phase 1 建議順序（P1 -> P7） —— **【完成 2026-05-13】** Next.js 控制台 v1（P6，2026-05-07）＋ Enterprise 串接證據鏈（P1–P5，2026-05-13）＋ Command Plane（P7，2026-05-08）三條件全達。追溯總表已同步：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（P1–P7 全 🟢）。
+- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
+  - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
+  - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
+
+#### 下一期計畫（未開始）
+
+- [ ] **（下次 AO-RESUME 提醒）AwareWave 自動告警維修系統 v3.2 — 計畫書執行** —— **【進行中】** **2026-05-13 Codex implementation baseline 已完成**：`repair_runs` migration、`/ops/repairs` Queue/Runs/Safety/Policy UI、`/api/ops/repairs/*`、`/api/ops/repairs/health`、Slack interactive callback、Slack `approve_repair` 按鈕、GitHub auto-repair workflows、pre-repair backup gate（webhook 或 SG/EU SSH fallback）、CLAUDE auto-repair 紅線；`npm run build` PASS。**2026-05-13 上線基礎已補**：EU DB `repair_runs` migration 已以 `supabase_admin` 套用並 reload schema；SG `next-admin` 已部署 commit `41a773a`；production `/api/ops/repairs/health` 已回報 `table_ok=true`、`backup_configured=true`、`backup_mode=ssh`、`source_policies` 含 Sentry/Kuma/Grafana/PostHog/Netdata/manual。**2026-05-13 Web-control / Phase 3 安全驗收已補強**：`AUTO_REPAIR_GITHUB_TOKEN` 與 GitHub Secrets (`ANTHROPIC_API_KEY`、`SLACK_WEBHOOK_URL`) 已設定；SG deployed commit `87cfa76`；`/ops/repairs` 為操作者控制台，Repair API 由 nginx Basic Auth 邊界保護後注入可信 ops role；`/ops/inbox` 保持 incident SSOT，不合併成第二套維修 UI；production smoke `repair-center` 15 checks / 0 failed / 1 expected warning；backup-fail drill PASS（不建 GitHub Issue）；safe rollback snapshot/restore drill PASS；synthetic Sentry → backup → GitHub Issue → Claude Action analysis-only handoff PASS。**仍待外部設定/最終驗收**：正式 Slack App `SLACK_SIGNING_SECRET` / `SLACK_BOT_TOKEN`；Slack 按鈕互動核准與真實 code-scoped PR/merge/deploy 端到端。**計畫書 owner doc**：`docs/awarewave-auto-repair-plan-v3.2-final.md`（v3.2 Final 2026-05-08，33 KB）。**目標**：多來源 ops signals（Sentry／Uptime Kuma／Netdata／Grafana／PostHog／CI／health／Cloudflare／Supabase／n8n／Trigger.dev／deploy drift／WordPress/MainWP）→ Ops Inbox → Repair Center → Slack 核准 → PR → Merge → `/sg-deploy`。**分類原則**：Sentry→auto-repair；Uptime/Grafana/PostHog→analysis-only；Netdata/資安/控制面→human-only；CI/流程類→先 triage。**4 層保護**：CI 綠勾／中文摘要／部署後 health-check 自動 rollback／Sentry 持續監控。
+  - **2026-05-12 基線更新**：owner docs 已收斂為 `docs/awarewave-auto-repair-plan-v3.2-final.md` + `docs/awarewave-auto-repair-phase2-handoff.md` + `docs/awarewave-repair-center-app-architecture.md` + `docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md` + `agency-os/docs/operations/slack-notification-routing.md`。**路由基線**：`#infra-alerts` = raw infra、`#ops-incidents` = curated incident、`#github-prs` = PR 通知、Telegram = 手機備援；舊 `#alerts-critical` / `#alerts-info` 已作廢。
+  - **下次 AO-RESUME 必提醒（最新停點 2026-05-13）**：系統 Web 控制與安全 drills 已可用；真正未完成只剩外部 Slack App secret 與真實 code-scoped production drill。下一步順序：(1) 到 Slack App 後台取得真實 `Signing Secret` 與 Bot token；(2) 設 SG `/root/lobster-phase1/.env` 的 `SLACK_SIGNING_SECRET`，並用 `gh secret set SLACK_SIGNING_SECRET` / `SLACK_BOT_TOKEN` 寫入 GitHub；(3) `sg-deploy.sh next-admin` 後重跑 `npm run smoke:repair-center -- --base-url=https://app.aware-wave.com`，目標 15 checks / 0 failed / 0 warning；(4) 從 Slack 按鈕跑一次 `approve_repair` 互動核准；(5) 只有使用者明確授權時，才做壞 commit auto-rollback destructive drill；否則維持目前 safe snapshot/restore rollback PASS 證據。
+  - **Phase 1（你做，30 分鐘）**：確認既有 `#infra-alerts` / `#ops-incidents`，只新增 `#github-prs`；建 Slack App（Webhook 指向 `#ops-incidents`）；GitHub repo 設 4 個 Secrets（`ANTHROPIC_API_KEY`／`SLACK_WEBHOOK_URL`／`SLACK_BOT_TOKEN`／`SLACK_SIGNING_SECRET`）；**不要**把 Telegram token 放進 GitHub Secrets；驗證 `/api/ops/inbox/health` 顯示 `telegram_notify_enabled=true`；啟用 main branch protection。
+  - **Phase 2（Claude Code 做，2-3 小時）**：擴充 `app/api/webhooks/sentry/route.ts`（fingerprint dedup + Slack Block Kit）；新增 `webhooks/uptime-kuma`／`webhooks/netdata` route；新增 `app/api/internal/commands/slack/route.ts`（Approve → 備份 → GitHub Issue）；新增 `.github/workflows/auto-repair-claude.yml` + `auto-repair-pr-notify.yml`；補強 `sg-deploy.sh` health-check + Slack 通知；CLAUDE.md 追加自動維修紅線；**新增 app 路由骨架**：`app.aware-wave.com/ops/repairs` 作為 Repair Center orchestration layer，不可另建第二套 inbox / approval / deploy UI。
+  - **Phase 3（驗收 1 小時）**：22 步端到端（Sentry test error → Slack → Approve → 備份 → Issue → Claude PR → CI → Merge → `/sg-deploy` → health-check → Slack 完成）+ Phase 3-B（rollback drill）+ Phase 3-C（備份失敗阻擋驗收）。
+  - **Phase 4（觀察期 30 天）**：每週日 5 分鐘巡檢（重複修同一 bug？`needs-human-review` PR？BACKUP_RESTORE_PROOF 最新一筆超過 7 天？）；每月初 10 分鐘指標複盤。
+  - **Phase 5（多客戶擴展 + Dashboard）**：Phase 4 完成後啟動，計畫書第十五節有完整任務清單。
+  - **不衝突宣告**：計畫書 §二明列「不可更動」既有架構（lobster-* 容器、GitHub Actions 4 個 workflow、CLAUDE.md、`system-health-check`、`rollback-phase1.sh`、`backup-eu-stack.sh`、Sentry／Kuma／Netdata、`sg-deploy.sh`、ops console）；不採用 n8n Slack 中間層／自動 deploy on merge。Telegram 保留為手機備援通知 + command plane，與本計畫並行但不擔任主 incident bus。
+  - **DoD（總）**：(1) Phase 1+2+3 全綠（22 步端到端 PASS）；(2) `BACKUP_RESTORE_PROOF` 含一筆 auto-repair 觸發的 backup ID；(3) Phase 4 第一週巡檢報告；(4) WORKLOG 留 `AUTO_TASK_DONE` evidence。
+  - **下一步建議**：先讀計畫書全文（`Read d:/Work/docs/awarewave-auto-repair-plan-v3.2-final.md`）+ handoff brief（`Read d:/Work/docs/awarewave-auto-repair-phase2-handoff.md`）+ AI 實作閱讀簡報（`Read d:/Work/docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`），再開始 Phase 1；交代理時三份一起附上。
+- [ ] **WordPress 外掛堆疊自動安裝（app.aware-wave.com Onboard Wizard）** —— **【進行中】** —— 進度：**Phase 0 ✅ 完成**（`lib/wp-plugin-stack-catalog.ts` commit b205f40）；**Phase 1 ✅ 完成 2026-05-13**（`OnboardWizard.tsx` commit 41a773a，5 步驟 Wizard，站型選擇 + 外掛堆疊摘要，TypeScript 通過）。**下一步：Phase 2 — contracts.ts 擴充 + BuildConsole 外掛摘要顯示**。
+  - 外掛選型：`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`
+  - 實作計畫：`lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
+  - **AI 執行 Brief**：`lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`（直接交給 Claude / Codex，每次一個 Phase）
+  - Build System 規則：`lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md`
+  **實作順序**（依賴鏈，依序執行）：
+  - ~~Phase 0：`lib/wp-plugin-stack-catalog.ts`（TypeScript 外掛 SSOT）~~ **✅ 2026-05-12 完成**
+  - ~~Phase 1：`OnboardWizard.tsx`（新增站型選擇 Step 2，原 Step 2-4 → 3-5，WizardStep 型別更新）~~ **✅ 2026-05-13 完成**
+  - ~~Phase 2：`contracts.ts` + `BuildConsole.tsx`（欄位擴充 + URL params + 摘要顯示）~~ **✅ 2026-05-13 完成**
+  - ~~Phase 3：Trigger.dev `wp-install-plugins` task（WP-CLI 執行層，先確認 workflow 檔存在）~~ **✅ 2026-05-13 完成**
+  - ~~Phase 4：`/ops/clients/[slug]` 顯示安裝結果~~ **✅ 2026-05-13 完成**
+  **Phase 1 — 開始前必讀（照順序交給 Claude / Codex）**：
+  1. `lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`（Phase 1 區段）— 完整讀完再動手
+  2. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/OnboardWizard.tsx` — 完整讀完，了解現有 4 步驟架構
+  3. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts` — Phase 0 建立的 catalog（必須先完成）
+  4. `lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md`（§3 紅線規則）— 禁止踩的地雷
+  5. `agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md` — 外掛選型依據（了解 ★/↩/† 含義）
+  **DoD（全部 Phase 完成）**：(1) Wizard 選站型後顯示外掛清單；(2) enqueue 後 `BuildRunRequest` 含 `wpSiteType`/`hasEcommerce`/`pluginSlugs[]`；(3) Trigger.dev Stage 3 安裝完成，`package_install_runs` 有記錄；(4) Client Detail 顯示已安裝／需手動清單；(5) 付費外掛記錄為 `skipped_license` 不報錯。
+
+## Next — 已完成歷程（查詢用）
+
+### 2026-05-13 — Enterprise 工具層 Phase 1 正式串接 + Phase 1 P1→P7 建置順序（結案）
+
+- [x] **Enterprise 工具層 Phase 1 正式串接**
+  - **證據**：`WORKLOG.md §2026-05-13「Enterprise 工具層 Phase 1 — 端到端串接結案驗收」`
+  - **五層**：Secrets（2026-05-01）/ Sentry（2026-04-12）/ PostHog（2026-05-01）/ Cloudflare（2026-05-01）/ Slack（2026-05-01）
+  - **端到端路徑**：Command Plane Phase 2c smoke 15/15 PASS（2026-05-08）覆蓋全五層（Telegram→Cloudflare→JWT→Supabase→Slack）
+  - **追溯總表**：`TOOLS_DELIVERY_TRACEABILITY.md` P1–P7 全部更新為 🟢
+- [x] **（工具建置）Phase 1 建議順序（P1 -> P7）**
+  - **P6（Next.js 控制台 v1）**：ops-console-smoke 9/9 PASS（2026-05-07）；`reports/status/ops-console-smoke-LATEST.json`
+  - **Enterprise 串接**：見上條，2026-05-13 結案
+  - **P7（Command Plane）**：Phase 2c smoke 15/15 PASS（2026-05-08）
+
+### 2026-05-08/09 — SG drift cron + strategy-review demo + Command Plane Phase 2 + MainWP EU（結案）
+
+- [x] **（2026-05-08 09:00 TPE 之後驗證）SG drift cron 第一次自動 firing** —— **【AUTO_TASK_DONE_APPLIED 2026-05-08T09:xx TPE】** log: `[2026-05-08T01:00:03Z] alert sent: HTTP 200, behind=7`；cron daemon active/enabled；結案條件已達（drift>0 + HTTP 2xx）。
 - [x] **（明日提醒）`/strategy-review` skill demo 實測** —— **【完成 2026-05-09】** **明日（2026-05-08）試跑：**用今天 Hermes Agent 的問題（要不要採用、值不值得整合）作為第一個 strategy-review 案例，跑 **Mode 1（four-role-collaboration）**驗證並行 subagent 真的有獨立 context、不會互相污染。**操作：**在 Claude Code 輸入 `/strategy-review 要不要採用 Hermes Agent` 或自然語觸發。**DoD：**(1) 4 個 `general-purpose` subagent 並行返回 4 份結構化 finding／bias_check／must_investigate；(2) 產出 `agency-os/reports/strategy-review/2026-05-08-adopt-hermes-agent.md`；(3) `INDEX.md` 自動補一行；(4) 確認 4 份報告**真的不同**（沒有 context contamination — 例：相同 finding 用相同 framing 出現在 2+ 份 = 失敗，要回頭調 mode 檔案）。**背景：**`.claude/skills/strategy-review/SKILL.md`、`.claude/skills/strategy-review/README.md` §Testing the skill；範本 `templates/decision-record.md`。
 - [x] **Command Plane Phase 2** —— **【完成 2026-05-08】** Phase 1 已 production live（`@awarewave_ops_bot` 5 個 low-risk 指令 + 8/8 smoke + 端到端驗收，2026-05-07）。Phase 2 解鎖「手機可執行任務」，是 vs Slack 的真正差異點。**owner doc**：`agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md` §13。
   - **2a — Kill switch 從手機控** —— **【已完成 2026-05-08】** ✅ commit `a329335`（feat）+ `e20386e`（smoke 動態 count）。已 deploy 到 SG `lobster-next-admin`（Up healthy），smoke **9/9 PASSED** 含 `emergency_stop_via_telegram - cmd=completed mode=emergency_stop`。Telegram setMyCommands 已含 8 個指令。**驗收路徑**：手機 `/emergency_stop` → `system_modes.mode='emergency_stop'` ✅；後續 `/status` → `blocked_by_killswitch` ✅；SQL editor 改 mode='normal' 後恢復 ✅。`/normal_mode` 從 Telegram 永遠擋 ✅。
   - **2b — Trigger.dev medium-risk dispatch** —— **【已完成 2026-05-08】** ✅ commit `8b8d54e`. Phase 2b ships **lightweight inline pattern**（非完整 Trigger.dev queue）：`/trigger_staging_workflow <task>` 直接 HTTP POST 到 Trigger.dev REST API（allowlist 目前只有 `ao-infrastructure-check`），handler 立即回 run_id；`/replay_dead_letter <uuid>` 為**診斷模式**（lookup `error_events` 回傳細節，full automatic re-execution 排到 Phase 3 — 需要先處理 idempotency rewrite + side-effect rollback hooks）。SG `.env` 加入 `TRIGGER_API_URL` + `TRIGGER_ACCESS_TOKEN`，docker-compose 已 wire。Smoke **11/11 PASSED** 含 `trigger_workflow_allowlist` + `replay_dead_letter_validation`。Telegram setMyCommands 含 10 個指令。手機驗收：傳 `/trigger_staging_workflow ao-infrastructure-check` 應拿到 run_id；傳 `/trigger_staging_workflow no-such-task` 拿到 allowlist 拒絕訊息。
   - **2c — ops console approval / system_modes UI** —— **【已完成 2026-05-08】** ✅ commit `6b7b525`（UI pages）+ `c09a529`（RLS fix）+ smoke 15/15（`approvals_list_endpoint_shape` / `system_modes_get_shape` / `approve_route_wired` all OK）。`/ops/approvals` 列出 pending high/critical command_requests；`/ops/system-modes` 顯示 current mode；兩個 API GET 端點以 service-role client 繞過 RLS，均回 200。手動解鎖路徑驗證：SQL editor `update system_modes set mode='normal'` PASS（Phase 2c.1 system_modes UI 不再是阻塞項）。
-- [ ] **（AO-RESUME 提醒）桌機開工後跑 Claude user-level 對齊腳本** —— **【未完成】** 2026-05-07 筆電已建立 `mcp/claude-userlevel/` SSOT + `scripts/sync-claude-userlevel.ps1`，並對齊筆電 `~/.claude/`。**桌機下一步**：`git pull` 後在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge`，使 `~/.claude/{hooks,settings.json,mcp.json}` 對齊 SSOT。**驗收**：跑 `-Mode verify` 應 exit 0（PASS）。背景：`mcp/claude-userlevel/README.md`、`CLAUDE.md` § 桌機/換機設定。
 - [x] **MainWP EU 計畫啟動核對** —— **【完成 2026-05-09】** Dashboard 已部署於 EU (204.168.175.41)，`mainwp.aware-wave.com`。Docker Compose (WordPress 6.7-apache + MySQL 8.0)、nginx vhost + rate-limit、fail2ban WordPress jail、WP-CLI 安裝、MainWP Dashboard 6.0.12 激活、host crontab WP-Cron、Uptime Kuma Monitor #22。**待操作者**：(1) Cloudflare DNS A record `mainwp.aware-wave.com → 204.168.175.41`；(2) `certbot --expand` 加域名；(3) Dashboard 後台初始化精靈；(4) 接入第一個客戶（§22 Child 流程）。計畫文件：`D:\Work\docs\wordpress_mainwp_plan.md` §25 部署紀錄。
-- [ ] **（AO-RESUME 提醒）開工後閱讀 Telegram 內容** —— **【未完成】** 每次開工（含送出 `AO-RESUME` 後）先開 Telegram：營運／告警／`@awarewave_ops_bot` 等相關對話，處理未讀與待回覆。**DoD：**(1) 未讀已消化（回覆、存檔或標記稍後）；(2) 需追蹤事項已寫入當日 `WORKLOG.md` 或對應 tenant／`TASKS`；(3) 若有指令錯誤或告警，已對照 `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md`／`TELEGRAM_OPERATOR_CHEATSHEET.md` 排查或記錄阻塞。**敏感：**勿將 token／對話全文貼進 git 或聊天留存檔。
-- [ ] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：桌機 2026-05-07 `machine-environment-audit -Strict` PASS（no warnings）✓**；筆電尚未執行。任一台未 PASS 則本條不結案。**筆電下一步：**依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 + §1.5.1**（WP 棧）逐步執行後，在筆電 monorepo 根跑 `machine-environment-audit.ps1 -FetchOrigin -Strict`；細項 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。
-- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
-  - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（**URL／lifecycle SSOT**）、`SITES_INDEX.md`（須與 registry 對齊）、各案 `02_EXECUTION_PLAN.md` Day 2、`SITE_PROFILE.md`；Runbook §2 對齊框：`PRODUCTION_RUNBOOK_PILOT_*`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
-  - **自動漂移閘道**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（比對 **`SITES_INDEX`**、含 HTTPS 之 **`sites/*/SITE_PROFILE`**、以及 `projects/*/02_EXECUTION_PLAN.md` 的 staging URL；`scripts/system-health-check.ps1` → **`verify-build-gates`**；PR `.github/workflows/tenant-staging-ssot.yml`）。
-- [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。
-  - 本項目標：完成 M1 台帳（staging/prod、備份策略、維護窗、baseline 外掛/版本）
-- [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。**下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
-  - 本項目標：完成 M1 啟動（tenant/site/project + 雲端 staging 可用 + Discovery 國際需求補齊）
-- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中 2026-05-08】§1.2 ✅ §1.3 DB dump ✅**。§1.2 機讀基線完成（commit `b5cef4c`：WP 6.9.4 / PHP 8.2.30 / MariaDB 11.8.6 / Kadence 1.3.6 / 35 active plugins (16 有更新) / 2 admins / 138MB DB / 風險 Top 3）。§1.3 DB dump 完成（`soulful_db_20260508_160734.sql.gz`，15 MB，SHA256 `849db784…`，本機 + `BACKUP_RESTORE_PROOF.md #1`；restore drill 待 staging 建立後執行）。**仍開放（操作者必做）**：§1.1 帳號層級權限確認（Hostinger panel / DNS panel / WP admin browser login，純 SSH 無法驗證 panel-level access）。Day 2 staging 操作指引已備：`DAY2_STAGING_OPERATOR_GUIDE.md`；Day 3 更新計劃已備：`DAY3_SECURITY_PATCH_PLAN.md`。
-  - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md` 第 1~2 節
-  - 產出：§1.2 ✅ §1.3 DB dump ✅ §1.1 待操作者 §restore drill 待 Day 2
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架 + Discovery 骨架完成。**下一步：**與客戶確認素材與頂級網域，選定主機商 → 銜接 **`TASKS`**「Day 2 雲端 staging 實機驗收」。
-  - 執行：`docs/operations/PRODUCTION_RUNBOOK_PILOT_B_NEW_SITE_SCENERY_TRAVEL_MONGOLIA.md` 第 1~2 節
-  - 產出：新站 staging 啟動條件
-- [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
-  - 本項目標：試點 tenant 實填回饋後，再擴欄位與自動檢查（若有）
-- [ ] （Next-Gen 對齊）M3 控制台輸出映射到「20 部門」責任矩陣與模板欄位 —— **【未開始】**
-  - 目的：避免 Pilot 成果與跨國企業目標脫鉤
-- [ ] `lobster-factory` A10-2 商業閉環實跑 —— **【未開始】**
-  - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
-- [ ] `lobster-factory` A7 全站自動建站補齊 —— **【未開始】**
-  - 範圍：hosting adapter + provision/shell guardrails 端到端
-- [ ] Enterprise 工具層 Phase 1 正式串接 —— **【進行中】** **進度：**Secrets／Sentry／PostHog／Cloudflare／Slack 等 **已結案** → 見 **`已完成歷程`** **§2026-05-01**。**仍缺：**本項 **DoD** 要求的「端到端正式串接」**WORKLOG／report 證據鏈**（不綁特定身分供應商）。
-  - 範圍：env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts（身分層採 JWT/OIDC）
-  - DoD：下列子任務全數完成且有對應證據連結（WORKLOG / report）
-- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
-  - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
-  - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
-- [ ] （工具建置）Phase 1 建議順序（P1 -> P7） —— **【進行中】** **進度：****P1～P5、P2（n8n staging）** 已結案 → **`已完成歷程` §2026-05-01**。**仍開放：**以 **`Next.js 控制台 v1`** 與 **Enterprise 串接證據鏈** 作為本條總賬收口（不綁特定身分供應商）。本條結案時須同時滿足兩者 DoD。
-  - 追溯總表：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（每一工具任務對回規格 + DoD + 證據欄位）
-- [ ] **（下次 AO-RESUME 提醒）AwareWave 自動告警維修系統 v3.2 — 計畫書執行** —— **【未開始】** **計畫書 owner doc**：`docs/awarewave-auto-repair-plan-v3.2-final.md`（v3.2 Final 2026-05-08，33 KB）。**目標**：Sentry／Uptime Kuma／Netdata 偵測到問題 → Slack 推播 → 你按 2 下（Approve + Merge）+ 1 個 `/sg-deploy` 即修復。**3 種告警差別處理**：Sentry→自動修；Kuma→AI 只分析；Netdata→AI 只寫 issue 不修。**4 層保護**：CI 綠勾／中文摘要／部署後 health-check 自動 rollback／Sentry 持續監控。
-  - **Phase 1（你做，30 分鐘）**：建 3 個 Slack 頻道（`#alerts-critical`／`#alerts-info`／`#github-prs`）+ 推播偏好；建 Slack App（拿 Bot Token / Signing Secret / Webhook URL）；GitHub repo 設 4 個 Secrets（`ANTHROPIC_API_KEY`／`SLACK_WEBHOOK_URL`／`SLACK_BOT_TOKEN`／`SLACK_SIGNING_SECRET`）；啟用 main branch protection。
-  - **Phase 2（Claude Code 做，2-3 小時）**：擴充 `app/api/webhooks/sentry/route.ts`（fingerprint dedup + Slack Block Kit）；新增 `webhooks/uptime-kuma`／`webhooks/netdata` route；新增 `app/api/internal/commands/slack/route.ts`（Approve → 備份 → GitHub Issue）；新增 `.github/workflows/auto-repair-claude.yml` + `auto-repair-pr-notify.yml`；補強 `sg-deploy.sh` health-check + Slack 通知；CLAUDE.md 追加自動維修紅線。
-  - **Phase 3（驗收 1 小時）**：22 步端到端（Sentry test error → Slack → Approve → 備份 → Issue → Claude PR → CI → Merge → `/sg-deploy` → health-check → Slack 完成）+ Phase 3-B（rollback drill）+ Phase 3-C（備份失敗阻擋驗收）。
-  - **Phase 4（觀察期 30 天）**：每週日 5 分鐘巡檢（重複修同一 bug？`needs-human-review` PR？BACKUP_RESTORE_PROOF 最新一筆超過 7 天？）；每月初 10 分鐘指標複盤。
-  - **Phase 5（多客戶擴展 + Dashboard）**：Phase 4 完成後啟動，計畫書第十五節有完整任務清單。
-  - **不衝突宣告**：計畫書 §二明列「不可更動」既有架構（lobster-* 容器、GitHub Actions 4 個 workflow、CLAUDE.md、`system-health-check`、`rollback-phase1.sh`、`backup-eu-stack.sh`、Sentry／Kuma／Netdata、`sg-deploy.sh`、ops console）；不採用 Telegram／n8n Slack 中間層／自動 deploy on merge（多人工關卡更安全）。Telegram Phase 1+2 仍保留（與本計畫並行不互斥）。
-  - **DoD（總）**：(1) Phase 1+2+3 全綠（22 步端到端 PASS）；(2) `BACKUP_RESTORE_PROOF` 含一筆 auto-repair 觸發的 backup ID；(3) Phase 4 第一週巡檢報告；(4) WORKLOG 留 `AUTO_TASK_DONE` evidence。
-  - **下一步建議**：先讀計畫書全文（`Read d:/Work/docs/awarewave-auto-repair-plan-v3.2-final.md`），確認 Phase 1 的 Slack 頻道命名 + Bot 名稱，再開工。
-- [ ] **製作外掛包一鍵加入** —— **【未開始】** 將龍蝦工廠／租戶常用的 WordPress 外掛（含 mu-plugins 與第三方授權外掛）打包，提供「一鍵加入新客戶站」的流程，避免每個新案重複下載／設定。**範圍待釐清**（占位，下次討論補 DoD）：(a) 外掛清單來源（哪些必備、哪些選配）；(b) 打包方式（zip／composer.json／wp-cli script／lobster build profile）；(c) 一鍵入口（next-admin `/onboard` 增加按鈕？或 `/build` profile？）；(d) 授權處理（付費外掛 license key 的 secrets 治理路徑，禁明文進 git）；(e) 與既有 `client-onboarding` subagent／MainWP child site 流程的銜接。**Owner doc 待建**。**下一步**：先把上述 (a)–(e) 對齊一輪，再決定要不要開新 owner doc 或直接擴充 `lobster-factory/docs/` 既有文件。
-
-## Next — 已完成歷程（查詢用）
 
 ### 2026-05-07 — Next.js 控制台 v1（P7）DoD 結案
 
@@ -331,5 +404,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-09 12:51:06 UTC_
+_Last synced: 2026-05-13 09:42:36 UTC_
 

@@ -156,6 +156,7 @@ type BuildProfile = "profile_a" | "profile_b" | "profile_c";
 type BuildExecutionMode = "plan_only" | "enqueue";
 type BuildEnvironment = "staging" | "production";
 type BuildPackageSlug = "wp-basic" | "wp-business" | "wc-core";
+type WpSiteType = "tourism" | "brand" | "ecommerce"; // see WP_CLIENT_PLUGIN_STACK.md §八
 
 interface BuildRunRequest {
   profile: BuildProfile;
@@ -170,15 +171,21 @@ interface BuildRunRequest {
   domain?: string;
   siteUrl?: string;
   wpAdminUrl?: string;
-  packageSlug?: BuildPackageSlug;
+  packageSlug?: BuildPackageSlug;       // derived from wpSiteType + hasEcommerce when both present
+  wpSiteType?: WpSiteType;              // tourism | brand | ecommerce — from OnboardWizard Step 2
+  hasEcommerce?: boolean;               // drives ecommerce module inclusion (forced true when wpSiteType === "ecommerce")
+  pluginSlugs?: string[];               // resolved installable slug list (free + alternativeSlug fallbacks) — see WP_CLIENT_PLUGIN_STACK.md §八.2
   provider?: "awarewave-internal" | "hostinger" | "cloudways" | "generic-wordpress" | "manual";
   locale?: string;
   credentialsRef?: string;
   backupRef?: string;
   backupConfirmed?: boolean;
   notes?: string;
+  integrations?: BuildIntegrations;     // service wiring: Uptime Kuma, Sentry, PostHog, n8n, MainWP
 }
 ```
+
+> **Plugin stack fields** (`wpSiteType`, `hasEcommerce`, `pluginSlugs`) are wired (2026-05-13). Operator selects in OnboardWizard Step 2; resolved list comes from [`WP_CLIENT_PLUGIN_STACK.md`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md) §八 via [`wp-plugin-stack-catalog.ts`](../infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts). Implementation history: `PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`.
 
 Validation rules:
 
@@ -324,7 +331,8 @@ packages/workflows/src/trigger/create-wp-site.ts
 
 1. Create registry records
 2. Provision staging WordPress through provider adapter
-3. Apply package manifest
+3. Apply package manifest (theme + postInstall + operational plugins — see [`WP_CLIENT_PLUGIN_STACK.md`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md) §八.1 boundary rule)
+3.5. Install user-facing plugin stack via `wp-install-plugins` task (`pluginSlugs[]` from Wizard Step 2 → WP-CLI install + activate)
 4. Install and connect MainWP Child
 5. Register monitoring
 6. Run smoke tests
@@ -496,6 +504,8 @@ Tables or fields still required for full one-click delivery:
 |---|---|
 | `sites.site_type` | `new_client` / `existing_wp` / `ao_internal` |
 | `sites.apply_mode` | `full_install` / `adopt_delta` / `internal_setup` |
+| `sites.wp_site_type` | `tourism` / `brand` / `ecommerce` — populated from OnboardWizard Step 2 |
+| `package_install_runs.result_summary` (JSONB) | Per-plugin row stores `{ plugin_slug, status: "installed"\|"skipped_license"\|"failed", version, error_message }` — zero-migration approach, written by `wp-install-plugins` task |
 | `adopt_audits` | Profile C audit header |
 | `adopt_audit_items` | Profile C item-level classification |
 | `smoke_test_results` | Smoke test results per run |
@@ -715,7 +725,7 @@ This is enough to deliver Mongolia Travel with controlled manual fallback.
 
 - Provider adapter contract tests
 - Hostinger or ManualTaskAdapter path
-- `create_wp_site` end-to-end staging run
+- `create_wp_site` end-to-end staging run (orchestration of Stage 3 manifest + Stage 3.5 plugin stack now wired — runs gated by `LOBSTER_EXECUTE_MANIFEST_STEPS=true`)
 - MainWP connection
 - Basic smoke tests
 - Handoff report
@@ -767,6 +777,7 @@ These are not bugs in the Build Console; they are remaining system work:
 - Full Profile B provider automation depends on provider credentials/adapters.
 - Profile C requires new adopt tables and rollback workflow.
 - `site_type` / `apply_mode` DB migration still needs canonical implementation.
+- **Plugin stack auto-install: implemented 2026-05-13**. SSOT = [`WP_CLIENT_PLUGIN_STACK.md`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md) §八. Boundary: Manifest handles theme + postInstall + operational plugins (`mainwp-child`, conditional `litespeed`); user-facing plugin list handled by `wp-install-plugins` task. SSH execution gated by `LOBSTER_EXECUTE_MANIFEST_STEPS=true` (default OFF, dry-run safe).
 - `docs/hosting/*` is the canonical hosting adapter documentation path required by `npm run validate`; do not move those files under `docs/e2e/hosting`.
 
 ## 22. Verification Commands

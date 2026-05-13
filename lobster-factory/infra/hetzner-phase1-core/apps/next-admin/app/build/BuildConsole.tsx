@@ -160,6 +160,20 @@ export default function BuildConsole() {
       base.siteUrl     = str("siteUrl")       ?? base.siteUrl;
       base.wpAdminUrl  = str("wpAdminUrl")    ?? base.wpAdminUrl;
     }
+    // Plugin stack params from OnboardWizard Step 2 (pack-based model)
+    const selectedPacksRaw = searchParams.get("selectedPacks");
+    if (selectedPacksRaw) base.selectedPacks = selectedPacksRaw.split(",").filter(Boolean) as import("../../lib/build-console/contracts").WpPluginModule[];
+    const pluginSlugsRaw = searchParams.get("pluginSlugs");
+    if (pluginSlugsRaw) base.pluginSlugs = pluginSlugsRaw.split(",").filter(Boolean);
+    const paidCount = Number(searchParams.get("paidPluginCount") ?? "0") || undefined;
+    if (paidCount) base.paidPluginCount = paidCount;
+    // SSH target params (operator-supplied via Wizard Step 1) — required for tasks.trigger(wp-install-plugins)
+    const sshHostRaw = searchParams.get("sshHost");
+    if (sshHostRaw) base.sshHost = sshHostRaw;
+    const wpPathRaw = searchParams.get("wpPath");
+    if (wpPathRaw) base.wpPath = wpPathRaw;
+    const sshRefRaw = searchParams.get("sshCredentialsRef");
+    if (sshRefRaw) base.sshCredentialsRef = sshRefRaw;
     setProfile(p);
     setForm({ ...base, executionMode: "enqueue" });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -484,6 +498,49 @@ export default function BuildConsole() {
               </label>
             </>
           ) : null}
+
+          {/* ── WP Plugin Stack Summary ──────────────────────────────────── */}
+          {form.pluginSlugs && form.pluginSlugs.length > 0 && (
+            <div className="build-plugin-stack-summary" style={{ margin: "12px 0", padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8 }}>
+              <div className="section-title" style={{ marginBottom: 8 }}>📦 WordPress 外掛堆疊（OnboardWizard Step 2 帶入）</div>
+              <div className="build-kv-grid">
+                <div>
+                  <span>外掛包</span>
+                  <strong>
+                    {form.selectedPacks && form.selectedPacks.length > 0
+                      ? `基礎包 + ${form.selectedPacks.map((p) => ({ ecommerce: "電商包", tourism: "旅遊包", brand: "形象包" } as Record<string,string>)[p] ?? p).join(" + ")}`
+                      : "基礎包"}
+                  </strong>
+                </div>
+                <div>
+                  <span>🟢 自動安裝（WP.org）</span>
+                  <strong style={{ color: "#166534" }}>{form.pluginSlugs.length} 個</strong>
+                </div>
+                {form.paidPluginCount ? (
+                  <div>
+                    <span>🟡 需手動上傳（付費）</span>
+                    <strong style={{ color: "#92400e" }}>{form.paidPluginCount} 個</strong>
+                  </div>
+                ) : null}
+                <div>
+                  <span>SSH host（一鍵安裝必要）</span>
+                  <strong style={{ color: form.sshHost ? "#166534" : "#92400e", fontFamily: form.sshHost ? "monospace" : undefined, fontSize: 11 }}>
+                    {form.sshHost ?? "未提供 — 安裝會跳過（Wizard Step 1 可補）"}
+                  </strong>
+                </div>
+                {form.wpPath && (
+                  <div>
+                    <span>WP 路徑</span>
+                    <strong style={{ fontFamily: "monospace", fontSize: 11 }}>{form.wpPath}</strong>
+                  </div>
+                )}
+              </div>
+              <p className="form-hint" style={{ marginTop: 8, fontSize: 11, marginBottom: 0 }}>
+                Enqueue 後 Trigger.dev 自動觸發 wp-install-plugins task；SSH 執行需在 EU 機器設定{" "}
+                <code>LOBSTER_EXECUTE_MANIFEST_STEPS=true</code> 才會真的安裝（否則 dry-run）。
+              </p>
+            </div>
+          )}
 
           {/* ── Integrations ──────────────────────────────────────────────── */}
           <div className="build-integrations-toggle">

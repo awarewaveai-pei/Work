@@ -26,28 +26,39 @@ export async function GET() {
   if (!supabase) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
 
   const today = new Date().toISOString().slice(0, 10);
-  const [active, critical, high, quota, lastIngest] = await Promise.all([
+  const [active, critical, high, quota, probe] = await Promise.all([
     supabase.from("ops_incidents").select("id", { count: "exact", head: true }).in("status", ["open", "investigating"]),
     supabase.from("ops_incidents").select("id", { count: "exact", head: true }).in("status", ["open", "investigating"]).eq("severity", "critical"),
     supabase.from("ops_incidents").select("id", { count: "exact", head: true }).in("status", ["open", "investigating"]).eq("severity", "high"),
     supabase.from("ops_inbox_gemini_quota").select("count").eq("date", today).maybeSingle(),
-    supabase.from("ops_incidents").select("last_seen_at").order("last_seen_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase
+      .from("ops_health_probes")
+      .select("checked_at, status, latency_ms")
+      .eq("probe_key", "ops-inbox")
+      .maybeSingle(),
   ]);
 
-  const lastIngestAt = (lastIngest.data as any)?.last_seen_at ?? null;
+  const lastProbeAt = (probe.data as any)?.checked_at ?? null;
+  const probeStatus = (probe.data as any)?.status ?? null;
+  const probeLatencyMs = (probe.data as any)?.latency_ms ?? null;
   const maxIngestAgeMinutes = parsePositiveIntEnv("OPS_INBOX_MAX_INGEST_AGE_MINUTES", 1440);
   const requireRecentIngest = parseBooleanEnv("OPS_INBOX_REQUIRE_RECENT_INGEST", true);
   const ingestTokenConfigured = Boolean(process.env.OPS_INBOX_INGEST_TOKEN?.trim());
   const notifyEnabled = isOpsInboxNotifyGloballyEnabled();
   const slackWebhookConfigured = Boolean(process.env.OPS_INBOX_SLACK_INCIDENTS_WEBHOOK?.trim());
+  const telegramNotifyEnabled = parseBooleanEnv("OPS_INBOX_TELEGRAM_NOTIFY_ENABLED", false);
+  const telegramConfigured = Boolean(
+    process.env.TELEGRAM_BOT_TOKEN?.trim() &&
+      (process.env.OPS_INBOX_TELEGRAM_CHAT_IDS?.trim() || process.env.TELEGRAM_ALLOWED_CHAT_IDS?.trim()),
+  );
 
   let ingestAgeMinutes: number | null = null;
   let ingestFresh = true;
-  if (lastIngestAt) {
-    const lastMs = Date.parse(lastIngestAt);
+  if (lastProbeAt) {
+    const lastMs = Date.parse(lastProbeAt);
     if (Number.isFinite(lastMs)) {
       ingestAgeMinutes = Math.floor((Date.now() - lastMs) / 60000);
-      ingestFresh = ingestAgeMinutes <= maxIngestAgeMinutes;
+      ingestFresh = ingestAgeMinutes <= maxIngestAgeMinutes && probeStatus === "ok";
     } else {
       ingestFresh = false;
     }
@@ -66,7 +77,10 @@ export async function GET() {
     high_count: high.count ?? 0,
     gemini_quota_used: quota.data?.count ?? 0,
     gemini_quota_limit: Number(process.env.OPS_INBOX_GEMINI_DAILY_LIMIT ?? 1400),
-    last_ingest_at: lastIngestAt,
+    last_ingest_at: lastProbeAt,
+    last_probe_at: lastProbeAt,
+    probe_status: probeStatus,
+    probe_latency_ms: probeLatencyMs,
     ingest_age_minutes: ingestAgeMinutes,
     ingest_fresh: ingestFresh,
     max_ingest_age_minutes: maxIngestAgeMinutes,
@@ -74,5 +88,7 @@ export async function GET() {
     ingest_token_configured: ingestTokenConfigured,
     notify_enabled: notifyEnabled,
     slack_webhook_configured: slackWebhookConfigured,
+    telegram_notify_enabled: telegramNotifyEnabled,
+    telegram_configured: telegramConfigured,
   }, { status: ok ? 200 : 503 });
 }

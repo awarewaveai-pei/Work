@@ -12,11 +12,15 @@
 > Build estimate: 5 個工作日（單人）
 > AI 工具盤: ChatGPT Plus / Claude Pro / Gemini Free / Cursor Pro / Copilot
 > Last audit against codebase: 2026-04-27（已對齊 `next-admin` middleware、`packages/db/migrations`、`lib/supabase-server`、`lib/ops-role`、`app/layout.tsx`）
+>
+> Current routing note (2026-05-12): Tier 1 is `#infra-alerts`, Tier 2 is
+> `#ops-incidents`. The authoritative current contract is
+> `agency-os/docs/operations/slack-notification-routing.md`.
 
 > **30-year invariants（30 年內都不能違反）**
 > 1. **不裝 Clerk、不裝 Supabase Auth**：沿用 `next-admin/middleware.ts` 的 trusted-proxy + role header 模型。
 > 2. **不裝 OpenAI / Anthropic SDK**：吃使用者既有 ChatGPT Plus / Claude Pro / Cursor Pro 訂閱，零 API 邊際成本。
-> 3. **不混流**：`#alerts-infra`（Tier 1 firehose，Netdata/Kuma 直連）與 `#ops-incidents`（Tier 2 curated，Inbox 專用）永不混流。
+> 3. **不混流**：`#infra-alerts`（Tier 1 firehose，Netdata/Kuma 直連）與 `#ops-incidents`（Tier 2 curated，Inbox 專用）永不混流。
 > 4. **不撞既有 schema / route**：Inbox 全部用 `ops_incidents`、`ops_inbox_*`、`/api/webhooks/*`、`/ops/inbox*` 命名，不動既有 `ops_console` / `ops_action_*` / `media_assets` / `ai_image_jobs` 表，不動既有 `/api/ops/*` 路由。
 > 5. **抽象先行**：`Notifier` interface 即使只有 1 個實作也要寫，這是 30 年內唯一不需重做的決策。
 
@@ -80,7 +84,7 @@ OPS_INBOX_POSTHOG_ENABLED          # "false"（v1 預設關）
 
 - [ ] `next-admin` 本地 `npm run dev` 起得來，`/api-check` 綠燈
 - [ ] Supabase awarewave 連得上：`/rest/v1/` 能 GET、service role key 有效
-- [ ] Slack `#alerts-infra` 過去 24h 內有 Netdata 訊息（驗證 Tier 1 firehose 仍正常）
+- [ ] Slack `#infra-alerts` 過去 24h 內有 Netdata 訊息（驗證 Tier 1 firehose 仍正常）
 
 **已知（2026-04-27 體檢結果，不擋路線 B）**：
 
@@ -228,7 +232,7 @@ rg --no-heading "ops_incidents|OPS_INBOX_|/api/webhooks|/ops/inbox|lib/ops-inbox
 | Sidebar 位置 | Overview 區塊，Ops Console v1 的兄弟節點 | 與 Dashboard / Ops Console v1 / API Health 並列 |
 | 資料庫 | Supabase (`awarewave` project) | 你已有，且 Sentry/PostHog 都已經連這個 |
 | Auth | **沿用 next-admin 既有：trusted reverse proxy + role header**（`x-ops-proxy-auth` + `x-ops-claims-role`，由 `OPS_PROXY_SHARED_SECRET` 驗證） | 你**沒裝 Clerk**；目前 admin 的 middleware 已是這個模型，路線 B 不引進新 auth 系統 |
-| Slack 通知 | 兩層拓撲（§6.6）：`#alerts-infra` 既有 firehose、`#ops-incidents` 新建 curated | 已有 webhook |
+| Slack 通知 | 兩層拓撲（§6.6）：`#infra-alerts` 既有 firehose、`#ops-incidents` 新建 curated | 已有 webhook |
 | Tier 1 自動分類 | Google Gemini Flash（Free Tier，1500 req/day） | 已有 `GEMINI_API_KEY`，**零** API 邊際成本 |
 | Tier 2/3 深度診斷 | 「複製 prompt + 開新分頁」吃 ChatGPT Plus / Claude Pro / Cursor Pro 訂閱 | **不裝** OpenAI / Anthropic SDK |
 | Cursor deeplink | `cursor://anysphere.cursor-deeplink/prompt?text=` | 已支援 |
@@ -283,7 +287,7 @@ rg --no-heading "ops_incidents|OPS_INBOX_|/api/webhooks|/ops/inbox|lib/ops-inbox
 | `app/layout.tsx` sidebar | Overview 區塊有 4 條連結 | **加 1 條** Ops Inbox（在 Ops Console v1 與 API Health 之間） | 純加，不刪不改 | < 5 行 diff |
 | `packages/db/migrations/` | 已到 `0012_seed_ops_console_minimal.sql` | 新增 `0013_ops_inbox.sql` | 編號連續，無撞號 | 採用既有編號慣例（§5、§10） |
 | `packages/shared/src/types/` | 只有 `v3-skeleton.ts` | **不放這裡**。Inbox 型別放 `apps/next-admin/lib/ops-inbox/types.ts` | `next.config.ts` 的 `outputFileTracingRoot` 限制在 next-admin，跨 packages 在 Docker build 會痛 | 型別隨 app 走 |
-| 既有 Slack `#alerts-infra` | Netdata / Kuma 直連 | **完全不動** | Inbox 通知改發到 `#ops-incidents`（§6.6） | 兩層拓撲分流 |
+| 既有 Slack `#infra-alerts` | Netdata / Kuma 直連 | **完全不動** | Inbox 通知改發到 `#ops-incidents`（§6.6） | 兩層拓撲分流 |
 | 既有 `getSupabaseWriteClient()` 呼叫者 | `app/api/ops/*` 的 5 個路由 | 共用同一 client，但讀寫不同表 | 表名 `ops_incidents` 與 `ops_action_*` / `ops_audit_events` / `media_assets` 完全不重疊 | grep 已驗證（§0.1.3） |
 | 既有 Sentry `@sentry/nextjs` | next-admin 已掛 | webhook handler 失敗時用 `Sentry.captureException()` | 不重複 instrument | 沿用既有 SDK 實例 |
 | 既有 `@supabase/supabase-js@^2.49.8` | next-admin 已用 | Inbox 沿用同版 | 無新依賴 | — |
@@ -300,7 +304,7 @@ URL（UI）:    /ops/inbox, /ops/inbox/[id]
 Files:        apps/next-admin/lib/ops-inbox/**
 Env vars:     OPS_INBOX_*                           （所有 inbox 專屬變數一律此前綴）
 TS types:     apps/next-admin/lib/ops-inbox/types.ts（不放 packages/shared）
-Slack:        #ops-incidents                        （和 #alerts-infra 永不混流）
+Slack:        #ops-incidents                        （和 #infra-alerts 永不混流）
 ```
 
 > 違反這套命名 → PR reviewer 直接 reject。30 年內這份命名不能改，因為改了就會出現「半 ops_incidents 半 ops_inbox_incidents」的歷史包袱。
@@ -899,7 +903,7 @@ export const KNOWN_SERVICES = Object.keys(SERVICE_REGISTRY) as KnownService[];
 ```txt
 ┌─────────────────────────────────────────────────────────────┐
 │  Tier 1：Firehose（原始告警，高頻、低訊號雜訊比）             │
-│  → Slack #alerts-infra（沿用既有，不動）                    │
+│  → Slack #infra-alerts（沿用既有，不動）                    │
 │  → 來源：Netdata、Uptime Kuma、Grafana 直連                 │
 │  → 觀眾：on-call、即時 SRE                                  │
 │  → 保留理由：Inbox 掛了也不會看不到告警（故障隔離）         │
@@ -923,8 +927,8 @@ export const KNOWN_SERVICES = Object.keys(SERVICE_REGISTRY) as KnownService[];
 | 訊號雜訊比 | Netdata 一晚刷 200 條 CPU spike，淹沒 Inbox 真正需要看的 5 條 critical | `#ops-incidents` 永遠只有「已去重、有 context、值得人看」的事件 |
 | 故障隔離 | Inbox 程式有 bug 不發通知 → 連 Netdata 告警都看不到 | Tier 1 走原路，Inbox 是錦上添花 |
 | 觀眾不同 | on-call 想看 raw、triage 想看 curated，混流兩邊都不滿意 | 每個頻道的訂閱者明確 |
-| 重複通知 | 同一 outage Netdata 發到 #alerts-infra，Inbox 也發到 #alerts-infra | 永遠不重複 |
-| 長期演進 | 之後想加 Discord / Email / PagerDuty，#alerts-infra 變成大雜燴 | 各層獨立路由，加減通道不互相影響 |
+| 重複通知 | 同一 outage Netdata 發到 #infra-alerts，Inbox 也發到 #infra-alerts | 永遠不重複 |
+| 長期演進 | 之後想加 Discord / Email / PagerDuty，#infra-alerts 變成大雜燴 | 各層獨立路由，加減通道不互相影響 |
 
 #### 6.6.2 Notifier 抽象（讓 Slack 隨時可換）
 
@@ -1502,11 +1506,11 @@ Copilot 不在 dashboard 流程內。當你點 `[Open in Cursor]` 跳到 IDE 後
 - [ ] 寫一份 `docs/ops-inbox-runbook.md`（給未來的自己怎麼用，含「換通道 SOP」）
 - [ ] 把所有 webhook URL + token 文件化進 `agency-os/.../REMOTE_WORKSTATION_STARTUP.md` 與 `credentials.md §18`
 - [ ] **驗收**：
-  - 跑完一輪 end-to-end —— Sentry 觸發 → `#ops-incidents` 收到（不是 #alerts-infra）→ 點連結進 inbox → 按 Diagnose → 看到 AI 診斷 → 按 Cursor 跳到本地修
+  - 跑完一輪 end-to-end —— Sentry 觸發 → `#ops-incidents` 收到（不是 #infra-alerts）→ 點連結進 inbox → 按 Diagnose → 看到 AI 診斷 → 按 Cursor 跳到本地修
   - 同一 fingerprint 短時間連觸 5 次：`#ops-incidents` 只收 1 條，`notification_log` 有 1 sent + 4 throttled
   - severity 從 medium 升到 critical：再發一條（含 `<!here>`），log 顯示 rule = `severity_escalation`
   - 設 `OPS_INBOX_NOTIFY_ENABLED=false` 後再觸發：`#ops-incidents` 不收，但 DB 有 incident + 有 throttle log
-  - **#alerts-infra 完全沒收到 Inbox 發的訊息**（驗證兩層拓撲分流正確）
+  - **#infra-alerts 完全沒收到 Inbox 發的訊息**（驗證兩層拓撲分流正確）
 
 ---
 
@@ -1720,7 +1724,7 @@ detail 頁的 PasteAiResultBox：
 - Server Action 把結論 push 進 ai_diagnoses 陣列，role = 'manual-paste'
 
 ## Slack 通知（兩層拓撲，§6.6 是聖經）
-- **完全不動既有 #alerts-infra**（Netdata / Kuma 直連繼續走那個頻道）
+- **完全不動既有 #infra-alerts**（Netdata / Kuma 直連繼續走那個頻道）
 - **新開 `#ops-incidents`** 給 Inbox 用，env 走 `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`
 - 寫 Notifier interface（`lib/ops-inbox/notify/`）：
   - `types.ts`（Notifier / NotificationResult）
@@ -1777,7 +1781,7 @@ OPS_INBOX_POSTHOG_ENABLED         = "false"            # v1 預設關（§15 #8�
 1. Slack workspace → Create channel → 名稱：ops-incidents
    - 描述：Curated incidents from Ops Inbox（已去重、含 AI 摘要）
    - Privacy：public（你 workspace 內公開即可）
-2. 邀請自己進去，把舊的 #alerts-infra 訂閱者**不要**自動拉進來
+2. 邀請自己進去，把舊的 #infra-alerts 訂閱者**不要**自動拉進來
    （這兩個頻道服務不同觀眾，分開訂閱）
 3. https://api.slack.com/apps → 你既有的 App（Netdata 用的那個就可以）
    → Incoming Webhooks → Add New Webhook → 選 #ops-incidents
@@ -1853,10 +1857,10 @@ OPS_INBOX_POSTHOG_ENABLED         = "false"            # v1 預設關（§15 #8�
 - [ ] `[Open n8n UI]` / `[Open Studio]` 對 remote-ui service 能正確開頁（並把 prompt 放剪貼簿）
 - [ ] 「貼回 AI 結論」能存進 `ai_diagnoses` 並在 timeline 顯示
 - [ ] **狀態機正確**：webhook 同 fingerprint 從 medium → critical 觸發 `severity_escalation` 通知；resolved 後再進來觸發 `reopen` 通知（`reopen_count++`）
-- [ ] 新 incident 自動發 Slack 通知到 **`#ops-incidents`**（不是 `#alerts-infra`）
+- [ ] 新 incident 自動發 Slack 通知到 **`#ops-incidents`**（不是 `#infra-alerts`）
 - [ ] 同 fingerprint 15 分鐘內二次觸發**不重發**，但 `notification_log` 有 throttled 紀錄
 - [ ] `OPS_INBOX_NOTIFY_ENABLED=false` 時不發 Slack（kill switch 有效）
-- [ ] **`#alerts-infra` 完全沒被 Inbox 寫入過**（兩層拓撲驗證）
+- [ ] **`#infra-alerts` 完全沒被 Inbox 寫入過**（兩層拓撲驗證）
 - [ ] Tier 1 quota 達 1400/天後不再呼叫 Gemini，列表 fallback 顯示原始 title
 
 ### 13.3 安全性（路線 B 級別）
@@ -1933,7 +1937,7 @@ create table feedback_loops ...;
 | 1 | 用哪個 Supabase project？ | `awarewave`（自架 EU）：API `https://supabase.aware-wave.com`、Studio `https://studio.aware-wave.com` | ✅ 已決 |
 | 2 | Inbox UI 掛在哪？ | `next-admin` 內 `/ops/inbox`，公開於 `https://app.aware-wave.com/ops/inbox` | ✅ 已決 |
 | 3 | Auth？ | 沿用既有 trusted-proxy + role header（無 Clerk）；webhook 用 `OPS_INBOX_INGEST_TOKEN` 獨立驗證 | ✅ 已決（§4.1） |
-| 4 | Slack 通知頻道？ | 新開 `#ops-incidents`（Tier 2 curated）；`#alerts-infra` 保持原樣（Tier 1 firehose） | ✅ 已決（§6.6） |
+| 4 | Slack 通知頻道？ | 新開 `#ops-incidents`（Tier 2 curated）；`#infra-alerts` 保持原樣（Tier 1 firehose） | ✅ 已決（§6.6） |
 | 5 | AI 成本模型？ | 訂閱優先三軌制：Gemini free / ChatGPT Plus + Claude Pro / Cursor Pro | ✅ 已決（§8.0） |
 | 6 | DB schema 對齊路線？ | 對齊藍圖 §7.2/§7.3，但只建一張 `ops_incidents`，jsonb 暫存 ai_diagnoses / notification_log | ✅ 已決（§5） |
 | 7 | Migration 系統？ | `lobster-factory/packages/db/migrations/0013_ops_inbox.sql`（既有 numbered 慣例） | ✅ 已決（§5、§10） |
@@ -1981,7 +1985,7 @@ create table feedback_loops ...;
 
 | 風險 | 機率 | 影響 | 緩解 |
 |---|---|---|---|
-| Inbox 程式 bug 不發 Slack 通知 | 中 | curated 通知漏發 | **§6.6 兩層拓撲：Tier 1 直連 `#alerts-infra` 不依賴 Inbox**，最壞退化成「沒 curated」，不會「完全看不到」 |
+| Inbox 程式 bug 不發 Slack 通知 | 中 | curated 通知漏發 | **§6.6 兩層拓撲：Tier 1 直連 `#infra-alerts` 不依賴 Inbox**，最壞退化成「沒 curated」，不會「完全看不到」 |
 | `#ops-incidents` webhook 失效 | 低 | curated 通知漏發 | `notification_log` 記 `status: failed`，可重放；`OPS_INBOX_NOTIFY_ENABLED=false` 可全域 kill |
 | Slack 公司倒閉 / 被取代（30 年內機率不低） | 中 | 通知通道整體不可用 | §6.6.2 `Notifier` 介面：新寫 `DiscordNotifier` / `EmailNotifier`，DB schema、UI、webhook handler 都不動 |
 | Slack 頻道重命名 / 重建 | 中 | webhook URL 失效 | 通道名稱不寫死在 code，env 換 webhook URL 即可 |
@@ -2021,7 +2025,7 @@ create table feedback_loops ...;
 - 不裝 OpenAI / Anthropic SDK（吃訂閱不吃 API）
 - 不寫 budgetGuard（沒有 token 收費）
 - 不裝 Clerk
-- 不把 Inbox 通知混進 #alerts-infra（§6.6 兩層拓撲，30 年都不混）
+- 不把 Inbox 通知混進 #infra-alerts（§6.6 兩層拓撲，30 年都不混）
 - 不在 code 寫死 Slack 頻道名（一律從 env 讀 webhook URL）
 - 不為了「現在只有一個 notifier」就跳過 Notifier interface（多 100 行救 30 年）
 ```
@@ -2486,7 +2490,7 @@ Invoke-RestMethod -Uri "https://app.aware-wave.com/api/ops/inbox/health" `
 
 ### D.4 兩層拓撲仍分流
 
-- [ ] `#alerts-infra` 過去 30 天**沒有** Inbox 簽名訊息（用 `ops-inbox` 字串 grep slack export）
+- [ ] `#infra-alerts` 過去 30 天**沒有** Inbox 簽名訊息（用 `ops-inbox` 字串 grep slack export）
 - [ ] `#ops-incidents` 過去 30 天**有** Inbox 簽名訊息（系統還活著）
 
 ### D.5 既有系統仍未被搞壞
@@ -2530,7 +2534,7 @@ Invoke-RestMethod -Uri "https://app.aware-wave.com/api/ops/inbox/health" `
 > - [x] §0 30-year invariants 你接受
 > - [x] §0.1 Day 0 readiness checklist 你已跑過
 > - [x] §4.2 衝突矩陣的「既有系統不退化」承諾你接受
-> - [x] §6.6 兩層通知拓撲（`#alerts-infra` vs `#ops-incidents`）已決
+> - [x] §6.6 兩層通知拓撲（`#infra-alerts` vs `#ops-incidents`）已決
 > - [x] §8.0 訂閱優先 AI 成本模型已決
 > - [x] §12.4 不做的環境變數清單已決
 > - [ ] 你給綠燈 → 執行 Cursor Task B-1

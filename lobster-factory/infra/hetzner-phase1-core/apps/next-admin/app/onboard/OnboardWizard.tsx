@@ -11,10 +11,20 @@ import {
   type DepartmentCluster,
 } from "../../lib/department-catalog";
 import type { BuildPackageSlug, BuildProvider } from "../../lib/build-console/contracts";
+import {
+  WP_PLUGIN_CATALOG,
+  resolvePluginsForPacks,
+  resolveInstallableSlugsForPacks,
+  resolvePaidPluginsForPacks,
+  resolveConditionalPlugins,
+  derivePackageSlugFromPacks,
+  type WpPluginModule,
+  type WpPlugin,
+} from "../../lib/wp-plugin-stack-catalog";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type WizardStep = 1 | 2 | 3 | 4;
+type WizardStep = 1 | 2 | 3 | 4 | 5;
 type OnboardProfile = "profile_b" | "profile_c";
 
 interface ClientInfo {
@@ -35,6 +45,16 @@ interface ClientInfo {
   workspaceId: string;
   projectId: string;
   siteId: string;
+  // WP Plugin Stack — additive pack model (base always-on + optional addon packs)
+  selectedPacks: WpPluginModule[];
+  resolvedPluginSlugs: string[];       // free auto-installable (no condition)
+  resolvedConditionalPlugins: WpPlugin[]; // conditional (e.g. litespeed on LiteSpeed host only)
+  resolvedPaidPlugins: WpPlugin[];     // paid, no free alt — manual upload required
+  // SSH connection target — passes to wp-install-plugins task
+  // (operator-supplied for existing clients; left empty when hosting adapter will provide)
+  sshHost: string;
+  wpPath: string;
+  sshCredentialsRef: string;
 }
 
 interface ProvResult {
@@ -45,15 +65,72 @@ interface ProvResult {
   detail?: string;
 }
 
+// Netdata is infra-level (monitors VPS, not per-client) — intentionally excluded.
 const PROVIDERS = [
-  { id: "sentry",      label: "Sentry",      desc: "建立 project + DSN" },
-  { id: "posthog",     label: "PostHog",      desc: "建立 project + API key" },
-  { id: "uptime_kuma", label: "Uptime Kuma",  desc: "建立 HTTP monitor" },
-  { id: "n8n",         label: "n8n",          desc: "複製 onboarding workflow" },
-  { id: "github",      label: "GitHub",       desc: "建立 client repo" },
-  { id: "trigger",     label: "Trigger.dev",  desc: "建立 project + token" },
-  { id: "supabase",    label: "Supabase",     desc: "建立 cloud project" },
-];
+  {
+    id: "sentry", label: "Sentry", icon: "🔴",
+    desc: "Error tracking — 建立 project + DSN",
+    hintDefs: [
+      { key: "sentryProjectSlug", label: "Project Slug" },
+      { key: "sentryProjectName", label: "Project Name" },
+    ],
+  },
+  {
+    id: "posthog", label: "PostHog", icon: "🦔",
+    desc: "Product analytics — 建立 project + API key",
+    hintDefs: [
+      { key: "posthogProjectName", label: "Project Name" },
+    ],
+  },
+  {
+    id: "uptime_kuma", label: "Uptime Kuma", icon: "📡",
+    desc: "Uptime monitoring — 建立 HTTP monitor",
+    hintDefs: [
+      { key: "uptimeMonitorUrl",  label: "Monitor URL" },
+      { key: "uptimeMonitorName", label: "Monitor Name" },
+    ],
+  },
+  {
+    id: "n8n", label: "n8n", icon: "⚡",
+    desc: "Automation — 複製 onboarding workflow",
+    hintDefs: [
+      { key: "n8nWorkflowSuffix", label: "Workflow Suffix" },
+    ],
+  },
+  {
+    id: "github", label: "GitHub", icon: "🐙",
+    desc: "Source control — 建立 client repo",
+    hintDefs: [
+      { key: "githubRepoName", label: "Repo Name" },
+    ],
+  },
+  {
+    id: "trigger", label: "Trigger.dev", icon: "🎯",
+    desc: "Job runner — 建立 project + deploy token",
+    hintDefs: [] as { key: string; label: string }[],
+  },
+  {
+    id: "supabase", label: "Supabase", icon: "🌊",
+    desc: "Database — 建立 cloud project + schema",
+    hintDefs: [] as { key: string; label: string }[],
+  },
+] satisfies Array<{ id: string; label: string; icon: string; desc: string; hintDefs: { key: string; label: string }[] }>;
+
+function getHintPlaceholders(info: ClientInfo): Record<string, string> {
+  const siteUrl =
+    info.profile === "profile_b"
+      ? `https://${info.domain || "client.com"}`
+      : info.siteUrl || "https://client.com";
+  return {
+    sentryProjectSlug:  info.tenantSlug  || "client-slug",
+    sentryProjectName:  info.clientName  || "Client Name",
+    posthogProjectName: info.clientName  || "Client Name",
+    githubRepoName:     info.tenantSlug  || "client-site",
+    uptimeMonitorUrl:   siteUrl,
+    uptimeMonitorName:  info.clientName  || "Client Site",
+    n8nWorkflowSuffix:  info.tenantSlug  || "client-name",
+  };
+}
 
 const GROUP_ORDER: DepartmentCluster["group"][] = [
   "core", "revenue", "supply_chain", "platform", "support", "horizontal", "cross_border",
@@ -83,6 +160,13 @@ function makeDefaultClient(): ClientInfo {
     workspaceId: randomUUID(),
     projectId: randomUUID(),
     siteId: randomUUID(),
+    selectedPacks: [],
+    resolvedPluginSlugs: resolveInstallableSlugsForPacks([]),
+    resolvedConditionalPlugins: resolveConditionalPlugins([]),
+    resolvedPaidPlugins: resolvePaidPluginsForPacks([]),
+    sshHost: "",
+    wpPath: "/var/www/html",
+    sshCredentialsRef: "",
   };
 }
 
@@ -184,15 +268,6 @@ function Step1({
             </select>
           </div>
           <div className="form-row">
-            <label className="form-label">Package</label>
-            <select className="form-select" value={info.packageSlug}
-              onChange={(e) => onChange({ packageSlug: e.target.value as BuildPackageSlug })}>
-              <option value="wp-basic">wp-basic</option>
-              <option value="wp-business">wp-business</option>
-              <option value="wc-core">wc-core</option>
-            </select>
-          </div>
-          <div className="form-row">
             <label className="form-label">Locale</label>
             <input className="form-input" value={info.locale}
               onChange={(e) => onChange({ locale: e.target.value })}
@@ -217,6 +292,36 @@ function Step1({
           </div>
         </div>
       )}
+
+      {/* ── SSH 接入（一鍵安裝外掛必填）─────────────────────────────────────── */}
+      <div className="onboard-uuid-block" style={{ marginTop: 16 }}>
+        <div className="section-title" style={{ marginBottom: 4 }}>SSH 接入（一鍵自動安裝外掛必填）</div>
+        <p className="form-hint" style={{ marginBottom: 12 }}>
+          填入後，按下 Launch 會由 Trigger.dev 自動 SSH 安裝外掛。
+          Profile B 新站可留空（hosting adapter 之後會自動填）。
+          憑證走 vault 引用，**不**在此貼真實 SSH key。
+        </p>
+        <div className="build-form-grid">
+          <div className="form-row">
+            <label className="form-label">SSH host {info.profile === "profile_c" ? <span style={{ color: "#dc2626" }}>*</span> : null}</label>
+            <input className="form-input" value={info.sshHost}
+              onChange={(e) => onChange({ sshHost: e.target.value.trim() })}
+              placeholder="soulful.aware-wave.com 或 1.2.3.4" />
+          </div>
+          <div className="form-row">
+            <label className="form-label">WP 安裝路徑</label>
+            <input className="form-input" value={info.wpPath}
+              onChange={(e) => onChange({ wpPath: e.target.value.trim() || "/var/www/html" })}
+              placeholder="/var/www/html" />
+          </div>
+          <div className="form-row" style={{ gridColumn: "1 / -1" }}>
+            <label className="form-label">SSH credentials vault ref（選填）</label>
+            <input className="form-input" value={info.sshCredentialsRef}
+              onChange={(e) => onChange({ sshCredentialsRef: e.target.value.trim() })}
+              placeholder={`vault://ssh/${info.tenantSlug || "<slug>"}`} />
+          </div>
+        </div>
+      </div>
 
       <div className="onboard-uuid-block">
         <div className="section-title" style={{ marginBottom: 8 }}>Auto-generated IDs（記錄到 Supabase）</div>
@@ -243,15 +348,235 @@ function Step1({
 
       <button type="button" className="btn-primary" disabled={!valid} onClick={onNext}
         style={{ marginTop: 20 }}>
-        下一步 → 部門選型
+        下一步 → 站型選擇
       </button>
     </div>
   );
 }
 
-// ── Step 2: Department Selection ──────────────────────────────────────────────
+// ── Step 2: WP Plugin Pack Selection ─────────────────────────────────────────
+// SSOT: agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md §一/二/三/八.1
+// 純加法模型：基礎包（必裝）+ 3 個獨立 checkbox（電商 / 旅遊 / 形象）
 
-function Step2({
+// Pre-computed module sizes (catalog is static)
+const BASE_PACK_SIZE      = WP_PLUGIN_CATALOG.filter((p) => p.module === "base").length;      // 16
+const ECOMMERCE_PACK_SIZE = WP_PLUGIN_CATALOG.filter((p) => p.module === "ecommerce").length; // 12
+const TOURISM_PACK_SIZE   = WP_PLUGIN_CATALOG.filter((p) => p.module === "tourism").length;   // 5
+const BRAND_PACK_SIZE     = WP_PLUGIN_CATALOG.filter((p) => p.module === "brand").length;     // 3
+
+const ADDON_PACKS: { id: WpPluginModule; label: string; desc: string; emoji: string; count: number }[] = [
+  { id: "ecommerce", label: "電商包",       desc: "WooCommerce / 金流 / CartFlows / Email Designer",  emoji: "🛒", count: ECOMMERCE_PACK_SIZE },
+  { id: "tourism",   label: "旅遊包",       desc: "WP Travel Engine / CPT UI / Modula Gallery / 地圖", emoji: "🏝️", count: TOURISM_PACK_SIZE   },
+  { id: "brand",     label: "形象 / 品牌包", desc: "CPT UI / Modula Gallery / Popup Maker",             emoji: "🎨", count: BRAND_PACK_SIZE     },
+];
+
+function Step2WpType({
+  info,
+  onChange,
+  onNext,
+  onBack,
+}: {
+  info: ClientInfo;
+  onChange: (patch: Partial<ClientInfo>) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const applyPacks = (packs: WpPluginModule[]) => {
+    onChange({
+      selectedPacks: packs,
+      resolvedPluginSlugs: resolveInstallableSlugsForPacks(packs),
+      resolvedConditionalPlugins: resolveConditionalPlugins(packs),
+      resolvedPaidPlugins: resolvePaidPluginsForPacks(packs),
+      packageSlug: derivePackageSlugFromPacks(packs),
+    });
+  };
+
+  const togglePack = (id: WpPluginModule) => {
+    const next = info.selectedPacks.includes(id)
+      ? info.selectedPacks.filter((p) => p !== id)
+      : [...info.selectedPacks, id];
+    applyPacks(next);
+  };
+
+  const allPlugins       = resolvePluginsForPacks(info.selectedPacks);
+  const totalCount       = allPlugins.length;
+  const autoCount        = info.resolvedPluginSlugs.length;
+  const conditionalCount = info.resolvedConditionalPlugins.length;
+  const paidCount        = info.resolvedPaidPlugins.length;
+
+  // Stack breakdown rows
+  const stackRows: { name: string; emoji: string; count: number; locked?: boolean }[] = [
+    { name: "基礎包", emoji: "📦", count: BASE_PACK_SIZE, locked: true },
+    ...ADDON_PACKS
+      .filter((p) => info.selectedPacks.includes(p.id))
+      .map((p) => ({ name: p.label, emoji: p.emoji, count: p.count })),
+  ];
+
+  // Plugins grouped by module
+  const byModule = {
+    base:      allPlugins.filter((p) => p.module === "base"),
+    ecommerce: allPlugins.filter((p) => p.module === "ecommerce"),
+    tourism:   allPlugins.filter((p) => p.module === "tourism"),
+    brand:     allPlugins.filter((p) => p.module === "brand"),
+  };
+
+  return (
+    <div className="onboard-step-body">
+      <div className="build-alert build-alert-ok" style={{ marginBottom: 16 }}>
+        <strong>純加法模型</strong>：基礎包（必裝 {BASE_PACK_SIZE} 個）＋ 勾選任意加購包，可疊加。
+        清單依據 <code>WP_CLIENT_PLUGIN_STACK.md</code>，由 Trigger.dev 透過 WP-CLI 自動安裝。
+      </div>
+
+      {/* ── Base pack (always-on, locked) ─────────────────────────────────── */}
+      <div className="dept-summary" style={{ marginBottom: 16, background: "#f0fdf4", borderColor: "#bbf7d0" }}>
+        <div className="section-title" style={{ marginBottom: 6 }}>
+          📦 基礎包 — 必裝 <strong style={{ color: "#166534" }}>{BASE_PACK_SIZE} 個</strong>
+          <span className="form-hint" style={{ marginLeft: 8 }}>（所有客戶站通用，不可取消）</span>
+        </div>
+        <p className="form-hint" style={{ margin: 0, fontSize: 11 }}>
+          Kadence Theme / Wordfence / WPvivid / Rank Math SEO / LiteSpeed Cache / ShortPixel /
+          Fluent Forms+SMTP+CRM / CleanTalk(↩Akismet) / GTM4WP / ACF / Complianz(選配) … 等
+        </p>
+      </div>
+
+      {/* ── Addon pack checkboxes ─────────────────────────────────────────── */}
+      <div className="section-title" style={{ marginBottom: 8 }}>加購包（獨立勾選，可多選）</div>
+      <div className="dept-cluster-grid" style={{ marginBottom: 16 }}>
+        {ADDON_PACKS.map(({ id, label, desc, emoji, count }) => {
+          const active = info.selectedPacks.includes(id);
+          return (
+            <label
+              key={id}
+              className={`dept-cluster-card ${active ? "selected" : ""}`}
+              style={{ cursor: "pointer" }}
+            >
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={() => togglePack(id)}
+                style={{ marginRight: 6 }}
+              />
+              <span className="dept-cluster-name">{emoji} {label}</span>
+              <span className="dept-cluster-rows">{desc}</span>
+              <span className="dept-cluster-rows" style={{ color: active ? "#166534" : "#64748b", fontWeight: 600 }}>
+                +{count} 個
+              </span>
+            </label>
+          );
+        })}
+      </div>
+
+      {/* ── Stack breakdown summary ───────────────────────────────────────── */}
+      <div className="dept-summary" style={{ marginBottom: 16 }}>
+        <div className="section-title" style={{ marginBottom: 10 }}>
+          📊 組合結果 — {stackRows.length} 個外掛包 / 共 {totalCount} 個外掛
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginBottom: 12 }}>
+          <tbody>
+            {stackRows.map((row, i) => (
+              <tr key={row.name} style={{ borderBottom: i === stackRows.length - 1 ? "2px solid var(--border-subtle)" : "1px solid #f1f5f9" }}>
+                <td style={{ padding: "6px 8px", width: 36 }}>{row.emoji}</td>
+                <td style={{ padding: "6px 8px" }}>
+                  {row.name}
+                  {row.locked && <span className="form-hint" style={{ marginLeft: 6 }}>（必裝）</span>}
+                </td>
+                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "monospace", color: "#64748b" }}>
+                  {i === 0 ? "  " : "+ "}{row.count}
+                </td>
+              </tr>
+            ))}
+            <tr>
+              <td style={{ padding: "8px" }} />
+              <td style={{ padding: "8px", fontWeight: 700 }}>總計</td>
+              <td style={{ padding: "8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace" }}>{totalCount} 個外掛</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="build-kv-grid">
+          <div><span>🟢 自動安裝（WP.org）</span><strong style={{ color: "#166534" }}>{autoCount} 個</strong></div>
+          <div>
+            <span>🔵 條件安裝（LiteSpeed 主機才裝）</span>
+            <strong style={{ color: "#1d4ed8" }}>{conditionalCount} 個</strong>
+          </div>
+          <div>
+            <span>🟡 需手動上傳（付費 zip）</span>
+            <strong style={{ color: paidCount > 0 ? "#92400e" : "#166534" }}>{paidCount} 個</strong>
+          </div>
+        </div>
+        {conditionalCount > 0 && (
+          <p className="form-hint" style={{ marginTop: 6, fontSize: 11, color: "#1d4ed8" }}>
+            條件外掛：{info.resolvedConditionalPlugins.map((p) => p.slug).join(", ")}
+            &nbsp;— 只在 LiteSpeed 主機上安裝（Hostinger VPS 預設是 LiteSpeed；Cloudways/Nginx 不裝）
+          </p>
+        )}
+        {paidCount > 0 && (
+          <p className="form-hint" style={{ marginTop: 6, fontSize: 11 }}>
+            付費外掛：{info.resolvedPaidPlugins.map((p) => p.label).join(", ")}
+            <br />
+            → 上線後到客戶 WP 後台 <code>Plugins → Add New → Upload Plugin</code> 手動上傳 zip
+          </p>
+        )}
+      </div>
+
+      {/* ── Expandable full plugin list grouped by module ──────────────── */}
+      <button
+        type="button"
+        className="btn-secondary"
+        style={{ fontSize: 12, padding: "4px 10px", marginBottom: 8 }}
+        onClick={() => setExpanded((x) => !x)}
+      >
+        {expanded ? "▲ 收起完整外掛清單" : "▼ 展開完整外掛清單（依模組分組）"}
+      </button>
+      {expanded && (
+        <div className="dept-summary" style={{ marginBottom: 16 }}>
+          {(["base", "ecommerce", "tourism", "brand"] as const).map((mod) => {
+            const list = byModule[mod];
+            if (list.length === 0) return null;
+            const moduleLabel =
+              mod === "base"      ? `📦 基礎包（${list.length}）` :
+              mod === "ecommerce" ? `🛒 電商包（${list.length}）` :
+              mod === "tourism"   ? `🏝️ 旅遊包（${list.length}）` :
+                                    `🎨 形象包（${list.length}）`;
+            return (
+              <div key={mod} style={{ marginBottom: 12 }}>
+                <div className="section-title" style={{ fontSize: 12, marginBottom: 6 }}>{moduleLabel}</div>
+                <div className="dept-file-list">
+                  {list.map((p) => (
+                    <div key={`${mod}-${p.slug}`} className="dept-file-row">
+                      <code className="dept-file-path">{p.slug}</code>
+                      <span className="dept-file-fields" style={{ color: !p.free && !p.alternativeSlug ? "#92400e" : undefined }}>
+                        {p.label}
+                        {!p.free && p.alternativeSlug && (
+                          <span className="dept-file-recommended"> ↩ {p.alternativeSlug}</span>
+                        )}
+                        {!p.free && !p.alternativeSlug && " ⚠ 需手動上傳"}
+                        {!p.required && " † 選配"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+        <button type="button" className="btn-secondary" onClick={onBack}>← 返回</button>
+        <button type="button" className="btn-primary" onClick={onNext}>
+          下一步 → 部門選型
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 3: Department Selection ──────────────────────────────────────────────
+
+function Step3Dept({
   tenantSlug,
   selected,
   onChange,
@@ -355,9 +680,9 @@ function Step2({
   );
 }
 
-// ── Step 3: Service Provisioning ──────────────────────────────────────────────
+// ── Step 4: Service Provisioning ──────────────────────────────────────────────
 
-function Step3({
+function Step4Svc({
   info,
   providers,
   onProvidersChange,
@@ -380,56 +705,117 @@ function Step3({
   onNext: () => void;
   onBack: () => void;
 }) {
-  const toggle = (id: string) => {
+  const toggle = (id: string) =>
     onProvidersChange(
       providers.includes(id) ? providers.filter((p) => p !== id) : [...providers, id]
     );
-  };
+
+  const allIds = PROVIDERS.map((p) => p.id);
+  const allSelected = allIds.every((id) => providers.includes(id));
+  const placeholders = getHintPlaceholders(info);
+
+  const setHint = (key: string, value: string) =>
+    onHintsChange({ ...hints, [key]: value });
 
   return (
     <div className="onboard-step-body">
-      <p className="form-hint" style={{ marginBottom: 16 }}>
-        選擇要為此客戶建立的外部服務帳號。系統使用 master token（已存於 Trigger worker 環境變數），
-        為每位客戶建立獨立 project／monitor／DSN，結果寫入 Supabase{" "}
-        <code>tenant_integration_bindings</code>。
+      <p className="form-hint" style={{ marginBottom: 12 }}>
+        系統使用 master token（已存於 Trigger worker 環境）為每位客戶建立獨立 project／monitor／DSN，
+        結果寫入 Supabase <code>tenant_integration_bindings</code>。
+        留空 Hints 使用自動衍生值（顯示於 placeholder）。
       </p>
 
-      <div className="dept-cluster-grid" style={{ marginBottom: 16 }}>
-        {PROVIDERS.map((p) => (
-          <label
-            key={p.id}
-            className={`dept-cluster-card ${providers.includes(p.id) ? "selected" : ""}`}
-          >
-            <input type="checkbox" checked={providers.includes(p.id)} onChange={() => toggle(p.id)} />
-            <span className="dept-cluster-name">{p.label}</span>
-            <span className="dept-cluster-rows">{p.desc}</span>
-          </label>
-        ))}
+      {/* ── Bulk controls ─────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <span className="section-title" style={{ marginBottom: 0 }}>
+          已選 {providers.length} / {PROVIDERS.length} 個服務
+        </span>
+        <button type="button" className="btn-secondary"
+          style={{ fontSize: 12, padding: "3px 10px" }}
+          onClick={() => onProvidersChange(allSelected ? [] : allIds)}>
+          {allSelected ? "全部取消" : "全選 7 個"}
+        </button>
       </div>
 
-      <div className="section-title" style={{ marginBottom: 8 }}>選填 Hints（留空使用預設）</div>
-      <div className="build-form-grid">
-        {[
-          { key: "sentryProjectSlug",   label: "Sentry project slug",  ph: "client-slug" },
-          { key: "sentryProjectName",   label: "Sentry project name",  ph: info.clientName || "Client Name" },
-          { key: "posthogProjectName",  label: "PostHog project name", ph: info.clientName || "Client Name" },
-          { key: "githubRepoName",      label: "GitHub repo name",     ph: info.tenantSlug || "client-site" },
-          { key: "uptimeMonitorUrl",    label: "Uptime monitor URL",   ph: info.profile === "profile_b" ? `https://${info.domain || "client.com"}` : info.siteUrl || "https://client.com" },
-          { key: "uptimeMonitorName",   label: "Uptime monitor name",  ph: info.clientName || "Client Site" },
-          { key: "n8nWorkflowSuffix",   label: "n8n workflow suffix",  ph: info.tenantSlug || "client-name" },
-        ].map(({ key, label, ph }) => (
-          <div key={key} className="form-row">
-            <label className="form-label">{label}</label>
-            <input className="form-input" value={hints[key] ?? ""}
-              onChange={(e) => onHintsChange({ ...hints, [key]: e.target.value })}
-              placeholder={ph} />
-          </div>
-        ))}
+      {/* ── Per-service cards ─────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        {PROVIDERS.map((p) => {
+          const active = providers.includes(p.id);
+          return (
+            <div
+              key={p.id}
+              style={{
+                border: `1px solid ${active ? "#3b82f6" : "var(--border-subtle, #e2e8f0)"}`,
+                borderLeft: `4px solid ${active ? "#3b82f6" : "#cbd5e1"}`,
+                borderRadius: 8,
+                padding: "14px 16px",
+                background: active ? "#f0f9ff" : "var(--surface-bg, #fff)",
+                opacity: active ? 1 : 0.65,
+                transition: "all 0.15s",
+              }}
+            >
+              {/* Header row */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                    <span style={{ fontSize: 20 }}>{p.icon}</span>
+                    <strong style={{ fontSize: 15 }}>{p.label}</strong>
+                  </div>
+                  <span className="form-hint" style={{ margin: 0 }}>{p.desc}</span>
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", flexShrink: 0, marginLeft: 16 }}>
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={() => toggle(p.id)}
+                    style={{ width: 16, height: 16 }}
+                  />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: active ? "#1d4ed8" : "#94a3b8" }}>
+                    {active ? "✓ 開通" : "略過"}
+                  </span>
+                </label>
+              </div>
+
+              {/* Hint fields (always visible; disabled when not selected) */}
+              {p.hintDefs.length > 0 && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: p.hintDefs.length > 1 ? "1fr 1fr" : "1fr",
+                    gap: "8px 12px",
+                    marginTop: 12,
+                  }}
+                >
+                  {p.hintDefs.map(({ key, label }) => (
+                    <div key={key} className="form-row" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontSize: 11, marginBottom: 3 }}>{label}</label>
+                      <input
+                        className="form-input"
+                        style={{ fontSize: 12, opacity: active ? 1 : 0.5 }}
+                        value={hints[key] ?? ""}
+                        onChange={(e) => setHint(key, e.target.value)}
+                        placeholder={`自動：${placeholders[key] ?? "—"}`}
+                        disabled={!active}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {p.hintDefs.length === 0 && active && (
+                <p className="form-hint" style={{ margin: "10px 0 0", fontSize: 11, color: "#64748b" }}>
+                  自動建立 — 不需要額外設定
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {provResult ? (
+      {/* ── Result banner ─────────────────────────────────────────────────── */}
+      {provResult && (
         <div className={`build-alert ${provResult.ok ? "build-alert-ok" : "build-alert-blocked"}`}
-          style={{ marginTop: 12 }}>
+          style={{ marginBottom: 12 }}>
           {provResult.ok ? (
             <>
               ✓ Trigger.dev 已接受 — runId: <code>{provResult.runId ?? "unknown"}</code>
@@ -439,24 +825,30 @@ function Step3({
             <>Error: {provResult.error}{provResult.detail ? <><br />{provResult.detail}</> : null}</>
           )}
         </div>
-      ) : null}
+      )}
 
-      <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+      <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
         <button type="button" className="btn-secondary" onClick={onBack}>← 返回</button>
-        <button type="button" className="btn-secondary" disabled={loading || providers.length === 0} onClick={onSubmit}>
-          {loading ? "開通中…" : `一鍵開通 ${providers.length} 個服務`}
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={loading || providers.length === 0}
+          onClick={onSubmit}
+          style={{ fontWeight: 600 }}
+        >
+          {loading ? "開通中…" : `⚡ 一鍵開通 ${providers.length} 個服務`}
         </button>
         <button type="button" className="btn-primary" onClick={onNext}>
-          {provResult?.ok ? "下一步 → 啟動 Build ✓" : "跳過，直接啟動 Build →"}
+          {provResult?.ok ? "下一步 → 啟動 Build ✓" : "跳過 →"}
         </button>
       </div>
     </div>
   );
 }
 
-// ── Step 4: Launch ────────────────────────────────────────────────────────────
+// ── Step 5: Launch ────────────────────────────────────────────────────────────
 
-function Step4({
+function Step5Launch({
   info,
   selectedDepts,
   providers,
@@ -469,6 +861,11 @@ function Step4({
   provResult: ProvResult | null;
   onBack: () => void;
 }) {
+  const totalPlugins = resolvePluginsForPacks(info.selectedPacks).length;
+  const packLabel = info.selectedPacks.length === 0
+    ? "基礎包"
+    : `基礎包 + ${info.selectedPacks.map((p) => ({ ecommerce: "電商包", tourism: "旅遊包", brand: "形象包" })[p]).join(" + ")}`;
+
   const params = new URLSearchParams({
     profile: info.profile,
     clientName: info.clientName,
@@ -482,6 +879,12 @@ function Step4({
       : { siteUrl: info.siteUrl, wpAdminUrl: info.wpAdminUrl }
     ),
   });
+  if (info.selectedPacks.length > 0) params.set("selectedPacks", info.selectedPacks.join(","));
+  params.set("pluginSlugs", info.resolvedPluginSlugs.join(","));
+  params.set("paidPluginCount", String(info.resolvedPaidPlugins.length));
+  if (info.sshHost)            params.set("sshHost", info.sshHost);
+  if (info.wpPath)             params.set("wpPath", info.wpPath);
+  if (info.sshCredentialsRef)  params.set("sshCredentialsRef", info.sshCredentialsRef);
 
   const buildUrl = `/build?${params.toString()}`;
 
@@ -496,6 +899,23 @@ function Step4({
         <div><span>Slug</span><strong>{info.tenantSlug || "—"}</strong></div>
         <div><span>Email</span><strong>{info.customerEmail || "—"}</strong></div>
         <div><span>Profile</span><strong>{info.profile}</strong></div>
+        <div><span>外掛包組合</span><strong>{packLabel}</strong></div>
+        <div>
+          <span>容器 Manifest（自動）</span>
+          <strong style={{ fontFamily: "monospace", fontSize: 12 }}>{info.packageSlug}</strong>
+        </div>
+        <div>
+          <span>外掛總數</span>
+          <strong>
+            {totalPlugins}（可自動安裝 {info.resolvedPluginSlugs.length} / 需手動授權 {info.resolvedPaidPlugins.length}）
+          </strong>
+        </div>
+        <div>
+          <span>SSH host</span>
+          <strong style={{ color: info.sshHost ? "#166534" : "#92400e", fontFamily: info.sshHost ? "monospace" : undefined, fontSize: 11 }}>
+            {info.sshHost || "未填 — 一鍵安裝外掛將跳過（hosting adapter 之後可補）"}
+          </strong>
+        </div>
         <div><span>Departments</span><strong>{selectedDepts.size} / 20</strong></div>
         <div><span>Services</span><strong>{provResult?.ok ? `${provResult.providers?.join(", ")}` : providers.length > 0 ? "待開通" : "跳過"}</strong></div>
         <div><span>organizationId</span><strong style={{ fontSize: 11, fontFamily: "monospace" }}>{info.organizationId}</strong></div>
@@ -504,9 +924,9 @@ function Step4({
 
       <div className="section-title" style={{ marginTop: 20, marginBottom: 8 }}>下一步</div>
       <ol style={{ paddingLeft: 20, lineHeight: 2 }}>
-        <li>將 <code>DEPARTMENT_SELECTION.json</code>（Step 2 複製的 JSON）貼入 <code>tenants/{info.tenantSlug || "<slug>"}/core/</code></li>
+        <li>將 <code>DEPARTMENT_SELECTION.json</code>（Step 3 複製的 JSON）貼入 <code>tenants/{info.tenantSlug || "<slug>"}/core/</code></li>
         <li>在 Supabase 建立 organization / workspace / project / site 記錄（使用上方 UUID）</li>
-        <li>點擊「啟動 Build Console」→ 選擇 <code>enqueue</code> 模式執行部署</li>
+        <li>點擊「啟動 Build Console」→ 選擇 <code>enqueue</code> 模式執行部署（外掛將由 Trigger.dev 自動安裝）</li>
       </ol>
 
       <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
@@ -523,9 +943,10 @@ function Step4({
 
 const STEPS: { step: WizardStep; label: string }[] = [
   { step: 1, label: "客戶資訊" },
-  { step: 2, label: "部門選型（M3）" },
-  { step: 3, label: "開通服務" },
-  { step: 4, label: "啟動 Build" },
+  { step: 2, label: "站型選擇" },
+  { step: 3, label: "部門選型（M3）" },
+  { step: 4, label: "開通服務" },
+  { step: 5, label: "啟動 Build" },
 ];
 
 export default function OnboardWizard() {
@@ -542,7 +963,7 @@ export default function OnboardWizard() {
     setInfo((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  // Auto-register client in Supabase organizations table when entering Step 4.
+  // Auto-register client in Supabase organizations table when entering Step 5.
   // Non-blocking: wizard advances regardless of result.
   const createOrgRecord = async () => {
     if (!info.tenantSlug.trim() || !info.clientName.trim()) return;
@@ -575,9 +996,9 @@ export default function OnboardWizard() {
     }
   };
 
-  const goToStep4 = async () => {
+  const goToStep5 = async () => {
     await createOrgRecord();
-    setStep(4);
+    setStep(5);
   };
 
   const submitProvisioning = async () => {
@@ -612,7 +1033,7 @@ export default function OnboardWizard() {
           <div key={s} className={`onboard-progress-item ${step === s ? "active" : step > s ? "done" : ""}`}>
             <StepBadge step={s} current={step} />
             <span className="onboard-progress-label">{label}</span>
-            {s < 4 && <span className="onboard-progress-sep">→</span>}
+            {s < 5 && <span className="onboard-progress-sep">→</span>}
           </div>
         ))}
       </div>
@@ -627,12 +1048,11 @@ export default function OnboardWizard() {
 
       {step >= 2 && (
         <div className="build-panel" style={{ marginTop: 16 }}>
-          <StepHeader step={2} current={step} label="Step 2 — 部門選型（M3 · 20 部門）" />
+          <StepHeader step={2} current={step} label="Step 2 — 網站類型 + 外掛堆疊" />
           {step === 2 && (
-            <Step2
-              tenantSlug={info.tenantSlug}
-              selected={selectedDepts}
-              onChange={setSelectedDepts}
+            <Step2WpType
+              info={info}
+              onChange={patchInfo}
               onNext={() => setStep(3)}
               onBack={() => setStep(1)}
             />
@@ -642,18 +1062,13 @@ export default function OnboardWizard() {
 
       {step >= 3 && (
         <div className="build-panel" style={{ marginTop: 16 }}>
-          <StepHeader step={3} current={step} label="Step 3 — 開通外部服務帳號" />
+          <StepHeader step={3} current={step} label="Step 3 — 部門選型（M3 · 20 部門）" />
           {step === 3 && (
-            <Step3
-              info={info}
-              providers={providers}
-              onProvidersChange={setProviders}
-              hints={hints}
-              onHintsChange={setHints}
-              provResult={provResult}
-              loading={provLoading || orgCreating}
-              onSubmit={submitProvisioning}
-              onNext={() => { void goToStep4(); }}
+            <Step3Dept
+              tenantSlug={info.tenantSlug}
+              selected={selectedDepts}
+              onChange={setSelectedDepts}
+              onNext={() => setStep(4)}
               onBack={() => setStep(2)}
             />
           )}
@@ -662,14 +1077,34 @@ export default function OnboardWizard() {
 
       {step >= 4 && (
         <div className="build-panel" style={{ marginTop: 16 }}>
-          <StepHeader step={4} current={step} label="Step 4 — 啟動 Build Console" />
+          <StepHeader step={4} current={step} label="Step 4 — 開通外部服務帳號" />
           {step === 4 && (
-            <Step4
+            <Step4Svc
+              info={info}
+              providers={providers}
+              onProvidersChange={setProviders}
+              hints={hints}
+              onHintsChange={setHints}
+              provResult={provResult}
+              loading={provLoading || orgCreating}
+              onSubmit={submitProvisioning}
+              onNext={() => { void goToStep5(); }}
+              onBack={() => setStep(3)}
+            />
+          )}
+        </div>
+      )}
+
+      {step >= 5 && (
+        <div className="build-panel" style={{ marginTop: 16 }}>
+          <StepHeader step={5} current={step} label="Step 5 — 啟動 Build Console" />
+          {step === 5 && (
+            <Step5Launch
               info={info}
               selectedDepts={selectedDepts}
               providers={providers}
               provResult={provResult}
-              onBack={() => setStep(3)}
+              onBack={() => setStep(4)}
             />
           )}
         </div>

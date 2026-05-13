@@ -1,0 +1,22 @@
+{
+  "name": "lobster-e2e-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright E2E test suite for Lobster Factory — smoke, QA, client-site, a11y, perf",
+  "scripts": {
+    "install:browsers": "npx playwright install chromium --with-deps",
+    "test": "playwright test",
+    "test:smoke": "playwright test --project=smoke",
+    "test:qa": "playwright test --project=qa",
+    "test:client": "playwright test --project=client",
+    "test:a11y": "playwright test --project=a11y",
+    "test:perf": "playwright test --project=perf",
+    "test:screenshot": "playwright test --project=screenshot",
+    "report": "playwright show-report playwright-report"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.0.0"
+  }
+}

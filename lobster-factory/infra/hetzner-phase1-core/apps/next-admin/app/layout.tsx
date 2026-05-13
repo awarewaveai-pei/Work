@@ -49,6 +49,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               {/* 3. 操作（需要動作的事）────────────────────── */}
               <div className="sidebar-section">
                 <div className="sidebar-section-label">Actions</div>
+                <Link href="/ops/repairs" className="sidebar-link" title="自動維修控制面：incident → PR → deploy gate">
+                  <span className="sidebar-icon">🛠</span> Repair Center
+                </Link>
                 <Link href="/ops/approvals" className="sidebar-link" title="高風險指令簽核佇列">
                   <span className="sidebar-icon">✓</span> Approvals
                 </Link>

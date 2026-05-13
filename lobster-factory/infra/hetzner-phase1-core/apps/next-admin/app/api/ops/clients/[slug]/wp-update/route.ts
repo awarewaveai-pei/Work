@@ -20,9 +20,13 @@ import {
   getSupabaseServerClient,
   getSupabaseWriteClient,
 } from "../../../../../../lib/supabase-server";
+import { timingSafeEqual } from "../../../../../../lib/ops-inbox/verifyIngestToken";
 import type { ClientConfig } from "../../../../../../app/api/ops/clients/route";
 
 export const dynamic = "force-dynamic";
+
+const WP_PATH_RE = /^[A-Za-z0-9_/\-.]+$/;
+const PLUGIN_SLUG_RE = /^[a-z0-9-]+$/;
 export const maxDuration = 300;
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -32,8 +36,8 @@ const SYNC_KEY = process.env.OPS_PROXY_SHARED_SECRET ?? "";
 function isAuthorized(request: NextRequest): boolean {
   const { role } = resolveOpsRole(request);
   if (canSyncWpReport(role)) return true;
-  const syncKey = request.headers.get("x-ops-sync-key");
-  return !!(SYNC_KEY && syncKey === SYNC_KEY);
+  const syncKey = request.headers.get("x-ops-sync-key") ?? "";
+  return !!(SYNC_KEY && timingSafeEqual(syncKey, SYNC_KEY));
 }
 
 // ── SSH helpers ───────────────────────────────────────────────────────────────
@@ -171,6 +175,13 @@ export async function POST(
   }
   const privateKey = Buffer.from(sshKeyB64, "base64").toString("utf-8");
   const plugins: string[] = cfg.waves?.[wave] ?? [];
+
+  if (!WP_PATH_RE.test(cfg.wp_path!)) {
+    return new Response("Invalid wp_path in client_config", { status: 400 });
+  }
+  if (plugins.some((p) => !PLUGIN_SLUG_RE.test(p))) {
+    return new Response("Invalid plugin slug in client_config waves", { status: 400 });
+  }
 
   // ── SSE stream ───────────────────────────────────────────────────────────
 

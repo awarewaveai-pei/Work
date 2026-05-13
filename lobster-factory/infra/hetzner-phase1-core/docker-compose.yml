@@ -32,6 +32,11 @@ services:
       - /etc/nginx/.htpasswd_studio:/etc/nginx/.htpasswd_studio:ro
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.50'
     logging: *lobster-logging
 
   redis:
@@ -50,6 +55,11 @@ services:
       retries: 5
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
     logging: *lobster-logging
 
   # Canonical self-hosted n8n for AwareWave is on EU (see SERVICE_CREDENTIALS_MAP.md).
@@ -96,6 +106,11 @@ services:
       start_period: 40s
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
     logging: *lobster-logging
 
   wordpress-db:
@@ -123,6 +138,11 @@ services:
       start_period: 40s
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.00'
     logging: *lobster-logging
 
   wordpress:
@@ -165,6 +185,11 @@ services:
       start_period: 90s
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: '0.50'
     logging: *lobster-logging
 
   node-api:
@@ -198,6 +223,11 @@ services:
       start_period: 25s
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
     logging: *lobster-logging
 
   next-admin:
@@ -228,6 +258,9 @@ services:
       OPS_INBOX_NOTIFY_ENABLED: ${OPS_INBOX_NOTIFY_ENABLED:-}
       OPS_INBOX_SLACK_INCIDENTS_WEBHOOK: ${OPS_INBOX_SLACK_INCIDENTS_WEBHOOK:-}
       OPS_INBOX_PUBLIC_URL: ${OPS_INBOX_PUBLIC_URL:-}
+      OPS_INBOX_TELEGRAM_NOTIFY_ENABLED: ${OPS_INBOX_TELEGRAM_NOTIFY_ENABLED:-}
+      OPS_INBOX_TELEGRAM_NOTIFY_MIN_SEVERITY: ${OPS_INBOX_TELEGRAM_NOTIFY_MIN_SEVERITY:-medium}
+      OPS_INBOX_TELEGRAM_CHAT_IDS: ${OPS_INBOX_TELEGRAM_CHAT_IDS:-}
       OPS_INBOX_POSTHOG_ENABLED: ${OPS_INBOX_POSTHOG_ENABLED:-}
       OPS_INBOX_GEMINI_ENABLED: ${OPS_INBOX_GEMINI_ENABLED:-}
       OPS_INBOX_GEMINI_DAILY_LIMIT: ${OPS_INBOX_GEMINI_DAILY_LIMIT:-1400}
@@ -235,7 +268,40 @@ services:
       OPS_PROXY_SHARED_SECRET: ${OPS_PROXY_SHARED_SECRET:-}
       OPS_ALLOW_SIMULATED_ROLE_FALLBACK: ${OPS_ALLOW_SIMULATED_ROLE_FALLBACK:-}
       OPS_ROLE_RESOLUTION_MODE: ${OPS_ROLE_RESOLUTION_MODE:-}
+      OPS_SIMULATED_FALLBACK_ROLE: ${OPS_SIMULATED_FALLBACK_ROLE:-}
       INTERNAL_ADMIN_BASE_URL: ${INTERNAL_ADMIN_BASE_URL:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      TELEGRAM_ALLOWED_USER_IDS: ${TELEGRAM_ALLOWED_USER_IDS:-}
+      TELEGRAM_ALLOWED_CHAT_IDS: ${TELEGRAM_ALLOWED_CHAT_IDS:-}
+      # Command Plane: org/workspace scope (Phase 1: single-owner deployment)
+      COMMAND_PLANE_DEFAULT_ORG_ID: ${COMMAND_PLANE_DEFAULT_ORG_ID:-}
+      COMMAND_PLANE_DEFAULT_WORKSPACE_ID: ${COMMAND_PLANE_DEFAULT_WORKSPACE_ID:-}
+      # AI handlers (/daily_review, /weekly_review) — falls back to raw JSON if unset
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Repair Center: backup gate + GitHub handoff + Slack interactive approval
+      AUTO_REPAIR_BACKUP_WEBHOOK_URL: ${AUTO_REPAIR_BACKUP_WEBHOOK_URL:-}
+      AUTO_REPAIR_BACKUP_WEBHOOK_TOKEN: ${AUTO_REPAIR_BACKUP_WEBHOOK_TOKEN:-}
+      AUTO_REPAIR_SG_SSH_HOST: ${AUTO_REPAIR_SG_SSH_HOST:-}
+      AUTO_REPAIR_SG_SSH_PORT: ${AUTO_REPAIR_SG_SSH_PORT:-}
+      AUTO_REPAIR_SG_SSH_USER: ${AUTO_REPAIR_SG_SSH_USER:-}
+      AUTO_REPAIR_SG_SSH_KEY_ENV: ${AUTO_REPAIR_SG_SSH_KEY_ENV:-}
+      AUTO_REPAIR_SG_SSH_KEY_B64: ${AUTO_REPAIR_SG_SSH_KEY_B64:-}
+      AUTO_REPAIR_EU_SSH_HOST: ${AUTO_REPAIR_EU_SSH_HOST:-}
+      AUTO_REPAIR_EU_SSH_PORT: ${AUTO_REPAIR_EU_SSH_PORT:-}
+      AUTO_REPAIR_EU_SSH_USER: ${AUTO_REPAIR_EU_SSH_USER:-}
+      AUTO_REPAIR_EU_SSH_KEY_ENV: ${AUTO_REPAIR_EU_SSH_KEY_ENV:-}
+      AUTO_REPAIR_EU_SSH_KEY_B64: ${AUTO_REPAIR_EU_SSH_KEY_B64:-}
+      AUTO_REPAIR_REQUIRE_EU_BACKUP: ${AUTO_REPAIR_REQUIRE_EU_BACKUP:-}
+      AUTO_REPAIR_SG_PHASE1_ROOT: ${AUTO_REPAIR_SG_PHASE1_ROOT:-}
+      AUTO_REPAIR_SG_BACKUP_SCRIPT: ${AUTO_REPAIR_SG_BACKUP_SCRIPT:-}
+      AUTO_REPAIR_SG_VERIFY_SCRIPT: ${AUTO_REPAIR_SG_VERIFY_SCRIPT:-}
+      AUTO_REPAIR_EU_BACKUP_SCRIPT: ${AUTO_REPAIR_EU_BACKUP_SCRIPT:-}
+      AUTO_REPAIR_EU_VERIFY_SCRIPT: ${AUTO_REPAIR_EU_VERIFY_SCRIPT:-}
+      AUTO_REPAIR_GITHUB_TOKEN: ${AUTO_REPAIR_GITHUB_TOKEN:-}
+      AUTO_REPAIR_GITHUB_OWNER: ${AUTO_REPAIR_GITHUB_OWNER:-}
+      AUTO_REPAIR_GITHUB_REPO: ${AUTO_REPAIR_GITHUB_REPO:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
       # Build Console: optional immediate Trigger.dev dispatcher kick (see apps/next-admin/lib/kick-dispatcher.ts)
       TRIGGER_SECRET_KEY: ${TRIGGER_SECRET_KEY:-}
       TRIGGER_API_URL: ${TRIGGER_API_URL:-https://api.trigger.dev}
@@ -259,6 +325,11 @@ services:
       start_period: 50s
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.00'
     logging: *lobster-logging
 
 networks:

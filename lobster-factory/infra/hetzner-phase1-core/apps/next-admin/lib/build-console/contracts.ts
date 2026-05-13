@@ -1,3 +1,6 @@
+import type { WpSiteType, WpPluginModule } from "../wp-plugin-stack-catalog";
+export type { WpSiteType, WpPluginModule };
+
 export type BuildProfile = "profile_a" | "profile_b" | "profile_c";
 export type BuildExecutionMode = "plan_only" | "enqueue";
 export type BuildEnvironment = "staging" | "production";
@@ -75,6 +78,25 @@ export interface BuildRunRequest {
   siteUrl?: string;
   wpAdminUrl?: string;
   packageSlug?: BuildPackageSlug;
+  /**
+   * WP Plugin Stack (additive pack model, OnboardWizard v2).
+   * Replaces wpSiteType + hasEcommerce. Array of addon pack ids; base is always implied.
+   * e.g. ["ecommerce"], ["tourism", "ecommerce"], []
+   */
+  selectedPacks?: WpPluginModule[];
+  /** Legacy — kept for BuildConsole manual form and backward compat. Prefer selectedPacks. */
+  wpSiteType?: WpSiteType;
+  hasEcommerce?: boolean;
+  /** Resolved installable slugs (free plugins + free alternatives) from resolveInstallableSlugsForPacks() */
+  pluginSlugs?: string[];
+  /** Count of paid plugins with no free alternative — operator must install manually */
+  paidPluginCount?: number;
+  /** SSH host of the target WordPress server (operator-supplied for existing clients, or auto-filled by hosting adapter for new ones) */
+  sshHost?: string;
+  /** WordPress root path on the SSH host. Defaults to /var/www/html when omitted. */
+  wpPath?: string;
+  /** Vault reference for SSH credentials (e.g. vault://ssh/<client-slug>); never contains the key itself */
+  sshCredentialsRef?: string;
   provider?: BuildProvider;
   locale?: string;
   credentialsRef?: string;
@@ -145,18 +167,26 @@ export interface BuildRunResponse {
   details?: string;
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function isUuid(value: string | undefined): boolean {
   return !!value && UUID_RE.test(value);
 }
 
 export function normalizeBuildRequest(payload: BuildRunRequest): BuildRunRequest {
+  let derivedSlug: BuildPackageSlug;
+  if (payload.selectedPacks) {
+    derivedSlug = payload.selectedPacks.includes("ecommerce") ? "wc-core"
+      : payload.selectedPacks.includes("brand") ? "wp-business"
+      : "wp-basic";
+  } else {
+    derivedSlug = (payload.hasEcommerce || payload.wpSiteType === "ecommerce") ? "wc-core" : "wp-basic";
+  }
   return {
     ...payload,
     executionMode: payload.executionMode ?? "plan_only",
     environment: payload.environment ?? "staging",
-    packageSlug: payload.packageSlug ?? "wp-basic",
+    packageSlug: payload.packageSlug ?? derivedSlug,
     provider: payload.provider ?? defaultProviderFor(payload.profile),
     locale: payload.locale?.trim() || "en_US",
     clientName: payload.clientName?.trim(),
@@ -209,9 +239,18 @@ function defaultProviderFor(profile: BuildRunRequest["profile"]): BuildProvider 
   return "hostinger";
 }
 
-function smokeProfileFor(packageSlug: BuildPackageSlug | undefined): BuildPlan["smokeProfile"] {
-  if (packageSlug === "wp-business") return "business";
-  if (packageSlug === "wc-core") return "woocommerce";
+function smokeProfileFor(req: BuildRunRequest): BuildPlan["smokeProfile"] {
+  // Pack-based model (OnboardWizard v2)
+  if (req.selectedPacks) {
+    if (req.selectedPacks.includes("ecommerce")) return "woocommerce";
+    if (req.selectedPacks.includes("brand")) return "business";
+    return "basic";
+  }
+  // Legacy: wpSiteType + hasEcommerce
+  if (req.hasEcommerce || req.wpSiteType === "ecommerce") return "woocommerce";
+  if (req.wpSiteType === "brand") return "business";
+  if (req.packageSlug === "wc-core") return "woocommerce";
+  if (req.packageSlug === "wp-business") return "business";
   return "basic";
 }
 
@@ -294,7 +333,7 @@ function profileAPlan(input: BuildRunRequest, environment: BuildEnvironment): Bu
 
 function profileBPlan(input: BuildRunRequest, environment: BuildEnvironment): BuildPlan {
   const packageSlug = input.packageSlug ?? "wp-basic";
-  const smokeProfile = smokeProfileFor(packageSlug);
+  const smokeProfile = smokeProfileFor(input);
   const blockers: string[] = [];
   if (!input.domain) blockers.push("new customer domain is required");
   if (!input.provider) blockers.push("hosting provider is required");

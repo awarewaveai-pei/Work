@@ -8,11 +8,22 @@
 
 ## 一、這份文件是什麼
 
-這是一份完整的施工計劃書，讓 Sentry / Uptime Kuma / Netdata 偵測到問題後，AI 自動幫你修，你只需要在手機 Slack 上按兩下。
+這是一份完整的施工計劃書，讓第一批正式 intake（Sentry / Uptime Kuma / Netdata）與已存在的延伸訊號（Grafana、PostHog、GitHub Actions、health endpoints、Cloudflare、Supabase、n8n、Trigger.dev、deploy drift、WordPress/MainWP）進入同一條 Ops Inbox -> Repair Center 路徑。AI 只會在政策允許時協助修復；你仍只需要在手機 Slack 上按兩下。
 
 **你的角色**：看通知 → 按 Approve → 看摘要 → 按 Merge → 打 `/sg-deploy`。其餘全自動。
 
 **這份文件可以直接交給 Claude Code 執行。**
+
+### 2026-05-12 Routing Baseline
+
+本文件自 2026-05-12 起以目前正式營運中的通知契約為唯一基準：
+
+- `#infra-alerts`：raw infrastructure / monitor firehose
+- `#ops-incidents`：curated incident channel，供人優先處理
+- `#github-prs`：auto-repair PR 通知
+- Telegram：手機備援通知 + command plane，不是第三套 incident bus
+
+舊版 `#alerts-critical` / `#alerts-info` 設計視為作廢。後續任何代理、文件、workflow、webhook route 都不得重新建立第二套路由中心。
 
 ---
 
@@ -54,26 +65,43 @@ EU 機 (204.168.175.41) — 資料 + 工作流
 | Sentry | ✅ 有在收錯誤 | 需接 webhook |
 | Uptime Kuma | ✅ uptime.aware-wave.com | 需接 webhook |
 | Netdata | ✅ 已設定 | 需接 webhook |
-| Slack workspace | ✅ 已有 #infra-alerts | 需建新頻道 + 設 App |
+| Slack workspace | ✅ 已有 #infra-alerts / #ops-incidents | 只新增 #github-prs；Slack App 綁現有事故路由 |
 | Web ops console | ✅ app.aware-wave.com/ops | 高風險指令核准在這（不動）|
 | sg-deploy.sh | ✅ 已有 | 整合，不重寫 |
+| Telegram bot | ✅ 已有 @awarewave_ops_bot | 保留作手機備援通知與指令入口 |
 
 ### 不使用
 
 | 工具 | 原因 |
 |------|------|
-| Telegram | 剛裝、無整合、多一個維護點 |
 | n8n 做 Slack 中間層 | 直接用 Next.js route 更簡潔、少一個跳轉 |
 | 自動 deploy on merge | 多一道人工關卡更安全（`/sg-deploy`）|
+
+> 2026-05-12 修正：Telegram 已經不是「剛裝、無整合」狀態。正式契約是 Slack 做主要分流，Telegram 做手機備援通知與 Command Plane，不新增 Telegram 作為第三套事故資料庫。
+
+### 長期 Invariants
+
+以下規則視為 30 年都不應改變的核心邊界，除非整套通知系統重構：
+
+| Invariant | 定義 |
+|------|------|
+| Ops Inbox 是唯一 curated decision layer | dedup、throttle、severity escalation、reopen 規則只能收斂在這裡 |
+| Slack 是主事故面 | 人工事故處理、Approve、triage 都以 `#ops-incidents` 為準 |
+| Telegram 是手機備援 | 只接人工需要知道的訊號，不承擔主事故路由 |
+| raw 與 curated 必須分層 | raw monitor 可進 `#infra-alerts`；curated incident 必須走 `Ops Inbox -> #ops-incidents` |
+| 降級優先於整體失效 | Telegram 壞掉時 Slack 主線要活著；Ops Inbox 壞掉時 raw infra 仍要能進 `#infra-alerts` |
+| secrets 不出 repo | Slack webhook、Telegram token、chat id、ingest token 不進 git，不複製到不必要的 CI/Action secret |
 
 ---
 
 ## 三、完整流程
 
 ```
-1.  Sentry / Uptime Kuma / Netdata 偵測到問題
+1.  Ops signals 偵測到問題
+    第一批正式 intake：Sentry / Uptime Kuma / Netdata
+    延伸 intake：Grafana / PostHog / CI / health / Cloudflare / Supabase / n8n / Trigger / deploy drift / WordPress
                     ↓
-2.  Slack #alerts-critical 收到通知
+2.  Slack #ops-incidents 收到通知；Telegram 收到手機備援（符合嚴重度門檻時）
     （問題摘要 + 嚴重度 + Approve 按鈕）
                     ↓
 3.  ★ 你按「Approve — 叫 AI 修」           ← 你的第 1 下
@@ -114,7 +142,9 @@ EU 機 (204.168.175.41) — 資料 + 工作流
 
 ---
 
-## 四、三種告警的差別處理
+## 四、告警來源與差別處理
+
+Sentry、Uptime Kuma、Netdata 是 v3.2 第一批正式維修 intake，不是系統的完整檢測邊界。所有新來源都先進 Ops Inbox，經過 dedup、throttle、severity、fingerprint、owner boundary 穩定後，再由 Repair Center 判斷是否可進入維修。
 
 ### Sentry（程式碼 bug）→ 自動修
 
@@ -150,6 +180,47 @@ Netdata critical
 ```
 
 AI 不碰的原因：CPU、RAM、disk 問題改 code 改不好。
+
+### Grafana / Loki / SLO（延遲、日誌、複合查詢）→ AI 只分析，確認 code-scoped 才開 PR
+
+```
+Grafana alert
+  → Ops Inbox normalize 為 grafana incident
+  → Repair Center 標示 analysis-only
+  → 先產出 triage：服務、時間窗、LogQL/指標、可能根因
+  → 只有證據明確指向 repo code regression 時，才可升級為 PR
+```
+
+AI 不直接修的原因：Grafana 可能代表 nginx、DB、容量、外部服務、部署漂移、log pattern 或 SLO 問題，不等於 code bug。
+
+### PostHog（產品／漏斗／行為異常）→ AI 只分析，不直接自動修
+
+```
+PostHog alert
+  → Ops Inbox normalize 為 posthog business incident
+  → Repair Center 標示 analysis-only
+  → AI 做事件、版本、流量、客戶群、近期 deploy 對照
+  → 需要人工判斷是否是產品問題、追蹤設定問題、或真 regression
+```
+
+AI 不直接修的原因：行為異常是 business signal，不是 stack trace；可能是市場流量、追蹤漏裝、A/B 設定、內容變更或客戶行為造成。
+
+### CI / GitHub Actions / Trigger.dev / n8n → 先 triage，避免跨 owner 誤修
+
+```
+workflow failure
+  → Ops Inbox / Repair Center 顯示 triage-needed 或 analysis-only
+  → AI 先分辨：test regression、secret/env、外部 API、排程、runner、部署環境
+  → 只有 test/code regression 才可產生 PR
+```
+
+### Cloudflare / DNS / WAF / Auth / Payment / Secrets → human-only
+
+這類是控制面與資安邊界。Repair Center 可以建立 incident、分析、提示 runbook，但不能自動修 code、不能自動改設定、不能把憑證複製到 GitHub Secrets。
+
+### Policy SSOT
+
+可自動修與不可自動修的正式分類以 `docs/awarewave-repair-center-app-architecture.md` 的 `Signal Source Taxonomy` 與 next-admin `lib/repair-center/policy.ts` 為準。本計劃書只描述流程，不另開第二套判斷規則。
 
 ---
 
@@ -333,14 +404,14 @@ pre-repair-20260508-1430-sentry-58291-wp.sql.gz
 
 | 頻道 | 用途 | 通知設定 |
 |------|------|----------|
-| #alerts-critical | Sentry error、Uptime Kuma DOWN、部署失敗 | 每則推播 + 聲音 |
-| #alerts-info | 部署成功、備份完成、一般資訊 | 靜音 |
+| #infra-alerts | endpoint / Netdata / raw infra monitor | 可吵，作為原始監控層 |
+| #ops-incidents | Sentry、Kuma、Grafana、Netdata、PostHog、deploy drift、endpoint secondary | 主要人工事故處理頻道 |
 | #github-prs | Claude 開的 PR 通知 | 只有 @你 才響 |
 
 ### 勿擾時段
 
-Slack 設定 → 勿擾：23:00 — 08:00
-但 #alerts-critical 穿透勿擾。
+Slack 設定 → 勿擾：23:00 — 08:00。
+`#ops-incidents` 和 Telegram bot DM 是需要手機看到的事故面；`#infra-alerts` 不作為人工第一入口。
 
 ### Slack 訊息格式（告警帶按鈕）
 
@@ -352,6 +423,10 @@ Slack 設定 → 勿擾：23:00 — 08:00
 
 [✅ Approve — 叫 AI 修]  [👀 只看不修]
 ```
+
+### Source of Truth
+
+通知分流與驗收規則以 `agency-os/docs/operations/slack-notification-routing.md` 為準。本文件負責 auto-repair 的施工順序與交接，不得另寫一套不同的 Slack / Telegram 路由規則。
 
 ---
 
@@ -383,8 +458,8 @@ POST /api/webhooks/sentry
 POST /api/webhooks/uptime-kuma
   → 驗證 secret
   → 解析 payload
-  → DOWN → 送 #alerts-critical + Approve 按鈕
-  → UP → 送 #alerts-info「✅ 恢復了」
+  → DOWN → 送 #ops-incidents + Telegram 備援 + Approve 按鈕
+  → UP → 送 #ops-incidents「恢復了」
 ```
 
 #### Netdata webhook route
@@ -396,8 +471,8 @@ POST /api/webhooks/uptime-kuma
 POST /api/webhooks/netdata
   → 驗證 secret
   → 解析 payload
-  → critical → #alerts-critical（只有「已讀」按鈕，沒有 Approve）
-  → warning → #alerts-info
+  → critical → #ops-incidents + Telegram 備援（只有「已讀」按鈕，沒有 Approve）
+  → warning → #ops-incidents（依 Telegram 嚴重度門檻決定是否備援）
 ```
 
 ### 10-B. Slack Approve callback → 備份 → GitHub Issue
@@ -547,14 +622,14 @@ for endpoint in "https://app.aware-wave.com" "https://aware-wave.com" "https://a
     bash rollback-phase1.sh
     # Slack 通知
     curl -X POST "$SLACK_WEBHOOK" -H 'Content-Type: application/json' \
-      -d '{"channel":"#alerts-critical","text":"⚠️ 部署失敗，已自動 Rollback"}'
+      -d '{"channel":"#ops-incidents","text":"部署失敗，已自動 Rollback"}'
     exit 1
   fi
 done
 
 # 3. 成功通知
 curl -X POST "$SLACK_WEBHOOK" -H 'Content-Type: application/json' \
-  -d "{\"channel\":\"#alerts-info\",\"text\":\"✅ 部署完成，三個端點全部正常\"}"
+  -d "{\"channel\":\"#ops-incidents\",\"text\":\"部署完成，三個端點全部正常\"}"
 ```
 
 ### 10-F. 完成報告
@@ -588,7 +663,44 @@ Commit：abc1234
 
 ---
 
-## 十一、GitHub 設定
+## 十一、Phase 2 Guardrails
+
+Claude Code 或任何代理做 Phase 2 時，必須遵守以下硬限制：
+
+| Guardrail | 要求 |
+|------|------|
+| 不可新建第二套路由 | 不可重建 `#alerts-critical` / `#alerts-info`，也不可把 Telegram 變成主事故通道 |
+| 不可重寫 dedup / throttle | 若已有 Ops Inbox 規則，應延用，不可在各 webhook route 各寫一份 |
+| 不可重寫 severity mapping | Sentry / Kuma / Netdata 的嚴重度轉換必須集中管理，避免同事件不同規則 |
+| 不可讓單一事件多重 fan-out | 同一 incident 不能同時被 raw 路徑與 curated 路徑各自重複通知到同一人 |
+| 不可把 secrets 擴散 | Telegram token 不進 GitHub Secrets；只放 SG host / next-admin env |
+| 不可把 failure 變成 silence | 任一路徑失敗時，要記 log、保留主線、可 drill，不可靜默失效 |
+
+### Failure Mode 與 Rollback 原則
+
+| 情境 | 系統行為 |
+|------|------|
+| Telegram 壞掉 | Slack 主線照常；incident log 必須可看到 Telegram failed |
+| Ops Inbox 壞掉 | `#infra-alerts` 仍必須收到 raw endpoint / Netdata direct 訊號 |
+| Slack webhook 壞掉 | health / drill 要能看出配置異常，不可假裝成功 |
+| 備份失敗 | 自動維修流程立即停止，不建 Issue、不開 PR |
+| deploy 後 health check 失敗 | `rollback-phase1.sh` 自動執行，並回報 `#ops-incidents` + Telegram 備援 |
+
+### Acceptance Gates
+
+Phase 2 完成前，必須至少通過以下門檻，否則不得宣稱可上線：
+
+| Gate | 驗收標準 |
+|------|------|
+| Endpoint alert gate | public endpoint 故障 / 恢復時，Slack 與 Telegram 都能收到 |
+| Ops Inbox gate | synthetic incident 進來後，`#ops-incidents` 與 Telegram 都能收到 |
+| Deploy drift gate | drift cron 觸發時，Slack 與 Telegram 都能收到 |
+| Health gate | `/api/ops/inbox/health` 回 `ok:true`，且顯示 Telegram config 為 enabled / configured |
+| Backup gate | pre-repair 備份失敗時，流程明確中止，不建 Issue、不開 PR |
+
+---
+
+## 十二、GitHub 設定
 
 ### Secrets（repo → Settings → Secrets）
 
@@ -609,7 +721,7 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 
 ---
 
-## 十二、與已有系統的關係
+## 十三、與已有系統的關係
 
 ### 不衝突清單
 
@@ -631,22 +743,30 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 | 不新建 rollback 腳本 | 已有 rollback-phase1.sh |
 | 不新建備份腳本 | 已有 backup-eu-stack.sh |
 | 不用 n8n 接 Slack | 直接在 Next.js 寫 route |
-| 不用 Telegram | 剛裝、無整合、多一個維護點 |
+| 不把 Telegram 當主要事故匯流排 | Slack/Ops Inbox 是主線；Telegram 只做手機備援與指令入口 |
 | 不做 auto-merge / auto-deploy | /sg-deploy 手動觸發更安全 |
 
 ---
 
-## 十三、執行計劃
+## 十四、執行計劃
+
+### 執行計劃前置說明
+
+Phase 1 的目的不是「建幾個頻道」，而是建立唯一、可驗收、可交接的控制面。Phase 2 的目的不是自由發揮，而是沿著既有通知契約把 webhook、Approve、PR、自動維修串起來。
+
+只有當 `#ops-incidents`、Telegram backup、`#github-prs`、health endpoint 都已經可驗證，Phase 2 才算有正式施工前提。
 
 ### Phase 1：你做（30 分鐘）
 
 | 步驟 | 動作 | 完成標準 |
 |------|------|----------|
-| 1.1 | 在 Slack 建 3 個頻道：#alerts-critical、#alerts-info、#github-prs | 頻道存在 |
-| 1.2 | 設定各頻道通知偏好（critical 推播+聲音、info 靜音、prs 只@提及）| 手機通知設定完成 |
-| 1.3 | 建立 Slack App：拿到 Bot Token + Signing Secret + Webhook URL | 三個值都拿到 |
+| 1.1 | 確認 Slack 已有 #infra-alerts、#ops-incidents；只新建 #github-prs | 不新增 #alerts-critical / #alerts-info，避免通知分裂 |
+| 1.2 | 設定通知偏好：#ops-incidents 推播+聲音，#infra-alerts 視情況靜音，#github-prs 只 @ 提及 | 手機通知設定完成 |
+| 1.3 | 建立 Slack App：拿到 Bot Token + Signing Secret + Webhook URL；Webhook 指向 #ops-incidents | 三個值都拿到 |
 | 1.4 | 在 GitHub repo 設定 4 個 Secrets：ANTHROPIC_API_KEY、SLACK_WEBHOOK_URL、SLACK_BOT_TOKEN、SLACK_SIGNING_SECRET | Secrets 頁面看到 4 個 |
-| 1.5 | 設定 Branch Protection（main branch） | Protection rules 啟用 |
+| 1.5 | 保留 Telegram bot；不要把 Telegram token 加到 GitHub Secrets，Telegram 只在 SG host / next-admin env 作備援 | Telegram DM smoke test 通過 |
+| 1.6 | 驗證 `/api/ops/inbox/health` 顯示 `notify_enabled=true`、`telegram_notify_enabled=true`、`telegram_configured=true` | health gate 通過 |
+| 1.7 | 設定 Branch Protection（main branch） | Protection rules 啟用 |
 
 ### Phase 2：Claude Code 做（2-3 小時）
 
@@ -660,13 +780,14 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 | 2.6 | 新建 auto-repair-pr-notify.yml | .github/workflows/auto-repair-pr-notify.yml |
 | 2.7 | 確認 sg-deploy.sh 有 health check + Slack 通知 | sg-deploy.sh |
 | 2.8 | 在 CLAUDE.md 尾部追加自動維修規則 + PR 格式 + 紅線 | CLAUDE.md |
+| 2.9 | 不得新建第二套路由；必須沿用 `#infra-alerts` / `#ops-incidents` / Telegram backup 的既有契約 | 全部改動符合 guardrails |
 
 ### Phase 3：端到端驗收（1 小時）
 
 | # | 測試步驟 | 預期結果 | ✅/❌ |
 |---|----------|----------|-------|
 | 1 | 手動在 Sentry 觸發 test error | Sentry 收到 | |
-| 2 | 等 Slack #alerts-critical | 收到通知 + Approve 按鈕 | |
+| 2 | 等 Slack #ops-incidents | 收到通知 + Approve 按鈕；符合門檻時 Telegram 也收到 | |
 | 3 | 按「✅ Approve — 叫 AI 修」 | 按鈕消失，顯示「處理中」 | |
 | 4 | 等備份 | Slack 顯示「備份完成」 | |
 | 5 | 等 GitHub Issue | Issue 建立，有 auto-repair label | |
@@ -678,8 +799,19 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 | 11 | 在 GitHub 按 Merge | PR merged | |
 | 12 | 在 Slack 打 /sg-deploy | 開始部署 | |
 | 13 | 等 health check | 三個端點都 200 | |
-| 14 | Slack #alerts-info 收到完成報告 | 有結果 + 備份 ID + commit | |
+| 14 | Slack #ops-incidents 收到完成報告 | 有結果 + 備份 ID + commit | |
 | 15 | 在 Sentry 確認 test error 不再出現 | 錯誤消失或被 resolve | |
+
+### Phase 3-A：通知路由驗收
+
+| # | 測試步驟 | 預期結果 | ✅/❌ |
+|---|----------|----------|-------|
+| A1 | 人工觸發 endpoint 故障 drill | `#infra-alerts` 收到 raw alert | |
+| A2 | 同一次 endpoint drill | `#ops-incidents` 收到 secondary alert | |
+| A3 | 同一次 endpoint drill | Telegram 收到手機備援 | |
+| A4 | 丟一筆 Ops Inbox synthetic incident | `#ops-incidents` 收到 curated incident | |
+| A5 | 同一筆 synthetic incident | Telegram 收到同事件備援 | |
+| A6 | 重送同 fingerprint 事件 | throttle / dedup 生效，不重複轟炸 | |
 
 ### Phase 3-B：驗收 rollback
 
@@ -687,7 +819,7 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 |---|----------|----------|-------|
 | 16 | 故意部署一個壞的 commit | deploy 成功但 health check 失敗 | |
 | 17 | 等 rollback | rollback-phase1.sh 自動執行 | |
-| 18 | 等 Slack | #alerts-critical 收到「部署失敗，已 Rollback」 | |
+| 18 | 等 Slack | #ops-incidents 收到「部署失敗，已 Rollback」；Telegram 備援收到 | |
 | 19 | 確認網站正常 | 三個端點都 200（回到上一版）| |
 
 ### Phase 3-C：驗收備份失敗阻擋
@@ -700,7 +832,7 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 
 ---
 
-## 十四、Phase 4 — 觀察期（30 天）
+## 十五、Phase 4 — 觀察期（30 天）
 
 ### 每週日做（5 分鐘）
 
@@ -715,9 +847,16 @@ SLACK_SIGNING_SECRET   = Slack App signing secret（驗證 callback）
 2. 看 /root/backups/ 目錄 → 備份檔案有在長（SG 和 EU 都要看）
 3. 看 GitHub Actions → auto-repair 相關的 action 有沒有異常失敗率
 
+### 每月 drill（不可省）
+
+1. 跑一次通知 smoke：endpoint、Ops Inbox synthetic、deploy drift
+2. 看 `/api/ops/inbox/health`
+3. 確認 Telegram 備援仍有收到
+4. 確認沒有新文件或新代理偷偷把路由改回多中心
+
 ---
 
-## 十五、Phase 5 — 多客戶擴展 + Dashboard（Phase 4 完成後做）
+## 十六、Phase 5 — 多客戶擴展 + Dashboard（Phase 4 完成後做）
 
 ### 前置條件
 
@@ -773,7 +912,7 @@ create table incidents_config (
   auto_repair_enabled boolean default false,
   deploy_command text,                   -- '/client-a-deploy' 或 null
   backup_script_path text,              -- '/root/scripts/backup-client-a.sh' 或 null
-  slack_channel text default '#alerts-critical',
+  slack_channel text default '#ops-incidents',
   notes text,                            -- 備註
   is_active boolean default true,
   created_at timestamptz default now(),
@@ -832,7 +971,7 @@ Sentry webhook 進來
   → 從 payload 取出 sentry_project
   → 查 incidents_config：哪個客戶？
   → 找到 → 帶客戶名稱的 Slack 通知
-  → 找不到 → 送 #alerts-info「未知 Sentry project，請檢查設定」
+  → 找不到 → 送 #ops-incidents「未知 Sentry project，請檢查設定」
 
 Slack 訊息格式：
   🚨 *[客戶A] Sentry Error*
@@ -963,7 +1102,7 @@ Dashboard 資料來源：直接讀 supabase-db 的 incidents 和 incidents_confi
 
 ---
 
-## 十六、未來擴充方向（Phase 5 之後）
+## 十七、未來擴充方向（Phase 5 之後）
 
 | 方向 | 什麼時候做 | 風險 |
 |------|-----------|------|
@@ -977,10 +1116,11 @@ Dashboard 資料來源：直接讀 supabase-db 的 incidents 和 incidents_confi
 
 ---
 
-## 十七、這份文件的使用方式
+## 十八、這份文件的使用方式
 
 1. **Phase 1**：你自己照表做，30 分鐘
 2. **Phase 2**：把「第十節：技術實作細節」整段貼給 Claude Code，叫它照著建
+   並同時附上 `docs/awarewave-auto-repair-phase2-handoff.md`，避免代理重建第二套路由
 3. **Phase 3**：跑驗收清單，22 步全綠才算完成
 4. **Phase 4**：每週日 5 分鐘、每月初 10 分鐘，持續觀察 30 天
 5. **Phase 5**：30 天穩定後，把「第十五節：Phase 5」整段貼給 Claude Code，建多客戶 + Dashboard

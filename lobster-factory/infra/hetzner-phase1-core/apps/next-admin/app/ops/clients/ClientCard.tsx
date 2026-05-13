@@ -1,6 +1,7 @@
 "use client";
 // ClientCard — client component so onMouseEnter/onMouseLeave work in Next.js 15 RSC.
 // Receives pre-computed data props (org row + health result) from the server page.
+// M3: department count badge added — 2026-05-13
 
 import Link from "next/link";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
@@ -44,6 +45,9 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
   const daysSinceRun = lastRunAt
     ? Math.floor((Date.now() - lastRunAt.getTime()) / 86_400_000)
     : null;
+
+  // M3: department coverage count
+  const deptCount = Array.isArray(cfg.department_selection) ? cfg.department_selection.length : null;
 
   const healthColor = health.ok ? "#16a34a" : "#dc2626";
   const healthBg = health.ok ? "#f0fdf4" : "#fef2f2";
@@ -105,11 +109,14 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
           </div>
         )}
 
-        {/* Row 3: platform + hosting tags */}
+        {/* Row 3: platform + hosting tags + department count */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
           {platformLabel !== "—" && <Tag label={platformLabel} />}
           {hostingLabel !== "—" && <Tag label={hostingLabel} />}
           {cfg.notes && <Tag label={cfg.notes} muted />}
+          {deptCount !== null
+            ? <Tag label={`${deptCount}/20 部門`} dept active={deptCount >= 8} />
+            : <Tag label="部門未設定" dept active={false} />}
         </div>
 
         {/* Row 3b: quick action links */}
@@ -183,7 +190,11 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
 
 // ── Small helpers (client-side fine too) ─────────────────────────────────────
 
-function Tag({ label, muted }: { label: string; muted?: boolean }) {
+function Tag({ label, muted, dept, active }: { label: string; muted?: boolean; dept?: boolean; active?: boolean }) {
+  let bg = "#e0e7ff", color = "#4338ca", border = "#c7d2fe";
+  if (muted)  { bg = "#f1f5f9"; color = "#64748b"; border = "#cbd5e1"; }
+  if (dept && active)  { bg = "#f0fdf4"; color = "#166534"; border = "#bbf7d0"; }
+  if (dept && !active) { bg = "#fef9c3"; color = "#854d0e"; border = "#fde047"; }
   return (
     <span style={{
       display: "inline-block",
@@ -191,9 +202,7 @@ function Tag({ label, muted }: { label: string; muted?: boolean }) {
       borderRadius: 20,
       fontSize: 10,
       fontWeight: 500,
-      background: muted ? "#f1f5f9" : "#e0e7ff",
-      color: muted ? "#64748b" : "#4338ca",
-      border: `1px solid ${muted ? "#cbd5e1" : "#c7d2fe"}`,
+      background: bg, color, border: `1px solid ${border}`,
     }}>
       {label}
     </span>

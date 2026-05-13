@@ -2,6 +2,381 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-13
+
+### WP Plugin Auto-Install — Phase 2+3 完成 + SSH + UI 重設計（2026-05-13）
+
+**根因 / 背景**：WP 外掛一鍵安裝系統 Phase 0+1 已完成，本輪補齊剩餘技術缺口，讓整條自動安裝鏈路邏輯完整。
+
+**完成項目（全部 commit `92271f4`，已 push to origin/main）**：
+
+1. **純加法包模型（`wp-plugin-stack-catalog.ts`）**：`condition?: "is_litespeed"` 欄位標記條件外掛；`resolveInstallableSlugsForPacks` 加入 dedup（CPT UI / Modula 跨模組各只裝一次）；`resolveConditionalPlugins` 新函式；`resolveInstallableSlugs`（legacy）同步修正。
+2. **`BuildRunRequest` / `contracts.ts`**：加入 `selectedPacks?: WpPluginModule[]`；`smokeProfileFor` 與 `normalizeBuildRequest` 優先使用 `selectedPacks`，保留 legacy 欄位向下相容；`BuildConsole.tsx` 讀取 `selectedPacks` URL param。
+3. **`wp-install-plugins.ts`（Trigger.dev task）**：改用 `ssh2` npm（`Client`）取代 `spawn("ssh")`——不再依賴系統 `ssh` binary，私鑰直接傳內容不寫暫存檔，任何 Node.js 容器皆可用；加入 `--force --skip-plugins` 冪等安裝；per-client vault key 解析（`LOBSTER_SSH_KEY_<REF>` 優先，fallback `LOBSTER_WP_SSH_PRIVATE_KEY`）。
+4. **WordPress Dockerfile**：加入 WP-CLI v2.11.0 pinned，`lobster-wordpress` 重建後即可在容器內執行 `wp plugin install`。
+5. **OnboardWizard Step2**：純加法 checkbox（基礎包 + 3 個 addon），取代舊版 radio wpSiteType。
+6. **OnboardWizard Step4 UI 重設計**：7 個服務各自一張卡片（Sentry/PostHog/Uptime Kuma/n8n/GitHub/Trigger.dev/Supabase），Hint 欄位嵌在對應卡片內，placeholder 顯示自動衍生值，全選/全部取消按鈕。
+
+**驗證**：
+- `ssh2` ESM import: `node --input-type=module --eval "import { Client } from 'ssh2'; console.log(typeof Client)"` → `function` ✓
+- next-admin TypeScript: `npx tsc --noEmit` — 我們修改的檔案零錯誤（既有 test file 錯誤為預存，不屬本輪）✓
+- `git push origin main` 成功（commit `92271f4`）✓
+
+**避免再發生**：SSH binary 依賴改為 npm，未來 Trigger.dev 升級映像不會再破壞此 task。LiteSpeed 外掛有 `condition` flag，不會在非 LiteSpeed 主機誤裝。
+
+**待辦（本任務尚未完整可用）**：
+1. `/sg-deploy` — 重建 `lobster-wordpress` container，WP-CLI 才真正進入生產環境
+2. Trigger.dev re-deploy — `ssh2` 才納入 task image（`.\scripts\lobster-trigger-deploy.ps1`，需 `TRIGGER_DEPLOY_PAT`）
+3. End-to-end smoke test — Step4 provision-services + wp-install-plugins 完整跑過
+
+### /onboard 專屬 Playwright smoke spec 新增（2026-05-13）
+
+**根因**：先前 sg-deploy 後的 smoke 02 只檢查路由 status code（401/302/200 都算 PASS），所以新版 OnboardWizard UI 部署失敗時（頁面實際是 Next.js 404 或卡舊 bundle）也會「PASS」。`curl /onboard` 回 401 只證明 nginx 收到請求，沒證明 Next.js 找得到路由。
+
+**修法**：
+- 新增 `lobster-factory/infra/hetzner-phase1-core/tests/e2e/smoke/04-onboard-page.spec.ts`：用 `httpCredentials` 過 nginx auth_basic，斷言 (a) status=200、(b) 5 個 step labels（客戶資訊／站型選擇／部門選型／開通服務／啟動 Build）皆 visible、(c) document.title 不是 404、(d) 無 fatal console error。
+- 新增 `OPS_BASIC_USER` / `OPS_BASIC_PASSWORD` env 入口：`mcp/user-env.ps1`（machine-local，setx 持久化）+ `mcp/user-env.template.ps1`（範本，雙機 bootstrap 對齊）+ `tests/e2e/helpers/env.ts`（`opsBasicHttpCredentials()` 取得器）。
+- 既有 `/sg-deploy` post-deploy hook 已自動跑 `playwright-runner.ps1 -Mode smoke`，新 spec 因 `testMatch: '**/smoke/**/*.spec.ts'` 自動納入，**無需改 hook**。
+- `.claude/commands/sg-deploy.md` 加註：新 spec 需要 `OPS_BASIC_USER` + `OPS_BASIC_PASSWORD`；fresh machine 須先跑 `mcp/user-env.ps1` 並重啟 shell。
+
+**驗證**：
+```
+cd lobster-factory/infra/hetzner-phase1-core/tests
+npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=list
+→ 4 passed (7.5s)
+```
+四項斷言全 PASS：status 200、5 step labels visible、無 404 leak、無 fatal console error。同時實測 `curl -u awarewave:AwareWave2026! https://app.aware-wave.com/onboard` 回 200 + HTML 含 `站型選擇` → 確認當前線上 wizard 新 UI 已部署正常（順帶發現 `page.tsx` 描述寫「4 步驟」但 wizard 是 5 步驟，cosmetic drift，不阻塞本任務）。
+
+**避免再發生**：未來任何破壞 `/onboard` 載入路徑、或讓 wizard 5 個 step labels 消失的 deploy，會在 sg-deploy 後 5 分鐘內被 smoke 04 抓到，evidence 寫入 `agency-os/reports/e2e/YYYY-MM-DD/smoke/`。下一個值得擴：若 `OnboardWizard` 步驟改名，spec 需同 PR 更新（locator 是穩定中文文案，drift 立刻 fail）。
+
+**雙機同步**：`mcp/user-env.ps1` 為 gitignored 本機檔，跨機透過 `import-cross-machine-memory.ps1` 經 `AO-SYNC-<date>` 帶到另一機；下次另一台 AO-RESUME 會自動拿到新 OPS_BASIC_* keys。
+
+### Enterprise 工具層 Phase 1 — 端到端串接結案驗收（2026-05-13）
+
+**背景**：各工具個別結案散落於 2026-04-12～2026-05-08 的 WORKLOG 各段，但父任務「Enterprise 工具層 Phase 1 正式串接」缺少一份整合性的端到端驗收記錄。本段補齊此證據鏈，作為結案 SSOT。
+
+**五層工具鏈驗收摘要**
+
+| 層 | 工具 | 結案日期 | 證據位置 |
+|---|---|---|---|
+| Secrets 治理 | env/mcp vault、n8n MCP key 輪替 | 2026-05-01 | `TASKS.md §2026-05-01`；`AUTO_TASK_DONE` |
+| 可觀測 — 錯誤 | Sentry（next-admin／node-api／php；n8n DSN） | 2026-04-12 | `WORKLOG.md ##2026-04-12`；`SENTRY_ALERT_POLICY.md` |
+| 可觀測 — 行為 | PostHog（三站：Website／Admin／Soulful Expression） | 2026-05-01 | `TASKS.md §2026-05-01`；Codex commit 同日 |
+| 邊界保護 | Cloudflare DNS／WAF／rate-limit | 2026-05-01 | `TASKS.md §2026-05-01`；`CLOUDFLARE_HETZNER_PHASE1.md` |
+| 告警通道 | Slack `#infra-alerts`（Netdata）；n8n `shared-error-handler-sentry-staging` | 2026-05-01 / 2026-04-10 | `TASKS.md §2026-05-01`；n8n E2E 正本 |
+| 身分與授權 | JWT／RLS（ops console role 區隔；ADR 006） | 2026-05-07/08 | ops-console-smoke 9/9 PASS；`reports/status/ops-console-smoke-LATEST.json` |
+
+**端到端整合路徑（五層同時在線的最強證明）**
+
+2026-05-08 Command Plane Phase 2c 驗收，一條手機觸發到資料庫更新的完整路徑：
+> Telegram `/emergency_stop` → **Cloudflare** WAF pass → **Next.js** ops console（**JWT** role check）→ `system_modes` Supabase 寫入（**Secrets** 環境變數）→ `/status` 回傳 `blocked_by_killswitch` → **Slack** `#ops-incidents` 狀態推播（n8n）→ smoke **15/15 PASS**（含 `system_modes_get_shape`、`approve_route_wired`）
+
+此路徑覆蓋：Secrets、Cloudflare、JWT/RLS、Slack 四層，Sentry 持續在線捕捉錯誤。
+
+**TOOLS_DELIVERY_TRACEABILITY.md 同步**：P1–P6 全部更新為 🟢，新增 P7 Command Plane 行。
+
+- AUTO_TASK_DONE_APPLIED (2026-05-13T09:42:52Z): Enterprise 工具層 Phase 1 正式串接
+- AUTO_TASK_DONE_APPLIED (2026-05-13T09:42:52Z): （工具建置）Phase 1 建議順序（P1 -> P7）
+
+### Codex 2026-05-13 — Repair Center full implementation baseline
+- 完成 Repair Center 第一版可運作骨架：新增 `repair_runs` migration、`lib/repair-center/*` service/policy/backup/GitHub handoff、`/api/ops/repairs/*`、Slack interactive callback、`/ops/repairs` Queue/Runs/Safety/Policy UI。
+- 保留系統邊界：Ops Inbox 仍是 incident SSOT；Repair Center 只做 orchestration；Approvals/System Modes/Build Console 不被取代；production deploy 仍手動 `sg-deploy.sh`。
+- Slack 通知加入 `approve_repair` / `acknowledge_only` Block Kit action；Slack callback 以 `SLACK_SIGNING_SECRET` 驗證，並呼叫同一套 Repair service。
+- 新增 GitHub workflows：`.github/workflows/auto-repair-claude.yml`、`.github/workflows/auto-repair-pr-notify.yml`。
+- 安全 gate：`AUTO_REPAIR_BACKUP_WEBHOOK_URL` 未設定或失敗時，repair run 停在 `triage_needed`，不建 GitHub Issue / PR；`AUTO_REPAIR_GITHUB_TOKEN` 未設定時同樣不會進入 repair。
+- 文件同步：`docs/awarewave-repair-center-app-architecture.md`、`docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`、`agency-os/docs/operations/slack-notification-routing.md`、`CLAUDE.md`。
+- 驗證：`npm run build` in `lobster-factory/infra/hetzner-phase1-core/apps/next-admin` PASS；僅餘既有 Sentry setup warning 與 `ssh2` optional native dependency warning。
+
+### Codex 2026-05-13 — Repair backup gate hardening
+- 補強 pre-repair backup gate：若 `AUTO_REPAIR_BACKUP_WEBHOOK_URL` 存在就走 webhook；否則走 SSH fallback，跑既有 SG `backup-phase1.sh` + `verify-backup.sh`，以及 EU `/root/scripts/backup-eu-stack.sh` + `verify-backup-eu.sh`（EU 預設 required）。
+- 新增 `lib/repair-center/ssh.ts` 與 `/api/ops/repairs/health`，讓 UI 和 smoke test 可看到 backup/GitHub/Slack/System Mode gate。
+- `/ops/repairs` Safety panel 改為辨識 webhook/SSH backup gate，不再只看 webhook env。
+- 驗證：`npm run build` PASS；仍只有既有 Sentry setup warning 與 `ssh2` optional native dependency warning。
+
+### Codex 2026-05-13 — Repair Center signal taxonomy + production foundation
+- 補強 Repair Center signal taxonomy：Sentry/Kuma/Netdata 不再被視為完整邊界；Grafana/Loki、PostHog、GitHub Actions、health endpoints、Cloudflare、Supabase、n8n、Trigger.dev、deploy drift、WordPress/MainWP 皆列為可進 Ops Inbox 的 extended ops signals。
+- `lib/repair-center/policy.ts` 收斂為 `REPAIR_SOURCE_POLICIES` 單一 catalog，並用 `satisfies Record<IncidentSource, RepairSourcePolicy>` 讓新增 incident source 未分類時由 TypeScript 擋下；`/ops/repairs` Policy UI 與 `/api/ops/repairs/health` 均讀同一 catalog。
+- `scripts/repair-center-smoke.mjs` 新增 `policy: source catalog` gate；本機 smoke 顯示 policy catalog PASS。
+- EU DB：已開 Supabase SSH tunnel，`npm run smoke:supabase-tunnel -- --sql` PASS；`0027_repair_runs.sql` 以 EU `supabase_admin` 套用成功，並 `NOTIFY pgrst, 'reload schema'`；`repair-center-smoke` 的 `db: repair_runs` 已由 PGRST205 轉為 PASS（HTTP 200, content-range `*/0`）。
+- SG runtime：`docker-compose.yml` 補 next-admin Repair Center env pass-through；SG `/root/lobster-phase1/docker-compose.yml` 已備份後同步；SG root 自身已可用 `/root/.ssh/backup_to_eu` SSH fallback key 連 SG 與 EU；`.env` 已設定 SSH backup gate（不輸出 secret）。
+- Deploy：推送 `origin/main` 至 `41a773a`，SG `/root/Work` fast-forward 後執行 `/root/lobster-phase1/scripts/sg-deploy.sh next-admin --skip-pull`；`lobster-next-admin` healthy，deployed commit `41a773aed4cece7230af9beb0d02cbc0cb3eeafc`。
+- Production health：`https://app.aware-wave.com/api/ops/repairs/health` 已存在；目前預期回 `503`，其中 `table_ok=true`、`backup_configured=true`、`backup_mode=ssh`、`source_policies` 正確，剩 `github_configured=false` 與 `slack_signing_configured=false`。`/api/ops/inbox/health` 回 200。
+- Remaining gate：設定正式 `AUTO_REPAIR_GITHUB_TOKEN`、`SLACK_SIGNING_SECRET`、GitHub Secrets 後，重跑 `npm run smoke:repair-center -- --base-url=https://app.aware-wave.com`，再進 Phase 3 22 步、rollback drill、backup-fail drill。
+
+### Codex 2026-05-13 — Repair Center web-control hardening
+- 完成 Web 控制邊界設計：`/ops/repairs` 是操作者控制台；`/ops/inbox` 保持 incident intake / dedup / triage SSOT，兩者串接但不合併。
+- GitHub handoff 已補 runtime 與 repo secrets：`AUTO_REPAIR_GITHUB_TOKEN` 已設於 SG；GitHub Secrets 已設 `ANTHROPIC_API_KEY` 與 `SLACK_WEBHOOK_URL`（未記錄 secret value）。
+- 修正安全邊界：Next app 不再信任外部 `Authorization: Basic` header；nginx 對 `/api/ops/repairs*` 套 Basic Auth，通過後才注入 `x-ops-claims-role: admin`。`/ops/*` 頁面同樣由 nginx Basic Auth 注入可信 role。
+- Repo nginx 設定補回 `security-headers.inc`，避免部署時覆蓋 production security headers。
+- Deploy：推送 `3ed6ebd`，SG `/root/Work` fast-forward，系統 nginx `nginx -t` PASS 並 reload，`sg-deploy.sh next-admin --skip-pull` 完成；`lobster-next-admin` healthy，deployed commit `3ed6ebd`。
+- 驗證：`/api/ops/repairs/health` HTTP 200 且 `web_ui_ready=true`、`github_configured=true`、`backup_mode=ssh`；未登入 `/api/ops/repairs` HTTP 401；`/api/ops/inbox/health` HTTP 200；內部 trusted proxy role check 回 `role=admin`；`npm run smoke:repair-center -- --base-url=https://app.aware-wave.com`：15 checks / 0 failed / 3 expected warnings。
+- 仍待：`SLACK_SIGNING_SECRET` 需由正式 Slack App 提供後，Slack interactive button 才能列為 ready；Phase 3 22 步、rollback drill、backup-fail drill 尚未結案。
+
+### Codex 2026-05-13 — Repair Center Phase 3 safe drills
+- `scripts/repair-center-smoke.mjs` 改為在 `--base-url=https://app.aware-wave.com` 時讀 production health 作為 backup/GitHub runtime truth；production smoke 現為 15 checks / 0 failed / 1 expected warning（僅 `SLACK_SIGNING_SECRET`）。
+- Phase 3-C backup-fail drill：短暫將 Repair backup gate 指向必定失敗的 localhost webhook，synthetic Sentry incident → Repair approval → `backup_failed`；run `207b182d...` 停在 `triage_needed` / `backup_status=failed`，且 `github_issue_created=false`；已還原 SSH backup gate。
+- Safe rollback drill：`rollback-phase1.sh save next-admin` 建立 `rollback-20260513-083148`，再 restore 同 snapshot；`lobster-next-admin` health PASS，deployed commit 保持 `87cfa76`。
+- Happy-path handoff drill：synthetic Sentry incident `f83d04c3...` → SG+EU SSH backup PASS（backup ref `pre-repair-20260513T0836-sentry-929fb8ba`）→ GitHub Issue #1 建立 → Claude Code Action 成功留下中文 analysis-only comment；無 PR，符合 drill 指示與 guardrails。Issue #1 已關閉，drill runs 已標記 resolved/human-only，health `active_runs=0`。
+- 修正 `.github/workflows/auto-repair-claude.yml`：補 `id-token: write`、`actions: read`、`github_token: ${{ secrets.GITHUB_TOKEN }}`，並將 issue trigger 收斂為 `opened`，避免 opened/labeled 重複觸發。
+- 仍待外部設定：正式 Slack App `SLACK_SIGNING_SECRET` 與 `SLACK_BOT_TOKEN` 尚未提供；沒有真實 Signing Secret 無法驗證 Slack interactive approve。破壞 production 的 bad-commit auto-rollback drill 未執行，改以 safe snapshot/restore drill 驗證 rollback script。
+
+### AO-RESUME handoff — Repair Center remaining items
+- 下次開工先看 `TASKS.md` 的「AwareWave 自動告警維修系統 v3.2」條目；目前 production 可操作、健康檢查正常、active repair runs = 0。
+- 必提醒使用者：Slack App 後台仍需取出真實 `Signing Secret` 與 Bot token；拿到後設定 SG `.env` + GitHub Secrets，再部署 next-admin 並重跑 `repair-center-smoke`，目標 0 warning。
+- Slack secret 設好後要補跑：Slack `approve_repair` 按鈕互動核准 drill；真實 code-scoped incident 的 PR/merge/deploy 端到端；destructive bad-commit auto-rollback drill 只有使用者明確授權才做。
+
+## 2026-05-12
+
+### Daily
+- 品質修訂：WP 外掛文件三份（WP_CLIENT_PLUGIN_STACK.md / PLAN / BRIEF），修復 10 個關鍵缺漏（WP.org Slug 欄、★/↩/† 標記體系、Complianz 矛盾、plugin_install_runs×3→package_install_runs、alternativeSlug 欄位、resolvePaidPlugins 補入、resolvedPaidPlugins 補入、Phase 1 WizardStep 型別、URL params 傳遞、smokeProfileFor 位置說明）
+- Phase 0 實作：新建 `lib/wp-plugin-stack-catalog.ts`（36 entries，base 16 + ecommerce 12 + tourism 5 + brand 3，三個 exported functions，TypeScript 通過）
+- TASKS.md 更新：WP 外掛自動安裝任務狀態 未開始→進行中，Phase 0 打完成，Phase 1 開工清單（5 個必讀檔）寫入
+- 本日稍早（另一輪）：AO-SYNC 雙機同步修復（export/import 腳本動態 project key + UTF-8 BOM + env var）
+- AUTO_TASK_DONE: export-cross-machine-memory secrets 時間戳修復（LastWriteTime 蓋成 sync 時間）
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:7b9f61f39c447cd2cf4fbcaf23ba070e2309f36dc4cfd8aacad3fc1a56fac3cd -->
+
+### claude 2026-05-12 18:00
+
+- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）——export/import 腳本改為動態 project key 推導 + UTF-8 BOM + AO_SYNC_ROOT/AO_SYNC_SECRETS_ROOT env var；四項檔案（MEMORY.md、user-env.ps1、SSH keys、AWARE_WAVE_CREDENTIALS.md）完整同步
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+  - `scripts/import-cross-machine-memory.ps1`
+  - `mcp/user-env.ps1`
+  - `agency-os/TASKS.md`
+- **Git**: 9 commits ahead of origin/main（checkpoint 系列）
+- **對應 TASKS 子字串（可選）**: AO-SYNC 環境變數設定
+- **風險／待辦（可選）**: 筆電須設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT 環境變數（D:\Work, key=d--Work）並測試 AO-RESUME 匯入流程
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:436e906aac028720dbe07cc89a7b39e028dd16450270f443de765e8360e86cf3 -->
+
+### claude 2026-05-12 18:30
+
+- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）——動態 project key + UTF-8 BOM + env vars；mcp/user-env.ps1 duplicate keys 修復；daily note 補齊
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+  - `scripts/import-cross-machine-memory.ps1`
+  - `mcp/user-env.ps1`
+  - `agency-os/TASKS.md`
+  - `agency-os/memory/daily/2026-05-12.md`
+- **Git**: 9 commits ahead of origin/main（checkpoint 系列 + 本次修復）
+- **對應 TASKS 子字串（可選）**: AO-SYNC 環境變數設定
+- **風險／待辦（可選）**: 筆電須設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT（D:\Work）並測試 AO-RESUME 匯入
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:af2f48e17e8fb139ea47fca7f95f2a09291276d8254e4a59cb062612d7cb27bf -->
+
+### claude 2026-05-12 22:00
+
+- **完成（一句）**: WP plugin stack 文件品質修訂（10 個缺漏全修）+ Phase 0 `wp-plugin-stack-catalog.ts`（36 entries，3 functions，TypeScript SSOT）+ TASKS.md Phase 1 開工清單（5 必讀檔）
+- **變更路徑**:
+  - `agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`
+  - `lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
+  - `lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts`
+  - `agency-os/TASKS.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+  - `agency-os/memory/daily/2026-05-12.md`
+- **Git**: b205f40, 5dff4ce, 59dccca, 5e4014e（本 closeout 前已 commit；closeout 再 push）
+- **對應 TASKS 子字串（可選）**: WP 外掛自動安裝
+- **風險／待辦（可選）**: Phase 1（OnboardWizard 新 Step 2）明日開始；開始前依 TASKS 必讀清單順序讀 5 個檔案
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:c8396eba5bbc07efb99d13c0b355bb2b0495589f6a3ab357c7a6e876708d7203 -->
+
+### claude 2026-05-12 22:15
+
+- **完成（一句）**: 修復 PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md 中 broken link（`../../../` → `../../` 指向 WP_CLIENT_PLUGIN_STACK.md）；doc integrity gate 通過
+- **變更路徑**:
+  - `lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
+- **Git**: 本 closeout commit 前修復
+- **對應 TASKS 子字串（可選）**: WP 外掛自動安裝
+- **風險／待辦（可選）**:
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:9557a101b7a3e92660aa0e45572c6ff6078efaba3c9e1e6d3dbd596ab5a0db44 -->
+
+### claude 2026-05-12 22:45
+
+- **完成（一句）**: 修復 export-cross-machine-memory.ps1 — secrets 複製後強制 LastWriteTime = sync 時間，Google Drive 顯示正確上傳時間
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+- **Git**: 5aa753c（已 push）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
+
+## 2026-05-11
+
+### 桌機 Claude user-level 對齊 <2026-05-11>
+
+- 執行 `sync-claude-userlevel.ps1 -Mode merge` on 桌機
+- hooks：3 個更新（`ao-resume-on-prompt.ps1`、`hooks.json`、`README.md`），19/19 same 後
+- settings.json：governed keys 覆寫，normalizer 修正 9 個 array 結構（PS5.1 1-element array bug）
+- mcp.json：確認 `{}` 無 drift
+- verify 模式仍顯示 settings.json drift → 已知 false positive（normalizer 後處理造成比較不符）；實際內容正確
+- backup：`agency-os/Backups/claude-userlevel-20260511-090325/`
+
+### SG VPS — app.aware-wave.com Basic Auth 修復 + 衍生事件處理 <2026-05-11>
+
+**根因鏈**：2026-05-11 重新啟用 Basic Auth 時，`/api/` 路徑未豁免 → Telegram webhook `/api/internal/commands/telegram` 被 401 擋住 → bot 11 則指令排隊靜默 → 監控誤報（CHECK_URLS 含 `/` 返回 401）。
+
+**修復 — 系統 nginx（system nginx `app` site）**：
+- 路徑：`/etc/nginx/sites-enabled/app`（canonical repo: `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`）
+- 新增 `location ^~ /api/` block（無 auth）放在 `location /`（有 auth_basic）之前
+- `location /`：加 `auth_basic "Aware Wave Admin"` + `auth_basic_user_file /etc/nginx/.htpasswd_studio`
+- nginx 優先順序：`^~ /api/ops/` → `^~ /api/build/` → `^~ /api/` → `location /`（auth）
+- `nginx -t` PASS，`systemctl reload nginx`
+- 驗證：`app.aware-wave.com/` → 401 ✓；錯誤密碼 → 401 ✓；`/api/ops/summary` → 200 ✓；Telegram `pending_update_count` 11 → 0 ✓
+
+**修復 — Telegram bot**：
+- 根因：nginx `/api/` 豁免後，Telegram webhook 恢復收到指令
+- bot 排隊 11 則全數消化（getWebhookInfo `pending_update_count: 0`）
+
+**修復 — 雙頻道告警（#infra-alerts + #ops-incidents）**：
+- `endpoint-alert.sh`：`send_webhook()` 改為同時 POST `WEBHOOK_URL`（#infra-alerts）和 `OPS_INCIDENTS_WEBHOOK_URL`（#ops-incidents）
+- `check-drift-and-alert.sh`：新增 step 9b 讀取 `.env` 的 `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`，獨立 POST #ops-incidents
+- `awarewave-endpoint-alert.local.template`：新檔，記錄 drop-in 覆蓋模式（`CHECK_URLS` 改用 `/api/ops/summary`，`OPS_INCIDENTS_WEBHOOK_URL` 設定說明）
+- VPS drop-in：`/etc/default/awarewave-endpoint-alert.local` 已 `CHECK_URLS` 改用 `app.aware-wave.com/api/ops/summary`（避免 `/` 401 誤報）
+
+**VPS commit**：`0b252be`（SG VPS `/root/Work`，無法推 GitHub → 本機 apply 後統一 push）
+**本機 commits**：`fd88821`、`11f0942`（checkpoint/memory）
+**推送**：本 commit 統一推 origin/main，VPS 再 `git pull`
+
+**避免再發生**：
+- nginx conf 已明文列出「所有 /api/ 路徑無 auth，location / 才有 auth」，任何未來改 auth 層級時須先看此規則
+- monitoring CHECK_URLS 不得用 `/`（有 auth 的路徑），改用 `/api/ops/summary`（已在 template 記錄）
+- ops-incidents 靜默根因：只掛了一個 Slack webhook；現雙頻道 pattern 已成 convention
+
+**相關文件**：
+- `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`
+- `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`
+- `lobster-factory/infra/hetzner-phase1-core/scripts/check-drift-and-alert.sh`（新增）
+- `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/awarewave-endpoint-alert.local.template`（新增）
+
+### CLAUDE.md 系統全知優化 <2026-05-11>
+
+**任務**：掃 Work repo 所有 README（28 份，排除 node_modules），找 Claude 不知道但會影響操作決策的關鍵事實，以最省 token 方式補入 CLAUDE.md。
+
+**已移除（節省 ~650 行/session）**：
+- `@agency-os/docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md`（~150 行，內容已在 AGENTS.md 覆蓋）
+- `@mcp/README.md`（~100 行，日常不需要細節）
+- `@agency-os/docs/operations/mcp-add-server-quickstart.md`（~200 行，按需讀取）
+
+**新增 §系統架構速查（25 行）** — 9 個關鍵事實：
+1. 目錄分工（agency-os / lobster-factory / scripts / mcp / tenants）
+2. SG（5.223.93.113）vs EU（204.168.175.41）伺服器邊界（不可混用）
+3. ClickHouse 固定在 25.7.x（禁升 latest/24.x）
+4. 龍蝦 Routing 三件套必須同 PR 同步
+5. Supabase 寫入預設 OFF；Manifest 執行預設 OFF
+6. Trigger.dev `tr_pat_*`（deploy）vs `tr_prod_*`（SDK）不可互換
+7. Cursor rules 正本在 `agency-os/.cursor/rules/`（repo 根是 mirror）
+8. Staging URL SSOT：`tenants/<slug>/core/ENVIRONMENT_REGISTRY.md`
+9. 監控端點用 `/api/ops/summary`（非 `/`），drop-in pattern
+
+**結果**：CLAUDE.md 97 → 123 行；session 載入節省約 450 行；新增的 25 行覆蓋 9 個會造成操作錯誤的知識盲區。
+
+**commit**: `d5a707a`
+
+### CLAUDE.md 全系統精確性驗證＋修正 <2026-05-11>
+
+**任務**：系統性驗證 CLAUDE.md 每一條目是否符合 repo 實況；找到不符合就修正並做跨檔 R4 掃描。
+
+**發現並修正的問題（8 項）**：
+1. **非存在旗標名**（CLAUDE.md 118）：`-EnableWrites`/`-ExecuteManifest` 不存在任何腳本 → 改為實際 env var `LOBSTER_ENABLE_DB_WRITES=true`、`LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`（確認自 `trigger.config.ts`、`installManifestStaging.ts`）
+2. **SG 服務清單錯誤**：原含 n8n/Supabase/Trigger v3（實際都在 EU）→ 更正為 nginx/next-admin/node-api/wordpress/redis（docker-compose.yml 驗證）
+3. **EU 服務清單不完整**：漏 Supabase、n8n、MainWP、Uptime Kuma → 補入（Cloudflare DNS 截圖確認 204.168.175.41）
+4. **死亡路徑 `reference_recurring_ops_recipes.md`**：3 處引用（CLAUDE.md、sg-reboot.md、SERVICE_CREDENTIALS_MAP.md）→ 全部移除或改為正確描述
+5. **硬編使用者名稱 `user1115`**：sg-deploy.md、sg-reboot.md、trigger-deploy-agent.md → 改為 `$env:USERPROFILE`
+6. **Runbook 明文密碼**：`HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` 含 `UcxTUVkPdkfP`/`PLxPNRueadaw` → 改為 vault 指令
+7. **「筆電」誤稱**：AGENTS.md、claude-userlevel README、DESKTOP_MCP_SETUP.md、DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md → 改為「兩台桌機」/「個人桌機+公司桌機」
+8. **Routing JSON 名模糊**：「routing matrix JSON」→ `workflow-risk-matrix.json`（實際檔名確認）
+
+**新增 R4 規則**：每次寫檔後 grep 剛改的確切字串（限 `.claude/ runbooks/ scripts/ agency-os/docs/ mcp/` 範圍）→ 一次 commit 修完同類問題；避免全域掃描浪費 token。
+
+**根因**：CLAUDE.md 部分內容為「概念描述」而非「可執行指令」，與實際腳本 API 漂移。
+
+**避免再發生**：R4 rule 已入 CLAUDE.md；任何更新 CLAUDE.md 的操作須先 Glob 確認路徑/旗標存在。
+
+**commits**: `2522010`、`0d7a90f`、`5a25079`、`9e16329`、`422cddc`、`de7adae`
+
+### 機型修正 + memory 搬移 + 跨機同步自動化 <2026-05-11>
+
+**任務**：使用者指出「兩台桌機」描述有誤；同時發現 memory 檔在 git 外、跨機須手動複製；要求 AO-CLOSE 自動匯出、AO-RESUME 自動匯入，零手動步驟。
+
+**修正（6 項）**：
+1. **機型錯誤**（5 處）：`AGENTS.md`、`user_devices.md`、`REMOTE_WORKSTATION_STARTUP.md`、`DESKTOP_MCP_SETUP.md`、`DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md` — 「兩台桌機」→「個人筆電 + 公司桌機」
+2. **memory 檔搬入 repo**：`feedback_git_push.md`、`feedback_trigger_deploy.md`、`user_devices.md` 從 `~/.claude/.../memory/` 移入 `agency-os/memory/`（git-tracked，`git pull` 自動同步）
+3. **MEMORY.md index 更新**：指向 repo 路徑；user-level `~/.claude/.../memory/` 下只留 `MEMORY.md` 本身（index，非內容）
+4. **新建 `scripts/export-cross-machine-memory.ps1`**：AO-CLOSE 後自動把 `MEMORY.md` 複製到 `Desktop\AO-SYNC-<date>\memory\`，附 `IMPORT_INSTRUCTIONS.md`
+5. **新建 `scripts/import-cross-machine-memory.ps1`**：找最新 `Desktop\AO-SYNC-*` 資料夾；比對時間戳；匯入 MEMORY.md；寫 `.imported` flag 避免重複匯入；無 AO-SYNC 時靜默不做（對筆電是正常）
+6. **ao-resume.ps1 升級**：verify（warn-only）→ merge（auto-fix）；新增 `sync-mcp-config.ps1` 自動呼叫；新增 `import-cross-machine-memory.ps1` 自動呼叫；全部 non-blocking（`$global:LASTEXITCODE = 0`）
+7. **ao-close.ps1**：末尾加 `export-cross-machine-memory.ps1` 呼叫
+8. **新建 `docs/operations/CROSS_MACHINE_SYNC_RUNBOOK.md`**：說明架構、每日例行、AO-RESUME 一鍵自動流程、一次性設定項目（SSH key、DPAPI vault）
+
+**結果**：兩台機器操作模式完全對稱。AO-CLOSE 在公司桌機自動導出 → 帶 AO-SYNC 到家 → AO-RESUME 自動匯入，零手動。
+
+**避免再發生**：user_devices.md 已入 repo；機器描述統一為「個人筆電 + 公司桌機」；下次換機只需 `AO-RESUME`。
+
+- AUTO_TASK_DONE: 機型描述修正（5 個檔案，個人筆電+公司桌機）
+- AUTO_TASK_DONE: memory 檔搬入 repo git-tracked（feedback_git_push.md、feedback_trigger_deploy.md、user_devices.md）
+- AUTO_TASK_DONE: 跨機同步自動化（export-cross-machine-memory.ps1 + import-cross-machine-memory.ps1 + ao-close/ao-resume 整合）
+- AUTO_TASK_DONE: AO-RESUME 全自動升級（sync-userlevel merge + sync-mcp + import MEMORY.md）
+- AUTO_TASK_DONE: CROSS_MACHINE_SYNC_RUNBOOK.md 新建
+
+### Telegram Command Plane emergency_stop 解除 + bot 回覆修復 <2026-05-11>
+
+**根因**：使用者 5/9 晚上傳 `/emergency_stop` 把 Command Plane 的 kill switch 關掉，之後完全忘記（`system_modes` 表 `mode='emergency_stop'`）。所有 Telegram 指令被靜默攔截（`blocked_by_killswitch`），bot 不回覆但 Telegram 看不出任何錯誤。
+
+**修復**：
+- EU Supabase psql 直接 `UPDATE system_modes SET mode='normal'` — 確認 `UPDATE 1`
+- 驗證：新的 `/status` 指令進 DB → `status=completed`；bot 成功回覆
+
+**補充說明文件**：
+- `emergency_stop` 只停 Telegram Command Plane（不影響服務）；只能用 SQL/ops console 解除（不能從 Telegram 解鎖，防止帳號被盜後被還原）
+- 相關狀態等級：`emergency_stop > maintenance > read_only > normal`
+
+**避免再發生**：`/emergency_stop` 是真正的緊急停機，使用前須確認有辦法用 SQL/ops console 解除。
+
+- AUTO_TASK_DONE: Telegram Command Plane kill switch 解除（emergency_stop → normal）
+
+### /health CRITICAL 誤報修復 + ops probe heartbeat 建立 <2026-05-11>
+
+**根因**：`health.ts` 用 `ops_incidents.created_at` 最新時間判斷 ingest 新鮮度。系統完全健康時沒有新 incident → `ingestFresh=false` → 誤報 `CRITICAL`。設計根本性錯誤。
+
+**另發現**：
+- `AwareWave Ops` 客戶在 `/client_status` 顯示 DOWN：`site_url` 設為 `https://app.aware-wave.com`（root，Basic Auth 保護返回 401），誤判 DOWN → 修正為 `/api/ops/summary`（200）
+- `/weeklyreview`、`/dailyreview` 5/7~5/8 失敗：Anthropic API key 過期，容器 5/11 01:46 重啟後新 key 已生效，歷史問題不需處理
+
+**修復（三層）**：
+
+1. **狀態邏輯修正**（`health.ts`）：stale ingest → WARN（非 CRITICAL）；CRITICAL 保留給有 active critical incident 的情況
+2. **ops_health_probes 表**（EU Supabase）：`probe_key PRIMARY KEY, status, checked_at, latency_ms, detail, metadata`
+3. **`/api/ops/probe` 端點**（next-admin）：POST + Bearer token → upsert `ops_health_probes('ops-inbox')`；`health.ts` 改查此表而非 `ops_incidents`
+4. **SG cron** `0 */6 * * *`：每 6 小時打一次 probe，日誌 `/root/lobster-phase1/logs/probe.log`
+
+**commits**：`5a3d87f`（status logic）、`f718518`（probe endpoint + health.ts 改查 heartbeat）
+**deploy**：`sg-deploy.sh next-admin` commit `f718518`，容器健康 ✓
+
+**副作用**：n8n admin 密碼在本 session 被意外重設為 `PeiAI20260405!`（peijingartstudio@gmail.com）；`user-management:reset` 清除了原始 email/password，無法還原。
+
+**避免再發生**：
+- health check 的「新鮮度」指標必須用獨立 heartbeat，不能依賴 incident 有無
+- monitoring `site_url` 不能用有 auth 的路徑（`/` 有 Basic Auth）
+
+- AUTO_TASK_DONE: /health CRITICAL 誤報修復（health.ts 狀態邏輯）
+- AUTO_TASK_DONE: ops_health_probes 表建立 + /api/ops/probe 端點
+- AUTO_TASK_DONE: AwareWave Ops client site_url 修正（/ → /api/ops/summary）
+- AUTO_TASK_DONE: SG cron 每 6 小時 probe heartbeat
+
+---
+
 ## 2026-05-09
 
 ### next-admin UI 配色＋層級重做 <2026-05-09>
@@ -1981,7 +2356,7 @@
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-09 12:51:06 UTC_
+_Last synced: 2026-05-13 09:43:34 UTC_
 
 ## 2026-03-20
 
@@ -2416,9 +2791,4 @@ _Last synced: 2026-05-09 12:51:06 UTC_
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
 
-
-## 2026-05-11
-
-### Machine appendix (weekly-system-review)
-- 2026-05-11 22:42:29 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
 

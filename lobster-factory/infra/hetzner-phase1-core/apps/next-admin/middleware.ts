@@ -29,6 +29,10 @@ export function middleware(request: NextRequest) {
   for (const header of CLAIM_HEADERS) headers.delete(header);
   if (!trustedProxy) headers.delete(SIMULATED_HEADER);
 
+  if (!trustedProxy && isProductionLike()) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   if (trustedProxy && isValidRole(claimRole)) {
     headers.set("x-ops-claims-role", claimRole!.trim().toLowerCase());
   }

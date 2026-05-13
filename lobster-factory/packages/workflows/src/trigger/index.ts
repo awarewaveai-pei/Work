@@ -5,3 +5,4 @@ export { applyManifest } from "./apply-manifest";
 export { dispatchActionRun, dispatchActionRunSchedule } from "./dispatch-action-run";
 export { aoInfrastructureCheck, aoInfrastructureCheckSchedule } from "./ao-infrastructure-check";
 export { adoptClientOs } from "./adopt-client-os";
+export { wpInstallPlugins } from "../tasks/wp-install-plugins";

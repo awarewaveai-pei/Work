@@ -27,6 +27,20 @@
 | 對外溝通／品牌 | `PROFILE.md` | 品牌與語系 | 多市場訊息責任 | production: `soulfulexpression.org` |
 | 投資人關係／IR | `PROFILE.md` | — | `N/A` 或窗口索引 | **N/A —** 目前規模不适用 |
 
+## M3 控制台設定（2026-05-13）
+
+要在 Ops Console 顯示部門覆蓋率，請在 Supabase `organizations.metadata.client_config` 填入：
+
+```json
+{
+  "department_selection": ["CLU_STRATEGY_GOVERN","CLU_FINANCE","CLU_SECURITY_IT","CLU_ENGINEERING","CLU_ORDER_OPS","CLU_MARKETING","CLU_CUSTOMER_SUCCESS","CLU_BRAND_COMMS"],
+  "department_selection_reviewed_at": "2026-05-13"
+}
+```
+
+> 上方為 Soulful Expression 建議 SMB + 行銷/品牌預設值（8/20）。實際選型依合約範圍調整。  
+> M3 API：`GET /api/ops/clients/company-soulful-expression/department-summary`
+
 ## Related (repo SSOT)
 
 - `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`

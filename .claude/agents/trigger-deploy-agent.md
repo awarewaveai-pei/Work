@@ -23,7 +23,7 @@ Wait for confirmation before proceeding.
 1. **Connect to EU server**:
    - host: `204.168.175.41`
    - username: `root`
-   - privateKeyPath: `C:/Users/USER/.ssh/hetzner_trigger`
+   - privateKeyPath: `$env:USERPROFILE/.ssh/hetzner_trigger`（Claude 須先展開為絕對路徑）
 
 2. **Navigate to workflows**:
    ```bash

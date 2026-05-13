@@ -6,6 +6,11 @@
 > **適用環境**：AwareWave SG / EU 雙機架構，solo operator
 > **owner doc**：本檔（單一主人）
 
+> 2026-05-12 狀態更新：本檔改為歷史參考，不再是 auto-repair 的施工正本。
+> 正式施工與交接基準改以 `docs/awarewave-auto-repair-plan-v3.2-final.md` 與 `agency-os/docs/operations/slack-notification-routing.md` 為準。
+> 如本檔內容與上述文件衝突，一律以上述兩份較新的文件為準。
+> 本檔後續段落若仍出現 legacy 的 `#ops`、單 channel、或 n8n hot-path 範例，視為歷史內容保留，不得直接照抄實作。
+
 ---
 
 ## 0. 摘要
@@ -60,10 +65,10 @@ AwareWave 既有「告警接收」與「指令執行」兩條 ops 路徑：
 |---|-----|------------|
 | 1 | **不自動 deploy**：取消 `on: push: main`，deploy 永遠手動跑 `sg-deploy.sh` | 不衝突（CLAUDE.md High-STOP）；每次 push to main 不該 trigger deploy |
 | 2 | **n8n 不在 hot path**：Slack incoming webhook 直連 + Block Kit 帶按鈕；n8n 只處理單一 callback | 不 lock-in（n8n 掛了 alert 仍進得來） |
-| 3 | **Telegram 角色不降級**：本計畫不重新定義 Telegram；Telegram 仍是 phone-ops 主動通道（既有 Phase 2c）| 不重工（不浪費既有投資） |
+| 3 | **Telegram 角色不降級**：Telegram 仍是 phone-ops 主動通道，且現已補上手機備援通知角色 | 不重工（不浪費既有投資） |
 | 4 | **Health check 用既有 `scripts/system-health-check.ps1`**：手動 deploy 後自動 call | 不重工 |
 | 5 | **Rollback 直接 call `rollback-phase1.sh`**：不寫 fallback yaml | 不重工 |
-| 6 | **Slack 1 個 channel `#ops`**：訊息分級用 emoji prefix，不切 4 個 channel | 不重工（既有 channel；認知負擔） |
+| 6 | **Slack 採既有雙層路由**：`#infra-alerts` = raw infra、`#ops-incidents` = curated incident，不重建新 channel 體系 | 不重工（沿用正式營運契約） |
 | 7 | **Dedup 用 fingerprint + 24 小時視窗**：用 `lib/ops-inbox/fingerprint.ts` 既有實作 | 不重工 + 不衝突（既有架構已內建） |
 
 ---
@@ -203,7 +208,7 @@ AwareWave 既有「告警接收」與「指令執行」兩條 ops 路徑：
 | `SLACK_BOT_TOKEN` (xoxp) | 既有 | ⚠ 看是否需 Slack App OAuth（下節決定） |
 | `SENTRY_AUTH_TOKEN` | 既有 | ✅（設 Sentry webhook 時） |
 | `UPTIME_KUMA_API_KEY` | 既有 | ✅ |
-| `TELEGRAM_BOT_TOKEN` | 既有（Phase 2 用） | ❌ 本系統不用 Telegram |
+| `TELEGRAM_BOT_TOKEN` | 既有（Phase 2 用） | ✅ 手機備援通知 + command plane |
 | `ANTHROPIC_API_KEY` | 既有 | ✅（Claude Code Action） |
 | `GITHUB_PERSONAL_ACCESS_TOKEN` | 既有 | ⚠ Action 自動 GITHUB_TOKEN 可能就夠；用 PAT 才能跨 repo |
 | `OPS_INBOX_INGEST_TOKEN` | 既有 | ❌（不寫 ops_incidents） |
@@ -230,9 +235,9 @@ AwareWave 既有「告警接收」與「指令執行」兩條 ops 路徑：
 
 #### 6.1.1 Slack 設定（5 分鐘）
 
-1. **頻道**：用既有 `#ops` 或建一個（如尚無）
-2. **頻道通知偏好**：Settings → Notifications → 「每則訊息」+ 「音效開啟」
-3. **勿擾時段**：23:00–08:00；`#ops` 加入「allow notifications during DND」白名單
+1. **頻道**：沿用既有 `#infra-alerts`、`#ops-incidents`；只新增 `#github-prs`
+2. **頻道通知偏好**：`#ops-incidents` 設為「每則訊息」+ 音效；`#infra-alerts` 視需要靜音；`#github-prs` 僅 @ 提及
+3. **勿擾時段**：23:00–08:00；讓 `#ops-incidents` 與 Telegram 備援保持可見
 
 #### 6.1.2 Slack App 建立（10 分鐘）
 
@@ -247,7 +252,7 @@ AwareWave 既有「告警接收」與「指令執行」兩條 ops 路徑：
 4. **Features → OAuth & Permissions**：
    - Bot Token Scopes 加：`chat:write`, `chat:write.public`, `incoming-webhook`, `commands`
 5. **Install App → Install to Workspace**
-   - 同意並挑 `#ops` channel
+   - 同意並讓 incoming webhook 指向 `#ops-incidents`
    - 拿到 Bot User OAuth Token (xoxb-...)
    - 拿到 Webhook URL（`hooks.slack.com/services/...`）
 6. **記下兩個值**，Phase 2 會放進 vault。

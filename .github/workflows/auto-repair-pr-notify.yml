@@ -1,0 +1,27 @@
+name: Auto-Repair - PR Notification
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  notify:
+    if: contains(github.event.pull_request.labels.*.name, 'auto-repair')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "SLACK_WEBHOOK_URL not configured; skipping Slack notification"
+            exit 0
+          fi
+          curl -fsS -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "{\"text\":\"Auto-repair PR is ready for human review: ${PR_TITLE} ${PR_URL}. Merge only after green CI and low-risk Chinese summary.\"}"

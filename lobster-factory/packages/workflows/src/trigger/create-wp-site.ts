@@ -1,4 +1,4 @@
-import { task, logger } from "@trigger.dev/sdk";
+import { task, logger, tasks } from "@trigger.dev/sdk";
 import { z } from "zod";
 import { newUuid } from "../utils/uid";
 import { buildWorkflowRunInsertSql } from "../db/sql/workflowRunsSql";
@@ -52,6 +52,11 @@ const InputSchema = z.preprocess(
     provider: z.string().optional(),
     locale: z.string().optional(),
     integrations: IntegrationsSchema,
+    // WP Plugin Stack — from OnboardWizard Step 2 (Phase 1)
+    pluginSlugs: z.array(z.string()).optional(),
+    sshHost: z.string().optional(),
+    sshCredentialsRef: z.string().optional(),
+    wpPath: z.string().optional(),
     // dispatcher passthrough fields (ignored by this workflow but safe to accept)
     _dispatchedFromActionRunId: z.string().optional(),
     _traceId: z.string().optional(),
@@ -210,6 +215,19 @@ export const createWpSite = task({
             wpRootPath: stagingRef.wpRootPath,
             wpAdminUrl: stagingRef.wpAdminUrl,
           },
+          wpInstallPlugins: input.pluginSlugs?.length
+            ? {
+                workflowId: "wp-install-plugins" as const,
+                pluginSlugs: input.pluginSlugs,
+                sshHost: input.sshHost ?? (stagingRef as { sshHost?: string }).sshHost ?? "TODO_from_staging_ref",
+                sshCredentialsRef: input.sshCredentialsRef ?? `vault://ssh/${input.siteName}`,
+                wpPath: input.wpPath ?? stagingRef.wpRootPath,
+                organizationId: input.organizationId,
+                workspaceId: input.workspaceId,
+                siteId: input.siteId,
+                note: "Trigger.dev tasks.trigger() fires this task at Stage 3.5 (see create-wp-site.ts integrations section)",
+              }
+            : { note: "no pluginSlugs provided — skip wp-install-plugins" },
           runSmokeTests: "TODO_after_real_wp_or_smoke_test_sh",
           writeArtifactsAndLogs: "TODO",
           db: {
@@ -237,6 +255,19 @@ export const createWpSite = task({
             projectId: input.projectId,
             siteId: input.siteId,
           },
+          wpInstallPlugins: input.pluginSlugs?.length
+            ? {
+                workflowId: "wp-install-plugins" as const,
+                pluginSlugs: input.pluginSlugs,
+                sshHost: input.sshHost ?? "TODO_from_staging_ref",
+                sshCredentialsRef: input.sshCredentialsRef ?? `vault://ssh/${input.siteName}`,
+                wpPath: input.wpPath ?? "TODO",
+                organizationId: input.organizationId,
+                workspaceId: input.workspaceId,
+                siteId: input.siteId,
+                note: "Trigger wp-install-plugins task after apply-manifest Stage 3 completes",
+              }
+            : { note: "no pluginSlugs provided — skip wp-install-plugins" },
           runSmokeTests: "TODO",
           writeArtifactsAndLogs: "TODO",
           db: {
@@ -278,6 +309,52 @@ export const createWpSite = task({
         logger.warn("create-wp-site: some integrations failed", { errors: integrationErrors });
       }
 
+      // ── Stage 3.5: Trigger wp-install-plugins for user-facing plugin stack ──
+      // SSOT: agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md §八
+      // Gated by LOBSTER_EXECUTE_MANIFEST_STEPS env var (default OFF for safety).
+      // The wp-install-plugins task itself also respects the env var and will
+      // do dry-run if SSH execution is disabled. Fire-and-forget pattern —
+      // results are written to package_install_runs and surfaced in
+      // /ops/clients/[slug] page.
+      let pluginInstallRunHandle: { id: string } | null = null;
+      const willExecuteSteps =
+        (process.env.LOBSTER_EXECUTE_MANIFEST_STEPS || "").toLowerCase() === "true" ||
+        process.env.LOBSTER_EXECUTE_MANIFEST_STEPS === "1";
+      const sshHost = input.sshHost ?? (stagingRef as { sshHost?: string } | null)?.sshHost ?? null;
+
+      if (input.pluginSlugs?.length && sshHost && willExecuteSteps) {
+        try {
+          const handle = await tasks.trigger("wp-install-plugins", {
+            sshHost,
+            sshUser: "root",
+            sshCredentialsRef: input.sshCredentialsRef ?? `vault://ssh/${input.siteName}`,
+            wpPath: input.wpPath ?? stagingRef?.wpRootPath ?? "/var/www/html",
+            pluginSlugs: input.pluginSlugs,
+            organizationId: input.organizationId,
+            workspaceId: input.workspaceId,
+            siteId: input.siteId,
+            buildRunId: workflowRunId,
+          });
+          pluginInstallRunHandle = { id: handle.id };
+          logger.info("create-wp-site: wp-install-plugins triggered", {
+            runId: handle.id, pluginCount: input.pluginSlugs.length,
+          });
+        } catch (err) {
+          logger.warn("create-wp-site: wp-install-plugins trigger failed (non-fatal)", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      } else if (input.pluginSlugs?.length) {
+        logger.info("create-wp-site: wp-install-plugins skipped", {
+          hasSshHost: !!sshHost,
+          willExecuteSteps,
+          pluginCount: input.pluginSlugs.length,
+          reason: !sshHost
+            ? "no ssh host (operator must supply input.sshHost or hosting adapter must populate stagingRef.sshHost)"
+            : "LOBSTER_EXECUTE_MANIFEST_STEPS is not true (dry-run mode)",
+        });
+      }
+
       captureWorkflowEvent("workflow completed", {
         workflowId: "create-wp-site",
         organizationId: input.organizationId,
@@ -287,6 +364,7 @@ export const createWpSite = task({
         status: finalStatus,
         hostingOutcome: hosting.outcome,
         integrationResults,
+        pluginInstallTriggered: !!pluginInstallRunHandle,
       });
 
       return {
@@ -296,6 +374,11 @@ export const createWpSite = task({
         vendorStaging: hosting.outcome === "provisioned" ? hosting.ref : null,
         next,
         integrations: integrationResults,
+        pluginInstall: {
+          triggered: !!pluginInstallRunHandle,
+          runHandle: pluginInstallRunHandle,
+          pluginCount: input.pluginSlugs?.length ?? 0,
+        },
       };
     } catch (error) {
       captureWorkflowEvent("workflow errored", {

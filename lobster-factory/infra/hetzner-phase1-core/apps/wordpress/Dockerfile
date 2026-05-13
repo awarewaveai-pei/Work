@@ -21,4 +21,11 @@ COPY docker-entrypoint-sentry.sh /usr/local/bin/lobster-init.sh
 RUN chmod +x /usr/local/bin/lobster-init.sh
 
 WORKDIR /var/www/html
+
+# Install WP-CLI (pinned — update when WP-CLI releases a tested stable)
+# Allows: docker exec lobster-wordpress wp plugin install <slug> --activate --allow-root
+RUN curl -sSL https://github.com/wp-cli/wp-cli/releases/download/v2.11.0/wp-cli-2.11.0.phar \
+      -o /usr/local/bin/wp \
+    && chmod +x /usr/local/bin/wp
+
 CMD ["/usr/local/bin/lobster-init.sh"]

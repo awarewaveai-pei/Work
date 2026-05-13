@@ -19,6 +19,8 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `apply-pending-task-checkmarks.ps1` | Apply pending checkmarks (legacy wrapper) |
 | `init-closeout-inbox.ps1` | Initialise closeout-inbox.md |
 | `verify-closeout-completeness.ps1` | Gate: confirm WORKLOG has evidence before commit |
+| `export-cross-machine-memory.ps1` | Export MEMORY.md index to Desktop\AO-SYNC-<date>\ (called by ao-close) |
+| `import-cross-machine-memory.ps1` | Import MEMORY.md from Desktop\AO-SYNC-*\ if newer (called by ao-resume; silent no-op if no AO-SYNC) |
 
 ## Build / Health / Gates
 
@@ -101,7 +103,8 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `sync-hetzner-observability-grafana-content.ps1` | Sync Grafana dashboards/content |
 | `sync-hetzner-pagerduty-endpoint-alert.ps1` | Sync PagerDuty endpoint alerts |
 | `sync-hetzner-slack-alert-webhooks.ps1` | Sync Slack alert webhooks |
-| `public-endpoint-smoke.ps1` | Smoke test public endpoints |
+| `public-endpoint-smoke.ps1` | Smoke test public endpoints (HTTP-only; Playwright gives browser-level equivalent) |
+| `playwright-runner.ps1` | Playwright E2E orchestrator — smoke / qa / client / screenshot / a11y / perf / install. Called by `/playwright` skill. |
 | `ops-console-bootstrap.ps1` | Bootstrap ops console |
 | `ops-console-smoke.ps1` | Smoke test ops console |
 | `ops-network-precheck.ps1` | Network precheck before ops |
@@ -140,6 +143,7 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | Script | Purpose |
 |--------|---------|
 | `update-client-wp-plugins.ps1` | Safe one-command plugin updater: backup-first → wave update → health check → auto-rollback. Config per client at `tenants/*/core/wp-update-config.json`. Owner doc: `agency-os/docs/operations/WP_MANAGED_UPDATES.md` |
+| `verify-wp-plugin-stack-sync.mjs` | Drift check: `WP_CLIENT_PLUGIN_STACK.md` (human SSOT) vs `wp-plugin-stack-catalog.ts` (machine mirror). Exit 0 = aligned; exit 1 = drift. Owner doc: `agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md` §八.5 |
 
 ## WordPress / Local Dev
 
@@ -179,6 +183,12 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | `rag_query.ts` | RAG query (TypeScript) |
 | `rag_seed_and_embedding.ts` | RAG seed and embedding (TypeScript) |
 | `setup-rag-env.ps1` | Set up RAG environment |
+
+## Cursor / IDE Tooling
+
+| Script | Purpose |
+|--------|---------|
+| `fix-cursor-ai-sidebars.mjs` | Patch Codex + Claude Code extension package.json to force activity bar placement; run after sidebar icons vanish |
 
 ---
 

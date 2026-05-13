@@ -172,13 +172,14 @@ if ($bootstrapRaw -notmatch 'sync-claude-userlevel\.ps1') {
     Write-Error "verify-build-gates: bootstrap-mcp-machine.ps1 must invoke sync-claude-userlevel.ps1 -Mode install (contract guard)."
     exit 1
 }
-# ao-resume.ps1 must invoke the verify-mode warn-only check (anchored on contract marker)
-if ($aoResumeRaw -notmatch '#\s*CONTRACT:\s*invoke\s+sync-claude-userlevel\.ps1\s+-Mode\s+verify') {
-    Write-Error "verify-build-gates: ao-resume.ps1 must invoke sync-claude-userlevel.ps1 -Mode verify (warn-only drift detector). Missing contract marker."
+# ao-resume.ps1 must invoke sync-claude-userlevel.ps1 in verify OR merge mode (anchored on contract marker)
+# merge is a superset of verify (auto-fixes drift instead of just warning)
+if ($aoResumeRaw -notmatch '#\s*CONTRACT:\s*invoke\s+sync-claude-userlevel\.ps1\s+-Mode\s+(verify|merge)') {
+    Write-Error "verify-build-gates: ao-resume.ps1 must invoke sync-claude-userlevel.ps1 -Mode verify or -Mode merge. Missing contract marker."
     exit 1
 }
-if ($aoResumeRaw -notmatch '-Mode verify') {
-    Write-Error "verify-build-gates: ao-resume.ps1 missing actual '-Mode verify' invocation."
+if ($aoResumeRaw -notmatch '-Mode (verify|merge)') {
+    Write-Error "verify-build-gates: ao-resume.ps1 missing actual '-Mode verify' or '-Mode merge' invocation."
     exit 1
 }
 

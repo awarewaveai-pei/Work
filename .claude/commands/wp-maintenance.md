@@ -55,6 +55,19 @@ Post-check:
 Evidence:
 ```
 
+## Post safe-update: automatic client verification
+
+After a **successful** `safe-update`, **always** run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\playwright-runner.ps1 `
+  -Mode client -ClientSlug <slug> -SkipInstall
+```
+
+This checks: homepage 200, no PHP errors, no broken JS, wp-admin accessible,
+and captures full-page + mobile screenshots as update evidence.
+Evidence is archived to `agency-os/reports/e2e/YYYY-MM-DD/client/`.
+
 ## Owner Doc
 
 `agency-os/docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md`

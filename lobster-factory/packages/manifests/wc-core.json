@@ -1,9 +1,9 @@
 {
   "name": "wc-core",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "schemaVersion": "1.0.0",
   "target": "staging-only",
-  "description": "Base WooCommerce + Kadence + FluentCRM stack",
+  "description": "WooCommerce container manifest: Kadence theme + operational plugins (host-conditional cache). User-facing ecommerce plugins (WooCommerce, CartFlows, Stripe gateway, etc.) are owned by agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md §八 (ecommerce module) and installed via wp-install-plugins task — do NOT add user-facing plugins here.",
   "guardrails": {
     "allowEnvironments": ["staging"],
     "requireBackup": true,
@@ -13,14 +13,6 @@
   "conflicts": [],
   "steps": [
     { "id": "theme-kadence", "type": "install_theme", "slug": "kadence" },
-    { "id": "plugin-kadence-blocks", "type": "install_plugin", "slug": "kadence-blocks" },
-    { "id": "plugin-woocommerce", "type": "install_plugin", "slug": "woocommerce" },
-    { "id": "plugin-cartflows", "type": "install_plugin", "slug": "cartflows" },
-    { "id": "plugin-rank-math", "type": "install_plugin", "slug": "seo-by-rank-math" },
-    { "id": "plugin-fluent-crm", "type": "install_plugin", "slug": "fluent-crm" },
-    { "id": "plugin-fluent-forms", "type": "install_plugin", "slug": "fluentform" },
-    { "id": "plugin-fluent-smtp", "type": "install_plugin", "slug": "fluent-smtp" },
-    { "id": "plugin-site-kit", "type": "install_plugin", "slug": "google-site-kit" },
     {
       "id": "plugin-litespeed",
       "type": "conditional_plugin",
@@ -29,18 +21,16 @@
     }
   ],
   "postInstall": [
-    { "type": "activate_theme", "slug": "kadence" },
+    { "type": "activate_theme",   "slug": "kadence" },
     { "type": "flush_permalinks" },
-    { "type": "set_option", "key": "timezone_string", "value": "Asia/Taipei" }
+    { "type": "set_option",        "key": "timezone_string", "value": "Asia/Taipei" }
   ],
   "verification": [
     { "type": "check_homepage" },
-    { "type": "check_admin_login" },
-    { "type": "check_plugin_active", "slug": "woocommerce" },
-    { "type": "check_plugin_active", "slug": "fluent-crm" }
+    { "type": "check_admin_login" }
   ],
+  "smokeProfile": "woocommerce",
   "rollback": {
     "strategy": "restore_backup_snapshot"
   }
 }
-

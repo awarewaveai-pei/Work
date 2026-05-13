@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-11 22:42:28
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-05-13 17:43:49
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -212,14 +212,34 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-11.md
-_no file for today yet._
+## 5) memory/daily/2026-05-13.md
+# Daily Note - 2026-05-13
+
+## Done today
+- WP Plugin Auto-Install 系統主體完成（commit `92271f4`）
+  - `wp-plugin-stack-catalog.ts`：純加法包模型、LiteSpeed conditional、dedup、resolveConditionalPlugins
+  - `contracts.ts` + `BuildConsole.tsx`：selectedPacks 參數、smokeProfileFor/normalizeBuildRequest 更新
+  - `wp-install-plugins.ts`：改用 ssh2 npm（不依賴系統 ssh binary）、私鑰不寫磁碟、--force --skip-plugins 冪等、per-client vault key
+  - `Dockerfile`（WordPress）：WP-CLI v2.11.0 pinned
+  - `OnboardWizard.tsx` Step2：純加法 checkbox 包選擇
+  - `OnboardWizard.tsx` Step4：每個服務各自一張卡片（7 個服務），Hint 欄位嵌入，全選按鈕
+- Repair Center Phase3 docs & workflow fixes（remote commits）合併進 main
+- /onboard smoke spec 04 補強（早班）
+
+## Current state
+- WP plugin auto-install 邏輯已完整，但實際功能尚未可用（兩個 deploy 待做）
+- main branch 已 push，所有功能邏輯在 origin/main
+
+## Next steps
+- `/sg-deploy` — 重建 lobster-wordpress container（WP-CLI 才進生產）
+- Trigger.dev re-deploy — ssh2 才納入 task image（`.\scripts\lobster-trigger-deploy.ps1`）
+- End-to-end smoke test：Step4 provision-services + wp-install-plugins 完整驗收
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-09 20:51:12`
+- Time: `2026-05-13 17:43:41`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -229,14 +249,13 @@ _no file for today yet._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260509-205112.md`
-- Closeout: `reports/closeout/closeout-20260509-205107.md`
+- Health: `reports/health/health-20260513-174340.md`
+- Closeout: `reports/closeout/closeout-20260513-174335.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- `git pull origin main`：**Already up to date**。
 - `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
 - `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
 
@@ -295,5 +314,6 @@ _no file for today yet._
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 

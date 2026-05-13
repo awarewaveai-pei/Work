@@ -1,6 +1,6 @@
 # Claude Code user-level SSOT
 
-**單一目的**：讓每台機器的 `~/.claude/` 內容（hooks、settings.json、mcp.json）能透過 git pull + 一個指令對齊，達成「**桌機與筆電的 Claude Code 行為完全一致**」，且不靠手動複製整個資料夾。
+**單一目的**：讓每台機器的 `~/.claude/` 內容（hooks、settings.json、mcp.json、commands/）能透過 git pull + 一個指令對齊，達成「**筆電與桌機的 Claude Code 行為完全一致**」，且不靠手動複製整個資料夾。
 
 > 本目錄是 30 年級的 SSOT。要新增、修改、刪除被治理的檔案，**只**改這裡 → commit → 兩台跑 `sync-claude-userlevel.ps1 -Mode merge`。
 
@@ -42,6 +42,11 @@ mcp/claude-userlevel/
 
 ### `hooks/` — 完全 sync
 所有 19 個檔案 cross-machine identical。腳本用 mirror 模式覆蓋。
+
+### `~/.claude/commands/` — 完全 sync（2026-05-11 新增）
+**SSOT 來源**：`repo/.claude/commands/`（已進 git）。腳本用 mirror 模式覆蓋。  
+project-level commands 在 repo 開啟時優先；user-level 作為不開 repo 時的 fallback。  
+**禁止**：在 `~/.claude/commands/` 直接建立不在 repo 裡的副本。
 
 ### `settings.json` — 部分 sync
 **強制覆蓋（overwriteKeys）**：

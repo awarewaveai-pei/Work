@@ -98,7 +98,7 @@ Get-Process ssh | Stop-Process
 | 位置 | 內容 |
 |---|---|
 | `mcp/user-env.ps1` | **主檔**，所有明文 key（gitignored，只在本機） |
-| `C:\Users\user1115\.claude\projects\d--Work\memory\reference_vps_access.md` | VPS 密碼、JWT keys、SSH 指令 |
+| `scripts/secrets-vault.ps1 -Action get -Name <KEY>` | VPS 密碼、JWT keys（用 vault 存取，不存明文檔） |
 | Windows Registry（`setx` 寫入） | 所有 env vars，開機後自動載入 |
 
 > **備份建議**：定期將 `mcp/user-env.ps1` 複製到 Google Drive 或 1Password Secure Note。

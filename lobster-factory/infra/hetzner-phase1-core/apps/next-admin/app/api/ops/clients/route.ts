@@ -3,9 +3,11 @@
 // Data lives in organizations.metadata (JSONB). No extra table needed.
 //
 // Phase 2c client management dashboard — 2026-05-08
+// M3 department coverage field added — 2026-05-13
 
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "../../../../lib/supabase-server";
+import type { ClusterId } from "@/lib/department-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,15 @@ export interface ClientConfig {
     wave2?: string[];
     wave3?: string[];
   };
+
+  // M3: 20-department capability selection for this client.
+  // Source of truth: agency-os/tenants/<slug>/core/DEPARTMENT_SELECTION.json
+  // Synced here so the console can display coverage without reading repo files at runtime.
+  // Use DEPARTMENT_CATALOG SMB_DEFAULT_CLUSTERS as initial value for SMB clients.
+  department_selection?: ClusterId[];
+
+  // ISO date of last department selection review (populated alongside department_selection)
+  department_selection_reviewed_at?: string;
 }
 
 export interface WpUpdateLatest {

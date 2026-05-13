@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { triggerAutoClassify } from "@/lib/ops-inbox/ai/triggerAutoClassify";
+import { resolveOpsRole, canTriggerAiDiagnose } from "@/lib/ops-role";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const { role } = resolveOpsRole(req);
+  if (!canTriggerAiDiagnose(role)) {
+    return new NextResponse("forbidden", { status: 403 });
+  }
+
   let body: { incident_id?: string } = {};
   try {
     body = await req.json();

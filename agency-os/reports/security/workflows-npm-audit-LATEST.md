@@ -1,17 +1,19 @@
 # Workflows npm audit report
 
-- Generated UTC: 2026-05-04T08:37:45.301Z
+- Generated UTC: 2026-05-11T01:10:19.203Z
 - Path: `lobster-factory/packages/workflows`
-- Total: 2
+- Total: 4
 - Critical: 0
-- High: 0
-- Moderate: 2
+- High: 1
+- Moderate: 3
 - Low: 0
 
 ## Findings
 
-- `@trigger.dev/sdk`: severity=`moderate`, direct=`true`, fixAvailable=`true`, via=uuid
-- `uuid`: severity=`moderate`, direct=`false`, fixAvailable=`true`, via=uuid (1116970)
+- `express-rate-limit`: severity=`moderate`, direct=`false`, fixAvailable=`true`, via=ip-address
+- `fast-uri`: severity=`high`, direct=`false`, fixAvailable=`true`, via=fast-uri (1117870), fast-uri (1117884)
+- `hono`: severity=`moderate`, direct=`false`, fixAvailable=`true`, via=hono (1117763), hono (1117764), hono (1117915), hono (1117916), hono (1117919)
+- `ip-address`: severity=`moderate`, direct=`false`, fixAvailable=`true`, via=ip-address (1117683)
 
 ## Decision template
 

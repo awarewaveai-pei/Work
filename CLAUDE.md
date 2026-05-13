@@ -1,218 +1,135 @@
 @agency-os/AGENTS.md
-@agency-os/docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md
-@mcp/README.md
-@agency-os/docs/operations/mcp-add-server-quickstart.md
 @scripts/README.md
 
 # Claude Code Project Instructions
 
-## Shared MCP Governance
+## 核心規範（每次適用）
 
-- Treat `mcp/registry.template.json` and `scripts/sync-mcp-config.ps1` as the only shared source of truth for MCP server definitions in this repo.
-- Project-scoped Claude MCP config lives at repo-root `.mcp.json`.
-- Do not treat `~/.claude/mcp.json` as the shared project config. Claude Code project instructions and project MCP are repo-owned; user/local scope belongs in `~/.claude.json` or other machine-local settings.
-- When comparing against user-level Cursor or Claude MCP files, use them only as discovery inputs. Merge useful structure back into the shared registry and docs without copying live secrets into git.
-- When changing MCP setup, update these repo files first:
-  1. `mcp/registry.template.json`
-  2. `mcp/user-env.template.ps1` when new environment variable names are needed
-  3. `mcp/README.md`
-  4. `agency-os/docs/operations/mcp-add-server-quickstart.md`
-- After MCP changes, run `powershell -ExecutionPolicy Bypass -File .\scripts\sync-mcp-config.ps1` from the monorepo root.
-- Expected generated outputs are:
-  - `.mcp.json`
-  - `%USERPROFILE%\.codex\config.toml`
-  - `%USERPROFILE%\.copilot\mcp-config.json`
-  - `%USERPROFILE%\.gemini\settings.json`
-- Never commit live tokens, JWTs, passwords, PATs, or machine-specific secrets from user-level MCP files.
-- `.mcp.json` uses `${env:MONOREPO_ROOT}` for script paths. Ensure `MONOREPO_ROOT=C:\Users\USER\Work` is set as a Windows user environment variable on each machine.
+### Commit Prefix（強制）
+每個 commit 第一行：`[claude]`、`[cursor]`、`[codex]` 其中一個（全小寫、半形方括號 + 半形空白）。預設 `[claude]`。
 
-## Commit Prefix (強制)
+### R1：雙機設定同步
+| 項目 | SSOT | 同步方式 |
+|------|------|---------|
+| commands / agents / scripts / docs / runbooks | `repo/.claude/` + `agency-os/` + `scripts/` | `git pull` 自動 ✓ |
+| hooks / settings.json / `~/.claude/commands/` | `mcp/claude-userlevel/` | `git pull` + `sync-claude-userlevel.ps1 -Mode merge` |
+| memory `~/.claude/projects/*/memory/` | 無 | ❌ 手動複製（不進 git） |
 
-每個 `git commit` 第一行必須以下列三者擇一開頭（全小寫、半形方括號，後接一個半形空白）：
+**禁止**：在 `~/.claude/` 建立不在 repo 的副本。新機一鍵：`bootstrap-mcp-machine.ps1`。
 
-- `[claude]` — 本次主要在 Claude Code 脈絡完成
-- `[cursor]` — 主要在 Cursor（含 Agent）脈絡完成
-- `[codex]` — 主要在 Codex 脈絡完成
+### R2：任務完成強制
+1. `git commit` — message 含根因 + 驗證 = 30 秒故障手冊
+2. `WORKLOG.md` — 根因 / 步驟 / 驗證 / 避免再發生
+3. 新 pattern → 更新 runbook/template（不得只留 WORKLOG）
 
-全面切換至 Claude Code 後，預設使用 `[claude]`。  
-範例：`[claude] fix: sync-mcp-config ClaudeProjectPlaceholder path`
+### R3：30 年品質（操作前問）
+(a) 已有 SSOT？先讀，不重建。　(b) 破壞單一 Owner 原則？　(c) 30 秒能找到並理解？
 
-## 並行 session 編輯衝突偵測（Cursor + Claude 同時跑）
+### R4：修改即驗證（強制，每次寫檔）
+**寫入前**：每個路徑 / 腳本名 / 引用 → Glob 確認存在，不存在不寫。  
+**寫入後**：grep **你剛修的確切字串**（非全域掃描），範圍限 `.claude/ runbooks/ scripts/ agency-os/docs/ mcp/`，命中的一起修，同一 commit。  
+**原則**：改了什麼 → grep 那個字串；不做無目標全域掃描（浪費 token）。
 
-修改 SG/EU 上的 drop-in 檔案（`/etc/default/*.local`、systemd unit override 等）後，**若回頭使用該檔超過 5 分鐘**（例如等待 reboot、等下個 cron tick），動作前先重看一次：
+## MCP 治理
+SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`。  
+`~/.claude/mcp.json` 強制為 `{}`；shared MCP 走 repo `.mcp.json`。禁止 commit secrets。
 
-```bash
-ssh hetzner-sg 'stat -c "mtime=%y" /etc/default/awarewave-endpoint-alert.local; grep "^HEARTBEAT_URL" /etc/default/awarewave-endpoint-alert.local'
-```
-
-若 mtime 比你最後一次寫的時間更新，懷疑並行 session 蓋掉了。`journalctl --since '<mtime - 2m>' --until '<mtime + 2m>' | grep -E "(crontab|REPLACE|sshd.*Accepted)"` 找肇事 session。
-歷史案例：2026-05-08 我 08:29 uncomment 的 HEARTBEAT_URL 在 08:38 被另一個 cursor session 重新 commented，導致 reboot 後 Kuma 8 分鐘無 heartbeat。memory: `reference_recurring_ops_recipes.md §3`。
-
-## Risk-Tiered Confirmation（操作風險分級）
-
+## 操作風險分級（強制）
 | 等級 | 說明 | 處置 |
 |------|------|------|
-| **Low** | doc、小修、非破壞新檔 | 可做，說明假設 |
-| **Medium** | 核心邏輯、新依賴、auth | 先簡述計畫，同意再做 |
-| **High — STOP** | prod deploy、破壞性 migration、大量刪、金流、身分權限/RLS、憑證、無法乾淨回滾 | **停止**，說明風險，要求明示 go ahead |
+| Low | doc、小修、非破壞新檔 | 直接做，說明假設 |
+| Medium | 核心邏輯、新依賴、auth | 先說計畫，同意再做 |
+| **High — STOP** | prod deploy、破壞性 migration、金流、身分/RLS、憑證、無法回滾 | 停止，說風險，等明示 go ahead |
 
-**一律拒絕**：跳錯處、硬編密鑰、直衝 prod、一次蓋整個系統。
+禁止：跳錯處、硬編密鑰、直衝 prod、一次蓋整個系統。
 
-## Git 分支原則（強制）
+## Git 分支（強制）
+直接在 `main` commit/push。禁止建立新 branch（`settings.json` deny 已硬擋）。
 
-**預設直接在 `main` 上 commit／push。禁止建立新 branch**，除非使用者在同一則訊息中明確要求。
+## 自動開工（AO-RESUME）
+對話第一句是**問候 / 不知從哪開始 / 短句無明確目標（< 15 字）** → 直接執行 AO-RESUME，輸出五段式摘要，不等使用者打指令。  
+Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claude 讀狀態檔即可。
 
-- 不得執行 `git checkout -b`、`git switch -c`、`git switch --create`、`git branch <newbranch>`
-- `.claude/settings.json` deny 規則已硬性擋住上述指令
-- 理由：避免多代理切換後歷史混亂、減少 merge 衝突、保持 `git pull` 簡單
+## 自動收工（AO-CLOSE）
+任何關機/結束表達（「收工」「晚安」「bye」「done」「先這樣」「走了」等）→ 直接觸發完整 AO-CLOSE 流程。
 
-## Runbooks（緊急應變）
+## VPS 並行衝突（drop-in 檔案）
+修改 `/etc/default/*.local` 後 > 5 分鐘才再使用：`stat -c "mtime=%y" <file>` 確認 mtime 未被另一 session 覆蓋。
 
-事故、入侵、伺服器 OOM、WAF 設定問題時，查 `runbooks/`：
-- `HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` — 伺服器 502/OOM
-- `HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md` — 加密挖礦入侵
-- `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` — 一般安全事件
-- `CLOUDFLARE-WAF-SETUP.md` — Cloudflare WAF
-- `CODEX-CONFIG-ERRORS-FIXES.md` — Codex 設定錯誤
+## 緊急 Runbooks
+`runbooks/`：502/OOM、加密挖礦入侵、安全事件、Cloudflare WAF、Codex 設定錯誤。
 
-## 自動開工偵測（不需要記關鍵字）
-
-**對話開頭如果使用者的第一句話是下列任一情況，直接執行 AO-RESUME 流程，再回應他的問題：**
-
-- 問候語：「嗨」「hi」「早」「你好」「hey」「在嗎」「我來了」「開工了」「繼續」「回來了」「好了我來了」「掉線了」「我又來了」
-- 不知道從哪裡開始：「然後呢」「接著做什麼」「現在做什麼」「繼續哪裡」「然後」「接下來」「現在哪裡」
-- 短句且沒有指定具體任務（< 15 字，沒有明確目標）
-
-不需要使用者打 `AO-RESUME`。判斷到上述情況，直接做：跑 `ao-resume.ps1`、讀狀態檔、輸出五段式摘要。
-
-## 自動收工偵測（不需要記關鍵字）
-
-**以下任何表達都等同 `AO-CLOSE`，直接觸發完整收工流程：**
-
-「收工」「關機」「要睡了」「晚安」「掰掰」「bye」「好了」「今天先這樣」「先這樣」「今天到這」「可以了」「done」「ok done」「結束了」「不做了」「走了」「要出門了」「先關」「關掉」「ok today」「that's it」「夠了」「差不多了」「關閉」
-
-不需要使用者打 `AO-CLOSE`。
-
-## Claude Code Hook：AO-RESUME
-
-`~/.claude/settings.json` 的 `UserPromptSubmit` hook → `~/.claude/hooks/ao-resume-on-prompt.ps1`（user-level，不進 git）。  
-行為與 `.cursor/hooks.json` 的 `beforeSubmitPrompt` 完全等效：偵測 `^AO-RESUME` 即自動執行 `ao-resume.ps1 -FullMainlineParity`，結果寫入 `agency-os/.agency-state/ao-resume-hook-last.json`（120 秒去重，兩 IDE 共用同一狀態檔）。
-
-## 雙 IDE 並存（Cursor + Claude Code）
-
-本 repo 同時支援兩套 IDE，隨時可切換，不需遷移。完整架構見：  
-`agency-os/docs/operations/dual-ide-coexistence-strategy.md`
-
-## Cursor 停訂閱時的作業模式（Claude Only Fallback）
-
-若未來停止 Cursor 訂閱，專案仍可完整運作；請採以下模式：
-
-1. **主控 IDE 改為 Claude Code**（`CLAUDE.md` + `AGENTS.md` + `CLAUDE_EXECUTION_BLUEPRINT_30Y.md`）。
-2. **流程不變**：開工與收工仍使用同一組 repo 腳本：
-   - 開工：`scripts/ao-resume.ps1 -FullMainlineParity`
-   - 收工：`scripts/ao-close.ps1`
-3. **驗證不變**：持續使用 `verify-build-gates`、`system-health-check`、功能 smoke（例如 `ops-console-smoke.ps1`）。
-4. **MCP 不變**：共享 SSOT 仍是 `mcp/registry.template.json` + `scripts/sync-mcp-config.ps1` + repo `.mcp.json`。
-5. **不要重建第二套規則**：維持單一真相，避免為「無 Cursor」再複製一份平行 runbook。
-
-## Slash Commands（`/command-name`）
-
-專案級 slash commands 存放於 `.claude/commands/`（已進 git）。在對話輸入框打 `/` 即可呼叫：
-
+## Slash Commands（`.claude/commands/`，git 追蹤）
 | 指令 | 用途 |
 |------|------|
-| `/ao-resume` | 手動觸發 AO-RESUME 五段式摘要（hook 已失效時備用） |
-| `/ao-close` | 手動觸發 AO-CLOSE 完整收工流程 |
-| `/checkpoint` | Mid-session git checkpoint（不 push） |
-| `/recap` | 顯示今日完成摘要（關機前回顧用） |
-| `/tasks` | 列出所有未完成 `- [ ]` 任務 |
-| `/health` | 執行 `system-health-check.ps1` 並報告結果 |
-| `/doc-sync` | 執行 `doc-sync-automation.ps1 -AutoDetect` |
-| `/verify` | 執行 `verify-build-gates.ps1` |
-| `/build-tenant` | 引導新客戶租戶佈建（Lobster Factory） |
-| `/smoke-test` | 執行 n8n MCP + 核心服務煙霧測試 |
-| `/decide` | 18 階段多代理決策評審（工具選型 / 架構審查 / 商業策略）產出完整決策文件含可觀測性計畫 |
-| `/strategy-review` | 多角度策略決策審查（4 角色協作 / 紅藍辯論 / Pre-Mortem） |
-| `/sg-deploy` | SSH 上 SG VPS 跑 `sg-deploy.sh`（git → staging rsync → build → up → 寫 `.deployed-commit`） |
-| `/check-drift` | 跑 `check-deploy-drift.ps1`，回報 SG production vs `origin/main` 落後幾個 commit |
-| `/vault-sync` | 同步 vault → Windows user env，列出仍缺的 key |
-| `/vault-status` | 顯示 vault 所有 key 名稱 + `.cursor/mcp.json` 缺漏清單 |
-| `/client-status` | 查詢所有客戶（或單一）健康 + WP 更新狀態（呼叫 `/api/ops/clients` + Telegram `/client_status` 同源） |
-| `/wp-maintenance` | WordPress 維護入口：MainWP/WPvivid 備份狀態、更新計畫、backup-gated safe update routine |
+| `/ao-resume` | 手動 AO-RESUME |
+| `/ao-close` | 手動 AO-CLOSE |
+| `/checkpoint` | Mid-session git checkpoint |
+| `/recap` | 今日完成摘要 |
+| `/tasks` | 列所有未完成任務 |
+| `/health` | system-health-check.ps1 |
+| `/doc-sync` | doc-sync-automation.ps1 -AutoDetect |
+| `/verify` | verify-build-gates.ps1 |
+| `/smoke-test` | 核心服務煙霧測試 |
+| `/sg-deploy` | SG VPS sg-deploy.sh |
+| `/sg-reboot` | SG VPS 安全重啟（pre/post-flight） |
+| `/check-drift` | SG prod vs origin/main drift |
+| `/client-onboarding` | 新客戶 onboarding（Supabase + SSH + MainWP） |
+| `/vault-sync` | vault → Windows env |
+| `/vault-status` | vault key 清單 |
+| `/client-status` | 客戶健康 + WP 更新狀態 |
+| `/build-tenant` | 新客戶租戶佈建 |
+| `/wp-maintenance` | WordPress 維護入口 |
+| `/playwright` | Playwright E2E：smoke / qa / client / screenshot / a11y / perf / install |
+| `/decide` | 18 階段多代理決策評審 |
+| `/strategy-review` | 多角度策略決策審查 |
+| `/fix-sidebars` | 修復 Cursor 側邊欄消失（Codex / Claude Code 圖示不見） |
 
-## Project Subagents
-
-專案級 subagents 存放於 `.claude/agents/`（已進 git）。Claude Code 在需要時自動選用：
-
+## Project Subagents（`.claude/agents/`，git 追蹤）
 | Agent | 觸發時機 |
 |-------|---------|
-| `repair-agent` | 健康檢查失敗、腳本報錯、MCP 連不上、文件交叉引用斷掉、vault/env 對齊問題 |
+| `repair-agent` | 健康檢查失敗 / 腳本報錯 / MCP 斷線 / 文件交叉引用斷掉 |
 | `site-builder` | 新客戶租戶佈建（GitHub / Sentry / PostHog / Supabase / n8n） |
-| `trigger-deploy-agent` | Trigger.dev EU 工作流部署（需提供 `tr_pat_*` Personal Access Token） |
-| `client-onboarding` | 新客戶 onboarding（Supabase SQL seed + SSH 金鑰存放 + Wave 分類 / MainWP 連線）|
-| `wordpress-maintenance-agent` | WordPress 客戶維護（MainWP/WPvivid 備份 gate、MainWP sync、plugin wave 更新計畫 / safe update）|
-| `decision-intelligence` | 18 階段多代理決策評審（工具選型、架構審查、商業策略）；使用 `ai-decision-intelligence` skill；`/decide` 觸發 |
+| `trigger-deploy-agent` | Trigger.dev EU 部署（需 `tr_pat_*` PAT） |
+| `client-onboarding` | 新客戶 onboarding（Supabase seed + SSH + MainWP） |
+| `wordpress-maintenance-agent` | WP 客戶維護（備份 gate / 更新計畫 / safe update） |
+| `decision-intelligence` | 18 階段決策評審（`/decide` 觸發） |
 
-## 桌機 / 換機設定（**自動化版**，2026-05-07 起）
+## 雙機換機
+Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。  
+本地 WP 棧（若需要）：`bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`（詳：`REMOTE_WORKSTATION_STARTUP.md §1.5.1`）。
 
-repo 內所有東西（commands、agents、CLAUDE.md、AGENTS.md、scripts）`git pull` 自動同步。  
-**user-level 內容（hooks、settings.json、mcp.json）也已治理化** — `mcp/claude-userlevel/` 是 SSOT，由 `scripts/sync-claude-userlevel.ps1` 同步到 `~/.claude/`，不再手動複製。
+## 雙 IDE / Cursor Fallback
+雙 IDE 架構：`dual-ide-coexistence-strategy.md`。停 Cursor 時用同一組腳本（ao-resume / ao-close / verify），不重建第二套規則。
 
-### 換機 / 新機（一鍵）
+## 系統架構速查（Claude 必讀）
 
-```powershell
-git clone <repo> Work
-cd Work
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
-```
+### 目錄分工
+`agency-os/` — AO 治理（TASKS/WORKLOG/memory/docs/runbooks）；`lobster-factory/` — 龍蝦工廠（clients/infra/packages/workflows）；`scripts/` — 全域腳本；`mcp/` — MCP registry + user-level SSOT；`agency-os/tenants/` — 每客戶設定（`<slug>/core/ENVIRONMENT_REGISTRY.md` = Staging URL SSOT）。
 
-`bootstrap-mcp-machine.ps1` 會自動：
-1. 載入機器本地 env（`mcp/user-env.ps1`）
-2. 跑 `sync-mcp-config.ps1` 同步 MCP 設定
-3. 跑 `sync-claude-userlevel.ps1 -Mode install` 對齊 `~/.claude/hooks/`、`~/.claude/settings.json`、`~/.claude/mcp.json`
+### 伺服器邊界（**不可混用**）
+| 代號 | IP | 服務 |
+|------|-----|------|
+| **SG** | 5.223.93.113 | phase1-core Docker（nginx / next-admin / node-api / wordpress / redis） |
+| **EU** | 204.168.175.41 | Trigger.dev **v4** + ClickHouse **25.7.x**（禁升 latest / 24.x）+ Supabase + n8n + MainWP + Uptime Kuma + registry:5000 |
 
-### 日常同步（git pull 帶下 hooks/template 更新時）
+### 龍蝦 Routing 三件套（同一 PR 必須同步）
+`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `lobster-factory/workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md` — 任一改動必須三份同步，否則 routing drift。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge
-```
+### 龍蝦自動化安全預設
+Supabase 寫入**預設 OFF**（env: `LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 執行**預設 `off`**（env: `LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）。
 
-`merge` 模式會：
-- mirror 整個 `hooks/` 目錄
-- 強制覆蓋 settings.json 的 `hooks` 段、`permissions.deny`、`permissions.additionalDirectories`、`theme`、`autoUpdatesChannel`
-- **保留** `permissions.allow`（每機自己累積，不互相覆蓋）
-- 把 `~/.claude/mcp.json` 規範化為 `{"mcpServers":{}}`（per CLAUDE.md，shared MCP 走 repo `.mcp.json`）
+### Auto-Repair 紅線
+Repair Center 正本流程：`incident -> triage -> approve -> backup -> repair run -> GitHub issue/PR -> human merge -> manual sg-deploy -> health gate -> rollback if needed`。
 
-### 巡檢
+Claude / auto-repair PR 絕對不可：改 secrets / `.env*` / keys；改 auth、payment、permission；改 DB migration；改 nginx、Dockerfile、docker-compose；自動 deploy production；用空 catch 或吞錯把問題藏起來。沒有 pre-repair backup 就不能建 Issue / PR；沒有人工 merge 和手動 `/sg-deploy` 就不能有 production 變更。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode verify
-```
+Auto-repair PR 必須含中文摘要：問題、原因、修法、風險、建議。改超過 3 個檔案、同 fingerprint 第二次修、API response 格式變更、cron/排程/第三方 API 變更，一律標 `needs-human-review`。
 
-exit 0 = 對齊；exit 1 = drift。完整 SSOT 與擴充方法見 `mcp/claude-userlevel/README.md`。
+### Trigger.dev 憑證（不可互換）
+`tr_pat_*` = CLI deploy（vault key: `TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（vault key: `TRIGGER_ACCESS_TOKEN`）。
 
-### 仍需各機獨立操作
-
-- **Secrets vault（DPAPI）無法跨機複製**：DPAPI 金鑰綁定本機帳號，必須在每台機器執行：
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File .\scripts\secrets-vault.ps1 -Action import-mcp
-  ```
-- **memory（`~/.claude/projects/<repo>/memory/`）**：跨機 session 記憶，git 不追蹤；目前仍需手動複製（候補加入治理範圍）。
-
-複製後在新機器 monorepo 根執行一次：
-```powershell
-# 設定 Windows 使用者環境變數（必須）
-[System.Environment]::SetEnvironmentVariable('MONOREPO_ROOT','C:\Users\<筆電帳號>\Work','User')
-# 完整 MCP + 環境初始化
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
-```
-
-### 筆電 Windows 本機 WordPress 棧（龍蝦 staging 需要）
-
-若 TASKS「雙機環境對齊」尚未勾選，或 memory 載明筆電須補 WP 層，**遵守以下正本**（不重複步驟）：
-
-- 操作步驟：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5.1
-- 詳細說明：`lobster-factory/docs/operations/LOCAL_WORDPRESS_WINDOWS.md`
-- 一鍵腳本：`scripts/bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`
-
-完整桌機快速啟動：`agency-os/docs/operations/dual-ide-coexistence-strategy.md` §新機器快速啟動
+### 其他 SSOT
+- Cursor rules 正本：`agency-os/.cursor/rules/`（repo 根 `.cursor/rules/` 是 mirror，不改正本）
+- 監控端點：用 `/api/ops/summary`（非 `/`，root 有 auth_basic 保護）
+- nginx 監控 drop-in：`/etc/default/awarewave-endpoint-alert.local`（SG VPS 本地，sync 不覆蓋）

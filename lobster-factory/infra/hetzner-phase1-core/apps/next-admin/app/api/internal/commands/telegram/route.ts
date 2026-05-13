@@ -29,6 +29,30 @@ import { reportCommandError } from "@/lib/command-plane/errorReporting";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Required env vars for the command plane. Checked once per cold start so
+// any misconfigured deploy surfaces immediately in Sentry rather than silently
+// swallowing every incoming Telegram message for hours.
+const REQUIRED_ENV: ReadonlyArray<string> = [
+  "TELEGRAM_WEBHOOK_SECRET",
+  "TELEGRAM_ALLOWED_USER_IDS",
+  "TELEGRAM_ALLOWED_CHAT_IDS",
+  "TELEGRAM_BOT_TOKEN",
+  "COMMAND_PLANE_DEFAULT_ORG_ID",
+];
+const _missingEnv = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (_missingEnv.length > 0) {
+  // Capture once at module load — every deploy that is missing env vars will
+  // produce exactly one Sentry event (not one per request).
+  Sentry.captureMessage(
+    `command-plane misconfigured: missing env vars: ${_missingEnv.join(", ")}`,
+    {
+      level: "error",
+      tags: { component: "command-plane", phase: "startup" },
+      extra: { missing: _missingEnv },
+    },
+  );
+}
+
 export async function POST(req: Request) {
   // 1) Header secret check.
   const secret = verifyTelegramSecret(req);
@@ -115,7 +139,7 @@ export async function POST(req: Request) {
     command,
     args: argsText ? { raw: argsText } : {},
     organizationId: orgId,
-    workspaceId: process.env.COMMAND_PLANE_DEFAULT_WORKSPACE_ID ?? null,
+    workspaceId: process.env.COMMAND_PLANE_DEFAULT_WORKSPACE_ID || null,
     metadata: {
       chat_id: message.chat.id,
       message_id: message.message_id,

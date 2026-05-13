@@ -43,6 +43,7 @@ export class SlackNotifier implements Notifier {
             { type: "mrkdwn", text: `<${incidentUrl}|Open in Inbox>` },
           ],
         },
+        ...repairActionBlocks(i),
       ],
     };
 
@@ -58,4 +59,43 @@ export class SlackNotifier implements Notifier {
       return { status: "failed", error: String(e?.message ?? e) };
     }
   }
+}
+
+function repairActionBlocks(i: NotificationContext["incident"]): any[] {
+  if (i.status === "resolved" || i.status === "ignored") return [];
+  const repairable = i.source === "sentry" || i.source === "uptime_kuma" || i.source === "grafana";
+  const netdata = i.source === "netdata";
+  if (!repairable && !netdata) return [];
+
+  const label =
+    i.source === "sentry"
+      ? "Approve repair"
+      : i.source === "uptime_kuma" || i.source === "grafana"
+        ? "Approve analysis"
+        : "Acknowledge";
+
+  return [
+    {
+      type: "actions",
+      elements: [
+        ...(repairable
+          ? [
+              {
+                type: "button",
+                text: { type: "plain_text", text: label },
+                style: "primary",
+                action_id: "approve_repair",
+                value: i.id,
+              },
+            ]
+          : []),
+        {
+          type: "button",
+          text: { type: "plain_text", text: netdata ? "Acknowledge" : "View only" },
+          action_id: "acknowledge_only",
+          value: i.id,
+        },
+      ],
+    },
+  ];
 }

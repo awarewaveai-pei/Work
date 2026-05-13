@@ -57,9 +57,14 @@
 
 ## 與 Next-Gen 藍圖的對齊
 
-- **M1**：環境與交付標準化 → 本矩陣 + `ENVIRONMENT_REGISTRY` + `RELEASE_GATES`。  
-- **M2**：放行／回滾證據化 → `BACKUP_RESTORE_PROOF` + 專案 execution plan。  
-- **M3**：控制台化 → 本矩陣欄位應可在狀態報表機械汇总（未來腳本對照此檔欄位語意）。
+- **M1** ✅：環境與交付標準化 → 本矩陣 + `ENVIRONMENT_REGISTRY` + `RELEASE_GATES`。  
+- **M2** ✅：放行／回滾證據化 → `BACKUP_RESTORE_PROOF` + 專案 execution plan。  
+- **M3** ✅（2026-05-13）：控制台化 — 以下四件套已落地，本矩陣欄位現可機械匯總：
+  - **API**：`GET /api/ops/clients/:slug/department-summary` → 回傳 `activeCount`、`byGroup`、`matrixRowsCovered`、`enterpriseTier`
+  - **UI**：`DepartmentCoveragePanel`（`app/ops/clients/[slug]/DepartmentCoveragePanel.tsx`）— 客戶詳情頁 20 部門覆蓋率視圖
+  - **Card badge**：`ClientCard` 顯示 `X/20 部門` 綠色（≥8）/ 黃色（<8）badge
+  - **狀態報表**：`scripts/generate-customer-delivery-status.ps1` → `reports/status/customer-delivery-status-LATEST.md`（由 `generate-integrated-status-report.ps1` 每次收工自動觸發）
+  - **資料欄位**：`organizations.metadata.client_config.department_selection: ClusterId[]`（JSONB 擴充，無 migration）
 
 ## Related (repo SSOT, do not duplicate body here)
 
