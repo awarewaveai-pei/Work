@@ -121,11 +121,14 @@
 
 #### 工具層 / 基礎建設 / 治理
 
-- [ ] Enterprise 工具層 Phase 1 正式串接 —— **【進行中】** **進度：**Secrets／Sentry／PostHog／Cloudflare／Slack 等 **已結案** → 見 **`已完成歷程`** **§2026-05-01**。**仍缺：**本項 **DoD** 要求的「端到端正式串接」**WORKLOG／report 證據鏈**（不綁特定身分供應商）。
-  - 範圍：env/mcp secrets 治理、Cloudflare WAF/rate-limit、Sentry error ingest、PostHog core events、Slack alerts（身分層採 JWT/OIDC）
-  - DoD：下列子任務全數完成且有對應證據連結（WORKLOG / report）
-- [ ] （工具建置）Phase 1 建議順序（P1 -> P7） —— **【進行中】** **進度：****P1～P5、P2（n8n staging）** 已結案 → **`已完成歷程` §2026-05-01**。**仍開放：**以 **`Next.js 控制台 v1`** 與 **Enterprise 串接證據鏈** 作為本條總賬收口（不綁特定身分供應商）。本條結案時須同時滿足兩者 DoD。
-  - 追溯總表：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（每一工具任務對回規格 + DoD + 證據欄位）
+- [x] Enterprise 工具層 Phase 1 正式串接 —— **【完成 2026-05-13】** 五層工具全數結案＋端到端串接路徑驗收，見 `WORKLOG.md §2026-05-13「Enterprise 工具層 Phase 1 — 端到端串接結案驗收」`。
+  - [x] Secrets 治理（env/mcp vault + n8n key 輪替）— 2026-05-01
+  - [x] Sentry 錯誤觀測（next-admin／node-api／php）— 2026-04-12
+  - [x] PostHog 事件基線（三站命名 + live 驗證）— 2026-05-01
+  - [x] Cloudflare DNS／WAF／rate-limit 邊界保護 — 2026-05-01
+  - [x] Slack 告警通道（Netdata `#infra-alerts` + n8n Sentry handler）— 2026-05-01
+  - [x] 端到端串接驗收：Telegram → Cloudflare → JWT/RLS ops console → Supabase → Slack，Command Plane Phase 2c smoke 15/15 PASS（2026-05-08）；`WORKLOG.md §2026-05-13`
+- [x] （工具建置）Phase 1 建議順序（P1 -> P7） —— **【完成 2026-05-13】** Next.js 控制台 v1（P6，2026-05-07）＋ Enterprise 串接證據鏈（P1–P5，2026-05-13）＋ Command Plane（P7，2026-05-08）三條件全達。追溯總表已同步：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（P1–P7 全 🟢）。
 - [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
   - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
   - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
@@ -162,6 +165,18 @@
   **DoD（全部 Phase 完成）**：(1) Wizard 選站型後顯示外掛清單；(2) enqueue 後 `BuildRunRequest` 含 `wpSiteType`/`hasEcommerce`/`pluginSlugs[]`；(3) Trigger.dev Stage 3 安裝完成，`package_install_runs` 有記錄；(4) Client Detail 顯示已安裝／需手動清單；(5) 付費外掛記錄為 `skipped_license` 不報錯。
 
 ## Next — 已完成歷程（查詢用）
+
+### 2026-05-13 — Enterprise 工具層 Phase 1 正式串接 + Phase 1 P1→P7 建置順序（結案）
+
+- [x] **Enterprise 工具層 Phase 1 正式串接**
+  - **證據**：`WORKLOG.md §2026-05-13「Enterprise 工具層 Phase 1 — 端到端串接結案驗收」`
+  - **五層**：Secrets（2026-05-01）/ Sentry（2026-04-12）/ PostHog（2026-05-01）/ Cloudflare（2026-05-01）/ Slack（2026-05-01）
+  - **端到端路徑**：Command Plane Phase 2c smoke 15/15 PASS（2026-05-08）覆蓋全五層（Telegram→Cloudflare→JWT→Supabase→Slack）
+  - **追溯總表**：`TOOLS_DELIVERY_TRACEABILITY.md` P1–P7 全部更新為 🟢
+- [x] **（工具建置）Phase 1 建議順序（P1 -> P7）**
+  - **P6（Next.js 控制台 v1）**：ops-console-smoke 9/9 PASS（2026-05-07）；`reports/status/ops-console-smoke-LATEST.json`
+  - **Enterprise 串接**：見上條，2026-05-13 結案
+  - **P7（Command Plane）**：Phase 2c smoke 15/15 PASS（2026-05-08）
 
 ### 2026-05-08/09 — SG drift cron + strategy-review demo + Command Plane Phase 2 + MainWP EU（結案）
 

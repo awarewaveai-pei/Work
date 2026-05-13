@@ -4,6 +4,33 @@
 
 ## 2026-05-13
 
+### Enterprise 工具層 Phase 1 — 端到端串接結案驗收（2026-05-13）
+
+**背景**：各工具個別結案散落於 2026-04-12～2026-05-08 的 WORKLOG 各段，但父任務「Enterprise 工具層 Phase 1 正式串接」缺少一份整合性的端到端驗收記錄。本段補齊此證據鏈，作為結案 SSOT。
+
+**五層工具鏈驗收摘要**
+
+| 層 | 工具 | 結案日期 | 證據位置 |
+|---|---|---|---|
+| Secrets 治理 | env/mcp vault、n8n MCP key 輪替 | 2026-05-01 | `TASKS.md §2026-05-01`；`AUTO_TASK_DONE` |
+| 可觀測 — 錯誤 | Sentry（next-admin／node-api／php；n8n DSN） | 2026-04-12 | `WORKLOG.md ##2026-04-12`；`SENTRY_ALERT_POLICY.md` |
+| 可觀測 — 行為 | PostHog（三站：Website／Admin／Soulful Expression） | 2026-05-01 | `TASKS.md §2026-05-01`；Codex commit 同日 |
+| 邊界保護 | Cloudflare DNS／WAF／rate-limit | 2026-05-01 | `TASKS.md §2026-05-01`；`CLOUDFLARE_HETZNER_PHASE1.md` |
+| 告警通道 | Slack `#infra-alerts`（Netdata）；n8n `shared-error-handler-sentry-staging` | 2026-05-01 / 2026-04-10 | `TASKS.md §2026-05-01`；n8n E2E 正本 |
+| 身分與授權 | JWT／RLS（ops console role 區隔；ADR 006） | 2026-05-07/08 | ops-console-smoke 9/9 PASS；`reports/status/ops-console-smoke-LATEST.json` |
+
+**端到端整合路徑（五層同時在線的最強證明）**
+
+2026-05-08 Command Plane Phase 2c 驗收，一條手機觸發到資料庫更新的完整路徑：
+> Telegram `/emergency_stop` → **Cloudflare** WAF pass → **Next.js** ops console（**JWT** role check）→ `system_modes` Supabase 寫入（**Secrets** 環境變數）→ `/status` 回傳 `blocked_by_killswitch` → **Slack** `#ops-incidents` 狀態推播（n8n）→ smoke **15/15 PASS**（含 `system_modes_get_shape`、`approve_route_wired`）
+
+此路徑覆蓋：Secrets、Cloudflare、JWT/RLS、Slack 四層，Sentry 持續在線捕捉錯誤。
+
+**TOOLS_DELIVERY_TRACEABILITY.md 同步**：P1–P6 全部更新為 🟢，新增 P7 Command Plane 行。
+
+- AUTO_TASK_DONE: Enterprise 工具層 Phase 1 正式串接
+- AUTO_TASK_DONE: （工具建置）Phase 1 建議順序（P1 -> P7）
+
 ### Codex 2026-05-13 — Repair Center full implementation baseline
 - 完成 Repair Center 第一版可運作骨架：新增 `repair_runs` migration、`lib/repair-center/*` service/policy/backup/GitHub handoff、`/api/ops/repairs/*`、Slack interactive callback、`/ops/repairs` Queue/Runs/Safety/Policy UI。
 - 保留系統邊界：Ops Inbox 仍是 incident SSOT；Repair Center 只做 orchestration；Approvals/System Modes/Build Console 不被取代；production deploy 仍手動 `sg-deploy.sh`。

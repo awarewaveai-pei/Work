@@ -96,11 +96,11 @@
 | Redis | ⚪ 未啟動（Phase A） | 可 | P2 | `docs/operations/hetzner-stack-rollout-index.md` | 服務健康檢查與應用連線成功 |
 | Nginx | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 路由/健康檢查/SSL 正常 |
 | Node API | 🟡 建置中（Phase A） | 可 | P1-P2 | `docs/operations/hetzner-stack-rollout-index.md` | 核心 API endpoint 驗證通過 |
-| Next.js 控制台 | 🟡 建置中（P6；控制平面 migration 已落地） | 可 | P3 | `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`、`../lobster-factory/packages/db/migrations/0011_ops_console_control_plane.sql` | 可建立並回顯 1 個測試租戶設定；AI 生圖落 R2 並可於 SoR 追蹤；WP 商品/部落格圖維持 WP 媒體庫 |
+| Next.js 控制台 | 🟢 已完成（2026-05-07；ops-console-smoke 9/9 PASS；含 tenant 回顯、viewer 403、admin 寫入、audit 對應、system_modes、approvals UI） | 可 | P3 | `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`、`../lobster-factory/packages/db/migrations/0011_ops_console_control_plane.sql` | ops-console-smoke 9/9 PASS；`reports/status/ops-console-smoke-LATEST.json` |
 | Sentry | 🟢 已上線（Phase1：`next-admin`／`node-api`／`php` + n8n DSN；**2026-04-12** 驗證與告警，見 `agency-os/WORKLOG.md` **`## 2026-04-12`**） | 可（維運較重） | P3 | `docs/operations/tools-and-integrations.md`、`../lobster-factory/infra/hetzner-phase1-core/README.md` | 測試錯誤可上報與告警；手動路由 `../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/sentry-test/route.ts` |
-| PostHog | ⚪ 未啟動（列入 P4） | 可 | P3 | `docs/operations/tools-and-integrations.md` | 可看到完整測試 funnel |
+| PostHog | 🟢 已上線（2026-05-01；Aware Wave Website／Admin／Soulful Expression 三站命名與 live 事件驗證） | 可 | P3 | `docs/operations/tools-and-integrations.md` | 可看到完整測試 funnel |
 | MinIO（S3 相容） | ⚪ 未啟動（Phase B） | 可 | P3（需要時） | `docs/operations/hetzner-stack-rollout-index.md` | 上傳/下載/權限驗證通過 |
-| Cloudflare | ⚪ 未啟動（列入 P5） | 以 SaaS 為主 | P2-P3 | `docs/operations/tools-and-integrations.md` | 規則生效且無回歸 |
+| Cloudflare | 🟢 已上線（2026-05-01；DNS／WAF／rate-limit 規則生效，見 `TASKS.md §2026-05-01`） | 以 SaaS 為主 | P2-P3 | `docs/operations/tools-and-integrations.md` | 規則生效且無回歸 |
 | GitHub Actions | 🟢 已上線（CI 正在使用） | SaaS（可改自建 CI） | P1-P2 | `docs/operations/github-actions-trigger-prod-deploy.md` | gate 與部署流程驗證通過 |
 | **Rollback（映像回版）** | ⚪ 腳本已建立；待演練 | 可（`rollback-phase1.sh` + Docker tag） | P3 | `docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`；腳本：`lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh` | VPS 上完成 save→deploy→restore 演練，WORKLOG 有 `ROLLBACK:` 紀錄 |
 | **Staging（next-admin / node-api）** | ⚪ compose override 已建立；待部署 | 可（同 VPS，`-p lobster-staging` 隔離） | P3 | `docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §5；`lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml` | staging stack running；port 9001/9002 健康驗收 PASS |
@@ -111,12 +111,13 @@
 
 | 階段 | 項目 | 目前狀態 | 對應 `TASKS` 關鍵字 |
 |---|---|---|---|
-| P1 | Secrets 治理升級 | 🟡 基線已文件化（Owner／vault 鍵名對照）；**輪替演練待 WORKLOG 證據** | `（工具建置）Secrets 治理升級`；執行手冊 `secrets-governance-p1-closeout.md` |
+| P1 | Secrets 治理升級 | 🟢 已完成（2026-05-01；env/mcp vault 鍵名全對齊，n8n MCP key 輪替證據＋`AUTO_TASK_DONE`，見 `TASKS.md §2026-05-01`） | `（工具建置）Secrets 治理升級`；執行手冊 `secrets-governance-p1-closeout.md` |
 | P2 | Hetzner 自託管 n8n（staging） | 🟢 E2E DoD 已證（2026-04-10） | `（工具建置）Hetzner 自託管 n8n（staging）`；E2E 正本 `n8n-staging-client-onboarding-e2e.md` |
 | P3 | Sentry 觀測接入 | 🟢 DoD 已證（2026-04-12；`WORKLOG.md`、`TASKS.md`） | `（工具建置）Sentry 觀測接入` |
-| P4 | PostHog 事件基線 | ⚪ 未啟動 | `（工具建置）PostHog 事件基線` |
-| P5 | Cloudflare 邊界保護 | ⚪ 未啟動 | `（工具建置）Cloudflare 邊界保護` |
-| P6 | Next.js 控制台 v1（Internal Ops） | ⚪ 未啟動 | `（工具建置）Next.js 控制台 v1（Internal Ops）` |
+| P4 | PostHog 事件基線 | 🟢 已完成（2026-05-01；三站命名與 live 驗證，見 `TASKS.md §2026-05-01`） | `（工具建置）PostHog 事件基線` |
+| P5 | Cloudflare 邊界保護 | 🟢 已完成（2026-05-01；DNS／WAF／TLS 規則生效，見 `TASKS.md §2026-05-01`） | `（工具建置）Cloudflare 邊界保護` |
+| P6 | Next.js 控制台 v1（Internal Ops） | 🟢 已完成（2026-05-07；ops-console-smoke 9/9 PASS，見 `TASKS.md §2026-05-07`） | `（工具建置）Next.js 控制台 v1（Internal Ops）` |
+| P7 | Command Plane（Always-On） | 🟢 已完成（2026-05-08；Phase 2c smoke 15/15 PASS；Telegram + ops approval + system_modes 端到端，見 `TASKS.md §2026-05-08`） | `Command Plane Phase 2`；owner doc `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md` |
 
 ## 任務到規格追溯（P1-P6）
 | `TASKS` 關鍵字 | 主要規格正本 | 路由錨點 | 完成判定（需可觀測） | 證據欄位 |
@@ -128,6 +129,7 @@
 | `（工具建置）Cloudflare 邊界保護` | `docs/operations/tools-and-integrations.md` | 邊界防護能力 | staging 防護生效且無回歸 | `zone`, `rule_ids`, `before_after_result`, `rollback_note` |
 | `（工具建置）Identity 組織與角色（不綁 Clerk）` | `docs/architecture/decisions/002-clerk-identity-boundary.md`（歷史 ADR，待新 ADR 取代） | 控制平面身分邊界不可破 | 兩個測試角色權限區隔成功 | `org_id`, `role_matrix_ref`, `test_accounts`, `result` |
 | `（工具建置）Next.js 控制台 v1` | `docs/operations/NEXTJS_INTERNAL_OPS_CONSOLE_V1.md` | UI 不可繞過既有路由與核准 | 可由 UI 建立 1 筆測試配置 | `tenant_slug`, `department_selection_payload`, `submit_result`, `ui_capture` |
+| `Command Plane Phase 2（Always-On）` | `docs/operations/COMMAND_PLANE_RUNBOOK.md` §13 | 控制平面；高 risk 指令須 ops console 簽核 | Telegram + ops approval + system_modes 端到端 smoke PASS | smoke `15/15 PASS`；`WORKLOG.md §2026-05-08` Phase 2c；commit `6b7b525`、`c09a529` |
 
 ## 執行檢查清單（每完成一項都要做）
 - 在 `TASKS.md` 對應項有狀態更新（未完成/完成）。
@@ -171,5 +173,5 @@
 - `TASKS.md`
 - `WORKLOG.md`
 
-_Last synced: 2026-05-11 03:52:20 UTC_
+_Last synced: 2026-05-13 — P1–P7 全部對齊為 🟢 已完成；加入 P7 Command Plane；平台能力總表同步_
 
