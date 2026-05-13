@@ -1,13 +1,29 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getCurrentSystemMode } from "@/lib/repair-center/service";
-import { REPAIR_SOURCE_POLICIES } from "@/lib/repair-center/policy";
+import { REPAIR_SOURCE_POLICIES, repairPolicyLabel } from "@/lib/repair-center/policy";
+import type { RepairPolicy } from "@/lib/repair-center/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function configured(name: string): boolean {
   return Boolean(process.env[name]?.trim());
+}
+
+const REQUIRED_REPAIR_LABELS: RepairPolicy[] = ["auto_repair", "analysis_only", "human_only", "triage_needed"];
+const REQUIRED_POLICY_TEXT = ["可自動修復", "僅分析", "人工處理", "需分流", "手動"];
+
+function textIsPresent(value: string): boolean {
+  return value.trim().length > 0 && !value.includes("\uFFFD");
+}
+
+function policyCatalogTextOk(): boolean {
+  const sourcePolicyText = REPAIR_SOURCE_POLICIES.flatMap(({ label, rationale }) => [label, rationale]);
+  const repairLabelText = REQUIRED_REPAIR_LABELS.map((policy) => repairPolicyLabel(policy));
+  const catalogText = [...sourcePolicyText, ...repairLabelText].join("\n");
+
+  return [...sourcePolicyText, ...repairLabelText].every(textIsPresent) && REQUIRED_POLICY_TEXT.every((text) => catalogText.includes(text));
 }
 
 export async function GET() {
@@ -55,6 +71,8 @@ export async function GET() {
       slack_interactive_ready: slackSigningConfigured,
       web_ui_ready: ok,
       deploy_mode: "manual_sg_deploy_only",
+      policy_catalog_count: REPAIR_SOURCE_POLICIES.length,
+      policy_catalog_text_ok: policyCatalogTextOk(),
       source_policies: REPAIR_SOURCE_POLICIES.map(({ source, label, policy, family }) => ({ source, label, policy, family })),
     },
     { status: ok ? 200 : 503 },

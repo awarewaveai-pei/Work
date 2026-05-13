@@ -82,6 +82,14 @@ function checkRepairPolicyCatalog() {
   } else {
     fail("policy: source catalog", `missing/unguarded entries: ${missing.map(([source, policy]) => `${source}:${policy}`).join(", ") || "exhaustive guard"}`);
   }
+
+  const requiredText = ["錯誤堆疊", "可自動修復", "僅分析", "人工處理", "需分流", "手動"];
+  const missingText = requiredText.filter((value) => !text.includes(value));
+  if (!text.includes("\uFFFD") && missingText.length === 0) {
+    pass("policy: text encoding", "UTF-8 catalog labels and rationales are readable");
+  } else {
+    fail("policy: text encoding", `replacement chars or missing text: ${missingText.join(", ") || "replacement char"}`);
+  }
 }
 
 function requestText(url, options = {}) {
@@ -129,6 +137,11 @@ async function checkHttp(baseUrl) {
       if (route === "/api/ops/repairs/health" && res.ok) {
         try {
           remoteRepairHealth = JSON.parse(text);
+          if (remoteRepairHealth?.policy_catalog_text_ok === true) {
+            pass("http: repair policy text", "production policy_catalog_text_ok=true");
+          } else {
+            fail("http: repair policy text", `policy_catalog_text_ok=${String(remoteRepairHealth?.policy_catalog_text_ok)}`);
+          }
         } catch {
           remoteRepairHealth = null;
         }
