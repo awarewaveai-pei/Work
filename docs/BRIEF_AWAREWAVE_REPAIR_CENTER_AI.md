@@ -252,8 +252,12 @@ Before changing Repair Center, inspect the current implementation:
 6. `.github/workflows/auto-repair-claude.yml`
 7. `.github/workflows/auto-repair-pr-notify.yml`
 
-Important: the backup gate is intentionally externalized behind `AUTO_REPAIR_BACKUP_WEBHOOK_URL`.
-If that variable is not configured or returns a failure, the repair run stops before GitHub issue creation.
+Important: the backup gate has two valid modes:
+
+1. `AUTO_REPAIR_BACKUP_WEBHOOK_URL` external gate.
+2. SSH fallback gate using existing SG/EU backup scripts.
+
+If neither mode is fully configured, or if the configured gate fails, the repair run stops before GitHub issue creation.
 Do not weaken this behavior to make demos pass.
 
 --- 

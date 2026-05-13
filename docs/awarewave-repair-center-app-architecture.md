@@ -95,6 +95,7 @@ The first real implementation is now anchored in the existing Next.js app:
 | UI | `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/repairs/page.tsx` |
 | UI actions | `app/ops/repairs/RepairActions.tsx` |
 | API | `app/api/ops/repairs/*` |
+| Health | `app/api/ops/repairs/health/route.ts` |
 | Slack callback | `app/api/internal/commands/slack/route.ts` |
 | GitHub workflows | `.github/workflows/auto-repair-claude.yml`, `.github/workflows/auto-repair-pr-notify.yml` |
 
@@ -104,9 +105,21 @@ Environment variables:
 |------|------|
 | `AUTO_REPAIR_BACKUP_WEBHOOK_URL` | Required backup gate. If missing or failing, no GitHub issue is created. |
 | `AUTO_REPAIR_BACKUP_WEBHOOK_TOKEN` | Optional bearer token for the backup gate webhook. |
+| `AUTO_REPAIR_SG_SSH_HOST` / `AUTO_REPAIR_SG_SSH_PORT` / `AUTO_REPAIR_SG_SSH_USER` / `AUTO_REPAIR_SG_SSH_KEY_B64` | SSH fallback backup gate for SG when no backup webhook is configured. |
+| `AUTO_REPAIR_EU_SSH_HOST` / `AUTO_REPAIR_EU_SSH_PORT` / `AUTO_REPAIR_EU_SSH_USER` / `AUTO_REPAIR_EU_SSH_KEY_B64` | SSH fallback backup gate for EU. Required by default. |
+| `AUTO_REPAIR_REQUIRE_EU_BACKUP` | Defaults to required. Set `false` only for deliberate SG-only drills. |
+| `AUTO_REPAIR_SG_PHASE1_ROOT` | Defaults to `/root/lobster-phase1`. |
+| `AUTO_REPAIR_SG_BACKUP_SCRIPT` / `AUTO_REPAIR_SG_VERIFY_SCRIPT` | Defaults to `./scripts/backup-phase1.sh` and `./scripts/verify-backup.sh`. |
+| `AUTO_REPAIR_EU_BACKUP_SCRIPT` / `AUTO_REPAIR_EU_VERIFY_SCRIPT` | Defaults to `/root/scripts/backup-eu-stack.sh` and `/root/scripts/verify-backup-eu.sh`. |
 | `AUTO_REPAIR_GITHUB_TOKEN` | GitHub issue creation token. Falls back to `GITHUB_TOKEN` when available. |
 | `AUTO_REPAIR_GITHUB_OWNER` / `AUTO_REPAIR_GITHUB_REPO` | Default GitHub target. Defaults to `awarewaveai-pei/Work`. |
 | `SLACK_SIGNING_SECRET` | Verifies Slack interactive approve callbacks. |
+
+Backup gate order:
+
+1. If `AUTO_REPAIR_BACKUP_WEBHOOK_URL` is configured, call it.
+2. Otherwise use SSH fallback to run existing SG/EU backup and verify scripts.
+3. If either required backup path fails, stop the run before GitHub issue creation.
 
 Current policy mapping:
 
