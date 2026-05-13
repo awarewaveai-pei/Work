@@ -4,6 +4,31 @@
 
 ## 2026-05-13
 
+### WP Plugin Auto-Install — Phase 2+3 完成 + SSH + UI 重設計（2026-05-13）
+
+**根因 / 背景**：WP 外掛一鍵安裝系統 Phase 0+1 已完成，本輪補齊剩餘技術缺口，讓整條自動安裝鏈路邏輯完整。
+
+**完成項目（全部 commit `92271f4`，已 push to origin/main）**：
+
+1. **純加法包模型（`wp-plugin-stack-catalog.ts`）**：`condition?: "is_litespeed"` 欄位標記條件外掛；`resolveInstallableSlugsForPacks` 加入 dedup（CPT UI / Modula 跨模組各只裝一次）；`resolveConditionalPlugins` 新函式；`resolveInstallableSlugs`（legacy）同步修正。
+2. **`BuildRunRequest` / `contracts.ts`**：加入 `selectedPacks?: WpPluginModule[]`；`smokeProfileFor` 與 `normalizeBuildRequest` 優先使用 `selectedPacks`，保留 legacy 欄位向下相容；`BuildConsole.tsx` 讀取 `selectedPacks` URL param。
+3. **`wp-install-plugins.ts`（Trigger.dev task）**：改用 `ssh2` npm（`Client`）取代 `spawn("ssh")`——不再依賴系統 `ssh` binary，私鑰直接傳內容不寫暫存檔，任何 Node.js 容器皆可用；加入 `--force --skip-plugins` 冪等安裝；per-client vault key 解析（`LOBSTER_SSH_KEY_<REF>` 優先，fallback `LOBSTER_WP_SSH_PRIVATE_KEY`）。
+4. **WordPress Dockerfile**：加入 WP-CLI v2.11.0 pinned，`lobster-wordpress` 重建後即可在容器內執行 `wp plugin install`。
+5. **OnboardWizard Step2**：純加法 checkbox（基礎包 + 3 個 addon），取代舊版 radio wpSiteType。
+6. **OnboardWizard Step4 UI 重設計**：7 個服務各自一張卡片（Sentry/PostHog/Uptime Kuma/n8n/GitHub/Trigger.dev/Supabase），Hint 欄位嵌在對應卡片內，placeholder 顯示自動衍生值，全選/全部取消按鈕。
+
+**驗證**：
+- `ssh2` ESM import: `node --input-type=module --eval "import { Client } from 'ssh2'; console.log(typeof Client)"` → `function` ✓
+- next-admin TypeScript: `npx tsc --noEmit` — 我們修改的檔案零錯誤（既有 test file 錯誤為預存，不屬本輪）✓
+- `git push origin main` 成功（commit `92271f4`）✓
+
+**避免再發生**：SSH binary 依賴改為 npm，未來 Trigger.dev 升級映像不會再破壞此 task。LiteSpeed 外掛有 `condition` flag，不會在非 LiteSpeed 主機誤裝。
+
+**待辦（本任務尚未完整可用）**：
+1. `/sg-deploy` — 重建 `lobster-wordpress` container，WP-CLI 才真正進入生產環境
+2. Trigger.dev re-deploy — `ssh2` 才納入 task image（`.\scripts\lobster-trigger-deploy.ps1`，需 `TRIGGER_DEPLOY_PAT`）
+3. End-to-end smoke test — Step4 provision-services + wp-install-plugins 完整跑過
+
 ### /onboard 專屬 Playwright smoke spec 新增（2026-05-13）
 
 **根因**：先前 sg-deploy 後的 smoke 02 只檢查路由 status code（401/302/200 都算 PASS），所以新版 OnboardWizard UI 部署失敗時（頁面實際是 Next.js 404 或卡舊 bundle）也會「PASS」。`curl /onboard` 回 401 只證明 nginx 收到請求，沒證明 Next.js 找得到路由。
@@ -86,6 +111,19 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - Deploy：推送 `3ed6ebd`，SG `/root/Work` fast-forward，系統 nginx `nginx -t` PASS 並 reload，`sg-deploy.sh next-admin --skip-pull` 完成；`lobster-next-admin` healthy，deployed commit `3ed6ebd`。
 - 驗證：`/api/ops/repairs/health` HTTP 200 且 `web_ui_ready=true`、`github_configured=true`、`backup_mode=ssh`；未登入 `/api/ops/repairs` HTTP 401；`/api/ops/inbox/health` HTTP 200；內部 trusted proxy role check 回 `role=admin`；`npm run smoke:repair-center -- --base-url=https://app.aware-wave.com`：15 checks / 0 failed / 3 expected warnings。
 - 仍待：`SLACK_SIGNING_SECRET` 需由正式 Slack App 提供後，Slack interactive button 才能列為 ready；Phase 3 22 步、rollback drill、backup-fail drill 尚未結案。
+
+### Codex 2026-05-13 — Repair Center Phase 3 safe drills
+- `scripts/repair-center-smoke.mjs` 改為在 `--base-url=https://app.aware-wave.com` 時讀 production health 作為 backup/GitHub runtime truth；production smoke 現為 15 checks / 0 failed / 1 expected warning（僅 `SLACK_SIGNING_SECRET`）。
+- Phase 3-C backup-fail drill：短暫將 Repair backup gate 指向必定失敗的 localhost webhook，synthetic Sentry incident → Repair approval → `backup_failed`；run `207b182d...` 停在 `triage_needed` / `backup_status=failed`，且 `github_issue_created=false`；已還原 SSH backup gate。
+- Safe rollback drill：`rollback-phase1.sh save next-admin` 建立 `rollback-20260513-083148`，再 restore 同 snapshot；`lobster-next-admin` health PASS，deployed commit 保持 `87cfa76`。
+- Happy-path handoff drill：synthetic Sentry incident `f83d04c3...` → SG+EU SSH backup PASS（backup ref `pre-repair-20260513T0836-sentry-929fb8ba`）→ GitHub Issue #1 建立 → Claude Code Action 成功留下中文 analysis-only comment；無 PR，符合 drill 指示與 guardrails。Issue #1 已關閉，drill runs 已標記 resolved/human-only，health `active_runs=0`。
+- 修正 `.github/workflows/auto-repair-claude.yml`：補 `id-token: write`、`actions: read`、`github_token: ${{ secrets.GITHUB_TOKEN }}`，並將 issue trigger 收斂為 `opened`，避免 opened/labeled 重複觸發。
+- 仍待外部設定：正式 Slack App `SLACK_SIGNING_SECRET` 與 `SLACK_BOT_TOKEN` 尚未提供；沒有真實 Signing Secret 無法驗證 Slack interactive approve。破壞 production 的 bad-commit auto-rollback drill 未執行，改以 safe snapshot/restore drill 驗證 rollback script。
+
+### AO-RESUME handoff — Repair Center remaining items
+- 下次開工先看 `TASKS.md` 的「AwareWave 自動告警維修系統 v3.2」條目；目前 production 可操作、健康檢查正常、active repair runs = 0。
+- 必提醒使用者：Slack App 後台仍需取出真實 `Signing Secret` 與 Bot token；拿到後設定 SG `.env` + GitHub Secrets，再部署 next-admin 並重跑 `repair-center-smoke`，目標 0 warning。
+- Slack secret 設好後要補跑：Slack `approve_repair` 按鈕互動核准 drill；真實 code-scoped incident 的 PR/merge/deploy 端到端；destructive bad-commit auto-rollback drill 只有使用者明確授權才做。
 
 ## 2026-05-12
 
@@ -2752,4 +2790,3 @@ _Last synced: 2026-05-12 10:04:37 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
