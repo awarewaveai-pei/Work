@@ -4,6 +4,13 @@
 
 ## 2026-05-13
 
+### Codex 2026-05-13 — Claude auto-repair workflow unblocked
+- Removed the previous GitHub App installation blocker without requiring a new Slack or GitHub App: `.github/workflows/auto-repair-claude.yml` now passes `${{ github.token }}` to `anthropics/claude-code-action@v1`, grants `actions: read`, uses `actions/checkout@v5`, raises the Claude turn budget to 30, allows `Edit`, and adds a post-success `gh pr create` step using `steps.claude.outputs.branch_name`.
+- Repo Actions workflow permissions were updated through GitHub API: `default_workflow_permissions=write`, `can_approve_pull_request_reviews=true`; this removes the `GitHub Actions is not permitted to create or approve pull requests` blocker for future auto PR creation.
+- Verification Issue #5 proved the workflow now reaches Claude and pushes `claude/...` branches: run `25801399103` succeeded and produced branch `claude/issue-5-20260513-1314`; run `25801687448` later produced `claude/issue-5-20260513-1319`. Before repo permission was fixed, the auto PR step failed at `createPullRequest`; after permission was fixed, rerun was blocked by Anthropic API credit/key state.
+- Claude-generated branch `claude/issue-5-20260513-1319` was reviewed and merged manually as PR #8 (`602c849`), adding `policy_catalog_count === 6` production smoke verification. Production smoke after merge: `repair-center-smoke` **18 checks / 0 failed / 0 warnings**.
+- Current external blocker: GitHub/Slack/workflow permissions are no longer the issue; the remaining fully automatic Claude rerun requires a valid funded `ANTHROPIC_API_KEY` (the valid key returned `Credit balance is too low`; an alternate local key was invalid and was not kept).
+
 ### Codex 2026-05-13 — Repair Center real Slack approve + PR/merge/deploy drill
 - Slack signed `approve_repair` production callback completed: incident `8c354306-a595-4227-a6e6-d088953f9cbe` -> Repair Run `f82411fe-d802-4b90-aef1-5d0c1fc46786` -> SG/EU backup PASS (`pre-repair-20260513T1246-sentry-f82411fe`) -> GitHub Issue #2 created.
 - External automation gap found: Auto-Repair Claude Code workflow run `25800055913` failed because the Claude Code GitHub App is not installed on repo `awarewaveai-pei/Work`. This blocks fully automatic Claude PR creation until the GitHub App is installed.
