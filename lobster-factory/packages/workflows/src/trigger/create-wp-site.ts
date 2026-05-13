@@ -52,6 +52,11 @@ const InputSchema = z.preprocess(
     provider: z.string().optional(),
     locale: z.string().optional(),
     integrations: IntegrationsSchema,
+    // WP Plugin Stack — from OnboardWizard Step 2 (Phase 1)
+    pluginSlugs: z.array(z.string()).optional(),
+    sshHost: z.string().optional(),
+    sshCredentialsRef: z.string().optional(),
+    wpPath: z.string().optional(),
     // dispatcher passthrough fields (ignored by this workflow but safe to accept)
     _dispatchedFromActionRunId: z.string().optional(),
     _traceId: z.string().optional(),
@@ -210,6 +215,19 @@ export const createWpSite = task({
             wpRootPath: stagingRef.wpRootPath,
             wpAdminUrl: stagingRef.wpAdminUrl,
           },
+          wpInstallPlugins: input.pluginSlugs?.length
+            ? {
+                workflowId: "wp-install-plugins" as const,
+                pluginSlugs: input.pluginSlugs,
+                sshHost: input.sshHost ?? stagingRef.sshHost ?? "TODO_from_staging_ref",
+                sshCredentialsRef: input.sshCredentialsRef ?? `vault://ssh/${input.siteName}`,
+                wpPath: input.wpPath ?? stagingRef.wpRootPath,
+                organizationId: input.organizationId,
+                workspaceId: input.workspaceId,
+                siteId: input.siteId,
+                note: "Trigger wp-install-plugins task after apply-manifest Stage 3 completes",
+              }
+            : { note: "no pluginSlugs provided — skip wp-install-plugins" },
           runSmokeTests: "TODO_after_real_wp_or_smoke_test_sh",
           writeArtifactsAndLogs: "TODO",
           db: {
@@ -237,6 +255,19 @@ export const createWpSite = task({
             projectId: input.projectId,
             siteId: input.siteId,
           },
+          wpInstallPlugins: input.pluginSlugs?.length
+            ? {
+                workflowId: "wp-install-plugins" as const,
+                pluginSlugs: input.pluginSlugs,
+                sshHost: input.sshHost ?? "TODO_from_staging_ref",
+                sshCredentialsRef: input.sshCredentialsRef ?? `vault://ssh/${input.siteName}`,
+                wpPath: input.wpPath ?? "TODO",
+                organizationId: input.organizationId,
+                workspaceId: input.workspaceId,
+                siteId: input.siteId,
+                note: "Trigger wp-install-plugins task after apply-manifest Stage 3 completes",
+              }
+            : { note: "no pluginSlugs provided — skip wp-install-plugins" },
           runSmokeTests: "TODO",
           writeArtifactsAndLogs: "TODO",
           db: {

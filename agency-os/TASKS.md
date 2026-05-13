@@ -154,9 +154,9 @@
   **實作順序**（依賴鏈，依序執行）：
   - ~~Phase 0：`lib/wp-plugin-stack-catalog.ts`（TypeScript 外掛 SSOT）~~ **✅ 2026-05-12 完成**
   - ~~Phase 1：`OnboardWizard.tsx`（新增站型選擇 Step 2，原 Step 2-4 → 3-5，WizardStep 型別更新）~~ **✅ 2026-05-13 完成**
-  - **Phase 2（下一步）**：`contracts.ts` + `BuildConsole.tsx`（欄位擴充 + URL params + 摘要顯示）
-  - Phase 3：Trigger.dev `wp-install-plugins` task（WP-CLI 執行層，先確認 workflow 檔存在）
-  - Phase 4：`/ops/clients/[slug]` 顯示安裝結果
+  - ~~Phase 2：`contracts.ts` + `BuildConsole.tsx`（欄位擴充 + URL params + 摘要顯示）~~ **✅ 2026-05-13 完成**
+  - ~~Phase 3：Trigger.dev `wp-install-plugins` task（WP-CLI 執行層，先確認 workflow 檔存在）~~ **✅ 2026-05-13 完成**
+  - **Phase 4（下一步）**：`/ops/clients/[slug]` 顯示安裝結果
   **Phase 1 — 開始前必讀（照順序交給 Claude / Codex）**：
   1. `lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`（Phase 1 區段）— 完整讀完再動手
   2. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/OnboardWizard.tsx` — 完整讀完，了解現有 4 步驟架構
