@@ -10,6 +10,17 @@ export const N8N_URL    = process.env.PLAYWRIGHT_N8N_URL    || 'https://n8n.awar
 export const CLIENT_URL = process.env.PLAYWRIGHT_CLIENT_URL || '';
 export const OPS_TOKEN  = process.env.OPS_API_TOKEN         || '';
 
+// HTTP Basic credentials for app.aware-wave.com (nginx auth_basic "Aware Wave Admin").
+// Sourced from mcp/user-env.ps1 → User-scope env (OPS_BASIC_USER / OPS_BASIC_PASSWORD).
+// When empty, specs requiring auth fail fast with a clear "set these in user-env.ps1" message.
+export const OPS_BASIC_USER     = process.env.OPS_BASIC_USER     || '';
+export const OPS_BASIC_PASSWORD = process.env.OPS_BASIC_PASSWORD || '';
+
+export function opsBasicHttpCredentials(): { username: string; password: string } | undefined {
+  if (!OPS_BASIC_USER || !OPS_BASIC_PASSWORD) return undefined;
+  return { username: OPS_BASIC_USER, password: OPS_BASIC_PASSWORD };
+}
+
 /** Directory where explicit page.screenshot() calls write PNG files */
 export const SCREENSHOTS_DIR =
   process.env.PLAYWRIGHT_SCREENSHOTS_DIR || './test-results/screenshots';

@@ -82,6 +82,11 @@ $vars = @{
     GRAFANA_SERVICE_ACCOUNT_TOKEN = ""
     GRAFANA_BASIC_USER           = ""
     GRAFANA_BASIC_PASSWORD       = ""
+    # app.aware-wave.com + studio.aware-wave.com nginx auth_basic (htpasswd_studio).
+    # Used by Playwright smoke spec smoke/04-onboard-page.spec.ts.
+    # Fill from AWARE_WAVE_CREDENTIALS.md §三.
+    OPS_BASIC_USER               = ""
+    OPS_BASIC_PASSWORD           = ""
     NETDATA_BASE_URL             = "https://app.netdata.cloud"
     NETDATA_API_TOKEN            = ""
     SLACK_API_BASE_URL           = "https://slack.com/api"

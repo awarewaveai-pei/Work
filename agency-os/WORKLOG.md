@@ -4,6 +4,28 @@
 
 ## 2026-05-13
 
+### /onboard 專屬 Playwright smoke spec 新增（2026-05-13）
+
+**根因**：先前 sg-deploy 後的 smoke 02 只檢查路由 status code（401/302/200 都算 PASS），所以新版 OnboardWizard UI 部署失敗時（頁面實際是 Next.js 404 或卡舊 bundle）也會「PASS」。`curl /onboard` 回 401 只證明 nginx 收到請求，沒證明 Next.js 找得到路由。
+
+**修法**：
+- 新增 `lobster-factory/infra/hetzner-phase1-core/tests/e2e/smoke/04-onboard-page.spec.ts`：用 `httpCredentials` 過 nginx auth_basic，斷言 (a) status=200、(b) 5 個 step labels（客戶資訊／站型選擇／部門選型／開通服務／啟動 Build）皆 visible、(c) document.title 不是 404、(d) 無 fatal console error。
+- 新增 `OPS_BASIC_USER` / `OPS_BASIC_PASSWORD` env 入口：`mcp/user-env.ps1`（machine-local，setx 持久化）+ `mcp/user-env.template.ps1`（範本，雙機 bootstrap 對齊）+ `tests/e2e/helpers/env.ts`（`opsBasicHttpCredentials()` 取得器）。
+- 既有 `/sg-deploy` post-deploy hook 已自動跑 `playwright-runner.ps1 -Mode smoke`，新 spec 因 `testMatch: '**/smoke/**/*.spec.ts'` 自動納入，**無需改 hook**。
+- `.claude/commands/sg-deploy.md` 加註：新 spec 需要 `OPS_BASIC_USER` + `OPS_BASIC_PASSWORD`；fresh machine 須先跑 `mcp/user-env.ps1` 並重啟 shell。
+
+**驗證**：
+```
+cd lobster-factory/infra/hetzner-phase1-core/tests
+npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=list
+→ 4 passed (7.5s)
+```
+四項斷言全 PASS：status 200、5 step labels visible、無 404 leak、無 fatal console error。同時實測 `curl -u awarewave:AwareWave2026! https://app.aware-wave.com/onboard` 回 200 + HTML 含 `站型選擇` → 確認當前線上 wizard 新 UI 已部署正常（順帶發現 `page.tsx` 描述寫「4 步驟」但 wizard 是 5 步驟，cosmetic drift，不阻塞本任務）。
+
+**避免再發生**：未來任何破壞 `/onboard` 載入路徑、或讓 wizard 5 個 step labels 消失的 deploy，會在 sg-deploy 後 5 分鐘內被 smoke 04 抓到，evidence 寫入 `agency-os/reports/e2e/YYYY-MM-DD/smoke/`。下一個值得擴：若 `OnboardWizard` 步驟改名，spec 需同 PR 更新（locator 是穩定中文文案，drift 立刻 fail）。
+
+**雙機同步**：`mcp/user-env.ps1` 為 gitignored 本機檔，跨機透過 `import-cross-machine-memory.ps1` 經 `AO-SYNC-<date>` 帶到另一機；下次另一台 AO-RESUME 會自動拿到新 OPS_BASIC_* keys。
+
 ### Enterprise 工具層 Phase 1 — 端到端串接結案驗收（2026-05-13）
 
 **背景**：各工具個別結案散落於 2026-04-12～2026-05-08 的 WORKLOG 各段，但父任務「Enterprise 工具層 Phase 1 正式串接」缺少一份整合性的端到端驗收記錄。本段補齊此證據鏈，作為結案 SSOT。

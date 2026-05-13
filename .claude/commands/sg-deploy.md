@@ -35,6 +35,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\playwright-runner.ps1 -Mode s
 This runs the Playwright smoke suite (≈ 4 min) and archives evidence to
 `agency-os/reports/e2e/YYYY-MM-DD/smoke/`. Do **not** skip this step.
 
+The smoke suite includes `smoke/04-onboard-page.spec.ts`, which authenticates
+against the nginx `auth_basic` on `app.aware-wave.com` and asserts the
+OnboardWizard UI is actually rendered (not just that the route returns 200).
+It requires `OPS_BASIC_USER` + `OPS_BASIC_PASSWORD` in the User-scope env
+(set via `mcp/user-env.ps1`). On a fresh machine, run that script once and
+restart the shell before deploying — otherwise this spec hard-fails.
+
 If the smoke suite fails:
 1. Report which tests failed with the exact error
 2. Check if it is a transient network issue (retry once)
