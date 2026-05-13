@@ -16,6 +16,7 @@ for (const arg of process.argv.slice(2)) {
 }
 
 const checks = [];
+let remoteRepairHealth = null;
 function pass(name, detail = "") {
   checks.push({ ok: true, name, detail });
 }
@@ -125,6 +126,13 @@ async function checkHttp(baseUrl) {
       const res = await requestText(`${base}${route}`);
       const text = res.text;
       const short = text.slice(0, 500).replace(/\s+/g, " ");
+      if (route === "/api/ops/repairs/health" && res.ok) {
+        try {
+          remoteRepairHealth = JSON.parse(text);
+        } catch {
+          remoteRepairHealth = null;
+        }
+      }
       if (res.ok) pass(`http: ${route}`, `HTTP ${res.status} ${short}`);
       else fail(`http: ${route}`, `HTTP ${res.status} ${short}`);
     } catch (e) {
@@ -162,19 +170,23 @@ async function checkSupabase() {
 
 function checkEnv({ advisory = false } = {}) {
   const softFail = advisory ? warn : fail;
+  const remote = advisory && remoteRepairHealth && typeof remoteRepairHealth === "object" ? remoteRepairHealth : null;
   const hasWebhook = envConfigured("AUTO_REPAIR_BACKUP_WEBHOOK_URL");
   const hasSgSsh = envConfigured("AUTO_REPAIR_SG_SSH_HOST") && (envConfigured("AUTO_REPAIR_SG_SSH_KEY_B64") || envConfigured(env("AUTO_REPAIR_SG_SSH_KEY_ENV")));
   const euRequired = env("AUTO_REPAIR_REQUIRE_EU_BACKUP").toLowerCase() !== "false";
   const hasEuSsh = envConfigured("AUTO_REPAIR_EU_SSH_HOST") && (envConfigured("AUTO_REPAIR_EU_SSH_KEY_B64") || envConfigured(env("AUTO_REPAIR_EU_SSH_KEY_ENV")));
 
-  if (hasWebhook) pass("env: backup gate", "webhook configured");
+  if (remote?.backup_configured) pass("env: backup gate", `production ${remote.backup_mode ?? "backup"} configured`);
+  else if (hasWebhook) pass("env: backup gate", "webhook configured");
   else if (hasSgSsh && (!euRequired || hasEuSsh)) pass("env: backup gate", euRequired ? "SG+EU SSH configured" : "SG SSH configured; EU optional");
   else softFail("env: backup gate", "configure AUTO_REPAIR_BACKUP_WEBHOOK_URL or SG/EU SSH envs");
 
-  if (envConfigured("AUTO_REPAIR_GITHUB_TOKEN") || envConfigured("GITHUB_TOKEN")) pass("env: GitHub token", "configured");
+  if (remote?.github_configured) pass("env: GitHub token", "production configured");
+  else if (envConfigured("AUTO_REPAIR_GITHUB_TOKEN") || envConfigured("GITHUB_TOKEN")) pass("env: GitHub token", "configured");
   else softFail("env: GitHub token", "AUTO_REPAIR_GITHUB_TOKEN or GITHUB_TOKEN required");
 
-  if (envConfigured("SLACK_SIGNING_SECRET")) pass("env: Slack signing", "configured");
+  if (remote?.slack_signing_configured) pass("env: Slack signing", "production configured");
+  else if (envConfigured("SLACK_SIGNING_SECRET")) pass("env: Slack signing", "configured");
   else warn("env: Slack signing", "SLACK_SIGNING_SECRET is required only for Slack interactive approve; web UI repair remains usable without it.");
 
   if (envConfigured("ANTHROPIC_API_KEY")) pass("env: Anthropic", "configured");
@@ -192,9 +204,9 @@ async function main() {
   checkRepairPolicyCatalog();
 
   const baseUrl = args.get("base-url") || env("REPAIR_CENTER_BASE_URL");
-  checkEnv({ advisory: Boolean(baseUrl) });
   await checkSupabase();
   await checkHttp(baseUrl);
+  checkEnv({ advisory: Boolean(baseUrl) });
 
   for (const c of checks) {
     const mark = c.ok === true ? "PASS" : c.ok === false ? "FAIL" : "WARN";
