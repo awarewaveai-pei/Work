@@ -30,8 +30,7 @@ if (-not $env:LOBSTER_VAULT_LOADED) {
     $argStr     = "-VpsHost '$VpsHost' -SshKey '$SshKey' -AoOrgId '$AoOrgId'"
     $innerCmd   = "Set-Item Env:LOBSTER_VAULT_LOADED 1; & '$scriptPath' $argStr"
     & "$repoRoot\scripts\secrets-vault.ps1" -Action run `
-        -Names @("TRIGGER_DEPLOY_PAT", "POSTHOG_API_KEY", "OPS_INBOX_INGEST_TOKEN",
-                 "LOBSTER_EXECUTE_MANIFEST_STEPS", "LOBSTER_WP_SSH_PRIVATE_KEY") `
+        -Names @("TRIGGER_DEPLOY_PAT", "POSTHOG_API_KEY", "OPS_INBOX_INGEST_TOKEN") `
         -Command $innerCmd
     exit $LASTEXITCODE
 }
@@ -60,8 +59,8 @@ $pat        = $env:TRIGGER_DEPLOY_PAT
 $phk        = $env:POSTHOG_API_KEY
 $oit        = $env:OPS_INBOX_INGEST_TOKEN
 # Optional — empty string is safe: syncEnvVars skips empty values
-$execSteps  = $env:LOBSTER_EXECUTE_MANIFEST_STEPS  ?? ""
-$wpSshKey   = $env:LOBSTER_WP_SSH_PRIVATE_KEY       ?? ""
+$execSteps  = if ($env:LOBSTER_EXECUTE_MANIFEST_STEPS)  { $env:LOBSTER_EXECUTE_MANIFEST_STEPS }  else { "" }
+$wpSshKey   = if ($env:LOBSTER_WP_SSH_PRIVATE_KEY)      { $env:LOBSTER_WP_SSH_PRIVATE_KEY }      else { "" }
 
 $deployBash = @"
 #!/bin/bash
@@ -107,7 +106,7 @@ echo "  SENTRY_URL:                     `$SENTRY_URL"
 echo "  N8N_URL:                        `$N8N_URL"
 echo "  UPTIME_KUMA_URL:                `$UPTIME_KUMA_URL"
 echo "  LOBSTER_EXECUTE_MANIFEST_STEPS: `$LOBSTER_EXECUTE_MANIFEST_STEPS"
-echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: $([ -n "`$LOBSTER_WP_SSH_PRIVATE_KEY" ] && echo yes || echo no)"
+if [ -n "`$LOBSTER_WP_SSH_PRIVATE_KEY" ]; then echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: yes"; else echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: no"; fi
 
 cd /root/Work/lobster-factory/packages/workflows
 

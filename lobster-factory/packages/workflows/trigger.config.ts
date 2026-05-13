@@ -8,6 +8,9 @@ export default defineConfig({
   triggerUrl: "https://trigger.aware-wave.com",
   dirs: ["./src/trigger"],
   build: {
+    // ssh2 uses native C++ addons (.node files); esbuild cannot bundle them.
+    // Mark as external so Trigger.dev installs them in the worker at runtime.
+    external: ["ssh2", "cpu-features"],
     extensions: [
       // Sync runtime env vars into Trigger prod/staging on each deploy.
       // Source: export from vault / local env before `npx trigger.dev deploy`.
