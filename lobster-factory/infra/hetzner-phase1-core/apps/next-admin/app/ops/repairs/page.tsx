@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canApproveCommand, readOpsRole } from "@/lib/ops-role";
-import { policyForIncident, repairPolicyLabel } from "@/lib/repair-center/policy";
+import { REPAIR_SOURCE_POLICIES, policyForIncident, repairPolicyLabel } from "@/lib/repair-center/policy";
 import type { RepairIncident, RepairRun } from "@/lib/repair-center/types";
 import { RepairActions } from "./RepairActions";
 
@@ -172,10 +172,10 @@ export default async function RepairsPage() {
         </Panel>
 
         <Panel title="Policy" subtitle="No duplicated inbox, approval system, deploy engine, or notification brain">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-            <PolicyCard title="Sentry" label="Auto-repair" body="Backup first, then GitHub issue with @claude. Human merge and manual deploy remain required." />
-            <PolicyCard title="Uptime / Grafana" label="Analysis-only" body="Backup first, then GitHub issue for triage. PR only when the cause is clearly code-scoped." />
-            <PolicyCard title="Netdata" label="Human-only" body="Infrastructure signal. Keep it in Ops Inbox and Repair history, but do not auto-fix code." />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            {REPAIR_SOURCE_POLICIES.map((entry) => (
+              <PolicyCard key={entry.source} title={entry.label} label={repairPolicyLabel(entry.policy)} body={entry.rationale} />
+            ))}
           </div>
         </Panel>
       </div>

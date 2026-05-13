@@ -80,6 +80,7 @@ Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claud
 | `/client-status` | 客戶健康 + WP 更新狀態 |
 | `/build-tenant` | 新客戶租戶佈建 |
 | `/wp-maintenance` | WordPress 維護入口 |
+| `/playwright` | Playwright E2E：smoke / qa / client / screenshot / a11y / perf / install |
 | `/decide` | 18 階段多代理決策評審 |
 | `/strategy-review` | 多角度策略決策審查 |
 | `/fix-sidebars` | 修復 Cursor 側邊欄消失（Codex / Claude Code 圖示不見） |

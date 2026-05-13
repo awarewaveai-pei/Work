@@ -60,6 +60,8 @@ What you must learn from this group:
 - Slack routing is `#infra-alerts` for raw infra and `#ops-incidents` for curated incidents
 - Telegram is a backup path, not the main incident bus
 - `Repair Center` must orchestrate, not duplicate
+- Sentry / Uptime Kuma / Netdata are the first formal intake set, not the full monitoring boundary
+- Grafana and PostHog already exist as Ops Inbox sources and must be classified through policy, not treated as new systems
 
 ### 2. Existing app structure
 
@@ -94,7 +96,10 @@ These define the existing incident lifecycle. Do not re-implement this logic els
 8. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/sentry/route.ts`
 9. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/uptime-kuma/route.ts`
 10. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/netdata/route.ts`
-11. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/inbox/health/route.ts`
+11. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/grafana/route.ts`
+12. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/posthog/route.ts`
+13. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/inbox/health/route.ts`
+14. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts`
 
 What you must learn from this group:
 
@@ -103,6 +108,7 @@ What you must learn from this group:
 - severity logic already exists
 - Slack and Telegram fan-out already exist
 - health verification already exists
+- Repair policy already distinguishes auto-repair, analysis-only, triage-needed, and human-only
 
 ### 4. Safety and command boundaries
 
@@ -146,6 +152,8 @@ Before writing code, the AI must be able to explain all of the following correct
 6. Why Telegram cannot become the primary repair UI.
 7. Why no new dedup or severity engine should be created.
 8. Why no secrets should be duplicated into repo-tracked files or unnecessary CI paths.
+9. Why product/business signals such as PostHog can inform diagnosis but must not directly trigger autonomous code repair.
+10. Why Grafana/SLO/log signals are analysis-first unless evidence proves a bounded code regression.
 
 If the AI cannot explain these 8 points, it is not ready to code.
 

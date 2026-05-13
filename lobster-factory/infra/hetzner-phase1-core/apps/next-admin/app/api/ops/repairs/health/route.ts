@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getCurrentSystemMode } from "@/lib/repair-center/service";
+import { REPAIR_SOURCE_POLICIES } from "@/lib/repair-center/policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +53,7 @@ export async function GET() {
       github_configured: githubConfigured,
       slack_signing_configured: slackSigningConfigured,
       deploy_mode: "manual_sg_deploy_only",
+      source_policies: REPAIR_SOURCE_POLICIES.map(({ source, label, policy, family }) => ({ source, label, policy, family })),
     },
     { status: ok ? 200 : 503 },
   );

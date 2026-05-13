@@ -104,6 +104,17 @@ Thumbs.db
 .cursor/**/.lock
 **/.cursor/**/locks/
 
+# --- Playwright E2E artifacts (re-generated each run; only LATEST committed) ---
+# Local working dir inside tests/
+lobster-factory/infra/hetzner-phase1-core/tests/node_modules/
+lobster-factory/infra/hetzner-phase1-core/tests/playwright-report/
+lobster-factory/infra/hetzner-phase1-core/tests/playwright-results.json
+lobster-factory/infra/hetzner-phase1-core/tests/test-results/
+lobster-factory/infra/hetzner-phase1-core/tests/playwright-output/
+# Archived reports — timestamped runs are local-only; keep only LATEST placeholder
+agency-os/reports/e2e/*/
+!agency-os/reports/e2e/LATEST.md
+
 # --- Agency reports (keep only canonical latest snapshot in git) ---
 agency-os/reports/health/health-*.md
 agency-os/reports/health/health-*.json

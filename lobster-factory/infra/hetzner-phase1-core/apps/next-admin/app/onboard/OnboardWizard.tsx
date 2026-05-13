@@ -11,10 +11,17 @@ import {
   type DepartmentCluster,
 } from "../../lib/department-catalog";
 import type { BuildPackageSlug, BuildProvider } from "../../lib/build-console/contracts";
+import {
+  resolvePluginStack,
+  resolveInstallableSlugs,
+  resolvePaidPlugins,
+  type WpSiteType,
+  type WpPlugin,
+} from "../../lib/wp-plugin-stack-catalog";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type WizardStep = 1 | 2 | 3 | 4;
+type WizardStep = 1 | 2 | 3 | 4 | 5;
 type OnboardProfile = "profile_b" | "profile_c";
 
 interface ClientInfo {
@@ -35,6 +42,11 @@ interface ClientInfo {
   workspaceId: string;
   projectId: string;
   siteId: string;
+  // WP Plugin Stack (Phase 1)
+  wpSiteType: WpSiteType;
+  hasEcommerce: boolean;
+  resolvedPluginSlugs: string[];
+  resolvedPaidPlugins: WpPlugin[];
 }
 
 interface ProvResult {
@@ -44,6 +56,12 @@ interface ProvResult {
   error?: string;
   detail?: string;
 }
+
+const WP_SITE_TYPE_LABELS: Record<WpSiteType, string> = {
+  tourism:   "旅遊業",
+  brand:     "形象 / 品牌站",
+  ecommerce: "一般電商",
+};
 
 const PROVIDERS = [
   { id: "sentry",      label: "Sentry",      desc: "建立 project + DSN" },
@@ -83,6 +101,10 @@ function makeDefaultClient(): ClientInfo {
     workspaceId: randomUUID(),
     projectId: randomUUID(),
     siteId: randomUUID(),
+    wpSiteType: "brand",
+    hasEcommerce: false,
+    resolvedPluginSlugs: resolveInstallableSlugs("brand", false),
+    resolvedPaidPlugins: resolvePaidPlugins("brand", false),
   };
 }
 
@@ -243,15 +265,146 @@ function Step1({
 
       <button type="button" className="btn-primary" disabled={!valid} onClick={onNext}
         style={{ marginTop: 20 }}>
-        下一步 → 部門選型
+        下一步 → 站型選擇
       </button>
     </div>
   );
 }
 
-// ── Step 2: Department Selection ──────────────────────────────────────────────
+// ── Step 2: WP Site Type Selection ────────────────────────────────────────────
 
-function Step2({
+const WP_TYPE_CARDS: { type: WpSiteType; label: string; desc: string }[] = [
+  { type: "tourism",   label: "旅遊業",        desc: "旅遊行程、地圖、多語言" },
+  { type: "brand",     label: "形象 / 品牌站", desc: "企業形象、作品集、活動頁" },
+  { type: "ecommerce", label: "一般電商",       desc: "WooCommerce 完整電商" },
+];
+
+function Step2WpType({
+  info,
+  onChange,
+  onNext,
+  onBack,
+}: {
+  info: ClientInfo;
+  onChange: (patch: Partial<ClientInfo>) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const applyType = (type: WpSiteType, ecom: boolean) => {
+    const effectiveEcom = type === "ecommerce" ? true : ecom;
+    onChange({
+      wpSiteType: type,
+      hasEcommerce: effectiveEcom,
+      resolvedPluginSlugs: resolveInstallableSlugs(type, effectiveEcom),
+      resolvedPaidPlugins: resolvePaidPlugins(type, effectiveEcom),
+    });
+  };
+
+  const allPlugins = resolvePluginStack(info.wpSiteType, info.hasEcommerce);
+  const totalCount = allPlugins.length;
+  const autoCount  = info.resolvedPluginSlugs.length;
+  const paidCount  = info.resolvedPaidPlugins.length;
+
+  return (
+    <div className="onboard-step-body">
+      <p className="form-hint" style={{ marginBottom: 16 }}>
+        選擇客戶網站類型，系統自動組合對應的外掛堆疊。後續由 Trigger.dev 透過 WP-CLI 安裝。
+      </p>
+
+      {/* Site type cards */}
+      <div className="dept-cluster-grid" style={{ marginBottom: 16 }}>
+        {WP_TYPE_CARDS.map(({ type, label, desc }) => {
+          const active = info.wpSiteType === type;
+          return (
+            <label
+              key={type}
+              className={`dept-cluster-card ${active ? "selected" : ""}`}
+              style={{ cursor: "pointer" }}
+            >
+              <input
+                type="radio"
+                name="wpSiteType"
+                checked={active}
+                onChange={() => applyType(type, info.hasEcommerce)}
+                style={{ marginRight: 6 }}
+              />
+              <span className="dept-cluster-name">{label}</span>
+              <span className="dept-cluster-rows">{desc}</span>
+            </label>
+          );
+        })}
+      </div>
+
+      {/* Ecommerce checkbox */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+          <input
+            type="checkbox"
+            checked={info.hasEcommerce}
+            disabled={info.wpSiteType === "ecommerce"}
+            onChange={(e) => applyType(info.wpSiteType, e.target.checked)}
+          />
+          含電商（WooCommerce）
+          {info.wpSiteType === "ecommerce" && (
+            <span className="form-hint" style={{ marginLeft: 4 }}>— 電商站型已強制啟用</span>
+          )}
+        </label>
+      </div>
+
+      {/* Plugin summary */}
+      <div className="dept-summary" style={{ marginBottom: 16 }}>
+        <div className="section-title" style={{ marginBottom: 8 }}>
+          外掛堆疊摘要 — 共 {totalCount} 個外掛
+        </div>
+        <div className="build-kv-grid" style={{ marginBottom: 8 }}>
+          <div><span>可自動安裝（WP-CLI）</span><strong style={{ color: "#166534" }}>{autoCount} 個</strong></div>
+          <div>
+            <span>需手動授權（付費）</span>
+            <strong style={{ color: paidCount > 0 ? "#92400e" : "#166534" }}>{paidCount} 個</strong>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="btn-secondary"
+          style={{ fontSize: 12, padding: "4px 10px", marginBottom: 8 }}
+          onClick={() => setExpanded((x) => !x)}
+        >
+          {expanded ? "▲ 收起清單" : "▼ 展開完整外掛清單"}
+        </button>
+        {expanded && (
+          <div className="dept-file-list">
+            {allPlugins.map((p) => (
+              <div key={p.slug} className="dept-file-row">
+                <code className="dept-file-path">{p.slug}</code>
+                <span className="dept-file-fields" style={{ color: !p.free && !p.alternativeSlug ? "#92400e" : undefined }}>
+                  {p.label}
+                  {!p.free && p.alternativeSlug && (
+                    <span className="dept-file-recommended"> ↩ {p.alternativeSlug}</span>
+                  )}
+                  {!p.free && !p.alternativeSlug && " ⚠ 需手動安裝"}
+                  {!p.required && " †"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+        <button type="button" className="btn-secondary" onClick={onBack}>← 返回</button>
+        <button type="button" className="btn-primary" onClick={onNext}>
+          下一步 → 部門選型
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 3: Department Selection ──────────────────────────────────────────────
+
+function Step3Dept({
   tenantSlug,
   selected,
   onChange,
@@ -355,9 +508,9 @@ function Step2({
   );
 }
 
-// ── Step 3: Service Provisioning ──────────────────────────────────────────────
+// ── Step 4: Service Provisioning ──────────────────────────────────────────────
 
-function Step3({
+function Step4Svc({
   info,
   providers,
   onProvidersChange,
@@ -454,9 +607,9 @@ function Step3({
   );
 }
 
-// ── Step 4: Launch ────────────────────────────────────────────────────────────
+// ── Step 5: Launch ────────────────────────────────────────────────────────────
 
-function Step4({
+function Step5Launch({
   info,
   selectedDepts,
   providers,
@@ -469,6 +622,8 @@ function Step4({
   provResult: ProvResult | null;
   onBack: () => void;
 }) {
+  const totalPlugins = resolvePluginStack(info.wpSiteType, info.hasEcommerce).length;
+
   const params = new URLSearchParams({
     profile: info.profile,
     clientName: info.clientName,
@@ -482,6 +637,10 @@ function Step4({
       : { siteUrl: info.siteUrl, wpAdminUrl: info.wpAdminUrl }
     ),
   });
+  params.set("wpSiteType", info.wpSiteType);
+  params.set("hasEcommerce", String(info.hasEcommerce));
+  params.set("pluginSlugs", info.resolvedPluginSlugs.join(","));
+  params.set("paidPluginCount", String(info.resolvedPaidPlugins.length));
 
   const buildUrl = `/build?${params.toString()}`;
 
@@ -496,6 +655,13 @@ function Step4({
         <div><span>Slug</span><strong>{info.tenantSlug || "—"}</strong></div>
         <div><span>Email</span><strong>{info.customerEmail || "—"}</strong></div>
         <div><span>Profile</span><strong>{info.profile}</strong></div>
+        <div><span>網站類型</span><strong>{WP_SITE_TYPE_LABELS[info.wpSiteType]}{info.hasEcommerce && info.wpSiteType !== "ecommerce" ? " + 電商" : ""}</strong></div>
+        <div>
+          <span>外掛總數</span>
+          <strong>
+            {totalPlugins}（可自動安裝 {info.resolvedPluginSlugs.length} / 需手動授權 {info.resolvedPaidPlugins.length}）
+          </strong>
+        </div>
         <div><span>Departments</span><strong>{selectedDepts.size} / 20</strong></div>
         <div><span>Services</span><strong>{provResult?.ok ? `${provResult.providers?.join(", ")}` : providers.length > 0 ? "待開通" : "跳過"}</strong></div>
         <div><span>organizationId</span><strong style={{ fontSize: 11, fontFamily: "monospace" }}>{info.organizationId}</strong></div>
@@ -504,9 +670,9 @@ function Step4({
 
       <div className="section-title" style={{ marginTop: 20, marginBottom: 8 }}>下一步</div>
       <ol style={{ paddingLeft: 20, lineHeight: 2 }}>
-        <li>將 <code>DEPARTMENT_SELECTION.json</code>（Step 2 複製的 JSON）貼入 <code>tenants/{info.tenantSlug || "<slug>"}/core/</code></li>
+        <li>將 <code>DEPARTMENT_SELECTION.json</code>（Step 3 複製的 JSON）貼入 <code>tenants/{info.tenantSlug || "<slug>"}/core/</code></li>
         <li>在 Supabase 建立 organization / workspace / project / site 記錄（使用上方 UUID）</li>
-        <li>點擊「啟動 Build Console」→ 選擇 <code>enqueue</code> 模式執行部署</li>
+        <li>點擊「啟動 Build Console」→ 選擇 <code>enqueue</code> 模式執行部署（外掛將由 Trigger.dev 自動安裝）</li>
       </ol>
 
       <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
@@ -523,9 +689,10 @@ function Step4({
 
 const STEPS: { step: WizardStep; label: string }[] = [
   { step: 1, label: "客戶資訊" },
-  { step: 2, label: "部門選型（M3）" },
-  { step: 3, label: "開通服務" },
-  { step: 4, label: "啟動 Build" },
+  { step: 2, label: "站型選擇" },
+  { step: 3, label: "部門選型（M3）" },
+  { step: 4, label: "開通服務" },
+  { step: 5, label: "啟動 Build" },
 ];
 
 export default function OnboardWizard() {
@@ -542,7 +709,7 @@ export default function OnboardWizard() {
     setInfo((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  // Auto-register client in Supabase organizations table when entering Step 4.
+  // Auto-register client in Supabase organizations table when entering Step 5.
   // Non-blocking: wizard advances regardless of result.
   const createOrgRecord = async () => {
     if (!info.tenantSlug.trim() || !info.clientName.trim()) return;
@@ -575,9 +742,9 @@ export default function OnboardWizard() {
     }
   };
 
-  const goToStep4 = async () => {
+  const goToStep5 = async () => {
     await createOrgRecord();
-    setStep(4);
+    setStep(5);
   };
 
   const submitProvisioning = async () => {
@@ -612,7 +779,7 @@ export default function OnboardWizard() {
           <div key={s} className={`onboard-progress-item ${step === s ? "active" : step > s ? "done" : ""}`}>
             <StepBadge step={s} current={step} />
             <span className="onboard-progress-label">{label}</span>
-            {s < 4 && <span className="onboard-progress-sep">→</span>}
+            {s < 5 && <span className="onboard-progress-sep">→</span>}
           </div>
         ))}
       </div>
@@ -627,12 +794,11 @@ export default function OnboardWizard() {
 
       {step >= 2 && (
         <div className="build-panel" style={{ marginTop: 16 }}>
-          <StepHeader step={2} current={step} label="Step 2 — 部門選型（M3 · 20 部門）" />
+          <StepHeader step={2} current={step} label="Step 2 — 網站類型 + 外掛堆疊" />
           {step === 2 && (
-            <Step2
-              tenantSlug={info.tenantSlug}
-              selected={selectedDepts}
-              onChange={setSelectedDepts}
+            <Step2WpType
+              info={info}
+              onChange={patchInfo}
               onNext={() => setStep(3)}
               onBack={() => setStep(1)}
             />
@@ -642,18 +808,13 @@ export default function OnboardWizard() {
 
       {step >= 3 && (
         <div className="build-panel" style={{ marginTop: 16 }}>
-          <StepHeader step={3} current={step} label="Step 3 — 開通外部服務帳號" />
+          <StepHeader step={3} current={step} label="Step 3 — 部門選型（M3 · 20 部門）" />
           {step === 3 && (
-            <Step3
-              info={info}
-              providers={providers}
-              onProvidersChange={setProviders}
-              hints={hints}
-              onHintsChange={setHints}
-              provResult={provResult}
-              loading={provLoading || orgCreating}
-              onSubmit={submitProvisioning}
-              onNext={() => { void goToStep4(); }}
+            <Step3Dept
+              tenantSlug={info.tenantSlug}
+              selected={selectedDepts}
+              onChange={setSelectedDepts}
+              onNext={() => setStep(4)}
               onBack={() => setStep(2)}
             />
           )}
@@ -662,14 +823,34 @@ export default function OnboardWizard() {
 
       {step >= 4 && (
         <div className="build-panel" style={{ marginTop: 16 }}>
-          <StepHeader step={4} current={step} label="Step 4 — 啟動 Build Console" />
+          <StepHeader step={4} current={step} label="Step 4 — 開通外部服務帳號" />
           {step === 4 && (
-            <Step4
+            <Step4Svc
+              info={info}
+              providers={providers}
+              onProvidersChange={setProviders}
+              hints={hints}
+              onHintsChange={setHints}
+              provResult={provResult}
+              loading={provLoading || orgCreating}
+              onSubmit={submitProvisioning}
+              onNext={() => { void goToStep5(); }}
+              onBack={() => setStep(3)}
+            />
+          )}
+        </div>
+      )}
+
+      {step >= 5 && (
+        <div className="build-panel" style={{ marginTop: 16 }}>
+          <StepHeader step={5} current={step} label="Step 5 — 啟動 Build Console" />
+          {step === 5 && (
+            <Step5Launch
               info={info}
               selectedDepts={selectedDepts}
               providers={providers}
               provResult={provResult}
-              onBack={() => setStep(3)}
+              onBack={() => setStep(4)}
             />
           )}
         </div>

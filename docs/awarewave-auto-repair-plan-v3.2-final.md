@@ -8,7 +8,7 @@
 
 ## 一、這份文件是什麼
 
-這是一份完整的施工計劃書，讓 Sentry / Uptime Kuma / Netdata 偵測到問題後，AI 自動幫你修，你只需要在手機 Slack 上按兩下。
+這是一份完整的施工計劃書，讓第一批正式 intake（Sentry / Uptime Kuma / Netdata）與已存在的延伸訊號（Grafana、PostHog、GitHub Actions、health endpoints、Cloudflare、Supabase、n8n、Trigger.dev、deploy drift、WordPress/MainWP）進入同一條 Ops Inbox -> Repair Center 路徑。AI 只會在政策允許時協助修復；你仍只需要在手機 Slack 上按兩下。
 
 **你的角色**：看通知 → 按 Approve → 看摘要 → 按 Merge → 打 `/sg-deploy`。其餘全自動。
 
@@ -97,7 +97,9 @@ EU 機 (204.168.175.41) — 資料 + 工作流
 ## 三、完整流程
 
 ```
-1.  Sentry / Uptime Kuma / Netdata 偵測到問題
+1.  Ops signals 偵測到問題
+    第一批正式 intake：Sentry / Uptime Kuma / Netdata
+    延伸 intake：Grafana / PostHog / CI / health / Cloudflare / Supabase / n8n / Trigger / deploy drift / WordPress
                     ↓
 2.  Slack #ops-incidents 收到通知；Telegram 收到手機備援（符合嚴重度門檻時）
     （問題摘要 + 嚴重度 + Approve 按鈕）
@@ -140,7 +142,9 @@ EU 機 (204.168.175.41) — 資料 + 工作流
 
 ---
 
-## 四、三種告警的差別處理
+## 四、告警來源與差別處理
+
+Sentry、Uptime Kuma、Netdata 是 v3.2 第一批正式維修 intake，不是系統的完整檢測邊界。所有新來源都先進 Ops Inbox，經過 dedup、throttle、severity、fingerprint、owner boundary 穩定後，再由 Repair Center 判斷是否可進入維修。
 
 ### Sentry（程式碼 bug）→ 自動修
 
@@ -176,6 +180,47 @@ Netdata critical
 ```
 
 AI 不碰的原因：CPU、RAM、disk 問題改 code 改不好。
+
+### Grafana / Loki / SLO（延遲、日誌、複合查詢）→ AI 只分析，確認 code-scoped 才開 PR
+
+```
+Grafana alert
+  → Ops Inbox normalize 為 grafana incident
+  → Repair Center 標示 analysis-only
+  → 先產出 triage：服務、時間窗、LogQL/指標、可能根因
+  → 只有證據明確指向 repo code regression 時，才可升級為 PR
+```
+
+AI 不直接修的原因：Grafana 可能代表 nginx、DB、容量、外部服務、部署漂移、log pattern 或 SLO 問題，不等於 code bug。
+
+### PostHog（產品／漏斗／行為異常）→ AI 只分析，不直接自動修
+
+```
+PostHog alert
+  → Ops Inbox normalize 為 posthog business incident
+  → Repair Center 標示 analysis-only
+  → AI 做事件、版本、流量、客戶群、近期 deploy 對照
+  → 需要人工判斷是否是產品問題、追蹤設定問題、或真 regression
+```
+
+AI 不直接修的原因：行為異常是 business signal，不是 stack trace；可能是市場流量、追蹤漏裝、A/B 設定、內容變更或客戶行為造成。
+
+### CI / GitHub Actions / Trigger.dev / n8n → 先 triage，避免跨 owner 誤修
+
+```
+workflow failure
+  → Ops Inbox / Repair Center 顯示 triage-needed 或 analysis-only
+  → AI 先分辨：test regression、secret/env、外部 API、排程、runner、部署環境
+  → 只有 test/code regression 才可產生 PR
+```
+
+### Cloudflare / DNS / WAF / Auth / Payment / Secrets → human-only
+
+這類是控制面與資安邊界。Repair Center 可以建立 incident、分析、提示 runbook，但不能自動修 code、不能自動改設定、不能把憑證複製到 GitHub Secrets。
+
+### Policy SSOT
+
+可自動修與不可自動修的正式分類以 `docs/awarewave-repair-center-app-architecture.md` 的 `Signal Source Taxonomy` 與 next-admin `lib/repair-center/policy.ts` 為準。本計劃書只描述流程，不另開第二套判斷規則。
 
 ---
 

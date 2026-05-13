@@ -59,6 +59,30 @@ function checkFile(rel, label = rel) {
   else fail(`file missing: ${label}`, rel);
 }
 
+function checkRepairPolicyCatalog() {
+  const rel = "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts";
+  const full = path.join(root, rel);
+  if (!fs.existsSync(full)) {
+    fail("policy: source catalog", `${rel} missing`);
+    return;
+  }
+  const text = fs.readFileSync(full, "utf8");
+  const expected = [
+    ["sentry", "auto_repair"],
+    ["uptime_kuma", "analysis_only"],
+    ["grafana", "analysis_only"],
+    ["posthog", "analysis_only"],
+    ["netdata", "human_only"],
+    ["manual", "triage_needed"],
+  ];
+  const missing = expected.filter(([source, policy]) => !text.includes(`source: "${source}"`) || !text.includes(`policy: "${policy}"`));
+  if (missing.length === 0 && text.includes("satisfies Record<IncidentSource, RepairSourcePolicy>")) {
+    pass("policy: source catalog", "all current sources classified with exhaustive TypeScript guard");
+  } else {
+    fail("policy: source catalog", `missing/unguarded entries: ${missing.map(([source, policy]) => `${source}:${policy}`).join(", ") || "exhaustive guard"}`);
+  }
+}
+
 function requestText(url, options = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
@@ -164,6 +188,7 @@ async function main() {
   checkFile("lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/commands/slack/route.ts", "Slack callback route");
   checkFile(".github/workflows/auto-repair-claude.yml", "Claude auto-repair workflow");
   checkFile(".github/workflows/auto-repair-pr-notify.yml", "PR notify workflow");
+  checkRepairPolicyCatalog();
 
   checkEnv();
   await checkSupabase();

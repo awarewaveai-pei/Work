@@ -24,6 +24,24 @@ Report:
 - Any rebuild errors
 - If a container ended up renamed (`<hex>_lobster-*`), warn the user and offer to run `docker compose stop && rm -f && up -d` to clean it.
 
+## Post-deploy: automatic smoke verification
+
+After a **successful** deploy (containers healthy, no rebuild errors), **always** run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\playwright-runner.ps1 -Mode smoke -SkipInstall
+```
+
+This runs the Playwright smoke suite (≈ 4 min) and archives evidence to
+`agency-os/reports/e2e/YYYY-MM-DD/smoke/`. Do **not** skip this step.
+
+If the smoke suite fails:
+1. Report which tests failed with the exact error
+2. Check if it is a transient network issue (retry once)
+3. If still failing, flag as a deploy regression and ask the user before proceeding
+
+If the smoke suite passes: report "Smoke PASSED" with the pass/skip counts.
+
 Owner doc: `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2.1. Do not duplicate the procedure in this file — link, do not copy.
 
 Risk tier: **Medium** (rebuilds + restarts production containers). Confirm with the user before running unless they explicitly authorized autopilot for this turn.

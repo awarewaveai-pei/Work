@@ -29,6 +29,23 @@ Primary app: `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`
 7. Deploy remains manual through existing release tooling.
 8. Health failure triggers rollback and notification.
 
+## Signal Source Taxonomy
+
+Repair Center must treat Sentry, Uptime Kuma, and Netdata as the first production intake set, not as the full monitoring boundary. The platform already has additional ops signals through Grafana/Loki, PostHog, GitHub Actions, health endpoints, Cloudflare, Supabase, n8n, Trigger.dev, deploy drift checks, and WordPress/MainWP.
+
+Use this taxonomy when adding or changing sources:
+
+| Source family | Examples | Repair policy | Rationale |
+|------|------|------|------|
+| Code exception | Sentry | `auto_repair` | Stack traces and file/line context can produce bounded code PRs. |
+| Availability and SLO | Uptime Kuma, Grafana alerting, endpoint probes | `analysis_only` | Downtime can be code, DNS, DB, nginx, capacity, or deploy drift; triage must come before PR. |
+| Infrastructure resource | Netdata, host disk, CPU, memory, container health | `human_only` by default | Resource incidents usually require operator action, scaling, cleanup, or infra changes, not blind code edits. |
+| Product and business behavior | PostHog funnel drop, conversion anomaly, feature usage anomaly | `analysis_only` | Behavior anomalies are evidence, not proof of a code bug. They need diagnosis before repair. |
+| Delivery and workflow | GitHub Actions, Trigger.dev, n8n, deploy drift, backup freshness | `triage_needed` or `analysis_only` | These can indicate broken automation; repair is allowed only after owner boundary is clear. |
+| Security, identity, DNS, payment, secrets | Cloudflare WAF/security events, auth/role changes, billing/provider events | `human_only` | These are high-risk control-plane changes and must not trigger autonomous code repair. |
+
+New sources should first normalize into Ops Inbox. Only after they have stable severity, fingerprint, ownership, and drill behavior may they be promoted into Repair Center policy.
+
 ## Ownership Boundaries
 
 | Surface | Owns | Must not own |
@@ -115,6 +132,8 @@ Environment variables:
 | `AUTO_REPAIR_GITHUB_OWNER` / `AUTO_REPAIR_GITHUB_REPO` | Default GitHub target. Defaults to `awarewaveai-pei/Work`. |
 | `SLACK_SIGNING_SECRET` | Verifies Slack interactive approve callbacks. |
 
+`/api/ops/repairs/health` must expose the active source policy catalog as `source_policies` so drills and operators can verify that UI, code, and documentation agree on auto-repair vs analysis-only vs human-only behavior.
+
 Backup gate order:
 
 1. If `AUTO_REPAIR_BACKUP_WEBHOOK_URL` is configured, call it.
@@ -127,6 +146,7 @@ Current policy mapping:
 |------|------|
 | `sentry` | `auto_repair` |
 | `uptime_kuma` / `grafana` | `analysis_only` |
+| `posthog` | `analysis_only` |
 | `netdata` | `human_only` |
 | other critical sources | `triage_needed` |
 
