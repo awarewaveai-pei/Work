@@ -68,6 +68,20 @@ const WP_SITE_TYPE_LABELS: Record<WpSiteType, string> = {
   ecommerce: "一般電商",
 };
 
+/**
+ * Auto-derive packageSlug (container manifest) from Step 2 site type.
+ * Single source of truth: WP_CLIENT_PLUGIN_STACK.md §八.1 boundary rule.
+ *   wc-core     → enforces staging-only + backup-required (ecommerce safety)
+ *   wp-business → brand sites that need fluent-crm smoke checks
+ *   wp-basic    → minimal container (default)
+ * This replaces the manual "Package" dropdown previously in Step 1.
+ */
+function derivePackageSlug(wpSiteType: WpSiteType, hasEcommerce: boolean): BuildPackageSlug {
+  if (hasEcommerce || wpSiteType === "ecommerce") return "wc-core";
+  if (wpSiteType === "brand") return "wp-business";
+  return "wp-basic";
+}
+
 const PROVIDERS = [
   { id: "sentry",      label: "Sentry",      desc: "建立 project + DSN" },
   { id: "posthog",     label: "PostHog",      desc: "建立 project + API key" },
@@ -98,7 +112,7 @@ function makeDefaultClient(): ClientInfo {
     profile: "profile_b",
     domain: "",
     provider: "hostinger",
-    packageSlug: "wp-basic",
+    packageSlug: derivePackageSlug("brand", false), // auto-derived from default wpSiteType in Step 2
     locale: "en_US",
     siteUrl: "",
     wpAdminUrl: "",
@@ -211,15 +225,6 @@ function Step1({
               <option value="cloudways">Cloudways</option>
               <option value="generic-wordpress">Generic WordPress</option>
               <option value="manual">Manual</option>
-            </select>
-          </div>
-          <div className="form-row">
-            <label className="form-label">Package</label>
-            <select className="form-select" value={info.packageSlug}
-              onChange={(e) => onChange({ packageSlug: e.target.value as BuildPackageSlug })}>
-              <option value="wp-basic">wp-basic</option>
-              <option value="wp-business">wp-business</option>
-              <option value="wc-core">wc-core</option>
             </select>
           </div>
           <div className="form-row">
@@ -345,6 +350,8 @@ function Step2WpType({
       hasEcommerce: effectiveEcom,
       resolvedPluginSlugs: resolveInstallableSlugs(type, effectiveEcom),
       resolvedPaidPlugins: resolvePaidPlugins(type, effectiveEcom),
+      // Container manifest is auto-derived from site type — see derivePackageSlug() docstring
+      packageSlug: derivePackageSlug(type, effectiveEcom),
     });
   };
 
@@ -793,6 +800,10 @@ function Step5Launch({
         <div><span>Email</span><strong>{info.customerEmail || "—"}</strong></div>
         <div><span>Profile</span><strong>{info.profile}</strong></div>
         <div><span>網站類型</span><strong>{WP_SITE_TYPE_LABELS[info.wpSiteType]}{info.hasEcommerce && info.wpSiteType !== "ecommerce" ? " + 電商" : ""}</strong></div>
+        <div>
+          <span>容器 Manifest（自動）</span>
+          <strong style={{ fontFamily: "monospace", fontSize: 12 }}>{info.packageSlug}</strong>
+        </div>
         <div>
           <span>外掛總數</span>
           <strong>
