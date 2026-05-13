@@ -16,7 +16,7 @@ export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
 
   async function start() {
     if (!incidentId) return;
-    if (!confirm("Start repair orchestration? This will run the backup gate before any GitHub issue is created.")) return;
+    if (!confirm("要啟動修復流程嗎？系統會先執行備份閘門，通過後才建立 GitHub Issue。")) return;
     setBusy(true);
     setMsg(null);
     try {
@@ -27,7 +27,7 @@ export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
       });
       const json = await res.json();
       setOk(json.ok === true);
-      setMsg(json.ok ? "Repair run started. Refresh to see current state." : `Blocked: ${json.error ?? "unknown"}`);
+      setMsg(json.ok ? "修復流程已啟動。重新整理即可查看最新狀態。" : `已阻擋：${json.error ?? "未知錯誤"}`);
     } catch (e) {
       setOk(false);
       setMsg((e as Error).message);
@@ -38,8 +38,8 @@ export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
 
   async function humanOnly() {
     if (!runId) return;
-    const reason = prompt("Reason for human-only handling:", "Manual review required") ?? "";
-    if (!confirm("Mark this repair run as human-only?")) return;
+    const reason = prompt("改為人工處理的原因：", "需要人工審查") ?? "";
+    if (!confirm("要將這筆修復標記為人工處理嗎？")) return;
     setBusy(true);
     setMsg(null);
     try {
@@ -50,7 +50,7 @@ export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
       });
       const json = await res.json();
       setOk(json.ok === true);
-      setMsg(json.ok ? "Marked human-only. Refresh to see current state." : `Failed: ${json.error ?? "unknown"}`);
+      setMsg(json.ok ? "已標記為人工處理。重新整理即可查看最新狀態。" : `失敗：${json.error ?? "未知錯誤"}`);
     } catch (e) {
       setOk(false);
       setMsg((e as Error).message);
@@ -73,7 +73,7 @@ export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
       });
       const json = await res.json();
       setOk(json.ok === true);
-      setMsg(json.ok ? "PR link saved. Refresh to see current state." : `Failed: ${json.error ?? "unknown"}`);
+      setMsg(json.ok ? "PR 連結已儲存。重新整理即可查看最新狀態。" : `失敗：${json.error ?? "未知錯誤"}`);
     } catch (e) {
       setOk(false);
       setMsg((e as Error).message);
@@ -84,7 +84,7 @@ export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
 
   async function markDeployPending() {
     if (!runId) return;
-    if (!confirm("Mark this run as deploy_pending? Production deploy remains manual.")) return;
+    if (!confirm("要將這筆修復標記為待部署嗎？正式環境部署仍需手動執行。")) return;
     setBusy(true);
     setMsg(null);
     try {
@@ -95,7 +95,7 @@ export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
       });
       const json = await res.json();
       setOk(json.ok === true);
-      setMsg(json.ok ? "Marked deploy pending. Run sg-deploy manually when ready." : `Failed: ${json.error ?? "unknown"}`);
+      setMsg(json.ok ? "已標記為待部署。確認後請手動執行 sg-deploy。" : `失敗：${json.error ?? "未知錯誤"}`);
     } catch (e) {
       setOk(false);
       setMsg((e as Error).message);
@@ -104,24 +104,24 @@ export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
     }
   }
 
-  if (!canAct) return <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>read-only</span>;
+  if (!canAct) return <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>唯讀</span>;
 
   return (
     <div style={{ display: "grid", gap: 8, justifyItems: "end", minWidth: 144 }}>
       {mode === "start" ? (
         <button type="button" className="btn-primary" disabled={busy} onClick={start}>
-          {busy ? "Starting..." : "Approve"}
+          {busy ? "啟動中..." : "核准修復"}
         </button>
       ) : (
         <>
           <button type="button" className="btn-secondary" disabled={busy} onClick={addPr}>
-            Add PR
+            加入 PR
           </button>
           <button type="button" className="btn-secondary" disabled={busy} onClick={markDeployPending}>
-            Deploy pending
+            待部署
           </button>
           <button type="button" className="btn-secondary" disabled={busy} onClick={humanOnly}>
-            Human-only
+            人工處理
           </button>
         </>
       )}

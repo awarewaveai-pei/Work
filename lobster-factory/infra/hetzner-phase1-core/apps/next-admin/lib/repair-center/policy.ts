@@ -15,42 +15,42 @@ const REPAIR_SOURCE_POLICY_BY_SOURCE = {
     label: "Sentry",
     policy: "auto_repair",
     family: "code_exception",
-    rationale: "Stack traces and file context can produce bounded code PRs after backup and approval.",
+    rationale: "錯誤堆疊與檔案脈絡足以在備份與核准後產生範圍受控的修復 PR。",
   },
   uptime_kuma: {
     source: "uptime_kuma",
     label: "Uptime Kuma",
     policy: "analysis_only",
     family: "availability_slo",
-    rationale: "Availability failures may be code, DNS, DB, nginx, capacity, or deploy drift.",
+    rationale: "可用性異常可能來自程式、DNS、資料庫、nginx、容量或部署漂移，需先分析。",
   },
   grafana: {
     source: "grafana",
     label: "Grafana",
     policy: "analysis_only",
     family: "availability_slo",
-    rationale: "Latency, logs, and SLO alerts need triage before a code-scoped PR is safe.",
+    rationale: "延遲、日誌與 SLO 告警必須先分流判讀，才能安全限定成程式修復 PR。",
   },
   posthog: {
     source: "posthog",
     label: "PostHog",
     policy: "analysis_only",
     family: "product_behavior",
-    rationale: "Business and funnel anomalies are evidence, not direct proof of a code bug.",
+    rationale: "商業與漏斗異常是診斷證據，不等於可直接自動修的程式錯誤。",
   },
   netdata: {
     source: "netdata",
     label: "Netdata",
     policy: "human_only",
     family: "infrastructure",
-    rationale: "Host resources and container health usually require operator or infrastructure action.",
+    rationale: "主機資源與容器健康多半需要操作者或基礎設施層處置。",
   },
   manual: {
     source: "manual",
-    label: "Manual",
+    label: "手動",
     policy: "triage_needed",
     family: "manual",
-    rationale: "Manual incidents need an operator to classify owner boundary before automation.",
+    rationale: "手動事件需先由操作者判定責任邊界，再決定是否進入自動化。",
   },
 } satisfies Record<IncidentSource, RepairSourcePolicy>;
 
@@ -68,10 +68,10 @@ export function policyForIncident(source: IncidentSource, severity: IncidentSeve
 }
 
 export function repairPolicyLabel(policy: RepairPolicy): string {
-  if (policy === "auto_repair") return "Auto-repair";
-  if (policy === "analysis_only") return "Analysis-only";
-  if (policy === "human_only") return "Human-only";
-  return "Triage needed";
+  if (policy === "auto_repair") return "可自動修復";
+  if (policy === "analysis_only") return "僅分析";
+  if (policy === "human_only") return "人工處理";
+  return "需分流";
 }
 
 export function canApprovePolicy(policy: RepairPolicy): boolean {
