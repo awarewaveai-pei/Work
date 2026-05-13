@@ -28,7 +28,7 @@ function roleResolutionMode(): "claims_only" | "claims_with_simulated_fallback" 
 }
 
 export function readSimulatedRole(request: Request): OpsRole {
-  return toRole(request.headers.get(SIMULATED_ROLE_HEADER)) ?? "operator";
+  return toRole(request.headers.get(SIMULATED_ROLE_HEADER)) ?? toRole(process.env.OPS_SIMULATED_FALLBACK_ROLE) ?? "operator";
 }
 
 export function readClaimsRole(request: Request): OpsRole | null {

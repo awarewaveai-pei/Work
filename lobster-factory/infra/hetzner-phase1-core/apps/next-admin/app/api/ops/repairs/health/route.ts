@@ -36,7 +36,7 @@ export async function GET() {
     tableError = res.error?.message ?? null;
   }
 
-  const ok = tableOk && mode === "normal" && backupConfigured && githubConfigured && slackSigningConfigured;
+  const ok = tableOk && mode === "normal" && backupConfigured && githubConfigured;
 
   return NextResponse.json(
     {
@@ -52,6 +52,8 @@ export async function GET() {
       eu_backup_configured: euSsh,
       github_configured: githubConfigured,
       slack_signing_configured: slackSigningConfigured,
+      slack_interactive_ready: slackSigningConfigured,
+      web_ui_ready: ok,
       deploy_mode: "manual_sg_deploy_only",
       source_policies: REPAIR_SOURCE_POLICIES.map(({ source, label, policy, family }) => ({ source, label, policy, family })),
     },
