@@ -83,6 +83,52 @@ export default async function ClientDetailPage({
       .limit(10),
   ]);
 
+  // ── M3: compute department coverage (server-side, no extra fetch) ──────────
+  const selectedIds: ClusterId[] = Array.isArray(cfg.department_selection)
+    ? (cfg.department_selection as ClusterId[])
+    : [];
+  const activeSet = new Set(selectedIds);
+  const deptSummary: DepartmentSummaryPayload = (() => {
+    type EnterpriseTier = "not_configured" | "smb" | "growth" | "enterprise";
+    const computeTier = (n: number, ids: ClusterId[]): EnterpriseTier => {
+      if (n === 0) return "not_configured";
+      const cross = ids.some((id) => ["CLU_TAX_TRADE", "CLU_LEGAL", "CLU_REGIONAL"].includes(id));
+      if (n >= 14 || cross) return "enterprise";
+      if (n >= 8) return "growth";
+      return "smb";
+    };
+    type GroupKey = (typeof DEPARTMENT_CATALOG)[0]["group"];
+    const groupMap = new Map<GroupKey, { groupKey: GroupKey; groupLabel: string; total: number; active: number; clusters: unknown[] }>();
+    for (const cluster of DEPARTMENT_CATALOG) {
+      const g = cluster.group;
+      if (!groupMap.has(g)) groupMap.set(g, { groupKey: g, groupLabel: GROUP_LABELS[g], total: 0, active: 0, clusters: [] });
+      const ge = groupMap.get(g)!;
+      ge.clusters.push({
+        clusterId: cluster.clusterId, label: cluster.label, group: g,
+        active: activeSet.has(cluster.clusterId),
+        matrixRows: cluster.matrixRows,
+        requiredTemplateFiles: cluster.templateFiles.filter((f) => f.mandatoryFields?.length).map((f) => f.path),
+        recommendedTemplateFiles: cluster.templateFiles.filter((f) => f.recommendedFields?.length).map((f) => f.path),
+      });
+      ge.total += 1;
+      if (activeSet.has(cluster.clusterId)) ge.active += 1;
+    }
+    const matrixRowsCovered = Array.from(new Set(DEPARTMENT_CATALOG.filter((c) => activeSet.has(c.clusterId)).flatMap((c) => c.matrixRows)));
+    const allRequiredTemplateFiles = Array.from(new Set(DEPARTMENT_CATALOG.filter((c) => activeSet.has(c.clusterId)).flatMap((c) => c.templateFiles.filter((f) => f.mandatoryFields?.length).map((f) => f.path))));
+    const isDefaultSelection = selectedIds.length === SMB_DEFAULT_CLUSTERS.length && SMB_DEFAULT_CLUSTERS.every((id) => activeSet.has(id));
+    return {
+      slug: org.slug, name: org.name,
+      activeCount: selectedIds.length, totalCount: 20 as const,
+      coveragePercent: Math.round((selectedIds.length / 20) * 100),
+      enterpriseTier: computeTier(selectedIds.length, selectedIds),
+      activeClusterIds: selectedIds,
+      inactiveClusterIds: DEPARTMENT_CATALOG.filter((c) => !activeSet.has(c.clusterId)).map((c) => c.clusterId),
+      byGroup: Array.from(groupMap.values()) as DepartmentSummaryPayload["byGroup"],
+      matrixRowsCovered, allRequiredTemplateFiles, isDefaultSelection,
+      lastReviewedAt: cfg.department_selection_reviewed_at ?? null,
+    };
+  })();
+
   const runs = runsResult.data ?? [];
 
   // Partition WP results
@@ -243,6 +289,11 @@ export default async function ClientDetailPage({
               </div>
             )}
           </Section>
+
+          {/* M3: Department coverage panel */}
+          <div style={{ marginTop: 16 }}>
+            <DepartmentCoveragePanel summary={deptSummary} />
+          </div>
         </div>
 
         {/* ── Right sidebar: links + raw config ─────────────────── */}

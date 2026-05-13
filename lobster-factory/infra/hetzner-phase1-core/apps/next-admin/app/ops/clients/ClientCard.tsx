@@ -1,6 +1,7 @@
 "use client";
 // ClientCard — client component so onMouseEnter/onMouseLeave work in Next.js 15 RSC.
 // Receives pre-computed data props (org row + health result) from the server page.
+// M3: department count badge added — 2026-05-13
 
 import Link from "next/link";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
