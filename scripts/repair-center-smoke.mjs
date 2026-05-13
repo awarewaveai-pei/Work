@@ -142,6 +142,13 @@ async function checkHttp(baseUrl) {
           } else {
             fail("http: repair policy text", `policy_catalog_text_ok=${String(remoteRepairHealth?.policy_catalog_text_ok)}`);
           }
+          if (remoteRepairHealth && Object.prototype.hasOwnProperty.call(remoteRepairHealth, "policy_catalog_count")) {
+            if (remoteRepairHealth.policy_catalog_count === 6) {
+              pass("http: repair policy count", "production policy_catalog_count=6");
+            } else {
+              fail("http: repair policy count", `policy_catalog_count=${String(remoteRepairHealth.policy_catalog_count)} (expected 6)`);
+            }
+          }
         } catch {
           remoteRepairHealth = null;
         }
