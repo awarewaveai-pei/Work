@@ -27,7 +27,10 @@
 [CmdletBinding()]
 param(
   [string] $BaseUrl = 'https://app.aware-wave.com',
-  [switch] $Clear
+  [switch] $Clear,
+  # Print current webhook info from Telegram (getWebhookInfo) + compare with expected URL.
+  # Use after any deploy or "bot not responding" incident for instant diagnosis.
+  [switch] $Verify
 )
 
 Set-StrictMode -Version Latest
@@ -52,6 +55,39 @@ From monorepo root:
 
 if (-not $Clear -and [string]::IsNullOrWhiteSpace($secret)) {
   throw "TELEGRAM_WEBHOOK_SECRET is not set. See script docstring."
+}
+
+if ($Verify) {
+  $info = Invoke-RestMethod -Method GET -Uri "https://api.telegram.org/bot$token/getWebhookInfo"
+  $expected = ($BaseUrl.TrimEnd('/')) + '/api/internal/commands/telegram'
+  $current  = $info.result.url
+  $urlMatch = ($current -eq $expected)
+  $pending  = $info.result.pending_update_count
+  $lastErr  = $info.result.last_error_message
+  $lastErrAt = $info.result.last_error_date
+  Write-Host ""
+  Write-Host "── Telegram Webhook Diagnostic ─────────────────────────────" -ForegroundColor Cyan
+  Write-Host "  Expected URL : $expected"
+  Write-Host "  Current URL  : $current"
+  if ($urlMatch) {
+    Write-Host "  URL match    : OK" -ForegroundColor Green
+  } else {
+    Write-Host "  URL match    : MISMATCH — re-run without -Verify to fix" -ForegroundColor Red
+  }
+  Write-Host "  Pending msgs : $pending"
+  if ($lastErr) {
+    $errTime = if ($lastErrAt) { [DateTimeOffset]::FromUnixTimeSeconds($lastErrAt).ToString('yyyy-MM-dd HH:mm:ssZ') } else { '?' }
+    Write-Host "  Last error   : $lastErr (at $errTime)" -ForegroundColor Yellow
+  } else {
+    Write-Host "  Last error   : none" -ForegroundColor Green
+  }
+  Write-Host ""
+  Write-Host "  NOTE: Telegram cannot expose whether the secret_token matches." -ForegroundColor DarkGray
+  Write-Host "  If bot is silent but URL is correct, the server's TELEGRAM_WEBHOOK_SECRET" -ForegroundColor DarkGray
+  Write-Host "  may not match the vault value. Fix: ensure server .env has the vault value" -ForegroundColor DarkGray
+  Write-Host "  then rebuild: docker compose --env-file .env up -d --build next-admin" -ForegroundColor DarkGray
+  Write-Host "────────────────────────────────────────────────────────────" -ForegroundColor Cyan
+  exit 0
 }
 
 if ($Clear) {

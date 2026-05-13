@@ -270,7 +270,14 @@ services:
       OPS_ROLE_RESOLUTION_MODE: ${OPS_ROLE_RESOLUTION_MODE:-}
       INTERNAL_ADMIN_BASE_URL: ${INTERNAL_ADMIN_BASE_URL:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      TELEGRAM_ALLOWED_USER_IDS: ${TELEGRAM_ALLOWED_USER_IDS:-}
       TELEGRAM_ALLOWED_CHAT_IDS: ${TELEGRAM_ALLOWED_CHAT_IDS:-}
+      # Command Plane: org/workspace scope (Phase 1: single-owner deployment)
+      COMMAND_PLANE_DEFAULT_ORG_ID: ${COMMAND_PLANE_DEFAULT_ORG_ID:-}
+      COMMAND_PLANE_DEFAULT_WORKSPACE_ID: ${COMMAND_PLANE_DEFAULT_WORKSPACE_ID:-}
+      # AI handlers (/daily_review, /weekly_review) — falls back to raw JSON if unset
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # Build Console: optional immediate Trigger.dev dispatcher kick (see apps/next-admin/lib/kick-dispatcher.ts)
       TRIGGER_SECRET_KEY: ${TRIGGER_SECRET_KEY:-}
       TRIGGER_API_URL: ${TRIGGER_API_URL:-https://api.trigger.dev}
