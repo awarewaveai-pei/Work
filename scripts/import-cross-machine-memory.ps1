@@ -7,21 +7,26 @@
 #   secrets      -- $env:AO_SYNC_SECRETS_ROOT\  (user-env.ps1, .ssh\*, AWARE_WAVE_CREDENTIALS.md)
 #
 # Folder selection strategy (N-machine safe):
-#   New format (AO-SYNC-date-MACHINE): exclude own machine by folder name suffix → pick newest OTHER machine
-#   Old format (AO-SYNC-date):         exclude own machine via .exported-by tag   → backward compatible
+#   New format (AO-SYNC-date-MACHINE): exclude own machine by folder name suffix -> pick newest OTHER machine
+#   Old format (AO-SYNC-date):         exclude own machine via .exported-by tag  -> backward compatible
 #   Both formats sorted by date desc; picks the single best candidate.
 #
-# Bidirectional sync -- last AO-CLOSE wins:
-#   MEMORY.md    -- import from latest OTHER machine's folder; skip own-machine exports
-#   user-env.ps1 -- skipped if SHA256 of sync copy matches local copy (avoids ~60 setx calls)
-#   SSH keys     -- skipped per-key if SHA256 matches local copy
-#   AWARE_WAVE_CREDENTIALS.md -- skipped if SHA256 matches local copy
+# Import decision (per file):
+#   1. SHA256 same                                              -> log "unchanged", skip write
+#   2. SHA256 differs AND manifest exists AND local mtime newer -> WARN "local-newer", keep local
+#   3. SHA256 differs AND (no manifest OR local is older)       -> backup + atomic copy + verify
+#
+# SSH exclusion (never imported):
+#   known_hosts, known_hosts.old, authorized_keys, *.txt, *.old, *.bkup, *.backup
+#
+# Pre-overwrite backup: %LOCALAPPDATA%\AgencyOS\cross-machine-backup\<timestamp>\
+#   Auto-purges: keeps last 5 backup sets (older sets deleted on each run).
+#
+# Drive detection: tries G H F E D I J (not hardcoded to G:).
 
 param([string]$WorkRoot = "")
 
 # ── 0. Load env vars from User registry if missing from process env ──────────
-# Handles subprocess sessions that pre-date the setx calls
-# (e.g. ao-resume.ps1 launched via Bash before the registry vars were loaded).
 if (-not $env:AO_SYNC_ROOT) {
     $regVal = [System.Environment]::GetEnvironmentVariable('AO_SYNC_ROOT', 'User')
     if ($regVal) { $env:AO_SYNC_ROOT = $regVal }
@@ -50,6 +55,84 @@ function Get-SafeHash([string]$Path) {
     return ""
 }
 
+# ── Helper: pre-overwrite local backup ───────────────────────────────────────
+# Saves the current local file before overwriting so recovery is always possible.
+# Location: %LOCALAPPDATA%\AgencyOS\cross-machine-backup\<timestamp>\<RelLabel>
+$script:BackupTimestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$script:BackupRoot      = Join-Path $env:LOCALAPPDATA 'AgencyOS\cross-machine-backup'
+
+function Invoke-LocalBackup([string]$Path, [string]$RelLabel) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $dst    = Join-Path $script:BackupRoot "$script:BackupTimestamp\$($RelLabel -replace '/', '\')"
+    $dstDir = Split-Path $dst -Parent
+    if (-not (Test-Path $dstDir)) { New-Item -ItemType Directory -Path $dstDir -Force | Out-Null }
+    Copy-Item -LiteralPath $Path -Destination $dst -Force -ErrorAction SilentlyContinue
+}
+
+function Invoke-PurgeOldBackups {
+    if (-not (Test-Path $script:BackupRoot)) { return }
+    Get-ChildItem $script:BackupRoot -Directory -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Select-Object -Skip 5 |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+# ── Helper: read the most-recent export manifest ─────────────────────────────
+# Returns a PSCustomObject with exported_utc, machine, files — or $null if none found.
+function Read-ExportManifest([string]$SecretsRoot) {
+    if (-not (Test-Path -LiteralPath $SecretsRoot)) { return $null }
+    $best = $null; $bestUtc = [datetime]::MinValue
+    Get-ChildItem -Path $SecretsRoot -Filter '.manifest-*.json' -File -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            try {
+                $data = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+                $utc  = [datetime]::Parse($data.exported_utc, $null,
+                            [System.Globalization.DateTimeStyles]::RoundtripKind)
+                if ($utc -gt $bestUtc) { $bestUtc = $utc; $best = $data }
+            } catch { }
+        }
+    return $best
+}
+
+# ── Helper: decide whether to import a file ───────────────────────────────────
+# Returns: 'unchanged' | 'local-newer' | 'import'
+#   unchanged  : SHA256 identical -> no write needed
+#   local-newer: SHA256 differs but local mtime > manifest.exported_utc -> keep local
+#   import     : SHA256 differs and source is authoritative -> proceed with backup+copy
+function Get-ImportDecision([string]$SrcPath, [string]$DstPath, $Manifest) {
+    if ((Get-SafeHash $SrcPath) -eq (Get-SafeHash $DstPath)) { return 'unchanged' }
+    if (-not $Manifest) { return 'import' }
+    try {
+        $exportedUtc = [datetime]::Parse($Manifest.exported_utc, $null,
+                           [System.Globalization.DateTimeStyles]::RoundtripKind)
+        if ((Test-Path -LiteralPath $DstPath) -and
+            (Get-Item -LiteralPath $DstPath).LastWriteTimeUtc -gt $exportedUtc) {
+            return 'local-newer'
+        }
+    } catch { }
+    return 'import'
+}
+
+# ── Helper: atomic copy with post-write SHA256 verification ──────────────────
+# Writes to a .tmp file, verifies hash, then renames. Prevents partial writes.
+# Returns $true on success.
+function Copy-Atomic([string]$Src, [string]$Dst) {
+    $tmp = "$Dst.aosync-tmp"
+    try {
+        Copy-Item -LiteralPath $Src -Destination $tmp -Force
+        if ((Get-SafeHash $tmp) -ne (Get-SafeHash $Src)) {
+            Write-Host "  WARN: post-copy verify failed -- skipped: $(Split-Path $Dst -Leaf)" -ForegroundColor Yellow
+            return $false
+        }
+        Move-Item -LiteralPath $tmp -Destination $Dst -Force
+        return $true
+    } catch {
+        Write-Host "  WARN: copy-atomic error ($($_.Exception.Message))" -ForegroundColor Yellow
+        return $false
+    } finally {
+        if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 # ── 2. MEMORY.md import ───────────────────────────────────────────────────────
 # Derive Claude Code project key from WorkRoot (works across machines/drives).
 # e.g.  C:\Users\USER\Work  ->  c--Users-USER-Work
@@ -68,25 +151,26 @@ if ($env:AO_SYNC_ROOT) {
     # Mixing paths with the same folder names causes the wrong version to be picked.
     $searchRoots += $env:AO_SYNC_ROOT
 } else {
-    # Auto-detect: search for the AO-SYNC folder inside Google Drive (depth ≤ 2).
-    # Resolves G:\<MyDrive>\EverydayPW\AO-SYNC correctly without hardcoding folder names.
+    # Auto-detect: tries drive letters G H F E D I J (not hardcoded to G:).
     $gdFound = $false
-    if (Test-Path "G:\") {
-        $myDrive = Get-ChildItem "G:\" -Directory -ErrorAction SilentlyContinue |
+    foreach ($drvLetter in @('G', 'H', 'F', 'E', 'D', 'I', 'J')) {
+        $drvRoot = "${drvLetter}:\"
+        if (-not (Test-Path $drvRoot)) { continue }
+        $myDrive = Get-ChildItem $drvRoot -Directory -ErrorAction SilentlyContinue |
                    Select-Object -First 1 -ExpandProperty FullName
-        if ($myDrive) {
-            $detected = Get-ChildItem -Path $myDrive -Filter "AO-SYNC" -Directory `
-                            -Recurse -Depth 2 -ErrorAction SilentlyContinue |
-                        Select-Object -First 1 -ExpandProperty FullName
-            if ($detected) {
-                $searchRoots += $detected
-                $gdFound = $true
-                # Auto-derive secrets root from AO-SYNC location (parent = EverydayPW)
-                if (-not $env:AO_SYNC_SECRETS_ROOT) {
-                    $env:AO_SYNC_SECRETS_ROOT = Split-Path $detected -Parent
-                    Write-Host "  auto-derived: AO_SYNC_SECRETS_ROOT = $env:AO_SYNC_SECRETS_ROOT" -ForegroundColor DarkGray
-                }
+        if (-not $myDrive) { continue }
+        $detected = Get-ChildItem -Path $myDrive -Filter "AO-SYNC" -Directory `
+                        -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+                    Select-Object -First 1 -ExpandProperty FullName
+        if ($detected) {
+            $searchRoots += $detected
+            $gdFound = $true
+            # Auto-derive secrets root from AO-SYNC location (parent = EverydayPW)
+            if (-not $env:AO_SYNC_SECRETS_ROOT) {
+                $env:AO_SYNC_SECRETS_ROOT = Split-Path $detected -Parent
+                Write-Host "  auto-derived: AO_SYNC_SECRETS_ROOT = $env:AO_SYNC_SECRETS_ROOT" -ForegroundColor DarkGray
             }
+            break
         }
     }
     # Desktop fallback only when Google Drive auto-detect also finds nothing.
@@ -123,17 +207,16 @@ $candidateFolders = $allFolders | ForEach-Object {
     $_ -ne $null -and
     # New format: exclude own machine by folder name (fast, no file I/O needed)
     -not ($_.IsNewFormat -and $_.FolderMachine -eq $machineTag)
-} | Sort-Object DateStr -Descending   # newest date first; within same date, order is arbitrary (all acceptable)
+} | Sort-Object DateStr -Descending   # newest date first
 
 # ── MEMORY.md import ──────────────────────────────────────────────────────────
+# Always overwrites -- last-AO-CLOSE-wins by design (no SHA256 guard on MEMORY.md).
 if ($candidateFolders.Count -gt 0 -and $memDest) {
 
-    # Walk sorted candidates; for old-format folders, verify .exported-by before accepting.
     $best = $null
     foreach ($entry in $candidateFolders) {
         if ($entry.IsNewFormat) {
-            $best = $entry   # new format: already filtered by name; accept immediately
-            break
+            $best = $entry; break
         } else {
             # Old format: double-check .exported-by (backward compat)
             $exportedByFile = Join-Path $entry.Folder.FullName "memory\.exported-by"
@@ -146,7 +229,6 @@ if ($candidateFolders.Count -gt 0 -and $memDest) {
                 $best | Add-Member -NotePropertyName ExportedBy -NotePropertyValue $exportedBy -Force
                 break
             }
-            # else: own-machine old-format folder — skip, try next candidate
         }
     }
 
@@ -175,60 +257,98 @@ if ($candidateFolders.Count -gt 0 -and $memDest) {
 $secretsRoot = $env:AO_SYNC_SECRETS_ROOT
 if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
 
-    # user-env.ps1 -> mcp\user-env.ps1
-    # Only copies + runs setx when content has changed (avoids ~60 setx calls on every AO-RESUME).
+    # Load the most recent export manifest for timestamp-aware conflict resolution.
+    # If no manifest exists (e.g. export was run before this upgrade), falls back to hash-only.
+    $manifest = Read-ExportManifest $secretsRoot
+    if ($manifest) {
+        Write-Host "  manifest loaded: exported by $($manifest.machine) at $($manifest.exported_utc)" -ForegroundColor DarkGray
+    }
+
+    # Purge old local backups (keep last 5 sets, run once per import session)
+    Invoke-PurgeOldBackups
+
+    # ── user-env.ps1 -> mcp\user-env.ps1 ─────────────────────────────────────
     $userEnvSrc = Join-Path $secretsRoot "user-env.ps1"
     if ((Test-Path -LiteralPath $userEnvSrc) -and $WorkRoot) {
         $userEnvDest = Join-Path $WorkRoot "mcp\user-env.ps1"
-        if ((Get-SafeHash $userEnvSrc) -ne (Get-SafeHash $userEnvDest)) {
-            Copy-Item -LiteralPath $userEnvSrc -Destination $userEnvDest -Force
-            Write-Host "  cross-machine import: user-env.ps1 updated" -ForegroundColor Green
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $userEnvDest
-            Write-Host "  cross-machine import: env vars applied (open a new terminal to inherit)" -ForegroundColor Green
-
-            # Sync updated keys into vault so health check stays at 100%.
-            # Vault (DPAPI) and user-env.ps1 (setx) are separate stores;
-            # this bridges them automatically after every content change.
-            $vaultScript = Join-Path $WorkRoot "scripts\secrets-vault.ps1"
-            if (Test-Path -LiteralPath $vaultScript) {
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $vaultScript -Action import-user-env -McpPath $userEnvDest
-                Write-Host "  cross-machine import: vault synced from user-env.ps1" -ForegroundColor Green
+        $decision    = Get-ImportDecision $userEnvSrc $userEnvDest $manifest
+        switch ($decision) {
+            'unchanged'  {
+                Write-Host "  cross-machine import: user-env.ps1 unchanged (setx + vault skipped)" -ForegroundColor DarkGray
             }
-        } else {
-            Write-Host "  cross-machine import: user-env.ps1 unchanged (setx + vault skipped)" -ForegroundColor DarkGray
-        }
-    }
-
-    # SSH keys -> ~/.ssh\  (per-key hash check; only copies changed keys)
-    $sshSrc  = Join-Path $secretsRoot ".ssh"
-    $sshDest = Join-Path $env:USERPROFILE ".ssh"
-    if (Test-Path -LiteralPath $sshSrc) {
-        if (-not (Test-Path -LiteralPath $sshDest)) {
-            New-Item -ItemType Directory -Path $sshDest -Force | Out-Null
-        }
-        $sshKeys = @("hetzner_trigger", "id_ed25519", "hostinger_soulful",
-                     "hetzner_trigger.pub", "id_ed25519.pub", "hostinger_soulful.pub", "config")
-        foreach ($key in $sshKeys) {
-            $src = Join-Path $sshSrc $key
-            $dst = Join-Path $sshDest $key
-            if (Test-Path -LiteralPath $src) {
-                if ((Get-SafeHash $src) -ne (Get-SafeHash $dst)) {
-                    Copy-Item -LiteralPath $src -Destination $dst -Force
-                    Write-Host "  cross-machine import: .ssh/$key updated" -ForegroundColor Green
+            'local-newer' {
+                Write-Host "  cross-machine import: user-env.ps1 WARN — local is newer than manifest ($($manifest.exported_utc)), kept local" -ForegroundColor Yellow
+            }
+            'import' {
+                Invoke-LocalBackup $userEnvDest "user-env.ps1"
+                if (Copy-Atomic $userEnvSrc $userEnvDest) {
+                    Write-Host "  cross-machine import: user-env.ps1 updated" -ForegroundColor Green
+                    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $userEnvDest
+                    Write-Host "  cross-machine import: env vars applied (open a new terminal to inherit)" -ForegroundColor Green
+                    # Sync updated keys into vault so health check stays at 100%.
+                    $vaultScript = Join-Path $WorkRoot "scripts\secrets-vault.ps1"
+                    if (Test-Path -LiteralPath $vaultScript) {
+                        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $vaultScript -Action import-user-env -McpPath $userEnvDest
+                        Write-Host "  cross-machine import: vault synced from user-env.ps1" -ForegroundColor Green
+                    }
                 }
             }
         }
     }
 
-    # AWARE_WAVE_CREDENTIALS.md -> user home
+    # ── SSH keys -> ~/.ssh\ ───────────────────────────────────────────────────
+    # Dynamic scan from Google Drive .ssh/ — picks up any new key automatically.
+    # Exclusion list: machine-specific or reference-only files that must not roam.
+    $sshSrc          = Join-Path $secretsRoot ".ssh"
+    $sshDest         = Join-Path $env:USERPROFILE ".ssh"
+    $sshExcludeNames = @('known_hosts', 'known_hosts.old', 'authorized_keys')
+    $sshExcludeExts  = @('.txt', '.old', '.bkup', '.backup')
+    if (Test-Path -LiteralPath $sshSrc) {
+        if (-not (Test-Path -LiteralPath $sshDest)) {
+            New-Item -ItemType Directory -Path $sshDest -Force | Out-Null
+        }
+        Get-ChildItem -Path $sshSrc -File -ErrorAction SilentlyContinue | ForEach-Object {
+            $name = $_.Name
+            if ($sshExcludeNames -contains $name) { return }
+            if ($sshExcludeExts  -contains $_.Extension.ToLower()) { return }
+            $src      = $_.FullName
+            $dst      = Join-Path $sshDest $name
+            $decision = Get-ImportDecision $src $dst $manifest
+            switch ($decision) {
+                'unchanged'   {
+                    Write-Host "  cross-machine import: .ssh/$name unchanged" -ForegroundColor DarkGray
+                }
+                'local-newer' {
+                    Write-Host "  cross-machine import: .ssh/$name WARN — local is newer than manifest, kept local" -ForegroundColor Yellow
+                }
+                'import' {
+                    Invoke-LocalBackup $dst "ssh/$name"
+                    if (Copy-Atomic $src $dst) {
+                        Write-Host "  cross-machine import: .ssh/$name updated" -ForegroundColor Green
+                    }
+                }
+            }
+        }
+    }
+
+    # ── AWARE_WAVE_CREDENTIALS.md -> user home ────────────────────────────────
     $credsSrc = Join-Path $secretsRoot "AWARE_WAVE_CREDENTIALS.md"
     $credsDst = Join-Path $env:USERPROFILE "AWARE_WAVE_CREDENTIALS.md"
     if (Test-Path -LiteralPath $credsSrc) {
-        if ((Get-SafeHash $credsSrc) -ne (Get-SafeHash $credsDst)) {
-            Copy-Item -LiteralPath $credsSrc -Destination $credsDst -Force
-            Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md updated" -ForegroundColor Green
-        } else {
-            Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md unchanged" -ForegroundColor DarkGray
+        $decision = Get-ImportDecision $credsSrc $credsDst $manifest
+        switch ($decision) {
+            'unchanged'   {
+                Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md unchanged" -ForegroundColor DarkGray
+            }
+            'local-newer' {
+                Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md WARN — local is newer than manifest, kept local" -ForegroundColor Yellow
+            }
+            'import' {
+                Invoke-LocalBackup $credsDst "AWARE_WAVE_CREDENTIALS.md"
+                if (Copy-Atomic $credsSrc $credsDst) {
+                    Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md updated" -ForegroundColor Green
+                }
+            }
         }
     }
 

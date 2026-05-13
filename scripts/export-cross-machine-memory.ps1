@@ -8,7 +8,7 @@
 # Priority order for MEMORY.md destination:
 #   1. -DestRoot param (explicit override)
 #   2. $env:AO_SYNC_ROOT env var (machine-specific config) -- SET THIS on each machine
-#   3. Auto-detect Google Drive: scan G:\ for first child directory (avoids non-ASCII encoding issues)
+#   3. Auto-detect Google Drive: tries drive letters G H F E D I J (not hardcoded to G:)
 #   4. Desktop (fallback -- not recommended for sensitive files)
 #
 # Secrets destination:
@@ -19,11 +19,15 @@
 #   [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'G:\<MyDrive>\EverydayPW',         'User')
 #
 # What is exported:
-#   MEMORY.md              -> $AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\MEMORY.md
-#   .exported-by           -> $AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\.exported-by
-#   user-env.ps1           -> $AO_SYNC_SECRETS_ROOT\user-env.ps1   (shared, last-write-wins)
-#   .ssh\*                 -> $AO_SYNC_SECRETS_ROOT\.ssh\           (shared, last-write-wins)
-#   AWARE_WAVE_CREDENTIALS -> $AO_SYNC_SECRETS_ROOT\AWARE_WAVE_CREDENTIALS.md
+#   MEMORY.md                  -> $AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\MEMORY.md
+#   .exported-by               -> $AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\.exported-by
+#   user-env.ps1               -> $AO_SYNC_SECRETS_ROOT\user-env.ps1   (shared, last-write-wins)
+#   .ssh\*                     -> $AO_SYNC_SECRETS_ROOT\.ssh\           (dynamic scan, excl. machine-specific)
+#   AWARE_WAVE_CREDENTIALS.md  -> $AO_SYNC_SECRETS_ROOT\AWARE_WAVE_CREDENTIALS.md
+#   .manifest-<MACHINE>.json   -> $AO_SYNC_SECRETS_ROOT\               (sha256 + timestamp per file)
+#
+# SSH exclusion (never exported):
+#   known_hosts, known_hosts.old, authorized_keys, *.txt, *.old, *.bkup, *.backup
 #
 # Pruning rules (never touch other machines' history):
 #   Own machine folders  : keep 7 most recent (AO-SYNC-*-<MACHINE>)
@@ -39,12 +43,9 @@ param(
 )
 
 $today      = Get-Date -Format "yyyy-MM-dd"
-# Sanitise COMPUTERNAME: keep alphanumeric + hyphen only (safe for folder names on all OS/Drive mounts)
 $machineTag = $env:COMPUTERNAME.ToUpper() -replace '[^A-Za-z0-9]', '-'
 
 # ── 0. Load env vars from User registry if missing from process env ──────────
-# Handles subprocess sessions that pre-date the setx calls
-# (e.g. ao-close.ps1 launched via Bash before the registry vars were loaded).
 if (-not $env:AO_SYNC_ROOT) {
     $regVal = [System.Environment]::GetEnvironmentVariable('AO_SYNC_ROOT', 'User')
     if ($regVal) { $env:AO_SYNC_ROOT = $regVal }
@@ -70,9 +71,6 @@ if (-not $WorkRoot) {
 }
 
 # ── 2. Derive Claude Code project key ─────────────────────────────────────────
-# Rule: lowercase drive letter, replace ':' and '\' with '-'
-# e.g.  C:\Users\USER\Work  ->  c--Users-USER-Work
-#       D:\Work             ->  d--Work
 $projectKey = $WorkRoot.Substring(0,1).ToLower() + ($WorkRoot.Substring(1) -replace ':', '-' -replace '\\', '-')
 $memSrc     = Join-Path $env:USERPROFILE ".claude\projects\$projectKey\memory"
 $memIndex   = Join-Path $memSrc "MEMORY.md"
@@ -82,41 +80,32 @@ if (-not (Test-Path -LiteralPath $memIndex)) {
     exit 0
 }
 
-# ── 3. Resolve sync root ──────────────────────────────────────────────────────
-# Structure on Google Drive:
-#   G:\<MyDrive>\EverydayPW\AO-SYNC\        <- AO_SYNC_ROOT (MEMORY.md daily folders)
-#   G:\<MyDrive>\EverydayPW\                <- AO_SYNC_SECRETS_ROOT (user-env, .ssh, CREDS)
-#
-# Auto-detect searches for the AO-SYNC folder inside MyDrive (depth ≤ 2),
-# so it correctly resolves EverydayPW\AO-SYNC rather than joining at the wrong level.
+# ── 3. Resolve sync root (drive-letter-agnostic auto-detect) ─────────────────
 $syncRoot = if ($DestRoot) {
     $DestRoot
 } elseif ($env:AO_SYNC_ROOT) {
     $env:AO_SYNC_ROOT
 } else {
     $detected = $null
-    if (Test-Path "G:\") {
-        $myDrive = Get-ChildItem "G:\" -Directory -ErrorAction SilentlyContinue |
+    foreach ($drvLetter in @('G','H','F','E','D','I','J')) {
+        $drvRoot = "${drvLetter}:\"
+        if (-not (Test-Path $drvRoot)) { continue }
+        $myDrive = Get-ChildItem $drvRoot -Directory -ErrorAction SilentlyContinue |
                    Select-Object -First 1 -ExpandProperty FullName
-        if ($myDrive) {
-            # Search for an existing AO-SYNC folder up to 2 levels deep (e.g. EverydayPW\AO-SYNC)
-            $detected = Get-ChildItem -Path $myDrive -Filter "AO-SYNC" -Directory `
-                            -Recurse -Depth 2 -ErrorAction SilentlyContinue |
-                        Select-Object -First 1 -ExpandProperty FullName
-        }
+        if (-not $myDrive) { continue }
+        $found = Get-ChildItem -Path $myDrive -Filter "AO-SYNC" -Directory `
+                     -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+                 Select-Object -First 1 -ExpandProperty FullName
+        if ($found) { $detected = $found; break }
     }
     if ($detected) { $detected } else { Join-Path $env:USERPROFILE "Desktop" }
 }
 
-# Auto-derive secrets root from sync root when env var is absent:
-#   EverydayPW\AO-SYNC -> parent = EverydayPW  (where user-env, .ssh, CREDS live)
 if (-not $env:AO_SYNC_SECRETS_ROOT -and $syncRoot -ne (Join-Path $env:USERPROFILE "Desktop")) {
     $env:AO_SYNC_SECRETS_ROOT = Split-Path $syncRoot -Parent
     Write-Host "  auto-derived: AO_SYNC_SECRETS_ROOT = $env:AO_SYNC_SECRETS_ROOT" -ForegroundColor DarkGray
 }
 
-# Each machine writes to its own subfolder: AO-SYNC-<date>-<MACHINE>
-# Same machine, same day = overwrite own folder (idempotent). Different machine = separate folder (no collision).
 $destBase = if ($DestRoot) { $DestRoot } else { Join-Path $syncRoot "AO-SYNC-$today-$machineTag" }
 
 Write-Host ""
@@ -131,8 +120,6 @@ New-Item -ItemType Directory -Path $memDest -Force | Out-Null
 Copy-Item -LiteralPath $memIndex -Destination (Join-Path $memDest "MEMORY.md") -Force
 Write-Host "  copied: MEMORY.md" -ForegroundColor Green
 
-# Write machine tag so the import script can skip re-importing our own export.
-# Import logic: skip if .exported-by == $env:COMPUTERNAME; import otherwise.
 $env:COMPUTERNAME | Out-File -FilePath (Join-Path $memDest ".exported-by") -Encoding UTF8 -NoNewline -Force
 Write-Host "  tagged: .exported-by=$($env:COMPUTERNAME)" -ForegroundColor DarkGray
 
@@ -152,18 +139,23 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     }
 
     # ~/.ssh\* -> $AO_SYNC_SECRETS_ROOT\.ssh\
-    $sshSrc  = Join-Path $env:USERPROFILE ".ssh"
-    $sshDest = Join-Path $secretsRoot ".ssh"
+    # Dynamic scan: picks up any new key automatically.
+    # Exclusion list: machine-specific or reference-only files that must NOT roam.
+    $sshSrc          = Join-Path $env:USERPROFILE ".ssh"
+    $sshDest         = Join-Path $secretsRoot ".ssh"
+    $sshExcludeNames = @('known_hosts', 'known_hosts.old', 'authorized_keys')
+    $sshExcludeExts  = @('.txt', '.old', '.bkup', '.backup')
+    $exportedSshKeys = [System.Collections.Generic.List[string]]::new()
     New-Item -ItemType Directory -Path $sshDest -Force | Out-Null
-    $sshKeys = @("hetzner_trigger", "id_ed25519", "hostinger_soulful",
-                 "hetzner_trigger.pub", "id_ed25519.pub", "hostinger_soulful.pub", "config")
-    foreach ($key in $sshKeys) {
-        $src = Join-Path $sshSrc $key
-        if (Test-Path -LiteralPath $src) {
-            $keyDest = Join-Path $sshDest $key
-            Copy-Item -LiteralPath $src -Destination $keyDest -Force
+    if (Test-Path -LiteralPath $sshSrc) {
+        Get-ChildItem -Path $sshSrc -File -ErrorAction SilentlyContinue | ForEach-Object {
+            if ($sshExcludeNames -contains $_.Name) { return }
+            if ($sshExcludeExts  -contains $_.Extension.ToLower()) { return }
+            $keyDest = Join-Path $sshDest $_.Name
+            Copy-Item -LiteralPath $_.FullName -Destination $keyDest -Force
             (Get-Item -LiteralPath $keyDest).LastWriteTime = $syncNow
-            Write-Host "  copied: .ssh/$key" -ForegroundColor Green
+            Write-Host "  copied: .ssh/$($_.Name)" -ForegroundColor Green
+            $exportedSshKeys.Add($_.Name)
         }
     }
 
@@ -176,6 +168,32 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         Write-Host "  copied: AWARE_WAVE_CREDENTIALS.md" -ForegroundColor Green
     }
 
+    # Write export manifest: enables timestamp-aware conflict resolution on import.
+    # Import reads this to detect "local is newer than export" and keep local instead of overwriting.
+    $manifestEntries = [ordered]@{}
+    $manifestSources = [System.Collections.Generic.List[object]]::new()
+    $manifestSources.Add([pscustomobject]@{ key = 'user-env.ps1';              path = Join-Path $secretsRoot 'user-env.ps1' })
+    $manifestSources.Add([pscustomobject]@{ key = 'AWARE_WAVE_CREDENTIALS.md'; path = Join-Path $secretsRoot 'AWARE_WAVE_CREDENTIALS.md' })
+    foreach ($kn in $exportedSshKeys) {
+        $manifestSources.Add([pscustomobject]@{ key = ".ssh/$kn"; path = Join-Path $sshDest $kn })
+    }
+    foreach ($mf in $manifestSources) {
+        if (Test-Path -LiteralPath $mf.path) {
+            $manifestEntries[$mf.key] = [ordered]@{
+                sha256 = (Get-FileHash -LiteralPath $mf.path -Algorithm SHA256).Hash
+                size   = (Get-Item -LiteralPath $mf.path).Length
+            }
+        }
+    }
+    [ordered]@{
+        exported_utc = $syncNow.ToUniversalTime().ToString('o')
+        machine      = $env:COMPUTERNAME
+        machine_tag  = $machineTag
+        files        = $manifestEntries
+    } | ConvertTo-Json -Depth 3 |
+        Out-File -FilePath (Join-Path $secretsRoot ".manifest-$machineTag.json") -Encoding UTF8 -Force
+    Write-Host "  manifest: .manifest-$machineTag.json ($($manifestEntries.Count) entries)" -ForegroundColor DarkGray
+
     Write-Host "  secrets -> $secretsRoot" -ForegroundColor Cyan
 
 } elseif ($secretsRoot) {
@@ -187,10 +205,8 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
 }
 
 # ── 6. Pruning (two independent rules, never touch what we don't own) ────────
-# Skip pruning when DestRoot is an explicit override (caller controls that path).
 if (-not $DestRoot) {
 
-    # Rule A: own-machine folders — keep 7 most recent (AO-SYNC-*-<MACHINE>)
     $ownFolders = Get-ChildItem -Path $syncRoot -Filter "AO-SYNC-*-$machineTag" -Directory -ErrorAction SilentlyContinue |
                   Sort-Object Name -Descending
     if ($ownFolders.Count -gt 7) {
@@ -200,13 +216,10 @@ if (-not $DestRoot) {
         }
     }
 
-    # Rule B: other-machine folders — expire after 30 days (keeps cross-machine history without unbounded growth)
-    # Also handles old-format AO-SYNC-<date> folders that have no machine suffix.
     $cutoff = (Get-Date).AddDays(-30)
     Get-ChildItem -Path $syncRoot -Filter "AO-SYNC-*" -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notmatch "-$([regex]::Escape($machineTag))$" } |
         Where-Object {
-            # Extract date from folder name (supports both old "AO-SYNC-date" and new "AO-SYNC-date-MACHINE")
             if ($_.Name -match '^AO-SYNC-(\d{4}-\d{2}-\d{2})') {
                 try { [datetime]::ParseExact($matches[1], 'yyyy-MM-dd', $null) -lt $cutoff } catch { $false }
             } else { $false }
@@ -236,8 +249,9 @@ This file is a manual fallback guide only -- you should never need to run these 
 | memory/MEMORY.md | Claude Code project memory index |
 | memory/.exported-by | Machine that created this export ($($env:COMPUTERNAME)) |
 | (secrets root)/user-env.ps1 | All MCP API keys (shared, last-write-wins) |
-| (secrets root)/.ssh/* | SSH keys (shared, last-write-wins) |
+| (secrets root)/.ssh/* | SSH keys (dynamic scan; excl. known_hosts / authorized_keys / *.txt) |
 | (secrets root)/AWARE_WAVE_CREDENTIALS.md | Credentials reference (shared) |
+| (secrets root)/.manifest-$machineTag.json | Export manifest (sha256 + timestamp per file) |
 
 ## Manual import (fallback only)
 
@@ -261,6 +275,9 @@ Write-Host "Import complete" -ForegroundColor Green
 | Item | Reason |
 |------|--------|
 | DPAPI vault (%LOCALAPPDATA%\AgencyOS\secrets\vault.json) | Machine-bound encryption; cannot decrypt on another machine |
+| known_hosts, known_hosts.old | Machine-specific; would create SSH confusion on other machines |
+| authorized_keys | Server-side key list; must not roam |
+| *.txt, *.old, *.bkup | Reference or backup copies; not needed on other machines |
 | All repo files | Synced via git pull |
 "@
 
