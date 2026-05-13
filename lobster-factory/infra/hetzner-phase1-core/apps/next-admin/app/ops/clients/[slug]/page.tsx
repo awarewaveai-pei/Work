@@ -9,6 +9,14 @@ import { notFound } from "next/navigation";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
 import { WpUpdateButtons } from "./WpUpdateButtons";
+import { DepartmentCoveragePanel } from "./DepartmentCoveragePanel";
+import type { DepartmentSummaryPayload } from "@/app/api/ops/clients/[slug]/department-summary/route";
+import {
+  DEPARTMENT_CATALOG,
+  SMB_DEFAULT_CLUSTERS,
+  GROUP_LABELS,
+  type ClusterId,
+} from "@/lib/department-catalog";
 
 export const dynamic = "force-dynamic";
 
