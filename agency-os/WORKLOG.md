@@ -95,6 +95,11 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - 修正 `.github/workflows/auto-repair-claude.yml`：補 `id-token: write`、`actions: read`、`github_token: ${{ secrets.GITHUB_TOKEN }}`，並將 issue trigger 收斂為 `opened`，避免 opened/labeled 重複觸發。
 - 仍待外部設定：正式 Slack App `SLACK_SIGNING_SECRET` 與 `SLACK_BOT_TOKEN` 尚未提供；沒有真實 Signing Secret 無法驗證 Slack interactive approve。破壞 production 的 bad-commit auto-rollback drill 未執行，改以 safe snapshot/restore drill 驗證 rollback script。
 
+### AO-RESUME handoff — Repair Center remaining items
+- 下次開工先看 `TASKS.md` 的「AwareWave 自動告警維修系統 v3.2」條目；目前 production 可操作、健康檢查正常、active repair runs = 0。
+- 必提醒使用者：Slack App 後台仍需取出真實 `Signing Secret` 與 Bot token；拿到後設定 SG `.env` + GitHub Secrets，再部署 next-admin 並重跑 `repair-center-smoke`，目標 0 warning。
+- Slack secret 設好後要補跑：Slack `approve_repair` 按鈕互動核准 drill；真實 code-scoped incident 的 PR/merge/deploy 端到端；destructive bad-commit auto-rollback drill 只有使用者明確授權才做。
+
 ## 2026-05-12
 
 ### Daily
