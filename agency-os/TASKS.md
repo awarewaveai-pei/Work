@@ -163,6 +163,14 @@
   - **Enterprise 串接**：見上條，2026-05-13 結案
   - **P7（Command Plane）**：Phase 2c smoke 15/15 PASS（2026-05-08）
 
+### 2026-05-13 — WordPress 外掛堆疊自動安裝 上線（結案）
+
+- [x] **WordPress 外掛堆疊自動安裝（app.aware-wave.com Onboard Wizard）**
+  - **證據**：SG WP-CLI 2.11.0 驗證通過（`sg-deploy.sh wordpress` 重建）；Trigger.dev Version **`20260513.2`** 已 deploy（10 tasks live on EU）；E2E dry-run smoke：task 接收 payload → 回傳 `installed: [{slug, version: 'dry_run'}]` → 無 DB write（設計正確）
+  - **主要修正**：`trigger.config.ts` 加 `external: ["ssh2", "cpu-features"]`（native addon esbuild 相容）+ `LOBSTER_EXECUTE_MANIFEST_STEPS` / `LOBSTER_WP_SSH_PRIVATE_KEY` 寫入 `syncEnvVars`；`lobster-trigger-deploy.ps1` 修 PS5.1 `??` compat + 加選填 var 注入
+  - **Vault 金鑰**：`TRIGGER_DEPLOY_PAT`、`POSTHOG_API_KEY`、`OPS_INBOX_INGEST_TOKEN` 已入庫；`LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_WP_SSH_PRIVATE_KEY` 留待首個真實客戶上線時設定
+  - **待補**：`package_install_runs` DB 寫入驗證——DB 現無真實 client 記錄（FK 約束設計正確），首客上線後即可全鏈驗收
+
 ### 2026-05-08/09 — SG drift cron + strategy-review demo + Command Plane Phase 2 + MainWP EU（結案）
 
 - [x] **（2026-05-08 09:00 TPE 之後驗證）SG drift cron 第一次自動 firing** —— **【AUTO_TASK_DONE_APPLIED 2026-05-08T09:xx TPE】** log: `[2026-05-08T01:00:03Z] alert sent: HTTP 200, behind=7`；cron daemon active/enabled；結案條件已達（drift>0 + HTTP 2xx）。
