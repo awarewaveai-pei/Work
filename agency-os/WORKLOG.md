@@ -132,6 +132,13 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - 驗證：PowerShell parser 兩支 PASS；`node --check scripts/repair-center-smoke.mjs` PASS；隔離假 profile / 假 AO-SYNC / 假 secrets root 匯出匯入 PASS（含 SSH 排除、manifest、local-newer 保護、pre-overwrite backup）；`npm run smoke:repair-center -- --base-url=https://app.aware-wave.com` → 15 checks / 0 failed / 1 warning（僅 `SLACK_SIGNING_SECRET`）。
 - 仍待外部設定：真實 Slack App `SLACK_SIGNING_SECRET`；`SLACK_BOT_TOKEN` 已由 `AWARE_WAVE_CREDENTIALS.md` 補進 GitHub Secrets（SG `.env` 原已存在）。未做 destructive bad-commit rollback drill，除非使用者明確授權。
 
+### Codex 2026-05-13 — Repair Center Slack signing secret gate complete
+- `SLACK_SIGNING_SECRET` 已由 Slack App `ops-incidents` Basic Information 取得，寫入 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`、GitHub Secret `SLACK_SIGNING_SECRET`、SG `/root/lobster-phase1/.env`（secret value 不入庫、不輸出）。
+- SG `sg-deploy.sh next-admin --skip-pull` 已重建並重啟 `lobster-next-admin`；container healthy，deployed commit `baa1140`。
+- Production smoke：`npm run smoke:repair-center -- --base-url=https://app.aware-wave.com` → 15 checks / 0 failed / 0 warning；health 回 `slack_signing_configured=true`、`slack_interactive_ready=true`、`active_runs=0`。
+- Slack callback signature drill：用同一 signing secret 對 `acknowledge_only` payload 簽名後 POST production `/api/internal/commands/slack`，HTTP 200，回 `Acknowledged. No repair run was created.`；已驗證簽章 gate 可用且測試不建立 repair run。
+- 仍待：真實 Slack `approve_repair` 按鈕互動核准 drill；真實 code-scoped incident 的 PR/merge/deploy 端到端；destructive bad-commit auto-rollback drill 只有使用者明確授權才做。
+
 ## 2026-05-12
 
 ### Daily
