@@ -12,7 +12,6 @@ import {
   type BuildProvider,
   type BuildRunRequest,
   type BuildRunResponse,
-  type WpSiteType,
 } from "../../lib/build-console/contracts";
 import type { OpsRole } from "../../lib/ops-contracts";
 import { roleHeader } from "../../lib/ops-role";
@@ -161,11 +160,9 @@ export default function BuildConsole() {
       base.siteUrl     = str("siteUrl")       ?? base.siteUrl;
       base.wpAdminUrl  = str("wpAdminUrl")    ?? base.wpAdminUrl;
     }
-    // Plugin stack params from OnboardWizard Step 2
-    const wpSiteTypeRaw = searchParams.get("wpSiteType") as WpSiteType | null;
-    if (wpSiteTypeRaw) base.wpSiteType = wpSiteTypeRaw;
-    const hasEcommerceRaw = searchParams.get("hasEcommerce") === "true";
-    if (hasEcommerceRaw) base.hasEcommerce = hasEcommerceRaw;
+    // Plugin stack params from OnboardWizard Step 2 (pack-based model)
+    const selectedPacksRaw = searchParams.get("selectedPacks");
+    if (selectedPacksRaw) base.selectedPacks = selectedPacksRaw.split(",").filter(Boolean) as import("../../lib/build-console/contracts").WpPluginModule[];
     const pluginSlugsRaw = searchParams.get("pluginSlugs");
     if (pluginSlugsRaw) base.pluginSlugs = pluginSlugsRaw.split(",").filter(Boolean);
     const paidCount = Number(searchParams.get("paidPluginCount") ?? "0") || undefined;
@@ -508,10 +505,11 @@ export default function BuildConsole() {
               <div className="section-title" style={{ marginBottom: 8 }}>📦 WordPress 外掛堆疊（OnboardWizard Step 2 帶入）</div>
               <div className="build-kv-grid">
                 <div>
-                  <span>站型</span>
+                  <span>外掛包</span>
                   <strong>
-                    {form.wpSiteType ?? "—"}
-                    {form.hasEcommerce && form.wpSiteType !== "ecommerce" ? " + 電商" : ""}
+                    {form.selectedPacks && form.selectedPacks.length > 0
+                      ? `基礎包 + ${form.selectedPacks.map((p) => ({ ecommerce: "電商包", tourism: "旅遊包", brand: "形象包" } as Record<string,string>)[p] ?? p).join(" + ")}`
+                      : "基礎包"}
                   </strong>
                 </div>
                 <div>

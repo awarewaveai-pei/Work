@@ -1,5 +1,5 @@
-import type { WpSiteType } from "../wp-plugin-stack-catalog";
-export type { WpSiteType };
+import type { WpSiteType, WpPluginModule } from "../wp-plugin-stack-catalog";
+export type { WpSiteType, WpPluginModule };
 
 export type BuildProfile = "profile_a" | "profile_b" | "profile_c";
 export type BuildExecutionMode = "plan_only" | "enqueue";
@@ -78,10 +78,16 @@ export interface BuildRunRequest {
   siteUrl?: string;
   wpAdminUrl?: string;
   packageSlug?: BuildPackageSlug;
-  /** WP Plugin Stack — populated by OnboardWizard Step 2 */
+  /**
+   * WP Plugin Stack (additive pack model, OnboardWizard v2).
+   * Replaces wpSiteType + hasEcommerce. Array of addon pack ids; base is always implied.
+   * e.g. ["ecommerce"], ["tourism", "ecommerce"], []
+   */
+  selectedPacks?: WpPluginModule[];
+  /** Legacy — kept for BuildConsole manual form and backward compat. Prefer selectedPacks. */
   wpSiteType?: WpSiteType;
   hasEcommerce?: boolean;
-  /** Resolved installable slugs (free plugins + free alternatives) from resolveInstallableSlugs() */
+  /** Resolved installable slugs (free plugins + free alternatives) from resolveInstallableSlugsForPacks() */
   pluginSlugs?: string[];
   /** Count of paid plugins with no free alternative — operator must install manually */
   paidPluginCount?: number;
@@ -168,12 +174,19 @@ export function isUuid(value: string | undefined): boolean {
 }
 
 export function normalizeBuildRequest(payload: BuildRunRequest): BuildRunRequest {
+  let derivedSlug: BuildPackageSlug;
+  if (payload.selectedPacks) {
+    derivedSlug = payload.selectedPacks.includes("ecommerce") ? "wc-core"
+      : payload.selectedPacks.includes("brand") ? "wp-business"
+      : "wp-basic";
+  } else {
+    derivedSlug = (payload.hasEcommerce || payload.wpSiteType === "ecommerce") ? "wc-core" : "wp-basic";
+  }
   return {
     ...payload,
     executionMode: payload.executionMode ?? "plan_only",
     environment: payload.environment ?? "staging",
-    packageSlug: payload.packageSlug
-      ?? (payload.hasEcommerce || payload.wpSiteType === "ecommerce" ? "wc-core" : "wp-basic"),
+    packageSlug: payload.packageSlug ?? derivedSlug,
     provider: payload.provider ?? defaultProviderFor(payload.profile),
     locale: payload.locale?.trim() || "en_US",
     clientName: payload.clientName?.trim(),
@@ -227,9 +240,15 @@ function defaultProviderFor(profile: BuildRunRequest["profile"]): BuildProvider 
 }
 
 function smokeProfileFor(req: BuildRunRequest): BuildPlan["smokeProfile"] {
+  // Pack-based model (OnboardWizard v2)
+  if (req.selectedPacks) {
+    if (req.selectedPacks.includes("ecommerce")) return "woocommerce";
+    if (req.selectedPacks.includes("brand")) return "business";
+    return "basic";
+  }
+  // Legacy: wpSiteType + hasEcommerce
   if (req.hasEcommerce || req.wpSiteType === "ecommerce") return "woocommerce";
   if (req.wpSiteType === "brand") return "business";
-  // Fallback: derive from packageSlug for backward compat when wpSiteType is absent
   if (req.packageSlug === "wc-core") return "woocommerce";
   if (req.packageSlug === "wp-business") return "business";
   return "basic";

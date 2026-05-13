@@ -12,10 +12,12 @@ import {
 } from "../../lib/department-catalog";
 import type { BuildPackageSlug, BuildProvider } from "../../lib/build-console/contracts";
 import {
-  resolvePluginStack,
-  resolveInstallableSlugs,
-  resolvePaidPlugins,
-  type WpSiteType,
+  WP_PLUGIN_CATALOG,
+  resolvePluginsForPacks,
+  resolveInstallableSlugsForPacks,
+  resolvePaidPluginsForPacks,
+  derivePackageSlugFromPacks,
+  type WpPluginModule,
   type WpPlugin,
 } from "../../lib/wp-plugin-stack-catalog";
 
@@ -42,9 +44,8 @@ interface ClientInfo {
   workspaceId: string;
   projectId: string;
   siteId: string;
-  // WP Plugin Stack (Phase 1)
-  wpSiteType: WpSiteType;
-  hasEcommerce: boolean;
+  // WP Plugin Stack — additive pack model (base always-on + optional addon packs)
+  selectedPacks: WpPluginModule[];
   resolvedPluginSlugs: string[];
   resolvedPaidPlugins: WpPlugin[];
   // SSH connection target — passes to wp-install-plugins task
@@ -60,26 +61,6 @@ interface ProvResult {
   providers?: string[];
   error?: string;
   detail?: string;
-}
-
-const WP_SITE_TYPE_LABELS: Record<WpSiteType, string> = {
-  tourism:   "旅遊業",
-  brand:     "形象 / 品牌站",
-  ecommerce: "一般電商",
-};
-
-/**
- * Auto-derive packageSlug (container manifest) from Step 2 site type.
- * Single source of truth: WP_CLIENT_PLUGIN_STACK.md §八.1 boundary rule.
- *   wc-core     → enforces staging-only + backup-required (ecommerce safety)
- *   wp-business → brand sites that need fluent-crm smoke checks
- *   wp-basic    → minimal container (default)
- * This replaces the manual "Package" dropdown previously in Step 1.
- */
-function derivePackageSlug(wpSiteType: WpSiteType, hasEcommerce: boolean): BuildPackageSlug {
-  if (hasEcommerce || wpSiteType === "ecommerce") return "wc-core";
-  if (wpSiteType === "brand") return "wp-business";
-  return "wp-basic";
 }
 
 const PROVIDERS = [
@@ -112,7 +93,7 @@ function makeDefaultClient(): ClientInfo {
     profile: "profile_b",
     domain: "",
     provider: "hostinger",
-    packageSlug: derivePackageSlug("brand", false), // auto-derived from default wpSiteType in Step 2
+    packageSlug: "wp-basic",
     locale: "en_US",
     siteUrl: "",
     wpAdminUrl: "",
@@ -120,10 +101,9 @@ function makeDefaultClient(): ClientInfo {
     workspaceId: randomUUID(),
     projectId: randomUUID(),
     siteId: randomUUID(),
-    wpSiteType: "brand",
-    hasEcommerce: false,
-    resolvedPluginSlugs: resolveInstallableSlugs("brand", false),
-    resolvedPaidPlugins: resolvePaidPlugins("brand", false),
+    selectedPacks: [],
+    resolvedPluginSlugs: resolveInstallableSlugsForPacks([]),
+    resolvedPaidPlugins: resolvePaidPluginsForPacks([]),
     sshHost: "",
     wpPath: "/var/www/html",
     sshCredentialsRef: "",
@@ -314,21 +294,21 @@ function Step1({
   );
 }
 
-// ── Step 2: WP Site Type Selection ────────────────────────────────────────────
+// ── Step 2: WP Plugin Pack Selection ─────────────────────────────────────────
 // SSOT: agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md §一/二/三/八.1
-// 外掛採疊加制：基礎包（必裝） + 站型包 + （選用）電商包
-
-const WP_TYPE_CARDS: { type: WpSiteType; label: string; desc: string; emoji: string }[] = [
-  { type: "tourism",   label: "旅遊業",        desc: "行程、地圖、多語言", emoji: "🏝️" },
-  { type: "brand",     label: "形象 / 品牌站", desc: "企業形象、作品集、活動頁", emoji: "🎨" },
-  { type: "ecommerce", label: "一般電商",       desc: "純 WooCommerce 電商站（自動含電商包）", emoji: "🛒" },
-];
+// 純加法模型：基礎包（必裝）+ 3 個獨立 checkbox（電商 / 旅遊 / 形象）
 
 // Pre-computed module sizes (catalog is static)
-const BASE_PACK_SIZE     = resolvePluginStack("brand", false).filter((p) => p.module === "base").length;     // 16
-const ECOMMERCE_PACK_SIZE = resolvePluginStack("brand", true).filter((p) => p.module === "ecommerce").length; // 12
-const TOURISM_PACK_SIZE  = resolvePluginStack("tourism", false).filter((p) => p.module === "tourism").length; // 5
-const BRAND_PACK_SIZE    = resolvePluginStack("brand", false).filter((p) => p.module === "brand").length;     // 3
+const BASE_PACK_SIZE      = WP_PLUGIN_CATALOG.filter((p) => p.module === "base").length;      // 16
+const ECOMMERCE_PACK_SIZE = WP_PLUGIN_CATALOG.filter((p) => p.module === "ecommerce").length; // 12
+const TOURISM_PACK_SIZE   = WP_PLUGIN_CATALOG.filter((p) => p.module === "tourism").length;   // 5
+const BRAND_PACK_SIZE     = WP_PLUGIN_CATALOG.filter((p) => p.module === "brand").length;     // 3
+
+const ADDON_PACKS: { id: WpPluginModule; label: string; desc: string; emoji: string; count: number }[] = [
+  { id: "ecommerce", label: "電商包",       desc: "WooCommerce / 金流 / CartFlows / Email Designer",  emoji: "🛒", count: ECOMMERCE_PACK_SIZE },
+  { id: "tourism",   label: "旅遊包",       desc: "WP Travel Engine / CPT UI / Modula Gallery / 地圖", emoji: "🏝️", count: TOURISM_PACK_SIZE   },
+  { id: "brand",     label: "形象 / 品牌包", desc: "CPT UI / Modula Gallery / Popup Maker",             emoji: "🎨", count: BRAND_PACK_SIZE     },
+];
 
 function Step2WpType({
   info,
@@ -343,131 +323,110 @@ function Step2WpType({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  const applyType = (type: WpSiteType, ecom: boolean) => {
-    const effectiveEcom = type === "ecommerce" ? true : ecom;
+  const applyPacks = (packs: WpPluginModule[]) => {
     onChange({
-      wpSiteType: type,
-      hasEcommerce: effectiveEcom,
-      resolvedPluginSlugs: resolveInstallableSlugs(type, effectiveEcom),
-      resolvedPaidPlugins: resolvePaidPlugins(type, effectiveEcom),
-      // Container manifest is auto-derived from site type — see derivePackageSlug() docstring
-      packageSlug: derivePackageSlug(type, effectiveEcom),
+      selectedPacks: packs,
+      resolvedPluginSlugs: resolveInstallableSlugsForPacks(packs),
+      resolvedPaidPlugins: resolvePaidPluginsForPacks(packs),
+      packageSlug: derivePackageSlugFromPacks(packs),
     });
   };
 
-  const allPlugins  = resolvePluginStack(info.wpSiteType, info.hasEcommerce);
-  const totalCount  = allPlugins.length;
-  const autoCount   = info.resolvedPluginSlugs.length;
-  const paidCount   = info.resolvedPaidPlugins.length;
-  const effectiveEcommerce = info.hasEcommerce || info.wpSiteType === "ecommerce";
+  const togglePack = (id: WpPluginModule) => {
+    const next = info.selectedPacks.includes(id)
+      ? info.selectedPacks.filter((p) => p !== id)
+      : [...info.selectedPacks, id];
+    applyPacks(next);
+  };
 
-  // Active pack breakdown
-  const stackedPacks: { name: string; emoji: string; count: number; required: boolean; locked?: boolean }[] = [
-    { name: "基礎包",   emoji: "📦", count: BASE_PACK_SIZE,     required: true, locked: true },
+  const allPlugins = resolvePluginsForPacks(info.selectedPacks);
+  const totalCount = allPlugins.length;
+  const autoCount  = info.resolvedPluginSlugs.length;
+  const paidCount  = info.resolvedPaidPlugins.length;
+
+  // Stack breakdown rows
+  const stackRows: { name: string; emoji: string; count: number; locked?: boolean }[] = [
+    { name: "基礎包", emoji: "📦", count: BASE_PACK_SIZE, locked: true },
+    ...ADDON_PACKS
+      .filter((p) => info.selectedPacks.includes(p.id))
+      .map((p) => ({ name: p.label, emoji: p.emoji, count: p.count })),
   ];
-  if (info.wpSiteType === "tourism") {
-    stackedPacks.push({ name: "旅遊包", emoji: "🏝️", count: TOURISM_PACK_SIZE, required: true });
-  }
-  if (info.wpSiteType === "brand") {
-    stackedPacks.push({ name: "形象包", emoji: "🎨", count: BRAND_PACK_SIZE, required: true });
-  }
-  if (effectiveEcommerce) {
-    stackedPacks.push({ name: "電商包", emoji: "🛒", count: ECOMMERCE_PACK_SIZE, required: true });
-  }
 
-  // Plugins grouped by module for expanded view
+  // Plugins grouped by module
   const byModule = {
     base:      allPlugins.filter((p) => p.module === "base"),
+    ecommerce: allPlugins.filter((p) => p.module === "ecommerce"),
     tourism:   allPlugins.filter((p) => p.module === "tourism"),
     brand:     allPlugins.filter((p) => p.module === "brand"),
-    ecommerce: allPlugins.filter((p) => p.module === "ecommerce"),
   };
 
   return (
     <div className="onboard-step-body">
       <div className="build-alert build-alert-ok" style={{ marginBottom: 16 }}>
-        <strong>外掛採疊加制</strong>：基礎包（必裝 16 個）+ 站型包 +（選用）電商包。
+        <strong>純加法模型</strong>：基礎包（必裝 {BASE_PACK_SIZE} 個）＋ 勾選任意加購包，可疊加。
         清單依據 <code>WP_CLIENT_PLUGIN_STACK.md</code>，由 Trigger.dev 透過 WP-CLI 自動安裝。
       </div>
 
-      {/* ── Base pack (always-on) ─────────────────────────────────────────── */}
+      {/* ── Base pack (always-on, locked) ─────────────────────────────────── */}
       <div className="dept-summary" style={{ marginBottom: 16, background: "#f0fdf4", borderColor: "#bbf7d0" }}>
         <div className="section-title" style={{ marginBottom: 6 }}>
           📦 基礎包 — 必裝 <strong style={{ color: "#166534" }}>{BASE_PACK_SIZE} 個</strong>
+          <span className="form-hint" style={{ marginLeft: 8 }}>（所有客戶站通用，不可取消）</span>
         </div>
         <p className="form-hint" style={{ margin: 0, fontSize: 11 }}>
-          Kadence Theme / Wordfence / WPvivid / Rank Math SEO / LiteSpeed Cache / ShortPixel / Fluent Forms+SMTP+CRM /
-          CleanTalk(↩Akismet) / GTM4WP / ACF / Complianz(選配) … 等
+          Kadence Theme / Wordfence / WPvivid / Rank Math SEO / LiteSpeed Cache / ShortPixel /
+          Fluent Forms+SMTP+CRM / CleanTalk(↩Akismet) / GTM4WP / ACF / Complianz(選配) … 等
         </p>
       </div>
 
-      {/* ── Site type cards (each shows +N plugins) ────────────────────── */}
-      <div className="section-title" style={{ marginBottom: 8 }}>選擇站型 — 加疊站型專屬包</div>
+      {/* ── Addon pack checkboxes ─────────────────────────────────────────── */}
+      <div className="section-title" style={{ marginBottom: 8 }}>加購包（獨立勾選，可多選）</div>
       <div className="dept-cluster-grid" style={{ marginBottom: 16 }}>
-        {WP_TYPE_CARDS.map(({ type, label, desc, emoji }) => {
-          const active = info.wpSiteType === type;
-          const addOn =
-            type === "tourism"   ? `+${TOURISM_PACK_SIZE} 個旅遊包` :
-            type === "brand"     ? `+${BRAND_PACK_SIZE} 個形象包` :
-                                   `+${ECOMMERCE_PACK_SIZE} 個電商包（含 WooCommerce）`;
+        {ADDON_PACKS.map(({ id, label, desc, emoji, count }) => {
+          const active = info.selectedPacks.includes(id);
           return (
             <label
-              key={type}
+              key={id}
               className={`dept-cluster-card ${active ? "selected" : ""}`}
               style={{ cursor: "pointer" }}
             >
               <input
-                type="radio"
-                name="wpSiteType"
+                type="checkbox"
                 checked={active}
-                onChange={() => applyType(type, info.hasEcommerce)}
+                onChange={() => togglePack(id)}
                 style={{ marginRight: 6 }}
               />
               <span className="dept-cluster-name">{emoji} {label}</span>
               <span className="dept-cluster-rows">{desc}</span>
               <span className="dept-cluster-rows" style={{ color: active ? "#166534" : "#64748b", fontWeight: 600 }}>
-                {addOn}
+                +{count} 個
               </span>
             </label>
           );
         })}
       </div>
 
-      {/* ── Ecommerce checkbox (independent add-on for tourism/brand) ───── */}
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-          <input
-            type="checkbox"
-            checked={info.hasEcommerce}
-            disabled={info.wpSiteType === "ecommerce"}
-            onChange={(e) => applyType(info.wpSiteType, e.target.checked)}
-          />
-          ☑ 同時含電商（+{ECOMMERCE_PACK_SIZE} 個電商包 — WooCommerce / 金流 / CartFlows）
-          {info.wpSiteType === "ecommerce" && (
-            <span className="form-hint" style={{ marginLeft: 4 }}>— 「一般電商」站型已強制啟用</span>
-          )}
-        </label>
-      </div>
-
-      {/* ── Stack breakdown summary (key feature: shows packs) ─────────── */}
+      {/* ── Stack breakdown summary ───────────────────────────────────────── */}
       <div className="dept-summary" style={{ marginBottom: 16 }}>
-        <div className="section-title" style={{ marginBottom: 10 }}>📊 組合結果 — 已選 {stackedPacks.length} 個外掛包</div>
+        <div className="section-title" style={{ marginBottom: 10 }}>
+          📊 組合結果 — {stackRows.length} 個外掛包 / 共 {totalCount} 個外掛
+        </div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginBottom: 12 }}>
           <tbody>
-            {stackedPacks.map((p, i) => (
-              <tr key={p.name} style={{ borderBottom: i === stackedPacks.length - 1 ? "2px solid var(--border-subtle)" : "1px solid #f1f5f9" }}>
-                <td style={{ padding: "6px 8px", width: 36 }}>{p.emoji}</td>
+            {stackRows.map((row, i) => (
+              <tr key={row.name} style={{ borderBottom: i === stackRows.length - 1 ? "2px solid var(--border-subtle)" : "1px solid #f1f5f9" }}>
+                <td style={{ padding: "6px 8px", width: 36 }}>{row.emoji}</td>
                 <td style={{ padding: "6px 8px" }}>
-                  {p.name}
-                  {p.locked && <span className="form-hint" style={{ marginLeft: 6 }}>（必裝）</span>}
+                  {row.name}
+                  {row.locked && <span className="form-hint" style={{ marginLeft: 6 }}>（必裝）</span>}
                 </td>
                 <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "monospace", color: "#64748b" }}>
-                  {i === 0 ? "  " : "+ "}{p.count}
+                  {i === 0 ? "  " : "+ "}{row.count}
                 </td>
               </tr>
             ))}
             <tr>
-              <td style={{ padding: "8px" }}></td>
+              <td style={{ padding: "8px" }} />
               <td style={{ padding: "8px", fontWeight: 700 }}>總計</td>
               <td style={{ padding: "8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace" }}>{totalCount} 個外掛</td>
             </tr>
@@ -501,14 +460,14 @@ function Step2WpType({
       </button>
       {expanded && (
         <div className="dept-summary" style={{ marginBottom: 16 }}>
-          {(["base", "tourism", "brand", "ecommerce"] as const).map((mod) => {
+          {(["base", "ecommerce", "tourism", "brand"] as const).map((mod) => {
             const list = byModule[mod];
             if (list.length === 0) return null;
             const moduleLabel =
               mod === "base"      ? `📦 基礎包（${list.length}）` :
+              mod === "ecommerce" ? `🛒 電商包（${list.length}）` :
               mod === "tourism"   ? `🏝️ 旅遊包（${list.length}）` :
-              mod === "brand"     ? `🎨 形象包（${list.length}）` :
-                                    `🛒 電商包（${list.length}）`;
+                                    `🎨 形象包（${list.length}）`;
             return (
               <div key={mod} style={{ marginBottom: 12 }}>
                 <div className="section-title" style={{ fontSize: 12, marginBottom: 6 }}>{moduleLabel}</div>
@@ -763,7 +722,10 @@ function Step5Launch({
   provResult: ProvResult | null;
   onBack: () => void;
 }) {
-  const totalPlugins = resolvePluginStack(info.wpSiteType, info.hasEcommerce).length;
+  const totalPlugins = resolvePluginsForPacks(info.selectedPacks).length;
+  const packLabel = info.selectedPacks.length === 0
+    ? "基礎包"
+    : `基礎包 + ${info.selectedPacks.map((p) => ({ ecommerce: "電商包", tourism: "旅遊包", brand: "形象包" })[p]).join(" + ")}`;
 
   const params = new URLSearchParams({
     profile: info.profile,
@@ -778,8 +740,7 @@ function Step5Launch({
       : { siteUrl: info.siteUrl, wpAdminUrl: info.wpAdminUrl }
     ),
   });
-  params.set("wpSiteType", info.wpSiteType);
-  params.set("hasEcommerce", String(info.hasEcommerce));
+  if (info.selectedPacks.length > 0) params.set("selectedPacks", info.selectedPacks.join(","));
   params.set("pluginSlugs", info.resolvedPluginSlugs.join(","));
   params.set("paidPluginCount", String(info.resolvedPaidPlugins.length));
   if (info.sshHost)            params.set("sshHost", info.sshHost);
@@ -799,7 +760,7 @@ function Step5Launch({
         <div><span>Slug</span><strong>{info.tenantSlug || "—"}</strong></div>
         <div><span>Email</span><strong>{info.customerEmail || "—"}</strong></div>
         <div><span>Profile</span><strong>{info.profile}</strong></div>
-        <div><span>網站類型</span><strong>{WP_SITE_TYPE_LABELS[info.wpSiteType]}{info.hasEcommerce && info.wpSiteType !== "ecommerce" ? " + 電商" : ""}</strong></div>
+        <div><span>外掛包組合</span><strong>{packLabel}</strong></div>
         <div>
           <span>容器 Manifest（自動）</span>
           <strong style={{ fontFamily: "monospace", fontSize: 12 }}>{info.packageSlug}</strong>

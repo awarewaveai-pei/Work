@@ -188,3 +188,43 @@ export function resolvePaidPlugins(
     (plugin) => !plugin.free && !plugin.alternativeSlug
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pack-based API (additive model: base always-on + optional ecommerce/tourism/brand)
+// Replaces the wpSiteType + hasEcommerce combo in OnboardWizard v2.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Returns all WpPlugin entries for the given packs. Base is always included. */
+export function resolvePluginsForPacks(packs: WpPluginModule[]): WpPlugin[] {
+  const packSet = new Set<WpPluginModule>([...packs, "base"]);
+  return WP_PLUGIN_CATALOG.filter((p) => packSet.has(p.module));
+}
+
+/** Returns slugs for `wp plugin install --activate`. Same logic as resolveInstallableSlugs. */
+export function resolveInstallableSlugsForPacks(packs: WpPluginModule[]): string[] {
+  const slugs: string[] = [];
+  for (const plugin of resolvePluginsForPacks(packs)) {
+    if (plugin.free) slugs.push(plugin.slug);
+    else if (plugin.alternativeSlug) slugs.push(plugin.alternativeSlug);
+  }
+  return slugs;
+}
+
+/** Returns paid plugins with no free alternative — must be installed manually. */
+export function resolvePaidPluginsForPacks(packs: WpPluginModule[]): WpPlugin[] {
+  return resolvePluginsForPacks(packs).filter((p) => !p.free && !p.alternativeSlug);
+}
+
+/** Auto-derives container manifest slug from selected packs. */
+export function derivePackageSlugFromPacks(packs: WpPluginModule[]): "wp-basic" | "wp-business" | "wc-core" {
+  if (packs.includes("ecommerce")) return "wc-core";
+  if (packs.includes("brand")) return "wp-business";
+  return "wp-basic";
+}
+
+/** Auto-derives smoke profile from selected packs. */
+export function deriveSmokeProfileFromPacks(packs: WpPluginModule[]): "woocommerce" | "business" | "basic" {
+  if (packs.includes("ecommerce")) return "woocommerce";
+  if (packs.includes("brand")) return "business";
+  return "basic";
+}
