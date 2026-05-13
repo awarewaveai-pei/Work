@@ -118,6 +118,13 @@ Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。
 ### 龍蝦自動化安全預設
 Supabase 寫入**預設 OFF**（env: `LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 執行**預設 `off`**（env: `LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）。
 
+### Auto-Repair 紅線
+Repair Center 正本流程：`incident -> triage -> approve -> backup -> repair run -> GitHub issue/PR -> human merge -> manual sg-deploy -> health gate -> rollback if needed`。
+
+Claude / auto-repair PR 絕對不可：改 secrets / `.env*` / keys；改 auth、payment、permission；改 DB migration；改 nginx、Dockerfile、docker-compose；自動 deploy production；用空 catch 或吞錯把問題藏起來。沒有 pre-repair backup 就不能建 Issue / PR；沒有人工 merge 和手動 `/sg-deploy` 就不能有 production 變更。
+
+Auto-repair PR 必須含中文摘要：問題、原因、修法、風險、建議。改超過 3 個檔案、同 fingerprint 第二次修、API response 格式變更、cron/排程/第三方 API 變更，一律標 `needs-human-review`。
+
 ### Trigger.dev 憑證（不可互換）
 `tr_pat_*` = CLI deploy（vault key: `TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（vault key: `TRIGGER_ACCESS_TOKEN`）。
 

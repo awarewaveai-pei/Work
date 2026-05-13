@@ -1,0 +1,56 @@
+name: Auto-Repair - Claude Code
+
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: auto-repair-${{ github.event.issue.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  claude-repair:
+    if: >
+      github.event.issue.pull_request == null &&
+      contains(github.event.issue.labels.*.name, 'auto-repair') &&
+      (
+        github.event_name == 'issues' ||
+        contains(github.event.comment.body, '@claude')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Claude repair
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--max-turns 10"
+
+      - name: Notify Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "SLACK_WEBHOOK_URL not configured; skipping Slack notification"
+            exit 0
+          fi
+          if [ "$JOB_STATUS" = "success" ]; then
+            MSG="Claude auto-repair analysis completed"
+          else
+            MSG="Claude auto-repair analysis failed; manual review required"
+          fi
+          curl -fsS -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "{\"text\":\"${MSG}: ${ISSUE_TITLE} ${ISSUE_URL}\"}"
