@@ -264,9 +264,117 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 
 ---
 
+## 八、自動化執行系統（本文件是 SSOT，下游消費者列表）
+
+> 本文件（`WP_CLIENT_PLUGIN_STACK.md`）是**人類可讀的外掛清單真相**。  
+> 所有自動化系統都從這裡衍生，不得繞過或自行另立清單。
+
+### 8.1 兩層架構（Manifest = 容器，Catalog = 內容）
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ WP_CLIENT_PLUGIN_STACK.md（本文件，人類可讀 SSOT）                │
+│   ↓ 手動同步（slug 維護責任見 §七）                                  │
+│ lib/wp-plugin-stack-catalog.ts（機器可讀 mirror，36 entries）       │
+└──────────────────────────────────────────────────────────────────┘
+        ↓                                          ↓
+┌─────────────────────────┐          ┌─────────────────────────────┐
+│ Manifest 容器層          │          │ Catalog 內容層                │
+│ packages/manifests/*.json│          │ resolveInstallableSlugs()     │
+│                          │          │                               │
+│ 職責：                    │          │ 職責：                          │
+│ • install_theme (kadence)│          │ • 16 base + 站型/電商模組      │
+│ • mainwp-child (運維)    │          │ • 動態組合（依站型）            │
+│ • litespeed (主機條件)   │          │ • 過濾 free: false（付費跳過）  │
+│ • postInstall hooks      │          │                               │
+│ • verification           │          │ 觸發：                          │
+│ • rollback strategy      │          │ • wp-install-plugins task     │
+│                          │          │                               │
+│ 觸發：                    │          │                               │
+│ • apply-manifest task    │          │                               │
+└─────────────────────────┘          └─────────────────────────────┘
+        ↓                                          ↓
+        └──────────────┬───────────────────────────┘
+                       ↓
+              SSH + wp-cli on target host
+                       ↓
+              Supabase package_install_runs
+                       ↓
+              /ops/clients/[slug] 顯示結果
+```
+
+**邊界規則（不得交叉）**：
+- Manifest **不得**包含本文件 §一/二/三 列出的外掛 → 由 Catalog 統一處理
+- Manifest **可以**包含「運維基礎設施」外掛（如 `mainwp-child`）— 這些不對使用者開放選擇
+- Catalog **不得**包含主題（theme）或 postInstall 設定 → 由 Manifest 處理
+
+### 8.2 下游消費者地圖
+
+| 角色 | 檔案 | 用途 |
+|------|------|------|
+| **TypeScript SSOT mirror** | `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts` | 機器可讀外掛資料 + `resolvePluginStack` / `resolveInstallableSlugs` / `resolvePaidPlugins` |
+| **OnboardWizard Step 2** | `lobster-factory/infra/.../app/onboard/OnboardWizard.tsx` | 操作員選站型 + 顯示外掛數量 |
+| **BuildConsole** | `lobster-factory/infra/.../app/build/BuildConsole.tsx` | URL params 帶入後顯示綠色摘要 |
+| **BuildRunRequest 合約** | `lobster-factory/infra/.../lib/build-console/contracts.ts` | `wpSiteType` / `hasEcommerce` / `pluginSlugs` 欄位 |
+| **Trigger.dev 安裝 task** | `lobster-factory/packages/workflows/src/tasks/wp-install-plugins.ts` | 真正 SSH + wp-cli install 執行層 |
+| **Trigger.dev 容器 task** | `lobster-factory/packages/workflows/src/trigger/apply-manifest.ts` | 主題 + postInstall + verification |
+| **Orchestrator workflow** | `lobster-factory/packages/workflows/src/trigger/create-wp-site.ts` | 依序觸發 apply-manifest → wp-install-plugins |
+| **客戶端顯示** | `lobster-factory/infra/.../app/ops/clients/[slug]/page.tsx` | 從 `package_install_runs` 讀取顯示安裝結果 |
+| **同步驗證腳本** | `scripts/verify-wp-plugin-stack-sync.mjs` | 比對本文件 vs catalog.ts，計數與 slug 對齊 |
+
+### 8.3 安裝來源（30 年穩定原則）
+
+| 外掛類型 | 來源 | 操作員是否需介入 |
+|---------|------|---------------|
+| `free: true`（28 個）| WP.org → `wp plugin install <slug>` 自動下載 | ❌ 完全自動 |
+| `free: false` + `alternativeSlug`（如 CleanTalk → Akismet、WP Maps Pro → Leaflet）| catalog 自動改用替代品 | ❌ 完全自動 |
+| `free: false` 無替代（如 Kadence Shop Kit / ECPay / YITH Points）| WordPress 後台手動上傳 `.zip` | ✅ 操作員介入（見 §8.4）|
+
+**為何不建私有 zip vault？**
+- 30 年維護成本：vault 主機 / 授權密鑰加密 / 版權法律風險 / 帳號流轉
+- WP 內建 Upload Plugin 已經是穩定 20+ 年的標準介面
+- 付費外掛通常一個客戶站只裝 2-3 個，手動成本可接受
+- `package_install_runs` + `operator_tasks` 已記錄需處理清單，遺漏風險低
+
+### 8.4 付費外掛操作員 Runbook
+
+當 `/ops/clients/[slug]` 顯示「⚠️ 需手動授權」清單時：
+
+1. 取得授權 zip：
+   - **Kadence Shop Kit**：Kadence Full Bundle 授權帳號 → My Account → Downloads
+   - **ECPay Payment Gateway**：ECPay 商家後台 → 技術支援 → 外掛下載（DIRECT，無 WP.org）
+   - **YITH Points and Rewards**：YITH 帳號 → My Licences → Download
+2. 登入該客戶 WP 後台：`https://<client-domain>/wp-admin/plugin-install.php?tab=upload`
+3. **Plugins → Add New → Upload Plugin** → 選 zip → Install Now → Activate
+4. 回 `/ops/clients/[slug]`，確認該外掛已從「需手動授權」消失（下次 sync 自動更新）
+
+### 8.5 漂移防護（drift prevention）
+
+兩份不同步是最大風險。每次修改本文件 §一/二/三 後**必須**：
+
+```powershell
+# 1. 修改 catalog.ts 對應 entry（slug / alternativeSlug / module）
+# 2. 跑同步驗證
+node scripts/verify-wp-plugin-stack-sync.mjs
+# Exit 0 = 對齊；Exit 1 = drift（列出差異）
+```
+
+CI 應掛此驗證為 build gate（待 V3 governance gates 整合）。
+
+### 8.6 不可違反的紅線
+
+1. 本文件之外**不得**有第二份「使用者外掛清單」
+2. Manifest 加任何外掛前先問：這是運維基礎設施嗎？不是 → 加進本文件而非 Manifest
+3. catalog.ts 改任何 slug → 立即同步本文件，反之亦然
+4. 付費外掛永遠不嘗試 `wp plugin install`（會失敗污染 log）→ 由 `free: false` 自動跳過
+5. 不得把授權密鑰或付費 zip URL 寫進 catalog.ts 或 git → 任何時候只在 vault / WP admin 手動處理
+
+---
+
 ## Changelog
 
 | 日期 | 變更說明 |
 |------|---------|
 | 2026-05-12 | 初版建立：基礎全員 + 電商模組 + 旅遊/形象模組 + 4 個決策樹 |
 | 2026-05-12 | 品質修訂：所有表格加入 WP.org Slug 欄；★/↩/† 標記規範；Complianz 選配說明；§七補 slug 維護責任 |
+| 2026-05-13 | 新增 §八 自動化執行系統：兩層架構 + 下游消費者地圖 + 安裝來源策略 + 付費外掛 Runbook + 漂移防護 + 紅線 |

@@ -1,8 +1,8 @@
 # BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md
 
-> **這份文件的用途**：直接交給 Claude / Codex 執行。  
-> 每次只交一個 Phase。不要一次交全部。  
-> Last updated: 2026-05-12（品質修訂：Phase 0 加 alternativeSlug + resolveInstallableSlugs 邏輯；Phase 1 補 WizardStep 型別 + URL params 傳遞 + 驗收條件修正；Phase 2 補 useEffect 讀取 + smokeProfileFor 位置說明；Phase 3 補前置檔案確認）
+> **這份文件的用途**：歷史參考 — Phase 0-4 已全部實作完成（2026-05-13）。  
+> **未來修改外掛清單**：請改 [`WP_CLIENT_PLUGIN_STACK.md`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md)（SSOT），不再回頭改本檔。  
+> Last updated: 2026-05-13 — Status: ✅ Implemented (commits 41a773a / a6ce672 / 02455c5 / 45dce6c)
 
 ---
 

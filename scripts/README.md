@@ -143,6 +143,7 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 | Script | Purpose |
 |--------|---------|
 | `update-client-wp-plugins.ps1` | Safe one-command plugin updater: backup-first → wave update → health check → auto-rollback. Config per client at `tenants/*/core/wp-update-config.json`. Owner doc: `agency-os/docs/operations/WP_MANAGED_UPDATES.md` |
+| `verify-wp-plugin-stack-sync.mjs` | Drift check: `WP_CLIENT_PLUGIN_STACK.md` (human SSOT) vs `wp-plugin-stack-catalog.ts` (machine mirror). Exit 0 = aligned; exit 1 = drift. Owner doc: `agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md` §八.5 |
 
 ## WordPress / Local Dev
 

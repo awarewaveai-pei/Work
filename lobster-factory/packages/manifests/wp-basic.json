@@ -1,10 +1,10 @@
 {
   "name": "wp-basic",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "schemaVersion": "1.0.0",
   "target": "wordpress",
   "applyMode": "full_install",
-  "description": "Basic WordPress site: Kadence theme + Rank Math + Fluent Forms + FluentSMTP + MainWP Child",
+  "description": "WordPress container manifest: Kadence theme + operational plugins (MainWP Child, host-conditional cache). User-facing plugin list is owned by agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md §八 and installed via wp-install-plugins task — do NOT add user-facing plugins here.",
   "guardrails": {
     "allowEnvironments": ["staging", "production"],
     "requireBackup": false,
@@ -13,12 +13,8 @@
   "dependencies": [],
   "conflicts": [],
   "steps": [
-    { "id": "theme-kadence",         "type": "install_theme",       "slug": "kadence" },
-    { "id": "plugin-kadence-blocks", "type": "install_plugin",      "slug": "kadence-blocks" },
-    { "id": "plugin-rank-math",      "type": "install_plugin",      "slug": "seo-by-rank-math" },
-    { "id": "plugin-fluent-forms",   "type": "install_plugin",      "slug": "fluentform" },
-    { "id": "plugin-fluent-smtp",    "type": "install_plugin",      "slug": "fluent-smtp" },
-    { "id": "plugin-mainwp-child",   "type": "install_plugin",      "slug": "mainwp-child" },
+    { "id": "theme-kadence",       "type": "install_theme",  "slug": "kadence" },
+    { "id": "plugin-mainwp-child", "type": "install_plugin", "slug": "mainwp-child" },
     {
       "id": "plugin-litespeed",
       "type": "conditional_plugin",
@@ -27,16 +23,13 @@
     }
   ],
   "postInstall": [
-    { "type": "activate_theme",              "slug": "kadence" },
+    { "type": "activate_theme",   "slug": "kadence" },
     { "type": "flush_permalinks" },
-    { "type": "set_option",                  "key": "timezone_string", "value": "Asia/Taipei" },
-    { "type": "configure_fluent_smtp_via_env" },
-    { "type": "configure_rank_math_defaults" }
+    { "type": "set_option",        "key": "timezone_string", "value": "Asia/Taipei" }
   ],
   "verification": [
     { "type": "check_homepage" },
     { "type": "check_admin_login" },
-    { "type": "check_plugin_active", "slug": "fluentform" },
     { "type": "check_plugin_active", "slug": "mainwp-child" }
   ],
   "smokeProfile": "basic",

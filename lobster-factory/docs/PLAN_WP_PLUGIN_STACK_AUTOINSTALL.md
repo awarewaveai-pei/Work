@@ -1,10 +1,11 @@
 # PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md
 
-> **Owner File** — WordPress 外掛堆疊自動安裝功能實作計畫。  
+> **Owner File** — WordPress 外掛堆疊自動安裝功能實作計畫（已完成）。  
 > **所屬系統**：`app.aware-wave.com` Build System（Lobster Factory Phase 1）  
-> **不涵蓋**：Build System 整體架構 → [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md)；外掛選型依據 → [`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md)  
-> **Last updated**: 2026-05-12  
-> **Status**: Planning — not yet implemented
+> **不涵蓋**：Build System 整體架構 → [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md)；外掛選型依據 → [`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md) §八（自動化執行系統，含下游消費者地圖、安裝來源策略、漂移防護）  
+> **Last updated**: 2026-05-13  
+> **Status**: ✅ Implemented (Phases 0-4 all merged into `main`, commits `41a773a` → `45dce6c`，2026-05-13)
+> **Note**: 本檔保留為「實作脈絡 + 設計決策紀錄」。日後新增/修改外掛清單請改動 [`WP_CLIENT_PLUGIN_STACK.md`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md)（SSOT），不再回頭改本檔。
 
 ---
 
@@ -267,18 +268,18 @@ export const wpInstallPlugins = task({
 });
 ```
 
-**Supabase 擴充既有表**：`package_install_runs`（`ONE_CLICK_BUILD_SYSTEM.md §10` 已規劃）
+**Supabase（已實作，零 migration 方案）**：每個外掛安裝結果寫入 `package_install_runs` 一筆，**逐外掛資料存在 `result_summary` JSONB 欄**：
 
-> 不新建表，擴充現有 `package_install_runs` 新增以下欄位（需確認現有 schema 後執行 migration）：
+```jsonc
+{
+  "plugin_slug": "woocommerce",
+  "status": "installed" | "skipped_license" | "failed",
+  "version": "8.0.0",       // null when skipped/failed
+  "error_message": null     // string when failed
+}
+```
 
-| 新增欄位 | 型別 | 說明 |
-|---------|------|------|
-| `plugin_slug` | text | WP.org / 付費外掛 slug |
-| `status` | text | `installed` / `skipped_license` / `failed` |
-| `version` | text | 安裝後版本號 |
-| `error_message` | text | 失敗原因（nullable） |
-
-> 若 `package_install_runs` 現有結構無法擴充（欄位衝突），才考慮建立 `plugin_install_runs` 新表——決定前先讀現有 migration 檔案。
+**為何最終不加新欄位**：`result_summary` JSONB 已存在，避免破壞性 migration（NOT NULL 加欄位需處理舊資料），且查詢端 `/ops/clients/[slug]` 可直接 `r.result_summary?.status` 取值。Row-level `status` 仍用既有 enum (`completed` / `failed`)。
 
 ---
 
@@ -368,3 +369,4 @@ Phase 4 需要 Phase 3 已有安裝結果資料。
 |------|---------|
 | 2026-05-12 | 初版建立：4個 Phase + 架構圖 + 所有需修改檔案清單 |
 | 2026-05-12 | 品質修訂：架構圖 plugin_install_runs→package_install_runs；WpPlugin 介面加 alternativeSlug；補 resolvePaidPlugins；Phase 1 ClientInfo 補 resolvedPaidPlugins |
+| 2026-05-13 | 全部實作完成（commits 41a773a / a6ce672 / 02455c5 / 45dce6c）；status → Implemented；schema 走 `result_summary` JSONB（零 migration），不再新增表欄；後續 SSOT 改 [`WP_CLIENT_PLUGIN_STACK.md §八`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md) |
