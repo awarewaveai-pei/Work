@@ -72,8 +72,8 @@ export default async function ClientDetailPage({
   const cfg = ((org.metadata as Record<string, unknown>)?.client_config as ClientConfig) ?? {};
   const wp = ((org.metadata as Record<string, unknown>)?.wp_update_latest as WpUpdateLatest) ?? null;
 
-  // Parallel: health probe + last 10 workflow runs for this org
-  const [health, runsResult] = await Promise.all([
+  // Parallel: health probe + last 10 workflow runs + initial plugin installs
+  const [health, runsResult, installRunsResult] = await Promise.all([
     probeHealth(cfg.site_url),
     supabase
       .from("ops_action_runs")
@@ -81,6 +81,12 @@ export default async function ClientDetailPage({
       .eq("organization_id", org.id)
       .order("started_at", { ascending: false })
       .limit(10),
+    supabase
+      .from("package_install_runs")
+      .select("id,status,result_summary,created_at")
+      .eq("organization_id", org.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
   ]);
 
   // ── M3: compute department coverage (server-side, no extra fetch) ──────────
@@ -130,6 +136,13 @@ export default async function ClientDetailPage({
   })();
 
   const runs = runsResult.data ?? [];
+
+  // Partition initial plugin install results
+  type InstallRunSummary = { plugin_slug?: string; status?: string; version?: string | null; error_message?: string | null };
+  const installRuns = (installRunsResult.data ?? []) as Array<{ id: string; status: string; result_summary: unknown; created_at: string | null }>;
+  const pluginInstalled = installRuns.filter(r => (r.result_summary as InstallRunSummary)?.status === "installed");
+  const pluginSkipped   = installRuns.filter(r => (r.result_summary as InstallRunSummary)?.status === "skipped_license");
+  const pluginFailed    = installRuns.filter(r => (r.result_summary as InstallRunSummary)?.status === "failed");
 
   // Partition WP results
   const updated = wp?.results?.filter((r) => r.status === "updated") ?? [];
@@ -191,6 +204,41 @@ export default async function ClientDetailPage({
               slug={org.slug}
               waves={cfg.waves ?? {}}
             />
+          )}
+
+          {/* Initial plugin install card */}
+          {cfg.platform === "wordpress" && (
+            <Section title="初始外掛堆疊安裝" badge={installRuns.length > 0 ? `${installRuns.length} 筆` : "尚無記錄"} style={{ marginBottom: 16 }}>
+              {installRuns.length === 0 ? (
+                <NoData>尚未執行初始安裝（透過 Onboard Wizard 觸發 Build 後自動安裝）</NoData>
+              ) : (
+                <>
+                  <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+                    <SummaryMetric label="已安裝" value={pluginInstalled.length} color="#16a34a" />
+                    <SummaryMetric label="需手動授權" value={pluginSkipped.length} color="#ca8a04" />
+                    <SummaryMetric label="失敗" value={pluginFailed.length} color="#dc2626" />
+                  </div>
+                  {pluginInstalled.length > 0 && (
+                    <>
+                      <SubTitle>✅ 已安裝</SubTitle>
+                      <PluginInstallTable rows={pluginInstalled.map(r => r.result_summary as InstallRunSummary)} statusColor="#16a34a" />
+                    </>
+                  )}
+                  {pluginSkipped.length > 0 && (
+                    <>
+                      <SubTitle style={{ marginTop: 12 }}>⚠️ 需手動授權（付費外掛）</SubTitle>
+                      <PluginInstallTable rows={pluginSkipped.map(r => r.result_summary as InstallRunSummary)} statusColor="#ca8a04" />
+                    </>
+                  )}
+                  {pluginFailed.length > 0 && (
+                    <>
+                      <SubTitle style={{ marginTop: 12 }}>❌ 安裝失敗</SubTitle>
+                      <PluginInstallTable rows={pluginFailed.map(r => r.result_summary as InstallRunSummary)} statusColor="#dc2626" />
+                    </>
+                  )}
+                </>
+              )}
+            </Section>
           )}
 
           {/* Plugin update card */}
@@ -491,6 +539,42 @@ function NoData({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "12px 0", lineHeight: 1.7 }}>
       {children}
+    </div>
+  );
+}
+
+function PluginInstallTable({
+  rows,
+  statusColor,
+}: {
+  rows: Array<{ plugin_slug?: string; version?: string | null; error_message?: string | null }>;
+  statusColor: string;
+}) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+            {["外掛 Slug", "版本 / 說明"].map((h) => (
+              <th key={h} style={{ textAlign: "left", padding: "5px 8px", color: "var(--text-muted)", fontWeight: 500 }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.plugin_slug ?? i} style={{ borderBottom: "1px solid #f8fafc" }}>
+              <td style={{ padding: "5px 8px", fontFamily: "monospace", fontSize: 11, color: statusColor, fontWeight: 600 }}>
+                {r.plugin_slug ?? "—"}
+              </td>
+              <td style={{ padding: "5px 8px", color: "var(--text-muted)", fontSize: 11 }}>
+                {r.version ?? (r.error_message ? r.error_message.slice(0, 80) : "—")}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
