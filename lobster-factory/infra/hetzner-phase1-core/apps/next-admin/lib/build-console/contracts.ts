@@ -1,3 +1,6 @@
+import type { WpSiteType } from "../wp-plugin-stack-catalog";
+export type { WpSiteType };
+
 export type BuildProfile = "profile_a" | "profile_b" | "profile_c";
 export type BuildExecutionMode = "plan_only" | "enqueue";
 export type BuildEnvironment = "staging" | "production";
@@ -75,6 +78,13 @@ export interface BuildRunRequest {
   siteUrl?: string;
   wpAdminUrl?: string;
   packageSlug?: BuildPackageSlug;
+  /** WP Plugin Stack — populated by OnboardWizard Step 2 */
+  wpSiteType?: WpSiteType;
+  hasEcommerce?: boolean;
+  /** Resolved installable slugs (free plugins + free alternatives) from resolveInstallableSlugs() */
+  pluginSlugs?: string[];
+  /** Count of paid plugins with no free alternative — operator must install manually */
+  paidPluginCount?: number;
   provider?: BuildProvider;
   locale?: string;
   credentialsRef?: string;
@@ -156,7 +166,8 @@ export function normalizeBuildRequest(payload: BuildRunRequest): BuildRunRequest
     ...payload,
     executionMode: payload.executionMode ?? "plan_only",
     environment: payload.environment ?? "staging",
-    packageSlug: payload.packageSlug ?? "wp-basic",
+    packageSlug: payload.packageSlug
+      ?? (payload.hasEcommerce || payload.wpSiteType === "ecommerce" ? "wc-core" : "wp-basic"),
     provider: payload.provider ?? defaultProviderFor(payload.profile),
     locale: payload.locale?.trim() || "en_US",
     clientName: payload.clientName?.trim(),
@@ -209,9 +220,12 @@ function defaultProviderFor(profile: BuildRunRequest["profile"]): BuildProvider 
   return "hostinger";
 }
 
-function smokeProfileFor(packageSlug: BuildPackageSlug | undefined): BuildPlan["smokeProfile"] {
-  if (packageSlug === "wp-business") return "business";
-  if (packageSlug === "wc-core") return "woocommerce";
+function smokeProfileFor(req: BuildRunRequest): BuildPlan["smokeProfile"] {
+  if (req.hasEcommerce || req.wpSiteType === "ecommerce") return "woocommerce";
+  if (req.wpSiteType === "brand") return "business";
+  // Fallback: derive from packageSlug for backward compat when wpSiteType is absent
+  if (req.packageSlug === "wc-core") return "woocommerce";
+  if (req.packageSlug === "wp-business") return "business";
   return "basic";
 }
 
@@ -294,7 +308,7 @@ function profileAPlan(input: BuildRunRequest, environment: BuildEnvironment): Bu
 
 function profileBPlan(input: BuildRunRequest, environment: BuildEnvironment): BuildPlan {
   const packageSlug = input.packageSlug ?? "wp-basic";
-  const smokeProfile = smokeProfileFor(packageSlug);
+  const smokeProfile = smokeProfileFor(input);
   const blockers: string[] = [];
   if (!input.domain) blockers.push("new customer domain is required");
   if (!input.provider) blockers.push("hosting provider is required");

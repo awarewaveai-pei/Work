@@ -12,6 +12,7 @@ import {
   type BuildProvider,
   type BuildRunRequest,
   type BuildRunResponse,
+  type WpSiteType,
 } from "../../lib/build-console/contracts";
 import type { OpsRole } from "../../lib/ops-contracts";
 import { roleHeader } from "../../lib/ops-role";
@@ -160,6 +161,15 @@ export default function BuildConsole() {
       base.siteUrl     = str("siteUrl")       ?? base.siteUrl;
       base.wpAdminUrl  = str("wpAdminUrl")    ?? base.wpAdminUrl;
     }
+    // Plugin stack params from OnboardWizard Step 2
+    const wpSiteTypeRaw = searchParams.get("wpSiteType") as WpSiteType | null;
+    if (wpSiteTypeRaw) base.wpSiteType = wpSiteTypeRaw;
+    const hasEcommerceRaw = searchParams.get("hasEcommerce") === "true";
+    if (hasEcommerceRaw) base.hasEcommerce = hasEcommerceRaw;
+    const pluginSlugsRaw = searchParams.get("pluginSlugs");
+    if (pluginSlugsRaw) base.pluginSlugs = pluginSlugsRaw.split(",").filter(Boolean);
+    const paidCount = Number(searchParams.get("paidPluginCount") ?? "0") || undefined;
+    if (paidCount) base.paidPluginCount = paidCount;
     setProfile(p);
     setForm({ ...base, executionMode: "enqueue" });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -484,6 +494,32 @@ export default function BuildConsole() {
               </label>
             </>
           ) : null}
+
+          {/* ── WP Plugin Stack Summary ──────────────────────────────────── */}
+          {form.pluginSlugs && form.pluginSlugs.length > 0 && (
+            <div className="build-plugin-stack-summary" style={{ margin: "12px 0", padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8 }}>
+              <div className="section-title" style={{ marginBottom: 8 }}>WordPress 外掛堆疊（OnboardWizard Step 2）</div>
+              <div className="build-kv-grid">
+                <div>
+                  <span>站型</span>
+                  <strong>
+                    {form.wpSiteType ?? "—"}
+                    {form.hasEcommerce && form.wpSiteType !== "ecommerce" ? " + 電商" : ""}
+                  </strong>
+                </div>
+                <div>
+                  <span>可自動安裝</span>
+                  <strong style={{ color: "#166534" }}>{form.pluginSlugs.length} 個 slug</strong>
+                </div>
+                {form.paidPluginCount ? (
+                  <div>
+                    <span>需手動授權（付費）</span>
+                    <strong style={{ color: "#92400e" }}>{form.paidPluginCount} 個</strong>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
 
           {/* ── Integrations ──────────────────────────────────────────────── */}
           <div className="build-integrations-toggle">
