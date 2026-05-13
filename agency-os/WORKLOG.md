@@ -125,6 +125,13 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - 必提醒使用者：Slack App 後台仍需取出真實 `Signing Secret` 與 Bot token；拿到後設定 SG `.env` + GitHub Secrets，再部署 next-admin 並重跑 `repair-center-smoke`，目標 0 warning。
 - Slack secret 設好後要補跑：Slack `approve_repair` 按鈕互動核准 drill；真實 code-scoped incident 的 PR/merge/deploy 端到端；destructive bad-commit auto-rollback drill 只有使用者明確授權才做。
 
+### Codex 2026-05-13 — Repair Center closeout + AO-SYNC script fix
+- Production cleanup：backup-fail drill run `207b182d-01db-45e9-8779-6e19280dfa57` 原本卡在 `deploy_pending` 但 `backup_status=failed`；已用 Repair API 標成 `resolved`，保留 `deploy_ref=backup-fail-drill-cleanup-2026-05-13`，`/api/ops/repairs/health` 現回 `active_runs=0`。
+- `scripts/repair-center-smoke.mjs`：`--base-url` production smoke 改先讀 production health；若 health 回 `table_ok=true`，`db: repair_runs` 以 runtime truth PASS，不再因本機直連 Supabase timeout 誤報。`ANTHROPIC_API_KEY` 在 production smoke 下不要求本機 env（GitHub Actions secret 才是 owner）。
+- AO-SYNC 腳本收尾：`export-cross-machine-memory.ps1` / `import-cross-machine-memory.ps1` 補 Windows PowerShell 5.1 單一物件 `.Count` 問題，避免只有一個 `AO-SYNC-*` folder 時 `MEMORY.md` 匯入被跳過，也讓 export prune 計數穩定。
+- 驗證：PowerShell parser 兩支 PASS；`node --check scripts/repair-center-smoke.mjs` PASS；隔離假 profile / 假 AO-SYNC / 假 secrets root 匯出匯入 PASS（含 SSH 排除、manifest、local-newer 保護、pre-overwrite backup）；`npm run smoke:repair-center -- --base-url=https://app.aware-wave.com` → 15 checks / 0 failed / 1 warning（僅 `SLACK_SIGNING_SECRET`）。
+- 仍待外部設定：真實 Slack App `SLACK_SIGNING_SECRET` / `SLACK_BOT_TOKEN`；未做 destructive bad-commit rollback drill，除非使用者明確授權。
+
 ## 2026-05-12
 
 ### Daily
@@ -2790,5 +2797,4 @@ _Last synced: 2026-05-13 09:43:34 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
 

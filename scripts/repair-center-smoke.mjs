@@ -141,7 +141,13 @@ async function checkHttp(baseUrl) {
   }
 }
 
-async function checkSupabase() {
+async function checkSupabase({ advisory = false } = {}) {
+  if (remoteRepairHealth?.table_ok) {
+    pass("db: repair_runs", `production table_ok; active_runs=${remoteRepairHealth.active_runs ?? "n/a"}`);
+    return;
+  }
+
+  const softFail = advisory ? warn : fail;
   const url = env("SUPABASE_URL") || env("NEXT_PUBLIC_SUPABASE_URL");
   const key = env("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) {
@@ -161,10 +167,10 @@ async function checkSupabase() {
     if (res.ok) {
       pass("db: repair_runs", `HTTP ${res.status}; content-range=${res.headers["content-range"] ?? "n/a"}`);
     } else {
-      fail("db: repair_runs", `HTTP ${res.status} ${text.slice(0, 500)}`);
+      softFail("db: repair_runs", `HTTP ${res.status} ${text.slice(0, 500)}`);
     }
   } catch (e) {
-    fail("db: repair_runs", e instanceof Error ? e.message : String(e));
+    softFail("db: repair_runs", e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -190,6 +196,7 @@ function checkEnv({ advisory = false } = {}) {
   else warn("env: Slack signing", "SLACK_SIGNING_SECRET is required only for Slack interactive approve; web UI repair remains usable without it.");
 
   if (envConfigured("ANTHROPIC_API_KEY")) pass("env: Anthropic", "configured");
+  else if (advisory) pass("env: Anthropic", "not required in local env for production smoke; GitHub Actions owns this secret");
   else warn("env: Anthropic", "ANTHROPIC_API_KEY is required by GitHub Secrets, not necessarily local runtime.");
 }
 
@@ -204,8 +211,8 @@ async function main() {
   checkRepairPolicyCatalog();
 
   const baseUrl = args.get("base-url") || env("REPAIR_CENTER_BASE_URL");
-  await checkSupabase();
   await checkHttp(baseUrl);
+  await checkSupabase({ advisory: Boolean(baseUrl) });
   checkEnv({ advisory: Boolean(baseUrl) });
 
   for (const c of checks) {
