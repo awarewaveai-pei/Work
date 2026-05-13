@@ -53,6 +53,8 @@ export default async function RepairsPage() {
   const activeRuns = runs.filter((r) => ACTIVE_STATES.includes(r.state));
   const recentRuns = runs.slice(0, 30);
   const blocked = systemMode !== "normal";
+  const backupGate = readBackupGate();
+  const githubGate = Boolean(process.env.AUTO_REPAIR_GITHUB_TOKEN || process.env.GITHUB_TOKEN);
 
   return (
     <div style={{ background: "var(--bg-canvas)", minHeight: "100vh", padding: "28px 32px" }}>
@@ -84,8 +86,8 @@ export default async function RepairsPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, marginBottom: 16 }}>
           <Metric label="Queue" value={queue.length} hint="repairable incidents without a run" />
           <Metric label="Active Runs" value={activeRuns.length} hint="not resolved / not human-only" />
-          <Metric label="Backup Gate" value={process.env.AUTO_REPAIR_BACKUP_WEBHOOK_URL ? "wired" : "blocked"} hint="no backup means no issue" tone={process.env.AUTO_REPAIR_BACKUP_WEBHOOK_URL ? "ok" : "warn"} />
-          <Metric label="GitHub Gate" value={process.env.AUTO_REPAIR_GITHUB_TOKEN || process.env.GITHUB_TOKEN ? "wired" : "blocked"} hint="issue creation requires token" tone={process.env.AUTO_REPAIR_GITHUB_TOKEN || process.env.GITHUB_TOKEN ? "ok" : "warn"} />
+          <Metric label="Backup Gate" value={backupGate.ok ? backupGate.mode : "blocked"} hint="no backup means no issue" tone={backupGate.ok ? "ok" : "warn"} />
+          <Metric label="GitHub Gate" value={githubGate ? "wired" : "blocked"} hint="issue creation requires token" tone={githubGate ? "ok" : "warn"} />
         </div>
 
         {blocked && (
@@ -127,8 +129,9 @@ export default async function RepairsPage() {
 
           <Panel title="Safety" subtitle="Gates that protect production">
             <SafetyRow name="System Mode" ok={!blocked} value={systemMode} link="/ops/system-modes" />
-            <SafetyRow name="Backup Gate" ok={Boolean(process.env.AUTO_REPAIR_BACKUP_WEBHOOK_URL)} value={process.env.AUTO_REPAIR_BACKUP_WEBHOOK_URL ? "configured" : "missing AUTO_REPAIR_BACKUP_WEBHOOK_URL"} />
-            <SafetyRow name="GitHub Issue Gate" ok={Boolean(process.env.AUTO_REPAIR_GITHUB_TOKEN || process.env.GITHUB_TOKEN)} value={process.env.AUTO_REPAIR_GITHUB_TOKEN || process.env.GITHUB_TOKEN ? "configured" : "missing AUTO_REPAIR_GITHUB_TOKEN"} />
+            <SafetyRow name="Repair Health" ok={backupGate.ok && githubGate} value="GET /api/ops/repairs/health" link="/api/ops/repairs/health" />
+            <SafetyRow name="Backup Gate" ok={backupGate.ok} value={backupGate.value} />
+            <SafetyRow name="GitHub Issue Gate" ok={githubGate} value={githubGate ? "configured" : "missing AUTO_REPAIR_GITHUB_TOKEN"} />
             <SafetyRow name="Deploy Gate" ok value="manual only via sg-deploy.sh / Build Console" link="/build" />
             <SafetyRow name="Ops Inbox Health" ok value="source of truth remains /api/ops/inbox/health" link="/api/ops/inbox/health" />
           </Panel>
@@ -262,3 +265,21 @@ const pillStyle: React.CSSProperties = { fontSize: 11, padding: "2px 8px", borde
 const okPillStyle: React.CSSProperties = { ...pillStyle, background: "#dcfce7", color: "#166534" };
 const warnPillStyle: React.CSSProperties = { ...pillStyle, background: "#fef3c7", color: "#92400e" };
 const dangerPillStyle: React.CSSProperties = { ...pillStyle, background: "#fee2e2", color: "#991b1b" };
+
+function readBackupGate(): { ok: boolean; mode: string; value: string } {
+  if (process.env.AUTO_REPAIR_BACKUP_WEBHOOK_URL) {
+    return { ok: true, mode: "webhook", value: "webhook configured" };
+  }
+  const sg =
+    Boolean(process.env.AUTO_REPAIR_SG_SSH_HOST) &&
+    Boolean(process.env.AUTO_REPAIR_SG_SSH_KEY_B64 || (process.env.AUTO_REPAIR_SG_SSH_KEY_ENV && process.env[process.env.AUTO_REPAIR_SG_SSH_KEY_ENV]));
+  const euRequired = process.env.AUTO_REPAIR_REQUIRE_EU_BACKUP?.trim().toLowerCase() !== "false";
+  const eu =
+    Boolean(process.env.AUTO_REPAIR_EU_SSH_HOST) &&
+    Boolean(process.env.AUTO_REPAIR_EU_SSH_KEY_B64 || (process.env.AUTO_REPAIR_EU_SSH_KEY_ENV && process.env[process.env.AUTO_REPAIR_EU_SSH_KEY_ENV]));
+  if (sg && (!euRequired || eu)) {
+    return { ok: true, mode: "ssh", value: euRequired ? "SG + EU SSH configured" : "SG SSH configured; EU intentionally optional" };
+  }
+  if (!sg) return { ok: false, mode: "blocked", value: "missing SG SSH or backup webhook" };
+  return { ok: false, mode: "blocked", value: "missing EU SSH; set AUTO_REPAIR_REQUIRE_EU_BACKUP=false only for SG-only drill" };
+}
