@@ -1,4 +1,4 @@
-# export-cross-machine-memory.ps1
+﻿# export-cross-machine-memory.ps1
 # Exports the Claude Code project memory INDEX + secrets to the cross-machine sync folder.
 # Called automatically at end of AO-CLOSE after git push. Non-blocking.
 #
@@ -15,8 +15,8 @@
 #   $env:AO_SYNC_SECRETS_ROOT -- no auto-fallback; skipped if not set
 #
 # Per-machine setup (run once, open a new terminal after):
-#   [System.Environment]::SetEnvironmentVariable('AO_SYNC_ROOT',         'G:\<MyDrive>\EverydayPW\AO-SYNC', 'User')
-#   [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'G:\<MyDrive>\EverydayPW',         'User')
+#   [System.Environment]::SetEnvironmentVariable('AO_SYNC_ROOT',         'G:\<MyDrive>\MySecretVault\AO-SYNC', 'User')
+#   [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'G:\<MyDrive>\MySecretVault',         'User')
 #
 # What is exported:
 #   MEMORY.md                  -> $AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\MEMORY.md

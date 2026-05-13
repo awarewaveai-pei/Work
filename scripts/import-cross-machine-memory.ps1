@@ -1,4 +1,4 @@
-# import-cross-machine-memory.ps1
+﻿# import-cross-machine-memory.ps1
 # Auto-imports all cross-machine files from the sync folder on AO-RESUME.
 # Called by ao-resume.ps1 (non-blocking). Silent no-op when no AO-SYNC folder exists.
 #
@@ -165,7 +165,7 @@ if ($env:AO_SYNC_ROOT) {
         if ($detected) {
             $searchRoots += $detected
             $gdFound = $true
-            # Auto-derive secrets root from AO-SYNC location (parent = EverydayPW)
+            # Auto-derive secrets root from AO-SYNC location (parent = MySecretVault)
             if (-not $env:AO_SYNC_SECRETS_ROOT) {
                 $env:AO_SYNC_SECRETS_ROOT = Split-Path $detected -Parent
                 Write-Host "  auto-derived: AO_SYNC_SECRETS_ROOT = $env:AO_SYNC_SECRETS_ROOT" -ForegroundColor DarkGray

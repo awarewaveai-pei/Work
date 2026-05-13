@@ -163,7 +163,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 
 ### claude 2026-05-12 18:00
 
-- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）——export/import 腳本改為動態 project key 推導 + UTF-8 BOM + AO_SYNC_ROOT/AO_SYNC_SECRETS_ROOT env var；四項檔案（MEMORY.md、user-env.ps1、SSH keys、AWARE_WAVE_CREDENTIALS.md）完整同步
+- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（MySecretVault）——export/import 腳本改為動態 project key 推導 + UTF-8 BOM + AO_SYNC_ROOT/AO_SYNC_SECRETS_ROOT env var；四項檔案（MEMORY.md、user-env.ps1、SSH keys、AWARE_WAVE_CREDENTIALS.md）完整同步
 - **變更路徑**:
   - `scripts/export-cross-machine-memory.ps1`
   - `scripts/import-cross-machine-memory.ps1`
@@ -179,7 +179,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 
 ### claude 2026-05-12 18:30
 
-- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）——動態 project key + UTF-8 BOM + env vars；mcp/user-env.ps1 duplicate keys 修復；daily note 補齊
+- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（MySecretVault）——動態 project key + UTF-8 BOM + env vars；mcp/user-env.ps1 duplicate keys 修復；daily note 補齊
 - **變更路徑**:
   - `scripts/export-cross-machine-memory.ps1`
   - `scripts/import-cross-machine-memory.ps1`
