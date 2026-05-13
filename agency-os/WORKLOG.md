@@ -1,8 +1,24 @@
-﻿# Worklog
+# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-05-13
+
+### API 成本修復（晚班，Claude Code session）
+
+**根因**：`ANTHROPIC_API_KEY` 被 vault-sync 推入 Windows 使用者環境變數，Claude Code 看到後優先使用 API Key 計費，忽略 Max 訂閱。repair-center GitHub Actions 測試期間多次呼叫 Claude（`--max-turns 30`），3.1M tokens 累積 = 約 $10，燒掉 $5 原始額度與部分新儲值 $6。
+
+**修復步驟**：
+1. 從 Windows 使用者環境變數移除 `ANTHROPIC_API_KEY`（`SetEnvironmentVariable(..., [string]::Empty, 'User')`）→ Claude Code 改走 Max 訂閱免費額度
+2. 確認 repair-center 使用 GitHub repository secrets，與 Windows env var 完全獨立，不受影響
+3. 確認 Cursor（免費額度）、Codex（OpenAI key）、Gemini（Gemini key）均不走 Anthropic API 帳戶
+4. `.github/workflows/auto-repair-claude.yml`：`--max-turns 30` → `--max-turns 15`，降低每次 repair job 約 40-50% token 消耗
+
+**驗證**：Windows 使用者環境變數查詢回空值；yml 已 commit（含入 checkpoint `auto-save on session start`）。
+
+**避免再發生**：vault-sync 下次跑時可能重推 `ANTHROPIC_API_KEY`；若再出現相同問題，需將 `ANTHROPIC_API_KEY` 從 vault-sync 的推送清單中排除。
+
+- AUTO_TASK_DONE_APPLIED (2026-05-13T14:38:50Z): AwareWave 自動告警維修系統 v3.2 — 計畫書執行
 
 ### Codex 2026-05-13 — Claude auto-repair workflow unblocked
 - Removed the previous GitHub App installation blocker without requiring a new Slack or GitHub App: `.github/workflows/auto-repair-claude.yml` now passes `${{ github.token }}` to `anthropics/claude-code-action@v1`, grants `actions: read`, uses `actions/checkout@v5`, raises the Claude turn budget to 30, allows `Edit`, and adds a post-success `gh pr create` step using `steps.claude.outputs.branch_name`.
@@ -154,6 +170,22 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - Production smoke：`npm run smoke:repair-center -- --base-url=https://app.aware-wave.com` → 15 checks / 0 failed / 0 warning；health 回 `slack_signing_configured=true`、`slack_interactive_ready=true`、`active_runs=0`。
 - Slack callback signature drill：用同一 signing secret 對 `acknowledge_only` payload 簽名後 POST production `/api/internal/commands/slack`，HTTP 200，回 `Acknowledged. No repair run was created.`；已驗證簽章 gate 可用且測試不建立 repair run。
 - 仍待：真實 Slack `approve_repair` 按鈕互動核准 drill；真實 code-scoped incident 的 PR/merge/deploy 端到端；destructive bad-commit auto-rollback drill 只有使用者明確授權才做。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:17d8462f92e66f93dc7dff269350ae49142439386ac6ece5ea801a6f626b282a -->
+
+### claude-code 2026-05-13 22:45
+
+- **完成（一句）**: Anthropic API 成本診斷 — 移除 Windows 環境變數 ANTHROPIC_API_KEY，修復 Claude Code 走 Max 訂閱；auto-repair max-turns 30→15
+- **變更路徑**:
+  - `.github/workflows/auto-repair-claude.yml` (max-turns 30→15)
+  - `agency-os/WORKLOG.md` (AUTO_TASK_DONE + 根因記錄)
+  - `agency-os/memory/CONVERSATION_MEMORY.md` (蒸餾)
+  - `agency-os/memory/daily/2026-05-13.md` (晚班補記)
+- **Git**: 含入先前 checkpoint commits（ahead 3）
+- **對應 TASKS 子字串（可選）**: AwareWave 自動告警維修系統 v3.2 — 計畫書執行
+- **風險／待辦（可選）**: vault-sync 下次執行可能重推 ANTHROPIC_API_KEY 到 Windows env，建議排除或監控
 
 ## 2026-05-12
 
@@ -2386,7 +2418,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-13 14:30:02 UTC_
+_Last synced: 2026-05-13 14:38:31 UTC_
 
 ## 2026-03-20
 

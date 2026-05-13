@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-13 17:43:49
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-05-13 22:38:48
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -210,6 +210,13 @@
 - **未來判斷依據**：使用者報「線上 feature 不見／少」時，先跑 `/check-drift` 不要先 grep git history（memory `feedback_check_deploy_drift_first.md`）。
 - **使用者桌面 `AWARE_WAVE_CREDENTIALS.md` §24** 仍有 EU/SG 描述錯誤（next-admin 在 SG 不在 EU）；不在 git，候授權後代修。
 
+### Today (2026-05-13 晚) - Anthropic API 成本診斷與修復
+- **症狀**：使用者發現 Feb 23 買的 $5 API credits 耗盡，不記得有用 API。
+- **根因**：(1) `ANTHROPIC_API_KEY` 被 vault-sync 推入 Windows 使用者環境變數，Claude Code 看到後優先走 API Key 計費，忽略 Max 訂閱。(2) repair-center GitHub Actions 在建置/測試期間多次以 `--max-turns 30` 呼叫 Claude → 3.1M tokens ≈ $10。
+- **修復**：移除 Windows 使用者環境變數中的 `ANTHROPIC_API_KEY`（`SetEnvironmentVariable(..., [string]::Empty, 'User')`）；Claude Code 改走 Max 訂閱。repair-center 使用 GitHub Secrets，不受影響。
+- **降成本**：`auto-repair-claude.yml` `--max-turns 30` → `15`，降低每次 repair job 約 40-50% token。
+- **注意**：vault-sync 下次執行可能重推 `ANTHROPIC_API_KEY` 到 Windows env，需監控或排除。Cursor（免費額度）/ Codex / Gemini 不走 Anthropic API 帳戶，無問題。
+
 > Full runbook: see `## Runbook Commands` in the source file.
 
 ## 5) memory/daily/2026-05-13.md
@@ -235,11 +242,32 @@
 - Trigger.dev re-deploy — ssh2 才納入 task image（`.\scripts\lobster-trigger-deploy.ps1`）
 - End-to-end smoke test：Step4 provision-services + wp-install-plugins 完整驗收
 
+## 晚班補記（API 成本修復）
+- 確認 3.1M tokens 消耗原因：`ANTHROPIC_API_KEY` 在 Windows 使用者環境變數 + repair-center GitHub Actions `--max-turns 30` 多次測試
+- 移除 Windows 使用者環境變數中的 `ANTHROPIC_API_KEY` → Claude Code 改用 Max 訂閱
+- `auto-repair-claude.yml` max-turns 30 → 15，降低未來 repair job API 成本
+- vault-sync 下次若重推 key 需注意，可能要排除 `ANTHROPIC_API_KEY`
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:17d8462f92e66f93dc7dff269350ae49142439386ac6ece5ea801a6f626b282a -->
+
+### claude-code 2026-05-13 22:45
+
+- **完成（一句）**: Anthropic API 成本診斷 — 移除 Windows 環境變數 ANTHROPIC_API_KEY，修復 Claude Code 走 Max 訂閱；auto-repair max-turns 30→15
+- **變更路徑**:
+  - `.github/workflows/auto-repair-claude.yml` (max-turns 30→15)
+  - `agency-os/WORKLOG.md` (AUTO_TASK_DONE + 根因記錄)
+  - `agency-os/memory/CONVERSATION_MEMORY.md` (蒸餾)
+  - `agency-os/memory/daily/2026-05-13.md` (晚班補記)
+- **Git**: 含入先前 checkpoint commits（ahead 3）
+- **對應 TASKS 子字串（可選）**: AwareWave 自動告警維修系統 v3.2 — 計畫書執行
+- **風險／待辦（可選）**: vault-sync 下次執行可能重推 ANTHROPIC_API_KEY 到 Windows env，建議排除或監控
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-13 17:43:41`
+- Time: `2026-05-13 22:38:39`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -249,13 +277,14 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260513-174340.md`
-- Closeout: `reports/closeout/closeout-20260513-174335.md`
+- Health: `reports/health/health-20260513-223838.md`
+- Closeout: `reports/closeout/closeout-20260513-223832.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+- `git pull origin main`：**Already up to date**。
 - `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
 - `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
 
@@ -314,6 +343,5 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
 
 
