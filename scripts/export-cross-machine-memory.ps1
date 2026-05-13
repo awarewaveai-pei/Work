@@ -207,8 +207,10 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
 # ── 6. Pruning (two independent rules, never touch what we don't own) ────────
 if (-not $DestRoot) {
 
-    $ownFolders = Get-ChildItem -Path $syncRoot -Filter "AO-SYNC-*-$machineTag" -Directory -ErrorAction SilentlyContinue |
-                  Sort-Object Name -Descending
+    $ownFolders = @(
+        Get-ChildItem -Path $syncRoot -Filter "AO-SYNC-*-$machineTag" -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending
+    )
     if ($ownFolders.Count -gt 7) {
         $ownFolders | Select-Object -Skip 7 | ForEach-Object {
             Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue

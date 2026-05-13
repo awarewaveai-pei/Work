@@ -195,19 +195,21 @@ $allFolders = @(
     }
 )
 
-$candidateFolders = $allFolders | ForEach-Object {
-    $name = $_.Name
-    if ($name -match '^AO-SYNC-(\d{4}-\d{2}-\d{2})-(.+)$') {
-        [PSCustomObject]@{ Folder = $_; DateStr = $matches[1]; IsNewFormat = $true;  FolderMachine = $matches[2] }
-    } elseif ($name -match '^AO-SYNC-(\d{4}-\d{2}-\d{2})$') {
-        [PSCustomObject]@{ Folder = $_; DateStr = $matches[1]; IsNewFormat = $false; FolderMachine = '' }
-    }
-    # Folders that don't match either pattern are silently ignored
-} | Where-Object {
-    $_ -ne $null -and
-    # New format: exclude own machine by folder name (fast, no file I/O needed)
-    -not ($_.IsNewFormat -and $_.FolderMachine -eq $machineTag)
-} | Sort-Object DateStr -Descending   # newest date first
+$candidateFolders = @(
+    $allFolders | ForEach-Object {
+        $name = $_.Name
+        if ($name -match '^AO-SYNC-(\d{4}-\d{2}-\d{2})-(.+)$') {
+            [PSCustomObject]@{ Folder = $_; DateStr = $matches[1]; IsNewFormat = $true;  FolderMachine = $matches[2] }
+        } elseif ($name -match '^AO-SYNC-(\d{4}-\d{2}-\d{2})$') {
+            [PSCustomObject]@{ Folder = $_; DateStr = $matches[1]; IsNewFormat = $false; FolderMachine = '' }
+        }
+        # Folders that don't match either pattern are silently ignored
+    } | Where-Object {
+        $_ -ne $null -and
+        # New format: exclude own machine by folder name (fast, no file I/O needed)
+        -not ($_.IsNewFormat -and $_.FolderMachine -eq $machineTag)
+    } | Sort-Object DateStr -Descending   # newest date first
+)
 
 # ── MEMORY.md import ──────────────────────────────────────────────────────────
 # Always overwrites -- last-AO-CLOSE-wins by design (no SHA256 guard on MEMORY.md).
