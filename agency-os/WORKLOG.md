@@ -56,6 +56,13 @@
 - Production health：`https://app.aware-wave.com/api/ops/repairs/health` 已存在；目前預期回 `503`，其中 `table_ok=true`、`backup_configured=true`、`backup_mode=ssh`、`source_policies` 正確，剩 `github_configured=false` 與 `slack_signing_configured=false`。`/api/ops/inbox/health` 回 200。
 - Remaining gate：設定正式 `AUTO_REPAIR_GITHUB_TOKEN`、`SLACK_SIGNING_SECRET`、GitHub Secrets 後，重跑 `npm run smoke:repair-center -- --base-url=https://app.aware-wave.com`，再進 Phase 3 22 步、rollback drill、backup-fail drill。
 
+### Codex 2026-05-13 — Repair Center web-control hardening
+- 完成 Web 控制邊界設計：`/ops/repairs` 是操作者控制台；`/ops/inbox` 保持 incident intake / dedup / triage SSOT，兩者串接但不合併。
+- GitHub handoff 已補 runtime 與 repo secrets：`AUTO_REPAIR_GITHUB_TOKEN` 已設於 SG；GitHub Secrets 已設 `ANTHROPIC_API_KEY` 與 `SLACK_WEBHOOK_URL`（未記錄 secret value）。
+- 修正安全邊界：Next app 不再信任外部 `Authorization: Basic` header；nginx 對 `/api/ops/repairs*` 套 Basic Auth，通過後才注入 `x-ops-claims-role: admin`。`/ops/*` 頁面同樣由 nginx Basic Auth 注入可信 role。
+- Repo nginx 設定補回 `security-headers.inc`，避免部署時覆蓋 production security headers。
+- 仍待：`SLACK_SIGNING_SECRET` 需由正式 Slack App 提供後，Slack interactive button 才能列為 ready；Phase 3 22 步、rollback drill、backup-fail drill 尚未結案。
+
 ## 2026-05-12
 
 ### Daily

@@ -2,7 +2,7 @@ import type { OpsRole } from "./ops-contracts";
 
 const SIMULATED_ROLE_HEADER = "x-ops-simulated-role";
 const CLAIMS_ROLE_HEADERS = ["x-ops-claims-role", "x-user-role", "x-clerk-role"] as const;
-type RoleSource = "claims" | "basic_auth" | "simulated" | "default_viewer";
+type RoleSource = "claims" | "simulated" | "default_viewer";
 
 function toRole(value: string | null | undefined): OpsRole | null {
   const raw = value?.trim().toLowerCase();
@@ -39,18 +39,9 @@ export function readClaimsRole(request: Request): OpsRole | null {
   return null;
 }
 
-function readBasicAuthRole(request: Request): OpsRole | null {
-  const auth = request.headers.get("authorization") ?? "";
-  if (!auth.toLowerCase().startsWith("basic ")) return null;
-  return toRole(process.env.OPS_BASIC_AUTH_ROLE) ?? null;
-}
-
 export function resolveOpsRole(request: Request): { role: OpsRole; source: RoleSource } {
   const claimsRole = readClaimsRole(request);
   if (claimsRole) return { role: claimsRole, source: "claims" };
-
-  const basicAuthRole = readBasicAuthRole(request);
-  if (basicAuthRole) return { role: basicAuthRole, source: "basic_auth" };
 
   const allowSimulated = roleResolutionMode() === "claims_with_simulated_fallback" && shouldAllowSimulatedFallback();
   if (allowSimulated) return { role: readSimulatedRole(request), source: "simulated" };
