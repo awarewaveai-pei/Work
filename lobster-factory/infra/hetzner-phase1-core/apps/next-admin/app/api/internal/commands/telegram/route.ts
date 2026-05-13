@@ -139,7 +139,7 @@ export async function POST(req: Request) {
     command,
     args: argsText ? { raw: argsText } : {},
     organizationId: orgId,
-    workspaceId: process.env.COMMAND_PLANE_DEFAULT_WORKSPACE_ID ?? null,
+    workspaceId: process.env.COMMAND_PLANE_DEFAULT_WORKSPACE_ID || null,
     metadata: {
       chat_id: message.chat.id,
       message_id: message.message_id,
