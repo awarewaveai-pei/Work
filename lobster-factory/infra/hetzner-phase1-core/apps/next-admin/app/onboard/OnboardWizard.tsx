@@ -47,6 +47,11 @@ interface ClientInfo {
   hasEcommerce: boolean;
   resolvedPluginSlugs: string[];
   resolvedPaidPlugins: WpPlugin[];
+  // SSH connection target — passes to wp-install-plugins task
+  // (operator-supplied for existing clients; left empty when hosting adapter will provide)
+  sshHost: string;
+  wpPath: string;
+  sshCredentialsRef: string;
 }
 
 interface ProvResult {
@@ -105,6 +110,9 @@ function makeDefaultClient(): ClientInfo {
     hasEcommerce: false,
     resolvedPluginSlugs: resolveInstallableSlugs("brand", false),
     resolvedPaidPlugins: resolvePaidPlugins("brand", false),
+    sshHost: "",
+    wpPath: "/var/www/html",
+    sshCredentialsRef: "",
   };
 }
 
@@ -240,6 +248,36 @@ function Step1({
         </div>
       )}
 
+      {/* ── SSH 接入（一鍵安裝外掛必填）─────────────────────────────────────── */}
+      <div className="onboard-uuid-block" style={{ marginTop: 16 }}>
+        <div className="section-title" style={{ marginBottom: 4 }}>SSH 接入（一鍵自動安裝外掛必填）</div>
+        <p className="form-hint" style={{ marginBottom: 12 }}>
+          填入後，按下 Launch 會由 Trigger.dev 自動 SSH 安裝外掛。
+          Profile B 新站可留空（hosting adapter 之後會自動填）。
+          憑證走 vault 引用，**不**在此貼真實 SSH key。
+        </p>
+        <div className="build-form-grid">
+          <div className="form-row">
+            <label className="form-label">SSH host {info.profile === "profile_c" ? <span style={{ color: "#dc2626" }}>*</span> : null}</label>
+            <input className="form-input" value={info.sshHost}
+              onChange={(e) => onChange({ sshHost: e.target.value.trim() })}
+              placeholder="soulful.aware-wave.com 或 1.2.3.4" />
+          </div>
+          <div className="form-row">
+            <label className="form-label">WP 安裝路徑</label>
+            <input className="form-input" value={info.wpPath}
+              onChange={(e) => onChange({ wpPath: e.target.value.trim() || "/var/www/html" })}
+              placeholder="/var/www/html" />
+          </div>
+          <div className="form-row" style={{ gridColumn: "1 / -1" }}>
+            <label className="form-label">SSH credentials vault ref（選填）</label>
+            <input className="form-input" value={info.sshCredentialsRef}
+              onChange={(e) => onChange({ sshCredentialsRef: e.target.value.trim() })}
+              placeholder={`vault://ssh/${info.tenantSlug || "<slug>"}`} />
+          </div>
+        </div>
+      </div>
+
       <div className="onboard-uuid-block">
         <div className="section-title" style={{ marginBottom: 8 }}>Auto-generated IDs（記錄到 Supabase）</div>
         <div className="build-kv-grid">
@@ -272,12 +310,20 @@ function Step1({
 }
 
 // ── Step 2: WP Site Type Selection ────────────────────────────────────────────
+// SSOT: agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md §一/二/三/八.1
+// 外掛採疊加制：基礎包（必裝） + 站型包 + （選用）電商包
 
-const WP_TYPE_CARDS: { type: WpSiteType; label: string; desc: string }[] = [
-  { type: "tourism",   label: "旅遊業",        desc: "旅遊行程、地圖、多語言" },
-  { type: "brand",     label: "形象 / 品牌站", desc: "企業形象、作品集、活動頁" },
-  { type: "ecommerce", label: "一般電商",       desc: "WooCommerce 完整電商" },
+const WP_TYPE_CARDS: { type: WpSiteType; label: string; desc: string; emoji: string }[] = [
+  { type: "tourism",   label: "旅遊業",        desc: "行程、地圖、多語言", emoji: "🏝️" },
+  { type: "brand",     label: "形象 / 品牌站", desc: "企業形象、作品集、活動頁", emoji: "🎨" },
+  { type: "ecommerce", label: "一般電商",       desc: "純 WooCommerce 電商站（自動含電商包）", emoji: "🛒" },
 ];
+
+// Pre-computed module sizes (catalog is static)
+const BASE_PACK_SIZE     = resolvePluginStack("brand", false).filter((p) => p.module === "base").length;     // 16
+const ECOMMERCE_PACK_SIZE = resolvePluginStack("brand", true).filter((p) => p.module === "ecommerce").length; // 12
+const TOURISM_PACK_SIZE  = resolvePluginStack("tourism", false).filter((p) => p.module === "tourism").length; // 5
+const BRAND_PACK_SIZE    = resolvePluginStack("brand", false).filter((p) => p.module === "brand").length;     // 3
 
 function Step2WpType({
   info,
@@ -302,21 +348,61 @@ function Step2WpType({
     });
   };
 
-  const allPlugins = resolvePluginStack(info.wpSiteType, info.hasEcommerce);
-  const totalCount = allPlugins.length;
-  const autoCount  = info.resolvedPluginSlugs.length;
-  const paidCount  = info.resolvedPaidPlugins.length;
+  const allPlugins  = resolvePluginStack(info.wpSiteType, info.hasEcommerce);
+  const totalCount  = allPlugins.length;
+  const autoCount   = info.resolvedPluginSlugs.length;
+  const paidCount   = info.resolvedPaidPlugins.length;
+  const effectiveEcommerce = info.hasEcommerce || info.wpSiteType === "ecommerce";
+
+  // Active pack breakdown
+  const stackedPacks: { name: string; emoji: string; count: number; required: boolean; locked?: boolean }[] = [
+    { name: "基礎包",   emoji: "📦", count: BASE_PACK_SIZE,     required: true, locked: true },
+  ];
+  if (info.wpSiteType === "tourism") {
+    stackedPacks.push({ name: "旅遊包", emoji: "🏝️", count: TOURISM_PACK_SIZE, required: true });
+  }
+  if (info.wpSiteType === "brand") {
+    stackedPacks.push({ name: "形象包", emoji: "🎨", count: BRAND_PACK_SIZE, required: true });
+  }
+  if (effectiveEcommerce) {
+    stackedPacks.push({ name: "電商包", emoji: "🛒", count: ECOMMERCE_PACK_SIZE, required: true });
+  }
+
+  // Plugins grouped by module for expanded view
+  const byModule = {
+    base:      allPlugins.filter((p) => p.module === "base"),
+    tourism:   allPlugins.filter((p) => p.module === "tourism"),
+    brand:     allPlugins.filter((p) => p.module === "brand"),
+    ecommerce: allPlugins.filter((p) => p.module === "ecommerce"),
+  };
 
   return (
     <div className="onboard-step-body">
-      <p className="form-hint" style={{ marginBottom: 16 }}>
-        選擇客戶網站類型，系統自動組合對應的外掛堆疊。後續由 Trigger.dev 透過 WP-CLI 安裝。
-      </p>
+      <div className="build-alert build-alert-ok" style={{ marginBottom: 16 }}>
+        <strong>外掛採疊加制</strong>：基礎包（必裝 16 個）+ 站型包 +（選用）電商包。
+        清單依據 <code>WP_CLIENT_PLUGIN_STACK.md</code>，由 Trigger.dev 透過 WP-CLI 自動安裝。
+      </div>
 
-      {/* Site type cards */}
+      {/* ── Base pack (always-on) ─────────────────────────────────────────── */}
+      <div className="dept-summary" style={{ marginBottom: 16, background: "#f0fdf4", borderColor: "#bbf7d0" }}>
+        <div className="section-title" style={{ marginBottom: 6 }}>
+          📦 基礎包 — 必裝 <strong style={{ color: "#166534" }}>{BASE_PACK_SIZE} 個</strong>
+        </div>
+        <p className="form-hint" style={{ margin: 0, fontSize: 11 }}>
+          Kadence Theme / Wordfence / WPvivid / Rank Math SEO / LiteSpeed Cache / ShortPixel / Fluent Forms+SMTP+CRM /
+          CleanTalk(↩Akismet) / GTM4WP / ACF / Complianz(選配) … 等
+        </p>
+      </div>
+
+      {/* ── Site type cards (each shows +N plugins) ────────────────────── */}
+      <div className="section-title" style={{ marginBottom: 8 }}>選擇站型 — 加疊站型專屬包</div>
       <div className="dept-cluster-grid" style={{ marginBottom: 16 }}>
-        {WP_TYPE_CARDS.map(({ type, label, desc }) => {
+        {WP_TYPE_CARDS.map(({ type, label, desc, emoji }) => {
           const active = info.wpSiteType === type;
+          const addOn =
+            type === "tourism"   ? `+${TOURISM_PACK_SIZE} 個旅遊包` :
+            type === "brand"     ? `+${BRAND_PACK_SIZE} 個形象包` :
+                                   `+${ECOMMERCE_PACK_SIZE} 個電商包（含 WooCommerce）`;
           return (
             <label
               key={type}
@@ -330,14 +416,17 @@ function Step2WpType({
                 onChange={() => applyType(type, info.hasEcommerce)}
                 style={{ marginRight: 6 }}
               />
-              <span className="dept-cluster-name">{label}</span>
+              <span className="dept-cluster-name">{emoji} {label}</span>
               <span className="dept-cluster-rows">{desc}</span>
+              <span className="dept-cluster-rows" style={{ color: active ? "#166534" : "#64748b", fontWeight: 600 }}>
+                {addOn}
+              </span>
             </label>
           );
         })}
       </div>
 
-      {/* Ecommerce checkbox */}
+      {/* ── Ecommerce checkbox (independent add-on for tourism/brand) ───── */}
       <div style={{ marginBottom: 16 }}>
         <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}>
           <input
@@ -346,51 +435,96 @@ function Step2WpType({
             disabled={info.wpSiteType === "ecommerce"}
             onChange={(e) => applyType(info.wpSiteType, e.target.checked)}
           />
-          含電商（WooCommerce）
+          ☑ 同時含電商（+{ECOMMERCE_PACK_SIZE} 個電商包 — WooCommerce / 金流 / CartFlows）
           {info.wpSiteType === "ecommerce" && (
-            <span className="form-hint" style={{ marginLeft: 4 }}>— 電商站型已強制啟用</span>
+            <span className="form-hint" style={{ marginLeft: 4 }}>— 「一般電商」站型已強制啟用</span>
           )}
         </label>
       </div>
 
-      {/* Plugin summary */}
+      {/* ── Stack breakdown summary (key feature: shows packs) ─────────── */}
       <div className="dept-summary" style={{ marginBottom: 16 }}>
-        <div className="section-title" style={{ marginBottom: 8 }}>
-          外掛堆疊摘要 — 共 {totalCount} 個外掛
-        </div>
-        <div className="build-kv-grid" style={{ marginBottom: 8 }}>
-          <div><span>可自動安裝（WP-CLI）</span><strong style={{ color: "#166534" }}>{autoCount} 個</strong></div>
+        <div className="section-title" style={{ marginBottom: 10 }}>📊 組合結果 — 已選 {stackedPacks.length} 個外掛包</div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginBottom: 12 }}>
+          <tbody>
+            {stackedPacks.map((p, i) => (
+              <tr key={p.name} style={{ borderBottom: i === stackedPacks.length - 1 ? "2px solid var(--border-subtle)" : "1px solid #f1f5f9" }}>
+                <td style={{ padding: "6px 8px", width: 36 }}>{p.emoji}</td>
+                <td style={{ padding: "6px 8px" }}>
+                  {p.name}
+                  {p.locked && <span className="form-hint" style={{ marginLeft: 6 }}>（必裝）</span>}
+                </td>
+                <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "monospace", color: "#64748b" }}>
+                  {i === 0 ? "  " : "+ "}{p.count}
+                </td>
+              </tr>
+            ))}
+            <tr>
+              <td style={{ padding: "8px" }}></td>
+              <td style={{ padding: "8px", fontWeight: 700 }}>總計</td>
+              <td style={{ padding: "8px", textAlign: "right", fontWeight: 700, fontFamily: "monospace" }}>{totalCount} 個外掛</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="build-kv-grid">
+          <div><span>🟢 自動安裝（WP.org）</span><strong style={{ color: "#166534" }}>{autoCount} 個</strong></div>
           <div>
-            <span>需手動授權（付費）</span>
+            <span>🟡 需手動上傳（付費 zip）</span>
             <strong style={{ color: paidCount > 0 ? "#92400e" : "#166534" }}>{paidCount} 個</strong>
           </div>
         </div>
-        <button
-          type="button"
-          className="btn-secondary"
-          style={{ fontSize: 12, padding: "4px 10px", marginBottom: 8 }}
-          onClick={() => setExpanded((x) => !x)}
-        >
-          {expanded ? "▲ 收起清單" : "▼ 展開完整外掛清單"}
-        </button>
-        {expanded && (
-          <div className="dept-file-list">
-            {allPlugins.map((p) => (
-              <div key={p.slug} className="dept-file-row">
-                <code className="dept-file-path">{p.slug}</code>
-                <span className="dept-file-fields" style={{ color: !p.free && !p.alternativeSlug ? "#92400e" : undefined }}>
-                  {p.label}
-                  {!p.free && p.alternativeSlug && (
-                    <span className="dept-file-recommended"> ↩ {p.alternativeSlug}</span>
-                  )}
-                  {!p.free && !p.alternativeSlug && " ⚠ 需手動安裝"}
-                  {!p.required && " †"}
-                </span>
-              </div>
-            ))}
-          </div>
+        {paidCount > 0 && (
+          <p className="form-hint" style={{ marginTop: 8, fontSize: 11 }}>
+            付費外掛清單：{info.resolvedPaidPlugins.map((p) => p.label).join(", ")}
+            <br />
+            → 上線後到該客戶 WP 後台 <code>Plugins → Add New → Upload Plugin</code> 手動上傳 zip
+          </p>
         )}
       </div>
+
+      {/* ── Expandable full plugin list grouped by module ──────────────── */}
+      <button
+        type="button"
+        className="btn-secondary"
+        style={{ fontSize: 12, padding: "4px 10px", marginBottom: 8 }}
+        onClick={() => setExpanded((x) => !x)}
+      >
+        {expanded ? "▲ 收起完整外掛清單" : "▼ 展開完整外掛清單（依模組分組）"}
+      </button>
+      {expanded && (
+        <div className="dept-summary" style={{ marginBottom: 16 }}>
+          {(["base", "tourism", "brand", "ecommerce"] as const).map((mod) => {
+            const list = byModule[mod];
+            if (list.length === 0) return null;
+            const moduleLabel =
+              mod === "base"      ? `📦 基礎包（${list.length}）` :
+              mod === "tourism"   ? `🏝️ 旅遊包（${list.length}）` :
+              mod === "brand"     ? `🎨 形象包（${list.length}）` :
+                                    `🛒 電商包（${list.length}）`;
+            return (
+              <div key={mod} style={{ marginBottom: 12 }}>
+                <div className="section-title" style={{ fontSize: 12, marginBottom: 6 }}>{moduleLabel}</div>
+                <div className="dept-file-list">
+                  {list.map((p) => (
+                    <div key={`${mod}-${p.slug}`} className="dept-file-row">
+                      <code className="dept-file-path">{p.slug}</code>
+                      <span className="dept-file-fields" style={{ color: !p.free && !p.alternativeSlug ? "#92400e" : undefined }}>
+                        {p.label}
+                        {!p.free && p.alternativeSlug && (
+                          <span className="dept-file-recommended"> ↩ {p.alternativeSlug}</span>
+                        )}
+                        {!p.free && !p.alternativeSlug && " ⚠ 需手動上傳"}
+                        {!p.required && " † 選配"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
         <button type="button" className="btn-secondary" onClick={onBack}>← 返回</button>
@@ -641,6 +775,9 @@ function Step5Launch({
   params.set("hasEcommerce", String(info.hasEcommerce));
   params.set("pluginSlugs", info.resolvedPluginSlugs.join(","));
   params.set("paidPluginCount", String(info.resolvedPaidPlugins.length));
+  if (info.sshHost)            params.set("sshHost", info.sshHost);
+  if (info.wpPath)             params.set("wpPath", info.wpPath);
+  if (info.sshCredentialsRef)  params.set("sshCredentialsRef", info.sshCredentialsRef);
 
   const buildUrl = `/build?${params.toString()}`;
 
@@ -660,6 +797,12 @@ function Step5Launch({
           <span>外掛總數</span>
           <strong>
             {totalPlugins}（可自動安裝 {info.resolvedPluginSlugs.length} / 需手動授權 {info.resolvedPaidPlugins.length}）
+          </strong>
+        </div>
+        <div>
+          <span>SSH host</span>
+          <strong style={{ color: info.sshHost ? "#166534" : "#92400e", fontFamily: info.sshHost ? "monospace" : undefined, fontSize: 11 }}>
+            {info.sshHost || "未填 — 一鍵安裝外掛將跳過（hosting adapter 之後可補）"}
           </strong>
         </div>
         <div><span>Departments</span><strong>{selectedDepts.size} / 20</strong></div>

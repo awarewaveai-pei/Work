@@ -85,6 +85,12 @@ export interface BuildRunRequest {
   pluginSlugs?: string[];
   /** Count of paid plugins with no free alternative — operator must install manually */
   paidPluginCount?: number;
+  /** SSH host of the target WordPress server (operator-supplied for existing clients, or auto-filled by hosting adapter for new ones) */
+  sshHost?: string;
+  /** WordPress root path on the SSH host. Defaults to /var/www/html when omitted. */
+  wpPath?: string;
+  /** Vault reference for SSH credentials (e.g. vault://ssh/<client-slug>); never contains the key itself */
+  sshCredentialsRef?: string;
   provider?: BuildProvider;
   locale?: string;
   credentialsRef?: string;
