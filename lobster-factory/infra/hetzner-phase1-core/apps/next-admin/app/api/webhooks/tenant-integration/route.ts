@@ -5,7 +5,7 @@ import { verifyIngestToken } from "@/lib/ops-inbox/verifyIngestToken";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PROVIDER_RE = /^[a-z][a-z0-9_]{0,63}$/;
 const SOURCES = new Set(["manual", "n8n", "trigger", "build_console", "cli"]);
 const STATUSES = new Set(["pending", "active", "failed", "revoked"]);

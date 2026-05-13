@@ -32,6 +32,11 @@ services:
       - /etc/nginx/.htpasswd_studio:/etc/nginx/.htpasswd_studio:ro
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.50'
     logging: *lobster-logging
 
   redis:
@@ -50,6 +55,11 @@ services:
       retries: 5
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
     logging: *lobster-logging
 
   # Canonical self-hosted n8n for AwareWave is on EU (see SERVICE_CREDENTIALS_MAP.md).
@@ -96,6 +106,11 @@ services:
       start_period: 40s
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
     logging: *lobster-logging
 
   wordpress-db:
@@ -123,6 +138,11 @@ services:
       start_period: 40s
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.00'
     logging: *lobster-logging
 
   wordpress:
@@ -165,6 +185,11 @@ services:
       start_period: 90s
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: '0.50'
     logging: *lobster-logging
 
   node-api:
@@ -198,6 +223,11 @@ services:
       start_period: 25s
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
     logging: *lobster-logging
 
   next-admin:
@@ -264,6 +294,11 @@ services:
       start_period: 50s
     networks:
       - lobster-net
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.00'
     logging: *lobster-logging
 
 networks:
