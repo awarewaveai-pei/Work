@@ -221,28 +221,17 @@ function Format-Summary {
     param($Results, [string]$Mode)
     if (-not $Results) { Write-Warn 'No results JSON found'; return }
 
-    $suites = $Results.suites
-    $passed = 0; $failed = 0; $skipped = 0
+    # Playwright JSON output has a top-level "stats" object — use it directly
+    $stats   = $Results.stats
+    $passed  = if ($stats.expected)   { $stats.expected  } else { 0 }
+    $failed  = if ($stats.unexpected) { $stats.unexpected } else { 0 }
+    $skipped = if ($stats.skipped)    { $stats.skipped   } else { 0 }
+    $total   = $passed + $failed + $skipped
+    $icon    = if ($failed -eq 0) { 'PASSED' } else { 'FAILED' }
 
-    function Count-Results { param($Suite)
-        foreach ($spec in $Suite.specs) {
-            foreach ($test in $spec.tests) {
-                switch ($test.status) {
-                    'expected'   { $script:passed++  }
-                    'skipped'    { $script:skipped++ }
-                    default      { $script:failed++  }
-                }
-            }
-        }
-        foreach ($child in $Suite.suites) { Count-Results $child }
-    }
-    foreach ($s in $suites) { Count-Results $s }
-
-    $total = $passed + $failed + $skipped
-    $icon  = if ($failed -eq 0) { '✔' } else { '✘' }
     Write-Host ""
-    Write-Host "── Playwright $Mode results ────────────────────────────" -ForegroundColor Cyan
-    Write-Host "   $icon  Passed: $passed   Failed: $failed   Skipped: $skipped   Total: $total"
+    Write-Host "── Playwright $Mode results ───────────────────────────" -ForegroundColor Cyan
+    Write-Host "   [$icon]  Passed: $passed   Failed: $failed   Skipped: $skipped   Total: $total"
     if ($failed -gt 0) {
         Write-Host "   Report: $ModeArchive\playwright-report\index.html" -ForegroundColor Yellow
     }
