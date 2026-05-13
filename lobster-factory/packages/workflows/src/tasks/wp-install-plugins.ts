@@ -1,9 +1,6 @@
 import { task, logger } from "@trigger.dev/sdk";
 import { z } from "zod";
-import { spawn } from "node:child_process";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { Client } from "ssh2";
 import { newUuid } from "../utils/uid";
 import { buildPackageInstallRunInsertSql } from "../db/sql/packageInstallRunsSql";
 import { buildPackageInstallRunRow } from "../db/sql/packageInstallRunsSql";
@@ -37,31 +34,64 @@ const InputSchema = z.object({
   buildRunId: z.string().uuid(),
 });
 
+// ── Per-client SSH key resolution ─────────────────────────────────────────────
+//
+// Each client can have its own key stored as:
+//   LOBSTER_SSH_KEY_<REF>   e.g. vault://ssh/mongolia-travel → LOBSTER_SSH_KEY_SSH_MONGOLIA_TRAVEL
+// Falls back to the global LOBSTER_WP_SSH_PRIVATE_KEY for backward compat.
+// This prevents a single key compromise from exposing all client servers.
+
+function resolvePrivateKey(sshCredentialsRef: string): string {
+  const envKey = "LOBSTER_SSH_KEY_" + sshCredentialsRef
+    .replace(/^vault:\/\//, "")
+    .replace(/[^a-z0-9]/gi, "_")
+    .toUpperCase();
+  return process.env[envKey] || process.env.LOBSTER_WP_SSH_PRIVATE_KEY || "";
+}
+
 // ── SSH exec helper ───────────────────────────────────────────────────────────
+// Uses ssh2 npm (no system `ssh` binary needed — works in any Node container).
+// Private key is passed as content directly; never written to disk.
 
 async function sshExec(
   host: string,
   user: string,
-  keyPath: string,
+  privateKey: string,
   command: string,
   timeoutMs = 60_000
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const args = [
-      "-i", keyPath,
-      "-o", "StrictHostKeyChecking=no",
-      "-o", "BatchMode=yes",
-      "-o", "ConnectTimeout=15",
-      `${user}@${host}`,
-      command,
-    ];
+    const conn = new Client();
     let stdout = "";
     let stderr = "";
-    const proc = spawn("ssh", args, { timeout: timeoutMs });
-    proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
-    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
-    proc.on("close", (code) => resolve({ exitCode: code ?? 1, stdout, stderr }));
-    proc.on("error", (err) => resolve({ exitCode: 1, stdout, stderr: err.message }));
+    let settled = false;
+
+    const settle = (result: { exitCode: number; stdout: string; stderr: string }) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        try { conn.end(); } catch { /* ignore close errors */ }
+        resolve(result);
+      }
+    };
+
+    const timer = setTimeout(
+      () => settle({ exitCode: 1, stdout, stderr: "SSH connection timed out" }),
+      timeoutMs
+    );
+
+    conn.on("ready", () => {
+      conn.exec(command, (err, stream) => {
+        if (err) { settle({ exitCode: 1, stdout, stderr: err.message }); return; }
+        stream.on("data", (d: Buffer) => { stdout += d.toString(); });
+        stream.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+        stream.on("close", (code: number) => settle({ exitCode: code ?? 1, stdout, stderr }));
+      });
+    });
+
+    conn.on("error", (err) => settle({ exitCode: 1, stdout, stderr: err.message }));
+
+    conn.connect({ host, port: 22, username: user, privateKey, readyTimeout: 15_000 });
   });
 }
 
@@ -103,20 +133,14 @@ export const wpInstallPlugins = task({
       const execMode = (process.env.LOBSTER_EXECUTE_MANIFEST_STEPS || "").toLowerCase();
       const willRunSsh = execMode === "true" || execMode === "1";
 
-      // SSH private key — never log, never store in DB
-      const sshPrivateKey = process.env.LOBSTER_WP_SSH_PRIVATE_KEY || "";
+      // SSH private key — per-client resolution, never logged, never stored in DB
+      const sshPrivateKey = resolvePrivateKey(input.sshCredentialsRef);
       if (willRunSsh && !sshPrivateKey) {
         throw new Error(
-          "LOBSTER_EXECUTE_MANIFEST_STEPS=true but LOBSTER_WP_SSH_PRIVATE_KEY is not set"
+          `LOBSTER_EXECUTE_MANIFEST_STEPS=true but no SSH key found. ` +
+          `Set LOBSTER_SSH_KEY_${input.sshCredentialsRef.replace(/^vault:\/\//, "").replace(/[^a-z0-9]/gi, "_").toUpperCase()} ` +
+          `(per-client) or LOBSTER_WP_SSH_PRIVATE_KEY (global fallback).`
         );
-      }
-
-      // Write key to temp file (never log the path with key content)
-      let keyPath = "";
-      if (willRunSsh) {
-        const tmpDir = await mkdtemp(join(tmpdir(), "lobster-wp-"));
-        keyPath = join(tmpDir, "id");
-        await writeFile(keyPath, sshPrivateKey, { mode: 0o600 });
       }
 
       const result: WpInstallPluginsResult = {
@@ -134,11 +158,13 @@ export const wpInstallPlugins = task({
         let errorMsg = "";
 
         if (willRunSsh) {
-          const cmd = `wp plugin install ${slug} --activate --path=${input.wpPath} --allow-root`;
+          // --force: reinstall even if already installed (idempotent)
+          // --skip-plugins: prevents broken plugins from blocking WP-CLI itself
+          const cmd = `wp plugin install ${slug} --activate --force --skip-plugins --path=${input.wpPath} --allow-root`;
           const { exitCode, stdout, stderr } = await sshExec(
             input.sshHost,
             input.sshUser,
-            keyPath,
+            sshPrivateKey,
             cmd
           );
 
@@ -245,11 +271,6 @@ export const wpInstallPlugins = task({
             }
           }
         }
-      }
-
-      // Clean up temp key file
-      if (keyPath) {
-        await rm(dirname(keyPath), { recursive: true, force: true }).catch(() => {});
       }
 
       const summary = {

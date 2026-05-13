@@ -28,6 +28,13 @@ export interface WpPlugin {
    * Omit if there is no free substitute and the plugin must be installed manually.
    */
   alternativeSlug?: string;
+  /**
+   * Server-side condition for installation.
+   * "is_litespeed" — only install on LiteSpeed hosts; skip on Nginx/Apache.
+   * When set, the plugin is excluded from auto-install and shown separately as conditional.
+   * Operator must explicitly enable via LOBSTER_CONDITION_<NAME>=true env var or manifest override.
+   */
+  condition?: "is_litespeed";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,7 +51,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   { slug: "wpvivid-backups-and-migration",    label: "WPvivid Backup",                             free: true,  required: true,  module: "base" },
   { slug: "seo-by-rank-math",                 label: "Rank Math SEO",                              free: true,  required: true,  module: "base" },
   { slug: "redirection",                      label: "Redirection",                                free: true,  required: true,  module: "base" },
-  { slug: "litespeed-cache",                  label: "LiteSpeed Cache ★",                          free: true,  required: true,  module: "base" },
+  { slug: "litespeed-cache",                  label: "LiteSpeed Cache ★",                          free: true,  required: true,  module: "base", condition: "is_litespeed" },
   { slug: "shortpixel-image-optimiser",       label: "ShortPixel Image Optimiser ★",               free: true,  required: true,  module: "base" },
   { slug: "really-simple-ssl",               label: "Really Simple SSL",                          free: true,  required: true,  module: "base" },
   { slug: "fluentform",                       label: "Fluent Forms",                               free: true,  required: true,  module: "base" },
@@ -157,21 +164,22 @@ export function resolvePluginStack(
  * Returns slugs that can be directly passed to `wp plugin install <slug> --activate`.
  *
  * Logic per entry in resolvePluginStack:
+ *   condition set                      → skip (conditional: not auto-installed, shown separately)
  *   free: true                         → use plugin.slug
  *   free: false + alternativeSlug      → use alternativeSlug (free fallback ↩)
  *   free: false + no alternativeSlug   → skip (operator must install manually)
+ * Deduplicates: same slug appearing in multiple modules (e.g. CPT UI in tourism+brand) is installed once.
  */
 export function resolveInstallableSlugs(
   siteType: WpSiteType,
   hasEcommerce: boolean
 ): string[] {
+  const seen = new Set<string>();
   const slugs: string[] = [];
   for (const plugin of resolvePluginStack(siteType, hasEcommerce)) {
-    if (plugin.free) {
-      slugs.push(plugin.slug);
-    } else if (plugin.alternativeSlug) {
-      slugs.push(plugin.alternativeSlug);
-    }
+    if (plugin.condition) continue;
+    const slug = plugin.free ? plugin.slug : plugin.alternativeSlug;
+    if (slug && !seen.has(slug)) { seen.add(slug); slugs.push(slug); }
   }
   return slugs;
 }
@@ -200,12 +208,18 @@ export function resolvePluginsForPacks(packs: WpPluginModule[]): WpPlugin[] {
   return WP_PLUGIN_CATALOG.filter((p) => packSet.has(p.module));
 }
 
-/** Returns slugs for `wp plugin install --activate`. Same logic as resolveInstallableSlugs. */
+/**
+ * Returns slugs for `wp plugin install --activate`.
+ * Skips: conditional plugins (e.g. litespeed-cache on non-LiteSpeed hosts), paid-no-alt plugins.
+ * Deduplicates: same slug appearing in multiple modules (CPT UI in tourism+brand) is listed once.
+ */
 export function resolveInstallableSlugsForPacks(packs: WpPluginModule[]): string[] {
+  const seen = new Set<string>();
   const slugs: string[] = [];
   for (const plugin of resolvePluginsForPacks(packs)) {
-    if (plugin.free) slugs.push(plugin.slug);
-    else if (plugin.alternativeSlug) slugs.push(plugin.alternativeSlug);
+    if (plugin.condition) continue;
+    const slug = plugin.free ? plugin.slug : plugin.alternativeSlug;
+    if (slug && !seen.has(slug)) { seen.add(slug); slugs.push(slug); }
   }
   return slugs;
 }
@@ -213,6 +227,21 @@ export function resolveInstallableSlugsForPacks(packs: WpPluginModule[]): string
 /** Returns paid plugins with no free alternative — must be installed manually. */
 export function resolvePaidPluginsForPacks(packs: WpPluginModule[]): WpPlugin[] {
   return resolvePluginsForPacks(packs).filter((p) => !p.free && !p.alternativeSlug);
+}
+
+/**
+ * Returns plugins with a server-side condition (e.g. litespeed-cache).
+ * These are shown to the operator but NOT auto-installed — requires explicit host-type confirmation.
+ * Deduplicates cross-module entries.
+ */
+export function resolveConditionalPlugins(packs: WpPluginModule[]): WpPlugin[] {
+  const seen = new Set<string>();
+  return resolvePluginsForPacks(packs).filter((p) => {
+    if (!p.condition) return false;
+    if (seen.has(p.slug)) return false;
+    seen.add(p.slug);
+    return true;
+  });
 }
 
 /** Auto-derives container manifest slug from selected packs. */

@@ -16,6 +16,7 @@ import {
   resolvePluginsForPacks,
   resolveInstallableSlugsForPacks,
   resolvePaidPluginsForPacks,
+  resolveConditionalPlugins,
   derivePackageSlugFromPacks,
   type WpPluginModule,
   type WpPlugin,
@@ -46,8 +47,9 @@ interface ClientInfo {
   siteId: string;
   // WP Plugin Stack — additive pack model (base always-on + optional addon packs)
   selectedPacks: WpPluginModule[];
-  resolvedPluginSlugs: string[];
-  resolvedPaidPlugins: WpPlugin[];
+  resolvedPluginSlugs: string[];       // free auto-installable (no condition)
+  resolvedConditionalPlugins: WpPlugin[]; // conditional (e.g. litespeed on LiteSpeed host only)
+  resolvedPaidPlugins: WpPlugin[];     // paid, no free alt — manual upload required
   // SSH connection target — passes to wp-install-plugins task
   // (operator-supplied for existing clients; left empty when hosting adapter will provide)
   sshHost: string;
@@ -63,15 +65,72 @@ interface ProvResult {
   detail?: string;
 }
 
+// Netdata is infra-level (monitors VPS, not per-client) — intentionally excluded.
 const PROVIDERS = [
-  { id: "sentry",      label: "Sentry",      desc: "建立 project + DSN" },
-  { id: "posthog",     label: "PostHog",      desc: "建立 project + API key" },
-  { id: "uptime_kuma", label: "Uptime Kuma",  desc: "建立 HTTP monitor" },
-  { id: "n8n",         label: "n8n",          desc: "複製 onboarding workflow" },
-  { id: "github",      label: "GitHub",       desc: "建立 client repo" },
-  { id: "trigger",     label: "Trigger.dev",  desc: "建立 project + token" },
-  { id: "supabase",    label: "Supabase",     desc: "建立 cloud project" },
-];
+  {
+    id: "sentry", label: "Sentry", icon: "🔴",
+    desc: "Error tracking — 建立 project + DSN",
+    hintDefs: [
+      { key: "sentryProjectSlug", label: "Project Slug" },
+      { key: "sentryProjectName", label: "Project Name" },
+    ],
+  },
+  {
+    id: "posthog", label: "PostHog", icon: "🦔",
+    desc: "Product analytics — 建立 project + API key",
+    hintDefs: [
+      { key: "posthogProjectName", label: "Project Name" },
+    ],
+  },
+  {
+    id: "uptime_kuma", label: "Uptime Kuma", icon: "📡",
+    desc: "Uptime monitoring — 建立 HTTP monitor",
+    hintDefs: [
+      { key: "uptimeMonitorUrl",  label: "Monitor URL" },
+      { key: "uptimeMonitorName", label: "Monitor Name" },
+    ],
+  },
+  {
+    id: "n8n", label: "n8n", icon: "⚡",
+    desc: "Automation — 複製 onboarding workflow",
+    hintDefs: [
+      { key: "n8nWorkflowSuffix", label: "Workflow Suffix" },
+    ],
+  },
+  {
+    id: "github", label: "GitHub", icon: "🐙",
+    desc: "Source control — 建立 client repo",
+    hintDefs: [
+      { key: "githubRepoName", label: "Repo Name" },
+    ],
+  },
+  {
+    id: "trigger", label: "Trigger.dev", icon: "🎯",
+    desc: "Job runner — 建立 project + deploy token",
+    hintDefs: [] as { key: string; label: string }[],
+  },
+  {
+    id: "supabase", label: "Supabase", icon: "🌊",
+    desc: "Database — 建立 cloud project + schema",
+    hintDefs: [] as { key: string; label: string }[],
+  },
+] satisfies Array<{ id: string; label: string; icon: string; desc: string; hintDefs: { key: string; label: string }[] }>;
+
+function getHintPlaceholders(info: ClientInfo): Record<string, string> {
+  const siteUrl =
+    info.profile === "profile_b"
+      ? `https://${info.domain || "client.com"}`
+      : info.siteUrl || "https://client.com";
+  return {
+    sentryProjectSlug:  info.tenantSlug  || "client-slug",
+    sentryProjectName:  info.clientName  || "Client Name",
+    posthogProjectName: info.clientName  || "Client Name",
+    githubRepoName:     info.tenantSlug  || "client-site",
+    uptimeMonitorUrl:   siteUrl,
+    uptimeMonitorName:  info.clientName  || "Client Site",
+    n8nWorkflowSuffix:  info.tenantSlug  || "client-name",
+  };
+}
 
 const GROUP_ORDER: DepartmentCluster["group"][] = [
   "core", "revenue", "supply_chain", "platform", "support", "horizontal", "cross_border",
@@ -103,6 +162,7 @@ function makeDefaultClient(): ClientInfo {
     siteId: randomUUID(),
     selectedPacks: [],
     resolvedPluginSlugs: resolveInstallableSlugsForPacks([]),
+    resolvedConditionalPlugins: resolveConditionalPlugins([]),
     resolvedPaidPlugins: resolvePaidPluginsForPacks([]),
     sshHost: "",
     wpPath: "/var/www/html",
@@ -327,6 +387,7 @@ function Step2WpType({
     onChange({
       selectedPacks: packs,
       resolvedPluginSlugs: resolveInstallableSlugsForPacks(packs),
+      resolvedConditionalPlugins: resolveConditionalPlugins(packs),
       resolvedPaidPlugins: resolvePaidPluginsForPacks(packs),
       packageSlug: derivePackageSlugFromPacks(packs),
     });
@@ -339,10 +400,11 @@ function Step2WpType({
     applyPacks(next);
   };
 
-  const allPlugins = resolvePluginsForPacks(info.selectedPacks);
-  const totalCount = allPlugins.length;
-  const autoCount  = info.resolvedPluginSlugs.length;
-  const paidCount  = info.resolvedPaidPlugins.length;
+  const allPlugins       = resolvePluginsForPacks(info.selectedPacks);
+  const totalCount       = allPlugins.length;
+  const autoCount        = info.resolvedPluginSlugs.length;
+  const conditionalCount = info.resolvedConditionalPlugins.length;
+  const paidCount        = info.resolvedPaidPlugins.length;
 
   // Stack breakdown rows
   const stackRows: { name: string; emoji: string; count: number; locked?: boolean }[] = [
@@ -436,15 +498,25 @@ function Step2WpType({
         <div className="build-kv-grid">
           <div><span>🟢 自動安裝（WP.org）</span><strong style={{ color: "#166534" }}>{autoCount} 個</strong></div>
           <div>
+            <span>🔵 條件安裝（LiteSpeed 主機才裝）</span>
+            <strong style={{ color: "#1d4ed8" }}>{conditionalCount} 個</strong>
+          </div>
+          <div>
             <span>🟡 需手動上傳（付費 zip）</span>
             <strong style={{ color: paidCount > 0 ? "#92400e" : "#166534" }}>{paidCount} 個</strong>
           </div>
         </div>
+        {conditionalCount > 0 && (
+          <p className="form-hint" style={{ marginTop: 6, fontSize: 11, color: "#1d4ed8" }}>
+            條件外掛：{info.resolvedConditionalPlugins.map((p) => p.slug).join(", ")}
+            &nbsp;— 只在 LiteSpeed 主機上安裝（Hostinger VPS 預設是 LiteSpeed；Cloudways/Nginx 不裝）
+          </p>
+        )}
         {paidCount > 0 && (
-          <p className="form-hint" style={{ marginTop: 8, fontSize: 11 }}>
-            付費外掛清單：{info.resolvedPaidPlugins.map((p) => p.label).join(", ")}
+          <p className="form-hint" style={{ marginTop: 6, fontSize: 11 }}>
+            付費外掛：{info.resolvedPaidPlugins.map((p) => p.label).join(", ")}
             <br />
-            → 上線後到該客戶 WP 後台 <code>Plugins → Add New → Upload Plugin</code> 手動上傳 zip
+            → 上線後到客戶 WP 後台 <code>Plugins → Add New → Upload Plugin</code> 手動上傳 zip
           </p>
         )}
       </div>
@@ -633,56 +705,117 @@ function Step4Svc({
   onNext: () => void;
   onBack: () => void;
 }) {
-  const toggle = (id: string) => {
+  const toggle = (id: string) =>
     onProvidersChange(
       providers.includes(id) ? providers.filter((p) => p !== id) : [...providers, id]
     );
-  };
+
+  const allIds = PROVIDERS.map((p) => p.id);
+  const allSelected = allIds.every((id) => providers.includes(id));
+  const placeholders = getHintPlaceholders(info);
+
+  const setHint = (key: string, value: string) =>
+    onHintsChange({ ...hints, [key]: value });
 
   return (
     <div className="onboard-step-body">
-      <p className="form-hint" style={{ marginBottom: 16 }}>
-        選擇要為此客戶建立的外部服務帳號。系統使用 master token（已存於 Trigger worker 環境變數），
-        為每位客戶建立獨立 project／monitor／DSN，結果寫入 Supabase{" "}
-        <code>tenant_integration_bindings</code>。
+      <p className="form-hint" style={{ marginBottom: 12 }}>
+        系統使用 master token（已存於 Trigger worker 環境）為每位客戶建立獨立 project／monitor／DSN，
+        結果寫入 Supabase <code>tenant_integration_bindings</code>。
+        留空 Hints 使用自動衍生值（顯示於 placeholder）。
       </p>
 
-      <div className="dept-cluster-grid" style={{ marginBottom: 16 }}>
-        {PROVIDERS.map((p) => (
-          <label
-            key={p.id}
-            className={`dept-cluster-card ${providers.includes(p.id) ? "selected" : ""}`}
-          >
-            <input type="checkbox" checked={providers.includes(p.id)} onChange={() => toggle(p.id)} />
-            <span className="dept-cluster-name">{p.label}</span>
-            <span className="dept-cluster-rows">{p.desc}</span>
-          </label>
-        ))}
+      {/* ── Bulk controls ─────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <span className="section-title" style={{ marginBottom: 0 }}>
+          已選 {providers.length} / {PROVIDERS.length} 個服務
+        </span>
+        <button type="button" className="btn-secondary"
+          style={{ fontSize: 12, padding: "3px 10px" }}
+          onClick={() => onProvidersChange(allSelected ? [] : allIds)}>
+          {allSelected ? "全部取消" : "全選 7 個"}
+        </button>
       </div>
 
-      <div className="section-title" style={{ marginBottom: 8 }}>選填 Hints（留空使用預設）</div>
-      <div className="build-form-grid">
-        {[
-          { key: "sentryProjectSlug",   label: "Sentry project slug",  ph: "client-slug" },
-          { key: "sentryProjectName",   label: "Sentry project name",  ph: info.clientName || "Client Name" },
-          { key: "posthogProjectName",  label: "PostHog project name", ph: info.clientName || "Client Name" },
-          { key: "githubRepoName",      label: "GitHub repo name",     ph: info.tenantSlug || "client-site" },
-          { key: "uptimeMonitorUrl",    label: "Uptime monitor URL",   ph: info.profile === "profile_b" ? `https://${info.domain || "client.com"}` : info.siteUrl || "https://client.com" },
-          { key: "uptimeMonitorName",   label: "Uptime monitor name",  ph: info.clientName || "Client Site" },
-          { key: "n8nWorkflowSuffix",   label: "n8n workflow suffix",  ph: info.tenantSlug || "client-name" },
-        ].map(({ key, label, ph }) => (
-          <div key={key} className="form-row">
-            <label className="form-label">{label}</label>
-            <input className="form-input" value={hints[key] ?? ""}
-              onChange={(e) => onHintsChange({ ...hints, [key]: e.target.value })}
-              placeholder={ph} />
-          </div>
-        ))}
+      {/* ── Per-service cards ─────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        {PROVIDERS.map((p) => {
+          const active = providers.includes(p.id);
+          return (
+            <div
+              key={p.id}
+              style={{
+                border: `1px solid ${active ? "#3b82f6" : "var(--border-subtle, #e2e8f0)"}`,
+                borderLeft: `4px solid ${active ? "#3b82f6" : "#cbd5e1"}`,
+                borderRadius: 8,
+                padding: "14px 16px",
+                background: active ? "#f0f9ff" : "var(--surface-bg, #fff)",
+                opacity: active ? 1 : 0.65,
+                transition: "all 0.15s",
+              }}
+            >
+              {/* Header row */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                    <span style={{ fontSize: 20 }}>{p.icon}</span>
+                    <strong style={{ fontSize: 15 }}>{p.label}</strong>
+                  </div>
+                  <span className="form-hint" style={{ margin: 0 }}>{p.desc}</span>
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", flexShrink: 0, marginLeft: 16 }}>
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={() => toggle(p.id)}
+                    style={{ width: 16, height: 16 }}
+                  />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: active ? "#1d4ed8" : "#94a3b8" }}>
+                    {active ? "✓ 開通" : "略過"}
+                  </span>
+                </label>
+              </div>
+
+              {/* Hint fields (always visible; disabled when not selected) */}
+              {p.hintDefs.length > 0 && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: p.hintDefs.length > 1 ? "1fr 1fr" : "1fr",
+                    gap: "8px 12px",
+                    marginTop: 12,
+                  }}
+                >
+                  {p.hintDefs.map(({ key, label }) => (
+                    <div key={key} className="form-row" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontSize: 11, marginBottom: 3 }}>{label}</label>
+                      <input
+                        className="form-input"
+                        style={{ fontSize: 12, opacity: active ? 1 : 0.5 }}
+                        value={hints[key] ?? ""}
+                        onChange={(e) => setHint(key, e.target.value)}
+                        placeholder={`自動：${placeholders[key] ?? "—"}`}
+                        disabled={!active}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {p.hintDefs.length === 0 && active && (
+                <p className="form-hint" style={{ margin: "10px 0 0", fontSize: 11, color: "#64748b" }}>
+                  自動建立 — 不需要額外設定
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {provResult ? (
+      {/* ── Result banner ─────────────────────────────────────────────────── */}
+      {provResult && (
         <div className={`build-alert ${provResult.ok ? "build-alert-ok" : "build-alert-blocked"}`}
-          style={{ marginTop: 12 }}>
+          style={{ marginBottom: 12 }}>
           {provResult.ok ? (
             <>
               ✓ Trigger.dev 已接受 — runId: <code>{provResult.runId ?? "unknown"}</code>
@@ -692,15 +825,21 @@ function Step4Svc({
             <>Error: {provResult.error}{provResult.detail ? <><br />{provResult.detail}</> : null}</>
           )}
         </div>
-      ) : null}
+      )}
 
-      <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+      <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
         <button type="button" className="btn-secondary" onClick={onBack}>← 返回</button>
-        <button type="button" className="btn-secondary" disabled={loading || providers.length === 0} onClick={onSubmit}>
-          {loading ? "開通中…" : `一鍵開通 ${providers.length} 個服務`}
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={loading || providers.length === 0}
+          onClick={onSubmit}
+          style={{ fontWeight: 600 }}
+        >
+          {loading ? "開通中…" : `⚡ 一鍵開通 ${providers.length} 個服務`}
         </button>
         <button type="button" className="btn-primary" onClick={onNext}>
-          {provResult?.ok ? "下一步 → 啟動 Build ✓" : "跳過，直接啟動 Build →"}
+          {provResult?.ok ? "下一步 → 啟動 Build ✓" : "跳過 →"}
         </button>
       </div>
     </div>
