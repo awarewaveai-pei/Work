@@ -83,23 +83,36 @@ if (-not (Test-Path -LiteralPath $memIndex)) {
 }
 
 # ── 3. Resolve sync root ──────────────────────────────────────────────────────
+# Structure on Google Drive:
+#   G:\<MyDrive>\EverydayPW\AO-SYNC\        <- AO_SYNC_ROOT (MEMORY.md daily folders)
+#   G:\<MyDrive>\EverydayPW\                <- AO_SYNC_SECRETS_ROOT (user-env, .ssh, CREDS)
+#
+# Auto-detect searches for the AO-SYNC folder inside MyDrive (depth ≤ 2),
+# so it correctly resolves EverydayPW\AO-SYNC rather than joining at the wrong level.
 $syncRoot = if ($DestRoot) {
     $DestRoot
 } elseif ($env:AO_SYNC_ROOT) {
     $env:AO_SYNC_ROOT
 } else {
-    # Auto-detect Google Drive by scanning G:\ for its first child directory.
-    # Avoids hardcoding non-ASCII folder names that fail across locales/encodings.
-    $gdRoot = $null
+    $detected = $null
     if (Test-Path "G:\") {
-        $gdRoot = Get-ChildItem "G:\" -Directory -ErrorAction SilentlyContinue |
-                  Select-Object -First 1 -ExpandProperty FullName
+        $myDrive = Get-ChildItem "G:\" -Directory -ErrorAction SilentlyContinue |
+                   Select-Object -First 1 -ExpandProperty FullName
+        if ($myDrive) {
+            # Search for an existing AO-SYNC folder up to 2 levels deep (e.g. EverydayPW\AO-SYNC)
+            $detected = Get-ChildItem -Path $myDrive -Filter "AO-SYNC" -Directory `
+                            -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+                        Select-Object -First 1 -ExpandProperty FullName
+        }
     }
-    if ($gdRoot) {
-        Join-Path $gdRoot "AO-SYNC"
-    } else {
-        Join-Path $env:USERPROFILE "Desktop"
-    }
+    if ($detected) { $detected } else { Join-Path $env:USERPROFILE "Desktop" }
+}
+
+# Auto-derive secrets root from sync root when env var is absent:
+#   EverydayPW\AO-SYNC -> parent = EverydayPW  (where user-env, .ssh, CREDS live)
+if (-not $env:AO_SYNC_SECRETS_ROOT -and $syncRoot -ne (Join-Path $env:USERPROFILE "Desktop")) {
+    $env:AO_SYNC_SECRETS_ROOT = Split-Path $syncRoot -Parent
+    Write-Host "  auto-derived: AO_SYNC_SECRETS_ROOT = $env:AO_SYNC_SECRETS_ROOT" -ForegroundColor DarkGray
 }
 
 # Each machine writes to its own subfolder: AO-SYNC-<date>-<MACHINE>

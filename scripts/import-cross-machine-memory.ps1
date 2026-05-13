@@ -68,14 +68,25 @@ if ($env:AO_SYNC_ROOT) {
     # Mixing paths with the same folder names causes the wrong version to be picked.
     $searchRoots += $env:AO_SYNC_ROOT
 } else {
-    # Auto-detect Google Drive by scanning G:\ for its first child directory.
+    # Auto-detect: search for the AO-SYNC folder inside Google Drive (depth ≤ 2).
+    # Resolves G:\<MyDrive>\EverydayPW\AO-SYNC correctly without hardcoding folder names.
     $gdFound = $false
     if (Test-Path "G:\") {
-        $gdRoot = Get-ChildItem "G:\" -Directory -ErrorAction SilentlyContinue |
-                  Select-Object -First 1 -ExpandProperty FullName
-        if ($gdRoot) {
-            $searchRoots += (Join-Path $gdRoot "AO-SYNC")
-            $gdFound = $true
+        $myDrive = Get-ChildItem "G:\" -Directory -ErrorAction SilentlyContinue |
+                   Select-Object -First 1 -ExpandProperty FullName
+        if ($myDrive) {
+            $detected = Get-ChildItem -Path $myDrive -Filter "AO-SYNC" -Directory `
+                            -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+                        Select-Object -First 1 -ExpandProperty FullName
+            if ($detected) {
+                $searchRoots += $detected
+                $gdFound = $true
+                # Auto-derive secrets root from AO-SYNC location (parent = EverydayPW)
+                if (-not $env:AO_SYNC_SECRETS_ROOT) {
+                    $env:AO_SYNC_SECRETS_ROOT = Split-Path $detected -Parent
+                    Write-Host "  auto-derived: AO_SYNC_SECRETS_ROOT = $env:AO_SYNC_SECRETS_ROOT" -ForegroundColor DarkGray
+                }
+            }
         }
     }
     # Desktop fallback only when Google Drive auto-detect also finds nothing.
