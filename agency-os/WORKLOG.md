@@ -13,6 +13,12 @@
 - 文件同步：`docs/awarewave-repair-center-app-architecture.md`、`docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`、`agency-os/docs/operations/slack-notification-routing.md`、`CLAUDE.md`。
 - 驗證：`npm run build` in `lobster-factory/infra/hetzner-phase1-core/apps/next-admin` PASS；僅餘既有 Sentry setup warning 與 `ssh2` optional native dependency warning。
 
+### Codex 2026-05-13 — Repair backup gate hardening
+- 補強 pre-repair backup gate：若 `AUTO_REPAIR_BACKUP_WEBHOOK_URL` 存在就走 webhook；否則走 SSH fallback，跑既有 SG `backup-phase1.sh` + `verify-backup.sh`，以及 EU `/root/scripts/backup-eu-stack.sh` + `verify-backup-eu.sh`（EU 預設 required）。
+- 新增 `lib/repair-center/ssh.ts` 與 `/api/ops/repairs/health`，讓 UI 和 smoke test 可看到 backup/GitHub/Slack/System Mode gate。
+- `/ops/repairs` Safety panel 改為辨識 webhook/SSH backup gate，不再只看 webhook env。
+- 驗證：`npm run build` PASS；仍只有既有 Sentry setup warning 與 `ssh2` optional native dependency warning。
+
 ## 2026-05-12
 
 ### Daily
