@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import http from "node:http";
+import https from "node:https";
 import path from "node:path";
 import process from "node:process";
-import { createClient } from "@supabase/supabase-js";
-import dotenv from "dotenv";
 
-dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+loadDotenv(path.resolve(process.cwd(), ".env.local"));
+loadDotenv(path.resolve(process.cwd(), ".env"));
 
 const root = process.cwd();
 const args = new Map();
@@ -34,6 +34,22 @@ function env(name) {
   return (process.env[name] ?? "").trim();
 }
 
+function loadDotenv(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const text = fs.readFileSync(filePath, "utf8");
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const idx = trimmed.indexOf("=");
+    const key = trimmed.slice(0, idx).trim();
+    let value = trimmed.slice(idx + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (key && process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
 function envConfigured(name) {
   return Boolean(env(name));
 }
@@ -41,6 +57,37 @@ function envConfigured(name) {
 function checkFile(rel, label = rel) {
   if (exists(rel)) pass(`file: ${label}`, rel);
   else fail(`file missing: ${label}`, rel);
+}
+
+function requestText(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const transport = parsed.protocol === "http:" ? http : https;
+    const req = transport.request(
+      parsed,
+      {
+        method: options.method ?? "GET",
+        headers: options.headers ?? {},
+        timeout: options.timeoutMs ?? 10000,
+      },
+      (res) => {
+        const chunks = [];
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () => {
+          resolve({
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            status: res.statusCode ?? 0,
+            headers: res.headers,
+            text: chunks.join(""),
+          });
+        });
+      },
+    );
+    req.on("timeout", () => req.destroy(new Error(`Request timed out after ${options.timeoutMs ?? 10000}ms`)));
+    req.on("error", reject);
+    req.end();
+  });
 }
 
 async function checkHttp(baseUrl) {
@@ -51,8 +98,8 @@ async function checkHttp(baseUrl) {
   const base = baseUrl.replace(/\/$/, "");
   for (const route of ["/api/ops/repairs/health", "/api/ops/inbox/health"]) {
     try {
-      const res = await fetch(`${base}${route}`, { signal: AbortSignal.timeout(10000) });
-      const text = await res.text();
+      const res = await requestText(`${base}${route}`);
+      const text = res.text;
       const short = text.slice(0, 500).replace(/\s+/g, " ");
       if (res.ok) pass(`http: ${route}`, `HTTP ${res.status} ${short}`);
       else fail(`http: ${route}`, `HTTP ${res.status} ${short}`);
@@ -69,10 +116,24 @@ async function checkSupabase() {
     warn("db: skipped", "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for DB smoke.");
     return;
   }
-  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const res = await supabase.from("repair_runs").select("id", { count: "exact", head: true });
-  if (res.error) fail("db: repair_runs", res.error.message);
-  else pass("db: repair_runs", `count=${res.count ?? 0}`);
+  try {
+    const restUrl = `${url.replace(/\/$/, "")}/rest/v1/repair_runs?select=id&limit=1`;
+    const res = await requestText(restUrl, {
+      headers: {
+        apikey: key,
+        authorization: `Bearer ${key}`,
+        prefer: "count=exact",
+      },
+    });
+    const text = res.text;
+    if (res.ok) {
+      pass("db: repair_runs", `HTTP ${res.status}; content-range=${res.headers["content-range"] ?? "n/a"}`);
+    } else {
+      fail("db: repair_runs", `HTTP ${res.status} ${text.slice(0, 500)}`);
+    }
+  } catch (e) {
+    fail("db: repair_runs", e instanceof Error ? e.message : String(e));
+  }
 }
 
 function checkEnv() {
