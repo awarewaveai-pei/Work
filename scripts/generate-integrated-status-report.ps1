@@ -287,3 +287,13 @@ if (Test-Path -LiteralPath $renderTimeline) {
         exit $LASTEXITCODE
     }
 }
+
+# M3: generate customer delivery status (20-department coverage snapshot)
+$customerDeliveryScript = Join-Path $root "scripts\generate-customer-delivery-status.ps1"
+if (Test-Path -LiteralPath $customerDeliveryScript) {
+    Write-Host "== generate-integrated-status-report: M3 customer delivery status (20-dept) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $customerDeliveryScript -WorkspaceRoot $root
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "generate-integrated-status-report: generate-customer-delivery-status exited $LASTEXITCODE (non-fatal)"
+    }
+}

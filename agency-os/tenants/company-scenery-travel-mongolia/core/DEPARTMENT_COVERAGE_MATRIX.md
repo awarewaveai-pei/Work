@@ -24,6 +24,20 @@
 | 資料／隱私 | `core/CROSS_BORDER_GOVERNANCE.md` | — | 個資角色、跨境傳輸 | **跨境上線前必填** |
 | 對外溝通 | `PROFILE.md` | 品牌與語系（EN 主） | 多市場訊息 | Instagram 為目前主要通路 |
 
+## M3 控制台設定（2026-05-13）
+
+要在 Ops Console 顯示部門覆蓋率，請在 Supabase `organizations.metadata.client_config` 填入：
+
+```json
+{
+  "department_selection": ["CLU_STRATEGY_GOVERN","CLU_FINANCE","CLU_SECURITY_IT","CLU_ENGINEERING","CLU_ORDER_OPS","CLU_MARKETING","CLU_CUSTOMER_SUCCESS","CLU_BRAND_COMMS","CLU_REGIONAL"],
+  "department_selection_reviewed_at": "2026-05-13"
+}
+```
+
+> Scenery Travel Mongolia 建議 SMB + 國際化 預設（9/20，含 `CLU_REGIONAL`）。調整依合約與法域確認。  
+> M3 API：`GET /api/ops/clients/company-scenery-travel-mongolia/department-summary`
+
 ## Related
 
 - `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`

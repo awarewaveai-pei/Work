@@ -15,6 +15,20 @@
 | 跨境／稅務／法遵／大面積子處理者 | `CROSS_BORDER_GOVERNANCE.md` | **N/A —** 內部 drill，不涉及真實客戶跨境 |
 | IR | `PROFILE.md` | **N/A —** |
 
+## M3 控制台設定（2026-05-13）
+
+要在 Ops Console 顯示部門覆蓋率，請在 Supabase `organizations.metadata.client_config` 填入：
+
+```json
+{
+  "department_selection": ["CLU_STRATEGY_GOVERN","CLU_FINANCE","CLU_SECURITY_IT","CLU_ENGINEERING","CLU_ORDER_OPS"],
+  "department_selection_reviewed_at": "2026-05-13"
+}
+```
+
+> P1 Pilot 為內部實跑用途，採 SMB 最小集合（5/20）。  
+> M3 API：`GET /api/ops/clients/company-p1-pilot/department-summary`
+
 ## Related
 
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`

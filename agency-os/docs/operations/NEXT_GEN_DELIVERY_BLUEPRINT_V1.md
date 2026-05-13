@@ -84,28 +84,28 @@
 
 ---
 
-## M3：營運控制台化（Week 3-4）
+## M3：營運控制台化（Week 3-4）✅ 2026-05-13 完成
 
 ### 目標
 - 你不用翻多份文件就能決策。
 - 以紅黃綠顯示客戶風險、最近備份、最近部署結果。
+- **M3 擴充（Next-Gen 對齊）**：控制台輸出映射到「20 部門」責任矩陣，避免試點與跨國企業目標脫鉤。
 
-### 交付物
-- 客戶狀態彙整（可先 markdown，後續升級成可視化）
-- 最小控制台檔案（建議）：
-  - `reports/status/customer-delivery-status-LATEST.md`
-  - 每日自動生成腳本：`scripts/generate-customer-delivery-status.ps1`
+### 已交付（2026-05-13）
+- `reports/status/customer-delivery-status-LATEST.md` — 每次 AO-CLOSE 自動生成
+- `scripts/generate-customer-delivery-status.ps1` — 查 Supabase → 輸出 20 部門覆蓋率 + 健康狀態表
+- `GET /api/ops/clients/:slug/department-summary` — 機器可讀部門摘要 API（回傳 tier / byGroup / matrixRows）
+- `DepartmentCoveragePanel` — 客戶詳情頁 20 部門覆蓋率面板（按 group 分組、進度條、必填模板清單）
+- `ClientCard` — 列表頁顯示 `X/20 部門` badge（綠≥8，黃<8，無設定黃警示）
+- `organizations.metadata.client_config.department_selection: ClusterId[]` — 無 migration JSONB 擴充
+- `DEPARTMENT_COVERAGE_MATRIX.md`（templates + 3 tenant 副本）— 均已更新含 M3 設定說明與建議 JSON
 
-### 建議檔案改動
-- `agency-os/docs/overview/EXECUTION_DASHBOARD.md`（新增入口與判讀）
-- `agency-os/README.md`（首頁入口）
-- `scripts/generate-integrated-status-report.ps1`（串接新狀態檔）
-
-### 驗收標準（DoD）
+### 驗收標準（DoD）✅
 - 你能在 3 分鐘內回答：
-  - 哪些客戶本週可安全上線？
-  - 哪些客戶沒有可用回滾點？
-  - 哪些客戶 staging/prod 漂移？
+  - 哪些客戶本週可安全上線？（ClientCard 健康 badge + WP 更新數）
+  - 哪些客戶沒有可用回滾點？（Workflow runs + Release Gates）
+  - 哪些客戶 staging/prod 漂移？（`verify-tenant-staging-sites-index-ssot.ps1`）
+  - **哪些客戶已啟用幾個企業部門、屬於哪個 tier？**（`DepartmentCoveragePanel` + `/department-summary`）
 
 ## 3) 風險與對策（先寫死，避免反覆討論）
 

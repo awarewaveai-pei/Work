@@ -109,8 +109,9 @@
   - **自動漂移閘道**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（比對 **`SITES_INDEX`**、含 HTTPS 之 **`sites/*/SITE_PROFILE`**、以及 `projects/*/02_EXECUTION_PLAN.md` 的 staging URL；`scripts/system-health-check.ps1` → **`verify-build-gates`**；PR `.github/workflows/tenant-staging-ssot.yml`）。
 - [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
   - 本項目標：試點 tenant 實填回饋後，再擴欄位與自動檢查（若有）
-- [ ] （Next-Gen 對齊）M3 控制台輸出映射到「20 部門」責任矩陣與模板欄位 —— **【未開始】**
+- [x] （Next-Gen 對齊）M3 控制台輸出映射到「20 部門」責任矩陣與模板欄位 —— **【完成 2026-05-13】**
   - 目的：避免 Pilot 成果與跨國企業目標脫鉤
+  - **交付**：`department-summary` API + `DepartmentCoveragePanel` UI + `ClientCard` badge + `generate-customer-delivery-status.ps1` + `DEPARTMENT_COVERAGE_MATRIX.md` 四份更新
 
 #### 龍蝦工廠（lobster-factory）
 
