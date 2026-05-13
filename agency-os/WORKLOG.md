@@ -4,6 +4,15 @@
 
 ## 2026-05-13
 
+### Codex 2026-05-13 — Repair Center real Slack approve + PR/merge/deploy drill
+- Slack signed `approve_repair` production callback completed: incident `8c354306-a595-4227-a6e6-d088953f9cbe` -> Repair Run `f82411fe-d802-4b90-aef1-5d0c1fc46786` -> SG/EU backup PASS (`pre-repair-20260513T1246-sentry-f82411fe`) -> GitHub Issue #2 created.
+- External automation gap found: Auto-Repair Claude Code workflow run `25800055913` failed because the Claude Code GitHub App is not installed on repo `awarewaveai-pei/Work`. This blocks fully automatic Claude PR creation until the GitHub App is installed.
+- Manual code-scoped PR path completed by Codex: PR #3 (`fix(repair-center): guard policy catalog text`) added `policy_catalog_text_ok` to repair health and added UTF-8 policy text checks to `repair-center-smoke`; Release Gate passed; PR merged as `460aa7db2d4e3118442e43f19e85581853d2d5fd`.
+- Production deploy completed with `/root/lobster-phase1/scripts/sg-deploy.sh next-admin`: SG `/root/Work` fast-forwarded `baa1140` -> `460aa7d`, `lobster-next-admin` rebuilt, restarted, and became healthy; `.deployed-commit` = `460aa7d`.
+- Production verification: `npm run smoke:repair-center -- --base-url=https://app.aware-wave.com` -> **17 checks / 0 failed / 0 warnings**, including `policy_catalog_text_ok=true`, `table_ok=true`, backup SSH configured, GitHub token configured, and Slack signing configured.
+- Closeout: Repair Run `f82411fe-d802-4b90-aef1-5d0c1fc46786` updated to `state=resolved`, `deploy_status=passed`, PR URL #3, deploy ref `460aa7d`; GitHub Issue #2 closed with drill comment.
+- Remaining non-destructive gap: install Claude Code GitHub App to rerun the same drill as fully automatic issue -> Claude PR. Destructive bad-commit production rollback drill remains intentionally unrun unless the operator explicitly authorizes it.
+
 ### WP Plugin Auto-Install — Phase 2+3 完成 + SSH + UI 重設計（2026-05-13）
 
 **根因 / 背景**：WP 外掛一鍵安裝系統 Phase 0+1 已完成，本輪補齊剩餘技術缺口，讓整條自動安裝鏈路邏輯完整。
