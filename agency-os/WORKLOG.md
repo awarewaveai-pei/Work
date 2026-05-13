@@ -118,11 +118,11 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - Safe rollback drill：`rollback-phase1.sh save next-admin` 建立 `rollback-20260513-083148`，再 restore 同 snapshot；`lobster-next-admin` health PASS，deployed commit 保持 `87cfa76`。
 - Happy-path handoff drill：synthetic Sentry incident `f83d04c3...` → SG+EU SSH backup PASS（backup ref `pre-repair-20260513T0836-sentry-929fb8ba`）→ GitHub Issue #1 建立 → Claude Code Action 成功留下中文 analysis-only comment；無 PR，符合 drill 指示與 guardrails。Issue #1 已關閉，drill runs 已標記 resolved/human-only，health `active_runs=0`。
 - 修正 `.github/workflows/auto-repair-claude.yml`：補 `id-token: write`、`actions: read`、`github_token: ${{ secrets.GITHUB_TOKEN }}`，並將 issue trigger 收斂為 `opened`，避免 opened/labeled 重複觸發。
-- 仍待外部設定：正式 Slack App `SLACK_SIGNING_SECRET` 與 `SLACK_BOT_TOKEN` 尚未提供；沒有真實 Signing Secret 無法驗證 Slack interactive approve。破壞 production 的 bad-commit auto-rollback drill 未執行，改以 safe snapshot/restore drill 驗證 rollback script。
+- 仍待外部設定：正式 Slack App `SLACK_SIGNING_SECRET` 尚未提供；沒有真實 Signing Secret 無法驗證 Slack interactive approve。`SLACK_BOT_TOKEN` 已存在於本機 credentials / SG `.env`。破壞 production 的 bad-commit auto-rollback drill 未執行，改以 safe snapshot/restore drill 驗證 rollback script。
 
 ### AO-RESUME handoff — Repair Center remaining items
 - 下次開工先看 `TASKS.md` 的「AwareWave 自動告警維修系統 v3.2」條目；目前 production 可操作、健康檢查正常、active repair runs = 0。
-- 必提醒使用者：Slack App 後台仍需取出真實 `Signing Secret` 與 Bot token；拿到後設定 SG `.env` + GitHub Secrets，再部署 next-admin 並重跑 `repair-center-smoke`，目標 0 warning。
+- 必提醒使用者：Slack App 後台仍需取出真實 `Signing Secret`；拿到後設定 SG `.env` + GitHub Secret，再部署 next-admin 並重跑 `repair-center-smoke`，目標 0 warning。
 - Slack secret 設好後要補跑：Slack `approve_repair` 按鈕互動核准 drill；真實 code-scoped incident 的 PR/merge/deploy 端到端；destructive bad-commit auto-rollback drill 只有使用者明確授權才做。
 
 ### Codex 2026-05-13 — Repair Center closeout + AO-SYNC script fix
@@ -130,7 +130,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `scripts/repair-center-smoke.mjs`：`--base-url` production smoke 改先讀 production health；若 health 回 `table_ok=true`，`db: repair_runs` 以 runtime truth PASS，不再因本機直連 Supabase timeout 誤報。`ANTHROPIC_API_KEY` 在 production smoke 下不要求本機 env（GitHub Actions secret 才是 owner）。
 - AO-SYNC 腳本收尾：`export-cross-machine-memory.ps1` / `import-cross-machine-memory.ps1` 補 Windows PowerShell 5.1 單一物件 `.Count` 問題，避免只有一個 `AO-SYNC-*` folder 時 `MEMORY.md` 匯入被跳過，也讓 export prune 計數穩定。
 - 驗證：PowerShell parser 兩支 PASS；`node --check scripts/repair-center-smoke.mjs` PASS；隔離假 profile / 假 AO-SYNC / 假 secrets root 匯出匯入 PASS（含 SSH 排除、manifest、local-newer 保護、pre-overwrite backup）；`npm run smoke:repair-center -- --base-url=https://app.aware-wave.com` → 15 checks / 0 failed / 1 warning（僅 `SLACK_SIGNING_SECRET`）。
-- 仍待外部設定：真實 Slack App `SLACK_SIGNING_SECRET` / `SLACK_BOT_TOKEN`；未做 destructive bad-commit rollback drill，除非使用者明確授權。
+- 仍待外部設定：真實 Slack App `SLACK_SIGNING_SECRET`；`SLACK_BOT_TOKEN` 已由 `AWARE_WAVE_CREDENTIALS.md` 補進 GitHub Secrets（SG `.env` 原已存在）。未做 destructive bad-commit rollback drill，除非使用者明確授權。
 
 ## 2026-05-12
 
@@ -2797,4 +2797,3 @@ _Last synced: 2026-05-13 09:43:34 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
