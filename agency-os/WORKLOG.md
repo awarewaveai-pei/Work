@@ -87,6 +87,14 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - 驗證：`/api/ops/repairs/health` HTTP 200 且 `web_ui_ready=true`、`github_configured=true`、`backup_mode=ssh`；未登入 `/api/ops/repairs` HTTP 401；`/api/ops/inbox/health` HTTP 200；內部 trusted proxy role check 回 `role=admin`；`npm run smoke:repair-center -- --base-url=https://app.aware-wave.com`：15 checks / 0 failed / 3 expected warnings。
 - 仍待：`SLACK_SIGNING_SECRET` 需由正式 Slack App 提供後，Slack interactive button 才能列為 ready；Phase 3 22 步、rollback drill、backup-fail drill 尚未結案。
 
+### Codex 2026-05-13 — Repair Center Phase 3 safe drills
+- `scripts/repair-center-smoke.mjs` 改為在 `--base-url=https://app.aware-wave.com` 時讀 production health 作為 backup/GitHub runtime truth；production smoke 現為 15 checks / 0 failed / 1 expected warning（僅 `SLACK_SIGNING_SECRET`）。
+- Phase 3-C backup-fail drill：短暫將 Repair backup gate 指向必定失敗的 localhost webhook，synthetic Sentry incident → Repair approval → `backup_failed`；run `207b182d...` 停在 `triage_needed` / `backup_status=failed`，且 `github_issue_created=false`；已還原 SSH backup gate。
+- Safe rollback drill：`rollback-phase1.sh save next-admin` 建立 `rollback-20260513-083148`，再 restore 同 snapshot；`lobster-next-admin` health PASS，deployed commit 保持 `87cfa76`。
+- Happy-path handoff drill：synthetic Sentry incident `f83d04c3...` → SG+EU SSH backup PASS（backup ref `pre-repair-20260513T0836-sentry-929fb8ba`）→ GitHub Issue #1 建立 → Claude Code Action 成功留下中文 analysis-only comment；無 PR，符合 drill 指示與 guardrails。Issue #1 已關閉，drill runs 已標記 resolved/human-only，health `active_runs=0`。
+- 修正 `.github/workflows/auto-repair-claude.yml`：補 `id-token: write`、`actions: read`、`github_token: ${{ secrets.GITHUB_TOKEN }}`，並將 issue trigger 收斂為 `opened`，避免 opened/labeled 重複觸發。
+- 仍待外部設定：正式 Slack App `SLACK_SIGNING_SECRET` 與 `SLACK_BOT_TOKEN` 尚未提供；沒有真實 Signing Secret 無法驗證 Slack interactive approve。破壞 production 的 bad-commit auto-rollback drill 未執行，改以 safe snapshot/restore drill 驗證 rollback script。
+
 ## 2026-05-12
 
 ### Daily
@@ -2752,4 +2760,3 @@ _Last synced: 2026-05-12 10:04:37 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
