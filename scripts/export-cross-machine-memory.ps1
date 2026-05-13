@@ -2,6 +2,9 @@
 # Exports the Claude Code project memory INDEX + secrets to the cross-machine sync folder.
 # Called automatically at end of AO-CLOSE after git push. Non-blocking.
 #
+# Folder naming: AO-SYNC-<date>-<MACHINENAME>  (one per machine per day, no collision)
+# Supports N machines: each machine has its own namespace; import always picks latest OTHER machine.
+#
 # Priority order for MEMORY.md destination:
 #   1. -DestRoot param (explicit override)
 #   2. $env:AO_SYNC_ROOT env var (machine-specific config) -- SET THIS on each machine
@@ -16,11 +19,15 @@
 #   [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'G:\<MyDrive>\EverydayPW',         'User')
 #
 # What is exported:
-#   MEMORY.md              -> $AO_SYNC_ROOT\AO-SYNC-<date>\memory\MEMORY.md
-#   .exported-by           -> $AO_SYNC_ROOT\AO-SYNC-<date>\memory\.exported-by  (machine tag for import skip logic)
-#   user-env.ps1           -> $AO_SYNC_SECRETS_ROOT\user-env.ps1
-#   .ssh\*                 -> $AO_SYNC_SECRETS_ROOT\.ssh\
+#   MEMORY.md              -> $AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\MEMORY.md
+#   .exported-by           -> $AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\.exported-by
+#   user-env.ps1           -> $AO_SYNC_SECRETS_ROOT\user-env.ps1   (shared, last-write-wins)
+#   .ssh\*                 -> $AO_SYNC_SECRETS_ROOT\.ssh\           (shared, last-write-wins)
 #   AWARE_WAVE_CREDENTIALS -> $AO_SYNC_SECRETS_ROOT\AWARE_WAVE_CREDENTIALS.md
+#
+# Pruning rules (never touch other machines' history):
+#   Own machine folders  : keep 7 most recent (AO-SYNC-*-<MACHINE>)
+#   Other machine folders: auto-expire after 30 days
 #
 # What is NOT exported:
 #   DPAPI vault (%LOCALAPPDATA%\AgencyOS\secrets\vault.json) -- machine-bound encryption
@@ -31,7 +38,9 @@ param(
     [string]$DestRoot = ""
 )
 
-$today = Get-Date -Format "yyyy-MM-dd"
+$today      = Get-Date -Format "yyyy-MM-dd"
+# Sanitise COMPUTERNAME: keep alphanumeric + hyphen only (safe for folder names on all OS/Drive mounts)
+$machineTag = $env:COMPUTERNAME.ToUpper() -replace '[^A-Za-z0-9]', '-'
 
 # ── 0. Load env vars from User registry if missing from process env ──────────
 # Handles subprocess sessions that pre-date the setx calls
@@ -93,7 +102,9 @@ $syncRoot = if ($DestRoot) {
     }
 }
 
-$destBase = if ($DestRoot) { $DestRoot } else { Join-Path $syncRoot "AO-SYNC-$today" }
+# Each machine writes to its own subfolder: AO-SYNC-<date>-<MACHINE>
+# Same machine, same day = overwrite own folder (idempotent). Different machine = separate folder (no collision).
+$destBase = if ($DestRoot) { $DestRoot } else { Join-Path $syncRoot "AO-SYNC-$today-$machineTag" }
 
 Write-Host ""
 Write-Host "== AO-SYNC export ==" -ForegroundColor Cyan
@@ -162,27 +173,48 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     Write-Host "  Set once: [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT','G:\<vault>','User')" -ForegroundColor DarkGray
 }
 
-# ── 6. Prune old AO-SYNC-* folders (keep 7 most recent) ──────────────────────
+# ── 6. Pruning (two independent rules, never touch what we don't own) ────────
 # Skip pruning when DestRoot is an explicit override (caller controls that path).
 if (-not $DestRoot) {
-    $allSyncFolders = Get-ChildItem -Path $syncRoot -Filter "AO-SYNC-*" -Directory -ErrorAction SilentlyContinue |
-                      Sort-Object Name -Descending
-    if ($allSyncFolders.Count -gt 7) {
-        $allSyncFolders | Select-Object -Skip 7 | ForEach-Object {
+
+    # Rule A: own-machine folders — keep 7 most recent (AO-SYNC-*-<MACHINE>)
+    $ownFolders = Get-ChildItem -Path $syncRoot -Filter "AO-SYNC-*-$machineTag" -Directory -ErrorAction SilentlyContinue |
+                  Sort-Object Name -Descending
+    if ($ownFolders.Count -gt 7) {
+        $ownFolders | Select-Object -Skip 7 | ForEach-Object {
             Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Host "  pruned: $($_.Name)" -ForegroundColor DarkGray
+            Write-Host "  pruned (own, >7): $($_.Name)" -ForegroundColor DarkGray
         }
     }
+
+    # Rule B: other-machine folders — expire after 30 days (keeps cross-machine history without unbounded growth)
+    # Also handles old-format AO-SYNC-<date> folders that have no machine suffix.
+    $cutoff = (Get-Date).AddDays(-30)
+    Get-ChildItem -Path $syncRoot -Filter "AO-SYNC-*" -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notmatch "-$([regex]::Escape($machineTag))$" } |
+        Where-Object {
+            # Extract date from folder name (supports both old "AO-SYNC-date" and new "AO-SYNC-date-MACHINE")
+            if ($_.Name -match '^AO-SYNC-(\d{4}-\d{2}-\d{2})') {
+                try { [datetime]::ParseExact($matches[1], 'yyyy-MM-dd', $null) -lt $cutoff } catch { $false }
+            } else { $false }
+        } | ForEach-Object {
+            Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Host "  pruned (other, >30d): $($_.Name)" -ForegroundColor DarkGray
+        }
 }
 
 # ── 7. Write human-readable import guide (manual fallback reference) ──────────
 $memDestPath = Join-Path $memDest "MEMORY.md"
 $instructions = @"
-# AO-SYNC Export -- $today  (machine: $($env:COMPUTERNAME), key: $projectKey)
+# AO-SYNC Export -- $today  (machine: $($env:COMPUTERNAME) [$machineTag], key: $projectKey)
 
 Auto-generated by AO-CLOSE.
 The import is FULLY AUTOMATED via import-cross-machine-memory.ps1 (called by ao-resume.ps1).
 This file is a manual fallback guide only -- you should never need to run these steps by hand.
+
+## Folder naming convention
+  AO-SYNC-<date>-<MACHINENAME>/   <- one per machine per day, no collision across machines
+  Other machines: import this folder on their next AO-RESUME (picks latest non-self folder).
 
 ## What is in this export
 
@@ -190,9 +222,9 @@ This file is a manual fallback guide only -- you should never need to run these 
 |----------|---------|
 | memory/MEMORY.md | Claude Code project memory index |
 | memory/.exported-by | Machine that created this export ($($env:COMPUTERNAME)) |
-| (secrets root)/user-env.ps1 | All MCP API keys |
-| (secrets root)/.ssh/* | SSH keys |
-| (secrets root)/AWARE_WAVE_CREDENTIALS.md | Credentials reference |
+| (secrets root)/user-env.ps1 | All MCP API keys (shared, last-write-wins) |
+| (secrets root)/.ssh/* | SSH keys (shared, last-write-wins) |
+| (secrets root)/AWARE_WAVE_CREDENTIALS.md | Credentials reference (shared) |
 
 ## Manual import (fallback only)
 

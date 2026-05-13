@@ -3,12 +3,16 @@
 # Called by ao-resume.ps1 (non-blocking). Silent no-op when no AO-SYNC folder exists.
 #
 # Sources:
-#   MEMORY.md    -- $env:AO_SYNC_ROOT\AO-SYNC-<date>\memory\MEMORY.md
+#   MEMORY.md    -- $env:AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\MEMORY.md
 #   secrets      -- $env:AO_SYNC_SECRETS_ROOT\  (user-env.ps1, .ssh\*, AWARE_WAVE_CREDENTIALS.md)
 #
+# Folder selection strategy (N-machine safe):
+#   New format (AO-SYNC-date-MACHINE): exclude own machine by folder name suffix → pick newest OTHER machine
+#   Old format (AO-SYNC-date):         exclude own machine via .exported-by tag   → backward compatible
+#   Both formats sorted by date desc; picks the single best candidate.
+#
 # Bidirectional sync -- last AO-CLOSE wins:
-#   MEMORY.md    -- skipped if memory\.exported-by matches THIS machine's COMPUTERNAME
-#                   (prevents re-importing your own export; imports from the other machine)
+#   MEMORY.md    -- import from latest OTHER machine's folder; skip own-machine exports
 #   user-env.ps1 -- skipped if SHA256 of sync copy matches local copy (avoids ~60 setx calls)
 #   SSH keys     -- skipped per-key if SHA256 matches local copy
 #   AWARE_WAVE_CREDENTIALS.md -- skipped if SHA256 matches local copy
@@ -81,39 +85,79 @@ if ($env:AO_SYNC_ROOT) {
 }
 $searchRoots = $searchRoots | Select-Object -Unique
 
-$syncFolders = @(
+# Sanitise own machine tag (same rule as export script)
+$machineTag = $env:COMPUTERNAME.ToUpper() -replace '[^A-Za-z0-9]', '-'
+
+# ── Collect + classify all AO-SYNC-* folders ─────────────────────────────────
+# Supports both naming formats:
+#   New: AO-SYNC-2026-05-13-DESKTOP-PC   (per-machine, no collision)
+#   Old: AO-SYNC-2026-05-13              (legacy, single folder per day)
+$allFolders = @(
     foreach ($root in $searchRoots) {
         if (Test-Path $root) {
             Get-ChildItem -Path $root -Filter "AO-SYNC-*" -Directory -ErrorAction SilentlyContinue
         }
     }
-) | Sort-Object Name -Descending
+)
 
-if ($syncFolders.Count -gt 0 -and $memDest) {
-    $latest         = $syncFolders[0]
-    $srcFile        = Join-Path $latest.FullName "memory\MEMORY.md"
-    $exportedByFile = Join-Path $latest.FullName "memory\.exported-by"
-
-    # Read machine tag written by the exporting machine.
-    # Skip if WE exported this folder (prevents circular re-import of our own data).
-    # Import if exported by another machine, or if tag is absent (legacy export).
-    $exportedBy = ""
-    if (Test-Path -LiteralPath $exportedByFile) {
-        $exportedBy = (Get-Content -LiteralPath $exportedByFile -Raw -Encoding UTF8).Trim()
+$candidateFolders = $allFolders | ForEach-Object {
+    $name = $_.Name
+    if ($name -match '^AO-SYNC-(\d{4}-\d{2}-\d{2})-(.+)$') {
+        [PSCustomObject]@{ Folder = $_; DateStr = $matches[1]; IsNewFormat = $true;  FolderMachine = $matches[2] }
+    } elseif ($name -match '^AO-SYNC-(\d{4}-\d{2}-\d{2})$') {
+        [PSCustomObject]@{ Folder = $_; DateStr = $matches[1]; IsNewFormat = $false; FolderMachine = '' }
     }
+    # Folders that don't match either pattern are silently ignored
+} | Where-Object {
+    $_ -ne $null -and
+    # New format: exclude own machine by folder name (fast, no file I/O needed)
+    -not ($_.IsNewFormat -and $_.FolderMachine -eq $machineTag)
+} | Sort-Object DateStr -Descending   # newest date first; within same date, order is arbitrary (all acceptable)
 
-    if (-not (Test-Path -LiteralPath $srcFile)) {
-        Write-Host "  cross-machine import: MEMORY.md not found in $($latest.Name)" -ForegroundColor DarkGray
-    } elseif ($exportedBy -eq $env:COMPUTERNAME) {
-        Write-Host "  cross-machine import: MEMORY.md skipped (this machine exported $($latest.Name))" -ForegroundColor DarkGray
-    } else {
-        if (-not (Test-Path -LiteralPath $memDest)) {
-            New-Item -ItemType Directory -Path $memDest -Force | Out-Null
+# ── MEMORY.md import ──────────────────────────────────────────────────────────
+if ($candidateFolders.Count -gt 0 -and $memDest) {
+
+    # Walk sorted candidates; for old-format folders, verify .exported-by before accepting.
+    $best = $null
+    foreach ($entry in $candidateFolders) {
+        if ($entry.IsNewFormat) {
+            $best = $entry   # new format: already filtered by name; accept immediately
+            break
+        } else {
+            # Old format: double-check .exported-by (backward compat)
+            $exportedByFile = Join-Path $entry.Folder.FullName "memory\.exported-by"
+            $exportedBy = ''
+            if (Test-Path -LiteralPath $exportedByFile) {
+                $exportedBy = (Get-Content -LiteralPath $exportedByFile -Raw -Encoding UTF8).Trim()
+            }
+            if ($exportedBy -ne $env:COMPUTERNAME) {
+                $best = $entry
+                $best | Add-Member -NotePropertyName ExportedBy -NotePropertyValue $exportedBy -Force
+                break
+            }
+            # else: own-machine old-format folder — skip, try next candidate
         }
-        Copy-Item -LiteralPath $srcFile -Destination (Join-Path $memDest "MEMORY.md") -Force
-        $fromLabel = if ($exportedBy) { $exportedBy } else { "unknown machine" }
-        Write-Host "  cross-machine import: MEMORY.md imported from $($latest.Name) [by: $fromLabel]" -ForegroundColor Green
     }
+
+    if (-not $best) {
+        Write-Host "  cross-machine import: MEMORY.md skipped (all AO-SYNC folders belong to this machine)" -ForegroundColor DarkGray
+    } else {
+        $srcFile = Join-Path $best.Folder.FullName "memory\MEMORY.md"
+        if (-not (Test-Path -LiteralPath $srcFile)) {
+            Write-Host "  cross-machine import: MEMORY.md not found in $($best.Folder.Name)" -ForegroundColor DarkGray
+        } else {
+            if (-not (Test-Path -LiteralPath $memDest)) {
+                New-Item -ItemType Directory -Path $memDest -Force | Out-Null
+            }
+            Copy-Item -LiteralPath $srcFile -Destination (Join-Path $memDest "MEMORY.md") -Force
+            $fromLabel = if ($best.FolderMachine) { $best.FolderMachine } `
+                         elseif ($best.ExportedBy) { $best.ExportedBy } `
+                         else { 'unknown machine' }
+            Write-Host "  cross-machine import: MEMORY.md imported from $($best.Folder.Name) [by: $fromLabel]" -ForegroundColor Green
+        }
+    }
+} elseif ($candidateFolders.Count -eq 0 -and $allFolders.Count -gt 0) {
+    Write-Host "  cross-machine import: MEMORY.md skipped (no other-machine AO-SYNC folder found)" -ForegroundColor DarkGray
 }
 
 # ── 3. Secrets import ─────────────────────────────────────────────────────────
