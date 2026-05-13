@@ -46,6 +46,16 @@
 - `/ops/repairs` Safety panel 改為辨識 webhook/SSH backup gate，不再只看 webhook env。
 - 驗證：`npm run build` PASS；仍只有既有 Sentry setup warning 與 `ssh2` optional native dependency warning。
 
+### Codex 2026-05-13 — Repair Center signal taxonomy + production foundation
+- 補強 Repair Center signal taxonomy：Sentry/Kuma/Netdata 不再被視為完整邊界；Grafana/Loki、PostHog、GitHub Actions、health endpoints、Cloudflare、Supabase、n8n、Trigger.dev、deploy drift、WordPress/MainWP 皆列為可進 Ops Inbox 的 extended ops signals。
+- `lib/repair-center/policy.ts` 收斂為 `REPAIR_SOURCE_POLICIES` 單一 catalog，並用 `satisfies Record<IncidentSource, RepairSourcePolicy>` 讓新增 incident source 未分類時由 TypeScript 擋下；`/ops/repairs` Policy UI 與 `/api/ops/repairs/health` 均讀同一 catalog。
+- `scripts/repair-center-smoke.mjs` 新增 `policy: source catalog` gate；本機 smoke 顯示 policy catalog PASS。
+- EU DB：已開 Supabase SSH tunnel，`npm run smoke:supabase-tunnel -- --sql` PASS；`0027_repair_runs.sql` 以 EU `supabase_admin` 套用成功，並 `NOTIFY pgrst, 'reload schema'`；`repair-center-smoke` 的 `db: repair_runs` 已由 PGRST205 轉為 PASS（HTTP 200, content-range `*/0`）。
+- SG runtime：`docker-compose.yml` 補 next-admin Repair Center env pass-through；SG `/root/lobster-phase1/docker-compose.yml` 已備份後同步；SG root 自身已可用 `/root/.ssh/backup_to_eu` SSH fallback key 連 SG 與 EU；`.env` 已設定 SSH backup gate（不輸出 secret）。
+- Deploy：推送 `origin/main` 至 `41a773a`，SG `/root/Work` fast-forward 後執行 `/root/lobster-phase1/scripts/sg-deploy.sh next-admin --skip-pull`；`lobster-next-admin` healthy，deployed commit `41a773aed4cece7230af9beb0d02cbc0cb3eeafc`。
+- Production health：`https://app.aware-wave.com/api/ops/repairs/health` 已存在；目前預期回 `503`，其中 `table_ok=true`、`backup_configured=true`、`backup_mode=ssh`、`source_policies` 正確，剩 `github_configured=false` 與 `slack_signing_configured=false`。`/api/ops/inbox/health` 回 200。
+- Remaining gate：設定正式 `AUTO_REPAIR_GITHUB_TOKEN`、`SLACK_SIGNING_SECRET`、GitHub Secrets 後，重跑 `npm run smoke:repair-center -- --base-url=https://app.aware-wave.com`，再進 Phase 3 22 步、rollback drill、backup-fail drill。
+
 ## 2026-05-12
 
 ### Daily
