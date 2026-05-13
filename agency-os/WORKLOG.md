@@ -75,8 +75,8 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 
 **TOOLS_DELIVERY_TRACEABILITY.md 同步**：P1–P6 全部更新為 🟢，新增 P7 Command Plane 行。
 
-- AUTO_TASK_DONE: Enterprise 工具層 Phase 1 正式串接
-- AUTO_TASK_DONE: （工具建置）Phase 1 建議順序（P1 -> P7）
+- AUTO_TASK_DONE_APPLIED (2026-05-13T09:42:52Z): Enterprise 工具層 Phase 1 正式串接
+- AUTO_TASK_DONE_APPLIED (2026-05-13T09:42:52Z): （工具建置）Phase 1 建議順序（P1 -> P7）
 
 ### Codex 2026-05-13 — Repair Center full implementation baseline
 - 完成 Repair Center 第一版可運作骨架：新增 `repair_runs` migration、`lib/repair-center/*` service/policy/backup/GitHub handoff、`/api/ops/repairs/*`、Slack interactive callback、`/ops/repairs` Queue/Runs/Safety/Policy UI。
@@ -2356,7 +2356,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-12 10:04:37 UTC_
+_Last synced: 2026-05-13 09:43:34 UTC_
 
 ## 2026-03-20
 
@@ -2790,3 +2790,5 @@ _Last synced: 2026-05-12 10:04:37 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+

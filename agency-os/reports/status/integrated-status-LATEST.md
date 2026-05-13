@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-12 18:04:45
+- Generated: 2026-05-13 17:43:49
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -212,107 +212,34 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-12.md
-# Daily Note - 2026-05-12
+## 5) memory/daily/2026-05-13.md
+# Daily Note - 2026-05-13
 
 ## Done today
-- 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）
-- export/import 腳本改為動態 project key 推導（適用 C: 桌機 + D: 筆電）
-- 加 UTF-8 BOM 解決 PowerShell 5.x 中文路徑讀取失敗問題
-- 設定 AO_SYNC_ROOT / AO_SYNC_SECRETS_ROOT env var 指向 EverydayPW
-- 修復 mcp/user-env.ps1 重複 key（UPTIME_KUMA_BASE_URL / _API_KEY / GRAFANA_BASE_URL）
-- 四項同步檔案確認：MEMORY.md、user-env.ps1、SSH keys、AWARE_WAVE_CREDENTIALS.md
+- WP Plugin Auto-Install 系統主體完成（commit `92271f4`）
+  - `wp-plugin-stack-catalog.ts`：純加法包模型、LiteSpeed conditional、dedup、resolveConditionalPlugins
+  - `contracts.ts` + `BuildConsole.tsx`：selectedPacks 參數、smokeProfileFor/normalizeBuildRequest 更新
+  - `wp-install-plugins.ts`：改用 ssh2 npm（不依賴系統 ssh binary）、私鑰不寫磁碟、--force --skip-plugins 冪等、per-client vault key
+  - `Dockerfile`（WordPress）：WP-CLI v2.11.0 pinned
+  - `OnboardWizard.tsx` Step2：純加法 checkbox 包選擇
+  - `OnboardWizard.tsx` Step4：每個服務各自一張卡片（7 個服務），Hint 欄位嵌入，全選按鈕
+- Repair Center Phase3 docs & workflow fixes（remote commits）合併進 main
+- /onboard smoke spec 04 補強（早班）
 
 ## Current state
-- 桌機 AO-SYNC export 流程修復完畢，export 目標正確指向 Google Drive EverydayPW
-- 9 commits ahead of origin/main，準備 push
+- WP plugin auto-install 邏輯已完整，但實際功能尚未可用（兩個 deploy 待做）
+- main branch 已 push，所有功能邏輯在 origin/main
 
 ## Next steps
-- 完成 AO-CLOSE（git push）並確認 EverydayPW 內容
-- 回家筆電：設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT → 測試 AO-RESUME 匯入流程
-
-- WP plugin stack 文件品質修訂（第二輪，稍晚）：三份文件（WP_CLIENT_PLUGIN_STACK.md / PLAN / BRIEF）10 個關鍵缺漏全部修復
-- Phase 0 實作：新建 `lib/wp-plugin-stack-catalog.ts`（36 entries，3 exported functions，TypeScript SSOT）
-- TASKS.md 更新：WP 外掛任務 未開始→進行中，Phase 0 打完成，Phase 1 開工清單（5 必讀檔）寫入
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:7b9f61f39c447cd2cf4fbcaf23ba070e2309f36dc4cfd8aacad3fc1a56fac3cd -->
-
-### claude 2026-05-12 18:00
-
-- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）——export/import 腳本改為動態 project key 推導 + UTF-8 BOM + AO_SYNC_ROOT/AO_SYNC_SECRETS_ROOT env var；四項檔案（MEMORY.md、user-env.ps1、SSH keys、AWARE_WAVE_CREDENTIALS.md）完整同步
-- **變更路徑**:
-  - `scripts/export-cross-machine-memory.ps1`
-  - `scripts/import-cross-machine-memory.ps1`
-  - `mcp/user-env.ps1`
-  - `agency-os/TASKS.md`
-- **Git**: 9 commits ahead of origin/main（checkpoint 系列）
-- **對應 TASKS 子字串（可選）**: AO-SYNC 環境變數設定
-- **風險／待辦（可選）**: 筆電須設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT 環境變數（D:\Work, key=d--Work）並測試 AO-RESUME 匯入流程
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:436e906aac028720dbe07cc89a7b39e028dd16450270f443de765e8360e86cf3 -->
-
-### claude 2026-05-12 18:30
-
-- **完成（一句）**: 修復 AO-SYNC 雙機同步至 Google Drive（EverydayPW）——動態 project key + UTF-8 BOM + env vars；mcp/user-env.ps1 duplicate keys 修復；daily note 補齊
-- **變更路徑**:
-  - `scripts/export-cross-machine-memory.ps1`
-  - `scripts/import-cross-machine-memory.ps1`
-  - `mcp/user-env.ps1`
-  - `agency-os/TASKS.md`
-  - `agency-os/memory/daily/2026-05-12.md`
-- **Git**: 9 commits ahead of origin/main（checkpoint 系列 + 本次修復）
-- **對應 TASKS 子字串（可選）**: AO-SYNC 環境變數設定
-- **風險／待辦（可選）**: 筆電須設定 AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT（D:\Work）並測試 AO-RESUME 匯入
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:af2f48e17e8fb139ea47fca7f95f2a09291276d8254e4a59cb062612d7cb27bf -->
-
-### claude 2026-05-12 22:00
-
-- **完成（一句）**: WP plugin stack 文件品質修訂（10 個缺漏全修）+ Phase 0 `wp-plugin-stack-catalog.ts`（36 entries，3 functions，TypeScript SSOT）+ TASKS.md Phase 1 開工清單（5 必讀檔）
-- **變更路徑**:
-  - `agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`
-  - `lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
-  - `lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md`
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts`
-  - `agency-os/TASKS.md`
-  - `agency-os/memory/CONVERSATION_MEMORY.md`
-  - `agency-os/memory/daily/2026-05-12.md`
-- **Git**: b205f40, 5dff4ce, 59dccca, 5e4014e（本 closeout 前已 commit；closeout 再 push）
-- **對應 TASKS 子字串（可選）**: WP 外掛自動安裝
-- **風險／待辦（可選）**: Phase 1（OnboardWizard 新 Step 2）明日開始；開始前依 TASKS 必讀清單順序讀 5 個檔案
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:c8396eba5bbc07efb99d13c0b355bb2b0495589f6a3ab357c7a6e876708d7203 -->
-
-### claude 2026-05-12 22:15
-
-- **完成（一句）**: 修復 PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md 中 broken link（`../../../` → `../../` 指向 WP_CLIENT_PLUGIN_STACK.md）；doc integrity gate 通過
-- **變更路徑**:
-  - `lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md`
-- **Git**: 本 closeout commit 前修復
-- **對應 TASKS 子字串（可選）**: WP 外掛自動安裝
-- **風險／待辦（可選）**:
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:9557a101b7a3e92660aa0e45572c6ff6078efaba3c9e1e6d3dbd596ab5a0db44 -->
-
-### claude 2026-05-12 22:45
-
-- **完成（一句）**: 修復 export-cross-machine-memory.ps1 — secrets 複製後強制 LastWriteTime = sync 時間，Google Drive 顯示正確上傳時間
-- **變更路徑**:
-  - `scripts/export-cross-machine-memory.ps1`
-- **Git**: 5aa753c（已 push）
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**:
+- `/sg-deploy` — 重建 lobster-wordpress container（WP-CLI 才進生產）
+- Trigger.dev re-deploy — ssh2 才納入 task image（`.\scripts\lobster-trigger-deploy.ps1`）
+- End-to-end smoke test：Step4 provision-services + wp-install-plugins 完整驗收
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-12 18:04:43`
+- Time: `2026-05-13 17:43:41`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -322,14 +249,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260512-180443.md`
-- Closeout: `reports/closeout/closeout-20260512-180438.md`
+- Health: `reports/health/health-20260513-174340.md`
+- Closeout: `reports/closeout/closeout-20260513-174335.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- `git pull origin main`：**Already up to date**。
 - `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
 - `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
 
@@ -388,5 +314,6 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 
