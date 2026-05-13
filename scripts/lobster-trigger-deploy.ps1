@@ -30,7 +30,8 @@ if (-not $env:LOBSTER_VAULT_LOADED) {
     $argStr     = "-VpsHost '$VpsHost' -SshKey '$SshKey' -AoOrgId '$AoOrgId'"
     $innerCmd   = "Set-Item Env:LOBSTER_VAULT_LOADED 1; & '$scriptPath' $argStr"
     & "$repoRoot\scripts\secrets-vault.ps1" -Action run `
-        -Names @("TRIGGER_DEPLOY_PAT", "POSTHOG_API_KEY", "OPS_INBOX_INGEST_TOKEN") `
+        -Names @("TRIGGER_DEPLOY_PAT", "POSTHOG_API_KEY", "OPS_INBOX_INGEST_TOKEN",
+                 "LOBSTER_EXECUTE_MANIFEST_STEPS", "LOBSTER_WP_SSH_PRIVATE_KEY") `
         -Command $innerCmd
     exit $LASTEXITCODE
 }
@@ -55,9 +56,12 @@ Write-Host "[deploy] SERVICE_ROLE_KEY obtained (length=$($srk.Length))." -Foregr
 # ── 3. Build bash deploy script ────────────────────────────────────────────
 # PowerShell here-string: $pat/$srk/$phk/$oit/$AoOrgId are expanded by PS.
 # Bash variable refs in echo lines use backtick-escaped $: `$VAR → $VAR in output.
-$pat = $env:TRIGGER_DEPLOY_PAT
-$phk = $env:POSTHOG_API_KEY
-$oit = $env:OPS_INBOX_INGEST_TOKEN
+$pat        = $env:TRIGGER_DEPLOY_PAT
+$phk        = $env:POSTHOG_API_KEY
+$oit        = $env:OPS_INBOX_INGEST_TOKEN
+# Optional — empty string is safe: syncEnvVars skips empty values
+$execSteps  = $env:LOBSTER_EXECUTE_MANIFEST_STEPS  ?? ""
+$wpSshKey   = $env:LOBSTER_WP_SSH_PRIVATE_KEY       ?? ""
 
 $deployBash = @"
 #!/bin/bash
@@ -90,14 +94,20 @@ export POSTHOG_HOST=https://us.i.posthog.com
 export OPS_INBOX_INGEST_TOKEN='$oit'
 export AWAREWAVE_WEBHOOK_BASE_URL=https://app.aware-wave.com
 
+# wp-install-plugins: SSH execution gate + global SSH key
+export LOBSTER_EXECUTE_MANIFEST_STEPS='$execSteps'
+export LOBSTER_WP_SSH_PRIVATE_KEY='$wpSshKey'
+
 echo '=== Env ready ==='
-echo "  TRIGGER_API_URL:      `$TRIGGER_API_URL"
-echo "  LOBSTER_SUPABASE_URL: `$LOBSTER_SUPABASE_URL"
-echo "  LOBSTER_AO_ORG_ID:    `$LOBSTER_AO_ORG_ID"
-echo "  POSTHOG_HOST:         `$POSTHOG_HOST"
-echo "  SENTRY_URL:           `$SENTRY_URL"
-echo "  N8N_URL:              `$N8N_URL"
-echo "  UPTIME_KUMA_URL:      `$UPTIME_KUMA_URL"
+echo "  TRIGGER_API_URL:                `$TRIGGER_API_URL"
+echo "  LOBSTER_SUPABASE_URL:           `$LOBSTER_SUPABASE_URL"
+echo "  LOBSTER_AO_ORG_ID:              `$LOBSTER_AO_ORG_ID"
+echo "  POSTHOG_HOST:                   `$POSTHOG_HOST"
+echo "  SENTRY_URL:                     `$SENTRY_URL"
+echo "  N8N_URL:                        `$N8N_URL"
+echo "  UPTIME_KUMA_URL:                `$UPTIME_KUMA_URL"
+echo "  LOBSTER_EXECUTE_MANIFEST_STEPS: `$LOBSTER_EXECUTE_MANIFEST_STEPS"
+echo "  LOBSTER_WP_SSH_PRIVATE_KEY set: $([ -n "`$LOBSTER_WP_SSH_PRIVATE_KEY" ] && echo yes || echo no)"
 
 cd /root/Work/lobster-factory/packages/workflows
 
