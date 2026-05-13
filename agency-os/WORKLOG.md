@@ -61,6 +61,8 @@
 - GitHub handoff 已補 runtime 與 repo secrets：`AUTO_REPAIR_GITHUB_TOKEN` 已設於 SG；GitHub Secrets 已設 `ANTHROPIC_API_KEY` 與 `SLACK_WEBHOOK_URL`（未記錄 secret value）。
 - 修正安全邊界：Next app 不再信任外部 `Authorization: Basic` header；nginx 對 `/api/ops/repairs*` 套 Basic Auth，通過後才注入 `x-ops-claims-role: admin`。`/ops/*` 頁面同樣由 nginx Basic Auth 注入可信 role。
 - Repo nginx 設定補回 `security-headers.inc`，避免部署時覆蓋 production security headers。
+- Deploy：推送 `3ed6ebd`，SG `/root/Work` fast-forward，系統 nginx `nginx -t` PASS 並 reload，`sg-deploy.sh next-admin --skip-pull` 完成；`lobster-next-admin` healthy，deployed commit `3ed6ebd`。
+- 驗證：`/api/ops/repairs/health` HTTP 200 且 `web_ui_ready=true`、`github_configured=true`、`backup_mode=ssh`；未登入 `/api/ops/repairs` HTTP 401；`/api/ops/inbox/health` HTTP 200；內部 trusted proxy role check 回 `role=admin`；`npm run smoke:repair-center -- --base-url=https://app.aware-wave.com`：15 checks / 0 failed / 3 expected warnings。
 - 仍待：`SLACK_SIGNING_SECRET` 需由正式 Slack App 提供後，Slack interactive button 才能列為 ready；Phase 3 22 步、rollback drill、backup-fail drill 尚未結案。
 
 ## 2026-05-12
