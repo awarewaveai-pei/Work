@@ -77,6 +77,14 @@ export default defineConfig({
         const aoOrgId = process.env.LOBSTER_AO_ORG_ID ?? "";
         if (aoOrgId.trim()) out.LOBSTER_AO_ORG_ID = aoOrgId.trim();
 
+        // ── wp-install-plugins: SSH execution gate + global key ───────────────
+        // LOBSTER_EXECUTE_MANIFEST_STEPS="true" → task actually SSHes into WP host.
+        // LOBSTER_WP_SSH_PRIVATE_KEY → PEM key used when no per-client key is set.
+        const executeSteps = process.env.LOBSTER_EXECUTE_MANIFEST_STEPS ?? "";
+        if (executeSteps.trim()) out.LOBSTER_EXECUTE_MANIFEST_STEPS = executeSteps.trim();
+        const wpSshKey = process.env.LOBSTER_WP_SSH_PRIVATE_KEY ?? "";
+        if (wpSshKey.trim()) out.LOBSTER_WP_SSH_PRIVATE_KEY = wpSshKey.trim();
+
         return out;
       }),
     ],
