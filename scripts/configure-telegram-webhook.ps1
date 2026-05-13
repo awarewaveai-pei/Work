@@ -61,10 +61,10 @@ if ($Verify) {
   $info = Invoke-RestMethod -Method GET -Uri "https://api.telegram.org/bot$token/getWebhookInfo"
   $expected = ($BaseUrl.TrimEnd('/')) + '/api/internal/commands/telegram'
   $current  = $info.result.url
-  $urlMatch = ($current -eq $expected)
-  $pending  = $info.result.pending_update_count
-  $lastErr  = $info.result.last_error_message
-  $lastErrAt = $info.result.last_error_date
+  $urlMatch  = ($current -eq $expected)
+  $pending   = $info.result.pending_update_count
+  $lastErr   = if ($info.result.PSObject.Properties.Name -contains 'last_error_message') { $info.result.last_error_message } else { $null }
+  $lastErrAt = if ($info.result.PSObject.Properties.Name -contains 'last_error_date')    { $info.result.last_error_date    } else { $null }
   Write-Host ""
   Write-Host "── Telegram Webhook Diagnostic ─────────────────────────────" -ForegroundColor Cyan
   Write-Host "  Expected URL : $expected"
