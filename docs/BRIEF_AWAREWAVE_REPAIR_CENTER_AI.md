@@ -240,7 +240,23 @@ If documents disagree, prefer this order:
 5. current `next-admin` code structure
 6. older historical docs
 
----
+## 2026-05-13 Built Surface
+
+Before changing Repair Center, inspect the current implementation:
+
+1. `lobster-factory/packages/db/migrations/0027_repair_runs.sql`
+2. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/*`
+3. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/*`
+4. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/commands/slack/route.ts`
+5. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/repairs/page.tsx`
+6. `.github/workflows/auto-repair-claude.yml`
+7. `.github/workflows/auto-repair-pr-notify.yml`
+
+Important: the backup gate is intentionally externalized behind `AUTO_REPAIR_BACKUP_WEBHOOK_URL`.
+If that variable is not configured or returns a failure, the repair run stops before GitHub issue creation.
+Do not weaken this behavior to make demos pass.
+
+--- 
 
 ## Final Instruction to the AI
 

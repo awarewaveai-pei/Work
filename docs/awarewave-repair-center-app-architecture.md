@@ -84,3 +84,37 @@ The first usable Repair Center screen should contain:
 3. Do not bypass `/ops/system-modes`.
 4. Do not add Telegram-only repair actions.
 5. Do not create a second dedup or severity pipeline outside Ops Inbox.
+
+## 2026-05-13 Implementation Baseline
+
+The first real implementation is now anchored in the existing Next.js app:
+
+| Layer | Implementation |
+|------|------|
+| Data model | `lobster-factory/packages/db/migrations/0027_repair_runs.sql` |
+| UI | `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/repairs/page.tsx` |
+| UI actions | `app/ops/repairs/RepairActions.tsx` |
+| API | `app/api/ops/repairs/*` |
+| Slack callback | `app/api/internal/commands/slack/route.ts` |
+| GitHub workflows | `.github/workflows/auto-repair-claude.yml`, `.github/workflows/auto-repair-pr-notify.yml` |
+
+Environment variables:
+
+| Variable | Purpose |
+|------|------|
+| `AUTO_REPAIR_BACKUP_WEBHOOK_URL` | Required backup gate. If missing or failing, no GitHub issue is created. |
+| `AUTO_REPAIR_BACKUP_WEBHOOK_TOKEN` | Optional bearer token for the backup gate webhook. |
+| `AUTO_REPAIR_GITHUB_TOKEN` | GitHub issue creation token. Falls back to `GITHUB_TOKEN` when available. |
+| `AUTO_REPAIR_GITHUB_OWNER` / `AUTO_REPAIR_GITHUB_REPO` | Default GitHub target. Defaults to `awarewaveai-pei/Work`. |
+| `SLACK_SIGNING_SECRET` | Verifies Slack interactive approve callbacks. |
+
+Current policy mapping:
+
+| Source | Policy |
+|------|------|
+| `sentry` | `auto_repair` |
+| `uptime_kuma` / `grafana` | `analysis_only` |
+| `netdata` | `human_only` |
+| other critical sources | `triage_needed` |
+
+Production deploy remains manual. Repair Center may mark a run as `deploy_pending`, but does not run deploy.

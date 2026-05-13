@@ -11,7 +11,8 @@ export type CommandErrorSource =
   | "command_ingress_failed"
   | "command_dispatch_failed"
   | "command_handler_failed"
-  | "telegram_auth_failed";
+  | "telegram_auth_failed"
+  | "telegram_send_failed";
 
 export interface CommandErrorReport {
   organizationId: string | null;

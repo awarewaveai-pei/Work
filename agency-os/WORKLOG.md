@@ -2,6 +2,17 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-13
+
+### Codex 2026-05-13 — Repair Center full implementation baseline
+- 完成 Repair Center 第一版可運作骨架：新增 `repair_runs` migration、`lib/repair-center/*` service/policy/backup/GitHub handoff、`/api/ops/repairs/*`、Slack interactive callback、`/ops/repairs` Queue/Runs/Safety/Policy UI。
+- 保留系統邊界：Ops Inbox 仍是 incident SSOT；Repair Center 只做 orchestration；Approvals/System Modes/Build Console 不被取代；production deploy 仍手動 `sg-deploy.sh`。
+- Slack 通知加入 `approve_repair` / `acknowledge_only` Block Kit action；Slack callback 以 `SLACK_SIGNING_SECRET` 驗證，並呼叫同一套 Repair service。
+- 新增 GitHub workflows：`.github/workflows/auto-repair-claude.yml`、`.github/workflows/auto-repair-pr-notify.yml`。
+- 安全 gate：`AUTO_REPAIR_BACKUP_WEBHOOK_URL` 未設定或失敗時，repair run 停在 `triage_needed`，不建 GitHub Issue / PR；`AUTO_REPAIR_GITHUB_TOKEN` 未設定時同樣不會進入 repair。
+- 文件同步：`docs/awarewave-repair-center-app-architecture.md`、`docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`、`agency-os/docs/operations/slack-notification-routing.md`、`CLAUDE.md`。
+- 驗證：`npm run build` in `lobster-factory/infra/hetzner-phase1-core/apps/next-admin` PASS；僅餘既有 Sentry setup warning 與 `ssh2` optional native dependency warning。
+
 ## 2026-05-12
 
 ### Daily

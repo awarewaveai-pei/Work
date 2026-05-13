@@ -49,6 +49,9 @@ This avoids notification loops, duplicate fan-out, and ambiguous ownership.
 
 - Accepts Sentry, Grafana, Uptime Kuma, Netdata, and PostHog webhooks.
 - Sends to `#ops-incidents` via `OPS_INBOX_SLACK_INCIDENTS_WEBHOOK`.
+- For repairable incidents, Slack messages may include interactive buttons:
+  - `approve_repair` posts to `/api/internal/commands/slack`, verifies `SLACK_SIGNING_SECRET`, then starts the same Repair Center flow used by `/ops/repairs`.
+  - `acknowledge_only` records no repair run and is only a human acknowledgement.
 - Sends a phone backup to Telegram when `OPS_INBOX_TELEGRAM_NOTIFY_ENABLED=true`.
 - Telegram minimum severity is `OPS_INBOX_TELEGRAM_NOTIFY_MIN_SEVERITY` and defaults to `medium`.
 - Telegram uses `OPS_INBOX_TELEGRAM_CHAT_IDS`, or falls back to `TELEGRAM_ALLOWED_CHAT_IDS`.

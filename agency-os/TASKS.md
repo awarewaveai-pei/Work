@@ -132,7 +132,7 @@
 
 #### 下一期計畫（未開始）
 
-- [ ] **（下次 AO-RESUME 提醒）AwareWave 自動告警維修系統 v3.2 — 計畫書執行** —— **【未開始】** **計畫書 owner doc**：`docs/awarewave-auto-repair-plan-v3.2-final.md`（v3.2 Final 2026-05-08，33 KB）。**目標**：Sentry／Uptime Kuma／Netdata 偵測到問題 → Slack 推播 → 你按 2 下（Approve + Merge）+ 1 個 `/sg-deploy` 即修復。**3 種告警差別處理**：Sentry→自動修；Kuma→AI 只分析；Netdata→AI 只寫 issue 不修。**4 層保護**：CI 綠勾／中文摘要／部署後 health-check 自動 rollback／Sentry 持續監控。
+- [ ] **（下次 AO-RESUME 提醒）AwareWave 自動告警維修系統 v3.2 — 計畫書執行** —— **【進行中】** **2026-05-13 Codex implementation baseline 已完成**：`repair_runs` migration、`/ops/repairs` Queue/Runs/Safety/Policy UI、`/api/ops/repairs/*`、Slack interactive callback、Slack `approve_repair` 按鈕、GitHub auto-repair workflows、CLAUDE auto-repair 紅線；`npm run build` PASS。**仍待上線/驗收**：套用 DB migration、設定 `AUTO_REPAIR_BACKUP_WEBHOOK_URL` / `AUTO_REPAIR_GITHUB_TOKEN` / `SLACK_SIGNING_SECRET` / GitHub Secrets、跑 Phase 3 22 步端到端與 rollback/backup-fail drill。**計畫書 owner doc**：`docs/awarewave-auto-repair-plan-v3.2-final.md`（v3.2 Final 2026-05-08，33 KB）。**目標**：Sentry／Uptime Kuma／Netdata 偵測到問題 → Slack 推播 → 你按 2 下（Approve + Merge）+ 1 個 `/sg-deploy` 即修復。**3 種告警差別處理**：Sentry→自動修；Kuma→AI 只分析；Netdata→AI 只寫 issue 不修。**4 層保護**：CI 綠勾／中文摘要／部署後 health-check 自動 rollback／Sentry 持續監控。
   - **2026-05-12 基線更新**：owner docs 已收斂為 `docs/awarewave-auto-repair-plan-v3.2-final.md` + `docs/awarewave-auto-repair-phase2-handoff.md` + `docs/awarewave-repair-center-app-architecture.md` + `docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md` + `agency-os/docs/operations/slack-notification-routing.md`。**路由基線**：`#infra-alerts` = raw infra、`#ops-incidents` = curated incident、`#github-prs` = PR 通知、Telegram = 手機備援；舊 `#alerts-critical` / `#alerts-info` 已作廢。
   - **Phase 1（你做，30 分鐘）**：確認既有 `#infra-alerts` / `#ops-incidents`，只新增 `#github-prs`；建 Slack App（Webhook 指向 `#ops-incidents`）；GitHub repo 設 4 個 Secrets（`ANTHROPIC_API_KEY`／`SLACK_WEBHOOK_URL`／`SLACK_BOT_TOKEN`／`SLACK_SIGNING_SECRET`）；**不要**把 Telegram token 放進 GitHub Secrets；驗證 `/api/ops/inbox/health` 顯示 `telegram_notify_enabled=true`；啟用 main branch protection。
   - **Phase 2（Claude Code 做，2-3 小時）**：擴充 `app/api/webhooks/sentry/route.ts`（fingerprint dedup + Slack Block Kit）；新增 `webhooks/uptime-kuma`／`webhooks/netdata` route；新增 `app/api/internal/commands/slack/route.ts`（Approve → 備份 → GitHub Issue）；新增 `.github/workflows/auto-repair-claude.yml` + `auto-repair-pr-notify.yml`；補強 `sg-deploy.sh` health-check + Slack 通知；CLAUDE.md 追加自動維修紅線；**新增 app 路由骨架**：`app.aware-wave.com/ops/repairs` 作為 Repair Center orchestration layer，不可另建第二套 inbox / approval / deploy UI。
@@ -388,4 +388,3 @@
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
 _Last synced: 2026-05-12 09:46:59 UTC_
-
