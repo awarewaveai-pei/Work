@@ -160,7 +160,8 @@ async function checkSupabase() {
   }
 }
 
-function checkEnv() {
+function checkEnv({ advisory = false } = {}) {
+  const softFail = advisory ? warn : fail;
   const hasWebhook = envConfigured("AUTO_REPAIR_BACKUP_WEBHOOK_URL");
   const hasSgSsh = envConfigured("AUTO_REPAIR_SG_SSH_HOST") && (envConfigured("AUTO_REPAIR_SG_SSH_KEY_B64") || envConfigured(env("AUTO_REPAIR_SG_SSH_KEY_ENV")));
   const euRequired = env("AUTO_REPAIR_REQUIRE_EU_BACKUP").toLowerCase() !== "false";
@@ -168,13 +169,13 @@ function checkEnv() {
 
   if (hasWebhook) pass("env: backup gate", "webhook configured");
   else if (hasSgSsh && (!euRequired || hasEuSsh)) pass("env: backup gate", euRequired ? "SG+EU SSH configured" : "SG SSH configured; EU optional");
-  else fail("env: backup gate", "configure AUTO_REPAIR_BACKUP_WEBHOOK_URL or SG/EU SSH envs");
+  else softFail("env: backup gate", "configure AUTO_REPAIR_BACKUP_WEBHOOK_URL or SG/EU SSH envs");
 
   if (envConfigured("AUTO_REPAIR_GITHUB_TOKEN") || envConfigured("GITHUB_TOKEN")) pass("env: GitHub token", "configured");
-  else fail("env: GitHub token", "AUTO_REPAIR_GITHUB_TOKEN or GITHUB_TOKEN required");
+  else softFail("env: GitHub token", "AUTO_REPAIR_GITHUB_TOKEN or GITHUB_TOKEN required");
 
   if (envConfigured("SLACK_SIGNING_SECRET")) pass("env: Slack signing", "configured");
-  else fail("env: Slack signing", "SLACK_SIGNING_SECRET required for interactive approve");
+  else warn("env: Slack signing", "SLACK_SIGNING_SECRET is required only for Slack interactive approve; web UI repair remains usable without it.");
 
   if (envConfigured("ANTHROPIC_API_KEY")) pass("env: Anthropic", "configured");
   else warn("env: Anthropic", "ANTHROPIC_API_KEY is required by GitHub Secrets, not necessarily local runtime.");
@@ -190,9 +191,10 @@ async function main() {
   checkFile(".github/workflows/auto-repair-pr-notify.yml", "PR notify workflow");
   checkRepairPolicyCatalog();
 
-  checkEnv();
+  const baseUrl = args.get("base-url") || env("REPAIR_CENTER_BASE_URL");
+  checkEnv({ advisory: Boolean(baseUrl) });
   await checkSupabase();
-  await checkHttp(args.get("base-url") || env("REPAIR_CENTER_BASE_URL"));
+  await checkHttp(baseUrl);
 
   for (const c of checks) {
     const mark = c.ok === true ? "PASS" : c.ok === false ? "FAIL" : "WARN";
