@@ -28,14 +28,14 @@ jobs:
       )
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Claude repair
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
-          claude_args: "--max-turns 10"
+          claude_args: "--max-turns 30 --allowedTools Edit,Read,Grep,Glob,LS"
 
       - name: Notify Slack
         if: always()
