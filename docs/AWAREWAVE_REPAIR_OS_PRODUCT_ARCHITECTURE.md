@@ -824,7 +824,7 @@ Status:
 Source updated.
 Build verified.
 SG environment prepared for provider credential references.
-Deployment pending until next-admin is rebuilt from the latest commit.
+Production app deployed.
 ```
 
 Source changes:
@@ -862,4 +862,9 @@ Verification:
 
 ```text
 npm run build passed in apps/next-admin.
+SG next-admin deployed commit c6e52c3.
+Production Validate passed for awarewave-ops: Sentry, Slack, Supabase, Uptime Kuma, Netdata, PostHog, Trigger.dev.
+Production Validate failed for awarewave-ops Cloudflare with HTTP 401; this indicates the Cloudflare token reference must be rotated or corrected.
+Production Validate failed for awarewave-ops n8n with HTTP 401; current N8N_AUTH_BEARER_TOKEN is not accepted by the n8n REST workflow API.
+Production Validate failed for awarewave-ops Grafana because the seeded endpoint is not reachable from SG next-admin; replace the local-only endpoint with an SG-reachable Grafana URL or proxy.
 ```
