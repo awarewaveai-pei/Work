@@ -664,3 +664,82 @@ Internal engines:
 ```
 
 This gives the product a clear buyer-facing shape while preserving the existing technical foundation.
+
+## Implementation Log
+
+### 2026-05-14: Client-Normalized Repair OS Foundation
+
+Status:
+
+```text
+Source updated.
+Build verified.
+Live organization records normalized.
+Live structural migration applied and verified.
+```
+
+Decisions locked:
+
+```text
+awarewave-ops is a client, not an agency, inside Repair OS.
+awarewave-ops is marked as an internal first-party client through metadata.
+soulful-expression is marked as an external customer through metadata.
+Repair Center remains the product command center.
+Ops Inbox remains an internal incident intake engine and compatibility surface.
+```
+
+Source changes:
+
+```text
+lobster-factory/packages/db/migrations/0028_repair_os_client_asset_scope.sql
+  Seeds awarewave-ops as type=client.
+  Adds metadata.client_kind=internal.
+  Adds metadata.relationship=first_party.
+  Creates the asset and integration scope needed for client-grade Repair OS.
+
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/clients/route.ts
+  Exposes clientKind and relationship from organization metadata.
+
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/clients/ClientCard.tsx
+  Shows internal/external client identity instead of presenting awarewave-ops as a special agency.
+
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/integrations/page.tsx
+  Shows client identity and relationship on the Integrations page.
+```
+
+Live data changes completed:
+
+```text
+awarewave-ops.type = client
+awarewave-ops.metadata.client_kind = internal
+awarewave-ops.metadata.relationship = first_party
+
+soulful-expression.type = client
+soulful-expression.metadata.client_kind = external
+soulful-expression.metadata.relationship = customer
+```
+
+Verification:
+
+```text
+npm run build passed in apps/next-admin.
+Live organizations endpoint verified both awarewave-ops and soulful-expression as type=client.
+Live assets endpoint verified 7 seeded AwareWave platform assets.
+Live ops_incidents endpoint verified client_slug, organization_id, and asset_id columns.
+Live repair_runs endpoint verified client_slug, organization_id, and asset_id columns.
+Live tenant_integration_bindings endpoint verified table exists.
+```
+
+Remaining production work:
+
+```text
+Create or connect actual tenant_integration_bindings records through the customer-facing Integrations setup flow.
+Do not treat the Integrations page as fully production-complete until customers can add, test, revoke, and audit integrations from the UI.
+```
+
+Live migration note:
+
+```text
+Migration 0028 must be run as supabase_admin on self-hosted Supabase.
+The postgres role in this environment is not a superuser and can fail on Supabase DDL event triggers.
+```

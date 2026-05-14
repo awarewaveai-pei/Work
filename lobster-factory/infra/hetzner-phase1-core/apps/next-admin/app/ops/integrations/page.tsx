@@ -95,6 +95,9 @@ export default async function IntegrationsPage() {
 
       <section style={{ display: "grid", gap: 14 }}>
         {organizations.map((org) => {
+          const meta = org.metadata ?? {};
+          const clientKind = typeof meta.client_kind === "string" ? meta.client_kind : org.slug === "awarewave-ops" ? "internal" : "external";
+          const relationship = typeof meta.relationship === "string" ? meta.relationship : org.slug === "awarewave-ops" ? "first_party" : "customer";
           const orgAssets = assetsByOrg.get(org.id) ?? [];
           const orgIntegrations = integrationsByOrg.get(org.id) ?? [];
           const configuredProviders = new Set(orgIntegrations.map((i) => i.provider));
@@ -106,7 +109,8 @@ export default async function IntegrationsPage() {
                 <div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 4 }}>
                     <h2 style={{ fontSize: 16, fontWeight: 750, color: "var(--text-primary)", margin: 0 }}>{org.name}</h2>
-                    <Pill text={org.type} />
+                    <Pill text={clientKind} tone={clientKind === "internal" ? "warn" : "muted"} />
+                    <Pill text={relationship} />
                     <Pill text={org.status} tone={org.status === "active" ? "ok" : "muted"} />
                   </div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{org.slug}</div>

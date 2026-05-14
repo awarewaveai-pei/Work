@@ -142,9 +142,13 @@ insert into public.organizations (slug, name, type, status, metadata)
 values (
   'awarewave-ops',
   'AwareWave Ops',
-  'agency',
+  'client',
   'active',
   jsonb_build_object(
+    'client_kind',
+    'internal',
+    'relationship',
+    'first_party',
     'client_config',
     jsonb_build_object(
       'platform', 'saas',
@@ -250,4 +254,3 @@ where r.incident_id = i.id
 
 -- 9) Keep PostgREST environments honest after new tables/columns.
 notify pgrst, 'reload schema';
-

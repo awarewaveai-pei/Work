@@ -30,6 +30,16 @@ export interface HealthResult {
 export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult }) {
   const cfg = (org.metadata?.client_config as ClientConfig) ?? {};
   const wp = (org.metadata?.wp_update_latest as WpUpdateLatest) ?? null;
+  const clientKind = typeof org.metadata?.client_kind === "string"
+    ? org.metadata.client_kind
+    : org.slug === "awarewave-ops"
+      ? "internal"
+      : "external";
+  const relationship = typeof org.metadata?.relationship === "string"
+    ? org.metadata.relationship
+    : org.slug === "awarewave-ops"
+      ? "first_party"
+      : "customer";
 
   const platformLabel = cfg.platform === "wordpress" ? "WordPress"
     : cfg.platform === "saas" ? "SaaS"
@@ -87,7 +97,7 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>{org.name}</div>
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>
-              {org.slug} · {org.type} · {org.status}
+              {org.slug} · {clientKind} · {relationship} · {org.status}
             </div>
           </div>
           <div style={{
@@ -113,6 +123,7 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
           {platformLabel !== "—" && <Tag label={platformLabel} />}
           {hostingLabel !== "—" && <Tag label={hostingLabel} />}
+          <Tag label={clientKind === "internal" ? "Internal client" : "External client"} muted={clientKind !== "internal"} />
           {cfg.notes && <Tag label={cfg.notes} muted />}
           {deptCount !== null
             ? <Tag label={`${deptCount}/20 部門`} dept active={deptCount >= 8} />

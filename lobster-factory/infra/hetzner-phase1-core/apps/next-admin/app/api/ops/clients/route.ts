@@ -68,6 +68,8 @@ export interface ClientRow {
   slug: string;
   name: string;
   type: string;
+  clientKind: "internal" | "external" | "demo" | "sandbox" | "partner" | string;
+  relationship: "first_party" | "customer" | "partner" | string;
   status: string;
   clientConfig: ClientConfig;
   wpUpdateLatest: WpUpdateLatest | null;
@@ -99,6 +101,8 @@ export async function GET() {
       slug: row.slug,
       name: row.name,
       type: row.type,
+      clientKind: typeof meta.client_kind === "string" ? meta.client_kind : row.slug === "awarewave-ops" ? "internal" : "external",
+      relationship: typeof meta.relationship === "string" ? meta.relationship : row.slug === "awarewave-ops" ? "first_party" : "customer",
       status: row.status,
       clientConfig: (meta.client_config as ClientConfig) ?? {},
       wpUpdateLatest: (meta.wp_update_latest as WpUpdateLatest) ?? null,
