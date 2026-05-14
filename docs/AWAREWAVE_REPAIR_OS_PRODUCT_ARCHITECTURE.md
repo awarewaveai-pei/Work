@@ -876,7 +876,8 @@ Status:
 ```text
 Source updated.
 Build verified.
-Production deployment pending.
+Production deployed.
+Live nginx boundary applied.
 ```
 
 Why this change exists:
@@ -916,4 +917,11 @@ Verification:
 ```text
 npm run build passed in apps/next-admin after RBAC and nginx source changes.
 Build warnings are existing Sentry configuration and ssh2 optional dependency warnings; they do not block the production build.
+SG next-admin deployed commit e00625e.
+Live system nginx reloaded with the /api/ops/integrations admin block.
+Old backup files were moved out of /etc/nginx/sites-enabled so nginx no longer loads duplicate app.aware-wave.com/api.aware-wave.com server blocks.
+Live /etc/nginx/snippets/ops-proxy-headers.inc was synchronized to match next-admin OPS_PROXY_SHARED_SECRET.
+Unauthenticated https://app.aware-wave.com/api/ops/integrations returns 401 at nginx.
+Direct app access without the trusted proxy header returns 403.
+Direct app access with the live proxy secret and admin claim returns 200 and lists organizations/integrations.
 ```
