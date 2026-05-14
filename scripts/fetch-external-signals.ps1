@@ -160,7 +160,7 @@ if (-not $slackToken) {
                     | ForEach-Object {
                         $ts  = [DateTime]::new(1970,1,1,0,0,0,[DateTimeKind]::Utc).AddSeconds([double]($_.ts -split '\.')[0])
                         $txt = ($_.text -replace '<[^>]+>', '' -replace '\r?\n', ' ').Trim()
-                        if ($txt.Length -gt 200) { $txt = $txt.Substring(0,200) + "…" }
+                        if ($txt.Length -gt 200) { $txt = $txt.Substring(0,200) + "..." }
                         [ordered]@{ date = $ts.ToString("o"); text = $txt }
                     })
                 $slackChannels[$ch] = [ordered]@{ status = "ok"; unread_count = $msgs.Count; messages = $msgs }
