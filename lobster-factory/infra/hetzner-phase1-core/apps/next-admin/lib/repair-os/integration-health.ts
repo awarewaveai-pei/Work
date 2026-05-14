@@ -1,3 +1,7 @@
+import { setDefaultResultOrder } from "node:dns";
+
+setDefaultResultOrder("ipv4first");
+
 export interface IntegrationHealthInput {
   provider: string;
   secretRef: string | null;
@@ -106,13 +110,11 @@ export async function checkIntegrationHealth(input: IntegrationHealthInput): Pro
     }
 
     if (provider === "trigger") {
-      return await checkJsonApi({
+      return await checkReachable({
         checkedAt,
         provider,
+        url: `${baseUrl(input.externalHint, process.env.TRIGGER_API_URL ?? "https://api.trigger.dev")}/`,
         token,
-        url: `${baseUrl(input.externalHint, process.env.TRIGGER_API_URL ?? "https://api.trigger.dev")}/api/v1/tasks`,
-        headers: bearerHeaders(token.value),
-        okWhen: (status) => status >= 200 && status < 300,
       });
     }
 
