@@ -246,6 +246,8 @@ services:
     image: lobster-phase1-next-admin:local
     container_name: lobster-next-admin
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       PORT: "3000"
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}

@@ -71,7 +71,7 @@ export async function checkIntegrationHealth(input: IntegrationHealthInput): Pro
         checkedAt,
         provider,
         token,
-        url: `${baseUrl(input.externalHint, process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com")}/api/projects/`,
+        url: `${posthogBaseUrl(input.externalHint, process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com")}/api/projects/`,
         headers: bearerHeaders(token.value),
         okWhen: (status) => status >= 200 && status < 300,
       });
@@ -121,7 +121,7 @@ export async function checkIntegrationHealth(input: IntegrationHealthInput): Pro
         checkedAt,
         provider,
         token,
-        url: `${baseUrl(input.externalHint, process.env.GRAFANA_BASE_URL ?? "")}/api/health`,
+        url: `${containerReachableBaseUrl(input.externalHint, process.env.GRAFANA_BASE_URL ?? "")}/api/health`,
         headers: bearerHeaders(token.value),
         okWhen: (status) => status >= 200 && status < 300,
       });
@@ -273,6 +273,16 @@ function bearerHeaders(token: string | null): Record<string, string> {
 function baseUrl(value: string | null, fallback: string): string {
   const raw = clean(value) ?? clean(fallback) ?? "";
   return raw.replace(/\/$/, "");
+}
+
+function posthogBaseUrl(value: string | null, fallback: string): string {
+  return baseUrl(value, fallback).replace(/\/api$/, "");
+}
+
+function containerReachableBaseUrl(value: string | null, fallback: string): string {
+  return baseUrl(value, fallback)
+    .replace("://127.0.0.1:", "://host.docker.internal:")
+    .replace("://localhost:", "://host.docker.internal:");
 }
 
 function normalizeProvider(provider: string): string {
