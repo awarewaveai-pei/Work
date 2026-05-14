@@ -54,6 +54,7 @@ Uptime Kuma 204.168.175.41 → 200 ✅（受信任來源正常通過）
 正本計畫：`lobster-factory/infra/hetzner-phase1-core/docs/CLOUDFLARE_MIGRATION_PLAN.md`。
 
 - AUTO_TASK_DONE: 安全強化 — Cloudflare IP lock + Layer 2-3-4 全防禦縱深上線
+- AUTO_TASK_DONE: Cryptomator vault 掛載路徑，將 AO-SYNC 秘密檔案移入加密區
 
 ## 2026-05-13
 
