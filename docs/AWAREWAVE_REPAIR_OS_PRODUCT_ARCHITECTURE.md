@@ -960,6 +960,38 @@ Verification:
 npm run build passed in apps/next-admin after Cloudflare credential candidate validation changes.
 ```
 
+### 2026-05-14: Tenant Credential Isolation Guard
+
+Status:
+
+```text
+Source updated.
+Build verified.
+Production deployment pending.
+```
+
+Why this change exists:
+
+```text
+When an integration record has an explicit vault:SECRET_REF, validation must use that exact secret.
+It must not silently fall back to another customer's generic credential, because that can make a tenant integration look healthy with the wrong tenant's authority.
+```
+
+Source changes:
+
+```text
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-os/integration-health.ts
+  Generic token resolution now treats an explicit vault: reference as authoritative.
+  Fallback env names are used only when the integration does not specify a vault: reference.
+  Cloudflare keeps its candidate-testing behavior because Cloudflare is a first-party provider credential, not a tenant-specific Supabase service role.
+```
+
+Verification:
+
+```text
+npm run build passed in apps/next-admin after tenant credential isolation changes.
+```
+
 ### 2026-05-14: Integration RBAC And Admin Boundary
 
 Status:

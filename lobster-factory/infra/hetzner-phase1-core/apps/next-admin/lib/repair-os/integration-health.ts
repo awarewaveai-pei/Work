@@ -348,7 +348,11 @@ interface ResolvedToken {
 }
 
 function resolveToken(secretRef: string | null, fallbackEnvNames: string[]): ResolvedToken {
-  return resolveTokenCandidates(secretRef, fallbackEnvNames)[0] ?? { value: null, envName: null };
+  const explicitEnvName = vaultEnvName(secretRef);
+  if (explicitEnvName) return { value: clean(process.env[explicitEnvName]), envName: explicitEnvName };
+
+  const candidates = resolveTokenCandidates(secretRef, fallbackEnvNames);
+  return candidates.find((candidate) => candidate.value) ?? candidates[0] ?? { value: null, envName: null };
 }
 
 function resolveTokenCandidates(secretRef: string | null, fallbackEnvNames: string[]): ResolvedToken[] {
