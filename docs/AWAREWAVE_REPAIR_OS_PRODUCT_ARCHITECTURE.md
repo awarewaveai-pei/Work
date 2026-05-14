@@ -1034,6 +1034,38 @@ Cloudflare is failed until a valid API token is provided.
 External digest reads Telegram and configured Slack channels; GitHub PR channel remains unconfigured.
 ```
 
+### 2026-05-14: Integrations Action Required Panel
+
+Status:
+
+```text
+Source updated.
+Build verified.
+Production deployment pending.
+```
+
+Why this change exists:
+
+```text
+The system should not require the operator to read API logs or architecture notes to know why a customer connection is not production-clean.
+/ops/integrations must make external credential and channel blockers visible as actionable work.
+```
+
+Source changes:
+
+```text
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/integrations/page.tsx
+  Adds an Action required section above the customer connection list.
+  Converts known failure modes into operator-readable next steps.
+  Covers Cloudflare invalid token, tenant Supabase missing service role key, generic failed integrations, and missing SLACK_GITHUB_PRS_CHANNEL_ID for external signal digest.
+```
+
+Verification:
+
+```text
+npm run build passed in apps/next-admin after adding the Action required panel.
+```
+
 ### 2026-05-14: Integration RBAC And Admin Boundary
 
 Status:
