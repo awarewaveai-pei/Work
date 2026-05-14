@@ -933,7 +933,8 @@ Status:
 ```text
 Source updated.
 Build verified.
-Production deployment pending.
+Production deployed.
+Live nginx proxy header snippet corrected.
 ```
 
 Why this change exists:
@@ -952,6 +953,10 @@ lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/inbox/dige
   Reads Telegram command_requests since the requested timestamp.
   Caps lookback to 48 hours and response size to 50 messages.
   Returns compact digest messages for AO-RESUME and external signal comparison.
+
+lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/ops-proxy-headers.inc
+  Removes duplicate x-ops-proxy-auth assignment.
+  Keeps client spoofing protection by overwriting client-provided proxy headers exactly once.
 ```
 
 Boundary:
@@ -970,4 +975,8 @@ Verification:
 npm run build passed in apps/next-admin after adding /api/ops/inbox/digest.
 Build output includes the new dynamic route /api/ops/inbox/digest.
 Build warnings are the same existing Sentry configuration and ssh2 optional dependency warnings.
+SG next-admin deployed commit eaa3332.
+Live /etc/nginx/snippets/ops-proxy-headers.inc now has a single x-ops-proxy-auth assignment matching next-admin OPS_PROXY_SHARED_SECRET.
+Unauthenticated https://app.aware-wave.com/api/ops/inbox/digest returns 401 unauthorized.
+Authenticated digest request with OPS_INBOX_INGEST_TOKEN returns 200 and a compact messages array.
 ```

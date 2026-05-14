@@ -8,8 +8,7 @@
 #    Route blocks may set a narrow fallback role after this include, for example
 #    x-ops-claims-role=operator for the Basic Auth / Cloudflare Access protected Build Console API.
 
-# Prevent inbound spoofed values from clients.
-proxy_set_header x-ops-proxy-auth "";
+# Prevent inbound spoofed values from clients by overwriting any client-provided values below.
 proxy_set_header x-ops-claims-role "";
 proxy_set_header x-user-role "";
 proxy_set_header x-clerk-role "";
