@@ -74,15 +74,15 @@ export async function GET(req: Request) {
 
 function buildSummary(row: {
   command: string;
-  args: Record<string, unknown>;
+  args: Record<string, unknown> | null;
   status: string;
-  result: Record<string, unknown>;
+  result: Record<string, unknown> | null;
 }): string {
   const argStr = Object.entries(row.args ?? {})
     .filter(([, v]) => v !== null && v !== undefined && v !== "")
     .map(([k, v]) => `${k}=${v}`)
     .join(" ");
   const base = argStr ? `/${row.command} ${argStr}` : `/${row.command}`;
-  const statusHint = row.status === "completed" ? "✅" : row.status === "failed" ? "❌" : "⏳";
+  const statusHint = row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "pending";
   return `${statusHint} ${base}`;
 }

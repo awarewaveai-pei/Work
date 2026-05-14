@@ -925,3 +925,41 @@ Unauthenticated https://app.aware-wave.com/api/ops/integrations returns 401 at n
 Direct app access without the trusted proxy header returns 403.
 Direct app access with the live proxy secret and admin claim returns 200 and lists organizations/integrations.
 ```
+
+### 2026-05-14: External Signals Digest Boundary
+
+Status:
+
+```text
+Source updated.
+Build verification pending.
+Production deployment pending.
+```
+
+Why this change exists:
+
+```text
+Slack, Telegram, webhooks, and the app were previously easy to compare incorrectly because they enter the system through different pipes.
+Repair OS needs one readable operator digest during AO-RESUME without turning /ops/inbox back into a second maintenance center.
+```
+
+Source changes:
+
+```text
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/inbox/digest/route.ts
+  Adds GET /api/ops/inbox/digest?since=<ISO timestamp>.
+  Authenticates with Bearer OPS_INBOX_INGEST_TOKEN.
+  Reads Telegram command_requests since the requested timestamp.
+  Caps lookback to 48 hours and response size to 50 messages.
+  Returns compact digest messages for AO-RESUME and external signal comparison.
+```
+
+Boundary:
+
+```text
+/api/ops/inbox/digest is an internal compatibility/read-model endpoint.
+It does not make /ops/inbox a buyer-facing product surface.
+Repair Center remains the main maintenance command center.
+Slack digest collection remains in scripts/fetch-external-signals.ps1 through Slack conversations.history.
+Telegram digest collection uses command_requests because Telegram commands are already persisted there.
+```
