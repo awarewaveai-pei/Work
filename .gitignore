@@ -63,6 +63,7 @@ agency-os/.agency-state/agent-bootstrap-prompts.md
 agency-os/.agency-state/ao-resume-hook-last.json
 agency-os/.agency-state/ao-resume-hook-last.log
 agency-os/.agency-state/ao-resume-hook-fail.log
+agency-os/.agency-state/external-signals-digest.json
 
 # --- Local scratch (wp-dummy paths for regression; never push) ---
 .scratch/

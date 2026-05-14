@@ -953,6 +953,10 @@ lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/inbox/dige
   Reads Telegram command_requests since the requested timestamp.
   Caps lookback to 48 hours and response size to 50 messages.
   Returns compact digest messages for AO-RESUME and external signal comparison.
+  Normalizes command labels so persisted commands with or without a leading slash render as one slash only.
+
+.gitignore
+  Ignores agency-os/.agency-state/external-signals-digest.json because it is local runtime state, not source.
 
 lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/ops-proxy-headers.inc
   Removes duplicate x-ops-proxy-auth assignment.
@@ -979,4 +983,5 @@ SG next-admin deployed commit eaa3332.
 Live /etc/nginx/snippets/ops-proxy-headers.inc now has a single x-ops-proxy-auth assignment matching next-admin OPS_PROXY_SHARED_SECRET.
 Unauthenticated https://app.aware-wave.com/api/ops/inbox/digest returns 401 unauthorized.
 Authenticated digest request with OPS_INBOX_INGEST_TOKEN returns 200 and a compact messages array.
+Local AO-RESUME digest generated successfully: Telegram ok with unread messages; Slack partial because the GitHub PRs channel ID is not configured yet.
 ```

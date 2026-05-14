@@ -78,11 +78,12 @@ function buildSummary(row: {
   status: string;
   result: Record<string, unknown> | null;
 }): string {
+  const command = row.command.startsWith("/") ? row.command.slice(1) : row.command;
   const argStr = Object.entries(row.args ?? {})
     .filter(([, v]) => v !== null && v !== undefined && v !== "")
     .map(([k, v]) => `${k}=${v}`)
     .join(" ");
-  const base = argStr ? `/${row.command} ${argStr}` : `/${row.command}`;
+  const base = argStr ? `/${command} ${argStr}` : `/${command}`;
   const statusHint = row.status === "completed" ? "completed" : row.status === "failed" ? "failed" : "pending";
   return `${statusHint} ${base}`;
 }
