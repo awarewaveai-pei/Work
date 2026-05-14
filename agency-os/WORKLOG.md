@@ -2,6 +2,59 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-14
+
+### 安全強化 — Cloudflare IP Lock + 全防禦縱深啟動（4 層完整）
+
+**根因 / 觸發**：Netdata 告警（133% bad requests、8.24% success rate）+ Gemini API 錯誤 + deploy drift 4 commits。  
+調查確認：機器人掃描器（172 個 PHP webshell 路徑，172 個 404）壓低了同一分鐘成功率；Cloudflare DNS 已 PROXIED，但 SG 對任意 IP 開放 port 80，機器人繞過 Cloudflare 直打 `5.223.93.113` 獲得完整 nginx 回應，Layer 4 缺口。
+
+**攻擊者識別（已手動封鎖 7 天）**：
+- `195.178.110.199`（Amsterdam / TECHOFF SRV）：600 次命中，憑證／設定竊取型掃描
+- `213.209.159.175`（Germany / Feo Prest SRL）：388 次命中，WP 漏洞掃描
+- `20.151.226.69`（Azure / Microsoft）：172 次命中，PHP webshell 掃描（今日事件觸發者）
+
+**本輪完成工作（commits fc152bf → cea9bdf）**：
+
+1. **Claude Haiku primary AI**（`apps/next-admin/lib/ops-inbox/ai/claude.ts`，新建）  
+   Provider cascade：Claude Haiku 4.5 → Gemini 2.0 Flash Lite → skip；TypeScript union type 修正。
+
+2. **Gemini 升級**（`ai/gemini.ts`）：`gemini-1.5-flash` → `gemini-2.0-flash-lite`；加 12 秒 Promise.race timeout。
+
+3. **fail2ban 雙 jail 部署**（SG host，git 外）：
+   - `nginx-4xx`：40 次/5 分鐘 → 24 小時封禁
+   - `nginx-4xx-repeat`：10 次/1 小時 → 7 天封禁
+   - nginx log volume：`/var/log/lobster-nginx:/var/log/nginx:rw`（docker-compose.yml）
+
+4. **Layer 4 Cloudflare IP Lock**（`nginx/default.conf`，本輪最終部署）：
+   - `set_real_ip_from` + `real_ip_header CF-Connecting-IP`（15 個 CF 範圍 + EU VPS + localhost）
+   - `geo $realip_remote_addr $is_trusted_source` — 以連接前原始 IP 判斷，非 CF 替換後的 visitor IP
+   - `if ($is_trusted_source = 0) { return 444; }` 兩個 server blocks 頂端
+   - 直打 `5.223.93.113` → `444`（無回應）；Cloudflare 路徑 → `200` ✅
+
+5. **Cloudflare 帳號設定**（Free plan，Zone `f21b...`）：SSL Full (strict)、Always HTTPS、Security Level Medium、TLS 1.2 min、Browser Integrity Check。Bot Fight Mode 與 WAF 自訂規則因 Free plan API 限制，需於 Cloudflare Dashboard 手動開啟（見下方待辦）。
+
+**驗證**：
+```
+curl -H "Host: aware-wave.com" http://5.223.93.113/ → 000 (444, 連線關閉) ✅
+curl http://127.0.0.1/ -H "Host: aware-wave.com"    → 200 ✅
+nginx access.log: 5.223.93.113 → 444 0 (已記錄) ✅
+Uptime Kuma 204.168.175.41 → 200 ✅（受信任來源正常通過）
+.deployed-commit = cea9bdf ✅
+```
+
+**待辦（Dashboard 手動，不需 code change）**：
+- [ ] Cloudflare Dashboard → Security → Bots → **Bot Fight Mode → On**
+- [ ] Cloudflare Dashboard → Security → WAF → Custom Rules（需 Zone Firewall 權限）：
+  - Rule 1：block `/xmlrpc.php`
+  - Rule 2：rate limit `/wp-login.php`（5 req/min/IP）
+  - Rule 3：block `\.(env|sql|bak|old|htpasswd)$`
+
+**避免再發生**：Layer 4（Cloudflare IP lock）現已啟動。未來若 Cloudflare 更新 IP 範圍，需同步更新 `nginx/default.conf` 的 `set_real_ip_from` 與 `geo` 兩個區塊。  
+正本計畫：`lobster-factory/infra/hetzner-phase1-core/docs/CLOUDFLARE_MIGRATION_PLAN.md`。
+
+- AUTO_TASK_DONE: 安全強化 — Cloudflare IP lock + Layer 2-3-4 全防禦縱深上線
+
 ## 2026-05-13
 
 ### API 成本修復（晚班，Claude Code session）
