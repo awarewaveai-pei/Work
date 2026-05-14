@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkIntegrationHealth } from "@/lib/repair-os/integration-health";
+import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
+import type { OpsRole } from "@/lib/ops-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +86,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const resolved = resolveOpsRole(req);
+  if (!canWriteTenantConfig(resolved.role)) {
+    return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
+  }
+
   const supabase = getSupabaseWriteClient();
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "supabase_write_not_configured" }, { status: 503 });
@@ -148,13 +155,18 @@ export async function POST(req: Request) {
       provisioning_source: row.provisioning_source,
       has_secret_ref: !!row.secret_ref,
       has_external_hint: !!row.external_hint,
+      actor_role: resolved.role,
+      role_source: resolved.source,
     },
+    actorRole: resolved.role,
   });
 
   return NextResponse.json({ ok: true, integration: data });
 }
 
 export async function PATCH(req: Request) {
+  const resolved = resolveOpsRole(req);
+
   const supabase = getSupabaseWriteClient();
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "supabase_write_not_configured" }, { status: 503 });
@@ -171,6 +183,9 @@ export async function PATCH(req: Request) {
   }
   if (!action || !["validate", "activate", "revoke", "mark_failed"].includes(action)) {
     return NextResponse.json({ ok: false, error: "action must be validate, activate, revoke, or mark_failed" }, { status: 400 });
+  }
+  if (!canMutateIntegration(action, resolved.role)) {
+    return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role, action }, { status: 403 });
   }
 
   const { data: current, error: fetchError } = await supabase
@@ -224,10 +239,18 @@ export async function PATCH(req: Request) {
       status: data?.status ?? null,
       validation_scope: health?.scope ?? null,
       validation_summary: health?.summary ?? null,
+      actor_role: resolved.role,
+      role_source: resolved.source,
     },
+    actorRole: resolved.role,
   });
 
   return NextResponse.json({ ok: true, integration: data });
+}
+
+function canMutateIntegration(action: string, role: OpsRole): boolean {
+  if (action === "validate") return role === "owner" || role === "admin" || role === "operator";
+  return canWriteTenantConfig(role);
 }
 
 type JsonResult =
@@ -363,12 +386,13 @@ async function writeAuditEvent(
     eventType: string;
     targetId: string;
     payload: Record<string, unknown>;
+    actorRole: OpsRole;
   },
 ) {
   if (!supabase) return;
   await supabase.from("ops_audit_events").insert({
     organization_id: input.organizationId,
-    actor_role: "operator",
+    actor_role: input.actorRole,
     event_type: input.eventType,
     target_type: "tenant_integration_binding",
     target_id: input.targetId,
