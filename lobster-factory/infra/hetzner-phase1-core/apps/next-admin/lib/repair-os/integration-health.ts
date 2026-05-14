@@ -1,4 +1,6 @@
 import { setDefaultResultOrder } from "node:dns";
+import http from "node:http";
+import https from "node:https";
 
 setDefaultResultOrder("ipv4first");
 
@@ -222,7 +224,12 @@ async function checkReachable(input: {
   };
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+interface HealthHttpResponse {
+  status: number;
+  text(): Promise<string>;
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<HealthHttpResponse> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
@@ -231,12 +238,55 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
       signal: controller.signal,
       cache: "no-store",
     });
+  } catch (error) {
+    return await requestWithNodeHttp(url, init, error);
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function readJsonSafe(response: Response): Promise<unknown> {
+async function requestWithNodeHttp(url: string, init: RequestInit, originalError: unknown): Promise<HealthHttpResponse> {
+  const target = new URL(url);
+  const client = target.protocol === "http:" ? http : https;
+  const headers = normalizeHeaders(init.headers);
+
+  return await new Promise<HealthHttpResponse>((resolve, reject) => {
+    const req = client.request(
+      target,
+      {
+        method: init.method ?? "GET",
+        headers,
+        timeout: 12_000,
+        family: 4,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        res.on("end", () => {
+          const body = Buffer.concat(chunks).toString("utf8");
+          resolve({
+            status: res.statusCode ?? 0,
+            text: async () => body,
+          });
+        });
+      },
+    );
+    req.on("timeout", () => req.destroy(new Error("node_http_timeout")));
+    req.on("error", () => {
+      reject(originalError instanceof Error ? originalError : new Error("fetch failed"));
+    });
+    req.end();
+  });
+}
+
+function normalizeHeaders(headers: RequestInit["headers"]): Record<string, string> {
+  if (!headers) return {};
+  if (headers instanceof Headers) return Object.fromEntries(headers.entries());
+  if (Array.isArray(headers)) return Object.fromEntries(headers);
+  return headers as Record<string, string>;
+}
+
+async function readJsonSafe(response: HealthHttpResponse): Promise<unknown> {
   const text = await response.text();
   if (!text) return null;
   try {
