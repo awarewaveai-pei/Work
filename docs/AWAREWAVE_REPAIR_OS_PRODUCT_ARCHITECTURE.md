@@ -920,6 +920,46 @@ next-admin container can reach Grafana /api/health with HTTP 200.
 Repair OS production Validate for awarewave-ops Grafana now returns active with last_error=null.
 ```
 
+### 2026-05-14: Cloudflare Credential Candidate Validation
+
+Status:
+
+```text
+Source updated.
+Build verified.
+Production deployment pending.
+Cloudflare token replacement still required.
+```
+
+Why this change exists:
+
+```text
+Cloudflare validation should not fail forever because one secret_ref points to a stale token while a fallback env contains a valid replacement.
+The provider adapter should try known credential candidates safely and record which env names were tried without exposing token values.
+```
+
+Source changes:
+
+```text
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-os/integration-health.ts
+  Cloudflare validation now tests secret_ref plus fallback env candidates.
+  Returns active on the first accepted token.
+  Returns failed with tried_credential_envs metadata when all configured candidates are rejected.
+```
+
+Current production finding:
+
+```text
+Both configured SG Cloudflare token candidates are present, but Cloudflare /client/v4/user/tokens/verify returns HTTP 401 Invalid API Token for both.
+Repair OS cannot make Cloudflare active until a valid Cloudflare API token is provided and synced to SG.
+```
+
+Verification:
+
+```text
+npm run build passed in apps/next-admin after Cloudflare credential candidate validation changes.
+```
+
 ### 2026-05-14: Integration RBAC And Admin Boundary
 
 Status:

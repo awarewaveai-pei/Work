@@ -40,12 +40,12 @@ export async function checkIntegrationHealth(input: IntegrationHealthInput): Pro
 
   try {
     if (provider === "cloudflare") {
-      return await checkJsonApi({
+      return await checkJsonApiCandidates({
         checkedAt,
         provider,
-        token,
+        tokens: resolveTokenCandidates(input.secretRef, DEFAULT_ENV_BY_PROVIDER[provider] ?? []),
         url: "https://api.cloudflare.com/client/v4/user/tokens/verify",
-        headers: bearerHeaders(token.value),
+        headersForToken: bearerHeaders,
         okWhen: (status, json) => status === 200 && readBoolean(json, "success") === true,
       });
     }
@@ -199,6 +199,51 @@ async function checkJsonApi(input: {
   };
 }
 
+async function checkJsonApiCandidates(input: {
+  checkedAt: string;
+  provider: string;
+  tokens: ResolvedToken[];
+  url: string;
+  headersForToken: (token: string | null) => Record<string, string>;
+  okWhen: (status: number, json: unknown) => boolean;
+}): Promise<IntegrationHealthResult> {
+  if (!input.url) return missingUrl(input.checkedAt, input.provider);
+  const candidates = input.tokens.filter((candidate) => candidate.value);
+  if (candidates.length === 0) return missingToken(input.checkedAt, input.provider, input.tokens[0] ?? { value: null, envName: null });
+
+  const tried: string[] = [];
+  let lastResult: IntegrationHealthResult | null = null;
+  for (const candidate of candidates) {
+    tried.push(candidate.envName ?? "unknown");
+    lastResult = await checkJsonApi({
+      checkedAt: input.checkedAt,
+      provider: input.provider,
+      token: candidate,
+      url: input.url,
+      headers: input.headersForToken(candidate.value),
+      okWhen: input.okWhen,
+    });
+    if (lastResult.ok) {
+      return {
+        ...lastResult,
+        details: {
+          ...lastResult.details,
+          tried_credential_envs: tried,
+        },
+      };
+    }
+  }
+
+  return {
+    ...(lastResult as IntegrationHealthResult),
+    summary: `${lastResult?.summary ?? "Provider API rejected the configured credentials."} Tried ${tried.length} credential candidate(s).`,
+    details: {
+      ...(lastResult?.details ?? { provider: input.provider }),
+      tried_credential_envs: tried,
+    },
+  };
+}
+
 async function checkReachable(input: {
   checkedAt: string;
   provider: string;
@@ -303,13 +348,14 @@ interface ResolvedToken {
 }
 
 function resolveToken(secretRef: string | null, fallbackEnvNames: string[]): ResolvedToken {
+  return resolveTokenCandidates(secretRef, fallbackEnvNames)[0] ?? { value: null, envName: null };
+}
+
+function resolveTokenCandidates(secretRef: string | null, fallbackEnvNames: string[]): ResolvedToken[] {
   const ref = clean(secretRef);
   const envNames = [...new Set([vaultEnvName(ref), ...fallbackEnvNames].filter(Boolean) as string[])];
-  for (const envName of envNames) {
-    const value = clean(process.env[envName]);
-    if (value) return { value, envName };
-  }
-  return { value: null, envName: envNames[0] ?? null };
+  if (envNames.length === 0) return [{ value: null, envName: null }];
+  return envNames.map((envName) => ({ value: clean(process.env[envName]), envName }));
 }
 
 function vaultEnvName(secretRef: string | null): string | null {
