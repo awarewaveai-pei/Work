@@ -876,7 +876,8 @@ Status:
 ```text
 Source updated.
 Build verified.
-Production deployment pending.
+Production deployed.
+Grafana validation restored.
 ```
 
 Why this change exists:
@@ -912,6 +913,11 @@ Verification:
 
 ```text
 npm run build passed in apps/next-admin after adding GRAFANA_INTERNAL_BASE_URL support.
+SG observability stack started: Loki, Promtail, and Grafana.
+Live next-admin joined lobster-phase1_observability Docker network.
+Live GRAFANA_INTERNAL_BASE_URL set to http://lobster-grafana-obs:3000.
+next-admin container can reach Grafana /api/health with HTTP 200.
+Repair OS production Validate for awarewave-ops Grafana now returns active with last_error=null.
 ```
 
 ### 2026-05-14: Integration RBAC And Admin Boundary
