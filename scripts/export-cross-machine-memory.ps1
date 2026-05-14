@@ -24,7 +24,7 @@
 #   user-env.ps1               -> $AO_SYNC_SECRETS_ROOT\user-env.ps1   (shared, last-write-wins)
 #   .ssh\*                     -> $AO_SYNC_SECRETS_ROOT\.ssh\           (dynamic scan, excl. machine-specific)
 #   AWARE_WAVE_CREDENTIALS.md  -> $AO_SYNC_SECRETS_ROOT\AWARE_WAVE_CREDENTIALS.md
-#   .manifest-<MACHINE>.json   -> $AO_SYNC_SECRETS_ROOT\               (sha256 + timestamp per file)
+#   .manifest-<MACHINE>.json   -> $AO_SYNC_SECRETS_ROOT\               (sha256 + size per file; read by import for logging)
 #
 # SSH exclusion (never exported):
 #   known_hosts, known_hosts.old, authorized_keys, *.txt, *.old, *.bkup, *.backup
@@ -134,7 +134,6 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     if (Test-Path -LiteralPath $userEnvSrc) {
         $userEnvDest = Join-Path $secretsRoot "user-env.ps1"
         Copy-Item -LiteralPath $userEnvSrc -Destination $userEnvDest -Force
-        (Get-Item -LiteralPath $userEnvDest).LastWriteTime = $syncNow
         Write-Host "  copied: mcp/user-env.ps1" -ForegroundColor Green
     }
 
@@ -153,7 +152,6 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
             if ($sshExcludeExts  -contains $_.Extension.ToLower()) { return }
             $keyDest = Join-Path $sshDest $_.Name
             Copy-Item -LiteralPath $_.FullName -Destination $keyDest -Force
-            (Get-Item -LiteralPath $keyDest).LastWriteTime = $syncNow
             Write-Host "  copied: .ssh/$($_.Name)" -ForegroundColor Green
             $exportedSshKeys.Add($_.Name)
         }
@@ -164,12 +162,11 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     if (Test-Path -LiteralPath $credsSrc) {
         $credsDest = Join-Path $secretsRoot "AWARE_WAVE_CREDENTIALS.md"
         Copy-Item -LiteralPath $credsSrc -Destination $credsDest -Force
-        (Get-Item -LiteralPath $credsDest).LastWriteTime = $syncNow
         Write-Host "  copied: AWARE_WAVE_CREDENTIALS.md" -ForegroundColor Green
     }
 
-    # Write export manifest: enables timestamp-aware conflict resolution on import.
-    # Import reads this to detect "local is newer than export" and keep local instead of overwriting.
+    # Write export manifest: records sha256 + size per file for import-side logging and integrity check.
+    # Import uses its own local-state file (not this manifest) for conflict detection.
     $manifestEntries = [ordered]@{}
     $manifestSources = [System.Collections.Generic.List[object]]::new()
     $manifestSources.Add([pscustomobject]@{ key = 'user-env.ps1';              path = Join-Path $secretsRoot 'user-env.ps1' })

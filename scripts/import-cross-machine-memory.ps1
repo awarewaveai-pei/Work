@@ -1,4 +1,4 @@
-﻿# import-cross-machine-memory.ps1
+# import-cross-machine-memory.ps1
 # Auto-imports all cross-machine files from the sync folder on AO-RESUME.
 # Called by ao-resume.ps1 (non-blocking). Silent no-op when no AO-SYNC folder exists.
 #
@@ -11,10 +11,22 @@
 #   Old format (AO-SYNC-date):         exclude own machine via .exported-by tag  -> backward compatible
 #   Both formats sorted by date desc; picks the single best candidate.
 #
-# Import decision (per file):
-#   1. SHA256 same                                              -> log "unchanged", skip write
-#   2. SHA256 differs AND manifest exists AND local mtime newer -> WARN "local-newer", keep local
-#   3. SHA256 differs AND (no manifest OR local is older)       -> backup + atomic copy + verify
+# Import decision (per file) — content-hash based, NO mtime dependency:
+#   1. SHA256(vault) == SHA256(local)                            -> unchanged (skip write)
+#   2. SHA256(vault) != SHA256(local):
+#      a. -Force flag present                                     -> import (force overwrite)
+#      b. no local-state entry (first run / new file)            -> import (vault is authoritative)
+#      c. SHA256(local) == local-state entry                     -> import (local unchanged since last sync)
+#      d. SHA256(local) != local-state entry                     -> local-modified WARN (keep local)
+#
+# Local state file (machine-local, NOT in git, NOT synced):
+#   %LOCALAPPDATA%\AgencyOS\ao-sync-state.json
+#   Records SHA256 of each file at last successful import.
+#   Enables mtime-free conflict detection: if SHA256(local) matches local-state, the file was not
+#   modified since the last import — safe to overwrite with the vault update.
+#   Written at end of each session; read lazily at first use.
+#
+# Use -Force to bypass conflict detection and always overwrite with vault version.
 #
 # SSH exclusion (never imported):
 #   known_hosts, known_hosts.old, authorized_keys, *.txt, *.old, *.bkup, *.backup
@@ -24,7 +36,10 @@
 #
 # Drive detection: tries G H F E D I J (not hardcoded to G:).
 
-param([string]$WorkRoot = "")
+param(
+    [string]$WorkRoot = "",
+    [switch]$Force   # Bypass local-modified check; always import vault version
+)
 
 # ── 0. Load env vars from User registry if missing from process env ──────────
 if (-not $env:AO_SYNC_ROOT) {
@@ -76,8 +91,9 @@ function Invoke-PurgeOldBackups {
         ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
-# ── Helper: read the most-recent export manifest ─────────────────────────────
-# Returns a PSCustomObject with exported_utc, machine, files — or $null if none found.
+# ── Helper: read the most-recent export manifest (logging only) ───────────────
+# Returns PSCustomObject with exported_utc, machine, files — or $null if none found.
+# NOTE: manifest is used for logging only; import decisions use local state (not manifest).
 function Read-ExportManifest([string]$SecretsRoot) {
     if (-not (Test-Path -LiteralPath $SecretsRoot)) { return $null }
     $best = $null; $bestUtc = [datetime]::MinValue
@@ -93,23 +109,83 @@ function Read-ExportManifest([string]$SecretsRoot) {
     return $best
 }
 
-# ── Helper: decide whether to import a file ───────────────────────────────────
-# Returns: 'unchanged' | 'local-newer' | 'import'
-#   unchanged  : SHA256 identical -> no write needed
-#   local-newer: SHA256 differs but local mtime > manifest.exported_utc -> keep local
-#   import     : SHA256 differs and source is authoritative -> proceed with backup+copy
-function Get-ImportDecision([string]$SrcPath, [string]$DstPath, $Manifest) {
-    if ((Get-SafeHash $SrcPath) -eq (Get-SafeHash $DstPath)) { return 'unchanged' }
-    if (-not $Manifest) { return 'import' }
-    try {
-        $exportedUtc = [datetime]::Parse($Manifest.exported_utc, $null,
-                           [System.Globalization.DateTimeStyles]::RoundtripKind)
-        if ((Test-Path -LiteralPath $DstPath) -and
-            (Get-Item -LiteralPath $DstPath).LastWriteTimeUtc -gt $exportedUtc) {
-            return 'local-newer'
-        }
-    } catch { }
-    return 'import'
+# ── Local state: tracks SHA256 of each file at last successful import ─────────
+# Stored machine-locally (not in git, not synced to other machines).
+# Enables mtime-free conflict detection:
+#   SHA256(local) == local-state.sha256  ->  local unchanged since last sync  ->  safe to overwrite
+#   SHA256(local) != local-state.sha256  ->  local was modified               ->  true conflict, keep local
+$script:LocalStatePath     = Join-Path $env:LOCALAPPDATA 'AgencyOS\ao-sync-state.json'
+$script:LocalState         = $null    # loaded lazily on first Get-LocalStateHash call
+$script:LocalStateModified = $false
+$script:ImportFromMachine  = ''
+
+function Read-LocalState {
+    if ($null -ne $script:LocalState) { return $script:LocalState }
+    if (Test-Path -LiteralPath $script:LocalStatePath) {
+        try {
+            $raw = Get-Content -LiteralPath $script:LocalStatePath -Raw -Encoding UTF8 | ConvertFrom-Json
+            # ConvertFrom-Json returns PSCustomObject; convert .files to hashtable for dynamic key access.
+            $ht = @{}
+            if ($null -ne $raw.files) {
+                $raw.files.PSObject.Properties | ForEach-Object { $ht[$_.Name] = $_.Value }
+            }
+            $script:LocalState = [PSCustomObject]@{
+                last_import_utc = [string]$raw.last_import_utc
+                from_machine    = [string]$raw.from_machine
+                files           = $ht
+            }
+            return $script:LocalState
+        } catch { }
+    }
+    # No state file yet (first run on this machine).
+    $script:LocalState = [PSCustomObject]@{ last_import_utc = ''; from_machine = ''; files = @{} }
+    return $script:LocalState
+}
+
+function Get-LocalStateHash([string]$FileKey) {
+    $entry = (Read-LocalState).files[$FileKey]
+    if ($null -eq $entry) { return '' }
+    return [string]$entry.sha256   # works for both PSCustomObject and hashtable values
+}
+
+# Called after each successful import or unchanged confirmation. Marks local state dirty.
+function Update-LocalStateHash([string]$FileKey, [string]$Sha256) {
+    (Read-LocalState).files[$FileKey] = @{ sha256 = $Sha256 }
+    $script:LocalStateModified = $true
+}
+
+# Flush in-memory state to disk. Called once at end of import session.
+function Write-LocalState {
+    $state = Read-LocalState
+    $state.last_import_utc = (Get-Date).ToUniversalTime().ToString('o')
+    $state.from_machine    = $script:ImportFromMachine
+    $dir = Split-Path $script:LocalStatePath -Parent
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    [ordered]@{
+        last_import_utc = $state.last_import_utc
+        from_machine    = $state.from_machine
+        files           = $state.files
+    } | ConvertTo-Json -Depth 3 | Out-File -LiteralPath $script:LocalStatePath -Encoding UTF8 -Force
+}
+
+# ── Helper: decide whether to import a file (content-hash, no mtime) ─────────
+# Returns: 'unchanged' | 'import' | 'local-modified'
+#   unchanged     : SHA256 identical — no write needed
+#   import        : vault has update; local not modified since last sync — safe to overwrite
+#   local-modified: SHA256 differs AND local was modified since last sync — keep local, warn user
+#
+# -Force bypasses 'local-modified' and always returns 'import'.
+function Get-ImportDecision([string]$SrcPath, [string]$DstPath, [string]$FileKey) {
+    $srcHash = Get-SafeHash $SrcPath
+    $dstHash = Get-SafeHash $DstPath
+
+    if ($srcHash -eq $dstHash) { return 'unchanged' }
+    if ($Force)                { return 'import' }
+
+    $stateHash = Get-LocalStateHash $FileKey
+    if ($stateHash -eq '')         { return 'import' }   # first run / new file — vault authoritative
+    if ($dstHash   -eq $stateHash) { return 'import' }   # local unchanged since last sync
+    return 'local-modified'                               # local was modified — true conflict
 }
 
 # ── Helper: atomic copy with post-write SHA256 verification ──────────────────
@@ -165,7 +241,7 @@ if ($env:AO_SYNC_ROOT) {
         if ($detected) {
             $searchRoots += $detected
             $gdFound = $true
-            # Auto-derive secrets root from AO-SYNC location (parent = MySecretVault)
+            # Auto-derive secrets root from AO-SYNC location (parent folder)
             if (-not $env:AO_SYNC_SECRETS_ROOT) {
                 $env:AO_SYNC_SECRETS_ROOT = Split-Path $detected -Parent
                 Write-Host "  auto-derived: AO_SYNC_SECRETS_ROOT = $env:AO_SYNC_SECRETS_ROOT" -ForegroundColor DarkGray
@@ -248,6 +324,7 @@ if ($candidateFolders.Count -gt 0 -and $memDest) {
             $fromLabel = if ($best.FolderMachine) { $best.FolderMachine } `
                          elseif ($best.ExportedBy) { $best.ExportedBy } `
                          else { 'unknown machine' }
+            $script:ImportFromMachine = $fromLabel
             Write-Host "  cross-machine import: MEMORY.md imported from $($best.Folder.Name) [by: $fromLabel]" -ForegroundColor Green
         }
     }
@@ -259,11 +336,15 @@ if ($candidateFolders.Count -gt 0 -and $memDest) {
 $secretsRoot = $env:AO_SYNC_SECRETS_ROOT
 if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
 
-    # Load the most recent export manifest for timestamp-aware conflict resolution.
-    # If no manifest exists (e.g. export was run before this upgrade), falls back to hash-only.
+    # Load manifest for logging only (not used in import decision logic).
     $manifest = Read-ExportManifest $secretsRoot
     if ($manifest) {
         Write-Host "  manifest loaded: exported by $($manifest.machine) at $($manifest.exported_utc)" -ForegroundColor DarkGray
+        if (-not $script:ImportFromMachine) { $script:ImportFromMachine = $manifest.machine }
+    }
+
+    if ($Force) {
+        Write-Host "  -Force: conflict check bypassed — vault version always wins" -ForegroundColor Yellow
     }
 
     # Purge old local backups (keep last 5 sets, run once per import session)
@@ -273,17 +354,19 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     $userEnvSrc = Join-Path $secretsRoot "user-env.ps1"
     if ((Test-Path -LiteralPath $userEnvSrc) -and $WorkRoot) {
         $userEnvDest = Join-Path $WorkRoot "mcp\user-env.ps1"
-        $decision    = Get-ImportDecision $userEnvSrc $userEnvDest $manifest
+        $decision    = Get-ImportDecision $userEnvSrc $userEnvDest 'user-env.ps1'
         switch ($decision) {
-            'unchanged'  {
+            'unchanged' {
+                Update-LocalStateHash 'user-env.ps1' (Get-SafeHash $userEnvSrc)
                 Write-Host "  cross-machine import: user-env.ps1 unchanged (setx + vault skipped)" -ForegroundColor DarkGray
             }
-            'local-newer' {
-                Write-Host "  cross-machine import: user-env.ps1 WARN — local is newer than manifest ($($manifest.exported_utc)), kept local" -ForegroundColor Yellow
+            'local-modified' {
+                Write-Host "  cross-machine import: user-env.ps1 WARN — local was modified since last sync, kept local. Run with -Force to overwrite." -ForegroundColor Yellow
             }
             'import' {
                 Invoke-LocalBackup $userEnvDest "user-env.ps1"
                 if (Copy-Atomic $userEnvSrc $userEnvDest) {
+                    Update-LocalStateHash 'user-env.ps1' (Get-SafeHash $userEnvSrc)
                     Write-Host "  cross-machine import: user-env.ps1 updated" -ForegroundColor Green
                     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $userEnvDest
                     Write-Host "  cross-machine import: env vars applied (open a new terminal to inherit)" -ForegroundColor Green
@@ -299,7 +382,7 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     }
 
     # ── SSH keys -> ~/.ssh\ ───────────────────────────────────────────────────
-    # Dynamic scan from Google Drive .ssh/ — picks up any new key automatically.
+    # Dynamic scan from vault .ssh/ — picks up any new key automatically.
     # Exclusion list: machine-specific or reference-only files that must not roam.
     $sshSrc          = Join-Path $secretsRoot ".ssh"
     $sshDest         = Join-Path $env:USERPROFILE ".ssh"
@@ -310,22 +393,25 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
             New-Item -ItemType Directory -Path $sshDest -Force | Out-Null
         }
         Get-ChildItem -Path $sshSrc -File -ErrorAction SilentlyContinue | ForEach-Object {
-            $name = $_.Name
+            $name    = $_.Name
             if ($sshExcludeNames -contains $name) { return }
             if ($sshExcludeExts  -contains $_.Extension.ToLower()) { return }
-            $src      = $_.FullName
-            $dst      = Join-Path $sshDest $name
-            $decision = Get-ImportDecision $src $dst $manifest
+            $src     = $_.FullName
+            $dst     = Join-Path $sshDest $name
+            $fileKey = ".ssh/$name"
+            $decision = Get-ImportDecision $src $dst $fileKey
             switch ($decision) {
-                'unchanged'   {
+                'unchanged' {
+                    Update-LocalStateHash $fileKey (Get-SafeHash $src)
                     Write-Host "  cross-machine import: .ssh/$name unchanged" -ForegroundColor DarkGray
                 }
-                'local-newer' {
-                    Write-Host "  cross-machine import: .ssh/$name WARN — local is newer than manifest, kept local" -ForegroundColor Yellow
+                'local-modified' {
+                    Write-Host "  cross-machine import: .ssh/$name WARN — local was modified since last sync, kept local. Run with -Force to overwrite." -ForegroundColor Yellow
                 }
                 'import' {
                     Invoke-LocalBackup $dst "ssh/$name"
                     if (Copy-Atomic $src $dst) {
+                        Update-LocalStateHash $fileKey (Get-SafeHash $src)
                         Write-Host "  cross-machine import: .ssh/$name updated" -ForegroundColor Green
                     }
                 }
@@ -337,21 +423,29 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     $credsSrc = Join-Path $secretsRoot "AWARE_WAVE_CREDENTIALS.md"
     $credsDst = Join-Path $env:USERPROFILE "AWARE_WAVE_CREDENTIALS.md"
     if (Test-Path -LiteralPath $credsSrc) {
-        $decision = Get-ImportDecision $credsSrc $credsDst $manifest
+        $decision = Get-ImportDecision $credsSrc $credsDst 'AWARE_WAVE_CREDENTIALS.md'
         switch ($decision) {
-            'unchanged'   {
+            'unchanged' {
+                Update-LocalStateHash 'AWARE_WAVE_CREDENTIALS.md' (Get-SafeHash $credsSrc)
                 Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md unchanged" -ForegroundColor DarkGray
             }
-            'local-newer' {
-                Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md WARN — local is newer than manifest, kept local" -ForegroundColor Yellow
+            'local-modified' {
+                Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md WARN — local was modified since last sync, kept local. Run with -Force to overwrite." -ForegroundColor Yellow
             }
             'import' {
                 Invoke-LocalBackup $credsDst "AWARE_WAVE_CREDENTIALS.md"
                 if (Copy-Atomic $credsSrc $credsDst) {
+                    Update-LocalStateHash 'AWARE_WAVE_CREDENTIALS.md' (Get-SafeHash $credsSrc)
                     Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md updated" -ForegroundColor Green
                 }
             }
         }
+    }
+
+    # ── Flush local state to disk (once per session) ──────────────────────────
+    if ($script:LocalStateModified) {
+        Write-LocalState
+        Write-Host "  local state saved: $script:LocalStatePath" -ForegroundColor DarkGray
     }
 
     Write-Host "== cross-machine import: secrets from $secretsRoot ==" -ForegroundColor Cyan
