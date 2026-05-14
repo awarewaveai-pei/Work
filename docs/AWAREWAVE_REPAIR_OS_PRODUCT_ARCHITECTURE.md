@@ -42,15 +42,37 @@ Settings
 
 A client is an organization that receives monitoring, maintenance, automation, repair, and reporting.
 
-AwareWave itself must also be modeled as a client:
+In Repair OS, every maintained organization is a client. This includes AwareWave itself. AwareWave should not be a separate product category in the maintenance flow; it is an internal client that dogfoods the same system sold to external customers.
 
 ```text
 slug: awarewave-ops
-type: agency
-role: internal platform customer
+type: client
+client_kind: internal
+relationship: first_party
+role: internal platform client
 ```
 
 This avoids special-case architecture where the platform monitors everyone except itself through a different path.
+
+External customers use the same client model:
+
+```text
+slug: soulful-expression
+type: client
+client_kind: external
+relationship: customer
+role: external customer client
+```
+
+The distinction is not whether something is a client. The distinction is the relationship:
+
+```text
+internal
+external
+demo
+sandbox
+partner
+```
 
 ### Asset
 
@@ -434,6 +456,16 @@ The platform itself must be monitored and repaired through the same model sold t
 
 No permanent special-case path should exist for AwareWave operations.
 
+Use:
+
+```text
+awarewave-ops.type = client
+awarewave-ops.metadata.client_kind = internal
+awarewave-ops.metadata.relationship = first_party
+```
+
+Do not use `awarewave-ops.type = agency` inside the Repair OS product model.
+
 ## Target Data Model
 
 Long-term model:
@@ -493,6 +525,8 @@ repair_runs
 
 Current code uses `client_slug` as an incremental bridge. That is acceptable short term, but long term should move to `organization_id` and `asset_id`.
 
+`organizations.type` should not decide whether an organization is maintained by Repair OS. Maintained organizations should be treated as clients. Platform ownership and operating authority should be represented through metadata, roles, memberships, billing, or admin permissions.
+
 ## Phased Execution Plan
 
 ### Phase 0: Freeze The Product Decision
@@ -502,7 +536,7 @@ Decisions:
 ```text
 Repair Center is the product.
 Ops Inbox is an internal engine.
-Every customer, including AwareWave, is an organization.
+Every maintained organization, including AwareWave, is a client.
 Every monitored thing is an asset.
 Every external connection is an integration.
 ```
@@ -517,6 +551,7 @@ Tasks:
 Verify and apply missing migrations.
 Ensure tenant_integration_bindings exists in live DB.
 Ensure ops_incidents can be scoped to client/platform.
+Normalize AwareWave as an internal client.
 Seed AwareWave assets.
 Seed AwareWave integration records.
 Backfill existing incidents to awarewave-ops where appropriate.
@@ -629,4 +664,3 @@ Internal engines:
 ```
 
 This gives the product a clear buyer-facing shape while preserving the existing technical foundation.
-
