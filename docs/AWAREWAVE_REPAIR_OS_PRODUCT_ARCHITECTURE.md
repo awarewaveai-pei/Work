@@ -996,6 +996,44 @@ Production Validate for soulful-expression Supabase now fails honestly with miss
 Production Validate for awarewave-ops Supabase remains active.
 ```
 
+### 2026-05-14: Remaining Credential Inputs
+
+Status:
+
+```text
+Architecture and runtime behavior are now explicit.
+The remaining failures require external credential/channel values, not more guessing in code.
+```
+
+Open inputs:
+
+```text
+Cloudflare:
+  Both configured Cloudflare token env candidates are present on SG.
+  Cloudflare token verification returns HTTP 401 Invalid API Token for both.
+  Required action: create or locate a valid Cloudflare API token and sync it to SG.
+
+Soulful Expression Supabase:
+  SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY is empty locally and missing on SG.
+  Production Validate now correctly marks soulful-expression Supabase failed instead of using another tenant's key.
+  Required action: add the Soulful Expression Supabase service role key to local vault/user env and SG .env.
+
+Slack GitHub PR digest:
+  SLACK_GITHUB_PRS_CHANNEL_ID is not configured.
+  Slack conversations.list cannot be used with the current token because Slack returns missing_scope for channel listing.
+  Required action: either provide SLACK_GITHUB_PRS_CHANNEL_ID directly or add channel listing scopes to the Slack token.
+```
+
+Current clean state:
+
+```text
+Grafana is active through internal Docker networking.
+AwareWave Supabase is active with its own explicit secret_ref.
+Soulful Expression Supabase is failed until its own key is provided.
+Cloudflare is failed until a valid API token is provided.
+External digest reads Telegram and configured Slack channels; GitHub PR channel remains unconfigured.
+```
+
 ### 2026-05-14: Integration RBAC And Admin Boundary
 
 Status:
