@@ -733,8 +733,8 @@ Live tenant_integration_bindings endpoint verified table exists.
 Remaining production work:
 
 ```text
-Create or connect actual tenant_integration_bindings records through the customer-facing Integrations setup flow.
-Do not treat the Integrations page as fully production-complete until customers can add, test, revoke, and audit integrations from the UI.
+Add provider-specific deep health adapters for integrations that can safely verify credentials against external APIs.
+Add role-based access controls before exposing integration mutation controls to non-operator customer users.
 ```
 
 Live migration note:
@@ -742,4 +742,72 @@ Live migration note:
 ```text
 Migration 0028 must be run as supabase_admin on self-hosted Supabase.
 The postgres role in this environment is not a superuser and can fail on Supabase DDL event triggers.
+```
+
+### 2026-05-14: Customer-Facing Integration Controls
+
+Status:
+
+```text
+Source updated.
+Build verified.
+Live integration slots seeded and verified.
+```
+
+Source changes:
+
+```text
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/integrations/route.ts
+  Adds POST for safe integration upsert.
+  Adds PATCH for validate, activate, revoke, and mark_failed actions.
+  Verifies organization and asset ownership before writing.
+  Writes best-effort ops_audit_events for integration mutations.
+  Stores secret references only; raw tokens are not accepted or required.
+
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/integrations/IntegrationControls.tsx
+  Adds customer/operator UI for creating integration slots.
+  Adds row actions for validation, activation, and revocation.
+
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/integrations/page.tsx
+  Mounts the integration setup panel and per-row controls.
+
+lobster-factory/packages/db/migrations/0029_repair_os_integration_slots.sql
+  Seeds active AwareWave internal integration slots from known configured services.
+  Seeds Soulful Expression Supabase as an external customer integration.
+  Uses vault reference names only.
+```
+
+Live data changes completed:
+
+```text
+awarewave-ops active integrations:
+  cloudflare
+  grafana
+  n8n
+  netdata
+  posthog
+  sentry
+  slack
+  supabase
+  trigger
+  uptime_kuma
+
+soulful-expression active integrations:
+  supabase
+```
+
+Verification:
+
+```text
+npm run build passed in apps/next-admin.
+Live tenant_integration_bindings endpoint verified 11 integration records.
+All seeded integration records use vault: references, not raw secrets.
+```
+
+Important boundary:
+
+```text
+The current Validate action verifies registry shape, required references, and Repair OS ownership links.
+It does not yet call every external provider API.
+Provider-specific deep checks should be implemented as adapters, not hard-coded into the page.
 ```
