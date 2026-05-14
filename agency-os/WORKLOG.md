@@ -55,6 +55,19 @@ Uptime Kuma 204.168.175.41 → 200 ✅（受信任來源正常通過）
 
 - AUTO_TASK_DONE: 安全強化 — Cloudflare IP lock + Layer 2-3-4 全防禦縱深上線
 - AUTO_TASK_DONE: Cryptomator vault 掛載路徑，將 AO-SYNC 秘密檔案移入加密區
+- AUTO_TASK_DONE: 桌機確認 Claude Code 完全授權模式（bypassPermissions）
+
+### sync-claude-userlevel 永久修復（settings drift false positive）
+
+**根因**：`sync-claude-userlevel.ps1 -Mode verify` 長期回報 `settings: drift YES`，但所有 governed key 語意上完全一致。兩個疊加的 false positive 來源：
+1. PS5.1 `ConvertTo-Json` deep-clone 後 key 順序不穩定（`permissions` 子鍵排列不一致）
+2. PS5.1 1-element array bug：template 讀入後序列化為 `{...}`，Node normalizer 已修正 live 檔為 `[{...}]` → 兩者字串不同但語意相同
+
+**修法**：
+- 新增 `scripts/verify-settings-governed-keys.mjs`：Node.js 語意比對腳本，對每個 overwriteKey 做 canonical JSON 比對（key sort + 1-element array 正規化）
+- 修改 `sync-claude-userlevel.ps1` `Sync-Json-Merge` verify 分支：有 Node 時呼叫上述腳本，無 Node 時 fallback 到 PS5.1 per-key 比對
+
+**驗證**：`sync-claude-userlevel -Mode verify` → `RESULT: PASS` exit 0；真實 governed key 語意差異仍正確觸發 exit 1。
 
 ## 2026-05-13
 
