@@ -41,6 +41,9 @@ export interface NotificationLogEntry {
 
 export interface Incident {
   id: string;
+  organization_id?: string | null;
+  asset_id?: string | null;
+  client_slug?: string | null;
   source: IncidentSource;
   external_id: string;
   fingerprint: string;

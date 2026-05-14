@@ -21,6 +21,8 @@ export type RepairDeployStatus = "not_started" | "pending_manual" | "running" | 
 export interface RepairRun {
   id: string;
   incident_id: string;
+  organization_id?: string | null;
+  asset_id?: string | null;
   source: IncidentSource;
   client_slug: string | null;
   policy: RepairPolicy;

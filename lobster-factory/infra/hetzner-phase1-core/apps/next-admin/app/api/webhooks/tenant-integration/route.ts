@@ -19,6 +19,11 @@ function validate(body: Record<string, unknown>): string | null {
       return "workspace_id must be UUID when set";
     }
   }
+  if (body.asset_id != null && body.asset_id !== "") {
+    if (typeof body.asset_id !== "string" || !UUID_RE.test(body.asset_id)) {
+      return "asset_id must be UUID when set";
+    }
+  }
   if (typeof body.provider !== "string" || !PROVIDER_RE.test(body.provider)) {
     return "provider must be lowercase_snake (e.g. sentry, github)";
   }
@@ -69,6 +74,10 @@ export async function POST(req: Request) {
     workspace_id:
       body.workspace_id && String(body.workspace_id).trim() !== ""
         ? String(body.workspace_id)
+        : null,
+    asset_id:
+      body.asset_id && String(body.asset_id).trim() !== ""
+        ? String(body.asset_id)
         : null,
     provider: body.provider as string,
     secret_ref: body.secret_ref != null ? String(body.secret_ref) : null,
