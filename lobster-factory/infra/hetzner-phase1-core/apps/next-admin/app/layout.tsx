@@ -31,15 +31,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </Link>
               </div>
 
-              {/* 2. 監控（每天第一眼看）─────────────────────── */}
+              {/* 2. 維修主控（每天第一眼看）─────────────────── */}
               <div className="sidebar-section">
-                <div className="sidebar-section-label">Monitoring</div>
-                <Link href="/ops/inbox" className="sidebar-link" title="警報收件匣：Sentry / Uptime Kuma / Grafana">
-                  <span className="sidebar-icon">📥</span> Ops Inbox
+                <div className="sidebar-section-label">Repair OS</div>
+                <Link href="/ops/repairs" className="sidebar-link" title="AI 維修主控台：incident → repair → evidence">
+                  <span className="sidebar-icon">🛠</span> Repair Center
                   <OpsInboxBadge />
                 </Link>
                 <Link href="/ops/clients" className="sidebar-link" title="全客戶健康狀態 + WP 外掛更新">
                   <span className="sidebar-icon">👥</span> Clients
+                </Link>
+                <Link href="/ops/integrations" className="sidebar-link" title="客戶工具串接狀態：監控 / 通知 / AI / GitHub">
+                  <span className="sidebar-icon">⇄</span> Integrations
                 </Link>
                 <Link href="/api-check" className="sidebar-link" title="Node API 健康（server-side）">
                   <span className="sidebar-icon">⬡</span> API Health
@@ -49,9 +52,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               {/* 3. 操作（需要動作的事）────────────────────── */}
               <div className="sidebar-section">
                 <div className="sidebar-section-label">Actions</div>
-                <Link href="/ops/repairs" className="sidebar-link" title="自動維修控制面：incident → PR → deploy gate">
-                  <span className="sidebar-icon">🛠</span> Repair Center
-                </Link>
                 <Link href="/ops/approvals" className="sidebar-link" title="高風險指令簽核佇列">
                   <span className="sidebar-icon">✓</span> Approvals
                 </Link>
@@ -89,6 +89,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <div className="sidebar-section-label">System</div>
                 <Link href="/ops-console" className="sidebar-link" title="架構邊界 · Tenant 設定 · M3 · AI Job">
                   <span className="sidebar-icon">▣</span> Ops Console
+                </Link>
+                <Link href="/ops/inbox" className="sidebar-link" title="內部事件引擎：除錯與原始事件檢視">
+                  <span className="sidebar-icon">◇</span> Incident Engine
                 </Link>
                 <Link href="/api-check-client" className="sidebar-link" title="Node API 健康（browser-side）">
                   <span className="sidebar-icon">⬡</span> API Health (browser)

@@ -117,7 +117,9 @@ export default async function ClientsPage() {
         <strong>資料來源：</strong>Supabase organizations.metadata（client_config + wp_update_latest）。
         新客戶上線後，在 Supabase 更新 metadata 即可出現在此。
         外掛更新腳本執行後自動同步最新報告。{" "}
-        <Link href="/ops/inbox" style={{ color: "var(--accent)" }}>→ Ops Inbox</Link>
+        <Link href="/ops/repairs" style={{ color: "var(--accent)" }}>→ Repair Center</Link>
+        {" · "}
+        <Link href="/ops/integrations" style={{ color: "var(--accent)" }}>→ Integrations</Link>
       </div>
     </div>
   );

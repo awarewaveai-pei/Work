@@ -123,7 +123,7 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
         {cfg.platform !== "saas" && (
           <div style={{ marginBottom: 12 }}>
             <Link
-              href={`/ops/inbox?client_slug=${org.slug}`}
+              href={`/ops/repairs?client_slug=${org.slug}`}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 4,
                 padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500,
@@ -179,7 +179,7 @@ export function ClientCard({ org, health }: { org: OrgRow; health: HealthResult 
             fontSize: 11,
             color: "#0369a1",
           }}>
-            ◈ 平台自身 — 查看 <Link href="/ops/inbox" style={{ color: "#0369a1" }}>Ops Inbox</Link>、
+            ◈ 平台自身 — 查看 <Link href="/ops/repairs" style={{ color: "#0369a1" }}>Repair Center</Link>、
             <Link href="/ops/system-modes" style={{ color: "#0369a1" }}> 系統模式</Link>
           </div>
         )}

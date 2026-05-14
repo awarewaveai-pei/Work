@@ -10,7 +10,13 @@ export const dynamic = "force-dynamic";
 
 const ACTIVE_STATES = ["detected", "triage_needed", "approved", "backing_up", "repairing", "pr_ready", "deploy_pending", "deploying"];
 
-export default async function RepairsPage() {
+interface RepairsSearchParams {
+  client_slug?: string;
+}
+
+export default async function RepairsPage({ searchParams }: { searchParams?: Promise<RepairsSearchParams> }) {
+  const sp = searchParams ? await searchParams : {};
+  const clientSlug = sp.client_slug?.trim() || "";
   const h = await headers();
   const role = readOpsRole(new Request("http://localhost", { headers: h }));
   const canAct = canApproveCommand(role);
@@ -24,14 +30,20 @@ export default async function RepairsPage() {
   if (!supabase) {
     dbError = "Supabase client 尚未設定。";
   } else {
-    const [incidentRes, runRes, modeRes] = await Promise.all([
-      supabase
+    let incidentQuery = supabase
         .from("ops_incidents")
         .select("*")
         .in("status", ["open", "investigating"])
         .order("last_seen_at", { ascending: false })
-        .limit(80),
-      supabase.from("repair_runs").select("*").order("created_at", { ascending: false }).limit(100),
+        .limit(80);
+    if (clientSlug) incidentQuery = incidentQuery.eq("client_slug", clientSlug);
+
+    let runQuery = supabase.from("repair_runs").select("*").order("created_at", { ascending: false }).limit(100);
+    if (clientSlug) runQuery = runQuery.eq("client_slug", clientSlug);
+
+    const [incidentRes, runRes, modeRes] = await Promise.all([
+      incidentQuery,
+      runQuery,
       supabase
         .from("system_modes")
         .select("mode")
@@ -63,18 +75,29 @@ export default async function RepairsPage() {
           <Link href="/" style={linkStyle}>儀表板</Link>
           {" / "}
           <span>修復中心</span>
+          {clientSlug ? (
+            <>
+              {" / "}
+              <Link href="/ops/repairs" style={linkStyle}>全部客戶</Link>
+            </>
+          ) : null}
         </nav>
 
         <header style={{ display: "flex", justifyContent: "space-between", gap: 24, marginBottom: 22, alignItems: "flex-start" }}>
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 750, color: "var(--text-primary)", marginBottom: 6 }}>修復中心</h1>
+            {clientSlug ? (
+              <div style={{ fontSize: 12, color: "var(--accent)", fontWeight: 650, marginBottom: 6 }}>
+                client: {clientSlug}
+              </div>
+            ) : null}
             <p style={{ fontSize: 14, color: "var(--text-secondary)", maxWidth: 820, lineHeight: 1.7 }}>
-              這裡只負責修復流程編排：Ops Inbox 負責告警收件與分流，Approvals 負責高風險指令，
-              System Modes 負責緊急停止，Build Console / sg-deploy 負責正式環境部署。
+              Repair Center 是維修主控台：事件、AI 分析、備份、核准、GitHub handoff、手動部署與結案證據都應在這裡收斂。
+              Incident intake 是底層引擎，Approvals / System Modes / Build Console 是安全閘門。
             </p>
           </div>
           <div style={{ display: "grid", gap: 8, minWidth: 280 }}>
-            <QuickLink href="/ops/inbox" label="事件來源：Ops Inbox" />
+            <QuickLink href="/ops/integrations" label="客戶串接：Integrations" />
             <QuickLink href="/ops/approvals" label="高風險指令：Approvals" />
             <QuickLink href="/ops/system-modes" label={`系統模式：${displaySystemMode(systemMode)}`} tone={blocked ? "danger" : "ok"} />
             <QuickLink href="/build" label="部署維持手動：Build Console" />
@@ -133,7 +156,7 @@ export default async function RepairsPage() {
             <SafetyRow name="備份閘門" ok={backupGate.ok} value={backupGate.value} />
             <SafetyRow name="GitHub Issue 閘門" ok={githubGate} value={githubGate ? "已設定" : "缺少 AUTO_REPAIR_GITHUB_TOKEN"} />
             <SafetyRow name="部署閘門" ok value="僅能透過 sg-deploy.sh / Build Console 手動部署" link="/build" />
-            <SafetyRow name="Ops Inbox 健康檢查" ok value="事件真相來源仍是 /api/ops/inbox/health" link="/api/ops/inbox/health" />
+            <SafetyRow name="Incident intake 健康檢查" ok value="底層事件引擎 /api/ops/inbox/health" link="/api/ops/inbox/health" />
           </Panel>
         </div>
 

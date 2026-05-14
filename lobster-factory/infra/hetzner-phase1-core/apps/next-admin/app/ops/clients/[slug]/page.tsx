@@ -363,7 +363,8 @@ export default async function ClientDetailPage({
                   <QuickLink href="https://n8n.aware-wave.com" label="⚙️ n8n" />
                 </>
               )}
-              <QuickLink href="/ops/inbox" label="📥 Ops Inbox" internal />
+              <QuickLink href={`/ops/repairs?client_slug=${org.slug}`} label="Repair Center" internal />
+              <QuickLink href="/ops/integrations" label="Integrations" internal />
               <QuickLink href="/ops/approvals" label="✓ 待簽核" internal />
             </div>
           </Section>
