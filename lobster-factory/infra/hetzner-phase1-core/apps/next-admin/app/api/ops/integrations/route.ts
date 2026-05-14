@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getSupabaseWriteClient } from "@/lib/supabase-server";
+import { checkIntegrationHealth } from "@/lib/repair-os/integration-health";
 
 export const dynamic = "force-dynamic";
 
@@ -174,7 +175,7 @@ export async function PATCH(req: Request) {
 
   const { data: current, error: fetchError } = await supabase
     .from("tenant_integration_bindings")
-    .select("id,organization_id,asset_id,provider,secret_ref,external_hint,api_metadata,status")
+    .select("id,organization_id,asset_id,provider,secret_ref,external_hint,api_metadata,status,last_seen_at")
     .eq("id", id)
     .single();
 
@@ -184,7 +185,15 @@ export async function PATCH(req: Request) {
 
   const now = new Date().toISOString();
   const currentMeta = normalizeMetadata((current as Record<string, unknown>).api_metadata);
-  const update = buildActionUpdate(action, current as Record<string, unknown>, now);
+  const health = action === "validate"
+    ? await checkIntegrationHealth({
+      provider: String((current as Record<string, unknown>).provider),
+      secretRef: cleanOptionalString((current as Record<string, unknown>).secret_ref),
+      externalHint: cleanOptionalString((current as Record<string, unknown>).external_hint),
+      metadata: currentMeta,
+    })
+    : null;
+  const update = buildActionUpdate(action, current as Record<string, unknown>, now, health);
   const { data, error } = await supabase
     .from("tenant_integration_bindings")
     .update({
@@ -193,6 +202,7 @@ export async function PATCH(req: Request) {
         ...currentMeta,
         last_ui_action: action,
         last_ui_action_at: now,
+        ...(health ? { last_health_check: health } : {}),
       },
       updated_at: now,
     })
@@ -212,7 +222,8 @@ export async function PATCH(req: Request) {
       provider: (current as Record<string, unknown>).provider,
       asset_id: (current as Record<string, unknown>).asset_id ?? null,
       status: data?.status ?? null,
-      validation_scope: action === "validate" ? "registry_shape_and_references" : null,
+      validation_scope: health?.scope ?? null,
+      validation_summary: health?.summary ?? null,
     },
   });
 
@@ -287,7 +298,12 @@ async function verifyOwnership(
   return null;
 }
 
-function buildActionUpdate(action: string, current: Record<string, unknown>, now: string): Record<string, unknown> {
+function buildActionUpdate(
+  action: string,
+  current: Record<string, unknown>,
+  now: string,
+  health: Awaited<ReturnType<typeof checkIntegrationHealth>> | null,
+): Record<string, unknown> {
   if (action === "revoke") {
     return { status: "revoked", last_error: null };
   }
@@ -298,14 +314,15 @@ function buildActionUpdate(action: string, current: Record<string, unknown>, now
     return { status: "failed", last_error: "Marked failed from Integrations UI." };
   }
 
-  const hasUsableReference = !!cleanOptionalString(current.secret_ref) || !!cleanOptionalString(current.external_hint);
-  if (!hasUsableReference) {
+  if (health) {
     return {
-      status: "failed",
-      last_error: "Missing secret_ref or external_hint. Registry validation cannot prove this integration is connectable.",
-      last_tested_at: now,
+      status: health.status,
+      last_error: health.ok ? null : health.summary,
+      last_tested_at: health.checkedAt,
+      last_seen_at: health.ok ? health.checkedAt : cleanOptionalString(current.last_seen_at),
     };
   }
+
   return {
     status: "active",
     last_error: null,

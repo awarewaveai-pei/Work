@@ -1,0 +1,314 @@
+export interface IntegrationHealthInput {
+  provider: string;
+  secretRef: string | null;
+  externalHint: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface IntegrationHealthResult {
+  ok: boolean;
+  status: "active" | "failed" | "pending";
+  scope: "deep_provider_api" | "endpoint_reachable" | "registry_shape";
+  summary: string;
+  checkedAt: string;
+  details: Record<string, unknown>;
+}
+
+const DEFAULT_ENV_BY_PROVIDER: Record<string, string[]> = {
+  cloudflare: ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_AUTH_BEARER_TOKEN"],
+  grafana: ["GRAFANA_SERVICE_ACCOUNT_TOKEN"],
+  n8n: ["N8N_API_KEY", "N8N_AUTH_BEARER_TOKEN"],
+  netdata: ["NETDATA_API_TOKEN"],
+  posthog: ["POSTHOG_PERSONAL_API_KEY", "POSTHOG_API_KEY"],
+  sentry: ["SENTRY_AUTH_TOKEN"],
+  slack: ["SLACK_BOT_TOKEN"],
+  supabase: ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY", "SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY"],
+  trigger: ["TRIGGER_ACCESS_TOKEN", "TRIGGER_SECRET_KEY"],
+  uptime_kuma: ["UPTIME_KUMA_API_KEY"],
+};
+
+export async function checkIntegrationHealth(input: IntegrationHealthInput): Promise<IntegrationHealthResult> {
+  const provider = normalizeProvider(input.provider);
+  const checkedAt = new Date().toISOString();
+  const token = resolveToken(input.secretRef, DEFAULT_ENV_BY_PROVIDER[provider] ?? []);
+
+  try {
+    if (provider === "cloudflare") {
+      return await checkJsonApi({
+        checkedAt,
+        provider,
+        token,
+        url: "https://api.cloudflare.com/client/v4/user/tokens/verify",
+        headers: bearerHeaders(token.value),
+        okWhen: (status, json) => status === 200 && readBoolean(json, "success") === true,
+      });
+    }
+
+    if (provider === "sentry") {
+      return await checkJsonApi({
+        checkedAt,
+        provider,
+        token,
+        url: `${baseUrl(input.externalHint, "https://sentry.io/api/0")}/organizations/`,
+        headers: bearerHeaders(token.value),
+        okWhen: (status) => status >= 200 && status < 300,
+      });
+    }
+
+    if (provider === "slack") {
+      return await checkJsonApi({
+        checkedAt,
+        provider,
+        token,
+        url: "https://slack.com/api/auth.test",
+        headers: bearerHeaders(token.value),
+        okWhen: (status, json) => status === 200 && readBoolean(json, "ok") === true,
+      });
+    }
+
+    if (provider === "posthog") {
+      return await checkJsonApi({
+        checkedAt,
+        provider,
+        token,
+        url: `${baseUrl(input.externalHint, process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com")}/api/projects/`,
+        headers: bearerHeaders(token.value),
+        okWhen: (status) => status >= 200 && status < 300,
+      });
+    }
+
+    if (provider === "supabase") {
+      return await checkJsonApi({
+        checkedAt,
+        provider,
+        token,
+        url: `${baseUrl(input.externalHint, process.env.NEXT_PUBLIC_SUPABASE_URL ?? "")}/rest/v1/`,
+        headers: {
+          apikey: token.value ?? "",
+          Authorization: `Bearer ${token.value ?? ""}`,
+        },
+        okWhen: (status) => status >= 200 && status < 300,
+      });
+    }
+
+    if (provider === "n8n") {
+      return await checkJsonApi({
+        checkedAt,
+        provider,
+        token,
+        url: `${baseUrl(input.externalHint, "https://n8n.aware-wave.com/api/v1")}/workflows?limit=1`,
+        headers: {
+          Authorization: `Bearer ${token.value ?? ""}`,
+          "X-N8N-API-KEY": token.value ?? "",
+        },
+        okWhen: (status) => status >= 200 && status < 300,
+      });
+    }
+
+    if (provider === "trigger") {
+      return await checkJsonApi({
+        checkedAt,
+        provider,
+        token,
+        url: `${baseUrl(input.externalHint, process.env.TRIGGER_API_URL ?? "https://api.trigger.dev")}/api/v1/tasks`,
+        headers: bearerHeaders(token.value),
+        okWhen: (status) => status >= 200 && status < 300,
+      });
+    }
+
+    if (provider === "grafana") {
+      return await checkJsonApi({
+        checkedAt,
+        provider,
+        token,
+        url: `${baseUrl(input.externalHint, process.env.GRAFANA_BASE_URL ?? "")}/api/health`,
+        headers: bearerHeaders(token.value),
+        okWhen: (status) => status >= 200 && status < 300,
+      });
+    }
+
+    if (provider === "netdata") {
+      return await checkReachable({
+        checkedAt,
+        provider,
+        url: `${baseUrl(input.externalHint, process.env.NETDATA_BASE_URL ?? "https://app.netdata.cloud")}/api/v1/info`,
+        token,
+      });
+    }
+
+    if (provider === "uptime_kuma") {
+      return await checkReachable({
+        checkedAt,
+        provider,
+        url: `${baseUrl(input.externalHint, "https://uptime.aware-wave.com")}/`,
+        token,
+      });
+    }
+
+    const hasReference = Boolean(clean(input.secretRef) || clean(input.externalHint));
+    return {
+      ok: hasReference,
+      status: hasReference ? "pending" : "failed",
+      scope: "registry_shape",
+      summary: hasReference ? "Registry reference exists; no deep adapter is available for this provider yet." : "Missing registry reference.",
+      checkedAt,
+      details: { provider, adapter: "registry_only" },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: "failed",
+      scope: "deep_provider_api",
+      summary: error instanceof Error ? error.message : "Provider health check failed.",
+      checkedAt,
+      details: { provider, error: "exception" },
+    };
+  }
+}
+
+async function checkJsonApi(input: {
+  checkedAt: string;
+  provider: string;
+  token: ResolvedToken;
+  url: string;
+  headers: Record<string, string>;
+  okWhen: (status: number, json: unknown) => boolean;
+}): Promise<IntegrationHealthResult> {
+  if (!input.url) return missingUrl(input.checkedAt, input.provider);
+  if (!input.token.value) return missingToken(input.checkedAt, input.provider, input.token);
+
+  const response = await fetchWithTimeout(input.url, { headers: input.headers });
+  const json = await readJsonSafe(response);
+  const ok = input.okWhen(response.status, json);
+  return {
+    ok,
+    status: ok ? "active" : "failed",
+    scope: "deep_provider_api",
+    summary: ok ? "Provider API accepted the configured credential." : `Provider API rejected the check with HTTP ${response.status}.`,
+    checkedAt: input.checkedAt,
+    details: {
+      provider: input.provider,
+      http_status: response.status,
+      credential_env: input.token.envName,
+    },
+  };
+}
+
+async function checkReachable(input: {
+  checkedAt: string;
+  provider: string;
+  url: string;
+  token: ResolvedToken;
+}): Promise<IntegrationHealthResult> {
+  if (!input.url) return missingUrl(input.checkedAt, input.provider);
+
+  const headers = input.token.value ? bearerHeaders(input.token.value) : {};
+  const response = await fetchWithTimeout(input.url, { headers });
+  const ok = response.status >= 200 && response.status < 500;
+  return {
+    ok,
+    status: ok ? "active" : "failed",
+    scope: "endpoint_reachable",
+    summary: ok ? "Provider endpoint is reachable. This adapter does not prove full credential scope yet." : `Provider endpoint failed with HTTP ${response.status}.`,
+    checkedAt: input.checkedAt,
+    details: {
+      provider: input.provider,
+      http_status: response.status,
+      credential_env: input.token.envName,
+      credential_present: Boolean(input.token.value),
+    },
+  };
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      cache: "no-store",
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function readJsonSafe(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { non_json: true };
+  }
+}
+
+interface ResolvedToken {
+  value: string | null;
+  envName: string | null;
+}
+
+function resolveToken(secretRef: string | null, fallbackEnvNames: string[]): ResolvedToken {
+  const ref = clean(secretRef);
+  const envNames = [...new Set([vaultEnvName(ref), ...fallbackEnvNames].filter(Boolean) as string[])];
+  for (const envName of envNames) {
+    const value = clean(process.env[envName]);
+    if (value) return { value, envName };
+  }
+  return { value: null, envName: envNames[0] ?? null };
+}
+
+function vaultEnvName(secretRef: string | null): string | null {
+  const value = clean(secretRef);
+  if (!value?.startsWith("vault:")) return null;
+  const envName = value.slice("vault:".length).trim();
+  return /^[A-Z0-9_]+$/.test(envName) ? envName : null;
+}
+
+function bearerHeaders(token: string | null): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function baseUrl(value: string | null, fallback: string): string {
+  const raw = clean(value) ?? clean(fallback) ?? "";
+  return raw.replace(/\/$/, "");
+}
+
+function normalizeProvider(provider: string): string {
+  return provider.trim().toLowerCase().replace(/[-\s]+/g, "_");
+}
+
+function clean(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function readBoolean(json: unknown, key: string): boolean | null {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return null;
+  const value = (json as Record<string, unknown>)[key];
+  return typeof value === "boolean" ? value : null;
+}
+
+function missingToken(checkedAt: string, provider: string, token: ResolvedToken): IntegrationHealthResult {
+  return {
+    ok: false,
+    status: "failed",
+    scope: "deep_provider_api",
+    summary: token.envName ? `Missing credential environment variable ${token.envName}.` : "Missing credential environment variable.",
+    checkedAt,
+    details: { provider, credential_env: token.envName },
+  };
+}
+
+function missingUrl(checkedAt: string, provider: string): IntegrationHealthResult {
+  return {
+    ok: false,
+    status: "failed",
+    scope: "deep_provider_api",
+    summary: "Missing provider base URL.",
+    checkedAt,
+    details: { provider },
+  };
+}

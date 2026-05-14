@@ -158,6 +158,7 @@ export default async function IntegrationsPage() {
                     <div style={{ display: "grid", gap: 8 }}>
                       {orgIntegrations.map((integration) => {
                         const asset = integration.asset_id ? assetById.get(integration.asset_id) : null;
+                        const health = readLastHealthCheck(integration.api_metadata);
                         return (
                           <div key={integration.id} style={smallRowStyle}>
                             <div style={{ minWidth: 0 }}>
@@ -168,6 +169,14 @@ export default async function IntegrationsPage() {
                               </span>
                               {integration.last_error ? (
                                 <div style={{ fontSize: 11, color: "#991b1b", marginTop: 3 }}>{integration.last_error}</div>
+                              ) : null}
+                              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
+                                tested {formatTime(integration.last_tested_at)} · seen {formatTime(integration.last_seen_at)}
+                              </div>
+                              {health ? (
+                                <div style={{ fontSize: 11, color: health.ok ? "#166534" : "#991b1b", marginTop: 3 }}>
+                                  {health.scope}: {health.summary}
+                                </div>
                               ) : null}
                             </div>
                             <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
@@ -206,6 +215,21 @@ function groupBy<T>(rows: T[], keyFn: (row: T) => string): Map<string, T[]> {
     map.set(key, list);
   }
   return map;
+}
+
+function readLastHealthCheck(metadata: Record<string, unknown> | null | undefined): { ok: boolean; scope: string; summary: string } | null {
+  const raw = metadata?.last_health_check;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const row = raw as Record<string, unknown>;
+  if (typeof row.ok !== "boolean" || typeof row.scope !== "string" || typeof row.summary !== "string") return null;
+  return { ok: row.ok, scope: row.scope, summary: row.summary };
+}
+
+function formatTime(value: string | null | undefined): string {
+  if (!value) return "never";
+  const time = new Date(value);
+  if (Number.isNaN(time.getTime())) return "unknown";
+  return time.toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 function providerLabel(provider: string): string {
