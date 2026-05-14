@@ -967,7 +967,8 @@ Status:
 ```text
 Source updated.
 Build verified.
-Production deployment pending.
+Production deployed.
+Tenant isolation verified.
 ```
 
 Why this change exists:
@@ -990,6 +991,9 @@ Verification:
 
 ```text
 npm run build passed in apps/next-admin after tenant credential isolation changes.
+SG next-admin deployed commit c62922e.
+Production Validate for soulful-expression Supabase now fails honestly with missing SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY.
+Production Validate for awarewave-ops Supabase remains active.
 ```
 
 ### 2026-05-14: Integration RBAC And Admin Boundary
