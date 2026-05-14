@@ -1,4 +1,4 @@
-# Global Task Board
+﻿# Global Task Board
 
 
 
@@ -397,5 +397,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-13 14:38:31 UTC_
+_Last synced: 2026-05-14 10:42:25 UTC_
 

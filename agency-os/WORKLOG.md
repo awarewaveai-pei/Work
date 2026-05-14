@@ -4,6 +4,39 @@
 
 ## 2026-05-14
 
+### AO-RESUME 外部信號整合 — Telegram + Slack 全通（下午班）
+
+**根因 / 目標**：AO-RESUME 報告格式升級為七段式，並接入 Telegram / Slack 離線期間訊息，讓每次開工能看到錯過的 ops 信號。
+
+**完成項目**：
+
+1. **七段式 AO-RESUME 格式** — `.claude/commands/ao-resume.md` 升級：系統快照 / 外部信號 / 已完成 / 目前進度（含 Git/Audit/阻塞） / 未完成待辦（按 `####` 分類全列） / 需決策（選填） / 下一步。
+2. **待辦分類規則** — `agency-os/.cursor/rules/30-resume-keyword.mdc` + `.cursor/rules/30-resume-keyword.mdc` 兩份同步更新：強制按 `####` 分類輸出，禁止壓成單一清單，未分類視為無效回覆。
+3. **`scripts/fetch-external-signals.ps1`（新建）** — 讀取 Telegram digest API + Slack `conversations.history`；since 來自 `ao-close-last.txt` → `ao-resume-last.txt` → fallback 24h；always exit 0 非阻塞；輸出 `agency-os/.agency-state/external-signals-digest.json`。
+4. **`scripts/ao-close.ps1`** — 新增寫入 `ao-close-last.txt`（AO-CLOSE 結束時間戳），作為 Telegram/Slack 離線期間起點。
+5. **`scripts/ao-resume.ps1`** — 新增呼叫 `fetch-external-signals.ps1`，每次開工自動抓取外部信號。
+6. **`/api/ops/inbox/digest` endpoint（新建）** — `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/inbox/digest/route.ts`；查 `command_requests` WHERE `source='telegram'` AND `received_at >= since`；Bearer `OPS_INBOX_INGEST_TOKEN` 驗證；上限 50 條 / 48h lookback；已部署到 SG `eaa3332`。
+7. **Slack 整合** — `xoxp` user token（`admin` scope）可直接讀 workspace admin 頻道歷史；Channel IDs 寫入 vault：`SLACK_OPS_INCIDENTS_CHANNEL_ID=C0B004HJYV8`、`SLACK_INFRA_ALERTS_CHANNEL_ID=C0AUQ7J5789`。
+8. **Vault / user-env 修正** — `SLACK_BOT_TOKEN` 更新至新 token；`OPS_INBOX_INGEST_TOKEN` vault 修正為 SG `.env` 正確值 `66461c6d...ab5`；`user-env.ps1` 新增 `OPS_INBOX_INGEST_TOKEN` 條目；`SLACK_BOT_TOKEN` user-env 同步更新。
+9. **編碼修正** — `fetch-external-signals.ps1` 第 163 行 Unicode `…` → ASCII `...`（PS 在 cp950 下 parse error）。
+10. **`AWARE_WAVE_CREDENTIALS.md` 更新** — 新增 Slack App ID / Client ID / Client Secret / Verification Token / Channel IDs；更新 Slack user OAuth token。
+
+**驗證**：
+```
+fetch-external-signals.ps1 執行結果（2026-05-14）：
+  Telegram: ok (16 msg) ✅  — 已讀到 5/13 的 /trigger_staging_workflow, /client_status, /daily_review 等
+  Slack #ops-incidents: ok (5 msg) ✅ — Claude auto-repair analysis failed 等告警
+  Slack #infra-alerts:  ok (5 msg) ✅ — endpoint alert/recovered
+  #github-prs: no_channel_id（頻道不存在，正常跳過）
+```
+
+**避免再發生**：  
+- `user-env.ps1` 中 `SLACK_BOT_TOKEN` / `OPS_INBOX_INGEST_TOKEN` 需與 vault 同步；下次輪替 token 時兩處一起改。
+- Slack `xoxp` admin token 可讀頻道歷史；若 token 失效，重發 Slack OAuth → 替換 `SLACK_BOT_TOKEN`。
+
+- AUTO_TASK_DONE: AO-RESUME 外部信號整合（Telegram digest API + Slack conversations.history）
+- AUTO_TASK_DONE: AO-RESUME 七段式格式 + 未完成待辦分類輸出
+
 ### 安全強化 — Cloudflare IP Lock + 全防禦縱深啟動（4 層完整）
 
 **根因 / 觸發**：Netdata 告警（133% bad requests、8.24% success rate）+ Gemini API 錯誤 + deploy drift 4 commits。  
@@ -54,7 +87,7 @@ Uptime Kuma 204.168.175.41 → 200 ✅（受信任來源正常通過）
 正本計畫：`lobster-factory/infra/hetzner-phase1-core/docs/CLOUDFLARE_MIGRATION_PLAN.md`。
 
 - AUTO_TASK_DONE: 安全強化 — Cloudflare IP lock + Layer 2-3-4 全防禦縱深上線
-- AUTO_TASK_DONE: Cryptomator vault 掛載路徑，將 AO-SYNC 秘密檔案移入加密區
+- AUTO_TASK_DONE_APPLIED (2026-05-14T10:42:42Z): Cryptomator vault 掛載路徑，將 AO-SYNC 秘密檔案移入加密區
 - AUTO_TASK_DONE: 桌機確認 Claude Code 完全授權模式（bypassPermissions）
 
 ### sync-claude-userlevel 永久修復（settings drift false positive）
@@ -2485,7 +2518,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-13 14:38:31 UTC_
+_Last synced: 2026-05-14 10:42:25 UTC_
 
 ## 2026-03-20
 
@@ -2919,4 +2952,5 @@ _Last synced: 2026-05-13 14:38:31 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
