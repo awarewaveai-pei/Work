@@ -1041,7 +1041,8 @@ Status:
 ```text
 Source updated.
 Build verified.
-Production deployment pending.
+Production deployed.
+Production page verified.
 ```
 
 Why this change exists:
@@ -1064,6 +1065,8 @@ Verification:
 
 ```text
 npm run build passed in apps/next-admin after adding the Action required panel.
+SG next-admin deployed commit af0cddb.
+Production /ops/integrations rendered with Action required items for Cloudflare, Soulful Expression Supabase, and missing SLACK_GITHUB_PRS_CHANNEL_ID.
 ```
 
 ### 2026-05-14: Integration RBAC And Admin Boundary
