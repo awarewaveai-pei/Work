@@ -932,7 +932,7 @@ Status:
 
 ```text
 Source updated.
-Build verification pending.
+Build verified.
 Production deployment pending.
 ```
 
@@ -962,4 +962,12 @@ It does not make /ops/inbox a buyer-facing product surface.
 Repair Center remains the main maintenance command center.
 Slack digest collection remains in scripts/fetch-external-signals.ps1 through Slack conversations.history.
 Telegram digest collection uses command_requests because Telegram commands are already persisted there.
+```
+
+Verification:
+
+```text
+npm run build passed in apps/next-admin after adding /api/ops/inbox/digest.
+Build output includes the new dynamic route /api/ops/inbox/digest.
+Build warnings are the same existing Sentry configuration and ssh2 optional dependency warnings.
 ```
