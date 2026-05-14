@@ -815,3 +815,51 @@ The current Validate action verifies registry shape, required references, and Re
 It does not yet call every external provider API.
 Provider-specific deep checks should be implemented as adapters, not hard-coded into the page.
 ```
+
+### 2026-05-14: Provider Health Adapter Validation
+
+Status:
+
+```text
+Source updated.
+Build verified.
+SG environment prepared for provider credential references.
+Deployment pending until next-admin is rebuilt from the latest commit.
+```
+
+Source changes:
+
+```text
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-os/integration-health.ts
+  Adds provider-aware validation adapters.
+  Supports deep API checks for Cloudflare, Sentry, Slack, PostHog, Supabase, n8n, Trigger.dev, and Grafana.
+  Supports endpoint reachability checks for Netdata and Uptime Kuma where the current API surface is not yet standardized.
+  Resolves credentials from vault-style secret_ref values such as vault:CLOUDFLARE_API_TOKEN.
+  Never returns raw tokens in API responses or audit payloads.
+
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/integrations/route.ts
+  Validate now runs the provider adapter instead of only checking registry shape.
+  Stores last_health_check in tenant_integration_bindings.api_metadata.
+  Updates last_tested_at and last_seen_at from actual validation results.
+
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/integrations/page.tsx
+  Shows last tested time, last seen time, and latest health check summary.
+
+lobster-factory/infra/hetzner-phase1-core/docker-compose.yml
+  Passes integration health env names into next-admin.
+```
+
+SG environment changes completed:
+
+```text
+Provider adapter env references were added to /root/lobster-phase1/.env.
+Remote .env was backed up before update.
+All required AwareWave provider env references are present.
+SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY remains empty on SG and must be filled before deep-validating Soulful Expression Supabase from next-admin.
+```
+
+Verification:
+
+```text
+npm run build passed in apps/next-admin.
+```
