@@ -30,6 +30,8 @@ services:
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - /etc/nginx/.htpasswd_studio:/etc/nginx/.htpasswd_studio:ro
+      # Host log dir for fail2ban — nginx writes here, fail2ban reads from host path
+      - /var/log/lobster-nginx:/var/log/nginx:rw
     networks:
       - lobster-net
     deploy:
