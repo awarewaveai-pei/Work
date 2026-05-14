@@ -1076,7 +1076,8 @@ Status:
 ```text
 Source updated.
 Build verified.
-Production deployment pending.
+Production deployed.
+Production page verified.
 ```
 
 Why this change exists:
@@ -1107,6 +1108,8 @@ Verification:
 
 ```text
 npm run build passed in apps/next-admin after wiring integration blockers into Repair Center.
+SG next-admin deployed commit a964395.
+Production /ops/repairs rendered the "維修能力補件" panel and "客戶串接：3 個補件" quick link.
 ```
 
 ### 2026-05-14: Integration RBAC And Admin Boundary
