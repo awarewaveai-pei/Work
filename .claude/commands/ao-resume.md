@@ -4,10 +4,11 @@ The hook has already run `scripts/ao-resume.ps1 -FullMainlineParity` and written
 
 Read these files in order:
 1. `agency-os/.agency-state/ao-resume-hook-last.json` (log_tail + auto_checkpoint fields)
-2. `agency-os/.agency-state/open-tasks-snapshot.md`
-3. `agency-os/TASKS.md`
-4. `agency-os/WORKLOG.md` (last 30 lines)
-5. `agency-os/memory/CONVERSATION_MEMORY.md`
+2. `agency-os/.agency-state/external-signals-digest.json` (Telegram + Slack digest; written by fetch-external-signals.ps1)
+3. `agency-os/.agency-state/open-tasks-snapshot.md`
+4. `agency-os/TASKS.md`
+5. `agency-os/WORKLOG.md` (last 30 lines)
+6. `agency-os/memory/CONVERSATION_MEMORY.md`
 
 Then output the **AO-RESUME 七段式** response:
 
