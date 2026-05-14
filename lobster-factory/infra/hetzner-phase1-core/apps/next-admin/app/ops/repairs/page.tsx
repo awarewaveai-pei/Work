@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canApproveCommand, readOpsRole } from "@/lib/ops-role";
+import { buildIntegrationBlockers, type IntegrationBlocker } from "@/lib/repair-os/integration-blockers";
 import { REPAIR_SOURCE_POLICIES, policyForIncident, repairPolicyLabel } from "@/lib/repair-center/policy";
 import type { RepairIncident, RepairRun } from "@/lib/repair-center/types";
 import { RepairActions } from "./RepairActions";
@@ -24,6 +25,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
 
   let incidents: RepairIncident[] = [];
   let runs: RepairRun[] = [];
+  let integrationBlockers: IntegrationBlocker[] = [];
   let systemMode = "normal";
   let dbError: string | null = null;
 
@@ -41,7 +43,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
     let runQuery = supabase.from("repair_runs").select("*").order("created_at", { ascending: false }).limit(100);
     if (clientSlug) runQuery = runQuery.eq("client_slug", clientSlug);
 
-    const [incidentRes, runRes, modeRes] = await Promise.all([
+    const [incidentRes, runRes, modeRes, orgRes, integrationRes] = await Promise.all([
       incidentQuery,
       runQuery,
       supabase
@@ -50,11 +52,30 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
         .eq("scope_type", "global")
         .is("scope_id", null)
         .maybeSingle(),
+      supabase
+        .from("organizations")
+        .select("id,slug,name")
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("tenant_integration_bindings")
+        .select("id,organization_id,provider,status,last_error,api_metadata")
+        .order("created_at", { ascending: true }),
     ]);
     if (incidentRes.error) dbError = incidentRes.error.message;
     if (runRes.error) dbError = runRes.error.message;
+    if (orgRes.error) dbError = orgRes.error.message;
+    if (integrationRes.error) dbError = integrationRes.error.message;
     incidents = ((incidentRes.data ?? []) as RepairIncident[]).filter((i) => i.environment === "production");
     runs = (runRes.data ?? []) as RepairRun[];
+    integrationBlockers = buildIntegrationBlockers(
+      (integrationRes.data ?? []).map((row) => ({
+        ...row,
+        api_metadata: typeof row.api_metadata === "object" && row.api_metadata && !Array.isArray(row.api_metadata)
+          ? row.api_metadata as Record<string, unknown>
+          : null,
+      })),
+      (orgRes.data ?? []) as { id: string; slug: string; name: string }[],
+    );
     systemMode = String((modeRes.data as any)?.mode ?? "normal");
   }
 
@@ -97,7 +118,11 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
             </p>
           </div>
           <div style={{ display: "grid", gap: 8, minWidth: 280 }}>
-            <QuickLink href="/ops/integrations" label="客戶串接：Integrations" />
+            <QuickLink
+              href="/ops/integrations"
+              label={integrationBlockers.length ? `客戶串接：${integrationBlockers.length} 個補件` : "客戶串接：Integrations"}
+              tone={integrationBlockers.length ? "danger" : undefined}
+            />
             <QuickLink href="/ops/approvals" label="高風險指令：Approvals" />
             <QuickLink href="/ops/system-modes" label={`系統模式：${displaySystemMode(systemMode)}`} tone={blocked ? "danger" : "ok"} />
             <QuickLink href="/build" label="部署維持手動：Build Console" />
@@ -119,6 +144,27 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
             title="修復流程已被 System Modes 阻擋"
             body={`目前模式是 ${displaySystemMode(systemMode)}。請先到 /ops/system-modes 恢復 normal，才能核准修復。`}
           />
+        )}
+
+        {integrationBlockers.length > 0 && (
+          <Panel title="維修能力補件" subtitle="這些外部串接會影響 Repair Center 的偵測、通知、驗證或客戶交付能力。" style={{ marginBottom: 16, background: "#fff7ed", borderColor: "#fed7aa" }}>
+            <div style={{ display: "grid", gap: 10 }}>
+              {integrationBlockers.map((item) => (
+                <div key={item.key} style={{ ...rowStyle, background: "#fff" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 5, flexWrap: "wrap" }}>
+                      <span style={warnPillStyle}>{item.clientSlug}</span>
+                      <span style={pillStyle}>{providerLabel(item.provider)}</span>
+                      <span style={item.status === "pending" ? warnPillStyle : dangerPillStyle}>{item.status}</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: "#7c2d12", fontWeight: 700 }}>{item.message}</div>
+                    <div style={{ fontSize: 12, color: "#9a3412", marginTop: 4 }}>{item.nextStep}</div>
+                  </div>
+                  <Link href="/ops/integrations" style={linkButtonStyle}>前往串接</Link>
+                </div>
+              ))}
+            </div>
+          </Panel>
         )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 16, marginBottom: 16 }}>
@@ -153,6 +199,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
           <Panel title="安全閘門" subtitle="保護正式環境的必要檢查">
             <SafetyRow name="系統模式" ok={!blocked} value={displaySystemMode(systemMode)} link="/ops/system-modes" />
             <SafetyRow name="修復健康檢查" ok={backupGate.ok && githubGate} value="GET /api/ops/repairs/health" link="/api/ops/repairs/health" />
+            <SafetyRow name="客戶串接補件" ok={integrationBlockers.length === 0} value={integrationBlockers.length ? `${integrationBlockers.length} 個待補` : "已清空"} link="/ops/integrations" />
             <SafetyRow name="備份閘門" ok={backupGate.ok} value={backupGate.value} />
             <SafetyRow name="GitHub Issue 閘門" ok={githubGate} value={githubGate ? "已設定" : "缺少 AUTO_REPAIR_GITHUB_TOKEN"} />
             <SafetyRow name="部署閘門" ok value="僅能透過 sg-deploy.sh / Build Console 手動部署" link="/build" />
@@ -338,7 +385,27 @@ function displaySystemMode(value: string): string {
   return labels[value] ?? value;
 }
 
+function providerLabel(provider: string): string {
+  const labels: Record<string, string> = {
+    uptime_kuma: "Uptime Kuma",
+    posthog: "PostHog",
+    github: "GitHub",
+    trigger: "Trigger.dev",
+    n8n: "n8n",
+    sentry: "Sentry",
+    grafana: "Grafana",
+    netdata: "Netdata",
+    slack: "Slack",
+    telegram: "Telegram",
+    supabase: "Supabase",
+    wordpress: "WordPress",
+    cloudflare: "Cloudflare",
+  };
+  return labels[provider] ?? provider;
+}
+
 const linkStyle: React.CSSProperties = { color: "var(--accent)", textDecoration: "none" };
+const linkButtonStyle: React.CSSProperties = { ...linkStyle, border: "1px solid #fed7aa", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, alignSelf: "center", whiteSpace: "nowrap" };
 const quickLinkStyle: React.CSSProperties = { display: "block", border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff", color: "var(--text-secondary)", padding: "8px 10px", fontSize: 12, textDecoration: "none" };
 const rowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", border: "1px solid #e2e8f0", borderRadius: 8, padding: 14 };
 const pillStyle: React.CSSProperties = { fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "#f1f5f9", color: "#475569", whiteSpace: "nowrap" };

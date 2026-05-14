@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import type { AssetRow, IntegrationRow } from "@/app/api/ops/integrations/route";
+import { buildIntegrationBlockers, readLastHealthCheck } from "@/lib/repair-os/integration-blockers";
 import { IntegrationCreatePanel, IntegrationRowActions } from "./IntegrationControls";
 
 export const dynamic = "force-dynamic";
@@ -62,24 +63,11 @@ export default async function IntegrationsPage() {
   const assetById = new Map(assets.map((a) => [a.id, a]));
   const assetsByOrg = groupBy(assets, (a) => a.organization_id);
   const integrationsByOrg = groupBy(integrations, (i) => i.organization_id);
-  const orgById = new Map(organizations.map((org) => [org.id, org]));
 
   const activeCount = integrations.filter((i) => i.status === "active").length;
   const failedCount = integrations.filter((i) => i.status === "failed").length;
   const pendingCount = integrations.filter((i) => i.status === "pending").length;
-  const actionItems = integrations
-    .map((integration) => buildActionItem(integration, orgById.get(integration.organization_id)))
-    .filter((item): item is IntegrationActionItem => Boolean(item));
-  if (!process.env.SLACK_GITHUB_PRS_CHANNEL_ID?.trim()) {
-    actionItems.push({
-      key: "external-signals:slack-github-prs",
-      clientName: "AwareWave Ops",
-      provider: "slack",
-      status: "pending",
-      message: "External signal digest cannot read the GitHub PR Slack channel because SLACK_GITHUB_PRS_CHANNEL_ID is not configured.",
-      nextStep: "Add SLACK_GITHUB_PRS_CHANNEL_ID directly, or give the Slack token channel-listing scope and discover the channel ID.",
-    });
-  }
+  const actionItems = buildIntegrationBlockers(integrations, organizations);
 
   return (
     <div style={{ background: "var(--bg-canvas)", minHeight: "100vh", padding: "28px 32px" }}>
@@ -257,65 +245,6 @@ function groupBy<T>(rows: T[], keyFn: (row: T) => string): Map<string, T[]> {
     map.set(key, list);
   }
   return map;
-}
-
-function readLastHealthCheck(metadata: Record<string, unknown> | null | undefined): { ok: boolean; scope: string; summary: string } | null {
-  const raw = metadata?.last_health_check;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  const row = raw as Record<string, unknown>;
-  if (typeof row.ok !== "boolean" || typeof row.scope !== "string" || typeof row.summary !== "string") return null;
-  return { ok: row.ok, scope: row.scope, summary: row.summary };
-}
-
-interface IntegrationActionItem {
-  key: string;
-  clientName: string;
-  provider: string;
-  status: string;
-  message: string;
-  nextStep: string;
-}
-
-function buildActionItem(integration: IntegrationRow, org: OrganizationRow | undefined): IntegrationActionItem | null {
-  const clientName = org?.name ?? org?.slug ?? "Unknown client";
-  const error = integration.last_error ?? "";
-  const health = readLastHealthCheck(integration.api_metadata);
-  const summary = health?.summary ?? error;
-
-  if (integration.provider === "cloudflare" && (integration.status === "failed" || /Invalid API Token|HTTP 401/i.test(summary))) {
-    return {
-      key: integration.id,
-      clientName,
-      provider: integration.provider,
-      status: integration.status,
-      message: "Cloudflare rejected the configured API token.",
-      nextStep: "Create or locate a valid Cloudflare API token, sync it to SG, then Validate again.",
-    };
-  }
-
-  if (integration.provider === "supabase" && /SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY|Missing credential/i.test(summary)) {
-    return {
-      key: integration.id,
-      clientName,
-      provider: integration.provider,
-      status: integration.status,
-      message: "This client has an explicit Supabase vault reference, but the required service role key is missing.",
-      nextStep: "Add SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY to the secure env stores and redeploy next-admin.",
-    };
-  }
-
-  if (integration.status === "failed") {
-    return {
-      key: integration.id,
-      clientName,
-      provider: integration.provider,
-      status: integration.status,
-      message: summary || "Provider validation failed.",
-      nextStep: "Review the provider credential, endpoint, and secret_ref, then Validate again.",
-    };
-  }
-
-  return null;
 }
 
 function formatTime(value: string | null | undefined): string {

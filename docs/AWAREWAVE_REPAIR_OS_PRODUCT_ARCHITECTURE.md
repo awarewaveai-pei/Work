@@ -1069,6 +1069,46 @@ SG next-admin deployed commit af0cddb.
 Production /ops/integrations rendered with Action required items for Cloudflare, Soulful Expression Supabase, and missing SLACK_GITHUB_PRS_CHANNEL_ID.
 ```
 
+### 2026-05-14: Repair Center Integration Readiness
+
+Status:
+
+```text
+Source updated.
+Build verified.
+Production deployment pending.
+```
+
+Why this change exists:
+
+```text
+Repair Center is the main maintenance command center.
+Operator-critical integration blockers must be visible there, not only in /ops/integrations.
+This keeps the product one-glance and reduces the chance of starting repair work while external customer connections are incomplete.
+```
+
+Source changes:
+
+```text
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-os/integration-blockers.ts
+  Adds one shared blocker classifier for integration readiness.
+  Covers Cloudflare invalid token, tenant Supabase missing key, generic failed provider validation, and missing Slack GitHub PR channel ID.
+
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/integrations/page.tsx
+  Reuses the shared blocker classifier instead of local duplicated logic.
+
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/repairs/page.tsx
+  Shows a Repair Center "維修能力補件" panel when integration blockers exist.
+  Updates the Integrations quick link to show blocker count.
+  Adds a Safety Gate row for customer integration blockers.
+```
+
+Verification:
+
+```text
+npm run build passed in apps/next-admin after wiring integration blockers into Repair Center.
+```
+
 ### 2026-05-14: Integration RBAC And Admin Boundary
 
 Status:
