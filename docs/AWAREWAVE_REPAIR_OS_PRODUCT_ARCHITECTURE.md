@@ -752,6 +752,7 @@ Status:
 Source updated.
 Build verified.
 Live integration slots seeded and verified.
+Production app deployed.
 ```
 
 Source changes:
@@ -802,6 +803,9 @@ Verification:
 npm run build passed in apps/next-admin.
 Live tenant_integration_bindings endpoint verified 11 integration records.
 All seeded integration records use vault: references, not raw secrets.
+SG next-admin deployed commit c4e35a7.
+Production GET /api/ops/integrations returned ok=true with assets, organizations, and 11 integrations.
+Production PATCH /api/ops/integrations validate succeeded for awarewave-ops cloudflare.
 ```
 
 Important boundary:
