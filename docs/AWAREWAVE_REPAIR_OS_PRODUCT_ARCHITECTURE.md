@@ -869,6 +869,51 @@ Production Validate failed for awarewave-ops Cloudflare with HTTP 401 even after
 Production Validate failed for awarewave-ops Grafana because the seeded endpoint is not reachable from SG next-admin; replace the local-only endpoint with an SG-reachable Grafana URL or proxy.
 ```
 
+### 2026-05-14: Grafana Internal Health Path
+
+Status:
+
+```text
+Source updated.
+Build verified.
+Production deployment pending.
+```
+
+Why this change exists:
+
+```text
+Grafana is intentionally loopback-only on SG at 127.0.0.1:3009.
+That is safe for human access through an SSH tunnel, but next-admin runs in Docker and cannot reach host loopback through host.docker.internal when Grafana is bound only to 127.0.0.1.
+Repair OS therefore needs a separate internal container URL for provider validation.
+```
+
+Source changes:
+
+```text
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-os/integration-health.ts
+  Grafana validation now prefers GRAFANA_INTERNAL_BASE_URL when present.
+  GRAFANA_BASE_URL remains available for the public/operator-facing hint.
+
+lobster-factory/infra/hetzner-phase1-core/docker-compose.yml
+  Passes GRAFANA_INTERNAL_BASE_URL into next-admin.
+  Connects next-admin to the external lobster-phase1_observability Docker network.
+```
+
+Production intent:
+
+```text
+Keep Grafana public exposure closed.
+Run the observability stack on SG.
+Set GRAFANA_INTERNAL_BASE_URL=http://lobster-grafana-obs:3000 for next-admin provider health checks.
+Keep operator access through SSH tunnel to 127.0.0.1:3009.
+```
+
+Verification:
+
+```text
+npm run build passed in apps/next-admin after adding GRAFANA_INTERNAL_BASE_URL support.
+```
+
 ### 2026-05-14: Integration RBAC And Admin Boundary
 
 Status:

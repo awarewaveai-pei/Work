@@ -321,6 +321,7 @@ services:
       N8N_AUTH_BEARER_TOKEN: ${N8N_AUTH_BEARER_TOKEN:-}
       UPTIME_KUMA_API_KEY: ${UPTIME_KUMA_API_KEY:-}
       GRAFANA_BASE_URL: ${GRAFANA_BASE_URL:-}
+      GRAFANA_INTERNAL_BASE_URL: ${GRAFANA_INTERNAL_BASE_URL:-}
       GRAFANA_SERVICE_ACCOUNT_TOKEN: ${GRAFANA_SERVICE_ACCOUNT_TOKEN:-}
       NETDATA_BASE_URL: ${NETDATA_BASE_URL:-}
       NETDATA_API_TOKEN: ${NETDATA_API_TOKEN:-}
@@ -346,6 +347,7 @@ services:
       start_period: 50s
     networks:
       - lobster-net
+      - observability
     deploy:
       resources:
         limits:
@@ -356,6 +358,9 @@ services:
 networks:
   lobster-net:
     name: lobster-net
+    external: true
+  observability:
+    name: lobster-phase1_observability
     external: true
 
 volumes:

@@ -121,11 +121,12 @@ export async function checkIntegrationHealth(input: IntegrationHealthInput): Pro
     }
 
     if (provider === "grafana") {
+      const internalGrafanaBaseUrl = baseUrl(process.env.GRAFANA_INTERNAL_BASE_URL ?? null, "");
       return await checkJsonApi({
         checkedAt,
         provider,
         token,
-        url: `${containerReachableBaseUrl(input.externalHint, process.env.GRAFANA_BASE_URL ?? "")}/api/health`,
+        url: `${internalGrafanaBaseUrl || containerReachableBaseUrl(input.externalHint, process.env.GRAFANA_BASE_URL ?? "")}/api/health`,
         headers: bearerHeaders(token.value),
         okWhen: (status) => status >= 200 && status < 300,
       });
