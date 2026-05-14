@@ -811,9 +811,9 @@ Production PATCH /api/ops/integrations validate succeeded for awarewave-ops clou
 Important boundary:
 
 ```text
-The current Validate action verifies registry shape, required references, and Repair OS ownership links.
-It does not yet call every external provider API.
-Provider-specific deep checks should be implemented as adapters, not hard-coded into the page.
+This section is superseded by the Provider Health Adapter Validation section below.
+The Validate action now calls provider adapters when an adapter is available.
+The older c4e35a7 Cloudflare validation note was a registry-level validation, not proof that the live Cloudflare token was accepted by Cloudflare.
 ```
 
 ### 2026-05-14: Provider Health Adapter Validation
@@ -867,4 +867,53 @@ Production Validate passed for awarewave-ops: Sentry, Slack, Supabase, Uptime Ku
 awarewave-ops n8n secret_ref corrected from vault:N8N_AUTH_BEARER_TOKEN to vault:N8N_API_KEY.
 Production Validate failed for awarewave-ops Cloudflare with HTTP 401 even after switching to vault:CLOUDFLARE_AUTH_BEARER_TOKEN; the Cloudflare token must be rotated or corrected.
 Production Validate failed for awarewave-ops Grafana because the seeded endpoint is not reachable from SG next-admin; replace the local-only endpoint with an SG-reachable Grafana URL or proxy.
+```
+
+### 2026-05-14: Integration RBAC And Admin Boundary
+
+Status:
+
+```text
+Source updated.
+Build verified.
+Production deployment pending.
+```
+
+Why this change exists:
+
+```text
+/ops/integrations is where a customer or operator connects AI, diagnostics, alerting, monitoring, and repair-provider tools.
+For a sellable Repair OS, this must not be an unscoped internal shortcut.
+It must be a clear customer-facing integration surface with explicit permissions and audit records.
+```
+
+Source changes:
+
+```text
+lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/integrations/route.ts
+  POST now requires owner/admin via canWriteTenantConfig.
+  PATCH validate allows owner/admin/operator.
+  PATCH activate, revoke, and mark_failed require owner/admin.
+  Audit events now record the resolved actor role and role source.
+
+lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf
+  Adds a more-specific /api/ops/integrations location before the generic /api/ops/ block.
+  Protects integration mutation APIs with the same Basic Auth admin boundary used by /ops pages.
+  Sets x-ops-claims-role admin for the current production admin boundary.
+```
+
+Current boundary:
+
+```text
+Today, production /ops/integrations is admin-facing.
+It is safe for AwareWave internal operation and early customer onboarding.
+Before exposing this directly to customer employees, replace the Basic Auth admin mapping with real customer-scoped auth claims.
+The API already has action-level role checks, so future customer auth can be introduced without rewriting the integration model.
+```
+
+Verification:
+
+```text
+npm run build passed in apps/next-admin after RBAC and nginx source changes.
+Build warnings are existing Sentry configuration and ssh2 optional dependency warnings; they do not block the production build.
 ```
