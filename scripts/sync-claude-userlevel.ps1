@@ -305,9 +305,38 @@ function Sync-Json-Merge($spec, [string]$mode) {
     }
   }
 
-  # Drift = merged JSON differs from pre-merge existing JSON
+  # Drift detection:
+  # verify  — compare each overwriteKey individually; avoids false positives from PS5.1
+  #           ConvertTo-Json key-ordering non-determinism after deep-clone round-trip.
+  # merge / install / dry-run — compare full compressed JSON (informational only; sync always writes).
   $mergedJsonAfter = $merged | ConvertTo-Json -Depth 30 -Compress
-  $hasDrift = ($existingJsonBefore -ne $mergedJsonAfter)
+  $hasDrift = $false
+  if ($mode -eq 'verify') {
+    # Use Node-based semantic comparison to avoid two PS5.1 false-positive classes:
+    #   (a) key-ordering non-determinism after deep-clone round-trip
+    #   (b) 1-element-array vs object serialization mismatch (normalizer fixes live file
+    #       but PS5.1 still serializes template arrays as objects)
+    $verifyScript = Join-Path $MonorepoRoot 'scripts\verify-settings-governed-keys.mjs'
+    if (Test-Path $verifyScript) {
+      $keysArg = ($spec.overwriteKeys -join ',')
+      $nodeOut = & node $verifyScript $src $tgt `
+        "USERPROFILE=$UserProfile" "MONOREPO_ROOT=$MonorepoRoot" `
+        "overwriteKeys=$keysArg" 2>&1
+      $hasDrift = ($LASTEXITCODE -ne 0)
+      if ($hasDrift) { foreach ($l in $nodeOut) { Write-Host "  $l" -ForegroundColor DarkYellow } }
+    } else {
+      # Fallback: per-key PS5.1 comparison (may produce false positives on 1-element arrays)
+      foreach ($k in @($spec.overwriteKeys)) {
+        $eVal = Get-NestedKey $existing $k
+        $tVal = Get-NestedKey $tpl $k
+        $eStr = if ($null -ne $eVal) { $eVal | ConvertTo-Json -Depth 30 -Compress } else { 'null' }
+        $tStr = if ($null -ne $tVal) { $tVal | ConvertTo-Json -Depth 30 -Compress } else { 'null' }
+        if ($eStr -ne $tStr) { $hasDrift = $true; Write-Host "  drifted key: $k" -ForegroundColor DarkYellow }
+      }
+    }
+  } else {
+    $hasDrift = ($existingJsonBefore -ne $mergedJsonAfter)
+  }
 
   Write-Host "[settings] target=$tgt" -ForegroundColor Yellow
   $driftLabel = if ($hasDrift) {'YES'} else {'no'}
