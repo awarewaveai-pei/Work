@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import type { AssetRow, IntegrationRow } from "@/app/api/ops/integrations/route";
+import { IntegrationCreatePanel, IntegrationRowActions } from "./IntegrationControls";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +94,14 @@ export default async function IntegrationsPage() {
         </div>
       )}
 
+      {assetsReady && integrationsReady && (
+        <IntegrationCreatePanel
+          organizations={organizations.map((org) => ({ id: org.id, slug: org.slug, name: org.name }))}
+          assets={assets}
+          providers={PROVIDERS}
+        />
+      )}
+
       <section style={{ display: "grid", gap: 14 }}>
         {organizations.map((org) => {
           const meta = org.metadata ?? {};
@@ -161,7 +170,10 @@ export default async function IntegrationsPage() {
                                 <div style={{ fontSize: 11, color: "#991b1b", marginTop: 3 }}>{integration.last_error}</div>
                               ) : null}
                             </div>
-                            <Pill text={integration.status} tone={statusTone(integration.status)} />
+                            <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
+                              <Pill text={integration.status} tone={statusTone(integration.status)} />
+                              <IntegrationRowActions integration={integration} />
+                            </div>
                           </div>
                         );
                       })}

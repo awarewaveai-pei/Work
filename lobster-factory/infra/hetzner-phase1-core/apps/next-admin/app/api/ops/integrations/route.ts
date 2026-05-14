@@ -89,7 +89,7 @@ export async function POST(req: Request) {
   }
 
   const bodyResult = await readJson(req);
-  if (!bodyResult.ok) return bodyResult.response;
+  if (bodyResult.ok === false) return bodyResult.response;
 
   const body = bodyResult.body;
   const validation = validateUpsert(body);
@@ -160,7 +160,7 @@ export async function PATCH(req: Request) {
   }
 
   const bodyResult = await readJson(req);
-  if (!bodyResult.ok) return bodyResult.response;
+  if (bodyResult.ok === false) return bodyResult.response;
 
   const body = bodyResult.body;
   const id = cleanOptionalString(body.id);
