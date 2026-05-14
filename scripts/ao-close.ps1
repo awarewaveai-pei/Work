@@ -486,6 +486,19 @@ try {
         Write-Host "== AO-CLOSE: cross-machine memory export ==" -ForegroundColor Cyan
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $exportScript -WorkRoot $WorkRoot
     }
+
+    # Write close timestamp so AO-RESUME external-signals fetch knows the gap start.
+    try {
+        $closeStampDir  = Join-Path $WorkRoot "agency-os\.agency-state"
+        $closeStampPath = Join-Path $closeStampDir "ao-close-last.txt"
+        $null = New-Item -ItemType Directory -Force -Path $closeStampDir
+        $closeNow = (Get-Date).ToUniversalTime().ToString("o")
+        $utf8NoBom2 = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($closeStampPath, $closeNow + [Environment]::NewLine, $utf8NoBom2)
+        Write-Host ("AO-CLOSE: close stamp written ({0})" -f $closeNow) -ForegroundColor DarkGray
+    } catch {
+        Write-Warning "AO-CLOSE: could not write ao-close-last.txt (non-fatal): $_"
+    }
 } finally {
     Pop-Location
 }

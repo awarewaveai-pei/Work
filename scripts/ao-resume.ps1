@@ -365,6 +365,15 @@ if (Test-Path -LiteralPath $backupHealthScript) {
     $global:LASTEXITCODE = 0
 }
 
+# Fetch external signals (Telegram ops inbox + Slack) since last AO-CLOSE — non-blocking.
+$fetchSignalsScript = Join-Path $WorkRoot "scripts\fetch-external-signals.ps1"
+if (Test-Path -LiteralPath $fetchSignalsScript) {
+    Write-Host "== AO-RESUME: fetch external signals (Telegram + Slack) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $fetchSignalsScript -WorkRoot $WorkRoot
+    # Non-blocking: ignore exit code
+    $global:LASTEXITCODE = 0
+}
+
 # Report delta since last AO-RESUME (local stamp under agency-os/.agency-state/)
 $stateDir = Join-Path $WorkRoot "agency-os\.agency-state"
 $stampPath = Join-Path $stateDir "ao-resume-last.txt"
