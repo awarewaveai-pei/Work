@@ -88,9 +88,12 @@ if (-not $sinceUtc) {
 # -To override: explicit end cap
 if ($To) {
     try {
-        $untilUtc = [DateTime]::Parse($To, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
         if (-not $To.Contains("Z") -and -not $To.Contains("+")) {
-            $untilUtc = $untilUtc.AddHours(-8)
+            # No timezone: treat as CST (UTC+8) → subtract 8h to get UTC
+            $parsedTo  = [DateTime]::Parse($To, $null, [System.Globalization.DateTimeStyles]::None)
+            $untilUtc = [DateTime]::SpecifyKind($parsedTo.AddHours(-8), [DateTimeKind]::Utc)
+        } else {
+            $untilUtc = [DateTime]::Parse($To, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
         }
         Write-Host "   until: $To (from -To param, UTC=$($untilUtc.ToString('o')))" -ForegroundColor DarkGray
     } catch {
