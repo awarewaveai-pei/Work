@@ -37,6 +37,7 @@ Wait for confirmation before proceeding.
    export TRIGGER_API_URL=https://trigger.aware-wave.com
    npx trigger.dev@4.4.4 deploy
    ```
+   > Trigger.dev version on EU is **v4.4.4** (`trigger-webapp` image: `ghcr.io/triggerdotdev/trigger.dev:v4.4.4`). Always deploy with matching CLI version.
 
 4. **Verify**: confirm exit 0 and deployment URL in output.
 
