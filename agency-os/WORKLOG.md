@@ -76,12 +76,12 @@ Uptime Kuma 204.168.175.41 → 200 ✅（受信任來源正常通過）
 .deployed-commit = cea9bdf ✅
 ```
 
-**待辦（Dashboard 手動，不需 code change）**：
-- [ ] Cloudflare Dashboard → Security → Bots → **Bot Fight Mode → On**
-- [ ] Cloudflare Dashboard → Security → WAF → Custom Rules（需 Zone Firewall 權限）：
-  - Rule 1：block `/xmlrpc.php`
-  - Rule 2：rate limit `/wp-login.php`（5 req/min/IP）
-  - Rule 3：block `\.(env|sql|bak|old|htpasswd)$`
+**Cloudflare Dashboard 設定（2026-05-15 API 驗證完成）**：
+- [x] Cloudflare Bot Fight Mode → `fight_mode: true` ✅（API 確認）
+- [x] WAF Custom Rules — 3 條全部到位 ✅（API 確認）：
+  - Block xmlrpc.php attacks（action: block）
+  - Challenge wp-login from non-TW/SG IPs（action: managed_challenge）
+  - Block sensitive file access（action: block）
 
 **避免再發生**：Layer 4（Cloudflare IP lock）現已啟動。未來若 Cloudflare 更新 IP 範圍，需同步更新 `nginx/default.conf` 的 `set_real_ip_from` 與 `geo` 兩個區塊。  
 正本計畫：`lobster-factory/infra/hetzner-phase1-core/docs/CLOUDFLARE_MIGRATION_PLAN.md`。
@@ -116,7 +116,7 @@ Uptime Kuma 204.168.175.41 → 200 ✅（受信任來源正常通過）
 
 **驗證**：Windows 使用者環境變數查詢回空值；yml 已 commit（含入 checkpoint `auto-save on session start`）。
 
-**避免再發生**：vault-sync 下次跑時可能重推 `ANTHROPIC_API_KEY`；若再出現相同問題，需將 `ANTHROPIC_API_KEY` 從 vault-sync 的推送清單中排除。
+**避免再發生**：`ANTHROPIC_API_KEY` 已從 `mcp/user-env.ps1` 移除（2026-05-13），vault-sync 源頭不再含此 key — 重推風險已消除（2026-05-15 grep 確認）。
 
 - AUTO_TASK_DONE_APPLIED (2026-05-13T14:38:50Z): AwareWave 自動告警維修系統 v3.2 — 計畫書執行
 
@@ -285,7 +285,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
   - `agency-os/memory/daily/2026-05-13.md` (晚班補記)
 - **Git**: 含入先前 checkpoint commits（ahead 3）
 - **對應 TASKS 子字串（可選）**: AwareWave 自動告警維修系統 v3.2 — 計畫書執行
-- **風險／待辦（可選）**: vault-sync 下次執行可能重推 ANTHROPIC_API_KEY 到 Windows env，建議排除或監控
+- **風險已關閉（2026-05-15）**: ANTHROPIC_API_KEY 已從 user-env.ps1 移除，vault-sync 無法重推，風險消除。
 
 ## 2026-05-12
 
