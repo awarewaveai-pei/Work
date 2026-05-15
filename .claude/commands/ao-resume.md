@@ -1,10 +1,26 @@
 Follow the AO-RESUME protocol (AGENTS.md §快速續接關鍵字).
 
-The hook has already run `scripts/ao-resume.ps1 -FullMainlineParity` and written results to `agency-os/.agency-state/ao-resume-hook-last.json`. Check the `finished_utc` timestamp — if within 120 seconds, skip re-running the script.
+## Step 0 — Hook state check (MANDATORY before reading anything)
 
-Read these files in order:
-1. `agency-os/.agency-state/ao-resume-hook-last.json` (log_tail + auto_checkpoint fields)
-2. `agency-os/.agency-state/external-signals-digest.json` (Telegram + Slack digest; written by fetch-external-signals.ps1)
+Read `agency-os/.agency-state/ao-resume-hook-last.json`.
+
+**Case A — File exists AND `finished_utc` is within 5 minutes of now:**
+Hook ran successfully. Proceed to Step 1 reading files below.
+
+**Case B — File missing OR `finished_utc` is more than 5 minutes old OR file has errors:**
+Hook did NOT run (or ran too long ago). Claude MUST actively run these two scripts now via Bash and capture their output for Sections 1 and 2:
+
+```powershell
+# Run in D:\Work
+powershell -ExecutionPolicy Bypass -File scripts\import-cross-machine-memory.ps1
+powershell -ExecutionPolicy Bypass -File scripts\fetch-external-signals.ps1
+```
+
+Do NOT skip this step. Do NOT silently assume both passed. Report the actual stdout of each script in Sections 1 and 2 respectively. If either script fails (non-zero exit, exception), report the error verbatim.
+
+## Step 1 — Read files in order:
+1. `agency-os/.agency-state/ao-resume-hook-last.json` (log_tail + auto_checkpoint fields; may be absent in Case B)
+2. `agency-os/.agency-state/external-signals-digest.json` (Telegram + Slack digest)
 3. `agency-os/.agency-state/open-tasks-snapshot.md`
 4. `agency-os/TASKS.md`
 5. `agency-os/WORKLOG.md` (last 30 lines)
@@ -19,10 +35,11 @@ One-line status: SG/EU 服務狀態 (UP/DOWN) | deploy drift commits | Git ahead
 Source: ao-resume-hook-last.json log_tail + health check output.
 
 Cross-machine import result (從 ao-resume-hook-last.json log_tail 或手動跑 import 的輸出讀取):
-List every file checked, with one of three statuses:
+List every file checked, with one of these statuses:
 - ✅ 覆蓋（updated）— vault 版本與本機不同，已寫入
 - ✔ 未變動（unchanged）— SHA256 相同，未覆蓋
-- ⚠ 衝突保留（local-modified）— 本機有改動，保留本機版本
+- 📋 本機領先（local-ahead）— 同機 vault，本機在上次 ao-close 後有修改，屬正常（下次 ao-close 會 export）
+- ⚠ 衝突保留（local-modified/CONFLICT）— 跨機衝突，本機有改動與 vault 不同，保留本機版本
 - — 來源不存在（skipped）— vault 檔案不在指定路徑
 
 Files to report: `MEMORY.md`、`user-env.ps1`、`.ssh/hetzner_trigger`、`.ssh/id_ed25519`、`.ssh/hostinger_soulful`、`.ssh/config`、`AWARE_WAVE_CREDENTIALS.md`
