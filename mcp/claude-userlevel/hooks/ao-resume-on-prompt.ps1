@@ -93,7 +93,7 @@ try {
         if (Test-Path -LiteralPath $checkpointScript) {
             Push-Location -LiteralPath $root
             try {
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[claude] checkpoint: auto-save on session start" *>&1 | Out-Null
+                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[claude] checkpoint: auto-save on session start" 2>&1 | Out-Null
             } finally {
                 Pop-Location | Out-Null
             }
@@ -136,7 +136,7 @@ try {
             try {
                 $allLogLines.Add("== AO-RESUME hook: dirty tree detected; auto-checkpoint before FullMainlineParity ==") | Out-Null
                 $cpOut = @(
-                    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[claude] checkpoint: auto-save dirty tree before AO-RESUME hook" *>&1
+                    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[claude] checkpoint: auto-save dirty tree before AO-RESUME hook" 2>&1
                 )
                 $autoCheckpointExit = $LASTEXITCODE
                 foreach ($line in $cpOut) { $allLogLines.Add([string]$line) | Out-Null }
