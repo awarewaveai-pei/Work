@@ -70,6 +70,8 @@ try {
 function Get-Secret {
     param([string]$Name)
     $v = [System.Environment]::GetEnvironmentVariable($Name)
+    if (-not $v) { $v = [System.Environment]::GetEnvironmentVariable($Name, 'User') }
+    if (-not $v) { $v = [System.Environment]::GetEnvironmentVariable($Name, 'Machine') }
     if ($v) { return $v }
     if ($vaultStore) {
         try { return Get-VaultSecret -Store $vaultStore -Name $Name } catch {}

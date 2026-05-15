@@ -84,7 +84,8 @@ function Get-HostBackupHealth {
         'echo OLDEST_TIME=$oldest_time'
     )
     $raw = ($parts -join "; ")
-    $cmd = "bash -lc `"" + ($raw.Replace("`"", "\`"")) + "`""
+    $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($raw))
+    $cmd = "echo $b64 | base64 -d | bash -l"
     $res = Invoke-Ssh -ServerHost $ServerHost -Command $cmd
     if ($res.ExitCode -ne 0) {
         return [ordered]@{
