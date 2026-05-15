@@ -1,0 +1,31 @@
+{
+    "generatedAt":  "2026-05-15T08:02:01.5638251Z",
+    "overall":  "PASS",
+    "fatal":  false,
+    "fatalReason":  "",
+    "sg":  {
+               "host":  "5.223.93.113",
+               "ok":  true,
+               "error":  "",
+               "cron_status":  "present",
+               "cron_lines":  "SHELL=/bin/bash PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin 0 2 backups lobster-phase1 nginx-site-backups Work backups lobster-phase1 nginx-site-backups Work backups lobster-phase1 nginx-site-backups Work root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261 30 2 backups lobster-phase1 nginx-site-backups Work backups lobster-phase1 nginx-site-backups Work backups lobster-phase1 nginx-site-backups Work root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
+               "retention_days":  "(unknown)",
+               "retention_source":  "unknown",
+               "backup_size":  "400M",
+               "latest_time":  "2026-05-07 15:50:46",
+               "oldest_time":  "2026-05-07 15:50:46"
+           },
+    "eu":  {
+               "host":  "204.168.175.41",
+               "ok":  true,
+               "error":  "",
+               "cron_status":  "present",
+               "cron_lines":  "SHELL=/bin/bash PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin 30 2 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work root /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261 0 3 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work root /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
+               "retention_days":  "(unknown)",
+               "retention_source":  "unknown",
+               "backup_size":  "919M",
+               "latest_time":  "2026-05-15 08:02:41",
+               "oldest_time":  "2026-05-08 08:34:52"
+           },
+    "reportPath":  "agency-os/reports/status/backup-health-LATEST.md"
+}
