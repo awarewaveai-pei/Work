@@ -15,11 +15,11 @@
 #   $env:AO_SYNC_SECRETS_ROOT -- no auto-fallback; skipped if not set
 #
 # Per-machine setup (run once, open a new terminal after):
-#   Cryptomator setup (this project): vault at G:\我的雲端硬碟\MySecretVault\MySecretVault\
-#   Cryptomator virtual drive mounts to E:\ when unlocked -- use E:\ paths below.
-#   [System.Environment]::SetEnvironmentVariable('AO_SYNC_ROOT',         'E:\AO-SYNC', 'User')
-#   [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'E:\',        'User')
-#   NOTE: Cryptomator must be unlocked (E:\ present) before running export or import.
+#   Secrets are stored unencrypted in Google Drive at G:\我的雲端硬碟\MySecretVault\MySecretVault\
+#   Use the Google Drive path directly to avoid dependency on Cryptomator mount state (E:\).
+#   [System.Environment]::SetEnvironmentVariable('AO_SYNC_ROOT',         'G:\我的雲端硬碟\MySecretVault\MySecretVault\AO-SYNC', 'User')
+#   [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'G:\我的雲端硬碟\MySecretVault\MySecretVault',        'User')
+#   NOTE: if G:\ drive letter changes (new machine), update both vars above accordingly.
 #
 # What is exported:
 #   MEMORY.md                  -> $AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\MEMORY.md
