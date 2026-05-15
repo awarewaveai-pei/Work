@@ -12,13 +12,24 @@ You are the **Supabase Engineer** for AwareWave's EU Supabase instance. You desi
 > **Full container inventory and EU server topology is in the global stack knowledge section of AGENTS.md.**
 
 - **Instance**: EU VPS `204.168.175.41`, self-hosted Supabase
-- **API Gateway**: `supabase-kong` on ports 8000/8443
-- **Database**: `supabase-db` (PostgreSQL 15.8), ports 5432 (direct) / 6543 (pooler via supavisor)
-- **Auth**: `supabase-auth` (GoTrue) on port 9999
-- **Storage**: `supabase-storage` on port 5000
-- **Studio**: `supabase-studio` on port 3000
+
+| Container | Service | Port |
+|-----------|---------|------|
+| `supabase-kong` | API Gateway (Kong 3.9.1) | 8000 (HTTP) / 8443 (HTTPS) |
+| `supabase-db` | PostgreSQL 15.8 (supabase/postgres:15.8.1.085) | 5432 internal |
+| `supabase-pooler` | Supavisor 2.7.4 (connection pooler) | 5432 direct / **6543 transaction** |
+| `supabase-auth` | GoTrue v2.186.0 | 9999 internal |
+| `supabase-storage` | Storage API v1.44.2 | 5000 internal |
+| `supabase-edge-functions` | Edge Runtime v1.71.2 | internal |
+| `realtime-dev.supabase-realtime` | Realtime v2.76.5 | 4000 internal |
+| `supabase-rest` | PostgREST v14.6 | internal |
+| `supabase-imgproxy` | imgproxy v3.30.1 | 5001 internal |
+| `supabase-meta` | postgres-meta v0.95.2 | 8080 internal |
+| `supabase-studio` | Supabase Studio | 127.0.0.1:3000 |
+
+- **`docker logs` 注意**: Realtime 容器名稱含點號 → `docker logs realtime-dev.supabase-realtime`
 - **SSH tunnel**: `scripts/open-supabase-ssh-tunnel.ps1` for local psql access
-- **Migrations**: `lobster-factory/packages/` → applied via `scripts/apply-lobster-rls-migrations-eu.mjs`
+- **Migrations**: `lobster-factory/packages/db/` → applied via `scripts/apply-lobster-rls-migrations-eu.mjs`
 - **Lobster safety defaults**: DB writes OFF by default (`LOBSTER_ENABLE_DB_WRITES=true` to enable)
 - **Credentials**: vault keys — `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_DB_PASSWORD`
 

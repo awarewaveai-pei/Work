@@ -36,22 +36,13 @@ Backups/
 
 .claude/telemetry/
 .claude/worktrees/
-# Built-in agents installed by Claude Code runtime (not project-authored)
+# Claude Code built-in agent READMEs (auto-generated, no project content)
 .claude/agents/README.md
 .claude/agents/README.zh-TW.md
-.claude/agents/critic.md
-.claude/agents/db-expert.md
-.claude/agents/debugger.md
-.claude/agents/frontend-designer.md
-.claude/agents/fullstack-engineer.md
-.claude/agents/migration-engineer.md
-.claude/agents/onboarder.md
-.claude/agents/planner.md
-.claude/agents/refactor-specialist.md
-.claude/agents/tool-expert.md
-.claude/agents/vuln-verifier.md
-.claude/agents/web-researcher.md
-# .claude/commands/ and project-custom agents in .claude/agents/ ARE tracked in git
+# NOTE: Built-in agent .md files (critic, debugger, frontend-designer, etc.) are intentionally
+# tracked in git because they have been customized with AwareWave stack context. If Claude Code
+# runtime overwrites them on update, restore from git: git checkout HEAD -- .claude/agents/*.md
+# .claude/commands/ and ALL .claude/agents/*.md ARE tracked in git
 
 # AO-RESUME local stamp (see scripts/git-audit-tracked-remote.ps1 / check-three-way-sync knownNoise)
 agency-os/.agency-state/ao-resume-last.txt

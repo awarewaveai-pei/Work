@@ -22,8 +22,17 @@ Use `mcp__hetzner-ssh__*` MCP tools when available; fall back to Bash otherwise.
 ### Service Operations
 - Check service health: `docker ps`, `docker compose ps`, `systemctl status`
 - Restart containers: `docker compose restart <service>` from the correct working directory
-- SG stack lives in `/root/lobster-phase1/` — always `cd /root/lobster-phase1` before docker compose commands
-- EU services each have their own directory under `/root/`
+
+**Working directories (must cd before docker compose commands):**
+| Stack | Directory | Key containers |
+|-------|-----------|----------------|
+| SG Phase 1 | `/root/lobster-phase1/` | lobster-nginx, lobster-wordpress, lobster-node-api, lobster-next-admin, lobster-redis |
+| EU Trigger.dev | `/root/trigger/` | trigger-webapp, trigger-supervisor, trigger-clickhouse, trigger-postgres, trigger-redis, trigger-registry, trigger-minio, trigger-electric, trigger-docker-proxy |
+| EU Supabase | `/root/supabase/` | supabase-kong, supabase-db, supabase-pooler, supabase-studio, supabase-auth, supabase-storage, supabase-edge-functions |
+| EU n8n | `/root/n8n/` | n8n (network: supabase_default) |
+
+- `realtime-dev.supabase-realtime` — unusual container name (contains a dot); `docker logs "realtime-dev.supabase-realtime"`
+- WP web root is **named Docker volume** `wordpress_data` (not a bind-mount directory)
 
 ### Nginx
 - Config files: `/etc/nginx/sites-available/` and `/etc/nginx/conf.d/`

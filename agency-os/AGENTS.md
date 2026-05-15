@@ -31,34 +31,57 @@
 **SG VPS** `5.223.93.113` — Phase 1 Core（`/root/lobster-phase1/`）
 | 容器名稱 | 服務 | 對外端點 |
 |---------|-----|---------|
-| `lobster-nginx` | Reverse proxy | Port 80/443 |
-| `lobster-wordpress` | WordPress | aware-wave.com → wordpress:80 |
-| `lobster-wordpress-db` | MariaDB | 內部 |
-| `lobster-node-api` | Node.js API | api.aware-wave.com → node-api:3001 |
-| `lobster-next-admin` | Next.js Admin | app.aware-wave.com → next-admin:3000 |
-| `lobster-redis` | Redis cache | 內部 |
+| `lobster-nginx` | Reverse proxy (nginx:stable) | Port 80/443 |
+| `lobster-wordpress` | WordPress (MariaDB 11 DB) | aware-wave.com → proxy_pass wordpress:80 |
+| `lobster-wordpress-db` | MariaDB 11 | 內部 |
+| `lobster-node-api` | Node.js API (Express, port 3001) | api.aware-wave.com/api/ → node-api:3001 |
+| `lobster-next-admin` | Next.js 15 Admin (port 3000 內部 / 3002 host) | app.aware-wave.com → next-admin:3000 |
+| `lobster-redis` | Redis 7 (127.0.0.1:6379) | 內部 |
 - nginx rate limits: public 30r/s / admin 20r/s / webhook 10r/s / wplogin 5r/m
-- WP web root: `/var/www/html`（掛載 `./wordpress-html`）
+- nginx config 正本: `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`（repo）
+- WP web root: `/var/www/html`（**named volume** `wordpress_data`，非 bind mount）
 - 進 WP 容器: `docker exec -it lobster-wordpress bash`
 - 部署腳本: `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull）
+- **next-admin 注意**：`@supabase/auth-helpers-nextjs` 已廢棄，此專案用 `@supabase/supabase-js ^2.49.8`；樣式為 CSS 變數（無 Tailwind）
 
 **EU VPS** `204.168.175.41` — Services
+*Trigger.dev 群組* (`/root/trigger/`，`docker compose` in that dir)
 | 容器名稱 | 服務 | Port |
 |---------|-----|------|
-| `n8n` | n8n 自動化 | 127.0.0.1:5678（n8n.aware-wave.com） |
-| `trigger-webapp` | Trigger.dev v4.4.4 | 8030 |
-| `trigger-supervisor` | Trigger.dev Supervisor | 8020 |
-| `trigger-clickhouse` | ClickHouse **25.7.5** | 內部 |
+| `trigger-webapp` | Trigger.dev v4.4.4 | 127.0.0.1:8030 |
+| `trigger-supervisor` | Trigger.dev Supervisor v4.4.4 | 127.0.0.1:8020 |
+| `trigger-clickhouse` | ClickHouse **25.7.5-debian-12-r0** | 內部（9123/9090） |
 | `trigger-postgres` | PostgreSQL 16 | 內部 |
 | `trigger-redis` | Redis 7 | 內部 |
-| `supabase-kong` | Supabase API Gateway | 8000/8443 |
-| `supabase-db` | PostgreSQL 15.8 | 5432/6543（pooler） |
-| `supabase-studio` | Supabase Studio | 3000 |
-| `supabase-auth` | GoTrue Auth | 9999 |
-| `supabase-storage` | Storage | 5000 |
-- **ClickHouse 版本鎖定**：`25.7.5-debian-12-r0`，**禁止升 latest 或 24.x**
-- n8n DB: PostgreSQL on `supabase-db:5432`，database `n8n`
+| `trigger-registry` | Docker Registry | 127.0.0.1:5000 |
+| `trigger-minio` | MinIO Object Store | 127.0.0.1:9000/9001 |
+| `trigger-electric` | Electric SQL 1.2.4 | 內部 |
+| `trigger-docker-proxy` | Docker Socket Proxy | 內部 |
+
+*Supabase 群組* (`/root/supabase/`)
+| 容器名稱 | 服務 | Port |
+|---------|-----|------|
+| `supabase-kong` | API Gateway (Kong 3.9.1) | 127.0.0.1:${KONG_HTTP_PORT}:8000 / ${KONG_HTTPS_PORT}:8443 |
+| `supabase-db` | PostgreSQL 15.8 | 內部 |
+| `supabase-pooler` | Supavisor 2.7.4 (連線池) | 127.0.0.1:${POSTGRES_PORT}:5432 / :6543 |
+| `supabase-studio` | Supabase Studio | 127.0.0.1:3000 |
+| `supabase-auth` | GoTrue v2.186.0 | 內部:9999 |
+| `supabase-storage` | Storage API v1.44.2 | 內部:5000 |
+| `supabase-edge-functions` | Edge Runtime v1.71.2 | 內部 |
+| `realtime-dev.supabase-realtime` | Realtime v2.76.5 | 內部:4000 |
+| `supabase-rest` | PostgREST v14.6 | 內部 |
+| `supabase-imgproxy` | imgproxy v3.30.1 | 內部:5001 |
+| `supabase-meta` | postgres-meta v0.95.2 | 內部:8080 |
+
+*n8n* (`/root/n8n/` 或同一 supabase_default 網路)
+| 容器名稱 | 服務 | Port |
+|---------|-----|------|
+| `n8n` | n8n 2.15.1 | 127.0.0.1:5678（n8n.aware-wave.com） |
+
+- **ClickHouse 版本鎖定**：`CLICKHOUSE_IMAGE_TAG=25.7.5-debian-12-r0`（.env 覆蓋 compose 預設的 24.8.8），**禁止升 latest 或降回 24.x**
+- n8n DB: `supabase-db:5432`，database `n8n`；網路 `supabase_default`
 - SSH key: `~/.ssh/hetzner_trigger`（兩台 VPS 共用，password login DISABLED）
+- `docker logs` 特殊容器名：`realtime-dev.supabase-realtime`（含點號）
 
 **Client Tenants**
 | Slug | 網站 | SSH |
