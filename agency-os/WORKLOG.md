@@ -4,6 +4,22 @@
 
 ## 2026-05-15
 
+### AO-RESUME protocol 修復 — hook 未跑時強制 fallback（commit `682c554`）
+
+**根因**：`ao-resume.md` 假設 `UserPromptSubmit` hook 永遠成功執行並寫入 `ao-resume-hook-last.json`。當 hook 未跑（state 檔不存在或 `finished_utc` 超過 5 分鐘），Claude 原本沒有任何指示要手動跑 `import-cross-machine-memory.ps1` 和 `fetch-external-signals.ps1`，導致 Section 1（系統快照 / 跨機 import）與 Section 2（外部信號）靜默空白，使用者看不到 AO-SYNC 結果與 Slack/Telegram 摘要。
+
+**修正**：在 `ao-resume.md` 最前端加入 **Step 0 — Hook state check（MANDATORY）**：
+- Case A（state 檔存在且 `finished_utc` < 5 分鐘前）：正常讀取 state 檔，跳過重跑。
+- Case B（state 檔不存在 / 超過 5 分鐘 / 有錯誤）：Claude 必須主動用 Bash 跑兩支腳本，並將 stdout 直接回報於 Section 1 和 Section 2。絕不靜默跳過。
+
+**同次修正**：import 狀態說明新增 `📋 本機領先（local-ahead）` — 同機 vault、本機在上次 ao-close 後有修改屬正常，下次 ao-close export 即可。
+
+**驗證**：commit `682c554`，`.claude/commands/ao-resume.md` 更新，`~/.claude/commands/ao-resume.md` 為同一 symlink 自動同步。
+
+**避免再發生**：所有 AO-RESUME 協議修改，必須同步更新 `ao-resume.md` 中的 Step 0 判斷邏輯，不得只改腳本。
+
+
+
 ### claude-code 2026-05-15 銝?嚗PI 閮祥皜?嚗?- AUTO_TASK_DONE: 蝘駁 claude-fast / claude-latest MCP server嚗egistry.template.json + .mcp.json + ~/.claude/mcp.json嚗?瘨 ANTHROPIC_API_KEY ?? MCP 鋡怠?怎?憸券?ommit 7311689
 - AUTO_TASK_DONE: .github/workflows/auto-repair-claude.yml ?寧 claude-haiku-4-5-20251001 + max-turns 10嚗PI ??? 90%?ommit 016cdd6
 - AUTO_TASK_DONE: ~/.claude/settings.json ? disableAgentView + forceLoginMethod claudeai嚗?甇?background agent ?芸?閫貊 ultrareview嚗撥??extension 韏?Max 閮?? API credits??- ?孵?嚗S Code extension ??console嚗PI credits嚗芋撘?伐?瘥活 git commit ?芸?閫貊 ultrareview ??API 擗?嚗? Max 閮憿漲??- 撽?嚗身摰神?亙?????? VS Code ??敺?撖?蝒?行?憭晞?- 憸券嚗??敺?頝喳嚗???Anthropic 摰?辣蝣箄? Max 閮 vs API credits ????
