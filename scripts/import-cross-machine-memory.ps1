@@ -41,15 +41,13 @@ param(
     [switch]$Force   # Bypass local-modified check; always import vault version
 )
 
-# ── 0. Load env vars from User registry if missing from process env ──────────
-if (-not $env:AO_SYNC_ROOT) {
-    $regVal = [System.Environment]::GetEnvironmentVariable('AO_SYNC_ROOT', 'User')
-    if ($regVal) { $env:AO_SYNC_ROOT = $regVal }
-}
-if (-not $env:AO_SYNC_SECRETS_ROOT) {
-    $regVal = [System.Environment]::GetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'User')
-    if ($regVal) { $env:AO_SYNC_SECRETS_ROOT = $regVal }
-}
+# ── 0. Load env vars — User registry always wins over stale process env ─────
+# Reason: process env vars can be stale (inherited from IDE started before setx ran).
+# Always prefer the persisted User registry value; fall back to process env only if registry is empty.
+$_regSyncRoot    = [System.Environment]::GetEnvironmentVariable('AO_SYNC_ROOT',         'User')
+$_regSecretsRoot = [System.Environment]::GetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'User')
+if ($_regSyncRoot)    { $env:AO_SYNC_ROOT         = $_regSyncRoot }
+if ($_regSecretsRoot) { $env:AO_SYNC_SECRETS_ROOT = $_regSecretsRoot }
 
 # ── 1. Resolve WorkRoot ───────────────────────────────────────────────────────
 if (-not $WorkRoot) {
