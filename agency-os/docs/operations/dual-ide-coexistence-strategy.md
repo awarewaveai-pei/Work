@@ -136,7 +136,7 @@
 
 `git clone` 或 `git pull` 後即可用：
 - `.claude/commands/` — 所有 slash commands（完整列表見 `CLAUDE.md §Slash Commands`）
-- `.claude/agents/` — 專案 subagents（`repair-agent`、`site-builder`、`trigger-deploy-agent`、`client-onboarding`、`wordpress-maintenance-agent`、`decision-intelligence`）
+- `.claude/agents/` — 專案 subagents（完整清單 SSOT：`CLAUDE.md §Project Subagents`）
 - `CLAUDE.md`、`agency-os/AGENTS.md` — 指令與治理規則
 - `scripts/ao-resume.ps1`、`scripts/ao-close.ps1` — 開工收工腳本
 - `.mcp.json` — MCP 伺服器定義（機密由環境變數填入）
