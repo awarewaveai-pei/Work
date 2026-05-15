@@ -36,15 +36,15 @@
    - `../lobster-factory/docs/LOBSTER_FACTORY_COMPLETION_PLAN_V2.md`
 7. 先輸出啟動摘要（固定格式）：
    - **一般開場**（非 `AO-RESUME`）：`Yesterday Recap`（Completed/Pending/Risks）、`Today Plan`（Priority 1/2/3）、`Confirm`：「今天先做哪一項？」
-   - **關鍵字 `AO-RESUME`**：**優先**依 **`.cursor/rules/30-resume-keyword.mdc` 第 3 節**（五段式：**已完成／目前進度／未完成待辦全列／選填其他提醒／下一步**）。**禁止**用極短回覆取代「**每一條** `- [ ]` 待辦逐條列出」與「**實質**阻塞／風險盤點」（見該規則）。
+   - **關鍵字 `AO-RESUME`**：**優先**依 **`.claude/commands/ao-resume.md`**（七段式：**系統快照／外部信號／已完成／目前進度／未完成待辦全列／需決策（選填）／下一步**）。**禁止**用極短回覆取代「**每一條** `- [ ]` 待辦逐條列出」與「**實質**阻塞／風險盤點」（見該規則）。
 
 ## 快速續接關鍵字
 - 跨系統運作模型（AO 治理 + 龍蝦執行）：`docs/overview/ao-lobster-operating-model.md`（作為事件節奏與責任分工的總入口）。
 - **雙機前提（固定）**：目前預設使用者有 **個人筆電 + 公司桌機** 兩台工作機。凡提到環境、MCP、AI 客戶端、Secrets、依賴、`AO-RESUME` 對齊，皆必須以「**repo 共用結構 + 各機器獨立 env/vault/user-level config**」處理，不得假設單機，也不得建議直接複製另一台的明文本機設定檔。
-- 使用者輸入 `AO-RESUME` 時：**IDE hook 會先自動跑腳本**——Cursor 用 **`.cursor/hooks.json`** `beforeSubmitPrompt`；Claude Code 用 **`~/.claude/settings.json`** `UserPromptSubmit`。兩者都呼叫 **`ao-resume.ps1 -FullMainlineParity`** 並寫入 **`agency-os/.agency-state/ao-resume-hook-last.json`**／**`.log`**（120 秒去重條款讓兩 IDE 共用同一狀態檔）。之後 **預設＝代理包办**：代理依該規則決定是否仍需終端補跑，並讀 **`open-tasks-snapshot.md`**、`TASKS`、`WORKLOG`、`CONVERSATION_MEMORY` 等回五段式；**禁止**在代理可自跑成功時仍叫使用者「你先手動 pull／先貼指令」。**無終端**時依該規則極窄義 fallback，並標註未跑完整腳本。
+- 使用者輸入 `AO-RESUME` 時：**IDE hook 會先自動跑腳本**——Cursor 用 **`.cursor/hooks.json`** `beforeSubmitPrompt`；Claude Code 用 **`~/.claude/settings.json`** `UserPromptSubmit`。兩者都呼叫 **`ao-resume.ps1 -FullMainlineParity`** 並寫入 **`agency-os/.agency-state/ao-resume-hook-last.json`**／**`.log`**（120 秒去重條款讓兩 IDE 共用同一狀態檔）。之後 **預設＝代理包办**：代理依該規則決定是否仍需終端補跑，並讀 **`open-tasks-snapshot.md`**、`TASKS`、`WORKLOG`、`CONVERSATION_MEMORY` 等回七段式；**禁止**在代理可自跑成功時仍叫使用者「你先手動 pull／先貼指令」。**無終端**時依該規則極窄義 fallback，並標註未跑完整腳本。
 - **雙機協作硬性說明**：`AO-RESUME` 對應腳本 **`scripts/ao-resume.ps1`** 會 **`git fetch`**，且**僅在落後 `origin/main`（behind>0）** 時 **`git pull --ff-only origin main`**；若**落後且工作樹仍髒**，預設**不**自動 stash 可能失敗（見 `REMOTE` **2.5.1**）。**預設**同一腳本在 preflight 後會跑 **`machine-environment-audit -FetchOrigin -Strict`**（與 **`align-workstation.ps1`** 相同）；**Exit 0**＝機器裁決可開工，無需目視 `LAST_SYSTEM_STATUS`／`integrated-status`。完整開工順序、30 秒自檢：`docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **新機 §1.5**、**例行 §2**。
 - 若已啟用 Autopilot Phase1，開機會自動執行 `scripts/ao-resume.ps1 -SkipVerify -SkipStrictEnvironmentAudit -AllowUnexpectedDirty`（輕量 preflight；**不**跑完整閘道與 Strict 環境稽核；**不**取代你主動打 **`AO-RESUME`** 時應跑的完整 **`ao-resume.ps1 -FullMainlineParity`**）。
-- 回覆格式固定為 **`AO-RESUME` 五段式**（見 **`30-resume-keyword.mdc` 第 3 節**）：`已完成`、`目前進度`（含龍蝦 Milestone／今日 DoD／**實質**阻塞風險盤點＋**Git／開工裁決**：`ao-resume.ps1` **exit code**、**`AUDIT RESULT: PASS (no warnings)`** 與否、`ahead`／`behind`），**`未完成待辦（TASKS）` 逐條全列**、選填其他提醒、`下一步`。
+- 回覆格式固定為 **`AO-RESUME` 七段式**（見 **`.claude/commands/ao-resume.md`**）：`系統快照`、`外部信號`（Telegram + Slack）、`已完成`、`目前進度`（含龍蝦 Milestone／今日 DoD／**實質**阻塞風險盤點＋**Git／開工裁決**：`ao-resume.ps1` **exit code**、**`AUDIT RESULT: PASS (no warnings)`** 與否、`ahead`／`behind`），**`未完成待辦（TASKS）` 逐條全列**、`需決策`（選填）、`下一步`。
 - **`阻塞／風險` 禁止**只回「無」二字；須依該規則綜合盤點並說明依據，或分點列出具體風險。
 - 使用者輸入 **`AO-CLOSE`**（關鍵字不變）或明確表達要關機/收工時，必須先執行 **closeout**，再輸出：`今日完成`、`今日未完成`、`連動檢查`、`明日優先`。
   - **只打 AO-CLOSE 即含義完整**：等同授權代理在跑 **`ao-close.ps1` 前**主動依**當輪對話 + `TASKS.md` 開放項**（＋必要時 **print-today-closeout-recap**）補齊 **`WORKLOG.md`** 當日 **`- AUTO_TASK_DONE: …`**，並更新 **`memory/CONVERSATION_MEMORY.md`**（**不要**求使用者手寫長篇；**不要**求使用者再加一句「照對話全寫進 AUTO_TASK_DONE」）；證據不足時**只問一題**。
