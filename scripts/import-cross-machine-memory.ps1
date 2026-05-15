@@ -167,23 +167,36 @@ function Write-LocalState {
 }
 
 # ── Helper: decide whether to import a file (content-hash, no mtime) ─────────
-# Returns: 'unchanged' | 'import' | 'local-modified'
-#   unchanged     : SHA256 identical — no write needed
-#   import        : vault has update; local not modified since last sync — safe to overwrite
+# Returns: 'unchanged' | 'import' | 'local-modified' | 'local-ahead'
+#   unchanged    : SHA256 identical — no write needed
+#   import       : vault has update; local not modified since last sync — safe to overwrite
 #   local-modified: SHA256 differs AND local was modified since last sync — keep local, warn user
+#   local-ahead  : same-machine vault (own ao-close snapshot); local is newer than vault — normal, no action
 #
-# -Force bypasses 'local-modified' and always returns 'import'.
-function Get-ImportDecision([string]$SrcPath, [string]$DstPath, [string]$FileKey) {
+# -Force bypasses conflict checks and always returns 'import'.
+# $SameMachine: $true when vault was exported by this machine — changes WARN to informational.
+function Get-ImportDecision([string]$SrcPath, [string]$DstPath, [string]$FileKey, [bool]$SameMachine = $false) {
     $srcHash = Get-SafeHash $SrcPath
     $dstHash = Get-SafeHash $DstPath
 
     if ($srcHash -eq $dstHash) { return 'unchanged' }
     if ($Force)                { return 'import' }
 
+    # Re-verify after short pause — catches transient reads (OS cache flush, sync client mid-write).
+    # Prevents false WARN when files are actually identical but hash was read during a write operation.
+    Start-Sleep -Milliseconds 400
+    $srcHash = Get-SafeHash $SrcPath
+    $dstHash = Get-SafeHash $DstPath
+    if ($srcHash -eq $dstHash) { return 'unchanged' }
+
+    # Same-machine vault: local being ahead of vault is expected (modified after last ao-close).
+    # Not a conflict — local changes will be exported on next ao-close.
+    if ($SameMachine) { return 'local-ahead' }
+
     $stateHash = Get-LocalStateHash $FileKey
     if ($stateHash -eq '')         { return 'import' }   # first run / new file — vault authoritative
     if ($dstHash   -eq $stateHash) { return 'import' }   # local unchanged since last sync
-    return 'local-modified'                               # local was modified — true conflict
+    return 'local-modified'                               # cross-machine conflict — keep local, warn user
 }
 
 # ── Helper: atomic copy with post-write SHA256 verification ──────────────────
@@ -355,6 +368,11 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         if (-not $script:ImportFromMachine) { $script:ImportFromMachine = $manifest.machine }
     }
 
+    # Determine if vault was exported by this machine (own ao-close snapshot).
+    # own-machine: local being ahead of vault is normal — local changes will export on next ao-close.
+    # cross-machine: vault may have updates from other machine — conflict detection needed.
+    $sameMachine = $manifest -and ($manifest.machine -eq $env:COMPUTERNAME)
+
     if ($Force) {
         Write-Host "  -Force: conflict check bypassed — vault version always wins" -ForegroundColor Yellow
     }
@@ -366,14 +384,18 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     $userEnvSrc = Join-Path $secretsRoot "user-env.ps1"
     if ((Test-Path -LiteralPath $userEnvSrc) -and $WorkRoot) {
         $userEnvDest = Join-Path $WorkRoot "mcp\user-env.ps1"
-        $decision    = Get-ImportDecision $userEnvSrc $userEnvDest 'user-env.ps1'
+        $decision    = Get-ImportDecision $userEnvSrc $userEnvDest 'user-env.ps1' $sameMachine
         switch ($decision) {
             'unchanged' {
                 Update-LocalStateHash 'user-env.ps1' (Get-SafeHash $userEnvSrc)
-                Write-Host "  cross-machine import: user-env.ps1 unchanged (setx + vault skipped)" -ForegroundColor DarkGray
+                Write-Host "  cross-machine import: user-env.ps1 unchanged" -ForegroundColor DarkGray
+            }
+            'local-ahead' {
+                Update-LocalStateHash 'user-env.ps1' (Get-SafeHash $userEnvDest)
+                Write-Host "  cross-machine import: user-env.ps1 local has changes since last ao-close (will export on next ao-close)" -ForegroundColor DarkGray
             }
             'local-modified' {
-                Write-Host "  cross-machine import: user-env.ps1 WARN — local was modified since last sync, kept local. Run with -Force to overwrite." -ForegroundColor Yellow
+                Write-Host "  cross-machine import: user-env.ps1 CONFLICT — vault differs from local; local changes kept. Use -Force to take vault version." -ForegroundColor Yellow
             }
             'import' {
                 Invoke-LocalBackup $userEnvDest "user-env.ps1"
@@ -382,7 +404,6 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
                     Write-Host "  cross-machine import: user-env.ps1 updated" -ForegroundColor Green
                     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $userEnvDest
                     Write-Host "  cross-machine import: env vars applied (open a new terminal to inherit)" -ForegroundColor Green
-                    # Sync updated keys into vault so health check stays at 100%.
                     $vaultScript = Join-Path $WorkRoot "scripts\secrets-vault.ps1"
                     if (Test-Path -LiteralPath $vaultScript) {
                         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $vaultScript -Action import-user-env -McpPath $userEnvDest
@@ -411,14 +432,18 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
             $src     = $_.FullName
             $dst     = Join-Path $sshDest $name
             $fileKey = ".ssh/$name"
-            $decision = Get-ImportDecision $src $dst $fileKey
+            $decision = Get-ImportDecision $src $dst $fileKey $sameMachine
             switch ($decision) {
                 'unchanged' {
                     Update-LocalStateHash $fileKey (Get-SafeHash $src)
                     Write-Host "  cross-machine import: .ssh/$name unchanged" -ForegroundColor DarkGray
                 }
+                'local-ahead' {
+                    Update-LocalStateHash $fileKey (Get-SafeHash $dst)
+                    Write-Host "  cross-machine import: .ssh/$name local has changes since last ao-close (will export on next ao-close)" -ForegroundColor DarkGray
+                }
                 'local-modified' {
-                    Write-Host "  cross-machine import: .ssh/$name WARN — local was modified since last sync, kept local. Run with -Force to overwrite." -ForegroundColor Yellow
+                    Write-Host "  cross-machine import: .ssh/$name CONFLICT — vault differs from local; local changes kept. Use -Force to take vault version." -ForegroundColor Yellow
                 }
                 'import' {
                     Invoke-LocalBackup $dst "ssh/$name"
@@ -435,14 +460,18 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     $credsSrc = Join-Path $secretsRoot "AWARE_WAVE_CREDENTIALS.md"
     $credsDst = Join-Path $env:USERPROFILE "AWARE_WAVE_CREDENTIALS.md"
     if (Test-Path -LiteralPath $credsSrc) {
-        $decision = Get-ImportDecision $credsSrc $credsDst 'AWARE_WAVE_CREDENTIALS.md'
+        $decision = Get-ImportDecision $credsSrc $credsDst 'AWARE_WAVE_CREDENTIALS.md' $sameMachine
         switch ($decision) {
             'unchanged' {
                 Update-LocalStateHash 'AWARE_WAVE_CREDENTIALS.md' (Get-SafeHash $credsSrc)
                 Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md unchanged" -ForegroundColor DarkGray
             }
+            'local-ahead' {
+                Update-LocalStateHash 'AWARE_WAVE_CREDENTIALS.md' (Get-SafeHash $credsDst)
+                Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md local has changes since last ao-close (will export on next ao-close)" -ForegroundColor DarkGray
+            }
             'local-modified' {
-                Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md WARN — local was modified since last sync, kept local. Run with -Force to overwrite." -ForegroundColor Yellow
+                Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md CONFLICT — vault differs from local; local changes kept. Use -Force to take vault version." -ForegroundColor Yellow
             }
             'import' {
                 Invoke-LocalBackup $credsDst "AWARE_WAVE_CREDENTIALS.md"
