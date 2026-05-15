@@ -45,7 +45,8 @@ param(
     [string]$DestRoot = ""
 )
 
-$today      = Get-Date -Format "yyyy-MM-dd"
+$syncNow    = Get-Date
+$today      = $syncNow.ToString("yyyy-MM-dd")
 $machineTag = $env:COMPUTERNAME.ToUpper() -replace '[^A-Za-z0-9]', '-'
 
 # ── 0. Load env vars — User registry always wins over stale process env ─────
@@ -118,7 +119,9 @@ Write-Host "   destination: $destBase" -ForegroundColor DarkGray
 # ── 4. Export MEMORY.md + machine identity tag ───────────────────────────────
 $memDest = Join-Path $destBase "memory"
 New-Item -ItemType Directory -Path $memDest -Force | Out-Null
-Copy-Item -LiteralPath $memIndex -Destination (Join-Path $memDest "MEMORY.md") -Force
+$memDestFile = Join-Path $memDest "MEMORY.md"
+Copy-Item -LiteralPath $memIndex -Destination $memDestFile -Force
+(Get-Item $memDestFile).LastWriteTime = $syncNow
 Write-Host "  copied: MEMORY.md" -ForegroundColor Green
 
 $env:COMPUTERNAME | Out-File -FilePath (Join-Path $memDest ".exported-by") -Encoding UTF8 -NoNewline -Force
@@ -128,13 +131,12 @@ Write-Host "  tagged: .exported-by=$($env:COMPUTERNAME)" -ForegroundColor DarkGr
 $secretsRoot = $env:AO_SYNC_SECRETS_ROOT
 if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
 
-    $syncNow = Get-Date
-
     # mcp/user-env.ps1 -> $AO_SYNC_SECRETS_ROOT\user-env.ps1
     $userEnvSrc = Join-Path $WorkRoot "mcp\user-env.ps1"
     if (Test-Path -LiteralPath $userEnvSrc) {
         $userEnvDest = Join-Path $secretsRoot "user-env.ps1"
         Copy-Item -LiteralPath $userEnvSrc -Destination $userEnvDest -Force
+        (Get-Item $userEnvDest).LastWriteTime = $syncNow
         Write-Host "  copied: mcp/user-env.ps1" -ForegroundColor Green
     }
 
@@ -153,6 +155,7 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
             if ($sshExcludeExts  -contains $_.Extension.ToLower()) { return }
             $keyDest = Join-Path $sshDest $_.Name
             Copy-Item -LiteralPath $_.FullName -Destination $keyDest -Force
+            (Get-Item $keyDest).LastWriteTime = $syncNow
             Write-Host "  copied: .ssh/$($_.Name)" -ForegroundColor Green
             $exportedSshKeys.Add($_.Name)
         }
@@ -163,6 +166,7 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     if (Test-Path -LiteralPath $credsSrc) {
         $credsDest = Join-Path $secretsRoot "AWARE_WAVE_CREDENTIALS.md"
         Copy-Item -LiteralPath $credsSrc -Destination $credsDest -Force
+        (Get-Item $credsDest).LastWriteTime = $syncNow
         Write-Host "  copied: AWARE_WAVE_CREDENTIALS.md" -ForegroundColor Green
     }
 
