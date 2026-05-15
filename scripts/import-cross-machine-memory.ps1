@@ -269,6 +269,13 @@ $allFolders = @(
     }
 )
 
+# Find own machine's latest export date (to avoid importing older data from another machine).
+# Scenario: same-machine AO-CLOSE → AO-RESUME — own export is today, other machine is yesterday.
+# Without this guard, we would overwrite today's MEMORY.md with yesterday's other-machine version.
+$ownLatestDateStr = $allFolders | ForEach-Object {
+    if ($_.Name -match "^AO-SYNC-(\d{4}-\d{2}-\d{2})-$([regex]::Escape($machineTag))$") { $matches[1] }
+} | Sort-Object -Descending | Select-Object -First 1
+
 $candidateFolders = @(
     $allFolders | ForEach-Object {
         $name = $_.Name
@@ -280,10 +287,17 @@ $candidateFolders = @(
         # Folders that don't match either pattern are silently ignored
     } | Where-Object {
         $_ -ne $null -and
-        # New format: exclude own machine by folder name (fast, no file I/O needed)
-        -not ($_.IsNewFormat -and $_.FolderMachine -eq $machineTag)
+        # Exclude own machine folders
+        -not ($_.IsNewFormat -and $_.FolderMachine -eq $machineTag) -and
+        # Only import if other machine's export is strictly newer than own machine's latest export.
+        # Prevents overwriting fresh local data with stale data from another machine.
+        ($ownLatestDateStr -eq $null -or $_.DateStr -gt $ownLatestDateStr)
     } | Sort-Object DateStr -Descending   # newest date first
 )
+
+if ($ownLatestDateStr -and $candidateFolders.Count -eq 0 -and $allFolders.Count -gt 0) {
+    Write-Host "  cross-machine import: skipped — own machine export ($ownLatestDateStr) is same date or newer than all other-machine exports" -ForegroundColor DarkGray
+}
 
 # ── MEMORY.md import ──────────────────────────────────────────────────────────
 # Always overwrites -- last-AO-CLOSE-wins by design (no SHA256 guard on MEMORY.md).
