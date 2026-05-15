@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-15 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-15 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:f0fa8c38968e640f529c5d0fb863197db9bd941920a7864b7da0d15b50e9bc15 -->
+- **2026-05-15 下午（API 計費清理）**：VS Code Claude Code extension 在 console（API credits）模式下每次 git commit 自動觸發 ultrareview 平行多 agent review，導致「Failed to run review: insufficient funds」反覆彈出（API 餘額 $5.82）。修正三項：(1) 移除 claude-fast/claude-latest MCP server（registry.template.json + .mcp.json + ~/.claude/mcp.json），commit `7311689`；(2) auto-repair-claude.yml 改 Haiku + max-turns 10，降成本 ~90%，commit `016cdd6`；(3) ~/.claude/settings.json 加 `disableAgentView: true` + `forceLoginMethod: "claudeai"`，強制走 Max 訂閱額度。VS Code 尚未重開——需重啟 IDE 驗證彈窗消失。
 - **2026-05-15 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-15 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:60989638bfab079696739a053830b416c5b8ebf86e493961df1aba67985c9b7f -->
 - **2026-05-15 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-15 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:d28f4513e01d568c31b57c36a0f82864ea953083e2bc73d0d1b453f399e8d2ad -->
 - **2026-05-15 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-15 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:3d3e90778715723cc2a1b492884f12bcb1148914dd1159774cb19313225bbc09 -->
@@ -433,5 +435,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-15 07:39:18 UTC_
+_Last synced: 2026-05-15 09:24:59 UTC_
 

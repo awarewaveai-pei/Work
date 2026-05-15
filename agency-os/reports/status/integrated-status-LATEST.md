@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-15 15:39:33
+- Generated: 2026-05-15 17:25:24
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -232,7 +232,15 @@
 - AO-SYNC 跨機同步路徑正確（G:\ Google Drive 直接路徑，不依賴 Cryptomator 掛載）
 - 進程環境 `AO_SYNC_ROOT`/`AO_SYNC_SECRETS_ROOT` 為舊值（下次 IDE 重啟自動更新）
 
+## 下午 session（API 計費清理）
+- 問題：VS Code Claude Code extension 每次 git commit 自動觸發 ultrareview，彈出「Failed to run review: insufficient funds」。根因：extension 以 console（API credits）模式登入，非 Max 訂閱額度。ultrareview 平行跑多個 Claude agents，單次成本 > 剩餘 $5.82 API 餘額。
+- 修正 1：移除 claude-fast / claude-latest MCP server（registry.template.json + .mcp.json + ~/.claude/mcp.json），消除 ANTHROPIC_API_KEY 呼叫風險。commit 7311689
+- 修正 2：.github/workflows/auto-repair-claude.yml 改用 claude-haiku-4-5-20251001 + max-turns 10，API 成本降約 90%。commit 016cdd6
+- 修正 3：~/.claude/settings.json 加入 `disableAgentView: true`（停 background agent 自動觸發）+ `forceLoginMethod: "claudeai"`（強制走 Max 訂閱）。
+- 待驗：重開 VS Code 後確認彈窗消失
+
 ## Next steps
+- **重開 VS Code** 讓 disableAgentView + forceLoginMethod 生效，觀察 commit 後是否仍出現彈窗
 - 桌機開工後確認 `sync-claude-userlevel.ps1 -Mode merge` 同步最新 hook 修正
 - Termius 手機 SSH 設定（出國前必做）
 - Soulful Expression Day 1 §1.1（操作者登入確認）
@@ -277,11 +285,28 @@
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**: 無
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:f0fa8c38968e640f529c5d0fb863197db9bd941920a7864b7da0d15b50e9bc15 -->
+
+### claude-code 2026-05-15 16:30
+
+- **完成（一句）**: API 計費清理：移除 claude-fast/claude-latest MCP server、auto-repair 改 Haiku、settings.json 加 disableAgentView + forceLoginMethod
+- **變更路徑**:
+  - `mcp/registry.template.json`
+  - `.github/workflows/auto-repair-claude.yml`
+  - `~/.claude/settings.json`（user-level，不入 git）
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/daily/2026-05-15.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+- **Git**: 7311689, 016cdd6
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: VS Code 尚未重開；需重啟 IDE 後確認「Failed to run review」彈窗消失才算根治
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-15 15:39:28`
+- Time: `2026-05-15 17:25:14`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -291,8 +316,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260515-153927.md`
-- Closeout: `reports/closeout/closeout-20260515-153920.md`
+- Health: `reports/health/health-20260515-172512.md`
+- Closeout: `reports/closeout/closeout-20260515-172500.md`
 
 ## Action
 - No blocking issue detected.

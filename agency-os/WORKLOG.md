@@ -4,6 +4,9 @@
 
 ## 2026-05-15
 
+### claude-code 2026-05-15 銝?嚗PI 閮祥皜?嚗?- AUTO_TASK_DONE: 蝘駁 claude-fast / claude-latest MCP server嚗egistry.template.json + .mcp.json + ~/.claude/mcp.json嚗?瘨 ANTHROPIC_API_KEY ?? MCP 鋡怠?怎?憸券?ommit 7311689
+- AUTO_TASK_DONE: .github/workflows/auto-repair-claude.yml ?寧 claude-haiku-4-5-20251001 + max-turns 10嚗PI ??? 90%?ommit 016cdd6
+- AUTO_TASK_DONE: ~/.claude/settings.json ? disableAgentView + forceLoginMethod claudeai嚗?甇?background agent ?芸?閫貊 ultrareview嚗撥??extension 韏?Max 閮?? API credits??- ?孵?嚗S Code extension ??console嚗PI credits嚗芋撘?伐?瘥活 git commit ?芸?閫貊 ultrareview ??API 擗?嚗? Max 閮憿漲??- 撽?嚗身摰神?亙?????? VS Code ??敺?撖?蝒?行?憭晞?- 憸券嚗??敺?頝喳嚗???Anthropic 摰?辣蝣箄? Max 閮 vs API credits ????
 ### Hook *>&1 全面修復 + AO-SYNC 跨機同步驗證（筆電班）
 
 **根因 / 目標**：延續 2026-05-14 的 AO-RESUME hook 修復，全面清除剩餘 `*>&1` 風險，並驗證昨日所有 AO-SYNC 路徑修正均正確生效。
@@ -76,6 +79,24 @@
 - **Git**: 25ab9d9
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**: 無
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:f0fa8c38968e640f529c5d0fb863197db9bd941920a7864b7da0d15b50e9bc15 -->
+
+### claude-code 2026-05-15 16:30
+
+- **完成（一句）**: API 計費清理：移除 claude-fast/claude-latest MCP server、auto-repair 改 Haiku、settings.json 加 disableAgentView + forceLoginMethod
+- **變更路徑**:
+  - `mcp/registry.template.json`
+  - `.github/workflows/auto-repair-claude.yml`
+  - `~/.claude/settings.json`（user-level，不入 git）
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/daily/2026-05-15.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+- **Git**: 7311689, 016cdd6
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: VS Code 尚未重開；需重啟 IDE 後確認「Failed to run review」彈窗消失才算根治
 
 ## 2026-05-14
 
@@ -2593,7 +2614,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-15 07:39:18 UTC_
+_Last synced: 2026-05-15 09:24:59 UTC_
 
 ## 2026-03-20
 
