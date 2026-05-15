@@ -69,9 +69,11 @@ try {
 
 function Get-Secret {
     param([string]$Name)
-    $v = [System.Environment]::GetEnvironmentVariable($Name)
-    if (-not $v) { $v = [System.Environment]::GetEnvironmentVariable($Name, 'User') }
+    # Registry-always-wins: User registry has authoritative current values;
+    # process env may be stale (set when IDE launched before vault-sync ran).
+    $v = [System.Environment]::GetEnvironmentVariable($Name, 'User')
     if (-not $v) { $v = [System.Environment]::GetEnvironmentVariable($Name, 'Machine') }
+    if (-not $v) { $v = [System.Environment]::GetEnvironmentVariable($Name) }
     if ($v) { return $v }
     if ($vaultStore) {
         try { return Get-VaultSecret -Store $vaultStore -Name $Name } catch {}
