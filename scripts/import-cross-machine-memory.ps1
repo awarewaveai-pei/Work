@@ -3,8 +3,8 @@
 # Called by ao-resume.ps1 (non-blocking). Silent no-op when no AO-SYNC folder exists.
 #
 # Sources:
-#   MEMORY.md    -- $env:AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\MEMORY.md
-#   secrets      -- $env:AO_SYNC_SECRETS_ROOT\  (user-env.ps1, .ssh\*, AWARE_WAVE_CREDENTIALS.md)
+#   MEMORY.md             -- $env:AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\MEMORY.md
+#   secrets               -- $env:AO_SYNC_SECRETS_ROOT\  (user-env.ps1, .ssh\*, AWARE_WAVE_CREDENTIALS.md, claude-settings.json)
 #
 # Folder selection strategy (N-machine safe):
 #   New format (AO-SYNC-date-MACHINE): exclude own machine by folder name suffix -> pick newest OTHER machine
@@ -478,6 +478,33 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
                 if (Copy-Atomic $credsSrc $credsDst) {
                     Update-LocalStateHash 'AWARE_WAVE_CREDENTIALS.md' (Get-SafeHash $credsSrc)
                     Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md updated" -ForegroundColor Green
+                }
+            }
+        }
+    }
+
+    # ── claude-settings.json -> ~/.claude/settings.json ──────────────────────
+    $claudeSettingsSrc = Join-Path $secretsRoot "claude-settings.json"
+    $claudeSettingsDst = Join-Path $env:USERPROFILE ".claude\settings.json"
+    if (Test-Path -LiteralPath $claudeSettingsSrc) {
+        $decision = Get-ImportDecision $claudeSettingsSrc $claudeSettingsDst 'claude-settings.json' $sameMachine
+        switch ($decision) {
+            'unchanged' {
+                Update-LocalStateHash 'claude-settings.json' (Get-SafeHash $claudeSettingsSrc)
+                Write-Host "  cross-machine import: ~/.claude/settings.json unchanged" -ForegroundColor DarkGray
+            }
+            'local-ahead' {
+                Update-LocalStateHash 'claude-settings.json' (Get-SafeHash $claudeSettingsDst)
+                Write-Host "  cross-machine import: ~/.claude/settings.json local has changes since last ao-close (will export on next ao-close)" -ForegroundColor DarkGray
+            }
+            'local-modified' {
+                Write-Host "  cross-machine import: ~/.claude/settings.json CONFLICT — vault differs from local; local changes kept. Use -Force to take vault version." -ForegroundColor Yellow
+            }
+            'import' {
+                Invoke-LocalBackup $claudeSettingsDst "claude-settings.json"
+                if (Copy-Atomic $claudeSettingsSrc $claudeSettingsDst) {
+                    Update-LocalStateHash 'claude-settings.json' (Get-SafeHash $claudeSettingsSrc)
+                    Write-Host "  cross-machine import: ~/.claude/settings.json updated (restart Claude Code to apply)" -ForegroundColor Green
                 }
             }
         }

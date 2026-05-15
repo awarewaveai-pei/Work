@@ -27,6 +27,7 @@
 #   user-env.ps1               -> $AO_SYNC_SECRETS_ROOT\user-env.ps1   (shared, last-write-wins)
 #   .ssh\*                     -> $AO_SYNC_SECRETS_ROOT\.ssh\           (dynamic scan, excl. machine-specific)
 #   AWARE_WAVE_CREDENTIALS.md  -> $AO_SYNC_SECRETS_ROOT\AWARE_WAVE_CREDENTIALS.md
+#   claude-settings.json       -> $AO_SYNC_SECRETS_ROOT\claude-settings.json  (~/.claude/settings.json)
 #   .manifest-<MACHINE>.json   -> $AO_SYNC_SECRETS_ROOT\               (sha256 + size per file; read by import for logging)
 #
 # SSH exclusion (never exported):
@@ -170,12 +171,23 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         Write-Host "  copied: AWARE_WAVE_CREDENTIALS.md" -ForegroundColor Green
     }
 
+    # ~/.claude/settings.json -> $AO_SYNC_SECRETS_ROOT\claude-settings.json
+    # Contains: disableAgentView, forceLoginMethod, hooks config, MCP settings — needed on all machines.
+    $claudeSettingsSrc = Join-Path $env:USERPROFILE ".claude\settings.json"
+    if (Test-Path -LiteralPath $claudeSettingsSrc) {
+        $claudeSettingsDest = Join-Path $secretsRoot "claude-settings.json"
+        Copy-Item -LiteralPath $claudeSettingsSrc -Destination $claudeSettingsDest -Force
+        (Get-Item $claudeSettingsDest).LastWriteTime = $syncNow
+        Write-Host "  copied: ~/.claude/settings.json" -ForegroundColor Green
+    }
+
     # Write export manifest: records sha256 + size per file for import-side logging and integrity check.
     # Import uses its own local-state file (not this manifest) for conflict detection.
     $manifestEntries = [ordered]@{}
     $manifestSources = [System.Collections.Generic.List[object]]::new()
     $manifestSources.Add([pscustomobject]@{ key = 'user-env.ps1';              path = Join-Path $secretsRoot 'user-env.ps1' })
     $manifestSources.Add([pscustomobject]@{ key = 'AWARE_WAVE_CREDENTIALS.md'; path = Join-Path $secretsRoot 'AWARE_WAVE_CREDENTIALS.md' })
+    $manifestSources.Add([pscustomobject]@{ key = 'claude-settings.json';      path = Join-Path $secretsRoot 'claude-settings.json' })
     foreach ($kn in $exportedSshKeys) {
         $manifestSources.Add([pscustomobject]@{ key = ".ssh/$kn"; path = Join-Path $sshDest $kn })
     }
@@ -255,6 +267,7 @@ This file is a manual fallback guide only -- you should never need to run these 
 | (secrets root)/user-env.ps1 | All MCP API keys (shared, last-write-wins) |
 | (secrets root)/.ssh/* | SSH keys (dynamic scan; excl. known_hosts / authorized_keys / *.txt) |
 | (secrets root)/AWARE_WAVE_CREDENTIALS.md | Credentials reference (shared) |
+| (secrets root)/claude-settings.json | ~/.claude/settings.json (disableAgentView, forceLoginMethod, hooks) |
 | (secrets root)/.manifest-$machineTag.json | Export manifest (sha256 + timestamp per file) |
 
 ## Manual import (fallback only)
