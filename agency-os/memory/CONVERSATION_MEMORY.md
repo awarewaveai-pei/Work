@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-15 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-15 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:60989638bfab079696739a053830b416c5b8ebf86e493961df1aba67985c9b7f -->
 - **2026-05-15 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-15 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:d28f4513e01d568c31b57c36a0f82864ea953083e2bc73d0d1b453f399e8d2ad -->
 - **2026-05-15 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-15 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:3d3e90778715723cc2a1b492884f12bcb1148914dd1159774cb19313225bbc09 -->
 - **2026-05-14（AO-RESUME 外部信號整合 + Slack token 修復）**：AO-RESUME 升級為七段式格式（系統快照/外部信號/已完成/目前進度/未完成待辦分類/需決策/下一步）。`fetch-external-signals.ps1`（新建）接入 Telegram digest API（`/api/ops/inbox/digest`，已部署 SG `eaa3332`）+ Slack `conversations.history`（xoxp admin token 可直讀 workspace admin 頻道）。Vault 修正：`SLACK_BOT_TOKEN`（新 token `...92084`）、`OPS_INBOX_INGEST_TOKEN` 修正為 SG `.env` 正確值；user-env.ps1 兩個 key 同步。Slack Channel IDs 入 vault：`#ops-incidents=C0B004HJYV8`、`#infra-alerts=C0AUQ7J5789`。驗證：Telegram ok (16 msg) + Slack 兩頻道 ok。未完成待辦強制分類規則（30-resume-keyword.mdc 兩份同步）。`AO_SYNC_SECRETS_ROOT` 修正為 Google Drive 路徑。AWARE_WAVE_CREDENTIALS.md 更新含新 Slack App 憑證 + Channel IDs。
@@ -432,5 +433,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-15 07:33:31 UTC_
+_Last synced: 2026-05-15 07:39:18 UTC_
 

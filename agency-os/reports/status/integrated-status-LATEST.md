@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-15 15:33:46
+- Generated: 2026-05-15 15:39:33
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -264,11 +264,24 @@
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**: 進程 env vars 為舊值，IDE 重啟後自動更新
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:60989638bfab079696739a053830b416c5b8ebf86e493961df1aba67985c9b7f -->
+
+### claude-code 2026-05-15 07:50
+
+- **完成（一句）**: AO-SYNC export/import 改 registry-always-wins，根除 stale process env 問題
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+  - `scripts/import-cross-machine-memory.ps1`
+- **Git**: 25ab9d9
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 無
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-15 15:33:40`
+- Time: `2026-05-15 15:39:28`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -278,8 +291,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260515-153340.md`
-- Closeout: `reports/closeout/closeout-20260515-153332.md`
+- Health: `reports/health/health-20260515-153927.md`
+- Closeout: `reports/closeout/closeout-20260515-153920.md`
 
 ## Action
 - No blocking issue detected.

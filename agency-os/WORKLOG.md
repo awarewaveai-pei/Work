@@ -24,6 +24,16 @@
 - 下次修改 hook 時，搜尋整個檔案的 `*>&1`（非只改某一行），確保全部替換為 `2>&1`。  
 - SSOT (`mcp/claude-userlevel/hooks/`) 與 LIVE (`~/.claude/hooks/`) 必須 line-by-line 一致；用 `sync-claude-userlevel.ps1 -Mode merge` 同步後再 `-Mode verify`。
 
+### AO-SYNC 路徑「缺才補」邏輯根本修復（commit `25ab9d9`）
+
+**根因**：`export-cross-machine-memory.ps1` / `import-cross-machine-memory.ps1` 的 env var 載入邏輯是「缺才補 User registry」，但進程有**舊值**時條件不觸發，直接用錯誤路徑。本輪 AO-CLOSE 匯出寫到了 `G:\...\MySecretVault\AO-SYNC\`（少一層）和 `E:\`（Cryptomator）。
+
+**修法**：改為「**User registry 有值就永遠覆蓋進程值**」，兩個腳本同步。
+
+**驗證**：`export-cross-machine-memory.ps1` 重跑後 destination = `G:\...\MySecretVault\MySecretVault\AO-SYNC\`、secrets = `G:\...\MySecretVault\MySecretVault` ✅
+
+- AUTO_TASK_DONE: AO-SYNC export/import registry-always-wins fix
+
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
 <!-- ao-close-inbox-sha256:3d3e90778715723cc2a1b492884f12bcb1148914dd1159774cb19313225bbc09 -->
@@ -52,6 +62,20 @@
 - **Git**: e725f3f
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**: 進程 env vars 為舊值，IDE 重啟後自動更新
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:60989638bfab079696739a053830b416c5b8ebf86e493961df1aba67985c9b7f -->
+
+### claude-code 2026-05-15 07:50
+
+- **完成（一句）**: AO-SYNC export/import 改 registry-always-wins，根除 stale process env 問題
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`
+  - `scripts/import-cross-machine-memory.ps1`
+- **Git**: 25ab9d9
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 無
 
 ## 2026-05-14
 
@@ -2569,7 +2593,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-15 07:33:31 UTC_
+_Last synced: 2026-05-15 07:39:18 UTC_
 
 ## 2026-03-20
 
