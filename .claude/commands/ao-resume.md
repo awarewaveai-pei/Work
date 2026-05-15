@@ -18,6 +18,16 @@ Then output the **AO-RESUME 七段式** response:
 One-line status: SG/EU 服務狀態 (UP/DOWN) | deploy drift commits | Git ahead/behind/dirty
 Source: ao-resume-hook-last.json log_tail + health check output.
 
+Cross-machine import result (從 ao-resume-hook-last.json log_tail 或手動跑 import 的輸出讀取):
+List every file checked, with one of three statuses:
+- ✅ 覆蓋（updated）— vault 版本與本機不同，已寫入
+- ✔ 未變動（unchanged）— SHA256 相同，未覆蓋
+- ⚠ 衝突保留（local-modified）— 本機有改動，保留本機版本
+- — 來源不存在（skipped）— vault 檔案不在指定路徑
+
+Files to report: `MEMORY.md`、`user-env.ps1`、`.ssh/hetzner_trigger`、`.ssh/id_ed25519`、`.ssh/hostinger_soulful`、`.ssh/config`、`AWARE_WAVE_CREDENTIALS.md`
+If import did not run (hook missing / E:\ not mounted / G:\ not accessible), write「import 未執行 — [原因]」and list what needs to be fixed.
+
 **2. 外部信號**
 Telegram @awarewave_ops_bot: 未讀數量 + 可操作項條列（無則寫「本輪無未讀」）
 Slack #ops-incidents / #infra-alerts: 未讀數量 + 最新一筆（無法讀取時寫「無法讀取 — 請手動確認」）
