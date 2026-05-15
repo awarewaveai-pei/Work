@@ -81,11 +81,15 @@ wp --path=/var/www/html db query "SELECT * FROM wp_options WHERE option_name = '
 4. Use `wp --debug` flag for verbose output
 
 ### Client site paths
-- WordPress sites run on SG VPS (`5.223.93.113`) inside Docker
-- WP container path: `/var/www/html/` inside the `wordpress` container
-- Access via: `docker exec -it lobster-phase1-wordpress-1 bash` then WP-CLI
-- Or via MainWP on EU for plugin management across all clients
+
+> **Full server topology is in the global stack knowledge section of AGENTS.md.**
+
+- SG WordPress container: `lobster-wordpress`, web root `/var/www/html`
+- Enter container: `docker exec -it lobster-wordpress bash`
+- WP-CLI inside container: `wp --allow-root --path=/var/www/html <command>`
+- External clients (e.g. soulful): SSH `ssh -p 65002 u942075013@191.101.230.176`, WP path `/home/u942075013/domains/soulfulexpression.org/public_html`
 - Per-client config: `agency-os/tenants/<slug>/core/`
+- Client slugs: `soulful` (soulfulexpression.org), `mongolia`, `p1-pilot`
 
 ### Safe update protocol
 - **Always backup first** via WPvivid before any plugin update

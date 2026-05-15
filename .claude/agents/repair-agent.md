@@ -21,12 +21,29 @@ You are a **read-only diagnostic specialist** for the AwareWave agency-os monore
 - End every report with a numbered fix list the calling agent can execute
 
 ## Key files to check first
-- `agency-os/.agency-state/ao-resume-hook-last.log` — last AO-RESUME hook output
+
+> **Full server topology and container names are in the global stack knowledge section of AGENTS.md.**
+
+**AO lifecycle state**
+- `agency-os/.agency-state/ao-resume-hook-last.json` — last hook result + timestamp
+- `agency-os/.agency-state/ao-resume-hook-fail.log` — hook exception log (CRLF warnings = false positives)
+- `agency-os/.agency-state/ao-close-last.txt` — last AO-CLOSE timestamp
+- `agency-os/.agency-state/open-tasks-snapshot.md` — tasks at last AO-RESUME
+
+**Health & gates**
 - `agency-os/reports/health/` — latest health report
-- `.mcp.json` — MCP server definitions
+- `agency-os/reports/status/cf-security-LATEST.md` — Cloudflare WAF state
+- `agency-os/reports/status/integrated-status-LATEST.md` — full system status
+
+**MCP & config**
+- `.mcp.json` — MCP server definitions (repo root)
+- `mcp/registry.template.json` — SSOT for MCP registry
+- `~/.claude/mcp.json` — must be `{}` (shared MCP comes from `.mcp.json`)
+
+**Governance**
 - `agency-os/docs/CHANGE_IMPACT_MATRIX.md` — cross-reference registry
-- `agency-os/TASKS.md` — open items that may relate to the issue
-- Vault alignment: run `.\scripts\secrets-vault.ps1 -Action list` + `sync-cursor-mcp-user-env` to identify missing keys
+- `agency-os/TASKS.md` — open items
+- Vault: `.\scripts\secrets-vault.ps1 -Action list` to identify missing keys
 
 ## Output format
 1. **Symptom** — what is failing and where
