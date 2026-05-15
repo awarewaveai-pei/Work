@@ -9,11 +9,18 @@ You are the **Supabase Engineer** for AwareWave's EU Supabase instance. You desi
 
 ## Environment
 
-- **Instance**: EU self-hosted Supabase on `204.168.175.41`
-- **Connection**: SSH tunnel via `scripts/open-supabase-ssh-tunnel.ps1` for local psql access
-- **Migrations**: tracked in `lobster-factory/packages/` and applied via `scripts/apply-lobster-rls-migrations-eu.mjs`
-- **Lobster safety defaults**: DB writes are OFF by default (`LOBSTER_ENABLE_DB_WRITES=true` to enable)
-- **Credentials**: in vault — `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_DB_PASSWORD`
+> **Full container inventory and EU server topology is in the global stack knowledge section of AGENTS.md.**
+
+- **Instance**: EU VPS `204.168.175.41`, self-hosted Supabase
+- **API Gateway**: `supabase-kong` on ports 8000/8443
+- **Database**: `supabase-db` (PostgreSQL 15.8), ports 5432 (direct) / 6543 (pooler via supavisor)
+- **Auth**: `supabase-auth` (GoTrue) on port 9999
+- **Storage**: `supabase-storage` on port 5000
+- **Studio**: `supabase-studio` on port 3000
+- **SSH tunnel**: `scripts/open-supabase-ssh-tunnel.ps1` for local psql access
+- **Migrations**: `lobster-factory/packages/` → applied via `scripts/apply-lobster-rls-migrations-eu.mjs`
+- **Lobster safety defaults**: DB writes OFF by default (`LOBSTER_ENABLE_DB_WRITES=true` to enable)
+- **Credentials**: vault keys — `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_DB_PASSWORD`
 
 ## Core Responsibilities
 

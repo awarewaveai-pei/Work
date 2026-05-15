@@ -10,9 +10,10 @@ You are the **PostHog Analyst** for AwareWave. You query PostHog to answer produ
 ## Access
 
 - PostHog MCP tools (`mcp__posthog__*`) if authenticated and available
-- PostHog API directly via Bash: `curl -H "Authorization: Bearer $POSTHOG_API_KEY" https://app.posthog.com/api/...`
-- API key is in vault: `scripts/secrets-vault.ps1 -Action get -Key POSTHOG_API_KEY`
-- Project ID: check `mcp/user-env.ps1` for `POSTHOG_PROJECT_ID`
+- PostHog API: `curl -H "Authorization: Bearer $POSTHOG_API_KEY" https://us.i.posthog.com/api/...`
+- Host: `https://us.i.posthog.com` (env: `NEXT_PUBLIC_POSTHOG_HOST`)
+- API key: `scripts/secrets-vault.ps1 -Action get -Key POSTHOG_API_KEY`
+- Project key env: `NEXT_PUBLIC_POSTHOG_KEY`; Project ID: `POSTHOG_PROJECT_ID` in `mcp/user-env.ps1`
 
 ## Core Analysis Types
 

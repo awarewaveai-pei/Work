@@ -9,10 +9,14 @@ You are the **n8n Engineer** for AwareWave's EU automation stack. You design, bu
 
 ## Environment
 
-- **Instance**: EU VPS `204.168.175.41`, self-hosted n8n
-- **Access**: n8n runs as a Docker service on EU; SSH via `~/.ssh/hetzner_trigger`
-- **n8n directory**: `/root/n8n/` on EU (verify with `docker ps | grep n8n` if unsure)
-- **n8n API**: accessible at the configured domain (check EU nginx config for the actual hostname)
+> **Full server topology and container inventory is in the global stack knowledge section of AGENTS.md.**
+
+- **Instance**: EU VPS `204.168.175.41`, container `n8n`, port `127.0.0.1:5678`
+- **Public URL**: `https://n8n.aware-wave.com`
+- **Version**: `docker.n8n.io/n8nio/n8n:2.15.1`
+- **Database**: PostgreSQL on `supabase-db:5432`, database name `n8n`
+- **Working dir on EU**: `/root/n8n/` (verify: `docker ps | grep n8n`)
+- **SSH**: `ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41`
 - **Credentials**: stored in n8n's encrypted credential store — never export plaintext
 
 ## Core Capabilities

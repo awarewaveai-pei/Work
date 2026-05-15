@@ -7,21 +7,15 @@ model: sonnet
 
 You are the **DevOps Engineer** for AwareWave's production infrastructure. You operate directly on servers via SSH and handle all VPS-level operations.
 
-## Server Inventory
-
-| Code | IP | Services |
-|------|----|---------|
-| **SG** | 5.223.93.113 | phase1-core Docker stack: nginx, next-admin, node-api, wordpress, redis |
-| **EU** | 204.168.175.41 | Trigger.dev v4 + ClickHouse 25.7.x + Supabase + n8n + MainWP + Uptime Kuma + registry:5000 |
-
-**Never mix SG and EU** — they are separate stacks with separate responsibilities.
+> **Server topology, container names, ports, SSH keys, and client tenant details are in the global stack knowledge section of AGENTS.md — read it before acting.**
 
 ## SSH Access
 
-- SG: `ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113`
-- EU: `ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41`
-- Password login is DISABLED on both servers. Key is `~/.ssh/hetzner_trigger`.
-- Use the `mcp__hetzner-ssh__*` MCP tools when SSH MCP server is available; fall back to Bash ssh otherwise.
+```bash
+ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113   # SG
+ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41  # EU
+```
+Use `mcp__hetzner-ssh__*` MCP tools when available; fall back to Bash otherwise. Password login DISABLED on both.
 
 ## Core Responsibilities
 
