@@ -60,17 +60,21 @@
 - [x] **（筆電必做）AO-SYNC 環境變數設定** —— **【未開始】** 桌機已設好，筆電需要同步設定兩個環境變數才能讓 AO-CLOSE 正確匯出。
   **筆電環境**：repo 在 `D:\Work`，帳號家目錄在 `C:\Users\<帳號>`，project key = `d--Work`。
   在筆電 PowerShell（從 `D:\Work` 執行）：
+  > **Cryptomator 架構（2026-05-15 確認）**：
+  > - Vault 加密容器位於 `G:\我的雲端硬碟\MySecretVault\MySecretVault\`
+  > - Cryptomator 解鎖後虛擬磁碟掛載為 `E:\`（這才是正確的讀寫路徑）
+  > - 桌機 env var 已確認：`AO_SYNC_ROOT=E:\AO-SYNC`、`AO_SYNC_SECRETS_ROOT=E:\`
   ```powershell
-  [System.Environment]::SetEnvironmentVariable('AO_SYNC_ROOT', 'G:\我的雲端硬碟\MySecretVault\AO-SYNC', 'User')
-  [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'G:\我的雲端硬碟\MySecretVault', 'User')
+  [System.Environment]::SetEnvironmentVariable('AO_SYNC_ROOT',         'E:\AO-SYNC', 'User')
+  [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'E:\',        'User')
   ```
-  設完後測試（**只做一次**，之後 AO-CLOSE / AO-RESUME 全自動）：
+  設完後測試（**只做一次**，之後 AO-CLOSE / AO-RESUME 全自動；須先確認 Cryptomator 已解鎖並掛載至 `E:\`）：
   ```powershell
   & scripts\export-cross-machine-memory.ps1 -WorkRoot (Get-Location).Path
   ```
-  應看到 MEMORY.md + user-env.ps1 + SSH keys + AWARE_WAVE_CREDENTIALS.md 全部寫入 MySecretVault。
-  **DoD：** export 成功 + MEMORY.md 寫到 `G:\我的雲端硬碟\MySecretVault\AO-SYNC\AO-SYNC-<date>\memory\`。
-- [x] **（筆電必做）確認 Cryptomator vault 掛載路徑，將 AO-SYNC 秘密檔案移入加密區** —— **【完成 2026-05-14】** **背景：** 目前 `.ssh/`、`user-env`、`AWARE_WAVE_CREDENTIALS` 存在 Google Drive `MySecretVault/` 根目錄（vault 外面），只有 Google 伺服器端加密，無端對端加密。`MySecretVault/` 內已有 `vault.cryptomator`＋`masterkey.cryptomator`，Cryptomator 設定是在筆電上做的。**筆電開工時步驟：** (1) 打開 Cryptomator → 解鎖 MySecretVault vault → 記下掛載路徑（例如 `Z:\` 或某資料夾）；(2) 告訴代理掛載路徑；(3) 代理會：把 `.ssh/`、`user-env.ps1`、`AWARE_WAVE_CREDENTIALS.md` 移進 vault 內的對應子資料夾、更新兩台機器的 `AO_SYNC_SECRETS_ROOT` env var 指向 vault 內路徑、確認 AO-CLOSE / AO-RESUME 腳本正常讀寫。**DoD：** AO-CLOSE 成功將秘密檔案寫入 Cryptomator 加密路徑（非 vault 外面的明文位置）；兩台機器 `AO_SYNC_SECRETS_ROOT` 已更新並驗證。
+  應看到 MEMORY.md + user-env.ps1 + SSH keys + AWARE_WAVE_CREDENTIALS.md 全部寫入 `E:\`。
+  **DoD：** export 成功 + MEMORY.md 寫到 `E:\AO-SYNC\AO-SYNC-<date>-<MACHINE>\memory\`。
+- [x] **（筆電必做）確認 Cryptomator vault 掛載路徑，將 AO-SYNC 秘密檔案移入加密區** —— **【完成 2026-05-15 確認】** **結論（桌機已驗證）：** Cryptomator vault 加密容器位於 `G:\我的雲端硬碟\MySecretVault\MySecretVault\`；解鎖後虛擬磁碟掛載至 `E:\`。`.ssh/`、`user-env.ps1`、`AWARE_WAVE_CREDENTIALS.md`、`AO-SYNC/` 均存放於 `E:\`（加密保護）。**兩台機器正確 env var：** `AO_SYNC_ROOT=E:\AO-SYNC`、`AO_SYNC_SECRETS_ROOT=E:\`。**注意：** `ANTHROPIC_API_KEY` 已從 `user-env.ps1`（本機 + vault 兩份）移除，避免 Claude Code 走 API 計費而非 Max 訂閱。筆電開工前須先解鎖 Cryptomator（`E:\` 才會出現），再執行 AO-RESUME。
 - [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】**
   - 📖 **完整步驟讀這個（單一主人）**：[`agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`](docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md) — §0（5 步驗證）+ §5（4 條 Snippets）+ §8（key 上手機 3 方法）
   - 📅 **規劃日期**：2026-05-08
