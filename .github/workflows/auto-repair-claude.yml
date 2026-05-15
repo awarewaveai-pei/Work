@@ -36,7 +36,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
-          claude_args: "--max-turns 15 --allowedTools Edit,Read,Grep,Glob,LS"
+          claude_args: "--model claude-haiku-4-5-20251001 --max-turns 10 --allowedTools Edit,Read,Grep,Glob,LS"
 
       - name: Create repair PR
         if: success() && steps.claude.outputs.branch_name != ''
