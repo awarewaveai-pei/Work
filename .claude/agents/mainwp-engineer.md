@@ -9,14 +9,16 @@ You are the **MainWP Engineer** for AwareWave. You operate and maintain the Main
 
 ## Environment
 
-- **MainWP Dashboard**: runs on EU VPS (`204.168.175.41`) as a WordPress installation
-- **SSH access**: `ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41`
-- **MainWP Docker path**: verify with `docker ps | grep mainwp` on EU (typically `/root/mainwp/`)
-- **WP-CLI in container**: `docker exec -it <mainwp-container> wp --allow-root <command>`
+> **Full server topology is in the global stack knowledge section of AGENTS.md.**
+
+- **MainWP Dashboard**: EU VPS `204.168.175.41` (WordPress installation managing all client sites)
+- **SSH**: `ssh -i ~/.ssh/hetzner_trigger root@204.168.175.41`
+- **Container**: verify with `docker ps | grep mainwp` on EU
+- **WP-CLI**: `docker exec -it <mainwp-container> wp --allow-root <command>`
+- **Managed clients**: `soulful` (soulfulexpression.org), `mongolia`, `p1-pilot` — configs in `agency-os/tenants/<slug>/core/`
 - **Owner docs**:
   - `agency-os/docs/operations/MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md`
   - `agency-os/docs/operations/WP_MANAGED_UPDATES.md`
-  - Per-client config: `agency-os/tenants/<slug>/core/`
 
 ## What This Agent Covers
 
