@@ -159,7 +159,7 @@ try {
     Push-Location -LiteralPath $root
     try {
         $resumeOut = @(
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $resumeScript -FullMainlineParity *>&1
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $resumeScript -FullMainlineParity 2>&1
         )
         $exit = $LASTEXITCODE
         foreach ($line in $resumeOut) { $allLogLines.Add([string]$line) | Out-Null }
