@@ -370,7 +370,15 @@ $fetchSignalsScript = Join-Path $WorkRoot "scripts\fetch-external-signals.ps1"
 if (Test-Path -LiteralPath $fetchSignalsScript) {
     Write-Host "== AO-RESUME: fetch external signals (Telegram + Slack) ==" -ForegroundColor Cyan
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $fetchSignalsScript -WorkRoot $WorkRoot
-    # Non-blocking: ignore exit code
+    $global:LASTEXITCODE = 0
+}
+
+# Cloudflare security posture check (warn-only) — bot fight mode + WAF rules.
+$cfSecScript = Join-Path $WorkRoot "scripts\check-cloudflare-security.ps1"
+if (Test-Path -LiteralPath $cfSecScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: Cloudflare security check (warn-only) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $cfSecScript -WorkRoot $WorkRoot
     $global:LASTEXITCODE = 0
 }
 

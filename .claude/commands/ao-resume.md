@@ -29,8 +29,12 @@ Files to report: `MEMORY.md`、`user-env.ps1`、`.ssh/hetzner_trigger`、`.ssh/i
 If import did not run (hook missing / E:\ not mounted / G:\ not accessible), write「import 未執行 — [原因]」and list what needs to be fixed.
 
 **2. 外部信號**
+Read `agency-os/.agency-state/external-signals-digest.json` (written by fetch-external-signals.ps1).
+If `since_utc` in the digest is more than 2 hours older than current time AND the user's question implies a specific range, automatically run `/signals` with the correct `-From`/`-To` before outputting this section.
+
 Telegram @awarewave_ops_bot: 未讀數量 + 可操作項條列（無則寫「本輪無未讀」）
 Slack #ops-incidents / #infra-alerts: 未讀數量 + 最新一筆（無法讀取時寫「無法讀取 — 請手動確認」）
+Cloudflare security: report result from `agency-os/reports/status/cf-security-LATEST.md` (bot=ON/OFF, rules=N) — skip if file missing.
 Only include actionable items; skip routine noise.
 
 **3. 已完成**

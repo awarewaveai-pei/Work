@@ -22,7 +22,12 @@
 param(
     [string]$WorkRoot      = "",
     [int]$MaxLookbackHours = 24,
-    [int]$SlackMaxPerChan  = 5
+    [int]$SlackMaxPerChan  = 5,
+    # Optional explicit time range (ISO 8601 or "yyyy-MM-dd HH:mm", CST or UTC).
+    # When -From is set it overrides ao-close-last.txt as the since anchor.
+    # When -To is set it caps the query end (Slack latest= + digest until=).
+    [string]$From          = "",
+    [string]$To            = ""
 )
 
 Set-StrictMode -Version Latest
@@ -40,25 +45,64 @@ $null = New-Item -ItemType Directory -Force -Path $stateDir
 
 Write-Host "== fetch-external-signals: building digest ==" -ForegroundColor Cyan
 
-# --- determine "since" timestamp (ao-close stamp preferred, ao-resume fallback) ---
+# --- determine "since" / "until" timestamps ---
 $sinceUtc = $null
-foreach ($stampFile in @("ao-close-last.txt", "ao-resume-last.txt")) {
-    $f = Join-Path $stateDir $stampFile
-    if (Test-Path -LiteralPath $f) {
-        try {
-            $raw = (Get-Content -LiteralPath $f -Raw -Encoding UTF8).Trim()
-            $sinceUtc = [DateTime]::Parse($raw, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
-            Write-Host "   since: $raw (from $stampFile)" -ForegroundColor DarkGray
-            break
-        } catch {}
+$untilUtc = $null
+
+# -From override: explicit start (supports "yyyy-MM-dd HH:mm" in CST or ISO UTC)
+if ($From) {
+    try {
+        if (-not $From.Contains("Z") -and -not $From.Contains("+")) {
+            # No timezone: treat as CST (UTC+8) → subtract 8h to get UTC
+            $parsed  = [DateTime]::Parse($From, $null, [System.Globalization.DateTimeStyles]::None)
+            $sinceUtc = [DateTime]::SpecifyKind($parsed.AddHours(-8), [DateTimeKind]::Utc)
+        } else {
+            $sinceUtc = [DateTime]::Parse($From, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+        }
+        Write-Host "   since: $From (from -From param, UTC=$($sinceUtc.ToString('o')))" -ForegroundColor DarkGray
+    } catch {
+        Write-Host "   WARN: -From '$From' parse failed, using ao-close stamp" -ForegroundColor Yellow
+        $sinceUtc = $null
+    }
+}
+
+# Stamp fallback when -From not provided
+if (-not $sinceUtc) {
+    foreach ($stampFile in @("ao-close-last.txt", "ao-resume-last.txt")) {
+        $f = Join-Path $stateDir $stampFile
+        if (Test-Path -LiteralPath $f) {
+            try {
+                $raw = (Get-Content -LiteralPath $f -Raw -Encoding UTF8).Trim()
+                $sinceUtc = [DateTime]::Parse($raw, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+                Write-Host "   since: $raw (from $stampFile)" -ForegroundColor DarkGray
+                break
+            } catch {}
+        }
     }
 }
 if (-not $sinceUtc) {
     $sinceUtc = (Get-Date).ToUniversalTime().AddHours(-$MaxLookbackHours)
     Write-Host "   since: no stamp found, using last $MaxLookbackHours h" -ForegroundColor DarkYellow
 }
-$sinceIso   = $sinceUtc.ToString("o")
-$sinceEpoch = [long]($sinceUtc - [DateTime]::new(1970,1,1,0,0,0,[DateTimeKind]::Utc)).TotalSeconds
+
+# -To override: explicit end cap
+if ($To) {
+    try {
+        $untilUtc = [DateTime]::Parse($To, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+        if (-not $To.Contains("Z") -and -not $To.Contains("+")) {
+            $untilUtc = $untilUtc.AddHours(-8)
+        }
+        Write-Host "   until: $To (from -To param, UTC=$($untilUtc.ToString('o')))" -ForegroundColor DarkGray
+    } catch {
+        Write-Host "   WARN: -To '$To' parse failed, ignoring upper bound" -ForegroundColor Yellow
+        $untilUtc = $null
+    }
+}
+
+$sinceIso    = $sinceUtc.ToString("o")
+$sinceEpoch  = [long]($sinceUtc - [DateTime]::new(1970,1,1,0,0,0,[DateTimeKind]::Utc)).TotalSeconds
+$untilIso    = if ($untilUtc) { $untilUtc.ToString("o") } else { $null }
+$untilEpoch  = if ($untilUtc) { [long]($untilUtc - [DateTime]::new(1970,1,1,0,0,0,[DateTimeKind]::Utc)).TotalSeconds } else { $null }
 
 # --- load vault ---
 $vaultStore = $null
@@ -95,6 +139,7 @@ $opsToken = Get-Secret "OPS_INBOX_INGEST_TOKEN"
 if ($opsToken) {
     try {
         $uri  = "$opsBase/api/ops/inbox/digest?since=$([Uri]::EscapeDataString($sinceIso))"
+        if ($untilIso) { $uri += "&until=$([Uri]::EscapeDataString($untilIso))" }
         $resp = Invoke-RestMethod -Uri $uri `
                     -Headers @{ Authorization = "Bearer $opsToken" } `
                     -TimeoutSec 10 -ErrorAction Stop
@@ -151,6 +196,7 @@ if (-not $slackToken) {
         }
         try {
             $uri  = "https://slack.com/api/conversations.history?channel=$chId&oldest=$sinceEpoch&limit=20&inclusive=false"
+            if ($untilEpoch) { $uri += "&latest=$untilEpoch" }
             $resp = Invoke-RestMethod -Uri $uri `
                         -Headers @{ Authorization = "Bearer $slackToken" } `
                         -TimeoutSec 10 -ErrorAction Stop

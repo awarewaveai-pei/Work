@@ -57,7 +57,7 @@ Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claud
 修改 `/etc/default/*.local` 後 > 5 分鐘才再使用：`stat -c "mtime=%y" <file>` 確認 mtime 未被另一 session 覆蓋。
 
 ## 緊急 Runbooks
-`runbooks/`：502/OOM、加密挖礦入侵、安全事件、Cloudflare WAF、Codex 設定錯誤。
+`runbooks/`：502/OOM（含 base64 SSH pattern）、加密挖礦入侵、安全事件、Cloudflare WAF、Codex 設定錯誤。
 
 ## Slash Commands（`.claude/commands/`，git 追蹤）
 | 指令 | 用途 |
@@ -74,6 +74,7 @@ Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claud
 | `/sg-deploy` | SG VPS sg-deploy.sh |
 | `/sg-reboot` | SG VPS 安全重啟（pre/post-flight） |
 | `/check-drift` | SG prod vs origin/main drift |
+| `/signals` | Slack + Telegram 訊息查詢（支援時段：`/signals [from] [to]`，CST）|
 | `/client-onboarding` | 新客戶 onboarding（Supabase + SSH + MainWP） |
 | `/vault-sync` | vault → Windows env |
 | `/vault-status` | vault key 清單 |

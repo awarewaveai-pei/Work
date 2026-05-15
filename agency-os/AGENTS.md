@@ -18,6 +18,15 @@
 - 目前約定心跳頻率：每 **15 分鐘** 回報一次
 - 使用者輸入 `進度?` 時，需立即回覆「目前在做什麼 / 有無阻塞 / 下一步」
 
+## 代理自動工具使用規則（Claude 主動執行，不等使用者開口）
+
+| 觸發情境 | 代理必須立即執行 |
+|---------|--------------|
+| 使用者問某段時間的 Slack / Telegram 訊息、告警、incident | `/signals [from] [to]` — 用 `scripts/fetch-external-signals.ps1 -From ... -To ...`；解析時間（無時區預設 CST/UTC+8） |
+| AO-RESUME 外部信號段落：digest 的 `since_utc` 比需要範圍早 > 2 小時 | 自動補跑 `/signals -From <需要起點>` 再輸出 |
+| AO-RESUME：每次一定要讀 `reports/status/cf-security-LATEST.md`，把 CF 安全狀態列入外部信號段 | 讀檔後回報 bot=ON/OFF / rules=N；不用重新跑腳本除非檔案 mtime > 24h |
+| 使用者問 Cloudflare 設定是否正常 | 執行 `scripts/check-cloudflare-security.ps1` 並回報 |
+
 ## MCP／外掛分工（何時用哪個工具）
 - **完整表**（與 repo 根 `mcp.json` 鍵對齊、含 LLM 分流與龍蝦 Routing 對照）：**`docs/operations/cursor-mcp-and-plugin-inventory.md`**。
 - **龍蝦自動化強制規格**（誰可 orchestrate、核准、rollback）：`../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`（**不**被 IDE MCP 清單取代）。

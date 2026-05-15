@@ -142,3 +142,25 @@ VNC 輸入特殊字元常出問題（`@` → `2`、`&&` → `77`）。
 python3 -c "import base64; open('/root/.ssh/authorized_keys','w').write(base64.urlsafe_b64decode('c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUs0aWhQaWVrbm5kK204VlZXRW05U092TFkxSlBYVGxnbXVwMUQrYWl2RFAgdXNlckBERVNLVE9QLU4zMzU5NUkK').decode()); print('OK')"
 ```
 3. 最終解法：用 Rescue Mode（見上方）
+
+---
+
+## 附錄：SSH 複雜 bash 指令用 base64 傳輸（避免引號地獄）
+
+**問題**：透過 SSH 執行包含單引號 `'`（如 `grep -E '(pattern)'`）的複雜 bash 腳本時，
+`bash -lc "..."` 包裝後單引號失效，`(` 會觸發 `syntax error near unexpected token '('`。
+
+**解法**（PowerShell 端）：
+```powershell
+$script = @"
+set -eu
+grep -E '[A-Z_]*(:-|:=)' /path/to/file
+"@
+$b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($script))
+$cmd = "echo $b64 | base64 -d | bash -l"
+& ssh -i $keyPath "root@$host" $cmd
+```
+
+**原則**：凡腳本含單引號、`grep -E`、awk、sed 等可能有 `(` 的複雜邏輯，
+一律用 base64 pipe，不要用 `bash -lc "..."` 拼接字串。
+參考實作：`scripts/check-backup-health.ps1`（lines 86-88）。

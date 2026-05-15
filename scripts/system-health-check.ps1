@@ -536,6 +536,27 @@ if (Test-Path $driftScript) {
     Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail "Skipped: scripts/check-deploy-drift.ps1 not present"
 }
 
+# 9) Cloudflare security posture (warn-only informational check).
+$cfScript = Join-Path $root "scripts/check-cloudflare-security.ps1"
+if (Test-Path $cfScript) {
+    try {
+        $cfOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $cfScript -WorkRoot $root 2>&1 | Out-String
+        if ($cfOut -match "PASS") {
+            $detail = ($cfOut -split "`n" | Where-Object { $_ -match "bot=" } | Select-Object -First 1).Trim()
+            Add-Check -Name "Cloudflare security (bot+WAF)" -Pass $true -Detail $detail
+        } elseif ($cfOut -match "SKIP") {
+            Add-Check -Name "Cloudflare security (bot+WAF)" -Pass $true -Detail "Skipped: no API token"
+        } else {
+            $detail = ($cfOut -split "`n" | Where-Object { $_ -match "bot=" } | Select-Object -First 1).Trim()
+            Add-Check -Name "Cloudflare security (bot+WAF)" -Pass $true -Detail "WARN: $detail (see reports/status/cf-security-LATEST.md)"
+        }
+    } catch {
+        Add-Check -Name "Cloudflare security (bot+WAF)" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+    }
+} else {
+    Add-Check -Name "Cloudflare security (bot+WAF)" -Pass $true -Detail "Skipped: check-cloudflare-security.ps1 not present"
+}
+
 $total = $checks.Count
 $passed = @($checks | Where-Object { $_.pass }).Count
 $failed = $total - $passed
