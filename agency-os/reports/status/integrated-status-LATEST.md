@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-14 18:42:41
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-05-15 15:33:46
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -219,41 +219,56 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-14.md
-# 2026-05-14
+## 5) memory/daily/2026-05-15.md
+# Daily Note - 2026-05-15
 
 ## Done today
-
-- **早班（前次 session）**：Cloudflare Layer 4 IP Lock + fail2ban 雙 jail；Claude Haiku primary AI；sync-claude-userlevel false positive 永久修復；`AO_SYNC_SECRETS_ROOT` 修正為 Google Drive 路徑；Cryptomator vault 掛載完成。
-- **下午班（本 session）**：
-  - TASKS.md 5 項 `[x]` 打勾（AO-RESUME 提醒系列 + 雙機環境對齊）
-  - AO-RESUME 格式升級：七段式（外部信號段新增）
-  - 未完成待辦強制按 `####` 分類輸出（兩份 `.cursor/rules/30-resume-keyword.mdc` 同步）
-  - `scripts/fetch-external-signals.ps1` 新建：Telegram digest + Slack history；always exit 0
-  - `scripts/ao-close.ps1` 修改：寫 `ao-close-last.txt` 作為離線期間起點
-  - `scripts/ao-resume.ps1` 修改：呼叫 `fetch-external-signals.ps1`
-  - `.claude/commands/ao-resume.md` 升級至七段式
-  - `/api/ops/inbox/digest` route.ts 建立並部署 SG（`eaa3332`）
-  - Slack channel IDs 入 vault：`C0B004HJYV8`（ops-incidents）、`C0AUQ7J5789`（infra-alerts）
-  - Vault 修正：`SLACK_BOT_TOKEN` 更新、`OPS_INBOX_INGEST_TOKEN` 修正至 SG 正確值
-  - `mcp/user-env.ps1` 新增 `OPS_INBOX_INGEST_TOKEN` + 更新 `SLACK_BOT_TOKEN`
-  - `fetch-external-signals.ps1` 編碼修正（Unicode `…` → ASCII `...`）
-  - `AWARE_WAVE_CREDENTIALS.md` 更新（Slack App 憑證 + Channel IDs）
-  - `AO_SYNC_SECRETS_ROOT` 修正為 `G:\我的雲端硬碟\MySecretVault`
-  - 端到端驗證：Telegram ok (16 msg) + Slack #ops-incidents ok (5 msg) + Slack #infra-alerts ok (5 msg)
+- Hook `ao-resume-on-prompt.ps1`：全面清除剩餘 `*>&1`（lines 96、139），兩處 checkpoint 呼叫改 `2>&1`；LIVE + SSOT 同步，commit `e725f3f`
+- 驗證 vault `user-env.ps1`（G:\...）語法正常、無 `ANTHROPIC_API_KEY`、Slack IDs 存在、SHA256 與本機相同
+- 12/12 全項 PASS：Hook、AGENTS.md、ao-resume.md 匯入區塊、AO_SYNC env vars、vault ↔ local 一致
 
 ## Current state
+- Hook 三個 powershell.exe 呼叫全部 `2>&1`，AO-RESUME hook 崩潰問題已根治
+- AO-SYNC 跨機同步路徑正確（G:\ Google Drive 直接路徑，不依賴 Cryptomator 掛載）
+- 進程環境 `AO_SYNC_ROOT`/`AO_SYNC_SECRETS_ROOT` 為舊值（下次 IDE 重啟自動更新）
 
-- 外部信號整合完成，下次 AO-RESUME 會自動顯示 Telegram + Slack 離線訊息
-- Slack token 需留意：`xoxp` admin token 可讀頻道，若輪替需更新 vault + user-env.ps1
-- SG 部署至 `eaa3332` / `5763a50` commit
-- AO_SYNC_SECRETS_ROOT 已修正，AO-CLOSE export 會將 user-env.ps1 / .ssh / CREDENTIALS 寫入 Google Drive
+## Next steps
+- 桌機開工後確認 `sync-claude-userlevel.ps1 -Mode merge` 同步最新 hook 修正
+- Termius 手機 SSH 設定（出國前必做）
+- Soulful Expression Day 1 §1.1（操作者登入確認）
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:3d3e90778715723cc2a1b492884f12bcb1148914dd1159774cb19313225bbc09 -->
+
+### claude-code 2026-05-15 07:30
+
+- **完成（一句）**: Hook 全面修復（*>&1→2>&1 lines 96/139）+ AO-SYNC 跨機同步完整驗證
+- **變更路徑**:
+  - `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`
+  - `agency-os/WORKLOG.md`
+- **Git**: e725f3f
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 進程環境 AO_SYNC_ROOT/SECRETS_ROOT 仍為舊值；下次 IDE 重啟後自動更新
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:d28f4513e01d568c31b57c36a0f82864ea953083e2bc73d0d1b453f399e8d2ad -->
+
+### claude-code 2026-05-15 07:31
+
+- **完成（一句）**: Hook *>&1 全面修復（lines 96/139）+ 12/12 驗證 PASS
+- **變更路徑**:
+  - `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/daily/2026-05-15.md`
+- **Git**: e725f3f
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 進程 env vars 為舊值，IDE 重啟後自動更新
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-14 18:42:32`
+- Time: `2026-05-15 15:33:40`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -263,13 +278,14 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260514-184232.md`
-- Closeout: `reports/closeout/closeout-20260514-184227.md`
+- Health: `reports/health/health-20260515-153340.md`
+- Closeout: `reports/closeout/closeout-20260515-153332.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+- `git pull origin main`：**Already up to date**。
 - `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
 - `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
 
@@ -328,6 +344,5 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
 
 

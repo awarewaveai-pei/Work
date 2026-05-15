@@ -1,6 +1,57 @@
-# Worklog
+﻿# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
+
+## 2026-05-15
+
+### Hook *>&1 全面修復 + AO-SYNC 跨機同步驗證（筆電班）
+
+**根因 / 目標**：延續 2026-05-14 的 AO-RESUME hook 修復，全面清除剩餘 `*>&1` 風險，並驗證昨日所有 AO-SYNC 路徑修正均正確生效。
+
+**完成項目**：
+
+1. **Hook 全面修復（commit `e725f3f`）** — `ao-resume-on-prompt.ps1` 內另有兩處 checkpoint 呼叫（lines 96、139）仍用 `*>&1`；昨日僅修了 line 162（ao-resume.ps1 呼叫）。本輪全部改為 `2>&1`，同時更新 LIVE（`~/.claude/hooks/`）與 SSOT（`mcp/claude-userlevel/hooks/`）；兩檔 line-by-line 一致（SHA256 差異為 CRLF/LF 編碼，內容相同）。
+2. **Vault `user-env.ps1` 驗證通過** — `G:\我的雲端硬碟\MySecretVault\MySecretVault\user-env.ps1`：PowerShell parser 語法 OK，`ANTHROPIC_API_KEY` 不存在，Slack channel ID 存在，SHA256 與本機 `mcp/user-env.ps1` 完全相同。（昨日疑似有 `$insert` 汙染，本輪確認已修復。）
+3. **全項驗證通過（12/12 PASS）**：
+   - Hook（LIVE + SSOT）：零 `*>&1`
+   - AGENTS.md：三處 `七段式`，零 `五段式`
+   - `.claude/commands/ao-resume.md`：跨機匯入 per-file 狀態區塊存在
+   - `export-cross-machine-memory.ps1`：header 路徑為 G:\ 正確路徑
+   - Windows User env：`AO_SYNC_ROOT = G:\...\MySecretVault\MySecretVault\AO-SYNC`；`AO_SYNC_SECRETS_ROOT = G:\...\MySecretVault\MySecretVault`
+   - Vault + local `user-env.ps1`：SHA256 相同，無 `ANTHROPIC_API_KEY`，Slack IDs 存在
+
+**避免再發生**：  
+- 下次修改 hook 時，搜尋整個檔案的 `*>&1`（非只改某一行），確保全部替換為 `2>&1`。  
+- SSOT (`mcp/claude-userlevel/hooks/`) 與 LIVE (`~/.claude/hooks/`) 必須 line-by-line 一致；用 `sync-claude-userlevel.ps1 -Mode merge` 同步後再 `-Mode verify`。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:3d3e90778715723cc2a1b492884f12bcb1148914dd1159774cb19313225bbc09 -->
+
+### claude-code 2026-05-15 07:30
+
+- **完成（一句）**: Hook 全面修復（*>&1→2>&1 lines 96/139）+ AO-SYNC 跨機同步完整驗證
+- **變更路徑**:
+  - `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`
+  - `agency-os/WORKLOG.md`
+- **Git**: e725f3f
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 進程環境 AO_SYNC_ROOT/SECRETS_ROOT 仍為舊值；下次 IDE 重啟後自動更新
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:d28f4513e01d568c31b57c36a0f82864ea953083e2bc73d0d1b453f399e8d2ad -->
+
+### claude-code 2026-05-15 07:31
+
+- **完成（一句）**: Hook *>&1 全面修復（lines 96/139）+ 12/12 驗證 PASS
+- **變更路徑**:
+  - `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/daily/2026-05-15.md`
+- **Git**: e725f3f
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 進程 env vars 為舊值，IDE 重啟後自動更新
 
 ## 2026-05-14
 
@@ -2518,7 +2569,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-14 10:42:25 UTC_
+_Last synced: 2026-05-15 07:33:31 UTC_
 
 ## 2026-03-20
 
@@ -2952,5 +3003,4 @@ _Last synced: 2026-05-14 10:42:25 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
 
