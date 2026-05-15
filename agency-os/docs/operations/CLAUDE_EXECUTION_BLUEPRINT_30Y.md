@@ -315,9 +315,23 @@ Outcome target: functionality parity with less tooling, zero governance drift.
 - `agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` — machine startup + AO-RESUME
 - `agency-os/TASKS.md` — open tasks
 - `agency-os/WORKLOG.md` — evidence log
-- `.claude/commands/` — slash command definitions (`/ao-resume`, `/ao-close`, `/verify`, `/health`, `/doc-sync`, `/build-tenant`, `/smoke-test`)
+- `.claude/commands/` — slash command definitions:
+  - AO lifecycle: `/ao-resume`, `/ao-close`, `/checkpoint`, `/recap`
+  - Health / gates: `/health`, `/verify`, `/smoke-test`, `/check-drift`
+  - Docs: `/doc-sync`, `/tasks`
+  - Infra / deploy: `/sg-deploy`, `/sg-reboot`
+  - Observability: `/signals` (Slack + Telegram 時段查詢，auto-triggered)
+  - Security: `/vault-sync`, `/vault-status`
+  - Client / WP: `/client-onboarding`, `/client-status`, `/build-tenant`, `/wp-maintenance`
+  - Testing: `/playwright`
+  - Decision: `/decide`, `/strategy-review`
+  - Misc: `/fix-sidebars`
 - `.claude/agents/repair-agent.md` — system diagnostic subagent
 - `.claude/agents/site-builder.md` — tenant provisioning subagent
+- `.claude/agents/trigger-deploy-agent.md` — Trigger.dev EU deploy subagent
+- `.claude/agents/client-onboarding.md` — client onboarding subagent
+- `.claude/agents/wordpress-maintenance-agent.md` — WP maintenance subagent
+- `.claude/agents/decision-intelligence.md` — 18-stage decision review subagent
 
-_Last updated: 2026-05-06_
+_Last updated: 2026-05-15_
 

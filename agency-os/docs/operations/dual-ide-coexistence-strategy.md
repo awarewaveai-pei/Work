@@ -65,9 +65,13 @@
 | 檔案 | 用途 |
 |------|------|
 | `CLAUDE.md` | 專案指令（自動讀取 `@AGENTS.md`） |
-| `.claude/commands/*.md` | Slash commands（`/ao-resume`、`/ao-close`、`/health` 等） |
+| `.claude/commands/*.md` | Slash commands — 完整列表見 `CLAUDE.md §Slash Commands`（含 `/signals`、`/sg-deploy`、`/playwright` 等 24 個） |
 | `.claude/agents/repair-agent.md` | 系統診斷 subagent |
 | `.claude/agents/site-builder.md` | 租戶佈建 subagent |
+| `.claude/agents/trigger-deploy-agent.md` | Trigger.dev EU 部署 subagent |
+| `.claude/agents/client-onboarding.md` | 新客戶 onboarding subagent |
+| `.claude/agents/wordpress-maintenance-agent.md` | WP 維護 subagent |
+| `.claude/agents/decision-intelligence.md` | 18 階段決策評審 subagent |
 | `~/.claude/settings.json` | hooks + permissions（user-level，不進 git） |
 | `~/.claude/hooks/ao-resume-on-prompt.ps1` | Claude Code AO-RESUME hook 腳本（user-level，不進 git） |
 | `~/.claude/hooks/branch-protection.js` | 分支保護 hook（user-level，不進 git） |
@@ -131,8 +135,8 @@
 ### 從 git repo 自動同步的（不需手動複製）
 
 `git clone` 或 `git pull` 後即可用：
-- `.claude/commands/` — 所有 slash commands（`/ao-resume`、`/ao-close` 等）
-- `.claude/agents/` — 專案 subagents（`repair-agent`、`site-builder`）
+- `.claude/commands/` — 所有 slash commands（完整列表見 `CLAUDE.md §Slash Commands`）
+- `.claude/agents/` — 專案 subagents（`repair-agent`、`site-builder`、`trigger-deploy-agent`、`client-onboarding`、`wordpress-maintenance-agent`、`decision-intelligence`）
 - `CLAUDE.md`、`agency-os/AGENTS.md` — 指令與治理規則
 - `scripts/ao-resume.ps1`、`scripts/ao-close.ps1` — 開工收工腳本
 - `.mcp.json` — MCP 伺服器定義（機密由環境變數填入）
