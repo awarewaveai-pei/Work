@@ -43,6 +43,16 @@ ruler:
 ingester:
   max_chunk_age: 24h
 
+# Compactor runs retention deletion against boltdb-shipper indexes.
+# working_directory must be on the same volume as /loki.
+compactor:
+  working_directory: /loki/boltdb-shipper-compactor
+  shared_store: filesystem
+  retention_enabled: true
+  compaction_interval: 10m
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+
 limits_config:
   unordered_writes: true
   ingestion_rate_mb: 32
@@ -53,6 +63,8 @@ limits_config:
   per_stream_rate_limit_burst: 128M
   reject_old_samples: true
   reject_old_samples_max_age: 720h
+  # Retain logs for 30 days; compactor enforces deletion
+  retention_period: 720h
 
 analytics:
   reporting_enabled: false

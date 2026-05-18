@@ -1,0 +1,24 @@
+# Uptime Kuma — EU server (204.168.175.41)
+# Use this file to recreate the container with correct settings.
+# Live data is in the named Docker volume "uptime-kuma" (/app/data).
+#
+# To recreate: docker compose -f /root/uptime-kuma-compose.yml up -d
+# To stop:     docker compose -f /root/uptime-kuma-compose.yml down  (preserves volume)
+#
+# Memory limit (512 MB) added 2026-05-18 to prevent swap pressure
+# under Trigger.dev runner bursts on this server.
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    network_mode: host
+    mem_limit: 512m
+    memswap_limit: 512m
+    volumes:
+      - uptime-kuma:/app/data
+
+volumes:
+  uptime-kuma:
+    external: true
