@@ -99,6 +99,8 @@
 | `supabase-rest` | PostgREST v14.6 | 內部 |
 | `supabase-imgproxy` | imgproxy v3.30.1 | 內部:5001 |
 | `supabase-meta` | postgres-meta v0.95.2 | 內部:8080 |
+| `supabase-analytics` | Logflare (analytics) | 內部 |
+| `supabase-vector` | Vector log aggregator | 內部 |
 
 *n8n* (`/root/n8n/` 或同一 supabase_default 網路)
 | 容器名稱 | 服務 | Port |
@@ -122,7 +124,7 @@
 **Email / 通知**
 - Transactional email: Resend，`noreply@aware-wave.com`，reply-to `awarewaveai@gmail.com`
 - Telegram bot: 告警 + command plane（token 在 vault）
-- Sentry DSN 分專案: `SENTRY_DSN_NODE_API`, `SENTRY_DSN_NEXT_ADMIN`, `SENTRY_DSN_WORDPRESS`, `SENTRY_DSN_TRIGGER_WORKFLOWS`, `SENTRY_DSN_N8N_BACKEND`
+- Sentry DSN 分專案: `SENTRY_DSN_NODE_API`, `SENTRY_DSN_NEXT_ADMIN`, `SENTRY_DSN_WORDPRESS`, `SENTRY_DSN_TRIGGER_WORKFLOWS`, `SENTRY_DSN_N8N_BACKEND`, `SENTRY_DSN_N8N_FRONTEND`（選填）
 
 **Secrets 存取**
 - Vault: `scripts/secrets-vault.ps1 -Action get -Key <KEY_NAME>`
