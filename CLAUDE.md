@@ -5,33 +5,6 @@
 
 ## 核心規範（每次適用）
 
-### R0：架構師模式（所有任務強制，優先級最高）
-
-你是本專案的資深系統架構師、工程師、技術負責人、PM 與 QA 負責人。
-目標不是快速產生程式碼，而是完整理解現有系統後，做出最小、穩定、安全、可維護、可驗證、可回滾的修改，能穩定運行 30 年。
-
-**修改任何檔案前，必須先輸出以下區塊，等待明確批准後才可動手：**
-[任務理解] 根本問題是什麼（非表面症狀）
-[現況分析] 已讀的相關檔案、架構、依賴、資料流、控制流與既有慣例
-[風險清單] 衝突、重工、相容性、安全、資料一致性問題
-[方案比較] 方案A最小修改 vs 方案B較完整，各附優缺點／風險／rollback
-[建議方案] 推薦哪個，為什麼它最穩定低風險
-[實作計畫] 具體步驟與預計修改檔案
-[驗證計畫] 測試、lint、build、手動檢查或其他驗證方式
-
-**修改完成後，必須輸出：**
-[已修改] 逐項列出檔案與修改原因
-[驗證結果] 實際執行的檢查；無法執行需明說，不得假裝已驗證
-[剩餘風險] 仍存在的不確定點
-[rollback] 如何安全回復
-
-**禁止：**
-未讀現有邏輯即重寫 / 建立與現有功能重複的模組 / 猜測補未知（必須標記「不確定」並說明查證方式）
-刪除未確認為無用的檔案、API、Migration / 硬編密鑰 / 為通過眼前測試加臨時 workaround
-
-**遇到以下情況立即停止並回報，不得硬做：**
-需求與現有架構衝突 / 缺少關鍵資訊 / 可能資料遺失 / 可能安全風險 / 無法驗證結果 / 取捨會影響產品方向
-
 ### Commit Prefix（強制）
 每個 commit 第一行：`[claude]`、`[cursor]`、`[codex]` 其中一個（全小寫、半形方括號 + 半形空白）。預設 `[claude]`。
 
@@ -127,10 +100,8 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 `agency-os/` — AO 治理（TASKS/WORKLOG/memory/docs/runbooks）；`lobster-factory/` — 龍蝦工廠（clients/infra/packages/workflows）；`scripts/` — 全域腳本；`mcp/` — MCP registry + user-level SSOT；`agency-os/tenants/` — 每客戶設定（`<slug>/core/ENVIRONMENT_REGISTRY.md` = Staging URL SSOT）。
 
 ### 伺服器邊界（**不可混用**）
-| 代號 | IP | 服務 |
-|------|-----|------|
-| **SG** | 5.223.93.113 | phase1-core Docker（nginx / next-admin / node-api / wordpress / redis） |
-| **EU** | 204.168.175.41 | Trigger.dev **v4** + ClickHouse **25.7.x**（禁升 latest / 24.x）+ Supabase + n8n + MainWP + Uptime Kuma + registry:5000 |
+SG `5.223.93.113` / EU `204.168.175.41` — 容器細節見 AGENTS.md §AwareWave Stack。  
+ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。
 
 ### 龍蝦 Routing 三件套（同一 PR 必須同步）
 `lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `lobster-factory/workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md` — 任一改動必須三份同步，否則 routing drift。
