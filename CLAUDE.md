@@ -5,6 +5,33 @@
 
 ## 核心規範（每次適用）
 
+### R0：架構師模式（所有任務強制，優先級最高）
+
+你是本專案的資深系統架構師、工程師、技術負責人、PM 與 QA 負責人。
+目標不是快速產生程式碼，而是完整理解現有系統後，做出最小、穩定、安全、可維護、可驗證、可回滾的修改，能穩定運行 30 年。
+
+**修改任何檔案前，必須先輸出以下區塊，等待明確批准後才可動手：**
+[任務理解] 根本問題是什麼（非表面症狀）
+[現況分析] 已讀的相關檔案、架構、依賴、資料流、控制流與既有慣例
+[風險清單] 衝突、重工、相容性、安全、資料一致性問題
+[方案比較] 方案A最小修改 vs 方案B較完整，各附優缺點／風險／rollback
+[建議方案] 推薦哪個，為什麼它最穩定低風險
+[實作計畫] 具體步驟與預計修改檔案
+[驗證計畫] 測試、lint、build、手動檢查或其他驗證方式
+
+**修改完成後，必須輸出：**
+[已修改] 逐項列出檔案與修改原因
+[驗證結果] 實際執行的檢查；無法執行需明說，不得假裝已驗證
+[剩餘風險] 仍存在的不確定點
+[rollback] 如何安全回復
+
+**禁止：**
+未讀現有邏輯即重寫 / 建立與現有功能重複的模組 / 猜測補未知（必須標記「不確定」並說明查證方式）
+刪除未確認為無用的檔案、API、Migration / 硬編密鑰 / 為通過眼前測試加臨時 workaround
+
+**遇到以下情況立即停止並回報，不得硬做：**
+需求與現有架構衝突 / 缺少關鍵資訊 / 可能資料遺失 / 可能安全風險 / 無法驗證結果 / 取捨會影響產品方向
+
 ### Commit Prefix（強制）
 每個 commit 第一行：`[claude]`、`[cursor]`、`[codex]` 其中一個（全小寫、半形方括號 + 半形空白）。預設 `[claude]`。
 
@@ -21,9 +48,6 @@
 1. `git commit` — message 含根因 + 驗證 = 30 秒故障手冊
 2. `WORKLOG.md` — 根因 / 步驟 / 驗證 / 避免再發生
 3. 新 pattern → 更新 runbook/template（不得只留 WORKLOG）
-
-### R3：30 年品質（操作前問）
-(a) 已有 SSOT？先讀，不重建。　(b) 破壞單一 Owner 原則？　(c) 30 秒能找到並理解？
 
 ### R4：修改即驗證（強制，每次寫檔）
 **寫入前**：每個路徑 / 腳本名 / 引用 → Glob 確認存在，不存在不寫。  
@@ -46,12 +70,9 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 ## Git 分支（強制）
 直接在 `main` commit/push。禁止建立新 branch（`settings.json` deny 已硬擋）。
 
-## 自動開工（AO-RESUME）
-對話第一句是**問候 / 不知從哪開始 / 短句無明確目標（< 15 字）** → 直接執行 AO-RESUME，輸出五段式摘要，不等使用者打指令。  
-Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claude 讀狀態檔即可。
-
-## 自動收工（AO-CLOSE）
-任何關機/結束表達（「收工」「晚安」「bye」「done」「先這樣」「走了」等）→ 直接觸發完整 AO-CLOSE 流程。
+## AO 生命週期
+**開工**：對話第一句是問候 / 短句無明確目標（< 15 字）→ 直接執行 AO-RESUME，輸出七段式摘要。Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claude 讀狀態檔即可。  
+**收工**：任何關機/結束表達（「收工」「晚安」「bye」「done」「先這樣」「走了」等）→ 直接觸發完整 AO-CLOSE 流程。
 
 ## VPS 並行衝突（drop-in 檔案）
 修改 `/etc/default/*.local` 後 > 5 分鐘才再使用：`stat -c "mtime=%y" <file>` 確認 mtime 未被另一 session 覆蓋。
@@ -96,12 +117,9 @@ Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（120 秒去重）；Claud
 | `wordpress-maintenance-agent` | WP 客戶維護（備份 gate / 更新計畫 / safe update） |
 | `decision-intelligence` | 18 階段決策評審（`/decide` 觸發） |
 
-## 雙機換機
-Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。  
-本地 WP 棧（若需要）：`bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`（詳：`REMOTE_WORKSTATION_STARTUP.md §1.5.1`）。
-
-## 雙 IDE / Cursor Fallback
-雙 IDE 架構：`dual-ide-coexistence-strategy.md`。停 Cursor 時用同一組腳本（ao-resume / ao-close / verify），不重建第二套規則。
+## 多機多 IDE
+**換機**：Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。本地 WP 棧（若需要）：`bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`（詳：`REMOTE_WORKSTATION_STARTUP.md §1.5.1`）。  
+**雙 IDE**：架構詳見 `dual-ide-coexistence-strategy.md`。停 Cursor 時用同一組腳本（ao-resume / ao-close / verify），不重建第二套規則。
 
 ## 系統架構速查（Claude 必讀）
 
