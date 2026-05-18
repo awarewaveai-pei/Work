@@ -21,10 +21,10 @@
 2. `WORKLOG.md` — 根因 / 步驟 / 驗證 / 避免再發生
 3. 新 pattern → 更新 runbook/template（不得只留 WORKLOG）
 
-### R4：修改即驗證（強制，每次寫檔）
+### R4：聲稱即驗證（強制，寫入與審查均適用）
 **寫入前**：每個路徑 / 腳本名 / 引用 → Glob 確認存在，不存在不寫。  
-**寫入後**：grep **你剛修的確切字串**（非全域掃描），範圍限 `.claude/ runbooks/ scripts/ agency-os/docs/ mcp/`，命中的一起修，同一 commit。  
-**原則**：改了什麼 → grep 那個字串；不做無目標全域掃描（浪費 token）。
+**寫入後**：grep **你剛修的確切字串**，範圍限 `.claude/ runbooks/ scripts/ agency-os/docs/ mcp/`，命中的一起修，同一 commit。  
+**審查時**：任何聲稱「列舉目錄內容 / 映射檔案 / 清單完整」的段落 → 必須 Glob/Grep 對照實際狀態，不得只讀文字。「看起來合理」≠「已驗證正確」。
 
 ## MCP 治理
 SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`。  
