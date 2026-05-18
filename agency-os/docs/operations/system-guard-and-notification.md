@@ -40,5 +40,5 @@
 - `RESUME_AFTER_REBOOT.md`
 - `scripts/system-guard.ps1`
 
-_Last synced: 2026-05-15 07:31:24 UTC_
+_Last synced: 2026-05-18 06:50:32 UTC_
 

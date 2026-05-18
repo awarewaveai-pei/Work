@@ -1,12 +1,21 @@
 {
     "mcpServers":  {
-                       "posthog":  {
-                                       "url":  "https://mcp.posthog.com/mcp",
-                                       "headers":  {
-                                                       "Authorization":  "Bearer ${env:POSTHOG_PERSONAL_API_KEY}"
-                                                   },
-                                       "type":  "http"
-                                   },
+                       "gemini-latest":  {
+                                             "args":  [
+                                                          "-NoProfile",
+                                                          "-ExecutionPolicy",
+                                                          "Bypass",
+                                                          "-File",
+                                                          "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
+                                                          "-Provider",
+                                                          "gemini"
+                                                      ],
+                                             "env":  {
+                                                         "GEMINI_MODEL":  "gemini-3.1-pro-preview",
+                                                         "GEMINI_API_KEY":  "${env:GEMINI_API_KEY}"
+                                                     },
+                                             "command":  "powershell"
+                                         },
                        "copilot":  {
                                        "url":  "https://api.githubcopilot.com/mcp",
                                        "headers":  {
@@ -70,22 +79,16 @@
                                                  },
                                          "command":  "cmd"
                                      },
-                       "grok-fast":  {
-                                         "args":  [
-                                                      "-NoProfile",
-                                                      "-ExecutionPolicy",
-                                                      "Bypass",
-                                                      "-File",
-                                                      "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-                                                      "-Provider",
-                                                      "xai"
-                                                  ],
-                                         "env":  {
-                                                     "GROK_MODEL":  "grok-4.20-reasoning",
-                                                     "XAI_API_KEY":  "${env:XAI_API_KEY}"
-                                                 },
-                                         "command":  "powershell"
-                                     },
+                       "n8n":  {
+                                   "args":  [
+                                                "${workspaceFolder}\\scripts\\run-n8n-mcp.mjs"
+                                            ],
+                                   "env":  {
+                                               "N8N_MCP_URL":  "${env:N8N_MCP_URL}",
+                                               "N8N_AUTH_BEARER_TOKEN":  "${env:N8N_AUTH_BEARER_TOKEN}"
+                                           },
+                                   "command":  "node"
+                               },
                        "cloudflare":  {
                                           "url":  "https://mcp.cloudflare.com/mcp",
                                           "headers":  {
@@ -115,22 +118,6 @@
                                                 },
                                         "command":  "cmd"
                                     },
-                       "claude-fast":  {
-                                           "args":  [
-                                                        "-NoProfile",
-                                                        "-ExecutionPolicy",
-                                                        "Bypass",
-                                                        "-File",
-                                                        "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-                                                        "-Provider",
-                                                        "anthropic"
-                                                    ],
-                                           "env":  {
-                                                       "ANTHROPIC_MODEL":  "claude-haiku-4-5-20251001",
-                                                       "ANTHROPIC_API_KEY":  "${env:ANTHROPIC_API_KEY}"
-                                                   },
-                                           "command":  "powershell"
-                                       },
                        "canva":  {
                                      "args":  [
                                                   "/c",
@@ -141,18 +128,6 @@
                                               ],
                                      "command":  "cmd"
                                  },
-                       "perplexity":  {
-                                          "args":  [
-                                                       "/c",
-                                                       "npx",
-                                                       "-y",
-                                                       "@perplexity-ai/mcp-server"
-                                                   ],
-                                          "env":  {
-                                                      "PERPLEXITY_API_KEY":  "${env:PERPLEXITY_API_KEY}"
-                                                  },
-                                          "command":  "cmd"
-                                      },
                        "chatgpt-latest":  {
                                               "args":  [
                                                            "-NoProfile",
@@ -197,6 +172,13 @@
                                               },
                                       "command":  "cmd"
                                   },
+                       "posthog":  {
+                                       "url":  "https://mcp.posthog.com/mcp",
+                                       "headers":  {
+                                                       "Authorization":  "Bearer ${env:POSTHOG_PERSONAL_API_KEY}"
+                                                   },
+                                       "type":  "http"
+                                   },
                        "replicate":  {
                                          "args":  [
                                                       "/c",
@@ -282,16 +264,18 @@
                                                     ],
                                            "command":  "cmd"
                                        },
-                       "n8n":  {
-                                   "args":  [
-                                                "${workspaceFolder}\\scripts\\run-n8n-mcp.mjs"
-                                            ],
-                                   "env":  {
-                                               "N8N_MCP_URL":  "${env:N8N_MCP_URL}",
-                                               "N8N_AUTH_BEARER_TOKEN":  "${env:N8N_AUTH_BEARER_TOKEN}"
-                                           },
-                                   "command":  "node"
-                               },
+                       "perplexity":  {
+                                          "args":  [
+                                                       "/c",
+                                                       "npx",
+                                                       "-y",
+                                                       "@perplexity-ai/mcp-server"
+                                                   ],
+                                          "env":  {
+                                                      "PERPLEXITY_API_KEY":  "${env:PERPLEXITY_API_KEY}"
+                                                  },
+                                          "command":  "cmd"
+                                      },
                        "gemini-fast":  {
                                            "args":  [
                                                         "-NoProfile",
@@ -308,37 +292,21 @@
                                                    },
                                            "command":  "powershell"
                                        },
-                       "claude-latest":  {
-                                             "args":  [
-                                                          "-NoProfile",
-                                                          "-ExecutionPolicy",
-                                                          "Bypass",
-                                                          "-File",
-                                                          "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-                                                          "-Provider",
-                                                          "anthropic"
-                                                      ],
-                                             "env":  {
-                                                         "ANTHROPIC_MODEL":  "claude-sonnet-4-6",
-                                                         "ANTHROPIC_API_KEY":  "${env:ANTHROPIC_API_KEY}"
-                                                     },
-                                             "command":  "powershell"
-                                         },
-                       "gemini-latest":  {
-                                             "args":  [
-                                                          "-NoProfile",
-                                                          "-ExecutionPolicy",
-                                                          "Bypass",
-                                                          "-File",
-                                                          "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
-                                                          "-Provider",
-                                                          "gemini"
-                                                      ],
-                                             "env":  {
-                                                         "GEMINI_MODEL":  "gemini-3.1-pro-preview",
-                                                         "GEMINI_API_KEY":  "${env:GEMINI_API_KEY}"
-                                                     },
-                                             "command":  "powershell"
-                                         }
+                       "grok-fast":  {
+                                         "args":  [
+                                                      "-NoProfile",
+                                                      "-ExecutionPolicy",
+                                                      "Bypass",
+                                                      "-File",
+                                                      "${workspaceFolder}\\scripts\\run-llm-mcp.ps1",
+                                                      "-Provider",
+                                                      "xai"
+                                                  ],
+                                         "env":  {
+                                                     "GROK_MODEL":  "grok-4.20-reasoning",
+                                                     "XAI_API_KEY":  "${env:XAI_API_KEY}"
+                                                 },
+                                         "command":  "powershell"
+                                     }
                    }
 }

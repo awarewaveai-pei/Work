@@ -3,6 +3,9 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-18 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-18 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:dffd3868a0c7cf68c8908298600396587b78cfa24ab8f2561ed3aaaecd93571b -->
+- **2026-05-18 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-18 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:93317e2f105c9b1ae44d60a1b028cca3d47a05ea4073975342b732d09de4b2c4 -->
+- **2026-05-18（桌機首次開工 — Git 假分歧修復 + API 驗證）**：桌機 4 天未用（上次 2026-05-14），AO-RESUME hook 在 git pull 前 auto-commit `ao-close-last.txt`（state 檔），造成假分歧（ahead=1, behind=44）。修法：`git reset HEAD~1` + 刪除衝突 state 檔 + `git pull --ff-only` → `0 0`，fast-forward 44 commits（包含筆電全部工作）。Anthropic API $5.81 補額後確認有效：建 Issue #10 觸發 `auto-repair-claude.yml` → success。GitHub MCP "Bad credentials" 為 stale process（PAT 有效，重啟 Claude Code 自動解決）。根本改善建議：state 檔類 dirty 不應觸發 auto-checkpoint。
 - **2026-05-15 17:25 → 2026-05-18 09:02（完整 session，7 個實質 commit）**：(1) AO-SYNC export mtime 修正（`baca9e4`）；(2) import 同機 local-ahead 邏輯修正（`4f58ae6`）；(3) ao-resume fallback Step 0 強制執行（`682c554`）；(4) web-researcher 強制直接引用規則（`9ce65c4`，178 行，首次版控）；(5) **200% agent 大稽核**（`b180251`）：修正 AGENTS.md 幻覺（WP volume / EU 漏列 10 容器 / 前端 stack），13 個 built-in agent .md 從 .gitignore 移出加入 git 版控（2302 行新增，15 檔案）；(6) AO-SYNC 加入 settings.json 匯出（`8102794`）；(7) Uptime Kuma fix runbook（`c74a773`，85 行）。ao-close push 完成，AO-SYNC 匯出 9 entries 含 settings.json。
 - **2026-05-15 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-15 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:f0fa8c38968e640f529c5d0fb863197db9bd941920a7864b7da0d15b50e9bc15 -->
 - **2026-05-15 下午（API 計費清理）**：VS Code Claude Code extension 在 console（API credits）模式下每次 git commit 自動觸發 ultrareview 平行多 agent review，導致「Failed to run review: insufficient funds」反覆彈出（API 餘額 $5.82）。修正三項：(1) 移除 claude-fast/claude-latest MCP server（registry.template.json + .mcp.json + ~/.claude/mcp.json），commit `7311689`；(2) auto-repair-claude.yml 改 Haiku + max-turns 10，降成本 ~90%，commit `016cdd6`；(3) ~/.claude/settings.json 加 `disableAgentView: true` + `forceLoginMethod: "claudeai"`，強制走 Max 訂閱額度。VS Code 尚未重開——需重啟 IDE 驗證彈窗消失。
@@ -436,5 +439,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-18 01:00:10 UTC_
+_Last synced: 2026-05-18 06:50:32 UTC_
 

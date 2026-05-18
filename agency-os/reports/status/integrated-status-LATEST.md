@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-18 09:02:20
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-05-18 14:50:44
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -222,11 +222,22 @@
 ## 5) memory/daily/2026-05-18.md
 # Daily Note — 2026-05-18
 
-## Done today
+## Done today（含前日 17:25 至本次收工全部工作）
 
-- **AO-SYNC 擴充**（commit `8102794`）：`~/.claude/settings.json` 加入跨機 export/import，使 Claude Code 設定可跟著 AO-SYNC 轉機器。
-- **Uptime Kuma Monitor Fix Runbook**（commit `c74a773`）：`runbooks/UPTIME-KUMA-MONITOR-FIX.md` 85 行，補齊手機 SSH 可用的緊急排查手冊。
-- 以上 2 個 commit 尚未 push，由 ao-close.ps1 收口時推送。
+本 session 橫跨 2026-05-15 17:25 → 2026-05-18 09:02，共 7 個實質 commit：
+
+1. **AO-SYNC export mtime 修正**（`baca9e4`）：匯出後強制更新 mtime，修正 import 端誤判「未更新」的問題。
+2. **AO-SYNC import 同機 local-ahead 修正**（`4f58ae6`）：同機 vault 改顯示 `📋 local-ahead`（非 WARN）；加 re-verify 防 transient read。57 行變更。
+3. **AO-RESUME fallback Step 0 強制執行**（`682c554`）：hook 未跑時 Claude 必須主動跑 import + signals 腳本；不得靜默跳過。
+4. **web-researcher 強制直接引用**（`9ce65c4`）：新增 178 行 agent 規則；Direct quotes 段強制；無引用主張標注 [unverified]；首次加入 git 版控。
+5. **200% Agent 大稽核 + 幻覺修正**（`b180251`）：
+   - AGENTS.md：WP volume 幻覺修正、EU 補 10 個漏列容器、ClickHouse 版本確認。
+   - agent .md 幻覺修正：frontend-designer（auth-helpers / Tailwind）、fullstack-engineer（path / npm）、supabase-engineer（pooler）、devops-engineer（EU dirs）、debugger（log cmds）。
+   - 13 個 built-in agent .md 從 .gitignore 移出，加入 git 版控（2302 行新增，15 檔案）。
+6. **AO-SYNC 加入 settings.json**（`8102794`）：export/import 腳本支援 `~/.claude/settings.json`，跨機自動同步 Claude Code 設定。
+7. **Uptime Kuma Monitor Fix Runbook**（`c74a773`）：`runbooks/UPTIME-KUMA-MONITOR-FIX.md` 85 行緊急排查手冊。
+
+所有 commit 已由 ao-close.ps1 推送；AO-SYNC 匯出 9 entries 含 settings.json。
 
 ## Current state
 
@@ -240,15 +251,53 @@
   - Repair Center Phase 4 週巡檢啟動
   - 自動修復觸發分類決策表輸出
 
+## 下午班（桌機 AO-RESUME 第二次開工）
+
+**桌機首次開工（4 天未用）**：
+
+- **Git 假分歧修復**：AO-RESUME hook 在 `git pull` 前 auto-commit `ao-close-last.txt`（state 檔），造成 `local ahead=1, origin ahead=44`。Reset → 刪除衝突檔 → `git pull --ff-only` → `0 0` 對齊。44 commits 包含筆電 2026-05-14~18 的全部工作。
+- **Anthropic API 驗證**：$5.81 餘額補充後，原 GitHub Secret key 不需更換。建 Issue #10 觸發 `auto-repair-claude.yml` → `status = success`，auto-repair Phase 4 觀察期可正常運行。
+- **GitHub MCP 診斷**：PAT 有效（HTTP 200），但 MCP 伺服器為 stale process，本次用 `gh` CLI 替代；重啟 Claude Code 後自動解決。
+
 ## Blockers / Risks
 
 - 無新阻塞。既有阻塞：Termius 需操作者手機操作；Soulful §1.1 需操作者登入 Hostinger panel。
+- GitHub MCP stale process（重啟 Claude Code 自動解決，非緊急）。
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:93317e2f105c9b1ae44d60a1b028cca3d47a05ea4073975342b732d09de4b2c4 -->
+
+### claude 2026-05-18 11:55
+
+- **完成（一句）**: 桌機 AO-RESUME 假分歧修復（git reset + pull ff-only）、Anthropic API key 驗證（Issue #10 workflow success）、WORKLOG/memory/daily 更新
+- **變更路徑**:
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+  - `agency-os/memory/daily/2026-05-18.md`
+- **Git**: 未 commit（含入本次 ao-close commit）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: GitHub MCP stale process（PAT 有效，重啟 Claude Code 自動解決）；AO-RESUME hook auto-checkpoint state 檔問題建議後續以 --skip-worktree 或 gitignore 處理
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:dffd3868a0c7cf68c8908298600396587b78cfa24ab8f2561ed3aaaecd93571b -->
+
+### claude 2026-05-18 12:05
+
+- **完成（一句）**: 桌機 Git 假分歧修復 + Anthropic API 驗證（Issue #10 workflow success）+ MCP sync（claude-fast/claude-latest 重新對齊）+ WORKLOG/memory/daily 更新
+- **變更路徑**:
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+  - `agency-os/memory/daily/2026-05-18.md`
+  - `.mcp.json`（MCP sync 更新）
+- **Git**: 未 commit（含入本次 ao-close commit）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: GitHub MCP stale process（重啟 Claude Code 自動解決）
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-18 09:02:13`
+- Time: `2026-05-18 14:50:39`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -258,13 +307,14 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260518-090213.md`
-- Closeout: `reports/closeout/closeout-20260518-090205.md`
+- Health: `reports/health/health-20260518-145038.md`
+- Closeout: `reports/closeout/closeout-20260518-145034.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+
 ### 他處電腦開機須知 + 缺席使用者授權之 AO-CLOSE
 - 新增 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（公司機／換機：`git pull`、`verify-build-gates`、`npm ci`、`integrated-status` 路徑說明、與根目錄 `reports/status` 區別）。
 - 更新 **`RESUME_AFTER_REBOOT.md`**（區分：同機重開 vs 他處開機）、**`README.md`**、**`EXECUTION_DASHBOARD.md`** 指向該須知。
@@ -323,6 +373,5 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
 
 

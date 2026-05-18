@@ -63,6 +63,71 @@
 **完成**：`runbooks/UPTIME-KUMA-MONITOR-FIX.md` 新建（85 行）。涵蓋 EU VPS Docker 狀態確認、kuma DB 修復指令、alert 測試恢復步驟。  
 **動機**：補齊出國手機 SSH 緊急排查手冊列表。
 
+### 桌機 AO-RESUME 分歧修復 + Anthropic API 驗證（下午班）
+
+**根因 / 目標**：桌機 4 天未開工，上次使用時間為 2026-05-14；筆電期間推送 44 個 commit 至 origin/main。AO-RESUME hook 在執行 `git pull` **之前**先 auto-commit 了 dirty 的 `ao-close-last.txt`（state 檔），造成 `local ahead=1, origin ahead=44` 的假分歧。另需確認 Anthropic API 帳戶補額後 auto-repair workflow 可正常執行。
+
+**完成項目**：
+
+1. **Git 假分歧修復**：
+   - `git reset HEAD~1` 取消 auto-checkpoint commit（`c375b2d`，僅含 `ao-close-last.txt`）
+   - 刪除衝突的 `ao-close-last.txt`（origin/main 已有最新版）
+   - `git pull --ff-only origin main` → fast-forward 44 commits（97 檔案，5006 行新增）
+   - 結果：`ahead=0, behind=0` — 完全對齊
+   - 包含筆電工作：新 agent 群（critic/debugger/frontend-designer 等 13 個）、scripts 更新、runbooks、AO-SYNC 改進
+
+2. **Anthropic API key 驗證**：
+   - 帳戶餘額補充 $5.81 後，確認原 GitHub Secret `ANTHROPIC_API_KEY` 不需更換（key 本身有效，只是餘額不足）
+   - 建立測試 Issue #10（`[test] Verify Claude workflow API key — read-only check`，加 `auto-repair` label）
+   - GitHub Actions `auto-repair-claude.yml` workflow 執行結果：`status = success`
+   - 確認 auto-repair Phase 4 觀察期可正常運行
+
+3. **GitHub MCP "Bad credentials" 診斷**：
+   - 桌機 `GITHUB_PERSONAL_ACCESS_TOKEN` 環境變數已設定（`ghp_6uoPH...`）
+   - PAT 本身有效（curl 驗 HTTP 200）
+   - 根因：Claude Code 本次 session 啟動時 MCP 伺服器程序未讀到 env var（stale process）
+   - 解法：重啟 Claude Code 後自動解決；本次 session 改用 `gh` CLI 替代
+
+**驗證**：
+```
+git rev-list --left-right --count origin/main...HEAD → 0  0 ✅
+GitHub Actions run 26017791816 → completed / success ✅
+curl github.com API with PAT → HTTP 200 ✅
+```
+
+**避免再發生**：AO-RESUME hook 應在 auto-checkpoint 前先確認是否真的 dirty（非 state 檔）；state 檔類的 dirty 可考慮用 `--skip-worktree` 或 gitignore 處理。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:93317e2f105c9b1ae44d60a1b028cca3d47a05ea4073975342b732d09de4b2c4 -->
+
+### claude 2026-05-18 11:55
+
+- **完成（一句）**: 桌機 AO-RESUME 假分歧修復（git reset + pull ff-only）、Anthropic API key 驗證（Issue #10 workflow success）、WORKLOG/memory/daily 更新
+- **變更路徑**:
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+  - `agency-os/memory/daily/2026-05-18.md`
+- **Git**: 未 commit（含入本次 ao-close commit）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: GitHub MCP stale process（PAT 有效，重啟 Claude Code 自動解決）；AO-RESUME hook auto-checkpoint state 檔問題建議後續以 --skip-worktree 或 gitignore 處理
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:dffd3868a0c7cf68c8908298600396587b78cfa24ab8f2561ed3aaaecd93571b -->
+
+### claude 2026-05-18 12:05
+
+- **完成（一句）**: 桌機 Git 假分歧修復 + Anthropic API 驗證（Issue #10 workflow success）+ MCP sync（claude-fast/claude-latest 重新對齊）+ WORKLOG/memory/daily 更新
+- **變更路徑**:
+  - `agency-os/WORKLOG.md`
+  - `agency-os/memory/CONVERSATION_MEMORY.md`
+  - `agency-os/memory/daily/2026-05-18.md`
+  - `.mcp.json`（MCP sync 更新）
+- **Git**: 未 commit（含入本次 ao-close commit）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: GitHub MCP stale process（重啟 Claude Code 自動解決）
+
 ## 2026-05-15
 
 ### AO-RESUME protocol 修復 — hook 未跑時強制 fallback（commit `682c554`）
@@ -2691,7 +2756,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-18 01:02:03 UTC_
+_Last synced: 2026-05-18 06:50:32 UTC_
 
 ## 2026-03-20
 
@@ -3132,5 +3197,4 @@ _Last synced: 2026-05-18 01:02:03 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
 

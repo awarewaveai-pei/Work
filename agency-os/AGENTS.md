@@ -218,4 +218,22 @@ Auto-repair PR 必須含中文摘要：問題、原因、修法、風險、建�
 - **部署 drift 雙層偵測（2026-05-08 起）**：(a) **客戶端**：`scripts/check-deploy-drift.ps1` 比對 SG production `/root/lobster-phase1/.deployed-commit` 與 `origin/main`，掛入 `system-health-check.ps1` §7（warn-only）；slash command `/check-drift`。(b) **伺服器端**：SG cron `0 1 * * *`（09:00 TPE）跑 `/root/lobster-phase1/scripts/check-drift-and-alert.sh`，drift > 0 即 Slack alert（dedupe by `(deployed,origin)` pair）。Owner doc：`docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2.1-2.6。
 - **治理檔月度 drift 巡檢（2026-05-08 起）**：`scripts/check-governance-docs-drift.ps1` 對 4 個長期治理檔（Inventory / Routing Spec / Routing Matrix / Traceability）做 cross-ref + MCP 名單 + mtime + footer 一致性檢查，輸出 `reports/governance/drift-YYYY-MM.md`。每月 1 號由 `AgencyOS-MonthlyReview` routine 自動跑（Claude Cloud），亦可手動觸發。informational snapshot，非 build gate。
 
+## Related Documents (Auto-Synced)
+- `.cursor/rules/00-session-bootstrap.mdc`
+- `.cursor/rules/10-memory-maintenance.mdc`
+- `.cursor/rules/20-doc-sync-closeout.mdc`
+- `.cursor/rules/30-resume-keyword.mdc`
+- `.cursor/rules/40-shutdown-closeout.mdc`
+- `.cursor/rules/63-cursor-core-identity-risk.mdc`
+- `docs/CHANGE_IMPACT_MATRIX.md`
+- `docs/operations/cursor-enterprise-rules-index.md`
+- `docs/operations/cursor-mcp-and-plugin-inventory.md`
+- `docs/operations/new-doc-linkage-checklist.md`
+- `docs/operations/system-guard-and-notification.md`
+- `docs/operations/system-operation-sop.md`
+- `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
+- `README.md`
+- `scripts/register-new-governance-doc.ps1`
+
+_Last synced: 2026-05-18 06:50:32 UTC_
 
