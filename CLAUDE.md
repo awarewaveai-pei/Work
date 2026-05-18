@@ -52,42 +52,6 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 ## 緊急 Runbooks
 `runbooks/`：502/OOM（含 base64 SSH pattern）、加密挖礦入侵、安全事件、Cloudflare WAF、Codex 設定錯誤。
 
-## Slash Commands（`.claude/commands/`，git 追蹤）
-| 指令 | 用途 |
-|------|------|
-| `/ao-resume` | 手動 AO-RESUME |
-| `/ao-close` | 手動 AO-CLOSE |
-| `/checkpoint` | Mid-session git checkpoint |
-| `/recap` | 今日完成摘要 |
-| `/tasks` | 列所有未完成任務 |
-| `/health` | system-health-check.ps1 |
-| `/doc-sync` | doc-sync-automation.ps1 -AutoDetect |
-| `/verify` | verify-build-gates.ps1 |
-| `/smoke-test` | 核心服務煙霧測試 |
-| `/sg-deploy` | SG VPS sg-deploy.sh |
-| `/sg-reboot` | SG VPS 安全重啟（pre/post-flight） |
-| `/check-drift` | SG prod vs origin/main drift |
-| `/signals` | Slack + Telegram 訊息查詢（支援時段：`/signals [from] [to]`，CST）|
-| `/client-onboarding` | 新客戶 onboarding（Supabase + SSH + MainWP） |
-| `/vault-sync` | vault → Windows env |
-| `/vault-status` | vault key 清單 |
-| `/client-status` | 客戶健康 + WP 更新狀態 |
-| `/build-tenant` | 新客戶租戶佈建 |
-| `/wp-maintenance` | WordPress 維護入口 |
-| `/playwright` | Playwright E2E：smoke / qa / client / screenshot / a11y / perf / install |
-| `/decide` | 18 階段多代理決策評審 |
-| `/strategy-review` | 多角度策略決策審查 |
-| `/fix-sidebars` | 修復 Cursor 側邊欄消失（Codex / Claude Code 圖示不見） |
-
-## Project Subagents（`.claude/agents/`，git 追蹤）
-| Agent | 觸發時機 |
-|-------|---------|
-| `repair-agent` | 健康檢查失敗 / 腳本報錯 / MCP 斷線 / 文件交叉引用斷掉 |
-| `site-builder` | 新客戶租戶佈建（GitHub / Sentry / PostHog / Supabase / n8n） |
-| `trigger-deploy-agent` | Trigger.dev EU 部署（需 `tr_pat_*` PAT） |
-| `client-onboarding` | 新客戶 onboarding（Supabase seed + SSH + MainWP） |
-| `wordpress-maintenance-agent` | WP 客戶維護（備份 gate / 更新計畫 / safe update） |
-| `decision-intelligence` | 18 階段決策評審（`/decide` 觸發） |
 
 ## 多機多 IDE
 **換機**：Secrets vault 各機獨立：`secrets-vault.ps1 -Action import-mcp`。本地 WP 棧（若需要）：`bootstrap-local-wordpress-windows.ps1 -EnsurePhpIni`（詳：`REMOTE_WORKSTATION_STARTUP.md §1.5.1`）。  
