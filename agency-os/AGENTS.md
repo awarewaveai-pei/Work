@@ -162,9 +162,13 @@
 - **完整表**（與 repo 根 `mcp.json` 鍵對齊、含 LLM 分流與龍蝦 Routing 對照）：**`docs/operations/cursor-mcp-and-plugin-inventory.md`**。
 - **龍蝦自動化強制規格**（誰可 orchestrate、核准、rollback）：`../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`（**不**被 IDE MCP 清單取代）。
 
-## Session 啟動順序
-AO-RESUME 完整啟動流程詳見 `.claude/commands/ao-resume.md`（七段式：系統快照／外部信號／已完成／目前進度／未完成待辦全列／需決策／下一步）。
-一般開場：Yesterday Recap（Completed/Pending/Risks）→ Today Plan（Priority 1/2/3）→ Confirm 今天先做哪一項。
+## Session 啟動順序（每次都做）
+1. `agency-os/TASKS.md` + `agency-os/WORKLOG.md`（last 30 lines）
+2. `agency-os/memory/CONVERSATION_MEMORY.md`；若易混淆 `LAST_AO_RESUME_BRIEF`／`SESSION_TEMPLATE`／inbox 機械匯入，先掃 `memory/MEMORY_INDEX.md`
+3. `agency-os/memory/daily/` 今日與昨日筆記（若存在）
+4. 龍蝦工廠主軸（若存在）：`lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md` + `LOBSTER_FACTORY_COMPLETION_PLAN_V2.md`
+
+**輸出格式：** AO-RESUME 關鍵字 → 七段式，詳見 `.claude/commands/ao-resume.md`；一般開場 → Yesterday Recap（Completed/Pending/Risks）→ Today Plan（Priority 1/2/3）→ Confirm 今天先做哪一項。
 
 ## 快速續接關鍵字
 - 跨系統運作模型（AO 治理 + 龍蝦執行）：`docs/overview/ao-lobster-operating-model.md`（作為事件節奏與責任分工的總入口）。
