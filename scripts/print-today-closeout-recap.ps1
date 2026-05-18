@@ -2,7 +2,7 @@ param(
     [string]$WorkRoot = ""
 )
 
-# Prints mechanical "what happened today" hints for humans with weak session memory.
+# Prints mechanical "what happened since last AO-CLOSE" hints for Claude.
 # Safe read-only: git log / status / WORKLOG / memory/daily.
 
 Set-StrictMode -Version Latest
@@ -24,14 +24,31 @@ if ($WorkRoot) {
     $WorkRoot = (Get-Location).Path
 }
 
-$today = (Get-Date).ToString("yyyy-MM-dd")
-$agencyRoot = Join-Path $WorkRoot "agency-os"
+$today       = (Get-Date).ToString("yyyy-MM-dd")
+$agencyRoot  = Join-Path $WorkRoot "agency-os"
 $worklogPath = Join-Path $agencyRoot "WORKLOG.md"
-$dailyPath = Join-Path $agencyRoot "memory\daily\$today.md"
-$utf8 = [System.Text.UTF8Encoding]::new($false)
+$dailyPath   = Join-Path $agencyRoot "memory\daily\$today.md"
+$utf8        = [System.Text.UTF8Encoding]::new($false)
+
+# --- Determine since-timestamp from last AO-RESUME stamp ---
+# The recap window is "last AO-RESUME → this AO-CLOSE", matching how work is actually structured.
+$resumeStampPath = Join-Path $WorkRoot "agency-os\.agency-state\ao-resume-last.txt"
+$sinceLabel    = "local calendar day"
+$sinceParam    = (Get-Date).Date.ToString("yyyy-MM-dd HH:mm:ss")
+$lastResumeDate = $today   # fallback: only today's WORKLOG section
+
+if (Test-Path -LiteralPath $resumeStampPath) {
+    $rawStamp = (Get-Content -LiteralPath $resumeStampPath -Raw -Encoding UTF8).Trim()
+    if ($rawStamp -match '^\d{4}-\d{2}-\d{2}') {
+        $sinceParam     = $rawStamp
+        $sinceLabel     = "last AO-RESUME ($rawStamp)"
+        # Extract just the date part for WORKLOG section matching
+        $lastResumeDate = $rawStamp.Substring(0, 10)
+    }
+}
 
 Write-Host ""
-Write-Host "== Today recap (machine-backed; local date $today) ==" -ForegroundColor Cyan
+Write-Host "== Session recap (last AO-RESUME → AO-CLOSE; since $sinceLabel; local date $today) ==" -ForegroundColor Cyan
 Write-Host "Use this to fill WORKLOG / TASKS / pending-task-completions (no need to memorize)." -ForegroundColor DarkGray
 Write-Host ""
 
@@ -47,11 +64,10 @@ try {
             Write-Host ("  {0}" -f $ln)
         }
         Write-Host ""
-        $sinceLocal = (Get-Date).Date.ToString("yyyy-MM-dd HH:mm:ss")
-        Write-Host "Commits today (local calendar day, newest first):" -ForegroundColor Yellow
-        $commits = @(git log --since="$sinceLocal" --pretty=format:"%h %s" 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        Write-Host "Commits since last AO-CLOSE (newest first):" -ForegroundColor Yellow
+        $commits = @(git log --since="$sinceParam" --pretty=format:"%h %s" 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
         if ($commits.Count -eq 0) {
-            Write-Host "  (none on this branch — or only uncommitted / older commits)" -ForegroundColor DarkGray
+            Write-Host "  (none — all commits pre-date last AO-CLOSE or nothing new)" -ForegroundColor DarkGray
         } else {
             $max = [Math]::Min(35, $commits.Count)
             for ($i = 0; $i -lt $max; $i++) {
@@ -68,40 +84,66 @@ try {
     Pop-Location
 }
 
+# --- WORKLOG: show all ## yyyy-MM-dd sections from lastCloseDate through today ---
 Write-Host ""
-Write-Host ("WORKLOG section ## {0}:" -f $today) -ForegroundColor Yellow
+Write-Host "WORKLOG sections since ${lastResumeDate} (last AO-RESUME):" -ForegroundColor Yellow
 if (-not (Test-Path -LiteralPath $worklogPath)) {
     Write-Host "  (WORKLOG.md missing)" -ForegroundColor DarkYellow
 } else {
     $wl = [System.IO.File]::ReadAllLines($worklogPath, $utf8)
-    $header = "## $today"
-    $start = -1
+
+    # Collect all ## yyyy-MM-dd headers between lastCloseDate and today (inclusive)
+    $datePattern = '^##\s+(\d{4}-\d{2}-\d{2})\s*$'
+    $sectionsToShow = [System.Collections.Generic.List[string]]::new()
+    $inSection = $false
+    $sectionLines = [System.Collections.Generic.List[string]]::new()
+    $currentSectionDate = ""
+
     for ($i = 0; $i -lt $wl.Length; $i++) {
-        if ($wl[$i].Trim() -eq $header) { $start = $i; break }
-    }
-    if ($start -lt 0) {
-        Write-Host "  (no '$header' block yet — add ### bullets under it before you forget)" -ForegroundColor DarkYellow
-    } else {
-        $out = New-Object System.Collections.Generic.List[string]
-        for ($j = $start + 1; $j -lt $wl.Length; $j++) {
-            if ($wl[$j] -match '^\s*##\s+') { break }
-            if ($wl[$j].Trim().Length -gt 0) { $out.Add($wl[$j]) }
+        $line = $wl[$i]
+        if ($line -match $datePattern) {
+            # Flush previous section if it qualifies
+            if ($inSection -and $currentSectionDate -ge $lastResumeDate -and $currentSectionDate -le $today) {
+                $sectionsToShow.AddRange($sectionLines)
+            }
+            $currentSectionDate = $matches[1]
+            $inSection = $true
+            $sectionLines = [System.Collections.Generic.List[string]]::new()
+            $sectionLines.Add($line)
+        } elseif ($inSection) {
+            # Stop collecting if we hit a non-date top-level header (## that is not a date)
+            if ($line -match '^##\s+' -and $line -notmatch $datePattern) {
+                if ($currentSectionDate -ge $lastResumeDate -and $currentSectionDate -le $today) {
+                    $sectionsToShow.AddRange($sectionLines)
+                }
+                $inSection = $false
+                $sectionLines = [System.Collections.Generic.List[string]]::new()
+            } else {
+                $sectionLines.Add($line)
+            }
         }
-        if ($out.Count -eq 0) {
-            Write-Host "  (empty under $header — paste what you shipped)" -ForegroundColor DarkYellow
-        } else {
-            $cap = 45
-            $n = [Math]::Min($cap, $out.Count)
-            for ($k = 0; $k -lt $n; $k++) {
-                Write-Host ("  {0}" -f $out[$k])
-            }
-            if ($out.Count -gt $cap) {
-                Write-Host ("  ... ({0} more lines in WORKLOG)" -f ($out.Count - $cap)) -ForegroundColor DarkGray
-            }
+    }
+    # Flush final section
+    if ($inSection -and $currentSectionDate -ge $lastResumeDate -and $currentSectionDate -le $today) {
+        $sectionsToShow.AddRange($sectionLines)
+    }
+
+    if ($sectionsToShow.Count -eq 0) {
+        Write-Host "  (no WORKLOG sections found between $lastResumeDate and $today)" -ForegroundColor DarkYellow
+    } else {
+        $cap = 80
+        $n = [Math]::Min($cap, $sectionsToShow.Count)
+        for ($k = 0; $k -lt $n; $k++) {
+            $l = $sectionsToShow[$k]
+            if ($l.Trim().Length -gt 0) { Write-Host ("  {0}" -f $l) }
+        }
+        if ($sectionsToShow.Count -gt $cap) {
+            Write-Host ("  ... ({0} more lines in WORKLOG)" -f ($sectionsToShow.Count - $cap)) -ForegroundColor DarkGray
         }
     }
 }
 
+# --- Daily note: show today's file ---
 Write-Host ""
 Write-Host "memory/daily/$today.md:" -ForegroundColor Yellow
 if (-not (Test-Path -LiteralPath $dailyPath)) {
