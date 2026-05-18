@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-15 17:25:24
+- Generated: 2026-05-18 09:02:20
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,94 +219,36 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-15.md
-# Daily Note - 2026-05-15
+## 5) memory/daily/2026-05-18.md
+# Daily Note — 2026-05-18
 
 ## Done today
-- Hook `ao-resume-on-prompt.ps1`：全面清除剩餘 `*>&1`（lines 96、139），兩處 checkpoint 呼叫改 `2>&1`；LIVE + SSOT 同步，commit `e725f3f`
-- 驗證 vault `user-env.ps1`（G:\...）語法正常、無 `ANTHROPIC_API_KEY`、Slack IDs 存在、SHA256 與本機相同
-- 12/12 全項 PASS：Hook、AGENTS.md、ao-resume.md 匯入區塊、AO_SYNC env vars、vault ↔ local 一致
+
+- **AO-SYNC 擴充**（commit `8102794`）：`~/.claude/settings.json` 加入跨機 export/import，使 Claude Code 設定可跟著 AO-SYNC 轉機器。
+- **Uptime Kuma Monitor Fix Runbook**（commit `c74a773`）：`runbooks/UPTIME-KUMA-MONITOR-FIX.md` 85 行，補齊手機 SSH 可用的緊急排查手冊。
+- 以上 2 個 commit 尚未 push，由 ao-close.ps1 收口時推送。
 
 ## Current state
-- Hook 三個 powershell.exe 呼叫全部 `2>&1`，AO-RESUME hook 崩潰問題已根治
-- AO-SYNC 跨機同步路徑正確（G:\ Google Drive 直接路徑，不依賴 Cryptomator 掛載）
-- 進程環境 `AO_SYNC_ROOT`/`AO_SYNC_SECRETS_ROOT` 為舊值（下次 IDE 重啟自動更新）
 
-## 下午 session（API 計費清理）
-- 問題：VS Code Claude Code extension 每次 git commit 自動觸發 ultrareview，彈出「Failed to run review: insufficient funds」。根因：extension 以 console（API credits）模式登入，非 Max 訂閱額度。ultrareview 平行跑多個 Claude agents，單次成本 > 剩餘 $5.82 API 餘額。
-- 修正 1：移除 claude-fast / claude-latest MCP server（registry.template.json + .mcp.json + ~/.claude/mcp.json），消除 ANTHROPIC_API_KEY 呼叫風險。commit 7311689
-- 修正 2：.github/workflows/auto-repair-claude.yml 改用 claude-haiku-4-5-20251001 + max-turns 10，API 成本降約 90%。commit 016cdd6
-- 修正 3：~/.claude/settings.json 加入 `disableAgentView: true`（停 background agent 自動觸發）+ `forceLoginMethod: "claudeai"`（強制走 Max 訂閱）。
-- 待驗：重開 VS Code 後確認彈窗消失
+- Git 最新 commit：`c74a773` — docs: add Uptime Kuma monitor fix runbook
+- 所有開放待辦維持 2026-05-15 狀態；見 `TASKS.md §未完成`。
+- 主要開放項：
+  - Termius 手機 SSH 設定（出國前必做，操作者手動）
+  - Soulful Expression Day 1 §1.1 操作者確認
+  - Day 2 staging 實機驗收（兩案）
+  - Scenery Travel Mongolia 新站建置
+  - Repair Center Phase 4 週巡檢啟動
+  - 自動修復觸發分類決策表輸出
 
-## Next steps
-- **重開 VS Code** 讓 disableAgentView + forceLoginMethod 生效，觀察 commit 後是否仍出現彈窗
-- 桌機開工後確認 `sync-claude-userlevel.ps1 -Mode merge` 同步最新 hook 修正
-- Termius 手機 SSH 設定（出國前必做）
-- Soulful Expression Day 1 §1.1（操作者登入確認）
+## Blockers / Risks
 
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:3d3e90778715723cc2a1b492884f12bcb1148914dd1159774cb19313225bbc09 -->
-
-### claude-code 2026-05-15 07:30
-
-- **完成（一句）**: Hook 全面修復（*>&1→2>&1 lines 96/139）+ AO-SYNC 跨機同步完整驗證
-- **變更路徑**:
-  - `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`
-  - `agency-os/WORKLOG.md`
-- **Git**: e725f3f
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: 進程環境 AO_SYNC_ROOT/SECRETS_ROOT 仍為舊值；下次 IDE 重啟後自動更新
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:d28f4513e01d568c31b57c36a0f82864ea953083e2bc73d0d1b453f399e8d2ad -->
-
-### claude-code 2026-05-15 07:31
-
-- **完成（一句）**: Hook *>&1 全面修復（lines 96/139）+ 12/12 驗證 PASS
-- **變更路徑**:
-  - `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`
-  - `agency-os/WORKLOG.md`
-  - `agency-os/memory/daily/2026-05-15.md`
-- **Git**: e725f3f
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: 進程 env vars 為舊值，IDE 重啟後自動更新
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:60989638bfab079696739a053830b416c5b8ebf86e493961df1aba67985c9b7f -->
-
-### claude-code 2026-05-15 07:50
-
-- **完成（一句）**: AO-SYNC export/import 改 registry-always-wins，根除 stale process env 問題
-- **變更路徑**:
-  - `scripts/export-cross-machine-memory.ps1`
-  - `scripts/import-cross-machine-memory.ps1`
-- **Git**: 25ab9d9
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: 無
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:f0fa8c38968e640f529c5d0fb863197db9bd941920a7864b7da0d15b50e9bc15 -->
-
-### claude-code 2026-05-15 16:30
-
-- **完成（一句）**: API 計費清理：移除 claude-fast/claude-latest MCP server、auto-repair 改 Haiku、settings.json 加 disableAgentView + forceLoginMethod
-- **變更路徑**:
-  - `mcp/registry.template.json`
-  - `.github/workflows/auto-repair-claude.yml`
-  - `~/.claude/settings.json`（user-level，不入 git）
-  - `agency-os/WORKLOG.md`
-  - `agency-os/memory/daily/2026-05-15.md`
-  - `agency-os/memory/CONVERSATION_MEMORY.md`
-- **Git**: 7311689, 016cdd6
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: VS Code 尚未重開；需重啟 IDE 後確認「Failed to run review」彈窗消失才算根治
+- 無新阻塞。既有阻塞：Termius 需操作者手機操作；Soulful §1.1 需操作者登入 Hostinger panel。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-15 17:25:14`
+- Time: `2026-05-18 09:02:13`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -316,21 +258,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260515-172512.md`
-- Closeout: `reports/closeout/closeout-20260515-172500.md`
+- Health: `reports/health/health-20260518-090213.md`
+- Closeout: `reports/closeout/closeout-20260518-090205.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- `git pull origin main`：**Already up to date**。
-- `verify-build-gates.ps1`：**PASS**；health **100%（269/269）**（`reports/health/health-20260329-221913.md`）。
-- `lobster-factory`：`npm run operator:sanity` **PASS**（staging regression 第 4 步未帶 `wpRootPath` → **SKIPPED**，屬預期）。
-
-### AO-CLOSE（2026-03-27）
-- 已完成收工前進度同步（`TASKS.md`、`WORKLOG.md`、`memory/CONVERSATION_MEMORY.md`、`memory/daily/2026-03-27.md`）。
-- 準備執行 `D:\Work\scripts\ao-close.ps1` 一鍵閘道與推送。
-
 ### 他處電腦開機須知 + 缺席使用者授權之 AO-CLOSE
 - 新增 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（公司機／換機：`git pull`、`verify-build-gates`、`npm ci`、`integrated-status` 路徑說明、與根目錄 `reports/status` 區別）。
 - 更新 **`RESUME_AFTER_REBOOT.md`**（區分：同機重開 vs 他處開機）、**`README.md`**、**`EXECUTION_DASHBOARD.md`** 指向該須知。
@@ -382,5 +316,13 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+
+
+## 2026-05-18
+
+### Machine appendix (weekly-system-review)
+- 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
 

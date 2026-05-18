@@ -2,6 +2,22 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-18
+
+### AO-SYNC 擴充：settings.json 加入跨機匯出（commit `8102794`）
+
+**完成**：`export-cross-machine-memory.ps1` 新增匯出 `~/.claude/settings.json`（user-level Claude Code 設定）；`import-cross-machine-memory.ps1` 新增讀取並顯示 settings.json 匯入狀態，使跨機切換時 Claude Code 設定（defaultMode、disableAgentView 等）也能同步。
+
+**驗證**：兩個腳本均已更新，commit push 至 origin 前先跑 ao-close 收口。
+
+### Uptime Kuma Monitor Fix Runbook 新增（commit `c74a773`）
+
+**完成**：`runbooks/UPTIME-KUMA-MONITOR-FIX.md` 新建（85 行）。涵蓋 Uptime Kuma monitor 失效排查：EU VPS Docker 狀態確認、kuma DB 修復指令、alert 測試恢復步驟。
+
+**動機**：補齊緊急 runbook 列表，讓出國時手機 SSH 也能按圖索驥處理 Uptime Kuma 告警。
+
+**開放待辦維持不變**（見 TASKS.md §未完成）：Termius 手機 SSH 設定、Soulful Day 1 §1.1 操作者確認、Day 2 staging 實機驗收、Mongolia 新站建置、Repair Center Phase 4 週巡檢、自動修復觸發分類決策表。
+
 ## 2026-05-15
 
 ### AO-RESUME protocol 修復 — hook 未跑時強制 fallback（commit `682c554`）
@@ -2630,7 +2646,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-15 09:24:59 UTC_
+_Last synced: 2026-05-18 01:02:03 UTC_
 
 ## 2026-03-20
 
@@ -3064,4 +3080,12 @@ _Last synced: 2026-05-15 09:24:59 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+
+
+## 2026-05-18
+
+### Machine appendix (weekly-system-review)
+- 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 
