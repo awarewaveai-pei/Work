@@ -4,19 +4,64 @@
 
 ## 2026-05-18
 
-### AO-SYNC 擴充：settings.json 加入跨機匯出（commit `8102794`）
+### 補記：上次 AO-CLOSE（3cef089, 17:25）至本次 AO-CLOSE 完整工作紀錄
 
-**完成**：`export-cross-machine-memory.ps1` 新增匯出 `~/.claude/settings.json`（user-level Claude Code 設定）；`import-cross-machine-memory.ps1` 新增讀取並顯示 settings.json 匯入狀態，使跨機切換時 Claude Code 設定（defaultMode、disableAgentView 等）也能同步。
+> 原始 AO-CLOSE 時 Claude 僅記錄最後 2 個 commit，以下補齊全部 7 個實質 commit。
 
-**驗證**：兩個腳本均已更新，commit push 至 origin 前先跑 ao-close 收口。
+#### 1. AO-SYNC export mtime 修正（commit `baca9e4`, 17:34）
 
-### Uptime Kuma Monitor Fix Runbook 新增（commit `c74a773`）
+**根因**：`export-cross-machine-memory.ps1` 匯出檔案後未更新 mtime，導致 import 端因 mtime 判斷為「未更新」而略過。  
+**修正**：匯出後對每個 copied 檔案執行 `[IO.File]::SetLastWriteTime(...)` 強制更新 mtime = 匯出時間。  
+**避免再發生**：匯出腳本必須在複製完成後更新 mtime，否則 import 端 mtime 比較會失效。
 
-**完成**：`runbooks/UPTIME-KUMA-MONITOR-FIX.md` 新建（85 行）。涵蓋 Uptime Kuma monitor 失效排查：EU VPS Docker 狀態確認、kuma DB 修復指令、alert 測試恢復步驟。
+#### 2. AO-SYNC import 同機邏輯修正（commit `4f58ae6`, 18:42）
 
-**動機**：補齊緊急 runbook 列表，讓出國時手機 SSH 也能按圖索驥處理 Uptime Kuma 告警。
+**根因**：`import-cross-machine-memory.ps1` 讀取同機匯出的 vault 時，誤判為「WARN」（應為 local-ahead，屬正常）；另有 transient read 問題導致有時讀不到最新版。  
+**修正**：同機 vault export 改顯示 `📋 本機領先 (local-ahead)` 而非 WARN；新增 re-verify 確認 mtime 穩定後再比較。  
+**改動規模**：57 行變更（43 新增 / 14 刪除）。
 
-**開放待辦維持不變**（見 TASKS.md §未完成）：Termius 手機 SSH 設定、Soulful Day 1 §1.1 操作者確認、Day 2 staging 實機驗收、Mongolia 新站建置、Repair Center Phase 4 週巡檢、自動修復觸發分類決策表。
+#### 3. AO-RESUME fallback 強制執行（commit `682c554` + `32ca85e`, 18:50）
+
+**根因**：`ao-resume.md` 假設 `UserPromptSubmit` hook 永遠成功，但 hook 未跑時 Claude 靜默跳過 import + signals，使用者看不到跨機 import 狀態與 Slack/Telegram 摘要。  
+**修正**：在 `ao-resume.md` 最前端加入 **Step 0 — Hook state check（MANDATORY）**：  
+- Case A（state 檔 < 5 分鐘）：正常讀取 state 檔。  
+- Case B（不存在 / 超過 5 分鐘 / 有錯誤）：Claude 必須主動用 Bash 跑 import + signals 腳本並直接回報 stdout。  
+**避免再發生**：ao-resume.md Step 0 必須作為任何 AO-RESUME 修改的強制審查點。
+
+#### 4. web-researcher agent — 強制直接引用（commit `9ce65c4`, 19:38）
+
+**根因**：web-researcher 在摘要 fetch 內容時會改寫原文，讓幻覺主張與真實引用混在一起無法分辨。  
+**修正**：新建 `.claude/agents/web-researcher.md`（178 行）：  
+- 輸出格式強制含 **Direct quotes** 段，無此段即不合格。  
+- 無直接引用的主張標注 `[unverified — training data only]`。  
+- High confidence 必須附直接引用。  
+- 紅線：永不改寫可引用的原文；永不省略 Direct quotes 段。  
+**特殊**：此 agent 原在 `.gitignore`，已用 `-f` 強制加入 git 版控，確保 AwareWave context 跨機同步。
+
+#### 5. 200% Agent 大稽核 — 修正幻覺 + 將 built-in agents 加入 git 版控（commit `b180251`, 19:49）
+
+**背景**：發現 AGENTS.md 與多個 agent .md 檔案對 AwareWave stack 的描述有誤，且 12 個 built-in agent 被 .gitignore 排除，導致跨機後 AwareWave 特定 context 全部遺失。  
+**確認幻覺並修正**：
+- `AGENTS.md` WordPress volume 聲稱掛載 `./wordpress-html` → 實為 named volume `wordpress_data`（docker-compose.yml:175 驗證）。
+- `AGENTS.md` EU table 漏列 10 個容器：`supabase-pooler`、`supabase-edge-functions`、`realtime-dev.supabase-realtime`、`supabase-rest`、`supabase-imgproxy`、`supabase-meta`、`trigger-registry`、`trigger-minio`、`trigger-electric`、`trigger-docker-proxy`（全部補入）。
+- `frontend-designer.md`：`@supabase/auth-helpers-nextjs`（已廢棄，實際不用）→ `@supabase/supabase-js ^2.49.8`（package.json 驗證）。
+- `frontend-designer.md`：Tailwind CSS 聲稱 → 無 tailwind.config / postcss.config，改為 CSS 變數（檔案掃描驗證）。
+- `fullstack-engineer.md`：apps/ 路徑描述錯誤 → 正確 path + tree；`pnpm test` → `npm test`（package.json 驗證）。
+- `supabase-engineer.md`：補 supabase-pooler 容器名稱 + 完整服務表。
+- `devops-engineer.md`：補 EU directory table 含所有工作目錄。
+- `debugger.md`：補 supabase-pooler、realtime-dev.supabase-realtime log 指令。  
+**版控改動**：`.gitignore` 移除 12 個 built-in agent .md 排除規則；新增 13 個 agent 檔案進入 git（`critic`, `db-expert`, `debugger`, `devops-engineer`, `frontend-designer`, `fullstack-engineer`, `migration-engineer`, `onboarder`, `planner`, `refactor-specialist`, `supabase-engineer`, `tool-expert`, `vuln-verifier`）。  
+**改動規模**：15 檔案，2302 行新增。
+
+#### 6. AO-SYNC 擴充：settings.json 加入跨機匯出（commit `8102794`, 19:58）
+
+**完成**：`export-cross-machine-memory.ps1` 新增匯出 `~/.claude/settings.json`（user-level Claude Code 設定）；`import-cross-machine-memory.ps1` 新增讀取 settings.json 匯入狀態，使跨機切換時 Claude Code 設定（defaultMode、disableAgentView、forceLoginMethod 等）自動同步。  
+**驗證**：本次 AO-CLOSE 已確認 settings.json 出現在 Google Drive AO-SYNC manifest（9 entries）。
+
+#### 7. Uptime Kuma Monitor Fix Runbook（commit `c74a773`, 23:07）
+
+**完成**：`runbooks/UPTIME-KUMA-MONITOR-FIX.md` 新建（85 行）。涵蓋 EU VPS Docker 狀態確認、kuma DB 修復指令、alert 測試恢復步驟。  
+**動機**：補齊出國手機 SSH 緊急排查手冊列表。
 
 ## 2026-05-15
 
