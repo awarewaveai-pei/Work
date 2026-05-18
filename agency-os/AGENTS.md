@@ -50,8 +50,13 @@
 ### 執行品質標準
 - 輸出必須可直接使用：完整指令、確切路徑、預期結果，使用者不需要自行補全
 - 操作前先說明假設；高風險操作先列風險與回滾方案再執行
-- 寧可多問一個確認問題，也不做一個無法回滾的操作
+- 高風險 / 無法回滾的操作：停止、說明風險、等明示 go ahead，不得自行推進
 - 每個發現都要附上 `file:line` 證據，不接受「可能是」、「應該是」
+
+### R4：聲稱即驗證（強制，寫入與審查均適用）
+**寫入前**：每個路徑 / 腳本名 / 引用 → Glob 確認存在，不存在不寫。  
+**寫入後**：grep **你剛修的確切字串**，範圍限 `.claude/ runbooks/ scripts/ agency-os/docs/ mcp/`，命中的一起修，同一 commit。  
+**審查時**：任何聲稱「列舉目錄內容 / 映射檔案 / 清單完整」的段落 → 必須 Glob/Grep 對照實際狀態，不得只讀文字。「看起來合理」≠「已驗證正確」。
 
 ### AwareWave Stack 全局知識（所有 Agent 共用）
 
@@ -101,6 +106,14 @@
 - Vault: `scripts/secrets-vault.ps1 -Action get -Key <KEY_NAME>`
 - 所有 key names 在: `mcp/user-env.ps1`
 - **禁止**在任何檔案中硬編 secret 值
+
+**Lobster Factory 操作規則（所有 Agent 強制）**
+- **Routing 三件套（同一 PR 必須同步）**：`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `lobster-factory/workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md` — 任一改動必須三份同步，否則 routing drift。
+- **自動化安全預設**：Supabase 寫入**預設 OFF**（env: `LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 執行**預設 `off`**（env: `LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）。
+- **Trigger.dev 憑證（不可互換）**：`tr_pat_*` = CLI deploy（vault key: `TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（vault key: `TRIGGER_ACCESS_TOKEN`）。
+- Cursor rules 正本：`agency-os/.cursor/rules/`（repo 根 `.cursor/rules/` 是 mirror，不改正本）
+- 監控端點：用 `/api/ops/summary`（非 `/`，root 有 auth_basic 保護）
+- nginx 監控 drop-in：`/etc/default/awarewave-endpoint-alert.local`（SG VPS 本地，sync 不覆蓋）
 
 ---
 
@@ -153,8 +166,7 @@
 - **`阻塞／風險` 禁止**只回「無」二字；須依該規則綜合盤點並說明依據，或分點列出具體風險。
 - 使用者輸入 **`AO-CLOSE`**（關鍵字不變）或明確表達要關機/收工時，必須先執行 **closeout**，再輸出：`今日完成`、`今日未完成`、`連動檢查`、`明日優先`。
   - **只打 AO-CLOSE 即含義完整**：等同授權代理在跑 **`ao-close.ps1` 前**主動依**當輪對話 + `TASKS.md` 開放項**（＋必要時 **print-today-closeout-recap**）補齊 **`WORKLOG.md`** 當日 **`- AUTO_TASK_DONE: …`**，並更新 **`memory/CONVERSATION_MEMORY.md`**（**不要**求使用者手寫長篇；**不要**求使用者再加一句「照對話全寫進 AUTO_TASK_DONE」）；證據不足時**只問一題**。
-  - **建議一鍵**（更新 **`WORKLOG` / `memory/**`**；**`TASKS` 打勾**多由腳本依 **`AUTO_TASK_DONE`** 套用）：**正本** monorepo 根 **`.\scripts\ao-close.ps1`**；**`.\agency-os\scripts\ao-close.ps1`** 僅 **thin wrapper** 轉發參數（**勿**複製業務邏輯以免分叉）  
-    → 預設依序（細節以 **`40-shutdown-closeout.mdc`**／**`end-of-day-checklist.md` §1a** 為準）：**`ensure-daily-progress-scaffold`** → **inbox guard**（預設 **warn**）→ **`merge-closeout-inbox-into-progress`**（**WORKLOG** + **memory/daily** + **`CONVERSATION_MEMORY` 指標列**）→ **`print-today-closeout-recap`** → **`verify-build-gates`** → **`system-guard`** → **`generate-integrated-status-report`** → **`apply-closeout-task-checkmarks`** → **`git add`** → **`verify-closeout-completeness`**（預設 **strict**，擋無證據之 commit）→ **`git commit`／`git push`**。緊急：**`-CompletenessGate warn|off`** 或 **`-SkipCompletenessGate`**。不推：`-SkipPush`；略過龍蝦閘（不建議）：`-SkipVerify`。
+  - **建議一鍵**：`.\scripts\ao-close.ps1`（正本）；`.\agency-os\scripts\ao-close.ps1` 為 thin wrapper。步驟詳見 `docs/operations/end-of-day-checklist.md` §1a。緊急 flags：`-CompletenessGate warn|off`、`-SkipCompletenessGate`、`-SkipPush`、略過龍蝦閘：`-SkipVerify`。
   - 預設收工門檻：`system-health-check` **100%**（未達 100% 先修復再收工；僅在使用者明確允許時可放寬）。
   - **單一真相**：AO-CLOSE 的操作步驟以 `docs/operations/end-of-day-checklist.md` 為準，關鍵字行為以 `.cursor/rules/40-shutdown-closeout.mdc` 為準。
   - **或分部手動**（與一鍵擇一）：`doc-sync-automation -AutoDetect` → `system-health-check` → `system-guard -Mode manual` → 再自行 `git push`（見 `docs/operations/end-of-day-checklist.md`）。
@@ -198,5 +210,12 @@
 - 不做不可逆破壞操作
 - 生產環境操作前先列風險與回滾方案
 - 客戶新增需求先判定是否需走 `docs/operations/scope-change-policy.md`
+
+### Auto-Repair 紅線
+Repair Center 正本流程：`incident → triage → approve → backup → repair run → GitHub issue/PR → human merge → manual sg-deploy → health gate → rollback if needed`。
+
+絕對不可：改 secrets / `.env*` / keys；改 auth、payment、permission；改 DB migration；改 nginx、Dockerfile、docker-compose；自動 deploy production；用空 catch 或吞錯把問題藏起來。沒有 pre-repair backup 就不能建 Issue / PR；沒有人工 merge 和手動 `/sg-deploy` 就不能有 production 變更。
+
+Auto-repair PR 必須含中文摘要：問題、原因、修法、風險、建議。改超過 3 個檔案、同 fingerprint 第二次修、API response 格式變更、cron/排程/第三方 API 變更，一律標 `needs-human-review`。
 
 

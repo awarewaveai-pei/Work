@@ -22,11 +22,6 @@
 2. `WORKLOG.md` — 根因 / 步驟 / 驗證 / 避免再發生
 3. 新 pattern → 更新 runbook/template（不得只留 WORKLOG）
 
-### R4：聲稱即驗證（強制，寫入與審查均適用）
-
-**寫入前**：每個路徑 / 腳本名 / 引用 → Glob 確認存在，不存在不寫。  
-**寫入後**：grep **你剛修的確切字串**，範圍限 `.claude/ runbooks/ scripts/ agency-os/docs/ mcp/`，命中的一起修，同一 commit。  
-**審查時**：任何聲稱「列舉目錄內容 / 映射檔案 / 清單完整」的段落 → 必須 Glob/Grep 對照實際狀態，不得只讀文字。「看起來合理」≠「已驗證正確」。
 
 ## MCP 治理
 
@@ -78,29 +73,5 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 SG `5.223.93.113` / EU `204.168.175.41` — 容器細節見 AGENTS.md §AwareWave Stack。  
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。
 
-### 龍蝦 Routing 三件套（同一 PR 必須同步）
-
-`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md` + `lobster-factory/workflow-risk-matrix.json` + `lobster-factory/docs/ROUTING_MATRIX.md` — 任一改動必須三份同步，否則 routing drift。
-
-### 龍蝦自動化安全預設
-
-Supabase 寫入**預設 OFF**（env: `LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 執行**預設 `off`**（env: `LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）。
-
-### Auto-Repair 紅線
-
-Repair Center 正本流程：`incident -> triage -> approve -> backup -> repair run -> GitHub issue/PR -> human merge -> manual sg-deploy -> health gate -> rollback if needed`。
-
-Claude / auto-repair PR 絕對不可：改 secrets / `.env*` / keys；改 auth、payment、permission；改 DB migration；改 nginx、Dockerfile、docker-compose；自動 deploy production；用空 catch 或吞錯把問題藏起來。沒有 pre-repair backup 就不能建 Issue / PR；沒有人工 merge 和手動 `/sg-deploy` 就不能有 production 變更。
-
-Auto-repair PR 必須含中文摘要：問題、原因、修法、風險、建議。改超過 3 個檔案、同 fingerprint 第二次修、API response 格式變更、cron/排程/第三方 API 變更，一律標 `needs-human-review`。
-
-### Trigger.dev 憑證（不可互換）
-
-`tr_pat_*` = CLI deploy（vault key: `TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（vault key: `TRIGGER_ACCESS_TOKEN`）。
-
-### 其他 SSOT
-
-- Cursor rules 正本：`agency-os/.cursor/rules/`（repo 根 `.cursor/rules/` 是 mirror，不改正本）
-- 監控端點：用 `/api/ops/summary`（非 `/`，root 有 auth_basic 保護）
-- nginx 監控 drop-in：`/etc/default/awarewave-endpoint-alert.local`（SG VPS 本地，sync 不覆蓋）
+詳細操作規則（Routing 三件套 / 自動化安全預設 / Auto-Repair 紅線 / Trigger.dev 憑證 / 其他 SSOT）見 AGENTS.md §Lobster Factory 操作規則 及 §Auto-Repair 紅線。
 
