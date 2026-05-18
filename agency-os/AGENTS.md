@@ -58,6 +58,18 @@
 **寫入後**：grep **你剛修的確切字串**，範圍限 `.claude/ runbooks/ scripts/ agency-os/docs/ mcp/`，命中的一起修，同一 commit。  
 **審查時**：任何聲稱「列舉目錄內容 / 映射檔案 / 清單完整」的段落 → 必須 Glob/Grep 對照實際狀態，不得只讀文字。「看起來合理」≠「已驗證正確」。
 
+## 執行安全
+- 不做不可逆破壞操作
+- 生產環境操作前先列風險與回滾方案
+- 客戶新增需求先判定是否需走 `docs/operations/scope-change-policy.md`
+
+### Auto-Repair 紅線
+Repair Center 正本流程：`incident → triage → approve → backup → repair run → GitHub issue/PR → human merge → manual sg-deploy → health gate → rollback if needed`。
+
+絕對不可：改 secrets / `.env*` / keys；改 auth、payment、permission；改 DB migration；改 nginx、Dockerfile、docker-compose；自動 deploy production；用空 catch 或吞錯把問題藏起來。沒有 pre-repair backup 就不能建 Issue / PR；沒有人工 merge 和手動 `/sg-deploy` 就不能有 production 變更。
+
+Auto-repair PR 必須含中文摘要：問題、原因、修法、風險、建議。改超過 3 個檔案、同 fingerprint 第二次修、API response 格式變更、cron/排程/第三方 API 變更，一律標 `needs-human-review`。
+
 ### AwareWave Stack 全局知識（所有 Agent 共用）
 
 **SG VPS** `5.223.93.113` — Phase 1 Core（`/root/lobster-phase1/`）
@@ -205,17 +217,5 @@
 - **重大分岔留下 ADR 骨架**：`docs/architecture/decisions/ADR_INDEX.md`（採輕量格式；細節仍回寫 `WORKLOG`）
 - **部署 drift 雙層偵測（2026-05-08 起）**：(a) **客戶端**：`scripts/check-deploy-drift.ps1` 比對 SG production `/root/lobster-phase1/.deployed-commit` 與 `origin/main`，掛入 `system-health-check.ps1` §7（warn-only）；slash command `/check-drift`。(b) **伺服器端**：SG cron `0 1 * * *`（09:00 TPE）跑 `/root/lobster-phase1/scripts/check-drift-and-alert.sh`，drift > 0 即 Slack alert（dedupe by `(deployed,origin)` pair）。Owner doc：`docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2.1-2.6。
 - **治理檔月度 drift 巡檢（2026-05-08 起）**：`scripts/check-governance-docs-drift.ps1` 對 4 個長期治理檔（Inventory / Routing Spec / Routing Matrix / Traceability）做 cross-ref + MCP 名單 + mtime + footer 一致性檢查，輸出 `reports/governance/drift-YYYY-MM.md`。每月 1 號由 `AgencyOS-MonthlyReview` routine 自動跑（Claude Cloud），亦可手動觸發。informational snapshot，非 build gate。
-
-## 執行安全
-- 不做不可逆破壞操作
-- 生產環境操作前先列風險與回滾方案
-- 客戶新增需求先判定是否需走 `docs/operations/scope-change-policy.md`
-
-### Auto-Repair 紅線
-Repair Center 正本流程：`incident → triage → approve → backup → repair run → GitHub issue/PR → human merge → manual sg-deploy → health gate → rollback if needed`。
-
-絕對不可：改 secrets / `.env*` / keys；改 auth、payment、permission；改 DB migration；改 nginx、Dockerfile、docker-compose；自動 deploy production；用空 catch 或吞錯把問題藏起來。沒有 pre-repair backup 就不能建 Issue / PR；沒有人工 merge 和手動 `/sg-deploy` 就不能有 production 變更。
-
-Auto-repair PR 必須含中文摘要：問題、原因、修法、風險、建議。改超過 3 個檔案、同 fingerprint 第二次修、API response 格式變更、cron/排程/第三方 API 變更，一律標 `needs-human-review`。
 
 
