@@ -21,6 +21,12 @@ function hasTrustedProxyAuth(request: NextRequest): boolean {
 }
 
 export function middleware(request: NextRequest) {
+  // /api/ops/summary is a public monitoring endpoint (Uptime Kuma health check).
+  // Cloudflare strips x-ops-proxy-auth before forwarding, so we exempt this path.
+  if (request.nextUrl.pathname === "/api/ops/summary") {
+    return NextResponse.next();
+  }
+
   const headers = new Headers(request.headers);
 
   const trustedProxy = hasTrustedProxyAuth(request);
