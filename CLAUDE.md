@@ -1,5 +1,4 @@
 @agency-os/AGENTS.md
-@scripts/README.md
 
 # Claude Code Project Instructions
 

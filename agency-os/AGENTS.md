@@ -162,21 +162,9 @@
 - **完整表**（與 repo 根 `mcp.json` 鍵對齊、含 LLM 分流與龍蝦 Routing 對照）：**`docs/operations/cursor-mcp-and-plugin-inventory.md`**。
 - **龍蝦自動化強制規格**（誰可 orchestrate、核准、rollback）：`../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`（**不**被 IDE MCP 清單取代）。
 
-## Session 啟動順序（每次都做）
-1. 讀 `README.md`（本目錄）；若工作區含整個 monorepo，一併讀 `../README.md`（根目錄導覽：龍蝦工廠 + AO + `verify-build-gates`）
-1b. **子網域／`api.aware-wave.com`／`node-api` 邊界與長期計畫（git 唯一正文）**：`docs/edge-and-domains/EDGE_DOMAINS_INDEX.md` → `docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`（**不要**在 `~/.cursor/plans/` 維護第二份相同正文）
-1c. **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）**：`docs/governance-plans/GOVERNANCE_PLANS_INDEX.md`
-1d. **平台能力＋工具總索引 §0（一句話＋連到專文／計畫；與狀態同檔）**：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
-2. 讀 `AGENTS.md`
-3. 讀 `memory/CONVERSATION_MEMORY.md`（長期記憶）；若易混淆 **`LAST_AO_RESUME_BRIEF`**／**`SESSION_TEMPLATE`**／**inbox 機械匯入**，先掃 **`memory/MEMORY_INDEX.md`**
-4. 讀 `memory/daily/` 的今日與昨日筆記（若存在）
-5. 讀 `TASKS.md` 與 `WORKLOG.md`
-6. 讀龍蝦工廠主軸文件（若存在）：
-   - `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
-   - `../lobster-factory/docs/LOBSTER_FACTORY_COMPLETION_PLAN_V2.md`
-7. 先輸出啟動摘要（固定格式）：
-   - **一般開場**（非 `AO-RESUME`）：`Yesterday Recap`（Completed/Pending/Risks）、`Today Plan`（Priority 1/2/3）、`Confirm`：「今天先做哪一項？」
-   - **關鍵字 `AO-RESUME`**：**優先**依 **`.claude/commands/ao-resume.md`**（七段式：**系統快照／外部信號／已完成／目前進度／未完成待辦全列／需決策（選填）／下一步**）。**禁止**用極短回覆取代「**每一條** `- [ ]` 待辦逐條列出」與「**實質**阻塞／風險盤點」（見該規則）。
+## Session 啟動順序
+AO-RESUME 完整啟動流程詳見 `.claude/commands/ao-resume.md`（七段式：系統快照／外部信號／已完成／目前進度／未完成待辦全列／需決策／下一步）。
+一般開場：Yesterday Recap（Completed/Pending/Risks）→ Today Plan（Priority 1/2/3）→ Confirm 今天先做哪一項。
 
 ## 快速續接關鍵字
 - 跨系統運作模型（AO 治理 + 龍蝦執行）：`docs/overview/ao-lobster-operating-model.md`（作為事件節奏與責任分工的總入口）。
@@ -218,20 +206,10 @@
 - **新增或大幅改版「重要 md」（治理／對外／會給客戶看）**：必讀並依序處理 **`docs/operations/new-doc-linkage-checklist.md`**；寫入 **`change-impact-map.json` + 矩陣** 可半自動：`scripts/register-new-governance-doc.ps1`（仍須指定要連動的 `-Targets`；**README 入口與內文語意**無法替你判斷，請補齊後跑 doc-sync / health）。
 
 ## 文件治理規則
-- **檔名可讀性規範（強制）**：檔名必須讓人一眼看出用途，建議結構為 `TYPE_SCOPE_PURPOSE[_CLIENT/PROJECT].md`（例：`PRODUCTION_RUNBOOK_PILOT_A_EXISTING_SITE_SOULFUL_EXPRESSION.md`）。禁止 `new.md`、`temp.md`、`v2-final-final.md` 這類不具語意命名。
-- **最高原則（除非必要）**：**一份內容只能有一個主人（Owner File）**。
-- 非 Owner 檔案只放「一句摘要 + 連結」，不得複製完整內容（尤其流程圖、SOP 指令塊、規格正文）。
-- 必要副本（法遵/審計/對外交付）必須在檔頭標註原因與 Owner 路徑，並指定同步責任人。
-- **IDE 規則索引（Cursor `.mdc` + Claude Code `CLAUDE.md` 並存架構）**：`docs/operations/cursor-enterprise-rules-index.md`（匯流 `63`–`66` `.mdc`、MCP inventory、龍蝦 `MCP_TOOL_ROUTING_SPEC`；Claude Code 對應見該檔 §Claude Code；與 `AO-RESUME`／`AO-CLOSE` 衝突時以本 repo 之 **00／30／40** 規則為準）
-- 治理/標準/模板文件優先放 `docs/` 分類目錄
-- 新增文件時必須在 `README.md` 增加入口
-- 任務結束前必做關聯檢查，避免只改單一文件造成不同步
-- 文件更新後，執行：`powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -AutoDetect`
-- 重大改版後，執行：`powershell -ExecutionPolicy Bypass -File .\scripts\system-health-check.ps1`
-- 會話結束前，執行：`powershell -ExecutionPolicy Bypass -File .\scripts\system-guard.ps1 -Mode manual`
-- `system-health-check` 的 Critical Gate 必須 PASS（連動缺漏不允許帶過）
-- 所有腳本讀寫檔案必須顯式使用 UTF-8，避免亂碼與編碼漂移
-- 每次變更前必須完整閱讀目標檔與直接關聯的 source-of-truth；變更後必做衝突檢查（重複、矛盾、路徑舊值、狀態不一致）
+- **檔名規範**：`TYPE_SCOPE_PURPOSE.md`；禁止 `new.md`、`temp.md`、`v2-final-final.md`
+- **單一 Owner 原則**：一份內容只能有一個主人；非 Owner 檔案只放一句摘要 + 連結，不得複製完整內容
+- 治理文件優先放 `docs/` 分類目錄；新增文件時必須在 `README.md` 增加入口
+- 完整規則與 IDE 索引：`docs/operations/cursor-enterprise-rules-index.md`
 
 ## 長期營運紀律（30 年級）
 - **憲章級原則（短、可對照閘道）**：`docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`
@@ -244,22 +222,4 @@
 - 生產環境操作前先列風險與回滾方案
 - 客戶新增需求先判定是否需走 `docs/operations/scope-change-policy.md`
 
-## Related Documents (Auto-Synced)
-- `.cursor/rules/00-session-bootstrap.mdc`
-- `.cursor/rules/10-memory-maintenance.mdc`
-- `.cursor/rules/20-doc-sync-closeout.mdc`
-- `.cursor/rules/30-resume-keyword.mdc`
-- `.cursor/rules/40-shutdown-closeout.mdc`
-- `.cursor/rules/63-cursor-core-identity-risk.mdc`
-- `docs/CHANGE_IMPACT_MATRIX.md`
-- `docs/operations/cursor-enterprise-rules-index.md`
-- `docs/operations/cursor-mcp-and-plugin-inventory.md`
-- `docs/operations/new-doc-linkage-checklist.md`
-- `docs/operations/system-guard-and-notification.md`
-- `docs/operations/system-operation-sop.md`
-- `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
-- `README.md`
-- `scripts/register-new-governance-doc.ps1`
-
-_Last synced: 2026-05-18 01:00:10 UTC_
 
