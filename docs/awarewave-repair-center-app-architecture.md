@@ -81,8 +81,8 @@ Do not create multiple overlapping state machines across Slack, Ops Inbox, and G
 3. `Slack` is the primary human incident surface.
 4. `Telegram` is backup notification plus command plane only.
 5. No backup means no repair run.
-6. No human merge means no production code change.
-7. No manual deploy means no production release.
+6. Auto-deploy via `sg-deploy.sh` is allowed; backup + health gate + auto-rollback required before any production change.
+7. nginx / Dockerfile / docker-compose changes require: backup → apply → health check → auto-rollback on failure.
 
 ## UI Information Architecture
 

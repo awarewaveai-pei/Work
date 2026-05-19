@@ -33,8 +33,8 @@ Canonical flow:
 3. Slack is the main human incident surface.
 4. Telegram is backup notification plus command plane only.
 5. No backup means no repair run.
-6. No human merge means no production code change.
-7. No manual deploy means no production release.
+6. Auto-deploy via `sg-deploy.sh` is allowed; backup + health gate + auto-rollback required before any production change.
+7. nginx / Dockerfile / docker-compose changes require: backup → apply → health check → auto-rollback on failure.
 8. `#alerts-critical` and `#alerts-info` are obsolete and must not be rebuilt.
 9. Do not move Telegram secrets into GitHub Secrets.
 10. Do not bypass `sg-deploy.sh`, `rollback-phase1.sh`, or `System Modes`.
