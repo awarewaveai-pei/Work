@@ -46,11 +46,28 @@ Files to report: `MEMORY.md`、`user-env.ps1`、`.ssh/hetzner_trigger`、`.ssh/i
 If import did not run (hook missing / E:\ not mounted / G:\ not accessible), write「import 未執行 — [原因]」and list what needs to be fixed.
 
 **2. 外部信號**
-Read `agency-os/.agency-state/external-signals-digest.json` (written by fetch-external-signals.ps1).
-If `since_utc` in the digest is more than 2 hours older than current time AND the user's question implies a specific range, automatically run `/signals` with the correct `-From`/`-To` before outputting this section.
+Read `agency-os/.agency-state/external-signals-digest.json`.
+
+**First, output a single header line** showing the exact gap window and its reliability:
+```
+區間：[gap_window.start_utc → gap_window.end_utc, both converted to CST]（source: [gap_window.source]）
+```
+Then classify the digest before reporting any messages:
+
+- **`gap_window.is_fresh = true`** AND **`fetch_status = "ok"`**：
+  All signals below are from this session's gap (last AO-CLOSE → this AO-RESUME) and are by definition unprocessed. No ambiguity.
+
+- **`gap_window.is_fresh = false`** (source is `ao-resume-last.txt` or `fallback-24h`）：
+  ⚠️ **UNRELIABLE WINDOW** — the gap start anchor was missing (ao-close-last.txt not found). Signals may overlap with the previous session. Do NOT report as definitively unprocessed. Offer to re-run: `scripts/fetch-external-signals.ps1`.
+
+- **`fetch_status = "partial"` or `"failed"`**：
+  ⚠️ **FETCH FAILED** — one or both APIs returned errors. Show which channels failed and their status strings. Do not guess at content; write「無法讀取 — [channel]: [status]」.
+
+- **Digest is stale** (hook `finished_utc` from ao-resume-hook-last.json is >10 min newer than digest `generated_utc`)：
+  ⚠️ **STALE DIGEST** — fetch-signals ran during AO-RESUME but did not refresh the file (API failure or credential issue). Report what the stale digest contains but label every item `[from stale digest — may be already-seen]`. Offer to manually re-run.
 
 Telegram @awarewave_ops_bot: 未讀數量 + 可操作項條列（無則寫「本輪無未讀」）
-Slack #ops-incidents / #infra-alerts: 未讀數量 + 最新一筆（無法讀取時寫「無法讀取 — 請手動確認」）
+Slack #ops-incidents / #infra-alerts / #github-prs: 未讀數量 + 最新一筆
 Cloudflare security: report result from `agency-os/reports/status/cf-security-LATEST.md` (bot=ON/OFF, rules=N) — skip if file missing.
 Only include actionable items; skip routine noise.
 
