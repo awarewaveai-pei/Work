@@ -93,7 +93,10 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
     # Nested powershell.exe writes stdout to the success stream; when this function is invoked as
     # `$x = Invoke-...`, that output would fuse with `return`, producing bogus non-numeric exits.
     & powershell.exe @AlignArgs | Out-Host
-    $exit1 = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+    # NOTE: After `| Out-Host` the pipeline can leave $LASTEXITCODE null in PS 5.1.
+    # Treat null as 0 (not 1): git-align.ps1 now has an explicit `exit 0` at the end,
+    # so null here means "script completed without a native command setting the code" = success.
+    $exit1 = if ($null -eq $LASTEXITCODE -or $LASTEXITCODE -eq '') { 0 } else { [int]$LASTEXITCODE }
     if ($exit1 -eq 0) {
         return 0
     }

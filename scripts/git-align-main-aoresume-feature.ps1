@@ -232,3 +232,7 @@ To intentionally discard those commits (destructive): pass -AllowResetAheadOfOri
 } finally {
     Pop-Location
 }
+
+# Explicit exit 0 ensures callers (ao-resume, CI) see success even when the last
+# native command in the try block leaves $LASTEXITCODE in an indeterminate state.
+exit 0
