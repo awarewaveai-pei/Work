@@ -68,7 +68,7 @@ Repair Center 正本流程：`incident → triage → backup → repair run → 
 
 **絕對不可（無論任何情況）**：改 secrets / `.env*` / keys；改 auth、payment、permission、RLS；改 DB migration；未經 health gate 直接 deploy production；用空 catch 或吞錯把問題藏起來。沒有 pre-repair backup 就不能建 Issue。
 
-**nginx / Dockerfile / docker-compose 可改，但強制流程**：① 修改前備份原檔 ② 套用後立即跑 health check ③ health check 失敗自動 rollback 到備份 ④ 寫入 WORKLOG。四步缺一不可。
+**nginx / Dockerfile / docker-compose 可改，但強制流程**：① 修改前備份原檔 ② 套用後立即跑 health check ③ health check 失敗自動 rollback 到備份 ④ 寫入 WORKLOG。四步缺一不可。機械閘腳本：`lobster-factory/infra/hetzner-phase1-core/scripts/safe-infra-patch.sh`（VPS 上：`/root/lobster-phase1/scripts/safe-infra-patch.sh`）。
 
 Auto-repair GitHub issue 必須含中文摘要：問題、原因、修法、風險、建議。改超過 3 個檔案、同 fingerprint 第二次修、API response 格式變更、cron/排程/第三方 API 變更，一律標 `needs-human-review`。
 
