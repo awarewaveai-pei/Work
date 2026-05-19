@@ -46,8 +46,9 @@ $null = New-Item -ItemType Directory -Force -Path $stateDir
 Write-Host "== fetch-external-signals: building digest ==" -ForegroundColor Cyan
 
 # --- determine "since" / "until" timestamps ---
-$sinceUtc = $null
-$untilUtc = $null
+$sinceUtc    = $null
+$untilUtc    = $null
+$sinceSource = "fallback-24h"   # updated below as we find a better anchor
 
 # -From override: explicit start (supports "yyyy-MM-dd HH:mm" in CST or ISO UTC)
 if ($From) {
@@ -59,6 +60,7 @@ if ($From) {
         } else {
             $sinceUtc = [DateTime]::Parse($From, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
         }
+        $sinceSource = "explicit-from-param"
         Write-Host "   since: $From (from -From param, UTC=$($sinceUtc.ToString('o')))" -ForegroundColor DarkGray
     } catch {
         Write-Host "   WARN: -From '$From' parse failed, using ao-close stamp" -ForegroundColor Yellow
@@ -66,14 +68,15 @@ if ($From) {
     }
 }
 
-# Stamp fallback when -From not provided
+# Stamp fallback when -From not provided (or parse failed)
 if (-not $sinceUtc) {
     foreach ($stampFile in @("ao-close-last.txt", "ao-resume-last.txt")) {
         $f = Join-Path $stateDir $stampFile
         if (Test-Path -LiteralPath $f) {
             try {
                 $raw = (Get-Content -LiteralPath $f -Raw -Encoding UTF8).Trim()
-                $sinceUtc = [DateTime]::Parse($raw, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+                $sinceUtc    = [DateTime]::Parse($raw, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+                $sinceSource = $stampFile
                 Write-Host "   since: $raw (from $stampFile)" -ForegroundColor DarkGray
                 break
             } catch {}
@@ -82,8 +85,13 @@ if (-not $sinceUtc) {
 }
 if (-not $sinceUtc) {
     $sinceUtc = (Get-Date).ToUniversalTime().AddHours(-$MaxLookbackHours)
+    # sinceSource already "fallback-24h"
     Write-Host "   since: no stamp found, using last $MaxLookbackHours h" -ForegroundColor DarkYellow
 }
+
+# is_fresh = true when the anchor is reliable (came from explicit param or ao-close stamp).
+# false when falling back to ao-resume-last.txt or 24h — may include already-seen signals.
+$isFresh = $sinceSource -in @("explicit-from-param", "ao-close-last.txt")
 
 # -To override: explicit end cap
 if ($To) {
@@ -232,9 +240,24 @@ Write-Host ("   Slack:    {0}" -f $slackStatus) `
 # ─────────────────────────────────────────────────────────────────────────────
 # Write digest
 # ─────────────────────────────────────────────────────────────────────────────
+$generatedUtc = (Get-Date).ToUniversalTime()
+$endIso       = if ($untilUtc) { $untilUtc.ToString("o") } else { $generatedUtc.ToString("o") }
+
+# Aggregate fetch_status: ok = all channels succeeded, partial = at least one ok, failed = none ok.
+$allStatuses  = @($tgStatus) + @($slackChannels.Values | ForEach-Object { $_.status })
+$okCount      = ($allStatuses | Where-Object { $_ -eq "ok" }).Count
+$fetchStatus  = if ($okCount -eq $allStatuses.Count) { "ok" } elseif ($okCount -gt 0) { "partial" } else { "failed" }
+
 $digest = [ordered]@{
-    generated_utc = (Get-Date).ToUniversalTime().ToString("o")
-    since_utc     = $sinceIso
+    generated_utc = $generatedUtc.ToString("o")
+    since_utc     = $sinceIso           # kept for backward compat
+    fetch_status  = $fetchStatus        # ok | partial | failed
+    gap_window    = [ordered]@{
+        start_utc = $sinceIso           # last AO-CLOSE (or fallback)
+        end_utc   = $endIso             # this AO-RESUME (or -To cap)
+        source    = $sinceSource        # explicit-from-param | ao-close-last.txt | ao-resume-last.txt | fallback-24h
+        is_fresh  = $isFresh            # true = gap is reliable; false = fallback anchor, may include old signals
+    }
     telegram      = [ordered]@{
         status       = $tgStatus
         unread_count = $tgUnread

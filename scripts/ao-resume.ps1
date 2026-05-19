@@ -366,11 +366,41 @@ if (Test-Path -LiteralPath $backupHealthScript) {
 }
 
 # Fetch external signals (Telegram ops inbox + Slack) since last AO-CLOSE — non-blocking.
+# Pass -From explicitly so the gap window is always (last AO-CLOSE → now), not a stale fallback.
 $fetchSignalsScript = Join-Path $WorkRoot "scripts\fetch-external-signals.ps1"
 if (Test-Path -LiteralPath $fetchSignalsScript) {
     Write-Host "== AO-RESUME: fetch external signals (Telegram + Slack) ==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $fetchSignalsScript -WorkRoot $WorkRoot
+    $aoStateDir     = Join-Path $WorkRoot "agency-os\.agency-state"
+    $closeStampPath = Join-Path $aoStateDir "ao-close-last.txt"
+    $fromArgs = @()
+    if (Test-Path -LiteralPath $closeStampPath) {
+        $closeTs = (Get-Content -LiteralPath $closeStampPath -Raw -Encoding UTF8).Trim()
+        if ($closeTs) {
+            $fromArgs = @("-From", $closeTs)
+            Write-Host ("   gap-start: {0} (ao-close-last.txt)" -f $closeTs) -ForegroundColor DarkGray
+        }
+    } else {
+        Write-Host "   WARN: ao-close-last.txt missing — signals will use 24h fallback (run AO-CLOSE to fix)" -ForegroundColor Yellow
+    }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $fetchSignalsScript -WorkRoot $WorkRoot @fromArgs
     $global:LASTEXITCODE = 0
+    # Freshness gate: if digest is >10 min old after the fetch, the API calls likely failed.
+    $digestPath = Join-Path $aoStateDir "external-signals-digest.json"
+    if (Test-Path -LiteralPath $digestPath) {
+        try {
+            $dj     = Get-Content -LiteralPath $digestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $genUtc = [DateTime]::Parse($dj.generated_utc, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+            $ageMin = [int]([DateTime]::UtcNow - $genUtc).TotalMinutes
+            if ($ageMin -gt 10) {
+                Write-Host ("   SIGNALS-STALE: digest is {0} min old — Telegram/Slack fetch likely failed; check vault credentials" -f $ageMin) -ForegroundColor Yellow
+            } else {
+                $src = if ($dj.gap_window) { $dj.gap_window.source } else { "unknown" }
+                Write-Host ("   signals-fresh: digest {0} min old, source={1}, fetch_status={2}" -f $ageMin, $src, $dj.fetch_status) -ForegroundColor Green
+            }
+        } catch {
+            Write-Host "   WARN: could not read digest for freshness check" -ForegroundColor Yellow
+        }
+    }
 }
 
 # Cloudflare security posture check (warn-only) — bot fight mode + WAF rules.
