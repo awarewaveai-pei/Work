@@ -375,6 +375,12 @@ if (-not $SkipAutoTaskCheckmarks -and (Test-Path -LiteralPath $applyMarks)) {
     Write-Host "== AO-CLOSE: -SkipAutoTaskCheckmarks（略過自動打勾）==" -ForegroundColor DarkYellow
 }
 
+$dispatchScript = Join-Path $WorkRoot "scripts\append-agent-dispatch-to-worklog.ps1"
+if (Test-Path -LiteralPath $dispatchScript) {
+    Write-Host "== AO-CLOSE: agent dispatch summary → WORKLOG ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dispatchScript -WorkRoot $WorkRoot
+}
+
 Write-Host ""
 Write-Host "=== AO-CLOSE: automation boundary (every run) ===" -ForegroundColor Cyan
 Write-Host "SCRIPT DID: daily scaffold; inbox guard; merge-closeout-inbox (verbatim -> WORKLOG + memory/daily + CONVERSATION_MEMORY pointer); recap; verify/guard/report; apply AUTO_TASK_DONE -> TASKS; after git add, verify-closeout-completeness (default strict) before commit." -ForegroundColor Green

@@ -115,6 +115,16 @@
             "description": "Run sibling test files and report failures"
           }
         ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/agent-dispatch-log.js",
+            "description": "Log agent dispatches to agency-os/reports/agent-dispatch/dispatch-YYYYMMDD.jsonl"
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [

@@ -117,6 +117,17 @@ Forces feature-branch workflow without ever silently allowing a direct commit to
 
 Skips the check if `offset` or `limit` is already set.
 
+### 🤖 `agent-dispatch-log.js`
+**Fires:** `PostToolUse` on `Agent`
+**What it does:** Every time Claude dispatches a subagent (devops-engineer, supabase-engineer, etc.), appends a JSONL record to `agency-os/reports/agent-dispatch/dispatch-YYYYMMDD.jsonl`. Falls back to `~/.claude/agent-dispatch/` if `agency-os/` is not found under the working directory. Auto-redacts secret patterns (tokens, passwords, GitHub keys, Trigger.dev PATs).
+
+**Output format:**
+```json
+{"ts":"2026-05-19T08:15:00Z","task_id":"dlg-20260519-081500-a1b2","agent":"devops-engineer","description":"Restart lobster-nginx on SG VPS","result_snippet":"nginx restarted successfully, health PASS"}
+```
+
+**AO-CLOSE integration:** `scripts/append-agent-dispatch-to-worklog.ps1` reads today's JSONL and appends a `### Agent 派工紀錄` block to `WORKLOG.md` automatically on every AO-CLOSE. The JSONL is committed to git for cross-machine traceability.
+
 ### 📚 `session-summary.js`
 **Fires:** `Stop`
 **What it does:** Appends a structured session summary to `~/.claude/sessions/<date>-<session-id>.md`. Includes the working directory, current `git status --short`, and recent commit log.

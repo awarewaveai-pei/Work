@@ -117,6 +117,17 @@
 
 如果已經設了 `offset` 或 `limit` 就跳過。
 
+### 🤖 `agent-dispatch-log.js`
+**觸發：** `PostToolUse` on `Agent`
+**做什麼：** 每次 Claude 呼叫 subagent（devops-engineer、supabase-engineer 等），就把一筆 JSONL 紀錄 append 到 `agency-os/reports/agent-dispatch/dispatch-YYYYMMDD.jsonl`。若工作目錄下找不到 `agency-os/`，則 fallback 到 `~/.claude/agent-dispatch/`。自動 redact 常見密碼 pattern（token、password、GitHub key、Trigger.dev PAT）。
+
+**輸出格式：**
+```json
+{"ts":"2026-05-19T08:15:00Z","task_id":"dlg-20260519-081500-a1b2","agent":"devops-engineer","description":"Restart lobster-nginx on SG VPS","result_snippet":"nginx restarted successfully, health PASS"}
+```
+
+**AO-CLOSE 整合：** `scripts/append-agent-dispatch-to-worklog.ps1` 在每次 AO-CLOSE 讀當天 JSONL，自動把 `### Agent 派工紀錄` 寫進 `WORKLOG.md`。JSONL 進 git，跨機可查。
+
 ### 📚 `session-summary.js`
 **觸發：** `Stop`
 **做什麼：** Append 一份結構化的 session 摘要到 `~/.claude/sessions/<日期>-<session-id>.md`。包含當下工作目錄、`git status --short`、最近 commit log。
