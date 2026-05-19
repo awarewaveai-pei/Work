@@ -128,6 +128,39 @@ curl github.com API with PAT → HTTP 200 ✅
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**: GitHub MCP stale process（重啟 Claude Code 自動解決）
 
+## 2026-05-19
+
+### EU VPS ClickHouse 升級 24.8.8 → 25.7.5（trigger-webapp 記憶體爆炸根因修復）
+
+**根因**：EU VPS `/root/trigger/.env` 缺少 `CLICKHOUSE_IMAGE_TAG` 設定，docker-compose fallback 到舊 default `24.8.8-debian-12-r0`。但 volume 內的 schema（`metrics_v1`、`task_runs_v1/v2` 等）使用 `JSON(max_dynamic_paths=8, ...)` 語法，由 ClickHouse 25.x 建立。24.8.8 無法 attach `metrics_v1` 表，且 trigger-webapp `@clickhouse/client 1.12.1` 每次 run 執行時發送 `enable_json_type=1` 設定參數（25.3+ 才支援），24.8.8 回傳 `UNKNOWN_SETTING`，觸發 retry queue 在記憶體無限堆積，導致容器 13 分鐘從 255MB 漲至 764MB+，重啟只是清掉 queue，根本問題未解。
+
+**修復步驟**：
+1. 停 trigger-webapp + clickhouse（避免備份期間文件變動）
+2. 備份 volume：`/root/backups/clickhouse-data-pre-upgrade-25.7.5-20260519-060453.tar.gz`（906MB）
+3. 在 `/root/trigger/.env` 加入 `CLICKHOUSE_IMAGE_TAG=25.7.5-debian-12-r0`
+4. `docker compose pull clickhouse && docker compose up -d clickhouse`
+5. 等 healthy → 驗證 `SHOW TABLES FROM trigger_dev` 全部 23 張表正常（含 `metrics_v1`）
+6. 啟動 webapp → 觀察 log 無 ClickHouseError
+7. 修 `lobster-factory/infra/trigger/docker-compose.yml` fallback default：`24.8.8` → `25.7.5`
+8. commit `bde752b` → push origin main
+
+**同場處理（記憶體維護排程優化）**：
+- trigger-webapp smart-restart 門檻從 500MB 調高至 1200MB（正常操作水位 ~850MB，非洩漏）
+- crontab 改為每日 04:00 UTC 門檻式重啟（trigger-webapp 1200MB / n8n 500MB）
+- `/root/scripts/smart-restart-if-oom.sh` 已建立並驗證
+
+**驗證**：
+- ClickHouse 版本：`SELECT version()` → `25.7.5.34` ✅
+- trigger_dev 23 張表：`SHOW TABLES FROM trigger_dev` 全部正常 attach ✅
+- ClickHouseError in logs：0 ✅
+- 記憶體趨勢：775–865MB 震盪（非單向增長）✅
+
+**避免再發生**：docker-compose fallback 已改為正確版本，即使 .env 缺設定也不會退回 24.8.x。
+
+**備份保留計畫**：`/root/backups/clickhouse-data-pre-upgrade-25.7.5-20260519-060453.tar.gz` 保留至 2026-06-01，若系統穩定則刪除（見 TASKS.md「EU VPS ClickHouse 升級後備份清理」）。
+
+**Rollback**：若 25.7.5 出問題，刪 .env 中 `CLICKHOUSE_IMAGE_TAG` 行 → 退回 24.8.8（現狀，不會更壞）；volume 備份為最後手段。
+
 ## 2026-05-15
 
 ### AO-RESUME protocol 修復 — hook 未跑時強制 fallback（commit `682c554`）

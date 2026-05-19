@@ -125,6 +125,10 @@
 - [ ] `lobster-factory` A7 全站自動建站補齊 —— **【未開始】**
   - 範圍：hosting adapter + provision/shell guardrails 端到端
 
+#### EU VPS 維護
+
+- [ ] **【2026-06-01 檢查】EU VPS ClickHouse 升級後備份清理** —— **【未開始】** **背景**：2026-05-19 將 EU VPS ClickHouse 從 24.8.8 升級至 25.7.5（修正 `enable_json_type` UNKNOWN_SETTING 導致 trigger-webapp 記憶體爆炸問題）。升級前備份檔案存於 EU VPS `/root/backups/clickhouse-data-pre-upgrade-25.7.5-20260519-060453.tar.gz`（906MB）。**2026-06-01 執行**：SSH 進 EU VPS → 確認 trigger-webapp 過去兩週無 ClickHouse 錯誤（`grep ClickHouseError /var/log/smart-restart.log`）且記憶體維持正常水位 → 若穩定則刪除備份：`rm /root/backups/clickhouse-data-pre-upgrade-25.7.5-20260519-060453.tar.gz`。**DoD**：備份已刪除 + WORKLOG 留紀錄；若系統不穩定則保留並回報。
+
 #### 工具層 / 基礎建設 / 治理
 
 - [x] Enterprise 工具層 Phase 1 正式串接 —— **【完成 2026-05-13】** 五層工具全數結案＋端到端串接路徑驗收，見 `WORKLOG.md §2026-05-13「Enterprise 工具層 Phase 1 — 端到端串接結案驗收」`。
