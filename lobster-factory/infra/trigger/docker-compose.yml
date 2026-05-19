@@ -63,7 +63,7 @@ services:
       start_period: 10s
 
   clickhouse:
-    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-24.8.8-debian-12-r0}
+    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-25.7.5-debian-12-r0}
     container_name: trigger-clickhouse
     restart: unless-stopped
     logging: *trigger-logging
@@ -92,7 +92,7 @@ services:
       start_period: 20s
 
   clickhouse-config-check:
-    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-24.8.8-debian-12-r0}
+    image: bitnamilegacy/clickhouse:${CLICKHOUSE_IMAGE_TAG:-25.7.5-debian-12-r0}
     container_name: trigger-clickhouse-config-check
     profiles: ["preflight"]
     restart: "no"
