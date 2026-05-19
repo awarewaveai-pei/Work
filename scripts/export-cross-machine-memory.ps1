@@ -117,13 +117,30 @@ Write-Host "   machine    : $($env:COMPUTERNAME)" -ForegroundColor DarkGray
 Write-Host "   project-key: $projectKey" -ForegroundColor DarkGray
 Write-Host "   destination: $destBase" -ForegroundColor DarkGray
 
-# ── 4. Export MEMORY.md + machine identity tag ───────────────────────────────
+# ── 4. Export all memory *.md files + machine identity tag ────────────────────
 $memDest = Join-Path $destBase "memory"
 New-Item -ItemType Directory -Path $memDest -Force | Out-Null
+
 $memDestFile = Join-Path $memDest "MEMORY.md"
 Copy-Item -LiteralPath $memIndex -Destination $memDestFile -Force
 (Get-Item $memDestFile).LastWriteTime = $syncNow
 Write-Host "  copied: MEMORY.md" -ForegroundColor Green
+
+# Export individual memory files (all *.md except MEMORY.md itself).
+# These are the actual memory content files — without them the index is useless on another machine.
+$exportedMemFiles = 0
+Get-ChildItem -Path $memSrc -Filter "*.md" -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ne "MEMORY.md" } |
+    ForEach-Object {
+        $dstPath = Join-Path $memDest $_.Name
+        Copy-Item -LiteralPath $_.FullName -Destination $dstPath -Force
+        (Get-Item $dstPath).LastWriteTime = $syncNow
+        Write-Host "  copied: memory/$($_.Name)" -ForegroundColor Green
+        $exportedMemFiles++
+    }
+if ($exportedMemFiles -gt 0) {
+    Write-Host "  exported: $exportedMemFiles individual memory file(s)" -ForegroundColor DarkGray
+}
 
 $env:COMPUTERNAME | Out-File -FilePath (Join-Path $memDest ".exported-by") -Encoding UTF8 -NoNewline -Force
 Write-Host "  tagged: .exported-by=$($env:COMPUTERNAME)" -ForegroundColor DarkGray
@@ -263,6 +280,7 @@ This file is a manual fallback guide only -- you should never need to run these 
 | Location | Content |
 |----------|---------|
 | memory/MEMORY.md | Claude Code project memory index |
+| memory/*.md | Individual memory files (feedback, project, reference entries) |
 | memory/.exported-by | Machine that created this export ($($env:COMPUTERNAME)) |
 | (secrets root)/user-env.ps1 | All MCP API keys (shared, last-write-wins) |
 | (secrets root)/.ssh/* | SSH keys (dynamic scan; excl. known_hosts / authorized_keys / *.txt) |

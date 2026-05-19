@@ -557,6 +557,30 @@ if (Test-Path $cfScript) {
     Add-Check -Name "Cloudflare security (bot+WAF)" -Pass $true -Detail "Skipped: check-cloudflare-security.ps1 not present"
 }
 
+# 10) Memory index integrity (warn-only).
+# Checks that every MEMORY.md link resolves to a real file, and no file is unindexed.
+# Pass=$true even on drift so this never blocks AO-CLOSE — agent fixes at session start.
+$memValidateScript = Join-Path $monoRoot "scripts\validate-memory-index.ps1"
+if (Test-Path -LiteralPath $memValidateScript) {
+    try {
+        $prevEapMem = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $memOut  = & powershell -NoProfile -ExecutionPolicy Bypass -File $memValidateScript -WorkRoot $monoRoot *>&1 | Out-String
+        $memExit = $LASTEXITCODE
+        $ErrorActionPreference = $prevEapMem
+        $memTrim = $memOut.Trim() -replace "`r?`n", "; "
+        if ($memExit -eq 0) {
+            Add-Check -Name "Memory index integrity (MEMORY.md vs actual files)" -Pass $true -Detail $memTrim
+        } else {
+            Add-Check -Name "Memory index integrity (MEMORY.md vs actual files)" -Pass $true -Detail ("WARN: " + $memTrim)
+        }
+    } catch {
+        Add-Check -Name "Memory index integrity (MEMORY.md vs actual files)" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+    }
+} else {
+    Add-Check -Name "Memory index integrity (MEMORY.md vs actual files)" -Pass $true -Detail "Skipped: scripts/validate-memory-index.ps1 not present"
+}
+
 $total = $checks.Count
 $passed = @($checks | Where-Object { $_.pass }).Count
 $failed = $total - $passed

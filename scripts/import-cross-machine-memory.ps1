@@ -352,6 +352,41 @@ if ($candidateFolders.Count -gt 0 -and $memDest) {
             $script:ImportFromMachine = $fromLabel
             Write-Host "  cross-machine import: MEMORY.md imported from $($best.Folder.Name) [by: $fromLabel]" -ForegroundColor Green
         }
+
+        # ── Individual memory files import ───────────────────────────────────
+        # Import each *.md (except MEMORY.md) using SHA256 conflict detection.
+        # First run (no local state entry) = vault is authoritative, import.
+        # Local-modified (changed since last sync) = keep local, warn user.
+        $srcMemDir = Join-Path $best.Folder.FullName "memory"
+        if ((Test-Path -LiteralPath $srcMemDir) -and $memDest) {
+            if (-not (Test-Path -LiteralPath $memDest)) {
+                New-Item -ItemType Directory -Path $memDest -Force | Out-Null
+            }
+            Get-ChildItem -Path $srcMemDir -Filter "*.md" -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -ne "MEMORY.md" } |
+                ForEach-Object {
+                    $indSrc  = $_.FullName
+                    $indDst  = Join-Path $memDest $_.Name
+                    $fileKey = "memory/$($_.Name)"
+                    $decision = Get-ImportDecision $indSrc $indDst $fileKey $false
+                    switch ($decision) {
+                        'unchanged' {
+                            Update-LocalStateHash $fileKey (Get-SafeHash $indSrc)
+                            Write-Host "  cross-machine import: memory/$($_.Name) unchanged" -ForegroundColor DarkGray
+                        }
+                        'local-modified' {
+                            Write-Host "  cross-machine import: memory/$($_.Name) CONFLICT — vault differs; local kept. Use -Force to take vault." -ForegroundColor Yellow
+                        }
+                        'import' {
+                            Invoke-LocalBackup $indDst "memory/$($_.Name)"
+                            if (Copy-Atomic $indSrc $indDst) {
+                                Update-LocalStateHash $fileKey (Get-SafeHash $indSrc)
+                                Write-Host "  cross-machine import: memory/$($_.Name) imported" -ForegroundColor Green
+                            }
+                        }
+                    }
+                }
+        }
     }
 } elseif ($candidateFolders.Count -eq 0 -and $allFolders.Count -gt 0) {
     Write-Host "  cross-machine import: MEMORY.md skipped (no other-machine AO-SYNC folder found)" -ForegroundColor DarkGray
