@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-18 14:50:44
+- Generated: 2026-05-19 18:10:18
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,85 +219,59 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-18.md
-# Daily Note — 2026-05-18
+## 5) memory/daily/2026-05-19.md
+# Daily Note - 2026-05-19
 
-## Done today（含前日 17:25 至本次收工全部工作）
-
-本 session 橫跨 2026-05-15 17:25 → 2026-05-18 09:02，共 7 個實質 commit：
-
-1. **AO-SYNC export mtime 修正**（`baca9e4`）：匯出後強制更新 mtime，修正 import 端誤判「未更新」的問題。
-2. **AO-SYNC import 同機 local-ahead 修正**（`4f58ae6`）：同機 vault 改顯示 `📋 local-ahead`（非 WARN）；加 re-verify 防 transient read。57 行變更。
-3. **AO-RESUME fallback Step 0 強制執行**（`682c554`）：hook 未跑時 Claude 必須主動跑 import + signals 腳本；不得靜默跳過。
-4. **web-researcher 強制直接引用**（`9ce65c4`）：新增 178 行 agent 規則；Direct quotes 段強制；無引用主張標注 [unverified]；首次加入 git 版控。
-5. **200% Agent 大稽核 + 幻覺修正**（`b180251`）：
-   - AGENTS.md：WP volume 幻覺修正、EU 補 10 個漏列容器、ClickHouse 版本確認。
-   - agent .md 幻覺修正：frontend-designer（auth-helpers / Tailwind）、fullstack-engineer（path / npm）、supabase-engineer（pooler）、devops-engineer（EU dirs）、debugger（log cmds）。
-   - 13 個 built-in agent .md 從 .gitignore 移出，加入 git 版控（2302 行新增，15 檔案）。
-6. **AO-SYNC 加入 settings.json**（`8102794`）：export/import 腳本支援 `~/.claude/settings.json`，跨機自動同步 Claude Code 設定。
-7. **Uptime Kuma Monitor Fix Runbook**（`c74a773`）：`runbooks/UPTIME-KUMA-MONITOR-FIX.md` 85 行緊急排查手冊。
-
-所有 commit 已由 ao-close.ps1 推送；AO-SYNC 匯出 9 entries 含 settings.json。
+## Done today
+- 實作 agent 派工稽核紀錄系統（Plan B）：`agent-dispatch-log.js` hook + `dispatch-YYYYMMDD.jsonl` + AO-CLOSE WORKLOG 自動摘要整合
+- 診斷並修復 `settings.json` 缺少 Agent PostToolUse matcher（sync script merge 缺口）
+- 以實際 subagent 派工確認 hook 端對端觸發，JSONL 寫入並 commit
 
 ## Current state
+- 派工稽核系統已上線；換機時需手動補 settings.json Agent entry（sync 邏輯待修）
+- WP Plugin Auto-Install 的 sg-deploy + Trigger.dev re-deploy 仍 pending
+- 所有 health check 100%（360/360）
 
-- Git 最新 commit：`c74a773` — docs: add Uptime Kuma monitor fix runbook
-- 所有開放待辦維持 2026-05-15 狀態；見 `TASKS.md §未完成`。
-- 主要開放項：
-  - Termius 手機 SSH 設定（出國前必做，操作者手動）
-  - Soulful Expression Day 1 §1.1 操作者確認
-  - Day 2 staging 實機驗收（兩案）
-  - Scenery Travel Mongolia 新站建置
-  - Repair Center Phase 4 週巡檢啟動
-  - 自動修復觸發分類決策表輸出
-
-## 下午班（桌機 AO-RESUME 第二次開工）
-
-**桌機首次開工（4 天未用）**：
-
-- **Git 假分歧修復**：AO-RESUME hook 在 `git pull` 前 auto-commit `ao-close-last.txt`（state 檔），造成 `local ahead=1, origin ahead=44`。Reset → 刪除衝突檔 → `git pull --ff-only` → `0 0` 對齊。44 commits 包含筆電 2026-05-14~18 的全部工作。
-- **Anthropic API 驗證**：$5.81 餘額補充後，原 GitHub Secret key 不需更換。建 Issue #10 觸發 `auto-repair-claude.yml` → `status = success`，auto-repair Phase 4 觀察期可正常運行。
-- **GitHub MCP 診斷**：PAT 有效（HTTP 200），但 MCP 伺服器為 stale process，本次用 `gh` CLI 替代；重啟 Claude Code 後自動解決。
-
-## Blockers / Risks
-
-- 無新阻塞。既有阻塞：Termius 需操作者手機操作；Soulful §1.1 需操作者登入 Hostinger panel。
-- GitHub MCP stale process（重啟 Claude Code 自動解決，非緊急）。
+## Next steps
+- 修 `sync-claude-userlevel.ps1 -Mode merge` 讓它能合併新的 PostToolUse matcher
+- 換機後補 settings.json Agent entry
+- WP Plugin Auto-Install 待下次開工繼續
 
 ## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:93317e2f105c9b1ae44d60a1b028cca3d47a05ea4073975342b732d09de4b2c4 -->
+<!-- ao-close-inbox-sha256:a072b4d963c46e7a8d9c374342010af0ddebbed2a445055747e5c0f1d3afc842 -->
 
-### claude 2026-05-18 11:55
+### claude-sonnet 2026-05-19 18:15
 
-- **完成（一句）**: 桌機 AO-RESUME 假分歧修復（git reset + pull ff-only）、Anthropic API key 驗證（Issue #10 workflow success）、WORKLOG/memory/daily 更新
+- **完成（一句）**: 實作並驗證 agent 派工稽核紀錄系統（Plan B）：PostToolUse hook + JSONL + AO-CLOSE WORKLOG 整合，確認實際觸發
 - **變更路徑**:
-  - `agency-os/WORKLOG.md`
-  - `agency-os/memory/CONVERSATION_MEMORY.md`
-  - `agency-os/memory/daily/2026-05-18.md`
-- **Git**: 未 commit（含入本次 ao-close commit）
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: GitHub MCP stale process（PAT 有效，重啟 Claude Code 自動解決）；AO-RESUME hook auto-checkpoint state 檔問題建議後續以 --skip-worktree 或 gitignore 處理
+  - `mcp/claude-userlevel/hooks/agent-dispatch-log.js`（新增）
+  - `mcp/claude-userlevel/hooks/hooks.json`（+Agent matcher）
+  - `scripts/append-agent-dispatch-to-worklog.ps1`（新增）
+  - `scripts/ao-close.ps1`（+dispatch 呼叫）
+  - `mcp/claude-userlevel/hooks/README.md`、`README.zh-TW.md`（文件）
+  - `agency-os/reports/agent-dispatch/dispatch-20260519.jsonl`（初始紀錄）
+  - `~/.claude/settings.json`（手動補 Agent PostToolUse matcher，未進 git）
+- **Git**: 2b5fd6c (feat) + c62432f (fix settings.json)
+- **對應 TASKS 子字串（可選）**: 派工稽核
+- **風險／待辦（可選）**: sync-claude-userlevel.ps1 -Mode merge 未能自動合併新 PostToolUse matcher 到 settings.json，需日後修 merge 邏輯；換機時須手動補 Agent entry
 
 ## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:dffd3868a0c7cf68c8908298600396587b78cfa24ab8f2561ed3aaaecd93571b -->
+<!-- ao-close-inbox-sha256:a35cd5b152d2d10b88dac4ed718d2b4b17b86293168c0be036d68016887dfc85 -->
 
-### claude 2026-05-18 12:05
+### claude-sonnet 2026-05-19 18:20
 
-- **完成（一句）**: 桌機 Git 假分歧修復 + Anthropic API 驗證（Issue #10 workflow success）+ MCP sync（claude-fast/claude-latest 重新對齊）+ WORKLOG/memory/daily 更新
+- **完成（一句）**: AO-CLOSE 執行完畢，daily note 填寫完成
 - **變更路徑**:
-  - `agency-os/WORKLOG.md`
-  - `agency-os/memory/CONVERSATION_MEMORY.md`
-  - `agency-os/memory/daily/2026-05-18.md`
-  - `.mcp.json`（MCP sync 更新）
-- **Git**: 未 commit（含入本次 ao-close commit）
+  - `agency-os/memory/daily/2026-05-19.md`（填 TBD placeholder）
+- **Git**: pending this AO-CLOSE commit
 - **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: GitHub MCP stale process（重啟 Claude Code 自動解決）
+- **風險／待辦（可選）**:
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-18 14:50:39`
+- Time: `2026-05-19 18:10:13`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -307,8 +281,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260518-145038.md`
-- Closeout: `reports/closeout/closeout-20260518-145034.md`
+- Health: `reports/health/health-20260519-181013.md`
+- Closeout: `reports/closeout/closeout-20260519-181008.md`
 
 ## Action
 - No blocking issue detected.

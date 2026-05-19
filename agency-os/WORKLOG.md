@@ -1,4 +1,4 @@
-# Worklog
+﻿# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
@@ -160,6 +160,41 @@ curl github.com API with PAT → HTTP 200 ✅
 **備份保留計畫**：`/root/backups/clickhouse-data-pre-upgrade-25.7.5-20260519-060453.tar.gz` 保留至 2026-06-01，若系統穩定則刪除（見 TASKS.md「EU VPS ClickHouse 升級後備份清理」）。
 
 **Rollback**：若 25.7.5 出問題，刪 .env 中 `CLICKHOUSE_IMAGE_TAG` 行 → 退回 24.8.8（現狀，不會更壞）；volume 備份為最後手段。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:a072b4d963c46e7a8d9c374342010af0ddebbed2a445055747e5c0f1d3afc842 -->
+
+### claude-sonnet 2026-05-19 18:15
+
+- **完成（一句）**: 實作並驗證 agent 派工稽核紀錄系統（Plan B）：PostToolUse hook + JSONL + AO-CLOSE WORKLOG 整合，確認實際觸發
+- **變更路徑**:
+  - `mcp/claude-userlevel/hooks/agent-dispatch-log.js`（新增）
+  - `mcp/claude-userlevel/hooks/hooks.json`（+Agent matcher）
+  - `scripts/append-agent-dispatch-to-worklog.ps1`（新增）
+  - `scripts/ao-close.ps1`（+dispatch 呼叫）
+  - `mcp/claude-userlevel/hooks/README.md`、`README.zh-TW.md`（文件）
+  - `agency-os/reports/agent-dispatch/dispatch-20260519.jsonl`（初始紀錄）
+  - `~/.claude/settings.json`（手動補 Agent PostToolUse matcher，未進 git）
+- **Git**: 2b5fd6c (feat) + c62432f (fix settings.json)
+- **對應 TASKS 子字串（可選）**: 派工稽核
+- **風險／待辦（可選）**: sync-claude-userlevel.ps1 -Mode merge 未能自動合併新 PostToolUse matcher 到 settings.json，需日後修 merge 邏輯；換機時須手動補 Agent entry
+
+
+### Agent dispatch log
+- unknown: Hook live verification ping -> hook-test-ok
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:a35cd5b152d2d10b88dac4ed718d2b4b17b86293168c0be036d68016887dfc85 -->
+
+### claude-sonnet 2026-05-19 18:20
+
+- **完成（一句）**: AO-CLOSE 執行完畢，daily note 填寫完成
+- **變更路徑**:
+  - `agency-os/memory/daily/2026-05-19.md`（填 TBD placeholder）
+- **Git**: pending this AO-CLOSE commit
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
 
 ## 2026-05-15
 
@@ -2789,7 +2824,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-18 06:50:32 UTC_
+_Last synced: 2026-05-19 10:10:07 UTC_
 
 ## 2026-03-20
 

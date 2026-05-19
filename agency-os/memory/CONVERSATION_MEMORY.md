@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-19 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-19 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:a35cd5b152d2d10b88dac4ed718d2b4b17b86293168c0be036d68016887dfc85 -->
+- **2026-05-19 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-19 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:a072b4d963c46e7a8d9c374342010af0ddebbed2a445055747e5c0f1d3afc842 -->
 - **2026-05-19（記憶系統修復）**：全面盤點 Claude Code auto-memory 系統。發現 MEMORY.md 15 條目中 12 條指向不存在的檔案（ghost entries），2 個現有檔案未索引。根因：cross-machine export 只同步 MEMORY.md 索引，不同步個別 `*.md` 檔案本體，導致跨機同步後索引指向空文件。方案 B 修復：(1) 清理 MEMORY.md 至 5 個真實條目；(2) 補 2026-05-19 摘要至 CONVERSATION_MEMORY.md；(3) export 腳本改為 copy 全部 `*.md`；(4) import 腳本加 SHA256 衝突偵測逐一匯入 `*.md`；(5) 新建 `validate-memory-index.ps1` health gate；(6) 接入 `system-health-check.ps1`（warn-only）。下次跨機 AO-CLOSE + AO-RESUME 後可驗證記憶完整同步。
 - **2026-05-18 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-18 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:dffd3868a0c7cf68c8908298600396587b78cfa24ab8f2561ed3aaaecd93571b -->
 - **2026-05-18 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-18 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:93317e2f105c9b1ae44d60a1b028cca3d47a05ea4073975342b732d09de4b2c4 -->
@@ -440,5 +442,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-18 06:50:32 UTC_
+_Last synced: 2026-05-19 10:10:07 UTC_
 
