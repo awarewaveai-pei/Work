@@ -123,7 +123,7 @@
   - **DoD（總）**：(1) Phase 1+2+3 全綠（22 步端到端 PASS）；(2) `BACKUP_RESTORE_PROOF` 含一筆 auto-repair 觸發的 backup ID；(3) Phase 4 第一週巡檢報告；(4) WORKLOG 留 `AUTO_TASK_DONE` evidence。
   - **下一步建議**：先讀計畫書全文（`Read d:/Work/docs/awarewave-auto-repair-plan-v3.2-final.md`）+ handoff brief（`Read d:/Work/docs/awarewave-auto-repair-phase2-handoff.md`）+ AI 實作閱讀簡報（`Read d:/Work/docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`），再開始 Phase 1；交代理時三份一起附上。
 
-- [ ] **（2026-05-14 提醒）檢討自動修復系統觸發分類：為什麼只有 Sentry 是全自動，其他來源都要人工核准？** —— **【未開始】** 目前分類原則：Sentry→auto-repair；Uptime Kuma/Grafana/PostHog→analysis-only；Netdata/資安/控制面→human-only；CI/流程類→先 triage。**待釐清問題：**(1) 每個來源的 auto-repair 門檻是什麼（信號可信度？影響範圍？可逆性？）；(2) 哪些來源已具備足夠信號品質可升級為全自動（例如 Uptime Kuma down + 已知 pattern）；(3) 哪些應永遠維持人工核准（資安、DB migration、金流）；(4) 現行 Slack `approve_repair` 流程是否太重——能否有「輕量核准」（一鍵）vs「完整核准」（需備份 + review）兩種模式？**DoD：** 輸出一份更新的分類決策表，更新至計畫書 `docs/awarewave-auto-repair-plan-v3.2-final.md` §分類原則，並同步 `source_policies` 設定。
+- [x] **（2026-05-14 提醒）檢討自動修復系統觸發分類：為什麼只有 Sentry 是全自動，其他來源都要人工核准？** —— **【未開始】** 目前分類原則：Sentry→auto-repair；Uptime Kuma/Grafana/PostHog→analysis-only；Netdata/資安/控制面→human-only；CI/流程類→先 triage。**待釐清問題：**(1) 每個來源的 auto-repair 門檻是什麼（信號可信度？影響範圍？可逆性？）；(2) 哪些來源已具備足夠信號品質可升級為全自動（例如 Uptime Kuma down + 已知 pattern）；(3) 哪些應永遠維持人工核准（資安、DB migration、金流）；(4) 現行 Slack `approve_repair` 流程是否太重——能否有「輕量核准」（一鍵）vs「完整核准」（需備份 + review）兩種模式？**DoD：** 輸出一份更新的分類決策表，更新至計畫書 `docs/awarewave-auto-repair-plan-v3.2-final.md` §分類原則，並同步 `source_policies` 設定。
 
 ## Next — 已完成歷程（查詢用）
 

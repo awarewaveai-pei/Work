@@ -4,6 +4,25 @@
 
 ## 2026-05-20
 
+### AUTO_TASK_DONE: auto-repair 觸發分類檢討完成（commit 54b0c2f）
+
+**根本問題**：TASKS 2026-05-14 遺留任務：為什麼只有 Sentry 是 auto_repair，其他來源要人工核准？
+
+**分析結論**：auto_repair 需同時滿足三條件：信號精確到行號（stack trace）、修復 PR 範圍可窄化（code exception）、CI 可機器驗證。目前只有 Sentry 同時滿足。
+
+**發現的缺口**：Sentry critical severity 與 low/medium 走同樣路徑，無額外 needs_human_review gate。
+
+**修復**：
+- `policy.ts`：RepairSourcePolicy 加 `can_escalate_to_pr` boolean（uptime_kuma/grafana=true；posthog/netdata/manual=false）
+- `policy.ts`：新增 `severityRequiresHumanReview(severity)` — critical → true（任何來源皆強制 needs_human_review）
+- `policy.test.ts`：補 9 個新測試，全 44 tests pass
+- `docs/awarewave-auto-repair-plan-v3.2-final.md`：§四 新增 §分類原則 決策表
+- `TASKS.md`：BOM 復原（WriteAllLines 誤移除）
+
+**驗證**：`npm test` → 44 passed，0 failed（本機 next-admin）
+
+**避免再發生**：分類原則現已同時存在於 policy.ts rationale 欄位 + plan doc §分類原則，雙重文件化。
+
 ### feat: Repair Center 六視角缺口修復全部完成（commits f7b45c0, 75f3727, 3a9bd21, efb615e）
 
 **根本問題**：六視角審查發現 Repair Center 存在安全邊界不精確、測試基礎設施缺失、流程斷鏈三類缺口。
