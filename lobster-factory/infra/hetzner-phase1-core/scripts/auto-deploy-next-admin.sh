@@ -58,14 +58,21 @@ if [[ -z "$DEPLOYED" || -z "$REMOTE_HEAD" ]]; then
 fi
 
 git cat-file -e "${DEPLOYED}^{commit}" 2>/dev/null || { log "ERROR: deployed commit not in repo"; exit 1; }
-BEHIND=$(git rev-list --count "${DEPLOYED}..${REMOTE_HEAD}" 2>/dev/null || echo 0)
+
+# App-code paths only — ignore governance/tooling commits (same filter as check-drift-and-alert.sh)
+APP_PATHS=(
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/"
+    "lobster-factory/infra/hetzner-phase1-core/nginx/"
+    "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml"
+)
+BEHIND=$(git rev-list --count "${DEPLOYED}..${REMOTE_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || echo 0)
 
 if [[ "$BEHIND" -lt 1 ]]; then
-    log "OK: no drift (deployed=${DEPLOYED:0:7} origin=${REMOTE_HEAD:0:7})"
+    log "OK: no app-code drift (deployed=${DEPLOYED:0:7} origin=${REMOTE_HEAD:0:7})"
     exit 0
 fi
 
-log "DRIFT: deployed=${DEPLOYED:0:7} origin=${REMOTE_HEAD:0:7} behind=$BEHIND -- starting auto-deploy"
+log "DRIFT: deployed=${DEPLOYED:0:7} origin=${REMOTE_HEAD:0:7} app-code behind=$BEHIND -- starting auto-deploy"
 
 DEPLOY_SUCCESS=0
 NEW_COMMIT="${DEPLOYED}"
@@ -77,7 +84,7 @@ else
     log "FAILED: sg-deploy.sh exited non-zero for $APP"
 fi
 
-SUBJECTS=$(cd "$WORK_DIR" && git log --no-merges --format=" - %h %s" --max-count=3 "${DEPLOYED}..${REMOTE_HEAD}" 2>/dev/null || true)
+SUBJECTS=$(cd "$WORK_DIR" && git log --no-merges --format=" - %h %s" --max-count=3 "${DEPLOYED}..${REMOTE_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || true)
 
 if [[ "$DEPLOY_SUCCESS" -eq 1 ]]; then
     SLACK_MSG=$(printf ':white_check_mark: *SG next-admin auto-deployed*\nResolved drift of *%s* commit(s).\n\n- was deployed: `%s`\n- now deployed: `%s`\n- origin/main:  `%s`\n\nCommits:\n%s' "$BEHIND" "${DEPLOYED:0:12}" "${NEW_COMMIT:0:12}" "${REMOTE_HEAD:0:12}" "$SUBJECTS")
