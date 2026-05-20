@@ -81,3 +81,63 @@ curl -sSI https://aware-wave.com/xmlrpc.php | grep "HTTP"
 - Trigger.dev dashboard 子網域若遇 WS 問題：確認 WebSockets 已開且 Cloudflare timeout > 100s
 - n8n webhook 如遇 Cloudflare block：先暫時設 Challenge（驗證碼），排查後改 Rate Limit
 - 所有 Custom Rules 先用 **Log** 模式觀察 24 小時，確認無誤再改 **Block**
+
+---
+
+## §API 維護（Claude 自動使用）
+
+> 使用 Cloudflare Ruleset API 管理 Custom WAF Rules，不需進 Dashboard。
+
+### 固定 ID（勿修改）
+
+| 項目 | ID |
+|---|---|
+| Zone（aware-wave.com） | `f21b1919632fee2221647908a94fdcac` |
+| Custom WAF Ruleset | `f290fd58b69c4cedb7a0688ca959034f` |
+| Block xmlrpc.php | `a881ce5e7b5841eca99fc797187020e9` |
+| Block sensitive file access（scanner paths） | `74c0e70b90874ea4b44926aecb44ae16` |
+| Challenge wp-login non-TW/SG | `（從 API list 查）` |
+
+### 查現有規則
+
+```bash
+CF_TOKEN=$(grep "CLOUDFLARE_API_TOKEN" mcp/user-env.ps1 | sed 's/.*= "\(.*\)"/\1/')
+curl -s "https://api.cloudflare.com/client/v4/zones/f21b1919632fee2221647908a94fdcac/rulesets/f290fd58b69c4cedb7a0688ca959034f" \
+  -H "Authorization: Bearer $CF_TOKEN" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for r in d['result']['rules']:
+    print(f'[{r[\"action\"]}] {r[\"description\"]}: {r[\"expression\"][:100]}')
+"
+```
+
+### 追加新 scanner path 至 Block sensitive file access
+
+```bash
+CF_TOKEN=$(grep "CLOUDFLARE_API_TOKEN" mcp/user-env.ps1 | sed 's/.*= "\(.*\)"/\1/')
+
+# 編輯下方 expression，追加 or http.request.uri.path contains "/新路徑"
+NEW_EXPR='(http.request.uri.path contains "/.env" or http.request.uri.path contains "/.git" or http.request.uri.path contains "/config.php" or http.request.uri.path contains "/.aws/" or http.request.uri.path contains "/.ssh/" or http.request.uri.path contains "/wp-config" or http.request.uri.path contains "/etc/passwd" or http.request.uri.path contains "/etc/shadow" or http.request.uri.path contains "/.htaccess" or http.request.uri.path contains "/.DS_Store" or http.request.uri.path contains "/phpinfo")'
+
+PAYLOAD=$(python3 -c "import json,sys; print(json.dumps({'action':'block','expression':sys.argv[1],'description':'Block sensitive file access (scanner paths)','enabled':True}))" "$NEW_EXPR")
+
+curl -s -X PATCH \
+  "https://api.cloudflare.com/client/v4/zones/f21b1919632fee2221647908a94fdcac/rulesets/f290fd58b69c4cedb7a0688ca959034f/rules/74c0e70b90874ea4b44926aecb44ae16" \
+  -H "Authorization: Bearer $CF_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$PAYLOAD" | python3 -c "import json,sys; d=json.load(sys.stdin); print('success:', d['success'])"
+```
+
+### 驗證（PATCH 後必跑）
+
+```bash
+# 全部應回 403
+curl -s -o /dev/null -w "/.aws/credentials: %{http_code}\n" https://n8n.aware-wave.com/.aws/credentials
+curl -s -o /dev/null -w "/.ssh/id_rsa: %{http_code}\n"     https://n8n.aware-wave.com/.ssh/id_rsa
+curl -s -o /dev/null -w "/wp-config.bak: %{http_code}\n"   https://n8n.aware-wave.com/wp-config.bak
+curl -s -o /dev/null -w "/etc/passwd: %{http_code}\n"       https://n8n.aware-wave.com/etc/passwd
+
+# 正常路徑應回 200
+curl -s -o /dev/null -w "/healthz: %{http_code}\n"         https://n8n.aware-wave.com/healthz
+curl -s -o /dev/null -w "/api/ops/summary: %{http_code}\n" https://app.aware-wave.com/api/ops/summary
+```

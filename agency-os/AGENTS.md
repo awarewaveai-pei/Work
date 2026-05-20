@@ -109,8 +109,10 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.cursor/rules/4
 |---------|---------|
 | 使用者問某段時間的 Slack / Telegram / 告警 / incident | `scripts/fetch-external-signals.ps1 -From ... -To ...`（無時區預設 CST/UTC+8）|
 | AO-RESUME digest `since_utc` 比需要範圍早 > 2 小時 | 補跑 `/signals -From <需要起點>` |
-| AO-RESUME | 讀 `reports/status/cf-security-LATEST.md`，列入外部信號段（mtime >24h 才重跑腳本）|
+| AO-RESUME | 讀 `reports/status/cf-security-LATEST.md`，列入外部信號段（mtime >24h 才重跑腧本）|
 | 使用者問 Cloudflare 設定是否正常 | `scripts/check-cloudflare-security.ps1` |
+| `fetch-external-signals` Telegram 欄出現 `error.*401\|error.*403` | 立即執行三步診斷：① `curl -s -o /dev/null -w "%{http_code}" https://app.aware-wave.com/api/ops/inbox/digest` — 若 403 代表 middleware 仍擋（需查 middleware.ts）；若 401 代表 token 不符 → ② `powershell -File scripts/secrets-vault.ps1 -Action import-user-env` → ③ 更新 User registry：`[System.Environment]::SetEnvironmentVariable('OPS_INBOX_INGEST_TOKEN', <vault值>, 'User')` → ④ 重跑 fetch-signals 確認 `ok`。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
+| EU VPS `infra-alerts` 出現 scanner 路徑（`/.aws/`、`/.ssh/`、`/wp-config` 等）且 bad request % > 50 | ① SSH EU VPS 確認是否已自動恢復；② 若持續進行中，用 Cloudflare WAF PATCH API 追加該路徑至 block rule（Zone=`f21b1919632fee2221647908a94fdcac`，Ruleset=`f290fd58b69c4cedb7a0688ca959034f`，Rule=`74c0e70b90874ea4b44926aecb44ae16`）；③ curl 實測新路徑回 403 確認生效。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
 
 MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
