@@ -4,6 +4,37 @@
 
 ## 2026-05-20
 
+### feat: Repair Center 六視角缺口修復全部完成（commits f7b45c0, 75f3727, 3a9bd21, efb615e）
+
+**根本問題**：六視角審查發現 Repair Center 存在安全邊界不精確、測試基礎設施缺失、流程斷鏈三類缺口。
+
+**批次 1 — 安全與配置（f7b45c0）**
+- A1 `middleware.ts`：`startsWith("/api/ops/inbox/")` → 精確比對 `/health` + `/digest`，消除隱性開門風險
+- A2 `auto-repair-claude.yml`：移除 `id-token: write`（OIDC 多餘權限）
+- A3 `user-env.ps1`：填入 soulful-expression Supabase service role key（本機 gitignored）
+
+**批次 2 — 測試基礎設施（75f3727）**
+- next-admin 加入 vitest ^2.1.0 + test/test:watch scripts + vitest.config.ts（@/* 路徑別名）
+- 新建 `lib/repair-center/__tests__/policy.test.ts`：27 個測試
+- 原死程式碼 `rules.test.ts` 8 個測試復活
+- `npm test`：2 files / 35 tests / 0 failed ✅
+
+**批次 3 — GitHub Webhook（3a9bd21 → 部署 efb615e）**
+- 新建 `/api/webhooks/github/route.ts`：HMAC-SHA256 驗簽 + `pull_request.closed+merged` → `pr_ready → deploy_pending`
+- docker-compose.yml 加 `GITHUB_WEBHOOK_SECRET` pass-through
+- SG `.env` 寫入 secret，container 重建後 `printenv` 確認載入
+- sg-deploy 部署，錯誤 secret curl 回 401 ✅
+- GitHub Webhook ID `627222921` 建立，監聽 `pull_request` events ✅
+- `AWARE_WAVE_CREDENTIALS.md` 補記完整 webhook 資訊
+
+**驗證**：`/api/webhooks/github` 錯誤 secret → 401；`/api/ops/inbox/health` → 200；`npm test` 35/35 pass。
+
+**剩餘**：筆電 `mcp/user-env.ps1` A3 本機 key 補填（gitignored，不影響生產）。
+
+**- AUTO_TASK_DONE: Repair Center 缺口修復 — 批次 2 + 批次 3**
+
+---
+
 ### drill: Phase 3-C 備份失敗 drill 通過（2026-05-20）
 
 **目的**：驗證備份閘門失敗時，repair OS 不建立 GitHub Issue，run 進入 `triage_needed`。
