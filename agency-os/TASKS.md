@@ -1,4 +1,4 @@
-﻿# Global Task Board
+# Global Task Board
 
 
 
@@ -52,29 +52,6 @@
 
 #### 雙機環境 / 日常開工
 
-- [x] **（AO-RESUME 提醒）開工後閱讀 Telegram 內容** —— **【未完成】** 每次開工（含送出 `AO-RESUME` 後）先開 Telegram：營運／告警／`@awarewave_ops_bot` 等相關對話，處理未讀與待回覆。**DoD：**(1) 未讀已消化（回覆、存檔或標記稍後）；(2) 需追蹤事項已寫入當日 `WORKLOG.md` 或對應 tenant／`TASKS`；(3) 若有指令錯誤或告警，已對照 `agency-os/docs/operations/COMMAND_PLANE_RUNBOOK.md`／`TELEGRAM_OPERATOR_CHEATSHEET.md` 排查或記錄阻塞。**敏感：**勿將 token／對話全文貼進 git 或聊天留存檔。
-- [x] **（AO-RESUME 提醒）桌機開工後跑 Claude user-level 對齊腳本** —— **【未完成】** 2026-05-07 筆電已建立 `mcp/claude-userlevel/` SSOT + `scripts/sync-claude-userlevel.ps1`，並對齊筆電 `~/.claude/`。**桌機下一步**：`git pull` 後在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge`，使 `~/.claude/{hooks,settings.json,mcp.json}` 對齊 SSOT。**驗收**：跑 `-Mode verify` 應 exit 0（PASS）。背景：`mcp/claude-userlevel/README.md`、`CLAUDE.md` § 桌機/換機設定。
-- [x] **（桌機必做）確認 Claude Code 完全授權模式（bypassPermissions）** —— **【完成 2026-05-14】** 筆電 `~/.claude/settings.json` 已設 `"defaultMode": "bypassPermissions"` + `"skipDangerousModePermissionPrompt": true`，Claude Code 不詢問任何工具調用。桌機需同步此設定才能達到同等效果。**步驟：** `git pull` 後在 monorepo 根執行 `powershell -ExecutionPolicy Bypass -File .\scripts\sync-claude-userlevel.ps1 -Mode merge`，再跑 `-Mode verify`。**DoD：** `verify` exit 0 且 `~/.claude/settings.json` 含 `"defaultMode": "bypassPermissions"`。
-- [x] **（AO-RESUME 提醒）雙機環境對齊（桌機＋筆電）** —— **【進行中】** **進度：桌機 2026-05-07 `machine-environment-audit -Strict` PASS（no warnings）✓**；筆電尚未執行。任一台未 PASS 則本條不結案。**筆電下一步：**依 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §1.5 + §1.5.1**（WP 棧）逐步執行後，在筆電 monorepo 根跑 `machine-environment-audit.ps1 -FetchOrigin -Strict`；細項 → **`docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`**。
-- [x] **（AO-RESUME 提醒—筆電）確認桌機 2026-05-11 變更不衝突筆電設定** —— **【待筆電開工時查照】** **本輪桌機改動（代理查照）：** (1) `sync-claude-userlevel.ps1 -Mode merge` 更新 `~/.claude/hooks/` 3 個檔（`ao-resume-on-prompt.ps1`、`hooks.json`、`README.md`），覆寫 `settings.json` governed keys，normalize 9 個 array 結構；SSOT `mcp/claude-userlevel/` 本身未改，git 含最新版。(2) SG VPS `app.aware-wave.com` Basic Auth：加入系統 nginx `/etc/nginx/sites-enabled/app` 的 `location /` block（`auth_basic "Aware Wave Admin"` + user_file `/etc/nginx/.htpasswd_studio`）；Docker `nginx/default.conf` 的 `auth_basic` 也已取消注釋（但系統 nginx 才是 443 真正入口）。**筆電開工查照清單：** (a) `git pull` 後執行 `sync-claude-userlevel.ps1 -Mode verify`——若 hooks 顯示 3 個 update（同桌機），跑 `-Mode merge` 對齊，再 verify exit 0；(b) 確認 `settings.json` `additionalDirectories` 含筆電正確 USERPROFILE 路徑（merge 自動展開 `${USERPROFILE}`，通常無問題）；(c) VPS 變更純伺服器端，不影響筆電。**DoD：筆電 `verify` exit 0（PASS）後本條結案。**
-- [x] **（筆電必做）AO-SYNC 環境變數設定** —— **【未開始】** 桌機已設好，筆電需要同步設定兩個環境變數才能讓 AO-CLOSE 正確匯出。
-  **筆電環境**：repo 在 `D:\Work`，帳號家目錄在 `C:\Users\<帳號>`，project key = `d--Work`。
-  在筆電 PowerShell（從 `D:\Work` 執行）：
-  > **路徑架構（2026-05-15 確認）**：
-  > - 秘密檔案（`.ssh/`、`user-env.ps1`、`AWARE_WAVE_CREDENTIALS.md`、`AO-SYNC/`）實際存放於 Google Drive `G:\我的雲端硬碟\MySecretVault\MySecretVault\`
-  > - Cryptomator vault 掛載在 `E:\`（但 vault 內目前只有 `重要.rtf`，秘密檔案尚未移入加密空間）
-  > - **不透過 E:\ 路徑**，直接用 G:\ 路徑確保不受 Cryptomator 掛載狀態影響
-  ```powershell
-  [System.Environment]::SetEnvironmentVariable('AO_SYNC_ROOT',         'G:\我的雲端硬碟\MySecretVault\MySecretVault\AO-SYNC', 'User')
-  [System.Environment]::SetEnvironmentVariable('AO_SYNC_SECRETS_ROOT', 'G:\我的雲端硬碟\MySecretVault\MySecretVault',        'User')
-  ```
-  設完後測試（**只做一次**，之後 AO-CLOSE / AO-RESUME 全自動）：
-  ```powershell
-  & scripts\export-cross-machine-memory.ps1 -WorkRoot (Get-Location).Path
-  ```
-  應看到 MEMORY.md + user-env.ps1 + SSH keys + AWARE_WAVE_CREDENTIALS.md 全部寫入 `G:\我的雲端硬碟\MySecretVault\MySecretVault\`。
-  **DoD：** export 成功 + MEMORY.md 寫到 `G:\我的雲端硬碟\MySecretVault\MySecretVault\AO-SYNC\AO-SYNC-<date>-<MACHINE>\memory\`。
-- [x] **（筆電必做）確認 Cryptomator vault 掛載路徑，將 AO-SYNC 秘密檔案移入加密區** —— **【2026-05-15 重新確認】** **現況（桌機調查）：** Cryptomator vault 容器在 `G:\我的雲端硬碟\MySecretVault\MySecretVault\`，解鎖後掛載至 `E:\`；但 E:\ 內目前只有 `重要.rtf`——秘密檔案（`.ssh/`、`user-env.ps1`、`AWARE_WAVE_CREDENTIALS.md`、`AO-SYNC/`）實際存在 Google Drive 的 **G:\ 路徑**，未進入 Cryptomator 加密空間。**結論：目前改用 G:\ 直接路徑**，不依賴 Cryptomator 掛載狀態，避免重演昨天 AO-CLOSE 寫入 "EverydayPW" 的問題（當時 E:\ 掛的是錯誤的 vault）。**兩台機器正確 env var：** `AO_SYNC_ROOT=G:\我的雲端硬碟\MySecretVault\MySecretVault\AO-SYNC`、`AO_SYNC_SECRETS_ROOT=G:\我的雲端硬碟\MySecretVault\MySecretVault`。**注意：** `ANTHROPIC_API_KEY` 已從 `user-env.ps1`（本機 + vault 兩份）移除。
 - [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】**
   - 📖 **完整步驟讀這個（單一主人）**：[`agency-os/docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md`](docs/operations/TELEGRAM_OPERATOR_CHEATSHEET.md) — §0（5 步驗證）+ §5（4 條 Snippets）+ §8（key 上手機 3 方法）
   - 📅 **規劃日期**：2026-05-08
@@ -114,13 +91,9 @@
   - **自動漂移閘道**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（比對 **`SITES_INDEX`**、含 HTTPS 之 **`sites/*/SITE_PROFILE`**、以及 `projects/*/02_EXECUTION_PLAN.md` 的 staging URL；`scripts/system-health-check.ps1` → **`verify-build-gates`**；PR `.github/workflows/tenant-staging-ssot.yml`）。
 - [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
   - 本項目標：試點 tenant 實填回饋後，再擴欄位與自動檢查（若有）
-- [x] （Next-Gen 對齊）M3 控制台輸出映射到「20 部門」責任矩陣與模板欄位 —— **【完成 2026-05-13】**
-  - 目的：避免 Pilot 成果與跨國企業目標脫鉤
-  - **交付**：`department-summary` API + `DepartmentCoveragePanel` UI + `ClientCard` badge + `generate-customer-delivery-status.ps1` + `DEPARTMENT_COVERAGE_MATRIX.md` 四份更新
 
 #### 龍蝦工廠（lobster-factory）
 
-- [x] **Repair Center 缺口修復 — 全批次完成（2026-05-20）** —— **【完成】** 批次 1（middleware 精確化 + OIDC 權限移除）、批次 2（vitest 35/35 pass）、批次 3（GitHub webhook `pr_ready→deploy_pending`，Webhook ID 627222921）全數 commit + deploy。剩餘：筆電 `mcp/user-env.ps1` soulful Supabase key 補填（本機 gitignored，不影響生產）。詳見 `WORKLOG.md §2026-05-20`。
 - [ ] `lobster-factory` A10-2 商業閉環實跑 —— **【未開始】**
   - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
 - [ ] `lobster-factory` A7 全站自動建站補齊 —— **【未開始】**
@@ -132,21 +105,13 @@
 
 #### 工具層 / 基礎建設 / 治理
 
-- [x] Enterprise 工具層 Phase 1 正式串接 —— **【完成 2026-05-13】** 五層工具全數結案＋端到端串接路徑驗收，見 `WORKLOG.md §2026-05-13「Enterprise 工具層 Phase 1 — 端到端串接結案驗收」`。
-  - [x] Secrets 治理（env/mcp vault + n8n key 輪替）— 2026-05-01
-  - [x] Sentry 錯誤觀測（next-admin／node-api／php）— 2026-04-12
-  - [x] PostHog 事件基線（三站命名 + live 驗證）— 2026-05-01
-  - [x] Cloudflare DNS／WAF／rate-limit 邊界保護 — 2026-05-01
-  - [x] Slack 告警通道（Netdata `#infra-alerts` + n8n Sentry handler）— 2026-05-01
-  - [x] 端到端串接驗收：Telegram → Cloudflare → JWT/RLS ops console → Supabase → Slack，Command Plane Phase 2c smoke 15/15 PASS（2026-05-08）；`WORKLOG.md §2026-05-13`
-- [x] （工具建置）Phase 1 建議順序（P1 -> P7） —— **【完成 2026-05-13】** Next.js 控制台 v1（P6，2026-05-07）＋ Enterprise 串接證據鏈（P1–P5，2026-05-13）＋ Command Plane（P7，2026-05-08）三條件全達。追溯總表已同步：`docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`（P1–P7 全 🟢）。
 - [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
   - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
   - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
 
 #### 下一期計畫（未開始）
 
-- [x] **（下次 AO-RESUME 提醒）AwareWave 自動告警維修系統 v3.2 — 計畫書執行** —— **【進行中】** **2026-05-13 Codex implementation baseline 已完成**：`repair_runs` migration、`/ops/repairs` Queue/Runs/Safety/Policy UI、`/api/ops/repairs/*`、`/api/ops/repairs/health`、Slack interactive callback、Slack `approve_repair` 按鈕、GitHub auto-repair workflows、pre-repair backup gate（webhook 或 SG/EU SSH fallback）、CLAUDE auto-repair 紅線；`npm run build` PASS。**2026-05-13 上線基礎已補**：EU DB `repair_runs` migration 已以 `supabase_admin` 套用並 reload schema；SG `next-admin` 已部署 commit `41a773a`；production `/api/ops/repairs/health` 已回報 `table_ok=true`、`backup_configured=true`、`backup_mode=ssh`、`source_policies` 含 Sentry/Kuma/Grafana/PostHog/Netdata/manual。**2026-05-13 Web-control / Phase 3 安全驗收已補強**：`AUTO_REPAIR_GITHUB_TOKEN` 與 GitHub Secrets (`ANTHROPIC_API_KEY`、`SLACK_WEBHOOK_URL`) 已設定；SG deployed commit `87cfa76`；`/ops/repairs` 為操作者控制台，Repair API 由 nginx Basic Auth 邊界保護後注入可信 ops role；`/ops/inbox` 保持 incident SSOT，不合併成第二套維修 UI；production smoke `repair-center` 15 checks / 0 failed / 1 expected warning；backup-fail drill PASS（不建 GitHub Issue）；safe rollback snapshot/restore drill PASS；synthetic Sentry → backup → GitHub Issue → Claude Action analysis-only handoff PASS。**Slack secret gate 已完成**：`SLACK_SIGNING_SECRET` 已寫入 credentials / SG `.env` / GitHub Secret，`SLACK_BOT_TOKEN` 已在 SG + GitHub；production smoke 15 checks / 0 failed / 0 warning。**2026-05-13 最終實機驗收已完成**：signed Slack `approve_repair` production callback → Repair Run `f82411fe-d802-4b90-aef1-5d0c1fc46786` → backup PASS → GitHub Issue #2；Codex 接手完成 code-scoped PR #3 → Release Gate PASS → merge commit `460aa7d` → `sg-deploy.sh next-admin` → production smoke `repair-center` 17 checks / 0 failed / 0 warning，Repair Run 已標記 `resolved` / deploy `passed`。**2026-05-13 Claude auto-repair workflow 已解除 GitHub 端阻塞**：改傳 `${{ github.token }}`、允許 `Edit`、提高 turns、Actions repo permission 改為 `write` + `can_approve_pull_request_reviews=true`，Issue #5 已證明 Claude 可成功執行並推 `claude/...` branch；Claude-generated PR #8 已合併，production smoke 18 checks / 0 failed / 0 warning。**目前唯一外部缺口**：有效 `ANTHROPIC_API_KEY` 需補額（valid key 回 `Credit balance is too low`；另一支本機 key invalid，已還原）。**計畫書 owner doc**：`docs/awarewave-auto-repair-plan-v3.2-final.md`（v3.2 Final 2026-05-08，33 KB）。**目標**：多來源 ops signals（Sentry／Uptime Kuma／Netdata／Grafana／PostHog／CI／health／Cloudflare／Supabase／n8n／Trigger.dev／deploy drift／WordPress/MainWP）→ Ops Inbox → Repair Center → Slack 核准 → PR → Merge → `/sg-deploy`。**分類原則**：Sentry→auto-repair；Uptime/Grafana/PostHog→analysis-only；Netdata/資安/控制面→human-only；CI/流程類→先 triage。**4 層保護**：CI 綠勾／中文摘要／部署後 health-check 自動 rollback／Sentry 持續監控。
+- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2 — Phase 4 觀察期進行中** —— **【進行中】** Phase 1+2+3 全部完成，production smoke 18 checks / 0 failed；Phase 4 每週巡檢已啟動（每週五 14:00），觀察期到期：2026-06-19。**唯一剩餘外部缺口**：Anthropic API 帳戶補額後重跑 Issue #5 驗證全自動 Claude branch → PR。**DoD（Phase 4）**：Phase 4 第一週巡檢報告 + WORKLOG `AUTO_TASK_DONE` evidence。詳見 `docs/awarewave-auto-repair-plan-v3.2-final.md`。 —— **【進行中】** **2026-05-13 Codex implementation baseline 已完成**：`repair_runs` migration、`/ops/repairs` Queue/Runs/Safety/Policy UI、`/api/ops/repairs/*`、`/api/ops/repairs/health`、Slack interactive callback、Slack `approve_repair` 按鈕、GitHub auto-repair workflows、pre-repair backup gate（webhook 或 SG/EU SSH fallback）、CLAUDE auto-repair 紅線；`npm run build` PASS。**2026-05-13 上線基礎已補**：EU DB `repair_runs` migration 已以 `supabase_admin` 套用並 reload schema；SG `next-admin` 已部署 commit `41a773a`；production `/api/ops/repairs/health` 已回報 `table_ok=true`、`backup_configured=true`、`backup_mode=ssh`、`source_policies` 含 Sentry/Kuma/Grafana/PostHog/Netdata/manual。**2026-05-13 Web-control / Phase 3 安全驗收已補強**：`AUTO_REPAIR_GITHUB_TOKEN` 與 GitHub Secrets (`ANTHROPIC_API_KEY`、`SLACK_WEBHOOK_URL`) 已設定；SG deployed commit `87cfa76`；`/ops/repairs` 為操作者控制台，Repair API 由 nginx Basic Auth 邊界保護後注入可信 ops role；`/ops/inbox` 保持 incident SSOT，不合併成第二套維修 UI；production smoke `repair-center` 15 checks / 0 failed / 1 expected warning；backup-fail drill PASS（不建 GitHub Issue）；safe rollback snapshot/restore drill PASS；synthetic Sentry → backup → GitHub Issue → Claude Action analysis-only handoff PASS。**Slack secret gate 已完成**：`SLACK_SIGNING_SECRET` 已寫入 credentials / SG `.env` / GitHub Secret，`SLACK_BOT_TOKEN` 已在 SG + GitHub；production smoke 15 checks / 0 failed / 0 warning。**2026-05-13 最終實機驗收已完成**：signed Slack `approve_repair` production callback → Repair Run `f82411fe-d802-4b90-aef1-5d0c1fc46786` → backup PASS → GitHub Issue #2；Codex 接手完成 code-scoped PR #3 → Release Gate PASS → merge commit `460aa7d` → `sg-deploy.sh next-admin` → production smoke `repair-center` 17 checks / 0 failed / 0 warning，Repair Run 已標記 `resolved` / deploy `passed`。**2026-05-13 Claude auto-repair workflow 已解除 GitHub 端阻塞**：改傳 `${{ github.token }}`、允許 `Edit`、提高 turns、Actions repo permission 改為 `write` + `can_approve_pull_request_reviews=true`，Issue #5 已證明 Claude 可成功執行並推 `claude/...` branch；Claude-generated PR #8 已合併，production smoke 18 checks / 0 failed / 0 warning。**目前唯一外部缺口**：有效 `ANTHROPIC_API_KEY` 需補額（valid key 回 `Credit balance is too low`；另一支本機 key invalid，已還原）。**計畫書 owner doc**：`docs/awarewave-auto-repair-plan-v3.2-final.md`（v3.2 Final 2026-05-08，33 KB）。**目標**：多來源 ops signals（Sentry／Uptime Kuma／Netdata／Grafana／PostHog／CI／health／Cloudflare／Supabase／n8n／Trigger.dev／deploy drift／WordPress/MainWP）→ Ops Inbox → Repair Center → Slack 核准 → PR → Merge → `/sg-deploy`。**分類原則**：Sentry→auto-repair；Uptime/Grafana/PostHog→analysis-only；Netdata/資安/控制面→human-only；CI/流程類→先 triage。**4 層保護**：CI 綠勾／中文摘要／部署後 health-check 自動 rollback／Sentry 持續監控。
   - **2026-05-12 基線更新**：owner docs 已收斂為 `docs/awarewave-auto-repair-plan-v3.2-final.md` + `docs/awarewave-auto-repair-phase2-handoff.md` + `docs/awarewave-repair-center-app-architecture.md` + `docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md` + `agency-os/docs/operations/slack-notification-routing.md`。**路由基線**：`#infra-alerts` = raw infra、`#ops-incidents` = curated incident、`#github-prs` = PR 通知、Telegram = 手機備援；舊 `#alerts-critical` / `#alerts-info` 已作廢。
   - **下次 AO-RESUME 必提醒（最新停點 2026-05-19）**：系統 Web 控制、安全 drills、Slack secret gate、真實 `approve_repair`、code-scoped PR/merge/deploy 均已跑通；production smoke 18 checks / 0 failed / 0 warning。剩餘缺口：(1) Anthropic API 帳戶補額後，重跑 Issue #5 或新 issue 驗證全自動 Claude branch → PR step；(2) ✅ Phase 4 每週巡檢已啟動（2026-05-19）：每週五 14:00，`scripts/phase4-weekly-check.ps1` + Windows Task Scheduler `AwareWave-Phase4-WeeklyCheck` + Telegram 通知；(3) 只有使用者明確授權時，才做壞 commit auto-rollback destructive drill；否則維持目前 safe snapshot/restore rollback PASS 證據。
   - **Phase 1（你做，30 分鐘）**：確認既有 `#infra-alerts` / `#ops-incidents`，只新增 `#github-prs`；建 Slack App（Webhook 指向 `#ops-incidents`）；GitHub repo 設 4 個 Secrets（`ANTHROPIC_API_KEY`／`SLACK_WEBHOOK_URL`／`SLACK_BOT_TOKEN`／`SLACK_SIGNING_SECRET`）；**不要**把 Telegram token 放進 GitHub Secrets；驗證 `/api/ops/inbox/health` 顯示 `telegram_notify_enabled=true`；啟用 main branch protection。
@@ -161,6 +126,21 @@
 - [ ] **（2026-05-14 提醒）檢討自動修復系統觸發分類：為什麼只有 Sentry 是全自動，其他來源都要人工核准？** —— **【未開始】** 目前分類原則：Sentry→auto-repair；Uptime Kuma/Grafana/PostHog→analysis-only；Netdata/資安/控制面→human-only；CI/流程類→先 triage。**待釐清問題：**(1) 每個來源的 auto-repair 門檻是什麼（信號可信度？影響範圍？可逆性？）；(2) 哪些來源已具備足夠信號品質可升級為全自動（例如 Uptime Kuma down + 已知 pattern）；(3) 哪些應永遠維持人工核准（資安、DB migration、金流）；(4) 現行 Slack `approve_repair` 流程是否太重——能否有「輕量核准」（一鍵）vs「完整核准」（需備份 + review）兩種模式？**DoD：** 輸出一份更新的分類決策表，更新至計畫書 `docs/awarewave-auto-repair-plan-v3.2-final.md` §分類原則，並同步 `source_policies` 設定。
 
 ## Next — 已完成歷程（查詢用）
+
+### 2026-05-20 — Repair Center 缺口修復全批次結案
+
+- [x] **Repair Center 缺口修復 — 全批次完成（2026-05-20）** —— 批次 1（middleware 精確化 + OIDC 權限移除）、批次 2（vitest 35/35 pass）、批次 3（GitHub webhook pr_ready→deploy_pending，Webhook ID 627222921）全數 commit + deploy。詳見 WORKLOG.md §2026-05-20。
+
+### 2026-05-15 ~ 2026-05-20 — 雙機環境設定結案（筆電 + AO-SYNC）
+
+- [x] （AO-RESUME 提醒）開工後閱讀 Telegram 內容 ✅
+- [x] （桌機/筆電）Claude user-level 對齊腳本 ✅（sync-claude-userlevel.ps1 -Mode merge + bypassPermissions 雙機對齊）
+- [x] （筆電必做）AO-SYNC 環境變數設定 ✅（AO_SYNC_ROOT + AO_SYNC_SECRETS_ROOT 設至 G:\ 路徑）
+- [x] （筆電必做）確認 Cryptomator vault 掛載路徑 ✅（改用 G:\ 直接路徑，不依賴 Cryptomator 掛載狀態）
+
+### 2026-05-13 — Next-Gen M3 控制台輸出映射（結案）
+
+- [x] （Next-Gen 對齊）M3 控制台輸出映射到「20 部門」責任矩陣與模板欄位 — 完成 2026-05-13。交付：department-summary API + DepartmentCoveragePanel UI + ClientCard badge + generate-customer-delivery-status.ps1 + DEPARTMENT_COVERAGE_MATRIX.md 四份更新。
 
 ### 2026-05-13 — Enterprise 工具層 Phase 1 正式串接 + Phase 1 P1→P7 建置順序（結案）
 

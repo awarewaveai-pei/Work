@@ -79,9 +79,10 @@ If nothing definitive, state that clearly and point to WORKLOG for reference.
 - Lobster Factory Milestone (M1~M5) + 今日 DoD
 - Git/Audit: exit code | AUDIT RESULT: PASS? | ahead=N behind=N
 - 阻塞/風險: list specific blockers with evidence; do NOT write just「無」— if none found, write「本次盤點：未見需立即處理之阻塞」and state the basis.
+  **Source rules**: derive blockers ONLY from (a) open `- [ ]` tasks in TASKS.md, (b) `is_fresh=true` external signals, (c) health check failures in ao-resume-hook log. **Never derive from `- [x]` items** (even if they appear in `### 未完成`); `[x]` = already resolved, not a blocker.
 
 **5. 未完成待辦（TASKS）**
-Group tasks by their `####` category header from TASKS.md. Output every open `- [ ]` item — do NOT summarize, skip, or flatten into a single list.
+Group tasks by their `####` category header from TASKS.md. Output every open `- [ ]` item — do NOT summarize, skip, or flatten into a single list. **Skip all `- [x]` items**, including any that appear in `### 未完成` (they are completed; `### 未完成` is being cleaned up).
 
 Format:
 #### 雙機環境 / 日常開工
