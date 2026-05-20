@@ -16,6 +16,7 @@ This directory is the single source of truth for MCP server definitions that nee
 - `SERVICE_MATRIX.md`: which services use direct MCP versus the local AwareWave wrapper
 - `SHARED_MCP_API_SOP.md`: standard operating procedure for adding shared MCP/API entries safely
 - `claude-userlevel/`: **SSOT for Claude Code user-level files** (hooks, settings.json, mcp.json) — see `claude-userlevel/README.md`. Synced via `scripts/sync-claude-userlevel.ps1`. **Per CLAUDE.md, `~/.claude/mcp.json` must be `{"mcpServers":{}}`** — shared MCP servers belong in repo `.mcp.json` (generated from `registry.template.json`).
+- `codex-userlevel/`: SSOT for Codex user-level Claude compatibility wrappers. Synced by `mcp/codex-userlevel/scripts/sync-claude-to-codex.ps1` and also run from `scripts/bootstrap-mcp-machine.ps1`.
 
 ## Standard flow
 

@@ -74,6 +74,15 @@ if (Test-Path -LiteralPath $syncClaudeUserlevel) {
     }
 }
 
+$syncCodexUserlevel = Join-Path $WorkspaceRoot "mcp\codex-userlevel\scripts\sync-claude-to-codex.ps1"
+if (Test-Path -LiteralPath $syncCodexUserlevel) {
+    Write-Host "Aligning Codex user-level Claude compatibility wrappers..." -ForegroundColor Green
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncCodexUserlevel -WorkRoot $WorkspaceRoot -Mode linked
+    if ($LASTEXITCODE -ne 0) {
+        throw "sync-claude-to-codex.ps1 failed (exit $LASTEXITCODE)"
+    }
+}
+
 Write-Host ""
 Write-Host "Bootstrap finished." -ForegroundColor Green
 Write-Host "Use these clients after opening a new terminal if you changed persistent env vars:" -ForegroundColor Gray
