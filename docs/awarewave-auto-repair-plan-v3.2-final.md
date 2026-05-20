@@ -218,6 +218,21 @@ workflow failure
 
 這類是控制面與資安邊界。Repair Center 可以建立 incident、分析、提示 runbook，但不能自動修 code、不能自動改設定、不能把憑證複製到 GitHub Secrets。
 
+### 分類原則（2026-05-20 檢討確認）
+
+`auto_repair` 資格需同時滿足三條件：信號精確到檔案 + 行號（stack trace）、修復 PR 範圍可窄化（code exception）、CI 可機器驗證。目前只有 Sentry 同時滿足。
+
+| 來源 | policy | can_escalate_to_pr | 說明 |
+|------|--------|:---:|------|
+| Sentry | `auto_repair` | — | 唯一滿足三條件；stack trace 可精確定位 |
+| Uptime Kuma | `analysis_only` | ✅ | 根因不明；分析確認 code regression 後可手動升級為 PR |
+| Grafana | `analysis_only` | ✅ | 同 Uptime Kuma 邏輯；metrics ≠ code regression |
+| PostHog | `analysis_only` | ❌ | 行為信號屬 business signal，需人工判斷策略，禁止升級 |
+| Netdata | `human_only` | ❌ | 改 code 無法解決 CPU/RAM/disk；需 infra 介入 |
+| manual | `triage_needed` | ❌ | 邊界未知，先分流 |
+
+**Critical severity 閘門**：任何來源 severity=critical 的 incident 在 RepairRun 建立時強制 `needs_human_review = true`，即使 source policy 為 `auto_repair`（實作：`severityRequiresHumanReview()` in policy.ts）。
+
 ### Policy SSOT
 
 可自動修與不可自動修的正式分類以 `docs/awarewave-repair-center-app-architecture.md` 的 `Signal Source Taxonomy` 與 next-admin `lib/repair-center/policy.ts` 為準。本計劃書只描述流程，不另開第二套判斷規則。

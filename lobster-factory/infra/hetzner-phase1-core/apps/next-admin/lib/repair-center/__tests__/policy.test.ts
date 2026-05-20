@@ -6,6 +6,7 @@ import {
   policyForIncident,
   REPAIR_SOURCE_POLICIES,
   repairPolicyLabel,
+  severityRequiresHumanReview,
 } from "../policy";
 
 describe("REPAIR_SOURCE_POLICIES", () => {
@@ -87,4 +88,25 @@ describe("repairPolicyLabel", () => {
   it("analysis_only → 僅分析", () => expect(repairPolicyLabel("analysis_only")).toBe("僅分析"));
   it("human_only → 人工處理", () => expect(repairPolicyLabel("human_only")).toBe("人工處理"));
   it("triage_needed → 需分流", () => expect(repairPolicyLabel("triage_needed")).toBe("需分流"));
+});
+
+describe("can_escalate_to_pr", () => {
+  it("uptime_kuma can escalate to PR after confirmed code regression", () =>
+    expect(policyCatalogForSource("uptime_kuma").can_escalate_to_pr).toBe(true));
+  it("grafana can escalate to PR after confirmed code regression", () =>
+    expect(policyCatalogForSource("grafana").can_escalate_to_pr).toBe(true));
+  it("posthog cannot escalate — business signal, not code bug", () =>
+    expect(policyCatalogForSource("posthog").can_escalate_to_pr).toBe(false));
+  it("netdata cannot escalate — infra layer, code fix won't help", () =>
+    expect(policyCatalogForSource("netdata").can_escalate_to_pr).toBe(false));
+  it("manual cannot auto-escalate", () =>
+    expect(policyCatalogForSource("manual").can_escalate_to_pr).toBe(false));
+});
+
+describe("severityRequiresHumanReview", () => {
+  it("critical → true (any source, needs_human_review forced)", () =>
+    expect(severityRequiresHumanReview("critical")).toBe(true));
+  it("high → false", () => expect(severityRequiresHumanReview("high")).toBe(false));
+  it("medium → false", () => expect(severityRequiresHumanReview("medium")).toBe(false));
+  it("low → false", () => expect(severityRequiresHumanReview("low")).toBe(false));
 });
