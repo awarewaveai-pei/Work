@@ -66,6 +66,8 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 - WP web root: `/var/www/html`（**named volume** `wordpress_data`，非 bind mount）
 - 進 WP 容器: `docker exec -it lobster-wordpress bash`
 - 部署: `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull）
+  - **next-admin test gate（內建）**：`sg-deploy.sh next-admin` 會在 build 前自動跑 `npm test`（vitest，35 tests）；失敗 → deploy 自動 abort，不進入 build。
+  - 若 npm test 失敗：先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看錯誤，修好後再 push + 重跑 sg-deploy。
 - next-admin：用 `@supabase/supabase-js ^2.49.8`（非 auth-helpers）；樣式為 CSS 變數（無 Tailwind）
 
 **EU VPS** `204.168.175.41` — Services（compose SSOT 見 repo）
@@ -113,6 +115,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.cursor/rules/4
 | 使用者問 Cloudflare 設定是否正常 | `scripts/check-cloudflare-security.ps1` |
 | `fetch-external-signals` Telegram 欄出現 `error.*401\|error.*403` | 立即執行三步診斷：① `curl -s -o /dev/null -w "%{http_code}" https://app.aware-wave.com/api/ops/inbox/digest` — 若 403 代表 middleware 仍擋（需查 middleware.ts）；若 401 代表 token 不符 → ② `powershell -File scripts/secrets-vault.ps1 -Action import-user-env` → ③ 更新 User registry：`[System.Environment]::SetEnvironmentVariable('OPS_INBOX_INGEST_TOKEN', <vault值>, 'User')` → ④ 重跑 fetch-signals 確認 `ok`。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
 | EU VPS `infra-alerts` 出現 scanner 路徑（`/.aws/`、`/.ssh/`、`/wp-config` 等）且 bad request % > 50 | ① SSH EU VPS 確認是否已自動恢復；② 若持續進行中，用 Cloudflare WAF PATCH API 追加該路徑至 block rule（Zone=`f21b1919632fee2221647908a94fdcac`，Ruleset=`f290fd58b69c4cedb7a0688ca959034f`，Rule=`74c0e70b90874ea4b44926aecb44ae16`）；③ curl 實測新路徑回 403 確認生效。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
+| next-admin 程式碼改動後 sg-deploy 失敗且 log 含 `npm test FAILED` | ① 在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看失敗詳情；② 修好測試或修好程式碼（二擇一，視測試是否合理）；③ commit + push；④ 重跑 `sg-deploy.sh next-admin`。**禁止**：繞過 test gate（--skip-pull + 手動 rsync 或直接 `docker compose build`）。 |
 
 MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
