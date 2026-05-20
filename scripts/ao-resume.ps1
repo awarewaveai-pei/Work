@@ -106,6 +106,29 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     )
     if ($statusShort.Count -eq 0) {
+        # Clean tree but git-align still failed — branch is ahead of origin without a dirty worktree.
+        # This happens when ao-close-last.txt was committed but not pushed (ao-close-last.txt is now
+        # gitignored, but old checkpoints may have included it). Push and retry rather than propagating
+        # a phantom exit-1 that would skip all downstream AO-RESUME steps.
+        $aheadCount = 0
+        try {
+            $aStr = (& git -C $Root rev-list --count "origin/main..HEAD" 2>$null | Select-Object -Last 1)
+            if ($aStr -match '^\s*(\d+)\s*$') { $aheadCount = [int]$Matches[1] }
+        } catch { }
+        if ($aheadCount -gt 0) {
+            Write-Host ("== AO-RESUME: clean tree; main is {0} commit(s) ahead of origin — push then retry align ==" -f $aheadCount) -ForegroundColor Yellow
+            Push-Location -LiteralPath $Root
+            try {
+                & git push 2>&1 | Out-Host
+                $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+            } finally { Pop-Location }
+            if ($pushExit -ne 0) {
+                Write-Host "AO-RESUME: git push failed (exit $pushExit). Fix auth/network then re-run AO-RESUME." -ForegroundColor Yellow
+                return $pushExit
+            }
+            & powershell.exe @AlignArgs | Out-Host
+            return $(if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE })
+        }
         return $exit1
     }
 

@@ -55,7 +55,8 @@ param(
     [int]$FailAt = 6,
     [switch]$Strict,
     [switch]$Json,
-    [switch]$SkipFetch
+    [switch]$SkipFetch,
+    [switch]$AppCodeOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -171,10 +172,23 @@ try {
         if ($Strict) { Emit-Result -Status "FAIL" -ExitCode 2 -Message $msg -Data @{ deployed = $deployedCommit } }
         Emit-Result -Status "ERROR" -ExitCode 3 -Message $msg -Data @{ deployed = $deployedCommit }
     }
-    $behindStr = (git rev-list --count "$deployedCommit..$localHead" 2>&1).Trim()
-    $aheadStr  = (git rev-list --count "$localHead..$deployedCommit" 2>&1).Trim()
-    $behind = [int]$behindStr
-    $ahead  = [int]$aheadStr
+    if ($AppCodeOnly) {
+        # Count only commits that touch SG next-admin app paths (ignores governance/tooling noise).
+        $appPaths = @(
+            "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/",
+            "lobster-factory/infra/hetzner-phase1-core/nginx/",
+            "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml"
+        )
+        $behindCommits = @(git rev-list "$deployedCommit..$localHead" -- @appPaths 2>&1 | Where-Object { $_ -match '^[0-9a-f]{7,40}$' })
+        $aheadCommits  = @(git rev-list "$localHead..$deployedCommit" -- @appPaths 2>&1 | Where-Object { $_ -match '^[0-9a-f]{7,40}$' })
+        $behind = $behindCommits.Count
+        $ahead  = $aheadCommits.Count
+    } else {
+        $behindStr = (git rev-list --count "$deployedCommit..$localHead" 2>&1).Trim()
+        $aheadStr  = (git rev-list --count "$localHead..$deployedCommit" 2>&1).Trim()
+        $behind = [int]$behindStr
+        $ahead  = [int]$aheadStr
+    }
 } finally {
     Pop-Location
 }
