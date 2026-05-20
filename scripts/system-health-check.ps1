@@ -646,3 +646,4 @@ if ($criticalFailures.Count -gt 0) {
     Write-Error ("Critical gate failed: " + (($criticalFailures | Sort-Object -Unique) -join "; "))
     exit 2
 }
+exit 0
