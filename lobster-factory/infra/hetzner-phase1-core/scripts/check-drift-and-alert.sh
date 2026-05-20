@@ -62,16 +62,21 @@ if [[ -z "$DEPLOYED" ]]; then
   exit 0
 fi
 
-# 5. Compute behind / ahead
+# 5. Compute behind / ahead (app-code paths only — ignores governance/tooling commits)
+APP_PATHS=(
+  "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/"
+  "lobster-factory/infra/hetzner-phase1-core/nginx/"
+  "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml"
+)
 git cat-file -e "${DEPLOYED}^{commit}" 2>/dev/null || {
   log "ERROR: deployed commit $DEPLOYED not in /root/Work — fetch origin?"
   exit 0
 }
-BEHIND=$(git rev-list --count "${DEPLOYED}..${ORIGIN_HEAD}" 2>/dev/null || echo 0)
-AHEAD=$(git rev-list --count "${ORIGIN_HEAD}..${DEPLOYED}" 2>/dev/null || echo 0)
+BEHIND=$(git rev-list --count "${DEPLOYED}..${ORIGIN_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || echo 0)
+AHEAD=$(git rev-list --count "${ORIGIN_HEAD}..${DEPLOYED}" -- "${APP_PATHS[@]}" 2>/dev/null || echo 0)
 
 # 6. Decide alert
-log "check: deployed=${DEPLOYED:0:7} origin=${ORIGIN_HEAD:0:7} behind=$BEHIND ahead=$AHEAD"
+log "check (app-code only): deployed=${DEPLOYED:0:7} origin=${ORIGIN_HEAD:0:7} behind=$BEHIND ahead=$AHEAD"
 
 if [[ "$BEHIND" -lt "$THRESHOLD_BEHIND" ]]; then
   log "OK: in sync"
@@ -87,12 +92,12 @@ if [[ "$FORCE" -eq 0 && "$PREV_KEY" == "$CURR_KEY" ]]; then
   exit 0
 fi
 
-# 8. Build alert message — first 3 commit subjects for context
-SUBJECTS=$(git log --no-merges --format=' • %h %s' --max-count=3 "${DEPLOYED}..${ORIGIN_HEAD}" 2>/dev/null || true)
+# 8. Build alert message — first 3 app-code commit subjects for context
+SUBJECTS=$(git log --no-merges --format=' • %h %s' --max-count=3 "${DEPLOYED}..${ORIGIN_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || true)
 
 MSG=$(cat <<MSG_EOF
-:warning: *SG next-admin deploy drift*
-Production is *${BEHIND}* commit(s) behind \`origin/main\`.
+:warning: *SG next-admin app-code deploy drift*
+Production is *${BEHIND}* app-code commit(s) behind \`origin/main\`.
 
 • deployed: \`${DEPLOYED:0:12}\`
 • origin/main: \`${ORIGIN_HEAD:0:12}\`
@@ -143,9 +148,9 @@ TELEGRAM_PRIMARY_CHAT_ID=$(echo "$TELEGRAM_ALLOWED_CHAT_IDS_VAL" | cut -d',' -f1
 
 if [[ -n "${TELEGRAM_BOT_TOKEN_VAL:-}" && -n "${TELEGRAM_PRIMARY_CHAT_ID:-}" ]]; then
   TG_MSG=$(cat <<TG_EOF
-WARN: SG next-admin deploy drift
+WARN: SG next-admin app-code deploy drift
 
-Production is ${BEHIND} commit(s) behind origin/main.
+Production is ${BEHIND} app-code commit(s) behind origin/main.
 
 deployed:    ${DEPLOYED:0:12}
 origin/main: ${ORIGIN_HEAD:0:12}
