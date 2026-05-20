@@ -198,6 +198,15 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         Write-Host "  copied: ~/.claude/settings.json" -ForegroundColor Green
     }
 
+    # agency-os/.agency-state/ao-close-last.txt -> $AO_SYNC_SECRETS_ROOT\ao-close-last.txt
+    # Allows the other machine to anchor fetch-external-signals to the real last AO-CLOSE time.
+    $aoCloseSrc = Join-Path $PSScriptRoot "..\agency-os\.agency-state\ao-close-last.txt"
+    if (Test-Path -LiteralPath $aoCloseSrc) {
+        $aoCloseDest = Join-Path $secretsRoot "ao-close-last.txt"
+        Copy-Item -LiteralPath $aoCloseSrc -Destination $aoCloseDest -Force
+        Write-Host "  copied: ao-close-last.txt" -ForegroundColor Green
+    }
+
     # Write export manifest: records sha256 + size per file for import-side logging and integrity check.
     # Import uses its own local-state file (not this manifest) for conflict detection.
     $manifestEntries = [ordered]@{}

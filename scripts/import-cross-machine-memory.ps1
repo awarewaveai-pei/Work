@@ -545,6 +545,16 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         }
     }
 
+    # ── ao-close-last.txt: import to local .agency-state so fetch-external-signals anchors correctly ──
+    $aoCloseSrc = Join-Path $secretsRoot "ao-close-last.txt"
+    if (Test-Path -LiteralPath $aoCloseSrc) {
+        $aoCloseDst = Join-Path $PSScriptRoot "..\agency-os\.agency-state\ao-close-last.txt"
+        $aoCloseDir = Split-Path $aoCloseDst -Parent
+        if (-not (Test-Path -LiteralPath $aoCloseDir)) { New-Item -ItemType Directory -Path $aoCloseDir -Force | Out-Null }
+        Copy-Item -LiteralPath $aoCloseSrc -Destination $aoCloseDst -Force
+        Write-Host "  cross-machine import: ao-close-last.txt synced ($((Get-Content $aoCloseDst -Raw).Trim()))" -ForegroundColor Green
+    }
+
     # ── Flush local state to disk (once per session) ──────────────────────────
     if ($script:LocalStateModified) {
         Write-LocalState
