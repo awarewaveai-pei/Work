@@ -120,6 +120,7 @@
 
 #### 龍蝦工廠（lobster-factory）
 
+- [ ] **Repair Center 缺口修復 — 批次 2 + 批次 3（筆電繼續）** —— **【批次 1 完成，2/3 待執行】** **計畫書**：`agency-os/REPAIR_CENTER_GAPS_PLAN.md`（跨機換機 SSOT，git tracked）。**批次 1（桌機已完成 commit）**：middleware.ts bypass 精確化、GitHub Actions 移除多餘 OIDC 權限、user-env.ps1 補 soulful Supabase key（本機）。**批次 2（筆電）**：next-admin 加入 vitest（package.json + test script）+ 新建 `lib/repair-center/__tests__/policy.test.ts`，讓現有死程式碼 `rules.test.ts` 與新 policy 測試均可跑；`npm test` 全過。**批次 3（筆電）**：新建 `/api/webhooks/github/route.ts`，HMAC-SHA256 驗簽，`pull_request.closed+merged` → repair_run `pr_ready → deploy_pending`；需補 `GITHUB_WEBHOOK_SECRET` env var + 設定 GitHub Webhooks。**DoD**：`npm test` PASS + GitHub webhook curl 驗簽正確 + repair_run 狀態轉換成功。
 - [ ] `lobster-factory` A10-2 商業閉環實跑 —— **【未開始】**
   - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
 - [ ] `lobster-factory` A7 全站自動建站補齊 —— **【未開始】**

@@ -27,7 +27,8 @@ export function middleware(request: NextRequest) {
   // Cloudflare strips x-ops-proxy-auth before forwarding, so we exempt these paths.
   if (
     request.nextUrl.pathname === "/api/ops/summary" ||
-    request.nextUrl.pathname.startsWith("/api/ops/inbox/")
+    request.nextUrl.pathname === "/api/ops/inbox/health" ||
+    request.nextUrl.pathname === "/api/ops/inbox/digest"
   ) {
     return NextResponse.next();
   }
