@@ -93,7 +93,9 @@ try {
         if (Test-Path -LiteralPath $checkpointScript) {
             Push-Location -LiteralPath $root
             try {
+                $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
                 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[claude] checkpoint: auto-save on session start" 2>&1 | Out-Null
+                $ErrorActionPreference = $savedEAP
             } finally {
                 Pop-Location | Out-Null
             }
@@ -135,9 +137,11 @@ try {
             Push-Location -LiteralPath $root
             try {
                 $allLogLines.Add("== AO-RESUME hook: dirty tree detected; auto-checkpoint before FullMainlineParity ==") | Out-Null
+                $savedEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
                 $cpOut = @(
                     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[claude] checkpoint: auto-save dirty tree before AO-RESUME hook" 2>&1
                 )
+                $ErrorActionPreference = $savedEAP2
                 $autoCheckpointExit = $LASTEXITCODE
                 foreach ($line in $cpOut) { $allLogLines.Add([string]$line) | Out-Null }
             }
@@ -158,9 +162,11 @@ try {
 
     Push-Location -LiteralPath $root
     try {
+        $savedEAP3 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
         $resumeOut = @(
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $resumeScript -FullMainlineParity 2>&1
         )
+        $ErrorActionPreference = $savedEAP3
         $exit = $LASTEXITCODE
         foreach ($line in $resumeOut) { $allLogLines.Add([string]$line) | Out-Null }
     }
