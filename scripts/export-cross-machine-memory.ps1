@@ -180,12 +180,16 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     }
 
     # ~/AWARE_WAVE_CREDENTIALS.md -> $AO_SYNC_SECRETS_ROOT\AWARE_WAVE_CREDENTIALS.md
+    # Always written with UTF-8 BOM so vault is authoritative encoding source.
+    # VSCode saves without BOM; this ensures BOM is never lost through the sync cycle.
     $credsSrc = Join-Path $env:USERPROFILE "AWARE_WAVE_CREDENTIALS.md"
     if (Test-Path -LiteralPath $credsSrc) {
         $credsDest = Join-Path $secretsRoot "AWARE_WAVE_CREDENTIALS.md"
-        Copy-Item -LiteralPath $credsSrc -Destination $credsDest -Force
+        $utf8bom = New-Object System.Text.UTF8Encoding($true)
+        $credsContent = [System.IO.File]::ReadAllText($credsSrc, [System.Text.Encoding]::UTF8)
+        [System.IO.File]::WriteAllText($credsDest, $credsContent, $utf8bom)
         (Get-Item $credsDest).LastWriteTime = $syncNow
-        Write-Host "  copied: AWARE_WAVE_CREDENTIALS.md" -ForegroundColor Green
+        Write-Host "  copied (UTF-8 BOM enforced): AWARE_WAVE_CREDENTIALS.md" -ForegroundColor Green
     }
 
     # ~/.claude/settings.json -> $AO_SYNC_SECRETS_ROOT\claude-settings.json

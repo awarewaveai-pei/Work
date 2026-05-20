@@ -510,9 +510,15 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
             }
             'import' {
                 Invoke-LocalBackup $credsDst "AWARE_WAVE_CREDENTIALS.md"
-                if (Copy-Atomic $credsSrc $credsDst) {
-                    Update-LocalStateHash 'AWARE_WAVE_CREDENTIALS.md' (Get-SafeHash $credsSrc)
-                    Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md updated" -ForegroundColor Green
+                # Write with UTF-8 BOM — vault should already have BOM, but enforce here as defence-in-depth
+                try {
+                    $utf8bom = New-Object System.Text.UTF8Encoding($true)
+                    $credsContent = [System.IO.File]::ReadAllText($credsSrc, [System.Text.Encoding]::UTF8)
+                    [System.IO.File]::WriteAllText($credsDst, $credsContent, $utf8bom)
+                    Update-LocalStateHash 'AWARE_WAVE_CREDENTIALS.md' (Get-SafeHash $credsDst)
+                    Write-Host "  cross-machine import: AWARE_WAVE_CREDENTIALS.md updated (UTF-8 BOM enforced)" -ForegroundColor Green
+                } catch {
+                    Write-Host "  WARN: AWARE_WAVE_CREDENTIALS.md import failed ($($_.Exception.Message))" -ForegroundColor Yellow
                 }
             }
         }
