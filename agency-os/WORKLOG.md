@@ -4,6 +4,47 @@
 
 ## 2026-05-20
 
+### fix: Telegram 信號管線 + EU VPS 掃描告警根治（commits 4ea985f）
+
+**根本問題 C — Telegram fetch-external-signals 每次 401**
+
+根因（三層）：
+1. `middleware.ts` 只豁免 `/api/ops/summary`；所有 `/api/ops/*` 在 production 要求 `x-ops-proxy-auth` header
+2. Cloudflare 在轉發前剝除 `x-ops-proxy-auth`（程式碼注釋本身已說明），導致任何外部呼叫都無法通過 middleware gate
+3. User registry 中 `OPS_INBOX_INGEST_TOKEN` 存有舊 32 字元 token，`Get-Secret` 優先讀 registry，送出錯誤 token → 即使 middleware 通過也會 401
+
+**修正 C1：`middleware.ts`（commit 4ea985f）**
+- 在 `/api/ops/summary` bypass 後追加 `request.nextUrl.pathname.startsWith("/api/ops/inbox/")`
+- `/api/ops/inbox/*` 路由自身有 `verifyIngestToken`（Bearer token）守門，安全性不降
+- sg-deploy next-admin 完成，容器 healthy 確認（03:48 UTC）
+
+**修正 C2：User registry token 同步**
+- `secrets-vault.ps1 -Action import-user-env` → vault 同步 user-env.ps1 的 61 個 key
+- 手動更新 User registry `OPS_INBOX_INGEST_TOKEN` 為正確 64 字元 token
+- 驗證：`fetch-external-signals.ps1` → `Telegram: ok (0 msg)` ✅
+
+**根本問題 D — EU VPS infra-alerts CRITICAL（87.8% bad requests，2026-05-19 20:53-21:08 UTC）**
+
+根因：自動化憑證掃描器攻擊（`/.aws/credentials`、`/wp-config.bak`、`/.ssh/id_rsa` 等），所有請求均 404，15 分鐘後自行停止。scanner 使用 Cloudflare 匿名層（172.64.0.0/13），fail2ban 無法封鎖。
+
+**修正 D：Cloudflare WAF 規則更新**
+- 既有規則 `Block sensitive file access`（id=74c0e70b）expression 只有 `/.env`、`/.git`、`/config.php`
+- 新增覆蓋：`/.aws/`、`/.ssh/`、`/wp-config`、`/etc/passwd`、`/etc/shadow`、`/.htaccess`、`/.DS_Store`、`/phpinfo`
+- PATCH via Cloudflare Ruleset API → success: True
+- 效果：下次相同掃描模式在 Cloudflare edge 即被 block，EU VPS nginx 不再看到這些請求，Netdata bad request 比例不會觸發 CRITICAL
+
+**驗證**
+- curl 無 token → 401（middleware bypass 生效，route 層驗證中）
+- curl 帶正確 token → 200
+- fetch-external-signals.ps1 → Telegram: ok
+- Cloudflare WAF 規則 4 條全部 ON
+
+**避免再發生**
+- User registry token 更新流程：user-env.ps1 變更後需跑 `import-user-env` + 手動 `SetEnvironmentVariable` 或 `sync-cursor-mcp-user-env`（若 key 在 MCP 引用列表中）
+- middleware.ts 新增 `/api/ops/inbox/` 以外的 server-to-server 端點時，同樣需要評估是否需要 bypass + 路由自身需有 token 驗證
+
+---
+
 ### fix: daily AO-RESUME exit-1 + deploy drift false alarms (commits 3f83dc7, c58935d)
 
 **根本問題 A — 每日 AO-RESUME exit_code=1**
