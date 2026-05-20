@@ -22,8 +22,13 @@ function hasTrustedProxyAuth(request: NextRequest): boolean {
 
 export function middleware(request: NextRequest) {
   // /api/ops/summary is a public monitoring endpoint (Uptime Kuma health check).
-  // Cloudflare strips x-ops-proxy-auth before forwarding, so we exempt this path.
-  if (request.nextUrl.pathname === "/api/ops/summary") {
+  // /api/ops/inbox/* are server-to-server ingest endpoints that authenticate via
+  // Bearer token (verifyIngestToken) at the route level — no proxy-auth needed.
+  // Cloudflare strips x-ops-proxy-auth before forwarding, so we exempt these paths.
+  if (
+    request.nextUrl.pathname === "/api/ops/summary" ||
+    request.nextUrl.pathname.startsWith("/api/ops/inbox/")
+  ) {
     return NextResponse.next();
   }
 
