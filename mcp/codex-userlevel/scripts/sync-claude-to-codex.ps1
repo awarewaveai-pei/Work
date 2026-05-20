@@ -324,6 +324,39 @@ function Write-RunbookIndex {
   Write-Utf8NoBom -Path (Join-Path $DestDir "index.md") -Value ($rows -join "`n")
 }
 
+function Write-ProjectIndex {
+  param(
+    [string]$WorkRoot,
+    [string]$DestDir,
+    [string]$ClaudeHome
+  )
+
+  $rows = @(
+    "# Claude-First Project Sources"
+    ""
+    "These files are the human-maintained Claude-first sources for repo-level operating rules. Codex must read them as source references instead of maintaining a separate copy."
+    ""
+    "| Source | Path | Use |"
+    "|---|---|---|"
+  )
+
+  $claudeMd = Join-Path $WorkRoot "CLAUDE.md"
+  if (Test-Path -LiteralPath $claudeMd) {
+    $rows += "| CLAUDE.md | $(Escape-TableCell $claudeMd) | Legacy Claude project instructions and repo operating rules. Read when a request depends on project workflow, AO-RESUME/AO-CLOSE behavior, git discipline, MCP policy, risk gates, or Agency OS operating context. |"
+  }
+
+  $agencyAgents = Join-Path $WorkRoot "agency-os\AGENTS.md"
+  if (Test-Path -LiteralPath $agencyAgents) {
+    $rows += "| agency-os AGENTS | $(Escape-TableCell $agencyAgents) | Agency OS local instructions referenced from CLAUDE.md. Read for Agency OS-specific workflow and governance context. |"
+  }
+
+  if (Test-Path -LiteralPath $ClaudeHome) {
+    $rows += "| Claude assets | $(Escape-TableCell $ClaudeHome) | Shared Claude agents, commands, hooks, skills, and plugin assets. Human-maintained source; Codex wrappers/indexes are generated from here. |"
+  }
+
+  Write-Utf8NoBom -Path (Join-Path $DestDir "index.md") -Value ($rows -join "`n")
+}
+
 function Write-PluginIndex {
   param(
     [string]$PluginMarketplacesDir,
@@ -390,6 +423,7 @@ Use this skill as a compatibility layer over the migrated Claude Code assets fro
 2. Read the relevant index first:
    - Agents: `references/agents/index.md`
    - Commands: `references/commands/index.md`
+   - Project instructions: `references/project/index.md`
    - Hooks: `references/hooks/index.md`
    - MCP: `references/mcp/index.md`
    - Plugins: `references/plugins/index.md`
@@ -402,6 +436,10 @@ Use this skill as a compatibility layer over the migrated Claude Code assets fro
 Claude agents are migrated as prompt references, not native Codex `agent_type` values. When a user asks for a named Claude agent, read `references/agents/<agent>.md` and use it as role guidance in the current Codex agent.
 
 If the user explicitly asks for sub-agents or parallel agent work, map Claude read-only agents to Codex `explorer` where appropriate and implementation agents to Codex `worker`. Keep delegated work concrete and bounded.
+
+## Project Instructions
+
+Claude is the human-maintained source of truth. For repo-level workflow, read `references/project/index.md`, then read the referenced `CLAUDE.md` or nested `AGENTS.md` source directly. Do not copy `CLAUDE.md` into Codex. Codex system/developer instructions and explicit user instructions still take precedence over legacy Claude wording.
 
 ## Commands
 
@@ -615,6 +653,7 @@ $agentDest = Join-Path $references "agents"
 $commandDest = Join-Path $references "commands"
 $hookDest = Join-Path $references "hooks"
 $mcpDest = Join-Path $references "mcp"
+$projectDest = Join-Path $references "project"
 $runbookDest = Join-Path $references "runbooks"
 $pluginDest = Join-Path $references "plugins"
 
@@ -622,6 +661,7 @@ Ensure-Directory $agentDest
 Ensure-Directory $commandDest
 Ensure-Directory $hookDest
 Ensure-Directory $mcpDest
+Ensure-Directory $projectDest
 Ensure-Directory $runbookDest
 Ensure-Directory $pluginDest
 
@@ -640,6 +680,7 @@ Write-AgentIndex -SourceDir (Join-Path $ClaudeHome "agents") -DestDir $agentDest
 Write-CommandIndex -SourceDir (Join-Path $ClaudeHome "commands") -DestDir $commandDest -UseSourceLinks ($Mode -eq "linked")
 Write-HookIndex -ClaudeSettingsPath (Join-Path $ClaudeHome "settings.json") -DestDir $hookDest
 Write-McpIndex -ClaudeMcpPath (Join-Path $ClaudeHome "mcp.json") -CodexConfigPath (Join-Path $CodexHome "config.toml") -DestDir $mcpDest
+Write-ProjectIndex -WorkRoot $WorkRoot -DestDir $projectDest -ClaudeHome $ClaudeHome
 Write-RunbookIndex -WorkRoot $WorkRoot -DestDir $runbookDest
 Write-PluginIndex -PluginMarketplacesDir (Join-Path $ClaudeHome "plugins\marketplaces") -DestDir $pluginDest
 
@@ -648,7 +689,8 @@ $globalAgentsContent = @'
 # User Codex Instructions
 
 - Use the `claude-compat` skill when the user asks for migrated Claude agents, slash commands, hooks, runbooks, plugins, or Claude Code workflow parity.
-- Claude source content lives in `D:\Work\.claude`; user Codex skills are thin wrappers/indexes, not independent copies.
+- Claude source content lives in `D:\Work\CLAUDE.md` and `D:\Work\.claude`; user Codex skills are generated thin wrappers/indexes, not independent copies.
+- Claude is the only human-maintained workflow source. Do not hand-maintain a parallel Codex rule set for migrated Claude behavior.
 - This file is the user-level Codex instruction source. Do not add Codex-only instructions or migration helpers to the repo root.
 - Project-specific instructions may live in nested repo `AGENTS.md` files when a project intentionally owns them.
 - The user-level MCP config may contain live secrets. Never print raw `config.toml`, `.mcp.json`, `mcp.json`, `.credentials.json`, or token-bearing env values.
