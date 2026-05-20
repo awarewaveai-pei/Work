@@ -4,6 +4,35 @@
 
 ## 2026-05-20
 
+### fix: CREDENTIALS UTF-8 BOM 同步迴圈根治 + 內容損毀回復（commits fe9b1ab）
+
+**根本問題**：`AWARE_WAVE_CREDENTIALS.md` 反覆在 VSCode 儲存後失去 BOM → export → vault 存入 BOM-less → import → 仍 BOM-less，形成迴圈；另外舊跨機操作遺留內容損毀（Unicode codepoint 錯誤，非編碼問題，無法逆推）。
+
+**診斷過程**：
+1. 確認 BOM 週期：`export-cross-machine-memory.ps1` 用 `Copy-Item`（binary，保留 BOM-less）→ vault 存 BOM-less → `import-cross-machine-memory.ps1` 用 `Copy-Atomic` → 相同問題
+2. 內容損毀：`New-Object System.Text.UTF8Encoding($false, $true)` 誤判（Bash `$bytes` 被展開為空字串，實際未驗證）→ 真實損毀（無任何編碼可逆推）
+3. Desktop 版本（2026-05-09）為最後已知正確副本；May 15 backup 存有 §二十七 補充欄目
+
+**修正（commit fe9b1ab）**：
+- `export-cross-machine-memory.ps1`：CREDENTIALS 從 `Copy-Item` 改為 `ReadAllText` + `WriteAllText(utf8bom)` 強制 BOM
+- `import-cross-machine-memory.ps1`：CREDENTIALS 的 import case 同樣改為 `ReadAllText` + `WriteAllText(utf8bom)`
+
+**內容回復過程**：
+1. Desktop 版（May 9）作為正確 base（§一–§二十六 中文正確）
+2. May 15 backup 中提取 §二十七 May-12 補充（7 條）還原
+3. §二十六 GitHub Webhook 段（Webhook ID 627222921）從原損毀版提取後保留
+4. 最終：594 行，BOM=True，§二十七 有 10 條記錄（含 3 May-9 原始 + 7 May-12 補充）
+
+**資料遺失事件（高嚴重度，無法回復）**：
+- **根因**：`merge-credentials.ps1` 只以 `##` section headers 作為邊界偵測，未處理 `###` 子節和已有 section 內的新增內容
+- **影響**：使用者 2026-05-09 ~ 2026-05-20 在現有 sections 內的所有新增內容（含今日 2026-05-20 加入的內容）**永久遺失**
+- **觸發**：使用者指出今日新增內容後才發現；Downloads 副本也在作業中被覆蓋，無任何備份
+- **避免再發生**：合併憑證檔前必須逐行 diff（`fc` 或 `diff -u`）；以 `###` 為邊界、content-aware；保留原始備份至確認無誤後才刪除；Downloads 副本為最後防線，不可寫入
+
+**Vault 狀態**：vault 目前存有合併版（無 restore-section27 更新），需重新同步 594 行版本（**待下次開機時補做**）。
+
+---
+
 ### AUTO_TASK_DONE: auto-repair 觸發分類檢討完成（commit 54b0c2f）
 
 **根本問題**：TASKS 2026-05-14 遺留任務：為什麼只有 Sentry 是 auto_repair，其他來源要人工核准？
