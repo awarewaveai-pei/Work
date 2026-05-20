@@ -202,6 +202,7 @@ $data = @{
     ahead           = $ahead
     warnAt          = $WarnAt
     failAt          = $FailAt
+    appCodeOnly     = [bool]$AppCodeOnly
 }
 
 if ($behind -ge $FailAt) {

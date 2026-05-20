@@ -5,6 +5,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check-deploy-drift.ps1
 ```
 
 Optional flags (pass after `/check-drift`):
+- `-AppCodeOnly` — count only commits that touch next-admin/nginx/docker-compose (ignores governance/tooling commits; default in health check and AO-CLOSE)
 - `-SkipFetch` — use cached `origin/main` instead of fetching
 - `-Strict` — treat any drift as FAIL (exit 2) instead of WARN (exit 1); use this in CI
 - `-Json` — emit JSON instead of human-readable

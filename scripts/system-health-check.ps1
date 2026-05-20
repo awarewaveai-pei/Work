@@ -516,16 +516,16 @@ if (Test-Path $vaultHelper) {
 $driftScript = Join-Path $root "scripts/check-deploy-drift.ps1"
 if (Test-Path $driftScript) {
     try {
-        $driftJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $driftScript -SkipFetch -Json 2>&1 | Out-String
+        $driftJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $driftScript -AppCodeOnly -SkipFetch -Json 2>&1 | Out-String
         $driftExit = $LASTEXITCODE
         $driftObj = $null
         try { $driftObj = $driftJson | ConvertFrom-Json -ErrorAction Stop } catch { $driftObj = $null }
         if ($driftObj -and $driftObj.status -eq "PASS") {
             Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("PASS at " + $driftObj.deployedCommit.Substring(0, [Math]::Min(7, $driftObj.deployedCommit.Length)))
         } elseif ($driftObj -and $driftObj.status -eq "WARN") {
-            Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("WARN: " + $driftObj.behind + " commit(s) behind origin/main; run /root/lobster-phase1/scripts/sg-deploy.sh on SG when ready")
+            Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("WARN: " + $driftObj.behind + " app-code commit(s) behind origin/main; run /root/lobster-phase1/scripts/sg-deploy.sh on SG when ready")
         } elseif ($driftObj -and $driftObj.status -eq "FAIL") {
-            Add-Check -Name "Deploy drift (SG next-admin)" -Pass $false -Detail ("FAIL: " + $driftObj.behind + " commit(s) behind origin/main (>= " + $driftObj.failAt + "); run sg-deploy.sh now")
+            Add-Check -Name "Deploy drift (SG next-admin)" -Pass $false -Detail ("FAIL: " + $driftObj.behind + " app-code commit(s) behind origin/main (>= " + $driftObj.failAt + "); run sg-deploy.sh now")
         } else {
             Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("Skipped (probe error, exit " + $driftExit + ")")
         }

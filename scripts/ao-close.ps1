@@ -486,6 +486,19 @@ try {
     Write-Host "ao-close: done (verify + guard + integrated report + push OK)." -ForegroundColor Green
     Write-Host "Re-read the automation boundary block above if anything feels missing." -ForegroundColor DarkGray
 
+    # Non-blocking app-code deploy drift hint (SSH probe ~5s; any error is silently ignored).
+    try {
+        $driftScript = Join-Path $WorkRoot "scripts\check-deploy-drift.ps1"
+        if (Test-Path -LiteralPath $driftScript) {
+            $driftRaw = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $driftScript -AppCodeOnly -SkipFetch -Json 2>&1 | Out-String
+            $driftObj = $null
+            try { $driftObj = $driftRaw | ConvertFrom-Json -ErrorAction Stop } catch { }
+            if ($driftObj -and $driftObj.behind -gt 0) {
+                Write-Host ("DEPLOY HINT: SG production is {0} app-code commit(s) behind. Run sg-deploy.sh when ready." -f $driftObj.behind) -ForegroundColor Yellow
+            }
+        }
+    } catch { }
+
     # Cross-machine memory export — non-blocking; failure does not affect AO-CLOSE exit code.
     $exportScript = Join-Path $WorkRoot "scripts\export-cross-machine-memory.ps1"
     if (Test-Path -LiteralPath $exportScript) {
