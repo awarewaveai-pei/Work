@@ -35,6 +35,20 @@
 
 ---
 
+### feat: sg-deploy.sh next-admin test gate + AGENTS.md 自動規則（commit 155500e）
+
+**根本問題**：vitest 裝好後 sg-deploy.sh 不自動跑測試，壞掉的 PR 可能繞過測試直接部署。
+
+**修正**：在 sg-deploy.sh step 1.5 加入 npm test gate——git pull 後、rsync 前，若 APPS 含 next-admin 且非 dry-run，自動跑 `npm --prefix $GIT_APPS_ROOT/next-admin test`；失敗 → `fail()` 中止整個 deploy，錯誤訊息明確禁止繞過。
+
+**驗證**：`bash -n` 語法檢查 pass；`sg-deploy.sh next-admin` 輸出 `npm test gate (next-admin)` → `2 passed / 35 passed` → `npm test passed` → `lobster-next-admin healthy`。
+
+**AGENTS.md**：SG VPS 段補記 test gate 說明；代理自動工具規則表加入 `npm test FAILED` 三步修復流程 + 禁止繞過聲明。
+
+**- AUTO_TASK_DONE: sg-deploy test gate**
+
+---
+
 ### drill: Phase 3-C 備份失敗 drill 通過（2026-05-20）
 
 **目的**：驗證備份閘門失敗時，repair OS 不建立 GitHub Issue，run 進入 `triage_needed`。
