@@ -4,6 +4,28 @@
 
 ## 2026-05-20
 
+### drill: Phase 3-C 備份失敗 drill 通過（2026-05-20）
+
+**目的**：驗證備份閘門失敗時，repair OS 不建立 GitHub Issue，run 進入 `triage_needed`。
+
+**步驟**：
+1. 建立 test incident（sentry / low severity）→ id `41c04e86-5ff3-40a9-8819-b9512c5e3abb`
+2. `docker pause lobster-wordpress-db`（使備份腳本 `docker exec mariadb-dump` 失敗）
+3. POST `/api/ops/repairs` `{ incident_id }` → 觸發 `startRepairFromIncident`
+4. 觀察回應
+5. `docker unpause lobster-wordpress-db`（容器 healthy 確認）
+
+**結果**（drill pass ✅）：
+- `ok: false`, `error: backup_failed`
+- `run.state: triage_needed`（非 repairing）
+- `run.backup_status: failed`, `backup_error: sg_backup_failed:1`
+- `github_issue_number: None` — 無任何 GitHub Issue 建立
+- DB 容器 unpause 後 10 秒內回到 healthy
+
+**結論**：備份閘門正常運作。備份失敗時系統正確阻止 GitHub Issue 建立，run 標記需人工介入（triage_needed）。
+
+---
+
 ### fix: Telegram 信號管線 + EU VPS 掃描告警根治（commits 4ea985f）
 
 **根本問題 C — Telegram fetch-external-signals 每次 401**
