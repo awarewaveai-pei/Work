@@ -325,6 +325,19 @@ da795…
 - **對應 TASKS 子字串（可選）**: 檢討自動修復系統觸發分類
 - **風險／待辦（可選）**: 高嚴重度資料遺失——merge-credentials.ps1 只比對 `##` headers，使用者 2026-05-09~05-20 CREDENTIALS 新增內容永久遺失，Downloads 副本亦被覆蓋，無法回復。Vault（Google Drive）存有合併版，需手動同步 594 行正確版本。
 
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:063e4d4796f3f8745ea9851b210803d704d53350de11c1ae3a19fbf14ac53687 -->
+
+### claude-sonnet-4-6 2026-05-20 23:59
+
+- **完成（一句）**: system-health-check.ps1 加 exit 0 修正 system-guard 100% health 但 gate=fail 的長期 bug
+- **變更路徑**:
+  - `scripts/system-health-check.ps1`（加 `exit 0` 在 critical-failure check 之後）
+- **Git**: 34ac46f
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 此 bug 可能存在已久（validate-memory-index exit code 殘留）；今日 ao-close 首次觸發是因 closeout-inbox 需先 init 才執行，系統流程比平常多跑一次 system-guard
+
 ## 2026-05-18
 
 ### 補記：上次 AO-CLOSE（3cef089, 17:25）至本次 AO-CLOSE 完整工作紀錄
@@ -3147,7 +3160,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-20 15:14:07 UTC_
+_Last synced: 2026-05-20 15:27:23 UTC_
 
 ## 2026-03-20
 

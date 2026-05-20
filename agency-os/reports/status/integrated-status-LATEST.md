@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-20 17:46:46
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-05-20 23:27:43
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -223,19 +223,56 @@
 # Daily Note - 2026-05-20
 
 ## Done today
-- (TBD)
+- auto-repair 觸發分類檢討（commit 54b0c2f）：can_escalate_to_pr + severityRequiresHumanReview + 9 tests → 44 tests pass；plan doc §分類原則 決策表
+- CREDENTIALS BOM 同步迴圈根治（commit fe9b1ab）：export/import 腳本改用 ReadAllText + WriteAllText(utf8bom)，永久修正 VSCode→vault→import BOM 遺失迴圈
+- CREDENTIALS 內容損毀回復：Desktop May-9 版為正確 base，May-15 backup §二十七 7 條還原，GitHub Webhook 段保留，最終 594 行 BOM=True
+- Repair Center 六視角缺口修復（commits f7b45c0, 75f3727, 3a9bd21, efb615e）、sg-deploy test gate（commit 155500e）
 
 ## Current state
-- (TBD)
+- CREDENTIALS `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`：594 行，BOM=True，§一–§二十七 中文正確
+- Vault（Google Drive）：存有合併版（pre-restore-section27），需補同步 594 行版本
+- **資料遺失**：使用者 2026-05-09~2026-05-20 在現有 sections 內的新增內容（含 2026-05-20 當日）永久遺失；無任何備份可回復
+- next-admin：44 tests pass，sg-deploy test gate 已啟用
 
 ## Next steps
-- (TBD)
+- 下次開機前：將 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`（594 行）同步至 vault（`G:\我的雲端硬碟\MySecretVault\...`）
+- 若記得今日 CREDENTIALS 新增了什麼，手動補回
+- Anthropic API 帳戶補額後驗證 Issue #5 全自動 Claude branch → PR（Phase 4 唯一外部缺口）
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:3d5c2fec7148948b6446aad4d7858f611badc01542b3e4e35e05671b108d158a -->
+
+### claude-sonnet-4-6 2026-05-20 23:59
+
+- **完成（一句）**: CREDENTIALS BOM 同步迴圈根治 + 損毀內容回復 + auto-repair 觸發分類決策表完成
+- **變更路徑**:
+  - `scripts/export-cross-machine-memory.ps1`（BOM 強制寫入）
+  - `scripts/import-cross-machine-memory.ps1`（BOM 強制寫入）
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts`（can_escalate_to_pr + severityRequiresHumanReview）
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/__tests__/policy.test.ts`（44 tests）
+  - `docs/awarewave-auto-repair-plan-v3.2-final.md`（§分類原則 決策表）
+  - `agency-os/WORKLOG.md`、`agency-os/memory/CONVERSATION_MEMORY.md`、`agency-os/memory/daily/2026-05-20.md`
+- **Git**: fe9b1ab（BOM fix）, 54b0c2f（policy），7319156（AO-CLOSE docs）
+- **對應 TASKS 子字串（可選）**: 檢討自動修復系統觸發分類
+- **風險／待辦（可選）**: 高嚴重度資料遺失——merge-credentials.ps1 只比對 `##` headers，使用者 2026-05-09~05-20 CREDENTIALS 新增內容永久遺失，Downloads 副本亦被覆蓋，無法回復。Vault（Google Drive）存有合併版，需手動同步 594 行正確版本。
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:063e4d4796f3f8745ea9851b210803d704d53350de11c1ae3a19fbf14ac53687 -->
+
+### claude-sonnet-4-6 2026-05-20 23:59
+
+- **完成（一句）**: system-health-check.ps1 加 exit 0 修正 system-guard 100% health 但 gate=fail 的長期 bug
+- **變更路徑**:
+  - `scripts/system-health-check.ps1`（加 `exit 0` 在 critical-failure check 之後）
+- **Git**: 34ac46f
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 此 bug 可能存在已久（validate-memory-index exit code 殘留）；今日 ao-close 首次觸發是因 closeout-inbox 需先 init 才執行，系統流程比平常多跑一次 system-guard
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-20 17:46:38`
+- Time: `2026-05-20 23:27:34`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -245,13 +282,15 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260520-174637.md`
-- Closeout: `reports/closeout/closeout-20260520-174633.md`
+- Health: `reports/health/health-20260520-232733.md`
+- Closeout: `reports/closeout/closeout-20260520-232725.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+
+### 他處電腦開機須知 + 缺席使用者授權之 AO-CLOSE
 - 新增 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（公司機／換機：`git pull`、`verify-build-gates`、`npm ci`、`integrated-status` 路徑說明、與根目錄 `reports/status` 區別）。
 - 更新 **`RESUME_AFTER_REBOOT.md`**（區分：同機重開 vs 他處開機）、**`README.md`**、**`EXECUTION_DASHBOARD.md`** 指向該須知。
 - 使用者授權代理於不在現場時執行 **`ao-close.ps1`**（含 push）；證據見本日 `memory/daily/2026-03-27.md`。
@@ -309,7 +348,5 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
 
 

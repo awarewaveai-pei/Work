@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-20 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-20 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:063e4d4796f3f8745ea9851b210803d704d53350de11c1ae3a19fbf14ac53687 -->
 - **2026-05-20 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-20 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:3d5c2fec7148948b6446aad4d7858f611badc01542b3e4e35e05671b108d158a -->
 - **2026-05-20（CREDENTIALS 修復 + auto-repair 分類 + BOM 根治）**：(1) auto-repair 觸發分類檢討完成（commit 54b0c2f）：三條件框架（行號精確度/範圍可窄化/CI 可驗證）形式化；`can_escalate_to_pr`（uptime_kuma/grafana=true）+ `severityRequiresHumanReview`（critical→強制 human_review）；44 tests pass；plan doc §分類原則 決策表。(2) CREDENTIALS BOM 同步迴圈根治（commit fe9b1ab）：export/import 腳本改 ReadAllText+WriteAllText(utf8bom)，打破 VSCode→no-BOM→vault→import 迴圈。(3) CREDENTIALS 內容損毀回復：Desktop May-9 版為 base，May-15 backup §二十七 7 條還原，最終 594 行。**嚴重事件**：merge-credentials.ps1 只比對 `##` headers，遺漏 `###` 子節與 section 內容，導致 2026-05-09~05-20 使用者新增內容（含今日）**永久遺失**，Downloads 副本亦被覆蓋。Vault 待補同步（594 行版本）。
 - **2026-05-20（Repair Center 六視角缺口修復 + sg-deploy test gate）**：R0 架構師模式分析後，三批次全部完成並部署。**批次 1**（f7b45c0）：middleware.ts `startsWith` → 精確比對；GitHub Actions 移除多餘 `id-token: write`；user-env.ps1 填入 soulful Supabase key。**批次 2**（75f3727）：next-admin 加入 vitest + policy.test.ts，rules.test.ts 復活，`npm test` 35/35 pass。**批次 3**（3a9bd21 → 部署 efb615e）：`/api/webhooks/github/route.ts` HMAC-SHA256 驗簽，PR merge → `pr_ready → deploy_pending`；SG .env 寫入 `GITHUB_WEBHOOK_SECRET`；GitHub Webhook ID `627222921` 建立。AWARE_WAVE_CREDENTIALS.md 補記 webhook 資訊。**sg-deploy test gate**（155500e）：SG `sg-deploy.sh` step 1.5 加入 npm test 門檻，失敗自動 abort；AGENTS.md 加自動規則，Claude 遇 `npm test FAILED` log 知道三步修復流程。筆電唯一待做：`mcp/user-env.ps1` A3 soulful key（gitignored，不影響生產）。
@@ -445,5 +446,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-05-20 15:14:07 UTC_
+_Last synced: 2026-05-20 15:27:23 UTC_
 
