@@ -158,6 +158,107 @@
 **避免再發生**
 - `.agency-state/` 新增任何本地狀態檔前先確認已在 `.gitignore` 中
 
+
+### Agent dispatch log
+- devops-engineer: EU VPS nginx bad request 根因調查 -> All evidence collected. I have a complete picture of the root cause.
+
+---
+
+[DEVOPS-COMPLETION]
+
+## Action taken
+- Server: EU (204.168.175.41)
+- What I did: Read-only forensic analysis — no config chan…
+- devops-engineer: EU VPS 入侵鑑識完整調查 -> 所有 8 個 Step 的資料已收集完畢。現在輸出完整的入侵鑑識結論。
+
+---
+
+[DEVOPS-COMPLETION]
+
+## Action taken
+- Server: EU (204.168.175.41)
+- What I did: 執行完整 8-Step 入侵鑑識調查，純診斷，零修改
+- Commands run: SSH + grep/find/ss/ps/docker logs/…
+- devops-engineer: 讀取 EU VPS 現有安全配置（純讀取） -> 所有原始輸出已完整收集。以下是整理後的發現，供安全補強分析使用。
+
+---
+
+[DEVOPS-COMPLETION]
+
+## Action taken
+- Server: EU (204.168.175.41)
+- What I did: 純讀取，8 個步驟全部執行，零修改
+
+## Verification
+- 所有命令均為只讀操作 (ls, cat, find, nginx -v, nginx …
+- devops-engineer: EU VPS 完整安全補強執行 -> 所有執行完畢，以下是完整報告。
+
+---
+
+[DEVOPS-COMPLETION]
+
+## Action taken
+- Server: EU (`204.168.175.41`)
+- Backup created: `/root/security-hardening-backup-20260520-015552/` (7 files)
+
+**步驟 1 — chmod 修正**
+- `/root/…
+- devops-engineer: 讀取 EU VPS 修改後檔案完整內容 -> 以下是每個檔案的完整原始輸出：
+
+---
+
+===FILE:mainwp===
+```
+# MainWP Dashboard — AwareWave EU (204.168.175.41)
+# Phase 1: HTTP-only (for certbot ACME challenge + stack testing)
+# Phase 2: HTTPS added by certbot --exp…
+- devops-engineer: 查 SG VPS 目前 next-admin 部署狀態 -> 原始輸出如下：
+
+---
+
+**.deployed-commit（伺服器上已部署的 commit）**
+```
+da7953f7cb7dfcb45f7599460402f06d8a476bf7
+```
+
+**.deployed-at（部署時間戳）**
+```
+2026-05-18T08:28:52Z
+```
+
+**.drift-alert-state（drift 偵測記錄）**
+```
+da795…
+- devops-engineer: 讀 sg-deploy.sh 完整內容和 git log 差異 -> ---
+
+[DEVOPS-COMPLETION]
+
+## Action taken
+- Server: SG (5.223.93.113)
+- What I did: Read-only reconnaissance — 5 commands, zero modifications
+
+## Verification
+- All commands were read-only (cat, ls, g…
+- devops-engineer: SG 立即部署 + 建立自動部署機制 -> Script runs cleanly, correctly detects no drift after the deployment. All done.
+
+---
+
+[DEVOPS-COMPLETION]
+
+## Action taken
+- Server: SG (5.223.93.113)
+- Deployed next-admin: ran `sg-deploy.sh next-adm…
+- devops-engineer: 讀取 auto-deploy-next-admin.sh 最終內容 -> [DEVOPS-COMPLETION]
+
+## Action taken
+- Server: SG (5.223.93.113)
+- What I did: 純讀取 `/root/lobster-phase1/scripts/auto-deploy-next-admin.sh`，未做任何修改
+- Commands run: `ssh -i ~/.ssh/hetzner_trigger root@5…
+- Explore: Deep codebase exploration for auto-repair and app.aware-wave.com files -> I understand. I'm continuing from the comprehensive search that was completed. Let me provide the structured findings directly.
+
+## EXHAUSTIVE SEARCH RESULTS: AUTO-REPAIR AND APP.AWARE-WAVE.COM
+
+### A…
 ## 2026-05-18
 
 ### 補記：上次 AO-CLOSE（3cef089, 17:25）至本次 AO-CLOSE 完整工作紀錄
@@ -2980,7 +3081,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-19 10:10:07 UTC_
+_Last synced: 2026-05-20 09:46:31 UTC_
 
 ## 2026-03-20
 
@@ -3421,4 +3522,6 @@ _Last synced: 2026-05-19 10:10:07 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+
 

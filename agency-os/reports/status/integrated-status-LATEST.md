@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-19 18:10:18
+- Generated: 2026-05-20 17:46:46
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,59 +219,23 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-19.md
-# Daily Note - 2026-05-19
+## 5) memory/daily/2026-05-20.md
+# Daily Note - 2026-05-20
 
 ## Done today
-- 實作 agent 派工稽核紀錄系統（Plan B）：`agent-dispatch-log.js` hook + `dispatch-YYYYMMDD.jsonl` + AO-CLOSE WORKLOG 自動摘要整合
-- 診斷並修復 `settings.json` 缺少 Agent PostToolUse matcher（sync script merge 缺口）
-- 以實際 subagent 派工確認 hook 端對端觸發，JSONL 寫入並 commit
+- (TBD)
 
 ## Current state
-- 派工稽核系統已上線；換機時需手動補 settings.json Agent entry（sync 邏輯待修）
-- WP Plugin Auto-Install 的 sg-deploy + Trigger.dev re-deploy 仍 pending
-- 所有 health check 100%（360/360）
+- (TBD)
 
 ## Next steps
-- 修 `sync-claude-userlevel.ps1 -Mode merge` 讓它能合併新的 PostToolUse matcher
-- 換機後補 settings.json Agent entry
-- WP Plugin Auto-Install 待下次開工繼續
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:a072b4d963c46e7a8d9c374342010af0ddebbed2a445055747e5c0f1d3afc842 -->
-
-### claude-sonnet 2026-05-19 18:15
-
-- **完成（一句）**: 實作並驗證 agent 派工稽核紀錄系統（Plan B）：PostToolUse hook + JSONL + AO-CLOSE WORKLOG 整合，確認實際觸發
-- **變更路徑**:
-  - `mcp/claude-userlevel/hooks/agent-dispatch-log.js`（新增）
-  - `mcp/claude-userlevel/hooks/hooks.json`（+Agent matcher）
-  - `scripts/append-agent-dispatch-to-worklog.ps1`（新增）
-  - `scripts/ao-close.ps1`（+dispatch 呼叫）
-  - `mcp/claude-userlevel/hooks/README.md`、`README.zh-TW.md`（文件）
-  - `agency-os/reports/agent-dispatch/dispatch-20260519.jsonl`（初始紀錄）
-  - `~/.claude/settings.json`（手動補 Agent PostToolUse matcher，未進 git）
-- **Git**: 2b5fd6c (feat) + c62432f (fix settings.json)
-- **對應 TASKS 子字串（可選）**: 派工稽核
-- **風險／待辦（可選）**: sync-claude-userlevel.ps1 -Mode merge 未能自動合併新 PostToolUse matcher 到 settings.json，需日後修 merge 邏輯；換機時須手動補 Agent entry
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:a35cd5b152d2d10b88dac4ed718d2b4b17b86293168c0be036d68016887dfc85 -->
-
-### claude-sonnet 2026-05-19 18:20
-
-- **完成（一句）**: AO-CLOSE 執行完畢，daily note 填寫完成
-- **變更路徑**:
-  - `agency-os/memory/daily/2026-05-19.md`（填 TBD placeholder）
-- **Git**: pending this AO-CLOSE commit
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**:
+- (TBD)
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-19 18:10:13`
+- Time: `2026-05-20 17:46:38`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -281,15 +245,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260519-181013.md`
-- Closeout: `reports/closeout/closeout-20260519-181008.md`
+- Health: `reports/health/health-20260520-174637.md`
+- Closeout: `reports/closeout/closeout-20260520-174633.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-
-### 他處電腦開機須知 + 缺席使用者授權之 AO-CLOSE
 - 新增 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（公司機／換機：`git pull`、`verify-build-gates`、`npm ci`、`integrated-status` 路徑說明、與根目錄 `reports/status` 區別）。
 - 更新 **`RESUME_AFTER_REBOOT.md`**（區分：同機重開 vs 他處開機）、**`README.md`**、**`EXECUTION_DASHBOARD.md`** 指向該須知。
 - 使用者授權代理於不在現場時執行 **`ao-close.ps1`**（含 push）；證據見本日 `memory/daily/2026-03-27.md`。
@@ -347,5 +309,7 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
+
 
 
