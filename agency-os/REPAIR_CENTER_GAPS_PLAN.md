@@ -5,9 +5,9 @@
 
 ---
 
-## 已完成（桌機）
+## 已完成（桌機，2026-05-20）
 
-### 批次 1 — 安全與配置修正（已 commit）
+### 批次 1 — 安全與配置修正（commit f7b45c0）
 
 - [x] **A1 — middleware.ts bypass 精確化**
   - 檔案：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/middleware.ts`
@@ -23,9 +23,24 @@
 
 ---
 
-## 待執行（筆電）
+### 批次 2 — 測試基礎設施（commit 75f3727）✅
 
-### 批次 2 — 測試基礎設施
+- [x] package.json: vitest ^2.1.0 + test/test:watch scripts
+- [x] vitest.config.ts: @/* 路徑別名 + environment=node
+- [x] lib/repair-center/__tests__/policy.test.ts: 27 個測試全過
+- [x] rules.test.ts 8 個測試復活
+- npm test: 2 files / 35 tests / 0 failed ✅
+
+### 批次 3 — GitHub Webhook（commit 3a9bd21）✅ — **筆電還需設定 SG .env + GitHub Webhooks**
+
+- [x] app/api/webhooks/github/route.ts: HMAC-SHA256 驗簽 + pr_ready → deploy_pending
+- [x] docker-compose.yml: GITHUB_WEBHOOK_SECRET env pass-through
+- [ ] **筆電待做**：SG /root/lobster-phase1/.env 加 `GITHUB_WEBHOOK_SECRET=<自選值>`
+- [ ] **筆電待做**：GitHub Settings → Webhooks → URL: `https://app.aware-wave.com/api/webhooks/github`，Events: Pull requests，Secret: 同上
+
+## 已完成（桌機，2026-05-20）
+
+### 批次 1 — 安全與配置修正（commit f7b45c0）
 
 **目標**：讓 `rules.test.ts`（已存在但死掉）可以跑，並補 policy 單元測試。
 
