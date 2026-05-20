@@ -2,6 +2,54 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-20
+
+### fix: daily AO-RESUME exit-1 + deploy drift false alarms (commits 3f83dc7, c58935d)
+
+**根本問題 A — 每日 AO-RESUME exit_code=1**
+
+根因：`ao-close-last.txt` 在 `ao-close.ps1` 的 `git push` 之後才寫入（line ~503），所以每次 AO-CLOSE 結束後它都是 dirty file，下次 AO-RESUME hook 就 checkpoint → 產生 ahead=1 commit → `git-align` 丟 exception → ao-resume.ps1 在 line 233 exit，跳過所有 downstream steps（import、fetch-signals、cloudflare check）。
+
+**修正 A1：`.gitignore` + `git rm --cached`**
+- 新增 `agency-os/.agency-state/ao-close-last.txt`、`closeout-inbox.md`、`doc-sync-state.json` 至 `.gitignore`
+- `git rm --cached` 移除追蹤（檔案保留在磁碟）
+- 這三個檔案未來不再污染 working tree
+
+**修正 A2：`scripts/ao-resume.ps1`**
+- `Invoke-FullMainlineAlignWithAutoCheckpoint` lines 108-109：原本 clean-tree + exit1 直接 `return $exit1`
+- 修改為：偵測 `origin/main..HEAD` ahead count → 若 > 0 則 push 再 retry align（一次）→ 解決 ao-close-last.txt 遺留 commit 觸發的假 exit-1
+
+**根本問題 B — SG deploy drift 每日假告警**
+
+根因：`check-deploy-drift.ps1` 計算全部 commit 數；16 筆未部署 commit 全是 governance/tooling，沒有一筆觸碰 next-admin app code，導致每日 health check FAIL 告警。
+
+**修正 B1：`scripts/check-deploy-drift.ps1`**
+- 新增 `-AppCodeOnly [switch]`：啟用時用 `git rev-list <range> -- <paths>` 只計算觸碰 `next-admin/`、`nginx/`、`docker-compose.yml` 的 commit
+- JSON output 加入 `appCodeOnly` 欄位
+
+**修正 B2：`scripts/system-health-check.ps1`**
+- 預設啟用 `-AppCodeOnly` — health check 不再因 governance commit 誤報
+- WARN/FAIL 訊息改為 "app-code commit(s)"
+
+**修正 B3：`scripts/ao-close.ps1`**
+- AO-CLOSE push 成功後新增非阻塞 deploy drift hint（SSH ~5s，錯誤靜默忽略）
+- 若 `behind > 0` 則輸出 `DEPLOY HINT: SG production is N app-code commit(s) behind. Run sg-deploy.sh when ready.`
+
+**修正 B4：`.claude/commands/check-drift.md`**
+- 文件化 `-AppCodeOnly` flag
+
+**驗證**
+- `git diff` 確認所有變更正確
+- `git push origin main` 成功（c6d98d1..c58935d）
+- `.gitignore` 新增 3 行；`git rm --cached` 確認 3 檔已移除追蹤
+
+**剩餘風險**
+- ao-close.ps1 的 drift hint 在 SSH 不通時靜默略過（設計如此，非問題）
+- 筆電（D:\ 機器）下次 AO-RESUME 後 ao-close-last.txt 同樣在 gitignore，但需確認筆電是否已 pull — 下次筆電開工時確認
+
+**避免再發生**
+- `.agency-state/` 新增任何本地狀態檔前先確認已在 `.gitignore` 中
+
 ## 2026-05-18
 
 ### 補記：上次 AO-CLOSE（3cef089, 17:25）至本次 AO-CLOSE 完整工作紀錄
