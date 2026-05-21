@@ -130,8 +130,10 @@ echo '=== npm install ==='
 npm install --silent 2>&1 | tail -3
 
 echo '=== Deploy (trigger v4) ==='
-# --api-url overrides triggerUrl in trigger.config.ts for all CLI API calls.
-# Uses localhost:8030 to bypass Cloudflare Bot Fight Mode on trigger.aware-wave.com.
+# Force IPv4: Cloudflare WAF skip rule matches ip.src eq 204.168.175.41 (IPv4 only).
+# Without this, Node.js defaults to IPv6 (2a01:4f9:c012:3a55::1) which misses the WAF rule
+# and hits Bot Fight Mode with a 403 managed challenge.
+export NODE_OPTIONS='--dns-result-order=ipv4first'
 ./node_modules/.bin/trigger deploy --api-url http://127.0.0.1:8030
 "@
 
