@@ -109,6 +109,26 @@
   - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
   - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
 
+#### Auto-Repair — 操作者手動任務
+
+- [ ] **【操作者必做】安裝 Claude GitHub App 並確認 health endpoint** —— **【未開始】** **背景**：2026-05-21 查核確認 `awarewaveai-pei` 帳號下 **0 個 GitHub App 安裝**，Claude GitHub App 尚未部署。Auto-Repair 修復迴圈的 GitHub Issue 開單 / Claude PR 建立步驟依賴此 App；App 未裝，每次修復到「GitHub handoff」環節都會靜默失敗。health endpoint 目前回傳 `github_app_status: "unverified"`。
+  - **執行流程（依序）**：
+    - **步驟 1 — 安裝 App**：瀏覽器前往 `https://github.com/apps/claude` → Install → 選帳號 `awarewaveai-pei` → Repository access 選 `Only select repositories` → 勾選 `Work` → Install
+    - **步驟 2 — 設 env var**：SSH 進 SG VPS (`ssh root@5.223.93.113`)，執行：
+      ```bash
+      echo "AUTO_REPAIR_GITHUB_APP_CONFIRMED=true" >> /root/lobster-phase1/.env
+      docker restart lobster-next-admin
+      ```
+    - **步驟 3 — 驗收**：等 30 秒後執行：
+      ```bash
+      curl -s "http://localhost:3002/api/ops/repairs/health" \
+        -H "x-ops-proxy-auth: $(grep OPS_PROXY_AUTH_TOKEN /root/lobster-phase1/.env | cut -d= -f2)" \
+        -H "x-ops-claims-role: owner" | python3 -m json.tool | grep github_app_status
+      ```
+      期望值：`"github_app_status": "confirmed_by_operator"`
+  - **DoD**：health endpoint 回傳 `github_app_status: "confirmed_by_operator"` + WORKLOG `AUTO_TASK_DONE` 留紀錄
+  - **⚠️ 注意**：此為 Auto-Repair 全自動閉環的最後一塊缺口；未完成前，系統雖可偵測事件與備份，但 GitHub Issue / Claude PR 步驟無法自動執行
+
 #### 下一期計畫（未開始）
 
 - [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2 — Phase 4 觀察期進行中** —— **【進行中】** Phase 1+2+3 全部完成，production smoke 18 checks / 0 failed；Phase 4 每週巡檢已啟動（每週五 14:00），觀察期到期：2026-06-19。**唯一剩餘外部缺口**：重跑 Issue #5 驗證全自動 Claude branch → PR（ANTHROPIC_API_KEY 已補額 2026-05-21）。**DoD（Phase 4）**：Phase 4 第一週巡檢報告 + WORKLOG `AUTO_TASK_DONE` evidence。詳見 `docs/awarewave-auto-repair-plan-v3.2-final.md`。 —— **【進行中】** **2026-05-13 Codex implementation baseline 已完成**：`repair_runs` migration、`/ops/repairs` Queue/Runs/Safety/Policy UI、`/api/ops/repairs/*`、`/api/ops/repairs/health`、Slack interactive callback、Slack `approve_repair` 按鈕、GitHub auto-repair workflows、pre-repair backup gate（webhook 或 SG/EU SSH fallback）、CLAUDE auto-repair 紅線；`npm run build` PASS。**2026-05-13 上線基礎已補**：EU DB `repair_runs` migration 已以 `supabase_admin` 套用並 reload schema；SG `next-admin` 已部署 commit `41a773a`；production `/api/ops/repairs/health` 已回報 `table_ok=true`、`backup_configured=true`、`backup_mode=ssh`、`source_policies` 含 Sentry/Kuma/Grafana/PostHog/Netdata/manual。**2026-05-13 Web-control / Phase 3 安全驗收已補強**：`AUTO_REPAIR_GITHUB_TOKEN` 與 GitHub Secrets (`ANTHROPIC_API_KEY`、`SLACK_WEBHOOK_URL`) 已設定；SG deployed commit `87cfa76`；`/ops/repairs` 為操作者控制台，Repair API 由 nginx Basic Auth 邊界保護後注入可信 ops role；`/ops/inbox` 保持 incident SSOT，不合併成第二套維修 UI；production smoke `repair-center` 15 checks / 0 failed / 1 expected warning；backup-fail drill PASS（不建 GitHub Issue）；safe rollback snapshot/restore drill PASS；synthetic Sentry → backup → GitHub Issue → Claude Action analysis-only handoff PASS。**Slack secret gate 已完成**：`SLACK_SIGNING_SECRET` 已寫入 credentials / SG `.env` / GitHub Secret，`SLACK_BOT_TOKEN` 已在 SG + GitHub；production smoke 15 checks / 0 failed / 0 warning。**2026-05-13 最終實機驗收已完成**：signed Slack `approve_repair` production callback → Repair Run `f82411fe-d802-4b90-aef1-5d0c1fc46786` → backup PASS → GitHub Issue #2；Codex 接手完成 code-scoped PR #3 → Release Gate PASS → merge commit `460aa7d` → `sg-deploy.sh next-admin` → production smoke `repair-center` 17 checks / 0 failed / 0 warning，Repair Run 已標記 `resolved` / deploy `passed`。**2026-05-13 Claude auto-repair workflow 已解除 GitHub 端阻塞**：改傳 `${{ github.token }}`、允許 `Edit`、提高 turns、Actions repo permission 改為 `write` + `can_approve_pull_request_reviews=true`，Issue #5 已證明 Claude 可成功執行並推 `claude/...` branch；Claude-generated PR #8 已合併，production smoke 18 checks / 0 failed / 0 warning。**✅ ANTHROPIC_API_KEY 已補額（2026-05-21）**。**計畫書 owner doc**：`docs/awarewave-auto-repair-plan-v3.2-final.md`（v3.2 Final 2026-05-08，33 KB）。**目標**：多來源 ops signals（Sentry／Uptime Kuma／Netdata／Grafana／PostHog／CI／health／Cloudflare／Supabase／n8n／Trigger.dev／deploy drift／WordPress/MainWP）→ Ops Inbox → Repair Center → Slack 核准 → PR → Merge → `/sg-deploy`。**分類原則**：Sentry→auto-repair；Uptime/Grafana/PostHog→analysis-only；Netdata/資安/控制面→human-only；CI/流程類→先 triage。**4 層保護**：CI 綠勾／中文摘要／部署後 health-check 自動 rollback／Sentry 持續監控。

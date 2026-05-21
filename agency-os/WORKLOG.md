@@ -4,6 +4,27 @@
 
 ## 2026-05-21
 
+### 調查：Claude GitHub App 安裝狀態確認（2026-05-21）
+
+**事件**：GAP-03 閉環後，health endpoint 回傳 `github_app_status: "unverified"`。操作者詢問意涵，指示展開查核。
+
+**查核方式**：
+1. `GET /repos/awarewaveai-pei/Work` → HTTP 200，repo 可達 ✅
+2. `GET /repos/.../installation` → 401（PAT 限制，by design，非問題）
+3. `GET /repos/.../issues/comments?per_page=20` → 15 則留言，6 則 Bot，全為 `github-actions[bot]`，**無 Claude bot 活動**
+4. `GET /user/installations` → **0 個 GitHub App 安裝**
+
+**結論**：Claude GitHub App 尚未安裝在 `awarewaveai-pei` 帳號下。Auto-Repair 修復迴圈目前的 GitHub Issue 開單 / PR 建立步驟，依賴 Claude GitHub App 執行自動操作；App 未安裝，此步驟每次都會失敗。
+
+**操作者必須執行的動作（見 TASKS）**：
+1. 前往 `https://github.com/apps/claude` 安裝 Claude GitHub App，授權存取 `awarewaveai-pei/Work`
+2. 在 SG VPS 設 `AUTO_REPAIR_GITHUB_APP_CONFIRMED=true` 並重啟 container
+3. 確認 health endpoint 回傳 `github_app_status: "confirmed_by_operator"`
+
+**系統面已結案**：health endpoint 三層偵測邏輯已正確實作，不屬程式碼問題。
+
+---
+
 ### AUTO_TASK_DONE: GAP-01/03 最終閉環 — health endpoint SSH 常態探針 + GitHub App 三層狀態（commit `2a7d67e`）
 
 **根本問題**：前次修復（`c4ac12c`）仍有兩個 P1 設計缺口：
