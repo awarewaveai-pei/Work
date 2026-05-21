@@ -18,7 +18,7 @@ function envVal(name: string): string {
 
 // GAP-01 — backup script existence probe (SSH stat, advisory only)
 
-type ScriptProbeStatus = "ok" | "not_found" | "ssh_error" | "unconfigured" | "skipped";
+type ScriptProbeStatus = "ok" | "not_found" | "ssh_error" | "unconfigured" | "skipped" | "not_probed";
 
 interface BackupScriptProbe {
   sg: ScriptProbeStatus;
@@ -173,7 +173,10 @@ function policyCatalogTextOk(): boolean {
   return [...sourcePolicyText, ...repairLabelText].every(textIsPresent) && REQUIRED_POLICY_TEXT.every((text) => catalogText.includes(text));
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const deepProbe = searchParams.get("deep") === "1";
+
   const supabase = getSupabaseServerClient();
   const mode = await getCurrentSystemMode();
   const backupWebhook = configured("AUTO_REPAIR_BACKUP_WEBHOOK_URL");
@@ -203,9 +206,12 @@ export async function GET() {
     tableError = res.error?.message ?? null;
   }
 
-  // GAP-01 + GAP-03: run probes in parallel, both advisory (do not affect ok)
+  // SSH probe is opt-in via ?deep=1 to keep base health check fast (<1s).
+  // GitHub API check always runs — lightweight, validates token + repo access.
   const [scriptProbe, githubCheck] = await Promise.all([
-    probeBackupScripts(backupMode),
+    deepProbe
+      ? probeBackupScripts(backupMode)
+      : Promise.resolve<BackupScriptProbe>({ sg: "not_probed", eu: "not_probed", note: "Pass ?deep=1 to trigger SSH probe" }),
     githubToken
       ? checkGithubRepoAndApp(githubOwner, githubRepo, githubToken)
       : Promise.resolve<GithubRepoCheck>({
