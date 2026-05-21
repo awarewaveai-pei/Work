@@ -12,20 +12,23 @@
 
 $ErrorActionPreference = "Continue"
 
-# Diagnostic: write timestamp to temp log so we can confirm the hook fires
+# Diagnostic log — remove after hook confirmed working
 $logFile = "$env:TEMP\post-push-trigger-deploy.log"
-"$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') hook fired, args=$args" | Add-Content $logFile
+$ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+"$ts hook fired pwd=$(Get-Location)" | Add-Content $logFile
 
 # Find repo root dynamically (hook can live anywhere in ~/.claude/hooks/)
 $repoRoot = (git rev-parse --show-toplevel 2>$null).Trim()
+"$ts repoRoot='$repoRoot' ec=$LASTEXITCODE" | Add-Content $logFile
 if (-not $repoRoot -or $LASTEXITCODE -ne 0) {
-    exit 0
+    "$ts EXIT: no repo root" | Add-Content $logFile; exit 0
 }
 
 # Guard: only run in the AwareWave monorepo
 $deployScript = Join-Path $repoRoot "scripts\lobster-trigger-deploy.ps1"
+"$ts deployScript='$deployScript' exists=$(Test-Path $deployScript)" | Add-Content $logFile
 if (-not (Test-Path $deployScript)) {
-    exit 0
+    "$ts EXIT: no deploy script" | Add-Content $logFile; exit 0
 }
 
 # Which workflow paths trigger an auto-deploy?
@@ -37,21 +40,22 @@ $watchPaths = @(
 
 # Get files changed in the last push (HEAD vs HEAD~1)
 $changedFiles = git -C $repoRoot diff HEAD~1 HEAD --name-only 2>$null
+"$ts changedFiles='$($changedFiles -join ',')' ec=$LASTEXITCODE" | Add-Content $logFile
 if ($LASTEXITCODE -ne 0 -or -not $changedFiles) {
-    exit 0
+    "$ts EXIT: no changed files" | Add-Content $logFile; exit 0
 }
 
 # Check if any watched path was touched
 $triggered = $false
 foreach ($path in $watchPaths) {
     if ($changedFiles | Where-Object { $_ -like "$path*" -or $_ -eq $path }) {
-        $triggered = $true
-        break
+        $triggered = $true; break
     }
 }
+"$ts triggered=$triggered" | Add-Content $logFile
 
 if (-not $triggered) {
-    exit 0
+    "$ts EXIT: no watched path changed" | Add-Content $logFile; exit 0
 }
 
 Write-Host ""
