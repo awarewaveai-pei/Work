@@ -239,7 +239,62 @@ docker rmi lobster-phase1-node-api:rollback-20260101-000000
 
 ---
 
-## 7. 限制與邊界
+## 7. Trigger.dev Workflows 部署與回滾（EU VPS）
+
+**Owner script**：`scripts/lobster-trigger-deploy.ps1`（本機執行，SSH 到 EU VPS）  
+**部署方式**：CLI deploy（不影響 Docker containers，Worker image 由 Trigger.dev 自管）  
+**Server**：`https://trigger.aware-wave.com`（EU VPS `204.168.175.41`）
+
+### 7.1 標準部署
+
+```powershell
+# 本機執行（自動從 vault 讀取 PAT + Supabase key）
+.\scripts\lobster-trigger-deploy.ps1
+```
+
+腳本行為：vault 讀秘 → SSH EU VPS → `git pull --ff-only origin main` → `npm install` → `./node_modules/.bin/trigger deploy`
+
+### 7.2 回滾（Deploy 失敗或功能回退）
+
+Trigger.dev 自架無內建 rollback 指令。回滾方式：**重新 deploy 上一個穩定 commit 的 package.json**。
+
+```powershell
+# 1. 本機 checkout 舊版本的 package.json 與 lock file（不 reset 整個 working tree）
+git checkout <prev-stable-commit> -- lobster-factory/packages/workflows/package.json
+git checkout <prev-stable-commit> -- lobster-factory/packages/workflows/package-lock.json
+
+# 2. 本機重跑 npm install 確認 lock file 一致
+cd lobster-factory/packages/workflows && npm install
+
+# 3. 重新 deploy（腳本會 git pull，但 VPS 上仍是 HEAD；此時手動 deploy 而非透過腳本）
+# SSH 進 EU VPS：
+#   cd /root/Work/lobster-factory/packages/workflows
+#   git checkout <prev-stable-commit> -- package.json package-lock.json
+#   npm install
+#   export TRIGGER_ACCESS_TOKEN=<tr_pat_*>
+#   export TRIGGER_API_URL=https://trigger.aware-wave.com
+#   npx trigger.dev@<prev-version> deploy
+```
+
+> **注意**：回滾後，Workers 上的舊版本 image 會立即生效（新 run 用舊 image）。進行中的 run 繼續在舊 worker 跑直到完成。
+
+WORKLOG 格式：
+```
+- TRIGGER_ROLLBACK: from=<bad-commit> to=<good-commit> | reason=<一句話> | health=PASS
+```
+
+### 7.3 版本追蹤
+
+| 項目 | 位置 |
+|------|------|
+| CLI 版本（以 package.json 為準） | `packages/workflows/package.json` → `devDependencies.trigger.dev` |
+| Server 版本（EU VPS） | `docker inspect trigger-webapp \| jq '.[].Config.Image'`（SSH EU VPS） |
+| 最後 deploy 版本 | Trigger.dev Dashboard → Deployments |
+| CLI↔Server 相容矩陣 | CLI 4.x 對 Server 4.x patch 版本均相容；跨 minor 需查 changelog |
+
+---
+
+## 8. 限制與邊界
 
 - **資料庫不在此範圍**：資料回滾需用 `scripts/backup-phase1.sh` 生成的備份還原（見 `LONG_TERM_OPS.md` §4）。
 - **快照僅存於本機 VPS Docker daemon**：VPS 毀損時快照不可用，需靠 backup 還原程式碼並重建映像。

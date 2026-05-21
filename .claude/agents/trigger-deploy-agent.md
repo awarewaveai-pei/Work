@@ -35,9 +35,9 @@ Wait for confirmation before proceeding.
    ```bash
    export TRIGGER_ACCESS_TOKEN=<tr_pat_provided_by_user>
    export TRIGGER_API_URL=https://trigger.aware-wave.com
-   npx trigger.dev@4.4.4 deploy
+   npx trigger.dev@4.4.6 deploy
    ```
-   > Trigger.dev version on EU is **v4.4.4** (`trigger-webapp` image: `ghcr.io/triggerdotdev/trigger.dev:v4.4.4`). Always deploy with matching CLI version.
+   > Trigger.dev server on EU is **v4.4.4** (`trigger-webapp` image). CLI **4.4.6** is compatible — confirmed 2026-05-21 (4.4.5/4.4.6 contain no CLI↔Server breaking API changes; 4.4.5 deprecation gate only affects v3 CLI). Always use the CLI version matching `packages/workflows/package.json` → `trigger.dev` field.
 
 4. **Verify**: confirm exit 0 and deployment URL in output.
 

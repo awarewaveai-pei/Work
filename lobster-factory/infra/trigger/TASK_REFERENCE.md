@@ -284,7 +284,7 @@ As of 2026-05-07, the following vars are set in the Trigger.dev prod environment
 | `LOBSTER_AO_ORG_ID` | ❌ missing — must be set before next deploy |
 | All tenant provisioning vars | ❌ missing — sync on next deploy |
 
-To sync all vars, export them locally then run `npx trigger.dev@4.4.4 deploy` (see §Deploy below).
+To sync all vars, export them locally then run `npx trigger.dev@4.4.6 deploy` (see §Deploy below).
 
 ---
 
@@ -323,7 +323,7 @@ export TRIGGER_API_URL=https://trigger.aware-wave.com
 export LOBSTER_SUPABASE_URL=https://supabase.aware-wave.com
 export LOBSTER_SUPABASE_SERVICE_ROLE_KEY=<key>
 export LOBSTER_AO_ORG_ID=<ao-org-uuid>
-npx trigger.dev@4.4.4 deploy
+npx trigger.dev@4.4.6 deploy
 ```
 
 See [README.md §7a](README.md#7a-完整-deploy-registry5000-為何會失敗怎麼做才對) for registry connectivity details.

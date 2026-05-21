@@ -126,20 +126,20 @@ docker compose --env-file .env logs -f webapp
 
 ### 7. 本機 deploy 工作流程（`packages/workflows`）
 
-**CLI 版本**：與 `packages/workflows/package.json` 內 **`@trigger.dev/sdk`** 對齊（目前 **4.4.4**）。請使用 **`npx trigger.dev@4.4.4`**（勿隨意 `@latest`，避免與已鎖 SDK 漂移）。
+**CLI 版本**：與 `packages/workflows/package.json` 內 **`trigger.dev`** devDependency 對齊（目前 **4.4.6**）。請使用 **`npx trigger.dev@4.4.6`**（勿隨意 `@latest`，避免與已鎖 SDK 漂移）。Server（trigger-webapp）目前為 v4.4.4；CLI 4.4.6 對 Server 4.4.4 相容，已確認（2026-05-21）。
 
 1. 在 dashboard 建立 **project**，把 **`project`** 寫進 `packages/workflows/trigger.config.ts`。  
 2. **兩種金鑰勿混用**（與 [官方 API keys](https://trigger.dev/docs/apikeys) 一致）：  
    - **Project → API keys → Production secret key（`tr_prod_*`）**：給後端／SDK 設 **`TRIGGER_SECRET_KEY`**，用於 **從你的 App 觸發已部署的 task**。**不要**把它設成 CLI 的 **`TRIGGER_ACCESS_TOKEN`**。  
    - **Account → Personal Access Tokens（`tr_pat_*`）**：在 **`{APP_ORIGIN}/account/tokens`** 建立（例：`https://trigger.aware-wave.com/account/tokens`）。用於 **`login`／`deploy`／CI** 的 **`TRIGGER_ACCESS_TOKEN`**（自架另可設 **`TRIGGER_API_URL`**，見 [CLI deploy](https://trigger.dev/docs/cli-deploy-commands#self-hosting)）。若儀表板只突出 **Secret key** 一欄，請改到 **帳號／Account** 區找 **PAT**。  
-3. **互動式登入（一次性）**：`npx trigger.dev@4.4.4 login -a <APP_ORIGIN>`（瀏覽器／magic link；無需在指令列預先貼 `tr_pat_*`）。**CI／無頭機**才需事先匯出 **`TRIGGER_ACCESS_TOKEN`（`tr_pat_*`）**。  
+3. **互動式登入（一次性）**：`npx trigger.dev@4.4.6 login -a <APP_ORIGIN>`（瀏覽器／magic link；無需在指令列預先貼 `tr_pat_*`）。**CI／無頭機**才需事先匯出 **`TRIGGER_ACCESS_TOKEN`（`tr_pat_*`）**。  
 4. **Deploy 機器**必須能對 **`registry:5000`** 完成 **push** — 見下方 **§7a**。
 
 ```bash
 cd lobster-factory/packages/workflows
-npx trigger.dev@4.4.4 login -a https://trigger.aware-wave.com
+npx trigger.dev@4.4.6 login -a https://trigger.aware-wave.com
 # 見 §7a；勿用整包 phase1 .env 當 --env-file（會污染 TRIGGER_ACCESS_TOKEN）
-npx trigger.dev@4.4.4 deploy -p "<project ref>" -a https://trigger.aware-wave.com --env-file <僅含 POSTHOG_API_KEY、POSTHOG_HOST 的檔案>
+npx trigger.dev@4.4.6 deploy -p "<project ref>" -a https://trigger.aware-wave.com --env-file <僅含 POSTHOG_API_KEY、POSTHOG_HOST 的檔案>
 ```
 
 **Windows（推薦封裝）**：在 **`infra/trigger`** 目錄執行（自動從 `trigger.config.ts` / `package.json` 讀取 ref 與 CLI 版本，並只萃取 PostHog 兩鍵）：
@@ -154,7 +154,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy-workflows.ps1
 自架 v4 會在本機 **build** 後 **push** 到 **`https://registry:5000/...`**（映像倉庫在主機名 **`registry`**）。  
 **筆電 Windows** 若未處理 DNS／網路，會出現 **`lookup registry ... no such host`** — 這與 Docker Desktop 是否正常無關。
 
-**路徑 A（首選，最簡運維）**：在 **EU 上跑 Trigger stack 的那台 VPS** SSH 進去，於 repo 內執行 **`deploy-workflows.ps1`（若裝了 PowerShell／複製腳本）** 或上面的 **`npx trigger.dev@4.4.4 deploy`**；並先在該機對 **`127.0.0.1:5000`**（或 compose 公布的 registry 位址）**`docker login`**，帳密與 **`DEPLOY_REGISTRY_USERNAME` / `DEPLOY_REGISTRY_PASSWORD`**（`registry/auth.htpasswd`）一致。
+**路徑 A（首選，最簡運維）**：在 **EU 上跑 Trigger stack 的那台 VPS** SSH 進去，於 repo 內執行 **`deploy-workflows.ps1`（若裝了 PowerShell／複製腳本）** 或上面的 **`npx trigger.dev@4.4.6 deploy`**；並先在該機對 **`127.0.0.1:5000`**（或 compose 公布的 registry 位址）**`docker login`**，帳密與 **`DEPLOY_REGISTRY_USERNAME` / `DEPLOY_REGISTRY_PASSWORD`**（`registry/auth.htpasswd`）一致。
 
 > **EU VPS 一次性前置設定**（已完成，2026-05-07）：registry hostname 只在 Docker 內部 DNS 可解析，從 VPS host 部署需額外三步：
 >
@@ -197,7 +197,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy-workflows.ps1
 `packages/workflows` 內 `captureWorkflowEvent` 使用 **`posthog-node`**，於任務執行時讀 **`process.env.POSTHOG_API_KEY`** 與 **`POSTHOG_HOST`**（見 `src/observability/posthog.ts`）。這些必須出現在 **Trigger 專案的環境變數**（prod／staging），而不是 phase1-core 的 `.env`。
 
 - **方式 A（儀表板）**：Project → **Environment Variables** → 新增 **`POSTHOG_API_KEY`**（可標為 Secret）、**`POSTHOG_HOST`**（例如 `https://us.i.posthog.com`）。  
-- **方式 B（deploy 時同步）**：本 repo 已在 `packages/workflows/trigger.config.ts` 設定 **`syncEnvVars`**。在本機 deploy 前匯出與 phase1 相同的兩個變數（或由 `--env-file` 載入），再執行 **`npx trigger.dev@4.4.4 deploy`**（並遵守 §7a **registry** 可達性），會把值同步到 Trigger（見 [Trigger env docs](https://trigger.dev/docs/deploy-environment-variables)）。若兩個變數皆未設定，extension 不會寫入任何 PostHog 鍵。
+- **方式 B（deploy 時同步）**：本 repo 已在 `packages/workflows/trigger.config.ts` 設定 **`syncEnvVars`**。在本機 deploy 前匯出與 phase1 相同的兩個變數（或由 `--env-file` 載入），再執行 **`npx trigger.dev@4.4.6 deploy`**（並遵守 §7a **registry** 可達性），會把值同步到 Trigger（見 [Trigger env docs](https://trigger.dev/docs/deploy-environment-variables)）。若兩個變數皆未設定，extension 不會寫入任何 PostHog 鍵。
 
 ---
 
