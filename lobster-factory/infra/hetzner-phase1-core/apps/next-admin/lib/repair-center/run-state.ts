@@ -17,6 +17,7 @@ export function visibleRunButtons(
   closeRun: boolean;
   confirmDeployed: boolean;
   escalate: boolean;
+  archive: boolean;
 } {
   const terminal = isTerminalState(runState);
   return {
@@ -26,6 +27,8 @@ export function visibleRunButtons(
     closeRun: runState === "human_only",
     confirmDeployed: runState === "deploy_pending" || runState === "deploying",
     escalate: canEscalate && !terminal,
+    // Archive is available for any known terminal state (excludes undefined/empty)
+    archive: Boolean(runState) && (TERMINAL_STATES as readonly string[]).includes(runState!),
   };
 }
 

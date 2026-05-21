@@ -4,7 +4,7 @@ import { appendAudit } from "./audit";
 import { runPreRepairBackup } from "./backup";
 import { createRepairIssue, postEscalationComment, resolveGithubTarget } from "./github";
 import { canApprovePolicy, needsGitHubIssue, policyCatalogForSource, policyForIncident } from "./policy";
-import { escalateGuard } from "./run-state";
+import { escalateGuard, isTerminalState } from "./run-state";
 import type { RepairRun, RepairRunWithIncident } from "./types";
 
 export async function getCurrentSystemMode(): Promise<string> {
@@ -312,4 +312,33 @@ export async function updateRunLinks(
 
   const updated = await updateRun(id, patch);
   return { ok: true, run: updated };
+}
+
+export async function archiveRun(id: string, actor: string): Promise<{ ok: boolean; run?: RepairRun; error?: string }> {
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return { ok: false, error: "supabase_write_not_configured" };
+
+  const run = await fetchRepairRunWithIncident(id);
+  if (!run) return { ok: false, error: "repair_run_not_found" };
+  if (!isTerminalState(run.state)) return { ok: false, error: "run_not_in_terminal_state" };
+  if (run.archived_at) return { ok: false, error: "already_archived" };
+
+  const updated = await updateRun(id, {
+    archived_at: new Date().toISOString(),
+    audit_log: appendAudit(run.audit_log, {
+      actor,
+      action: "archived",
+      detail: "Manually archived from Repair Center.",
+    }),
+  });
+  return { ok: true, run: updated ?? undefined };
+}
+
+export async function archiveStaleRuns(retentionDays = 90): Promise<{ ok: boolean; archived?: number; error?: string }> {
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return { ok: false, error: "supabase_write_not_configured" };
+
+  const { data, error } = await supabase.rpc("archive_stale_repair_runs", { retention_days: retentionDays });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, archived: data as number };
 }
