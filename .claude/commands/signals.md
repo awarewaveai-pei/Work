@@ -51,4 +51,4 @@
 - 時間未帶時區預設為 CST（UTC+8）
 - Slack token 需有 `channels:history` scope（User registry `SLACK_BOT_TOKEN` 優先）
 - Telegram 0 則不代表異常，可能只是沒有人傳訊息
-- 輸出格式：先 Slack（#ops-incidents → #infra-alerts → #github-prs），再 Telegram
+- 輸出格式：先 Slack（#ops-incidents → #infra-alerts），再 Telegram

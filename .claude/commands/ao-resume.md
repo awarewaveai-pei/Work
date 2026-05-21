@@ -67,7 +67,7 @@ Then classify the digest before reporting any messages:
   ⚠️ **STALE DIGEST** — fetch-signals ran during AO-RESUME but did not refresh the file (API failure or credential issue). Report what the stale digest contains but label every item `[from stale digest — may be already-seen]`. Offer to manually re-run.
 
 Telegram @awarewave_ops_bot: 未讀數量 + 可操作項條列（無則寫「本輪無未讀」）
-Slack #ops-incidents / #infra-alerts / #github-prs: 未讀數量 + 最新一筆
+Slack #ops-incidents / #infra-alerts: 未讀數量 + 最新一筆
 Cloudflare security: report result from `agency-os/reports/status/cf-security-LATEST.md` (bot=ON/OFF, rules=N) — skip if file missing.
 Only include actionable items; skip routine noise.
 
