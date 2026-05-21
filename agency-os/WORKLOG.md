@@ -4,6 +4,44 @@
 
 ## 2026-05-21
 
+### fix: CREDENTIALS 亂碼迴圈根治 + 594 行版本強制回復
+
+**根本問題**：AO-RESUME 每次 import CREDENTIALS 被攔截（'local-modified'），本機停在舊/亂碼版本；即使 vault 是正確的也無法更新。
+
+**根因鏈（三步）**：
+1. `import-cross-machine-memory.ps1` 寫入本機時強制加 BOM → stateHash = SHA256(BOM + text)
+2. VSCode 開啟後儲存 → 自動去掉 BOM → 本機 dstHash = SHA256(text only) ≠ stateHash
+3. `export-cross-machine-memory.ps1` 把 vault 重新加 BOM 寫出，但**從不更新 ao-sync-state.json** → stateHash 永遠停在上次 import 的值 → 每次 AO-RESUME：dstHash ≠ stateHash → 'local-modified' → import 攔截 → BOM 永不復原 → Windows ANSI app 看到亂碼
+
+**三方 hash 現況（修復前）**：
+- 本機（552 行，BOM ✅）：`295E1F...910A`
+- Vault（594 行，BOM ✅）：`317996...8CEF8`
+- stateHash：`F3F066...CDAA`（三個全不同 → 判定為衝突）
+
+**修復步驟 1（立即回復）**：
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\import-cross-machine-memory.ps1 -Force
+```
+- 本機 pre-overwrite backup 自動建立於 `%LOCALAPPDATA%\AgencyOS\cross-machine-backup\`
+- 本機寫入 vault 594 行 BOM 版，stateHash 同步更新
+
+**修復步驟 2（根治，`export-cross-machine-memory.ps1` 第 194-218 行）**：
+在 CREDENTIALS export 後，立刻把本機當前 SHA256 寫入 `ao-sync-state.json`。邏輯：
+- 下次 export 後：stateHash = SHA256(local, 當前)
+- 下次 import：dstHash == stateHash → 回傳 'import' → BOM 被正確補回 → 永不再亂碼
+
+**驗證結果**：
+```
+local == vault hash : True   (3179...8CEF8)
+local == stateHash  : True
+BOM present         : True
+Line count          : 594
+```
+
+**避免再發生**：export 腳本每次對 CREDENTIALS 寫完 vault 後，必須同步 ao-sync-state.json（已修復）。切換機器若看到 CREDENTIALS 行數異常，執行 `import-cross-machine-memory.ps1 -Force` 可強制從 vault 回復。
+
+---
+
 ### fix: check-backup-health.ps1 四項 Bug 修復 + 備份新鮮度門檻
 
 **根本問題**：AO-RESUME 每次報告「SG backup latest = 2026-05-07」（14 天未更新），造成持續誤報。

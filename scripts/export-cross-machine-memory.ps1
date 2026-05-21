@@ -190,6 +190,32 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         [System.IO.File]::WriteAllText($credsDest, $credsContent, $utf8bom)
         (Get-Item $credsDest).LastWriteTime = $syncNow
         Write-Host "  copied (UTF-8 BOM enforced): AWARE_WAVE_CREDENTIALS.md" -ForegroundColor Green
+
+        # Update local state so next import sees 'import' instead of 'local-modified'.
+        # Root cause of BOM garbling loop: export writes vault WITH BOM but never updates
+        # ao-sync-state.json. On next AO-RESUME, stateHash (old BOM hash) != dstHash (VSCode
+        # stripped BOM) -> 'local-modified' -> import blocked -> BOM never restored -> garbled.
+        # Fix: after export, store current local hash as stateHash so import can safely overwrite.
+        $localStateFile = Join-Path $env:LOCALAPPDATA 'AgencyOS\ao-sync-state.json'
+        try {
+            $localState = if (Test-Path -LiteralPath $localStateFile) {
+                Get-Content -LiteralPath $localStateFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            } else {
+                [pscustomobject]@{ last_import_utc = ''; from_machine = ''; files = [pscustomobject]@{} }
+            }
+            if ($null -eq $localState.files) {
+                $localState | Add-Member -NotePropertyName files -NotePropertyValue ([pscustomobject]@{}) -Force
+            }
+            $localCredHash = (Get-FileHash -LiteralPath $credsSrc -Algorithm SHA256).Hash
+            $localState.files | Add-Member -NotePropertyName 'AWARE_WAVE_CREDENTIALS.md' `
+                -NotePropertyValue @{ sha256 = $localCredHash } -Force
+            $stateDir = Split-Path $localStateFile -Parent
+            if (-not (Test-Path $stateDir)) { New-Item -ItemType Directory -Path $stateDir -Force | Out-Null }
+            $localState | ConvertTo-Json -Depth 3 | Out-File -LiteralPath $localStateFile -Encoding UTF8 -Force
+            Write-Host "  local state synced: AWARE_WAVE_CREDENTIALS.md sha256=$localCredHash" -ForegroundColor DarkGray
+        } catch {
+            Write-Host "  WARN: could not update local state for CREDENTIALS ($($_.Exception.Message))" -ForegroundColor Yellow
+        }
     }
 
     # ~/.claude/settings.json -> $AO_SYNC_SECRETS_ROOT\claude-settings.json
