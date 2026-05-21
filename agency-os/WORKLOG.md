@@ -4,6 +4,29 @@
 
 ## 2026-05-21
 
+### fix: workflows npm audit — 9 HIGH + 11 moderate → 0 vulnerabilities（trigger.dev 4.4.4→4.4.6）
+
+**根本問題**：`lobster-factory/packages/workflows` 累積 20 個漏洞（9 HIGH, 11 moderate），其中 `systeminformation` 的現有 override `^5.31.5` 本身就是漏洞上界（攻擊範圍 ≤5.31.5），等同無效保護。
+
+**步驟**：
+1. 升 `@trigger.dev/sdk` / `@trigger.dev/build` / `trigger.dev` 4.4.4 → 4.4.6（routine patch，含上游安全修正）
+2. 修正現有錯誤 override：`systeminformation ^5.31.5` → `^5.31.6`
+3. 新增 7 個 overrides：`fast-uri ^3.1.2`、`hono ^4.12.18`、`brace-expansion ^5.0.6`、`ip-address ^10.2.0`、`ws ^8.20.1`、`socket.io-adapter ^2.5.7`、`protobufjs ^7.5.8`
+4. `npm install` → `found 0 vulnerabilities`
+5. `npm test` → 18 tests pass (3 files)
+
+**關鍵發現**：
+- `protobufjs` 原先被認為 7.x 全部有漏洞（≤7.5.7），實際 7.5.8/7.5.9/7.6.0 已存在且安全；與 `@opentelemetry/otlp-transformer@0.203.0` 的 `^7.3.0` 需求完全相容，最終解析到 7.6.0
+- `ws` override 超出 engine.io@6.5.5 的 tilde pin（`~8.17.1`），但 8.x 無 breaking change，socket.io 官方 advisory 明示此為正確修法
+
+**驗證結果**：
+- `npm audit`: 0 vulnerabilities
+- `npm list ws`: 全樹 ws@8.20.1 deduped
+- `npm list protobufjs`: 7.6.0（>7.5.7 漏洞上界）
+- vitest: 18/18 pass
+
+**避免再發生**：overrides 版本邊界需嚴格比對漏洞描述的 `<=` 上界，確認 override 版本嚴格大於該上界，而非等於。
+
 ### fix: Repair Center 全缺口修復 + 剩餘風險測試覆蓋（commits e999a60, 後續）
 
 **根本問題**：Auto-Repair 系統存在 5 個功能缺口、3 個維運風險、3 個可觀測性缺失，導致備份錯誤難判讀、Critical 告警節流過長（15 分鐘）、analysis_only 事件無升級路徑、UI 無法直接結案/確認部署。
