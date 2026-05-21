@@ -293,7 +293,8 @@ export async function GET() {
       github_repo_target: githubConfigured ? { owner: githubOwner, repo: githubRepo } : null,
       github_repo_accessible: githubCheck.repo_accessible,
       github_push_access: githubCheck.push_access,
-      github_app_installed: githubCheck.app_installed,
+      github_app_installed: githubCheck.app_installed, // deprecated: always null
+      github_app_status: githubCheck.app_status,
       github_app_advisory: githubCheck.note,
       slack_signing_configured: slackSigningConfigured,
       slack_interactive_ready: slackSigningConfigured,

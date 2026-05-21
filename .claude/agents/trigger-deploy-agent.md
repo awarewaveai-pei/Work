@@ -69,6 +69,8 @@ Watch for these milestones in stdout:
 | `=== Env ready ===` | All env vars set, listing to confirm ✓ |
 | `=== Git pull ===` | Repo synced on VPS ✓ |
 | `=== npm install ===` | Dependencies installed ✓ |
+| `=== Patch buildImage.js ===` | Cloudflare BFM bypass applied — MUST appear before deploy ✓ |
+| `buildImage.js patched: TRIGGER_API_URL -> http://127.0.0.1:8030` | sed patch confirmed ✓ |
 | `=== Deploy (trigger v4) ===` | trigger CLI running ✓ |
 | `[deploy] Done` | Deploy succeeded ✓ |
 
