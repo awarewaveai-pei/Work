@@ -104,7 +104,8 @@ export LOBSTER_EXECUTE_MANIFEST_STEPS='$execSteps'
 export LOBSTER_WP_SSH_PRIVATE_KEY='$wpSshKey'
 
 echo '=== Env ready ==='
-echo "  TRIGGER_API_URL:                `$TRIGGER_API_URL"
+echo "  TRIGGER_API_URL (CLI):          `$TRIGGER_API_URL"
+echo "  LOBSTER_TRIGGER_PUBLIC_API_URL: `$LOBSTER_TRIGGER_PUBLIC_API_URL"
 echo "  LOBSTER_SUPABASE_URL:           `$LOBSTER_SUPABASE_URL"
 echo "  LOBSTER_AO_ORG_ID:              `$LOBSTER_AO_ORG_ID"
 echo "  POSTHOG_HOST:                   `$POSTHOG_HOST"
@@ -123,7 +124,9 @@ echo '=== npm install ==='
 npm install --silent 2>&1 | tail -3
 
 echo '=== Deploy (trigger v4) ==='
-./node_modules/.bin/trigger deploy
+# --api-url overrides triggerUrl in trigger.config.ts for all CLI API calls.
+# Uses localhost:8030 to bypass Cloudflare Bot Fight Mode on trigger.aware-wave.com.
+./node_modules/.bin/trigger deploy --api-url http://127.0.0.1:8030
 "@
 
 # ── 4. Write script to VPS temp file (stdin, no TTY needed) ───────────────
