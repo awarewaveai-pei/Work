@@ -76,13 +76,15 @@ function Get-HostBackupHealth {
         'if [ -z "$retention_days" ] || [ "$retention_days" = "(unknown)" ]; then delete_rule_days=$(grep -v ''^[[:space:]]*#'' "$BACKUP_SCRIPT" | grep -Eo -- ''-mtime[[:space:]]*\+[0-9]+'' | head -n 1 | grep -Eo ''[0-9]+'' || true); if [ -n "$delete_rule_days" ]; then retention_days="$delete_rule_days"; retention_source="delete-rule"; fi; fi',
         'if [ -z "$retention_days" ]; then retention_days="(unknown)"; fi',
         'if [ -d "$BACKUP_DIR" ]; then backup_size=$(du -sh "$BACKUP_DIR" 2>/dev/null | awk ''{print $1}''); latest_file=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); oldest_file=$(ls -1tr "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); if [ -n "$latest_file" ]; then latest_time=$(stat -c ''%y'' "$BACKUP_DIR/$latest_file" | cut -d''.'' -f1); else latest_time="(none)"; fi; if [ -n "$oldest_file" ]; then oldest_time=$(stat -c ''%y'' "$BACKUP_DIR/$oldest_file" | cut -d''.'' -f1); else oldest_time="(none)"; fi; else backup_size="(missing)"; latest_time="(missing)"; oldest_time="(missing)"; fi',
+        'backup_age_days="999"; if [ -d "$BACKUP_DIR" ]; then _latest=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n 1 || true); if [ -n "$_latest" ]; then _mtime=$(stat -c ''%Y'' "$BACKUP_DIR/$_latest" 2>/dev/null || echo "0"); _now=$(date +%s); backup_age_days=$(( (_now - _mtime) / 86400 )); fi; fi',
         'echo CRON_STATUS=$cron_status',
-        'echo CRON_LINES=$cron_lines',
+        'echo "CRON_LINES=$(printf ''%s'' "$cron_lines" | tr ''\n'' ''|'')"',
         'echo RETENTION_DAYS=$retention_days',
         'echo RETENTION_SOURCE=$retention_source',
         'echo BACKUP_SIZE=$backup_size',
         'echo LATEST_TIME=$latest_time',
-        'echo OLDEST_TIME=$oldest_time'
+        'echo OLDEST_TIME=$oldest_time',
+        'echo BACKUP_AGE_DAYS=$backup_age_days'
     )
     $raw = ($parts -join "; ")
     $b64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($raw))
@@ -90,16 +92,17 @@ function Get-HostBackupHealth {
     $res = Invoke-Ssh -ServerHost $ServerHost -Command $cmd
     if ($res.ExitCode -ne 0) {
         return [ordered]@{
-            host           = $ServerHost
-            ok             = $false
-            error          = $res.Output
-            cron_status    = "(error)"
-            cron_lines     = "(error)"
-            retention_days = "(error)"
+            host             = $ServerHost
+            ok               = $false
+            error            = $res.Output
+            cron_status      = "(error)"
+            cron_lines       = "(error)"
+            retention_days   = "(error)"
             retention_source = "(error)"
-            backup_size    = "(error)"
-            latest_time    = "(error)"
-            oldest_time    = "(error)"
+            backup_size      = "(error)"
+            latest_time      = "(error)"
+            oldest_time      = "(error)"
+            backup_age_days  = "999"
         }
     }
 
