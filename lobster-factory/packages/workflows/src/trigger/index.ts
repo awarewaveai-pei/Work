@@ -1,4 +1,3 @@
-// v20260521 — hook fire diagnostic
 export { recordTenantIntegration } from "./record-tenant-integration";
 export { orchestrateTenantProvisioning } from "./orchestrate-tenant-provisioning";
 export { createWpSite } from "./create-wp-site";
