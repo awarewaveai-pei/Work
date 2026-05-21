@@ -91,12 +91,14 @@ AUTO_TASK_DONE: Trigger workflows 完整 deploy — <trigger.dev deploy URL> —
 |---------|-------|-----|
 | `TRIGGER_DEPLOY_PAT in vault must be a deploy PAT` | PAT missing or wrong type | Set `tr_pat_*` in vault |
 | `Could not read SERVICE_ROLE_KEY from VPS` | VPS unreachable or key missing in `/root/supabase/.env` | Check SSH key + VPS connectivity |
-| `403 Just a moment` during deploy | Cloudflare Bot Fight Mode not bypassed | Confirm `NODE_OPTIONS=--dns-result-order=ipv4first` is in the bash script and IPv4 WAF skip rule is enabled for zone `f21b1919632fee2221647908a94fdcac` |
+| `403 Just a moment` or `cType: 'managed'` during `#16 [indexer 2/2] RUN node` | Docker indexer calling public URL, Cloudflare BFM blocking | sed patch missing or not applied — check `=== Patch buildImage.js ===` milestone in output; see `runbooks/TRIGGER-DEPLOY-CLOUDFLARE-BFM.md` |
+| `403 Just a moment` before indexer stage | CLI auth calls blocked by Cloudflare | Confirm `NODE_OPTIONS=--dns-result-order=ipv4first` + IPv4 WAF skip rule enabled for zone `f21b1919632fee2221647908a94fdcac` |
 | syncEnvVars syncs nothing | Running ad-hoc deploy without vault env vars | Always use `lobster-trigger-deploy.ps1` |
 
 ## Reference
 
 - Deploy script: `scripts/lobster-trigger-deploy.ps1`
+- Cloudflare BFM bypass runbook: `runbooks/TRIGGER-DEPLOY-CLOUDFLARE-BFM.md`
 - Deploy guide: `lobster-factory/infra/trigger/README.md` §7a
 - Task reference (env vars per task): `lobster-factory/infra/trigger/TASK_REFERENCE.md`
 - EU server: `204.168.175.41` (Helsinki hel1, Hetzner ID: 127972089)
