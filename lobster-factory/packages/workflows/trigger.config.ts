@@ -11,18 +11,18 @@ export default defineConfig({
   triggerUrl: process.env.LOBSTER_TRIGGER_DEPLOY_URL ?? "https://trigger.aware-wave.com",
   dirs: ["./src/trigger"],
   build: {
-    // TRIGGER_API_URL (http://127.0.0.1:8030) overrides the Docker build-arg so the
-    // managed-index-controller runs against the local trigger-webapp instead of the
-    // public Cloudflare-proxied URL. This build-arg is injected AFTER the CLI's own
-    // --build-arg TRIGGER_API_URL (last value wins in Docker buildx).
-    // Combined with --network=host in the deploy command, the indexer reaches localhost
-    // directly — no Cloudflare involved.
-    // NOTE: use TRIGGER_API_URL directly (already set to http://127.0.0.1:8030 by the
-    // deploy script), NOT LOBSTER_TRIGGER_DEPLOY_URL — the latter is set before this
-    // config is evaluated but TRIGGER_API_URL is the one the CLI already exports.
-    env: {
-      TRIGGER_API_URL: process.env.TRIGGER_API_URL ?? "https://trigger.aware-wave.com",
-    },
+    // Cloudflare bypass for the managed-index-controller:
+    // The indexer runs as a Docker build RUN step. It reads TRIGGER_API_URL which
+    // localBuildImage() sets from apiUrl (server's self-reported https://trigger.aware-wave.com).
+    // Cloudflare BFM blocks that call inside Docker.
+    // FIX: lobster-trigger-deploy.ps1 patches buildImage.js after npm install to replace
+    //   TRIGGER_API_URL=${apiUrl} → TRIGGER_API_URL=http://127.0.0.1:8030 in localBuildImage.
+    // Combined with --network=host in the deploy command the indexer reaches the VPS-local
+    // trigger-webapp at port 8030 without going through Cloudflare.
+    // NOTE: build.env.TRIGGER_API_URL does NOT work — confirmed that build.env is NOT
+    //   propagated to buildEnvVars in localBuildImage in trigger.dev 4.4.6 (only works
+    //   for syncEnvVars/deploy sync path, not for the docker --build-arg override).
+    //
     // ssh2 uses native C++ addons (.node files); esbuild cannot bundle them.
     // Mark as external so Trigger.dev installs them in the worker at runtime.
     external: ["ssh2", "cpu-features"],

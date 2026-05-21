@@ -129,13 +129,24 @@ git -C /root/Work pull --ff-only origin main 2>&1 | tail -5
 echo '=== npm install ==='
 npm install --silent 2>&1 | tail -3
 
+echo '=== Patch buildImage.js (bypass Cloudflare for indexer) ==='
+# Root cause: localBuildImage() in trigger.dev sets --build-arg TRIGGER_API_URL=${apiUrl}
+# where apiUrl = server's self-reported URL (https://trigger.aware-wave.com).
+# The managed-index-controller RUN step inside Docker calls that URL, Cloudflare blocks it.
+# trigger.config.ts build.env does NOT propagate to buildEnvVars in trigger.dev 4.4.6
+# (confirmed: build.env syncs env vars correctly via syncEnvVars, but the TRIGGER_API_URL
+# override never reaches localBuildImage's --build-arg list).
+# Direct patch: replace ${apiUrl} with the VPS-local URL so the indexer uses localhost.
+# Combined with --network=host on the deploy command, the indexer reaches port 8030 directly.
+# Re-applied after every npm install which resets node_modules.
+sed -i 's|TRIGGER_API_URL=\`${apiUrl}|TRIGGER_API_URL=http://127.0.0.1:8030|g' \
+  ./node_modules/trigger.dev/dist/esm/deploy/buildImage.js
+echo "  buildImage.js patched: TRIGGER_API_URL → http://127.0.0.1:8030"
+
 echo '=== Deploy (trigger v4) ==='
 # Force IPv4 for the CLI process itself (auth calls etc.).
 # The managed-index-controller inside the Docker build uses --network=host so it
-# can reach 127.0.0.1:8030 directly, bypassing Cloudflare entirely.
-# TRIGGER_API_URL build-arg is overridden via trigger.config.ts build.env to point
-# to the local trigger-webapp (http://127.0.0.1:8030) so the indexer never calls
-# the public Cloudflare-proxied URL.
+# reaches 127.0.0.1:8030 directly (trigger-webapp internal port, no Cloudflare).
 export NODE_OPTIONS='--dns-result-order=ipv4first'
 ./node_modules/.bin/trigger deploy --api-url http://127.0.0.1:8030 --network=host
 "@
