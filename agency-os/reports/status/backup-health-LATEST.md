@@ -1,6 +1,6 @@
 # Backup health report
 
-- Generated: 2026-05-15 16:02:01
+- Generated: 2026-05-21 09:21:38
 - Overall: **PASS**
 
 ## SG (5.223.93.113)
@@ -13,9 +13,9 @@
 
 ## EU (204.168.175.41)
 - Cron file: /etc/cron.d/eu-backup => **present**
-- Cron schedule (non-comment lines): SHELL=/bin/bash PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin 30 2 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work root /root/scripts/backup-eu-stack.sh >> /var/log/eu-backup.log 2>&1 0 3 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts snap supabase trigger uptime-kuma Work root /root/scripts/verify-backup-eu.sh >> /var/log/eu-backup.log 2>&1
+- Cron schedule (non-comment lines): SHELL=/bin/bash PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin 30 2 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work root /root/scripts/backup-eu-stack.sh >> /var/log/eu-backup.log 2>&1 0 3 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work root /root/scripts/verify-backup-eu.sh >> /var/log/eu-backup.log 2>&1
 - Retention days (RETENTION_DAYS): (unknown) (source: unknown)
-- Backup dir size (/root/backups): 919M
-- Latest backup file time: 2026-05-15 08:02:41
-- Oldest backup file time: 2026-05-08 08:34:52
+- Backup dir size (/root/backups): 2.7G
+- Latest backup file time: 2026-05-21 01:22:24
+- Oldest backup file time: 2026-05-13 02:30:08
 
