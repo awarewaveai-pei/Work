@@ -59,14 +59,15 @@ function Get-HostBackupHealth {
     param(
         [Parameter(Mandatory = $true)][string]$ServerHost,
         [Parameter(Mandatory = $true)][string]$CronPath,
-        [Parameter(Mandatory = $true)][string]$BackupScriptPath
+        [Parameter(Mandatory = $true)][string]$BackupScriptPath,
+        [Parameter(Mandatory = $true)][string]$BackupDir
     )
 
     $parts = @(
         'set -eu',
         ("CRON_PATH='" + $CronPath + "'"),
         ("BACKUP_SCRIPT='" + $BackupScriptPath + "'"),
-        "BACKUP_DIR='/root/backups'",
+        ("BACKUP_DIR='" + $BackupDir + "'"),
         'if [ -f "$CRON_PATH" ]; then cron_status="present"; cron_lines=$(grep -v ''^[[:space:]]*#'' "$CRON_PATH" | grep -v ''^[[:space:]]*$'' || true); if [ -z "$cron_lines" ]; then cron_lines="(empty)"; fi; else cron_status="missing"; cron_lines="(missing)"; fi',
         'retention_days="(unknown)"',
         'retention_source="unknown"',
@@ -136,8 +137,8 @@ if (-not $sshOk) {
     $fatal = $true
     $fatalReason = "SSH private key not found: $PrivateKey"
 } else {
-    $sg = Get-HostBackupHealth -ServerHost $SgHost -CronPath "/etc/cron.d/lobster-backup" -BackupScriptPath "/root/lobster-phase1/scripts/backup-phase1.sh"
-    $eu = Get-HostBackupHealth -ServerHost $EuHost -CronPath "/etc/cron.d/eu-backup" -BackupScriptPath "/root/scripts/backup-eu-stack.sh"
+    $sg = Get-HostBackupHealth -ServerHost $SgHost -CronPath "/etc/cron.d/lobster-backup" -BackupScriptPath "/root/lobster-phase1/scripts/backup-phase1.sh" -BackupDir "/root/lobster-phase1/backups"
+    $eu = Get-HostBackupHealth -ServerHost $EuHost -CronPath "/etc/cron.d/eu-backup" -BackupScriptPath "/root/scripts/backup-eu-stack.sh" -BackupDir "/root/backups"
 }
 
 $overall = if ($fatal) { "ERROR" } elseif ($sg.ok -and $eu.ok) { "PASS" } else { "WARN" }
@@ -169,7 +170,7 @@ if ($fatal) {
         [void]$markdown.AppendLine("- Cron file: " + $node.cron + " => **" + $node.data.cron_status + "**")
         [void]$markdown.AppendLine("- Cron schedule (non-comment lines): " + $node.data.cron_lines)
         [void]$markdown.AppendLine("- Retention days (RETENTION_DAYS): " + $node.data.retention_days + " (source: " + $node.data.retention_source + ")")
-        [void]$markdown.AppendLine("- Backup dir size (/root/backups): " + $node.data.backup_size)
+        [void]$markdown.AppendLine("- Backup dir size: " + $node.data.backup_size)
         [void]$markdown.AppendLine("- Latest backup file time: " + $node.data.latest_time)
         [void]$markdown.AppendLine("- Oldest backup file time: " + $node.data.oldest_time)
         [void]$markdown.AppendLine("")
