@@ -18,7 +18,7 @@ function envVal(name: string): string {
 
 // GAP-01 — backup script existence probe (SSH stat, advisory only)
 
-type ScriptProbeStatus = "ok" | "not_found" | "ssh_error" | "unconfigured" | "skipped" | "not_probed";
+type ScriptProbeStatus = "ok" | "not_found" | "ssh_error" | "unconfigured" | "skipped";
 
 interface BackupScriptProbe {
   sg: ScriptProbeStatus;
@@ -96,12 +96,15 @@ async function probeBackupScripts(backupMode: string): Promise<BackupScriptProbe
   return { sg, eu };
 }
 
-// GAP-03 — GitHub repo accessibility + App installation check
+// GAP-03 — GitHub repo accessibility + App status (three-tier: env var → comments → unverified)
+
+type GithubAppStatus = "confirmed_by_operator" | "auto_detected" | "unverified" | "no_issues" | "error";
 
 interface GithubRepoCheck {
   repo_accessible: boolean | null;
   push_access: boolean | null;
-  app_installed: boolean | null;
+  app_installed: boolean | null; // deprecated: always null; kept for backward compat
+  app_status: GithubAppStatus;
   note: string;
 }
 
@@ -113,8 +116,10 @@ async function checkGithubRepoAndApp(owner: string, repo: string, token: string)
   };
   const settingsUrl = `https://github.com/${owner}/${repo}/settings/installations`;
 
+  // Step 1: repo accessibility (always needed for repo_accessible + push_access)
   let repo_accessible: boolean | null = null;
   let push_access: boolean | null = null;
+  let hasIssues = true; // assume true unless API says otherwise
   try {
     const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
       headers,
@@ -123,39 +128,90 @@ async function checkGithubRepoAndApp(owner: string, repo: string, token: string)
     if (res.ok) {
       const data: unknown = await res.json().catch(() => ({}));
       repo_accessible = true;
-      const perms = (data as Record<string, unknown>)?.permissions as Record<string, boolean> | undefined;
+      const d = data as Record<string, unknown>;
+      const perms = d?.permissions as Record<string, boolean> | undefined;
       push_access = perms ? perms.push === true || perms.admin === true : null;
+      if (typeof d?.open_issues_count === "number") hasIssues = d.open_issues_count > 0;
     } else if (res.status === 404) {
       repo_accessible = false;
     }
-    // 401/403: token error — leave as null
+    // 401/403: token error — repo_accessible stays null
   } catch {
-    // network error — leave as null
+    // network error — repo_accessible stays null
   }
 
-  let app_installed: boolean | null = null;
-  let note = `GitHub App installation cannot be verified with a PAT. Check manually: ${settingsUrl}`;
+  // Step 2: env var — operator explicit confirmation (authoritative, no further API call needed)
+  if (process.env.AUTO_REPAIR_GITHUB_APP_CONFIRMED?.trim().toLowerCase() === "true") {
+    return {
+      repo_accessible,
+      push_access,
+      app_installed: null,
+      app_status: "confirmed_by_operator",
+      note: `Claude GitHub App confirmed by operator for ${owner}/${repo}.`,
+    };
+  }
 
-  if (repo_accessible === true) {
-    try {
-      const appRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/installation`, {
-        headers,
-        signal: AbortSignal.timeout(5000),
-      });
-      if (appRes.status === 200) {
-        app_installed = true;
-        note = `GitHub App installation confirmed on ${owner}/${repo}. Verify it is the Claude app: ${settingsUrl}`;
-      } else if (appRes.status === 404) {
-        app_installed = false;
-        note = `No GitHub App installation found on ${owner}/${repo}. Install Claude GitHub App: ${settingsUrl}`;
+  // Repo not accessible — cannot proceed with comments check
+  if (repo_accessible !== true) {
+    return {
+      repo_accessible,
+      push_access,
+      app_installed: null,
+      app_status: "error",
+      note: `Cannot reach ${owner}/${repo}. Check AUTO_REPAIR_GITHUB_TOKEN permissions.`,
+    };
+  }
+
+  // No issues — cannot detect bot activity via comments
+  if (!hasIssues) {
+    return {
+      repo_accessible: true,
+      push_access,
+      app_installed: null,
+      app_status: "no_issues",
+      note: `No issues in ${owner}/${repo} to detect bot activity. Set AUTO_REPAIR_GITHUB_APP_CONFIRMED=true after verifying app installation: ${settingsUrl}`,
+    };
+  }
+
+  // Step 3: comments API — look for claude bot activity (indirect but real signal)
+  try {
+    const commentsRes = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/issues/comments?per_page=20&sort=created&direction=desc`,
+      { headers, signal: AbortSignal.timeout(5000) },
+    );
+    if (commentsRes.ok) {
+      const comments: unknown = await commentsRes.json().catch(() => []);
+      const botFound =
+        Array.isArray(comments) &&
+        (comments as unknown[]).some((c) => {
+          const user = (c as Record<string, unknown>)?.user as Record<string, unknown> | undefined;
+          return (
+            user?.type === "Bot" &&
+            typeof user?.login === "string" &&
+            user.login.toLowerCase().includes("claude")
+          );
+        });
+      if (botFound) {
+        return {
+          repo_accessible: true,
+          push_access,
+          app_installed: null,
+          app_status: "auto_detected",
+          note: `Claude GitHub App auto-detected via recent bot activity in ${owner}/${repo}. Set AUTO_REPAIR_GITHUB_APP_CONFIRMED=true to permanently confirm: ${settingsUrl}`,
+        };
       }
-      // 401/403: PAT scope insufficient for this endpoint — keep null + default note
-    } catch {
-      // timeout or network error — keep null + default note
     }
+  } catch {
+    // timeout or network error — fall through to unverified
   }
 
-  return { repo_accessible, push_access, app_installed, note };
+  return {
+    repo_accessible: true,
+    push_access,
+    app_installed: null,
+    app_status: "unverified",
+    note: `Claude GitHub App not detected in ${owner}/${repo}. Install it and trigger a repair (bot will comment), or set AUTO_REPAIR_GITHUB_APP_CONFIRMED=true: ${settingsUrl}`,
+  };
 }
 
 const REQUIRED_REPAIR_LABELS: RepairPolicy[] = ["auto_repair", "analysis_only", "human_only", "triage_needed"];
@@ -173,10 +229,7 @@ function policyCatalogTextOk(): boolean {
   return [...sourcePolicyText, ...repairLabelText].every(textIsPresent) && REQUIRED_POLICY_TEXT.every((text) => catalogText.includes(text));
 }
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const deepProbe = searchParams.get("deep") === "1";
-
+export async function GET() {
   const supabase = getSupabaseServerClient();
   const mode = await getCurrentSystemMode();
   const backupWebhook = configured("AUTO_REPAIR_BACKUP_WEBHOOK_URL");
@@ -206,18 +259,17 @@ export async function GET(request: Request) {
     tableError = res.error?.message ?? null;
   }
 
-  // SSH probe is opt-in via ?deep=1 to keep base health check fast (<1s).
-  // GitHub API check always runs — lightweight, validates token + repo access.
+  // GAP-01: SSH probe runs on every GET — real-time script existence check.
+  // GAP-03: GitHub check runs env var → comments API → unverified (three-tier).
   const [scriptProbe, githubCheck] = await Promise.all([
-    deepProbe
-      ? probeBackupScripts(backupMode)
-      : Promise.resolve<BackupScriptProbe>({ sg: "not_probed", eu: "not_probed", note: "Pass ?deep=1 to trigger SSH probe" }),
+    probeBackupScripts(backupMode),
     githubToken
       ? checkGithubRepoAndApp(githubOwner, githubRepo, githubToken)
       : Promise.resolve<GithubRepoCheck>({
           repo_accessible: null,
           push_access: null,
           app_installed: null,
+          app_status: "error",
           note: "Configure AUTO_REPAIR_GITHUB_TOKEN or GITHUB_TOKEN to enable GitHub handoff.",
         }),
   ]);

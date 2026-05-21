@@ -20,7 +20,29 @@ The production script handles all of this:
 - Injects all env vars needed by `syncEnvVars` (Supabase URL + key, PostHog, OPS token, AO org ID, N8N, Uptime Kuma, Sentry, webhook base URL…)
 - Sets `NODE_OPTIONS=--dns-result-order=ipv4first` to force IPv4 → WAF skip rule fires → Bot Fight Mode bypassed
 - Uses `--api-url http://127.0.0.1:8030` to route CLI auth through VPS-local trigger-webapp
-- Runs `git pull → npm install → trigger deploy` in sequence
+- **Patches `buildImage.js` after `npm install`** (see below — this is the Cloudflare BFM bypass for the Docker indexer)
+- Runs `git pull → npm install → sed patch → trigger deploy` in sequence
+
+## Critical: Cloudflare BFM bypass via sed patch
+
+`trigger deploy` builds a Docker image containing a **managed indexer stage** (`#16 [indexer 2/2] RUN node managed-index-controller.mjs`). This step runs inside Docker and calls the Trigger.dev server to fetch env vars and register tasks.
+
+**The problem**: `localBuildImage()` in `trigger.dev/dist/esm/deploy/buildImage.js` (line 365) hardcodes:
+```js
+`TRIGGER_API_URL=${apiUrl}`   // apiUrl = https://trigger.aware-wave.com
+```
+The Docker indexer RUN step calls this public URL → Cloudflare BFM returns 403.
+
+**The fix** (already in `lobster-trigger-deploy.ps1`, re-applied after every `npm install`):
+```bash
+sed -i 's|TRIGGER_API_URL=\${apiUrl}|TRIGGER_API_URL=http://127.0.0.1:8030|g' \
+  ./node_modules/trigger.dev/dist/esm/deploy/buildImage.js
+```
+Combined with `--network=host`, the Docker indexer reaches port 8030 (VPS-local trigger-webapp) directly without going through Cloudflare.
+
+**`build.env.TRIGGER_API_URL` does NOT work**: confirmed in trigger.dev 4.4.6 — `build.env` is NOT propagated to `buildEnvVars` in `localBuildImage()`. Only the sed patch reliably overrides the Docker `--build-arg`.
+
+Full runbook: `runbooks/TRIGGER-DEPLOY-CLOUDFLARE-BFM.md`
 
 ## Pre-flight check
 
