@@ -2,6 +2,33 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-21
+
+### fix: check-backup-health.ps1 四項 Bug 修復 + 備份新鮮度門檻
+
+**根本問題**：AO-RESUME 每次報告「SG backup latest = 2026-05-07」（14 天未更新），造成持續誤報。
+
+**根因分析（RCA）**：
+1. **Bug 1（目錄錯誤）**：腳本寫死 `BACKUP_DIR='/root/backups'`，但 SG 的實際備份目錄為 `/root/lobster-phase1/backups/`（`backup-phase1.sh` 中 ROOT=script-parent，BACKUP_DIR=./backups）。`/root/backups/` 只有一份 2026-05-07 手動壓縮檔。修正：改為呼叫端傳入 `-BackupDir`（SG 傳 `/root/lobster-phase1/backups`，EU 傳 `/root/backups`）。
+2. **Bug 2（Retention grep pattern）**：grep 正則 `[A-Z_]*RETENTION[A-Z_]*DAYS` 無法匹配 `BACKUP_RETAIN_DAYS`（使用 RETAIN 非 RETENTION）。修正：改為 `[A-Z_]*(RETENTION|RETAIN)[A-Z_]*DAYS`，sed back-reference 也從 `\1` 改為 `\2`。
+3. **Bug 3（runtime var list）**：runtime source 掃描清單缺少 `BACKUP_RETAIN_DAYS`。修正：加入清單。
+4. **Bug 4（CRON_LINES 亂碼）**：`echo CRON_LINES=$cron_lines` 未引號，多行變數會被 shell word-split 導致解析亂碼。修正：改為 `echo "CRON_LINES=$(printf '%s' "$cron_lines" | tr '\n' '|')"` 壓縮為一行。
+
+**新功能：備份新鮮度門檻（staleness gate）**：
+- `backup_age_days` = 最新備份項目 mtime 距今天數（`stat -c %Y` + epoch 差）。
+- 若 `age > 2 days` → 整體 WARN + 報告標記 `STALE` + Write-Host 黃色。
+
+**驗證結果**：
+```
+Overall: PASS
+- SG: cron=present, retention=7d(static), size=1.8G, latest=2026-05-21 02:02:33, age=0d
+- EU: cron=present, retention=7d(static), size=3.0G, latest=2026-05-21 02:03:14, age=0d
+```
+
+**避免再發生**：新機或新備份路徑變更時，需同步更新 `check-backup-health.ps1` 呼叫端 `-BackupDir` 參數。
+
+---
+
 ## 2026-05-20
 
 ### fix: CREDENTIALS UTF-8 BOM 同步迴圈根治 + 內容損毀回復（commits fe9b1ab）
