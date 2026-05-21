@@ -49,7 +49,10 @@ export default defineConfig({
         if (execMode.trim())  out.LOBSTER_MANIFEST_EXECUTION_MODE    = execMode.trim();
 
         // ── Infrastructure endpoints (ao-infrastructure-check) ───────────────
-        const triggerApiUrl  = process.env.TRIGGER_API_URL  ?? "";
+        // LOBSTER_TRIGGER_PUBLIC_API_URL: set by lobster-trigger-deploy.ps1 to the public
+        // HTTPS URL (https://trigger.aware-wave.com) so tasks get the correct runtime URL.
+        // Falls back to TRIGGER_API_URL. Never syncs a localhost deploy URL to the project.
+        const triggerApiUrl  = process.env.LOBSTER_TRIGGER_PUBLIC_API_URL ?? process.env.TRIGGER_API_URL ?? "";
         const n8nUrl         = process.env.N8N_URL          ?? "";
         const uptimeKumaUrl  = process.env.UPTIME_KUMA_URL  ?? "";
         const sentryUrl      = process.env.SENTRY_URL       ?? "";

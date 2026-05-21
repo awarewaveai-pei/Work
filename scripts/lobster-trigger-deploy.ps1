@@ -69,8 +69,14 @@ export NVM_DIR=/root/.nvm
 source /root/.nvm/nvm.sh
 
 # Trigger.dev auth
+# TRIGGER_API_URL=localhost:8030 — bypass Cloudflare Bot Fight Mode for CLI deploy.
+# trigger-webapp listens on 127.0.0.1:8030 internally; the public HTTPS URL goes through
+# Cloudflare which blocks automated CLI requests with a JS challenge.
+# LOBSTER_TRIGGER_PUBLIC_API_URL is picked up by trigger.config.ts syncEnvVars to sync
+# the correct public URL to the Trigger.dev project env (used by tasks at runtime).
 export TRIGGER_ACCESS_TOKEN='$pat'
-export TRIGGER_API_URL=https://trigger.aware-wave.com
+export TRIGGER_API_URL=http://127.0.0.1:8030
+export LOBSTER_TRIGGER_PUBLIC_API_URL=https://trigger.aware-wave.com
 
 # Supabase
 export LOBSTER_SUPABASE_URL=https://supabase.aware-wave.com
