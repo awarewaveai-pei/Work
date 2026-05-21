@@ -10,9 +10,10 @@ interface Props {
   runId?: string;
   runState?: string;
   canEscalate?: boolean;
+  archivedAt?: string | null;
 }
 
-export function RepairActions({ canAct, mode, incidentId, runId, runState, canEscalate }: Props) {
+export function RepairActions({ canAct, mode, incidentId, runId, runState, canEscalate, archivedAt }: Props) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [ok, setOk] = useState<boolean | null>(null);
@@ -151,6 +152,24 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
     }
   }
 
+  async function archive() {
+    if (!runId) return;
+    if (!confirm("要封存這筆修復記錄嗎？封存後不會出現在主清單，但審計資料完整保留。")) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/ops/repairs/${runId}/archive`, { method: "POST" });
+      const json = await res.json();
+      setOk(json.ok === true);
+      setMsg(json.ok ? "已封存。重新整理即可確認。" : `失敗：${json.error ?? "未知錯誤"}`);
+    } catch (e) {
+      setOk(false);
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function escalate() {
     if (!runId) return;
     if (!confirm("確認已分析根因為 code regression，要升級為自動修復 PR 嗎？")) return;
@@ -174,7 +193,7 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
 
   if (!canAct) return <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>唯讀</span>;
 
-  const btns = mode === "run" ? visibleRunButtons(runState, canEscalate ?? false) : null;
+  const btns = mode === "run" ? visibleRunButtons(runState, canEscalate ?? false, archivedAt) : null;
 
   return (
     <div style={{ display: "grid", gap: 8, justifyItems: "end", minWidth: 144 }}>
@@ -212,6 +231,12 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
           {btns!.escalate && (
             <button type="button" className="btn-secondary" disabled={busy} onClick={escalate}>
               升級修復
+            </button>
+          )}
+          {btns!.archive && (
+            <button type="button" className="btn-secondary" disabled={busy} onClick={archive}
+              style={{ color: "#92400e", borderColor: "#fcd34d" }}>
+              封存
             </button>
           )}
         </>

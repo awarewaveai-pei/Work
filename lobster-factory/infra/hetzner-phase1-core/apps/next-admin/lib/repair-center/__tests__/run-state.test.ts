@@ -146,3 +146,31 @@ describe("escalateGuard", () => {
     expect(g.reason).toBe("source_cannot_escalate");
   });
 });
+
+describe("visibleRunButtons — archive button", () => {
+  it("terminal state + not archived → archive shown", () => {
+    for (const state of TERMINAL_STATES) {
+      expect(visibleRunButtons(state, false).archive).toBe(true);
+    }
+  });
+
+  it("active state → archive hidden", () => {
+    for (const state of ["detected", "repairing", "pr_ready", "deploy_pending"]) {
+      expect(visibleRunButtons(state, false).archive).toBe(false);
+    }
+  });
+
+  it("undefined state → archive hidden", () => {
+    expect(visibleRunButtons(undefined, false).archive).toBe(false);
+  });
+
+  it("terminal state + archivedAt set → archive hidden (縱深防禦)", () => {
+    for (const state of TERMINAL_STATES) {
+      expect(visibleRunButtons(state, false, "2026-05-21T00:00:00Z").archive).toBe(false);
+    }
+  });
+
+  it("terminal state + archivedAt null → archive shown", () => {
+    expect(visibleRunButtons("resolved", false, null).archive).toBe(true);
+  });
+});

@@ -39,6 +39,32 @@ begin
 end;
 $$;
 
+-- 鎖定 RPC 存取權限：只有 service_role 可呼叫，防止一般使用者大批封存。
+-- SECURITY DEFINER 函數以 owner 權限執行，必須明確限制呼叫者。
+revoke all on function public.archive_stale_repair_runs(int) from public;
+grant execute on function public.archive_stale_repair_runs(int) to service_role;
+
+-- pg_cron 自動封存排程（容錯：pg_cron 不可用時 schema 異動仍會成功）
+-- supabase/postgres:15.8.1.085 預裝 pg_cron，通常可直接啟用。
+do $$
+begin
+  create extension if not exists pg_cron;
+  if not exists (select 1 from cron.job where jobname = 'archive-stale-repair-runs') then
+    perform cron.schedule(
+      'archive-stale-repair-runs',
+      '0 2 * * *',
+      $$select public.archive_stale_repair_runs(90)$$
+    );
+  end if;
+exception when others then
+  raise notice 'pg_cron setup skipped: %. Run manually when available.', sqlerrm;
+end;
+$$;
+
+-- ⚠️ 維護警告：terminal state 清單同時定義於兩處，新增 terminal state 時必須同步更新：
+-- 1. 此函數內：state in ('resolved', 'rolled_back', 'human_only')
+-- 2. TypeScript：lib/repair-center/run-state.ts TERMINAL_STATES
+
 comment on function public.archive_stale_repair_runs(int) is
   'Soft-archives terminal repair_runs older than retention_days days. '
   'Call via POST /api/ops/repairs/archive-stale or schedule with pg_cron: '

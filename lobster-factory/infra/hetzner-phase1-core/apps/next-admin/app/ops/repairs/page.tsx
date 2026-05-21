@@ -40,7 +40,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
         .limit(80);
     if (clientSlug) incidentQuery = incidentQuery.eq("client_slug", clientSlug);
 
-    let runQuery = supabase.from("repair_runs").select("*").order("created_at", { ascending: false }).limit(100);
+    let runQuery = supabase.from("repair_runs").select("*").is("archived_at", null).order("created_at", { ascending: false }).limit(100);
     if (clientSlug) runQuery = runQuery.eq("client_slug", clientSlug);
 
     const [incidentRes, runRes, modeRes, orgRes, integrationRes] = await Promise.all([
@@ -239,6 +239,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
                     canAct={canAct && !blocked}
                     mode="run"
                     runState={run.state}
+                    archivedAt={run.archived_at ?? null}
                     canEscalate={
                       run.policy === "analysis_only" &&
                       policyCatalogForSource(run.source).can_escalate_to_pr

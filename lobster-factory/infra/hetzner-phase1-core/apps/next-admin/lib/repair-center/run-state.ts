@@ -10,6 +10,7 @@ export function isTerminalState(state?: string): boolean {
 export function visibleRunButtons(
   runState: string | undefined,
   canEscalate: boolean,
+  archivedAt?: string | null,
 ): {
   addPr: boolean;
   markDeployPending: boolean;
@@ -28,7 +29,7 @@ export function visibleRunButtons(
     confirmDeployed: runState === "deploy_pending" || runState === "deploying",
     escalate: canEscalate && !terminal,
     // Archive is available for any known terminal state (excludes undefined/empty)
-    archive: Boolean(runState) && (TERMINAL_STATES as readonly string[]).includes(runState!),
+    archive: !archivedAt && Boolean(runState) && (TERMINAL_STATES as readonly string[]).includes(runState!),
   };
 }
 

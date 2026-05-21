@@ -321,7 +321,7 @@ export async function archiveRun(id: string, actor: string): Promise<{ ok: boole
   const run = await fetchRepairRunWithIncident(id);
   if (!run) return { ok: false, error: "repair_run_not_found" };
   if (!isTerminalState(run.state)) return { ok: false, error: "run_not_in_terminal_state" };
-  if (run.archived_at) return { ok: false, error: "already_archived" };
+  if (run.archived_at) return { ok: true, run: run as RepairRun };
 
   const updated = await updateRun(id, {
     archived_at: new Date().toISOString(),
