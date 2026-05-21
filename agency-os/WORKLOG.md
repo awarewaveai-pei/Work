@@ -4,6 +4,49 @@
 
 ## 2026-05-21
 
+### fix: Repair Center 全缺口修復 + 剩餘風險測試覆蓋（commits e999a60, 後續）
+
+**根本問題**：Auto-Repair 系統存在 5 個功能缺口、3 個維運風險、3 個可觀測性缺失，導致備份錯誤難判讀、Critical 告警節流過長（15 分鐘）、analysis_only 事件無升級路徑、UI 無法直接結案/確認部署。
+
+**根因鏈**：
+1. `integration-blockers.ts` 將 `SLACK_GITHUB_PRS_CHANNEL_ID`（AO-RESUME 外部信號抓取用）誤判為修復能力必要條件，造成 Repair Center 每次載入就出現假阻擋器（RISK-01）
+2. `rules.ts` critical 事件與 medium 事件共用同一個 15 分鐘節流窗口，critical 重複打進來時最慢 15 分鐘才通知（RISK-03）
+3. `backup.ts` SSH 失敗只回傳 `exit_127`，操作人員無法判斷是腳本不存在還是 SSH 連線失敗（GAP-01）
+4. `triggerAutoClassify` AI 失敗直接 throw，webhook handler 的 catch 只吞錯誤，incident 上無任何失敗標記（GAP-05）
+5. 無從 analysis_only 升級到 auto_repair 的路徑（GAP-02），Uptime Kuma/Grafana 確認 code regression 後只能靠人工重建 run
+6. RepairActions.tsx 按鈕不分狀態全都顯示，已結案的 run 仍可點「加入 PR」（OBS-03）
+7. 剩餘風險（按鈕條件顯示、escalate guard）邏輯存在 React client component 和 DB 呼叫中，完全不可測試
+
+**修復步驟**：
+- RISK-01: `integration-blockers.ts` 移除假 Slack PR 阻擋器
+- RISK-02: `integration-health.ts` Netdata 有 token → `checkJsonApi` 深度驗證；Uptime Kuma URL → `/api/health`
+- RISK-03: `rules.ts` CRITICAL_THROTTLE_WINDOW_MS = 3 分鐘；`rules.test.ts` +4 個 critical 節流測試
+- RISK-04: `check-backup-health.ps1` STALE 門檻 >2 天改 >3 天
+- GAP-01: `backup.ts` `describeSshExitCode()` 將 exit 127 → `script_not_found` 等
+- GAP-02: `github.ts` 新增 `postEscalationComment`；`service.ts` 新增 `escalateAnalysisOnlyRun`（三層防護）；新增 `repairs/[id]/escalate/route.ts`
+- GAP-03: `health/route.ts` 新增 `github_repo_target` + `github_app_advisory`
+- GAP-04/OBS-03: `RepairActions.tsx` 結案 / 確認部署完成 / 升級修復 三個新按鈕；既有按鈕按 `runState` 條件顯示
+- GAP-05: `triggerAutoClassify` try-catch 吸收 AI 失敗並寫入 `incident.tags.auto_classify_error`；5 個 webhook handler 移除 dead catch
+- 剩餘風險閉環：新建 `lib/repair-center/run-state.ts`（TERMINAL_STATES / isTerminalState / visibleRunButtons / escalateGuard 四個純函式）；RepairActions.tsx 和 service.ts 改用共用模組；新建 `__tests__/run-state.test.ts`（36 個測試涵蓋狀態矩陣和 escalate guard 所有 guard path）
+
+**驗證結果**：
+- `npm test` 83/83 通過（3 個測試檔：run-state.test.ts 36、policy.test.ts 36、rules.test.ts 11）
+- 全部 TypeScript 型別無 any 強制轉換（除原有 `as any` 外）
+- `escalateGuard` 三層防護：policy→source→terminal state，每層都有獨立測試案例
+
+**P3/P4 完成狀態**：
+- P3 Slack GitHub PR blocker → ✅ 移除
+- P3 Critical 節流縮短 → ✅ 3 分鐘
+- P3 Netdata/Uptime Kuma deep check → ✅ 完成
+- P4 repair_runs TTL/封存 → ❌ 未做（需 DB migration，標記為長期技術債）
+
+**避免再發生**：
+- 新增 RepairActions 按鈕時，邏輯必須放在 `run-state.ts` 而非 component 內；條件邏輯需配套測試（`__tests__/run-state.test.ts`）
+- escalate guard 新增條件時，同步更新 `escalateGuard()` 並補測試
+- Auto-Repair 系統每次新增功能：確認 `health/route.ts` 是否需要新增揭露欄位
+
+---
+
 ### fix: CREDENTIALS 亂碼迴圈根治 + 594 行版本強制回復
 
 **根本問題**：AO-RESUME 每次 import CREDENTIALS 被攔截（'local-modified'），本機停在舊/亂碼版本；即使 vault 是正確的也無法更新。

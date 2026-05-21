@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TERMINAL_STATES, isTerminalState, visibleRunButtons } from "@/lib/repair-center/run-state";
 
 interface Props {
   canAct: boolean;
@@ -9,12 +10,6 @@ interface Props {
   runId?: string;
   runState?: string;
   canEscalate?: boolean;
-}
-
-const TERMINAL_STATES = ["resolved", "rolled_back", "human_only"];
-
-function isTerminal(state?: string): boolean {
-  return !state || TERMINAL_STATES.includes(state);
 }
 
 export function RepairActions({ canAct, mode, incidentId, runId, runState, canEscalate }: Props) {
@@ -179,6 +174,8 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
 
   if (!canAct) return <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>唯讀</span>;
 
+  const btns = mode === "run" ? visibleRunButtons(runState, canEscalate ?? false) : null;
+
   return (
     <div style={{ display: "grid", gap: 8, justifyItems: "end", minWidth: 144 }}>
       {mode === "start" ? (
@@ -187,32 +184,32 @@ export function RepairActions({ canAct, mode, incidentId, runId, runState, canEs
         </button>
       ) : (
         <>
-          {!TERMINAL_STATES.includes(runState ?? "") && (
+          {btns!.addPr && (
             <button type="button" className="btn-secondary" disabled={busy} onClick={addPr}>
               加入 PR
             </button>
           )}
-          {(runState === "repairing" || runState === "pr_ready") && (
+          {btns!.markDeployPending && (
             <button type="button" className="btn-secondary" disabled={busy} onClick={markDeployPending}>
               待部署
             </button>
           )}
-          {!TERMINAL_STATES.includes(runState ?? "") && (
+          {btns!.humanOnly && (
             <button type="button" className="btn-secondary" disabled={busy} onClick={humanOnly}>
               人工處理
             </button>
           )}
-          {runState === "human_only" && (
+          {btns!.closeRun && (
             <button type="button" className="btn-secondary" disabled={busy} onClick={closeRun}>
               結案
             </button>
           )}
-          {(runState === "deploy_pending" || runState === "deploying") && (
+          {btns!.confirmDeployed && (
             <button type="button" className="btn-secondary" disabled={busy} onClick={confirmDeployed}>
               確認部署完成
             </button>
           )}
-          {canEscalate && !isTerminal(runState) && (
+          {btns!.escalate && (
             <button type="button" className="btn-secondary" disabled={busy} onClick={escalate}>
               升級修復
             </button>

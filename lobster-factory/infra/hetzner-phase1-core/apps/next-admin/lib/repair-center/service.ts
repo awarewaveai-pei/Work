@@ -4,6 +4,7 @@ import { appendAudit } from "./audit";
 import { runPreRepairBackup } from "./backup";
 import { createRepairIssue, postEscalationComment, resolveGithubTarget } from "./github";
 import { canApprovePolicy, needsGitHubIssue, policyCatalogForSource, policyForIncident } from "./policy";
+import { escalateGuard } from "./run-state";
 import type { RepairRun, RepairRunWithIncident } from "./types";
 
 export async function getCurrentSystemMode(): Promise<string> {
@@ -250,11 +251,9 @@ export async function escalateAnalysisOnlyRun(
   const run = await fetchRepairRunWithIncident(id);
   if (!run) return { ok: false, error: "repair_run_not_found" };
 
-  if (run.policy !== "analysis_only") return { ok: false, error: "not_analysis_only" };
   const catalog = policyCatalogForSource(run.source);
-  if (!catalog.can_escalate_to_pr) return { ok: false, error: "source_cannot_escalate" };
-  const terminal = ["resolved", "rolled_back", "human_only"];
-  if (terminal.includes(run.state)) return { ok: false, error: "run_in_terminal_state", details: { state: run.state } };
+  const guard = escalateGuard(run, catalog.can_escalate_to_pr);
+  if (!guard.can) return { ok: false, error: guard.reason, details: guard.reason === "run_in_terminal_state" ? { state: run.state } : undefined };
 
   const updated = await updateRun(id, {
     policy: "auto_repair",
