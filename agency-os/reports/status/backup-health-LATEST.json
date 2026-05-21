@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-05-21T02:02:32.0273223Z",
+    "generatedAt":  "2026-05-21T02:11:28.0864682Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -8,24 +8,26 @@
                "ok":  true,
                "error":  "",
                "cron_status":  "present",
-               "cron_lines":  "SHELL=/bin/bash PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin 0 2 backups lobster-phase1 nginx-site-backups Work backups lobster-phase1 nginx-site-backups Work backups lobster-phase1 nginx-site-backups Work root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261 30 2 backups lobster-phase1 nginx-site-backups Work backups lobster-phase1 nginx-site-backups Work backups lobster-phase1 nginx-site-backups Work root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
-               "retention_days":  "(unknown)",
-               "retention_source":  "unknown",
+               "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
+               "retention_days":  "7",
+               "retention_source":  "static",
                "backup_size":  "1.8G",
                "latest_time":  "2026-05-21 02:02:33",
-               "oldest_time":  "2026-05-13 08:36:06"
+               "oldest_time":  "2026-05-13 08:36:06",
+               "backup_age_days":  "0"
            },
     "eu":  {
                "host":  "204.168.175.41",
                "ok":  true,
                "error":  "",
                "cron_status":  "present",
-               "cron_lines":  "SHELL=/bin/bash PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin 30 2 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work root /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261 0 3 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work 100 backups mainwp , m[Destination]) for m in json.load(sys.stdin)] n8n scripts security-hardening-backup-20260520-015552 snap supabase trigger uptime-kuma uptime-kuma-compose.yml Work root /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
-               "retention_days":  "(unknown)",
-               "retention_source":  "unknown",
+               "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
+               "retention_days":  "7",
+               "retention_source":  "static",
                "backup_size":  "3.0G",
                "latest_time":  "2026-05-21 02:03:14",
-               "oldest_time":  "2026-05-13 02:30:08"
+               "oldest_time":  "2026-05-13 02:30:08",
+               "backup_age_days":  "0"
            },
     "reportPath":  "agency-os/reports/status/backup-health-LATEST.md"
 }
