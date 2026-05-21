@@ -46,20 +46,20 @@ grant execute on function public.archive_stale_repair_runs(int) to service_role;
 
 -- pg_cron 自動封存排程（容錯：pg_cron 不可用時 schema 異動仍會成功）
 -- supabase/postgres:15.8.1.085 預裝 pg_cron，通常可直接啟用。
-do $$
+do $outer$
 begin
   create extension if not exists pg_cron;
   if not exists (select 1 from cron.job where jobname = 'archive-stale-repair-runs') then
     perform cron.schedule(
       'archive-stale-repair-runs',
       '0 2 * * *',
-      $$select public.archive_stale_repair_runs(90)$$
+      'select public.archive_stale_repair_runs(90)'
     );
   end if;
 exception when others then
   raise notice 'pg_cron setup skipped: %. Run manually when available.', sqlerrm;
 end;
-$$;
+$outer$;
 
 -- ⚠️ 維護警告：terminal state 清單同時定義於兩處，新增 terminal state 時必須同步更新：
 -- 1. 此函數內：state in ('resolved', 'rolled_back', 'human_only')
@@ -69,7 +69,7 @@ comment on function public.archive_stale_repair_runs(int) is
   'Soft-archives terminal repair_runs older than retention_days days. '
   'Call via POST /api/ops/repairs/archive-stale or schedule with pg_cron: '
   'select cron.schedule(''archive-stale-repair-runs'', ''0 2 * * *'', '
-  '$$select public.archive_stale_repair_runs(90)$$);';
+  '''select public.archive_stale_repair_runs(90)'');';
 
 comment on column public.repair_runs.archived_at is
   'Set when a terminal run is soft-archived. Archived runs are excluded from the '
