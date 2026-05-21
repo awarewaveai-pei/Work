@@ -4,6 +4,61 @@
 
 ## 2026-05-21
 
+### AUTO_TASK_DONE: GAP-01/03 最終閉環 — health endpoint SSH 常態探針 + GitHub App 三層狀態（commit `2a7d67e`）
+
+**根本問題**：前次修復（`c4ac12c`）仍有兩個 P1 設計缺口：
+- GAP-01：SSH probe 改成 `?deep=1` opt-in，操作員不主動帶參數就永遠看到 `not_probed`，等同 advisory 廢掉
+- GAP-03：GitHub App 安裝狀態仍為靜態 `null`（PAT 呼叫 `/installation` 端點 401 不可繞），修復迴圈中斷無任何明確訊號
+
+**根因**：
+- `?deep=1` opt-in 違反健康端點 "operator-facing, runs on every GET" 原則；health endpoint 本為維運人員主動查核，5s 延遲可接受
+- GitHub PAT 的根本限制：`/repos/{owner}/{repo}/installation` 需要 GitHub App JWT，不支援 PAT — 永遠回 401。正確做法是放棄直接查安裝 API，改用三層間接偵測
+
+**最終實作（route.ts 單一檔案）**：
+
+**GAP-01 — SSH 常態探針（always-on）**
+- 移除 `searchParams` / `?deep=1` / `"not_probed"` 整組 opt-in 邏輯
+- `GET()` 無 request 參數；每次呼叫直接執行 `probeBackupScripts(backupMode)`
+- SSH probe 在 backup_mode=ssh 時同時探測 SG + EU（`Promise.all`），各 5s timeout（`Promise.race`）
+- webhook_mode 時回傳 `{ sg: "skipped", eu: "skipped", note: "webhook_mode" }`
+- 結果欄位 `backup_script_probe: { sg, eu }`，值域：`ok | not_found | ssh_error | unconfigured | skipped`
+
+**GAP-03 — GitHub App 三層狀態（env var → comments API → unverified）**
+- 移除 `/installation` 端點呼叫（PAT 永遠 401，無用）
+- 新增 `GithubAppStatus` 型別：`"confirmed_by_operator" | "auto_detected" | "unverified" | "no_issues" | "error"`
+- 三層優先級：
+  1. **env var 主路**：`AUTO_REPAIR_GITHUB_APP_CONFIRMED=true` → `confirmed_by_operator`（免 API call，適合已知裝好的系統）
+  2. **comments API 備援**：`GET /repos/.../issues/comments?per_page=20&sort=created&direction=desc` 搜尋 `user.type==="Bot" && user.login.toLowerCase().includes("claude")` → `auto_detected`（有 bot 活動紀錄即確認）
+  3. **無法偵測**：`unverified`（新部署、尚無 bot 活動）+ 含完整安裝連結與 env var 確認指引
+- 四個邊界狀態：`error`（repo 不可達 / 無 token）、`no_issues`（無 issues 可偵測 bot 活動）
+- 舊欄位 `github_app_installed` 保留（永遠 `null`，標記 deprecated，維持向後相容）
+
+**驗證結果（curl SG VPS，commit `2a7d67e`）**：
+```json
+{
+  "ok": true,
+  "backup_script_probe": { "sg": "ok", "eu": "ok" },
+  "github_repo_accessible": true,
+  "github_push_access": true,
+  "github_app_status": "unverified",
+  "github_app_installed": null,
+  "github_app_advisory": "Claude GitHub App not detected in awarewaveai-pei/Work. Install it and trigger a repair (bot will comment), or set AUTO_REPAIR_GITHUB_APP_CONFIRMED=true: https://github.com/awarewaveai-pei/Work/settings/installations"
+}
+```
+- HTTP 200，約 5.2s（含 SG+EU SSH probe + GitHub API，全部並行）
+- npm test gate: 88/88 ✅
+- Docker build + healthcheck: 7s ✅
+- HTTP smoke check: 4 端點全 200 ✅
+
+**剩餘操作項（非程式碼）**：
+- 操作員確認 `awarewaveai-pei/Work` repo 已安裝 Claude GitHub App 後，在 SG VPS `/root/lobster-phase1/.env` 設 `AUTO_REPAIR_GITHUB_APP_CONFIRMED=true`（重啟 next-admin container 生效），狀態即轉為 `confirmed_by_operator`
+
+**避免再發生**：
+- Health endpoint 加入外部 IO 時，優先評估「operator-facing endpoint，5s 延遲可接受」，不應預設 opt-in
+- GitHub API 能力邊界：PAT 只能存取 repo/issues/contents/actions，無法查詢 App 安裝；需偵測 App 活動時走 bot comment 路徑
+
+---
+
 ### fix: workflows npm audit — 9 HIGH + 11 moderate → 0 vulnerabilities（trigger.dev 4.4.4→4.4.6）
 
 **根本問題**：`lobster-factory/packages/workflows` 累積 20 個漏洞（9 HIGH, 11 moderate），其中 `systeminformation` 的現有 override `^5.31.5` 本身就是漏洞上界（攻擊範圍 ≤5.31.5），等同無效保護。

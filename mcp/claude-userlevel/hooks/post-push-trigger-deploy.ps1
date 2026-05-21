@@ -12,6 +12,10 @@
 
 $ErrorActionPreference = "Continue"
 
+# Diagnostic: write timestamp to temp log so we can confirm the hook fires
+$logFile = "$env:TEMP\post-push-trigger-deploy.log"
+"$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') hook fired, args=$args" | Add-Content $logFile
+
 # Find repo root dynamically (hook can live anywhere in ~/.claude/hooks/)
 $repoRoot = (git rev-parse --show-toplevel 2>$null).Trim()
 if (-not $repoRoot -or $LASTEXITCODE -ne 0) {
