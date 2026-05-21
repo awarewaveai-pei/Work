@@ -130,11 +130,14 @@ echo '=== npm install ==='
 npm install --silent 2>&1 | tail -3
 
 echo '=== Deploy (trigger v4) ==='
-# Force IPv4: Cloudflare WAF skip rule matches ip.src eq 204.168.175.41 (IPv4 only).
-# Without this, Node.js defaults to IPv6 (2a01:4f9:c012:3a55::1) which misses the WAF rule
-# and hits Bot Fight Mode with a 403 managed challenge.
+# Force IPv4 for the CLI process itself (auth calls etc.).
+# The managed-index-controller inside the Docker build uses --network=host so it
+# can reach 127.0.0.1:8030 directly, bypassing Cloudflare entirely.
+# TRIGGER_API_URL build-arg is overridden via trigger.config.ts build.env to point
+# to the local trigger-webapp (http://127.0.0.1:8030) so the indexer never calls
+# the public Cloudflare-proxied URL.
 export NODE_OPTIONS='--dns-result-order=ipv4first'
-./node_modules/.bin/trigger deploy --api-url http://127.0.0.1:8030
+./node_modules/.bin/trigger deploy --api-url http://127.0.0.1:8030 --network=host
 "@
 
 # ── 4. Write script to VPS temp file (stdin, no TTY needed) ───────────────
