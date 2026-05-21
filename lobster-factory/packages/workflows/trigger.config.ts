@@ -11,14 +11,17 @@ export default defineConfig({
   triggerUrl: process.env.LOBSTER_TRIGGER_DEPLOY_URL ?? "https://trigger.aware-wave.com",
   dirs: ["./src/trigger"],
   build: {
-    // LOBSTER_TRIGGER_DEPLOY_URL (http://127.0.0.1:8030) overrides TRIGGER_API_URL in the
-    // Docker build arg so the managed-index-controller runs against the local trigger-webapp
-    // instead of the public Cloudflare-proxied URL. This build-arg comes after the CLI's
-    // own --build-arg TRIGGER_API_URL (last value wins in Docker buildx).
+    // TRIGGER_API_URL (http://127.0.0.1:8030) overrides the Docker build-arg so the
+    // managed-index-controller runs against the local trigger-webapp instead of the
+    // public Cloudflare-proxied URL. This build-arg is injected AFTER the CLI's own
+    // --build-arg TRIGGER_API_URL (last value wins in Docker buildx).
     // Combined with --network=host in the deploy command, the indexer reaches localhost
     // directly — no Cloudflare involved.
+    // NOTE: use TRIGGER_API_URL directly (already set to http://127.0.0.1:8030 by the
+    // deploy script), NOT LOBSTER_TRIGGER_DEPLOY_URL — the latter is set before this
+    // config is evaluated but TRIGGER_API_URL is the one the CLI already exports.
     env: {
-      TRIGGER_API_URL: process.env.LOBSTER_TRIGGER_DEPLOY_URL ?? "https://trigger.aware-wave.com",
+      TRIGGER_API_URL: process.env.TRIGGER_API_URL ?? "https://trigger.aware-wave.com",
     },
     // ssh2 uses native C++ addons (.node files); esbuild cannot bundle them.
     // Mark as external so Trigger.dev installs them in the worker at runtime.
