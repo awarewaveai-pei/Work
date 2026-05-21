@@ -190,6 +190,35 @@ Overall: PASS
 
 ---
 
+### fix: Trigger workflows Cloudflare BFM 完整繞過 + deploy 20260521.4（commits 89350b6, c19da17）
+
+**根本問題**：`trigger deploy` CLI 步驟成功，但 Docker build 的 indexer stage（`managed-index-controller.mjs` 作為 `RUN node` 執行）對 `https://trigger.aware-wave.com` 發出 HTTP 請求被 Cloudflare Bot Fight Mode 攔截（HTTP 403 managed challenge），導致 deploy 失敗。
+
+**根因鏈**：
+1. `localBuildImage()` (trigger.dev 4.4.6 `buildImage.js` line 365) 硬碼 `--build-arg TRIGGER_API_URL=${apiUrl}` 其中 `apiUrl` = server 回報的 `https://trigger.aware-wave.com`
+2. Containerfile 的 indexer stage 透過 `ARG TRIGGER_API_URL` + `ENV` 繼承此值，`RUN node managed-index-controller.mjs` 對該 URL 發出請求
+3. Cloudflare BFM 對 Docker build RUN step 的 HTTP 請求回傳 403 managed challenge
+4. `build.env.TRIGGER_API_URL` 在 `trigger.config.ts` 設定**無效**：確認 trigger.dev 4.4.6 `build.env` 不傳遞至 `localBuildImage()` 的 `buildEnvVars`，docker `--build-arg` 不被覆蓋
+
+**修正**（commit `c19da17`）：
+- `scripts/lobster-trigger-deploy.ps1`：`npm install` 後新增 sed patch 步驟，直接修改 `buildImage.js`：`sed -i 's|TRIGGER_API_URL=\${apiUrl}|TRIGGER_API_URL=http://127.0.0.1:8030|g'`
+- 搭配 `--network=host`，indexer 的 Docker build RUN step 直接到達 VPS 本地 port 8030（trigger-webapp），繞過 Cloudflare
+- `lobster-factory/packages/workflows/trigger.config.ts`：移除無效的 `build.env.TRIGGER_API_URL`，補充完整根因說明註解
+
+**驗證結果**：
+- version `20260521.4` deploy 成功：indexer 通過（無 Cloudflare 403）
+- `syncEnvVars`：13 個 env vars 同步至 Trigger.dev project env
+- 10 個 tasks 成功部署
+- deployment URL: https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/l974w6dl
+
+**避免再發生**：
+- `npm install` 後必須重新套用 sed patch（node_modules 會被覆寫）；已內建於 deploy script，每次 deploy 自動重套
+- trigger.dev 版本升級後需確認 `buildImage.js` 中 `TRIGGER_API_URL=` 位置是否變動，若有則更新 sed pattern
+
+- AUTO_TASK_DONE: Trigger workflows 完整 deploy — https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/l974w6dl — 20260521.4
+
+---
+
 ## 2026-05-20
 
 ### fix: CREDENTIALS UTF-8 BOM 同步迴圈根治 + 內容損毀回復（commits fe9b1ab）

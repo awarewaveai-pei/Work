@@ -352,12 +352,10 @@
 - [x] `lobster-factory` Enterprise 必備工具補強路線（已取消）
   - 範圍：Sentry / PostHog / Cloudflare / Secrets / Identity
   - 現況：Identity 採 JWT/OIDC（不綁特定供應商）；Secrets 暫採 env/mcp，後續升級 secrets manager
-- [ ] **`lobster-factory/packages/workflows` `npm audit`**（2026-04-01）
-  - 現況：已做相依升級與 `overrides` 收斂；目前剩 2 筆 moderate，皆來自 `@trigger.dev/sdk` -> `uuid`（`<14.0.0`）上游傳遞依賴。
-  - 2026-04-29 決策：`npm audit`/`npm outdated` 複核，`@trigger.dev/sdk` 與 `trigger.dev` 最新仍為 `4.4.4`，`fixAvailable=false`；暫列 **acceptable risk**（僅 moderate，無 high/critical）。
+- [ ] **`lobster-factory/packages/workflows` `npm audit` 例行週檢**（2026-04-01）
+  - **2026-05-21 現況**：`@trigger.dev/sdk`/`trigger.dev` 升至 4.4.6 + 7 個 overrides 收斂 → `found 0 vulnerabilities`（9 HIGH + 11 moderate 全清）；commit `89350b6`。
+  - **開放項目**：例行週檢（執行 `npm run audit:workflows-security`，輸出至 `agency-os/reports/security/workflows-npm-audit-LATEST.md`）；若再升版後需確認 0 漏洞。
   - 禁止：勿在本目錄執行 `npm audit fix --force`（會導向不相容 Trigger 版本）。
-  - 對策：持續追 Trigger 官方修補（`@trigger.dev/sdk`/`trigger.dev`）；每次升版後執行 `npm run test` + `npm audit` 回歸；本機勿將 Trigger dev server 暴露公網。
-  - 例行檢查：執行 `npm run audit:workflows-security`，報告輸出至 `agency-os/reports/security/workflows-npm-audit-LATEST.md`（週檢 + 升版觸發檢查）。
 
 ## Backlog — 已完成歷程
 - [x] 客戶分級與風險評分模型
