@@ -1,4 +1,4 @@
-// v20260521 — hook auto-deploy test
+// v20260521 — hook auto-deploy test v2
 export { recordTenantIntegration } from "./record-tenant-integration";
 export { orchestrateTenantProvisioning } from "./orchestrate-tenant-provisioning";
 export { createWpSite } from "./create-wp-site";
