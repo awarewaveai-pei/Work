@@ -45,9 +45,11 @@ export function decideNotification(args: DecideArgs): Decision {
   }
 
   // Repeat webhook hits same fingerprint: notify every severity, but throttle so Slack is not flooded.
+  // Critical incidents use a shorter window so operators are alerted more promptly.
   if (transition.kind === "duplicate") {
     const lastSend = lastSentAt(incident);
-    if (lastSend && now.getTime() - lastSend.getTime() < THROTTLE_WINDOW_MS) {
+    const windowMs = incident.severity === "critical" ? CRITICAL_THROTTLE_WINDOW_MS : THROTTLE_WINDOW_MS;
+    if (lastSend && now.getTime() - lastSend.getTime() < windowMs) {
       return { shouldSend: false, reason: "within_throttle_window" };
     }
     if (incident.severity === "critical") return { shouldSend: true, rule: "critical_immediate" };

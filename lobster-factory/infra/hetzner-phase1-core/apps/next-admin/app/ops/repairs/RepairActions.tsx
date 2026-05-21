@@ -7,9 +7,17 @@ interface Props {
   mode: "start" | "run";
   incidentId?: string;
   runId?: string;
+  runState?: string;
+  canEscalate?: boolean;
 }
 
-export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
+const TERMINAL_STATES = ["resolved", "rolled_back", "human_only"];
+
+function isTerminal(state?: string): boolean {
+  return !state || TERMINAL_STATES.includes(state);
+}
+
+export function RepairActions({ canAct, mode, incidentId, runId, runState, canEscalate }: Props) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [ok, setOk] = useState<boolean | null>(null);
@@ -104,6 +112,71 @@ export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
     }
   }
 
+  async function closeRun() {
+    if (!runId) return;
+    if (!confirm("要將這筆修復標記為已解決（結案）嗎？")) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/ops/repairs/${runId}/links`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state: "resolved" }),
+      });
+      const json = await res.json();
+      setOk(json.ok === true);
+      setMsg(json.ok ? "已結案。重新整理即可查看最新狀態。" : `失敗：${json.error ?? "未知錯誤"}`);
+    } catch (e) {
+      setOk(false);
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmDeployed() {
+    if (!runId) return;
+    if (!confirm("要確認部署已完成並結案嗎？")) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/ops/repairs/${runId}/links`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state: "resolved", deploy_status: "passed" }),
+      });
+      const json = await res.json();
+      setOk(json.ok === true);
+      setMsg(json.ok ? "部署已確認，修復結案。重新整理即可查看最新狀態。" : `失敗：${json.error ?? "未知錯誤"}`);
+    } catch (e) {
+      setOk(false);
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function escalate() {
+    if (!runId) return;
+    if (!confirm("確認已分析根因為 code regression，要升級為自動修復 PR 嗎？")) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/ops/repairs/${runId}/escalate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+      });
+      const json = await res.json();
+      setOk(json.ok === true);
+      setMsg(json.ok ? "已升級為 auto_repair。GitHub Issue 將收到升級通知。重新整理即可查看最新狀態。" : `失敗：${json.error ?? "未知錯誤"}`);
+    } catch (e) {
+      setOk(false);
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!canAct) return <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>唯讀</span>;
 
   return (
@@ -114,15 +187,36 @@ export function RepairActions({ canAct, mode, incidentId, runId }: Props) {
         </button>
       ) : (
         <>
-          <button type="button" className="btn-secondary" disabled={busy} onClick={addPr}>
-            加入 PR
-          </button>
-          <button type="button" className="btn-secondary" disabled={busy} onClick={markDeployPending}>
-            待部署
-          </button>
-          <button type="button" className="btn-secondary" disabled={busy} onClick={humanOnly}>
-            人工處理
-          </button>
+          {!TERMINAL_STATES.includes(runState ?? "") && (
+            <button type="button" className="btn-secondary" disabled={busy} onClick={addPr}>
+              加入 PR
+            </button>
+          )}
+          {(runState === "repairing" || runState === "pr_ready") && (
+            <button type="button" className="btn-secondary" disabled={busy} onClick={markDeployPending}>
+              待部署
+            </button>
+          )}
+          {!TERMINAL_STATES.includes(runState ?? "") && (
+            <button type="button" className="btn-secondary" disabled={busy} onClick={humanOnly}>
+              人工處理
+            </button>
+          )}
+          {runState === "human_only" && (
+            <button type="button" className="btn-secondary" disabled={busy} onClick={closeRun}>
+              結案
+            </button>
+          )}
+          {(runState === "deploy_pending" || runState === "deploying") && (
+            <button type="button" className="btn-secondary" disabled={busy} onClick={confirmDeployed}>
+              確認部署完成
+            </button>
+          )}
+          {canEscalate && !isTerminal(runState) && (
+            <button type="button" className="btn-secondary" disabled={busy} onClick={escalate}>
+              升級修復
+            </button>
+          )}
         </>
       )}
       {msg && (

@@ -106,3 +106,38 @@ export async function createRepairIssue(run: RepairRunWithIncident): Promise<Git
     ].join("\n");
   }
 }
+
+export async function postEscalationComment(args: {
+  owner: string;
+  repo: string;
+  issueNumber: number;
+  actor: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const token = env("AUTO_REPAIR_GITHUB_TOKEN") || env("GITHUB_TOKEN");
+  if (!token) return { ok: false, error: "github_token_not_configured" };
+
+  const body = [
+    `🔼 **Escalation by ${args.actor}**`,
+    "",
+    "This repair run has been escalated from **analysis_only** to **auto_repair**.",
+    "The responsible operator has confirmed a code-regression root cause.",
+    "You may now proceed to generate a targeted fix PR following the original guardrails.",
+  ].join("\n");
+
+  const res = await fetch(
+    `https://api.github.com/repos/${args.owner}/${args.repo}/issues/${args.issueNumber}/comments`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/vnd.github+json",
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+        "x-github-api-version": "2022-11-28",
+      },
+      body: JSON.stringify({ body }),
+    },
+  );
+
+  if (!res.ok) return { ok: false, error: `github_comment_${res.status}` };
+  return { ok: true };
+}

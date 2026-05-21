@@ -2,8 +2,8 @@ import { getSupabaseServerClient, getSupabaseWriteClient } from "@/lib/supabase-
 import type { Incident } from "@/lib/ops-inbox/types";
 import { appendAudit } from "./audit";
 import { runPreRepairBackup } from "./backup";
-import { createRepairIssue, resolveGithubTarget } from "./github";
-import { canApprovePolicy, needsGitHubIssue, policyForIncident } from "./policy";
+import { createRepairIssue, postEscalationComment, resolveGithubTarget } from "./github";
+import { canApprovePolicy, needsGitHubIssue, policyCatalogForSource, policyForIncident } from "./policy";
 import type { RepairRun, RepairRunWithIncident } from "./types";
 
 export async function getCurrentSystemMode(): Promise<string> {
@@ -238,6 +238,43 @@ export async function markRunHumanOnly(id: string, actor: string, reason: string
     }),
   });
   return { ok: true, run: updated };
+}
+
+export async function escalateAnalysisOnlyRun(
+  id: string,
+  actor: string,
+): Promise<{ ok: boolean; run?: RepairRun; error?: string; details?: unknown }> {
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return { ok: false, error: "supabase_write_not_configured" };
+
+  const run = await fetchRepairRunWithIncident(id);
+  if (!run) return { ok: false, error: "repair_run_not_found" };
+
+  if (run.policy !== "analysis_only") return { ok: false, error: "not_analysis_only" };
+  const catalog = policyCatalogForSource(run.source);
+  if (!catalog.can_escalate_to_pr) return { ok: false, error: "source_cannot_escalate" };
+  const terminal = ["resolved", "rolled_back", "human_only"];
+  if (terminal.includes(run.state)) return { ok: false, error: "run_in_terminal_state", details: { state: run.state } };
+
+  const updated = await updateRun(id, {
+    policy: "auto_repair",
+    audit_log: appendAudit(run.audit_log, {
+      actor,
+      action: "escalated_to_auto_repair",
+      detail: "Operator confirmed code-regression root cause; escalated from analysis_only to auto_repair.",
+    }),
+  });
+
+  if (run.github_issue_number && run.github_owner && run.github_repo) {
+    await postEscalationComment({
+      owner: run.github_owner,
+      repo: run.github_repo,
+      issueNumber: run.github_issue_number,
+      actor,
+    }).catch(() => {});
+  }
+
+  return { ok: true, run: updated ?? undefined };
 }
 
 export async function updateRunLinks(

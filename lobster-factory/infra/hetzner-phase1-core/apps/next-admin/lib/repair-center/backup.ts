@@ -120,6 +120,14 @@ async function runRemoteScript(args: {
   }
 }
 
+function describeSshExitCode(code: number, stderr: string): string {
+  if (code === 127) return "script_not_found";
+  if (code === 255) return "ssh_connection_failed";
+  if (/permission denied/i.test(stderr)) return "ssh_permission_denied";
+  if (/no such file/i.test(stderr)) return "path_not_found";
+  return `exit_${code}`;
+}
+
 async function runSshBackupGate(run: RepairRunWithIncident): Promise<BackupGateResult> {
   const sg = readSshTarget("SG");
   const eu = readSshTarget("EU");
@@ -161,7 +169,7 @@ async function runSshBackupGate(run: RepairRunWithIncident): Promise<BackupGateR
     const sgResult = await runRemoteScript({ label: "sg", target: sg, command: sgCommand });
     detail.sg = sgResult;
     if (!sgResult.ok) {
-      return { ok: false, error: `sg_backup_failed:${sgResult.code}`, detail };
+      return { ok: false, error: `sg_backup_failed:${describeSshExitCode(sgResult.code, sgResult.stderr)}`, detail };
     }
 
     if (eu) {
@@ -170,7 +178,7 @@ async function runSshBackupGate(run: RepairRunWithIncident): Promise<BackupGateR
       const euResult = await runRemoteScript({ label: "eu", target: eu, command: euCommand });
       detail.eu = euResult;
       if (!euResult.ok) {
-        return { ok: false, error: `eu_backup_failed:${euResult.code}`, detail };
+        return { ok: false, error: `eu_backup_failed:${describeSshExitCode(euResult.code, euResult.stderr)}`, detail };
       }
     } else {
       detail.eu = { skipped: true, reason: "AUTO_REPAIR_REQUIRE_EU_BACKUP=false" };

@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canApproveCommand, readOpsRole } from "@/lib/ops-role";
 import { buildIntegrationBlockers, type IntegrationBlocker } from "@/lib/repair-os/integration-blockers";
-import { REPAIR_SOURCE_POLICIES, policyForIncident, repairPolicyLabel } from "@/lib/repair-center/policy";
+import { REPAIR_SOURCE_POLICIES, policyCatalogForSource, policyForIncident, repairPolicyLabel } from "@/lib/repair-center/policy";
 import type { RepairIncident, RepairRun } from "@/lib/repair-center/types";
 import { RepairActions } from "./RepairActions";
 
@@ -234,7 +234,16 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
                     </div>
                     {run.backup_error ? <div style={{ color: "#991b1b", fontSize: 12, marginTop: 5 }}>{run.backup_error}</div> : null}
                   </div>
-                  <RepairActions runId={run.id} canAct={canAct && !blocked} mode="run" />
+                  <RepairActions
+                    runId={run.id}
+                    canAct={canAct && !blocked}
+                    mode="run"
+                    runState={run.state}
+                    canEscalate={
+                      run.policy === "analysis_only" &&
+                      policyCatalogForSource(run.source).can_escalate_to_pr
+                    }
+                  />
                 </div>
               ))}
             </div>

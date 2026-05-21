@@ -133,19 +133,25 @@ export async function checkIntegrationHealth(input: IntegrationHealthInput): Pro
     }
 
     if (provider === "netdata") {
-      return await checkReachable({
-        checkedAt,
-        provider,
-        url: `${baseUrl(input.externalHint, process.env.NETDATA_BASE_URL ?? "https://app.netdata.cloud")}/api/v1/info`,
-        token,
-      });
+      const netdataUrl = `${baseUrl(input.externalHint, process.env.NETDATA_BASE_URL ?? "https://app.netdata.cloud")}/api/v1/info`;
+      if (token.value) {
+        return await checkJsonApi({
+          checkedAt,
+          provider,
+          token,
+          url: netdataUrl,
+          headers: bearerHeaders(token.value),
+          okWhen: (status) => status >= 200 && status < 300,
+        });
+      }
+      return await checkReachable({ checkedAt, provider, url: netdataUrl, token });
     }
 
     if (provider === "uptime_kuma") {
       return await checkReachable({
         checkedAt,
         provider,
-        url: `${baseUrl(input.externalHint, "https://uptime.aware-wave.com")}/`,
+        url: `${baseUrl(input.externalHint, "https://uptime.aware-wave.com")}/api/health`,
         token,
       });
     }

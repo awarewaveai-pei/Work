@@ -72,11 +72,7 @@ export async function POST(req: Request) {
   }
 
   if (transition.kind === "new") {
-    try {
-      await triggerAutoClassify(upserted.id);
-    } catch (e) {
-      Sentry.captureException(e);
-    }
+    await triggerAutoClassify(upserted.id);
   }
   try {
     await dispatchNotifications({ incident: upserted as Incident, transition });

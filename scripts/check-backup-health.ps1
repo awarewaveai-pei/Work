@@ -145,8 +145,8 @@ if (-not $sshOk) {
     $eu = Get-HostBackupHealth -ServerHost $EuHost -CronPath "/etc/cron.d/eu-backup" -BackupScriptPath "/root/scripts/backup-eu-stack.sh" -BackupDir "/root/backups"
 }
 
-$sgStale = ($sg -ne $null) -and $sg.ok -and ($sg.backup_age_days -match '^\d+$') -and ([int]$sg.backup_age_days -gt 2)
-$euStale = ($eu -ne $null) -and $eu.ok -and ($eu.backup_age_days -match '^\d+$') -and ([int]$eu.backup_age_days -gt 2)
+$sgStale = ($sg -ne $null) -and $sg.ok -and ($sg.backup_age_days -match '^\d+$') -and ([int]$sg.backup_age_days -gt 3)
+$euStale = ($eu -ne $null) -and $eu.ok -and ($eu.backup_age_days -match '^\d+$') -and ([int]$eu.backup_age_days -gt 3)
 $overall = if ($fatal) { "ERROR" } elseif ((-not $sg.ok) -or (-not $eu.ok)) { "WARN" } elseif ($sgStale -or $euStale) { "WARN" } else { "PASS" }
 
 $markdown = New-Object System.Text.StringBuilder
@@ -179,7 +179,7 @@ if ($fatal) {
         [void]$markdown.AppendLine("- Backup dir size: " + $node.data.backup_size)
         [void]$markdown.AppendLine("- Latest backup file time: " + $node.data.latest_time)
         [void]$markdown.AppendLine("- Oldest backup file time: " + $node.data.oldest_time)
-        $ageTag = if ($node.data.backup_age_days -match '^\d+$' -and [int]$node.data.backup_age_days -gt 2) { " STALE" } else { "" }
+        $ageTag = if ($node.data.backup_age_days -match '^\d+$' -and [int]$node.data.backup_age_days -gt 3) { " STALE" } else { "" }
         [void]$markdown.AppendLine("- Backup age: " + $node.data.backup_age_days + "d" + $ageTag)
         [void]$markdown.AppendLine("")
     }
@@ -219,7 +219,7 @@ if ($Json) {
         )) {
             if ($x.data.ok) {
                 $ageD = $x.data.backup_age_days
-                $stale = ($ageD -match '^\d+$') -and ([int]$ageD -gt 2)
+                $stale = ($ageD -match '^\d+$') -and ([int]$ageD -gt 3)
                 $line = "- " + $x.name + ": cron=" + $x.data.cron_status + ", retention=" + $x.data.retention_days + "d(" + $x.data.retention_source + "), size=" + $x.data.backup_size + ", latest=" + $x.data.latest_time + ", oldest=" + $x.data.oldest_time + ", age=" + $ageD + "d"
                 if ($stale) {
                     Write-Host ($line + " STALE") -ForegroundColor Yellow
