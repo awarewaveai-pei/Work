@@ -5,7 +5,10 @@ export default defineConfig({
   // After first boot: open https://trigger.aware-wave.com, create a project,
   // copy the new project ref here and remove the old Cloud ref.
   project: "proj_6c4f24492a705729fc2c",
-  triggerUrl: "https://trigger.aware-wave.com",
+  // LOBSTER_TRIGGER_DEPLOY_URL: override triggerUrl at deploy time to bypass Cloudflare
+  // Bot Fight Mode (set to http://127.0.0.1:8030 in lobster-trigger-deploy.ps1).
+  // Default is the public URL for development and manual deploy flows.
+  triggerUrl: process.env.LOBSTER_TRIGGER_DEPLOY_URL ?? "https://trigger.aware-wave.com",
   dirs: ["./src/trigger"],
   build: {
     // ssh2 uses native C++ addons (.node files); esbuild cannot bundle them.

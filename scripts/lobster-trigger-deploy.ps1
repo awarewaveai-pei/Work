@@ -75,7 +75,13 @@ source /root/.nvm/nvm.sh
 # LOBSTER_TRIGGER_PUBLIC_API_URL is picked up by trigger.config.ts syncEnvVars to sync
 # the correct public URL to the Trigger.dev project env (used by tasks at runtime).
 export TRIGGER_ACCESS_TOKEN='$pat'
+# Both TRIGGER_API_URL and LOBSTER_TRIGGER_DEPLOY_URL use localhost to bypass Cloudflare
+# Bot Fight Mode. TRIGGER_API_URL covers env-var-driven CLI auth; LOBSTER_TRIGGER_DEPLOY_URL
+# overrides triggerUrl in trigger.config.ts so ALL CLI API calls stay on localhost.
+# LOBSTER_TRIGGER_PUBLIC_API_URL is synced to the Trigger.dev project env via syncEnvVars
+# so tasks at runtime have the correct public-facing URL for ao-infrastructure-check, etc.
 export TRIGGER_API_URL=http://127.0.0.1:8030
+export LOBSTER_TRIGGER_DEPLOY_URL=http://127.0.0.1:8030
 export LOBSTER_TRIGGER_PUBLIC_API_URL=https://trigger.aware-wave.com
 
 # Supabase
