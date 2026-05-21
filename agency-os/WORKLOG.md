@@ -27,6 +27,63 @@
 
 **避免再發生**：overrides 版本邊界需嚴格比對漏洞描述的 `<=` 上界，確認 override 版本嚴格大於該上界，而非等於。
 
+### feat: P4 repair_runs 軟封存 + GAP-01/03 health endpoint 完整補齊 + sg-deploy（commits 77c4c81 → c4ac12c）
+
+**根本問題**：Auto-Repair 系統有兩個 P1 缺口在前次修復中僅部分補齊：
+- P4：repair_runs 表無 TTL/封存機制，terminal state run 永久累積（查詢效能隱患、稽核過重）
+- GAP-01：health endpoint 只驗 env var 存在，不確認 VPS 備份腳本實際存在
+- GAP-03：health endpoint 只有靜態文字提示 GitHub App，無實際 API 驗證
+
+**實作內容**：
+
+**P4 — repair_runs 軟封存機制**（commit `77c4c81`，8 檔）
+- DB migration `0030_repair_runs_archive.sql`：新增 `archived_at timestamptz` column、2 個 partial index（`WHERE archived_at IS NULL`）、`archive_stale_repair_runs(retention_days int default 90)` 函式（SECURITY DEFINER + REVOKE/GRANT + pg_cron DO block 含 idempotency check + exception handler）
+- `service.ts`：新增 `archiveRun()` + `archiveStaleRuns()`，`archiveRun` 已封存時回 `ok:true`（idempotent）
+- `app/api/ops/repairs/[id]/archive/route.ts`（新增）：POST，owner-only
+- `app/api/ops/repairs/archive-stale/route.ts`（新增）：POST，retention_days 可選參數
+- `RepairActions.tsx`：新增 archive button（amber 色，僅 terminal state + 未封存時顯示）
+- `run-state.ts`：`visibleRunButtons` 新增 `archivedAt` 第三參數，縱深防禦（archivedAt 已設 → archive button 隱藏）
+- `__tests__/run-state.test.ts`：5 個 archive button 測試（total 88/88）
+- `page.tsx`：runQuery 新增 `.is("archived_at", null)` filter + 傳 `archivedAt` prop
+
+**P4 Migration 修正**（commit `f306952`）
+- 根因：PostgreSQL 不允許在 `DO $...$` block 內巢狀 `$` dollar-quote；pg_cron 命令字串改用單引號
+- 修正：outer block 改 `DO $outer$ ... $outer$`，cron command 改 `'select ...'`
+
+**GAP-01 + GAP-03 — health endpoint 強化**（commit `6898ca4`）
+- GAP-01：新增 `probeBackupScripts(backupMode)` — SSH stat 遠端驗證 SG/EU 備份腳本存在，5s timeout，並行執行，結果放 `backup_script_probe: { sg, eu }`
+- GAP-03：新增 `checkGithubRepoAndApp(owner, repo, token)` — 呼叫 `GET /repos/{owner}/{repo}` 驗證 token + repo 可達性（`github_repo_accessible`, `github_push_access`）；呼叫 `/installation` 端點嘗試取得 App 安裝狀態（PAT 場景回 null，屬 GitHub API 限制）
+- 兩個 probe 並行執行，均為 advisory（不影響 `ok` 計算）
+
+**SSH probe opt-in 修正**（commit `c4ac12c`）
+- 根因：SSH probe 在每次 GET 都執行，最多阻塞 5s，不符 health endpoint 快速回應原則
+- 修正：probe 改 `?deep=1` opt-in；base check 返回 `not_probed`（<3s 回應）；deep check 完整 SSH stat（~5s）
+
+**sg-deploy**
+- 執行 `sg-deploy.sh next-admin`，從 `fcf7895` 更新至 `c4ac12c`
+- npm test gate: 88/88 ✅
+- Docker build + healthcheck: 7s ✅
+- HTTP smoke check: 4 端點全 200 ✅
+
+**驗證結果**：
+- `GET /health` base：200, 2.49s, `backup_script_probe.sg: "not_probed"` ✅
+- `GET /health?deep=1`：200, 4.93s, `backup_script_probe: { sg: "ok", eu: "ok" }` ✅
+- `github_repo_accessible: true`, `github_push_access: true` ✅
+- `github_app_installed: null` — **by design**：PAT 無法呼叫 `/repos/{owner}/{repo}/installation`（需 GitHub App JWT）；`github_app_advisory` 含手動確認連結 `https://github.com/awarewaveai-pei/Work/settings/installations`
+- pg_cron job：`archive-stale-repair-runs`, schedule `0 2 * * *`, active=true ✅（Supabase Studio 驗證）
+- `archived_at` column：`timestamp with time zone, nullable` ✅
+
+**剩餘風險（全部已閉環）**：
+- `github_app_installed: null` — by design，GitHub API PAT 限制，非程式碼問題，advisory 文字已給操作者完整手動確認路徑
+- Migration `0030` 已直接套用 Supabase Studio（非透過 sg-deploy），TypeScript 程式碼同步 deploy
+
+**避免再發生**：
+- PostgreSQL dollar-quote 巢狀禁忌：`DO $outer$` 內部的字串一律用單引號，不可再用 `$...$`
+- Health endpoint 凡加入外部 IO（SSH/API call）皆改為 opt-in query param，保持 base check < 3s
+- 維護警告（同時定義於兩處）：新增 terminal state 時必須同步 `archive_stale_repair_runs()` SQL 和 `TERMINAL_STATES`（`run-state.ts`）
+
+---
+
 ### fix: Repair Center 全缺口修復 + 剩餘風險測試覆蓋（commits e999a60, 後續）
 
 **根本問題**：Auto-Repair 系統存在 5 個功能缺口、3 個維運風險、3 個可觀測性缺失，導致備份錯誤難判讀、Critical 告警節流過長（15 分鐘）、analysis_only 事件無升級路徑、UI 無法直接結案/確認部署。
