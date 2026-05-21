@@ -39,18 +39,6 @@ export function buildIntegrationBlockers(
     .map((integration) => buildIntegrationBlocker(integration, orgById.get(integration.organization_id)))
     .filter((item): item is IntegrationBlocker => Boolean(item));
 
-  if (!env.SLACK_GITHUB_PRS_CHANNEL_ID?.trim()) {
-    blockers.push({
-      key: "external-signals:slack-github-prs",
-      clientName: "AwareWave Ops",
-      clientSlug: "awarewave-ops",
-      provider: "slack",
-      status: "pending",
-      message: "External signal digest cannot read the GitHub PR Slack channel because SLACK_GITHUB_PRS_CHANNEL_ID is not configured.",
-      nextStep: "Add SLACK_GITHUB_PRS_CHANNEL_ID directly, or give the Slack token channel-listing scope and discover the channel ID.",
-    });
-  }
-
   return blockers;
 }
 

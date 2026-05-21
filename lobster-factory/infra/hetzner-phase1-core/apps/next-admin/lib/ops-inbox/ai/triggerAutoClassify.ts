@@ -33,7 +33,7 @@ async function runAiSummarize(incident: Incident): Promise<{ provider: Supported
   throw new Error("no_ai_provider_available");
 }
 
-export async function triggerAutoClassify(incidentId: string): Promise<{ skipped?: string; summary?: string }> {
+export async function triggerAutoClassify(incidentId: string): Promise<{ skipped?: string; summary?: string; error?: string }> {
   // Feature flag: legacy key still works; having either API key also implies intent
   const enabled =
     process.env.OPS_INBOX_GEMINI_ENABLED === "true" ||
@@ -51,7 +51,21 @@ export async function triggerAutoClassify(incidentId: string): Promise<{ skipped
   const existing = incident.ai_diagnoses ?? [];
   if (existing.some((d) => d.role === "auto-classify")) return { skipped: "already_classified" };
 
-  const { provider, model, summary } = await runAiSummarize(incident);
+  let aiResult: { provider: SupportedProvider; model: string; summary: string };
+  try {
+    aiResult = await runAiSummarize(incident);
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : "ai_summarize_failed";
+    // best-effort: tag incident so ops can see classify failed without checking Sentry
+    await supabase
+      .from("ops_incidents")
+      .update({ tags: { ...(incident.tags ?? {}), auto_classify_error: errorMsg } })
+      .eq("id", incidentId)
+      .then(() => {}, () => {});
+    return { error: errorMsg };
+  }
+
+  const { provider, model, summary } = aiResult;
 
   const diagnosis: AiDiagnosis = {
     provider,

@@ -27,6 +27,7 @@ interface Decision {
 }
 
 const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+const CRITICAL_THROTTLE_WINDOW_MS = 3 * 60 * 1000;
 
 export function decideNotification(args: DecideArgs): Decision {
   const { incident, transition, now } = args;
