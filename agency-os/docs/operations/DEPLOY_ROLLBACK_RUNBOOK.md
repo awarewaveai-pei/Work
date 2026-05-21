@@ -17,7 +17,7 @@
 | 一鍵回滾 | `./scripts/rollback-phase1.sh restore <service> [snapshot-tag]` |
 | 清理舊快照 | `./scripts/rollback-phase1.sh clean <service> [days]`（預設 30 天） |
 | n8n 版本回滾 | `./scripts/rollback-phase1.sh n8n-pin <old-semver>` |
-| 部署後驗收 | `docker compose ps && curl -sf http://127.0.0.1/health && curl -sf http://127.0.0.1/api/health` |
+| 部署後驗收 | `docker compose ps && curl -sf http://127.0.0.1:3002/ && curl -sf http://127.0.0.1/ && curl -sf -H "Host: api.aware-wave.com" http://127.0.0.1/api/health` |
 
 ---
 
@@ -63,11 +63,13 @@
 | 步驟 | 動作 | 失敗處置 |
 |------|------|---------|
 | 1 | `cd /root/Work && git fetch + git pull --ff-only origin main` | 非 fast-forward → 立即 fail（保留現狀，需要人介入） |
-| 2 | `rsync -av --delete --exclude='.env*' --exclude='node_modules' --exclude='.next' /root/Work/...//apps/<APP>/ /root/lobster-phase1/apps/<APP>/` | rsync 錯誤 → fail，staging 保持原狀 |
+| 1.5 | `npm test`（next-admin 專屬 test gate，35 vitest tests） | test 失敗 → 立即 fail abort deploy，舊版繼續跑 |
+| 2 | `rsync -av --delete --exclude='.env*' --exclude='node_modules' --exclude='.next' /root/Work/.../apps/<APP>/ /root/lobster-phase1/apps/<APP>/` | rsync 錯誤 → fail，staging 保持原狀 |
 | 3 | `docker compose build <APP>` | build fail → fail，舊 image 還在跑 |
-| 4 | `docker compose up -d <APP>` | up fail → fail（容器名衝突時要 `docker compose stop && rm -f` 後重來） |
-| 5 | 等 healthcheck 60s | unhealthy → fail（用第 3 節 rollback） |
-| 6 | 寫 `/root/lobster-phase1/.deployed-commit`（client-side `check-deploy-drift.ps1` 比對用） | — |
+| 4 | `docker compose up -d <APP>`（race-condition 自動重試一次） | up fail → fail（容器名衝突時自動 stop/rm-f/up 重試；兩次皆失敗才 abort） |
+| 5 | 寫 `/root/lobster-phase1/.deployed-commit` + `.deployed-at`（drift 偵測用） | — |
+| 6 | 等 healthcheck 60s | unhealthy → fail（用第 3 節 rollback） |
+| 7 | **HTTP smoke check**（curl 4 端點：next-admin :3002/、/api/ops/summary、nginx/wp :80/、node-api /api/health）；**非致命**，失敗寫 `.smoke-warn` flag，不 exit non-zero | 失敗 → log SMOKE_WARN + 寫 `.smoke-warn`；`auto-deploy-next-admin.sh` 讀取後附加到 Slack/Telegram 通知 |
 
 ### 2.2 客戶端 drift 檢查
 
@@ -258,4 +260,4 @@ docker rmi lobster-phase1-node-api:rollback-20260101-000000
 - `agency-os/TASKS.md`
 - `agency-os/WORKLOG.md`
 
-_Last synced: 2026-04-30_
+_Last synced: 2026-05-21_

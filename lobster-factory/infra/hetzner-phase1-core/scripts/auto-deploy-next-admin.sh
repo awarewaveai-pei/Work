@@ -75,11 +75,20 @@ fi
 log "DRIFT: deployed=${DEPLOYED:0:7} origin=${REMOTE_HEAD:0:7} app-code behind=$BEHIND -- starting auto-deploy"
 
 DEPLOY_SUCCESS=0
+SMOKE_WARN_SUFFIX=""
 NEW_COMMIT="${DEPLOYED}"
 if bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FILE" 2>&1; then
     NEW_COMMIT=$(cat "$DEPLOY_DIR/.deployed-commit" | tr -d '[:space:]')
     log "SUCCESS: $APP deployed to ${NEW_COMMIT:0:12}"
     DEPLOY_SUCCESS=1
+    # Capture smoke warnings written by sg-deploy.sh step 7
+    SMOKE_WARN_SUFFIX=""
+    if [[ -f "$DEPLOY_DIR/.smoke-warn" ]]; then
+        _sw=$(cat "$DEPLOY_DIR/.smoke-warn" 2>/dev/null || echo "?")
+        _sw_count="${_sw%%|*}"; _sw_ts="${_sw##*|}"
+        SMOKE_WARN_SUFFIX="\n\n SMOKE_WARN: ${_sw_count} endpoint(s) non-2xx at ${_sw_ts}"
+        log "SMOKE_WARN flag detected: $_sw"
+    fi
 else
     log "FAILED: sg-deploy.sh exited non-zero for $APP"
 fi
@@ -110,6 +119,8 @@ send_slack() {
     fi
 }
 
+SLACK_MSG="${SLACK_MSG}${SMOKE_WARN_SUFFIX}"
+TG_MSG="${TG_MSG}${SMOKE_WARN_SUFFIX}"
 send_slack "${SLACK_WEBHOOK_URL:-}" "$SLACK_MSG" "slack"
 send_slack "${OPS_INCIDENTS_WEBHOOK:-}" "$SLACK_MSG" "ops-incidents-slack"
 

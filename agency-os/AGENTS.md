@@ -68,7 +68,18 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 - 部署: `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull）
   - **next-admin test gate（內建）**：`sg-deploy.sh next-admin` 會在 build 前自動跑 `npm test`（vitest，35 tests）；失敗 → deploy 自動 abort，不進入 build。
   - 若 npm test 失敗：先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看錯誤，修好後再 push + 重跑 sg-deploy。
+  - **HTTP smoke check（Step 7，內建）**：`sg-deploy.sh` 在 docker healthcheck 後自動 curl 4 端點（next-admin :3002/、/api/ops/summary、nginx/wp :80/、node-api /api/health via Host header）；非致命，失敗寫 `.smoke-warn` + log SMOKE_WARN；`auto-deploy-next-admin.sh` 讀取後附加至 Slack/Telegram 通知。SSOT：`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh` Step 7。
 - next-admin：用 `@supabase/supabase-js ^2.49.8`（非 auth-helpers）；樣式為 CSS 變數（無 Tailwind）
+
+**新部署路徑強制清單（SOP）** — 每次新增可部署服務或 deploy path 時，必須同時完成以下 5 項：
+
+| # | 項目 | 說明 |
+|---|------|------|
+| 1 | **Unit test gate** | 在 `sg-deploy.sh` 加入對應 `npm test` 或等效測試；失敗 → abort deploy |
+| 2 | **Docker healthcheck** | `docker-compose.yml` 對應服務必須有 `healthcheck:` 定義；sg-deploy Step 6 等待 healthy |
+| 3 | **HTTP smoke check** | 在 `sg-deploy.sh` Step 7 `_smoke_check` 區塊加入新端點的 curl 驗證 |
+| 4 | **Rollback 指令** | 在 `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` 補充對應服務的回滾步驟 |
+| 5 | **Notification** | 確認 Slack/Telegram 通知涵蓋新路徑的 SUCCESS/FAIL/SMOKE_WARN 三種狀態 |
 
 **EU VPS** `204.168.175.41` — Services（compose SSOT 見 repo）
 - Trigger.dev: `lobster-factory/infra/trigger/docker-compose.yml`（`/root/trigger/`）
