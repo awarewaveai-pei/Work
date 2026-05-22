@@ -4,6 +4,54 @@
 
 ## 2026-05-22
 
+### 跨機 .md UTF-8 BOM 一勞永逸 + AO-RESUME VPS reboot 機械化偵測 + L1 自動辨識規則（2026-05-22 05:30 UTC）
+
+**事件鏈**：操作者收到 Netdata `system.post_update_reboot_status=1` 告警字面看不懂；發現該告警其實 21 小時前就進 `external-signals-digest.json` 但 Claude 沒辨識。順便發現 memory `.md` 跨 Google Drive 同步會亂碼（40+ 檔無 BOM）。三件事一次處理，做到「再也不需要操作者懂技術字串」。
+
+**根因**：
+- **R1（reboot 告警被忽略 21h）**：AGENTS.md 已有「代理自動工具使用規則」表，但純文字規則依賴 LLM 在 5 條 Slack 訊息中辨識某條 — 統計上會失敗（事實證明 21 小時沒人理）
+- **R2（memory .md 亂碼）**：`scripts/export-cross-machine-memory.ps1` line 125/136 + `import-cross-machine-memory.ps1` line 348/382 對 memory `.md` 用裸 `Copy-Item`，PowerShell 在 Big5 系統讀無 BOM UTF-8 → 誤判為 Big5 → CJK 亂碼。團隊先前 commit `fe9b1ab` 已為 `AWARE_WAVE_CREDENTIALS.md` 修過同一問題，但 memory `.md` 沒延伸
+- **R3（pre-existing path bug）**：兩個 sync script 對 `WorkRoot` 用 `Substring(1) -replace ':', '-' -replace '\\', '-'`；若 caller 傳入 forward-slash 路徑（如 `d:/Work`），`projectKey` 算成 `d-/Work`，Join-Path normalise 後變兩段 `d-\Work`，找不到 memory dir 安靜 skip。產線 AO-CLOSE 走 Resolve-Path 不受影響，但測試或直接 invoke 會踩到
+
+**修法（L1 + L2 + 跨機 BOM + 防禦性 path）**：
+
+1. **L1 文字規則（AGENTS.md `40f3f9b`）**：「代理自動工具使用規則」表加一條，訊息含 reboot 訊號（9 種英中 pattern）**且**含 VPS 識別字（EU/SG 各 4 種）→ Claude 自動跑對應 `/eu-reboot` 或 `/sg-reboot` 的 Step 1 pre-flight read-only checks → 中文摘要 → 等明示 go-ahead 才 Step 2 reboot。AO-RESUME 時也主動點名「⚠️ EU/SG 需 reboot」。
+
+2. **L2 機械化偵測（ao-resume.ps1 `2952dea`）**：在腳本末尾加 ~95 行 PowerShell block，每次 AO-RESUME 機械式 grep `external-signals-digest.json`，命中即印紅色警告 block 於輸出末尾（落入 hook 的 `log_tail` → `ao-resume-hook-last.json` → Claude 必讀）。**關鍵差異**：不依賴 LLM 在訊息列表中注意，PowerShell 確定性比對。實測 regex 對 EU 原始告警文字命中、不誤判 SG。
+
+3. **跨機 BOM 4 階段（commits 6ddfeab/6a8321a/ec05fa6）**：
+   - Phase 1（backfill）：21 個現有 memory `.md` 補 BOM；備份於 `~/.claude/projects/d--Work/memory/.bom-backfill-backup-20260522-050028/`（20 檔，本機不入 git）
+   - Phase 2（export）：新增 `Copy-MdWithUtf8Bom` helper，MEMORY.md + memory/*.md 全強制 BOM
+   - Phase 3（import）：新增 `Set-Utf8BomOnFile` helper，import 後 normalise BOM；**`'import'` 分支 stateHash 改存 post-BOM `Get-SafeHash $indDst`**（原本存 `$indSrc` 會在 BOM 化後造成 hash mismatch 引發誤判 'local-modified'）；MEMORY.md import 同樣加 normalize
+   - Phase 4（AGENTS.md）：§「跨機 .md 編碼紀律」加進治理 — 範圍、機械保障、寫入最佳實踐
+
+4. **防禦性 path 修法（兩 script `4ae8f5af` + `6b2ada11`）**：兩個 sync script 在 derive `projectKey` 前加 `(Resolve-Path -LiteralPath $WorkRoot).Path`，無論 caller 傳什麼 slash 風格，都先正規化為 Windows 路徑。預防直接 invoke 或測試誤用。
+
+**驗證**：
+- BOM helpers unit test：8 cases ALL PASS（no-BOM source → BOM dst / BOM source idempotent / 雙跑 hash 不變 / 空檔→3 bytes / 缺檔不拋 / CJK content preserved / src≠dst hash 證明需用 dst hash / BOM 兩端 hash 一致證明 idempotence）
+- 真實 Drive 落地驗證：意外 export 到 `G:\我的雲端硬碟\...\AO-SYNC-2026-05-22-LAPTOP-R7I86OR5\`，**22/22 `.md` 全 BOM** ✓
+- L2 detection regex synthetic test：原始 EU Netdata 告警文字命中、SG 識別字不誤判
+- PowerShell parser 兩 script 通過
+- AO-RESUME 端到端跑完無 error，今日 digest 已不含 reboot 訊號（EU 已 reboot），警告 block 正確不觸發
+
+**避免再發生**：
+- Reboot 告警：以後 Netdata 對 EU/SG 出 `post_update_reboot_status=1`，Claude 在當 turn 即觸發 pre-flight；AO-RESUME 也機械化點名，不再依賴使用者理解技術字串
+- 跨機 .md 亂碼：boundary 兩端強制 BOM，writers（含 Claude、其他 AI、人工）永遠不用知道；任何流入 Drive 的 `.md` 自動正規化
+- Path 風格：兩個 sync script 對外部呼叫都自我保護，未來測試/腳本不會再踩 forward-slash 暗坑
+
+**已知 transient（可接受）**：首次同步當下，backfilled local（有 BOM）與舊 Drive src（無 BOM）hash 不同，會被判 `local-modified` 阻擋 import — 對方機器跑一次新 export 後自然收斂。對使用者顯示「CONFLICT — vault differs」一次性可忽略。
+
+**Rollback**：
+- BOM 改動如出問題：`git revert` 三個 commit；既有檔可從 `.bom-backfill-backup-20260522-050028/` 還原
+- L1 規則：`git revert` AGENTS.md commit
+- L2 偵測：`git revert` ao-resume.ps1 commit（detection block 全在 try/catch 內，即使有 bug 也不會 break AO-RESUME）
+
+**Files**：
+- `agency-os/AGENTS.md`（L1 規則 + §跨機 .md 編碼紀律）
+- `scripts/ao-resume.ps1`（L2 機械化偵測 +95 行）
+- `scripts/export-cross-machine-memory.ps1`（Copy-MdWithUtf8Bom helper + Resolve-Path 防禦）
+- `scripts/import-cross-machine-memory.ps1`（Set-Utf8BomOnFile helper + stateHash 修正 + Resolve-Path 防禦）
+
 ### AO-CLOSE 跨機 stamp 卡死 bug 根治 + AO-RESUME 漏跑偵測 + backfill 標準工具（2026-05-22 04:20 UTC）
 
 **事件**：AO-RESUME 報告「中斷 ~2 天（05-21 未開工）」，但操作者確認 05-21 正常工作了一整天（27+ commits）。深查發現：
