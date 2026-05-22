@@ -4,6 +4,58 @@
 
 ## 2026-05-22
 
+### BUG_HUNT_PROTOCOL.md — 抓蟲大業 30 年治理協定 + auto-discovery（commits `0836d94` / `d235dc5` / `c038b38`，~21:00 UTC+8）
+
+**起源**：使用者觀察「今天每件事都抓到蟲，這半年 vibe coding 可能千百個 latent bug」。回答 = 把今天 CP950 audit 的 class-by-class 模式抽象成永久治理協定，未來任何 audit 情境 Claude 自動依協定執行。
+
+**4 件交付**：
+
+- **`agency-os/docs/operations/BUG_HUNT_PROTOCOL.md`**（新，~200 行 after critic）—— 方法 SSOT：
+  - 5 核心原則 + 5-tier 觸發模型（Tier 0 外部證據 / Tier 1 incident / Tier 2 critic 反覆 / Tier 3 月度 / Tier 4 機會 + stack-change）
+  - 9-step Build Playbook（Step 7 含 FP-rate < 10% **exit gate**——critic 指出最大 30 年失敗模式是「noisy tool→operator dismiss→tool dies→protocol becomes theater」）
+  - Backlog（8 個候選 class，含 `blast_radius × likelihood × scope` 公式定義各變數 1-5 scale）
+  - KPI 含可量測 operator-minutes/月 marker（WORKLOG `[AUDIT-OPS-MIN] N`）
+  - 操作者/Claude 分工 + 30 年預測曲線
+- **`agency-os/AGENTS.md`** —— `## 代理自動工具使用規則` table 加 1 trigger row（不再 orphan line）：「任何 audit / 抓蟲 / bug class / encoding / silent fail / 工具化相關 → 先讀 BUG_HUNT_PROTOCOL + AUDIT_REGISTRY 再答」
+- **`agency-os/docs/CHANGE_IMPACT_MATRIX.md`** + **`change-impact-map.json`** —— `scripts/register-new-governance-doc.ps1` 跑過後自動加 row，新治理文件接入既有 drift 監控
+- **`~/.claude/projects/d--Work/memory/feedback_bug_hunt_protocol.md`** + **`MEMORY.md`** index —— 觸發詞 28 中文 + 11 英文，markdown link 風格與既有 memory 一致
+
+**驗證**（R0 [驗證計畫] 4 動作）：
+
+1. **實測**：5 cross-ref 全 resolve OK；Protocol 主要 section 18 個齊全；`register-new-governance-doc.ps1` 自動更 CHANGE_IMPACT_MATRIX + change-impact-map.json
+2. **Review**：critic deep round → **0 Critical / 4 Major / 5 Minor**
+   - **Major #1 governance registration missing** → 跑 register-new-governance-doc.ps1 修
+   - **Major #2 KPI 不可量測** → 加 `[AUDIT-OPS-MIN] N` WORKLOG marker
+   - **Major #3 Step 7 FP-rate 無 exit gate** → 補「< 10% OR documented accepted-FP」
+   - **Major #4 Tier 不窮盡** → 加 Tier 0（外部證據）+ Tier 4b（stack-change）
+   - Minor #1/#3/#5 採納（formula 變數定義 / 擴 trigger words / AGENTS row 取代 orphan）
+3. **抓蟲**：`/audit-cross-machine-bom` 抓到 `feedback_bug_hunt_protocol.md` 缺 BOM（Write tool 預設不寫）→ `-Fix` 補 → 30/30 CLEAN
+   - **工具自證價值**：寫 protocol 的同時被 protocol 引用的工具抓到自己的 bug
+4. **WORKLOG**：本段
+
+**Auto-discovery 鏈**（從現在起 30 年運作）：
+
+```
+任何 session 觸發 audit/抓蟲/bug class/encoding 相關詞
+  ↓ (AGENTS.md trigger row 規則)
+Claude Read BUG_HUNT_PROTOCOL.md + AUDIT_REGISTRY.md
+  ↓ (5-tier 模型分類使用者情境)
+依 9-step playbook 啟動或補 backlog
+  ↓
+9 步完成後 → AUDIT_REGISTRY 新 class section + WORKLOG entry
+  ↓
+KPI 自動累積（class 數 / FIXED / TRACKED / operator-min）
+```
+
+**剩餘風險**：
+- 5-tier 仍可能漏（如 tooling vendor breaking change），未來 Tier 5 預留
+- KPI 「operator-min < 30/月」門檻要 1-2 月真實數據驗證合理性
+- Memory trigger words 過寬可能誤觸發（但讀 protocol 本身成本低，寧可寬）
+
+**Rollback**：4 個檔皆獨立 `git revert`；AUDIT_REGISTRY 不動（歷史不可逆 per protocol §Rollback 規則）
+
+**跨機同步**：4 個檔都在 repo / project memory SSOT，`git pull` + AO-SYNC import 自動到位
+
 ### CP950 audit toolchain — A+B+C+D 一次到位讓 Claude 自動使用（commits in checkpoints `047066f` → `546307b`，~20:00 UTC+8）
 
 **起源**：使用者問「今天 Claude 作的內容，有值得做成 runbook / command / agent / skill 等永久化的嗎？做完要實測+review+抓蟲+WORKLOG」。回答 = 把今天手工 CP950 audit 變成自動工具 + 永久治理文件，讓未來「Claude 動到 .ps1 就自動跑」。
