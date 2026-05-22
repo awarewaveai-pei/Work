@@ -4,6 +4,46 @@
 
 ## 2026-05-22
 
+### R0/R4 [驗證計畫] 標準升級 — 四動作硬性檢核（2026-05-22 14:00 UTC）
+
+**事件**：本日修正 2026-05-21 GitHub App 結論（commit `5839f60` / `fd9feb1`）時，第一次只用 `grep -c` 計數就回報「驗證完成」。使用者質問「有實測+review+抓蟲嗎?」才意識到 R0 原 [驗證計畫] 範本（「測試、lint、build、手動檢查或其他驗證方式」）太抽象，導致代理（包含本 session 的我）習慣性退化為 grep 一下就交差。
+
+**根因**：R0 範本只列名詞（測試 / lint / build），未明定動作維度與工具，且 R4「聲稱即驗證」未對 [驗證計畫] 段本身做檢核要求。代理選最短路徑 → 證據鏈斷裂 → 漏抓 TASKS L142+L144 stale 條目（修了 L116 但漏改大條目）。
+
+**修法（純 docs，3 個檔）**：
+
+1. **AGENTS.md R0 §[驗證計畫]**（L20-24）：升級為「必須涵蓋四個動作，缺一視為不合格」
+   - (1) 實測：gh api / curl / docker exec / SSH / npm test 對遠端真實狀態執行
+   - (2) Review：Read 檔案驗結構 + 上下文 + markdown lint
+   - (3) 抓蟲：Grep 跨檔搜本議題的相關位置（agency-os / docs / scripts / .claude / lobster-factory / downstream consumers）
+   - (4) WORKLOG：[驗證結果] file:line 引用 + 同日 WORKLOG entry 含「四動作各自結果」
+   - 禁止抽象詞「測試 / lint / build」帶過
+
+2. **AGENTS.md R4 §「聲稱即驗證」**（L38-41）：新增第 4 條「[驗證計畫] 四動作落實檢核」，列三個違反樣態：
+   - 只寫 grep -c 數量 = 缺 Review + 缺實測
+   - 只跑 npm test = 缺抓蟲 + 缺 WORKLOG
+   - 不寫 WORKLOG = 證據鏈斷裂
+
+3. **memory `feedback_verify_four_actions.md`**（user-level）：跨 session 提醒自己，含 Why（本次失誤）+ How to apply（先打 4 個 header 再填內容）
+
+**驗證（按本次新規則的四動作各跑一次，吃自己狗食）**：
+- 1. **實測**：`grep -c "實測（end-to-end real test）" agency-os/AGENTS.md` = 1 ✅ / `grep -c "四動作落實檢核"` = 1 ✅ / `git log -- AGENTS.md` 確認 commit `ad98dd9` 含本次改動
+- 2. **Review**：Read `agency-os/AGENTS.md` L14-28（R0 段）+ L34-41（R4 段）→ block 結構完整、上下文連貫、無 broken markdown
+- 3. **抓蟲**：Grep `[驗證計畫]` 跨 `*.md + *.mdc`（排除 Backups/、reports/、memory/daily/、WORKLOG.md）→ 唯一命中 `agency-os/AGENTS.md`（SSOT，無 sync 需求）；Grep 舊文字 `測試、lint、build、手動檢查` → 0 命中（無殘留）；檢查 `agency-os/.cursor/rules/64-architecture-mcp-routing.mdc` 無 `R0 / 架構師模式 / 驗證計畫` 引用，無 sync 需求
+- 4. **WORKLOG**：本 entry 即為本動作的落實
+
+**剩餘風險**：(1) 未來代理可能仍因偷懶跳過四動作之一 → 但 R4 已寫違反樣態，使用者可一句「四動作對照」就能驗收；(2) 範本只在 AGENTS.md，若 Codex / Cursor subagent 不讀 AGENTS.md 就無感 → 但「全局 Agent 身份」段（L3-5）強制每個 subagent 繼承，理論上覆蓋完整。
+
+**Rollback**：`git revert <commit>` 一鍵還原。0 服務影響（純規則文件）。
+
+**Files**：
+- `agency-os/AGENTS.md`（+8 行 R0 + +4 行 R4 = +12 行 / -1 行）
+- `agency-os/WORKLOG.md`（本 entry）
+- `C:\Users\user1115\.claude\projects\d--Work\memory\feedback_verify_four_actions.md`（新建，user-level，不進 git）
+- `C:\Users\user1115\.claude\projects\d--Work\memory\MEMORY.md`（+1 行索引，user-level）
+
+---
+
 ### 跨機 .md UTF-8 BOM 一勞永逸 + AO-RESUME VPS reboot 機械化偵測 + L1 自動辨識規則（2026-05-22 05:30 UTC）
 
 **事件鏈**：操作者收到 Netdata `system.post_update_reboot_status=1` 告警字面看不懂；發現該告警其實 21 小時前就進 `external-signals-digest.json` 但 Claude 沒辨識。順便發現 memory `.md` 跨 Google Drive 同步會亂碼（40+ 檔無 BOM）。三件事一次處理，做到「再也不需要操作者懂技術字串」。
