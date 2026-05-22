@@ -4,6 +4,87 @@
 
 ## 2026-05-22
 
+### Phase 4 forensic — 監督者本身睡著三週，重建為 Claude routine + 雙重 watchdog（~16:30 UTC）
+
+**事件**：操作者問「星期五下午那個 cron job 跑了嗎？」。R0 forensic 在 30 分鐘內挖出三層失敗：
+
+| 治理文件 claim ([TASKS.md:148](agency-os/TASKS.md#L148)) | 實況 |
+|---|---|
+| `scripts/phase4-weekly-check.ps1` 已就緒 | ❌ PowerShell 5.1 + Big5 codepage 下 parser 直接死（UTF-8 無 BOM + CJK 字串） |
+| Windows Task Scheduler `AwareWave-Phase4-WeeklyCheck` Ready | ❌ 本機不存在（`Get-ScheduledTask -TaskName` 直接 not found） |
+| `/phase4-check` CronCreate 7 天 expiry 設計 | ❌ `CronList` 顯示無；script 註解坦言「需每週手動跑 `/phase4-check` 續命」 |
+| Phase 4 已啟動 2026-05-19 | ❌ `agency-os/reports/repair-center/` 目錄根本不存在 = **0 報告寫出** |
+| Phase 4 觀察期 2026-06-19 結束 | ⚠️ 前 11 天根本沒在觀察 |
+
+**根因**：架構反模式 — Phase 4 是設計來「監督 auto-repair 漂移」的看門狗，但**它自己沒看門狗**。觸發路徑（CronCreate 7d / Windows Task / Manual）三條都不可靠且**全部靜默失敗**；governance docs 還宣稱它是醒著的。30 年穩定性 = 監督者本身要被監督。
+
+**修法**（per architect mandate「最小、穩定、安全、可維護、可驗證、可回滾」）：
+
+1. **新增 SSOT 子目錄** `agency-os/automation/claude-routines/` —
+   - `README.md`：建立 Claude routine 治理 + 「Decision rubric」（何時用 routine vs SG cron vs Trigger.dev vs Windows Task Scheduler）
+   - `phase4-weekly.md`：`AgencyOS-RepairCenterPhase4Weekly` 完整 SSOT（cron `0 14 * * 5` / Sonnet 4.6 / prompt verbatim / web UI checklist / env vars 引用 vault key / verification / rollback）
+   - 同時記載 backfill backlog：`AgencyOS-DailyBriefing/Weekly/Monthly` 既有 routine prompts 在 Anthropic 雲端 hidden state（[WORKLOG 2026-05-04 §2208 + 2026-05-13 §2258](agency-os/WORKLOG.md) 確認），治理債列入
+
+2. **新增 watchdog**（核心防護）`scripts/system-health-check.ps1` §11：
+   - 設計為陣列驅動（未來其他 routine 直接 append `$routineOutputs` entry）
+   - 邏輯：`phase4-LATEST.md` mtime > 8 天 → WARN；檔案不存在 → WARN「routine never ran」
+   - `Pass=$true` 即使 stale（warn-only，per §10 既有慣例，不 block AO-CLOSE）
+   - **實測驗證**：當前 routine 未建 → 報告檔不存在 → check 確實出 WARN，detail = `report file missing — routine AgencyOS-RepairCenterPhase4Weekly never ran or path wrong; check https://claude.ai/code/routines`
+
+3. **Script 改為 fallback**（不刪，per R0「不得任意刪除既有功能」）`scripts/phase4-weekly-check.ps1`：
+   - 加 UTF-8 BOM（10292 → 10295 bytes，3 byte BOM）→ PowerShell 5.1 在任何 codepage 都能 parse
+   - 加 `.STATUS` tombstone comment 指向 routine SSOT + watchdog
+   - 修改 `.NOTES` 觸發路徑清單（remove 失效的 Windows Task Scheduler / CronCreate claim）
+   - Parser sanity check：`[scriptblock]::Create((Get-Content -Raw))` PASS
+   - 不补跑：watchdog 的「report missing WARN」是 signal 提醒操作者去 web UI 設定 routine；補跑會蓋掉 signal
+
+4. **TASKS.md L148 治理對齊**：原 claim 「Phase 4 已啟動 2026-05-19」用 strikethrough 改寫為事實版本（含 3 個失效機制 + 現行設計 + web UI 待辦），不刪歷史
+
+5. **Slash command** `.claude/commands/phase4-check.md` 完全重寫：
+   - 重定位為 fallback（非 primary）；Step 1 加 routine running check
+   - 拿掉 CronCreate Step 2（廢設計）；改為 routine 健檢 + BOM 修復 recipe
+   - 加 watchdog clearance verification
+
+6. **automation README** 加 `claude-routines/` 引用 + 「不同 scheduling primitive」標注
+
+**驗證（R0 [驗證計畫] 4 動作）**：
+
+1. **實測**：
+   - `system-health-check.ps1` 跑完 score 99.7% (366/367)；§11 watchdog row 出現於 `agency-os/reports/health/health-20260522-161537.json`，狀態確認為 WARN（report file missing）
+   - `scripts\phase4-weekly-check.ps1` BOM 前後 byte 對比：10292 → 10295（+3 = BOM）；parser test [scriptblock]::Create() PASS
+   - vault probe：`TELEGRAM_BOT_TOKEN` length=46、`TELEGRAM_ALLOWED_CHAT_IDS` length=10 全有，routine env var 來源可用
+   - critical gate FAIL 為**預先存在**的 `validate-doc-integrity.mjs` exit 1（WORKLOG 內舊有相對路徑問題），與本次改動無關（broken_link 內容**無一**指向本次新增/修改檔案）
+2. **Review**：
+   - Read 每個改動驗結構 + markdown 結構（code-fence paired、列表縮排一致）
+   - `git log --oneline -10` 確認沒 parallel session 在改 phase4 相關檔案
+3. **抓蟲**：
+   - `Grep "phase4-weekly-check|AwareWave-Phase4-WeeklyCheck|phase4 cron"` 範圍 `.claude/ agency-os/ scripts/` → 結果只剩 TASKS.md（已改）、phase4-weekly.md（新 SSOT 內標 supersedes）、phase4-weekly-check.ps1（內標 deprecated），無 stale 主張殘留
+   - 發現平行工作 `scripts/_console-encoding-helpers.ps1`（runtime stdout CP950 解碼 helper）—— 與本次 BOM fix 是**不同層**的編碼問題（source parsing vs runtime capture），不重工
+   - `audit-cross-machine-bom` 待跑（pending todo）—— 本次新增 .md 在 repo 內，**不**走 Google Drive，跨機 BOM discipline 不適用，但仍跑 skill 確認 zero regression
+4. **WORKLOG**：本段（含完整事件鏈 + 治理 drift 量化 + R0 4 動作對應）
+
+**剩餘風險**：
+
+- **單一未做項**：routine 本身需操作者 web UI 建立（10 分鐘）—— Anthropic 平台限制（env vars 只能 web 設）；SSOT 檔已含 checklist，下次見面 10 分鐘搞定
+- routine 建立後第一次 `Run now` 結果待驗（可能 prompt 有微調空間）
+- 治理債：3 個既有 routine（Daily/Weekly/Monthly Briefing）prompts 仍在 hidden state，需另開 task 從 web UI 抄回 repo
+
+**Rollback**：
+
+| 階段 | 動作 |
+|---|---|
+| 全部撤回 | `git revert <this-commit-sha>` |
+| 只撤 watchdog | Edit system-health-check.ps1 移除 §11 區塊 |
+| 只撤 SSOT 目錄 | `git rm -r agency-os/automation/claude-routines/` |
+| Script BOM 撤 | `$c=[IO.File]::ReadAllText($p,[Text.UTF8Encoding]::new($true)); [IO.File]::WriteAllText($p,$c,[Text.UTF8Encoding]::new($false))` |
+| 已建 routine 撤 | <https://claude.ai/code/routines> → routine → Delete |
+
+**Anti-pattern 教訓（為未來自己留）**：
+
+- 任何「自動化檢查」上線時，必須**同時**設計：(a) 觸發機制、(b) 輸出位置、(c) **watchdog**（外部驗證它在跑）—— 缺 (c) = 注定靜默死亡
+- governance docs 寫「已啟動」之前，必須有實測證據（report 存在 / cron 真的 fired），否則就是 drift 種子
+- 「監督者的監督者」必須在不同層、不同 trigger、不同失敗模式 —— 同層 watchdog 等於沒有
+
 ### verify-gate 鐵律 deploy — critic + real-test 強制（commit `e807984`，~16:00 UTC）
 
 **事件**：操作者反映「幾個月來代理做 code change 都只跑 syntax + logic walk，跳過 critic + real-execution test，蟲債累積」。當天實例為 backfill-missed-daily.ps1 通過 syntax + critic round 1 review 卻在實測時暴露 PowerShell CP950 stdout decoding 把 UTF-8 中文 commit message 變 `??` 並吃掉換行字元（兩 commits 合併成一行）。純 critic 看程式碼看不出來，要真的執行才現形。
