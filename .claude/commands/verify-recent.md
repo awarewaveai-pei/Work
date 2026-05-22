@@ -10,30 +10,23 @@ Companion to the harness-enforced rule (`mcp/claude-userlevel/hooks/code-change-
 - `--ack "reason"` → **operator override**: log to daily memory + clear tracker. Use sparingly.
 - Unknown flag → **error and exit**; do NOT default to full verify.
 
-## Step 0 — Read tracker (SID derivation MUST match `_verify-shared.js`)
+## Step 0 — Read tracker (SID via shared helper — same source of truth as JS hooks)
+
+Anchor everything to repo root so the SID cwd-fallback in `Get-VerifySid` matches what the
+Node hooks compute (Node hooks run with `process.cwd()` = repo root).
 
 ```powershell
-function Get-VerifySid {
-    $explicit = $env:CLAUDE_SESSION_ID
-    if ($explicit -and $explicit.Trim()) {
-        $clean = $explicit.Trim() -replace '[^a-zA-Z0-9_-]', '_'
-        return $clean.Substring(0, [Math]::Min(64, $clean.Length))
-    }
-    $cwd = (Get-Location).Path
-    $ppid = 0
-    try {
-        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $PID" -ErrorAction SilentlyContinue
-        if ($proc) { $ppid = [int]$proc.ParentProcessId }
-    } catch {}
-    $sha1 = [System.Security.Cryptography.SHA1]::Create()
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes("$cwd|$ppid")
-    $hash = ($sha1.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join ''
-    return $hash.Substring(0, 16)
-}
-$sid = Get-VerifySid
-$tf = "$env:TEMP\claude-unverified-code-$sid.txt"
+$repoRoot = (git rev-parse --show-toplevel 2>$null)
+if (-not $repoRoot) { $repoRoot = $PWD.Path }
+$repoRoot = $repoRoot -replace '/', '\'   # normalise to Windows separators
+. (Join-Path $repoRoot 'scripts\verify-sid-shared.ps1')
+Push-Location -LiteralPath $repoRoot
+try {
+    $sid = Get-VerifySid
+    $tf  = Get-VerifyTrackerPath -Sid $sid
+} finally { Pop-Location }
 if (-not (Test-Path -LiteralPath $tf)) {
-    Write-Host "verify-recent: tracker is empty — nothing to verify."
+    Write-Host "verify-recent: tracker is empty (sid=$sid) — nothing to verify."
     exit 0
 }
 $files = @(Get-Content -LiteralPath $tf -Encoding UTF8 | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -notmatch '^#' }) | Sort-Object -Unique
@@ -88,10 +81,14 @@ Write-Host "verify-recent: tracker cleared. git commit is unblocked."
 
 ## `--ack "reason"` variant (atomic helper)
 
-Do NOT inline the clear-and-log here — call the atomic helper:
+Do NOT inline the clear-and-log here — call the atomic helper via absolute repo-root path:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-recent-ack.ps1 -Reason "<operator-supplied reason>"
+$ackScript = Join-Path $repoRoot 'scripts\verify-recent-ack.ps1'
+Push-Location -LiteralPath $repoRoot
+try {
+    powershell -NoProfile -ExecutionPolicy Bypass -File $ackScript -Reason "<operator-supplied reason>"
+} finally { Pop-Location }
 ```
 
 The helper guarantees: WORKLOG/daily-memory append succeeds BEFORE tracker delete. If append fails, tracker stays, gate stays blocked.

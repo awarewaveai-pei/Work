@@ -41,30 +41,12 @@ if (-not $WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }
 
-# ── SID derivation: MUST match _verify-shared.js getSessionId() ────────────────
-# If CLAUDE_SESSION_ID is set + non-empty → use it. Else hash(cwd + ppid).
-# Sanitize: keep only [a-zA-Z0-9_-], cap 64 chars.
-function Get-VerifySid {
-    $explicit = $env:CLAUDE_SESSION_ID
-    if ($explicit -and $explicit.Trim()) {
-        return ((($explicit.Trim()) -replace '[^a-zA-Z0-9_-]', '_')).Substring(0, [Math]::Min(64, $explicit.Trim().Length))
-    }
-    # Fallback: hash(cwd + ppid). Get parent pid via Get-CimInstance.
-    $cwd = (Get-Location).Path
-    $ppid = 0
-    try {
-        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $PID" -ErrorAction SilentlyContinue
-        if ($proc) { $ppid = [int]$proc.ParentProcessId }
-    } catch {}
-    $base = "$cwd|$ppid"
-    $sha1 = [System.Security.Cryptography.SHA1]::Create()
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($base)
-    $hash = ($sha1.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join ''
-    return $hash.Substring(0, 16)
-}
+# Dot-source the shared SID derivation. Single source of truth — must stay byte-compatible
+# with mcp/claude-userlevel/hooks/_verify-shared.js getSessionId().
+. (Join-Path $PSScriptRoot "verify-sid-shared.ps1")
 
 $sid = Get-VerifySid
-$tf  = Join-Path $env:TEMP "claude-unverified-code-$sid.txt"
+$tf  = Get-VerifyTrackerPath -Sid $sid
 
 if (-not (Test-Path -LiteralPath $tf)) {
     Write-Host "verify-recent-ack: tracker is empty (sid=$sid) — nothing to acknowledge." -ForegroundColor DarkGray
@@ -106,7 +88,10 @@ try {
         $header = "# Daily Note - $today" + [Environment]::NewLine + [Environment]::NewLine
         [System.IO.File]::WriteAllText($dailyPath, $header + $body, $utf8NoBom)
     } else {
-        # Read current, append, atomic-write back
+        # Read current, append, atomic-write back via tmp + Move-Item -Force.
+        # NOTE: NO explicit BOM stripping needed. [System.IO.File]::ReadAllText with any UTF-8
+        # encoding instance auto-detects + strips a leading BOM (verified empirically 2026-05-22 —
+        # StreamReader default detectEncodingFromByteOrderMarks=true).
         $existing = [System.IO.File]::ReadAllText($dailyPath, [System.Text.Encoding]::UTF8)
         $combined = $existing.TrimEnd() + [Environment]::NewLine + [Environment]::NewLine + $body
         $tmpPath = "$dailyPath.tmp"

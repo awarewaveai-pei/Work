@@ -15,7 +15,10 @@ let d = '';
 process.stdin.on('data', c => d += c);
 process.stdin.on('end', () => {
   try {
-    const sid = shared.getSessionId();
+    // Stop hook also receives JSON stdin with session_id field per Claude Code docs.
+    let parsed = null;
+    try { parsed = JSON.parse(d); } catch (_) { /* fall through to env-var path */ }
+    const sid = shared.getSessionId(parsed);
     const tf = shared.getTrackerPath(sid);
     const files = [...new Set(shared.readTracker(tf).map(shared.normalizePath))];
     if (files.length === 0) { process.stdout.write(d); return; }

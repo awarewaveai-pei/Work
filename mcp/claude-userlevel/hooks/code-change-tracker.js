@@ -43,7 +43,7 @@ process.stdin.on('end', () => {
     const tracked = files.filter(f => CODE_EXT.test(f) && !TEST_EXT.test(f));
     if (tracked.length === 0) { process.stdout.write(d); return; }
 
-    const sid = shared.getSessionId();
+    const sid = shared.getSessionId(i);
     const tf = shared.getTrackerPath(sid);
 
     // Dedup case-insensitively on Windows (M4). Keep original casing in tracker output.

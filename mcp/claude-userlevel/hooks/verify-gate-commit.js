@@ -52,11 +52,10 @@ process.stdin.on('end', () => {
     const reason = detectBlockReason(cmd);
     if (!reason) { process.stdout.write(d); return; }
 
-    // Tracker check
-    const sid = shared.getSessionId();
+    // Tracker check. Pass parsed JSON so getSessionId can prefer stdin's session_id field.
+    const sid = shared.getSessionId(i);
     const tf = shared.getTrackerPath(sid);
-    const files = [...new Set(shared.readTracker(tf).map(shared.normalizePath))]
-      .map(p => p); // unique by lowered key, output original casing
+    const files = [...new Set(shared.readTracker(tf).map(shared.normalizePath))];
     if (files.length === 0) { process.stdout.write(d); return; }
 
     // BLOCK. Cap output to STDERR_MAX_LINES so we don't flood Claude's context (C4).
