@@ -136,20 +136,21 @@ $memDest = Join-Path $destBase "memory"
 New-Item -ItemType Directory -Path $memDest -Force | Out-Null
 
 $memDestFile = Join-Path $memDest "MEMORY.md"
-Copy-Item -LiteralPath $memIndex -Destination $memDestFile -Force
+Copy-MdWithUtf8Bom -Source $memIndex -Destination $memDestFile
 (Get-Item $memDestFile).LastWriteTime = $syncNow
-Write-Host "  copied: MEMORY.md" -ForegroundColor Green
+Write-Host "  copied (UTF-8 BOM enforced): MEMORY.md" -ForegroundColor Green
 
 # Export individual memory files (all *.md except MEMORY.md itself).
 # These are the actual memory content files — without them the index is useless on another machine.
+# All .md copies enforce UTF-8 BOM to survive Google Drive sync (prevents Big5 misread on other machines).
 $exportedMemFiles = 0
 Get-ChildItem -Path $memSrc -Filter "*.md" -File -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -ne "MEMORY.md" } |
     ForEach-Object {
         $dstPath = Join-Path $memDest $_.Name
-        Copy-Item -LiteralPath $_.FullName -Destination $dstPath -Force
+        Copy-MdWithUtf8Bom -Source $_.FullName -Destination $dstPath
         (Get-Item $dstPath).LastWriteTime = $syncNow
-        Write-Host "  copied: memory/$($_.Name)" -ForegroundColor Green
+        Write-Host "  copied (UTF-8 BOM enforced): memory/$($_.Name)" -ForegroundColor Green
         $exportedMemFiles++
     }
 if ($exportedMemFiles -gt 0) {
