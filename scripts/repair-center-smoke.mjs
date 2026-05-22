@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Phase 4 verification: 2026-05-22 (verified after ANTHROPIC_API_KEY top-up)
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
