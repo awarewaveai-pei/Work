@@ -4,6 +4,37 @@
 
 ## 2026-05-22
 
+### verify-gate 鐵律 deploy — critic + real-test 強制（commit `e807984`，~16:00 UTC）
+
+**事件**：操作者反映「幾個月來代理做 code change 都只跑 syntax + logic walk，跳過 critic + real-execution test，蟲債累積」。當天實例為 backfill-missed-daily.ps1 通過 syntax + critic round 1 review 卻在實測時暴露 PowerShell CP950 stdout decoding 把 UTF-8 中文 commit message 變 `??` 並吃掉換行字元（兩 commits 合併成一行）。純 critic 看程式碼看不出來，要真的執行才現形。
+
+**根因**：記憶提醒（`feedback_test_review_default.md`）是 soft rule，代理在壓力下會忽略。需 harness-enforced 鐵律。
+
+**修法**（per AGENTS.md §跨機 .md 編碼紀律 同層級的機械保障）：
+
+- **PostToolUse W|E hook** (`code-change-tracker.js`)：改 `.ps1/.sh/.py/.ts/.tsx/.js/.jsx` → 累積到 `$TMPDIR/claude-unverified-code-<sid>.txt` + stderr reminder
+- **PreToolUse Bash hook** (`verify-gate-commit.js`)：偵測 `git commit` / `gh pr merge` / `hub commit` / `base64|bash` → tracker 非空時 **exit 2 阻擋**。Regex 過 13 個邊界（commit-tree / commit-graph / git_commit_helper 等）。Hook 自身異常 → log 到 `~/.claude/verify-gate-failures.log` + stderr WARN + fail-open（避免 hook bug 永久 block）
+- **Stop hook** (`verify-gate-stop.js`)：列未驗證檔 + 行動指令，never block。輸出 cap 20 行 + tracker cap 500 entries
+- **Shared helper** (`_verify-shared.js`)：SID 優先序 `stdin session_id → CLAUDE_CODE_SESSION_ID → CLAUDE_SESSION_ID → sha1(cwd)`、Windows case-insensitive dedup、logFailOpen 含 mkdirSync recursive + tmpdir fallback
+- **Slash command** `/verify-recent` + `--trivial` + `--ack`（atomic helper `scripts/verify-recent-ack.ps1`：先寫 daily memory audit 後刪 tracker，日誌寫入失敗則 tracker 留下、gate 維持 blocked）
+- **PS SID shared module** `scripts/verify-sid-shared.ps1`：與 JS getSessionId byte-compatible，dot-source pattern + git rev-parse 子目錄 anchor
+- 槽位：`settings.template.json` PreToolUse Bash slot 3、PostToolUse W|E slot 4、Stop slot 5；已 `sync-claude-userlevel.ps1 -Mode merge` 部署到 `~/.claude/hooks/`
+
+**驗證（R0 [驗證計畫] 4 動作）**：
+
+1. **實測**：35/35 單元測試（regex 12 cases + caps + dedup + 跨進程 SID 隔離 + JSON parse）+ 9/9 整合測試 F1-F6（3-spawn e2e gate + JS/PS SID parity 在 env + cwd fallback + 子目錄 invocation + --ack atomic + 過閘解鎖）+ 真實 dogfood（本 commit 前 tracker 含 `verify-recent-ack.ps1`，`/verify-recent --ack` 寫日誌後清空，gate 解鎖才能 commit）
+2. **Review**：3 輪 `critic` agent deep review；最後一輪 0 Critical 0 Major
+3. **抓蟲**：critic 抓 3 Critical（Round 1: SID collision、fail-open silent、regex bypass）+ 2 NEW Critical（Round 2: 用錯 env var `CLAUDE_SESSION_ID` 應為 `CLAUDE_CODE_SESSION_ID` + ppid fallback 每 spawn 都變導致 gate 完全失效）+ 3 Major（Round 3: cwd-dependent dot-source、PS-provider cwd 非 OS cwd、PS 缺 stdin path 文檔）全修；`audit-cross-machine-bom` 27/27 CLEAN 無 regression
+4. **WORKLOG**：本段
+
+**剩餘風險**：
+- 鐵律是 accident-prevention 不是 adversarial defense；shell metaprogramming（`eval $X`、function 重定義 `git`）可繞過。`--ack` 是文檔化 escape hatch
+- audit log 至 `~/.claude/verify-gate-failures.log`，操作者需定期查看（暫無自動輪替）
+
+**rollback**：移除 `mcp/claude-userlevel/settings.template.json` 三條 hook entry + `scripts/sync-claude-userlevel.ps1 -Mode merge` → 30 秒解除整套鐵律。個別 hook 失效對應 `.js` 刪掉即可，其他 hook 不受影響。
+
+**附帶**：本輪也含 Round 3 final clean-up（`verify-recent-ack.ps1` BOM strip dead code 移除——`agency-os/memory/daily/<today>.md` 在 repo 不走 Drive，per AGENTS.md「不走 Drive 免 BOM」本就不需 BOM，且 .NET `ReadAllText` 自動 strip BOM 經實測驗證）。
+
 ### R0 §[現況分析] + §禁止段 加 git log -10 前置硬規 + 新 memory feedback（2026-05-22 15:00 UTC）
 
 **事件**：14:38 重工事件後（commit `a6cea9b` 重做 `628b011` 已做之事），使用者授權把「Edit 前必跑 `git log -10`」寫進 R0，作為防止重工的 hard rule。
