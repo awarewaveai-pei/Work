@@ -2,6 +2,32 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-22
+
+### EU VPS kernel reboot + 新建 `eu-reboot` runbook（2026-05-22 04:14 UTC）
+
+**事件**：Netdata 自 2026-05-21 06:43 UTC 起持續 warning `awarewave-eu-hel1-cpx32 system.post_update_reboot_status=1`，懸 ~21 小時未處理。
+
+**根因**：`unattended-upgrades` 套用了 `linux-image-5.15.0-179-generic` + `linux-base` 但需要 reboot 才能切到新 kernel。原本 SG 有 `~/.claude/commands/sg-reboot.md` runbook，EU 從未補上，導致每次 unattended-upgrades 後告警都成為臨時決策。
+
+**修法**：
+1. 新建 `~/.claude/commands/eu-reboot.md`（mirror sg-reboot.md 結構，加上 EU-specific 項目：ClickHouse pin 檢查、25 個容器清單、Supabase DB pg_isready post-flight、Hetzner console rollback 指引）
+2. 跑 pre-flight 7 項全綠（kernel pending ✓ / 25 containers all `restart=unless-stopped` ✓ / CLICKHOUSE_IMAGE_TAG=25.7.5-debian-12-r0 ✓ / disk 36% ✓ / backup 20260522-023001 < 2h old ✓ / 公開端點 302/200/200 ✓）
+3. 執行 `nohup bash -c 'sleep 1 && reboot' &`（T0 = 2026-05-22T04:14:47Z）
+4. SSH 在 66 秒後恢復（T1 = 2026-05-22T04:15:53Z）
+5. Post-flight 全綠：kernel `5.15.0-177 → 5.15.0-179` ✓ / `/var/run/reboot-required` 消失 ✓ / 25 容器 Up ✓ / ClickHouse image 仍 `bitnamilegacy/clickhouse:25.7.5-debian-12-r0` ✓ / supabase-db `accepting connections` ✓ / 公開端點 302/200/200 ✓
+
+**驗證**：見上 post-flight 項；Load 38.49 是 25 container 同時啟動的暫態（非問題）；trigger-postgres 看到的 `role "postgres" does not exist` 是 pre-flight 我自己跑錯 query 留下的紀錄，非 reboot 引發；`TaskRunStatus enum` ERROR 是預先存在的應用層 bug（pre-existing，與 reboot 無關，可另案追蹤）。
+
+**避免再發生**：
+- 以後 Netdata 對 EU 出現 `system.post_update_reboot_status=1` → 直接跑 `/eu-reboot` skill，不再臨時造輪子
+- AGENTS.md 的「代理自動工具使用規則」表可考慮加入這條映射；本次先以 runbook 自身的「Use when」段落取代
+- 觀察一個 unattended-upgrades 週期後，若再次出現，評估是否要把 EU 的 cron 同步 SG（讓套用與重啟更可預測）
+
+**Rollback**（未觸發）：若新 kernel 開機失敗 → Hetzner Cloud Console 進 GRUB 選舊 kernel；`apt-mark hold linux-image-5.15.0-179-generic`。
+
+**Files**：`~/.claude/commands/eu-reboot.md`（新建，user-level skill — 不進 repo SSOT，因 sg-reboot 也是 user-level；雙機同步需手動複製，與 R1 R/W 區隔一致）。
+
 ## 2026-05-21
 
 ### 調查：Claude GitHub App 安裝狀態確認（2026-05-21）
