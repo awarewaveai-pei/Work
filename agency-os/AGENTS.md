@@ -158,6 +158,27 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 
 **長期紀律**: ADR → `docs/architecture/decisions/ADR_INDEX.md`；deploy drift → `/check-drift`；治理 drift 月巡 → `scripts/check-governance-docs-drift.ps1`。詳見 `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`。
 
+## 跨機 .md 編碼紀律（強制）
+
+**規則**：任何走 Google Drive 跨機同步的 `.md` 必須是 UTF-8 + BOM。沒 BOM → 桌機 PowerShell 在 Big5 系統會誤解 → CJK 亂碼。
+
+**範圍**（走 Drive）：
+- `~/.claude/projects/<key>/memory/MEMORY.md`
+- `~/.claude/projects/<key>/memory/*.md`
+- `AWARE_WAVE_CREDENTIALS.md`（vault）
+
+**範圍**（**不**走 Drive，免 BOM）：repo 內所有 .md（WORKLOG / TASKS / runbooks / docs / .cursor/rules）→ git 處理 bytes，免疫此問題。
+
+**機械保障**（已套用，無需 LLM 自律）：
+- `scripts/export-cross-machine-memory.ps1` → `Copy-MdWithUtf8Bom` helper：所有 export 強制 BOM
+- `scripts/import-cross-machine-memory.ps1` → `Set-Utf8BomOnFile` helper：所有 import 強制 BOM
+- 一次性 backfill：`memory/.bom-backfill-backup-<timestamp>/` 留存無 BOM 版本（如需 rollback）
+
+**寫入 memory .md 時的最佳實踐**：
+- Claude 用 Write tool 寫 memory .md 時，**內容裡可以放 CJK**（會以 UTF-8 byte 寫入）
+- BOM 由 export/import 機械加上，**Claude 本機寫入時不需手動加 BOM**
+- 例外：若直接寫到 Google Drive 路徑（繞過 export script），**必須**手動加 BOM
+
 ## First Run
 若有 `BOOTSTRAP.md`，先照檔案完成初始化再開始任務。
 
