@@ -4,6 +4,37 @@
 
 ## 2026-05-22
 
+### R0 §[現況分析] + §禁止段 加 git log -10 前置硬規 + 新 memory feedback（2026-05-22 15:00 UTC）
+
+**事件**：14:38 重工事件後（commit `a6cea9b` 重做 `628b011` 已做之事），使用者授權把「Edit 前必跑 `git log -10`」寫進 R0，作為防止重工的 hard rule。
+
+**修法**（純 docs + memory）：
+- `agency-os/AGENTS.md` L15（R0 §[現況分析]）末尾加：「**必含 `git log --oneline -10` 輸出**（看近期 commits 是否已有同議題改動，避免重工）」
+- `agency-os/AGENTS.md` L33（R0 §禁止段）末尾加：「**未跑 `git log --oneline -10` 即 Edit**（2026-05-22 14:38 重工事件根因，見 WORKLOG §「R0 違反事件」）」
+- `~/.claude/projects/d--Work/memory/feedback_git_log_before_edit.md` 新建（feedback type，跨 session 提醒）
+- `~/.claude/projects/d--Work/memory/MEMORY.md` 索引 +1
+
+**驗證（4 動作 dogfooding）**：
+- 1. **實測**：
+  - 動作 0：跑 `git log --oneline -10` 確認無同議題 commit（即本次 Edit 前先 dogfood 新規則）✅
+  - `grep -c "git log --oneline -10" agency-os/AGENTS.md` = 2（[現況分析] + §禁止段）✅
+  - **audit-cross-machine-bom 即時抓到 bug**：剛建的 `feedback_git_log_before_edit.md` 缺 BOM（Write tool 預設不寫 BOM）→ `-Fix` 補上 → re-audit 27/27 CLEAN ✅（**新規則第一天就抓到自己的 bug，工具效果立竿見影**）
+- 2. **Review**：Read AGENTS.md L14-16 + L32-33，結構對稱、與其他禁止項並列、無 markdown breakage
+- 3. **抓蟲**：grep `git log` 跨 agency-os/*.md → 唯一命中 AGENTS.md（SSOT 無 sync 需求）；MEMORY.md 索引含新 entry
+- 4. **WORKLOG**：本 entry
+
+**剩餘風險**：(1) 代理仍可能跳過 `git log -10` 假裝做了 → R4「不得假裝已驗證」配套；(2) Write 動作預設不寫 BOM，未來建新 `.md` 還會遇到 → 已有 audit + -Fix 流程兜底。
+
+**Rollback**：`git revert HEAD` 一鍵還原。
+
+**Files**：
+- `agency-os/AGENTS.md`（+2 行：[現況分析] +1 行 / §禁止段 +1 行）
+- `agency-os/WORKLOG.md`（本 entry）
+- `~/.claude/.../memory/feedback_git_log_before_edit.md`（新建，user-level，不進 git）
+- `~/.claude/.../memory/MEMORY.md`（+1 行索引，user-level）
+
+---
+
 ### 新建 `/audit-cross-machine-bom` skill + 抓蟲：自寫 memory 撞既存 + bash heredoc 二次踩坑（2026-05-22 14:35 UTC）
 
 **事件**：使用者要把今天的工作固化成可重用資產（skill / memory）。我提了 P1+P1（skill + 4-action validation memory），使用者批准 + 要求做完跑四動作驗證。
