@@ -110,3 +110,29 @@ Concrete first action. If a 需決策 item is blocking, state it first.
 ---
 
 Do NOT ask the user to manually pull or run any command if the script already ran successfully.
+
+## Step 3 — Archive the report (MANDATORY after Step 1 output)
+
+After printing the 七段式 to chat, write the **exact same markdown** to:
+
+```
+agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md
+```
+
+Where `YYYY-MM-DD-HHmm` is the local time you began Step 1. Use the `Write` tool.
+This is the only way the user can browse past AO-RESUME reports — skipping it
+silently breaks the workflow.
+
+### Prune old reports (>30 days)
+
+After writing today's file, list `agency-os/reports/ao-resume/*.md` (Glob),
+parse the date prefix of each filename, and delete any whose date is more than
+30 days before today. Skip `README.md`. Use the `Bash` tool with `rm` — git
+will track the deletions on the next commit.
+
+If the archive folder doesn't exist yet, create it first.
+
+### Self-check
+
+If you forgot Step 3, the user is allowed to re-prompt with「你忘了寫 archive」—
+acknowledge the lapse and write the file immediately.

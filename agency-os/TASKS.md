@@ -107,6 +107,30 @@
 
 #### 工具層 / 基礎建設 / 治理
 
+#### Encoding 防護 — 一勞永逸延伸（CP950 audit 後續，2026-05-22 開出）
+
+> 背景：2026-05-22 全專案 36 個 .ps1/.sh audit 完成，4 個 unprotected 已修。詳見 WORKLOG `### Audit history — CP950 / encoding trap class（2026-05-22）`。以下是 audit 延伸的小債 + 防護工具建議。
+
+- [ ] **`scripts/audit-cp950-traps.ps1`** —— **【未開始】** 把今天手工 audit 機械化
+  - **觸發**：立即可做（~30 min）
+  - **動作**：grep 全 PS 找 `& <ssh|docker|wp|scp|git>` capture 不在 `Invoke-WithUtf8Console` 區塊內的 site → 印報告；新增 `.claude/commands/audit-encoding.md` slash command；接入 `scripts/system-health-check.ps1` 週檢
+  - **DoD**：對 `scripts/` + `lobster-factory/` PS 跑無漏報；人為加一個未包覆的 `& ssh` 測試 case 能抓到；放進 health-check 後不破現有 100% PASS
+
+- [ ] **遷移 `print-open-tasks.ps1` / `print-today-closeout-recap.ps1` 到統一 helper** —— **【未開始 / 條件觸發】**
+  - **觸發**：**下次有人 Edit 這兩個檔任一個時順手**（不專門排——subprocess 模型下本來就安全）
+  - **動作**：line 14 的 script-level `[Console]::OutputEncoding = UTF8` 改為 dot-source `_console-encoding-helpers.ps1` + 包覆關鍵 region 用 `Invoke-WithUtf8Console`
+  - **DoD**：與 4 個 fixed 腳本同 pattern；syntax + real run pass
+
+- [ ] **`scripts/generate-integrated-status-report.ps1:275-276` BOM 一致性** —— **【未開始 / 條件觸發】**
+  - **觸發**：**下次有人 Edit 此檔時順手**
+  - **動作**：`Set-Content -LiteralPath $outFile -Value $text -Encoding UTF8`（PS 5.1 寫 BOM）改為 `[System.IO.File]::WriteAllText($outFile, $text, [System.Text.UTF8Encoding]::new($false))`；line 275 + 276 兩處
+  - **DoD**：輸出 `integrated-status-LATEST.md` hex dump 確認無 `EF BB BF` 開頭
+
+- [ ] **`lobster-factory/infra/trigger/deploy-workflows.ps1:72,85` 補 `-Encoding UTF8`** —— **【未開始 / 條件觸發】**
+  - **觸發**：**下次有人 Edit 此檔時順手**
+  - **動作**：兩處 `Get-Content` 後綴補 `-Encoding UTF8`
+  - **DoD**：syntax check + dry-run trigger deploy 通過
+
 - [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
   - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
   - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄

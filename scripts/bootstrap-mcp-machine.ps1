@@ -35,6 +35,42 @@ if (-not (Test-Path -LiteralPath $syncScriptPath)) {
     throw "Sync script not found: $syncScriptPath"
 }
 
+# --- Ensure .claude is a junction to $env:USERPROFILE\.claude ---
+# Why: .claude/commands/, .claude/agents/*.md, .claude/skills/ are git-tracked but live under
+# ~/.claude/ at runtime. A junction makes git see and update those files in place. Without it,
+# git pull writes to D:\Work\.claude\ as a real folder and Claude Code keeps reading ~/.claude\,
+# causing silent drift between commands/agents/skills committed in git vs. what actually runs.
+$claudeRepoPath = Join-Path $WorkspaceRoot ".claude"
+$claudeUserPath = Join-Path $env:USERPROFILE ".claude"
+if (-not (Test-Path -LiteralPath $claudeUserPath)) {
+    Write-Host "WARN: $claudeUserPath does not exist; Claude Code may not be installed. Skipping junction setup." -ForegroundColor Yellow
+} else {
+    $needsJunction = $false
+    if (-not (Test-Path -LiteralPath $claudeRepoPath)) {
+        $needsJunction = $true
+    } else {
+        $item = Get-Item -LiteralPath $claudeRepoPath -Force
+        $isLink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+        if (-not $isLink) {
+            Write-Host "WARN: $claudeRepoPath exists as a real directory, not a junction." -ForegroundColor Yellow
+            Write-Host "  Cross-machine sync of commands/agents/skills will NOT work until this is fixed." -ForegroundColor Yellow
+            Write-Host "  Manual fix: backup contents, then 'rmdir $claudeRepoPath' and re-run bootstrap." -ForegroundColor Yellow
+        } else {
+            Write-Host "Junction already exists: $claudeRepoPath -> $($item.Target)" -ForegroundColor Gray
+        }
+    }
+    if ($needsJunction) {
+        Write-Host "Creating junction: $claudeRepoPath -> $claudeUserPath" -ForegroundColor Green
+        try {
+            New-Item -ItemType Junction -Path $claudeRepoPath -Target $claudeUserPath -Force | Out-Null
+            Write-Host "  Junction created." -ForegroundColor Green
+        } catch {
+            Write-Host "  WARN: junction creation failed: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "  Fallback (manual, admin shell): mklink /J `"$claudeRepoPath`" `"$claudeUserPath`"" -ForegroundColor Yellow
+        }
+    }
+}
+
 if (-not $SkipEnvLoad) {
     if (Test-Path -LiteralPath $EnvScriptPath) {
         Write-Host "Loading machine-local MCP environment: $EnvScriptPath" -ForegroundColor Green
