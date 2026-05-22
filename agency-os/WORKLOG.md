@@ -4,6 +4,50 @@
 
 ## 2026-05-22
 
+### CP950 stdout hardening — 全專案 audit + 4 個 unprotected scripts 防護（commits `8a18ecb` → `52e97d6`，~17:00 UTC）
+
+**事件**：操作者要求 audit「過去幾個月做的 code change」找蟲——優先掃 CP950 同類（zh-TW Windows 預設 `[Console]::OutputEncoding = CP950`，會把外部命令 stdout 的 UTF-8 多 byte 序列 mojibake 並可能吃換行字元）。
+
+**全專案 trap 盤點**（grep `& ssh|& docker|& wp|& scp` PS scripts）：
+
+| File | Line | 之前狀態 |
+|------|------|---------|
+| `scripts/check-backup-health.ps1` | 39 | ❌ unprotected |
+| `scripts/check-deploy-drift.ps1` | 87 | ❌ unprotected |
+| `scripts/diff-env-vs-vault.ps1` | 116, 118 | ❌ unprotected（ssh + docker exec 各一）|
+| `scripts/update-client-wp-plugins.ps1` | 105 | ❌ unprotected |
+| `scripts/backfill-missed-daily.ps1` | 62-86 | ✅（今日早些已修）|
+| `scripts/print-open-tasks.ps1` / `print-today-closeout-recap.ps1` | 14 | ✅（script-level set；subprocess 安全）|
+
+**修法**（一勞永逸 = 共享 helper，不 5× 貼）：
+
+- 新建 `scripts/_console-encoding-helpers.ps1`（仿 `_vault-helpers.ps1` pattern）—— export `Invoke-WithUtf8Console { scriptblock }`：save `[Console]::OutputEncoding` → set UTF-8 → 執行 → finally 還原。`$LASTEXITCODE` 自動 propagate；nested-safe；`[Console]` 不可用時 fail-open（rare service context）
+- 4 個 unprotected scripts 全部 dot-source helper + wrap 對應 capture site
+- `update-client-wp-plugins.ps1` 額外把 `Copy-FromServer` / `Copy-ToServer` (scp) 也包起來（scp stderr 可能含非 ASCII 如 PQ-KEX advisories）
+- `check-deploy-drift.ps1` 順手補 `Set-StrictMode -Version Latest`（pre-existing gap，88/89 其他 .ps1 都有，這個漏掉）
+- helper 自身加 `Set-StrictMode`（與 `_vault-helpers.ps1` 一致）
+
+**驗證**（R0 [驗證計畫] 4 動作）：
+
+1. **實測**：
+   - 6 檔 syntax check ALL OK
+   - Helper 5/5 unit tests PASS（before=big5 / inside=utf-8 / after=big5 確認 save+restore；`$LASTEXITCODE=42` 從 scriptblock 穿透；throw 時仍 restore；stdout 多元素流出）
+   - 真實 SSH 對 SG production：`check-deploy-drift.ps1` 跑 2 次 PASS（JSON valid、`behind=0`、exit 0；StrictMode 加後仍正確）
+2. **Review**：critic deep round → 0 Critical / 0 Major / 3 Minor（StrictMode×2 + scp wrap）全修
+3. **抓蟲**：critic 額外發現 `print-*` 兩檔用 script-level set（subprocess 模型下安全，不動）；`Copy-FromServer/ToServer` scp 漏包順手補
+4. **WORKLOG**：本段
+
+**已通過 audit（無需動）**：
+- `scripts/merge-closeout-inbox-into-progress.ps1`（0 外部命令呼叫）
+- `scripts/apply-closeout-task-checkmarks.ps1`（用 `[StringComparison]::Ordinal` 比對中文，regex 只比 ASCII 結構）
+- `scripts/fetch-external-signals.ps1`（`Invoke-RestMethod` 走 JSON 路徑不經 stdout encoding）
+
+**剩餘風險**：
+- 其他未審查腳本（如 `generate-integrated-status-report.ps1`、lobster-factory infra 腳本）若也呼叫 `& ssh|docker` 需照同套修法；本輪以高風險前 4 個收口
+- helper 在 `[Console]` 不可用時 fail-open（docstring 已說明）；未來如需 strict 模式可加 `-StrictEncoding` switch
+
+**Rollback**：`git revert 52e97d6` 收尾 minor 修法；wrapping 主修法在 `8a18ecb` / `faafbae` / `8e0e33e` / `2c62680` 內，個別檔可 `git checkout origin/main~N -- scripts/<file>` 還原
+
 ### Phase 4 forensic — 監督者本身睡著三週，重建為 Claude routine + 雙重 watchdog（~16:30 UTC）
 
 **事件**：操作者問「星期五下午那個 cron job 跑了嗎？」。R0 forensic 在 30 分鐘內挖出三層失敗：
