@@ -551,14 +551,40 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         }
     }
 
-    # ── ao-close-last.txt: import to local .agency-state so fetch-external-signals anchors correctly ──
+    # ── ao-close-last.txt: import only if vault timestamp is strictly newer than local ──
+    # Monotonic guarantee: stamp only moves forward in time. Prevents the historical bug where
+    # a stale vault value (e.g. set by a partial AO-CLOSE on machine B) overwrote a fresh local
+    # value on machine A, permanently anchoring AO-RESUME signals to old timestamps.
+    # -Force still bypasses this guard for emergency recovery.
     $aoCloseSrc = Join-Path $secretsRoot "ao-close-last.txt"
     if (Test-Path -LiteralPath $aoCloseSrc) {
         $aoCloseDst = Join-Path $PSScriptRoot "..\agency-os\.agency-state\ao-close-last.txt"
         $aoCloseDir = Split-Path $aoCloseDst -Parent
         if (-not (Test-Path -LiteralPath $aoCloseDir)) { New-Item -ItemType Directory -Path $aoCloseDir -Force | Out-Null }
-        Copy-Item -LiteralPath $aoCloseSrc -Destination $aoCloseDst -Force
-        Write-Host "  cross-machine import: ao-close-last.txt synced ($((Get-Content $aoCloseDst -Raw).Trim()))" -ForegroundColor Green
+
+        $shouldImport = $true
+        $reason = "vault newer"
+        if ((Test-Path -LiteralPath $aoCloseDst) -and (-not $Force)) {
+            try {
+                $vaultTs = [DateTime]::Parse((Get-Content -LiteralPath $aoCloseSrc -Raw -Encoding UTF8).Trim(), $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+                $localTs = [DateTime]::Parse((Get-Content -LiteralPath $aoCloseDst -Raw -Encoding UTF8).Trim(), $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+                if ($vaultTs -le $localTs) {
+                    $shouldImport = $false
+                    $reason = "skipped (vault $($vaultTs.ToString('o')) <= local $($localTs.ToString('o')))"
+                }
+            } catch {
+                # Unparseable timestamp on either side — fall back to import (vault wins) so a corrupt
+                # local file gets repaired. Logged so the operator notices.
+                Write-Host "  cross-machine import: ao-close-last.txt timestamp parse failed ($_) — importing vault as recovery" -ForegroundColor Yellow
+            }
+        }
+
+        if ($shouldImport) {
+            Copy-Item -LiteralPath $aoCloseSrc -Destination $aoCloseDst -Force
+            Write-Host "  cross-machine import: ao-close-last.txt synced ($((Get-Content $aoCloseDst -Raw).Trim()))" -ForegroundColor Green
+        } else {
+            Write-Host "  cross-machine import: ao-close-last.txt $reason" -ForegroundColor DarkGray
+        }
     }
 
     # ── Flush local state to disk (once per session) ──────────────────────────

@@ -499,14 +499,9 @@ try {
         }
     } catch { }
 
-    # Cross-machine memory export — non-blocking; failure does not affect AO-CLOSE exit code.
-    $exportScript = Join-Path $WorkRoot "scripts\export-cross-machine-memory.ps1"
-    if (Test-Path -LiteralPath $exportScript) {
-        Write-Host "== AO-CLOSE: cross-machine memory export ==" -ForegroundColor Cyan
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $exportScript -WorkRoot $WorkRoot
-    }
-
-    # Write close timestamp so AO-RESUME external-signals fetch knows the gap start.
+    # Write close timestamp BEFORE cross-machine export so vault gets the fresh value.
+    # Ordering bug history: export used to run first → vault kept N-1's stamp → next AO-RESUME's
+    # import overwrote local NEW with vault OLD → cross-machine stamp permanently stuck.
     try {
         $closeStampDir  = Join-Path $WorkRoot "agency-os\.agency-state"
         $closeStampPath = Join-Path $closeStampDir "ao-close-last.txt"
@@ -517,6 +512,14 @@ try {
         Write-Host ("AO-CLOSE: close stamp written ({0})" -f $closeNow) -ForegroundColor DarkGray
     } catch {
         Write-Warning "AO-CLOSE: could not write ao-close-last.txt (non-fatal): $_"
+    }
+
+    # Cross-machine memory export — non-blocking; failure does not affect AO-CLOSE exit code.
+    # Runs AFTER write-stamp so vault sees the just-written value (see ordering note above).
+    $exportScript = Join-Path $WorkRoot "scripts\export-cross-machine-memory.ps1"
+    if (Test-Path -LiteralPath $exportScript) {
+        Write-Host "== AO-CLOSE: cross-machine memory export ==" -ForegroundColor Cyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $exportScript -WorkRoot $WorkRoot
     }
 } finally {
     Pop-Location
