@@ -11,13 +11,18 @@
 **根因**：`unattended-upgrades` 套用了 `linux-image-5.15.0-179-generic` + `linux-base` 但需要 reboot 才能切到新 kernel。原本 SG 有 `~/.claude/commands/sg-reboot.md` runbook，EU 從未補上，導致每次 unattended-upgrades 後告警都成為臨時決策。
 
 **修法**：
-1. 新建 `~/.claude/commands/eu-reboot.md`（mirror sg-reboot.md 結構，加上 EU-specific 項目：ClickHouse pin 檢查、25 個容器清單、Supabase DB pg_isready post-flight、Hetzner console rollback 指引）
-2. 跑 pre-flight 7 項全綠（kernel pending ✓ / 25 containers all `restart=unless-stopped` ✓ / CLICKHOUSE_IMAGE_TAG=25.7.5-debian-12-r0 ✓ / disk 36% ✓ / backup 20260522-023001 < 2h old ✓ / 公開端點 302/200/200 ✓）
-3. 執行 `nohup bash -c 'sleep 1 && reboot' &`（T0 = 2026-05-22T04:14:47Z）
-4. SSH 在 66 秒後恢復（T1 = 2026-05-22T04:15:53Z）
-5. Post-flight 全綠：kernel `5.15.0-177 → 5.15.0-179` ✓ / `/var/run/reboot-required` 消失 ✓ / 25 容器 Up ✓ / ClickHouse image 仍 `bitnamilegacy/clickhouse:25.7.5-debian-12-r0` ✓ / supabase-db `accepting connections` ✓ / 公開端點 302/200/200 ✓
+1. `~/.claude/commands/eu-reboot.md`（先前 session 已建立 mtime=04:12:29 UTC；本 session 直接套用 — mirror sg-reboot.md 結構，加上 EU-specific 項目：ClickHouse pin 檢查、25 個容器清單、Supabase DB pg_isready post-flight、Hetzner console rollback 指引）
+2. 跑 pre-flight 全綠（kernel pending ✓ / 25 containers all `restart=unless-stopped` ✓ / CLICKHOUSE_IMAGE_TAG=25.7.5-debian-12-r0 ✓ / disk 36% ✓ / backup 20260522-023001 ~1h44m old ✓ / 0 active Trigger.dev runs ✓ / origin endpoints 302/401/301 ✓）
+   - 異常：公開 CF endpoints curl 從 EU 回 403（WAF 反同 IP 迴圈），origin loopback test 確認服務健康；判定為已知 WAF 行為，非阻塞
+3. 執行 `nohup bash -c 'sleep 1 && reboot' &`（T0 ≈ 2026-05-22T04:14:30Z；SSH MCP 連線同時掉線屬預期）
+4. SSH 在 ~55 秒後恢復（T1 ≈ 2026-05-22T04:15:25Z；外部 bash poll 04:16:25 UTC 讀到 uptime=1 分鐘）
+5. Post-flight 全綠（04:18 UTC 量測）：kernel `5.15.0-177 → 5.15.0-179` ✓ / `/var/run/reboot-required` 消失 ✓ / 25 容器 Up（19 healthy + 6 no-healthcheck baseline + 0 unhealthy）✓ / ClickHouse image 仍 `bitnamilegacy/clickhouse:25.7.5-debian-12-r0` ✓ / supabase-db + trigger-postgres 均 `accepting connections` ✓ / Uptime Kuma 全部 monitor 綠（Trigger 401 / n8n 200 / Supabase 200-401 / MainWP 301）✓
 
-**驗證**：見上 post-flight 項；Load 38.49 是 25 container 同時啟動的暫態（非問題）；trigger-postgres 看到的 `role "postgres" does not exist` 是 pre-flight 我自己跑錯 query 留下的紀錄，非 reboot 引發；`TaskRunStatus enum` ERROR 是預先存在的應用層 bug（pre-existing，與 reboot 無關，可另案追蹤）。
+**驗證**：見上 post-flight 項。
+- Load 04:16=12.63 → 04:18=14.05，是 25 container 同時啟動的暫態（非問題）
+- DB 日誌出現 `FATAL: terminating connection due to administrator command` 時間 04:14:52 → 屬 reboot 前的 graceful shutdown 斷線，非 post-reboot 錯誤
+- trigger-clickhouse 04:13:28 `MEMORY_LIMIT_EXCEEDED` 為 reboot 前既有（時間早於 reboot），與本次無關，列為獨立 issue
+- Trigger.dev `TaskRunStatus enum` ERROR 是 pre-flight 我自己跑錯 enum 名稱（已修正：用 `unnest(enum_range)` 查 17 個 valid statuses 後重跑），非系統 bug
 
 **避免再發生**：
 - 以後 Netdata 對 EU 出現 `system.post_update_reboot_status=1` → 直接跑 `/eu-reboot` skill，不再臨時造輪子
@@ -26,7 +31,9 @@
 
 **Rollback**（未觸發）：若新 kernel 開機失敗 → Hetzner Cloud Console 進 GRUB 選舊 kernel；`apt-mark hold linux-image-5.15.0-179-generic`。
 
-**Files**：`~/.claude/commands/eu-reboot.md`（新建，user-level skill — 不進 repo SSOT，因 sg-reboot 也是 user-level；雙機同步需手動複製，與 R1 R/W 區隔一致）。
+**Files**：`~/.claude/commands/eu-reboot.md`（user-level skill，於 04:12:29 UTC 由前一 session 建立 — 不進 repo SSOT，因 sg-reboot 也是 user-level；雙機同步需手動複製，與 R1 R/W 區隔一致）。
+
+**CREDENTIALS sync 順帶確認**：本機 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`（25768 bytes, BOM=True）SHA256 = `3179963791…28cef8`，與 `G:\我的雲端硬碟\MySecretVault\MySecretVault\AWARE_WAVE_CREDENTIALS.md`（2026-05-21 11:34:38 mtime）**完全一致**。2026-05-20 daily note 提到的「待同步至 vault」實際在 2026-05-21 即已完成；該待辦標記過時，本次驗證後免動作。
 
 ## 2026-05-21
 
