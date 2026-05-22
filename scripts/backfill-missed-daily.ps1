@@ -130,5 +130,5 @@ Write-Host "  commits captured: $($commits.Count)" -ForegroundColor DarkGray
 Write-Host "  marker: <!-- backfilled:manual --> (clearly flagged as reconstruction)" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "Next: review the file, add any missing narrative, then commit:" -ForegroundColor Cyan
-Write-Host "  git add agency-os/memory/daily/$Date.md && git commit -m `"docs: backfill daily/$Date — AO-CLOSE was missed`"" -ForegroundColor DarkGray
+Write-Host "  git add agency-os/memory/daily/$Date.md && git commit -m `"docs: backfill daily/$Date -- AO-CLOSE was missed`"" -ForegroundColor DarkGray
 exit 0
