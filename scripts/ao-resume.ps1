@@ -405,49 +405,42 @@ if (Test-Path -LiteralPath $fetchSignalsScript) {
             $fromArgs = @("-From", $closeTs)
             Write-Host ("   gap-start: {0} (ao-close-last.txt)" -f $closeTs) -ForegroundColor DarkGray
 
-            # Health check: detect "missed AO-CLOSE" by comparing stamp to most recent commit on main.
-            # If repo has commits newer than the stamp by >24h, AO-CLOSE likely did not run on that day,
-            # leaving a daily-file hole. Print actionable recovery command (backfill-missed-daily.ps1).
+            # Health check: detect "missed AO-CLOSE" by scanning for commit dates that have NO
+            # corresponding daily file. This is the definitive signal (a day with real work but
+            # no scaffold = AO-CLOSE never ran). Filters out [claude] checkpoint commits so a
+            # day with only auto-checkpoint activity doesn't false-fire.
+            # Print the exact backfill command so the operator can paste-and-run.
             try {
                 $stampUtc = [DateTime]::Parse($closeTs, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
                 Push-Location $WorkRoot
                 try {
-                    $lastCommitIso = (git log -1 --format=%cI 2>$null).Trim()
+                    # Get commit dates since stamp, EXCLUDING auto-checkpoint commits (those are not real work).
+                    $rawLog = git log --since="$($stampUtc.ToString('o'))" --pretty=format:"%cd|%s" --date=format:"%Y-%m-%d" 2>$null
                 } finally {
                     Pop-Location
                 }
-                if ($lastCommitIso) {
-                    $commitUtc = [DateTime]::Parse($lastCommitIso, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
-                    $gapHours = [int]($commitUtc - $stampUtc).TotalHours
-                    if ($gapHours -gt 24) {
-                        # Find the latest commit date that has no corresponding daily file.
-                        $missedDate = $null
-                        Push-Location $WorkRoot
-                        try {
-                            $recentCommitDates = @(git log --since="$($stampUtc.ToString('o'))" --pretty=format:"%cd" --date=format:"%Y-%m-%d" 2>$null | Sort-Object -Unique -Descending)
-                        } finally {
-                            Pop-Location
-                        }
-                        foreach ($d in $recentCommitDates) {
-                            $candidate = Join-Path $WorkRoot "agency-os\memory\daily\$d.md"
-                            if (-not (Test-Path -LiteralPath $candidate)) {
-                                $missedDate = $d
-                                break
-                            }
-                        }
-                        Write-Host ""
-                        Write-Host "  WARN: AO-CLOSE may have been missed." -ForegroundColor Yellow
-                        Write-Host ("        last stamp = {0} ({1}h ago)" -f $closeTs, $gapHours) -ForegroundColor Yellow
-                        Write-Host ("        last commit = {0} (gap > 24h)" -f $lastCommitIso) -ForegroundColor Yellow
-                        if ($missedDate) {
-                            Write-Host ("        daily/{0}.md is missing." -f $missedDate) -ForegroundColor Yellow
-                            Write-Host "  RECOVERY (copy-paste exactly):" -ForegroundColor Cyan
-                            Write-Host ("    powershell -File scripts/backfill-missed-daily.ps1 -Date {0}" -f $missedDate) -ForegroundColor White
-                        } else {
-                            Write-Host "        (all daily files present — stamp may just be stale; OK to ignore)" -ForegroundColor DarkGray
-                        }
-                        Write-Host ""
+                $realCommitDates = @(
+                    $rawLog |
+                        Where-Object { $_ -and ($_ -notmatch '\[claude\]\s+checkpoint') } |
+                        ForEach-Object { ($_ -split '\|', 2)[0] } |
+                        Sort-Object -Unique
+                )
+                $missedDates = @(
+                    $realCommitDates | Where-Object {
+                        -not (Test-Path -LiteralPath (Join-Path $WorkRoot "agency-os\memory\daily\$_.md"))
                     }
+                )
+                if ($missedDates.Count -gt 0) {
+                    Write-Host ""
+                    Write-Host "  WARN: AO-CLOSE may have been missed on these date(s) — daily file(s) absent:" -ForegroundColor Yellow
+                    foreach ($d in $missedDates) {
+                        Write-Host ("        - daily/{0}.md  (real commits exist but no scaffold)" -f $d) -ForegroundColor Yellow
+                    }
+                    Write-Host "  RECOVERY (copy-paste exactly):" -ForegroundColor Cyan
+                    foreach ($d in $missedDates) {
+                        Write-Host ("    powershell -File scripts/backfill-missed-daily.ps1 -Date {0}" -f $d) -ForegroundColor White
+                    }
+                    Write-Host ""
                 }
             } catch {
                 # Silent: health check must never break AO-RESUME.
