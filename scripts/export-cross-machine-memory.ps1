@@ -86,6 +86,11 @@ if (-not $WorkRoot) {
     Write-Host "export-cross-machine-memory: WorkRoot not resolved; skip." -ForegroundColor Yellow
     exit 0
 }
+# Normalise WorkRoot to Windows-style backslash before deriving project key.
+# Required because Join-Path normalises '/' to '\' inside the resulting path,
+# which would split 'd-/Work' into TWO segments ('d-', 'Work') instead of the
+# single segment 'd--Work' that Claude Code actually uses.
+try { $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path } catch { }
 
 # ── 2. Derive Claude Code project key ─────────────────────────────────────────
 $projectKey = $WorkRoot.Substring(0,1).ToLower() + ($WorkRoot.Substring(1) -replace ':', '-' -replace '\\', '-')
