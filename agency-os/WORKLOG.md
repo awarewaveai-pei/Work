@@ -4,6 +4,53 @@
 
 ## 2026-05-22
 
+### 新建 `/audit-cross-machine-bom` skill + 抓蟲：自寫 memory 撞既存 + bash heredoc 二次踩坑（2026-05-22 14:35 UTC）
+
+**事件**：使用者要把今天的工作固化成可重用資產（skill / memory）。我提了 P1+P1（skill + 4-action validation memory），使用者批准 + 要求做完跑四動作驗證。
+
+**修法**：
+1. `.claude/commands/audit-cross-machine-bom.md`（新建 58 行）— skill spec：報告 / `-Fix` 模式 / 跨機 ProjectKey 覆寫 / scope 邊界
+2. `scripts/audit-cross-machine-bom.ps1`（新建 167 行）— PS 實作：autodetect WorkRoot+ProjectKey、掃 memory dir + AO_SYNC_SECRETS_ROOT vault、`-Fix` 模式含 timestamped backup
+3. `memory/feedback_test_artifact_isolation.md`（新建 narrow memory）— 兩條 operational lesson：test 寫 `$env:TEMP` / bash heredoc 不能配 PS 變數
+4. `memory/MEMORY.md` — index +1 entry
+
+**抓蟲過程的兩個 self-bug**：
+- 原本要寫的 `feedback_4action_validation.md` 大量重複既存 `feedback_test_review_default.md` + `feedback_verify_four_actions.md`，違反 R0「不得建立重複模組」→ 刪除，改寫獨有 narrow memory
+- 用 bash heredoc 寫 PS memory 時，bash 把 `$tmp` / `$(Get-Random)` 展開為空 → 內容被汙染。**正在記錄這個 bug 的同時又踩了一次** → 改用 Python (`PYEOF` 單引號 heredoc) 寫入
+
+**驗證計畫四動作結果**：
+
+1. **實測（end-to-end real test）**：
+   - Default mode → 找到 3 個 drift memory 檔（`feedback_bilingual_jargon` / `feedback_test_review_default` / `feedback_verify_four_actions`，另一 session 寫的）；exit code 1 ✓
+   - `-Fix` mode → 3 fixed 0 errors，backup 落在 `.bom-backfill-backup-20260522-143212/`
+   - Re-audit → 26/26 BOM CLEAN ✓
+   - Byte-level 驗證：`fixed_bytes == BOM + orig_bytes`，內容 100% 保留（3/3 檔 match-expected=True）
+
+2. **Review（讀回產物）**：
+   - [`.claude/commands/audit-cross-machine-bom.md`](.claude/commands/audit-cross-machine-bom.md) 58 行；code-fence 6 個（3 paired）✓
+   - [`scripts/audit-cross-machine-bom.ps1`](scripts/audit-cross-machine-bom.ps1) 167 行；PS parser OK ✓
+   - [`memory/feedback_test_artifact_isolation.md`](C:/Users/user1115/.claude/projects/d--Work/memory/feedback_test_artifact_isolation.md) frontmatter 正確、BOM `ef bb bf` 在前 3 bytes ✓
+
+3. **抓蟲（cross-file grep）**：
+   - `audit-cross-machine-bom` 在 repo 只出現於我自己建的 2 個檔 → no stale references
+   - `BOM` 在 4 個 agency-os 檔提及（AGENTS.md / WORKLOG.md = 本次 / INTEGRATED_STATUS_REPORT.md 不衝突 / 2026-05-12 daily archive）→ no conflicting claims
+   - Memory 命名：15 個 `feedback_*.md`，我的 follow convention ✓
+   - Skill 命名：`.claude/commands/audit-*` 僅我一個，無 collision ✓
+
+4. **WORKLOG（本 entry）**：✓ 含四動作對應結果 + file:line 引用 + self-bug 自陳
+
+**避免再發生**：
+- 寫 memory / runbook / skill 前先 grep 既存同主題檔（feedback memory 命名衝突檢查已成既定 SOP — [[feedback_read_before_recommend]]）
+- 任何含 PS `$` 的多行內容寫檔，用 Python 或 PowerShell 直寫，禁用 bash heredoc
+- skill 加入後立即觀察 system 是否註冊（看 skill 列表）— 本次 `audit-cross-machine-bom` 已可見 ✓
+
+**Files**：
+- 新 [`scripts/audit-cross-machine-bom.ps1`](scripts/audit-cross-machine-bom.ps1)
+- 新 [`.claude/commands/audit-cross-machine-bom.md`](.claude/commands/audit-cross-machine-bom.md)
+- 新 [`~/.claude/projects/d--Work/memory/feedback_test_artifact_isolation.md`](C:/Users/user1115/.claude/projects/d--Work/memory/feedback_test_artifact_isolation.md)
+- 更新 `~/.claude/projects/d--Work/memory/MEMORY.md`（+1 entry）
+- 刪除 `feedback_4action_validation.md`（自寫自刪 — 重複違反 R0）
+
 ### CLAUDE.md 加 Codex fallback pointer — 雙工具共讀 SSOT 防禦性同步（2026-05-22 14:30 UTC）
 
 **事件**：完成 R0/R4 [驗證計畫] 四動作升級後（commits `ad98dd9` + `ec94bac`），使用者提醒「我也有再用 codex」。經抓蟲確認：

@@ -20,7 +20,7 @@
 [驗證計畫] 必須涵蓋四個動作，缺一視為不合格（禁止抽象詞「測試 / lint / build」帶過）：
   1. **實測（end-to-end real test）**：gh api / curl / docker exec / SSH / npm test 對遠端真實狀態執行；不可只跑 grep -c 或閱讀文字
   2. **Review（讀回改後產物）**：Read 檔案驗結構 + 上下文 + markdown lint（code-fence paired）
-  3. **抓蟲（cross-file bug hunt）**：Grep 跨檔搜本議題的相關位置（agency-os/、docs/、scripts/、.claude/、lobster-factory/、downstream consumers），找其他 stale 主張或副作用
+  3. **抓蟲（cross-file bug hunt）**：Grep 跨檔搜本議題的相關位置（agency-os/、docs/、scripts/、.claude/、lobster-factory/、downstream consumers），找其他 stale 主張或副作用；**若本次改動含 `.md` 檔案，額外跑 `audit-cross-machine-bom` skill** 確認跨機 Google Drive 同步的 UTF-8 BOM 合規（2026-05-20 CREDENTIALS 損毀事件根因）
   4. **WORKLOG（留證據鏈）**：[驗證結果] 段以 file:line 引用實際指令與輸出；同日 WORKLOG.md entry 含「四動作各自結果」摘要
 
 **修改完成後，必須輸出：**
