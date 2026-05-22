@@ -70,6 +70,25 @@ Claude 自動跑 /audit-encoding --file <path>
 
 **跨機同步**：4 個檔都在 repo（scripts/、.claude/commands/、agency-os/docs/、agency-os/AGENTS.md）→ git pull 跨機 ✅。`/audit-encoding` slash command 已 mirror 到 `~/.claude/commands/` per manifest。
 
+### AO-CLOSE 報告歸檔（鏡像 AO-RESUME archive pattern，~19:50 UTC+8）
+
+**起源**：操作者今天已經要求 AO-RESUME 報告寫進固定 folder（commit `4cbcee4` 完成）；同類請求：AO-CLOSE 每天也跑一次，同樣值得歸檔。
+
+**修改**（2 個檔，pure additive）：
+
+1. **`agency-os/reports/ao-close/README.md`**（新）—— archive folder 規範。同樣 30 天保留、git tracked、cross-machine via `git pull`。明確指向 ao-resume archive 形成「session 開→關」配對。
+2. **`~/.claude/commands/ao-close.md`**（修）—— 在「Output the four sections」之後加 `## Final Step — Archive the report` 段，含寫入 + prune >30d + self-check 三小節，措辭與 `ao-resume.md` Step 3 對稱。
+
+**[驗證計畫] 四動作**：
+- **實測**：兩個 archive folder 並列存在（`ls agency-os/reports/ao-*` 確認）；ao-close.md slash command 新段落落地
+- **Review**：兩檔結構正確（pattern 同 AO-RESUME archive，已測過）
+- **抓蟲**：`grep "reports/ao-close\|ao-close.*archive"` 無 stale ref，無命名衝突
+- **WORKLOG**：本 entry
+
+**剩餘風險**：靠 Claude 自律執行新加的 archive step——若未來常忘，加 β 兜底（讓 `ao-close.ps1` 也寫一份 raw status 版）。
+
+**Rollback**：`git revert <next commit>`；純加法
+
 ### Cross-machine sync — 機械保障層（`check-claude-sync.ps1` + `/sync-check` + health gate 整合，~19:10 UTC+8）
 
 **起源**：今天稍早補了 skills sync 漏洞 + bootstrap junction（commits `07dfa9d`、`4cbcee4`），但本質問題沒解——「sync 架構非自明」這件事，連架構師自己讀 CLAUDE.md 都會誤判（我自己今天就誤讀「commands 沒同步」一次）。文字會過時；只有可執行的 verifier 才是 ground truth。

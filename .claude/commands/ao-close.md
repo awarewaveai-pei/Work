@@ -27,3 +27,29 @@ Output the four sections (all covering 上次 AO-RESUME → 本次 AO-CLOSE):
 - **未完成**
 - **連動檢查**（doc-sync, health gate result）
 - **明日優先**
+
+## Final Step — Archive the report (MANDATORY after the four sections)
+
+After printing the four-section output to chat, write the **exact same markdown** to:
+
+```
+agency-os/reports/ao-close/YYYY-MM-DD-HHmm.md
+```
+
+Where `YYYY-MM-DD-HHmm` is the local time you ran `ao-close.ps1`. Use the `Write` tool.
+This is the only way the user can browse past AO-CLOSE reports — skipping it
+silently breaks the workflow.
+
+### Prune old reports (>30 days)
+
+After writing today's file, list `agency-os/reports/ao-close/*.md` (Glob),
+parse the date prefix of each filename, and delete any whose date is more than
+30 days before today. Skip `README.md`. Use the `Bash` tool with `rm` — git
+will track the deletions on the next commit.
+
+If the archive folder doesn't exist yet, create it first.
+
+### Self-check
+
+If you forgot the archive step, the user is allowed to re-prompt with「你忘了寫 archive」—
+acknowledge the lapse and write the file immediately.
