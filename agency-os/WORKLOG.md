@@ -41,6 +41,29 @@
 
 **已知 transient（可接受）**：首次同步當下，backfilled local（有 BOM）與舊 Drive src（無 BOM）hash 不同，會被判 `local-modified` 阻擋 import — 對方機器跑一次新 export 後自然收斂。對使用者顯示「CONFLICT — vault differs」一次性可忽略。
 
+**深度實測 + 抓蟲（2026-05-22 05:50 UTC 補做）**：
+
+| Test | 結果 | 證據 |
+|------|------|------|
+| BOM helpers unit test（8 cases） | ✅ 8/8 PASS | temp file test |
+| 真實 Drive 落地 22 .md | ✅ 22/22 BOM | `G:\我的雲端硬碟\...\AO-SYNC-2026-05-22-LAPTOP-R7I86OR5\` |
+| L2 detection synthetic 5 cases（fire / clean / malformed-json / missing-keys / no-VPS-id） | ✅ 5/5 PASS | temp file test 隔離 bash 變數展開 |
+| L2 warning 輸出格式正確 | ✅ PASS | 隔離測試確認 7 行警告 block 印出 |
+
+**新發現的 bug / fragility**：
+
+| # | 嚴重度 | 內容 |
+|---|------|------|
+| 1 | Medium | `scripts/{export,import}-cross-machine-memory.ps1` 對 forward-slash WorkRoot derive `projectKey` 錯誤（dormant；產線 AO-CLOSE 走 Resolve-Path 不受影響）→ **已修**：兩 script 都加 `(Resolve-Path -LiteralPath $WorkRoot).Path` 防禦（commits `4ae8f5af` + `6b2ada11`） |
+| 2 | **Medium-High** | `scripts/ao-resume.ps1` 有 5 個 early-exit 點（line 183/189/255/269/302），若觸發則 L2 detection block (line 537) **不會跑** → 使用者見 AO-RESUME 失敗訊息、re-run 後 detection 才會印。**不修**：reasoning — early-exit 都會印明顯錯誤（紅字 Write-Error + exit code），使用者人工 retry 後 detection 自然觸發；引入 try/finally 重構風險>價值。**留下監控門檻**：若實際碰到此 fragility，再做 state-file 雙寫保障 |
+| 3 | Low | Test 在 repo 內建 `.tail-test-backup-*` 觸發 auto-checkpoint hook → 被 commit 進 git（commits `5fd54fa` → `ce04c8a` 自動清除）。**已修**：以後 test 一律寫到 `$env:TEMP` 而非 repo 內 |
+| 4 | 工法 | bash heredoc 對 PS `$rebootDj.slack.channels` 的 `$rebootDj` 展開為空 → 假性 0-hit。**已避**：改用 temp `.ps1` 檔執行 PS test |
+
+**仍未做的測試（接受 ROI 不足）**：
+- 跨機 import 端到端 round-trip（需要對方機器配合）— 已透過 unit test T7/T8 證明 hash 收斂行為，整合風險低
+- Disk full / permission denied / 大檔效能 — 邊際情境，helper 用 .NET File API 與 stock Copy-Item 同行為
+- 並發 sync（兩台同時 AO-CLOSE）— Google Drive 自己處理衝突，out-of-scope
+
 **Rollback**：
 - BOM 改動如出問題：`git revert` 三個 commit；既有檔可從 `.bom-backfill-backup-20260522-050028/` 還原
 - L1 規則：`git revert` AGENTS.md commit
