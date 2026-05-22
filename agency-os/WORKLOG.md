@@ -191,6 +191,73 @@
 3. **R0 [驗證計畫] §3 抓蟲** 規則仍要求 grep 跨檔比對
 4. **未來工具**：`audit-cp950-traps.ps1` 完成後，週檢自動掃漏網
 
+### Phase 4 metric redesign — `.md latest-date proxy` 退役 + frontmatter + JSON truth source（~19:30 UTC）
+
+**事件**：操作者問「為什麼 5/22 backup 沒進 Drive」→ SSH EU VPS MainWP DB 調查 → 發現 backup **實際有成功**（soulful 5/22 19:05 TPE, 148 MB ZIP 在 Drive，task_id `wpvivid-ea9a8f38850c5`）。Phase 4 之前報的「14 天 stale」是 **metric 設計錯**（用 `.md latest-date < 7d` 當 freshness proxy，但 .md 是人類維護不會反映自動 backup）。
+
+**架構決策**（30 年穩定）：
+
+| 設計面 | 舊 | 新 |
+|---|---|---|
+| `BACKUP_RESTORE_PROOF.md` 語意 | 包山包海（baseline + drill + 每次 backup 日期）| **收斂為人類里程碑**（baseline、restore drill、failure incident analysis）|
+| Phase 4 freshness 機制 | grep `\b20\d\d-\d{2}-\d{2}\b` 取最大日期 | **2 個 truth source cross-check**：(a) YAML frontmatter `restore_drill_due_after` (b) sibling `BACKUP_AUTO_STATUS.json.last_success.unix_utc` |
+| 未 onboard tenant 處理 | 一律 WARN「無可解析日期」 | frontmatter `status: not-onboarded` → SKIP（silent） |
+| 區分 milestone vs auto-run | 無 | 兩種檔案、兩種語意、Phase 4 routine prompt 對應分支 |
+
+**修改清單**（commit 緊接本段）：
+
+1. **3 tenant BACKUP_RESTORE_PROOF.md** 加 YAML frontmatter：
+   - `company-soulful-expression/core/`: status=active, restore_drill_due_after=2026-08-06（baseline 5/8 + 90d），補 5/16 fail + 5/22 success incident records
+   - `company-p1-pilot/core/`: status=not-onboarded
+   - `company-scenery-travel-mongolia/core/`: status=not-onboarded
+2. **新增** `agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json` —— schema v1，從 MainWP DB query 結果 populate（task wpvivid-ea9a8f38850c5 / unix 1779447920 / 148 MB / Drive zip 名）
+3. **`agency-os/automation/claude-routines/phase4-weekly.md`** SSOT Check 3 重寫：
+   - 改為 frontmatter parsing + JSON cross-truth
+   - Sub-check 3A: restore drill due
+   - Sub-check 3B: BACKUP_AUTO_STATUS.json 8d freshness
+   - 路徑由 `agency-os/tenants/*/BACKUP_RESTORE_PROOF.md` 改為 `*/core/BACKUP_RESTORE_PROOF.md`（修正既有 glob bug —— 既有檔案實際在 `/core/` 子目錄，舊 glob 只能單層匹配）
+4. **`RemoteTrigger update`** 雲端 routine prompt 同步（HTTP 200，updated_at 2026-05-22T11:34:41Z）
+
+**Rollback evidence**（30 年穩定原則：永遠留下退路）：
+
+| 項目 | 舊值 | 新值 |
+|---|---|---|
+| routine trigger_id | `trig_01JyFw78ZkgwQzpyXXaX1F2K` | （不變） |
+| event UUID | `b7d2e8f4-9a1c-4e6f-8b2d-5f0c3e7a1b9d` | `c8e3f905-ab2d-4f7a-9c3d-6e1f2026a52a` |
+| Prompt SHA-256 (new) | — | `5bfebb42944fd11893954bdf0f72cc5d5705ec49d14e1d5bbe3227344540e11b` |
+| Prompt bytes (new) | — | 6082 UTF-8 bytes / 6000 chars |
+| next_run_at | 2026-05-29T06:01:03Z | （不變） |
+
+舊 prompt 完整內容在 git history（這個 commit 前一版 `agency-os/automation/claude-routines/phase4-weekly.md`），可用 `git show HEAD~1:agency-os/automation/claude-routines/phase4-weekly.md` 取回 + 再 `RemoteTrigger update` 把 event content 還原。
+
+**已知 gap（獨立 backlog，不在本 scope）**：
+
+1. **`aware-wave.com`（agency 自己網站）不在 `agency-os/tenants/` scope，Phase 4 不監控**。但它真實跑 WPvivid + 每週 Google Drive backup（驗證自 5/16 在 Drive 的 31 MB ZIP）。需獨立做 own-infrastructure backup monitoring，放入 lobster-phase1 scope。
+2. **`BACKUP_AUTO_STATUS.json` 短期手動** —— 今天從 MainWP DB query 結果填的。未來會 lag reality。需設計自動 sync 機制（EU VPS cron / WP REST endpoint + routine HTTPS / 其他）。
+3. **5/16 失敗根因未驗證** —— MainWP 紀錄是「local ZIP 上傳前被刪/移」，推測 Hostinger cleanup / disk quota / PHP timeout，需 SSH 進 Hostinger 確認。
+
+**驗證（R0 [驗證計畫] 4 動作）**：
+
+1. **實測**：
+   - `RemoteTrigger get trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K` → 確認 events[0].data.uuid = c8e3f905... + content 含 frontmatter logic ✓（HTTP 200）
+   - `RemoteTrigger update` → HTTP 200，updated_at 推進至 2026-05-22T11:34:41Z ✓
+   - SSH EU VPS mainwp-web docker → wp eval 查 `mwp_mainwp_wpvividmeta` 確認 task_id `wpvivid-ea9a8f38850c5` 5/22 11:05:20 UTC Succeeded ✓
+   - Google Drive PowerShell list → 確認 `soulfulexpression.org_wpvivid-ea9a8f38850c5_2026-05-22-10-53_backup_all.part001.zip` 148 MB 存在 ✓
+2. **Review**：Read 改後 5 個檔（3 .md + 1 .json + routine SSOT）—— 本 commit 後執行
+3. **抓蟲**：grep `BACKUP_RESTORE_PROOF|restore_drill_due_after|BACKUP_AUTO_STATUS|not-onboarded` 範圍 `.claude/ agency-os/ scripts/`；audit-cross-machine-bom 跑（有改 .md，per R0 §3）—— 本 commit 後執行
+4. **WORKLOG**：本段（含完整事件鏈 + 架構決策 + 3 個 known gap backlog + rollback evidence）
+
+**剩餘風險**：
+
+- routine 雲端 prompt 5/29 fire 才會真正執行新 Check 3 邏輯 —— LLM 解讀 frontmatter / JSON parse 若有歧義會 false WARN。Mitigation: prompt 寫得很機械（明確 if/else + 路徑 + 鍵名）；watchdog (system-health-check §11) 仍 catch「routine 沒 fire」。
+- BACKUP_AUTO_STATUS.json 手動值會 lag。一週內若無自動 sync 機制上線，這份 JSON 將顯示 stale，Phase 4 會 WARN —— **但這個 WARN 是「人類沒更新 audit trail」的真實 signal，不是「backup 沒跑」**。語意上正確。
+
+**Anti-pattern 教訓（為未來自己留）**：
+
+- **monitoring metric 設計 = 看「我量測的東西真的反映實況嗎？」**。用人類維護的 .md latest-date 當「backup 是否在跑」的 proxy 是**經典 metric proxy fallacy**（出處：Cobra effect / Goodhart's Law —— "when a measure becomes a target, it ceases to be a good measure"）
+- 30 年穩定不是「不變」而是「**語意對齊事實**」：當 .md 不再反映 backup 實況，metric 必須換源頭，不是繼續用錯指標
+- **「人類維護」+「機器執行」混淆 是反模式**：分離為兩種檔案、兩個 truth source、明確 cross-check，比把全部塞進一份 .md 健壯
+
 ### Phase 4 forensic — 監督者本身睡著三週，重建為 Claude routine + 雙重 watchdog（~16:30 UTC）
 
 **事件**：操作者問「星期五下午那個 cron job 跑了嗎？」。R0 forensic 在 30 分鐘內挖出三層失敗：

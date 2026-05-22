@@ -75,7 +75,9 @@ Set-StrictMode -Version Latest
 
 # Dogfood: this tool itself captures `git` stdout in Resolve-RepoRoot — must use the helper
 # it audits for, otherwise the auditor IS a trap.
-. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+# $PSScriptRoot is empty when piped via stdin / Invoke-Expression — fall back to MyInvocation.
+$script:scriptDir = if ($PSScriptRoot) { $PSScriptRoot } elseif ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path } else { (Get-Location).Path }
+. (Join-Path $script:scriptDir "_console-encoding-helpers.ps1")
 
 # Command names we treat as CP950-sensitive (capture trap candidates).
 # Linux/Unix native commands invoked from PowerShell on Windows hit the
@@ -129,19 +131,37 @@ function Test-IsInsideUtf8ConsoleBlock {
     return $false
 }
 
-function Test-FileHasScriptLevelProtection {
+function Get-ScriptLevelProtectionLine {
     <#
-      Pattern B: file sets [Console]::OutputEncoding = UTF8 somewhere at script-level
-      (before any capture site). Covers backfill-missed-daily / print-open-tasks pattern.
-      Returns $true if such a line exists in the source.
+      Pattern B: file sets [Console]::OutputEncoding = UTF8 somewhere.
+      Returns the 1-based line number of the FIRST set, or -1 if not found.
+
+      A capture site is protected by Pattern B ONLY if its line number > set's line number
+      (critic round 1 found false-negative: set after capture is no protection).
+
+      Matches all common UTF-8 set forms:
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        [Console]::OutputEncoding = [Text.Encoding]::UTF8
+        [System.Console]::OutputEncoding = ...
+        [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+        [Console]::OutputEncoding = (New-Object System.Text.UTF8Encoding $false)
+        [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
     #>
     param([string]$ScriptPath)
     try {
-        $content = [System.IO.File]::ReadAllText($ScriptPath, [System.Text.Encoding]::UTF8)
-        # Match `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` or `= [Text.Encoding]::UTF8` etc.
-        return ($content -match '\[Console\]::OutputEncoding\s*=\s*\[(?:System\.)?Text\.Encoding\]::UTF8')
+        $lines = [System.IO.File]::ReadAllLines($ScriptPath, [System.Text.Encoding]::UTF8)
+        # Two-stage match: first hit `[Console]::OutputEncoding` set, then verify RHS has UTF8 token.
+        $setRe = [regex]'\[(?:System\.)?Console\]::OutputEncoding\s*='
+        $utf8Re = [regex]'(?:UTF8|UTF8Encoding)'
+        for ($i = 0; $i -lt $lines.Length; $i++) {
+            $line = $lines[$i]
+            if ($setRe.IsMatch($line) -and $utf8Re.IsMatch($line)) {
+                return ($i + 1)  # 1-based
+            }
+        }
+        return -1
     } catch {
-        return $false
+        return -1
     }
 }
 
@@ -151,10 +171,9 @@ function Get-UnprotectedCaptures {
     #>
     param([string]$ScriptPath)
 
-    # Pattern B check (script-level set). If file has it, treat all captures as protected.
-    if (Test-FileHasScriptLevelProtection -ScriptPath $ScriptPath) {
-        return ,@()
-    }
+    # Pattern B check: get line number of script-level set (or -1 if none).
+    # Captures on lines AFTER the set are protected. Captures BEFORE the set are NOT.
+    $patternBLine = Get-ScriptLevelProtectionLine -ScriptPath $ScriptPath
 
     $tokens = $null
     $errors = $null
@@ -187,9 +206,12 @@ function Get-UnprotectedCaptures {
         # PowerShell parses both `& ssh` and bare `ssh` as CommandAst with InvocationOperator=Ampersand or Unknown.
         # For audit purposes, treat both as captures (assignment with `$x = ssh ...` also leaks stdout).
 
-        $protected = Test-IsInsideUtf8ConsoleBlock -Ast $c
-        if (-not $protected) {
-            $line = $c.Extent.StartLineNumber
+        $line = $c.Extent.StartLineNumber
+        # Pattern A: wrapped in Invoke-WithUtf8Console block
+        $protectedByA = Test-IsInsideUtf8ConsoleBlock -Ast $c
+        # Pattern B: file sets [Console]::OutputEncoding before this capture
+        $protectedByB = ($patternBLine -gt 0 -and $line -gt $patternBLine)
+        if (-not $protectedByA -and -not $protectedByB) {
             $snippet = $c.Extent.Text
             if ($snippet.Length -gt 100) { $snippet = $snippet.Substring(0, 100) + '...' }
             $findings.Add([pscustomobject]@{

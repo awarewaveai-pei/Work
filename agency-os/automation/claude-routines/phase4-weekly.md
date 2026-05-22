@@ -59,18 +59,59 @@ STEPS:
    CHECK2_DETAIL = "" if PASS else "#X: title | #Y: title" (pipe-separated).
    If gh exit != 0: CHECK2_STATUS = "SKIP", CHECK2_DETAIL = "gh exit=<code>".
 
-5. CHECK 3 — BACKUP_RESTORE_PROOF freshness:
-   Find all files matching pattern: agency-os/tenants/*/BACKUP_RESTORE_PROOF.md
+5. CHECK 3 — Tenant backup health (frontmatter + auto-status JSON cross-truth):
+   Find all files matching pattern: agency-os/tenants/*/core/BACKUP_RESTORE_PROOF.md
    EXCLUDE any path containing substring "templates" or "template".
+
    For each file:
-     - Read content as UTF-8
-     - Find all date matches with regex: \b(20\d\d-\d{2}-\d{2})\b
-     - If zero matches: tenant is stale-with-reason "no parseable date"
-     - Else: latest_date = max date; age_days = (today UTC - latest_date) in whole days
-       - If age_days > 7: tenant stale-with-reason "${age_days}d (${latest_date})"
-       - Else: tenant fresh
-   CHECK3_STATUS = "PASS" if all fresh, "WARNING" if any stale, "SKIP" if zero files matched.
-   CHECK3_DETAIL = "" if PASS else "<parent_dir>: <reason>; ..." (semicolon-separated stale tenants).
+     a. Parse YAML frontmatter (between top --- and the next ---).
+        Required keys: status (one of: active, not-onboarded).
+        Optional keys when status=active: restore_drill_due_after (YYYY-MM-DD), last_known_success_utc, truth_source.
+
+     b. Branch on status:
+
+        - status == "not-onboarded":
+            tenant verdict = SKIP_NOT_ONBOARDED
+            (do NOT count as WARNING; the tenant has not started backup operations yet)
+
+        - status == "active":
+            Run two sub-checks; tenant verdict = worst of the two.
+
+            Sub-check 3A (restore drill due):
+              parse restore_drill_due_after (YYYY-MM-DD).
+              If today_utc > restore_drill_due_after:
+                  3A = WARN "restore drill overdue (due ${restore_drill_due_after})"
+              Else: 3A = PASS
+
+            Sub-check 3B (automated backup freshness — TRUTH SOURCE):
+              expected_json_path = same directory as the .md, file name BACKUP_AUTO_STATUS.json
+              If file missing: 3B = WARN "BACKUP_AUTO_STATUS.json missing — no truth source for last backup"
+              Else:
+                Parse JSON. Read .last_success.unix_utc.
+                age_days = (now_utc - unix_utc) / 86400, FLOORED.
+                If age_days > 8: 3B = WARN "last success ${age_days}d ago (${.last_success.iso_utc}); over 8d threshold"
+                Else: 3B = PASS
+
+            tenant verdict = WARN if either 3A or 3B WARN, else PASS
+
+        - any other status value: tenant verdict = WARN "unknown status frontmatter value: ${status}"
+
+   Aggregate across all tenants:
+     CHECK3_STATUS:
+       - "PASS" if every tenant is PASS or SKIP_NOT_ONBOARDED
+       - "WARNING" if any tenant is WARN
+       - "SKIP" if zero .md files found (suspicious — log it)
+     CHECK3_DETAIL:
+       - "" if PASS or zero WARNs
+       - "<tenant_slug>: <reason>; ..." (semicolon-separated for each WARN tenant)
+       - tenant_slug = parent directory of /core/ (e.g. company-soulful-expression)
+       - Do NOT include SKIP_NOT_ONBOARDED tenants in the detail string (they are silent by design).
+
+   Rationale (do not include in output; for routine author reference):
+     - .md frontmatter holds human-curated milestones (restore drill due, onboarding status)
+     - .json holds machine-truth (last successful backup task per MainWP DB)
+     - Phase 4 cross-checks both so monitoring no longer lags reality
+     - .md latest-date-as-freshness-proxy (the old logic) caused false WARNs and was retired 2026-05-22
 
 6. Compose OVERALL:
    warning_count = count of WARNING among CHECK1/2/3 statuses

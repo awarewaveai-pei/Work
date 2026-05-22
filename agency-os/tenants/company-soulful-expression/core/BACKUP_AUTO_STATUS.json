@@ -1,0 +1,30 @@
+{
+  "$schema_version": 1,
+  "tenant_slug": "company-soulful-expression",
+  "mainwp_site_id": 2,
+  "site_url": "https://www.soulfulexpression.org/",
+  "backup_destination": "googledrive",
+  "backup_destination_label": "Update_Backup",
+  "backup_schedule_cron": "weekly (start_time 2026-05-09 11:05:16 UTC)",
+  "last_success": {
+    "task_id": "wpvivid-ea9a8f38850c5",
+    "unix_utc": 1779447920,
+    "iso_utc": "2026-05-22T11:05:20Z",
+    "iso_tpe": "2026-05-22T19:05:20+08:00",
+    "status": "Succeeded",
+    "drive_zip_name": "soulfulexpression.org_wpvivid-ea9a8f38850c5_2026-05-22-10-53_backup_all.part001.zip",
+    "drive_zip_size_bytes": 148221436
+  },
+  "last_failure": {
+    "task_id": "wpvivid-389495d5500f8",
+    "unix_utc": 1778938514,
+    "iso_utc": "2026-05-16T13:35:14Z",
+    "status": "Failed",
+    "reason": "local backup ZIP not found before upload to remote — possibly Hostinger cleanup / disk quota / PHP timeout",
+    "follow_up_task": "investigate Hostinger wp-content/wpvividbackups/ retention behavior"
+  },
+  "synced_at_utc": "2026-05-22T11:25:00Z",
+  "synced_by": "manual — extracted from MainWP DB query 2026-05-22 by operator + Claude (CLI session 0f3d5f24)",
+  "truth_source": "mwp_mainwp_wpvividmeta WHERE site_id=2 AND option_name='report_addon' on EU VPS mainwp-web container",
+  "future_automation": "TODO: automated sync from MainWP DB to this file — see agency-os/automation/claude-routines/phase4-weekly.md §future"
+}

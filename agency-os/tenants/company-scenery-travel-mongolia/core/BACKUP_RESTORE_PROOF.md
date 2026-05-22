@@ -1,6 +1,21 @@
+---
+# Phase 4 backup monitoring metadata (machine-readable)
+status: not-onboarded
+onboarded_at: null
+backup_schedule: null
+backup_destination: null
+restore_drill_due_after: null
+last_known_success_utc: null
+truth_source: null
+---
+
 # Backup and Restore Proof — Scenery Travel Mongolia
 
 > 客觀證據；與 `ENVIRONMENT_REGISTRY` 欄位互相對齊更新。
+>
+> **2026-05-22 治理修訂**：本 tenant **尚未 onboard**（staging 環境尚未建立，無 production site 也無 baseline backup）。
+> Phase 4 routine 看到 `status: not-onboarded` 應該 **SKIP**（不算 WARNING），詳見 `agency-os/automation/claude-routines/phase4-weekly.md`。
+> Tenant onboarding 完成後（staging URL 寫入 ENVIRONMENT_REGISTRY + 首次 backup），把 frontmatter `status` 改為 `active` + 填其餘欄位。
 
 ## Backup Record
 
