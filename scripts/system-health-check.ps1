@@ -594,21 +594,34 @@ $routineOutputs = @(
         Hint        = "https://claude.ai/code/routines"
     }
 )
-foreach ($r in $routineOutputs) {
-    if (Test-Path -LiteralPath $r.Path) {
-        try {
-            $mtime = (Get-Item -LiteralPath $r.Path).LastWriteTime
-            $ageDays = [int]((Get-Date) - $mtime).TotalDays
-            if ($ageDays -gt $r.MaxAgeDays) {
-                Add-Check -Name $r.Name -Pass $true -Detail ("WARN: " + $ageDays + "d old (max " + $r.MaxAgeDays + "d) — routine " + $r.Routine + " may have stopped firing; check " + $r.Hint)
-            } else {
-                Add-Check -Name $r.Name -Pass $true -Detail ($ageDays.ToString() + "d old (routine " + $r.Routine + ")")
+# Layout guard: skip §11 entirely if $monoRoot doesn't actually contain agency-os/.
+# Prevents misleading "routine missing" WARN when the real fault is path drift.
+$agencyDir = Join-Path $monoRoot "agency-os"
+if (-not (Test-Path -LiteralPath $agencyDir)) {
+    foreach ($r in $routineOutputs) {
+        Add-Check -Name $r.Name -Pass $true -Detail ("Skipped: monoRoot layout drift — '" + $agencyDir + "' missing; cannot resolve routine output paths")
+    }
+} else {
+    foreach ($r in $routineOutputs) {
+        if (Test-Path -LiteralPath $r.Path) {
+            try {
+                $mtime = (Get-Item -LiteralPath $r.Path).LastWriteTime
+                # [Math]::Floor (not [int]) — [int] uses banker's rounding which fires alerts
+                # ~12h late. Clamp to 0 to avoid nonsense "-1d old" on future-dated mtime
+                # (git checkout / clock skew).
+                $ageDaysRaw = [Math]::Floor(((Get-Date) - $mtime).TotalDays)
+                $ageDays = [Math]::Max(0, $ageDaysRaw)
+                if ($ageDays -gt $r.MaxAgeDays) {
+                    Add-Check -Name $r.Name -Pass $true -Detail ("WARN: " + $ageDays + "d old (max " + $r.MaxAgeDays + "d) — routine " + $r.Routine + " may have stopped firing; check " + $r.Hint)
+                } else {
+                    Add-Check -Name $r.Name -Pass $true -Detail ($ageDays.ToString() + "d old (routine " + $r.Routine + ")")
+                }
+            } catch {
+                Add-Check -Name $r.Name -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
             }
-        } catch {
-            Add-Check -Name $r.Name -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+        } else {
+            Add-Check -Name $r.Name -Pass $true -Detail ("WARN: report file missing — routine " + $r.Routine + " never ran or path wrong; check " + $r.Hint)
         }
-    } else {
-        Add-Check -Name $r.Name -Pass $true -Detail ("WARN: report file missing — routine " + $r.Routine + " never ran or path wrong; check " + $r.Hint)
     }
 }
 
