@@ -581,6 +581,37 @@ if (Test-Path -LiteralPath $memValidateScript) {
     Add-Check -Name "Memory index integrity (MEMORY.md vs actual files)" -Pass $true -Detail "Skipped: scripts/validate-memory-index.ps1 not present"
 }
 
+# 11) Claude routine output freshness watchdog (warn-only).
+# Catches the "monitoring system stopped monitoring itself" failure mode.
+# Pass=$true even on stale so AO-CLOSE doesn't block — surfaces as visible WARN in report.
+# Source-of-truth for what each routine writes: agency-os/automation/claude-routines/*.md
+$routineOutputs = @(
+    @{
+        Name        = "Phase 4 weekly report freshness"
+        Path        = (Join-Path $monoRoot "agency-os\reports\repair-center\phase4-LATEST.md")
+        MaxAgeDays  = 8
+        Routine     = "AgencyOS-RepairCenterPhase4Weekly"
+        Hint        = "https://claude.ai/code/routines"
+    }
+)
+foreach ($r in $routineOutputs) {
+    if (Test-Path -LiteralPath $r.Path) {
+        try {
+            $mtime = (Get-Item -LiteralPath $r.Path).LastWriteTime
+            $ageDays = [int]((Get-Date) - $mtime).TotalDays
+            if ($ageDays -gt $r.MaxAgeDays) {
+                Add-Check -Name $r.Name -Pass $true -Detail ("WARN: " + $ageDays + "d old (max " + $r.MaxAgeDays + "d) — routine " + $r.Routine + " may have stopped firing; check " + $r.Hint)
+            } else {
+                Add-Check -Name $r.Name -Pass $true -Detail ($ageDays.ToString() + "d old (routine " + $r.Routine + ")")
+            }
+        } catch {
+            Add-Check -Name $r.Name -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+        }
+    } else {
+        Add-Check -Name $r.Name -Pass $true -Detail ("WARN: report file missing — routine " + $r.Routine + " never ran or path wrong; check " + $r.Hint)
+    }
+}
+
 $total = $checks.Count
 $passed = @($checks | Where-Object { $_.pass }).Count
 $failed = $total - $passed

@@ -1,15 +1,22 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
   Repair Center Phase 4 weekly check — 3 checks, ~5 minutes.
   Writes report to agency-os/reports/repair-center/phase4-LATEST.md
   Sends Telegram summary to TELEGRAM_ALLOWED_CHAT_IDS.
 
+.STATUS
+  DEPRECATED 2026-05-22 — kept as manual fallback only.
+  Primary execution path: Claude routine AgencyOS-RepairCenterPhase4Weekly
+  Routine SSOT: agency-os/automation/claude-routines/phase4-weekly.md
+  Watchdog: scripts/system-health-check.ps1 §11 (phase4-LATEST.md mtime > 8d → WARN)
+
 .NOTES
-  Can be triggered by:
-    - Windows Task Scheduler (every Friday 14:00)
-    - Claude CronCreate (/phase4-check slash command)
-    - Manual: .\scripts\phase4-weekly-check.ps1
+  Trigger paths (in order of preference):
+    1. Claude routine (primary, always-on, no machine dependency)
+    2. Manual fallback: chcp 65001 ; powershell -NoProfile -ExecutionPolicy Bypass -File scripts\phase4-weekly-check.ps1
+  File saved with UTF-8 BOM so PowerShell 5.1 parses CJK characters correctly
+  regardless of system codepage (Big5 / GBK / Shift-JIS, etc). Do not strip the BOM.
 #>
 param(
     [string]$WorkRoot = "",

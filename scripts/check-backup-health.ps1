@@ -12,6 +12,9 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+# CP950 protection for ssh stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+
 function Resolve-Root {
     param([string]$InputRoot)
     if ($InputRoot -and (Test-Path -LiteralPath $InputRoot)) {
@@ -36,7 +39,9 @@ function Invoke-Ssh {
         ("{0}@{1}" -f $SshUser, $ServerHost),
         $Command
     )
-    $out = & ssh @sshArgs 2>&1
+    # Force UTF-8 console for SSH stdout — Big5 locale would mojibake any CJK output bytes
+    # and can eat newline bytes inside multi-byte sequences. $LASTEXITCODE propagates.
+    $out = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
     return @{
         ExitCode = $LASTEXITCODE
         Output   = (($out | ForEach-Object { [string]$_ }) -join "`n").Trim()

@@ -61,6 +61,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# CP950 protection for ssh stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+
 function Resolve-RepoRoot {
     $here = $PSScriptRoot
     if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
