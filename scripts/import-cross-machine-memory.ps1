@@ -59,6 +59,12 @@ if (-not $WorkRoot) {
         $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
     }
 }
+# Normalise WorkRoot to Windows-style backslash before deriving project key.
+# Same reason as the export script: Join-Path normalises '/' to '\' which would
+# split 'd-/Work' into TWO path segments. Defensive against forward-slash callers.
+if ($WorkRoot) {
+    try { $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path } catch { }
+}
 
 # ── Helper: SHA256 hash of a file, empty string if missing ───────────────────
 function Get-SafeHash([string]$Path) {

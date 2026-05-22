@@ -55,6 +55,12 @@ if ((Test-Path -LiteralPath $dailyPath) -and (-not $Force)) {
 }
 
 Push-Location $WorkRoot
+# Force UTF-8 stdout decoding for git. Windows PowerShell defaults to OEM (CP950 for zh-TW),
+# which mangles multi-byte UTF-8 bytes in CJK commit messages — including, critically, eating
+# newline bytes so two commits merge into one line. git stores subjects as UTF-8; we decode as
+# UTF-8. Restored in finally so we don't pollute the caller's console encoding.
+$prevConsoleEncoding = [Console]::OutputEncoding
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 try {
     $null = git rev-parse --git-dir 2>$null
     if ($LASTEXITCODE -ne 0) {
@@ -74,9 +80,10 @@ try {
     $commits = @($log | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
     if ($commits.Count -eq 0) {
-        Write-Host "backfill-missed-daily: no commits found for $Date — writing empty scaffold." -ForegroundColor Yellow
+        Write-Host "backfill-missed-daily: no commits found for $Date -- writing empty scaffold." -ForegroundColor Yellow
     }
 } finally {
+    [Console]::OutputEncoding = $prevConsoleEncoding
     Pop-Location
 }
 
