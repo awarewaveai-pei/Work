@@ -68,6 +68,18 @@ function Get-SafeHash([string]$Path) {
     return ""
 }
 
+# ── Helper: ensure UTF-8 BOM on a .md file (idempotent) ──────────────────────
+# Why: .md files crossing Google Drive can be misread as Big5 by PowerShell on Windows
+# when no BOM is present, producing garbled CJK. Read-as-UTF-8 handles both BOM and
+# non-BOM source; write-with-BOM normalises. Used at the cross-machine boundary so
+# downstream readers (any PowerShell version, any code page) decode correctly.
+function Set-Utf8BomOnFile([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $utf8bom = New-Object System.Text.UTF8Encoding($true)
+    $content = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($Path, $content, $utf8bom)
+}
+
 # ── Helper: pre-overwrite local backup ───────────────────────────────────────
 # Saves the current local file before overwriting so recovery is always possible.
 # Location: %LOCALAPPDATA%\AgencyOS\cross-machine-backup\<timestamp>\<RelLabel>
@@ -345,12 +357,16 @@ if ($candidateFolders.Count -gt 0 -and $memDest) {
             if (-not (Test-Path -LiteralPath $memDest)) {
                 New-Item -ItemType Directory -Path $memDest -Force | Out-Null
             }
-            Copy-Item -LiteralPath $srcFile -Destination (Join-Path $memDest "MEMORY.md") -Force
+            $memDestPath = Join-Path $memDest "MEMORY.md"
+            Copy-Item -LiteralPath $srcFile -Destination $memDestPath -Force
+            # Normalise to UTF-8 BOM so PowerShell on this machine never misreads it as Big5
+            # regardless of how the source machine wrote it.
+            try { Set-Utf8BomOnFile -Path $memDestPath } catch { }
             $fromLabel = if ($best.FolderMachine) { $best.FolderMachine } `
                          elseif ($best.ExportedBy) { $best.ExportedBy } `
                          else { 'unknown machine' }
             $script:ImportFromMachine = $fromLabel
-            Write-Host "  cross-machine import: MEMORY.md imported from $($best.Folder.Name) [by: $fromLabel]" -ForegroundColor Green
+            Write-Host "  cross-machine import: MEMORY.md imported from $($best.Folder.Name) [by: $fromLabel] (UTF-8 BOM enforced)" -ForegroundColor Green
         }
 
         # ── Individual memory files import ───────────────────────────────────
@@ -380,8 +396,13 @@ if ($candidateFolders.Count -gt 0 -and $memDest) {
                         'import' {
                             Invoke-LocalBackup $indDst "memory/$($_.Name)"
                             if (Copy-Atomic $indSrc $indDst) {
-                                Update-LocalStateHash $fileKey (Get-SafeHash $indSrc)
-                                Write-Host "  cross-machine import: memory/$($_.Name) imported" -ForegroundColor Green
+                                # Normalise UTF-8 BOM on the local copy so PowerShell never
+                                # misreads it as Big5. This changes the dst hash; store the
+                                # post-BOM hash so next sync sees 'unchanged' once the export
+                                # side also emits BOM (settles within 1-2 sync cycles).
+                                try { Set-Utf8BomOnFile -Path $indDst } catch { }
+                                Update-LocalStateHash $fileKey (Get-SafeHash $indDst)
+                                Write-Host "  cross-machine import: memory/$($_.Name) imported (UTF-8 BOM enforced)" -ForegroundColor Green
                             }
                         }
                     }
