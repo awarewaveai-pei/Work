@@ -17,7 +17,11 @@
 [方案比較] 方案A最小修改 vs 方案B較完整，各附優缺點／風險／rollback
 [建議方案] 推薦哪個，為什麼它最穩定低風險
 [實作計畫] 具體步驟與預計修改檔案
-[驗證計畫] 測試、lint、build、手動檢查或其他驗證方式
+[驗證計畫] 必須涵蓋四個動作，缺一視為不合格（禁止抽象詞「測試 / lint / build」帶過）：
+  1. **實測（end-to-end real test）**：gh api / curl / docker exec / SSH / npm test 對遠端真實狀態執行；不可只跑 grep -c 或閱讀文字
+  2. **Review（讀回改後產物）**：Read 檔案驗結構 + 上下文 + markdown lint（code-fence paired）
+  3. **抓蟲（cross-file bug hunt）**：Grep 跨檔搜本議題的相關位置（agency-os/、docs/、scripts/、.claude/、lobster-factory/、downstream consumers），找其他 stale 主張或副作用
+  4. **WORKLOG（留證據鏈）**：[驗證結果] 段以 file:line 引用實際指令與輸出；同日 WORKLOG.md entry 含「四動作各自結果」摘要
 
 **修改完成後，必須輸出：**
 [已修改] 逐項列出檔案與修改原因
@@ -35,6 +39,10 @@
 **寫入前**：每個路徑 / 腳本名 / 引用 → Glob 確認存在，不存在不寫。
 **寫入後**：grep 你剛修的確切字串（範圍：`.claude/ runbooks/ scripts/ agency-os/docs/ mcp/`），命中一起修，同一 commit。
 **審查時**：聲稱「清單完整」的段落 → 必須 Glob/Grep 對照實際狀態，不得只讀文字。
+**[驗證計畫] 四動作落實檢核**：R0 [驗證計畫] 的四個動作（實測 / Review / 抓蟲 / WORKLOG）必須在 [驗證結果] 段對應出具體執行紀錄。違反樣態：
+- 只寫 grep -c 數量 = 缺 Review + 缺實測
+- 只跑 npm test = 缺抓蟲 + 缺 WORKLOG
+- 不寫 WORKLOG = 證據鏈斷裂，未來 AO-RESUME 看不到當時做了什麼
 
 ## 執行安全
 

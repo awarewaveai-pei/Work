@@ -22,7 +22,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const GIT_COMMIT_RE = /\bgit\s+(?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*commit\b/;
+// Match `git commit` (with optional flags before `commit`) but NOT `git commit-tree` / `git commit-graph`.
+// Trailing lookahead = whitespace / end / quote / semicolon / pipe. `\b` alone matches `-` too.
+const GIT_COMMIT_RE = /\bgit\s+(?:-[a-zA-Z0-9-]+\s+|-[a-zA-Z0-9-]+\s+\S+\s+|-C\s+\S+\s+)*commit(?=\s|$|["';|&])/;
 
 let d = '';
 process.stdin.on('data', c => d += c);
