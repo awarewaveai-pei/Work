@@ -136,7 +136,7 @@
 - **無 env vars、無 Telegram、純 git pull → 3 checks → commit → push** —— 完全對齊既有 3 個 routine 的 pattern
 - MCP connections (Notion/Calendar/Gmail) 從帳號自動 attach，Phase 4 prompt 不用、無害
 
-**未解 manual 步驟**：`RemoteTrigger run` 立刻試跑回 `HTTP 400 github_repo_access_denied`。Routine 已 enabled 但需操作者去 <https://claude.ai/code/routines> 重新授權 GitHub 一次才能跑。**可能同步影響 3 個既有 routine**（DailyBriefing/Weekly/Monthly），重授權後一併驗證。
+**初判錯誤已修正**：`RemoteTrigger run` 立刻試跑回 `HTTP 400 github_repo_access_denied` —— 初判「帳號級 GitHub auth 過期」是**錯的**。操作者上 web UI 看 routine 顯示 Active、無 re-auth 提示。對照 `AgencyOS-DailyBriefing.last_fired_at = 2026-05-22T00:05:18Z`（8 小時前才 fire 過）→ 排程 fire path 健康。**真實原因**：CLI `RemoteTrigger run` 與排程 fire 走**不同 auth path**，CLI session 對 `run` endpoint 有額外 OAuth check，stale session token 會 fail；排程 fire 用 routine 存的 auth、不受影響。Phase 4 routine 2026-05-29 14:00 TPE 排程 fire 不會受此影響。修正後說明已寫進 `claude-routines/phase4-weekly.md` §「CLI run vs scheduled fire」。
 
 **重大流程教訓（操作者 16:50 飛踢提示）**：
 

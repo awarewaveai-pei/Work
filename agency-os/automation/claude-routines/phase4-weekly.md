@@ -113,21 +113,35 @@ RULES:
 - Total runtime budget: 5 minutes — if exceeded, skip step 8 (commit) and exit cleanly
 ```
 
-## ⚠️ Outstanding manual step (2026-05-22)
+## CLI `RemoteTrigger run` vs scheduled fire — different auth paths (2026-05-22 lesson)
 
-`RemoteTrigger run` immediately after `create` returned `HTTP 400 github_repo_access_denied — re-authorize GitHub in settings`. The routine cannot fire until GitHub OAuth is re-authorized at the account level.
+**Symptom**: Immediately after `create`, `RemoteTrigger run` returned `HTTP 400 github_repo_access_denied — re-authorize GitHub in settings`. Re-trying on the **existing** `AgencyOS-DailyBriefing` from the same CLI session returned the same error.
 
-**To resolve (one-time, ~30 seconds)**:
+**Wrong initial conclusion** (initially documented here, since corrected): "account-level GitHub OAuth expired; user must re-authorize at <https://claude.ai/code/routines>".
 
-1. Open <https://claude.ai/code/routines>
-2. Click any routine (or the `AgencyOS-RepairCenterPhase4Weekly` entry)
-3. Look for a "re-authorize GitHub" prompt or settings link → click through
-4. Confirm GitHub permissions for repo `awarewaveai-pei/Work`
-5. Back in CLI: `RemoteTrigger` with `action: "run"` + `trigger_id: trig_01JyFw78ZkgwQzpyXXaX1F2K` to verify
+**Actual root cause** (confirmed by inspecting `RemoteTrigger get` data):
+- `AgencyOS-DailyBriefing.last_fired_at` was `2026-05-22T00:05:18Z` — only ~8 hours before the failed `run` call. So the routine's auth was working perfectly for scheduled fires.
+- The web UI (<https://claude.ai/code/routines>) showed the new routine as `Active` with `Next run 2026-05-29 14:00 TPE` and the repo connected — no re-authorize prompt visible.
+- Conclusion: **CLI `RemoteTrigger run` is a different code path than scheduled fires**. The interactive `run` endpoint enforces a fresh OAuth check against the current CLI session; scheduled fires use the routine's stored auth. Stale CLI session token → only `run` (and other write actions?) fail; `get` / `list` / scheduled fires still work.
 
-After re-auth: scheduled fires on every subsequent Friday will work automatically; manual `run` for ad-hoc testing also works.
+**Operational implications**:
 
-**This re-auth likely affects all 4 routines** (DailyBriefing / WeeklyReview / MonthlyReview / new Phase 4). If any of the 3 existing routines have stale `last_fired_at`, they may also have stopped firing — worth checking after re-auth.
+1. **`RemoteTrigger run` for ad-hoc testing may fail intermittently** when the CLI session is old. To dry-run a routine, prefer either:
+   - Re-run after refreshing the Claude Code session
+   - Use the "Run now" button in <https://claude.ai/code/routines> (web UI uses its own auth)
+   - For Phase 4 specifically: the fallback `scripts/phase4-weekly-check.ps1` is a fully working alternative
+2. **Do NOT mistake this for "the routine is broken"**. Look at `last_fired_at` and `next_run_at` via `RemoteTrigger get` to confirm scheduled fires are healthy.
+3. **If scheduled fires also stop** (e.g., `last_fired_at` drifts more than one cron interval behind `next_run_at`), THAT's the real auth-expired case and needs the web-UI re-auth.
+
+**Verification of scheduled-fire health for this routine**:
+
+```bash
+# Run any time. Should always show next_run_at advancing on every Friday 14:00 TPE.
+RemoteTrigger action=get trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K
+# Look for fields: last_fired_at (should appear after first fire), next_run_at, enabled.
+```
+
+Watchdog (`system-health-check.ps1` §11) catches the no-fire case independently of CLI auth state — if 8+ days pass with no fresh `phase4-LATEST.md`, it WARNs.
 
 ## Verification (after GitHub re-auth)
 
