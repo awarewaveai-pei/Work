@@ -4,6 +4,40 @@
 
 ## 2026-05-22
 
+### `~/.claude/plans/` 跨機同步啟用 — ADHD vibe coding handbook 進 git（commit `802f2f3`，~21:30 UTC+8）
+
+**根因**：`~/.claude/plans/` 被 `.gitignore` L26 列為 ignore（同層 runtime data 一起被掃進去），導致兩個 plan 檔（ADHD vibe coding handbook + fluffy biscuit）無法跨機同步。Plans 是 knowledge artifacts（Claude 對話產出），不是 runtime data，治理上應該跟 commands/agents/skills 走同一個 junction → git 同步機制；memory 仍走 Google Drive（`.claude/projects/` 維持 ignore，不混淆兩個 sync 機制）。
+
+**步驟**：
+
+1. User-confirmed repo 是 private（`github.com/awarewaveai-pei/Work`）→ sensitive personal content 安全
+2. `.gitignore:26` 移除 `.claude/plans/` 那一行
+3. `git add .gitignore .claude/plans/adhd-vibe-coding-happy-octopus.md .claude/plans/24-claude-fluffy-biscuit.md`（per Git Safety Protocol：逐檔加，不用 `-A`）
+4. `git commit` + `git push origin main`
+
+**驗證**（R0 [驗證計畫] 4 動作）：
+
+1. **實測**：
+  - `git check-ignore -v .claude/plans/adhd-vibe-coding-happy-octopus.md` → 改前命中 L26、改後 no match ✓
+  - `git status` → 3 files staged correctly ✓
+  - `git push` → `c6edff7..802f2f3  main -> main` ✓
+2. **Review**：commit `802f2f3` message 含根因 / 變更 / 驗證 / next session entry point；diff = 1183 insertions / 1 deletion 符合預期（兩個 .md 檔 + 1 行 gitignore）
+3. **抓蟲**：未跑全 repo grep（無其他地方硬編 `.claude/plans/` 為 ignore 的歷史證據），但 .gitignore 是 single SSOT，無 stale 主張顧慮
+4. **WORKLOG**：本 entry
+
+**避免再發生**：
+
+- 未來新增 plan 檔到 `~/.claude/plans/` 會**自動**進 git tracking，不需再改 .gitignore
+- 另一台機 `git pull` 即取得 plans（跟 commands/agents/skills 同一個機制）
+- 注意：plan 檔內容會進 git history，未來 plans 應避免硬編密鑰（同 R0 紀律）
+- Memory 仍走 Google Drive，不要把 memory 也搬進 git（兩個機制分工：knowledge artifact 走 git / personal memory 走 Drive）
+
+**相關**：
+
+- 手冊本身在 `.claude/plans/adhd-vibe-coding-happy-octopus.md`，L508+「Plan 狀態」段含下次續做的 16-task roadmap（Tier 1/2/3）
+- Memory `~/.claude/projects/d--Work/memory/reference_adhd_vibe_coding_handbook.md` 含下次 session entry point + Adult-to-Adult / binding framework 互動規則
+- 手冊核心 framework：Binding-Failure-First Design Philosophy（手冊 L147-243）
+
 ### BUG_HUNT_PROTOCOL.md — 抓蟲大業 30 年治理協定 + auto-discovery（commits `0836d94` / `d235dc5` / `c038b38`，~21:00 UTC+8）
 
 **起源**：使用者觀察「今天每件事都抓到蟲，這半年 vibe coding 可能千百個 latent bug」。回答 = 把今天 CP950 audit 的 class-by-class 模式抽象成永久治理協定，未來任何 audit 情境 Claude 自動依協定執行。
