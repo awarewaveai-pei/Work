@@ -60,6 +60,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
 
 # CP950 protection for ssh stdout capture (see scripts/_console-encoding-helpers.ps1).
 . (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")

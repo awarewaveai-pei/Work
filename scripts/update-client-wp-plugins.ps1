@@ -119,14 +119,19 @@ function Invoke-SSH {
 
 function Copy-FromServer {
   param([string]$Remote, [string]$Local)
-  & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no -o LogLevel=QUIET `
-        "${sshTarget}:${Remote}" $Local 2>&1 | Write-Verbose
+  # CP950 protection — scp stderr (e.g. PQ-KEX advisories) may contain non-ASCII
+  Invoke-WithUtf8Console {
+    & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no -o LogLevel=QUIET `
+          "${sshTarget}:${Remote}" $Local 2>&1
+  } | Write-Verbose
 }
 
 function Copy-ToServer {
   param([string]$Local, [string]$Remote)
-  & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no -o LogLevel=QUIET `
-        $Local "${sshTarget}:${Remote}" 2>&1 | Write-Verbose
+  Invoke-WithUtf8Console {
+    & scp -i $sshKey -P $sshPort -o StrictHostKeyChecking=no -o LogLevel=QUIET `
+          $Local "${sshTarget}:${Remote}" 2>&1
+  } | Write-Verbose
 }
 
 # ── Health check ─────────────────────────────────────────────────────────────

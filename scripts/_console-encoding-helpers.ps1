@@ -29,6 +29,8 @@
     service contexts) — the wrapped scriptblock still executes; encoding just isn't forced
 #>
 
+Set-StrictMode -Version Latest
+
 function Invoke-WithUtf8Console {
     <#
     .SYNOPSIS
