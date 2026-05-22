@@ -75,6 +75,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# CP950 protection for ssh stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+
 $WorkRoot   = Split-Path $PSScriptRoot -Parent
 $TenantsDir = Join-Path $WorkRoot 'agency-os\tenants'
 $DefaultReportsDir = Join-Path $WorkRoot 'agency-os\reports\wp-updates'
@@ -102,9 +105,13 @@ function Invoke-SSH {
   param([string]$Cmd, [switch]$PassThru)
   # LogLevel=QUIET suppresses benign SSH warnings (e.g. post-quantum key exchange advisory)
   # that would be caught as NativeCommandError with $ErrorActionPreference=Stop
-  $out = & ssh -i $sshKey -p $sshPort `
-               -o StrictHostKeyChecking=no -o BatchMode=yes -o LogLevel=QUIET `
-               $sshTarget $Cmd 2>&1
+  # Force UTF-8 console — wp-cli on WordPress sites with CJK content (site names, page titles)
+  # would otherwise mojibake on Big5-locale Windows during SSH stdout capture.
+  $out = Invoke-WithUtf8Console {
+    & ssh -i $sshKey -p $sshPort `
+          -o StrictHostKeyChecking=no -o BatchMode=yes -o LogLevel=QUIET `
+          $sshTarget $Cmd 2>&1
+  }
   if ($PassThru) { return $out }
   $out | Write-Verbose
   return $out

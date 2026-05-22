@@ -53,6 +53,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot "_vault-helpers.ps1")
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")  # CP950 protection for ssh/docker stdout capture
 
 if ($PresetSGNextAdmin) {
     $Mapping = @{
@@ -113,9 +114,10 @@ if ($useSsh) {
     # Single-string outer + single-quoted inner is the only form that ssh +
     # OpenSSH on Windows reliably forwards intact. Base64 contains no single
     # quotes so this is safe.
-    $rawOutput = & ssh $sshAlias "docker exec $container sh -c '$wrapper'" 2>&1
+    # Force UTF-8 console — remote `printf` emits UTF-8; CP950 default would mojibake.
+    $rawOutput = Invoke-WithUtf8Console { & ssh $sshAlias "docker exec $container sh -c '$wrapper'" 2>&1 }
 } else {
-    $rawOutput = & docker exec $container sh -c $wrapper 2>&1
+    $rawOutput = Invoke-WithUtf8Console { & docker exec $container sh -c $wrapper 2>&1 }
 }
 if ($LASTEXITCODE -ne 0) {
     throw "Remote fetch failed (exit $LASTEXITCODE):`n$rawOutput"

@@ -9,6 +9,7 @@
 - `automation/REGISTER_TENANT_TASKS.ps1`: creates/removes Windows Scheduled Tasks
 - `automation/ENQUEUE_TENANT_TASK.ps1`: enqueue irregular (adhoc) tasks
 - `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`: register global guard tasks
+- `automation/claude-routines/`: SSOT for Anthropic cloud Claude routines (different scheduling primitive — see subdir README for rubric)
 - `tenants/<tenant>/OPERATIONS_SCHEDULE.json`: tenant task plan
 - `tenants/<tenant>/OPS_QUEUE.json`: adhoc queue
 
