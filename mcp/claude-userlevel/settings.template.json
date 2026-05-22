@@ -60,6 +60,10 @@
           {
             "type": "command",
             "command": "node ~/.claude/hooks/commit-quality.js"
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/verify-gate-commit.js"
           }
         ]
       },
@@ -137,6 +141,10 @@
             "type": "command",
             "command": "node ~/.claude/hooks/test-runner.js",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/code-change-tracker.js"
           }
         ]
       }
@@ -172,6 +180,10 @@
           {
             "type": "command",
             "command": "node ~/.claude/hooks/session-summary.js"
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/verify-gate-stop.js"
           }
         ]
       }
