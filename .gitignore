@@ -23,7 +23,6 @@ Backups/
 .claude/hooks/
 .claude/ide/
 .claude/paste-cache/
-.claude/plans/
 .claude/plugins/
 .claude/projects/
 .claude/session-env/
