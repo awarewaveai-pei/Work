@@ -46,11 +46,13 @@ Each file MUST contain (in this order):
 
 ## Governance rules
 
-1. **Every routine here MUST have a watchdog**. A routine without a way to detect "it stopped firing" violates the 30-year operating discipline. The watchdog is typically a mtime check on a known output file, surfaced via `scripts/system-health-check.ps1` (so AO-RESUME catches it).
-2. **Never bake secrets into the prompt body**. Use env vars only. The env var values are set in the web UI (Anthropic cloud), not in this repo.
-3. **Cron minimum interval is 1 hour** (Anthropic platform limit). Sub-hourly tasks must use a different mechanism.
-4. **Routines push to `main` only if `unrestricted branch pushes` is enabled** on the routine. Document this in the file's setup checklist. The default is push to `claude/*` branches.
-5. **On routine deletion, leave the source file with a tombstone header** (`Status: Retired YYYY-MM-DD — reason`) for at least 6 months before removing the file. Keeps historical context auditable.
+1. **BEFORE designing a new routine, run `RemoteTrigger list` (via `/schedule list`) and inspect 2-3 existing routines' full configs**. Existing instances reveal what auth actually works, what's hardcoded, what env vars are or aren't used. Designing from abstract `/schedule` docs first wastes effort planning around non-existent constraints. Triggered by 2026-05-22 incident where 40 min was wasted designing a Telegram/env-var/web-UI scheme that wasn't needed (existing 3 routines use none). See `~/.claude/projects/d--Work/memory/feedback_inspect_before_design.md`.
+2. **Every routine here MUST have a watchdog**. A routine without a way to detect "it stopped firing" violates the 30-year operating discipline. The watchdog is typically a mtime check on a known output file, surfaced via `scripts/system-health-check.ps1` (so AO-RESUME catches it).
+3. **Never bake secrets into the prompt body**. If a routine needs secrets, use env vars (set via claude.ai routines web UI). But default to no secrets — git auth is inherited from the claude.ai account; pure git-based routines need nothing else.
+4. **Cron minimum interval is 1 hour** (Anthropic platform limit). Sub-hourly tasks must use a different mechanism.
+5. **Routines push to `main` by default** (existing 3 routines all do). Per Anthropic docs the default is `claude/*` branches, but our observed behavior on this account is unrestricted main push works. If a routine starts being rejected on main push, document in this README so the next routine author knows.
+6. **`RemoteTrigger run` may fail with `github_repo_access_denied` even though `create` succeeded**. Resolution: operator re-authorizes GitHub at <https://claude.ai/code/routines>. This is a per-account state that affects all routines. After re-auth, verify all routines fire correctly.
+7. **On routine deletion, leave the source file with a tombstone header** (`Status: Retired YYYY-MM-DD — reason`) for at least 6 months before removing the file. Keeps historical context auditable.
 
 ## Related Documents (Auto-Synced)
 - `agency-os/automation/README.md` (parent — Windows Task Scheduler automation)

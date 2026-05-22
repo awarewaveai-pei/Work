@@ -129,6 +129,31 @@
 - governance docs 寫「已啟動」之前，必須有實測證據（report 存在 / cron 真的 fired），否則就是 drift 種子
 - 「監督者的監督者」必須在不同層、不同 trigger、不同失敗模式 —— 同層 watchdog 等於沒有
 
+**Routine 實際建立結果**：
+
+`RemoteTrigger create` 走 in-CLI API（OAuth 自動處理，不需 web UI）：
+- ID `trig_01JyFw78ZkgwQzpyXXaX1F2K`，cron `0 6 * * 5` UTC = Friday 14:00 TPE，next_run_at `2026-05-29T06:01:03Z`
+- **無 env vars、無 Telegram、純 git pull → 3 checks → commit → push** —— 完全對齊既有 3 個 routine 的 pattern
+- MCP connections (Notion/Calendar/Gmail) 從帳號自動 attach，Phase 4 prompt 不用、無害
+
+**未解 manual 步驟**：`RemoteTrigger run` 立刻試跑回 `HTTP 400 github_repo_access_denied`。Routine 已 enabled 但需操作者去 <https://claude.ai/code/routines> 重新授權 GitHub 一次才能跑。**可能同步影響 3 個既有 routine**（DailyBriefing/Weekly/Monthly），重授權後一併驗證。
+
+**重大流程教訓（操作者 16:50 飛踢提示）**：
+
+操作者反映：「為什麼以前做過，你卻忘記，然後做完了才發現？」—— 本次設計流程根本錯誤：
+- ❌ Phase 1 用 subagent 查 `/schedule` **抽象文件** → 推論「需 web UI 設 env var」「需勾 unrestricted push」
+- ❌ Phase 2-4 基於不完整推測寫 262 行 SSOT 含「web UI 10 分鐘 checklist」「TELEGRAM_BOT_TOKEN env var 設定」
+- ✅ Phase 5 終於 `RemoteTrigger list` → 發現既有 3 routine **全部** zero env vars、no Telegram、no web UI
+- 浪費約 40 分鐘設計不存在的問題；SSOT 檔大幅重寫
+
+**根因**：用「抽象文件 research」當主要資訊源，把「inspect 真實現有狀態」放在最後當補課。操作者在前面對話**明確說過**「先讀 `AgencyOS-DailyBriefing` 怎麼處理的」，我卻把它放在「設計 prompt 草稿之後」。違反 R0「不得猜測」+「先讀現實」。
+
+**修法**：
+
+- 新增 `~/.claude/projects/d--Work/memory/feedback_inspect_before_design.md` + 更新 `MEMORY.md` index
+- `claude-routines/README.md` Governance rules 待補同條（下個 PR）
+- 觸發詞要警覺：「I'm researching what X *should* be 但沒先看 what X *currently is* in this account」→ STOP 切到 inspection 模式
+
 ### verify-gate 鐵律 deploy — critic + real-test 強制（commit `e807984`，~16:00 UTC）
 
 **事件**：操作者反映「幾個月來代理做 code change 都只跑 syntax + logic walk，跳過 critic + real-execution test，蟲債累積」。當天實例為 backfill-missed-daily.ps1 通過 syntax + critic round 1 review 卻在實測時暴露 PowerShell CP950 stdout decoding 把 UTF-8 中文 commit message 變 `??` 並吃掉換行字元（兩 commits 合併成一行）。純 critic 看程式碼看不出來，要真的執行才現形。

@@ -5,258 +5,186 @@
 | Field | Value |
 |---|---|
 | **Name** | `AgencyOS-RepairCenterPhase4Weekly` |
-| **Routine ID** | _(populate after web-UI creation; format: `trig_01...`)_ |
-| **Cron** | `0 14 * * 5` (Friday 14:00 TPE) |
-| **Model** | Claude Sonnet 4.6 (`claude-sonnet-4-6`) |
-| **Repo** | `awarewaveai-pei/Work` |
-| **Branch pushes** | Unrestricted (must enable in web UI — routine writes to `main`) |
-| **Owner** | AwareWave Ops |
-| **Created** | _(populate after web-UI creation; 2026-05-22 if same-day)_ |
+| **Routine ID** | `trig_01JyFw78ZkgwQzpyXXaX1F2K` |
+| **Cron (UTC)** | `0 6 * * 5` |
+| **Cron (TPE)** | Friday 14:00 (TPE = UTC+8, no DST) |
+| **Next run** | `2026-05-29T06:01:03Z` (= 2026-05-29 14:01 TPE) |
+| **Model** | `claude-sonnet-4-6` |
+| **Environment** | `env_01WybafvBbrm4WQXjntcvynp` (PEI) |
+| **Repo** | `https://github.com/awarewaveai-pei/Work` |
+| **Allowed tools** | Bash, Read, Write, Edit, Glob, Grep |
+| **Env vars** | None — matches existing 3 routines' pattern |
+| **MCP connections** | Notion / Google_Calendar / Gmail (auto-attached from account; unused by Phase 4) |
+| **Created** | 2026-05-22T08:47:42Z |
+| **Created via** | `RemoteTrigger` API (in-CLI, no web UI) |
 | **Supersedes** | `scripts/phase4-weekly-check.ps1` (kept as manual fallback only) |
+
+## Design decisions
+
+Followed the **existing 3-routine pattern** (DailyBriefing / WeeklyReview / MonthlyReview) discovered via `RemoteTrigger list`:
+
+- **No env vars** — git auth inherited from claude.ai account; nothing else needed
+- **No Telegram notification** — existing routines just `commit + push`; the watchdog (mtime check in `system-health-check.ps1` §11) + the visible `[claude] auto: Phase 4 週巡檢ㄚ ...` commit message are the observability signal
+- **No web UI step required** — full CLI creation via `RemoteTrigger create`
+
+Earlier draft of this file included an elaborate Telegram + env var + web UI checklist — that was based on abstract `/schedule` docs research before inspecting existing routines. Lesson saved at `~/.claude/projects/d--Work/memory/feedback_inspect_before_design.md`.
 
 ## Purpose
 
-Replaces the broken `/phase4-check` slash-command + Windows-Task-Scheduler hybrid that never worked on this developer machine. Runs the same 3 health checks (duplicate auto-repair PRs / needs-human-review backlog / BACKUP_RESTORE_PROOF freshness), writes a report to repo, and notifies via Telegram.
+Replaces the broken `/phase4-check` triple-trigger design (CronCreate 7-day expiry / non-existent Windows Task Scheduler / Big5-broken script) discovered to have never run on 2026-05-22. Runs the same 3 health checks (duplicate auto-repair PRs / needs-human-review backlog / BACKUP_RESTORE_PROOF freshness).
 
-Why replace, not patch: the old design had 3 unreliable triggers (CronCreate 7-day expiry, ghost Windows Task Scheduler entry, broken script). Forensic on 2026-05-22 found **zero reports ever written** despite TASKS.md claiming "Phase 4 已啟動 2026-05-19".
-
-## Environment variables (web UI → routine → Environment)
-
-| Variable | Source | Notes |
-|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | Vault: `scripts\secrets-vault.ps1 -Action get -Name TELEGRAM_BOT_TOKEN` | 46 chars; format `<bot_id>:<secret>` |
-| `TELEGRAM_CHAT_ID` | Vault: `TELEGRAM_ALLOWED_CHAT_IDS` (take the **first** comma-separated value) | 10-digit chat id |
-
-**Security:** never commit values to this file. The values live only in the Anthropic web UI's encrypted environment store + the local vault.
-
-## Web UI setup checklist
-
-Time: ~10 minutes. Do once.
-
-1. Open <https://claude.ai/code/routines>
-2. Click **New routine**
-3. Fill the form:
-   - **Name**: `AgencyOS-RepairCenterPhase4Weekly`
-   - **Repository**: `awarewaveai-pei/Work`
-   - **Branch policy**: ☑ **Allow unrestricted branch pushes** (required to write `main`)
-   - **Model**: Claude Sonnet 4.6
-   - **Schedule (cron)**: `0 14 * * 5`
-   - **Timezone**: Asia/Taipei (TPE)
-4. **Instructions** field: paste the entire **Prompt body** section below (verbatim, including the fenced code block markers if your UI strips them — adjust as needed; the content between the fences is the literal instruction text).
-5. **Environment variables** tab: add both vars from the table above. Pull values from vault using the commands listed.
-6. **Save**
-7. Click **Run now** to dry-run once.
-8. Verify:
-   - Telegram channel receives a message starting `✅` or `⚠️ Repair Center Phase 4`.
-   - `git pull` on your workstation shows a new commit by the routine adding `agency-os/reports/repair-center/phase4-LATEST.md`.
-9. **Populate this file's Metadata section** with the routine ID + creation date that the web UI shows, then commit.
-
-## Prompt body
-
-Paste everything between the markers (not including the markers themselves) into the routine's `Instructions` field.
+## Routine prompt (verbatim, as sent to RemoteTrigger create)
 
 ```text
-You are AwareWave's Repair Center Phase 4 weekly monitor. Execute the 3 checks below mechanically — no interpretation, no creativity. The repo `awarewaveai-pei/Work` is cloned at your working directory.
+You are AwareWave's Repair Center Phase 4 weekly monitor. Execute the 3 checks below mechanically — no interpretation. The repo awarewaveai-pei/Work is cloned at your working directory.
 
-REQUIRED ENVIRONMENT VARIABLES:
-- TELEGRAM_BOT_TOKEN
-- TELEGRAM_CHAT_ID
+STEPS:
 
-If either is unset, continue but skip the Telegram step and note "SKIP_TELEGRAM=missing_env" in the report.
+1. Run: git pull origin main
 
-============================================
-STEP 1 — Check 1: Auto-repair PR duplicate detection
-============================================
-Run:
-  gh pr list --repo awarewaveai-pei/Work --label auto-repair --state all --limit 30 --json number,title,createdAt > /tmp/check1.json
+2. Compute timestamps:
+   date_string = $(TZ=Asia/Taipei date +%Y-%m-%d)
+   timestamp   = $(TZ=Asia/Taipei date '+%Y-%m-%d %H:%M')
 
-Parse JSON. For each PR, compute a normalized key:
-  - Take title
-  - Remove "#NNN" references
-  - Collapse whitespace to single spaces
-  - Lowercase
-  - Truncate to first 40 chars
+3. CHECK 1 — Auto-repair PR duplicate detection:
+   Run: gh pr list --repo awarewaveai-pei/Work --label auto-repair --state all --limit 30 --json number,title,createdAt > /tmp/check1.json
+   Parse JSON. For each PR compute normalized_key = lowercase(remove(title, /#\d+/), then collapse whitespace, truncate to 40 chars). Group by key. Any group with 2+ PRs is a duplicate cluster.
+   CHECK1_STATUS = "PASS" if no clusters else "WARNING".
+   CHECK1_DETAIL = "" if PASS else "[#X, #Y]: key...; [#Z, #W]: key..." (semicolon-separated).
+   If gh exit != 0: CHECK1_STATUS = "SKIP", CHECK1_DETAIL = "gh exit=<code>".
 
-Group PRs by normalized key. Any group with 2 or more PRs is a duplicate cluster.
+4. CHECK 2 — needs-human-review backlog:
+   Run: gh pr list --repo awarewaveai-pei/Work --label needs-human-review --state open --limit 10 --json number,title,url > /tmp/check2.json
+   CHECK2_STATUS = "PASS" if empty list else "WARNING".
+   CHECK2_DETAIL = "" if PASS else "#X: title | #Y: title" (pipe-separated).
+   If gh exit != 0: CHECK2_STATUS = "SKIP", CHECK2_DETAIL = "gh exit=<code>".
 
-Set CHECK1_STATUS:
-  - "PASS" if no duplicate clusters
-  - "WARNING" if any duplicate clusters
-Set CHECK1_DETAIL:
-  - "" if PASS
-  - "[#X, #Y]: key...; [#Z, #W]: key..." if WARNING (semicolon-separated)
+5. CHECK 3 — BACKUP_RESTORE_PROOF freshness:
+   Find all files matching pattern: agency-os/tenants/*/BACKUP_RESTORE_PROOF.md
+   EXCLUDE any path containing substring "templates" or "template".
+   For each file:
+     - Read content as UTF-8
+     - Find all date matches with regex: \b(20\d\d-\d{2}-\d{2})\b
+     - If zero matches: tenant is stale-with-reason "no parseable date"
+     - Else: latest_date = max date; age_days = (today UTC - latest_date) in whole days
+       - If age_days > 7: tenant stale-with-reason "${age_days}d (${latest_date})"
+       - Else: tenant fresh
+   CHECK3_STATUS = "PASS" if all fresh, "WARNING" if any stale, "SKIP" if zero files matched.
+   CHECK3_DETAIL = "" if PASS else "<parent_dir>: <reason>; ..." (semicolon-separated stale tenants).
 
-If gh fails (exit != 0 or empty output): CHECK1_STATUS = "SKIP", CHECK1_DETAIL = "gh exit=<code>"
+6. Compose OVERALL:
+   warning_count = count of WARNING among CHECK1/2/3 statuses
+   skip_count = count of SKIP
+   If warning_count == 0 and skip_count == 0: OVERALL = "✅ 全PASS"
+   Else if skip_count == 0: OVERALL = "⚠️ ${warning_count} 項需注意"
+   Else: OVERALL = "⚠️ ${warning_count} 項需注意, ${skip_count} 項 SKIP"
 
-============================================
-STEP 2 — Check 2: needs-human-review backlog
-============================================
-Run:
-  gh pr list --repo awarewaveai-pei/Work --label needs-human-review --state open --limit 10 --json number,title,url > /tmp/check2.json
+7. Write report files:
+   mkdir -p agency-os/reports/repair-center
+   Write the EXACT content below to BOTH files (UTF-8 without BOM, LF line endings):
+     - agency-os/reports/repair-center/phase4-LATEST.md
+     - agency-os/reports/repair-center/phase4-${date_string}.md
 
-Set CHECK2_STATUS:
-  - "PASS" if list is empty
-  - "WARNING" if list has any items
-Set CHECK2_DETAIL:
-  - "" if PASS
-  - "#X: title | #Y: title | ..." if WARNING (pipe-separated)
+   ----- File content -----
+   # Repair Center Phase 4 週巡檢
+   - 日期: ${timestamp} TPE
+   - 觸發: Claude routine AgencyOS-RepairCenterPhase4Weekly
+   - Check 1 重複修復: ${CHECK1_STATUS}${CHECK1_DETAIL_PREFIXED}
+   - Check 2 needs-human-review PR: ${CHECK2_STATUS}${CHECK2_DETAIL_PREFIXED}
+   - Check 3 BACKUP_RESTORE_PROOF: ${CHECK3_STATUS}${CHECK3_DETAIL_PREFIXED}
+   - 整體: ${OVERALL}
+   ----- end -----
 
-If gh fails: CHECK2_STATUS = "SKIP", CHECK2_DETAIL = "gh exit=<code>"
+   Where ${CHECKn_DETAIL_PREFIXED} is empty string if detail is empty, else " — ${detail}" (em dash + detail).
 
-============================================
-STEP 3 — Check 3: BACKUP_RESTORE_PROOF freshness
-============================================
-Find all files matching pattern: agency-os/tenants/*/BACKUP_RESTORE_PROOF.md
-EXCLUDE any path containing the substring "templates" or "template".
+8. Commit + push:
+   git add agency-os/reports/repair-center/
+   git commit -m "[claude] auto: Phase 4 週巡檢 ${date_string} — ${OVERALL}"
+   git push origin main
+   If push fails (conflict): run git pull --rebase origin main, then retry push once. If still fails, exit reporting the error.
 
-For each found file:
-  - Read content as UTF-8
-  - Find all date matches with regex: \b(20\d\d-\d{2}-\d{2})\b
-  - If zero matches: this tenant is stale-with-reason "no parseable date"
-  - Else: latest_date = max of matches; age_days = (today UTC - latest_date) in whole days
-    - If age_days > 7: tenant is stale-with-reason "${age_days}d (${latest_date})"
-    - Else: tenant is fresh
-
-Set CHECK3_STATUS:
-  - "PASS" if all tenants fresh
-  - "WARNING" if any stale
-  - "SKIP" if no files found (suspicious — log "no BACKUP_RESTORE_PROOF.md files matched")
-Set CHECK3_DETAIL:
-  - "" if PASS
-  - "<tenant_slug>: <reason>; ..." for each stale tenant (semicolon-separated)
-  - tenant_slug = the parent directory name (e.g., `company-soulful`)
-
-============================================
-STEP 4 — Compose overall verdict
-============================================
-Count statuses among CHECK1, CHECK2, CHECK3:
-  - warning_count = number of "WARNING" statuses
-  - skip_count = number of "SKIP" statuses
-
-OVERALL:
-  - "✅ 全PASS" if warning_count == 0 and skip_count == 0
-  - "⚠️ ${warning_count} 項需注意" if warning_count > 0 and skip_count == 0
-  - "⚠️ ${warning_count} 項需注意, ${skip_count} 項 SKIP" if both
-
-============================================
-STEP 5 — Write report files
-============================================
-Create directory: agency-os/reports/repair-center (mkdir -p)
-
-Compute timestamp in TPE: e.g., "2026-05-22 14:00"
-Compute date string in TPE: e.g., "2026-05-22"
-
-Write the following content to BOTH files:
-  - agency-os/reports/repair-center/phase4-LATEST.md
-  - agency-os/reports/repair-center/phase4-${date_string}.md
-
-File content (UTF-8 without BOM, LF line endings):
----
-# Repair Center Phase 4 週巡檢
-- 日期: ${timestamp} TPE
-- 觸發: Claude routine AgencyOS-RepairCenterPhase4Weekly
-- Check 1 重複修復: ${CHECK1_STATUS}${CHECK1_DETAIL ? " — " + CHECK1_DETAIL : ""}
-- Check 2 needs-human-review PR: ${CHECK2_STATUS}${CHECK2_DETAIL ? " — " + CHECK2_DETAIL : ""}
-- Check 3 BACKUP_RESTORE_PROOF: ${CHECK3_STATUS}${CHECK3_DETAIL ? " — " + CHECK3_DETAIL : ""}
-- 整體: ${OVERALL}
----
-
-============================================
-STEP 6 — Send Telegram
-============================================
-If TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are set:
-
-emoji = "✅" if OVERALL starts with "✅" else "⚠️"
-short_ts = timestamp in MM/DD HH:MM format
-
-Compose text:
-${emoji} Repair Center Phase 4 週巡檢 ${short_ts}
-1 重複修復: ${CHECK1_STATUS}
-2 needs-human-review: ${CHECK2_STATUS}
-3 備份新鮮度: ${CHECK3_STATUS}
-
-詳細: agency-os/reports/repair-center/phase4-LATEST.md
-
-POST to https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage with JSON body:
-  {"chat_id": "${TELEGRAM_CHAT_ID}", "text": "<composed text>"}
-
-If POST fails: log error in transcript, continue (do not fail the routine).
-
-============================================
-STEP 7 — Commit and push
-============================================
-Run:
-  git add agency-os/reports/repair-center/
-  git commit -m "chore(repair-center): Phase 4 週巡檢 ${date_string} — ${OVERALL}"
-  git push origin main
-
-If git push fails (e.g., conflict): pull --rebase, retry once, then fail loudly.
-
-============================================
-CONSTRAINTS (DO NOT VIOLATE)
-============================================
-- Only write files inside agency-os/reports/repair-center/
-- Never delete any file
+RULES:
+- Only write inside agency-os/reports/repair-center/
+- Never delete files
 - Never amend prior commits
-- Never call external services other than:
-  - github.com (via gh CLI)
-  - api.telegram.org (via curl or equivalent)
-- If any STEP errors, capture the error message, still attempt STEPS 5–7 with partial data, and prefix the Telegram text with "❌ Phase 4 部分失敗: <step that errored>"
-- Total runtime budget: 5 minutes. If exceeded, abort STEP 7 (commit) and post Telegram with current state + "TIMEOUT" suffix.
+- Never modify TASKS.md, WORKLOG.md, memory/, or anything outside the report dir
+- Commit prefix MUST be [claude]
+- If any STEP 3/4/5 errors, capture the error message, still complete STEPS 6-8 with partial data, and prefix the commit message with "[claude] PARTIAL: Phase 4 ..."
+- Total runtime budget: 5 minutes — if exceeded, skip step 8 (commit) and exit cleanly
 ```
 
-## Verification
+## ⚠️ Outstanding manual step (2026-05-22)
 
-After Web UI Run now completes:
+`RemoteTrigger run` immediately after `create` returned `HTTP 400 github_repo_access_denied — re-authorize GitHub in settings`. The routine cannot fire until GitHub OAuth is re-authorized at the account level.
 
-1. **Routine listing**:
-   ```bash
-   /schedule list
-   ```
-   Should show `AgencyOS-RepairCenterPhase4Weekly` in the list.
+**To resolve (one-time, ~30 seconds)**:
 
-2. **Routine transcript** (web UI):
-   - All 7 steps logged
-   - No red error indicators
-   - Final commit SHA shown
+1. Open <https://claude.ai/code/routines>
+2. Click any routine (or the `AgencyOS-RepairCenterPhase4Weekly` entry)
+3. Look for a "re-authorize GitHub" prompt or settings link → click through
+4. Confirm GitHub permissions for repo `awarewaveai-pei/Work`
+5. Back in CLI: `RemoteTrigger` with `action: "run"` + `trigger_id: trig_01JyFw78ZkgwQzpyXXaX1F2K` to verify
 
-3. **Repo state** (after `git pull origin main`):
-   - File exists: `agency-os/reports/repair-center/phase4-LATEST.md`
-   - File exists: `agency-os/reports/repair-center/phase4-<YYYY-MM-DD>.md`
-   - Latest commit author: your GitHub identity (inherited by routine)
-   - Latest commit message: `chore(repair-center): Phase 4 週巡檢 ... — ...`
+After re-auth: scheduled fires on every subsequent Friday will work automatically; manual `run` for ad-hoc testing also works.
 
-4. **Telegram channel**: message with ✅ or ⚠️ prefix received within 30 seconds of routine completion.
+**This re-auth likely affects all 4 routines** (DailyBriefing / WeeklyReview / MonthlyReview / new Phase 4). If any of the 3 existing routines have stale `last_fired_at`, they may also have stopped firing — worth checking after re-auth.
 
-5. **Local watchdog**:
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\system-health-check.ps1
-   ```
-   Should show new check: `Phase 4 weekly report freshness — PASS — <N>d old`.
+## Verification (after GitHub re-auth)
+
+```bash
+# 1. Routine listing shows it
+/schedule list                  # should include AgencyOS-RepairCenterPhase4Weekly
+
+# 2. Manual trigger (use RemoteTrigger run action)
+#    Wait ~2 minutes for completion
+
+# 3. Verify commit landed
+git pull origin main
+git log --oneline -5            # should show [claude] auto: Phase 4 週巡檢 YYYY-MM-DD — ...
+
+# 4. Verify report file
+ls agency-os/reports/repair-center/    # should contain phase4-LATEST.md + phase4-YYYY-MM-DD.md
+
+# 5. Verify watchdog clear
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\system-health-check.ps1
+# Should now show: "Phase 4 weekly report freshness — Pass: True — 0d old (routine AgencyOS-RepairCenterPhase4Weekly)"
+```
 
 ## Watchdog (auto)
 
-`scripts/system-health-check.ps1` §11 (added 2026-05-22) checks:
+`scripts/system-health-check.ps1` §11 (added 2026-05-22) checks `phase4-LATEST.md` mtime:
 
-- `agency-os/reports/repair-center/phase4-LATEST.md` mtime
-- If `> 8 days` old: WARN (routine likely stopped firing)
-- If missing entirely: WARN (routine never ran successfully)
-- AO-RESUME / AO-CLOSE surface this WARN automatically
+| State | Watchdog message |
+|---|---|
+| File missing | WARN: report file missing — routine never ran or path wrong |
+| Age ≤ 8 days | `${N}d old (routine AgencyOS-RepairCenterPhase4Weekly)` (PASS) |
+| Age > 8 days | WARN: ${N}d old (max 8d) — routine may have stopped firing |
+| Layout drift (no agency-os/) | Skipped: monoRoot layout drift |
 
-This is the watchdog-of-the-watchdog: if the routine stops, AO-RESUME notices within 8 days.
+AO-RESUME / AO-CLOSE surface this WARN automatically. Watchdog uses `[Math]::Floor` (not `[int]`) to avoid banker's-rounding off-by-12h on the staleness boundary.
 
 ## Rollback
 
 | Scenario | Action |
 |---|---|
-| Disable temporarily | Web UI → routine → toggle Active off |
-| Delete routine | Web UI → routine → Delete; this file gains `Status: Retired YYYY-MM-DD` header per `claude-routines/README.md` rule |
-| Routine misbehaving (writing wrong files / spamming) | Disable in web UI first; investigate via transcript; commit fixes here; re-enable |
+| Disable temporarily | `RemoteTrigger update trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K body={"enabled":false}` |
+| Re-enable | same but `"enabled":true` |
+| Delete routine | <https://claude.ai/code/routines> → routine → Delete (no CLI delete supported) |
+| Routine misbehaving (writing wrong files / spamming) | Disable via RemoteTrigger update first; investigate via web UI transcript; commit fixes here; update via RemoteTrigger; re-enable |
 | Revert a bad commit by the routine | `git revert <sha>` then disable routine until prompt fixed |
+
+## Update flow (if prompt needs change)
+
+1. Edit the prompt body in this file (the fenced code block under "Routine prompt")
+2. `RemoteTrigger update trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K body={"job_config": {"ccr": {"events": [{"data": {"uuid": "<new-uuid>", "session_id": "", "type": "user", "parent_tool_use_id": null, "message": {"role": "user", "content": "<new-prompt-text>"}}}], "session_context": {...same as before...}, "environment_id": "env_01WybafvBbrm4WQXjntcvynp"}}}`
+3. Verify with `RemoteTrigger get trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K`
+4. Commit the SSOT update with link to actual API call
 
 ## Related
 
-- Fallback (manual run): `scripts/phase4-weekly-check.ps1` — kept as belt-and-suspenders backup; ran via `/phase4-check` slash command
+- Fallback (manual run): `scripts/phase4-weekly-check.ps1` — kept as belt-and-suspenders backup
 - Watchdog: `scripts/system-health-check.ps1` §11
-- Forensic context: `agency-os/WORKLOG.md` 2026-05-22 entry
+- Forensic + design rationale: `agency-os/WORKLOG.md` 2026-05-22 entry
 - Pattern doc: `agency-os/automation/claude-routines/README.md`
+- Sibling routines (same pattern, different schedule): `AgencyOS-DailyBriefing` (`trig_01XoSCqJQu6DDKVJw6Lvobpd`), `AgencyOS-WeeklyReview` (`trig_01WanBfvAZvx5TR8xAXjxKVp`), `AgencyOS-MonthlyReview` (`trig_01GWG3NQSPm7SbRdJAN25QdM`)
+- Lesson saved: `~/.claude/projects/d--Work/memory/feedback_inspect_before_design.md`
