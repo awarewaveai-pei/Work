@@ -625,6 +625,42 @@ if (-not (Test-Path -LiteralPath $agencyDir)) {
     }
 }
 
+# 12) Claude Code cross-machine sync drift (HARD failures block AO-CLOSE; SOFT surfaces as WARN).
+# Single source of truth: scripts/check-claude-sync.ps1 — see that script's header for severity model.
+# Why HARD blocks: a broken junction or missing tracked file means commands/agents/skills
+# silently diverge between machines; better to catch at gate than discover mid-session.
+$syncCheckScript = Join-Path $monoRoot "scripts\check-claude-sync.ps1"
+if (Test-Path -LiteralPath $syncCheckScript) {
+    try {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncCheckScript -Quiet 2>&1 | Out-Null
+        $syncExit = $LASTEXITCODE
+        $syncJsonPath = Join-Path $monoRoot "agency-os\.agency-state\sync-check-last.json"
+        $syncDetail = "exit=$syncExit"
+        if (Test-Path -LiteralPath $syncJsonPath) {
+            try {
+                $syncJson = Get-Content -LiteralPath $syncJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                $worst = $syncJson.worstSeverity
+                $hardFails = @($syncJson.findings | Where-Object { $_.severity -eq 'hard' })
+                $softFails = @($syncJson.findings | Where-Object { $_.severity -eq 'soft' })
+                $syncDetail = "worst=$worst, hard=$($hardFails.Count), soft=$($softFails.Count)"
+            } catch {
+                $syncDetail = "exit=$syncExit (JSON parse failed: $($_.Exception.Message))"
+            }
+        }
+        switch ($syncExit) {
+            0 { Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $true -Detail ("PASS: " + $syncDetail) }
+            1 { Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $false -Detail ("HARD FAIL: " + $syncDetail + " - run /sync-check for fix commands"); Add-CriticalFailure -Reason "Claude Code sync infrastructure broken (see /sync-check)" }
+            2 { Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $true -Detail ("WARN (soft): " + $syncDetail + " - uncommitted local files under .claude/{commands,agents,skills}") }
+            3 { Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $true -Detail "Skipped: Claude Code not installed" }
+            default { Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $false -Detail "Unexpected exit code $syncExit"; Add-CriticalFailure -Reason "check-claude-sync.ps1 returned unexpected exit $syncExit" }
+        }
+    } catch {
+        Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $true -Detail ("Skipped: invocation failed: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+    }
+} else {
+    Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $true -Detail "Skipped: scripts/check-claude-sync.ps1 not present"
+}
+
 $total = $checks.Count
 $passed = @($checks | Where-Object { $_.pass }).Count
 $failed = $total - $passed

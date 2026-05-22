@@ -10,20 +10,25 @@
 
   Checks (layered by severity):
 
-  HARD (exit 1) — sync infrastructure is broken; fix before next session:
+  HARD (exit 1) -- sync infrastructure is broken; fix before next session:
     H1. .claude is a Windows Junction/Symlink (or platform skip on non-Windows)
     H2. sync-claude-userlevel.ps1 -Mode verify exits 0 (hooks/settings/mcp.json)
-    H3. ~/.claude/mcp.json content is exactly '{}'
-    H4. Every git-tracked file under .claude/commands|agents|skills exists on disk
+    H3. Every git-tracked file under .claude/commands|agents|skills exists on disk
         (broken sync = git pull wrote into a real dir, Claude reads from ~/.claude)
 
-  SOFT (exit 2) — sync is working but the user has local files not in git
+  SOFT (exit 2) -- sync is working but the user has local files not in git
                   (untracked .md under .claude/{commands,agents,skills}). Not
                   blocking, but worth surfacing in case the user forgot to commit.
 
-  ENV (exit 3) — Claude Code not installed (~/.claude missing). Graceful skip.
+  ENV (exit 3) -- Claude Code not installed (~/.claude missing). Graceful skip.
 
-  PASS (exit 0) — all clean.
+  PASS (exit 0) -- all clean.
+
+  Note: a previous version also strict-matched ~/.claude/mcp.json to literal
+  '{}', but sync-claude-userlevel.ps1 -Mode verify (delegated above) already
+  enforces mcp.json conformance via its own template comparison. The strict
+  text match produced false positives on the semantically-equivalent
+  '{ "mcpServers": {} }' form. Removed to avoid duplicate / divergent rules.
 
 .PARAMETER Quiet
   Suppress human-readable output; only write JSON. Used by system-health-check
@@ -101,7 +106,10 @@ if (-not $ClaudeUserRoot -or -not (Test-Path -LiteralPath $ClaudeUserRoot)) {
 }
 
 # ---------- H1: .claude junction status ----------
-if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+# PS 5.1 lacks $IsWindows automatic variable; under Set-StrictMode it throws on access.
+# $env:OS = 'Windows_NT' on Windows (both PS 5.1 and PS 7+); empty on Linux/Mac.
+$isWindowsHost = ($env:OS -eq 'Windows_NT')
+if ($isWindowsHost) {
     if (Test-Path -LiteralPath $ClaudeRepoPath) {
         try {
             $item = Get-Item -LiteralPath $ClaudeRepoPath -Force
@@ -156,34 +164,10 @@ if (Test-Path -LiteralPath $syncScript) {
         -Fix 'git pull to restore scripts/sync-claude-userlevel.ps1'
 }
 
-# ---------- H3: ~/.claude/mcp.json is empty {} ----------
-if ($ClaudeUserRoot -and (Test-Path -LiteralPath $ClaudeUserRoot)) {
-    $mcpUserPath = Join-Path $ClaudeUserRoot 'mcp.json'
-    if (Test-Path -LiteralPath $mcpUserPath) {
-        try {
-            $raw = (Get-Content -LiteralPath $mcpUserPath -Raw -Encoding UTF8).Trim()
-            if ($raw -eq '{}') {
-                Add-Finding -Severity 'pass' -Check 'H3: ~/.claude/mcp.json' `
-                    -Detail 'Empty {} as required (project .mcp.json is the real SSOT)'
-            } else {
-                $excerpt = if ($raw.Length -gt 80) { $raw.Substring(0, 80) + '...' } else { $raw }
-                Add-Finding -Severity 'hard' -Check 'H3: ~/.claude/mcp.json' `
-                    -Detail "Not empty: '$excerpt'. CLAUDE.md R1 requires this to be {} so project .mcp.json wins." `
-                    -Fix 'powershell -File scripts\sync-claude-userlevel.ps1 -Mode merge'
-            }
-        } catch {
-            Add-Finding -Severity 'hard' -Check 'H3: ~/.claude/mcp.json' `
-                -Detail "Read failed: $($_.Exception.Message)" `
-                -Fix "Inspect $mcpUserPath manually"
-        }
-    } else {
-        Add-Finding -Severity 'soft' -Check 'H3: ~/.claude/mcp.json' `
-            -Detail "Missing: $mcpUserPath (expected to exist with content '{}')" `
-            -Fix 'powershell -File scripts\sync-claude-userlevel.ps1 -Mode install'
-    }
-}
-
-# ---------- H4 + S1: git-tracked .claude files exist on disk + extras ----------
+# ---------- H3 + S1: git-tracked .claude files exist on disk + extras ----------
+# (Former H3 strict-match of mcp.json removed -- H2 above already validates it
+#  via sync-claude-userlevel.ps1's own template comparison, which understands
+#  the semantically-equivalent '{ "mcpServers": {} }' form.)
 $claudeSubdirs = @('commands', 'agents', 'skills')
 foreach ($subdir in $claudeSubdirs) {
     $relPath = ".claude/$subdir"
@@ -199,11 +183,11 @@ foreach ($subdir in $claudeSubdirs) {
     if ($missing.Count -gt 0) {
         $sample = ($missing | Select-Object -First 3) -join ', '
         $more = if ($missing.Count -gt 3) { " (+$($missing.Count - 3) more)" } else { '' }
-        Add-Finding -Severity 'hard' -Check "H4: .claude/$subdir git/disk parity" `
+        Add-Finding -Severity 'hard' -Check "H3: .claude/$subdir git/disk parity" `
             -Detail "$($missing.Count) file(s) tracked in git but missing on disk: $sample$more. Junction likely broken." `
             -Fix 'powershell -File scripts\bootstrap-mcp-machine.ps1 (recreate junction); then git checkout HEAD -- .claude/'
     } else {
-        Add-Finding -Severity 'pass' -Check "H4: .claude/$subdir git/disk parity" `
+        Add-Finding -Severity 'pass' -Check "H3: .claude/$subdir git/disk parity" `
             -Detail "$($tracked.Count) tracked file(s) all present on disk"
     }
 
@@ -273,8 +257,8 @@ if (-not $Quiet) {
     Write-Host '------------------------------------------------------------' -ForegroundColor Cyan
     $label = switch ($worstSeverity) {
         'pass' { 'PASS' }
-        'soft' { 'WARN (soft drift — uncommitted local work)' }
-        'hard' { 'FAIL (hard drift — sync infrastructure broken)' }
+        'soft' { 'WARN (soft drift -- uncommitted local work)' }
+        'hard' { 'FAIL (hard drift -- sync infrastructure broken)' }
         'env'  { 'SKIP (Claude Code not installed)' }
     }
     $resultColor = switch ($worstSeverity) {

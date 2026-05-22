@@ -4,6 +4,54 @@
 
 ## 2026-05-22
 
+### Cross-machine sync — 機械保障層（`check-claude-sync.ps1` + `/sync-check` + health gate 整合，~19:10 UTC+8）
+
+**起源**：今天稍早補了 skills sync 漏洞 + bootstrap junction（commits `07dfa9d`、`4cbcee4`），但本質問題沒解——「sync 架構非自明」這件事，連架構師自己讀 CLAUDE.md 都會誤判（我自己今天就誤讀「commands 沒同步」一次）。文字會過時；只有可執行的 verifier 才是 ground truth。
+
+**目標**（30 年級紀律）：把「sync 是否健康」變成一段**可執行的程式**，自動掛進現有 health gate，drift 在 AO-CLOSE 100% 門檻就被擋下，不需要任何人記得跑檢查。
+
+**修改**（3 個新檔 + 1 個整合）：
+
+1. **`scripts/check-claude-sync.ps1`**（新）—— SSOT verifier，layered exit code：
+   - **HARD（exit 1）**：junction 狀態 / sync-claude-userlevel -Mode verify / `.claude/{commands,agents,skills}` 內 git-tracked 檔案是否實際存在於 disk（broken junction = 檔案在 git 看到但 disk 找不到）
+   - **SOFT（exit 2）**：disk 上有 `.claude/{commands,agents,skills}` 檔案但未 git-tracked（uncommitted local work，不 block）
+   - **ENV（exit 3）**：Claude Code 未安裝（`~/.claude` 不存在），graceful skip
+   - **PASS（exit 0）**：全清
+   - 輸出 JSON 到 `agency-os/.agency-state/sync-check-last.json`（machine-readable）+ 人類可讀 table（除非 `-Quiet`）
+
+2. **`.claude/commands/sync-check.md`**（新）—— slash command `/sync-check`，呼叫 PS script 並要求 Claude 摘要結果
+
+3. **`scripts/system-health-check.ps1` section 12**（修改）——掛新 check：
+   - exit 0 → PASS
+   - exit 1 → FAIL + Add-CriticalFailure（**block AO-CLOSE 100% gate**）
+   - exit 2 → PASS with WARN detail（不 block）
+   - exit 3 → PASS skipped
+   - default → FAIL + critical
+
+**[驗證計畫] 四動作結果**：
+
+- **實測**（3 個場景）：
+  1. **Happy path**：`powershell scripts/check-claude-sync.ps1` → 全 H 檢查 PASS，1 個 S1 SOFT（sync-check.md 自己尚未 commit，預期），exit=2
+  2. **Intentional break**：`mv .claude/skills/feature-plan/SKILL.md .testbak` → 重跑 → HARD 觸發「1 file(s) tracked in git but missing on disk: .claude/skills/feature-plan/SKILL.md」，exit=1；`mv` 還原確認 SKILL.md size 3404 bytes 恢復原狀
+  3. **Health-check 整合**：`powershell scripts/system-health-check.ps1` → 報表內含新 check name「Claude Code cross-machine sync (check-claude-sync.ps1)」+ detail「WARN (soft): worst=soft, hard=0, soft=1」+ pass=true；99.7% 367/368（1 個 Failed 是預先存在的 doc integrity，與本次無關）
+- **Review**：Read 3 個檔案結構正確（layered severity / switch case / slash command 摘要要求）；PS 語法 `[PSParser]::Tokenize` 雙檔通過
+- **抓蟲**：
+  - `grep "check-claude-sync\|sync-check.md"` 命中限本次新加（system-health-check.ps1 整合處）+ slash command 自身，無 stale ref
+  - `grep "/sync-check"` 無命名衝突（沒有其他文件先聲稱了這個 command）
+  - `grep "health gate.*100"` 既有文件對 health gate 描述未過時，新 check 自然納入 100% 門檻
+- **WORKLOG**：本 entry
+
+**過程踩到 2 個小坑（已修）**：
+1. PS 5.1 沒 `$IsWindows` 自動變數，配 `Set-StrictMode -Version Latest` 直接炸 → 改用 `$env:OS -eq 'Windows_NT'`
+2. 原 H3 嚴格比對 `~/.claude/mcp.json == '{}'`，但實際 sync 模板允許 `{ "mcpServers": {} }`（語意等價），且 H2 的 `sync-claude-userlevel.ps1 -Mode verify` 已負責此檢查 → 移除 H3，避免雙規則 / 偏移；H4 改編號為 H3
+
+**剩餘風險**：
+- **跨機 end-to-end 驗證**：本機 junction 已存在，只走「已是 junction」分支；新機 bootstrap 走「不存在 → 建立」分支的真實場景，要等下次桌機 pull 時才會自然驗證（建議當下用 `/sync-check` 確認）
+- **抓不到的 drift**：本 check 假設「git ls-files = 真實 SSOT」；若某檔被 `.gitignore` 排除但邏輯上應 tracked（例如未來新增 skill 種類忘了 negate），check 不會發現——這層需要人類 review `.gitignore`
+- **`-Mode verify` 內部弱點**：H2 是黑箱委派，若 sync-claude-userlevel 本身有 bug（例如 PS5.1 1-element array bug），本 check 無從察覺；但這風險不大，因為 sync-claude-userlevel 已有 normalize 機制 + node 驗證 helper
+
+**Rollback**：`git revert <next commit>`；無破壞性改動（純新增 script + 加 health check 區塊，無刪除）
+
 ### Cross-machine sync 補洞 + AO-RESUME 報告歸檔（commits `07dfa9d`、`4cbcee4`，~18:40-18:50 UTC+8）
 
 **起源**：操作者問「commands、skills、settings 應該都要同步啊怎麼會被擋下來」。盤點後發現：commands/agents 透過 `.claude` symlink + git tracking 已同步，但 (1) `.claude/skills/` 大部分被 `.gitignore` 排除（白名單只兩個），換機新裝的 skills 不會跟過去；(2) `bootstrap-mcp-machine.ps1` 沒自動建 `.claude` junction → 桌機若沒手動建，commands/agents/skills 即使 git pull 也會脫鉤；(3) CLAUDE.md R1 表第二行寫「`~/.claude/commands/`」歧義，commands 其實走 git。

@@ -129,11 +129,32 @@ function Test-IsInsideUtf8ConsoleBlock {
     return $false
 }
 
+function Test-FileHasScriptLevelProtection {
+    <#
+      Pattern B: file sets [Console]::OutputEncoding = UTF8 somewhere at script-level
+      (before any capture site). Covers backfill-missed-daily / print-open-tasks pattern.
+      Returns $true if such a line exists in the source.
+    #>
+    param([string]$ScriptPath)
+    try {
+        $content = [System.IO.File]::ReadAllText($ScriptPath, [System.Text.Encoding]::UTF8)
+        # Match `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` or `= [Text.Encoding]::UTF8` etc.
+        return ($content -match '\[Console\]::OutputEncoding\s*=\s*\[(?:System\.)?Text\.Encoding\]::UTF8')
+    } catch {
+        return $false
+    }
+}
+
 function Get-UnprotectedCaptures {
     <#
       Return list of @{File, Line, Cmd, Snippet} for unprotected capture sites.
     #>
     param([string]$ScriptPath)
+
+    # Pattern B check (script-level set). If file has it, treat all captures as protected.
+    if (Test-FileHasScriptLevelProtection -ScriptPath $ScriptPath) {
+        return ,@()
+    }
 
     $tokens = $null
     $errors = $null
@@ -222,7 +243,14 @@ $allFindings = New-Object System.Collections.Generic.List[object]
 $cleanCount = 0
 foreach ($f in $scanFiles) {
     $rel = $f.Replace($repoRoot + '\', '').Replace('\', '/')
-    $findings = @(Get-UnprotectedCaptures -ScriptPath $f)
+    # NOTE: Get-UnprotectedCaptures returns `,$array` (idiomatic to prevent unwrapping). DO NOT
+    # wrap again with @() — that produces double-wrap (1-element array containing the real array),
+    # then `foreach ($x in $findings)` yields an empty array as $x and $x.Line throws under StrictMode.
+    $findings = Get-UnprotectedCaptures -ScriptPath $f
+    if ($null -eq $findings) { $findings = @() }
+    # Force-coerce to array — under StrictMode, if Get-... returned a single non-array object,
+    # .Count would fail. @() ensures uniform array type.
+    $findings = @($findings)
     if ($findings.Count -eq 0) {
         $cleanCount++
         if (-not $Quiet -and -not $Json) { Write-Host ("  OK   {0}" -f $rel) -ForegroundColor DarkGray }

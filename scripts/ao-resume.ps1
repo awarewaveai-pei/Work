@@ -27,6 +27,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# CP950 protection for ssh/git stdout capture (see scripts/_console-encoding-helpers.ps1).
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+
 function Show-AoResumeQuickFix {
     param(
         [Parameter(Mandatory = $true)][string]$Step,
@@ -419,7 +422,10 @@ if (Test-Path -LiteralPath $fetchSignalsScript) {
                 Push-Location $WorkRoot
                 try {
                     # Get commit dates since stamp, EXCLUDING auto-checkpoint commits (those are not real work).
-                    $rawLog = git log --since="$($stampUtc.ToString('o'))" --pretty=format:"%cd|%s" --date=format:"%Y-%m-%d" 2>$null
+                    # CP950 protection: %s contains commit subjects which may include CJK — capture under
+                    # forced UTF-8 console to prevent mojibake + newline-eating (exact bug class that bit
+                    # backfill-missed-daily.ps1 2026-05-22).
+                    $rawLog = Invoke-WithUtf8Console { git log --since="$($stampUtc.ToString('o'))" --pretty=format:"%cd|%s" --date=format:"%Y-%m-%d" 2>$null }
                 } finally {
                     Pop-Location
                 }
