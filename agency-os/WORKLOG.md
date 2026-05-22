@@ -4,6 +4,36 @@
 
 ## 2026-05-22
 
+### CLAUDE.md 加 Codex fallback pointer — 雙工具共讀 SSOT 防禦性同步（2026-05-22 14:30 UTC）
+
+**事件**：完成 R0/R4 [驗證計畫] 四動作升級後（commits `ad98dd9` + `ec94bac`），使用者提醒「我也有再用 codex」。經抓蟲確認：
+- `~/.codex/AGENTS.md` L4-7 明寫「Claude source content lives in `D:\Work\CLAUDE.md` and `D:\Work\.claude`」+「Do not hand-maintain a parallel Codex rule set」→ 政策上 Codex 必須讀 Claude side 規則
+- `~/.codex/rules/default.rules` = 純 command allowlist，**非** behavior rules
+- `~/.codex/memories/` = 空目錄
+- `d:/Work/AGENTS.md` **不存在**（repo 根無 AGENTS.md，Codex 預設 convention 期望的位置）
+- `d:/Work/CLAUDE.md` L1 = `@agency-os/AGENTS.md`（Claude Code import 語法）
+
+**疑點**：Codex 是否認得 `@import` 語法 — 無 100% 證據。樂觀 → 自動載入；悲觀 → 把 `@agency-os/AGENTS.md` 當純文字略過，R0/R4 對 Codex 無感。
+
+**修法**（純 docs，1 行 HTML comment，極小修改）：
+- `d:/Work/CLAUDE.md` L1 後加 HTML comment fallback pointer：「Codex / 任何不認得 @import 的 agent：請額外讀 agency-os/AGENTS.md（R0 + R4 為強制；[驗證計畫] 須含實測 / Review / 抓蟲 / WORKLOG 四動作）」
+- HTML comment 對 Claude Code（已透過 @import 載入）= 0 影響；對 Codex（即使解析整個 CLAUDE.md 純文字）= 明文指引補讀
+- 不動 `agency-os/AGENTS.md`（SSOT 維持單檔，雙工具共讀，符合 user-level Codex AGENTS.md「no parallel rule set」政策）
+
+**驗證（四動作各跑一次，繼續吃自己狗食 = dogfooding）**：
+- 1. **實測**：`grep -c "Codex / 任何不認得 @import" d:/Work/CLAUDE.md` = 1 ✅；Python markdown 解析模擬確認 HTML comment 187 chars 對 render 隱形、code fence 仍 paired
+- 2. **Review**：Read CLAUDE.md L1-8 → 結構為 `@import → 空行 → HTML comment → 空行 → # heading`，符合 markdown 慣例，無 breakage
+- 3. **抓蟲**：(a) `grep "^@" *.md` 確認 repo 內**唯一** Claude-style import 在 CLAUDE.md（其他 `@(` 是 PowerShell array，非 markdown import）→ 無其他 @import 需 fallback；(b) `find lobster-factory -name AGENTS.md` = 0 → 無 nested AGENTS.md 患者；(c) `agency-os/AGENTS.md` = 唯一 SSOT ✅
+- 4. **WORKLOG**：本 entry 即為本動作落實
+
+**剩餘風險**：(1) 仍無「Codex 真的讀到」的端到端證明 — 下次 Codex session 實測再補；(2) 若未來 lobster-factory / 其他子目錄新增 AGENTS.md，需同步加 fallback pointer（屬 nested AGENTS.md 必跑檢核項，已在 R4 隱含覆蓋）。
+
+**Rollback**：`git revert HEAD` 一鍵還原（純 HTML comment，0 服務影響）。
+
+**Files**：`d:/Work/CLAUDE.md`（+2 行：HTML comment + 1 空行）
+
+---
+
 ### R0/R4 [驗證計畫] 標準升級 — 四動作硬性檢核（2026-05-22 14:00 UTC）
 
 **事件**：本日修正 2026-05-21 GitHub App 結論（commit `5839f60` / `fd9feb1`）時，第一次只用 `grep -c` 計數就回報「驗證完成」。使用者質問「有實測+review+抓蟲嗎?」才意識到 R0 原 [驗證計畫] 範本（「測試、lint、build、手動檢查或其他驗證方式」）太抽象，導致代理（包含本 session 的我）習慣性退化為 grep 一下就交差。

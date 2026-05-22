@@ -1,5 +1,7 @@
 @agency-os/AGENTS.md
 
+<!-- Codex / 任何不認得 @import 的 agent：請額外讀 agency-os/AGENTS.md（R0 架構師模式 + R4 聲稱即驗證為強制規則；[驗證計畫] 須含實測 / Review / 抓蟲 / WORKLOG 四動作）。本檔與 agency-os/AGENTS.md 為雙工具（Claude Code + Codex）共讀 SSOT。 -->
+
 # Claude Code Project Instructions
 
 ## 核心規範（每次適用）
