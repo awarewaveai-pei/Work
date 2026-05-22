@@ -65,6 +65,11 @@ try {
     $dateObj = [DateTime]::ParseExact($Date, 'yyyy-MM-dd', $null)
     $nextDay = $dateObj.AddDays(1).ToString('yyyy-MM-dd')
 
+    # NOTE: git log --since/--until use local-time boundaries (git's default). If a commit at
+    # 2026-05-21 23:55 +08:00 is being checked against $Date=2026-05-21, it correctly falls
+    # in-window. Cross-timezone backfill (e.g. running this script from a different region than
+    # where commits were authored) may shift the window by N hours. Acceptable for single-operator
+    # use; documented here so future maintainers don't add a "UTC fix" that breaks the common case.
     $log = git log --since="$Date 00:00" --until="$nextDay 00:00" --pretty=format:"%h|%ci|%s" 2>$null
     $commits = @($log | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
@@ -80,12 +85,12 @@ $generatedOn = (Get-Date).ToString('yyyy-MM-dd')
 $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add("# Daily Note - $Date")
 $lines.Add("")
-$lines.Add("<!-- backfilled:manual source=git-log generated_on=$generatedOn reason=`"AO-CLOSE did not run on $Date — daily scaffold never created. Reconstructed from git log to fill the date hole. Original closeout intent unknown; this is best-effort summary, not a verbatim record.`" -->")
+$lines.Add("<!-- backfilled:manual source=git-log generated_on=$generatedOn reason=`"AO-CLOSE did not run on $Date -- daily scaffold never created. Reconstructed from git log to fill the date hole. Original closeout intent unknown; this is best-effort summary, not a verbatim record.`" -->")
 $lines.Add("")
 $lines.Add("## Done today")
 $lines.Add("")
 if ($commits.Count -gt 0) {
-    $lines.Add("Reconstructed from ``git log --since=$Date --until=$nextDay``:")
+    $lines.Add("Reconstructed from ``git log --since=`"$Date 00:00`" --until=`"$nextDay 00:00`"`` (local-time boundaries):")
     $lines.Add("")
     foreach ($c in $commits) {
         $parts = $c -split '\|', 3
@@ -101,15 +106,15 @@ if ($commits.Count -gt 0) {
 $lines.Add("")
 $lines.Add("## Current state")
 $lines.Add("")
-$lines.Add("- (backfilled — current state not reconstructable from git log alone; check WORKLOG.md ## $Date and CONVERSATION_MEMORY.md for narrative context)")
+$lines.Add("- (backfilled -- current state not reconstructable from git log alone; check WORKLOG.md ## $Date and CONVERSATION_MEMORY.md for narrative context)")
 $lines.Add("")
 $lines.Add("## Next steps")
 $lines.Add("")
-$lines.Add("- (backfilled — next steps were never recorded; see TASKS.md for currently-open items)")
+$lines.Add("- (backfilled -- next steps were never recorded; see TASKS.md for currently-open items)")
 $lines.Add("")
 $lines.Add("## Closeout inbox (AO-CLOSE auto, verbatim)")
 $lines.Add("")
-$lines.Add("<!-- backfilled:manual — $Date has no closeout-inbox because AO-CLOSE did not run that day. -->")
+$lines.Add("<!-- backfilled:manual -- $Date has no closeout-inbox because AO-CLOSE did not run that day. -->")
 
 if (-not (Test-Path -LiteralPath $dailyDir)) {
     New-Item -ItemType Directory -Path $dailyDir -Force | Out-Null

@@ -502,15 +502,26 @@ try {
     # Write close timestamp BEFORE cross-machine export so vault gets the fresh value.
     # Ordering bug history: export used to run first → vault kept N-1's stamp → next AO-RESUME's
     # import overwrote local NEW with vault OLD → cross-machine stamp permanently stuck.
+    #
+    # Atomic write via tmp + Move-Item -Force: WriteAllText is non-atomic on Windows (truncate-then-
+    # write, ~5ms window with 0 bytes). A concurrent reader hitting that window would get null and
+    # crash under StrictMode. Move-Item -Force on NTFS is atomic (same volume), so readers always
+    # see either the OLD content or the complete NEW content — never an empty/partial file.
     try {
         $closeStampDir  = Join-Path $WorkRoot "agency-os\.agency-state"
         $closeStampPath = Join-Path $closeStampDir "ao-close-last.txt"
+        $closeStampTmp  = "$closeStampPath.tmp"
         $null = New-Item -ItemType Directory -Force -Path $closeStampDir
         $closeNow = (Get-Date).ToUniversalTime().ToString("o")
         $utf8NoBom2 = New-Object System.Text.UTF8Encoding $false
-        [System.IO.File]::WriteAllText($closeStampPath, $closeNow + [Environment]::NewLine, $utf8NoBom2)
+        [System.IO.File]::WriteAllText($closeStampTmp, $closeNow + [Environment]::NewLine, $utf8NoBom2)
+        Move-Item -LiteralPath $closeStampTmp -Destination $closeStampPath -Force
         Write-Host ("AO-CLOSE: close stamp written ({0})" -f $closeNow) -ForegroundColor DarkGray
     } catch {
+        # Best-effort cleanup of orphaned .tmp on failure.
+        if ($closeStampTmp -and (Test-Path -LiteralPath $closeStampTmp)) {
+            Remove-Item -LiteralPath $closeStampTmp -Force -ErrorAction SilentlyContinue
+        }
         Write-Warning "AO-CLOSE: could not write ao-close-last.txt (non-fatal): $_"
     }
 

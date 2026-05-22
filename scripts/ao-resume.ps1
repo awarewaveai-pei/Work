@@ -447,7 +447,10 @@ if (Test-Path -LiteralPath $fetchSignalsScript) {
                     Write-Host ""
                 }
             } catch {
-                # Silent: health check must never break AO-RESUME.
+                # Health check must never break AO-RESUME (degrade gracefully), but leave a
+                # forensic trail so the operator can diagnose if the check itself stops working.
+                # Common triggers: git lock, corrupted index, stamp file with unparseable timestamp.
+                Write-Host ("   (health check skipped: {0})" -f $_.Exception.Message) -ForegroundColor DarkGray
             }
         }
     } else {

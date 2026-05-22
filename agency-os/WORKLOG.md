@@ -74,6 +74,68 @@
 
 **CREDENTIALS sync 順帶確認**：本機 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`（25768 bytes, BOM=True）SHA256 = `3179963791…28cef8`，與 `G:\我的雲端硬碟\MySecretVault\MySecretVault\AWARE_WAVE_CREDENTIALS.md`（2026-05-21 11:34:38 mtime）**完全一致**。2026-05-20 daily note 提到的「待同步至 vault」實際在 2026-05-21 即已完成；該待辦標記過時，本次驗證後免動作。
 
+### Security pivot: n8n 密碼 rotation + repo PUBLIC→PRIVATE + Phase 4 全鏈驗證（2026-05-22 04:50~05:15 UTC）
+
+**事件鏈**：操作者授權執行「Phase 4 唯一外部缺口收官（ANTHROPIC_API_KEY 補額後重跑 Claude branch→PR 驗證）」。架構師檢視先決條件時三輪深度盤點，發現 repo 為 PUBLIC + 一筆明文密碼（`PeiAI20260405!`，n8n owner / BASIC_AUTH 雙用途）在 `WORKLOG.md` + `CONVERSATION_MEMORY.md` 公開洩漏 11+ 天 → 升級為 P0 安全事件，順序改為「rotate 密碼 → flip private → 跑 Phase 4」。
+
+**Round 1-3 三輪鑑識結論**：
+- ✅ Git history 無 sk-ant / ghp_ / AKIA / tr_pat_ / OpenSSH 等 active secrets
+- ❌ n8n 密碼明文 2 處公開（WORKLOG.md L1497 + CONVERSATION_MEMORY.md L30）
+- ❌ 37 個 .md 含 VPS IP / 3 個客戶 tenant 公開 / 客戶 site URL + 操作 SOP 公開
+- ✅ 0 forks / 0 stars / 0 deploy keys / 0 Pages / 0 submodules / 1 webhook 出站
+- ✅ GHA 月用量 ~50 min（Free private quota 2000 min/月 = 2.5% 使用率）
+- ✅ flip private 0 hard blocker，0 成本
+
+**修法（順序執行）**：
+1. **n8n 密碼 rotation**（EU VPS）
+   - 新密碼：本機 PowerShell `RandomNumberGenerator` 生成 24 char alphanumeric（純 base64 去 `/+=`）
+   - bcrypt hash：`docker exec -w /usr/local/lib/node_modules/n8n n8n node -e "..."` 在 n8n container 內生成 `$2a$10$...`
+   - DB UPDATE：`public."user"` SET password = '<HASH>' WHERE email = 'peijingartstudio@gmail.com'（rowcount = 1）
+   - Env 替換：`sed -i.tmp` 改 `/root/n8n/docker-compose.yml` 的 `N8N_BASIC_AUTH_PASSWORD=`（保留 .bak.20260522-pw-rotation）
+   - 套用：`docker compose -f /root/n8n/docker-compose.yml up -d`（容器 Recreate→Start）
+   - **發現**：n8n v2.15.1 已棄用 `N8N_BASIC_AUTH_*`；nginx vhost n8n.aware-wave.com 亦無 `auth_basic` → 真正保護為 app-level user password。BASIC_AUTH 屬 dead config，但仍 rotate（防 operator 跨系統重用）
+2. **驗證 rotation**（4 test）
+   - Test 1: NEW basic auth + /healthz → 200 ✅
+   - Test 2: OLD basic auth + / → 404（n8n v2 ignores BASIC_AUTH，可預期）
+   - Test 3: NEW password app login `/rest/login` → 200 + user data 回傳 ✅
+   - Test 4: **OLD password app login → 401 "Wrong username or password"** ✅（證明洩漏密碼已失效）
+3. **本機 + vault 同步**
+   - `d:/Work/mcp/user-env.ps1` L54（gitignored，never committed）
+   - `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md` §四 n8n 區塊（新增 App User 帳密 + rotation 紀錄 + n8n v2 BASIC_AUTH 棄用註解）
+   - vault 同步：`G:\我的雲端硬碟\MySecretVault\MySecretVault\AWARE_WAVE_CREDENTIALS.md` + `user-env.ps1`（byte-preserving copy 保留 BOM，pre-sync backup `.bak.20260522-130334`）→ SHA256 雙路徑一致 → 公司桌機下次 AO-RESUME 自動拿到新密碼
+4. **Repo flip PUBLIC → PRIVATE**
+   - `gh repo edit awarewaveai-pei/Work --visibility private --accept-visibility-change-consequences` → 5 秒生效
+   - 驗收：visibility=private ✅ / has_issues=True / has_actions=True / webhook 仍 active / `git ls-remote` 仍可（無 auth flow 異動）
+5. **决策：不 redact WORKLOG / CONVERSATION_MEMORY 明文密碼**
+   - 操作者明示：「如果是 private 後就不會有問題，就不要變動」
+   - 理由：密碼已失效（Test 4 = 401）+ private 後僅 collaborator 看得到 + 保留事件原文對未來覆盤更有價值 + 過去 47 天公開期已不可逆，redact 只增加閱讀解碼負擔
+6. **Phase 4 A → B 驗證**
+   - A：comment `@claude` 於 Issue #10 → workflow run `26269512072` → **Trigger result: true**（2026-05-18 是 false）→ Claude haiku-4-5 在 16s 內成功讀回 `# System Guard Status`（LAST_SYSTEM_STATUS.md 第一行）→ workflow 後段 PR 建立步驟失敗，但屬 read-only 任務的 workflow 設計副作用，非 API/Claude 問題
+   - B：建 Issue #11 要求 Claude 改 `scripts/repair-center-smoke.mjs` 加一行註解 → workflow run `26269607752` → **conclusion: success** → branch `claude/issue-11-20260522-0509` + commit `1c17694` + **PR #12 自動建立**（+1/-0/1 file，內容完全正確）
+
+**驗證**：
+- n8n rotation：4/4 test PASS（NEW=200, OLD=401）
+- vault sync：兩檔 SHA256 雙路徑一致
+- private flip：webhook + GHA + git 全部正常
+- Phase 4 A：Trigger result true / API key 通 / 16s 完成
+- Phase 4 B：Full chain (Claude → branch → push → PR) 全綠 / 45s 完成
+
+**避免再發生**：
+- AGENTS.md 應補規則「密碼洩漏 → 不要先 redact，先 rotate；rotate 失敗才考慮 redact + history purge」
+- 任何在 docs 寫明文密碼前，自動 hook 應警告（待設計）
+- 操作者本次教訓：「Aware 自家 ops repo 預設 private，加客戶資料 + infra IP 的 repo 一律 private」入規
+
+**已知 drift（另案）**：
+- `lobster-factory/infra/n8n/docker-compose.yml`（SSOT，用 `${N8N_AUTH_PASSWORD}` env var）與 EU 實機 `/root/n8n/docker-compose.yml`（hardcoded password）已 drift。本次 rotation 只改 EU 實機，未動 SSOT。SSOT 改用 env-var 模式更安全，但需配套 `.env` 檔。建議列入下次 ops review。
+
+**Rollback**（未觸發）：n8n rotation 失敗 → `cp /root/n8n/docker-compose.yml.bak.20260522-pw-rotation /root/n8n/docker-compose.yml && docker compose up -d` + DB password 回填舊 bcrypt hash（需先備份原 hash）。Private flip 失敗 → `gh repo edit --visibility public`。
+
+**Files**：
+- 本機改：`mcp/user-env.ps1`（gitignored）、`C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`、vault 雙檔
+- EU 實機：`/root/n8n/docker-compose.yml`、n8n DB `public."user"` row for `peijingartstudio@gmail.com`
+- GitHub：Issue #10（@claude comment）、Issue #11（新建）、PR #12（Claude 自動建立 + OPEN，待操作者決定 merge/close）、branch `claude/issue-10-20260522-0505`（empty orphan，Phase 4 A 副產物）、branch `claude/issue-11-20260522-0509`（有 commit，PR #12 用）
+- visibility：PUBLIC → PRIVATE（不可逆 = 過去 47 天公開期已被 Google/Bing/Wayback 索引）
+
 ## 2026-05-21
 
 ### 調查：Claude GitHub App 安裝狀態確認（2026-05-21）
