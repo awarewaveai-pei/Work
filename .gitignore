@@ -30,9 +30,12 @@ Backups/
 .claude/sessions/
 .claude/shell-snapshots/
 .claude/skills/*
-# Project-owned skills are tracked via explicit negation below.
-!.claude/skills/strategy-review/
-!.claude/skills/ai-decision-intelligence.skill
+# All project skill folders + .skill files are tracked (cross-machine sync via git symlink).
+# Negate the wildcard ignore for actual skill content; runtime caches stay ignored.
+!.claude/skills/*/
+!.claude/skills/*.skill
+.claude/skills/.cache/
+.claude/skills/*/.cache/
 
 .claude/telemetry/
 .claude/worktrees/
