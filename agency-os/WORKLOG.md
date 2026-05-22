@@ -4,6 +4,72 @@
 
 ## 2026-05-22
 
+### CP950 audit toolchain — A+B+C+D 一次到位讓 Claude 自動使用（commits in checkpoints `047066f` → `546307b`，~20:00 UTC+8）
+
+**起源**：使用者問「今天 Claude 作的內容，有值得做成 runbook / command / agent / skill 等永久化的嗎？做完要實測+review+抓蟲+WORKLOG」。回答 = 把今天手工 CP950 audit 變成自動工具 + 永久治理文件，讓未來「Claude 動到 .ps1 就自動跑」。
+
+**4 件交付**（A+B+C+D，全部跨機 git sync）：
+
+- **A — `scripts/audit-cp950-traps.ps1`**（新工具，~280 行）— PowerShell AST detector：
+  - 走 AST 找 `CommandAst` 命令名為 `ssh|docker|wp|scp|git|kubectl|helm|curl|wget`
+  - 檢查兩種保護：(Pattern A) wrapped in `Invoke-WithUtf8Console { ... }` block / (Pattern B) 檔內含 `[Console]::OutputEncoding = ...UTF8` 設定**且 set 在 capture 之前**（critic round 1 抓到此 line-order false-negative，已修）
+  - 模式：default 人類報表、`-Json` 機讀、`-File <path>` 單檔模式、`-Quiet`
+  - 退出碼：`0` clean / `1` drift / `2` error
+  - **自食其食**：自己的 `git rev-parse` capture 也包 `Invoke-WithUtf8Console`
+- **B — `agency-os/docs/operations/AUDIT_REGISTRY.md`**（新治理文件）— canonical audit registry：
+  - 狀態圖例（🔴 FIXED / 🟢 CLEAN / 🟡 TRACKED / 🛠 TOOL / ⏳ PENDING）+ how-to-add-new-audit + 範本
+  - 首筆條目：CP950 audit 完整結果（142 PS + 24 SH 掃描，8 fixed、55 clean、121 tracked 含詳細風險分類表）
+  - Statistics table 統計各種維度
+- **C — `.claude/commands/audit-encoding.md`**（新 slash command）— `/audit-encoding`：
+  - 包 A 的 wrapper，文件化所有模式（`--json` / `--file` / `--quiet`）
+  - 包含「When Claude should auto-trigger」表格映射條件→動作
+  - Fix template 教操作者如何修
+- **D — `agency-os/AGENTS.md` `## 代理自動工具使用規則` 加 1 條**：
+  - 觸發：任何 `Edit/Write/MultiEdit` 動到 `.ps1` 檔
+  - 動作：跑 `/audit-encoding --file <path>`，**讓工具自己當 oracle**（exit code 0/1 決定放行/處理）
+  - 不再依賴 Claude 推斷 capture pattern——機械化
+
+**Side-effect**：tool 立刻證明價值——抓到我**今天剛寫**的 bug！`ao-resume.ps1:425` 的健康檢查用 `git log --pretty=format:"%cd|%s"`，正是 backfill bug **同款 pattern**（`%s` commit subject 含 CJK 會被 CP950 吃換行）。已 wrap 修復。
+
+**驗證**（R0 [驗證計畫] 4 動作）：
+
+1. **實測**：
+   - 4 檔 syntax check ALL OK
+   - Synthetic test（capture 在 set 之前）→ 正確 flagged（line-order check 生效）
+   - Real test：`/audit-encoding` 全專案掃 142 檔 → 121 sites tracked，~1.06s 完成
+   - ao-resume.ps1:425 git log %s → 正確 protected after fix
+   - Dogfood：自己掃自己 → 正確 OK（own git rev-parse 已 wrap）
+2. **Review**：critic deep round → 0 Critical / 1 Major（Pattern B line-order false-negative）+ 5 Minor → Major 全修、3 Minor 採納（regex 加寬、`$PSScriptRoot` guard、AGENTS rule 重寫為 tool-as-oracle）
+3. **抓蟲**：critic 額外發現我自己的 ao-resume.ps1:425 — 跟 backfill 同款 pattern，**證實工具有效**
+4. **WORKLOG**：本段
+
+**Auto-trigger 鏈**（30 年自動運作）：
+
+```
+任何 Edit/Write/MultiEdit on *.ps1
+    ↓ (verify-gate hook 已存在)
+PostToolUse code-change-tracker.js 累積到 tracker
+    ↓ (AGENTS.md 新規則指示)
+Claude 自動跑 /audit-encoding --file <path>
+    ↓ (tool exit code)
+0 = clean → 繼續
+1 = drift → 按 fix template 處理 (wrap 或 TRACK)
+```
+
+**Statistics**：
+| Audited | Pattern A fixed | Pattern B clean | Out-of-scope clean | Tracked | 工具 shipped |
+|---------|----------------|----------------|-------------------|---------|------------|
+| 142 PS + 24 SH | 6 | 3 | 31 + 24 | 121 | 4 (tool + slash + registry + AGENTS rule) |
+
+**剩餘風險**：
+- 121 個 tracked sites 是 ASCII-only 操作（git rev-parse / status / fetch / docker info 等）。當操作者 Edit 任一檔，AGENTS.md 規則會強制 Claude 跑 `/audit-encoding --file <path>`——增量修。
+- Pattern B regex 已加寬（含 `[System.Console]::` 前綴 + `UTF8Encoding` constructor），但未涵蓋 aliased helper（`Set-Alias Run-Utf8 Invoke-WithUtf8Console`）。Critic 已標記 acceptable，未來如有 alias 使用再擴。
+- 工具不擋 commit（不像 verify-gate-commit.js），目前只 report + 由 AGENTS rule 引導 Claude。如需 hard-block 可在 Stop hook 加。
+
+**Rollback**：4 個新檔可獨立 `git revert` 對應 commits。AGENTS.md 1 行加入可單獨 revert。
+
+**跨機同步**：4 個檔都在 repo（scripts/、.claude/commands/、agency-os/docs/、agency-os/AGENTS.md）→ git pull 跨機 ✅。`/audit-encoding` slash command 已 mirror 到 `~/.claude/commands/` per manifest。
+
 ### Cross-machine sync — 機械保障層（`check-claude-sync.ps1` + `/sync-check` + health gate 整合，~19:10 UTC+8）
 
 **起源**：今天稍早補了 skills sync 漏洞 + bootstrap junction（commits `07dfa9d`、`4cbcee4`），但本質問題沒解——「sync 架構非自明」這件事，連架構師自己讀 CLAUDE.md 都會誤判（我自己今天就誤讀「commands 沒同步」一次）。文字會過時；只有可執行的 verifier 才是 ground truth。
