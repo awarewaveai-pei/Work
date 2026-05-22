@@ -51,30 +51,31 @@
 - 更新 `~/.claude/projects/d--Work/memory/MEMORY.md`（+1 entry）
 - 刪除 `feedback_4action_validation.md`（自寫自刪 — 重複違反 R0）
 
-### R0 [驗證計畫] 第 3 動作「抓蟲」加 audit-cross-machine-bom 條件工具（2026-05-22 14:50 UTC）
+### ⚠️ R0 違反事件：audit-cross-machine-bom 整合重工（2026-05-22 14:38 UTC）
 
-**事件**：使用者注意到 `audit-cross-machine-bom` skill 是本 session 新看到的工具，問是否該加進 R0 [驗證計畫] 抓蟲標準工具。
+**事件**：本 session 在 14:38 commit `a6cea9b` 試圖整合 audit-cross-machine-bom 進 R0 第 3 動作「抓蟲」，但 commit `628b011`（14:36，**早 2 分鐘**）已由另一 session 完成同件事。Git 自動去重 AGENTS.md（無 diff），但本 session 仍寫了 redundant WORKLOG entry 上來 → 本檔被污染。
 
-**根因**：2026-05-20 CREDENTIALS 損毀事件根因為跨機 .md 缺 UTF-8 BOM，PowerShell 在 Windows Big5 locale 下誤判編碼。雖然 export/import 腳本已強制 BOM，但手動編輯（VSCode 編輯預設不寫 BOM）或先前匯入的舊檔仍可能 drift。**僅靠規則文件提醒不夠，須在每次改動 .md 時機械化檢測**。
+**根因（R0 violation）**：
+- AGENTS.md R0 §禁止段明寫「未讀現有邏輯即重寫 / 建立重複模組」
+- 本 session 收到使用者「要」後，按既有 todo 直接 Edit，**未跑 `git log -5` 確認近期是否已有同議題 commit**
+- 信任現場記憶 > 信任 git ground truth = 反 R0
 
-**修法**（純 docs，1 行條件式 fallback）：
-- `agency-os/AGENTS.md` L23（R0 [驗證計畫] 第 3 動作）末尾加：「**若本次改動含 `.md` 檔案，額外跑 `audit-cross-machine-bom` skill** 確認跨機 Google Drive 同步的 UTF-8 BOM 合規（2026-05-20 CREDENTIALS 損毀事件根因）」
-- 條件式（含 .md 才跑）= 對純 code 改動 0 false positive；對 .md 改動則強制 BOM 檢核
-- 不動其他位置（R4 / CLAUDE.md / memory）— audit 屬「抓蟲動作」的工具項，不是新規則
+**事後處置**：
+- AGENTS.md：無實質重複（git 去重，狀態正確 = 628b011 的版本）
+- 本 WORKLOG entry：原為 redundant「實作 + dogfooding」紀錄，**改寫為 R0 violation 教材保留**（不刪除 = 歷史完整性 + 未來代理可學）
 
-**驗證（吃自己狗食 = dogfooding。本次改動是 .md 檔，所以必跑 audit）**：
-- 1. **實測**：
-  - `grep -c "audit-cross-machine-bom" agency-os/AGENTS.md` = 1 ✅
-  - `powershell -File scripts/audit-cross-machine-bom.ps1` → **26/26 .md 全部 BOM 合規，0 missing** ✅（含 ~/.claude/projects/d--Work/memory/*.md + vault CREDENTIALS）
-- 2. **Review**：Read AGENTS.md L20-25 → 第 3 動作條件式分號清晰、與其他三動作對稱、無 markdown breakage
-- 3. **抓蟲**：grep `抓蟲` 跨 agency-os/*.md → 唯一 SSOT 命中 `AGENTS.md`，無其他位置需同步 ✅
-- 4. **WORKLOG**：本 entry
+**避免再發生（hard rule）**：
+- **每個 Edit 動作前，必跑 `git log --oneline -10` 看最近 commits**（成本 < 1s，避免重工成本可能是數十分鐘）
+- 若看到 commit message 含本次議題關鍵字（例：本次的 `audit-cross-machine-bom`）→ 立即停下、`git show <sha>` 看實際內容、判定是否還需動作
+- 此規則應寫進 R0 [現況分析] 段：「已讀的相關檔案、架構、依賴」**加上「最近 10 個 commits」**
 
-**剩餘風險**：(1) 若未來 audit 腳本壞掉但規則仍寫「必跑」→ 代理可能假裝跑過，需 R4 「不得假裝已驗證」配套；(2) 條件「含 .md」可能誤觸發於 docs-only 改動，但 audit 跑時間 < 1s，成本可忽略。
+**Rollback**：本 entry 屬教材，不 revert。原 commit `a6cea9b` 也不 revert（保留作為失誤證據）。
 
-**Rollback**：`git revert HEAD` 一鍵還原。
+**對應 commit**：`a6cea9b`（無實質 AGENTS.md 變更，僅本 WORKLOG entry 改寫前的 redundant 版）
 
-**Files**：`agency-os/AGENTS.md`（+1 行條件式 fallback，0 行刪除）
+**主要實作見**：commit `628b011`（含 skill 建立 + AGENTS.md L23 整合 + 該 session 自己的 WORKLOG entry + 4 動作驗證結果）
+
+**Files**：本 WORKLOG entry（教材化，0 其他變動）
 
 ---
 
