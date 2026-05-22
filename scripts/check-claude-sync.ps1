@@ -115,7 +115,9 @@ if ($isWindowsHost) {
             $item = Get-Item -LiteralPath $ClaudeRepoPath -Force
             $isLink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
             if ($isLink) {
-                $target = $item.Target
+                # PS 5.1 Get-Item exposes Target as string[] for reparse points; unwrap to avoid
+                # "System.String[]" appearing in detail/JSON output. -join handles 1+ entries.
+                $target = if ($item.Target) { @($item.Target) -join ',' } else { '<unknown>' }
                 Add-Finding -Severity 'pass' -Check 'H1: .claude junction' `
                     -Detail "Junction OK -> $target"
             } else {
@@ -139,10 +141,15 @@ if ($isWindowsHost) {
 }
 
 # ---------- H2: sync-claude-userlevel verify ----------
+# CP950 trap protection: nested powershell.exe inherits the parent console's
+# OutputEncoding (CP950 on zh-TW Windows by default). The verify script's
+# UTF-8 stdout would be mangled when captured via 2>&1, polluting the
+# "Last output:" detail string. Force UTF-8 inside the child shell.
 $syncScript = Join-Path $MonorepoRoot 'scripts\sync-claude-userlevel.ps1'
 if (Test-Path -LiteralPath $syncScript) {
     try {
-        $verifyOut = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -Mode verify 2>&1
+        $verifyCommand = "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); & '$syncScript' -Mode verify"
+        $verifyOut = & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command $verifyCommand 2>&1
         $verifyExit = $LASTEXITCODE
         if ($verifyExit -eq 0) {
             Add-Finding -Severity 'pass' -Check 'H2: sync-claude-userlevel -Mode verify' `
@@ -191,7 +198,11 @@ foreach ($subdir in $claudeSubdirs) {
             -Detail "$($tracked.Count) tracked file(s) all present on disk"
     }
 
-    # SOFT: extras on disk (filesystem files not in git)
+    # SOFT: extras on disk (filesystem files not in git).
+    # Case-insensitive membership: git ls-files records the indexed casing, but
+    # Windows NTFS filesystem walks may emit a different case (e.g. case-only
+    # rename). Use HashSet[string] with OrdinalIgnoreCase to avoid false-positive
+    # SOFT findings on case-renamed files.
     $repoSubdirAbs = Join-Path $MonorepoRoot ($relPath -replace '/', '\')
     if (Test-Path -LiteralPath $repoSubdirAbs) {
         $diskFiles = @(Get-ChildItem -LiteralPath $repoSubdirAbs -Recurse -File -ErrorAction SilentlyContinue |
@@ -199,14 +210,20 @@ foreach ($subdir in $claudeSubdirs) {
                 $rel = $_.FullName.Substring($MonorepoRoot.Length).TrimStart('\') -replace '\\', '/'
                 $rel
             })
-        # Filter out files that .gitignore handles (README.md in agents/, .cache, etc.)
+        # Filter out paths that .gitignore handles, plus Claude Code runtime junk that
+        # may live under ~/.claude/ via the junction (history snapshots, plugin caches,
+        # node_modules from skill installs). Conservative deny-list: catch known noise,
+        # let anything new surface as SOFT until we know what it is.
         $relevant = $diskFiles | Where-Object {
             $name = Split-Path $_ -Leaf
             $isReadme = ($subdir -eq 'agents' -and ($name -eq 'README.md' -or $name -eq 'README.zh-TW.md'))
-            $isCache = $_ -match '\.cache(/|$)'
-            -not ($isReadme -or $isCache)
+            $isRuntimeJunk = $_ -match '/(?:\.cache|\.history|\.shell-snapshots|node_modules|__pycache__|\.venv)(?:/|$)'
+            -not ($isReadme -or $isRuntimeJunk)
         }
-        $extras = @($relevant | Where-Object { $tracked -notcontains $_ })
+        # Build case-insensitive set of tracked paths once per subdir
+        $trackedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($t in $tracked) { [void]$trackedSet.Add($t) }
+        $extras = @($relevant | Where-Object { -not $trackedSet.Contains($_) })
         if ($extras.Count -gt 0) {
             $sample = ($extras | Select-Object -First 3) -join ', '
             $more = if ($extras.Count -gt 3) { " (+$($extras.Count - 3) more)" } else { '' }
@@ -235,8 +252,26 @@ $result = [ordered]@{
     findings       = @($findings)
 }
 
+# Atomic write: temp file + rename. NTFS same-volume rename is atomic, so the
+# reader (system-health-check.ps1) never sees a partial JSON. Without this,
+# concurrent AO-RESUME hooks (120s dedup is best-effort, not a lock) could race
+# the writer and the reader catches a half-written file -> Skipped pass
+# silently masks real drift. See critic notes 2026-05-22.
+#
+# PS 5.1 / .NET Framework 4.x note: File.Move(src, dst, overwrite) 3-arg
+# overload only exists in .NET Core / .NET 5+. Use File.Replace for the
+# overwrite case (atomic on NTFS) and 2-arg File.Move for first-time write.
 $encoding = New-Object System.Text.UTF8Encoding $false
-[System.IO.File]::WriteAllText($JsonPath, ($result | ConvertTo-Json -Depth 10), $encoding)
+$tmpJsonPath = $JsonPath + '.tmp'
+[System.IO.File]::WriteAllText($tmpJsonPath, ($result | ConvertTo-Json -Depth 10), $encoding)
+if (Test-Path -LiteralPath $JsonPath) {
+    # PS 5.1 marshalling quirk: bare $null gets coerced to '' which File.Replace
+    # rejects with "not a valid path format". [NullString]::Value is the only
+    # form that survives into the C# String parameter as a real null reference.
+    [System.IO.File]::Replace($tmpJsonPath, $JsonPath, [NullString]::Value)
+} else {
+    [System.IO.File]::Move($tmpJsonPath, $JsonPath)
+}
 
 if (-not $Quiet) {
     Write-Host '============================================================' -ForegroundColor Cyan

@@ -65,8 +65,13 @@ if (-not (Test-Path -LiteralPath $claudeUserPath)) {
             New-Item -ItemType Junction -Path $claudeRepoPath -Target $claudeUserPath -Force | Out-Null
             Write-Host "  Junction created." -ForegroundColor Green
         } catch {
-            Write-Host "  WARN: junction creation failed: $($_.Exception.Message)" -ForegroundColor Yellow
-            Write-Host "  Fallback (manual, admin shell): mklink /J `"$claudeRepoPath`" `"$claudeUserPath`"" -ForegroundColor Yellow
+            # Critic 2026-05-22: silent continue is dangerous -- subsequent sync-mcp-config.ps1
+            # would write into a non-junction path, baking in drift. Match this script's
+            # existing throw-on-failure pattern (lines 98/108/118 below).
+            Write-Host "  ERROR: junction creation failed: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "  Fix: in an admin shell, run: mklink /J `"$claudeRepoPath`" `"$claudeUserPath`"" -ForegroundColor Yellow
+            Write-Host "  Then re-run bootstrap-mcp-machine.ps1" -ForegroundColor Yellow
+            throw "Junction setup failed; refusing to continue and bake in drift."
         }
     }
 }

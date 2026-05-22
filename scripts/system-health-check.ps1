@@ -632,19 +632,30 @@ if (-not (Test-Path -LiteralPath $agencyDir)) {
 $syncCheckScript = Join-Path $monoRoot "scripts\check-claude-sync.ps1"
 if (Test-Path -LiteralPath $syncCheckScript) {
     try {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncCheckScript -Quiet 2>&1 | Out-Null
+        # CP950 trap: nested powershell.exe inherits parent console OutputEncoding.
+        # Force UTF-8 inside child so JSON paths / Chinese filenames aren't mangled.
+        $syncCmd = "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); & '$syncCheckScript' -Quiet"
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command $syncCmd 2>&1 | Out-Null
         $syncExit = $LASTEXITCODE
         $syncJsonPath = Join-Path $monoRoot "agency-os\.agency-state\sync-check-last.json"
         $syncDetail = "exit=$syncExit"
         if (Test-Path -LiteralPath $syncJsonPath) {
-            try {
-                $syncJson = Get-Content -LiteralPath $syncJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            # Retry-on-IOException: writer uses atomic rename so this should be one-shot,
+            # but if another process holds the file briefly, retry 3x with 100ms backoff.
+            $syncJson = $null
+            for ($i = 0; $i -lt 3; $i++) {
+                try {
+                    $syncJson = Get-Content -LiteralPath $syncJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                    break
+                } catch {
+                    if ($i -lt 2) { Start-Sleep -Milliseconds 100 } else { throw }
+                }
+            }
+            if ($syncJson) {
                 $worst = $syncJson.worstSeverity
                 $hardFails = @($syncJson.findings | Where-Object { $_.severity -eq 'hard' })
                 $softFails = @($syncJson.findings | Where-Object { $_.severity -eq 'soft' })
                 $syncDetail = "worst=$worst, hard=$($hardFails.Count), soft=$($softFails.Count)"
-            } catch {
-                $syncDetail = "exit=$syncExit (JSON parse failed: $($_.Exception.Message))"
             }
         }
         switch ($syncExit) {
@@ -655,7 +666,12 @@ if (Test-Path -LiteralPath $syncCheckScript) {
             default { Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $false -Detail "Unexpected exit code $syncExit"; Add-CriticalFailure -Reason "check-claude-sync.ps1 returned unexpected exit $syncExit" }
         }
     } catch {
-        Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $true -Detail ("Skipped: invocation failed: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+        # Crash != graceful skip. A HARD gate component that crashes silently masks
+        # real drift; flip to Pass=false + Add-CriticalFailure so AO-CLOSE catches it.
+        $msg = $_.Exception.Message
+        $excerpt = $msg.Substring(0, [Math]::Min(120, $msg.Length))
+        Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $false -Detail ("Invocation crashed: " + $excerpt)
+        Add-CriticalFailure -Reason ("check-claude-sync.ps1 invocation failed: " + $excerpt)
     }
 } else {
     Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $true -Detail "Skipped: scripts/check-claude-sync.ps1 not present"

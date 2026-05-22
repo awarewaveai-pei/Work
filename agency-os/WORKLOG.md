@@ -52,6 +52,21 @@
 
 **Rollback**：`git revert <next commit>`；無破壞性改動（純新增 script + 加 health check 區塊，無刪除）
 
+**Critic deep review 後追加 6 個修正（Major 3 + Minor 3）**——`/verify-recent` 強制 critic agent 找洞，全部修完才放行 commit：
+
+1. **Major / atomic JSON write**（`check-claude-sync.ps1:239+`）：原 `WriteAllText` 直接覆寫 target，concurrent runs 會讀到半寫檔 → 改 temp file + `[System.IO.File]::Replace`（NTFS atomic）；首次寫 fall back `Move`。PS 5.1 marshalling 雷：`Replace` 第三參數 backup file 接 `$null` 會 ArgumentException「不合法路徑」，必須用 `[NullString]::Value` 才能傳真正 null 進 C# string。已 probe 確認。
+2. **Major / catch-swallow**（`system-health-check.ps1:657`）：原 `catch { Add-Check -Pass $true ... Skipped }` 把 invocation crash 變綠燈——HARD gate 元件這樣做等於關機；改 `-Pass $false` + `Add-CriticalFailure`，crash 直接觸發 AO-CLOSE block。
+3. **Major / case-insensitive set**（`check-claude-sync.ps1:209`）：原 `$tracked -notcontains $_` 大小寫敏感，Windows NTFS case-only rename 會誤報 SOFT；改 `HashSet[string]` 配 `StringComparer.OrdinalIgnoreCase`。
+4. **Minor / CP950 trap in nested call**（`check-claude-sync.ps1:145` + `system-health-check.ps1:635`）：nested `powershell.exe` 繼承 parent CP950 OutputEncoding，捕捉 UTF-8 stdout 會 mojibake；改用 `-Command` 包 `[Console]::OutputEncoding = UTF8 + & script`。
+5. **Minor / `$item.Target` array**（`check-claude-sync.ps1:118`）：PS 5.1 `Get-Item` 對 reparse point 的 Target 是 `string[]`，直接插入字串顯示為 `System.String[]`；改 `@($item.Target) -join ','` unwrap。
+6. **Minor / bootstrap silent continue**（`bootstrap-mcp-machine.ps1:67`）：junction create 失敗只 WARN 不擋——後面 `sync-mcp-config.ps1` 還是會跑進真實目錄烤死 drift；改 `throw`，與本檔既有 `throw` pattern 一致。
+
+**Critic 重複實測通過**：
+- 全 6 檔 PARSE OK
+- happy path PASS（H 全綠，S1 自然偵測本 session 未 commit 的 audit-encoding.md，正確行為）
+- intentional break 再測 → HARD 仍正確觸發 → 還原
+- `[NullString]::Value` 真 atomic write 確認 4 種 marshalling 中**只有** [NullString]::Value 成功（probe at `d:\tmp\test-replace.ps1`）
+
 ### Cross-machine sync 補洞 + AO-RESUME 報告歸檔（commits `07dfa9d`、`4cbcee4`，~18:40-18:50 UTC+8）
 
 **起源**：操作者問「commands、skills、settings 應該都要同步啊怎麼會被擋下來」。盤點後發現：commands/agents 透過 `.claude` symlink + git tracking 已同步，但 (1) `.claude/skills/` 大部分被 `.gitignore` 排除（白名單只兩個），換機新裝的 skills 不會跟過去；(2) `bootstrap-mcp-machine.ps1` 沒自動建 `.claude` junction → 桌機若沒手動建，commands/agents/skills 即使 git pull 也會脫鉤；(3) CLAUDE.md R1 表第二行寫「`~/.claude/commands/`」歧義，commands 其實走 git。
