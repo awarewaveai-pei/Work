@@ -200,6 +200,7 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 - `.cursor/rules/40-shutdown-closeout.mdc`
 - `.cursor/rules/63-cursor-core-identity-risk.mdc`
 - `docs/CHANGE_IMPACT_MATRIX.md`
+- `docs/operations/BUG_HUNT_PROTOCOL.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/cursor-mcp-and-plugin-inventory.md`
 - `docs/operations/new-doc-linkage-checklist.md`
@@ -209,5 +210,5 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-05-20 09:45:32 UTC_
+_Last synced: 2026-05-22 12:54:27 UTC_
 

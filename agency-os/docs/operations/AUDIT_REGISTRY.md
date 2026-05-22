@@ -1,4 +1,4 @@
-# Audit Registry
+﻿# Audit Registry
 
 > Canonical record of every code-quality / bug-class audit run against this monorepo.
 > Future Claude / operator reads this first to avoid re-auditing what's already checked.
@@ -139,4 +139,9 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 ---
 
 <!-- next audit class goes here; copy from "## Template" section above -->
+
+## Related Documents (Auto-Synced)
+- `docs/operations/BUG_HUNT_PROTOCOL.md`
+
+_Last synced: 2026-05-22 12:54:27 UTC_
 

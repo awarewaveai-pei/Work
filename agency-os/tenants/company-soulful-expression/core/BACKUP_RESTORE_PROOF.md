@@ -40,7 +40,7 @@ truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STAT
 
 ## Backup Milestone — 2026-05-09（MainWP + WPvivid 自動化建立）
 
-- 2026-05-09: MainWP Dashboard 連線修復，WPvivid Backup v0.9.126 在 child site 已 installed + active（[WORKLOG 2026-05-09 §MainWP WPvivid](../../WORKLOG.md)）
+- 2026-05-09: MainWP Dashboard 連線修復，WPvivid Backup v0.9.126 在 child site 已 installed + active（[WORKLOG 2026-05-09 §MainWP WPvivid](../../../WORKLOG.md)）
 - 2026-05-09 09:13 UTC, 11:08 UTC: 兩次 WPvivid backup task `Succeeded`（Dropbox 路徑 `SoulfulDBBackup`）
 - 2026-05-16 23:06 TPE: 切換 remote 至 Google Drive（`Update_Backup`，MainWP remote_id `wpvivid-remote-69ff0a63b77ab`，OAuth scope `drive.file`）
 

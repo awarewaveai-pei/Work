@@ -4,6 +4,9 @@
 
 ## 2026-05-22
 
+- AUTO_TASK_DONE: `scripts/audit-cp950-traps.ps1` 把今天手工 audit 機械化
+- AUTO_TASK_DONE: 抓蟲大業 30 年運轉模型（BUG_HUNT_PROTOCOL.md + AUDIT_REGISTRY.md + AGENTS.md trigger + memory auto-discovery）
+
 ### `~/.claude/plans/` 跨機同步啟用 — ADHD vibe coding handbook 進 git（commit `802f2f3`，~21:30 UTC+8）
 
 **根因**：`~/.claude/plans/` 被 `.gitignore` L26 列為 ignore（同層 runtime data 一起被掃進去），導致兩個 plan 檔（ADHD vibe coding handbook + fluffy biscuit）無法跨機同步。Plans 是 knowledge artifacts（Claude 對話產出），不是 runtime data，治理上應該跟 commands/agents/skills 走同一個 junction → git 同步機制；memory 仍走 Google Drive（`.claude/projects/` 維持 ignore，不混淆兩個 sync 機制）。
@@ -433,7 +436,7 @@ Claude 自動跑 /audit-encoding --file <path>
 
 **事件**：操作者問「星期五下午那個 cron job 跑了嗎？」。R0 forensic 在 30 分鐘內挖出三層失敗：
 
-| 治理文件 claim ([TASKS.md:148](agency-os/TASKS.md#L148)) | 實況 |
+| 治理文件 claim ([TASKS.md:148](TASKS.md#L148)) | 實況 |
 |---|---|
 | `scripts/phase4-weekly-check.ps1` 已就緒 | ❌ PowerShell 5.1 + Big5 codepage 下 parser 直接死（UTF-8 無 BOM + CJK 字串） |
 | Windows Task Scheduler `AwareWave-Phase4-WeeklyCheck` Ready | ❌ 本機不存在（`Get-ScheduledTask -TaskName` 直接 not found） |
@@ -448,7 +451,7 @@ Claude 自動跑 /audit-encoding --file <path>
 1. **新增 SSOT 子目錄** `agency-os/automation/claude-routines/` —
    - `README.md`：建立 Claude routine 治理 + 「Decision rubric」（何時用 routine vs SG cron vs Trigger.dev vs Windows Task Scheduler）
    - `phase4-weekly.md`：`AgencyOS-RepairCenterPhase4Weekly` 完整 SSOT（cron `0 14 * * 5` / Sonnet 4.6 / prompt verbatim / web UI checklist / env vars 引用 vault key / verification / rollback）
-   - 同時記載 backfill backlog：`AgencyOS-DailyBriefing/Weekly/Monthly` 既有 routine prompts 在 Anthropic 雲端 hidden state（[WORKLOG 2026-05-04 §2208 + 2026-05-13 §2258](agency-os/WORKLOG.md) 確認），治理債列入
+   - 同時記載 backfill backlog：`AgencyOS-DailyBriefing/Weekly/Monthly` 既有 routine prompts 在 Anthropic 雲端 hidden state（[WORKLOG 2026-05-04 §2208 + 2026-05-13 §2258](WORKLOG.md) 確認），治理債列入
 
 2. **新增 watchdog**（核心防護）`scripts/system-health-check.ps1` §11：
    - 設計為陣列驅動（未來其他 routine 直接 append `$routineOutputs` entry）
@@ -620,9 +623,9 @@ Claude 自動跑 /audit-encoding --file <path>
    - Byte-level 驗證：`fixed_bytes == BOM + orig_bytes`，內容 100% 保留（3/3 檔 match-expected=True）
 
 2. **Review（讀回產物）**：
-   - [`.claude/commands/audit-cross-machine-bom.md`](.claude/commands/audit-cross-machine-bom.md) 58 行；code-fence 6 個（3 paired）✓
-   - [`scripts/audit-cross-machine-bom.ps1`](scripts/audit-cross-machine-bom.ps1) 167 行；PS parser OK ✓
-   - [`memory/feedback_test_artifact_isolation.md`](C:/Users/user1115/.claude/projects/d--Work/memory/feedback_test_artifact_isolation.md) frontmatter 正確、BOM `ef bb bf` 在前 3 bytes ✓
+   - [`.claude/commands/audit-cross-machine-bom.md`](../.claude/commands/audit-cross-machine-bom.md) 58 行；code-fence 6 個（3 paired）✓
+   - [`scripts/audit-cross-machine-bom.ps1`](../scripts/audit-cross-machine-bom.ps1) 167 行；PS parser OK ✓
+   - `memory/feedback_test_artifact_isolation.md`（user-level: `~/.claude/projects/d--Work/memory/feedback_test_artifact_isolation.md`）frontmatter 正確、BOM `ef bb bf` 在前 3 bytes ✓
 
 3. **抓蟲（cross-file grep）**：
    - `audit-cross-machine-bom` 在 repo 只出現於我自己建的 2 個檔 → no stale references
@@ -638,9 +641,9 @@ Claude 自動跑 /audit-encoding --file <path>
 - skill 加入後立即觀察 system 是否註冊（看 skill 列表）— 本次 `audit-cross-machine-bom` 已可見 ✓
 
 **Files**：
-- 新 [`scripts/audit-cross-machine-bom.ps1`](scripts/audit-cross-machine-bom.ps1)
-- 新 [`.claude/commands/audit-cross-machine-bom.md`](.claude/commands/audit-cross-machine-bom.md)
-- 新 [`~/.claude/projects/d--Work/memory/feedback_test_artifact_isolation.md`](C:/Users/user1115/.claude/projects/d--Work/memory/feedback_test_artifact_isolation.md)
+- 新 [`scripts/audit-cross-machine-bom.ps1`](../scripts/audit-cross-machine-bom.ps1)
+- 新 [`.claude/commands/audit-cross-machine-bom.md`](../.claude/commands/audit-cross-machine-bom.md)
+- 新 `~/.claude/projects/d--Work/memory/feedback_test_artifact_isolation.md`（user-level, 走 Drive sync）
 - 更新 `~/.claude/projects/d--Work/memory/MEMORY.md`（+1 entry）
 - 刪除 `feedback_4action_validation.md`（自寫自刪 — 重複違反 R0）
 
@@ -4413,7 +4416,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-20 15:27:23 UTC_
+_Last synced: 2026-05-22 12:54:27 UTC_
 
 ## 2026-03-20
 
@@ -4854,4 +4857,5 @@ _Last synced: 2026-05-20 15:27:23 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+
 

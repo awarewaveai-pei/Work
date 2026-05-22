@@ -1,4 +1,4 @@
-# Bug Hunt Protocol — 30 年運轉模型
+﻿# Bug Hunt Protocol — 30 年運轉模型
 
 > 本檔是**方法論 SSOT**（HOW we hunt bugs）。
 > 對照：[AUDIT_REGISTRY.md](AUDIT_REGISTRY.md) 是**狀態 SSOT**（WHAT we've audited）。
@@ -232,3 +232,10 @@ Year 30:           系統幾乎自我審查，operator 介入近零
 
 _Initial deployment: 2026-05-22, after CP950 toolchain proved the model._
 _Maintainer: Claude + operator joint, updates via incident or monthly review trigger._
+
+## Related Documents (Auto-Synced)
+- `AGENTS.md`
+- `docs/operations/AUDIT_REGISTRY.md`
+
+_Last synced: 2026-05-22 12:54:27 UTC_
+
