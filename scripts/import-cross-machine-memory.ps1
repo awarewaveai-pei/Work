@@ -563,25 +563,48 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         if (-not (Test-Path -LiteralPath $aoCloseDir)) { New-Item -ItemType Directory -Path $aoCloseDir -Force | Out-Null }
 
         $shouldImport = $true
-        $reason = "vault newer"
+        $reason = "vault newer (initial state)"
         if ((Test-Path -LiteralPath $aoCloseDst) -and (-not $Force)) {
+            # Parse vault and local timestamps INDEPENDENTLY so we can distinguish which side is corrupt.
+            # Bug class avoided: a single try/catch around both parses lets a corrupt vault overwrite
+            # a good local — the exact bug class this fix is meant to prevent.
+            $vaultOk = $false; $localOk = $false
+            $vaultTs = $null; $localTs = $null
             try {
-                $vaultTs = [DateTime]::Parse((Get-Content -LiteralPath $aoCloseSrc -Raw -Encoding UTF8).Trim(), $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
-                $localTs = [DateTime]::Parse((Get-Content -LiteralPath $aoCloseDst -Raw -Encoding UTF8).Trim(), $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+                $vaultRaw = Get-Content -LiteralPath $aoCloseSrc -Raw -Encoding UTF8
+                if ($vaultRaw) { $vaultTs = [DateTime]::Parse($vaultRaw.Trim(), $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime(); $vaultOk = $true }
+            } catch { }
+            try {
+                $localRaw = Get-Content -LiteralPath $aoCloseDst -Raw -Encoding UTF8
+                if ($localRaw) { $localTs = [DateTime]::Parse($localRaw.Trim(), $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime(); $localOk = $true }
+            } catch { }
+
+            if ($vaultOk -and $localOk) {
                 if ($vaultTs -le $localTs) {
                     $shouldImport = $false
                     $reason = "skipped (vault $($vaultTs.ToString('o')) <= local $($localTs.ToString('o')))"
+                } else {
+                    $reason = "vault newer ($($vaultTs.ToString('o')) > $($localTs.ToString('o')))"
                 }
-            } catch {
-                # Unparseable timestamp on either side — fall back to import (vault wins) so a corrupt
-                # local file gets repaired. Logged so the operator notices.
-                Write-Host "  cross-machine import: ao-close-last.txt timestamp parse failed ($_) — importing vault as recovery" -ForegroundColor Yellow
+            } elseif ($vaultOk -and -not $localOk) {
+                $shouldImport = $true
+                $reason = "recovery: local corrupt/empty, importing vault"
+                Write-Host "  cross-machine import: ao-close-last.txt local unreadable — importing vault as recovery" -ForegroundColor Yellow
+            } elseif (-not $vaultOk -and $localOk) {
+                $shouldImport = $false
+                $reason = "vault corrupt/empty, keeping local"
+                Write-Host "  cross-machine import: ao-close-last.txt vault unreadable — keeping local (no overwrite)" -ForegroundColor Yellow
+            } else {
+                $shouldImport = $false
+                $reason = "both corrupt/empty, manual fix needed"
+                Write-Host "  cross-machine import: ao-close-last.txt both sides unreadable — skipping (run AO-CLOSE locally to recreate)" -ForegroundColor Red
             }
         }
 
         if ($shouldImport) {
             Copy-Item -LiteralPath $aoCloseSrc -Destination $aoCloseDst -Force
-            Write-Host "  cross-machine import: ao-close-last.txt synced ($((Get-Content $aoCloseDst -Raw).Trim()))" -ForegroundColor Green
+            $importedContent = (Get-Content -LiteralPath $aoCloseDst -Raw -Encoding UTF8).Trim()
+            Write-Host "  cross-machine import: ao-close-last.txt synced ($importedContent)" -ForegroundColor Green
         } else {
             Write-Host "  cross-machine import: ao-close-last.txt $reason" -ForegroundColor DarkGray
         }

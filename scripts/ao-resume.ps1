@@ -400,7 +400,11 @@ if (Test-Path -LiteralPath $fetchSignalsScript) {
     $closeStampPath = Join-Path $aoStateDir "ao-close-last.txt"
     $fromArgs = @()
     if (Test-Path -LiteralPath $closeStampPath) {
-        $closeTs = (Get-Content -LiteralPath $closeStampPath -Raw -Encoding UTF8).Trim()
+        # Null-guard: WriteAllText is non-atomic on Windows (truncate-then-write). A concurrent
+        # reader hitting the ~5ms window between truncate and write would otherwise get $null,
+        # then .Trim() throws under StrictMode → terminates AO-RESUME at this line.
+        $closeRaw = Get-Content -LiteralPath $closeStampPath -Raw -Encoding UTF8
+        $closeTs = if ($closeRaw) { $closeRaw.Trim() } else { "" }
         if ($closeTs) {
             $fromArgs = @("-From", $closeTs)
             Write-Host ("   gap-start: {0} (ao-close-last.txt)" -f $closeTs) -ForegroundColor DarkGray
@@ -421,7 +425,7 @@ if (Test-Path -LiteralPath $fetchSignalsScript) {
                 }
                 $realCommitDates = @(
                     $rawLog |
-                        Where-Object { $_ -and ($_ -notmatch '\[claude\]\s+checkpoint') } |
+                        Where-Object { $_ -and ($_ -notmatch '\[(claude|cursor|codex)\]\s+checkpoint') } |
                         ForEach-Object { ($_ -split '\|', 2)[0] } |
                         Sort-Object -Unique
                 )
