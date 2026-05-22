@@ -23,7 +23,12 @@
 4. **工具累積 > 手工努力**（30 年複利）
 5. **Cap 節奏 1-2 個 class / 月**（避免疲勞 & 主線停擺）
 
-## 4-Tier 觸發模型
+## 5-Tier 觸發模型
+
+### 🆘 Tier 0：外部證據（WAF / CVE / 安全掃描 / vendor advisory）
+**觸發**：外部來源指出某類風險（Cloudflare WAF 命中新攻擊模式、CVE 公告影響我們的 dep、pen-test 報告、vendor security advisory）
+**動作**：與 Tier 1 同 SLA（當日 MVP / 當週完整 toolchain）
+**範例**：未來 CVE 涉及 PowerShell ConsoleHost decoder → 立即建 audit class
 
 ### 🔴 Tier 1：真實 production incident
 **觸發**：某個 bug 在 production 爆了（資料損毀 / 服務中斷 / 安全洩漏 / 操作者親眼看到 `??` 亂碼）
@@ -41,10 +46,14 @@
 **優先**：`blast_radius × likelihood × scope`
 **節奏**：2-4 hr / class
 
-### 🟢 Tier 4：機會主義
-**觸發**：verify-gate 在 Edit 某舊檔時，已部署的 audit tool 自動抓到 drift
-**動作**：操作者決定當下修，或加進 🟡 TRACKED 等下次
-**好處**：零額外工，純被動發現
+### 🟢 Tier 4：機會主義 + 技術棧變動
+**觸發**：
+- (4a) verify-gate 在 Edit 某舊檔時，已部署的 audit tool 自動抓到 drift
+- (4b) **技術棧變動** —— 引入新 runtime / framework / dependency major version 升級 / 新 OS locale 出現（會 reset bug class 計數）
+**動作**：
+- 4a：操作者決定當下修，或加進 🟡 TRACKED 等下次
+- 4b：在 protocol 此處留 stack-change 紀錄；舊 audit class 重新驗證仍適用、新 audit class 評估是否要建
+**範例**：未來如引入 Bun / Deno / 把 PowerShell 7 換成別的 → reset CP950-class 假設，重審
 
 ---
 

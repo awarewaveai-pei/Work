@@ -84,6 +84,8 @@
 | `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` | `docs/operations/cursor-mcp-and-plugin-inventory.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md`, `TASKS.md`, `WORKLOG.md`, `docs/operations/tools-and-integrations.md`, `docs/operations/security-secrets-policy.md`, `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`, `docs/DOCS_INDEX.md`, `docs/operations/OPS_DOCS_INDEX.md`, `docs/edge-and-domains/EDGE_DOMAINS_INDEX.md`, `docs/governance-plans/GOVERNANCE_PLANS_INDEX.md`, `AGENTS.md`, `README.md`, `../README.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `../lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md` | `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md` §41, `../lobster-factory/docs/ARCHITECTURE_CANONICAL_MAP.md`, `docs/overview/ao-lobster-operating-model.md`, `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` §0, `docs/CHANGE_IMPACT_MATRIX.md` |
 
+| `docs/operations/BUG_HUNT_PROTOCOL.md` | `AGENTS.md`, `docs/operations/AUDIT_REGISTRY.md` |
+
 ## 最小同步清單（每次改版）
 - [ ] `README.md` 路徑與入口已更新
 - [ ] `TASKS.md` 狀態已同步
@@ -101,4 +103,5 @@
 - `scripts/register-new-governance-doc.ps1`
 
 _Last synced: 2026-05-20 15:27:23 UTC_
+
 
