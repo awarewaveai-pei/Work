@@ -48,6 +48,53 @@
 
 **Rollback**：`git revert 52e97d6` 收尾 minor 修法；wrapping 主修法在 `8a18ecb` / `faafbae` / `8e0e33e` / `2c62680` 內，個別檔可 `git checkout origin/main~N -- scripts/<file>` 還原
 
+### Audit history — CP950 / encoding trap class（2026-05-22 全專案掃描完成）
+
+**範圍**：36 個檔（PS scripts 12 + Lobster PS 4 + Linux .sh 24，不含 `node_modules/` / `Backups/`）
+
+**方法**：grep `$var = & <ssh|docker|wp|scp|git>` capture + `Get-Content` 無 `-Encoding` + `catch {}` empty + 讀檔走 data flow + critic deep review + real SSH 對 SG production 雙次驗證
+
+#### 🔴 已 FIX（受 `scripts/_console-encoding-helpers.ps1` 保護）
+
+- `scripts/backfill-missed-daily.ps1`（line 62-86）—— **唯一今日真實爆點**：`git log` 中文 commit message 被 CP950 decode 吃換行字元，兩 commits 合併成一行
+- `scripts/check-backup-health.ps1:39`（`& ssh`）
+- `scripts/check-deploy-drift.ps1:87`（`& ssh`）+ 順手補 `Set-StrictMode -Version Latest`
+- `scripts/diff-env-vs-vault.ps1:116, 118`（`& ssh` + `& docker exec`）
+- `scripts/update-client-wp-plugins.ps1:105`（`& ssh`）+ `122, 128`（scp wrap）
+
+#### 🟢 CLEAN — 已驗證無 trap，**勿重 audit** 除非邏輯變動
+
+- `scripts/merge-closeout-inbox-into-progress.ps1`（0 外部命令呼叫）
+- `scripts/apply-closeout-task-checkmarks.ps1`（中文 substring 用 `[StringComparison]::Ordinal`，regex 只比 ASCII 結構）
+- `scripts/fetch-external-signals.ps1`（`Invoke-RestMethod` 走 JSON 路徑，HTTP charset header 自動處理）
+- `scripts/generate-integrated-status-report.ps1`（純 markdown 聚合，BOM cosmetic 留 TASKS）
+- `scripts/print-open-tasks.ps1` / `scripts/print-today-closeout-recap.ps1`（script-level set 不 restore，subprocess 模型下安全；遷移留 TASKS）
+- `lobster-factory/infra/trigger/{deploy-workflows,preflight-clickhouse,validate-config}.ps1`
+- `lobster-factory/infra/hetzner-phase1-core/scripts/test-ops-inbox-webhooks.ps1`（`Invoke-WebRequest` HTTP 路徑）
+- **24 個 `.sh` 檔**：Linux bash byte-oriented + VPS locale `C.UTF-8`，**CP950 trap class 不存在於 Linux**——不需也不應該包 `Invoke-WithUtf8Console`（無此函式）
+
+#### 🛠 工具建立
+
+- **`scripts/_console-encoding-helpers.ps1`**（新）—— `Invoke-WithUtf8Console { scriptblock }` 共享 helper；仿 `_vault-helpers.ps1` pattern；5/5 unit tests PASS（before=big5 / inside=utf-8 / after=big5；`$LASTEXITCODE` 穿透；throw 時仍 restore；stdout 多元素流出）；real SSH 對 SG production（`check-deploy-drift.ps1`）雙次驗證 PASS
+- **延伸工具留 TASKS**：`scripts/audit-cp950-traps.ps1` + `/audit-encoding` slash command（自動化掃描）尚未建——詳見 TASKS `#### Encoding 防護 — 一勞永逸延伸`
+
+#### Statistics
+
+| 維度 | 數字 |
+|------|------|
+| Audited | 36 |
+| Fixed（hardened today）| 4（PS）|
+| Clean — no action | 32（1 PS BOM cosmetic、2 PS migration candidates、24 SH、5 PS 無 trap）|
+| Real production breaks 歷史 | 1（`backfill-missed-daily.ps1`，今日修）|
+| 延伸 TASKS 條目 | 4（1 工具 + 3 條件觸發 cleanup）|
+
+#### 30-year 防護機制（今日後新蟲擋下方式）
+
+1. **`code-change-tracker.js` hook** → 改 `.ps1/.sh/...` 必跑 `/verify-recent`
+2. **`critic` deep review brief** 已寫明：「look for encoding issues (CP950 / locale)」
+3. **R0 [驗證計畫] §3 抓蟲** 規則仍要求 grep 跨檔比對
+4. **未來工具**：`audit-cp950-traps.ps1` 完成後，週檢自動掃漏網
+
 ### Phase 4 forensic — 監督者本身睡著三週，重建為 Claude routine + 雙重 watchdog（~16:30 UTC）
 
 **事件**：操作者問「星期五下午那個 cron job 跑了嗎？」。R0 forensic 在 30 分鐘內挖出三層失敗：
