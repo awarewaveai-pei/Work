@@ -205,6 +205,23 @@
 
 **系統面已結案**：health endpoint 三層偵測邏輯已正確實作，不屬程式碼問題。
 
+> **【2026-05-22 修訂】上方「結論」段第二句為錯誤主張，本日 Phase 4 B 實測證偽。**
+>
+> 原文「Auto-Repair 修復迴圈目前的 GitHub Issue 開單 / PR 建立步驟，依賴 Claude GitHub App 執行自動操作；App 未安裝，此步驟每次都會失敗」與實際架構不符。
+>
+> **7 項實測證據**（2026-05-22 13:00~13:20 UTC）：
+> 1. `auto-repair-claude.yml` workflow 用 `github_token: ${{ github.token }}`（GHA ephemeral token），非 App token
+> 2. Issue #11 → PR #12 全鏈成功（branch `claude/issue-11-20260522-0509` + commit `1c17694`）
+> 3. PR #12 user.login = `github-actions[bot]`（不是 `claude[bot]`）
+> 4. commit `1c17694` verification = `unsigned`（若 App 經手會自動 GPG-signed by GitHub）
+> 5. commit author name `claude[bot]` 是 `anthropics/claude-code-action@v1` 內部 `git config user.name` cosmetic label，與 App 安裝狀態無關
+> 6. `gh api repos/.../commits/1c17694/check-suites` 僅見 `Sentry` app，無 Claude app
+> 7. health endpoint 偵測邏輯（route.ts L176-209）正確 — 因 18 則最近 comments 中 0 個 author login 含 `claude` 字串，回 `unverified` 為設計預期，**非 functional gap**
+>
+> **正確結論**：Claude GitHub App **未安裝**屬實，但**非必須**。Auto-Repair 全鏈（issue → workflow → Claude → branch push → PR auto-create）完全不依賴 App。`unverified` 屬 **cosmetic** 狀態，要消除可選：(a) 真的裝 App（將來 comments 含 claude bot → auto-detect 為 `auto_detected`）；(b) 設 `AUTO_REPAIR_GITHUB_APP_CONFIRMED=true` 自我宣告為 `confirmed_by_operator`；(c) 不管它，0 功能損失。
+>
+> **TASKS.md 已同步降級**：原【操作者必做】條目改為【可選 cosmetic】，保留原裝法步驟供未來真的要裝時用。
+
 ---
 
 ### AUTO_TASK_DONE: GAP-01/03 最終閉環 — health endpoint SSH 常態探針 + GitHub App 三層狀態（commit `2a7d67e`）

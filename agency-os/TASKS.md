@@ -113,8 +113,14 @@
 
 #### Auto-Repair — 操作者手動任務
 
-- [ ] **【操作者必做】安裝 Claude GitHub App 並確認 health endpoint** —— **【未開始】** **背景**：2026-05-21 查核確認 `awarewaveai-pei` 帳號下 **0 個 GitHub App 安裝**，Claude GitHub App 尚未部署。Auto-Repair 修復迴圈的 GitHub Issue 開單 / Claude PR 建立步驟依賴此 App；App 未裝，每次修復到「GitHub handoff」環節都會靜默失敗。health endpoint 目前回傳 `github_app_status: "unverified"`。
-  - **執行流程（依序）**：
+- [ ] **【可選 cosmetic — 非必要】安裝 Claude GitHub App（消除 health endpoint advisory）** —— **【未開始】**
+  - **2026-05-22 更新**：原為【操作者必做】，本日 Phase 4 B 實測證明 Auto-Repair 全鏈**不依賴**此 App（Issue #11 → workflow → Claude → branch push → PR #12 全綠，commit `1c17694` 由 `${{ github.token }}` 經 `gh pr create` 完成；commit `unsigned` 證明非 App 經手）。原 2026-05-21 WORKLOG「依賴 App、每次都會失敗」結論已在 §「調查」段追加 **【2026-05-22 修訂】** 修正。本條保留供未來真的想裝時使用，但**不再阻塞 Phase 4 收官**。
+  - **背景（原文留存供參考）**：2026-05-21 查核確認 `awarewaveai-pei` 帳號下 0 個 GitHub App 安裝。health endpoint 目前回傳 `github_app_status: "unverified"` + advisory「Install it...」字串 — 此屬 **cosmetic** 訊息，不影響功能。
+  - **三選一**：
+    - **選項 A — 不裝**：0 動作，0 影響；health endpoint 永遠回 `unverified`（無感）
+    - **選項 B — 設環境變數自我宣告**：SSH SG `echo "AUTO_REPAIR_GITHUB_APP_CONFIRMED=true" >> /root/lobster-phase1/.env && docker restart lobster-next-admin` → 狀態變 `confirmed_by_operator`（cosmetic 修正，未真裝 App）
+    - **選項 C — 真的裝 App**：增加「在任意 issue/PR 用 @claude」便利性（目前用 workflow 替代足夠）
+  - **執行流程（若選 C）**：
     - **步驟 1 — 安裝 App**：瀏覽器前往 `https://github.com/apps/claude` → Install → 選帳號 `awarewaveai-pei` → Repository access 選 `Only select repositories` → 勾選 `Work` → Install
     - **步驟 2 — 設 env var**：SSH 進 SG VPS (`ssh root@5.223.93.113`)，執行：
       ```bash
@@ -128,8 +134,8 @@
         -H "x-ops-claims-role: owner" | python3 -m json.tool | grep github_app_status
       ```
       期望值：`"github_app_status": "confirmed_by_operator"`
-  - **DoD**：health endpoint 回傳 `github_app_status: "confirmed_by_operator"` + WORKLOG `AUTO_TASK_DONE` 留紀錄
-  - **⚠️ 注意**：此為 Auto-Repair 全自動閉環的最後一塊缺口；未完成前，系統雖可偵測事件與備份，但 GitHub Issue / Claude PR 步驟無法自動執行
+  - **DoD（任一即可結案）**：(a) 選 A → 在 WORKLOG 留「明示不裝、Phase 4 已通」決策證據；(b) 選 B/C → health endpoint 回傳 `confirmed_by_operator` + WORKLOG `AUTO_TASK_DONE`
+  - **不再阻塞**：Phase 4 全鏈已於 2026-05-22 驗證收官（PR #12），本條從 P0 降為可選
 
 #### 下一期計畫（未開始）
 
