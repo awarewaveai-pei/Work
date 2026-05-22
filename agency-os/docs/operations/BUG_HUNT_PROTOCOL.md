@@ -43,7 +43,11 @@
 
 ### 🟡 Tier 3：月度 schedule-driven
 **觸發**：每月最後一個週日（或操作者擇期）從 [AUDIT_REGISTRY](AUDIT_REGISTRY.md) ⏳ PENDING 隊列挑 1-2 個
-**優先**：`blast_radius × likelihood × scope`
+**優先公式**：`blast_radius × likelihood × scope`
+- **blast_radius** (1-5)：1=單一腳本、2=同模組、3=跨模組、4=跨服務、5=跨 tenant / prod 影響
+- **likelihood** (1-5)：1=理論可能、2=曾觀察 1 次、3=多 session 抓到、4=每週觸發、5=日常觸發
+- **scope** (整數)：grep 該 trap pattern 的命中數
+- 範例：CP950（blast=3、likelihood=5（已踩）、scope=123）→ 1845 → Tier 1 急
 **節奏**：2-4 hr / class
 
 ### 🟢 Tier 4：機會主義 + 技術棧變動
@@ -88,10 +92,15 @@
    - 動作：`/audit-<class> --file <path>`
    - 用 tool 當 oracle（exit 0=放行；exit 1=按 fix template）
        ↓
-7. Critic deep review 自己的 audit tool
+7. Critic deep review 自己的 audit tool（**FP-rate exit gate**）
    - 抓 false-positive / false-negative
    - 抓 AST traversal edge cases
    - 抓 regex 漏字
+   - **必須過閘才能宣告 DEPLOYED**：
+     (a) 對 dogfood corpus 跑，FP rate < 10%（人工抽 20 個確認）**OR**
+     (b) AUDIT_REGISTRY 該 class 章節**明文列舉** accepted-FP 類型 + 理由
+   - 為什麼此閘存在：critic 觀察「FP > 10% 的 tool ship → operator 每次 dismiss → tool
+     在 month 2-3 死亡 → protocol 變 theater」。30 年最大失敗模式
        ↓
 8. 跨機 sync verify + WORKLOG entry
    - git commit + push（自動跨機同步）
@@ -144,6 +153,7 @@
 | Critic round 抓到的 Critical 數 / session | < 1 是健康 | review 結果 |
 | AGENTS.md `## 代理自動工具使用規則` 條數 | 累積增長（每 audit class +1）| grep table 行數 |
 | `scripts/audit-*.ps1` 工具數 | 累積增長 | `ls scripts/audit-*.ps1` |
+| **操作者實際 audit minutes / 月** | **< 30 min / 月** | WORKLOG marker `[AUDIT-OPS-MIN] <N>`；每月底操作者寫一次該行；`scripts/check-governance-docs-drift.ps1` 月檢可 grep |
 
 ## 操作者每月承擔（你的部分）
 

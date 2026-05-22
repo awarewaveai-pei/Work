@@ -137,10 +137,9 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.cursor/rules/4
 | next-admin 程式碼改動後 sg-deploy 失敗且 log 含 `npm test FAILED` | ① 在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看失敗詳情；② 修好測試或修好程式碼（二擇一，視測試是否合理）；③ commit + push；④ 重跑 `sg-deploy.sh next-admin`。**禁止**：繞過 test gate（--skip-pull + 手動 rsync 或直接 `docker compose build`）。 |
 | 訊息含 reboot 訊號（任一）：`post_update_reboot_status`／`needs reboot`／`requires reboot`／`reboot.?required`／`System restart required`／`重啟`／`重開機`／`重新啟動`／`/var/run/reboot-required` **且**含 VPS 識別字（EU：`awarewave-eu-hel1`／`hel1`／`204.168.175.41`／`EU`；SG：`awarewave-sg`／`wordpress-ubuntu-4gb-sin`／`sin-1`／`5.223.93.113`／`SG`）| 自動執行對應 `/eu-reboot` 或 `/sg-reboot` 的 **Step 1 pre-flight read-only checks**（kernel 待版／容器 restart policy／CLICKHOUSE pin／backup 年齡／公開端點）→ 中文摘要結果 + 預期停機時間 → **等使用者明示 go-ahead 才進 Step 2 reboot**。**禁止**：未過 pre-flight 自動 reboot；無 VPS 識別字時自動觸發（避免誤判使用者在說自己電腦或別的東西）。**AO-RESUME 時**：若 `external-signals-digest.json` 或 `cf-security-LATEST.md` 內含上述訊號，於七段式輸出主動點名「⚠️ EU/SG 需 reboot，建議跑 /eu-reboot」，不要靜默。 |
 | 任何 `Edit`／`Write`／`MultiEdit` 寫入或修改 `.ps1` 檔（CP950 trap class，2026-05-22 backfill-missed-daily.ps1 真實爆過）| 立即執行 `/audit-encoding --file <該檔絕對路徑>`，**讓工具本身當 oracle**（exit 0=放行；exit 1=按 fix template 處理：(a) wrap 該 capture site；(b) 移到 [AUDIT_REGISTRY 🟡 TRACKED](docs/operations/AUDIT_REGISTRY.md#cp950--encoding-trap-audit-2026-05-22) 並解釋為何 ASCII-only 不需修）。詳：[.claude/commands/audit-encoding.md](../.claude/commands/audit-encoding.md) |
+| 任何 audit / 抓蟲 / bug class / encoding / silent fail / 工具化 / class-by-class 相關問題或情境 | 先讀 [`docs/operations/BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)（方法 SSOT，5-tier 觸發 + 9-step playbook + KPI）+ [`docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md)（狀態 SSOT）再回答，不靠常識 / 不臨機自創流程 |
 
 MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
-
-抓蟲大業 30 年運轉模型（class-by-class、4-tier 觸發、backlog、KPI、操作者/Claude 分工）：[`docs/operations/BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)。Audit 狀態 SSOT：[`docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md)。
 
 ## Session 啟動順序（每次都做）
 
