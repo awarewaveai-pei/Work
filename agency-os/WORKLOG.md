@@ -4,7 +4,40 @@
 
 ## 2026-05-22
 
-### CP950 stdout hardening — 全專案 audit + 4 個 unprotected scripts 防護（commits `8a18ecb` → `52e97d6`，~17:00 UTC）
+### Cross-machine sync 補洞 + AO-RESUME 報告歸檔（commits `07dfa9d`、`4cbcee4`，~18:40-18:50 UTC+8）
+
+**起源**：操作者問「commands、skills、settings 應該都要同步啊怎麼會被擋下來」。盤點後發現：commands/agents 透過 `.claude` symlink + git tracking 已同步，但 (1) `.claude/skills/` 大部分被 `.gitignore` 排除（白名單只兩個），換機新裝的 skills 不會跟過去；(2) `bootstrap-mcp-machine.ps1` 沒自動建 `.claude` junction → 桌機若沒手動建，commands/agents/skills 即使 git pull 也會脫鉤；(3) CLAUDE.md R1 表第二行寫「`~/.claude/commands/`」歧義，commands 其實走 git。
+
+**另開順手**：操作者也要求「AO-RESUME 報告每次寫進 folder 方便回看，1 個月保留」。
+
+**修改**：
+
+1. **`.gitignore`** lines 32-38：`.claude/skills/*` 仍排除 + `!.claude/skills/*/` + `!.claude/skills/*.skill` 全部 negate，runtime cache 仍 ignore
+2. **新追蹤的 skill 檔**（4 個）：`feature-plan/`、`level-check/`、`qa-review/`、`sdd-update/` 各一 SKILL.md（`integration-javascript_node/` 是空目錄 git 不追蹤）
+3. **`scripts/bootstrap-mcp-machine.ps1`** lines 38-72：新區塊「Ensure .claude is a junction」—— 自動建 Windows Junction (`New-Item -ItemType Junction`)，含四種狀態處理（不存在/已是 junction/是真目錄警告/建立失敗 fallback `mklink /J`）
+4. **`agency-os/reports/ao-resume/README.md`**：archive folder 規範（檔名 `YYYY-MM-DD-HHmm.md`、30 天保留、git tracked）
+5. **`~/.claude/commands/ao-resume.md`**（透過 .claude junction，即 `d:\Work\.claude\commands\ao-resume.md`）：新增「Step 3 — Archive the report」段，定義寫入 + prune >30d + self-check 機制
+6. **`CLAUDE.md`** R1 表第一行：commands → `commands/agents/skills/...`，加註「透過 `.claude` junction → `~/.claude/`」；第二行去除歧義；底部一句加強 bootstrap 自動建 junction 說明
+
+**[驗證計畫] 四動作結果**：
+
+- **實測**：`git status` 確認 5 個 commit 落地（auto-checkpoint hook 自動 commit `07dfa9d` 含 4 skill + .gitignore；`4cbcee4` 含 bootstrap + ao-resume.md + archive README）；`git ls-files .claude/skills/ | wc -l` = 15（從 11 → 15）；archive folder + README 實際存在
+- **Review**：Read 回 `.gitignore` lines 32-38、`ao-resume.md` lines 110-138、`bootstrap-mcp-machine.ps1` lines 38-72 各區塊結構正確；bootstrap script 透過 `[System.Management.Automation.PSParser]::Tokenize` syntax check 過（temp file in `d:\tmp\syntax-check.ps1`，避免 bash heredoc 吃 PS `$var`，見 memory `feedback_test_artifact_isolation`）
+- **抓蟲**：`grep -rn "mcp/claude-userlevel/commands\|~/.claude/commands/.* SSOT"` 只命中 WORKLOG line 501（歷史紀錄不改寫）+ Backups/* 目錄（歷史備份不該動）；`grep -rn "\.claude/skills"` 命中均為 Backups 目錄
+- **WORKLOG**：本 entry
+
+**驗證計畫不含的部份（待下次新機/桌機觸發才能 end-to-end 實測）**：
+- Junction 在實際新機 bootstrap 是否成功建立（本機已有 symlink，邏輯走「已是 junction」分支）
+- 第二台機器 git pull 後 4 個新 skill 是否真的能跑（本機已有，無法本機驗證跨機）
+- 下次 `/ao-resume` 觸發時 Claude 是否確實寫進 archive folder（slash command 改動，等下次觸發才驗）
+
+**剩餘風險**：
+- 桌機若已存在真實 `.claude` 目錄（非 junction），bootstrap 只警告不自動修——避免吃掉操作者資料；需操作者手動處理
+- AO-RESUME archive 依賴 Claude 自律執行 Step 3，沒有兜底機制（PS hook 不知道七段式內容）；若多次發現遺漏，回頭加 β 方案（PS 也寫一份 raw JSON 版）
+
+**Rollback**：`git revert 07dfa9d 4cbcee4`；CLAUDE.md 改動見當前 working tree
+
+
 
 **事件**：操作者要求 audit「過去幾個月做的 code change」找蟲——優先掃 CP950 同類（zh-TW Windows 預設 `[Console]::OutputEncoding = CP950`，會把外部命令 stdout 的 UTF-8 多 byte 序列 mojibake 並可能吃換行字元）。
 

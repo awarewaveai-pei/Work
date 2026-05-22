@@ -11,12 +11,12 @@
 
 | 項目                                            | SSOT                                        | 同步方式                                                 |
 | --------------------------------------------- | ------------------------------------------- | ---------------------------------------------------- |
-| commands / agents / scripts / docs / runbooks | `repo/.claude/` + `agency-os/` + `scripts/` | `git pull` 自動 ✓                                      |
-| hooks / settings.json / `~/.claude/commands/` | `mcp/claude-userlevel/`                     | `git pull` + `sync-claude-userlevel.ps1 -Mode merge` |
+| commands / agents / skills / scripts / docs / runbooks | `repo/.claude/` + `agency-os/` + `scripts/` | `git pull` 自動 ✓（透過 `.claude` junction → `~/.claude/`） |
+| hooks / settings.json / mcp.json (user-level) | `mcp/claude-userlevel/`                     | `git pull` + `sync-claude-userlevel.ps1 -Mode merge` |
 | memory `~/.claude/projects/*/memory/`         | 無                                           | ❌ 手動複製（不進 git）                                       |
 
 
-**禁止**：在 `~/.claude/` 建立不在 repo 的副本。新機一鍵：`bootstrap-mcp-machine.ps1`。
+**禁止**：在 `~/.claude/` 建立不在 repo 的副本。新機一鍵：`bootstrap-mcp-machine.ps1`（自動建 `.claude` junction，commands/agents/skills 即 git-tracked）。
 
 ### R2：任務完成強制
 
