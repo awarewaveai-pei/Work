@@ -534,6 +534,101 @@ if ($sorted.Count -eq 0) {
     }
 }
 
+# ---------- VPS reboot-required mechanical detection ----------
+# Scans the existing external-signals-digest.json for Netdata "post_update_reboot_status"
+# alerts mentioning a known VPS host (EU/SG). Emits a hard-to-ignore block at the END of
+# AO-RESUME output so the hook's log_tail (last 48 lines) captures it and Claude reads
+# it from ao-resume-hook-last.json. Defense in depth: AGENTS.md text rule + this
+# mechanical detector — do not rely on LLM attention alone.
+$savedEAPReboot = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $rebootHits = @()
+    $rebootDigestPath = Join-Path $WorkRoot "agency-os\.agency-state\external-signals-digest.json"
+    if (Test-Path -LiteralPath $rebootDigestPath) {
+        $rebootDigestRaw = Get-Content -LiteralPath $rebootDigestPath -Raw -Encoding UTF8
+        # Coarse string scan first — only parse JSON if pattern is present in raw bytes.
+        if ($rebootDigestRaw -match 'post_update_reboot|requires reboot|needs reboot|System restart required') {
+            try {
+                $rebootDj = $rebootDigestRaw | ConvertFrom-Json
+                $rebootCandidateMsgs = New-Object System.Collections.Generic.List[object]
+                # Slack: signals.slack.channels.<name>.messages[]
+                if ($rebootDj.PSObject.Properties.Name -contains 'slack' -and `
+                    $rebootDj.slack -and `
+                    $rebootDj.slack.PSObject.Properties.Name -contains 'channels' -and `
+                    $rebootDj.slack.channels) {
+                    foreach ($chProp in $rebootDj.slack.channels.PSObject.Properties) {
+                        $ch = $chProp.Value
+                        if ($ch -and $ch.PSObject.Properties.Name -contains 'messages' -and $ch.messages) {
+                            foreach ($m in $ch.messages) {
+                                $rebootCandidateMsgs.Add([PSCustomObject]@{ src = ("slack/" + $chProp.Name); msg = $m }) | Out-Null
+                            }
+                        }
+                    }
+                }
+                # Telegram: signals.telegram.messages[]
+                if ($rebootDj.PSObject.Properties.Name -contains 'telegram' -and `
+                    $rebootDj.telegram -and `
+                    $rebootDj.telegram.PSObject.Properties.Name -contains 'messages' -and `
+                    $rebootDj.telegram.messages) {
+                    foreach ($m in $rebootDj.telegram.messages) {
+                        $rebootCandidateMsgs.Add([PSCustomObject]@{ src = "telegram"; msg = $m }) | Out-Null
+                    }
+                }
+                foreach ($cand in $rebootCandidateMsgs) {
+                    $m = $cand.msg
+                    if (-not ($m.PSObject.Properties.Name -contains 'text')) { continue }
+                    $msgText = [string]$m.text
+                    if ($msgText -match 'post_update_reboot|requires reboot|needs reboot|System restart required') {
+                        $hitHost = $null
+                        if ($msgText -match 'awarewave-eu-hel1|hel1-cpx32|204\.168\.175\.41') {
+                            $hitHost = 'EU (awarewave-eu-hel1-cpx32 / 204.168.175.41)'
+                        } elseif ($msgText -match 'wordpress-ubuntu-4gb-sin|sin-1|5\.223\.93\.113') {
+                            $hitHost = 'SG (wordpress-ubuntu-4gb-sin-1 / 5.223.93.113)'
+                        }
+                        if ($hitHost) {
+                            $msgDate = if ($m.PSObject.Properties.Name -contains 'date') { [string]$m.date } else { '?' }
+                            $rebootHits += [PSCustomObject]@{
+                                host   = $hitHost
+                                text   = $msgText
+                                date   = $msgDate
+                                source = $cand.src
+                            }
+                        }
+                    }
+                }
+            } catch {
+                # JSON parse failure — silent; raw-scan match without parsable JSON is unusual but non-fatal.
+            }
+        }
+    }
+    if (@($rebootHits).Count -gt 0) {
+        # Dedupe by host (one host may emit multiple matching messages).
+        $rebootByHost = @{}
+        foreach ($h in $rebootHits) {
+            if (-not $rebootByHost.ContainsKey($h.host)) { $rebootByHost[$h.host] = $h }
+        }
+        Write-Host ""
+        Write-Host "==================================================================" -ForegroundColor Red
+        Write-Host "WARN VPS REBOOT REQUIRED -- handle this turn, do not defer" -ForegroundColor Red
+        Write-Host "==================================================================" -ForegroundColor Red
+        foreach ($key in $rebootByHost.Keys) {
+            $h = $rebootByHost[$key]
+            $slug = if ($h.host -like 'EU*') { 'eu-reboot' } else { 'sg-reboot' }
+            Write-Host ("  host    : {0}" -f $h.host) -ForegroundColor Yellow
+            Write-Host ("  signal  : {0} @ {1}" -f $h.source, $h.date) -ForegroundColor Yellow
+            Write-Host ("  action  : run /{0} (auto-runs pre-flight read-only; wait for go-ahead to reboot)" -f $slug) -ForegroundColor Cyan
+            Write-Host ""
+        }
+        Write-Host "Claude: surface this in your AO-RESUME 7-segment output immediately, do not bury it." -ForegroundColor Red
+        Write-Host "==================================================================" -ForegroundColor Red
+    }
+} catch {
+    # Top-level catch — never break AO-RESUME on detection bugs.
+}
+$ErrorActionPreference = $savedEAPReboot
+# ---------- end VPS reboot detection ----------
+
 $nowStamp = (Get-Date).ToUniversalTime().ToString("o")
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($stampPath, $nowStamp + [Environment]::NewLine, $utf8NoBom)
