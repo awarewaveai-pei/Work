@@ -87,7 +87,8 @@ function Invoke-Ssh {
         ("{0}@{1}" -f $ServerUser, $ServerHost),
         $Cmd
     )
-    $out = & ssh @sshArgs 2>&1
+    # Force UTF-8 console for SSH stdout (CP950 trap protection).
+    $out = Invoke-WithUtf8Console { & ssh @sshArgs 2>&1 }
     return @{ ExitCode = $LASTEXITCODE; Output = ($out -join "`n") }
 }
 
