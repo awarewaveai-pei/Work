@@ -51,6 +51,33 @@
 - 更新 `~/.claude/projects/d--Work/memory/MEMORY.md`（+1 entry）
 - 刪除 `feedback_4action_validation.md`（自寫自刪 — 重複違反 R0）
 
+### R0 [驗證計畫] 第 3 動作「抓蟲」加 audit-cross-machine-bom 條件工具（2026-05-22 14:50 UTC）
+
+**事件**：使用者注意到 `audit-cross-machine-bom` skill 是本 session 新看到的工具，問是否該加進 R0 [驗證計畫] 抓蟲標準工具。
+
+**根因**：2026-05-20 CREDENTIALS 損毀事件根因為跨機 .md 缺 UTF-8 BOM，PowerShell 在 Windows Big5 locale 下誤判編碼。雖然 export/import 腳本已強制 BOM，但手動編輯（VSCode 編輯預設不寫 BOM）或先前匯入的舊檔仍可能 drift。**僅靠規則文件提醒不夠，須在每次改動 .md 時機械化檢測**。
+
+**修法**（純 docs，1 行條件式 fallback）：
+- `agency-os/AGENTS.md` L23（R0 [驗證計畫] 第 3 動作）末尾加：「**若本次改動含 `.md` 檔案，額外跑 `audit-cross-machine-bom` skill** 確認跨機 Google Drive 同步的 UTF-8 BOM 合規（2026-05-20 CREDENTIALS 損毀事件根因）」
+- 條件式（含 .md 才跑）= 對純 code 改動 0 false positive；對 .md 改動則強制 BOM 檢核
+- 不動其他位置（R4 / CLAUDE.md / memory）— audit 屬「抓蟲動作」的工具項，不是新規則
+
+**驗證（吃自己狗食 = dogfooding。本次改動是 .md 檔，所以必跑 audit）**：
+- 1. **實測**：
+  - `grep -c "audit-cross-machine-bom" agency-os/AGENTS.md` = 1 ✅
+  - `powershell -File scripts/audit-cross-machine-bom.ps1` → **26/26 .md 全部 BOM 合規，0 missing** ✅（含 ~/.claude/projects/d--Work/memory/*.md + vault CREDENTIALS）
+- 2. **Review**：Read AGENTS.md L20-25 → 第 3 動作條件式分號清晰、與其他三動作對稱、無 markdown breakage
+- 3. **抓蟲**：grep `抓蟲` 跨 agency-os/*.md → 唯一 SSOT 命中 `AGENTS.md`，無其他位置需同步 ✅
+- 4. **WORKLOG**：本 entry
+
+**剩餘風險**：(1) 若未來 audit 腳本壞掉但規則仍寫「必跑」→ 代理可能假裝跑過，需 R4 「不得假裝已驗證」配套；(2) 條件「含 .md」可能誤觸發於 docs-only 改動，但 audit 跑時間 < 1s，成本可忽略。
+
+**Rollback**：`git revert HEAD` 一鍵還原。
+
+**Files**：`agency-os/AGENTS.md`（+1 行條件式 fallback，0 行刪除）
+
+---
+
 ### CLAUDE.md 加 Codex fallback pointer — 雙工具共讀 SSOT 防禦性同步（2026-05-22 14:30 UTC）
 
 **事件**：完成 R0/R4 [驗證計畫] 四動作升級後（commits `ad98dd9` + `ec94bac`），使用者提醒「我也有再用 codex」。經抓蟲確認：
