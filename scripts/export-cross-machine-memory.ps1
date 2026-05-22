@@ -46,6 +46,20 @@ param(
     [string]$DestRoot = ""
 )
 
+# Copy a .md file while enforcing UTF-8 BOM at the destination. Reason: .md files crossing
+# Google Drive can be misread as Big5 by PowerShell on Windows when no BOM is present, causing
+# CJK garbling. Reading source as UTF-8 then writing with BOM normalises encoding at the
+# cross-machine boundary; idempotent (source-with-BOM round-trips identically).
+function Copy-MdWithUtf8Bom {
+    param(
+        [Parameter(Mandatory=$true)][string]$Source,
+        [Parameter(Mandatory=$true)][string]$Destination
+    )
+    $utf8bom = New-Object System.Text.UTF8Encoding($true)
+    $content = [System.IO.File]::ReadAllText($Source, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($Destination, $content, $utf8bom)
+}
+
 $syncNow    = Get-Date
 $today      = $syncNow.ToString("yyyy-MM-dd")
 $machineTag = $env:COMPUTERNAME.ToUpper() -replace '[^A-Za-z0-9]', '-'
