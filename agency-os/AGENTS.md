@@ -140,6 +140,8 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.cursor/rules/4
 
 MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
+抓蟲大業 30 年運轉模型（class-by-class、4-tier 觸發、backlog、KPI、操作者/Claude 分工）：[`docs/operations/BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)。Audit 狀態 SSOT：[`docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md)。
+
 ## Session 啟動順序（每次都做）
 
 1. `agency-os/TASKS.md` + `agency-os/WORKLOG.md`（last 30 lines）
