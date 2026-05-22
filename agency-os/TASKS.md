@@ -135,6 +135,60 @@
   - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`
   - DoD：術語與欄位一致（`task_type`/`risk_level`/`environment`/`approval_required`），並完成每月 drift 檢查記錄
 
+#### Bug Hunt — 系統邏輯 audit 隊列（依 [`BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)，2026-05-22 開出）
+
+> **重要差異**：本節是**系統級邏輯 audit**（state machine、race、permission、async flow），不是 CP950 那種 mechanical regex pattern audit。每個 class 需走完整 9-step Build Playbook，預計 4-8 hr / class。
+>
+> 優先公式（per protocol）：`blast_radius × likelihood × scope`
+> - 一鍵架站：5 × 2 × 大（跨 tenant prod，likelihood 不確定因未驗）= Tier 3 月度排程
+> - Auto-Repair：5 × 3 × 中（觸碰 prod deploy + secrets + Slack/GitHub callback）= Tier 3 月度排程，優先於一鍵架站
+
+- [ ] **一鍵架站系統 — 邏輯檢視 + critic review + 抓蟲** —— **【未開始】** **Tier 3 月度排程**
+  - **範圍**（建議按此順序審）：
+    1. `lobster-factory/packages/workflows/` — Trigger.dev tenant provisioning task chain（state machine + idempotency + retry）
+    2. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/` — 4-step wizard（client info → dept selector → service provisioning → summary）
+    3. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts` + 對應 hosting adapters
+    4. Provisioning side-effects：Sentry project、PostHog project、Supabase schema、n8n workflows、GitHub repo 建立 — 任一失敗的 rollback 路徑
+    5. `tenant_integration_bindings` table + `orchestrate-tenant-provisioning` task
+  - **動作**（依 [BUG_HUNT_PROTOCOL 9-step playbook](docs/operations/BUG_HUNT_PROTOCOL.md#build-playbook每個-audit-class-的永久化步驟)）：
+    1. R0 [現況分析]：盤點上述 5 範圍的 data flow / control flow（畫一張 mermaid sequence diagram）
+    2. 找關鍵 bug class：state machine 死鎖、partial provisioning rollback 缺失、idempotency 漏洞、外部 API 失敗的補償邏輯、secret leak in workflow context
+    3. 對每個 class 跑 `critic` subagent deep review
+    4. 真實 dogfood：用 `agency-os/tenants/templates/` 跑 staging onboarding，觀察每步副作用
+    5. 寫 audit report 至 `agency-os/reports/audit/one-click-onboarding-YYYY-MM-DD.md`
+    6. 發現 ≥1 mechanical pattern → 抽象成新 audit tool (`scripts/audit-<class>.ps1`)
+  - **DoD**：
+    - audit report 含 R0 4 動作完整紀錄
+    - 🔴 FIXED / 🟢 CLEAN / 🟡 TRACKED 分類完成，寫入 [`AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md) 新章節
+    - Critical/Major 全修，Minor 至少 50% 修或正當 TRACK 理由
+    - 若衍生新 audit class → 加 entry 進 protocol §Backlog
+  - **觸發建議**：本月度排程；或下次真有 A10-2 商業閉環實跑前先 audit；或操作者擇期
+  - **跨機**：repo 內，git pull 同步
+
+- [ ] **Auto-Repair 系統 — 邏輯檢視 + critic review + 抓蟲** —— **【未開始】** **Tier 3 月度排程，優先**
+  - **範圍**（建議按此順序審）：
+    1. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/` — policy.ts（auto-repair 分類）、run-state.ts、smoothing/dedup
+    2. `app/api/ops/repairs/*` — Queue / Runs / Safety / Policy / health endpoints
+    3. `app/api/webhooks/sentry|uptime-kuma|netdata|grafana|posthog/route.ts` — 多來源 signal ingestion
+    4. `app/api/internal/commands/slack/route.ts` — Slack interactive callback（signing secret 驗證 + approve_repair → backup → GitHub Issue）
+    5. `.github/workflows/auto-repair-claude.yml` + `auto-repair-pr-notify.yml` — Claude action chain
+    6. `scripts/sg-deploy.sh` Step 7 HTTP smoke + auto-rollback hook（已部署但未獨立 audit）
+    7. `lib/repair-center/__tests__/policy.test.ts` 35 + 47 tests — 是否覆蓋邊界？
+  - **動作**（依 [BUG_HUNT_PROTOCOL 9-step playbook](docs/operations/BUG_HUNT_PROTOCOL.md#build-playbook每個-audit-class-的永久化步驟)）：
+    1. R0 [現況分析]：sequence diagram（incoming signal → triage → backup → GitHub Issue → Claude action → PR → merge → deploy → health → rollback-if-fail）
+    2. 找關鍵 bug class：signature 驗證繞過、race in repair_runs state machine、auto-rollback 觸發條件遺漏、`source_policies` 升級錯誤、secret 在 log / Slack message 中洩漏、Claude action turn limit / token exhaustion 處理、idempotency on duplicate Sentry fingerprint
+    3. critic deep review × 多輪（先 policy.ts，後 webhooks，最後 callback flow）
+    4. 真實 dogfood：建 synthetic Sentry issue → 觀察全鏈每步 side-effect + log
+    5. audit report 至 `agency-os/reports/audit/auto-repair-YYYY-MM-DD.md`
+    6. 若發現 mechanical pattern（如 empty catch silent fail 在 repair-center 反覆出現）→ 抽象成 audit class
+  - **DoD**：同上 + 額外
+    - **Signature verification audit**（Slack signing secret + GitHub webhook secret 端到端確認無 bypass）
+    - **Secret leak audit**：repair_runs.error_summary / Slack message / GitHub Issue body 不含 secrets
+    - **Rollback path audit**：確認 sg-deploy.sh Step 7 失敗時的自動 rollback 真的會跑（不只是「在 plan 書裡寫了」）
+  - **觸發建議**：**先於一鍵架站**（已 production 跑、blast radius 高、Phase 4 觀察期 2026-06-19 結束前最好過 audit）
+  - **owner doc 參考**：`docs/awarewave-auto-repair-plan-v3.2-final.md` + `docs/awarewave-repair-center-app-architecture.md` + `docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`
+  - **跨機**：repo 內，git pull 同步
+
 #### Auto-Repair — 操作者手動任務
 
 - [ ] **【可選 cosmetic — 非必要】安裝 Claude GitHub App（消除 health endpoint advisory）** —— **【未開始】**
