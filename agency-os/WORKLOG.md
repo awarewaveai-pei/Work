@@ -4,6 +4,45 @@
 
 ## 2026-05-22
 
+### AO-CLOSE 跨機 stamp 卡死 bug 根治 + AO-RESUME 漏跑偵測 + backfill 標準工具（2026-05-22 04:20 UTC）
+
+**事件**：AO-RESUME 報告「中斷 ~2 天（05-21 未開工）」，但操作者確認 05-21 正常工作了一整天（27+ commits）。深查發現：
+- `agency-os/.agency-state/ao-close-last.txt` 內容停在 `2026-05-20T09:46:00Z`，從 05-20 中午起永遠不更新
+- `agency-os/memory/daily/2026-05-21.md` 完全不存在（AO-CLOSE 漏跑那天沒生成 scaffold）
+- `.claude/bash-commands.log` 證據：05-20 12:43 UTC Claude 自己手動 hard-code 寫入 `2026-05-20T09:46:00Z` 當臨時止血，這個值流入 vault 後永遠回流
+
+**根因（兩個獨立 bug 疊加）**：
+1. **Bug A（程式碼順序錯誤）**：`scripts/ao-close.ps1` 把 cross-machine export（line 502-507）排在 write-stamp（line 510-520）**之前** → export 每次都帶 LOCAL 的「上一次的上一次」舊值出去 → 下次 import force-copy 把舊值蓋回本機 → 兩台機器之間的 stamp 永久卡死
+2. **Bug C（import 無條件覆蓋）**：`scripts/import-cross-machine-memory.ps1` line 560 `Copy-Item -Force` 不比較 timestamp，舊值無條件蓋過本機新值
+
+**修法（A1+ 方案，6 檔 + 3 後續 Major fix）**：
+1. `scripts/ao-close.ps1`（commit `bdbbfde`）— write-stamp 區塊搬到 cross-machine export 之前；加 ordering 說明 comment
+2. `scripts/import-cross-machine-memory.ps1`（`bdbbfde` + 後續 Major #1 修正）— 改為 ISO timestamp 比較（monotonic guarantee：舊不蓋新）；獨立 try-parse vault 與 local，正確區分四種狀態：兩者 OK→比較、vault OK local 壞→recovery import、vault 壞 local OK→keep local（**不**用 vault corrupt 蓋掉好的 local — 這正是要防的 bug 類別）、兩者皆壞→skip 並提示手動
+3. `scripts/ao-resume.ps1`（`40f3f9b` + 後續 Major #2/#3 修正）— 新增健康檢查：掃描自 stamp 以來的真實 commit dates（過濾 `[claude|cursor|codex] checkpoint`），找出無對應 daily 檔的日期，印警告 + 精確 backfill 指令；line 403 `Get-Content` 加 null-guard（避開 WriteAllText non-atomic ~5ms 競態窗口下 StrictMode 拋錯終止 AO-RESUME 的失效模式）
+4. `scripts/backfill-missed-daily.ps1`（**新建**，129 行）— 標準恢復工具：`-Date yyyy-MM-dd` 從 git log 補建 daily 檔，header 含 `<!-- backfilled:manual -->` 明確標示；refuse overwrite without `-Force`；regex `^\d{4}-\d{2}-\d{2}$` + `[DateTime]::ParseExact` 雙重防 path-traversal
+5. `agency-os/memory/daily/2026-05-21.md`（**新建**，53 行）— 從 git log 補建 05-21 daily 檔，header 明確標示是 2026-05-22 補建
+6. `agency-os/.agency-state/ao-close-last.txt` — 手動修正為 `2026-05-21T09:32:31.0000000Z`（d12cb1b commit UTC）
+
+**Critic deep review 結果**：3 Major 全數修完（已 in 後續 commits）：
+- Major #1 — import recovery branch 反轉：原本 try/catch 包整段 parse，任一邊壞都觸發 import → 修為獨立 try-parse 四象限決策（見修法 2）
+- Major #2 — `ao-resume.ps1:403` Get-Content `.Trim()` 在 try/catch 外：StrictMode 下 null 拋錯會直接中止 AO-RESUME → 修為先 read raw 後 null-check 再 Trim（見修法 3）
+- Major #3 — checkpoint regex 只匹配 `[claude]` 漏 `[cursor]` `[codex]`（dual-IDE 策略下會 false-fire 健康警告）→ 廣化為 `\[(claude|cursor|codex)\]\s+checkpoint`（見修法 3）
+
+**驗證**：
+- 4 個 PS 檔語法 ALL OK
+- backfill 工具：拒絕 overwrite without -Force ✓ / empty scaffold for no-commits day ✓
+- import 比較邏輯：vault older→SKIP ✓ / vault newer→IMPORT ✓
+- 健康檢查：daily 都在→不警告 ✓ / 隱藏 05-21.md→正確偵測並印 backfill 指令 ✓
+- regex 過濾：`[claude|cursor|codex] checkpoint` 三種都 DROP，真實 commit + AO-CLOSE chore 都 KEEP ✓
+- Path-traversal：`^\d{4}-\d{2}-\d{2}$` regex + ParseExact 雙重防護 ✓ (critic verified)
+
+**避免再發生**：
+- 收工時操作者動作不變（照常 `AO-CLOSE`）— vault 從此會收到新值
+- 開工時若漏跑 AO-CLOSE，AO-RESUME 自動印「漏哪一天 + 補建指令」，操作者複製貼上即可
+- 未來不再需要 Claude 手動 hard-code timestamp（5/20 那種臨時止血）— `backfill-missed-daily.ps1` 為唯一標準入口
+
+**剩餘風險**：今晚首次真實 AO-CLOSE 才能 end-to-end 驗證 ordering；vault 舊 stamp 會被該次 export 自動覆蓋。Suggestion #1（atomic tmp+rename）作為 belt-and-braces 防禦，留作後續可選改善。
+
 ### EU VPS kernel reboot + 新建 `eu-reboot` runbook（2026-05-22 04:14 UTC）
 
 **事件**：Netdata 自 2026-05-21 06:43 UTC 起持續 warning `awarewave-eu-hel1-cpx32 system.post_update_reboot_status=1`，懸 ~21 小時未處理。
