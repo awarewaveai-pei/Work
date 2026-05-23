@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { verifyIngestToken } from "@/lib/ops-inbox/verifyIngestToken";
+import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,12 +48,12 @@ export async function POST(req: Request) {
     return new NextResponse("unauthorized", { status: 401 });
   }
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return new NextResponse("invalid json", { status: 400 });
-  }
+  // C3 fix (cross-file抓蟲 2026-05-23 catch-up): same OPS_INBOX_INGEST_TOKEN as the 5
+  // audited webhook routes → same DoS surface if token leaks. Migrating to the shared
+  // readWebhookBody helper closes the gap (256KB cap) + sets up future per-source HMAC.
+  const bodyRead = await readWebhookBody(req);
+  if (!bodyRead.ok) return new NextResponse(bodyRead.error, { status: bodyRead.status });
+  const raw = bodyRead.parsed;
 
   if (!raw || typeof raw !== "object") {
     return NextResponse.json({ ok: false, error: "expected object" }, { status: 400 });

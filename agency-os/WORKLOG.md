@@ -341,6 +341,57 @@ Repo 完整 rollback：`git revert <P15 commit hash>`
 
 **Memory update（commit 後）**：補一條 `feedback_audit_deliverables_need_self_critic.md` — 「audit 的 deliverables 本身（report MD / harness ps1 / AGENTS row / AUDIT_REGISTRY section）都是 code-equivalent change，必須跑 R0+R4 4 動作 self-critic；不是只 Read-back 就算數。operator 兩次 push back + verify-gate hook block commit 是這條 lesson 的證據鏈」。
 
+#### 2026-05-23 第三回合 — Critical patches apply round（operator 明示「處理好所有的事」後）
+
+**根因**：上輪 self-critic 找出 5 Major patch defects 後，我列了「下批 session apply」就停。operator 第三次 push back：「你去處理好所有的事 然後報告」+ 上一輪解釋我才意識到「ready-to-apply」defer 等於違反「一勞永逸」mandate。立即動工：把 5 個 Critical 全部 apply 到 repo，Patch Errata 同時折回。
+
+**修改檔案**（13 個 — 5 個 Critical + Errata folded in）：
+
+**C2 (redactSecrets value-aware)**
+- `lib/ops-inbox/redactSecrets.ts` — 全寫；10 個 anchored value patterns + `OPS_AGGRESSIVE_REDACT=true` env gate（EMaj-1）+ MAX_DEPTH=64（EMaj-4）+ MAX_STRING_LENGTH=4096
+- `lib/ops-inbox/__tests__/redactSecrets.test.ts` — 新建 16 cases，含 FP-resistance（Sentry minified JS / PostHog screenshot data URI 必須保留）+ deep nesting 20-40 legitimate / >64 limit 各一例。**16/16 pass**
+
+**C3 (256KB body cap + req.text() refactor 為未來 HMAC 鋪路)**
+- `lib/ops-inbox/readRequestBody.ts` — 新建 shared helper；content-length 早 reject 413 + 保留 raw text for future per-source HMAC（同時關 M3）
+- 5 個 `webhooks/{sentry,uptime-kuma,netdata,grafana,posthog}/route.ts` — 全換用 `readWebhookBody(req)`
+- posthog 同時關 m3 — feature flag 改在 auth 之前，避免 503 訊息洩漏 token validity
+
+**C4 (column allow-list + viewer guard + SSH 6KB→500B truncate)**
+- `app/api/ops/repairs/route.ts` — GET 加 LIST_COLUMNS 顯式欄位白名單不含 audit_log（EMaj-3 reframe — primary fix）+ defense-in-depth viewer guard
+- `lib/repair-center/backup.ts` — SSH stdout/stderr 6000B → 500B 最後防線
+
+**C5 (severity gate as pipeline stop)**
+- `lib/repair-center/service.ts` — `severityRequiresHumanReview()` helper 接好（關 m9）+ critical gate（state=triage_needed，跳過 pipeline）+ 新 `confirmCriticalRun()`
+- `app/api/ops/repairs/[id]/confirm-critical/route.ts` — 新建路由；canApproveCommand-gated
+
+**C1 (sg-deploy.sh auto-rollback + EMaj-2 save-before-deploy + EMin-7 PREVIOUS_COMMIT)**
+- `scripts/sg-deploy.sh` — RESTORABLE_APPS partition（EMaj-2）+ Step 2.5 `save` 每個 restorable app + Step 7 smoke-fail 觸發 `restore` + 還原 `.deployed-commit` + drill mode env flag
+- `scripts/auto-deploy-next-admin.sh` — 讀 `.rollback-triggered` flag，Slack/Telegram 附加「🔴 AUTO-ROLLBACK FIRED」prefix
+- `docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md:72` — 從「非致命」改成「致命 + drill mode」
+- `agency-os/AGENTS.md:79` — 同上行為描述同步
+
+**Governance**
+- `agency-os/docs/operations/AUDIT_REGISTRY.md` — 5 條 🔴 TRACKED → 🔴 FIXED 含 file refs + statistics FIXED 0→5
+- `agency-os/TASKS.md` — 5 個 sub-task `[ ]` → `[x]`；Phase 4 收官建議改可正常 2026-06-19 收官
+- `scripts/audit-tools/dogfood-auto-repair.ps1` — `$logicReminders` 從「[CRIT] 未修」改「[FIXED] regression surface 是…」
+
+**[驗證結果] R0+R4 四動作（apply round）**：
+
+1. **實測**：`npm test` 在 next-admin → **109/109 vitest pass**（16 redactSecrets + 既有 93）；`bash -n sg-deploy.sh && bash -n auto-deploy-next-admin.sh` clean；harness re-run 10/10 invariants + 1 cosmetic warn；**不在本機 live 跑 sg-deploy**（drill mode env=false 預設 fallback 可一秒回舊行為）
+2. **Review**：Read 13 個修改檔；vitest 即「Read 我寫的 code 對」的最強形式
+3. **抓蟲**：grep `非致命` → 兩處同步改；grep `await req.json()` 在 5 webhook → 全替換 `readWebhookBody`；grep `select("\*")` → repairs/route.ts 已 LIST_COLUMNS；grep `severity === "critical"` inline → service.ts 已用 helper
+4. **WORKLOG**：本 entry（13 個檔修改清單 + 4 動作各自結果 + 5 Criticals C1-C5 Errata fold-in 對照）
+
+**剩餘風險**：
+- (a) C1 takes effect 只在 operator 下次跑 sg-deploy 時；**第一次 live 建議先用 `AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false` drill** 觀察是否會誤觸，再切回 true
+- (b) C5 的 `/confirm-critical` 路由 **UI 還沒做**；短期 operator 要 curl 或從 Slack 連結手動點。API 已可用，不阻塞 Phase 4
+- (c) `OPS_AGGRESSIVE_REDACT` 預設 OFF（安全預設 FP-resistant），如需更激進可 SG VPS `.env` 開啟
+- (d) 10 Major + 9 Minor 留下次 iteration（m3/m9 隨 Critical 順手修）
+
+**Rollback**：13 個檔都是增量 / 純函式 / 新建檔，無 schema change / migration / prod secret 改。`git revert` 即可全還原。C1 出問題改 `AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false` env 一秒切回舊行為。
+
+**Memory update（commit 後）**：補一條 `feedback_apply_after_design_not_defer.md` — 「audit 設計完整 + Errata 折回後，Low/Medium-risk patch should apply same session，不要 defer。defer 的理由（staging dry-run、product owner 決策）要 case-by-case。30-year lesson：設計 + apply 的 round-trip cost 比 defer 後重起 context 低」。
+
 ---
 
 ## 2026-05-22
