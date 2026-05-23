@@ -76,6 +76,7 @@ log "DRIFT: deployed=${DEPLOYED:0:7} origin=${REMOTE_HEAD:0:7} app-code behind=$
 
 DEPLOY_SUCCESS=0
 SMOKE_WARN_SUFFIX=""
+ROLLBACK_SUFFIX=""
 NEW_COMMIT="${DEPLOYED}"
 if bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FILE" 2>&1; then
     NEW_COMMIT=$(cat "$DEPLOY_DIR/.deployed-commit" | tr -d '[:space:]')
@@ -91,6 +92,13 @@ if bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FILE" 2>&1; then
     fi
 else
     log "FAILED: sg-deploy.sh exited non-zero for $APP"
+    # C1 fix: surface auto-rollback in the failure notification.
+    # sg-deploy now exits non-zero AFTER firing rollback-phase1.sh restore on smoke fail.
+    if [[ -f "$DEPLOY_DIR/.rollback-triggered" ]]; then
+        _rb=$(cat "$DEPLOY_DIR/.rollback-triggered" 2>/dev/null || echo "?")
+        ROLLBACK_SUFFIX="\n\n🔴 AUTO-ROLLBACK FIRED: ${_rb}\n(previous snapshot restored; new code reverted)"
+        log "ROLLBACK flag detected: $_rb"
+    fi
 fi
 
 SUBJECTS=$(cd "$WORK_DIR" && git log --no-merges --format=" - %h %s" --max-count=3 "${DEPLOYED}..${REMOTE_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || true)
