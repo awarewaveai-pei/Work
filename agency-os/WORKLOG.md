@@ -27,9 +27,26 @@
 3. **抓蟲（cross-file bug hunt）**：grep `tailLines|log_tail|steps_summary` across repo → 找到 3 處原寫死 48（Claude hook / Cursor hook / ao-resume.ps1 註解），**3 處全修**，無 stale 主張；跑 `audit-cp950-traps.ps1` 對兩個 hook → **發現 2 個 pre-existing drift**（Claude hook L54 / Cursor hook L50 `git status --porcelain` 未 wrap），輸出僅 ASCII 不會觸發 CP950 trap，本次 **scope 之外不修**，**留存於此**等使用者授權單獨開 task 或移到 [AUDIT_REGISTRY 🟡 TRACKED](docs/operations/AUDIT_REGISTRY.md#cp950--encoding-trap-audit-2026-05-22)
 4. **WORKLOG**：本 entry（含四動作摘要 + 證據連結 + 待辦 CP950 finding）
 
-**剩餘風險**：(a) `steps_summary` regex 對 ao-resume.ps1 `== xxx ==` header 格式有 implicit contract（>1 年穩定，低風險）；(b) 200 行 tail 仍小於 354 行 log，前半段（manifest/doc_integrity/etc）仍 truncated — 但已由 steps_summary cover；(c) 桌機 sync 需操作者執行（無法自動），靠 git push commit message 提醒。
+**[Round 2 — critic 抓到的 5 條 cheap fix 同 commit 處理]**（使用者要求「完善完整完美」）：
 
-**Rollback**：`git revert <commit>`；兩台跑 `scripts\sync-claude-userlevel.ps1 -Mode merge` 恢復 48 行 + 刪 steps_summary 區塊；hook 本身 try/catch 兜底，regex 出錯不會 block chat。
+| # | fix | 檔案 | 驗證 |
+|---|---|---|---|
+| 1 | Cursor stdin `[Console]::In.ReadToEnd()` → UTF-8 StreamReader（消 cross-IDE drift；Claude hook 已是 UTF-8 模式） | `.cursor/hooks/run-ao-resume-on-prompt.ps1:60-64` | round-2 critic verified, byte-identical to Claude hook |
+| 2 | 內層 loop window `$i + 6` → `$i + 10`（防將來 ao-resume blank-line padding 致 detail 空） | 兩 hook | round-2 critic verified, O(n) 不變 |
+| 3 | `ConvertTo-Json -Depth 4` → `-Depth 6`（current = 0 headroom；防將來 nested field silent truncate 為 `System.Object[]`） | 兩 hook | `d:\tmp\run-roundtwo-verify.ps1` step 6 PASS |
+| 4 | `Get-Content -Tail 200` → in-memory `$allLogLines` slice（消重讀 + race window） | 兩 hook | step 5 byte-equal disk-read PASS |
+| 5 | `git status --porcelain` 兩處未 wrap UTF-8 console（pre-existing CP950 drift） | Claude:54 / Cursor:50 | **out-of-scope**，作 follow-up |
+
+**[Round 2 驗證結果]**：
+
+1. **實測**：`d:\tmp\run-roundtwo-verify.ps1` 7 step 全 PASS（sync / SHA256 IDENTICAL `E5A92E0FAAD13F70` / syntax 3/3 / steps_summary 37 / in-memory tail byte-equal / Depth 6 deep-nested preserved / 無 stale `48` 或 `Depth 4` 殘留）
+2. **Review（round 2 critic deep）**：**0 finding**（🔴/🟠/🟡/🔵 全 0），結論 "Ready to ship"；含 PS 5.1 range operator 邊界、Int32 overflow、StreamReader disposal、Test-Path guard 替換等 5 大角度 empirical verified
+3. **抓蟲**：grep `\$tailLines\s*=\s*48|Depth\s+4\b` 兩 hook 0 hit；cross-IDE byte-identical 對 5 個改動段全部確認
+4. **WORKLOG**：本表
+
+**剩餘風險（最終版）**：(a) `steps_summary` regex 對 ao-resume.ps1 `== xxx ==` header 格式有 implicit contract（>1 年穩定，低風險）；(b) 200 行 tail 仍小於 354 行 log，前半段（manifest/doc_integrity/etc）仍 truncated — 但已由 steps_summary cover；(c) 桌機 sync 需操作者執行（無法自動），靠 git push commit message 提醒；(d) **pre-existing CP950 drift**（Claude hook L54 + Cursor hook L50 `git status --porcelain`）留作 follow-up — 輸出僅 ASCII 不會觸發 CP950 trap，本 commit scope 之外。
+
+**Rollback**：`git revert <commit>`；兩台跑 `scripts\sync-claude-userlevel.ps1 -Mode merge` 恢復；hook 本身 try/catch 兜底，regex 出錯不會 block chat。
 
 **Memory update（會在此 entry commit 後執行）**：新增 `feedback_observability_window_truncation.md` — 「Claude 讀 log_tail 看不到的 step 不等於 step 沒跑；觀察視窗短於 emitter 輸出量會 hallucinate；fix pattern = structured summary + 加大 tail (defense-in-depth)」。
 
