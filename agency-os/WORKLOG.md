@@ -52,16 +52,106 @@
 7. **P12 Phase 4 整合** —— weekly check 加 auto-reboot 健康指標
 8. **P13 跨 session memory** —— `~/.claude/projects/d--Work/memory/project_vps_auto_reboot.md` + MEMORY.md index
 
-**[驗證計畫] R0 四動作**（執行完待填）：
+**[驗證計畫] R0 四動作執行結果**：
 
-1. **實測**：（P2 SG reboot 完成後填 — old/new kernel + downtime + 9/9 container status + 4 endpoints + apt-config dump 驗證 + dry-run unattended-upgrade）
-2. **Review**：（待填 — 5 個改動檔的 Read + markdown lint）
-3. **抓蟲**：（待填 — grep `unattended-upgrade|reboot-required|Automatic-Reboot` 全 repo 確認無 stale 主張；BUG_HUNT_PROTOCOL 9-step 對照）
-4. **WORKLOG**：本 entry（最後 commit hash 填於 P15）
+### 1. 實測（end-to-end real test）
 
-**剩餘風險**：（待 P14 補）
+**P2 SG reboot**：
+- T0 (pre-reboot)：`2026-05-23T11:17:40Z`，T1 (SSH back)：`2026-05-23T11:18:11Z`，**downtime ≈ 31s**（落在 runbook 預期 30-90s）
+- Old kernel `6.8.0-111-generic` → New kernel `6.8.0-117-generic` ✓
+- `/var/run/reboot-required` 消失 ✓
+- 9/9 containers Up（lobster-{next-admin, loki, grafana-obs, promtail, nginx, wordpress, wordpress-db, node-api, redis}）
+- 4 endpoints：`aware-wave.com=200 / app.aware-wave.com=401(Basic Auth) / api.aware-wave.com/health=200 / uptime.aware-wave.com=200`
+- `endpoint-alert.timer=active`，`last_state=ok`
+- netdata `system.post_update_reboot_status`：`not_required=1, required=0` 即時歸 0
 
-**Rollback**：（待 P14 補）
+**P3 Ops Inbox closure**：
+- Query 找到 open incident `id=2e66435f-4439-4b6a-a045-ec93e98fbe48`（`occurrence_count=3`, `last_seen_at=2026-05-23 06:31:17.764+00`）
+- Manual SQL UPDATE `status='resolved'` → `UPDATE 1` 確認 ✓
+- 發現 webhook handler design bug，獨立記入 AUDIT_REGISTRY + TASKS（不修，獨立 PR）
+
+**P5+P6 SG/EU B-Minimal 部署**：
+- SFTP 寫 `/etc/apt/apt.conf.d/52awarewave-auto-reboot` 兩台 size=1596 bytes
+- 兩台 SHA256 **完全一致** = `0529840831f670311723ef0608552ccdfe5723811219bd1e8848b35facf2053d`
+- `apt-config dump | grep -i Automatic-Reboot`：兩台都列出三行設定 ✓
+- `unattended-upgrade --dry-run -d`：兩台 exit 0，正常處理 package metadata，無 syntax error
+
+**P9 next-admin code 改動實測**：
+- vitest 77/77 PASS（`policy.test.ts` 36 + `run-state.test.ts` 41）
+- TS compile：6 pre-existing errors in `rules.test.ts`（stash 後 baseline 仍 6 個 → 我的改動**沒新增**任何 TS error）
+
+### 2. Review（讀回改後產物）
+
+5 個關鍵檔結構與內容確認：
+- `52awarewave-auto-reboot.conf`：1596 bytes，3 行 effective config + inline comments 說明 SSOT/runbook/rollback
+- `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md`：9 個 section，所有 code-fence paired
+- `AGENTS.md` line 138 trigger rule：保留原 VPS 識別字邏輯 + 加 16h escalation 分支 + SSOT/runbook 連結
+- `policy.ts` netdata rationale：加 `system.post_update_reboot_status` 例外註記 + SSOT 連結
+- `health/route.ts`：新增 GAP-04 `probeAutoRebootConfig`（與 GAP-01 共用 SSH 認證模式）+ response field `auto_reboot`
+
+### 3. 抓蟲（cross-file bug hunt）
+
+- Grep `Automatic-Reboot|52awarewave|vps-auto-reboot|VPS-AUTO-REBOOT` 全 repo → 9 個檔，全為預期文件（**無 stale 主張**）
+- Grep `post_update_reboot_status|reboot-required` 全 repo → 12 個檔，全為預期文件（含 AUDIT_REGISTRY 新 entry + AO-RESUME archive + ao-resume.ps1 + 我所有改動）
+- BUG_HUNT_PROTOCOL 9-step 對照：本任務屬 Tier 4b（stack-change triggered — Ubuntu unattended-upgrades + auto-reboot 行為），符合協定觸發模型
+- `audit-cross-machine-bom` skill：3 個 memory .md 缺 BOM（本次新建的 `project_vps_auto_reboot.md` + 2 個早期遺漏），`-Fix` 補完 **30→33 = 100% compliant**，原檔備份 `memory/.bom-backfill-backup-20260523-194350/`
+
+### 4. WORKLOG（留證據鏈）
+
+本 entry。Git commit hash 由 P15 填寫（auto-checkpoint 已先 commit 為 `87903e8` → `9d1d229` 5 個 checkpoint，P15 將 push 並可能 squash）。
+
+---
+
+**剩餘風險**：
+
+1. **下一個 unattended-upgrades 週期才能真實驗證 auto-reboot**（dry-run only ≠ live reboot）。觀察期：2026-06-06 前若有 kernel CVE patch，會觀察 20:00 UTC 是否真自動 reboot
+2. **同晨 SG+EU 雙 reboot 可能性**（Ubuntu CVE 同日批次發佈時）：30-90s 雙服務同步 down 已接受；服務獨立 + restart=unless-stopped 已配，可承受
+3. **`Automatic-Reboot-WithUsers "true"`**：SSH 連線中也照 reboot；若操作者半夜 SSH 進去排查特定問題會被打斷；可改 `"false"` 變保守
+4. **Ops Inbox CLEAR auto-resolve bug 未修**（[`AUDIT_REGISTRY.md` §Ops Inbox webhook CLEAR auto-resolve + fingerprint instability (2026-05-23)](docs/operations/AUDIT_REGISTRY.md)）：每次 auto-reboot 後仍會留 stale incident；workaround = 手動 SQL；正式修需獨立 PR + DB migration
+5. **Phase 4 CHECK 4 spec 寫在 SSOT 但 routine prompt 未 deploy**：操作者下次 `RemoteTrigger update` 時部署
+
+---
+
+**Rollback**：
+
+逐機 rollback（任一台都可獨立）：
+```bash
+ssh root@5.223.93.113 'rm /etc/apt/apt.conf.d/52awarewave-auto-reboot'   # SG
+ssh root@204.168.175.41 'rm /etc/apt/apt.conf.d/52awarewave-auto-reboot' # EU
+```
+
+Repo 完整 rollback：`git revert <P15 commit hash>`
+
+部分 rollback（保留文件 + 規則，但關 auto-reboot）：`mv /etc/apt/apt.conf.d/52awarewave-auto-reboot /etc/apt/apt.conf.d/52awarewave-auto-reboot.disabled`
+
+完全可逆，30 年內任何一刻都可秒回到「自動裝 patch + 手動 reboot」舊狀態。手動 runbook（`/sg-reboot`、`/eu-reboot`）完整保留。
+
+---
+
+**已修改檔案列表**（本 session B-Minimal 範圍 — 不含並行 session 的 Auto-Repair audit）：
+
+| # | 檔案 | 改動類型 | 原因 |
+|---|------|---------|------|
+| 1 | `lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf` | 新建 | B-Minimal apt conf SSOT |
+| 2 | `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` | 新建 | 操作 runbook + rollback + monitoring |
+| 3 | `agency-os/AGENTS.md` line 138 | 修改 | reboot trigger rule 加 16h escalation 分支 |
+| 4 | `agency-os/automation/claude-routines/phase4-weekly.md` | 修改 | Pending CHECK 4 spec（待 RemoteTrigger update） |
+| 5 | `agency-os/docs/operations/AUDIT_REGISTRY.md` | 新章節 | Ops Inbox webhook CLEAR auto-resolve + fingerprint instability (2026-05-23) |
+| 6 | `agency-os/TASKS.md` | 修改 | (a) audit-cp950-traps 漂移修正→已完成；(b) 新 task：Ops Inbox netdata CLEAR auto-resolve bug |
+| 7 | `agency-os/WORKLOG.md` | 新 entry | 本紀錄 |
+| 8 | `lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md` line 12 | 修改 | 每週項補 auto-reboot 自動處理註記 |
+| 9 | `lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md` line 74 | 修改 | 每週節奏表補 auto-reboot 自動化引用 |
+| 10 | `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts` | 修改 | netdata rationale 加 OS 層 auto-reboot 例外 |
+| 11 | `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/health/route.ts` | 修改 | 新增 GAP-04 SSH probe + response field `auto_reboot` |
+| 12 | `~/.claude/projects/d--Work/memory/project_vps_auto_reboot.md` | 新建 | 跨 session 知識 + "不要重新提議" 警示 |
+| 13 | `~/.claude/projects/d--Work/memory/MEMORY.md` | 修改 | index 加上述 memory entry |
+
+**遠端部署狀態**：
+- SG VPS `5.223.93.113`：`/etc/apt/apt.conf.d/52awarewave-auto-reboot` deployed @ 2026-05-23 11:25 UTC, SHA256 一致
+- EU VPS `204.168.175.41`：`/etc/apt/apt.conf.d/52awarewave-auto-reboot` deployed @ 2026-05-23 11:26 UTC, SHA256 一致
+- SG kernel：`6.8.0-111 → 6.8.0-117` upgraded via /sg-reboot Step 1-5
+- EU kernel：`5.15.0-179`（昨日已升，無需 reboot）
+- Ops Inbox incident `2e66435f-4439-4b6a-a045-ec93e98fbe48`：resolved @ 2026-05-23 11:22:12 UTC
 
 ---
 
