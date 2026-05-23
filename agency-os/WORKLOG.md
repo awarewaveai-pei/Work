@@ -4,6 +4,91 @@
 
 ## 2026-05-23
 
+### B-Minimal 剩餘風險閉環 — Q2 stagger + Q4 Ops Inbox + Q5 Phase 4 CHECK 4（commit pending）
+
+**根本問題**：P14 收尾留下 5 條 [剩餘風險]，違反「一勞永逸 30 年穩定」承諾。用 R0 architect 模式重新分析後：
+- R1 (live-fire) + R3 (WithUsers): 已被現有監控/runbook 覆蓋 → 不需新動作
+- R2 (SG+EU 同晨 reboot): 加 30 分鐘 stagger
+- R4 (Ops Inbox CLEAR + fingerprint): SQL 確認 **13 stale incidents 已累積**（過去 11 天）= 證實 30 年 13k+ 規模 → 必修
+- R5 (Phase 4 CHECK 4): RemoteTrigger update 部署
+
+**做了什麼**：
+
+#### Q2 — EU stagger 到 20:30 UTC（消除同晨雙 reboot）
+- 新 SSOT `lobster-factory/infra/hetzner-phase1-core/auto-reboot/53awarewave-stagger-eu.conf`（1553 bytes）— 只 override `Automatic-Reboot-Time "20:30"`，其他兩 key 從 52 繼承
+- 52 file numbering convention: 53 > 52，apt 後讀 53 蓋過 52 的 time
+- 部署到 EU `/etc/apt/apt.conf.d/53awarewave-stagger-eu.conf`，**不部署 SG**
+- 驗證：EU `apt-config dump` 顯示 `Automatic-Reboot-Time "20:30"`，其他兩 key 仍 inherited from 52 ✓
+- SG 維持 20:00 UTC = 04:00 TPE；EU 改 20:30 UTC = 04:30 TPE；30 分鐘錯位
+
+#### Q4 — Ops Inbox CLEAR auto-resolve + fingerprint 穩定性（30 年 13k+ stale 防範）
+- **`lib/ops-inbox/fingerprint.ts:32-43`**：netdata case 改用 `raw.name`（穩定 metric ID，e.g. `system_post_update_reboot_status`）取代 `raw.alarm`（含 value 不穩）。Fallback chain: `name → alarm_id → alarm`
+- **`app/api/webhooks/netdata/route.ts:30-67`**：替換 skip-and-return 為 active resolve — CLEAR 訊號到時查 fingerprint 對應的 open incident，set status=resolved + resolved_at + resolved_by='netdata-auto-resolve-on-clear'。Idempotent via `.eq("status", "open")` filter（重複 CLEAR 不再 update）
+- **新 vitest** `lib/ops-inbox/__tests__/fingerprint.test.ts` 5 個 cases: WARNING/CLEAR 同 fingerprint / 三層 fallback / 不同 host 不同 fingerprint
+- **SQL backfill**: `UPDATE 13` netdata stale incidents (status='resolved', resolved_by='stale-backfill-2026-05-23-fingerprint-refactor', WHERE last_seen_at < NOW() - 24h)；`SELECT count(*) WHERE source='netdata' AND status='open'` post-backfill = **0** ✓
+
+#### Q5 — Phase 4 routine CHECK 4 部署（SSOT integrity）
+- **重新設計**：原 SSOT 提的 CHECK 4 用 `OPS_PROXY_AUTH_TOKEN` 不可行（routine 無 env vars，加進去破壞「無 env」既有 pattern）。改為**簡化版**：`test -f` on 3 SSOT paths（52 conf / 53 stagger / runbook），零 auth、零 deps
+- `RemoteTrigger update trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K`：prompt 從 3 checks 變 4 checks（add 5b CHECK 4，update STEP 6 OVERALL aggregation，update STEP 7 file template）
+- 驗證：`RemoteTrigger get` 顯示 `updated_at: 2026-05-22T11:34:41 → 2026-05-23T12:04:44Z` ✓；prompt 含「5b. CHECK 4 — VPS auto-reboot policy SSOT integrity」字串 ✓
+- Next fire: 2026-05-29 06:00 UTC (= 14:00 TPE Friday) 會跑新 4-check 版本
+- SSOT `agency-os/automation/claude-routines/phase4-weekly.md` 更新 "Pending CHECK 4" → "DEPLOYED 2026-05-23 12:04 UTC" + 設計理由說明（為何簡化）
+
+**[驗證計畫] R0 四動作執行結果**：
+
+1. **實測（end-to-end real test）**：
+   - **Q2**: EU `apt-config dump \| grep Automatic-Reboot-Time` → `"20:30"`（53 覆寫 52 確認）；SHA256 = `c07273c3d7aa009ab56fe2ca97c0f8ffd1baa019c2ea1347571beb6aa5cf438d`
+   - **Q4 vitest**: 82/82 PASS（5 new fingerprint + 36 policy + 41 run-state；新增 fingerprint.test.ts 完整覆蓋 WARNING/CLEAR 同 fingerprint、三層 fallback、host 分隔）
+   - **Q4 SQL**: `UPDATE 13` 完成 returning 13 rows；post-state `count=0 open netdata`
+   - **Q5 RemoteTrigger**: `update` HTTP 200 + `get` `updated_at` 推進 + prompt 內含 CHECK 4 邏輯 + warning_count 計入 CHECK4
+   
+2. **Review**：
+   - Read fingerprint.ts diff（純 case 內 +9 lines logic）+ netdata route.ts diff（+33 lines CLEAR handler）+ fingerprint.test.ts（90 lines, 5 it() blocks）+ 53 stagger conf（33 lines, 1 effective line）
+   - Read phase4-weekly.md 更新後的 SSOT，確認「DEPLOYED」字段與 routine actual state 對齊
+   
+3. **抓蟲**：
+   - Grep `raw\.alarm[^_]|computeFingerprint.*netdata` 全 lobster-factory → 4 個檔，全 expected（3 個我自己改的 + slack-alert-drill.sh 是 `alarm-notify` 字串巧合不相關）；無 stale alarm-based logic 殘留
+   - audit-cross-machine-bom: 33/33 PASS ✓（前次本 session 末 P14 已修齊）
+
+4. **WORKLOG**：本 entry
+
+**[已修改]**:
+
+| # | 檔案 | 改動 |
+|---|------|------|
+| 1 | `lobster-factory/infra/hetzner-phase1-core/auto-reboot/53awarewave-stagger-eu.conf` | 新 SSOT 30-min stagger override |
+| 2 | `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/fingerprint.ts` | netdata fingerprint 改用 raw.name 穩定 ID |
+| 3 | `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/netdata/route.ts` | CLEAR 訊號 active resolve 邏輯 |
+| 4 | `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/__tests__/fingerprint.test.ts` | 新 vitest 5 cases |
+| 5 | `agency-os/automation/claude-routines/phase4-weekly.md` | SSOT 更新 CHECK 4 部署狀態 |
+| 6 | `agency-os/WORKLOG.md` | 本 entry |
+
+**遠端部署狀態**：
+- EU `/etc/apt/apt.conf.d/53awarewave-stagger-eu.conf` deployed @ 2026-05-23 12:00 UTC, SHA256 c07273c3...438d
+- EU Supabase `ops_incidents`: 13 stale netdata 已 backfill resolved, remaining open netdata = 0
+- Claude routine `AgencyOS-RepairCenterPhase4Weekly` updated @ 2026-05-23T12:04:44Z, next fire 2026-05-29 06:00 UTC with 4-check spec
+
+**剩餘風險（minimal — 真的快窮盡了）**：
+1. **Webhook code 改動需 sg-deploy 才生效**：本 commit push 後待下次 next-admin deploy；過渡期 netdata 新 incident 仍走舊邏輯（但 fingerprint 邏輯已穩，未來 CLEAR 會自動 resolve）— 接受
+2. **Phase 4 routine 下週五 14:00 TPE 首次跑新 prompt**：若 prompt 有未發現 bug，routine fail；watchdog（`system-health-check.ps1` §11 mtime > 8d）會 catch — 接受
+3. **fingerprint 改動對歷史 incident lookup 斷裂**：本次 backfill 已清 13 個 stale；未來 CLEAR 用新 logic 乾淨；歷史不可逆 per AUDIT_REGISTRY 規則
+4. **30 分鐘 stagger 仍不夠的極端情境**（EU reboot > 30 min）：歷史證據顯示 EU 重啟 < 90s（昨日案例 55s），30 分鐘安全 margin 充足
+
+**Rollback**：
+```bash
+# Q2 stagger
+ssh root@204.168.175.41 'rm /etc/apt/apt.conf.d/53awarewave-stagger-eu.conf'
+
+# Q4 webhook + fingerprint
+git revert <Q4 commit>
+# 13 stale backfilled rows 保留 resolved (不能 un-resolve，acceptable)
+
+# Q5 routine
+# 用之前 RemoteTrigger get 拿到的舊 3-check prompt 透過 RemoteTrigger update 還原
+```
+
+---
+
 ### AO-RESUME hook log_tail 觀察視窗修正 — Claude hallucination 30 年防範（commit pending）
 
 **根本問題**：本日早些 AO-RESUME 後，[`agency-os/reports/ao-resume/2026-05-23-1848.md:24`](reports/ao-resume/2026-05-23-1848.md#L24) 出現「Cross-machine import：本輪 hook 未跑 import script（log_tail 無顯示）」這句 hallucination。表面看是 import 沒跑，**實際 import 完整成功**（`%LOCALAPPDATA%\AgencyOS\ao-sync-state.json` mtime=18:48:38，13 檔案 unchanged，from_machine=LAPTOP-R7I86OR5 同機 round-trip，SHA256 全 match）。30 年級根因：[`mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:195`](../mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1#L195) 寫死 `$tailLines = 48` 寫進 `log_tail` JSON 欄位，但實測 ao-resume.ps1 log **354 行**（含 git align / manifest schema / doc_integrity / scan-for-secrets / sentry / health / machine audit / sync / import / backup / signals / cloudflare / reports = 37 個 sub-step），48 行視窗只能 cover 最末 ~14% 的 step，前 86% 全被 truncate。Claude 讀 log_tail grep 不到「cross-machine import」字串就誤報 skipped。同 bug class 會影響所有非 last-48-line 的 sub-step（user-level sync / mcp sync / backup health 過去半年很可能多次低嚴重度誤報，因不 block 流程未被注意）。
