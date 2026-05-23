@@ -133,15 +133,31 @@ c. **Telegram / Slack alert 主動推**：fix 確保某種異常觸發 webhook �
 
 ---
 
+## 兩種 audit shape（決定走 Step 3 還是 /apply-audit）
+
+Build Playbook 預設 **Pattern audit** 形：可機械化偵測（CP950 regex、BOM byte check、sync state diff），產出 `scripts/audit-*.ps1` 工具 + `/audit-<class>` slash command。
+
+但 2026-05-23 Auto-Repair Tier 3 audit 是 **Logic audit** 形：state machine / signature / secret leak / rollback path 等系統邏輯議題，發現的是**具體 patch**（diff + tests），不是 detector rule。
+
+| Shape | Step 3 產物 | Step 5 AUDIT_REGISTRY 段 | Step 8 apply 動作 |
+|-------|------------|--------------------------|-----------------|
+| **Pattern audit** | `scripts/audit-<class>.ps1` (detector) + slash command | 🛠 TOOL + 🟡 TRACKED list | 自動 — 每次 Edit 跑工具當 oracle |
+| **Logic audit** | `agency-os/reports/audit/<class>-YYYY-MM-DD.md` (findings + ready-to-apply patches + Patch Errata) | 🔴 FIXED / 🔴 TRACKED (Critical) list + Plan SSOT 違反映射 | **`/apply-audit <report-path>`**（折回 Errata + cross-file 抓蟲 + 4-action verify per patch + 升級 FIXED + WORKLOG）|
+
+**Logic audit 的 Step 8 強制流程**詳見 [`.claude/commands/apply-audit.md`](../../../.claude/commands/apply-audit.md)。設計動機：2026-05-23 Auto-Repair audit 三次 operator push-back 才把 5 個 Critical apply 完整 — 工序沒永久化下次會重蹈。
+
+---
+
 ## 已執行的 class（永久部署）
 
 詳見 [AUDIT_REGISTRY.md](AUDIT_REGISTRY.md)，這裡只列 class 名稱：
 
-| Class | Status | 工具 |
-|-------|--------|------|
-| **CP950 / encoding-trap audit** (2026-05-22) | ✅ DEPLOYED | `/audit-encoding`、`scripts/audit-cp950-traps.ps1`、`scripts/_console-encoding-helpers.ps1` |
-| **Cross-machine .md BOM audit** (2026-05-22) | ✅ DEPLOYED | `/audit-cross-machine-bom`、`scripts/audit-cross-machine-bom.ps1` |
-| **Cross-machine sync verifier** (2026-05-22) | ✅ DEPLOYED | `/sync-check`、`scripts/check-claude-sync.ps1` |
+| Class | Shape | Status | 工具 |
+|-------|-------|--------|------|
+| **CP950 / encoding-trap audit** (2026-05-22) | Pattern | ✅ DEPLOYED | `/audit-encoding`、`scripts/audit-cp950-traps.ps1`、`scripts/_console-encoding-helpers.ps1` |
+| **Cross-machine .md BOM audit** (2026-05-22) | Pattern | ✅ DEPLOYED | `/audit-cross-machine-bom`、`scripts/audit-cross-machine-bom.ps1` |
+| **Cross-machine sync verifier** (2026-05-22) | Pattern | ✅ DEPLOYED | `/sync-check`、`scripts/check-claude-sync.ps1` |
+| **Auto-Repair logic audit** (2026-05-23) | Logic | ✅ DEPLOYED + APPLIED | `/apply-audit`、`scripts/audit-tools/dogfood-auto-repair.ps1`、[`reports/audit/auto-repair-2026-05-23.md`](../../reports/audit/auto-repair-2026-05-23.md)。5 🔴 Critical (C1-C5) 全 FIXED 同日；10 Major + 9 Minor 留下次 iteration |
 
 ---
 

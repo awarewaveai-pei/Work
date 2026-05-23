@@ -4,6 +4,33 @@
 
 ## 2026-05-23
 
+### Pattern 永久化 — operator-zero-memory + ADD-PERIODIC-HEALTH-CHECK runbook + BUG_HUNT_PROTOCOL Step 9.5
+
+**根本問題**：今天 session 學到 3 個值得永久化的 pattern，若不寫進 memory + runbook + protocol，下個 session 的 Claude（或新接手的工程師）會重蹈覆轍。
+
+**做了什麼**：
+
+1. **新 memory** `~/.claude/projects/d--Work/memory/feedback_operator_zero_memory_automation.md` — 「Operator zero-memory automation」設計原則。教訓：slash command + AGENTS trigger rule ≠ 自動化；真自動化 = 系統在 AO-RESUME / AO-CLOSE / Telegram 等已運行流程主動 surface。操作者 push back 引用：「我不會知道要問這個」「這是自動化嗎?」「我連『接手新 VPS』是什麼都不知道」。
+2. **新 runbook** `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` — 「Add a Periodic Health Check to AO-RESUME」codified 3-step pattern（write `check-X.ps1` → wire `ao-resume.ps1` → AGENTS.md trigger row）。基於今天確認的 3 個既有 instances（backup-health / cf-security / vps-auto-reboot-health），抽象為複用模板。含 anti-patterns、verification、rollback。
+3. **更新 BUG_HUNT_PROTOCOL.md** 加 §Step 9.5「Operator triggerability check」— 強制檢核：宣告「DEPLOYED + 30 年穩定」前，必須確認操作者**不需要記任何指令名稱**就能看到 fix 結果。3 個合法 surfacing 機制（AO-RESUME auto-call / AO-CLOSE health gate / Telegram push）；3 個不合法答案（slash command / AGENTS trigger rule / runbook 都是「需要操作者主動」）。
+4. **MEMORY.md index** 加新 entry 連結（依現有 pattern）。
+
+**[驗證結果] R0 4 動作**：
+
+1. **實測**：
+   - 4 個產出檔全部建立：memory（user/linter 已自動加 yaml frontmatter + BOM）/ runbook 7996 bytes / BUG_HUNT_PROTOCOL Step 9.5 grep 命中 1 個 / MEMORY.md index 新增 1 行
+   - Runbook 結構：8 個 `^## ` headings + 8 個 ` ``` ` fences（paired）
+   - BOM audit: 34/34 PASS（多 1 個 = 今天新建的 memory entry）
+2. **Review**：Read 後 4 檔結構正確；BUG_HUNT_PROTOCOL Step 9.5 位置正確（緊接在 §Step 9 之後，§已執行 class 之前）
+3. **抓蟲**：Grep `ADD-PERIODIC-HEALTH-CHECK|feedback_operator_zero_memory|operator-zero-memory-automation` 全 repo 命中 3 個檔（WORKLOG + BUG_HUNT_PROTOCOL + 自己），無 stale ref；BOM audit 清乾淨
+4. **WORKLOG**：本 entry
+
+**剩餘風險**：
+- 新 runbook 還沒被 future session 引用過——下次有人「想加 monitor X」時才能真實驗證可讀性。若 runbook 措辭不夠清楚，需小修
+- BUG_HUNT_PROTOCOL §Step 9.5 是新增的紀律 step，過去已 DEPLOYED 的 audit class（CP950 / cross-machine-bom / sync verifier）需 retrospective 自評是否符合 9.5；本 entry 不做（屬於另一個 audit 任務）
+
+**Rollback**：4 個檔皆可獨立 `git revert`；移除後 30 年自動化原則回到「隱性知識，每次重新體會」狀態，不影響任何現行運作。
+
 ### AO-RESUME Cursor rule 七段式同步 — rule drift fix
 
 **根本問題**：`.claude/commands/ao-resume.md` 已定義 **AO-RESUME 七段式**，但 `agency-os/.cursor/rules/30-resume-keyword.mdc` 與規則 README 仍寫五段式，導致 Cursor 關鍵字與 Claude slash command 可能輸出不同 template。
