@@ -164,29 +164,58 @@
   - **觸發建議**：本月度排程；或下次真有 A10-2 商業閉環實跑前先 audit；或操作者擇期
   - **跨機**：repo 內，git pull 同步
 
-- [ ] **Auto-Repair 系統 — 邏輯檢視 + critic review + 抓蟲** —— **【未開始】** **Tier 3 月度排程，優先**
-  - **範圍**（建議按此順序審）：
-    1. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/` — policy.ts（auto-repair 分類）、run-state.ts、smoothing/dedup
-    2. `app/api/ops/repairs/*` — Queue / Runs / Safety / Policy / health endpoints
-    3. `app/api/webhooks/sentry|uptime-kuma|netdata|grafana|posthog/route.ts` — 多來源 signal ingestion
-    4. `app/api/internal/commands/slack/route.ts` — Slack interactive callback（signing secret 驗證 + approve_repair → backup → GitHub Issue）
-    5. `.github/workflows/auto-repair-claude.yml` + `auto-repair-pr-notify.yml` — Claude action chain
-    6. `scripts/sg-deploy.sh` Step 7 HTTP smoke + auto-rollback hook（已部署但未獨立 audit）
-    7. `lib/repair-center/__tests__/policy.test.ts` 35 + 47 tests — 是否覆蓋邊界？
-  - **動作**（依 [BUG_HUNT_PROTOCOL 9-step playbook](docs/operations/BUG_HUNT_PROTOCOL.md#build-playbook每個-audit-class-的永久化步驟)）：
-    1. R0 [現況分析]：sequence diagram（incoming signal → triage → backup → GitHub Issue → Claude action → PR → merge → deploy → health → rollback-if-fail）
-    2. 找關鍵 bug class：signature 驗證繞過、race in repair_runs state machine、auto-rollback 觸發條件遺漏、`source_policies` 升級錯誤、secret 在 log / Slack message 中洩漏、Claude action turn limit / token exhaustion 處理、idempotency on duplicate Sentry fingerprint
-    3. critic deep review × 多輪（先 policy.ts，後 webhooks，最後 callback flow）
-    4. 真實 dogfood：建 synthetic Sentry issue → 觀察全鏈每步 side-effect + log
-    5. audit report 至 `agency-os/reports/audit/auto-repair-YYYY-MM-DD.md`
-    6. 若發現 mechanical pattern（如 empty catch silent fail 在 repair-center 反覆出現）→ 抽象成 audit class
-  - **DoD**：同上 + 額外
-    - **Signature verification audit**（Slack signing secret + GitHub webhook secret 端到端確認無 bypass）
-    - **Secret leak audit**：repair_runs.error_summary / Slack message / GitHub Issue body 不含 secrets
-    - **Rollback path audit**：確認 sg-deploy.sh Step 7 失敗時的自動 rollback 真的會跑（不只是「在 plan 書裡寫了」）
-  - **觸發建議**：**先於一鍵架站**（已 production 跑、blast radius 高、Phase 4 觀察期 2026-06-19 結束前最好過 audit）
-  - **owner doc 參考**：`docs/awarewave-auto-repair-plan-v3.2-final.md` + `docs/awarewave-repair-center-app-architecture.md` + `docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`
+- [x] **Auto-Repair 系統 — 邏輯檢視 + critic review + 抓蟲** —— **【已完成 audit；3 Critical patches 待 apply】** **Tier 3 月度排程，優先** **(2026-05-23 完成)**
+  - **產出**：[`agency-os/reports/audit/auto-repair-2026-05-23.md`](reports/audit/auto-repair-2026-05-23.md)（37 findings + R0 4-action evidence + 3 ready-to-apply patches）+ [AUDIT_REGISTRY.md §Auto-Repair logic audit (2026-05-23)](docs/operations/AUDIT_REGISTRY.md#auto-repair-logic-audit-2026-05-23) + [`scripts/audit-tools/dogfood-auto-repair.ps1`](../scripts/audit-tools/dogfood-auto-repair.ps1) + AGENTS.md auto-trigger 新規則 + WORKLOG 2026-05-23 entry
+  - **結論**：5 🔴 Critical（其中 3 個直接違反 Plan v3.2 SSOT） + 10 🟠 Major + 11 🟡 Minor + 8 🟢 Clean
+  - **Phase 4 收官建議**：**不應**在 C1/C2/C4 未 apply 前關閉 2026-06-19 觀察期
+
+#### Auto-Repair audit follow-up — Critical patches 待 apply（依 audit report §Top-3 Ready-to-Apply Fix Patches）
+
+- [ ] **【🔴 Critical C1 — sg-deploy.sh smoke-fail → 自動 rollback hook】** —— **【未開始】** **R0 設計已備齊，待 Apply session**
+  - **檔案**：[`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh:163-189`](../lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh#L163-L189) + [`auto-deploy-next-admin.sh:78-90`](../lobster-factory/infra/hetzner-phase1-core/scripts/auto-deploy-next-admin.sh#L78-L90) + [`DEPLOY_ROLLBACK_RUNBOOK.md:72`](docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md)
+  - **根因**：Plan v3.2 §五 第 3 層承諾「任何一個不 OK → rollback-phase1.sh 自動還原」，實作只寫 `.smoke-warn` flag。grep 證實**沒任何 .sh/.yml 自動觸發 rollback-phase1.sh**
+  - **動作**：apply [audit report §Patch 1](reports/audit/auto-repair-2026-05-23.md#patch-1-sg-deploysh-smoke-fail--rollback-c1-) — 加 `AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=true` 預設 + 失敗自動 `rollback-phase1.sh restore <app>` + 把 `.deployed-commit` 寫入移到 smoke 後 + 更新 runbook 行 72 描述
+  - **DoD**：①  staging dry-run 故意破壞 staging 端點，sg-deploy 自動 rollback 成功；② 寫 `.rollback-triggered` flag + Slack/Telegram 收到「🔴 AUTO-ROLLBACK FIRED」prefix；③ Production drill 在低流量時段跑 `AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false` + 故意壞 commit → 確認舊行為仍可（drill mode）；④ AUDIT_REGISTRY C1 升 🔴 FIXED 含 commit hash
+  - **風險**：Medium-High（觸 prod deploy 腳本，需 staging 先驗）
+  - **跨機**：repo 內，但部署要 SSH SG VPS
+
+- [ ] **【🔴 Critical C2 — redactSecrets.ts value-aware scrubber】** —— **【未開始】** **R0 設計已備齊**
+  - **檔案**：[`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/redactSecrets.ts`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/redactSecrets.ts) + 新檔 `__tests__/redactSecrets.test.ts`
+  - **根因**：L26 只 test key 名稱，value 內嵌 secret（`sk_live_*`、`ghp_*`、OpenSSH key 區塊、JWT、base64 blob）直接落 `ops_incidents.raw_payload`
+  - **動作**：apply [audit report §Patch 2](reports/audit/auto-repair-2026-05-23.md#patch-2-redactsecrets-value-aware-scrubber-c2-) — 加 9 個 SECRET_VALUE_PATTERNS + scrubValue(s) + MAX_STRING_LENGTH=4096 truncation + MAX_DEPTH=32（也修 C3 walk-depth）+ 7 個 vitest 測試
+  - **DoD**：① `npm test` 新測試全綠（sg-deploy 內建 test gate 會跑）；② Dogfood：synthetic Sentry payload 內嵌 `sk_test_*` → SELECT raw FROM ops_incidents 確認 `[REDACTED:STRIPE_KEY]`；③ AUDIT_REGISTRY C2 升 🔴 FIXED
+  - **風險**：Low-Medium（pure function，unit-test 完整）
   - **跨機**：repo 內，git pull 同步
+
+- [ ] **【🔴 Critical C4 — GET /api/ops/repairs role guard + audit_log 欄位 allow-list】** —— **【未開始】** **R0 設計已備齊**
+  - **檔案**：[`app/api/ops/repairs/route.ts:9-25`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/route.ts) + [`lib/repair-center/backup.ts:108-121`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/backup.ts)
+  - **根因**：GET handler 沒 `canApproveCommand` guard + `select("*")` 回傳 `audit_log` (SSH stdout/stderr 6KB) 給 default viewer
+  - **動作**：apply [audit report §Patch 3](reports/audit/auto-repair-2026-05-23.md#patch-3-get-repairs-role-guard--audit_log-column-allow-list-c4-) — 加 `canModifyIncidentStatus + source !== 'default_viewer'` guard + 改 `.select(LIST_COLUMNS)` 不含 `audit_log` + backup.ts 把 SSH stdout/stderr truncate 6KB → 500B
+  - **DoD**：① 無 auth GET 回 403；② 有 claims GET 200 但 `runs[*]` 不含 `audit_log`；③ harness 加新 test case；④ AUDIT_REGISTRY C4 升 🔴 FIXED
+  - **風險**：Low（additive auth）
+  - **跨機**：repo 內，git pull 同步
+
+- [ ] **【🔴 Critical C3 — Webhook routes body-size cap 256KB】** —— **【未開始】** **需 product owner 決策 256KB 上限**
+  - **檔案**：5 個 `app/api/webhooks/{sentry,uptime-kuma,netdata,grafana,posthog}/route.ts` + nginx webhook zone config
+  - **根因**：`await req.json()` 無 cap，500MB POST → OOM kill `lobster-next-admin`
+  - **動作**：① 確認最大合法 payload 大小（Sentry event ~100KB 上限）；② 各 route 早期 reject `> 256KB` 回 413；③ 切換 `req.text()` → JSON.parse（同時為未來 per-source HMAC retrofit 鋪路 — M3）；④ nginx `client_max_body_size 256k` 對 `/api/webhooks/*` location 防禦縱深
+  - **DoD**：① 各 route 加 size check unit test；② nginx config 改動透過 [safe-infra-patch.sh](../lobster-factory/infra/hetzner-phase1-core/scripts/safe-infra-patch.sh)；③ AUDIT_REGISTRY C3 升 🔴 FIXED
+  - **風險**：Low-Medium（產品 owner 256KB 決策 + 同時應做 M3 raw-body capture refactor）
+  - **跨機**：repo 內，git pull 同步
+
+- [ ] **【🔴 Critical C5 — needs_human_review 改為 pipeline gate（不只是 flag）】** —— **【未開始】** **需 product owner 決策（會改變操作流程）**
+  - **檔案**：[`lib/repair-center/service.ts:104, 119-121`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/service.ts) + [`policy.ts:82-84`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts)
+  - **根因**：Plan §四「Critical severity 閘門」實作只設欄位，pipeline 不檢查；`severityRequiresHumanReview()` dead code 但 docstring 說「呼叫端使用此函式」 = 文件騙人
+  - **動作**：① 決策方向（**推薦**：閘門化 — critical 需操作者額外 confirm 才跑 auto-repair pipeline）；② 在 `service.ts:119` 後加 `if (run.needs_human_review) { state='human_only'; return; }`；③ 用 `severityRequiresHumanReview()` 取代 inline `i.severity === 'critical'`；④ 更新 policy.ts docstring 反映正確契約
+  - **DoD**：① critical Sentry incident 點 Slack Approve → 進 `human_only` 不自動 backup/issue；② operator 需走 escalate 或新「force-approve-critical」flow；③ AUDIT_REGISTRY C5 升 🔴 FIXED
+  - **風險**：Low（純邏輯，但改變操作流程）— 需 owner 確認 plan §四 是否要改為 flag-only
+
+- [ ] **【🟠 Major M1-M10 + 🟡 Minor m1-m11】** —— **【未開始】** **Phase 4 收官前至少修 M1/M5/M6 + 3 個 Minor**
+  - **參考**：[audit report §Major Findings](reports/audit/auto-repair-2026-05-23.md#-major-findings-10) + [§Minor Findings](reports/audit/auto-repair-2026-05-23.md#-minor-findings-11)
+  - **建議順序**：M5（backup webhook size verify — 強化 BRIEF NN #5）→ M1（state machine transition graph — 防 ops role flip terminal）→ M6（GHA Edit path allow-list — 防 Claude 改 .github/.env/migrations）→ m9 (severityRequiresHumanReview docstring fix — 一行修)→ m4（uptime-kuma env from registry）→ m7（github_pr_url URL validation）
+
+- **owner doc 參考**：[`docs/awarewave-auto-repair-plan-v3.2-final.md`](../docs/awarewave-auto-repair-plan-v3.2-final.md) + [`docs/awarewave-repair-center-app-architecture.md`](../docs/awarewave-repair-center-app-architecture.md) + [`docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`](../docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md)
+- **跨機**：所有檔案 repo 內，git pull 同步；harness 跑在筆電 / 桌機任一台都可
 
 #### Auto-Repair — 操作者手動任務
 

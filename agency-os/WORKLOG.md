@@ -65,6 +65,49 @@
 
 ---
 
+### Auto-Repair 系統 Tier 3 audit — 5 Criticals + 10 Majors + 11 Minors（report + AUDIT_REGISTRY + AGENTS trigger 落地）
+
+**任務**：[TASKS.md `Auto-Repair 系統 — 邏輯檢視 + critic review + 抓蟲`](TASKS.md) 的 9-step playbook 全跑。原訂 Phase 4 觀察期 2026-06-19 收官前必須過 audit。
+
+**根本問題**：Auto-Repair 系統自 2026-05-13 baseline 起跑了 ~10 天，期間經歷 1 次真實 production break（2026-05-22 `OPS_INBOX_INGEST_TOKEN` 401）+ Phase 4 B drill 全綠（issue #11 → PR #12），表面健康。但這 ~10 天從未做過**系統級邏輯 audit**（State machine / signature / secret leak / rollback path / DoS surface），所有自信來自「config 層 health endpoint 回 ok=true」。
+
+**核心發現**：config 層全綠，邏輯層藏 **5 個 🔴 Critical**（其中 3 個直接違反 Plan v3.2 SSOT 契約）：
+- **C1**：[`sg-deploy.sh:163-189`](../lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh#L163-L189) Step 7 smoke-fail 沒呼叫 `rollback-phase1.sh`。Plan §五 第 3 層承諾的自動 rollback 是 fiction。Grep 證據：`rollback-phase1.sh` 只在自己 + runbook + plan 出現，**0 個 .sh / .yml 自動觸發**。
+- **C2**：[`redactSecrets.ts:26`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/redactSecrets.ts#L26) 只 redact key 不 redact value，payload value 內嵌 secret（Sentry breadcrumbs / OpenSSH key 區塊 / JWT）直接落 `ops_incidents.raw_payload`。是 secret-leak class 的入口。
+- **C3**：5 個 `webhooks/*/route.ts` 都 `await req.json()` **無 body size cap**，500MB POST → OOM kill。
+- **C4**：[`api/ops/repairs/route.ts:9-25`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/route.ts) GET handler **沒** `canApproveCommand`，回傳 `select("*")` 包含 `audit_log`（SSH stdout/stderr 6KB）→ 任何登入 viewer 看得到。
+- **C5**：[`service.ts:104`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/service.ts#L104) Critical severity 「閘門」實際只設 `needs_human_review` 欄位，pipeline L133-217 不檢查此欄位 → flag ≠ gate。`severityRequiresHumanReview()` 是 dead code（0 non-test caller，grep 證實），docstring 還說「呼叫端使用此函式」— **documentation lies**。
+
+**修改檔案**（5 處 — 全部是 audit deliverables，**未動產品代碼**）：
+1. [`agency-os/reports/audit/auto-repair-2026-05-23.md`](reports/audit/auto-repair-2026-05-23.md) — 完整 37 findings + Statistics + Plan SSOT 違反映射 + 3 個 Critical 的 ready-to-apply patch（含 diff、unit test、verification steps）
+2. [`agency-os/docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md#auto-repair-logic-audit-2026-05-23) — 新章節 `Auto-Repair logic audit (2026-05-23)`；🔴 TRACKED Critical 5 條、🟠 Major 10 條、🟡 Minor 11 條、🟢 CLEAN 8 條
+3. [`scripts/audit-tools/dogfood-auto-repair.ps1`](../scripts/audit-tools/dogfood-auto-repair.ps1) — 永久化 harness（recurring health probe + logic-finding reminder）；Mode `HealthOnly` 安全可隨時跑，`SyntheticSentry` 留 v2
+4. [`agency-os/AGENTS.md`](AGENTS.md) `## 代理自動工具使用規則` 加 1 條 — Edit Auto-Repair 邏輯時自動跑 harness oracle + 同步 [DEPLOY_ROLLBACK_RUNBOOK.md](docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md) 行為描述（防止 plan vs code 再次說一套做一套）
+5. `agency-os/reports/audit/` 目錄新建 — 第一個 Tier 3 logic audit，未來同類 audit 沿用此路徑
+
+**[驗證結果] R0 四動作**：
+
+1. **實測（end-to-end real test）**：`curl -fsSL https://app.aware-wave.com/api/ops/repairs/health` 回 `ok=true`、10 invariants 全綠（system_mode=normal, table_ok, backup_configured + ssh mode, sg/eu probe ok, github_configured, slack_signing_configured, policy_catalog_text_ok）。**佐證 audit 的核心命題：config 健康 ≠ logic 健康**。`scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly` exit 2（10/10 pass + 1 cosmetic warn = github_app_status unverified；workflow 用 `${{ github.token }}` 不依賴 App，per 2026-05-22 已驗）。
+2. **Review**：Read 完整 14 in-scope + 5 cross-ref 檔（policy/run-state/service/backup/github/audit/ssh/types/slack-route/sentry-route/redactSecrets/verifyIngestToken/repairs-route/links-route/ops-role/sg-deploy/rollback-phase1/auto-deploy-next-admin/auto-repair-claude.yml/0027 migration），無 excerpt。Read 寫出後的 audit report + AUDIT_REGISTRY 新章節確認 markdown 結構 + 連結。
+3. **抓蟲（cross-file bug hunt）**：3 個 `critic` subagent **平行**跑 ~6 min wall clock：(1) decision logic — 4 新發現我漏的（state machine bypass via updateRun、severityRequiresHumanReview dead code 但 docstring lies、isTerminalState(undefined) footgun、human_only flag 不一致）；(2) webhook intake — 8 新發現（value-blind redactSecrets 升為 Critical、DoS body cap、fingerprint forgery silent suppression、race on occurrence_count、severity injection、netdata silent CLEAR、uptime-kuma env from hostname、posthog auth ordering）；(3) orchestration + deploy — 6 新發現（C1 完整 grep evidence 鏈、GET role guard missing、no mid-sequence recovery、safeScriptPath allows `..`、GHA Edit unbounded、javascript: URI in github_pr_url）。Cross-file grep：`rollback-phase1` 命中 14 檔但**沒任何 .sh/.yml 自動觸發**；`synthetic|drill` 在 `scripts/` 0 命中（佐證需自建 harness）；`severityRequiresHumanReview` non-test callers = 0；`smoke-warn` 只 4 檔提及，無 rollback 路徑。
+4. **WORKLOG**：本 entry（含四動作摘要 + 證據連結 + 5 Criticals 細項）+ [TASKS.md](TASKS.md) 把 Auto-Repair audit 從「未開始」改「已完成 audit report，3 個 Critical 待 patch apply」+ [AUDIT_REGISTRY.md](docs/operations/AUDIT_REGISTRY.md#auto-repair-logic-audit-2026-05-23) 新章節 statistics。
+
+**剩餘風險**：
+- (a) audit 只發現問題沒修問題 — C1/C2/C4 三個 ready-to-apply patch 已設計但**未 apply**（per R0「最小修改 + 風險分級」決策：sg-deploy.sh = Medium-High，跨 session 走完整 R0；report 內含 patch diff、unit test、verification steps，下批 session 純執行）
+- (b) C3 body size cap + C5 severity gate 還需產品 owner 決策（256KB 上限是否夠用 / severity gate 改成 pipeline stop 改變操作流程）— 已在 report §Phase 4 Closeout Recommendation 列明
+- (c) Phase 4 觀察期 2026-06-19 收官**不應**在 C1/C2/C4 三個 Critical 未 apply 前關閉
+- (d) Dogfood harness 的 `SyntheticSentry` mode 是 v2 placeholder，今天沒對 prod 跑 synthetic POST（避免污染真 incidents；harness 設計上需要 `-ConfirmProd` switch，本次 audit 未啟用）
+
+**Rollback**（如本 audit deliverables 出問題）：
+- audit report / AUDIT_REGISTRY / AGENTS 都是 markdown 增量，`git revert` 即可
+- `scripts/audit-tools/dogfood-auto-repair.ps1` 是新檔，rm 即可
+- `agency-os/reports/audit/` 目錄是新建，若不要就 rm（其他人也可能用此路徑放下個 audit）
+- **無**產品代碼修改 = **無**回滾風險
+
+**Memory update（會在此 entry commit 後執行）**：新增 `feedback_audit_config_vs_logic_layer.md` — 「config layer health endpoint 全綠 ≠ logic layer 健康；Auto-Repair audit 證實 5 Critical 在 health endpoint 全綠的系統內。30-year lesson：每個系統都需要 config-health（machine probe）+ logic-audit（critic + dogfood）兩條獨立驗證鏈，缺一誤判」。
+
+---
+
 ## 2026-05-22
 
 - AUTO_TASK_DONE: `scripts/audit-cp950-traps.ps1` 把今天手工 audit 機械化
