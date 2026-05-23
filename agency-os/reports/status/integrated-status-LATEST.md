@@ -1,6 +1,6 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-22 20:54:45
+- Generated: 2026-05-24 01:17:25
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,99 +219,74 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-22.md
-# Daily Note - 2026-05-22
+## 5) memory/daily/2026-05-24.md
+# Daily Note - 2026-05-24
 
-## Done today
-- EU VPS kernel reboot 5.15.0-177 → 5.15.0-179（22 小時逾期告警處理）
-  - 走 `~/.claude/commands/eu-reboot.md` runbook（先前 session 已建立 04:12:29 UTC）
-  - Pre-flight 全綠；nohup reboot；total downtime ~55 秒（runbook 預期 30-90s 內，達標）
-  - Post-flight：25/25 containers up（19 healthy + 6 no-healthcheck baseline）；ClickHouse lock 25.7.5 維持；兩 Postgres `accepting connections`；Uptime Kuma 全綠
-- CREDENTIALS 同步狀態確認：本機 ↔ vault SHA256 一致（25768 bytes，BOM=True），2026-05-20 daily 的待辦已過時，本次驗證確認結案
-- AO 紀錄寫入：`WORKLOG.md` §2026-05-22 entry 修正為實測時戳 / `memory/daily/2026-05-22.md` 新建
-- **Security pivot：n8n 密碼 rotation + repo PUBLIC→PRIVATE + Phase 4 全鏈驗證**
-  - Round 1-3 三輪深度盤點，發現 `PeiAI20260405!` 在 WORKLOG + CONVERSATION_MEMORY 公開洩漏 11+ 天
-  - n8n password rotation：DB UPDATE bcrypt + sed compose env + docker recreate；4/4 login tests PASS（OLD=401, NEW=200）
-  - vault sync：本機 + G:\vault CREDENTIALS.md + user-env.ps1 雙路 SHA256 一致 → 公司桌機下次 AO-RESUME 自動拿到新密碼
-  - Repo flip：PUBLIC → PRIVATE（gh repo edit），webhook + GHA + git workflow 全部不受影響
-  - 不 redact WORKLOG/CONVERSATION_MEMORY（操作者決策：private + rotated 後風險可接受 + 保留歷史完整性）
-  - Phase 4 A：Issue #10 留 @claude → workflow Trigger result=true（前次 false）→ Claude 16s 成功讀回 `# System Guard Status`
-  - Phase 4 B：Issue #11 → workflow success → Claude 45s 改 1 行註解 → branch `claude/issue-11-20260522-0509` + commit `1c17694` + **PR #12 自動建立**
-  - **Phase 4 最後外部缺口正式收官**
+## Done (session window 2026-05-23T12:51 → 2026-05-24T01:00 CST)
 
-## Current state
-- EU VPS：kernel 5.15.0-179-generic，uptime 5 分鐘（剛重啟），25 containers up，0 unhealthy
-- Memory：4.6G/7.6G used，swap 75M/4G（fresh boot 較乾淨）
-- Load：14.05（5 分鐘均值，container 暖機暫態，預期將降至 < 3）
-- CREDENTIALS：本機 + vault 一致；無 outstanding sync
-- 待操作者外部動作：
-  - 安裝 Claude GitHub App（Auto-Repair 全自動閉環最後缺口）
-  - ~~重跑 Issue #5 驗證 ANTHROPIC_API_KEY 補額後 Claude branch→PR step~~ ✅ **2026-05-22 已完成（Issue #11 + PR #12 全鏈通）**
-  - 決定 Issue #10 / Issue #11 / PR #12 / 空 branch `claude/issue-10-20260522-0505` 的處置（close 或留作存證）
+### 2026-05-24 ~01:00（AO-CLOSE 收尾）
+- 修 `~/.claude/mcp.json` 含 24 條 plaintext-secret MCP 條目 → 走 R1 normalize 回 `{ "mcpServers": {} }`，shared MCP 由 repo `.mcp.json`（41 條）接手；backup 保存於 `~/.claude/backups/mcp.json.backup-2026-05-24-0100`
+- 修 `agency-os/WORKLOG.md:269` 死連結（`file://` URL 指向已刪 `d:\tmp\real-exec-test-v2.ps1`）→ 改純 code 文字，doc-integrity validator PASS
+- 加 TASKS entry「AO-RESUME 讀 WORKLOG tail 50 行邏輯改為『上次 AO-RESUME → 本次』區段」（操作者凌晨提問，明天會繼續討論）
+- cf-security-LATEST.md 順手刷新（PASS / bot=ON / rules=4 / xmlrpc=block）
+- Health gate 99.7% → **100% (371/371)** 達標
 
-## Next steps
-- 觀察 EU VPS Load 1-2 小時內降至正常水位（< 3）
-- 觀察 ClickHouse `MEMORY_LIMIT_EXCEEDED` warnings 是否持續（reboot 前 04:13:28 出現，需確認 fresh boot 後是否仍會復發 — 若復發另立 issue 調整 CH memory limit）
-- TASKS.md「EU VPS reboot」非顯式條目（屬日常維護），不需 AUTO_TASK_DONE 打勾，本日記 + WORKLOG 已成證據鏈
+### 2026-05-24 凌晨（commit 972aac9）
+- 新 plan 檔 `.claude/plans/tomo-feature-v2-plan.md` — `/tomo` feature v2（7 個設計決策、10 個 v1→v2 漏洞 fix、Phase 0/1/2/3、完整 4.3 抓蟲、Resume Instructions）
+- WORKLOG 2026-05-24 entry 留 iteration 證據鏈 + R0+R4 四動作驗證
 
-## Risk / 仍存在的不確定點
-- ClickHouse 已長期接近 921MB memory ceiling；本次 reboot 釋放 RSS，但若工作負載回升後再次撞線，仍會看到 merge task error（不致命，會自動 retry）
-- `eu-reboot` runbook 是 user-level（不進 git）；筆電若需要，需手動 sync `~/.claude/commands/eu-reboot.md`
-- **n8n drift（另案）**：`lobster-factory/infra/n8n/docker-compose.yml`（SSOT，env-var 模式）與 EU 實機 `/root/n8n/docker-compose.yml`（hardcoded）已 drift；本次 rotation 只改實機，未動 SSOT。建議下次 ops review 改 SSOT 為 env-var + 配 `.env`
-- **過去 47 天公開期已不可逆**：Google/Bing/Wayback 可能仍有 cached 內容；private 後僅止血未來，不能 undo 過去；操作者個人信箱 + 客戶名 + VPS IP + 操作 SOP 視為已外洩
+### 2026-05-23 下午/傍晚（commit 4756bd7）
+- 永久化 3 個 patterns：
+  - 新 memory `feedback_audit_shape_pattern_vs_logic.md`（Pattern audit vs Logic audit 的工序差異）
+  - 新 slash command `.claude/commands/apply-audit.md`（162 行，6 步 + 紅線清單 + 起源事件紀錄）
+  - 更新 `BUG_HUNT_PROTOCOL.md` 新增「兩種 audit shape」段、`AGENTS.md` 新增「操作者說『apply audit/處理好所有的事』→ 自動 `/apply-audit`」trigger row
 
-## Rollback（未觸發）
-- 新 kernel 若引發問題 → Hetzner console 進 GRUB 選 5.15.0-177 + `apt-mark hold linux-image-5.15.0-179-generic`
+## AUTO_TASK_DONE
+（本輪無 pre-existing TASKS `- [ ]` 被結案；今日完成的是新增治理/計畫工作 + 收工修復，不對應任何既有開放條目）
 
+## 體系觀察
+- WORKLOG tail-50 機械讀檔在長 entry 日會吃中段內容（操作者發現於本次 AO-RESUME），已入 TASKS 明天 R0 討論改法
+- `~/.claude/mcp.json` plaintext secrets 累積 = 隱性安全債（scan-for-secrets WARN 早已點名但被當噪音）；本次走 R1 SSOT 修復後消失，建議下次新增 MCP server 一律進 repo `.mcp.json` 不碰 user-level
+- AO-CLOSE 100% 門檻今晚一次擋出 2 個 critical（sync drift + broken-link），證明門檻有實效，不該帶 `-AllowNonPerfectHealth` 跳過
 
-### verify-recent --ack (2026-05-22T07:05:29.3413813Z)
+---
 
-**Reason**: F5 test ack
+### verify-recent --ack (2026-05-23T16:04:01.6784987Z)
 
-**Acknowledged unverified files** (count=1):
-
-- `/d/Work/auth.ts`
-
-
-### verify-recent --ack (2026-05-22T07:47:32.6393165Z)
-
-**Reason**: 已通過 3 輪 critic deep review (Round 1: 3 Critical + 5 Major fixed; Round 2: 2 NEW Critical SID bugs fixed; Round 3: 3 Major cwd-anchor/PS-cwd/stdin-path fixed) + 整合測試 F1-F6 9/9 PASS (跨進程 SID parity, JS/PS byte-compat, 完整 e2e gate cycle) + BOM round-trip 實測 (no stray BOM). 本 ack 解鎖 commit 進行 semantic 合併。
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\scripts\verify-recent-ack.ps1`
-
-
-### verify-recent --ack (2026-05-22T08:31:14.2208947Z)
-
-**Reason**: CP950 stdout hardening — 5 files (1 new helper + 4 patches) + 3 critic Minor fixed; critic deep review 0 Critical 0 Major; helper 5/5 unit tests PASS; real SSH test against SG production (check-deploy-drift.ps1) PASS twice with valid JSON + behind=0; syntax check all 5 OK.
+**Reason**: ao-resume.ps1 git push P3 fix: syntax PASS, critic round done (1 Minor comment ref already fixed, 0 Critical/Major), real-exec test 48.5s + exit 0 + 41 steps + cross-machine import at #31 of 41; d:\tmp/syntax-check.ps1 + real-exec-test-v2.ps1 + check-step2.ps1 are test artifacts not in repo not deployed
 
 **Acknowledged unverified files** (count=5):
 
-- `D:\Work\scripts\_console-encoding-helpers.ps1`
-- `d:\Work\scripts\check-backup-health.ps1`
-- `d:\Work\scripts\check-deploy-drift.ps1`
-- `d:\Work\scripts\diff-env-vs-vault.ps1`
-- `d:\Work\scripts\update-client-wp-plugins.ps1`
-
-
-### verify-recent --ack (2026-05-22T11:38:08.6243323Z)
-
-**Reason**: A+B+C+D 一次到位：A=audit-cp950-traps.ps1 (AST + Pattern B line-order detection) B=AUDIT_REGISTRY.md (canonical registry) C=/audit-encoding slash D=AGENTS.md auto-trigger rule (tool-as-oracle)。實測：tool caught my own bug ao-resume.ps1:428 (git log %s same pattern as backfill bug) — FIXED。critic round 1: 0 Critical / 1 Major (Pattern B line-order false-negative) + 3 Minor 全修。整合測試: synthetic capture-before-set → 正確 flagged；ao-resume %s → 正確 protected；full repo 142 scanned/121 drift (tracked backlog)。
-
-**Acknowledged unverified files** (count=4):
-
-- `D:\Work\scripts\audit-cp950-traps.ps1`
-- `D:\tmp\audit-debug.ps1`
 - `D:\Work\scripts\ao-resume.ps1`
-- `D:\tmp\test-capture-before-set.ps1`
+- `d:\tmp\check-step2.ps1`
+- `d:\tmp\real-exec-test-v2.ps1`
+- `d:\tmp\syntax-check.ps1`
+- `d:\tmp\run-ack2.ps1`
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:884a4286e45c3065eb2b2bd9f9d7b7cf476c4a7e30438003606e4d672f82a4b6 -->
+
+### claude-opus-4-7 2026-05-24 01:08
+
+- **完成（一句）**: AO-RESUME 七段式輸出 → 操作者要求 R0 架構師模式收尾 → 修復 `~/.claude/mcp.json` plaintext-secret drift（R1 violation）+ `WORKLOG.md:269` broken `file://` link，health gate 99.7% → 100% (371/371)，AO-CLOSE 100% 門檻達標。
+- **變更路徑**:
+  - `~/.claude/mcp.json`（normalize → `{ "mcpServers": {} }`，shared MCP 由 repo `.mcp.json` 41 條接手）
+  - `~/.claude/backups/mcp.json.backup-2026-05-24-0100`（backup 含 24 條 plaintext secrets，gitignored 不入版控）
+  - `agency-os/WORKLOG.md`（line 269 死連結改純 code 文字 + 新增「AO-CLOSE 收尾」session entry）
+  - `agency-os/TASKS.md`（新增「AO-RESUME 讀 WORKLOG tail 改為『上次 AO-RESUME → 本次』區段」task，操作者凌晨提問）
+  - `agency-os/reports/status/cf-security-LATEST.md`（refresh PASS）
+  - `agency-os/reports/ao-resume/2026-05-24-0057.md`（AO-RESUME archive，由 auto-checkpoint 進 commit `81eb2b2`）
+  - `agency-os/memory/daily/2026-05-24.md`（Done section 覆蓋 session window）
+  - `agency-os/memory/CONVERSATION_MEMORY.md`（session 摘要 entry）
+- **Git**: `81eb2b2` (auto-checkpoint), `972aac9` (/tomo plan), `4756bd7` (永久化 3 patterns) — ahead 1, dirty
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: (a) sync merge 過程 commands 段 Copy-Item 噴 IOException on `ao-close.md`（被其他 process 鎖；實際 same=33/update=0 不影響同步一致性，check-claude-sync 後續 PASS 證實）；(b) `~/.claude/backups/mcp.json.backup-2026-05-24-0100` 保留約 1-2 週後可手動刪（含 plaintext secrets）；(c) WORKLOG tail-50 讀檔邏輯改善已入 TASKS，明天討論。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-22 20:54:37`
+- Time: `2026-05-24 01:17:21`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -321,13 +296,14 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260522-205437.md`
-- Closeout: `reports/closeout/closeout-20260522-205428.md`
+- Health: `reports/health/health-20260524-011720.md`
+- Closeout: `reports/closeout/closeout-20260524-011714.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+
 ### 他處電腦開機須知 + 缺席使用者授權之 AO-CLOSE
 - 新增 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md`**（公司機／換機：`git pull`、`verify-build-gates`、`npm ci`、`integrated-status` 路徑說明、與根目錄 `reports/status` 區別）。
 - 更新 **`RESUME_AFTER_REBOOT.md`**（區分：同機重開 vs 他處開機）、**`README.md`**、**`EXECUTION_DASHBOARD.md`** 指向該須知。
@@ -386,6 +362,5 @@
 
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
 
 

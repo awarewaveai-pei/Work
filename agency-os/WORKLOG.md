@@ -68,6 +68,60 @@
 
 ---
 
+### AO-CLOSE 收尾 — sync infrastructure 修復 + WORKLOG broken-link 修復 + 100% health 達成
+
+**根本問題**：AO-RESUME 報出 hook `exit_code=1`、health-check 99.7%（370/371）擋 AO-CLOSE 100% 門檻。根因鏈：
+1. `check-claude-sync.ps1` 報 HARD drift — `~/.claude/mcp.json` 含 24 個 MCP 條目（內含 plaintext secrets），違反 CLAUDE.md R1「user-level mcp.json 強制為 `{}`」
+2. 修完 sync 後 health-check 浮出第二 critical — `validate-doc-integrity.mjs` 抓到 `agency-os/WORKLOG.md:269` 有一個指向已刪 tmp 檔的 markdown 連結（語法為「中括號包路徑、後接 file 協定 URL」，URL 形如 `file:` + `///d:/tmp/...`），validator 把該 URL 當相對路徑解析爆 broken_link
+
+**做了什麼**：
+1. Backup `~/.claude/mcp.json` → `~/.claude/mcp.json.backup-2026-05-24-0100`（24937 bytes）
+2. `scripts/sync-claude-userlevel.ps1 -Mode merge` — mcp.json normalized to `{ "mcpServers": {} }`；附帶 fix 8 個 settings.json hooks 結構 issue（object → array）
+3. `agency-os/WORKLOG.md:269` markdown link wrap 移除，保留純 code `\`d:\tmp\real-exec-test-v2.ps1\`` 文字
+4. `agency-os/TASKS.md` 加 WORKLOG-tail 邏輯改善 task（操作者 2026-05-24 凌晨提問，明天會繼續討論）
+5. cf-security-LATEST.md 順手刷新（PASS，bot=ON / rules=4 / xmlrpc=block）
+
+**[驗證結果] R0 4 動作**：
+1. **實測**：
+   - `check-claude-sync.ps1` exit=0、5/5 checks PASS（H1 junction / H2 sync-userlevel / H3×3 commands/agents/skills parity）
+   - `validate-doc-integrity.mjs` exit=0「Doc integrity PASSED」
+   - `system-health-check.ps1` 報 `Score: 100% (371/371)`
+   - `~/.claude/mcp.json` content `Get-Content | ConvertFrom-Json` → mcpServers empty object
+2. **Review**：Read 後 mcp.json 為 `{ "mcpServers": {} }`；WORKLOG line 269 改後 grep 確認無 `file://` 殘留；TASKS entry 結構與隔壁工具層 entries 一致
+3. **抓蟲**：(a) 跨檔 grep `file://` 在 agency-os/WORKLOG.md 確認只有此一處（其他 file:// 在獨立 daily memory backup 區與本次無關）；(b) Grep `mcp\.json` 跨 docs/runbooks 確認 R1 規約描述一致（CLAUDE.md / AGENTS.md / mcp.template.json 三處對齊）；(c) repo `.mcp.json` 有 41 entries > 本次清掉的 24，所有 MCP server 都在 project-scoped SSOT 內，下次 Claude Code restart 自動接手；(d) audit-cross-machine-bom 範圍未變動（本次未修 cross-machine .md 檔）
+4. **WORKLOG**：本 entry
+
+**剩餘風險**：
+- (a) sync merge 過程中 commands 同步段噴 `Copy-Item` IOException on `ao-close.md`（檔案被其他 process 鎖 — 可能 Cursor IDE 開著）。**但**：commands 同步段已先報 `same=33 / update=0 / create=0`，代表實際無需更新；IO 例外發生在 extra-handling 階段、不影響 sync 一致性（check-claude-sync 後續 PASS 證實）。**留意**：未來若同樣 lock 影響 update 路徑會真實丟失同步 — TASKS 可考慮加「sync 腳本對 commands lock 加 retry / detect Cursor 提示」
+- (b) `~/.claude/mcp.json.backup-2026-05-24-0100` 保留約 1-2 週後可手動刪除（含 plaintext secrets）
+
+**Rollback**：
+- 若 MCP 在下次重啟後缺工具：`Copy-Item ~/.claude/mcp.json.backup-2026-05-24-0100 ~/.claude/mcp.json -Force`
+- 若 doc validator 仍抓 broken_link：`git revert` 本 WORKLOG line 269 edit
+- 若 health-check 又跌：本 entry [實測] 四個 verify 指令可獨立重跑找出哪段退化
+
+---
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:884a4286e45c3065eb2b2bd9f9d7b7cf476c4a7e30438003606e4d672f82a4b6 -->
+
+### claude-opus-4-7 2026-05-24 01:08
+
+- **完成（一句）**: AO-RESUME 七段式輸出 → 操作者要求 R0 架構師模式收尾 → 修復 `~/.claude/mcp.json` plaintext-secret drift（R1 violation）+ `WORKLOG.md:269` broken `file://` link，health gate 99.7% → 100% (371/371)，AO-CLOSE 100% 門檻達標。
+- **變更路徑**:
+  - `~/.claude/mcp.json`（normalize → `{ "mcpServers": {} }`，shared MCP 由 repo `.mcp.json` 41 條接手）
+  - `~/.claude/backups/mcp.json.backup-2026-05-24-0100`（backup 含 24 條 plaintext secrets，gitignored 不入版控）
+  - `agency-os/WORKLOG.md`（line 269 死連結改純 code 文字 + 新增「AO-CLOSE 收尾」session entry）
+  - `agency-os/TASKS.md`（新增「AO-RESUME 讀 WORKLOG tail 改為『上次 AO-RESUME → 本次』區段」task，操作者凌晨提問）
+  - `agency-os/reports/status/cf-security-LATEST.md`（refresh PASS）
+  - `agency-os/reports/ao-resume/2026-05-24-0057.md`（AO-RESUME archive，由 auto-checkpoint 進 commit `81eb2b2`）
+  - `agency-os/memory/daily/2026-05-24.md`（Done section 覆蓋 session window）
+  - `agency-os/memory/CONVERSATION_MEMORY.md`（session 摘要 entry）
+- **Git**: `81eb2b2` (auto-checkpoint), `972aac9` (/tomo plan), `4756bd7` (永久化 3 patterns) — ahead 1, dirty
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: (a) sync merge 過程 commands 段 Copy-Item 噴 IOException on `ao-close.md`（被其他 process 鎖；實際 same=33/update=0 不影響同步一致性，check-claude-sync 後續 PASS 證實）；(b) `~/.claude/backups/mcp.json.backup-2026-05-24-0100` 保留約 1-2 週後可手動刪（含 plaintext secrets）；(c) WORKLOG tail-50 讀檔邏輯改善已入 TASKS，明天討論。
+
 ## 2026-05-23
 
 ### Pattern 永久化 — operator-zero-memory + ADD-PERIODIC-HEALTH-CHECK runbook + BUG_HUNT_PROTOCOL Step 9.5
@@ -266,7 +320,7 @@ git revert <Q4 commit>
 
 **[驗證結果] R0 四動作**：
 
-1. **實測（end-to-end real exec test）**：[`d:\tmp\real-exec-test-v2.ps1`](file:///d:/tmp/real-exec-test-v2.ps1) 模擬 hook stdin JSON → 真實觸發 deployed hook → ao-resume.ps1 跑完整 48.5s（vs v1 5.6s）→ hook exit=0（vs v1 exit=1）→ JSON state file `exit_code=0`、**`steps_summary` 含 41 step**（vs v1 4 step）、**cross-machine import step 在 #31 of 41 with 正確 detail**、`log_tail = 9944 chars`（200 行 ≈ 50/line）→ 副作用驗證：**no `.realtest*` file in repo**（artifact 全在 `$env:TEMP`）
+1. **實測（end-to-end real exec test）**：`d:\tmp\real-exec-test-v2.ps1` 模擬 hook stdin JSON → 真實觸發 deployed hook → ao-resume.ps1 跑完整 48.5s（vs v1 5.6s）→ hook exit=0（vs v1 exit=1）→ JSON state file `exit_code=0`、**`steps_summary` 含 41 step**（vs v1 4 step）、**cross-machine import step 在 #31 of 41 with 正確 detail**、`log_tail = 9944 chars`（200 行 ≈ 50/line）→ 副作用驗證：**no `.realtest*` file in repo**（artifact 全在 `$env:TEMP`）
 2. **Review**：critic round 對 P3 fix 兩段做 narrow-scope deep review → **0 Critical / 0 Major / 1 Minor**（comment 提到的 `resumeOut block` 不存在 → 改成 `$savedEAPReboot` 正確 reference）→ 修完再過 syntax PASS
 3. **抓蟲（cross-file）**：grep `git push 2>&1` 在 `D:\Work\scripts\*.ps1` → 只剩這 2 處且都 P3 包覆 ✅；grep `\$ErrorActionPreference = "Continue"` 確認 P3 pattern 與檔內既有 precedent 一致 ✅
 4. **WORKLOG**：本 Round 3 entry
@@ -4955,7 +5009,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-23 15:09:40 UTC_
+_Last synced: 2026-05-23 17:17:13 UTC_
 
 ## 2026-03-20
 
