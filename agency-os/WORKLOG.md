@@ -196,6 +196,49 @@ Repo 完整 rollback：`git revert <P15 commit hash>`
 
 **Memory update（會在此 entry commit 後執行）**：新增 `feedback_audit_config_vs_logic_layer.md` — 「config layer health endpoint 全綠 ≠ logic layer 健康；Auto-Repair audit 證實 5 Critical 在 health endpoint 全綠的系統內。30-year lesson：每個系統都需要 config-health（machine probe）+ logic-audit（critic + dogfood）兩條獨立驗證鏈，缺一誤判」。
 
+#### 2026-05-23 補 — Self-critic on the audit deliverables（R0+R4 iron rule 第二回合，被 operator push back 後補做）
+
+**根因**：上面那條 audit entry 寫完後，operator 連續兩次 push back 我：「你有 review + 抓蟲嗎? 我們不是有鐵律?」「剩餘風險 為什麼不處理?」+ verify-gate hook BLOCKED commit（`scripts/audit-tools/dogfood-auto-repair.ps1` 是新 .ps1 沒過 `/verify-recent`）。三個訊號同時打臉一個事實：**我對 audit 目標系統跑了 critic × 3，但對自己寫的 audit deliverables（report MD 571 行 / harness ps1 / AGENTS row / AUDIT_REGISTRY section / TASKS / WORKLOG）只 Read-back，沒跑 critic**。R4「審查時：聲稱清單完整的段落 → 必須 Glob/Grep 對照實際狀態，不得只讀文字」 + R0+R4 [驗證計畫] 4 動作雙鐵律違反。
+
+**修正動作**：spawn `critic` subagent 對 4 個 deliverables 做完整 review（report / AUDIT_REGISTRY / harness / AGENTS row）。結果：**0 Critical（事實準確）+ 5 Major + 7 Minor — 全部在我的 patches / 表述 / 工具本身**：
+- **EMaj-1** Patch 2 `B64_BLOB` regex 會把 Sentry 合法 base64（minified JS、source-map、PostHog screenshot data URI）當 secret redact → operators apply 後 revert
+- **EMaj-2** Patch 1 沒 `save`-before-deploy → 第一次自動 rollback 必失敗（沒 snapshot）+ APPS array 可能含 nginx/redis 不在 IMAGE_MAP
+- **EMaj-3** Patch 3 框架錯 — `canModifyIncidentStatus` 含 viewer，真正 fix 是 column allow-list 不是 role guard
+- **EMaj-4** MAX_DEPTH=32 太緊 — Sentry React stack frame 20-40 nesting 正常，會 corrupt
+- **EMaj-5** AGENTS.md trigger path 沒加 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 前綴 → 規則永遠不會 fire（dead rule）
+- **EMin-1** dogfood ps1 用 🔴🟠 emoji → CP950 console 顯示 ??；**我自己 audit class 內建蟲（雙重 iron rule 違反）**
+- **EMin-7** Patch 1 用未賦值 `$DEPLOYED_COMMIT` → echo 空字串
+- 其他 5 Minor（null safety / try-catch / circular ref / contradiction / candidates A-F 未列舉）
+
+**修改檔案**（self-critic round，4 處）：
+1. [`scripts/audit-tools/dogfood-auto-repair.ps1`](../scripts/audit-tools/dogfood-auto-repair.ps1) — EMin-1（emoji → `[CRIT]`/`[MAJ]` ASCII tags）+ EMin-2（malformed response guard）+ EMin-3（invariant test exception → Fail）+ em-dash → `--` + `§` → `section`（CP950 safety）
+2. [`agency-os/AGENTS.md`](AGENTS.md#代理自動工具使用規則) — EMaj-5（trigger row 141 全路徑加 monorepo 前綴 + glob anchor）
+3. [`agency-os/reports/audit/auto-repair-2026-05-23.md`](reports/audit/auto-repair-2026-05-23.md#patch-errata-self-critic-2026-05-23) — 新增完整 §Patch Errata 章節（5 Major + 7 Minor）+ Phase 4 closeout blocker 加 C5 + verdict line
+4. [`agency-os/docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md#auto-repair-logic-audit-2026-05-23) — 加 ⚠️ self-critic warning：「patches 含 5 Major design defects，apply 前必須折 Errata」
+5. [`agency-os/TASKS.md`](TASKS.md) — Critical sub-tasks 加 Patch Errata 必修清單 + closeout blocker 加 C5
+
+**[驗證結果] R0+R4 四動作（self-critic round）**：
+
+1. **實測**：`powershell scripts/verify-sid-shared.ps1` + `cat /tmp/claude-unverified-code-<sid>.txt` → tracker 含 dogfood-auto-repair.ps1；`[Parser]::ParseFile()` → PARSE OK；harness re-run post-fix → 10/10 invariants 綠 + ASCII clean output（之前 `??` em-dash 也修了）
+2. **Review**：Read 修改後的 4 個 deliverables 確認 markdown / PS syntax / cross-link / Errata 結構
+3. **抓蟲**：`grep -P '[^\x00-\x7F]'` 對 ps1 → 命中 4 處非 ASCII 全修；critic subagent 在背景跑完整 review，76K tokens / 15 tool uses；發現 5 Major + 7 Minor 全部 file:line evidence 確認
+4. **WORKLOG**：本補篇 entry
+
+**修正後的「剩餘風險處理」決策**（取代上面 entry 的「下批 session apply C2/C4」）：
+- **C2 + C4 不能今天 apply** — patches 本身有 5 Major bugs，apply = ship bugs（critic 結論：conditional yes）
+- **必須先做 Patch Errata fold-in**（apply C2/C4 前 ~30 min 修 patch 設計），不是「apply session」純執行
+- **C5 升 closeout blocker**（原 report 漏列，self-critic 補強）
+- 本 audit deliverables 經 self-critic round 後**才**算正式完成
+
+**剩餘風險**（修正後最終版）：
+- (a) Patch 1/2/3 Errata 折回是 ~30-60 min 工作，可下批 session 或本批繼續 — 由 operator 決定
+- (b) self-critic round 本身**沒**再跑一次 critic（避免無限遞迴）；本 entry 是 evidence trail，不是 evidence-of-evidence
+- (c) 此次踩坑教訓很值得記憶：**audit deliverables 本身也是 code change，也要 4-action**
+
+**Rollback**：4 處 edit 都是增量 markdown / 增量註解 + 少量 ps1 logic，`git revert` 即可恢復；無產品代碼修改。
+
+**Memory update（commit 後）**：補一條 `feedback_audit_deliverables_need_self_critic.md` — 「audit 的 deliverables 本身（report MD / harness ps1 / AGENTS row / AUDIT_REGISTRY section）都是 code-equivalent change，必須跑 R0+R4 4 動作 self-critic；不是只 Read-back 就算數。operator 兩次 push back + verify-gate hook block commit 是這條 lesson 的證據鏈」。
+
 ---
 
 ## 2026-05-22

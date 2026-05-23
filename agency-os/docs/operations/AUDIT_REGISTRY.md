@@ -187,7 +187,9 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 
 **Origin trigger**: Tier 3 monthly schedule + Phase 4 observation window closing 2026-06-19 (must clear Criticals before close).
 
-**Audit report (full findings + R0 fix patches)**: [reports/audit/auto-repair-2026-05-23.md](../../reports/audit/auto-repair-2026-05-23.md)
+**Audit report (full findings + R0 fix patches + Patch Errata)**: [reports/audit/auto-repair-2026-05-23.md](../../reports/audit/auto-repair-2026-05-23.md)
+
+**⚠️ Self-critic (2026-05-23)**: The audit deliverables were themselves critic-reviewed (R0+R4 iron rule applied to the audit itself). Findings are factually accurate but **patches contain 5 Major design defects** — see `Patch Errata` section in the report. **Do not apply any patch until Errata fixes are folded in.**
 
 ### 🔴 FIXED (now protected)
 

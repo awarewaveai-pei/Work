@@ -205,7 +205,10 @@ try {
         if ($line -match '^\s*==\s+(.+?)\s+==\s*$') {
             $stepName = $matches[1].Trim()
             $detailLines = @()
-            for ($j = $i + 1; $j -lt [Math]::Min($i + 6, $allLogLines.Count); $j++) {
+            # Lookahead window = 10 lines (was 6). Real ao-resume.ps1 has no >5-blank-line
+            # patterns today, but 10 gives headroom against future blank-line padding
+            # without changing O(n) total cost (10*n is still linear).
+            for ($j = $i + 1; $j -lt [Math]::Min($i + 10, $allLogLines.Count); $j++) {
                 $d = [string]$allLogLines[$j]
                 if ($d -match '^\s*==\s+(.+?)\s+==\s*$') { break }
                 if (-not [string]::IsNullOrWhiteSpace($d)) { $detailLines += $d.Trim() }
@@ -222,17 +225,28 @@ try {
     # log_tail: was 48 lines (too short — front-half steps truncated, causing
     # Claude to hallucinate skipped sub-steps). 200 gives ~3x headroom against
     # future ao-resume.ps1 growth. Defense-in-depth alongside steps_summary above.
+    # Source = in-memory $allLogLines (not Get-Content re-read of $logFile) to
+    # avoid (a) redundant disk I/O and (b) race window where another hook session
+    # could mutate the file between our Set-Content above and Get-Content here.
     $tailLines = 200
     $tailText = ""
-    if (Test-Path -LiteralPath $logFile) {
-        $tailText = (Get-Content -LiteralPath $logFile -Tail $tailLines -ErrorAction SilentlyContinue) -join "`n"
+    if ($allLogLines.Count -gt 0) {
+        $tailSlice = if ($allLogLines.Count -le $tailLines) {
+            $allLogLines
+        } else {
+            $allLogLines[($allLogLines.Count - $tailLines)..($allLogLines.Count - 1)]
+        }
+        $tailText = ($tailSlice -join "`n")
         if ($tailText.Length -gt 120000) {
             $tailText = $tailText.Substring($tailText.Length - 120000)
         }
     }
     $meta["log_tail"] = $tailText
 
-    ($meta | ConvertTo-Json -Depth 4 -Compress) | Set-Content -LiteralPath $jsonFile -Encoding UTF8
+    # -Depth 6 (was 4): current schema needs 4 ($meta → steps_summary → ordered
+    # hashtable → string), so 4 = zero headroom. Bumping to 6 is cheap insurance
+    # against future nested fields silently truncating to "System.Object[]" on PS 5.1.
+    ($meta | ConvertTo-Json -Depth 6 -Compress) | Set-Content -LiteralPath $jsonFile -Encoding UTF8
 
     Write-HookResponse '{"continue":true}'
     exit 0

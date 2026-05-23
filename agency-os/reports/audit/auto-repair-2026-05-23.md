@@ -475,7 +475,7 @@ async function runRemoteScript(args: {
 
 ## Phase 4 Closeout Recommendation
 
-**Do NOT close Phase 4 observation on 2026-06-19 until at least C1, C2, C4 are applied + verified.**
+**Do NOT close Phase 4 observation on 2026-06-19 until C1, C2, C4, C5 are applied + verified.** _(Updated 2026-05-23 self-critic: C5 added to blocker list — it violates Plan §四 SSOT just as C1 violates §五; defer-as-product-decision was understated.)_
 
 - C1 is the most exposing: any auto-repair PR landing in a regression scenario produces persistent prod degradation
 - C2 is the leak amplifier: every other security finding rides on top of unredacted secrets
@@ -566,6 +566,47 @@ Exit code: 2 (warn — config OK; logic-layer findings flagged separately)
 
 ---
 
+---
+
+## Patch Errata (Self-Critic 2026-05-23)
+
+After writing this report, operator demanded R0+R4 [驗證計畫] 4-action discipline applied to the **audit deliverables themselves** (not just the audited Auto-Repair system). A separate `critic` subagent reviewed this report + AUDIT_REGISTRY section + dogfood harness + AGENTS.md trigger row. Verdict: **conditional yes — findings are factually accurate, but patches need 5 Major + 7 Minor fixes before apply**. This Errata records them.
+
+### 🟠 Major patch defects (MUST fix before applying any patch)
+
+| ID | Affects | Issue | Required fix |
+|----|---------|-------|--------------|
+| **EMaj-1** | [§Patch 2 redactSecrets](#patch-2-redactsecrets-value-aware-scrubber-c2-) | `B64_BLOB` regex `/[A-Za-z0-9+/]{60,}={0,2}/g` will match legitimate base64 in Sentry payloads (minified JS in stack frames, source-map content, PostHog `$screenshot` data URIs, GitHub workflow log excerpts). Post-fix `raw_payload` becomes unreadable; operators will revert | Gate `B64_BLOB` behind `OPS_AGGRESSIVE_REDACT=true` env flag (default off), OR raise threshold to 200+ chars AND require a prefix anchor (e.g., must follow `key=`/`token=`/PEM header). Add positive-case unit test using a real Sentry sample |
+| **EMaj-2** | [§Patch 1 sg-deploy rollback](#patch-1-sg-deploysh-smoke-fail--rollback-c1-) | `rollback-phase1.sh restore <APP>` requires a prior `save` snapshot; my patch never calls `save` during deploy. **First auto-rollback will fail** because no snapshot exists. Plus `APPS` may include services (`redis`, `nginx`) outside `IMAGE_MAP={wordpress,node-api,next-admin}` — restore would error on those | (a) sg-deploy.sh must call `./scripts/rollback-phase1.sh save <APP>` between current Step 2 (rsync) and Step 3 (build) for every APP in IMAGE_MAP; (b) auto-rollback loop must filter `APPS` against `IMAGE_MAP` keys OR `rollback-phase1.sh restore` must be no-op tolerant for unknown services |
+| **EMaj-3** | [§Patch 3 GET role guard](#patch-3-get-repairs-role-guard--audit_log-column-allow-list-c4-) | `canModifyIncidentStatus` returns true for **viewer** too ([ops-role.ts:78-79](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-role.ts#L78-L79) explicit "includes viewer"). My patch claims role guard tightens access, but actually any `claims-role: viewer` request still passes. The **real** fix is the `LIST_COLUMNS` allow-list dropping `audit_log` | Reframe Patch 3: **primary fix = column allow-list** (sufficient for leak prevention); **secondary fix = guard `source !== 'default_viewer'`** (defense-in-depth for legacy paths). Update C4 prose at report line 107 to reflect this |
+| **EMaj-4** | [§Patch 2 MAX_DEPTH=32](#patch-2-redactsecrets-value-aware-scrubber-c2-) | Sentry `exception.values[].stacktrace.frames[].vars` legitimately nests 20-40 deep on React + Redux + middleware crashes. 32 will silently corrupt real payloads. The depth cap was conflated with C3 byte-size concern — different problems | Raise to `MAX_DEPTH = 64` and run against a real production Sentry sample before merge. Also: don't claim this "also fixes C3" — C3 is body bytes, not nesting depth |
+| **EMaj-5** | [AGENTS.md trigger row 141](../../AGENTS.md) | Path patterns were written without monorepo prefix (`lib/repair-center/*` instead of `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/*`). Claude sees absolute paths via `Edit`'s `file_path` — short patterns will never match → **trigger rule never fires = dead rule** | Already fixed in same commit: AGENTS.md row 141 now uses full paths + glob anchors. Verify by greping the rule for `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` prefix on all listed paths |
+
+### 🟡 Minor patch defects (recommended)
+
+| ID | Affects | Issue | Status |
+|----|---------|-------|--------|
+| **EMin-1** | [dogfood-auto-repair.ps1:77-82](../../../scripts/audit-tools/dogfood-auto-repair.ps1) | Used 🔴 🟠 emoji in `$logicReminders` — renders as `??` in CP950 console; **violates the audit harness's own audit class** (`AUDIT_REGISTRY §CP950 / encoding-trap audit`). Iron-rule violation by the audit deliverable | ✅ FIXED in same commit: emoji → `[CRIT]` / `[MAJ]` ASCII tags |
+| **EMin-2** | [dogfood-auto-repair.ps1:34-38](../../../scripts/audit-tools/dogfood-auto-repair.ps1) | `try/catch` on `Invoke-RestMethod` only catches first call; if endpoint returns non-JSON 200 (Cloudflare interstitial, gateway HTML), `$health` is a string and `$health.ok` is `$null` — all invariants silently fail | ✅ FIXED in same commit: added malformed-response guard after the try/catch block |
+| **EMin-3** | [dogfood-auto-repair.ps1 invariant loop](../../../scripts/audit-tools/dogfood-auto-repair.ps1) | `& $inv.Test` throwing exception doesn't increment `FailCount` — silent skip | ✅ FIXED in same commit: wrapped invariant test in `try/catch`, exception → Write-Fail |
+| **EMin-4** | AUDIT_REGISTRY §🛠 TOOL list | Lists "AGENTS.md trigger" as a tool but the trigger was added in the same change — circular self-reference. Cosmetic | Cosmetic, left as-is |
+| **EMin-5** | Report ✓ Verified Clean vs 🔵 escalate `actor` granularity note | "Verified Clean" sweeps `actor` identity concern under "gated by canApproveCommand"; but the 🔵 note flags actor-identity as separate concern. Internal contradiction | Acknowledged: route-layer auth is clean; audit-trail identity granularity is a separate Minor concern (left for next audit cycle) |
+| **EMin-6** | Report 4-Action Evidence table line "Critic × 3 rounds independently validated candidates A/B/C/D/E/F" | Candidates A-F never enumerated in report — external reference future readers cannot reconstruct | Note: candidates A-G were the main agent's preliminary findings before critic spawn (see [§現況分析] in operator-facing conversation transcript); they map to C1 (A), B (M2), C5 (C), M5 (D), C4 (E), m1/M6 (F), G (m1 dead code) |
+| **EMin-7** | [§Patch 1 line 244](#patch-1-sg-deploysh-smoke-fail--rollback-c1-) `echo "$DEPLOYED_COMMIT" > ...` | Variable `$DEPLOYED_COMMIT` was never assigned in the patch — would echo empty string | **Must fix in patch before apply**: `DEPLOYED_COMMIT=$(git -C "$REPO_DIR" rev-parse HEAD)` before the smoke gate, or reuse existing inline `$(git rev-parse HEAD)` expression from sg-deploy.sh line 138 |
+
+### Phase 4 closeout blocker list (revised)
+
+Original report said C1+C2+C4 must apply before 2026-06-19 closeout. **Self-critic recommends adding C5** — C5 violates Plan §四 SSOT contract just like C1 and M5 violate §五 and §六; should not be deferred as "product decision needed". C3 stays as "needs product owner decision on 256KB cap".
+
+**Revised closeout blocker list**: **C1 + C2 + C4 + C5 must be 🔴 FIXED before Phase 4 closes.** C3 can defer pending product-owner decision on payload size cap.
+
+### Verdict on overall audit quality
+
+Critic confidence rating: **conditional yes**. Findings are factually accurate (spot-checked C1/C2/C4/C5/M5/M8 all reproduce against source). But patches as-shipped contain 5 Major design defects. **Do not apply any patch from this report until the Errata above is folded in.**
+
+---
+
 _Audit completed 2026-05-23 by Claude in single session._
+_Self-critic (R0+R4 iron rule) completed same day; Errata appended above._
 _Cross-machine: this report lives in repo, syncs via `git pull` to both work machines._
-_Next audit: any subset of findings re-runs via `scripts/audit-tools/dogfood-auto-repair.ps1` + targeted critic re-review._
+_Next audit: any subset of findings re-runs via `scripts/audit-tools/dogfood-auto-repair.ps1` + targeted critic re-review. **Patches require Errata fixes before apply**._

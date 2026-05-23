@@ -12,7 +12,7 @@
 #     POSTs a fingerprintable Sentry payload, captures the incident_id and
 #     repair_run_id (if Slack flow exercised), then auto-cleanup marks it
 #     resolved via /api/ops/inbox/<id>/resolve.
-#     **Requires explicit -ConfirmProd switch — never runs against prod without it.**
+#     **Requires explicit -ConfirmProd switch -- never runs against prod without it.**
 #
 # Exit codes: 0 = pass, 1 = fail, 2 = warn (config gap but no logic violation)
 
@@ -35,7 +35,7 @@ function Write-Warn { param([string]$s); Write-Host "  [WARN] $s" -ForegroundCol
 function Write-Fail { param([string]$s); Write-Host "  [FAIL] $s" -ForegroundColor Red; $script:FailCount++ }
 
 Write-Line ""
-Write-Line "=== Auto-Repair dogfood drill — $AuditTag ==="
+Write-Line "=== Auto-Repair dogfood drill -- $AuditTag ==="
 Write-Line "Mode: $Mode  |  BaseUrl: $BaseUrl"
 Write-Line ""
 
@@ -45,6 +45,12 @@ try {
     $health = Invoke-RestMethod -Uri "$BaseUrl/api/ops/repairs/health" -TimeoutSec 15 -Method GET
 } catch {
     Write-Fail "health endpoint unreachable: $($_.Exception.Message)"
+    exit 1
+}
+
+# Min-2 from 2026-05-23 self-critic: guard against Cloudflare interstitial / non-JSON 200 returning a string
+if (-not $health -or -not ($health.PSObject.Properties.Name -contains 'ok')) {
+    Write-Fail "health response malformed (Cloudflare interstitial?): $($health | Out-String)"
     exit 1
 }
 
@@ -63,7 +69,12 @@ $invariants = @(
 )
 
 foreach ($inv in $invariants) {
-    if (& $inv.Test) { Write-Ok $inv.Name } else { Write-Fail $inv.Name }
+    # Min-3 from 2026-05-23 self-critic: wrap test in try/catch; exception = fail (not silent skip)
+    try {
+        if (& $inv.Test) { Write-Ok $inv.Name } else { Write-Fail $inv.Name }
+    } catch {
+        Write-Fail ("{0} (test threw: {1})" -f $inv.Name, $_.Exception.Message)
+    }
 }
 
 if ($health.github_app_status -ne 'confirmed_by_operator' -and $health.github_app_status -ne 'auto_detected') {
@@ -73,13 +84,14 @@ if ($health.github_app_status -ne 'confirmed_by_operator' -and $health.github_ap
 # ---------------- Logic-layer gaps the health endpoint cannot see ----------------
 Write-Line ""
 Write-Line "[2/2] Logic-layer audit reminders (health endpoint CANNOT validate these)"
+# NOTE: ASCII-only by design (CP950 console will render emoji as '??' -- Min-1 from 2026-05-23 self-critic)
 $logicReminders = @(
-    '🔴 C1: sg-deploy.sh Step 7 smoke-fail still does NOT invoke rollback-phase1.sh — verify after every infra patch'
-    '🔴 C2: lib/ops-inbox/redactSecrets.ts redacts keys only, NOT values — verify after every normalize/* change'
-    '🔴 C3: webhook routes have no body-size cap — verify nginx webhook zone rate limit + req.text() refactor'
-    '🔴 C4: GET /api/ops/repairs lacks canApproveCommand guard + returns audit_log to viewers'
-    '🔴 C5: service.ts:104 critical-severity gate is a flag, not a pipeline stop'
-    '🟠 M*: see agency-os/reports/audit/auto-repair-2026-05-23.md for full list'
+    '[CRIT] C1: sg-deploy.sh Step 7 smoke-fail still does NOT invoke rollback-phase1.sh -- verify after every infra patch'
+    '[CRIT] C2: lib/ops-inbox/redactSecrets.ts redacts keys only, NOT values -- verify after every normalize/* change'
+    '[CRIT] C3: webhook routes have no body-size cap -- verify nginx webhook zone rate limit + req.text() refactor'
+    '[CRIT] C4: GET /api/ops/repairs lacks canApproveCommand guard + returns audit_log to viewers'
+    '[CRIT] C5: service.ts:104 critical-severity gate is a flag, not a pipeline stop'
+    '[MAJ]  M*: see agency-os/reports/audit/auto-repair-2026-05-23.md for full list'
 )
 foreach ($r in $logicReminders) { Write-Line "    $r" }
 
@@ -88,8 +100,8 @@ if ($Mode -eq 'SyntheticSentry') {
     if (-not $ConfirmProd) {
         Write-Warn "SyntheticSentry mode requires -ConfirmProd switch; not running synthetic POST."
     } else {
-        Write-Warn "SyntheticSentry mode not yet implemented — placeholder for v2."
-        Write-Warn "Manual procedure: see audit report 2026-05-23 §Dogfood for current curl + cleanup steps."
+        Write-Warn "SyntheticSentry mode not yet implemented -- placeholder for v2."
+        Write-Warn "Manual procedure: see audit report 2026-05-23 sectionDogfood for current curl + cleanup steps."
     }
 }
 

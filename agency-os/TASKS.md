@@ -167,9 +167,16 @@
 - [x] **Auto-Repair 系統 — 邏輯檢視 + critic review + 抓蟲** —— **【已完成 audit；3 Critical patches 待 apply】** **Tier 3 月度排程，優先** **(2026-05-23 完成)**
   - **產出**：[`agency-os/reports/audit/auto-repair-2026-05-23.md`](reports/audit/auto-repair-2026-05-23.md)（37 findings + R0 4-action evidence + 3 ready-to-apply patches）+ [AUDIT_REGISTRY.md §Auto-Repair logic audit (2026-05-23)](docs/operations/AUDIT_REGISTRY.md#auto-repair-logic-audit-2026-05-23) + [`scripts/audit-tools/dogfood-auto-repair.ps1`](../scripts/audit-tools/dogfood-auto-repair.ps1) + AGENTS.md auto-trigger 新規則 + WORKLOG 2026-05-23 entry
   - **結論**：5 🔴 Critical（其中 3 個直接違反 Plan v3.2 SSOT） + 10 🟠 Major + 11 🟡 Minor + 8 🟢 Clean
-  - **Phase 4 收官建議**：**不應**在 C1/C2/C4 未 apply 前關閉 2026-06-19 觀察期
+  - **Phase 4 收官建議**：**不應**在 C1/C2/C4/C5 未 apply 前關閉 2026-06-19 觀察期 **（self-critic 2026-05-23 補強 — C5 違反 Plan §四 SSOT，加入 blocker list）**
 
-#### Auto-Repair audit follow-up — Critical patches 待 apply（依 audit report §Top-3 Ready-to-Apply Fix Patches）
+#### Auto-Repair audit follow-up — Critical patches **Errata 修正後**才可 apply（依 audit report §Top-3 Ready-to-Apply Fix Patches + §Patch Errata）
+
+> **⚠️ 2026-05-23 self-critic 更新**：原 report 三個「ready-to-apply」patch 經 R0+R4 鐵律 critic 自審後發現含 **5 個 Major + 7 個 Minor design defects**（patch 本身的 bug，非 audit 目標系統的 bug）。**任一 patch apply 前必須先把 [Patch Errata](reports/audit/auto-repair-2026-05-23.md#patch-errata-self-critic-2026-05-23) 折回 patch 設計**。Iron rule violation 的代價 = patch as-shipped 含 ship bugs。
+>
+> **Errata 必修清單**（apply 前內化）：
+> - **Patch 1 (C1)**：(EMaj-2) 加 `save`-before-deploy + (EMaj-2) APPS array 過濾 `IMAGE_MAP` keys + (EMin-7) 補 `DEPLOYED_COMMIT` 變數賦值
+> - **Patch 2 (C2)**：(EMaj-1) `B64_BLOB` regex 改 env-flag-gated 或加 prefix anchor + (EMaj-4) `MAX_DEPTH = 64` (非 32)
+> - **Patch 3 (C4)**：(EMaj-3) reframe — primary fix = column allow-list，secondary = default_viewer guard（`canModifyIncidentStatus` 含 viewer 不夠緊）
 
 - [ ] **【🔴 Critical C1 — sg-deploy.sh smoke-fail → 自動 rollback hook】** —— **【未開始】** **R0 設計已備齊，待 Apply session**
   - **檔案**：[`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh:163-189`](../lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh#L163-L189) + [`auto-deploy-next-admin.sh:78-90`](../lobster-factory/infra/hetzner-phase1-core/scripts/auto-deploy-next-admin.sh#L78-L90) + [`DEPLOY_ROLLBACK_RUNBOOK.md:72`](docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md)
