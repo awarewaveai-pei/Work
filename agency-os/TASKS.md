@@ -111,10 +111,9 @@
 
 > 背景：2026-05-22 全專案 36 個 .ps1/.sh audit 完成，4 個 unprotected 已修。詳見 WORKLOG `### Audit history — CP950 / encoding trap class（2026-05-22）`。以下是 audit 延伸的小債 + 防護工具建議。
 
-- [ ] **`scripts/audit-cp950-traps.ps1`** —— **【未開始】** 把今天手工 audit 機械化
-  - **觸發**：立即可做（~30 min）
-  - **動作**：grep 全 PS 找 `& <ssh|docker|wp|scp|git>` capture 不在 `Invoke-WithUtf8Console` 區塊內的 site → 印報告；新增 `.claude/commands/audit-encoding.md` slash command；接入 `scripts/system-health-check.ps1` 週檢
-  - **DoD**：對 `scripts/` + `lobster-factory/` PS 跑無漏報；人為加一個未包覆的 `& ssh` 測試 case 能抓到；放進 health-check 後不破現有 100% PASS
+- [x] **`scripts/audit-cp950-traps.ps1`** —— **【已完成 2026-05-22】** A+B+C+D 一次到位（commit chain `0836d94→c038b38`）：tool + AUDIT_REGISTRY.md + `/audit-encoding` slash + AGENTS.md auto-trigger rule。詳見 WORKLOG.md `## 2026-05-22 CP950 audit toolchain`。2026-05-23 在 AO-RESUME 抓到此漂移，本次 commit 同時補打勾。
+
+- [ ] **【2026-05-23 開出】Ops Inbox netdata CLEAR auto-resolve bug + fingerprint instability** —— **【未開始】** **背景**：B-Minimal auto-reboot 部署期間發現 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/netdata/route.ts:29-31` 對 CLEAR 訊號只 `return skipped`，不 actively resolve 既有 open incident。**且** `lib/ops-inbox/fingerprint.ts:32-33` 對 netdata 的 fingerprint 用 `host:alarm`，但 `alarm` 字串含 value（`= 1 status` vs `= 0 status`）→ CLEAR 與 WARNING 不同 fingerprint。**影響**：每次 auto-reboot 後 Ops Inbox 仍留 stale open incident，30 年 × 24+ 次/年 = 720+ stale incident 累積。**DoD**：(a) 修 fingerprint：netdata 改用 `alarm_id`（payload 已含此欄）或從 `alarm` 字串剝離 value 部分；(b) 修 webhook：CLEAR 訊號時主動查 fingerprint，若 open 則 set status=resolved + resolved_at + resolved_by='netdata-auto-resolve'；(c) 寫 migration backfill：用新 fingerprint 演算法重算所有 `ops_incidents.fingerprint`（or 加 `alarm_id` 欄位作為平行 lookup key）；(d) 新增 vitest 覆蓋 WARNING → CLEAR transition。**詳見**：`agency-os/docs/operations/AUDIT_REGISTRY.md` 對應 entry。**參考 commit**：本日 B-Minimal commit；P3 手動關 incident `2e66435f-4439-4b6a-a045-ec93e98fbe48` 的紀錄。
 
 - [ ] **遷移 `print-open-tasks.ps1` / `print-today-closeout-recap.ps1` 到統一 helper** —— **【未開始 / 條件觸發】**
   - **觸發**：**下次有人 Edit 這兩個檔任一個時順手**（不專門排——subprocess 模型下本來就安全）

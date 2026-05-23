@@ -71,7 +71,7 @@
 
 | 頻率 | 動作 | 產物 |
 |------|------|------|
-| **每週** | 看主機 **磁碟／安全更新**（`unattended-upgrades` 或固定維護窗） | 簡短 WORKLOG（若無異常可「本週無」） |
+| **每週** | 看主機 **磁碟**；安全更新已自動化（`unattended-upgrades` + auto-reboot 20:00 UTC，SSOT [`auto-reboot/52awarewave-auto-reboot.conf`](./auto-reboot/52awarewave-auto-reboot.conf)），人工只需查 netdata `post_update_reboot_status` 訊號 ≥ 16h 未消失的異常 | 簡短 WORKLOG（若無異常可「本週無」） |
 | **每月** | 審 **映像 CVE**、閱讀 n8n／WP **security release** | 決定是否 PATCH；staging 先行 |
 | **每季** | **祕密輪替**、備份還原 **smoke**、檢查 DNS／TLS 到期日 | 輪替紀錄（不含祕密本體） |
 | **每年** | **完整災難還原演練**、審視 **RPO/RTO** 是否仍成立 | `BACKUP_RESTORE_PROOF` 或內部報告 |

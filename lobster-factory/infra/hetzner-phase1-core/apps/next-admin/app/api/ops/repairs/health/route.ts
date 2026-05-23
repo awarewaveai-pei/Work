@@ -96,6 +96,73 @@ async function probeBackupScripts(backupMode: string): Promise<BackupScriptProbe
   return { sg, eu };
 }
 
+// GAP-04 — VPS auto-reboot config probe (B-Minimal, 2026-05-23)
+// Policy SSOT: lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf
+// Runbook: runbooks/VPS-AUTO-REBOOT-RUNBOOK.md
+//
+// Schedule: 20:00 UTC = 04:00 Asia/Taipei daily, only when /var/run/reboot-required exists.
+// Probes both SG and EU /etc/apt/apt.conf.d/52awarewave-auto-reboot existence via the
+// same SSH credentials used by GAP-01 (backup script probe). Returns "skipped" when
+// backup_mode != ssh to mirror GAP-01 semantics — we don't introduce a new SSH path.
+
+type AutoRebootProbeStatus = "ok" | "missing" | "ssh_error" | "unconfigured" | "skipped";
+
+interface AutoRebootProbe {
+  enabled_policy: true;
+  schedule_utc: "20:00";
+  schedule_local_tpe: "04:00";
+  ssot_path: "lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf";
+  runbook_path: "runbooks/VPS-AUTO-REBOOT-RUNBOOK.md";
+  sg: AutoRebootProbeStatus;
+  eu: AutoRebootProbeStatus;
+}
+
+async function probeAutoRebootConfig(backupMode: string): Promise<AutoRebootProbe> {
+  const policyShape = {
+    enabled_policy: true as const,
+    schedule_utc: "20:00" as const,
+    schedule_local_tpe: "04:00" as const,
+    ssot_path: "lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf" as const,
+    runbook_path: "runbooks/VPS-AUTO-REBOOT-RUNBOOK.md" as const,
+  };
+  if (backupMode !== "ssh") {
+    return { ...policyShape, sg: "skipped", eu: "skipped" };
+  }
+
+  const sgHost = envVal("AUTO_REPAIR_SG_SSH_HOST");
+  const sgUser = envVal("AUTO_REPAIR_SG_SSH_USER") || "root";
+  const sgPort = Number(envVal("AUTO_REPAIR_SG_SSH_PORT")) || 22;
+  const sgKeyEnv = envVal("AUTO_REPAIR_SG_SSH_KEY_ENV") || "AUTO_REPAIR_SG_SSH_KEY_B64";
+
+  const euHost = envVal("AUTO_REPAIR_EU_SSH_HOST");
+  const euUser = envVal("AUTO_REPAIR_EU_SSH_USER") || "root";
+  const euPort = Number(envVal("AUTO_REPAIR_EU_SSH_PORT")) || 22;
+  const euKeyEnv = envVal("AUTO_REPAIR_EU_SSH_KEY_ENV") || "AUTO_REPAIR_EU_SSH_KEY_B64";
+
+  const target = "/etc/apt/apt.conf.d/52awarewave-auto-reboot";
+  const probeFor = async (
+    host: string,
+    port: number,
+    username: string,
+    keyEnvName: string,
+  ): Promise<AutoRebootProbeStatus> => {
+    const status = await statRemoteScript(host, port, username, keyEnvName, target, 5000);
+    if (status === "not_found") return "missing";
+    return status as AutoRebootProbeStatus;
+  };
+
+  const [sg, eu] = await Promise.all([
+    sgHost
+      ? probeFor(sgHost, sgPort, sgUser, sgKeyEnv)
+      : Promise.resolve<AutoRebootProbeStatus>("unconfigured"),
+    euHost
+      ? probeFor(euHost, euPort, euUser, euKeyEnv)
+      : Promise.resolve<AutoRebootProbeStatus>("unconfigured"),
+  ]);
+
+  return { ...policyShape, sg, eu };
+}
+
 // GAP-03 — GitHub repo accessibility + App status (three-tier: env var → comments → unverified)
 
 type GithubAppStatus = "confirmed_by_operator" | "auto_detected" | "unverified" | "no_issues" | "error";
@@ -261,7 +328,8 @@ export async function GET() {
 
   // GAP-01: SSH probe runs on every GET — real-time script existence check.
   // GAP-03: GitHub check runs env var → comments API → unverified (three-tier).
-  const [scriptProbe, githubCheck] = await Promise.all([
+  // GAP-04: VPS auto-reboot config probe (B-Minimal) — same SSH credentials as GAP-01.
+  const [scriptProbe, githubCheck, autoRebootProbe] = await Promise.all([
     probeBackupScripts(backupMode),
     githubToken
       ? checkGithubRepoAndApp(githubOwner, githubRepo, githubToken)
@@ -272,6 +340,7 @@ export async function GET() {
           app_status: "error",
           note: "Configure AUTO_REPAIR_GITHUB_TOKEN or GITHUB_TOKEN to enable GitHub handoff.",
         }),
+    probeAutoRebootConfig(backupMode),
   ]);
 
   const ok = tableOk && mode === "normal" && backupConfigured && githubConfigured;
@@ -303,6 +372,7 @@ export async function GET() {
       policy_catalog_count: REPAIR_SOURCE_POLICIES.length,
       policy_catalog_text_ok: policyCatalogTextOk(),
       source_policies: REPAIR_SOURCE_POLICIES.map(({ source, label, policy, family }) => ({ source, label, policy, family })),
+      auto_reboot: autoRebootProbe,
     },
     { status: ok ? 200 : 503 },
   );

@@ -550,9 +550,10 @@ if ($sorted.Count -eq 0) {
 # ---------- VPS reboot-required mechanical detection ----------
 # Scans the existing external-signals-digest.json for Netdata "post_update_reboot_status"
 # alerts mentioning a known VPS host (EU/SG). Emits a hard-to-ignore block at the END of
-# AO-RESUME output so the hook's log_tail (last 48 lines) captures it and Claude reads
-# it from ao-resume-hook-last.json. Defense in depth: AGENTS.md text rule + this
-# mechanical detector — do not rely on LLM attention alone.
+# AO-RESUME output so the hook's log_tail (last 200 lines, see ao-resume-on-prompt.ps1)
+# captures it and Claude reads it from ao-resume-hook-last.json. Defense in depth:
+# AGENTS.md text rule + this mechanical detector + steps_summary structured field —
+# do not rely on LLM attention alone.
 $savedEAPReboot = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {

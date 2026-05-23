@@ -235,11 +235,45 @@ AO-RESUME / AO-CLOSE surface this WARN automatically. Watchdog uses `[Math]::Flo
 3. Verify with `RemoteTrigger get trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K`
 4. Commit the SSOT update with link to actual API call
 
+## Pending CHECK 4 — VPS auto-reboot config verification (planned 2026-05-23, deploy in next routine update)
+
+**Added**: 2026-05-23 as part of B-Minimal VPS auto-reboot deployment
+**Status**: ⏳ SPEC only — not yet in deployed routine prompt; operator must run `RemoteTrigger update` (see "Update flow" above) when ready
+
+**Goal**: Once a week, verify the auto-reboot apt conf file is still present on both VPSes, in case `unattended-upgrades` reinstall / apt purge / image rebuild silently removes it.
+
+**Mechanics**: call next-admin health endpoint (already extended in [`/api/ops/repairs/health`](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/health/route.ts) GAP-04 section, 2026-05-23) and check `auto_reboot.sg` + `auto_reboot.eu` fields.
+
+**Proposed CHECK 4 prompt block** (to be inserted before "6. Compose OVERALL"):
+
+```text
+5b. CHECK 4 — VPS auto-reboot config (B-Minimal SSOT presence):
+   Run: curl -s -H "x-ops-proxy-auth: ${OPS_PROXY_AUTH_TOKEN}" -H "x-ops-claims-role: owner" https://app.aware-wave.com/api/ops/repairs/health > /tmp/check4.json
+   Parse JSON. Read .auto_reboot.sg and .auto_reboot.eu.
+   For each:
+     - "ok" → PASS
+     - "missing" → WARN "conf removed from <vps>; re-deploy from SSOT"
+     - "ssh_error" or "unconfigured" → SKIP (probe path not available, not a real failure)
+     - "skipped" → SKIP (backup_mode != ssh)
+   CHECK4_STATUS = "PASS" if both ok or skip; "WARNING" if any missing.
+   CHECK4_DETAIL = "" if PASS else "sg: missing; eu: missing" (comma-joined offending VPSes).
+   If curl fails: CHECK4_STATUS = "SKIP", CHECK4_DETAIL = "health endpoint unreachable: <exit code>".
+```
+
+Then add to step 6 OVERALL aggregation: include CHECK4_STATUS in warning_count calculation.
+And step 7 file content: add line `- Check 4 VPS auto-reboot 配置: ${CHECK4_STATUS}${CHECK4_DETAIL_PREFIXED}`
+
+**Why deferred**: Routine prompt changes carry risk (broken prompt → routine fails silently); operator should batch-test in claude.ai/code/routines web UI before deploying. Current monitoring chain (netdata reboot-required signal + AGENTS.md 16h escalation + /sg-reboot manual override) already covers the primary failure mode; CHECK 4 is defense-in-depth, not critical-path.
+
+**Owner SSOT**: this MD file is the canonical updated prompt; the deployed routine remains at the pre-2026-05-23 3-check version until operator runs `RemoteTrigger update`.
+
 ## Related
 
 - Fallback (manual run): `scripts/phase4-weekly-check.ps1` — kept as belt-and-suspenders backup
 - Watchdog: `scripts/system-health-check.ps1` §11
-- Forensic + design rationale: `agency-os/WORKLOG.md` 2026-05-22 entry
+- VPS auto-reboot SSOT: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf`
+- VPS auto-reboot runbook: `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md`
+- Forensic + design rationale: `agency-os/WORKLOG.md` 2026-05-22 entry + 2026-05-23 B-Minimal entry
 - Pattern doc: `agency-os/automation/claude-routines/README.md`
 - Sibling routines (same pattern, different schedule): `AgencyOS-DailyBriefing` (`trig_01XoSCqJQu6DDKVJw6Lvobpd`), `AgencyOS-WeeklyReview` (`trig_01WanBfvAZvx5TR8xAXjxKVp`), `AgencyOS-MonthlyReview` (`trig_01GWG3NQSPm7SbRdJAN25QdM`)
 - Lesson saved: `~/.claude/projects/d--Work/memory/feedback_inspect_before_design.md`

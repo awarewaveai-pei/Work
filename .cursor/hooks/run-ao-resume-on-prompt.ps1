@@ -158,10 +158,41 @@ try {
         auto_checkpoint_exit_code = $autoCheckpointExit
         auto_checkpoint_summary   = $autoCheckpointSummary
         agent_skip_rerun_seconds = 120
-        note              = "If this file mtime is within agent_skip_rerun_seconds of agent handling AO-RESUME, do not re-run ao-resume.ps1; read log_tail in this JSON and TASKS/snapshot."
+        note              = "If this file mtime is within agent_skip_rerun_seconds of agent handling AO-RESUME, do not re-run ao-resume.ps1; read steps_summary (preferred) or log_tail in this JSON and TASKS/snapshot."
     }
 
-    $tailLines = 48
+    # Structured step summary: parse '== ... ==' headers from ao-resume.ps1 output.
+    # Agent reads steps_summary directly instead of grep-ing log_tail (which can be
+    # truncated when ao-resume grows new sub-steps). Each entry captures the step
+    # header + next 3 non-blank lines as a short status snapshot.
+    # Root cause this prevents: 2026-05-23 hallucination where Claude saw no
+    # "cross-machine import" in last-48-line log_tail and incorrectly reported
+    # import as skipped (import had actually succeeded — log front-half was truncated).
+    # Kept identical to Claude Code hook (mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1)
+    # so dual-IDE state files have the same shape for cross-IDE de-dup.
+    $stepsSummary = New-Object System.Collections.Generic.List[object]
+    for ($i = 0; $i -lt $allLogLines.Count; $i++) {
+        $line = [string]$allLogLines[$i]
+        if ($line -match '^\s*==\s+(.+?)\s+==\s*$') {
+            $stepName = $matches[1].Trim()
+            $detailLines = @()
+            for ($j = $i + 1; $j -lt [Math]::Min($i + 6, $allLogLines.Count); $j++) {
+                $d = [string]$allLogLines[$j]
+                if ($d -match '^\s*==\s+(.+?)\s+==\s*$') { break }
+                if (-not [string]::IsNullOrWhiteSpace($d)) { $detailLines += $d.Trim() }
+                if ($detailLines.Count -ge 3) { break }
+            }
+            $stepsSummary.Add([ordered]@{
+                name   = $stepName
+                detail = ($detailLines -join ' | ')
+            }) | Out-Null
+        }
+    }
+    $meta["steps_summary"] = $stepsSummary
+
+    # log_tail: was 48 lines (too short — front-half steps truncated). 200 gives
+    # ~3x headroom. Defense-in-depth alongside steps_summary above.
+    $tailLines = 200
     $tailText = ""
     if (Test-Path -LiteralPath $logFile) {
         $tailText = (Get-Content -LiteralPath $logFile -Tail $tailLines -ErrorAction SilentlyContinue) -join "`n"

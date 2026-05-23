@@ -9,7 +9,7 @@
 
 - [ ] 主機 **`df -h`**、inode、Docker 儲存空間正常  
 - [ ] **`docker compose ps`** 無異常重啟循環；必要時 `docker compose logs -f --tail=200 <service>`  
-- [ ] 安全更新／重開機窗（若使用 `unattended-upgrades` 等）無待處理失敗  
+- [ ] *(自動)* **VPS 套件升級 + auto-reboot** 每日 20:00 UTC (= 04:00 TPE) — `unattended-upgrades` 裝 security patch，若觸發 `/var/run/reboot-required` 則同時段自動 reboot。SSOT：[`auto-reboot/52awarewave-auto-reboot.conf`](./auto-reboot/52awarewave-auto-reboot.conf)；runbook：[`../../../runbooks/VPS-AUTO-REBOOT-RUNBOOK.md`](../../../runbooks/VPS-AUTO-REBOOT-RUNBOOK.md)。**人工介入時機**：若 netdata `post_update_reboot_status` 訊號 ≥ 16 小時未消失 → 自動化失敗，走 `/sg-reboot` 或 `/eu-reboot` 手動 runbook  
 - [ ] *(自動)* **Docker weekly cleanup** 每週日自動執行（SG 03:00 UTC、EU 03:30 UTC）；抽查 `tail -30 /var/log/docker-weekly-cleanup.log` 確認無異常
 
 ---

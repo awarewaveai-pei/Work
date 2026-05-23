@@ -4,6 +4,37 @@
 
 ## 2026-05-23
 
+### AO-RESUME hook log_tail 觀察視窗修正 — Claude hallucination 30 年防範（commit pending）
+
+**根本問題**：本日早些 AO-RESUME 後，[`agency-os/reports/ao-resume/2026-05-23-1848.md:24`](reports/ao-resume/2026-05-23-1848.md#L24) 出現「Cross-machine import：本輪 hook 未跑 import script（log_tail 無顯示）」這句 hallucination。表面看是 import 沒跑，**實際 import 完整成功**（`%LOCALAPPDATA%\AgencyOS\ao-sync-state.json` mtime=18:48:38，13 檔案 unchanged，from_machine=LAPTOP-R7I86OR5 同機 round-trip，SHA256 全 match）。30 年級根因：[`mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:195`](../mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1#L195) 寫死 `$tailLines = 48` 寫進 `log_tail` JSON 欄位，但實測 ao-resume.ps1 log **354 行**（含 git align / manifest schema / doc_integrity / scan-for-secrets / sentry / health / machine audit / sync / import / backup / signals / cloudflare / reports = 37 個 sub-step），48 行視窗只能 cover 最末 ~14% 的 step，前 86% 全被 truncate。Claude 讀 log_tail grep 不到「cross-machine import」字串就誤報 skipped。同 bug class 會影響所有非 last-48-line 的 sub-step（user-level sync / mcp sync / backup health 過去半年很可能多次低嚴重度誤報，因不 block 流程未被注意）。
+
+**方案**：A + B 並行（defense-in-depth）：
+- A. `$tailLines = 48 → 200`（~3x headroom；JSON 約 +7KB / Claude context <0.5%）
+- B. 新增 `steps_summary` 結構化欄位 — hook regex parse `== ... ==` step header + 接下來最多 3 行作 detail snapshot，寫進 hook state JSON；**Claude 不再依賴 grep log_tail 即可知每個 step 是否跑過**
+
+**修改檔案**（4 處）：
+1. [`mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`](../mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1) — Claude Code SSOT，加 steps_summary + log_tail 200
+2. [`.cursor/hooks/run-ao-resume-on-prompt.ps1`](../.cursor/hooks/run-ao-resume-on-prompt.ps1) — Cursor IDE 對應 hook，平行修改保雙 IDE 一致
+3. [`scripts/ao-resume.ps1:550-555`](../scripts/ao-resume.ps1#L550) — 註解 "last 48 lines" → "last 200 lines, see ao-resume-on-prompt.ps1"
+4. [`agency-os/reports/ao-resume/2026-05-23-1848.md:24`](reports/ao-resume/2026-05-23-1848.md#L24) — errata 註記原 hallucination 不可信 + fix 連結
+
+**雙機同步**：本機 `scripts\sync-claude-userlevel.ps1 -Mode merge` 已跑（SSOT → `~/.claude/hooks/`，SHA256 `F1AC08B566289AA7` 雙端一致）；桌機需 `git pull && scripts\sync-claude-userlevel.ps1 -Mode merge`。
+
+**[驗證結果] R0 四動作**：
+
+1. **實測（end-to-end real test）**：寫 `d:\tmp\test-stepssummary.ps1` 用真實 `ao-resume-hook-last.log`（354 行）餵新 regex → **37 個 step 全部解析成功**；「AO-RESUME: cross-machine memory import (auto)」step 含 detail "skipped — own machine export (2026-05-22) ... | manifest loaded: exported by LAPTOP-R7I86OR5"；200-line tail captures import ✅；48-line tail CONFIRMED 把 import 段切掉（證實 hallucination root cause）
+2. **Review**：Read 修改後的兩個 hook 確認 `$tailLines = 200` + steps_summary 區塊在 `$meta` 寫 JSON 前；Read errata 確認 link / 引用路徑正確
+3. **抓蟲（cross-file bug hunt）**：grep `tailLines|log_tail|steps_summary` across repo → 找到 3 處原寫死 48（Claude hook / Cursor hook / ao-resume.ps1 註解），**3 處全修**，無 stale 主張；跑 `audit-cp950-traps.ps1` 對兩個 hook → **發現 2 個 pre-existing drift**（Claude hook L54 / Cursor hook L50 `git status --porcelain` 未 wrap），輸出僅 ASCII 不會觸發 CP950 trap，本次 **scope 之外不修**，**留存於此**等使用者授權單獨開 task 或移到 [AUDIT_REGISTRY 🟡 TRACKED](docs/operations/AUDIT_REGISTRY.md#cp950--encoding-trap-audit-2026-05-22)
+4. **WORKLOG**：本 entry（含四動作摘要 + 證據連結 + 待辦 CP950 finding）
+
+**剩餘風險**：(a) `steps_summary` regex 對 ao-resume.ps1 `== xxx ==` header 格式有 implicit contract（>1 年穩定，低風險）；(b) 200 行 tail 仍小於 354 行 log，前半段（manifest/doc_integrity/etc）仍 truncated — 但已由 steps_summary cover；(c) 桌機 sync 需操作者執行（無法自動），靠 git push commit message 提醒。
+
+**Rollback**：`git revert <commit>`；兩台跑 `scripts\sync-claude-userlevel.ps1 -Mode merge` 恢復 48 行 + 刪 steps_summary 區塊；hook 本身 try/catch 兜底，regex 出錯不會 block chat。
+
+**Memory update（會在此 entry commit 後執行）**：新增 `feedback_observability_window_truncation.md` — 「Claude 讀 log_tail 看不到的 step 不等於 step 沒跑；觀察視窗短於 emitter 輸出量會 hallucinate；fix pattern = structured summary + 加大 tail (defense-in-depth)」。
+
+---
+
 ### SG VPS reboot + VPS 套件升級自動化（B-Minimal）一勞永逸方案部署
 
 **根本問題**：不是「SG 今天要不要 reboot」，而是「30 年內 VPS 套件升級後 reboot 這條鏈每月觸發 2-4 次、每次都要操作者人工決策 + 點按」。EU 昨天逾期 22h、SG 今天又重演 — 證明手動鏈不可持續。
