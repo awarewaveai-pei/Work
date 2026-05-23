@@ -39,7 +39,9 @@ const ANCHORED_VALUE_PATTERNS: Array<{ re: RegExp; tag: string }> = [
   { re: /\btr_(pat|prod)_[A-Za-z0-9]{20,}/g, tag: "TRIGGER_TOKEN" },
   { re: /\bAKIA[0-9A-Z]{16}\b/g, tag: "AWS_ACCESS_KEY" },
   { re: /\bASIA[0-9A-Z]{16}\b/g, tag: "AWS_TEMP_KEY" },
-  { re: /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/g, tag: "JWT" },
+  // JWT: header AND body both base64-encode JSON starting with '{' → 'eyJ'. Anchor on both
+  // segments starting with eyJ to keep FP near zero while accepting short payload JWTs.
+  { re: /\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, tag: "JWT" },
   // PEM-format private keys (any algorithm). Multiline-aware via [\s\S].
   {
     re: /-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]+?-----END [A-Z ]+ PRIVATE KEY-----/g,
