@@ -130,6 +130,23 @@ ssh root@<vps> 'ls /var/run/reboot-required* 2>&1'
 
 ---
 
+## 4.5. 快速狀態查詢（slash command）
+
+部署後任何時候可跑：
+
+```
+/auto-reboot-status
+```
+
+這個 slash command（[`~/.claude/commands/auto-reboot-status.md`](../.claude/commands/auto-reboot-status.md)）會 SSH 進 SG + EU，並列查：
+- `apt-config dump` 三個 Automatic-Reboot 鍵值
+- 52 / 53 conf 檔 SHA256（對照 repo SSOT 是否漂移）
+- `unattended-upgrades` daemon active/enabled
+- `/var/run/reboot-required` 是否存在（待 reboot）
+- 最近 3 次 reboot 時間
+
+回報格式：一張表 + 一行 verdict（🟢/🟡/🔴）。Read-only，無風險。
+
 ## 5. 監控訊號（自動化 ON 後，操作者該怎麼看）
 
 | 訊號 | 含義 | 操作 |
