@@ -26,10 +26,6 @@ export async function POST(req: Request) {
   const raw = redactSecrets(payload);
   const draft = normalizeNetdata(raw);
 
-  if (draft.severity === "low" && (raw as any)?.status === "CLEAR") {
-    return NextResponse.json({ skipped: "netdata_clear" });
-  }
-
   draft.fingerprint = computeFingerprint({
     source: draft.source,
     service: draft.service,
@@ -40,6 +36,41 @@ export async function POST(req: Request) {
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) return new NextResponse("db unavailable", { status: 503 });
+
+  // 2026-05-23: CLEAR signal active resolve.
+  // Replaces the old skip-and-return logic which left every open incident stale forever.
+  // Now: when netdata transitions WARNING/CRITICAL → CLEAR, look up the matching open
+  // incident by stable fingerprint (host:name) and mark it resolved.
+  // Fingerprint stability is guaranteed by fingerprint.ts:32 using raw.name (stable
+  // metric ID) rather than raw.alarm (label text containing value).
+  // Idempotent: `.eq("status", "open")` filter ensures duplicate CLEARs are no-ops.
+  if ((raw as any)?.status === "CLEAR") {
+    const { data: openMatch } = await supabase
+      .from("ops_incidents")
+      .select("id")
+      .eq("fingerprint", draft.fingerprint)
+      .eq("environment", draft.environment)
+      .eq("status", "open")
+      .maybeSingle();
+
+    if (openMatch) {
+      const { error: resolveError } = await supabase
+        .from("ops_incidents")
+        .update({
+          status: "resolved",
+          resolved_at: new Date().toISOString(),
+          resolved_by: "netdata-auto-resolve-on-clear",
+        })
+        .eq("id", openMatch.id);
+
+      if (resolveError) {
+        Sentry.captureException(resolveError, { tags: { route: "ops-inbox-webhook-netdata", op: "clear-resolve" } });
+        return new NextResponse("resolve write failed", { status: 500 });
+      }
+      return NextResponse.json({ resolved: openMatch.id });
+    }
+    return NextResponse.json({ skipped: "no_open_match" });
+  }
 
   const { data: existing } = await supabase
     .from("ops_incidents")
