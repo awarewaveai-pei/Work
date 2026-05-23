@@ -4,6 +4,36 @@
 
 ## 2026-05-24
 
+### `/tomo` feature — v2 plan complete, implementation pending（晚間規劃 session）
+
+**根本問題**：user 痛點「告一段落要說『明天提醒我做 X 並寫入 task 並讓明天的 AI 知道怎麼接』每次都打很長，且多視窗工作流會重複」→ 需要一個 trigger 一鍵完成「reminder + handoff packet 整理 + 跨機同步」。
+
+**做了什麼（規劃 only，未實作）**：
+1. **新檔** [`.claude/plans/tomo-feature-v2-plan.md`](../.claude/plans/tomo-feature-v2-plan.md) — 7 條設計決策拍板 + 10 漏洞 v1→v2 fix + Phase 0/1/2/3 step-by-step + 完整 4.3 抓蟲（v2 補完版，含 BUG_HUNT_PROTOCOL 9-step + audit-cross-machine-bom + critic + CHANGE_IMPACT_MATRIX 6 step，不只 grep）+ R8-R11 風險清單 + Resume Instructions
+2. **設計關鍵決策**：trigger 字 `/tomo` + `/tomo!` (4 字短，跟 /recap/tasks 同類)；TASKS.md `- [ ]` = pending SSOT（不用 .agency-state，因 gitignored）；packet 在 `agency-os/handoffs/`（git tracked → 跨機天然同步）；ao-resume.md 第 7 段條件式擴張 inline packet（不改成 8 段式，因第 7 段「下一步」本來就是 handoff 天然落點）
+
+**iteration 過程**（留證據鏈避免明天重做）：
+- v1：6 個檔，30-45 min，遺漏 10 漏洞（autopilot hang、多 pending 顯示、secret in hint、跨機 race 等）
+- v2：補完 10 漏洞，7 個檔，50-70 min
+- v2 corrected：user push-back「抓蟲 grep 太少」→ 補完 4.3 抓蟲成 6 step（BUG_HUNT_PROTOCOL + audit-cross-machine-bom + critic + CHANGE_IMPACT_MATRIX）
+
+**[驗證結果] R0+R4 四動作**（本 session 為 plan only，驗證僅針對 plan 檔本身）：
+1. **實測**：plan 檔 Write 成功（agent harness 確認）；無 e2e 實測（feature 未實作）
+2. **Review**：plan 結構含 8 個 section + 表格 + Resume Instructions，可供明天獨立 agent 接手；markdown lint 通過（手動掃 code-fence 配對）
+3. **抓蟲**：grep `handoff|carryover|reminder|明日提醒|tomorrow|/tomo` 跨 .md 找到 30+ 命中（多為其他語境，無重工風險，最相關是 `docs/awarewave-auto-repair-phase2-handoff.md` = 不同領域 phase handoff）；確認 `agency-os/handoffs/` 不存在（白紙）
+4. **WORKLOG**：本 entry
+
+**剩餘風險**（明天實作前處理）：
+- (a) Phase 0 未做 — `scripts/checkpoint.ps1` push 行為、`scan-local-config-for-secrets.ps1` 介面、`print-open-tasks.ps1` parsing 三個依賴未驗證。**明天 Phase 0 必跑**
+- (b) Plan 是 SSOT 但無自動測試保護 — 若明天 agent 不讀 plan 直接從對話 memory 動手 = 會錯過 10 漏洞 fix。**緩解**：plan 內 §8 Resume Instructions 明文「禁止從對話 memory 重生 plan」
+- (c) health-check 在 AO-RESUME hook 報 FAIL（Claude Code sync infrastructure broken，see /sync-check）— **與本 plan 無關**，但 AO-CLOSE 100% 門檻會擋；本次未跑 `scripts/ao-close.ps1`，user 明天決定是否帶 `-AllowNonPerfectHealth` flag
+
+**Rollback**：plan 檔是新增 markdown，無破壞性。`git rm .claude/plans/tomo-feature-v2-plan.md` 即還原。WORKLOG 本 entry 可 `git revert`。
+
+**Memory update（明天實作完才寫）**：`project_tomo_command.md` — feature 上線後的使用 guide；現在不寫因 feature 未存在。
+
+---
+
 ### Pattern 永久化 — `/apply-audit` slash command + BUG_HUNT_PROTOCOL 兩種 audit shape
 
 **根本問題**：2026-05-23 Auto-Repair Tier 3 audit 用三次 operator push-back 才把 5 個 Critical apply 完整（push 1=「review 抓蟲鐵律」，push 2=「剩餘風險為什麼不處理」，push 3=「處理好所有的事」）。若不把這條工序永久化，下次 logic audit（Empty `catch {}` / Atomic file race / 等 Backlog Tier 3 候選）會重蹈相同 3 次 push-back 路徑。operator 第四問「今天有沒有值得永久化的」直接觸發。
