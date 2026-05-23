@@ -111,6 +111,26 @@
    - 累積偵測 drift
 ```
 
+### Step 9.5 — Operator triggerability check（**強制**，2026-05-23 加入）
+
+**規則**：宣告「DEPLOYED + 30 年穩定」前，必須通過此檢核：
+
+> 操作者**不需要記住任何指令名稱、檔案路徑、關鍵字**就能在日常流程中看到 fix 結果或 audit verdict 嗎？
+
+3 個合法答案（其一即可）：
+
+a. **AO-RESUME 自動 surface**：fix / audit 寫 `agency-os/reports/status/<X>-LATEST.md`，`scripts/ao-resume.ps1` auto-call，AGENTS.md 代理自動工具使用規則 table 有對應「AO-RESUME 時讀 X-LATEST.md」row → 七段式自動點名。詳見 [`runbooks/ADD-PERIODIC-HEALTH-CHECK.md`](../../../runbooks/ADD-PERIODIC-HEALTH-CHECK.md)。
+b. **AO-CLOSE health gate 失敗會擋**：fix 確保某 invariant，違反時 `system-health-check.ps1` 對應 check FAIL，AO-CLOSE 100% gate 自動擋，操作者必看。
+c. **Telegram / Slack alert 主動推**：fix 確保某種異常觸發 webhook → 操作者手機立刻收。
+
+**3 個不合法答案**（觸發 R0 違反，必須補上 a/b/c 才能宣告 DEPLOYED）：
+
+- ❌ 「我做了 `/cmd-name` slash command」→ 操作者不會記指令名
+- ❌ 「AGENTS.md trigger rule 寫了，下次 Claude 對話會自動跑」→ 需要操作者先開 IDE + 提到關鍵字 = 不是自動化
+- ❌ 「Runbook 寫了完整步驟」→ runbook 是查詢用，不是 surfacing 機制
+
+**為什麼此檢核存在**：2026-05-23 B-Minimal auto-reboot session 操作者明確 push back「我不會知道要問這個」。30 年最大失敗模式是「fix shipped 但 operator never sees」— 跟 §Step 7 FP-rate exit gate 同 spirit（noisy tool dies / invisible fix wasted）。詳見 [`~/.claude/projects/d--Work/memory/feedback_operator_zero_memory_automation.md`](../../../.claude/projects/d--Work/memory/feedback_operator_zero_memory_automation.md)。
+
 ---
 
 ## 已執行的 class（永久部署）

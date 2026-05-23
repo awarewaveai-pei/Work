@@ -125,8 +125,8 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
                 # Local Continue: git push writes progress / "To <url>" to stderr by design.
                 # With $ErrorActionPreference = "Stop" + `2>&1`, those stderr lines are raised as
                 # NativeCommandError and abort the script before $LASTEXITCODE is checked. Use the
-                # same save/restore pattern as elsewhere in this file (e.g. resumeOut block) so the
-                # outer strict policy is preserved while git push's normal stderr is tolerated.
+                # same save/restore pattern as the `$savedEAPReboot` VPS reboot block around L590
+                # so the outer strict policy is preserved while git push's normal stderr is tolerated.
                 # Real fail is still caught via $LASTEXITCODE != 0.
                 $savedEAPPush1 = $ErrorActionPreference
                 $ErrorActionPreference = "Continue"
