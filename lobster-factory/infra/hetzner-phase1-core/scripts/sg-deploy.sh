@@ -125,6 +125,25 @@ if [[ $DRY_RUN -eq 1 ]]; then
   exit 0
 fi
 
+# 2.5 snapshot before build (C1 EMaj-2 fix: auto-rollback needs prior `save`).
+#     Without this, the first auto-rollback fires on a build that has no snapshot →
+#     rollback-phase1.sh restore would error. We snapshot every restorable app pre-build
+#     so the smoke-fail rollback path always has a tag to restore.
+if [[ ${#RESTORABLE_APPS[@]} -gt 0 ]]; then
+  if [[ -x "$ROLLBACK_SCRIPT" ]]; then
+    log "--- snapshot before build (rollback prep) ---"
+    for APP in "${RESTORABLE_APPS[@]}"; do
+      "$ROLLBACK_SCRIPT" save "$APP" 2>&1 | tee -a "$LOG_FILE" \
+        || log "WARN: snapshot save for $APP failed; auto-rollback will not be available for this app"
+    done
+  else
+    log "WARN: $ROLLBACK_SCRIPT not executable; auto-rollback disabled this run"
+  fi
+fi
+if [[ ${#NON_RESTORABLE_APPS[@]} -gt 0 ]]; then
+  log "WARN: apps outside rollback-phase1.sh IMAGE_MAP, no auto-rollback for: ${NON_RESTORABLE_APPS[*]}"
+fi
+
 # 3. build
 cd "$STAGING_DIR"
 log "--- docker compose build ${APPS[*]} ---"
@@ -148,9 +167,16 @@ fi
 
 # 5. record deployed commit IMMEDIATELY after successful up (before healthcheck wait).
 #    This way drift detector knows what we shipped even if healthcheck flakes.
-echo "$(git -C "$REPO_DIR" rev-parse HEAD)" > "$STAGING_DIR/.deployed-commit"
+#    C1 fix: also remember the PREVIOUS commit so smoke-fail auto-rollback can revert
+#    the drift marker. EMin-7 also addressed (no more unassigned $DEPLOYED_COMMIT reference).
+PREVIOUS_COMMIT=""
+if [[ -f "$STAGING_DIR/.deployed-commit" ]]; then
+  PREVIOUS_COMMIT=$(cat "$STAGING_DIR/.deployed-commit")
+fi
+NEW_COMMIT=$(git -C "$REPO_DIR" rev-parse HEAD)
+echo "$NEW_COMMIT" > "$STAGING_DIR/.deployed-commit"
 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STAGING_DIR/.deployed-at"
-log "wrote .deployed-commit = $(cat "$STAGING_DIR/.deployed-commit")"
+log "wrote .deployed-commit = $NEW_COMMIT (previous: ${PREVIOUS_COMMIT:-none})"
 
 # 6. wait for healthy (informational; does not invalidate the .deployed-commit record)
 for APP in "${APPS[@]}"; do
@@ -173,8 +199,10 @@ for APP in "${APPS[@]}"; do
 done
 
 
-# 7. HTTP smoke check — verifies HTTP layer after container health gate.
-#    Non-fatal: SMOKE_WARN logged + .smoke-warn flag written; does NOT exit non-zero.
+# 7. HTTP smoke check + auto-rollback gate.
+#    C1 fix (Plan v3.2 §五 third layer): smoke fail → auto-restore last snapshot.
+#    Drill mode (AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false) preserves the legacy
+#    "non-fatal warn" behavior for scheduled drills where degradation is intentional.
 #    Endpoints confirmed reachable from localhost 2026-05-21.
 _smoke_errors=0
 _smoke_check() {
@@ -196,9 +224,46 @@ else log "  SMOKE_WARN: node-api health -> $_na_http"; _smoke_errors=$((_smoke_e
 if [[ "$_smoke_errors" -gt 0 ]]; then
   log "SMOKE_WARN: $_smoke_errors endpoint(s) returned non-2xx -- service may be partially degraded"
   printf '%s|%s\n' "$_smoke_errors" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STAGING_DIR/.smoke-warn"
+
+  # C1: Plan §五 third-layer auto-rollback (default ON).
+  if [[ "${AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL:-true}" == "true" ]]; then
+    log "--- AUTO-ROLLBACK triggered by smoke failure ---"
+    if [[ ${#RESTORABLE_APPS[@]} -eq 0 ]]; then
+      log "ERROR: no restorable apps in this deploy; cannot auto-rollback"
+      fail "smoke check failed and no restorable apps to roll back"
+    fi
+    if [[ ! -x "$ROLLBACK_SCRIPT" ]]; then
+      log "ERROR: $ROLLBACK_SCRIPT not executable; auto-rollback unavailable"
+      fail "smoke check failed and rollback script unavailable"
+    fi
+    _rollback_failures=0
+    for APP in "${RESTORABLE_APPS[@]}"; do
+      log "rolling back $APP to previous snapshot..."
+      if ! "$ROLLBACK_SCRIPT" restore "$APP" 2>&1 | tee -a "$LOG_FILE"; then
+        log "ROLLBACK_FAILED for $APP -- manual intervention required"
+        _rollback_failures=$((_rollback_failures + 1))
+      fi
+    done
+    # Revert .deployed-commit to pre-deploy state so drift detector reflects rollback.
+    if [[ -n "$PREVIOUS_COMMIT" ]]; then
+      echo "$PREVIOUS_COMMIT" > "$STAGING_DIR/.deployed-commit"
+      log ".deployed-commit reverted to $PREVIOUS_COMMIT (pre-rollback state)"
+    fi
+    printf 'ROLLBACK|smoke_errors=%d|rollback_failures=%d|%s\n' \
+      "$_smoke_errors" "$_rollback_failures" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      > "$STAGING_DIR/.rollback-triggered"
+    if [[ "$_rollback_failures" -gt 0 ]]; then
+      fail "auto-rollback fired but $_rollback_failures app(s) failed to restore; URGENT manual check required"
+    else
+      fail "auto-rollback fired after smoke check; new code reverted to previous snapshot"
+    fi
+  else
+    log "AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false -- DRILL MODE; leaving degraded state for inspection"
+  fi
 else
   log "smoke: all endpoints OK"
   rm -f "$STAGING_DIR/.smoke-warn"
+  rm -f "$STAGING_DIR/.rollback-triggered"
 fi
 
 log "=== sg-deploy complete ==="
