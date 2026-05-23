@@ -1,12 +1,57 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { canApproveCommand, resolveOpsRole } from "@/lib/ops-role";
+import { canApproveCommand, canModifyIncidentStatus, resolveOpsRole } from "@/lib/ops-role";
 import { startRepairFromIncident } from "@/lib/repair-center/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// SSOT: agency-os/reports/audit/auto-repair-2026-05-23.md §Patch 3 (with Errata EMaj-3)
+// Original audit C4: GET handler had no role guard AND used select("*") which returned
+// audit_log column (SSH stdout/stderr up to 6KB) to default viewers.
+//
+// EMaj-3 reframe: primary fix = column allow-list (drops audit_log from list view).
+// canModifyIncidentStatus includes 'viewer' role by design, so role guard alone is not
+// sufficient — column allow-list is the real protection. Role guard is defense-in-depth
+// against the default_viewer fallback (anonymous requests resolved to viewer when no
+// claims header is present).
+const LIST_COLUMNS = [
+  "id",
+  "incident_id",
+  "source",
+  "client_slug",
+  "policy",
+  "state",
+  "approved_by",
+  "approved_at",
+  "backup_status",
+  "backup_ref",
+  "backup_checked_at",
+  "github_owner",
+  "github_repo",
+  "github_issue_number",
+  "github_issue_url",
+  "github_pr_number",
+  "github_pr_url",
+  "deploy_status",
+  "deploy_ref",
+  "deploy_checked_at",
+  "risk_level",
+  "needs_human_review",
+  "created_at",
+  "updated_at",
+  "archived_at",
+].join(",");
+
 export async function GET(request: Request) {
+  // Errata EMaj-3 defense-in-depth: block default_viewer fallback (anonymous/no-claims requests).
+  // Legitimate operator UI passes claims headers via middleware; CI/curl-without-auth resolves
+  // to default_viewer and now gets 403 instead of reading the queue.
+  const resolved = resolveOpsRole(request);
+  if (!canModifyIncidentStatus(resolved.role) || resolved.source === "default_viewer") {
+    return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
+  }
+
   const supabase = getSupabaseServerClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
 
@@ -16,12 +61,13 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("repair_runs")
-    .select("*")
+    // Primary C4 fix: explicit column allow-list — audit_log NEVER returned in list view.
+    .select(LIST_COLUMNS)
     .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error) return NextResponse.json({ ok: false, error: "repair_runs_fetch_failed", details: error.message }, { status: 409 });
-  return NextResponse.json({ ok: true, runs: data ?? [], role: resolveOpsRole(request).role });
+  return NextResponse.json({ ok: true, runs: data ?? [], role: resolved.role });
 }
 
 export async function POST(request: Request) {

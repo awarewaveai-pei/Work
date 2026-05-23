@@ -111,8 +111,12 @@ async function runRemoteScript(args: {
     const result = await sshExec(conn, args.command);
     return {
       ok: result.code === 0,
-      stdout: result.stdout.slice(-6000),
-      stderr: result.stderr.slice(-6000),
+      // C4 fix (paired with audit_log column allow-list): truncate 6000→500 to limit blast
+      // radius if anything later exposes audit_log (e.g. detail endpoint). 500 bytes is
+      // enough to debug exit-code semantics (last line of error output) without persisting
+      // multi-screen SSH transcripts that may include hostnames / paths / incidental secrets.
+      stdout: result.stdout.slice(-500),
+      stderr: result.stderr.slice(-500),
       code: result.code,
     };
   } finally {
