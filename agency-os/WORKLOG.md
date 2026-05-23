@@ -2,6 +2,42 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-24
+
+### Pattern 永久化 — `/apply-audit` slash command + BUG_HUNT_PROTOCOL 兩種 audit shape
+
+**根本問題**：2026-05-23 Auto-Repair Tier 3 audit 用三次 operator push-back 才把 5 個 Critical apply 完整（push 1=「review 抓蟲鐵律」，push 2=「剩餘風險為什麼不處理」，push 3=「處理好所有的事」）。若不把這條工序永久化，下次 logic audit（Empty `catch {}` / Atomic file race / 等 Backlog Tier 3 候選）會重蹈相同 3 次 push-back 路徑。operator 第四問「今天有沒有值得永久化的」直接觸發。
+
+**修改檔案（3 個）**：
+1. **新建** [`.claude/commands/apply-audit.md`](../.claude/commands/apply-audit.md) — 162 行 slash command，包含 6 步流程（pre-flight read → sequence patches by risk+dependency → per-patch apply loop with Errata fold-in + 4-action verify per patch + cross-file 抓蟲 → cross-cutting validation → AUDIT_REGISTRY upgrade → WORKLOG entry → commit/push with ack）+ 紅線清單（不可 Errata 沒折就 apply、不可 Medium-High patch 沒明示就 apply、不可 4-action 跳過、不可 Critical 升 FIXED 沒 commit hash）+ origin event 紀錄（三次 push-back）+ 觸發條件表
+2. [`agency-os/docs/operations/BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md) — 新增「## 兩種 audit shape」段落（Pattern vs Logic 對照表 → 決定走 Build Playbook 還是 `/apply-audit`），AUDIT_REGISTRY 已執行 class 表加 `Shape` 欄位 + Auto-Repair logic audit 2026-05-23 列入 ✅ DEPLOYED + APPLIED
+3. [`agency-os/AGENTS.md`](AGENTS.md) — `## 代理自動工具使用規則` 新增一條 trigger row：操作者說「apply audit / apply the patches / 套用 audit / 把 audit 修一修 / 處理好所有的事」+ 指涉 audit report → 自動 `/apply-audit <path>`，強制 Errata 折回 + 跨檔抓蟲 + 4-action verify
+
+**結合既有**：`/apply-audit` 不是新獨立系統，是組合：
+- [`BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md) Build Playbook step 8（cross-machine sync + WORKLOG）
+- [`AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md) 🔴 TRACKED → 🔴 FIXED 狀態升級協議
+- [`scripts/verify-recent-ack.ps1`](../scripts/verify-recent-ack.ps1) ack helper（verify-gate hook block 時的合規 unblock 路徑）
+- R0+R4 [驗證計畫] 4 動作鐵律
+- 既有 critic / audit-encoding / audit-cross-machine-bom skill 同家族 .md 格式
+
+**[驗證結果] R0+R4 四動作**：
+1. **實測**：5 個引用檔全存在（auto-repair-2026-05-23.md 612 行、BUG_HUNT_PROTOCOL.md、AUDIT_REGISTRY.md、verify-recent-ack.ps1、dogfood-auto-repair.ps1）— bash 逐一 `[[ -f "$f" ]]` 確認；skill 已被 Claude Code 系統自動掃到（available-skills system-reminder 列出 `apply-audit` row）= 真實「系統載入」實測
+2. **Review**：Read-back 寫好的 3 個檔（apply-audit.md 162 行 vs sibling audit-encoding.md 75 行 / audit-cross-machine-bom.md 58 行，較長因 /apply-audit 流程較複雜，可接受）；BUG_HUNT_PROTOCOL 新段插入位置（Step 9.5 之後 / 「## 已執行的 class」之前）邏輯正確；AGENTS.md trigger row 嵌在「audit / 抓蟲 / bug class」row 之後，保持主題集中
+3. **抓蟲**：`grep -rn "apply-audit"` 跨 `.claude/` + `agency-os/` 顯示 live references 在 4 個檔對齊（apply-audit.md 自身 + BUG_HUNT_PROTOCOL + AGENTS + auto-repair-2026-05-23.md retrospective mention）；其他匹配是 `.claude/file-history/` backup 與 `.claude.json` index（非 stale 主張，是 harness 機械備份）；無漏網跨機 sync 問題（repo 內 .md，git pull 自動同步）
+4. **WORKLOG**：本 entry（含修改檔案清單 + 4 動作各自結果 + 剩餘風險 + rollback）
+
+**剩餘風險**：
+- (a) `/apply-audit` 是**procedural skill**（markdown 描述步驟），不是可執行腳本。實際 apply 仍靠主 agent 跟著走 — 若主 agent 又跳步，會回到 2026-05-23 的 3-push-back 路徑。**緩解**：AGENTS.md trigger row 明文「強制 Errata fold-in + 4-action」，operator 第一次 push-back 時可貼此檔案連結
+- (b) Logic audit 目前只有 1 個案例（Auto-Repair 2026-05-23）= n=1 工序驗證。下次 logic audit（Empty catch / Atomic race / 等）才會真實壓力測試
+- (c) BUG_HUNT_PROTOCOL「兩種 audit shape」段把 Step 5 AUDIT_REGISTRY 描述拆兩種，但 audit_registry 本身的 template 沒同步更新。**留下次 iteration**：當第二個 Logic audit 出現時再分離 template
+- (d) Date 跨日（2026-05-23 → 2026-05-24）— 本 entry 寫在 2026-05-24，但與 5/23 audit + apply round 同一邏輯 session。WORKLOG 約定「跨日 session 按真實寫入日歸檔」，符合慣例
+
+**Rollback**：3 個檔修改全是增量 .md（新 file + 段落插入 + table row 追加）。`git revert <commit>` 即可全還原。無產品代碼 / harness logic / DB schema 變動。
+
+**Memory update（commit 後）**：補一條 `feedback_audit_shape_pattern_vs_logic.md` — 「audit 有兩種 shape：Pattern (CP950 / BOM / sync — 機械可偵測) → 走 Build Playbook 9 步建 detector tool；Logic (state machine / signature / rollback path — 靠 critic + 設計判斷) → 用 `/apply-audit` walk through apply round。混淆兩者 = 把 Logic audit 強塞進 detector tool 框 = 設計上不可能機械化 = 工具死掉。30-year lesson：先分 shape 再選工序」。
+
+---
+
 ## 2026-05-23
 
 ### Pattern 永久化 — operator-zero-memory + ADD-PERIODIC-HEALTH-CHECK runbook + BUG_HUNT_PROTOCOL Step 9.5
@@ -179,6 +215,42 @@ git revert <Q4 commit>
 **Rollback**：`git revert <commit>`；兩台跑 `scripts\sync-claude-userlevel.ps1 -Mode merge` 恢復；hook 本身 try/catch 兜底，regex 出錯不會 block chat。
 
 **Memory update（會在此 entry commit 後執行）**：新增 `feedback_observability_window_truncation.md` — 「Claude 讀 log_tail 看不到的 step 不等於 step 沒跑；觀察視窗短於 emitter 輸出量會 hallucinate；fix pattern = structured summary + 加大 tail (defense-in-depth)」。
+
+---
+
+### Round 3 — ao-resume.ps1 git push stderr bug + 真實 end-to-end exec test
+
+**Push-back 起點**：使用者問「有實測嗎？」— 我承認 Round 1/2 算 algorithmic unit test 不算 R0 [驗證計畫] 真實 end-to-end real exec test。補做 real test 暴露 2 件副產品：
+
+**副產品 A — Pre-existing bug**：[`scripts/ao-resume.ps1:125 + 158`](../scripts/ao-resume.ps1#L125) 兩處 `& git push 2>&1 | Out-Host`。git push 把 progress / "To &lt;url&gt;" 寫到 stderr 是 standard 行為，但檔內 `Set-StrictMode -Version Latest` + `$ErrorActionPreference = "Stop"` + `2>&1` 會把這些 stderr 視為 `NativeCommandError` throw → 每次 main ahead origin 時 ao-resume.ps1 提前 exit 1（real test v1 證實 5.6s exit 1，只跑到 4 step）。
+
+**副產品 B — Test artifact 被 auto-checkpoint commit**：`agency-os/.agency-state/ao-resume-hook-last.json.realtest-backup` 被 commit `85bc13c` 順手 commit 進 git（auto-checkpoint hook 偵測 dirty tree 自動 commit）。
+
+**修法（萬無一失，每個 risk 對應 0 機率路徑）**：
+
+| 修 | 方法 | 為什麼安全 |
+|---|---|---|
+| Bug A | P3 pattern（局部 `$savedEAPPushN = $ErrorActionPreference; $ErrorActionPreference = "Continue"; ...; restore`），兩處同時改 | 同檔 L590 `$savedEAPReboot` 已有 precedent；exit code 判斷邏輯不變；真實 fail 仍透過 `$LASTEXITCODE != 0` 抓到 |
+| 副產品 B | `git rm` backup file + 獨立 commit `5018698` | 不會 lose 並行 session 內容（85bc13c 含的 auto-reboot-LATEST 已被後續 commit 覆寫成新版） |
+| R7 防護 | Real test v2 artifact 全寫 `$env:TEMP\AgencyOS-realtest-<ts>\` | auto-checkpoint scan repo 看不到 `$env:TEMP` → 0 機率污染 |
+
+**[驗證結果] R0 四動作**：
+
+1. **實測（end-to-end real exec test）**：[`d:\tmp\real-exec-test-v2.ps1`](file:///d:/tmp/real-exec-test-v2.ps1) 模擬 hook stdin JSON → 真實觸發 deployed hook → ao-resume.ps1 跑完整 48.5s（vs v1 5.6s）→ hook exit=0（vs v1 exit=1）→ JSON state file `exit_code=0`、**`steps_summary` 含 41 step**（vs v1 4 step）、**cross-machine import step 在 #31 of 41 with 正確 detail**、`log_tail = 9944 chars`（200 行 ≈ 50/line）→ 副作用驗證：**no `.realtest*` file in repo**（artifact 全在 `$env:TEMP`）
+2. **Review**：critic round 對 P3 fix 兩段做 narrow-scope deep review → **0 Critical / 0 Major / 1 Minor**（comment 提到的 `resumeOut block` 不存在 → 改成 `$savedEAPReboot` 正確 reference）→ 修完再過 syntax PASS
+3. **抓蟲（cross-file）**：grep `git push 2>&1` 在 `D:\Work\scripts\*.ps1` → 只剩這 2 處且都 P3 包覆 ✅；grep `\$ErrorActionPreference = "Continue"` 確認 P3 pattern 與檔內既有 precedent 一致 ✅
+4. **WORKLOG**：本 Round 3 entry
+
+**剩餘風險（Round 3 最終版）**：
+- 無新風險（4 動作全綠）
+- pre-existing CP950 drift（git status --porcelain ×2）仍為 follow-up，獨立 task
+- 桌機需 git pull + sync-claude-userlevel.ps1 -Mode merge（hook 已改、scripts/ao-resume.ps1 改）
+
+**Rollback**：兩段 P3 包覆獨立可 revert（`git revert <commit>` 即可）；exit code 邏輯不變，rollback 後行為回到「main ahead origin 時 retry/publish 路徑 throw」（即 Round 1/2 之前狀態）。
+
+**踩坑教訓寫進 memory**：
+- 「Real test ≠ algorithmic test」：拿既有 log 餵 regex 是 unit test，**真實 invoke hook script 走全流程才是 R0 [驗證計畫] 標準的 real exec test**
+- 「Test artifact must live in `$env:TEMP`」：repo 路徑下的 test artifact 會被 auto-checkpoint hook 順手 commit；30 年防範 = artifact 一律寫 `$env:TEMP\<ProjectTag>-<ts>\`
 
 ---
 
