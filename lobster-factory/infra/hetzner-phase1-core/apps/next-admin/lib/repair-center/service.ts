@@ -3,7 +3,13 @@ import type { Incident } from "@/lib/ops-inbox/types";
 import { appendAudit } from "./audit";
 import { runPreRepairBackup } from "./backup";
 import { createRepairIssue, postEscalationComment, resolveGithubTarget } from "./github";
-import { canApprovePolicy, needsGitHubIssue, policyCatalogForSource, policyForIncident } from "./policy";
+import {
+  canApprovePolicy,
+  needsGitHubIssue,
+  policyCatalogForSource,
+  policyForIncident,
+  severityRequiresHumanReview,
+} from "./policy";
 import { escalateGuard, isTerminalState } from "./run-state";
 import type { RepairRun, RepairRunWithIncident } from "./types";
 
@@ -33,6 +39,12 @@ export async function startRepairFromIncident(args: {
   incidentId: string;
   actor: string;
   source: "web" | "slack";
+  /**
+   * C5 critical-severity gate bypass. Set true ONLY when called from
+   * confirmCriticalRun() after explicit operator second confirmation. Slack callbacks
+   * and the default web "Approve" button MUST NOT pass this.
+   */
+  forceCriticalApproval?: boolean;
 }): Promise<{ ok: boolean; run?: RepairRunWithIncident; error?: string; details?: unknown }> {
   const mode = await getCurrentSystemMode();
   if (mode !== "normal") {
@@ -101,7 +113,10 @@ export async function startRepairFromIncident(args: {
         github_owner: target.owner,
         github_repo: target.repo,
         risk_level: i.severity === "critical" ? "critical" : i.severity === "high" ? "high" : "medium",
-        needs_human_review: policy !== "auto_repair" || i.severity === "critical",
+        // C5 fix: use the severityRequiresHumanReview helper (was inline duplicate). This
+        // also closes the m9 "dead code with misleading docstring" finding — the helper is
+        // now the SSOT for the critical-severity gate predicate.
+        needs_human_review: policy !== "auto_repair" || severityRequiresHumanReview(i.severity),
         audit_log: appendAudit([], {
           actor: args.actor,
           action: "run_created",
@@ -128,6 +143,32 @@ export async function startRepairFromIncident(args: {
       }),
     });
     return { ok: true, run: { ...(updated ?? run), incident: i as any } };
+  }
+
+  // C5 fix (pipeline gate, not just a flag): Plan v3.2 §四 explicitly calls critical-severity
+  // a "閘門" (gate). Original code only set needs_human_review boolean but the pipeline
+  // proceeded unconditionally to backup → issue → Claude repair. This gate now actually stops
+  // the pipeline and requires a SECOND explicit operator confirmation via
+  // POST /api/ops/repairs/<id>/confirm-critical (route guarded by canApproveCommand).
+  // Bypass for drills: callers can pass forceCriticalApproval=true (only the
+  // confirmCriticalRun callsite below does this).
+  if (severityRequiresHumanReview(i.severity) && !args.forceCriticalApproval) {
+    const updated = await updateRun(run.id, {
+      state: "triage_needed",
+      needs_human_review: true,
+      audit_log: appendAudit(run.audit_log, {
+        actor: args.actor,
+        action: "critical_severity_gate_held",
+        detail:
+          "Critical-severity incident held at triage_needed per Plan v3.2 §四. Confirm via /ops/repairs UI → POST /api/ops/repairs/<id>/confirm-critical to proceed.",
+        data: { severity: i.severity },
+      }),
+    });
+    return {
+      ok: true,
+      run: { ...(updated ?? run), incident: i as any },
+      error: "critical_requires_second_confirmation",
+    };
   }
 
   const approvedAt = new Date().toISOString();
