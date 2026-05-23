@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { verifyIngestToken } from "@/lib/ops-inbox/verifyIngestToken";
 import { redactSecrets } from "@/lib/ops-inbox/redactSecrets";
+import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { computeFingerprint } from "@/lib/ops-inbox/fingerprint";
 import { computeTransition, maxSeverity } from "@/lib/ops-inbox/transition";
 import { normalizeSentry } from "@/lib/ops-inbox/normalize/sentry";
@@ -18,14 +19,11 @@ export async function POST(req: Request) {
     return new NextResponse("unauthorized", { status: 401 });
   }
 
-  let payload: unknown;
-  try {
-    payload = await req.json();
-  } catch {
-    return new NextResponse("invalid json", { status: 400 });
-  }
-
-  const raw = redactSecrets(payload);
+  // C3 + M3 fix: bounded body read via shared helper. Keeps raw text for future
+  // per-source HMAC verification (Sentry signs the raw body bytes).
+  const body = await readWebhookBody(req);
+  if (!body.ok) return new NextResponse(body.error, { status: body.status });
+  const raw = redactSecrets(body.parsed);
   const draft = normalizeSentry(raw);
   draft.fingerprint = computeFingerprint({
     source: draft.source,
