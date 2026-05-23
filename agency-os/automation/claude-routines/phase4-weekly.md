@@ -235,37 +235,53 @@ AO-RESUME / AO-CLOSE surface this WARN automatically. Watchdog uses `[Math]::Flo
 3. Verify with `RemoteTrigger get trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K`
 4. Commit the SSOT update with link to actual API call
 
-## Pending CHECK 4 — VPS auto-reboot config verification (planned 2026-05-23, deploy in next routine update)
+## CHECK 4 — VPS auto-reboot SSOT integrity (deployed 2026-05-23 12:04 UTC)
 
-**Added**: 2026-05-23 as part of B-Minimal VPS auto-reboot deployment
-**Status**: ⏳ SPEC only — not yet in deployed routine prompt; operator must run `RemoteTrigger update` (see "Update flow" above) when ready
+**Status**: 🟢 DEPLOYED — `RemoteTrigger update trigger_id=trig_01JyFw78ZkgwQzpyXXaX1F2K` completed at 2026-05-23T12:04:44Z. First fire with CHECK 4 will be 2026-05-29 06:00 UTC (= 14:00 TPE Friday).
 
-**Goal**: Once a week, verify the auto-reboot apt conf file is still present on both VPSes, in case `unattended-upgrades` reinstall / apt purge / image rebuild silently removes it.
+**Goal**: Catch git-level removal of the auto-reboot policy SSOT (conf or runbook), which would silently break the auto-reboot chain even though VPS deployments remain.
 
-**Mechanics**: call next-admin health endpoint (already extended in [`/api/ops/repairs/health`](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/health/route.ts) GAP-04 section, 2026-05-23) and check `auto_reboot.sg` + `auto_reboot.eu` fields.
+**Design rationale — why simplified from original 2026-05-23 proposal**:
 
-**Proposed CHECK 4 prompt block** (to be inserted before "6. Compose OVERALL"):
+Original proposal called the next-admin health endpoint to probe VPS file existence (`auto_reboot.sg/eu` status). Discarded because:
+- Routine has no env vars (matches existing 3-routine "no env" pattern)
+- `/api/ops/repairs/health` requires `x-ops-proxy-auth` header (nginx Basic Auth boundary)
+- Adding `OPS_PROXY_AUTH_TOKEN` to routine env would diverge from `AgencyOS-DailyBriefing` / `WeeklyReview` / `MonthlyReview` pattern, complicating future routine ops
+
+Simplified CHECK 4: `test -f` on 3 SSOT paths in the cloned repo. Zero auth, zero deps, catches the "someone deleted the conf from git" failure mode.
+
+**What CHECK 4 catches** (genuinely complementary to existing monitoring):
+- Accidental `git rm` of any of the 3 SSOT files (conf, stagger-eu conf, runbook)
+- Branch checkout drift (wrong branch checked out, missing files)
+- Repo corruption
+
+**What CHECK 4 does NOT catch** (already monitored elsewhere):
+- VPS-level deletion of `/etc/apt/apt.conf.d/52awarewave-auto-reboot` → netdata `system.post_update_reboot_status` will not clear → AGENTS.md 16h escalation rule fires
+- `unattended-upgrades` service stopped → same chain
+- `Automatic-Reboot-Time` invalid value → apt parses defensively, treats as disabled → same chain
+
+**Deployed prompt block** (verbatim, between STEP 5 and STEP 6 in routine):
 
 ```text
-5b. CHECK 4 — VPS auto-reboot config (B-Minimal SSOT presence):
-   Run: curl -s -H "x-ops-proxy-auth: ${OPS_PROXY_AUTH_TOKEN}" -H "x-ops-claims-role: owner" https://app.aware-wave.com/api/ops/repairs/health > /tmp/check4.json
-   Parse JSON. Read .auto_reboot.sg and .auto_reboot.eu.
-   For each:
-     - "ok" → PASS
-     - "missing" → WARN "conf removed from <vps>; re-deploy from SSOT"
-     - "ssh_error" or "unconfigured" → SKIP (probe path not available, not a real failure)
-     - "skipped" → SKIP (backup_mode != ssh)
-   CHECK4_STATUS = "PASS" if both ok or skip; "WARNING" if any missing.
-   CHECK4_DETAIL = "" if PASS else "sg: missing; eu: missing" (comma-joined offending VPSes).
-   If curl fails: CHECK4_STATUS = "SKIP", CHECK4_DETAIL = "health endpoint unreachable: <exit code>".
+5b. CHECK 4 — VPS auto-reboot policy SSOT integrity (added 2026-05-23):
+   Verify the policy SSOT files exist in the cloned repo. This catches accidental git-level removal or branch drift that would break the auto-reboot chain.
+   Required files:
+     - lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf
+     - lobster-factory/infra/hetzner-phase1-core/auto-reboot/53awarewave-stagger-eu.conf
+     - runbooks/VPS-AUTO-REBOOT-RUNBOOK.md
+
+   For each path, run: test -f "$path" && echo OK || echo MISSING
+   CHECK4_STATUS = "PASS" if all 3 are OK; "WARNING" if any MISSING.
+   CHECK4_DETAIL = "" if PASS else "missing: <path1>; <path2>" (semicolon-separated).
+
+   Note: this checks the SSOT layer only. Live deployment status is monitored separately by netdata system.post_update_reboot_status alarm + AGENTS.md 16h escalation rule.
 ```
 
-Then add to step 6 OVERALL aggregation: include CHECK4_STATUS in warning_count calculation.
-And step 7 file content: add line `- Check 4 VPS auto-reboot 配置: ${CHECK4_STATUS}${CHECK4_DETAIL_PREFIXED}`
+STEP 6 OVERALL updated to include CHECK4 in `warning_count` + `skip_count` aggregation.
+STEP 7 file template adds: `- Check 4 VPS auto-reboot SSOT: ${CHECK4_STATUS}${CHECK4_DETAIL_PREFIXED}`
 
-**Why deferred**: Routine prompt changes carry risk (broken prompt → routine fails silently); operator should batch-test in claude.ai/code/routines web UI before deploying. Current monitoring chain (netdata reboot-required signal + AGENTS.md 16h escalation + /sg-reboot manual override) already covers the primary failure mode; CHECK 4 is defense-in-depth, not critical-path.
-
-**Owner SSOT**: this MD file is the canonical updated prompt; the deployed routine remains at the pre-2026-05-23 3-check version until operator runs `RemoteTrigger update`.
+**Rollback** (if CHECK 4 breaks the routine):
+`RemoteTrigger update` with the original 3-check prompt (preserved in earlier git history of this file before commit on 2026-05-23, or retrieve via `RemoteTrigger get` from the previous successful run).
 
 ## Related
 
