@@ -394,6 +394,24 @@ if (Test-Path -LiteralPath $backupHealthScript) {
     $global:LASTEXITCODE = 0
 }
 
+# --- VPS auto-reboot health snapshot (warn-only; surfaces B-Minimal drift in EVERY AO-RESUME) ---
+# Rationale: operator should never need to remember `/auto-reboot-status` slash command.
+# This script writes agency-os/reports/status/auto-reboot-LATEST.md, which Claude reads at AO-RESUME
+# (same pattern as backup-health-LATEST.md + cf-security-LATEST.md). 30-year zero-effort visibility.
+$autoRebootHealthScript = Join-Path $WorkRoot "scripts\check-vps-auto-reboot-health.ps1"
+if (Test-Path -LiteralPath $autoRebootHealthScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: VPS auto-reboot health snapshot (warn-only) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $autoRebootHealthScript -WorkRoot $WorkRoot
+    $arExit = $LASTEXITCODE
+    if ($arExit -ne 0) {
+        Write-Host "WARN: VPS auto-reboot health snapshot returned non-zero (see agency-os/reports/status/auto-reboot-LATEST.md)." -ForegroundColor Yellow
+        Write-Host "      AO-RESUME continues because this check is warn-only." -ForegroundColor Yellow
+        Write-Host ""
+    }
+    $global:LASTEXITCODE = 0
+}
+
 # Fetch external signals (Telegram ops inbox + Slack) since last AO-CLOSE — non-blocking.
 # Pass -From explicitly so the gap window is always (last AO-CLOSE → now), not a stale fallback.
 $fetchSignalsScript = Join-Path $WorkRoot "scripts\fetch-external-signals.ps1"

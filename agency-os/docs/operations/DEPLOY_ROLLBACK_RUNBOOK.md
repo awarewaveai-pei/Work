@@ -69,7 +69,7 @@
 | 4 | `docker compose up -d <APP>`（race-condition 自動重試一次） | up fail → fail（容器名衝突時自動 stop/rm-f/up 重試；兩次皆失敗才 abort） |
 | 5 | 寫 `/root/lobster-phase1/.deployed-commit` + `.deployed-at`（drift 偵測用） | — |
 | 6 | 等 healthcheck 60s | unhealthy → fail（用第 3 節 rollback） |
-| 7 | **HTTP smoke check**（curl 4 端點：next-admin :3002/、/api/ops/summary、nginx/wp :80/、node-api /api/health）；**非致命**，失敗寫 `.smoke-warn` flag，不 exit non-zero | 失敗 → log SMOKE_WARN + 寫 `.smoke-warn`；`auto-deploy-next-admin.sh` 讀取後附加到 Slack/Telegram 通知 |
+| 7 | **HTTP smoke check + 自動 rollback**（curl 4 端點：next-admin :3002/、/api/ops/summary、nginx/wp :80/、node-api /api/health）；**致命**：任一 endpoint 非 2xx → 自動觸發 `rollback-phase1.sh restore <app>` 逐一還原 RESTORABLE_APPS（wordpress/node-api/next-admin）+ 寫 `.rollback-triggered` flag + `.deployed-commit` 還原為 PREVIOUS_COMMIT + `fail`（exit non-zero）。**Drill mode**：`AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false ./sg-deploy.sh <app>` 保留舊「非致命 warn」行為供刻意降級演練。2026-05-23 Tier 3 audit C1 fix：實現 Plan v3.2 §五 第 3 層承諾的自動 rollback | 失敗 → SMOKE_WARN log + `.smoke-warn` + ROLLBACK fail + `.rollback-triggered`；`auto-deploy-next-admin.sh` 同時讀兩個 flag 在 Slack/Telegram 附加 SMOKE_WARN 與「🔴 AUTO-ROLLBACK FIRED」prefix |
 
 ### 2.2 客戶端 drift 檢查
 
