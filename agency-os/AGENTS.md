@@ -211,5 +211,5 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-05-22 12:54:27 UTC_
+_Last synced: 2026-05-23 15:09:40 UTC_
 

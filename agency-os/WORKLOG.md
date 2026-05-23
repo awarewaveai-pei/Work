@@ -4,6 +4,24 @@
 
 ## 2026-05-23
 
+### AO-RESUME Cursor rule 七段式同步 — rule drift fix
+
+**根本問題**：`.claude/commands/ao-resume.md` 已定義 **AO-RESUME 七段式**，但 `agency-os/.cursor/rules/30-resume-keyword.mdc` 與規則 README 仍寫五段式，導致 Cursor 關鍵字與 Claude slash command 可能輸出不同 template。
+
+**做了什麼**：
+- `agency-os/.cursor/rules/30-resume-keyword.mdc`：第 3 節改為七段式：`1. 系統快照`、`2. 外部信號`、`3. 已完成`、`4. 目前進度`、`5. 未完成待辦（TASKS）`、`6. 需決策`、`7. 下一步`；保留 hook 去重、TASKS 全列、Git/Strict 裁決規則。
+- `agency-os/.cursor/rules/README.md` 與根 mirror `.cursor/rules/README.md`：同步描述 `30-resume-keyword.mdc` 為七段式，並更新「你會看到的固定輸出」。
+
+**驗證結果**：
+1. **實測**：PowerShell 讀入 `agency-os/.cursor/rules/30-resume-keyword.mdc` 與根 mirror `.cursor/rules/30-resume-keyword.mdc`，逐一驗證 `1. 系統快照` → `7. 下一步` 七個 label 依序存在，且不含 `五段式|五個頂層`；兩檔皆回 `OK: ordered seven-section AO-RESUME template`。另用 `rg "五段式|五個頂層"` 對 `.cursor/rules`、`agency-os/.cursor/rules`、`.claude/commands`、根/agency README 檢查，已無命中。
+2. **Review**：讀回 `30-resume-keyword.mdc` 第 3 節與 README 開工固定輸出，確認七段順序與 `.claude/commands/ao-resume.md` 對齊；未把 slash command 的 archive 規則塞進 Cursor keyword 規則。
+3. **抓蟲**：跨檔搜尋 `Yesterday Recap|Today Plan|Confirm`；殘留只在 `00-session-bootstrap.mdc` 的新對話 bootstrap 舊模板，非 AO-RESUME template。
+4. **BOM audit**：`audit-cross-machine-bom.ps1` 初跑發現既有 `memory/feedback_operator_zero_memory_automation.md` 缺 BOM；已用同腳本 `-Fix` 修復並備份，再跑結果 `missing BOM: 0`。
+5. **WORKLOG**：本 entry。
+
+**剩餘風險**：
+- `.claude/commands/ao-resume.md` 仍有 slash command 專用 archive 規則；本次只同步 Cursor `AO-RESUME` 的回覆 template，不改 archive 行為。
+
 ### B-Minimal 剩餘風險閉環 — Q2 stagger + Q4 Ops Inbox + Q5 Phase 4 CHECK 4（commit pending）
 
 **根本問題**：P14 收尾留下 5 條 [剩餘風險]，違反「一勞永逸 30 年穩定」承諾。用 R0 architect 模式重新分析後：
@@ -4808,7 +4826,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-22 12:54:27 UTC_
+_Last synced: 2026-05-23 15:09:40 UTC_
 
 ## 2026-03-20
 
@@ -5249,5 +5267,4 @@ _Last synced: 2026-05-22 12:54:27 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
 

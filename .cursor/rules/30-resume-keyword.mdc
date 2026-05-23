@@ -11,7 +11,7 @@ When the user message contains `AO-RESUME`, before proposing any new implementat
 
 1. **開工單一路徑（關鍵字 `AO-RESUME`＝跑正本腳本）**  
    - **Cursor 專案 hook（會真的執行）**：本 monorepo 根目錄 **`.cursor/hooks.json`** 已註冊 **`beforeSubmitPrompt`** → **`.cursor/hooks/run-ao-resume-on-prompt.ps1`**。使用者按送出且訊息符合 **`^AO-RESUME\b`**（不分大小寫）時，**Cursor 本機**會先檢查 working tree；若 dirty 則先自動跑 **`scripts\commit-checkpoint.ps1`** 做本機 checkpoint，再執行 **`scripts\ao-resume.ps1 -FullMainlineParity`**，並寫入 **`agency-os/.agency-state/ao-resume-hook-last.json`**（含 **`exit_code`**、**`log_tail`**、`auto_checkpoint_*`）與 **`ao-resume-hook-last.log`**（皆 gitignore）。**這不是「只改規則」**：腳本由 **IDE hook 行程**觸發。重載視窗或重啟 Cursor 後仍應生效；除錯見 Cursor **Hooks** 輸出通道。  
-   - **與 hook 去重（避免同輪跑兩次）**：若本則使用者訊息仍為 **`AO-RESUME`**，代理**先 Read** **`agency-os/.agency-state/ao-resume-hook-last.json`**，並以 **`Get-Item`**（或等價）檢查該檔 **LastWriteTime 距今 ≤120 秒**；若成立且 JSON 內 **`exit_code`** 為整數，**視為本輪已由 hook 執行過 `ao-resume.ps1`**——**禁止**再開終端重跑同一指令；五段式之 **Git／開工裁決** 以該 JSON 之 **`exit_code`** 與 **`log_tail`**（及必要時 **Read** 完整 **`ao-resume-hook-last.log`**）為準。**若檔案不存在、逾 120 秒、或本則非 AO-RESUME**，不適用去重。
+   - **與 hook 去重（避免同輪跑兩次）**：若本則使用者訊息仍為 **`AO-RESUME`**，代理**先 Read** **`agency-os/.agency-state/ao-resume-hook-last.json`**，並以 **`Get-Item`**（或等價）檢查該檔 **LastWriteTime 距今 ≤120 秒**；若成立且 JSON 內 **`exit_code`** 為整數，**視為本輪已由 hook 執行過 `ao-resume.ps1`**——**禁止**再開終端重跑同一指令；七段式之 **Git／開工裁決** 以該 JSON 之 **`exit_code`** 與 **`log_tail`**（及必要時 **Read** 完整 **`ao-resume-hook-last.log`**）為準。**若檔案不存在、逾 120 秒、或本則非 AO-RESUME**，不適用去重。
    - **Hook silent fail 診斷**：若 **`ao-resume-hook-last.json` 缺檔但 `agency-os/.agency-state/ao-resume-hook-fail.log` 存在**，hook 在 catch 區塊抓到例外但仍回 `continue:true` 不擋 chat；**Read** 該 fail log（含 timestamp + Exception.Message + ScriptStackTrace）診斷後再決定是否手動補跑 `scripts\ao-resume.ps1 -FullMainlineParity`。SSOT：**`mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`** catch 區塊；同步至 `~/.claude/hooks/` 由 **`scripts/sync-claude-userlevel.ps1 -Mode merge`** 完成。
    - **Agent 必做**：在可執行終端且**未**觸發上一條「hook 去重」時，於 **monorepo 根**（`git rev-parse --show-toplevel`）執行 **`powershell -ExecutionPolicy Bypass -File .\scripts\ao-resume.ps1 -FullMainlineParity`**（**必含** `-FullMainlineParity`：先 **`git-align-main-aoresume-feature.ps1 -SkipAoResume`** 對齊本機 **`main`=`origin/main`**；**預設不切換／建立任何功能分支**，停在 **`main`**）。僅在罕見需求時：加 **`-FullMainlineFeature`** **且** **`-FullMainlineFeatureBranch <name>`**，並可用 **`-FullMainlineRequireFeatureBranch`**；見 **`REMOTE_WORKSTATION_STARTUP.md` §2.5.1**）。  
     **同一輪腳本內後續**（勿再加「第二套」完整檢查）：`fetch`（對齊段已 fetch 仍會再跑）；**僅 behind>0** 時 `git pull --ff-only origin main`；**`verify-build-gates`**；workflows 依賴；**`print-open-tasks`**；**`machine-environment-audit -FetchOrigin -Strict`**；**`check-backup-health`（warn-only，輸出 `agency-os/reports/status/backup-health-LATEST.md`）**（見 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` 2.5.1**）。**不帶** `-FullMainlineParity` 時與 **`align-workstation.ps1`** 同行為（僅 preflight 軟對齊）。  
@@ -37,11 +37,15 @@ When the user message contains `AO-RESUME`, before proposing any new implementat
 If opened folder is `agency-os` only, use paths as above; lobster paths are `lobster-factory/docs/...`.（**僅開 agency-os 時**：`.agency-state/open-tasks-snapshot.md` 路徑同左，無 `agency-os/` 前綴。）
 
 3. **回覆結構（`AO-RESUME` 專用；禁止「過度精簡」到省略待辦或風險）**  
-   以下**五個頂層標題依序輸出**（繁中），每節都須有**可讀的實質內容**（禁止整節只剩一兩個字或「略」）：
+   以下**七個頂層標題依序輸出**（繁中），每節都須有**可讀的實質內容**（禁止整節只剩一兩個字或「略」）：
 
-   - **已完成** — 綜合 `memory`、`WORKLOG` 近日、`LAST_SYSTEM_STATUS`（若存在）；若本輪沒有明確完工項，**明講**並指向 `TASKS`／`WORKLOG` 供對照。
+   - **1. 系統快照** — One-line status：SG/EU 服務狀態（UP/DOWN 或「未取得」）｜deploy drift commits｜Git ahead/behind/dirty。來源以 `ao-resume-hook-last.json` 的 `log_tail`、`steps_summary`、health check output、以及當輪 `ao-resume.ps1` 終端輸出為準。若 cross-machine import 有結果，列出每個檔案狀態；若未執行，明寫「import 未執行 — [原因]」。
 
-   - **目前進度** — **必含**：
+   - **2. 外部信號** — 讀 `agency-os/.agency-state/external-signals-digest.json`（若存在）並先輸出 gap window（UTC 轉 CST/TPE）與可靠度。Telegram / Slack / Cloudflare security 只列 actionable items；若 digest stale、partial、failed，必須標明，不得把舊訊號當本輪未處理訊號。
+
+   - **3. 已完成** — 綜合 `memory`、`WORKLOG` 近日、`LAST_SYSTEM_STATUS`（若存在）；若本輪沒有明確完工項，**明講**並指向 `TASKS`／`WORKLOG` 供對照。
+
+   - **4. 目前進度** — **必含**：
      - **龍蝦工廠**：**目前 Milestone**（M1~M5；不確定時寫「待對照 `LOBSTER_FACTORY_MASTER_CHECKLIST`」）；**今日 DoD**。
      - **阻塞／風險／需注意**：**禁止**只寫單獨「無」或「沒有」二字。須綜合 **`TASKS` 開放項**、`WORKLOG`、`CONVERSATION_MEMORY`、`LAST_SYSTEM_STATUS`（若存在）、`LOBSTER_FACTORY_MASTER_CHECKLIST`／Completion Plan 開放語意、**當輪** `ao-resume.ps1`／Strict 稽核終端輸出（若代理有看到）。若有阻塞或風險：**分點**列出（含建議下一步或需使用者決策處）。若盤點後確無：**寫「本次盤點：未見需立即處理之阻塞」**，並**至少一句**說明依據（例如 Strict 結果、WORKLOG／memory 是否曾標記風險）。
      - **Git／開工裁決** — **必含**（以當輪 **`ao-resume.ps1` 終端輸出**為準，禁止憑記憶编造）：
@@ -50,11 +54,11 @@ If opened folder is `agency-os` only, use paths as above; lobster paths are `lob
        - **與 `origin/main`**：**`ahead`／`behind`** 數字或等價敘述（開工大改前 **behind 必須為 0**）。**註**：`machine-environment-audit -Strict` 會把多數 WARN（含常見的 **dirty**、**ahead>0**）視為 FAIL；若與 **`REMOTE_WORKSTATION_STARTUP.md` §2.3**「ahead 敘述」並存，**以稽核腳本實際輸出為準**。
        - 若未跑腳本或 exit 非 0：明寫「未跑／exit ≠ 0」，並指 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §2.5.1** 的修復方向（commit／push／pull／`-AllowUnexpectedDirty` 等依終端 quick-fix）。
 
-   - **未完成待辦（TASKS，`- [ ]` 全列，依分類輸出）** — **必做**：以 **`open-tasks-snapshot.md`**（優先）與 **`agency-os/TASKS.md`** 對齊後，**依 `####` 分類標題分組輸出**——先印該 `####` 標題，再列其下所有 `- [ ]` 項，**完整複製原文**（checkbox 與文字均保留）；空分類省略。**禁止**將所有待辦壓成單一無分類清單，**禁止**只寫「見 TASKS」「共 N 條」而不列內文。**若** **Total open = 0**：寫「（0 條未完成）」**並**一句話確認。**條數必須**與快照／`print-open-tasks` **Total open** 一致（不一致須說明原因）。**若 Total open > 35**：仍**不得省略**任一行——可分段輸出（同一對話回合內接續貼上直至列完），並在首段註明「待辦較多，分 N 段列完」。**未全列 `- [ ]` 或未分類輸出，視為無效回覆，必須重出**。
+   - **5. 未完成待辦（TASKS，`- [ ]` 全列，依分類輸出）** — **必做**：以 **`open-tasks-snapshot.md`**（優先）與 **`agency-os/TASKS.md`** 對齊後，**依 `####` 分類標題分組輸出**——先印該 `####` 標題，再列其下所有 `- [ ]` 項，**完整複製原文**（checkbox 與文字均保留）；空分類省略。**禁止**將所有待辦壓成單一無分類清單，**禁止**只寫「見 TASKS」「共 N 條」而不列內文。**若** **Total open = 0**：寫「（0 條未完成）」**並**一句話確認。**條數必須**與快照／`print-open-tasks` **Total open** 一致（不一致須說明原因）。**若 Total open > 35**：仍**不得省略**任一行——可分段輸出（同一對話回合內接續貼上直至列完），並在首段註明「待辦較多，分 N 段列完」。**未全列 `- [ ]` 或未分類輸出，視為無效回覆，必須重出**。
 
-   - **其他提醒（選填）** — `integrated-status-LATEST`、當日 `memory/daily`、或 `CONVERSATION_MEMORY` 中需接續的**非 TASKS 行項目**；若無則省略本節標題。
+   - **6. 需決策**（選填 — 整節只在有內容時輸出）— 只列不能由代理自行推進、需要人類選擇或操作的項目。每項必含：類型（資源／策略／權限／外部）、說明、影響。
 
-   - **下一步** — 具體、可執行；並保留下方第 6、7 點之雙機／筆電提醒（若適用）。
+   - **7. 下一步** — 具體、可執行；若 **需決策** 有阻塞項，先寫需決策的第一動作；並保留下方第 6、7 點之雙機／筆電提醒（若適用）。
 
 4. In `已完成` 或 `目前進度` 中：若本輪 **`ao-resume.ps1` 已執行且 exit 0**，**只**用終端輸出標註 **Git／Strict／ahead-behind**，**禁止**再請使用者「請你再跑一次 `ao-resume.ps1`」；僅在**本輪未跑**或 **exit≠0** 時，由代理在**同一或下一回合**自跑至成功或明確報告阻塞（無終端／需人類決策）。
 
