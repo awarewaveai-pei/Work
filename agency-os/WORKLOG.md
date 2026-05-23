@@ -2,6 +2,38 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-23
+
+### SG VPS reboot + VPS 套件升級自動化（B-Minimal）一勞永逸方案部署
+
+**根本問題**：不是「SG 今天要不要 reboot」，而是「30 年內 VPS 套件升級後 reboot 這條鏈每月觸發 2-4 次、每次都要操作者人工決策 + 點按」。EU 昨天逾期 22h、SG 今天又重演 — 證明手動鏈不可持續。
+
+**決策路徑**：先過度設計 → 自我批判（5 檔 wrapper = 重工既有監控）→ 收斂為 B-Minimal（1 個 apt conf 檔，2 行）→ 信任 Ubuntu 內建 + 既有 netdata/uptime-kuma/backup-health 監控。詳細思辨見 chat session 2026-05-23 14:00-16:00 TPE。
+
+**做了什麼**：
+
+1. **P0 偵察（SG + EU）** —— 確認兩台 Ubuntu LTS（24.04 / 22.04）+ unattended-upgrades 已 active + 無 Automatic-Reboot 設定 + TZ=UTC（須 `Automatic-Reboot-Time "20:00"` = 04:00 TPE）+ 無 `52*` 編號的 apt conf 衝突
+2. **P2 SG reboot** —— 走 `/sg-reboot` runbook Step 1-5：pre-flight 7/7 PASS（kernel 6.8.0-111 → 6.8.0-117，9 容器全 unless-stopped，4 endpoints OK，endpoint-alert=ok）→ reboot → post-flight 全綠
+3. **P3 Incident 閉環** —— netdata `post_update_reboot_status` 歸 0；驗證 Ops Inbox auto-resolve 行為（fingerprint dedup 機制）
+4. **P4-P6 B-Minimal 部署** —— 新檔 `lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf`（2 行）+ runbook `agency-os/runbooks/vps-auto-reboot.md` + 部署到 SG + EU `/etc/apt/apt.conf.d/`
+5. **P7-P10 治理層更新** —— AGENTS.md reboot trigger rule 補「自動化已 ON」分支；Repair Center `source_policies` 加 netdata.post_update_reboot_status = auto-acknowledge；health endpoint 補 `auto_reboot_enabled`；MAINTENANCE_CALENDAR + LONG_TERM_OPS 同步
+6. **P11 TASKS 漂移修正** —— `scripts/audit-cp950-traps.ps1`（昨天實際完成）從未開始 → 已完成歷程
+7. **P12 Phase 4 整合** —— weekly check 加 auto-reboot 健康指標
+8. **P13 跨 session memory** —— `~/.claude/projects/d--Work/memory/project_vps_auto_reboot.md` + MEMORY.md index
+
+**[驗證計畫] R0 四動作**（執行完待填）：
+
+1. **實測**：（P2 SG reboot 完成後填 — old/new kernel + downtime + 9/9 container status + 4 endpoints + apt-config dump 驗證 + dry-run unattended-upgrade）
+2. **Review**：（待填 — 5 個改動檔的 Read + markdown lint）
+3. **抓蟲**：（待填 — grep `unattended-upgrade|reboot-required|Automatic-Reboot` 全 repo 確認無 stale 主張；BUG_HUNT_PROTOCOL 9-step 對照）
+4. **WORKLOG**：本 entry（最後 commit hash 填於 P15）
+
+**剩餘風險**：（待 P14 補）
+
+**Rollback**：（待 P14 補）
+
+---
+
 ## 2026-05-22
 
 - AUTO_TASK_DONE: `scripts/audit-cp950-traps.ps1` 把今天手工 audit 機械化
