@@ -167,7 +167,7 @@
 - [x] **Auto-Repair 系統 — 邏輯檢視 + critic review + 抓蟲** —— **【已完成 audit；3 Critical patches 待 apply】** **Tier 3 月度排程，優先** **(2026-05-23 完成)**
   - **產出**：[`agency-os/reports/audit/auto-repair-2026-05-23.md`](reports/audit/auto-repair-2026-05-23.md)（37 findings + R0 4-action evidence + 3 ready-to-apply patches）+ [AUDIT_REGISTRY.md §Auto-Repair logic audit (2026-05-23)](docs/operations/AUDIT_REGISTRY.md#auto-repair-logic-audit-2026-05-23) + [`scripts/audit-tools/dogfood-auto-repair.ps1`](../scripts/audit-tools/dogfood-auto-repair.ps1) + AGENTS.md auto-trigger 新規則 + WORKLOG 2026-05-23 entry
   - **結論**：5 🔴 Critical（其中 3 個直接違反 Plan v3.2 SSOT） + 10 🟠 Major + 11 🟡 Minor + 8 🟢 Clean
-  - **Phase 4 收官建議**：**不應**在 C1/C2/C4/C5 未 apply 前關閉 2026-06-19 觀察期 **（self-critic 2026-05-23 補強 — C5 違反 Plan §四 SSOT，加入 blocker list）**
+  - **Phase 4 收官建議**：**Critical-tier 全部 apply 完成 2026-05-23**（C1-C5 全部 🔴 FIXED）。Phase 4 觀察期可正常 2026-06-19 收官；Major-tier 修正排入下一 iteration。
 
 #### Auto-Repair audit follow-up — Critical patches **Errata 修正後**才可 apply（依 audit report §Top-3 Ready-to-Apply Fix Patches + §Patch Errata）
 
@@ -178,7 +178,7 @@
 > - **Patch 2 (C2)**：(EMaj-1) `B64_BLOB` regex 改 env-flag-gated 或加 prefix anchor + (EMaj-4) `MAX_DEPTH = 64` (非 32)
 > - **Patch 3 (C4)**：(EMaj-3) reframe — primary fix = column allow-list，secondary = default_viewer guard（`canModifyIncidentStatus` 含 viewer 不夠緊）
 
-- [ ] **【🔴 Critical C1 — sg-deploy.sh smoke-fail → 自動 rollback hook】** —— **【未開始】** **R0 設計已備齊，待 Apply session**
+- [x] **【🔴 Critical C1 — sg-deploy.sh smoke-fail → 自動 rollback hook】** —— **【已 apply 2026-05-23】** **takes effect on next sg-deploy run**
   - **檔案**：[`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh:163-189`](../lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh#L163-L189) + [`auto-deploy-next-admin.sh:78-90`](../lobster-factory/infra/hetzner-phase1-core/scripts/auto-deploy-next-admin.sh#L78-L90) + [`DEPLOY_ROLLBACK_RUNBOOK.md:72`](docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md)
   - **根因**：Plan v3.2 §五 第 3 層承諾「任何一個不 OK → rollback-phase1.sh 自動還原」，實作只寫 `.smoke-warn` flag。grep 證實**沒任何 .sh/.yml 自動觸發 rollback-phase1.sh**
   - **動作**：apply [audit report §Patch 1](reports/audit/auto-repair-2026-05-23.md#patch-1-sg-deploysh-smoke-fail--rollback-c1-) — 加 `AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=true` 預設 + 失敗自動 `rollback-phase1.sh restore <app>` + 把 `.deployed-commit` 寫入移到 smoke 後 + 更新 runbook 行 72 描述
@@ -186,7 +186,7 @@
   - **風險**：Medium-High（觸 prod deploy 腳本，需 staging 先驗）
   - **跨機**：repo 內，但部署要 SSH SG VPS
 
-- [ ] **【🔴 Critical C2 — redactSecrets.ts value-aware scrubber】** —— **【未開始】** **R0 設計已備齊**
+- [x] **【🔴 Critical C2 — redactSecrets.ts value-aware scrubber】** —— **【已 apply 2026-05-23】** **16 vitest cases pass; takes effect on next next-admin container rebuild**
   - **檔案**：[`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/redactSecrets.ts`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/redactSecrets.ts) + 新檔 `__tests__/redactSecrets.test.ts`
   - **根因**：L26 只 test key 名稱，value 內嵌 secret（`sk_live_*`、`ghp_*`、OpenSSH key 區塊、JWT、base64 blob）直接落 `ops_incidents.raw_payload`
   - **動作**：apply [audit report §Patch 2](reports/audit/auto-repair-2026-05-23.md#patch-2-redactsecrets-value-aware-scrubber-c2-) — 加 9 個 SECRET_VALUE_PATTERNS + scrubValue(s) + MAX_STRING_LENGTH=4096 truncation + MAX_DEPTH=32（也修 C3 walk-depth）+ 7 個 vitest 測試
@@ -194,7 +194,7 @@
   - **風險**：Low-Medium（pure function，unit-test 完整）
   - **跨機**：repo 內，git pull 同步
 
-- [ ] **【🔴 Critical C4 — GET /api/ops/repairs role guard + audit_log 欄位 allow-list】** —— **【未開始】** **R0 設計已備齊**
+- [x] **【🔴 Critical C4 — GET /api/ops/repairs role guard + audit_log 欄位 allow-list】** —— **【已 apply 2026-05-23】** **LIST_COLUMNS 排除 audit_log + viewer guard active on next container rebuild**
   - **檔案**：[`app/api/ops/repairs/route.ts:9-25`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/route.ts) + [`lib/repair-center/backup.ts:108-121`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/backup.ts)
   - **根因**：GET handler 沒 `canApproveCommand` guard + `select("*")` 回傳 `audit_log` (SSH stdout/stderr 6KB) 給 default viewer
   - **動作**：apply [audit report §Patch 3](reports/audit/auto-repair-2026-05-23.md#patch-3-get-repairs-role-guard--audit_log-column-allow-list-c4-) — 加 `canModifyIncidentStatus + source !== 'default_viewer'` guard + 改 `.select(LIST_COLUMNS)` 不含 `audit_log` + backup.ts 把 SSH stdout/stderr truncate 6KB → 500B
@@ -202,7 +202,7 @@
   - **風險**：Low（additive auth）
   - **跨機**：repo 內，git pull 同步
 
-- [ ] **【🔴 Critical C3 — Webhook routes body-size cap 256KB】** —— **【未開始】** **需 product owner 決策 256KB 上限**
+- [x] **【🔴 Critical C3 — Webhook routes body-size cap 256KB】** —— **【已 apply 2026-05-23】** **architect 決策 256KB（Sentry typical event <100KB，2-3x headroom）+ readWebhookBody shared helper + req.text() refactor 也鋪好 M3 HMAC retrofit 路徑**
   - **檔案**：5 個 `app/api/webhooks/{sentry,uptime-kuma,netdata,grafana,posthog}/route.ts` + nginx webhook zone config
   - **根因**：`await req.json()` 無 cap，500MB POST → OOM kill `lobster-next-admin`
   - **動作**：① 確認最大合法 payload 大小（Sentry event ~100KB 上限）；② 各 route 早期 reject `> 256KB` 回 413；③ 切換 `req.text()` → JSON.parse（同時為未來 per-source HMAC retrofit 鋪路 — M3）；④ nginx `client_max_body_size 256k` 對 `/api/webhooks/*` location 防禦縱深
@@ -210,7 +210,7 @@
   - **風險**：Low-Medium（產品 owner 256KB 決策 + 同時應做 M3 raw-body capture refactor）
   - **跨機**：repo 內，git pull 同步
 
-- [ ] **【🔴 Critical C5 — needs_human_review 改為 pipeline gate（不只是 flag）】** —— **【未開始】** **需 product owner 決策（會改變操作流程）**
+- [x] **【🔴 Critical C5 — needs_human_review 改為 pipeline gate（不只是 flag）】** —— **【已 apply 2026-05-23】** **architect 決策走 pipeline stop 派；critical incident state=triage_needed，新路由 POST /api/ops/repairs/[id]/confirm-critical 給 operator 二次確認用**
   - **檔案**：[`lib/repair-center/service.ts:104, 119-121`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/service.ts) + [`policy.ts:82-84`](../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts)
   - **根因**：Plan §四「Critical severity 閘門」實作只設欄位，pipeline 不檢查；`severityRequiresHumanReview()` dead code 但 docstring 說「呼叫端使用此函式」 = 文件騙人
   - **動作**：① 決策方向（**推薦**：閘門化 — critical 需操作者額外 confirm 才跑 auto-repair pipeline）；② 在 `service.ts:119` 後加 `if (run.needs_human_review) { state='human_only'; return; }`；③ 用 `severityRequiresHumanReview()` 取代 inline `i.severity === 'critical'`；④ 更新 policy.ts docstring 反映正確契約

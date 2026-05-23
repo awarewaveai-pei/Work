@@ -234,7 +234,7 @@ See audit report §Minor Findings table. Highlights: dead code at `policy.ts:74`
 
 | Audited | 🔴 FIXED | 🟢 CLEAN | 🔴 TRACKED (Critical) | 🟠 TRACKED (Major) | 🟡 TRACKED (Minor) | Real production breaks pre-audit | Tooling shipped |
 |---------|----------|----------|----------------------|--------------------|--------------------|---------------------------------|-----------------|
-| 14 + 5 ref | 0 | 8 | 5 | 10 | 11 | 1 (`OPS_INBOX_INGEST_TOKEN` 2026-05-22 — partial overlap with C2/M2 root cause) | 3 (harness + reports/audit/ dir + AGENTS rule) |
+| 14 + 5 ref | 5 | 8 | 0 | 10 | 11 (2 closed alongside Criticals: m3 posthog ordering, m9 dead helper wired) | 1 (`OPS_INBOX_INGEST_TOKEN` 2026-05-22 — partial overlap with C2/M2 root cause) | 4 (harness + reports/audit/ dir + AGENTS rule + readRequestBody shared helper) |
 
 ### Plan v3.2 SSOT contract violations
 

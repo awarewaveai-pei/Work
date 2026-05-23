@@ -130,22 +130,32 @@ ssh root@<vps> 'ls /var/run/reboot-required* 2>&1'
 
 ---
 
-## 4.5. 快速狀態查詢（slash command）
+## 4.5. 狀態查詢（自動 + 手動）
 
-部署後任何時候可跑：
+### 自動（你不需要記任何指令）
+
+**每次 AO-RESUME 自動跑** `scripts/check-vps-auto-reboot-health.ps1`，產出：
+
+- `agency-os/reports/status/auto-reboot-LATEST.md` — 人類讀的 verdict 表
+- `agency-os/reports/status/auto-reboot-LATEST.json` — 機器讀的完整 snapshot
+
+**AGENTS.md trigger rule** 規定 AO-RESUME 七段式必讀此檔，若非 🟢 healthy 或有 pending reboot 會於系統快照段點名。**這是真自動化** — 你只要每天開 IDE 就會看到，不需要記任何指令。
+
+### 手動 ad-hoc 重查（少用）
+
+如果想立即重跑（例如剛改完 conf 想驗證），兩種等價路徑：
 
 ```
 /auto-reboot-status
 ```
 
-這個 slash command（[`~/.claude/commands/auto-reboot-status.md`](../.claude/commands/auto-reboot-status.md)）會 SSH 進 SG + EU，並列查：
-- `apt-config dump` 三個 Automatic-Reboot 鍵值
-- 52 / 53 conf 檔 SHA256（對照 repo SSOT 是否漂移）
-- `unattended-upgrades` daemon active/enabled
-- `/var/run/reboot-required` 是否存在（待 reboot）
-- 最近 3 次 reboot 時間
+或在 PowerShell：
 
-回報格式：一張表 + 一行 verdict（🟢/🟡/🔴）。Read-only，無風險。
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/check-vps-auto-reboot-health.ps1
+```
+
+兩者都 SSH SG + EU 查同樣項目：apt-config 三鍵 / 52 + 53 SHA256 / daemon / reboot-required / 最近 reboot。Read-only，無風險。
 
 ## 5. 監控訊號（自動化 ON 後，操作者該怎麼看）
 
