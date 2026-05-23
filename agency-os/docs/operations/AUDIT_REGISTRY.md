@@ -191,9 +191,15 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 
 **⚠️ Self-critic (2026-05-23)**: The audit deliverables were themselves critic-reviewed (R0+R4 iron rule applied to the audit itself). Findings are factually accurate but **patches contain 5 Major design defects** — see `Patch Errata` section in the report. **Do not apply any patch until Errata fixes are folded in.**
 
+**✅ 2026-05-23 apply round complete**: all 5 🔴 Critical findings (C1–C5) applied to repo with Patch Errata folded in (EMaj-1 anchor-only regex for B64, EMaj-2 save-before-deploy + APPS filter, EMaj-3 column allow-list as primary fix, EMaj-4 MAX_DEPTH=64, EMin-7 PREVIOUS_COMMIT variable). All 109/109 next-admin vitest tests pass; bash -n on sg-deploy + auto-deploy clean; dogfood harness 10/10 invariants. C1 takes effect on operator's next sg-deploy run; C2/C3/C4/C5 active immediately on next `lobster-next-admin` container rebuild.
+
 ### 🔴 FIXED (now protected)
 
-_(none yet — patches designed in audit report, application deferred to dedicated R0 sessions; entries will move here as commits land)_
+- **C1** sg-deploy.sh Step 7 — auto-rollback hook implemented + RESTORABLE_APPS partition (wordpress/node-api/next-admin) + AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=true default + DEPLOY_ROLLBACK_RUNBOOK.md line 72 updated + auto-deploy-next-admin.sh ROLLBACK suffix in Slack/Telegram. Implements Plan v3.2 §五 第 3 層 contract. Files: [sg-deploy.sh](../../../lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh), [auto-deploy-next-admin.sh](../../../lobster-factory/infra/hetzner-phase1-core/scripts/auto-deploy-next-admin.sh), [DEPLOY_ROLLBACK_RUNBOOK.md:72](DEPLOY_ROLLBACK_RUNBOOK.md), [AGENTS.md:79](../../AGENTS.md). Verification: `bash -n` clean both scripts; first real exercise on operator's next `sg-deploy.sh next-admin` run.
+- **C2** redactSecrets.ts — value-aware scrubber (10 anchored patterns: Stripe, GitHub PAT, Slack token, Trigger.dev token, AWS access key, JWT, PEM private key, key=value pairs) + `OPS_AGGRESSIVE_REDACT=true` env gate for un-anchored B64 detection (EMaj-1) + MAX_DEPTH=64 (EMaj-4) + MAX_STRING_LENGTH=4096 truncation. 16 new vitest cases all pass. Files: [redactSecrets.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/redactSecrets.ts), [redactSecrets.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/__tests__/redactSecrets.test.ts).
+- **C3** 5 webhook routes — 256KB body cap via shared `readWebhookBody` helper + req.text() refactor (preserves raw bytes for future per-source HMAC retrofit, closes M3). PostHog feature-flag now precedes auth check (closes m3 token-validity leak). Files: [readRequestBody.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/readRequestBody.ts) (new), all 5 `webhooks/*/route.ts`.
+- **C4** GET /api/ops/repairs — explicit LIST_COLUMNS allow-list (audit_log NEVER returned in list view, primary fix per Errata EMaj-3 reframe) + `canModifyIncidentStatus + source !== 'default_viewer'` defense-in-depth guard + backup.ts SSH stdout/stderr 6000→500 byte truncation. Files: [repairs/route.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/route.ts), [backup.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/backup.ts).
+- **C5** Severity gate is now a real pipeline stop — uses `severityRequiresHumanReview()` helper (closes m9 dead code + docstring lies), critical incidents create run at `triage_needed` state, NEW route POST /api/ops/repairs/[id]/confirm-critical for explicit operator second confirmation. Plan v3.2 §四 contract honored. Files: [service.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/service.ts), [confirm-critical/route.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/[id]/confirm-critical/route.ts) (new).
 
 ### 🟢 CLEAN (reviewed, no action)
 
@@ -206,15 +212,9 @@ _(none yet — patches designed in audit report, application deferred to dedicat
 - `computeFingerprint` SHA-256 use — collision-resistance sufficient for dedup
 - `ssh.ts` — no user-data interpolation into commands (env-path concern tracked separately as M8)
 
-### 🔴 TRACKED — Critical (must fix before Phase 4 closeout 2026-06-19)
+### 🔴 TRACKED — Critical
 
-| ID | File:line | Issue | Patch ref |
-|---|-----------|-------|---------|
-| C1 | [sg-deploy.sh:163-189](../../../lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh) | Step 7 smoke-fail does NOT invoke `rollback-phase1.sh` — Plan v3.2 §五 third-layer rollback promise unimplemented | Patch 1 in audit report |
-| C2 | [redactSecrets.ts:1-35](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/redactSecrets.ts) | Redactor is key-only; payload values containing secrets reach `ops_incidents.raw_payload` unredacted | Patch 2 in audit report |
-| C3 | All 5 `webhooks/*/route.ts` | No body-size cap; `await req.json()` accepts unbounded payload → memory DoS | Designed in §C3 of audit report |
-| C4 | [api/ops/repairs/route.ts:9-25](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/route.ts) | GET has no role guard + `select("*")` returns `audit_log` (SSH stdout/stderr) to default viewers | Patch 3 in audit report |
-| C5 | [service.ts:104](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/service.ts) + [policy.ts:82](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts) | `needs_human_review` is a flag, not a pipeline gate; `severityRequiresHumanReview()` is dead code with misleading docstring | Designed in §C5 of audit report |
+_(all 5 moved to 🔴 FIXED above on 2026-05-23; Phase 4 closeout 2026-06-19 unblocked for the Critical-tier; Major-tier follow-up next iteration.)_
 
 ### 🟠 TRACKED — Major (10 findings)
 

@@ -85,13 +85,15 @@ if ($health.github_app_status -ne 'confirmed_by_operator' -and $health.github_ap
 Write-Line ""
 Write-Line "[2/2] Logic-layer audit reminders (health endpoint CANNOT validate these)"
 # NOTE: ASCII-only by design (CP950 console will render emoji as '??' -- Min-1 from 2026-05-23 self-critic)
+# 2026-05-23 post-fix update: C1-C5 all FIXED in same session. Reminders now describe
+# the REGRESSION SURFACE -- what to re-verify whenever the related code is edited.
 $logicReminders = @(
-    '[CRIT] C1: sg-deploy.sh Step 7 smoke-fail still does NOT invoke rollback-phase1.sh -- verify after every infra patch'
-    '[CRIT] C2: lib/ops-inbox/redactSecrets.ts redacts keys only, NOT values -- verify after every normalize/* change'
-    '[CRIT] C3: webhook routes have no body-size cap -- verify nginx webhook zone rate limit + req.text() refactor'
-    '[CRIT] C4: GET /api/ops/repairs lacks canApproveCommand guard + returns audit_log to viewers'
-    '[CRIT] C5: service.ts:104 critical-severity gate is a flag, not a pipeline stop'
-    '[MAJ]  M*: see agency-os/reports/audit/auto-repair-2026-05-23.md for full list'
+    '[FIXED] C1: sg-deploy.sh Step 7 -> auto-rollback ON (AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false for drill). Regression surface: any Step 7 / rollback-phase1.sh edit.'
+    '[FIXED] C2: redactSecrets.ts value-aware + OPS_AGGRESSIVE_REDACT gated B64. Regression surface: any redactSecrets.ts / normalize/*.ts edit -- re-run unit tests.'
+    '[FIXED] C3: webhook routes use readWebhookBody (256KB cap + req.text). Regression surface: any new webhook route MUST use readWebhookBody not req.json().'
+    '[FIXED] C4: GET /api/ops/repairs has column allow-list (no audit_log) + viewer guard. Regression surface: any select("*") in repairs routes.'
+    '[FIXED] C5: severity gate is now a pipeline stop (state=triage_needed + confirm-critical route). Regression surface: any service.ts severity logic / new approval path.'
+    '[OPEN]  Majors M1-M10 + Minors m1-m11: see agency-os/reports/audit/auto-repair-2026-05-23.md (next iteration backlog).'
 )
 foreach ($r in $logicReminders) { Write-Line "    $r" }
 

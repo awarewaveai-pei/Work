@@ -4,9 +4,9 @@
 SSH SG + EU; verify B-Minimal auto-reboot config integrity; write LATEST report.
 
 .DESCRIPTION
-Auto-called by ao-resume.ps1 (alongside check-backup-health.ps1 + check-cloudflare-security.ps1).
+Auto-called by ao-resume.ps1 alongside check-backup-health.ps1 + check-cloudflare-security.ps1.
 Writes agency-os/reports/status/auto-reboot-LATEST.md (+ .json).
-The operator never needs to remember a slash command — every AO-RESUME surfaces auto-reboot drift here.
+The operator never needs to remember a slash command - every AO-RESUME surfaces auto-reboot drift here.
 
 Checks per VPS:
   - apt-config Automatic-Reboot 3-tuple
@@ -16,10 +16,10 @@ Checks per VPS:
   - kernel + last reboot time
 
 Verdict per host (worst-of):
-  🟢 healthy — all expected, no drift, no pending reboot
-  🟡 drift   — SSOT SHA256 mismatch OR unexpected apt-config value
-  🔴 broken  — daemon stopped OR 52 conf missing
-  ⚠ pending — reboot-required marker exists (informational; not a failure)
+  GREEN healthy - all expected, no drift, no pending reboot
+  YELLOW drift  - SSOT SHA256 mismatch OR unexpected apt-config value
+  RED broken    - daemon stopped OR 52 conf missing
+  pending       - reboot-required marker exists (informational; not a failure)
 
 Exit code: always 0 (warn-only, same convention as backup-health + cf-security).
 
@@ -27,6 +27,10 @@ Exit code: always 0 (warn-only, same convention as backup-health + cf-security).
 SSOT: lobster-factory/infra/hetzner-phase1-core/auto-reboot/
 Runbook: runbooks/VPS-AUTO-REBOOT-RUNBOOK.md
 Slash command (manual ad-hoc): /auto-reboot-status
+
+PS5.1 source-encoding rule: do NOT use unicode emoji in source code. Big5 console
+parser will crash on multi-byte chars without BOM. Use ASCII labels internally;
+map to emoji only at MD-output time via WriteAllText UTF8.
 #>
 [CmdletBinding()]
 param(
@@ -41,8 +45,14 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-# CP950 protection for ssh stdout capture.
 . (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+
+# Verdict-to-emoji map (kept here so we never write emoji literals in source).
+$ICON_HEALTHY = [char]::ConvertFromUtf32(0x1F7E2)  # green circle
+$ICON_DRIFT   = [char]::ConvertFromUtf32(0x1F7E1)  # yellow circle
+$ICON_BROKEN  = [char]::ConvertFromUtf32(0x1F534)  # red circle
+$ICON_WARN    = [char]0x26A0                       # warning sign
+$ICON_CHECK   = [char]0x2713                       # check mark
 
 function Resolve-Root {
     param([string]$InputRoot)
@@ -98,26 +108,19 @@ function Get-RepoSsotSha {
 function Get-AutoRebootHealth {
     param([string]$ServerHost, [bool]$Is53Expected)
 
-    # Single base64-encoded bash gathers everything in one round-trip.
     $parts = @(
         'set -eu',
-        # 1. apt-config Automatic-Reboot keys (ground truth)
         'AR=$(apt-config dump 2>/dev/null | grep -E ''^Unattended-Upgrade::Automatic-Reboot'' || true)',
         'AR_ON=$(echo "$AR" | grep ''^Unattended-Upgrade::Automatic-Reboot "'' | head -n1 | sed ''s/.*"\(.*\)";/\1/'')',
         'AR_TIME=$(echo "$AR" | grep ''^Unattended-Upgrade::Automatic-Reboot-Time '' | head -n1 | sed ''s/.*"\(.*\)";/\1/'')',
         'AR_USERS=$(echo "$AR" | grep ''^Unattended-Upgrade::Automatic-Reboot-WithUsers '' | head -n1 | sed ''s/.*"\(.*\)";/\1/'')',
-        # 2. SHA256 of conf files (empty string if missing)
         'SHA52=$(sha256sum /etc/apt/apt.conf.d/52awarewave-auto-reboot 2>/dev/null | awk ''{print $1}'')',
         'SHA53=$(sha256sum /etc/apt/apt.conf.d/53awarewave-stagger-eu.conf 2>/dev/null | awk ''{print $1}'')',
-        # 3. daemon
         'DAEMON_ACTIVE=$(systemctl is-active unattended-upgrades 2>/dev/null || echo "unknown")',
         'DAEMON_ENABLED=$(systemctl is-enabled unattended-upgrades 2>/dev/null || echo "unknown")',
-        # 4. pending reboot
         'if [ -f /var/run/reboot-required ]; then REBOOT_PENDING=1; REBOOT_PKGS=$(tr ''\n'' '','' < /var/run/reboot-required.pkgs 2>/dev/null | sed ''s/,$//'' || echo ""); else REBOOT_PENDING=0; REBOOT_PKGS=""; fi',
-        # 5. kernel + last reboot
         'KERNEL=$(uname -r)',
         'LAST_REBOOT=$(last reboot 2>/dev/null | head -n1 | tr -s '' '' | cut -d'' '' -f5-9 || echo "unknown")',
-        # Emit
         'echo "AR_ON=$AR_ON"',
         'echo "AR_TIME=$AR_TIME"',
         'echo "AR_USERS=$AR_USERS"',
@@ -140,7 +143,6 @@ function Get-AutoRebootHealth {
             host = $ServerHost
             ok = $false
             error = $res.Output
-            verdict = "ssh_error"
         }
     }
 
@@ -164,87 +166,107 @@ function Get-AutoRebootHealth {
 }
 
 function Compute-Verdict {
-    param($Host_, [string]$SsotSha52, [string]$SsotSha53)
-    if (-not $Host_.ok) { return @{ icon = "🔴"; label = "broken"; reasons = @("ssh_error: " + $Host_.error) } }
+    param($Snapshot, [string]$SsotSha52, [string]$SsotSha53)
+    if (-not $Snapshot.ok) {
+        return @{ label = "broken"; reasons = @("ssh_error: " + $Snapshot.error); pending = $false }
+    }
 
     $reasons = New-Object System.Collections.Generic.List[string]
-    $icon = "🟢"
     $label = "healthy"
 
-    # 🔴 broken conditions
-    if ($Host_.daemon_active -ne "active") {
-        $reasons.Add("daemon not active (=" + $Host_.daemon_active + ")")
-        $icon = "🔴"; $label = "broken"
+    if ($Snapshot.daemon_active -ne "active") {
+        $reasons.Add("daemon not active (=" + $Snapshot.daemon_active + ")")
+        $label = "broken"
     }
-    if (-not $Host_.sha52) {
+    if (-not $Snapshot.sha52) {
         $reasons.Add("52awarewave-auto-reboot conf MISSING")
-        $icon = "🔴"; $label = "broken"
+        $label = "broken"
     }
 
-    # 🟡 drift conditions (don't override broken)
     if ($label -ne "broken") {
-        if ($Host_.ar_on -ne "true") {
-            $reasons.Add("Automatic-Reboot=" + $Host_.ar_on + " (expected true)")
-            $icon = "🟡"; $label = "drift"
+        if ($Snapshot.ar_on -ne "true") {
+            $reasons.Add("Automatic-Reboot=" + $Snapshot.ar_on + " (expected true)")
+            $label = "drift"
         }
-        if ($SsotSha52 -and $Host_.sha52 -and ($Host_.sha52 -ne $SsotSha52)) {
-            $reasons.Add("52 SHA256 mismatch (host=" + $Host_.sha52.Substring(0,12) + " vs repo=" + $SsotSha52.Substring(0,12) + ")")
-            $icon = "🟡"; $label = "drift"
+        if ($SsotSha52 -and $Snapshot.sha52 -and ($Snapshot.sha52 -ne $SsotSha52)) {
+            $reasons.Add("52 SHA256 mismatch (host=" + $Snapshot.sha52.Substring(0,12) + " vs repo=" + $SsotSha52.Substring(0,12) + ")")
+            $label = "drift"
         }
-        if ($Host_.expect_53) {
-            if (-not $Host_.sha53) {
+        if ($Snapshot.expect_53) {
+            if (-not $Snapshot.sha53) {
                 $reasons.Add("53 stagger conf MISSING (expected on this host)")
-                $icon = "🟡"; $label = "drift"
-            } elseif ($SsotSha53 -and ($Host_.sha53 -ne $SsotSha53)) {
+                $label = "drift"
+            } elseif ($SsotSha53 -and ($Snapshot.sha53 -ne $SsotSha53)) {
                 $reasons.Add("53 SHA256 mismatch")
-                $icon = "🟡"; $label = "drift"
+                $label = "drift"
             }
-            if ($Host_.ar_time -ne "20:30") {
-                $reasons.Add("Automatic-Reboot-Time=" + $Host_.ar_time + " (expected 20:30 from 53 override)")
-                $icon = "🟡"; $label = "drift"
+            if ($Snapshot.ar_time -ne "20:30") {
+                $reasons.Add("Automatic-Reboot-Time=" + $Snapshot.ar_time + " (expected 20:30 from 53 override)")
+                $label = "drift"
             }
         } else {
-            if ($Host_.sha53) {
+            if ($Snapshot.sha53) {
                 $reasons.Add("53 stagger conf UNEXPECTED on this host (should be EU only)")
-                $icon = "🟡"; $label = "drift"
+                $label = "drift"
             }
-            if ($Host_.ar_time -ne "20:00") {
-                $reasons.Add("Automatic-Reboot-Time=" + $Host_.ar_time + " (expected 20:00)")
-                $icon = "🟡"; $label = "drift"
+            if ($Snapshot.ar_time -ne "20:00") {
+                $reasons.Add("Automatic-Reboot-Time=" + $Snapshot.ar_time + " (expected 20:00)")
+                $label = "drift"
             }
         }
     }
 
-    # ⚠ pending is informational (orthogonal to verdict)
-    $pending = ($Host_.reboot_pending -eq "1")
+    $pending = ($Snapshot.reboot_pending -eq "1")
 
     return @{
-        icon    = $icon
         label   = $label
         reasons = $reasons
         pending = $pending
     }
 }
 
+function Icon-For-Label {
+    param([string]$Label)
+    switch ($Label) {
+        "healthy" { return $ICON_HEALTHY }
+        "drift"   { return $ICON_DRIFT }
+        "broken"  { return $ICON_BROKEN }
+        default   { return "?" }
+    }
+}
+
+function Sha-Cell {
+    param([string]$HostSha, [string]$RepoSha, [string]$NaIfMissing = "missing")
+    if (-not $HostSha) { return $NaIfMissing }
+    if ($RepoSha -and ($HostSha -eq $RepoSha)) { return $ICON_CHECK }
+    return "drift"
+}
+
 # Main
 $rootPath = Resolve-Root -InputRoot $WorkRoot
-$repoSsot52 = Join-Path "lobster-factory" "infra\hetzner-phase1-core\auto-reboot\52awarewave-auto-reboot.conf"
-$repoSsot53 = Join-Path "lobster-factory" "infra\hetzner-phase1-core\auto-reboot\53awarewave-stagger-eu.conf"
-$ssotSha52 = Get-RepoSsotSha -Root $rootPath -RelPath $repoSsot52
-$ssotSha53 = Get-RepoSsotSha -Root $rootPath -RelPath $repoSsot53
+$repoSsot52Rel = "lobster-factory\infra\hetzner-phase1-core\auto-reboot\52awarewave-auto-reboot.conf"
+$repoSsot53Rel = "lobster-factory\infra\hetzner-phase1-core\auto-reboot\53awarewave-stagger-eu.conf"
+$ssotSha52 = Get-RepoSsotSha -Root $rootPath -RelPath $repoSsot52Rel
+$ssotSha53 = Get-RepoSsotSha -Root $rootPath -RelPath $repoSsot53Rel
 
 $sg = Get-AutoRebootHealth -ServerHost $SgHost -Is53Expected $false
 $eu = Get-AutoRebootHealth -ServerHost $EuHost -Is53Expected $true
 
-$sgVerdict = Compute-Verdict -Host_ $sg -SsotSha52 $ssotSha52 -SsotSha53 $ssotSha53
-$euVerdict = Compute-Verdict -Host_ $eu -SsotSha52 $ssotSha52 -SsotSha53 $ssotSha53
+$sgVerdict = Compute-Verdict -Snapshot $sg -SsotSha52 $ssotSha52 -SsotSha53 $ssotSha53
+$euVerdict = Compute-Verdict -Snapshot $eu -SsotSha52 $ssotSha52 -SsotSha53 $ssotSha53
 
-# Worst-of for overall
-$worst = "🟢"; $worstLabel = "PASS"
+$worstLabel = "healthy"
 foreach ($v in @($sgVerdict, $euVerdict)) {
-    if ($v.icon -eq "🔴") { $worst = "🔴"; $worstLabel = "FAIL" }
-    elseif ($v.icon -eq "🟡" -and $worst -ne "🔴") { $worst = "🟡"; $worstLabel = "WARN" }
+    if ($v.label -eq "broken") { $worstLabel = "broken" }
+    elseif ($v.label -eq "drift" -and $worstLabel -ne "broken") { $worstLabel = "drift" }
 }
+$worstUserLabel = switch ($worstLabel) {
+    "healthy" { "PASS" }
+    "drift"   { "WARN" }
+    "broken"  { "FAIL" }
+    default   { "UNKNOWN" }
+}
+$worstIcon = Icon-For-Label $worstLabel
 
 $genUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
 $reportDir = Join-Path $rootPath "agency-os\reports\status"
@@ -252,32 +274,23 @@ if (-not (Test-Path -LiteralPath $reportDir)) { New-Item -ItemType Directory -Fo
 
 # JSON output
 $jsonObj = [ordered]@{
-    generated_utc  = $genUtc
-    overall_icon   = $worst
-    overall_label  = $worstLabel
-    ssot = [ordered]@{
-        sha52 = $ssotSha52
-        sha53 = $ssotSha53
-    }
-    sg = [ordered]@{
-        host    = $sg
-        verdict = $sgVerdict
-    }
-    eu = [ordered]@{
-        host    = $eu
-        verdict = $euVerdict
-    }
+    generated_utc = $genUtc
+    overall_label = $worstLabel
+    overall_user  = $worstUserLabel
+    ssot = [ordered]@{ sha52 = $ssotSha52; sha53 = $ssotSha53 }
+    sg = [ordered]@{ snapshot = $sg; verdict = [ordered]@{ label = $sgVerdict.label; reasons = $sgVerdict.reasons; pending = $sgVerdict.pending } }
+    eu = [ordered]@{ snapshot = $eu; verdict = [ordered]@{ label = $euVerdict.label; reasons = $euVerdict.reasons; pending = $euVerdict.pending } }
 }
 $jsonPath = Join-Path $reportDir "auto-reboot-LATEST.json"
 $jsonText = ($jsonObj | ConvertTo-Json -Depth 8)
 [System.IO.File]::WriteAllText($jsonPath, $jsonText, [System.Text.UTF8Encoding]::new($false))
 
-# Markdown report (for AO-RESUME human-reading + Phase 4 + visual scan)
+# Markdown report
 $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("# VPS auto-reboot health")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("- Generated: $genUtc UTC")
-[void]$md.AppendLine("- **Overall: $worst $worstLabel**")
+[void]$md.AppendLine("- **Overall: $worstIcon $worstUserLabel**")
 [void]$md.AppendLine("- SSOT: ``lobster-factory/infra/hetzner-phase1-core/auto-reboot/``")
 [void]$md.AppendLine("- Runbook: ``runbooks/VPS-AUTO-REBOOT-RUNBOOK.md``")
 [void]$md.AppendLine("")
@@ -286,36 +299,46 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("| VPS | Verdict | Auto-Reboot | Time | SSOT 52 | SSOT 53 | daemon | pending | kernel |")
 [void]$md.AppendLine("|-----|---------|-------------|------|---------|---------|--------|---------|--------|")
 
-foreach ($pair in @(@{ name="SG ($SgHost)"; h=$sg; v=$sgVerdict }, @{ name="EU ($EuHost)"; h=$eu; v=$euVerdict })) {
-    $h = $pair.h
-    $v = $pair.v
-    if (-not $h.ok) {
-        [void]$md.AppendLine("| $($pair.name) | $($v.icon) $($v.label) | - | - | - | - | - | - | - |")
+$pairs = @(
+    @{ name = "SG ($SgHost)"; snap = $sg; verdict = $sgVerdict },
+    @{ name = "EU ($EuHost)"; snap = $eu; verdict = $euVerdict }
+)
+foreach ($p in $pairs) {
+    $snap = $p.snap
+    $v = $p.verdict
+    $icon = Icon-For-Label $v.label
+    if (-not $snap.ok) {
+        [void]$md.AppendLine("| $($p.name) | $icon $($v.label) | - | - | - | - | - | - | - |")
         continue
     }
-    $sha52Status = if ($h.sha52 -and $ssotSha52 -and ($h.sha52 -eq $ssotSha52)) { "✓" } elseif (-not $h.sha52) { "missing" } else { "drift" }
-    $sha53Status = if (-not $h.expect_53) {
-        if ($h.sha53) { "unexpected" } else { "n/a" }
+    $sha52Cell = Sha-Cell -HostSha $snap.sha52 -RepoSha $ssotSha52
+    if (-not $snap.expect_53) {
+        $sha53Cell = if ($snap.sha53) { "unexpected" } else { "n/a" }
     } else {
-        if ($h.sha53 -and $ssotSha53 -and ($h.sha53 -eq $ssotSha53)) { "✓" } elseif (-not $h.sha53) { "missing" } else { "drift" }
+        $sha53Cell = Sha-Cell -HostSha $snap.sha53 -RepoSha $ssotSha53
     }
-    $pendingDisp = if ($v.pending) { "⚠ yes" } else { "no" }
-    [void]$md.AppendLine("| $($pair.name) | $($v.icon) $($v.label) | $($h.ar_on) | $($h.ar_time) | $sha52Status | $sha53Status | $($h.daemon_active)/$($h.daemon_enabled) | $pendingDisp | $($h.kernel) |")
+    $pendingCell = if ($v.pending) { "$ICON_WARN yes" } else { "no" }
+    $daemonCell = "$($snap.daemon_active)/$($snap.daemon_enabled)"
+    [void]$md.AppendLine("| $($p.name) | $icon $($v.label) | $($snap.ar_on) | $($snap.ar_time) | $sha52Cell | $sha53Cell | $daemonCell | $pendingCell | $($snap.kernel) |")
 }
 
 [void]$md.AppendLine("")
-[void]$md.AppendLine("## Reasons (if not 🟢)")
-[void]$md.AppendLine("")
-foreach ($pair in @(@{ name="SG"; v=$sgVerdict }, @{ name="EU"; v=$euVerdict })) {
-    if ($pair.v.reasons.Count -gt 0) {
-        [void]$md.AppendLine("**$($pair.name)** ($($pair.v.icon) $($pair.v.label)):")
-        foreach ($r in $pair.v.reasons) {
-            [void]$md.AppendLine("- $r")
+$anyReasons = ($sgVerdict.reasons.Count -gt 0) -or ($euVerdict.reasons.Count -gt 0)
+if ($anyReasons) {
+    [void]$md.AppendLine("## Reasons")
+    [void]$md.AppendLine("")
+    foreach ($p in $pairs) {
+        if ($p.verdict.reasons.Count -gt 0) {
+            $picon = Icon-For-Label $p.verdict.label
+            [void]$md.AppendLine("**$($p.name)** ($picon $($p.verdict.label)):")
+            foreach ($r in $p.verdict.reasons) {
+                [void]$md.AppendLine("- $r")
+            }
+            [void]$md.AppendLine("")
         }
-        [void]$md.AppendLine("")
     }
 }
-# Pending block (informational; not a failure)
+
 $anyPending = $sgVerdict.pending -or $euVerdict.pending
 if ($anyPending) {
     [void]$md.AppendLine("## Pending reboot (informational)")
@@ -327,9 +350,10 @@ if ($anyPending) {
         [void]$md.AppendLine("- EU: ``/var/run/reboot-required`` present. Packages: ``$($eu.reboot_pkgs)``. Auto-reboot window: next **20:30 UTC** (= 04:30 TPE).")
     }
     [void]$md.AppendLine("")
-    [void]$md.AppendLine("Action: none — let OS handle. If marker persists > 16h, AGENTS.md trigger rule escalates to manual ``/sg-reboot`` or ``/eu-reboot``.")
+    [void]$md.AppendLine("Action: none - let OS handle. If marker persists > 16h, AGENTS.md trigger rule escalates to manual ``/sg-reboot`` or ``/eu-reboot``.")
     [void]$md.AppendLine("")
 }
+
 [void]$md.AppendLine("## Last reboot")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("- SG: $($sg.last_reboot)")
@@ -346,10 +370,18 @@ if ($Json) {
     Write-Output $jsonText
 } else {
     Write-Host ""
-    Write-Host "== VPS auto-reboot health: $worst $worstLabel ==" -ForegroundColor $(if ($worst -eq "🟢") { "Green" } elseif ($worst -eq "🟡") { "Yellow" } else { "Red" })
-    Write-Host "  SG: $($sgVerdict.icon) $($sgVerdict.label)" -NoNewline
+    $color = switch ($worstLabel) {
+        "healthy" { "Green" }
+        "drift"   { "Yellow" }
+        "broken"  { "Red" }
+        default   { "White" }
+    }
+    Write-Host "== VPS auto-reboot health: $worstIcon $worstUserLabel ==" -ForegroundColor $color
+    $sgIcon = Icon-For-Label $sgVerdict.label
+    $euIcon = Icon-For-Label $euVerdict.label
+    Write-Host "  SG: $sgIcon $($sgVerdict.label)" -NoNewline
     if ($sgVerdict.pending) { Write-Host " (reboot pending, auto-fire @ 20:00 UTC)" -ForegroundColor Yellow } else { Write-Host "" }
-    Write-Host "  EU: $($euVerdict.icon) $($euVerdict.label)" -NoNewline
+    Write-Host "  EU: $euIcon $($euVerdict.label)" -NoNewline
     if ($euVerdict.pending) { Write-Host " (reboot pending, auto-fire @ 20:30 UTC)" -ForegroundColor Yellow } else { Write-Host "" }
     Write-Host "  Report: agency-os/reports/status/auto-reboot-LATEST.md"
 }
