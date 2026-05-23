@@ -49,6 +49,19 @@ if [[ ${#APPS[@]} -eq 0 ]]; then
   APPS=(next-admin)
 fi
 
+# C1 fix (Errata EMaj-2): partition APPS into restorable (have image snapshot semantics
+# in rollback-phase1.sh IMAGE_MAP) vs not. Only restorable apps participate in
+# save-before-build + restore-on-smoke-fail.
+ROLLBACK_SCRIPT="$(dirname "$0")/rollback-phase1.sh"
+RESTORABLE_APPS=()
+NON_RESTORABLE_APPS=()
+for _app in "${APPS[@]}"; do
+  case "$_app" in
+    wordpress|node-api|next-admin) RESTORABLE_APPS+=("$_app") ;;
+    *) NON_RESTORABLE_APPS+=("$_app") ;;
+  esac
+done
+
 log "=== sg-deploy starting ==="
 log "apps: ${APPS[*]}"
 log "skip-pull: $SKIP_PULL ; dry-run: $DRY_RUN"

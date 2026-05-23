@@ -7,6 +7,7 @@ import { redactSecrets } from "@/lib/ops-inbox/redactSecrets";
 import { computeTransition, maxSeverity } from "@/lib/ops-inbox/transition";
 import type { Incident, IncidentSnapshot } from "@/lib/ops-inbox/types";
 import { verifyIngestToken } from "@/lib/ops-inbox/verifyIngestToken";
+import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { triggerAutoClassify } from "@/lib/ops-inbox/ai/triggerAutoClassify";
 import { dispatchNotifications } from "@/lib/ops-inbox/notify/dispatcher";
 
@@ -14,19 +15,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  if (!verifyIngestToken(req)) return new NextResponse("unauthorized", { status: 401 });
+  // Minor m3 fix: when feature flag is off, return 401 (not 503 "posthog disabled") so
+  // probe traffic can't distinguish "your token is valid but feature is off" from
+  // "your token is invalid". Defense-in-depth against credential probing.
   if (process.env.OPS_INBOX_POSTHOG_ENABLED !== "true") {
-    return new NextResponse("posthog ingestion disabled", { status: 503 });
+    return new NextResponse("unauthorized", { status: 401 });
   }
+  if (!verifyIngestToken(req)) return new NextResponse("unauthorized", { status: 401 });
 
-  let payload: unknown;
-  try {
-    payload = await req.json();
-  } catch {
-    return new NextResponse("invalid json", { status: 400 });
-  }
-
-  const raw = redactSecrets(payload);
+  // C3 + M3 fix: bounded body read (256KB cap) preserving raw bytes for future HMAC.
+  const body = await readWebhookBody(req);
+  if (!body.ok) return new NextResponse(body.error, { status: body.status });
+  const raw = redactSecrets(body.parsed);
   const draft = normalizePostHog(raw);
   draft.fingerprint = computeFingerprint({
     source: draft.source,
