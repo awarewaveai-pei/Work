@@ -76,7 +76,7 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 - 部署: `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull）
   - **next-admin test gate（內建）**：`sg-deploy.sh next-admin` 會在 build 前自動跑 `npm test`（vitest，35 tests）；失敗 → deploy 自動 abort，不進入 build。
   - 若 npm test 失敗：先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看錯誤，修好後再 push + 重跑 sg-deploy。
-  - **HTTP smoke check（Step 7，內建）**：`sg-deploy.sh` 在 docker healthcheck 後自動 curl 4 端點（next-admin :3002/、/api/ops/summary、nginx/wp :80/、node-api /api/health via Host header）；非致命，失敗寫 `.smoke-warn` + log SMOKE_WARN；`auto-deploy-next-admin.sh` 讀取後附加至 Slack/Telegram 通知。SSOT：`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh` Step 7。
+  - **HTTP smoke check + 自動 rollback（Step 7，2026-05-23 起致命）**：`sg-deploy.sh` 在 docker healthcheck 後自動 curl 4 端點（next-admin :3002/、/api/ops/summary、nginx/wp :80/、node-api /api/health via Host header）；任一非 2xx → 自動觸發 `rollback-phase1.sh restore <app>` 逐一還原 RESTORABLE_APPS（wordpress/node-api/next-admin）+ 寫 `.rollback-triggered` flag + 還原 `.deployed-commit` + fail。Drill mode 用 `AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false` 跑 sg-deploy 保留舊非致命 warn 行為。SSOT：`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh` Step 7；audit ref：`agency-os/reports/audit/auto-repair-2026-05-23.md` §Patch 1 (C1)。
 - next-admin：用 `@supabase/supabase-js ^2.49.8`（非 auth-helpers）；樣式為 CSS 變數（無 Tailwind）
 
 **新部署路徑強制清單（SOP）** — 每次新增可部署服務或 deploy path 時，必須同時完成以下 5 項：
