@@ -260,6 +260,40 @@ export async function startRepairFromIncident(args: {
   return { ok: true, run: { ...(repaired ?? run), incident: i as any } };
 }
 
+/**
+ * C5 fix companion: explicit second-confirmation path for critical-severity incidents
+ * held at `triage_needed` by `startRepairFromIncident`. Operator must hit this from the
+ * /ops/repairs UI (canApproveCommand-gated route) to clear the gate.
+ *
+ * Reuses `startRepairFromIncident` with `forceCriticalApproval=true` so the backup +
+ * GitHub-issue + Claude-repair pipeline executes the same way as a non-critical run.
+ */
+export async function confirmCriticalRun(args: {
+  runId: string;
+  actor: string;
+}): Promise<{ ok: boolean; run?: RepairRunWithIncident; error?: string; details?: unknown }> {
+  const run = await fetchRepairRunWithIncident(args.runId);
+  if (!run) return { ok: false, error: "repair_run_not_found" };
+  if (!run.needs_human_review) return { ok: false, error: "run_not_in_critical_review_hold" };
+  if (run.state !== "triage_needed") return { ok: false, error: "run_not_in_triage_needed_state", details: { state: run.state } };
+
+  // Audit the explicit confirmation BEFORE re-entering the pipeline.
+  await updateRun(args.runId, {
+    audit_log: appendAudit(run.audit_log, {
+      actor: args.actor,
+      action: "critical_severity_gate_confirmed",
+      detail: "Operator explicitly confirmed critical-severity repair via /confirm-critical route.",
+    }),
+  });
+
+  return startRepairFromIncident({
+    incidentId: run.incident_id,
+    actor: args.actor,
+    source: "web",
+    forceCriticalApproval: true,
+  });
+}
+
 export async function updateRun(id: string, patch: Record<string, unknown>): Promise<RepairRun | null> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return null;
