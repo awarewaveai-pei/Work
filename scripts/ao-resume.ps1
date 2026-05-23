@@ -122,8 +122,18 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
             Write-Host ("== AO-RESUME: clean tree; main is {0} commit(s) ahead of origin — push then retry align ==" -f $aheadCount) -ForegroundColor Yellow
             Push-Location -LiteralPath $Root
             try {
-                & git push 2>&1 | Out-Host
-                $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+                # Local Continue: git push writes progress / "To <url>" to stderr by design.
+                # With $ErrorActionPreference = "Stop" + `2>&1`, those stderr lines are raised as
+                # NativeCommandError and abort the script before $LASTEXITCODE is checked. Use the
+                # same save/restore pattern as elsewhere in this file (e.g. resumeOut block) so the
+                # outer strict policy is preserved while git push's normal stderr is tolerated.
+                # Real fail is still caught via $LASTEXITCODE != 0.
+                $savedEAPPush1 = $ErrorActionPreference
+                $ErrorActionPreference = "Continue"
+                try {
+                    & git push 2>&1 | Out-Host
+                    $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+                } finally { $ErrorActionPreference = $savedEAPPush1 }
             } finally { Pop-Location }
             if ($pushExit -ne 0) {
                 Write-Host "AO-RESUME: git push failed (exit $pushExit). Fix auth/network then re-run AO-RESUME." -ForegroundColor Yellow
@@ -155,8 +165,13 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
     try {
         $null = git rev-parse --git-dir 2>$null
         if ($LASTEXITCODE -eq 0) {
-            & git push 2>&1 | Out-Host
-            $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+            # Local Continue: see L125 above for full rationale (git push stderr vs strict mode).
+            $savedEAPPush2 = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            try {
+                & git push 2>&1 | Out-Host
+                $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+            } finally { $ErrorActionPreference = $savedEAPPush2 }
             if ($pushExit -ne 0) {
                 Write-Host "AO-RESUME: git push failed (exit $pushExit). Fix auth/network/upstream, run git push, then re-run AO-RESUME. Align retry skipped so checkpoint is not reset away." -ForegroundColor Yellow
                 return $pushExit
