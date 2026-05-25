@@ -211,6 +211,34 @@
 
 **rollback**：`git revert cad1f43 d392ff8`（兩個 auto-checkpoint commit，含全部 7 個檔案）
 
+### `/tomo` feature — E2E 全鏈實測 + critic 2C+6M+6m apply（2026-05-25 下午）
+
+**背景**：實作完成後補跑 E2E test + critic review；本段記錄 2C+6M+6m 全修 + E2E 4 動作實測結果。
+
+**Critic findings 應用結果**：
+- C1（phantom `consumed`）：SCHEMA.md + README.md + project_tomo_command.md 全部移除 consumed 欄位；TASKS.md `- [ ]` / `- [x]` = 唯一 SSOT
+- C2（hint injection）：Step 1 改用 Write tool（literal file write，無 shell interpolation）；`-WorkRoot "$env:TEMP" -Path "tomo-hint-scan.txt"` 避開 PS5 Join-Path 絕對路徑 bug
+- M1-M6（collision / rollback / WORKLOG subsection / CJK slug / section anchor / secret escape）：全部 apply 至 tomo.md
+- m1/m5/m6（minor UX）：apply 至 tomo.md
+
+**E2E test 全鏈（3 個函式跑通 PASS）**：
+
+| 測試 | 動作 | 結果 |
+|------|-----|-----|
+| Step 1 secret scan | Write tool → `$env:TEMP\tomo-hint-scan.txt`；`scan-local-config-for-secrets.ps1` | Files scanned: 1, 12 patterns, **PASS** ✅ |
+| Step 5 Write order | F1 packet → F2 TASKS → F3 WORKLOG（依序）| 三檔全寫入 ✅ |
+| Step 6 checkpoint+push | `commit-checkpoint.ps1` → `git push origin main` | 8c65d19 推遠端 ✅ |
+
+**新 Minor 發現（Write tool Read-first edge case）**：固定 temp filename `tomo-hint-scan.txt` 跨 session 留存；下次 `/tomo` 在新 session 若檔案已存在，Write tool 回 "File has not been read yet"。**修法**：tomo.md Step 1 補一句「若 Write tool 回 Read-first 錯誤，先 Read temp file 再重試 Write」— **已套用（本 session）**。
+
+**驗證結果（R0+R4 四動作）**：
+1. **實測**：3 個 E2E 函式 PASS（secret scan / Write order / checkpoint+push），commit 8c65d19 推遠端成功
+2. **Review**：tomo.md Step 1 Read-first fallback 已確認寫入；SCHEMA.md consumed 欄位確認移除；README.md phantom claim 確認移除；TASKS.md `#### 待釐清 / 明日提醒` 新 `- [ ]` row 正確插入；WORKLOG `### Tomorrow captured (/tomo)` 正確置於今日首 `###` subsection
+3. **抓蟲**：project_tomo_command.md memory 舊 `consumed: true` 由 `apply-closeout-task-checkmarks.ps1` 這行已修正（C1 fix 2026-05-25）；tomo.md Step 1 Read-first fallback 唯一修改點，無跨檔影響
+4. **WORKLOG**：本條目，四動作各自結果如上
+
+**剩餘風險**：Write tool Read-first edge case 已有 spec-level fallback 指令（tomo.md Step 1 L18）；無 production impact。
+
 ---
 
 ## 2026-05-24
