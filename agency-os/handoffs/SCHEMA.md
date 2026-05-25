@@ -13,11 +13,10 @@ slug: <kebab-case identifier, derived from hint, first 3-4 words>
 created_utc: <ISO 8601, UTC, e.g. 2026-05-24T16:30:00Z>
 hint: "<user's original /tomo hint — redacted of any secrets>"
 source_session_summary: "<one sentence: what the session was doing>"
-consumed: false
 ---
 ```
 
-`consumed` is set to `true` only by `scripts/apply-closeout-task-checkmarks.ps1` when it marks the corresponding TASKS.md row `[x]`. Do NOT set it manually.
+Pending/consumed state is determined by the TASKS.md `- [ ]` / `- [x]` row (the only SSOT). See `agency-os/handoffs/README.md`.
 
 ## 6-Segment Body
 
@@ -61,7 +60,4 @@ Use `$WORK_ROOT` as a placeholder for the monorepo root in all repo-relative pat
 `/tomo` scans the hint via `scripts/scan-local-config-for-secrets.ps1` before writing.
 If a pattern matches → **ABORT** + warn user to rewrite hint without secrets.
 
-Patterns checked (source: `scripts/scan-local-config-for-secrets.ps1 §$patterns`):
-JWT, GitHub PAT (classic + fine-grained + OAuth), Anthropic API key, OpenAI API key,
-Google API key, AWS access key, Trigger.dev token, Uptime Kuma API key,
-Postgres DSN with password, Google app password.
+Patterns checked: see `scripts/scan-local-config-for-secrets.ps1 §$patterns` (12 patterns, canonical list — do not duplicate here).

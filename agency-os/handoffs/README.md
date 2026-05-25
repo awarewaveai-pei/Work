@@ -27,8 +27,7 @@ State is determined by `agency-os/TASKS.md`, not by the packet file itself:
 | `- [ ] … → handoffs/<file>` | pending — AI should inline at AO-RESUME |
 | `- [x] … → handoffs/<file>` | consumed — skip at AO-RESUME |
 
-`scripts/apply-closeout-task-checkmarks.ps1` sets `consumed: true` in the frontmatter
-when it marks the TASKS.md row `[x]`. Do NOT edit `consumed` manually.
+No `consumed` field in packet frontmatter — TASKS.md row state is the only SSOT.
 
 ## Prune Policy
 

@@ -13,17 +13,21 @@ Packet format SSOT: `agency-os/handoffs/SCHEMA.md`
 
 ## Step 1 — Secret check (MANDATORY before any write)
 
-Write the hint text to a temp file, then scan using `-WorkRoot + -Path` (avoids Join-Path absolute-path bug on PS5):
+Use the **Write tool** to write the hint to a temp file (avoids PowerShell quote-injection):
+
+1. Write tool → file `$env:TEMP\tomo-hint-scan.txt` — content: hint text on line 1, one empty line 2.
+2. Then run:
 
 ```powershell
-Set-Content -Path "$env:TEMP\tomo-hint-scan.txt" -Value @("<hint>", "") -Encoding UTF8
-powershell -ExecutionPolicy Bypass -File scripts\scan-local-config-for-secrets.ps1 -WorkRoot "$env:TEMP" -Path "tomo-hint-scan.txt"
+powershell -ExecutionPolicy Bypass -File scripts/scan-local-config-for-secrets.ps1 -WorkRoot "$env:TEMP" -Path "tomo-hint-scan.txt"
 ```
 
 - **Exit 0**: proceed.
 - **Exit ≥ 1**: ABORT. Print:
   ```
-  ⛔ /tomo ABORT — hint 含疑似 secret（<pattern name>）。請改寫 hint 後重試。
+  ⛔ /tomo ABORT — hint 含疑似 secret（<pattern name>）。
+  若 hint 是討論 secret 相關的 bug（非包含真實憑證），請用 <TOKEN> 替代後重試。
+  例："修 JWT decode bug，token=<TOKEN>"
   ```
   Do NOT write any file.
 
@@ -70,24 +74,34 @@ If `/tomo` (no bang): show full packet preview and ask:
 ---
 回覆：
   go        — 確認，直接寫入
-  補:<text>  — 加到第 5 段（下一步）後再寫
+  補:<text>  — 加到第 5 段（下一步）末尾作為新編號步驟後再寫
   重抓       — 重新抽取脈絡
   取消       — 放棄
 ```
 
-Wait for user response. Apply `補:` additions to Step 5 of the packet before writing.
+Wait for user response. Apply `補:` additions as new numbered step(s) appended at the end of segment 5.
 If `/tomo!` (bang): skip this step entirely.
 
 ---
 
 ## Step 5 — Write files
 
-**Compute slug**: lowercase hint, first 3-4 meaningful words, kebab-case.
-Example: `tomo 實作 /tomo feature` → slug `tomo-feature`
+**Compute slug**: extract first 3 ASCII words from hint (skip CJK/non-ASCII tokens), lowercase kebab-case.
+- ≥ 2 ASCII tokens found: join first 3 with `-`. Example: `修 ops-inbox CLEAR bug` → `ops-inbox-clear`
+- < 2 ASCII tokens (all-CJK hint): use `tomo-HHmmss`. Example: `明天繼續` → `tomo-143052`
 
 **Compute filename**: `YYYY-MM-DD-HHmm-<slug>.md` (local time at invocation)
 
+**Write order and failure recovery**:
+1. Write File 1 (packet) first.
+2. Write File 2 (TASKS.md) second — if this fails, delete File 1 and ABORT.
+3. Write File 3 (WORKLOG) third — if this fails, leave File 1 + File 2 in place (packet discoverable via TASKS pointer); print `⚠️ WORKLOG write failed — packet + TASKS pointer saved, run checkpoint manually`.
+4. Proceed to Step 6 only if all 3 files written (or only WORKLOG failed and user accepts).
+
 ### File 1: Packet
+
+**Collision check**: before writing, check if `agency-os/handoffs/<filename>` already exists.
+If it does, append `-2` to the slug and recompute filename; repeat until unique.
 
 Write `agency-os/handoffs/<filename>` with frontmatter + 6-segment body per SCHEMA.md.
 
@@ -98,14 +112,13 @@ slug: <slug>
 created_utc: <ISO 8601 UTC>
 hint: "<hint text>"
 source_session_summary: "<one sentence: what the session was doing>"
-consumed: false
 ---
 ```
 
 ### File 2: TASKS.md
 
-Find the `#### 待釐清 / 明日提醒` section inside `## Next — 未完成（目前正式隊列）` → `### 未完成`.
-Append one line:
+Grep TASKS.md for the literal string `#### 待釐清 / 明日提醒` (unique in file — verified).
+Append one line immediately after the last existing `- [ ]` row in that section (or after the `>` note line if section is empty):
 
 ```
 - [ ] <hint one-liner> → handoffs/<filename>
@@ -123,16 +136,22 @@ If the section does not exist yet, create it as the **first sub-section** inside
 
 ### File 3: WORKLOG.md
 
-In today's entry (date header `## YYYY-MM-DD`), append under the last line:
+Find (or create) a `### Tomorrow captured (/tomo)` subsection under today's `## YYYY-MM-DD` heading.
+Insert it **before** any existing `### <topic>` subsections (immediately after the `## YYYY-MM-DD` line).
+Append one bullet inside it:
 
 ```
 - TOMORROW_CAPTURED: <slug> → handoffs/<filename>
 ```
 
+If the subsection already exists today, append the bullet at the end of it.
+
 If no today entry exists, append at end of file:
 
 ```markdown
 ## <YYYY-MM-DD>
+
+### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: <slug> → handoffs/<filename>
 ```
 
@@ -142,10 +161,11 @@ If no today entry exists, append at end of file:
 
 ```powershell
 # Stage the three changed files and commit
-scripts\commit-checkpoint.ps1 -Message "feat(tomo): capture handoff packet <slug>" -Paths @("agency-os/handoffs/<filename>", "agency-os/TASKS.md", "agency-os/WORKLOG.md")
+scripts/commit-checkpoint.ps1 -Message "feat(tomo): capture handoff packet <slug>" -Paths @("agency-os/handoffs/<filename>", "agency-os/TASKS.md", "agency-os/WORKLOG.md")
 
 # commit-checkpoint.ps1 does NOT push — push separately
 git push origin main
+# If push fails (branch behind remote): ⚠️ print "push failed — run `git pull --rebase && git push origin main` manually"
 ```
 
 ---
@@ -157,5 +177,5 @@ Print:
 ```
 ✅ /tomo packet saved: agency-os/handoffs/<filename>
    TASKS.md #### 待釐清 / 明日提醒 已新增
-   AO-RESUME 明天第 7 段會自動展開此 packet。
+   AO-RESUME 下次第 7 段會顯示此 packet（≤3 件全文展開；多於 3 件以摘要列出）。
 ```
