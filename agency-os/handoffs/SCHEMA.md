@@ -1,0 +1,67 @@
+# Handoff Packet Schema
+
+> SSOT for `/tomo` write-side and `ao-resume.md` read-side.
+> Both files reference this schema — do NOT define the format in either file independently.
+
+## Frontmatter (required)
+
+Every packet at `agency-os/handoffs/YYYY-MM-DD-HHmm-<slug>.md` must include:
+
+```yaml
+---
+slug: <kebab-case identifier, derived from hint, first 3-4 words>
+created_utc: <ISO 8601, UTC, e.g. 2026-05-24T16:30:00Z>
+hint: "<user's original /tomo hint — redacted of any secrets>"
+source_session_summary: "<one sentence: what the session was doing>"
+consumed: false
+---
+```
+
+`consumed` is set to `true` only by `scripts/apply-closeout-task-checkmarks.ps1` when it marks the corresponding TASKS.md row `[x]`. Do NOT set it manually.
+
+## 6-Segment Body
+
+### 1. 任務目標
+What this task is trying to accomplish. One paragraph, outcome-oriented.
+
+### 2. 為什麼做
+Motivation, urgency, who asked for it, what breaks if not done.
+
+### 3. 已試過
+Anything attempted this session: commands run, approaches rejected, dead ends.
+If nothing tried yet, write `尚未開始`.
+
+### 4. 卡在哪
+The exact blocker or stopping point — what the AI needs to pick up from.
+Be concrete: `file:line`, error message, missing permission, decision awaited.
+
+### 5. 下一步指令
+Actionable numbered steps for the AI picking this up.
+Include exact commands, file paths, tool calls. No abstract verbs ("investigate", "check").
+
+### 6. 相關資源
+- **Files**: list paths using `$WORK_ROOT/...` for repo paths
+- **Commits**: recent relevant SHAs + one-line descriptions
+- **VPS / external**: absolute paths for server-side resources
+- **Known landmines**: things that will break if the AI doesn't know
+
+## Path Placeholder Rule
+
+Use `$WORK_ROOT` as a placeholder for the monorepo root in all repo-relative paths.
+
+| ✅ Correct | ❌ Wrong |
+|-----------|---------|
+| `$WORK_ROOT/agency-os/TASKS.md` | `C:\Users\USER\Work\agency-os\TASKS.md` |
+| `/root/lobster-phase1/` (VPS) | — VPS absolute paths are fine |
+
+`ao-resume.md` Step 7 replaces `$WORK_ROOT` with `cwd` at read time.
+
+## Secret Redact Rule
+
+`/tomo` scans the hint via `scripts/scan-local-config-for-secrets.ps1` before writing.
+If a pattern matches → **ABORT** + warn user to rewrite hint without secrets.
+
+Patterns checked (source: `scripts/scan-local-config-for-secrets.ps1 §$patterns`):
+JWT, GitHub PAT (classic + fine-grained + OAuth), Anthropic API key, OpenAI API key,
+Google API key, AWS access key, Trigger.dev token, Uptime Kuma API key,
+Postgres DSN with password, Google app password.
