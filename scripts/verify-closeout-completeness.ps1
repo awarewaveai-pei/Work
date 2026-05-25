@@ -111,6 +111,41 @@ try {
         Write-Warning $msg
     }
 
+    # REALTEST gate: if code files are staged, today's WORKLOG must have REALTEST_EVIDENCE: or REALTEST_WAIVED:.
+    # Runtime-affecting extensions: .ps1 .ts .tsx .js .jsx .mjs .sh .py
+    # Legitimate exceptions -> add REALTEST_WAIVED: <DOC_ONLY|SMOKE_COVERED|QUERY_ONLY|NA> -- <reason>
+    $codeExts = @('.ps1', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.sh', '.py')
+    $hasCodeStaged = $false
+    foreach ($sf in $significant) {
+        if ($codeExts -contains ([System.IO.Path]::GetExtension($sf).ToLower())) {
+            $hasCodeStaged = $true
+            break
+        }
+    }
+    if ($hasCodeStaged) {
+        $hasRtEvidence = $false
+        if ($section -match '(?m)^\s*-\s*REALTEST_EVIDENCE:') { $hasRtEvidence = $true }
+        if ($section -match '(?m)^\s*-\s*REALTEST_WAIVED:')   { $hasRtEvidence = $true }
+        if (-not $hasRtEvidence) {
+            $rtMsg = ("verify-closeout-completeness: code files staged (.ps1/.ts/.js/.sh/.mjs/.py) but no REALTEST_EVIDENCE: or REALTEST_WAIVED: in {0}." -f $hdr) +
+                     " Add: - REALTEST_EVIDENCE: tool=<Bash|SSH|curl|WebFetch> | cmd=<command> | exit=<code> | ms=<N>" +
+                     " OR: - REALTEST_WAIVED: <DOC_ONLY|SMOKE_COVERED|QUERY_ONLY|NA> -- <one-line reason>. Gate=$Gate"
+            if ($Gate -eq "strict") {
+                Write-Error $rtMsg
+                exit 1
+            }
+            Write-Warning $rtMsg
+        }
+    }
+    # Print REALTEST summary for operator spot-check (non-blocking, visual only).
+    $rtLines = @(($section -split '\r?\n') | Where-Object { $_ -match 'REALTEST_EVIDENCE:|REALTEST_WAIVED:' })
+    if ($rtLines.Count -gt 0) {
+        Write-Host ("== REALTEST evidence today: {0} line(s) ==" -f $rtLines.Count) -ForegroundColor Cyan
+        foreach ($rtl in $rtLines) { Write-Host ("  {0}" -f $rtl.Trim()) -ForegroundColor DarkGray }
+    } elseif ($hasCodeStaged) {
+        Write-Host "== REALTEST: no evidence in today's WORKLOG (code staged) -- add REALTEST_EVIDENCE: or REALTEST_WAIVED: ==" -ForegroundColor Yellow
+    }
+
     # Daily note quality gate: block closeout if today's scaffold placeholders remain.
     $dailyPath = Join-Path $WorkRoot ("agency-os\memory\daily\{0}.md" -f $today)
     if (Test-Path -LiteralPath $dailyPath) {

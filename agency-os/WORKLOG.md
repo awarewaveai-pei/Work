@@ -4,6 +4,32 @@
 
 ## 2026-05-25
 
+### REALTEST gate 實作（verify-closeout-completeness + AGENTS.md）
+
+**根本問題**：R0 要求「實測」，但無機械閘區分「Claude 真跑 tool call」vs「文字描述」。
+
+**方案**：方案 D — WORKLOG REALTEST_EVIDENCE marker + verify-closeout-completeness gate + AO-CLOSE 視覺 summary。
+
+**改動**：
+- `agency-os/AGENTS.md:21` — 實測定義加 REALTEST format contract（tool/cmd/exit/ms fields）
+- `agency-os/AGENTS.md:46` — R4 違反樣態加「只寫文字描述 = AO-CLOSE 會擋」
+- `scripts/verify-closeout-completeness.ps1:114-147` — REALTEST gate：staged .ps1/.ts/.js/.sh/.mjs/.py → WORKLOG 必有 REALTEST_EVIDENCE: 或 REALTEST_WAIVED:；summary 每次 AO-CLOSE 印出供操作者 spot-check
+
+**[驗證結果]**：
+1. **實測**：
+   - audit-encoding（CP950）：pre-existing lines 31/36 已在 AUDIT_REGISTRY Low-tracked；新增程式碼 clean
+   - S1（code staged + 無 REALTEST → exit 1）✅ `verify-closeout-completeness.ps1` 正確擋住
+   - S2（REALTEST_WAIVED: SMOKE_COVERED → exit 0）✅ summary line 正確印出
+   - S3（REALTEST_EVIDENCE: tool=Bash → exit 0 + summary）✅
+   - S4（doc-only staged，無 .ps1/.ts → gate 不觸發 exit 0）✅
+   - REALTEST_EVIDENCE: tool=PowerShell | cmd=verify-closeout-completeness.ps1 -Gate strict (4 scenarios) | exit=0 | ms=~800
+2. **Review**：Read back AGENTS.md:18-46 + verify-closeout-completeness.ps1:112-153，結構正確，邏輯與現有 PS5.1 pattern 一致
+3. **抓蟲**：Grep REALTEST_EVIDENCE/REALTEST_WAIVED → 僅 2 檔（SSOT + gate）；Grep verify-closeout-completeness → 12 檔，Cursor rules 描述相容，無 stale claims
+4. **WORKLOG**：本 entry 含四動作各自結果
+
+- AUTO_TASK_DONE: REALTEST gate 實作 — verify-closeout-completeness + AGENTS.md
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=verify-closeout-completeness.ps1 -Gate strict (4 scenarios) | exit=S1:1 S2-S4:0 | ms=~800
+
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: tomo-critic-findings → handoffs/2026-05-25-1418-tomo-critic-findings.md
 

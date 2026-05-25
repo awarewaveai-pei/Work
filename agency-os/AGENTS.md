@@ -18,7 +18,7 @@
 [建議方案] 推薦哪個，為什麼它最穩定低風險
 [實作計畫] 具體步驟與預計修改檔案
 [驗證計畫] 必須涵蓋四個動作，缺一視為不合格（禁止抽象詞「測試 / lint / build」帶過）：
-  1. **實測（end-to-end real test）**：gh api / curl / docker exec / SSH / npm test 對遠端真實狀態執行；不可只跑 grep -c 或閱讀文字
+  1. **實測（end-to-end real test）**：gh api / curl / docker exec / SSH / npm test 對遠端真實狀態執行；不可只跑 grep -c 或閱讀文字；**code 改動後 WORKLOG [驗證結果] 必須有下列其一**（`verify-closeout-completeness` 機械閘，AO-CLOSE 自動強制）：`- REALTEST_EVIDENCE: tool=<Bash|SSH|curl|WebFetch> | cmd=<command> | exit=<code> | ms=<N>` 或 `- REALTEST_WAIVED: <DOC_ONLY|SMOKE_COVERED|QUERY_ONLY|NA> -- <reason>`
   2. **Review（讀回改後產物）**：Read 檔案驗結構 + 上下文 + markdown lint（code-fence paired）
   3. **抓蟲（cross-file bug hunt）**：Grep 跨檔搜本議題的相關位置（agency-os/、docs/、scripts/、.claude/、lobster-factory/、downstream consumers），找其他 stale 主張或副作用；**若本次改動含 `.md` 檔案，額外跑 `audit-cross-machine-bom` skill** 確認跨機 Google Drive 同步的 UTF-8 BOM 合規（2026-05-20 CREDENTIALS 損毀事件根因）
   4. **WORKLOG（留證據鏈）**：[驗證結果] 段以 file:line 引用實際指令與輸出；同日 WORKLOG.md entry 含「四動作各自結果」摘要
@@ -43,6 +43,7 @@
 - 只寫 grep -c 數量 = 缺 Review + 缺實測
 - 只跑 npm test = 缺抓蟲 + 缺 WORKLOG
 - 不寫 WORKLOG = 證據鏈斷裂，未來 AO-RESUME 看不到當時做了什麼
+- 實測段只寫文字描述（「我跑了 curl，結果是 200」）而無 `REALTEST_EVIDENCE:` 或 `REALTEST_WAIVED:` 行 = AO-CLOSE 機械閘會擋（`verify-closeout-completeness` 強制）
 
 ## 執行安全
 

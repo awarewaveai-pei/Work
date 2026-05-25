@@ -16,6 +16,7 @@ Packet format SSOT: `agency-os/handoffs/SCHEMA.md`
 Use the **Write tool** to write the hint to a temp file (avoids PowerShell quote-injection):
 
 1. Write tool → file `$env:TEMP\tomo-hint-scan.txt` — content: hint text on line 1, one empty line 2.
+   - If Write tool returns "File has not been read yet": Read `$env:TEMP\tomo-hint-scan.txt` first, then retry Write.
 2. Then run:
 
 ```powershell
