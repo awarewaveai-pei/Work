@@ -148,6 +148,46 @@ try {
         Write-Host "== REALTEST: no evidence in today's WORKLOG (code staged) -- add REALTEST_EVIDENCE: or REALTEST_WAIVED: ==" -ForegroundColor Yellow
     }
 
+    # REVIEW gate: all significant staged changes require REVIEW_DONE: or REVIEW_WAIVED:.
+    # Legitimate exceptions -> REVIEW_WAIVED: <DOC_ONLY|NA> -- <reason>
+    $hasReviewEvidence = $false
+    if ($section -match '(?m)^\s*-\s*REVIEW_DONE:')                     { $hasReviewEvidence = $true }
+    if ($section -match '(?m)^\s*-\s*REVIEW_WAIVED:\s+(DOC_ONLY|NA)\b') { $hasReviewEvidence = $true }
+    if (-not $hasReviewEvidence) {
+        $rvMsg = ("verify-closeout-completeness: staged changes require REVIEW_DONE: or REVIEW_WAIVED: in {0}." -f $hdr) +
+                 " Add: - REVIEW_DONE: critic=<Quick|Standard|Deep> | verdict=<pass/warn/fail> | findings=<Nc/Nm/Nn>" +
+                 " OR: - REVIEW_WAIVED: <DOC_ONLY|NA> -- <one-line reason>. Gate=$Gate"
+        if ($Gate -eq "strict") { Write-Error $rvMsg; exit 1 }
+        Write-Warning $rvMsg
+    }
+    $rvLines = @(($section -split '\r?\n') | Where-Object { $_ -match '^\s*-\s*(REVIEW_DONE:|REVIEW_WAIVED:)' })
+    if ($rvLines.Count -gt 0) {
+        Write-Host ("== REVIEW evidence today: {0} line(s) ==" -f $rvLines.Count) -ForegroundColor Cyan
+        foreach ($rvl in $rvLines) { Write-Host ("  {0}" -f $rvl.Trim()) -ForegroundColor DarkGray }
+    } else {
+        Write-Host "== REVIEW: no evidence in today's WORKLOG -- add REVIEW_DONE: or REVIEW_WAIVED: ==" -ForegroundColor Yellow
+    }
+
+    # BUGHUNT gate: all significant staged changes require BUGHUNT_DONE: or BUGHUNT_WAIVED:.
+    # Legitimate exceptions -> BUGHUNT_WAIVED: <DOC_ONLY|NA> -- <reason>
+    $hasBughuntEvidence = $false
+    if ($section -match '(?m)^\s*-\s*BUGHUNT_DONE:')                     { $hasBughuntEvidence = $true }
+    if ($section -match '(?m)^\s*-\s*BUGHUNT_WAIVED:\s+(DOC_ONLY|NA)\b') { $hasBughuntEvidence = $true }
+    if (-not $hasBughuntEvidence) {
+        $bhMsg = ("verify-closeout-completeness: staged changes require BUGHUNT_DONE: or BUGHUNT_WAIVED: in {0}." -f $hdr) +
+                 " Add: - BUGHUNT_DONE: scope=<paths> | grep=<pattern> | hits=<N>" +
+                 " OR: - BUGHUNT_WAIVED: <DOC_ONLY|NA> -- <one-line reason>. Gate=$Gate"
+        if ($Gate -eq "strict") { Write-Error $bhMsg; exit 1 }
+        Write-Warning $bhMsg
+    }
+    $bhLines = @(($section -split '\r?\n') | Where-Object { $_ -match '^\s*-\s*(BUGHUNT_DONE:|BUGHUNT_WAIVED:)' })
+    if ($bhLines.Count -gt 0) {
+        Write-Host ("== BUGHUNT evidence today: {0} line(s) ==" -f $bhLines.Count) -ForegroundColor Cyan
+        foreach ($bhl in $bhLines) { Write-Host ("  {0}" -f $bhl.Trim()) -ForegroundColor DarkGray }
+    } else {
+        Write-Host "== BUGHUNT: no evidence in today's WORKLOG -- add BUGHUNT_DONE: or BUGHUNT_WAIVED: ==" -ForegroundColor Yellow
+    }
+
     # Daily note quality gate: block closeout if today's scaffold placeholders remain.
     $dailyPath = Join-Path $WorkRoot ("agency-os\memory\daily\{0}.md" -f $today)
     if (Test-Path -LiteralPath $dailyPath) {

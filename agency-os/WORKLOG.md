@@ -43,6 +43,34 @@
 - AUTO_TASK_DONE: /review trigger rule — AGENTS.md L141 + critic patches
 - REALTEST_EVIDENCE: tool=PowerShell | cmd=verify-closeout-completeness.ps1 -Gate strict (5 scenarios post-critic) | exit=all-expected | ms=~1200
 
+### REVIEW + BUGHUNT gate 實作（四動作全機械化）
+
+**根本問題**：R0 四動作（實測/Review/抓蟲/WORKLOG）只有實測和 WORKLOG 有 AO-CLOSE 機械閘；Review/抓蟲靠行為規則，Claude 慣性跳過，使用者每次主動問才抓到問題。
+
+**方案**：REVIEW_DONE + BUGHUNT_DONE marker 進 AO-CLOSE gate，觸發條件 = 所有 significant staged 變更（非只限 code files）。
+
+**改動**：
+- `scripts/verify-closeout-completeness.ps1:150-195` — REVIEW gate + BUGHUNT gate（各含 WAIVED 白名單 DOC_ONLY|NA + summary 印出）
+- `agency-os/AGENTS.md:22` — Review 動作補 REVIEW_DONE marker 格式 + 機械閘說明
+- `agency-os/AGENTS.md:23` — 抓蟲動作補 BUGHUNT_DONE marker 格式 + 機械閘說明
+- `agency-os/AGENTS.md:47-48` — R4 違反樣態補 REVIEW_DONE / BUGHUNT_DONE 缺失樣態
+
+**[驗證結果]**：
+1. **實測**：5 scenarios regex test（PS `Test-Regex` harness）：
+   - A（全 4 marker present）→ REVIEW_DONE/BUGHUNT_DONE 均命中 ✅
+   - B（缺 REVIEW_DONE）→ 未命中 ✅
+   - C（缺 BUGHUNT_DONE）→ 未命中 ✅
+   - D（WAIVED: DOC_ONLY）→ 白名單接受 ✅
+   - E（WAIVED: YOLO/SKIP）→ 白名單拒絕 ✅
+2. **Review**：/audit-encoding exit 1 — 只有 pre-existing L31/L36（AUDIT_REGISTRY Low-tracked）；新增程式碼 ASCII-only clean ✅；AGENTS.md L22/L23/L47/L48 格式正確 ✅
+3. **抓蟲**：Grep `REVIEW_DONE|BUGHUNT_DONE` → 僅 AGENTS.md（SSOT）命中，無 stale 副本；Grep `verify-closeout-completeness` 跨 12 檔引用均描述 gate 用途，無矛盾 ✅；`.mdc` 無需 sync ✅
+4. **WORKLOG**：本 entry 含四動作各自結果
+
+- AUTO_TASK_DONE: REVIEW + BUGHUNT gate — 四動作全機械化 verify-closeout-completeness + AGENTS.md
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=Test-Regex harness 5 scenarios | exit=all-PASS | ms=~400
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0C/0M/1m(pre-existing CP950 Low-tracked)
+- BUGHUNT_DONE: scope=agency-os/ scripts/ .claude/ .cursor/ | grep=REVIEW_DONE|BUGHUNT_DONE|verify-closeout | hits=12-files-no-stale
+
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: tomo-critic-findings → handoffs/2026-05-25-1418-tomo-critic-findings.md
 
