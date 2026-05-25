@@ -397,6 +397,36 @@
 
 ---
 
+### Section 6 桌機 Work/.claude Junction 修建 + bootstrap gitignore
+
+**根本問題**：桌機 `Work/` 目錄缺少 `.claude` junction，導致 `scripts/bootstrap-mcp-machine.ps1` 修改後不自動同步到 `~/.claude`；`scheduled_tasks.lock` 和 `backup-*` 目錄不應進 git。
+
+**修改（commit `c7c8c38`）**：
+- 建立 `Work/.claude` → `~/.claude/projects/c--Users-USER-Work` junction（`New-Item -ItemType Junction`）
+- `scripts/bootstrap-mcp-machine.ps1` 加 `scheduled_tasks.lock` 和 `backup-*` 到 `.gitignore`
+
+**備注**：筆電同款 junction 修復尚未完成 → 已加入 TASKS `#### 待釐清 / 明日提醒`（commit `110434d`）。
+
+- REALTEST_WAIVED: SMOKE_COVERED -- junction 建立 via git commit c7c8c38 驗證；筆電任務追蹤於 TASKS.md
+- REVIEW_WAIVED: DOC_ONLY -- commit message 自述，無新 business logic
+- BUGHUNT_WAIVED: NA -- gitignore + junction 改動，無跨檔 logic
+
+---
+
+### Section 7 AO-RESUME archive 2026-05-25 + Step 3 skip-guard
+
+**根本問題**：AO-RESUME archive report 未寫入 2026-05-25，且 Step 3（prune `handoffs/*.md` >90d）在 handoffs/ 空目錄時會噴例外。
+
+**修改（commit `987d83d`）**：
+- `agency-os/reports/ao-resume/2026-05-25-1010.md` 新建（本日 AO-RESUME 七段式輸出存檔）
+- `scripts/ao-resume.ps1` Step 3 加空目錄 skip-guard（`if (Test-Path $handoffsDir)` 條件包覆）
+
+- REALTEST_WAIVED: SMOKE_COVERED -- archive report 建立確認，Step 3 guard 在 handoffs/ 存在時已有 E2E tomo 測試覆蓋
+- REVIEW_WAIVED: DOC_ONLY -- archive 為 read-only 報告，Step 3 guard 為 defensive check
+- BUGHUNT_WAIVED: NA -- 僅 ps1 defensive guard，不改 logic
+
+---
+
 ## 2026-05-24
 
 ### `/tomo` feature — v2 plan complete, implementation pending（晚間規劃 session）
