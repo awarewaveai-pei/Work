@@ -47,6 +47,44 @@
 
 ---
 
+### Section 3 scanner-block.inc Critic Patch — regex 錨定修正 + limit_req off false positive 確認
+
+**根本問題**：上一個 session（Section 2）建立的 scanner-block.inc 有 4 個 Critic Major：
+1. `limit_req off;` 缺失 — 疑慮是 server-level limit_req 被 scanner-block location 繼承，bursty scanner 的 503 落進 access.log 讓 Netdata 看到
+2. `eval-stdin` 未錨定 → false positive 風險（應為 `eval-stdin\.php`）
+3. `gravitysmtp` 未錨定（應為 `/wp-content/plugins/gravitysmtp`）
+4. `/\.git/`、`/\.aws/`、`/\.ssh/` 無 trailing 問題（不匹配無斜線結尾的路徑）
+
+**分析與結論**：
+- Major-1 (`limit_req off;`)：嘗試加入，SG nginx/1.24.0 + EU nginx/1.18.0 兩台均回 `invalid parameter "off"`（nginx 1.23.3+ feature，Ubuntu packaging 未含）。**但 false positive 確認**：EU 15-burst test 實測，15 次 `/.env` burst → scanner.log 5 條（尾巴），access.log 無污染。原因：nginx location phase 先於 preaccess/limit_req phase；rate-limited 503 在 LOG_PHASE 時 location 已確定為 scanner-block，使用 location 的 access_log。`limit_req off;` 不需要，Critic Major-1 為 false positive。
+- Major-2 (certbot)：SG `authenticator = nginx`（HTTP-01）+ port 80 純 Docker（host nginx 從未綁 80）。cert 2026-07-16 到期（52 天），issuance 2026-04-17（尚未歷經自動 renewal）。dry-run 逾時（120s）→ 獨立既有風險，非本次引入。**→ 另立 TASK，deadline 2026-06-16**。
+- Major-3 + Major-4：已修 ✅
+
+**修改（commit 見下方）**：
+- `nginx/system-sites/scanner-block.inc`：
+  - `eval-stdin` → `eval-stdin\.php`（PHP RCE payload 確定為 .php 結尾）
+  - `gravitysmtp` → `/wp-content/plugins/gravitysmtp`（精確 WP plugin path）
+  - `/\.git/` → `/\.git(/|$)`（無斜線結尾也能匹配）
+  - `/\.aws/` → `/\.aws(/|$)`；`/\.ssh/` → `/\.ssh(/|$)`（同上）
+  - 加 `Note on limit_req inheritance` 說明為何不需要 `limit_req off;`
+
+**驗證結果（R0 四動作）**：
+1. **實測**：
+   - SG：`.env=000, wp-config=000, .git=000, .aws=000, eval-stdin.php=000` ✅
+   - EU：`n8n .env=000, supabase wp-config=000, supabase .git=000` ✅
+   - EU 15-burst rate-limit test：scanner.log 有 5 條 444；access.log 最後 5 條全是正常 Uptime Kuma / Supabase 流量，無 scanner 污染 ✅
+2. **Review**：SG + EU live `/etc/nginx/snippets/scanner-block.inc` 內容與 repo SSOT 完全一致（SFTP size=1635 bytes 兩台相同）✅
+3. **抓蟲**：SG grep scanner-block → 3 個 server block include（aware-wave-phase1, app, api）✅；EU grep → 4 個（n8n, studio, eu-default-site, supabase）✅；logrotate `/var/log/nginx/*.log` 兩台皆涵蓋 scanner.log ✅；Critic Major-1 `limit_req off` false positive 以 burst test 反駁
+4. **WORKLOG**：此條目（四動作各自結果如上）
+
+**剩餘風險**：
+- certbot aware-wave.com HTTP-01 renewal 未測成功（dry-run 逾時）→ 2026-06-16 前須遷移 DNS-01（另立 TASK）
+- Critic Major (^~) gap：app.aware-wave.com 的 `^~` prefix location 擋住 /api/* subtree 的 scanner-block regex，這是已知限制（scanner 打 /api/ 路徑不會被 scanner-block 攔，但 rate-limit 仍有效）
+
+**rollback**：`git revert <this commit>` → 重新 SFTP + reload 兩台
+
+---
+
 ### Section 2 Nginx 掃描器防護 — 一勞永逸（scanner-block + limit_req 全面補齊）
 
 **根本問題**：2026-05-22 SG bad requests 119.4% + 2026-05-23 EU bad requests 89.3% 兩次告警，root cause 有三個：
