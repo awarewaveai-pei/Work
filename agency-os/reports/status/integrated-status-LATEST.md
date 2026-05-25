@@ -1,7 +1,7 @@
 ﻿# Integrated status report (assembled)
 
-- Generated: 2026-05-24 01:17:25
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-05-25 18:37:06
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -219,74 +219,172 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-24.md
-# Daily Note - 2026-05-24
+## 5) memory/daily/2026-05-25.md
+# Daily Note - 2026-05-25
 
-## Done (session window 2026-05-23T12:51 → 2026-05-24T01:00 CST)
+## Done (session window 2026-05-21T01:23 UTC → 2026-05-25 AO-CLOSE)
 
-### 2026-05-24 ~01:00（AO-CLOSE 收尾）
-- 修 `~/.claude/mcp.json` 含 24 條 plaintext-secret MCP 條目 → 走 R1 normalize 回 `{ "mcpServers": {} }`，shared MCP 由 repo `.mcp.json`（41 條）接手；backup 保存於 `~/.claude/backups/mcp.json.backup-2026-05-24-0100`
-- 修 `agency-os/WORKLOG.md:269` 死連結（`file://` URL 指向已刪 `d:\tmp\real-exec-test-v2.ps1`）→ 改純 code 文字，doc-integrity validator PASS
-- 加 TASKS entry「AO-RESUME 讀 WORKLOG tail 50 行邏輯改為『上次 AO-RESUME → 本次』區段」（操作者凌晨提問，明天會繼續討論）
-- cf-security-LATEST.md 順手刷新（PASS / bot=ON / rules=4 / xmlrpc=block）
-- Health gate 99.7% → **100% (371/371)** 達標
+### 2026-05-25 下午（今日下半段）
 
-### 2026-05-24 凌晨（commit 972aac9）
-- 新 plan 檔 `.claude/plans/tomo-feature-v2-plan.md` — `/tomo` feature v2（7 個設計決策、10 個 v1→v2 漏洞 fix、Phase 0/1/2/3、完整 4.3 抓蟲、Resume Instructions）
-- WORKLOG 2026-05-24 entry 留 iteration 證據鏈 + R0+R4 四動作驗證
+**R0 四動作全機械化閘道**（commits in WORKLOG 2026-05-25）：
+- REALTEST gate：`verify-closeout-completeness.ps1` 加 staged code → WORKLOG 必有 `REALTEST_EVIDENCE:`/`REALTEST_WAIVED:` 機械閘
+- /review trigger rule：`AGENTS.md L141` 加「R0 完成前強制 `/review` critic subagent 外部 oracle」
+- REVIEW gate + BUGHUNT gate：`REVIEW_DONE:`/`BUGHUNT_DONE:` marker 進 AO-CLOSE gate — 四動作完全機械化
+- Critic 發現並修復：1 Major（summary regex 不一致）+ 3 Minor；5 scenarios 全 PASS
 
-### 2026-05-23 下午/傍晚（commit 4756bd7）
-- 永久化 3 個 patterns：
-  - 新 memory `feedback_audit_shape_pattern_vs_logic.md`（Pattern audit vs Logic audit 的工序差異）
-  - 新 slash command `.claude/commands/apply-audit.md`（162 行，6 步 + 紅線清單 + 起源事件紀錄）
-  - 更新 `BUG_HUNT_PROTOCOL.md` 新增「兩種 audit shape」段、`AGENTS.md` 新增「操作者說『apply audit/處理好所有的事』→ 自動 `/apply-audit`」trigger row
+**SG certbot DNS-01 wildcard cert**（commit `4872c7d`）：
+- `certbot-dns-cloudflare` 安裝；`aware-wave.com + *.aware-wave.com` 單 cert；到期 2026-08-23
+- `certbot renew --dry-run` SG + EU 全 PASS；5 orphaned cert 刪除；90 天全自動
+
+**/tomo E2E 驗收（2C+6M+Read-first Minor 全 apply）**（commit `1fb9179`）：
+- C1（phantom consumed）/ C2（hint injection Write tool）/ M1-M6 / Read-first Minor 全部驗收通過
+- AUTO_TASK_DONE: 補完 tomo critic findings apply — 2C+6M+Read-first 全修完
+
+**桌機 Work/.claude junction 修建 + bootstrap gitignore**（commit `c7c8c38`）：
+- `Work/.claude` junction 指向 `~/.claude/projects/c--Users-USER-Work`
+- `scheduled_tasks.lock` + `backup-*` 加入 .gitignore
+
+**AO-RESUME archive + Step 3 skip-guard**（commit `987d83d`）：
+- `agency-os/reports/ao-resume/2026-05-25-1010.md` 建立
+- `ao-resume.ps1` Step 3 空目錄 skip-guard
+
+**Section 1 系統快照全面盤查**（commits `b791bfb` + `283b1da`）：
+- 7 個 AO-RESUME 系統問題全部定論（SG reboot OK / EU bad-req 自癒 / SSH keys 存在 / 5 memory 備份靜默失敗根因）
+- `Invoke-LocalBackup` + `Backup-Path` 加 try/catch Stop — 失敗有名 WARN 輸出；AUDIT_REGISTRY FIXED
+
+### 2026-05-21 to 2026-05-24（全 session 前段，已在 2026-05-24 01:17 AO-CLOSE commit `5fcafa8` 覆蓋）
+
+- Nginx scanner-block D1-D5（SG+EU 全面補齊，scanner-block.inc 13 路徑）
+- scanner-block Critic Major 3 個 fix（regex 錨定）
+- /tomo v2 全鏈實作（7 個檔案，plan `972aac9` → impl `3f9a20d` → handoff `8c65d19`）
+- Auto-Repair 5 Criticals (C1-C5) FIXED + cross-file 抓蟲
+- 永久化 3 patterns (apply-audit skill, Pattern vs Logic audit, AGENTS trigger)
+- Phase 4 weekly routine 已建立確認（CLI RemoteTrigger，非 web UI）
 
 ## AUTO_TASK_DONE
-（本輪無 pre-existing TASKS `- [ ]` 被結案；今日完成的是新增治理/計畫工作 + 收工修復，不對應任何既有開放條目）
+- AUTO_TASK_DONE: tomo critic findings E2E — 2C+6M+Read-first Minor 全驗收
+- AUTO_TASK_DONE: SG certbot DNS-01 migration — wildcard cert, 5 orphaned certs deleted, EU dry-run verified
+- AUTO_TASK_DONE: REALTEST gate — verify-closeout-completeness + AGENTS.md
+- AUTO_TASK_DONE: /review trigger rule — AGENTS.md L141 + critic patches
+- AUTO_TASK_DONE: REVIEW + BUGHUNT gate — 四動作全機械化
 
 ## 體系觀察
-- WORKLOG tail-50 機械讀檔在長 entry 日會吃中段內容（操作者發現於本次 AO-RESUME），已入 TASKS 明天 R0 討論改法
-- `~/.claude/mcp.json` plaintext secrets 累積 = 隱性安全債（scan-for-secrets WARN 早已點名但被當噪音）；本次走 R1 SSOT 修復後消失，建議下次新增 MCP server 一律進 repo `.mcp.json` 不碰 user-level
-- AO-CLOSE 100% 門檻今晚一次擋出 2 個 critical（sync drift + broken-link），證明門檻有實效，不該帶 `-AllowNonPerfectHealth` 跳過
-
----
-
-### verify-recent --ack (2026-05-23T16:04:01.6784987Z)
-
-**Reason**: ao-resume.ps1 git push P3 fix: syntax PASS, critic round done (1 Minor comment ref already fixed, 0 Critical/Major), real-exec test 48.5s + exit 0 + 41 steps + cross-machine import at #31 of 41; d:\tmp/syntax-check.ps1 + real-exec-test-v2.ps1 + check-step2.ps1 are test artifacts not in repo not deployed
-
-**Acknowledged unverified files** (count=5):
-
-- `D:\Work\scripts\ao-resume.ps1`
-- `d:\tmp\check-step2.ps1`
-- `d:\tmp\real-exec-test-v2.ps1`
-- `d:\tmp\syntax-check.ps1`
-- `d:\tmp\run-ack2.ps1`
+- R0 四動作（實測/Review/抓蟲/WORKLOG）從行為規則升到機械閘，是本 session 最大治理里程碑
+- certbot DNS-01 wildcard 徹底解決 HTTP-01 renewal 死穴（port 80 Docker 佔用問題）
+- `/tomo` v2 E2E 全鏈跑通，handoff packet 機制完整可用
+- Backup silent-fail 修法：`-ErrorAction Stop` + try/catch = 30 年可維護
 
 ## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:884a4286e45c3065eb2b2bd9f9d7b7cf476c4a7e30438003606e4d672f82a4b6 -->
+<!-- ao-close-inbox-sha256:pending -->
 
-### claude-opus-4-7 2026-05-24 01:08
+### claude-sonnet-4-6 2026-05-25 AO-CLOSE
 
-- **完成（一句）**: AO-RESUME 七段式輸出 → 操作者要求 R0 架構師模式收尾 → 修復 `~/.claude/mcp.json` plaintext-secret drift（R1 violation）+ `WORKLOG.md:269` broken `file://` link，health gate 99.7% → 100% (371/371)，AO-CLOSE 100% 門檻達標。
+- **完成（一句）**: 四動作機械化閘道（REALTEST+REVIEW+BUGHUNT gate）部署、SG certbot DNS-01 wildcard cert 一勞永逸、/tomo v2 E2E 驗收、backup silent-fail 修復、nginx scanner-block D1-D5 全面補齊。
 - **變更路徑**:
-  - `~/.claude/mcp.json`（normalize → `{ "mcpServers": {} }`，shared MCP 由 repo `.mcp.json` 41 條接手）
-  - `~/.claude/backups/mcp.json.backup-2026-05-24-0100`（backup 含 24 條 plaintext secrets，gitignored 不入版控）
-  - `agency-os/WORKLOG.md`（line 269 死連結改純 code 文字 + 新增「AO-CLOSE 收尾」session entry）
-  - `agency-os/TASKS.md`（新增「AO-RESUME 讀 WORKLOG tail 改為『上次 AO-RESUME → 本次』區段」task，操作者凌晨提問）
-  - `agency-os/reports/status/cf-security-LATEST.md`（refresh PASS）
-  - `agency-os/reports/ao-resume/2026-05-24-0057.md`（AO-RESUME archive，由 auto-checkpoint 進 commit `81eb2b2`）
-  - `agency-os/memory/daily/2026-05-24.md`（Done section 覆蓋 session window）
-  - `agency-os/memory/CONVERSATION_MEMORY.md`（session 摘要 entry）
-- **Git**: `81eb2b2` (auto-checkpoint), `972aac9` (/tomo plan), `4756bd7` (永久化 3 patterns) — ahead 1, dirty
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: (a) sync merge 過程 commands 段 Copy-Item 噴 IOException on `ao-close.md`（被其他 process 鎖；實際 same=33/update=0 不影響同步一致性，check-claude-sync 後續 PASS 證實）；(b) `~/.claude/backups/mcp.json.backup-2026-05-24-0100` 保留約 1-2 週後可手動刪（含 plaintext secrets）；(c) WORKLOG tail-50 讀檔邏輯改善已入 TASKS，明天討論。
+  - `scripts/verify-closeout-completeness.ps1`（REALTEST + REVIEW + BUGHUNT gate 新增）
+  - `agency-os/AGENTS.md`（R0 四動作 marker format + R4 違反樣態 + /review trigger rule）
+  - `.claude/commands/tomo.md` / `agency-os/handoffs/SCHEMA.md` / `README.md`（tomo v2 E2E critic fix）
+  - `lobster-factory/infra/.../nginx/system-sites/scanner-block.inc`（regex 錨定）
+  - `lobster-factory/infra/.../nginx/system-sites/aware-wave-app-api-subdomains.conf`（cert path wildcard）
+  - `scripts/import-cross-machine-memory.ps1`（Invoke-LocalBackup try/catch）
+  - `scripts/sync-claude-userlevel.ps1`（Backup-Path try/catch + CP950 fix）
+  - `agency-os/docs/operations/AUDIT_REGISTRY.md`（sync-claude-userlevel 🔴 FIXED）
+  - `scripts/ao-resume.ps1`（Step 3 skip-guard）
+  - `agency-os/reports/ao-resume/2026-05-25-1010.md`（archive 新建）
+  - `.gitignore`（scheduled_tasks.lock + backup-*）
+- **對應 TASKS 子字串**:
+  - `tomo critic findings E2E`
+  - `SG certbot DNS-01 migration`
+- **風險／待辦**:
+  - 筆電 bootstrap junction 修復仍開放（操作者手動執行 scripts/bootstrap-mcp-machine.ps1）
+  - AO-RESUME WORKLOG tail 改法（TASKS 開放項，操作者確認後 R0 實作）
+  - Auto-Repair Major M1-M10 follow-up（Phase 4 觀察期 2026-06-19 收官前）
+
+## Open Items (攜入下一 session)
+- [ ] 筆電 bootstrap-mcp-machine.ps1 junction 修復（無代理可執行，操作者手動）
+- [ ] AO-RESUME WORKLOG tail 改為「上次 AO-RESUME → 本次」區段（R0 討論）
+- [ ] Auto-Repair Major M1-M10 follow-up（Phase 4 觀察期 2026-06-19）
+- [ ] Ops Inbox netdata CLEAR fingerprint instability
+- [ ] EU ClickHouse backup cleanup（2026-06-01）
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:134d453d8e9481cb88044cf454f3640404e6817c1b800a4863f4b0ec1a8a6510 -->
+
+### claude-sonnet-4-6 2026-05-25 23:59
+
+- **完成（一句）**: 四動作機械化閘道（REALTEST+REVIEW+BUGHUNT gate verify-closeout-completeness）+ SG certbot DNS-01 wildcard cert + /tomo v2 E2E 驗收 + backup silent-fail 修復 + nginx scanner-block D1-D5 全面補齊 + 桌機 Work/.claude junction 修建。
+- **變更路徑**:
+  - `scripts/verify-closeout-completeness.ps1`（REALTEST + REVIEW + BUGHUNT gate 新增，Critic 4 findings fix）
+  - `agency-os/AGENTS.md`（R0 四動作 marker format contract + R4 違反樣態 + /review trigger rule L141）
+  - `.claude/commands/tomo.md`（C1 consumed 移除、C2 Write tool、M1-M6、Read-first fallback）
+  - `agency-os/handoffs/SCHEMA.md` / `agency-os/handoffs/README.md`（consumed 欄位移除）
+  - `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/scanner-block.inc`（regex 錨定）
+  - `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`（cert path wildcard）
+  - `scripts/import-cross-machine-memory.ps1`（Invoke-LocalBackup try/catch）
+  - `scripts/sync-claude-userlevel.ps1`（Backup-Path try/catch + CP950 dot-source fix）
+  - `agency-os/docs/operations/AUDIT_REGISTRY.md`（sync-claude-userlevel 🔴 FIXED）
+  - `scripts/ao-resume.ps1`（Step 3 handoffs skip-guard）
+  - `agency-os/reports/ao-resume/2026-05-25-1010.md`（archive 新建）
+  - `.gitignore`（scheduled_tasks.lock + backup-* 加入）
+  - `agency-os/WORKLOG.md`（Section 6/7 + AO-CLOSE AUTO_TASK_DONE）
+  - `agency-os/memory/CONVERSATION_MEMORY.md`（2026-05-25 session 摘要）
+  - `agency-os/memory/daily/2026-05-25.md`（新建）
+- **Git**: `1010b76`(chkpt) `110434d`(task) `c7c8c38`(bootstrap) `1fb9179`(tomo-E2E) `4872c7d`(certbot) `8c65d19`(tomo-handoff) `5af7e41`(scanner-critic) `3f9a20d`(tomo-impl) `1b29227`(D5-nginx) `fb941c0`(scanner-block) `283b1da`(sync-fix) `b791bfb`(import-fix) `987d83d`(ao-resume)
+- **對應 TASKS 子字串（可選）**: tomo critic findings E2E
+- **風險／待辦（可選）**: 筆電 bootstrap junction 修復仍開放（操作者手動）；AO-RESUME WORKLOG tail 改法待 R0 討論；Auto-Repair M1-M10 follow-up（Phase 4 2026-06-19）
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:42c0dad5325deb2a8e4ed7e8e3f0d8313ffda12bead68d54a440529008dcaf21 -->
+
+### claude-sonnet-4-6 2026-05-25 23:59
+
+- **完成（一句）**: 四動作機械化閘道（REALTEST+REVIEW+BUGHUNT gate）+ SG certbot DNS-01 wildcard cert + /tomo v2 E2E 驗收 + backup silent-fail 修復 + nginx scanner-block D1-D5 + 桌機 Work/.claude junction + BUG_HUNT_PROTOCOL 跨機連結修復。
+- **變更路徑**:
+  - `scripts/verify-closeout-completeness.ps1`（REALTEST + REVIEW + BUGHUNT gate）
+  - `agency-os/AGENTS.md`（R0 四動作 marker format + /review trigger rule L141）
+  - `agency-os/docs/operations/BUG_HUNT_PROTOCOL.md`（跨機 memory link 修復）
+  - `scripts/import-cross-machine-memory.ps1` / `scripts/sync-claude-userlevel.ps1`（backup try/catch）
+  - `scripts/ao-resume.ps1`（Step 3 skip-guard）
+- **Git**: `ac15849`(doc-fix) `9502ad4`(merge-inbox) `3e4c3b3`(daily-gate) `0073839`(pre-closeout) `1fb9179`(tomo-E2E) `4872c7d`(certbot) `c7c8c38`(bootstrap) `283b1da`(sync-fix)
+- **對應 TASKS 子字串（可選）**: tomo critic findings E2E
+- **風險／待辦（可選）**: 筆電 bootstrap junction 仍開放；AO-RESUME WORKLOG tail 改法待討論；Auto-Repair M1-M10 follow-up
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:facd27ae4c7f7fd536a340c10fb14712b4e2f59742917644a99a0af667206f08 -->
+
+### claude-sonnet-4-6 2026-05-25 23:59
+
+- **完成（一句）**: 四動作機械化閘道（REALTEST+REVIEW+BUGHUNT gate）+ SG certbot DNS-01 wildcard cert + /tomo v2 E2E 驗收 + backup silent-fail 修復 + nginx scanner-block D1-D5 全面補齊 + 桌機 Work/.claude junction 修建 + BUG_HUNT_PROTOCOL 跨機連結修復。
+- **變更路徑**:
+  - `scripts/verify-closeout-completeness.ps1`（REALTEST + REVIEW + BUGHUNT gate 新增）
+  - `agency-os/AGENTS.md`（R0 四動作 marker format + /review trigger rule L141）
+  - `agency-os/docs/operations/BUG_HUNT_PROTOCOL.md`（跨機 memory link 修復）
+  - `scripts/import-cross-machine-memory.ps1` / `scripts/sync-claude-userlevel.ps1`（backup try/catch）
+  - `scripts/ao-resume.ps1`（Step 3 skip-guard）
+- **Git**: `d667c95` `9502ad4` `ac15849` `3e4c3b3` `0073839` `1010b76` `110434d` `c7c8c38` `1fb9179` `4872c7d`
+- **對應 TASKS 子字串（可選）**: tomo critic findings E2E
+- **風險／待辦（可選）**: 筆電 bootstrap junction 仍開放；AO-RESUME WORKLOG tail 改法待討論；Auto-Repair M1-M10 follow-up（Phase 4 2026-06-19）
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:715366fbedc364d91698d6343faa953dc2cf02edccda5f430edb76335510cf85 -->
+
+### claude-sonnet-4-6 2026-05-25 23:59
+
+- **完成（一句）**: 四動作機械化閘道（REALTEST+REVIEW+BUGHUNT gate）+ SG certbot DNS-01 wildcard cert + /tomo v2 E2E 驗收 + backup silent-fail 修復 + nginx scanner-block D1-D5 全面補齊 + 桌機 Work/.claude junction 修建 + BUG_HUNT_PROTOCOL 跨機連結修復 + verify-closeout-completeness CJK path crash 修復。
+- **變更路徑**:
+  - `scripts/verify-closeout-completeness.ps1`（GetExtension crash on octal-escaped paths — try/catch fix）
+  - `agency-os/docs/operations/BUG_HUNT_PROTOCOL.md`（跨機 memory link 修復）
+  - `scripts/import-cross-machine-memory.ps1` / `scripts/sync-claude-userlevel.ps1`（backup try/catch）
+  - `scripts/ao-resume.ps1`（Step 3 skip-guard）
+- **Git**: `d667c95` `9502ad4` `ac15849` `3e4c3b3` `0073839` `1010b76` `110434d` `c7c8c38` `1fb9179` `4872c7d`
+- **對應 TASKS 子字串（可選）**: tomo critic findings E2E
+- **風險／待辦（可選）**: 筆電 bootstrap junction 仍開放；AO-RESUME WORKLOG tail 改法待討論；Auto-Repair M1-M10 follow-up（Phase 4 2026-06-19）
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-24 01:17:21`
+- Time: `2026-05-25 18:37:04`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -296,8 +394,8 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260524-011720.md`
-- Closeout: `reports/closeout/closeout-20260524-011714.md`
+- Health: `reports/health/health-20260525-183704.md`
+- Closeout: `reports/closeout/closeout-20260525-183657.md`
 
 ## Action
 - No blocking issue detected.

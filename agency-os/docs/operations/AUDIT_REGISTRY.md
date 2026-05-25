@@ -247,5 +247,5 @@ See audit report §Minor Findings table. Highlights: dead code at `policy.ts:74`
 ## Related Documents (Auto-Synced)
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
 
-_Last synced: 2026-05-23 17:17:13 UTC_
+_Last synced: 2026-05-25 10:32:53 UTC_
 

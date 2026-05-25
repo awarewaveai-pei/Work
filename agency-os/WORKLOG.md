@@ -1,4 +1,4 @@
-# Worklog
+﻿# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
@@ -470,6 +470,39 @@
 - **Git**: `ac15849`(doc-fix) `9502ad4`(merge-inbox) `3e4c3b3`(daily-gate) `0073839`(pre-closeout) `1fb9179`(tomo-E2E) `4872c7d`(certbot) `c7c8c38`(bootstrap) `283b1da`(sync-fix)
 - **對應 TASKS 子字串（可選）**: tomo critic findings E2E
 - **風險／待辦（可選）**: 筆電 bootstrap junction 仍開放；AO-RESUME WORKLOG tail 改法待討論；Auto-Repair M1-M10 follow-up
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:facd27ae4c7f7fd536a340c10fb14712b4e2f59742917644a99a0af667206f08 -->
+
+### claude-sonnet-4-6 2026-05-25 23:59
+
+- **完成（一句）**: 四動作機械化閘道（REALTEST+REVIEW+BUGHUNT gate）+ SG certbot DNS-01 wildcard cert + /tomo v2 E2E 驗收 + backup silent-fail 修復 + nginx scanner-block D1-D5 全面補齊 + 桌機 Work/.claude junction 修建 + BUG_HUNT_PROTOCOL 跨機連結修復。
+- **變更路徑**:
+  - `scripts/verify-closeout-completeness.ps1`（REALTEST + REVIEW + BUGHUNT gate 新增）
+  - `agency-os/AGENTS.md`（R0 四動作 marker format + /review trigger rule L141）
+  - `agency-os/docs/operations/BUG_HUNT_PROTOCOL.md`（跨機 memory link 修復）
+  - `scripts/import-cross-machine-memory.ps1` / `scripts/sync-claude-userlevel.ps1`（backup try/catch）
+  - `scripts/ao-resume.ps1`（Step 3 skip-guard）
+- **Git**: `d667c95` `9502ad4` `ac15849` `3e4c3b3` `0073839` `1010b76` `110434d` `c7c8c38` `1fb9179` `4872c7d`
+- **對應 TASKS 子字串（可選）**: tomo critic findings E2E
+- **風險／待辦（可選）**: 筆電 bootstrap junction 仍開放；AO-RESUME WORKLOG tail 改法待討論；Auto-Repair M1-M10 follow-up（Phase 4 2026-06-19）
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:715366fbedc364d91698d6343faa953dc2cf02edccda5f430edb76335510cf85 -->
+
+### claude-sonnet-4-6 2026-05-25 23:59
+
+- **完成（一句）**: 四動作機械化閘道（REALTEST+REVIEW+BUGHUNT gate）+ SG certbot DNS-01 wildcard cert + /tomo v2 E2E 驗收 + backup silent-fail 修復 + nginx scanner-block D1-D5 全面補齊 + 桌機 Work/.claude junction 修建 + BUG_HUNT_PROTOCOL 跨機連結修復 + verify-closeout-completeness CJK path crash 修復。
+- **變更路徑**:
+  - `scripts/verify-closeout-completeness.ps1`（GetExtension crash on octal-escaped paths — try/catch fix）
+  - `agency-os/docs/operations/BUG_HUNT_PROTOCOL.md`（跨機 memory link 修復）
+  - `scripts/import-cross-machine-memory.ps1` / `scripts/sync-claude-userlevel.ps1`（backup try/catch）
+  - `scripts/ao-resume.ps1`（Step 3 skip-guard）
+- **Git**: `d667c95` `9502ad4` `ac15849` `3e4c3b3` `0073839` `1010b76` `110434d` `c7c8c38` `1fb9179` `4872c7d`
+- **對應 TASKS 子字串（可選）**: tomo critic findings E2E
+- **風險／待辦（可選）**: 筆電 bootstrap junction 仍開放；AO-RESUME WORKLOG tail 改法待討論；Auto-Repair M1-M10 follow-up（Phase 4 2026-06-19）
 
 ## 2026-05-24
 
@@ -5478,7 +5511,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-23 17:17:13 UTC_
+_Last synced: 2026-05-25 10:36:56 UTC_
 
 ## 2026-03-20
 
@@ -5919,3 +5952,4 @@ _Last synced: 2026-05-23 17:17:13 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+

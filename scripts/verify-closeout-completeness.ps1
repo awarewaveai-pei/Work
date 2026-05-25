@@ -117,7 +117,9 @@ try {
     $codeExts = @('.ps1', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.sh', '.py', '.psm1', '.psd1')
     $hasCodeStaged = $false
     foreach ($sf in $significant) {
-        if ($codeExts -contains ([System.IO.Path]::GetExtension($sf).ToLowerInvariant())) {
+        # Use regex fallback: [System.IO.Path]::GetExtension throws on git octal-escaped paths (e.g. "\351\203...")
+        $ext = try { [System.IO.Path]::GetExtension($sf).ToLowerInvariant() } catch { if ($sf -match '\.(\w+)$') { ".$($Matches[1].ToLowerInvariant())" } else { '' } }
+        if ($codeExts -contains $ext) {
             $hasCodeStaged = $true
             break
         }

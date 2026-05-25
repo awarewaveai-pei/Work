@@ -29,5 +29,5 @@
 - `docs/operations/tenant-scheduling.md`
 - `tenants/templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md`
 
-_Last synced: 2026-05-22 12:54:27 UTC_
+_Last synced: 2026-05-25 10:32:53 UTC_
 
