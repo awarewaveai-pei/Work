@@ -105,7 +105,21 @@ Items that cannot proceed without a human choice or action. Each entry must incl
 - 影響：what is blocked until resolved
 
 **7. 下一步**
-Concrete first action. If a 需決策 item is blocking, state it first.
+
+**Pending handoff packets (check before first action)**:
+
+1. Scan TASKS.md open `- [ ]` rows inside `#### 待釐清 / 明日提醒` for lines containing `→ handoffs/`
+2. For each pointer found, read `agency-os/handoffs/<filename>`
+3. Display by count:
+   - **0 packets**: skip this sub-section entirely
+   - **1–3 packets**: inline full packet markdown for each, separated by `---`
+   - **4+ packets**: inline the 3 most recent (by `YYYY-MM-DD-HHmm` filename prefix) in full; for the rest list: `- <slug> (handoffs/<filename>, created <date>)` and add: 「回覆「展開 packet <slug>」可查看完整內容」
+4. **Missing packet file**: if pointer exists but file not found, print:
+   `⚠️ packet 不見 (handoffs/<filename>) — 請確認 git pull 已完成`
+   Do NOT fail AO-RESUME for a missing packet.
+5. **Path expansion**: replace `$WORK_ROOT` in packet content with the current working directory before displaying.
+
+Then: Concrete first action. If a 需決策 item is blocking, state it first.
 
 ---
 
@@ -133,6 +147,12 @@ parse the date prefix of each filename, and delete any whose date is more than
 will track the deletions on the next commit.
 
 If the archive folder doesn't exist yet, create it first.
+
+### Prune old handoff packets (>90 days)
+
+Also list `agency-os/handoffs/*.md` (Glob), parse the `YYYY-MM-DD` prefix of each filename,
+and delete any whose date is more than 90 days before today.
+Skip `SCHEMA.md` and `README.md`. Use the `Bash` tool with `rm`.
 
 ### Self-check
 

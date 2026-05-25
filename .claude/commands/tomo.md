@@ -13,11 +13,11 @@ Packet format SSOT: `agency-os/handoffs/SCHEMA.md`
 
 ## Step 1 — Secret check (MANDATORY before any write)
 
-Write the hint text to a temp file and scan it:
+Write the hint text to a temp file, then scan using `-WorkRoot + -Path` (avoids Join-Path absolute-path bug on PS5):
 
 ```powershell
-Set-Content -Path "$env:TEMP\tomo-hint-scan.txt" -Value "<hint>" -Encoding UTF8
-powershell -ExecutionPolicy Bypass -File scripts\scan-local-config-for-secrets.ps1 -Path "$env:TEMP\tomo-hint-scan.txt"
+Set-Content -Path "$env:TEMP\tomo-hint-scan.txt" -Value @("<hint>", "") -Encoding UTF8
+powershell -ExecutionPolicy Bypass -File scripts\scan-local-config-for-secrets.ps1 -WorkRoot "$env:TEMP" -Path "tomo-hint-scan.txt"
 ```
 
 - **Exit 0**: proceed.
