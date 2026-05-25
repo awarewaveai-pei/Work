@@ -1,4 +1,4 @@
-﻿# Worklog
+# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
@@ -426,6 +426,33 @@
 - BUGHUNT_WAIVED: NA -- 僅 ps1 defensive guard，不改 logic
 
 ---
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:134d453d8e9481cb88044cf454f3640404e6817c1b800a4863f4b0ec1a8a6510 -->
+
+### claude-sonnet-4-6 2026-05-25 23:59
+
+- **完成（一句）**: 四動作機械化閘道（REALTEST+REVIEW+BUGHUNT gate verify-closeout-completeness）+ SG certbot DNS-01 wildcard cert + /tomo v2 E2E 驗收 + backup silent-fail 修復 + nginx scanner-block D1-D5 全面補齊 + 桌機 Work/.claude junction 修建。
+- **變更路徑**:
+  - `scripts/verify-closeout-completeness.ps1`（REALTEST + REVIEW + BUGHUNT gate 新增，Critic 4 findings fix）
+  - `agency-os/AGENTS.md`（R0 四動作 marker format contract + R4 違反樣態 + /review trigger rule L141）
+  - `.claude/commands/tomo.md`（C1 consumed 移除、C2 Write tool、M1-M6、Read-first fallback）
+  - `agency-os/handoffs/SCHEMA.md` / `agency-os/handoffs/README.md`（consumed 欄位移除）
+  - `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/scanner-block.inc`（regex 錨定）
+  - `lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`（cert path wildcard）
+  - `scripts/import-cross-machine-memory.ps1`（Invoke-LocalBackup try/catch）
+  - `scripts/sync-claude-userlevel.ps1`（Backup-Path try/catch + CP950 dot-source fix）
+  - `agency-os/docs/operations/AUDIT_REGISTRY.md`（sync-claude-userlevel 🔴 FIXED）
+  - `scripts/ao-resume.ps1`（Step 3 handoffs skip-guard）
+  - `agency-os/reports/ao-resume/2026-05-25-1010.md`（archive 新建）
+  - `.gitignore`（scheduled_tasks.lock + backup-* 加入）
+  - `agency-os/WORKLOG.md`（Section 6/7 + AO-CLOSE AUTO_TASK_DONE）
+  - `agency-os/memory/CONVERSATION_MEMORY.md`（2026-05-25 session 摘要）
+  - `agency-os/memory/daily/2026-05-25.md`（新建）
+- **Git**: `1010b76`(chkpt) `110434d`(task) `c7c8c38`(bootstrap) `1fb9179`(tomo-E2E) `4872c7d`(certbot) `8c65d19`(tomo-handoff) `5af7e41`(scanner-critic) `3f9a20d`(tomo-impl) `1b29227`(D5-nginx) `fb941c0`(scanner-block) `283b1da`(sync-fix) `b791bfb`(import-fix) `987d83d`(ao-resume)
+- **對應 TASKS 子字串（可選）**: tomo critic findings E2E
+- **風險／待辦（可選）**: 筆電 bootstrap junction 修復仍開放（操作者手動）；AO-RESUME WORKLOG tail 改法待 R0 討論；Auto-Repair M1-M10 follow-up（Phase 4 2026-06-19）
 
 ## 2026-05-24
 
@@ -5875,4 +5902,3 @@ _Last synced: 2026-05-23 17:17:13 UTC_
 
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
