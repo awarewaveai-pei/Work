@@ -96,8 +96,12 @@ function Invoke-LocalBackup([string]$Path, [string]$RelLabel) {
     if (-not (Test-Path -LiteralPath $Path)) { return }
     $dst    = Join-Path $script:BackupRoot "$script:BackupTimestamp\$($RelLabel -replace '/', '\')"
     $dstDir = Split-Path $dst -Parent
-    if (-not (Test-Path $dstDir)) { New-Item -ItemType Directory -Path $dstDir -Force | Out-Null }
-    Copy-Item -LiteralPath $Path -Destination $dst -Force -ErrorAction SilentlyContinue
+    try {
+        if (-not (Test-Path $dstDir)) { New-Item -ItemType Directory -Path $dstDir -Force -ErrorAction Stop | Out-Null }
+        Copy-Item -LiteralPath $Path -Destination $dst -Force -ErrorAction Stop
+    } catch {
+        Write-Host "  WARN: backup failed for '$RelLabel' -> '$dst': $($_.Exception.Message)" -ForegroundColor Yellow
+    }
 }
 
 function Invoke-PurgeOldBackups {
