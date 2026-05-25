@@ -31,7 +31,12 @@
 - `agency-os/docs/operations/AUDIT_REGISTRY.md:114` — sync-claude-userlevel.ps1 → 🔴 FIXED
 
 **驗證結果**：
-1. 實測：`audit-cp950-traps.ps1 -File import-cross-machine-memory.ps1` → CLEAN exit 0；`-File sync-claude-userlevel.ps1` → CLEAN exit 0
+1. 實測（end-to-end real test）：`test-invoke-localbackup.ps1` + `test-backup-path.ps1`（各 3 case，寫入 $env:TEMP 不進 repo）
+   - Test A（成功）：backup file 確實建立在 `TIMESTAMP\memory\feedback_health_gate.md` ✅
+   - Test B（失敗有名）：Access Denied → 印 `WARN: backup failed for 'memory/...' -> '...': Access to the path ... is denied.` ✅
+   - Test C（不拋出）：`callerContinued = $true`，caller 在 failure 後繼續執行 ✅
+   - `sync-claude-userlevel.ps1 Backup-Path`：同樣 3 case 全 PASS ✅
+   - 兩個函式 encoding audit：`audit-cp950-traps.ps1` → CLEAN exit 0 ✅
 2. Review：Read 回兩個函式 — try/catch 結構正確，所有 5 個 callsite 覆蓋，`$RelLabel` + `$dst` 都在錯誤訊息中
 3. 抓蟲：Grep 全 scripts/ 找 `Copy-Item -ErrorAction SilentlyContinue` → 命中 sync-claude-userlevel.ps1，已一起修；AUDIT_REGISTRY 確認無 orphan 條目
 4. WORKLOG：此條目（四動作各自結果如上）
