@@ -90,13 +90,21 @@
 4. **WORKLOG**：此條目（四動作各自結果如上）
 
 **剩餘風險**：
-- n8n.aware-wave.com / supabase.aware-wave.com 443 block 仍無 scanner-block → 記錄在 access.log（D5 follow-up）
+- ~~n8n.aware-wave.com / supabase.aware-wave.com 443 block 仍無 scanner-block~~ → D5 已於同 session 補完（commit `1b29227`）
 - scanner.log 初次創建後 logrotate 第一個週期前不壓縮，屬正常行為
 - 未來新增 scanner path 需手動更新 scanner-block.inc 並重新 SSH 部署兩台
 
 **rollback**：
 - SG：`sudo cp /etc/nginx/sites-available/aware-wave-phase1.bak-20260525-* /etc/nginx/sites-available/aware-wave-phase1 && sudo nginx -t && sudo systemctl reload nginx`
-- EU：`sudo ln -sf /etc/nginx/sites-available/default.bak-20260525-* /etc/nginx/sites-enabled/default && sudo nginx -t && sudo systemctl reload nginx`
+- EU default：`sudo ln -sf /etc/nginx/sites-available/default.bak-20260525-* /etc/nginx/sites-enabled/default && sudo nginx -t && sudo systemctl reload nginx`
+- EU n8n/supabase/studio：各自 `.bak-20260525-*` 同上模式 rollback
+
+**D5 補完（commit `1b29227`，同 session）**：
+- n8n.aware-wave.com：server block 加 `include scanner-block.inc`（limit_req 已在 location level，不重複）
+- supabase.aware-wave.com：server block 加 `limit_req zone=general burst=50` + scanner-block
+- studio.aware-wave.com：server block 加 `limit_req zone=general burst=20` + scanner-block
+- 實測（proper SNI `--resolve`）：n8n/supabase 各 scanner path → 000 ✅；legit / → 200/401 ✅
+- SSOT 備注：live 伺服器 supabase/studio 為獨立檔，supabase-subdomains.conf 保留合併版正本（pre-existing drift）
 
 ---
 
