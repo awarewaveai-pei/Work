@@ -8,13 +8,16 @@
 # eliminating false-positive bad-request alarms even for slow scanners below the rate-limit threshold.
 # scanner.log is auto-rotated by the global logrotate /var/log/nginx/*.log wildcard pattern.
 #
+# limit_req off: suppress inherited server-level rate-limit so scanner paths never log
+# a 503/429 burst rejection to access.log (which would still be visible to Netdata).
+#
 # Patterns sourced from confirmed attack logs (SG 2026-05-22, EU 2026-05-23):
-#   phpunit eval-stdin (PHP RCE), .env credential harvesting, .git/.aws exposure,
+#   phpunit eval-stdin.php (PHP RCE), .env credential harvesting, .git/.aws exposure,
 #   Spring Boot /actuator, Outlook /owa, IoT /onvif, Flask .flaskenv,
 #   WP plugin probe gravitysmtp, PHP RFI hello.world, .ssh key harvesting,
 #   wp-config.php, xmlrpc.php.
 
-location ~* "(/\.env|/phpunit|eval-stdin|/\.git/|/\.aws/|/actuator/|/owa/|/onvif/|/\.flaskenv|gravitysmtp|/hello\.world|/\.ssh/|/wp-config\.php|/xmlrpc\.php)" {
+location ~* "(/\.env|/phpunit|eval-stdin\.php|/\.git(/|$)|/\.aws(/|$)|/actuator/|/owa/|/onvif/|/\.flaskenv|/wp-content/plugins/gravitysmtp|/hello\.world|/\.ssh(/|$)|/wp-config\.php|/xmlrpc\.php)" {
     access_log /var/log/nginx/scanner.log combined;
     return 444;
 }
