@@ -108,6 +108,44 @@
 
 ---
 
+### `/tomo` feature — v2 實作完成
+
+**根本問題**：操作者每次告一段落都要手動說「明天提醒我做 X 並寫入 task」，重複且脆弱；隔天 AI 缺上下文需要重新推導。
+
+**git log base**：`a7523d1`（checkpoint），計畫 SSOT：`.claude/plans/tomo-feature-v2-plan.md`
+
+**Phase 0 發現（4 個假設驗證）**：
+1. `scripts/checkpoint.ps1` 不存在 → 實際是 `scripts/commit-checkpoint.ps1`，**commit-only 不 push** → tomo.md 補 `git push origin main` step
+2. `scan-local-config-for-secrets.ps1 -Path <絕對路徑>` 在此機 Join-Path 不識別 absolute 第二參數 → `C:\Work\C:\Temp\file.txt` → 解法：`-WorkRoot "$env:TEMP" -Path "filename"`
+3. 單行 hint temp file → `$lines.Count` 在 strict mode 失敗（scalar not array）→ 解法：`-Value @("<hint>", "")` 確保 2 行
+4. `.cursor/rules/` mirror = 13 檔雙向一致；`print-open-tasks.ps1` 只追蹤 `##` heading → `####` 純視覺，不破 parsing
+
+**修改檔案（7 個）**：
+- `agency-os/handoffs/SCHEMA.md`（新建）：6 段格式 + frontmatter + $WORK_ROOT placeholder + secret redact 規則
+- `agency-os/handoffs/README.md`（新建）：目錄用途 + 命名規約 + pending/consumed 判斷 + prune policy
+- `.claude/commands/tomo.md`（新建）：完整 `/tomo` + `/tomo!` 7-step 流程 spec，含 Phase 0 三個修正
+- `agency-os/TASKS.md`：新增 `#### 待釐清 / 明日提醒` 固定分類於 `### 未完成` 最前面
+- `.claude/commands/ao-resume.md`：第 7 段加 pending packet 條件式邏輯（0/1-3/4+ 策略 + missing graceful + Step 3 prune 擴展到 handoffs/*.md >90d）
+- `agency-os/AGENTS.md`：代理自動工具表加 `/tomo` trigger 那一列
+- `~/.claude/projects/.../memory/project_tomo_command.md`（Phase 3，本 entry 後寫）
+
+**驗證結果（R0+R4 四動作）**：
+1. **實測**：
+   - `print-open-tasks.ps1 -NoSnapshot` → Total open: 23，新 `####` section 不破 parsing ✅
+   - 乾淨 hint scan：`-WorkRoot "$env:TEMP" -Path "tomo-hint-scan.txt"` → `Files scanned: 1, PASS` ✅
+   - Secret hint scan：`ghp_abc...` → `[WARN] GitHub PAT (classic), exit 1` ✅（ABORT 門檻 ≥ 1 正確攔截）
+2. **Review**：三角 cross-reference 確認（ao-resume.md ↔ tomo.md ↔ AGENTS.md ↔ SCHEMA.md ↔ TASKS.md）；ao-resume.md Section 7 + Step 3 prune 段結構正確；`#### 待釐清 / 明日提醒` 位於 `### 未完成` 最前面
+3. **抓蟲**：Grep `handoff|tomorrow|TOMORROW_CAPTURED|/tomo` 全 repo → 30+ 命中均為其他語境（auto-repair phase handoff、docs 通用語），無重工；`agency-os/handoffs/` triangle refs 命中 8 個檔（正確）；CHANGE_IMPACT_MATRIX AGENTS.md 下游（cursor-enterprise-rules-index 等）不需改動（只加 trigger row）
+4. **WORKLOG**：此條目，四動作各自結果如上
+
+**剩餘風險**：
+- `scan-local-config-for-secrets.ps1` 的 strict mode + scalar string bug 僅影響單行檔，已在 tomo.md spec 用 `@(hint, "")` 迴避；不修原腳本
+- `/tomo` propose 流程尚無 E2E 真實對話測試（因需 recursive invocation）；下次使用時才完整驗收
+
+**rollback**：`git revert cad1f43 d392ff8`（兩個 auto-checkpoint commit，含全部 7 個檔案）
+
+---
+
 ## 2026-05-24
 
 ### `/tomo` feature — v2 plan complete, implementation pending（晚間規劃 session）
