@@ -47,6 +47,59 @@
 
 ---
 
+### Section 2 Nginx 掃描器防護 — 一勞永逸（scanner-block + limit_req 全面補齊）
+
+**根本問題**：2026-05-22 SG bad requests 119.4% + 2026-05-23 EU bad requests 89.3% 兩次告警，root cause 有三個：
+1. SG host nginx `limit_req_zone req_perip` 定義了但所有 server block 都沒有 `limit_req` directive → 限速完全無效
+2. EU default site（port 80 catch-all）沒有任何限速，直接 hit 的掃描器自由進入
+3. `access_log /var/log/nginx/access.log` 記錄掃描器請求 → Netdata web_log 看到高 bad% → 誤告警（慢掃描器 < zone rate 也無法靠 limit_req 攔截，卻仍貢獻計算）
+
+**架構決策**（git log base: a9b04c2）：
+- D1：移除 `aware-wave-phase1.conf` port 80 server block（SSOT drift fix：live server 已無 port 80，Docker lobster-nginx 處理）
+- D2：新建 `scanner-block.inc` — regex 攔截 13 種確認路徑，`access_log /var/log/nginx/scanner.log`（不進 access.log）→ Netdata 永久看不到掃描器流量（即使慢掃描器也有效）
+- D3：SG 三個 server block 全部加 `limit_req zone=req_perip burst=50 nodelay`（修 C1 零限速漏洞）
+- D4：EU 新建 `eu-default-site.conf` 替換 stock default，加 `limit_req zone=general burst=10 nodelay` + scanner-block
+- D5：supabase.aware-wave.com / n8n.aware-wave.com scanner-block 為下一個 follow-up（D5 out of scope）
+
+**現況分析**（先讀四個 SSOT + git log）：
+- `aware-wave-security.conf`（live SG）：`limit_req_zone $binary_remote_addr zone=req_perip:10m rate=30r/s;` 已定義 ✅，只差 server block 引用
+- `eu-rate-limit-zones.conf`（live EU）：`limit_req_zone ... zone=general:10m rate=30r/s;` 已定義 ✅
+- `lobster-aware-wave-locations.inc`：無任何 `limit_req`，所有 location 皆無衝突 → server-level 新增安全
+- `sg-deploy.sh`：只部署 Docker apps（next-admin/node-api/wordpress），不動 system-sites → 手動 SSH 部署為正確路徑
+
+**修改（4 個 SSOT 檔，commits 667d86e + a7523d1）**：
+- `nginx/system-sites/scanner-block.inc`（新建）：13 種 scanner path regex → `access_log scanner.log; return 444;`
+- `nginx/system-sites/aware-wave-phase1.conf`：移除 port 80 block；443 block 加 `limit_req zone=req_perip burst=50 nodelay;` + `include /etc/nginx/snippets/scanner-block.inc;`
+- `nginx/system-sites/aware-wave-app-api-subdomains.conf`：app + api 兩個 server block 各加 `limit_req` + scanner-block
+- `nginx/system-sites/eu-default-site.conf`（新建）：port 80 default_server，`limit_req zone=general burst=10 nodelay;` + scanner-block + `location / { return 444; }`
+
+**SSH 部署（兩台並行）**：
+- 備份 SG：`.bak-20260525-053502`（aware-wave-phase1 + aware-wave-app-api-subdomains.conf）
+- 備份 EU：`default.bak-20260525-053459`
+- SG `nginx -t` → TEST_PASS；EU `nginx -t` → TEST_PASS；兩台 `systemctl reload nginx` → RELOAD_OK
+
+**驗證結果（R0 四動作）**：
+1. **實測（end-to-end）**：
+   - SG `curl -sk -H "Host: aware-wave.com" https://127.0.0.1/.env` → 000（444 close）✅
+   - SG `curl .../phpunit/test.php` → 000 ✅；`.../wp-config.php` → 000 ✅
+   - SG `curl https://127.0.0.1/` → 200（WordPress 正常）✅
+   - SG `scanner.log` tail：3 條 444 記錄 ✅；`access.log` grep scanner → 0 筆 ✅
+   - EU default site `/` → 000 ✅；`/.env` → 000 ✅；zone=general 載入確認 ✅
+2. **Review**：`cat /etc/nginx/snippets/scanner-block.inc` 內容符合 SSOT ✅；aware-wave-phase1 只剩 443 block ✅；app/api 兩個 server block 各有 limit_req + scanner-block ✅；EU symlink `sites-enabled/default → /etc/nginx/sites-available/eu-default-site` ✅
+3. **抓蟲**：Grep `system-sites|aware-wave-phase1|scanner-block` 全 repo → 無自動部署腳本引用 system-sites ✅；req_perip zone 定義在 conf.d/aware-wave-security.conf ✅；文件只有路徑引用無需更新 ✅；n8n `.env` probe via HTTP → 301 redirect（n8n server block 自身有 limit_req，HTTP probe 被 redirect，HTTPS probe 受限，D5 follow-up）
+4. **WORKLOG**：此條目（四動作各自結果如上）
+
+**剩餘風險**：
+- n8n.aware-wave.com / supabase.aware-wave.com 443 block 仍無 scanner-block → 記錄在 access.log（D5 follow-up）
+- scanner.log 初次創建後 logrotate 第一個週期前不壓縮，屬正常行為
+- 未來新增 scanner path 需手動更新 scanner-block.inc 並重新 SSH 部署兩台
+
+**rollback**：
+- SG：`sudo cp /etc/nginx/sites-available/aware-wave-phase1.bak-20260525-* /etc/nginx/sites-available/aware-wave-phase1 && sudo nginx -t && sudo systemctl reload nginx`
+- EU：`sudo ln -sf /etc/nginx/sites-available/default.bak-20260525-* /etc/nginx/sites-enabled/default && sudo nginx -t && sudo systemctl reload nginx`
+
+---
+
 ## 2026-05-24
 
 ### `/tomo` feature — v2 plan complete, implementation pending（晚間規劃 session）
