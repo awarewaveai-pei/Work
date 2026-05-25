@@ -28,7 +28,20 @@
 4. **WORKLOG**：本 entry 含四動作各自結果
 
 - AUTO_TASK_DONE: REALTEST gate 實作 — verify-closeout-completeness + AGENTS.md
-- REALTEST_EVIDENCE: tool=PowerShell | cmd=verify-closeout-completeness.ps1 -Gate strict (4 scenarios) | exit=S1:1 S2-S4:0 | ms=~800
+
+### /review trigger rule + critic patch（AGENTS.md L141）
+
+- 加 `代理自動工具使用規則` L141：code 改動後即將完成 R0 → 強制跑 `/review`（critic subagent，外部 oracle）；不得以自我描述替代 critic output
+- `/review` 首次觸發結果 → critic (Standard) 找到 1 Major + 3 Minor，已全修：
+  - Major: summary regex 與 gate regex 不一致 → 統一為 `^\s*-\s*(REALTEST_EVIDENCE:|REALTEST_WAIVED:)`
+  - Minor: error message extension list hardcoded → 改動態 `($codeExts -join '/')`
+  - Minor: `.ToLower()` → `.ToLowerInvariant()`
+  - Minor: waiver whitelist 未機械強制 → `REALTEST_WAIVED:\s+(DOC_ONLY|SMOKE_COVERED|QUERY_ONLY|NA)\b`
+  - 同加 `.psm1/.psd1` 到 `$codeExts`
+- 回歸 5 scenarios 全過：S1=1 S2=0 S3=1(invalid-tier) S4=0 S5=0
+
+- AUTO_TASK_DONE: /review trigger rule — AGENTS.md L141 + critic patches
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=verify-closeout-completeness.ps1 -Gate strict (5 scenarios post-critic) | exit=all-expected | ms=~1200
 
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: tomo-critic-findings → handoffs/2026-05-25-1418-tomo-critic-findings.md
@@ -111,6 +124,86 @@
 - Critic Major (^~) gap：app.aware-wave.com 的 `^~` prefix location 擋住 /api/* subtree 的 scanner-block regex，這是已知限制（scanner 打 /api/ 路徑不會被 scanner-block 攔，但 rate-limit 仍有效）
 
 **rollback**：`git revert <this commit>` → 重新 SFTP + reload 兩台
+
+---
+
+### Section 4 SG Certbot 遷移 DNS-01（Cloudflare）— 一勞永逸 wildcard cert
+
+**根本問題**：SG VPS `aware-wave.com` + `api.aware-wave.com` certbot 使用 `authenticator = nginx`（HTTP-01 驗證），但 host nginx 從不綁 port 80（Docker lobster-nginx 接管），導致 HTTP-01 乾跑超時（dry-run 120s 逾時，random delay 427s）。Cert 2026-07-16 到期，自動 renewal 無法通過，deadline 2026-06-16（到期前 30 天）。
+
+**現況分析**（git log base: 5af7e41）：
+- SG host nginx：sites-enabled 只有 `app` + `aware-wave-phase1`（兩者均 443-only，無 80）
+- SG certbot certs（改動前）：6 個 cert — aware-wave.com, api.aware-wave.com, n8n, supabase, trigger, uptime
+- EU VPS 4 個域（n8n/supabase/trigger/uptime）有自己的 cert，SG 的 copy 是 orphan（cert timer 跑失敗但無 active nginx 引用）
+- `api.aware-wave.com` cert 同時覆蓋 `app.aware-wave.com`（SAN），nginx SSOT 使用此 cert 路徑
+- `www.aware-wave.com` 是 Cloudflare CNAME proxy → `aware-wave.com`；若個別更新 www.aware-wave.com，certbot 嘗試建 `_acme-challenge.www.aware-wave.com` TXT 但 LE DNS 查到 NXDOMAIN（CNAME proxied block TXT）→ wildcard 解法最乾淨
+
+**方案選擇（三選一）**：
+- A（選）：DNS-01 via Cloudflare，wildcard `*.aware-wave.com + aware-wave.com` → 單 cert 覆蓋全部子域，CNAME 問題消失，certbot-timer 90 天全自動
+- B：Cloudflare Origin Cert 15 年 → 測試發現 token 無 `SSL:Write` 權限，blocked
+- C：Webroot HTTP-01 → 需 bind port 80 架構改動，爆炸半徑高，pass
+
+**修改步驟（全在 SG VPS live + repo SSOT）**：
+
+1. 安裝 `certbot-dns-cloudflare`（apt）
+2. 建立 `/etc/letsencrypt/cloudflare.ini`（chmod 600, root:root）— Cloudflare DNS:Edit token
+3. 更新 `/etc/letsencrypt/renewal/aware-wave.com.conf`：`authenticator = dns-cloudflare`，加 credentials 路徑（backup: `.bak-20260525`）
+4. 更新 `/etc/letsencrypt/renewal/api.aware-wave.com.conf`：同上（backup: `.bak-20260525`）
+5. 發行 wildcard cert：`certbot certonly --dns-cloudflare -d "aware-wave.com" -d "*.aware-wave.com" --cert-name aware-wave.com --no-random-sleep-on-renew --non-interactive`
+6. 更新 SG nginx SSOT `aware-wave-app-api-subdomains.conf`：cert path `api.aware-wave.com/` → `aware-wave.com/`（兩個 server block，4 行）
+7. `nginx -t && systemctl reload nginx`
+8. `certbot renew --dry-run --cert-name aware-wave.com --no-random-sleep-on-renew`
+9. 刪除 5 個 orphaned certs：api, n8n, supabase, trigger, uptime
+
+**驗證結果（R0 四動作）**：
+
+1. **實測（end-to-end real test）**：
+   - Cert SAN 確認：`openssl x509 ... | grep -A3 "Subject Alternative"` → `DNS:*.aware-wave.com, DNS:aware-wave.com` ✅
+   - Wildcard cert issued：`certbot certonly` → `Successfully received certificate. Expires 2026-08-23` ✅
+   - Dry-run：`certbot renew --dry-run --cert-name aware-wave.com --no-random-sleep-on-renew` → `Congratulations, all simulated renewals succeeded` ✅
+   - nginx 健康：`nginx -t` → `syntax ok / test successful`；`systemctl reload nginx` → RELOAD_OK ✅
+   - HTTPS 實際連線（curl -sv）：
+     - `aware-wave.com`：`subject: CN=aware-wave.com`, `SSL certificate verify ok` ✅
+     - `api.aware-wave.com`：`subjectAltName: host "api.aware-wave.com" matched cert's "*.aware-wave.com"` ✅
+     - `app.aware-wave.com`：`subjectAltName: host "app.aware-wave.com" matched cert's "*.aware-wave.com"` ✅
+   - 5 orphaned certs 刪除：`certbot delete --non-interactive` 全 `Deleted all files` ✅
+   - SG 刪除後 nginx -t 仍 OK（supabase-subdomains.conf 不在 sites-enabled）✅
+   - EU dry-run：`certbot renew --dry-run --cert-name supabase.aware-wave.com --no-random-sleep-on-renew` → `all simulated renewals succeeded` ✅
+
+2. **Review（讀回改後產物）**：
+   - `certbot certificates` on SG：只剩 1 cert `aware-wave.com (aware-wave.com *.aware-wave.com)` VALID 89 days ✅
+   - `certbot certificates` on EU：1 cert `supabase.aware-wave.com (6 SANs)` VALID 73 days ✅
+   - repo SSOT `aware-wave-app-api-subdomains.conf`：ssl_certificate lines 139/140/169/170 全部 `live/aware-wave.com/` ✅；TLS comment 更新為 wildcard 指令 ✅
+   - SG nginx sites-enabled：只有 `app -> aware-wave-app-api-subdomains.conf` + `aware-wave-phase1`；supabase-subdomains.conf NOT enabled ✅
+
+3. **抓蟲（cross-file bug hunt）**：
+   - `grep letsencrypt/live/api\|n8n\|trigger\|uptime /etc/nginx/ --include="*.conf"` on SG → 零命中（所有 enabled conf 無 stale cert path）✅
+   - repo grep `ssl_certificate.*api\.aware-wave\.com` under `nginx/` → 零命中 ✅
+   - repo `apache/sites-available/` 中 `api.conf`, `app.conf`, `uptime.conf`, `trigger.conf`, `n8n.conf` 仍有舊 cert paths → **已標注**：Apache 目錄為歷史文件（架構已全面 nginx），不是 live 部署，cert 路徑已失效但不構成 live 風險。不修（避免 scope creep）。
+   - EU nginx SSOT `supabase-subdomains.conf`, `n8n-aware-wave.conf`, `trigger-eu-vps.conf`, `mainwp-aware-wave.conf`, `uptime-aware-wave.conf` 使用 `live/supabase.aware-wave.com/` → **CORRECT**（EU 的 cert 確實命名為 supabase.aware-wave.com）✅
+
+4. **WORKLOG**：此條目（四動作各自結果如上）
+
+**新狀態**：
+| VPS | Cert | 覆蓋域 | 機制 | 到期 |
+|-----|------|--------|------|------|
+| SG | `aware-wave.com` | `aware-wave.com`, `*.aware-wave.com` | DNS-01 Cloudflare | 2026-08-23 |
+| EU | `supabase.aware-wave.com` | 6 SANs（supabase/n8n/studio/trigger/uptime/mainwp）| HTTP-01 nginx | 2026-08-07 |
+
+**90 天後你需要做什麼**：完全不需要手動操作。`certbot.timer` systemd 服務每天自動跑 `certbot renew`；DNS-01 透過 Cloudflare API 自動建立/刪除 TXT record；nginx 自動 reload。下次到期 2026-08-23 前 30 天（約 2026-07-24）certbot 會自動更新。
+
+**剩餘風險**：
+- Apache 歷史文件（`apache/sites-available/`）cert paths 指向已刪 cert — 不影響 live，但若有人看文件會困惑。後續清理在 backlog 但非緊急。
+- `cloudflare.ini` 含 API token → chmod 600 root:root，不進 git ✅
+
+**rollback**：
+1. `cp /etc/letsencrypt/renewal/aware-wave.com.conf.bak-20260525 /etc/letsencrypt/renewal/aware-wave.com.conf`
+2. `cp /etc/nginx/sites-available/aware-wave-app-api-subdomains.conf.bak-20260525 /etc/nginx/sites-available/aware-wave-app-api-subdomains.conf`
+3. `nginx -t && systemctl reload nginx`
+4. 重新 issue cert：`certbot certonly --nginx -d api.aware-wave.com -d app.aware-wave.com`（只要 api.aware-wave.com cert 還在 /etc/letsencrypt/renewal/ 則更快）
+
+- AUTO_TASK_DONE: SG certbot DNS-01 migration — wildcard cert, 5 orphaned certs deleted, EU dry-run verified
+- REALTEST_EVIDENCE: tool=SSH | cmd=certbot renew --dry-run (SG+EU) + curl -sv aware-wave.com/api/app.aware-wave.com + certbot certificates | exit=0 | ms=~45000
 
 ---
 
