@@ -4,6 +4,9 @@
 
 ## 2026-05-25
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: tomo-critic-findings → handoffs/2026-05-25-1418-tomo-critic-findings.md
+
 ### Section 1 系統快照全面盤查 + review/抓蟲
 
 **根本問題**：AO-RESUME 2026-05-25-1010 報告有 7 項 Section 1 問題需要查清楚並修好，含 5 個 memory 備份靜默失敗 + auto-reboot 報告過期。
