@@ -10,6 +10,7 @@
 .claude/mcp.json
 .claude/settings.json
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # --- Local backup directory (machine-local snapshots; never commit) ---
 Backups/
@@ -64,6 +65,9 @@ agency-os/.agency-state/doc-sync-state.json
 
 # --- Local scratch (wp-dummy paths for regression; never push) ---
 .scratch/
+
+# --- bootstrap junction backup (created by bootstrap-mcp-machine.ps1 manual fix) ---
+.claude-real-backup*/
 
 # --- Dependencies (reinstall with npm ci / npm install) ---
 node_modules/
