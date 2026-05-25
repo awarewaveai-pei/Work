@@ -2,6 +2,46 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-25
+
+### Section 1 系統快照全面盤查 + review/抓蟲
+
+**根本問題**：AO-RESUME 2026-05-25-1010 報告有 7 項 Section 1 問題需要查清楚並修好，含 5 個 memory 備份靜默失敗 + auto-reboot 報告過期。
+
+**現況分析**（git log --oneline -10 → 987d83d 最新）：
+
+| 問題 | 調查結論 |
+|------|---------|
+| SG 502/reboot-required | ✅ 已自行重開機（5/23 11:18 UTC），reboot_pending=NO，9 個容器 Up 39h healthy |
+| EU bad requests spike | ✅ 自動回復（5/23 04:09 UTC），2 分 10 秒自癒 |
+| SSH keys "skipped" | ✅ 非跳過 — hetzner_trigger/id_ed25519/hostinger_soulful/config 全部本機存在，import 顯示 unchanged 顏色未被 stdout capture |
+| CREDENTIALS.md "skipped" | ✅ 非跳過 — 備份於 20260525-095828\AWARE_WAVE_CREDENTIALS.md，本機存在 |
+| 5 memory 備份失敗 | 🔴→✅ 根因：`Invoke-LocalBackup` New-Item+Copy-Item 無 try/catch，失敗靜默吞掉；nested path（TIMESTAMP\memory\file）建立失敗不可見，flat path（TIMESTAMP\file）成功 → 確認備份空，imports 照常完成 |
+| Hook state 5/21 | ✅ 正常 — hook 只在 AO-RESUME 關鍵字觸發；本 session 是 context 接續，非 keyword → 無需動作 |
+| auto-reboot-LATEST.md 過期 | ✅ 已刷新 → SG 🟢 EU 🟢 |
+
+**方案比較**：
+- A：只加 `-ErrorAction SilentlyContinue` → 仍靜默，治標不治本
+- **B（選）**：try/catch + `-ErrorAction Stop` + 具名 WARN 輸出 → 失敗立即可見，含 RelLabel + 確切路徑 + 錯誤訊息
+
+**修改**（commits `b791bfb` + `283b1da`）：
+- `scripts/import-cross-machine-memory.ps1:95-105` — `Invoke-LocalBackup` 加 try/catch，New-Item/Copy-Item 改 Stop
+- `scripts/sync-claude-userlevel.ps1:138-146` — `Backup-Path` 同樣樣式修正（bug hunt 補抓）
+- `scripts/sync-claude-userlevel.ps1:53` — dot-source `_console-encoding-helpers.ps1`；line 56 `git rev-parse` wrap in `Invoke-WithUtf8Console`
+- `agency-os/docs/operations/AUDIT_REGISTRY.md:114` — sync-claude-userlevel.ps1 → 🔴 FIXED
+
+**驗證結果**：
+1. 實測：`audit-cp950-traps.ps1 -File import-cross-machine-memory.ps1` → CLEAN exit 0；`-File sync-claude-userlevel.ps1` → CLEAN exit 0
+2. Review：Read 回兩個函式 — try/catch 結構正確，所有 5 個 callsite 覆蓋，`$RelLabel` + `$dst` 都在錯誤訊息中
+3. 抓蟲：Grep 全 scripts/ 找 `Copy-Item -ErrorAction SilentlyContinue` → 命中 sync-claude-userlevel.ps1，已一起修；AUDIT_REGISTRY 確認無 orphan 條目
+4. WORKLOG：此條目（四動作各自結果如上）
+
+**剩餘風險**：不知道哪 5 個 memory 文件在 5/25 失敗（G: 不可用無法重現），但下次 import 會明確輸出 WARN + 路徑。
+
+**rollback**：`git revert b791bfb 283b1da` 回復兩次 commit。
+
+---
+
 ## 2026-05-24
 
 ### `/tomo` feature — v2 plan complete, implementation pending（晚間規劃 session）
