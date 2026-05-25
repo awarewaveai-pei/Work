@@ -454,6 +454,23 @@
 - **對應 TASKS 子字串（可選）**: tomo critic findings E2E
 - **風險／待辦（可選）**: 筆電 bootstrap junction 修復仍開放（操作者手動）；AO-RESUME WORKLOG tail 改法待 R0 討論；Auto-Repair M1-M10 follow-up（Phase 4 2026-06-19）
 
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:42c0dad5325deb2a8e4ed7e8e3f0d8313ffda12bead68d54a440529008dcaf21 -->
+
+### claude-sonnet-4-6 2026-05-25 23:59
+
+- **完成（一句）**: 四動作機械化閘道（REALTEST+REVIEW+BUGHUNT gate）+ SG certbot DNS-01 wildcard cert + /tomo v2 E2E 驗收 + backup silent-fail 修復 + nginx scanner-block D1-D5 + 桌機 Work/.claude junction + BUG_HUNT_PROTOCOL 跨機連結修復。
+- **變更路徑**:
+  - `scripts/verify-closeout-completeness.ps1`（REALTEST + REVIEW + BUGHUNT gate）
+  - `agency-os/AGENTS.md`（R0 四動作 marker format + /review trigger rule L141）
+  - `agency-os/docs/operations/BUG_HUNT_PROTOCOL.md`（跨機 memory link 修復）
+  - `scripts/import-cross-machine-memory.ps1` / `scripts/sync-claude-userlevel.ps1`（backup try/catch）
+  - `scripts/ao-resume.ps1`（Step 3 skip-guard）
+- **Git**: `ac15849`(doc-fix) `9502ad4`(merge-inbox) `3e4c3b3`(daily-gate) `0073839`(pre-closeout) `1fb9179`(tomo-E2E) `4872c7d`(certbot) `c7c8c38`(bootstrap) `283b1da`(sync-fix)
+- **對應 TASKS 子字串（可選）**: tomo critic findings E2E
+- **風險／待辦（可選）**: 筆電 bootstrap junction 仍開放；AO-RESUME WORKLOG tail 改法待討論；Auto-Repair M1-M10 follow-up
+
 ## 2026-05-24
 
 ### `/tomo` feature — v2 plan complete, implementation pending（晚間規劃 session）
