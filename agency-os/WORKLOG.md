@@ -68,7 +68,7 @@
 
 - AUTO_TASK_DONE: REVIEW + BUGHUNT gate — 四動作全機械化 verify-closeout-completeness + AGENTS.md
 - REALTEST_EVIDENCE: tool=PowerShell | cmd=Test-Regex harness 5 scenarios | exit=all-PASS | ms=~400
-- REVIEW_DONE: critic=Standard | verdict=warn | findings=0C/0M/2m/2s
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0C/0M/2m/2s — M1(Write-Error dead code x7) fixed
 - BUGHUNT_DONE: scope=agency-os/ scripts/ .claude/ .cursor/ | grep=REVIEW_DONE|BUGHUNT_DONE|verify-closeout | hits=12-files-no-stale
 
 ### Tomorrow captured (/tomo)

@@ -53,7 +53,7 @@ try {
     if (-not (Test-Path -LiteralPath $worklogPath)) {
         $msg = "verify-closeout-completeness: WORKLOG.md missing but staged changes exist."
         if ($Gate -eq "strict") {
-            Write-Error $msg
+            Write-Host $msg -ForegroundColor Red
             exit 1
         }
         Write-Warning $msg
@@ -74,7 +74,7 @@ try {
     if ($start -lt 0) {
         $msg = "verify-closeout-completeness: no WORKLOG section $hdr but staged edits exist. Run scaffold or add section."
         if ($Gate -eq "strict") {
-            Write-Error $msg
+            Write-Host $msg -ForegroundColor Red
             exit 1
         }
         Write-Warning $msg
@@ -105,7 +105,7 @@ try {
         $list = ($significant -join ", ")
         $msg = "verify-closeout-completeness: staged changes ($list) require today's WORKLOG evidence: add line `- AUTO_TASK_DONE: <substring>` and/or ensure inbox merge appended `Closeout inbox (AO-CLOSE auto`. Gate=$Gate"
         if ($Gate -eq "strict") {
-            Write-Error $msg
+            Write-Host $msg -ForegroundColor Red
             exit 1
         }
         Write-Warning $msg
@@ -132,7 +132,7 @@ try {
                      " Add: - REALTEST_EVIDENCE: tool=<Bash|SSH|curl|WebFetch> | cmd=<command> | exit=<code> | ms=<N>" +
                      " OR: - REALTEST_WAIVED: <DOC_ONLY|SMOKE_COVERED|QUERY_ONLY|NA> -- <one-line reason>. Gate=$Gate"
             if ($Gate -eq "strict") {
-                Write-Error $rtMsg
+                Write-Host $rtMsg -ForegroundColor Red
                 exit 1
             }
             Write-Warning $rtMsg
@@ -157,7 +157,7 @@ try {
         $rvMsg = ("verify-closeout-completeness: staged changes require REVIEW_DONE: or REVIEW_WAIVED: in {0}." -f $hdr) +
                  " Add: - REVIEW_DONE: critic=<Quick|Standard|Deep> | verdict=<pass/warn/fail> | findings=<Nc/Nm/Nn>" +
                  " OR: - REVIEW_WAIVED: <DOC_ONLY|NA> -- <one-line reason>. Gate=$Gate"
-        if ($Gate -eq "strict") { Write-Error $rvMsg; exit 1 }
+        if ($Gate -eq "strict") { Write-Host $rvMsg -ForegroundColor Red; exit 1 }
         Write-Warning $rvMsg
     }
     $rvLines = @(($section -split '\r?\n') | Where-Object { $_ -match '^\s*-\s*(REVIEW_DONE:|REVIEW_WAIVED:)' })
@@ -177,7 +177,7 @@ try {
         $bhMsg = ("verify-closeout-completeness: staged changes require BUGHUNT_DONE: or BUGHUNT_WAIVED: in {0}." -f $hdr) +
                  " Add: - BUGHUNT_DONE: scope=<paths> | grep=<pattern> | hits=<N>" +
                  " OR: - BUGHUNT_WAIVED: <DOC_ONLY|NA> -- <one-line reason>. Gate=$Gate"
-        if ($Gate -eq "strict") { Write-Error $bhMsg; exit 1 }
+        if ($Gate -eq "strict") { Write-Host $bhMsg -ForegroundColor Red; exit 1 }
         Write-Warning $bhMsg
     }
     $bhLines = @(($section -split '\r?\n') | Where-Object { $_ -match '^\s*-\s*(BUGHUNT_DONE:|BUGHUNT_WAIVED:)' })
@@ -196,7 +196,7 @@ try {
         if ($hasTbd) {
             $msg = "verify-closeout-completeness: daily note still contains scaffold placeholders `(TBD)` in $dailyPath. Fill Done today / Current state / Next steps before closeout. Gate=$Gate"
             if ($Gate -eq "strict") {
-                Write-Error $msg
+                Write-Host $msg -ForegroundColor Red
                 exit 1
             }
             Write-Warning $msg
