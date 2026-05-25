@@ -111,6 +111,8 @@ Concrete first action. If a 需決策 item is blocking, state it first.
 
 Do NOT ask the user to manually pull or run any command if the script already ran successfully.
 
+> ⚠️ **七段式輸出完成後立即執行 Step 3（Archive）— 不得跳過。**
+
 ## Step 3 — Archive the report (MANDATORY after Step 1 output)
 
 After printing the 七段式 to chat, write the **exact same markdown** to:
