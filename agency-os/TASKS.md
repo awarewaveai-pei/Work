@@ -53,7 +53,7 @@
 #### 待釐清 / 明日提醒
 > `/tomo` 自動寫入此分類；handoff packet 路徑見 `agency-os/handoffs/`
 
-- [ ] 補完 tomo critic findings apply — 驗收 2 Critical + 6 Major 全修完 → handoffs/2026-05-25-1418-tomo-critic-findings.md
+- [x] 補完 tomo critic findings apply — 驗收 2 Critical + 6 Major 全修完 → handoffs/2026-05-25-1418-tomo-critic-findings.md
 
 #### 雙機環境 / 日常開工
 
