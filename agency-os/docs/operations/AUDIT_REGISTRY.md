@@ -111,7 +111,7 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 | `scripts/machine-environment-audit.ps1` | 5 | Low |
 | `scripts/phase4-weekly-check.ps1` | 1 | Low |
 | `scripts/scan-local-config-for-secrets.ps1` | 1 | Low |
-| `scripts/sync-claude-userlevel.ps1` | 1 | Low |
+| `scripts/sync-claude-userlevel.ps1` | 1 | Low — 🔴 FIXED b791bfb+followup: wrapped `git rev-parse` in `Invoke-WithUtf8Console` |
 | `scripts/verify-closeout-completeness.ps1` | 2 | Low |
 | `lobster-factory/infra/trigger/deploy-workflows.ps1` | 1 | Low — `docker info` |
 | `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` | 1 | Low |

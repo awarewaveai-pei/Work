@@ -50,10 +50,12 @@ param(
 $ErrorActionPreference = 'Stop'
 $script:exitCode = 0
 
+. (Join-Path $PSScriptRoot '_console-encoding-helpers.ps1')
+
 # ---------- Locate repo root ----------
 function Resolve-MonorepoRoot {
   try {
-    $r = (& git rev-parse --show-toplevel 2>$null)
+    $r = Invoke-WithUtf8Console { & git rev-parse --show-toplevel 2>$null }
     if ($LASTEXITCODE -eq 0 -and $r) { return ($r -replace '/', '\').TrimEnd('\') }
   } catch { }
   $envRoot = $env:MONOREPO_ROOT
@@ -136,8 +138,12 @@ function Backup-Path([string]$Path, [string]$RelLabel) {
   Ensure-BackupDir
   $dest = Join-Path $BackupRoot $RelLabel
   $destDir = Split-Path -Parent $dest
-  if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
-  Copy-Item -Path $Path -Destination $dest -Recurse -Force -ErrorAction SilentlyContinue
+  try {
+    if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force -ErrorAction Stop | Out-Null }
+    Copy-Item -Path $Path -Destination $dest -Recurse -Force -ErrorAction Stop
+  } catch {
+    Write-Host "  WARN: backup failed for '$RelLabel' -> '$dest': $($_.Exception.Message)" -ForegroundColor Yellow
+  }
 }
 
 # ---------- Hash helpers ----------
