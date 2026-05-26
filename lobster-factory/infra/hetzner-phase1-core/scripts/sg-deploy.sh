@@ -83,23 +83,27 @@ if [[ $SKIP_PULL -eq 0 ]]; then
 fi
 
 # 2. rsync each app
-# 1.5. test gate — npm test before build, only for next-admin
+# 1.5. pre-build gate — typecheck then tests, only for next-admin, before rsync/snapshot.
+#      Order: tsc first (fast, clean diagnostics) then vitest.
+#      Note: tsc runs against the source tree (no .next/types/** regeneration);
+#      covers source-level type errors — same scope as GHA next-admin-typecheck.yml.
 if [[ " ${APPS[*]} " =~ " next-admin " && $DRY_RUN -eq 0 ]]; then
   TEST_DIR="$GIT_APPS_ROOT/next-admin"
-  log "--- npm test gate (next-admin) ---"
   if [[ ! -d "$TEST_DIR/node_modules" ]]; then
     log "node_modules missing; running npm install --include=dev ..."
     npm --prefix "$TEST_DIR" install --include=dev 2>&1 | tee -a "$LOG_FILE" \
-      || fail "npm install failed — cannot run test gate"
+      || fail "npm install failed — cannot run pre-build gate"
   fi
-  npm --prefix "$TEST_DIR" test 2>&1 | tee -a "$LOG_FILE" \
-    || fail "npm test FAILED — deploy aborted; fix tests before re-deploying next-admin"
-  log "npm test passed"
 
   log "--- tsc typecheck gate (next-admin) ---"
   npm --prefix "$TEST_DIR" run typecheck 2>&1 | tee -a "$LOG_FILE" \
     || fail "tsc typecheck FAILED — deploy aborted; fix type errors before re-deploying next-admin"
   log "tsc typecheck passed"
+
+  log "--- npm test gate (next-admin) ---"
+  npm --prefix "$TEST_DIR" test 2>&1 | tee -a "$LOG_FILE" \
+    || fail "npm test FAILED — deploy aborted; fix tests before re-deploying next-admin"
+  log "npm test passed"
 fi
 
 for APP in "${APPS[@]}"; do
