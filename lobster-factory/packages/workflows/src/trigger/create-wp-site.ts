@@ -33,6 +33,13 @@ function normalizeBuildConsolePayload(raw: unknown): unknown {
 // SSRF guard: only allow https URLs that don't resolve to private/internal networks.
 // Applied to all integration URL fields at parse time so the Trigger.dev worker never
 // fetches an attacker-controlled internal endpoint.
+//
+// Defence layers:
+//  1. protocol must be https
+//  2. hostname matched against RFC-1918 + loopback + link-local ranges (IPv4 + IPv6)
+//  3. IPv6 bracket stripping (WHATWG URL keeps brackets: [::1] → strip → ::1)
+//  4. Numeric/hex/octal IPv4 forms rejected (e.g. 2130706433, 0x7f000001, 0177.1)
+//  5. DNS rebinding not prevented at parse time — mitigated by operator-only input path
 const PRIVATE_IP_RE = [
   /^127\./,
   /^10\./,
@@ -40,15 +47,29 @@ const PRIVATE_IP_RE = [
   /^192\.168\./,
   /^169\.254\./,
   /^::1$/,
+  /^::ffff:/i,
   /^fc00:/i,
   /^fd/i,
+  /^fe80:/i,
 ];
 function noSsrfUrl(raw: string): boolean {
   try {
     const { protocol, hostname } = new URL(raw);
     if (protocol !== "https:") return false;
-    if (PRIVATE_IP_RE.some((re) => re.test(hostname))) return false;
-    if (hostname.endsWith(".local") || hostname.endsWith(".internal")) return false;
+    // Strip IPv6 brackets that WHATWG URL preserves: "[::1]" → "::1"
+    const h = hostname.startsWith("[") ? hostname.slice(1, -1) : hostname;
+    if (PRIVATE_IP_RE.some((re) => re.test(h))) return false;
+    // Reject localhost aliases
+    if (
+      h === "localhost" ||
+      h.endsWith(".localhost") ||
+      h.endsWith(".local") ||
+      h.endsWith(".internal") ||
+      h.endsWith(".lan") ||
+      h.endsWith(".home.arpa")
+    ) return false;
+    // Reject numeric/hex/octal IPv4 forms that bypass regex (e.g. 2130706433, 0x7f000001)
+    if (/^(0x[0-9a-f]+|\d+(\.\d+)*|0[0-7]+(\.[0-9]+)*)$/i.test(h)) return false;
     return true;
   } catch {
     return false;

@@ -237,7 +237,8 @@ export const applyManifest = task({
       },
     });
 
-    const manifestAbsolutePath = path.resolve(input.manifestPath);
+    // Use the already-validated, contained path from the MANIFESTS_BASE check above.
+    const manifestAbsolutePath = resolvedManifestPath;
     const wpRootAbsolute = path.resolve(input.wpRootPath);
 
     let shellExecution:

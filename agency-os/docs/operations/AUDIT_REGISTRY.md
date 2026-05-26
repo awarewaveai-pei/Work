@@ -70,6 +70,7 @@
 - `scripts/diff-env-vs-vault.ps1:116, 118` — commit `faafbae` — SSH + docker exec captures
 - `scripts/update-client-wp-plugins.ps1:105, 122, 128` — commit `8e0e33e` + `52e97d6` — SSH + scp captures (Copy-FromServer + Copy-ToServer also wrapped)
 - `scripts/ao-resume.ps1:425` — commit `<this-commit>` — `git log --pretty=format:"%cd|%s"` (subject CJK) — **tool found bug I introduced today in commit `e807984`** — exact same pattern as the backfill original break
+- `scripts/print-today-closeout-recap.ps1` — commit `<encoding-fix-commit>` 2026-05-26 — Pattern B → Pattern A: `git status -sb` (CJK paths) + `git log %s` (CJK subjects) wrapped in `Invoke-WithUtf8Console`; bare `[Console]::OutputEncoding` setter removed; dot-source added
 
 ### 🟢 CLEAN (reviewed, no action)
 
@@ -77,14 +78,16 @@
 - `scripts/merge-closeout-inbox-into-progress.ps1` — 0 external commands (pure markdown aggregator)
 - `scripts/apply-closeout-task-checkmarks.ps1` — `[StringComparison]::Ordinal` for CJK substring, regex matches only ASCII structure
 - `scripts/fetch-external-signals.ps1` — `Invoke-RestMethod` (HTTP charset header handled by .NET, no stdout encoding path)
-- `scripts/generate-integrated-status-report.ps1` — pure .md aggregator (BOM cosmetic; cleanup deferred to TASKS)
+- `scripts/generate-integrated-status-report.ps1` — pure .md aggregator; no external command captures. BOM consistency fixed in commit `<encoding-fix-commit>` 2026-05-26: `Set-Content -Encoding UTF8` (PS5=BOM / PS7=no-BOM) replaced with `[System.IO.File]::WriteAllText($path, $text, UTF8NoBOM)` — PS5/PS7 consistent no-BOM output
 - `lobster-factory/infra/trigger/{validate-config,preflight-clickhouse}.ps1` — 0 captures
 - `lobster-factory/infra/hetzner-phase1-core/scripts/test-ops-inbox-webhooks.ps1` — `Invoke-WebRequest` (HTTP path, same safety as Invoke-RestMethod)
 
 #### Pattern B protected (script-level `[Console]::OutputEncoding = UTF8`)
-- `scripts/print-open-tasks.ps1` — subprocess model safe (process exit restores encoding)
-- `scripts/print-today-closeout-recap.ps1` — same
 - `scripts/backfill-missed-daily.ps1` — uses save+restore via Pattern B (fixed today)
+
+#### Pattern A upgraded (2026-05-26)
+- `scripts/print-open-tasks.ps1` — no external command stdout captures; dot-source added for future-proofing; `chcp 65001` retained for PS5 terminal display; bare `OutputEncoding` setters removed (were no-ops for this script)
+- `scripts/print-today-closeout-recap.ps1` — moved to 🔴 FIXED above
 
 #### Linux scripts (CP950 trap class does NOT exist on Linux)
 - 24 `.sh` files — bash is byte-oriented, VPS locale `C.UTF-8`, no `[Console]::OutputEncoding` equivalent. No fix needed and no `Invoke-WithUtf8Console` function exists for bash.
@@ -113,7 +116,7 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 | `scripts/scan-local-config-for-secrets.ps1` | 1 | Low |
 | `scripts/sync-claude-userlevel.ps1` | 1 | Low — 🔴 FIXED b791bfb+followup: wrapped `git rev-parse` in `Invoke-WithUtf8Console` |
 | `scripts/verify-closeout-completeness.ps1` | 2 | Low |
-| `lobster-factory/infra/trigger/deploy-workflows.ps1` | 1 | Low — `docker info` |
+| `lobster-factory/infra/trigger/deploy-workflows.ps1` | 1 | **False positive** — `docker info 2>&1 \| Out-Null` discards all output; no stdout decode occurs; CP950 trap does not apply. Also fixed commit `<encoding-fix-commit>` 2026-05-26: L72 `Get-Content $PkgPath -Raw` + L85 `Get-Content $PosthogEnvSource` now both use `-Encoding UTF8` |
 | `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` | 1 | Low |
 | `mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1` | 2 | Low |
 | `scripts/generate-customer-delivery-status.ps1`, `scripts/playwright-runner.ps1` | parse-error reported | Pre-existing PS parse errors unrelated to encoding |
@@ -134,7 +137,9 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 
 | Audited | Fixed (Pattern A) | Fixed (Pattern B) | Clean | Tracked | Real production breaks pre-audit | Tooling shipped |
 |---------|-------------------|-------------------|-------|---------|----------------------------------|-----------------|
-| 142 (PS) + 24 (SH) | 5 | 3 | 31 + 24 | 117 | 1 (`backfill-missed-daily.ps1`) | 3 (helper + tool + slash + AGENTS rule) |
+| 142 (PS) + 24 (SH) | 6 | 1 | 32 + 24 | 117 | 1 (`backfill-missed-daily.ps1`) | 3 (helper + tool + slash + AGENTS rule) |
+
+_2026-05-26 update: +1 Pattern A (print-today-closeout-recap); Pattern B 3→1 (print-today→A, print-open→Clean); Clean 31→32 (print-open-tasks added); deploy-workflows docker info annotated false-positive; generate-integrated-status-report BOM consistency fixed._
 
 ---
 
@@ -146,34 +151,23 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 
 **Class**: webhook handler completeness — "incident-creating but incident-not-closing" anti-pattern
 
-**Status**: 🟡 TRACKED — bug confirmed, fix deferred to dedicated PR
+**Status**: 🔴 FIXED (code committed `f933312` 2026-05-23; **production effect pending sg-deploy**)
 
 **Discovered during**: 2026-05-23 B-Minimal VPS auto-reboot deployment, P3 incident closure step. After SG reboot manually cleared the underlying signal, the operator-visible Ops Inbox row remained `status=open` because the webhook code path did not actively resolve incidents on netdata CLEAR transitions.
 
-**Evidence**:
-- [`webhooks/netdata/route.ts:29-31`](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/netdata/route.ts#L29-L31) — CLEAR signals return `{"skipped": "netdata_clear"}` without touching the matching open incident
-- [`lib/ops-inbox/fingerprint.ts:32-33`](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/fingerprint.ts#L32-L33) — netdata fingerprint = `sha256("netdata:${host}:${alarm}")`. `alarm` string includes value (e.g. `= 1 status` vs `= 0 status`), so CLEAR and WARNING fingerprints **don't match** even if active-resolve were introduced
-- Manual SQL closure of incident `2e66435f-4439-4b6a-a045-ec93e98fbe48` confirms the design gap, not a one-off bug
+**Root cause** (historical):
+- `fingerprint.ts` used `raw.alarm` (label text including runtime value e.g. `= 1 status`) — label changes between WARNING/CLEAR so fingerprints didn't match across transitions
+- `route.ts` had skip-and-return on CLEAR (`{"skipped": "netdata_clear"}`) — no attempt to resolve the matching open incident
 
-**Impact** (per BUG_HUNT_PROTOCOL `blast_radius × likelihood × scope`):
-- blast_radius: 2 — operator sees stale list, but no production impact
-- likelihood: 5 — happens **every single time** a netdata-tracked signal transitions back to OK
-- scope: medium — affects all netdata signals (not just `post_update_reboot_status`); ~24+ events/year × 30 years = 720+ stale incidents accumulated
+**Fix implemented** (commit `f933312` 2026-05-23):
+1. **`lib/ops-inbox/fingerprint.ts:32-43`** — netdata case: use `raw.name` (stable metric ID e.g. `system_post_update_reboot_status`) as primary key; fallback chain `name → alarm_id → alarm`
+2. **`app/api/webhooks/netdata/route.ts:44-70`** — CLEAR active resolve: look up open incident by stable fingerprint + environment, set `status=resolved` + `resolved_at` + `resolved_by='netdata-auto-resolve-on-clear'`; idempotent via `.eq("status","open")` filter
+3. **`lib/ops-inbox/__tests__/fingerprint.test.ts`** — 5 vitest cases: WARNING/CLEAR same fingerprint, three-layer fallback, different host = different fingerprint
+4. **SQL backfill** — `UPDATE 13` stale netdata incidents (`resolved_by='stale-backfill-2026-05-23-fingerprint-refactor'`); post-backfill `SELECT count(*) WHERE source='netdata' AND status='open'` = 0
 
-**Fix scope** (NOT done today — separate PR):
-1. Stabilize fingerprint: switch netdata to `alarm_id` (already in payload) or strip value from `alarm` string before hashing
-2. Active resolve on CLEAR: replace line 29-31 skip-and-return with: look up matching open incident by stable fingerprint, set `status=resolved`, `resolved_at=now()`, `resolved_by='netdata-auto-resolve'`
-3. Migration: backfill `ops_incidents.fingerprint` with new algorithm OR add parallel `alarm_id` lookup column
-4. Test: vitest case for WARNING → CLEAR transition + duplicate CLEAR (idempotency)
+**Production deploy**: code merged but `sg-deploy` not yet executed (18 commits behind as of 2026-05-26). Existing deployment still runs pre-fix logic during the gap. Workaround: manually `UPDATE ops_incidents SET status='resolved'` via `docker exec supabase-db psql` if stale incidents accumulate before deploy.
 
-**Why TRACKED, not FIXED today**:
-- 2026-05-23 session focused on B-Minimal VPS auto-reboot deployment (15 phases, 8 file changes already)
-- Fingerprint refactor + migration deserves independent PR with backup proof + staging dry-run
-- Per R0 "最小修改" — not bundling unrelated DB schema concerns into infra automation PR
-
-**Tracked task**: `agency-os/TASKS.md` §工具層 / 基礎建設 / 治理 → "Ops Inbox netdata CLEAR auto-resolve bug + fingerprint instability"
-
-**Workaround until fixed**: manually run `UPDATE ops_incidents SET status='resolved' ...` via `docker exec supabase-db psql` when ops review finds stale incident. Pattern documented in `agency-os/WORKLOG.md` §2026-05-23.
+**Tracked task**: `agency-os/TASKS.md` §Encoding 防護延伸 → "Ops Inbox netdata CLEAR auto-resolve bug + fingerprint instability" — **AUDIT_REGISTRY updated 2026-05-26; close TASK after sg-deploy confirms live**
 
 ---
 
@@ -269,19 +263,28 @@ _(all 5 moved to 🔴 FIXED above on 2026-05-23; Phase 4 closeout 2026-06-19 unb
 
 **Audit report (full findings)**: [reports/audit/lobster-factory-one-click-site-2026-05-26.md](../../reports/audit/lobster-factory-one-click-site-2026-05-26.md)
 
-### 🔴 TRACKED — Critical (3) — must fix before any production `enqueue` mode enabled
+### 🔴 FIXED — Critical (3)
 
-- `dispatch-action-run.ts:165-191` — **C1**: Dispatcher bypasses `approval_required` / `approval_status` gates entirely; production approval is a paper tiger (cron picks up any `status=pending` run within 60s regardless of approval state)
-- `create-wp-site.ts` + `app/api/build/runs/route.ts:114-143` — **C2**: Zero idempotency on `siteId`; double-submit or Trigger.dev retry re-provisions everything (Sentry, MainWP, Uptime Kuma, hosting account, plugins)
-- `integration-steps.ts:64-371` + `create-wp-site.ts:34-40` — **C3**: SSRF surface: `uptimeKuma.url`, `n8n.onboardingWebhookUrl`, `mainWp.dashboardUrl`, `postHog.host` all `z.string()` with no URL validation; worker on EU VPS fetches attacker-supplied URLs and echoes response body into `output_snapshot` → PostHog/Sentry
+- `dispatch-action-run.ts` — **C1** 🔴 FIXED (PENDING_COMMIT) — `ActionRunSchema` + PostgREST `or=` filter + `dispatchRun()` guard; approval_required=true runs blocked at DB query + double-check in application layer
+- `app/api/build/runs/route.ts` — **C2** 🔴 FIXED (PENDING_COMMIT) — siteId duplicate check (`.maybeSingle()` before INSERT → 409 `site_run_already_active`); TOCTOU acknowledged, partial unique index noted as follow-up DB migration (out of scope for application-layer patch)
+- `create-wp-site.ts` + `integration-steps.ts` — **C3** 🔴 FIXED (PENDING_COMMIT) — `noSsrfUrl()` refine on all 4 URL fields (https-only + RFC-1918 + IPv6 bracket-strip + numeric/hex IP + localhost aliases); response body exfil channel removed from all 5 integration error paths + n8n success path; `btoa` → `Buffer.from()` (m7 bundled)
 
-### 🟠 TRACKED — Major (11)
+### 🟠 FIXED — Major (2 of 11)
 
-See [full report §Major Findings](../../reports/audit/lobster-factory-one-click-site-2026-05-26.md#-major-findings-11). Highlights: literal `"TODO_from_staging_ref"` as sshHost (M1), `as { sshHost? }` cast on type without that field (M2), dry-run writes `status="completed"` to DB (M3), isLicenseError stderr substring misclassification (M4), production-block check after PostHog event (M5), **arbitrary file read via `manifestPath`** (M6), spawn inherits entire process.env incl. secrets (M7), **shell command injection on `slug`/`wpPath`** (M8), partial state on webhook 502 with no rollback (M9), non-atomic dispatch sequence (M10), failure `output_snapshot` omits shellExecution (M11).
+- `apply-manifest.ts:39` — **M6** 🟠 FIXED (PENDING_COMMIT) — `manifestPath` regex allowlist (`^[a-zA-Z0-9][a-zA-Z0-9_\-./]*\.(json|yaml|yml)$`) + `!p.includes("..")` refine + `path.resolve(MANIFESTS_BASE, ...)` + `startsWith(MANIFESTS_BASE + path.sep)` containment; also fixed stale `manifestAbsolutePath = path.resolve(input.manifestPath)` that re-escaped containment
+- `wp-install-plugins.ts:30,33` — **M8** 🟠 FIXED (PENDING_COMMIT) — `slug: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/)` + `wpPath: z.string().regex(^/[a-zA-Z0-9_\-/.]{1,200}$).refine(!includes(".."))` — injection blocked at Zod parse before any SSH exec
 
-### 🟡 TRACKED — Minor (12)
+### 🟠 TRACKED — Major (9 remaining)
 
-Inconsistent bool env parsing (m1/m2), `any` cast on Zod value (m3), misleading pluginCount (m4), double-slash URL (m5), hardcoded sentry.io (m6), `btoa` instead of Buffer (m7), allSettled loses service identity (m8), Number(NaN) setTimeout (m9), statSync swallowed (m10), non-valid-v4 mock UUID (m11), HOSTING_PROVISION_PATH accepts absolute URL (m12).
+See [full report §Major Findings](../../reports/audit/lobster-factory-one-click-site-2026-05-26.md#-major-findings-11). Still tracked: literal `"TODO_from_staging_ref"` as sshHost (M1), `as { sshHost? }` cast (M2), dry-run writes `status="completed"` to DB (M3), isLicenseError stderr misclassification (M4), production-block check after PostHog event (M5), spawn inherits entire process.env incl. secrets (M7), partial state on webhook 502 (M9), non-atomic dispatch sequence (M10), failure `output_snapshot` omits shellExecution (M11).
+
+### 🟡 FIXED — Minor (1 of 12)
+
+- `integration-steps.ts:339` — **m7** 🟡 FIXED (PENDING_COMMIT) — `btoa` → `Buffer.from(..).toString("base64")` (bundled with C3 PR)
+
+### 🟡 TRACKED — Minor (11 remaining)
+
+Inconsistent bool env parsing (m1/m2), `any` cast on Zod value (m3), misleading pluginCount (m4), double-slash URL (m5), hardcoded sentry.io (m6), allSettled loses service identity (m8), Number(NaN) setTimeout (m9), statSync swallowed (m10), non-valid-v4 mock UUID (m11), HOSTING_PROVISION_PATH accepts absolute URL (m12).
 
 ### 🟢 CLEAN
 

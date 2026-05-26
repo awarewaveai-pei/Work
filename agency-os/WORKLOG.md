@@ -50,6 +50,39 @@
 
 **下一步**: 加 TASKS.md C1/C2/C3 追蹤項；production enqueue 模式前必須清 3 Critical。
 
+### 一鍵架站系統 C1+C2+C3+M6+M8 Security Patch (PENDING_COMMIT)
+
+**根本問題**: 承上 Tier 3 審計，修補 3 Critical + 2 Major 安全漏洞。R0 完整分析 → 等待使用者「准」 → 5 patch 實作。
+
+**修改項目 (5 個 patch)**:
+- `dispatch-action-run.ts` — **C1**: `ActionRunSchema` 加 `approval_required: z.boolean().default(false)` + `approval_status: z.string().default("none")`；查詢加 PostgREST `or=(approval_required.eq.false,approval_status.eq.approved)`；`dispatchRun()` 開頭加 guard（批准閘雙重防禦）
+- `app/api/build/runs/route.ts` — **C2**: INSERT 前查 `ops_action_runs WHERE site_id=? AND status IN (pending, running, dispatched)` → 409 `site_run_already_active`；`.maybeSingle()` fast-path（TOCTOU 已知限制，DB migration unique index 為後續 follow-up）
+- `create-wp-site.ts` — **C3a**: `noSsrfUrl()` helper（https-only + RFC-1918 IPv4 + IPv6 bracket-strip + ::ffff:/fe80:/fc00:/fd block + decimal/hex IP reject + localhost alias block）；`ssrfSafeUrl` schema 套用所有 4 個 URL 欄位
+- `integration-steps.ts` — **C3b**: 5 個 integration 的 error path response body 改 `(response body redacted)`；n8n success path 移除 `resourceId: body.slice(0,200)`；`btoa()` → `Buffer.from().toString("base64")` (m7 bundled)
+- `apply-manifest.ts` — **M6**: `manifestPath` regex + `!includes("..")` refine；`MANIFESTS_BASE` containment check；修復 critic 發現的 `manifestAbsolutePath = path.resolve(input.manifestPath)` 繞過（再次用舊 path，bypass containment）
+- `wp-install-plugins.ts` — **M8**: `slug: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/)` + `wpPath: z.string().regex(...).refine(!includes(".."))` — 兩個 SSH exec injection vector 封閉
+
+**critic subagent 二輪 review (Standard)**:
+- C1: warn（schema nullish → 改為 default(false/none)，已修）
+- C2: fail → TOCTOU 確認，DB unique index 為 application-layer fix 之外的後續 follow-up（已記錄 Tracked）
+- C3: fail → IPv6 bracket `[::1]` bypass + decimal/hex IP form bypass（已修 noSsrfUrl）；localhost alias 補齊（已修）
+- P4 (M6): warn → `manifestAbsolutePath` 再次 `path.resolve(input.manifestPath)` bypass 已在 line 240 修正
+- P5 (M8): warn → sshHost 未驗證（注 SSRF-for-SSH concern，已記錄 Tracked 後續）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (workflows) | exit=0 | ms=533 | tests=18 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=tsc --noEmit (next-admin) | exit=0 | ms=<N> | output=none
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=3c/5m/4n (items fixed: schema narrowing + IPv6 + manifestAbsolutePath bypass)
+- BUGHUNT_DONE: scope=lobster-factory/packages/,infra/next-admin/ | grep=ops_action_runs+INSERT|noSsrfUrl|manifestAbsolutePath|dispatchRun | hits=confirmed single INSERT path, SSRF guard on all 4 URL fields, containment fix applied
+
+**已知剩餘風險**:
+- C2 TOCTOU：check-then-insert 在極端並發下仍可 race；需 DB unique partial index `ON ops_action_runs(site_id) WHERE status IN ('pending','running','dispatched')` → 後續 migration
+- C3 DNS rebinding：parse-time URL check 無法防止 DNS rebinding（attacker 控制 DNS）；需 egress proxy 或 post-resolve check → Phase 5+ scope
+- M8 sshHost 未驗證 SSRF-for-SSH：`sshHost: z.string().min(1)` 允許 internal host → 後續 follow-up
+- AUDIT_REGISTRY.md：C1/C2/C3/M6/M8/m7 升 FIXED 但標 PENDING_COMMIT；commit hash 待補
+
+**Rollback**: `git revert <commit>` 可完整回滾 5 patch；無 DB schema change；無 API contract break。
+
 ### SG deploy next-admin — TS discriminated union fix (`6f20cfa`)
 
 **根本問題：** C3+M3 auto-repair fix（2026-05-23）在 6 個 webhook route 使用 `if (!body.ok)` 來 narrow `ReadBodyError | ReadBodyResult<unknown>`，但 `strict: false` tsconfig 下 `!body.ok` 無法正確 narrow discriminated union。vitest 不做型別檢查，錯誤潛伏 18 commits，直到 `sg-deploy next-admin` 首次跑 `next build` 時 tsc 才爆。

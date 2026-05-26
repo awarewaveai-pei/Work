@@ -35,8 +35,8 @@ const ActionRunSchema = z.object({
   status:           z.string(),
   trace_id:         z.string().nullish(),
   metadata:         z.record(z.unknown()).default({}),
-  approval_required: z.boolean().nullish(),
-  approval_status:   z.string().nullish(),
+  approval_required: z.boolean().default(false),
+  approval_status:   z.string().default("none"),
 });
 
 type ActionRun = z.infer<typeof ActionRunSchema>;
