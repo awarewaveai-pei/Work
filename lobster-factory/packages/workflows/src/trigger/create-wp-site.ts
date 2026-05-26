@@ -30,13 +30,39 @@ function normalizeBuildConsolePayload(raw: unknown): unknown {
   return o;
 }
 
+// SSRF guard: only allow https URLs that don't resolve to private/internal networks.
+// Applied to all integration URL fields at parse time so the Trigger.dev worker never
+// fetches an attacker-controlled internal endpoint.
+const PRIVATE_IP_RE = [
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^::1$/,
+  /^fc00:/i,
+  /^fd/i,
+];
+function noSsrfUrl(raw: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(raw);
+    if (protocol !== "https:") return false;
+    if (PRIVATE_IP_RE.some((re) => re.test(hostname))) return false;
+    if (hostname.endsWith(".local") || hostname.endsWith(".internal")) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+const ssrfSafeUrl = z.string().url().refine(noSsrfUrl, "URL must use https and must not target a private/internal address");
+
 // Integration sub-schema (all optional — skipped if not provided)
 const IntegrationsSchema = z.object({
-  uptimeKuma: z.object({ url: z.string(), apiKey: z.string(), groupName: z.string().optional() }).optional(),
+  uptimeKuma: z.object({ url: ssrfSafeUrl, apiKey: z.string(), groupName: z.string().optional() }).optional(),
   sentry:     z.object({ org: z.string(), authToken: z.string(), team: z.string().optional() }).optional(),
-  postHog:    z.object({ projectApiKey: z.string(), host: z.string().optional() }).optional(),
-  n8n:        z.object({ onboardingWebhookUrl: z.string(), bearerToken: z.string().optional() }).optional(),
-  mainWp:     z.object({ dashboardUrl: z.string(), consumerKey: z.string(), consumerSecret: z.string() }).optional(),
+  postHog:    z.object({ projectApiKey: z.string(), host: ssrfSafeUrl.optional() }).optional(),
+  n8n:        z.object({ onboardingWebhookUrl: ssrfSafeUrl, bearerToken: z.string().optional() }).optional(),
+  mainWp:     z.object({ dashboardUrl: ssrfSafeUrl, consumerKey: z.string(), consumerSecret: z.string() }).optional(),
 }).optional();
 
 const InputSchema = z.preprocess(

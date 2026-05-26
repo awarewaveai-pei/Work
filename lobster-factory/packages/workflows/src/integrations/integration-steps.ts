@@ -94,8 +94,7 @@ export async function registerUptimeKumaMonitor(
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return { service: "uptime_kuma", status: "error", detail: `HTTP ${res.status}: ${text}` };
+      return { service: "uptime_kuma", status: "error", detail: `HTTP ${res.status} (response body redacted)` };
     }
 
     const json = (await res.json()) as { monitorID?: number; msg?: string };
@@ -148,8 +147,7 @@ export async function registerUptimeKumaSslMonitor(
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return { service: "uptime_kuma_ssl", status: "error", detail: `HTTP ${res.status}: ${text}` };
+      return { service: "uptime_kuma_ssl", status: "error", detail: `HTTP ${res.status} (response body redacted)` };
     }
 
     const json = (await res.json()) as { monitorID?: number };
@@ -200,8 +198,7 @@ export async function createSentryProject(
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return { service: "sentry", status: "error", detail: `HTTP ${res.status}: ${text}` };
+      return { service: "sentry", status: "error", detail: `HTTP ${res.status} (response body redacted)` };
     }
 
     const json = (await res.json()) as { id?: string; slug?: string; name?: string };
@@ -258,8 +255,7 @@ export async function capturePostHogOnboardingEvent(
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return { service: "posthog", status: "error", detail: `HTTP ${res.status}: ${text}` };
+      return { service: "posthog", status: "error", detail: `HTTP ${res.status} (response body redacted)` };
     }
 
     return {
@@ -301,16 +297,13 @@ export async function triggerN8nOnboarding(
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return { service: "n8n", status: "error", detail: `HTTP ${res.status}: ${text}` };
+      return { service: "n8n", status: "error", detail: `HTTP ${res.status} (response body redacted)` };
     }
 
-    const body = await res.text();
     return {
       service: "n8n",
       status: "ok",
       detail: `Onboarding webhook triggered`,
-      resourceId: body.slice(0, 200),
     };
   } catch (err) {
     return {
@@ -336,7 +329,7 @@ export async function addSiteToMainWp(
 
   // MainWP REST API v2: POST /wp-json/mainwp/v2/site/add
   // Requires Basic auth with consumer key:secret
-  const credentials = btoa(`${cfg.consumerKey}:${cfg.consumerSecret}`);
+  const credentials = Buffer.from(`${cfg.consumerKey}:${cfg.consumerSecret}`).toString("base64");
 
   try {
     const res = await fetch(`${cfg.dashboardUrl}/wp-json/mainwp/v2/site/add`, {
@@ -349,8 +342,7 @@ export async function addSiteToMainWp(
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return { service: "mainwp", status: "error", detail: `HTTP ${res.status}: ${text}` };
+      return { service: "mainwp", status: "error", detail: `HTTP ${res.status} (response body redacted)` };
     }
 
     const json = (await res.json()) as { id?: number; site_url?: string };

@@ -111,6 +111,26 @@ export async function POST(request: Request) {
       );
     }
 
+    if (input.siteId) {
+      const { data: existingRun } = await supabase
+        .from("ops_action_runs")
+        .select("id, status")
+        .eq("site_id", input.siteId)
+        .in("status", ["pending", "running", "dispatched"])
+        .maybeSingle();
+      if (existingRun) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "site_run_already_active",
+            details: { existingRunId: existingRun.id, status: existingRun.status },
+            plan,
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     const { data: inserted, error: insertError } = await supabase
       .from("ops_action_runs")
       .insert({

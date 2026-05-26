@@ -26,8 +26,16 @@ const InputSchema = z.object({
   /** SSH username, defaults to root */
   sshUser: z.string().default("root"),
   /** Absolute path to WordPress root on the remote host */
-  wpPath: z.string().default("/var/www/html"),
-  pluginSlugs: z.array(z.string().min(1)).min(1),
+  wpPath: z
+    .string()
+    .regex(/^\/[a-zA-Z0-9_\-/.]{1,200}$/, "wpPath must be an absolute path with safe characters")
+    .refine((p) => !p.includes(".."), "path traversal not allowed in wpPath")
+    .default("/var/www/html"),
+  pluginSlugs: z
+    .array(
+      z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "invalid plugin slug — must match WP.org slug format")
+    )
+    .min(1),
   organizationId: z.string().uuid(),
   workspaceId: z.string().uuid(),
   siteId: z.string().uuid(),

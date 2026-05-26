@@ -27,14 +27,16 @@ const ACTION_KEY_TO_TASK_ID: Record<string, string> = {
 
 // Shape of an ops_action_runs row (only fields we need)
 const ActionRunSchema = z.object({
-  id:              z.string().uuid(),
-  action_key:      z.string().optional(),   // joined from ops_action_catalog if needed
-  action_id:       z.string().uuid(),
-  organization_id: z.string().uuid().nullish(),
-  input_payload:   z.record(z.unknown()).default({}),  // correct column name
-  status:          z.string(),
-  trace_id:        z.string().nullish(),
-  metadata:        z.record(z.unknown()).default({}),
+  id:               z.string().uuid(),
+  action_key:       z.string().optional(),   // joined from ops_action_catalog if needed
+  action_id:        z.string().uuid(),
+  organization_id:  z.string().uuid().nullish(),
+  input_payload:    z.record(z.unknown()).default({}),  // correct column name
+  status:           z.string(),
+  trace_id:         z.string().nullish(),
+  metadata:         z.record(z.unknown()).default({}),
+  approval_required: z.boolean().nullish(),
+  approval_status:   z.string().nullish(),
 });
 
 type ActionRun = z.infer<typeof ActionRunSchema>;
@@ -93,6 +95,19 @@ async function updateRunStatus(
 // Dispatch a single action run
 // ─────────────────────────────────────────────
 async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: ActionRun) {
+  // Defence-in-depth: block approval-gated runs even if the DB filter somehow missed them.
+  if (run.approval_required && run.approval_status !== "approved") {
+    logger.warn("dispatcher: run blocked by approval gate", {
+      id: run.id,
+      approval_required: run.approval_required,
+      approval_status: run.approval_status,
+    });
+    await updateRunStatus(creds, run.id, "dispatch_failed", {
+      error_summary: "approval_gate_blocked: run requires approval before dispatch",
+    });
+    return;
+  }
+
   // Resolve action_key from metadata (set by Build Console) or look up from catalog
   const actionKeyFromMeta =
     typeof run.metadata?.action_key === "string" ? run.metadata.action_key : null;
@@ -165,11 +180,17 @@ export const dispatchActionRun = task({
   run: async (payload: unknown) => {
     const creds = getSupabaseCreds();
 
-    // Fetch pending runs (max 10 per invocation)
+    // Fetch pending runs that are either pre-approval-not-required or already approved.
+    // Runs with approval_required=true AND approval_status != 'approved' are excluded.
     const rows = await supabaseRestQuery(
       creds,
       "ops_action_runs",
-      { status: "eq.pending", limit: 10, order: "started_at.asc" }
+      {
+        status: "eq.pending",
+        or: "(approval_required.eq.false,approval_status.eq.approved)",
+        limit: 10,
+        order: "started_at.asc",
+      }
     );
 
     const runs = z.array(ActionRunSchema).parse(rows ?? []);

@@ -36,7 +36,13 @@ const InputSchema = z.object({
   siteId: z.string().uuid(),
   environmentId: z.string().uuid(),
   wpRootPath: z.string().min(1),
-  manifestPath: z.string().min(1),
+  manifestPath: z
+    .string()
+    .regex(
+      /^[a-zA-Z0-9][a-zA-Z0-9_\-./]*\.(json|yaml|yml)$/,
+      "manifestPath must be a relative .json/.yaml/.yml filename"
+    )
+    .refine((p) => !p.includes(".."), "path traversal not allowed in manifestPath"),
   manifestSlug: z.enum(SUPPORTED_MANIFESTS).optional(),
   environmentType: z.enum(["staging", "production"]),
 });
@@ -109,7 +115,15 @@ export const applyManifest = task({
       throw new Error("Manifest install is blocked outside staging");
     }
 
-    const raw = await fs.readFile(path.resolve(input.manifestPath), "utf8");
+    const MANIFESTS_BASE = path.resolve(
+      process.env.LOBSTER_MANIFESTS_DIR ?? path.join(process.cwd(), "manifests")
+    );
+    const resolvedManifestPath = path.resolve(MANIFESTS_BASE, input.manifestPath);
+    if (!resolvedManifestPath.startsWith(MANIFESTS_BASE + path.sep) &&
+        resolvedManifestPath !== MANIFESTS_BASE) {
+      throw new Error(`manifestPath escapes allowed directory: ${input.manifestPath}`);
+    }
+    const raw = await fs.readFile(resolvedManifestPath, "utf8");
     const parsedRaw = JSON.parse(raw) as unknown;
     const manifest = ManifestSchema.parse(parsedRaw);
 
