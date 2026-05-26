@@ -4,6 +4,25 @@
 
 ## 2026-05-26
 
+### AO-CLOSE 預授權修復 + system-guard 健康檢查去重
+
+**根本問題**: AO-CLOSE 花費近一小時且反覆要求 R0 逐項批准。根因：R0「修改任何檔案前必須等待明確批准」無 AO 生命週期例外，導致 WORKLOG / memory / daily 每次寫入都觸發 approval loop；system-guard.ps1 在 ao-close.ps1 內重複跑兩次 system-health-check（verify-build-gates 各一次、system-guard 各一次），每次含 10s timeout 網路呼叫，浪費 2-3 分鐘。
+
+**修改項目**:
+- `agency-os/AGENTS.md` — R0 段新增「AO 生命週期例外（預授權，R0 逐項批准不適用）」區塊；AO-CLOSE 快速續接段移除降低門檻歧義
+- `CLAUDE.md` — AO lifecycle 段補「預授權」說明
+- `.claude/commands/ao-close.md` — 頂部加 pre-auth callout block；移除 health gate 允許降低門檻描述
+- `.claude/commands/ao-resume.md` — 頂部加 pre-auth 一行說明
+- `agency-os/scripts/system-guard.ps1` — 新增「若 reports/health/health-*.md < 10 分鐘且 score=100%，直接複用，不重跑 system-health-check」去重邏輯；$healthDir/$closeoutDir/$guardDir 提前定義
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=PS dedup-logic isolation test (3 cases: fresh-100/stale/99pct) | exit=0 | ms=<1000 | output="All 3 tests PASS"
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/2m_fixed/4n -- 2 Major: (1) timezone-conversion fragility → fixed to [DateTime]::UtcNow; (2) $healthExitCode uninitialized → fixed to $healthExitCode=1 defensive default. Minors are non-blocking. audit-cp950-traps exit=0.
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=AllowNonPerfectHealth|SkipVerify|pre-auth | hits=0 新增豁免；grep=usedFreshReport|freshCutoff|healthExitCode | hits=1 each (system-guard.ps1 only, no downstream callers)
+- BUGHUNT_WAIVED: NA -- system-guard.ps1 無 downstream callers in lobster-factory (呼叫路徑僅 ao-close.ps1 → scripts/system-guard.ps1)
+
+**Rollback**: `git revert HEAD` 可完整回滾；health gate 仍維持 100%，-AllowNonPerfectHealth 仍禁止。
+
 ### Auto-Repair M1+M5+M6+m1+m7 fix — Phase 4 closeout 優先項
 
 **根本問題**: Bug Hunt 隊列 — `auto-repair-2026-05-23.md` 中 3 Major（M1/M5/M6）+ 2 Minor（m1/m7）在 Phase 4 觀察期收官（2026-06-19）前必須修。

@@ -1,3 +1,5 @@
+> **[預授權]** AO-RESUME 為完整預授權操作。`reports/ao-resume/*.md` 存檔寫入及 handoff packet 修剪**直接執行**，R0 逐項批准不適用。
+
 Follow the AO-RESUME protocol (AGENTS.md §快速續接關鍵字).
 
 ## Step 0 — Hook state check (MANDATORY before reading anything)

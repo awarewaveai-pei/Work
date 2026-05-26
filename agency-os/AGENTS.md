@@ -28,6 +28,16 @@
      `hits=0` 宣告若含 ASCII 識別符型 pattern（長度 ≥ 5，無空格/CJK），`bughunt-oracle.ps1` 於 AO-CLOSE commit 時機器驗證（排除 staged files）；宣告 0 但實際命中 → HARD FAIL（`scripts/bughunt-oracle.ps1` `Invoke-BughuntOracle`）。
   4. **WORKLOG（留證據鏈）**：[驗證結果] 段以 file:line 引用實際指令與輸出；同日 WORKLOG.md entry 含「四動作各自結果」摘要
 
+**AO 生命週期例外（預授權，R0 逐項批准不適用）**  
+使用者觸發 AO-CLOSE（含：收工／晚安／bye／done／先這樣／走了）或 AO-RESUME（含開工關鍵字），以下操作**直接執行，禁止要求逐項批准**：  
+① `WORKLOG.md` 寫入 AUTO_TASK_DONE / REALTEST_EVIDENCE / REALTEST_WAIVED / REVIEW_DONE / REVIEW_WAIVED / BUGHUNT_DONE / BUGHUNT_WAIVED 及任何本流程所需證據行  
+② `memory/CONVERSATION_MEMORY.md` 精簡蒸餾更新  
+③ `memory/daily/YYYY-MM-DD.md` 當日記錄  
+④ `reports/ao-close/*.md` 與 `reports/ao-resume/*.md` 存檔寫入  
+⑤ 執行 `ao-close.ps1` / `ao-resume.ps1` 腳本本身  
+**自修規則**：若 `verify-closeout-completeness` 擋下，代理自行補寫缺漏證據行後重跑，無需使用者批准；若 ao-close.ps1 因 behind remote 中止，自行跑 `git pull --ff-only origin main` 後重跑。  
+**唯一允許問一題的情況**：(a) `git push` 被拒且需人類介入（auth 失敗 / 真正 merge conflict）；(b) health check 自修後仍 < 100%，列出具體失敗項並問一題；**禁止**主動提議降低門檻或使用 `-AllowNonPerfectHealth`。
+
 **修改完成後，必須輸出：**
 [已修改] 逐項列出檔案與修改原因
 [驗證結果] 實際執行的檢查；無法執行需明說，不得假裝已驗證
@@ -169,7 +179,7 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 
 **AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（120 秒去重）。代理讀狀態檔回七段式；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。
 
-**AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 先修復）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：`.cursor/rules/40-shutdown-closeout.mdc`。
+**AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 代理**自行嘗試自修後重跑**，修不好才列具體失敗項問一題；**禁止**主動提議 `-AllowNonPerfectHealth`）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：`.cursor/rules/40-shutdown-closeout.mdc`。
 
 ## Git + 記憶 + 文件
 
