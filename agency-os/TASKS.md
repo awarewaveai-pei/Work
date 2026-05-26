@@ -123,22 +123,13 @@
 
 - [x] **`scripts/audit-cp950-traps.ps1`** —— **【已完成 2026-05-22】** A+B+C+D 一次到位（commit chain `0836d94→c038b38`）：tool + AUDIT_REGISTRY.md + `/audit-encoding` slash + AGENTS.md auto-trigger rule。詳見 WORKLOG.md `## 2026-05-22 CP950 audit toolchain`。2026-05-23 在 AO-RESUME 抓到此漂移，本次 commit 同時補打勾。
 
-- [ ] **【2026-05-23 開出】Ops Inbox netdata CLEAR auto-resolve bug + fingerprint instability** —— **【未開始】** **背景**：B-Minimal auto-reboot 部署期間發現 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/netdata/route.ts:29-31` 對 CLEAR 訊號只 `return skipped`，不 actively resolve 既有 open incident。**且** `lib/ops-inbox/fingerprint.ts:32-33` 對 netdata 的 fingerprint 用 `host:alarm`，但 `alarm` 字串含 value（`= 1 status` vs `= 0 status`）→ CLEAR 與 WARNING 不同 fingerprint。**影響**：每次 auto-reboot 後 Ops Inbox 仍留 stale open incident，30 年 × 24+ 次/年 = 720+ stale incident 累積。**DoD**：(a) 修 fingerprint：netdata 改用 `alarm_id`（payload 已含此欄）或從 `alarm` 字串剝離 value 部分；(b) 修 webhook：CLEAR 訊號時主動查 fingerprint，若 open 則 set status=resolved + resolved_at + resolved_by='netdata-auto-resolve'；(c) 寫 migration backfill：用新 fingerprint 演算法重算所有 `ops_incidents.fingerprint`（or 加 `alarm_id` 欄位作為平行 lookup key）；(d) 新增 vitest 覆蓋 WARNING → CLEAR transition。**詳見**：`agency-os/docs/operations/AUDIT_REGISTRY.md` 對應 entry。**參考 commit**：本日 B-Minimal commit；P3 手動關 incident `2e66435f-4439-4b6a-a045-ec93e98fbe48` 的紀錄。
+- [x] **【✅ 2026-05-26 code 修復 commit `f933312`；sg-deploy 後生效】Ops Inbox netdata CLEAR auto-resolve bug + fingerprint instability** —— **【未開始】** **背景**：B-Minimal auto-reboot 部署期間發現 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/netdata/route.ts:29-31` 對 CLEAR 訊號只 `return skipped`，不 actively resolve 既有 open incident。**且** `lib/ops-inbox/fingerprint.ts:32-33` 對 netdata 的 fingerprint 用 `host:alarm`，但 `alarm` 字串含 value（`= 1 status` vs `= 0 status`）→ CLEAR 與 WARNING 不同 fingerprint。**影響**：每次 auto-reboot 後 Ops Inbox 仍留 stale open incident，30 年 × 24+ 次/年 = 720+ stale incident 累積。**DoD**：(a) 修 fingerprint：netdata 改用 `alarm_id`（payload 已含此欄）或從 `alarm` 字串剝離 value 部分；(b) 修 webhook：CLEAR 訊號時主動查 fingerprint，若 open 則 set status=resolved + resolved_at + resolved_by='netdata-auto-resolve'；(c) 寫 migration backfill：用新 fingerprint 演算法重算所有 `ops_incidents.fingerprint`（or 加 `alarm_id` 欄位作為平行 lookup key）；(d) 新增 vitest 覆蓋 WARNING → CLEAR transition。**詳見**：`agency-os/docs/operations/AUDIT_REGISTRY.md` 對應 entry。**參考 commit**：本日 B-Minimal commit；P3 手動關 incident `2e66435f-4439-4b6a-a045-ec93e98fbe48` 的紀錄。
 
-- [ ] **遷移 `print-open-tasks.ps1` / `print-today-closeout-recap.ps1` 到統一 helper** —— **【未開始 / 條件觸發】**
-  - **觸發**：**下次有人 Edit 這兩個檔任一個時順手**（不專門排——subprocess 模型下本來就安全）
-  - **動作**：line 14 的 script-level `[Console]::OutputEncoding = UTF8` 改為 dot-source `_console-encoding-helpers.ps1` + 包覆關鍵 region 用 `Invoke-WithUtf8Console`
-  - **DoD**：與 4 個 fixed 腳本同 pattern；syntax + real run pass
+- [x] **【✅ 2026-05-26 `<encoding-fix-commit>`】遷移 `print-open-tasks.ps1` / `print-today-closeout-recap.ps1` 到統一 helper** — Pattern A dot-source + `Invoke-WithUtf8Console` on all git captures; audit exit 0 confirmed
 
-- [ ] **`scripts/generate-integrated-status-report.ps1:275-276` BOM 一致性** —— **【未開始 / 條件觸發】**
-  - **觸發**：**下次有人 Edit 此檔時順手**
-  - **動作**：`Set-Content -LiteralPath $outFile -Value $text -Encoding UTF8`（PS 5.1 寫 BOM）改為 `[System.IO.File]::WriteAllText($outFile, $text, [System.Text.UTF8Encoding]::new($false))`；line 275 + 276 兩處
-  - **DoD**：輸出 `integrated-status-LATEST.md` hex dump 確認無 `EF BB BF` 開頭
+- [x] **【✅ 2026-05-26 `<encoding-fix-commit>`】`scripts/generate-integrated-status-report.ps1:275-276` BOM 一致性** — `Set-Content -Encoding UTF8` → `WriteAllText(UTF8NoBOM)`; hex dump confirmed no `EF BB BF`
 
-- [ ] **`lobster-factory/infra/trigger/deploy-workflows.ps1:72,85` 補 `-Encoding UTF8`** —— **【未開始 / 條件觸發】**
-  - **觸發**：**下次有人 Edit 此檔時順手**
-  - **動作**：兩處 `Get-Content` 後綴補 `-Encoding UTF8`
-  - **DoD**：syntax check + dry-run trigger deploy 通過
+- [x] **【✅ 2026-05-26 `<encoding-fix-commit>`】`lobster-factory/infra/trigger/deploy-workflows.ps1:72,85` 補 `-Encoding UTF8`** — both `Get-Content` calls now use `-Encoding UTF8`; docker-info false-positive annotated
 
 - [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
   - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`

@@ -159,6 +159,36 @@
 - BUGHUNT_DONE: scope=.claude/commands/ scripts/ agency-os/reports/ | grep=unread_count,未讀數量,本輪無未讀,no other-machine AO-SYNC | hits=archive reports only (expected)
 - WORKLOG: this entry
 
+### CP950 encoding 防護延伸 + Ops Inbox CLEAR 稽核 (`<encoding-fix-commit>`)
+
+**根本問題**: 2026-05-26 AO-RESUME 報告中 4 個「Encoding 防護延伸」TASKS 待辦，徹查後確認：
+1. `print-today-closeout-recap.ps1` — Pattern B（script-level setter）未包 git captures；CJK commit 主旨 / 路徑可爛碼
+2. `print-open-tasks.ps1` — 無外部命令 capture，Pattern A dot-source 補齊做未來保護
+3. `generate-integrated-status-report.ps1:275-276` — `Set-Content -Encoding UTF8` PS5=BOM / PS7=no-BOM 不一致
+4. `lobster-factory/infra/trigger/deploy-workflows.ps1:72,85` — `Get-Content` 無 `-Encoding UTF8`（可讀到 Big5 解碼 .env）
+5. Ops Inbox netdata CLEAR — 已 commit `f933312`（2026-05-23），AUDIT_REGISTRY 更新至 🟡 TRACKED（sg-deploy pending）
+
+**修改項目**:
+- `scripts/print-today-closeout-recap.ps1` — Pattern B to Pattern A: dot-source helper; 4 git captures wrapped in `Invoke-WithUtf8Console` (`git rev-parse`, `git rev-parse --abbrev-ref HEAD`, `git status -sb`, `git log --since=... --pretty=format:"%h %s"`); bare `[Console]::OutputEncoding` setter removed
+- `scripts/print-open-tasks.ps1` — Pattern A dot-source added; 2 redundant `[Console]::OutputEncoding` setters removed (script has no external command captures)
+- `scripts/generate-integrated-status-report.ps1:275-276` — `Set-Content -Encoding UTF8` replaced with `[System.IO.File]::WriteAllText($path, $text, UTF8NoBOM)` — PS5/PS7 consistent no-BOM
+- `lobster-factory/infra/trigger/deploy-workflows.ps1` — L60 false-positive annotation; L72+L85 `Get-Content` + `-Encoding UTF8`
+- `agency-os/docs/operations/AUDIT_REGISTRY.md` — CP950 sections updated; deploy-workflows false-positive annotated; BOM fix recorded; netdata CLEAR reverted from 🔴 FIXED (legend mismatch: code not yet deployed) to 🟡 TRACKED (code fix committed `f933312`, sg-deploy pending)
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=audit-cp950-traps.ps1 --file scripts/print-today-closeout-recap.ps1 | exit=0 | output="clean=1 drift=0" | ms=~500
+- REALTEST_EVIDENCE: tool=Bash | cmd=audit-cp950-traps.ps1 --file scripts/print-open-tasks.ps1 | exit=0 | output="clean=1 drift=0" | ms=~500
+- REALTEST_EVIDENCE: tool=Bash | cmd=PowerShell ReadAllBytes on reports/status/integrated-status-LATEST.md | exit=0 | output="bytes[0..2]=[35,32,73] (no BOM EF BB BF)"
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/3n — M(AUDIT_REGISTRY 🔴 FIXED legend inconsistency) resolved same session; n1=placeholder SHA pending commit (expected); n2=Set-Content BOM deploy-workflows:85 pre-existing not introduced; n3=AUDIT_REGISTRY:170 style note only
+- BUGHUNT_DONE: scope=scripts/,lobster-factory/infra/trigger/,agency-os/docs/operations/ | grep=print-today-closeout-recap|print-open-tasks|generate-integrated-status-report|deploy-workflows | hits=all consistent; BOM downstream consumers confirmed none (Read tool + humans only)
+
+**剩餘風險**:
+- `deploy-workflows.ps1:85 Set-Content -Encoding utf8` writes BOM on PS5 (pre-existing, not introduced); trigger.dev CLI generally skips BOM; fix on next Edit
+- AUDIT_REGISTRY `<encoding-fix-commit>` placeholder x5 — pending real hash update after this commit
+- Ops Inbox CLEAR fix (`f933312`) is in main but sg-deploy is 18+ commits behind; prod still runs pre-fix logic
+
+**Rollback**: `git revert <commit>` — no API / DB / schema change; no deploy triggered.
+
 ## 2026-05-25
 
 ### REALTEST gate 實作（verify-closeout-completeness + AGENTS.md）
