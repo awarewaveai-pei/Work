@@ -162,7 +162,7 @@ if ($opsToken) {
                 source = "telegram"
             }
         })
-        $tgUnread = $tgMessages.Count
+        $tgUnread = $tgMessages.Count   # internal var kept for compat; JSON key is message_count
         $tgStatus = "ok"
     } catch {
         $msg = ($_.Exception.Message -replace '\r?\n', ' ')
@@ -195,13 +195,13 @@ $slackChannels = [ordered]@{}
 if (-not $slackToken) {
     $slackStatus = "no_token"
     foreach ($ch in $channelMap.Keys) {
-        $slackChannels[$ch] = [ordered]@{ status = "no_token"; unread_count = 0; messages = @() }
+        $slackChannels[$ch] = [ordered]@{ status = "no_token"; message_count = 0; messages = @() }
     }
 } else {
     foreach ($ch in $channelMap.Keys) {
         $chId = $channelMap[$ch]
         if (-not $chId) {
-            $slackChannels[$ch] = [ordered]@{ status = "no_channel_id"; unread_count = 0; messages = @() }
+            $slackChannels[$ch] = [ordered]@{ status = "no_channel_id"; message_count = 0; messages = @() }
             $slackStatus = "partial"
             continue
         }
@@ -212,7 +212,7 @@ if (-not $slackToken) {
                         -Headers @{ Authorization = "Bearer $slackToken" } `
                         -TimeoutSec 10 -ErrorAction Stop
             if (-not $resp.ok) {
-                $slackChannels[$ch] = [ordered]@{ status = "slack_error: $($resp.error)"; unread_count = 0; messages = @() }
+                $slackChannels[$ch] = [ordered]@{ status = "slack_error: $($resp.error)"; message_count = 0; messages = @() }
                 $slackStatus = "partial"
             } else {
                 $msgs = @($resp.messages `
@@ -224,11 +224,11 @@ if (-not $slackToken) {
                         if ($txt.Length -gt 200) { $txt = $txt.Substring(0,200) + "..." }
                         [ordered]@{ date = $ts.ToString("o"); text = $txt }
                     })
-                $slackChannels[$ch] = [ordered]@{ status = "ok"; unread_count = $msgs.Count; messages = $msgs }
+                $slackChannels[$ch] = [ordered]@{ status = "ok"; message_count = $msgs.Count; messages = $msgs }
             }
         } catch {
             $err = ($_.Exception.Message -replace '\r?\n', ' ')
-            $slackChannels[$ch] = [ordered]@{ status = "error: $err"; unread_count = 0; messages = @() }
+            $slackChannels[$ch] = [ordered]@{ status = "error: $err"; message_count = 0; messages = @() }
             $slackStatus = "partial"
         }
     }
@@ -259,9 +259,9 @@ $digest = [ordered]@{
         is_fresh  = $isFresh            # true = gap is reliable; false = fallback anchor, may include old signals
     }
     telegram      = [ordered]@{
-        status       = $tgStatus
-        unread_count = $tgUnread
-        messages     = $tgMessages
+        status        = $tgStatus
+        message_count = $tgUnread   # renamed from unread_count: no read/unread filtering; returns ALL messages in window
+        messages      = $tgMessages
     }
     slack         = [ordered]@{
         status   = $slackStatus

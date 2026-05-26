@@ -41,6 +41,8 @@ List every file checked, with one of these statuses:
 - 📋 本機領先（local-ahead）— 同機 vault，本機在上次 ao-close 後有修改，屬正常（下次 ao-close 會 export）
 - ⚠ 衝突保留（local-modified/CONFLICT）— 跨機衝突，本機有改動與 vault 不同，保留本機版本
 - — 來源不存在（skipped）— vault 檔案不在指定路徑
+- ✔ 其他機器匯出較舊（skipped，屬正常）— 筆電 AO-SYNC 存在但日期早於桌機，跳過以保護本機較新資料；本機 MEMORY.md 是最新版。**這不是錯誤。** 下次從筆電 AO-CLOSE 後再切回桌機，才會觸發 import。
+- — 同機工作流（skipped）— 只有單機在用，無跨機 AO-SYNC 資料夾
 
 Files to report: `MEMORY.md`、`user-env.ps1`、`.ssh/hetzner_trigger`、`.ssh/id_ed25519`、`.ssh/hostinger_soulful`、`.ssh/config`、`AWARE_WAVE_CREDENTIALS.md`
 If import did not run (hook missing / E:\ not mounted / G:\ not accessible), write「import 未執行 — [原因]」and list what needs to be fixed.
@@ -66,8 +68,8 @@ Then classify the digest before reporting any messages:
 - **Digest is stale** (hook `finished_utc` from ao-resume-hook-last.json is >10 min newer than digest `generated_utc`)：
   ⚠️ **STALE DIGEST** — fetch-signals ran during AO-RESUME but did not refresh the file (API failure or credential issue). Report what the stale digest contains but label every item `[from stale digest — may be already-seen]`. Offer to manually re-run.
 
-Telegram @awarewave_ops_bot: 未讀數量 + 可操作項條列（無則寫「本輪無未讀」）
-Slack #ops-incidents / #infra-alerts: 未讀數量 + 最新一筆
+Telegram @awarewave_ops_bot: 區段訊息數（**不過濾已讀 — 時間窗內全部訊息**）+ 可操作項條列（無則寫「本輪無新訊息」）
+Slack #ops-incidents / #infra-alerts: 區段訊息數（不過濾已讀）+ 最新一筆
 Cloudflare security: report result from `agency-os/reports/status/cf-security-LATEST.md` (bot=ON/OFF, rules=N) — skip if file missing.
 Only include actionable items; skip routine noise.
 

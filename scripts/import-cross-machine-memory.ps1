@@ -420,7 +420,17 @@ if ($candidateFolders.Count -gt 0 -and $memDest) {
         }
     }
 } elseif ($candidateFolders.Count -eq 0 -and $allFolders.Count -gt 0) {
-    Write-Host "  cross-machine import: MEMORY.md skipped (no other-machine AO-SYNC folder found)" -ForegroundColor DarkGray
+    # Distinguish two cases: (a) other-machine folders exist but are older than own machine;
+    # (b) all folders belong to own machine (single-machine workflow).
+    $otherMachineFolders = @($allFolders | Where-Object {
+        $_.Name -match '^AO-SYNC-(\d{4}-\d{2}-\d{2})-(.+)$' -and $matches[2] -ne $machineTag
+    } | Sort-Object Name -Descending)
+    if ($otherMachineFolders.Count -gt 0) {
+        $newestOtherDate = ($otherMachineFolders[0].Name -replace '^AO-SYNC-(\d{4}-\d{2}-\d{2}).*', '$1')
+        Write-Host ("  cross-machine import: MEMORY.md skipped — other-machine export ({0}) older than own machine ({1}); local MEMORY.md is current" -f $newestOtherDate, $ownLatestDateStr) -ForegroundColor DarkGray
+    } else {
+        Write-Host "  cross-machine import: MEMORY.md skipped — single-machine workflow (no other-machine AO-SYNC folder)" -ForegroundColor DarkGray
+    }
 }
 
 # ── 3. Secrets import ─────────────────────────────────────────────────────────
