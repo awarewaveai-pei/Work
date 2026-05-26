@@ -151,7 +151,7 @@ _2026-05-26 update: +1 Pattern A (print-today-closeout-recap); Pattern B 3→1 (
 
 **Class**: webhook handler completeness — "incident-creating but incident-not-closing" anti-pattern
 
-**Status**: 🔴 FIXED (code committed `f933312` 2026-05-23; **production effect pending sg-deploy**)
+**Status**: 🟡 TRACKED — code fix committed `f933312` 2026-05-23; **effect goes live on next sg-deploy** (18 commits pending as of 2026-05-26). See "Fix implemented" below. This entry moves to 🔴 FIXED after sg-deploy confirms the handler is live.
 
 **Discovered during**: 2026-05-23 B-Minimal VPS auto-reboot deployment, P3 incident closure step. After SG reboot manually cleared the underlying signal, the operator-visible Ops Inbox row remained `status=open` because the webhook code path did not actively resolve incidents on netdata CLEAR transitions.
 
