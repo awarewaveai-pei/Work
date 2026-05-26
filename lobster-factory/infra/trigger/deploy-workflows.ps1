@@ -57,7 +57,7 @@ $CfgPath = Join-Path $WorkflowsDir "trigger.config.ts"
 $PkgPath = Join-Path $WorkflowsDir "package.json"
 
 if (-not $SkipDockerCheck) {
-    docker info 2>&1 | Out-Null
+    docker info 2>&1 | Out-Null  # CP950 audit false-positive: Out-Null discards output, no stdout decode occurs
     if ($LASTEXITCODE -ne 0) {
         throw "Docker daemon not reachable. Start Docker Desktop (or Docker Engine), then retry."
     }
@@ -69,7 +69,7 @@ if (-not $m) {
 }
 $ProjectRef = $m.Matches.Groups[1].Value
 
-$pkgJson = Get-Content $PkgPath -Raw | ConvertFrom-Json
+$pkgJson = Get-Content $PkgPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $triggerSdkVer = $pkgJson.dependencies.'@trigger.dev/sdk'
 if (-not $triggerSdkVer) {
     throw "Missing @trigger.dev/sdk in $PkgPath"
@@ -82,7 +82,7 @@ if (-not $PosthogEnvSource) {
 $tmpEnv = Join-Path ([System.IO.Path]::GetTempPath()) ("trigger-posthog-only-" + [guid]::NewGuid().ToString("n") + ".env")
 try {
     if ((Test-Path $PosthogEnvSource)) {
-        Get-Content $PosthogEnvSource | Where-Object { $_ -match '^\s*(POSTHOG_API_KEY|POSTHOG_HOST)\s*=' } | Set-Content -Path $tmpEnv -Encoding utf8
+        Get-Content $PosthogEnvSource -Encoding UTF8 | Where-Object { $_ -match '^\s*(POSTHOG_API_KEY|POSTHOG_HOST)\s*=' } | Set-Content -Path $tmpEnv -Encoding utf8
         Write-Host "Using POSTHOG-only excerpt from: $PosthogEnvSource"
     }
     else {

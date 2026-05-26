@@ -8,12 +8,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Pattern A: save/restore [Console]::OutputEncoding around each external capture.
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+
+# chcp 65001 retained for PS5 terminal display of CJK in Write-Host output.
+# [Console]::OutputEncoding is now managed per-capture via Invoke-WithUtf8Console.
 if ($PSVersionTable.PSVersion.Major -lt 7) {
-    try {
-        chcp 65001 | Out-Null
-        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-        $OutputEncoding = [System.Text.Encoding]::UTF8
-    } catch {}
+    try { chcp 65001 | Out-Null } catch {}
 }
 
 if ($WorkRoot) {
@@ -54,18 +55,20 @@ Write-Host ""
 
 Push-Location $WorkRoot
 try {
-    $null = git rev-parse --git-dir 2>$null
+    $null = Invoke-WithUtf8Console { git rev-parse --git-dir 2>$null }
     $inGit = ($LASTEXITCODE -eq 0)
     if ($inGit) {
-        $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+        $branch = (Invoke-WithUtf8Console { git rev-parse --abbrev-ref HEAD }).Trim()
         Write-Host ("Git branch: {0}" -f $branch) -ForegroundColor DarkGray
-        $st = (git status -sb).Trim()
+        $st = (Invoke-WithUtf8Console { git status -sb }).Trim()
         foreach ($ln in ($st -split "`n")) {
             Write-Host ("  {0}" -f $ln)
         }
         Write-Host ""
         Write-Host "Commits since last AO-CLOSE (newest first):" -ForegroundColor Yellow
-        $commits = @(git log --since="$sinceParam" --pretty=format:"%h %s" 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        $commits = @(Invoke-WithUtf8Console {
+            git log --since="$sinceParam" --pretty=format:"%h %s" 2>$null
+        } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
         if ($commits.Count -eq 0) {
             Write-Host "  (none — all commits pre-date last AO-CLOSE or nothing new)" -ForegroundColor DarkGray
         } else {

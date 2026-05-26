@@ -272,8 +272,11 @@ if (Test-Path $worklogPath) {
 }
 
 $text = $sb.ToString()
-Set-Content -LiteralPath $outFile -Value $text -Encoding UTF8
-Set-Content -LiteralPath $latestFile -Value $text -Encoding UTF8
+# [System.IO.File]::WriteAllText with explicit UTF-8-NoBOM encoder is PS5/PS7 consistent.
+# Set-Content -Encoding UTF8 writes WITH BOM on PS5 but WITHOUT BOM on PS7.
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+[System.IO.File]::WriteAllText($outFile,    $text, $utf8NoBom)
+[System.IO.File]::WriteAllText($latestFile, $text, $utf8NoBom)
 
 Write-Output ("Integrated status report: reports/status/" + [System.IO.Path]::GetFileName($outFile))
 Write-Output ("Also written to: reports/status/integrated-status-LATEST.md")

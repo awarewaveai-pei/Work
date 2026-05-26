@@ -7,13 +7,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# Windows PowerShell 5.x consoles often default to a legacy code page; TASKS.md is UTF-8.
+# Pattern A: dot-source for future-proofing. This script has no external command stdout captures;
+# Invoke-WithUtf8Console is not called here. chcp 65001 retained for PS5 terminal display of CJK.
+. (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 if ($PSVersionTable.PSVersion.Major -lt 7) {
-    try {
-        chcp 65001 | Out-Null
-        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-        $OutputEncoding = [System.Text.Encoding]::UTF8
-    } catch {}
+    try { chcp 65001 | Out-Null } catch {}
 }
 
 if ($WorkRoot) {
