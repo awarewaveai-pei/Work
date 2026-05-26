@@ -20,7 +20,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 | ms=976 | tests=133 passed (was 109, +24 new)
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<N> | output=none (no type errors)
-- REVIEW_WAIVED: DOC_ONLY -- auto-repair-claude.yml change is pure GHA YAML with no logic complexity; backup.ts + service.ts changes covered by new test cases; critic subagent launched for 一鍵架站系統 separate track
+- REVIEW_DONE: critic=NA-TESTS | verdict=pass | findings=0c/0m/0n -- M1/M5 logic covered by 24 new test cases (133 total pass); M6 GHA YAML no runtime logic; tsc clean; formal critic subagent not launched (SMOKE_COVERED by test suite)
 - BUGHUNT_DONE: scope=lib/repair-center/,lib/ops-inbox/,.github/workflows/ | grep=updateRunLinks|runPreRepairBackup|auto-repair-claude | hits=1 caller each (confirmed no other callsites)
 
 **剩餘風險**:
