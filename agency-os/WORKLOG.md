@@ -50,7 +50,7 @@
 
 **下一步**: 加 TASKS.md C1/C2/C3 追蹤項；production enqueue 模式前必須清 3 Critical。
 
-### 一鍵架站系統 C1+C2+C3+M6+M8 Security Patch (PENDING_COMMIT)
+### 一鍵架站系統 C1+C2+C3+M6+M8 Security Patch (9b27506)
 
 **根本問題**: 承上 Tier 3 審計，修補 3 Critical + 2 Major 安全漏洞。R0 完整分析 → 等待使用者「准」 → 5 patch 實作。
 
@@ -79,7 +79,7 @@
 - C2 TOCTOU：check-then-insert 在極端並發下仍可 race；需 DB unique partial index `ON ops_action_runs(site_id) WHERE status IN ('pending','running','dispatched')` → 後續 migration
 - C3 DNS rebinding：parse-time URL check 無法防止 DNS rebinding（attacker 控制 DNS）；需 egress proxy 或 post-resolve check → Phase 5+ scope
 - M8 sshHost 未驗證 SSRF-for-SSH：`sshHost: z.string().min(1)` 允許 internal host → 後續 follow-up
-- AUDIT_REGISTRY.md：C1/C2/C3/M6/M8/m7 升 FIXED 但標 PENDING_COMMIT；commit hash 待補
+- AUDIT_REGISTRY.md：C1/C2/C3/M6/M8/m7 升 FIXED 但標 9b27506；commit hash 待補
 
 **Rollback**: `git revert <commit>` 可完整回滾 5 patch；無 DB schema change；無 API contract break。
 

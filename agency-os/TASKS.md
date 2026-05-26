@@ -154,9 +154,9 @@
 
 - [x] **一鍵架站系統 — 邏輯檢視 + critic review + 抓蟲** —— **【✅ 2026-05-26 完成】** **Tier 3 月度排程** → report: [lobster-factory-one-click-site-2026-05-26.md](reports/audit/lobster-factory-one-click-site-2026-05-26.md)（3C+11M+12m）
 
-- [x] **一鍵架站 C1 — 修 dispatcher approval gate** — **【✅ 2026-05-26 PENDING_COMMIT】** `dispatch-action-run.ts` schema + PostgREST `or=` filter + dispatchRun guard
-- [x] **一鍵架站 C2 — siteId idempotency** — **【✅ 2026-05-26 PENDING_COMMIT】** `app/api/build/runs/route.ts` siteId duplicate check → 409；TOCTOU partial unique index 為後續 DB migration
-- [x] **一鍵架站 C3+M6+M8 — Zod schema tightening** — **【✅ 2026-05-26 PENDING_COMMIT】** SSRF guard (noSsrfUrl + IPv6 + numeric IP + localhost) + manifestPath containment fix + slug/wpPath regex; response body exfil removed
+- [x] **一鍵架站 C1 — 修 dispatcher approval gate** — **【✅ 2026-05-26 9b27506】** `dispatch-action-run.ts` schema + PostgREST `or=` filter + dispatchRun guard
+- [x] **一鍵架站 C2 — siteId idempotency** — **【✅ 2026-05-26 9b27506】** `app/api/build/runs/route.ts` siteId duplicate check → 409；TOCTOU partial unique index 為後續 DB migration
+- [x] **一鍵架站 C3+M6+M8 — Zod schema tightening** — **【✅ 2026-05-26 9b27506】** SSRF guard (noSsrfUrl + IPv6 + numeric IP + localhost) + manifestPath containment fix + slug/wpPath regex; response body exfil removed
   - **範圍**（建議按此順序審）：
     1. `lobster-factory/packages/workflows/` — Trigger.dev tenant provisioning task chain（state machine + idempotency + retry）
     2. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/` — 4-step wizard（client info → dept selector → service provisioning → summary）

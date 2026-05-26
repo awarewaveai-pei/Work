@@ -265,14 +265,14 @@ _(all 5 moved to 🔴 FIXED above on 2026-05-23; Phase 4 closeout 2026-06-19 unb
 
 ### 🔴 FIXED — Critical (3)
 
-- `dispatch-action-run.ts` — **C1** 🔴 FIXED (PENDING_COMMIT) — `ActionRunSchema` + PostgREST `or=` filter + `dispatchRun()` guard; approval_required=true runs blocked at DB query + double-check in application layer
-- `app/api/build/runs/route.ts` — **C2** 🔴 FIXED (PENDING_COMMIT) — siteId duplicate check (`.maybeSingle()` before INSERT → 409 `site_run_already_active`); TOCTOU acknowledged, partial unique index noted as follow-up DB migration (out of scope for application-layer patch)
-- `create-wp-site.ts` + `integration-steps.ts` — **C3** 🔴 FIXED (PENDING_COMMIT) — `noSsrfUrl()` refine on all 4 URL fields (https-only + RFC-1918 + IPv6 bracket-strip + numeric/hex IP + localhost aliases); response body exfil channel removed from all 5 integration error paths + n8n success path; `btoa` → `Buffer.from()` (m7 bundled)
+- `dispatch-action-run.ts` — **C1** 🔴 FIXED (9b27506) — `ActionRunSchema` + PostgREST `or=` filter + `dispatchRun()` guard; approval_required=true runs blocked at DB query + double-check in application layer
+- `app/api/build/runs/route.ts` — **C2** 🔴 FIXED (9b27506) — siteId duplicate check (`.maybeSingle()` before INSERT → 409 `site_run_already_active`); TOCTOU acknowledged, partial unique index noted as follow-up DB migration (out of scope for application-layer patch)
+- `create-wp-site.ts` + `integration-steps.ts` — **C3** 🔴 FIXED (9b27506) — `noSsrfUrl()` refine on all 4 URL fields (https-only + RFC-1918 + IPv6 bracket-strip + numeric/hex IP + localhost aliases); response body exfil channel removed from all 5 integration error paths + n8n success path; `btoa` → `Buffer.from()` (m7 bundled)
 
 ### 🟠 FIXED — Major (2 of 11)
 
-- `apply-manifest.ts:39` — **M6** 🟠 FIXED (PENDING_COMMIT) — `manifestPath` regex allowlist (`^[a-zA-Z0-9][a-zA-Z0-9_\-./]*\.(json|yaml|yml)$`) + `!p.includes("..")` refine + `path.resolve(MANIFESTS_BASE, ...)` + `startsWith(MANIFESTS_BASE + path.sep)` containment; also fixed stale `manifestAbsolutePath = path.resolve(input.manifestPath)` that re-escaped containment
-- `wp-install-plugins.ts:30,33` — **M8** 🟠 FIXED (PENDING_COMMIT) — `slug: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/)` + `wpPath: z.string().regex(^/[a-zA-Z0-9_\-/.]{1,200}$).refine(!includes(".."))` — injection blocked at Zod parse before any SSH exec
+- `apply-manifest.ts:39` — **M6** 🟠 FIXED (9b27506) — `manifestPath` regex allowlist (`^[a-zA-Z0-9][a-zA-Z0-9_\-./]*\.(json|yaml|yml)$`) + `!p.includes("..")` refine + `path.resolve(MANIFESTS_BASE, ...)` + `startsWith(MANIFESTS_BASE + path.sep)` containment; also fixed stale `manifestAbsolutePath = path.resolve(input.manifestPath)` that re-escaped containment
+- `wp-install-plugins.ts:30,33` — **M8** 🟠 FIXED (9b27506) — `slug: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/)` + `wpPath: z.string().regex(^/[a-zA-Z0-9_\-/.]{1,200}$).refine(!includes(".."))` — injection blocked at Zod parse before any SSH exec
 
 ### 🟠 TRACKED — Major (9 remaining)
 
@@ -280,7 +280,7 @@ See [full report §Major Findings](../../reports/audit/lobster-factory-one-click
 
 ### 🟡 FIXED — Minor (1 of 12)
 
-- `integration-steps.ts:339` — **m7** 🟡 FIXED (PENDING_COMMIT) — `btoa` → `Buffer.from(..).toString("base64")` (bundled with C3 PR)
+- `integration-steps.ts:339` — **m7** 🟡 FIXED (9b27506) — `btoa` → `Buffer.from(..).toString("base64")` (bundled with C3 PR)
 
 ### 🟡 TRACKED — Minor (11 remaining)
 
