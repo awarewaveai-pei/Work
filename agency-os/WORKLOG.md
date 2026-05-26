@@ -73,7 +73,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=npm test (workflows) | exit=0 | ms=533 | tests=18 passed
 - REALTEST_EVIDENCE: tool=Bash | cmd=tsc --noEmit (next-admin) | exit=0 | ms=<N> | output=none
 - REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=3c/5m/4n (items fixed: schema narrowing + IPv6 + manifestAbsolutePath bypass)
-- BUGHUNT_DONE: scope=lobster-factory/packages/,infra/next-admin/ | grep=ops_action_runs+INSERT|noSsrfUrl|manifestAbsolutePath|dispatchRun | hits=confirmed single INSERT path, SSRF guard on all 4 URL fields, containment fix applied
+- BUGHUNT_DONE: scope=lobster-factory/packages/,infra/next-admin/,agency-os/docs/,scripts/,.claude/,runbooks/,mcp/ | grep=ops_action_runs+INSERT|noSsrfUrl|LOBSTER_MANIFESTS_DIR|dispatchRun+pending|IntegrationsSchema | hits=0 stale refs in docs/scripts/commands; audit report is historical record (AUDIT_REGISTRY is state SSOT); no existing env-var doc to update for LOBSTER_MANIFESTS_DIR
 
 **已知剩餘風險**:
 - C2 TOCTOU：check-then-insert 在極端並發下仍可 race；需 DB unique partial index `ON ops_action_runs(site_id) WHERE status IN ('pending','running','dispatched')` → 後續 migration
