@@ -2,6 +2,46 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-26
+
+### SG deploy next-admin — TS discriminated union fix (`6f20cfa`)
+
+**根本問題：** C3+M3 auto-repair fix（2026-05-23）在 6 個 webhook route 使用 `if (!body.ok)` 來 narrow `ReadBodyError | ReadBodyResult<unknown>`，但 `strict: false` tsconfig 下 `!body.ok` 無法正確 narrow discriminated union。vitest 不做型別檢查，錯誤潛伏 18 commits，直到 `sg-deploy next-admin` 首次跑 `next build` 時 tsc 才爆。
+
+**修改：**
+1. 6 個 webhook routes（grafana/netdata/posthog/sentry/uptime-kuma/tenant-integration）：`!body.ok` → `body.ok === false`（explicit discriminant equality）
+2. `rules.test.ts`：`{ kind: "duplicate" } as IncidentTransition` → `dupMedium`/`dupCritical` helper consts with `satisfies IncidentTransition`（critic M-1：type cast 隱藏了 `prevSeverity`/`prevStatus` 缺失問題）
+
+**治理補丁：** AGENTS.md R0 [驗證計畫] + verify-recent.md Step 1 補「`.ts`/`.tsx` 改動必跑 `npx tsc --noEmit`」以防同類漏網。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=sg-deploy.sh next-admin | exit=0 | ms=138000 | smoke=4/4 OK | deployed=6f20cfa
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/4n — M-1 (test cast) fixed same session
+- BUGHUNT_DONE: scope=apps/next-admin/app/api/webhooks/ lib/ops-inbox/ | grep=!body\.ok | hits=0 (all converted)
+- WORKLOG: this entry
+
+### AO-RESUME 外部信號標籤 + 跨機 import 訊息修正 (`eb74838`)
+
+**根本問題（兩個獨立 bug）：**
+
+**Bug A — 「未讀」誤導標籤：**
+- `fetch-external-signals.ps1` JSON 欄位名 `unread_count` 讓 Claude 渲染 "N 則未讀"
+- API `/api/ops/inbox/digest`（`route.ts:46`）查 `command_requests` 無 `is_read` 過濾 — 本來就返回時間窗全部訊息
+- 使用者憂慮：AO-CLOSE 後在 Telegram 點開通知（已讀），下次 AO-RESUME 是否會被過濾 → **答：不會，API 無已讀過濾**
+- Fix: `unread_count` → `message_count`；ao-resume.md 改「未讀數量」→「區段訊息數（不過濾已讀）」
+
+**Bug B — MEMORY.md 「來源不存在」誤判：**
+- 觀察：AO-RESUME 每次顯示 "MEMORY.md — 來源不存在（skipped）"
+- 實際：MEMORY.md 本機存在（Exists: True）；筆電 AO-SYNC `2026-05-24` < 桌機 `2026-05-25`，import 正確跳過
+- 根因：`import-cross-machine-memory.ps1:422` 的 `elseif` 分支輸出 "no other-machine AO-SYNC folder found" — 但實際上筆電資料夾存在，只是較舊
+- Fix：新增區分 "其他機器較舊（正常）" vs "真正無其他機器資料夾" 的分支訊息
+
+[驗證結果]
+- REALTEST_WAIVED: RENAME_ONLY+DOC_ONLY -- JSON key rename, message text change, no logic path modified
+- REVIEW_WAIVED: DOC_ONLY -- ao-resume.md label text + PS1 message string only
+- BUGHUNT_DONE: scope=.claude/commands/ scripts/ agency-os/reports/ | grep=unread_count,未讀數量,本輪無未讀,no other-machine AO-SYNC | hits=archive reports only (expected)
+- WORKLOG: this entry
+
 ## 2026-05-25
 
 ### REALTEST gate 實作（verify-closeout-completeness + AGENTS.md）
