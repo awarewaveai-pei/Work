@@ -189,6 +189,32 @@
 
 **Rollback**: `git revert <commit>` — no API / DB / schema change; no deploy triggered.
 
+### BUGHUNT SOP — R0 §抓蟲 機械化 (3 files, 9 edits)
+
+**根本問題**: R0 [驗證計畫] §抓蟲 是一句散文（無具體路徑清單、無 grep 模式指引）；`verify-recent.md` 完全沒有 BUGHUNT 步驟；`verify-closeout-completeness.ps1` BUGHUNT gate 只檢查 label 存在不驗 scope 品質 → 本次 session 實際發生 scope 縮水（commit `7f0a812` 補正）。
+
+**修改項目**:
+- `agency-os/AGENTS.md` R0 §抓蟲 (line 23-27) — 散文 → 結構化清單：2 always-required 根路徑（`agency-os`、`scripts`）+ 條件式路徑（.claude/lobster-factory）+ grep 模式分類 + `BUGHUNT_SCOPE_NARROW` escape hatch 說明；`$bhRequiredRoots` SSOT pointer 指向 ps1
+- `scripts/verify-closeout-completeness.ps1` — BUGHUNT gate 新增 scope 關鍵字品質閘：提取 `scope=` 值（非整行比對，防 grep= 欄位誤觸），檢查 `agency-os`/`scripts` 是否出現；缺失 + 無 `BUGHUNT_SCOPE_NARROW:` → strict exit 1；`$bhRequiredRoots` 是唯一路徑 SSOT
+- `.claude/commands/verify-recent.md` — 新增 Step 2.5 BUGHUNT（critic 後、exec 前）；更新 output format（加 `bughunt:` 欄）；`--trivial` variant 補 `BUGHUNT_WAIVED: DOC_ONLY -- trivial edit`；Notes 說明 SSOT 分工
+
+**Critic round 結果 (2 Majors found & fixed)**:
+- Major 1: ps1 scope 關鍵字 match 對整行而非 `scope=` 值 → fix: 先 regex 提取 `$scopeVal`
+- Major 2: 4 required roots 太嚴 → fix: 改 2 always-required (`agency-os`, `scripts`) + 條件式指引
+- Minor: AGENTS.md line 27 殘留「4 根路徑」→ fix: 改為「agency-os 或 scripts」
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=verify-closeout-completeness.ps1 -Gate off | exit=0 | ms=~200 (no error output = syntax OK)
+- REVIEW_DONE: critic=Quick | verdict=warn→fixed | findings=0c/2m/4n (Major 1+2 fixed; minor --trivial conflict fixed; minor downstream-consumers re-added)
+- BUGHUNT_DONE: scope=agency-os/,scripts/,.claude/,lobster-factory/ | grep=bhRequiredRoots+BUGHUNT_SCOPE_NARROW+§抓蟲+verify-recent | hits=0 stale governance refs; $bhRequiredRoots in 2 files only (ps1+AGENTS.md) ✓; §抓蟲 in ps1 comment (intentional cross-ref) ✓
+- AUTO_TASK_DONE: BUGHUNT SOP — AGENTS.md + verify-closeout-completeness.ps1 + verify-recent.md
+
+**剩餘風險**:
+- `$hasScopeNarrow` 是 section-wide 非 per-line paired：單個 `BUGHUNT_SCOPE_NARROW:` 可豁免同日所有 `BUGHUNT_DONE:` — 複雜多任務日可能過度豁免；目前不加 per-line 配對（PS1 複雜度 vs. 收益不划算）
+- `Select-Object -First 1`：多任務日只查第一個 `BUGHUNT_DONE:`，後續 narrow scope 不被查 — 同上，不加 (YAGNI)
+
+**Rollback**: `git revert <commit>` — governance doc + ps1 only; no API / DB / deploy change.
+
 ## 2026-05-25
 
 ### REALTEST gate 實作（verify-closeout-completeness + AGENTS.md）

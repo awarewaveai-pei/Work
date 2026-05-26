@@ -151,7 +151,7 @@ _2026-05-26 update: +1 Pattern A (print-today-closeout-recap); Pattern B 3→1 (
 
 **Class**: webhook handler completeness — "incident-creating but incident-not-closing" anti-pattern
 
-**Status**: 🟡 TRACKED — code fix committed `f933312` 2026-05-23; **effect goes live on next sg-deploy** (18 commits pending as of 2026-05-26). See "Fix implemented" below. This entry moves to 🔴 FIXED after sg-deploy confirms the handler is live.
+**Status**: 🔴 FIXED — committed `f933312` 2026-05-23; **confirmed deployed on SG VPS 2026-05-26** (`.deployed-commit = 2311d6e`, which is a descendant of `f933312`). Handler is live.
 
 **Discovered during**: 2026-05-23 B-Minimal VPS auto-reboot deployment, P3 incident closure step. After SG reboot manually cleared the underlying signal, the operator-visible Ops Inbox row remained `status=open` because the webhook code path did not actively resolve incidents on netdata CLEAR transitions.
 
@@ -165,9 +165,9 @@ _2026-05-26 update: +1 Pattern A (print-today-closeout-recap); Pattern B 3→1 (
 3. **`lib/ops-inbox/__tests__/fingerprint.test.ts`** — 5 vitest cases: WARNING/CLEAR same fingerprint, three-layer fallback, different host = different fingerprint
 4. **SQL backfill** — `UPDATE 13` stale netdata incidents (`resolved_by='stale-backfill-2026-05-23-fingerprint-refactor'`); post-backfill `SELECT count(*) WHERE source='netdata' AND status='open'` = 0
 
-**Production deploy**: code merged but `sg-deploy` not yet executed (18 commits behind as of 2026-05-26). Existing deployment still runs pre-fix logic during the gap. Workaround: manually `UPDATE ops_incidents SET status='resolved'` via `docker exec supabase-db psql` if stale incidents accumulate before deploy.
+**Production deploy**: `f933312` is ancestor of deployed commit `2311d6e` on SG VPS — confirmed live 2026-05-26.
 
-**Tracked task**: `agency-os/TASKS.md` §Encoding 防護延伸 → "Ops Inbox netdata CLEAR auto-resolve bug + fingerprint instability" — **AUDIT_REGISTRY updated 2026-05-26; close TASK after sg-deploy confirms live**
+**Tracked task**: `agency-os/TASKS.md` §Encoding 防護延伸 → closed 2026-05-26 (sg-deploy confirmed).
 
 ---
 
