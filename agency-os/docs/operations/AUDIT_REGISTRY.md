@@ -70,7 +70,7 @@
 - `scripts/diff-env-vs-vault.ps1:116, 118` — commit `faafbae` — SSH + docker exec captures
 - `scripts/update-client-wp-plugins.ps1:105, 122, 128` — commit `8e0e33e` + `52e97d6` — SSH + scp captures (Copy-FromServer + Copy-ToServer also wrapped)
 - `scripts/ao-resume.ps1:425` — commit `<this-commit>` — `git log --pretty=format:"%cd|%s"` (subject CJK) — **tool found bug I introduced today in commit `e807984`** — exact same pattern as the backfill original break
-- `scripts/print-today-closeout-recap.ps1` — commit `<encoding-fix-commit>` 2026-05-26 — Pattern B → Pattern A: `git status -sb` (CJK paths) + `git log %s` (CJK subjects) wrapped in `Invoke-WithUtf8Console`; bare `[Console]::OutputEncoding` setter removed; dot-source added
+- `scripts/print-today-closeout-recap.ps1` — commit `27d36dc` 2026-05-26 — Pattern B → Pattern A: `git status -sb` (CJK paths) + `git log %s` (CJK subjects) wrapped in `Invoke-WithUtf8Console`; bare `[Console]::OutputEncoding` setter removed; dot-source added
 
 ### 🟢 CLEAN (reviewed, no action)
 
@@ -78,7 +78,7 @@
 - `scripts/merge-closeout-inbox-into-progress.ps1` — 0 external commands (pure markdown aggregator)
 - `scripts/apply-closeout-task-checkmarks.ps1` — `[StringComparison]::Ordinal` for CJK substring, regex matches only ASCII structure
 - `scripts/fetch-external-signals.ps1` — `Invoke-RestMethod` (HTTP charset header handled by .NET, no stdout encoding path)
-- `scripts/generate-integrated-status-report.ps1` — pure .md aggregator; no external command captures. BOM consistency fixed in commit `<encoding-fix-commit>` 2026-05-26: `Set-Content -Encoding UTF8` (PS5=BOM / PS7=no-BOM) replaced with `[System.IO.File]::WriteAllText($path, $text, UTF8NoBOM)` — PS5/PS7 consistent no-BOM output
+- `scripts/generate-integrated-status-report.ps1` — pure .md aggregator; no external command captures. BOM consistency fixed in commit `27d36dc` 2026-05-26: `Set-Content -Encoding UTF8` (PS5=BOM / PS7=no-BOM) replaced with `[System.IO.File]::WriteAllText($path, $text, UTF8NoBOM)` — PS5/PS7 consistent no-BOM output
 - `lobster-factory/infra/trigger/{validate-config,preflight-clickhouse}.ps1` — 0 captures
 - `lobster-factory/infra/hetzner-phase1-core/scripts/test-ops-inbox-webhooks.ps1` — `Invoke-WebRequest` (HTTP path, same safety as Invoke-RestMethod)
 
@@ -116,7 +116,7 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 | `scripts/scan-local-config-for-secrets.ps1` | 1 | Low |
 | `scripts/sync-claude-userlevel.ps1` | 1 | Low — 🔴 FIXED b791bfb+followup: wrapped `git rev-parse` in `Invoke-WithUtf8Console` |
 | `scripts/verify-closeout-completeness.ps1` | 2 | Low |
-| `lobster-factory/infra/trigger/deploy-workflows.ps1` | 1 | **False positive** — `docker info 2>&1 \| Out-Null` discards all output; no stdout decode occurs; CP950 trap does not apply. Also fixed commit `<encoding-fix-commit>` 2026-05-26: L72 `Get-Content $PkgPath -Raw` + L85 `Get-Content $PosthogEnvSource` now both use `-Encoding UTF8` |
+| `lobster-factory/infra/trigger/deploy-workflows.ps1` | 1 | **False positive** — `docker info 2>&1 \| Out-Null` discards all output; no stdout decode occurs; CP950 trap does not apply. Also fixed commit `27d36dc` 2026-05-26: L72 `Get-Content $PkgPath -Raw` + L85 `Get-Content $PosthogEnvSource` now both use `-Encoding UTF8` |
 | `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` | 1 | Low |
 | `mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1` | 2 | Low |
 | `scripts/generate-customer-delivery-status.ps1`, `scripts/playwright-runner.ps1` | parse-error reported | Pre-existing PS parse errors unrelated to encoding |

@@ -125,11 +125,11 @@
 
 - [x] **【✅ 2026-05-26 code 修復 commit `f933312`；sg-deploy 後生效】Ops Inbox netdata CLEAR auto-resolve bug + fingerprint instability** —— **【未開始】** **背景**：B-Minimal auto-reboot 部署期間發現 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/netdata/route.ts:29-31` 對 CLEAR 訊號只 `return skipped`，不 actively resolve 既有 open incident。**且** `lib/ops-inbox/fingerprint.ts:32-33` 對 netdata 的 fingerprint 用 `host:alarm`，但 `alarm` 字串含 value（`= 1 status` vs `= 0 status`）→ CLEAR 與 WARNING 不同 fingerprint。**影響**：每次 auto-reboot 後 Ops Inbox 仍留 stale open incident，30 年 × 24+ 次/年 = 720+ stale incident 累積。**DoD**：(a) 修 fingerprint：netdata 改用 `alarm_id`（payload 已含此欄）或從 `alarm` 字串剝離 value 部分；(b) 修 webhook：CLEAR 訊號時主動查 fingerprint，若 open 則 set status=resolved + resolved_at + resolved_by='netdata-auto-resolve'；(c) 寫 migration backfill：用新 fingerprint 演算法重算所有 `ops_incidents.fingerprint`（or 加 `alarm_id` 欄位作為平行 lookup key）；(d) 新增 vitest 覆蓋 WARNING → CLEAR transition。**詳見**：`agency-os/docs/operations/AUDIT_REGISTRY.md` 對應 entry。**參考 commit**：本日 B-Minimal commit；P3 手動關 incident `2e66435f-4439-4b6a-a045-ec93e98fbe48` 的紀錄。
 
-- [x] **【✅ 2026-05-26 `<encoding-fix-commit>`】遷移 `print-open-tasks.ps1` / `print-today-closeout-recap.ps1` 到統一 helper** — Pattern A dot-source + `Invoke-WithUtf8Console` on all git captures; audit exit 0 confirmed
+- [x] **【✅ 2026-05-26 `27d36dc`】遷移 `print-open-tasks.ps1` / `print-today-closeout-recap.ps1` 到統一 helper** — Pattern A dot-source + `Invoke-WithUtf8Console` on all git captures; audit exit 0 confirmed
 
-- [x] **【✅ 2026-05-26 `<encoding-fix-commit>`】`scripts/generate-integrated-status-report.ps1:275-276` BOM 一致性** — `Set-Content -Encoding UTF8` → `WriteAllText(UTF8NoBOM)`; hex dump confirmed no `EF BB BF`
+- [x] **【✅ 2026-05-26 `27d36dc`】`scripts/generate-integrated-status-report.ps1:275-276` BOM 一致性** — `Set-Content -Encoding UTF8` → `WriteAllText(UTF8NoBOM)`; hex dump confirmed no `EF BB BF`
 
-- [x] **【✅ 2026-05-26 `<encoding-fix-commit>`】`lobster-factory/infra/trigger/deploy-workflows.ps1:72,85` 補 `-Encoding UTF8`** — both `Get-Content` calls now use `-Encoding UTF8`; docker-info false-positive annotated
+- [x] **【✅ 2026-05-26 `27d36dc`】`lobster-factory/infra/trigger/deploy-workflows.ps1:72,85` 補 `-Encoding UTF8`** — both `Get-Content` calls now use `-Encoding UTF8`; docker-info false-positive annotated
 
 - [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
   - 範圍：`cursor-mcp-and-plugin-inventory.md`、`MCP_TOOL_ROUTING_SPEC.md`、`ROUTING_MATRIX.md`、`TOOLS_DELIVERY_TRACEABILITY.md`

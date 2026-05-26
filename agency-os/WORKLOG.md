@@ -159,7 +159,7 @@
 - BUGHUNT_DONE: scope=.claude/commands/ scripts/ agency-os/reports/ | grep=unread_count,未讀數量,本輪無未讀,no other-machine AO-SYNC | hits=archive reports only (expected)
 - WORKLOG: this entry
 
-### CP950 encoding 防護延伸 + Ops Inbox CLEAR 稽核 (`<encoding-fix-commit>`)
+### CP950 encoding 防護延伸 + Ops Inbox CLEAR 稽核 (code `27d36dc`, docs `30bb785`)
 
 **根本問題**: 2026-05-26 AO-RESUME 報告中 4 個「Encoding 防護延伸」TASKS 待辦，徹查後確認：
 1. `print-today-closeout-recap.ps1` — Pattern B（script-level setter）未包 git captures；CJK commit 主旨 / 路徑可爛碼
@@ -184,7 +184,7 @@
 
 **剩餘風險**:
 - `deploy-workflows.ps1:85 Set-Content -Encoding utf8` writes BOM on PS5 (pre-existing, not introduced); trigger.dev CLI generally skips BOM; fix on next Edit
-- AUDIT_REGISTRY `<encoding-fix-commit>` placeholder x5 — pending real hash update after this commit
+- AUDIT_REGISTRY placeholder replaced with `27d36dc` (code commit) — done
 - Ops Inbox CLEAR fix (`f933312`) is in main but sg-deploy is 18+ commits behind; prod still runs pre-fix logic
 
 **Rollback**: `git revert <commit>` — no API / DB / schema change; no deploy triggered.
