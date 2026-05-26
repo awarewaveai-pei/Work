@@ -24,7 +24,8 @@ STAGING_DIR="/root/lobster-phase1"
 GIT_APPS_ROOT="$REPO_DIR/lobster-factory/infra/hetzner-phase1-core/apps"
 LOG_DIR="$STAGING_DIR/logs"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/sg-deploy-$(date +%Y%m%d-%H%M%S).log"
+LOG_FILE="${LOG_FILE:-$LOG_DIR/sg-deploy-$(date +%Y%m%d-%H%M%S).log}"
+export LOG_FILE
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG_FILE"; }
 fail() { log "ERROR: $*"; exit 1; }
@@ -80,6 +81,29 @@ if [[ $SKIP_PULL -eq 0 ]]; then
   else
     log "git: already up to date ($AFTER)"
   fi
+fi
+
+# 1.8. self-sync deploy scripts from git → staging (prevents script drift without manual copy).
+#      Runs only after a successful git pull (SKIP_PULL=0) so --skip-pull stays truly isolated.
+#      If sg-deploy.sh itself changed: exec the new version so the rest of the deploy uses
+#      the latest code (avoids bash reading the old script body after self-overwrite).
+if [[ $SKIP_PULL -eq 0 ]]; then
+  _git_scripts="$REPO_DIR/lobster-factory/infra/hetzner-phase1-core/scripts"
+  _staging_scripts="$STAGING_DIR/scripts"
+  [[ -f "$_git_scripts/sg-deploy.sh" ]] || fail "git scripts dir missing: $_git_scripts"
+  _self_changed=0
+  cmp -s "$_git_scripts/sg-deploy.sh" "$0" 2>/dev/null || _self_changed=1
+  log "--- sync deploy scripts ---"
+  rsync -a "$_git_scripts/" "$_staging_scripts/" 2>&1 | tee -a "$LOG_FILE"
+  find "$_staging_scripts" -maxdepth 1 -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
+  if [[ "$_self_changed" -eq 1 ]]; then
+    log "sg-deploy.sh updated from git — re-execing new version"
+    _reexec=(--skip-pull)
+    [[ $DRY_RUN -eq 1 ]] && _reexec+=(--dry-run)
+    _reexec+=("${APPS[@]}")
+    exec "$_staging_scripts/sg-deploy.sh" "${_reexec[@]}"
+  fi
+  log "deploy scripts synced"
 fi
 
 # 2. rsync each app
