@@ -110,12 +110,31 @@
 
 **治理補丁：** `AGENTS.md` 新部署路徑強制清單 item 6：含 tsconfig.json 的服務必須有三層 typecheck gate。
 
-**架構缺口發現：** `sg-deploy.sh` 的 `scripts/` 目錄不在 rsync 路徑內（只同步 `apps/`），staging `/root/lobster-phase1/scripts/` 需手動更新。本次手動補齊後，設計 Step 1.8 自動同步機制（待後續 PR）。
+**架構缺口發現：** `sg-deploy.sh` 的 `scripts/` 目錄不在 rsync 路徑內（只同步 `apps/`），staging `/root/lobster-phase1/scripts/` 需手動更新。Step 1.8 已實作（見下節，commits `18fd948` + `8546a27`）。
 
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=SSH | cmd="sg-deploy.sh next-admin --skip-pull (tsc+test+smoke)" | exit=0 | ms=27000 | tsc=13s passed 04:01:48Z | test=3s passed 04:01:51Z | smoke=4/4 OK 04:02:02Z
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/4n — n4=tsc-first order (already applied)
 - BUGHUNT_DONE: scope=sg-deploy.sh,.github/workflows/,package.json,AGENTS.md | grep=typecheck|tsc --noEmit|pre-build gate | hits=all consistent post-patch; auto-deploy-next-admin.sh (staging cron) calls staging sg-deploy.sh → inherits new gate
+- WORKLOG: this entry
+
+### sg-deploy.sh Step 1.8 — self-sync deploy scripts (`18fd948` + `8546a27`)
+
+**根本問題：** `sg-deploy.sh` rsync 只同步 `apps/`；`scripts/` 目錄在 staging 永遠不自動更新，需手動 cp。這是 tsc gate 在 staging 缺席的根因（18 commits 未更新）。
+
+**方案：** Step 1.8（git pull 後、pre-build gate 前）— 每次部署後 rsync git scripts/ → staging scripts/。若 `sg-deploy.sh` 本身變動：exec 新版本（避免 bash 中途讀舊 body），傳遞 `--skip-pull` 防止重入。
+
+**Critic 二輪 findings 與修正：**
+- Maj-1: `cmp "$_git_scripts/sg-deploy.sh" "$0"` — `cd "$REPO_DIR"` 後 `$0` (relative) 解析到 `/root/Work/scripts/sg-deploy.sh`（不存在）→ cmp 永遠 non-zero → 每次都 re-exec。Fix: `SELF_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"` 在 cd 前捕獲絕對路徑
+- Maj-2: 無 source-guard → git scripts dir 消失時 rsync 靜默清空 staging。Fix: `[[ -f "$_git_scripts/sg-deploy.sh" ]] || fail`
+- Min-2: `LOG_FILE` 不繼承到 re-exec 子程序 → 每個 exec 建新 log 檔，一次 deploy 拆兩個檔案。Fix: `export LOG_FILE` + `LOG_FILE="${LOG_FILE:-...}"`
+- Min-4: `chmod +x *.sh` glob 無匹配時 chmod 出 error。Fix: `find -maxdepth 1 -name "*.sh" -exec chmod +x {} +`
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd="sg-deploy.sh --dry-run (in-sync path)" | exit=0 | result="deploy scripts synced" (no re-exec) | at=06:02:15Z
+- REALTEST_EVIDENCE: tool=SSH | cmd="sg-deploy.sh --dry-run (staging+1 line diff)" | exit=0 | result="re-execing new version" → "DRY RUN complete" | staging restored to 305 lines = git | at=06:03:03Z
+- REVIEW_DONE: critic=Standard | verdict=pass post-fixes | findings=0c/0m/2n (Maj-1+Maj-2+Min-2+Min-4 all applied)
+- BUGHUNT_DONE: scope=sg-deploy.sh | grep=SELF_PATH|_self_changed|cmp -s | hits=single Step 1.8 block; no other callers to update
 - WORKLOG: this entry
 
 ### AO-RESUME 外部信號標籤 + 跨機 import 訊息修正 (`eb74838`)
