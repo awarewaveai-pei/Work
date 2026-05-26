@@ -66,6 +66,25 @@
 - BUGHUNT_DONE: scope=apps/next-admin/app/api/webhooks/ lib/ops-inbox/ | grep=!body\.ok | hits=0 (all converted)
 - WORKLOG: this entry
 
+### TypeScript typecheck 三層防禦 — 一勞永逸 (`package.json` + `sg-deploy.sh` tsc gate + GHA CI)
+
+**根本問題：** TS 型別錯誤可在 main 靜默潛伏直到 `next build`（sg-deploy Step 4）才爆。根因分析：vitest 只驗邏輯不驗型別；3 條 commit 路徑（Claude Code / GHA auto-repair / direct push）中只有 Claude Code 有部分 tsc 覆蓋；無 CI 型別守門人。
+
+**系統方案（三層）：**
+1. `package.json` — 新增 `"typecheck": "tsc --noEmit"` script（本地快速 gate）
+2. `sg-deploy.sh` — pre-build gate 改為 tsc first（13s）再 vitest（3s）；改前只有 vitest；order 重要：tsc 快且診斷清晰
+3. `.github/workflows/next-admin-typecheck.yml` — 新增 GHA CI（push+PR to main，paths filter `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/**`）；Node 20 + npm ci + `npm run typecheck`；~90s 上線，比 sg-deploy 快 8 分鐘
+
+**治理補丁：** `AGENTS.md` 新部署路徑強制清單 item 6：含 tsconfig.json 的服務必須有三層 typecheck gate。
+
+**架構缺口發現：** `sg-deploy.sh` 的 `scripts/` 目錄不在 rsync 路徑內（只同步 `apps/`），staging `/root/lobster-phase1/scripts/` 需手動更新。本次手動補齊後，設計 Step 1.8 自動同步機制（待後續 PR）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd="sg-deploy.sh next-admin --skip-pull (tsc+test+smoke)" | exit=0 | ms=27000 | tsc=13s passed 04:01:48Z | test=3s passed 04:01:51Z | smoke=4/4 OK 04:02:02Z
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/4n — n4=tsc-first order (already applied)
+- BUGHUNT_DONE: scope=sg-deploy.sh,.github/workflows/,package.json,AGENTS.md | grep=typecheck|tsc --noEmit|pre-build gate | hits=all consistent post-patch; auto-deploy-next-admin.sh (staging cron) calls staging sg-deploy.sh → inherits new gate
+- WORKLOG: this entry
+
 ### AO-RESUME 外部信號標籤 + 跨機 import 訊息修正 (`eb74838`)
 
 **根本問題（兩個獨立 bug）：**
