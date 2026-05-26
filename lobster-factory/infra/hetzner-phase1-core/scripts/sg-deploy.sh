@@ -26,6 +26,7 @@ LOG_DIR="$STAGING_DIR/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_FILE:-$LOG_DIR/sg-deploy-$(date +%Y%m%d-%H%M%S).log}"
 export LOG_FILE
+SELF_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG_FILE"; }
 fail() { log "ERROR: $*"; exit 1; }
@@ -92,7 +93,7 @@ if [[ $SKIP_PULL -eq 0 ]]; then
   _staging_scripts="$STAGING_DIR/scripts"
   [[ -f "$_git_scripts/sg-deploy.sh" ]] || fail "git scripts dir missing: $_git_scripts"
   _self_changed=0
-  cmp -s "$_git_scripts/sg-deploy.sh" "$0" 2>/dev/null || _self_changed=1
+  cmp -s "$_git_scripts/sg-deploy.sh" "$SELF_PATH" 2>/dev/null || _self_changed=1
   log "--- sync deploy scripts ---"
   rsync -a "$_git_scripts/" "$_staging_scripts/" 2>&1 | tee -a "$LOG_FILE"
   find "$_staging_scripts" -maxdepth 1 -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
