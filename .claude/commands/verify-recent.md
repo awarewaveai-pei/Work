@@ -70,6 +70,8 @@ Execute per **AGENTS.md R0 §抓蟲** (single SSOT for scope, grep patterns, req
 
 `verify-closeout-completeness` enforces `agency-os` + `scripts` root presence in `scope=` at commit time (see `$bhRequiredRoots` in that script). If stale cross-file references are found → fix in same commit before clearing tracker.
 
+`bughunt-oracle.ps1` also runs at commit time: for ASCII identifier-type patterns in `grep=` (length ≥ 5, no spaces/CJK/regex specials), it runs a literal search in declared scope excluding staged files. Declaring `hits=0` for a symbol that still exists in other files → HARD FAIL.
+
 ## Step 3 — Real exec test (skip if --trivial)
 
 For each file, **propose** (do not auto-run if side-effecting) a real-execution test:

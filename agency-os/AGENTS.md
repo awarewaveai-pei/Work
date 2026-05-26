@@ -25,6 +25,7 @@
      **grep 什麼（依改動類型）**：① 改動的 symbol/function/const 名稱的 call sites（含 downstream consumers）② 移除或重命名的 schema 欄位 ③ 改動的 string literal（action_key / taskId / status）④ WORKLOG/docs 中可能過期的聲稱
      **必填格式（機械閘，AO-CLOSE 強制）**：`- BUGHUNT_DONE: scope=<paths> | grep=<pattern> | hits=<N>` 或 `- BUGHUNT_WAIVED: <DOC_ONLY|NA> -- <reason>`
      確認無命中才可寫 `hits=0`；scope 不含 `agency-os` 或 `scripts` 時：加 `- BUGHUNT_SCOPE_NARROW: <明確理由>` 豁免 gate（不可靜默省略）。
+     `hits=0` 宣告若含 ASCII 識別符型 pattern（長度 ≥ 5，無空格/CJK），`bughunt-oracle.ps1` 於 AO-CLOSE commit 時機器驗證（排除 staged files）；宣告 0 但實際命中 → HARD FAIL（`scripts/bughunt-oracle.ps1` `Invoke-BughuntOracle`）。
   4. **WORKLOG（留證據鏈）**：[驗證結果] 段以 file:line 引用實際指令與輸出；同日 WORKLOG.md entry 含「四動作各自結果」摘要
 
 **修改完成後，必須輸出：**

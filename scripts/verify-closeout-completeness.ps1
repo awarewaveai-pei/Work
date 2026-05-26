@@ -26,6 +26,10 @@ if (-not $WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }
 
+# Dot-source oracle function (defines Invoke-BughuntOracle for use inside the try block below).
+$_oraclePath = Join-Path $PSScriptRoot 'bughunt-oracle.ps1'
+if (Test-Path -LiteralPath $_oraclePath) { . $_oraclePath }
+
 Push-Location $WorkRoot
 try {
     $null = git rev-parse --git-dir 2>$null
@@ -208,6 +212,19 @@ try {
                 if ($Gate -eq "strict") { Write-Host $scopeMsg -ForegroundColor Red; exit 1 }
                 Write-Warning $scopeMsg
             }
+        }
+    }
+
+    # BUGHUNT oracle: verify hits=0 claims by literal-search of identifier-type patterns.
+    # Staged files excluded — BUGHUNT checks cross-file impact, not the changed file itself.
+    if ($hasBughuntEvidence -and (Get-Command Invoke-BughuntOracle -ErrorAction SilentlyContinue)) {
+        $oracleResult = Invoke-BughuntOracle `
+            -WorklogSection $section `
+            -WorkRoot $WorkRoot `
+            -Gate $Gate `
+            -StagedFiles $staged
+        if ($oracleResult -gt 0 -and $Gate -eq "strict") {
+            exit 1
         }
     }
 
