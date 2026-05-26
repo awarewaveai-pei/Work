@@ -78,15 +78,26 @@ function Invoke-BughuntOracle {
     # Intentionally simple regex — must be readable and stable for 30 years.
     $idRegex = '^[a-zA-Z_$][a-zA-Z0-9_$.\-]{4,}$'
 
+    # Code-file extensions: oracle only searches source files, not documentation.
+    # .md/.json/.yaml mention symbol names legitimately (WORKLOG, README, config) — not stale callers.
+    $codeExts = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
+    foreach ($ext in @('.ps1','.psm1','.psd1','.ts','.tsx','.js','.jsx','.mjs','.cjs','.py','.sh','.bash')) {
+        [void]$codeExts.Add($ext)
+    }
+
     # Build staged-file exclusion set (absolute paths, case-insensitive on Windows/NTFS).
+    # git returns relative forward-slash paths (e.g. scripts/foo.ps1); absolute paths also accepted
+    # (test harness, CI) via IsPathRooted guard.
     $stagedSet = [System.Collections.Generic.HashSet[string]]::new(
         [System.StringComparer]::OrdinalIgnoreCase
     )
     foreach ($sf in $StagedFiles) {
         if ([string]::IsNullOrWhiteSpace($sf)) { continue }
-        # git returns forward-slash paths; normalise to OS separator before Join-Path.
-        $rel = $sf.TrimStart('/').TrimStart('\') -replace '/', [System.IO.Path]::DirectorySeparatorChar
-        [void]$stagedSet.Add((Join-Path $WorkRoot $rel))
+        $norm = $sf.Trim() -replace '/', [System.IO.Path]::DirectorySeparatorChar
+        $abs  = if ([System.IO.Path]::IsPathRooted($norm)) { $norm } else { Join-Path $WorkRoot $norm }
+        [void]$stagedSet.Add($abs)
     }
 
     # Find BUGHUNT_DONE lines that declare hits=0 (plain "0" or "0 <description text>").
@@ -109,11 +120,10 @@ function Invoke-BughuntOracle {
         # Field separator is ' | ' (space-pipe-space).
         # Within grep= field, '|' and '+' (no surrounding spaces) are pattern separators.
         $fields = @($afterColon -split ' \| ')
-        $scopeRaw = ''; $grepRaw = ''; $hitsRaw = ''
+        $scopeRaw = ''; $grepRaw = ''
         foreach ($f in $fields) {
             if ($f -match '^scope=(.+)$') { $scopeRaw = $Matches[1].Trim() }
             if ($f -match '^grep=(.+)$')  { $grepRaw  = $Matches[1].Trim() }
-            if ($f -match '^hits=(.+)$')  { $hitsRaw  = $Matches[1].Trim() }
         }
 
         if ([string]::IsNullOrWhiteSpace($grepRaw) -or [string]::IsNullOrWhiteSpace($scopeRaw)) {
@@ -122,12 +132,17 @@ function Invoke-BughuntOracle {
         }
 
         # Resolve scope= to absolute paths (comma and/or whitespace separated).
+        # Paths in BUGHUNT_DONE are always relative to WorkRoot (e.g. agency-os/, scripts/).
+        # Guard against already-absolute paths to avoid double-join corruption.
         $scopePaths = @(
             ($scopeRaw -split '[,\s]+') |
             Where-Object { $_ } |
             ForEach-Object {
-                $rel = $_.TrimEnd('/').TrimEnd('\') -replace '/', [System.IO.Path]::DirectorySeparatorChar
-                try { Join-Path $WorkRoot $rel } catch { $null }
+                $cleaned = $_.TrimEnd('/').TrimEnd('\') -replace '/', [System.IO.Path]::DirectorySeparatorChar
+                try {
+                    if ([System.IO.Path]::IsPathRooted($cleaned)) { $cleaned }
+                    else { Join-Path $WorkRoot $cleaned }
+                } catch { $null }
             } |
             Where-Object { $_ }
         )
@@ -164,6 +179,8 @@ function Invoke-BughuntOracle {
                 @($entry)
             }
             foreach ($fi in $files) {
+                # Only search code files — .md/.json/.yaml legitimately mention symbol names.
+                if (-not $codeExts.Contains($fi.Extension)) { continue }
                 # Skip staged files (the changed artifacts; cross-file refs are in OTHER files).
                 if ($stagedSet.Count -gt 0 -and $stagedSet.Contains($fi.FullName)) { continue }
                 # Deduplicate across overlapping scope paths.
