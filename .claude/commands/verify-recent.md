@@ -59,6 +59,17 @@ Spawn the `critic` subagent with all tracked files as the scope. Brief:
 
 If critic reports 🔴 Critical or 🟠 Major → STOP, present findings, do NOT clear tracker (operator must fix and re-run).
 
+## Step 2.5 — BUGHUNT (skip if --trivial)
+
+Execute per **AGENTS.md R0 §抓蟲** (single SSOT for scope, grep patterns, required roots). Then manually append one of the following to today's `agency-os/WORKLOG.md` before Step 3:
+
+```
+- BUGHUNT_DONE: scope=<agency-os,scripts,...> | grep=<pattern> | hits=<N>
+- BUGHUNT_WAIVED: <DOC_ONLY|NA> -- <reason>
+```
+
+`verify-closeout-completeness` enforces `agency-os` + `scripts` root presence in `scope=` at commit time (see `$bhRequiredRoots` in that script). If stale cross-file references are found → fix in same commit before clearing tracker.
+
 ## Step 3 — Real exec test (skip if --trivial)
 
 For each file, **propose** (do not auto-run if side-effecting) a real-execution test:
@@ -97,7 +108,7 @@ If operator says `/verify-recent --ack` without a reason → ask: "What's the re
 
 ## `--trivial` variant
 
-Only do Step 1 (syntax). Skip Step 2 + 3. Clear tracker.
+Only do Step 1 (syntax). Skip Steps 2, 2.5, and 3. Append `- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)` to today's WORKLOG. Clear tracker.
 
 ## Unknown flag
 
@@ -110,6 +121,7 @@ verify-recent: <mode>
   files:    <N>
   syntax:   <OK | FAIL with paths>
   critic:   <OK | N issues | skipped>
+  bughunt:  <DONE scope=... | WAIVED | skipped (--trivial)>
   exec:     <OK | proposed | skipped>
   cleared:  <yes | no>
 ```
@@ -120,3 +132,4 @@ verify-recent: <mode>
 - Memory rules are soft. Hook + slash command + commit gate is the harness-enforced rule.
 - SSOT: `mcp/claude-userlevel/hooks/{_verify-shared,code-change-tracker,verify-gate-stop,verify-gate-commit}.js` + `.claude/commands/verify-recent.md` + `scripts/verify-recent-ack.ps1`.
 - Audit trail for failures: `~/.claude/verify-gate-failures.log` (one line per hook exception).
+- BUGHUNT spec lives in AGENTS.md R0 §抓蟲; required root list lives in `scripts/verify-closeout-completeness.ps1` `$bhRequiredRoots`. verify-recent only executes and records — no duplicate definitions here.

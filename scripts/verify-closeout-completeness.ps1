@@ -190,6 +190,27 @@ try {
         Write-Host "== BUGHUNT: no evidence in today's WORKLOG -- add BUGHUNT_DONE: or BUGHUNT_WAIVED: ==" -ForegroundColor Yellow
     }
 
+    # BUGHUNT scope keyword gate: scope= must mention required root paths.
+    # SSOT for required roots lives here; AGENTS.md R0 §抓蟲 references these names.
+    # When repo root structure changes, update $bhRequiredRoots AND AGENTS.md §抓蟲 bullet (two files only).
+    if ($hasBughuntEvidence) {
+        $bhDoneLine = @(($section -split '\r?\n') | Where-Object { $_ -match '^\s*-\s*BUGHUNT_DONE:' }) | Select-Object -First 1
+        $hasScopeNarrow = ($section -match '(?m)^\s*-\s*BUGHUNT_SCOPE_NARROW:')
+        if ($bhDoneLine -and -not $hasScopeNarrow) {
+            # Always-required roots (gate enforced). For .claude/ and lobster-factory/ add when relevant.
+            # SSOT: $bhRequiredRoots here; AGENTS.md R0 §抓蟲 references these names.
+            $bhRequiredRoots = @('agency-os', 'scripts')
+            # Extract only the scope= value (before next | field) to avoid matching grep= or hits= fields.
+            $scopeVal = if ($bhDoneLine -match 'scope=([^|]+)') { $Matches[1] } else { '' }
+            $missingRoots = @($bhRequiredRoots | Where-Object { $scopeVal -notmatch [regex]::Escape($_) })
+            if ($missingRoots.Count -gt 0) {
+                $scopeMsg = ("verify-closeout-completeness: BUGHUNT_DONE scope= missing required root(s): {0}. Widen scope= to include them, OR add: - BUGHUNT_SCOPE_NARROW: <reason>. Gate=$Gate" -f ($missingRoots -join ', '))
+                if ($Gate -eq "strict") { Write-Host $scopeMsg -ForegroundColor Red; exit 1 }
+                Write-Warning $scopeMsg
+            }
+        }
+    }
+
     # Daily note quality gate: block closeout if today's scaffold placeholders remain.
     $dailyPath = Join-Path $WorkRoot ("agency-os\memory\daily\{0}.md" -f $today)
     if (Test-Path -LiteralPath $dailyPath) {
