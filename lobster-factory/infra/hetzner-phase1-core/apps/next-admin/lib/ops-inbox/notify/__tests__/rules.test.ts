@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { decideNotification } from "../rules";
+import type { IncidentTransition } from "../../types";
 
 /** Mirrors rules.ts throttle constants. */
 const THROTTLE_MS = 15 * 60 * 1000;
@@ -11,6 +12,10 @@ const baseIncident: any = {
   severity: "medium",
   notification_log: [],
 };
+
+// Typed duplicate-transition helpers — satisfies ensures required fields are present.
+const dupMedium = { kind: "duplicate", prevSeverity: "medium", prevStatus: "open" } satisfies IncidentTransition;
+const dupCritical = { kind: "duplicate", prevSeverity: "critical", prevStatus: "open" } satisfies IncidentTransition;
 
 describe("decideNotification", () => {
   beforeEach(() => {
@@ -61,7 +66,7 @@ describe("decideNotification", () => {
       severity: "medium",
       notification_log: [{ channel: "x", rule: "new_incident_first_occurrence", status: "sent", ts: past }],
     };
-    const d = decideNotification({ incident, transition: { kind: "duplicate" }, now: new Date() });
+    const d = decideNotification({ incident, transition: dupMedium, now: new Date() });
     expect(d.shouldSend).toBe(true);
     expect(d.rule).toBe("duplicate_occurrence");
   });
@@ -73,7 +78,7 @@ describe("decideNotification", () => {
       severity: "medium",
       notification_log: [{ channel: "x", rule: "new_incident_first_occurrence", status: "sent", ts: recent }],
     };
-    const d = decideNotification({ incident, transition: { kind: "duplicate" }, now: new Date() });
+    const d = decideNotification({ incident, transition: dupMedium, now: new Date() });
     expect(d.shouldSend).toBe(false);
     expect(d.reason).toBe("within_throttle_window");
   });
@@ -85,7 +90,7 @@ describe("decideNotification", () => {
       severity: "critical",
       notification_log: [{ channel: "x", rule: "critical_immediate", status: "sent", ts: past }],
     };
-    const d = decideNotification({ incident, transition: { kind: "duplicate" }, now: new Date() });
+    const d = decideNotification({ incident, transition: dupCritical, now: new Date() });
     expect(d.shouldSend).toBe(true);
     expect(d.rule).toBe("critical_immediate");
   });
@@ -97,7 +102,7 @@ describe("decideNotification", () => {
       severity: "critical",
       notification_log: [{ channel: "x", rule: "critical_immediate", status: "sent", ts: recent }],
     };
-    const d = decideNotification({ incident, transition: { kind: "duplicate" }, now: new Date() });
+    const d = decideNotification({ incident, transition: dupCritical, now: new Date() });
     expect(d.shouldSend).toBe(false);
     expect(d.reason).toBe("within_throttle_window");
   });
@@ -109,7 +114,7 @@ describe("decideNotification", () => {
       severity: "critical",
       notification_log: [{ channel: "x", rule: "critical_immediate", status: "sent", ts: past }],
     };
-    const d = decideNotification({ incident, transition: { kind: "duplicate" }, now: new Date() });
+    const d = decideNotification({ incident, transition: dupCritical, now: new Date() });
     expect(d.shouldSend).toBe(true);
     expect(d.rule).toBe("critical_immediate");
   });
@@ -121,7 +126,7 @@ describe("decideNotification", () => {
       severity: "medium",
       notification_log: [{ channel: "x", rule: "new_incident_first_occurrence", status: "sent", ts: past }],
     };
-    const d = decideNotification({ incident, transition: { kind: "duplicate" }, now: new Date() });
+    const d = decideNotification({ incident, transition: dupMedium, now: new Date() });
     expect(d.shouldSend).toBe(false);
     expect(d.reason).toBe("within_throttle_window");
   });

@@ -19,7 +19,7 @@ export async function POST(req: Request) {
 
   // C3 + M3 fix: bounded body read (256KB cap) preserving raw bytes for future HMAC.
   const body = await readWebhookBody(req);
-  if (!body.ok) return new NextResponse(body.error, { status: body.status });
+  if (body.ok === false) return new NextResponse(body.error, { status: body.status });
   const raw = redactSecrets(body.parsed);
   const draft = normalizeUptimeKuma(raw);
   draft.fingerprint = computeFingerprint({

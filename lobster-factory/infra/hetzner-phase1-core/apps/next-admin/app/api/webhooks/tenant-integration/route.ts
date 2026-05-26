@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   // audited webhook routes → same DoS surface if token leaks. Migrating to the shared
   // readWebhookBody helper closes the gap (256KB cap) + sets up future per-source HMAC.
   const bodyRead = await readWebhookBody(req);
-  if (!bodyRead.ok) return new NextResponse(bodyRead.error, { status: bodyRead.status });
+  if (bodyRead.ok === false) return new NextResponse(bodyRead.error, { status: bodyRead.status });
   const raw = bodyRead.parsed;
 
   if (!raw || typeof raw !== "object") {

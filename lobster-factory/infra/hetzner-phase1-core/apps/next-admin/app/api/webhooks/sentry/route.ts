@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   // C3 + M3 fix: bounded body read via shared helper. Keeps raw text for future
   // per-source HMAC verification (Sentry signs the raw body bytes).
   const body = await readWebhookBody(req);
-  if (!body.ok) return new NextResponse(body.error, { status: body.status });
+  if (body.ok === false) return new NextResponse(body.error, { status: body.status });
   const raw = redactSecrets(body.parsed);
   const draft = normalizeSentry(raw);
   draft.fingerprint = computeFingerprint({
