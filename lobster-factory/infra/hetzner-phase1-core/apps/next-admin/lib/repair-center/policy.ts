@@ -71,7 +71,6 @@ export function policyCatalogForSource(source: IncidentSource): RepairSourcePoli
 export function policyForIncident(source: IncidentSource, severity: IncidentSeverity): RepairPolicy {
   const catalogPolicy = policyCatalogForSource(source).policy;
   if (catalogPolicy !== "triage_needed") return catalogPolicy;
-  if (severity === "critical") return "triage_needed";
   return source === "manual" ? "triage_needed" : "human_only";
 }
 

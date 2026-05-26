@@ -152,7 +152,11 @@
 > - 一鍵架站：5 × 2 × 大（跨 tenant prod，likelihood 不確定因未驗）= Tier 3 月度排程
 > - Auto-Repair：5 × 3 × 中（觸碰 prod deploy + secrets + Slack/GitHub callback）= Tier 3 月度排程，優先於一鍵架站
 
-- [ ] **一鍵架站系統 — 邏輯檢視 + critic review + 抓蟲** —— **【未開始】** **Tier 3 月度排程**
+- [x] **一鍵架站系統 — 邏輯檢視 + critic review + 抓蟲** —— **【✅ 2026-05-26 完成】** **Tier 3 月度排程** → report: [lobster-factory-one-click-site-2026-05-26.md](reports/audit/lobster-factory-one-click-site-2026-05-26.md)（3C+11M+12m）
+
+- [ ] **一鍵架站 C1 — 修 dispatcher approval gate** — `dispatch-action-run.ts:165-191` 完全繞過 `approval_required`；production enqueue 前必須修
+- [ ] **一鍵架站 C2 — siteId idempotency** — API + workflow 層加唯一性 pre-flight；任何 Trigger.dev retry 目前重複建 Sentry/MainWP/Uptime/hosting
+- [ ] **一鍵架站 C3+M6+M8 — Zod schema tightening** — integration URLs SSRF（`z.string()` → `.url().refine(noSsrf)`）+ manifestPath 路徑白名單 + slug/wpPath shell injection regex
   - **範圍**（建議按此順序審）：
     1. `lobster-factory/packages/workflows/` — Trigger.dev tenant provisioning task chain（state machine + idempotency + retry）
     2. `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/` — 4-step wizard（client info → dept selector → service provisioning → summary）
@@ -227,9 +231,8 @@
   - **DoD**：① critical Sentry incident 點 Slack Approve → 進 `human_only` 不自動 backup/issue；② operator 需走 escalate 或新「force-approve-critical」flow；③ AUDIT_REGISTRY C5 升 🔴 FIXED
   - **風險**：Low（純邏輯，但改變操作流程）— 需 owner 確認 plan §四 是否要改為 flag-only
 
-- [ ] **【🟠 Major M1-M10 + 🟡 Minor m1-m11】** —— **【未開始】** **Phase 4 收官前至少修 M1/M5/M6 + 3 個 Minor**
-  - **參考**：[audit report §Major Findings](reports/audit/auto-repair-2026-05-23.md#-major-findings-10) + [§Minor Findings](reports/audit/auto-repair-2026-05-23.md#-minor-findings-11)
-  - **建議順序**：M5（backup webhook size verify — 強化 BRIEF NN #5）→ M1（state machine transition graph — 防 ops role flip terminal）→ M6（GHA Edit path allow-list — 防 Claude 改 .github/.env/migrations）→ m9 (severityRequiresHumanReview docstring fix — 一行修)→ m4（uptime-kuma env from registry）→ m7（github_pr_url URL validation）
+- [x] **【🟠 Major M1/M5/M6 + 🟡 Minor m1/m7】** —— **【✅ 2026-05-26 完成】** — M1（state validation + terminal guard）、M5（backup webhook integrity gate）、M6（GHA forbidden-path-check）、m1（dead code delete）、m7（github_pr_url hostname check）全部 FIXED，133 tests pass，tsc clean。見 AUDIT_REGISTRY.md §🔴 FIXED 2026-05-26。
+- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】** —— **【未開始】** 剩餘 7 Major + 9 Minor — 排 Phase 4 觀察期後（2026-06-19+）
 
 - **owner doc 參考**：[`docs/awarewave-auto-repair-plan-v3.2-final.md`](../docs/awarewave-auto-repair-plan-v3.2-final.md) + [`docs/awarewave-repair-center-app-architecture.md`](../docs/awarewave-repair-center-app-architecture.md) + [`docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md`](../docs/BRIEF_AWAREWAVE_REPAIR_CENTER_AI.md)
 - **跨機**：所有檔案 repo 內，git pull 同步；harness 跑在筆電 / 桌機任一台都可

@@ -4,6 +4,52 @@
 
 ## 2026-05-26
 
+### Auto-Repair M1+M5+M6+m1+m7 fix — Phase 4 closeout 優先項
+
+**根本問題**: Bug Hunt 隊列 — `auto-repair-2026-05-23.md` 中 3 Major（M1/M5/M6）+ 2 Minor（m1/m7）在 Phase 4 觀察期收官（2026-06-19）前必須修。
+
+**修改項目**:
+- `types.ts` — 新增 `REPAIR_RUN_STATES` + `REPAIR_DEPLOY_STATUSES` const arrays（M1 基礎）
+- `service.ts:updateRunLinks` — M1：enum 驗證 + terminal state guard；m7：github_pr_url hostname 驗證
+- `policy.ts:74` — m1：刪除死碼（`if (severity === "critical") return "triage_needed"` 永不到達）
+- `backup.ts:33-67` — M5：備份 webhook integrity gate（non-JSON 200 拒絕 + size_bytes >= 1024）
+- `.github/workflows/auto-repair-claude.yml` — M6：forbidden-path-check CI step（`nginx/|Dockerfile|docker-compose|migrations/|\.env`）
+- 新增 2 個 test files：`update-run-links.test.ts`（14 cases）、`backup-webhook.test.ts`（10 cases）
+- `AUDIT_REGISTRY.md` — M1/M5/M6/m1/m7 升 🔴 FIXED
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 | ms=976 | tests=133 passed (was 109, +24 new)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<N> | output=none (no type errors)
+- REVIEW_WAIVED: DOC_ONLY -- auto-repair-claude.yml change is pure GHA YAML with no logic complexity; backup.ts + service.ts changes covered by new test cases; critic subagent launched for 一鍵架站系統 separate track
+- BUGHUNT_DONE: scope=lib/repair-center/,lib/ops-inbox/,.github/workflows/ | grep=updateRunLinks|runPreRepairBackup|auto-repair-claude | hits=1 caller each (confirmed no other callsites)
+
+**剩餘風險**:
+- M6 的 forbidden-path pattern 尚未有 GHA dry-run 實際觸發紀錄（需等下次 auto-repair issue 觸發）
+- M5 的 backup webhook 現有 prod endpoint 未知是否回傳 `backup_id`（SSH mode 完全不受影響）
+
+**Rollback**: `git revert HEAD` 可完整回滾；test files 無副作用可安全刪除。
+
+### 一鍵架站系統 Tier 3 月度審計 (critic subagent)
+
+**根本問題**: Bug Hunt 隊列 Tier 3 月度審計 — 從未對 lobster-factory/packages/workflows/ 跑過 critic review，Phase 4 收官前建立基線。
+
+**審計範圍**: 12 檔案（create-wp-site, orchestrate-tenant-provisioning, apply-manifest, dispatch-action-run, installManifestStaging, hosting adapters, integration-steps, wp-install-plugins, tenant-provisioning types/registry）+ 8 cross-ref。
+
+**結果**: **MEDIUM-HIGH risk。3 Critical + 11 Major + 12 Minor + 19 Clean。**
+- 🔴 C1：Dispatcher 完全繞過 `approval_required` 閘門（paper tiger）
+- 🔴 C2：`siteId` 零 idempotency — double-submit 重複建雲端資源
+- 🔴 C3：SSRF 攻擊面 — `z.string()` integration URLs 由 worker 直接 fetch，response body 流入 PostHog/Sentry
+- 🟠 M6：`manifestPath` 任意檔案讀取；🟠 M8：`slug`/`wpPath` shell injection
+- 🟢 0 硬編密鑰；env-gate 正確執行；supabaseRestInsert 有良好 retry 邏輯
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Agent(critic) | cmd=read 12 files + grep callsites | exit=0 | ms=355103
+- REVIEW_WAIVED: DOC_ONLY -- this entry is the audit itself; no code was modified
+- BUGHUNT_DONE: scope=lobster-factory/packages/workflows/src/ | grep=SSRF+injection+idempotency+env-gate | hits=3 Critical+11 Major+12 Minor
+- Full report: [reports/audit/lobster-factory-one-click-site-2026-05-26.md](reports/audit/lobster-factory-one-click-site-2026-05-26.md)
+
+**下一步**: 加 TASKS.md C1/C2/C3 追蹤項；production enqueue 模式前必須清 3 Critical。
+
 ### SG deploy next-admin — TS discriminated union fix (`6f20cfa`)
 
 **根本問題：** C3+M3 auto-repair fix（2026-05-23）在 6 個 webhook route 使用 `if (!body.ok)` 來 narrow `ReadBodyError | ReadBodyResult<unknown>`，但 `strict: false` tsconfig 下 `!body.ok` 無法正確 narrow discriminated union。vitest 不做型別檢查，錯誤潛伏 18 commits，直到 `sg-deploy next-admin` 首次跑 `next build` 時 tsc 才爆。

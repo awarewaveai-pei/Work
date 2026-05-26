@@ -11,6 +11,7 @@ import {
   severityRequiresHumanReview,
 } from "./policy";
 import { escalateGuard, isTerminalState } from "./run-state";
+import { REPAIR_RUN_STATES, REPAIR_DEPLOY_STATUSES } from "./types";
 import type { RepairRun, RepairRunWithIncident } from "./types";
 
 export async function getCurrentSystemMode(): Promise<string> {
@@ -365,12 +366,38 @@ export async function updateRunLinks(
   const run = await fetchRepairRunWithIncident(id);
   if (!run) return { ok: false, error: "repair_run_not_found" };
 
+  // M1: validate state against known enum; block writes to terminal runs.
+  if (body.state) {
+    if (!(REPAIR_RUN_STATES as readonly string[]).includes(body.state)) {
+      return { ok: false, error: "invalid_state_value", details: { received: body.state, allowed: [...REPAIR_RUN_STATES] } };
+    }
+    if (isTerminalState(run.state)) {
+      return { ok: false, error: "run_in_terminal_state", details: { state: run.state } };
+    }
+  }
+  // M1: validate deploy_status against known enum.
+  if (body.deploy_status && !(REPAIR_DEPLOY_STATUSES as readonly string[]).includes(body.deploy_status)) {
+    return { ok: false, error: "invalid_deploy_status_value", details: { received: body.deploy_status, allowed: [...REPAIR_DEPLOY_STATUSES] } };
+  }
+
   const patch: Record<string, unknown> = {};
   if (body.github_pr_url !== undefined) {
-    patch.github_pr_url = body.github_pr_url.trim() || null;
-    const match = body.github_pr_url.match(/\/pull\/(\d+)/);
+    const trimmedPrUrl = body.github_pr_url.trim();
+    // m7: reject non-github.com PR URLs to prevent javascript: or SSRF injection.
+    if (trimmedPrUrl) {
+      try {
+        const parsed = new URL(trimmedPrUrl);
+        if (parsed.hostname !== "github.com") {
+          return { ok: false, error: "invalid_github_pr_url_hostname", details: { hostname: parsed.hostname } };
+        }
+      } catch {
+        return { ok: false, error: "invalid_github_pr_url_format" };
+      }
+    }
+    patch.github_pr_url = trimmedPrUrl || null;
+    const match = trimmedPrUrl.match(/\/pull\/(\d+)/);
     patch.github_pr_number = match ? Number(match[1]) : null;
-    patch.state = body.github_pr_url.trim() ? "pr_ready" : run.state;
+    patch.state = trimmedPrUrl ? "pr_ready" : run.state;
   }
   if (body.github_issue_url !== undefined) patch.github_issue_url = body.github_issue_url.trim() || null;
   if (body.deploy_ref !== undefined) {

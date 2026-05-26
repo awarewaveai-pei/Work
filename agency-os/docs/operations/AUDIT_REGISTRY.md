@@ -216,13 +216,24 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 
 _(all 5 moved to 🔴 FIXED above on 2026-05-23; Phase 4 closeout 2026-06-19 unblocked for the Critical-tier; Major-tier follow-up next iteration.)_
 
-### 🟠 TRACKED — Major (10 findings)
+### 🔴 FIXED — Major (2026-05-26)
 
-See audit report §Major Findings table. Includes: state-machine bypass via `updateRun` (M1), per-source HMAC missing (M2), `req.json` blocks future HMAC retrofit (M3), fingerprint forgery for silent suppression (M4), backup webhook accepts non-JSON 200 as success (M5), Claude allowed Edit on `.github/`/`nginx/`/migrations (M6), no mid-sequence recovery in `service.ts` (M7), `safeScriptPath` allows `..` (M8), `escalateAnalysisOnlyRun` TOCTOU (M9), Sentry retry storm loses occurrence_count increments (M10).
+- **M1** `service.ts:updateRunLinks` — 2026-05-26 — Enum validation + terminal state guard added. `body.state` validated against `REPAIR_RUN_STATES` const; terminal run writes blocked; `body.deploy_status` validated against `REPAIR_DEPLOY_STATUSES` const. Files: [types.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/types.ts) (new consts), [service.ts:updateRunLinks](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/service.ts). Tests: [update-run-links.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/__tests__/update-run-links.test.ts) 14 cases.
+- **M5** `backup.ts:33-67` — 2026-05-26 — Backup webhook integrity gate: rejects non-JSON 200 (Cloudflare/nginx page), rejects JSON with no `backup_id`/`backup_ref`, enforces `size_bytes >= 1024` when present. Implements Plan §六 "No backup means no repair run". File: [backup.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/backup.ts). Tests: [backup-webhook.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/__tests__/backup-webhook.test.ts) 10 cases.
+- **M6** `.github/workflows/auto-repair-claude.yml` — 2026-05-26 — Forbidden-path-check CI step added between Claude run and PR creation. Blocks PR if Claude touched `.github/workflows/`, `nginx/`, `Dockerfile`, `docker-compose*`, `/migrations/`, `.env*`. File: [auto-repair-claude.yml](../../../.github/workflows/auto-repair-claude.yml).
 
-### 🟡 TRACKED — Minor (11 findings)
+### 🟠 TRACKED — Major (7 remaining)
 
-See audit report §Minor Findings table. Highlights: dead code at `policy.ts:74` (m1), bearer length leak (m2), posthog auth ordering (m3), uptime-kuma env from `monitor.hostname` (m4), **m5 netdata silent CLEAR — overlaps with [Ops Inbox webhook CLEAR auto-resolve audit (2026-05-23)](#ops-inbox-webhook-clear-auto-resolve--fingerprint-instability-2026-05-23) — same root cause, deduped here**, `isTerminalState(undefined)===true` footgun (m6), `github_pr_url` accepts `javascript:` (m7), GHA "completed" message on empty branch (m8), `severityRequiresHumanReview` doc lies (m9), `triage_needed` accumulation (m10), RLS missing deny-anon policy (m11).
+~~M1~~ ~~M5~~ ~~M6~~ FIXED above. Remaining: per-source HMAC missing (M2), `req.json` blocks future HMAC retrofit (M3), fingerprint forgery for silent suppression (M4), no mid-sequence recovery in `service.ts` (M7), `safeScriptPath` allows `..` (M8), `escalateAnalysisOnlyRun` TOCTOU (M9), Sentry retry storm loses occurrence_count increments (M10).
+
+### 🔴 FIXED — Minor (2026-05-26)
+
+- **m1** `policy.ts:74` — 2026-05-26 — Dead code `if (severity === "critical") return "triage_needed"` deleted. Unreachable because only `source=manual` reaches this branch, and the following line already covers that case. File: [policy.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts).
+- **m7** `service.ts:updateRunLinks` — 2026-05-26 — `github_pr_url` hostname validated via `new URL()` — rejects `javascript:` and non-`github.com` hostnames before storage. Bundled with M1 fix. Tests: [update-run-links.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/__tests__/update-run-links.test.ts) 4 dedicated URL cases.
+
+### 🟡 TRACKED — Minor (9 remaining)
+
+~~m1~~ ~~m7~~ FIXED above. ~~m3 posthog ordering~~ ~~m9 dead helper wired~~ closed alongside Criticals (2026-05-23). Remaining: bearer length leak (m2), uptime-kuma env from `monitor.hostname` (m4), **m5 netdata silent CLEAR — overlaps with [Ops Inbox webhook CLEAR auto-resolve audit (2026-05-23)](#ops-inbox-webhook-clear-auto-resolve--fingerprint-instability-2026-05-23) — same root cause, deduped here**, `isTerminalState(undefined)===true` footgun (m6), GHA "completed" message on empty branch (m8), `triage_needed` accumulation (m10), RLS missing deny-anon policy (m11).
 
 ### 🛠 TOOL
 
@@ -234,18 +245,58 @@ See audit report §Minor Findings table. Highlights: dead code at `policy.ts:74`
 
 | Audited | 🔴 FIXED | 🟢 CLEAN | 🔴 TRACKED (Critical) | 🟠 TRACKED (Major) | 🟡 TRACKED (Minor) | Real production breaks pre-audit | Tooling shipped |
 |---------|----------|----------|----------------------|--------------------|--------------------|---------------------------------|-----------------|
-| 14 + 5 ref | 5 | 8 | 0 | 10 | 11 (2 closed alongside Criticals: m3 posthog ordering, m9 dead helper wired) | 1 (`OPS_INBOX_INGEST_TOKEN` 2026-05-22 — partial overlap with C2/M2 root cause) | 4 (harness + reports/audit/ dir + AGENTS rule + readRequestBody shared helper) |
+| 14 + 5 ref | **10** (5 Critical + 3 Major + 2 Minor) | 8 | 0 | **7** | **9** | 1 (`OPS_INBOX_INGEST_TOKEN` 2026-05-22 — partial overlap with C2/M2 root cause) | 4 (harness + reports/audit/ dir + AGENTS rule + readRequestBody shared helper) |
 
 ### Plan v3.2 SSOT contract violations
 
-| Plan reference | Violation finding | Severity |
-|---------------|--------------------|---------|
-| §五 第 3 層 "任何一個不 OK → rollback-phase1.sh 自動還原" | C1 | 🔴 Critical |
-| §四 Critical severity 閘門 | C5 | 🔴 Critical |
-| §六 備份驗證 "檔案大小 > 1KB" | M5 | 🟠 Major |
+| Plan reference | Violation finding | Severity | Status |
+|---------------|--------------------|---------|--------|
+| §五 第 3 層 "任何一個不 OK → rollback-phase1.sh 自動還原" | C1 | 🔴 Critical | 🔴 FIXED 2026-05-23 |
+| §四 Critical severity 閘門 | C5 | 🔴 Critical | 🔴 FIXED 2026-05-23 |
+| §六 備份驗證 "檔案大小 > 1KB" | M5 | 🟠 Major | 🔴 FIXED 2026-05-26 |
+
+---
+
+## 一鍵架站系統 logic audit (2026-05-26)
+
+**Scope**: 12 files, `lobster-factory/packages/workflows/src/` (create-wp-site, orchestrate-tenant-provisioning, apply-manifest, dispatch-action-run, executor/installManifestStaging, hosting/{resolveStagingProvisioning,mockStagingAdapter,providers/httpJsonStagingAdapter}, integrations/integration-steps, tasks/wp-install-plugins, lib/tenant-provisioning/{types,providers/registry}) + 8 cross-referenced files (build/runs route, contracts, supabaseRestInsert, postTenantIntegrationWebhook, http/env helpers)
+
+**Method**: Full file reads (no excerpts) + critic subagent × 1 round + cross-file grep (callers + SSRF surface + shell injection vectors + env-gate bypass)
+
+**Tool**: critic subagent (manual trigger)
+
+**Origin trigger**: Tier 3 monthly schedule (Bug Hunt 隊列)
+
+**Audit report (full findings)**: [reports/audit/lobster-factory-one-click-site-2026-05-26.md](../../reports/audit/lobster-factory-one-click-site-2026-05-26.md)
+
+### 🔴 TRACKED — Critical (3) — must fix before any production `enqueue` mode enabled
+
+- `dispatch-action-run.ts:165-191` — **C1**: Dispatcher bypasses `approval_required` / `approval_status` gates entirely; production approval is a paper tiger (cron picks up any `status=pending` run within 60s regardless of approval state)
+- `create-wp-site.ts` + `app/api/build/runs/route.ts:114-143` — **C2**: Zero idempotency on `siteId`; double-submit or Trigger.dev retry re-provisions everything (Sentry, MainWP, Uptime Kuma, hosting account, plugins)
+- `integration-steps.ts:64-371` + `create-wp-site.ts:34-40` — **C3**: SSRF surface: `uptimeKuma.url`, `n8n.onboardingWebhookUrl`, `mainWp.dashboardUrl`, `postHog.host` all `z.string()` with no URL validation; worker on EU VPS fetches attacker-supplied URLs and echoes response body into `output_snapshot` → PostHog/Sentry
+
+### 🟠 TRACKED — Major (11)
+
+See [full report §Major Findings](../../reports/audit/lobster-factory-one-click-site-2026-05-26.md#-major-findings-11). Highlights: literal `"TODO_from_staging_ref"` as sshHost (M1), `as { sshHost? }` cast on type without that field (M2), dry-run writes `status="completed"` to DB (M3), isLicenseError stderr substring misclassification (M4), production-block check after PostHog event (M5), **arbitrary file read via `manifestPath`** (M6), spawn inherits entire process.env incl. secrets (M7), **shell command injection on `slug`/`wpPath`** (M8), partial state on webhook 502 with no rollback (M9), non-atomic dispatch sequence (M10), failure `output_snapshot` omits shellExecution (M11).
+
+### 🟡 TRACKED — Minor (12)
+
+Inconsistent bool env parsing (m1/m2), `any` cast on Zod value (m3), misleading pluginCount (m4), double-slash URL (m5), hardcoded sentry.io (m6), `btoa` instead of Buffer (m7), allSettled loses service identity (m8), Number(NaN) setTimeout (m9), statSync swallowed (m10), non-valid-v4 mock UUID (m11), HOSTING_PROVISION_PATH accepts absolute URL (m12).
+
+### 🟢 CLEAN
+
+19 items verified clean — see [full report §Verified Clean](../../reports/audit/lobster-factory-one-click-site-2026-05-26.md#-verified-clean). No hardcoded secrets. All credentials sourced from `process.env.LOBSTER_*`. Env-gates (`LOBSTER_ENABLE_DB_WRITES`, `LOBSTER_EXECUTE_MANIFEST_STEPS`) correctly enforced. `supabaseRestInsert` has solid retry + correlation logic.
+
+### Statistics
+
+| Audited | 🔴 Critical | 🟠 Major | 🟡 Minor | ✓ Verified Clean | Hardcoded secrets | Real production breaks pre-audit |
+|---------|-------------|----------|----------|------------------|-------------------|----------------------------------|
+| 12 + 8 ref | 3 | 11 | 12 | 19 | 0 | 0 (pre-emptive Tier 3 monthly) |
+
+---
 
 ## Related Documents (Auto-Synced)
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
 
-_Last synced: 2026-05-25 10:32:53 UTC_
+_Last synced: 2026-05-26 11:05:00 UTC_
 

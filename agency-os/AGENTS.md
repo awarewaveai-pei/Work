@@ -82,7 +82,7 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
   - **HTTP smoke check + 自動 rollback（Step 7，2026-05-23 起致命）**：`sg-deploy.sh` 在 docker healthcheck 後自動 curl 4 端點（next-admin :3002/、/api/ops/summary、nginx/wp :80/、node-api /api/health via Host header）；任一非 2xx → 自動觸發 `rollback-phase1.sh restore <app>` 逐一還原 RESTORABLE_APPS（wordpress/node-api/next-admin）+ 寫 `.rollback-triggered` flag + 還原 `.deployed-commit` + fail。Drill mode 用 `AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false` 跑 sg-deploy 保留舊非致命 warn 行為。SSOT：`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh` Step 7；audit ref：`agency-os/reports/audit/auto-repair-2026-05-23.md` §Patch 1 (C1)。
 - next-admin：用 `@supabase/supabase-js ^2.49.8`（非 auth-helpers）；樣式為 CSS 變數（無 Tailwind）
 
-**新部署路徑強制清單（SOP）** — 每次新增可部署服務或 deploy path 時，必須同時完成以下 5 項：
+**新部署路徑強制清單（SOP）** — 每次新增可部署服務或 deploy path 時，必須同時完成以下 6 項：
 
 | # | 項目 | 說明 |
 |---|------|------|
@@ -91,6 +91,7 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 | 3 | **HTTP smoke check** | 在 `sg-deploy.sh` Step 7 `_smoke_check` 區塊加入新端點的 curl 驗證 |
 | 4 | **Rollback 指令** | 在 `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` 補充對應服務的回滾步驟 |
 | 5 | **Notification** | 確認 Slack/Telegram 通知涵蓋新路徑的 SUCCESS/FAIL/SMOKE_WARN 三種狀態 |
+| 6 | **Typecheck gate**（含 `tsconfig.json` 的服務）| ① 在 `package.json` 加 `"typecheck": "tsc --noEmit"`；② 在 `sg-deploy.sh` 對應 test gate 區塊加 `npm run typecheck`（rsync 前）；③ 新增 `.github/workflows/<service>-typecheck.yml`（push + PR to main，path filter）。三件套缺一不補，vitest 不做型別檢查（2026-05-26 sg-deploy 爆 18 commits 積累 type error 根因）。 |
 
 **EU VPS** `204.168.175.41` — Services（compose SSOT 見 repo）
 - Trigger.dev: `lobster-factory/infra/trigger/docker-compose.yml`（`/root/trigger/`）

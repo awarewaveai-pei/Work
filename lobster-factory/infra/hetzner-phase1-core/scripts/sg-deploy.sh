@@ -95,6 +95,11 @@ if [[ " ${APPS[*]} " =~ " next-admin " && $DRY_RUN -eq 0 ]]; then
   npm --prefix "$TEST_DIR" test 2>&1 | tee -a "$LOG_FILE" \
     || fail "npm test FAILED — deploy aborted; fix tests before re-deploying next-admin"
   log "npm test passed"
+
+  log "--- tsc typecheck gate (next-admin) ---"
+  npm --prefix "$TEST_DIR" run typecheck 2>&1 | tee -a "$LOG_FILE" \
+    || fail "tsc typecheck FAILED — deploy aborted; fix type errors before re-deploying next-admin"
+  log "tsc typecheck passed"
 fi
 
 for APP in "${APPS[@]}"; do

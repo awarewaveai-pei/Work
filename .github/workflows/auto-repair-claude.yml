@@ -37,6 +37,21 @@ jobs:
           github_token: ${{ github.token }}
           claude_args: "--model claude-haiku-4-5-20251001 --max-turns 10 --allowedTools Edit,Read,Grep,Glob,LS"
 
+      - name: Validate Claude did not touch forbidden paths
+        if: success() && steps.claude.outputs.branch_name != ''
+        env:
+          BRANCH_NAME: ${{ steps.claude.outputs.branch_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git fetch origin "$DEFAULT_BRANCH" 2>/dev/null || true
+          CHANGED=$(git diff --name-only "origin/$DEFAULT_BRANCH"..."$BRANCH_NAME" 2>/dev/null || git diff --name-only HEAD)
+          FORBIDDEN=$(echo "$CHANGED" | grep -E '\.github/workflows/|nginx/|Dockerfile|docker-compose|/migrations/|\.env' || true)
+          if [ -n "$FORBIDDEN" ]; then
+            echo "::error::Auto-repair touched forbidden paths (AGENTS.md Auto-Repair 紅線):"
+            echo "$FORBIDDEN"
+            exit 1
+          fi
+
       - name: Create repair PR
         if: success() && steps.claude.outputs.branch_name != ''
         env:

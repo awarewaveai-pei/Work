@@ -41,8 +41,10 @@ export async function runPreRepairBackup(run: RepairRunWithIncident): Promise<Ba
     });
 
     let payload: any = null;
+    let jsonParsed = false;
     try {
       payload = await res.json();
+      jsonParsed = true;
     } catch {
       payload = { text: await res.text().catch(() => "") };
     }
@@ -56,11 +58,29 @@ export async function runPreRepairBackup(run: RepairRunWithIncident): Promise<Ba
     }
 
     const backupRef = String(payload?.backup_id ?? payload?.backupRef ?? payload?.backup_ref ?? "");
-    return {
-      ok: true,
-      backupRef: backupRef || `pre-repair:${run.id}`,
-      detail: payload ?? {},
-    };
+
+    // M5: reject 200 responses that aren't valid JSON with a recognisable backup ref.
+    // A Cloudflare maintenance page, nginx 200, or empty body must not silently pass
+    // as a successful backup — Plan §六 "No backup means no repair run".
+    if (!jsonParsed || !backupRef) {
+      return {
+        ok: false,
+        error: "backup_webhook_no_ref",
+        detail: { ...payload, jsonParsed, note: "Webhook returned 200 but backup_id / backup_ref missing from JSON." },
+      };
+    }
+
+    // Plan §六: if size_bytes is present in the webhook response, enforce 1 KB minimum.
+    const sizeBytes = typeof payload?.size_bytes === "number" ? payload.size_bytes : null;
+    if (sizeBytes !== null && sizeBytes < 1024) {
+      return {
+        ok: false,
+        error: "backup_webhook_size_too_small",
+        detail: { ...payload, size_bytes: sizeBytes, minimum: 1024 },
+      };
+    }
+
+    return { ok: true, backupRef, detail: payload ?? {} };
   } catch (e: any) {
     return { ok: false, error: String(e?.message ?? e) };
   }

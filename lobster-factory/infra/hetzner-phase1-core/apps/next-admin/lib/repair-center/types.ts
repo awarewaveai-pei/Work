@@ -18,6 +18,17 @@ export type RepairRunState =
 export type RepairBackupStatus = "not_started" | "running" | "passed" | "failed" | "skipped";
 export type RepairDeployStatus = "not_started" | "pending_manual" | "running" | "passed" | "failed" | "rolled_back";
 
+/** All valid RepairRunState values — used for input validation at API boundaries. */
+export const REPAIR_RUN_STATES: readonly RepairRunState[] = [
+  "detected", "triage_needed", "approved", "backing_up", "repairing",
+  "pr_ready", "deploy_pending", "deploying", "rolled_back", "resolved", "human_only",
+] as const;
+
+/** All valid RepairDeployStatus values — used for input validation at API boundaries. */
+export const REPAIR_DEPLOY_STATUSES: readonly RepairDeployStatus[] = [
+  "not_started", "pending_manual", "running", "passed", "failed", "rolled_back",
+] as const;
+
 export interface RepairRun {
   id: string;
   incident_id: string;
