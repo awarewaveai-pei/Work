@@ -4,6 +4,24 @@
 
 ## 2026-05-27
 
+### Claude Code 完整檔案參考清單 建立
+
+**根本問題**：使用者提供的 6-category 檔案清單有架構性錯誤（`.cursor/rules/*.mdc` 誤分類為 Claude Code 自動載入）及多項遺漏（Auto Memory、.agency-state/ 狀態檔、34 個 slash commands、25 個 subagents、7 個 skills）。需建立一份正確完整的 SSOT 參考文件。
+
+**修改項目**：
+- 新建 `agency-os/docs/operations/claude-code-file-reference.md`（8 categories：Tier 0 自動載入 / Tier 1 AO-RESUME / Slash Commands 34 個 / Subagents 25 個 / Skills 7 個 / 寫入目標 / 執行 Scripts / 查詢用 Docs）
+- 補充「Cursor IDE 自動載入」段，明確標示 13 個 `.mdc` 是 Cursor 專用
+- `docs/operations/cursor-enterprise-rules-index.md` Related Documents 加入新檔指標
+- `docs/DOCS_INDEX.md` operations 段加入新檔連結
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 純文件，無可執行邏輯
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（內容對應已驗證的實際 ls 輸出）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=claude-code-file-reference | hits=2（DOCS_INDEX.md + cursor-enterprise-rules-index.md，兩個 pointer 正確連結）
+- AUTO_TASK_DONE: Claude Code 完整檔案參考清單建立完成
+
+
+
 ### Cursor rules 完整對齊（C1/C2/D2/D3/I1/I2/I3）
 
 **根本問題**: 七個跨 IDE 規則衝突、SSOT 漂移與邊界模糊點，根因時間軸：
