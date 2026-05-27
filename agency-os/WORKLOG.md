@@ -4,6 +4,36 @@
 
 ## 2026-05-27
 
+### M1-M4+P1 軟規則機械化 — 5 個新/強化 hook gates
+
+**根本問題**：AGENTS.md 軟規則在長對話後因 context compression 被忽視（bottom-of-file 優先壓縮），且無強制執行機制。需將所有可機械化的規則轉為 hook gates。
+
+**本次改動（Plan C，使用者批准）**：
+- 新建 `mcp/claude-userlevel/hooks/git-log-injector.js` — PreToolUse Write|Edit，每 session 首次 Edit 前注入 `git log --oneline -10`（M1；解決 2026-05-22 14:38 parallel session 重工）
+- 新建 `mcp/claude-userlevel/hooks/auto-repair-guard.js` — PreToolUse Write|Edit，偵測 auto-repair 路徑 → WARN 須先讀 audit baseline + 跑 dogfood healthcheck（M3）
+- 新建 `mcp/claude-userlevel/hooks/high-risk-bash-warn.js` — PreToolUse Bash，偵測 `docker compose down/stop`、直接 VPS rsync/scp、DB migration deploy → BLOCK 直到 operator 加 `# CONFIRMED-HIGH-RISK: <reason>` leading comment（P1）
+- 強化 `mcp/claude-userlevel/hooks/code-change-tracker.js` — .ps1 修改時額外提示 `/audit-encoding`（M2）
+- 強化 `mcp/claude-userlevel/hooks/verify-gate-stop.js` — Stop 時 recovery commands 加入 `/review`（M4）
+- 修正 `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1:7,191` — 兩處 120s → 300s（comment + JSON field）
+- 修正 `.cursor/hooks/run-ao-resume-on-prompt.ps1:164` — agent_skip_rerun_seconds 120 → 300（bughunt 找到的 stale Cursor hook）
+- 修正 `scripts/sync-claude-userlevel.ps1:129,138` — PSScriptAnalyzer: Ensure-BackupDir → Initialize-BackupDir
+- 更新 `mcp/claude-userlevel/settings.template.json` — 新增 3 hook 的 PreToolUse 登記
+- 全部 sync 至 `~/.claude/` via `sync-claude-userlevel.ps1 -Mode merge`
+
+**Critic 發現並修正的問題（2 Critical，3 Major）**：
+- C1 high-risk-bash-warn regex 假陽性（node -e string 內含 docker compose down） → 改為 `^\s*` 行首錨定，排除 `&&` 鏈
+- C2 ACK pattern 可內嵌繞過 → 改為 first-non-blank-line 判斷
+- M1 stderr flush 在 Windows pipe 上非同步 → `process.stderr.write('', () => process.exit(2))`
+- M2 git-log-injector TOCTOU race → 改用 `{ flag: 'wx' }` atomic create
+- M3 git log cwd 用 process.cwd() 而非 file path → 改為 `path.dirname(filePath)`
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node C:\Users\USER\AppData\Local\Temp\test-high-risk-regex.js | exit=0 | ms=~50 (19/19 pattern tests PASS)
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --check (5 JS files) + PS1 parser (2 files) | exit=0 | ms=<100
+- REALTEST_EVIDENCE: tool=Bash | cmd=sync-claude-userlevel.ps1 -Mode merge; MD5 hash verify high-risk-bash-warn.js + git-log-injector.js | exit=0 | ms=~3000 (MATCH)
+- REVIEW_DONE: critic=Deep | verdict=pass after fixes | findings=2c/3m/4n (all C+M addressed; M issues confirmed fixed by re-test)
+- BUGHUNT_DONE: scope=agency-os,scripts,.cursor/hooks | grep=Ensure-BackupDir|agent_skip_rerun_seconds | hits=1 (Cursor hook 164:120 → fixed same commit)
+
 ### 100% 執行可靠性：P1-P8 SSOT 清理
 
 **根本問題**：三層缺陷：(1) C1 fix 回歸 — 120s→300s 只修了 .cursor/rules/，漏了 CLAUDE.md/AGENTS.md/ops docs；(2) Broken pointer — 63.mdc §13 指向 AGENTS.md §操作風險分級，但該 section 不存在（表在 CLAUDE.md）；(3) IDE 邊界混用 — AGENTS.md 在兩處把 Claude Code 的 AO-CLOSE SSOT 指向 Cursor-only .mdc。

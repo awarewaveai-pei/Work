@@ -69,6 +69,12 @@ process.stdin.on('end', () => {
     if (hidden > 0) process.stderr.write(`[Hook] ...and ${hidden} more file(s) modified\n`);
     process.stderr.write('[Hook] Run /verify-recent before declaring done (syntax + critic + real exec test).\n');
     process.stderr.write('[Hook] Override (trivial edit only): /verify-recent --trivial. Last resort: /verify-recent --ack.\n');
+
+    // PS1-specific: CP950 encoding trap (2026-05-22 backfill-missed-daily.ps1 incident)
+    const hasPsFiles = tracked.some(f => /\.ps1$/i.test(f));
+    if (hasPsFiles) {
+      process.stderr.write('[Hook] PS1 FILE MODIFIED: run /audit-encoding --file <path> (CP950 encoding trap — WORKLOG 2026-05-22).\n');
+    }
   } catch (e) {
     // Unexpected — log loudly (fixes m1) and pass through (never break operator flow).
     shared.logFailOpen('code-change-tracker', e);

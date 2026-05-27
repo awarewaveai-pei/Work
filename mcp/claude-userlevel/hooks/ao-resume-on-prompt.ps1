@@ -4,7 +4,7 @@
 #
 # Ported from .cursor/hooks/run-ao-resume-on-prompt.ps1 (Cursor beforeSubmitPrompt).
 # Both hooks call the same scripts/ao-resume.ps1 and write to the same state dir,
-# so the 120-second de-dup guard in ao-resume-hook-last.json works across both IDEs.
+# so the 300-second de-dup guard in ao-resume-hook-last.json works across both IDEs.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -188,7 +188,7 @@ try {
         auto_checkpoint_committed = $autoCheckpointCommitted
         auto_checkpoint_exit_code = $autoCheckpointExit
         auto_checkpoint_summary   = $autoCheckpointSummary
-        agent_skip_rerun_seconds = 120
+        agent_skip_rerun_seconds = 300
         note              = "If this file mtime is within agent_skip_rerun_seconds of agent handling AO-RESUME, do not re-run ao-resume.ps1; read steps_summary (preferred) or log_tail in this JSON and TASKS/snapshot."
     }
 

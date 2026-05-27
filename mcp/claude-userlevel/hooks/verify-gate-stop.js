@@ -29,6 +29,7 @@ process.stdin.on('end', () => {
     for (const ln of shown) process.stderr.write(ln + '\n');
     if (hidden > 0) process.stderr.write(`[Hook]   ...and ${hidden} more (see ${tf})\n`);
     process.stderr.write('[Hook] Run /verify-recent to verify (syntax + critic + real exec test).\n');
+    process.stderr.write('[Hook] For code files: also run /review (critic subagent — required by AGENTS.md R0 §驗證計畫).\n');
     process.stderr.write('[Hook] Or /verify-recent --ack to acknowledge risk and clear (logged to WORKLOG).\n');
     process.stderr.write('[Hook] Note: git commit is BLOCKED in this session until tracker is cleared.\n\n');
   } catch (e) {

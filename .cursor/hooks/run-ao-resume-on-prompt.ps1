@@ -161,7 +161,7 @@ try {
         auto_checkpoint_committed = $autoCheckpointCommitted
         auto_checkpoint_exit_code = $autoCheckpointExit
         auto_checkpoint_summary   = $autoCheckpointSummary
-        agent_skip_rerun_seconds = 120
+        agent_skip_rerun_seconds = 300
         note              = "If this file mtime is within agent_skip_rerun_seconds of agent handling AO-RESUME, do not re-run ao-resume.ps1; read steps_summary (preferred) or log_tail in this JSON and TASKS/snapshot."
     }
 

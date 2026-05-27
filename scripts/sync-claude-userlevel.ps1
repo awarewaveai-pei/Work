@@ -126,7 +126,7 @@ function Expand-VarsRecursive($obj) {
 }
 
 # ---------- Backup helpers ----------
-function Ensure-BackupDir {
+function Initialize-BackupDir {
   if ($NoBackup) { return }
   if (-not (Test-Path $BackupRoot)) {
     New-Item -ItemType Directory -Path $BackupRoot -Force | Out-Null
@@ -135,7 +135,7 @@ function Ensure-BackupDir {
 function Backup-Path([string]$Path, [string]$RelLabel) {
   if ($NoBackup) { return }
   if (-not (Test-Path $Path)) { return }
-  Ensure-BackupDir
+  Initialize-BackupDir
   $dest = Join-Path $BackupRoot $RelLabel
   $destDir = Split-Path -Parent $dest
   try {

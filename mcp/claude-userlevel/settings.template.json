@@ -64,12 +64,24 @@
           {
             "type": "command",
             "command": "node ~/.claude/hooks/verify-gate-commit.js"
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/high-risk-bash-warn.js"
           }
         ]
       },
       {
         "matcher": "Write|Edit",
         "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/git-log-injector.js"
+          },
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/auto-repair-guard.js"
+          },
           {
             "type": "command",
             "command": "node ~/.claude/hooks/config-protection.js"
