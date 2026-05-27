@@ -2,6 +2,27 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-27
+
+### next-admin tsconfig.json 移除棄用 baseUrl
+
+**根本問題**: TypeScript 5.9.3 對 `compilerOptions.baseUrl` 發出棄用警告（TS 7.0 將停止運作）。
+
+**現況分析**:
+- `moduleResolution: "bundler"` 模式下，TS 5.0+ 允許 `paths` 不依賴 `baseUrl`；路徑錨點預設為 tsconfig 所在目錄（與 `"."` 完全等價）
+- Vitest 有獨立 `resolve.alias` 設定（`vitest.config.ts`），完全不讀 tsconfig `baseUrl`
+- Next.js SWC 直接讀 tsconfig `paths`，不需要 `baseUrl` 作為錨點
+
+**修改**: 刪除 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/tsconfig.json` 第 25 行 `"baseUrl": "."` 一行。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=<60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test` (vitest) | exit=0 | 133 tests passed in 778ms
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (single-line deletion, JSON structure valid)
+- BUGHUNT_DONE: scope=agency-os,scripts,docs | grep=baseUrl | hits=12 (全為 $SupabaseUrl/$BaseUrl PowerShell 參數或 PathB 歷史實作文件，無 stale forward-guidance 聲稱)
+
+**避免再發生**: TS 7.0 升級時無額外成本；`vitest.config.ts` 獨立 alias 是正確架構（不依賴 tsconfig baseUrl）。
+
 ## 2026-05-26
 
 ### AO-CLOSE 預授權修復 + system-guard 健康檢查去重
