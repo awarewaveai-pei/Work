@@ -141,7 +141,7 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 ## 語言與輸出
 
 繁體中文；先結論後步驟；操作說明含路徑 + 動作 + 預期結果；指令貼完整可執行版本；每 15 分鐘回報長任務進度。
-Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依 `.cursor/rules/40-shutdown-closeout.mdc` 回寫 WORKLOG/memory。
+Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回寫 WORKLOG/memory（Cursor: `.cursor/rules/40-shutdown-closeout.mdc`；Claude Code: `.claude/commands/ao-close.md`）。
 
 ## 代理自動工具使用規則（Claude 主動執行）
 
@@ -183,9 +183,9 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 
 **雙機前提**：個人筆電 + 公司桌機兩台；所有環境以「repo 共用 + 各機獨立 env/vault」處理，不假設單機。
 
-**AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（120 秒去重）。代理讀狀態檔回七段式；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。
+**AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（300 秒去重）。代理讀狀態檔回七段式；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。
 
-**AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 代理**自行嘗試自修後重跑**，修不好才列具體失敗項問一題；**禁止**主動提議 `-AllowNonPerfectHealth`）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：`.cursor/rules/40-shutdown-closeout.mdc`。
+**AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 代理**自行嘗試自修後重跑**，修不好才列具體失敗項問一題；**禁止**主動提議 `-AllowNonPerfectHealth`）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：Cursor → `.cursor/rules/40-shutdown-closeout.mdc`；Claude Code → `.claude/commands/ao-close.md`。
 
 ## Git + 記憶 + 文件
 

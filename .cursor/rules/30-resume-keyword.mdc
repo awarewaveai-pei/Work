@@ -31,7 +31,7 @@ When the user message contains `AO-RESUME`, before proposing any new implementat
 - `agency-os/TASKS.md`
 - `agency-os/WORKLOG.md`
 - `agency-os/LAST_SYSTEM_STATUS.md` (if exists)
-- `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` (if exists)
+- `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md` (if exists)
 - `lobster-factory/docs/LOBSTER_FACTORY_COMPLETION_PLAN_V2.md` (if exists)
 
 If opened folder is `agency-os` only, use paths as above; lobster paths are `lobster-factory/docs/...`.（**僅開 agency-os 時**：`.agency-state/open-tasks-snapshot.md` 路徑同左，無 `agency-os/` 前綴。）
