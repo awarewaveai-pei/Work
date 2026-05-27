@@ -34,6 +34,44 @@
 - REVIEW_DONE: critic=Deep | verdict=pass after fixes | findings=2c/3m/4n (all C+M addressed; M issues confirmed fixed by re-test)
 - BUGHUNT_DONE: scope=agency-os,scripts,.cursor/hooks | grep=Ensure-BackupDir|agent_skip_rerun_seconds | hits=1 (Cursor hook 164:120 → fixed same commit)
 
+### 實測（R0 真實 hook 執行驗證）— M1-M4+P1 hooks
+
+**目的**：確認 3 個新 hook 真正透過 Claude Code PreToolUse/PostToolUse 機制觸發（synthetic smoke test ≠ 真實觸發）。
+
+**測試步驟與結果**：
+1. 清除 flag：`claude-git-log-injected-dc66a047-...-2026-05-27.flag` 不存在 → 確認 dedup 清零
+2. Write tool → `$env:TEMP\hook-realtest-trigger.txt` → 預期看到 `[Hook] GIT LOG` → **無任何 [Hook] 訊息出現在 Claude context**
+3. Write tool → `$env:TEMP\hook-realtest-ps1.ps1` → 預期看到 `[Hook] PS1 FILE MODIFIED` → **無任何 [Hook] 訊息**
+4. 查 verify tracker：`claude-unverified-code-dc66a047-...txt` **含** `hook-realtest-ps1.ps1` → PostToolUse code-change-tracker **確實執行了**
+5. 查 failure log：`~/.claude/verify-gate-failures.log` **不存在** → 零例外
+6. 查 flag：`claude-git-log-injected-...-2026-05-27.flag` **存在，mtime=14:03:00** → PreToolUse git-log-injector **確實執行了**
+7. Bash tool → `prisma migrate deploy` → `PreToolUse:Bash hook error: [Hook] HIGH-RISK OPERATION BLOCKED ...` **清楚可見** → exit-2 BLOCK **可見** ✅
+
+**架構發現（重要）**：
+- PreToolUse/PostToolUse exit-0 hooks：**執行但 stderr 不轉發給 Claude** — 側效果（flag create、tracker write）生效，advisory 訊息靜默
+- PreToolUse exit-2 hooks：**執行且 stderr 可見** — error message 完整出現在 Claude context
+- Stop event hooks（verify-gate-stop）：前次 session 確認有效；本次未重測（需主動觸發 Stop event）
+
+**各 hook 有效性評估**：
+| Hook | 目的 | 執行 | 訊息可見 | 整體效果 |
+|------|-----|------|---------|---------|
+| `high-risk-bash-warn.js` | BLOCK 高風險 Bash | ✅ | ✅ exit-2 | ✅ 完整 |
+| `code-change-tracker.js` state | 追蹤 code 改動 → verify gate | ✅ | N/A（側效果） | ✅ 完整 |
+| `verify-gate-commit.js` | BLOCK commit → 強制驗證 | ✅ (既有) | ✅ exit-2 | ✅ 完整 |
+| `git-log-injector.js` | 首次 Edit 前注入 git log | ✅ 執行 | ❌ exit-0 靜默 | ⚠️ 降級：僅 dedup flag |
+| `auto-repair-guard.js` | auto-repair 路徑 WARN | ✅ 執行 | ❌ exit-0 靜默 | ⚠️ 降級：無效 advisory |
+| `code-change-tracker.js` reminder | /verify-recent 提醒 | ✅ 執行 | ❌ exit-0 靜默 | ⚠️ 降級：靜默；gate 鏈仍有效 |
+
+**待決定（使用者）**：
+- `git-log-injector.js`：改為 exit-2 "首次 Edit per session ACK"（稍擾但達標），或接受靜默限制？
+- `auto-repair-guard.js`：改為 exit-2 BLOCK（需 `# CONFIRMED-AUTOREPAIR: <reason>`），或接受靜默限制？
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=Write $env:TEMP\hook-realtest-ps1.ps1; verify tracker+flag+failure-log | exit=0 | ms=~500 (hooks fire confirmed; exit-2 visible confirmed via prisma migrate deploy block)
+- REVIEW_WAIVED: DOC_ONLY -- this entry is a test finding log, no code changed
+- BUGHUNT_WAIVED: NA -- no code change; architectural finding only
+- AUTO_TASK_DONE: 實測完成；架構限制記錄；git-log-injector + auto-repair-guard 改為 exit-2 方向待使用者決定
+
 ### 100% 執行可靠性：P1-P8 SSOT 清理
 
 **根本問題**：三層缺陷：(1) C1 fix 回歸 — 120s→300s 只修了 .cursor/rules/，漏了 CLAUDE.md/AGENTS.md/ops docs；(2) Broken pointer — 63.mdc §13 指向 AGENTS.md §操作風險分級，但該 section 不存在（表在 CLAUDE.md）；(3) IDE 邊界混用 — AGENTS.md 在兩處把 Claude Code 的 AO-CLOSE SSOT 指向 Cursor-only .mdc。
