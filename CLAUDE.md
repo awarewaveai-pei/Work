@@ -32,15 +32,7 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 
 ## 操作風險分級（強制）
 
-
-| 等級              | 說明                                          | 處置                  |
-| --------------- | ------------------------------------------- | ------------------- |
-| Low             | doc、小修、非破壞新檔                                | 直接做，說明假設            |
-| Medium          | 核心邏輯、新依賴、auth                               | 先說計畫，同意再做           |
-| **High — STOP** | prod deploy、破壞性 migration、金流、身分/RLS、憑證、無法回滾 | 停止，說風險，等明示 go ahead |
-
-
-禁止：跳錯處、硬編密鑰、直衝 prod、一次蓋整個系統。
+> SSOT：`agency-os/AGENTS.md §操作風險分級`（三級表 Low/Medium/High 定義在此，不重複）
 
 ## Git 分支（強制）
 

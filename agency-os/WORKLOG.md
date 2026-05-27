@@ -4,6 +4,27 @@
 
 ## 2026-05-27
 
+### 100% 執行可靠性：P1-P8 SSOT 清理
+
+**根本問題**：三層缺陷：(1) C1 fix 回歸 — 120s→300s 只修了 .cursor/rules/，漏了 CLAUDE.md/AGENTS.md/ops docs；(2) Broken pointer — 63.mdc §13 指向 AGENTS.md §操作風險分級，但該 section 不存在（表在 CLAUDE.md）；(3) IDE 邊界混用 — AGENTS.md 在兩處把 Claude Code 的 AO-CLOSE SSOT 指向 Cursor-only .mdc。
+
+**Commit 1（903edf9）P1-P6**：
+- CLAUDE.md:51 + AGENTS.md:186 — 120s→300s
+- AGENTS.md:144/188 — AO-CLOSE SSOT 明確標 Cursor vs Claude Code
+- 30-resume-keyword.mdc L34（SSOT + mirror）— MASTER_CHECKLIST.md → _v2
+
+**Commit 2（本次）P7-P8 + bughunt 追加**：
+- AGENTS.md — 插入 §操作風險分級 section（Low/Med/High 三行表，從 CLAUDE.md 移過來）
+- CLAUDE.md:33-43 — 移除重複表，改成 pointer → AGENTS.md §操作風險分級
+- AGENTS.md Related Docs — 移除 5 條 .cursor/rules/（Cursor 專用），加入 .claude/commands/ao-close.md + ao-resume.md
+- 追加 bughunt 發現的 3 個 120s：cursor-enterprise-rules-index.md + dual-ide-coexistence-strategy.md（×2）
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 純文件/指針修正，無可執行邏輯
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（grep 驗證各修正點；AGENTS.md §操作風險分級 正確插入；CLAUDE.md pointer 完整；120s 全清零）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=120秒去重|操作風險分級 | hits=0（source files only，.claude/cache 除外）
+- AUTO_TASK_DONE: 100% 執行可靠性 P1-P8 修正完成
+
 ### Claude Code 完整檔案參考清單 建立
 
 **根本問題**：使用者提供的 6-category 檔案清單有架構性錯誤（`.cursor/rules/*.mdc` 誤分類為 Claude Code 自動載入）及多項遺漏（Auto Memory、.agency-state/ 狀態檔、34 個 slash commands、25 個 subagents、7 個 skills）。需建立一份正確完整的 SSOT 參考文件。

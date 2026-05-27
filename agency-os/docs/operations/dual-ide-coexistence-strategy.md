@@ -96,7 +96,7 @@
                     │  3. 跑 ao-resume.ps1             │
                     │     -FullMainlineParity          │
                     │  4. 寫入 ao-resume-hook-last.json│
-                    │     （120 秒去重，兩 IDE 共用）   │
+                    │     （300 秒去重，兩 IDE 共用）   │
                     └──────────────────────────────────┘
                     │
                     └──→ 代理讀狀態檔 → 輸出五段式摘要
@@ -114,7 +114,7 @@
 
 ### 兩個同時開啟
 可以。兩邊讀不同的 config 檔案，不互相干擾。  
-唯一共用的是 `agency-os/.agency-state/ao-resume-hook-last.json`（120 秒去重防止重複跑）。
+唯一共用的是 `agency-os/.agency-state/ao-resume-hook-last.json`（300 秒去重防止重複跑）。
 
 ### Cursor 停訂閱（Claude-only）模式
 

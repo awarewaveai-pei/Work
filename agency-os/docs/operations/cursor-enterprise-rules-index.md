@@ -12,7 +12,7 @@
 | Hook 腳本 | `.cursor/hooks/run-ao-resume-on-prompt.ps1` | `~/.claude/hooks/ao-resume-on-prompt.ps1` |
 | MCP 伺服器 | `.cursor/mcp.json`（project-scoped） | `.mcp.json`（共用 SSOT，兩邊都讀） |
 | Commit prefix | `[cursor]` | `[claude]` |
-| 狀態輸出 | `agency-os/.agency-state/ao-resume-hook-last.json` | **同一檔案**（共用，120 秒去重） |
+| 狀態輸出 | `agency-os/.agency-state/ao-resume-hook-last.json` | **同一檔案**（共用，300 秒去重） |
 
 ---
 

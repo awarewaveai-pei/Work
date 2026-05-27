@@ -62,6 +62,16 @@
 - Review 段只寫「讀回了檔案，結構正確」而無 `REVIEW_DONE:` 或 `REVIEW_WAIVED:` 行 = AO-CLOSE 機械閘會擋（`verify-closeout-completeness` 強制）
 - 抓蟲段只寫「已搜尋相關位置」而無 `BUGHUNT_DONE:` 或 `BUGHUNT_WAIVED:` 行 = AO-CLOSE 機械閘會擋（`verify-closeout-completeness` 強制）
 
+## 操作風險分級（強制）
+
+| 等級              | 說明                                          | 處置                  |
+| --------------- | ------------------------------------------- | ------------------- |
+| Low             | doc、小修、非破壞新檔                                | 直接做，說明假設            |
+| Medium          | 核心邏輯、新依賴、auth                               | 先說計畫，同意再做           |
+| **High — STOP** | prod deploy、破壞性 migration、金流、身分/RLS、憑證、無法回滾 | 停止，說風險，等明示 go ahead |
+
+禁止：跳錯處、硬編密鑰、直衝 prod、一次蓋整個系統。
+
 ## 執行安全
 
 不做不可逆破壞操作；生產環境先列風險與 rollback 方案；客戶新增需求先判定 `docs/operations/scope-change-policy.md`。
@@ -222,12 +232,8 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 若有 `BOOTSTRAP.md`，先照檔案完成初始化再開始任務。
 
 ## Related Documents (Auto-Synced)
-- `.cursor/rules/00-session-bootstrap.mdc`
-- `.cursor/rules/10-memory-maintenance.mdc`
-- `.cursor/rules/20-doc-sync-closeout.mdc`
-- `.cursor/rules/30-resume-keyword.mdc`
-- `.cursor/rules/40-shutdown-closeout.mdc`
-- `.cursor/rules/63-cursor-core-identity-risk.mdc`
+- `.claude/commands/ao-resume.md`（Claude Code AO-RESUME 執行 SSOT）
+- `.claude/commands/ao-close.md`（Claude Code AO-CLOSE 執行 SSOT）
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
