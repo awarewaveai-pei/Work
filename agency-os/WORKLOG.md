@@ -4,6 +4,31 @@
 
 ## 2026-05-27
 
+### Cursor rules 完整對齊（C1/C2/D2/D3/I1/I2/I3）
+
+**根本問題**: 七個跨 IDE 規則衝突、SSOT 漂移與邊界模糊點，根因時間軸：
+- C1（hook 去重 120s vs 300s）：2026-04-27 Cursor agent 自設 120s；2026-05-15 Claude Code 獨立設 300s，兩個 agent 從未互查
+- C2（00-bootstrap 輸出格式衝突）：day-1 就同時存在，從未定義優先序
+- D2/D3（63.mdc §3/§13 重複）：63 從 self-contained Cursor template 誕生，SSOT 原則成熟後未回頭清理
+- I1（AGENTS.md §Session啟動 vs ao-resume.md 讀檔清單）：ao-resume.md 快速演化，AGENTS.md 靜態未跟進
+- I2（20-doc-sync vs 40-shutdown 邊界未定）：day-1 設計未明確分工
+- I3（D:\Work hardcoded）：2026-05-15 筆電 session 遺留
+
+**修改項目**（正本 agency-os/.cursor/rules/ + mirror .cursor/rules/ 各一份）：
+- C1：30-resume-keyword.mdc `≤120秒`/`逾120秒` → `≤300秒`/`逾300秒`（與 ao-resume.md 682c554 deliberate 決策一致）
+- C2：00-session-bootstrap.mdc 輸出格式段加 `> 適用範圍：非 AO-RESUME 對話；AO-RESUME 時 30-resume 七段式優先`
+- D2：63.mdc §13 Risk-Tiered → pointer 到 AGENTS.md §操作風險分級（Single Owner）
+- D3：63.mdc §3 Identity → 保留一行英文摘要 + pointer 到 AGENTS.md §全局 Agent 身份
+- I1：AGENTS.md §Session啟動順序 → 加執行 SSOT pointer，概念摘要保留
+- I2：20-doc-sync-closeout.mdc → 加 AO-CLOSE 豁免說明（ao-close.ps1 system-guard 已涵蓋）
+- I3：ao-resume.md `# Run in D:\Work` → `# Run in repo root`
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 全為 .mdc/.md 設定檔，無可執行行為
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（pointer 替換 + scope note + comment 修正，語意一致）
+- BUGHUNT_DONE: scope=agency-os/.cursor/rules/,.cursor/rules/,agency-os/,.claude/commands/ | grep=120秒|D:\\Work | hits=0（舊字串全清除）
+- AUTO_TASK_DONE: Cursor rules C1/C2/D2/D3/I1/I2/I3 七項對齊完成
+
 ### Cursor rules 去重修正：63.mdc §1.1 重複段落 + 00-bootstrap 死路徑
 
 **根本問題**: `63-cursor-core-identity-risk.mdc` §1.1 被複貼兩次（逐字重複，連標題都重複）；`00-session-bootstrap.mdc` 引用了不存在的 `LOBSTER_FACTORY_MASTER_CHECKLIST.md`（正確為 `_v2.md`）。

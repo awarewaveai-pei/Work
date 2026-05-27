@@ -13,7 +13,7 @@ Hook ran successfully. Proceed to Step 1 reading files below.
 Hook did NOT run (or ran too long ago). Claude MUST actively run these two scripts now via Bash and capture their output for Sections 1 and 2:
 
 ```powershell
-# Run in D:\Work
+# Run in repo root
 powershell -ExecutionPolicy Bypass -File scripts\import-cross-machine-memory.ps1
 powershell -ExecutionPolicy Bypass -File scripts\fetch-external-signals.ps1
 ```

@@ -23,7 +23,9 @@ with the same filenames before declaring context missing.
 - **另一台 `AO-CLOSE` push 後**：本機在 Cursor 送 **`AO-RESUME`** 至腳本 exit 0（或手動等價對齊），否則 `TASKS`／`WORKLOG`／`memory` 可能落後、**push 會被拒**。  
 - 完整步驟：`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` — **§1.5**、**§2**、§2.3。
 
-At the beginning of every new conversation, output this exact structure:
+> **適用範圍**：本格式僅限**非 AO-RESUME 的一般對話**。使用者輸入 `AO-RESUME` 時，改用 `30-resume-keyword.mdc` 七段式格式（其優先級高於本格式）。
+
+At the beginning of every new conversation (non AO-RESUME), output this exact structure:
 
 - Yesterday Recap:
   - Completed

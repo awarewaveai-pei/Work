@@ -166,6 +166,12 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
 ## Session 啟動順序（每次都做）
 
+> **執行 SSOT（完整讀檔清單含 hook state / signals / snapshot）**：
+> - Claude Code：`.claude/commands/ao-resume.md` Step 1
+> - Cursor：`.cursor/rules/30-resume-keyword.mdc` Step 2
+> 本段為概念摘要；兩者不一致時以上述執行 SSOT 為準。
+
+概念摘要（核心順序）：
 1. `agency-os/TASKS.md` + `agency-os/WORKLOG.md`（last 30 lines）
 2. `agency-os/memory/CONVERSATION_MEMORY.md`
 3. `agency-os/memory/daily/` 今日與昨日（若存在）
