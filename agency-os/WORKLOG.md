@@ -6185,3 +6185,49 @@ _Last synced: 2026-05-25 10:36:56 UTC_
 ### Machine appendix (weekly-system-review)
 - 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
 
+
+## 2026-05-26
+
+### bughunt-oracle.ps1: machine verification gate for BUGHUNT_DONE hits=0 claims
+
+**根因**：AGENTS.md §抓蟲 的 hits=0 宣告靠 AI honor system，無法機器驗證。
+**修改**：新增 （ function）；整合至 （dot-source + oracle call block）；更新  +  說明機器驗證行為。
+
+**實作決策**：
+- ASCII identifier-type filter（）：CJK/space/regex-special 不可偽造，identifier 名稱可驗證
+- Code-file-only（.ps1/.ts/.tsx 等，排除 .md/.json/.yaml）：文件檔中出現 symbol 名是合法引用，非 stale caller
+- Staged file exclusion：BUGHUNT 驗交叉影響；staged 檔本身預期含改動 symbol
+-  param prefix：避免 dot-source 時覆蓋 caller 的 /（Critic Critical fix）
+- WorkRoot bounds check（僅對 WorkRoot 內 scope）：防止 .claude junction 遍歷到  外部
+
+**Critic review 修正**（Standard, 1 Critical / 2 Major / 4 Minor）：
+- Critical: top-level  clobbers caller / on dot-source → 重命名為 //
+- Major 1:  對 locked file 靜默 false-clean → 改為  + 顯式 Warning
+- Major 2:  匹配行內任意位置 → 改為  要求 pipe 前綴（結構性欄位）
+- Minor: junction traversal 防護（WorkRoot bounds check on in-WorkRoot scopes）；oracle 遺失時 strict gate 顯式 Warning
+
+[已修改]
+- （新增）：~180 行，defines 
+- ：dot-source 塊 + oracle call block + missing-oracle warning
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File test-oracle.ps1 (5 paths: D/E/F/G/H) | exit=0 | ms=~3000
+  - PATH D (staged excluded): failures=0 ✓
+  - PATH E (not staged, hit detected): failures=1 ✓
+  - PATH F (real BUGHUNT_DONE, staged files excluded): failures=0 ✓
+  - PATH G (CJK filtered, no check): failures=0 ✓
+  - PATH H (WAIVED line, no oracle): failures=0 ✓
+  - PATH_CRIT (dot-source no longer clobbers WorkRoot/Gate): OK ✓
+- REVIEW_DONE: critic=Standard | verdict=pass (after fixes) | findings=1c/2m/4n — all fixed
+- BUGHUNT_DONE: scope=agency-os/,scripts/,.claude/ | grep=Invoke-BughuntOracle+bughunt-oracle | hits=0 stale code callers (all hits in docs/.md or staged files)
+- BUGHUNT_WAIVED: DOC_ONLY -- bhRequiredRoots only in verify-closeout-completeness.ps1 (staged) + docs
+
+[剩餘風險]
+-  param 在 standalone mode CLI 可用；dot-source path 不受影響
+-  →  改動：BUGHUNT_DONE 行必須包含  欄位分隔符（format 一直如此）
+
+[rollback]
+-  — oracle + verify-closeout 的改動均在同一 commit，單一 revert 即可
+- AO-CLOSE gate 退回純 label-presence + scope-keyword 驗證（無 content 驗證）
+
+AUTO_TASK_DONE: bughunt-oracle.ps1 implementation + critic fixes complete
