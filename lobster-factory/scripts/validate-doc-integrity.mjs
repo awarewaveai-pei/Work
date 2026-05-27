@@ -56,10 +56,33 @@ const canonicalDupPatterns = [
   { label: "LONG_TERM_OPERATING_DISCIPLINE", re: /LONG_TERM_OPERATING_DISCIPLINE\.md/i },
 ];
 
+/**
+ * Blank fenced code blocks and inline code spans so [text](href) inside them
+ * are not treated as real links. CommonMark: code surfaces suppress link parsing.
+ */
+function stripCodeSurfaces(md) {
+  // Pass 1: fenced code blocks (``` or ~~~) — state machine handles unterminated fences.
+  const lines = md.split("\n");
+  let inFence = false, fenceMark = "", fenceMin = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (!inFence) {
+      const m = lines[i].match(/^(`{3,}|~{3,})/);
+      if (m) { inFence = true; fenceMark = m[1][0]; fenceMin = m[1].length; lines[i] = ""; }
+    } else {
+      const c = lines[i].match(/^(`{3,}|~{3,})\s*$/);
+      if (c && c[1][0] === fenceMark && c[1].length >= fenceMin) inFence = false;
+      lines[i] = "";
+    }
+  }
+  // Pass 2: inline code spans — single-line, single or multi backtick.
+  return lines.join("\n").replace(/`+[^`\n]*`+/g, "");
+}
+
 function extractLinks(mdContent) {
+  const stripped = stripCodeSurfaces(mdContent);
   const links = [];
   let m;
-  while ((m = linkRe.exec(mdContent)) !== null) {
+  while ((m = linkRe.exec(stripped)) !== null) {
     links.push(m[2].trim());
   }
   return links;

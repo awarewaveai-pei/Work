@@ -212,6 +212,20 @@
 - REVIEW_WAIVED: DOC_ONLY -- 純 fail-open guard，無業務邏輯
 - BUGHUNT_DONE: scope=scripts | grep=IsPathRooted | hits=1 (bughunt-oracle.ps1 only, fixed same edit)
 
+### validate-doc-integrity.mjs — code surface 連結豁免
+
+**根本問題**: `validate-doc-integrity.mjs` 的 `extractLinks()` 用純 regex 掃描 raw markdown，無 code span 或 code fence 意識。WORKLOG 描述一個 broken link 時（如「含 `[CLAUDE.md](../../CLAUDE.md)` 連結語法」），若說明文字用到真正的 markdown link syntax，gate 會把它當作一個需要驗證的真實連結，觸發 false positive。根源是 CommonMark 規範：code surface 內的語法不是真實連結，scanner 應跳過。
+
+**修改項目** (`lobster-factory/scripts/validate-doc-integrity.mjs`):
+- 新增 `stripCodeSurfaces(md)` helper（~18 行）：Pass 1 — state machine 識別 fenced code blocks（\`\`\` 或 ~~~）並 blank；Pass 2 — regex blank inline code spans（單/多 backtick，單行）
+- 修改 `extractLinks(mdContent)` 第一行：對 `stripped = stripCodeSurfaces(mdContent)` 跑 linkRe，而非 raw content
+- 改動僅限 lines 59-86；其他掃描邏輯（scanMarkdownFile、resolveLink、scanRoot）無改動
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node C:\Users\USER\AppData\Local\Temp\test-strip-code-surfaces.mjs | exit=0 | ms=~50 | output="10/10 pass"（含 bare link extracted / inline code suppressed / fenced suppressed / tilde fenced suppressed / mixed / double-backtick / WORKLOG exact problem / unterminated fence fail-safe / fenced with info string）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（linkRe g-flag lastIndex 正確重置驗證；pass 2 greediness probed；indented fences 0 real hits in repo；ReDoS linear-confirmed；full validator run PASSED on actual repo）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=extractLinks|stripCodeSurfaces | hits=4 (validate-doc-integrity.mjs only — definition at 63/81 + call at 82/107; no other callers)
+
 ## 2026-05-26
 
 ### AO-CLOSE 預授權修復 + system-guard 健康檢查去重
