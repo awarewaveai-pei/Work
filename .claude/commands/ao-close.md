@@ -12,6 +12,18 @@ Before writing anything, determine the session window:
 Before running `ao-close.ps1`, do the following:
 
 1. Review ALL git commits since last AO-RESUME (use `git log --since` above) + `agency-os/TASKS.md` open items
+
+1a. **[TASKS sync]** Read every `- [ ]` line under `### 未完成` in `agency-os/TASKS.md`.
+    For each open item completed this session, write into today's WORKLOG section:
+    ```
+    - AUTO_TASK_DONE: <substring>
+    ```
+    where `<substring>` is a string copied verbatim from that `- [ ]` line that:
+    - appears in **exactly one** `- [ ]` line in TASKS.md (multi-match = fatal error in the script)
+    - is long enough to be unambiguous (≥ 10 chars, avoid generic words)
+    Skip items not completed this session. Skip items already `- [x]`.
+    `apply-closeout-task-checkmarks.ps1` does exact substring match — it cannot infer intent.
+
 2. Write `AUTO_TASK_DONE` entries into `agency-os/WORKLOG.md` for everything completed since last AO-RESUME (not just today)
 3. Update `agency-os/memory/CONVERSATION_MEMORY.md` with a condensed summary covering the full session window (上次 AO-RESUME → 本次 AO-CLOSE)
 4. Update `agency-os/memory/daily/YYYY-MM-DD.md` — use today's date for the file, but **Done today** section must cover the full session window (all dates since last AO-RESUME)
