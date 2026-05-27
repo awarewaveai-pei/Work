@@ -63,7 +63,6 @@
 4. **`63`–`66` 同步到 monorepo 根**：已自動化 — `verify-build-gates.ps1` 與 `doc-sync-automation.ps1`（Apply）會呼叫 **`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`**；健檢會對四檔做 SHA256 比對（見 `README-部署說明.md` § Monorepo 根工作區）。
 
 ## Related Documents (Auto-Synced)
-- `docs/operations/claude-code-file-reference.md` — Claude Code 完整檔案參考清單（本對照表的 Claude Code 側完整展開）
 - `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md`
 - `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`
 - `../lobster-factory/docs/ROUTING_MATRIX.md`
@@ -81,5 +80,5 @@
 - `docs/operations/security-secrets-policy.md`
 - `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`
 
-_Last synced: 2026-05-25 10:32:53 UTC_
+_Last synced: 2026-05-27 07:52:18 UTC_
 

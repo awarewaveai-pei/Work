@@ -232,8 +232,12 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 若有 `BOOTSTRAP.md`，先照檔案完成初始化再開始任務。
 
 ## Related Documents (Auto-Synced)
-- `.claude/commands/ao-resume.md`（Claude Code AO-RESUME 執行 SSOT）
-- `.claude/commands/ao-close.md`（Claude Code AO-CLOSE 執行 SSOT）
+- `.cursor/rules/00-session-bootstrap.mdc`
+- `.cursor/rules/10-memory-maintenance.mdc`
+- `.cursor/rules/20-doc-sync-closeout.mdc`
+- `.cursor/rules/30-resume-keyword.mdc`
+- `.cursor/rules/40-shutdown-closeout.mdc`
+- `.cursor/rules/63-cursor-core-identity-risk.mdc`
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
@@ -245,5 +249,5 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-05-25 10:32:53 UTC_
+_Last synced: 2026-05-27 07:52:18 UTC_
 

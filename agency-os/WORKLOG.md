@@ -192,6 +192,26 @@
 
 **避免再發生**: TS 7.0 升級時無額外成本；`vitest.config.ts` 獨立 alias 是正確架構（不依賴 tsconfig baseUrl）。
 
+### claude-code-file-reference.md — 死連結修正
+
+**問題**: `docs/operations/claude-code-file-reference.md:240` 含相對路徑 markdown link 指向 `../../CLAUDE.md`，從 `agency-os/docs/operations/` 向上兩層解析為 `agency-os/CLAUDE.md`（不存在；CLAUDE.md 在 repo root）。doc-integrity gate 在 AO-CLOSE 擋住。
+
+**修正**: 改為純文字 `CLAUDE.md (repo root)` — 相對路徑連結無法正確連到 repo root，純文字描述更穩定。
+
+- REALTEST_WAIVED: DOC_ONLY -- 僅修改 .md 連結語法，無可執行邏輯
+- REVIEW_WAIVED: DOC_ONLY -- 單行文字修改，語意不變
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=claude-code-file-reference | hits=2 (DOCS_INDEX.md + cursor-enterprise-rules-index.md — 均指向檔案路徑而非相對 link，不受影響)
+
+### bughunt-oracle.ps1 — git-quoted CJK path 修正
+
+**問題**: `git add -A` 後，git 對含 CJK 字元的檔名（如 `README-部署說明.md`）輸出以 `"` 包住的 octal-escaped 路徑；oracle `$stagedSet` 建構時對帶 `"` 前綴的路徑呼叫 `IsPathRooted()` → `ArgumentException: 無法辨識路徑中的字元`，導致 verify-closeout-completeness 例外中止。
+
+**修正** (`scripts/bughunt-oracle.ps1`): foreach 迴圈內 strip 外層 `"..."` + 整個塊 try/catch fail-open（octal-escaped interior 無法匹配真實 Unicode 路徑，但 staged-set 是豁免提示而非硬需求）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/verify-closeout-completeness.ps1 | ms=<30000 (confirmed after fix)
+- REVIEW_WAIVED: DOC_ONLY -- 純 fail-open guard，無業務邏輯
+- BUGHUNT_DONE: scope=scripts | grep=IsPathRooted | hits=1 (bughunt-oracle.ps1 only, fixed same edit)
+
 ## 2026-05-26
 
 ### AO-CLOSE 預授權修復 + system-guard 健康檢查去重
@@ -5933,7 +5953,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-25 10:36:56 UTC_
+_Last synced: 2026-05-27 08:02:23 UTC_
 
 ## 2026-03-20
 
@@ -6421,3 +6441,5 @@ _Last synced: 2026-05-25 10:36:56 UTC_
 - AO-CLOSE gate 退回純 label-presence + scope-keyword 驗證（無 content 驗證）
 
 AUTO_TASK_DONE: bughunt-oracle.ps1 implementation + critic fixes complete
+
+

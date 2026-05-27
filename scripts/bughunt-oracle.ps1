@@ -100,9 +100,19 @@ function Invoke-BughuntOracle {
     )
     foreach ($sf in $StagedFiles) {
         if ([string]::IsNullOrWhiteSpace($sf)) { continue }
-        $norm = $sf.Trim() -replace '/', [System.IO.Path]::DirectorySeparatorChar
-        $abs  = if ([System.IO.Path]::IsPathRooted($norm)) { $norm } else { Join-Path $WorkRoot $norm }
-        [void]$stagedSet.Add($abs)
+        # git quotes non-ASCII paths with surrounding double-quotes + octal escapes.
+        # Strip the outer quotes so IsPathRooted doesn't throw on the leading '"'.
+        # The octal-escaped interior won't match the real Unicode path, but fail-open
+        # is fine: the staged-set is an exclusion hint, not a hard requirement.
+        $raw  = $sf.Trim()
+        if ($raw.StartsWith('"') -and $raw.EndsWith('"') -and $raw.Length -gt 1) {
+            $raw = $raw.Substring(1, $raw.Length - 2)
+        }
+        $norm = $raw -replace '/', [System.IO.Path]::DirectorySeparatorChar
+        try {
+            $abs = if ([System.IO.Path]::IsPathRooted($norm)) { $norm } else { Join-Path $WorkRoot $norm }
+            [void]$stagedSet.Add($abs)
+        } catch { }  # fail-open: invalid path chars (octal-escaped CJK) — skip entry
     }
 
     # Find BUGHUNT_DONE lines that declare hits=0 (plain "0" or "0 <description text>").

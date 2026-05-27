@@ -237,7 +237,7 @@
 ## Related Documents
 
 - [`docs/operations/cursor-enterprise-rules-index.md`](cursor-enterprise-rules-index.md) — IDE 規則索引（含 Cursor vs Claude Code 對照表）
-- [`CLAUDE.md`](../../CLAUDE.md) — 專案指令 SSOT
+- `CLAUDE.md` (repo root) — 專案指令 SSOT
 - `agency-os/AGENTS.md` — 全局 Agent 規則 SSOT
 - [`.claude/commands/ao-resume.md`](../../../.claude/commands/ao-resume.md) — AO-RESUME 執行 SSOT（含完整 Tier 1 讀檔清單）
 
