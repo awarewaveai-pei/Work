@@ -72,6 +72,28 @@
 - BUGHUNT_WAIVED: NA -- no code change; architectural finding only
 - AUTO_TASK_DONE: 實測完成；架構限制記錄；git-log-injector + auto-repair-guard 改為 exit-2 方向待使用者決定
 
+### exit-2 升級：git-log-injector + auto-repair-guard（一勞永逸）
+
+**根本問題**：exit-0 stderr 在 Claude Code 架構中不可見（2026-05-27 實測確認）。兩個 advisory hooks 實質無效。需升級為 exit-2 BLOCK 才能真正機械化規則。
+
+**架構決策**：
+- `git-log-injector.js`：exit-2 first-Write/Edit-per-session-day。非 git 路徑：刪除 flag (fail-open) 不消耗 gate。unlink 失敗：logFailOpen + WARN（M1 Critic fix）
+- `auto-repair-guard.js`：exit-2 per-pattern-category（7 個 patterns，各獨立 flag，形如 `claude-autorepair-guard-${sid}-cat${idx}.flag`）。同 session 不同 category 觸發獨立 block（M2 Critic fix）
+
+**修改項目**：
+- `mcp/claude-userlevel/hooks/git-log-injector.js` — exit-0→exit-2 + flag delete on git fail + logFailOpen on unlink fail
+- `mcp/claude-userlevel/hooks/auto-repair-guard.js` — exit-0→exit-2 + per-category flag logic + getPatternIndex helper
+- `agency-os/AGENTS.md` L15, L48, L173 — 機械閘說明更新為 exit-2 BLOCK 語意
+- `~/.claude/hooks/` — sync via `sync-claude-userlevel.ps1 -Mode merge`
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Write | cmd=Write C:\Users\USER\Work\.hook-test-git-log.tmp (repo path) | exit=2 | ms=~200 (git log 10 commits visible in error msg; re-issue exit=0 pass confirmed)
+- REALTEST_EVIDENCE: tool=Write | cmd=Write repair-center/test-guard-realtest.js | exit=2 | ms=~150 (4 pre-checks visible; re-issue exit=0 pass confirmed)
+- REALTEST_EVIDENCE: tool=Bash | cmd=prisma migrate deploy | exit=2 | ms=~100 (HIGH-RISK BLOCK confirmed; unchanged)
+- REVIEW_DONE: critic=Deep | verdict=pass after M1+M2 fixes | findings=0c/2m/3n (M1: logFailOpen on unlink; M2: per-category flag → both fixed; Minors accepted as-is)
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp/claude-userlevel/hooks | grep=auto-repair-guard|git-log-injector | hits=3 (AGENTS.md 3 lines updated to exit-2 — all correct)
+- AUTO_TASK_DONE: exit-2 升級完成，20/20 smoke tests pass，實測全確認
+
 ### 100% 執行可靠性：P1-P8 SSOT 清理
 
 **根本問題**：三層缺陷：(1) C1 fix 回歸 — 120s→300s 只修了 .cursor/rules/，漏了 CLAUDE.md/AGENTS.md/ops docs；(2) Broken pointer — 63.mdc §13 指向 AGENTS.md §操作風險分級，但該 section 不存在（表在 CLAUDE.md）；(3) IDE 邊界混用 — AGENTS.md 在兩處把 Claude Code 的 AO-CLOSE SSOT 指向 Cursor-only .mdc。
