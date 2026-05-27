@@ -4,6 +4,9 @@
 
 ## 2026-05-27
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: git-pull-sync-claude-userlevel → handoffs/2026-05-27-1521-git-pull-sync-claude-userlevel.md
+
 ### M1-M4+P1 軟規則機械化 — 5 個新/強化 hook gates
 
 **根本問題**：AGENTS.md 軟規則在長對話後因 context compression 被忽視（bottom-of-file 優先壓縮），且無強制執行機制。需將所有可機械化的規則轉為 hook gates。

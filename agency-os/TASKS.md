@@ -55,6 +55,7 @@
 
 - [x] 補完 tomo critic findings apply — 驗收 2 Critical + 6 Major 全修完 → handoffs/2026-05-25-1418-tomo-critic-findings.md
 - [ ] 筆電跑 `scripts/bootstrap-mcp-machine.ps1` — 修 `.claude` junction（同桌機今日修法），否則筆電 git pull 後新命令/agents 仍不同步
+- [ ] 第二台機器同步 exit-2 hook 升級 → handoffs/2026-05-27-1521-git-pull-sync-claude-userlevel.md
 
 #### 雙機環境 / 日常開工
 
