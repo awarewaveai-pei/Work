@@ -27,8 +27,13 @@ if (-not $WorkRoot) {
 }
 
 # Dot-source oracle function (defines Invoke-BughuntOracle for use inside the try block below).
+# $Bh* params in oracle's param() block prevent clobbering caller's $WorkRoot/$Gate on dot-source.
 $_oraclePath = Join-Path $PSScriptRoot 'bughunt-oracle.ps1'
-if (Test-Path -LiteralPath $_oraclePath) { . $_oraclePath }
+if (Test-Path -LiteralPath $_oraclePath) {
+    . $_oraclePath
+} elseif ($Gate -eq "strict") {
+    Write-Warning "bughunt-oracle: oracle script missing at $_oraclePath — content verification SKIPPED (gate degraded)."
+}
 
 Push-Location $WorkRoot
 try {

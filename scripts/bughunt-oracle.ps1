@@ -36,7 +36,11 @@
 
   USAGE — standalone (for testing / CI):
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\bughunt-oracle.ps1 `
-        -WorklogSectionFile <utf8-temp-file> [-WorkRoot <path>] [-Gate warn|strict|off]
+        -WorklogSectionFile <utf8-temp-file> [-BhWorkRoot <path>] [-BhGate warn|strict|off]
+
+  NOTE on param naming: top-level params use $Bh* prefix to avoid clobbering caller's
+  $WorkRoot / $Gate / $StagedFiles when dot-sourced. The function Invoke-BughuntOracle
+  uses the clean names (it has its own scope).
 
 .NOTES
   SSOT for required-roots: scripts/verify-closeout-completeness.ps1 $bhRequiredRoots.
@@ -47,10 +51,11 @@ param(
     # Standalone mode: path to UTF-8 file containing the WORKLOG section text.
     # Unused when dot-sourced; caller passes -WorklogSection to Invoke-BughuntOracle directly.
     [string]$WorklogSectionFile = "",
-    [string]$WorkRoot           = "",
+    # $Bh* prefix avoids clobbering caller's $WorkRoot / $Gate / $StagedFiles on dot-source.
+    [string]$BhWorkRoot         = "",
     [ValidateSet("off", "warn", "strict")]
-    [string]$Gate               = "strict",
-    [string[]]$StagedFiles      = @()
+    [string]$BhGate             = "strict",
+    [string[]]$BhStagedFiles    = @()
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -103,7 +108,7 @@ function Invoke-BughuntOracle {
     # Find BUGHUNT_DONE lines that declare hits=0 (plain "0" or "0 <description text>").
     $bhLines = @(
         ($WorklogSection -split '\r?\n') |
-        Where-Object { $_ -match '^\s*-\s*BUGHUNT_DONE:' -and $_ -match '\bhits=0(\b|\s|$)' }
+        Where-Object { $_ -match '^\s*-\s*BUGHUNT_DONE:' -and $_ -match '\|\s*hits=0(\b|\s|$)' }
     )
 
     if ($bhLines.Count -eq 0) {
@@ -178,9 +183,15 @@ function Invoke-BughuntOracle {
             } else {
                 @($entry)
             }
+            # For scopes INSIDE WorkRoot, prevent junction/symlink traversal outside (e.g. .claude/ → ~/.claude/).
+            # For explicitly-declared scopes outside WorkRoot, allow — they are intentional (test fixtures, CI paths).
+            $workRootPrefix = $WorkRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+            $scopeIsInsideWorkRoot = $sp.StartsWith($workRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)
             foreach ($fi in $files) {
                 # Only search code files — .md/.json/.yaml legitimately mention symbol names.
                 if (-not $codeExts.Contains($fi.Extension)) { continue }
+                # Skip files that escaped WorkRoot via junction traversal (only enforced for in-WorkRoot scopes).
+                if ($scopeIsInsideWorkRoot -and -not $fi.FullName.StartsWith($workRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
                 # Skip staged files (the changed artifacts; cross-file refs are in OTHER files).
                 if ($stagedSet.Count -gt 0 -and $stagedSet.Contains($fi.FullName)) { continue }
                 # Deduplicate across overlapping scope paths.
@@ -197,7 +208,11 @@ function Invoke-BughuntOracle {
 
         foreach ($pat in $patterns) {
             try {
-                $hits = @($candidates | Select-String -Pattern $pat -SimpleMatch -ErrorAction SilentlyContinue)
+                $_bhErrors = $null
+                $hits = @($candidates | Select-String -Pattern $pat -SimpleMatch -ErrorAction SilentlyContinue -ErrorVariable _bhErrors)
+                if ($null -ne $_bhErrors -and $_bhErrors.Count -gt 0) {
+                    Write-Warning ("bughunt-oracle: {0} file(s) unreadable while searching '{1}' — those files NOT verified." -f $_bhErrors.Count, $pat)
+                }
                 if ($hits.Count -gt 0) {
                     $failCount++
                     $sample = ($hits | Select-Object -First 3 |
@@ -244,12 +259,12 @@ if ($WorklogSectionFile) {
     Set-StrictMode -Version Latest
     $ErrorActionPreference = "Stop"
 
-    if ($Gate -eq "off") { exit 0 }
+    if ($BhGate -eq "off") { exit 0 }
 
-    if (-not $WorkRoot) {
-        $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    if (-not $BhWorkRoot) {
+        $BhWorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
     } else {
-        $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
+        $BhWorkRoot = (Resolve-Path -LiteralPath $BhWorkRoot).Path
     }
 
     $utf8 = New-Object System.Text.UTF8Encoding $false
@@ -261,9 +276,9 @@ if ($WorklogSectionFile) {
 
     $failures = Invoke-BughuntOracle `
         -WorklogSection $sectionText `
-        -WorkRoot $WorkRoot `
-        -Gate $Gate `
-        -StagedFiles $StagedFiles
+        -WorkRoot $BhWorkRoot `
+        -Gate $BhGate `
+        -StagedFiles $BhStagedFiles
 
     exit ([int]($failures -gt 0))
 }
