@@ -12,7 +12,7 @@ Before proposing any implementation plan, always read:
 - `memory/daily/` today and yesterday notes if they exist
 - `TASKS.md`
 - `WORKLOG.md`
-- `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST.md` (if exists)
+- `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md` (if exists)
 - `lobster-factory/docs/LOBSTER_FACTORY_COMPLETION_PLAN_V2.md` (if exists)
 
 If those files are not found in the current opened folder, retry under `agency-os/`

@@ -4,6 +4,18 @@
 
 ## 2026-05-27
 
+### Cursor rules 去重修正：63.mdc §1.1 重複段落 + 00-bootstrap 死路徑
+
+**根本問題**: `63-cursor-core-identity-risk.mdc` §1.1 被複貼兩次（逐字重複，連標題都重複）；`00-session-bootstrap.mdc` 引用了不存在的 `LOBSTER_FACTORY_MASTER_CHECKLIST.md`（正確為 `_v2.md`）。
+
+**修改**: 刪除 `63.mdc` 第二個 §1.1（8 行）；更新 `00-bootstrap.mdc` 路徑為 `_v2.md`。正本（`agency-os/.cursor/rules/`）和 mirror（`.cursor/rules/`）各 2 個檔案，共 4 個檔案同步修正。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- Cursor rule config 檔案，無可執行行為
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (重複段落刪除 + 路徑字串修正，語意不變)
+- BUGHUNT_DONE: scope=agency-os/.cursor/rules/,.cursor/rules/ | grep=LOBSTER_FACTORY_MASTER_CHECKLIST | hits=0 (舊死路徑已清除；WORKLOG 歷史記錄不計)
+- AUTO_TASK_DONE: Cursor rules 63.mdc §1.1 重複清除 + 00-bootstrap 路徑修正
+
 ### next-admin tsconfig.json 移除棄用 baseUrl
 
 **根本問題**: TypeScript 5.9.3 對 `compilerOptions.baseUrl` 發出棄用警告（TS 7.0 將停止運作）。
