@@ -10,7 +10,7 @@ import {
   policyForIncident,
   severityRequiresHumanReview,
 } from "./policy";
-import { escalateGuard, isTerminalState, isStrictTerminalState } from "./run-state";
+import { escalateGuard, isStrictTerminalState } from "./run-state";
 import { REPAIR_RUN_STATES, REPAIR_DEPLOY_STATUSES } from "./types";
 import type { RepairRun, RepairRunWithIncident } from "./types";
 
@@ -442,7 +442,10 @@ export async function archiveRun(id: string, actor: string): Promise<{ ok: boole
 
   const run = await fetchRepairRunWithIncident(id);
   if (!run) return { ok: false, error: "repair_run_not_found" };
-  if (!isTerminalState(run.state)) return { ok: false, error: "run_not_in_terminal_state" };
+  // Strict write gate (m6-ext). DB enforces NOT NULL since migration 0027, but the !run.state
+  // check stays: it satisfies TS control-flow narrowing before the string-typed isStrictTerminalState
+  // call, and guards against test fixtures / future schema drift without costing anything.
+  if (!run.state || !isStrictTerminalState(run.state)) return { ok: false, error: "run_not_in_terminal_state" };
   if (run.archived_at) return { ok: true, run: run as RepairRun };
 
   const updated = await updateRun(id, {

@@ -4,6 +4,21 @@
 
 ## 2026-05-28
 
+### m6-ext — archiveRun write gate strict-ify (R0 剩餘風險修正)
+
+**根本問題**：Batch 1 的 R0 [剩餘風險] 中，Risk 2 聲稱「其他 isTerminalState 呼叫都是 UI/display 情境」但未 grep 驗證。實際 grep 發現 `archiveRun`（write gate）在 line 445 仍用 forgiving `isTerminalState`。同 m6 根因。
+
+**修法**（`service.ts`）：
+- line 445: `!isTerminalState(run.state)` → `!run.state || !isStrictTerminalState(run.state)` + 說明 comment
+- line 13 import: 移除已無 call site 的 `isTerminalState`（critic 發現）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~10000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 | result=151/151 pass
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n (1 minor=TOCTOU pre-existing; 1 note=unused import → fixed; 1 note=comment → expanded)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isTerminalState | hits=0 in service.ts (import removed, no call sites remain); all other files as expected
+- AUTO_TASK_DONE: m6-ext archiveRun gate — service.ts strict write gate 完整覆蓋
+
 ### Auto-Repair Batch 1 — M7+M8+m6+m8-GHA+m9-doc (audit 2026-05-23 follow-up)
 
 **根本問題（5 項）**：
