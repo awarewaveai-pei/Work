@@ -4,6 +4,36 @@
 
 ## 2026-05-28
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: git-pull-phase4 → handoffs/2026-05-28-1152-git-pull-phase4.md
+
+### AO-RESUME WORKLOG excerpt -- gap window 取代 tail-30
+
+**根本問題**：`ao-resume.md` Step 1 讀 WORKLOG last 30 lines（固定），一個有產出的 session 可能有 50+ 行導致截斷，Claude 看不到完整上次 session 內容。
+
+**修法**：`scripts/ao-resume.ps1` 新增 WORKLOG excerpt 生成 block，以 `ao-close-last.txt` 為 gap 起點，掃描 WORKLOG 降序 sections，輸出 `agency-os/.agency-state/worklog-excerpt.md`（300 行上限）。Claude 讀此 state file 而非 raw tail。
+
+**修改檔案**：
+- `scripts/ao-resume.ps1` -- WORKLOG excerpt 生成 block（null-guard + try/catch + ASCII dashes + warn-only write）
+- `.claude/commands/ao-resume.md` -- Step 1 #5 改讀 worklog-excerpt.md，附 fallback last 30 lines
+- `.gitignore` -- 加 `agency-os/.agency-state/worklog-excerpt.md`（防 commit pollution）
+- `agency-os/AGENTS.md` -- 概念摘要更新
+- `agency-os/docs/operations/claude-code-file-reference.md` -- 檔案表更新
+
+**Critic 發現並修正（2 Major + 3 Minor）**：
+- M1: `worklog-excerpt.md` 未加 .gitignore -> 加入
+- M2: em-dash `--` CP950 mojibake -> 全換 ASCII `--`
+- m1: `Get-Content -Raw` null race -> 分離 null-guard（同 L442-443 pattern）
+- m2: empty catch {} 無 forensic log -> 加 `Write-Host $_.Exception.Message`
+- m3: `WriteAllText` 非 warn-only -> wrap try/catch + Yellow warn
+
+**[驗證結果]**
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell.exe WORKLOG slice test (firstInRangeIdx=4 endBoundaryIdx=299 Slice=295 lines from ## 2026-05-28) | exit=0 | ms=~1200
+- REALTEST_EVIDENCE: tool=Bash | cmd=audit-cp950-traps.ps1 -File ao-resume.ps1 (new block: no em-dash in header strings) | exit=0 | ms=~800
+- REVIEW_DONE: critic=Standard | verdict=pass (post-fix) | findings=2M/3m/2s initial; all M+m fixed
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=worklog-excerpt,WORKLOG.*last.{0,5}30 | hits=2 (AGENTS.md:185 + claude-code-file-reference.md:38, both updated)
+
 ### 根治：SG auto-deploy 連敗 + deploy 信號統一接入 ops_inbox
 
 **根本問題（雙重）**：
