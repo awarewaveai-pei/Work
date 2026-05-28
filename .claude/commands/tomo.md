@@ -50,14 +50,19 @@ Gather from these sources in parallel:
 
 ## Step 3 — Generate packet (SCHEMA.md format)
 
+**寫作原則：讓陌生 Claude 打開就能馬上動手。**
+- 段 5（下一步指令）是唯一必須詳細的段落 — 寫成可直接執行的編號步驟。
+- 其他段落：**1-2 行為上限**；沒有阻塞意義的背景一律省略。
+- 不要寫散文、不要重複 hint 內容、不要展開「為什麼這樣設計」。
+
 Fill all 6 segments per `agency-os/handoffs/SCHEMA.md`:
 
-1. **任務目標** — outcome being worked toward
-2. **為什麼做** — motivation, urgency, who asked
-3. **已試過** — commands run, approaches tried this session (`尚未開始` if nothing)
-4. **卡在哪** — exact blocker or stopping point (`file:line` / error / missing info / decision awaited)
-5. **下一步指令** — numbered, concrete, executable steps for the AI picking this up
-6. **相關資源** — files (`$WORK_ROOT/` prefix for repo paths), commits (SHA + one-line), VPS paths, known landmines
+1. **任務目標** — 一行：要達成什麼結果
+2. **為什麼做** — 一行：只寫 blocking reason；純提醒型直接寫 `定時驗收`
+3. **已試過** — 只列有助於避免重工的事實；空白時寫 `尚未開始`
+4. **卡在哪** — 一行：確切阻礙（`file:line` / error / 等待什麼）；純等待時寫 `等 <時間>`
+5. **下一步指令** — 編號步驟，每步含確切指令或路徑；這是全包最重要的段落
+6. **相關資源** — 只列執行 Step 5 實際需要的檔案；known landmines 只寫會讓 Claude 出錯的陷阱
 
 **Path rule**: all repo paths must use `$WORK_ROOT/...` placeholder. No machine-specific absolute paths.
 
