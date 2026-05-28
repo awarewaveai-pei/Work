@@ -83,6 +83,91 @@ function Invoke-Git {
     }
 }
 
+function Write-GitFetchLedger {
+    # Record the outcome of git fetch attempts so AO-RESUME (and any agent reading
+    # the state file) can distinguish "no new commits because we are caught up"
+    # from "no new commits because fetch failed and we don't actually know".
+    # Without this, a DNS hiccup looks identical to a quiet repo (observed 2026-05-28).
+    param(
+        [bool]$Success,
+        [int]$Attempts = 1,
+        [int]$ExitCode = 0,
+        [string]$ErrorText = '',
+        [datetime]$StartUtc,
+        [string]$RootDir
+    )
+    try {
+        $stateDir  = Join-Path $RootDir 'agency-os\.agency-state'
+        if (-not (Test-Path -LiteralPath $stateDir)) {
+            New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+        }
+        $statePath = Join-Path $stateDir 'git-fetch-last.json'
+        $payload = [pscustomobject]@{
+            schemaVersion = 1
+            startedAtUtc  = $StartUtc.ToString('o')
+            finishedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
+            success       = $Success
+            attempts      = $Attempts
+            exitCode      = $ExitCode
+            errorExcerpt  = $ErrorText
+        }
+        $json = $payload | ConvertTo-Json -Depth 4
+        $utf8 = New-Object System.Text.UTF8Encoding($true)
+        [System.IO.File]::WriteAllText($statePath, $json, $utf8)
+    } catch {
+        Write-Host ("  WARN: failed to write git-fetch-last.json: " + $_.Exception.Message) -ForegroundColor Yellow
+    }
+}
+
+function Invoke-GitFetchWithRetry {
+    # Retries `git fetch origin --prune` on transient network/DNS failures.
+    # Backoff: 5s, 10s, 20s (exponential). Each attempt writes outcome to
+    # agency-os/.agency-state/git-fetch-last.json so downstream consumers don't
+    # confuse "fetch failed silently" with "no remote changes". On final failure,
+    # prints a loud red banner and throws — preserving original Invoke-Git contract.
+    param(
+        [int]$MaxAttempts = 3,
+        [int[]]$BackoffSeconds = @(5, 10, 20)
+    )
+    $startUtc = (Get-Date).ToUniversalTime()
+    $attempts = 0
+    $lastExit = 0
+    $lastError = ''
+    while ($attempts -lt $MaxAttempts) {
+        $attempts++
+        Push-Location -LiteralPath $WorkRoot
+        try {
+            $stderr = & git fetch origin --prune 2>&1
+            $lastExit = $LASTEXITCODE
+            if ($lastExit -eq 0) {
+                Write-GitFetchLedger -Success $true -Attempts $attempts -StartUtc $startUtc -RootDir $WorkRoot
+                return
+            }
+            $joined = ($stderr -join "`n")
+            $lastError = if ($joined.Length -gt 500) { $joined.Substring(0, 500) } else { $joined }
+            if ($attempts -lt $MaxAttempts) {
+                $sleepSec = $BackoffSeconds[[Math]::Min($attempts - 1, $BackoffSeconds.Count - 1)]
+                Write-Host ("  WARN: git fetch attempt $attempts/$MaxAttempts failed (exit $lastExit). Retrying in ${sleepSec}s...") -ForegroundColor Yellow
+                Write-Host ("    stderr: " + $lastError.Substring(0, [Math]::Min(200, $lastError.Length))) -ForegroundColor DarkYellow
+                Start-Sleep -Seconds $sleepSec
+            }
+        } finally {
+            Pop-Location
+        }
+    }
+    Write-GitFetchLedger -Success $false -Attempts $attempts -ExitCode $lastExit -ErrorText $lastError -StartUtc $startUtc -RootDir $WorkRoot
+    Write-Host ""
+    Write-Host "============================================================" -ForegroundColor Red
+    Write-Host "GIT FETCH FAILED after $MaxAttempts attempts (last exit $lastExit)" -ForegroundColor Red
+    Write-Host "  Sync state with origin is UNKNOWN — do NOT trust 'no new commits' conclusions." -ForegroundColor Red
+    Write-Host "  Ledger: agency-os/.agency-state/git-fetch-last.json" -ForegroundColor Red
+    Write-Host "  Last error excerpt:" -ForegroundColor Red
+    Write-Host ("    " + $lastError.Substring(0, [Math]::Min(300, $lastError.Length))) -ForegroundColor Red
+    Write-Host "============================================================" -ForegroundColor Red
+    Write-Host ""
+    throw ("git fetch origin --prune failed after $MaxAttempts attempts (exit $lastExit)")
+}
+
 function Test-WorktreeClean {
     Push-Location -LiteralPath $WorkRoot
     try {
@@ -97,7 +182,10 @@ Push-Location -LiteralPath $WorkRoot
 try {
     Write-Host "== git-align-main-aoresume-feature (WorkRoot=$WorkRoot) ==" -ForegroundColor Cyan
 
-    Invoke-Git @("fetch", "origin", "--prune")
+    # Replaced 2026-05-28 (Phase C4 of plan Z): retry 3x with exponential backoff +
+    # write outcome ledger so downstream consumers can distinguish transient DNS
+    # failures from a quiet remote. Original was Invoke-Git @("fetch", "origin", "--prune").
+    Invoke-GitFetchWithRetry
 
     if (-not (Test-WorktreeClean)) {
         if (-not $AllowStash) {

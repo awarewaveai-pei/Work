@@ -6,11 +6,11 @@ Follow the AO-RESUME protocol (AGENTS.md §快速續接關鍵字).
 
 Read `agency-os/.agency-state/ao-resume-hook-last.json`.
 
-**Case A — File exists AND `finished_utc` is within 5 minutes of now:**
+**Case A — File exists AND `finished_utc` is within 5 minutes of now AND `exit_code` is 0:**
 Hook ran successfully. Proceed to Step 1 reading files below.
 
-**Case B — File missing OR `finished_utc` is more than 5 minutes old OR file has errors:**
-Hook did NOT run (or ran too long ago). Claude MUST actively run these two scripts now via Bash and capture their output for Sections 1 and 2:
+**Case B — File missing OR `finished_utc` is more than 5 minutes old OR file has errors OR `exit_code` is non-zero:**
+Hook did NOT complete cleanly (missing, stale, or errored). Claude MUST actively run these two scripts now via Bash and capture their output for Sections 1 and 2:
 
 ```powershell
 # Run in repo root
@@ -19,6 +19,25 @@ powershell -ExecutionPolicy Bypass -File scripts\fetch-external-signals.ps1
 ```
 
 Do NOT skip this step. Do NOT silently assume both passed. Report the actual stdout of each script in Sections 1 and 2 respectively. If either script fails (non-zero exit, exception), report the error verbatim.
+
+### Step 0a — Hook-failure prominence rule (Phase C2/C3 of plan Z, 2026-05-28)
+
+If `exit_code` is non-zero OR `agency-os/.agency-state/git-fetch-last.json` shows `success: false`:
+
+**The very first line of section 1 MUST be a ⚠️ banner.** Format:
+
+```
+⚠️ HOOK FAILED (exit=N) — <one-line root cause from log_tail / steps_summary> — DO NOT TRUST "no new commits" or "Gap 期間" conclusions until git fetch succeeds.
+```
+
+Then list remediation steps right after (e.g., `nslookup github.com`, then `git fetch origin --prune`).
+
+**Forbidden in section 3 (已完成) when hook failed**: writing `Gap 期間: repo 看起來無新 commit` or any analogous statement that treats "absence of evidence" as "evidence of absence". That conflation caused 4 days of desktop work to be invisible on 2026-05-28. Always qualify with `(local view only; remote state UNKNOWN due to fetch failure — see Step 0a banner)`.
+
+Also read `agency-os/.agency-state/junction-last.json` if present:
+- `verdict=ok` → silent.
+- `verdict=repaired` → mention briefly in section 1 ("ℹ️ .claude junction was self-healed this run").
+- `verdict=repaired-with-warning` or `verdict=error` → escalate to a banner in section 1 like `⚠️ .claude junction repair needs content review at $env:TEMP\claude-junction-autoheal-*\`.
 
 ## Step 1 — Read files in order:
 1. `agency-os/.agency-state/ao-resume-hook-last.json` (log_tail + auto_checkpoint fields; may be absent in Case B)

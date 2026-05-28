@@ -4,7 +4,9 @@
 #
 # Sources:
 #   MEMORY.md             -- $env:AO_SYNC_ROOT\AO-SYNC-<date>-<MACHINE>\memory\MEMORY.md
-#   secrets               -- $env:AO_SYNC_SECRETS_ROOT\  (user-env.ps1, .ssh\*, AWARE_WAVE_CREDENTIALS.md, claude-settings.json)
+#   secrets               -- $env:AO_SYNC_SECRETS_ROOT\  (user-env.ps1, .ssh\*, AWARE_WAVE_CREDENTIALS.md)
+#                            ~/.claude/settings.json no longer imported here (removed 2026-05-28, Phase B of plan Z);
+#                            use scripts\sync-claude-userlevel.ps1 -Mode merge for cross-machine alignment.
 #
 # Folder selection strategy (N-machine safe):
 #   New format (AO-SYNC-date-MACHINE): exclude own machine by folder name suffix -> pick newest OTHER machine
@@ -565,32 +567,15 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         }
     }
 
-    # ── claude-settings.json -> ~/.claude/settings.json ──────────────────────
-    $claudeSettingsSrc = Join-Path $secretsRoot "claude-settings.json"
-    $claudeSettingsDst = Join-Path $env:USERPROFILE ".claude\settings.json"
-    if (Test-Path -LiteralPath $claudeSettingsSrc) {
-        $decision = Get-ImportDecision $claudeSettingsSrc $claudeSettingsDst 'claude-settings.json' $sameMachine
-        switch ($decision) {
-            'unchanged' {
-                Update-LocalStateHash 'claude-settings.json' (Get-SafeHash $claudeSettingsSrc)
-                Write-Host "  cross-machine import: ~/.claude/settings.json unchanged" -ForegroundColor DarkGray
-            }
-            'local-ahead' {
-                Update-LocalStateHash 'claude-settings.json' (Get-SafeHash $claudeSettingsDst)
-                Write-Host "  cross-machine import: ~/.claude/settings.json local has changes since last ao-close (will export on next ao-close)" -ForegroundColor DarkGray
-            }
-            'local-modified' {
-                Write-Host "  cross-machine import: ~/.claude/settings.json CONFLICT — vault differs from local; local changes kept. Use -Force to take vault version." -ForegroundColor Yellow
-            }
-            'import' {
-                Invoke-LocalBackup $claudeSettingsDst "claude-settings.json"
-                if (Copy-Atomic $claudeSettingsSrc $claudeSettingsDst) {
-                    Update-LocalStateHash 'claude-settings.json' (Get-SafeHash $claudeSettingsSrc)
-                    Write-Host "  cross-machine import: ~/.claude/settings.json updated (restart Claude Code to apply)" -ForegroundColor Green
-                }
-            }
-        }
-    }
+    # ── claude-settings.json import REMOVED 2026-05-28 (Phase B of plan Z) ──────────────────────
+    # Previously imported ~/.claude/settings.json from vault. Removed because vault snapshots
+    # captured machine-resolved absolute paths (permissions.additionalDirectories), so importing
+    # on a different machine clobbered correctly-resolved paths and caused guaranteed
+    # `sync-claude-userlevel.ps1 -Mode verify` drift each cross-machine open.
+    # Cross-machine alignment for settings.json now goes through:
+    #   mcp\claude-userlevel\settings.template.json (placeholder SSOT)
+    #   + scripts\sync-claude-userlevel.ps1 -Mode merge
+    # Stale vault file (G:\...\claude-settings.json) can be deleted manually; see WORKLOG 2026-05-28.
 
     # ── ao-close-last.txt: import only if vault timestamp is strictly newer than local ──
     # Monotonic guarantee: stamp only moves forward in time. Prevents the historical bug where

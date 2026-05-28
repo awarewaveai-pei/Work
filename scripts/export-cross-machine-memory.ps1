@@ -27,8 +27,14 @@
 #   user-env.ps1               -> $AO_SYNC_SECRETS_ROOT\user-env.ps1   (shared, last-write-wins)
 #   .ssh\*                     -> $AO_SYNC_SECRETS_ROOT\.ssh\           (dynamic scan, excl. machine-specific)
 #   AWARE_WAVE_CREDENTIALS.md  -> $AO_SYNC_SECRETS_ROOT\AWARE_WAVE_CREDENTIALS.md
-#   claude-settings.json       -> $AO_SYNC_SECRETS_ROOT\claude-settings.json  (~/.claude/settings.json)
 #   .manifest-<MACHINE>.json   -> $AO_SYNC_SECRETS_ROOT\               (sha256 + size per file; read by import for logging)
+#
+# Note: ~/.claude/settings.json is NOT synced via this vault. Cross-machine alignment for
+# settings.json is done via scripts\sync-claude-userlevel.ps1 with mcp\claude-userlevel\
+# settings.template.json as the placeholder-based SSOT. Removed 2026-05-28 (Phase B of plan Z):
+# the previous vault export captured machine-resolved absolute paths (e.g. C:\Users\USER\Work)
+# which clobbered the receiving machine's correctly-resolved paths each AO-SYNC, causing
+# guaranteed sync-claude-userlevel verify drift every cross-machine open. See WORKLOG 2026-05-28.
 #
 # SSH exclusion (never exported):
 #   known_hosts, known_hosts.old, authorized_keys, *.txt, *.old, *.bkup, *.backup
@@ -238,15 +244,14 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         }
     }
 
-    # ~/.claude/settings.json -> $AO_SYNC_SECRETS_ROOT\claude-settings.json
-    # Contains: disableAgentView, forceLoginMethod, hooks config, MCP settings — needed on all machines.
-    $claudeSettingsSrc = Join-Path $env:USERPROFILE ".claude\settings.json"
-    if (Test-Path -LiteralPath $claudeSettingsSrc) {
-        $claudeSettingsDest = Join-Path $secretsRoot "claude-settings.json"
-        Copy-Item -LiteralPath $claudeSettingsSrc -Destination $claudeSettingsDest -Force
-        (Get-Item $claudeSettingsDest).LastWriteTime = $syncNow
-        Write-Host "  copied: ~/.claude/settings.json" -ForegroundColor Green
-    }
+    # ~/.claude/settings.json export REMOVED 2026-05-28 (Phase B of plan Z).
+    # Reason: settings.json contains machine-resolved absolute paths in
+    # permissions.additionalDirectories (e.g. C:\Users\USER\Work). Exporting them via
+    # vault and importing on a different machine clobbered the receiving machine's
+    # correctly-resolved paths every AO-SYNC, causing guaranteed
+    # `sync-claude-userlevel.ps1 -Mode verify` drift each cross-machine open.
+    # Cross-machine alignment for settings.json now goes through the single SSOT:
+    # mcp\claude-userlevel\settings.template.json (placeholder-based) + sync-claude-userlevel.ps1.
 
     # agency-os/.agency-state/ao-close-last.txt -> $AO_SYNC_SECRETS_ROOT\ao-close-last.txt
     # Allows the other machine to anchor fetch-external-signals to the real last AO-CLOSE time.
@@ -263,7 +268,7 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
     $manifestSources = [System.Collections.Generic.List[object]]::new()
     $manifestSources.Add([pscustomobject]@{ key = 'user-env.ps1';              path = Join-Path $secretsRoot 'user-env.ps1' })
     $manifestSources.Add([pscustomobject]@{ key = 'AWARE_WAVE_CREDENTIALS.md'; path = Join-Path $secretsRoot 'AWARE_WAVE_CREDENTIALS.md' })
-    $manifestSources.Add([pscustomobject]@{ key = 'claude-settings.json';      path = Join-Path $secretsRoot 'claude-settings.json' })
+    # NOTE: claude-settings.json removed 2026-05-28 (Phase B of plan Z); see header comment.
     foreach ($kn in $exportedSshKeys) {
         $manifestSources.Add([pscustomobject]@{ key = ".ssh/$kn"; path = Join-Path $sshDest $kn })
     }
@@ -344,7 +349,6 @@ This file is a manual fallback guide only -- you should never need to run these 
 | (secrets root)/user-env.ps1 | All MCP API keys (shared, last-write-wins) |
 | (secrets root)/.ssh/* | SSH keys (dynamic scan; excl. known_hosts / authorized_keys / *.txt) |
 | (secrets root)/AWARE_WAVE_CREDENTIALS.md | Credentials reference (shared) |
-| (secrets root)/claude-settings.json | ~/.claude/settings.json (disableAgentView, forceLoginMethod, hooks) |
 | (secrets root)/.manifest-$machineTag.json | Export manifest (sha256 + timestamp per file) |
 
 ## Manual import (fallback only)

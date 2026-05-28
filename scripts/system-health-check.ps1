@@ -677,6 +677,44 @@ if (Test-Path -LiteralPath $syncCheckScript) {
     Add-Check -Name "Claude Code cross-machine sync (check-claude-sync.ps1)" -Pass $true -Detail "Skipped: scripts/check-claude-sync.ps1 not present"
 }
 
+# 12b) .claude junction integrity (self-heal candidate).
+# Rationale: existing check-claude-sync H1 has historically returned PASS even when
+# d:\Work\.claude was a real folder instead of a junction (observed 2026-05-28). This
+# stronger gate uses fsutil reparsepoint to verify the junction's reparse data and
+# resolves the target path, catching silent drift the legacy H1 misses.
+# Self-heal is intentionally NOT performed here — health checks must be read-only.
+# Repair runs in the AO-RESUME UserPromptSubmit hook (mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1).
+$ensureJunctionScript = Join-Path $monoRoot "scripts\ensure-claude-junction.ps1"
+if (Test-Path -LiteralPath $ensureJunctionScript) {
+    try {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ensureJunctionScript -DryRun -EmitState 2>&1 | Out-Null
+        $junctionExit = $LASTEXITCODE
+        $junctionJsonPath = Join-Path $monoRoot "agency-os\.agency-state\junction-last.json"
+        $junctionDetail = "exit=$junctionExit"
+        if (Test-Path -LiteralPath $junctionJsonPath) {
+            try {
+                $junctionJson = Get-Content -LiteralPath $junctionJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                $junctionDetail = "verdict=$($junctionJson.verdict), target=$($junctionJson.targetPath)"
+            } catch {
+                # state file unreadable — fall back to exit code only
+            }
+        }
+        switch ($junctionExit) {
+            0 { Add-Check -Name ".claude junction (ensure-claude-junction.ps1 dry-run)" -Pass $true -Detail ("PASS: " + $junctionDetail) }
+            1 { Add-Check -Name ".claude junction (ensure-claude-junction.ps1 dry-run)" -Pass $false -Detail ("FAIL: " + $junctionDetail + " - target ~/.claude missing or junction unrepairable; run scripts/ensure-claude-junction.ps1 manually"); Add-CriticalFailure -Reason "Claude junction broken: $junctionDetail" }
+            2 { Add-Check -Name ".claude junction (ensure-claude-junction.ps1 dry-run)" -Pass $false -Detail ("FAIL: " + $junctionDetail + " - junction drift detected; will be repaired on next AO-RESUME hook fire, but content backup needs review"); Add-CriticalFailure -Reason "Claude junction drift requires content review: $junctionDetail" }
+            default { Add-Check -Name ".claude junction (ensure-claude-junction.ps1 dry-run)" -Pass $false -Detail "Unexpected exit code $junctionExit"; Add-CriticalFailure -Reason "ensure-claude-junction.ps1 returned unexpected exit $junctionExit" }
+        }
+    } catch {
+        $msg = $_.Exception.Message
+        $excerpt = $msg.Substring(0, [Math]::Min(120, $msg.Length))
+        Add-Check -Name ".claude junction (ensure-claude-junction.ps1 dry-run)" -Pass $false -Detail ("Invocation crashed: " + $excerpt)
+        Add-CriticalFailure -Reason ("ensure-claude-junction.ps1 invocation failed: " + $excerpt)
+    }
+} else {
+    Add-Check -Name ".claude junction (ensure-claude-junction.ps1 dry-run)" -Pass $true -Detail "Skipped: scripts/ensure-claude-junction.ps1 not present"
+}
+
 $total = $checks.Count
 $passed = @($checks | Where-Object { $_.pass }).Count
 $failed = $total - $passed

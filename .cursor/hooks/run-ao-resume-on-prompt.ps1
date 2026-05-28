@@ -91,6 +91,26 @@ try {
         New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
     }
 
+    # ── STEP 0: self-heal .claude junction BEFORE any git operation ────────────
+    # CLAUDE.md R1 mandates that repo-root `.claude/` is a junction to ~/.claude/.
+    # Mirror of the Claude Code hook (ao-resume-on-prompt.ps1) — see WORKLOG 2026-05-28.
+    $ensureJunctionScript = Join-Path $root "scripts\ensure-claude-junction.ps1"
+    if (Test-Path -LiteralPath $ensureJunctionScript) {
+        Push-Location -LiteralPath $root
+        try {
+            $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            $junctionOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ensureJunctionScript -EmitState 2>&1
+            $junctionExit = $LASTEXITCODE
+            $ErrorActionPreference = $savedEAP
+            if ($junctionExit -ne 0) {
+                Write-Host ("⚠️ ensure-claude-junction exit=$junctionExit — review agency-os/.agency-state/junction-last.json") -ForegroundColor Yellow
+                $junctionOutput | ForEach-Object { Write-Host $_ }
+            }
+        } finally {
+            Pop-Location | Out-Null
+        }
+    }
+
     $logFile = Join-Path $stateDir "ao-resume-hook-last.log"
     $jsonFile = Join-Path $stateDir "ao-resume-hook-last.json"
     $resumeScript = Join-Path $root "scripts\ao-resume.ps1"

@@ -84,6 +84,30 @@ try {
         exit 0
     }
 
+    # ── STEP 0: self-heal .claude junction BEFORE any git operation ────────────
+    # CLAUDE.md R1 mandates that repo-root `.claude/` is a junction to ~/.claude/.
+    # If junction is silently broken (became a real folder), the next auto-checkpoint
+    # below will commit "deletions" of 49+ tracked files (observed 2026-05-28).
+    # ensure-claude-junction.ps1 is idempotent — no-op when junction OK.
+    $ensureJunctionScript = Join-Path $root "scripts\ensure-claude-junction.ps1"
+    if (Test-Path -LiteralPath $ensureJunctionScript) {
+        Push-Location -LiteralPath $root
+        try {
+            $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            $junctionOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ensureJunctionScript -EmitState 2>&1
+            $junctionExit = $LASTEXITCODE
+            $ErrorActionPreference = $savedEAP
+            # Only surface output when something was repaired or errored (exit 1/2).
+            # Exit 0 with verdict=ok = silent (junction already healthy).
+            if ($junctionExit -ne 0) {
+                Write-Host ("⚠️ ensure-claude-junction exit=$junctionExit — review state file agency-os/.agency-state/junction-last.json") -ForegroundColor Yellow
+                $junctionOutput | ForEach-Object { Write-Host $_ }
+            }
+        } finally {
+            Pop-Location | Out-Null
+        }
+    }
+
     # Always auto-checkpoint on every prompt if working tree is dirty.
     # This ensures untracked/modified files are never left behind even when
     # the user doesn't type AO-RESUME or AO-CLOSE.

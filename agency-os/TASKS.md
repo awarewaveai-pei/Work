@@ -120,6 +120,10 @@
 
 #### 工具層 / 基礎建設 / 治理
 
+- [ ] **【2026-05-28 開出 — Phase Z 後續 Z4】scan-for-secrets known-suppressed baseline** —— **【未開始】** **背景**：`scripts\scan-for-secrets.ps1`（透過 `verify-build-gates`）每次都印 ~24 條 WARN 對 `~/.claude/settings.json` + `mcp/user-env.ps1` 的 plaintext secrets。這些是 **gitignored** 且已治理（vault），噪音壓過真正新發現。**DoD**：(a) 加 `--known-suppressed-baseline` 旗標或 baseline file 列已治理 keys/files；(b) verify-build-gates 預設掛 baseline，新發現才印 WARN，舊已知 silent + 計數；(c) baseline 外的 finding → 紅字阻斷。**參考**：`agency-os/docs/operations/mcp-secrets-hardening-runbook.md §Local Plaintext Scanner`、本日 WORKLOG `## 2026-05-28 Phase Z`。**先決**：Phase Z A-C 已完成。
+
+- [ ] **【2026-05-28 開出 — Phase Z 後續 Z5】AO-CLOSE health gate 補強（fetch-recency）** —— **【未開始】** **背景**：Phase Z 加了 `scripts/ensure-claude-junction.ps1` (junction self-heal，已接入 system-health-check) 與 `git-fetch-last.json` ledger (`git-align-main-aoresume-feature.ps1` retry 3x)，但 health-check 還沒消費 ledger。**DoD**：(a) `scripts/system-health-check.ps1` 補 fetch-recency gate（讀 `agency-os/.agency-state/git-fetch-last.json`，若 `success=false` OR `finishedAtUtc` > 7 天 → WARN，> 30 天 → critical fail）；(b) gate 不能被 `-AllowNonPerfectHealth` 旁路；(c) AO-CLOSE 流程跑一次 dry-run 驗收。**參考**：本日 WORKLOG `## 2026-05-28 Phase Z`。**先決**：Phase Z A-C 已完成。
+
 - [x] **【2026-05-24 操作者提問】AO-RESUME 讀 WORKLOG tail 50 行邏輯改為「上次 AO-RESUME → 本次」區段** —— **【完成 2026-05-28】** ao-resume.ps1 生成 worklog-excerpt.md（gap window by AO-CLOSE date），ao-resume.md Step 1 #5 改讀此 state file。 **背景**：操作者觀察 `tail -50` 是機械讀檔，遇上長 entry（如 2026-05-24 `/tomo` plan + 永久化 patterns）會被中間區塊吃掉，看不到本輪 session 真實內容。**討論方向**：改成讀「自上次 AO-RESUME 戳記後的所有 entry」或「最近 N 個 `### ` subsection」；候選 anchor = `.agency-state/ao-resume-last.txt` / `ao-close-last.txt` 戳記 + `## YYYY-MM-DD` heading 邊界。**待操作者明天決定**：要改 ao-resume.ps1 內 WORKLOG fetch 邏輯，或加 helper script `scripts/print-worklog-since-last-resume.ps1`，或調整 `.claude/commands/ao-resume.md` 指示 agent 改用 grep + offset Read。**DoD**：AO-RESUME 第 3 段「已完成」能完整列出本輪 session 全部 entry，無中段截斷。
 
 #### Encoding 防護 — 一勞永逸延伸（CP950 audit 後續，2026-05-22 開出）

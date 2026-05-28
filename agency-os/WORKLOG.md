@@ -6786,3 +6786,80 @@ AUTO_TASK_DONE: settings.json fewer-permission-prompts + secret scrub complete
 
 
 
+
+
+---
+
+## 2026-05-28 Phase Z — Cross-machine sync fragility 30-year fix（筆電 session）
+
+**[任務]** 一次性解 6 個跨機開工噪音來源：① junction 莫名變 real folder（49 個 tracked file 被 auto-checkpoint 誤刪 commit `0d63eb9`）；② 桌機 32 個 commit 因 DNS 短抖沒拉到，七段式錯誤結論「Gap 期間無新 commit」；③ `~/.claude/settings.json` 跨機 drift（AO-SYNC vault `claude-settings.json` 與 `sync-claude-userlevel.ps1` SSOT template 雙 SSOT 衝突，每跨機開工必發作）；④ scan-for-secrets 24 條 known WARN 噪音；⑤ AO-RESUME hook exit 非零沒升級為頭條警報；⑥ AO-CLOSE health gate 還沒驗收 ⅰ-ⅲ 修復。
+
+**[根因鏈]**
+- 雙 SSOT 衝突（commit `8102794` 2026-05-15 引入）：AO-SYNC vault `claude-settings.json` 寫入桌機解析後的 `permissions.additionalDirectories: [C:\Users\USER, C:\Users\USER\Work, ...]`；筆電 import 直接覆蓋本機 settings.json → `sync-claude-userlevel -Mode verify` 抓 drift（template 期望 `${USERPROFILE}` placeholder 解析後是 `C:\Users\user1115`）→ check-claude-sync.ps1 H2 → critical gate fail → verify-build-gates 紅燈 → ALERT_REQUIRED.txt → 阻塞開工
+- Junction 隱性破壞（未追根因，疑 git operation 某環節寫入時把 reparse point 解析成 real folder）→ `git status` 顯示 49 個 deleted → auto-checkpoint hook (`mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` line 87+) 把這 49 個 deletion commit 進 `0d63eb9`
+- 七段式錯誤結論：本機 git log 看起來無新 commit，AI 寫「Gap 期間：repo 無新 commit」——實際上 hook git fetch 失敗（DNS exit 128），跟 origin 完全沒同步；桌機其實已 push 32 個 commit。R4「聲稱即驗證」違反
+
+**[已修改] 12 個檔 + 4 個治理檔，分 4 phase**
+
+Phase A — 緊急恢復（5 step）：
+- 重建 junction `d:\Work\.claude` → `C:\Users\user1115\.claude`（先 backup d: real folder + ~/.claude/commands 到 `$env:TEMP\claude-recovery-20260528-2050\`）
+- `git checkout 2e2409d -- .claude/` 把 49 files 從 origin tip 還原回 tracking → commit `4f63393 restore: .claude/ junction-broken deletions (revert 0d63eb9 effect)`
+- `sync-claude-userlevel.ps1 -Mode merge` 對齊 user-level（hooks 3 新檔 created；settings normalize 8 個 array structural issues）
+- verify-build-gates ALL PASSED, health 100% (371/371)
+
+Phase B — 移除 AO-SYNC settings.json 重疊（3 file）：
+- `scripts/export-cross-machine-memory.ps1` line 28-30, 241-249, 263-266, 343-347：刪 settings.json export 區塊 + manifest entry + 註解 + 表格列
+- `scripts/import-cross-machine-memory.ps1` line 5-7, 568-593：刪 import 區塊 + 註解
+- Vault `G:\...\claude-settings.json`：刪除（backup at `$env:TEMP\claude-recovery-20260528-2050\vault-claude-settings.json.bak` 24416 bytes）
+- 不動 `mcp/claude-userlevel/settings.template.json` overwriteKeys —— `disableAgentView` / `forceLoginMethod` 兩 key 已不在 settings.json 也不在 SSOT，原 commit 的理由已蒸發；單 SSOT 路線：`settings.template.json` (placeholder) + `sync-claude-userlevel.ps1`
+
+Phase C — 自癒 + 觀察性升級（5 file）：
+- 新檔 `scripts/ensure-claude-junction.ps1`（217 lines）：idempotent junction self-heal，支援 `-DryRun` (read-only health 用) 與 `-EmitState` (寫 `.agency-state/junction-last.json`)。fsutil reparsepoint query 真實驗證；不對則 backup→rmdir→mklink；exit 0/1/2 分等級
+- `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` line 82-105：UserPromptSubmit 第一動作呼叫 ensure-claude-junction（在 auto-checkpoint **之前**，防止 hook 又一次把 deletion commit 掉）
+- `.cursor/hooks/run-ao-resume-on-prompt.ps1` line 89-108：Cursor 版同步（cross-IDE 一致）
+- `scripts/system-health-check.ps1` line 679-714（after check 12 check-claude-sync）：新 gate 12b `.claude junction (ensure-claude-junction.ps1 dry-run)`，verdict ≠ ok → Add-CriticalFailure（不能被 -AllowNonPerfectHealth 旁路）
+- `scripts/git-align-main-aoresume-feature.ps1`：加 `Invoke-GitFetchWithRetry` (3 attempts, 5s/10s/20s exponential backoff) + `Write-GitFetchLedger` 寫 `.agency-state/git-fetch-last.json`；line 100 `Invoke-Git @("fetch", "origin", "--prune")` 替換為 `Invoke-GitFetchWithRetry`；失敗時印紅字 banner「sync state UNKNOWN — do NOT trust 'no new commits'」
+- `.claude/commands/ao-resume.md` Step 0 + 新 Step 0a：hook exit 非零 → 第一段第一行 `⚠️ HOOK FAILED` banner；禁止寫「Gap 期間 repo 無新 commit」這種 false-absence-of-evidence 結論；junction-last.json 與 git-fetch-last.json 讀取規則
+
+Phase D — TASKS + WORKLOG：
+- `agency-os/TASKS.md` `#### 工具層 / 基礎建設 / 治理` 加 Z4 (scan-for-secrets baseline) + Z5 (AO-CLOSE fetch-recency gate)；標記 5/24 提的 WORKLOG tail 議題為已完成（桌機 `5c86a3b` 解了）
+- 本 entry
+
+**[驗證結果 — R0+R4 四動作]**
+
+1. **實測 end-to-end**：
+   - `scripts/verify-build-gates.ps1` → exit 0, ALL PASSED（Health 100% 371/371）
+   - `scripts/check-claude-sync.ps1` → H1+H2+H3 全 pass；sync-check-last.json `worstSeverity=pass`
+   - `fsutil reparsepoint query d:\Work\.claude` → `0xa0000003 Mount Point`（junction 健在）
+   - `scripts/ensure-claude-junction.ps1 -DryRun` → verdict=ok exit=0
+   - `git-align-main-aoresume-feature.ps1` 真實 invoke → `git-fetch-last.json` 寫入 `success=true, attempts=1, exitCode=0` ✓
+   - `ls d:/Work/.claude/agents/` → 25 個檔可見（透過 junction）
+2. **Review 讀回**：
+   - 改後 export/import-cross-machine-memory.ps1：grep `claude-settings` 只剩我加的註解 + 不相關的 normalize-claude-settings.mjs（PS5.1 ConvertTo-Json bug fix，UNRELATED，不動）
+   - ensure-claude-junction.ps1 / system-health-check.ps1 / ao-resume.md：JSON 結構合法，PowerShell syntax 過
+3. **抓蟲 cross-file**：
+   - `grep -rln "claude-settings" scripts/ mcp/` → 只剩 5 條：2 個我的註解（export/import）+ 3 個 normalize-claude-settings.mjs（無關）
+   - `grep "ao-resume-on-prompt"` 確認 Claude Code 與 Cursor 兩個 hook 都加了 junction self-heal
+   - audit-cross-machine-bom skill：本次改的 .md 是 ao-resume.md（透過 junction 落到 ~/.claude/commands/ → 不走 Google Drive，免 BOM）；TASKS.md / WORKLOG.md 在 repo 內，git 處理 bytes，免疫
+4. **WORKLOG**：本 entry。**未跑 audit-encoding skill**：改的 .ps1（ensure-claude-junction.ps1 / git-align-main-aoresume-feature.ps1 / system-health-check.ps1）含 `Invoke-WithUtf8Console` pattern OR ASCII-only console output；ensure-claude-junction 含 cmd.exe call 但有 `2>&1` capture，CP950 trap 不適用（fsutil 輸出含 CJK 但已用 regex strip `\??\` prefix）
+
+**[剩餘風險]**
+- 桌機需 git pull + restart Claude Code 才會收到新 hook（junction self-heal）。在那之前桌機若再遇 junction 變 real folder → auto-checkpoint hook 仍會誤 commit deletion
+- `~/.claude/commands` 3 個本機自編版本（ao-close.md, ao-resume.md, verify-recent.md，未 commit）已被 `git checkout 2e2409d -- .claude/` 覆蓋；備份在 `$env:TEMP\claude-recovery-20260528-2050\user-claude-commands\`，需操作者 diff 後決定要不要合併某些客製改動
+- Z4 (scan-for-secrets baseline) + Z5 (fetch-recency gate) 留到下次 session
+- Vault `claude-settings.json` 已從 Google Drive 刪除；下次桌機 import 不會再覆蓋本機 settings.json（已備份 .bak）；但桌機本機 settings.json 內容尚未對齊 SSOT，需在桌機跑 `sync-claude-userlevel.ps1 -Mode merge` 一次
+
+**[rollback]**
+- Phase A：`git revert 4f63393`；junction 改回 real folder = `rmdir d:\Work\.claude && cp -r $env:TEMP\claude-recovery-20260528-2050\d-claude-real-folder\* d:\Work\.claude\`
+- Phase B：`git revert <commit>`；vault 還原 = `cp $env:TEMP\claude-recovery-20260528-2050\vault-claude-settings.json.bak G:\...\MySecretVault\claude-settings.json`
+- Phase C：每個檔個別 `git revert`；hook 行為退回原版
+
+**[跨機分工]**
+- 桌機下次開工：先 `git pull origin main` → 跑 `scripts/sync-claude-userlevel.ps1 -Mode merge`（拉新 hook + 對齊 settings template）→ 重啟 Claude Code（hooks reload）→ 跑一次 AO-RESUME 確認 ensure-claude-junction 印 verdict=ok
+
+**[後續觀察 7-30 天]**
+- Junction self-heal 是否真的能防止 auto-checkpoint 誤 commit deletion
+- git fetch retry 在桌機 DNS 抖動時是否成功（看 git-fetch-last.json attempts 欄位 > 1 的次數）
+- 七段式第 1 段是否真的在 hook fail 時 banner 開頭
+
+AUTO_TASK_DONE: Phase Z plan complete — junction self-heal + AO-SYNC SSOT collision removed + fetch retry ledger + hook failure prominence
