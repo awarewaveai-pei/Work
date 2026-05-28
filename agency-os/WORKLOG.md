@@ -2,6 +2,35 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-05-28
+
+### Trigger.dev TaskRunStatus enum 不相容 — 根因確認並關閉
+
+**根本問題**：EU reboot 後 trigger-postgres log 出現 `invalid input value for enum "TaskRunStatus": "FAILED"/"QUEUED"`，需判斷來源與是否需升級處理。
+
+**現況分析**（SSH EU VPS 實測）：
+- 總計 2 次 ERROR，均發生在 2026-05-22 04:09:54 + 04:10:04 UTC（EU reboot day）
+- 2026-05-23 至今（6 天）：**0 次**
+- 系統最後 reboot：2026-05-22 04:15:11
+
+**根因（STATEMENT 完整暴露）**：Trigger.dev webapp v4.4.4 cold-start 時自執行兩條內部診斷 SQL，這些查詢的 IN/NOT IN 列表裡仍含 v3-era enum 值（`FAILED`、`QUEUED`），而 v4 schema 已將這兩個值從 `TaskRunStatus` 移除。PostgreSQL 對 enum literal 做靜態型別檢查，直接 ERROR。屬 **Trigger.dev upstream regression bug**，非我方代碼（全域 grep 確認無此查詢）。
+
+**觸發條件**：**僅在 trigger-postgres + trigger-webapp 冷啟動序列中**（container restart / VPS reboot），穩定運行期不再出現。
+
+**DoD 判定**：達到 criterion #3（< 5 次/週，實際 0 次/後 6 天）→ 關閉，列為已知 upstream cosmetic issue。
+
+**其他同天 ERROR（均屬 cold-start 副作用）**：
+- `electric_publication/slot already exists` — Electric SQL 重連冪等行為，正常
+- `column "trigger" does not exist` — 單次 migration 排序副作用，1 筆
+- `duplicate key` (5/21) — deploy idempotent，正常
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker logs trigger-postgres --since 2026-05-22 + grep TaskRunStatus | exit=0 | ms=~2000 (hits=2, both 2026-05-22 04:09-04:10; zero since 2026-05-23)
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker logs trigger-postgres --since 2026-05-23 grep TaskRunStatus count | exit=0 | ms=~1000 (count=0 confirmed)
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (doc-only update; no code change)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=TaskRunStatus | hits=0 (no stale claims; this WORKLOG entry is the only record)
+- AUTO_TASK_DONE: Trigger.dev TaskRunStatus enum 不相容查詢來源追查
+
 ## 2026-05-27
 
 ### Tomorrow captured (/tomo)
