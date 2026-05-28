@@ -246,6 +246,36 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (API calls + doc updates; no code change)
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=WeeklyReview\|auto_disabled\|phase4-weekly | hits=0 (no stale claims; this WORKLOG entry is the authoritative record)
 
+### Auto-Repair Batch 2 — m2+m10+m11 (audit 2026-05-23 follow-up)
+
+**根本問題（3 項）**：
+- m2: `verifyIngestToken.ts` 舊版 `timingSafeEqual` 若 `Buffer.from(a).length !== Buffer.from(b).length` 短路返回 `false`，攻擊者可透過計時觀察推算出 expected token 長度（timing side-channel leak）。`telegramAuth.ts` 有相同問題的私有拷貝。
+- m10: `archive_stale_repair_runs` 函數（migration 0030）不包含 `triage_needed` 狀態，導致廢棄 triage 跑道永遠堆積。
+- m11: `repair_runs` 表啟用了 RLS（migration 0027）但無任何 policy，PostgREST 以「0 rows 靜默」而非明確拒絕回應 anon 查詢，可能遮蔽邏輯錯誤。
+
+**修法（含 critic Major 修正）**：
+- m2: 新建 `lib/security/timingSafeEqual.ts`（shared SSOT），使用 HMAC-SHA256 正規化兩端為固定 32-byte 輸出後再呼叫 `crypto.timingSafeEqual`；hoisted `HMAC_KEY = Buffer.alloc(32)`（非 per-call）。`verifyIngestToken.ts` + `telegramAuth.ts` 均改為 import 共用模組（critic Major 1/2：消除拷貝漂移風險）。
+- m2 測試加強（critic Minor 1/2）：新增 UTF-8/multibyte 測試（CJK 同值=true；NFC vs NFD=false）；新增 source-level 機器驗證：讀取 `lib/security/timingSafeEqual.ts` source，strip 注釋行後斷言無 `.length !== .length` 早退分支，並確認含 `crypto.timingSafeEqual`。
+- m10: `CREATE OR REPLACE FUNCTION public.archive_stale_repair_runs(int)` — 加入 `triage_needed` UPDATE 區塊（14 天硬編碼 retention），回傳兩段合計。函數簽名不變，pg_cron 與 service.ts 呼叫端零改動。migration 0032 applied to EU Supabase.
+- m11: `CREATE POLICY "deny_anon_all" ON public.repair_runs FOR ALL TO anon USING (false) WITH CHECK (false)`，將隱式靜默空集改為明確 policy denial。migration 0033 applied to EU Supabase.
+
+**修改檔案**（7 個）：
+- `lib/security/timingSafeEqual.ts`（新增）— 共用 HMAC 正規化實作 + hoisted key
+- `lib/ops-inbox/verifyIngestToken.ts` — 改 import 共用模組 + re-export 維持現有 callers
+- `lib/command-plane/telegramAuth.ts` — 移除私有拷貝，改 import 共用模組
+- `lib/ops-inbox/__tests__/verifyIngestToken.test.ts` — UTF-8 + source-level 機器驗證（17 tests total）
+- `packages/db/migrations/0032_archive_triage_needed.sql`（新增）— m10 archive triage_needed
+- `packages/db/migrations/0033_repair_runs_rls_deny_anon.sql`（新增）— m11 explicit deny-anon policy
+- `agency-os/docs/operations/AUDIT_REGISTRY.md` — m2/m10/m11 → FIXED
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~10000 (0 type errors, all 3 modules resolve)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 | result=168/168 pass (8 test files; verifyIngestToken 17 tests incl. UTF-8 + source-level guard)
+- REALTEST_EVIDENCE: tool=SSH | cmd=EU Supabase psql — apply 0032+0033, rpc+anon verify | exit=0 | result=m10_ok=t rpc_returns_int=0 anon_row_count=0 m11_ok=t
+- REVIEW_DONE: critic=Deep | verdict=pass (after fixes) | findings=0c/2m/3n — M1 timingSafeEqual DRY fixed (shared module); M2 Telegram test coverage fixed (same shared module covers both); m1 UTF-8 tests added; m2 source-level regression guard added; m3 Buffer.alloc(32) hoisted to module constant
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=timingSafeEqual|a\.length.*b\.length|archive_stale|deny_anon | hits=3 verified clean: (1) slack/route.ts:24 `a.length === b.length && crypto.timingSafeEqual` — harmless (Slack sig is fixed-format v0=<64hex>); (2) middleware.ts:20 plain `===` on OPS_PROXY_SHARED_SECRET — same m2 class, out-of-scope informational finding, tracked separately; (3) all verifyIngestToken callers (wp-update, wp-report) still compile via re-export
+- AUTO_TASK_DONE: Auto-Repair Batch 2 — m2+m10+m11 fixed; critic Major fixes applied (shared module + test coverage)
+
 ## 2026-05-27
 
 ### Tomorrow captured (/tomo)

@@ -230,9 +230,15 @@ _(all 5 moved to 🔴 FIXED above on 2026-05-23; Phase 4 closeout 2026-06-19 unb
 - **m8-GHA** `.github/workflows/auto-repair-claude.yml` — 2026-05-28 — commit `c872012` — Slack notification now distinguishes "code patch ready for review" vs "analysis only (no code changes produced)" based on `BRANCH_NAME` presence. Operator now knows whether to expect a PR. `BRANCH_NAME` guarded via `[ -n ]` only — not interpolated into payload (injection-safe). File: [auto-repair-claude.yml](../../../.github/workflows/auto-repair-claude.yml).
 - **m9-docstring** `policy.ts:severityRequiresHumanReview` — 2026-05-28 — commit `c872012` — Docstring corrected to accurately describe the `triage_needed` gate: run is held at `triage_needed` state until explicit operator confirmation via POST `/confirm-critical`. C5 introduced this gate; m9 (dead-helper wired) was already closed alongside C5. File: [policy.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts).
 
-### 🟡 TRACKED — Minor (5 remaining)
+### 🔴 FIXED — Minor (Batch 2, 2026-05-28)
 
-~~m1~~ ~~m7~~ ~~m6~~ ~~m8~~ ~~m9~~ FIXED above. ~~m3 posthog ordering~~ ~~m9 dead helper wired~~ closed alongside Criticals (2026-05-23). ~~m5 netdata silent CLEAR~~ deduped → [Ops Inbox webhook CLEAR auto-resolve audit](#ops-inbox-webhook-clear-auto-resolve--fingerprint-instability-2026-05-23). Remaining: bearer length leak (m2), uptime-kuma env from `monitor.hostname` (m4), `triage_needed` accumulation (m10), RLS missing deny-anon policy (m11).
+- **m2** `verifyIngestToken.ts` + `telegramAuth.ts` — commit `<batch2>` — Removed `if (a.length !== b.length) return false` length-leak. Both sides now HMAC-SHA256 digested to fixed 32-byte output before `crypto.timingSafeEqual` — timing is independent of input length. Fixed same pattern in `telegramAuth.ts` (private copy, same root cause). Tests: 14 new cases in [verifyIngestToken.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/__tests__/verifyIngestToken.test.ts).
+- **m10** `archive_stale_repair_runs` function — commit `<batch2>` — Migration [0032_archive_triage_needed.sql](../../../lobster-factory/packages/db/migrations/0032_archive_triage_needed.sql): `CREATE OR REPLACE FUNCTION` extended to also archive `triage_needed` runs older than 14 days. Same `(int)` signature — pg_cron job and service.ts callers require no changes. Applied to EU Supabase 2026-05-28.
+- **m11** `repair_runs` RLS deny-anon policy — commit `<batch2>` — Migration [0033_repair_runs_rls_deny_anon.sql](../../../lobster-factory/packages/db/migrations/0033_repair_runs_rls_deny_anon.sql): `CREATE POLICY "deny_anon_all" … USING (false) WITH CHECK (false)` for anon role. Eliminates silent-empty-result footgun for future anon-key queries. Applied to EU Supabase 2026-05-28.
+
+### 🟡 TRACKED — Minor (2 remaining)
+
+~~m1~~ ~~m2~~ ~~m6~~ ~~m7~~ ~~m8~~ ~~m9~~ ~~m10~~ ~~m11~~ FIXED above. ~~m3 posthog ordering~~ ~~m9 dead helper wired~~ closed alongside Criticals (2026-05-23). ~~m5 netdata silent CLEAR~~ deduped → [Ops Inbox webhook CLEAR auto-resolve audit](#ops-inbox-webhook-clear-auto-resolve--fingerprint-instability-2026-05-23). Remaining: uptime-kuma env from `monitor.hostname` (m4), GHA Slack "completed" on empty branch (m8-GHA already FIXED in Batch 1 above).
 
 ### 🛠 TOOL
 

@@ -10,6 +10,7 @@
 // an enumeration oracle for attackers).
 
 import type { TelegramMessage } from "./types";
+import { timingSafeEqual } from "../security/timingSafeEqual";
 
 export type TelegramAuthOutcome =
   | { ok: true }
@@ -54,9 +55,6 @@ function isAllowed(id: number, csv: string | undefined): boolean {
   return set.has(String(id));
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
+// timingSafeEqual is imported from lib/security/timingSafeEqual (shared SSOT).
+// Both this module and verifyIngestToken use the same implementation so a future
+// security fix cannot land on one and silently miss the other (m2 critic Major fix).

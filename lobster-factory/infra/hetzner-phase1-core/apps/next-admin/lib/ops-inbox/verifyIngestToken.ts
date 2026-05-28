@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "../security/timingSafeEqual";
+
 export function verifyIngestToken(req: Request): boolean {
   const auth = req.headers.get("authorization") ?? "";
   const expected = process.env.OPS_INBOX_INGEST_TOKEN;
@@ -7,9 +9,6 @@ export function verifyIngestToken(req: Request): boolean {
   return timingSafeEqual(m[1], expected);
 }
 
-export function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
+// Re-export so callers that import timingSafeEqual from this module continue to work.
+// The canonical implementation lives in lib/security/timingSafeEqual.ts (m2 audit fix).
+export { timingSafeEqual };
