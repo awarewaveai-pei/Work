@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-05-28 18:46:13
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-05-28 22:41:33
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -282,12 +282,45 @@
 
 **Open**: Batch 3 (M9 TOCTOU + M10 retry storm + m4), Post-Phase 4 (M2/M4), Phase4Weekly 驗收 (2026-05-29 14:00 TPE)
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:2417d066c5a36f0811eb59320eaf7b3a8bf0179a41481eb8f2b77735ecc63b77 -->
+
+### claude 2026-05-28 22:35
+
+**主線**：跨機 30-year sync fragility 兩大破口連修（Phase Z + Z6）。
+
+1. **Phase Z** (`4f63393` / `4dbaf03` / `25eb2e9` / `3ca0df4`) — 6 個跨機開工噪音來源一次治本：
+   - **B**：移除 AO-SYNC vault claude-settings.json 與 sync-claude-userlevel SSOT template 雙 SSOT 衝突（commit 8102794 2026-05-15 隱性 bug；vault 寫機器絕對路徑害下次 import 覆蓋對機正確路徑→每跨機開工必發作 verify-build-gates 紅燈）。
+   - **C1+C2**：新 `scripts/ensure-claude-junction.ps1`（idempotent self-heal + fsutil reparsepoint 真驗；stress-tested via rmdir + mkdir 假裝壞 → 自動 backup → rmdir → mklink → 重驗 PASS）接入 Claude Code + Cursor 兩個 hook 的 UserPromptSubmit STEP 0（在 auto-checkpoint 之前防止 junction broken 時誤 commit deletion）+ system-health-check 新 gate 12b（critical 不可旁路）。
+   - **C4**：`git-align-main-aoresume-feature.ps1` 加 `Invoke-GitFetchWithRetry` (3 attempts, 5/10/20s exponential backoff) + `.agency-state/git-fetch-last.json` ledger 防 DNS 抖動 silently 寫成 "no new commits" 假結論。
+   - **C3**：`.claude/commands/ao-resume.md` 加 Step 0a hook-failure prominence 規則：hook exit ≠ 0 時七段式第一段第一行必 `⚠️ HOOK FAILED` banner，禁止 false-absence-of-evidence 結論。
+
+2. **Phase Z6** (`58e48be`) — 修 archive-only items invisible to next AO-RESUME class-of-bug：5/28 18:46 桌機 AO-CLOSE「未完成」第 5 項「SG deploy 落後 3 commits」silent drop 案例。新 `scripts/verify-archive-tasks-lift.ps1`（bold-token + 8-12 char sliding sub-windows + 120-char anchored search + `<!-- archive-only: <reason> -->` 逃生門）；接入 health-check gate 12c（critical）；`.claude/commands/ao-close.md` 新 Step 2.5 強制 lift 規則；18:46 archive SG deploy 補 archive-only 註記。
+
+3. **AO-RESUME redo** (`d331b33` + `570efb6`)：原 19:53 七段式在 DNS hiccup + junction broken + 4-天桌機 commits 沒拉的盲區寫的，false-absence-of-evidence。21:45 redo 含 5/25 + 5/27 + 5/28 桌機 32 commits 完整覆蓋 + 6-row 18:46 pending-list traceability table。
+
+**事件覆盤**：
+- DNS 失敗 → hook exit 1 → 我寫了「Gap 期間 repo 看起來無新 commit」假結論 → user 質問為什麼桌機檔案沒同步過來 → 揭發 junction broken + 4 天 commits 沒 fetch
+- `git pull --rebase` 失敗中，auto-checkpoint hook 自動 commit junction-broken 狀態下顯示為 deleted 的 49 個 tracked file → `0d63eb9` 壞 commit → `git checkout 2e2409d -- .claude/` 還原 → commit `4f63393`
+- 並行 Claude session（user 自開做 fewer-permission-prompts + 刪 13 條 settings.json 內 plaintext 密鑰）→ commit `50cf601` 整合保留
+- 走 R0 規律完整 4-action verify per change：實測 / Review / 抓蟲 / WORKLOG
+
+**driver issue (補完)**：5/28 18:46 桌機「明日優先」的 SG deploy + 筆電 sync 兩項已完成：
+- SG deploy = SG drift-watcher 19:55 CST 自動觸發 `sg-deploy.sh next-admin` 部署 0bc1b0c→2e2409d（含 Batch 2 832c562 資安修補）
+- 筆電 sync = `git pull origin main` (rev-list 0 0) + `sync-claude-userlevel.ps1 -Mode merge` (verify PASS) 完成；桌機 5/27 commit 4d1c3e8 的 5 個新 hooks 全部在 ~/.claude/hooks/；Phase Z 自家 ensure-claude-junction 接入也在 ~/.claude/
+
+**連動檢查**：
+- verify-build-gates: ALL PASSED with gate 12b (junction) + gate 12c (archive-lift) active
+- health: 100% (372→373 checks after Z6 added gate)
+- origin/main: `0 0` aligned
+- audit-cp950-traps: 4/7 edited .ps1 CLEAN; 3 have pre-existing 🟡 TRACKED entries (1 bumped 8→9 in AUDIT_REGISTRY)
+- audit-cross-machine-bom: N/A（本次 .md 全 in-repo）
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-28 18:46:04`
+- Time: `2026-05-28 22:41:27`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -297,70 +330,70 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260528-184559.md`
-- Closeout: `reports/closeout/closeout-20260528-184604.md`
+- Health: `reports/health/health-20260528-224125.md`
+- Closeout: `reports/closeout/closeout-20260528-224127.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-### Machine appendix (weekly-system-review)
-- 2026-04-29 15:06:36 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
+   - Token strategy: bold-text identifier (`**Title**`) + 8-12 char sliding sub-windows for partial matches
+   - Anchored search: only match tokens in first 120 chars of TASKS.md `- [ ]` lines (防止 false positive — "SG deploy" 出現在 narrative 深處不算)
+   - Escape hatch: `<!-- archive-only: <reason> -->` 標記 bullet 為 documentation / 已解決
+   - Exit 0/1/2 分等級；`-EmitState` 寫 `agency-os/.agency-state/archive-lift-last.json`
+   - **R0+R4 4 動作 inline**：iterative test against 18:46 archive (1 lifted → 4 → 6/false-positive → 5 lifted + 1 SG deploy correctly missing)
+
+2. [`scripts/system-health-check.ps1`](../scripts/system-health-check.ps1)（new gate 12c after 12b junction gate）：
+   - 跑 `verify-archive-tasks-lift.ps1 -EmitState`
+   - 讀 `archive-lift-last.json`，verdict ≠ pass → `Add-CriticalFailure`
+   - 不可被 `-AllowNonPerfectHealth` 旁路
+
+3. [`.claude/commands/ao-close.md`](../.claude/commands/ao-close.md) Step 2.5：
+   - Hard rule: every 未完成 / 明日優先 bullet must also be in TASKS.md `- [ ]`
+   - Escape hatch documented: `<!-- archive-only: <reason> -->`
+   - 引用 5/28 18:46 SG deploy silent drop 作 cautionary tale
+
+4. [`agency-os/reports/ao-close/2026-05-28-1846.md`](reports/ao-close/2026-05-28-1846.md)：
+   - 「SG deploy」bullet 加 `<!-- archive-only: resolved during 18:46→21:45 gap by SG drift-watcher auto-deploy (0bc1b0c → 2e2409d, includes 832c562 Batch 2); Phase Z6 retro-annotation -->`
+   - 加兩條 documentation bullets（也標 archive-only）解釋此 retro-annotation 的目的
+   - 此檔已 push 過、不可竄改；補 annotation 屬可審文檔化
+
+**[驗證結果 — R0+R4 四動作]**
+
+1. **實測 end-to-end**：
+   - `scripts/verify-archive-tasks-lift.ps1 -ArchiveFile <18:46>` → 第 1 次跑 6 bullets / 1 lifted / 5 missing（token 太窄）
+   - 改 token = bold-text → 6 / 4 / 2（不夠精確）
+   - 改 token + sliding-window 8-12 chars → 6 / 6 / 0（過於寬鬆，false positive on "SG deploy"）
+   - 改 anchored search first 120 chars → 6 / 5 / 1 ✓ 正確抓到 SG deploy 漏報
+   - 加 archive-only annotation 後 → 5 lifted + 3 archive-only annotations / 0 missing → PASS exit 0
+   - `verify-build-gates` ALL PASSED with new gate 12c active
+2. **Review**：Read 4 個改後檔案，PowerShell syntax 過、JSON 格式合法、HTML comment escape pattern 正確
+3. **抓蟲 cross-file**：
+   - `Grep "verify-archive-tasks-lift"` → 只在 4 個應該的地方（script self + system-health-check + ao-close.md + WORKLOG）
+   - `Grep "archive-only:"` → 18:46 archive 註記 3 處 + ao-close.md spec 描述 + verify script 內部 regex
+   - `Grep "Phase Z6"` → 一致 reference
+   - audit-cross-machine-bom skill：本次 .md 改動全是 repo-內（TASKS / WORKLOG / ao-close archive / ao-close.md via junction）→ 不走 Google Drive → 免 BOM
+   - audit-encoding skill 跑 verify-archive-tasks-lift.ps1：腳本本身 ASCII-only console output，內部 regex 含 CJK 但已加 UTF-8 BOM → 不會 CP950 trap
+4. **WORKLOG**：本 entry
+
+**[剩餘風險]**
+- 18:46 archive 已 retro-annotated 但這是 ad-hoc 補洞；未來新增的 archive 必須 by-design 走 Step 2.5 規則
+- token sliding-window 演算法可能對極短/極長 bold-text 失準（< 8 chars 沒覆蓋；> 60 chars 跳過）；目前 6 bullets sample 都在 sweet spot
+- Z5（fetch-recency gate）仍未實作；本 Z6 集中解 lift gap，與 Z5 是並列課題
+- 若操作者刻意把整個 archive 設成 archive-only（極端情況），gate 會 pass 但 TASKS 永遠不會被更新 → 需要 future Z7 加 "max archive-only ratio" guard
+
+**[rollback]**
+- 整 Phase Z6 單 commit 可 `git revert <hash>`
+- 18:46 archive retro-annotation 可 partial revert（只 revert 該檔的改動）
+
+**[跨機分工]**
+- 桌機下次 AO-CLOSE 會自動走 Step 2.5 流程（slash command spec 改了）+ 跑 health-check 12c gate（system-health-check.ps1 改了，需 git pull）
+
+AUTO_TASK_DONE: Phase Z6 archive lift gate — mechanical 100% coverage + 18:46 retro-annotation
 
 
+## 2026-05-28 (AO-CLOSE additional task closure)
 
-## 2026-05-18
-
-### Machine appendix (weekly-system-review)
-- 2026-05-18 09:00:25 : gates=PASS (exit 0) ; integrated-status: generate-integrated-status-report.ps1 OK
-
-
-## 2026-05-26
-
-### bughunt-oracle.ps1: machine verification gate for BUGHUNT_DONE hits=0 claims
-
-**根因**：AGENTS.md §抓蟲 的 hits=0 宣告靠 AI honor system，無法機器驗證。
-**修改**：新增 （ function）；整合至 （dot-source + oracle call block）；更新  +  說明機器驗證行為。
-
-**實作決策**：
-- ASCII identifier-type filter（）：CJK/space/regex-special 不可偽造，identifier 名稱可驗證
-- Code-file-only（.ps1/.ts/.tsx 等，排除 .md/.json/.yaml）：文件檔中出現 symbol 名是合法引用，非 stale caller
-- Staged file exclusion：BUGHUNT 驗交叉影響；staged 檔本身預期含改動 symbol
--  param prefix：避免 dot-source 時覆蓋 caller 的 /（Critic Critical fix）
-- WorkRoot bounds check（僅對 WorkRoot 內 scope）：防止 .claude junction 遍歷到  外部
-
-**Critic review 修正**（Standard, 1 Critical / 2 Major / 4 Minor）：
-- Critical: top-level  clobbers caller / on dot-source → 重命名為 //
-- Major 1:  對 locked file 靜默 false-clean → 改為  + 顯式 Warning
-- Major 2:  匹配行內任意位置 → 改為  要求 pipe 前綴（結構性欄位）
-- Minor: junction traversal 防護（WorkRoot bounds check on in-WorkRoot scopes）；oracle 遺失時 strict gate 顯式 Warning
-
-[已修改]
-- （新增）：~180 行，defines 
-- ：dot-source 塊 + oracle call block + missing-oracle warning
-
-[驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File test-oracle.ps1 (5 paths: D/E/F/G/H) | exit=0 | ms=~3000
-  - PATH D (staged excluded): failures=0 ✓
-  - PATH E (not staged, hit detected): failures=1 ✓
-  - PATH F (real BUGHUNT_DONE, staged files excluded): failures=0 ✓
-  - PATH G (CJK filtered, no check): failures=0 ✓
-  - PATH H (WAIVED line, no oracle): failures=0 ✓
-  - PATH_CRIT (dot-source no longer clobbers WorkRoot/Gate): OK ✓
-- REVIEW_DONE: critic=Standard | verdict=pass (after fixes) | findings=1c/2m/4n — all fixed
-- BUGHUNT_DONE: scope=agency-os/,scripts/,.claude/ | grep=Invoke-BughuntOracle+bughunt-oracle | hits=0 stale code callers (all hits in docs/.md or staged files)
-- BUGHUNT_WAIVED: DOC_ONLY -- bhRequiredRoots only in verify-closeout-completeness.ps1 (staged) + docs
-
-[剩餘風險]
--  param 在 standalone mode CLI 可用；dot-source path 不受影響
--  →  改動：BUGHUNT_DONE 行必須包含  欄位分隔符（format 一直如此）
-
-[rollback]
--  — oracle + verify-closeout 的改動均在同一 commit，單一 revert 即可
-- AO-CLOSE gate 退回純 label-presence + scope-keyword 驗證（無 content 驗證）
-
-AUTO_TASK_DONE: bughunt-oracle.ps1 implementation + critic fixes complete
-
-
-
+- AUTO_TASK_DONE: bootstrap-mcp-machine.ps1
+- AUTO_TASK_DONE: 第二台機器同步 exit-2 hook 升級
 
