@@ -5,8 +5,6 @@ Follow the `/tomo` carry-over protocol.
 `/tomo <hint>` — capture unfinished work as a handoff packet so tomorrow's AO-RESUME
 picks it up without re-deriving context from chat history. Always writes directly — no preview, no confirmation prompt.
 
-`/tomo! <hint>` — identical alias.
-
 Packet format SSOT: `agency-os/handoffs/SCHEMA.md`
 
 ---
