@@ -676,6 +676,76 @@ try {
 $ErrorActionPreference = $savedEAPReboot
 # ---------- end VPS reboot detection ----------
 
+# --- WORKLOG excerpt since last AO-CLOSE ---
+# Writes .agency-state/worklog-excerpt.md so Claude reads the bounded gap window
+# instead of an arbitrary last-30-lines tail. WORKLOG is descending (newest first).
+Write-Host ""
+Write-Host "== AO-RESUME: WORKLOG excerpt (since last AO-CLOSE) ==" -ForegroundColor Cyan
+$worklogSrcPath    = Join-Path $WorkRoot "agency-os\WORKLOG.md"
+$worklogExcerptPath = Join-Path $stateDir "worklog-excerpt.md"
+$wlUtf8NoBom       = New-Object System.Text.UTF8Encoding $false
+$maxWlLines        = 300
+if (Test-Path -LiteralPath $worklogSrcPath) {
+    $wlLines       = Get-Content -LiteralPath $worklogSrcPath -Encoding UTF8
+    $excerptHeader = ""
+    $excerptBody   = ""
+    $closeStampForWl = Join-Path $stateDir "ao-close-last.txt"
+    if (Test-Path -LiteralPath $closeStampForWl) {
+        $wlParsedOk = $false
+        $closeDateForWl = ""
+        try {
+            $rawCloseForWl  = (Get-Content -LiteralPath $closeStampForWl -Raw -Encoding UTF8).Trim()
+            $closeUtcForWl  = [DateTime]::Parse($rawCloseForWl, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+            $closeDateForWl = $closeUtcForWl.ToLocalTime().ToString("yyyy-MM-dd")
+            $wlParsedOk     = $true
+        } catch { }
+        if ($wlParsedOk) {
+            # WORKLOG descending: scan for first section >= close_date (start of in-range block),
+            # then stop at first section < close_date (end boundary).
+            $firstInRangeIdx = -1
+            $endBoundaryIdx  = $wlLines.Count
+            for ($wi = 0; $wi -lt $wlLines.Count; $wi++) {
+                if ($wlLines[$wi] -match '^## (\d{4}-\d{2}-\d{2})') {
+                    $sDate = $Matches[1]
+                    if ([string]::Compare($sDate, $closeDateForWl, $false) -ge 0) {
+                        if ($firstInRangeIdx -lt 0) { $firstInRangeIdx = $wi }
+                    } else {
+                        $endBoundaryIdx = $wi
+                        break
+                    }
+                }
+            }
+            if ($firstInRangeIdx -ge 0) {
+                $wlSlice = $wlLines[$firstInRangeIdx..($endBoundaryIdx - 1)]
+                if ($wlSlice.Count -gt $maxWlLines) {
+                    $wlSlice = @() + $wlSlice[0..($maxWlLines - 1)] + @("", "...[capped at $maxWlLines lines — older entries omitted]")
+                }
+                $excerptHeader = "# WORKLOG excerpt — gap since AO-CLOSE $closeDateForWl (CST)"
+                $excerptBody   = $wlSlice -join "`n"
+                Write-Host ("   WORKLOG excerpt: {0} lines (sections >= {1})" -f $wlSlice.Count, $closeDateForWl) -ForegroundColor DarkGray
+            } else {
+                $excerptHeader = "# WORKLOG excerpt — fallback: last 30 lines (no section >= $closeDateForWl found)"
+                $excerptBody   = ($wlLines | Select-Object -Last 30) -join "`n"
+                Write-Host "   WORKLOG excerpt: no section >= $closeDateForWl; fallback last 30 lines" -ForegroundColor Yellow
+            }
+        } else {
+            $excerptHeader = "# WORKLOG excerpt — fallback: last 30 lines (close stamp parse error)"
+            $excerptBody   = ($wlLines | Select-Object -Last 30) -join "`n"
+            Write-Host "   WORKLOG excerpt: close stamp parse error; fallback last 30 lines" -ForegroundColor Yellow
+        }
+    } else {
+        $excerptHeader = "# WORKLOG excerpt — fallback: last 30 lines (ao-close-last.txt missing)"
+        $excerptBody   = ($wlLines | Select-Object -Last 30) -join "`n"
+        Write-Host "   WORKLOG excerpt: ao-close-last.txt missing; fallback last 30 lines" -ForegroundColor Yellow
+    }
+    if ($excerptHeader) {
+        [System.IO.File]::WriteAllText($worklogExcerptPath, ($excerptHeader + "`n`n" + $excerptBody + "`n"), $wlUtf8NoBom)
+    }
+} else {
+    Write-Host "   WORKLOG excerpt: WORKLOG.md not found at $worklogSrcPath" -ForegroundColor Yellow
+}
+# --- end WORKLOG excerpt ---
+
 $nowStamp = (Get-Date).ToUniversalTime().ToString("o")
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($stampPath, $nowStamp + [Environment]::NewLine, $utf8NoBom)

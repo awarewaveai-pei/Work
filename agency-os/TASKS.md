@@ -231,7 +231,7 @@
 
 #### Auto-Repair — 操作者手動任務
 
-- [ ] **【可選 cosmetic — 非必要】安裝 Claude GitHub App（消除 health endpoint advisory）** —— **【未開始】**
+- [x] **【可選 cosmetic — 非必要】安裝 Claude GitHub App（消除 health endpoint advisory）** —— **【關閉：不需要裝，2026-05-28 徹底查核確認】**
   - **2026-05-22 更新**：原為【操作者必做】，本日 Phase 4 B 實測證明 Auto-Repair 全鏈**不依賴**此 App（Issue #11 → workflow → Claude → branch push → PR #12 全綠，commit `1c17694` 由 `${{ github.token }}` 經 `gh pr create` 完成；commit `unsigned` 證明非 App 經手）。原 2026-05-21 WORKLOG「依賴 App、每次都會失敗」結論已在 §「調查」段追加 **【2026-05-22 修訂】** 修正。本條保留供未來真的想裝時使用，但**不再阻塞 Phase 4 收官**。
   - **背景（原文留存供參考）**：2026-05-21 查核確認 `awarewaveai-pei` 帳號下 0 個 GitHub App 安裝。health endpoint 目前回傳 `github_app_status: "unverified"` + advisory「Install it...」字串 — 此屬 **cosmetic** 訊息，不影響功能。
   - **三選一**：
