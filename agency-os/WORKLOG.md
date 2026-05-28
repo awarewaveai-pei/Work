@@ -138,13 +138,14 @@
 **Fallback script 評估**：`scripts/phase4-weekly-check.ps1` 使用舊 Check 3 邏輯（date regex，不認 frontmatter `status: not-onboarded`）+ 缺 Check 4。p1-pilot + scenery 的 null 值 frontmatter 無可解析日期 → 誤報 WARNING。不跑，等明天 routine 以正確新邏輯 fire。
 
 **待操作者手動確認**：
-- 去 `claude.ai/code/routines` → AgencyOS-WeeklyReview → 確認無「re-authorize GitHub」警告
-- 2026-05-29 14:00 TPE 後：`git pull` 確認 `agency-os/reports/repair-center/phase4-LATEST.md` 日期已更新
+- ~~去 `claude.ai/code/routines` → AgencyOS-WeeklyReview → 確認無「re-authorize GitHub」警告~~ **✅ 2026-05-28 web UI 截圖確認：Active，無警告，next=6/1 09:00 TPE**
+- 2026-05-29 14:00 TPE 後：`git pull` 確認 `agency-os/reports/repair-center/phase4-LATEST.md` 日期已更新（待明天）
 
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=RemoteTrigger | cmd=get trig_01JyFw78ZkgwQzpyXXaX1F2K + list all | exit=HTTP200 | ms=<2000 (Phase4Weekly: enabled=true, last_fired_at=absent; WeeklyReview: enabled=false, ended_reason=auto_disabled_repo_access)
 - REALTEST_EVIDENCE: tool=RemoteTrigger | cmd=update WeeklyReview enabled=true | exit=HTTP200 | ms=<1000 (enabled=true, ended_reason cleared, next_run_at=2026-06-01T01:05Z)
 - REALTEST_EVIDENCE: tool=RemoteTrigger | cmd=run Phase4Weekly | exit=HTTP400 | ms=<500 (github_repo_access_denied — expected CLI path behavior per phase4-weekly.md §CLI vs scheduled auth)
+- REALTEST_EVIDENCE: tool=WebUI | cmd=claude.ai/code/routines screenshot (2026-05-28) | exit=OK | result=Phase4Weekly Active next=2026-05-29 14:00 TPE repo=awarewaveai-pei/Work; WeeklyReview Active next=2026-06-01 09:00 TPE; no re-authorize warning on either
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (API calls + doc updates; no code change)
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=WeeklyReview\|auto_disabled\|phase4-weekly | hits=0 (no stale claims; this WORKLOG entry is the authoritative record)
 
