@@ -283,6 +283,18 @@ STEP 7 file template adds: `- Check 4 VPS auto-reboot SSOT: ${CHECK4_STATUS}${CH
 **Rollback** (if CHECK 4 breaks the routine):
 `RemoteTrigger update` with the original 3-check prompt (preserved in earlier git history of this file before commit on 2026-05-23, or retrieve via `RemoteTrigger get` from the previous successful run).
 
+## Incident: AgencyOS-WeeklyReview auto-disabled (2026-05-25)
+
+**What happened**: On 2026-05-25 01:09 UTC, `AgencyOS-WeeklyReview` attempted its Monday scheduled fire and received `auto_disabled_repo_access`. Platform auto-set `enabled=false`. Undiscovered for 10 days.
+
+**Root cause**: 2026-05-22 05:26 UTC, repo flipped PUBLIC→PRIVATE (commit `3abe5e2`, P0 security incident — n8n password rotation). WeeklyReview was authorized when repo was PUBLIC. DailyBriefing (also pre-private) continued firing successfully — theory: daily fires kept the token active; weekly 7-day silence + repo visibility change caused auth failure.
+
+**Fix applied 2026-05-28**: `RemoteTrigger update enabled=true` → HTTP 200, `ended_reason` cleared, `next_run_at: 2026-06-01T01:05 UTC`.
+
+**Remaining risk**: Underlying OAuth token validity unconfirmed. If 2026-06-01 fire auto-disables again → go to `claude.ai/code/routines`, find AgencyOS-WeeklyReview, re-authorize GitHub connection.
+
+**Lesson**: Repo visibility changes can silently break infrequently-firing routines while daily routines survive. After any repo visibility change, check all routines via `RemoteTrigger list` within 24h.
+
 ## Related
 
 - Fallback (manual run): `scripts/phase4-weekly-check.ps1` — kept as belt-and-suspenders backup

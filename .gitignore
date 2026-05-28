@@ -62,6 +62,7 @@ agency-os/.agency-state/external-signals-digest.json
 agency-os/.agency-state/ao-close-last.txt
 agency-os/.agency-state/closeout-inbox.md
 agency-os/.agency-state/doc-sync-state.json
+agency-os/.agency-state/worklog-excerpt.md
 
 # --- Local scratch (wp-dummy paths for regression; never push) ---
 .scratch/

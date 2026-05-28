@@ -686,7 +686,9 @@ $worklogExcerptPath = Join-Path $stateDir "worklog-excerpt.md"
 $wlUtf8NoBom       = New-Object System.Text.UTF8Encoding $false
 $maxWlLines        = 300
 if (Test-Path -LiteralPath $worklogSrcPath) {
-    $wlLines       = Get-Content -LiteralPath $worklogSrcPath -Encoding UTF8
+    # Null-guard: Get-Content returns $null on 0-byte file; $null.Count throws under StrictMode.
+    $wlRaw   = Get-Content -LiteralPath $worklogSrcPath -Encoding UTF8
+    $wlLines = if ($wlRaw) { @($wlRaw) } else { @() }
     $excerptHeader = ""
     $excerptBody   = ""
     $closeStampForWl = Join-Path $stateDir "ao-close-last.txt"
@@ -694,11 +696,15 @@ if (Test-Path -LiteralPath $worklogSrcPath) {
         $wlParsedOk = $false
         $closeDateForWl = ""
         try {
-            $rawCloseForWl  = (Get-Content -LiteralPath $closeStampForWl -Raw -Encoding UTF8).Trim()
+            # Null-guard: non-atomic WriteAllText can yield empty read in a ~5ms race window (same pattern as L442-443).
+            $rawCloseForWl  = Get-Content -LiteralPath $closeStampForWl -Raw -Encoding UTF8
+            $rawCloseForWl  = if ($rawCloseForWl) { $rawCloseForWl.Trim() } else { "" }
             $closeUtcForWl  = [DateTime]::Parse($rawCloseForWl, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
             $closeDateForWl = $closeUtcForWl.ToLocalTime().ToString("yyyy-MM-dd")
             $wlParsedOk     = $true
-        } catch { }
+        } catch {
+            Write-Host ("   (WORKLOG excerpt: close stamp parse skipped: {0})" -f $_.Exception.Message) -ForegroundColor DarkGray
+        }
         if ($wlParsedOk) {
             # WORKLOG descending: scan for first section >= close_date (start of in-range block),
             # then stop at first section < close_date (end boundary).
@@ -718,28 +724,33 @@ if (Test-Path -LiteralPath $worklogSrcPath) {
             if ($firstInRangeIdx -ge 0) {
                 $wlSlice = $wlLines[$firstInRangeIdx..($endBoundaryIdx - 1)]
                 if ($wlSlice.Count -gt $maxWlLines) {
-                    $wlSlice = @() + $wlSlice[0..($maxWlLines - 1)] + @("", "...[capped at $maxWlLines lines — older entries omitted]")
+                    $wlSlice = @() + $wlSlice[0..($maxWlLines - 1)] + @("", "...[capped at $maxWlLines lines -- older entries omitted]")
                 }
-                $excerptHeader = "# WORKLOG excerpt — gap since AO-CLOSE $closeDateForWl (CST)"
+                $excerptHeader = "# WORKLOG excerpt -- gap since AO-CLOSE $closeDateForWl (CST)"
                 $excerptBody   = $wlSlice -join "`n"
                 Write-Host ("   WORKLOG excerpt: {0} lines (sections >= {1})" -f $wlSlice.Count, $closeDateForWl) -ForegroundColor DarkGray
             } else {
-                $excerptHeader = "# WORKLOG excerpt — fallback: last 30 lines (no section >= $closeDateForWl found)"
+                $excerptHeader = "# WORKLOG excerpt -- fallback: last 30 lines (no section >= $closeDateForWl found)"
                 $excerptBody   = ($wlLines | Select-Object -Last 30) -join "`n"
                 Write-Host "   WORKLOG excerpt: no section >= $closeDateForWl; fallback last 30 lines" -ForegroundColor Yellow
             }
         } else {
-            $excerptHeader = "# WORKLOG excerpt — fallback: last 30 lines (close stamp parse error)"
+            $excerptHeader = "# WORKLOG excerpt -- fallback: last 30 lines (close stamp parse error)"
             $excerptBody   = ($wlLines | Select-Object -Last 30) -join "`n"
             Write-Host "   WORKLOG excerpt: close stamp parse error; fallback last 30 lines" -ForegroundColor Yellow
         }
     } else {
-        $excerptHeader = "# WORKLOG excerpt — fallback: last 30 lines (ao-close-last.txt missing)"
+        $excerptHeader = "# WORKLOG excerpt -- fallback: last 30 lines (ao-close-last.txt missing)"
         $excerptBody   = ($wlLines | Select-Object -Last 30) -join "`n"
         Write-Host "   WORKLOG excerpt: ao-close-last.txt missing; fallback last 30 lines" -ForegroundColor Yellow
     }
     if ($excerptHeader) {
-        [System.IO.File]::WriteAllText($worklogExcerptPath, ($excerptHeader + "`n`n" + $excerptBody + "`n"), $wlUtf8NoBom)
+        # Warn-only: a transient disk/lock error must not abort the AO-RESUME stamp write (L749-751).
+        try {
+            [System.IO.File]::WriteAllText($worklogExcerptPath, ($excerptHeader + "`n`n" + $excerptBody + "`n"), $wlUtf8NoBom)
+        } catch {
+            Write-Host ("   WARN: WORKLOG excerpt write failed: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+        }
     }
 } else {
     Write-Host "   WORKLOG excerpt: WORKLOG.md not found at $worklogSrcPath" -ForegroundColor Yellow

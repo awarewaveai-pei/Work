@@ -73,6 +73,41 @@
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=TaskRunStatus | hits=0 (no stale claims; this WORKLOG entry is the only record)
 - AUTO_TASK_DONE: Trigger.dev TaskRunStatus enum 不相容查詢來源追查
 
+### Routine 健康調查：WeeklyReview auto-disabled + Phase4Weekly 首次 fire 驗證
+
+**根本問題**：徹查 Phase 4 觀察期進度時發現雙重隱患：(1) `AgencyOS-WeeklyReview` 被平台自動停用（`ended_reason: auto_disabled_repo_access`），週報已斷 10 天無人知；(2) `AgencyOS-RepairCenterPhase4Weekly` 從未 scheduled fire（API `last_fired_at` 欄位缺失），明天是第一次。
+
+**根因（實證，非推測）**：
+
+事件鏈：
+- 2026-05-06：WeeklyReview 建立（repo 當時 PUBLIC）
+- 2026-05-18 01:11 UTC：WeeklyReview 最後一次成功 fire（WORKLOG 有紀錄）
+- 2026-05-22 05:26 UTC：**repo flip PUBLIC→PRIVATE**（commit `3abe5e2`，n8n 密碼外洩 P0 安全事件處置）
+- 2026-05-22 08:47 UTC：Phase4Weekly 建立（repo **已是 PRIVATE**）
+- 2026-05-25 01:09 UTC：WeeklyReview 嘗試 scheduled fire → `auto_disabled_repo_access` → 平台自動停用
+- 2026-05-28 00:11 UTC：DailyBriefing scheduled fire 成功（今天，正面背書）
+
+**不對稱關鍵**：DailyBriefing（建立於 PUBLIC）仍正常；WeeklyReview（同樣建立於 PUBLIC）卻死了。推測：DailyBriefing 每日 fire 保持 token 活躍；WeeklyReview 7 天沉默後遇 repo 私有化 → token 過期或 private repo scope 重驗失敗。屬 claude.ai routine 內部 auth 機制，無法 100% 確認。
+
+**Phase4Weekly 評估**：建立於 repo 已為 PRIVATE 之後 → stored auth 應對 private repo 授予；CLI `RemoteTrigger run` → HTTP 400（預期，CLI path 與 scheduled fire path 不同 auth）；信心度約 75%。
+
+**修復動作**：
+1. `RemoteTrigger update WeeklyReview enabled=true` → HTTP 200，`ended_reason` 清空，`next_run_at: 2026-06-01T01:05 UTC`
+2. Phase4Weekly CLI run → HTTP 400（預期失敗，不代表 scheduled fire 失敗）
+
+**Fallback script 評估**：`scripts/phase4-weekly-check.ps1` 使用舊 Check 3 邏輯（date regex，不認 frontmatter `status: not-onboarded`）+ 缺 Check 4。p1-pilot + scenery 的 null 值 frontmatter 無可解析日期 → 誤報 WARNING。不跑，等明天 routine 以正確新邏輯 fire。
+
+**待操作者手動確認**：
+- 去 `claude.ai/code/routines` → AgencyOS-WeeklyReview → 確認無「re-authorize GitHub」警告
+- 2026-05-29 14:00 TPE 後：`git pull` 確認 `agency-os/reports/repair-center/phase4-LATEST.md` 日期已更新
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=RemoteTrigger | cmd=get trig_01JyFw78ZkgwQzpyXXaX1F2K + list all | exit=HTTP200 | ms=<2000 (Phase4Weekly: enabled=true, last_fired_at=absent; WeeklyReview: enabled=false, ended_reason=auto_disabled_repo_access)
+- REALTEST_EVIDENCE: tool=RemoteTrigger | cmd=update WeeklyReview enabled=true | exit=HTTP200 | ms=<1000 (enabled=true, ended_reason cleared, next_run_at=2026-06-01T01:05Z)
+- REALTEST_EVIDENCE: tool=RemoteTrigger | cmd=run Phase4Weekly | exit=HTTP400 | ms=<500 (github_repo_access_denied — expected CLI path behavior per phase4-weekly.md §CLI vs scheduled auth)
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (API calls + doc updates; no code change)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=WeeklyReview\|auto_disabled\|phase4-weekly | hits=0 (no stale claims; this WORKLOG entry is the authoritative record)
+
 ## 2026-05-27
 
 ### Tomorrow captured (/tomo)
