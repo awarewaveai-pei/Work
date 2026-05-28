@@ -135,10 +135,12 @@ if ($latestArchive -and (Test-Path -LiteralPath $latestArchive)) {
   $archiveLines = Get-Content -LiteralPath $latestArchive -Encoding UTF8
   $currentSection = $null
   foreach ($line in $archiveLines) {
-    # Section detector: any heading containing 未完成 or 明日優先
-    if ($line -match '^#{1,3}\s+.*(未完成|明日優先).*$') {
-      if ($line -match '未完成')    { $currentSection = '未完成' }
-      elseif ($line -match '明日優先') { $currentSection = '明日優先' }
+    # Section detector: heading text EXACTLY '未完成' or '明日優先'
+    # (Pre-fix bug: '^#{1,3}\s+.*(未完成|明日優先).*$' matched sub-headings like
+    # '### 兩條 5/28 18:46「明日優先」實質完成', falsely capturing its bullets.
+    # 2026-05-28 22:50 fix during Phase Z6 self-validation.)
+    if ($line -match '^#{1,3}\s+(未完成|明日優先)\s*$') {
+      $currentSection = $matches[1]
       continue
     }
     # Section terminator: next top-level heading
