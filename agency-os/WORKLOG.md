@@ -113,6 +113,54 @@
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=TaskRunStatus | hits=0 (no stale claims; this WORKLOG entry is the only record)
 - AUTO_TASK_DONE: Trigger.dev TaskRunStatus enum 不相容查詢來源追查
 
+### EU VPS ClickHouse OOM 根治 — 系統 log 表 TTL 未生效 + 數字後綴表堆積
+
+**根本問題（雙重）**：
+1. `override.xml` 的 TTL 設定（2026-04-29 加入）**只在 CREATE TABLE 時生效**；現有 `text_log`、`metric_log` 等表已存在 → TTL 未套用 → 系統 log 無限累積
+2. ClickHouse 在 merge 壓力下建立大量數字後綴替代表（`text_log_0`...`text_log_6`、`metric_log_0`...`metric_log_3` 等），總計 40+ 個系統 log 表，各自累積資料 → 無法清除 → OOM 惡性循環
+
+**根因證據**（Netdata 告警截圖確認）：
+- Memory 99%+，CPU 101% Critical
+- `system.tables total_bytes` 最大者：`text_log_5` 658 MiB、`asynchronous_metric_log_2` 253 MiB、`trace_log_3` 48 MiB
+- TRUNCATE 失敗：`Code: 241 MEMORY_LIMIT_EXCEEDED`（查詢本身也需要 4 MiB 分配，記憶體已滿）
+
+**根治方案（Plan D，使用者批准）**：
+1. `SYSTEM STOP MERGES` — 暫停背景合併，降低即時壓力
+2. docker stop trigger-clickhouse
+3. 直接刪除 named volume（`trigger_trigger_clickhouse_data`）內 **所有系統 log 表** 的 store 目錄 + metadata .sql 檔（非業務資料，可安全刪除）
+   - 刪除清單：text_log*.sql (8)、metric_log*.sql (5)、trace_log*.sql (5)、asynchronous_metric_log*.sql (4)、query_log*.sql (7)、query_views_log、processors_profile_log*.sql (4)、query_metric_log、opentelemetry_span_log*.sql (2)、latency_log*.sql (2)、error_log*.sql (5)、part_log
+   - 釋放磁碟空間：468 MiB
+4. docker start trigger-clickhouse → ClickHouse 從 override.xml 重新建表（TTL 生效）
+5. 對 override.xml **未覆蓋** 的 3 張表手動 `ALTER TABLE MODIFY TTL`：opentelemetry_span_log（finish_date + 7 DAY）、part_log（event_date + 7 DAY）、query_views_log（event_date + 14 DAY）
+
+**TTL 套用結果（全 11 張現存系統 log 表）**：
+| 表名 | TTL |
+|------|-----|
+| text_log | event_date + 14 DAY |
+| query_log | event_date + 14 DAY |
+| query_views_log | event_date + 14 DAY |
+| metric_log | event_date + 7 DAY |
+| trace_log | event_date + 7 DAY |
+| asynchronous_metric_log | event_date + 7 DAY |
+| processors_profile_log | event_date + 7 DAY |
+| latency_log | event_date + 7 DAY |
+| part_log | event_date + 7 DAY |
+| opentelemetry_span_log | finish_date + 7 DAY |
+| error_log | event_date + 30 DAY |
+
+`query_metric_log`：不存在（首次寫入時 ClickHouse 將以 override.xml TTL 建立）
+
+**事後穩定指標**：MEM 33.65% / 1 GiB，CPU 11.91%，container healthy
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker stats trigger-clickhouse --no-stream after restart | exit=0 | result=MEM 33.65% (344 MiB / 1 GiB), CPU 11.91%
+- REALTEST_EVIDENCE: tool=SSH | cmd=SELECT name, has_ttl FROM system.tables WHERE database='system' (11 tables) | exit=0 | result=all 11 have TTL clauses confirmed
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker inspect trigger-clickhouse State.Health | exit=0 | result=Status=running, Health=healthy
+- REALTEST_EVIDENCE: tool=SSH | cmd=SELECT metric, value FROM system.metrics WHERE metric LIKE '%Merge%' | exit=0 | result=BackgroundMergesAndMutationsPoolTask=0 (idle clean), pool=32 (ready)
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (infra remediation, no code change)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=clickhouse.*ttl\|text_log\|metric_log | hits=0 (no stale docs; this entry is authoritative)
+- AUTO_TASK_DONE: EU VPS ClickHouse OOM 根治（TTL 全套用，數字後綴表清除，MEM 99%→34%）
+
 ### Routine 健康調查：WeeklyReview auto-disabled + Phase4Weekly 首次 fire 驗證
 
 **根本問題**：徹查 Phase 4 觀察期進度時發現雙重隱患：(1) `AgencyOS-WeeklyReview` 被平台自動停用（`ended_reason: auto_disabled_repo_access`），週報已斷 10 天無人知；(2) `AgencyOS-RepairCenterPhase4Weekly` 從未 scheduled fire（API `last_fired_at` 欄位缺失），明天是第一次。
