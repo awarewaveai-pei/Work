@@ -3,9 +3,9 @@ Follow the `/tomo` carry-over protocol.
 ## Overview
 
 `/tomo <hint>` — capture unfinished work as a handoff packet so tomorrow's AO-RESUME
-picks it up without re-deriving context from chat history.
+picks it up without re-deriving context from chat history. Always writes directly — no preview, no confirmation prompt.
 
-`/tomo! <hint>` — same, but skip the propose step (write directly).
+`/tomo! <hint>` — identical alias.
 
 Packet format SSOT: `agency-os/handoffs/SCHEMA.md`
 
@@ -63,29 +63,7 @@ Fill all 6 segments per `agency-os/handoffs/SCHEMA.md`:
 
 ---
 
-## Step 4 — Propose (skip if `!`)
-
-If `/tomo` (no bang): show full packet preview and ask:
-
-```
-📋 /tomo Packet Preview — <slug>
-
-[packet markdown here]
-
----
-回覆：
-  go        — 確認，直接寫入
-  補:<text>  — 加到第 5 段（下一步）末尾作為新編號步驟後再寫
-  重抓       — 重新抽取脈絡
-  取消       — 放棄
-```
-
-Wait for user response. Apply `補:` additions as new numbered step(s) appended at the end of segment 5.
-If `/tomo!` (bang): skip this step entirely.
-
----
-
-## Step 5 — Write files
+## Step 4 — Write files
 
 **Compute slug**: extract first 3 ASCII words from hint (skip CJK/non-ASCII tokens), lowercase kebab-case.
 - ≥ 2 ASCII tokens found: join first 3 with `-`. Example: `修 ops-inbox CLEAR bug` → `ops-inbox-clear`
