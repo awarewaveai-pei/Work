@@ -136,7 +136,7 @@ If no today entry exists, append at end of file:
 
 ---
 
-## Step 6 — Checkpoint + push
+## Step 5 — Checkpoint + push
 
 ```powershell
 # Stage the three changed files and commit
@@ -149,7 +149,7 @@ git push origin main
 
 ---
 
-## Step 7 — Confirm
+## Step 6 — Confirm
 
 Print:
 
