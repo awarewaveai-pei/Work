@@ -4,6 +4,48 @@
 
 ## 2026-05-28
 
+### 根治：SG auto-deploy 連敗 + deploy 信號統一接入 ops_inbox
+
+**根本問題（雙重）**：
+1. `tsconfig.tsbuildinfo` 被 git 追蹤（VPS build 每次重新產生 → `git pull --ff-only` 因 dirty working tree 失敗 → 整個 auto-deploy chain 斷掉 36 小時、8+ 次連敗、production 落後 3 commits）
+2. AO-RESUME 的「telegram: 0」報告讓操作者誤以為無告警，實際上 Telegram 收到多個 FAILED deploy 通知——因為 fetch-external-signals 只讀 `command_requests`（user→bot 指令）而非 deploy 事件
+
+**架構根治（非 patchwork）**：
+- 修根因一：新增 `.gitignore`（app 層 + infra 層雙重防線）untrack `tsconfig.tsbuildinfo`
+- 修根因二：VPS deploy 事件統一接入 `ops_incidents` pipeline（`POST /api/webhooks/deploy` → `ops_incidents` table → `GET /api/ops/inbox/incidents?source=deploy` → fetch-external-signals → AO-RESUME deploy_events 段）
+
+**改動清單**（13 個檔案）：
+- `apps/next-admin/.gitignore`（新增）— 防止 build artifacts 被追蹤
+- `infra/hetzner-phase1-core/.gitignore`（強化）— apps/*/tsconfig.tsbuildinfo 防線
+- `lib/ops-inbox/types.ts`— IncidentSource 加入 "deploy"
+- `lib/ops-inbox/normalize/deploy.ts`（新增）— normalizeDeploy()，1h dedup bucket
+- `app/api/webhooks/deploy/route.ts`（新增）— POST webhook，readWebhookBody<Record<string,unknown>>
+- `app/api/ops/inbox/incidents/route.ts`（新增）— GET endpoint，source 白名單驗證
+- `lib/ops-inbox/notify/rules.ts`— deploy source → shouldSend=false（VPS script 直接通知，避免雙發）
+- `lib/repair-center/policy.ts`— deploy policy 加入（satisfies exhaustive check 需要）
+- `middleware.ts`— 新增 /api/ops/inbox/incidents + /api/webhooks/* 豁免（prod 403 修正）
+- `scripts/auto-deploy-next-admin.sh`— post_to_ops_inbox() 函式（定義在呼叫前），deploy_success/failed 各發一次
+- `scripts/fetch-external-signals.ps1`— 新增 deploy_events 段、ops_inbox_commands 正名、endpoint_pending 視為 neutral
+- `.claude/commands/ao-resume.md`— 外部信號段更新：ops_inbox_commands 說明 + deploy_events 段
+
+**Critic 修正（2C + 3M + 5m，全數修正）**：
+- C1 bash: post_to_ops_inbox() 定義在呼叫後 → `set -euo pipefail` 下 exit 127 直接終止腳本（移至 deploy block 前）
+- C2 middleware: /api/ops/inbox/incidents 未豁免 → prod Cloudflare 去掉 x-ops-proxy-auth → 403
+- M3 deploy/route.ts: 缺 existingError guard（沉默 DB 讀錯 → occurrence_count 損毀）→ 加入
+- M4 bash: BEHIND 非數字時 python3 int() throws ValueError → script abort → 加 regex guard + `|| payload=""`
+- M5 incidents/route.ts: sourceParam 無白名單 → 加 ALLOWED_SOURCES Set
+- m4 endpoint_pending 顯示 Green（誤導）→ 改 Yellow
+- m5 endpoint_pending 拉低 aggregate fetch_status → 加 deployStatusForAggregate 中性化
+- 其餘 m1-m3/m5 均修正（詳見 critic report）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p apps/next-admin/tsconfig.json | exit=0 | ms=~8000 (0 type errors)
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash -n scripts/auto-deploy-next-admin.sh | exit=0 | ms=<100 (bash syntax clean)
+- REALTEST_WAIVED: VPS_DEPLOY — new endpoints require VPS deploy to test end-to-end; pending push + sg-deploy.sh next-admin
+- REVIEW_DONE: critic=Deep | verdict=pass after fixes | findings=2c/3m/5n (all C+M addressed)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ops_inbox_commands|deploy_events|IncidentSource|normalizeDeploy | hits=4 (all updated in same commit)
+- AUTO_TASK_DONE: SG auto-deploy 根治 + ops_inbox 架構統一
+
 ### Trigger.dev TaskRunStatus enum 不相容 — 根因確認並關閉
 
 **根本問題**：EU reboot 後 trigger-postgres log 出現 `invalid input value for enum "TaskRunStatus": "FAILED"/"QUEUED"`，需判斷來源與是否需升級處理。
