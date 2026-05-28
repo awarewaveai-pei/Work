@@ -41,7 +41,12 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p apps/next-admin/tsconfig.json | exit=0 | ms=~8000 (0 type errors)
 - REALTEST_EVIDENCE: tool=Bash | cmd=bash -n scripts/auto-deploy-next-admin.sh | exit=0 | ms=<100 (bash syntax clean)
-- REALTEST_WAIVED: VPS_DEPLOY — new endpoints require VPS deploy to test end-to-end; pending push + sg-deploy.sh next-admin
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | ms=~390000 (tsc PASS, vitest 136/136 pass, smoke 4/4 all 200)
+- REALTEST_EVIDENCE: tool=SSH+curl | cmd=POST /api/webhooks/deploy (deploy_success payload) | exit=200 | result=incident_id=e7eb7ad4 transition=new occ=1
+- REALTEST_EVIDENCE: tool=SSH+curl | cmd=POST #2 same hour bucket (dedup) | exit=200 | result=transition=duplicate occ=2 (fingerprint dedup confirmed)
+- REALTEST_EVIDENCE: tool=SSH+curl | cmd=GET /api/ops/inbox/incidents?source=deploy | exit=200 | result=count=1 title="SG next-admin auto-deployed OK"
+- REALTEST_EVIDENCE: tool=Bash | cmd=fetch-external-signals.ps1 -From '2026-05-28 11:00' -To '2026-05-28 12:00' | exit=0 | result=deploy_events status=ok event_count=1 fetch_status=ok
+- NOTE: 實測發現 DB check constraint 未含 'deploy' → 500；已補 migration 0031，apply 至 EU Supabase (supabase_admin)，重測 HTTP 200
 - REVIEW_DONE: critic=Deep | verdict=pass after fixes | findings=2c/3m/5n (all C+M addressed)
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ops_inbox_commands|deploy_events|IncidentSource|normalizeDeploy | hits=4 (all updated in same commit)
 - AUTO_TASK_DONE: SG auto-deploy 根治 + ops_inbox 架構統一
