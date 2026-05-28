@@ -101,7 +101,7 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 | `scripts/ao-close.ps1` | 22 | Medium — `git diff --cached` captures content (could have CJK); other 21 are ASCII metadata |
 | `scripts/ao-resume.ps1` | 5 | Low — remaining are status/push/rev-parse (ASCII) after %s fix |
 | `scripts/check-three-way-sync.ps1` | 16 | Low — all git status/rev-parse/fetch (ASCII) |
-| `scripts/git-align-main-aoresume-feature.ps1` | 8 | Low — all git align ops (ASCII) |
+| `scripts/git-align-main-aoresume-feature.ps1` | 9 | Low — all git align ops (ASCII); count bumped 8→9 on 2026-05-28 by Phase Z adding `Invoke-GitFetchWithRetry` (line 140 `& git fetch origin --prune 2>&1`); same risk profile as the other 8 sites in this file |
 | `scripts/git-audit-tracked-remote.ps1` | 7 | Low — git ls-files, status (could have CJK paths) |
 | `scripts/check-deploy-drift.ps1` | 7 | Low — git fetch/rev-parse (ASCII commit hashes) |
 | `scripts/commit-checkpoint.ps1` | 5 | Medium — `git commit -m $Message` (message may have CJK) |
