@@ -35,6 +35,8 @@ export function decideNotification(args: DecideArgs): Decision {
   if (!isOpsInboxNotifyGloballyEnabled()) return { shouldSend: false, reason: "globally_disabled" };
   if (incident.environment === "development") return { shouldSend: false, reason: "env_development" };
   if (incident.status === "ignored") return { shouldSend: false, reason: "status_ignored" };
+  // Deploy events: VPS auto-deploy script sends Telegram/Slack directly to avoid double-notification.
+  if (incident.source === "deploy") return { shouldSend: false, reason: "deploy_direct_notify" };
 
   if (transition.kind === "severity_escalated") return { shouldSend: true, rule: "severity_escalation" };
   if (transition.kind === "reopened") return { shouldSend: true, rule: "reopen" };

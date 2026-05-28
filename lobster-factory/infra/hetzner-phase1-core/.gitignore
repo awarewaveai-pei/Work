@@ -3,4 +3,5 @@ docker-compose.override.yml
 apps/*/node_modules
 apps/*/.next
 apps/*/dist
+apps/*/tsconfig.tsbuildinfo
 backups/
