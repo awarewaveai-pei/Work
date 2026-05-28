@@ -77,6 +77,28 @@ fi
 
 log "DRIFT: deployed=${DEPLOYED:0:7} origin=${REMOTE_HEAD:0:7} app-code behind=$BEHIND -- starting auto-deploy"
 
+post_to_ops_inbox() {
+    local event=$1
+    if [[ -z "${OPS_INBOX_INGEST_TOKEN:-}" ]]; then
+        log "ops-inbox skipped: OPS_INBOX_INGEST_TOKEN not set"
+        return 0
+    fi
+    [[ "$BEHIND" =~ ^[0-9]+$ ]] || BEHIND=0
+    local payload
+    payload=$(OEVENT="$event" OAPP="$APP" ODEPLOYED="${DEPLOYED:0:12}" OORIGIN="${REMOTE_HEAD:0:12}" OBEHIND="$BEHIND" ORUN_AT="$(ts)" \
+        python3 -c 'import json,os; print(json.dumps({"event":os.environ["OEVENT"],"app":os.environ["OAPP"],"deployed_commit":os.environ["ODEPLOYED"],"origin_commit":os.environ["OORIGIN"],"behind":int(os.environ["OBEHIND"]),"run_at":os.environ["ORUN_AT"]}))') || payload=""
+    [[ -z "$payload" ]] && { log "ops-inbox: payload build failed, skipping"; return 0; }
+    local http
+    http=$(curl -sS -o /tmp/opsinbox-resp -w "%{http_code}" \
+        -X POST -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${OPS_INBOX_INGEST_TOKEN}" \
+        --data "$payload" \
+        "${OPS_INBOX_BASE_URL}/api/webhooks/deploy" 2>>"$LOG_FILE" || echo "000")
+    if [[ "$http" =~ ^2 ]]; then log "ops-inbox: $event sent: HTTP $http"
+    else log "ops-inbox: $event FAILED: HTTP $http: $(head -c 100 /tmp/opsinbox-resp 2>/dev/null)"; fi
+    return 0
+}
+
 DEPLOY_SUCCESS=0
 SMOKE_WARN_SUFFIX=""
 ROLLBACK_SUFFIX=""
@@ -115,26 +137,6 @@ else
     SLACK_MSG=$(printf ':x: *SG next-admin auto-deploy FAILED*\nDrift of *%s* commit(s) but deploy failed.\n\n- deployed:    `%s`\n- origin/main: `%s`\n\nFix: SSH -> `/root/lobster-phase1/scripts/sg-deploy.sh next-admin`' "$BEHIND" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}")
     TG_MSG=$(printf 'FAIL: SG next-admin auto-deploy FAILED\n\nDrift of %s commit(s), deploy failed.\n\ndeployed:    %s\norigin/main: %s\n\nFix: /root/lobster-phase1/scripts/sg-deploy.sh next-admin' "$BEHIND" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}")
 fi
-
-post_to_ops_inbox() {
-    local event=$1
-    if [[ -z "${OPS_INBOX_INGEST_TOKEN:-}" ]]; then
-        log "ops-inbox skipped: OPS_INBOX_INGEST_TOKEN not set"
-        return 0
-    fi
-    local payload
-    payload=$(OEVENT="$event" OAPP="$APP" ODEPLOYED="${DEPLOYED:0:12}" OORIGIN="${REMOTE_HEAD:0:12}" OBEHIND="$BEHIND" ORUN_AT="$(ts)" \
-        python3 -c 'import json,os; print(json.dumps({"event":os.environ["OEVENT"],"app":os.environ["OAPP"],"deployed_commit":os.environ["ODEPLOYED"],"origin_commit":os.environ["OORIGIN"],"behind":int(os.environ["OBEHIND"]),"run_at":os.environ["ORUN_AT"]}))')
-    local http
-    http=$(curl -sS -o /tmp/opsinbox-resp -w "%{http_code}" \
-        -X POST -H "Content-Type: application/json" \
-        -H "Authorization: Bearer ${OPS_INBOX_INGEST_TOKEN}" \
-        --data "$payload" \
-        "${OPS_INBOX_BASE_URL}/api/webhooks/deploy" 2>>"$LOG_FILE" || echo "000")
-    if [[ "$http" =~ ^2 ]]; then log "ops-inbox: $event sent: HTTP $http"
-    else log "ops-inbox: $event FAILED: HTTP $http: $(head -c 100 /tmp/opsinbox-resp 2>/dev/null)"; fi
-    return 0
-}
 
 send_slack() {
     local webhook=$1

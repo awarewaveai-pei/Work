@@ -31,12 +31,17 @@ export async function POST(req: Request) {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return new NextResponse("db unavailable", { status: 503 });
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("ops_incidents")
     .select("id, severity, status, occurrence_count, reopen_count")
     .eq("fingerprint", draft.fingerprint)
     .eq("environment", draft.environment)
     .maybeSingle();
+
+  if (existingError) {
+    Sentry.captureException(existingError, { tags: { route: "ops-inbox-webhook-deploy", step: "read_existing" } });
+    return new NextResponse("db read failed", { status: 500 });
+  }
 
   const snapshot = (existing ?? null) as IncidentSnapshot | null;
   const transition = computeTransition(snapshot, draft);

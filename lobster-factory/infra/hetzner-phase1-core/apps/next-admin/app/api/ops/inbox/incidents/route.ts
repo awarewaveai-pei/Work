@@ -43,6 +43,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
   }
 
+  const ALLOWED_SOURCES = new Set(["sentry", "uptime_kuma", "grafana", "netdata", "posthog", "manual", "deploy"]);
+  if (sourceParam && !ALLOWED_SOURCES.has(sourceParam)) {
+    return NextResponse.json({ ok: false, error: "invalid source param" }, { status: 400 });
+  }
+
   let query = supabase
     .from("ops_incidents")
     .select("id, source, signal_type, severity, service, environment, title, message, status, occurrence_count, tags, created_at, last_seen_at")

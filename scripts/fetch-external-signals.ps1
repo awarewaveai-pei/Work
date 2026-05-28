@@ -211,7 +211,7 @@ if ($opsToken) {
 }
 
 Write-Host ("   deploy_events:      {0} ({1} events)" -f $deployStatus, $deployCount) `
-    -ForegroundColor $(if ($deployStatus -in @("ok","endpoint_pending")) { "Green" } else { "Yellow" })
+    -ForegroundColor $(if ($deployStatus -eq "ok") { "Green" } elseif ($deployStatus -eq "endpoint_pending") { "Yellow" } else { "Red" })
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SLACK — conversations.history per channel
@@ -279,7 +279,9 @@ $generatedUtc = (Get-Date).ToUniversalTime()
 $endIso       = if ($untilUtc) { $untilUtc.ToString("o") } else { $generatedUtc.ToString("o") }
 
 # Aggregate fetch_status: ok = all channels succeeded, partial = at least one ok, failed = none ok.
-$allStatuses  = @($tgStatus, $deployStatus) + @($slackChannels.Values | ForEach-Object { $_.status })
+# endpoint_pending is a known-transient state (new endpoint not yet deployed); treat as neutral for aggregate.
+$deployStatusForAggregate = if ($deployStatus -eq "endpoint_pending") { "ok" } else { $deployStatus }
+$allStatuses  = @($tgStatus, $deployStatusForAggregate) + @($slackChannels.Values | ForEach-Object { $_.status })
 $okCount      = ($allStatuses | Where-Object { $_ -eq "ok" }).Count
 $fetchStatus  = if ($okCount -eq $allStatuses.Count) { "ok" } elseif ($okCount -gt 0) { "partial" } else { "failed" }
 

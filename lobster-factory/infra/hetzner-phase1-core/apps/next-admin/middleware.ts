@@ -28,7 +28,9 @@ export function middleware(request: NextRequest) {
   if (
     request.nextUrl.pathname === "/api/ops/summary" ||
     request.nextUrl.pathname === "/api/ops/inbox/health" ||
-    request.nextUrl.pathname === "/api/ops/inbox/digest"
+    request.nextUrl.pathname === "/api/ops/inbox/digest" ||
+    request.nextUrl.pathname === "/api/ops/inbox/incidents" ||
+    request.nextUrl.pathname.startsWith("/api/webhooks/")
   ) {
     return NextResponse.next();
   }
