@@ -2,8 +2,14 @@
 export const TERMINAL_STATES = ["resolved", "rolled_back", "human_only"] as const;
 export type TerminalState = (typeof TERMINAL_STATES)[number];
 
+/** Forgiving — undefined returns true (defensive for UI display). Do NOT use in write gates. */
 export function isTerminalState(state?: string): boolean {
   return !state || (TERMINAL_STATES as readonly string[]).includes(state);
+}
+
+/** Strict — for write gates where state is guaranteed non-null (DB NOT NULL constraint). */
+export function isStrictTerminalState(state: string): boolean {
+  return (TERMINAL_STATES as readonly string[]).includes(state);
 }
 
 /** Returns the visibility of each action button for a repair run row. */

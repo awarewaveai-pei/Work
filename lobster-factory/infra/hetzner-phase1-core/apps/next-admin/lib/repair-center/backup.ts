@@ -101,7 +101,11 @@ function positiveIntEnv(name: string, fallback: number): number {
 
 function safeScriptPath(raw: string, fallback: string): string {
   const value = raw.trim() || fallback;
-  if (!/^[/A-Za-z0-9_.-]+$/.test(value)) {
+  // M8: reject `..` before regex — `.` is allowed for filenames (e.g. backup-phase1.sh)
+  // but `..` enables path traversal (../../etc/cron.daily/evil.sh).
+  // Shell-safety invariant: charset [/A-Za-z0-9_.-] excludes all shell metacharacters
+  // (;|$`\n space = backtick). DO NOT widen the charset without auditing all interpolation sites.
+  if (value.includes("..") || !/^[/A-Za-z0-9_.-]+$/.test(value)) {
     throw new Error(`unsafe_script_path:${value}`);
   }
   return value;

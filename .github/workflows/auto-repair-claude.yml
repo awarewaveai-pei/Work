@@ -103,13 +103,21 @@ jobs:
           ISSUE_URL: ${{ github.event.issue.html_url }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           JOB_STATUS: ${{ job.status }}
+          BRANCH_NAME: ${{ steps.claude.outputs.branch_name }}
         run: |
           if [ -z "$SLACK_WEBHOOK_URL" ]; then
             echo "SLACK_WEBHOOK_URL not configured; skipping Slack notification"
             exit 0
           fi
+          # m8: distinguish code-patch vs analysis-only so operator knows whether to expect a PR.
+          # BRANCH_NAME is used only in a [ -n ] guard — NOT interpolated into MSG or the curl payload.
+          # If BRANCH_NAME is ever added to MSG, it must be sanitised first (branch names can contain JSON-special chars).
           if [ "$JOB_STATUS" = "success" ]; then
-            MSG="Claude auto-repair analysis completed"
+            if [ -n "$BRANCH_NAME" ]; then
+              MSG="Claude auto-repair: code patch ready for review"
+            else
+              MSG="Claude auto-repair: analysis only (no code changes produced)"
+            fi
           else
             MSG="Claude auto-repair analysis failed; manual review required"
           fi

@@ -83,8 +83,14 @@ export function policyForIncident(source: IncidentSource, severity: IncidentSeve
 }
 
 /**
- * Critical severity incidents — 無論 source policy 為何 — 建立 RepairRun 時應強制設
- * needs_human_review = true。呼叫端在建立 RepairRun 前使用此函式決定該欄位。
+ * Returns true for severity=critical incidents.
+ *
+ * Used as a pipeline gate in `approveRepairRun` (service.ts): if this returns true and
+ * `forceCriticalApproval` is not set, the run is held at state="triage_needed" and requires
+ * a second explicit operator confirmation via POST /api/ops/repairs/<id>/confirm-critical
+ * before backup + GitHub Issue + Claude repair run can proceed.
+ *
+ * Plan v3.2 §四 Critical severity 閘門 SSOT.
  */
 export function severityRequiresHumanReview(severity: IncidentSeverity): boolean {
   return severity === "critical";

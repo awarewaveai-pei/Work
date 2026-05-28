@@ -10,7 +10,7 @@ import {
   policyForIncident,
   severityRequiresHumanReview,
 } from "./policy";
-import { escalateGuard, isTerminalState } from "./run-state";
+import { escalateGuard, isTerminalState, isStrictTerminalState } from "./run-state";
 import { REPAIR_RUN_STATES, REPAIR_DEPLOY_STATUSES } from "./types";
 import type { RepairRun, RepairRunWithIncident } from "./types";
 
@@ -217,7 +217,26 @@ export async function startRepairFromIncident(args: {
     }),
   });
 
-  const runForIssue = { ...(backedUp ?? run), incident: i as any } as RepairRunWithIncident;
+  // M7: backup succeeded but state transition failed (Supabase network drop or row vanished).
+  // Do NOT continue — proceeding with stale `run` (old state) would corrupt DB state machine,
+  // skipping "approved" entirely and landing on "repairing" directly. Operator must fix via UI.
+  if (!backedUp) {
+    console.error(
+      `[repair] run ${run.id}: backup passed (ref: ${backup.backupRef ?? "unknown"}) but ` +
+      `state transition to "approved" failed. Run stuck at backing_up. Manual intervention required.`
+    );
+    return {
+      ok: false,
+      run: { ...run, incident: i as any },
+      error: "state_transition_failed_after_backup",
+      details: {
+        backup_ref: backup.backupRef,
+        hint: "Backup succeeded. Update run state to 'approved' manually via /ops/repairs UI.",
+      },
+    };
+  }
+
+  const runForIssue = { ...backedUp, incident: i as any } as RepairRunWithIncident;
   if (!needsGitHubIssue(runForIssue.policy)) {
     const updated = await updateRun(run.id, {
       state: "human_only",
@@ -371,7 +390,8 @@ export async function updateRunLinks(
     if (!(REPAIR_RUN_STATES as readonly string[]).includes(body.state)) {
       return { ok: false, error: "invalid_state_value", details: { received: body.state, allowed: [...REPAIR_RUN_STATES] } };
     }
-    if (isTerminalState(run.state)) {
+    // m6: use strict version — run.state is string (DB NOT NULL); undefined must not pass as "terminal".
+    if (isStrictTerminalState(run.state)) {
       return { ok: false, error: "run_in_terminal_state", details: { state: run.state } };
     }
   }

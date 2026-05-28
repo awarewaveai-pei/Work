@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TERMINAL_STATES, escalateGuard, isTerminalState, visibleRunButtons } from "../run-state";
+import { TERMINAL_STATES, escalateGuard, isStrictTerminalState, isTerminalState, visibleRunButtons } from "../run-state";
 
 describe("TERMINAL_STATES", () => {
   it("contains exactly resolved, rolled_back, human_only", () => {
@@ -25,6 +25,36 @@ describe("isTerminalState", () => {
 
   it("empty string → true (coerced missing)", () => {
     expect(isTerminalState("")).toBe(true);
+  });
+});
+
+describe("isStrictTerminalState", () => {
+  it.each([...TERMINAL_STATES])("%s → true", (state) => {
+    expect(isStrictTerminalState(state)).toBe(true);
+  });
+
+  it.each(["detected", "triage_needed", "approved", "backing_up", "repairing", "pr_ready", "deploy_pending", "deploying"])(
+    "%s → false (active state)",
+    (state) => {
+      expect(isStrictTerminalState(state)).toBe(false);
+    },
+  );
+
+  it("unknown string → false (no false-positive terminal detection)", () => {
+    expect(isStrictTerminalState("some_future_state")).toBe(false);
+  });
+
+  // Contract difference vs isTerminalState: strict rejects empty/whitespace (treats as non-terminal)
+  it('empty string → false (strict; contrast: isTerminalState("") → true)', () => {
+    expect(isStrictTerminalState("")).toBe(false);
+  });
+
+  it('whitespace padding → false (" resolved " is not a terminal state)', () => {
+    expect(isStrictTerminalState(" resolved ")).toBe(false);
+  });
+
+  it("RESOLVED (uppercase) → false (case-sensitive)", () => {
+    expect(isStrictTerminalState("RESOLVED")).toBe(false);
   });
 });
 
