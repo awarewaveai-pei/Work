@@ -210,24 +210,29 @@ _2026-05-26 update: +1 Pattern A (print-today-closeout-recap); Pattern B 3→1 (
 
 _(all 5 moved to 🔴 FIXED above on 2026-05-23; Phase 4 closeout 2026-06-19 unblocked for the Critical-tier; Major-tier follow-up next iteration.)_
 
-### 🔴 FIXED — Major (2026-05-26)
+### 🔴 FIXED — Major (2026-05-26 / 2026-05-28)
 
 - **M1** `service.ts:updateRunLinks` — 2026-05-26 — Enum validation + terminal state guard added. `body.state` validated against `REPAIR_RUN_STATES` const; terminal run writes blocked; `body.deploy_status` validated against `REPAIR_DEPLOY_STATUSES` const. Files: [types.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/types.ts) (new consts), [service.ts:updateRunLinks](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/service.ts). Tests: [update-run-links.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/__tests__/update-run-links.test.ts) 14 cases.
 - **M5** `backup.ts:33-67` — 2026-05-26 — Backup webhook integrity gate: rejects non-JSON 200 (Cloudflare/nginx page), rejects JSON with no `backup_id`/`backup_ref`, enforces `size_bytes >= 1024` when present. Implements Plan §六 "No backup means no repair run". File: [backup.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/backup.ts). Tests: [backup-webhook.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/__tests__/backup-webhook.test.ts) 10 cases.
 - **M6** `.github/workflows/auto-repair-claude.yml` — 2026-05-26 — Forbidden-path-check CI step added between Claude run and PR creation. Blocks PR if Claude touched `.github/workflows/`, `nginx/`, `Dockerfile`, `docker-compose*`, `/migrations/`, `.env*`. File: [auto-repair-claude.yml](../../../.github/workflows/auto-repair-claude.yml).
+- **M7** `service.ts:approveRepairRun` — 2026-05-28 — commit `c872012` — Null-check after backup→state-transition: `updateRun("approved")` returning null now causes early return with `error: "state_transition_failed_after_backup"` instead of silently falling back to `?? run` (stale state) and continuing. Backup_ref preserved in error detail for manual recovery. File: [service.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/service.ts).
+- **M8** `backup.ts:safeScriptPath` — 2026-05-28 — commit `c872012` — Added `value.includes("..")` check before the allowlist regex. Prevents path-traversal env-var injection (e.g. `../../etc/cron.daily/evil.sh`). The `.` character in the charset is still allowed for valid filenames like `backup-phase1.sh`. Shell-safety invariant documented in comment. File: [backup.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/backup.ts).
 
-### 🟠 TRACKED — Major (7 remaining)
+### 🟠 TRACKED — Major (4 remaining)
 
-~~M1~~ ~~M5~~ ~~M6~~ FIXED above. Remaining: per-source HMAC missing (M2), `req.json` blocks future HMAC retrofit (M3), fingerprint forgery for silent suppression (M4), no mid-sequence recovery in `service.ts` (M7), `safeScriptPath` allows `..` (M8), `escalateAnalysisOnlyRun` TOCTOU (M9), Sentry retry storm loses occurrence_count increments (M10).
+~~M1~~ ~~M5~~ ~~M6~~ ~~M7~~ ~~M8~~ FIXED above. ~~M3~~ closed by C3 (req.text() refactor 2026-05-23 preserves raw bytes for future per-source HMAC retrofit). Remaining: per-source HMAC missing (M2), fingerprint forgery for silent suppression (M4), `escalateAnalysisOnlyRun` TOCTOU (M9), Sentry retry storm loses occurrence_count increments (M10).
 
-### 🔴 FIXED — Minor (2026-05-26)
+### 🔴 FIXED — Minor (2026-05-26 / 2026-05-28)
 
 - **m1** `policy.ts:74` — 2026-05-26 — Dead code `if (severity === "critical") return "triage_needed"` deleted. Unreachable because only `source=manual` reaches this branch, and the following line already covers that case. File: [policy.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts).
 - **m7** `service.ts:updateRunLinks` — 2026-05-26 — `github_pr_url` hostname validated via `new URL()` — rejects `javascript:` and non-`github.com` hostnames before storage. Bundled with M1 fix. Tests: [update-run-links.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/__tests__/update-run-links.test.ts) 4 dedicated URL cases.
+- **m6** `run-state.ts` — 2026-05-28 — commit `c872012` — Added `isStrictTerminalState(state: string)` export for write gates where `undefined` must not bypass the gate. Kept `isTerminalState(undefined→true)` for UI display callers (hides buttons on unknown state, the safe direction). Write gate in `service.ts:updateRunLinks` updated to use strict version. Tests: 15 new cases in [run-state.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/__tests__/run-state.test.ts).
+- **m8-GHA** `.github/workflows/auto-repair-claude.yml` — 2026-05-28 — commit `c872012` — Slack notification now distinguishes "code patch ready for review" vs "analysis only (no code changes produced)" based on `BRANCH_NAME` presence. Operator now knows whether to expect a PR. `BRANCH_NAME` guarded via `[ -n ]` only — not interpolated into payload (injection-safe). File: [auto-repair-claude.yml](../../../.github/workflows/auto-repair-claude.yml).
+- **m9-docstring** `policy.ts:severityRequiresHumanReview` — 2026-05-28 — commit `c872012` — Docstring corrected to accurately describe the `triage_needed` gate: run is held at `triage_needed` state until explicit operator confirmation via POST `/confirm-critical`. C5 introduced this gate; m9 (dead-helper wired) was already closed alongside C5. File: [policy.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/policy.ts).
 
-### 🟡 TRACKED — Minor (9 remaining)
+### 🟡 TRACKED — Minor (5 remaining)
 
-~~m1~~ ~~m7~~ FIXED above. ~~m3 posthog ordering~~ ~~m9 dead helper wired~~ closed alongside Criticals (2026-05-23). Remaining: bearer length leak (m2), uptime-kuma env from `monitor.hostname` (m4), **m5 netdata silent CLEAR — overlaps with [Ops Inbox webhook CLEAR auto-resolve audit (2026-05-23)](#ops-inbox-webhook-clear-auto-resolve--fingerprint-instability-2026-05-23) — same root cause, deduped here**, `isTerminalState(undefined)===true` footgun (m6), GHA "completed" message on empty branch (m8), `triage_needed` accumulation (m10), RLS missing deny-anon policy (m11).
+~~m1~~ ~~m7~~ ~~m6~~ ~~m8~~ ~~m9~~ FIXED above. ~~m3 posthog ordering~~ ~~m9 dead helper wired~~ closed alongside Criticals (2026-05-23). ~~m5 netdata silent CLEAR~~ deduped → [Ops Inbox webhook CLEAR auto-resolve audit](#ops-inbox-webhook-clear-auto-resolve--fingerprint-instability-2026-05-23). Remaining: bearer length leak (m2), uptime-kuma env from `monitor.hostname` (m4), `triage_needed` accumulation (m10), RLS missing deny-anon policy (m11).
 
 ### 🛠 TOOL
 
@@ -239,7 +244,8 @@ _(all 5 moved to 🔴 FIXED above on 2026-05-23; Phase 4 closeout 2026-06-19 unb
 
 | Audited | 🔴 FIXED | 🟢 CLEAN | 🔴 TRACKED (Critical) | 🟠 TRACKED (Major) | 🟡 TRACKED (Minor) | Real production breaks pre-audit | Tooling shipped |
 |---------|----------|----------|----------------------|--------------------|--------------------|---------------------------------|-----------------|
-| 14 + 5 ref | **10** (5 Critical + 3 Major + 2 Minor) | 8 | 0 | **7** | **9** | 1 (`OPS_INBOX_INGEST_TOKEN` 2026-05-22 — partial overlap with C2/M2 root cause) | 4 (harness + reports/audit/ dir + AGENTS rule + readRequestBody shared helper) |
+| 14 + 5 ref | **15** (5 Critical + 5 Major + 5 Minor) | 8 | 0 | **4** | **5** | 1 (`OPS_INBOX_INGEST_TOKEN` 2026-05-22 — partial overlap with C2/M2 root cause) | 4 (harness + reports/audit/ dir + AGENTS rule + readRequestBody shared helper) |
+| _+Batch 1 (c872012, 2026-05-28)_ | _+5: M7, M8, m6, m8-GHA, m9-doc_ | | | _M3 also closed by C3_ | | | |
 
 ### Plan v3.2 SSOT contract violations
 

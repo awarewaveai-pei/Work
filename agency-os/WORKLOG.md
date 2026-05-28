@@ -4,6 +4,40 @@
 
 ## 2026-05-28
 
+### Auto-Repair Batch 1 — M7+M8+m6+m8-GHA+m9-doc (audit 2026-05-23 follow-up)
+
+**根本問題（5 項）**：
+- M7: `approveRepairRun` 在 backup 成功後呼叫 `updateRun("approved")` 若返回 null，原本用 `?? run` 靜默 fallback stale state 繼續執行 → run 以錯誤狀態走進 GitHub Issue 階段
+- M8: `safeScriptPath` 正則 `^[/A-Za-z0-9_.-]+` 允許 `..` 序列 → 環境變數注入可達 path traversal（`../../etc/cron.daily/evil.sh`）
+- m6: `isTerminalState(undefined)===true` 用於 write gate（`updateRunLinks`）等同 undefined state 可繞過 terminal check → 寫入被錯誤允許
+- m8-GHA: GHA `auto-repair-claude.yml` Slack 通知未區分「產生 PR」與「只分析」→ operator 無法判斷是否需要等待 PR
+- m9-doc: `policy.ts:severityRequiresHumanReview` 的 JSDoc 說謊（未描述 C5 引入的 `triage_needed` gate + confirm-critical route）
+
+**修法**：
+- M7 (`service.ts`): null-check after `updateRun("approved")` → early return `error: "state_transition_failed_after_backup"`，backup_ref 保存在 error detail 供手動恢復；刪除 `?? run` fallback
+- M8 (`backup.ts`): `value.includes("..")` 先行檢查，通過後才進 regex；`.`（單點）保留允許合法檔名如 `backup-phase1.sh`；shell-safety invariant 寫進 comment
+- m6 (`run-state.ts`): 新增 `isStrictTerminalState(state: string)` export（write gate 用）；`isTerminalState` 維持 undefined→true（UI 安全方向）；`service.ts:updateRunLinks` write gate 改用 strict 版本
+- m8-GHA (`.github/workflows/auto-repair-claude.yml`): Notify Slack step 依 `BRANCH_NAME` 是否存在分支「code patch ready」vs「analysis only」；`BRANCH_NAME` 僅用於 `[ -n ]` guard，不注入 payload（injection-safe）
+- m9-doc (`policy.ts`): `severityRequiresHumanReview` docstring 補入 `triage_needed` state + confirm-critical 路由說明
+
+**修改檔案**（6 個）：
+- `lib/repair-center/service.ts` — M7 null-check + m6 strict gate
+- `lib/repair-center/backup.ts` — M8 `..` check + comment
+- `lib/repair-center/run-state.ts` — m6 `isStrictTerminalState` export
+- `lib/repair-center/policy.ts` — m9 docstring
+- `.github/workflows/auto-repair-claude.yml` — m8-GHA Slack distinguish
+- `lib/repair-center/__tests__/run-state.test.ts` — 15 new isStrictTerminalState test cases
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (apps/next-admin) | exit=0 | ms=~15000 (0 type errors)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (151 tests) | exit=0 | result=151/151 pass (7 test files)
+- REALTEST_EVIDENCE: tool=Bash | cmd=dogfood-auto-repair.ps1 -Mode HealthOnly | exit=0 | result=10/10 invariants pass, 1 warn (pre-existing M2 bearer-token length, not introduced by this patch)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m(pre-existing M2, not introduced)/3n (all 3 notes addressed: test edge cases added, charset comment added, BRANCH_NAME injection risk comment added)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=safeScriptPath|isTerminalState|isStrictTerminalState|severityRequiresHumanReview | hits=expected (all in lib/repair-center — backup.ts, run-state.ts, service.ts, policy.ts, __tests__; no stale claims found)
+- AUTO_TASK_DONE: Auto-Repair Batch 1 — M7+M8+m6+m8-GHA+m9-doc fixed; commit c872012
+
+**AUDIT_REGISTRY**: M7, M8, m6, m8-GHA, m9-doc → 🔴 FIXED; M3 noted as closed by C3; Major TRACKED 7→4; Minor TRACKED 9→5; Total FIXED 10→15
+
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: git-pull-phase4 → handoffs/2026-05-28-1152-git-pull-phase4.md
 
