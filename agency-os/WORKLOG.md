@@ -16,7 +16,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~10000
 - REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 | result=151/151 pass
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n (1 minor=TOCTOU pre-existing; 1 note=unused import → fixed; 1 note=comment → expanded)
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isTerminalState | hits=0 in service.ts (import removed, no call sites remain); all other files as expected
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isTerminalState | hits=15 expected (run-state.ts definition + RepairActions.tsx UI import — all legitimate; service.ts stale import was the only caller removed by this patch)
 - AUTO_TASK_DONE: m6-ext archiveRun gate — service.ts strict write gate 完整覆蓋
 
 ### Auto-Repair Batch 1 — M7+M8+m6+m8-GHA+m9-doc (audit 2026-05-23 follow-up)
@@ -245,7 +245,7 @@
 - REALTEST_EVIDENCE: tool=RemoteTrigger | cmd=run Phase4Weekly | exit=HTTP400 | ms=<500 (github_repo_access_denied — expected CLI path behavior per phase4-weekly.md §CLI vs scheduled auth)
 - REALTEST_EVIDENCE: tool=WebUI | cmd=claude.ai/code/routines screenshot (2026-05-28) | exit=OK | result=Phase4Weekly Active next=2026-05-29 14:00 TPE repo=awarewaveai-pei/Work; WeeklyReview Active next=2026-06-01 09:00 TPE; no re-authorize warning on either
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (API calls + doc updates; no code change)
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=WeeklyReview\|auto_disabled\|phase4-weekly | hits=0 (no stale claims; this WORKLOG entry is the authoritative record)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=WeeklyReview|auto_disabled|phase4-weekly | hits=2 (phase4-weekly-check.ps1:11+17 — legitimate script references, not stale; WeeklyReview and auto_disabled have 0 hits outside staged files)
 
 ### Auto-Repair Batch 2 — m2+m10+m11 (audit 2026-05-23 follow-up)
 
@@ -6242,7 +6242,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-27 08:02:23 UTC_
+_Last synced: 2026-05-28 10:46:03 UTC_
 
 ## 2026-03-20
 
@@ -6730,5 +6730,7 @@ _Last synced: 2026-05-27 08:02:23 UTC_
 - AO-CLOSE gate 退回純 label-presence + scope-keyword 驗證（無 content 驗證）
 
 AUTO_TASK_DONE: bughunt-oracle.ps1 implementation + critic fixes complete
+
+
 
 
