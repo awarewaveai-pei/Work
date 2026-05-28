@@ -182,7 +182,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 > 本段為概念摘要；兩者不一致時以上述執行 SSOT 為準。
 
 概念摘要（核心順序）：
-1. `agency-os/TASKS.md` + `agency-os/WORKLOG.md`（last 30 lines）
+1. `agency-os/TASKS.md` + `agency-os/.agency-state/worklog-excerpt.md`（WORKLOG since last AO-CLOSE；由 ao-resume.ps1 生成；不存在時 fallback last 30 lines）
 2. `agency-os/memory/CONVERSATION_MEMORY.md`
 3. `agency-os/memory/daily/` 今日與昨日（若存在）
 4. `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md` + `LOBSTER_FACTORY_COMPLETION_PLAN_V2.md`

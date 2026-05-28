@@ -35,7 +35,7 @@
 | 檔案 | 說明 |
 |------|-----|
 | `agency-os/TASKS.md` | 任務狀態 |
-| `agency-os/WORKLOG.md`（last 30 lines） | 最近工作紀錄 |
+| `agency-os/.agency-state/worklog-excerpt.md`（WORKLOG since last AO-CLOSE；不存在時 fallback `WORKLOG.md` last 30 lines） | 最近工作紀錄 |
 | `agency-os/memory/CONVERSATION_MEMORY.md` | 長期對話記憶 |
 | `agency-os/memory/daily/YYYY-MM-DD.md` | 今日日記 |
 | `agency-os/memory/daily/YYYY-MM-DD.md`（昨日） | 昨日日記 |
