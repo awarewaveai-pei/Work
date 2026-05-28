@@ -59,6 +59,7 @@
 - [ ] **【2026-05-29 驗收】Phase4Weekly 首次 scheduled fire** — 14:00 TPE 後 `git pull origin main` → 確認 `agency-os/reports/repair-center/phase4-LATEST.md` 日期為 2026-05-29；若未更新 → 升級到 `claude.ai/code/routines` web UI 重授權 + 手動跑 `scripts/phase4-weekly-check.ps1`
 - [ ] **【先做後等 6/1】WeeklyReview auth 確認** — 先到 `claude.ai/code/routines` 確認 AgencyOS-WeeklyReview 無「re-authorize GitHub」警告（根因：2026-05-22 repo PUBLIC→PRIVATE 導致 2026-05-25 auto-disabled，今日已 re-enable via API）；若有警告 → 點進去重新授權；2026-06-01 01:00 UTC 後確認 `last_fired_at` 已更新
 - [ ] 明天 14:00 TPE 後 git pull 看 phase4-LATEST.md 日期有沒有變成 2026-05-29 → handoffs/2026-05-28-1152-git-pull-phase4.md
+- [ ] Auto-Repair audit Batch 3 (M9 TOCTOU + M10 retry storm + m4 hostname) + Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) → handoffs/2026-05-28-1807-batch-3-post-phase.md
 
 #### 雙機環境 / 日常開工
 
