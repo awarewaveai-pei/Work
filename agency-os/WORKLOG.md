@@ -56,6 +56,7 @@
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: git-pull-phase4 → handoffs/2026-05-28-1152-git-pull-phase4.md
 - TOMORROW_CAPTURED: batch-3-post-phase → handoffs/2026-05-28-1807-batch-3-post-phase.md
+- TOMORROW_CAPTURED: tomo-225340 → handoffs/2026-05-28-2253-tomo-225340.md
 
 ### AO-RESUME WORKLOG excerpt -- gap window 取代 tail-30
 
