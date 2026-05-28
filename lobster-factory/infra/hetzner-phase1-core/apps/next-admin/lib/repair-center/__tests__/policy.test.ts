@@ -10,7 +10,7 @@ import {
 } from "../policy";
 
 describe("REPAIR_SOURCE_POLICIES", () => {
-  it("covers all 6 sources", () => {
+  it("covers all 7 sources", () => {
     const sources = REPAIR_SOURCE_POLICIES.map((p) => p.source);
     expect(sources).toContain("sentry");
     expect(sources).toContain("uptime_kuma");
@@ -18,7 +18,8 @@ describe("REPAIR_SOURCE_POLICIES", () => {
     expect(sources).toContain("posthog");
     expect(sources).toContain("netdata");
     expect(sources).toContain("manual");
-    expect(sources).toHaveLength(6);
+    expect(sources).toContain("deploy");
+    expect(sources).toHaveLength(7);
   });
 
   it("every entry has non-empty rationale", () => {
@@ -35,6 +36,7 @@ describe("policyCatalogForSource", () => {
   it("posthog → analysis_only", () => expect(policyCatalogForSource("posthog").policy).toBe("analysis_only"));
   it("netdata → human_only", () => expect(policyCatalogForSource("netdata").policy).toBe("human_only"));
   it("manual → triage_needed", () => expect(policyCatalogForSource("manual").policy).toBe("triage_needed"));
+  it("deploy → human_only", () => expect(policyCatalogForSource("deploy").policy).toBe("human_only"));
 });
 
 describe("policyForIncident", () => {
@@ -66,6 +68,10 @@ describe("policyForIncident", () => {
 
   it("manual critical → triage_needed (high-severity manual still needs triage)", () => {
     expect(policyForIncident("manual", "critical")).toBe("triage_needed");
+  });
+
+  it("deploy always returns human_only (operational event, repair center does not intervene)", () => {
+    for (const s of severities) expect(policyForIncident("deploy", s)).toBe("human_only");
   });
 });
 
@@ -101,6 +107,8 @@ describe("can_escalate_to_pr", () => {
     expect(policyCatalogForSource("netdata").can_escalate_to_pr).toBe(false));
   it("manual cannot auto-escalate", () =>
     expect(policyCatalogForSource("manual").can_escalate_to_pr).toBe(false));
+  it("deploy cannot auto-escalate — operational event, not code regression", () =>
+    expect(policyCatalogForSource("deploy").can_escalate_to_pr).toBe(false));
 });
 
 describe("severityRequiresHumanReview", () => {
