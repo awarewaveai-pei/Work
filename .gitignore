@@ -65,6 +65,7 @@ agency-os/.agency-state/doc-sync-state.json
 agency-os/.agency-state/worklog-excerpt.md
 agency-os/.agency-state/junction-last.json
 agency-os/.agency-state/git-fetch-last.json
+agency-os/.agency-state/archive-lift-last.json
 
 # --- Local scratch (wp-dummy paths for regression; never push) ---
 .scratch/

@@ -6863,3 +6863,76 @@ Phase D — TASKS + WORKLOG：
 - 七段式第 1 段是否真的在 hook fail 時 banner 開頭
 
 AUTO_TASK_DONE: Phase Z plan complete — junction self-heal + AO-SYNC SSOT collision removed + fetch retry ledger + hook failure prominence
+
+
+---
+
+## 2026-05-28 Phase Z6 — AO-CLOSE archive lift gate
+
+**[任務]** 解 5/28 18:46 AO-CLOSE archive「未完成」第 5 項「SG deploy 落後 3 commits」silent drop 的 class-of-bug：archive-only items 沒 lift 到 TASKS.md → 跨機 AO-RESUME 看不到 → 永久遺失。
+
+**[根因]**
+- AO-CLOSE archive 是 agent (Claude) 用 Write tool 寫的（不是 script）
+- archive 「未完成 / 明日優先」段條目沒強制機制 lift 到 TASKS.md
+- AO-RESUME 只讀 TASKS.md / open-tasks-snapshot.md，不讀 AO-CLOSE archive
+- 結果：archive-only 條目對 cross-machine 操作者完全不可見
+- 觸發條件：跨機（桌機收工 → 筆電開工），operator 大腦無續接記憶
+
+**[已修改] 4 個檔**
+
+1. **新檔** [`scripts/verify-archive-tasks-lift.ps1`](../scripts/verify-archive-tasks-lift.ps1)（357 行 with BOM）：
+   - 讀最新 `agency-os/reports/ao-close/YYYY-MM-DD-HHMM.md`
+   - Parse `## 未完成` / `## 明日優先` sections
+   - Token strategy: bold-text identifier (`**Title**`) + 8-12 char sliding sub-windows for partial matches
+   - Anchored search: only match tokens in first 120 chars of TASKS.md `- [ ]` lines (防止 false positive — "SG deploy" 出現在 narrative 深處不算)
+   - Escape hatch: `<!-- archive-only: <reason> -->` 標記 bullet 為 documentation / 已解決
+   - Exit 0/1/2 分等級；`-EmitState` 寫 `agency-os/.agency-state/archive-lift-last.json`
+   - **R0+R4 4 動作 inline**：iterative test against 18:46 archive (1 lifted → 4 → 6/false-positive → 5 lifted + 1 SG deploy correctly missing)
+
+2. [`scripts/system-health-check.ps1`](../scripts/system-health-check.ps1)（new gate 12c after 12b junction gate）：
+   - 跑 `verify-archive-tasks-lift.ps1 -EmitState`
+   - 讀 `archive-lift-last.json`，verdict ≠ pass → `Add-CriticalFailure`
+   - 不可被 `-AllowNonPerfectHealth` 旁路
+
+3. [`.claude/commands/ao-close.md`](../.claude/commands/ao-close.md) Step 2.5：
+   - Hard rule: every 未完成 / 明日優先 bullet must also be in TASKS.md `- [ ]`
+   - Escape hatch documented: `<!-- archive-only: <reason> -->`
+   - 引用 5/28 18:46 SG deploy silent drop 作 cautionary tale
+
+4. [`agency-os/reports/ao-close/2026-05-28-1846.md`](reports/ao-close/2026-05-28-1846.md)：
+   - 「SG deploy」bullet 加 `<!-- archive-only: resolved during 18:46→21:45 gap by SG drift-watcher auto-deploy (0bc1b0c → 2e2409d, includes 832c562 Batch 2); Phase Z6 retro-annotation -->`
+   - 加兩條 documentation bullets（也標 archive-only）解釋此 retro-annotation 的目的
+   - 此檔已 push 過、不可竄改；補 annotation 屬可審文檔化
+
+**[驗證結果 — R0+R4 四動作]**
+
+1. **實測 end-to-end**：
+   - `scripts/verify-archive-tasks-lift.ps1 -ArchiveFile <18:46>` → 第 1 次跑 6 bullets / 1 lifted / 5 missing（token 太窄）
+   - 改 token = bold-text → 6 / 4 / 2（不夠精確）
+   - 改 token + sliding-window 8-12 chars → 6 / 6 / 0（過於寬鬆，false positive on "SG deploy"）
+   - 改 anchored search first 120 chars → 6 / 5 / 1 ✓ 正確抓到 SG deploy 漏報
+   - 加 archive-only annotation 後 → 5 lifted + 3 archive-only annotations / 0 missing → PASS exit 0
+   - `verify-build-gates` ALL PASSED with new gate 12c active
+2. **Review**：Read 4 個改後檔案，PowerShell syntax 過、JSON 格式合法、HTML comment escape pattern 正確
+3. **抓蟲 cross-file**：
+   - `Grep "verify-archive-tasks-lift"` → 只在 4 個應該的地方（script self + system-health-check + ao-close.md + WORKLOG）
+   - `Grep "archive-only:"` → 18:46 archive 註記 3 處 + ao-close.md spec 描述 + verify script 內部 regex
+   - `Grep "Phase Z6"` → 一致 reference
+   - audit-cross-machine-bom skill：本次 .md 改動全是 repo-內（TASKS / WORKLOG / ao-close archive / ao-close.md via junction）→ 不走 Google Drive → 免 BOM
+   - audit-encoding skill 跑 verify-archive-tasks-lift.ps1：腳本本身 ASCII-only console output，內部 regex 含 CJK 但已加 UTF-8 BOM → 不會 CP950 trap
+4. **WORKLOG**：本 entry
+
+**[剩餘風險]**
+- 18:46 archive 已 retro-annotated 但這是 ad-hoc 補洞；未來新增的 archive 必須 by-design 走 Step 2.5 規則
+- token sliding-window 演算法可能對極短/極長 bold-text 失準（< 8 chars 沒覆蓋；> 60 chars 跳過）；目前 6 bullets sample 都在 sweet spot
+- Z5（fetch-recency gate）仍未實作；本 Z6 集中解 lift gap，與 Z5 是並列課題
+- 若操作者刻意把整個 archive 設成 archive-only（極端情況），gate 會 pass 但 TASKS 永遠不會被更新 → 需要 future Z7 加 "max archive-only ratio" guard
+
+**[rollback]**
+- 整 Phase Z6 單 commit 可 `git revert <hash>`
+- 18:46 archive retro-annotation 可 partial revert（只 revert 該檔的改動）
+
+**[跨機分工]**
+- 桌機下次 AO-CLOSE 會自動走 Step 2.5 流程（slash command spec 改了）+ 跑 health-check 12c gate（system-health-check.ps1 改了，需 git pull）
+
+AUTO_TASK_DONE: Phase Z6 archive lift gate — mechanical 100% coverage + 18:46 retro-annotation

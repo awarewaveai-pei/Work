@@ -715,6 +715,42 @@ if (Test-Path -LiteralPath $ensureJunctionScript) {
     Add-Check -Name ".claude junction (ensure-claude-junction.ps1 dry-run)" -Pass $true -Detail "Skipped: scripts/ensure-claude-junction.ps1 not present"
 }
 
+# 12c) AO-CLOSE archive 未完成/明日優先 items lifted to TASKS.md.
+# Phase Z6 (2026-05-28) — prevents the silent-drop class observed when the
+# 5/28 18:46 AO-CLOSE archive's "SG deploy 落後 3 commits" item lived only in
+# the archive and was invisible to the next AO-RESUME. SSOT: every pending
+# item must be in TASKS.md OR explicitly annotated `<!-- archive-only: ... -->`.
+$archiveLiftScript = Join-Path $monoRoot "scripts\verify-archive-tasks-lift.ps1"
+if (Test-Path -LiteralPath $archiveLiftScript) {
+    try {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $archiveLiftScript -EmitState 2>&1 | Out-Null
+        $liftExit = $LASTEXITCODE
+        $liftJsonPath = Join-Path $monoRoot "agency-os\.agency-state\archive-lift-last.json"
+        $liftDetail = "exit=$liftExit"
+        if (Test-Path -LiteralPath $liftJsonPath) {
+            try {
+                $liftJson = Get-Content -LiteralPath $liftJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                $liftDetail = "verdict=$($liftJson.verdict), bullets=$($liftJson.bullets), lifted=$($liftJson.lifted), missing=$($liftJson.missing), archive-only=$($liftJson.archiveOnly)"
+            } catch {
+                # state file unreadable — fall back to exit code only
+            }
+        }
+        switch ($liftExit) {
+            0 { Add-Check -Name "AO-CLOSE archive items lifted to TASKS.md (verify-archive-tasks-lift.ps1)" -Pass $true -Detail ("PASS: " + $liftDetail) }
+            1 { Add-Check -Name "AO-CLOSE archive items lifted to TASKS.md (verify-archive-tasks-lift.ps1)" -Pass $false -Detail ("FAIL: " + $liftDetail + " - archive has 未完成/明日優先 items missing from TASKS.md `- [ ]`; add them OR mark each archive-only bullet with HTML comment '<!-- archive-only: <reason> -->'"); Add-CriticalFailure -Reason "AO-CLOSE archive items not lifted to TASKS.md (see archive-lift-last.json)" }
+            2 { Add-Check -Name "AO-CLOSE archive items lifted to TASKS.md (verify-archive-tasks-lift.ps1)" -Pass $true -Detail ("Skipped: " + $liftDetail + " - no archive yet (fresh repo)") }
+            default { Add-Check -Name "AO-CLOSE archive items lifted to TASKS.md (verify-archive-tasks-lift.ps1)" -Pass $false -Detail "Unexpected exit code $liftExit"; Add-CriticalFailure -Reason "verify-archive-tasks-lift.ps1 returned unexpected exit $liftExit" }
+        }
+    } catch {
+        $msg = $_.Exception.Message
+        $excerpt = $msg.Substring(0, [Math]::Min(120, $msg.Length))
+        Add-Check -Name "AO-CLOSE archive items lifted to TASKS.md (verify-archive-tasks-lift.ps1)" -Pass $false -Detail ("Invocation crashed: " + $excerpt)
+        Add-CriticalFailure -Reason ("verify-archive-tasks-lift.ps1 invocation failed: " + $excerpt)
+    }
+} else {
+    Add-Check -Name "AO-CLOSE archive items lifted to TASKS.md (verify-archive-tasks-lift.ps1)" -Pass $true -Detail "Skipped: scripts/verify-archive-tasks-lift.ps1 not present"
+}
+
 $total = $checks.Count
 $passed = @($checks | Where-Object { $_.pass }).Count
 $failed = $total - $passed

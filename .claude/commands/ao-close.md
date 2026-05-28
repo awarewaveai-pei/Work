@@ -42,6 +42,34 @@ Output the four sections (all covering 上次 AO-RESUME → 本次 AO-CLOSE):
 - **連動檢查**（doc-sync, health gate result）
 - **明日優先**
 
+### Step 2.5 — Lift rule for 未完成 / 明日優先 bullets (Phase Z6, 2026-05-28)
+
+**Hard rule (cross-machine 30-year discipline)**: every `- ` bullet you plan to
+write under `## 未完成` or `## 明日優先` MUST also exist as a `- [ ]` line in
+`agency-os/TASKS.md` BEFORE the archive write. Reason: archive-only items are
+invisible to the next AO-RESUME on a different machine, where the operator's
+memory is not available. This caused the 5/28 18:46 "SG deploy 落後 3 commits"
+silent drop.
+
+For each bullet planned:
+1. Identify a distinctive token (typically the **bold-text title** like `**Batch 3**`).
+2. Grep `agency-os/TASKS.md` for `^- \[ \]` lines containing the token.
+3. If no match: add a new `- [ ]` entry to TASKS.md under the appropriate
+   `####` section, commit it as part of this AO-CLOSE.
+4. If the item is genuinely transient (e.g. already resolved during the
+   session-close gap, like an auto-deployed drift), annotate the archive bullet:
+
+   ```
+   - **<title>** — <description> <!-- archive-only: <one-sentence reason> -->
+   ```
+
+   The HTML comment escape hatch skips the lift check while documenting why.
+
+**Mechanical gate**: `scripts/verify-archive-tasks-lift.ps1` runs from
+`scripts/system-health-check.ps1` and Add-CriticalFailure on any unlifted bullet.
+On next AO-CLOSE / health-check, missing lifts will fail the 100% gate. Read
+`agency-os/.agency-state/archive-lift-last.json` for current state.
+
 ## Final Step — Archive the report (MANDATORY after the four sections)
 
 After printing the four-section output to chat, write the **exact same markdown** to:
