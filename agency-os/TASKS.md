@@ -58,6 +58,7 @@
 - [ ] 第二台機器同步 exit-2 hook 升級 → handoffs/2026-05-27-1521-git-pull-sync-claude-userlevel.md
 - [ ] **【2026-05-29 驗收】Phase4Weekly 首次 scheduled fire** — 14:00 TPE 後 `git pull origin main` → 確認 `agency-os/reports/repair-center/phase4-LATEST.md` 日期為 2026-05-29；若未更新 → 升級到 `claude.ai/code/routines` web UI 重授權 + 手動跑 `scripts/phase4-weekly-check.ps1`
 - [ ] **【先做後等 6/1】WeeklyReview auth 確認** — 先到 `claude.ai/code/routines` 確認 AgencyOS-WeeklyReview 無「re-authorize GitHub」警告（根因：2026-05-22 repo PUBLIC→PRIVATE 導致 2026-05-25 auto-disabled，今日已 re-enable via API）；若有警告 → 點進去重新授權；2026-06-01 01:00 UTC 後確認 `last_fired_at` 已更新
+- [ ] 明天 14:00 TPE 後 git pull 看 phase4-LATEST.md 日期有沒有變成 2026-05-29 → handoffs/2026-05-28-1152-git-pull-phase4.md
 
 #### 雙機環境 / 日常開工
 
