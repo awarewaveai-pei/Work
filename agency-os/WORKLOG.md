@@ -6731,6 +6731,58 @@ _Last synced: 2026-05-28 10:46:03 UTC_
 
 AUTO_TASK_DONE: bughunt-oracle.ps1 implementation + critic fixes complete
 
+---
+
+## 2026-05-28 21:XX [claude] feat(claude-code): reduce permission prompts + scrub 13 secret entries from user-level allow list
+
+**[任務]** 大幅減少 VSCode Claude Code permission prompts，且跨機（筆電 + 桌機）一勞永逸。**順手清掉 13 條外露在 `~/.claude/settings.json` 的真實密鑰**。R0 架構師模式執行 — 方案 D（最小修改 + 利用既有加密同步）。
+
+**[根因]**
+- VSCode Claude Code extension 沒有 CLI 的 `Bypass Permissions` mode（只有 Auto / Ask / Edit-auto / Plan）→ 每個 Bash 都會 prompt 除非在 allow list
+- 既有 allow list 134 條只覆蓋單引號 PS wildcard（`Bash(powershell.exe -Command ' *)`），**沒有雙引號版本** → 我（claude）大半指令用 `"..."` 引號 → 每次 prompt
+- 既有 list 還混了 13 條過去誤點「Allow always」時整段含密鑰的 vault set 指令，**真實 JWT / API token 長期外露**在 user-level 設定檔
+
+**[已修改]**
+- `C:\Users\user1115\.claude\settings.json`（user-level，**非 git 追蹤**）：
+  - **刪除**：13 條含真實密鑰的 entries（原 line 72/73/74/79/80/92/95/97/101/103/105/107/112）
+  - **新增**：40 條安全 wildcards（`[System.Environment]::GetEnvironmentVariable*` × 4、`Get-Content *` × 4、`Test-Path *` × 4、`Get-ChildItem *` × 4、`Select-String *` × 2、`Get-Item *` × 2、ao-resume/ao-close/sync-claude-userlevel/check-vps/check-cloudflare/check-governance/fetch-signals/machine-audit/secrets-vault `-Action get|list`/import-cross-machine/export-cross-machine 共 20 條 file-based wildcards）
+  - **完全沒動**：`permissions.deny`（20 條紅線）、`defaultMode`、`additionalDirectories`、`hooks` 5 events、`autoUpdatesChannel`、`theme`
+  - 最終 allow count = 134 - 13 + 40 = **161**
+- `D:\Work\.claude\settings.json`：**刪除**（之前架構誤判建在 gitignored 路徑，無效，redundant）
+
+**[未修改 / 不做的事]**
+- ❌ 不新建 `mcp/claude-userlevel/curated-allow-patterns.json` + 不改 `sync-claude-userlevel.ps1`：原本 Option C 設計過度，因 user-level `~/.claude/settings.json` 已透過 `export-cross-machine-memory.ps1` line 243-248 自動上傳加密 vault → AO-RESUME 自動下載到對機 → 跨機需求**既有基建已解決**
+- ❌ 不加 `Bash(powershell -Command " *)` 等通配 wildcard（=任意執行；違反 `/fewer-permission-prompts` skill 安全規則）
+
+**[驗證結果 — R0+R4 四動作]**
+1. **實測（end-to-end real test）**：
+   - `(Get-Content settings.json | ConvertFrom-Json).permissions.allow.Count` = **161** ✅
+   - `.hooks.PSObject.Properties.Name` = `UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, Stop` ✅
+   - Secret grep `eyJhbGci|tr_prod_|xai-|sb_secret|uk1_|66461c|039cae` = **0 matches** ✅
+   - 跑 4 個新 wildcard 測試（Get-Content / Test-Path / GetEnvironmentVariable / Get-ChildItem）→ **0 permission prompts**，全 exit 0 ✅
+2. **Review（讀回改後產物）**：Read `~/.claude/settings.json` 確認 JSON 結構完整、deny + hooks + additionalDirectories 一字不漏保留
+3. **抓蟲（cross-file bug hunt）**：
+   - 確認 `mcp/claude-userlevel/settings.template.json` 不含 `permissions.allow`（不會被 sync 覆蓋）→ 不衝突
+   - 確認 `import-cross-machine-memory.ps1` line 568-588 會自動把新版同步到桌機（last-write-wins + CONFLICT 偵測）
+   - `Bash` grep 13 條密鑰 → 已 0 殘留
+4. **WORKLOG**：本 entry（即此處）
+
+**[剩餘風險]**
+- 13 條被刪 entries 對應密鑰仍在 vault 內（`secrets-vault.ps1 -Action get` 可取回，功能不受影響）；**但 token 本體仍 active**，建議獨立排程 rotate（出本任務範圍）
+- additionalDirectories 列 `C:\Users\USER\*`（uppercase）跟實際 profile `user1115` 不符 — 既有現象，不在此次處理範圍
+- 桌機要等下次 AO-RESUME 才收到新版（既有加密同步流程，自動）
+
+**[rollback]**
+1. **首選**：`powershell -ExecutionPolicy Bypass -File .\scripts\import-cross-machine-memory.ps1 -Force` → 從加密 vault 強制還原昨天 AO-CLOSE 版本（含原 134 條 + 13 密鑰）
+2. **手動**：開檔貼回原版（git history 不可用，本檔 .gitignore line 11 排除）
+
+**[後續觀察]**
+- 下次 AO-CLOSE 觸發 `export-cross-machine-memory.ps1` → 新版自動上傳加密 vault
+- 桌機開工跑 AO-RESUME → 自動下載到 `~/.claude/settings.json`
+- prompts 應大幅下降；若桌機收到後仍多 prompts，回頭加 wildcard 即可
+
+AUTO_TASK_DONE: settings.json fewer-permission-prompts + secret scrub complete
+
 
 
 
