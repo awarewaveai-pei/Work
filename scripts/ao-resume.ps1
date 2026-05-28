@@ -613,12 +613,12 @@ try {
                         }
                     }
                 }
-                # Telegram: signals.telegram.messages[]
-                if ($rebootDj.PSObject.Properties.Name -contains 'telegram' -and `
-                    $rebootDj.telegram -and `
-                    $rebootDj.telegram.PSObject.Properties.Name -contains 'messages' -and `
-                    $rebootDj.telegram.messages) {
-                    foreach ($m in $rebootDj.telegram.messages) {
+                # ops_inbox_commands: signals.ops_inbox_commands.messages[] (renamed from telegram 2026-05-28)
+                if ($rebootDj.PSObject.Properties.Name -contains 'ops_inbox_commands' -and `
+                    $rebootDj.ops_inbox_commands -and `
+                    $rebootDj.ops_inbox_commands.PSObject.Properties.Name -contains 'messages' -and `
+                    $rebootDj.ops_inbox_commands.messages) {
+                    foreach ($m in $rebootDj.ops_inbox_commands.messages) {
                         $rebootCandidateMsgs.Add([PSCustomObject]@{ src = "telegram"; msg = $m }) | Out-Null
                     }
                 }
