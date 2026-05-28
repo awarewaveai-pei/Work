@@ -119,7 +119,7 @@
 
 #### 工具層 / 基礎建設 / 治理
 
-- [ ] **【2026-05-24 操作者提問】AO-RESUME 讀 WORKLOG tail 50 行邏輯改為「上次 AO-RESUME → 本次」區段** —— **【未開始】** **背景**：操作者觀察 `tail -50` 是機械讀檔，遇上長 entry（如 2026-05-24 `/tomo` plan + 永久化 patterns）會被中間區塊吃掉，看不到本輪 session 真實內容。**討論方向**：改成讀「自上次 AO-RESUME 戳記後的所有 entry」或「最近 N 個 `### ` subsection」；候選 anchor = `.agency-state/ao-resume-last.txt` / `ao-close-last.txt` 戳記 + `## YYYY-MM-DD` heading 邊界。**待操作者明天決定**：要改 ao-resume.ps1 內 WORKLOG fetch 邏輯，或加 helper script `scripts/print-worklog-since-last-resume.ps1`，或調整 `.claude/commands/ao-resume.md` 指示 agent 改用 grep + offset Read。**DoD**：AO-RESUME 第 3 段「已完成」能完整列出本輪 session 全部 entry，無中段截斷。
+- [x] **【2026-05-24 操作者提問】AO-RESUME 讀 WORKLOG tail 50 行邏輯改為「上次 AO-RESUME → 本次」區段** —— **【完成 2026-05-28】** ao-resume.ps1 生成 worklog-excerpt.md（gap window by AO-CLOSE date），ao-resume.md Step 1 #5 改讀此 state file。 **背景**：操作者觀察 `tail -50` 是機械讀檔，遇上長 entry（如 2026-05-24 `/tomo` plan + 永久化 patterns）會被中間區塊吃掉，看不到本輪 session 真實內容。**討論方向**：改成讀「自上次 AO-RESUME 戳記後的所有 entry」或「最近 N 個 `### ` subsection」；候選 anchor = `.agency-state/ao-resume-last.txt` / `ao-close-last.txt` 戳記 + `## YYYY-MM-DD` heading 邊界。**待操作者明天決定**：要改 ao-resume.ps1 內 WORKLOG fetch 邏輯，或加 helper script `scripts/print-worklog-since-last-resume.ps1`，或調整 `.claude/commands/ao-resume.md` 指示 agent 改用 grep + offset Read。**DoD**：AO-RESUME 第 3 段「已完成」能完整列出本輪 session 全部 entry，無中段截斷。
 
 #### Encoding 防護 — 一勞永逸延伸（CP950 audit 後續，2026-05-22 開出）
 

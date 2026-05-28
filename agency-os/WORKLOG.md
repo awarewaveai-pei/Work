@@ -44,7 +44,7 @@
 - 修根因一：新增 `.gitignore`（app 層 + infra 層雙重防線）untrack `tsconfig.tsbuildinfo`
 - 修根因二：VPS deploy 事件統一接入 `ops_incidents` pipeline（`POST /api/webhooks/deploy` → `ops_incidents` table → `GET /api/ops/inbox/incidents?source=deploy` → fetch-external-signals → AO-RESUME deploy_events 段）
 
-**改動清單**（13 個檔案）：
+**改動清單**（14 個檔案，含 R0 第二輪補發現）：
 - `apps/next-admin/.gitignore`（新增）— 防止 build artifacts 被追蹤
 - `infra/hetzner-phase1-core/.gitignore`（強化）— apps/*/tsconfig.tsbuildinfo 防線
 - `lib/ops-inbox/types.ts`— IncidentSource 加入 "deploy"
@@ -57,6 +57,7 @@
 - `scripts/auto-deploy-next-admin.sh`— post_to_ops_inbox() 函式（定義在呼叫前），deploy_success/failed 各發一次
 - `scripts/fetch-external-signals.ps1`— 新增 deploy_events 段、ops_inbox_commands 正名、endpoint_pending 視為 neutral
 - `.claude/commands/ao-resume.md`— 外部信號段更新：ops_inbox_commands 說明 + deploy_events 段
+- `scripts/ao-resume.ps1:617`（R0 第二輪抓蟲補修）— reboot 偵測讀 `$rebootDj.telegram` → 改為 `$rebootDj.ops_inbox_commands`（digest key 改名後靜默失效）
 
 **Critic 修正（2C + 3M + 5m，全數修正）**：
 - C1 bash: post_to_ops_inbox() 定義在呼叫後 → `set -euo pipefail` 下 exit 127 直接終止腳本（移至 deploy block 前）
@@ -77,9 +78,13 @@
 - REALTEST_EVIDENCE: tool=SSH+curl | cmd=GET /api/ops/inbox/incidents?source=deploy | exit=200 | result=count=1 title="SG next-admin auto-deployed OK"
 - REALTEST_EVIDENCE: tool=Bash | cmd=fetch-external-signals.ps1 -From '2026-05-28 11:00' -To '2026-05-28 12:00' | exit=0 | result=deploy_events status=ok event_count=1 fetch_status=ok
 - NOTE: 實測發現 DB check constraint 未含 'deploy' → 500；已補 migration 0031，apply 至 EU Supabase (supabase_admin)，重測 HTTP 200
+- REALTEST_EVIDENCE: tool=SSH+bash | cmd=post_to_ops_inbox() isolated bash exec (deploy_failed) | exit=200 | result=incident_id=bae6099d transition=new (bash fn end-to-end confirmed)
+- REALTEST_EVIDENCE: tool=SSH | cmd=sha256sum VPS vs repo auto-deploy-next-admin.sh | exit=0 | result=hashes match (sync confirmed)
+- REALTEST_EVIDENCE: tool=Bash | cmd=fetch-external-signals.ps1 -From '2026-05-28 11:00' -To '2026-05-28 12:30' | exit=0 | result=deploy_events count=2 (both success+failed visible)
+- REALTEST_EVIDENCE: tool=Bash | cmd=PS parser ao-resume.ps1 after ops_inbox_commands fix | exit=0 | result=syntax OK
 - REVIEW_DONE: critic=Deep | verdict=pass after fixes | findings=2c/3m/5n (all C+M addressed)
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ops_inbox_commands|deploy_events|IncidentSource|normalizeDeploy | hits=4 (all updated in same commit)
-- AUTO_TASK_DONE: SG auto-deploy 根治 + ops_inbox 架構統一
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=rebootDj\.telegram|ops_inbox_commands|toHaveLength\(6\)|deploy_events|normalizeDeploy | hits=5 (ao-resume.ps1:617 stale key found+fixed; all others clean)
+- AUTO_TASK_DONE: SG auto-deploy 根治 + ops_inbox 架構統一（R0 第二輪完整通過）
 
 ### Trigger.dev TaskRunStatus enum 不相容 — 根因確認並關閉
 
