@@ -6242,7 +6242,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-28 10:46:03 UTC_
+_Last synced: 2026-05-28 14:30:02 UTC_
 
 ## 2026-03-20
 
@@ -6936,3 +6936,4 @@ AUTO_TASK_DONE: Phase Z plan complete — junction self-heal + AO-SYNC SSOT coll
 - 桌機下次 AO-CLOSE 會自動走 Step 2.5 流程（slash command spec 改了）+ 跑 health-check 12c gate（system-health-check.ps1 改了，需 git pull）
 
 AUTO_TASK_DONE: Phase Z6 archive lift gate — mechanical 100% coverage + 18:46 retro-annotation
+

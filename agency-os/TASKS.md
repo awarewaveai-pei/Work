@@ -540,5 +540,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-28 10:28:34 UTC_
+_Last synced: 2026-05-28 14:30:02 UTC_
 
