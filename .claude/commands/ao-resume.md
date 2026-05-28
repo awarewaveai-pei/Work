@@ -71,7 +71,8 @@ Then classify the digest before reporting any messages:
 - **Digest is stale** (hook `finished_utc` from ao-resume-hook-last.json is >10 min newer than digest `generated_utc`)：
   ⚠️ **STALE DIGEST** — fetch-signals ran during AO-RESUME but did not refresh the file (API failure or credential issue). Report what the stale digest contains but label every item `[from stale digest — may be already-seen]`. Offer to manually re-run.
 
-Telegram @awarewave_ops_bot: 區段訊息數（**不過濾已讀 — 時間窗內全部訊息**）+ 可操作項條列（無則寫「本輪無新訊息」）
+ops_inbox_commands（使用者 Bot 指令）：區段訊息數 + 可操作項條列；**0 訊息 = 「操作者本輪無下指令」，正常；不代表無告警**
+deploy_events（VPS 部署事件，source=deploy from ops_inbox）：區段筆數 + FAILED/SUCCESS 條列；無則寫「本輪無部署事件」；`endpoint_pending` = 新端點尚未部署，屬正常
 Slack #ops-incidents / #infra-alerts: 區段訊息數（不過濾已讀）+ 最新一筆
 Cloudflare security: report result from `agency-os/reports/status/cf-security-LATEST.md` (bot=ON/OFF, rules=N) — skip if file missing.
 Only include actionable items; skip routine noise.

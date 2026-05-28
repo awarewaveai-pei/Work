@@ -137,7 +137,7 @@ function Get-Secret {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TELEGRAM — ops inbox API
+# OPS_INBOX_COMMANDS — user Telegram commands (user → bot direction only; 0 = no operator commands, normal)
 # ─────────────────────────────────────────────────────────────────────────────
 $tgStatus   = "no_token"
 $tgUnread   = 0
@@ -175,8 +175,43 @@ if ($opsToken) {
     }
 }
 
-Write-Host ("   Telegram: {0} ({1} msg)" -f $tgStatus, $tgUnread) `
+Write-Host ("   ops_inbox_commands: {0} ({1} msg)" -f $tgStatus, $tgUnread) `
     -ForegroundColor $(if ($tgStatus -eq "ok") { "Green" } else { "Yellow" })
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPLOY EVENTS — VPS deploy events via ops_inbox incidents API (source=deploy)
+# ─────────────────────────────────────────────────────────────────────────────
+$deployStatus = "no_token"
+$deployCount  = 0
+$deployEvents = @()
+
+if ($opsToken) {
+    try {
+        $uri  = "$opsBase/api/ops/inbox/incidents?source=deploy&since=$([Uri]::EscapeDataString($sinceIso))"
+        if ($untilIso) { $uri += "&until=$([Uri]::EscapeDataString($untilIso))" }
+        $resp = Invoke-RestMethod -Uri $uri `
+                    -Headers @{ Authorization = "Bearer $opsToken" } `
+                    -TimeoutSec 10 -ErrorAction Stop
+        $deployEvents = @($resp.incidents | ForEach-Object {
+            [ordered]@{
+                date     = $_.last_seen_at
+                title    = $_.title
+                severity = $_.severity
+                status   = $_.status
+                service  = $_.service
+            }
+        })
+        $deployCount  = $deployEvents.Count
+        $deployStatus = "ok"
+    } catch {
+        $msg = ($_.Exception.Message -replace '\r?\n', ' ')
+        if ($msg -match "404|Not Found") { $deployStatus = "endpoint_pending" }
+        else { $deployStatus = "error: $msg" }
+    }
+}
+
+Write-Host ("   deploy_events:      {0} ({1} events)" -f $deployStatus, $deployCount) `
+    -ForegroundColor $(if ($deployStatus -in @("ok","endpoint_pending")) { "Green" } else { "Yellow" })
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SLACK — conversations.history per channel
@@ -244,7 +279,7 @@ $generatedUtc = (Get-Date).ToUniversalTime()
 $endIso       = if ($untilUtc) { $untilUtc.ToString("o") } else { $generatedUtc.ToString("o") }
 
 # Aggregate fetch_status: ok = all channels succeeded, partial = at least one ok, failed = none ok.
-$allStatuses  = @($tgStatus) + @($slackChannels.Values | ForEach-Object { $_.status })
+$allStatuses  = @($tgStatus, $deployStatus) + @($slackChannels.Values | ForEach-Object { $_.status })
 $okCount      = ($allStatuses | Where-Object { $_ -eq "ok" }).Count
 $fetchStatus  = if ($okCount -eq $allStatuses.Count) { "ok" } elseif ($okCount -gt 0) { "partial" } else { "failed" }
 
@@ -258,10 +293,15 @@ $digest = [ordered]@{
         source    = $sinceSource        # explicit-from-param | ao-close-last.txt | ao-resume-last.txt | fallback-24h
         is_fresh  = $isFresh            # true = gap is reliable; false = fallback anchor, may include old signals
     }
-    telegram      = [ordered]@{
+    ops_inbox_commands = [ordered]@{
         status        = $tgStatus
-        message_count = $tgUnread   # renamed from unread_count: no read/unread filtering; returns ALL messages in window
+        message_count = $tgUnread
         messages      = $tgMessages
+    }
+    deploy_events = [ordered]@{
+        status      = $deployStatus
+        event_count = $deployCount
+        events      = $deployEvents
     }
     slack         = [ordered]@{
         status   = $slackStatus

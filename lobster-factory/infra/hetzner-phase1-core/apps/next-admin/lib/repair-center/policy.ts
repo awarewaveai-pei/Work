@@ -52,6 +52,14 @@ const REPAIR_SOURCE_POLICY_BY_SOURCE = {
     rationale: "主機資源與容器健康多半需要操作者或基礎設施層處置。改程式碼無法解決 CPU / RAM / disk 問題。例外：`system.post_update_reboot_status` 自 2026-05-23 起由 OS 層 unattended-upgrades auto-reboot 處理（SSOT: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf`），仍歸 human_only 不變，但實際告警會在下一個 20:00 UTC 自動消失。",
     can_escalate_to_pr: false,
   },
+  deploy: {
+    source: "deploy",
+    label: "部署事件",
+    policy: "human_only",
+    family: "infrastructure",
+    rationale: "部署成功 / 失敗為操作性事件，不屬於 code regression，由 VPS auto-deploy 腳本直接通知，Repair Center 不介入。",
+    can_escalate_to_pr: false,
+  },
   manual: {
     source: "manual",
     label: "手動",

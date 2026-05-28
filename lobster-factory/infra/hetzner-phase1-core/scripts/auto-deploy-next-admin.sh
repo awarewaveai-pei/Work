@@ -45,6 +45,9 @@ OPS_INCIDENTS_WEBHOOK=$(grep -E '^OPS_INBOX_SLACK_INCIDENTS_WEBHOOK=' "$ENV_FILE
 TELEGRAM_BOT_TOKEN_VAL=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
 TELEGRAM_ALLOWED_CHAT_IDS_VAL=$(grep -E '^TELEGRAM_ALLOWED_CHAT_IDS=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
 TELEGRAM_PRIMARY_CHAT_ID=$(echo "$TELEGRAM_ALLOWED_CHAT_IDS_VAL" | cut -d',' -f1 | tr -d ' ')
+OPS_INBOX_INGEST_TOKEN=$(grep -E '^OPS_INBOX_INGEST_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+OPS_INBOX_BASE_URL=$(grep -E '^OPS_INBOX_BASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+if [[ -z "$OPS_INBOX_BASE_URL" ]]; then OPS_INBOX_BASE_URL="https://app.aware-wave.com"; fi
 
 cd "$WORK_DIR"
 git fetch origin main --quiet 2>>"$LOG_FILE" || { log "ERROR: git fetch failed"; exit 1; }
@@ -90,6 +93,7 @@ if bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FILE" 2>&1; then
         SMOKE_WARN_SUFFIX="\n\n SMOKE_WARN: ${_sw_count} endpoint(s) non-2xx at ${_sw_ts}"
         log "SMOKE_WARN flag detected: $_sw"
     fi
+    post_to_ops_inbox "deploy_success"
 else
     log "FAILED: sg-deploy.sh exited non-zero for $APP"
     # C1 fix: surface auto-rollback in the failure notification.
@@ -99,6 +103,7 @@ else
         ROLLBACK_SUFFIX="\n\n🔴 AUTO-ROLLBACK FIRED: ${_rb}\n(previous snapshot restored; new code reverted)"
         log "ROLLBACK flag detected: $_rb"
     fi
+    post_to_ops_inbox "deploy_failed"
 fi
 
 SUBJECTS=$(cd "$WORK_DIR" && git log --no-merges --format=" - %h %s" --max-count=3 "${DEPLOYED}..${REMOTE_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || true)
@@ -110,6 +115,26 @@ else
     SLACK_MSG=$(printf ':x: *SG next-admin auto-deploy FAILED*\nDrift of *%s* commit(s) but deploy failed.\n\n- deployed:    `%s`\n- origin/main: `%s`\n\nFix: SSH -> `/root/lobster-phase1/scripts/sg-deploy.sh next-admin`' "$BEHIND" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}")
     TG_MSG=$(printf 'FAIL: SG next-admin auto-deploy FAILED\n\nDrift of %s commit(s), deploy failed.\n\ndeployed:    %s\norigin/main: %s\n\nFix: /root/lobster-phase1/scripts/sg-deploy.sh next-admin' "$BEHIND" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}")
 fi
+
+post_to_ops_inbox() {
+    local event=$1
+    if [[ -z "${OPS_INBOX_INGEST_TOKEN:-}" ]]; then
+        log "ops-inbox skipped: OPS_INBOX_INGEST_TOKEN not set"
+        return 0
+    fi
+    local payload
+    payload=$(OEVENT="$event" OAPP="$APP" ODEPLOYED="${DEPLOYED:0:12}" OORIGIN="${REMOTE_HEAD:0:12}" OBEHIND="$BEHIND" ORUN_AT="$(ts)" \
+        python3 -c 'import json,os; print(json.dumps({"event":os.environ["OEVENT"],"app":os.environ["OAPP"],"deployed_commit":os.environ["ODEPLOYED"],"origin_commit":os.environ["OORIGIN"],"behind":int(os.environ["OBEHIND"]),"run_at":os.environ["ORUN_AT"]}))')
+    local http
+    http=$(curl -sS -o /tmp/opsinbox-resp -w "%{http_code}" \
+        -X POST -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${OPS_INBOX_INGEST_TOKEN}" \
+        --data "$payload" \
+        "${OPS_INBOX_BASE_URL}/api/webhooks/deploy" 2>>"$LOG_FILE" || echo "000")
+    if [[ "$http" =~ ^2 ]]; then log "ops-inbox: $event sent: HTTP $http"
+    else log "ops-inbox: $event FAILED: HTTP $http: $(head -c 100 /tmp/opsinbox-resp 2>/dev/null)"; fi
+    return 0
+}
 
 send_slack() {
     local webhook=$1
