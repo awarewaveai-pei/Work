@@ -128,7 +128,41 @@ try {
         exit 0
     }
 
+    # Auto-trigger AO-RESUME on first prompt of a new session (>8h since last successful run).
+    # Root cause of Class B failures (2026-05-29 analysis): when the user types a greeting
+    # or short message, CLAUDE.md auto-invokes AO-RESUME, but this hook only fires ao-resume.ps1
+    # for prompts starting with "AO-RESUME". Without this block, the state file stays stale
+    # (potentially days old) and Claude declares Case B, requiring manual intervention.
+    # With this block, any first-prompt-of-session auto-refreshes the AO-RESUME state if it
+    # is more than 8 hours old. Non-blocking: any read/parse failure is silently skipped.
+    $autoTriggerAoResume = $false
     if (-not $isAoResume) {
+        $earlyStateDir = Join-Path $root "agency-os\.agency-state"
+        $earlyJsonPath = Join-Path $earlyStateDir "ao-resume-hook-last.json"
+        try {
+            if (Test-Path -LiteralPath $earlyJsonPath) {
+                $earlyJson = Get-Content -LiteralPath $earlyJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                $hasFin = $earlyJson.PSObject.Properties.Name -contains 'finished_utc'
+                if ($hasFin -and $earlyJson.finished_utc -and ([string]$earlyJson.finished_utc) -ne 'null') {
+                    $lastFin = [DateTime]::Parse(
+                        [string]$earlyJson.finished_utc, $null,
+                        [System.Globalization.DateTimeStyles]::RoundtripKind
+                    )
+                    if (([DateTime]::UtcNow - $lastFin).TotalHours -gt 8) {
+                        $autoTriggerAoResume = $true
+                    }
+                } else {
+                    $autoTriggerAoResume = $true  # hook never completed cleanly
+                }
+            } else {
+                $autoTriggerAoResume = $true  # state file missing — first run
+            }
+        } catch {
+            # Non-fatal: if state-file read fails, skip auto-trigger and proceed normally
+        }
+    }
+
+    if (-not $isAoResume -and -not $autoTriggerAoResume) {
         Write-HookResponse '{"continue":true}'
         exit 0
     }
