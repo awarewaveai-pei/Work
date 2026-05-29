@@ -108,33 +108,15 @@ try {
         }
     }
 
-    # Always auto-checkpoint on every prompt if working tree is dirty.
-    # This ensures untracked/modified files are never left behind even when
-    # the user doesn't type AO-RESUME or AO-CLOSE.
-    $dirtyCheck = Get-GitDirtyEntries -RepoRoot $root
-    if (@($dirtyCheck).Count -gt 0 -and -not $isAoResume) {
-        $checkpointScript = Join-Path $root "scripts\commit-checkpoint.ps1"
-        if (Test-Path -LiteralPath $checkpointScript) {
-            Push-Location -LiteralPath $root
-            try {
-                $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[claude] checkpoint: auto-save on session start" 2>&1 | Out-Null
-                $ErrorActionPreference = $savedEAP
-            } finally {
-                Pop-Location | Out-Null
-            }
-        }
-        Write-HookResponse '{"continue":true}'
-        exit 0
-    }
-
     # Auto-trigger AO-RESUME on first prompt of a new session (>8h since last successful run).
     # Root cause of Class B failures (2026-05-29 analysis): when the user types a greeting
     # or short message, CLAUDE.md auto-invokes AO-RESUME, but this hook only fires ao-resume.ps1
     # for prompts starting with "AO-RESUME". Without this block, the state file stays stale
     # (potentially days old) and Claude declares Case B, requiring manual intervention.
-    # With this block, any first-prompt-of-session auto-refreshes the AO-RESUME state if it
-    # is more than 8 hours old. Non-blocking: any read/parse failure is silently skipped.
+    # With this block, any first-prompt-of-session auto-refreshes the AO-RESUME state if
+    # the last run was more than 8 hours ago.
+    # ORDERING: MUST run BEFORE the dirty-tree short-circuit below, because the dirty-tree
+    # branch exits early (exit 0) and would prevent this staleness check from ever running.
     $autoTriggerAoResume = $false
     if (-not $isAoResume) {
         $earlyStateDir = Join-Path $root "agency-os\.agency-state"
@@ -158,8 +140,31 @@ try {
                 $autoTriggerAoResume = $true  # state file missing — first run
             }
         } catch {
-            # Non-fatal: if state-file read fails, skip auto-trigger and proceed normally
+            # Unparseable or corrupt state file is the strongest signal to re-run ao-resume.ps1.
+            # A file that cannot be parsed cannot be trusted as evidence of a recent healthy run.
+            $autoTriggerAoResume = $true
         }
+    }
+
+    # Auto-checkpoint on every prompt if working tree is dirty — BUT only for plain
+    # non-AO-RESUME prompts when auto-trigger is not active. When auto-trigger fires,
+    # ao-resume.ps1's FullMainlineParity path handles dirty-tree via
+    # Invoke-FullMainlineAlignWithAutoCheckpoint, so no standalone checkpoint is needed.
+    $dirtyCheck = Get-GitDirtyEntries -RepoRoot $root
+    if (@($dirtyCheck).Count -gt 0 -and -not $isAoResume -and -not $autoTriggerAoResume) {
+        $checkpointScript = Join-Path $root "scripts\commit-checkpoint.ps1"
+        if (Test-Path -LiteralPath $checkpointScript) {
+            Push-Location -LiteralPath $root
+            try {
+                $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -Message "[claude] checkpoint: auto-save on session start" 2>&1 | Out-Null
+                $ErrorActionPreference = $savedEAP
+            } finally {
+                Pop-Location | Out-Null
+            }
+        }
+        Write-HookResponse '{"continue":true}'
+        exit 0
     }
 
     if (-not $isAoResume -and -not $autoTriggerAoResume) {
