@@ -291,6 +291,7 @@ if (-not $SkipOpenTasksList -and (Test-Path -LiteralPath $openTasksScript)) {
 }
 
 # --- Claude Code user-level alignment (BEFORE preflight; idempotent, non-blocking) ---
+# CONTRACT: invoke sync-claude-userlevel.ps1 -Mode merge
 # MUST run BEFORE check-three-way-sync / verify-build-gates because check-claude-sync.ps1
 # H2 calls `sync-claude-userlevel -Mode verify`. If SSOT template changed since last run
 # (e.g. a new hook added in a cross-machine commit), verify fails and blocks ALL downstream
