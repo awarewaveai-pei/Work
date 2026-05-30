@@ -23,6 +23,11 @@ WEBHOOK_WARN_STAMP="${STATE_DIR}/.warned_missing_webhook"
 WEBHOOK_URL="${WEBHOOK_URL:-}"
 CHECK_URLS="${CHECK_URLS:-https://aware-wave.com/ https://app.aware-wave.com/ https://api.aware-wave.com/health https://n8n.aware-wave.com/healthz https://trigger.aware-wave.com/ https://uptime.aware-wave.com/dashboard}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-12}"
+# Optional second URL list for cross-region or known-slow probes. Default empty =
+# fully backwards compatible (no second loop runs, no fingerprint change).
+# Use a longer timeout for cross-region canaries to absorb routine network variance.
+CHECK_URLS_SLOW="${CHECK_URLS_SLOW:-}"
+TIMEOUT_SEC_SLOW="${TIMEOUT_SEC_SLOW:-20}"
 HEARTBEAT_URL="${HEARTBEAT_URL:-}"
 TELEGRAM_NOTIFY_ENABLED="${TELEGRAM_NOTIFY_ENABLED:-false}"
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
@@ -167,12 +172,29 @@ send_heartbeat() {
 
 # --- HTTP checks ---
 fail_lines=()
-for url in ${CHECK_URLS}; do
-  code="$(curl -sS -o /dev/null -L -w "%{http_code}" --max-time "${TIMEOUT_SEC}" "${url}" || true)"
+# Probe one URL. Echoes URL identity to stderr on failure so journal entries
+# self-explain which target timed out (curl's own "timed out" message has no URL).
+# fail_lines mutation is intentional global state — kept here so the dual loops below
+# share the same fingerprint input format.
+probe_url() {
+  local url="$1" timeout="$2" code
+  code="$(curl -sS -o /dev/null -L -w "%{http_code}" --max-time "${timeout}" "${url}" || true)"
   # 2xx / 3xx only (avoid bash ERE pitfall: ^2|3 matches a lone "3" anywhere)
   if [[ ! "${code}" =~ ^[23][0-9]{2}$ ]]; then
+    echo "endpoint-alert: ${url} -> ${code} (timeout=${timeout}s)" >&2
     fail_lines+=("${url} -> ${code}")
   fi
+}
+
+for url in ${CHECK_URLS}; do
+  probe_url "${url}" "${TIMEOUT_SEC}"
+done
+# Second tier runs only when operator opts in via CHECK_URLS_SLOW (.local drop-in).
+# Order matters for fingerprint stability: fast tier first, slow tier second.
+# fingerprint dedup below uses sort -u so order isn't load-bearing, but keeping it
+# deterministic helps log readability.
+for url in ${CHECK_URLS_SLOW}; do
+  probe_url "${url}" "${TIMEOUT_SEC_SLOW}"
 done
 
 # --- Fingerprint + state machine ---

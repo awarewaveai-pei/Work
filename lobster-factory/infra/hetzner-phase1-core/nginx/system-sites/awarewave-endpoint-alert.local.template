@@ -1,12 +1,33 @@
 # /etc/default/awarewave-endpoint-alert.local
-# Drop-in override — survives sync-hetzner-slack-alert-webhooks.ps1 rewrites.
+# Drop-in override - survives sync-hetzner-slack-alert-webhooks.ps1 rewrites.
 # Install: copy this to /etc/default/awarewave-endpoint-alert.local on VPS.
+#
+# MONITORING SCOPE (2026-05-18 onwards):
+#   SG endpoint-alert = SG services + ONE EU dead-man canary.
+#   EU Uptime Kuma    = comprehensive monitoring of all SG + EU services.
+#
+#   EU dead-man canary rationale:
+#     If the EU server goes completely offline, Uptime Kuma (which lives on EU)
+#     dies with it and cannot fire alerts. The single canary below lets SG detect
+#     total EU server failure and alert via Slack.
+#     Chosen URL: uptime.aware-wave.com - lightweight, no daily restarts,
+#     memory-capped at 512 MB (stable). If it returns non-2xx, EU is in trouble.
 #
 # WHY app.aware-wave.com path is /api/ops/summary (not /):
 #   Basic Auth protects the UI root. /api/ops/summary is behind location ^~ /api/ops/
 #   (no auth_basic in system nginx) and returns HTTP 200 from next-admin.
-#   Do NOT check / directly — it returns 401 and triggers false alerts.
-CHECK_URLS="https://aware-wave.com/ https://app.aware-wave.com/api/ops/summary https://api.aware-wave.com/health https://n8n.aware-wave.com/healthz https://trigger.aware-wave.com/ https://uptime.aware-wave.com/dashboard"
+#   Do NOT check / directly - it returns 401 and triggers false alerts.
+
+# SG services (3) - local 127.0.0.1, sub-second TTFB, 12s timeout is plenty.
+CHECK_URLS="https://aware-wave.com/ https://app.aware-wave.com/api/ops/summary https://api.aware-wave.com/health"
+
+# Cross-region EU canary (1) - SG->EU has ~190ms RTT + Cloudflare edge variance.
+# Needs longer timeout to absorb routine network jitter without false alerts.
+# Added 2026-05-30 after 14 timeouts in 7 days (11 on 2026-05-29 alone) traced to
+# this URL hitting the 12s wall during transient cross-region slowdowns.
+CHECK_URLS_SLOW="https://uptime.aware-wave.com/"
+# TIMEOUT_SEC_SLOW defaults to 20s in endpoint-alert.sh; uncomment to override.
+# TIMEOUT_SEC_SLOW=20
 
 # OPS_INCIDENTS_WEBHOOK_URL: send all infra alerts to #ops-incidents (superset channel).
 # Get value from vault: scripts/secrets-vault.ps1 -Action get -Name OPS_INBOX_SLACK_INCIDENTS_WEBHOOK
