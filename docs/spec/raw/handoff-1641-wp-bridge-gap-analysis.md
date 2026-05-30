@@ -1,0 +1,39 @@
+---
+slug: tomo-164100
+created_utc: 2026-05-30T08:41:00Z
+hint: "研究並設計『客戶網站建置系統』(Lobster Factory Client Onboarding Portal) — 參考 sc-icg.com / yangsheep.art；客戶填完整 onboarding form → 系統自動選 WP package/manifest → Claude 生完整網站規格與建站計畫 → 整合 Sentry/Netdata/Uptime Kuma + Slack/Telegram/Email alert + repair-agent 自修；輸出 14 段規格。限制: prod 不自動改、staging-first、logs/run_id/status/rollback、高風險 approval、多客戶多專案多站。"
+source_session_summary: "研究同事 jonjonesai WP 工具→決定 clean-room 自建控制平面完勝他；並映射出 onboarding 建站平台 ~80% 已存在；完成 WP 執行層 Ed25519 安全脊椎(7/7)。"
+---
+
+## 1. 任務目標
+輸出「客戶網站建置系統」(= Lobster Factory Client Onboarding Portal) 的 **14 段完整工程規格**（可直接交給工程師/Cursor）：客戶填 intake form → 自動選 package/manifest → Claude 生網站規格與建站計畫 → staging-first 建站 → 監控 + 告警 + 自修。
+
+## 2. 為什麼做
+使用者核心產品方向（最終可商業販售）；本 session 已做完平台 gap 分析，可直接進入規格產出（非阻塞）。
+
+## 3. 已試過
+- **R0 平台 gap 分析已完成**：並行掃描產出三份 Explore 結論 —— ①build/manifest/onboarding ②monitoring/webhooks/repair/alerts ③Supabase/n8n/Trigger.dev。**結論：此平台 ~80% 已存在於 repo**，14 點裡監控/告警/修復/Supabase/workflow/staging 幾乎做完，真正 net-new 只有 5 支柱（見 §5）。
+- WP 執行層**安全脊椎已建並驗證**：clean-room `aware-wave-wp-bridge` 的 `SignatureVerifier`(Ed25519) 真測 7/7 PASS（= 14 段裡執行 bridge 組件起步）。
+- 鎖定決策：clean-room 自寫（不抄同事 code）、販售模式先不綁死（中性多租戶）、aware-wave.com 當 client-zero(profile_a)、POD 列「電商 package 建店序列」參考。
+
+## 4. 卡在哪
+未卡。任務是「產出規格文件」，材料齊備。
+
+## 5. 下一步指令
+1. **依 14 點輸出規格**，每章標 `✅已有(reuse:<路徑>)` 或 `🆕要做`，不要重寫已存在的 80%。
+2. **聚焦 net-new 5 支柱**（真正缺口）：① 客戶端智能 **intake 表單**（公司/品牌/產品/客群/目標/參考站/視覺/素材/頁面/功能/SEO-GEO/CRM/電商/客服/自動化；現有 OnboardWizard 是操作者導向、技術性，缺客戶探索式表單）② **spec 生成大腦**（form→sitemap/頁面/文案/設計方向/圖片需求/plugin 選擇邏輯/逐 plugin 配置）③ **客製商品電商 package**(`wc-custom`/POD + ProductSpec generator) ④ **per-tenant 監控自動佈建**(建站後自動開 Sentry project + Uptime Kuma monitors + 告警路由到客戶 Slack/Telegram；補 checkout/form/CRM-webhook/plugin-fatal 監控項) ⑤ **WP 執行 bridge**（續砌：NonceCache→KeyStore→自我修復 transaction→KadenceValidator→PHPUnit+CI）。
+3. **硬限制全程套用**：prod 不自動改、所有建站先 staging、每步有 logs/run_id/status/rollback、高風險 approval、多客戶多專案多站。
+4. **格式**：可直接交工程師/Cursor；**參考 sc-icg.com / yangsheep.art 的 intake UX**（多步、分價格層、結構化問卷）。
+5. 跑 WP bridge 驗證時：`php -d extension=sodium -l <file>` + 真測；REALTEST_EVIDENCE 寫 WORKLOG。
+
+## 6. 相關資源（reuse 既有，禁重做）
+- **Onboard/Build**：`$WORK_ROOT/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/onboard/OnboardWizard.tsx`（5 步 + ClientInfo interface）、`.../app/build/BuildConsole.tsx`（profile_a/b/c）、`.../lib/build-console/contracts.ts`（BuildRunRequest）。
+- **Manifests**：`$WORK_ROOT/lobster-factory/packages/manifests/{wp-basic,wp-business,wc-core}.json` + `$WORK_ROOT/lobster-factory/apps/api/src/types/manifest.ts`（Zod）+ `.../services/wp/wpFactory.ts`。Plugin packs SSOT：`$WORK_ROOT/agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`（base16 + ecommerce/tourism/brand）。M3：`.../next-admin/lib/department-catalog.ts`（20 clusters）。
+- **Trigger.dev**：`$WORK_ROOT/lobster-factory/packages/workflows/src/trigger/{create-wp-site,apply-manifest,adopt-client-os,orchestrate-tenant-provisioning}.ts`。
+- **監控/告警/修復**：`.../app/api/webhooks/{sentry,uptime-kuma,netdata,grafana,posthog}/route.ts` + `.../lib/ops-inbox/{redactSecrets,fingerprint,notify/{slack,telegram,rules}}.ts` + `.../lib/repair-center/{types,policy,service}.ts`（policy catalog：sentry=auto_repair / uptime,grafana=analysis_only / netdata,deploy=human_only）+ `.../app/api/ops/approvals/**`。
+- **Supabase schema（reuse，勿重建）**：`$WORK_ROOT/lobster-factory/packages/db/migrations/0001..0025`（organizations→workspaces→projects→sites→environments、workflow_runs、package_install_runs、approvals、ops_incidents、repair_runs、command_requests、system_modes、ai_image_jobs、tenant_integration_bindings、smoke_test_results、handoff_reports）。
+- **已建 WP bridge**：`$WORK_ROOT/lobster-factory/packages/wp-bridge-plugin/{README.md, includes/Auth/SignatureVerifier.php}`。
+- **設計全文 plan 檔**（四層控制平面 L1-L4、威脅模型表、gap 分析、商業定位、整合 app.aware-wave.com §N）：
+  完整路徑 `C:\Users\user1115\.claude\plans\https-github-com-jonjonesai-claude-wp-sequential-clock.md`
+  （= `~/.claude/plans/https-github-com-jonjonesai-claude-wp-sequential-clock.md`；**更正 2026-05-30**：此檔實為 git-tracked（`.claude` 是 junction → repo `.claude/plans/`，`git ls-files` 確認已 tracked + committed），**跨機 `git pull` 會同步**。原註「不進 git」是錯的。亦見 `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md`）。
+- **Landmines**：① 本機 CLI PHP sodium 需 `-d extension=sodium` ② auto-checkpoint hook 會 commit repo 任何 dirty file → 測試暫存寫 `d:/tmp` 或 `$env:TEMP` ③ 副作用寫入（寄信/收款/刪訂單）不可自動回滾，標非交易型/人工門控 ④ prod 永遠不自動改、staging-first。
