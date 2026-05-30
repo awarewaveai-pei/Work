@@ -7309,3 +7309,34 @@ AUTO_TASK_DONE: CP950 parse-break 機械閘上線（system-health-check 硬閘 +
 AUTO_TASK_DONE: /api/ops/summary 部署上 production + post-deploy smoke 通過
 AUTO_TASK_DONE: onboarding portal 研究跨機固化（codebase-map + reading list + raw fallback）
 
+
+## 2026-05-30 — endpoint-alert.sh 加 consecutive-failure debounce（治告警誤報整類）
+
+**[任務理解]** Telegram 整天噴 `-> 000000 (timeout)` 假告警（4 個 CF 前置端點零星抖動 + 1 分鐘自愈）。根因不是服務壞，是 `endpoint-alert.sh`（每分鐘一檢）**第一次失敗就 page、零容忍瞬斷**。SG→Cloudflare→SG 公網回路偶發 >12s（實測重現 connect=3ms 但 15s 收 0 bytes）。真實副作用 = alert fatigue。
+
+**[方案比較]** A 調 timeout/移 slow tier → 已證實不夠（uptime 今天 20s 仍抖兩次）；B 改本機 127.0.0.1 → 治不了 EU canary、要改腳本支援 Host header、改變語意；**C consecutive-failure debounce（採用）** → 一機制治整 class（SG+EU）、語意不變、端點無關。
+
+**[已修改]** `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（5 處核心 + 3 處 critic 強化）：
+- 新 `FAIL_THRESHOLD`（預設 2，連續 2 次失敗才 page；1=legacy 立即 page）+ case 驗證 + `-lt 1` clamp
+- 新 `STREAK_FILE`（fail_streak 計數，persist-before-side-effect）+ `STATE_DIR` 可覆寫（測試用，預設不變）
+- `new_state` 改為 threshold-gated（sub-threshold 失敗呈現為 ok 不 page）；`new_kind` 從 new_state 導出
+- recovered branch 加 `-z fingerprint` guard（防 mid-incident 升級誤報 recovered）
+- **critic Deep 後強化**（pre-existing 風險，順手治）：兩處 `send_pagerduty` 加 `|| true`（PagerDuty 失敗不得 abort alerter，符合 design rule #3）；`last_notify_at` 移到 sends 之前（persist-before-side-effect，防 channel 故障時 reminder storm）；FAIL_THRESHOLD comment 註明 flapping coverage gap
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`bash -n` (deployed path) | exit=0 | ms=~200
+- REALTEST_EVIDENCE: tool=SSH | cmd=`STATE_DIR=/tmp ... bash endpoint-alert.sh`（狀態機真測，threshold=2/1）| exit=0 | 結果：R1 fail→state=ok/streak=1/**不 page** ✓ R2 fail→fail/2/**page** ✓ R3 healthy→ok/0/**recovered page fired**（notify_at 546→547）✓ 單次瞬斷 fail→ok→**兩次都 NONE（噪音消除）** ✓ threshold=1→立即 page（legacy 相容）✓ 無重複 page ✓
+- REALTEST_EVIDENCE: tool=SSH | cmd=`systemctl start awarewave-endpoint-alert.service`（真實 prod config 一輪）| exit=0 | service=success、last_state=ok、fail_streak=0、timer active 每分鐘
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/3n（**最關鍵兩類 real-outage-miss + false-recovered 經 critic 逐路追蹤確認 CLEAN**；2 Major+1 Minor 為 pre-existing，已順手修；flapping gap 已文件化）
+- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os | grep=`FAIL_THRESHOLD\|fail_streak\|STREAK_FILE` | hits=0（新 symbol 僅存在於 endpoint-alert.sh；無其他 consumer；systemd 靠 exit code、Slack/TG 靠人；slack-alert-drill.sh 不參考新 var）
+
+**[部署]** scp byte-exact（手貼 base64 曾損毀，sha 比對抓到 → 改 scp）→ /usr/local/bin/endpoint-alert.sh（sha cc80417b）；backup `endpoint-alert.sh.bak-20260530T155602Z`。
+
+**[剩餘風險]**
+- **Deploy gap（已開 TASKS）**：`endpoint-alert.sh` 無自動化部署機制（手動 scp）；`sync-hetzner-slack-alert-webhooks.ps1` 只寫 env。重建 SG 或 .bak 被清 → 腳本回退舊版。需 `sync-hetzner-endpoint-alert-script.ps1`（仿 heartbeat sync）。
+- flapping（每隔一分鐘 down）不 page = consecutive-hysteresis 固有；公網全面監控本就是 Uptime Kuma 的職責（已文件化）。
+
+**[rollback]** SG：`cp /usr/local/bin/endpoint-alert.sh.bak-20260530T155602Z /usr/local/bin/endpoint-alert.sh`（一行）；repo：`git revert <hash>`。
+
+AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（治公網抖動假告警 + critic 強化 pagerduty/persist 順序）
+

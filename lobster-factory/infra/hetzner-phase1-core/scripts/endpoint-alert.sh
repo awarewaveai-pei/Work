@@ -15,9 +15,12 @@
 #     are read correctly; new writes use "ok" or "fail:<sha256>".
 set -euo pipefail
 
-STATE_DIR="/var/lib/awarewave-alert"
+# STATE_DIR is overridable (default unchanged) so the state machine can be
+# exercised against a throwaway dir in tests without touching prod state.
+STATE_DIR="${STATE_DIR:-/var/lib/awarewave-alert}"
 STATE_FILE="${STATE_DIR}/last_state"
 LAST_NOTIFY_FILE="${STATE_DIR}/last_notify_at"
+STREAK_FILE="${STATE_DIR}/fail_streak"
 WEBHOOK_WARN_STAMP="${STATE_DIR}/.warned_missing_webhook"
 
 WEBHOOK_URL="${WEBHOOK_URL:-}"
@@ -45,6 +48,24 @@ RENOTIFY_AFTER_SEC="${RENOTIFY_AFTER_SEC:-0}"
 case "${RENOTIFY_AFTER_SEC}" in
   ''|*[!0-9]*) RENOTIFY_AFTER_SEC=0 ;;
 esac
+
+# Consecutive failing runs required before the FIRST alert fires (debounce /
+# hysteresis). 1 = legacy behaviour (alert on the very first failing check).
+# Default 2 suppresses single-run transients — e.g. one curl exceeding --max-time
+# during a brief Cloudflare edge / cross-region stall — which previously paged and
+# then self-recovered the next minute (alert fatigue). A real outage persists
+# across runs and still alerts after FAIL_THRESHOLD minutes. The raw failure is
+# logged to the journal every run regardless, so forensics are unaffected.
+# COVERAGE NOTE: this is CONSECUTIVE-failure hysteresis. A target that flaps with
+# a < FAIL_THRESHOLD run-length (e.g. down every other minute) never accumulates
+# enough consecutive failures to page here. That is acceptable for this alerter
+# because comprehensive public-surface monitoring is Uptime Kuma's job (see the
+# .local drop-in header); this script is the SG-side + EU dead-man safety net.
+FAIL_THRESHOLD="${FAIL_THRESHOLD:-2}"
+case "${FAIL_THRESHOLD}" in
+  ''|*[!0-9]*) FAIL_THRESHOLD=2 ;;
+esac
+[[ "${FAIL_THRESHOLD}" -lt 1 ]] && FAIL_THRESHOLD=1
 
 mkdir -p "${STATE_DIR}"
 
@@ -207,13 +228,36 @@ for url in ${CHECK_URLS_SLOW:-}; do
 done
 
 # --- Fingerprint + state machine ---
-# new_state is "ok" or "fail:<sha256-of-sorted-failures>"
+# fingerprint = sha256 of this run's sorted failing URLs (empty when all OK).
 fingerprint=""
 if [[ ${#fail_lines[@]} -gt 0 ]]; then
   fingerprint="$(printf '%s\n' "${fail_lines[@]}" | LC_ALL=C sort -u | sha256sum | awk '{print $1}')"
 fi
+
+# --- Debounce: consecutive failing-run counter (hysteresis) ---
+# Persist the streak BEFORE deriving notifiable state so a crash cannot regress it
+# (same invariant as the STATE_FILE write below). A single transient failure
+# (streak < FAIL_THRESHOLD) is NOT notifiable. This single lever tames both the
+# SG-service Cloudflare-hairpin jitter and the EU cross-region canary, which a
+# longer per-URL timeout could not (uptime still hit the 20s wall).
+prev_streak="$(cat "${STREAK_FILE}" 2>/dev/null || echo 0)"
+case "${prev_streak}" in
+  ''|*[!0-9]*) prev_streak=0 ;;
+esac
+if [[ -n "${fingerprint}" ]]; then
+  fail_streak=$(( prev_streak + 1 ))
+else
+  fail_streak=0
+fi
+write_atomic "${STREAK_FILE}" "${fail_streak}"
+
+# new_state is the NOTIFIABLE state: "ok" or "fail:<sha256>". Sub-threshold
+# failures present as "ok" (not yet paging); probe_url() already logged the raw
+# failure to the journal above.
 new_state="ok"
-[[ -n "${fingerprint}" ]] && new_state="fail:${fingerprint}"
+if [[ -n "${fingerprint}" && "${fail_streak}" -ge "${FAIL_THRESHOLD}" ]]; then
+  new_state="fail:${fingerprint}"
+fi
 
 old_state="$(cat "${STATE_FILE}" 2>/dev/null || true)"
 last_notify_at="$(cat "${LAST_NOTIFY_FILE}" 2>/dev/null || echo 0)"
@@ -227,7 +271,9 @@ now_epoch="$(date +%s)"
 old_kind="ok"
 [[ -n "${old_state}" && "${old_state}" != "ok" ]] && old_kind="fail"
 new_kind="ok"
-[[ -n "${fingerprint}" ]] && new_kind="fail"
+# Derive from the NOTIFIABLE state (threshold-gated), not the raw fingerprint, so
+# a sub-threshold transient does not count as a notifiable failure.
+[[ "${new_state}" != "ok" ]] && new_kind="fail"
 
 notify=false
 notify_kind=""
@@ -237,8 +283,11 @@ if [[ "${new_state}" != "${old_state}" ]]; then
     # ok -> fail OR fail:A -> fail:B (different failure set). Always notify.
     notify=true
     notify_kind="alert"
-  elif [[ "${new_kind}" == "ok" && -n "${old_state}" ]]; then
-    # fail -> ok. Recovered.
+  elif [[ "${new_kind}" == "ok" && -z "${fingerprint}" && -n "${old_state}" ]]; then
+    # fail -> ok. Recovered. The `-z fingerprint` guard ensures we only announce
+    # recovery when there are genuinely zero current failures — not when failures
+    # are merely sub-threshold (which would mis-report an ongoing incident as
+    # resolved, e.g. when this debounce upgrade lands mid-incident).
     notify=true
     notify_kind="recovered"
   fi
@@ -258,11 +307,20 @@ write_atomic "${STATE_FILE}" "${new_state}"
 if [[ "${notify}" == "true" ]]; then
   host="$(hostname)"
   ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  # Persist the notify timestamp BEFORE the channel sends — same persist-before-
+  # side-effect invariant as STATE_FILE / STREAK_FILE. Recording the attempt time
+  # up front keeps the RENOTIFY_AFTER_SEC clock advancing even if a channel send
+  # crashes, preventing a per-minute reminder storm during a channel outage.
+  write_atomic "${LAST_NOTIFY_FILE}" "${now_epoch}"
   if [[ "${new_kind}" == "ok" ]]; then
     msg=":white_check_mark: [aware-wave endpoint recovered] ${host} ${ts}"
     send_webhook "${msg}"
     send_telegram "${msg}"
-    send_pagerduty "resolve" "[aware-wave] public endpoint check recovered (${host})" ""
+    # `|| true`: a PagerDuty enqueue failure (HTTP error / connection timeout
+    # re-raises in send_pagerduty) must NEVER abort the alerter under `set -e`
+    # — same principle as the heartbeat (design rule #3). PagerDuty has its own
+    # dedup_key, so a missed enqueue self-heals on the next run.
+    send_pagerduty "resolve" "[aware-wave] public endpoint check recovered (${host})" "" || true
   else
     prefix=":rotating_light:"
     [[ "${notify_kind}" == "alert-reminder" ]] && prefix=":warning: [reminder]"
@@ -273,10 +331,9 @@ if [[ "${notify}" == "true" ]]; then
     # Reminders do not re-trigger PagerDuty (the incident is already open;
     # PagerDuty's own dedup_key would absorb it anyway).
     if [[ "${notify_kind}" != "alert-reminder" ]]; then
-      send_pagerduty "trigger" "[aware-wave] public endpoint check failed (${host})" "${detail_text}"
+      send_pagerduty "trigger" "[aware-wave] public endpoint check failed (${host})" "${detail_text}" || true
     fi
   fi
-  write_atomic "${LAST_NOTIFY_FILE}" "${now_epoch}"
 fi
 
 # Heartbeat last; failure non-fatal (see send_heartbeat).
