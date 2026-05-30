@@ -1,19 +1,16 @@
 # Workflows npm audit report
 
-- Generated UTC: 2026-05-11T01:10:19.203Z
+- Generated UTC: 2026-05-30T07:23:24.122Z
 - Path: `lobster-factory/packages/workflows`
-- Total: 4
+- Total: 1
 - Critical: 0
-- High: 1
-- Moderate: 3
+- High: 0
+- Moderate: 1
 - Low: 0
 
 ## Findings
 
-- `express-rate-limit`: severity=`moderate`, direct=`false`, fixAvailable=`true`, via=ip-address
-- `fast-uri`: severity=`high`, direct=`false`, fixAvailable=`true`, via=fast-uri (1117870), fast-uri (1117884)
-- `hono`: severity=`moderate`, direct=`false`, fixAvailable=`true`, via=hono (1117763), hono (1117764), hono (1117915), hono (1117916), hono (1117919)
-- `ip-address`: severity=`moderate`, direct=`false`, fixAvailable=`true`, via=ip-address (1117683)
+- `qs`: severity=`moderate`, direct=`false`, fixAvailable=`true`, via=qs (1119502)
 
 ## Decision template
 

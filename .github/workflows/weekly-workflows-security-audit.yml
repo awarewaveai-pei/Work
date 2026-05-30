@@ -81,7 +81,11 @@ jobs:
               ``,
               `## Report`,
               ``,
+              // Fenced as literal text: dependency names / advisory titles are
+              // untrusted strings — prevents them rendering as markdown in the issue.
+              '```text',
               report,
+              '```',
             ].join('\n');
 
             const existing = await github.rest.issues.listForRepo({
