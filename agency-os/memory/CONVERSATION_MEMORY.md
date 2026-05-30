@@ -1,8 +1,9 @@
-﻿# Conversation Memory
+# Conversation Memory
 
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-05-30 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-30 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:1587bb790aa0a750b5207d8f67cbd7b5f05d74b087f91d7ab473279e0a8f99b3 -->
 - **2026-05-28 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-05-28 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:2417d066c5a36f0811eb59320eaf7b3a8bf0179a41481eb8f2b77735ecc63b77 -->
 
 - **2026-05-28 22:35 CST (AO-CLOSE 筆電 session, Phase Z + Z6)** — 跨機 30-year sync fragility 兩大破口連修。Phase Z (commits 4f63393/4dbaf03/25eb2e9/3ca0df4): 移除 AO-SYNC vault claude-settings.json 與 sync-claude-userlevel SSOT template 雙 SSOT 衝突 (8102794 引入); 新 scripts/ensure-claude-junction.ps1 自癒 (idempotent stress-tested) 接入兩個 hook UserPromptSubmit STEP 0 + system-health-check gate 12b (防 auto-checkpoint 在 junction broken 時誤 commit 49 tracked file 像 0d63eb9 那樣); git-align-main-aoresume-feature.ps1 加 Invoke-GitFetchWithRetry 3 attempts + git-fetch-last.json ledger; .claude/commands/ao-resume.md 加 Step 0a hook fail banner 規則。Phase Z6 (commit 58e48be): 修 archive-only items invisible to next AO-RESUME class-of-bug — 新 scripts/verify-archive-tasks-lift.ps1 (bold-token + sliding-window + 120-char anchor + archive-only escape) 接入 health-check gate 12c critical; .claude/commands/ao-close.md 加 Step 2.5 強制 lift 規則; 18:46 archive SG deploy 補 archive-only 註記。事件覆盤: 19:53 AO-RESUME hook 失敗 (DNS) 寫假結論; junction broken auto-checkpoint 誤刪 49 file (用 git checkout 2e2409d 還原 commit 4f63393); 並行 session 做 fewer-permission-prompts + 刪 13 密鑰 (50cf601 整合)。驗證: verify-build-gates ALL PASSED with 兩 gate 12b/12c active; health 100%; origin 0 0 aligned; stress-test junction 自癒可用; verify-archive-tasks-lift 對 18:46 正確抓 SG deploy missing。桌機下次: git pull + sync-claude-userlevel merge + 重啟 Claude Code。
@@ -460,4 +461,3 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
 _Last synced: 2026-05-28 14:41:26 UTC_
-
