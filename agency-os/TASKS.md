@@ -58,6 +58,8 @@
 - [ ] **【2026-06-05 06:00 UTC 後驗收】Phase4Weekly 第二次 scheduled fire** — 確認 routine 自動 fire 成功（無 `auto_disabled_*` ended_reason）。檢查：`agency-os/reports/repair-center/phase4-LATEST.md` 日期更新到 2026-06-05；若再 disable → `claude.ai/code/routines` 手動重新授權 GitHub connection（API re-enable 無法治本 OAuth token 失效）。同步 6/1 WeeklyReview 結果驗收 OAuth token 底層有效性。根因 + 一次性修法見 WORKLOG 2026-05-30 13:20 entry。
 - [ ] Auto-Repair audit Batch 3 (M9 TOCTOU + M10 retry storm + m4 hostname) + Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) → handoffs/2026-05-28-1807-batch-3-post-phase.md
 - [ ] **Phase Z8** — AO-RESUME archive lift gate（同 Z6 思路套 AO-RESUME）：每次 AO-RESUME 寫 7-段式後必須 archive 到 `agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md`，否則 next health-check fail。原因：今天 5/30 12:32 AO-RESUME 我輸出 7-段式但忘了寫 archive，操作者點出才補；同 5/28 18:46 SG deploy silent drop class of bug，protocol 沒機械閘就靠 agent 自律不靠譜。實作：新 `scripts/verify-aoresume-archive.ps1` + 接入 system-health-check gate 12d + `.claude/commands/ao-resume.md` 加 Step 3 強制規則。
+- [ ] 設計「客戶網站建置系統」(Lobster Factory Onboarding Portal) + 輸出 14 段規格（含續砌 aware-wave-wp-bridge 執行層）→ handoffs/2026-05-30-1641-tomo-164100.md
+- [ ] 研究+輸出 Client Onboarding Portal 完整 14 段規格（form→自動選 package→Claude 生規格→staging 建站→monitoring+repair-agent）→ handoffs/2026-05-30-1644-onboarding-portal-spec.md
 
 #### 雙機環境 / 日常開工
 

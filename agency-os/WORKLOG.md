@@ -4,6 +4,10 @@
 
 ## 2026-05-30
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: tomo-164100 → handoffs/2026-05-30-1641-tomo-164100.md
+- TOMORROW_CAPTURED: onboarding-portal-spec → handoffs/2026-05-30-1644-onboarding-portal-spec.md
+
 ### Daily
 - 15:20 CST：weekly-automation framework 一勞永逸退役 — machine-local Windows 排程（單桌機、無 freshness watchdog、silent 19 天斷流）→ GitHub Actions `weekly-workflows-security-audit.yml`（git-tracked cron + 原生 surface）；刪 5 個死腳本、補 tombstone、health 100%
 - 13:40 CST：nginx 429 throttle-status 一勞永逸（SG+EU 雙 VPS）— rate/conn limiter 503→429 根治 netdata 5xx 假 CRITICAL；aware-wave-security.conf + nginx-lobster filter + netdata health.d 三檔收進 repo SSOT
