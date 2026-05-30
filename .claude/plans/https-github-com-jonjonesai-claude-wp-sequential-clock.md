@@ -177,7 +177,42 @@ AI 給規格 → 系統批量、可驗證、可回滾地把整站建好/改好�
 **架構注意(誠實)**:next-admin 在 SG VPS,Bridge 在各 client 站(如 Hostinger)→ Dashboard 的 API route **server 端**跨網呼叫 Bridge(SG→Hostinger 有延遲但控制操作可接受;簽章/key 留在 server)。
 **治理注意**:next-admin 改動走 `sg-deploy.sh`(npm test + typecheck + smoke + 自動回滾)且受 auto-repair guard 規則管;新 UI/API 須過這條 pipeline,符合既有閘。
 
-## 採用範圍對齊
-✅ fork 他的 Bridge(強化)作連線層 ✅ repo 原生 `/wp-operate` + 四層控制平面 + 內容/商品工廠 + 自我修復 + 測試/CI
-✅ **整合進 app.aware-wave.com**:接既有 `/ops/clients`、`/ops/approvals`、audit、inbox、job 模式(Dashboard 當駕駛艙)
-❌ 不採用他的 store-drop POD 建店整套 / Archon CLI ⏸ POD 建店留未來選項
+## P. 平台全景 + Gap 分析（2026-05-30 範圍擴張：從「WP bridge」→「整個 Client Onboarding 建站平台」）
+使用者把目標擴大成完整的 Onboarding Portal → 表單 → Claude 生規格 → staging-first 建站 → 監控 → 自修復。
+**R0 重大發現:此平台 ~80% 已存在於 repo,任務本質是「補完缺口」而非「從零建」。**
+
+### 已存在（重用，禁止重做）— file:evidence 見三份 Explore 報告
+- **多租戶 Supabase schema**:`packages/db/migrations/0001..0025`：organizations→workspaces→projects→sites→environments、`workflow_runs`、`package_install_runs`、`approval_policies/approvals/approval_steps`、`agents/agent_runs`、`ops_incidents`、`repair_runs`、`command_requests`、`system_modes`、`ai_image_jobs`、`media_assets`、`tenant_integration_bindings`、`smoke_test_results`、`adopt_audits`、`handoff_reports`、`resource_locks`、`ops_audit_events`。
+- **Onboard/Build UI**:`app/onboard/OnboardWizard.tsx`(5 步)、`app/build/BuildConsole.tsx`(profile_a/b/c)、`lib/build-console/contracts.ts`。
+- **Manifests**:`packages/manifests/{wp-basic,wp-business,wc-core}.json` + Zod `apps/api/src/types/manifest.ts` + `wpFactory.ts` validator。
+- **Trigger.dev 任務**:`create-wp-site`、`apply-manifest`、`adopt-client-os`、`orchestrate-tenant-provisioning`、`record-tenant-integration`、`dispatch-action-run`、`wp-install-plugins`、`ao-infrastructure-check`(`packages/workflows/src/trigger/`)。
+- **監控/webhook/notify**:`app/api/webhooks/{sentry,uptime-kuma,netdata,grafana,posthog}/route.ts` + `lib/ops-inbox/{redactSecrets,fingerprint,verifyIngestToken,transition,notify/{slack,telegram,rules,dispatcher}}`。
+- **Repair Center**:`lib/repair-center/{types,policy,run-state,service,backup,github}.ts` + `app/api/ops/repairs/**`(policy catalog、狀態機、critical pipeline gate、health gate）。
+- **Approvals**:`app/api/ops/approvals/**` + `command_requests`(high/critical gating + RBAC)。
+- **Plugin packs SSOT**:`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`(base16 + ecommerce/tourism/brand)。
+- **Run/rollback 範式**:`workflow_runs`(status: queued/running/succeeded/failed/waiting_approval)、`package_install_runs`(含 rollback_run_id)、`sg-deploy.sh`+`rollback-phase1.sh`、`LOBSTER_ENABLE_DB_WRITES`/`LOBSTER_MANIFEST_EXECUTION_MODE` gates。
+
+### Net-new（真正要做的缺口）
+1. **🆕 Client-facing 智能 Intake Portal**:現有 OnboardWizard 是**操作者導向、技術性**(slug/plugin pack/department)。缺的是**客戶導向的探索式表單**(公司/品牌/產品/客群/目標/參考站/視覺風格/素材/頁面/功能/SEO-GEO/CRM/電商/客服/自動化)= sc-icg.com / yangsheep.art 那種 intake。**這是主要新工作。**
+2. **🆕 Spec-generation 大腦**:Claude 把 intake → 完整網站規格(sitemap/頁面結構/首頁文案/設計方向/圖片需求/plugin-pack 選擇邏輯/逐 plugin 配置/staging→QA→launch)。建材都有,缺的是 generator + prompt + 輸出 schema。
+3. **🆕 Package 自動選擇規則引擎**:產業/目標/功能 → package + manifest。packs 已存在,規則引擎是新的。
+4. **🆕 客製商品電商 package**(`wc-custom`/POD):新 manifest + **ProductSpec/客製商品 generator**(變體、個人化欄位、印製範圍、供應商)。**→ 此處他的 store-drop POD DAG 重獲參考價值(見下)。**
+5. **🆕 Per-tenant 監控自動佈建**:平台級監控已有;缺「建站後自動幫該客戶開 Sentry project + Uptime Kuma monitors + 告警路由到客戶 Slack/Telegram」。`orchestrate-tenant-provisioning` 已部分做,需補齊 checkout/form/CRM-webhook/plugin-fatal 監控項。
+6. **🆕 WP 執行 bridge(本案原始範圍)**:把生成的規格**安全地套到站上**(對話式/自我修復)= `aware-wave-wp-bridge`,當 `apply-manifest` 之後的「逐 block/逐設定」精修層。
+7. **🆕 Client-zero dogfooding**:aware-wave.com 自身當 profile_a 客戶,跑同一條 pipeline(見下)。
+
+### POD 參考價值重估（回應「他那個 POD 也有參考價值吧?」）
+**對,改判。** 原本因為「只操作既有站」判 POD 無關;但使用者要做**客製商品電商**(net-new #4),
+他的 `store-drop-skill` 43-node DAG(palette→products→pages→menus→dark-mode→verify 的 staging-first 驗證式建店序列)
+**對「電商 package 的建站步驟序列 + Kadence/Woo 商店設定知識」是有效參考**。
+界線不變:**只當行為/步驟參考,clean-room 自寫,不抄 code、不用 Archon CLI**。
+
+### Client-zero（回應「我的網站定位也是一個客戶」）
+**對,且架構已支援。** 現有 `profile_a`(AO-agent / aware-wave.com internal,見 BuildConsole)就是為此存在。
+aware-wave.com 當「客戶零號」跑完整 intake→spec→build→monitor pipeline = 最佳 dogfooding + 第一個展示案例(像 sc-icg/yangsheep 拿自己網站當招牌)。
+
+## 採用範圍對齊（更新）
+✅ clean-room 自寫 Bridge(net-new #6)作執行層 ✅ 接既有 onboard/build/manifests/trigger/repair/approvals,**不重做 80% 已存在部分**
+✅ 整合進 app.aware-wave.com(Dashboard 當駕駛艙) ✅ **他的 POD 重列為「電商 package 建站序列」參考**(clean-room)
+✅ 客製商品電商 = 新 `wc-custom` package + ProductSpec generator ✅ aware-wave.com = client-zero(profile_a dogfooding)
+❌ 不抄他的 code / 不用 Archon CLI ⏸ 販售商業模式先不綁死(中性多租戶設計)
