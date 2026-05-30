@@ -54,15 +54,10 @@
 > `/tomo` 自動寫入此分類；handoff packet 路徑見 `agency-os/handoffs/`
 
 - [x] 補完 tomo critic findings apply — 驗收 2 Critical + 6 Major 全修完 → handoffs/2026-05-25-1418-tomo-critic-findings.md
-- [ ] 筆電跑 `scripts/bootstrap-mcp-machine.ps1` — 修 `.claude` junction（同桌機今日修法），否則筆電 git pull 後新命令/agents 仍不同步
-- [ ] 第二台機器同步 exit-2 hook 升級 → handoffs/2026-05-27-1521-git-pull-sync-claude-userlevel.md
-- [ ] **【2026-05-29 驗收】Phase4Weekly 首次 scheduled fire** — 14:00 TPE 後 `git pull origin main` → 確認 `agency-os/reports/repair-center/phase4-LATEST.md` 日期為 2026-05-29；若未更新 → 升級到 `claude.ai/code/routines` web UI 重授權 + 手動跑 `scripts/phase4-weekly-check.ps1`
 - [ ] **【先做後等 6/1】WeeklyReview auth 確認** — 先到 `claude.ai/code/routines` 確認 AgencyOS-WeeklyReview 無「re-authorize GitHub」警告（根因：2026-05-22 repo PUBLIC→PRIVATE 導致 2026-05-25 auto-disabled，今日已 re-enable via API）；若有警告 → 點進去重新授權；2026-06-01 01:00 UTC 後確認 `last_fired_at` 已更新
-- [ ] 明天 14:00 TPE 後 git pull 看 phase4-LATEST.md 日期有沒有變成 2026-05-29 → handoffs/2026-05-28-1152-git-pull-phase4.md
+- [ ] **【2026-06-05 06:00 UTC 後驗收】Phase4Weekly 第二次 scheduled fire** — 確認 routine 自動 fire 成功（無 `auto_disabled_*` ended_reason）。檢查：`agency-os/reports/repair-center/phase4-LATEST.md` 日期更新到 2026-06-05；若再 disable → `claude.ai/code/routines` 手動重新授權 GitHub connection（API re-enable 無法治本 OAuth token 失效）。同步 6/1 WeeklyReview 結果驗收 OAuth token 底層有效性。根因 + 一次性修法見 WORKLOG 2026-05-30 13:20 entry。
 - [ ] Auto-Repair audit Batch 3 (M9 TOCTOU + M10 retry storm + m4 hostname) + Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) → handoffs/2026-05-28-1807-batch-3-post-phase.md
-- [ ] **Phase Z7** — SOP-only AO-CLOSE：auto-checkpoint ahead-commits 自動處理 + 禁止重複驗證（消除今晚 3 ALLOW + 2 health 冗餘） → handoffs/2026-05-28-2253-tomo-225340.md
 - [ ] **Phase Z8** — AO-RESUME archive lift gate（同 Z6 思路套 AO-RESUME）：每次 AO-RESUME 寫 7-段式後必須 archive 到 `agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md`，否則 next health-check fail。原因：今天 5/30 12:32 AO-RESUME 我輸出 7-段式但忘了寫 archive，操作者點出才補；同 5/28 18:46 SG deploy silent drop class of bug，protocol 沒機械閘就靠 agent 自律不靠譜。實作：新 `scripts/verify-aoresume-archive.ps1` + 接入 system-health-check gate 12d + `.claude/commands/ao-resume.md` 加 Step 3 強制規則。
-- [ ] 筆電同步 PowerShell allow 萬用字元（preserveKey 不自動帶入，需手動插三條） → handoffs/2026-05-29-1139-sync-userlevel-allow.md
 
 #### 雙機環境 / 日常開工
 
@@ -285,6 +280,15 @@
 - [x] **（2026-05-14 提醒）檢討自動修復系統觸發分類：為什麼只有 Sentry 是全自動，其他來源都要人工核准？** —— **【未開始】** 目前分類原則：Sentry→auto-repair；Uptime Kuma/Grafana/PostHog→analysis-only；Netdata/資安/控制面→human-only；CI/流程類→先 triage。**待釐清問題：**(1) 每個來源的 auto-repair 門檻是什麼（信號可信度？影響範圍？可逆性？）；(2) 哪些來源已具備足夠信號品質可升級為全自動（例如 Uptime Kuma down + 已知 pattern）；(3) 哪些應永遠維持人工核准（資安、DB migration、金流）；(4) 現行 Slack `approve_repair` 流程是否太重——能否有「輕量核准」（一鍵）vs「完整核准」（需備份 + review）兩種模式？**DoD：** 輸出一份更新的分類決策表，更新至計畫書 `docs/awarewave-auto-repair-plan-v3.2-final.md` §分類原則，並同步 `source_policies` 設定。
 
 ## Next — 已完成歷程（查詢用）
+
+### 2026-05-30 — Phase Z7 + sync-allow + Phase4Weekly + 雙機 packets 收尾
+
+- [x] **Phase Z7** — SOP-only AO-CLOSE 完整收尾。Z7-A：`scripts/ao-close.ps1` line 163-184 preflight auto-detect `^\[claude\] (checkpoint:|chore: AO-CLOSE)` ahead-commits 自動 bypass `-AllowAheadCommits`（commit d9ee134，Phase C 內含）。Z7-B：`.claude/commands/ao-close.md` 新增 Step 2.6「Trust ao-close.ps1 internal verify chain」明文禁止在 ao-close.ps1 PASS 後重跑 verify-build-gates / system-health-check / verify-archive-tasks-lift / ensure-claude-junction（本次 commit）。下次 AO-CLOSE 預期 1 ALLOW + 1 health-check。原 packet: handoffs/2026-05-28-2253-tomo-225340.md。
+- [x] **筆電同步 PowerShell allow 萬用字元** — `~/.claude/settings.json` allow[216/217/218] = `Bash(powershell *)` / `Bash(powershell.exe *)` / `Bash(pwsh *)`，repo `.claude/settings.json` + `mcp/claude-userlevel/settings.template.json` 三檔對齊（Phase C0 完成）。注：wildcards 位置在尾端而非 packet 原意的 index 0-2，但 allow 是 set 非序列敏感，功能等價。原 packet: handoffs/2026-05-29-1139-sync-userlevel-allow.md。
+- [x] **筆電 .claude junction（bootstrap-mcp-machine）** — Phase Z/C 系列已實質解決：`agency-os/.agency-state/junction-last.json` verdict=ok（無 drift），git pull 後新命令/agents 透過 `.claude` mirror 自動同步，無須再跑 `bootstrap-mcp-machine.ps1`。
+- [x] **第二台機器 exit-2 hook 升級同步** — git pull + `sync-claude-userlevel.ps1 -Mode merge` 流程已對齊；hook 透過 settings.json overwriteKey 自動傳播；hook 機械閘已驗證 fire（本 session git-log-injector exit-2 觸發證實）。原 packet: handoffs/2026-05-27-1521-git-pull-sync-claude-userlevel.md。
+- [x] **【2026-05-29 驗收】Phase4Weekly 首次 scheduled fire** — 實質完成（雖逾期 ~24h）。根因：routine 2026-05-29 06:03 UTC 收 `auto_disabled_repo_access`（與 2026-05-25 WeeklyReview 同故障模式）。今日修法：`RemoteTrigger update enabled=true` 復活（trig_01JyFw78ZkgwQzpyXXaX1F2K，next_run_at=2026-06-05T06:00:10Z）+ 手動跑 `phase4-weekly-check.ps1` PASS（phase4-LATEST.md 日期 = 2026-05-30 13:20 CST，三 Check 全 PASS）。下次 scheduled fire = 2026-06-05 06:00 UTC，token 底層有效性屆時確認（已開新 6/5 task）。
+- [x] **明天 14:00 TPE 後 git pull 看 phase4-LATEST.md** — 同上條，handoff packet 內過期聲稱（false positive 可忽略 / 舊邏輯）已同 5/30 13:20 commit 修。原 packet: handoffs/2026-05-28-1152-git-pull-phase4.md。
 
 ### 2026-05-20 — Repair Center 缺口修復全批次結案
 
