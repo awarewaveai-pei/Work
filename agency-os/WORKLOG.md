@@ -5,8 +5,69 @@
 ## 2026-05-30
 
 ### Daily
+- 13:40 CST：nginx 429 throttle-status 一勞永逸（SG+EU 雙 VPS）— rate/conn limiter 503→429 根治 netdata 5xx 假 CRITICAL；aware-wave-security.conf + nginx-lobster filter + netdata health.d 三檔收進 repo SSOT
+- 14:00 CST：Phase Z7-B 補齊 + 6 個跨 session packets 結案 mark（Z7 / sync-allow / junction / exit-2 hook / Phase4Weekly 5/29 / phase4 git pull）
 - 13:20 CST：解 AO-RESUME 兩個 🟡 blocker — Phase 4 routine 復活 + sync-userlevel force-copy race 治本 + fallback Check 3 假警報修正
 - 12:00 CST：scanner-block.inc + endpoint-alert.sh 一勞永逸（Layer 2 啟發式 + per-URL tier）
+
+### claude 2026-05-30 13:40 — nginx 429 throttle-status 一勞永逸（SG+EU 雙 VPS）
+
+**根因**：netdata `awarewave_nginx_5xx_recent` CRITICAL（5/28-5/30 連續多次，例：單一 scanner IP `34.186.19.38` 一波 187/204 條請求觸發）的真正源頭**不是上游故障**，而是 nginx 兩道防禦性節流指令在限流時回傳**預設 status 503**：① `limit_req zone=req_perip`（rate limit，預設 503）② `limit_conn conn_perip 50`（connection limit，預設 503）。netdata web_log collector 把 503 計入 `error`（5xx）維度 → 觸發假 CRITICAL。防禦性節流是「正常工作」不是「伺服器失敗」，整套 stack（fail2ban filter `(?!429|401)` 排除 429、netdata 把 429 歸 `success`）**早已設計成預期 429**，唯獨 nginx config 缺了 `*_status 429` 這一行。既有慣例已存在於 `default.conf:75`（container nginx）+ `mainwp-aware-wave.conf`，這次是把慣例補齊到剩下的 vhost。
+
+**已修改**（4 檔 deploy + 2 檔收進 SSOT，3-way sha 全對齊 repo/SG/EU）：
+- [`infra/hetzner-phase1-core/nginx/system-sites/aware-wave-phase1.conf`](../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-phase1.conf) — apex（SG host 443）`limit_req` 後加 `limit_req_status 429;` + 4 行理由註解。sha `e11701373cef873192eabc28e18b444c8730576be0bce485d48b815b6a18adfa` → `/etc/nginx/sites-available/aware-wave-phase1`。
+- [`infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf`](../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/aware-wave-app-api-subdomains.conf) — app + api 兩個 server block 各加 `limit_req_status 429;`。sha `8ba979220fff6deeb8aff464571597a3f44c5163cdf01bd54a8d3c79bf762bd8`（scp 部署，避免 base64 手抄；live 收斂 comment-only drift）。
+- [`infra/hetzner-phase1-core/nginx/aware-wave-security.conf`](../lobster-factory/infra/hetzner-phase1-core/nginx/aware-wave-security.conf) — **新檔，原本只在 VPS** `/etc/nginx/conf.d/`。http context 加 `limit_conn_status 429;` + `limit_req_status 429;`（治第二源 `limit_conn`）；含 req_perip/conn_perip zone 定義 + 22 條 Cloudflare set_real_ip_from。Owner ref 修正為 `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md`。sha `a1fe2e882978a07fe6b3e5c7b45204d648de88c54dec4eddf2af423cda8ed044`。
+- [`infra/hetzner-phase1-core/nginx/system-sites/eu-rate-limit-zones.conf`](../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/eu-rate-limit-zones.conf) — EU `/etc/nginx/conf.d/rate-limit-zones.conf` http context 加 `limit_req_status 429;`（一次設定，所有 vhost 繼承）。sha `596c269d005755ae6254d3b96de23481264cefcf9263675af7deb9330ccd2bcd`。
+- [`infra/hetzner-phase1-core/fail2ban/filter.d/nginx-lobster.conf`](../lobster-factory/infra/hetzner-phase1-core/fail2ban/filter.d/nginx-lobster.conf) — **新檔，scp 自 SG VPS 收進 SSOT**（治理 gap）。sha `97f1a73d31b4652421abcf0a2afdb8675123a9ceb6e4377c44197beeda23df14`。
+- [`infra/hetzner-phase1-core/netdata/health.d/aware-wave.conf`](../lobster-factory/infra/hetzner-phase1-core/netdata/health.d/aware-wave.conf) — **新檔，scp 自 SG VPS 收進 SSOT**。sha `dfbe3ae9c91055ea9dc57f82ff7bed2d22bfd3a8cbc50a81b603e3e6b57551da`。
+
+**[驗證結果]**（R0 四動作）：
+
+1. **實測**：
+   - REALTEST_EVIDENCE: tool=SSH | cmd=`for i in $(seq 1 150); do curl -s -o /dev/null -w "%{http_code}\n" https://aware-wave.com/ & done; wait \| sort \| uniq -c`（SG 150 並發 burst，部署後）| exit=0 | result=`50×200 / 100×429 / 0×503`（部署前同測為 `52×200 / 57×429 / 41×503`，503 歸零）
+   - REALTEST_EVIDENCE: tool=SSH | cmd=`sha256sum /etc/nginx/sites-available/aware-wave-phase1 /etc/nginx/sites-available/aware-wave-app-api-subdomains.conf /etc/nginx/conf.d/aware-wave-security.conf`（SG）+ `sha256sum /etc/nginx/conf.d/rate-limit-zones.conf`（EU）| exit=0 | result=4 檔 sha 與 repo byte-identical（e1170137 / 8ba9792 / a1fe2e88 / 596c269）
+   - REALTEST_EVIDENCE: tool=SSH | cmd=`nginx -t && systemctl reload nginx`（SG + EU）| exit=0 | result=`syntax is ok / test is successful`，reload 無 error
+2. **Review**：
+   - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n — critic 確認 429 為 4xx 正確語意、未移動問題（fail2ban `(?!429|401)` 排除、netdata 429→success、502/504 真故障仍可見）；唯一 Minor（security.conf Owner ref stale）已同步修正並重 deploy（sha a1fe2e88）。
+3. **抓蟲**：
+   - BUGHUNT_DONE: scope=`agency-os lobster-factory scripts` | grep=`limit_req_status\|limit_conn_status\|req_perip\|conn_perip` | hits=既有慣例命中（default.conf:75 / mainwp-aware-wave.conf 已有 429，本次補齊的 4 個 vhost + security.conf；無衝突定義、無 stale 聲稱）
+   - BUGHUNT_DONE: scope=`lobster-factory` | grep=`429\|503\|nginx-lobster\|web_log` | hits=fail2ban filter + netdata health.d 確認 429 在所有 alarm bucket 之外（error/bad_requests 皆不含 429），無 downstream 破壞
+4. **WORKLOG**：本 entry。
+
+**[剩餘風險]**：
+- netdata `awarewave_nginx_5xx_recent` 須等下一波 scanner burst 才能在 production 驗收「不再誤報」（burst real-test 已證 nginx 端 0×503，但 netdata 端需實戰確認）；真正 502/504 上游故障仍會正常告警（已驗語意正確）。
+- fail2ban / netdata 兩個收進 SSOT 的檔目前為 VPS→repo 單向快照，未來 VPS 端若手改需重跑 sha 對齊（治理慣例已存在）。
+
+**[rollback]**：SG 從 `/root/nginx-backups/limit_req_status-20260530-052426/` 還原 + `nginx -t && systemctl reload nginx`；EU 從 `/root/nginx-backups/limit_req_status-20260530-053101/` 還原；repo 側 `git revert <hash>`。移除 `*_status 429` 即回到舊 503 行為（非破壞性，僅影響節流回應碼）。
+
+### claude 2026-05-30 14:00 — Phase Z7-B 補齊 + 跨 session packets 結案
+
+**根因**：本日 12:32 AO-RESUME §7「下一步」標示 Phase Z7 已完成 Z7-A（ao-close.ps1 preflight auto-detect，commit d9ee134）但 Z7-B（`.claude/commands/ao-close.md` Step 2.6 「禁止重複驗證」明文規則）尚未補；同時有 5 個跨 session packets（兩個 5/29 Phase4 驗收 + sync-userlevel-allow + bootstrap-mcp-machine + exit-2 hook）已被 Phase Z/C 實質解決但 TASKS.md 仍掛 `- [ ]`，需 mark done + 移到歷程區避免 archive-lift gate 卡 health check。
+
+**已修改**：
+- [`.claude/commands/ao-close.md`](../.claude/commands/ao-close.md) — Step 2.5 之後新增 `### Step 2.6 — Trust ao-close.ps1 internal verify chain`：明文禁止在 ao-close.ps1 PASS 後重跑 verify-build-gates / system-health-check / verify-archive-tasks-lift / ensure-claude-junction（junction-last.json verdict ≠ ok 例外）。理由：浪費 30-60s + 多餘 ALLOW prompt + 不增加正確性。配套引用 Z7-A line 163-184 preflight auto-detect。例外的例外：behind remote 中止後 git pull --ff-only 再重跑 ao-close.ps1（檔頭 [預授權] 段已授權）。
+- [`agency-os/TASKS.md`](TASKS.md) — 從「未完成 / 待釐清明日提醒」刪 6 條 `- [ ]`（L57/58/59/61/63/65 原行號）並移到「已完成歷程」新區塊 `### 2026-05-30 — Phase Z7 + sync-allow + Phase4Weekly + 雙機 packets 收尾`，每條附 closeout 證據（commit / 驗證指令 / handoff 引用）。新增 1 條 `- [ ]` 「【2026-06-05 06:00 UTC 後驗收】Phase4Weekly 第二次 scheduled fire」以追蹤 OAuth token 底層有效性。
+
+**[驗證結果]**（R0 四動作）：
+
+1. **實測**：
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts\verify-build-gates.ps1` | exit=0 | ms=~25000 | result=`verify-build-gates: ALL PASSED` + `Health Score: 100% (373/373)` + archive-lift verdict=pass
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File d:\tmp\bughunt-z7b.ps1` | exit=0 | result=Step 2.5 L42 + Step 2.6 L70 同檔順序正確；TASKS.md 未完成區 0 個 still-open stale claims（4 條全 mark [x]）；新 6/5 follow-up task 在 L58
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts\audit-cross-machine-bom.ps1` | exit=1 | result=37/38 with BOM；唯一 missing BOM 為 `memory/feedback_no_constant_allow.md`（與本 commit 無關，待下次 export-cross-machine-memory.ps1 自動補；本 commit 修的 ao-close.md / TASKS.md / WORKLOG.md 皆 repo 內檔，非 cross-Drive scope）
+   - REALTEST_WAIVED: NA -- Z7-A preflight 邏輯本 commit 未動（仍在 d9ee134 line 163-184），不重跑 ao-close.ps1 dry-run（會觸發 multi-ALLOW，違反本 commit 目的）
+2. **Review**：
+   - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — docs-only 改動：Step 2.6 結構與 Step 2.5 對稱（hard rule + 理由 + 配套機械閘 + 例外），引用 line 163-184 經 grep 確認準確；TASKS.md 歷程區塊格式符合既有慣例（`### YYYY-MM-DD —` + `- [x] **<title>** — <description>`）
+3. **抓蟲**：
+   - BUGHUNT_DONE: scope=`agency-os .claude scripts` | grep=`Step 2.6\|Trust ao-close\|verify chain` | hits=4（本檔 ao-close.md Step 2.6 段 + 本 WORKLOG entry 引用，無其他過期重複定義）
+   - BUGHUNT_DONE: scope=`agency-os` | grep=`bootstrap-mcp-machine\|exit-2 hook\|Phase Z7\|sync-userlevel-allow\|Phase4Weekly 首次` | hits=新歷程區塊內 5 條符合，未完成區無殘留（grep TASKS.md 確認）
+4. **WORKLOG**：本 entry。
+
+**[剩餘風險]**：
+- Z7-B 規則寫進 ao-close.md，但「下次 AO-CLOSE 只需 1 ALLOW + 1 health-check」要等真正執行才能驗收（本次未跑 AO-CLOSE，僅 mid-session commit）
+- 2026-06-05 06:00 UTC Phase4Weekly 第二次 fire + 2026-06-01 01:05 UTC WeeklyReview 是否再被 auto-disable 仍未知（OAuth token 底層有效性未證實）
+
+**[rollback]**：`git revert <hash>` 還原；無 production 影響（docs + TASKS markdown only）。
 
 ### claude 2026-05-30 13:20 — Phase 4 routine 復活 + sync force-copy race + fallback Check 3 假警報
 
