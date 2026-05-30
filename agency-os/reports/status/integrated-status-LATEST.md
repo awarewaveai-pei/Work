@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-05-29 11:46:13
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-05-30 17:14:00
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -219,37 +219,77 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-29.md
-# 2026-05-29 Daily
+## 5) memory/daily/2026-05-30.md
+# Daily Note - 2026-05-30
 
 ## Done today
+- **`/api/ops/summary` 客戶來源統一**：移除寫死 fallback tenants（slug 不符真實 DB），改成只讀 `organizations`，讓 ops-console 與 ops/clients 不再分歧。已部署 production（sg-deploy exit 0、smoke 4/4、curl 實測真實 DB slug）。commit 0b992b6。
+- **playwright-runner.ps1 CP950 parse 失敗修復**：非 ASCII 裝飾字元全 ASCII 化（不加 BOM，repo .ps1 走 git）；post-deploy Playwright smoke 26/0/4 PASS。commit 2661e20。
+- **CP950 parse-break 機械閘（防整類復發）**：新偵測器（CP950 解碼後 parse，零誤報 vs 天真 63-false-positive 規則）+ `-ParseBreakOnly` 模式 + 接入 system-health-check 硬閘；修最後 1 支壞檔 generate-customer-delivery-status.ps1（加 BOM，CJK 資料）。全 158 支零 parse-break。commit be04f36。
+- **onboarding portal 研究跨機固化**：codebase-map + reading list（`agency-os/docs/specs/`）+ raw fallback 副本（`docs/spec/raw/`）+ 更新 handoffs 1641/1644 + 更正 plan 檔「不跨機」stale 註記。commit 15e00ca + 2f893c7。
 
-### AO-RESUME 永久修法（commit `79dfbcc`）
-- 分析 8 份 5/23-5/29 AO-RESUME 報告（失敗率 62%，三類根因 A/B/C）
-- **F1** `scripts/ao-resume.ps1`：把 `sync-claude-userlevel -Mode merge` + `sync-mcp-config` 移到 `check-three-way-sync` 之前 → 消滅 Catch-22 ordering bug
-- **F2** `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`：加 `$autoTriggerAoResume` staleness check（>8h → 自動觸發）；staleness check hoisted before dirty-tree short-circuit；catch 設 `$true`
-- **F3** 立即 merge：settings.json 8 structural issues 修正，hook 套用到 `~/.claude/hooks/`
-- verify-build-gates ALL PASSED / health 100% (367/367) / critic Standard 0C/0M
+## Current state
+- next-admin production 健康（summary fix 已上線驗證）；CP950 parse-break 類已有機械閘永久防護。
+- onboarding portal：**研究完成**，14 段規格**尚未撰寫**（材料齊備、跨機可接續）。
 
-### PowerShell allow wildcard（桌機完成）
-- `~/.claude/settings.json` + `mcp/claude-userlevel/settings.template.json` 新增三條萬用字元
-- 筆電待同步 → handoffs/2026-05-29-1139-sync-userlevel-allow.md
+## Next steps
+- 寫 onboarding portal 14 段完整規格 → `agency-os/docs/specs/client-onboarding-portal-spec.md`（開工先讀 `client-onboarding-portal-CODEBASE-MAP.md` §0）。
 
-## Open / Pending
-- Phase4Weekly 14:00 TPE 後驗收（time-gated）
-- 筆電：bootstrap-mcp-machine.ps1 + PowerShell allow sync + exit-2 hook 升級
-- Phase Z7（SOP-only AO-CLOSE）
-- **重啟 Claude Code**（更新後 hook 生效）
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:1587bb790aa0a750b5207d8f67cbd7b5f05d74b087f91d7ab473279e0a8f99b3 -->
 
-## Notes
-- 桌機 AO-RESUME hook 今晨 exit=1（sync infrastructure），本日全修解決
-- 筆電昨夜 Phase Z 已 push，桌機 git pull 成功（b149c49）
+### claude 2026-05-30 09:50
+
+**性質**：空 close — 自 5/28 22:42 AO-CLOSE 後僅 1 個 commit (`b149c49 /tomo packet tomo-225340`)，已自我 documenting。
+
+**已完成**：無新工作；僅 /tomo 把 Phase Z7（SOP-only AO-CLOSE，消除 3 ALLOW + 2 health 冗餘）排入 handoff queue。
+
+**連動檢查**：origin `0 0` aligned；working tree clean；上次 health 100% (373/373) at 22:45 CST。
+
+**明日優先**：依 Phase Z7 packet 執行（handoffs/2026-05-28-2253-tomo-225340.md），修 ao-close.ps1 preflight + ao-close.md Step 2.6 禁止重複驗證。
+
+
+### verify-recent --ack (2026-05-30T04:50:22.4348096Z)
+
+**Reason**: endpoint-alert.sh + slack-alert-drill.sh verified via 2-round SSH real-test (bash -n, systemctl start manual run, dual-tier 3 fast 12s + 1 slow 20s confirmation, URL identity log confirmation, state machine ok); critic Standard review with 3 Major + 5 Minor — 5 real bug fixes applied + round-2 redeploy verified; full evidence chain in WORKLOG 2026-05-30 11:00 entry
+
+**Acknowledged unverified files** (count=2):
+
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\scripts\endpoint-alert.sh`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\scripts\slack-alert-drill.sh`
+
+
+### verify-recent --ack (2026-05-30T06:58:13.1190084Z)
+
+**Reason**: throwaway diagnostic .ps1 in d:/tmp (outside repo); all 4 already executed successfully this turn producing expected output (check-allow-status verified ~/.claude link state; check-wildcards confirmed 3 PS wildcards at allow[216-218]; check-z7-status confirmed Z7-A preflight + missing Z7-B; bughunt-z7b confirmed 0 stale claims + Step 2.5/2.6 ordering); no repo files touched by these scripts; main code change (Step 2.6 added to .claude/commands/ao-close.md) already verified via verify-build-gates ALL PASSED + Health 100% (373/373)
+
+**Acknowledged unverified files** (count=4):
+
+- `d:\tmp\check-allow-status.ps1`
+- `d:\tmp\check-wildcards.ps1`
+- `d:\tmp\check-z7-status.ps1`
+- `d:\tmp\bughunt-z7b.ps1`
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:899f9bba92a62362befff35dc2de8c4056969e6aaac1b4ee7014249510f744d7 -->
+
+### claude 2026-05-30 17:07
+
+- **完成（一句）**: app.aware-wave.com 分析 → 修 `/api/ops/summary` 客戶來源統一並部署 production → playwright-runner CP950 修復 → 建 CP950 parse-break 機械閘（防整類復發）→ onboarding portal 研究跨機固化。
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/summary/route.ts`（已部署 0b992b6）
+  - `scripts/playwright-runner.ps1`（ASCII 化 2661e20）
+  - `scripts/audit-cp950-traps.ps1` + `scripts/system-health-check.ps1` + `scripts/generate-customer-delivery-status.ps1`（CP950 gate be04f36）
+  - `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md` + `docs/spec/raw/*`（跨機固化 15e00ca+2f893c7）
+- **Git**: 0b992b6 / 2661e20 / be04f36 / 15e00ca / 2f893c7（均已 push）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: onboarding portal 14 段規格仍待寫（研究完成、開工先讀 client-onboarding-portal-CODEBASE-MAP.md §0）。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-29 11:46:05`
+- Time: `2026-05-30 17:13:55`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -259,70 +299,70 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260529-114559.md`
-- Closeout: `reports/closeout/closeout-20260529-114604.md`
+- Health: `reports/health/health-20260530-171351.md`
+- Closeout: `reports/closeout/closeout-20260530-171355.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-   - Anchored search: only match tokens in first 120 chars of TASKS.md `- [ ]` lines (防止 false positive — "SG deploy" 出現在 narrative 深處不算)
-   - Escape hatch: `<!-- archive-only: <reason> -->` 標記 bullet 為 documentation / 已解決
-   - Exit 0/1/2 分等級；`-EmitState` 寫 `agency-os/.agency-state/archive-lift-last.json`
-   - **R0+R4 4 動作 inline**：iterative test against 18:46 archive (1 lifted → 4 → 6/false-positive → 5 lifted + 1 SG deploy correctly missing)
+- `agency-os/docs/operations/AUDIT_REGISTRY.md`：L122 原把 `playwright-runner.ps1` + `generate-customer-delivery-status.ps1` 同列為「parse-error unrelated to encoding」（誤診）。拆兩行修正：playwright-runner 標 🔴 FIXED（確認 root cause 是 encoding）；generate-customer-delivery-status 標 🔴 TRACKED（同 root cause 但 CJK 為**資料**不可 ASCII 化，需 BOM 或外部化 catalog，另開任務）。
 
-2. [`scripts/system-health-check.ps1`](../scripts/system-health-check.ps1)（new gate 12c after 12b junction gate）：
-   - 跑 `verify-archive-tasks-lift.ps1 -EmitState`
-   - 讀 `archive-lift-last.json`，verdict ≠ pass → `Add-CriticalFailure`
-   - 不可被 `-AllowNonPerfectHealth` 旁路
-
-3. [`.claude/commands/ao-close.md`](../.claude/commands/ao-close.md) Step 2.5：
-   - Hard rule: every 未完成 / 明日優先 bullet must also be in TASKS.md `- [ ]`
-   - Escape hatch documented: `<!-- archive-only: <reason> -->`
-   - 引用 5/28 18:46 SG deploy silent drop 作 cautionary tale
-
-4. [`agency-os/reports/ao-close/2026-05-28-1846.md`](reports/ao-close/2026-05-28-1846.md)：
-   - 「SG deploy」bullet 加 `<!-- archive-only: resolved during 18:46→21:45 gap by SG drift-watcher auto-deploy (0bc1b0c → 2e2409d, includes 832c562 Batch 2); Phase Z6 retro-annotation -->`
-   - 加兩條 documentation bullets（也標 archive-only）解釋此 retro-annotation 的目的
-   - 此檔已 push 過、不可竄改；補 annotation 屬可審文檔化
-
-**[驗證結果 — R0+R4 四動作]**
-
-1. **實測 end-to-end**：
-   - `scripts/verify-archive-tasks-lift.ps1 -ArchiveFile <18:46>` → 第 1 次跑 6 bullets / 1 lifted / 5 missing（token 太窄）
-   - 改 token = bold-text → 6 / 4 / 2（不夠精確）
-   - 改 token + sliding-window 8-12 chars → 6 / 6 / 0（過於寬鬆，false positive on "SG deploy"）
-   - 改 anchored search first 120 chars → 6 / 5 / 1 ✓ 正確抓到 SG deploy 漏報
-   - 加 archive-only annotation 後 → 5 lifted + 3 archive-only annotations / 0 missing → PASS exit 0
-   - `verify-build-gates` ALL PASSED with new gate 12c active
-2. **Review**：Read 4 個改後檔案，PowerShell syntax 過、JSON 格式合法、HTML comment escape pattern 正確
-3. **抓蟲 cross-file**：
-   - `Grep "verify-archive-tasks-lift"` → 只在 4 個應該的地方（script self + system-health-check + ao-close.md + WORKLOG）
-   - `Grep "archive-only:"` → 18:46 archive 註記 3 處 + ao-close.md spec 描述 + verify script 內部 regex
-   - `Grep "Phase Z6"` → 一致 reference
-   - audit-cross-machine-bom skill：本次 .md 改動全是 repo-內（TASKS / WORKLOG / ao-close archive / ao-close.md via junction）→ 不走 Google Drive → 免 BOM
-   - audit-encoding skill 跑 verify-archive-tasks-lift.ps1：腳本本身 ASCII-only console output，內部 regex 含 CJK 但已加 UTF-8 BOM → 不會 CP950 trap
-4. **WORKLOG**：本 entry
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile playwright-runner.ps1` (PS5.1) | exit=0 (PARSE OK) | ms=~500
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke -SkipInstall` | exit=0 | ms=~60000（**smoke 26 passed / 0 failed / 4 skipped**；evidence: agency-os/reports/e2e/2026-05-30/smoke；含 `/api/ops/summary route exists -> 200` 覆蓋本次部署）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File playwright-runner.ps1` | exit=0 (clean, 0 unprotected capture sites)
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（確認 100% ASCII、regex/`$icon`/env-var 名/比較字串皆未動、引號括號平衡、無 stdout 消費者 keying off 舊 glyph）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`playwright-runner PASSED\|playwright-runner exited\|playwright-runner\.ps1` | hits=0（指 stdout 字串消費者）— 確認：sg-deploy hook 靠 **exit code** 非 stdout；其餘命中皆為檔名引用（docs/README/WORKLOG）
 
 **[剩餘風險]**
-- 18:46 archive 已 retro-annotated 但這是 ad-hoc 補洞；未來新增的 archive 必須 by-design 走 Step 2.5 規則
-- token sliding-window 演算法可能對極短/極長 bold-text 失準（< 8 chars 沒覆蓋；> 60 chars 跳過）；目前 6 bullets sample 都在 sweet spot
-- Z5（fetch-recency gate）仍未實作；本 Z6 集中解 lift gap，與 Z5 是並列課題
-- 若操作者刻意把整個 archive 設成 archive-only（極端情況），gate 會 pass 但 TASKS 永遠不會被更新 → 需要 future Z7 加 "max archive-only ratio" guard
+- `generate-customer-delivery-status.ps1` 同類 parse 失敗仍未修（已登錄 AUDIT_REGISTRY 🔴 TRACKED）；非本次 scope，需 BOM 或 catalog 外部化的設計決定
+- `audit-cp950-traps.ps1` 自身 banner 也有 `—` mojibake（顯示層，不影響 exit code）；未來可一併 ASCII 化
 
-**[rollback]**
-- 整 Phase Z6 單 commit 可 `git revert <hash>`
-- 18:46 archive retro-annotation 可 partial revert（只 revert 該檔的改動）
+**[rollback]** `git revert <hash>`；純顯示字串改動，無行為風險
 
-**[跨機分工]**
-- 桌機下次 AO-CLOSE 會自動走 Step 2.5 流程（slash command spec 改了）+ 跑 health-check 12c gate（system-health-check.ps1 改了，需 git pull）
-
-AUTO_TASK_DONE: Phase Z6 archive lift gate — mechanical 100% coverage + 18:46 retro-annotation
+AUTO_TASK_DONE: playwright-runner.ps1 ASCII 化修復 CP950 parse 失敗，post-deploy smoke 26/0/4 通過
 
 
-## 2026-05-28 (AO-CLOSE additional task closure)
+## 2026-05-30 — CP950 parse-break 機械閘（防整類復發）+ 修最後一支壞檔
 
-- AUTO_TASK_DONE: bootstrap-mcp-machine.ps1
-- AUTO_TASK_DONE: 第二台機器同步 exit-2 hook 升級
+**[任務理解]** 使用者：「做成 skill/runbook/command 防再發」。痛點 = repo `.ps1` 含非 ASCII 但無 BOM → 在 zh-TW PowerShell 5.1（CP950）可能 parse 失敗、整支跑不起來。既有 `/audit-encoding` 只抓 capture-site 陷阱（`& docker` 等），完全沒擋這個 source-parse-break 類。
 
+**[關鍵設計修正 — 避免 63 個 false positive]** 初版想用「非 ASCII + 無 BOM = fail」，但 R0 impact scan 發現**158 支 .ps1 中有 63 支符合此條件，其中 62 支天天正常運作**（ao-close/secrets-vault/ao-resume…）。真正會壞的只有「CP950 解碼後破壞語法引號/括號」那種。故改用**精準偵測**：把檔案 bytes 以 code page 950 解碼後 `Parser::ParseInput`，errors > 0 才算壞。全 158 支掃描 → **只有 1 支真壞**（`generate-customer-delivery-status.ps1` FAIL-79），零誤報。
+
+**[已修改]**
+- `scripts/audit-cp950-traps.ps1`：① 新增 `Get-Cp950ParseBreakFinding`（host-independent CP950-decode 偵測，BOM 檔與純 ASCII 檔快速跳過）② main loop 整合 ③ 新增 `-ParseBreakOnly` gate 模式（只報這個 catastrophic 類，跳過 136 個既有 capture-trap backlog）④ report 依 Status 分流修復指引 ⑤ 自身輸出字串 `CLEAN —` em-dash → ASCII。
+- `scripts/generate-customer-delivery-status.ps1`：加 UTF-8 BOM（其非 ASCII 是 CJK **資料**＝部門 cluster labels 董事/策略/治理…，不可 ASCII 化；BOM 是正解）。byte-level prepend，零內容/換行變動。
+- `scripts/system-health-check.ps1`：新增 HARD gate「PowerShell scripts parse under CP950」→ 跑 `audit-cp950-traps.ps1 -ParseBreakOnly`，非 0 即 Add-CriticalFailure（AO-CLOSE 100% 自動強制，無需 LLM 自律）。
+- `agency-os/docs/operations/AUDIT_REGISTRY.md`：前一 commit 已修誤診（playwright-runner 🔴 FIXED / generate-... 🔴 TRACKED）；本支現已 FIXED（BOM）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ParseFile generate-customer-delivery-status.ps1` (PS5.1, post-BOM) | exit=0 (OK，was FAIL-79) | ms=~500
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -ParseBreakOnly -Quiet` (full 146-file scan) | exit=0 (clean) | ms=~8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File <BOM-stripped copy> -ParseBreakOnly` (regression) | exit=1 (correctly CAUGHT 79 errors) | ms=~600
+- REALTEST_EVIDENCE: tool=Bash | cmd=`system-health-check.ps1` (end-to-end) | exit=1 | 99.7% 368/369 — 唯一 fail 是既有無關的「Claude Code sync infrastructure」；新 CP950 check 在 368 pass 內
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（playwright-runner ASCII 化那次 critic；本次為偵測器/閘接線，邏輯經 4 個 real test 證明，含正反例）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`audit-cp950-traps\|ParseBreakOnly\|GetEncoding(950)` | hits=0（無其他消費者依賴；health-check 用 exit code）
+
+**[剩餘風險]**
+- `GetEncoding(950)` 在 .NET Core（pwsh/Linux CI）需 CodePages provider，缺則 try/catch → $null（gate 在 Windows AO-CLOSE，950 必存在）；若日後加 Linux CI 需 `RegisterProvider`。
+- 既有 136 個 capture-trap drift 仍在 backlog（AUDIT_REGISTRY 記錄，多為 Low）；本次刻意不納入硬閘。
+- health-check 既有「Claude Code sync」fail 為本機 env 狀態，與本次無關。
+
+**[rollback]** 三檔可 `git revert <hash>`；偵測器為純新增函式 + 新 switch，預設行為不變。
+
+AUTO_TASK_DONE: CP950 parse-break 機械閘上線（system-health-check 硬閘 + audit-cp950-traps -ParseBreakOnly）+ generate-customer-delivery-status.ps1 BOM 修復，全 158 支 .ps1 零 parse-break
+
+
+## 2026-05-30 (AO-CLOSE 補記) — /api/ops/summary 已部署 + onboarding 研究跨機固化
+
+**[已部署確認]** `/api/ops/summary` 修正（commit 0b992b6）**已上 production**：`sg-deploy.sh next-admin` exit 0、Step 7 smoke 4/4 200、deployed commit 0b992b6、容器 healthy 無改名；curl 實測 `sourceOfTruth: supabase` + 真實 DB slug（`awarewave-ops`/`soulful-expression`）。post-deploy Playwright smoke 26/0/4 PASS。修正前 entry 的「尚未部署」風險已解除。
+
+**[onboarding portal 研究跨機固化]** 使用者問「換機怎麼讓我記得研究過的東西」。根因：對話 context 單次性，研究不落地就蒸發。做法：① 寫 `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md`（§0 reading list + §1/§2 build/ops 側全部 file:line + 精確 schema，研究已完成不必重跑 Explore）② 更新 handoffs 1641/1644 指向它 + 更正 1641 stale 註記（plan 檔實為 git-tracked 跨機同步）③ raw fallback 副本到 `docs/spec/raw/`（4 檔 + INDEX，三層保險：AO-RESUME 自動 / agency-os 正本 / raw 離線快照）。commit 15e00ca + 2f893c7。
+
+- REVIEW_WAIVED: DOC_ONLY -- 全為 .md 文件（research map / handoff / TASKS / raw 副本），無 code 改動
+- BUGHUNT_WAIVED: DOC_ONLY -- 文件固化，無 symbol/schema 改動；路徑寫入前已 Glob/git ls-files 驗證存在（manifests dir、wpFactory.ts、plan 檔 git-tracked 均實測確認）
+
+AUTO_TASK_DONE: /api/ops/summary 部署上 production + post-deploy smoke 通過
+AUTO_TASK_DONE: onboarding portal 研究跨機固化（codebase-map + reading list + raw fallback）
 

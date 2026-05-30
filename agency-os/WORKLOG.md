@@ -1,4 +1,4 @@
-# Worklog
+﻿# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
@@ -222,6 +222,22 @@
 **連動檢查**：origin `0 0` aligned；working tree clean；上次 health 100% (373/373) at 22:45 CST。
 
 **明日優先**：依 Phase Z7 packet 執行（handoffs/2026-05-28-2253-tomo-225340.md），修 ao-close.ps1 preflight + ao-close.md Step 2.6 禁止重複驗證。
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:899f9bba92a62362befff35dc2de8c4056969e6aaac1b4ee7014249510f744d7 -->
+
+### claude 2026-05-30 17:07
+
+- **完成（一句）**: app.aware-wave.com 分析 → 修 `/api/ops/summary` 客戶來源統一並部署 production → playwright-runner CP950 修復 → 建 CP950 parse-break 機械閘（防整類復發）→ onboarding portal 研究跨機固化。
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/summary/route.ts`（已部署 0b992b6）
+  - `scripts/playwright-runner.ps1`（ASCII 化 2661e20）
+  - `scripts/audit-cp950-traps.ps1` + `scripts/system-health-check.ps1` + `scripts/generate-customer-delivery-status.ps1`（CP950 gate be04f36）
+  - `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md` + `docs/spec/raw/*`（跨機固化 15e00ca+2f893c7）
+- **Git**: 0b992b6 / 2661e20 / be04f36 / 15e00ca / 2f893c7（均已 push）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: onboarding portal 14 段規格仍待寫（研究完成、開工先讀 client-onboarding-portal-CODEBASE-MAP.md §0）。
 
 ## 2026-05-28
 
@@ -6499,7 +6515,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-28 14:41:26 UTC_
+_Last synced: 2026-05-30 09:13:54 UTC_
 
 ## 2026-03-20
 
@@ -7279,3 +7295,17 @@ AUTO_TASK_DONE: playwright-runner.ps1 ASCII 化修復 CP950 parse 失敗，post-
 **[rollback]** 三檔可 `git revert <hash>`；偵測器為純新增函式 + 新 switch，預設行為不變。
 
 AUTO_TASK_DONE: CP950 parse-break 機械閘上線（system-health-check 硬閘 + audit-cp950-traps -ParseBreakOnly）+ generate-customer-delivery-status.ps1 BOM 修復，全 158 支 .ps1 零 parse-break
+
+
+## 2026-05-30 (AO-CLOSE 補記) — /api/ops/summary 已部署 + onboarding 研究跨機固化
+
+**[已部署確認]** `/api/ops/summary` 修正（commit 0b992b6）**已上 production**：`sg-deploy.sh next-admin` exit 0、Step 7 smoke 4/4 200、deployed commit 0b992b6、容器 healthy 無改名；curl 實測 `sourceOfTruth: supabase` + 真實 DB slug（`awarewave-ops`/`soulful-expression`）。post-deploy Playwright smoke 26/0/4 PASS。修正前 entry 的「尚未部署」風險已解除。
+
+**[onboarding portal 研究跨機固化]** 使用者問「換機怎麼讓我記得研究過的東西」。根因：對話 context 單次性，研究不落地就蒸發。做法：① 寫 `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md`（§0 reading list + §1/§2 build/ops 側全部 file:line + 精確 schema，研究已完成不必重跑 Explore）② 更新 handoffs 1641/1644 指向它 + 更正 1641 stale 註記（plan 檔實為 git-tracked 跨機同步）③ raw fallback 副本到 `docs/spec/raw/`（4 檔 + INDEX，三層保險：AO-RESUME 自動 / agency-os 正本 / raw 離線快照）。commit 15e00ca + 2f893c7。
+
+- REVIEW_WAIVED: DOC_ONLY -- 全為 .md 文件（research map / handoff / TASKS / raw 副本），無 code 改動
+- BUGHUNT_WAIVED: DOC_ONLY -- 文件固化，無 symbol/schema 改動；路徑寫入前已 Glob/git ls-files 驗證存在（manifests dir、wpFactory.ts、plan 檔 git-tracked 均實測確認）
+
+AUTO_TASK_DONE: /api/ops/summary 部署上 production + post-deploy smoke 通過
+AUTO_TASK_DONE: onboarding portal 研究跨機固化（codebase-map + reading list + raw fallback）
+
