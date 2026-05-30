@@ -119,7 +119,8 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 | `lobster-factory/infra/trigger/deploy-workflows.ps1` | 1 | **False positive** — `docker info 2>&1 \| Out-Null` discards all output; no stdout decode occurs; CP950 trap does not apply. Also fixed commit `27d36dc` 2026-05-26: L72 `Get-Content $PkgPath -Raw` + L85 `Get-Content $PosthogEnvSource` now both use `-Encoding UTF8` |
 | `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` | 1 | Low |
 | `mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1` | 2 | Low |
-| `scripts/generate-customer-delivery-status.ps1`, `scripts/playwright-runner.ps1` | parse-error reported | Pre-existing PS parse errors unrelated to encoding |
+| `scripts/playwright-runner.ps1` | parse-error | 🔴 FIXED 2026-05-30: root cause **WAS** encoding (BOM-less non-ASCII decorative glyphs `╔═╗ ► ✔ ⚠ ✘ → —` mis-decoded by PS5.1 under CP950 → broken string terminator at L340). Fixed by converting all decorative chars to ASCII (`[OK]`/`[!]`/`[X]`/`->`/`--`). Verified: `Parser::ParseFile` OK + smoke 26/0/4 + `audit-cp950-traps` clean. Original "unrelated to encoding" diagnosis was incorrect. |
+| `scripts/generate-customer-delivery-status.ps1` | parse-error (79) | 🔴 TRACKED: same encoding root cause (41 non-ASCII, PARSE FAIL under CP950) but **distinct subclass** — non-ASCII is CJK **data** (department cluster labels e.g. `倉儲/履約`), NOT strippable to ASCII. Fix = add UTF-8 BOM **or** externalize catalog to UTF-8 JSON read with `-Encoding UTF8` (preferred, matches DEPARTMENT_CLUSTER_CATALOG pattern). Not yet fixed — separate task. |
 
 **Hardening strategy** (per AGENTS.md auto-trigger): when any of these scripts gets an `Edit`/`Write`, Claude must:
 1. Run `/audit-encoding --file <path>` on the changed file

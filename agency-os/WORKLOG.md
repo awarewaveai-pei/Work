@@ -7221,3 +7221,27 @@ AUTO_TASK_DONE: Phase Z6 archive lift gate — mechanical 100% coverage + 18:46 
 **[rollback]** 單檔單 commit，可 `git revert <hash>`；未部署故無 production 影響
 
 AUTO_TASK_DONE: /api/ops/summary 移除寫死 fallback tenants，客戶來源統一為 organizations
+
+
+## 2026-05-30 — playwright-runner.ps1 CP950 parse 失敗修復（部署後 smoke 解鎖）
+
+**[任務理解]** 部署 /api/ops/summary 後跑強制 post-deploy Playwright smoke，`playwright-runner.ps1` 在本機（Big5/CP950 + PowerShell 5.1）**parse 失敗無法執行**。根因：檔案含非 ASCII 裝飾字元（box-drawing `╔═╗║╚╝`、`► ✔ ⚠ ✘ → —`）卻**無 UTF-8 BOM**；PS5.1 在 CP950 codepage 下誤解多 byte UTF-8，L340 的 em-dash `—` 破壞字串引號 → 整支 parse abort。屬 CP950 trap class。使用者提醒：BOM 是給跨 Google Drive 的加密 .md（桌機 Big5 防亂碼），repo 內 .ps1 走 git 不走 Drive → **不該加 BOM**，正解為 ASCII 化。
+
+**[已修改]**
+- `scripts/playwright-runner.ps1`：全部非 ASCII 裝飾字元 → ASCII（helper 前綴 `> [OK] [!] [X]`；banner `===`/`---`；箭頭 `->`；em-dash `-`）。無動到任何 logic / 函式名 / 參數 / regex / 比較字串。
+- `agency-os/docs/operations/AUDIT_REGISTRY.md`：L122 原把 `playwright-runner.ps1` + `generate-customer-delivery-status.ps1` 同列為「parse-error unrelated to encoding」（誤診）。拆兩行修正：playwright-runner 標 🔴 FIXED（確認 root cause 是 encoding）；generate-customer-delivery-status 標 🔴 TRACKED（同 root cause 但 CJK 為**資料**不可 ASCII 化，需 BOM 或外部化 catalog，另開任務）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile playwright-runner.ps1` (PS5.1) | exit=0 (PARSE OK) | ms=~500
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke -SkipInstall` | exit=0 | ms=~60000（**smoke 26 passed / 0 failed / 4 skipped**；evidence: agency-os/reports/e2e/2026-05-30/smoke；含 `/api/ops/summary route exists -> 200` 覆蓋本次部署）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File playwright-runner.ps1` | exit=0 (clean, 0 unprotected capture sites)
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（確認 100% ASCII、regex/`$icon`/env-var 名/比較字串皆未動、引號括號平衡、無 stdout 消費者 keying off 舊 glyph）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`playwright-runner PASSED\|playwright-runner exited\|playwright-runner\.ps1` | hits=0（指 stdout 字串消費者）— 確認：sg-deploy hook 靠 **exit code** 非 stdout；其餘命中皆為檔名引用（docs/README/WORKLOG）
+
+**[剩餘風險]**
+- `generate-customer-delivery-status.ps1` 同類 parse 失敗仍未修（已登錄 AUDIT_REGISTRY 🔴 TRACKED）；非本次 scope，需 BOM 或 catalog 外部化的設計決定
+- `audit-cp950-traps.ps1` 自身 banner 也有 `—` mojibake（顯示層，不影響 exit code）；未來可一併 ASCII 化
+
+**[rollback]** `git revert <hash>`；純顯示字串改動，無行為風險
+
+AUTO_TASK_DONE: playwright-runner.ps1 ASCII 化修復 CP950 parse 失敗，post-deploy smoke 26/0/4 通過
