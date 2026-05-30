@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Playwright E2E test runner — orchestrates install, execution, and evidence archival.
+    Playwright E2E test runner - orchestrates install, execution, and evidence archival.
 
 .DESCRIPTION
     Owner: scripts/playwright-runner.ps1 (monorepo canonical, do not duplicate)
@@ -20,10 +20,10 @@
 
     Output
     ------
-    JSON results  → <ReportDir>/playwright-results.json
-    HTML report   → <ReportDir>/playwright-report/index.html
-    Screenshots   → <ReportDir>/screenshots/**/*.png
-    Copied to     → agency-os/reports/e2e/YYYY-MM-DD/<Mode>/
+    JSON results  -> <ReportDir>/playwright-results.json
+    HTML report   -> <ReportDir>/playwright-report/index.html
+    Screenshots   -> <ReportDir>/screenshots/**/*.png
+    Copied to     -> agency-os/reports/e2e/YYYY-MM-DD/<Mode>/
 
 .PARAMETER Mode
     One of: smoke | qa | client | screenshot | a11y | perf | all | install
@@ -86,7 +86,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
+# --- Paths ---------------------------------------------------------------------
 $MonoRoot  = Resolve-Path (Join-Path $PSScriptRoot '..')
 $TestsDir  = Join-Path $MonoRoot 'lobster-factory\infra\hetzner-phase1-core\tests'
 $TenantsDir= Join-Path $MonoRoot 'agency-os\tenants'
@@ -101,11 +101,11 @@ $DateLabel   = (Get-Date -Format 'yyyy-MM-dd')
 $ModeArchive = Join-Path $ArchiveBase "$DateLabel\$Mode"
 New-Item -ItemType Directory -Force -Path $ModeArchive | Out-Null
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
-function Write-Step { param([string]$Msg) Write-Host "  ► $Msg" -ForegroundColor Cyan }
-function Write-Ok   { param([string]$Msg) Write-Host "  ✔ $Msg" -ForegroundColor Green }
-function Write-Warn { param([string]$Msg) Write-Host "  ⚠ $Msg" -ForegroundColor Yellow }
-function Write-Fail { param([string]$Msg) Write-Host "  ✘ $Msg" -ForegroundColor Red }
+# --- Helpers -------------------------------------------------------------------
+function Write-Step { param([string]$Msg) Write-Host "  > $Msg" -ForegroundColor Cyan }
+function Write-Ok   { param([string]$Msg) Write-Host "  [OK] $Msg" -ForegroundColor Green }
+function Write-Warn { param([string]$Msg) Write-Host "  [!] $Msg" -ForegroundColor Yellow }
+function Write-Fail { param([string]$Msg) Write-Host "  [X] $Msg" -ForegroundColor Red }
 
 function Assert-NodeAvailable {
     try { $v = & node --version 2>&1; Write-Ok "Node.js $v" }
@@ -139,18 +139,18 @@ function Install-PlaywrightDeps {
     try {
         $nmPath = Join-Path $TestsDir 'node_modules'
         if ($SkipInstall -and (Test-Path $nmPath)) {
-            Write-Ok 'node_modules present — skipping npm install'
+            Write-Ok 'node_modules present - skipping npm install'
         } else {
             Write-Step 'npm install'
             & npm install --prefer-offline 2>&1 | Write-Host
             if ($LASTEXITCODE -ne 0) { throw 'npm install failed' }
         }
 
-        # Always ensure browsers — idempotent
+        # Always ensure browsers - idempotent
         Write-Step 'playwright install chromium'
         & npx playwright install chromium --with-deps 2>&1 | Write-Host
         if ($LASTEXITCODE -ne 0) {
-            Write-Warn 'Browser install returned non-zero — may need admin rights or --with-deps support'
+            Write-Warn 'Browser install returned non-zero - may need admin rights or --with-deps support'
         }
     } finally {
         Pop-Location
@@ -168,7 +168,7 @@ function Invoke-PlaywrightProject {
     $localHtmlReport  = Join-Path $TestsDir 'playwright-report'
     $screenshots      = Join-Path $ReportDir 'screenshots'
 
-    # Set env vars — Playwright picks these up via process.env in config + specs
+    # Set env vars - Playwright picks these up via process.env in config + specs
     $env:PLAYWRIGHT_BASE_URL        = $BaseUrl
     $env:PLAYWRIGHT_API_URL         = $ApiUrl
     $env:PLAYWRIGHT_N8N_URL         = $N8nUrl
@@ -184,7 +184,7 @@ function Invoke-PlaywrightProject {
     Push-Location $TestsDir
     try {
         Write-Step "playwright test $($Projects -join ', ')"
-        # Use reporters from playwright.config.ts — do NOT pass --reporter on CLI
+        # Use reporters from playwright.config.ts - do NOT pass --reporter on CLI
         # (CLI format differs from config format and breaks JSON output path)
         & npx playwright test @projectArgs --config playwright.config.ts 2>&1 | Write-Host
         $exitCode = $LASTEXITCODE
@@ -221,7 +221,7 @@ function Format-Summary {
     param($Results, [string]$Mode)
     if (-not $Results) { Write-Warn 'No results JSON found'; return }
 
-    # Playwright JSON output has a top-level "stats" object — use it directly
+    # Playwright JSON output has a top-level "stats" object - use it directly
     $stats   = $Results.stats
     $passed  = if ($stats.expected)   { $stats.expected  } else { 0 }
     $failed  = if ($stats.unexpected) { $stats.unexpected } else { 0 }
@@ -230,7 +230,7 @@ function Format-Summary {
     $icon    = if ($failed -eq 0) { 'PASSED' } else { 'FAILED' }
 
     Write-Host ""
-    Write-Host "── Playwright $Mode results ───────────────────────────" -ForegroundColor Cyan
+    Write-Host "--- Playwright $Mode results ---------------------------" -ForegroundColor Cyan
     Write-Host "   [$icon]  Passed: $passed   Failed: $failed   Skipped: $skipped   Total: $total"
     if ($failed -gt 0) {
         Write-Host "   Report: $ModeArchive\playwright-report\index.html" -ForegroundColor Yellow
@@ -239,11 +239,11 @@ function Format-Summary {
     Write-Host ""
 }
 
-# ── Main dispatch ──────────────────────────────────────────────────────────────
+# --- Main dispatch -------------------------------------------------------------
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║  playwright-runner  mode=$Mode  $(Get-Date -Format 'yyyy-MM-dd HH:mm')  ║" -ForegroundColor Cyan
-Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host "  playwright-runner  mode=$Mode  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 
 Assert-NodeAvailable
@@ -268,7 +268,7 @@ switch ($Mode) {
 
     'qa' {
         if (-not $env:OPS_TEST_EMAIL -or -not $env:OPS_TEST_PASSWORD) {
-            Write-Warn 'OPS_TEST_EMAIL / OPS_TEST_PASSWORD not set — QA auth tests will skip'
+            Write-Warn 'OPS_TEST_EMAIL / OPS_TEST_PASSWORD not set - QA auth tests will skip'
         }
         $r = Invoke-PlaywrightProject -Projects @('qa')
         Format-Summary (Read-PlaywrightResults $r.ResultsJson) 'qa'
@@ -296,7 +296,7 @@ switch ($Mode) {
                 PLAYWRIGHT_LABEL       = $Label
             }
         Format-Summary (Read-PlaywrightResults $r.ResultsJson) "screenshot ($ssUrl)"
-        Write-Ok "Screenshots → $ModeArchive\screenshots"
+        Write-Ok "Screenshots -> $ModeArchive\screenshots"
         $overallExit = $r.ExitCode
     }
 
@@ -335,9 +335,9 @@ switch ($Mode) {
 
 if ($overallExit -ne 0) {
     Write-Fail "playwright-runner exited with failures (exit $overallExit)"
-    Write-Host "  → Open report: $ModeArchive\playwright-report\index.html" -ForegroundColor Yellow
+    Write-Host "  -> Open report: $ModeArchive\playwright-report\index.html" -ForegroundColor Yellow
 } else {
-    Write-Ok "playwright-runner PASSED — evidence at $ModeArchive"
+    Write-Ok "playwright-runner PASSED - evidence at $ModeArchive"
 }
 
 exit $overallExit
