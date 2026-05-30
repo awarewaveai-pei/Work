@@ -61,6 +61,7 @@
 - [ ] 明天 14:00 TPE 後 git pull 看 phase4-LATEST.md 日期有沒有變成 2026-05-29 → handoffs/2026-05-28-1152-git-pull-phase4.md
 - [ ] Auto-Repair audit Batch 3 (M9 TOCTOU + M10 retry storm + m4 hostname) + Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) → handoffs/2026-05-28-1807-batch-3-post-phase.md
 - [ ] **Phase Z7** — SOP-only AO-CLOSE：auto-checkpoint ahead-commits 自動處理 + 禁止重複驗證（消除今晚 3 ALLOW + 2 health 冗餘） → handoffs/2026-05-28-2253-tomo-225340.md
+- [ ] **Phase Z8** — AO-RESUME archive lift gate（同 Z6 思路套 AO-RESUME）：每次 AO-RESUME 寫 7-段式後必須 archive 到 `agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md`，否則 next health-check fail。原因：今天 5/30 12:32 AO-RESUME 我輸出 7-段式但忘了寫 archive，操作者點出才補；同 5/28 18:46 SG deploy silent drop class of bug，protocol 沒機械閘就靠 agent 自律不靠譜。實作：新 `scripts/verify-aoresume-archive.ps1` + 接入 system-health-check gate 12d + `.claude/commands/ao-resume.md` 加 Step 3 強制規則。
 - [ ] 筆電同步 PowerShell allow 萬用字元（preserveKey 不自動帶入，需手動插三條） → handoffs/2026-05-29-1139-sync-userlevel-allow.md
 
 #### 雙機環境 / 日常開工
