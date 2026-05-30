@@ -5,12 +5,46 @@
 ## 2026-05-30
 
 ### Daily
+- 15:20 CST：weekly-automation framework 一勞永逸退役 — machine-local Windows 排程（單桌機、無 freshness watchdog、silent 19 天斷流）→ GitHub Actions `weekly-workflows-security-audit.yml`（git-tracked cron + 原生 surface）；刪 5 個死腳本、補 tombstone、health 100%
 - 13:40 CST：nginx 429 throttle-status 一勞永逸（SG+EU 雙 VPS）— rate/conn limiter 503→429 根治 netdata 5xx 假 CRITICAL；aware-wave-security.conf + nginx-lobster filter + netdata health.d 三檔收進 repo SSOT
 - 14:00 CST：Phase Z7-B 補齊 + 6 個跨 session packets 結案 mark（Z7 / sync-allow / junction / exit-2 hook / Phase4Weekly 5/29 / phase4 git pull）
 - 13:20 CST：解 AO-RESUME 兩個 🟡 blocker — Phase 4 routine 復活 + sync-userlevel force-copy race 治本 + fallback Check 3 假警報修正
 - 12:00 CST：scanner-block.inc + endpoint-alert.sh 一勞永逸（Layer 2 啟發式 + per-URL tier）
 
-### claude 2026-05-30 13:40 — nginx 429 throttle-status 一勞永逸（SG+EU 雙 VPS）
+### claude 2026-05-30 15:20 — weekly-automation framework 一勞永逸退役 → GitHub Actions
+
+**根因**：`agency-os/reports/weekly/` 報告流自 2026-05-11 後 silent 斷流 19 天（health 仍報 100%）。源頭是 `AgencyOS-WeeklyAutomation`／`AgencyOS-WeeklySystemReview` 兩個用 `Register-ScheduledTask` 註冊的 **machine-local Windows 排程**，只在單一桌機存在（筆電從未註冊），且 `system-health-check.ps1` 只檢查腳本**檔案存在**、從不檢查報告**新鮮度** → 桌機在排程分鐘沒開機就靜默停產，無任何 surface。符合 memory「Operator zero-memory automation」：排程沒有在已運行流程主動 surface ≠ 真自動化。
+
+**決策（B vs C）**：使用者授權「一勞永逸」。分析後確認 weekly job 兩塊工作：① build-gate / integrated-status **已被 CI（release-gate-main.yml + lobster-workflows-validate-main.yml）+ ao-close.ps1 完整覆蓋**，無需獨立時間排程；② 只有 npm security audit 需要時間 cadence（新 CVE 會打在**未改動**的依賴上，push/PR CI 抓不到）且可 GHA-portable。→ 退役整個 machine-local framework，唯一需要 cadence 的搬到 GitHub Actions。
+
+**已修改**：
+- **新增** [`.github/workflows/weekly-workflows-security-audit.yml`](../.github/workflows/weekly-workflows-security-audit.yml) — cron `30 1 * * 1`（Mon 01:30 UTC = 09:30 TPE）+ workflow_dispatch；`permissions: contents:read, issues:write`（最小化）；7 steps：checkout@v5 → setup-node@v5(22.x) → `npm run audit:workflows-security` → upload-artifact@v4(LATEST.md) → severity gate `npm audit --audit-level=high`（`id:gate continue-on-error:true`）→ github-script@v7（gate outcome=failure 才開/留言 issue，labels `weekly-security-audit`+`needs-human-review`，report 50000 字截斷 + **```text fence** 中和 dep-name markdown injection）→ fail job。
+- **刪除 5 檔（git rm）**：`scripts/run-weekly-automation.ps1`、`scripts/weekly-automation-config.json`、`scripts/register-weekly-automation-task.ps1`、`scripts/weekly-system-review.ps1`、`agency-os/automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1`。（**保留** `verify-build-gates.ps1` + `generate-integrated-status-report.ps1` — 被 ao-close 等沿用。）
+- `scripts/system-health-check.ps1` — `$coreFiles` 移除 `REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1`；移除 `weekly-system-review.ps1` 的 Test-Path sanity block（健康檢查曾因 Missing map source FAIL）。
+- `agency-os/docs/change-impact-map.json` — watch_files 移除兩個退役腳本 + 移除整個 `rules[]` block（source=REGISTER_WEEKLY...）。JSON 仍 valid。
+- **Tombstone**：`agency-os/docs/operations/weekly-automation-framework.md`（改寫為 RETIRED 含 former-job→new-home 對照表 + 點名 monthly review 同缺陷待跟進）；`agency-os/reports/weekly/README.md`（新 tombstone 含桌機 unregister one-liner）。
+- **De-reference**：`scripts/README.md`、`end-of-day-checklist.md`、`EXECUTION_DASHBOARD.md`、`INTEGRATED_STATUS_REPORT.md`、`COMMAND_PLANE_RUNBOOK(.zh-TW).md`、`.claude/plans/24-claude-fluffy-biscuit.md`。
+- 重新產生 `agency-os/reports/security/workflows-npm-audit-LATEST.md`（原 committed 版 stale 顯示 High:1 fast-uri → 現 High:0 / Moderate:1 qs，反映真實）。
+
+**[驗證結果]**（R0 四動作）：
+
+1. **實測**：
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`npm run audit:workflows-security`（lobster-factory）| exit=0 | result=寫出 LATEST.md + timestamped report，Total 1 / Critical 0 / High 0 / Moderate 1(qs)
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`npm audit --audit-level=high`（lobster-factory/packages/workflows）| exit=0 | result=無 high+ → gate 不會誤觸發 issue（語意正確）
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`python -c "import yaml; d=yaml.safe_load(...); steps=d['jobs']['audit']['steps']"` | exit=0 | result=YAML valid，7 steps，script step fence count=2（open+close）
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/system-health-check.ps1` | exit=0 | result=100%（368/368）— 退役後無 dangling map source / missing file
+2. **Review**：
+   - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n — critic 確認 GHA gate 語意（outcome vs conclusion + continue-on-error）、最小 permissions、label auto-create、no-install 執行、step 順序（issue 先開再 fail job）、change-impact-map.json JSON valid、health-check 結構完整皆正確；2 Minor（stale committed LATEST、markdown injection）**本 commit 已修**（regenerate LATEST + ```text fence）。
+3. **抓蟲**：
+   - BUGHUNT_DONE: scope=`agency-os scripts .github .claude` | grep=`run-weekly-automation\|weekly-system-review\|register-weekly-automation\|REGISTER_WEEKLY_SYSTEM_REVIEW\|weekly-automation-config` | hits=0 dangling code refs（剩餘命中皆 tombstone/WORKLOG 歷史敘述，刻意保留）
+4. **WORKLOG**：本 entry。
+
+**[剩餘風險]**：
+- **monthly review（`AgencyOS-MonthlySystemReview`）有相同 machine-local-task 缺陷**，本次未修（已在 tombstone doc 點名待跟進）。
+- 桌機可能仍註冊 stale 排程，需一次性手動 `Unregister-ScheduledTask`（見 reports/weekly/README.md；已轉達使用者）。
+- GHA cron 首次實跑須等下週一 01:30 UTC 才能在 production 驗收（workflow_dispatch 可手動先驗）。
+
+
 
 **根因**：netdata `awarewave_nginx_5xx_recent` CRITICAL（5/28-5/30 連續多次，例：單一 scanner IP `34.186.19.38` 一波 187/204 條請求觸發）的真正源頭**不是上游故障**，而是 nginx 兩道防禦性節流指令在限流時回傳**預設 status 503**：① `limit_req zone=req_perip`（rate limit，預設 503）② `limit_conn conn_perip 50`（connection limit，預設 503）。netdata web_log collector 把 503 計入 `error`（5xx）維度 → 觸發假 CRITICAL。防禦性節流是「正常工作」不是「伺服器失敗」，整套 stack（fail2ban filter `(?!429|401)` 排除 429、netdata 把 429 歸 `success`）**早已設計成預期 429**，唯獨 nginx config 缺了 `*_status 429` 這一行。既有慣例已存在於 `default.conf:75`（container nginx）+ `mainwp-aware-wave.conf`，這次是把慣例補齊到剩下的 vhost。
 
