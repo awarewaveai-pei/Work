@@ -93,7 +93,7 @@
 ### 3.2 不做 (deferred to Phase 2 / 3)
 
 - ❌ Trigger.dev `dispatch-command` task — 等 Trigger env vars 完整同步後再上（目前 Supabase / DB keys 未同步，硬接會壞既有 onboarding）
-- ❌ Anthropic Routines 整合 — 既有 `scripts/run-weekly-automation.ps1` 已覆蓋 90% 需求；Routines 留做「電腦永遠不開」場景
+- ❌ Anthropic Routines 整合 — ~~既有 `scripts/run-weekly-automation.ps1` 已覆蓋 90% 需求~~（**已過期 2026-05-30**：該機器本地排程因「電腦不開機」靜默斷 19 天而退役；workflow 安全稽核改走 GitHub Actions `weekly-workflows-security-audit.yml`，build gate 由 CI + ao-close 覆蓋。詳 `agency-os/reports/weekly/README.md`）
 - ❌ Slack / Email ingress — 同樣 schema、抄 telegram/route.ts 即可，不必 day-1 上
 - ❌ 自動化 restore drill — 既有 `LONG_TERM_OPS.md` 已寫年度演練；自動化是 Phase 3
 - ❌ Kill Switch UI in ops console — Phase 1 用 SQL 直接切（emergency 場景反而不該依賴 UI）
