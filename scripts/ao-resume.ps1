@@ -290,6 +290,38 @@ if (-not $SkipOpenTasksList -and (Test-Path -LiteralPath $openTasksScript)) {
     Write-Host "== AO-RESUME: -SkipOpenTasksList（略過待辦快照）==" -ForegroundColor DarkYellow
 }
 
+# --- Claude Code user-level alignment (BEFORE preflight; idempotent, non-blocking) ---
+# CONTRACT: invoke sync-claude-userlevel.ps1 -Mode merge
+# MUST run BEFORE check-three-way-sync / verify-build-gates because check-claude-sync.ps1
+# H2 calls `sync-claude-userlevel -Mode verify`. If SSOT template changed since last run
+# (e.g. a new hook added in a cross-machine commit), verify fails and blocks ALL downstream
+# AO-RESUME steps — worklog, signals, memory import never run. Running merge FIRST applies
+# the latest template so the subsequent verify always passes.
+# Root cause fix (2026-05-29): ordering bug — verify ran before merge could fix the drift.
+$claudeUserlevelSync = Join-Path $WorkRoot "scripts\sync-claude-userlevel.ps1"
+if (Test-Path -LiteralPath $claudeUserlevelSync) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: Claude user-level sync (auto-merge) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $claudeUserlevelSync -Mode merge
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARN: sync-claude-userlevel -Mode merge returned non-zero; hooks/settings may be stale." -ForegroundColor Yellow
+    }
+    $global:LASTEXITCODE = 0
+}
+
+# --- MCP config sync (auto-regenerate from SSOT; idempotent, non-blocking) ---
+# Regenerates .mcp.json / .cursor/mcp.json / Codex / Gemini from mcp/registry.template.json.
+$mcpSyncScript = Join-Path $WorkRoot "scripts\sync-mcp-config.ps1"
+if (Test-Path -LiteralPath $mcpSyncScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: MCP config sync (auto) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mcpSyncScript
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARN: sync-mcp-config returned non-zero; MCP settings may be stale." -ForegroundColor Yellow
+    }
+    $global:LASTEXITCODE = 0
+}
+
 Write-Host "== AO-RESUME: preflight auto-fix ==" -ForegroundColor Cyan
 
 # Script-scoped flag: survives nested powershell.exe -File (print-open-tasks). Compute here so StrictMode never reads an "unassigned" switch at script top.
@@ -348,35 +380,6 @@ if ($script:StrictEnvAudit) {
         Write-Error "ao-resume: machine-environment-audit -Strict failed (exit $LASTEXITCODE). Fix output above; no manual markdown checklist required."
         exit $LASTEXITCODE
     }
-}
-
-# --- Claude Code user-level alignment (auto-merge; idempotent, non-blocking) ---
-# CONTRACT: invoke sync-claude-userlevel.ps1 -Mode merge
-# -Mode merge is a superset of -Mode verify: auto-fixes governed keys AND detects drift.
-# Overwrites only governed keys (hooks/deny/additionalDirs/theme), PRESERVES permissions.allow.
-# normalizer auto-fixes PS 5.1 1-element-array bug — no manual patching needed.
-$claudeUserlevelSync = Join-Path $WorkRoot "scripts\sync-claude-userlevel.ps1"
-if (Test-Path -LiteralPath $claudeUserlevelSync) {
-    Write-Host ""
-    Write-Host "== AO-RESUME: Claude user-level sync (auto-merge) ==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $claudeUserlevelSync -Mode merge
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "WARN: sync-claude-userlevel -Mode merge returned non-zero; hooks/settings may be stale." -ForegroundColor Yellow
-    }
-    $global:LASTEXITCODE = 0
-}
-
-# --- MCP config sync (auto-regenerate from SSOT; idempotent, non-blocking) ---
-# Regenerates .mcp.json / .cursor/mcp.json / Codex / Gemini from mcp/registry.template.json.
-$mcpSyncScript = Join-Path $WorkRoot "scripts\sync-mcp-config.ps1"
-if (Test-Path -LiteralPath $mcpSyncScript) {
-    Write-Host ""
-    Write-Host "== AO-RESUME: MCP config sync (auto) ==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mcpSyncScript
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "WARN: sync-mcp-config returned non-zero; MCP settings may be stale." -ForegroundColor Yellow
-    }
-    $global:LASTEXITCODE = 0
 }
 
 # --- Cross-machine memory import (auto; non-blocking) ---

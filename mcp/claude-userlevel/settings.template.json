@@ -7,6 +7,11 @@
     "_defaultMode_comment": "bypassPermissions = no per-command prompts. Only valid in user-level ~/.claude/settings.json (Claude Code ignores it in project-shared .claude/settings.json for safety). 'skipDangerousModePermissionPrompt' suppresses the one-time entry confirmation. Hard guardrails come from 'deny' below + hooks/branch-protection.js + hooks/hooks.json's PreToolUse rm-rf block. See mcp/claude-userlevel/README.md.",
     "defaultMode": "bypassPermissions",
     "skipDangerousModePermissionPrompt": true,
+    "allow": [
+      "Bash(powershell *)",
+      "Bash(powershell.exe *)",
+      "Bash(pwsh *)"
+    ],
     "deny": [
       "Bash(git push --force *)",
       "Bash(git push -f *)",

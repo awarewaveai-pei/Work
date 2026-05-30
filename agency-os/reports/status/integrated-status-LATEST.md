@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-05-28 22:42:11
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-05-29 11:46:13
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -219,108 +219,37 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-05-28.md
-# Daily Note - 2026-05-28
+## 5) memory/daily/2026-05-29.md
+# 2026-05-29 Daily
 
+## Done today
 
-### verify-recent --ack (2026-05-28T03:21:48.2747965Z)
+### AO-RESUME 永久修法（commit `79dfbcc`）
+- 分析 8 份 5/23-5/29 AO-RESUME 報告（失敗率 62%，三類根因 A/B/C）
+- **F1** `scripts/ao-resume.ps1`：把 `sync-claude-userlevel -Mode merge` + `sync-mcp-config` 移到 `check-three-way-sync` 之前 → 消滅 Catch-22 ordering bug
+- **F2** `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`：加 `$autoTriggerAoResume` staleness check（>8h → 自動觸發）；staleness check hoisted before dirty-tree short-circuit；catch 設 `$true`
+- **F3** 立即 merge：settings.json 8 structural issues 修正，hook 套用到 `~/.claude/hooks/`
+- verify-build-gates ALL PASSED / health 100% (367/367) / critic Standard 0C/0M
 
-**Reason**: Full verification completed: tsc --noEmit PASS, bash -n PASS, critic subagent found 2C+3M+5m all fixed. Real exec test waived - new API endpoints require VPS deployment; bash function verified clean by syntax check + manual review.
+### PowerShell allow wildcard（桌機完成）
+- `~/.claude/settings.json` + `mcp/claude-userlevel/settings.template.json` 新增三條萬用字元
+- 筆電待同步 → handoffs/2026-05-29-1139-sync-userlevel-allow.md
 
-**Acknowledged unverified files** (count=9):
+## Open / Pending
+- Phase4Weekly 14:00 TPE 後驗收（time-gated）
+- 筆電：bootstrap-mcp-machine.ps1 + PowerShell allow sync + exit-2 hook 升級
+- Phase Z7（SOP-only AO-CLOSE）
+- **重啟 Claude Code**（更新後 hook 生效）
 
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\ops-inbox\types.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\ops-inbox\normalize\deploy.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\deploy\route.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\ops-inbox\notify\rules.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\ops\inbox\incidents\route.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\repair-center\policy.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\scripts\auto-deploy-next-admin.sh`
-- `c:\Users\USER\Work\scripts\fetch-external-signals.ps1`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\middleware.ts`
-
-
-### verify-recent --ack (2026-05-28T05:30:09.4943827Z)
-
-**Reason**: R0 second pass: ao-resume.ps1 stale key fix (telegram->ops_inbox_commands). PS syntax PASS confirmed by parser. Logic change is 4-line property name substitution; pattern proven correct by fetch-external-signals.ps1 which uses ops_inbox_commands key.
-
-**Acknowledged unverified files** (count=1):
-
-- `C:\Users\USER\Work\scripts\ao-resume.ps1`
-
-
-### verify-recent --ack (2026-05-28T08:44:55.8165086Z)
-
-**Reason**: Verification completed in prior session (context compacted): tsc --noEmit 0 errors, vitest 151/151, critic Deep pass (0c/1m-pre-existing/3n), dogfood harness 10/10. Batch 1 auto-repair M7+M8+m6+m8+m9 fixes.
-
-**Acknowledged unverified files** (count=4):
-
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\repair-center\backup.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\repair-center\run-state.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\repair-center\service.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\repair-center\policy.ts`
-
-
-### verify-recent --ack (2026-05-28T10:01:55.3322857Z)
-
-**Reason**: Batch 2 critic-fix files fully verified this session: tsc 0 errors, vitest 168/168 pass (8 files), critic Deep verdict=pass (0C/2M-fixed/3m-fixed), BUGHUNT_DONE scope=agency-os,scripts,lobster-factory. Evidence in WORKLOG 2026-05-28 Batch 2 section.
-
-**Acknowledged unverified files** (count=3):
-
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\ops-inbox\verifyIngestToken.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\command-plane\telegramAuth.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\security\timingSafeEqual.ts`
-
-### AO-CLOSE 2026-05-28
-
-**Done today** (session window 01:31 UTC → AO-CLOSE):
-- Batch 1 Auto-Repair fixes (c872012): M7 null-check, M8 path traversal, m6 isStrictTerminalState, m8-GHA, m9-doc
-- m6-ext (6b9f9ea): archiveRun strict gate (補發現 Batch 1 遺漏)
-- Batch 2 Auto-Repair fixes (832c562): m2 timingSafeEqual shared module, m10 triage archive migration, m11 RLS deny-anon; tsc 0 / vitest 168/168 / critic Deep 0C/2M-fixed/3m-fixed
-- AUDIT_REGISTRY updated: 4 Major (M2/M4/M9/M10) + 1 Minor (m4) remaining
-- /tomo Batch 3 + Post-Phase 4 packet: handoffs/2026-05-28-1807-batch-3-post-phase.md
-
-**Open**: Batch 3 (M9 TOCTOU + M10 retry storm + m4), Post-Phase 4 (M2/M4), Phase4Weekly 驗收 (2026-05-29 14:00 TPE)
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:2417d066c5a36f0811eb59320eaf7b3a8bf0179a41481eb8f2b77735ecc63b77 -->
-
-### claude 2026-05-28 22:35
-
-**主線**：跨機 30-year sync fragility 兩大破口連修（Phase Z + Z6）。
-
-1. **Phase Z** (`4f63393` / `4dbaf03` / `25eb2e9` / `3ca0df4`) — 6 個跨機開工噪音來源一次治本：
-   - **B**：移除 AO-SYNC vault claude-settings.json 與 sync-claude-userlevel SSOT template 雙 SSOT 衝突（commit 8102794 2026-05-15 隱性 bug；vault 寫機器絕對路徑害下次 import 覆蓋對機正確路徑→每跨機開工必發作 verify-build-gates 紅燈）。
-   - **C1+C2**：新 `scripts/ensure-claude-junction.ps1`（idempotent self-heal + fsutil reparsepoint 真驗；stress-tested via rmdir + mkdir 假裝壞 → 自動 backup → rmdir → mklink → 重驗 PASS）接入 Claude Code + Cursor 兩個 hook 的 UserPromptSubmit STEP 0（在 auto-checkpoint 之前防止 junction broken 時誤 commit deletion）+ system-health-check 新 gate 12b（critical 不可旁路）。
-   - **C4**：`git-align-main-aoresume-feature.ps1` 加 `Invoke-GitFetchWithRetry` (3 attempts, 5/10/20s exponential backoff) + `.agency-state/git-fetch-last.json` ledger 防 DNS 抖動 silently 寫成 "no new commits" 假結論。
-   - **C3**：`.claude/commands/ao-resume.md` 加 Step 0a hook-failure prominence 規則：hook exit ≠ 0 時七段式第一段第一行必 `⚠️ HOOK FAILED` banner，禁止 false-absence-of-evidence 結論。
-
-2. **Phase Z6** (`58e48be`) — 修 archive-only items invisible to next AO-RESUME class-of-bug：5/28 18:46 桌機 AO-CLOSE「未完成」第 5 項「SG deploy 落後 3 commits」silent drop 案例。新 `scripts/verify-archive-tasks-lift.ps1`（bold-token + 8-12 char sliding sub-windows + 120-char anchored search + `<!-- archive-only: <reason> -->` 逃生門）；接入 health-check gate 12c（critical）；`.claude/commands/ao-close.md` 新 Step 2.5 強制 lift 規則；18:46 archive SG deploy 補 archive-only 註記。
-
-3. **AO-RESUME redo** (`d331b33` + `570efb6`)：原 19:53 七段式在 DNS hiccup + junction broken + 4-天桌機 commits 沒拉的盲區寫的，false-absence-of-evidence。21:45 redo 含 5/25 + 5/27 + 5/28 桌機 32 commits 完整覆蓋 + 6-row 18:46 pending-list traceability table。
-
-**事件覆盤**：
-- DNS 失敗 → hook exit 1 → 我寫了「Gap 期間 repo 看起來無新 commit」假結論 → user 質問為什麼桌機檔案沒同步過來 → 揭發 junction broken + 4 天 commits 沒 fetch
-- `git pull --rebase` 失敗中，auto-checkpoint hook 自動 commit junction-broken 狀態下顯示為 deleted 的 49 個 tracked file → `0d63eb9` 壞 commit → `git checkout 2e2409d -- .claude/` 還原 → commit `4f63393`
-- 並行 Claude session（user 自開做 fewer-permission-prompts + 刪 13 條 settings.json 內 plaintext 密鑰）→ commit `50cf601` 整合保留
-- 走 R0 規律完整 4-action verify per change：實測 / Review / 抓蟲 / WORKLOG
-
-**driver issue (補完)**：5/28 18:46 桌機「明日優先」的 SG deploy + 筆電 sync 兩項已完成：
-- SG deploy = SG drift-watcher 19:55 CST 自動觸發 `sg-deploy.sh next-admin` 部署 0bc1b0c→2e2409d（含 Batch 2 832c562 資安修補）
-- 筆電 sync = `git pull origin main` (rev-list 0 0) + `sync-claude-userlevel.ps1 -Mode merge` (verify PASS) 完成；桌機 5/27 commit 4d1c3e8 的 5 個新 hooks 全部在 ~/.claude/hooks/；Phase Z 自家 ensure-claude-junction 接入也在 ~/.claude/
-
-**連動檢查**：
-- verify-build-gates: ALL PASSED with gate 12b (junction) + gate 12c (archive-lift) active
-- health: 100% (372→373 checks after Z6 added gate)
-- origin/main: `0 0` aligned
-- audit-cp950-traps: 4/7 edited .ps1 CLEAN; 3 have pre-existing 🟡 TRACKED entries (1 bumped 8→9 in AUDIT_REGISTRY)
-- audit-cross-machine-bom: N/A（本次 .md 全 in-repo）
+## Notes
+- 桌機 AO-RESUME hook 今晨 exit=1（sync infrastructure），本日全修解決
+- 筆電昨夜 Phase Z 已 push，桌機 git pull 成功（b149c49）
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-05-28 22:42:07`
+- Time: `2026-05-29 11:46:05`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -330,14 +259,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260528-224205.md`
-- Closeout: `reports/closeout/closeout-20260528-224207.md`
+- Health: `reports/health/health-20260529-114559.md`
+- Closeout: `reports/closeout/closeout-20260529-114604.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-   - Token strategy: bold-text identifier (`**Title**`) + 8-12 char sliding sub-windows for partial matches
    - Anchored search: only match tokens in first 120 chars of TASKS.md `- [ ]` lines (防止 false positive — "SG deploy" 出現在 narrative 深處不算)
    - Escape hatch: `<!-- archive-only: <reason> -->` 標記 bullet 為 documentation / 已解決
    - Exit 0/1/2 分等級；`-EmitState` 寫 `agency-os/.agency-state/archive-lift-last.json`
@@ -396,4 +324,5 @@ AUTO_TASK_DONE: Phase Z6 archive lift gate — mechanical 100% coverage + 18:46 
 
 - AUTO_TASK_DONE: bootstrap-mcp-machine.ps1
 - AUTO_TASK_DONE: 第二台機器同步 exit-2 hook 升級
+
 

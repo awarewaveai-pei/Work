@@ -108,11 +108,50 @@ try {
         }
     }
 
-    # Always auto-checkpoint on every prompt if working tree is dirty.
-    # This ensures untracked/modified files are never left behind even when
-    # the user doesn't type AO-RESUME or AO-CLOSE.
+    # Auto-trigger AO-RESUME on first prompt of a new session (>8h since last successful run).
+    # Root cause of Class B failures (2026-05-29 analysis): when the user types a greeting
+    # or short message, CLAUDE.md auto-invokes AO-RESUME, but this hook only fires ao-resume.ps1
+    # for prompts starting with "AO-RESUME". Without this block, the state file stays stale
+    # (potentially days old) and Claude declares Case B, requiring manual intervention.
+    # With this block, any first-prompt-of-session auto-refreshes the AO-RESUME state if
+    # the last run was more than 8 hours ago.
+    # ORDERING: MUST run BEFORE the dirty-tree short-circuit below, because the dirty-tree
+    # branch exits early (exit 0) and would prevent this staleness check from ever running.
+    $autoTriggerAoResume = $false
+    if (-not $isAoResume) {
+        $earlyStateDir = Join-Path $root "agency-os\.agency-state"
+        $earlyJsonPath = Join-Path $earlyStateDir "ao-resume-hook-last.json"
+        try {
+            if (Test-Path -LiteralPath $earlyJsonPath) {
+                $earlyJson = Get-Content -LiteralPath $earlyJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                $hasFin = $earlyJson.PSObject.Properties.Name -contains 'finished_utc'
+                if ($hasFin -and $earlyJson.finished_utc -and ([string]$earlyJson.finished_utc) -ne 'null') {
+                    $lastFin = [DateTime]::Parse(
+                        [string]$earlyJson.finished_utc, $null,
+                        [System.Globalization.DateTimeStyles]::RoundtripKind
+                    )
+                    if (([DateTime]::UtcNow - $lastFin).TotalHours -gt 8) {
+                        $autoTriggerAoResume = $true
+                    }
+                } else {
+                    $autoTriggerAoResume = $true  # hook never completed cleanly
+                }
+            } else {
+                $autoTriggerAoResume = $true  # state file missing — first run
+            }
+        } catch {
+            # Unparseable or corrupt state file is the strongest signal to re-run ao-resume.ps1.
+            # A file that cannot be parsed cannot be trusted as evidence of a recent healthy run.
+            $autoTriggerAoResume = $true
+        }
+    }
+
+    # Auto-checkpoint on every prompt if working tree is dirty — BUT only for plain
+    # non-AO-RESUME prompts when auto-trigger is not active. When auto-trigger fires,
+    # ao-resume.ps1's FullMainlineParity path handles dirty-tree via
+    # Invoke-FullMainlineAlignWithAutoCheckpoint, so no standalone checkpoint is needed.
     $dirtyCheck = Get-GitDirtyEntries -RepoRoot $root
-    if (@($dirtyCheck).Count -gt 0 -and -not $isAoResume) {
+    if (@($dirtyCheck).Count -gt 0 -and -not $isAoResume -and -not $autoTriggerAoResume) {
         $checkpointScript = Join-Path $root "scripts\commit-checkpoint.ps1"
         if (Test-Path -LiteralPath $checkpointScript) {
             Push-Location -LiteralPath $root
@@ -128,7 +167,7 @@ try {
         exit 0
     }
 
-    if (-not $isAoResume) {
+    if (-not $isAoResume -and -not $autoTriggerAoResume) {
         Write-HookResponse '{"continue":true}'
         exit 0
     }

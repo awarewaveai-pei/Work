@@ -61,6 +61,7 @@
 - [ ] 明天 14:00 TPE 後 git pull 看 phase4-LATEST.md 日期有沒有變成 2026-05-29 → handoffs/2026-05-28-1152-git-pull-phase4.md
 - [ ] Auto-Repair audit Batch 3 (M9 TOCTOU + M10 retry storm + m4 hostname) + Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) → handoffs/2026-05-28-1807-batch-3-post-phase.md
 - [ ] **Phase Z7** — SOP-only AO-CLOSE：auto-checkpoint ahead-commits 自動處理 + 禁止重複驗證（消除今晚 3 ALLOW + 2 health 冗餘） → handoffs/2026-05-28-2253-tomo-225340.md
+- [ ] 筆電同步 PowerShell allow 萬用字元（preserveKey 不自動帶入，需手動插三條） → handoffs/2026-05-29-1139-sync-userlevel-allow.md
 
 #### 雙機環境 / 日常開工
 
@@ -541,5 +542,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-28 14:30:02 UTC_
+_Last synced: 2026-05-29 03:46:03 UTC_
 
