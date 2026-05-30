@@ -1,4 +1,4 @@
-# generate-customer-delivery-status.ps1
+﻿# generate-customer-delivery-status.ps1
 # M3 Next-Gen alignment: queries Supabase for all client orgs and outputs
 # reports/status/customer-delivery-status-LATEST.md — a machine-readable
 # per-client snapshot covering health, WP update status, and 20-department

@@ -7245,3 +7245,33 @@ AUTO_TASK_DONE: /api/ops/summary 移除寫死 fallback tenants，客戶來源統
 **[rollback]** `git revert <hash>`；純顯示字串改動，無行為風險
 
 AUTO_TASK_DONE: playwright-runner.ps1 ASCII 化修復 CP950 parse 失敗，post-deploy smoke 26/0/4 通過
+
+
+## 2026-05-30 — CP950 parse-break 機械閘（防整類復發）+ 修最後一支壞檔
+
+**[任務理解]** 使用者：「做成 skill/runbook/command 防再發」。痛點 = repo `.ps1` 含非 ASCII 但無 BOM → 在 zh-TW PowerShell 5.1（CP950）可能 parse 失敗、整支跑不起來。既有 `/audit-encoding` 只抓 capture-site 陷阱（`& docker` 等），完全沒擋這個 source-parse-break 類。
+
+**[關鍵設計修正 — 避免 63 個 false positive]** 初版想用「非 ASCII + 無 BOM = fail」，但 R0 impact scan 發現**158 支 .ps1 中有 63 支符合此條件，其中 62 支天天正常運作**（ao-close/secrets-vault/ao-resume…）。真正會壞的只有「CP950 解碼後破壞語法引號/括號」那種。故改用**精準偵測**：把檔案 bytes 以 code page 950 解碼後 `Parser::ParseInput`，errors > 0 才算壞。全 158 支掃描 → **只有 1 支真壞**（`generate-customer-delivery-status.ps1` FAIL-79），零誤報。
+
+**[已修改]**
+- `scripts/audit-cp950-traps.ps1`：① 新增 `Get-Cp950ParseBreakFinding`（host-independent CP950-decode 偵測，BOM 檔與純 ASCII 檔快速跳過）② main loop 整合 ③ 新增 `-ParseBreakOnly` gate 模式（只報這個 catastrophic 類，跳過 136 個既有 capture-trap backlog）④ report 依 Status 分流修復指引 ⑤ 自身輸出字串 `CLEAN —` em-dash → ASCII。
+- `scripts/generate-customer-delivery-status.ps1`：加 UTF-8 BOM（其非 ASCII 是 CJK **資料**＝部門 cluster labels 董事/策略/治理…，不可 ASCII 化；BOM 是正解）。byte-level prepend，零內容/換行變動。
+- `scripts/system-health-check.ps1`：新增 HARD gate「PowerShell scripts parse under CP950」→ 跑 `audit-cp950-traps.ps1 -ParseBreakOnly`，非 0 即 Add-CriticalFailure（AO-CLOSE 100% 自動強制，無需 LLM 自律）。
+- `agency-os/docs/operations/AUDIT_REGISTRY.md`：前一 commit 已修誤診（playwright-runner 🔴 FIXED / generate-... 🔴 TRACKED）；本支現已 FIXED（BOM）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ParseFile generate-customer-delivery-status.ps1` (PS5.1, post-BOM) | exit=0 (OK，was FAIL-79) | ms=~500
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -ParseBreakOnly -Quiet` (full 146-file scan) | exit=0 (clean) | ms=~8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File <BOM-stripped copy> -ParseBreakOnly` (regression) | exit=1 (correctly CAUGHT 79 errors) | ms=~600
+- REALTEST_EVIDENCE: tool=Bash | cmd=`system-health-check.ps1` (end-to-end) | exit=1 | 99.7% 368/369 — 唯一 fail 是既有無關的「Claude Code sync infrastructure」；新 CP950 check 在 368 pass 內
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（playwright-runner ASCII 化那次 critic；本次為偵測器/閘接線，邏輯經 4 個 real test 證明，含正反例）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`audit-cp950-traps\|ParseBreakOnly\|GetEncoding(950)` | hits=0（無其他消費者依賴；health-check 用 exit code）
+
+**[剩餘風險]**
+- `GetEncoding(950)` 在 .NET Core（pwsh/Linux CI）需 CodePages provider，缺則 try/catch → $null（gate 在 Windows AO-CLOSE，950 必存在）；若日後加 Linux CI 需 `RegisterProvider`。
+- 既有 136 個 capture-trap drift 仍在 backlog（AUDIT_REGISTRY 記錄，多為 Low）；本次刻意不納入硬閘。
+- health-check 既有「Claude Code sync」fail 為本機 env 狀態，與本次無關。
+
+**[rollback]** 三檔可 `git revert <hash>`；偵測器為純新增函式 + 新 switch，預設行為不變。
+
+AUTO_TASK_DONE: CP950 parse-break 機械閘上線（system-health-check 硬閘 + audit-cp950-traps -ParseBreakOnly）+ generate-customer-delivery-status.ps1 BOM 修復，全 158 支 .ps1 零 parse-break

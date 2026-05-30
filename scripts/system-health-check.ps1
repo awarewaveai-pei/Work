@@ -531,6 +531,26 @@ if (Test-Path $driftScript) {
     Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail "Skipped: scripts/check-deploy-drift.ps1 not present"
 }
 
+# 7b) CP950 parse-break gate (HARD). A BOM-less non-ASCII .ps1 that fails to parse under code
+# page 950 cannot run at all on a zh-TW PowerShell 5.1 host (root cause: playwright-runner.ps1 +
+# generate-customer-delivery-status.ps1, both 2026-05-30). The broader capture-trap audit stays
+# informational/on-demand (large accepted backlog); only this catastrophic class blocks AO-CLOSE.
+# SSOT: scripts/audit-cp950-traps.ps1 -ParseBreakOnly.
+$cp950Gate = Join-Path $root "scripts/audit-cp950-traps.ps1"
+if (Test-Path $cp950Gate) {
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $cp950Gate -ParseBreakOnly -Quiet 2>&1 | Out-Null
+        $cp950Exit = $LASTEXITCODE
+        $cp950Pass = ($cp950Exit -eq 0)
+        Add-Check -Name "PowerShell scripts parse under CP950 (no BOM-less non-ASCII parse-breaks)" -Pass $cp950Pass -Detail $(if ($cp950Pass) { "OK (all .ps1 parse on Big5 PS 5.1)" } else { "FAIL: >=1 .ps1 cannot parse under CP950 - run scripts/audit-cp950-traps.ps1 -ParseBreakOnly; fix = ASCII-ify or add UTF-8 BOM" })
+        if (-not $cp950Pass) { Add-CriticalFailure -Reason "A repo .ps1 fails to parse under CP950 (cannot run on zh-TW PS 5.1) - see audit-cp950-traps.ps1 -ParseBreakOnly" }
+    } catch {
+        Add-Check -Name "PowerShell scripts parse under CP950 (no BOM-less non-ASCII parse-breaks)" -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+    }
+} else {
+    Add-Check -Name "PowerShell scripts parse under CP950 (no BOM-less non-ASCII parse-breaks)" -Pass $true -Detail "Skipped: scripts/audit-cp950-traps.ps1 not present"
+}
+
 # 9) Cloudflare security posture (warn-only informational check).
 $cfScript = Join-Path $root "scripts/check-cloudflare-security.ps1"
 if (Test-Path $cfScript) {

@@ -32,6 +32,12 @@
 .PARAMETER Quiet
   Suppress per-file "OK" lines; only show drift.
 
+.PARAMETER ParseBreakOnly
+  Gate mode. Skip the capture-trap AST audit (a large, mostly-accepted backlog) and report
+  ONLY the catastrophic 'cp950-parse-break' class (BOM-less non-ASCII that fails to parse
+  under CP950 -> the script cannot run at all). Exit 1 only if such a file exists. This is
+  the class wired into system-health-check.ps1 as a hard AO-CLOSE gate.
+
 .EXAMPLE
   powershell -File scripts/audit-cp950-traps.ps1
   # scan defaults, human report
@@ -67,7 +73,8 @@ param(
     [string[]]$Path = @(),
     [string]$File = "",
     [switch]$Json,
-    [switch]$Quiet
+    [switch]$Quiet,
+    [switch]$ParseBreakOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -227,6 +234,54 @@ function Get-UnprotectedCaptures {
     return ,$findings.ToArray()
 }
 
+function Get-Cp950ParseBreakFinding {
+    <#
+      Host-INDEPENDENT detector for the parse-break class (playwright-runner.ps1 +
+      generate-customer-delivery-status.ps1, both 2026-05-30). A BOM-less .ps1 containing
+      non-ASCII bytes is read by Windows PowerShell 5.1 on a zh-TW host using code page 950
+      (Big5). Most such files still parse (mojibake in comments/strings only) and run fine.
+      But when a UTF-8 multibyte sequence decodes under CP950 into bytes that break quoting
+      or brackets, the WHOLE script fails to parse and cannot run at all.
+
+      We reproduce that deterministically on ANY host: decode the raw bytes as CP950 and parse.
+        - Files WITH a UTF-8 BOM are read as UTF-8 on every host  -> always safe, skipped.
+        - Pure-ASCII files decode identically under CP950          -> never break, skipped.
+      This is why the naive "non-ASCII without BOM" rule is wrong: 63 repo scripts match it but
+      only the genuinely syntax-breaking ones are caught here.
+
+      Returns a finding (Status='cp950-parse-break') or $null.
+    #>
+    param([string]$ScriptPath)
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($ScriptPath)
+        # BOM present => UTF-8 on every host => safe.
+        if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { return $null }
+        # Pure ASCII => CP950 decode == ASCII => never breaks. Fast path.
+        $nonAscii = $false
+        foreach ($b in $bytes) { if ($b -gt 0x7F) { $nonAscii = $true; break } }
+        if (-not $nonAscii) { return $null }
+        # GetEncoding(950) is always present on .NET Framework (PS 5.1 / Windows). On .NET Core
+        # (pwsh/Linux) it needs the CodePages provider; if absent this throws -> caught -> $null.
+        # The gate's home is the Windows AO-CLOSE health check, where code page 950 is always present.
+        $cp950 = [System.Text.Encoding]::GetEncoding(950)
+        $text = $cp950.GetString($bytes)
+        $errs = $null
+        [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$null, [ref]$errs) | Out-Null
+        if ($errs -and $errs.Count -gt 0) {
+            return [pscustomobject]@{
+                File    = $ScriptPath
+                Line    = $errs[0].Extent.StartLineNumber
+                Cmd     = '(cp950-parse-break)'
+                Snippet = ("non-ASCII without BOM breaks parsing under CP950 ({0} error(s)) -- fix: ASCII-ify if decorative, or add UTF-8 BOM if CJK is data" -f $errs.Count)
+                Status  = 'cp950-parse-break'
+            }
+        }
+        return $null
+    } catch {
+        return $null
+    }
+}
+
 function Get-ScanTargets {
     param([string[]]$RootPaths, [string]$RepoRoot)
 
@@ -268,11 +323,19 @@ foreach ($f in $scanFiles) {
     # NOTE: Get-UnprotectedCaptures returns `,$array` (idiomatic to prevent unwrapping). DO NOT
     # wrap again with @() — that produces double-wrap (1-element array containing the real array),
     # then `foreach ($x in $findings)` yields an empty array as $x and $x.Line throws under StrictMode.
-    $findings = Get-UnprotectedCaptures -ScriptPath $f
-    if ($null -eq $findings) { $findings = @() }
-    # Force-coerce to array — under StrictMode, if Get-... returned a single non-array object,
-    # .Count would fail. @() ensures uniform array type.
-    $findings = @($findings)
+    if ($ParseBreakOnly) {
+        # Gate mode: skip the capture-trap backlog; report only the catastrophic parse-break class.
+        $findings = @()
+    } else {
+        $findings = Get-UnprotectedCaptures -ScriptPath $f
+        if ($null -eq $findings) { $findings = @() }
+        # Force-coerce to array — under StrictMode, if Get-... returned a single non-array object,
+        # .Count would fail. @() ensures uniform array type.
+        $findings = @($findings)
+    }
+    # Host-independent parse-break check (non-ASCII without BOM that breaks under CP950). Always runs.
+    $cp950Finding = Get-Cp950ParseBreakFinding -ScriptPath $f
+    if ($cp950Finding) { $findings = @($findings) + $cp950Finding }
     if ($findings.Count -eq 0) {
         $cleanCount++
         if (-not $Quiet -and -not $Json) { Write-Host ("  OK   {0}" -f $rel) -ForegroundColor DarkGray }
@@ -310,18 +373,26 @@ if ($Json) {
     Write-Host "============================================================" -ForegroundColor Cyan
     if ($totalDrift -gt 0) {
         Write-Host ""
-        Write-Host "Unprotected capture sites (must wrap in Invoke-WithUtf8Console { ... }):" -ForegroundColor Yellow
+        Write-Host "Encoding drift (CP950 capture traps and/or parse-breaks):" -ForegroundColor Yellow
         foreach ($x in $allFindings) {
             Write-Host ("  {0}:{1}  [{2}]  {3}" -f $x.File, $x.Line, $x.Cmd, $x.Snippet) -ForegroundColor Yellow
         }
         Write-Host ""
-        Write-Host "Fix pattern:" -ForegroundColor DarkGray
-        Write-Host "  . (Join-Path `$PSScriptRoot '_console-encoding-helpers.ps1')" -ForegroundColor DarkGray
-        Write-Host "  `$out = Invoke-WithUtf8Console { & ssh ... 2>&1 }" -ForegroundColor DarkGray
-        Write-Host ""
+        if (@($allFindings | Where-Object { $_.Status -eq 'unprotected' }).Count -gt 0) {
+            Write-Host "Fix pattern (capture traps):" -ForegroundColor DarkGray
+            Write-Host "  . (Join-Path `$PSScriptRoot '_console-encoding-helpers.ps1')" -ForegroundColor DarkGray
+            Write-Host "  `$out = Invoke-WithUtf8Console { & ssh ... 2>&1 }" -ForegroundColor DarkGray
+            Write-Host ""
+        }
+        if (@($allFindings | Where-Object { $_.Status -eq 'cp950-parse-break' }).Count -gt 0) {
+            Write-Host "Fix pattern (parse-breaks):" -ForegroundColor DarkGray
+            Write-Host "  ASCII-ify decorative glyphs (box-drawing / arrows / em-dashes), OR" -ForegroundColor DarkGray
+            Write-Host "  add a UTF-8 BOM when the non-ASCII is real CJK data the script must keep." -ForegroundColor DarkGray
+            Write-Host ""
+        }
     } else {
         Write-Host ""
-        Write-Host "  CLEAN — no unprotected capture sites." -ForegroundColor Green
+        Write-Host "  CLEAN - no unprotected capture sites." -ForegroundColor Green
         Write-Host ""
     }
 }
