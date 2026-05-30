@@ -21,7 +21,10 @@ LAST_NOTIFY_FILE="${STATE_DIR}/last_notify_at"
 WEBHOOK_WARN_STAMP="${STATE_DIR}/.warned_missing_webhook"
 
 WEBHOOK_URL="${WEBHOOK_URL:-}"
-CHECK_URLS="${CHECK_URLS:-https://aware-wave.com/ https://app.aware-wave.com/ https://api.aware-wave.com/health https://n8n.aware-wave.com/healthz https://trigger.aware-wave.com/ https://uptime.aware-wave.com/dashboard}"
+# Built-in default = local SG services only. Cross-region canaries belong in
+# CHECK_URLS_SLOW (see below) — do NOT add them here, the 12s fast tier will false-positive
+# on routine network jitter. Operators add per-VPS extras via /etc/default/awarewave-endpoint-alert.local.
+CHECK_URLS="${CHECK_URLS:-https://aware-wave.com/ https://app.aware-wave.com/api/ops/summary https://api.aware-wave.com/health}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-12}"
 # Optional second URL list for cross-region or known-slow probes. Default empty =
 # fully backwards compatible (no second loop runs, no fingerprint change).
@@ -178,7 +181,11 @@ fail_lines=()
 # share the same fingerprint input format.
 probe_url() {
   local url="$1" timeout="$2" code
-  code="$(curl -sS -o /dev/null -L -w "%{http_code}" --max-time "${timeout}" "${url}" || true)"
+  # `|| echo '000'` (not `|| true`) — when curl itself dies (DNS resolver crash,
+  # /dev/null unwritable, etc.), code would be empty string and journal line
+  # would print "url -> (timeout=Ns)" with no code, misleading the operator.
+  # '000' mirrors the same convention used in send_heartbeat() above.
+  code="$(curl -sS -o /dev/null -L -w "%{http_code}" --max-time "${timeout}" "${url}" || echo '000')"
   # 2xx / 3xx only (avoid bash ERE pitfall: ^2|3 matches a lone "3" anywhere)
   if [[ ! "${code}" =~ ^[23][0-9]{2}$ ]]; then
     echo "endpoint-alert: ${url} -> ${code} (timeout=${timeout}s)" >&2
@@ -186,14 +193,16 @@ probe_url() {
   fi
 }
 
-for url in ${CHECK_URLS}; do
+# `:-` defends against any future caller that unsets these vars (slack-alert-drill.sh
+# already does for symmetry); without `:-` an unset var crashes under `set -u`.
+for url in ${CHECK_URLS:-}; do
   probe_url "${url}" "${TIMEOUT_SEC}"
 done
 # Second tier runs only when operator opts in via CHECK_URLS_SLOW (.local drop-in).
 # Order matters for fingerprint stability: fast tier first, slow tier second.
 # fingerprint dedup below uses sort -u so order isn't load-bearing, but keeping it
 # deterministic helps log readability.
-for url in ${CHECK_URLS_SLOW}; do
+for url in ${CHECK_URLS_SLOW:-}; do
   probe_url "${url}" "${TIMEOUT_SEC_SLOW}"
 done
 

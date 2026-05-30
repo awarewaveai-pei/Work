@@ -35,7 +35,12 @@
 #                    plus extension catch-all (Layer 2) for future variants.
 
 # Layer 1 - Confirmed path/filename probes (explicit allowlist of denies).
-location ~* "(/\.env|/phpunit|eval-stdin\.php|/\.git(/|$)|/\.aws(/|$)|/actuator/|/owa/|/onvif/|/\.flaskenv|/wp-content/plugins/gravitysmtp|/hello\.world|/\.ssh(/|$)|/wp-config|/xmlrpc\.php|/Dockerfile|/docker-compose|/\.docker(/|$)|/\.vscode(/|$)|/terraform\.(tfstate|tfvars)|/WEB-INF/|/META-INF/|/storage/logs/|/src/(config|settings)\.(json|ya?ml)|/v1/config\.json|/(web|www|backup)\.zip)" {
+# Notes on anchoring:
+#   - `^/(web|www|backup)\.zip$` is anchored to root to avoid matching legitimate
+#     /wp-content/uploads/*/my-backup.zip downloads.
+#   - Suffix `(?:$|/|\?)` on extension/file rules defends against path-parameter
+#     bypass (/foo.sql/ or /foo.sql;jsessionid=x) and query-string variants.
+location ~* "(/\.env|/phpunit|eval-stdin\.php|/\.git(/|$)|/\.aws(/|$)|/actuator/|/owa/|/onvif/|/\.flaskenv|/wp-content/plugins/gravitysmtp|/hello\.world|/\.ssh(/|$)|/wp-config|/xmlrpc\.php|/Dockerfile|/docker-compose|/\.docker(/|$)|/\.vscode(/|$)|/terraform\.(tfstate|tfvars)|/WEB-INF/|/META-INF/|/storage/logs/|/src/(config|settings)\.(json|ya?ml)|/v1/config\.json|^/(web|www|backup)\.zip$)" {
     access_log /var/log/nginx/scanner.log combined;
     return 444;
 }
@@ -43,7 +48,10 @@ location ~* "(/\.env|/phpunit|eval-stdin\.php|/\.git(/|$)|/\.aws(/|$)|/actuator/
 # Layer 2 - Heuristic: file extensions with no legitimate public exposure.
 # Conservative - every extension here is a misconfig or scanner if served at any path.
 # .zip / .tar / .tar.gz NOT included: WP serves legitimate downloads from /wp-content/uploads/.
-location ~* "\.(sql|bak|old|swp|swo|pem|key|p12|pfx)$" {
+# Suffix `(?:$|/|;)` defends against path-parameter bypass (some scanners now use
+# /foo.sql/ or /foo.sql;jsessionid=x to dodge $-anchored rules). `;` is the URI
+# path-parameter separator (RFC 3986); legitimate AwareWave URIs never use it.
+location ~* "\.(sql|bak|old|swp|swo|pem|key|p12|pfx)(?:$|/|;)" {
     access_log /var/log/nginx/scanner.log combined;
     return 444;
 }

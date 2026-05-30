@@ -15,7 +15,7 @@ if [[ -f /etc/default/awarewave-endpoint-alert.local ]]; then
 fi
 set +a
 
-unset CHECK_URLS TIMEOUT_SEC 2>/dev/null || true
+unset CHECK_URLS TIMEOUT_SEC CHECK_URLS_SLOW TIMEOUT_SEC_SLOW 2>/dev/null || true
 
 if [[ -z "${WEBHOOK_URL:-}" ]]; then
   echo "WEBHOOK_URL is empty" >&2
