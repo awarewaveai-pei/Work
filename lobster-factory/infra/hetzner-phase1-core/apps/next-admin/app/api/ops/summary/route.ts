@@ -2,25 +2,6 @@ import { NextResponse } from "next/server";
 import type { MediaBoundaryRule, OpsAction, OpsTenant } from "../../../../lib/ops-contracts";
 import { getSupabaseServerClient } from "../../../../lib/supabase-server";
 
-const tenants: OpsTenant[] = [
-  {
-    id: "tenant-awarewave",
-    slug: "awarewave",
-    name: "AwareWave",
-    status: "active",
-    lastRunStatus: "completed",
-    riskLevel: "low",
-  },
-  {
-    id: "tenant-soulful-expression",
-    slug: "soulful-expression",
-    name: "Soulful Expression",
-    status: "active",
-    lastRunStatus: "running",
-    riskLevel: "medium",
-  },
-];
-
 const mediaRules: MediaBoundaryRule[] = [
   {
     domain: "ai_generated",
@@ -68,36 +49,50 @@ const actions: OpsAction[] = [
 
 export async function GET() {
   const supabase = getSupabaseServerClient();
-  if (supabase) {
-    const { data, error } = await supabase
-      .from("organizations")
-      .select("id,slug,name,status")
-      .order("created_at", { ascending: false })
-      .limit(20);
 
-    if (!error && data) {
-      const tenants: OpsTenant[] = data.map((org) => ({
-        id: org.id,
-        slug: org.slug,
-        name: org.name,
-        status: org.status === "active" ? "active" : "risk",
-        lastRunStatus: "completed",
-        riskLevel: org.status === "active" ? "low" : "medium",
-      }));
-
-      return NextResponse.json({
-        generatedAt: new Date().toISOString(),
-        sourceOfTruth: "supabase",
-        tenants,
-        mediaRules,
-        actions,
-      });
-    }
+  // Tenants are sourced ONLY from the live `organizations` table — the same
+  // source `/ops/clients` reads. When Supabase is unavailable or errors, return
+  // an empty tenant list (ops-console renders an explicit empty state) rather
+  // than fabricating clients that diverge from reality. mediaRules / actions are
+  // legitimate static config and are always returned.
+  if (!supabase) {
+    return NextResponse.json({
+      generatedAt: new Date().toISOString(),
+      sourceOfTruth: "supabase-unavailable",
+      tenants: [] as OpsTenant[],
+      mediaRules,
+      actions,
+    });
   }
+
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id,slug,name,status")
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error || !data) {
+    return NextResponse.json({
+      generatedAt: new Date().toISOString(),
+      sourceOfTruth: "supabase-error",
+      tenants: [] as OpsTenant[],
+      mediaRules,
+      actions,
+    });
+  }
+
+  const tenants: OpsTenant[] = data.map((org) => ({
+    id: org.id,
+    slug: org.slug,
+    name: org.name,
+    status: org.status === "active" ? "active" : "risk",
+    lastRunStatus: "completed",
+    riskLevel: org.status === "active" ? "low" : "medium",
+  }));
 
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
-    sourceOfTruth: "supabase-fallback",
+    sourceOfTruth: "supabase",
     tenants,
     mediaRules,
     actions,

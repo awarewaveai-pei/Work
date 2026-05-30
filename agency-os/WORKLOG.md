@@ -7195,3 +7195,29 @@ AUTO_TASK_DONE: Phase Z6 archive lift gate — mechanical 100% coverage + 18:46 
 
 - AUTO_TASK_DONE: bootstrap-mcp-machine.ps1
 - AUTO_TASK_DONE: 第二台機器同步 exit-2 hook 升級
+
+
+## 2026-05-30 — /api/ops/summary 統一客戶來源（移除寫死 fallback tenants）
+
+**[任務理解]** 使用者問「ops-console 與 ops/clients 的客戶來源是否一致」。根因：`/ops-console` 走 `/api/ops/summary`，該 route 在 Supabase client 為 null 或查詢出錯時，回傳**寫死的 2 筆假 tenants**（slug `awarewave`/`soulful-expression`，與真實 DB slug `awarewave-ops` 不符），導致 ops-console 可能顯示一組與 `/ops/clients`（即時讀 `organizations`）不同、且根本不存在的客戶；且任何 slug-based 連結會壞。Happy path 兩頁其實已對齊（都讀 `organizations`），分歧只發生在 fallback。
+
+**[已修改]**
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/summary/route.ts`
+  - 刪除寫死 `tenants` 常數陣列（原行 5-22）
+  - `GET()` 重構為三分支，皆回 HTTP 200 + 同 key 形狀（generatedAt/sourceOfTruth/tenants/mediaRules/actions）：`!supabase` → `tenants:[]` + `sourceOfTruth:"supabase-unavailable"`；query error/no data → `tenants:[]` + `"supabase-error"`；成功 → 沿用既有 mapping + `"supabase"`
+  - `mediaRules` / `actions` 靜態設定不動；tenants 自此**只來自 `organizations`**
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` (apps/next-admin) | exit=0 | ms=~12000
+- REALTEST_WAIVED: NA -- DB-down 路徑無法本機真實觸發；happy-path 線上 production curl 將由 `sg-deploy.sh` Step 7 smoke check（`/api/ops/summary` 必須 2xx）於部署時覆蓋
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（兩 Minor 為既有 carry-over：`paused`→`risk` 折疊、未防 NULL slug/name；非本次引入，不阻擋）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`supabase-fallback\|tenant-awarewave\|tenant-soulful-expression\|/api/ops/summary` | hits=0（指被刪 fallback 的消費者）— 確認：無 code 依賴舊 fallback slug；真實 DB slug 為 `awarewave-ops`；monitors（sg-deploy.sh:251 / endpoint-alert.sh:27）僅斷言 HTTP 狀態；ops-console-smoke.ps1:144 僅檢 `sourceOfTruth != null`（三分支皆滿足）；ops-console/page.tsx 已處理空 tenants（line 87/144/154）
+- 額外觀察（scope 外不修）：`tests/e2e/smoke/03-api-ops.spec.ts:33` 斷言 `toHaveProperty('tenant')`（單數）是既有錯誤斷言（回應只有 `tenants` 複數），被 `OPS_API_TOKEN` gate 住，與本改動無關
+
+**[剩餘風險]**
+- 尚未部署到 production；目前僅本機 tsc + critic 驗證過，真實 runtime 行為待 sg-deploy Step 7 smoke 確認
+- Critic 兩 Minor（paused 狀態折疊、NULL 欄位未防護）為既有問題，未來可另開 follow-up
+
+**[rollback]** 單檔單 commit，可 `git revert <hash>`；未部署故無 production 影響
+
+AUTO_TASK_DONE: /api/ops/summary 移除寫死 fallback tenants，客戶來源統一為 organizations
