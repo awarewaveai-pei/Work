@@ -26,11 +26,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "SilentlyContinue"
 
+. (Join-Path $PSScriptRoot '_console-encoding-helpers.ps1')
+
 if (-not $WorkRoot) {
-    try { $WorkRoot = (git -C $PSScriptRoot rev-parse --show-toplevel 2>$null).Trim() } catch {}
+    try { $WorkRoot = (Invoke-WithUtf8Console { git -C $PSScriptRoot rev-parse --show-toplevel 2>$null }).Trim() } catch {}
     if (-not $WorkRoot) { $WorkRoot = Split-Path $PSScriptRoot -Parent }
 }
-$WorkRoot = (Resolve-Path $WorkRoot).Path
+if (Test-Path $WorkRoot) { $WorkRoot = (Resolve-Path $WorkRoot).Path }
 
 $reportDir = Join-Path $WorkRoot "agency-os\reports\repair-center"
 $null = New-Item -ItemType Directory -Force -Path $reportDir
@@ -101,47 +103,95 @@ try {
 }
 $results["check2"] = @{ status = $check2Status; detail = $check2Detail }
 
-# ── Check 3: BACKUP_RESTORE_PROOF 新鮮度 ──────────────────────────────────
-Write-Host "`n[Check 3] BACKUP_RESTORE_PROOF 新鮮度（>7天警告）..." -ForegroundColor Cyan
+# ── Check 3: BACKUP_RESTORE_PROOF 健康（status frontmatter + JSON cross-truth）──
+# 2026-05-30: 退役舊「抓最新日期」proxy 邏輯（會誤報 not-onboarded tenant），改對齊
+# cloud routine AgencyOS-RepairCenterPhase4Weekly 的 status-frontmatter 邏輯：
+#   not-onboarded → SKIP（靜默，不算 WARNING）
+#   active → 3A restore_drill_due_after 逾期 + 3B BACKUP_AUTO_STATUS.json last_success > 8 天
+Write-Host "`n[Check 3] BACKUP_RESTORE_PROOF 健康（status frontmatter）..." -ForegroundColor Cyan
 $check3Status = "PASS"
 $check3Detail = ""
 $proofFiles   = Get-ChildItem -Path (Join-Path $WorkRoot "agency-os\tenants") -Filter "BACKUP_RESTORE_PROOF.md" -Recurse -ErrorAction SilentlyContinue |
-                Where-Object { $_.FullName -notmatch "templates" }
-$staleList    = @()
+                Where-Object { $_.FullName -notmatch "template" }
+$warnList = @()
+$nowUtc   = (Get-Date).ToUniversalTime()
 foreach ($f in $proofFiles) {
+    $tenantSlug = ($f.FullName -split '\\' | Where-Object { $_ -like 'company-*' } | Select-Object -First 1)
+    if (-not $tenantSlug) { $tenantSlug = Split-Path (Split-Path $f.DirectoryName -Parent) -Leaf }
     $raw = Get-Content -LiteralPath $f.FullName -Raw -ErrorAction SilentlyContinue
-    # Match most recent date entry: lines like "## 2026-05-08" or "date: 2026-05-08" or "**Date**: 2026-05-08"
-    $dateMatches = [regex]::Matches($raw, '\b(20\d\d-\d{2}-\d{2})\b')
-    if ($dateMatches.Count -gt 0) {
-        $latestDate = ($dateMatches | ForEach-Object { [datetime]$_.Value } | Sort-Object -Descending | Select-Object -First 1)
-        $ageDays    = [int]($now - $latestDate).TotalDays
-        $tenantSlug = ($f.FullName -split '\\' | Where-Object { $_ -like 'company-*' } | Select-Object -First 1)
-        if ($ageDays -gt 7) {
-            $staleList += "${tenantSlug}: ${ageDays}天前 ($($latestDate.ToString('yyyy-MM-dd')))"
-            Write-Host "   WARNING: $tenantSlug — 最新備份 $($latestDate.ToString('yyyy-MM-dd')) ($ageDays 天前)" -ForegroundColor Yellow
-        } else {
-            Write-Host "   OK: $tenantSlug — $($latestDate.ToString('yyyy-MM-dd')) ($ageDays 天前)" -ForegroundColor Green
+
+    $status = $null
+    $fmMatch = [regex]::Match($raw, '(?ms)\A---\s*\r?\n(.*?)\r?\n---')
+    if ($fmMatch.Success) {
+        $sMatch = [regex]::Match($fmMatch.Groups[1].Value, '(?m)^\s*status:\s*(\S+)')
+        if ($sMatch.Success) { $status = $sMatch.Groups[1].Value.Trim() }
+    }
+
+    if ($status -eq 'not-onboarded') {
+        Write-Host "   SKIP: $tenantSlug — not-onboarded" -ForegroundColor DarkGray
+        continue
+    }
+    if ($status -ne 'active') {
+        $warnList += "${tenantSlug}: 未知/缺 status frontmatter ($status)"
+        Write-Host "   WARNING: $tenantSlug — 未知 status '$status'" -ForegroundColor Yellow
+        continue
+    }
+
+    $tenantWarn = @()
+
+    # 3A — restore drill due
+    $drillMatch = [regex]::Match($fmMatch.Groups[1].Value, '(?m)^\s*restore_drill_due_after:\s*(\d{4}-\d{2}-\d{2})')
+    if ($drillMatch.Success) {
+        $due = [datetime]::ParseExact($drillMatch.Groups[1].Value, 'yyyy-MM-dd', $null)
+        if ($nowUtc.Date -gt $due.Date) {
+            $tenantWarn += "restore drill overdue (due $($drillMatch.Groups[1].Value))"
         }
+    }
+
+    # 3B — automated backup freshness (truth source)
+    $jsonPath = Join-Path $f.DirectoryName "BACKUP_AUTO_STATUS.json"
+    if (-not (Test-Path $jsonPath)) {
+        $tenantWarn += "BACKUP_AUTO_STATUS.json missing — no truth source"
     } else {
-        $staleList += "$($f.DirectoryName | Split-Path -Leaf): 無可解析日期"
-        Write-Host "   WARNING: $($f.FullName) — 無可解析日期" -ForegroundColor Yellow
+        try {
+            $j       = Get-Content -LiteralPath $jsonPath -Raw | ConvertFrom-Json
+            $unix    = [long]$j.last_success.unix_utc
+            $lastUtc = [datetimeoffset]::FromUnixTimeSeconds($unix).UtcDateTime
+            $ageDays = [Math]::Floor(($nowUtc - $lastUtc).TotalDays)
+            if ($ageDays -gt 8) {
+                $tenantWarn += "last success ${ageDays}d ago ($($j.last_success.iso_utc)); over 8d"
+            }
+        } catch {
+            $tenantWarn += "BACKUP_AUTO_STATUS.json parse error / missing last_success.unix_utc"
+        }
+    }
+
+    if ($tenantWarn.Count -gt 0) {
+        $warnList += "${tenantSlug}: $($tenantWarn -join ', ')"
+        Write-Host "   WARNING: $tenantSlug — $($tenantWarn -join ', ')" -ForegroundColor Yellow
+    } else {
+        Write-Host "   OK: $tenantSlug — active, drill+backup fresh" -ForegroundColor Green
     }
 }
-if ($proofFiles.Count -eq 0) {
+if (@($proofFiles).Count -eq 0) {
     $check3Status = "SKIP"
     $check3Detail = "無 BACKUP_RESTORE_PROOF.md 找到"
     Write-Host "   SKIP: $check3Detail" -ForegroundColor DarkYellow
-} elseif ($staleList.Count -gt 0) {
+} elseif ($warnList.Count -gt 0) {
     $check3Status = "WARNING"
-    $check3Detail = $staleList -join "; "
+    $check3Detail = $warnList -join "; "
 } else {
-    Write-Host "   PASS: 所有備份均在 7 天內" -ForegroundColor Green
+    Write-Host "   PASS: active tenant 備份健康；not-onboarded 已 SKIP" -ForegroundColor Green
 }
 $results["check3"] = @{ status = $check3Status; detail = $check3Detail }
 
 # ── 寫報告 ─────────────────────────────────────────────────────────────────
-$allPass = ($results.Values | Where-Object { $_.status -eq "WARNING" }).Count -eq 0
-$overall = if ($allPass) { "✅ 全PASS" } else { "⚠️ $(@($results.Values | Where-Object { $_.status -eq 'WARNING' }).Count) 項需注意" }
+$warnCount = @($results.Values | Where-Object { $_.status -eq "WARNING" }).Count
+$skipCount = @($results.Values | Where-Object { $_.status -eq "SKIP" }).Count
+$allPass   = ($warnCount -eq 0)
+$overall   = if ($warnCount -eq 0 -and $skipCount -eq 0) { "✅ 全PASS" }
+             elseif ($skipCount -eq 0) { "⚠️ $warnCount 項需注意" }
+             else { "⚠️ $warnCount 項需注意, $skipCount 項 SKIP" }
 
 $report = @"
 # Repair Center Phase 4 週巡檢

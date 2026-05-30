@@ -112,7 +112,7 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 | `scripts/check-claude-sync.ps1` | 2 | Low |
 | `scripts/fetch-external-signals.ps1` | 1 | Low — `git rev-parse --show-toplevel` (ASCII path) |
 | `scripts/machine-environment-audit.ps1` | 5 | Low |
-| `scripts/phase4-weekly-check.ps1` | 1 | Low |
+| `scripts/phase4-weekly-check.ps1` | 1 | Low — 🔴 FIXED 2026-05-30: wrapped `git rev-parse --show-toplevel` in `Invoke-WithUtf8Console` (same edit also rewrote Check 3 to status-frontmatter logic) |
 | `scripts/scan-local-config-for-secrets.ps1` | 1 | Low |
 | `scripts/sync-claude-userlevel.ps1` | 1 | Low — 🔴 FIXED b791bfb+followup: wrapped `git rev-parse` in `Invoke-WithUtf8Console` |
 | `scripts/verify-closeout-completeness.ps1` | 2 | Low |

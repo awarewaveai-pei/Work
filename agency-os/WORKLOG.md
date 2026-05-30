@@ -5,7 +5,43 @@
 ## 2026-05-30
 
 ### Daily
+- 13:20 CST：解 AO-RESUME 兩個 🟡 blocker — Phase 4 routine 復活 + sync-userlevel force-copy race 治本 + fallback Check 3 假警報修正
 - 12:00 CST：scanner-block.inc + endpoint-alert.sh 一勞永逸（Layer 2 啟發式 + per-URL tier）
+
+### claude 2026-05-30 13:20 — Phase 4 routine 復活 + sync force-copy race + fallback Check 3 假警報
+
+**根因**（兩個 AO-RESUME blocker，各自獨立）：
+
+1. **Phase4Weekly routine 逾期 22h**：`AgencyOS-RepairCenterPhase4Weekly` 在 2026-05-29 06:00 UTC 第一次 scheduled fire 時收到 `auto_disabled_repo_access`，平台自動 `enabled=false`（`RemoteTrigger get` 證實 `ended_reason=auto_disabled_repo_access`、`updated_at=2026-05-29T06:03:19Z`）。與 2026-05-25 WeeklyReview **完全同一故障模式**：repo 2026-05-22 PUBLIC→PRIVATE，週頻 routine（7 天靜默）授權失效。`phase4-LATEST.md` 因此卡在 2026-05-22（8 天 stale，watchdog WARN）。
+
+2. **sync gate exit 1（AO-RESUME hook 偶發失敗根因）**：`sync-claude-userlevel.ps1` 的 `Sync-Directory-Mirror` 寫入迴圈**無條件 force-copy 每個 command 檔，即使 MD5 byte-identical**（`same: 34, update: 0`）。當前執行中的 Claude session 握住 `ao-close.md` → `Copy-Item` IOException → 整個 sync 崩潰回非零 → `check-claude-sync` 報「sync infrastructure broken」critical gate fail。真正的 drift 其實只有 settings.json（已被 merge 修好），commands 根本沒 drift。這是 race condition：sync 對「沒變動但被鎖」的檔毫無免疫力。
+
+3. **fallback Check 3 假警報**（修 #1 時連帶發現）：`phase4-weekly-check.ps1` Check 3 還在用 2026-05-22 已退役的「抓最新日期」proxy 邏輯，對 `status: not-onboarded` 的 tenant（p1-pilot / mongolia）誤報 WARNING。cloud routine 早已改 status-frontmatter 邏輯，fallback 沒跟上。
+
+**已修改**：
+- **`RemoteTrigger update enabled=true`**（trig_01JyFw78ZkgwQzpyXXaX1F2K）→ HTTP 200，`ended_reason` 清空，`next_run_at=2026-06-05T06:00:10Z`。
+- [`scripts/sync-claude-userlevel.ps1`](../scripts/sync-claude-userlevel.ps1) `Sync-Directory-Mirror` 寫入迴圈 — 只 copy `update`+`create` 集合的檔（byte-identical 的 `same` 集合跳過），治本 force-copy race。
+- [`scripts/phase4-weekly-check.ps1`](../scripts/phase4-weekly-check.ps1) Check 3 — 重寫對齊 cloud routine：not-onboarded→SKIP、active→3A drill due + 3B `BACKUP_AUTO_STATUS.json` last_success > 8d；overall 區塊加 SKIP 計數；順手 wrap line 30 `git rev-parse` 進 `Invoke-WithUtf8Console`（CP950 trap 清零）；critic Major 修：`@($proofFiles).Count`（StrictMode+SilentlyContinue 下單元素/空集合 `.Count` 會吞例外→真 WARNING 被靜默降級為 PASS 的 false-negative）+ `Resolve-Path` 加 `Test-Path` guard。
+- [`agency-os/docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md) line 115 — phase4 CP950 trap 標 🔴 FIXED。
+- [`agency-os/handoffs/2026-05-28-1152-git-pull-phase4.md`](handoffs/2026-05-28-1152-git-pull-phase4.md) line 37/46/50 — 刪除已過期的「false positive 可忽略 / 舊邏輯」聲稱（R4 stale-claim 同 commit 修）。
+
+**[驗證結果]**（R0 四動作）：
+
+1. **實測**：
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`RemoteTrigger get trig_01JyFw78ZkgwQzpyXXaX1F2K` (after update) | exit=0 | result=`enabled:true, ended_reason:"", next_run_at:2026-06-05T06:00:10Z`
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts\phase4-weekly-check.ps1 -SkipTelegram` (post-fix re-run) | exit=0 | result=Check3 SKIP p1-pilot + SKIP mongolia + OK soulful → `整體: ✅ 全PASS`（假 WARNING 消失，phase4-LATEST.md 已覆寫）
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts\check-claude-sync.ps1` (post-fix) | exit=0 | result=`Result: PASS`（H2 sync verify 對齊）
+   - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts\system-health-check.ps1` | exit=0 | result=`Score: 100% (373/373)`
+2. **Review**：
+   - REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/1n — critic 抓出 phase4 `$proofFiles.Count` StrictMode false-negative（Major）+ `Resolve-Path` null guard（Minor），兩者皆修並 re-audit；sync-claude-userlevel.ps1 判定 fully clean。
+3. **抓蟲**：
+   - BUGHUNT_DONE: scope=`agency-os scripts` | grep=`phase4-weekly-check\|7天\|Sync-Directory-Mirror\|force-copy` | hits=多（callers：`/phase4-check` skill + system-health-check §11 watchdog 讀 phase4-LATEST.md，報告 4 行格式未變→無 downstream 破壞；stale false-positive 聲稱在 AUDIT_REGISTRY:115 + handoff packet 已同 commit 修）
+   - BUGHUNT_DONE: scope=`scripts` | grep=`Sync-Directory-Mirror` | hits=2（定義 line 156 + caller line 420 dispatch，簽章未變→無破壞）
+4. **WORKLOG**：本 entry。
+
+**[剩餘風險]**：Phase 4 + WeeklyReview 兩個週頻 routine 的 OAuth token 底層有效性未證實（API re-enable ≠ token 仍有效）。**2026-06-01 01:05 UTC WeeklyReview + 2026-06-05 06:00 UTC Phase4 下次 fire 要看是否又被 auto-disable**；若再 disable → `claude.ai/code/routines` 手動重新授權 GitHub connection。
+
+**[rollback]**：`git revert <hash>` 還原兩個 .ps1；`RemoteTrigger update enabled=false` 可停用 routine。
 
 ### claude 2026-05-30 11:00 — scanner-block.inc Layer 2 + endpoint-alert.sh per-URL tier
 

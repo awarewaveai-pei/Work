@@ -214,7 +214,13 @@ function Sync-Directory-Mirror($spec, [string]$mode, [string]$label = 'dir') {
   # install / merge => write
   Backup-Path $tgt "$label-before"
   if (-not (Test-Path $tgt)) { New-Item -ItemType Directory -Path $tgt -Force | Out-Null }
+  # Only copy files that actually differ (update) or are new (create). Byte-identical
+  # files (action.same, MD5-matched above) are skipped — force-copying an unchanged file
+  # crashes the whole sync if another process holds a transient lock on it (e.g. the
+  # running Claude session keeping ao-close.md open), falsely reporting "sync broken".
+  $toWrite = @($action.update) + @($action.create | Where-Object { $_ -ne '<DIR>' })
   foreach ($f in $srcFiles) {
+    if ($toWrite -notcontains $f.rel) { continue }
     $tgtFile = Join-Path $tgt $f.rel
     $tgtDir = Split-Path -Parent $tgtFile
     if (-not (Test-Path $tgtDir)) { New-Item -ItemType Directory -Path $tgtDir -Force | Out-Null }
