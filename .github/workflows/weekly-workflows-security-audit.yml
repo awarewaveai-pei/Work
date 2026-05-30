@@ -1,0 +1,114 @@
+# Weekly security audit for lobster-factory/packages/workflows dependencies.
+#
+# Why this exists as a GitHub Actions scheduled job (not a local Windows scheduled task):
+# new CVEs are disclosed against UNCHANGED dependencies over time, so a time-based scan is
+# the correct model — push/PR CI cannot catch a vuln in code that didn't change. The previous
+# delivery (machine-local `AgencyOS-WeeklyAutomation` scheduled task on one desktop) silently
+# stopped producing reports for 19 days because the desktop was not running at the scheduled
+# minute and nothing surfaced the gap. GHA removes the machine dependency: the cron + steps are
+# git-tracked, run on GitHub infra, and surface findings natively (Actions tab + email + issue).
+# Retirement context: agency-os/reports/weekly/README.md
+name: Weekly workflows security audit
+
+on:
+  schedule:
+    # Monday 01:30 UTC = 09:30 Asia/Taipei (TPE)
+    - cron: "30 1 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-workflows-security-audit
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.x"
+
+      # Report generation is deterministic and always exits 0 (writes the markdown report).
+      # No `npm install` needed: the audit script imports only node builtins, and `npm audit`
+      # reads package-lock.json (no node_modules required).
+      - name: Generate workflows security report
+        run: npm run audit:workflows-security
+        working-directory: lobster-factory
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflows-npm-audit
+          path: agency-os/reports/security/workflows-npm-audit-LATEST.md
+          if-no-files-found: warn
+
+      # Gate: non-zero exit iff a high/critical vulnerability is present.
+      - name: Severity gate (high+)
+        id: gate
+        continue-on-error: true
+        run: npm audit --audit-level=high
+        working-directory: lobster-factory/packages/workflows
+
+      - name: Open or update tracking issue on high/critical findings
+        if: steps.gate.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const label = 'weekly-security-audit';
+            const reportPath = 'agency-os/reports/security/workflows-npm-audit-LATEST.md';
+            let report = '_(report file not found)_';
+            try { report = fs.readFileSync(reportPath, 'utf8'); } catch (e) {}
+            // GitHub issue body cap is ~65k chars; trim defensively.
+            if (report.length > 50000) report = report.slice(0, 50000) + '\n\n_…truncated…_';
+
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const today = new Date().toISOString().slice(0, 10);
+            const title = `[weekly-security-audit] high/critical vuln in packages/workflows (${today})`;
+            const body = [
+              `Weekly dependency audit found **high or critical** vulnerabilities in \`lobster-factory/packages/workflows\`.`,
+              ``,
+              `- Run: ${runUrl}`,
+              `- Severity gate: \`npm audit --audit-level=high\` failed`,
+              ``,
+              `## Report`,
+              ``,
+              report,
+            ].join('\n');
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+              per_page: 1,
+            });
+
+            if (existing.data.length > 0) {
+              const num = existing.data[0].number;
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: num, body,
+              });
+              core.notice(`Updated existing issue #${num}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body, labels: [label, 'needs-human-review'],
+              });
+              core.notice(`Opened issue #${created.data.number}`);
+            }
+
+      - name: Fail job if high/critical found
+        if: steps.gate.outcome == 'failure'
+        run: |
+          echo "::error::High/critical vulnerability present — see opened issue and report artifact."
+          exit 1

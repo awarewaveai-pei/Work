@@ -18,11 +18,9 @@
                         "scripts/verify-tenant-staging-sites-index-ssot.ps1",
                         "scripts/doc-sync-automation.ps1",
                         "scripts/register-new-governance-doc.ps1",
-                        "scripts/weekly-system-review.ps1",
                         "scripts/generate-integrated-status-report.ps1",
                         "scripts/render-program-timeline-from-schedule.ps1",
                         "docs/overview/PROGRAM_SCHEDULE.json",
-                        "automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1",
                         "docs/operations/finance-operations.md",
                         "docs/operations/scope-change-policy.md",
                         "docs/operations/security-secrets-policy.md",
@@ -382,13 +380,6 @@
                                       ".cursor/rules/00-session-bootstrap.mdc",
                                       ".cursor/rules/30-resume-keyword.mdc",
                                       ".cursor/rules/40-shutdown-closeout.mdc"
-                                  ]
-                  },
-                  {
-                      "source":  "automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1",
-                      "targets":  [
-                                      "docs/overview/EXECUTION_DASHBOARD.md",
-                                      "docs/overview/INTEGRATED_STATUS_REPORT.md"
                                   ]
                   },
                   {

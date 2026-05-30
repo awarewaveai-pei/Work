@@ -282,7 +282,7 @@ Smoke test 會跑八項檢查（見 script header）。Exit 0 = 全綠。
 ## 12. Phase 2 / 3 roadmap
 
 - **Phase 2**：將 `/api/internal/commands/dispatch` 接到 Trigger.dev 的 `dispatch-action-run` task；釋放 medium-risk commands；新增 approvals + system_modes 的 ops console UI。
-- **Phase 3**：Slack / Email ingress、Anthropic Routines integration（取代 `run-weekly-automation.ps1` 的部分功能）、自動化 monthly restore drills、kill-switch one-click UI。
+- **Phase 3**：Slack / Email ingress、Anthropic Routines integration、自動化 monthly restore drills、kill-switch one-click UI。（註：原機器本地 `run-weekly-automation.ps1` 已於 2026-05-30 退役 → GitHub Actions `weekly-workflows-security-audit.yml`。）
 
 ## 13. 相關文件
 

@@ -86,12 +86,8 @@ All scripts live in this flat directory. Paths are hard-coded as `scripts\<name>
 
 | Script | Purpose |
 |--------|---------|
-| `register-weekly-automation-task.ps1` | Register weekly task in Windows Task Scheduler |
 | `register-monthly-system-review-task.ps1` | Register monthly task in Windows Task Scheduler |
 | `scheduled-task-launcher.ps1` | Launcher wrapper used by all scheduled tasks |
-| `run-weekly-automation.ps1` | Config-driven weekly job runner |
-| `weekly-automation-config.json` | Weekly job config (tasks, schedule, report dir) |
-| `weekly-system-review.ps1` | Weekly: build gates + status report + WORKLOG append |
 | `monthly-system-review.ps1` | Monthly: build gates + status report + Supabase memory check |
 | `check-supabase-memory-monthly.ps1` | Monthly Supabase memory usage check |
 | `archive-old-reports.ps1` | Archive old reports to keep reports/ clean |

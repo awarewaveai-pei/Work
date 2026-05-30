@@ -54,7 +54,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\generate-integrated-status-re
 _Last updated: manual doc; report body is script-generated._
 
 ## Related Documents (Auto-Synced)
-- `automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1`
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 

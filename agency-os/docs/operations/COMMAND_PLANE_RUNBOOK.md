@@ -310,7 +310,7 @@ The smoke test runs eight checks (see script header). Exit 0 = all green.
 ## 12. Phase 2 / 3 roadmap
 
 - **Phase 2**: wire `/api/internal/commands/dispatch` to Trigger.dev's `dispatch-action-run` task; lift medium-risk commands; ops console UI for approvals + system_modes.
-- **Phase 3**: Slack / Email ingress, Anthropic Routines integration (replace parts of `run-weekly-automation.ps1`), automated monthly restore drills, kill-switch one-click UI.
+- **Phase 3**: Slack / Email ingress, Anthropic Routines integration, automated monthly restore drills, kill-switch one-click UI. (Note: the former machine-local `run-weekly-automation.ps1` was retired 2026-05-30 → GitHub Actions `weekly-workflows-security-audit.yml`.)
 
 ## 13. Related documents
 

@@ -86,15 +86,11 @@
 2. 若只暫停：直接離開；回來在 Cursor 送 **`AO-RESUME`**（hook 跑 **`ao-resume.ps1`**），或 monorepo 根手動 **`scripts/ao-resume.ps1`**／`git pull --ff-only` 後再續接
 3. 若要安全收工再離開：`powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1 -SkipPush`
 
-### 每週（建議固定一天，例如週一）
-- **週期總檢**：`powershell -ExecutionPolicy Bypass -File .\scripts\weekly-system-review.ps1`（於 `agency-os`，或於 `<WORK_ROOT>` 跑 `.\scripts\weekly-system-review.ps1`）
-  - 內容：`verify-build-gates.ps1`（龍蝦 bootstrap + 治理 health）→ 重新產生 `reports/status/integrated-status-LATEST.md` → 在 `WORKLOG.md` 附錄**機器產生**的一小節（英文，方便編碼穩定）。
-  - 僅刷新綜合報告、不跑閘道：加 `-ReportOnly`；不重寫 WORKLOG：加 `-SkipWorklog`；**不在閘道失敗時寫告警檔**：加 `-NoAlert`。
-  - 若 **verify-build-gates 失敗**（且未 `-ReportOnly`、未 `-NoAlert`），會在 agency-os 根目錄寫入 **`ALERT_REQUIRED.txt`**（與收工清單 §0 對齊）；修復後請手動刪除該檔。
-  - 同一天若跑第二次，會再新增一個同日 `## 日期` 區塊；可自行合併或保留完整稽核軌跡。
-  - **路徑（junction/symlink）**：若 `agency-os` 以連結掛在磁碟根目錄（顯示路徑的父目錄可能是 `D:\` 而非 monorepo 根），週檢腳本會解析**實體目錄**，並向上尋找**同時**具備 `lobster-factory\scripts\bootstrap-validate.mjs` 與 monorepo `scripts\verify-build-gates.ps1` 的目錄（避免誤把僅含腳本複本的 `agency-os` 當成 monorepo 根，也避免誤找 `D:\scripts\...`）。
-- **排程（選用）**：`powershell -ExecutionPolicy Bypass -File .\automation\REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1 -WorkspaceRoot <WORK_ROOT>\agency-os`  
-  - 使用 **`Register-ScheduledTask`**（比 raw `schtasks` 在本機較穩）。預設：**每週一 09:00**、互動使用者 **Interactive** 登入型。需改背景行為：加 **`-NoInteractive`**（**S4U** 主體）。可改：`-DayOfWeek SUN -StartTime 20:00`。移除：`-RemoveOnly`。註冊後會 **Get-ScheduledTask** 立即驗證。
+### 每週
+- **週檢機器本地排程已於 2026-05-30 退役**（原 `weekly-system-review.ps1` + `AgencyOS-WeeklyAutomation` 單機 Windows 排程，靜默斷 19 天）。新分工：
+  - **Build gate / 整合狀態**：已由 CI（每 PR 跑 `npm run validate` / push）+ `ao-close.ps1` 每次收工重生 `integrated-status` 覆蓋；要手動跑一次在 monorepo 根 `<WORK_ROOT>` 執行 `.\scripts\verify-build-gates.ps1`。
+  - **Workflow 安全稽核**：GitHub Actions 週排程 [`.github/workflows/weekly-workflows-security-audit.yml`](../../../.github/workflows/weekly-workflows-security-audit.yml)（每週一 01:30 UTC = 09:30 TPE）；high/critical 自動開 `weekly-security-audit` issue。
+  - 退役脈絡：[`agency-os/reports/weekly/README.md`](../../reports/weekly/README.md)。
 - **防呆**：`system-health-check` 含 **§1b Script sanity**（檢查 `generate-integrated-status-report.ps1` 是否仍為「完整產報器」、非誤覆蓋成 wrapper）。
 
 ## 5) 防漏 / 防重工規則（你要我遵守的）
@@ -107,7 +103,6 @@
 
 ## Related Documents (Auto-Synced)
 - `../README.md`
-- `automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1`
 - `docs/operations/end-of-day-checklist.md`
 - `docs/overview/INTEGRATED_STATUS_REPORT.md`
 - `docs/overview/LEARNING_PATH_AI_AND_SYSTEMS.md`

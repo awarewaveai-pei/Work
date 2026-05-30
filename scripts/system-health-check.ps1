@@ -88,8 +88,7 @@ $coreFiles = @(
     "docs/change-impact-map.json",
     "automation/TENANT_AUTOMATION_RUNNER.ps1",
     "automation/REGISTER_TENANT_TASKS.ps1",
-    "automation/ENQUEUE_TENANT_TASK.ps1",
-    "automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1"
+    "automation/ENQUEUE_TENANT_TASK.ps1"
 )
 
 foreach ($f in $coreFiles) {
@@ -155,13 +154,9 @@ if (Test-Path $genPath) {
     Add-Check -Name "Script sanity: generate-integrated-status-report.ps1 (full/wrapper)" -Pass $genOk -Detail $genDetail
     if (-not $genOk) { Add-CriticalFailure -Reason "generate-integrated-status-report.ps1 failed sanity check" }
 }
-$wkPath = Join-Path $root "scripts\weekly-system-review.ps1"
-if (Test-Path $wkPath) {
-    $wkRaw = Get-Content -LiteralPath $wkPath -Raw -Encoding UTF8
-    $wkOk = ($wkRaw.Length -ge 800) -and ($wkRaw -match "verify-build-gates")
-    Add-Check -Name "Script sanity: weekly-system-review.ps1" -Pass $wkOk -Detail ($(if ($wkOk) { "OK" } else { "Unexpected content" }))
-    if (-not $wkOk) { Add-CriticalFailure -Reason "weekly-system-review.ps1 failed sanity check" }
-}
+# weekly-system-review.ps1 retired 2026-05-30 (machine-local scheduled task → GitHub Actions
+# weekly-workflows-security-audit.yml). build gates remain covered by verify-build-gates.ps1
+# (run by ao-close / CI). See agency-os/reports/weekly/README.md.
 
 # 1c) Monorepo root `.cursor/rules` must mirror agency-os `00` + `30` + `40` (path-transformed) + `50-operator` + enterprise 63-66 (SHA256)
 $monoRoot = Split-Path -Path $root -Parent
