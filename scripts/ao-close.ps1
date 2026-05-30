@@ -60,6 +60,17 @@ if ($WorkRoot) {
 }
 
 $agencyRoot = Join-Path $WorkRoot "agency-os"
+
+# Phase C (2026-05-30): dot-source shared git-safe-ops lib.
+# Replaces bare `git fetch origin` (line ~277) and `git push origin $branch` (line ~511)
+# which NativeCommandError'd under PS5.1 $ErrorActionPreference=Stop + any git stderr.
+$gitSafeOpsLib = Join-Path $WorkRoot "scripts\lib\git-safe-ops.ps1"
+if (Test-Path -LiteralPath $gitSafeOpsLib) {
+    . $gitSafeOpsLib
+} else {
+    Write-Warning "ao-close: git-safe-ops.ps1 not found at $gitSafeOpsLib — bare git calls will be used (unsafe)"
+}
+
 $healthReportUtils = Join-Path $WorkRoot "scripts\health-report-utils.ps1"
 if (Test-Path -LiteralPath $healthReportUtils) {
     . (Resolve-Path $healthReportUtils).Path
