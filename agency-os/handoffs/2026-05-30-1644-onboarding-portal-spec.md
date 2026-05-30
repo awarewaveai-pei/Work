@@ -23,6 +23,8 @@ source_session_summary: "使用者下達一份大型研究/設計需求，要 Cl
 
 **先盤點（避免重工），再設計，最後產出單一規格文件。**
 
+0. **先讀 `$WORK_ROOT/agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md`** — §0 是 reading list，§1/§2 已把 build 側 + ops 側全部 file:line 與精確 schema 摘要完（研究 2026-05-30 已完成，**不必重跑 Explore agent**）。
+
 1. **讀既有資產**（並行 Grep/Read，禁止憑空設計）：
    - `$WORK_ROOT/lobster-factory/packages/` 與 `$WORK_ROOT/lobster-factory/workflows/` — 既有 package / manifest / workflow 結構
    - `$WORK_ROOT/agency-os/handoffs/2026-05-30-1641-tomo-164100.md` — **今日另一個相關 packet**：aware-wave-wp-bridge（clean-room WP/Kadence/Woo 控制平面），本任務與它高度相關，必須對齊不可分叉
@@ -54,6 +56,7 @@ source_session_summary: "使用者下達一份大型研究/設計需求，要 Cl
 5. 完成後：規格文件本身就是交付物；commit + 在 TASKS.md 對應行打勾。
 
 ## 6. 相關資源
+- **★ 先讀**：`$WORK_ROOT/agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md` — 完整 codebase map + reading list（build 側 + ops 側全部 file:line + 精確 schema，研究已完成）
 - `$WORK_ROOT/lobster-factory/packages/`、`$WORK_ROOT/lobster-factory/workflows/` — 既有 package/workflow（**先讀**）
 - `$WORK_ROOT/agency-os/handoffs/2026-05-30-1641-tomo-164100.md` — 姊妹任務 wp-bridge，**必須對齊**
 - `$WORK_ROOT/agency-os/AGENTS.md` §Auto-Repair 紅線 / §AwareWave Stack — repair-agent 既有紅線 + monitoring stack 現況

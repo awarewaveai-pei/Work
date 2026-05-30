@@ -59,7 +59,7 @@
 - [ ] Auto-Repair audit Batch 3 (M9 TOCTOU + M10 retry storm + m4 hostname) + Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) → handoffs/2026-05-28-1807-batch-3-post-phase.md
 - [ ] **Phase Z8** — AO-RESUME archive lift gate（同 Z6 思路套 AO-RESUME）：每次 AO-RESUME 寫 7-段式後必須 archive 到 `agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md`，否則 next health-check fail。原因：今天 5/30 12:32 AO-RESUME 我輸出 7-段式但忘了寫 archive，操作者點出才補；同 5/28 18:46 SG deploy silent drop class of bug，protocol 沒機械閘就靠 agent 自律不靠譜。實作：新 `scripts/verify-aoresume-archive.ps1` + 接入 system-health-check gate 12d + `.claude/commands/ao-resume.md` 加 Step 3 強制規則。
 - [ ] 設計「客戶網站建置系統」(Lobster Factory Onboarding Portal) + 輸出 14 段規格（含續砌 aware-wave-wp-bridge 執行層）→ handoffs/2026-05-30-1641-tomo-164100.md
-- [ ] 研究+輸出 Client Onboarding Portal 完整 14 段規格（form→自動選 package→Claude 生規格→staging 建站→monitoring+repair-agent）→ handoffs/2026-05-30-1644-onboarding-portal-spec.md
+- [ ] 研究+輸出 Client Onboarding Portal 完整 14 段規格（form→自動選 package→Claude 生規格→staging 建站→monitoring+repair-agent）→ handoffs/2026-05-30-1644-onboarding-portal-spec.md｜**研究已完成 2026-05-30**：codebase map + reading list = `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md`（開工先讀此檔，§1/§2 全部 file:line，不必重跑 Explore）；剩「寫 14 段規格」
 
 #### 雙機環境 / 日常開工
 
