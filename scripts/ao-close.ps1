@@ -161,8 +161,23 @@ if (-not [string]::IsNullOrWhiteSpace($preflight.StatusLine)) {
 if ($preflight.RemoteFound -and $null -ne $preflight.Ahead -and $null -ne $preflight.Behind) {
     Write-Host "  branch: $($preflight.Branch) | remote: $($preflight.RemoteRef) | ahead=$($preflight.Ahead) behind=$($preflight.Behind) | dirty=$($preflight.Dirty)" -ForegroundColor DarkGray
     if ($preflight.Ahead -gt 0 -and -not $AllowAheadCommits) {
-        Write-Error "ao-close: preflight blocked because local branch is already ahead by $($preflight.Ahead) commit(s). Re-run with -AllowAheadCommits to acknowledge and continue."
-        exit 1
+        # Phase C4 (2026-05-30): auto-detect whether all ahead commits are system-generated
+        # checkpoints. If yes, bypass the flag — the operator shouldn't need -AllowAheadCommits
+        # just because the auto-checkpoint hook ran between the last push and AO-CLOSE.
+        Push-Location $WorkRoot
+        try {
+            $aheadSubjects = @(& git log "origin/$($preflight.Branch)..HEAD" --format="%s" 2>$null)
+        } finally { Pop-Location }
+        $humanCommits = @($aheadSubjects | Where-Object { $_ -notmatch '^\[claude\] (checkpoint:|chore: AO-CLOSE)' })
+        if ($aheadSubjects.Count -gt 0 -and $humanCommits.Count -eq 0) {
+            Write-Host ("  note: ahead=$($preflight.Ahead) commit(s) are all auto-generated " +
+                        "checkpoints — bypassing -AllowAheadCommits requirement.") -ForegroundColor DarkGray
+        } else {
+            Write-Error ("ao-close: preflight blocked — local branch is $($preflight.Ahead) commit(s) " +
+                "ahead including human-authored work.`n" +
+                "  Re-run with -AllowAheadCommits to continue.")
+            exit 1
+        }
     }
     if ($preflight.Ahead -gt 0 -and $AllowAheadCommits) {
         Write-Host "  note: -AllowAheadCommits acknowledged; continuing with existing ahead=$($preflight.Ahead)." -ForegroundColor Yellow
@@ -273,11 +288,20 @@ if (-not $SkipPush -and -not $AllowPushWhileBehind) {
             Write-Error "ao-close: not a git repository at $WorkRoot"
             exit 1
         }
-        git fetch origin 2>&1 | Out-Host
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "ao-close: git fetch failed; fix network/auth or pass -SkipPush."
-            exit 1
+        # Phase C (2026-05-30): was `git fetch origin 2>&1 | Out-Host` — caused NativeCommandError
+        # under PS5.1 EAP=Stop whenever git wrote "From https://..." to stderr.
+        if (Get-Command Invoke-SafeGitFetch -ErrorAction SilentlyContinue) {
+            Invoke-SafeGitFetch -WorkRoot $WorkRoot -Prune
+        } else {
+            $savedEAP = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            try { & git fetch origin --prune 2>&1 | Out-Host; $fetchExit = $LASTEXITCODE }
+            finally { $ErrorActionPreference = $savedEAP }
+            if ($fetchExit -ne 0) {
+                Write-Error "ao-close: git fetch failed (exit $fetchExit); fix network/auth or pass -SkipPush."
+                exit 1
+            }
         }
+
         $branch = (git rev-parse --abbrev-ref HEAD).Trim()
         if ($branch -ne "HEAD") {
             $remoteRef = "origin/$branch"
@@ -289,7 +313,10 @@ if (-not $SkipPush -and -not $AllowPushWhileBehind) {
                     $behind = [int]$parts[0]
                     $ahead = [int]$parts[1]
                     if ($behind -gt 0) {
-                        Write-Error "ao-close: $remoteRef is ahead by $behind commit(s). Run AO-RESUME or git pull --ff-only origin $branch (then resolve), then AO-CLOSE again. Or pass -AllowPushWhileBehind (unsafe)."
+                        Write-Error ("ao-close: remote is ahead by $behind commit(s) — local main is stale.`n" +
+                            "  Fix: run AO-RESUME first (which will git pull), then AO-CLOSE again.`n" +
+                            "  Quick fix (if safe): git pull --ff-only origin $branch`n" +
+                            "  Bypass (unsafe): pass -AllowPushWhileBehind")
                         exit 1
                     }
                 }
@@ -489,10 +516,17 @@ try {
 
     $branch = (git rev-parse --abbrev-ref HEAD).Trim()
     Write-Host "== AO-CLOSE: git push origin $branch ==" -ForegroundColor Cyan
-    git push origin $branch
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "ao-close: git push failed (check auth / network)"
-        exit 1
+    # Phase C (2026-05-30): was bare `git push origin $branch` — same NativeCommandError issue as fetch.
+    if (Get-Command Invoke-SafeGitPush -ErrorAction SilentlyContinue) {
+        Invoke-SafeGitPush -WorkRoot $WorkRoot -Branch $branch
+    } else {
+        $savedEAP = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { & git push origin $branch 2>&1 | Out-Host; $pushFbExit = $LASTEXITCODE }
+        finally { $ErrorActionPreference = $savedEAP }
+        if ($pushFbExit -ne 0) {
+            Write-Error "ao-close: git push failed (exit $pushFbExit; check auth / network)"
+            exit 1
+        }
     }
     Write-Host "ao-close: done (verify + guard + integrated report + push OK)." -ForegroundColor Green
     Write-Host "Re-read the automation boundary block above if anything feels missing." -ForegroundColor DarkGray
