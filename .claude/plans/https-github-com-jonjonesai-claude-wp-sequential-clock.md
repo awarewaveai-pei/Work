@@ -158,6 +158,19 @@ AI 給規格 → 系統批量、可驗證、可回滾地把整站建好/改好�
 - A/B:純本機 + repo 新檔,`git revert`;外掛只在本機。
 - C:刪 WP 上 key(瞬間撤權)+ 停用外掛;prod 任何寫入前已有 WPvivid 完整備份。
 
+## N. 整合進 app.aware-wave.com（Ops Dashboard / lobster-next-admin）— 強相關，非牛馬不相干
+**定位**:現有 Dashboard = 駕駛艙(cockpit,人看/審批);Bridge = 執行器(actuator,動 client WP)。AI 用 typed client 驅動 Bridge,人在 Dashboard 看/批。兩者共用同一個 `wp-bridge-client` SDK。Dashboard **已具備 ~80% 接點**(實際讀到的現有路由):
+- `app/ops/clients/page.tsx` + `app/ops/clients/[slug]/page.tsx` —— 每租戶頁,**已有** `api/ops/clients/[slug]/wp-report/route.ts`、`wp-update/route.ts`。→ 在 `[slug]` 頁加「**WP Control**」面板:per-tenant `/health`、最近 ops(committed/rolled_back)、render-diff、key 狀態、一鍵 dry-run。
+- `app/ops/approvals/page.tsx` + `api/ops/approvals/[id]/approve|reject/route.ts` —— **既有審批流**。→ Bridge 對 prod 的寫入/批量生成走此 gate:AI 提交 dry-run 結果 → Dashboard 顯示 diff → 人按 approve 才 commit。**我設計的「prod 寫入人工門控」UI 已經存在,直接接。**
+- `api/ops/audit-events/route.ts` —— Bridge 的 EventLog(who/what/before/after/rolled_back)直接 fan-in 此稽核流。
+- `api/ops/ai-image-jobs/route.ts` —— 非同步 job 先例。→ ContentSpec/ProductSpec 批量生成做成 `api/ops/wp-jobs`,沿用同模式(回 job_id + 進度)。
+- `app/ops/inbox/*` —— `rolled_back` / 失敗自我修復事件推此,**可見不靜默**。
+
+**新增(next-admin 端)**:`app/ops/clients/[slug]` 內 WP Control 面板元件 + `api/ops/clients/[slug]/wp-bridge/*` route(server-side 用 `wp-bridge-client` 呼叫該租戶 Bridge,key 從 env/vault 讀,**不外露到瀏覽器**)+ `api/ops/wp-jobs/*`。
+**架構注意(誠實)**:next-admin 在 SG VPS,Bridge 在各 client 站(如 Hostinger)→ Dashboard 的 API route **server 端**跨網呼叫 Bridge(SG→Hostinger 有延遲但控制操作可接受;簽章/key 留在 server)。
+**治理注意**:next-admin 改動走 `sg-deploy.sh`(npm test + typecheck + smoke + 自動回滾)且受 auto-repair guard 規則管;新 UI/API 須過這條 pipeline,符合既有閘。
+
 ## 採用範圍對齊
 ✅ fork 他的 Bridge(強化)作連線層 ✅ repo 原生 `/wp-operate` + 四層控制平面 + 內容/商品工廠 + 自我修復 + 測試/CI
+✅ **整合進 app.aware-wave.com**:接既有 `/ops/clients`、`/ops/approvals`、audit、inbox、job 模式(Dashboard 當駕駛艙)
 ❌ 不採用他的 store-drop POD 建店整套 / Archon CLI ⏸ POD 建店留未來選項
