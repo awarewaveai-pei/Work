@@ -70,6 +70,23 @@ For each bullet planned:
 On next AO-CLOSE / health-check, missing lifts will fail the 100% gate. Read
 `agency-os/.agency-state/archive-lift-last.json` for current state.
 
+### Step 2.6 — Trust ao-close.ps1 internal verify chain (Phase Z7, 2026-05-30)
+
+**禁止** 在 `ao-close.ps1` 返回 PASS 後重跑下列任一腳本：
+- `scripts/verify-build-gates.ps1`
+- `scripts/system-health-check.ps1`
+- `scripts/verify-archive-tasks-lift.ps1`
+- `scripts/ensure-claude-junction.ps1`（例外：`agency-os/.agency-state/junction-last.json` verdict ≠ `ok` 時允許單獨跑修補）
+
+**理由**：`ao-close.ps1` 內部已含完整 verify chain（system-health-check → verify-build-gates → archive-lift gate 12c → verify-closeout-completeness）。重複跑只會：
+1. 浪費 30-60s wall-clock
+2. 觸發多餘的 ALLOW prompt（每跑一次 PowerShell 就一次 prompt，違反「1 ALLOW per AO-CLOSE」SOP 目標）
+3. 不增加正確性（chain 是 deterministic，輸入無變不會改變結果）
+
+**配套機械閘**：`ao-close.ps1` preflight 已自動偵測 ahead commits 是否全為 `^\[claude\] (checkpoint:|chore: AO-CLOSE)` 並自動 bypass `-AllowAheadCommits`（Phase Z7-A，line 163-184）；operator 無須手動加 flag、agent 無須額外驗證。
+
+**例外的例外**：若 `ao-close.ps1` 因 behind remote 中止 → 跑 `git pull --ff-only origin main` 後重跑 `ao-close.ps1`（本檔開頭 [預授權] 段已授權，無須額外批准）；**不要** 在此情境下手動跑 verify-build-gates 「先確認」。
+
 ## Final Step — Archive the report (MANDATORY after the four sections)
 
 After printing the four-section output to chat, write the **exact same markdown** to:
