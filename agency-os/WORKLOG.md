@@ -5,7 +5,74 @@
 ## 2026-05-30
 
 ### Daily
-- (TBD)
+- 12:00 CST：scanner-block.inc + endpoint-alert.sh 一勞永逸（Layer 2 啟發式 + per-URL tier）
+
+### claude 2026-05-30 11:00 — scanner-block.inc Layer 2 + endpoint-alert.sh per-URL tier
+
+**根因**：使用者問「昨天和今天 slack / telegram 有什麼訊息」→ 徹底調查兩起告警 → 暴露**兩個系統性缺陷**：
+
+1. **scanner-block.inc 模式列表過時**：2026-05-22 baseline 只涵蓋 14 類舊型 probe。2026-05-30 00:19 UTC 攻擊者 `34.186.19.38` (GCP) 在 7 秒內掃 204 條新型 config-leak 路徑（Dockerfile / docker-compose / .vscode / terraform / WEB-INF / *.zip / *.sql backup / .docker / /storage/logs / /src/config.*）。`limit_req` 防線正確踢飛全部 503，但 leaked 進 access.log → Netdata 看到 → Slack false-positive alert。
+
+2. **endpoint-alert.sh 同 timeout 套 4 個 URL**：3 個本機 SG 服務 TTFB 0.05–0.7s + 1 個跨區 EU canary（`uptime.aware-wave.com`，SG→EU RTT 192ms + CF 邊緣抖動，TTFB 0.4–1.5s）共用 12s timeout。7 天記到 14 次 timeout，5/29 一天 11 次。腳本沒記哪個 URL fail → 操作者每次要重挖 journal。
+
+**方案（A2 + B2，30 年穩定取向）**：
+- **A2**：scanner-block.inc 加 explicit 2026 attack pattern 到 Layer 1 + 新增 Layer 2 啟發式（`.sql|.bak|.old|.swp|.swo|.pem|.key|.p12|.pfx` always-suspicious 副檔名）。`.zip/.tar` **故意排除**避免 WP `/wp-content/uploads/` 合法檔被誤殺。Layer 1 `/(web|www|backup)\.zip` 用 `^...$` strict-root anchor 同樣防止 `/wp-content/uploads/foo-backup.zip` 命中。
+- **B2**：endpoint-alert.sh 重構 probe 迴圈為 `probe_url(url, timeout)` 函式 + 加 `CHECK_URLS_SLOW` / `TIMEOUT_SEC_SLOW=20` 兩個 optional env var（預設空 = 完全 backward compatible）。失敗時 stderr `endpoint-alert: <url> -> <code> (timeout=<N>s)` 自我識別。
+
+**已修改**：
+- [`lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/scanner-block.inc`](../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/scanner-block.inc) — Layer 1 加 9 類新 pattern + Layer 2 副檔名 catch-all + comment 紀錄根因
+- [`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`](../lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh) — `probe_url` 函式 + dual loop + URL identity log + critic Maj-3 修 `|| echo '000'`（避免 curl crash 時 code 為空）+ Maj-2 修 `${VAR:-}` 防 `set -u` 配 unset
+- [`lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/awarewave-endpoint-alert.local.template`](../lobster-factory/infra/hetzner-phase1-core/nginx/system-sites/awarewave-endpoint-alert.local.template) — sync 5/18 drift（移除 n8n/trigger，剩 SG 3 服務）+ 加 `CHECK_URLS_SLOW=uptime.aware-wave.com` 範例
+- [`lobster-factory/infra/hetzner-phase1-core/scripts/slack-alert-drill.sh`](../lobster-factory/infra/hetzner-phase1-core/scripts/slack-alert-drill.sh) line 18 — `unset` 加新變數對稱性
+- **VPS .local**（SG 5.223.93.113，secrets 不入 git）— `CHECK_URLS` 拆 3 + `CHECK_URLS_SLOW="https://uptime.aware-wave.com/"`
+
+**[驗證結果]**（R0 四動作，全部完成，AO-CLOSE 機械閘合規格式）：
+
+1. **實測**：
+   - REALTEST_EVIDENCE: tool=SSH | cmd=`curl https://aware-wave.com/Dockerfile` (+ 15 其他攻擊 pattern probe) | exit=0 | ms=~50 ms/probe — 16 條 attack path 全部 → scanner.log 444（無一進 access.log）；`/wp-content/uploads/*/my-backup.zip` → 404 from upstream（**未**被 Layer 1 strict anchor 誤殺，critic Maj-1 fix 驗證）；`/secret.sql;jsessionid=x` → 520（critic Maj-1 path-param bypass fix 驗證）
+   - REALTEST_EVIDENCE: tool=SSH | cmd=`set -a; . /etc/default/awarewave-endpoint-alert.local; bash -x /usr/local/bin/endpoint-alert.sh` | exit=0 | ms=~700 — 確認 3 fast(12s) + 1 slow(20s) 雙 tier 正確分流
+   - REALTEST_EVIDENCE: tool=SSH | cmd=`CHECK_URLS_SLOW="https://nonexistent.aware-wave.com/" bash endpoint-alert.sh 2>&1` | exit=0 | journal 含 `endpoint-alert: https://nonexistent.aware-wave.com/ -> 000 (timeout=20s)` — URL identity logging 驗證
+   - REALTEST_EVIDENCE: tool=SSH | cmd=`systemctl start awarewave-endpoint-alert.service` (Round 2 部署後) | exit=0 | ms=2000 | state=ok — 真實 systemd 跑 + 正確 ok state
+
+2. **Review**：
+   - REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/5n — critic 抓出 3 個 Major + 5 個 Minor；**5 個 real bug/regression hole 全部修並 round-2 redeploy 驗證**：
+     - Maj-1 main: `/(web|www|backup)\.zip` 沒 anchor → match `/wp-content/uploads/.../my-backup.zip` 違反自己 design comment → 改 `^...$` strict root
+     - Maj-1 cont.: Layer 2 `$` anchor 被 `;jsessionid=x` 繞過 → 改 `(?:$|/|;)`
+     - Maj-2: `for url in ${VAR}` 在 `set -u` 下 unset 會 crash → 改 `${VAR:-}`
+     - Maj-3: `|| true` 讓 curl crash 時 code 變空 → 改 `|| echo '000'` 配 send_heartbeat 同慣例
+     - Min-4: built-in 預設 CHECK_URLS 仍含 `uptime.aware-wave.com/dashboard` → 新 VPS 部署沒 .local 會復發 → 預設改只含 3 個 local SG
+
+3. **抓蟲**：
+   - BUGHUNT_DONE: scope=`agency-os lobster-factory scripts` | grep=`CHECK_URLS_SLOW|TIMEOUT_SEC_SLOW|probe_url` | hits=2（僅出現於我改的 endpoint-alert.sh + .local.template，預期）
+   - BUGHUNT_DONE: scope=`agency-os lobster-factory scripts` | grep=`scanner-block` | hits=9（5 個 SSOT-include nginx 設定 + 2 個 WORKLOG 歷史記錄 + repo SSOT + memory daily，全部預期）
+   - BUGHUNT_DONE: scope=`agency-os lobster-factory scripts` | grep=`CHECK_URLS|endpoint-alert\.sh` | hits=16（功能 caller 2 個已處理；`sync-hetzner-slack-alert-webhooks.ps1` 註解明示不碰 CHECK_URLS；其餘 docs/memory 歷史紀錄）
+
+4. **WORKLOG**：本 entry。
+
+**[3-way SHA256 驗證]**：
+| 檔案 | repo | SG | EU | 一致 |
+|------|------|----|----|------|
+| scanner-block.inc | `2ac462ec...` | `2ac462ec...` | `2ac462ec...` | ✅ |
+| endpoint-alert.sh | `376e2f1f...` | `376e2f1f...` | (SG-only) | ✅ |
+
+**[Backup files 在 VPS（rollback < 30s）]**：
+- `/etc/nginx/snippets/scanner-block.inc.bak-20260530T025251Z`（SG 第一輪）
+- `/etc/nginx/snippets/scanner-block.inc.bak-20260530T030600Z`（EU 第一輪）
+- `/usr/local/bin/endpoint-alert.sh.bak-20260530T025251Z`（SG）
+- `/etc/default/awarewave-endpoint-alert.local.bak-20260530T025251Z`（SG）
+
+**[剩餘風險 / 已知 follow-up]**（不在本次 scope）：
+- EU 3 個 server block（mainwp / trigger / uptime）尚未掛 scanner-block.inc include — 5/25 baseline 遺漏，本次抓蟲發現，列為下次 PR
+- `default.conf:100/190` 和 `mainwp-aware-wave.conf:35` 同類 `$` anchor 也可被 path-param 繞過（critic 標 Minor，out-of-scope legacy）— 列為下次 PR
+- 兩個 fingerprint 細節：(a) Slack body 不顯示 timeout tier，operator 看 `uptime.aware-wave.com/ -> 000` 不知是 fast 還 slow；(b) 包含 timeout in fail_lines 會破壞舊 state fingerprint，所以維持現狀 — critic Min-2 接受
+
+**[rollback]**（< 1 min total）：
+- nginx: `cp /etc/nginx/snippets/scanner-block.inc.bak-20260530T025251Z /etc/nginx/snippets/scanner-block.inc && nginx -t && systemctl reload nginx`
+- endpoint-alert: `cp /usr/local/bin/endpoint-alert.sh.bak-20260530T025251Z /usr/local/bin/endpoint-alert.sh`
+- .local: `cp /etc/default/awarewave-endpoint-alert.local.bak-20260530T025251Z /etc/default/awarewave-endpoint-alert.local`
+- repo: `git revert <commit>`
+
+
 
 
 ### Closeout inbox (AO-CLOSE auto, verbatim)
