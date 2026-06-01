@@ -10,7 +10,34 @@ Read `agency-os/.agency-state/ao-resume-hook-last.json`.
 Hook ran successfully. Proceed to Step 1 reading files below.
 
 **Case B — File missing OR `finished_utc` is more than 5 minutes old OR file has errors OR `exit_code` is non-zero:**
-Hook did NOT complete cleanly (missing, stale, or errored). Claude MUST actively run these two scripts now via Bash and capture their output for Sections 1 and 2:
+Hook did NOT complete cleanly (missing, stale, or errored).
+
+### Step 0b — Git alignment recovery (MANDATORY FIRST STEP in Case B)
+
+Read `log_tail` from `ao-resume-hook-last.json`. If it contains `"non-fast-forward"` OR `"git push failed"`:
+
+1. **Check behind count** (run via Bash):
+   ```bash
+   git -C "C:/Users/USER/Work" rev-list --count HEAD..origin/main
+   ```
+2. **If behind > 0** → run immediately:
+   ```bash
+   git -C "C:/Users/USER/Work" pull --rebase origin main
+   ```
+3. **If rebase conflict** → check which files:
+   - Conflict in `*-LATEST.md` / `*-LATEST.json` / `*-LATEST.txt` only → auto-resolve each with local version:
+     ```bash
+     git -C "C:/Users/USER/Work" checkout --theirs -- <file>
+     git -C "C:/Users/USER/Work" add -- <file>
+     ```
+     Then: `git -C "C:/Users/USER/Work" rebase --continue`
+   - Conflict in ANY other file → `git -C "C:/Users/USER/Work" rebase --abort` → list conflicts → stop and ask user
+4. **After successful pull --rebase** → `git -C "C:/Users/USER/Work" push origin main`
+5. **Only after git state is clean**, run the two scripts below.
+
+**Why Step 0b exists**: The hook creates an auto-checkpoint commit (ahead=1) when dirty files exist at startup. If the remote is also ahead (cross-machine work pushed while this machine was idle), push is rejected (non-fast-forward). Without `git pull --rebase`, Claude reads stale local files and produces an incorrect report. This is a script-layer fix (`ao-resume.ps1` lines 138+) — Step 0b is the Claude-layer defense-in-depth fallback.
+
+Claude MUST then actively run these two scripts and capture their output for Sections 1 and 2:
 
 ```powershell
 # Run in repo root

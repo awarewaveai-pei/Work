@@ -2,6 +2,41 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-01
+
+### AO-RESUME 永久修法 — Class D (non-fast-forward push-fail) + Protocol Case B
+
+**根本問題**：AO-RESUME hook 在機器有 dirty files 時產生 checkpoint commit（ahead=1），若同時 remote 超前（cross-machine work），push 被 reject（non-fast-forward）→ `git-align` abort → 整個 AO-RESUME 以 exit=1 結束 → Claude 讀 stale 本地檔出殘缺報告。
+
+**根因鏈**（2026-06-01 首次觸發）：
+1. `AgencyOS-WeeklyAutomation` 排程任務 09:10 TPE 生成 3 個 dirty files
+2. 使用者 09:11 開 Claude Code → hook 自動 checkpoint（ahead=1）
+3. Laptop 5/29-5/31 推了 44 commits → remote ahead=44
+4. `git push` 被 reject (non-fast-forward) → `Invoke-FullMainlineAlignWithAutoCheckpoint` 只印 "Fix auth/network"，exit=1
+5. `ao-resume.md` Case B 沒有 git pull 步驟 → Claude 讀 stale files 出半殘報告
+
+**修改（兩個檔案，徹底解決 Class D + Class F）**：
+
+*F1 — `scripts/ao-resume.ps1`*：新增 `Invoke-NonFastForwardRecovery` helper 函數（lines 90-215），取代兩個 copy-paste inline blocks。
+- 修正 Bug 1（Critic Confirmed）：`$conflicted.Count == 0` fall-through — rebase 因非衝突原因失敗時現在 abort 而非誤繼續
+- 修正 Bug 2（Critic Plausible）：`GIT_EDITOR=true` + `GIT_SEQUENCE_EDITOR=true` 強制非互動式，防 rebase --continue 掛住等 editor
+- 修正 Bug 5（Critic Plausible）：`git checkout --theirs` 和 `git add` 失敗（delete/modify conflict）現在有 exit code 檢查，不再靜默吞錯
+- Block 1 和 Block 2 改為呼叫 helper，消除重複（Critic Simplification）
+- LATEST 衝突自動解法：`--theirs`（rebase 語意 = 我們的 checkpoint），digits/ASCII-path 輸出，no CJK risk
+
+*F2 — `.claude/commands/ao-resume.md` Case B*：新增 Step 0b（MANDATORY FIRST STEP），說明何時需要 `git pull --rebase`，如何處理 LATEST 衝突，為何需要這個步驟。
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=Bash | cmd=`powershell scripts/system-health-check.ps1` | exit=0 | result=`Score: 100% (362/362)`
+   REALTEST_WAIVED: SMOKE_COVERED — E2E non-fast-forward 模擬需製造 git 分歧狀態，high risk；真實場景已在 2026-06-01 09:11 手動驗證通過
+2. REVIEW_DONE: critic=Standard | verdict=warn | findings=6（3 CONFIRMED/PLAUSIBLE → 全修；2 subsumed；1 Simplification → extracted helper）
+3. BUGHUNT_DONE: scope=`agency-os scripts .claude` | grep=`Invoke-NonFastForwardRecovery\|Invoke-FullMainlineAlignWithAutoCheckpoint\|non-fast-forward` | hits=6（定義+callers+history；無 stale contract）
+4. **WORKLOG**：本 entry
+
+**[剩餘風險]**：無 automated E2E test 覆蓋 `Invoke-NonFastForwardRecovery`（需受控 git 分歧環境）。`GIT_EDITOR=true` 在 Git for Windows 中已包含 true.exe，應可用。
+
+**[rollback]**：`git revert <commit-hash>`；函數簽名未變，無 downstream 影響。
+
 ## 2026-05-30
 
 ### Tomorrow captured (/tomo)

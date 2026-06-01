@@ -87,6 +87,133 @@ function Assert-AoResumeRuleConsistency {
     return 0
 }
 
+function Invoke-NonFastForwardRecovery {
+    # Recovers from a rejected `git push` caused by the remote being ahead (non-fast-forward).
+    # Typical scenario: this machine created a checkpoint commit (ahead=1) while another machine
+    # pushed N commits in the interim → push rejected → run git pull --rebase to merge histories.
+    #
+    # Returns:
+    #   0        = fully recovered (rebased, pushed, align-retried successfully)
+    #  -1        = behindCount=0, not a NFF issue; caller should handle original push error
+    #  other >0  = recovery failed; caller should surface the error
+    param(
+        [Parameter(Mandatory = $true)][string]$Root,
+        [Parameter(Mandatory = $true)][string[]]$AlignArgs
+    )
+
+    # 1. Determine if remote is ahead (non-fast-forward case).
+    $behindCount = 0
+    try {
+        $bStr = (& git -C $Root rev-list --count "HEAD..origin/main" 2>$null | Select-Object -Last 1)
+        if ($bStr -match '^\s*(\d+)\s*$') { $behindCount = [int]$Matches[1] }
+    } catch { }
+    if ($behindCount -eq 0) { return -1 }  # Not NFF; caller uses original error path
+
+    Write-Host ("== AO-RESUME: push rejected (non-fast-forward) — remote ahead by {0}; running git pull --rebase origin main ==" -f $behindCount) -ForegroundColor Yellow
+
+    # 2. Pull --rebase: replay our local checkpoint commits on top of the remote state.
+    $savedEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    & git -C $Root pull --rebase origin main 2>&1 | Out-Host
+    $pullExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+    $ErrorActionPreference = $savedEAP
+
+    if ($pullExit -ne 0) {
+        # 3. Rebase stopped. Check what kind of failure this is.
+        $conflicted = @(& git -C $Root diff --name-only --diff-filter=U 2>$null |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+
+        if ($conflicted.Count -eq 0) {
+            # No conflict markers: rebase failed for a non-conflict reason (index.lock, hook failure,
+            # untracked-file overwrite, git internal error, etc.). Do NOT try to continue — abort cleanly.
+            Write-Host "AO-RESUME: pull --rebase failed with no conflict markers (git internal error?). Aborting rebase." -ForegroundColor Red
+            Write-Host "  Re-run AO-RESUME after verifying no stale .git/index.lock or pre-rebase hook errors." -ForegroundColor Yellow
+            $savedEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            & git -C $Root rebase --abort 2>&1 | Out-Null
+            $ErrorActionPreference = $savedEAP2
+            return $pullExit
+        }
+
+        $nonLatest = @($conflicted | Where-Object { $_ -notmatch '-LATEST\.(md|json|txt)$' })
+        if ($nonLatest.Count -gt 0) {
+            # Conflict in real code/docs — cannot auto-resolve; require human decision.
+            Write-Host "AO-RESUME: pull --rebase conflict in non-LATEST files — cannot auto-resolve. Aborting rebase." -ForegroundColor Red
+            $nonLatest | ForEach-Object { Write-Host ("  conflict: {0}" -f $_) -ForegroundColor Red }
+            Write-Host "  Fix: resolve conflicts manually, git add, git rebase --continue, then re-run AO-RESUME." -ForegroundColor Yellow
+            $savedEAP2 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            & git -C $Root rebase --abort 2>&1 | Out-Null
+            $ErrorActionPreference = $savedEAP2
+            return 1
+        }
+
+        # 4. All conflicts are auto-generated LATEST files — safe to take our local checkpoint.
+        #    Rebase semantics: --theirs = the commit being replayed (our checkpoint). --ours = upstream.
+        Write-Host ("AO-RESUME: auto-resolving {0} LATEST-file conflict(s) with local checkpoint (--theirs)..." -f $conflicted.Count) -ForegroundColor Yellow
+        $savedEAP3 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+        $resolveOk = $true
+        foreach ($cf in $conflicted) {
+            Write-Host ("  auto-resolve: {0}" -f $cf) -ForegroundColor DarkYellow
+            & git -C $Root checkout --theirs -- $cf 2>&1 | Out-Null
+            $checkoutExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+            if ($checkoutExit -ne 0) {
+                # checkout --theirs fails on delete/modify conflicts; treat as unresolvable.
+                Write-Host ("  ERROR: git checkout --theirs failed for '{0}' (delete/modify conflict?). Aborting." -f $cf) -ForegroundColor Red
+                $resolveOk = $false
+                break
+            }
+            & git -C $Root add -- $cf 2>&1 | Out-Null
+            $addExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+            if ($addExit -ne 0) {
+                Write-Host ("  ERROR: git add failed for '{0}'. Aborting." -f $cf) -ForegroundColor Red
+                $resolveOk = $false
+                break
+            }
+        }
+        $ErrorActionPreference = $savedEAP3
+
+        if (-not $resolveOk) {
+            $savedEAP4 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            & git -C $Root rebase --abort 2>&1 | Out-Null
+            $ErrorActionPreference = $savedEAP4
+            return 1
+        }
+
+        # 5. Force non-interactive editor so `rebase --continue` never hangs waiting for vim/notepad.
+        #    GIT_EDITOR=true: 'true' exits immediately with 0 → git accepts the existing commit message.
+        $savedEditor = $env:GIT_EDITOR; $env:GIT_EDITOR = 'true'
+        $savedSeqEditor = $env:GIT_SEQUENCE_EDITOR; $env:GIT_SEQUENCE_EDITOR = 'true'
+        $savedEAP5 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+        & git -C $Root rebase --continue 2>&1 | Out-Host
+        $pullExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+        $ErrorActionPreference = $savedEAP5
+        $env:GIT_EDITOR = $savedEditor
+        $env:GIT_SEQUENCE_EDITOR = $savedSeqEditor
+
+        if ($pullExit -ne 0) {
+            Write-Host ("AO-RESUME: rebase --continue failed after auto-resolve (exit {0}). Aborting." -f $pullExit) -ForegroundColor Red
+            $savedEAP6 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            & git -C $Root rebase --abort 2>&1 | Out-Null
+            $ErrorActionPreference = $savedEAP6
+            return $pullExit
+        }
+    }
+
+    # 6. Rebase succeeded. Push the rebased commits.
+    Write-Host "== AO-RESUME: pull --rebase succeeded; pushing... ==" -ForegroundColor Cyan
+    $savedEAP7 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    & git -C $Root push 2>&1 | Out-Host
+    $pushExit2 = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
+    $ErrorActionPreference = $savedEAP7
+    if ($pushExit2 -ne 0) {
+        Write-Host ("AO-RESUME: push failed after pull --rebase (exit {0}). Fix auth/network then re-run AO-RESUME." -f $pushExit2) -ForegroundColor Yellow
+        return $pushExit2
+    }
+
+    # 7. Push succeeded — retry git-align (aheadMain is now 0 after rebase+push; reset --hard works).
+    Write-Host "== AO-RESUME: push succeeded; retrying git-align... ==" -ForegroundColor Cyan
+    & powershell.exe @AlignArgs | Out-Host
+    return $(if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE })
+}
+
 function Invoke-FullMainlineAlignWithAutoCheckpoint {
     param(
         [Parameter(Mandatory = $true)][string]$Root,
@@ -136,6 +263,8 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
                 } finally { $ErrorActionPreference = $savedEAPPush1 }
             } finally { Pop-Location }
             if ($pushExit -ne 0) {
+                $recoveryExit = Invoke-NonFastForwardRecovery -Root $Root -AlignArgs $AlignArgs
+                if ($recoveryExit -ne -1) { return $recoveryExit }
                 Write-Host "AO-RESUME: git push failed (exit $pushExit). Fix auth/network then re-run AO-RESUME." -ForegroundColor Yellow
                 return $pushExit
             }
@@ -173,7 +302,9 @@ function Invoke-FullMainlineAlignWithAutoCheckpoint {
                 $pushExit = if ($null -eq $LASTEXITCODE) { 1 } else { [int]$LASTEXITCODE }
             } finally { $ErrorActionPreference = $savedEAPPush2 }
             if ($pushExit -ne 0) {
-                Write-Host "AO-RESUME: git push failed (exit $pushExit). Fix auth/network/upstream, run git push, then re-run AO-RESUME. Align retry skipped so checkpoint is not reset away." -ForegroundColor Yellow
+                $recoveryExit = Invoke-NonFastForwardRecovery -Root $Root -AlignArgs $AlignArgs
+                if ($recoveryExit -ne -1) { return $recoveryExit }
+                Write-Host "AO-RESUME: git push failed (exit $pushExit). Fix auth/network/upstream then re-run AO-RESUME." -ForegroundColor Yellow
                 return $pushExit
             }
         }
