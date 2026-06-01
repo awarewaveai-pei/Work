@@ -1,18 +1,18 @@
 ﻿# Weekly automation report
 
-- Generated: 2026-05-11 09:10:20
+- Generated: 2026-06-01 09:10:52
 - Work root: C:\Users\USER\Work
 - Config: C:\Users\USER\Work\scripts\weekly-automation-config.json
-- Result: PASS
+- Result: FAIL
 
 ## Job results
 
-### weekly-system-review - PASS
+### weekly-system-review - FAIL
 - Description: Run weekly build gates and integrated status report.
 - Type: powershellFile
-- Started: 2026-05-11T09:10:01
-- Ended: 2026-05-11T09:10:15
-- Exit code: 0
+- Started: 2026-06-01T09:10:03
+- Ended: 2026-06-01T09:10:50
+- Exit code: 1
 - Command: powershell.exe 
 
 #### stdout
@@ -122,18 +122,32 @@ Bootstrap validation PASSED ??== Monorepo: sync Cursor rules (00 + 30 + 40 + 50-
 verify-adr-index: OK (6 ADR file(s))
 == Local config: scan-for-secrets ==
 
-Findings (11):
-  [WARN] mcp/user-env.ps1:30  JWT (Supabase / generic)  match=eyJh***55AM  tracked=False
-  [WARN] mcp/user-env.ps1:32  JWT (Supabase / generic)  match=eyJh***55AM  tracked=False
-  [WARN] mcp/user-env.ps1:34  JWT (Supabase / generic)  match=eyJh***55AM  tracked=False
-  [WARN] mcp/user-env.ps1:35  Postgres DSN with password  match=post***AGo@  tracked=False
+Findings (25):
+  [WARN] .claude/settings.json:15  Google app password (4x4x4)  match=peij***00i9  tracked=False
+  [WARN] .claude/settings.json:75  JWT (Supabase / generic)  match=eyJh***55AM  tracked=False
+  [WARN] .claude/settings.json:76  JWT (Supabase / generic)  match=eyJh***55AM  tracked=False
+  [WARN] .claude/settings.json:77  Postgres DSN with password  match=post***AGo@  tracked=False
+  [WARN] .claude/settings.json:82  Uptime Kuma API key  match=uk1_***XAxo  tracked=False
+  [WARN] .claude/settings.json:83  Trigger.dev token  match=tr_p***145c  tracked=False
+  [WARN] .claude/settings.json:100  Trigger.dev token  match=tr_p***145c  tracked=False
+  [WARN] .claude/settings.json:104  JWT (Supabase / generic)  match=eyJh***rimI  tracked=False
+  [WARN] .claude/settings.json:106  JWT (Supabase / generic)  match=eyJh***rimI  tracked=False
+  [WARN] .claude/settings.json:108  JWT (Supabase / generic)  match=eyJh***dLTs  tracked=False
+  [WARN] .claude/settings.local.json:31  GitHub PAT (classic)  match=ghp_***GoMo  tracked=False
   [WARN] mcp/user-env.ps1:37  JWT (Supabase / generic)  match=eyJh***55AM  tracked=False
-  [WARN] mcp/user-env.ps1:44  JWT (Supabase / generic)  match=eyJh***2jak  tracked=False
-  [WARN] mcp/user-env.ps1:45  JWT (Supabase / generic)  match=eyJh***UR80  tracked=False
-  [WARN] mcp/user-env.ps1:63  GitHub PAT (classic)  match=ghp_***GoMo  tracked=False
-  [WARN] mcp/user-env.ps1:64  GitHub PAT (classic)  match=ghp_***GoMo  tracked=False
-  [WARN] mcp/user-env.ps1:68  Anthropic API key  match=sk-a***oAAA  tracked=False
-  [WARN] mcp/user-env.ps1:69  Google API key  match=AIza***waU8  tracked=False
+  [WARN] mcp/user-env.ps1:39  JWT (Supabase / generic)  match=eyJh***55AM  tracked=False
+  [WARN] mcp/user-env.ps1:41  JWT (Supabase / generic)  match=eyJh***55AM  tracked=False
+  [WARN] mcp/user-env.ps1:42  Postgres DSN with password  match=post***AGo@  tracked=False
+  [WARN] mcp/user-env.ps1:44  JWT (Supabase / generic)  match=eyJh***55AM  tracked=False
+  [WARN] mcp/user-env.ps1:46  JWT (Supabase / generic)  match=eyJh***rimI  tracked=False
+  [WARN] mcp/user-env.ps1:48  JWT (Supabase / generic)  match=eyJh***rimI  tracked=False
+  [WARN] mcp/user-env.ps1:51  JWT (Supabase / generic)  match=eyJh***2jak  tracked=False
+  [WARN] mcp/user-env.ps1:52  JWT (Supabase / generic)  match=eyJh***UR80  tracked=False
+  [WARN] mcp/user-env.ps1:64  Uptime Kuma API key  match=uk1_***XAxo  tracked=False
+  [WARN] mcp/user-env.ps1:85  GitHub PAT (classic)  match=ghp_***GoMo  tracked=False
+  [WARN] mcp/user-env.ps1:86  GitHub PAT (classic)  match=ghp_***GoMo  tracked=False
+  [WARN] mcp/user-env.ps1:90  Anthropic API key  match=sk-a***oAAA  tracked=False
+  [WARN] mcp/user-env.ps1:91  Google API key  match=AIza***waU8  tracked=False
 
 scan-local-config-for-secrets: WARN ??secret(s) in gitignored local config files.
   These are not in git, but reduce local exposure by sanitizing.
@@ -141,31 +155,40 @@ scan-local-config-for-secrets: WARN ??secret(s) in gitignored local config files
 verify-build-gates: scan-local-config-for-secrets WARN (gitignored plaintext; non-blocking). See runbook.
 == Observability baseline: Sentry contract ==
 == Agency OS: system-health-check ==
-Health report: reports/health/health-20260511-091011.md
-Score: 99.7% (357/358)
-== Shared AI Governance: Verify SSOT and Sync ==
-== Shared AI Governance: Checking SSOT Consistency ==
-  [OK] Canonical rules found and unique.
-  [OK] MCP registry template found.
-  Verifying .mcp.json consistency...
-  [OK] Agent bootstrap prompts found.
-  [OK] .mcp.json server list matches registry template.
-Shared AI Governance verification passed.
-== AO-RESUME contract: auto-checkpoint must pin WorkRoot ==
-== Claude user-level SSOT contract: required files exist ==
-verify-build-gates: ALL PASSED
-Integrated status report: reports/status/integrated-status-20260511-091014.md
-Also written to: reports/status/integrated-status-LATEST.md
-== generate-integrated-status-report: render PROGRAM_TIMELINE from PROGRAM_SCHEDULE.json ==
-render-program-timeline: updated C:\Users\USER\Work\agency-os\docs\overview\PROGRAM_TIMELINE.md
-weekly-system-review: done (gates=PASS (exit 0), report OK).
+Health report: reports/health/health-20260601-091049.md
+Score: 99.7% (366/367)
+```
+
+#### stderr
+```text
+C:\Users\USER\Work\scripts\system-health-check.ps1 : Critical gate failed: check-claude-sync.ps1 invocation failed: Can
+not locate monorepo root. Run from inside the repo.
+位於 C:\Users\USER\Work\scripts\system-health-check.ps1:816 字元:5
++     Write-Error ("Critical gate failed: " + (($criticalFailures | Sor ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [Write-Error], WriteErrorException
+    + FullyQualifiedErrorId : Microsoft.PowerShell.Commands.WriteErrorException,system-health-check.ps1
+ 
+C:\Users\USER\Work\scripts\verify-build-gates.ps1 : verify-build-gates: system-health-check failed (exit 1)
+位於 C:\Users\USER\Work\scripts\verify-build-gates.ps1:117 字元:5
++     Write-Error "verify-build-gates: system-health-check failed (exit ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [Write-Error], WriteErrorException
+    + FullyQualifiedErrorId : Microsoft.PowerShell.Commands.WriteErrorException,verify-build-gates.ps1
+ 
+C:\Users\USER\Work\scripts\weekly-system-review.ps1 : weekly-system-review: verify-build-gates failed (exit 1)
+雿 C:\Users\USER\Work\scripts\weekly-system-review.ps1:80 摮?:9
++         Write-Error "weekly-system-review: verify-build-gates failed  ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [Write-Error], WriteErrorException
+    + FullyQualifiedErrorId : Microsoft.PowerShell.Commands.WriteErrorException,weekly-system-review.ps1
 ```
 
 ### workflows-security-audit - PASS
 - Description: Run workflows npm audit and emit security report.
 - Type: process
-- Started: 2026-05-11T09:10:15
-- Ended: 2026-05-11T09:10:20
+- Started: 2026-06-01T09:10:50
+- Ended: 2026-06-01T09:10:52
 - Exit code: 0
 - Command: npm 
 
@@ -175,7 +198,7 @@ weekly-system-review: done (gates=PASS (exit 0), report OK).
 > audit:workflows-security
 > node scripts/audit-workflows-security.mjs
 
-Wrote: C:\Users\USER\Work\agency-os\reports\security\workflows-npm-audit-2026-05-11-011019.md
+Wrote: C:\Users\USER\Work\agency-os\reports\security\workflows-npm-audit-2026-06-01-011052.md
 Wrote: C:\Users\USER\Work\agency-os\reports\security\workflows-npm-audit-LATEST.md
 ```
 

@@ -1,0 +1,4 @@
+﻿verify-build-gates failed at 2026-06-01T01:10:49Z (exit 1)
+Remediation: from monorepo root run scripts/verify-build-gates.ps1 and fix reported issues.
+Then run agency-os scripts/system-health-check.ps1; see docs/operations/end-of-day-checklist.md
+Remove this file after fixing.
