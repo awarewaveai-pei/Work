@@ -106,5 +106,5 @@ npm run mcp:governance
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-05-30 09:13:53 UTC_
+_Last synced: 2026-06-01 08:13:26 UTC_
 

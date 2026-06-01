@@ -273,5 +273,5 @@ _Maintainer: Claude + operator joint, updates via incident or monthly review tri
 - `AGENTS.md`
 - `docs/operations/AUDIT_REGISTRY.md`
 
-_Last synced: 2026-05-30 09:13:53 UTC_
+_Last synced: 2026-06-01 08:13:26 UTC_
 

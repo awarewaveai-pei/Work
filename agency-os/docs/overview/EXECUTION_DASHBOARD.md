@@ -109,5 +109,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `memory/CONVERSATION_MEMORY.md`
 
-_Last synced: 2026-05-30 09:13:54 UTC_
+_Last synced: 2026-06-01 08:13:26 UTC_
 

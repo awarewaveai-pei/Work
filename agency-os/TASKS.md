@@ -1,4 +1,4 @@
-﻿# Global Task Board
+# Global Task Board
 
 
 
@@ -57,7 +57,7 @@
 - [ ] **【先做後等 6/1】WeeklyReview auth 確認** — 先到 `claude.ai/code/routines` 確認 AgencyOS-WeeklyReview 無「re-authorize GitHub」警告（根因：2026-05-22 repo PUBLIC→PRIVATE 導致 2026-05-25 auto-disabled，今日已 re-enable via API）；若有警告 → 點進去重新授權；2026-06-01 01:00 UTC 後確認 `last_fired_at` 已更新
 - [ ] **【2026-06-05 06:00 UTC 後驗收】Phase4Weekly 第二次 scheduled fire** — 確認 routine 自動 fire 成功（無 `auto_disabled_*` ended_reason）。檢查：`agency-os/reports/repair-center/phase4-LATEST.md` 日期更新到 2026-06-05；若再 disable → `claude.ai/code/routines` 手動重新授權 GitHub connection（API re-enable 無法治本 OAuth token 失效）。同步 6/1 WeeklyReview 結果驗收 OAuth token 底層有效性。根因 + 一次性修法見 WORKLOG 2026-05-30 13:20 entry。
 - [ ] Auto-Repair audit Batch 3 (M9 TOCTOU + M10 retry storm + m4 hostname) + Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) → handoffs/2026-05-28-1807-batch-3-post-phase.md
-- [ ] **Phase Z8** — AO-RESUME archive lift gate（同 Z6 思路套 AO-RESUME）：每次 AO-RESUME 寫 7-段式後必須 archive 到 `agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md`，否則 next health-check fail。原因：今天 5/30 12:32 AO-RESUME 我輸出 7-段式但忘了寫 archive，操作者點出才補；同 5/28 18:46 SG deploy silent drop class of bug，protocol 沒機械閘就靠 agent 自律不靠譜。實作：新 `scripts/verify-aoresume-archive.ps1` + 接入 system-health-check gate 12d + `.claude/commands/ao-resume.md` 加 Step 3 強制規則。
+- [x] **Phase Z8** — AO-RESUME archive lift gate（同 Z6 思路套 AO-RESUME）：每次 AO-RESUME 寫 7-段式後必須 archive 到 `agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md`，否則 next health-check fail。原因：今天 5/30 12:32 AO-RESUME 我輸出 7-段式但忘了寫 archive，操作者點出才補；同 5/28 18:46 SG deploy silent drop class of bug，protocol 沒機械閘就靠 agent 自律不靠譜。實作：新 `scripts/verify-aoresume-archive.ps1` + 接入 system-health-check gate 12d + `.claude/commands/ao-resume.md` 加 Step 3 強制規則。
 - [ ] 設計「客戶網站建置系統」(Lobster Factory Onboarding Portal) + 輸出 14 段規格（含續砌 aware-wave-wp-bridge 執行層）→ handoffs/2026-05-30-1641-tomo-164100.md
 - [ ] 研究+輸出 Client Onboarding Portal 完整 14 段規格（form→自動選 package→Claude 生規格→staging 建站→monitoring+repair-agent）→ handoffs/2026-05-30-1644-onboarding-portal-spec.md｜**研究已完成 2026-05-30**：codebase map + reading list = `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md`（開工先讀此檔，§1/§2 全部 file:line，不必重跑 Explore）；剩「寫 14 段規格」
 
@@ -114,7 +114,7 @@
 
 - [x] **【2026-06-16 前必做】SG certbot aware-wave.com 遷移 DNS-01（Cloudflare）** —— **【已完成 2026-05-25】** **背景**：SG VPS `aware-wave.com` cert（expiry 2026-07-16，52 天）使用 `authenticator = nginx`（HTTP-01），但 host nginx 從未綁 port 80（Docker 佔用）。cert 2026-04-17 首次取得，尚未歷經自動 renewal。dry-run 120s 逾時 → renewal 機制疑似已壞。certbot 約在 2026-06-16 開始 30-day-before 重試，若失敗導致 cert 過期 → HTTPS 中斷。**修復方法**：① `apt install python3-certbot-dns-cloudflare`；② 建 Cloudflare API token（`Zone:DNS:Edit` 權限，限 aware-wave.com zone）；③ `certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini -d aware-wave.com -d www.aware-wave.com`；④ `certbot renew --dry-run` 驗證通過；⑤ WORKLOG。**注意**：api.aware-wave.com cert 同樣用 nginx authenticator，需一併確認是否能 HTTP-01（app/api subdomains 由 host nginx 443 服務，無 port 80 block，同樣風險）。**DoD**：`certbot renew --dry-run` 兩個 cert（aware-wave.com + api.aware-wave.com）都回 `The dry run was successful` + WORKLOG 留紀錄。
 
-- [ ] **【2026-06-01 檢查】EU VPS ClickHouse 升級後備份清理** —— **【未開始】** **背景**：2026-05-19 將 EU VPS ClickHouse 從 24.8.8 升級至 25.7.5（修正 `enable_json_type` UNKNOWN_SETTING 導致 trigger-webapp 記憶體爆炸問題）。升級前備份檔案存於 EU VPS `/root/backups/clickhouse-data-pre-upgrade-25.7.5-20260519-060453.tar.gz`（906MB）。**2026-06-01 執行**：SSH 進 EU VPS → 確認 trigger-webapp 過去兩週無 ClickHouse 錯誤（`grep ClickHouseError /var/log/smart-restart.log`）且記憶體維持正常水位 → 若穩定則刪除備份：`rm /root/backups/clickhouse-data-pre-upgrade-25.7.5-20260519-060453.tar.gz`。**DoD**：備份已刪除 + WORKLOG 留紀錄；若系統不穩定則保留並回報。
+- [x] **【2026-06-01 檢查】EU VPS ClickHouse 升級後備份清理** —— **【未開始】** **背景**：2026-05-19 將 EU VPS ClickHouse 從 24.8.8 升級至 25.7.5（修正 `enable_json_type` UNKNOWN_SETTING 導致 trigger-webapp 記憶體爆炸問題）。升級前備份檔案存於 EU VPS `/root/backups/clickhouse-data-pre-upgrade-25.7.5-20260519-060453.tar.gz`（906MB）。**2026-06-01 執行**：SSH 進 EU VPS → 確認 trigger-webapp 過去兩週無 ClickHouse 錯誤（`grep ClickHouseError /var/log/smart-restart.log`）且記憶體維持正常水位 → 若穩定則刪除備份：`rm /root/backups/clickhouse-data-pre-upgrade-25.7.5-20260519-060453.tar.gz`。**DoD**：備份已刪除 + WORKLOG 留紀錄；若系統不穩定則保留並回報。
 
 - [x] **【✅ 2026-05-28 關閉】Trigger.dev `TaskRunStatus` enum 不相容查詢來源追查** —— **【已完成 2026-05-28】** **背景**：EU reboot 後 trigger-postgres log 出現 `ERROR: invalid input value for enum "TaskRunStatus": "FAILED"` 和 `"QUEUED"`（v3-era 名稱，v4 已移除）。**現況**：① 頻率極低（過去 7 天僅 2 次，均在 2026-05-22 04:09-04:10 UTC 出現）② 查詢字串不在我們 repo（已 grep 全域）③ Trigger.dev 本身健康，無實際失敗，僅 log noise ④ 真實使用 status 只有 3 種（COMPLETED_SUCCESSFULLY / COMPLETED_WITH_ERRORS / TIMED_OUT）。**疑似來源**：Trigger.dev 內部 observability/admin endpoint 或 trigger-webapp 自身週期任務。**DoD**：① 連續觀察 7-14 天記錄 ERROR 頻率與時間分布；② 若 > 10 次/天則升級追查（找 pg_stat_statements / 開 trigger-webapp debug log）；③ 若維持 < 5 次/週則關閉並列為已知 upstream cosmetic issue。
 
@@ -551,5 +551,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-30 09:13:54 UTC_
+_Last synced: 2026-06-01 08:13:26 UTC_
 

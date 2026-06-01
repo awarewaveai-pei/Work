@@ -1,10 +1,12 @@
-﻿# Worklog
+# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-06-01
 
 ### Phase Z8 — AO-RESUME archive lift gate（機械閘）
+
+- AUTO_TASK_DONE_APPLIED (2026-06-01T08:13:38Z): Phase Z8
 
 **根因**：ao-resume.md Step 3 只靠文字要求 Claude 寫 archive，Claude 一再忘記（本日兩次）。文字規則靠自律，不可靠。
 
@@ -25,7 +27,7 @@
 
 **結果**：DELETED。磁碟 /root/backups/: 52G / 150G (36%)
 
-- AUTO_TASK_DONE: EU VPS ClickHouse 升級後備份清理
+- AUTO_TASK_DONE_APPLIED (2026-06-01T08:13:38Z): EU VPS ClickHouse 升級後備份清理
 - REALTEST_EVIDENCE: tool=SSH | cmd=`grep -c ClickHouseError /var/log/smart-restart.log` + `rm ...tar.gz` | exit=0 | result=count=0, DELETED, disk=36%
 - REVIEW_WAIVED: NA -- rm 操作無需 code review
 - BUGHUNT_WAIVED: NA -- 單純刪除備份檔，無 code 改動
@@ -6605,7 +6607,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-05-30 09:13:54 UTC_
+_Last synced: 2026-06-01 08:13:26 UTC_
 
 ## 2026-03-20
 
@@ -7429,4 +7431,5 @@ AUTO_TASK_DONE: onboarding portal 研究跨機固化（codebase-map + reading li
 **[rollback]** SG：`cp /usr/local/bin/endpoint-alert.sh.bak-20260530T155602Z /usr/local/bin/endpoint-alert.sh`（一行）；repo：`git revert <hash>`。
 
 AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（治公網抖動假告警 + critic 強化 pagerduty/persist 順序）
+
 
