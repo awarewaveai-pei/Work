@@ -1,6 +1,6 @@
 # Aware Wave Observability Baseline
 
-Updated: 2026-04-21
+Updated: 2026-06-01
 
 ## Goal
 
@@ -28,6 +28,7 @@ This baseline assumes the current public surface includes:
 | --- | --- | --- |
 | `Netdata` | Host, CPU, RAM, swap, disk, network, process/container pressure, service-level symptoms | Product analytics, app exception triage |
 | `Uptime Kuma` | External HTTP/HTTPS/TCP checks, SSL expiry, heartbeat | Root-cause debugging inside the host |
+| `endpoint-alert.sh` | SG-side local container probes plus one EU dead-man canary | Public edge monitoring through Cloudflare hairpin |
 | `Sentry` | Code exceptions, performance regressions, release correlation | Host saturation, disk pressure |
 | `PostHog` | User journeys, drop-off, feature usage, frontend/product behavior | Infra paging or low-level service health |
 | `Cloudflare` | Edge errors, DNS, WAF/rate-limit events, cache behavior | Internal service metrics |
@@ -93,6 +94,23 @@ Also add:
 - heartbeat monitor for any scheduled backup or critical cron
 - optional TCP checks for private ports only if routed through a secure internal monitor
 
+## SG Endpoint Alert Baseline
+
+`awarewave-endpoint-alert.service` runs on SG every minute. Its fast tier must use local probes, not public Cloudflare URLs. This avoids daily `000000` noise from the `SG -> Cloudflare -> SG` hairpin path.
+
+Canonical SG drop-in: `/etc/default/awarewave-endpoint-alert.local`
+
+```bash
+CHECK_URLS="http://127.0.0.1:8080/ http://127.0.0.1:3002/api/ops/summary http://127.0.0.1:3001/health"
+CHECK_URLS_SLOW="https://uptime.aware-wave.com/api/entry-page"
+```
+
+Responsibilities:
+
+- SG endpoint-alert: local WordPress, next-admin, node-api liveness
+- EU Uptime Kuma: external public reachability, SSL expiry, and endpoint-alert heartbeat
+- Slack: delivery channel only, not source of truth
+
 ## Sentry Baseline
 
 Keep one project per service boundary:
@@ -145,7 +163,7 @@ Do not use Slack as a monitoring backend. It is only the transport layer.
 
 ## Immediate Checklist
 
-- [ ] Verify `endpoint-alert.sh` checks all six current public URLs
+- [ ] Verify `endpoint-alert.sh` checks SG local ports and only one EU dead-man canary
 - [ ] Confirm `Uptime Kuma` has one monitor per public surface plus SSL expiry checks
 - [ ] Confirm `Netdata` watches host, nginx, redis, n8n, trigger, minio, and self-hosted supabase where applicable
 - [ ] Confirm `Sentry` DSNs and alert rules exist for `node-api`, `trigger`, `n8n`, `next-admin`, and `wordpress`

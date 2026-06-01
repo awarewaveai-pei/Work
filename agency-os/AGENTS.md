@@ -145,8 +145,8 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 - **自動化安全預設**：DB 寫入預設 OFF（`LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 預設 off（`LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）
 - **Trigger.dev 憑證（不可互換）**：`tr_pat_*` = CLI deploy（`TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（`TRIGGER_ACCESS_TOKEN`）
 - Cursor rules 正本：`agency-os/.cursor/rules/`（repo 根 `.cursor/rules/` 是 mirror，不改正本）
-- 監控端點：`/api/ops/summary`（非 `/`，root 有 auth_basic 保護）
-- nginx drop-in：`/etc/default/awarewave-endpoint-alert.local`（SG VPS 本地，sync 不覆蓋）
+- 監控分工：SG `endpoint-alert.sh` 打本機端口（WordPress `127.0.0.1:8080/`、Next Admin `127.0.0.1:3002/api/ops/summary`、Node API `127.0.0.1:3001/health`）避免 `SG -> Cloudflare -> SG` hairpin timeout；EU Uptime Kuma 負責 public reachability + SSL。
+- nginx drop-in：`/etc/default/awarewave-endpoint-alert.local`（SG VPS 本地，sync 不覆蓋；EU canary 用 `https://uptime.aware-wave.com/api/entry-page`，不要用 `/` redirect chain）
 
 ## 語言與輸出
 
@@ -250,4 +250,3 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 - `scripts/register-new-governance-doc.ps1`
 
 _Last synced: 2026-05-30 09:13:53 UTC_
-

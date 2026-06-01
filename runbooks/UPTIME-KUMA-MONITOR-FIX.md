@@ -11,6 +11,10 @@
 EU VPS → `https://app.aware-wave.com/...` 會被 Cloudflare Bot Fight Mode 擋（403 Managed Challenge）。  
 正確做法：直打 SG raw IP + 補 `Host` header + 補 auth header。
 
+**不要把 SG endpoint-alert.sh 和 Uptime Kuma 混在一起。**  
+SG 本機的 `awarewave-endpoint-alert.service` 應該打 `127.0.0.1` / 本機 port，避免
+`SG -> Cloudflare -> SG` hairpin timeout。EU Uptime Kuma 才負責外部/public 視角與 SSL。
+
 ---
 
 ## 修復步驟
@@ -74,6 +78,33 @@ sqlite3 /var/lib/docker/volumes/uptime-kuma/_data/kuma.db \
 | `/health`（SG nginx）| `http://5.223.93.113/health` | ❌ 不需要 |
 | Supabase / Trigger / n8n | 直打 EU VPS 內部 127.0.0.1:PORT | 視 endpoint 而定 |
 | **禁止** | `https://app.aware-wave.com/...` 從 EU VPS 監控 | Cloudflare 會擋 |
+
+## SG endpoint-alert 正確分工
+
+`/etc/default/awarewave-endpoint-alert.local` 是 SG 本機 drop-in，sync 腳本不覆蓋。
+
+目前 fast checks 應為本機端口：
+
+```bash
+CHECK_URLS="http://127.0.0.1:8080/ http://127.0.0.1:3002/api/ops/summary http://127.0.0.1:3001/health"
+```
+
+EU dead-man canary 保留一條 public URL，但避免 `/` redirect chain：
+
+```bash
+CHECK_URLS_SLOW="https://uptime.aware-wave.com/api/entry-page"
+```
+
+驗證：
+
+```bash
+systemctl start awarewave-endpoint-alert.service
+journalctl -u awarewave-endpoint-alert.service --since "5 minutes ago" --no-pager
+cat /var/lib/awarewave-alert/last_state
+cat /var/lib/awarewave-alert/fail_streak
+```
+
+預期：service `SUCCESS`、`last_state=ok`、`fail_streak=0`。
 
 ---
 

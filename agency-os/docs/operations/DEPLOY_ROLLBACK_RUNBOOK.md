@@ -129,6 +129,32 @@ curl -sf http://127.0.0.1/ -H 'Host: app.aware-wave.com' | grep -c "Build Consol
 
 **訊息格式**：附 `behind` 數字、deployed/origin commit short hash、最近 3 個未上線 commit subject、修法提示（`/sg-deploy`）。
 
+### 2.5 Endpoint Alert 部署後驗收
+
+SG 的 `awarewave-endpoint-alert.service` 不應打 public Cloudflare URL 檢查 SG 自己，避免每日 `000000` hairpin timeout。部署或重建後確認 drop-in：
+
+```bash
+grep -E '^(CHECK_URLS|CHECK_URLS_SLOW)=' /etc/default/awarewave-endpoint-alert.local
+```
+
+預期：
+
+```bash
+CHECK_URLS="http://127.0.0.1:8080/ http://127.0.0.1:3002/api/ops/summary http://127.0.0.1:3001/health"
+CHECK_URLS_SLOW="https://uptime.aware-wave.com/api/entry-page"
+```
+
+手動驗收：
+
+```bash
+systemctl start awarewave-endpoint-alert.service
+systemctl status awarewave-endpoint-alert.service --no-pager -l
+cat /var/lib/awarewave-alert/last_state
+cat /var/lib/awarewave-alert/fail_streak
+```
+
+預期：service `SUCCESS`、`last_state=ok`、`fail_streak=0`。
+
 ### 2.5 已知行為與 bug 修正紀錄
 
 - **2026-05-08**：sg-deploy.sh 首版把寫 `.deployed-commit` 放在 healthcheck wait 之後，若 `docker compose up -d` 撞容器名 race condition 失敗，drift 偵測會失明。修正：(a) `up -d` 失敗若是 race condition 自動 `stop && rm -f && up -d` 重試一次；(b) 寫 `.deployed-commit` 提前到 build 成功 + up 成功之後（healthcheck 失敗仍保留紀錄，因為 image 已 build、容器已起，drift 角度看部署已落地）。
