@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-06-01T02:30:04.0723006Z",
+    "generatedAt":  "2026-06-01T02:31:10.5379682Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -11,8 +11,8 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "3.5G",
-               "latest_time":  "2026-06-01 02:00:01",
+               "backup_size":  "3.7G",
+               "latest_time":  "2026-06-01 02:30:43",
                "oldest_time":  "2026-05-25 02:00:01",
                "backup_age_days":  "0"
            },
@@ -25,7 +25,7 @@
                "retention_days":  "7",
                "retention_source":  "static",
                "backup_size":  "3.3G",
-               "latest_time":  "2026-06-01 02:30:03",
+               "latest_time":  "2026-06-01 02:30:26",
                "oldest_time":  "2026-05-19 06:06:13",
                "backup_age_days":  "0"
            },
