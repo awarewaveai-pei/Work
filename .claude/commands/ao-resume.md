@@ -10,42 +10,63 @@ Read `agency-os/.agency-state/ao-resume-hook-last.json`.
 Hook ran successfully. Proceed to Step 1 reading files below.
 
 **Case B — File missing OR `finished_utc` is more than 5 minutes old OR file has errors OR `exit_code` is non-zero:**
-Hook did NOT complete cleanly (missing, stale, or errored).
 
-### Step 0b — Git alignment recovery (MANDATORY FIRST STEP in Case B)
+**First: derive WORK_ROOT** — read `"work_root"` field from `ao-resume-hook-last.json`. If the file is missing, run `git rev-parse --show-toplevel` to get WORK_ROOT. All git and script commands below use `<WORK_ROOT>`.
+
+**Then determine sub-type:**
+
+---
+
+### Case B1 — `finished_utc` is within 5 minutes AND `exit_code` is non-zero
+
+`ao-resume.ps1` just ran this session but health gates failed. Since 2026-06-01 `ao-resume.ps1` generates ALL state files even when health gates fail (soft-exit design), state files are fresh.
+
+→ **Proceed directly to Step 1.** Read state files normally.
+→ In Section 1, the ⚠️ banner is MANDATORY (per Step 0a). Report specific health gate failures from `log_tail`.
+→ Do NOT re-run any scripts. No Step 0b needed.
+
+---
+
+### Case B2 — `finished_utc` is more than 5 minutes old OR file missing
+
+`ao-resume.ps1` either did not run this session, or exited at git-align (L404, before state file generation). State files may be stale.
+
+### Step 0b — Git alignment recovery (Case B2 only)
 
 Read `log_tail` from `ao-resume-hook-last.json`. If it contains `"non-fast-forward"` OR `"git push failed"`:
 
 1. **Check behind count** (run via Bash):
    ```bash
-   git -C "C:/Users/USER/Work" rev-list --count HEAD..origin/main
+   git -C "<WORK_ROOT>" rev-list --count HEAD..origin/main
    ```
 2. **If behind > 0** → run immediately:
    ```bash
-   git -C "C:/Users/USER/Work" pull --rebase origin main
+   git -C "<WORK_ROOT>" pull --rebase origin main
    ```
 3. **If rebase conflict** → check which files:
    - Conflict in `*-LATEST.md` / `*-LATEST.json` / `*-LATEST.txt` only → auto-resolve each with local version:
      ```bash
-     git -C "C:/Users/USER/Work" checkout --theirs -- <file>
-     git -C "C:/Users/USER/Work" add -- <file>
+     git -C "<WORK_ROOT>" checkout --theirs -- <file>
+     git -C "<WORK_ROOT>" add -- <file>
      ```
-     Then: `git -C "C:/Users/USER/Work" rebase --continue`
-   - Conflict in ANY other file → `git -C "C:/Users/USER/Work" rebase --abort` → list conflicts → stop and ask user
-4. **After successful pull --rebase** → `git -C "C:/Users/USER/Work" push origin main`
-5. **Only after git state is clean**, run the two scripts below.
+     Then: `git -C "<WORK_ROOT>" rebase --continue`
+   - Conflict in ANY other file → `git -C "<WORK_ROOT>" rebase --abort` → list conflicts → stop and ask user
+4. **After successful pull --rebase** → `git -C "<WORK_ROOT>" push origin main`
+5. **Only after git state is clean**, proceed to Step 0c.
 
-**Why Step 0b exists**: The hook creates an auto-checkpoint commit (ahead=1) when dirty files exist at startup. If the remote is also ahead (cross-machine work pushed while this machine was idle), push is rejected (non-fast-forward). Without `git pull --rebase`, Claude reads stale local files and produces an incorrect report. This is a script-layer fix (`ao-resume.ps1` lines 138+) — Step 0b is the Claude-layer defense-in-depth fallback.
+**Why Step 0b exists**: The hook creates an auto-checkpoint commit (ahead=1) when dirty files exist at startup. If the remote is also ahead (cross-machine work pushed while this machine was idle), push is rejected (non-fast-forward). Without `git pull --rebase`, `ao-resume.ps1` exits at git-align and no state files are generated.
 
-Claude MUST then actively run these two scripts and capture their output for Sections 1 and 2:
+### Step 0c — Regenerate all state files (Case B2, after Step 0b)
 
 ```powershell
-# Run in repo root
-powershell -ExecutionPolicy Bypass -File scripts\import-cross-machine-memory.ps1
-powershell -ExecutionPolicy Bypass -File scripts\fetch-external-signals.ps1
+powershell -ExecutionPolicy Bypass -File <WORK_ROOT>\scripts\ao-resume.ps1 -FullMainlineParity
 ```
 
-Do NOT skip this step. Do NOT silently assume both passed. Report the actual stdout of each script in Sections 1 and 2 respectively. If either script fails (non-zero exit, exception), report the error verbatim.
+- **exit=0**: All state files are fresh. Proceed to Step 1 (same as Case A).
+- **exit≠0 AND `ao-resume-hook-last.json` `finished_utc` is now within 5 minutes**: Health gates failed but state files were generated (soft-exit). → This is now Case B1. Proceed to Step 1 with ⚠️ banner.
+- **exit≠0 AND log shows git-align failure**: git alignment still failing (auth/network). Report error to user; do not proceed to Step 1 until git is clean.
+
+---
 
 ### Step 0a — Hook-failure prominence rule (Phase C2/C3 of plan Z, 2026-05-28)
 

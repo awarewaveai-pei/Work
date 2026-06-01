@@ -4,6 +4,35 @@
 
 ## 2026-06-01
 
+### ao-resume 設計根治 — health gate soft-exit + Case B1/B2 協議
+
+**根本問題**：ao-resume.ps1 的三個 health gate（preflight L488, deps L499, machine-audit L517）使用 hard exit，任一失敗即截斷所有後續狀態檔生成（L521-904），導致 Claude 拿到殘缺資料。另一個 session 修了 preflight 和 deps，但漏了 machine-audit（仍用 `Write-Error + exit`）和最終 exit（仍寫死 `exit 0`）。同時 ao-resume.md Case B 仍是舊邏輯（2 個 fallback scripts + hardcoded `C:/Users/USER/Work` 路徑）。
+
+**設計決策**：不加 flag（`-StateOnly`），不加逃生出口。把三個 hard exit 改成 soft exit，記住 exit code 到 `$healthGateExit`，讓 ao-resume.ps1 永遠跑完所有狀態生成，最後以 `$healthGateExit` 作為最終 exit code。這是根修，不是補丁。
+
+**已修改**：
+- [`scripts/ao-resume.ps1`](../scripts/ao-resume.ps1)：
+  - machine-environment-audit block（L511-525）：`Write-Error "missing" + exit 1` → `Write-Host Yellow + if ($healthGateExit -eq 0) { $healthGateExit = 1 }`；`Write-Error "failed" + exit $LASTEXITCODE` → `Write-Host Red + if ($healthGateExit -eq 0) { $healthGateExit = $LASTEXITCODE }`
+  - 最終 exit（L911）：`exit 0` → `if ($healthGateExit -ne 0) { ... exit $healthGateExit }; exit 0`
+- [`.claude/commands/ao-resume.md`](../.claude/commands/ao-resume.md)：
+  - Case B 拆成 B1（finished_utc < 5 min + exit≠0：狀態檔新鮮，直接 Step 1）和 B2（stale/missing：Step 0b git align + Step 0c re-run）
+  - 移除 2 個 fallback scripts 作為主要動作（只保留 B2 Step 0c 的 re-run ao-resume.ps1）
+  - 所有硬編 `C:/Users/USER/Work` → `<WORK_ROOT>`（從 hook JSON `work_root` 欄位動態讀）
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/verify-build-gates.ps1` | exit=0 | result=`verify-build-gates: ALL PASSED`
+   REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/system-health-check.ps1` | exit=0 | result=`Score: 100% (362/362)`
+   REALTEST_WAIVED: SMOKE_COVERED — 真實 health-gate-fail 場景需製造 preflight 失敗（高風險）；設計正確性已從既有的 preflight/deps soft exit（另一 session 測過）推斷；machine-audit 和最終 exit 用同一模式
+2. REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/1n — Major：`.cursor/rules/30-resume-keyword.mdc` L52/L55/L63 未同步 B1/B2 soft-exit 語意（同輪已修）；Minor：warn-only `$global:LASTEXITCODE = 0` reset 是 by-design（verified clean）。Critic 驗證：hook → `exit_code` → hook JSON 流正確；B1 不觸發 8h auto re-trigger；所有 hard-exit 均在狀態生成前（L332-418）確認為 B2 路徑
+3. BUGHUNT_DONE: scope=`agency-os scripts .claude` | grep=`healthGateExit` | hits=7（1 init + 1 preflight + 1 deps + 2 machine-audit + 1 final-check + 1 final-exit；全在 ao-resume.ps1；無其他 callers）
+   BUGHUNT_DONE: scope=`agency-os .claude scripts` | grep=`C:/Users/USER/Work\|C:\\Users\\USER\\Work` | hits=ao-resume.md 0（舊硬編路徑已全替換為 `<WORK_ROOT>`）
+   BUGHUNT_DONE: scope=`.cursor/rules` | grep=`exit≠0\|exit 非 0\|Case B1\|Case B2` | hits=30-resume-keyword.mdc L52/L55/L63 更新後命中新規則（同輪更新）；無其他 stale contract
+4. **WORKLOG**：本 entry
+
+**[剩餘風險]**：無 automated E2E test 覆蓋 health-gate-fail → soft-exit → 狀態生成完成路徑。真實驗收待下次 machine-audit 真正 fail 時觀察。
+
+**[rollback]**：`git revert <commit>`；preflight/deps 部分（另一 session）仍在；machine-audit + final exit 是本 commit 的增量。
+
 ### AO-RESUME 永久修法 — Class D (non-fast-forward push-fail) + Protocol Case B
 
 **根本問題**：AO-RESUME hook 在機器有 dirty files 時產生 checkpoint commit（ahead=1），若同時 remote 超前（cross-machine work），push 被 reject（non-fast-forward）→ `git-align` abort → 整個 AO-RESUME 以 exit=1 結束 → Claude 讀 stale 本地檔出殘缺報告。

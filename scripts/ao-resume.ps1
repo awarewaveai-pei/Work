@@ -511,16 +511,17 @@ if (-not $SkipWorkflowsDeps -and (Test-Path -LiteralPath $depsScript)) {
 if ($script:StrictEnvAudit) {
     $auditScript = Join-Path $WorkRoot "scripts\machine-environment-audit.ps1"
     if (-not (Test-Path -LiteralPath $auditScript)) {
-        Write-Error "ao-resume: machine-environment-audit missing at $auditScript"
-        exit 1
-    }
-    Write-Host ""
-    Write-Host "== AO-RESUME: 預設完整檢查（machine-environment-audit -FetchOrigin -Strict）==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $auditScript -WorkRoot $WorkRoot -FetchOrigin -Strict
-    if ($LASTEXITCODE -ne 0) {
-        Show-AoResumeQuickFix -Step "strict-audit" -ExitCode $LASTEXITCODE
-        Write-Error "ao-resume: machine-environment-audit -Strict failed (exit $LASTEXITCODE). Fix output above; no manual markdown checklist required."
-        exit $LASTEXITCODE
+        Write-Host "ao-resume: machine-environment-audit missing at $auditScript — skipping strict audit." -ForegroundColor Yellow
+        if ($healthGateExit -eq 0) { $healthGateExit = 1 }
+    } else {
+        Write-Host ""
+        Write-Host "== AO-RESUME: 預設完整檢查（machine-environment-audit -FetchOrigin -Strict）==" -ForegroundColor Cyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $auditScript -WorkRoot $WorkRoot -FetchOrigin -Strict
+        if ($LASTEXITCODE -ne 0) {
+            Show-AoResumeQuickFix -Step "strict-audit" -ExitCode $LASTEXITCODE
+            Write-Host ("ao-resume: machine-environment-audit FAILED (exit {0}) — health issues noted; generating state files." -f $LASTEXITCODE) -ForegroundColor Red
+            if ($healthGateExit -eq 0) { $healthGateExit = $LASTEXITCODE }
+        }
     }
 }
 
@@ -908,4 +909,9 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 Write-Host ""
 Write-Host ("AO-RESUME stamp updated: {0}" -f $nowStamp) -ForegroundColor DarkGray
 
+if ($healthGateExit -ne 0) {
+    Write-Host ""
+    Write-Host ("ao-resume: state files generated; health gate failures remain (exit {0}). Claude reads fresh state files and reports health issues in Section 1." -f $healthGateExit) -ForegroundColor Red
+    exit $healthGateExit
+}
 exit 0
