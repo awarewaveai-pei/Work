@@ -49,10 +49,10 @@ If opened folder is `agency-os` only, use paths as above; lobster paths are `../
      - **龍蝦工廠**：**目前 Milestone**（M1~M5；不確定時寫「待對照 `LOBSTER_FACTORY_MASTER_CHECKLIST`」）；**今日 DoD**。
      - **阻塞／風險／需注意**：**禁止**只寫單獨「無」或「沒有」二字。須綜合 **`TASKS` 開放項**、`WORKLOG`、`CONVERSATION_MEMORY`、`LAST_SYSTEM_STATUS`（若存在）、`LOBSTER_FACTORY_MASTER_CHECKLIST`／Completion Plan 開放語意、**當輪** `ao-resume.ps1`／Strict 稽核終端輸出（若代理有看到）。若有阻塞或風險：**分點**列出（含建議下一步或需使用者決策處）。若盤點後確無：**寫「本次盤點：未見需立即處理之阻塞」**，並**至少一句**說明依據（例如 Strict 結果、WORKLOG／memory 是否曾標記風險）。
      - **Git／開工裁決** — **必含**（以當輪 **`ao-resume.ps1` 終端輸出**為準，禁止憑記憶编造）：
-       - **`.\scripts\ao-resume.ps1`**：**exit code**（僅 **0** 得寫「預設完整開工路徑已跑完」）。
+       - **`.\scripts\ao-resume.ps1`**：**exit code**。exit=0 → 寫「預設完整開工路徑已跑完」。exit≠0 + `finished_utc` 在 5 分鐘內（**Case B1**，soft-exit 設計：健康閘失敗但狀態檔仍已生成）→ 寫「health gate 失敗（exit=N），狀態檔已新鮮生成，見 ⚠️ 橫幅」；**不得重跑**。exit≠0 + `finished_utc` 超過 5 分鐘（**Case B2**，git-align 截斷）→ 寫「未跑至狀態生成，狀態檔可能過期」。
        - **Strict 環境稽核**：是否出現 **`AUDIT RESULT: PASS (no warnings)`**（來自同次執行之 **`machine-environment-audit -FetchOrigin -Strict`**）。若腳本非 0 或無該行，**不得**宣稱 Strict PASS；**至少摘一行**失敗原因（例：工作樹 dirty、`ahead>0` 未 push、behind 需 pull、閘道／health 失敗）。
        - **與 `origin/main`**：**`ahead`／`behind`** 數字或等價敘述（開工大改前 **behind 必須為 0**）。**註**：`machine-environment-audit -Strict` 會把多數 WARN（含常見的 **dirty**、**ahead>0**）視為 FAIL；若與 **`REMOTE_WORKSTATION_STARTUP.md` §2.3**「ahead 敘述」並存，**以稽核腳本實際輸出為準**。
-       - 若未跑腳本或 exit 非 0：明寫「未跑／exit ≠ 0」，並指 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §2.5.1** 的修復方向（commit／push／pull／`-AllowUnexpectedDirty` 等依終端 quick-fix）。
+       - **Case B1**（exit≠0 + `finished_utc` < 5 min）：寫「health gate 失敗（見 ⚠️ 橫幅），狀態檔新鮮，不需重跑」，摘一行失敗原因。**Case B2**（exit≠0 + `finished_utc` 超 5 min 或 file missing）：明寫「未跑至狀態生成」，並指 **`docs/overview/REMOTE_WORKSTATION_STARTUP.md` §2.5.1** 修復方向；此時才由代理自跑 `ao-resume.ps1 -FullMainlineParity`。
 
    - **5. 未完成待辦（TASKS，`- [ ]` 全列，依分類輸出）** — **必做**：以 **`open-tasks-snapshot.md`**（優先）與 **`agency-os/TASKS.md`** 對齊後，**依 `####` 分類標題分組輸出**——先印該 `####` 標題，再列其下所有 `- [ ]` 項，**完整複製原文**（checkbox 與文字均保留）；空分類省略。**禁止**將所有待辦壓成單一無分類清單，**禁止**只寫「見 TASKS」「共 N 條」而不列內文。**若** **Total open = 0**：寫「（0 條未完成）」**並**一句話確認。**條數必須**與快照／`print-open-tasks` **Total open** 一致（不一致須說明原因）。**若 Total open > 35**：仍**不得省略**任一行——可分段輸出（同一對話回合內接續貼上直至列完），並在首段註明「待辦較多，分 N 段列完」。**未全列 `- [ ]` 或未分類輸出，視為無效回覆，必須重出**。
 
@@ -60,7 +60,7 @@ If opened folder is `agency-os` only, use paths as above; lobster paths are `../
 
    - **7. 下一步** — 具體、可執行；若 **需決策** 有阻塞項，先寫需決策的第一動作；並保留下方第 6、7 點之雙機／筆電提醒（若適用）。
 
-4. In `已完成` 或 `目前進度` 中：若本輪 **`ao-resume.ps1` 已執行且 exit 0**，**只**用終端輸出標註 **Git／Strict／ahead-behind**，**禁止**再請使用者「請你再跑一次 `ao-resume.ps1`」；僅在**本輪未跑**或 **exit≠0** 時，由代理在**同一或下一回合**自跑至成功或明確報告阻塞（無終端／需人類決策）。
+4. In `已完成` 或 `目前進度` 中：若本輪 **`ao-resume.ps1` 已執行且 exit 0**，**只**用終端輸出標註 **Git／Strict／ahead-behind**，**禁止**再請使用者「請你再跑一次 `ao-resume.ps1`」。**Case B1**（exit≠0 + `finished_utc` < 5 min，soft-exit 健康閘失敗但狀態檔新鮮）：同 exit=0 處理，以 ⚠️ 橫幅標注失敗，**禁止自跑**。**Case B2**（本輪未跑或 `finished_utc` 超過 5 min）：由代理在同一或下一回合自跑至成功或明確報告阻塞。
 
 5. Ask one focused confirmation question only if a blocker or ambiguity exists.
 
