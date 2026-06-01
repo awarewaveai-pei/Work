@@ -460,6 +460,12 @@ if (Test-Path -LiteralPath $claudeUserlevelSync) {
 
 Write-Host "== AO-RESUME: preflight auto-fix ==" -ForegroundColor Cyan
 
+# Health gate exit code: populated if any health gate fails; ao-resume continues to generate ALL
+# state files regardless so Claude always receives fresh data. Final exit uses this code so the
+# hook correctly records failure (exit≠0) while state files are still fresh.
+# Root cause fix (2026-06-01): health gates previously hard-exited, truncating state generation.
+$healthGateExit = 0
+
 # Script-scoped flag: survives nested powershell.exe -File (print-open-tasks). Compute here so StrictMode never reads an "unassigned" switch at script top.
 $skipStrictRequested = $false
 if ($PSBoundParameters.ContainsKey('SkipStrictEnvironmentAudit')) {
@@ -484,19 +490,19 @@ if ($AllowUnexpectedDirty -or $AllowPendingStash) { $syncArgs += "-AllowPendingS
 & powershell.exe @syncArgs
 if ($LASTEXITCODE -ne 0) {
     Show-AoResumeQuickFix -Step "preflight" -ExitCode $LASTEXITCODE
-    Write-Error "ao-resume: preflight check failed (exit $LASTEXITCODE)."
-    exit $LASTEXITCODE
+    Write-Host ("ao-resume: preflight FAILED (exit {0}) — health issues noted; continuing to generate state files." -f $LASTEXITCODE) -ForegroundColor Red
+    $healthGateExit = $LASTEXITCODE
+} else {
+    Write-Host "AO-RESUME preflight completed: repo is synced and ready." -ForegroundColor Green
 }
-
-Write-Host "AO-RESUME preflight completed: repo is synced and ready." -ForegroundColor Green
 
 $depsScript = Join-Path $WorkRoot "scripts\ensure-lobster-workflows-deps.ps1"
 if (-not $SkipWorkflowsDeps -and (Test-Path -LiteralPath $depsScript)) {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $depsScript -WorkRoot $WorkRoot
     if ($LASTEXITCODE -ne 0) {
         Show-AoResumeQuickFix -Step "workflows-deps" -ExitCode $LASTEXITCODE
-        Write-Error "ao-resume: workflows dependency step failed (exit $LASTEXITCODE)."
-        exit $LASTEXITCODE
+        Write-Host ("ao-resume: workflows-deps FAILED (exit {0}) — continuing to generate state files." -f $LASTEXITCODE) -ForegroundColor Red
+        if ($healthGateExit -eq 0) { $healthGateExit = $LASTEXITCODE }
     }
 } elseif ($SkipWorkflowsDeps) {
     Write-Host "== AO-RESUME: -SkipWorkflowsDeps（略過 npm ci 檢查）==" -ForegroundColor DarkYellow
