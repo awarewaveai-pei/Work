@@ -18,14 +18,16 @@
 #   (no auth_basic in system nginx) and returns HTTP 200 from next-admin.
 #   Do NOT check / directly - it returns 401 and triggers false alerts.
 
-# SG services (3) - local 127.0.0.1, sub-second TTFB, 12s timeout is plenty.
-CHECK_URLS="https://aware-wave.com/ https://app.aware-wave.com/api/ops/summary https://api.aware-wave.com/health"
+# SG services (3) - direct local probes avoid SG -> Cloudflare -> SG hairpin jitter.
+# Public edge monitoring belongs to EU Uptime Kuma; this SG-side alerter checks
+# that the local containers and reverse-proxy targets are alive.
+CHECK_URLS="http://127.0.0.1:8080/ http://127.0.0.1:3002/api/ops/summary http://127.0.0.1:3001/health"
 
 # Cross-region EU canary (1) - SG->EU has ~190ms RTT + Cloudflare edge variance.
 # Needs longer timeout to absorb routine network jitter without false alerts.
 # Added 2026-05-30 after 14 timeouts in 7 days (11 on 2026-05-29 alone) traced to
 # this URL hitting the 12s wall during transient cross-region slowdowns.
-CHECK_URLS_SLOW="https://uptime.aware-wave.com/"
+CHECK_URLS_SLOW="https://uptime.aware-wave.com/api/entry-page"
 # TIMEOUT_SEC_SLOW defaults to 20s in endpoint-alert.sh; uncomment to override.
 # TIMEOUT_SEC_SLOW=20
 
