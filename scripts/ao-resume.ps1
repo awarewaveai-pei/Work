@@ -421,27 +421,13 @@ if (-not $SkipOpenTasksList -and (Test-Path -LiteralPath $openTasksScript)) {
     Write-Host "== AO-RESUME: -SkipOpenTasksList（略過待辦快照）==" -ForegroundColor DarkYellow
 }
 
-# --- Claude Code user-level alignment (BEFORE preflight; idempotent, non-blocking) ---
-# CONTRACT: invoke sync-claude-userlevel.ps1 -Mode merge
-# MUST run BEFORE check-three-way-sync / verify-build-gates because check-claude-sync.ps1
-# H2 calls `sync-claude-userlevel -Mode verify`. If SSOT template changed since last run
-# (e.g. a new hook added in a cross-machine commit), verify fails and blocks ALL downstream
-# AO-RESUME steps — worklog, signals, memory import never run. Running merge FIRST applies
-# the latest template so the subsequent verify always passes.
-# Root cause fix (2026-05-29): ordering bug — verify ran before merge could fix the drift.
-$claudeUserlevelSync = Join-Path $WorkRoot "scripts\sync-claude-userlevel.ps1"
-if (Test-Path -LiteralPath $claudeUserlevelSync) {
-    Write-Host ""
-    Write-Host "== AO-RESUME: Claude user-level sync (auto-merge) ==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $claudeUserlevelSync -Mode merge
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "WARN: sync-claude-userlevel -Mode merge returned non-zero; hooks/settings may be stale." -ForegroundColor Yellow
-    }
-    $global:LASTEXITCODE = 0
-}
-
 # --- MCP config sync (auto-regenerate from SSOT; idempotent, non-blocking) ---
 # Regenerates .mcp.json / .cursor/mcp.json / Codex / Gemini from mcp/registry.template.json.
+# MUST run BEFORE sync-claude-userlevel merge: sync-mcp-config writes the full server list
+# back into .claude/mcp.json (which via junction = ~/.claude/mcp.json), overwriting any prior
+# normalization. Running merge AFTER ensures ~/.claude/mcp.json ends at {} (SSOT) before verify.
+# Root cause fix (2026-06-01): ordering bug — sync-mcp-config ran after merge, writing full list
+# back to ~/.claude/mcp.json → sync verify detected drift → H2 gate HARD fail → ao-resume abort.
 $mcpSyncScript = Join-Path $WorkRoot "scripts\sync-mcp-config.ps1"
 if (Test-Path -LiteralPath $mcpSyncScript) {
     Write-Host ""
@@ -449,6 +435,25 @@ if (Test-Path -LiteralPath $mcpSyncScript) {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mcpSyncScript
     if ($LASTEXITCODE -ne 0) {
         Write-Host "WARN: sync-mcp-config returned non-zero; MCP settings may be stale." -ForegroundColor Yellow
+    }
+    $global:LASTEXITCODE = 0
+}
+
+# --- Claude Code user-level alignment (BEFORE preflight; idempotent, non-blocking) ---
+# CONTRACT: invoke sync-claude-userlevel.ps1 -Mode merge
+# MUST run AFTER sync-mcp-config (which may write to .claude/mcp.json via junction) and
+# BEFORE check-three-way-sync / verify-build-gates because check-claude-sync.ps1 H2 calls
+# `sync-claude-userlevel -Mode verify`. Running merge last ensures ~/.claude/mcp.json = {}
+# (SSOT) before verify, regardless of what sync-mcp-config wrote.
+# Class A fix (2026-05-29): merge must run before verify (not after).
+# Ordering fix (2026-06-01): merge must also run after sync-mcp-config (not before).
+$claudeUserlevelSync = Join-Path $WorkRoot "scripts\sync-claude-userlevel.ps1"
+if (Test-Path -LiteralPath $claudeUserlevelSync) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: Claude user-level sync (auto-merge) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $claudeUserlevelSync -Mode merge
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARN: sync-claude-userlevel -Mode merge returned non-zero; hooks/settings may be stale." -ForegroundColor Yellow
     }
     $global:LASTEXITCODE = 0
 }
