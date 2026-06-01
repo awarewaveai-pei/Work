@@ -766,6 +766,34 @@ if (Test-Path -LiteralPath $archiveLiftScript) {
     Add-Check -Name "AO-CLOSE archive items lifted to TASKS.md (verify-archive-tasks-lift.ps1)" -Pass $true -Detail "Skipped: scripts/verify-archive-tasks-lift.ps1 not present"
 }
 
+# 12d) AO-RESUME archive written after most recent ao-resume stamp.
+# Phase Z8 (2026-06-01) — prevents the "forgot Step 3" class where Claude outputs the
+# 7-segment report but never writes agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md.
+# Root cause: text-only instructions are insufficient; mechanical gate required.
+$aoResumeArchiveScript = Join-Path $monoRoot "scripts\verify-aoresume-archive.ps1"
+if (Test-Path -LiteralPath $aoResumeArchiveScript) {
+    try {
+        $archiveOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $aoResumeArchiveScript -WorkRoot $monoRoot 2>&1
+        $archiveExit = $LASTEXITCODE
+        $archiveDetail = ($archiveOutput | Out-String).Trim()
+        switch ($archiveExit) {
+            0 { Add-Check -Name "AO-RESUME archive written (verify-aoresume-archive.ps1)" -Pass $true -Detail $archiveDetail }
+            1 { Add-Check -Name "AO-RESUME archive written (verify-aoresume-archive.ps1)" -Pass $false -Detail $archiveDetail
+                Add-CriticalFailure -Reason "AO-RESUME Step 3 archive missing — write 7-segment report to agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md" }
+            2 { Add-Check -Name "AO-RESUME archive written (verify-aoresume-archive.ps1)" -Pass $true -Detail "Skipped: $archiveDetail" }
+            default { Add-Check -Name "AO-RESUME archive written (verify-aoresume-archive.ps1)" -Pass $false -Detail "Unexpected exit ${archiveExit}: $archiveDetail"
+                Add-CriticalFailure -Reason "verify-aoresume-archive.ps1 returned unexpected exit $archiveExit" }
+        }
+    } catch {
+        $msg = $_.Exception.Message
+        $excerpt = $msg.Substring(0, [Math]::Min(120, $msg.Length))
+        Add-Check -Name "AO-RESUME archive written (verify-aoresume-archive.ps1)" -Pass $false -Detail ("Invocation crashed: " + $excerpt)
+        Add-CriticalFailure -Reason ("verify-aoresume-archive.ps1 invocation failed: " + $excerpt)
+    }
+} else {
+    Add-Check -Name "AO-RESUME archive written (verify-aoresume-archive.ps1)" -Pass $true -Detail "Skipped: scripts/verify-aoresume-archive.ps1 not present"
+}
+
 $total = $checks.Count
 $passed = @($checks | Where-Object { $_.pass }).Count
 $failed = $total - $passed
