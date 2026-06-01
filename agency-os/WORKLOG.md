@@ -4,6 +4,32 @@
 
 ## 2026-06-01
 
+### Phase Z8 — AO-RESUME archive lift gate（機械閘）
+
+**根因**：ao-resume.md Step 3 只靠文字要求 Claude 寫 archive，Claude 一再忘記（本日兩次）。文字規則靠自律，不可靠。
+
+**已修改**：
+- **新建 [`scripts/verify-aoresume-archive.ps1`](../scripts/verify-aoresume-archive.ps1)**：讀 `ao-resume-last.txt` 取 stamp UTC → 轉 CST → 掃 `agency-os/reports/ao-resume/*.md` → 若找到 filename time >= stamp_cst - 10min → exit 0 PASS；否則 exit 1 FAIL；stamp 不存在 → exit 2 SKIP
+- **[`scripts/system-health-check.ps1`](../scripts/system-health-check.ps1) gate 12d**：呼叫 verify-aoresume-archive.ps1；exit 1 → `Add-CriticalFailure`（AO-CLOSE 硬擋）
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=Bash | cmd=`verify-aoresume-archive.ps1 -WorkRoot C:\Users\USER\Work` | exit=0 | result=`PASS — archive 2026-06-01-1532.md covers ao-resume stamp 2026-06-01 15:32 CST`
+   REALTEST_EVIDENCE: tool=Bash | cmd=`system-health-check.ps1` | exit=0 | result=`Score: 100% (363/363)` — gate 12d 已計入
+2. REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n — exit code contract (0/1/2) 與 gate 12c 一致；grace period 10min 覆蓋 clock skew；`${archiveExit}` 修正 PS 冒號 parse 問題
+3. BUGHUNT_DONE: scope=`agency-os scripts` | grep=`verify-aoresume-archive\|gate 12d` | hits=2（health-check gate + 本 WORKLOG；無 stale contract）
+4. **WORKLOG**：本 entry
+
+### EU VPS ClickHouse 升級後備份清理
+
+**執行**：SSH EU VPS → `grep -c ClickHouseError /var/log/smart-restart.log` → **0 次**（升級 2026-05-19 至今 13 天無錯誤）→ `rm /root/backups/clickhouse-data-pre-upgrade-25.7.5-20260519-060453.tar.gz`
+
+**結果**：DELETED。磁碟 /root/backups/: 52G / 150G (36%)
+
+- AUTO_TASK_DONE: EU VPS ClickHouse 升級後備份清理
+- REALTEST_EVIDENCE: tool=SSH | cmd=`grep -c ClickHouseError /var/log/smart-restart.log` + `rm ...tar.gz` | exit=0 | result=count=0, DELETED, disk=36%
+- REVIEW_WAIVED: NA -- rm 操作無需 code review
+- BUGHUNT_WAIVED: NA -- 單純刪除備份檔，無 code 改動
+
 ### ao-resume 設計根治 — health gate soft-exit + Case B1/B2 協議
 
 **根本問題**：ao-resume.ps1 的三個 health gate（preflight L488, deps L499, machine-audit L517）使用 hard exit，任一失敗即截斷所有後續狀態檔生成（L521-904），導致 Claude 拿到殘缺資料。另一個 session 修了 preflight 和 deps，但漏了 machine-audit（仍用 `Write-Error + exit`）和最終 exit（仍寫死 `exit 0`）。同時 ao-resume.md Case B 仍是舊邏輯（2 個 fallback scripts + hardcoded `C:/Users/USER/Work` 路徑）。
