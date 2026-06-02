@@ -75,12 +75,25 @@ function formatTelegramIncident(ctx: NotificationContext): string {
             ? "REPEAT"
             : "NEW";
 
+  const SEV_CN: Record<string, string> = { critical: "🔴 緊急", high: "🟠 重要", medium: "🟡 注意", low: "🔵 提示" };
+  const SOURCE_CN: Record<string, string> = {
+    sentry: "應用程式錯誤 (Sentry)", uptime_kuma: "上線監測 (Uptime Kuma)",
+    netdata: "系統資源 (Netdata)", grafana: "效能指標 (Grafana)", posthog: "使用者分析 (PostHog)",
+  };
+  const RULE_CN: Record<string, string> = {
+    severity_escalation: "已升級 (ESCALATED)", reopen: "重新開啟 (REOPENED)",
+    critical_immediate: "緊急警報 (CRITICAL)", duplicate_occurrence: "重複發生 (REPEAT)",
+  };
+  const sevLabel = SEV_CN[i.severity] ?? i.severity.toUpperCase();
+  const srcLabel = SOURCE_CN[i.source] ?? i.source;
+  const ruleLabelCN = RULE_CN[ctx.rule] ?? "新告警 (NEW)";
+
   const lines = [
-    `[Ops Inbox] ${i.severity.toUpperCase()} ${ruleLabel}`,
-    `${i.source} / ${i.service ?? "host-level"} / ${i.environment}`,
+    `${sevLabel}告警 — ${srcLabel}`,
+    `狀態：${ruleLabelCN}`,
     i.title,
     i.message ?? "",
-    `Occurrences: ${i.occurrence_count} / fp:${fp}`,
+    `（技術資訊：severity=${i.severity} source=${i.source} rule=${ctx.rule} fp=${fp} count=${i.occurrence_count}）`,
     incidentUrl,
   ].filter(Boolean);
 

@@ -313,7 +313,8 @@ if [[ "${notify}" == "true" ]]; then
   # crashes, preventing a per-minute reminder storm during a channel outage.
   write_atomic "${LAST_NOTIFY_FILE}" "${now_epoch}"
   if [[ "${new_kind}" == "ok" ]]; then
-    msg=":white_check_mark: [aware-wave endpoint recovered] ${host} ${ts}"
+    msg="✅ 網站服務恢復正常 — ${host}
+（技術資訊：endpoint recovered ${ts}）"
     send_webhook "${msg}"
     send_telegram "${msg}"
     # `|| true`: a PagerDuty enqueue failure (HTTP error / connection timeout
@@ -322,9 +323,10 @@ if [[ "${notify}" == "true" ]]; then
     # dedup_key, so a missed enqueue self-heals on the next run.
     send_pagerduty "resolve" "[aware-wave] public endpoint check recovered (${host})" "" || true
   else
-    prefix=":rotating_light:"
-    [[ "${notify_kind}" == "alert-reminder" ]] && prefix=":warning: [reminder]"
-    msg="$(printf '%s [aware-wave endpoint alert] %s %s\n' "${prefix}" "${host}" "${ts}")$(printf '%s\n' "${fail_lines[@]}")"
+    prefix="🚨"
+    [[ "${notify_kind}" == "alert-reminder" ]] && prefix="⚠️ [提醒]"
+    fail_detail="$(printf '%s\n' "${fail_lines[@]}")"
+    msg="$(printf '%s 網站端點無回應，服務可能中斷 — %s\n失敗端點：\n%s\n（技術資訊：%s endpoint alert %s）' "${prefix}" "${host}" "${fail_detail}" "${prefix}" "${ts}")"
     detail_text="$(printf '%s\n' "${fail_lines[@]}")"
     send_webhook "${msg}"
     send_telegram "${msg}"

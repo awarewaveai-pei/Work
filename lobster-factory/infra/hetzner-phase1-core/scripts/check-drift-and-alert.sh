@@ -96,16 +96,14 @@ fi
 SUBJECTS=$(git log --no-merges --format=' • %h %s' --max-count=3 "${DEPLOYED}..${ORIGIN_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || true)
 
 MSG=$(cat <<MSG_EOF
-:warning: *SG next-admin app-code deploy drift*
-Production is *${BEHIND}* app-code commit(s) behind \`origin/main\`.
+:warning: *伺服器程式碼落後，有 ${BEHIND} 個更新尚未部署 — SG next-admin*
+新程式碼已備好但還沒上線，請執行部署
 
-• deployed: \`${DEPLOYED:0:12}\`
-• origin/main: \`${ORIGIN_HEAD:0:12}\`
-
-Latest commits not yet on prod:
+待部署更新：
 ${SUBJECTS}
 
-Fix: run \`/sg-deploy\` from Claude Code, or SSH and run \`/root/lobster-phase1/scripts/sg-deploy.sh next-admin\`.
+修復方式：在 Claude Code 執行 \`/sg-deploy\`，或 SSH 後執行 \`/root/lobster-phase1/scripts/sg-deploy.sh next-admin\`
+（技術資訊：app-code deploy drift, behind=${BEHIND}, deployed=${DEPLOYED:0:12}, origin=${ORIGIN_HEAD:0:12}）
 MSG_EOF
 )
 
@@ -148,17 +146,14 @@ TELEGRAM_PRIMARY_CHAT_ID=$(echo "$TELEGRAM_ALLOWED_CHAT_IDS_VAL" | cut -d',' -f1
 
 if [[ -n "${TELEGRAM_BOT_TOKEN_VAL:-}" && -n "${TELEGRAM_PRIMARY_CHAT_ID:-}" ]]; then
   TG_MSG=$(cat <<TG_EOF
-WARN: SG next-admin app-code deploy drift
+⚠️ 伺服器程式碼落後，有 ${BEHIND} 個更新尚未部署 — SG next-admin
+新程式碼已備好但還沒上線，請執行部署
 
-Production is ${BEHIND} app-code commit(s) behind origin/main.
-
-deployed:    ${DEPLOYED:0:12}
-origin/main: ${ORIGIN_HEAD:0:12}
-
-Latest commits not yet on prod:
+待部署更新：
 ${SUBJECTS}
 
-Fix: SSH (Termius) -> /root/lobster-phase1/scripts/sg-deploy.sh next-admin
+修復：SSH (Termius) -> /root/lobster-phase1/scripts/sg-deploy.sh next-admin
+（技術資訊：deploy drift, behind=${BEHIND}, deployed=${DEPLOYED:0:12}, origin=${ORIGIN_HEAD:0:12}）
 TG_EOF
 )
   TG_PAYLOAD=$(TGCID="$TELEGRAM_PRIMARY_CHAT_ID" TGTEXT="$TG_MSG" python3 -c 'import json,os; print(json.dumps({"chat_id":os.environ["TGCID"],"text":os.environ["TGTEXT"],"disable_web_page_preview":True}))')

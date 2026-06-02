@@ -25,22 +25,36 @@ export class SlackNotifier implements Notifier {
               : "";
     const here = ctx.rule === "critical_immediate" ? "<!here> " : "";
 
+    const SEV_CN: Record<string, string> = { critical: "緊急", high: "重要", medium: "注意", low: "提示" };
+    const SOURCE_CN: Record<string, string> = {
+      sentry: "應用程式錯誤", uptime_kuma: "上線監測", netdata: "系統資源",
+      grafana: "效能指標", posthog: "使用者分析",
+    };
+    const RULE_CN: Record<string, string> = {
+      severity_escalation: "已升級 (ESCALATED)", reopen: "重新開啟 (REOPENED)",
+      critical_immediate: "緊急警報 (CRITICAL)", duplicate_occurrence: "重複發生 (REPEAT)",
+    };
+    const sevLabel = SEV_CN[i.severity] ?? i.severity;
+    const srcLabel = SOURCE_CN[i.source] ?? i.source;
+    const ruleLabelCN = RULE_CN[ctx.rule] ?? "新告警 (NEW)";
+
     const body = {
-      text: `${sevEmoji} ${i.severity.toUpperCase()}${ruleLabel} · ${i.source} · ${i.title}`,
+      text: `${sevEmoji} ${sevLabel}告警 — ${srcLabel}｜${ruleLabelCN}\n${i.title}`,
       blocks: [
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `${here}${sevEmoji} *${i.severity.toUpperCase()}${ruleLabel}* · _${i.source}_ · *${i.service ?? "(host-level)"}* · ${i.environment}`,
+            text: `${here}${sevEmoji} *${sevLabel}告警* — ${srcLabel}｜${ruleLabelCN}`,
           },
         },
         { type: "section", text: { type: "mrkdwn", text: `*${i.title}*\n${i.message ?? ""}` } },
         {
           type: "context",
           elements: [
-            { type: "mrkdwn", text: `Occurrences: *${i.occurrence_count}* · fp:${fp}` },
-            { type: "mrkdwn", text: `<${incidentUrl}|Open in Inbox>` },
+            { type: "mrkdwn", text: `發生次數：*${i.occurrence_count}*` },
+            { type: "mrkdwn", text: `（技術資訊：severity=${i.severity} source=${i.source} rule=${ctx.rule} fp=${fp}）` },
+            { type: "mrkdwn", text: `<${incidentUrl}|在 Ops Inbox 查看>` },
           ],
         },
         ...repairActionBlocks(i),

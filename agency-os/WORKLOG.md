@@ -7433,3 +7433,5 @@ AUTO_TASK_DONE: onboarding portal 研究跨機固化（codebase-map + reading li
 AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（治公網抖動假告警 + critic 強化 pagerduty/persist 順序）
 
 
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); bilingual message text only, no logic change

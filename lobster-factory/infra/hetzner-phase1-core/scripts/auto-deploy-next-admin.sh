@@ -131,11 +131,11 @@ fi
 SUBJECTS=$(cd "$WORK_DIR" && git log --no-merges --format=" - %h %s" --max-count=3 "${DEPLOYED}..${REMOTE_HEAD}" -- "${APP_PATHS[@]}" 2>/dev/null || true)
 
 if [[ "$DEPLOY_SUCCESS" -eq 1 ]]; then
-    SLACK_MSG=$(printf ':white_check_mark: *SG next-admin auto-deployed*\nResolved drift of *%s* commit(s).\n\n- was deployed: `%s`\n- now deployed: `%s`\n- origin/main:  `%s`\n\nCommits:\n%s' "$BEHIND" "${DEPLOYED:0:12}" "${NEW_COMMIT:0:12}" "${REMOTE_HEAD:0:12}" "$SUBJECTS")
-    TG_MSG=$(printf 'OK: SG next-admin auto-deployed\n\nDrift of %s commit(s) resolved.\n\nwas: %s\nnow: %s\nhead:%s\n\nCommits:\n%s' "$BEHIND" "${DEPLOYED:0:12}" "${NEW_COMMIT:0:12}" "${REMOTE_HEAD:0:12}" "$SUBJECTS")
+    SLACK_MSG=$(printf ':white_check_mark: *後台自動部署成功 — SG next-admin*\n新版程式碼已上線，共更新 *%s* 個提交\n（技術資訊：auto-deployed, was:`%s` now:`%s` head:`%s`）\n\n最新更新：\n%s' "$BEHIND" "${DEPLOYED:0:12}" "${NEW_COMMIT:0:12}" "${REMOTE_HEAD:0:12}" "$SUBJECTS")
+    TG_MSG=$(printf '✅ 後台自動部署成功 — SG next-admin\n新版程式碼已上線，共更新 %s 個提交\n（技術資訊：auto-deployed, was:%s now:%s head:%s）\n\n最新更新：\n%s' "$BEHIND" "${DEPLOYED:0:12}" "${NEW_COMMIT:0:12}" "${REMOTE_HEAD:0:12}" "$SUBJECTS")
 else
-    SLACK_MSG=$(printf ':x: *SG next-admin auto-deploy FAILED*\nDrift of *%s* commit(s) but deploy failed.\n\n- deployed:    `%s`\n- origin/main: `%s`\n\nFix: SSH -> `/root/lobster-phase1/scripts/sg-deploy.sh next-admin`' "$BEHIND" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}")
-    TG_MSG=$(printf 'FAIL: SG next-admin auto-deploy FAILED\n\nDrift of %s commit(s), deploy failed.\n\ndeployed:    %s\norigin/main: %s\n\nFix: /root/lobster-phase1/scripts/sg-deploy.sh next-admin' "$BEHIND" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}")
+    SLACK_MSG=$(printf ':x: *後台自動部署失敗，需要手動處理 — SG next-admin*\n程式碼有 *%s* 個更新未能部署，請 SSH 進伺服器手動執行\n修復指令：`/root/lobster-phase1/scripts/sg-deploy.sh next-admin`\n（技術資訊：auto-deploy FAILED, drift=%s, deployed=%s, origin=%s）' "$BEHIND" "$BEHIND" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}")
+    TG_MSG=$(printf '❌ 後台自動部署失敗，需要手動處理 — SG next-admin\n程式碼有 %s 個更新未能部署，請 SSH 進伺服器手動執行\n修復指令：/root/lobster-phase1/scripts/sg-deploy.sh next-admin\n（技術資訊：auto-deploy FAILED, drift=%s, deployed=%s, origin=%s）' "$BEHIND" "$BEHIND" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}")
 fi
 
 send_slack() {
