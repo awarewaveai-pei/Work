@@ -111,6 +111,38 @@ jobs:
               core.notice(`Opened issue #${created.data.number}`);
             }
 
+      - name: Notify Slack and Telegram — audit summary
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          REPORT="agency-os/reports/security/workflows-npm-audit-LATEST.md"
+          TOTAL=$(grep "^- Total:"    "$REPORT" | grep -oE "[0-9]+" || echo "?")
+          CRITICAL=$(grep "^- Critical:" "$REPORT" | grep -oE "[0-9]+" || echo "0")
+          HIGH=$(grep "^- High:"     "$REPORT" | grep -oE "[0-9]+" || echo "0")
+          MODERATE=$(grep "^- Moderate:" "$REPORT" | grep -oE "[0-9]+" || echo "0")
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ "${CRITICAL}" -gt 0 ] || [ "${HIGH}" -gt 0 ]; then
+            ICON=":rotating_light:"
+            LABEL="HIGH/CRITICAL — action required"
+          elif [ "${MODERATE}" -gt 0 ]; then
+            ICON=":warning:"
+            LABEL="moderate"
+          else
+            ICON=":white_check_mark:"
+            LABEL="clean"
+          fi
+          # Slack
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"${ICON} *weekly npm audit* \`packages/workflows\` — ${LABEL} | total=${TOTAL} critical=${CRITICAL} high=${HIGH} moderate=${MODERATE} | <${RUN_URL}|GHA run>\"}"
+          # Telegram
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"${ICON} weekly npm audit packages/workflows — ${LABEL}\\ntotal=${TOTAL} critical=${CRITICAL} high=${HIGH} moderate=${MODERATE}\\n${RUN_URL}\"}"
+
       - name: Fail job if high/critical found
         if: steps.gate.outcome == 'failure'
         run: |
