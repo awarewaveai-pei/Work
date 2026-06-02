@@ -146,3 +146,6 @@ n8n-hetzner/
 
 # --- Local backups created by sync-claude-userlevel.ps1 etc. ---
 agency-os/Backups/
+
+# Orphaned deploy worktree directories
+.deploy-*/

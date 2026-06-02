@@ -126,15 +126,16 @@ jobs:
           HIGH=$(grep "^- High:"     "$REPORT" | grep -oE "[0-9]+" || echo "0")
           MODERATE=$(grep "^- Moderate:" "$REPORT" | grep -oE "[0-9]+" || echo "0")
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          TECH="total=${TOTAL} critical=${CRITICAL} high=${HIGH} moderate=${MODERATE}"
           if [ "${CRITICAL}" -gt 0 ] || [ "${HIGH}" -gt 0 ]; then
-            SLACK_MSG=":rotating_light: *每週套件安全掃描 — 發現高危漏洞，需要立即處理*\n套件：lobster-factory workflows\n嚴重：${CRITICAL} 個　高危：${HIGH} 個\n已自動建立 GitHub Issue 追蹤\n<${RUN_URL}|查看報告>"
-            TG_MSG="🚨 每週套件安全掃描 — 發現高危漏洞，需要立即處理\n套件：lobster-factory workflows\n嚴重：${CRITICAL} 個　高危：${HIGH} 個\n已自動建立 GitHub Issue 追蹤\n${RUN_URL}"
+            SLACK_MSG=":rotating_light: *每週套件安全掃描 — 發現高危漏洞，需要立即處理*\n套件中有嚴重安全問題，請盡快查看並修復\n（技術資訊：${TECH}）\n已自動建立 GitHub Issue 追蹤\n<${RUN_URL}|查看報告>"
+            TG_MSG="🚨 每週套件安全掃描 — 發現高危漏洞，需要立即處理\n套件中有嚴重安全問題，請盡快查看並修復\n（技術資訊：${TECH}）\n已自動建立 GitHub Issue 追蹤\n${RUN_URL}"
           elif [ "${MODERATE}" -gt 0 ]; then
-            SLACK_MSG=":warning: *每週套件安全掃描 — 發現中度風險*\n套件：lobster-factory workflows\n中度漏洞：${MODERATE} 個（建議近期修復，非緊急）\n<${RUN_URL}|查看報告>"
-            TG_MSG="⚠️ 每週套件安全掃描 — 發現中度風險\n套件：lobster-factory workflows\n中度漏洞：${MODERATE} 個（建議近期修復，非緊急）\n${RUN_URL}"
+            SLACK_MSG=":warning: *每週套件安全掃描 — 發現中度風險*\n有套件存在已知漏洞，建議近期修復，目前尚無緊急風險\n（技術資訊：${TECH}）\n<${RUN_URL}|查看報告>"
+            TG_MSG="⚠️ 每週套件安全掃描 — 發現中度風險\n有套件存在已知漏洞，建議近期修復，目前尚無緊急風險\n（技術資訊：${TECH}）\n${RUN_URL}"
           else
-            SLACK_MSG=":white_check_mark: *每週套件安全掃描 — 通過*\n套件：lobster-factory workflows\n結果：沒有發現任何安全漏洞"
-            TG_MSG="✅ 每週套件安全掃描 — 通過\n套件：lobster-factory workflows\n結果：沒有發現任何安全漏洞"
+            SLACK_MSG=":white_check_mark: *每週套件安全掃描 — 通過*\n所有套件安全，本週沒有發現任何漏洞\n（技術資訊：${TECH}）"
+            TG_MSG="✅ 每週套件安全掃描 — 通過\n所有套件安全，本週沒有發現任何漏洞\n（技術資訊：${TECH}）"
           fi
           # Slack
           curl -s -X POST "$SLACK_WEBHOOK_URL" \
