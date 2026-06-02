@@ -41,6 +41,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/ops/clients" className="sidebar-link" title="全客戶健康狀態 + WP 外掛更新">
                   <span className="sidebar-icon">👥</span> Clients
                 </Link>
+                <Link href="/ops/onboarding" className="sidebar-link" title="新客戶建站：填表 → Claude 生規格">
+                  <span className="sidebar-icon">✨</span> Onboarding
+                </Link>
                 <Link href="/ops/integrations" className="sidebar-link" title="客戶工具串接狀態：監控 / 通知 / AI / GitHub">
                   <span className="sidebar-icon">⇄</span> Integrations
                 </Link>
