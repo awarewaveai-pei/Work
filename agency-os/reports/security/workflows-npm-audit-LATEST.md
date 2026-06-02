@@ -1,16 +1,16 @@
 # Workflows npm audit report
 
-- Generated UTC: 2026-06-01T01:10:52.141Z
+- Generated UTC: 2026-06-02T01:48:37.516Z
 - Path: `lobster-factory/packages/workflows`
-- Total: 1
+- Total: 0
 - Critical: 0
 - High: 0
-- Moderate: 1
+- Moderate: 0
 - Low: 0
 
 ## Findings
 
-- `qs`: severity=`moderate`, direct=`false`, fixAvailable=`true`, via=qs (1119502)
+- No vulnerabilities reported.
 
 ## Decision template
 
