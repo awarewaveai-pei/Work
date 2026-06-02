@@ -105,6 +105,7 @@ export async function generateWebsiteSpec(
 
   // M3: structural validation before accepting as WebsiteSpec
   if (!validateSpec(parsed)) {
+    console.error("[spec-generator] validation failed. top-level keys:", Object.keys(parsed as object));
     return { ok: false, error: "spec_validation_failed", raw };
   }
 
