@@ -6,6 +6,9 @@
 
 ## 2026-06-02
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: onboarding-portal-e2e → handoffs/2026-06-02-1735-onboarding-portal-e2e.md
+
 ### Client Onboarding Portal MVP (§1-§6 + §12 + migration + deploy)
 
 **根本目標**：按 `agency-os/docs/architecture/client-onboarding-portal-spec.md` §14 MVP 執行順序，建立 Client Onboarding Portal 基礎層。
