@@ -7566,3 +7566,30 @@ AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（
 
 AUTO_TASK_DONE: system-guard LAST_SYSTEM_STATUS conditional-write（churn 治本，兩份同步 fix，換機 AO-RESUME 不再分歧）
 
+## 2026-06-02 — Onboarding Portal ① debug log 清理 + §7 架構 R0 發現（②③ 暫不實作的理由）
+
+**[任務]** 操作者交付 onboarding-portal-e2e packet 三步（① 清 debug logs → tsc/test → deploy；② 建 trigger-build route 接 orchestrate；③ §8 uptime_kuma）。授權我以技術負責人身分自行決定範圍。
+
+**[① 已完成]** `lib/onboarding/spec-generator.ts` 移除 9 行 debug `console.error`（只刪 log、保留全部 guard + return）。tsc --noEmit 0 errors、vitest 168/168 pass、critic Deep 0/0/0、無殘留 `console.*`。**未 sg-deploy**（log 清理零急迫，隨下次實質部署搭車，避免單獨為 cosmetic change 冒 prod 風險）。
+
+**[②③ R0 讀碼發現 — 不實作的理由]** packet §7 前任假設「呼叫 orchestrate-tenant-provisioning（已有 create-wp-site + apply-manifest）」與 code 不符：
+- `orchestrate-tenant-provisioning.ts`（讀畢）只 `runProviderStep` fan-out 佈建整合服務 + 寫 webhook，**不建 org/site、不觸發 create-wp-site**。
+- `create-wp-site.ts:89-112` payload 要 4 個已存在 UUID（organizationId/workspaceId/projectId/siteId）+ siteName + manifestSlug，website_spec 沒有。
+- **已存在建站 pipeline**：`/build` console（`app/build/` + `app/api/build/{provision-services,runs}` + `lib/build-console/contracts.ts`）→ `dispatch-action-run`（`ops.profile-b.create-wp-site → create-wp-site`）→ create-wp-site；org/site 走 `app/api/ops/organizations`、`ops/clients`。
+- **決定（技術負責人）**：②③ 若硬寫一條 route 自建 org/site + 觸發 create-wp-site = 平行重造既有 /build pipeline，違反 R0「不得建立重複邏輯」；照 orchestrate 接又不會真建站（誤導）。正解是把 intake→spec 餵進**既有 /build/dispatch pipeline**，需一次設計 pass（讀 build-console/contracts + dispatch 資料模型）。本 session 不猜不重造，改為**把真實架構固化進 packet + TASKS**，下次照正確前提設計。
+
+**[已修改]** spec-generator.ts（① log 清理）；handoffs/2026-06-02-1735-onboarding-portal-e2e.md（§4/§5/§6 更正前任假設 + 指向既有 pipeline）；TASKS.md（§7 項標注 ① 完成 + ②③ 需設計+reuse）。
+
+**[驗證結果]**
+1. REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | result=0 errors
+   REALTEST_EVIDENCE: tool=Bash | cmd=npm test (vitest) | exit=0 | result=168/168 pass, 8 files
+2. REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（9 行 log 移除無動到任何 guard/return；無 dangling block/unreachable）
+3. BUGHUNT_DONE: scope=agency-os,scripts | grep=console.\*(spec-generator) ; create-wp-site/orchestrate payload | hits=0 殘留 log；架構發現 orchestrate≠建站、既有 /build pipeline → 已固化 packet+TASKS
+4. WORKLOG: this entry
+
+**[剩餘風險]** ② §7 真正建站串接未做（需設計 pass，已記 packet+TASKS）；① 未 deploy（prod 仍有舊 debug log，無害，下次部署生效）。
+
+**[rollback]** `git revert <commit>` 還原 spec-generator.ts log 清理 + 文件更正。
+
+AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests + critic 0/0/0）+ §7 架構真相固化進 packet/TASKS（②③ 改 reuse 既有 /build pipeline 設計 pass）
+

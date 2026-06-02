@@ -25,40 +25,41 @@ Client Onboarding Portal：讓 `/ops/onboarding` 頁面在生成規格後能直�
 - nginx `/api/onboarding/` location block + Basic Auth + role=admin（完成，SG 已 deploy）
 - E2E 驗證：intake 201 ✅，generate-spec `website_spec_id: 0f099182-396a-418f-95dd-437a39355c62` ✅
 
-## 4. 卡在哪
+## 4. 卡在哪（2026-06-02 更新 — R0 讀碼後修正前任假設）
 
-§7 staging build 串接尚未開始；debug 用的 `console.error` log 仍在 spec-generator.ts（可清理）。
+debug logs **已清**（commit 見下）。真正的卡點是 **§7 的 packet 原假設與 code 不符**：
+
+- packet 原寫「呼叫 orchestrate-tenant-provisioning（已有 create-wp-site + apply-manifest）」→ **不成立**。`orchestrate-tenant-provisioning.ts` 實際只 `runProviderStep` fan-out 佈建整合服務（github/sentry/uptime_kuma/posthog/n8n/supabase）+ 寫 webhook，**沒建任何 org/site 記錄、沒觸發 create-wp-site**。
+- `create-wp-site`（`packages/workflows/src/trigger/create-wp-site.ts:89-112`）的 payload 要 **4 個已存在 UUID**：`organizationId / workspaceId / projectId / siteId` + `siteName` + `manifestSlug`（`wp-basic|wp-business|wc-core`）。website_spec 只有 `spec_data`，沒有這些。
+- **已存在一整條建站 pipeline**：`/build` console（`app/build/BuildConsole.tsx` + `app/api/build/{provision-services,runs}` + `lib/build-console/contracts.ts`）→ `dispatch-action-run`（`ops.profile-b.create-wp-site → create-wp-site`）→ create-wp-site；org/site 記錄走 `app/api/ops/organizations`、`ops/clients`。
+
+→ **結論：②③ 不能另造一套 org/site 建立 + create-wp-site 觸發（會重複既有 /build pipeline，違反 R0）。正解是把 intake→spec 餵進既有 /build/dispatch pipeline。這需要一次設計 pass，不是一條 quick route。**
 
 ## 5. 下一步指令
 
-### 先清理 debug logs（5 分鐘）
+### ① debug logs — ✅ 已完成（2026-06-02）
 
-1. 讀 `$WORK_ROOT/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/onboarding/spec-generator.ts`
-2. 移除所有 `console.error("[spec-validator]...")` 和 `console.error("[spec-generator]...")` 行
-3. `npx tsc --noEmit` 確認 0 errors，`npm test` 確認 168 pass
-4. `/verify-recent --trivial` → commit + push → `sg-deploy.sh next-admin`
+`spec-generator.ts` 9 行 debug `console.error` 已移除（只刪 log、保留所有 guard + return）；`tsc --noEmit` 0 errors、vitest **168/168 pass**、critic Deep 0/0/0。**尚未 sg-deploy**（log 清理零急迫，隨下次實質部署搭車）。
 
-### §14 MVP Step 7：staging build 串接
+### ② §7 staging build 串接 — 需先設計（不要直接寫 route）
 
-5. 讀 `$WORK_ROOT/agency-os/docs/architecture/client-onboarding-portal-spec.md` §7（staging build 流程）
-6. 讀 `$WORK_ROOT/lobster-factory/packages/workflows/src/trigger/orchestrate-tenant-provisioning.ts`（現有 orchestration）
-7. 建 API route `app/api/onboarding/trigger-build/route.ts`：
-   - 接收 `website_spec_id`（從 website_specs 查 form_data）
-   - 呼叫 existing `orchestrate-tenant-provisioning` Trigger.dev task（已有 create-wp-site + apply-manifest）
-   - 回傳 `workflow_run_id`
-8. 更新 `app/ops/onboarding/page.tsx` — spec 顯示後加「觸發建站」按鈕，POST `/api/onboarding/trigger-build`，顯示 run_id
+1. 讀 `$WORK_ROOT/agency-os/docs/architecture/client-onboarding-portal-spec.md` §7。
+2. 讀 **既有建站契約** `$WORK_ROOT/.../next-admin/lib/build-console/contracts.ts` + `app/api/build/provision-services/route.ts` + `app/api/build/runs/route.ts`（搞懂 /build 怎麼建 org/site + 怎麼 dispatch）。
+3. 讀 `$WORK_ROOT/lobster-factory/packages/workflows/src/trigger/dispatch-action-run.ts`（`ops.profile-b.create-wp-site` 映射 + payload）。
+4. **設計**：onboarding `website_spec` → 既有 /build 契約的映射（package_slug → manifestSlug；org/site 記錄怎麼從既有 ops/organizations 建或重用）。輸出方案再實作，**不得平行造新 org/site 邏輯**。
+5. 實作 route（觸發既有 pipeline，回 run_id）+ UI「觸發建站」按鈕。
 
-### §8 per-tenant monitoring（§14 MVP Step 7 後）
+### ③ §8 per-tenant monitoring（§7 後）
 
-9. 讀 `$WORK_ROOT/agency-os/docs/architecture/client-onboarding-portal-spec.md` §8
-10. 擴充 `orchestrate-tenant-provisioning.ts` providers 清單加 `uptime_kuma`（自動建 monitors per tenant）
+6. `uptime_kuma` 已是 orchestrate 的 provider enum + create-wp-site 的 `integrations.uptimeKuma`（`create-wp-site.ts:82`）→ §8 應在建站 payload 帶 uptimeKuma 設定，不需另造。
 
 ## 6. 相關資源
 
-- **規格 SSOT**：`$WORK_ROOT/agency-os/docs/architecture/client-onboarding-portal-spec.md`（§7 staging build + §8 monitoring）
-- **已建 API routes**：`$WORK_ROOT/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/onboarding/`
-- **UI 頁面**：`$WORK_ROOT/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ops/onboarding/page.tsx`
-- **Trigger.dev task**：`$WORK_ROOT/lobster-factory/packages/workflows/src/trigger/orchestrate-tenant-provisioning.ts`
-- **Landmine**：spec-generator.ts 還有 debug `console.error` → 先清再做其他事（不然 log 雜訊多）
-- **Landmine**：EU Supabase 已有 `intake_forms` + `website_specs` tables（0034 applied），不要重跑 migration
+- **規格 SSOT**：`$WORK_ROOT/agency-os/docs/architecture/client-onboarding-portal-spec.md`（§7 + §8）
+- **既有建站 pipeline（②③ 必須 reuse，勿重造）**：`/build` console（`app/build/`）+ `app/api/build/{provision-services,runs}` + `lib/build-console/contracts.ts` + `dispatch-action-run.ts` + `create-wp-site.ts` + `apply-manifest.ts`
+- **org/site 記錄**：`app/api/ops/organizations/route.ts`、`app/api/ops/clients/route.ts`
+- **已建 onboarding routes**：`$WORK_ROOT/.../next-admin/app/api/onboarding/`（submit + generate-spec）；route 慣例 = `resolveOpsRole` role gate → `getSupabaseWriteClient` → `NextResponse.json`
+- **UI 頁面**：`$WORK_ROOT/.../next-admin/app/ops/onboarding/page.tsx`
+- ⚠️ **Landmine**：`orchestrate-tenant-provisioning` **不建 WP 站**（只佈建整合服務）；§7 真正建站是 `create-wp-site`，且需 org/workspace/project/site 4 UUID。packet 舊版「已有 create-wp-site wired」是**錯的**，已於本次更正。
+- ⚠️ **Landmine**：EU Supabase 已有 `intake_forms` + `website_specs`（0034 applied），勿重跑 migration。
 - **測試用 intake_form_id**：`db0bc0a0-becb-46d7-943c-65e62b47fdfb`（AwareWave client-zero，spec 已生成）
