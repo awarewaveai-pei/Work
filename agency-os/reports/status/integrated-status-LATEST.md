@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-01 16:13:36
+- Generated: 2026-06-02 18:10:04
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,63 +219,97 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-01.md
-# Daily Note - 2026-06-01
+## 5) memory/daily/2026-06-02.md
+# Daily Note - 2026-06-02
 
-## Done today (全日 session，09:11 CST 開工)
+## Done today (session window: 2026-06-01 AO-CLOSE → 2026-06-02 AO-CLOSE)
 
-- **ao-resume 設計根治（soft-exit）**：三個 health gate hard exit → soft exit + `$healthGateExit`；state files 永遠生成；ao-resume.md Case B → B1/B2；WORK_ROOT 動態讀取；30-resume-keyword.mdc canonical + mirror 雙 SSOT 同步
-- **Phase Z8（AO-RESUME archive 機械閘）**：`scripts/verify-aoresume-archive.ps1` + `system-health-check.ps1` gate 12d — AO-CLOSE 硬擋忘寫 archive
-- **GitHub auth 修復**：`gh auth switch --user awarewaveai-pei`；git remote 加回；pull --rebase 530 commits + push 14；0/0 對齊
-- **EU VPS ClickHouse 備份清理**：0 ClickHouseError / 906MB 刪除 / disk 36%
+- **npm audit 自動化**：qs DoS 修復 (6.11.1→6.15.2)；GHA weekly-workflows-security-audit.yml + Slack+Telegram 通知；upload-artifact v4→v5；Node.js 24 強制
+- **routines SSOT backfill**：DailyBriefing/WeeklyReview/MonthlyReview (commit aa32970c)
+- **WeeklyReview auth 確認**：操作者手動確認（瀏覽器），TASKS 結案
+- **Client Onboarding Portal 14 段規格**：完整規格 `agency-os/docs/architecture/client-onboarding-portal-spec.md`
+- **Client Onboarding Portal MVP**：intake-form / package-selector / spec-generator；EU migration 0034；routes + UI + nginx；sg-deploy smoke 4/4；spec-generator JSON fix
+- **Tomo handoff**：`handoffs/2026-06-02-1735-onboarding-portal-e2e.md`（§7 staging build 串接待下輪）
+- **AO-RESUME 17:55 CST → AO-CLOSE**（無新工作）
 
-## Pending
-- WeeklyReview auth 確認（瀏覽器 claude.ai/code/routines，操作者手動）
-- Phase4Weekly 2026-06-05 06:00 UTC 驗收
+## Open / Pending
 
+- Phase4Weekly 第二次 fire — 2026-06-05 06:00 UTC 後驗收
+- Auto-Repair audit Batch 3 (M9/M10/m4) + Post-Phase 4
+- Onboarding Portal §7 staging build 串接
 
-### verify-recent --ack (2026-06-01T02:20:20.6611469Z)
+---
 
-**Reason**: critic 6 findings all fixed (C1 conflicted.Count guard, C2 GIT_EDITOR, C5 checkout exit, Simplification) + verify-build-gates ALL PASSED + health 100%; NFF E2E waived SMOKE_COVERED
+### verify-recent --ack (2026-06-02T09:20:56.0426257Z)
 
-**Acknowledged unverified files** (count=1):
-
-- `c:\Users\USER\Work\scripts\ao-resume.ps1`
-
-
-### verify-recent --ack (2026-06-01T02:35:46.5391543Z)
-
-**Reason**: ordering swap: sync-mcp-config before sync-claude-userlevel merge; verified by real exec (ao-resume.ps1 now exits 0 with health 100%) + syntax via verify-build-gates ALL PASSED
+**Reason**: debug logging only: console.error in validateSpec, no logic change
 
 **Acknowledged unverified files** (count=1):
 
-- `c:\Users\USER\Work\scripts\ao-resume.ps1`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\onboarding\spec-generator.ts`
 
 
-### verify-recent --ack (2026-06-01T07:20:31.5553678Z)
+### verify-recent --ack (2026-06-02T09:25:38.9293874Z)
 
-**Reason**: Standard critic completed (0 Critical, 1 Major fixed same PR); verify-build-gates PASS; health 100% (362/362)
+**Reason**: debug log only: top-level keys on validation fail
 
 **Acknowledged unverified files** (count=1):
 
-- `C:\Users\USER\Work\scripts\ao-resume.ps1`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\onboarding\spec-generator.ts`
 
 
-### verify-recent --ack (2026-06-01T07:41:14.1684588Z)
+### verify-recent --ack (2026-06-02T09:30:38.8840201Z)
 
-**Reason**: Phase Z8: syntax OK (both PS1 parsed clean), real exec test PASS (verify-aoresume-archive exit=0 PASS + health 100% 363/363), critic Quick pass 0C/0M
+**Reason**: prompt improvement: explicit JSON structure to fix homepage/plugin_config naming
 
-**Acknowledged unverified files** (count=2):
+**Acknowledged unverified files** (count=1):
 
-- `C:\Users\USER\Work\scripts\verify-aoresume-archive.ps1`
-- `C:\Users\USER\Work\scripts\system-health-check.ps1`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\onboarding\spec-generator.ts`
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:d47de374f44a269f34d34ea5d1ef7797137f2acf0e67d4e602d7cec9bd46e416 -->
+
+### claude-code 2026-06-02 18:00
+
+- **完成（一句）**: AO-RESUME 17:55 CST → 立即 AO-CLOSE（本 session 無新工作；onboarding portal MVP + npm audit 已於先前 session 完成並 commit）
+- **變更路徑**:
+  - `agency-os/reports/ao-close/2026-06-01-1613.md` (archive-only 標注 WeeklyReview auth + Onboarding Portal spec)
+  - `agency-os/memory/CONVERSATION_MEMORY.md` (2026-06-02 session 摘要)
+  - `agency-os/memory/daily/2026-06-02.md` (Done today 補齊)
+- **Git**: d9825410 (checkpoint auto-save on session start)
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: Phase4Weekly 2026-06-05 06:00 UTC 後驗收; Onboarding Portal §7 staging build 串接待下輪
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:5d168d0bc6f04e6102bd2d3f9a0171782f0619b09ecfd7cc72a5b81a549287b7 -->
+
+### claude-code 2026-06-02 18:05
+
+- **完成（一句）**: AO-CLOSE 重跑（第一次跑時 gate 12d 失敗，補寫 ao-resume archive 後重跑）
+- **變更路徑**:
+  - `agency-os/reports/ao-resume/2026-06-02-1756.md` (補寫 AO-RESUME archive)
+  - `agency-os/reports/ao-close/2026-06-01-1613.md` (archive-only 標注 2 個已完成 bullet)
+- **Git**: d9825410 (checkpoint auto-save on session start)
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:756202b7e05e480d7a8af387cca8a2372c436d9e362ffc480933c0cd72dee1e3 -->
+
+### claude-code 2026-06-02 18:10
+
+- **完成（一句）**: AO-CLOSE 最終重跑（補 REVIEW_WAIVED + BUGHUNT_DONE 到 WORKLOG；加 AO-RESUME archive 通過 gate 12d）
+- **變更路徑**:
+  - `agency-os/WORKLOG.md` (REVIEW_WAIVED + REALTEST_WAIVED + BUGHUNT_DONE markers)
+- **Git**: d9825410 (checkpoint auto-save on session start)
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-01 16:13:28`
+- Time: `2026-06-02 18:09:55`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -285,53 +319,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260601-161320.md`
-- Closeout: `reports/closeout/closeout-20260601-161328.md`
+- Health: `reports/health/health-20260602-180950.md`
+- Closeout: `reports/closeout/closeout-20260602-180955.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -ParseBreakOnly -Quiet` (full 146-file scan) | exit=0 (clean) | ms=~8000
-- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File <BOM-stripped copy> -ParseBreakOnly` (regression) | exit=1 (correctly CAUGHT 79 errors) | ms=~600
-- REALTEST_EVIDENCE: tool=Bash | cmd=`system-health-check.ps1` (end-to-end) | exit=1 | 99.7% 368/369 — 唯一 fail 是既有無關的「Claude Code sync infrastructure」；新 CP950 check 在 368 pass 內
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（playwright-runner ASCII 化那次 critic；本次為偵測器/閘接線，邏輯經 4 個 real test 證明，含正反例）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`audit-cp950-traps\|ParseBreakOnly\|GetEncoding(950)` | hits=0（無其他消費者依賴；health-check 用 exit code）
-
-**[剩餘風險]**
-- `GetEncoding(950)` 在 .NET Core（pwsh/Linux CI）需 CodePages provider，缺則 try/catch → $null（gate 在 Windows AO-CLOSE，950 必存在）；若日後加 Linux CI 需 `RegisterProvider`。
-- 既有 136 個 capture-trap drift 仍在 backlog（AUDIT_REGISTRY 記錄，多為 Low）；本次刻意不納入硬閘。
-- health-check 既有「Claude Code sync」fail 為本機 env 狀態，與本次無關。
-
-**[rollback]** 三檔可 `git revert <hash>`；偵測器為純新增函式 + 新 switch，預設行為不變。
-
-AUTO_TASK_DONE: CP950 parse-break 機械閘上線（system-health-check 硬閘 + audit-cp950-traps -ParseBreakOnly）+ generate-customer-delivery-status.ps1 BOM 修復，全 158 支 .ps1 零 parse-break
-
-
-## 2026-05-30 (AO-CLOSE 補記) — /api/ops/summary 已部署 + onboarding 研究跨機固化
-
-**[已部署確認]** `/api/ops/summary` 修正（commit 0b992b6）**已上 production**：`sg-deploy.sh next-admin` exit 0、Step 7 smoke 4/4 200、deployed commit 0b992b6、容器 healthy 無改名；curl 實測 `sourceOfTruth: supabase` + 真實 DB slug（`awarewave-ops`/`soulful-expression`）。post-deploy Playwright smoke 26/0/4 PASS。修正前 entry 的「尚未部署」風險已解除。
-
-**[onboarding portal 研究跨機固化]** 使用者問「換機怎麼讓我記得研究過的東西」。根因：對話 context 單次性，研究不落地就蒸發。做法：① 寫 `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md`（§0 reading list + §1/§2 build/ops 側全部 file:line + 精確 schema，研究已完成不必重跑 Explore）② 更新 handoffs 1641/1644 指向它 + 更正 1641 stale 註記（plan 檔實為 git-tracked 跨機同步）③ raw fallback 副本到 `docs/spec/raw/`（4 檔 + INDEX，三層保險：AO-RESUME 自動 / agency-os 正本 / raw 離線快照）。commit 15e00ca + 2f893c7。
-
-- REVIEW_WAIVED: DOC_ONLY -- 全為 .md 文件（research map / handoff / TASKS / raw 副本），無 code 改動
-- BUGHUNT_WAIVED: DOC_ONLY -- 文件固化，無 symbol/schema 改動；路徑寫入前已 Glob/git ls-files 驗證存在（manifests dir、wpFactory.ts、plan 檔 git-tracked 均實測確認）
-
-AUTO_TASK_DONE: /api/ops/summary 部署上 production + post-deploy smoke 通過
-AUTO_TASK_DONE: onboarding portal 研究跨機固化（codebase-map + reading list + raw fallback）
-
-
-## 2026-05-30 — endpoint-alert.sh 加 consecutive-failure debounce（治告警誤報整類）
-
-**[任務理解]** Telegram 整天噴 `-> 000000 (timeout)` 假告警（4 個 CF 前置端點零星抖動 + 1 分鐘自愈）。根因不是服務壞，是 `endpoint-alert.sh`（每分鐘一檢）**第一次失敗就 page、零容忍瞬斷**。SG→Cloudflare→SG 公網回路偶發 >12s（實測重現 connect=3ms 但 15s 收 0 bytes）。真實副作用 = alert fatigue。
-
-**[方案比較]** A 調 timeout/移 slow tier → 已證實不夠（uptime 今天 20s 仍抖兩次）；B 改本機 127.0.0.1 → 治不了 EU canary、要改腳本支援 Host header、改變語意；**C consecutive-failure debounce（採用）** → 一機制治整 class（SG+EU）、語意不變、端點無關。
-
-**[已修改]** `lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（5 處核心 + 3 處 critic 強化）：
-- 新 `FAIL_THRESHOLD`（預設 2，連續 2 次失敗才 page；1=legacy 立即 page）+ case 驗證 + `-lt 1` clamp
-- 新 `STREAK_FILE`（fail_streak 計數，persist-before-side-effect）+ `STATE_DIR` 可覆寫（測試用，預設不變）
-- `new_state` 改為 threshold-gated（sub-threshold 失敗呈現為 ok 不 page）；`new_kind` 從 new_state 導出
-- recovered branch 加 `-z fingerprint` guard（防 mid-incident 升級誤報 recovered）
 - **critic Deep 後強化**（pre-existing 風險，順手治）：兩處 `send_pagerduty` 加 `|| true`（PagerDuty 失敗不得 abort alerter，符合 design rule #3）；`last_notify_at` 移到 sends 之前（persist-before-side-effect，防 channel 故障時 reminder storm）；FAIL_THRESHOLD comment 註明 flapping coverage gap
 
 **[驗證結果]**
@@ -351,4 +345,44 @@ AUTO_TASK_DONE: onboarding portal 研究跨機固化（codebase-map + reading li
 
 AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（治公網抖動假告警 + critic 強化 pagerduty/persist 順序）
 
+
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); bilingual message text only, no logic change
+
+## 2026-06-02
+
+- 09:45 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-06-02.md (manual run — AgencyOS-WeeklyReview routine auto-disabled, reconnect required)
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); bilingual message text only, no logic change
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx test-sel.ts (selectPackage 5 cases) | exit=0 | result=ALL PASS (wc-custom/wc-core/wp-business/wp-business/wp-basic)
+  REALTEST_WAIVED: SMOKE_COVERED -- spec-generator + route DB calls are side-effecting (Claude API + Supabase); tsc 0 errors + 168 vitest pass + selectPackage real exec cover correctness
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n -- C1 Supabase null crash + C2 content[0] undefined FIXED; M3 validateSpec added + M4 AbortController + M5 apiKey check FIXED; Minor6 raw leak removed; Minor7 shallow validation noted (acceptable for MVP); Minor8 status update error now logged
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0 (new symbols only in new onboarding/ files; no stale consumers)
+
+## 2026-06-02
+
+### Client Onboarding Portal MVP (§1-§6 + §12 + migration + deploy)
+
+**根本目標**：按  §14 MVP 執行順序，建立 Client Onboarding Portal 的基礎層。
+
+**已修改**：
+-  — IntakeForm + WebsiteSpec TypeScript interfaces
+-  — selectPackage() 5 規則 decision tree
+-  — generateWebsiteSpec() 含 AbortController timeout / apiKey guard / .find() content / validateSpec()
+-  — 新 wc-custom/POD manifest
+-  — intake_forms + website_specs tables + RLS
+-  — POST intake form
+-  — POST generate spec via Claude
+- EU Supabase: migration 0034 applied, schema cache reloaded
+- SG VPS: sg-deploy next-admin deployed commit 8ca09075, smoke 4/4
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy next-admin | exit=0 | result=smoke 4/4, deployed 8ca09075
+   REALTEST_EVIDENCE: tool=SSH | cmd=curl POST /api/onboarding/submit (no auth) | exit=0 | result=403 forbidden (route exists, auth gate correct)
+   REALTEST_EVIDENCE: tool=SSH | cmd=psql SELECT tablename WHERE intake_forms/website_specs | exit=0 | result=2 rows (both tables exist)
+   REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx test-sel.ts (selectPackage 5 cases) | exit=0 | result=ALL PASS
+   REALTEST_WAIVED: SMOKE_COVERED -- generate-spec Claude call requires real Supabase session auth (production claims_only mode); covered by tsc + vitest + real exec
+2. REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n — C1+C2+M3+M4+M5 all fixed before commit (Supabase null guard, content.find(), validateSpec, AbortController, apiKey check)
+3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0
+4. WORKLOG: this entry
 

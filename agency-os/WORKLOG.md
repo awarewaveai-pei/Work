@@ -1,10 +1,14 @@
-# Worklog
+﻿# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); onboarding UI + sidebar link + nginx location block
 
 ## 2026-06-02
+
+- REVIEW_WAIVED: DOC_ONLY -- AO-CLOSE session only: archive-only annotation on 2026-06-01 archive + AO-RESUME archive write + CONVERSATION_MEMORY/daily update; no logic/code changes
+- REALTEST_WAIVED: DOC_ONLY -- same reason; no deployable changes this session
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=archive-only,verify-aoresume-archive | hits=2 (2026-06-01-1613.md annotations + ao-resume/2026-06-02-1756.md; no stale callers)
 
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: onboarding-portal-e2e → handoffs/2026-06-02-1735-onboarding-portal-e2e.md
@@ -24,6 +28,48 @@
 2. REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n — C1+C2+M3+M4+M5 all fixed before commit
 3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0
 4. WORKLOG: this entry
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:d47de374f44a269f34d34ea5d1ef7797137f2acf0e67d4e602d7cec9bd46e416 -->
+
+### claude-code 2026-06-02 18:00
+
+- **完成（一句）**: AO-RESUME 17:55 CST → 立即 AO-CLOSE（本 session 無新工作；onboarding portal MVP + npm audit 已於先前 session 完成並 commit）
+- **變更路徑**:
+  - `agency-os/reports/ao-close/2026-06-01-1613.md` (archive-only 標注 WeeklyReview auth + Onboarding Portal spec)
+  - `agency-os/memory/CONVERSATION_MEMORY.md` (2026-06-02 session 摘要)
+  - `agency-os/memory/daily/2026-06-02.md` (Done today 補齊)
+- **Git**: d9825410 (checkpoint auto-save on session start)
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: Phase4Weekly 2026-06-05 06:00 UTC 後驗收; Onboarding Portal §7 staging build 串接待下輪
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:5d168d0bc6f04e6102bd2d3f9a0171782f0619b09ecfd7cc72a5b81a549287b7 -->
+
+### claude-code 2026-06-02 18:05
+
+- **完成（一句）**: AO-CLOSE 重跑（第一次跑時 gate 12d 失敗，補寫 ao-resume archive 後重跑）
+- **變更路徑**:
+  - `agency-os/reports/ao-resume/2026-06-02-1756.md` (補寫 AO-RESUME archive)
+  - `agency-os/reports/ao-close/2026-06-01-1613.md` (archive-only 標注 2 個已完成 bullet)
+- **Git**: d9825410 (checkpoint auto-save on session start)
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:756202b7e05e480d7a8af387cca8a2372c436d9e362ffc480933c0cd72dee1e3 -->
+
+### claude-code 2026-06-02 18:10
+
+- **完成（一句）**: AO-CLOSE 最終重跑（補 REVIEW_WAIVED + BUGHUNT_DONE 到 WORKLOG；加 AO-RESUME archive 通過 gate 12d）
+- **變更路徑**:
+  - `agency-os/WORKLOG.md` (REVIEW_WAIVED + REALTEST_WAIVED + BUGHUNT_DONE markers)
+- **Git**: d9825410 (checkpoint auto-save on session start)
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**:
 
 ## 2026-06-01
 
@@ -6630,7 +6676,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-01 08:13:26 UTC_
+_Last synced: 2026-06-02 10:09:53 UTC_
 
 ## 2026-03-20
 
@@ -7495,3 +7541,4 @@ AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（
 2. REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n — C1+C2+M3+M4+M5 all fixed before commit (Supabase null guard, content.find(), validateSpec, AbortController, apiKey check)
 3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0
 4. WORKLOG: this entry
+
