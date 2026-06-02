@@ -39,10 +39,10 @@ Each file MUST contain (in this order):
 
 | File | Cron (TPE) | Purpose | Status |
 |---|---|---|---|
-| [`phase4-weekly.md`](phase4-weekly.md) | `0 14 * * 5` (Fri 14:00) | Repair Center Phase 4 weekly check | Pending creation in web UI (2026-05-22) |
-| _(backfill)_ `daily-briefing.md` | (TBD) | AgencyOS-DailyBriefing — daily scaffold + open tasks | Backlog: prompt source not yet in repo |
-| _(backfill)_ `weekly-briefing.md` | (TBD) | AgencyOS-WeeklyBriefing | Backlog: prompt source not yet in repo |
-| _(backfill)_ `monthly-briefing.md` | (TBD) | AgencyOS-MonthlyBriefing | Backlog: prompt source not yet in repo |
+| [`daily-briefing.md`](daily-briefing.md) | Every day 08:00 | Daily note scaffold + open tasks | ✅ Active (`trig_01XoSCqJQu6DDKVJw6Lvobpd`) |
+| [`weekly-review.md`](weekly-review.md) | Every Monday 09:00 | Weekly status report | ✅ Active (`trig_01WanBfvAZvx5TR8xAXjxKVp`) — re-authorized 2026-06-02 |
+| [`monthly-review.md`](monthly-review.md) | Day 1 of month 01:00 | Monthly review + governance drift | ✅ Active (`trig_01GWG3NQSPm7SbRdJAN25QdM`) |
+| [`phase4-weekly.md`](phase4-weekly.md) | Every Friday 14:00 | Repair Center Phase 4 weekly check | ✅ Active (`trig_01JyFw78ZkgwQzpyXXaX1F2K`) |
 
 ## Governance rules
 
