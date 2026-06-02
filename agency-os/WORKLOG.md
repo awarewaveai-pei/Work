@@ -7593,3 +7593,6 @@ AUTO_TASK_DONE: system-guard LAST_SYSTEM_STATUS conditional-write（churn 治本
 
 AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests + critic 0/0/0）+ §7 架構真相固化進 packet/TASKS（②③ 改 reuse 既有 /build pipeline 設計 pass）
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: onboarding-staging-build → handoffs/2026-06-02-2235-onboarding-staging-build.md
+
