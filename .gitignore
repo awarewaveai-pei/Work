@@ -47,13 +47,6 @@ Backups/
 # runtime overwrites them on update, restore from git: git checkout HEAD -- .claude/agents/*.md
 # .claude/commands/ and ALL .claude/agents/*.md ARE tracked in git
 
-# Machine-local health snapshots (system-guard.ps1 rewrites these every run with a
-# fresh timestamp/score -> guaranteed dirty tree at every session start). They were
-# never meant to be shared cross-machine; every reader reads the LOCAL copy. Tracking
-# them caused AO-RESUME divergence on every machine switch (root cause, 2026-06-02).
-agency-os/LAST_SYSTEM_STATUS.md
-agency-os/ALERT_REQUIRED.txt
-
 # AO-RESUME local stamp (see scripts/git-audit-tracked-remote.ps1 / check-three-way-sync knownNoise)
 agency-os/.agency-state/ao-resume-last.txt
 agency-os/.agency-state/pending-task-completions.txt
