@@ -44,7 +44,7 @@ jobs:
 
       - name: Upload security report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: workflows-npm-audit
           path: agency-os/reports/security/workflows-npm-audit-LATEST.md
