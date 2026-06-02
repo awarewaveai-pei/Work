@@ -7542,3 +7542,27 @@ AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（
 3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0
 4. WORKLOG: this entry
 
+## 2026-06-02 — system-guard LAST_SYSTEM_STATUS churn 治本（換機 AO-RESUME 分歧根因）
+
+**[根因]** `LAST_SYSTEM_STATUS.md` 是 git-tracked，但 `system-guard.ps1` 每跑必重寫，內含 3 個每次都變的欄位（`- Time:` 秒級時間戳、`- Health:`/`- Closeout:` 時間戳報告檔名）→ 開工 working tree 必 dirty → AO-RESUME hook auto-checkpoint 成一個 commit → 落後遠端時 push 被拒（non-fast-forward）→ 卡在分歧、每次換機手動 reset。本 session AO-RESUME 即因此 exit 1（behind 48）。先前一度誤用 `.gitignore` 規避（commit 6c0d61a），經操作者指正後 revert（9b2b2d3）：ignore 等於把跨機健康紀錄從共享 repo 刪掉，治標埋雷；正解是修檔案寫入邏輯。
+
+**[抓蟲額外發現 — 已記 TASKS]** 排程 `AgencyOS-SystemGuard-Daily` 實跑的是 `agency-os/scripts/system-guard.ps1`，非 top-level 正本；且 `scripts/` 與 `agency-os/scripts/` 有 29 同名檔、**20 個內容 drift**（含 ao-close/ao-resume/system-health-check/verify-build-gates 等 AO 生命週期核心腳本）。既定架構：root `scripts/` 為正本，`agency-os/scripts/*` 應為 thin wrapper（已對 sync-enterprise-cursor-rules / check-three-way-sync 套用，`system-health-check.ps1:143` 有 wrapper-rule 健康檢查）；system-guard 等 20 檔 wrapper 化未完成 → drift。本次只修 churn（兩份都套同一 fix 確保哪份跑都生效），20 檔 wrapper 化另記 TASKS。
+
+**[已修改]**
+- `scripts/system-guard.ps1`（正本）+ `agency-os/scripts/system-guard.ps1`（排程實跑）：寫 git-tracked `$statusFile` 前，用 `$stableStatusOf` 比對（`.TrimStart([char]0xFEFF)` 去 BOM + 丟 `^- (Time|Health|Closeout): ` 三行 + `.TrimEnd()`），實質狀態相同就**不重寫**；真的變了（score/exit/result/mode）才寫。gitignored `reports/guard/guard-<stamp>.md` 每次照寫不變。兩份此區塊**位元組相同**（anti-drift）。
+- 過程隱患自修：初版 regex 用了**字面 BOM byte**（CP950 trap，跨機編碼風險）→ 改 `.TrimStart([char]0xFEFF)` 純 ASCII。
+
+**[驗證結果]**
+1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell test-stable-status.ps1 (4 cases) | exit=0 | result=ALL PASS（時間戳/報告名 churn→不寫；score 100→99.5 / exit 0→1→寫；首跑/缺檔→寫；regex 不誤傷 `- Health score:`/`- Health gate exit code:`）
+   REALTEST_EVIDENCE: tool=Bash | cmd=run agency-os/scripts/system-guard.ps1 -WorkspaceRoot agency-os -Mode daily x2（排程實際呼叫） | exit=1(health FAIL 與 churn 無關) | result=LAST_SYSTEM_STATUS.md 兩次 SHA256 相同 60153216…（不再 churn）
+   REALTEST_EVIDENCE: tool=Bash | cmd=audit-cp950-traps.ps1 -ParseBreakOnly | exit=0 | result=scanned=147 clean=147 drift=0，兩支 system-guard OK
+2. REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（七項逐一實測：regex 不誤傷、BOM/CRLF/trailing-newline 正規化、首跑、無 silent staleness、StrictMode-clean、兩份位元組相同；備註：Get-Content -Raw 在 PS5.1 已剝 BOM，TrimStart 為無害防禦性 no-op）
+3. BUGHUNT_DONE: scope=agency-os,scripts | grep=LAST_SYSTEM_STATUS,stableStatusOf | hits=0（唯一 writer=system-guard；無 stale 符號引用；verify-closeout 僅排除不依賴重寫）；額外發現 scripts vs agency-os/scripts 20 檔 drift → 已記 TASKS
+4. WORKLOG: this entry
+
+**[剩餘風險]** 20 個核心腳本兩份 drift（含 AO 生命週期腳本）未 wrapper 化 — 已記 TASKS，未在本次處理。doc-sync 仍會 churn TASKS/WORKLOG/docs 的 `_Last synced` 時間戳（同類但獨立議題；AO-CLOSE 會 commit，session 啟動時通常已乾淨）。
+
+**[rollback]** `git revert <commit>` 還原兩支 system-guard.ps1。
+
+AUTO_TASK_DONE: system-guard LAST_SYSTEM_STATUS conditional-write（churn 治本，兩份同步 fix，換機 AO-RESUME 不再分歧）
+

@@ -174,8 +174,27 @@ if ($ok) {
     $lines += "- Blocking issues detected. Review latest health/closeout reports immediately."
 }
 
+# Full per-run snapshot always lands in the gitignored reports/guard/ report.
 Set-Content -Path $guardReport -Value ($lines -join "`r`n") -Encoding UTF8
-Set-Content -Path $statusFile -Value ($lines -join "`r`n") -Encoding UTF8
+
+# Only rewrite the git-tracked LAST_SYSTEM_STATUS.md when the MEANINGFUL status changed.
+# The Time stamp and the two timestamped report filenames (Health:/Closeout:) change every
+# run, so writing them into a tracked file made the working tree dirty at every session start.
+# The AO-RESUME hook then auto-committed that churn into a checkpoint, which could not
+# fast-forward when the other machine had pushed -> divergence + manual reset on every machine
+# switch (root cause, 2026-06-02). Excluding those volatile lines (and a leading UTF-8 BOM)
+# from the comparison keeps the tracked file byte-stable across runs with the same status.
+$newStatus = ($lines -join "`r`n")
+$stableStatusOf = {
+    param($text)
+    if (-not $text) { return "" }
+    $t = ([string]$text).TrimStart([char]0xFEFF)
+    (($t -split "`r?`n" | Where-Object { $_ -notmatch '^- (Time|Health|Closeout): ' }) -join "`n").TrimEnd()
+}
+$existingStatus = if (Test-Path -LiteralPath $statusFile) { Get-Content -LiteralPath $statusFile -Raw } else { "" }
+if ((& $stableStatusOf $existingStatus) -ne (& $stableStatusOf $newStatus)) {
+    Set-Content -Path $statusFile -Value $newStatus -Encoding UTF8
+}
 
 if ($ok) {
     if (Test-Path $alertFile) { Remove-Item -Path $alertFile -Force }
