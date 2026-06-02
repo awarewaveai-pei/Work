@@ -314,5 +314,5 @@ Inconsistent bool env parsing (m1/m2), `any` cast on Zod value (m3), misleading 
 ## Related Documents (Auto-Synced)
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
 
-_Last synced: 2026-06-01 08:13:26 UTC_
+_Last synced: 2026-06-02 14:53:46 UTC_
 

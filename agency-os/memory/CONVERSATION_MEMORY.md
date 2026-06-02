@@ -459,6 +459,14 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - **降成本**：`auto-repair-claude.yml` `--max-turns 30` → `15`，降低每次 repair job 約 40-50% token。
 - **注意**：vault-sync 下次執行可能重推 `ANTHROPIC_API_KEY` 到 Windows env，需監控或排除。Cursor（免費額度）/ Codex / Gemini 不走 Anthropic API 帳戶，無問題。
 
+## 2026-06-02（筆電 session）— 換機 AO-RESUME 根因治本 + onboarding ① + §7 架構更正
+
+- **換機 AO-RESUME 失敗根因（治本）**：`LAST_SYSTEM_STATUS.md` 是 git-tracked 但 `system-guard.ps1` 每跑必重寫（內含 Time/Health/Closeout 三個每次都變的欄位）→ 開工 tree 必 dirty → AO-RESUME hook auto-checkpoint → 落後遠端時 push 被拒 → 換機手動修。修法：寫前比對「排除三易變行」的實質狀態，相同就不重寫。**兩份同步**（排程跑 `agency-os/scripts/` 版、`scripts/` 是正本，位元組相同）。commit `a205499`。教訓：先誤用 `.gitignore` 規避（治標埋雷）→ revert；正解是修 writer。
+- **抓蟲副發現**：`scripts/` vs `agency-os/scripts/` 20 個核心腳本 drift（含 AO 生命週期）→ agency-os/scripts/* 應為 thin wrapper 轉呼叫 root 正本，遷移做一半。已記 TASKS。
+- **Claude sync drift**：health 99.7%→100%（userlevel settings.json hooks object→array + mcp.json，`sync-claude-userlevel.ps1 -Mode merge` 修，backup 留存）。
+- **onboarding portal**：① debug log 清理交付（commit `d3c7dd2`，tsc 0 + 168 tests + critic 0/0/0，未 deploy）。**②③ §7/§8 不實作的 R0 理由**：`orchestrate-tenant-provisioning` 不建 WP 站、`create-wp-site` 需 4 UUID、已有 `/build` console + dispatch-action-run + ops/organizations pipeline → ②③ 必須 reuse 既有 pipeline（設計 pass），不得另造/不得猜。packet + TASKS 已更正前任「已串接」錯誤假設。
+- **行為教訓（已存 memory feedback_aoresume_execution_discipline）**：先動手才理解造成多小時混亂；不抓 ignore 捷徑、不刪操作者 signal 檔、Windows bash 用正斜線、.ps1 regex 不放字面 BOM。
+
 ## Related Documents (Auto-Synced)
 - `.cursor/rules/00-session-bootstrap.mdc`
 - `.cursor/rules/10-memory-maintenance.mdc`
@@ -467,5 +475,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-02 10:09:53 UTC_
+_Last synced: 2026-06-02 14:53:46 UTC_
 

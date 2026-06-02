@@ -6676,7 +6676,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-02 10:09:53 UTC_
+_Last synced: 2026-06-02 14:53:46 UTC_
 
 ## 2026-03-20
 
@@ -7595,4 +7595,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: onboarding-staging-build → handoffs/2026-06-02-2235-onboarding-staging-build.md
+
 

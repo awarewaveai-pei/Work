@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-02 18:10:04
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-06-02 22:53:51
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -231,12 +231,18 @@
 - **Client Onboarding Portal MVP**：intake-form / package-selector / spec-generator；EU migration 0034；routes + UI + nginx；sg-deploy smoke 4/4；spec-generator JSON fix
 - **Tomo handoff**：`handoffs/2026-06-02-1735-onboarding-portal-e2e.md`（§7 staging build 串接待下輪）
 - **AO-RESUME 17:55 CST → AO-CLOSE**（無新工作）
+- **（筆電 22:xx session）AO-RESUME 救火**：換機 AO-RESUME exit 1（behind 48 + LAST_SYSTEM_STATUS churn）。根因治本 — `system-guard.ps1`（正本 + agency-os 排程版兩份同步）只在實質狀態變動時才重寫 git-tracked `LAST_SYSTEM_STATUS.md`（`.TrimStart(BOM)` + 丟 Time/Health/Closeout 三行比對），commit `a205499`，tsc 0 + 168 tests + critic 0/0/0 + 真實 e2e SHA256 不變。先誤用 `.gitignore` 已 revert。
+- **（筆電）Claude sync drift 修復**：health 99.7%→100% — userlevel settings.json 8 處 hooks object→array + mcp.json 正規化，`sync-claude-userlevel.ps1 -Mode merge`（backup 留存）。
+- **（筆電）onboarding ① debug log 清理交付**（commit `d3c7dd2`，tsc 0 + 168 tests + critic 0/0/0，未 deploy）；**②③ R0 讀碼發現**：`orchestrate-tenant-provisioning` 不建 WP 站、`create-wp-site` 需 4 UUID、已有 `/build` pipeline → ②③ 改 reuse 既有 pipeline 設計 pass（packet + TASKS 已更正前任「已串接」錯誤假設）。
+- **（筆電）AO-RESUME archive redo**（`reports/ao-resume/2026-06-02-2200.md`，乾淨狀態全資料）+ **/tomo packet** `onboarding-staging-build`。
 
 ## Open / Pending
 
 - Phase4Weekly 第二次 fire — 2026-06-05 06:00 UTC 後驗收
 - Auto-Repair audit Batch 3 (M9/M10/m4) + Post-Phase 4
-- Onboarding Portal §7 staging build 串接
+- Onboarding Portal §7 staging build 串接（需設計 pass，reuse 既有 /build pipeline）
+- `scripts/` vs `agency-os/scripts/` 20 檔核心腳本 drift → wrapper 化（2026-06-02 開出，高風險逐支 R0）
+- onboarding ① debug log 已清未 deploy（隨下次 sg-deploy 搭車）
 
 ---
 
@@ -326,63 +332,63 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- **critic Deep 後強化**（pre-existing 風險，順手治）：兩處 `send_pagerduty` 加 `|| true`（PagerDuty 失敗不得 abort alerter，符合 design rule #3）；`last_notify_at` 移到 sends 之前（persist-before-side-effect，防 channel 故障時 reminder storm）；FAIL_THRESHOLD comment 註明 flapping coverage gap
-
-**[驗證結果]**
-- REALTEST_EVIDENCE: tool=SSH | cmd=`bash -n` (deployed path) | exit=0 | ms=~200
-- REALTEST_EVIDENCE: tool=SSH | cmd=`STATE_DIR=/tmp ... bash endpoint-alert.sh`（狀態機真測，threshold=2/1）| exit=0 | 結果：R1 fail→state=ok/streak=1/**不 page** ✓ R2 fail→fail/2/**page** ✓ R3 healthy→ok/0/**recovered page fired**（notify_at 546→547）✓ 單次瞬斷 fail→ok→**兩次都 NONE（噪音消除）** ✓ threshold=1→立即 page（legacy 相容）✓ 無重複 page ✓
-- REALTEST_EVIDENCE: tool=SSH | cmd=`systemctl start awarewave-endpoint-alert.service`（真實 prod config 一輪）| exit=0 | service=success、last_state=ok、fail_streak=0、timer active 每分鐘
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/3n（**最關鍵兩類 real-outage-miss + false-recovered 經 critic 逐路追蹤確認 CLEAN**；2 Major+1 Minor 為 pre-existing，已順手修；flapping gap 已文件化）
-- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os | grep=`FAIL_THRESHOLD\|fail_streak\|STREAK_FILE` | hits=0（新 symbol 僅存在於 endpoint-alert.sh；無其他 consumer；systemd 靠 exit code、Slack/TG 靠人；slack-alert-drill.sh 不參考新 var）
-
-**[部署]** scp byte-exact（手貼 base64 曾損毀，sha 比對抓到 → 改 scp）→ /usr/local/bin/endpoint-alert.sh（sha cc80417b）；backup `endpoint-alert.sh.bak-20260530T155602Z`。
-
-**[剩餘風險]**
-- **Deploy gap（已開 TASKS）**：`endpoint-alert.sh` 無自動化部署機制（手動 scp）；`sync-hetzner-slack-alert-webhooks.ps1` 只寫 env。重建 SG 或 .bak 被清 → 腳本回退舊版。需 `sync-hetzner-endpoint-alert-script.ps1`（仿 heartbeat sync）。
-- flapping（每隔一分鐘 down）不 page = consecutive-hysteresis 固有；公網全面監控本就是 Uptime Kuma 的職責（已文件化）。
-
-**[rollback]** SG：`cp /usr/local/bin/endpoint-alert.sh.bak-20260530T155602Z /usr/local/bin/endpoint-alert.sh`（一行）；repo：`git revert <hash>`。
-
-AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（治公網抖動假告警 + critic 強化 pagerduty/persist 順序）
-
-
-
-- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); bilingual message text only, no logic change
-
-## 2026-06-02
-
-- 09:45 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-06-02.md (manual run — AgencyOS-WeeklyReview routine auto-disabled, reconnect required)
-- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); bilingual message text only, no logic change
-
-- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx test-sel.ts (selectPackage 5 cases) | exit=0 | result=ALL PASS (wc-custom/wc-core/wp-business/wp-business/wp-basic)
-  REALTEST_WAIVED: SMOKE_COVERED -- spec-generator + route DB calls are side-effecting (Claude API + Supabase); tsc 0 errors + 168 vitest pass + selectPackage real exec cover correctness
-- REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n -- C1 Supabase null crash + C2 content[0] undefined FIXED; M3 validateSpec added + M4 AbortController + M5 apiKey check FIXED; Minor6 raw leak removed; Minor7 shallow validation noted (acceptable for MVP); Minor8 status update error now logged
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0 (new symbols only in new onboarding/ files; no stale consumers)
-
-## 2026-06-02
-
-### Client Onboarding Portal MVP (§1-§6 + §12 + migration + deploy)
-
-**根本目標**：按  §14 MVP 執行順序，建立 Client Onboarding Portal 的基礎層。
-
-**已修改**：
--  — IntakeForm + WebsiteSpec TypeScript interfaces
--  — selectPackage() 5 規則 decision tree
--  — generateWebsiteSpec() 含 AbortController timeout / apiKey guard / .find() content / validateSpec()
--  — 新 wc-custom/POD manifest
--  — intake_forms + website_specs tables + RLS
--  — POST intake form
--  — POST generate spec via Claude
-- EU Supabase: migration 0034 applied, schema cache reloaded
-- SG VPS: sg-deploy next-admin deployed commit 8ca09075, smoke 4/4
-
-**[驗證結果]**：
-1. REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy next-admin | exit=0 | result=smoke 4/4, deployed 8ca09075
-   REALTEST_EVIDENCE: tool=SSH | cmd=curl POST /api/onboarding/submit (no auth) | exit=0 | result=403 forbidden (route exists, auth gate correct)
-   REALTEST_EVIDENCE: tool=SSH | cmd=psql SELECT tablename WHERE intake_forms/website_specs | exit=0 | result=2 rows (both tables exist)
-   REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx test-sel.ts (selectPackage 5 cases) | exit=0 | result=ALL PASS
    REALTEST_WAIVED: SMOKE_COVERED -- generate-spec Claude call requires real Supabase session auth (production claims_only mode); covered by tsc + vitest + real exec
 2. REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n — C1+C2+M3+M4+M5 all fixed before commit (Supabase null guard, content.find(), validateSpec, AbortController, apiKey check)
 3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0
 4. WORKLOG: this entry
+
+## 2026-06-02 — system-guard LAST_SYSTEM_STATUS churn 治本（換機 AO-RESUME 分歧根因）
+
+**[根因]** `LAST_SYSTEM_STATUS.md` 是 git-tracked，但 `system-guard.ps1` 每跑必重寫，內含 3 個每次都變的欄位（`- Time:` 秒級時間戳、`- Health:`/`- Closeout:` 時間戳報告檔名）→ 開工 working tree 必 dirty → AO-RESUME hook auto-checkpoint 成一個 commit → 落後遠端時 push 被拒（non-fast-forward）→ 卡在分歧、每次換機手動 reset。本 session AO-RESUME 即因此 exit 1（behind 48）。先前一度誤用 `.gitignore` 規避（commit 6c0d61a），經操作者指正後 revert（9b2b2d3）：ignore 等於把跨機健康紀錄從共享 repo 刪掉，治標埋雷；正解是修檔案寫入邏輯。
+
+**[抓蟲額外發現 — 已記 TASKS]** 排程 `AgencyOS-SystemGuard-Daily` 實跑的是 `agency-os/scripts/system-guard.ps1`，非 top-level 正本；且 `scripts/` 與 `agency-os/scripts/` 有 29 同名檔、**20 個內容 drift**（含 ao-close/ao-resume/system-health-check/verify-build-gates 等 AO 生命週期核心腳本）。既定架構：root `scripts/` 為正本，`agency-os/scripts/*` 應為 thin wrapper（已對 sync-enterprise-cursor-rules / check-three-way-sync 套用，`system-health-check.ps1:143` 有 wrapper-rule 健康檢查）；system-guard 等 20 檔 wrapper 化未完成 → drift。本次只修 churn（兩份都套同一 fix 確保哪份跑都生效），20 檔 wrapper 化另記 TASKS。
+
+**[已修改]**
+- `scripts/system-guard.ps1`（正本）+ `agency-os/scripts/system-guard.ps1`（排程實跑）：寫 git-tracked `$statusFile` 前，用 `$stableStatusOf` 比對（`.TrimStart([char]0xFEFF)` 去 BOM + 丟 `^- (Time|Health|Closeout): ` 三行 + `.TrimEnd()`），實質狀態相同就**不重寫**；真的變了（score/exit/result/mode）才寫。gitignored `reports/guard/guard-<stamp>.md` 每次照寫不變。兩份此區塊**位元組相同**（anti-drift）。
+- 過程隱患自修：初版 regex 用了**字面 BOM byte**（CP950 trap，跨機編碼風險）→ 改 `.TrimStart([char]0xFEFF)` 純 ASCII。
+
+**[驗證結果]**
+1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell test-stable-status.ps1 (4 cases) | exit=0 | result=ALL PASS（時間戳/報告名 churn→不寫；score 100→99.5 / exit 0→1→寫；首跑/缺檔→寫；regex 不誤傷 `- Health score:`/`- Health gate exit code:`）
+   REALTEST_EVIDENCE: tool=Bash | cmd=run agency-os/scripts/system-guard.ps1 -WorkspaceRoot agency-os -Mode daily x2（排程實際呼叫） | exit=1(health FAIL 與 churn 無關) | result=LAST_SYSTEM_STATUS.md 兩次 SHA256 相同 60153216…（不再 churn）
+   REALTEST_EVIDENCE: tool=Bash | cmd=audit-cp950-traps.ps1 -ParseBreakOnly | exit=0 | result=scanned=147 clean=147 drift=0，兩支 system-guard OK
+2. REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（七項逐一實測：regex 不誤傷、BOM/CRLF/trailing-newline 正規化、首跑、無 silent staleness、StrictMode-clean、兩份位元組相同；備註：Get-Content -Raw 在 PS5.1 已剝 BOM，TrimStart 為無害防禦性 no-op）
+3. BUGHUNT_DONE: scope=agency-os,scripts | grep=LAST_SYSTEM_STATUS,stableStatusOf | hits=0（唯一 writer=system-guard；無 stale 符號引用；verify-closeout 僅排除不依賴重寫）；額外發現 scripts vs agency-os/scripts 20 檔 drift → 已記 TASKS
+4. WORKLOG: this entry
+
+**[剩餘風險]** 20 個核心腳本兩份 drift（含 AO 生命週期腳本）未 wrapper 化 — 已記 TASKS，未在本次處理。doc-sync 仍會 churn TASKS/WORKLOG/docs 的 `_Last synced` 時間戳（同類但獨立議題；AO-CLOSE 會 commit，session 啟動時通常已乾淨）。
+
+**[rollback]** `git revert <commit>` 還原兩支 system-guard.ps1。
+
+AUTO_TASK_DONE: system-guard LAST_SYSTEM_STATUS conditional-write（churn 治本，兩份同步 fix，換機 AO-RESUME 不再分歧）
+
+## 2026-06-02 — Onboarding Portal ① debug log 清理 + §7 架構 R0 發現（②③ 暫不實作的理由）
+
+**[任務]** 操作者交付 onboarding-portal-e2e packet 三步（① 清 debug logs → tsc/test → deploy；② 建 trigger-build route 接 orchestrate；③ §8 uptime_kuma）。授權我以技術負責人身分自行決定範圍。
+
+**[① 已完成]** `lib/onboarding/spec-generator.ts` 移除 9 行 debug `console.error`（只刪 log、保留全部 guard + return）。tsc --noEmit 0 errors、vitest 168/168 pass、critic Deep 0/0/0、無殘留 `console.*`。**未 sg-deploy**（log 清理零急迫，隨下次實質部署搭車，避免單獨為 cosmetic change 冒 prod 風險）。
+
+**[②③ R0 讀碼發現 — 不實作的理由]** packet §7 前任假設「呼叫 orchestrate-tenant-provisioning（已有 create-wp-site + apply-manifest）」與 code 不符：
+- `orchestrate-tenant-provisioning.ts`（讀畢）只 `runProviderStep` fan-out 佈建整合服務 + 寫 webhook，**不建 org/site、不觸發 create-wp-site**。
+- `create-wp-site.ts:89-112` payload 要 4 個已存在 UUID（organizationId/workspaceId/projectId/siteId）+ siteName + manifestSlug，website_spec 沒有。
+- **已存在建站 pipeline**：`/build` console（`app/build/` + `app/api/build/{provision-services,runs}` + `lib/build-console/contracts.ts`）→ `dispatch-action-run`（`ops.profile-b.create-wp-site → create-wp-site`）→ create-wp-site；org/site 走 `app/api/ops/organizations`、`ops/clients`。
+- **決定（技術負責人）**：②③ 若硬寫一條 route 自建 org/site + 觸發 create-wp-site = 平行重造既有 /build pipeline，違反 R0「不得建立重複邏輯」；照 orchestrate 接又不會真建站（誤導）。正解是把 intake→spec 餵進**既有 /build/dispatch pipeline**，需一次設計 pass（讀 build-console/contracts + dispatch 資料模型）。本 session 不猜不重造，改為**把真實架構固化進 packet + TASKS**，下次照正確前提設計。
+
+**[已修改]** spec-generator.ts（① log 清理）；handoffs/2026-06-02-1735-onboarding-portal-e2e.md（§4/§5/§6 更正前任假設 + 指向既有 pipeline）；TASKS.md（§7 項標注 ① 完成 + ②③ 需設計+reuse）。
+
+**[驗證結果]**
+1. REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | result=0 errors
+   REALTEST_EVIDENCE: tool=Bash | cmd=npm test (vitest) | exit=0 | result=168/168 pass, 8 files
+2. REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（9 行 log 移除無動到任何 guard/return；無 dangling block/unreachable）
+3. BUGHUNT_DONE: scope=agency-os,scripts | grep=console.\*(spec-generator) ; create-wp-site/orchestrate payload | hits=0 殘留 log；架構發現 orchestrate≠建站、既有 /build pipeline → 已固化 packet+TASKS
+4. WORKLOG: this entry
+
+**[剩餘風險]** ② §7 真正建站串接未做（需設計 pass，已記 packet+TASKS）；① 未 deploy（prod 仍有舊 debug log，無害，下次部署生效）。
+
+**[rollback]** `git revert <commit>` 還原 spec-generator.ts log 清理 + 文件更正。
+
+AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests + critic 0/0/0）+ §7 架構真相固化進 packet/TASKS（②③ 改 reuse 既有 /build pipeline 設計 pass）
+
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: onboarding-staging-build → handoffs/2026-06-02-2235-onboarding-staging-build.md
+
 
