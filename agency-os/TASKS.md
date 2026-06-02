@@ -54,7 +54,7 @@
 > `/tomo` 自動寫入此分類；handoff packet 路徑見 `agency-os/handoffs/`
 
 - [x] 補完 tomo critic findings apply — 驗收 2 Critical + 6 Major 全修完 → handoffs/2026-05-25-1418-tomo-critic-findings.md
-- [ ] **【先做後等 6/1】WeeklyReview auth 確認** — 先到 `claude.ai/code/routines` 確認 AgencyOS-WeeklyReview 無「re-authorize GitHub」警告（根因：2026-05-22 repo PUBLIC→PRIVATE 導致 2026-05-25 auto-disabled，今日已 re-enable via API）；若有警告 → 點進去重新授權；2026-06-01 01:00 UTC 後確認 `last_fired_at` 已更新
+- [x] **【✅ 2026-06-02 完成】WeeklyReview auth 確認** — 先到 `claude.ai/code/routines` 確認 AgencyOS-WeeklyReview 無「re-authorize GitHub」警告（根因：2026-05-22 repo PUBLIC→PRIVATE 導致 2026-05-25 auto-disabled，今日已 re-enable via API）；若有警告 → 點進去重新授權；2026-06-01 01:00 UTC 後確認 `last_fired_at` 已更新
 - [ ] **【2026-06-05 06:00 UTC 後驗收】Phase4Weekly 第二次 scheduled fire** — 確認 routine 自動 fire 成功（無 `auto_disabled_*` ended_reason）。檢查：`agency-os/reports/repair-center/phase4-LATEST.md` 日期更新到 2026-06-05；若再 disable → `claude.ai/code/routines` 手動重新授權 GitHub connection（API re-enable 無法治本 OAuth token 失效）。同步 6/1 WeeklyReview 結果驗收 OAuth token 底層有效性。根因 + 一次性修法見 WORKLOG 2026-05-30 13:20 entry。
 - [ ] Auto-Repair audit Batch 3 (M9 TOCTOU + M10 retry storm + m4 hostname) + Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) → handoffs/2026-05-28-1807-batch-3-post-phase.md
 - [x] **Phase Z8** — AO-RESUME archive lift gate（同 Z6 思路套 AO-RESUME）：每次 AO-RESUME 寫 7-段式後必須 archive 到 `agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md`，否則 next health-check fail。原因：今天 5/30 12:32 AO-RESUME 我輸出 7-段式但忘了寫 archive，操作者點出才補；同 5/28 18:46 SG deploy silent drop class of bug，protocol 沒機械閘就靠 agent 自律不靠譜。實作：新 `scripts/verify-aoresume-archive.ps1` + 接入 system-health-check gate 12d + `.claude/commands/ao-resume.md` 加 Step 3 強制規則。
@@ -519,9 +519,8 @@
 - [x] `lobster-factory` Enterprise 必備工具補強路線（已取消）
   - 範圍：Sentry / PostHog / Cloudflare / Secrets / Identity
   - 現況：Identity 採 JWT/OIDC（不綁特定供應商）；Secrets 暫採 env/mcp，後續升級 secrets manager
-- [ ] **`lobster-factory/packages/workflows` `npm audit` 例行週檢**（2026-04-01）
-  - **2026-05-21 現況**：`@trigger.dev/sdk`/`trigger.dev` 升至 4.4.6 + 7 個 overrides 收斂 → `found 0 vulnerabilities`（9 HIGH + 11 moderate 全清）；commit `89350b6`。
-  - **開放項目**：例行週檢（執行 `npm run audit:workflows-security`，輸出至 `agency-os/reports/security/workflows-npm-audit-LATEST.md`）；若再升版後需確認 0 漏洞。
+- [x] **【✅ 2026-06-02 自動化完成】`lobster-factory/packages/workflows` `npm audit` 例行週檢**（2026-04-01）
+  - **2026-06-02**：qs DoS 弱點修復（6.11.1→6.15.2，GHSA-q8mj-m7cp-5q26）→ `found 0 vulnerabilities`。GHA `.github/workflows/weekly-workflows-security-audit.yml` 每週一自動執行，Slack + Telegram 雙語通知，不再需要手動週檢。
   - 禁止：勿在本目錄執行 `npm audit fix --force`（會導向不相容 Trigger 版本）。
 
 ## Backlog — 已完成歷程
