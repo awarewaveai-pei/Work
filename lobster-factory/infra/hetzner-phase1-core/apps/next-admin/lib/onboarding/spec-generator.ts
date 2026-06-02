@@ -36,17 +36,20 @@ Rules:
 }
 
 function validateSpec(obj: unknown): obj is WebsiteSpec {
-  if (!obj || typeof obj !== "object") return false;
+  if (!obj || typeof obj !== "object") { console.error("[spec-validator] not object"); return false; }
   const s = obj as Record<string, unknown>;
-  if (typeof s.site_name !== "string" || !s.site_name) return false;
-  if (!Array.isArray(s.sitemap) || s.sitemap.length === 0) return false;
-  if (!s.homepage || typeof s.homepage !== "object") return false;
+  if (typeof s.site_name !== "string" || !s.site_name) { console.error("[spec-validator] missing site_name"); return false; }
+  if (!Array.isArray(s.sitemap) || s.sitemap.length === 0) { console.error("[spec-validator] invalid sitemap:", s.sitemap); return false; }
+  if (!s.homepage || typeof s.homepage !== "object") { console.error("[spec-validator] missing homepage"); return false; }
   const hp = s.homepage as Record<string, unknown>;
-  if (!hp.hero || typeof hp.hero !== "object") return false;
-  if (!s.design || typeof s.design !== "object") return false;
+  if (!hp.hero || typeof hp.hero !== "object") { console.error("[spec-validator] missing hero"); return false; }
+  if (!s.design || typeof s.design !== "object") { console.error("[spec-validator] missing design"); return false; }
   const d = s.design as Record<string, unknown>;
-  if (typeof d.primary_color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(d.primary_color)) return false;
-  if (!s.plugin_config || typeof s.plugin_config !== "object") return false;
+  if (typeof d.primary_color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(d.primary_color)) {
+    console.error("[spec-validator] bad primary_color:", d.primary_color);
+    return false;
+  }
+  if (!s.plugin_config || typeof s.plugin_config !== "object") { console.error("[spec-validator] missing plugin_config"); return false; }
   return true;
 }
 
