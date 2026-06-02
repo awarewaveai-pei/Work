@@ -7435,3 +7435,8 @@ AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); bilingual message text only, no logic change
+
+## 2026-06-02
+
+- 09:45 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-06-02.md (manual run — AgencyOS-WeeklyReview routine auto-disabled, reconnect required)
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); bilingual message text only, no logic change
