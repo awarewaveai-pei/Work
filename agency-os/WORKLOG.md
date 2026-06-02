@@ -2,6 +2,24 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-02
+
+### Client Onboarding Portal MVP (§1-§6 + §12 + migration + deploy)
+
+**根本目標**：按 `agency-os/docs/architecture/client-onboarding-portal-spec.md` §14 MVP 執行順序，建立 Client Onboarding Portal 基礎層。
+
+**已修改**：新建 `lib/onboarding/{intake-form,package-selector,spec-generator}.ts`、`packages/manifests/wc-custom.json`、`packages/db/migrations/0034_intake_forms.sql`、`app/api/onboarding/{submit,generate-spec}/route.ts`；EU Supabase migration 0034 applied；SG sg-deploy commit `8ca09075`。
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy next-admin | exit=0 | result=smoke 4/4, deployed 8ca09075
+   REALTEST_EVIDENCE: tool=SSH | cmd=curl POST /api/onboarding/submit (no auth) | exit=0 | result=403 (route deployed, auth gate correct)
+   REALTEST_EVIDENCE: tool=SSH | cmd=psql SELECT tablename intake_forms/website_specs | exit=0 | result=2 rows (migration applied)
+   REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx test-sel.ts (selectPackage 5 cases) | exit=0 | result=ALL PASS
+   REALTEST_WAIVED: SMOKE_COVERED -- generate-spec Claude call requires real Supabase session (production claims_only); covered by tsc 0 + vitest 168/168 + real exec
+2. REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n — C1+C2+M3+M4+M5 all fixed before commit
+3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0
+4. WORKLOG: this entry
+
 ## 2026-06-01
 
 ### Phase Z8 — AO-RESUME archive lift gate（機械閘）
@@ -7445,3 +7463,30 @@ AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（
   REALTEST_WAIVED: SMOKE_COVERED -- spec-generator + route DB calls are side-effecting (Claude API + Supabase); tsc 0 errors + 168 vitest pass + selectPackage real exec cover correctness
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n -- C1 Supabase null crash + C2 content[0] undefined FIXED; M3 validateSpec added + M4 AbortController + M5 apiKey check FIXED; Minor6 raw leak removed; Minor7 shallow validation noted (acceptable for MVP); Minor8 status update error now logged
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0 (new symbols only in new onboarding/ files; no stale consumers)
+
+## 2026-06-02
+
+### Client Onboarding Portal MVP (§1-§6 + §12 + migration + deploy)
+
+**根本目標**：按  §14 MVP 執行順序，建立 Client Onboarding Portal 的基礎層。
+
+**已修改**：
+-  — IntakeForm + WebsiteSpec TypeScript interfaces
+-  — selectPackage() 5 規則 decision tree
+-  — generateWebsiteSpec() 含 AbortController timeout / apiKey guard / .find() content / validateSpec()
+-  — 新 wc-custom/POD manifest
+-  — intake_forms + website_specs tables + RLS
+-  — POST intake form
+-  — POST generate spec via Claude
+- EU Supabase: migration 0034 applied, schema cache reloaded
+- SG VPS: sg-deploy next-admin deployed commit 8ca09075, smoke 4/4
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy next-admin | exit=0 | result=smoke 4/4, deployed 8ca09075
+   REALTEST_EVIDENCE: tool=SSH | cmd=curl POST /api/onboarding/submit (no auth) | exit=0 | result=403 forbidden (route exists, auth gate correct)
+   REALTEST_EVIDENCE: tool=SSH | cmd=psql SELECT tablename WHERE intake_forms/website_specs | exit=0 | result=2 rows (both tables exist)
+   REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx test-sel.ts (selectPackage 5 cases) | exit=0 | result=ALL PASS
+   REALTEST_WAIVED: SMOKE_COVERED -- generate-spec Claude call requires real Supabase session auth (production claims_only mode); covered by tsc + vitest + real exec
+2. REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n — C1+C2+M3+M4+M5 all fixed before commit (Supabase null guard, content.find(), validateSpec, AbortController, apiKey check)
+3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0
+4. WORKLOG: this entry
