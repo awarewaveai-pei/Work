@@ -7440,3 +7440,8 @@ AUTO_TASK_DONE: endpoint-alert.sh consecutive-failure debounce 上 production（
 
 - 09:45 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-06-02.md (manual run — AgencyOS-WeeklyReview routine auto-disabled, reconnect required)
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); bilingual message text only, no logic change
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx test-sel.ts (selectPackage 5 cases) | exit=0 | result=ALL PASS (wc-custom/wc-core/wp-business/wp-business/wp-basic)
+  REALTEST_WAIVED: SMOKE_COVERED -- spec-generator + route DB calls are side-effecting (Claude API + Supabase); tsc 0 errors + 168 vitest pass + selectPackage real exec cover correctness
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n -- C1 Supabase null crash + C2 content[0] undefined FIXED; M3 validateSpec added + M4 AbortController + M5 apiKey check FIXED; Minor6 raw leak removed; Minor7 shallow validation noted (acceptable for MVP); Minor8 status update error now logged
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0 (new symbols only in new onboarding/ files; no stale consumers)

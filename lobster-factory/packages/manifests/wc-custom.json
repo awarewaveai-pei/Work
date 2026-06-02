@@ -1,0 +1,38 @@
+{
+  "name": "wc-custom",
+  "version": "1.0.0",
+  "schemaVersion": "1.0.0",
+  "target": "staging-only",
+  "description": "WooCommerce custom/POD manifest: Kadence theme + operational plugins. User-facing ecommerce plugins (WooCommerce, custom product plugins) installed via wp-install-plugins task — do NOT add user-facing plugins here.",
+  "guardrails": {
+    "allowEnvironments": ["staging"],
+    "requireBackup": true,
+    "blockIfProduction": true
+  },
+  "dependencies": [],
+  "conflicts": [],
+  "steps": [
+    { "id": "theme-kadence", "type": "install_theme", "slug": "kadence" },
+    {
+      "id": "plugin-litespeed",
+      "type": "conditional_plugin",
+      "condition": "is_litespeed",
+      "slug": "litespeed-cache"
+    }
+  ],
+  "postInstall": [
+    { "type": "activate_theme",   "slug": "kadence" },
+    { "type": "flush_permalinks" },
+    { "type": "set_option",        "key": "timezone_string", "value": "Asia/Taipei" },
+    { "type": "set_option",        "key": "woocommerce_enable_guest_checkout", "value": "yes" },
+    { "type": "set_option",        "key": "woocommerce_enable_signup_and_login_from_checkout", "value": "yes" }
+  ],
+  "verification": [
+    { "type": "check_homepage" },
+    { "type": "check_admin_login" }
+  ],
+  "smokeProfile": "woocommerce",
+  "rollback": {
+    "strategy": "restore_backup_snapshot"
+  }
+}
