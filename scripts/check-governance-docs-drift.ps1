@@ -271,6 +271,10 @@ $summary += "- Owner doc: this script. Trigger: ``scripts\check-governance-docs-
 
 Set-Content -LiteralPath $reportPath -Value ($summary -join "`n") -Encoding UTF8
 
+# Also write LATEST so AO-RESUME delta scan can surface it without reading monthly archives.
+$latestPath = Join-Path $reportDir "drift-LATEST.md"
+Set-Content -LiteralPath $latestPath -Value ($summary -join "`n") -Encoding UTF8
+
 Write-Host "Drift report written: $reportPath" -ForegroundColor $(if ($worst -eq "PASS") { "Green" } elseif ($worst -eq "WARN") { "Yellow" } else { "Red" })
 Write-Host "Overall: $worst"
 foreach ($k in $status.Keys) {

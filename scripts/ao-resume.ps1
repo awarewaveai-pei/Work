@@ -699,25 +699,17 @@ if ($runMonthly) {
     Write-Host ""
     Write-Host "== AO-RESUME: monthly checks (warn-only, last run > 30d ago) ==" -ForegroundColor Cyan
 
-    # 1. Monthly system review (verify-build-gates + integrated status report)
+    # 1. Monthly system review — calls generate-integrated-status-report + supabase-memory internally.
+    #    Do NOT call check-supabase-memory-monthly separately; monthly-system-review already does it.
     $monthlyReview = Join-Path $WorkRoot "scripts\monthly-system-review.ps1"
     if (Test-Path -LiteralPath $monthlyReview) {
-        Write-Host "  -> monthly-system-review..." -ForegroundColor DarkCyan
+        Write-Host "  -> monthly-system-review (includes supabase-memory)..." -ForegroundColor DarkCyan
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $monthlyReview `
             -AgencyOsRoot (Join-Path $WorkRoot "agency-os") -NoAlert -ReportOnly
         $global:LASTEXITCODE = 0
     }
 
-    # 2. Supabase memory check (SSH → EU VPS)
-    $supaMem = Join-Path $WorkRoot "scripts\check-supabase-memory-monthly.ps1"
-    if (Test-Path -LiteralPath $supaMem) {
-        Write-Host "  -> check-supabase-memory..." -ForegroundColor DarkCyan
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $supaMem `
-            -AgencyOsRoot (Join-Path $WorkRoot "agency-os")
-        $global:LASTEXITCODE = 0
-    }
-
-    # 3. Governance docs drift check
+    # 2. Governance docs drift check — writes reports/governance/drift-YYYY-MM.md + drift-LATEST.md
     $govDrift = Join-Path $WorkRoot "scripts\check-governance-docs-drift.ps1"
     if (Test-Path -LiteralPath $govDrift) {
         Write-Host "  -> check-governance-docs-drift..." -ForegroundColor DarkCyan
@@ -745,7 +737,7 @@ if (Test-Path -LiteralPath $stampPath) {
     }
 }
 
-$subdirs = @("closeout", "health", "guard", "status")
+$subdirs = @("closeout", "health", "guard", "status", "monthly", "governance")
 $allFiles = New-Object System.Collections.Generic.List[System.IO.FileInfo]
 foreach ($sub in $subdirs) {
     $dir = Join-Path $WorkRoot "agency-os\reports\$sub"
@@ -770,7 +762,7 @@ if (-not $lastUtc) {
     Write-Host "No prior stamp at agency-os/.agency-state/ao-resume-last.txt (first run or reset)." -ForegroundColor DarkYellow
 }
 if ($sorted.Count -eq 0) {
-    Write-Host "No new or updated files under agency-os/reports/{closeout,health,guard,status} since last stamp." -ForegroundColor Green
+    Write-Host "No new or updated files under agency-os/reports/{closeout,health,guard,status,monthly,governance} since last stamp." -ForegroundColor Green
 } else {
     $show = $sorted
     if ($sorted.Count -gt $cap) {
