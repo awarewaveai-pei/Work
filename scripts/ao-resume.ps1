@@ -671,6 +671,17 @@ if (Test-Path -LiteralPath $cfSecScript) {
     $global:LASTEXITCODE = 0
 }
 
+# Application-layer smoke tests (warn-only) — n8n MCP + Repair Center health.
+# Rationale: operator should never need to remember /smoke-test; results surface automatically.
+# Writes agency-os/reports/status/smoke-LATEST.json; Claude reads it in AO-RESUME §1.
+$smokeScript = Join-Path $WorkRoot "scripts\check-smoke-tests.ps1"
+if (Test-Path -LiteralPath $smokeScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: smoke tests (warn-only) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $smokeScript -WorkRoot $WorkRoot
+    $global:LASTEXITCODE = 0
+}
+
 # Report delta since last AO-RESUME (local stamp under agency-os/.agency-state/)
 $stateDir = Join-Path $WorkRoot "agency-os\.agency-state"
 $stampPath = Join-Path $stateDir "ao-resume-last.txt"
