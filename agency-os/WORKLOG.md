@@ -4,6 +4,9 @@
 
 ## 2026-06-03
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: tomo-174946 → handoffs/2026-06-03-1749-tomo-174946.md
+
 ### A7 — Hosting Bridge + 完整 E2E pipeline 驗收
 
 **根本目標**：實作 WP staging 自動建站，讓整條 pipeline 端到端跑通。
