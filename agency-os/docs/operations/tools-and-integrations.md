@@ -40,5 +40,5 @@
 - `docs/standards/n8n-workflow-architecture.md`
 - `tenants/templates/tenant-template/03_TOOLS_CONFIGURATION_GUIDE.md`
 
-_Last synced: 2026-06-02 14:53:46 UTC_
+_Last synced: 2026-06-03 05:51:15 UTC_
 
