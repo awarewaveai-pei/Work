@@ -698,35 +698,101 @@ if (-not (Test-Path -LiteralPath $monthlyStamp)) {
 if ($runMonthly) {
     Write-Host ""
     Write-Host "== AO-RESUME: monthly checks (warn-only, last run > 30d ago) ==" -ForegroundColor Cyan
+    $monthlyResults = @{}
 
-    # 1. Monthly system review — calls generate-integrated-status-report + supabase-memory internally.
-    #    Do NOT call check-supabase-memory-monthly separately; monthly-system-review already does it.
+    # 1. Monthly system review (includes supabase-memory internally; do NOT call separately)
     $monthlyReview = Join-Path $WorkRoot "scripts\monthly-system-review.ps1"
     if (Test-Path -LiteralPath $monthlyReview) {
-        Write-Host "  -> monthly-system-review (includes supabase-memory)..." -ForegroundColor DarkCyan
+        Write-Host "  -> monthly-system-review..." -ForegroundColor DarkCyan
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $monthlyReview `
             -AgencyOsRoot (Join-Path $WorkRoot "agency-os") -NoAlert -ReportOnly
+        $reviewExit = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        $monthlyResults["system_review"] = if ($reviewExit -eq 0) { "PASS" } elseif ($reviewExit -eq 1) { "WARN" } else { "FAIL" }
         $global:LASTEXITCODE = 0
-    }
+    } else { $monthlyResults["system_review"] = "SKIP" }
 
-    # 2. Governance docs drift check — writes reports/governance/drift-YYYY-MM.md + drift-LATEST.md
+    # 2. Supabase memory check (SSH → EU VPS) — separate from monthly-system-review
+    $supaMem = Join-Path $WorkRoot "scripts\check-supabase-memory-monthly.ps1"
+    if (Test-Path -LiteralPath $supaMem) {
+        Write-Host "  -> check-supabase-memory..." -ForegroundColor DarkCyan
+        $supOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $supaMem `
+            -AgencyOsRoot (Join-Path $WorkRoot "agency-os") 2>&1
+        $supaExit = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        $supaPercent = ($supOutput | Select-String 'RESULT_PERCENT=(.+)').Matches.Groups[1].Value
+        $supaStatus  = if ($supaExit -eq 0) { "PASS" } elseif ($supaExit -eq 1) { "WARN" } else { "FAIL" }
+        $monthlyResults["supabase_memory"] = if ($supaPercent) { "$supaStatus ($supaPercent%)" } else { $supaStatus }
+        $global:LASTEXITCODE = 0
+    } else { $monthlyResults["supabase_memory"] = "SKIP" }
+
+    # 3. Governance docs drift check
     $govDrift = Join-Path $WorkRoot "scripts\check-governance-docs-drift.ps1"
     if (Test-Path -LiteralPath $govDrift) {
         Write-Host "  -> check-governance-docs-drift..." -ForegroundColor DarkCyan
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $govDrift -WorkRoot $WorkRoot
+        $driftExit = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        $monthlyResults["governance_drift"] = if ($driftExit -eq 0) { "PASS" } elseif ($driftExit -eq 1) { "WARN" } else { "FAIL" }
         $global:LASTEXITCODE = 0
-    }
+    } else { $monthlyResults["governance_drift"] = "SKIP" }
 
     # Write consolidated monthly-LATEST.json to reports/status/ — single place to read.
     $monthlyStatusDir = Join-Path $WorkRoot "agency-os\reports\status"
     $null = New-Item -ItemType Directory -Force -Path $monthlyStatusDir
     $monthlyPayload = @{
-        generated         = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-        system_review     = if (Test-Path (Join-Path $WorkRoot "agency-os\reports\status\integrated-status-LATEST.md")) { "ok" } else { "skip" }
-        supabase_memory   = if (Test-Path (Join-Path $WorkRoot "agency-os\reports\status\supabase-memory-LATEST.md")) { "ok" } else { "skip" }
-        governance_drift  = if (Test-Path (Join-Path $WorkRoot "agency-os\reports\status\governance-drift-LATEST.md")) { "ok" } else { "skip" }
+        generated        = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+        system_review    = $monthlyResults["system_review"]
+        supabase_memory  = $monthlyResults["supabase_memory"]
+        governance_drift = $monthlyResults["governance_drift"]
     }
     $monthlyPayload | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $monthlyStatusDir "monthly-LATEST.json") -Encoding UTF8
+
+    # --- Notifications: Slack + Telegram ---
+    $allPass    = @($monthlyResults.Values | Where-Object { $_ -notlike "PASS*" -and $_ -notlike "SKIP*" }).Count -eq 0
+    $overallEmoji = if ($allPass) { "✅" } else { "⚠️" }
+    $overallWord  = if ($allPass) { "全部正常" } else { "有項目需注意" }
+    $monthLabel   = (Get-Date).ToString("yyyy-MM")
+
+    # Human-readable descriptions for each check
+    $humanDesc = @{
+        system_review    = "系統架構 / build gates / 程式碼品質"
+        supabase_memory  = "EU 資料庫記憶體使用量"
+        governance_drift = "四份核心治理文件一致性"
+    }
+
+    # Build body lines (技術術語 + 人話)
+    $lines = @()
+    foreach ($key in @("system_review","supabase_memory","governance_drift")) {
+        $val   = $monthlyResults[$key]
+        $icon  = if ($val -like "PASS*") { "✅" } elseif ($val -like "WARN*") { "⚠️" } elseif ($val -like "FAIL*") { "❌" } else { "⏭" }
+        $lines += "$icon $($humanDesc[$key]): $val"
+    }
+    $bodyText = $lines -join "`n"
+
+    # Slack
+    $notifyScript = Join-Path $WorkRoot "scripts\notify-ops.ps1"
+    if (Test-Path -LiteralPath $notifyScript) {
+        $slackTitle = "$overallEmoji 月度系統巡檢 $monthLabel — $overallWord"
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $notifyScript `
+            -Title $slackTitle -Message $bodyText -Level $(if ($allPass) { "success" } else { "warn" })
+        $global:LASTEXITCODE = 0
+    }
+
+    # Telegram
+    try {
+        $vaultScript = Join-Path $WorkRoot "scripts\secrets-vault.ps1"
+        $tokenRaw = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $vaultScript -Action get -Name TELEGRAM_BOT_TOKEN  2>&1 | Select-String '=')
+        $chatRaw  = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $vaultScript -Action get -Name TELEGRAM_ALLOWED_CHAT_IDS 2>&1 | Select-String '=')
+        $token  = $tokenRaw.ToString().Split('=', 2)[1].Trim()
+        $chatId = $chatRaw.ToString().Split('=',  2)[1].Trim().Split(',')[0].Trim()
+        if ($token -and $chatId) {
+            $tgText = "$overallEmoji 月度系統巡檢 $monthLabel`n$bodyText"
+            $tgBody = @{ chat_id = $chatId; text = $tgText } | ConvertTo-Json -Compress
+            Invoke-RestMethod -Method Post -Uri "https://api.telegram.org/bot$token/sendMessage" `
+                -ContentType 'application/json' -Body $tgBody -ErrorAction Stop | Out-Null
+            Write-Host "  Telegram 通知已發送" -ForegroundColor DarkCyan
+        }
+    } catch {
+        Write-Host "  WARN: Telegram 通知失敗 — $_" -ForegroundColor Yellow
+    }
 
     # Update stamp
     [DateTime]::UtcNow.ToString("o") | Set-Content -LiteralPath $monthlyStamp -Encoding UTF8
