@@ -49,6 +49,11 @@
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/suggest-compact.js",
             "description": "Suggest /compact every ~50 tool calls"
+          },
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/file-path-router.js",
+            "description": "Route to specialist agent based on file path (auth/db/supabase/n8n/nginx/wp/trigger)"
           }
         ]
       },
