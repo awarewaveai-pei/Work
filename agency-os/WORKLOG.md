@@ -4,6 +4,29 @@
 
 ## 2026-06-03
 
+### Trigger.dev workflows deploy — image rebuild (20260603)
+
+AUTO_TASK_DONE: Trigger workflows 完整 deploy — https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/hasunnuv — 20260603.1
+
+**根本問題**：supervisor 日誌顯示 `No such image: registry:5000/trigger/proj_6c4f24492a705729fc2c:20260526.x` — 本地 Docker registry 的 workflow 映像遺失，任務無法啟動。需要重新 deploy 以重建並推送映像。
+
+**執行方式**：scripts/lobster-trigger-deploy.ps1（SSOT，不跑 ad-hoc deploy）
+
+**Milestones 全部命中**：
+- [deploy] Vault secrets loaded
+- [deploy] SERVICE_ROLE_KEY obtained (length=180)
+- Env ready: TRIGGER_API_URL=http://127.0.0.1:8030, LOBSTER_TRIGGER_PUBLIC_API_URL=https://trigger.aware-wave.com
+- buildImage.js patched: TRIGGER_API_URL -> http://127.0.0.1:8030
+- Docker build #16 [indexer 2/2] RUN node — succeeded (BFM bypass active)
+- Successfully deployed version 20260603.1 (local build), 10 tasks
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell lobster-trigger-deploy.ps1 | exit=0 | ms=~300000 | result=version 20260603.1 deployed, 10 tasks, deployment=hasunnuv
+2. REVIEW_WAIVED: NA -- no code changed, redeploy only
+3. BUGHUNT_WAIVED: NA -- no code changes
+4. WORKLOG: this entry
+
+
 ### scripts/ vs agency-os/scripts/ 20 檔 drift — wrapper 化收尾
 
 **根本目標**：將 `agency-os/scripts/` 底下雙重完整實作的 9 個 .ps1 改為 thin wrapper，轉呼叫 `scripts/`（monorepo root SSOT）正本。
