@@ -8,6 +8,35 @@
 
 AUTO_TASK_DONE: Trigger workflows 完整 deploy — https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/hasunnuv — 20260603.1
 
+### Trigger.dev workflows deploy — dispatch-action-run PGRST204 fix (20260603.7)
+
+AUTO_TASK_DONE: Trigger workflows 完整 deploy — https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/k1u2nq9d — 20260603.7
+
+**根本問題**：`dispatch-action-run.ts` 的 `updateRunStatus()` 在 PATCH body 加了 `updated_at: new Date().toISOString()`，但 `ops_action_runs` schema 沒有 `updated_at` 欄位，導致 Supabase PostgREST 回 `PGRST204 400` 錯誤。Fix 已在 commit `fbb9fa34` 套用（移除 `updated_at`），需要 deploy 讓 Trigger.dev worker 吃到新程式碼。
+
+**執行方式**：按照 `scripts/lobster-trigger-deploy.ps1` 相同邏輯，透過 SSH 以 base64 上傳 bash script（包含所有 vault secrets），在 EU VPS 執行。
+
+**Milestones 全部命中**：
+- Fix confirmed in working tree: `{ status, ...extra }` (no `updated_at`)
+- npm install done
+- buildImage.js patch applied (TRIGGER_API_URL -> http://127.0.0.1:8030, 1 hit in localBuildImage)
+- `#16 [indexer 2/2] RUN node` DONE 1.4s (Docker indexer BFM bypass active, --network=host)
+- `Found 13 env vars to sync` — syncEnvVars pushed all secrets
+- Successfully deployed version 20260603.7 (local build), 10 tasks
+- Deployment URL: https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/k1u2nq9d
+
+**Post-deploy verification**:
+- Triggered `dispatch-action-run` via `POST /api/v1/tasks/dispatch-action-run/trigger` with prod token
+- TaskRun `run_cmpxq59rl0qym1wv5ks3xujxx` → `COMPLETED_SUCCESSFULLY`
+- `ops_action_runs` row `c9b6cc0e` status: `pending` → `dispatched` (no PGRST204 error)
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=SSH | cmd=bash deploy + curl trigger + psql check | exit=0 | result=version 20260603.7 deployed; TaskRun COMPLETED_SUCCESSFULLY; ops_action_runs c9b6cc0e=dispatched
+2. REVIEW_WAIVED: NA -- fix was in commit fbb9fa34, only redeploying
+3. BUGHUNT_WAIVED: NA -- no new code changes in this session, fix already committed
+4. WORKLOG: this entry
+
+
 **根本問題**：supervisor 日誌顯示 `No such image: registry:5000/trigger/proj_6c4f24492a705729fc2c:20260526.x` — 本地 Docker registry 的 workflow 映像遺失，任務無法啟動。需要重新 deploy 以重建並推送映像。
 
 **執行方式**：scripts/lobster-trigger-deploy.ps1（SSOT，不跑 ad-hoc deploy）
