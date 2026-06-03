@@ -86,7 +86,7 @@ async function updateRunStatus(
     creds,
     "ops_action_runs",
     runId,
-    { status, updated_at: new Date().toISOString(), ...extra },
+    { status, ...extra },
     { traceId: `dispatcher-${runId}` }
   );
 }
