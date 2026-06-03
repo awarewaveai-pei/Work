@@ -192,6 +192,54 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 使用者說「任務」/「還有什麼」/「今天要做哪些」/不確定目前 backlog 狀態 | 跑 `/tasks` 列出所有 open 待辦 |
 | **🔧 機械閘**：`auto-repair-guard.js` 每 session 首次 auto-repair Write/Edit 前 exit-2 BLOCK（顯示 4 pre-checks）；re-issue 通過。任何 `Edit`／`Write`／`MultiEdit` 寫入 Auto-Repair 邏輯（**完整路徑**：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/*`、`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/{redactSecrets,verifyIngestToken,fingerprint}.ts`、`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/{sentry,uptime-kuma,netdata,grafana,posthog}/route.ts`、`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/**`、`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/commands/slack/route.ts`、`.github/workflows/auto-repair-*.yml`、`lobster-factory/infra/hetzner-phase1-core/scripts/{sg-deploy,rollback-phase1,auto-deploy-next-admin}.sh`）| ① 先讀 [`reports/audit/auto-repair-2026-05-23.md`](reports/audit/auto-repair-2026-05-23.md)（最新 audit baseline，5 Criticals + 10 Majors + 11 Minors + Patch Errata）；② 跑 `powershell -ExecutionPolicy Bypass -File scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly`（讓 harness 當 oracle：exit 0=放行；exit 1=必須修；exit 2=warn 看內容）；③ 若改動修了 C1-C5 任一個 Critical → 同 PR 把 [AUDIT_REGISTRY.md §Auto-Repair logic audit (2026-05-23)](docs/operations/AUDIT_REGISTRY.md#auto-repair-logic-audit-2026-05-23) 對應條目從 🔴 TRACKED 升 🔴 FIXED，含 commit hash；④ 若改動觸及 `sg-deploy.sh` Step 7 / `redactSecrets.ts` / `webhooks/*/route.ts` body size / `app/api/ops/repairs/route.ts` GET，**必須同步更新 [DEPLOY_ROLLBACK_RUNBOOK.md](docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md) 對應行為描述**（避免 plan vs code 再次說一套做一套 — 本次 audit 三個 SSOT contract 違反的根因）;**注意**：本規則 trigger path **必須含完整 monorepo 前綴**（self-critic Maj-5 修正 2026-05-23：原版只寫 `lib/repair-center/*` 不會 fire，因 Claude 看到的 `file_path` 是絕對路徑） |
 
+### 核心行為規則：宣告執行，不詢問
+
+**使用者不需要知道任何工具名稱。** 當使用者描述問題或工作，Claude 負責識別情境、選擇工具、執行，並在執行前用一句話告知（「我用 debugger agent 來查這個 log」）。  
+**禁止**：問「要不要我用 X？」、「需要我跑 Y 嗎？」——Low/Medium 風險工具直接執行。High 風險（prod deploy / reboot / DB migration）仍需明示 go-ahead。
+
+### 工作類型 → Agent/Tool 路由表
+
+| 使用者描述的工作 | 自動使用 |
+|--------------|---------|
+| 有 bug / 程式跑錯 / log 看不懂 / 行為異常 | `debugger` agent（系統性根因分析）|
+| 資料庫 schema / migration / query 慢 / index | `db-expert` agent（唯讀分析）|
+| Supabase RLS / Edge Function / auth 權限 | `supabase-engineer` agent |
+| n8n workflow 壞了 / 要建新自動化 | `n8n-engineer` agent |
+| Trigger.dev 要 deploy / workflow 改動 | `trigger-deploy-agent` agent |
+| WordPress 外掛衝突 / Kadence / WooCommerce / Fluent | `wordpress-plugin-expert` agent |
+| WP 客戶備份 / 更新 / MainWP sync | `wordpress-maintenance-agent` agent |
+| MainWP 連不上 / child site 斷線 / 設定 | `mainwp-engineer` agent |
+| VPS / Docker / nginx 出問題 / container crash | `devops-engineer` agent |
+| 前端頁面 / UI 設計 / dashboard component | `frontend-designer` agent |
+| 複雜 feature 跨 3+ 模組 / 需要拆任務 | `planner` agent 先拆，再實作 |
+| 大規模 refactor / 10+ 檔案搬移重命名 | `refactor-specialist` agent |
+| 框架升級 / 套件 major version bump | `migration-engineer` agent |
+| 安全漏洞 / critic 回報疑似問題 | `vuln-verifier` agent 寫 PoC 驗證 |
+| PostHog 數據 / funnel / 轉換率 / feature flag | `posthog-analyst` agent |
+| 陌生 repo / 第一次看這個 codebase | `onboarder` agent |
+| API 文件 / 規格 / 版本差異查詢 | `web-researcher` agent |
+| 工具選型 / A vs B / 架構審查 / rollout 規劃 | `decision-intelligence` agent（`/decide`）|
+| 策略討論 / 要不要做 X / 紅藍隊壓力測試 | `strategy-review` skill |
+| 新功能要從哪裡開始 / 需求拆解 | `feature-plan` skill |
+| 想了解這個 code 品質如何 | `critic` agent（`/review`）|
+| 跑 QA / 瀏覽器測試 / 截圖 / 效能 | `/playwright` 對應模式 |
+| 想確認 .ps1 / .ts / .js 改動沒問題 | `/verify-recent`（syntax + critic + exec）|
+
+### 問題症狀 → Runbook 路由表
+
+| 症狀 / 告警 | 立即讀取的 Runbook |
+|-----------|----------------|
+| 網站 502 / 回應極慢 / OOM / container restart loop | `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` |
+| 可疑 process / 不明高 CPU / crypto miner 跡象 | `runbooks/HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md` |
+| 未授權存取 / credentials 外洩 / 安全事件 | `runbooks/SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` |
+| Telegram bot 沉默 / command plane 無回應 | `runbooks/COMMAND_PLANE_TELEGRAM_SILENCE_RUNBOOK.md` |
+| Uptime Kuma 監控壞了 / 誤報 / 設定錯誤 | `runbooks/UPTIME-KUMA-MONITOR-FIX.md` |
+| Trigger.dev deploy 失敗 / Cloudflare BFM 問題 | `runbooks/TRIGGER-DEPLOY-CLOUDFLARE-BFM.md` |
+| Codex 設定錯誤 / MCP 連不上 | `runbooks/CODEX-CONFIG-ERRORS-FIXES.md` |
+| 要新增週期性健康檢查 | `runbooks/ADD-PERIODIC-HEALTH-CHECK.md` |
+| Cloudflare WAF 規則 / scanner 攻擊 / DDoS | `runbooks/CLOUDFLARE-WAF-SETUP.md` |
+| VPS reboot 訊號 + 16h 未處理 | `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` |
+
 MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
 ## Session 啟動順序（每次都做）
