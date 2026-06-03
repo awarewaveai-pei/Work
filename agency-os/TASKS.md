@@ -109,7 +109,7 @@
 
 - [ ] `lobster-factory` A10-2 商業閉環實跑 —— **【未開始】**
   - 流程：新客戶建立 -> 驗收 -> production 觸發證據鏈
-- [ ] `lobster-factory` A7 全站自動建站補齊 —— **【未開始】**
+- [x] **【✅ 2026-06-03 完成】`lobster-factory` A7 全站自動建站補齊** — hosting bridge `provision-staging` route 上線；SSH→docker exec WP install；Trigger.dev http_json adapter 串接；E2E staging `green-valley-farm-28ba09` HTTP 200 驗證通過。commit 2af74c49。
   - 範圍：hosting adapter + provision/shell guardrails 端到端
 
 #### EU VPS 維護

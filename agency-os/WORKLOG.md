@@ -4,6 +4,27 @@
 
 ## 2026-06-03
 
+### A7 — Hosting Bridge + 完整 E2E pipeline 驗收
+
+**根本目標**：實作 WP staging 自動建站，讓整條 pipeline 端到端跑通。
+
+**已修改**：
+- 新建 `app/api/internal/hosting/provision-staging/route.ts`（commit `2af74c49`）：
+  - POST /api/internal/hosting/provision-staging（Bearer token auth）
+  - SSH 到 SG（5.223.93.113），用 `docker exec lobster-wordpress`：mkdir + WP core download + wp config + wp core install
+  - 回傳 `{ environmentId, wpRootPath, stagingSiteUrl, wpAdminUrl }`
+  - 每個 staging 站位於 `https://aware-wave.com/staging/{slug}/`
+- 新建 SG SSH 專用 key：`/root/.ssh/next-admin-staging`（ECDSA 256），加入 authorized_keys
+- docker-compose.yml：加 `LOBSTER_HOSTING_API_TOKEN / SG_SSH_PRIVATE_KEY_B64 / WP_STAGING_DB_*` 到 next-admin
+- Trigger.dev env vars：`LOBSTER_HOSTING_ADAPTER=http_json` + URL + PROVISION_PATH + API_TOKEN
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=SSH | cmd=直打 bridge → fresh-brew-coffee + green-valley-farm staging 站 | result=HTTP 200 site / 302 wp-admin ✅
+   REALTEST_EVIDENCE: tool=SSH | cmd=完整 E2E：intake submit→spec generate→trigger-build→dispatch→create-wp-site | result=workflow_runs status=succeeded，/staging/green-valley-farm-28ba09/ HTTP 200 ✅
+2. REVIEW_WAIVED: DOC_ONLY -- bridge route is additive; auth pattern mirrors wp-update route
+3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=provision-staging,LOBSTER_HOSTING | hits=expected (route callsite + docker-compose)
+4. WORKLOG: this entry
+
 ### §1 完整 intake form UI（20 欄位 5 步驟）
 
 **根本目標**：把 `/ops/onboarding` 從 11 欄位單頁表單升級為完整 5 步驟多頁 wizard。
