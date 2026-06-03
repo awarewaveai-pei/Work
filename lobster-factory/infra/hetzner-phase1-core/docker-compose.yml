@@ -335,6 +335,13 @@ services:
       # SSH keys for web-UI one-click WP plugin updates (base64-encoded private key per client)
       # Naming: SSH_KEY_<ssh_key_name uppercase> — must match client_config.ssh_key_name in Supabase
       SSH_KEY_HOSTINGER_SOULFUL: ${SSH_KEY_HOSTINGER_SOULFUL:-}
+      # Hosting bridge — provision WordPress staging sites
+      LOBSTER_HOSTING_API_TOKEN: ${LOBSTER_HOSTING_API_TOKEN:-}
+      SG_SSH_PRIVATE_KEY_B64: ${SG_SSH_PRIVATE_KEY_B64:-}
+      SG_SSH_HOST: ${SG_SSH_HOST:-5.223.93.113}
+      WP_STAGING_DB_USER: ${WORDPRESS_DB_USER:-wpuser}
+      WP_STAGING_DB_PASS: ${WORDPRESS_DB_PASSWORD:-}
+      WP_STAGING_DB_ROOT_PASS: ${WORDPRESS_DB_ROOT_PASSWORD:-}
     ports:
       - "${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000"
     depends_on:
