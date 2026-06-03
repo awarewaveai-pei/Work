@@ -194,8 +194,34 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 
 ### 核心行為規則：宣告執行，不詢問
 
-**使用者不需要知道任何工具名稱。** 當使用者描述問題或工作，Claude 負責識別情境、選擇工具、執行，並在執行前用一句話告知（「我用 debugger agent 來查這個 log」）。  
-**禁止**：問「要不要我用 X？」、「需要我跑 Y 嗎？」——Low/Medium 風險工具直接執行。High 風險（prod deploy / reboot / DB migration）仍需明示 go-ahead。
+**使用者不需要知道任何工具名稱，也不需要說任何觸發詞。** Claude 在工作過程中自行識別情境、選擇工具、執行，執行前用一句話告知（例：「我用 debugger agent 來查這個 log」）。  
+**禁止**：問「要不要我用 X？」「需要我跑 Y 嗎？」——Low/Medium 風險工具直接執行。High 風險（prod deploy / reboot / DB migration）仍需明示 go-ahead。
+
+### Claude 工作自觸發規則（不依賴使用者輸入）
+
+這是最重要的一張表。**觸發條件是 Claude 自己在做什麼，與使用者說什麼無關。**
+
+| Claude 正在做的事 | 自動執行 |
+|----------------|---------|
+| 要實作跨 3+ 模組 / 新功能設計 | 先召喚 `planner` agent 拆任務，再實作 |
+| 讀 code 時發現 bug / 異常行為 / 邏輯錯誤 | 召喚 `debugger` agent 系統性追根因 |
+| 改動涉及 auth / RLS / permission / 金流 | 改完後強制召喚 `critic` → `vuln-verifier` |
+| 改動 DB schema / migration / query | 改前召喚 `db-expert` 審查安全性 |
+| 改動 Supabase 相關（RLS / Edge Function / storage）| 召喚 `supabase-engineer` |
+| 改動 n8n workflow | 召喚 `n8n-engineer` |
+| 改動 nginx / docker-compose / Dockerfile | 先讀 `safe-infra-patch.sh` 規則，改後立即 health check |
+| 改動 WordPress 外掛 / 主題 / functions.php | 召喚 `wordpress-plugin-expert` |
+| 改動 `.ts/.tsx` 任何檔案 | 完成前跑 `npx tsc --noEmit`，型別錯誤不得宣告完成 |
+| 完成任何 code 改動（`.ps1/.ts/.tsx/.js/.sh/.py`）| 跑 `/verify-recent`（syntax + critic + exec）|
+| critic 回報 Critical 或 High 問題 | 召喚 `vuln-verifier` 寫 PoC 確認是否真實漏洞 |
+| 改動 governance 文件（`AGENTS.md` / `CLAUDE.md` / hooks / cursor rules）| 改後跑 `/doc-sync` + `/sync-check` |
+| 任何 R0 任務完成後（輸出 [已修改]）| 跑 `/checkpoint` 存 mid-session commit |
+| 準備 sg-deploy 前 | 自動跑 `/check-drift` + `/verify` + `tsc --noEmit`（有 ts 改動時）|
+| sg-deploy 完成後 | 自動跑 `/playwright smoke` |
+| wp-maintenance safe-update 完成後 | 自動跑 `/playwright client <slug>` |
+| 讀 log / SSH 進 VPS 看到 error / 異常 | 召喚 `incident-responder` 先 triage，再決定 runbook |
+| 發現問題需要 web 查規格 / API 文件 | 召喚 `web-researcher`，不靠訓練資料猜 |
+| 需要做技術選型 / 架構決策 | 召喚 `decision-intelligence`（`/decide`），不靠直覺推薦 |
 
 ### 工作類型 → Agent/Tool 路由表
 
