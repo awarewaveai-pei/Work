@@ -192,6 +192,28 @@ Items that cannot proceed without a human choice or action. Each entry must incl
    Do NOT fail AO-RESUME for a missing packet.
 5. **Path expansion**: replace `$WORK_ROOT` in packet content with the current working directory before displaying.
 
+**Skill Spotlight（依今日 TASKS 自動推薦）**
+
+根據 TASKS.md open items，點名今日最相關的 3–5 個工具。只列今日 TASKS 真正涉及的，不要湊數：
+
+| 今日 TASKS 涉及 | 推薦工具（依序） |
+|--------------|--------------|
+| 部署 / sg-deploy / 上線 | `/check-drift` → `/verify` → go-ahead → `/sg-deploy` → `/playwright smoke` |
+| 客戶 / WP / soulful / 外掛更新 | `/client-status` → `/wp-maintenance` → `/playwright client <slug>` |
+| 新功能規劃 / 要加什麼 | `/feature-plan` |
+| audit 報告 / apply patch | `/apply-audit` → `/verify-recent` |
+| 跨機 sync / hook / settings 改動 | `/sync-check` → `/doc-sync` |
+| 技術選型 / 架構決策 / A vs B | `/decide` 或 `/strategy-review` |
+| QA / 瀏覽器測試 | `/playwright smoke` 或 `/playwright qa` |
+| 系統健康不明 | `/health` → （若 sync fail）`/sync-check` |
+
+格式（輸出 2–4 行即可，不要列整張表）：
+```
+🔧 今日 Skill Spotlight：
+- `/xxx` — [何時用，一句話]
+- `/yyy` — [何時用，一句話]
+```
+
 Then: Concrete first action. If a 需決策 item is blocking, state it first.
 
 ---
