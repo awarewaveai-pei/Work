@@ -61,10 +61,12 @@ $repairUrl = "$AppBaseUrl/api/ops/repairs/health"
 $repairStatus = "skip"
 try {
     $authHeader = @{}
-    $basicPw = [System.Environment]::GetEnvironmentVariable("GRAFANA_BASIC_PASSWORD", "User")
-    if (-not $basicPw) { $basicPw = $env:GRAFANA_BASIC_PASSWORD }
-    if ($basicPw) {
-        $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("awarewave:$basicPw"))
+    $opsUser = [System.Environment]::GetEnvironmentVariable("OPS_BASIC_USER", "User")
+    if (-not $opsUser) { $opsUser = $env:OPS_BASIC_USER }
+    $opsPw   = [System.Environment]::GetEnvironmentVariable("OPS_BASIC_PASSWORD", "User")
+    if (-not $opsPw)   { $opsPw   = $env:OPS_BASIC_PASSWORD }
+    if ($opsUser -and $opsPw) {
+        $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${opsUser}:${opsPw}"))
         $authHeader = @{ Authorization = "Basic $b64" }
     }
     $resp = Invoke-RestMethod -Uri $repairUrl -Headers $authHeader -TimeoutSec 10 -ErrorAction Stop

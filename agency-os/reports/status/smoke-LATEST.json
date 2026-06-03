@@ -1,0 +1,12 @@
+﻿{
+    "checks":  {
+                   "repair_detail":  {
+                                         "ok":  true,
+                                         "system_mode":  "normal",
+                                         "table_ok":  true
+                                     },
+                   "n8n_mcp":  "ok",
+                   "repair_center":  "ok"
+               },
+    "generated":  "2026-06-03 13:11:57"
+}
