@@ -4,10 +4,12 @@ import { useState } from "react";
 import type { IntakeForm, WebsiteSpec } from "@/lib/onboarding/intake-form";
 
 export default function OnboardingPage() {
-  const [step, setStep] = useState<"form" | "submitting" | "generating" | "done" | "error">("form");
+  const [step, setStep] = useState<"form" | "submitting" | "generating" | "done" | "triggering" | "triggered" | "error">("form");
   const [error, setError] = useState<string | null>(null);
   const [spec, setSpec] = useState<WebsiteSpec | null>(null);
   const [intakeId, setIntakeId] = useState<string | null>(null);
+  const [websiteSpecId, setWebsiteSpecId] = useState<string | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
 
   const [form, setForm] = useState<Partial<IntakeForm>>({
     industry: "service",
@@ -54,12 +56,32 @@ export default function OnboardingPage() {
       return;
     }
     setSpec(genData.spec);
+    setWebsiteSpecId(genData.website_spec_id ?? null);
     setStep("done");
   }
 
   const set = (k: keyof IntakeForm, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
-  if (step === "done" && spec) {
+  async function handleTriggerBuild() {
+    if (!websiteSpecId || !intakeId) return;
+    setError(null);
+    setStep("triggering");
+    const res = await fetch("/api/onboarding/trigger-build", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ website_spec_id: websiteSpecId, intake_form_id: intakeId }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      setError(`觸發建站失敗：${data.error}${data.details ? ` — ${data.details}` : ""}`);
+      setStep("done");
+      return;
+    }
+    setRunId(data.run_id);
+    setStep("triggered");
+  }
+
+  if ((step === "done" || step === "triggering" || step === "triggered") && spec) {
     return (
       <div style={{ padding: "2rem", maxWidth: 800, margin: "0 auto" }}>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>
@@ -105,12 +127,38 @@ export default function OnboardingPage() {
           </pre>
         </details>
 
-        <button
-          onClick={() => { setStep("form"); setSpec(null); setIntakeId(null); }}
-          style={{ marginTop: "1.5rem", padding: "0.5rem 1.5rem", background: "var(--color-accent)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
-        >
-          建立另一個
-        </button>
+        {step === "triggered" && runId ? (
+          <div style={{ marginTop: "1.5rem", padding: "1rem 1.5rem", background: "#e8f5e9", border: "1px solid #4caf50", borderRadius: 8 }}>
+            <strong>✅ 已排入建站佇列</strong>
+            <p style={{ margin: "0.5rem 0 0", fontSize: "0.85rem", color: "#333" }}>
+              Run ID：<code>{runId}</code>
+            </p>
+            <a href="/build" style={{ display: "inline-block", marginTop: "0.75rem", color: "var(--color-accent)", fontWeight: 600 }}>
+              前往 /build 查看進度 →
+            </a>
+          </div>
+        ) : (
+          <div style={{ marginTop: "1.5rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            {error && (
+              <p style={{ width: "100%", color: "#c62828", background: "#fee", padding: "0.75rem", borderRadius: 6, margin: 0 }}>
+                {error}
+              </p>
+            )}
+            <button
+              onClick={handleTriggerBuild}
+              disabled={step === "triggering"}
+              style={{ padding: "0.75rem 1.5rem", background: "#2e7d32", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}
+            >
+              {step === "triggering" ? "排入中..." : "觸發建站 →"}
+            </button>
+            <button
+              onClick={() => { setStep("form"); setSpec(null); setIntakeId(null); setWebsiteSpecId(null); setRunId(null); }}
+              style={{ padding: "0.75rem 1.5rem", background: "var(--color-bg-secondary)", color: "var(--color-text-primary)", border: "1px solid var(--color-border)", borderRadius: 8, cursor: "pointer" }}
+            >
+              建立另一個
+            </button>
+          </div>
+        )}
       </div>
     );
   }
