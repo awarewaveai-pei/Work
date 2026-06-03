@@ -4,6 +4,24 @@
 
 ## 2026-06-03
 
+### §1 完整 intake form UI（20 欄位 5 步驟）
+
+**根本目標**：把 `/ops/onboarding` 從 11 欄位單頁表單升級為完整 5 步驟多頁 wizard。
+
+**已修改**：`app/ops/onboarding/page.tsx`（commit `8f40fbeb`，在 checkpoint 中）
+- Step 1：公司 & 品牌（name/tagline/industry/color picker/logo_status）
+- Step 2：客群 & 目標（target_audience textarea / primary_goal 多選格）
+- Step 3：功能需求（pages_needed 多選 / ecommerce/crm/booking checkbox / product_type 展開）
+- Step 4：視覺 & 參考（visual_style chip 按鈕 / reference_sites / language）
+- Step 5：素材 & 時程（existing_content radio / email / domain / budget_tier / launch_urgency）
+- 進度條 + 步驟驗證 + 所有原有提交/生成/觸發建站邏輯不變
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy next-admin | exit=0 | result=tsc 0 + vitest 168/168 + smoke 4/4, commit 8f40fbeb
+- REVIEW_WAIVED: DOC_ONLY -- pure UI rewrite, no API/logic change; same submit/generate/trigger-build flow
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=onboarding/page,IntakeForm,handleSubmit | hits=expected (only page.tsx callsite changed)
+- WORKLOG: this entry
+
 ### Trigger.dev workflows deploy — image rebuild (20260603)
 
 AUTO_TASK_DONE: Trigger workflows 完整 deploy — https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/hasunnuv — 20260603.1
