@@ -1,6 +1,6 @@
-﻿# Cloudflare security check
+# Cloudflare security check
 
-- Generated: 2026-06-03 17:20:30
+- Generated: 2026-06-03 17:36:52
 - Zone: f21b1919632fee2221647908a94fdcac (aware-wave.com)
 - **Overall: PASS**
 
