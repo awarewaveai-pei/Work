@@ -17,12 +17,12 @@ function toOrgSlug(name: string, suffix: string): string {
   return `${base}-${suffix}`;
 }
 
-function toManifestSlug(packageSlug: string): BuildPackageSlug {
+function toManifestSlug(packageSlug: unknown): { slug: BuildPackageSlug; downgraded: boolean } {
   if (packageSlug === "wp-basic" || packageSlug === "wp-business" || packageSlug === "wc-core") {
-    return packageSlug;
+    return { slug: packageSlug, downgraded: false };
   }
   // wc-custom not yet in create-wp-site SUPPORTED_MANIFEST_SLUGS — fallback to wc-core
-  return "wc-core";
+  return { slug: "wc-core", downgraded: true };
 }
 
 export async function POST(request: Request) {
@@ -50,16 +50,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Read spec
-  const { data: specRow, error: specErr } = await supabase
-    .from("website_specs")
-    .select("id, spec_data")
-    .eq("id", website_spec_id)
-    .single();
-  if (specErr || !specRow) {
-    return NextResponse.json({ ok: false, error: "website_spec_not_found" }, { status: 404 });
-  }
-
   // Read intake form
   const { data: intakeRow, error: intakeErr } = await supabase
     .from("intake_forms")
@@ -70,14 +60,61 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "intake_form_not_found" }, { status: 404 });
   }
 
+  // C2: Idempotency gate — if already building, return existing run
+  if (intakeRow.status === "building") {
+    const { data: existingRun } = await supabase
+      .from("ops_action_runs")
+      .select("id")
+      .contains("metadata", { intake_form_id })
+      .in("status", ["pending", "running", "dispatched"])
+      .maybeSingle();
+    if (existingRun) {
+      return NextResponse.json({ ok: true, run_id: existingRun.id, idempotent: true });
+    }
+  }
+
+  // Read spec and cross-validate FK
+  const { data: specRow, error: specErr } = await supabase
+    .from("website_specs")
+    .select("id, spec_data, intake_form_id")
+    .eq("id", website_spec_id)
+    .single();
+  if (specErr || !specRow) {
+    return NextResponse.json({ ok: false, error: "website_spec_not_found" }, { status: 404 });
+  }
+
+  // M1: Cross-validate that this spec belongs to this intake form
+  if (specRow.intake_form_id !== null && specRow.intake_form_id !== intake_form_id) {
+    return NextResponse.json(
+      { ok: false, error: "spec_intake_mismatch", detail: "website_spec does not belong to this intake_form" },
+      { status: 422 }
+    );
+  }
+
   const spec = specRow.spec_data as WebsiteSpec;
   const intakeForm = intakeRow.form_data as IntakeForm;
   const companyName = intakeForm.company_name;
   const domain = intakeForm.domain?.trim() || null;
   const locale = intakeForm.language === "zh-TW" ? "zh-TW" : "en";
 
-  // Create org (reuse if already bound)
-  let organizationId: string = (intakeRow.organization_id as string | null) ?? "";
+  // M2: Guard spec.packs and spec.package_slug against malformed spec_data
+  const rawPacks = (spec as unknown as Record<string, unknown>).packs;
+  const safePacks: WpPluginModule[] = Array.isArray(rawPacks)
+    ? (rawPacks as WpPluginModule[])
+    : [];
+  const { slug: manifestSlug, downgraded } = toManifestSlug(spec.package_slug);
+
+  // C2: Mark building before creating records (acts as a mutex for concurrent calls)
+  const { error: markErr } = await supabase
+    .from("intake_forms")
+    .update({ status: "building" })
+    .eq("id", intake_form_id);
+  if (markErr) {
+    return NextResponse.json({ ok: false, error: "status_update_failed", detail: markErr.message }, { status: 500 });
+  }
+
+  // Resolve org — reuse bound org or create new
+  let organizationId: string | null = (intakeRow.organization_id as string | null) ?? null;
 
   if (!organizationId) {
     const suffix = crypto.randomUUID().slice(0, 6);
@@ -94,84 +131,115 @@ export async function POST(request: Request) {
       .select("id")
       .single();
     if (orgErr || !org) {
-      return NextResponse.json(
-        { ok: false, error: "org_create_failed", detail: orgErr?.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: "org_create_failed" }, { status: 500 });
     }
     organizationId = org.id;
+
+    // Bind org to intake form
+    const { error: bindErr } = await supabase
+      .from("intake_forms")
+      .update({ organization_id: organizationId })
+      .eq("id", intake_form_id);
+    if (bindErr) {
+      return NextResponse.json({ ok: false, error: "org_bind_failed" }, { status: 500 });
+    }
   }
 
-  // Create workspace
-  const { data: workspace, error: wsErr } = await supabase
+  // Resolve workspace — reuse existing default or create
+  let workspaceId: string;
+  const { data: existingWs } = await supabase
     .from("workspaces")
-    .insert({
-      organization_id: organizationId,
-      name: `${companyName} - Default`,
-      slug: "default",
-      workspace_type: "default",
-      status: "active",
-    })
     .select("id")
-    .single();
-  if (wsErr || !workspace) {
-    return NextResponse.json(
-      { ok: false, error: "workspace_create_failed", detail: wsErr?.message },
-      { status: 500 }
-    );
+    .eq("organization_id", organizationId)
+    .eq("slug", "default")
+    .maybeSingle();
+
+  if (existingWs) {
+    workspaceId = existingWs.id;
+  } else {
+    const { data: ws, error: wsErr } = await supabase
+      .from("workspaces")
+      .insert({
+        organization_id: organizationId,
+        name: `${companyName} - Default`,
+        slug: "default",
+        workspace_type: "default",
+        status: "active",
+      })
+      .select("id")
+      .single();
+    if (wsErr || !ws) {
+      return NextResponse.json({ ok: false, error: "workspace_create_failed" }, { status: 500 });
+    }
+    workspaceId = ws.id;
   }
 
-  // Create project
-  const { data: project, error: projErr } = await supabase
+  // Resolve project — reuse existing or create
+  let projectId: string;
+  const { data: existingProj } = await supabase
     .from("projects")
-    .insert({
-      organization_id: organizationId,
-      workspace_id: workspace.id,
-      name: `${spec.site_name ?? companyName} Website`,
-      project_type: "wordpress",
-      status: "active",
-    })
     .select("id")
-    .single();
-  if (projErr || !project) {
-    return NextResponse.json(
-      { ok: false, error: "project_create_failed", detail: projErr?.message },
-      { status: 500 }
-    );
+    .eq("organization_id", organizationId)
+    .eq("workspace_id", workspaceId)
+    .eq("project_type", "wordpress")
+    .maybeSingle();
+
+  if (existingProj) {
+    projectId = existingProj.id;
+  } else {
+    const { data: proj, error: projErr } = await supabase
+      .from("projects")
+      .insert({
+        organization_id: organizationId,
+        workspace_id: workspaceId,
+        name: `${spec.site_name ?? companyName} Website`,
+        project_type: "wordpress",
+        status: "active",
+      })
+      .select("id")
+      .single();
+    if (projErr || !proj) {
+      return NextResponse.json({ ok: false, error: "project_create_failed" }, { status: 500 });
+    }
+    projectId = proj.id;
   }
 
-  // Create site
-  const manifestSlug = toManifestSlug(spec.package_slug ?? "wp-basic");
-  const { data: site, error: siteErr } = await supabase
+  // Resolve site — reuse existing staging draft or create
+  let siteId: string;
+  const { data: existingSite } = await supabase
     .from("sites")
-    .insert({
-      organization_id: organizationId,
-      workspace_id: workspace.id,
-      project_id: project.id,
-      name: spec.site_name ?? companyName,
-      primary_domain: domain,
-      locale: locale === "zh-TW" ? "zh_TW" : "en",
-      status: "draft",
-      theme_family: "kadence",
-      stack_profile: manifestSlug,
-    })
     .select("id")
-    .single();
-  if (siteErr || !site) {
-    return NextResponse.json(
-      { ok: false, error: "site_create_failed", detail: siteErr?.message },
-      { status: 500 }
-    );
+    .eq("organization_id", organizationId)
+    .eq("project_id", projectId)
+    .eq("status", "draft")
+    .maybeSingle();
+
+  if (existingSite) {
+    siteId = existingSite.id;
+  } else {
+    const { data: site, error: siteErr } = await supabase
+      .from("sites")
+      .insert({
+        organization_id: organizationId,
+        workspace_id: workspaceId,
+        project_id: projectId,
+        name: spec.site_name ?? companyName,
+        primary_domain: domain,
+        locale: locale === "zh-TW" ? "zh_TW" : "en",
+        status: "draft",
+        theme_family: "kadence",
+        stack_profile: manifestSlug,
+      })
+      .select("id")
+      .single();
+    if (siteErr || !site) {
+      return NextResponse.json({ ok: false, error: "site_create_failed" }, { status: 500 });
+    }
+    siteId = site.id;
   }
 
-  // Bind org + mark building
-  await supabase
-    .from("intake_forms")
-    .update({ organization_id: organizationId, status: "building" })
-    .eq("id", intake_form_id);
-
-  // Build the pipeline request
-  const stagingDomain = domain ?? `staging-${organizationId.slice(0, 8)}.aware-wave.com`;
+  // Build pipeline request
+  const stagingDomain = domain ?? `staging-${organizationId}.aware-wave.com`;
 
   const buildPayload: BuildRunRequest = {
     profile: "profile_b",
@@ -179,11 +247,11 @@ export async function POST(request: Request) {
     clientName: companyName,
     domain: stagingDomain,
     packageSlug: manifestSlug,
-    selectedPacks: spec.packs as WpPluginModule[],
+    selectedPacks: safePacks,
     organizationId,
-    workspaceId: workspace.id,
-    projectId: project.id,
-    siteId: site.id,
+    workspaceId,
+    projectId,
+    siteId,
     environment: "staging",
     provider: "hostinger",
     locale: locale === "zh-TW" ? "zh_TW" : "en_US",
@@ -221,18 +289,11 @@ export async function POST(request: Request) {
     .select("id, enabled")
     .eq("action_key", plan.actionKey)
     .single();
-
   if (actionErr || !action?.id) {
-    return NextResponse.json(
-      { ok: false, error: "action_catalog_missing", details: `Missing ${plan.actionKey}` },
-      { status: 409 }
-    );
+    return NextResponse.json({ ok: false, error: "action_catalog_missing" }, { status: 409 });
   }
   if (action.enabled === false) {
-    return NextResponse.json(
-      { ok: false, error: "action_disabled", details: `${plan.actionKey} is disabled` },
-      { status: 409 }
-    );
+    return NextResponse.json({ ok: false, error: "action_disabled" }, { status: 409 });
   }
 
   // Enqueue ops_action_runs
@@ -243,9 +304,9 @@ export async function POST(request: Request) {
     id: runId,
     action_id: action.id,
     organization_id: organizationId,
-    workspace_id: workspace.id,
-    project_id: project.id,
-    site_id: site.id,
+    workspace_id: workspaceId,
+    project_id: projectId,
+    site_id: siteId,
     environment_id: null,
     actor_user_id: null,
     actor_role: resolved.role,
@@ -269,10 +330,7 @@ export async function POST(request: Request) {
   });
 
   if (insertErr) {
-    return NextResponse.json(
-      { ok: false, error: "enqueue_failed", details: insertErr.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: "enqueue_failed" }, { status: 500 });
   }
 
   const dispatcherKick = await kickActionRunDispatcher();
@@ -281,10 +339,11 @@ export async function POST(request: Request) {
     ok: true,
     run_id: runId,
     organization_id: organizationId,
-    workspace_id: workspace.id,
-    project_id: project.id,
-    site_id: site.id,
+    workspace_id: workspaceId,
+    project_id: projectId,
+    site_id: siteId,
     trace_id: traceId,
+    manifest_downgraded: downgraded || undefined,
     dispatcher_kick: dispatcherKick,
   });
 }
