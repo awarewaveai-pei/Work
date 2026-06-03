@@ -271,9 +271,14 @@ $summary += "- Owner doc: this script. Trigger: ``scripts\check-governance-docs-
 
 Set-Content -LiteralPath $reportPath -Value ($summary -join "`n") -Encoding UTF8
 
-# Also write LATEST so AO-RESUME delta scan can surface it without reading monthly archives.
+# Also write LATEST to reports/governance/ for archive access.
 $latestPath = Join-Path $reportDir "drift-LATEST.md"
 Set-Content -LiteralPath $latestPath -Value ($summary -join "`n") -Encoding UTF8
+
+# Write LATEST to reports/status/ — canonical location for all LATEST files (same pattern as smoke/backup/auto-reboot).
+$statusDir = Join-Path $WorkRoot "agency-os\reports\status"
+$null = New-Item -ItemType Directory -Force -Path $statusDir
+Set-Content -LiteralPath (Join-Path $statusDir "governance-drift-LATEST.md") -Value ($summary -join "`n") -Encoding UTF8
 
 Write-Host "Drift report written: $reportPath" -ForegroundColor $(if ($worst -eq "PASS") { "Green" } elseif ($worst -eq "WARN") { "Yellow" } else { "Red" })
 Write-Host "Overall: $worst"

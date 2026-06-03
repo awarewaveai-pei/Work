@@ -152,6 +152,11 @@ $content = $lines -join "`r`n"
 Set-Content -LiteralPath $report -Value $content -Encoding UTF8
 Set-Content -LiteralPath $latest -Value $content -Encoding UTF8
 
+# Write LATEST to reports/status/ — canonical location for all LATEST files (same pattern as smoke/backup/auto-reboot).
+$statusDir = Join-Path $agencyRoot "reports\status"
+$null = New-Item -ItemType Directory -Force -Path $statusDir
+Set-Content -LiteralPath (Join-Path $statusDir "supabase-memory-LATEST.md") -Value $content -Encoding UTF8
+
 Write-Output ("RESULT_STATUS={0}" -f $status)
 Write-Output ("RESULT_PERCENT={0}" -f $(if ($usagePercent -gt 0) { $usagePercent } else { "N/A" }))
 Write-Output ("RESULT_SUMMARY={0}" -f $summary)

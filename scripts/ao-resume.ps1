@@ -717,9 +717,20 @@ if ($runMonthly) {
         $global:LASTEXITCODE = 0
     }
 
+    # Write consolidated monthly-LATEST.json to reports/status/ — single place to read.
+    $monthlyStatusDir = Join-Path $WorkRoot "agency-os\reports\status"
+    $null = New-Item -ItemType Directory -Force -Path $monthlyStatusDir
+    $monthlyPayload = @{
+        generated         = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+        system_review     = if (Test-Path (Join-Path $WorkRoot "agency-os\reports\status\integrated-status-LATEST.md")) { "ok" } else { "skip" }
+        supabase_memory   = if (Test-Path (Join-Path $WorkRoot "agency-os\reports\status\supabase-memory-LATEST.md")) { "ok" } else { "skip" }
+        governance_drift  = if (Test-Path (Join-Path $WorkRoot "agency-os\reports\status\governance-drift-LATEST.md")) { "ok" } else { "skip" }
+    }
+    $monthlyPayload | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $monthlyStatusDir "monthly-LATEST.json") -Encoding UTF8
+
     # Update stamp
     [DateTime]::UtcNow.ToString("o") | Set-Content -LiteralPath $monthlyStamp -Encoding UTF8
-    Write-Host "  monthly-checks-last.txt updated." -ForegroundColor DarkCyan
+    Write-Host "  monthly-LATEST.json + monthly-checks-last.txt updated." -ForegroundColor DarkCyan
 }
 
 # Report delta since last AO-RESUME (local stamp under agency-os/.agency-state/)
