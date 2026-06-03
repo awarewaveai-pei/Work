@@ -11,6 +11,8 @@
   Checks (all gracefully skipped on error — never breaks AO-RESUME):
     1. n8n MCP connectivity  (scripts/n8n-mcp-smoke.ps1)
     2. Repair Center health  (GET /api/ops/repairs/health)
+    3. Client sites health   (GET /api/ops/clients)
+    4. n8n workflow failures (GET n8n/api/v1/executions?status=error — last 24h)
   ops-console-smoke skipped here — requires TenantId which varies by tenant.
   Run /smoke-test manually for full DoD including ops-console.
 #>
@@ -83,6 +85,63 @@ try {
     $results["repair_center"] = if ($code) { "skip:http$code" } else { "skip:unreachable" }
 }
 
+# --- Check 3: Client sites health ---
+$clientsUrl = "$AppBaseUrl/api/ops/clients"
+try {
+    $resp = Invoke-RestMethod -Uri $clientsUrl -Headers $authHeader -TimeoutSec 10 -ErrorAction Stop
+    $clients = @($resp.clients)
+    if ($clients.Count -eq 0) {
+        $results["client_sites"] = "skip:no_clients"
+    } else {
+        $unhealthy = @($clients | Where-Object {
+            $_.health -and $_.health.status -and $_.health.status -notin @("ok","healthy","up")
+        })
+        if ($unhealthy.Count -eq 0) {
+            $results["client_sites"] = "ok:$($clients.Count)_healthy"
+        } else {
+            $names = ($unhealthy | ForEach-Object {
+                if ($_.slug) { $_.slug } elseif ($_.name) { $_.name } else { "unknown" }
+            }) -join ","
+            $results["client_sites"] = "warn:unhealthy=$names"
+        }
+    }
+} catch {
+    $code = $null
+    try { $code = [int]$_.Exception.Response.StatusCode } catch {}
+    $results["client_sites"] = if ($code) { "skip:http$code" } else { "skip:unreachable" }
+}
+
+# --- Check 4: n8n recent workflow failures (last 24h) ---
+try {
+    $n8nApiKey  = [System.Environment]::GetEnvironmentVariable("N8N_API_KEY", "User")
+    if (-not $n8nApiKey) { $n8nApiKey = $env:N8N_API_KEY }
+    $n8nBaseUrl = [System.Environment]::GetEnvironmentVariable("N8N_API_BASE_URL", "User")
+    if (-not $n8nBaseUrl) { $n8nBaseUrl = $env:N8N_API_BASE_URL }
+    if (-not $n8nBaseUrl) { $n8nBaseUrl = "https://n8n.aware-wave.com" }
+
+    if ($n8nApiKey) {
+        $since = (Get-Date).ToUniversalTime().AddHours(-24).ToString("yyyy-MM-ddTHH:mm:ssZ")
+        $execUrl = "$n8nBaseUrl/api/v1/executions?status=error&limit=10"
+        $n8nHeaders = @{ "X-N8N-API-KEY" = $n8nApiKey }
+        $execResp = Invoke-RestMethod -Uri $execUrl -Headers $n8nHeaders -TimeoutSec 10 -ErrorAction Stop
+        $recent = @($execResp.data | Where-Object {
+            $_.startedAt -and ([DateTime]$_.startedAt).ToUniversalTime() -gt ([DateTime]$since)
+        })
+        if ($recent.Count -eq 0) {
+            $results["n8n_failures"] = "ok:none_24h"
+        } else {
+            $wfNames = ($recent | ForEach-Object {
+                if ($_.workflowData -and $_.workflowData.name) { $_.workflowData.name } else { "id:$($_.id)" }
+            } | Select-Object -Unique) -join ","
+            $results["n8n_failures"] = "warn:$($recent.Count)_errors=$wfNames"
+        }
+    } else {
+        $results["n8n_failures"] = "skip:no_api_key"
+    }
+} catch {
+    $results["n8n_failures"] = "skip:exception"
+}
+
 # --- Write LATEST JSON ---
 $stamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 $payload = @{
@@ -93,10 +152,12 @@ $json = $payload | ConvertTo-Json -Depth 5
 Set-Content -Path (Join-Path $reportDir "smoke-LATEST.json") -Value $json -Encoding UTF8
 
 # --- Summary line for console ---
-$n8nOk     = $results["n8n_mcp"] -eq "ok"
-$repairOk  = $results["repair_center"] -eq "ok"
-$overall   = if ($n8nOk -and $repairOk) { "PASS" } elseif ($results["repair_center"] -like "skip*" -and $results["n8n_mcp"] -like "skip*") { "SKIP" } else { "WARN" }
+$checks    = @("n8n_mcp","repair_center","client_sites","n8n_failures")
+$hasWarn   = $checks | Where-Object { $results[$_] -like "warn:*" -or $results[$_] -like "fail:*" }
+$allSkip   = ($checks | Where-Object { $results[$_] -notlike "skip:*" }).Count -eq 0
+$overall   = if ($hasWarn) { "WARN" } elseif ($allSkip) { "SKIP" } else { "PASS" }
 $colour    = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } else { "Yellow" }
 
-Write-Host ("== Smoke: {0} | n8n={1} | repair={2} ==" -f $overall, $results["n8n_mcp"], $results["repair_center"]) -ForegroundColor $colour
+Write-Host ("== Smoke: {0} | n8n_mcp={1} | repair={2} | clients={3} | n8n_fail={4} ==" -f `
+    $overall, $results["n8n_mcp"], $results["repair_center"], $results["client_sites"], $results["n8n_failures"]) -ForegroundColor $colour
 exit 0

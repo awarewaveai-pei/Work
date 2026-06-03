@@ -162,6 +162,38 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 **使用者不需要知道任何工具名稱，也不需要說任何觸發詞。** Claude 在工作過程中自行識別情境、選擇工具、執行，執行前用一句話告知（例：「我用 debugger agent 來查這個 log」）。  
 **禁止**：問「要不要我用 X？」「需要我跑 Y 嗎？」——Low/Medium 風險工具直接執行。High 風險（prod deploy / reboot / DB migration）仍需明示 go-ahead。
 
+### 任務到達協議（強制，所有非 AO 任務的第一步）
+
+任何任務開始前，依序執行：
+
+**步驟 1 — 取得足夠的上下文**
+
+若使用者訊息模糊（「幫我」「那個」「看一下」等）：
+先讀 `agency-os/TASKS.md` + `agency-os/.agency-state/worklog-excerpt.md` + `agency-os/memory/CONVERSATION_MEMORY.md`  
+讀完仍不清楚 → 問**一個**具體問題，不問兩個。
+
+**步驟 2 — 分類任務類型，預載對應工具**
+
+| 任務類型 | 判斷條件 | 預載 |
+|---------|---------|------|
+| Infrastructure | VPS / Docker / nginx / 服務異常 | `incident-responder` triage → runbook |
+| Code change | 新增 / 修改 / 重構程式碼 | 見步驟 3 |
+| Client site | soulful / WP / 客戶相關 | `/client-status` 先確認 → `wordpress-*` agent |
+| Database | schema / migration / query / 資料 | `db-expert` 先審 → `supabase-engineer`（如涉 Supabase）|
+| Security | auth / RLS / permission / 漏洞 | `critic` → `vuln-verifier` |
+| Data/Analytics | PostHog / funnel / 轉換率 | `posthog-analyst` |
+| Technical decision | 工具選型 / 架構 / A vs B | `/decide` |
+| System health | 健康 / 監控 / 是否正常 | `/health` → `/smoke-test` |
+
+**步驟 3 — Code change 的複雜度判斷**
+
+- 改動 ≥ 3 個模組 / 有架構影響 → `planner` agent 先拆任務再實作
+- 改動 < 3 個模組 / 範圍明確 → 直接執行
+
+**步驟 4 — 確認完成標準**
+
+開始前確認這個任務類型的 DoD（見下方 §任務完成標準）。
+
 ### Claude 工作自觸發規則（不依賴使用者輸入）
 
 這是最重要的一張表。**觸發條件是 Claude 自己在做什麼，與使用者說什麼無關。**
@@ -226,6 +258,19 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 - 有「可能是」「大概」→ 要求用證據支撐，不接受猜測
 
 **禁止**：直接採用 agent 輸出而不驗證；以「agent 說了」取代自己的判斷。
+
+### 任務完成標準（DoD）
+
+每個任務完成前，對照以下標準確認：
+
+| 任務類型 | 完成條件（缺一不算完成）|
+|---------|----------------------|
+| **Code change** | REALTEST_EVIDENCE + REVIEW_DONE + BUGHUNT_DONE + WORKLOG（R0 四動作）|
+| **Infrastructure** | 症狀消失（curl / healthcheck 驗證）+ WORKLOG 記錄根因 + `/health` 100% |
+| **Client site 維護** | `/client-status` 健康 + `/playwright client <slug>` 無異常 + WORKLOG 記錄備份/更新/截圖 |
+| **Technical decision** | 決策記錄在 `reports/decisions/` + 使用者確認接受結論 |
+| **Research / 調研** | 具體答案（非「可能是」）+ 來源引用（URL 或 file:line）+ 結論寫進 WORKLOG |
+| **System health 確認** | 所有 smoke check PASS（或 WARN 項已解釋）+ WORKLOG 記錄時間與結果 |
 
 ### 問題症狀 → Runbook 路由表
 
