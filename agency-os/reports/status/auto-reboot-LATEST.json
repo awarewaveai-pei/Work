@@ -1,5 +1,5 @@
 {
-    "generated_utc":  "2026-06-03 01:17:55",
+    "generated_utc":  "2026-06-03 09:19:09",
     "overall_label":  "healthy",
     "overall_user":  "PASS",
     "ssot":  {
@@ -17,8 +17,8 @@
                                 "sha53":  "",
                                 "daemon_active":  "active",
                                 "daemon_enabled":  "enabled",
-                                "reboot_pending":  "0",
-                                "reboot_pkgs":  "",
+                                "reboot_pending":  "1",
+                                "reboot_pkgs":  "linux-image-6.8.0-124-generic,linux-base",
                                 "kernel":  "6.8.0-117-generic",
                                 "last_reboot":  "Sat May 23 11:18 still",
                                 "expect_53":  false
@@ -28,7 +28,7 @@
                                "reasons":  [
 
                                            ],
-                               "pending":  false
+                               "pending":  true
                            }
            },
     "eu":  {
