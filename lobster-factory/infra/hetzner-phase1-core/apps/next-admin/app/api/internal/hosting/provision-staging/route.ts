@@ -160,7 +160,7 @@ export async function POST(request: Request) {
     const themeOk = themeResult.code === 0 || themeResult.stdout.includes("already installed");
 
     // 7. Always install Kadence Blocks + base plugins; add manifest-specific slugs
-    const basePlugins = ["kadence-blocks", "rank-math-seo", "fluent-smtp", "litespeed-cache"];
+    const basePlugins = ["kadence-blocks", "seo-by-rank-math", "fluent-smtp", "litespeed-cache"];
     const ecommercePlugins = manifestSlug === "wc-core" || manifestSlug === "wc-custom"
       ? ["woocommerce", "woo-gutenberg-products-block"]
       : [];
