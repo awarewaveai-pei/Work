@@ -337,11 +337,9 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/operations/system-guard-and-notification.md`
 - `docs/operations/system-operation-sop.md`
-- `docs/operations/TOOL_TRIGGER_MAP.md`
-- `docs/operations/USER_INITIATED_TOOLS.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-06-03 05:51:15 UTC_
+_Last synced: 2026-06-03 09:57:41 UTC_
 

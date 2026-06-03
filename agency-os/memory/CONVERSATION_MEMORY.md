@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-06-03 (AO-CLOSE)** — 兩條主線。(1) **Provision-staging Kadence+plugins**（commit `2942cf1d`）：`route.ts` Step 6+7 加裝 Kadence 主題 + kadence-blocks/seo-by-rank-math/fluent-smtp/litespeed-cache/fluentform；SSH real-test 確認 Kadence+5 plugins active；sg-deploy exit 0，Playwright smoke 22/30（api-health 2 failures 為預存 nginx-auth 問題，非 regression）。(2) **Cloudflare WAF wp-login 403 臨時修**：操作者 IP `114.32.129.172` 不在 CIDR `114.34.0.0/15`；API patch 加入 `114.32.0.0/15`；**永久修**（改 `ip.geoip.country in {"TW" "SG"}`）存 tomo → `handoffs/2026-06-03-1749-tomo-174946.md`。
 - **2026-06-02 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-02 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:756202b7e05e480d7a8af387cca8a2372c436d9e362ffc480933c0cd72dee1e3 -->
 - **2026-06-02 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-02 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:5d168d0bc6f04e6102bd2d3f9a0171782f0619b09ecfd7cc72a5b81a549287b7 -->
 - **2026-06-02 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-02 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:d47de374f44a269f34d34ea5d1ef7797137f2acf0e67d4e602d7cec9bd46e416 -->
@@ -475,5 +476,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-03 05:51:15 UTC_
+_Last synced: 2026-06-03 09:57:41 UTC_
 

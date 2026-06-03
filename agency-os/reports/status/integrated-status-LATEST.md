@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-03 17:23:45
+- Generated: 2026-06-03 18:02:09
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -301,14 +301,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-2. REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n — C1+C2+M3+M4+M5 all fixed before commit (Supabase null guard, content.find(), validateSpec, AbortController, apiKey check)
-3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0
-4. WORKLOG: this entry
-
-## 2026-06-02 — system-guard LAST_SYSTEM_STATUS churn 治本（換機 AO-RESUME 分歧根因）
-
-**[根因]** `LAST_SYSTEM_STATUS.md` 是 git-tracked，但 `system-guard.ps1` 每跑必重寫，內含 3 個每次都變的欄位（`- Time:` 秒級時間戳、`- Health:`/`- Closeout:` 時間戳報告檔名）→ 開工 working tree 必 dirty → AO-RESUME hook auto-checkpoint 成一個 commit → 落後遠端時 push 被拒（non-fast-forward）→ 卡在分歧、每次換機手動 reset。本 session AO-RESUME 即因此 exit 1（behind 48）。先前一度誤用 `.gitignore` 規避（commit 6c0d61a），經操作者指正後 revert（9b2b2d3）：ignore 等於把跨機健康紀錄從共享 repo 刪掉，治標埋雷；正解是修檔案寫入邏輯。
-
 **[抓蟲額外發現 — 已記 TASKS]** 排程 `AgencyOS-SystemGuard-Daily` 實跑的是 `agency-os/scripts/system-guard.ps1`，非 top-level 正本；且 `scripts/` 與 `agency-os/scripts/` 有 29 同名檔、**20 個內容 drift**（含 ao-close/ao-resume/system-health-check/verify-build-gates 等 AO 生命週期核心腳本）。既定架構：root `scripts/` 為正本，`agency-os/scripts/*` 應為 thin wrapper（已對 sync-enterprise-cursor-rules / check-three-way-sync 套用，`system-health-check.ps1:143` 有 wrapper-rule 健康檢查）；system-guard 等 20 檔 wrapper 化未完成 → drift。本次只修 churn（兩份都套同一 fix 確保哪份跑都生效），20 檔 wrapper 化另記 TASKS。
 
 **[已修改]**
@@ -358,6 +350,14 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: onboarding-staging-build → handoffs/2026-06-02-2235-onboarding-staging-build.md
+
+
+
+
+## 2026-06-03
+
+### Machine appendix (monthly-system-review)
+- 2026-06-03 17:23:56 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 38.89% (< 85%))
 
 
 
