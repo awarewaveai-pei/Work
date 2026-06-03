@@ -129,15 +129,15 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | AO-RESUME digest `since_utc` 比需要範圍早 > 2 小時 | 補跑 `/signals -From <需要起點>` |
 | AO-RESUME | 讀 `reports/status/cf-security-LATEST.md`，列入外部信號段（mtime >24h 才重跑腳本）|
 | 使用者問 Cloudflare 設定是否正常 | `scripts/check-cloudflare-security.ps1` |
-| `fetch-external-signals` Telegram 欄出現 `error.*401\|error.*403` | 立即執行三步診斷：① `curl -s -o /dev/null -w "%{http_code}" https://app.aware-wave.com/api/ops/inbox/digest` — 若 403 代表 middleware 仍擋（需查 middleware.ts）；若 401 代表 token 不符 → ② `powershell -File scripts/secrets-vault.ps1 -Action import-user-env` → ③ 更新 User registry：`[System.Environment]::SetEnvironmentVariable('OPS_INBOX_INGEST_TOKEN', <vault值>, 'User')` → ④ 重跑 fetch-signals 確認 `ok`。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
-| EU VPS `infra-alerts` 出現 scanner 路徑（`/.aws/`、`/.ssh/`、`/wp-config` 等）且 bad request % > 50 | ① SSH EU VPS 確認是否已自動恢復；② 若持續進行中，用 Cloudflare WAF PATCH API 追加該路徑至 block rule（Zone=`f21b1919632fee2221647908a94fdcac`，Ruleset=`f290fd58b69c4cedb7a0688ca959034f`，Rule=`74c0e70b90874ea4b44926aecb44ae16`）；③ curl 實測新路徑回 403 確認生效。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
+| `fetch-external-signals` Telegram 欄出現 `error.*401\|error.*403` | ① curl inbox/digest 確認 403/401 類型；② `secrets-vault.ps1 -Action import-user-env`；③ 更新 `OPS_INBOX_INGEST_TOKEN` 到 User registry；④ 重跑確認 ok。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
+| EU VPS `infra-alerts` 出現 scanner 路徑（`/.aws/`、`/.ssh/`、`/wp-config`）且 bad request % > 50 | SSH EU 確認；若持續 → Cloudflare WAF PATCH API 追加 block rule；curl 實測 403。詳見 `runbooks/CLOUDFLARE-WAF-SETUP.md §API 維護` |
 | next-admin 程式碼改動後 sg-deploy 失敗且 log 含 `npm test FAILED` | ① 在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看失敗詳情；② 修好測試或修好程式碼（二擇一，視測試是否合理）；③ commit + push；④ 重跑 `sg-deploy.sh next-admin`。**禁止**：繞過 test gate（--skip-pull + 手動 rsync 或直接 `docker compose build`）。 |
-| 訊息含 reboot 訊號（任一）：`post_update_reboot_status`／`needs reboot`／`requires reboot`／`reboot.?required`／`System restart required`／`重啟`／`重開機`／`重新啟動`／`/var/run/reboot-required` **且**含 VPS 識別字（EU：`awarewave-eu-hel1`／`hel1`／`204.168.175.41`／`EU`；SG：`awarewave-sg`／`wordpress-ubuntu-4gb-sin`／`sin-1`／`5.223.93.113`／`SG`）| **🟢 自動化已 ON（2026-05-23 部署 B-Minimal）**：unattended-upgrades **SG 每日 20:00 UTC / EU 每日 20:30 UTC**（30 分鐘 stagger）。SSOT=[`lobster-factory/infra/hetzner-phase1-core/auto-reboot/`](../lobster-factory/infra/hetzner-phase1-core/auto-reboot/)；runbook=[`runbooks/VPS-AUTO-REBOOT-RUNBOOK.md`](../runbooks/VPS-AUTO-REBOOT-RUNBOOK.md)。**首選資料源**：[`reports/status/auto-reboot-LATEST.md`](reports/status/auto-reboot-LATEST.md)（每次 AO-RESUME 由 `check-vps-auto-reboot-health.ps1` 自動產生，含兩台 verdict 🟢/🟡/🔴 + 漂移原因 + pending 狀態 + 最近 reboot 時間），先讀此檔再決定動作。**判斷流程**：①「告警時戳」距現在 < 16 小時 + auto-reboot-LATEST.md 顯示 🟢 healthy → 告知「auto-reboot 將於下一個 20:00 UTC (SG) / 20:30 UTC (EU) 處理，無需動作」；不主動跑指令 ②「告警時戳」距現在 ≥ 16 小時 OR LATEST.md 顯示 🟡/🔴 → **依 LATEST verdict 處置**：🟢 healthy（訊號殘留，少見） → 升級手動 `/sg-reboot` 或 `/eu-reboot` Step 1 pre-flight → 中文摘要 → **等使用者 go-ahead 才進 Step 2**；🟡 drift（SHA256 不符 / apt-config 不對） → 先報漂移內容請使用者決定；🔴 broken（daemon 停 / conf 不見） → 立即升級手動 reboot 並標記需要重部署 SSOT。**ad-hoc 即時重查**：跑 [`/auto-reboot-status`](../.claude/commands/auto-reboot-status.md) 或 `scripts/check-vps-auto-reboot-health.ps1`（兩者等價）。**禁止**：未過 pre-flight 自動 reboot；無 VPS 識別字時自動觸發；對 < 16h 訊號跑 pre-flight（噪音）。**AO-RESUME 時**：必讀 `auto-reboot-LATEST.md` 並於系統快照段點名 verdict；若 LATEST.md 顯示 pending=yes 或 verdict 非 🟢，於七段式主動點名「⚠️ EU/SG reboot pending @ ... 或 auto-reboot drift」，不要靜默。 |
+| 訊息含 reboot 訊號（`needs reboot` / `重啟` 等）**且**含 VPS 識別字（EU/SG IP 或主機名）| 先讀 `reports/status/auto-reboot-LATEST.md`（verdict 🟢/🟡/🔴）。< 16h → auto-reboot 自動處理，不主動跑指令。≥ 16h 或非 🟢 → escalate 手動 `/sg-reboot` 或 `/eu-reboot`（High risk，等 go-ahead）。AO-RESUME 時必點名 verdict。詳見 `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md` |
 | 任何 `Edit`／`Write`／`MultiEdit` 寫入或修改 `.ps1` 檔（CP950 trap class，2026-05-22 backfill-missed-daily.ps1 真實爆過）| **🔧 機械閘**：`code-change-tracker.js` 修改 .ps1 時自動提示。立即執行 `/audit-encoding --file <該檔絕對路徑>`（exit 0=放行；exit 1=fix：wrap capture site 或加 AUDIT_REGISTRY 豁免）。詳：[.claude/commands/audit-encoding.md](../.claude/commands/audit-encoding.md) |
 | 任何 `Edit`／`Write`／`MultiEdit` 改動 code 檔（`.ps1 .ts .tsx .js .jsx .mjs .sh .py`）後即將完成 R0 任務（準備寫 [驗證結果]）| **🔧 機械閘**：`verify-gate-stop.js` session 結束時提醒。Review 段寫入前強制跑 `/review`（critic subagent，**外部 oracle**）；critic 結論納入 [驗證結果] Review 段。**禁止**：以自我描述替代 critic output。詳：[`.claude/commands/review.md`](../.claude/commands/review.md) |
 | 任何 audit / 抓蟲 / bug class / encoding / silent fail / 工具化 / class-by-class 相關問題或情境 | 先讀 [`docs/operations/BUG_HUNT_PROTOCOL.md`](docs/operations/BUG_HUNT_PROTOCOL.md)（方法 SSOT，5-tier 觸發 + 9-step playbook + KPI）+ [`docs/operations/AUDIT_REGISTRY.md`](docs/operations/AUDIT_REGISTRY.md)（狀態 SSOT）再回答，不靠常識 / 不臨機自創流程 |
 | 操作者說「apply audit」／「apply the patches」／「套用 audit」／「把 audit 修一修」／「處理好所有的事」並指涉一份 `agency-os/reports/audit/*.md`（或可從 WORKLOG / AUDIT_REGISTRY 推得最近未 apply 的 logic audit）| **立即執行 `/apply-audit <report-path>`**：強制 §Patch Errata fold-in 在改 code 前 + 跨檔抓蟲 catch-up（grep callsites of new symbols across `lobster-factory/`、`agency-os/`）+ 4-action verify per patch + AUDIT_REGISTRY 🔴 TRACKED → 🔴 FIXED 含 commit hash + WORKLOG entry 含 R0+R4 4 動作。**禁止**：跳過 Errata 折回直接 apply（2026-05-23 三次 push-back 的根因）；Medium-High 風險 patch（prod deploy script / auth / DB migration）沒操作者明示 OK 就 apply。詳：[`.claude/commands/apply-audit.md`](../.claude/commands/apply-audit.md) |
-| 操作者說 `/tomo <hint>` | **立即執行 `.claude/commands/tomo.md`**：① hint secret check（寫 `$env:TEMP\tomo-hint-scan.txt` → `scan-local-config-for-secrets.ps1 -Path`）→ exit ≥ 1 時 ABORT；② context 抽取（git status/log/diff + 對話 + TASKS.md）；③ 生 6 段 packet；④ 直接寫 `agency-os/handoffs/<filename>` + TASKS.md `#### 待釐清 / 明日提醒` + WORKLOG `TOMORROW_CAPTURED`（無 propose 確認步驟）；⑤ `commit-checkpoint.ps1` + `git push origin main`。詳：[`.claude/commands/tomo.md`](../.claude/commands/tomo.md)；packet 格式：[`agency-os/handoffs/SCHEMA.md`](handoffs/SCHEMA.md) |
+| 操作者說 `/tomo <hint>` | secret check → context 抽取 → 6 段 packet → 直接寫 `handoffs/` + TASKS + WORKLOG → commit + push（無 propose 確認）。詳見 [`.claude/commands/tomo.md`](../.claude/commands/tomo.md) |
 | **部署流程觸發**：使用者說「部署」/「deploy」/「推上去」/「可以上了」/「上線」 | ① `/check-drift` 確認 drift 清零 ② `/verify` 確認 build gate 通過 ③ 若有 `.ts/.tsx` 改動先在本機跑 `npx tsc --noEmit` ④ 三者 pass 才**提議**（不自動）`/sg-deploy`，等明示 go-ahead |
 | `/sg-deploy` smoke check pass 後 | 自動跑 `/playwright smoke` |
 | 使用者問「系統狀態」/「是否健康」/「health」/「有沒有問題」 | 跑 `/health`；若回報 `sync_check: FAIL` → 接著跑 `/sync-check` |
@@ -155,7 +155,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 使用者說「QA 跑一下」/「瀏覽器測試」/「截圖」/「效能測試」 | 對應跑 `/playwright smoke`（基礎）/`/playwright qa`（完整）/`/playwright screenshot <url>`/`/playwright perf` |
 | 使用者說「回顧一下」/「今天做了什麼」/「收工前看一下」/「要 close 了嗎」 | 跑 `/recap`（唯讀；確認後才跑 `/ao-close`） |
 | 使用者說「任務」/「還有什麼」/「今天要做哪些」/不確定目前 backlog 狀態 | 跑 `/tasks` 列出所有 open 待辦 |
-| **🔧 機械閘**：`auto-repair-guard.js` 每 session 首次 auto-repair Write/Edit 前 exit-2 BLOCK（顯示 4 pre-checks）；re-issue 通過。任何 `Edit`／`Write`／`MultiEdit` 寫入 Auto-Repair 邏輯（**完整路徑**：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/*`、`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/{redactSecrets,verifyIngestToken,fingerprint}.ts`、`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/{sentry,uptime-kuma,netdata,grafana,posthog}/route.ts`、`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/**`、`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/commands/slack/route.ts`、`.github/workflows/auto-repair-*.yml`、`lobster-factory/infra/hetzner-phase1-core/scripts/{sg-deploy,rollback-phase1,auto-deploy-next-admin}.sh`）| ① 先讀 [`reports/audit/auto-repair-2026-05-23.md`](reports/audit/auto-repair-2026-05-23.md)（最新 audit baseline，5 Criticals + 10 Majors + 11 Minors + Patch Errata）；② 跑 `powershell -ExecutionPolicy Bypass -File scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly`（讓 harness 當 oracle：exit 0=放行；exit 1=必須修；exit 2=warn 看內容）；③ 若改動修了 C1-C5 任一個 Critical → 同 PR 把 [AUDIT_REGISTRY.md §Auto-Repair logic audit (2026-05-23)](docs/operations/AUDIT_REGISTRY.md#auto-repair-logic-audit-2026-05-23) 對應條目從 🔴 TRACKED 升 🔴 FIXED，含 commit hash；④ 若改動觸及 `sg-deploy.sh` Step 7 / `redactSecrets.ts` / `webhooks/*/route.ts` body size / `app/api/ops/repairs/route.ts` GET，**必須同步更新 [DEPLOY_ROLLBACK_RUNBOOK.md](docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md) 對應行為描述**（避免 plan vs code 再次說一套做一套 — 本次 audit 三個 SSOT contract 違反的根因）;**注意**：本規則 trigger path **必須含完整 monorepo 前綴**（self-critic Maj-5 修正 2026-05-23：原版只寫 `lib/repair-center/*` 不會 fire，因 Claude 看到的 `file_path` 是絕對路徑） |
+| **🔧 機械閘**：`auto-repair-guard.js` 攔截 Auto-Repair 邏輯路徑（repair-center / webhooks / ops/repairs / sg-deploy.sh 等）| 首次觸發 BLOCK，re-issue 通過。① 讀 `reports/audit/auto-repair-2026-05-23.md`；② 跑 `dogfood-auto-repair.ps1 -Mode HealthOnly`；③ 修 C1-C5 → 更新 `AUDIT_REGISTRY.md`；④ 改 sg-deploy Step 7 / redactSecrets 等 → 更新 `DEPLOY_ROLLBACK_RUNBOOK.md`。路徑清單見 `mcp/claude-userlevel/hooks/auto-repair-guard.js` |
 
 ### 核心行為規則：宣告執行，不詢問
 
@@ -190,31 +190,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 
 ### 工作類型 → Agent/Tool 路由表
 
-| 使用者描述的工作 | 自動使用 |
-|--------------|---------|
-| 有 bug / 程式跑錯 / log 看不懂 / 行為異常 | `debugger` agent（系統性根因分析）|
-| 資料庫 schema / migration / query 慢 / index | `db-expert` agent（唯讀分析）|
-| Supabase RLS / Edge Function / auth 權限 | `supabase-engineer` agent |
-| n8n workflow 壞了 / 要建新自動化 | `n8n-engineer` agent |
-| Trigger.dev 要 deploy / workflow 改動 | `trigger-deploy-agent` agent |
-| WordPress 外掛衝突 / Kadence / WooCommerce / Fluent | `wordpress-plugin-expert` agent |
-| WP 客戶備份 / 更新 / MainWP sync | `wordpress-maintenance-agent` agent |
-| MainWP 連不上 / child site 斷線 / 設定 | `mainwp-engineer` agent |
-| VPS / Docker / nginx 出問題 / container crash | `devops-engineer` agent |
-| 前端頁面 / UI 設計 / dashboard component | `frontend-designer` agent |
-| 複雜 feature 跨 3+ 模組 / 需要拆任務 | `planner` agent 先拆，再實作 |
-| 大規模 refactor / 10+ 檔案搬移重命名 | `refactor-specialist` agent |
-| 框架升級 / 套件 major version bump | `migration-engineer` agent |
-| 安全漏洞 / critic 回報疑似問題 | `vuln-verifier` agent 寫 PoC 驗證 |
-| PostHog 數據 / funnel / 轉換率 / feature flag | `posthog-analyst` agent |
-| 陌生 repo / 第一次看這個 codebase | `onboarder` agent |
-| API 文件 / 規格 / 版本差異查詢 | `web-researcher` agent |
-| 工具選型 / A vs B / 架構審查 / rollout 規劃 | `decision-intelligence` agent（`/decide`）|
-| 策略討論 / 要不要做 X / 紅藍隊壓力測試 | `strategy-review` skill |
-| 新功能要從哪裡開始 / 需求拆解 | `feature-plan` skill |
-| 想了解這個 code 品質如何 | `critic` agent（`/review`）|
-| 跑 QA / 瀏覽器測試 / 截圖 / 效能 | `/playwright` 對應模式 |
-| 想確認 .ps1 / .ts / .js 改動沒問題 | `/verify-recent`（syntax + critic + exec）|
+→ 完整表（25 個工作類型 × agent/skill/command）見 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)
 
 ### 問題症狀 → Runbook 路由表
 
@@ -235,18 +211,8 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
 ## Session 啟動順序（每次都做）
 
-> **執行 SSOT（完整讀檔清單含 hook state / signals / snapshot）**：
-> - Claude Code：`.claude/commands/ao-resume.md` Step 1
-> - Cursor：`.cursor/rules/30-resume-keyword.mdc` Step 2
-> 本段為概念摘要；兩者不一致時以上述執行 SSOT 為準。
-
-概念摘要（核心順序）：
-1. `agency-os/TASKS.md` + `agency-os/.agency-state/worklog-excerpt.md`（WORKLOG since last AO-CLOSE；由 ao-resume.ps1 生成；不存在時 fallback last 30 lines）
-2. `agency-os/memory/CONVERSATION_MEMORY.md`
-3. `agency-os/memory/daily/` 今日與昨日（若存在）
-4. `lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md` + `LOBSTER_FACTORY_COMPLETION_PLAN_V2.md`
-
-AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
+SSOT：[`.claude/commands/ao-resume.md`](../.claude/commands/ao-resume.md)（Claude Code）/ `.cursor/rules/30-resume-keyword.mdc`（Cursor）。  
+Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hook-last.json` → 七段式輸出。兩者不一致時以各自 SSOT 為準。
 
 ## AO-RESUME / AO-CLOSE 快速續接
 
@@ -269,24 +235,9 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 
 ## 跨機 .md 編碼紀律（強制）
 
-**規則**：任何走 Google Drive 跨機同步的 `.md` 必須是 UTF-8 + BOM。沒 BOM → 桌機 PowerShell 在 Big5 系統會誤解 → CJK 亂碼。
-
-**範圍**（走 Drive）：
-- `~/.claude/projects/<key>/memory/MEMORY.md`
-- `~/.claude/projects/<key>/memory/*.md`
-- `AWARE_WAVE_CREDENTIALS.md`（vault）
-
-**範圍**（**不**走 Drive，免 BOM）：repo 內所有 .md（WORKLOG / TASKS / runbooks / docs / .cursor/rules）→ git 處理 bytes，免疫此問題。
-
-**機械保障**（已套用，無需 LLM 自律）：
-- `scripts/export-cross-machine-memory.ps1` → `Copy-MdWithUtf8Bom` helper：所有 export 強制 BOM
-- `scripts/import-cross-machine-memory.ps1` → `Set-Utf8BomOnFile` helper：所有 import 強制 BOM
-- 一次性 backfill：`memory/.bom-backfill-backup-<timestamp>/` 留存無 BOM 版本（如需 rollback）
-
-**寫入 memory .md 時的最佳實踐**：
-- Claude 用 Write tool 寫 memory .md 時，**內容裡可以放 CJK**（會以 UTF-8 byte 寫入）
-- BOM 由 export/import 機械加上，**Claude 本機寫入時不需手動加 BOM**
-- 例外：若直接寫到 Google Drive 路徑（繞過 export script），**必須**手動加 BOM
+走 Google Drive 同步的 `.md`（`memory/*.md`、`CREDENTIALS.md`）必須是 UTF-8 + BOM；否則 Big5 系統 CJK 亂碼。  
+Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。  
+機械保障：export/import scripts 自動加 BOM；Claude 本機 Write 時不需手動加（例外：直接寫 Google Drive 路徑才需手動加）。
 
 ## First Run
 若有 `BOOTSTRAP.md`，先照檔案完成初始化再開始任務。
