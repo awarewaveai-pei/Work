@@ -90,12 +90,25 @@ $noUi = $HideUi -or ($env:AGENCYOS_SCHEDULED_QUIET -eq "1")
 # 1) Sync relationships
 Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/doc-sync-automation.ps1") -ScriptArgs @("-AutoDetect")
 
-# 2) Health check
-Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/system-health-check.ps1") -ScriptArgs @("-WorkspaceRoot", $root)
-$healthExitCode = $LASTEXITCODE
-
+# 2) Health check — skip if a fresh 100% report exists from this session (< 10 min)
 $healthDir = Join-Path $root "reports/health"
 $closeoutDir = Join-Path $root "reports/closeout"
+$healthExitCode = 1
+$freshCutoff = [DateTime]::UtcNow.AddMinutes(-10)
+$existingHealth = Get-LatestFile -Dir $healthDir -Filter "health-*.md"
+$usedFreshReport = $false
+if ($existingHealth -and $existingHealth.LastWriteTimeUtc -gt $freshCutoff) {
+    $freshScore = Parse-HealthScore -HealthReportPath $existingHealth.FullName
+    if ($freshScore -ge 100.0) {
+        $healthExitCode = 0
+        $usedFreshReport = $true
+        Write-Host "system-guard: reusing fresh health report ($($existingHealth.Name), score=$($freshScore)%) — skipping duplicate run" -ForegroundColor Cyan
+    }
+}
+if (-not $usedFreshReport) {
+    Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/system-health-check.ps1") -ScriptArgs @("-WorkspaceRoot", $root)
+    $healthExitCode = $LASTEXITCODE
+}
 $guardDir = Join-Path $root "reports/guard"
 Ensure-Dir -Path $guardDir
 
