@@ -7728,3 +7728,9 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 
+
+## 2026-06-03
+
+### Machine appendix (monthly-system-review)
+- 2026-06-03 17:23:56 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 38.89% (< 85%))
+

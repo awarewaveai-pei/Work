@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-02 22:53:51
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-06-03 17:23:45
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -219,97 +219,66 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-02.md
-# Daily Note - 2026-06-02
-
-## Done today (session window: 2026-06-01 AO-CLOSE → 2026-06-02 AO-CLOSE)
-
-- **npm audit 自動化**：qs DoS 修復 (6.11.1→6.15.2)；GHA weekly-workflows-security-audit.yml + Slack+Telegram 通知；upload-artifact v4→v5；Node.js 24 強制
-- **routines SSOT backfill**：DailyBriefing/WeeklyReview/MonthlyReview (commit aa32970c)
-- **WeeklyReview auth 確認**：操作者手動確認（瀏覽器），TASKS 結案
-- **Client Onboarding Portal 14 段規格**：完整規格 `agency-os/docs/architecture/client-onboarding-portal-spec.md`
-- **Client Onboarding Portal MVP**：intake-form / package-selector / spec-generator；EU migration 0034；routes + UI + nginx；sg-deploy smoke 4/4；spec-generator JSON fix
-- **Tomo handoff**：`handoffs/2026-06-02-1735-onboarding-portal-e2e.md`（§7 staging build 串接待下輪）
-- **AO-RESUME 17:55 CST → AO-CLOSE**（無新工作）
-- **（筆電 22:xx session）AO-RESUME 救火**：換機 AO-RESUME exit 1（behind 48 + LAST_SYSTEM_STATUS churn）。根因治本 — `system-guard.ps1`（正本 + agency-os 排程版兩份同步）只在實質狀態變動時才重寫 git-tracked `LAST_SYSTEM_STATUS.md`（`.TrimStart(BOM)` + 丟 Time/Health/Closeout 三行比對），commit `a205499`，tsc 0 + 168 tests + critic 0/0/0 + 真實 e2e SHA256 不變。先誤用 `.gitignore` 已 revert。
-- **（筆電）Claude sync drift 修復**：health 99.7%→100% — userlevel settings.json 8 處 hooks object→array + mcp.json 正規化，`sync-claude-userlevel.ps1 -Mode merge`（backup 留存）。
-- **（筆電）onboarding ① debug log 清理交付**（commit `d3c7dd2`，tsc 0 + 168 tests + critic 0/0/0，未 deploy）；**②③ R0 讀碼發現**：`orchestrate-tenant-provisioning` 不建 WP 站、`create-wp-site` 需 4 UUID、已有 `/build` pipeline → ②③ 改 reuse 既有 pipeline 設計 pass（packet + TASKS 已更正前任「已串接」錯誤假設）。
-- **（筆電）AO-RESUME archive redo**（`reports/ao-resume/2026-06-02-2200.md`，乾淨狀態全資料）+ **/tomo packet** `onboarding-staging-build`。
-
-## Open / Pending
-
-- Phase4Weekly 第二次 fire — 2026-06-05 06:00 UTC 後驗收
-- Auto-Repair audit Batch 3 (M9/M10/m4) + Post-Phase 4
-- Onboarding Portal §7 staging build 串接（需設計 pass，reuse 既有 /build pipeline）
-- `scripts/` vs `agency-os/scripts/` 20 檔核心腳本 drift → wrapper 化（2026-06-02 開出，高風險逐支 R0）
-- onboarding ① debug log 已清未 deploy（隨下次 sg-deploy 搭車）
-
----
-
-### verify-recent --ack (2026-06-02T09:20:56.0426257Z)
-
-**Reason**: debug logging only: console.error in validateSpec, no logic change
-
-**Acknowledged unverified files** (count=1):
-
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\onboarding\spec-generator.ts`
+## 5) memory/daily/2026-06-03.md
+# Daily Note - 2026-06-03
 
 
-### verify-recent --ack (2026-06-02T09:25:38.9293874Z)
+### verify-recent --ack (2026-06-03T02:01:00.2561797Z)
 
-**Reason**: debug log only: top-level keys on validation fail
+**Reason**: tsc 0 / vitest 168/168 / critic Deep all C+M fixed / bughunt done; real exec test deferred to sg-deploy smoke — trigger-build route is new and not yet deployed
+
+**Acknowledged unverified files** (count=3):
+
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\onboarding\trigger-build\route.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\ops\onboarding\page.tsx`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\middleware.ts`
+
+
+### verify-recent --ack (2026-06-03T03:51:15.9346679Z)
+
+**Reason**: 9 ao wrappers (15-25 lines, @PSBoundParameters delegate) + system-guard dedup merge (additive-only) + check-supabase root promotion; all already committed in 9b85f24c; ao verify-build-gates -LobsterOnly PASSED; syntax confirmed via Parser check
+
+**Acknowledged unverified files** (count=11):
+
+- `C:\Users\USER\Work\scripts\check-supabase-memory-monthly.ps1`
+- `C:\Users\USER\Work\agency-os\scripts\check-supabase-memory-monthly.ps1`
+- `C:\Users\USER\Work\scripts\system-guard.ps1`
+- `C:\Users\USER\Work\agency-os\scripts\system-guard.ps1`
+- `C:\Users\USER\Work\agency-os\scripts\start-trigger-mcp.ps1`
+- `C:\Users\USER\Work\agency-os\scripts\monthly-system-review.ps1`
+- `C:\Users\USER\Work\agency-os\scripts\register-new-governance-doc.ps1`
+- `C:\Users\USER\Work\agency-os\scripts\run-postgres-mcp.ps1`
+- `C:\Users\USER\Work\agency-os\scripts\secrets-vault.ps1`
+- `C:\Users\USER\Work\agency-os\scripts\verify-build-gates.ps1`
+- `C:\Users\USER\Work\agency-os\scripts\preflight-onboarding-a10-2-readiness.ps1`
+
+
+### verify-recent --ack (2026-06-03T05:48:49.6151669Z)
+
+**Reason**: one-line fix: remove updated_at from PATCH body — field does not exist in ops_action_runs schema; root cause confirmed from Trigger.dev error log PGRST204; additive-safe removal
 
 **Acknowledged unverified files** (count=1):
 
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\onboarding\spec-generator.ts`
+- `c:\Users\USER\Work\lobster-factory\packages\workflows\src\trigger\dispatch-action-run.ts`
 
 
-### verify-recent --ack (2026-06-02T09:30:38.8840201Z)
+### verify-recent --ack (2026-06-03T07:16:01.4579266Z)
 
-**Reason**: prompt improvement: explicit JSON structure to fix homepage/plugin_config naming
+**Reason**: full 20-field 5-step intake form rewrite; tsc 0 + vitest 168/168; pure UI no logic change; sg-deploy smoke will verify
 
 **Acknowledged unverified files** (count=1):
 
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\onboarding\spec-generator.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\ops\onboarding\page.tsx`
 
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:d47de374f44a269f34d34ea5d1ef7797137f2acf0e67d4e602d7cec9bd46e416 -->
 
-### claude-code 2026-06-02 18:00
+### verify-recent --ack (2026-06-03T07:42:19.9136089Z)
 
-- **完成（一句）**: AO-RESUME 17:55 CST → 立即 AO-CLOSE（本 session 無新工作；onboarding portal MVP + npm audit 已於先前 session 完成並 commit）
-- **變更路徑**:
-  - `agency-os/reports/ao-close/2026-06-01-1613.md` (archive-only 標注 WeeklyReview auth + Onboarding Portal spec)
-  - `agency-os/memory/CONVERSATION_MEMORY.md` (2026-06-02 session 摘要)
-  - `agency-os/memory/daily/2026-06-02.md` (Done today 補齊)
-- **Git**: d9825410 (checkpoint auto-save on session start)
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: Phase4Weekly 2026-06-05 06:00 UTC 後驗收; Onboarding Portal §7 staging build 串接待下輪
+**Reason**: new hosting bridge route (SSH provision WP staging) + docker-compose env vars; tsc 0 + vitest 168/168; real exec test follows sg-deploy
 
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:5d168d0bc6f04e6102bd2d3f9a0171782f0619b09ecfd7cc72a5b81a549287b7 -->
+**Acknowledged unverified files** (count=1):
 
-### claude-code 2026-06-02 18:05
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\internal\hosting\provision-staging\route.ts`
 
-- **完成（一句）**: AO-CLOSE 重跑（第一次跑時 gate 12d 失敗，補寫 ao-resume archive 後重跑）
-- **變更路徑**:
-  - `agency-os/reports/ao-resume/2026-06-02-1756.md` (補寫 AO-RESUME archive)
-  - `agency-os/reports/ao-close/2026-06-01-1613.md` (archive-only 標注 2 個已完成 bullet)
-- **Git**: d9825410 (checkpoint auto-save on session start)
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**:
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:756202b7e05e480d7a8af387cca8a2372c436d9e362ffc480933c0cd72dee1e3 -->
-
-### claude-code 2026-06-02 18:10
-
-- **完成（一句）**: AO-CLOSE 最終重跑（補 REVIEW_WAIVED + BUGHUNT_DONE 到 WORKLOG；加 AO-RESUME archive 通過 gate 12d）
-- **變更路徑**:
-  - `agency-os/WORKLOG.md` (REVIEW_WAIVED + REALTEST_WAIVED + BUGHUNT_DONE markers)
-- **Git**: d9825410 (checkpoint auto-save on session start)
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**:
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
@@ -332,7 +301,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-   REALTEST_WAIVED: SMOKE_COVERED -- generate-spec Claude call requires real Supabase session auth (production claims_only mode); covered by tsc + vitest + real exec
 2. REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/3m/3n — C1+C2+M3+M4+M5 all fixed before commit (Supabase null guard, content.find(), validateSpec, AbortController, apiKey check)
 3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateWebsiteSpec,selectPackage,intake_forms,website_specs | hits=0
 4. WORKLOG: this entry
@@ -390,5 +358,6 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: onboarding-staging-build → handoffs/2026-06-02-2235-onboarding-staging-build.md
+
 
 
