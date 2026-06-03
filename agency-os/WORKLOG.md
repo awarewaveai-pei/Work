@@ -14,7 +14,10 @@
 - 修改 `middleware.ts`：加 `/api/onboarding/:path*` 到 matcher（Critic C1：缺這個導致 auth boundary regression）
 
 **[驗證結果]**：
-1. REALTEST_WAIVED: SMOKE_COVERED -- trigger-build route 未 deploy，real exec test 將由 sg-deploy smoke check 覆蓋（route 依賴 EU Supabase + Trigger.dev，staging 環境無法本機測試）
+1. REALTEST_EVIDENCE: tool=SSH | cmd=curl POST /api/onboarding/trigger-build (proxy-auth+claims-role) | exit=0 | result=HTTP 200, run_id=c9b6cc0e, org/ws/proj/site 建立, intake_forms.status=building ✅
+   REALTEST_EVIDENCE: tool=SSH | cmd=curl POST (same payload, idempotency test) | exit=0 | result=HTTP 200, same run_id c9b6cc0e, idempotent=true ✅
+   REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy next-admin | exit=0 | result=tsc 0 + vitest 168/168 + smoke 4/4, commit a573b759
+   REALTEST_EVIDENCE: tool=SSH | cmd=docker exec printenv UPTIME_KUMA_URL | exit=0 | result=https://uptime.aware-wave.com ✅ (§8 env var set)
 2. REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/4m/2n — C1(middleware matcher)+C2(idempotency)+M1(FK cross-validate)+M2(packs guard)+M3(workspace slug unique)+M4(binding update error) 全部 fixed before commit
 3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=trigger-build,toManifestSlug,api/onboarding | hits=3 (WORKLOG stale ref + integrated-status ref + page.tsx call site — all expected)
 4. WORKLOG: this entry

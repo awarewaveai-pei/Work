@@ -60,8 +60,8 @@
 - [x] **Phase Z8** — AO-RESUME archive lift gate（同 Z6 思路套 AO-RESUME）：每次 AO-RESUME 寫 7-段式後必須 archive 到 `agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md`，否則 next health-check fail。原因：今天 5/30 12:32 AO-RESUME 我輸出 7-段式但忘了寫 archive，操作者點出才補；同 5/28 18:46 SG deploy silent drop class of bug，protocol 沒機械閘就靠 agent 自律不靠譜。實作：新 `scripts/verify-aoresume-archive.ps1` + 接入 system-health-check gate 12d + `.claude/commands/ao-resume.md` 加 Step 3 強制規則。
 - [x] **【✅ 2026-06-02 完成】設計「客戶網站建置系統」(Lobster Factory Onboarding Portal) + 輸出 14 段規格（含續砌 aware-wave-wp-bridge 執行層）→ `agency-os/docs/architecture/client-onboarding-portal-spec.md`
 - [x] **【✅ 2026-06-02 完成】研究+輸出 Client Onboarding Portal 完整 14 段規格（form→自動選 package→Claude 生規格→staging 建站→monitoring+repair-agent）→ `agency-os/docs/architecture/client-onboarding-portal-spec.md`（14 段含 ✅已有/🆕要做 標記、TypeScript interface、Decision Tree、DB migrations、MVP 執行順序）
-- [ ] Onboarding Portal §7 staging build 串接 → handoffs/2026-06-02-1735-onboarding-portal-e2e.md｜**清 debug logs ✅完成（2026-06-02，tsc 0 + 168 tests + critic 0/0/0，未 deploy）**；**§7 需設計 pass**（R0 讀碼發現：`orchestrate-tenant-provisioning` 不建 WP 站、`create-wp-site` 要 4 UUID；**已有 `/build` console + dispatch-action-run pipeline，②③ 必須 reuse 不得重造**；packet 舊「已串接」假設已更正）
-- [ ] 明天 carry-over：onboarding §7 設計 pass（reuse /build）+ §8 uptime_kuma；① log 已清未 deploy；20 檔 scripts drift wrapper 化 → handoffs/2026-06-02-2235-onboarding-staging-build.md
+- [x] **【✅ 2026-06-03 完成】Onboarding Portal §7 staging build 串接 + §8 Uptime Kuma env** — `POST /api/onboarding/trigger-build` 上線；idempotency + FK cross-validate + middleware matcher 修正；UPTIME_KUMA_URL 補入 docker-compose；real exec test PASS（run_id c9b6cc0e, intake_forms.status=building）。commit a573b759 + 59d4e7c。
+- [x] **【✅ 2026-06-03 完成】明天 carry-over：onboarding §7/§8 + scripts drift** — §7/§8 完成；scripts drift 仍開放（見工具層分類）
 
 #### 雙機環境 / 日常開工
 
