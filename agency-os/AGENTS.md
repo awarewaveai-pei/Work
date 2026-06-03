@@ -86,58 +86,27 @@
 
 Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。改超過 3 個檔案、同 fingerprint 第二次修、API response 格式變更、cron/第三方 API 變更 → 標 `needs-human-review`。
 
-## AwareWave Stack 全局知識
+## AwareWave Stack 伺服器邊界（**不可混用**）
 
-**SG VPS** `5.223.93.113` — Phase 1 Core（`/root/lobster-phase1/`）
-| 容器名稱 | 服務 | 對外端點 |
-|---------|-----|---------|
-| `lobster-nginx` | Reverse proxy (nginx:stable) | Port 80/443 |
-| `lobster-wordpress` | WordPress (MariaDB 11 DB) | aware-wave.com → proxy_pass wordpress:80 |
-| `lobster-wordpress-db` | MariaDB 11 | 內部 |
-| `lobster-node-api` | Node.js API (Express, port 3001) | api.aware-wave.com/api/ → node-api:3001 |
-| `lobster-next-admin` | Next.js 15 Admin (port 3000 內部 / 3002 host) | app.aware-wave.com → next-admin:3000 |
-| `lobster-redis` | Redis 7 (127.0.0.1:6379) | 內部 |
-- nginx rate limits: public 30r/s / admin 20r/s / webhook 10r/s / wplogin 5r/m
-- nginx config 正本: `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`
-- WP web root: `/var/www/html`（**named volume** `wordpress_data`，非 bind mount）
-- 進 WP 容器: `docker exec -it lobster-wordpress bash`
-- 部署: `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull）
-  - **next-admin test gate（內建）**：`sg-deploy.sh next-admin` 會在 build 前自動跑 `npm test`（vitest，35 tests）；失敗 → deploy 自動 abort，不進入 build。
-  - 若 npm test 失敗：先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查看錯誤，修好後再 push + 重跑 sg-deploy。
-  - **HTTP smoke check + 自動 rollback（Step 7，2026-05-23 起致命）**：`sg-deploy.sh` 在 docker healthcheck 後自動 curl 4 端點（next-admin :3002/、/api/ops/summary、nginx/wp :80/、node-api /api/health via Host header）；任一非 2xx → 自動觸發 `rollback-phase1.sh restore <app>` 逐一還原 RESTORABLE_APPS（wordpress/node-api/next-admin）+ 寫 `.rollback-triggered` flag + 還原 `.deployed-commit` + fail。Drill mode 用 `AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false` 跑 sg-deploy 保留舊非致命 warn 行為。SSOT：`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh` Step 7；audit ref：`agency-os/reports/audit/auto-repair-2026-05-23.md` §Patch 1 (C1)。
-- next-admin：用 `@supabase/supabase-js ^2.49.8`（非 auth-helpers）；樣式為 CSS 變數（無 Tailwind）
+SG `5.223.93.113` / EU `204.168.175.41` — 容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)。  
+ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。  
+Secrets: `scripts/secrets-vault.ps1 -Action get -Key <KEY_NAME>`；key names 在 `mcp/user-env.ps1`；**禁止硬編**。
 
-**新部署路徑強制清單（SOP）** — 每次新增可部署服務或 deploy path 時，必須同時完成以下 6 項：
+**部署規則（強制）**：
+- SG 部署走 `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull）
+- `sg-deploy.sh` 內建：npm test gate → docker healthcheck → HTTP smoke check → 失敗自動 rollback
+- npm test 失敗時先在本機 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/` 跑 `npm test` 查原因
+
+**新部署路徑強制清單（SOP）** — 每次新增可部署服務時，必須同時完成以下 6 項：
 
 | # | 項目 | 說明 |
 |---|------|------|
-| 1 | **Unit test gate** | 在 `sg-deploy.sh` 加入對應 `npm test` 或等效測試；失敗 → abort deploy |
-| 2 | **Docker healthcheck** | `docker-compose.yml` 對應服務必須有 `healthcheck:` 定義；sg-deploy Step 6 等待 healthy |
-| 3 | **HTTP smoke check** | 在 `sg-deploy.sh` Step 7 `_smoke_check` 區塊加入新端點的 curl 驗證 |
-| 4 | **Rollback 指令** | 在 `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` 補充對應服務的回滾步驟 |
-| 5 | **Notification** | 確認 Slack/Telegram 通知涵蓋新路徑的 SUCCESS/FAIL/SMOKE_WARN 三種狀態 |
-| 6 | **Typecheck gate**（含 `tsconfig.json` 的服務）| ① 在 `package.json` 加 `"typecheck": "tsc --noEmit"`；② 在 `sg-deploy.sh` 對應 test gate 區塊加 `npm run typecheck`（rsync 前）；③ 新增 `.github/workflows/<service>-typecheck.yml`（push + PR to main，path filter）。三件套缺一不補，vitest 不做型別檢查（2026-05-26 sg-deploy 爆 18 commits 積累 type error 根因）。 |
-
-**EU VPS** `204.168.175.41` — Services（compose SSOT 見 repo）
-- Trigger.dev: `lobster-factory/infra/trigger/docker-compose.yml`（`/root/trigger/`）
-- Supabase: `lobster-factory/infra/supabase/docker-compose.yml`（`/root/supabase/`）
-- n8n: `lobster-factory/infra/n8n/docker-compose.yml`（`/root/n8n/`，網路 `supabase_default`）
-- **ClickHouse 版本鎖定**：`CLICKHOUSE_IMAGE_TAG=25.7.5-debian-12-r0`，**禁止升 latest 或降回 24.x**
-- n8n DB：`supabase-db:5432`，database `n8n`
-- SSH key：`~/.ssh/hetzner_trigger`（兩台共用，password login DISABLED）
-- `docker logs` 特殊容器名：`realtime-dev.supabase-realtime`（含點號）
-
-**Client Tenants**
-| Slug | 網站 | SSH |
-|------|-----|-----|
-| `soulful` | soulfulexpression.org | 191.101.230.176:65002 / u942075013 |
-| `mongolia` | scenery-travel-mongolia | — |
-| `p1-pilot` | p1-pilot | — |
-- WP 路徑（soulful）: `/home/u942075013/domains/soulfulexpression.org/public_html`
-- 所有客戶 tenant 設定: `agency-os/tenants/<slug>/core/`
-
-**Secrets**: `scripts/secrets-vault.ps1 -Action get -Key <KEY_NAME>`；key names 在 `mcp/user-env.ps1`；**禁止硬編**。
-**Email**: Resend `noreply@aware-wave.com`；Telegram bot: 告警 + command plane（token 在 vault）
+| 1 | **Unit test gate** | 在 `sg-deploy.sh` 加入 `npm test`；失敗 → abort |
+| 2 | **Docker healthcheck** | `docker-compose.yml` 必須有 `healthcheck:`；sg-deploy Step 6 等待 healthy |
+| 3 | **HTTP smoke check** | sg-deploy Step 7 `_smoke_check` 加入新端點 curl 驗證 |
+| 4 | **Rollback 指令** | `DEPLOY_ROLLBACK_RUNBOOK.md` 補充對應回滾步驟 |
+| 5 | **Notification** | Slack/Telegram 通知涵蓋 SUCCESS/FAIL/SMOKE_WARN |
+| 6 | **Typecheck gate** | `package.json` 加 `"typecheck": "tsc --noEmit"` + sg-deploy 加 `npm run typecheck` + `.github/workflows/<service>-typecheck.yml` |
 
 ## Lobster Factory 操作規則（所有 Agent 強制）
 
@@ -145,8 +114,7 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 - **自動化安全預設**：DB 寫入預設 OFF（`LOBSTER_ENABLE_DB_WRITES=true` 才開）；Manifest 預設 off（`LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`）
 - **Trigger.dev 憑證（不可互換）**：`tr_pat_*` = CLI deploy（`TRIGGER_DEPLOY_PAT`）；`tr_prod_*` = SDK runtime（`TRIGGER_ACCESS_TOKEN`）
 - Cursor rules 正本：`agency-os/.cursor/rules/`（repo 根 `.cursor/rules/` 是 mirror，不改正本）
-- 監控分工：SG `endpoint-alert.sh` 打本機端口（WordPress `127.0.0.1:8080/`、Next Admin `127.0.0.1:3002/api/ops/summary`、Node API `127.0.0.1:3001/health`）避免 `SG -> Cloudflare -> SG` hairpin timeout；EU Uptime Kuma 負責 public reachability + SSL。
-- nginx drop-in：`/etc/default/awarewave-endpoint-alert.local`（SG VPS 本地，sync 不覆蓋；EU canary 用 `https://uptime.aware-wave.com/api/entry-page`，不要用 `/` redirect chain）
+- 監控分工：SG endpoint-alert 打本機端口（避免 hairpin timeout）；EU Uptime Kuma 負責 public reachability。詳見 [`AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)
 
 ## 語言與輸出
 
