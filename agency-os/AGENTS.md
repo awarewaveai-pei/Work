@@ -190,7 +190,42 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 
 ### 工作類型 → Agent/Tool 路由表
 
-→ 完整表（25 個工作類型 × agent/skill/command）見 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)
+| 使用者描述的工作 | 自動使用 |
+|--------------|---------|
+| 有 bug / 程式跑錯 / log 看不懂 / 行為異常 | `debugger` agent |
+| VPS / Docker / nginx 問題 / container crash | `devops-engineer` agent |
+| 前端頁面 / UI 設計 / landing page / component | `frontend-designer` agent |
+| 複雜 feature 跨 3+ 模組 / 需要拆任務 | `planner` agent 先拆再實作 |
+| 10+ 檔案重構 / rename / 搬移 | `refactor-specialist` agent |
+| 框架升級 / 套件 major version bump | `migration-engineer` agent |
+| MainWP 連不上 / child site 斷線 | `mainwp-engineer` agent |
+| WP 客戶備份 / 更新 / MainWP sync | `wordpress-maintenance-agent` agent |
+| PostHog 數據 / funnel / 轉換率 / feature flag | `posthog-analyst` agent |
+| 陌生 repo / 第一次接觸這個 codebase | `onboarder` agent |
+| 安全漏洞 / critic 回報疑似問題 | `vuln-verifier` agent 寫 PoC 驗證 |
+| 工具選型 / A vs B / 架構審查 | `decision-intelligence` agent（`/decide`）|
+| 策略 / 要不要做 X / 紅藍隊壓力測試 | `strategy-review` skill |
+| 新功能需求拆解 / 要加什麼功能 | `feature-plan` skill |
+| API 文件 / 規格 / 版本差異 | `web-researcher` agent |
+
+→ 完整路由表（含所有 25 個工作類型）見 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)
+
+### Subagent 交接協議（強制）
+
+召喚任何 agent 前，briefing **必須包含以下五項**，缺任一項 = 劣質 brief，結果不可靠：
+
+1. **問題陳述** — 是什麼出了問題或需要完成什麼（用 `file:line` 引用，禁用模糊描述）
+2. **已知事實** — 已讀哪些檔案、看到了什麼
+3. **已排除原因** — 試過什麼、為什麼排除
+4. **預期輸出** — agent 應回傳什麼格式（例：根因 + fix patch + 驗證指令）
+5. **邊界** — agent 不應改什麼（例：「只分析不動 production」）
+
+**Agent 回傳後必須驗證：**
+- 每個 `file:line` 引用是否真實存在（Grep 確認）
+- 建議修改是否與現有慣例一致（讀相鄰程式碼）
+- 有「可能是」「大概」→ 要求用證據支撐，不接受猜測
+
+**禁止**：直接採用 agent 輸出而不驗證；以「agent 說了」取代自己的判斷。
 
 ### 問題症狀 → Runbook 路由表
 
