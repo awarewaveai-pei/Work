@@ -4,6 +4,23 @@
 
 ## 2026-06-03
 
+### scripts/ vs agency-os/scripts/ 20 檔 drift — wrapper 化收尾
+
+**根本目標**：將 `agency-os/scripts/` 底下雙重完整實作的 9 個 .ps1 改為 thin wrapper，轉呼叫 `scripts/`（monorepo root SSOT）正本。
+
+**已修改**（commit `9b85f24c`）：
+- Group 1 pure wrappers：`start-trigger-mcp`, `monthly-system-review`, `register-new-governance-doc`, `run-postgres-mcp`, `secrets-vault`, `verify-build-gates`, `preflight-onboarding-a10-2-readiness`（7 個 ao → wrapper）
+- Group 2 ao 領先：`check-supabase-memory-monthly`（ao 162 行複製至 root，ao → wrapper；root 原為 18 行 stub 反向 call ao，已翻轉）
+- Group 3 merge + wrap：`system-guard.ps1`（ao 的 10-min dedup 最佳化 merge 進 root，ao → wrapper）
+- Side effect from agent：`file-path-router.js` hook（commit `01f81670`，未在計畫內，待確認保留）
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=Bash | cmd=agency-os/scripts/verify-build-gates.ps1 -LobsterOnly | exit=0 | result=ALL PASSED（wrapper 委派 root 成功）
+   REALTEST_EVIDENCE: tool=Bash | cmd=diff check (19 drift 全為 wrapper vs root 預期 diff) | exit=0 | result=無雙重完整實作殘留
+2. REVIEW_WAIVED: DOC_ONLY -- wrappers are trivial delegates; root logic unchanged except system-guard.ps1 dedup merge (additive only)
+3. BUGHUNT_DONE: scope=agency-os,scripts | grep=ownerScript,Single-owner,real implementation | hits=19 (all 19 ao scripts now contain wrapper marker)
+4. WORKLOG: this entry
+
 ### Onboarding Portal §7 — trigger-build route (staging build 串接)
 
 **根本目標**：建 `POST /api/onboarding/trigger-build`，將 intake_form + website_spec 橋接到既有 `/build` dispatch pipeline（`create-wp-site` Trigger.dev task）。
