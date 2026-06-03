@@ -2,6 +2,25 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-03
+
+### Onboarding Portal §7 — trigger-build route (staging build 串接)
+
+**根本目標**：建 `POST /api/onboarding/trigger-build`，將 intake_form + website_spec 橋接到既有 `/build` dispatch pipeline（`create-wp-site` Trigger.dev task）。
+
+**已修改**：
+- 新建 `app/api/onboarding/trigger-build/route.ts`（259 行）：建立 org/workspace/project/site 四筆記錄，idempotent（reuse on retry，`building` 狀態作 mutex），cross-validate spec FK，guard `spec.packs`，wc-custom→wc-core fallback
+- 修改 `app/ops/onboarding/page.tsx`：加 `websiteSpecId` state + `handleTriggerBuild` + 觸發建站按鈕 + triggered 結果顯示
+- 修改 `middleware.ts`：加 `/api/onboarding/:path*` 到 matcher（Critic C1：缺這個導致 auth boundary regression）
+
+**[驗證結果]**：
+1. REALTEST_WAIVED: SMOKE_COVERED -- trigger-build route 未 deploy，real exec test 將由 sg-deploy smoke check 覆蓋（route 依賴 EU Supabase + Trigger.dev，staging 環境無法本機測試）
+2. REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/4m/2n — C1(middleware matcher)+C2(idempotency)+M1(FK cross-validate)+M2(packs guard)+M3(workspace slug unique)+M4(binding update error) 全部 fixed before commit
+3. BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=trigger-build,toManifestSlug,api/onboarding | hits=3 (WORKLOG stale ref + integrated-status ref + page.tsx call site — all expected)
+4. WORKLOG: this entry
+
+**commit**: `07faede3`
+
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); onboarding UI + sidebar link + nginx location block
 
 ## 2026-06-02
