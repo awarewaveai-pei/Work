@@ -177,11 +177,8 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | MCP tool 回 401 / 403 / connection failed / empty API response | 跑 `/vault-status`；若顯示 key 缺口 → 跑 `/vault-sync` |
 | 使用者提到「客戶」/「soulful」/「WP 更新」/「外掛」/「maintenance」 | 先跑 `/client-status [slug]` 了解現況，再決定下一步 |
 | `/wp-maintenance safe-update` 完成 | 自動跑 `/playwright client <slug>` 確認無破壞 |
-| 對話含「A 還是 B」/「要選哪個」/「架構怎麼設計」/「這方案好不好」/工具技術比較 | 直接跑 `/decide <問題>`（19 階段 + pre-mortem；中文問 → 中文報告） |
-| 對話含「要不要做 X」/「值不值得」/「紅藍隊」/「pre-mortem」/已決定策略的壓力測試 | 跑 `/strategy-review` |
 | Telegram bot 無回應 / 沉默 > 30 分鐘 / 使用者說「Telegram 壞了」/「指令沒反應」 | 跑 `/command-plane-verify` |
 | 使用者說「doc 過時了」/「更新設計文件」/「SDD 跟程式碼不一致」/「文件同步一下」 | 跑 `/sdd-update` |
-| 使用者討論新功能 /「我想加一個」/「plan 一下」/「要做一個 X 功能」 | 跑 `/feature-plan` |
 | 使用者說「跑 QA」/「找 bug」/「上線前測試」/「幫我測試一下」 | 跑 `/qa-review` |
 | 任何 non-trivial R0 任務完成（輸出 [已修改] 後，準備進下一個任務）| 跑 `/checkpoint`（mid-session git save；tree 乾淨時靜默跳過） |
 | Repair Center 告警（`/api/ops/repairs/health` 回 503 / `ok: false` / Phase 4 失敗）| 跑 `/phase4-check`；若持續失敗 → 讀 `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` |
@@ -287,7 +284,8 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 
 **雙機前提**：個人筆電 + 公司桌機兩台；所有環境以「repo 共用 + 各機獨立 env/vault」處理，不假設單機。
 
-**AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（300 秒去重）。代理讀狀態檔回七段式；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。
+**AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（300 秒去重）。代理讀狀態檔回七段式；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。  
+`ao-resume.ps1` 同時自動執行 `scripts/check-smoke-tests.ps1`（application-layer smoke：n8n MCP + Repair Center health）→ 寫 `reports/status/smoke-LATEST.json` → Claude 在 §1 系統快照回報。使用者不需要記得跑 `/smoke-test`。
 
 **AO-CLOSE**（關機/收工任何表達）：先補 `WORKLOG.md` AUTO_TASK_DONE + 更新 `CONVERSATION_MEMORY.md`，再跑 `.\scripts\ao-close.ps1`。預設門檻：health-check 100%（未達 100% 代理**自行嘗試自修後重跑**，修不好才列具體失敗項問一題；**禁止**主動提議 `-AllowNonPerfectHealth`）。步驟 SSOT：`docs/operations/end-of-day-checklist.md`；關鍵字行為 SSOT：Cursor → `.cursor/rules/40-shutdown-closeout.mdc`；Claude Code → `.claude/commands/ao-close.md`。
 
@@ -339,6 +337,8 @@ AO-RESUME → 七段式輸出（格式詳見 `.claude/commands/ao-resume.md`）
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/operations/system-guard-and-notification.md`
 - `docs/operations/system-operation-sop.md`
+- `docs/operations/TOOL_TRIGGER_MAP.md`
+- `docs/operations/USER_INITIATED_TOOLS.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
