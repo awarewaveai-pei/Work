@@ -682,6 +682,54 @@ if (Test-Path -LiteralPath $smokeScript) {
     $global:LASTEXITCODE = 0
 }
 
+# Monthly checks (warn-only) — run at most once per 30 days.
+# Pattern identical to backup-health / auto-reboot / cloudflare blocks above.
+$monthlyStamp = Join-Path $WorkRoot "agency-os\.agency-state\monthly-checks-last.txt"
+$runMonthly = $false
+if (-not (Test-Path -LiteralPath $monthlyStamp)) {
+    $runMonthly = $true
+} else {
+    try {
+        $lastRun = [DateTime]::Parse((Get-Content -LiteralPath $monthlyStamp -Raw).Trim())
+        if (([DateTime]::UtcNow - $lastRun).TotalDays -gt 30) { $runMonthly = $true }
+    } catch { $runMonthly = $true }
+}
+
+if ($runMonthly) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: monthly checks (warn-only, last run > 30d ago) ==" -ForegroundColor Cyan
+
+    # 1. Monthly system review (verify-build-gates + integrated status report)
+    $monthlyReview = Join-Path $WorkRoot "scripts\monthly-system-review.ps1"
+    if (Test-Path -LiteralPath $monthlyReview) {
+        Write-Host "  -> monthly-system-review..." -ForegroundColor DarkCyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $monthlyReview `
+            -AgencyOsRoot (Join-Path $WorkRoot "agency-os") -NoAlert -ReportOnly
+        $global:LASTEXITCODE = 0
+    }
+
+    # 2. Supabase memory check (SSH → EU VPS)
+    $supaMem = Join-Path $WorkRoot "scripts\check-supabase-memory-monthly.ps1"
+    if (Test-Path -LiteralPath $supaMem) {
+        Write-Host "  -> check-supabase-memory..." -ForegroundColor DarkCyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $supaMem `
+            -AgencyOsRoot (Join-Path $WorkRoot "agency-os")
+        $global:LASTEXITCODE = 0
+    }
+
+    # 3. Governance docs drift check
+    $govDrift = Join-Path $WorkRoot "scripts\check-governance-docs-drift.ps1"
+    if (Test-Path -LiteralPath $govDrift) {
+        Write-Host "  -> check-governance-docs-drift..." -ForegroundColor DarkCyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $govDrift -WorkRoot $WorkRoot
+        $global:LASTEXITCODE = 0
+    }
+
+    # Update stamp
+    [DateTime]::UtcNow.ToString("o") | Set-Content -LiteralPath $monthlyStamp -Encoding UTF8
+    Write-Host "  monthly-checks-last.txt updated." -ForegroundColor DarkCyan
+}
+
 # Report delta since last AO-RESUME (local stamp under agency-os/.agency-state/)
 $stateDir = Join-Path $WorkRoot "agency-os\.agency-state"
 $stampPath = Join-Path $stateDir "ao-resume-last.txt"

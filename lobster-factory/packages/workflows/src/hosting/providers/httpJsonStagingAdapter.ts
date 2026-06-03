@@ -68,6 +68,8 @@ export async function provisionHttpJsonStaging(input: {
         organizationId: input.organizationId,
         siteId: input.siteId,
         siteName: input.siteName,
+        manifestSlug: (input as Record<string, unknown>).manifestSlug ?? "wp-basic",
+        pluginSlugs: (input as Record<string, unknown>).pluginSlugs ?? [],
       }),
     });
 

@@ -72,14 +72,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { organizationId?: string; siteId?: string; siteName?: string };
+  let body: { organizationId?: string; siteId?: string; siteName?: string; manifestSlug?: string; pluginSlugs?: string[] };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const { organizationId, siteId, siteName } = body;
+  const { organizationId, siteId, siteName, manifestSlug = "wp-basic", pluginSlugs = [] } = body;
   if (!siteId || !siteName) {
     return NextResponse.json({ error: "siteId and siteName required" }, { status: 422 });
   }
@@ -152,12 +152,44 @@ export async function POST(request: Request) {
       throw new Error(`wp core install failed: ${installResult.stdout} ${installResult.stderr}`);
     }
 
+    // 6. Install Kadence theme
+    const themeResult = await sshExec(
+      conn,
+      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} theme install kadence kadence-child-theme-two --activate --path=${wpPath}/ --quiet 2>&1 || ${WP_CLI} theme install kadence --activate --path=${wpPath}/ --quiet 2>&1"`
+    );
+    const themeOk = themeResult.code === 0 || themeResult.stdout.includes("already installed");
+
+    // 7. Always install Kadence Blocks + base plugins; add manifest-specific slugs
+    const basePlugins = ["kadence-blocks", "rank-math-seo", "fluent-smtp", "litespeed-cache"];
+    const ecommercePlugins = manifestSlug === "wc-core" || manifestSlug === "wc-custom"
+      ? ["woocommerce", "woo-gutenberg-products-block"]
+      : [];
+    const crmPlugins = pluginSlugs.includes("fluentcrm") ? ["fluentcrm"] : [];
+    const formPlugins = ["fluentform"];
+
+    const allPlugins = [...new Set([
+      ...basePlugins,
+      ...ecommercePlugins,
+      ...crmPlugins,
+      ...formPlugins,
+      ...pluginSlugs.filter((s) => s && s.length > 2),
+    ])];
+
+    const pluginList = allPlugins.join(" ");
+    const pluginResult = await sshExec(
+      conn,
+      `docker exec -u www-data lobster-wordpress bash -c "${WP_CLI} plugin install ${pluginList} --activate --path=${wpPath}/ --quiet 2>&1"`
+    );
+    const pluginsOk = pluginResult.code === 0;
+
     return NextResponse.json({
       environmentId,
       wpRootPath: wpPath,
       stagingSiteUrl,
       wpAdminUrl,
       provisioningNotes: [
+        ...(!themeOk ? ["WARN: Kadence theme install had issues"] : []),
+        ...(!pluginsOk ? ["WARN: some plugins may not have installed"] : [`Plugins installed: ${allPlugins.join(", ")}`]),
         `staging/${slug}/ — subdirectory install on aware-wave.com`,
         `DB: ${dbName} on lobster-wordpress-db`,
         `Admin: admin / ${adminPass}`,
