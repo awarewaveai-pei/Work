@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$WorkRoot = "",
     [switch]$SkipVerify,
     # Autopilot / 極速開機：略過結尾的 machine-environment-audit -Strict（仍可能已用 -SkipVerify 略過 verify-build-gates）。
