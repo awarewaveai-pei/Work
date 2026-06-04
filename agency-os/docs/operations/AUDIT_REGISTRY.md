@@ -219,9 +219,14 @@ _(all 5 moved to 🔴 FIXED above on 2026-05-23; Phase 4 closeout 2026-06-19 unb
 - **M7** `service.ts:approveRepairRun` — 2026-05-28 — commit `c872012` — Null-check after backup→state-transition: `updateRun("approved")` returning null now causes early return with `error: "state_transition_failed_after_backup"` instead of silently falling back to `?? run` (stale state) and continuing. Backup_ref preserved in error detail for manual recovery. File: [service.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/service.ts).
 - **M8** `backup.ts:safeScriptPath` — 2026-05-28 — commit `c872012` — Added `value.includes("..")` check before the allowlist regex. Prevents path-traversal env-var injection (e.g. `../../etc/cron.daily/evil.sh`). The `.` character in the charset is still allowed for valid filenames like `backup-phase1.sh`. Shell-safety invariant documented in comment. File: [backup.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/backup.ts).
 
-### 🟠 TRACKED — Major (4 remaining)
+### 🔴 FIXED — Major (Batch 3, 2026-06-04)
 
-~~M1~~ ~~M5~~ ~~M6~~ ~~M7~~ ~~M8~~ FIXED above. ~~M3~~ closed by C3 (req.text() refactor 2026-05-23 preserves raw bytes for future per-source HMAC retrofit). Remaining: per-source HMAC missing (M2), fingerprint forgery for silent suppression (M4), `escalateAnalysisOnlyRun` TOCTOU (M9), Sentry retry storm loses occurrence_count increments (M10).
+- **M9** `service.ts:escalateAnalysisOnlyRun` — commit `<batch3>` — Replaced `updateRun(id, patch)` (blind UPDATE WHERE id=X) with atomic conditional UPDATE `.eq("policy","analysis_only").not("state","in",(terminal list))`. Concurrent double-escalation now returns `state_conflict_concurrent_modify` instead of silently overwriting. File: [service.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/service.ts). Tests: [run-state.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/__tests__/run-state.test.ts) 3 new M9 contract cases.
+- **M10** All 6 webhook routes (`sentry`, `uptime-kuma`, `grafana`, `netdata`, `posthog`, `deploy`) — commit `<batch3>` — Replaced JS-computed `occurrence_count = snapshot + 1` upsert with `upsertIncidentAtomic()` helper calling `upsert_incident_atomic` PL/pgSQL RPC (migration [0035](../../../lobster-factory/packages/db/migrations/0035_upsert_incident_atomic.sql)). `SET occurrence_count = ops_incidents.occurrence_count + 1` is row-locked and evaluated atomically. Concurrent retries (Sentry auto-retry class) no longer lose increments. Applied to EU Supabase 2026-06-04. New helper: [upsertIncidentAtomic.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/upsertIncidentAtomic.ts).
+
+### 🟠 TRACKED — Major (2 remaining)
+
+~~M1~~ ~~M5~~ ~~M6~~ ~~M7~~ ~~M8~~ ~~M9~~ ~~M10~~ FIXED above. ~~M3~~ closed by C3. Remaining: per-source HMAC missing (M2), fingerprint forgery for silent suppression (M4, depends on M2).
 
 ### 🔴 FIXED — Minor (2026-05-26 / 2026-05-28)
 
@@ -237,9 +242,13 @@ _(all 5 moved to 🔴 FIXED above on 2026-05-23; Phase 4 closeout 2026-06-19 unb
 - **m10** `archive_stale_repair_runs` function — commit `832c562` — Migration [0032_archive_triage_needed.sql](../../../lobster-factory/packages/db/migrations/0032_archive_triage_needed.sql): `CREATE OR REPLACE FUNCTION` extended to also archive `triage_needed` runs older than 14 days. Same `(int)` signature — pg_cron job and service.ts callers require no changes. Applied to EU Supabase 2026-05-28.
 - **m11** `repair_runs` RLS deny-anon policy — commit `832c562` — Migration [0033_repair_runs_rls_deny_anon.sql](../../../lobster-factory/packages/db/migrations/0033_repair_runs_rls_deny_anon.sql): `CREATE POLICY "deny_anon_all" … USING (false) WITH CHECK (false)` for anon role. Eliminates silent-empty-result footgun for future anon-key queries. Applied to EU Supabase 2026-05-28.
 
-### 🟡 TRACKED — Minor (2 remaining)
+### 🔴 FIXED — Minor (Batch 3, 2026-06-04)
 
-~~m1~~ ~~m2~~ ~~m6~~ ~~m7~~ ~~m8~~ ~~m9~~ ~~m10~~ ~~m11~~ FIXED above. ~~m3 posthog ordering~~ ~~m9 dead helper wired~~ closed alongside Criticals (2026-05-23). ~~m5 netdata silent CLEAR~~ deduped → [Ops Inbox webhook CLEAR auto-resolve audit](#ops-inbox-webhook-clear-auto-resolve--fingerprint-instability-2026-05-23). Remaining: uptime-kuma env from `monitor.hostname` (m4), GHA Slack "completed" on empty branch (m8-GHA already FIXED in Batch 1 above).
+- **m4** `normalize/uptime-kuma.ts:16` — commit `<batch3>` — Removed `monitor.hostname` from environment inference fallback. `hostname` is attacker-controlled in the webhook payload; an attacker could set `hostname="staging.evil.com"` to downgrade a production `critical` alert to `staging medium`. Fix: environment now relies exclusively on the explicit operator-set `env` tag. `kumaHostnameToService(monitor.hostname)` service lookup retained (whitelist map, attacker cannot add entries). Tests: [normalize-uptime-kuma.test.ts](../../../lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/__tests__/normalize-uptime-kuma.test.ts) 6 new m4 regression cases.
+
+### 🟡 TRACKED — Minor (0 remaining from original audit)
+
+~~m1~~ ~~m2~~ ~~m4~~ ~~m6~~ ~~m7~~ ~~m8~~ ~~m9~~ ~~m10~~ ~~m11~~ FIXED above. ~~m3 posthog ordering~~ ~~m9 dead helper wired~~ closed alongside Criticals (2026-05-23). ~~m5 netdata silent CLEAR~~ deduped → [Ops Inbox webhook CLEAR auto-resolve audit](#ops-inbox-webhook-clear-auto-resolve--fingerprint-instability-2026-05-23). ~~m8-GHA~~ FIXED Batch 1. All original minors resolved.
 
 ### 🛠 TOOL
 

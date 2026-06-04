@@ -204,3 +204,27 @@ describe("visibleRunButtons — archive button", () => {
     expect(visibleRunButtons("resolved", false, null).archive).toBe(true);
   });
 });
+
+// M9 regression: escalateGuard pure-function contract (the DB atomic WHERE predicate
+// mirrors this logic — both must agree on what constitutes a valid escalation target).
+describe("escalateGuard — M9 atomic-WHERE contract", () => {
+  it("analysis_only + active state → can escalate (DB WHERE will match)", () => {
+    const g = escalateGuard({ policy: "analysis_only", state: "repairing" }, true);
+    expect(g.can).toBe(true);
+  });
+
+  it.each([...TERMINAL_STATES])(
+    "terminal state '%s' → cannot escalate (DB .not('state','in',...) will filter out)",
+    (state) => {
+      const g = escalateGuard({ policy: "analysis_only", state }, true);
+      expect(g.can).toBe(false);
+      expect(g.reason).toBe("run_in_terminal_state");
+    },
+  );
+
+  it("non-analysis_only policy → guard blocks before DB (DB eq('policy','analysis_only') also blocks)", () => {
+    const g = escalateGuard({ policy: "auto_repair", state: "repairing" }, true);
+    expect(g.can).toBe(false);
+    expect(g.reason).toBe("not_analysis_only");
+  });
+});

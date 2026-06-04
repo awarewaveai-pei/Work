@@ -156,6 +156,12 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 使用者說「回顧一下」/「今天做了什麼」/「收工前看一下」/「要 close 了嗎」 | 跑 `/recap`（唯讀；確認後才跑 `/ao-close`） |
 | 使用者說「任務」/「還有什麼」/「今天要做哪些」/不確定目前 backlog 狀態 | 跑 `/tasks` 列出所有 open 待辦 |
 | **🔧 機械閘**：`auto-repair-guard.js` 攔截 Auto-Repair 邏輯路徑（repair-center / webhooks / ops/repairs / sg-deploy.sh 等）| 首次觸發 BLOCK，re-issue 通過。① 讀 `reports/audit/auto-repair-2026-05-23.md`；② 跑 `dogfood-auto-repair.ps1 -Mode HealthOnly`；③ 修 C1-C5 → 更新 `AUDIT_REGISTRY.md`；④ 改 sg-deploy Step 7 / redactSecrets 等 → 更新 `DEPLOY_ROLLBACK_RUNBOOK.md`。路徑清單見 `mcp/claude-userlevel/hooks/auto-repair-guard.js` |
+| 使用者說「grill me」/「問爆我」/「逼我想清楚」/「壓力測試計畫」/「對齊一下設計」 | 有 codebase 相關 → `grill-with-docs` skill（同時更新 CONTEXT.md + ADR）；純概念層 → `grill-me` skill。**禁止**：直接開始實作而不確認需求 |
+| 使用者說「TDD」/「寫測試」/「test-first」/「測試先行」/「red-green-refactor」 | 跑 `tdd` skill（整個紅綠重構流程，含垂直切片 + REALTEST_EVIDENCE 要求） |
+| 使用者說「做個原型」/「prototype」/「先試試看」/「試幾個設計」/「讓我玩一下」 | 跑 `prototype` skill（依問題類型路由：邏輯問題→LOGIC.md；UI→UI.md） |
+| 使用者說「架構改善」/「重構機會」/「模組太分散」/「很難測試」/「run improve-codebase」 | 跑 `improve-codebase-architecture` skill（探索 → HTML 報告 → grilling loop） |
+| 使用者說「token 太多」/「caveman」/「be brief」/「壓縮一下」/「less tokens」 | 跑 `/caveman`（持續生效直到 "stop caveman"）|
+| 讀 code 時碰到完全陌生的模組區段、不知道 caller 是誰 | 主動跑 `/zoom-out`（不問使用者，直接輸出模組地圖） |
 
 ### 核心行為規則：宣告執行，不詢問
 
@@ -219,6 +225,9 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 讀 log / SSH 進 VPS 看到 error / 異常 | 召喚 `incident-responder` 先 triage，再決定 runbook |
 | 發現問題需要 web 查規格 / API 文件 | 召喚 `web-researcher`，不靠訓練資料猜 |
 | 需要做技術選型 / 架構決策 | 召喚 `decision-intelligence`（`/decide`），不靠直覺推薦 |
+| 準備開始實作，但用戶需求尚未明確釐清（有歧義 / 多個可能詮釋）| 先跑 `grill-with-docs` skill 對齊，**禁止直接實作** |
+| 用戶說「寫測試」或新 feature 有明確 test 需求 | 跑 `tdd` skill，用垂直切片紅綠重構，**禁止先寫全部 test 再寫 impl（水平切片）** |
+| 讀 code 時發現模組介面幾乎與實作一樣複雜（shallow module）| 建議跑 `improve-codebase-architecture` skill 找加深機會 |
 
 ### 工作類型 → Agent/Tool 路由表
 
@@ -239,8 +248,13 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 策略 / 要不要做 X / 紅藍隊壓力測試 | `strategy-review` skill |
 | 新功能需求拆解 / 要加什麼功能 | `feature-plan` skill |
 | API 文件 / 規格 / 版本差異 | `web-researcher` agent |
+| 需求對齊 / 壓力測試計畫 / 確認術語 / 更新詞彙表 | `grill-with-docs` skill（有 codebase）/ `grill-me` skill（純概念）|
+| 測試先行 / TDD / red-green-refactor / 行為測試 | `tdd` skill（含 tests.md / mocking.md / deep-modules.md）|
+| 系統性除錯 / 六段 debug loop / 難以複現的 bug | `diagnose` skill → 複雜 root-cause 時 defer `debugger` agent |
+| 做原型 / 試設計 / 先跑跑看 | `prototype` skill（邏輯→終端 app；UI→多 variant route）|
+| 架構改善 / 加深機會 / 模組難測試 / 耦合太高 | `improve-codebase-architecture` skill（HTML 報告 + grilling）|
 
-→ 完整路由表（含所有 25 個工作類型）見 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)
+→ 完整路由表（含所有 30 個工作類型）見 [`docs/operations/TOOL_TRIGGER_MAP.md`](docs/operations/TOOL_TRIGGER_MAP.md)
 
 ### Subagent 交接協議（強制）
 

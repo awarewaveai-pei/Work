@@ -4,6 +4,31 @@
 
 ## 2026-06-04
 
+### Batch 3 Auto-Repair audit — M9 TOCTOU + M10 retry storm + m4 hostname (2026-06-04)
+
+**根本目標**：完成 auto-repair-2026-05-23 audit 剩餘 Batch 3（M9/M10/m4）。
+
+**已修改**：
+- `lib/repair-center/service.ts`：M9 fix — `escalateAnalysisOnlyRun` 從 `updateRun(id, patch)`（盲 UPDATE）改為帶 `.eq("policy","analysis_only").not("state","in",terminal_list)` 的 atomic conditional UPDATE；concurrent 第二次請求回 `state_conflict_concurrent_modify`；import 補 `TERMINAL_STATES`
+- `lib/ops-inbox/normalize/uptime-kuma.ts`：m4 fix — 移除 `monitor.hostname` 在 environment 推斷的 fallback（`/staging\./i.test(monitor.hostname)` 刪除）；攻擊者無法藉此將 production critical 降級為 staging medium
+- `packages/db/migrations/0035_upsert_incident_atomic.sql`（新建）：M10 fix — PL/pgSQL `upsert_incident_atomic` 函式，`SET occurrence_count = ops_incidents.occurrence_count + 1`（row-locked atomic），消除 6 個 webhook routes 的 concurrent retry 遺失 increment；applied to EU Supabase 2026-06-04
+- `lib/ops-inbox/upsertIncidentAtomic.ts`（新建）：M10 TypeScript helper，封裝 `.rpc("upsert_incident_atomic", ...)` 呼叫
+- 6 個 webhook routes（`sentry`, `uptime-kuma`, `grafana`, `netdata`, `posthog`, `deploy`）：import `maxSeverity` 刪除，改 import `upsertIncidentAtomic`；`.upsert({...draft, occurrence_count: snapshot+1,...})` 改呼叫 `upsertIncidentAtomic()`
+- `lib/ops-inbox/__tests__/normalize-uptime-kuma.test.ts`（新建）：m4 regression — 6 cases 驗證 attacker hostname 無法影響 environment/severity
+- `lib/repair-center/__tests__/run-state.test.ts`：M9 contract — 3 cases 驗證 escalateGuard pure-function 與 DB WHERE predicate 語義一致
+- `agency-os/docs/operations/AUDIT_REGISTRY.md`：M9/M10/m4 狀態更新 🟠/🟡 → 🔴 FIXED
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=EU psql CREATE FUNCTION upsert_incident_atomic | exit=0 | result=12 args confirmed
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | ms=~27000 | result=tsc 0 + vitest 168/168 + smoke 4/4 + deployed 97d3e87e → new commit
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (tsc + vitest 179/179 pass locally)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=occurrence_count,escalateAnalysisOnlyRun,monitor.hostname | hits=expected (all 6 routes updated, service.ts patched, normalizer patched)
+- WORKLOG: this entry
+
+**Phase4Weekly 驗收**：時間未到（驗收窗口 2026-06-05 06:00 UTC）；TASKS 保留待明日。
+
+**CF WAF**：另一個 AI 已用 LLAR 替代（更適合全球跑的使用者），CF Custom WAF Rules 已清空，不重建。
+
 ### 整合 mattpocock/skills — 日常 Coding 工作流 Skills（2026-06-04）
 
 **根本目標**：填補我們 .claude/ 系統「只有 OPS/治理層，缺乏 app coding 工作流」的空缺。
