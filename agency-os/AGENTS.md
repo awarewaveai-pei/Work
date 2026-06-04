@@ -149,7 +149,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | **部署流程觸發**：使用者說「部署」/「deploy」/「推上去」/「可以上了」/「上線」 | ① `/check-drift` 確認 drift 清零 ② `/verify` 確認 build gate 通過 ③ 若有 `.ts/.tsx` 改動先在本機跑 `npx tsc --noEmit` ④ 三者 pass 才**提議**（不自動）`/sg-deploy`，等明示 go-ahead |
 | `/sg-deploy` smoke check pass 後 | 自動跑 `/playwright smoke` |
 | 使用者問「系統狀態」/「是否健康」/「health」/「有沒有問題」 | 跑 `/health`；若回報 `sync_check: FAIL` → 接著跑 `/sync-check` |
-| 改動 governance 文件後（`AGENTS.md` / `CLAUDE.md` / `.cursor/rules/*.mdc` / hook `.js`）| 跑 `/doc-sync`；若改了 `.claude/commands/` 或 `.claude/agents/` → 同時跑 `/sync-check` 確認跨機一致 |
+| 改動 governance 文件後（`AGENTS.md` / `CLAUDE.md` / `.cursor/rules/*.mdc` / hook `.js`）| 跑 `/doc-sync`；若改了 `.claude/commands/` 或 `.claude/agents/` 或 `.claude/skills/` → 同時跑 `/sync-check` 確認跨機一致 |
 | MCP tool 回 401 / 403 / connection failed / empty API response | 跑 `/vault-status`；若顯示 key 缺口 → 跑 `/vault-sync` |
 | 使用者提到「客戶」/「soulful」/「WP 更新」/「外掛」/「maintenance」 | 先跑 `/client-status [slug]` 了解現況，再決定下一步 |
 | `/wp-maintenance safe-update` 完成 | 自動跑 `/playwright client <slug>` 確認無破壞 |
@@ -171,6 +171,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 使用者說「架構改善」/「重構機會」/「模組太分散」/「很難測試」/「run improve-codebase」 | 跑 `improve-codebase-architecture` skill（探索 → HTML 報告 → grilling loop） |
 | 使用者說「token 太多」/「caveman」/「be brief」/「壓縮一下」/「less tokens」 | 跑 `/caveman`（持續生效直到 "stop caveman"）|
 | 讀 code 時碰到完全陌生的模組區段、不知道 caller 是誰 | 主動跑 `/zoom-out`（不問使用者，直接輸出模組地圖） |
+| 使用者說「diagnose」/「debug this」/「一直報錯」/「找不到 bug」/「六段 debug」 | 跑 `diagnose` skill（6 段結構化 loop；複雜 root-cause 時 skill 內部 defer `debugger` agent）|
 
 ### 核心行為規則：宣告執行，不詢問
 
@@ -226,7 +227,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 改動 `.ts/.tsx` 任何檔案 | 完成前跑 `npx tsc --noEmit`，型別錯誤不得宣告完成 |
 | 完成任何 code 改動（`.ps1/.ts/.tsx/.js/.sh/.py`）| 跑 `/verify-recent`（syntax + critic + exec）|
 | critic 回報 Critical 或 High 問題 | 召喚 `vuln-verifier` 寫 PoC 確認是否真實漏洞 |
-| 改動 governance 文件（`AGENTS.md` / `CLAUDE.md` / hooks / cursor rules）| 改後跑 `/doc-sync` + `/sync-check` |
+| 改動 governance 文件（`AGENTS.md` / `CLAUDE.md` / hooks / cursor rules）| 改後跑 `/doc-sync`；若同時改了 `.claude/commands/` `.claude/agents/` `.claude/skills/` → 跑 `/sync-check` |
 | 任何 R0 任務完成後（輸出 [已修改]）| 跑 `/checkpoint` 存 mid-session commit |
 | 準備 sg-deploy 前 | 自動跑 `/check-drift` + `/verify` + `tsc --noEmit`（有 ts 改動時）|
 | sg-deploy 完成後 | 自動跑 `/playwright smoke` |
@@ -235,7 +236,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 發現問題需要 web 查規格 / API 文件 | 召喚 `web-researcher`，不靠訓練資料猜 |
 | 需要做技術選型 / 架構決策 | 召喚 `decision-intelligence`（`/decide`），不靠直覺推薦 |
 | 準備開始實作，但用戶需求尚未明確釐清（有歧義 / 多個可能詮釋）| 先跑 `grill-with-docs` skill 對齊，**禁止直接實作** |
-| 用戶說「寫測試」或新 feature 有明確 test 需求 | 跑 `tdd` skill，用垂直切片紅綠重構，**禁止先寫全部 test 再寫 impl（水平切片）** |
+| Claude 自己開始寫一個新 feature 的 code，且尚未先寫任何 test | 停下，改用 `tdd` skill 垂直切片流程，**禁止先寫全部 impl 再補 test** |
 | 讀 code 時發現模組介面幾乎與實作一樣複雜（shallow module）| 建議跑 `improve-codebase-architecture` skill 找加深機會 |
 | 讀不熟悉的 code 段落，不清楚這個模組被誰呼叫 / 屬於哪個系統層 | 直接跑 `/zoom-out`，給出模組地圖（**不問使用者**）|
 
