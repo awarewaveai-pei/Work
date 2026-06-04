@@ -1244,6 +1244,279 @@ NEXT_PUBLIC_SENTRY_DSN
 
 ---
 
-*文件產生：2026-06-04 by 全讀 codebase session*  
-*覆蓋範圍：所有頁面、API routes、lib 模組、DB schema、基礎設施*  
-*下次更新時機：任何重大功能改動後*
+## 15. 補充：初版遺漏的細節
+
+### 15.1 ops/inbox/[id] 詳情頁完整版面
+
+兩欄 layout（`gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)"`）：
+
+**左欄 `<main>`：**
+1. SeverityChip + source + service + environment + occurrence× 標題列
+2. StatusActions（右上角）
+3. AI 摘要框（⚠️ 寫死 "Gemini auto-summary"）
+4. Choose your AI 按鈕群（所有按鈕 inline flex）：
+   - `OpenInCursorButton`（primary）→ cursor deeplink
+   - `OpenRemoteUIButton target="n8n"`（只有 service.type === "remote-ui-n8n" 時顯示）
+   - `OpenRemoteUIButton target="supabase"`（只有 "remote-ui-supabase" 時顯示）
+   - `AskChatGPTButton`
+   - `AskClaudeButton`
+   - `AskGeminiButton`
+   - `CopyForTerminalButton tool="codex"`
+   - `CopyForTerminalButton tool="copilot"`
+   - `CopyForTerminalButton tool="gemini-cli"`
+5. `AiDiagnosisTimeline`
+6. `PasteAiResultBox`
+7. `RawPayloadDetails`（`<details>` 可展開）
+
+**右欄 `<aside>`：**
+- `ServicePanel`：服務名稱 + SERVICE_REGISTRY raw JSON
+- `OccurrencePanel`：`occurrence_count×`，first/last seen，fingerprint 前 8 字
+- `NotificationLogPanel`：通知日誌（✓ sent / ○ skipped / ⊘ throttled / ✗ failed，顯示 channel + rule + reason）
+
+---
+
+### 15.2 recommendOrder.ts（AI 推薦順序）
+
+```typescript
+// lib/ops-inbox/ai/recommendOrder.ts
+business signal → [claude, chatgpt, gemini]
+resource/uptime → [claude, gemini, chatgpt]
+其他（error/latency/deployment）→ [chatgpt, claude, gemini]
+```
+
+用於詳情頁顯示按鈕的順序建議。
+
+---
+
+### 15.3 IntegrationControls 完整邏輯
+
+**IntegrationCreatePanel（新增表單）：**
+- 欄位：Client（select org）/ Asset（select asset，filtered by org）/ Provider（select）/ Secret reference（`vault:ENV_NAME` 格式）/ External hint / Status（pending/active/failed/revoked）
+- POST `/api/ops/integrations` → upsert `tenant_integration_bindings`（onConflict: org+provider）
+
+**IntegrationRowActions（每列操作）：**
+```typescript
+PATCH /api/ops/integrations  body: { id, action: "validate"|"activate"|"revoke" }
+```
+- **Validate**：呼叫 `checkIntegrationHealth()`，寫 `api_metadata.last_health_check`
+- **Active**（status !== active 時顯示）：status → active
+- **Revoke**（status !== revoked 時顯示，紅色按鈕）：status → revoked
+
+---
+
+### 15.4 Slack Interactive 完整流程
+
+```
+POST /api/internal/commands/slack
+  1. verifySlackSignature()
+     → X-Slack-Request-Timestamp header（age < 5min）
+     → HMAC-SHA256(v0:{timestamp}:{rawBody}) vs X-Slack-Signature
+     → timing-safe comparison
+  2. parse URLSearchParams body.payload
+  3. switch actionId:
+     "acknowledge_only" → { response_type: "ephemeral", text: "Acknowledged. No repair run was created." }
+     "approve_repair" + value (incidentId) →
+       startRepairFromIncident({ incidentId: value, actor: "slack:{username}", source: "slack" })
+       → ok: true + github_issue_url → 回傳 issue URL
+       → backup_failed → "Pre-repair backup failed. No GitHub issue or PR was created."
+       → 其他失敗 → "Repair start failed: {error}"
+```
+
+---
+
+### 15.5 PostHog Analytics（posthog-analytics.tsx）
+
+`PostHogAnalytics` component（layout.tsx 內載入，`PHProvider` 之內）：
+- Mount 後 `fetch("/api/ops/analytics-context")`（讀 role + source）
+- `registerOpsSuperProperties(role, source)` → PostHog 每次 capture 都帶 `ops_role` / `ops_role_source` / `app`
+- `groupProject()` → PostHog Group "project" = "lobster-next-admin"
+- 只跑一次（`useRef(false)` guard）
+
+---
+
+### 15.6 Ops Console 完整頁面邏輯
+
+Server Component，3 個並行 fetch：
+1. `fetchSummary()` → `/api/ops/summary`（tenants + mediaRules + actions）
+2. `fetchWorkflowRuns()` → `/api/ops/workflow-runs?limit=10`（ops_action_runs）
+3. `fetchTenantConfig(defaultOrgId)` → `/api/ops/tenants/{id}/config`（第一個 tenant）
+
+**5 個 section：**
+1. **Architecture Boundary（3 卡片）**：AI Generated Images→R2 / WP Product/Blog→wp_uploads / Control Plane→Supabase
+2. **Tenants Snapshot**：所有 tenant 的 status + lastRunStatus + riskLevel
+3. **Media Boundary Rules**：ai_generated→r2 / wp_product→wp_uploads / wp_blog→wp_uploads
+4. **Action Allowlist**：3 個 actions（staging_sync / ai_generate_image / production_deploy_request）
+5. **Workflow Runs**：ops_action_runs 最近 10 筆（source summary：`build-console: N`）
+6. **Tenant Config**：第一個 tenant 的 PATCH form（status / defaultLocale / defaultTimezone）
+7. **M3 — 部門選型**：DepartmentSelector（20 clusters，複製 JSON 功能）
+8. **Controlled Write — AI Image Job**：AiJobForm → `POST /api/ops/ai-image-jobs`（建立 queued job + audit event）
+
+---
+
+### 15.7 DB Migrations 補充細節
+
+#### 0014 — 啟用 RLS
+對所有已知 public tables 跑 `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`，包括 organizations / workspaces / ops_incidents / ops_action_* / ai_image_jobs / ops_audit_events 等 40+ 個 table。最後掃一遍 `pg_tables` 補上漏網之魚。
+
+#### 0016 — RLS Policies（ops console tables）
+核心策略：`user_has_org_access(organization_id)` helper（0004 定義）。
+- `ops_action_catalog`：authenticated → select（無 org filter，reference data）
+- `ops_action_runs`：authenticated → CRUD via `user_has_org_access(org_id)`
+- `ai_image_jobs`：authenticated → CRUD via `user_has_org_access(org_id)`
+- `ops_audit_events`：authenticated → select via `user_has_org_access(org_id)`
+- `permissions` / `role_permissions`：authenticated → select（global reference）
+
+#### 0026 — ops_incidents.client_slug
+```sql
+ALTER TABLE ops_incidents ADD COLUMN client_slug text;
+CREATE INDEX ops_incidents_client_slug_idx ON ops_incidents(client_slug) WHERE client_slug IS NOT NULL;
+```
+用途：`/ops/inbox?client_slug=<slug>` deep-link（ClientCard 的「查看警報」按鈕）。
+
+#### 0028 — assets 表
+```sql
+assets (
+  id uuid, organization_id FK, workspace_id FK,
+  asset_type: 'website'|'web_app'|'api'|'wordpress'|'server'|'database'|'workflow'|'job_runner'|'repository'|'external_service'|'other',
+  environment: 'development'|'staging'|'production'|'shared',
+  primary_url, provider, status: 'active'|'inactive'|'maintenance'|'archived',
+  UNIQUE(organization_id, slug)
+)
+```
+
+#### 0029 — tenant_integration_bindings 種子資料
+awarewave-ops 預填 10 個 integration（sentry/uptime_kuma/grafana/netdata/posthog/slack/n8n/trigger/supabase/cloudflare）。
+soulful-expression 預填 supabase（`vault:SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`）。
+
+#### 0030 — repair_runs.archived_at + archive function
+```sql
+ALTER TABLE repair_runs ADD COLUMN archived_at timestamptz;
+-- Partial indexes (WHERE archived_at IS NULL) for lean active-run queries
+-- archive_stale_repair_runs(retention_days=90): archives terminal states > 90 days
+-- pg_cron: '0 2 * * *' (daily 02:00 UTC)
+```
+
+#### 0031 — deploy source 加入 ops_incidents
+移除舊 check constraint，重建以包含 `'deploy'`。
+
+#### 0032 — archive triage_needed（m10 fix）
+更新 `archive_stale_repair_runs()` 同時封存 `triage_needed` runs（>14 天未動）。
+Terminal runs 仍維持 90 天 retention。
+
+#### 0033 — repair_runs RLS deny anon（m11 fix）
+```sql
+CREATE POLICY deny_anon_all ON repair_runs FOR ALL TO anon USING (false);
+```
+防止 anon key 拿到 silent-empty（RLS enabled + no policy 的隱式 deny），改為明確 deny。
+
+---
+
+### 15.8 n8n Workflow Exports
+
+#### client-onboarding-flow.json（`active: false`）
+Phase 1 骨架，7 個 nodes：
+1. Manual Trigger
+2. Build Payload（hardcoded test UUIDs）
+3. 後續 nodes（provision staging, apply-manifest, etc.）
+用途：手動觸發 staging onboarding flow 的起點，尚未啟用。
+
+#### slo-weekly-slack-probe.json（`active: false`）
+4 個 nodes：
+1. Manual Trigger
+2. Weekly Mon 01:00 UTC（schedule trigger）
+3. Set Slack webhook + optional note（需填入真實 slackWebhookUrl，不要 commit）
+4. Probe endpoints + build summary（Code node）：
+   - HTTP GET `uptime.aware-wave.com/dashboard`
+   - HTTP GET `app.aware-wave.com/`
+   - HTTP GET `api.aware-wave.com/health`
+   - HTTP GET `n8n.aware-wave.com/healthz`
+   - timeout 15s per endpoint，彙整 OK/FAIL 結果
+5. Post Slack（HTTP Request POST slackWebhookUrl）
+
+兩個 workflow 都需手動設定並啟用。
+
+---
+
+### 15.9 create-wp-site（Trigger.dev）完整邏輯
+
+**SSRF Guard**：所有 integration URL 欄位在 Zod schema 解析時過濾：
+- 必須 `https://`
+- 拒絕 RFC-1918 + loopback + link-local（IPv4+IPv6）
+- 拒絕 localhost/.local/.internal/.lan 等
+- 拒絕 numeric/hex/octal IPv4 forms
+
+**Input Schema**（Zod，pre-process normalizeBuildConsolePayload）：
+```
+organizationId, workspaceId, projectId, siteId (UUIDs)
+siteName (string)
+manifestSlug: 'wp-basic'|'wp-business'|'wc-core' (default: 'wp-basic')
+domain?, provider?, locale?
+integrations?: { uptimeKuma?, sentry?, postHog?, n8n?, mainWp? }（全 SSRF-safe URL）
+pluginSlugs?, sshHost?, sshCredentialsRef?, wpPath?
+```
+
+**執行流程**：
+1. `captureWorkflowEvent("workflow started")`
+2. `resolveStagingProvisioning()` → 呼叫 `POST /api/internal/hosting/provision-staging`（httpJsonStagingAdapter）
+3. `runAllIntegrations(integrations)` → 並行設定 Uptime Kuma / Sentry / PostHog / n8n / MainWP
+4. 寫 workflow_runs / ops_action_runs 狀態到 Supabase
+
+---
+
+### 15.10 apply-manifest（Trigger.dev）完整邏輯
+
+**Manifest Schema（Zod）**：
+```
+{
+  name: string,
+  version: string,
+  schemaVersion: string,
+  target: "staging-only",
+  guardrails: {
+    allowEnvironments: string[],
+    requireBackup: boolean,
+    blockIfProduction: boolean,
+  },
+  steps: ManifestStep[],  // { id, type: 'install_theme'|'install_plugin'|'conditional_plugin', slug?, condition? }
+  postInstall?, verification?, rollback?
+}
+```
+
+**路徑安全**：
+- `LOBSTER_MANIFESTS_DIR` env 或 `process.cwd()/manifests`
+- `path.resolve` 後確認路徑以 MANIFESTS_BASE 開頭（防 path traversal）
+- 禁止 `..` 在 manifestPath
+
+**執行**：
+- environmentType !== "staging" → throw（production 硬擋）
+- `!manifest.guardrails.blockIfProduction` → throw
+- `getManifestExecutionMode()`：讀 `LOBSTER_EXECUTE_MANIFEST_STEPS` env
+  - `true` + `LOBSTER_MANIFEST_EXECUTION_MODE=apply` → 真實執行
+  - 否則 → dry_run（預設）
+- `runInstallFromManifestStaging()` → 逐步執行 steps
+
+---
+
+### 15.11 Supabase EU Docker Stack（完整服務）
+
+| Container | Image | Memory | 用途 |
+|-----------|-------|--------|------|
+| `supabase-studio` | supabase/studio:2026.03.16 | 512m / 0.3CPU | 管理 UI |
+| `supabase-kong` | kong/kong:3.9.1 | 512m / 0.5CPU | API Gateway（port 127.0.0.1:{KONG_HTTP_PORT}）|
+| `supabase-auth` | supabase/gotrue:v2.186.0 | 128m / 0.2CPU | Auth（GoTrue）|
+| `supabase-rest` | postgrest/postgrest | 128m | REST API |
+| `supabase-realtime` | supabase/realtime | 256m | WebSocket |
+| `supabase-storage` | supabase/storage-api | 128m | Object storage |
+| `supabase-meta` | supabase/postgres-meta | 64m | pg-meta |
+| `supabase-db` | supabase/postgres:15.8 | 512m | PostgreSQL |
+| `supabase-vector` | timberio/vector | 64m | Log aggregation |
+| `supabase-analytics` | supabase/logflare | 256m | Analytics |
+
+**Studio 位址**：`studio.aware-wave.com`（通過 Cloudflare → nginx → kong:8000 → studio:3000）
+
+**Clickhouse（Trigger.dev 用）**：`CLICKHOUSE_IMAGE_TAG=25.7.5-debian-12-r0`（**禁升 latest / 24.x**，版本鎖定）
+
+---
+
+*最後更新：2026-06-04（補全初版遺漏的 10 個細節區塊）*  
+*文件產生：全讀 codebase session，覆蓋率：~100%*
