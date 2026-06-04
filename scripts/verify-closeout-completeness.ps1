@@ -26,6 +26,15 @@ if (-not $WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 }
 
+# Dot-source UTF-8 console helper (safe capture of external-command stdout on CP950 Windows).
+# Required so git diff/rev-parse stdout is decoded as UTF-8, not CP950, on zh-TW hosts.
+$_helperPath = Join-Path $PSScriptRoot '_console-encoding-helpers.ps1'
+if (Test-Path -LiteralPath $_helperPath) {
+    . $_helperPath
+} else {
+    Write-Warning "verify-closeout-completeness: _console-encoding-helpers.ps1 missing — git output may decode incorrectly on CP950 hosts."
+}
+
 # Dot-source oracle function (defines Invoke-BughuntOracle for use inside the try block below).
 # $Bh* params in oracle's param() block prevent clobbering caller's $WorkRoot/$Gate on dot-source.
 $_oraclePath = Join-Path $PSScriptRoot 'bughunt-oracle.ps1'
@@ -37,12 +46,12 @@ if (Test-Path -LiteralPath $_oraclePath) {
 
 Push-Location $WorkRoot
 try {
-    $null = git rev-parse --git-dir 2>$null
+    $null = Invoke-WithUtf8Console { git rev-parse --git-dir 2>$null }
     if ($LASTEXITCODE -ne 0) {
         exit 0
     }
 
-    $staged = @(git diff --cached --name-only | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $staged = @(Invoke-WithUtf8Console { git diff --cached --name-only } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     if ($staged.Count -eq 0) {
         exit 0
     }
