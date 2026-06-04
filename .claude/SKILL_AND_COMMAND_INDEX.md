@@ -2,11 +2,11 @@
 
 > 自訂 slash command 與 SKILL.md 技能的完整索引。
 > SSOT = `.claude/commands/*.md`（slash command）+ `.claude/skills/*/SKILL.md`（技能）。
-> Last generated: 2026-05-30
+> Last generated: 2026-06-04
 
 兩類：
-- **Slash commands**（`.claude/commands/*.md`，共 33）— 打 `/<name>` 觸發。
-- **Skills**（`.claude/skills/`，共 6）— 由 Skill 工具依描述/trigger 詞自動載入。
+- **Slash commands**（`.claude/commands/*.md`，共 35）— 打 `/<name>` 觸發。
+- **Skills**（`.claude/skills/`，共 13）— 由 Skill 工具依描述/trigger 詞自動載入。
 
 ---
 
@@ -71,9 +71,18 @@
 | `/decide` | 觸發 decision-intelligence agent 做結構化多 agent 決策審查。 | [commands/decide.md](commands/decide.md) |
 | `/strategy-review` | 觸發 strategy-review 技能做多角度策略審查。 | [commands/strategy-review.md](commands/strategy-review.md) |
 
+### 編碼工作流（新增 2026-06-04，整合自 mattpocock/skills）
+
+| 指令 | 描述 | 路徑 |
+|---|---|---|
+| `/caveman` | 壓縮 ~75% token 的說話模式。持續生效直到 "stop caveman" 或 "normal mode"。 | [commands/caveman.md](commands/caveman.md) |
+| `/zoom-out` | 叫 agent 往上拉一層抽象，給出所有相關模組 + caller 的地圖。 | [commands/zoom-out.md](commands/zoom-out.md) |
+
 ---
 
-## B. Skills（6）
+## B. Skills（13）
+
+### 現有系統 Skills
 
 | 技能 | 描述 | 路徑 |
 |---|---|---|
@@ -83,5 +92,16 @@
 | `sdd-update` | 同步系統設計文件（SDD）與近期 code 改動。觸發：「更新 sdd / 同步設計文件 / 技術文件過時了」。先跑 5-level 檢查。 | [skills/sdd-update/SKILL.md](skills/sdd-update/SKILL.md) |
 | `strategy-review` | 非工程決策的多角度策略審查（選工具/客戶/商業/廠商/整合）：四角色協作、紅藍隊、pre-mortem，產可升 ADR 的決策紀錄。 | [skills/strategy-review/SKILL.md](skills/strategy-review/SKILL.md) |
 | `ai-decision-intelligence` | 技術決策多 agent 系統（工具選型、架構審查）。打包成 `.skill`（zip）。 | [skills/ai-decision-intelligence.skill](skills/ai-decision-intelligence.skill) |
+
+### 日常 Coding 工作流 Skills（整合自 mattpocock/skills，2026-06-04）
+
+| 技能 | 描述 | 路徑 |
+|---|---|---|
+| `grill-me` | 逐一追問計畫/設計直到達成共識，每題提供推薦答案。觸發：「grill me / 問爆我 / 逼我想清楚 / 壓力測試計畫」。 | [skills/grill-me/SKILL.md](skills/grill-me/SKILL.md) |
+| `grill-with-docs` | 逐一追問並同時更新 CONTEXT.md 詞彙表 + ADR。觸發：「grill with docs / 對齊設計 / 確認術語 / 更新詞彙表」。 | [skills/grill-with-docs/SKILL.md](skills/grill-with-docs/SKILL.md) |
+| `tdd` | 紅綠重構 TDD：垂直切片、行為測試、mock 只在系統邊界。觸發：「TDD / 寫測試 / red-green-refactor / test-first」。含 tests.md / mocking.md / deep-modules.md / interface-design.md / refactoring.md。 | [skills/tdd/SKILL.md](skills/tdd/SKILL.md) |
+| `diagnose` | 六段 debug loop：feedback loop → 複現 → 假說 → 插樁 → 修復 → 清理。含 R0 WORKLOG 要求。觸發：「diagnose / debug this / 找不到 bug / 一直報錯 / 效能問題」。 | [skills/diagnose/SKILL.md](skills/diagnose/SKILL.md) |
+| `prototype` | 兩個分支：邏輯原型（終端 app）或 UI 原型（同一 route 多 variant）。觸發：「prototype / 做個原型 / 先試試看 / 試幾個設計」。含 LOGIC.md / UI.md。 | [skills/prototype/SKILL.md](skills/prototype/SKILL.md) |
+| `improve-codebase-architecture` | 找架構「加深機會」，生成視覺 HTML 報告，進 grilling session。觸發：「架構改善 / 重構機會 / 模組太分散 / 很難測試」。含 LANGUAGE.md / DEEPENING.md / INTERFACE-DESIGN.md / HTML-REPORT.md。 | [skills/improve-codebase-architecture/SKILL.md](skills/improve-codebase-architecture/SKILL.md) |
 
 > ⚠️ `skills/integration-javascript_node/` 為**空資料夾**（無 SKILL.md），不是有效技能 — 可考慮清除。
