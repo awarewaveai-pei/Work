@@ -159,6 +159,33 @@ try {
         Write-Host "== REALTEST: no evidence in today's WORKLOG (code staged) -- add REALTEST_EVIDENCE: or REALTEST_WAIVED: ==" -ForegroundColor Yellow
     }
 
+    # DEBUG-TAG gate: staged code files must not contain [DEBUG-XXXX] instrumentation tags.
+    # These are added by /diagnose skill Phase 4 and must be removed in Phase 6 before closeout.
+    # Waiver: add  - DEBUG_TAG_WAIVED: <reason>  to today's WORKLOG section.
+    if ($hasCodeStaged) {
+        $hasDebugTagWaived = ($section -match '(?m)^\s*-\s*DEBUG_TAG_WAIVED:')
+        if (-not $hasDebugTagWaived) {
+            $debugTagFiles = @()
+            foreach ($sf in $significant) {
+                $ext = try { [System.IO.Path]::GetExtension($sf).ToLowerInvariant() } catch { if ($sf -match '\.(\w+)$') { ".$($Matches[1].ToLowerInvariant())" } else { '' } }
+                if ($codeExts -contains $ext) {
+                    $absPath = Join-Path $WorkRoot $sf
+                    if (Test-Path -LiteralPath $absPath) {
+                        $content = [System.IO.File]::ReadAllText($absPath, $utf8)
+                        if ($content -match '\[DEBUG-[A-Za-z0-9]+\]') {
+                            $debugTagFiles += $sf
+                        }
+                    }
+                }
+            }
+            if ($debugTagFiles.Count -gt 0) {
+                $dtMsg = ("verify-closeout-completeness: {0} staged code file(s) contain [DEBUG-] instrumentation tags from /diagnose Phase 4: {1}. Run: grep -r '[DEBUG-' on those files to find and remove all tags. OR add: - DEBUG_TAG_WAIVED: <reason>. Gate={2}" -f $debugTagFiles.Count, ($debugTagFiles -join ', '), $Gate)
+                if ($Gate -eq "strict") { Write-Host $dtMsg -ForegroundColor Red; exit 1 }
+                Write-Warning $dtMsg
+            }
+        }
+    }
+
     # REVIEW gate: all significant staged changes require REVIEW_DONE: or REVIEW_WAIVED:.
     # Legitimate exceptions -> REVIEW_WAIVED: <DOC_ONLY|NA> -- <reason>
     $hasReviewEvidence = $false
