@@ -237,6 +237,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 準備開始實作，但用戶需求尚未明確釐清（有歧義 / 多個可能詮釋）| 先跑 `grill-with-docs` skill 對齊，**禁止直接實作** |
 | 用戶說「寫測試」或新 feature 有明確 test 需求 | 跑 `tdd` skill，用垂直切片紅綠重構，**禁止先寫全部 test 再寫 impl（水平切片）** |
 | 讀 code 時發現模組介面幾乎與實作一樣複雜（shallow module）| 建議跑 `improve-codebase-architecture` skill 找加深機會 |
+| 讀不熟悉的 code 段落，不清楚這個模組被誰呼叫 / 屬於哪個系統層 | 直接跑 `/zoom-out`，給出模組地圖（**不問使用者**）|
 
 ### 工作類型 → Agent/Tool 路由表
 
