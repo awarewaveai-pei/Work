@@ -168,8 +168,8 @@ try {
         Write-Host "== REALTEST: no evidence in today's WORKLOG (code staged) -- add REALTEST_EVIDENCE: or REALTEST_WAIVED: ==" -ForegroundColor Yellow
     }
 
-    # DEBUG-TAG gate: staged code files must not contain [DEBUG-XXXX] instrumentation tags.
-    # These are added by /diagnose skill Phase 4 and must be removed in Phase 6 before closeout.
+    # DEBUG-TAG gate: staged code files must not contain temporary instrumentation tags.
+    # Format: [DEBUG-<hex-id>] — added by /diagnose skill Phase 4; must be removed in Phase 6.
     # Waiver: add  - DEBUG_TAG_WAIVED: <reason>  to today's WORKLOG section.
     if ($hasCodeStaged) {
         $hasDebugTagWaived = ($section -match '(?m)^\s*-\s*DEBUG_TAG_WAIVED:')
@@ -179,7 +179,7 @@ try {
                 $ext = try { [System.IO.Path]::GetExtension($sf).ToLowerInvariant() } catch { if ($sf -match '\.(\w+)$') { ".$($Matches[1].ToLowerInvariant())" } else { '' } }
                 if ($codeExts -contains $ext) {
                     $absPath = Join-Path $WorkRoot $sf
-                    if (Test-Path -LiteralPath $absPath) {
+                    if (Test-Path -LiteralPath $absPath -PathType Leaf) {
                         $content = [System.IO.File]::ReadAllText($absPath, $utf8)
                         if ($content -match '\[DEBUG-[A-Za-z0-9]+\]') {
                             $debugTagFiles += $sf
