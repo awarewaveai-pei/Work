@@ -115,7 +115,7 @@ Tool reports **117 remaining unprotected sites** across these files. Most are AS
 | `scripts/phase4-weekly-check.ps1` | 1 | Low — 🔴 FIXED 2026-05-30: wrapped `git rev-parse --show-toplevel` in `Invoke-WithUtf8Console` (same edit also rewrote Check 3 to status-frontmatter logic) |
 | `scripts/scan-local-config-for-secrets.ps1` | 1 | Low |
 | `scripts/sync-claude-userlevel.ps1` | 1 | Low — 🔴 FIXED b791bfb+followup: wrapped `git rev-parse` in `Invoke-WithUtf8Console` |
-| `scripts/verify-closeout-completeness.ps1` | 2 | Low |
+| `scripts/verify-closeout-completeness.ps1` | 2 | Low — 🔴 FIXED 2026-06-04: added `_console-encoding-helpers.ps1` dot-source + wrapped `git rev-parse` (L40) and `git diff --cached` (L45) in `Invoke-WithUtf8Console`; same edit also adds DEBUG-TAG gate for `/diagnose` Phase 4 cleanup |
 | `lobster-factory/infra/trigger/deploy-workflows.ps1` | 1 | **False positive** — `docker info 2>&1 \| Out-Null` discards all output; no stdout decode occurs; CP950 trap does not apply. Also fixed commit `27d36dc` 2026-05-26: L72 `Get-Content $PkgPath -Raw` + L85 `Get-Content $PosthogEnvSource` now both use `-Encoding UTF8` |
 | `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` | 1 | Low |
 | `mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1` | 2 | Low |

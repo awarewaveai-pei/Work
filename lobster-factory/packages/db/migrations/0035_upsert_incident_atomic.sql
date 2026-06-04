@@ -73,4 +73,11 @@ $$;
 COMMENT ON FUNCTION public.upsert_incident_atomic IS
 'Atomic incident upsert. occurrence_count uses SET count + 1 (row-locked),
 not a JS-computed literal. Eliminates concurrent-retry double-count loss (M10).
-Severity: max(existing, incoming). Reopen logic computed from current DB status.';
+Severity: max(existing, incoming). Reopen logic computed from current DB status.
+NOTE: conflict target is (fingerprint, environment) only. The second unique
+constraint unique(source, external_id) on ops_incidents (added in 0013) is NOT
+handled here — a collision where fingerprint differs but external_id matches a
+different row will surface as a 23505 unique_violation error, not a DO UPDATE.
+This matches the pre-migration .upsert({onConflict:"fingerprint,environment"})
+behavior. If source+external_id deduplication is ever needed, drop or broaden
+this constraint in a future migration.';

@@ -22,7 +22,7 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=EU psql CREATE FUNCTION upsert_incident_atomic | exit=0 | result=12 args confirmed
 - REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | ms=~27000 | result=tsc 0 + vitest 168/168 + smoke 4/4 + deployed 97d3e87e → new commit
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (tsc + vitest 179/179 pass locally)
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=occurrence_count,escalateAnalysisOnlyRun,monitor.hostname | hits=expected (all 6 routes updated, service.ts patched, normalizer patched)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=upsertIncidentAtomic,escalateAnalysisOnlyRun,occurrence_count.*snapshot,monitor\.hostname | hits=expected (12 callsites upsertIncidentAtomic all correct; 0 hits JS-computed occurrence_count race pattern — fully eliminated; 2 escalateAnalysisOnlyRun callsites OK; monitor.hostname remaining in whitelist service lookup + tags only, not environment inference)
 - WORKLOG: this entry
 
 **Phase4Weekly 驗收**：時間未到（驗收窗口 2026-06-05 06:00 UTC）；TASKS 保留待明日。
