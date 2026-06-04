@@ -24,3 +24,4 @@
 - [User travels internationally — no geo-based WAF](feedback_global_traveler.md) — User travels worldwide; Cloudflare country rules / IP CIDRs will block her abroad. Always use LLAR (server-side) not CF WAF for wp-login protection.
 - [VBC: Verify Before Conclude — never claim missing from one data point](feedback_claim_before_verify.md) — Before saying "X is broken/missing/not done", check if another layer replaced it. Read WORKLOG first when another session's work is in question. Root cause: 2026-06-04 CF WAF=0 → missed LLAR was installed.
 - [app.aware-wave.com 系統分析（2026-06-04 全讀）](project_app_aware_wave_analysis.md) — 徹底讀完全部 codebase + 12 個邏輯問題清單（auth 403/WpUpdateButtons 無樣式/3名1頁/2個onboarding/佇列邏輯/etc）
+- [Caveman mode is permanent default](feedback_caveman_default.md) — Always respond concise/compressed. Never wait for user to say "caveman". Drop only for destructive-op confirmations then resume.
