@@ -25,7 +25,11 @@ Backups/
 .claude/ide/
 .claude/paste-cache/
 .claude/plugins/
-.claude/projects/
+.claude/projects/*
+!.claude/projects/c--Users-USER-Work/
+.claude/projects/c--Users-USER-Work/*
+!.claude/projects/c--Users-USER-Work/memory/
+!.claude/projects/c--Users-USER-Work/memory/**
 .claude/session-env/
 .claude/sessions/
 .claude/shell-snapshots/
