@@ -54,6 +54,14 @@
 **寫入前**：每個路徑 / 腳本名 / 引用 → Glob 確認存在，不存在不寫。
 **寫入後**：grep 你剛修的確切字串（範圍：`.claude/ runbooks/ scripts/ agency-os/docs/ mcp/`），命中一起修，同一 commit。
 **審查時**：聲稱「清單完整」的段落 → 必須 Glob/Grep 對照實際狀態，不得只讀文字。
+
+**驗前先讀歷史（VBC — Verify Before Conclude，強制）**：
+宣告「X 缺失 / X 無保護 / X 沒完成」前，必須先查「是否有替代方案已補上」。**單一數據源缺失 ≠ 整體未完成。**
+- 正確流程：看到 A 層消失 → 先問「用什麼替代？」→ 讀 WORKLOG / 查 VPS 實際狀態 → 再下結論
+- 禁止：只查單一系統（CF API / VPS / git diff / DB）就宣告「另一個 session 沒做好」
+- 根因案例（2026-06-04）：CF WAF = 0 rules → 未讀 WORKLOG 確認 LLAR 已裝 → 誤報「wp-login 無保護」。正確：兩層一起看（WAF 消失 + LLAR 補上 = 完成，不是問題）
+- 同樣適用於：DB 表空了 / 設定檔不見了 / 容器消失了 / endpoint 沒了 → 都先問「誰接手了？」
+
 **[驗證計畫] 四動作落實檢核**：R0 [驗證計畫] 的四個動作（實測 / Review / 抓蟲 / WORKLOG）必須在 [驗證結果] 段對應出具體執行紀錄。違反樣態：
 - 只寫 grep -c 數量 = 缺 Review + 缺實測
 - 只跑 npm test = 缺抓蟲 + 缺 WORKLOG
@@ -146,6 +154,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 使用者提到「客戶」/「soulful」/「WP 更新」/「外掛」/「maintenance」 | 先跑 `/client-status [slug]` 了解現況，再決定下一步 |
 | `/wp-maintenance safe-update` 完成 | 自動跑 `/playwright client <slug>` 確認無破壞 |
 | Telegram bot 無回應 / 沉默 > 30 分鐘 / 使用者說「Telegram 壞了」/「指令沒反應」 | 跑 `/command-plane-verify` |
+| 使用者說「別的 AI 處理好了」/「另一個 session 做了 X」/「之前已經做過」/「似乎完成了」（任何基礎設施 / 安全 / 功能改動）| **VBC 協議（強制，R4 SSOT）**：① 先讀 `agency-os/WORKLOG.md` 最近 3 個 `## YYYY-MM-DD` 區塊，找對應 `[已修改]` / `AUTO_TASK_DONE` / `REALTEST_EVIDENCE` → 完整理解「做了什麼、用什麼替代方案」② 才做正向驗證（確認效果符合記錄）③ **禁止**：只查單點系統（CF API / git diff / VPS 單一服務）就宣告「沒做好」— 單層消失可能代表另一層已接手。根因：2026-06-04 CF WAF=0 rules 誤報案例（未讀 WORKLOG 確認 LLAR 已裝） |
 | 使用者說「doc 過時了」/「更新設計文件」/「SDD 跟程式碼不一致」/「文件同步一下」 | 跑 `/sdd-update` |
 | 使用者說「跑 QA」/「找 bug」/「上線前測試」/「幫我測試一下」 | 跑 `/qa-review` |
 | 任何 non-trivial R0 任務完成（輸出 [已修改] 後，準備進下一個任務）| 跑 `/checkpoint`（mid-session git save；tree 乾淨時靜默跳過） |
