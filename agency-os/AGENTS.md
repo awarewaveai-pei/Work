@@ -127,6 +127,7 @@ Secrets: `scripts/secrets-vault.ps1 -Action get -Key <KEY_NAME>`；key names 在
 ## 語言與輸出
 
 繁體中文；先結論後步驟；操作說明含路徑 + 動作 + 預期結果；指令貼完整可執行版本；每 15 分鐘回報長任務進度。
+**壓縮模式（永久預設）**：本 project 所有回覆採 caveman style（省 ~75% token）。不等使用者說觸發詞，直接生效。去掉 filler / 問候 / 解釋。技術名詞保留原文。僅在**不可逆操作確認**（刪資料 / deploy / reboot）時暫時切回完整說明，說完自動恢復。
 Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回寫 WORKLOG/memory（Cursor: `.cursor/rules/40-shutdown-closeout.mdc`；Claude Code: `.claude/commands/ao-close.md`）。
 
 ## 代理自動工具使用規則（Claude 主動執行）
@@ -239,6 +240,8 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | Claude 自己開始寫一個新 feature 的 code，且尚未先寫任何 test | 停下，改用 `tdd` skill 垂直切片流程，**禁止先寫全部 impl 再補 test** |
 | 讀 code 時發現模組介面幾乎與實作一樣複雜（shallow module）| 建議跑 `improve-codebase-architecture` skill 找加深機會 |
 | 讀不熟悉的 code 段落，不清楚這個模組被誰呼叫 / 屬於哪個系統層 | 直接跑 `/zoom-out`，給出模組地圖（**不問使用者**）|
+| debug 過程中第一個假說驗證失敗，或 bug 無法快速複現 | 切換到 `diagnose` skill 六段 loop（**不繼續猜測**）|
+| 設計一個 feature 時出現 2+ 個架構方向、無法靠分析決定哪個對 | 提議用 `prototype` skill 快速驗證（說明問題 + 等確認）|
 
 ### 工作類型 → Agent/Tool 路由表
 
