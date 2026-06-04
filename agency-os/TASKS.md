@@ -63,6 +63,7 @@
 - [x] **【✅ 2026-06-03 完成】Onboarding Portal §7 staging build 串接 + §8 Uptime Kuma env** — `POST /api/onboarding/trigger-build` 上線；idempotency + FK cross-validate + middleware matcher 修正；UPTIME_KUMA_URL 補入 docker-compose；real exec test PASS（run_id c9b6cc0e, intake_forms.status=building）。commit a573b759 + 59d4e7c。
 - [x] **【✅ 2026-06-03 完成】明天 carry-over：onboarding §7/§8 + scripts drift** — §7/§8 完成；scripts drift 仍開放（見工具層分類）
 - [ ] Cloudflare WAF wp-login 規則改 ip.geoip.country（現在是臨時 CIDR，換地點/ISP 就再被擋）→ handoffs/2026-06-03-1749-tomo-174946.md
+- [ ] 大修 app.aware-wave.com（12個問題）— AI AGENT 先讀 APP_AWARE_WAVE_COMPLETE_REFERENCE.md → handoffs/2026-06-04-1730-ai-agent-redesign.md
 
 #### 雙機環境 / 日常開工
 

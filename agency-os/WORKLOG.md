@@ -4,6 +4,9 @@
 
 ## 2026-06-04
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: ai-agent-redesign → handoffs/2026-06-04-1730-ai-agent-redesign.md
+
 ### Batch 3 Auto-Repair audit — M9 TOCTOU + M10 retry storm + m4 hostname (2026-06-04)
 
 **根本目標**：完成 auto-repair-2026-05-23 audit 剩餘 Batch 3（M9/M10/m4）。
