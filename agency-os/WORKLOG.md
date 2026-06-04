@@ -53,7 +53,22 @@
 3. BUGHUNT_DONE: scope=agency-os,scripts | grep=Custom Skills 6,grill,tdd,diagnose,prototype | hits=1 stale claim fixed (TOOL_TRIGGER_MAP.md:81)
 4. WORKLOG: this entry
 
-**未做的機械強制（設計決策）**：新 skills 為 prompt-based，依賴現有 AO-CLOSE gate (verify-closeout-completeness)；未建新 hook。AGENTS.md routing 待補（見使用者追問後的後續 task）。
+**未做的機械強制（設計決策）**：新 skills 為 prompt-based，依賴現有 AO-CLOSE gate (verify-closeout-completeness)；未建新 hook。AGENTS.md routing 已補（見後續 commits）。
+
+### verify-closeout-completeness.ps1 — DEBUG-TAG gate + CP950 fix（2026-06-04）
+
+**根本目標**：為 `/diagnose` skill 加機械強制（Phase 6 未清 debug tag → AO-CLOSE BLOCK）；同時修 pre-existing CP950 drift（AUDIT_REGISTRY Low）。
+
+**已修改**：
+- `scripts/verify-closeout-completeness.ps1`：① 新增 DEBUG-TAG gate（在 `$hasCodeStaged` block 內檢查 `[DEBUG-<hex-id>]` pattern，strict 模式 BLOCK；waiver `DEBUG_TAG_WAIVED:`）② 加 `_console-encoding-helpers.ps1` dot-source ③ 包 git rev-parse + git diff 在 `Invoke-WithUtf8Console { }` ④ Critic 修：comment 改用 `[DEBUG-<hex-id>]`（`<` 不在 `[A-Za-z0-9]`，不自匹配）⑤ Critic 修：`Test-Path -PathType Leaf` 防 directory 路徑 ReadAllText throw
+- `agency-os/docs/operations/AUDIT_REGISTRY.md`：`verify-closeout-completeness.ps1` 標 🔴 FIXED
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell verify-closeout-completeness.ps1 -Gate warn (no staged) exit=0; self-match test PASS; -PathType Leaf directory reject PASS; audit-cp950-traps clean=1 drift=0
+- REVIEW_DONE: critic=Deep | verdict=pass/fixed | findings=0c/0m/0n (2 major fixed: self-match comment + PathType Leaf)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=DEBUG_TAG_WAIVED,Invoke-WithUtf8Console,_console-encoding-helpers | hits=expected (AUDIT_REGISTRY + BUG_HUNT_PROTOCOL refs consistent; no stale claims)
+- WORKLOG: this entry
+- DEBUG_TAG_WAIVED: the gate script file itself contains verify logic code — not a debug instrumentation artifact
 
 ## 2026-06-03
 
