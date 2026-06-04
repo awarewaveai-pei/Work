@@ -78,7 +78,9 @@
 
 ---
 
-## Custom Skills（6 個）
+## Custom Skills（13 個）
+
+### 治理 / 系統 Skills（原有 6 個）
 
 | Skill | 功能 | 觸發 |
 |-------|------|------|
@@ -88,6 +90,18 @@
 | `sdd-update` | SDD 與 code 同步更新 | 🟢 「doc 過時」「設計文件更新」「SDD 跟 code 不一致」|
 | `strategy-review` | 非工程策略多角度審查 | 🟢 策略決策 / 紅藍隊 / pre-mortem |
 | `ai-decision-intelligence` | 技術決策多 agent 辯論系統 | 🟢 via `/decide` 自動呼叫 |
+
+### 日常 Coding 工作流 Skills（新增 7 個，整合自 mattpocock/skills，2026-06-04）
+
+| Skill | 功能 | 觸發 |
+|-------|------|------|
+| `grill-me` | 逐一追問計畫直到共識，每題提供推薦答案 | 🟢 「grill me」「問爆我」「逼我想清楚」|
+| `grill-with-docs` | 追問 + 同步更新 CONTEXT.md 詞彙表 + ADR | 🟢 「grill with docs」「對齊設計」「確認術語」|
+| `tdd` | 紅綠重構 TDD：垂直切片、行為測試、mock 只在邊界 | 🟢 「TDD」「寫測試」「red-green-refactor」|
+| `diagnose` | 六段 debug loop（含 R0 WORKLOG 要求） | 🟢 「diagnose」「找不到 bug」「一直報錯」「效能問題」|
+| `prototype` | 邏輯原型（終端 app）或 UI 原型（多 variant route） | 🟢 「prototype」「做個原型」「試幾個設計」|
+| `improve-codebase-architecture` | 找架構加深機會，生成 HTML 報告 + grilling | 🟢 「架構改善」「重構機會」「很難測試」|
+| `/caveman`（command） | token 壓縮 75%，持續生效直到 stop caveman | 🟢 「caveman mode」「less tokens」「be brief」|
 
 ---
 

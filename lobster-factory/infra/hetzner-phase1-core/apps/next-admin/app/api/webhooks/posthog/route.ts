@@ -4,7 +4,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { computeFingerprint } from "@/lib/ops-inbox/fingerprint";
 import { normalizePostHog } from "@/lib/ops-inbox/normalize/posthog";
 import { redactSecrets } from "@/lib/ops-inbox/redactSecrets";
-import { computeTransition, maxSeverity } from "@/lib/ops-inbox/transition";
+import { computeTransition } from "@/lib/ops-inbox/transition";
+import { upsertIncidentAtomic } from "@/lib/ops-inbox/upsertIncidentAtomic";
 import type { Incident, IncidentSnapshot } from "@/lib/ops-inbox/types";
 import { verifyIngestToken } from "@/lib/ops-inbox/verifyIngestToken";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
@@ -50,21 +51,8 @@ export async function POST(req: Request) {
   const transition = computeTransition(snapshot, draft);
   const isReopen = transition.kind === "reopened";
 
-  const { data: upserted, error } = await supabase
-    .from("ops_incidents")
-    .upsert(
-      {
-        ...draft,
-        last_seen_at: new Date().toISOString(),
-        occurrence_count: (snapshot?.occurrence_count ?? 0) + 1,
-        reopen_count: (snapshot?.reopen_count ?? 0) + (isReopen ? 1 : 0),
-        ...(isReopen ? { status: "open" as const, resolved_at: null, resolved_by: null } : {}),
-        severity: maxSeverity(snapshot?.severity, draft.severity),
-      },
-      { onConflict: "fingerprint,environment" },
-    )
-    .select("*")
-    .single();
+  // M10 fix: atomic upsert — occurrence_count incremented via SQL SET count+1 (row lock).
+  const { data: upserted, error } = await upsertIncidentAtomic(supabase, draft, isReopen);
 
   if (error || !upserted) {
     Sentry.captureException(error ?? new Error("upsert_empty"), { tags: { route: "ops-inbox-webhook-posthog" } });

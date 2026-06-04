@@ -12,8 +12,10 @@ export function normalizeUptimeKuma(raw: any): IncidentDraft {
   const certExpiringSoon = /cert.*expire/i.test(heartbeat.msg ?? "");
 
   const envTag = tags.find((t) => t.name === "env")?.value;
+  // m4 fix: exclude monitor.hostname from environment inference — hostname is attacker-controlled.
+  // Rely only on the explicit Uptime Kuma "env" tag (configured by operator, not incoming payload).
   const environment: IncidentEnvironment =
-    envTag === "staging" ? "staging" : envTag === "development" ? "development" : /staging\./i.test(monitor.hostname ?? "") ? "staging" : "production";
+    envTag === "staging" ? "staging" : envTag === "development" ? "development" : "production";
 
   const severity: IncidentSeverity = certExpiringSoon ? "low" : isDown ? (environment === "production" ? "critical" : "medium") : "low";
 

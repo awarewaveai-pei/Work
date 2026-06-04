@@ -10,7 +10,7 @@ import {
   policyForIncident,
   severityRequiresHumanReview,
 } from "./policy";
-import { escalateGuard, isStrictTerminalState } from "./run-state";
+import { escalateGuard, isStrictTerminalState, TERMINAL_STATES } from "./run-state";
 import { REPAIR_RUN_STATES, REPAIR_DEPLOY_STATUSES } from "./types";
 import type { RepairRun, RepairRunWithIncident } from "./types";
 
@@ -350,14 +350,25 @@ export async function escalateAnalysisOnlyRun(
   const guard = escalateGuard(run, catalog.can_escalate_to_pr);
   if (!guard.can) return { ok: false, error: guard.reason, details: guard.reason === "run_in_terminal_state" ? { state: run.state } : undefined };
 
-  const updated = await updateRun(id, {
-    policy: "auto_repair",
-    audit_log: appendAudit(run.audit_log, {
-      actor,
-      action: "escalated_to_auto_repair",
-      detail: "Operator confirmed code-regression root cause; escalated from analysis_only to auto_repair.",
-    }),
+  const newAuditLog = appendAudit(run.audit_log, {
+    actor,
+    action: "escalated_to_auto_repair",
+    detail: "Operator confirmed code-regression root cause; escalated from analysis_only to auto_repair.",
   });
+  // M9 fix: atomic conditional UPDATE — only succeeds if policy is still 'analysis_only'
+  // and the run has not been moved to a terminal state by a concurrent request.
+  const terminalList = `(${TERMINAL_STATES.map((s) => `"${s}"`).join(",")})`;
+  const { data: updated, error: updateError } = await supabase
+    .from("repair_runs")
+    .update({ policy: "auto_repair", audit_log: newAuditLog })
+    .eq("id", id)
+    .eq("policy", "analysis_only")
+    .not("state", "in", terminalList)
+    .select("*")
+    .maybeSingle();
+
+  if (updateError) return { ok: false, error: "update_failed", details: updateError.message };
+  if (!updated) return { ok: false, error: "state_conflict_concurrent_modify" };
 
   if (run.github_issue_number && run.github_owner && run.github_repo) {
     await postEscalationComment({
@@ -368,7 +379,7 @@ export async function escalateAnalysisOnlyRun(
     }).catch(() => {});
   }
 
-  return { ok: true, run: updated ?? undefined };
+  return { ok: true, run: updated as RepairRun };
 }
 
 export async function updateRunLinks(
