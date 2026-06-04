@@ -1225,22 +1225,300 @@ NEXT_PUBLIC_SENTRY_DSN
 
 ---
 
-## 14. 已知問題清單（12 項）
+## 14. 已知問題完整分析（12 項）
 
-| # | 問題 | 位置 | 嚴重性 | 說明 |
-|---|------|------|--------|------|
-| 1 | **Auth production 預設 403** | `middleware.ts` | 🔴 致命 | nginx 沒注入 `x-ops-proxy-auth` header，整個 admin UI 對瀏覽器 403 |
-| 2 | **WpUpdateButtons 無樣式** | `app/ops/clients/[slug]/WpUpdateButtons.tsx` | 🔴 功能壞掉 | 使用 Tailwind class（`bg-red-600` 等），但 app 無 Tailwind，全部按鈕無樣式 |
-| 3 | **三個名字指向同一頁** | `layout.tsx` + `page.tsx` | 🟠 混亂 | "Repair Center badge" / "Incident Engine" / "Ops Inbox" 都是 `/ops/inbox` |
-| 4 | **兩個 Onboarding 入口** | `/onboard` vs `/ops/onboarding` | 🟠 混亂 | 功能相同，使用者不知用哪個 |
-| 5 | **Repair Center 佇列邏輯** | `app/ops/repairs/page.tsx:83` | 🟠 邏輯錯誤 | 有任何 repair_run（含 resolved）→ incident 從佇列消失，無法重啟 |
-| 6 | **GitHub PR 棄案不處理** | `app/api/webhooks/github/route.ts` | 🟡 漏洞 | PR closed but not merged → repair_run 永遠卡在 pr_ready |
-| 7 | **repairs/health 每次 SSH** | `app/api/ops/repairs/health/route.ts` | 🟠 效能 | 每次 GET 真實 SSH 進 SG+EU，極重，Repair Center 頁面每次 load 都觸發 |
-| 8 | **Approvals 頁幾乎空** | `policyEngine.ts` + `app/ops/approvals` | 🟡 設計問題 | `/normal_mode` 被 policy 硬擋不進佇列，解 Kill Switch 路徑跟 Approvals 無關 |
-| 9 | **AI label 寫死 "Gemini"** | `app/ops/inbox/[id]/page.tsx:51` | 🟡 資訊錯誤 | 主 provider 是 Claude Haiku，label 永遠顯示 "Gemini auto-summary" |
-| 10 | **沒有即時更新** | 所有操作頁面 | 🟡 體驗差 | 全 force-dynamic RSC，操作後需手動重整；只有 Build Console poll + OpsInboxBadge 30s |
-| 11 | **Ops Console 孤兒頁面** | `app/ops-console/` | 🟡 設計問題 | 重複 Clients+Build Console 資料，AI image jobs 無後端處理，功能未完成 |
-| 12 | **Inbox→Repair 單向導覽** | `app/ops/inbox/[id]/page.tsx` | 🟡 UX | Inbox 詳情無「啟動修復」按鈕，需離開頁面去 Repair Center 操作 |
+### 快速索引
+
+| # | 問題 | 嚴重性 |
+|---|------|--------|
+| 1 | Auth production 預設 403 | 🔴 致命 |
+| 2 | WpUpdateButtons 完全無樣式 | 🔴 功能壞掉 |
+| 3 | 三個名字指向同一頁 | 🟠 混亂 |
+| 4 | 兩個 Onboarding 入口做同樣的事 | 🟠 混亂 |
+| 5 | Repair Center 佇列邏輯有漏洞 | 🟠 邏輯錯誤 |
+| 6 | repairs/health 每次 GET 做真實 SSH | 🟠 效能問題 |
+| 7 | GitHub PR 棄案不處理 | 🟡 漏洞 |
+| 8 | 沒有任何即時更新機制 | 🟡 體驗差 |
+| 9 | AI summary label 寫死為 "Gemini" | 🟡 資訊錯誤 |
+| 10 | Approvals 頁幾乎永遠空 | 🟡 設計錯誤 |
+| 11 | Ops Console 是孤兒頁面 | 🟡 設計錯誤 |
+| 12 | Ops Inbox → Repair Center 導覽是斷的 | 🟡 UX |
+
+---
+
+### 問題 1：Auth 在 production 基本上壞掉 🔴
+
+**根本原因**：`middleware.ts` 的邏輯：
+
+```typescript
+// middleware.ts
+function hasTrustedProxyAuth(request: NextRequest): boolean {
+  const expected = process.env.OPS_PROXY_SHARED_SECRET;
+  if (!expected) return !isProductionLike();          // production → false
+  return request.headers.get(PROXY_AUTH_HEADER) === expected;
+}
+
+// ...
+if (!trustedProxy && isProductionLike()) {
+  return NextResponse.json({ error: "forbidden" }, { status: 403 });
+}
+```
+
+Production 環境（`NODE_ENV=production`）下，所有 `/ops/*` 和 `/api/ops/*` 請求都需要 nginx 注入 `x-ops-proxy-auth` header 且值等於 `OPS_PROXY_SHARED_SECRET`。
+
+但 `nginx/default.conf` 完全沒有注入這個 header 的設定。
+
+**結果**：
+- 整個 admin UI 的所有頁面，在 production 下對瀏覽器直接請求都回 **403**
+- 使用者角色永遠是 `default_viewer`（`resolveOpsRole` fallback）
+- 所有寫入操作（Repair / Approvals / System Modes）全部被攔
+- 唯一例外：`/api/ops/summary`、`/api/ops/inbox/health`、`/api/webhooks/*`（這些路徑在 middleware 免驗）
+
+**影響範圍**：`/ops/*`、`/api/ops/*`（除免驗路徑）、`/api/ai/*`、`/api/build/*`、`/api/onboarding/*`
+
+**修法方向**：在 nginx 的 `app.aware-wave.com` server block 注入 proxy-auth header，或改用 Cloudflare Access 注入 claims header。
+
+---
+
+### 問題 2：WpUpdateButtons 完全無樣式 🔴
+
+**位置**：`app/ops/clients/[slug]/WpUpdateButtons.tsx`
+
+**根本原因**：元件全部使用 Tailwind CSS class：
+
+```tsx
+// WpUpdateButtons.tsx
+className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${meta.colour}`}
+// 其中 meta.colour = "bg-red-600 hover:bg-red-700 disabled:bg-red-900 text-white"
+
+className="animate-spin"   // loading spinner
+
+className="rounded border ${WAVE_META[running ?? 'wave3'].borderColour} bg-black font-mono text-xs text-green-400 p-3"
+```
+
+但整個 `next-admin` 應用使用**純 CSS 變數**（`globals.css`），**沒有安裝 Tailwind CSS**。`package.json` 中沒有 `tailwindcss` 依賴，也沒有 `tailwind.config.js`。
+
+**結果**：
+- Wave 1/2/3 更新按鈕無任何顏色和 padding
+- Abort 按鈕無樣式
+- Loading spinner（animate-spin）不旋轉
+- SSH log 輸出視窗沒有黑底綠字
+
+**修法**：將所有 Tailwind class 改為 inline style 或 CSS 變數，與 app 其他元件一致。
+
+---
+
+### 問題 3：三個名字指向同一個頁面 🟠
+
+**位置**：`app/layout.tsx`（側欄）、`app/page.tsx`（Dashboard）
+
+同一個頁面 `/ops/inbox` 在三個地方有三個不同的名稱：
+
+| 位置 | 顯示名稱 | 指向路徑 |
+|------|---------|---------|
+| 側欄 Repair OS 區 | Repair Center（但 `OpsInboxBadge` 數字指向 `/ops/inbox`）| `/ops/repairs`（badge 讀 `/ops/inbox` health）|
+| 側欄 System 區 | "◇ Incident Engine" | `/ops/inbox` |
+| Dashboard 主頁 NavCard | "📥 Ops Inbox" | `/ops/inbox` |
+
+`OpsInboxBadge`（側欄 Repair Center 旁的紅色數字）每 30 秒 poll `/api/ops/inbox/health`，顯示 `open_count`，但視覺上貼在「Repair Center」旁邊，讓使用者以為那是 repair run 的數量。
+
+**結果**：使用者不知道「Ops Inbox」和「Incident Engine」是同一個東西，也不清楚 badge 代表什麼。
+
+---
+
+### 問題 4：兩個 Onboarding 入口做完全相同的事 🟠
+
+| 入口 | 路徑 | 元件 |
+|------|------|------|
+| Dashboard「✦ New Client Onboarding」連結 | `/onboard` | `OnboardWizard.tsx`（5步驟）|
+| 側欄「✨ Onboarding」連結 | `/ops/onboarding` | `ops/onboarding/page.tsx`（5步驟）|
+
+兩個都呼叫完全相同的後端：
+```
+POST /api/onboarding/submit
+POST /api/onboarding/generate-spec
+POST /api/onboarding/trigger-build
+```
+
+兩個的表單欄位也幾乎完全相同（company_name / industry / primary_goal / pages_needed / has_ecommerce 等）。
+
+**結果**：使用者不知道用哪個，兩個入口都存在造成混淆。實際應只保留一個，或明確區分用途。
+
+---
+
+### 問題 5：Repair Center 待處理佇列邏輯有漏洞 🟠
+
+**位置**：`app/ops/repairs/page.tsx:83`
+
+```typescript
+// 問題在這裡
+const queue = incidents
+  .filter((i) => !runsByIncident.has(i.id))
+  .map((i) => ({ incident: i, policy: policyForIncident(i.source, i.severity) }));
+```
+
+`runsByIncident` 是所有 `repair_runs`（含 `is("archived_at", null)`）的 Map。只要一個 incident 有任何 repair_run（不論狀態是 `resolved`、`rolled_back`、`human_only`），它就**永遠從「待處理佇列」消失**。
+
+**結果**：
+- 一個 incident 第一次修復失敗（`human_only`）→ 佇列中消失
+- 操作者無法從 Repair Center 的佇列發起第二次修復嘗試
+- 只能手動去 Ops Inbox → 詳情 → 但詳情頁也沒有「啟動修復」按鈕（問題 12）
+
+**修法方向**：佇列邏輯應只過濾掉 **active-state** repair_runs（detected/triage_needed/approved/backing_up/repairing/pr_ready），terminal state（resolved/rolled_back/human_only）的 run 不應擋住 incident 重新進入佇列。
+
+---
+
+### 問題 6：repairs/health 每次 GET 做真實 SSH 連線 🟠
+
+**位置**：`app/api/ops/repairs/health/route.ts`（GAP-01 / GAP-04 部分）
+
+```typescript
+// 每次 GET /api/ops/repairs/health 都執行：
+const [scriptProbe, githubCheck, autoRebootProbe] = await Promise.all([
+  probeBackupScripts(backupMode),    // SSH 進 SG + EU，各 stat 一個腳本
+  checkGithubRepoAndApp(...),        // GitHub API 呼叫
+  probeAutoRebootConfig(backupMode), // SSH 進 SG + EU，各 stat 一個 apt config
+]);
+```
+
+`probeBackupScripts()` 和 `probeAutoRebootConfig()` 各做：
+- `connectSsh(SG)` + `sshExec("test -f ...")` + `conn.end()`
+- `connectSsh(EU)` + `sshExec("test -f ...")` + `conn.end()`
+- 每個 SSH 連線 5 秒 timeout
+
+**觸發頻率**：Repair Center 頁面（`/ops/repairs`）的頁面邏輯中直接顯示 `GET /api/ops/repairs/health` 的結果（Safety Gates 區塊）。Repair Center 有 `force-dynamic`，每次 page load 都觸發一次 health check → **每次 page load = 4 個 SSH 連線**（SG backup + EU backup + SG auto-reboot + EU auto-reboot）。
+
+**修法方向**：加 TTL cache（如 5-10 分鐘），或移到背景 cron job 更新，不在 page load 時同步 SSH。
+
+---
+
+### 問題 7：GitHub PR 被關閉但未合併時 repair_run 永遠卡住 🟡
+
+**位置**：`app/api/webhooks/github/route.ts:54`
+
+```typescript
+if (p.action !== "closed" || !(p.pull_request as Record<string, unknown>)?.merged) {
+  return NextResponse.json({ ignored: true, action: p.action });
+}
+```
+
+只處理 `action === "closed" && merged === true`。PR 被 close 但 `merged === false`（手動放棄）時，直接回 `{ ignored: true }`，不做任何處理。
+
+**結果**：
+- repair_run 永遠停在 `pr_ready` 狀態
+- 沒有自動轉 `human_only` 或通知操作者
+- 操作者必須手動去 Repair Center → 點「人工處理」才能清掉
+
+**修法**：處理 `closed && !merged` → 更新 repair_run state 為 `human_only`，audit_log 記錄 `pr_abandoned`。
+
+---
+
+### 問題 8：沒有任何即時更新機制 🟡
+
+所有頁面都是 Next.js Server Components + `export const dynamic = "force-dynamic"`，每次重整才拿到新資料。
+
+**受影響的核心操作頁面**：
+- `/ops/repairs`：啟動修復後沒有進度更新，要手動重整才看到 state 改變
+- `/ops/inbox`：新 incident 進來不會自動出現
+- `/ops/approvals`：新 command_request 進入佇列後不顯示
+- `/ops/clients`：WP 更新完後不自動更新
+
+**唯一有更新的地方**：
+- `Build Console`：每 3 秒 poll `/api/build/runs/[id]`（`setInterval(poll, 3000)`）
+- `OpsInboxBadge`：每 30 秒 poll `/api/ops/inbox/health`（`setInterval(tick, 30000)`）
+
+**修法方向**：對 Repair Center 和 Ops Inbox 加入 Server-Sent Events 或 polling，或使用 Supabase Realtime（`ops_incidents` / `repair_runs` 表的 changes 訂閱）。
+
+---
+
+### 問題 9：Incident 詳情頁 AI 分類 label 寫死為 "Gemini" 🟡
+
+**位置**：`app/ops/inbox/[id]/page.tsx:51`
+
+```tsx
+<section style={{ background: "var(--ai-bg)", color: "var(--ai-text)", ... }}>
+  <strong>✨ Gemini auto-summary</strong>   {/* ← 寫死 */}
+  <p style={{ marginTop: 8 }}>
+    {inc.ai_diagnoses?.find((d) => d.role === "auto-classify")?.summary ?? "（尚未分類...）"}
+  </p>
+</section>
+```
+
+但實際 auto-classify provider cascade（`triggerAutoClassify.ts`）：
+1. **Claude Haiku 4.5 優先**（有 `ANTHROPIC_API_KEY` → 用 Claude）
+2. Gemini 2.0 Flash Lite 備援（Claude 失敗 → 用 Gemini）
+
+若用的是 Claude，摘要就顯示在 "Gemini auto-summary" 標題下，資訊完全錯誤。
+
+**修法**：讀 `ai_diagnoses.find(d => d.role === "auto-classify")?.provider` 動態顯示。
+
+---
+
+### 問題 10：Approvals 頁面在實際使用中幾乎永遠是空的 🟡
+
+**位置**：`lib/command-plane/policyEngine.ts`
+
+```typescript
+const RISK_TABLE: Record<string, RiskLevel> = {
+  "/normal_mode": "high",   // ← 解除 Kill Switch 的唯一指令
+  // ...
+};
+
+const HARD_BLOCK_FROM: Record<CommandSource, Set<RiskLevel>> = {
+  telegram: new Set(["high", "critical"]),   // ← Telegram hard block
+};
+```
+
+`/normal_mode` 是 `high` risk，Telegram 永遠 block。所以從 Telegram 發 `/normal_mode` → `evaluatePolicy()` 回傳 `{ outcome: "block" }` → status=`blocked_by_policy`，**不進入 `queued` 佇列**。
+
+Approvals 頁面只顯示 `status === "queued"` 的 command_requests。`/normal_mode` 永遠不進佇列 → **Approvals 頁永遠沒有 `/normal_mode` 可簽核**。
+
+**解除 emergency_stop 的實際路徑**：
+1. `/ops/system-modes` 頁面（owner/admin，需 trusted proxy auth）
+2. SQL editor 直接 UPDATE system_modes
+
+Approvals 頁面在現有設計下，只有當 Telegram 以外的 source（如 internal / schedule）發出 high-risk command 時才有意義，但這些路徑尚未實作（`/api/internal/commands/dispatch` 是 501）。
+
+---
+
+### 問題 11：Ops Console 是沒有整合好的孤兒頁面 🟡
+
+**位置**：`app/ops-console/page.tsx`
+
+頁面顯示 4 塊資料，每一塊都與其他頁面重複或功能未完成：
+
+| 區塊 | 問題 |
+|------|------|
+| Tenants Snapshot | 與 `/ops/clients` 完全重複，從 `/api/ops/summary` 讀（同一個 `organizations` 表）|
+| Workflow Runs | 與 Build Console 的 live status 重複，從 `/api/ops/workflow-runs` 讀（同一個 `ops_action_runs`）|
+| Tenant Config | 只能改 3 個欄位（status/locale/timezone），無實際使用場景 |
+| AI Image Jobs form | 建立 `queued` 狀態的 job，但沒有任何 Trigger.dev 任務實際處理 `ai_image_jobs` 表 → job 永遠停在 `queued` |
+
+這是 v1 spec（`NEXTJS_INTERNAL_OPS_CONSOLE_V1.md`）的遺留骨架，當時設計的功能大部分已被其他頁面取代或尚未實作。
+
+---
+
+### 問題 12：Ops Inbox → Repair Center 雙向導覽缺一半 🟡
+
+**方向一（Repair Center → Ops Inbox）**：✅ 有
+```typescript
+// app/ops/repairs/page.tsx
+<Link href={`/ops/inbox/${run.incident_id}`} style={linkStyle}>事件</Link>
+```
+
+**方向二（Ops Inbox → Repair Center）**：❌ 缺
+```tsx
+// app/ops/inbox/[id]/page.tsx — 沒有啟動修復的按鈕
+// 使用者流程：
+// 1. 在 Ops Inbox 看到 critical incident
+// 2. 點進詳情頁
+// 3. 沒有任何「啟動修復」按鈕
+// 4. 必須手動導覽到 /ops/repairs
+// 5. 在 Repair Center 的「待處理佇列」找到這個 incident
+// 6. 點「核准修復」
+```
+
+加上問題 5（佇列邏輯），如果 incident 已有 terminal repair_run，它根本不出現在 Repair Center 佇列中。使用者會發現 Inbox 有問題但 Repair Center 看不到，完全沒有引導。
 
 ---
 
