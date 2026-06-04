@@ -2,6 +2,34 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-04
+
+### 整合 mattpocock/skills — 日常 Coding 工作流 Skills（2026-06-04）
+
+**根本目標**：填補我們 .claude/ 系統「只有 OPS/治理層，缺乏 app coding 工作流」的空缺。
+
+**已修改**（全部為新增，無修改既有檔案）：
+- `.claude/commands/caveman.md` — /caveman token 壓縮指令
+- `.claude/commands/zoom-out.md` — /zoom-out 模組地圖指令
+- `.claude/skills/grill-me/SKILL.md` — 逐一追問 skill
+- `.claude/skills/grill-with-docs/` (3 files) — 追問+詞彙表更新（ADR 路徑適配 `docs/architecture/decisions/`）
+- `.claude/skills/tdd/` (6 files) — TDD 套件（加 REALTEST_EVIDENCE 要求）
+- `.claude/skills/diagnose/SKILL.md` — 六段 debug loop（Phase 6 加 WORKLOG/REALTEST_EVIDENCE 要求）
+- `.claude/skills/prototype/` (3 files) — 原型 skill 兩分支
+- `.claude/skills/improve-codebase-architecture/` (5 files) — 架構深化套件
+- `.claude/SKILL_AND_COMMAND_INDEX.md` — 更新索引（6→13 skills, 33→35 commands）
+- `agency-os/docs/operations/TOOL_TRIGGER_MAP.md` — 修正 stale「Custom Skills（6 個）」→ 13
+
+**commits**: `ff3ba9a6`（wave 1+2），`29d9859b`（wave 3 + index）
+
+**[驗證結果]**：
+1. REALTEST_EVIDENCE: tool=Bash | cmd=frontmatter grep + internal link verify on all 8 skill dirs | exit=0 | result=all name+description fields present; all [file.md] links resolve; MISSING links confirmed inside code-block examples only
+2. REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1minor (trigger-collision diagnose/debugger, non-blocking)
+3. BUGHUNT_DONE: scope=agency-os,scripts | grep=Custom Skills 6,grill,tdd,diagnose,prototype | hits=1 stale claim fixed (TOOL_TRIGGER_MAP.md:81)
+4. WORKLOG: this entry
+
+**未做的機械強制（設計決策）**：新 skills 為 prompt-based，依賴現有 AO-CLOSE gate (verify-closeout-completeness)；未建新 hook。AGENTS.md routing 待補（見使用者追問後的後續 task）。
+
 ## 2026-06-03
 
 ### Tomorrow captured (/tomo)
