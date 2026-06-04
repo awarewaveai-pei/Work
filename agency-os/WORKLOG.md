@@ -6,6 +6,34 @@
 
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: ai-agent-redesign → handoffs/2026-06-04-1730-ai-agent-redesign.md
+- AUTO_TASK_DONE: Auto-Repair audit Batch 3 (M9 TOCTOU + M10 retry storm + m4 hostname)
+
+### app.aware-wave.com 全讀 + 系統分析 + 線上 webhook 修復（2026-06-04 session 2）
+
+**根本目標**：徹底了解 app.aware-wave.com 每一個頁面/API/lib/DB/基礎設施，產出永久參考文件，為大修改鋪路。
+
+**已完成**：
+1. **全讀 codebase**：100% 讀完 next-admin 所有頁面、~40 個 API routes、全部 lib 模組、35 個 DB migration、docker-compose.yml、nginx config、Dockerfile、Trigger.dev 任務
+2. **APP_AWARE_WAVE_COMPLETE_REFERENCE.md 建立**（1800 行）：commits `e3d2214e`/`9ab7dc74`/`7b25b380`；含 §14 完整 12 問題分析（code snippet + file:line + 根因 + 修法方向）
+3. **memory 進 git**：`.gitignore` 修改（`.claude/projects/c--Users-USER-Work/memory/**` 從 blanket ignore 改為逐層 allow）；41 個 memory 檔案現在 tracked；commit `70fb8e51`
+4. **VBC 原則加入 AGENTS.md**：R4 新增「宣告即驗證」前 `git log` + Verify Before Conclude pattern；commit `1fc640fc`
+5. **線上 webhook 全斷緊急修復**：
+   - 發現：所有 6 個 webhook routes 自 07:02 UTC 回 HTTP 500（約 2.3 小時）
+   - 根因：migration 0035 `upsert_incident_atomic` 函數存在於 DB，但 PostgREST schema cache 未刷新（PGRST202）
+   - 修法：SSH EU VPS → `docker exec supabase-db psql -U postgres postgres -c "NOTIFY pgrst, 'reload schema';"`
+   - 驗證：Netdata + Sentry webhook 兩個測試請求均回 HTTP 200；ops-inbox health `ok: true`
+6. **文件補全**：6 個遺漏區塊補進文件（§6 版面矛盾修正、§7 補 PATCH route、§13 補 6 個 env vars、§4 schema 補欄位、§6 wave 行為差異）
+7. **/tomo 建立**：`handoffs/2026-06-04-1730-ai-agent-redesign.md`
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=NOTIFY pgrst reload schema + curl webhook sentry/netdata | exit=0 | result=HTTP 200, incident_id returned, transition=new
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (文件性改動 + schema reload)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=upsertIncidentAtomic,upsert_incident_atomic,APP_AWARE_WAVE | hits=expected (3 commits; no stale claims)
+- WORKLOG: this entry
+
+**教訓（永久記錄）**：migration 加新 PL/pgSQL function 後，必須 `NOTIFY pgrst, 'reload schema'` 刷新 PostgREST cache，否則 REST API 無法看到函數（PGRST202）。migration 0035 原始 SQL 漏加這行（0030/0032 有加但 0035 沒有）。
+
+**未做的項目（轉 TASKS）**：文件 6 個細節錯誤修正完成；12 個問題的實際代碼修改已存入 /tomo handoff。
 
 ### Batch 3 Auto-Repair audit — M9 TOCTOU + M10 retry storm + m4 hostname (2026-06-04)
 
@@ -6911,7 +6939,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-03 10:01:58 UTC_
+_Last synced: 2026-06-04 09:35:46 UTC_
 
 ## 2026-03-20
 
@@ -7838,6 +7866,8 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 ### Machine appendix (monthly-system-review)
 - 2026-06-03 17:23:56 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 38.89% (< 85%))
+
+
 
 
 

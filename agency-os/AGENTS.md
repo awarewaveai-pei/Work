@@ -369,5 +369,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-06-03 09:57:41 UTC_
+_Last synced: 2026-06-04 09:33:28 UTC_
 

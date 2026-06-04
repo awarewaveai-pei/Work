@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-03 18:02:56
+- Generated: 2026-06-04 17:35:57
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,66 +219,44 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-03.md
-# Daily Note - 2026-06-03
+## 5) memory/daily/2026-06-04.md
+# 2026-06-04
 
+## Done today
 
-### verify-recent --ack (2026-06-03T02:01:00.2561797Z)
+### Session 1（上午）— Batch 3 + Skills
+- Auto-Repair Batch 3（M9 TOCTOU escalateAnalysisOnlyRun atomic UPDATE、M10 upsertIncidentAtomic PL/pgSQL、m4 uptime-kuma hostname）
+- mattpocock/skills 整合（caveman/zoom-out/grill-me/grill-with-docs/tdd/diagnose/prototype/improve-codebase-architecture）
+- verify-closeout-completeness DEBUG-TAG gate
+- VBC principle 加入 AGENTS.md R4
 
-**Reason**: tsc 0 / vitest 168/168 / critic Deep all C+M fixed / bughunt done; real exec test deferred to sg-deploy smoke — trigger-build route is new and not yet deployed
+### Session 2（下午）— 系統全讀 + 緊急修復
+- **app.aware-wave.com 全讀**：100% codebase（pages/API/lib/DB/infra）
+- **APP_AWARE_WAVE_COMPLETE_REFERENCE.md 建立**（1800 行）：3 次迭代補全，含 12 問題完整分析
+- **Memory 進 git**：.gitignore 修改，41 個 memory 檔案現在 git-tracked
+- **線上 webhook 全斷修復**（緊急）：`NOTIFY pgrst, 'reload schema'`，恢復 2.3 小時中斷
+- **/tomo**：大修改 handoff packet → `handoffs/2026-06-04-1730-ai-agent-redesign.md`
 
-**Acknowledged unverified files** (count=3):
+## Key Decisions
+- memory 不再只存本機，改為 git-tracked → 跨機直接 `git pull` 即可同步
+- app 大修改的優先順序：Auth 403 → WpUpdateButtons → Repair佇列 → 名稱統一
+- PostgREST schema cache 教訓：每次新增 PL/pgSQL function 必執行 `NOTIFY pgrst, 'reload schema'`
 
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\onboarding\trigger-build\route.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\ops\onboarding\page.tsx`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\middleware.ts`
+## Blockers / Open
+- 大修改本身：筆電繼續，AI 讀 APP_AWARE_WAVE_COMPLETE_REFERENCE.md 後開始
+- Phase4Weekly 第二次驗收：等 2026-06-05 06:00 UTC
+- Batch 3 Post-Phase 4（M2 per-source HMAC + M4 fingerprint）：仍開放
 
-
-### verify-recent --ack (2026-06-03T03:51:15.9346679Z)
-
-**Reason**: 9 ao wrappers (15-25 lines, @PSBoundParameters delegate) + system-guard dedup merge (additive-only) + check-supabase root promotion; all already committed in 9b85f24c; ao verify-build-gates -LobsterOnly PASSED; syntax confirmed via Parser check
-
-**Acknowledged unverified files** (count=11):
-
-- `C:\Users\USER\Work\scripts\check-supabase-memory-monthly.ps1`
-- `C:\Users\USER\Work\agency-os\scripts\check-supabase-memory-monthly.ps1`
-- `C:\Users\USER\Work\scripts\system-guard.ps1`
-- `C:\Users\USER\Work\agency-os\scripts\system-guard.ps1`
-- `C:\Users\USER\Work\agency-os\scripts\start-trigger-mcp.ps1`
-- `C:\Users\USER\Work\agency-os\scripts\monthly-system-review.ps1`
-- `C:\Users\USER\Work\agency-os\scripts\register-new-governance-doc.ps1`
-- `C:\Users\USER\Work\agency-os\scripts\run-postgres-mcp.ps1`
-- `C:\Users\USER\Work\agency-os\scripts\secrets-vault.ps1`
-- `C:\Users\USER\Work\agency-os\scripts\verify-build-gates.ps1`
-- `C:\Users\USER\Work\agency-os\scripts\preflight-onboarding-a10-2-readiness.ps1`
-
-
-### verify-recent --ack (2026-06-03T05:48:49.6151669Z)
-
-**Reason**: one-line fix: remove updated_at from PATCH body — field does not exist in ops_action_runs schema; root cause confirmed from Trigger.dev error log PGRST204; additive-safe removal
-
-**Acknowledged unverified files** (count=1):
-
-- `c:\Users\USER\Work\lobster-factory\packages\workflows\src\trigger\dispatch-action-run.ts`
-
-
-### verify-recent --ack (2026-06-03T07:16:01.4579266Z)
-
-**Reason**: full 20-field 5-step intake form rewrite; tsc 0 + vitest 168/168; pure UI no logic change; sg-deploy smoke will verify
-
-**Acknowledged unverified files** (count=1):
-
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\ops\onboarding\page.tsx`
-
-
-### verify-recent --ack (2026-06-03T07:42:19.9136089Z)
-
-**Reason**: new hosting bridge route (SSH provision WP staging) + docker-compose env vars; tsc 0 + vitest 168/168; real exec test follows sg-deploy
-
-**Acknowledged unverified files** (count=1):
-
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\internal\hosting\provision-staging\route.ts`
-
+## Commits today
+- `0875ee6d` checkpoint（M10 + m4 unstaged changes）
+- `29d9859b` skills wave 3
+- `9f862d82` Batch 3 security fix
+- `1fc640fc` VBC governance
+- `70fb8e51` memory git tracking
+- `e3d2214e` APP_AWARE_WAVE doc v1
+- `9ab7dc74` doc supplement §15
+- `7b25b380` doc §14 full analysis
+- `ca903a03` /tomo ai-agent-redesign
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
@@ -301,8 +279,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-**[抓蟲額外發現 — 已記 TASKS]** 排程 `AgencyOS-SystemGuard-Daily` 實跑的是 `agency-os/scripts/system-guard.ps1`，非 top-level 正本；且 `scripts/` 與 `agency-os/scripts/` 有 29 同名檔、**20 個內容 drift**（含 ao-close/ao-resume/system-health-check/verify-build-gates 等 AO 生命週期核心腳本）。既定架構：root `scripts/` 為正本，`agency-os/scripts/*` 應為 thin wrapper（已對 sync-enterprise-cursor-rules / check-three-way-sync 套用，`system-health-check.ps1:143` 有 wrapper-rule 健康檢查）；system-guard 等 20 檔 wrapper 化未完成 → drift。本次只修 churn（兩份都套同一 fix 確保哪份跑都生效），20 檔 wrapper 化另記 TASKS。
-
 **[已修改]**
 - `scripts/system-guard.ps1`（正本）+ `agency-os/scripts/system-guard.ps1`（排程實跑）：寫 git-tracked `$statusFile` 前，用 `$stableStatusOf` 比對（`.TrimStart([char]0xFEFF)` 去 BOM + 丟 `^- (Time|Health|Closeout): ` 三行 + `.TrimEnd()`），實質狀態相同就**不重寫**；真的變了（score/exit/result/mode）才寫。gitignored `reports/guard/guard-<stamp>.md` 每次照寫不變。兩份此區塊**位元組相同**（anti-drift）。
 - 過程隱患自修：初版 regex 用了**字面 BOM byte**（CP950 trap，跨機編碼風險）→ 改 `.TrimStart([char]0xFEFF)` 純 ASCII。
@@ -358,6 +334,8 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 ### Machine appendix (monthly-system-review)
 - 2026-06-03 17:23:56 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 38.89% (< 85%))
+
+
 
 
 

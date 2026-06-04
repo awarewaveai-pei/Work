@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-06-04 (AO-CLOSE, session 2)** — 三條主線。(1) **app.aware-wave.com 全讀 + 分析**：徹底讀完所有 codebase，產出 `agency-os/docs/operations/APP_AWARE_WAVE_COMPLETE_REFERENCE.md`（1800 行，含 §14 完整 12 問題 code evidence）；12 問題含 🔴 Auth 403（nginx 未注入 proxy-auth）、🔴 WpUpdateButtons 無樣式（Tailwind in non-Tailwind app）、🟠 Repair Center 佇列邏輯漏洞、🟠 repairs/health 每次 SSH 等。(2) **線上 webhook 緊急修復**：2.3 小時全斷（07:02–09:21 UTC），原因 PostgREST PGRST202（migration 0035 存在但 schema cache 未刷新），`NOTIFY pgrst, 'reload schema'` 修復；教訓：每次加新 function 必刷 cache。(3) **Memory 進 git + /tomo**：.gitignore 修改讓 41 個 memory 檔案被 tracked（cross-machine sync）；`/tomo` 建立大修改 handoff packet。
 - **2026-06-03 (AO-CLOSE)** — 兩條主線。(1) **Provision-staging Kadence+plugins**（commit `2942cf1d`）：`route.ts` Step 6+7 加裝 Kadence 主題 + kadence-blocks/seo-by-rank-math/fluent-smtp/litespeed-cache/fluentform；SSH real-test 確認 Kadence+5 plugins active；sg-deploy exit 0，Playwright smoke 22/30（api-health 2 failures 為預存 nginx-auth 問題，非 regression）。(2) **Cloudflare WAF wp-login 403 臨時修**：操作者 IP `114.32.129.172` 不在 CIDR `114.34.0.0/15`；API patch 加入 `114.32.0.0/15`；**永久修**（改 `ip.geoip.country in {"TW" "SG"}`）存 tomo → `handoffs/2026-06-03-1749-tomo-174946.md`。
 - **2026-06-02 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-02 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:756202b7e05e480d7a8af387cca8a2372c436d9e362ffc480933c0cd72dee1e3 -->
 - **2026-06-02 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-02 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:5d168d0bc6f04e6102bd2d3f9a0171782f0619b09ecfd7cc72a5b81a549287b7 -->
@@ -476,5 +477,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-03 09:57:41 UTC_
+_Last synced: 2026-06-04 09:33:28 UTC_
 
