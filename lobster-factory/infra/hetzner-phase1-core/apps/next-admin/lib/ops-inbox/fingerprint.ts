@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import type { IncidentSource, IncidentSignalType } from "./types";
 
 export function computeFingerprint(args: {
@@ -45,9 +45,14 @@ export function computeFingerprintV2(args: {
   raw: unknown;
 }): string {
   const v1 = computeFingerprint(args);
-  const salt = process.env.OPS_INBOX_FINGERPRINT_SALT;
+  const salt = process.env.OPS_INBOX_FINGERPRINT_SALT?.trim();
   if (!salt) return v1;
-  return sha256(`${salt}:${v1}`);
+  // HMAC-SHA256 (RFC 2104) — NOT sha256(salt + v1). The latter is a secret-prefix MAC,
+  // the length-extension-prone construction HMAC exists to replace. v2 is destined to
+  // become the dedup key (later migration); once it is, an attacker who can submit
+  // incidents and observe dedup behaviour gains a distinguishing oracle on v2. Use the
+  // correct keyed-hash primitive now — switching later would force a full re-key backfill.
+  return createHmac("sha256", salt).update(v1).digest("hex");
 }
 
 function sourceSpecificFingerprint(args: { source: IncidentSource; raw: unknown }): string | null {

@@ -25,7 +25,10 @@ DROP FUNCTION IF EXISTS public.upsert_incident_atomic(
   text, text, text, text, text, text, text, text, text, jsonb, jsonb, boolean
 );
 
-CREATE FUNCTION public.upsert_incident_atomic(
+-- CREATE OR REPLACE (not plain CREATE) so the migration is re-runnable: the DROP above
+-- removes the old 12-arg overload on first apply; OR REPLACE makes a second apply a no-op
+-- instead of erroring 42723 (function already exists).
+CREATE OR REPLACE FUNCTION public.upsert_incident_atomic(
   p_fingerprint     text,
   p_environment     text,
   p_source          text,
@@ -99,3 +102,22 @@ current DB status. 0036: also stores fingerprint_v2 (M4 salted fingerprint); the
 conflict target REMAINS (fingerprint, environment) — fingerprint_v2 is stored only,
 not yet a dedup key. The unique(source, external_id) constraint is still NOT handled
 here (a fingerprint-differs-but-external_id-matches collision surfaces as 23505).';
+
+-- ---------------------------------------------------------------------------
+-- ROLLBACK (down migration). Self-hosted Supabase has no automatic schema backup,
+-- so the inverse is documented here. Apply manually to revert 0036. Run order matters:
+-- restore the 0035 (12-arg) function FIRST (or the 6 webhook routes break with PGRST202),
+-- then drop the column, then reload the PostgREST schema cache.
+--
+--   DROP FUNCTION IF EXISTS public.upsert_incident_atomic(
+--     text, text, text, text, text, text, text, text, text, jsonb, jsonb, boolean, text
+--   );
+--   -- Re-create the 0035 function verbatim (12-arg, no fingerprint_v2):
+--   --   see migrations/0035_upsert_incident_atomic.sql and run its CREATE OR REPLACE block.
+--   ALTER TABLE public.ops_incidents DROP COLUMN IF EXISTS fingerprint_v2;
+--   -- Then on the DB host: NOTIFY pgrst, 'reload schema';
+-- ---------------------------------------------------------------------------
+--
+-- APPLY NOTE (Phase 2): after running this migration, the RPC signature changes 12→13
+-- args and a new column is exposed — you MUST run `NOTIFY pgrst, 'reload schema';` (or
+-- restart supabase-rest) or 13-arg calls fail with PGRST202 until the cache reloads.
