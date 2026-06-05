@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/ssr";
 
 // Sanitise the post-login redirect target: only same-origin absolute paths, never an
-// off-site URL (open-redirect guard). "//evil.com" and "https://…" are rejected → "/".
+// off-site URL (open-redirect guard). Must be "/" followed by a non-slash, non-backslash
+// char — rejects "//evil.com", "/\evil.com", "https://…", "" → "/".
 function safeNext(raw: string | null): string {
-  if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  if (raw && /^\/[^/\\]/.test(raw)) return raw;
   return "/";
 }
 
