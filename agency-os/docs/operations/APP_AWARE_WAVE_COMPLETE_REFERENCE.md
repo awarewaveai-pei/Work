@@ -1,8 +1,9 @@
 # app.aware-wave.com 完整技術參考手冊
 
 > **SSOT**：本文件由 2026-06-04 全讀 codebase 產生，涵蓋 app.aware-wave.com（Lobster Factory Admin Console）的每個頁面、API、lib 模組、資料庫、基礎設施。  
-> **用途**：任何 AI session 讀此文件後，無需重讀 code 即可直接操作系統。  
-> **維護**：每次重大改動後更新此文件。Last updated: 2026-06-04
+> **用途**：完整 code 級參考（深入查某頁/API/lib/DB 怎麼運作時讀）。  
+> **⚠️ 改動前先讀現況文件**：[`APP_AWARE_WAVE_CURRENT_STATE.md`](APP_AWARE_WAVE_CURRENT_STATE.md) — 網站「目前」長怎樣、怎麼登入、怎麼部署、有哪些陷阱（2026-06-05 大修後最新）。本檔某些段落（尤其 §3 認證、§14 問題）已被大修改變，以現況文件為準。  
+> **維護**：每次重大改動後更新此文件。Last updated: 2026-06-04（§3/§14 狀態見 2026-06-05 大修註記）
 
 ---
 
@@ -115,7 +116,10 @@ app.aware-wave.com  →  next-admin:3000
 
 ## 3. 認證架構
 
-### middleware.ts 攔截範圍
+> **🔴 已過時（2026-06-05 大修改寫）**：本節描述的是大修「前」的 proxy-trust（`OPS_PROXY_SHARED_SECRET` + `x-ops-proxy-auth` header）機制 = **問題 1（prod 全 403）的根因，已廢除**。
+> **現行認證 = Supabase Auth（email+密碼 session）**，完整說明見 [`APP_AWARE_WAVE_CURRENT_STATE.md` §1](APP_AWARE_WAVE_CURRENT_STATE.md)。要點：middleware 驗 Supabase session → `app_metadata.ops_role` → 注入 `x-ops-claims-role`；fail-closed；無條件剝除 inbound claim header（anti-spoof）；matcher 保護整個 console；nginx basic-auth 已移除。下方角色矩陣（owner/admin/operator/viewer）+ `ops-role.ts` RBAC **仍有效**（middleware 改的是「角色從哪來」，不是 RBAC 本身）。
+
+### middleware.ts 攔截範圍（⚠️ 已被 Supabase Auth 版本取代，僅供歷史對照）
 ```
 /api/ops/:path*
 /ops/:path*
@@ -1229,20 +1233,24 @@ NEXT_PUBLIC_SENTRY_DSN
 
 ### 快速索引
 
-| # | 問題 | 嚴重性 |
-|---|------|--------|
-| 1 | Auth production 預設 403 | 🔴 致命 |
-| 2 | WpUpdateButtons 完全無樣式 | 🔴 功能壞掉 |
-| 3 | 三個名字指向同一頁 | 🟠 混亂 |
-| 4 | 兩個 Onboarding 入口做同樣的事 | 🟠 混亂 |
-| 5 | Repair Center 佇列邏輯有漏洞 | 🟠 邏輯錯誤 |
-| 6 | repairs/health 每次 GET 做真實 SSH | 🟠 效能問題 |
-| 7 | GitHub PR 棄案不處理 | 🟡 漏洞 |
-| 8 | 沒有任何即時更新機制 | 🟡 體驗差 |
-| 9 | AI summary label 寫死為 "Gemini" | 🟡 資訊錯誤 |
-| 10 | Approvals 頁幾乎永遠空 | 🟡 設計錯誤 |
-| 11 | Ops Console 是孤兒頁面 | 🟡 設計錯誤 |
-| 12 | Ops Inbox → Repair Center 導覽是斷的 | 🟡 UX |
+> **✅ 2026-06-05 大修：12 問題已處理 11 個（P4 待產品決策）。** 下表「狀態 / 怎麼解的」為大修結果；下方各問題詳述為**大修前的分析**（根因 + 當時的 code evidence），保留作歷史與根因參考。現況以 [`APP_AWARE_WAVE_CURRENT_STATE.md`](APP_AWARE_WAVE_CURRENT_STATE.md) 為準。
+
+| # | 問題 | 嚴重性 | 狀態 / 怎麼解的（2026-06-05）|
+|---|------|--------|------|
+| 1 | Auth production 預設 403 | 🔴 致命 | ✅ **改用 Supabase Auth 身分層**（email+密碼 session）取代失效的 proxy-trust。新增 `lib/supabase/ssr.ts` + 重寫 `middleware.ts`（驗 session→`app_metadata.ops_role`→注入 `x-ops-claims-role`，fail-closed，anti-spoof，保護整個 console）+ `app/login/`。admin=`awarewaveai@gmail.com`(owner)。移除多餘 nginx basic-auth。詳見 CURRENT_STATE §1 |
+| 2 | WpUpdateButtons 完全無樣式 | 🔴 功能壞掉 | ✅ Tailwind class → `globals.css` 新增 `.wp-up-*` 真實 CSS class（支援 hover/disabled/spin）|
+| 3 | 三個名字指向同一頁 | 🟠 混亂 | ✅ 統一稱「Ops Inbox」（sidebar「Incident Engine」改名，對齊 Dashboard + URL）|
+| 4 | 兩個 Onboarding 入口做同樣的事 | 🟠 混亂 | ⏳ **未動**（產品決策；與 Client Onboarding Portal 14 段規格相關，宜整體規劃時一起處理）|
+| 5 | Repair Center 佇列邏輯有漏洞 | 🟠 邏輯錯誤 | ✅ filter 改為只隱藏被 active-state 或 human_only run 擁有的 incident；resolved/rolled_back 可重試回佇列（`startRepairFromIncident` 本就 reuse run）|
+| 6 | repairs/health 每次 GET 做真實 SSH | 🟠 效能問題 | ✅ 昂貴探測（4 SSH+2 GitHub）加 60s TTL cache（`getExpensiveProbes`）；system_mode/active_runs 仍即時。回應加 `probe_cache` 欄位 |
+| 7 | GitHub PR 棄案不處理 | 🟡 漏洞 | ✅ webhook 處理 `closed && !merged` → `human_only` + `needs_human_review` + audit `pr_abandoned`（保留 `.eq(state,pr_ready)` guard）|
+| 8 | 沒有任何即時更新機制 | 🟡 體驗差 | ✅ 新增 `AutoRefresh` client 元件（分頁可見時 `router.refresh()`）接入 Repair Center(15s)/Ops Inbox(20s)/Approvals(20s)。無 SSE |
+| 9 | AI summary label 寫死為 "Gemini" | 🟡 資訊錯誤 | ✅ `AutoSummary` 元件改讀 `ai_diagnoses.provider` 動態顯示（claude/gemini/chatgpt/cursor）|
+| 10 | Approvals 頁幾乎永遠空 | 🟡 設計錯誤 | ✅ 改善空狀態：誠實說明佇列用途 + emergency_stop 解鎖導向 System Modes（`/normal_mode` 從 Telegram 被 policy 擋，不入佇列）|
+| 11 | Ops Console 是孤兒頁面 | 🟡 設計錯誤 | ✅ 加導向 banner（非破壞性保留）：標明診斷/參考頁，日常操作導向 Clients/Build Console，註明 AI Image Job 未接 Trigger.dev |
+| 12 | Ops Inbox → Repair Center 導覽是斷的 | 🟡 UX | ✅ Incident 詳情頁加 `RepairPanel`：有 run 顯示狀態+連結；無 run 且 production 重用 `RepairActions` 啟動修復 |
+
+> 部署：P1/P2/P5/P6/P7/P9/P12 + P3 已上線（prod）；P8/P10/P11 已 commit（`04869f73`），部署待並行 Tarot 功能 typecheck 修復後隨下次 sg-deploy 一起上。
 
 ---
 
