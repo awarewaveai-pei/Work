@@ -94,8 +94,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/ops-console" className="sidebar-link" title="架構邊界 · Tenant 設定 · M3 · AI Job">
                   <span className="sidebar-icon">▣</span> Ops Console
                 </Link>
-                <Link href="/ops/inbox" className="sidebar-link" title="內部事件引擎：除錯與原始事件檢視">
-                  <span className="sidebar-icon">◇</span> Incident Engine
+                <Link href="/ops/inbox" className="sidebar-link" title="事件收斂中心：所有來源事件 + AI 分類 + 原始 payload">
+                  <span className="sidebar-icon">◇</span> Ops Inbox
                 </Link>
                 <Link href="/api-check-client" className="sidebar-link" title="Node API 健康（browser-side）">
                   <span className="sidebar-icon">⬡</span> API Health (browser)

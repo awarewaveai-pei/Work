@@ -2,14 +2,16 @@
 
 :root {
   --sidebar-w: 248px;
-  --sidebar-bg: #07101f;
-  --sidebar-border: #131e30;
-  --sidebar-text: #b8cfdf;
-  --sidebar-text-hover: #e0eaf4;
-  --sidebar-text-active: #ffffff;
-  --sidebar-hover: rgba(255,255,255,0.04);
-  --sidebar-active-bg: rgba(99,102,241,0.12);
+  /* Light sidebar (2026-06-05): light surface + dark text, indigo color-block on hover/active. */
+  --sidebar-bg: #f7f9fc;
+  --sidebar-border: #e6eaf4;
+  --sidebar-text: #475569;
+  --sidebar-text-hover: #0d1526;
+  --sidebar-text-active: #0d1526;
+  --sidebar-hover: rgba(99,102,241,0.08);
+  --sidebar-active-bg: rgba(99,102,241,0.14);
   --sidebar-active-bar: #6366f1;
+  --code-bg: #07101f;   /* dedicated dark bg for <pre> code blocks (was --sidebar-bg) */
   --accent: #6366f1;
   --accent-hover: #818cf8;
   --accent-light: rgba(99,102,241,0.08);
@@ -129,7 +131,7 @@ body {
 
 /* Add a visible horizontal rule between every section except the first */
 .sidebar-section + .sidebar-section {
-  border-top: 1px solid rgba(255,255,255,0.07);
+  border-top: 1px solid var(--sidebar-border);
   padding-top: 14px;
   margin-top: 2px;
 }
@@ -139,7 +141,7 @@ body {
   font-weight: 900;
   letter-spacing: .16em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.28);  /* very dim — clearly a category label, not a nav link */
+  color: #94a3b8;  /* muted slate — clearly a category label, not a nav link */
   padding: 0 10px;
   margin-bottom: 5px;
 }
@@ -150,7 +152,7 @@ body {
   gap: 9px;
   padding: 8px 10px;
   border-radius: 7px;
-  color: rgba(255,255,255,0.60);  /* clearly readable but secondary — not competing with active */
+  color: var(--sidebar-text);  /* dark-muted on light surface */
   text-decoration: none;
   font-size: 13px;
   font-weight: 400;
@@ -160,13 +162,13 @@ body {
 }
 
 .sidebar-link:hover {
-  background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.90);
+  background: var(--sidebar-hover);   /* indigo color-block on hover */
+  color: var(--sidebar-text-hover);
 }
 
 .sidebar-link.active {
-  background: rgba(99,102,241,0.22);  /* indigo tint — clearly selected, not just white-on-white */
-  color: #ffffff;
+  background: var(--sidebar-active-bg);  /* stronger indigo color-block when selected */
+  color: var(--sidebar-text-active);
   font-weight: 600;
 }
 
@@ -177,7 +179,7 @@ body {
   top: 5px;
   bottom: 5px;
   width: 3px;
-  background: #818cf8;    /* indigo — visible accent bar */
+  background: var(--sidebar-active-bar);    /* indigo — visible accent bar */
   border-radius: 3px;
 }
 
@@ -188,7 +190,7 @@ body {
   gap: 9px;
   padding: 7px 8px;
   border-radius: 7px;
-  color: rgba(255,255,255,0.22);  /* directly dim — clearly unavailable, not just faded nav */
+  color: #aab4c5;  /* dim slate — clearly unavailable, not just faded nav */
   font-size: 13px;
   font-weight: 400;
   cursor: default;
@@ -551,7 +553,7 @@ body {
 
 /* ── Pre / code ───────────────────────────────────────────────── */
 pre {
-  background: var(--sidebar-bg);
+  background: var(--code-bg);
   color: #e2e8f0;
   border-radius: var(--radius);
   padding: 18px;
@@ -1356,7 +1358,7 @@ pre {
 }
 
 .onboard-regen-btn:hover {
-  background: var(--sidebar-bg);
+  background: var(--text-primary);
   color: #fff;
 }
 

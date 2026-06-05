@@ -27,8 +27,8 @@ export function LogoutButton() {
       onClick={logout}
       disabled={busy}
       style={{
-        background: "none",
-        border: "1px solid rgba(255,255,255,0.12)",
+        background: "#fff",
+        border: "1px solid var(--sidebar-border)",
         borderRadius: 6,
         color: "var(--sidebar-text)",
         fontSize: 11,
