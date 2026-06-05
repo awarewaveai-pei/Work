@@ -247,7 +247,12 @@ _smoke_check() {
   else log "  SMOKE_WARN: $label -> $http"; _smoke_errors=$((_smoke_errors + 1)); fi
 }
 log "--- HTTP smoke check ---"
-_smoke_check "next-admin"                  "http://127.0.0.1:3002/"
+# next-admin liveness probes /login (public, excluded from the auth gate) instead of "/".
+# Since the Supabase-Auth cutover (2026-06-05) the root "/" page is gated → an
+# unauthenticated curl gets 302→/login, which is HEALTHY but not 2xx and would wrongly
+# trip the smoke-fail auto-rollback. /login renders 200 and proves the app + routing are up;
+# /api/ops/summary (exempt server-to-server endpoint) covers API liveness.
+_smoke_check "next-admin /login"           "http://127.0.0.1:3002/login"
 _smoke_check "next-admin /api/ops/summary" "http://127.0.0.1:3002/api/ops/summary"
 _smoke_check "nginx/wordpress"             "http://127.0.0.1/"
 _na_http=$(curl -sf --max-time 5 -o /dev/null -w "%{http_code}" \

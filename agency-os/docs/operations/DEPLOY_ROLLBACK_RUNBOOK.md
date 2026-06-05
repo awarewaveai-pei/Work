@@ -17,7 +17,9 @@
 | 一鍵回滾 | `./scripts/rollback-phase1.sh restore <service> [snapshot-tag]` |
 | 清理舊快照 | `./scripts/rollback-phase1.sh clean <service> [days]`（預設 30 天） |
 | n8n 版本回滾 | `./scripts/rollback-phase1.sh n8n-pin <old-semver>` |
-| 部署後驗收 | `docker compose ps && curl -sf http://127.0.0.1:3002/ && curl -sf http://127.0.0.1/ && curl -sf -H "Host: api.aware-wave.com" http://127.0.0.1/api/health` |
+| 部署後驗收 | `docker compose ps && curl -sf http://127.0.0.1:3002/login && curl -sf http://127.0.0.1:3002/api/ops/summary && curl -sf http://127.0.0.1/ && curl -sf -H "Host: api.aware-wave.com" http://127.0.0.1/api/health` |
+
+> **⚠️ Supabase-Auth cutover（2026-06-05）後**：next-admin 首頁 `/` 與所有 `/ops/*` 已被 middleware gate，未帶 session 的 `curl http://127.0.0.1:3002/` 會回 **302→/login**（健康但非 2xx）。故 `sg-deploy.sh` Step 7 smoke 與本驗收指令已改探測 **`/login`**（公開頁，回 200）+ `/api/ops/summary`（豁免端點）作為 liveness。完整登入流驗證需帶 Supabase session cookie（見 §auth-smoke）。
 
 ---
 
