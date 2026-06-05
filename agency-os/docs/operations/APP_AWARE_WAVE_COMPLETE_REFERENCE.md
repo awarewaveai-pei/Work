@@ -1233,14 +1233,14 @@ NEXT_PUBLIC_SENTRY_DSN
 
 ### 快速索引
 
-> **✅ 2026-06-05 大修：12 問題已處理 11 個（P4 待產品決策）。** 下表「狀態 / 怎麼解的」為大修結果；下方各問題詳述為**大修前的分析**（根因 + 當時的 code evidence），保留作歷史與根因參考。現況以 [`APP_AWARE_WAVE_CURRENT_STATE.md`](APP_AWARE_WAVE_CURRENT_STATE.md) 為準。
+> **✅ 2026-06-05 大修：12 問題全數處理。** 下表「狀態 / 怎麼解的」為大修結果；下方各問題詳述為**大修前的分析**（根因 + 當時的 code evidence），保留作歷史與根因參考。現況以 [`APP_AWARE_WAVE_CURRENT_STATE.md`](APP_AWARE_WAVE_CURRENT_STATE.md) 為準。
 
 | # | 問題 | 嚴重性 | 狀態 / 怎麼解的（2026-06-05）|
 |---|------|--------|------|
 | 1 | Auth production 預設 403 | 🔴 致命 | ✅ **改用 Supabase Auth 身分層**（email+密碼 session）取代失效的 proxy-trust。新增 `lib/supabase/ssr.ts` + 重寫 `middleware.ts`（驗 session→`app_metadata.ops_role`→注入 `x-ops-claims-role`，fail-closed，anti-spoof，保護整個 console）+ `app/login/`。admin=`awarewaveai@gmail.com`(owner)。移除多餘 nginx basic-auth。詳見 CURRENT_STATE §1 |
 | 2 | WpUpdateButtons 完全無樣式 | 🔴 功能壞掉 | ✅ Tailwind class → `globals.css` 新增 `.wp-up-*` 真實 CSS class（支援 hover/disabled/spin）|
 | 3 | 三個名字指向同一頁 | 🟠 混亂 | ✅ 統一稱「Ops Inbox」（sidebar「Incident Engine」改名，對齊 Dashboard + URL）|
-| 4 | 兩個 Onboarding 入口做同樣的事 | 🟠 混亂 | ⏳ **未動**（產品決策；與 Client Onboarding Portal 14 段規格相關，宜整體規劃時一起處理）|
+| 4 | 兩個 Onboarding 入口做同樣的事 | 🟠 混亂 | ✅ **已釐清**：VBC 發現實為兩個**不同階段**工具，非重複 —— `/ops/onboarding`=客戶探索式 intake 問卷（用 `IntakeForm` type）、`/onboard`=operator 技術建站精靈（slug/部門→Build Console）。sidebar 標籤改清楚：「Onboarding（客戶 Intake）」第1步 vs「建站精靈（技術）」第2步 |
 | 5 | Repair Center 佇列邏輯有漏洞 | 🟠 邏輯錯誤 | ✅ filter 改為只隱藏被 active-state 或 human_only run 擁有的 incident；resolved/rolled_back 可重試回佇列（`startRepairFromIncident` 本就 reuse run）|
 | 6 | repairs/health 每次 GET 做真實 SSH | 🟠 效能問題 | ✅ 昂貴探測（4 SSH+2 GitHub）加 60s TTL cache（`getExpensiveProbes`）；system_mode/active_runs 仍即時。回應加 `probe_cache` 欄位 |
 | 7 | GitHub PR 棄案不處理 | 🟡 漏洞 | ✅ webhook 處理 `closed && !merged` → `human_only` + `needs_human_review` + audit `pr_abandoned`（保留 `.eq(state,pr_ready)` guard）|

@@ -104,7 +104,7 @@ spoof x-ops-claims-role:admin 於 /ops/repairs → 期望 307（被剝除）
 | P1 | Auth production 403 | ✅ 已解（Supabase Auth 身分層上線）| 多 commit（見 §1）|
 | P2 | WpUpdateButtons 無樣式 | ✅ 已解（globals.css `.wp-up-*` class）| `cbe6d6e3` |
 | P3 | 三名一頁（Incident Engine/Ops Inbox）| ✅ 已解（統一「Ops Inbox」）| `04869f73` |
-| P4 | 兩個 Onboarding 入口 | ⏳ 未動（`/onboard` vs `/ops/onboarding`；待產品決策，對齊 Client Onboarding Portal 規格）|
+| P4 | 兩個 Onboarding 入口 | ✅ 已釐清：兩者非重複，是建站兩階段 —— `/ops/onboarding`=客戶 intake 問卷、`/onboard`=技術建站精靈。sidebar 標籤改清楚（第1步/第2步）| `（待部署）` |
 | P5 | Repair 佇列邏輯洞 | ✅ 已解（只隱藏 active/human_only run 的 incident）| `a831efd5` |
 | P6 | repairs/health 每 GET SSH | ✅ 已解（60s TTL cache）| `95e80904` |
 | P7 | GitHub PR 棄案不處理 | ✅ 已解（closed-not-merged→human_only）| `a831efd5` |
@@ -114,7 +114,7 @@ spoof x-ops-claims-role:admin 於 /ops/repairs → 期望 307（被剝除）
 | P11 | Ops Console 孤兒頁 | ✅ 已改善（導向 banner，非破壞性保留）| `04869f73`（部署待）|
 | P12 | Inbox→Repair 單向導覽 | ✅ 已解（RepairPanel：狀態+連結 / 啟動修復）| `a831efd5` |
 
-> **唯一未動 = P4**（兩個 onboarding 入口）：屬產品決策，且與「Client Onboarding Portal」14 段規格相關（見 [`../architecture/client-onboarding-portal-spec.md`](../architecture/client-onboarding-portal-spec.md)），宜整體規劃時一起處理，不單獨硬修。
+> **12 問題全數處理。** P4 的釐清：原分析「兩入口做同樣的事」其實不準 —— `/ops/onboarding` 是客戶探索式 intake 問卷（`IntakeForm` type，對齊 [Client Onboarding Portal 規格](../architecture/client-onboarding-portal-spec.md)），`/onboard` 是 operator 技術建站精靈（slug/部門→Build Console），兩者是建站的**不同階段**。修法 = sidebar 標籤分清（「Onboarding（客戶 Intake）」第1步 / 「建站精靈（技術）」第2步），保留兩工具。未來 Onboarding Portal 完整實作時可再串成單一導引流程。
 
 ---
 
