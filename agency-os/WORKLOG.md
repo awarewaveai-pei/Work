@@ -9,8 +9,9 @@
 - TOMORROW_CAPTURED: tomo-201752 → handoffs/2026-06-05-2017-tomo-201752.md
 - TOMORROW_CAPTURED: tomo-203020 → handoffs/2026-06-05-2030-tomo-203020.md
 - TOMORROW_CAPTURED: onboarding-ia-consolidation → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
+- TOMORROW_CAPTURED: tomo-203931 → handoffs/2026-06-05-2039-tomo-203931.md
 
-### app.aware-wave.com — 塔羅牌印刷檔生成工具（MVP，本機 build/tsc 綠，待 SG deploy 驗 live gen）
+### app.aware-wave.com — 塔羅牌印刷檔生成工具（已部署 SG `ccfbd176`，FLUX 真生圖驗證通過；OpenAI 待使用者加 billing）
 
 **背景**：使用者要在 app.aware-wave.com 加塔羅牌印刷檔生成工具。工作流（使用者確認）：文字生圖/以圖生圖生一張樣本→鎖風格→整套 78 張同風格→下載 PNG 印刷牌卡。提供的 `tarot-ai-generator.jsx` 是 artifact 原型（瀏覽器直打 anthropic、無 key、生 SVG），僅取其牌資料+版面。
 
@@ -32,10 +33,21 @@
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0C/3H/4M — H1 上游錯誤 body 外洩、H2 urlToDataUrl SSRF+無大小上限、H3 referenceImage 無大小/MIME 驗證 + M2 objectURL 洩漏 **已全部修**（image-gen 改 console.error+generic code、加 replicate.delivery host allowlist+20MB cap、route 加 png/jpeg/webp+9MB 驗證、TarotStudio revoke-on-replace+unmount cleanup）。M1/M3/L6（poll sleep abort、429 backoff、server 端 quota）列 enhancement 未做。
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=canCreateAiImageJob\|resolveOpsRole\|roleHeader\|generateTarotImage\|tools/tarot | hits=0（call sites 與既有 ai-image-jobs route 一致；所有 tarot 命中皆 .next build 產物/gitignore，無 source stale）。
 
+**[已部署 — SG production，使用者 go ×2]**
+- sg-deploy.sh next-admin 成功：`5de1dd81`（初版）→ `ccfbd176`（UX 修正）；容器 healthy、smoke 全綠。
+- **金鑰實況（部署後實測才發現）**：① SG `.env` **完全沒有 REPLICATE_API_TOKEN**，且 next-admin compose `environment:` 沒接 REPLICATE/OPENAI（只有 ANTHROPIC）→ 容器拿不到 → 生圖全掛。② 原 `.env` OPENAI 是 `sk-plac…` placeholder 假 key。
+- **修法**：compose next-admin 區塊加 `REPLICATE_API_TOKEN`+`OPENAI_API_KEY`（錨點 `PORT "3000"`）；`.env` 補兩 key（備份 `.env.bak.tarot-keys-*`/`.env.bak.replicate-newtoken-*`/`.env.bak.openai-newkey-*`）；`docker compose up -d next-admin` 吃新 env。
+- **金鑰 401 連鎖**：憑證檔 `AWARE_WAVE_CREDENTIALS.md` 原 Replicate+OpenAI key **都 401 失效**。使用者給新 key：Replicate `r8_MXAU…`（`/account` 200 ✓，**flux-schnell 真生一張 5s/HTTP201，輸出 replicate.delivery 符合 SSRF allowlist**）；OpenAI `sk-proj-niF7…`（`/models` 200，但 **gpt-image-1 回 `billing_hard_limit_reached`** → 帳號額度問題，非 key/程式問題，使用者需自行加 billing）。
+- 新 key 已同步三處：`AWARE_WAVE_CREDENTIALS.md`（BOM 完整）+ SG `.env` + 本機 vault（`secrets-vault.ps1 set`）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl replicate flux-schnell predictions (Prefer:wait)` | exit=0 ms≈4968 — status=succeeded, output=replicate.delivery/.../out-0.png（真生成驗證，補上本機 WAIVED 的 live gen）。
+
+**[UX 修正 ccfbd176]** 使用者上傳風格圖卻被「描述必填」silent-擋（沒動作）。改 `generatePreview` guard：風格描述改選填，只要「上傳參考圖 or ≥3 字描述」其一即可；label/hint 在已上傳圖時提示可留空。tsc green；REALTEST_WAIVED(--ack)：純 guard 放寬+字串，TarotStudio 本 session critic ×2。
+
 **[剩餘風險 / 待續]**
-- **未 deploy**：需 `/check-drift`→`/verify`→go-ahead→`sg-deploy.sh next-admin`，並確認 SG container 內 REPLICATE_API_TOKEN/OPENAI_API_KEY 可讀 + smoke `/tools/tarot` 200 + 真生一張。
+- **OpenAI 暫不可用**：帳號 billing hard limit → gpt-image 三檔全失敗，FLUX 兩檔正常（使用者加額度即解，無需改 code/重部署）。
+- **flux-schnell 不吃上傳圖**（無 img2img）：使用者用 schnell+上傳貓咪圖時圖被忽略；要用上傳圖當風格須選 flux-dev（UI 已黃字警告）。
 - nginx 60s/req：gpt-image-1 高品質可能近上限（FLUX dev 通常 <30s）；對策調 quality/或單獨提高該 route proxy_read_timeout。
-- 成本：每套約 NT$60–150，UI 批次前 window.confirm 二次確認；**無 server 端 quota（L6）**，operator 角色可腳本刷 spend → 未來補。
+- 成本：UI 批次前 window.confirm 二次確認；**無 server 端 quota（L6）**，operator 角色可腳本刷 spend → 未來補。
 - enhancement：upscale 到精確 827×1417、R2 持久化、Trigger.dev 批次（免瀏覽器開著）。
 
 ### wp-bridge — 從「不能跑」到「真站驗證 9/9」：runnable 層 + 端到端整合測試
