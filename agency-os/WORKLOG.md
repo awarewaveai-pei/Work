@@ -4,6 +4,25 @@
 
 ## 2026-06-05
 
+### wp-bridge — Phase A 砌第四磚 RequestAuthenticator（完整認證管線）
+
+**背景**：續砌（操作者全權授權、不要停；界線：不對 LIVE soulful 真寫入）。把前三磚串成單一 request gate。
+
+**[已修改]**（`packages/wp-bridge-plugin/includes/Http/`）
+- `SignedRequest`(值物件)、`AuthResult`(判決:wire reason + auditReason)、`RequestAuthenticator`(管線) + 整合測試（真 Ed25519）。
+- **authenticate-then-authorize**：resolve key→驗簽章(證持私鑰)→才查 status/ip/scope→nonce 最後。unknown key 與 bad sig 同回 401 generic（無列舉 oracle）；store 故障→503 fail-closed。
+- **review 驅動硬化（critic 2 Major，全修）**：① `timestamp_out_of_window` 不上 wire（會變 key-existence oracle，因 SignatureVerifier 在 crypto 前檢查 timestamp）→ 改 generic 401 wire + `auditReason` 僅 server log；② top-level `catch(\Throwable)`→503（非預期例外 fail-closed，非 500）；③ SignedRequest `clientIp` 信任邊界註記（WP glue 必用 verified peer/CF-Connecting-IP，禁裸 XFF）。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -d extension=sodium d:\tmp\realtest-nonce.php` | exit=0 | ms=~750 — **62/62 PASS**（Authenticator 整合 14：含 revoked+badsig→401 無洩漏、unexpected→503、replay、ip、scope）；`php -l` 22/22。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2M/2n（timestamp oracle + 無 top-level catch — **全修**；clientIp 邊界 + nonce 命名空間記入 doc/未來 glue）。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=RequestAuthenticator\|SignedRequest\|AuthResult | hits=0（僅 4 新檔，無 downstream 消費者，Router glue 未砌）。
+- WORKLOG：本 entry。
+
+**[剩餘風險 / 待續]**
+- Router REST glue（WP-coupled，需 wp-env 整合測）：解析 header/body/peer→SignedRequest、per-route required capability、AuthResult→WP_REST_Response（auditReason 進 EventLog）。clientIp 必用 verified peer。
+- 認證脊椎（4 磚）完成。下一階段：自我修復 Transaction（snapshot→apply→purge→render-verify→commit/rollback）。
+
 ### wp-bridge — Phase A 砌第三磚 KeyStore（key_id→公鑰 + scope/status/IP）
 
 **背景**：續砌 wp-bridge 認證脊椎。操作者全權授權自主推進（界線：不對 LIVE soulful 真寫入）。
