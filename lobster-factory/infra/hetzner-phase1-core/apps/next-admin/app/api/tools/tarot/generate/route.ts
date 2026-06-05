@@ -35,8 +35,16 @@ export async function POST(request: Request) {
   if (!body.prompt || body.prompt.trim().length < 3) {
     return NextResponse.json({ ok: false, error: "prompt is required (min length 3)" }, { status: 400 });
   }
-  if (body.referenceImage != null && !/^data:.+?;base64,/.test(body.referenceImage)) {
-    return NextResponse.json({ ok: false, error: "referenceImage must be a data: URL" }, { status: 400 });
+  if (body.referenceImage != null) {
+    if (!/^data:image\/(png|jpe?g|webp);base64,/.test(body.referenceImage)) {
+      return NextResponse.json(
+        { ok: false, error: "referenceImage must be a base64 image data URL (png/jpeg/webp)" },
+        { status: 400 },
+      );
+    }
+    if (body.referenceImage.length > 12_000_000) {
+      return NextResponse.json({ ok: false, error: "referenceImage too large (max ~9MB)" }, { status: 413 });
+    }
   }
   if (body.seed != null && (!Number.isInteger(body.seed) || body.seed < 0)) {
     return NextResponse.json({ ok: false, error: "seed must be a non-negative integer" }, { status: 400 });

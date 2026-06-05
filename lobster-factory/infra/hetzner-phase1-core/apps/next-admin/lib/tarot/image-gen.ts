@@ -25,17 +25,34 @@ export type TarotGenResult =
   | { ok: false; error: string };
 
 function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null {
-  const m = /^data:(.+?);base64,(.+)$/s.exec(dataUrl);
+  const m = /^data:(.+?);base64,(.+)$/.exec(dataUrl);
   if (!m) return null;
   return { mime: m[1], buffer: Buffer.from(m[2], "base64") };
 }
 
+const MAX_OUTPUT_BYTES = 20 * 1024 * 1024; // 20 MB ceiling on a single generated image
+
+// Only fetch generated images from Replicate's own delivery hosts — prevents the
+// upstream JSON from steering a server-side fetch at an arbitrary/internal URL (SSRF).
+function isAllowedOutputUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && (u.hostname === "replicate.delivery" || u.hostname.endsWith(".replicate.delivery"));
+  } catch {
+    return false;
+  }
+}
+
 async function urlToDataUrl(url: string, signal: AbortSignal): Promise<string> {
+  if (!isAllowedOutputUrl(url)) throw new Error("output_url_not_allowed");
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`fetch_output_failed_${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
+  const declared = Number(res.headers.get("content-length") ?? "0");
+  if (declared > MAX_OUTPUT_BYTES) throw new Error("output_too_large");
+  const ab = await res.arrayBuffer();
+  if (ab.byteLength > MAX_OUTPUT_BYTES) throw new Error("output_too_large");
   const mime = res.headers.get("content-type") ?? "image/png";
-  return `data:${mime};base64,${buf.toString("base64")}`;
+  return `data:${mime};base64,${Buffer.from(ab).toString("base64")}`;
 }
 
 // ── FLUX (Replicate) ──────────────────────────────────────────────────────────
@@ -70,7 +87,8 @@ async function generateFlux(params: TarotGenParams, signal: AbortSignal): Promis
   });
   if (!createRes.ok) {
     const detail = await createRes.text().catch(() => "");
-    return { ok: false, error: `replicate_${createRes.status}: ${detail.slice(0, 300)}` };
+    console.error("[tarot] replicate create failed", createRes.status, detail.slice(0, 500));
+    return { ok: false, error: `replicate_${createRes.status}` };
   }
 
   let prediction = (await createRes.json()) as {
@@ -90,7 +108,8 @@ async function generateFlux(params: TarotGenParams, signal: AbortSignal): Promis
   }
 
   if (prediction.status !== "succeeded") {
-    return { ok: false, error: `replicate_${prediction.status}: ${prediction.error ?? "no_output"}` };
+    console.error("[tarot] replicate prediction not succeeded", prediction.status, prediction.error ?? "");
+    return { ok: false, error: `replicate_${prediction.status}` };
   }
 
   const outUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
@@ -116,7 +135,7 @@ async function generateOpenai(params: TarotGenParams, signal: AbortSignal): Prom
     form.append("prompt", params.prompt);
     form.append("size", SIZE);
     form.append("quality", "medium");
-    form.append("image", new Blob([parsed.buffer], { type: parsed.mime }), "reference.png");
+    form.append("image", new Blob([new Uint8Array(parsed.buffer)], { type: parsed.mime }), "reference.png");
     res = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -134,7 +153,8 @@ async function generateOpenai(params: TarotGenParams, signal: AbortSignal): Prom
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    return { ok: false, error: `openai_${res.status}: ${detail.slice(0, 300)}` };
+    console.error("[tarot] openai image failed", res.status, detail.slice(0, 500));
+    return { ok: false, error: `openai_${res.status}` };
   }
 
   const json = (await res.json()) as { data?: { b64_json?: string }[] };

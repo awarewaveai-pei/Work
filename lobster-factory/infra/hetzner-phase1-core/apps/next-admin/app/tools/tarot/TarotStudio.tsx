@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, type TarotCard } from "./cards";
 import { renderPrintCard } from "./renderPrintCard";
@@ -68,6 +68,18 @@ export default function TarotStudio() {
   const doneCount = batch.filter((b) => b.status === "done").length;
 
   const lockedRef = referenceImage ?? previewImage;
+
+  // Revoke all card object URLs on unmount to avoid leaking blobs (78 + retries).
+  const batchRef = useRef<BatchItem[]>([]);
+  useEffect(() => {
+    batchRef.current = batch;
+  }, [batch]);
+  useEffect(
+    () => () => {
+      batchRef.current.forEach((it) => it.url && URL.revokeObjectURL(it.url));
+    },
+    [],
+  );
 
   async function onPickReference(file: File | null) {
     if (!file) {
