@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { computeFingerprint } from "../fingerprint";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { computeFingerprint, computeFingerprintV2 } from "../fingerprint";
 
 /**
  * 2026-05-23: Tests cover the netdata fingerprint stability fix.
@@ -100,5 +100,67 @@ describe("computeFingerprint — netdata stability", () => {
       raw: { host: "awarewave-eu-hel1-cpx32", name, alarm: "x = 1" },
     });
     expect(sg).not.toBe(eu);
+  });
+});
+
+describe("computeFingerprintV2 — M4 salted fingerprint", () => {
+  const args = {
+    source: "sentry" as const,
+    service: "next-admin",
+    signal_type: "error" as const,
+    title: "TypeError: cannot read property",
+    raw: { data: { issue: { id: "12345" } } },
+  };
+
+  let savedSalt: string | undefined;
+  beforeEach(() => {
+    savedSalt = process.env.OPS_INBOX_FINGERPRINT_SALT;
+    delete process.env.OPS_INBOX_FINGERPRINT_SALT;
+  });
+  afterEach(() => {
+    if (savedSalt === undefined) delete process.env.OPS_INBOX_FINGERPRINT_SALT;
+    else process.env.OPS_INBOX_FINGERPRINT_SALT = savedSalt;
+  });
+
+  it("salt unset → v2 equals v1 (no-op, deploy-safe)", () => {
+    expect(computeFingerprintV2(args)).toBe(computeFingerprint(args));
+  });
+
+  it("salt set → v2 differs from v1 (attacker cannot predict without salt)", () => {
+    process.env.OPS_INBOX_FINGERPRINT_SALT = "s3cr3t-server-salt";
+    expect(computeFingerprintV2(args)).not.toBe(computeFingerprint(args));
+  });
+
+  it("salt set → v2 is deterministic for the same input", () => {
+    process.env.OPS_INBOX_FINGERPRINT_SALT = "s3cr3t-server-salt";
+    expect(computeFingerprintV2(args)).toBe(computeFingerprintV2(args));
+  });
+
+  it("different salts → different v2 for the same input", () => {
+    process.env.OPS_INBOX_FINGERPRINT_SALT = "salt-A";
+    const a = computeFingerprintV2(args);
+    process.env.OPS_INBOX_FINGERPRINT_SALT = "salt-B";
+    const b = computeFingerprintV2(args);
+    expect(a).not.toBe(b);
+  });
+
+  it("salt set → v2 is a 64-char sha256 hex digest", () => {
+    process.env.OPS_INBOX_FINGERPRINT_SALT = "s3cr3t-server-salt";
+    expect(computeFingerprintV2(args)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("v2 tracks the same incident across WARNING/CLEAR (v1 stability is preserved under salt)", () => {
+    process.env.OPS_INBOX_FINGERPRINT_SALT = "s3cr3t-server-salt";
+    const host = "wordpress-ubuntu-4gb-sin-1";
+    const name = "system_post_update_reboot_status";
+    const warning = computeFingerprintV2({
+      source: "netdata", service: null, signal_type: "resource",
+      title: "= 1 status", raw: { host, name, status: "WARNING", value: "1" },
+    });
+    const cleared = computeFingerprintV2({
+      source: "netdata", service: null, signal_type: "resource",
+      title: "= 0 status", raw: { host, name, status: "CLEAR", value: "0" },
+    });
+    expect(warning).toBe(cleared);
   });
 });
