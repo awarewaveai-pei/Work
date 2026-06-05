@@ -78,6 +78,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               {/* 5. 內容工具（未來功能）─────────────────────── */}
               <div className="sidebar-section">
                 <div className="sidebar-section-label">Content Tools</div>
+                <Link href="/tools/tarot" className="sidebar-link" title="塔羅牌印刷檔生成工具：AI 生成整套 78 張同風格牌卡">
+                  <span className="sidebar-icon">🔮</span> Tarot
+                </Link>
                 <span className="sidebar-link-disabled">
                   <span className="sidebar-icon">✏</span> Generator
                   <span className="sidebar-coming-soon">Soon</span>

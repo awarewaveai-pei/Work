@@ -16,6 +16,7 @@
     "@sentry/nextjs": "^9",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.49.8",
+    "jszip": "^3.10.1",
     "next": "^15.2.4",
     "posthog-js": "^1.369.2",
     "react": "^19.0.0",
