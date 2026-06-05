@@ -6,6 +6,7 @@
 
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: wp-bridge-deploy-sell → handoffs/2026-06-05-1948-wp-bridge-deploy-sell.md
+- TOMORROW_CAPTURED: tomo-201752 → handoffs/2026-06-05-2017-tomo-201752.md
 
 ### app.aware-wave.com — 塔羅牌印刷檔生成工具（MVP，本機 build/tsc 綠，待 SG deploy 驗 live gen）
 
