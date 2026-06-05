@@ -5,18 +5,10 @@ import type { IntakeForm, WebsiteSpec } from "@/lib/onboarding/intake-form";
 
 const STEPS = [
   { num: 1, label: "公司品牌", duration: "2 min" },
-  { num: 2, label: "客群目標", duration: "1 min" },
+  { num: 2, label: "客群", duration: "1 min" },
   { num: 3, label: "功能需求", duration: "2 min" },
   { num: 4, label: "視覺參考", duration: "2 min" },
   { num: 5, label: "素材時程", duration: "1 min" },
-];
-
-const PRIMARY_GOALS = [
-  { value: "brand", label: "品牌展示" },
-  { value: "sell", label: "線上販售" },
-  { value: "booking", label: "預約服務" },
-  { value: "blog", label: "內容部落格" },
-  { value: "card_site", label: "名片站" },
 ];
 
 const PAGES = [
@@ -33,7 +25,7 @@ const PRODUCT_TYPES = [
   { value: "physical", label: "實體商品" },
   { value: "digital", label: "數位商品" },
   { value: "pod", label: "客製商品 (POD)" },
-  { value: "booking", label: "服務預約" },
+  // 「服務預約」已移除 — 與「功能需求 → 預約系統」重疊；預約走 needs_booking。
 ];
 
 const VISUAL_STYLES = [
@@ -75,7 +67,6 @@ export default function OnboardingPage() {
 
   function validateStep(s: number): string | null {
     if (s === 1 && !form.company_name?.trim()) return "請填寫公司/品牌名稱";
-    if (s === 2 && !form.primary_goal?.length) return "請至少選一個主要目標";
     if (s === 3 && !form.pages_needed?.length) return "請至少選一個頁面";
     return null;
   }
@@ -95,8 +86,8 @@ export default function OnboardingPage() {
   async function handleSubmit() {
     const err = validateStep(5);
     if (err) { setError(err); return; }
-    if (!form.company_name?.trim() || !form.primary_goal?.length || !form.pages_needed?.length) {
-      setError("請確認必填欄位已填寫（公司名稱、目標、頁面）");
+    if (!form.company_name?.trim() || !form.pages_needed?.length) {
+      setError("請確認必填欄位已填寫（公司名稱、頁面）");
       return;
     }
     setError(null);
@@ -521,12 +512,13 @@ export default function OnboardingPage() {
                 placeholder="company.com（無則留空，系統建 staging）" className="form-input" />
             </div>
             <div className="form-row">
-              <label className="form-label">預算級別 <span className="intake-required">*</span></label>
+              <label className="form-label">預算範圍 <span className="intake-required">*</span></label>
               <select value={form.budget_tier} onChange={e => set("budget_tier", e.target.value as IntakeForm["budget_tier"])} className="form-select">
-                <option value="starter">Starter — 基本品牌展示站</option>
-                <option value="business">Business — 品牌 + CRM + 行銷功能</option>
-                <option value="enterprise">Enterprise — 全功能電商/預約平台</option>
+                <option value="starter">5 萬以下</option>
+                <option value="business">5 – 15 萬</option>
+                <option value="enterprise">15 萬以上</option>
               </select>
+              <p className="form-hint" style={{ marginTop: 4 }}>幫助我們抓建站規模與報價方向；功能由上面的需求決定，不受此影響。</p>
             </div>
             <div className="form-row">
               <label className="form-label">上線時程</label>
