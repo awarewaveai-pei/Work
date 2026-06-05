@@ -4,6 +4,9 @@
 
 ## 2026-06-05
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: wp-bridge-deploy-sell → handoffs/2026-06-05-1948-wp-bridge-deploy-sell.md
+
 ### app.aware-wave.com — 塔羅牌印刷檔生成工具（MVP，本機 build/tsc 綠，待 SG deploy 驗 live gen）
 
 **背景**：使用者要在 app.aware-wave.com 加塔羅牌印刷檔生成工具。工作流（使用者確認）：文字生圖/以圖生圖生一張樣本→鎖風格→整套 78 張同風格→下載 PNG 印刷牌卡。提供的 `tarot-ai-generator.jsx` 是 artifact 原型（瀏覽器直打 anthropic、無 key、生 SVG），僅取其牌資料+版面。
