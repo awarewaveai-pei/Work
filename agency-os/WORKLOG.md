@@ -4,6 +4,25 @@
 
 ## 2026-06-05
 
+### wp-bridge — Phase A 砌第五磚 WriteTransaction（自我修復寫入迴圈，頭號差異點）
+
+**背景**：續砌（全權授權、不要停；界線：不對 LIVE soulful 真寫入）。這是「贏過同事」的核心：寫入不算完成，直到 render-verify 確認生效且沒壞，否則自動回滾。
+
+**[已修改]**（`packages/wp-bridge-plugin/includes/Transaction/`）
+- 8 檔：`Operation`(介面)、`Snapshot`、`Snapshotter`(介面)、`RenderObservation`、`Renderer`(介面)、`CachePurger`(介面)、`TransactionResult`、`WriteTransaction`(orchestrator) + 測試。WP-free，注入式 collaborator 可全測。
+- 迴圈：dry-run→preview / irreversible→blocked / 空 urls→unverifiable / render-before(不可觀測 fail-closed) → snapshot → apply(throw→rollback) → purge(throw→rollback) → render-after(非2xx→rollback) → expectsChange 但無變化→rollback no_effect → commit。rollback = restore+re-purge+re-render+hash 比對，失敗→rollback_failed(critical)。
+- **review 驅動修 2 Critical**：① 空 affectedUrls() 零驗證就 commit（fail-open）→ 改 unverifiable 拒於 apply 前；② 只驗「仍 2xx」不驗「改動生效」→ silent no-op 誤報 committed → 加 `expectsChange()` + no_effect rollback。+ honest docstring（render hash 是結構標記非全 byte；Snapshotter 契約負責 storage byte 還原 + 完整還原集，防 partial-apply 假乾淨回滾）。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -d extension=sodium d:\tmp\realtest-nonce.php` | exit=0 | ms=~800 — **71/71 PASS**（WriteTransaction 9：含 HEADLINE 壞寫入→自動回滾 byte-identical、apply-throw、irreversible-blocked、dry-run、空urls→unverifiable、no-effect→rollback、idempotent→commit、rollback_failed）；`php -l` 31/31。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=2C/1M（空urls fail-open + no-op 誤報 + byte-identical 誇大 — **全修**）。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=WriteTransaction\|TransactionResult\|Snapshotter\|Operation | hits=0（僅新檔，無 downstream 消費者，具體 WP 實作未砌）。
+- WORKLOG：本 entry。
+
+**[剩餘風險 / 待續]**
+- 具體 WP-coupled 實作（需 wp-env 整合測）：WpdbSnapshotter / BridgeRenderer(繞快取+結構標記 hash) / CacheStrategy(LiteSpeed/Redis/Cloudflare) / Operation 具體型。Snapshotter 必守「完整還原集 + storage byte 還原」契約。
+- **進度里程碑**：認證脊椎(4 磚) + 自我修復核心(1 磚) = wp-bridge 兩個最難/最差異化子系統完成，全 WP-free + 71 assertion + 每磚 critic/db-expert。下一步需起本機 wp-env 沙盒才能砌 WP-coupled 層。
+
 ### wp-bridge — Phase A 砌第四磚 RequestAuthenticator（完整認證管線）
 
 **背景**：續砌（操作者全權授權、不要停；界線：不對 LIVE soulful 真寫入）。把前三磚串成單一 request gate。
