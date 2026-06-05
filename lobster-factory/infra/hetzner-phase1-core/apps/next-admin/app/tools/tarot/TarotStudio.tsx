@@ -150,7 +150,15 @@ export default function TarotStudio() {
         return;
       }
       const blob = await renderPrintCard(card, resp.image);
-      patchItem(index, { status: "done", blob, url: URL.createObjectURL(blob), error: undefined });
+      const url = URL.createObjectURL(blob);
+      // revoke any prior url for this slot (retry case) before replacing
+      setBatch((prev) =>
+        prev.map((it, i) => {
+          if (i !== index) return it;
+          if (it.url) URL.revokeObjectURL(it.url);
+          return { ...it, status: "done", blob, url, error: undefined };
+        }),
+      );
     } catch (e) {
       patchItem(index, { status: "error", error: e instanceof Error ? e.message : String(e) });
     }
