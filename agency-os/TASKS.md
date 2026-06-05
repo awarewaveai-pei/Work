@@ -68,6 +68,7 @@
 - [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item（Phase4Weekly 錯 repo / incidents API 藏 open / 5 webhook 零流量）→ handoffs/2026-06-05-2017-tomo-201752.md
 - [ ] Hetzner Hosting Layer：驗證 Phase 1 修正(M9/M7/M3/M10,已commit未驗證)+補WORKLOG R0+推進Phase 2(provisionClient CLI) → handoffs/2026-06-05-2030-tomo-203020.md
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
+- [ ] wp-bridge v0.3.0：使用者更新 soulful → AI 在真站建第一篇草稿（SE-01）+ 續做 operation → handoffs/2026-06-05-2039-tomo-203931.md
 
 #### 雙機環境 / 日常開工
 
