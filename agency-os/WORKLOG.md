@@ -4,6 +4,35 @@
 
 ## 2026-06-05
 
+### app.aware-wave.com 大修 — B1-P2（樣式）+ B2（Repair Center 正確性 P5/P7/P9/P12）
+
+**背景**：今日開工目標 = 大修 app.aware-wave.com（Lobster Factory Admin Console）12 問題。SSOT = `docs/operations/APP_AWARE_WAVE_COMPLETE_REFERENCE.md §14` + handoff `2026-06-04-1730-ai-agent-redesign`。VBC 驗證現況 code 與 2026-06-04 文件 100% 相符，12 問題全在，無修復落地。操作者全權授權架構師決策，要求「一勞永逸、最完善、30 年」。
+
+**批次規劃**：B1 守門（P1 Auth 403 + P2 樣式）→ B2 Repair 正確性（P5/P7/P9/P12）→ B3 體驗（P3/P9 已含/P6/P8/P10/P11）。
+
+**[已修改]**
+- **P2** 無樣式（`apps/next-admin/app/globals.css` + `app/ops/clients/[slug]/WpUpdateButtons.tsx`）：根因 = 元件用 Tailwind class 但 app 無 Tailwind（package.json 確認無依賴）→ 按鈕裸樣式。修法 = 加 `.wp-up-*` 真實 CSS class（globals.css，app 慣例為全域 class，非 inline），正確支援 `:hover`/`:disabled`/`@keyframes` spin。Commit `cbe6d6e3`。
+- **P5** Repair 佇列洞（`app/ops/repairs/page.tsx`）：filter 由「排除有任何 run」改「排除被 active 或 human_only run 擁有的 incident」；resolved/rolled_back 可重試回佇列。VBC 證 `startRepairFromIncident`(service.ts:99) 本就 reuse run row → 純 filter 修，不動 service。
+- **P7** PR 棄案（`app/api/webhooks/github/route.ts`）：原只處理 merged，closed-not-merged 靜默 ignore → run 永卡 pr_ready。修法 = closed+配對 pr_ready run → merged→deploy_pending / 棄案→human_only(+needs_human_review)，保留 `.eq(state,pr_ready)` guard 確保 idempotent。
+- **P9** AI label 寫死 Gemini（`app/ops/inbox/[id]/page.tsx`）：`AutoSummary` 元件改讀 `ai_diagnoses.provider` 動態顯示。
+- **P12** Inbox→Repair 單向（同檔）：`RepairPanel` — 有 run 顯示狀態(+已封存標示)+連結；無 run 且 production 重用 `RepairActions mode="start"`。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin，P2 一次 + B2 兩次）| exit=0 | ms=~30000 — build/type gate 全綠；視覺 e2e 待 P1 解卡 sg-deploy 後 `/playwright client`（prod 現 403，本批未 deploy）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=P2 0c/0m/0n（Safe）；B2 0c/0m/2n → 2 Minor（human_only 佇列 no-op、archived run 標示）+ 1 suggestion **已於本批一併修**。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=runsByIncident | hits=0
+  - 已移除符號全 repo 0 殘留：`runsByIncident`(P5 刪)、`borderColour`/`colour`(P2 WAVE_META 刪)、寫死 `Gemini auto-summary`(只剩 P9 註解)。
+  - 新符號（合理存在，非 stale）：`AutoSummary`/`RepairPanel` 僅 inbox/[id]、`wp-up-*` 僅 globals.css+WpUpdateButtons、`pr_abandoned`/`pr_merged` 僅 github route audit 字串（無邏輯消費者）。
+  - github webhook response 僅**新增** `merged` 欄位（向後相容）；無 github webhook 既有測試需更新。
+- WORKLOG：本 entry。
+
+**[剩餘風險 / 待續]**
+- **P1 Auth 403 卡關（最高優先，需操作者一步）**：CF 帳號 `aea1a836e6f8b8d7f18206dc8e848bd6`、zone `aware-wave.com=f21b1919632fee2221647908a94fdcac`。**Cloudflare Zero Trust / Access 從未啟用**（API 回 `access.api.error.not_enabled`，無法 bootstrap）。架構決策 = 方案 B：CF Access（Email OTP IdP，零外部依賴）+ nginx 注入 x-ops-proxy-auth + middleware 驗 CF Access JWT + email→role。**操作者待辦**：one.dash.cloudflare.com 啟用 Zero Trust（team 名建議 awarewave，Free plan）。之後全程 API 接管。順序保證零暴露窗（Access policy 先 enforce → 才注入 nginx）。
+- B2/P2 **未 deploy**（待 P1 與 B1 併同 sg-deploy；prod 全 /ops/* 在 P1 修好前對瀏覽器 403，先 deploy 無可見效果）。
+- 剩餘 B3：P3 三名一頁 / P6 health SSH TTL cache / P8 即時更新 / P10 Approvals 空 / P11 Ops Console 孤兒。
+
+**[rollback]** P2 已 commit（`git revert cbe6d6e3`）；B2 git revert HEAD；皆未 deploy，prod 無影響。
+
 ### AO-RESUME 反覆失敗根治 — Phase 1：git-align fetch stderr NativeCommandError（systemic bug class）
 
 **根本問題（非表面症狀）**：使用者回報 AO-RESUME「幾乎每次跑都爆、每次修 2-3 小時、所以這兩次只敢先 `git pull`」。今天（2026-06-05 03:01 UTC）hook 自動觸發的 `ao-resume.ps1 -FullMainlineParity` 回 `exit_code:1`，實際失敗點 = `scripts/git-align-main-aoresume-feature.ps1:140`：
