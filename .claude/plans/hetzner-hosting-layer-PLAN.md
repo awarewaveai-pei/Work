@@ -258,7 +258,7 @@ V2 §4 tiers 轉成 input schema + provisioning 參數：
 - 孤兒計費：M9 rollback + reaper 掃 orphan-pending 超時刪。**teardown 必須顯式 `DELETE /v1/primary_ips/{id}`**（官方：刪 server 不連帶刪 Primary IP，€0.50/月孤兒費）；backup 隨 server 刪、snapshot 不隨刪（長期保留靠 snapshot）。
 - firewall 鎖死：cloud-init 先 ACCEPT 22 再 DROP + Hetzner Console rescue break-glass
 - 真機開機 = High risk = 需明示 go-ahead
-- 另一 AI 並行：baseline diff + 紅線（packages/workflows / webhook routes / migrations / Repair Center）
+- 另一 AI 並行：核心（Phase 1-4）與 UI 解耦，**只在 Phase 5（按鈕）才需協調 UI AI**；紅線（UI AI 別碰 packages/workflows / provision 核心 / migrations）+ baseline diff
 
 ---
 
