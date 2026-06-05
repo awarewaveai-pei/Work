@@ -133,7 +133,10 @@ function RepairPanel({
     return (
       <div style={box}>
         <h4>修復</h4>
-        <div style={{ fontSize: 13, margin: "8px 0" }}>狀態：{runStateLabel(run.state)}</div>
+        <div style={{ fontSize: 13, margin: "8px 0" }}>
+          狀態：{runStateLabel(run.state)}
+          {run.archived_at ? "（已封存）" : ""}
+        </div>
         <Link href="/ops/repairs">前往修復中心 →</Link>
       </div>
     );

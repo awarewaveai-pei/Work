@@ -107,8 +107,8 @@ export async function POST(req: Request) {
     state: newState,
     audit_log: newAudit,
     updated_at: new Date().toISOString(),
+    needs_human_review: !merged,
   };
-  if (!merged) patch.needs_human_review = true;
 
   const { error: updateErr } = await supabase
     .from("repair_runs")
