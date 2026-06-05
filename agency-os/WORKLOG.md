@@ -4,6 +4,24 @@
 
 ## 2026-06-05
 
+### wp-bridge — Phase A 砌第六磚 KadenceValidator（寫前護欄，回應使用者 Kadence class 關切）
+
+**背景**：使用者問「Kadence block 要固定 class 才能發揮格式」→ 砌正是這道護欄。全權授權續砌。
+
+**[已修改]**（`packages/wp-bridge-plugin/includes/Validation/`）
+- `Violation`、`ValidationResult`、`KadenceValidator` + 測試。吃 parsed block 樹遞迴驗：block 名白名單、rowlayout/column 須 kbVersion>=2、kadence block 須非空唯一 uniqueID（CSS class 綁 uniqueID，缺/撞→裸樣式）。違反回 dotted-path Violation。WP-free。
+- **review 驅動修 1 Major**：`kbVersion===2` 嚴格相等誤擋合法內容（critic 對照 Kadence 原始碼確認其用 `>=2`；float 2.0/未來 3/字串 "2" 全被誤拒）→ 改 `is_numeric && (float)>=2`；dedup map key 加 'id:' 前綴防數值字串 coercion 碰撞。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -d extension=sodium d:\tmp\realtest-nonce.php` | exit=0 — **83/83 PASS**（KadenceValidator 12：golden valid、kbVersion 2/2.0/"2"/3 accepted + 1/non-numeric rejected、缺/空/撞 uniqueID、unknown block、nested path、數值字串 ID 不誤撞）；`php -l` 35/35。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1M/2n（kbVersion 嚴格相等 false-positive — 已修；uniqueID 型別 + dedup coercion — 已強化）。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=KadenceValidator\|ValidationResult\|Violation | hits=0（新檔 + 設計文件引用，無 downstream code 消費者）。
+- WORKLOG：本 entry。
+
+**[剩餘風險 / 待續]**
+- block 白名單前向相容（新 Kadence block 需更新清單，已知 tradeoff）；serialize-roundtrip 在 WP glue 層驗。
+- **session 里程碑**：本 session 砌 6 磚（NonceCache→KeyStore→RequestAuthenticator→WriteTransaction→KadenceValidator + 既有 SignatureVerifier）= 認證脊椎 + 自我修復核心 + Kadence 護欄，全 WP-free + 83 assertion + 每磚 critic（多次抓到並修 Critical/Major）。**下一步需起本機 wp-env 沙盒**才能砌 WP-coupled 層（REST glue / 具體 Snapshotter·Renderer·CachePurger / Operation 具體型）。
+
 ### wp-bridge — Phase A 砌第五磚 WriteTransaction（自我修復寫入迴圈，頭號差異點）
 
 **背景**：續砌（全權授權、不要停；界線：不對 LIVE soulful 真寫入）。這是「贏過同事」的核心：寫入不算完成，直到 render-verify 確認生效且沒壞，否則自動回滾。
