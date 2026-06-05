@@ -59,17 +59,42 @@ final class RestController {
 
 		return new \WP_REST_Response(
 			array(
-				'name'        => 'aware-wave-wp-bridge',
-				'version'     => AWBRIDGE_VERSION,
-				'sodium'      => extension_loaded( 'sodium' ),
-				'server_time' => time(),
-				'schema'      => array(
+				'name'             => 'aware-wave-wp-bridge',
+				'version'          => AWBRIDGE_VERSION,
+				// Native libsodium extension (fast). Not required — WordPress bundles a pure-PHP
+				// fallback (sodium_compat), so what actually matters is crypto_ready below.
+				'sodium_extension' => extension_loaded( 'sodium' ),
+				// The decisive check: does Ed25519 sign+verify actually WORK on this host (via the
+				// extension OR WordPress's bundled pure-PHP polyfill)? If true, signed writes work.
+				'crypto_ready'     => $this->cryptoReady(),
+				'server_time'      => time(),
+				'schema'           => array(
 					'keys_ok'   => $keyStore->hasExpectedColumns(),
 					'nonces_pk' => $nonceStore->hasPrimaryKeyOnNonce(),
 				),
 			),
 			200
 		);
+	}
+
+	/**
+	 * Prove Ed25519 actually works here by doing a real ephemeral keypair sign+verify roundtrip.
+	 * Returns true whether the native sodium extension is loaded OR WordPress's bundled sodium_compat
+	 * polyfill is providing the functions. This is the check that decides whether signed writes can run.
+	 */
+	private function cryptoReady(): bool {
+		if ( ! function_exists( 'sodium_crypto_sign_keypair' ) ) {
+			return false;
+		}
+		try {
+			$keypair = sodium_crypto_sign_keypair();
+			$secret  = sodium_crypto_sign_secretkey( $keypair );
+			$public  = sodium_crypto_sign_publickey( $keypair );
+			$sig     = sodium_crypto_sign_detached( 'awbridge-selftest', $secret );
+			return sodium_crypto_sign_verify_detached( $sig, 'awbridge-selftest', $public );
+		} catch ( \Throwable $e ) {
+			return false;
+		}
 	}
 
 	public function setOption( $request ) {
