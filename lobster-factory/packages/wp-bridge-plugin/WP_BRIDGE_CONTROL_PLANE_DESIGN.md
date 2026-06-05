@@ -168,6 +168,7 @@ WP 外掛只存**公鑰**。每請求簽章綁定 `METHOD\nPATH\nTIMESTAMP\nNONC
 1. **建 soulful staging**（`ENVIRONMENT_REGISTRY.md` 現為 `provision_pending`，無 staging）。
    **Hostinger Premium 不含一鍵 staging（Business+/Cloud 才有），但 Premium 可架多站（本帳號 3 站、soulful 僅用 1 → 有空位）→ 把 staging 加成「獨立網站格」**：
    在 hPanel 把 `staging.soulfulexpression.org` 新增為**獨立網站**（自己的 docroot + 自己的 DB，**檔案/資料庫真隔離**），再用既有 SSH（`wp-update-config.json` host `191.101.230.176:65002`, key `hostinger_soulful`）`wp db export` + `rsync` files → clone 進 staging 格 → `wp search-replace` 換 URL。**不裝第三方 staging plugin、不升 Business**，用既有信任工具鏈。唯一共用層 = 同帳號伺服器資源/LiteSpeed/IP（CacheStrategy 已處理 LiteSpeed），對驗 restore + bridge 迴路足夠。
+   - **sodium 驗證**：建 staging 時順手 `php -m | grep sodium`（Ed25519 依賴；sodium 自 PHP 7.2 為核心內建，PHP 8.2 預設帶 → 風險 LOW，**不為此單獨 SSH prod**，折入本步免費驗）。
 2. **護欄 7 — restore drill 硬 gate（不可跳）**：在開放任何 live 寫入前，**必須對 staging 跑一次完整 restore drill 並證明 byte 還原**（soulful 的 `BACKUP_RESTORE_PROOF.md` 目前「未執行」= 安全網未驗）。drill 未綠 → live 寫入一律 `423 Locked`。
 3. staging 唯讀+dry-run → 單筆低風險寫入（過 WPvivid 備份門控,scope=files+DB）→ staging 全綠才翻 `lifecycle:live`。
 4. live 開放後 **按下方可逆性分類門控**；write-scope key 窄發。aware-wave 的 Cloudflare/Redis 路徑另行驗證。**HIGH 風險僅在 live-prod 寫入那一步,且全程門控。**
