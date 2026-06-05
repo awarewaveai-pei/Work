@@ -124,22 +124,42 @@ export default function OnboardingPage() {
   }
 
   async function handleTriggerBuild() {
-    if (!websiteSpecId || !intakeId) return;
-    setError(null);
-    setFlow("triggering");
-    const res = await fetch("/api/onboarding/trigger-build", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ website_spec_id: websiteSpecId, intake_form_id: intakeId }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      setError(`觸發建站失敗：${data.error}${data.details ? ` — ${data.details}` : ""}`);
-      setFlow("done");
+    // Guard with a visible message (was a silent return → looked like nothing happened).
+    if (!websiteSpecId || !intakeId) {
+      setError("無法觸發建站：規格 ID 遺失，請重新產生規格。");
       return;
     }
-    setRunId(data.run_id);
-    setFlow("triggered");
+    setError(null);
+    setFlow("triggering");
+    try {
+      const res = await fetch("/api/onboarding/trigger-build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ website_spec_id: websiteSpecId, intake_form_id: intakeId }),
+      });
+      // Read as text first so a non-JSON error page (500/HTML) doesn't throw and crash the handler.
+      const text = await res.text();
+      let data: { ok?: boolean; error?: string; details?: string; run_id?: string };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setError(`觸發建站失敗：伺服器回應非預期（HTTP ${res.status}）${text ? ` — ${text.slice(0, 160)}` : ""}`);
+        setFlow("done");
+        return;
+      }
+      if (!res.ok || !data.ok) {
+        setError(`觸發建站失敗：${data.error ?? `HTTP ${res.status}`}${data.details ? ` — ${data.details}` : ""}`);
+        setFlow("done");
+        return;
+      }
+      setRunId(data.run_id ?? null);
+      setFlow("triggered");
+    } catch (e) {
+      // Network/abort error — keep the operator on the spec view with a clear message,
+      // never let the handler throw (an unhandled rejection here looked like a reset).
+      setError(`觸發建站失敗：${e instanceof Error ? e.message : String(e)}`);
+      setFlow("done");
+    }
   }
 
   // ── Spec result view ──────────────────────────────────────────

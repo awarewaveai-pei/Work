@@ -40,12 +40,9 @@ export function selectPackage(form: IntakeForm): PackageSelection {
     };
   }
 
-  // Business with CRM or higher budget
-  if (
-    form.needs_crm ||
-    form.budget_tier === "business" ||
-    form.budget_tier === "enterprise"
-  ) {
+  // Business with CRM — package now driven only by concrete needs (budget_tier is informational
+  // for pricing/scale, not a feature driver; 2026-06-05 change per operator).
+  if (form.needs_crm) {
     return {
       package_slug: "wp-business",
       packs: ["base", "brand"],
