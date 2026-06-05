@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-04 17:35:57
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-06-05 21:19:12
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -219,44 +219,87 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-04.md
-# 2026-06-04
+## 5) memory/daily/2026-06-05.md
+# Daily Note - 2026-06-05
 
-## Done today
 
-### Session 1（上午）— Batch 3 + Skills
-- Auto-Repair Batch 3（M9 TOCTOU escalateAnalysisOnlyRun atomic UPDATE、M10 upsertIncidentAtomic PL/pgSQL、m4 uptime-kuma hostname）
-- mattpocock/skills 整合（caveman/zoom-out/grill-me/grill-with-docs/tdd/diagnose/prototype/improve-codebase-architecture）
-- verify-closeout-completeness DEBUG-TAG gate
-- VBC principle 加入 AGENTS.md R4
+### verify-recent --ack (2026-06-05T12:23:09.9555052Z)
 
-### Session 2（下午）— 系統全讀 + 緊急修復
-- **app.aware-wave.com 全讀**：100% codebase（pages/API/lib/DB/infra）
-- **APP_AWARE_WAVE_COMPLETE_REFERENCE.md 建立**（1800 行）：3 次迭代補全，含 12 問題完整分析
-- **Memory 進 git**：.gitignore 修改，41 個 memory 檔案現在 git-tracked
-- **線上 webhook 全斷修復**（緊急）：`NOTIFY pgrst, 'reload schema'`，恢復 2.3 小時中斷
-- **/tomo**：大修改 handoff packet → `handoffs/2026-06-04-1730-ai-agent-redesign.md`
+**Reason**: tarot UX: 風格描述改選填(上傳參考圖即可) + 條件式 label 文字；tsc --noEmit green；TarotStudio.tsx 本 session 已 critic 兩次；純 guard 放寬/字串改動，無新邏輯路徑
 
-## Key Decisions
-- memory 不再只存本機，改為 git-tracked → 跨機直接 `git pull` 即可同步
-- app 大修改的優先順序：Auth 403 → WpUpdateButtons → Repair佇列 → 名稱統一
-- PostgREST schema cache 教訓：每次新增 PL/pgSQL function 必執行 `NOTIFY pgrst, 'reload schema'`
+**Acknowledged unverified files** (count=1):
 
-## Blockers / Open
-- 大修改本身：筆電繼續，AI 讀 APP_AWARE_WAVE_COMPLETE_REFERENCE.md 後開始
-- Phase4Weekly 第二次驗收：等 2026-06-05 06:00 UTC
-- Batch 3 Post-Phase 4（M2 per-source HMAC + M4 fingerprint）：仍開放
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
 
-## Commits today
-- `0875ee6d` checkpoint（M10 + m4 unstaged changes）
-- `29d9859b` skills wave 3
-- `9f862d82` Batch 3 security fix
-- `1fc640fc` VBC governance
-- `70fb8e51` memory git tracking
-- `e3d2214e` APP_AWARE_WAVE doc v1
-- `9ab7dc74` doc supplement §15
-- `7b25b380` doc §14 full analysis
-- `ca903a03` /tomo ai-agent-redesign
+
+### verify-recent --ack (2026-06-05T12:26:37.8959506Z)
+
+**Reason**: M2/M4 Phase 1 已於本 session 完整驗證: tsc --noEmit exit 0 + npm test 197/197 (per-source 12 + V2 6 新測試) + critic x2 (M2 auth/M4 fingerprint, 無 Critical, Major/Minor 全修) + db-expert (0036 additive 安全). temp d:/tmp/*.sh = SSH 診斷 throwaway 非 repo code.
+
+**Acknowledged unverified files** (count=13):
+
+- `d:\tmp\sg-sentry-diag.sh`
+- `d:\tmp\sg-inc2.sh`
+- `d:\tmp\sg-webhook-flow.sh`
+- `d:\tmp\sg-inc3.sh`
+- `d:\tmp\eu-incident-truth.sh`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\ops-inbox\verifyIngestToken.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\sentry\route.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\uptime-kuma\route.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\netdata\route.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\grafana\route.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\posthog\route.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\ops-inbox\fingerprint.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\ops-inbox\upsertIncidentAtomic.ts`
+
+
+### verify-recent --ack (2026-06-05T12:33:34.5933137Z)
+
+**Reason**: Phase 1 Hetzner hosting M9/M7/M3/M10 已由 auto-checkpoint commit (f7174a5a); 驗證(tsc/vitest/critic/db-expert)經 /tomo 明確 defer 至明天 handoff 2026-06-05-2030-tomo-203020.md step 1-5
+
+**Acknowledged unverified files** (count=5):
+
+- `d:\Work\lobster-factory\packages\workflows\src\trigger\orchestrate-tenant-provisioning.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\executor\installManifestStaging.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\tasks\wp-install-plugins.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\db\supabase\supabaseRestInsert.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\trigger\dispatch-action-run.ts`
+
+
+### Done — 塔羅牌印刷檔生成工具（本 session，已上線）
+
+- **新功能**：app.aware-wave.com `/tools/tarot` — 文字/以圖生圖生風格樣本 → 鎖定 → 整套 78 張同風格 → client canvas 組印刷牌卡（70×120mm @300DPI 含出血）→ JSZip 下載 PNG。薄 server（金鑰只在 server，一張一 request），組版/打包全 client。
+- **模型選單（便宜→貴）**：flux-schnell（~NT$8/套，無 img2img）、openai-low、flux-dev（吃上傳圖）、openai-medium、openai-high。
+- **已部署 SG**：`5de1dd81`→`ccfbd176`，smoke 全綠。
+- **金鑰大坑**：部署後才發現 SG `.env` 完全沒 REPLICATE_API_TOKEN + next-admin compose 沒接 REPLICATE/OPENAI（只有 ANTHROPIC）+ 原 OPENAI 是 `sk-plac…` 假 key。憑證檔原 key 也全 401。修：compose 加兩 key（錨點 PORT 3000）+ .env 補（多份備份）+ 使用者給新 key。**新 Replicate `r8_MXAU…` 實測 flux-schnell 真生一張 5s ✓**；OpenAI `sk-proj-niF7…` key 有效但帳號 `billing_hard_limit_reached`。新 key 同步：憑證檔 + SG .env + vault。
+- **UX 修**：風格描述改選填（上傳參考圖即可）— 使用者上傳圖被「描述必填」silent-擋的回報。
+- **教訓**：explore agent 宣稱「.env 有 key」是假設，未驗證 → 部署後才爆。下次新功能依賴 server 端 secret，部署前先 SSH 確認該 secret 真的在目標 container env。
+
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:dfb009080d41476d22c397945a259370d91cd6b57c3bd15dbc6e1b78a78895e5 -->
+
+### claude 2026-06-05 20:55
+
+- **完成（一句）**: 塔羅牌印刷檔生成工具上線 `app.aware-wave.com/tools/tarot`（5 模型 flux-schnell ~NT$8 → gpt-image-high；client canvas 組印刷牌卡 70×120mm@300DPI 含出血 + JSZip 下載）+ 部署 SG `ccfbd176` + 金鑰 provisioning（補 REPLICATE/OPENAI 至 SG .env+compose+vault+憑證檔）+ UX 修（風格描述改選填，上傳參考圖即可）。
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot/*` + `lib/tarot/image-gen.ts` + `app/api/tools/tarot/generate/route.ts`
+  - `agency-os/WORKLOG.md` / `TASKS.md` / `memory/CONVERSATION_MEMORY.md` / `memory/daily/2026-06-05.md`（本 AO-CLOSE）
+- **Git**: `9ea345bd` / `ccfbd176`（均已 push）；SG deployed `ccfbd176`
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: （遠端／無 commit）OpenAI 帳號 `billing_hard_limit_reached` → gpt-image 三檔待使用者加額度；flux-schnell 無 img2img；新 key 已同步 SG+vault+憑證檔三處。健康 gate 3 項（archive-lift / ao-resume-archive / claude-sync drift）本次 AO-CLOSE 已自修。
+
+
+### claude 2026-05-30 17:07
+
+- **完成（一句）**: app.aware-wave.com 分析 → 修 `/api/ops/summary` 客戶來源統一並部署 production → playwright-runner CP950 修復 → 建 CP950 parse-break 機械閘（防整類復發）→ onboarding portal 研究跨機固化。
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/summary/route.ts`（已部署 0b992b6）
+  - `scripts/playwright-runner.ps1`（ASCII 化 2661e20）
+  - `scripts/audit-cp950-traps.ps1` + `scripts/system-health-check.ps1` + `scripts/generate-customer-delivery-status.ps1`（CP950 gate be04f36）
+  - `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md` + `docs/spec/raw/*`（跨機固化 15e00ca+2f893c7）
+- **Git**: 0b992b6 / 2661e20 / be04f36 / 15e00ca / 2f893c7（均已 push）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: onboarding portal 14 段規格仍待寫（研究完成、開工先讀 client-onboarding-portal-CODEBASE-MAP.md §0）。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
@@ -279,9 +322,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-**[已修改]**
-- `scripts/system-guard.ps1`（正本）+ `agency-os/scripts/system-guard.ps1`（排程實跑）：寫 git-tracked `$statusFile` 前，用 `$stableStatusOf` 比對（`.TrimStart([char]0xFEFF)` 去 BOM + 丟 `^- (Time|Health|Closeout): ` 三行 + `.TrimEnd()`），實質狀態相同就**不重寫**；真的變了（score/exit/result/mode）才寫。gitignored `reports/guard/guard-<stamp>.md` 每次照寫不變。兩份此區塊**位元組相同**（anti-drift）。
-- 過程隱患自修：初版 regex 用了**字面 BOM byte**（CP950 trap，跨機編碼風險）→ 改 `.TrimStart([char]0xFEFF)` 純 ASCII。
 
 **[驗證結果]**
 1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell test-stable-status.ps1 (4 cases) | exit=0 | result=ALL PASS（時間戳/報告名 churn→不寫；score 100→99.5 / exit 0→1→寫；首跑/缺檔→寫；regex 不誤傷 `- Health score:`/`- Health gate exit code:`）
@@ -338,4 +378,7 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 
+
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
 

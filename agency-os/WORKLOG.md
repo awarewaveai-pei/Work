@@ -304,6 +304,33 @@ PS5.1 在 `$ErrorActionPreference='Stop'` 下，native command 經 `2>&1` 合併
 
 **[rollback]** 單 commit、全 git 內：`git revert <commit>`。gate 若誤擋可暫從 verify-build-gates 移除該區塊。
 
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:dfb009080d41476d22c397945a259370d91cd6b57c3bd15dbc6e1b78a78895e5 -->
+
+### claude 2026-06-05 20:55
+
+- **完成（一句）**: 塔羅牌印刷檔生成工具上線 `app.aware-wave.com/tools/tarot`（5 模型 flux-schnell ~NT$8 → gpt-image-high；client canvas 組印刷牌卡 70×120mm@300DPI 含出血 + JSZip 下載）+ 部署 SG `ccfbd176` + 金鑰 provisioning（補 REPLICATE/OPENAI 至 SG .env+compose+vault+憑證檔）+ UX 修（風格描述改選填，上傳參考圖即可）。
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot/*` + `lib/tarot/image-gen.ts` + `app/api/tools/tarot/generate/route.ts`
+  - `agency-os/WORKLOG.md` / `TASKS.md` / `memory/CONVERSATION_MEMORY.md` / `memory/daily/2026-06-05.md`（本 AO-CLOSE）
+- **Git**: `9ea345bd` / `ccfbd176`（均已 push）；SG deployed `ccfbd176`
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: （遠端／無 commit）OpenAI 帳號 `billing_hard_limit_reached` → gpt-image 三檔待使用者加額度；flux-schnell 無 img2img；新 key 已同步 SG+vault+憑證檔三處。健康 gate 3 項（archive-lift / ao-resume-archive / claude-sync drift）本次 AO-CLOSE 已自修。
+
+
+### claude 2026-05-30 17:07
+
+- **完成（一句）**: app.aware-wave.com 分析 → 修 `/api/ops/summary` 客戶來源統一並部署 production → playwright-runner CP950 修復 → 建 CP950 parse-break 機械閘（防整類復發）→ onboarding portal 研究跨機固化。
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/summary/route.ts`（已部署 0b992b6）
+  - `scripts/playwright-runner.ps1`（ASCII 化 2661e20）
+  - `scripts/audit-cp950-traps.ps1` + `scripts/system-health-check.ps1` + `scripts/generate-customer-delivery-status.ps1`（CP950 gate be04f36）
+  - `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md` + `docs/spec/raw/*`（跨機固化 15e00ca+2f893c7）
+- **Git**: 0b992b6 / 2661e20 / be04f36 / 15e00ca / 2f893c7（均已 push）
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: onboarding portal 14 段規格仍待寫（研究完成、開工先讀 client-onboarding-portal-CODEBASE-MAP.md §0）。
+
 ## 2026-06-04
 
 ### Tomorrow captured (/tomo)
@@ -7241,7 +7268,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-04 09:35:46 UTC_
+_Last synced: 2026-06-05 13:01:09 UTC_
 
 ## 2026-03-20
 
@@ -8175,3 +8202,4 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
+

@@ -129,6 +129,8 @@
 
 #### 工具層 / 基礎建設 / 治理
 
+- [ ] **【2026-06-05 開出】塔羅牌印刷檔工具 tarot 後續** — **【部分上線】** 已部署 SG `ccfbd176`，`/tools/tarot` FLUX 兩檔（schnell/dev）可用，OpenAI 三檔卡在帳號 billing。**待辦**：(a) 使用者加 OpenAI billing（`billing_hard_limit_reached`）後驗 gpt-image-1 low/medium/high 真生圖；(b) flux-schnell 無 img2img — 評估換 img2img-capable 便宜模型 或 UI 阻擋 schnell+image 組合；(c) enhancements：upscale→精確 827×1417、R2 持久化、Trigger.dev 批次（免瀏覽器開著）、server 端 quota（L6 防刷 spend）。**參考**：WORKLOG 2026-06-05 tarot entry。
+
 - [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制** —— **【未開始】** **背景**：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（SG 公網告警器）**無 repo→SG 自動部署路徑**，靠手動 scp 到 `/usr/local/bin/endpoint-alert.sh`。`sync-hetzner-slack-alert-webhooks.ps1` 只寫 env 不部署腳本本體。30 年風險：SG 重建 / `.bak` 被清 → 腳本回退舊版且無人知。**DoD**：(a) 新 `scripts/sync-hetzner-endpoint-alert-script.ps1`（仿 `sync-hetzner-endpoint-alert-heartbeat.ps1`：base64 ship + backup + `bash -n` verify + sha 比對 + 一輪 `systemctl start` 驗收）；(b) 接入既有 infra sync 流程；(c) repo SSOT sha == SG sha 的 drift 檢查可選接 system-health-check。**參考**：本日 WORKLOG `## 2026-05-30 endpoint-alert.sh debounce`（debounce 部署即走此手動路徑）。
 
 - [x] **【✅ 2026-06-03 完成】`scripts/` vs `agency-os/scripts/` 20 檔 drift — wrapper 化收尾** — 9 個雙重實作全部轉為 wrapper；system-guard dedup 最佳化 merge 進 root；check-supabase-memory-monthly 翻轉 root↔ao。commit 9b85f24c。 **背景**：29 個同名腳本同時存在於 `scripts/`（CLAUDE.md:63 宣告為「全域腳本」正本）與 `agency-os/scripts/`，其中 **20 個內容已 drift**（含 AO 生命週期核心：`system-guard`(本次已雙修)、`ao-close`、`ao-resume`、`system-health-check`、`verify-build-gates`、`monthly-system-review`、`generate-integrated-status-report`、`check-three-way-sync`…）。既定架構意圖是 root `scripts/` 為正本、`agency-os/scripts/*` 應為 **thin wrapper** 轉呼叫正本（已對 `sync-enterprise-cursor-rules`、`check-three-way-sync` 套用；`system-health-check.ps1:143` 有 wrapper-rule 健康檢查），但遷移做到一半。**30 年風險**：改一份、另一份靜默跑舊邏輯（排程 `AgencyOS-SystemGuard-Daily` 跑的是 agency-os 版,非正本）。**DoD**：(a) 逐檔判定哪份領先、把獨特邏輯折回 root 正本；(b) `agency-os/scripts/<x>.ps1` 改為 thin wrapper；(c) 加 health-check gate 防再 drift；(d) 每支實跑驗證。**先決**：逐支走 R0（含 AO 生命週期關鍵腳本，高風險，需逐一實測 + rollback 計畫）。**參考**：本日 WORKLOG `## 2026-06-02 system-guard LAST_SYSTEM_STATUS churn 治本`。
@@ -562,5 +564,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-04 09:35:46 UTC_
+_Last synced: 2026-06-05 12:56:27 UTC_
 

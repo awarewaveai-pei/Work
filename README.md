@@ -1,4 +1,4 @@
-# aware-wave-wp-bridge
+﻿# aware-wave-wp-bridge
 
 A self-healing REST control plane that lets an AI agent operate an entire WordPress /
 Kadence / WooCommerce site **safely, completely, and provably** — and prove every write
@@ -52,3 +52,12 @@ includes/
 tests/                       PHPUnit (unit + wp-env integration)
 openapi/                     OpenAPI 3.1 contract (source of truth for the typed client)
 ```
+
+## Related Documents (Auto-Synced)
+- `docs/operations/cursor-enterprise-rules-index.md`
+- `docs/overview/EXECUTION_DASHBOARD.md`
+- `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
+- `README.md`
+
+_Last synced: 2026-06-05 12:56:27 UTC_
+
