@@ -352,7 +352,12 @@ if ($FullMainlineParity) {
         # Without this, git-align rejects a working tree that is materially clean. Cheap, idempotent, no side effects.
         Push-Location $WorkRoot
         try {
-            & git update-index --really-refresh 2>&1 | Out-Null
+            # EAP guard: update-index can emit stderr; under EAP=Stop + 2>&1 that throws
+            # NativeCommandError — and this is try/FINALLY (no catch), so it would propagate
+            # and abort AO-RESUME before git-align even runs.
+            $savedEAPRefresh = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+            try { & git update-index --really-refresh 2>&1 | Out-Null }
+            finally { $ErrorActionPreference = $savedEAPRefresh }
         } finally { Pop-Location }
 
         Write-Host "== AO-RESUME: FullMainlineParity (git align via git-align-main-aoresume-feature.ps1 -SkipAoResume) ==" -ForegroundColor Cyan

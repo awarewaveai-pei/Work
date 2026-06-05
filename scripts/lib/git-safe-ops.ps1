@@ -324,12 +324,11 @@ if ($SelfTest) {
     # Proves the EAP wrap returns Output/Text/ExitCode without throwing on git stderr.
     $gitRepo = Join-Path $env:TEMP "gso-capture-$(Get-Date -Format 'HHmmssfff')"
     New-Item -ItemType Directory -Path $gitRepo -Force | Out-Null
-    & git init -b main $gitRepo 2>&1 | Out-Null
+    # Dogfood the helper for repo setup (also keeps lint-git-eap-safety.ps1 clean).
+    Invoke-SafeGitCapture -GitArgs @('init', '-b', 'main', $gitRepo) | Out-Null
     Set-Content -Path (Join-Path $gitRepo 'f.txt') -Value 'x' -Encoding UTF8
-    Push-Location $gitRepo
-    & git add -A 2>&1 | Out-Null
-    & git -c user.email=t@t -c user.name=t commit -m init 2>&1 | Out-Null
-    Pop-Location
+    Invoke-SafeGitCapture -GitArgs @('add', '-A') -WorkRoot $gitRepo | Out-Null
+    Invoke-SafeGitCapture -GitArgs @('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'init') -WorkRoot $gitRepo | Out-Null
     $cap = Invoke-SafeGitCapture -GitArgs @('rev-parse', 'HEAD') -WorkRoot $gitRepo
     Assert-Eq "T5: capture ExitCode 0"      $cap.ExitCode 0
     Assert-Eq "T5: capture Output is array" ($cap.Output -is [array]) $true

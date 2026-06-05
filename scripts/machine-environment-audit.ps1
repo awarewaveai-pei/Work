@@ -39,6 +39,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Shared EAP-protected git capture (SSOT: scripts/lib/git-safe-ops.ps1). Prevents the
+# PS5.1 NativeCommandError footgun: git stderr ("From <url>", "warning: LF→CRLF") under
+# EAP=Stop + 2>&1 throws before $LASTEXITCODE is read. Provides Invoke-SafeGitCapture.
+. (Join-Path $PSScriptRoot 'lib\git-safe-ops.ps1')
+
 function Write-Audit {
     param(
         [ValidateSet("OK", "WARN", "FAIL")]
@@ -83,16 +88,13 @@ if ($criticalFail) {
 }
 Write-Audit -Level OK -Message "Monorepo layout (agency-os, lobster-factory, scripts) present."
 
-# --- Git ---
-try {
-    $null = & git rev-parse --is-inside-work-tree 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "not a git repo" }
-} catch {
+# --- Git --- (all git capture sites routed through the EAP-protected lib helper)
+if ((Invoke-SafeGitCapture -GitArgs @('rev-parse', '--is-inside-work-tree') -WorkRoot $WorkRoot).ExitCode -ne 0) {
     Write-Audit -Level FAIL -Message "Git: not a repository at $WorkRoot"
     exit 1
 }
 
-$statusShort = (& git status --porcelain 2>&1)
+$statusShort = (Invoke-SafeGitCapture -GitArgs @('status', '--porcelain') -WorkRoot $WorkRoot).Text
 if ($statusShort) {
     Write-Audit -Level WARN -Message "Working tree is dirty (commit/stash before assuming reproducible env)."
     $warnCount++
@@ -102,8 +104,8 @@ if ($statusShort) {
 
 if ($FetchOrigin) {
     Write-Host "Running: git fetch origin ..." -ForegroundColor DarkGray
-    & git fetch origin 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
+    $fetchRes = Invoke-SafeGitCapture -GitArgs @('fetch', 'origin') -WorkRoot $WorkRoot
+    if ($fetchRes.ExitCode -ne 0) {
         Write-Audit -Level WARN -Message "git fetch origin failed (offline or auth?). Skew check may be stale."
         $warnCount++
     }
@@ -111,7 +113,7 @@ if ($FetchOrigin) {
 
 $ahead = -1
 $behind = -1
-$counts = (& git rev-list --left-right --count HEAD...origin/main 2>&1) -join ""
+$counts = ((Invoke-SafeGitCapture -GitArgs @('rev-list', '--left-right', '--count', 'HEAD...origin/main') -WorkRoot $WorkRoot).Output) -join ""
 if ($counts -match '^\s*(\d+)\s+(\d+)\s*$') {
     $ahead = [int]$Matches[1]
     $behind = [int]$Matches[2]
@@ -128,7 +130,7 @@ if ($counts -match '^\s*(\d+)\s+(\d+)\s*$') {
     $warnCount++
 }
 
-$branch = (& git branch --show-current 2>&1).Trim()
+$branch = (Invoke-SafeGitCapture -GitArgs @('branch', '--show-current') -WorkRoot $WorkRoot).Text.Trim()
 if ($branch -eq "main") {
     Write-Audit -Level OK -Message "Git branch: main"
 } elseif ($behind -eq 0) {

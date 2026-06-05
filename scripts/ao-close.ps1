@@ -453,7 +453,9 @@ try {
         }
     }
 
-    $patch = (& git diff --cached -U0 2>&1 | Out-String)
+    # Routed through the EAP-protected lib helper: git diff can emit stderr (e.g. CRLF
+    # warnings) which under EAP=Stop + 2>&1 throws NativeCommandError before $patch is set.
+    $patch = (Invoke-SafeGitCapture -GitArgs @('diff', '--cached', '-U0') -WorkRoot $WorkRoot).Text
     if ($patch -match '(?m)^\+<<<<<<< ') {
         Write-Error "ao-close: staged diff contains merge conflict markers (+<<<<<<<). Resolve conflicts before commit."
         exit 1

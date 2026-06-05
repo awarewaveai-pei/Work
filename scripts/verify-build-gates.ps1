@@ -83,6 +83,20 @@ if (Test-Path -LiteralPath $secretScan) {
     }
 }
 
+# Git EAP-safety gate — the regression guarantee for the recurring AO-RESUME crash class:
+# a git call under $ErrorActionPreference='Stop' that captures stderr (2>&1) without an
+# EAP='Continue'/lib guard throws NativeCommandError on git's normal "From <url>" stderr.
+# Fixed 5x as one-off heads (git-align 2026-06-05 was the latest); this gate stops #6.
+$gitEapLint = Join-Path $WorkRoot "scripts\lint-git-eap-safety.ps1"
+if (Test-Path -LiteralPath $gitEapLint) {
+    Write-Host "== Git EAP safety: no unguarded git stderr capture (PS5.1 NativeCommandError) ==" -ForegroundColor Cyan
+    & powershell -ExecutionPolicy Bypass -NoProfile -File $gitEapLint -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "verify-build-gates: lint-git-eap-safety FAIL — a git call under EAP=Stop captures stderr without an EAP=Continue/lib guard (the recurring AO-RESUME crash class). Route via scripts/lib/git-safe-ops.ps1 or wrap with scoped `$ErrorActionPreference='Continue'."
+        exit $LASTEXITCODE
+    }
+}
+
 Write-Host "== Observability baseline: Sentry contract ==" -ForegroundColor Cyan
 $sentryPolicy = Join-Path $agencyRoot "docs\operations\SENTRY_ALERT_POLICY.md"
 if (-not (Test-Path -LiteralPath $sentryPolicy)) {

@@ -35,6 +35,33 @@ PS5.1 在 `$ErrorActionPreference='Stop'` 下，native command 經 `2>&1` 合併
 
 **[rollback]** 全在 git 內：`git revert <commit>` 或 `git checkout HEAD~1 -- scripts/lib/git-safe-ops.ps1 scripts/git-align-main-aoresume-feature.ps1`。
 
+### AO-RESUME bug class 根治 — Phase 2 + 3：完成 migration + regression gate（systemic kill）
+
+**目標**：不只修 git-align（Phase 1），而是讓「git stderr under EAP=Stop」這個 bug class **永遠回不來**。
+
+**[已修改]**
+- **migration 補完**（Phase 3）：
+  - `scripts/machine-environment-audit.ps1`：5 個 raw git 點（rev-parse/status/fetch/rev-list/branch）全走 `Invoke-SafeGitCapture`。
+  - `scripts/ao-resume.ps1:355`：`git update-index --really-refresh 2>&1` 在 **try/FINALLY（無 catch）** 內 → 例外會直接傳播 abort AO-RESUME；就地加 EAP guard。
+  - `scripts/ao-close.ps1:456`：`git diff --cached 2>&1` 改走 `Invoke-SafeGitCapture`。
+  - 盤點確認**不用改**：`ao-resume.ps1` 其餘 11 點已是 P3 EAP-wrap；`system-health-check.ps1` 2 個 `*>&1` 已 EAP-wrap；`ao-close.ps1` fetch/push 已走 lib。
+- **regression gate**（Phase 2）：
+  - 新 `scripts/lint-git-eap-safety.ps1`：偵測 `& git…2>&1` 在 EAP=Stop 下無 guard（lib 路由 / in-effect EAP=Continue 才算安全；跳註解/字串常數賦值；排除自身）。
+  - 接入 `scripts/verify-build-gates.ps1`（secret-scan gate 後）→ **每次 AO-CLOSE 強制檢查**，非零即 fail。
+  - `lib/git-safe-ops.ps1`：self-test 加 T5 並 dogfood 自己的 helper 建測試 repo。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`lint-fixed-test.ps1`（critic 案例）+ repo lint + machine-env-audit | exit=0 | ms=~12000 → A:`& git log --format="%H" 2>&1` 無 guard **FLAGGED**(exit 1)✓；B:字串常數賦值 **跳過**✓；C:單行檔 **不崩**(StrictMode)✓；D:EAP-wrap **過**✓；repo lint **0 violations**✓；`machine-environment-audit.ps1` 真跑 **exit 0**✓；lib self-test **12/12**✓。
+- REVIEW_DONE: critic=Deep | verdict=pass(after-fix) | findings=1c/1m/3n → **1 Critical**（string-literal skip `=\s*['"]` 會誤跳 `--format="%H"` 真實點 = gate 失效洞）**已修**（收窄成 `^\$\w+\s*=\s*['"]`）；**1 Major**（單行檔 `$lines.Count` StrictMode 崩潰假擋 gate）**已修**（`@(Get-Content)`）；3 Minor（try/catch credit 移除改更嚴 / Window doc 10→30 / block-comment 限制）已處理。critic 全部 re-verify 通過。
+- BUGHUNT_DONE: scope=scripts agency-os | grep=`lint-git-eap-safety.ps1`（掃全 116 個 .ps1）| hits=0（移除 try/catch credit 後曾冒 2 個真實點 ao-resume:355 + ao-close:456，已 migrate → 最終 0）。
+- WORKLOG：本 entry。
+
+**[剩餘風險 / 後續]**
+- gate 目前 **git-scope**；廣義 native-command class（ssh/docker/node/powershell 等 `2>&1`/`*>&1` under EAP=Stop，lint 首版抓出 ~40 個，多數 try/catch 或 `Invoke-WithUtf8Console` 已處理）列為**獨立 follow-up audit**（建 AUDIT_REGISTRY 條目）。
+- 未開始 task Z5（`system-health-check.ps1` 消費 `git-fetch-last.json` fetch-recency gate）仍待辦。
+
+**[rollback]** 單 commit、全 git 內：`git revert <commit>`。gate 若誤擋可暫從 verify-build-gates 移除該區塊。
+
 ## 2026-06-04
 
 ### Tomorrow captured (/tomo)
