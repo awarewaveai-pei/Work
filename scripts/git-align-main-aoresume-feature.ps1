@@ -54,6 +54,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Shared safe git wrappers (EAP-protected capture). SSOT: scripts/lib/git-safe-ops.ps1.
+# Root cause this prevents: PS5.1 + EAP=Stop turns git's normal stderr ("From <url>",
+# "LF will be replaced by CRLF") into a terminating NativeCommandError BEFORE
+# $LASTEXITCODE is checked — the recurring AO-RESUME crash (2026-06-05 fired at the
+# git fetch line below). Provides Invoke-SafeGitCapture for query commands.
+. (Join-Path $PSScriptRoot 'lib\git-safe-ops.ps1')
+
 # NOTE (Windows PowerShell 5.1):
 # Passing a [bool] parameter through `powershell.exe -File` using `-Name:$true/$false` is unreliable in some hosts.
 # Use switches only, and compute the effective behavior in-script.
@@ -137,8 +144,21 @@ function Invoke-GitFetchWithRetry {
         $attempts++
         Push-Location -LiteralPath $WorkRoot
         try {
-            $stderr = & git fetch origin --prune 2>&1
-            $lastExit = $LASTEXITCODE
+            # EAP save/restore: PS5.1 + EAP=Stop raises NativeCommandError on git's
+            # normal "From <url>" stderr BEFORE $LASTEXITCODE is read — the recurring
+            # AO-RESUME crash (2026-06-05 fired exactly here). Same pattern as the
+            # canonical lib (scripts/lib/git-safe-ops.ps1 Invoke-SafeGitFetch). Kept
+            # in-place (not delegated to the lib) because this function's
+            # Write-GitFetchLedger writes git-fetch-last.json, which
+            # .claude/commands/ao-resume.md Step 0a reads for its HOOK FAILED banner.
+            $savedEAP = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try {
+                $stderr = & git fetch origin --prune 2>&1
+                $lastExit = $LASTEXITCODE
+            } finally {
+                $ErrorActionPreference = $savedEAP
+            }
             if ($lastExit -eq 0) {
                 Write-GitFetchLedger -Success $true -Attempts $attempts -StartUtc $startUtc -RootDir $WorkRoot
                 return
@@ -169,13 +189,11 @@ function Invoke-GitFetchWithRetry {
 }
 
 function Test-WorktreeClean {
-    Push-Location -LiteralPath $WorkRoot
-    try {
-        $porcelain = (& git status --porcelain 2>&1)
-        return [string]::IsNullOrWhiteSpace($porcelain)
-    } finally {
-        Pop-Location
-    }
+    # Routed through the lib's EAP-protected capture: `git status` can emit stderr
+    # ("warning: ... LF will be replaced by CRLF") which, under EAP=Stop + 2>&1,
+    # would throw NativeCommandError. Invoke-SafeGitCapture scopes EAP='Continue'.
+    $r = Invoke-SafeGitCapture -GitArgs @('status', '--porcelain') -WorkRoot $WorkRoot
+    return [string]::IsNullOrWhiteSpace($r.Text)
 }
 
 Push-Location -LiteralPath $WorkRoot
@@ -200,15 +218,11 @@ try {
     Invoke-Git @("checkout", "main")
 
     $aheadMain = 0
-    Push-Location -LiteralPath $WorkRoot
-    try {
-        $aheadStr = (& git rev-list --count "origin/main..HEAD" 2>&1 | Select-Object -Last 1)
-        if ($LASTEXITCODE -eq 0 -and $aheadStr -match '^\s*(\d+)\s*$') {
-            $aheadMain = [int]$Matches[1]
-        }
-    }
-    finally {
-        Pop-Location | Out-Null
+    # Routed through the lib's EAP-protected capture (same NativeCommandError class).
+    $aheadRes = Invoke-SafeGitCapture -GitArgs @('rev-list', '--count', 'origin/main..HEAD') -WorkRoot $WorkRoot
+    $aheadStr = ($aheadRes.Output | Select-Object -Last 1)
+    if ($aheadRes.ExitCode -eq 0 -and $aheadStr -match '^\s*(\d+)\s*$') {
+        $aheadMain = [int]$Matches[1]
     }
 
     if ($aheadMain -gt 0 -and -not $AllowResetAheadOfOrigin) {
@@ -245,42 +259,33 @@ To intentionally discard those commits (destructive): pass -AllowResetAheadOfOri
         throw "git-align: -ContinueWithFeatureBranch requires a non-empty -FeatureBranch name."
     }
 
-    # Local feature branch: create from origin/<same> if missing
-    Push-Location -LiteralPath $WorkRoot
-    try {
-        $null = & git show-ref --verify --quiet "refs/heads/$FeatureBranch" 2>&1
-        $hasLocal = ($LASTEXITCODE -eq 0)
-    } finally {
-        Pop-Location
-    }
+    # Local feature branch: create from origin/<same> if missing.
+    # Routed through the lib's EAP-protected capture (same NativeCommandError class).
+    $hasLocal = (Invoke-SafeGitCapture -GitArgs @('show-ref', '--verify', '--quiet', "refs/heads/$FeatureBranch") -WorkRoot $WorkRoot).ExitCode -eq 0
     if (-not $hasLocal) {
-        Push-Location -LiteralPath $WorkRoot
-        try {
-            $null = & git show-ref --verify --quiet "refs/remotes/origin/$FeatureBranch" 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                if ($AllowMissingFeatureBranch) {
-                    Write-Host "== Feature branch missing: '$FeatureBranch' (no local, no origin/$FeatureBranch). Staying on main. ==" -ForegroundColor Yellow
-                    Write-Host "   Fix options:" -ForegroundColor DarkYellow
-                    Write-Host "   - Omit -ContinueWithFeatureBranch (stay on main), or" -ForegroundColor DarkYellow
-                    Write-Host "   - Pass -FeatureBranch <name> to match an existing branch, or" -ForegroundColor DarkYellow
-                    Write-Host "   - Create/push the branch on origin, then re-run, or" -ForegroundColor DarkYellow
-                    Write-Host "   - Add -RequireFeatureBranch to hard-fail (legacy behavior)." -ForegroundColor DarkYellow
-                    Write-Host "== Done: main aligned; feature branch not present (skipped). ==" -ForegroundColor Green
-                    return
-                }
-                throw "No local branch '$FeatureBranch' and no origin/$FeatureBranch. Push the branch first or fix -FeatureBranch. (If the branch was merged and deleted on purpose, omit -RequireFeatureBranch / do not pass it from ao-resume.)"
+        $originRefRes = Invoke-SafeGitCapture -GitArgs @('show-ref', '--verify', '--quiet', "refs/remotes/origin/$FeatureBranch") -WorkRoot $WorkRoot
+        if ($originRefRes.ExitCode -ne 0) {
+            if ($AllowMissingFeatureBranch) {
+                Write-Host "== Feature branch missing: '$FeatureBranch' (no local, no origin/$FeatureBranch). Staying on main. ==" -ForegroundColor Yellow
+                Write-Host "   Fix options:" -ForegroundColor DarkYellow
+                Write-Host "   - Omit -ContinueWithFeatureBranch (stay on main), or" -ForegroundColor DarkYellow
+                Write-Host "   - Pass -FeatureBranch <name> to match an existing branch, or" -ForegroundColor DarkYellow
+                Write-Host "   - Create/push the branch on origin, then re-run, or" -ForegroundColor DarkYellow
+                Write-Host "   - Add -RequireFeatureBranch to hard-fail (legacy behavior)." -ForegroundColor DarkYellow
+                Write-Host "== Done: main aligned; feature branch not present (skipped). ==" -ForegroundColor Green
+                return
             }
-        } finally {
-            Pop-Location
+            throw "No local branch '$FeatureBranch' and no origin/$FeatureBranch. Push the branch first or fix -FeatureBranch. (If the branch was merged and deleted on purpose, omit -RequireFeatureBranch / do not pass it from ao-resume.)"
         }
         Invoke-Git @("checkout", "-b", $FeatureBranch, "origin/$FeatureBranch")
     } else {
         Invoke-Git @("checkout", $FeatureBranch)
     }
 
-    # Merge main into feature if feature does not already contain origin/main
-    $null = & git merge-base --is-ancestor "origin/main" "HEAD" 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    # Merge main into feature if feature does not already contain origin/main.
+    # Routed through the lib's EAP-protected capture (same NativeCommandError class).
+    $ancestorRes = Invoke-SafeGitCapture -GitArgs @('merge-base', '--is-ancestor', 'origin/main', 'HEAD') -WorkRoot $WorkRoot
+    if ($ancestorRes.ExitCode -ne 0) {
         Write-Host "== Merging origin/main into $FeatureBranch ==" -ForegroundColor Yellow
         Invoke-Git @("merge", "--no-edit", "origin/main")
     } else {
@@ -298,11 +303,11 @@ To intentionally discard those commits (destructive): pass -AllowResetAheadOfOri
     }
 
     if ($PushFeature) {
-        $null = & git rev-list --left-right --count "origin/$FeatureBranch...HEAD" 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            $line = (& git rev-list --left-right --count "origin/$FeatureBranch...HEAD" 2>&1 | Select-Object -Last 1)
+        # Routed through the lib's EAP-protected capture (single call; was invoked twice).
+        $lrRes = Invoke-SafeGitCapture -GitArgs @('rev-list', '--left-right', '--count', "origin/$FeatureBranch...HEAD") -WorkRoot $WorkRoot
+        if ($lrRes.ExitCode -eq 0) {
+            $line = ($lrRes.Output | Select-Object -Last 1)
             if ($line -match '^\s*(\d+)\s+(\d+)\s*$') {
-                $left = [int]$Matches[1]
                 $right = [int]$Matches[2]
                 if ($right -gt 0) {
                     Write-Host "== git push -u origin $FeatureBranch (local ahead by $right) ==" -ForegroundColor Cyan

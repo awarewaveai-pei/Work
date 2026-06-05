@@ -2,6 +2,39 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-05
+
+### AO-RESUME 反覆失敗根治 — Phase 1：git-align fetch stderr NativeCommandError（systemic bug class）
+
+**根本問題（非表面症狀）**：使用者回報 AO-RESUME「幾乎每次跑都爆、每次修 2-3 小時、所以這兩次只敢先 `git pull`」。今天（2026-06-05 03:01 UTC）hook 自動觸發的 `ao-resume.ps1 -FullMainlineParity` 回 `exit_code:1`，實際失敗點 = `scripts/git-align-main-aoresume-feature.ps1:140`：
+
+```
+git.exe : From https://github.com/awarewaveai-pei/Work   ← git fetch 的正常 stderr
+  + FullyQualifiedErrorId : NativeCommandError
+```
+
+PS5.1 在 `$ErrorActionPreference='Stop'` 下，native command 經 `2>&1` 合併流寫 stderr 時被當成**終止性 `NativeCommandError`**，在 `$LASTEXITCODE` 檢查前就 throw。`git fetch` 只要**有新 commit 可抓**就印 `From <url>` 到 stderr → 兩台輪流工作時開工幾乎總有對方新 commit → **幾乎每次爆**。使用者「先 pull」正好讓 fetch 無輸出而閃過。
+
+**為何這顆頭活過 4 輪修復（復發機制）**：此 bug class 已被點修過 `1da2b98d`(hook fetch stderr)、`e725f3fe`(checkpoint *>&1)、`0c975496`(hook EAP=Continue)、`a009cd57`(git-align exit1)，並於 `4dbaf035`/Phase C 建立 canonical lib `scripts/lib/git-safe-ops.ps1`（`Invoke-SafeGitFetch/Push` 已正確 EAP 保護）。但 migration **只做到 ao-close.ps1**（`reports/ao-resume/2026-05-30-1232.md:21` 自承「Phase C 只修了 AO-CLOSE，AO-RESUME hook 內沒走 Invoke-SafeGit*」）。更關鍵：05-30 audit 寫「git-align **已有 Phase Z retry**」就當它安全 —— **沒檢查那個 `Invoke-GitFetchWithRetry` 函式內部的 fetch（line 140）根本沒 EAP 包覆**。「有 retry」≠「stderr-safe」的假設，是這顆頭存活的真因。每補一處、換個 git 狀態又從別的未 migrate 點冒出來。
+
+**[已修改]**
+- `scripts/lib/git-safe-ops.ps1`：新增 `Invoke-SafeGitCapture`（任意 git QUERY 指令在 scoped `EAP=Continue` 下捕捉 stdout+stderr，回傳 `{Output;Text;ExitCode}`）；SYNOPSIS 補列；self-test 加 T5（真實 throwaway repo 驗 shape + exit-code）。
+- `scripts/git-align-main-aoresume-feature.ps1`：dot-source lib；fetch 點（`Invoke-GitFetchWithRetry` 內）**就地加 EAP save/restore**（保留 `Write-GitFetchLedger` 寫 `git-fetch-last.json`，因 `.claude/commands/ao-resume.md` Step 0a 讀它判 HOOK FAILED banner — 改用 lib 會斷此依賴）；其餘 7 個 capture 點（status/rev-list ahead/show-ref×2/merge-base/rev-list left-right）全改走 `Invoke-SafeGitCapture`。現存唯一 raw `& git…2>&1`（line 157 fetch）已在 EAP=Continue 內，刻意保留。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`phase1-e2e-repro.ps1`（throwaway「落後 origin」repo 跑真實 git-align -SkipAoResume；control=舊 raw pattern） | exit=0 | ms=~9000 → CONTROL **THREW NativeCommandError**（證 bug 為真）；FIXED **exit=0**（fetch 印 "behind by 1" 不爆 → reset --hard → final behind=0 ahead=0）；VERDICT=PASS。另：`git-safe-ops.ps1 -SelfTest` **12/12 pass**（含新 T5）；`Invoke-SafeGitCapture` 真 repo smoke status/rev-list ExitCode=0。
+- REVIEW_DONE: critic=Standard | verdict=pass（Low risk for main AO-RESUME path，no Critical） | findings=0c/1m/2n → 1 Major（feature-path 5 raw 點）**已於同 commit 一併 migrate**；2 suggestions（SYNOPSIS+self-test）**已套用**。
+- BUGHUNT_DONE: scope=scripts agency-os | grep=`& *git[^|]*2>&1` + `git-fetch-last.json` consumers + `git-align…` callers | hits=1（git-align 僅剩 line 157 刻意 EAP-wrapped 的 fetch；`ao-resume.ps1:346` 呼叫 signature 不變，未受影響；`ao-resume.ps1:134/172` 依 05-30 audit 已有 Phase Z EAP 保護）。
+- WORKLOG：本 entry。
+
+**[剩餘風險 / 後續]**（systemic kill 尚未完成 — 這只是 Phase 1）
+- **Phase 2（regression gate，30 年保證）**：尚未做。需加機械閘（沿用 `mcp/claude-userlevel/hooks/` 模式）commit 前 BLOCK 任何 lib 外的 raw `& git…2>&1`/`*>&1` under EAP=Stop。**沒這個，head #6 仍會長回來**。
+- **Phase 3**：`scripts/machine-environment-audit.ps1`(5)、`scripts/system-health-check.ps1`(2 個 `*>&1` 子進程) 未 migrate；`ao-resume.ps1` 12 點據 05-30 audit 主路徑已保護但需逐點覆核。
+- 既有未結 task Z5：`system-health-check.ps1` 消費 `git-fetch-last.json`（fetch-recency gate）仍未開始（TASKS.md:134）。
+- AUDIT_REGISTRY 未追蹤「EAP-stderr NativeCommandError」bug class（它只追蹤 CP950 編碼）→ 建議新增該 audit class 條目。
+
+**[rollback]** 全在 git 內：`git revert <commit>` 或 `git checkout HEAD~1 -- scripts/lib/git-safe-ops.ps1 scripts/git-align-main-aoresume-feature.ps1`。
+
 ## 2026-06-04
 
 ### Tomorrow captured (/tomo)

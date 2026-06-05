@@ -29,6 +29,7 @@
     Write-GitNetworkLedger   ring-buffer JSON outcome log
     Invoke-SafeGitFetch      fetch + EAP + retry + ref-lock repair + ledger
     Invoke-SafeGitPush       push + EAP + ledger
+    Invoke-SafeGitCapture    arbitrary git QUERY command, output captured under EAP=Continue
 
   Self-tests:
     powershell -ExecutionPolicy Bypass -File scripts\lib\git-safe-ops.ps1 -SelfTest
@@ -231,6 +232,53 @@ function Invoke-SafeGitPush {
 }
 
 # ---------------------------------------------------------------------------
+# Invoke-SafeGitCapture — arbitrary git QUERY command, output captured safely
+# ---------------------------------------------------------------------------
+# For commands whose stdout the caller must parse (status --porcelain, rev-list
+# --count, rev-parse, show-ref, merge-base, branch --show-current, diff). Same
+# PS5.1 footgun as fetch/push: under $ErrorActionPreference='Stop', ANY stderr
+# line from git (warnings like "LF will be replaced by CRLF", informational refs)
+# is raised as a terminating NativeCommandError BEFORE $LASTEXITCODE is checked.
+# This wrapper scopes EAP='Continue' around the call so stderr is captured, never
+# fatal; the caller inspects .ExitCode for real success/failure.
+#
+# Returns: [pscustomobject]@{ Output = <string[]>; Text = <string>; ExitCode = <int> }
+#   Output : each line of merged stdout+stderr (array; @() when empty)
+#   Text   : Output joined with "`n" (convenience for single-value parses)
+#   ExitCode: $LASTEXITCODE (0 when git did not set it)
+#
+# Use for QUERY commands only. For network ops use Invoke-SafeGitFetch /
+# Invoke-SafeGitPush (they add retry + ledger). For state-changing local commands
+# whose output you discard (rebase --abort, add, checkout), the same EAP wrap
+# applies — pass them here and ignore .Output.
+function Invoke-SafeGitCapture {
+    param(
+        [Parameter(Mandatory = $true)][string[]] $GitArgs,
+        [string] $WorkRoot
+    )
+    $pushed = $false
+    if ($WorkRoot) { Push-Location -LiteralPath $WorkRoot; $pushed = $true }
+    try {
+        $savedEAP = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $out  = & git @GitArgs 2>&1
+            $code = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        } finally {
+            $ErrorActionPreference = $savedEAP
+        }
+    } finally {
+        if ($pushed) { Pop-Location | Out-Null }
+    }
+    $arr = @($out | ForEach-Object { [string]$_ })
+    return [pscustomobject]@{
+        Output   = $arr
+        Text     = ($arr -join "`n")
+        ExitCode = $code
+    }
+}
+
+# ---------------------------------------------------------------------------
 # Self-tests
 # ---------------------------------------------------------------------------
 if ($SelfTest) {
@@ -271,6 +319,25 @@ if ($SelfTest) {
     Assert-Eq "T4: lock exists before"   (Test-Path $fakeLock) $true
     if (Test-Path -LiteralPath $fakeLock) { Remove-Item -LiteralPath $fakeLock -Force }
     Assert-Eq "T4: lock removed after"   (Test-Path $fakeLock) $false
+
+    # T5: Invoke-SafeGitCapture shape + exit-code on a real throwaway repo.
+    # Proves the EAP wrap returns Output/Text/ExitCode without throwing on git stderr.
+    $gitRepo = Join-Path $env:TEMP "gso-capture-$(Get-Date -Format 'HHmmssfff')"
+    New-Item -ItemType Directory -Path $gitRepo -Force | Out-Null
+    & git init -b main $gitRepo 2>&1 | Out-Null
+    Set-Content -Path (Join-Path $gitRepo 'f.txt') -Value 'x' -Encoding UTF8
+    Push-Location $gitRepo
+    & git add -A 2>&1 | Out-Null
+    & git -c user.email=t@t -c user.name=t commit -m init 2>&1 | Out-Null
+    Pop-Location
+    $cap = Invoke-SafeGitCapture -GitArgs @('rev-parse', 'HEAD') -WorkRoot $gitRepo
+    Assert-Eq "T5: capture ExitCode 0"      $cap.ExitCode 0
+    Assert-Eq "T5: capture Output is array" ($cap.Output -is [array]) $true
+    Assert-Eq "T5: Text is 40-char sha"     ($cap.Text.Trim().Length) 40
+    # bad ref → non-zero exit, no throw
+    $capBad = Invoke-SafeGitCapture -GitArgs @('rev-parse', 'no-such-ref-xyz') -WorkRoot $gitRepo
+    Assert-Eq "T5: bad ref ExitCode != 0"   ($capBad.ExitCode -ne 0) $true
+    Remove-Item -Recurse -Force $gitRepo -ErrorAction SilentlyContinue
 
     Remove-Item -Recurse -Force $tmpRoot -ErrorAction SilentlyContinue
 
