@@ -65,6 +65,7 @@
 - [x] **【✅ 2026-06-04 已解決，方案改變】** ~~Cloudflare WAF wp-login 規則改 ip.geoip.country~~ — geo 方案對全球跑的操作者不利（出國會自擋）。改用 **LLAR (Limit Login Attempts Reloaded)** 伺服器端防護替代，CF Custom WAF Rules 已清空不重建。證據 WORKLOG:121。handoff 174946 已可歸檔。
 - [ ] 大修 app.aware-wave.com（12個問題）— AI AGENT 先讀 APP_AWARE_WAVE_COMPLETE_REFERENCE.md → handoffs/2026-06-04-1730-ai-agent-redesign.md
 - [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售 → handoffs/2026-06-05-1948-wp-bridge-deploy-sell.md
+- [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item（Phase4Weekly 錯 repo / incidents API 藏 open / 5 webhook 零流量）→ handoffs/2026-06-05-2017-tomo-201752.md
 
 #### 雙機環境 / 日常開工
 
