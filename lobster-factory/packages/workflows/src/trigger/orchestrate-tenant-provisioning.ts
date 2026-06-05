@@ -81,36 +81,74 @@ export const orchestrateTenantProvisioning = task({
 
       const providers = [...new Set(input.providers)];
       for (const provider of providers) {
-        const step = await runProviderStep(provider, ctx);
-        if (step.ok) {
-          await postTenantIntegrationWebhook({
-            organizationId: input.organizationId,
-            workspaceId: input.workspaceId,
+        // M9: isolate each provider so one failure (e.g. webhook 502) does not
+        // short-circuit the remaining providers. Failures are recorded, not thrown.
+        let step: Awaited<ReturnType<typeof runProviderStep>>;
+        try {
+          step = await runProviderStep(provider, ctx);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          results.push({ provider, ok: false, detail: `provider_step_threw: ${message}` });
+          logger.error("provision provider step threw — recorded, continuing", {
             provider,
-            secretRef: step.secretRef,
-            externalHint: step.externalHint,
-            apiMetadata: step.apiMetadata,
-            provisioningSource: "trigger",
-            status: step.status ?? "active",
+            error: message,
           });
-          results.push({ provider, ok: true });
-          logger.info("provision row written", { provider });
-        } else {
-          await postTenantIntegrationWebhook({
-            organizationId: input.organizationId,
-            workspaceId: input.workspaceId,
+          captureWorkflowException(err, {
+            workflowId: "orchestrate-tenant-provisioning",
+            route: "providerLoop.step",
             provider,
-            apiMetadata: {
-              customer_email: input.customerEmail,
-              ...(input.googleSubject ? { google_sub: input.googleSubject } : {}),
-              automation: "orchestrate-tenant-provisioning",
-            },
-            provisioningSource: "trigger",
-            status: "failed",
-            lastError: step.error,
           });
-          results.push({ provider, ok: false, detail: step.error });
-          logger.warn("provision step failed (recorded)", { provider, error: step.error });
+          continue;
+        }
+
+        try {
+          if (step.ok) {
+            await postTenantIntegrationWebhook({
+              organizationId: input.organizationId,
+              workspaceId: input.workspaceId,
+              provider,
+              secretRef: step.secretRef,
+              externalHint: step.externalHint,
+              apiMetadata: step.apiMetadata,
+              provisioningSource: "trigger",
+              status: step.status ?? "active",
+            });
+            results.push({ provider, ok: true });
+            logger.info("provision row written", { provider });
+          } else {
+            await postTenantIntegrationWebhook({
+              organizationId: input.organizationId,
+              workspaceId: input.workspaceId,
+              provider,
+              apiMetadata: {
+                customer_email: input.customerEmail,
+                ...(input.googleSubject ? { google_sub: input.googleSubject } : {}),
+                automation: "orchestrate-tenant-provisioning",
+              },
+              provisioningSource: "trigger",
+              status: "failed",
+              lastError: step.error,
+            });
+            results.push({ provider, ok: false, detail: step.error });
+            logger.warn("provision step failed (recorded)", { provider, error: step.error });
+          }
+        } catch (err) {
+          // Webhook recording failed. If the provider step had succeeded, the external
+          // resource now exists but is unrecorded — preserve secretRef in the detail so the
+          // binding can be reconciled later (M9: "secretRef lost forever" guard).
+          const message = err instanceof Error ? err.message : String(err);
+          const unrecordedRef = step.ok && step.secretRef ? ` unrecorded_secretRef=${step.secretRef}` : "";
+          results.push({ provider, ok: false, detail: `webhook_failed: ${message}${unrecordedRef}` });
+          logger.error("provision webhook post failed — recorded, continuing", {
+            provider,
+            stepOk: step.ok,
+            error: message,
+          });
+          captureWorkflowException(err, {
+            workflowId: "orchestrate-tenant-provisioning",
+            route: "providerLoop.webhook",
+            provider,
+          });
         }
       }
 

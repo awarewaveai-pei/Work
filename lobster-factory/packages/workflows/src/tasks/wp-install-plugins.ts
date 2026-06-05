@@ -229,6 +229,12 @@ export const wpInstallPlugins = task({
               status: pluginStatus,
               version: version || null,
               error_message: errorMsg || null,
+              // M3: the `status` column tracks whether the install-RUN finished; `applied`
+              // tracks whether the plugin was ACTUALLY installed. A dry-run "completes"
+              // without applying anything — dashboards must read `applied`, not `status`,
+              // to know if the plugin is really present. (status enum has no 'dry_run' value.)
+              mode: willRunSsh ? "live" : "dry_run",
+              applied: willRunSsh && pluginStatus === "installed",
             },
             logsRef: null,
             rollbackRunId: null,

@@ -7,6 +7,13 @@ export type SupabaseRestInsertOptions = {
   maxRetries?: number;
   baseDelayMs?: number;
   traceId?: string;
+  /**
+   * Extra PostgREST filters AND-ed onto a PATCH alongside `id=eq.<rowId>`.
+   * Values are raw PostgREST operators, e.g. `{ status: "eq.pending" }`.
+   * Used for atomic compare-and-swap claims (M10): a PATCH that matches 0 rows
+   * returns an empty representation, so the caller can detect a lost race.
+   */
+  match?: Record<string, string>;
   onAttempt?: (ctx: {
     attempt: number;
     table: string;
@@ -95,7 +102,12 @@ export async function supabaseRestPatch(
   const maxRetries = Math.max(0, Number(options.maxRetries ?? 2));
   const baseDelayMs = Math.max(50, Number(options.baseDelayMs ?? 250));
   const traceId = options.traceId ?? `trace-${Date.now()}`;
-  const url = `${config.supabaseUrl}/rest/v1/${table}?id=eq.${encodeURIComponent(rowId)}`;
+  let url = `${config.supabaseUrl}/rest/v1/${table}?id=eq.${encodeURIComponent(rowId)}`;
+  if (options.match) {
+    for (const [k, v] of Object.entries(options.match)) {
+      url += `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+    }
+  }
 
   let lastError = "";
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {

@@ -76,6 +76,50 @@ function getBashExecutable(): string {
   return process.platform === "win32" ? "bash.exe" : "bash";
 }
 
+/**
+ * M7: the install script (`install-from-manifest.sh`) only needs PATH (to find
+ * node / wp / bash), HOME (wp-cli + node config/cache) and DRY_RUN. Spreading the
+ * whole `process.env` into the child leaked every worker secret (Supabase keys,
+ * provider tokens, etc.) into a shell that prints + can be captured into snapshots.
+ *
+ * Default-deny: pass only a fixed allowlist of NON-SECRET vars the toolchain needs,
+ * plus DRY_RUN. Extra non-secret vars can be opted in via
+ * `LOBSTER_MANIFEST_ENV_PASSTHROUGH` (comma-separated key names) without code change.
+ */
+const MANIFEST_ENV_ALLOWLIST = [
+  "PATH",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "TZ",
+  "TMPDIR",
+  "TEMP",
+  "TMP",
+  // Windows (bash.exe / node on win32)
+  "SystemRoot",
+  "windir",
+  "WINDIR",
+  "USERPROFILE",
+  "PATHEXT",
+  "COMSPEC",
+  "SYSTEMDRIVE",
+] as const;
+
+export function buildManifestChildEnv(dryRun: boolean): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  const extra = (process.env.LOBSTER_MANIFEST_ENV_PASSTHROUGH || "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+  for (const key of [...MANIFEST_ENV_ALLOWLIST, ...extra]) {
+    const val = process.env[key];
+    if (val !== undefined) env[key] = val;
+  }
+  env.DRY_RUN = dryRun ? "1" : "0";
+  return env;
+}
+
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -97,10 +141,7 @@ function runOnce(p: {
 }): Promise<RunOnceOutcome> {
   return new Promise((resolve, reject) => {
     const child = spawn(p.bash, [p.scriptPath, p.manifestPath, p.wpRootPath], {
-      env: {
-        ...process.env,
-        DRY_RUN: p.dryRun ? "1" : "0",
-      },
+      env: buildManifestChildEnv(p.dryRun),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });

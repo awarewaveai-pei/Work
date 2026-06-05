@@ -91,6 +91,28 @@ async function updateRunStatus(
   );
 }
 
+/**
+ * M10: atomic claim. Transition pending → running ONLY if the row is still pending.
+ * Two concurrent dispatcher invocations can fetch the same pending row (the poll
+ * filter is `status=eq.pending`); the conditional PATCH (`WHERE id=X AND status=pending`)
+ * is evaluated atomically by Postgres row-locking, so exactly one wins. The loser gets
+ * an empty representation and skips — preventing double `tasks.trigger`.
+ * Returns true if this caller claimed the run.
+ */
+async function claimPendingRun(
+  creds: ReturnType<typeof getSupabaseCreds>,
+  runId: string
+): Promise<boolean> {
+  const rep = await supabaseRestPatch(
+    creds,
+    "ops_action_runs",
+    runId,
+    { status: "running" },
+    { traceId: `dispatcher-claim-${runId}`, match: { status: "eq.pending" } }
+  );
+  return Array.isArray(rep) && rep.length > 0;
+}
+
 // ─────────────────────────────────────────────
 // Dispatch a single action run
 // ─────────────────────────────────────────────
@@ -130,8 +152,15 @@ async function dispatchRun(creds: ReturnType<typeof getSupabaseCreds>, run: Acti
     return;
   }
 
-  // Mark running before triggering so a crash doesn't leave it in 'pending'
-  await updateRunStatus(creds, run.id, "running");
+  // M10: atomic claim (pending → running) before triggering. If a concurrent
+  // dispatcher already claimed this run, skip — do not double-trigger.
+  const claimed = await claimPendingRun(creds, run.id);
+  if (!claimed) {
+    logger.info("dispatcher: run already claimed by another dispatcher, skipping", {
+      runId: run.id,
+    });
+    return;
+  }
 
   // Build trigger payload: merge input_payload + dispatcher metadata
   const triggerPayload = {
