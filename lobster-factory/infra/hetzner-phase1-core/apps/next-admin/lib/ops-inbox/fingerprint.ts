@@ -27,8 +27,8 @@ export function computeFingerprint(args: {
 // can pre-compute a fingerprint and seed a fake incident — a later real alert then
 // dedups into the seeded row and is silently downgraded to "duplicate".
 //
-// computeFingerprintV2 salts the existing fingerprint with a server-only secret:
-//   v2 = sha256(salt + ":" + v1)
+// computeFingerprintV2 keys the existing fingerprint with a server-only secret salt:
+//   v2 = HMAC-SHA256(key = salt, msg = v1)
 // The attacker still knows v1 (it is derived from the payload) but cannot predict v2
 // without the salt, so cross-fingerprint collision-seeding becomes infeasible.
 //

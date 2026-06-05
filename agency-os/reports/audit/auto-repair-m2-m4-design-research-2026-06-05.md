@@ -101,6 +101,12 @@ verifyIngestSource(req, source):
 2. backfill `fingerprint_v2`（讀 stored `raw` 重算 salted）— **對 live `fingerprint` 零影響**，dedup 照常。
 3. deploy code：**雙寫**（fingerprint + fingerprint_v2）+ **讀 v2 fallback v1**。
 4. 全 open incident 都有 v2 後 → 最終 migration 把 unique 換到 `(fingerprint_v2, environment)`、drop/rename 舊欄。
+
+> ⚠️ **Phase 3 不變量（db-expert + critic 複審 2026-06-05，實作已採納）**
+> - **HMAC 不是 sha256-concat**：1b 程式採 `HMAC-SHA256(key=salt, msg=v1)`（critic Major：secret-prefix MAC 是反模式）。primitive 已定，未來 promote v2 為 dedup key 不需因此 re-key。
+> - **salt 必須在 promote 之前已設**：salt 未設時 v2==v1，M4 防護為零；promote 後才設/輪換 salt → 既有 row 的 v2 全變 → 同因新告警 dedup 不到舊 row → **大量重複 incident**。salt 上線即視為穩定，輪換需配套 re-backfill。
+> - **`SET NOT NULL` 前先 explicit backfill**：0036 後到 Phase 3 間從未再現的 row 其 `fingerprint_v2=NULL`。
+> - **0036 已加註解版 down-migration + `CREATE OR REPLACE`（可重跑）+ apply 後必跑 `NOTIFY pgrst,'reload schema'`**（12→13 arg 簽名變更使 PostgREST cache 失效，否則 PGRST202）。
 5. rollback = 直接退回讀 `fingerprint`，零資料動作。
 
 ### 4.3 若堅持簡單 in-place（僅當能保證停 ingest）
