@@ -137,14 +137,21 @@
 - **風險**：新租戶容器名不同 → backup 腳本失效（silent）。改腳本 = 動到 production 既有資產（risk）。
 - **建議**：新租戶 cloud-init 渲染的 docker-compose **沿用同套容器命名 + `--host` 明確傳入**，腳本原封不動復用（不改 production 腳本 = 最小爆炸半徑）。若未來需多站/機，再參數化容器名（env-driven），列為 backlog 不在本期。
 
-### 架構（依決策 1）
-升級 `packages/workflows/src/hosting/`（演化現有，不建 packages/hosting）：
-- `HostingAdapter` 廣義介面（createServer/createStaging/createSnapshot/restoreSnapshot/deleteEnvironment/getHealth/listResources/estimateCost）— V2 §29；現有 `StagingProvisionAdapter` 成為 createStaging 內部實作。
-- `providers/hetzner/HetznerHostingAdapter.ts`（主檔）+ `policy.ts`（prod-delete/rebuild block）+ `labels.ts`（cost-tracking schema）+ `cost.ts`（estimateCost）+ `types.ts`
-- `providers/cloudflare/dns.ts`（**新**：A-record 建/更新/刪，idempotent；複用 `CLOUDFLARE_API_TOKEN` + Zone ID `f21b1919632fee2221647908a94fdcac`）— repo 現無此 helper，friction #1 本體。
-- `resolveServerProvisioning.ts`（機層進入點，鏡像 resolveStagingProvisioning env-gate）
-- `ssrf.ts`（抽 create-wp-site.ts:55-78 共用，站層機層同一套）
-- cloud-init `infra/hetzner-provision/cloud-init/day1-hardening.yaml.tmpl` + `post-boot-bootstrap.sh`
+### 架構（依決策 0 + 1）
+**程序核心 = provisioning CLI 編排器**，復用既有 building-block 函式（非重寫），與觸發解耦：
+- **`packages/workflows/src/provision/provisionClient.ts`（新，SSOT 編排器）**：依序呼叫 building blocks（resolveServerProvisioning → cloud-init/post-boot → cloudflare DNS → resolveStagingProvisioning → runAllIntegrations → SMTP → QA），內建冪等（label 查重）+ 階段化 rollback（teardown: DELETE server+primary_ip）+ billable 步驟 approval-pause。**這支是 30 年 SSOT。**
+- **CLI entry `packages/workflows/src/provision/cli.ts`（新）**：薄 wrapper 解析參數 → 呼叫 `provisionClient()`。供 Slash Command（Phase 1）與 next-admin API route（Phase 2）共用。
+- building blocks（升級 `packages/workflows/src/hosting/`，演化現有不建 packages/hosting）：
+  - `HostingAdapter` 廣義介面（createServer/createStaging/createSnapshot/restoreSnapshot/deleteEnvironment/getHealth/listResources/estimateCost）— V2 §29；現有 `StagingProvisionAdapter` 成為 createStaging 內部實作。
+  - `providers/hetzner/HetznerHostingAdapter.ts`（主檔）+ `policy.ts`（prod-delete/rebuild block）+ `labels.ts` + `cost.ts` + `types.ts`
+  - `providers/cloudflare/dns.ts`（**新**：A-record 建/更新/刪 idempotent；複用 `CLOUDFLARE_API_TOKEN` + Zone ID `f21b1919632fee2221647908a94fdcac`）— friction #1 本體。
+  - `resolveServerProvisioning.ts`（機層進入點，鏡像 resolveStagingProvisioning env-gate）
+  - `ssrf.ts`（抽 create-wp-site.ts:55-78 共用）
+  - cloud-init `infra/hetzner-provision/cloud-init/day1-hardening.yaml.tmpl` + `post-boot-bootstrap.sh`
+- **觸發層（依決策 0，可換、與核心解耦）**：
+  - Phase 1：Slash Command `.claude/commands/provision-client.md`（呼叫 CLI）。不碰 next-admin。
+  - Phase 2：next-admin 按鈕 → `app/api/provision/route.ts`（**新**，呼叫同一 CLI/核心 + 既有 approval gate）。
+- **既有 `trigger/create-wp-site.ts` Trigger task**：維持 dormant/gated 不動；D3.0 的 `create-wp-site:184-185` 三元改為**選做**（CLI 為主路徑時非必要）。
 
 ### V2 補充併入（原計畫缺的 8 個自動化設計）
 1. **區域**：客戶交付站固定開 `sin`（Singapore）；控制平面留 `hel1`（Finland）。**public runtime 禁同步依賴 Finland**（checkout/login/cart）。input schema region enum 預設 sin。
@@ -220,27 +227,29 @@ V2 §4 tiers 轉成 input schema + provisioning 參數：
 
 > 補上這 3 個，staging→交付才真正一鍵順暢；正式上線維持 1 個安全 approve。creds 現況：CF ✅ / Resend ✅ / **Hetzner ❌ 空（見前置條件）**。
 
-## 前置條件（Prerequisites，Phase 3 前必備）
+## 前置條件（Prerequisites，真機 Phase 4 前必備；Phase 0-3 dry-run 不需）
 
-1. 🔴 **建 2 個 Hetzner project + token**（`HETZNER_API_TOKEN` 現空 `mcp/user-env.ps1:14`）— 一次性手動：Hetzner Console 建 **staging project** + **production project**，各建一個 Read+Write token（Hetzner 無細粒度權限，靠 project 隔離）。寫 vault：`secrets-vault.ps1 -Action set -Name HETZNER_STAGING_TOKEN` / `-Name HETZNER_PROD_TOKEN`。**無 token，Phase 3 真機無法進行**（Phase 0-2 dry-run 不受影響）。
+1. 🔴 **建 2 個 Hetzner project + token**（`HETZNER_API_TOKEN` 現空 `mcp/user-env.ps1:14`）— 一次性手動：Hetzner Console 建 **staging project** + **production project**，各建一個 Read+Write token（Hetzner 無細粒度權限，靠 project 隔離）。寫 vault：`secrets-vault.ps1 -Action set -Name HETZNER_STAGING_TOKEN` / `-Name HETZNER_PROD_TOKEN`。**無 token，Phase 4 真機無法進行**（Phase 0-3 dry-run 不受影響）。
 2. ✅ Cloudflare token / Zone ID — 已備。
 3. ✅ Resend SMTP key — 已備。
 4. Hetzner 帳號健康（V2 §3）：確認非新帳號詐騙風險期、付款方式有效、deletion protection 流程。
 
-## 執行順序（30 年紀律）
+## 執行順序（30 年紀律，依決策 0 雙觸發）
 
 - **Phase 0**：baseline checkpoint + 紅線給另一 AI + D1 SOP + D5 V2 入庫（純文件，Low risk，立即交付）
-- **Phase 1**：D2 修致命 gaps（M9→M7→M10→M3，R0 四動作 + critic，M10 經 db-expert）
-- **Phase 2**：D3.0 型別統一（先）→ D3 HostingAdapter 升級 + providers/hetzner + providers/cloudflare/dns + cloud-init + mock + dry-run + D4 OpenTofu 靜態（Layer 1 純本機驗證，不花錢）；M1/M2 同 PR 消除
-- **Phase 3**：真機驗收（cx22 開完即銷毀，High risk，需明示 go-ahead）
-- **Phase 4**：D6 tier 映射 + launch gate + field-test backlog
+- **Phase 1**：D2 修致命 gaps（M9→M7→M10→M3，R0 四動作 + critic，M10 經 db-expert）— 穩既有 building blocks
+- **Phase 2**：D3.0 型別統一 → building blocks（HostingAdapter + providers/hetzner + providers/cloudflare/dns + cloud-init）+ **`provisionClient.ts` 編排器 + `cli.ts`** + mock + dry-run + D4 OpenTofu 靜態（Layer 1 純本機驗證，不花錢）
+- **Phase 3（觸發 A，最省力）**：`/provision-client` Slash Command 接 CLI → **AI/指令觸發**即可開站。先用 dry-run 跑通整鏈。
+- **Phase 4**：真機驗收（**cpx 最小機**開完即銷毀，High risk，需明示 go-ahead）+ D6 tier 映射 + launch gate
+- **Phase 5（觸發 B，要按鈕時才做）**：next-admin 加按鈕 + `app/api/provision/route.ts` 呼叫**同一 CLI/核心** → 真自助按鈕。零重寫。**此階段才需協調 UI AI**。
+- **Trigger.dev**：本計畫不納入；未來客戶自助大量再評估包裝。
 
 ---
 
 ## 驗證計畫
 
 - **Layer 1 純本機/CI**：adapter/cloud-init/SSRF/token-選擇/label/idempotency/rollback/cost-estimate 單元測（mock fetch）+ OpenTofu `tofu plan` 驗
-- **Layer 2 真機（cx22 即銷毀）**：nmap 只見 22/80/443；臨時容器 0.0.0.0:9999 外部 filtered（挖礦迴歸）；無 key SSH 拒；curl 觸發 429/503；DNS-01 cert；SMTP 587 寄信測；auto-reboot 三鍵；cron 存在；day1-hardening.json 全綠
+- **Layer 2 真機（cpx 最小機即銷毀）**：先 `GET /v1/server_types?location=sin` 確認可用機型；nmap 只見 22/80/443；臨時容器 0.0.0.0:9999 外部 filtered（挖礦迴歸）；無 key SSH 拒；curl 觸發 429/503；DNS-01 cert；SMTP 587 寄信測；auto-reboot 三鍵；cron 存在；day1-hardening.json 全綠
 - **Layer 3 冪等/rollback**：同 siteId 回 reused；注入失敗驗無孤兒計費
 - 每階段 R0 四動作寫 WORKLOG（REALTEST_EVIDENCE/REVIEW_DONE/BUGHUNT_DONE）
 

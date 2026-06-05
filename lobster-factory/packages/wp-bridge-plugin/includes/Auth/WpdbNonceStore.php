@@ -32,6 +32,13 @@ namespace AwareWave\WpBridge\Auth;
 
 final class WpdbNonceStore implements NonceStore {
 
+	/**
+	 * Byte capacity of the `nonce` column. The store enforces this itself (remember()) and the DDL
+	 * (tableSchema()) derives the VARBINARY size from it, so the app bound and the column bound can
+	 * never drift apart. Must be >= NonceCache::MAX_NONCE_LENGTH.
+	 */
+	public const NONCE_COLUMN_BYTES = 256;
+
 	/** @var \wpdb The WordPress database access object. */
 	private $wpdb;
 
@@ -51,11 +58,25 @@ final class WpdbNonceStore implements NonceStore {
 	 * @inheritDoc
 	 */
 	public function remember( string $nonce, int $expiresAt ): bool {
+		// Enforce the column's byte bound in the store itself rather than trusting the caller. A nonce
+		// longer than VARBINARY(256) would be SILENTLY TRUNCATED by INSERT IGNORE (which downgrades
+		// truncation to a warning), and the stored prefix could collide with another nonce. Reject
+		// here -> fail closed. strlen() is byte length, matching the column's byte capacity.
+		if ( strlen( $nonce ) > self::NONCE_COLUMN_BYTES ) {
+			throw new NonceStoreUnavailable( 'nonce exceeds storage column bound (' . self::NONCE_COLUMN_BYTES . ' bytes)' );
+		}
+
 		$sql = $this->wpdb->prepare(
 			"INSERT IGNORE INTO `{$this->table}` ( nonce, expires_at ) VALUES ( %s, %d )",
 			$nonce,
 			$expiresAt
 		);
+
+		// prepare() returns '' / null on a malformed format string. Treat that as an outage and fail
+		// closed BY DESIGN, rather than executing an empty query and inferring freshness from it.
+		if ( ! is_string( $sql ) || $sql === '' ) {
+			throw new NonceStoreUnavailable( 'nonce store prepare() failed' );
+		}
 
 		$result = $this->wpdb->query( $sql );
 
@@ -64,10 +85,39 @@ final class WpdbNonceStore implements NonceStore {
 			throw new NonceStoreUnavailable( 'nonce store INSERT failed: ' . (string) $this->wpdb->last_error );
 		}
 
-		// INSERT IGNORE: 1 = newly inserted (fresh), 0 = duplicate key (replayed).
-		// The nonce length is bounded by NonceCache and the column is sized to match, so IGNORE
-		// cannot here be masking a truncation; 0 means duplicate, not a swallowed error.
-		return (int) $result === 1;
+		// INSERT IGNORE: 1 = newly inserted (fresh).
+		if ( (int) $result === 1 ) {
+			return true;
+		}
+
+		// 0 affected rows. Normally a duplicate key (a genuine replay). But INSERT IGNORE also
+		// downgrades real errors to warnings; if one surfaced as an error, last_error is non-empty,
+		// so we cannot prove this was a CLEAN duplicate -> fail closed instead of reporting "replayed".
+		if ( (string) $this->wpdb->last_error !== '' ) {
+			throw new NonceStoreUnavailable( 'nonce store INSERT ambiguous: ' . (string) $this->wpdb->last_error );
+		}
+
+		return false; // clean duplicate -> replayed
+	}
+
+	/**
+	 * Worst-failure-mode guard: if the table exists WITHOUT a PRIMARY KEY on `nonce` (e.g. dbDelta
+	 * silently dropped it, or a legacy table predates this schema), INSERT IGNORE would never detect
+	 * a duplicate and replay protection would be silently FAIL-OPEN. The activation brick and /health
+	 * MUST call this and refuse to enable writes when it returns false. (DESIGN §E top-risk #3 + db
+	 * review C1.)
+	 *
+	 * @return bool true iff the deployed table has a PRIMARY KEY on the `nonce` column.
+	 */
+	public function hasPrimaryKeyOnNonce(): bool {
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SHOW INDEX FROM `{$this->table}` WHERE Key_name = %s AND Column_name = %s",
+				'PRIMARY',
+				'nonce'
+			)
+		);
+		return is_array( $rows ) && count( $rows ) === 1;
 	}
 
 	/**
@@ -93,9 +143,12 @@ final class WpdbNonceStore implements NonceStore {
 	 */
 	public static function tableSchema( string $prefix, string $collate ): string {
 		$table = $prefix . 'awbridge_nonces';
+		// expires_at is BIGINT UNSIGNED (not INT) so it never becomes the limiting factor — INT UNSIGNED
+		// would overflow in 2106; this is a 30-year component. VARBINARY size is bound to the column
+		// constant so the app-level length guard and the schema can't drift.
 		return "CREATE TABLE `{$table}` (\n"
-			. "  nonce VARBINARY(256) NOT NULL,\n"
-			. "  expires_at INT UNSIGNED NOT NULL,\n"
+			. '  nonce VARBINARY(' . self::NONCE_COLUMN_BYTES . ") NOT NULL,\n"
+			. "  expires_at BIGINT UNSIGNED NOT NULL,\n"
 			. "  PRIMARY KEY  (nonce),\n"
 			. "  KEY expires_at (expires_at)\n"
 			. ") {$collate};";

@@ -4,6 +4,26 @@
 
 ## 2026-06-05
 
+### wp-bridge — 計畫深化 + Phase A 砌第二磚 NonceCache（防重放）
+
+**背景**：操作者要深化 aware-wave-wp-bridge 計畫「確保最完美」。先 grill-with-docs 對 repo 實況驗證 → 發現計畫已部分落地（DESIGN.md 為 git-tracked SSOT，Ed25519 SignatureVerifier 7/7 已成）。以 soulfulexpression.org 真實外掛 stack 校準。授權架構師決策續砌。
+
+**[已修改]**
+- **計畫深化**：`DESIGN.md` 改名 `WP_BRIDGE_CONTROL_PLANE_DESIGN.md`；補 7 護欄（深層頁 verify / PermalinkValidator / Fluent=側效 / Astra·CartFlows L1-only / license-gated detect / resource_locks 並行 / restore-drill 硬 gate）+ 安全地基決策（C→A 混合 + 可逆性分類門控表）。`ADR 007`（Ed25519 + 門控）。staging 方案校準 Hostinger Premium（多站空位開獨立 staging 格，不升 Business）。
+- **NonceCache 磚**（`packages/wp-bridge-plugin/includes/Auth/`）：`NonceStore`(介面)、`NonceStoreUnavailable`(例外)、`ArrayNonceStore`(測試)、`NonceCache`(協調,fail-closed)、`WpdbNonceStore`(production,atomic INSERT IGNORE + VARBINARY(256) PK)。+ `composer.json`/`phpunit.xml`/`tests/`（§G 首次 committed harness，含補交 SignatureVerifier 7/7 + NonceCacheTest + WpdbNonceStoreTest）。
+- **review 驅動硬化**：store 內自我強制 256-byte 界（防 INSERT IGNORE 靜默截斷）、prepare() 失敗顯式 fail-closed、0-rows last_error 檢查（區分乾淨 duplicate vs 吞錯）、`hasPrimaryKeyOnNonce()` 自檢（防 dbDelta 吃掉 PK → fail-open）、`expires_at` BIGINT、byte-vs-char docblock。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -d extension=sodium d:\tmp\realtest-nonce.php` | exit=0 | ms=~600 — 28/28 PASS（NonceCache 13 + WpdbNonceStore 8 + SignatureVerifier 7/7 重現）；`php -l` 9/9 OK。本機 sodium 經 `-d extension=sodium` 載（PHP 8.4.19）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3M/4n（critic：INSERT IGNORE 0-rows 歧義 / prepare fail-closed / expires_at 寬度 — **全修**）+ db-expert 0c-in-file/1C-activation-brick(C1 PK 自檢→已加 hasPrimaryKeyOnNonce)/2M（全處理）。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=NonceCache\|NonceStore\|awbridge_nonces\|WpdbNonceStore | hits=0
+  - 新符號無 downstream 消費者（Router 磚未砌，預期）；命中全為新檔本身 + DESIGN/handoff/CODEBASE-MAP 的 brick-order 引用（設計文件，非 stale code）。無平行 nonce 機制。
+- WORKLOG：本 entry。
+
+**[剩餘風險 / 待續]**
+- activation/lifecycle 磚（未砌）必接兩 gate：① 建表後呼 `hasPrimaryKeyOnNonce()` 否則 replay 防護 fail-open；② Hostinger 共享機確認真 cron 跑 nonce prune（correctness 不受影響，僅表成長）。
+- 下一磚：KeyStore（公鑰記錄 + scope + rotation）。
+
 ### app.aware-wave.com 大修 — B1-P2（樣式）+ B2（Repair Center 正確性 P5/P7/P9/P12）
 
 **背景**：今日開工目標 = 大修 app.aware-wave.com（Lobster Factory Admin Console）12 問題。SSOT = `docs/operations/APP_AWARE_WAVE_COMPLETE_REFERENCE.md §14` + handoff `2026-06-04-1730-ai-agent-redesign`。VBC 驗證現況 code 與 2026-06-04 文件 100% 相符，12 問題全在，無修復落地。操作者全權授權架構師決策，要求「一勞永逸、最完善、30 年」。

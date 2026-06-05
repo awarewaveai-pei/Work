@@ -25,8 +25,10 @@ namespace AwareWave\WpBridge\Auth;
 final class NonceCache {
 
 	/**
-	 * Upper bound on accepted nonce length. A nonce only needs ~128 bits of entropy (~22 base64url
-	 * chars); 256 is generous headroom while stopping a caller from using the store as a blob dump.
+	 * Upper bound on accepted nonce length, in BYTES (the limit is enforced with strlen(), a byte
+	 * count — NOT mb_strlen — because it must match WpdbNonceStore's VARBINARY byte capacity exactly).
+	 * A nonce only needs ~128 bits of entropy (~22 base64url bytes); 256 is generous headroom while
+	 * stopping a caller from using the store as a blob dump. MUST be <= WpdbNonceStore::NONCE_COLUMN_BYTES.
 	 */
 	public const MAX_NONCE_LENGTH = 256;
 

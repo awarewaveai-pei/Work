@@ -92,11 +92,18 @@ final class NonceCacheTest extends TestCase {
 		$this->assertSame( array( 'nonce-abc', 1_000_300 ), $spy->calls[0] );
 	}
 
-	public function test_non_positive_window_falls_back_to_default(): void {
+	public function test_zero_window_falls_back_to_default(): void {
 		$spy = new SpyNonceStore();
 		( new NonceCache( $spy, 0 ) )->check( 'nonce-abc', 1_000_000 );
 		// A window of 0 would expire nonce rows immediately; the guard must restore the safe default
 		// (SignatureVerifier::DEFAULT_WINDOW_SECONDS = 300), so expiry must be timestamp + 300.
+		$this->assertSame( 1_000_300, $spy->calls[0][1] );
+	}
+
+	public function test_negative_window_falls_back_to_default(): void {
+		$spy = new SpyNonceStore();
+		( new NonceCache( $spy, -5 ) )->check( 'nonce-abc', 1_000_000 );
+		// A negative window takes the same > 0 guard branch; expiry must still be timestamp + 300.
 		$this->assertSame( 1_000_300, $spy->calls[0][1] );
 	}
 }
