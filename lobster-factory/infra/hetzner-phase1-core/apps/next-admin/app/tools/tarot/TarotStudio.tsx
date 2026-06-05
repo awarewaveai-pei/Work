@@ -128,7 +128,11 @@ export default function TarotStudio() {
   function lockStyle() {
     if (!previewImage) return;
     setLocked(true);
-    setBatch(TAROT_CARDS.map((card) => ({ card, status: "idle" })));
+    setBatch((prev) => {
+      // re-lock after a prior batch: revoke old blob urls before resetting
+      prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
+      return TAROT_CARDS.map((card) => ({ card, status: "idle" }));
+    });
     setMessage(null);
   }
 

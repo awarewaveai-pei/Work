@@ -1,0 +1,30 @@
+{
+    "name": "awarewave/wp-bridge-plugin",
+    "description": "aware-wave-wp-bridge — clean-room Ed25519-authenticated WordPress control plane (security spine + replay protection).",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=7.4",
+        "ext-sodium": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "AwareWave\\WpBridge\\": "includes/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "AwareWave\\WpBridge\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --colors=always",
+        "lint": "find includes -name '*.php' -print0 | xargs -0 -n1 php -l"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

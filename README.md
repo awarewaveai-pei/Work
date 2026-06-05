@@ -1,110 +1,54 @@
-﻿# Work — Agency OS + Lobster Factory
+# aware-wave-wp-bridge
 
-本儲存庫收斂兩條主線：**Agency OS**（治理、客戶與營運 SOP、健康檢查）與 **Lobster Factory**（WordPress 工廠、Supabase、Trigger 工作流程、結構閘道）。
+A self-healing REST control plane that lets an AI agent operate an entire WordPress /
+Kadence / WooCommerce site **safely, completely, and provably** — and prove every write
+took effect before reporting success.
 
-建議用 Cursor／VS Code 開啟 **`Work-Monorepo.code-workspace`**（或將 **monorepo 根**當工作區根；路徑可為 `D:\Work`、`C:\Users\USER\Work` 等），相對連結才能穩定開啟 `docs/spec/raw/` 內原文。
+> **Positioning.** Most "let Claude edit WordPress" bridges are remote controls: they fire a
+> write and hope. This one is a *control system with a feedback loop* — every mutation is a
+> transaction that snapshots, applies, **re-renders the live page to verify the change took**,
+> and **auto-rolls-back if it didn't**. A write is not "done" until the bridge has independently
+> re-observed it.
 
-## 目錄
+## Why this exists / what makes it different
 
-| 路徑 | 用途 |
-|------|------|
-| [`agency-os/`](agency-os/) | 任務板、文件、排程、`system-health-check` / `system-guard`、租戶模板 |
-| [`lobster-factory/`](lobster-factory/) | migrations、manifests、`create-wp-site` / `apply-manifest`、`npm run validate` |
-| [`docs/spec/`](docs/spec/) | **規格原文**（長篇藍圖）：含 **20 個 Agency OS 模組**、`Master Spec v1`、企業級底座與 Cursor Pack——見 [`docs/spec/README.md`](docs/spec/README.md) |
-| **Cursor（IDE）企業級規則（版控正本）** | [`agency-os/docs/operations/cursor-enterprise-rules-index.md`](agency-os/docs/operations/cursor-enterprise-rules-index.md)（`63`–`66` `.mdc`、MCP／龍蝦 Routing 對齊說明） |
-| [`scripts/`](scripts/) | 跨專案腳本：`verify-build-gates.ps1`、`ao-close.ps1`、`apply-closeout-task-checkmarks.ps1`（收工依 `agency-os/WORKLOG.md` 的 `- AUTO_TASK_DONE:` 打勾 `agency-os/TASKS.md`）等 |
+| Capability | Typical WP bridge | aware-wave-wp-bridge |
+|---|---|---|
+| Auth | HTTP Basic / static key, key acceptable in `?query=` (logged) | **Ed25519-signed requests**, header-only, timestamp + single-use nonce (replay-proof) |
+| Secret at rest | plaintext credentials file on disk | site stores **only the public key** — a breach of the site cannot forge writes |
+| Write safety | fire-and-hope | **snapshot → apply → render-verify → auto-rollback** transaction |
+| Authorization | none on write endpoints | scope (read/write) + underlying **WP capability** assertion per route |
+| Cache flush | single host (e.g. LiteSpeed), `shell_exec` | pluggable: LiteSpeed hook + Redis + Cloudflare purge-by-URL (no `shell_exec`) |
+| Backend coverage | curated endpoints only | L1 generic option/meta/CPT + L2 typed adapters + L3 plugin lifecycle + L4 gated WP-CLI |
+| Correctness | untested | PHPUnit + CI, incl. an auto-rollback integration proof |
+| Block safety | manual `kbVersion:2` discipline | server-side `KadenceValidator` rejects malformed blocks **before** write |
 
-## 本機一次驗兩邊（推薦）
+## Design principles
+1. **Verify, never assume.** The `/render` endpoint returns cache-bypassed HTML; it is the
+   source of truth, not the browser.
+2. **Reversible by construction.** Every write snapshots first; failed verification auto-restores.
+3. **Least authority.** Read keys cannot write. Write keys still assert the WP capability the
+   operation requires.
+4. **Fail closed.** If the replay/nonce store is unavailable or verification is uncertain, the
+   operation is rejected or rolled back — never silently allowed.
 
-在儲存庫根目錄（你的 `<WORK_ROOT>`）：
+## Provenance & licensing
+This is an **independent, clean-room implementation**. It was written from first principles and
+from the documented behaviour of the WordPress REST and Kadence/WooCommerce data models; it does
+**not** incorporate or derive from any third-party plugin's source code. The proprietary control
+plane, generators, and SDK that consume this bridge are licensed separately and are not shipped to
+customer servers.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1
+## Status
+🚧 Phase A (local sandbox). Building the security spine first. Not production-ready.
+
+## Layout
 ```
-
-僅跑龍蝦閘道、略過 Agency 健檢：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1 -LobsterOnly
+aware-wave-wp-bridge.php     bootstrap (plugin header, autoload, route registration)
+includes/
+  Auth/SignatureVerifier.php HMAC canonical-request signing + timestamp/nonce checks (pure, unit-tested)
+  Auth/KeyStore.php          scoped, hashed key records; issuance/rotation
+  ...                        (Http/, Write/, Validate/, Cache/, Audit/ — see plan)
+tests/                       PHPUnit (unit + wp-env integration)
+openapi/                     OpenAPI 3.1 contract (source of truth for the typed client)
 ```
-
-## 多台電腦共用 MCP 設定
-
-MCP 現在用 repo 內的單一來源管理，目標是讓桌機與筆電都能用同一份配置同步到 `Codex`、`GitHub Copilot CLI`、`Gemini CLI` 與工作區 `.mcp.json`。
-
-1. 先填機器本地的環境變數範本：[`mcp/user-env.template.ps1`](mcp/user-env.template.ps1)
-2. 複製成 `mcp/user-env.ps1` 並填入該台機器的真實值
-3. 在新電腦直接執行：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mcp-machine.ps1
-```
-
-或：
-
-```powershell
-npm run mcp:bootstrap
-```
-
-已經有本機 env 時，也可以只跑：
-
-```powershell
-npm run mcp:sync
-```
-
-詳細說明見 [`mcp/README.md`](mcp/README.md)。
-新增共享 MCP/API 的標準流程見 [`mcp/SHARED_MCP_API_SOP.md`](mcp/SHARED_MCP_API_SOP.md)。
-
-若要一次對齊「共享 MCP + 協作代理規則（closeout inbox / 啟動提示包）」：
-
-```powershell
-npm run mcp:governance
-```
-
-## 建議閱讀與操作順序（降低矛盾、可賣可交付）
-
-下列順序假設你已開在 **monorepo 根**（含 `agency-os`、`lobster-factory`、根 `scripts`）。若只開 `agency-os` 子資料夾，請先用相對連結回到本頁與 `docs/spec`。
-
-1. **本頁** — 結構、`verify-build-gates`、雙機與收工關鍵字。  
-2. **他機／首次接線** — [`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)（**正式開工**：monorepo 根 **`.\scripts\ao-resume.ps1` exit 0** 後再打 **`AO-RESUME`**；**筆電／新機最短指令見該檔 §1.5**）。  
-3. **每日儀表板** — [`agency-os/docs/overview/EXECUTION_DASHBOARD.md`](agency-os/docs/overview/EXECUTION_DASHBOARD.md)（`TASKS` / 綜合狀態 / Gate）。  
-4. **人＋代理總則** — [`agency-os/AGENTS.md`](agency-os/AGENTS.md)（`AO-RESUME`／`AO-CLOSE`、MCP 清單入口）。  
-4b. **長期營運紀律（建置／換人仍可接）** — [`agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md`](agency-os/docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md)；重大分岔見 [`agency-os/docs/architecture/decisions/ADR_INDEX.md`](agency-os/docs/architecture/decisions/ADR_INDEX.md)。  
-4c. **30 年級 AI/coding/專案管理短憲章（跨國企業版）** — [`agency-os/docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md`](agency-os/docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md)。
-4d. **30 年級 AI/coding/專案管理短憲章（客戶精簡鏡像）** — [`agency-os/docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md`](agency-os/docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md)。
-5. **Cursor 企業規則（版控）** — [`agency-os/docs/operations/cursor-enterprise-rules-index.md`](agency-os/docs/operations/cursor-enterprise-rules-index.md)（**若與 AO 關鍵字流程衝突，以 `agency-os/.cursor/rules` 之 `00`／`30`／`40` 為準**）。
-6. **龍蝦與藍圖** — [`lobster-factory/README.md`](lobster-factory/README.md)、Checklist、Runbook；**規格原文** [`docs/spec/README.md`](docs/spec/README.md)、[**四份整合怎麼讀**](agency-os/docs/overview/company-os-four-sources-integration.md)。
-
-## 從哪讀起（快速連結）
-
-- **龍蝦工廠**：[`lobster-factory/README.md`](lobster-factory/README.md)；Master [`LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md`](lobster-factory/docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md)；驗收 [`LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST_v1.4.md`](lobster-factory/docs/LOBSTER_FACTORY_DEPLOYMENT_CHECKLIST_v1.4.md)；主清單 [`LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`](lobster-factory/docs/LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md)；日課合併版 [`LOBSTER_FACTORY_CHECKLIST.md`](lobster-factory/docs/LOBSTER_FACTORY_CHECKLIST.md)；[`lobster-factory/docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md`](lobster-factory/docs/operations/LOBSTER_FACTORY_OPERATOR_RUNBOOK.md)、[`lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md`](lobster-factory/docs/e2e/OPERABLE_E2E_PLAYBOOK.md)（A10-1 營運劇本）
-- **AO 系統**：[`agency-os/AGENTS.md`](agency-os/AGENTS.md)、[`agency-os/TASKS.md`](agency-os/TASKS.md)、[`agency-os/docs/overview/EXECUTION_DASHBOARD.md`](agency-os/docs/overview/EXECUTION_DASHBOARD.md)
-- **子網域／`api.aware-wave.com`／`node-api` 計畫（git 唯一正文）**：[`agency-os/docs/edge-and-domains/EDGE_DOMAINS_INDEX.md`](agency-os/docs/edge-and-domains/EDGE_DOMAINS_INDEX.md) → [`agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md`](agency-os/docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md)
-- **穩定化／規則治理長篇計畫（舊 Cursor plan 對照）**：[`agency-os/docs/governance-plans/GOVERNANCE_PLANS_INDEX.md`](agency-os/docs/governance-plans/GOVERNANCE_PLANS_INDEX.md)
-- **平台能力＋工具總索引 §0（一句話＋專文／計畫；單一 Owner）**：[`agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`](agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md)
-- **規格原文（長篇藍圖）**：[`docs/spec/README.md`](docs/spec/README.md)；**四份怎麼整合**：[`agency-os/docs/overview/company-os-four-sources-integration.md`](agency-os/docs/overview/company-os-four-sources-integration.md)
-
-## 開工與雙機同步（AO-RESUME）
-
-- **`AO-RESUME`**：請 Agent 依 **`agency-os/.cursor/rules/30-resume-keyword.mdc`** 讀進度檔，並在 monorepo 根執行 **`.\scripts\ao-resume.ps1 -FullMainlineParity`**（主線 **`main`=`origin/main`**；**預設不切功能分支、留在 `main`**，避免誤切分支。若你刻意要舊的「對齊 main 後回到功能分支再 `merge origin/main`」流程，改用 **`-FullMainlineFeature`**（或 **`-FullMainlineMainOnly:$false`**）並可搭配 **`-FullMainlineFeatureBranch <name>`**；再跑 preflight／閘道／Strict；見 **`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md` §2.5.1**）。**不帶** `-FullMainlineParity` 時行為同 **`align-workstation.ps1`**（僅 fetch／behind 時 ff-only pull 等）。Autopilot 開機則為輕量（見 **AGENTS.md**）。
-- **另一台已 AO-CLOSE push 時**：在 monorepo 根 **`AO-RESUME`**（或 **`ao-resume.ps1`**）即可同步檢查；若 pull／髒樹失敗再手動整理。完整清單：[`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)。**勾選 `TASKS`「雙機環境對齊」**：兩台各跑一次通過預設 **`ao-resume.ps1`**（結尾 Strict 已含）或等價稽核即可；細項與證據索引另見 [`agency-os/docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md`](agency-os/docs/overview/DUAL_MACHINE_ENVIRONMENT_CHECKLIST.md)。
-
-## 事件流程單一真相
-
-- 開工（AO-RESUME）：[`agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md`](agency-os/docs/overview/REMOTE_WORKSTATION_STARTUP.md)（**§2** 例行、**§2.5** 日內 Git：checkpoint + 收工 push）
-- 收工（AO-CLOSE）：[`agency-os/docs/operations/end-of-day-checklist.md`](agency-os/docs/operations/end-of-day-checklist.md) + [`agency-os/.cursor/rules/40-shutdown-closeout.mdc`](agency-os/.cursor/rules/40-shutdown-closeout.mdc)
-- 其餘文件僅保留入口摘要，避免重複維護多套命令
-
-## 收工與同步
-
-- 關鍵字 **`AO-CLOSE`**：**操作者只打這三字（或說收工／關機）**；**不必學** PowerShell 參數。細節與代理責任由 **`agency-os/.cursor/rules/40-shutdown-closeout.mdc`** 定義；實際收斂為在 monorepo 根由**代理**執行 **`.\scripts\ao-close.ps1`**（**正本**；**`agency-os\scripts\ao-close.ps1`** 僅 wrapper）。腳本含 scaffold、inbox 合併、recap、閘道、**`TASKS` 打勾**、completeness 檢查、預設 **commit + push**。**勿**在僅 `lobster-factory` 子目錄執行。補充說明見 [`end-of-day-checklist.md`](agency-os/docs/operations/end-of-day-checklist.md) §0、[`agency-os/memory/MEMORY_INDEX.md`](agency-os/memory/MEMORY_INDEX.md)。
-- **monorepo 根 `.cursor/rules`**（**`00`、`30`、`40`、`50`、`63–66`**）：正本在 **`agency-os/.cursor/rules`**；由 **`scripts/sync-enterprise-cursor-rules-to-monorepo-root.ps1`** 鏡像到根目錄（**`00`／`30`／`40`** 含路徑變換；**`verify-build-gates`** 預設會跑）。只改一邊會造成**規則分叉**。
-
-## Related Documents (Auto-Synced)
-- `docs/operations/cursor-enterprise-rules-index.md`
-- `docs/overview/EXECUTION_DASHBOARD.md`
-- `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
-- `README.md`
-
-_Last synced: 2026-06-03 05:51:15 UTC_
-
