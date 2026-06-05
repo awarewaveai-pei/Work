@@ -112,6 +112,26 @@ export default async function OpsConsolePage() {
 
       <div className="page">
 
+        {/* P11: orientation banner — this is a legacy/diagnostic view; its data overlaps
+            dedicated pages. Kept for the architecture reference + department selector. */}
+        <div
+          style={{
+            background: "#fffbeb",
+            border: "1px solid #fde68a",
+            color: "#92400e",
+            borderRadius: 8,
+            padding: "12px 16px",
+            marginBottom: 24,
+            fontSize: 13,
+            lineHeight: 1.7,
+          }}
+        >
+          <strong>診斷 / 參考頁</strong> — 此頁是架構邊界參考 + 部門選型。日常操作請用正式頁：
+          租戶健康看 <a href="/ops/clients" style={{ color: "#92400e", fontWeight: 600 }}>Clients</a>、
+          建站執行看 <a href="/build" style={{ color: "#92400e", fontWeight: 600 }}>Build Console</a>。
+          下方「Tenant Config」「AI Image Job」為實驗性（AI Image Job 尚未接 Trigger.dev 處理，建立後會停在 queued）。
+        </div>
+
         {/* ── Architecture Boundary ───────────────────── */}
         <div className="section-title">Architecture Boundary</div>
         <div className="card-grid" style={{ marginBottom: 28 }}>

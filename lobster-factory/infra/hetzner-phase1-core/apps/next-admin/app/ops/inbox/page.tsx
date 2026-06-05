@@ -6,6 +6,7 @@ import { IncidentCard } from "./components/IncidentCard";
 import { OpsInboxTelemetry } from "./OpsInboxTelemetry";
 import { IncidentFilterBar } from "./components/IncidentFilterBar";
 import { InboxGuidePanel } from "./components/InboxGuidePanel";
+import { AutoRefresh } from "../../AutoRefresh";
 import type { Incident, IncidentSeverity, IncidentSource, IncidentStatus } from "@/lib/ops-inbox/types";
 
 interface SearchParams {
@@ -57,6 +58,7 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
   return (
     <div style={{ background: "var(--bg-canvas)", minHeight: "100vh", padding: "28px 32px" }}>
       <OpsInboxTelemetry />
+      <AutoRefresh intervalMs={20000} />
       {/* ── Page header ─────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
         <div>

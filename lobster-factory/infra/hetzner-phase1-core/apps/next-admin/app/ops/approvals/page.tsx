@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { canApproveCommand, readOpsRole } from "@/lib/ops-role";
 import { ApprovalList } from "./ApprovalList";
+import { AutoRefresh } from "../../AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,7 @@ export default async function ApprovalsPage() {
 
   return (
     <div style={{ padding: "32px 40px", maxWidth: 1200 }}>
+      <AutoRefresh intervalMs={20000} />
       <h1 style={{ marginBottom: 6 }}>待簽核指令</h1>
       <p style={{ color: "#64748b", fontSize: 14, marginBottom: 24 }}>
         從 Telegram 等外部入口發來的高風險／關鍵指令會排隊在此，等待 owner / admin 簽核後才會實際執行。
@@ -101,10 +103,15 @@ export default async function ApprovalsPage() {
             color: "#065f46",
             borderRadius: 8,
             padding: "20px 24px",
-            textAlign: "center",
           }}
         >
-          ✅ 目前沒有待簽核項目，佇列是空的。
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>✅ 目前沒有待簽核項目，佇列是空的。</div>
+          <div style={{ fontSize: 13, lineHeight: 1.7, color: "#047857" }}>
+            此佇列只收「需 owner / admin 簽核」的 high / critical 指令（例如未來的內部排程或 webhook 來源）。
+            常見疑問：<strong>解除 emergency_stop（緊急停止）不會出現在這裡</strong> — 請改到{" "}
+            <Link href="/ops/system-modes" style={{ color: "#065f46", fontWeight: 600 }}>System Modes</Link>{" "}
+            切回 normal（Telegram 發 <code>/normal_mode</code> 屬 high-risk，會被 policy 直接擋下，不入此佇列）。
+          </div>
         </div>
       )}
 

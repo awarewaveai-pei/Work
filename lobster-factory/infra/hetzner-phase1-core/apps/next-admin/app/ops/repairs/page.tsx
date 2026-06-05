@@ -6,6 +6,7 @@ import { buildIntegrationBlockers, type IntegrationBlocker } from "@/lib/repair-
 import { REPAIR_SOURCE_POLICIES, policyCatalogForSource, policyForIncident, repairPolicyLabel } from "@/lib/repair-center/policy";
 import type { RepairIncident, RepairRun } from "@/lib/repair-center/types";
 import { RepairActions } from "./RepairActions";
+import { AutoRefresh } from "../../AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
 
   return (
     <div style={{ background: "var(--bg-canvas)", minHeight: "100vh", padding: "28px 32px" }}>
+      <AutoRefresh intervalMs={15000} />
       <div style={{ maxWidth: 1240, margin: "0 auto" }}>
         <nav style={{ marginBottom: 16, fontSize: 13, color: "var(--text-secondary)" }}>
           <Link href="/" style={linkStyle}>儀表板</Link>
