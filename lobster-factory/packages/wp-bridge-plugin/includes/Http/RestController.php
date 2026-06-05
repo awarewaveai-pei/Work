@@ -21,6 +21,8 @@ use AwareWave\WpBridge\Auth\SignatureVerifier;
 use AwareWave\WpBridge\Auth\WpdbKeyStore;
 use AwareWave\WpBridge\Auth\WpdbNonceStore;
 use AwareWave\WpBridge\Operation\SetOptionOperation;
+use AwareWave\WpBridge\Post\PostCreator;
+use AwareWave\WpBridge\Validation\KadenceValidator;
 use AwareWave\WpBridge\Transaction\Impl\HttpRenderer;
 use AwareWave\WpBridge\Transaction\Impl\NullCachePurger;
 use AwareWave\WpBridge\Transaction\Impl\OptionSnapshotter;
@@ -47,6 +49,16 @@ final class RestController {
 				'methods'             => 'POST',
 				'permission_callback' => '__return_true', // auth is enforced inside (signature-based, not WP cookies)
 				'callback'            => array( $this, 'setOption' ),
+			)
+		);
+
+		register_rest_route(
+			AWBRIDGE_REST_NAMESPACE,
+			'/post',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'createPost' ),
 			)
 		);
 	}
@@ -126,6 +138,42 @@ final class RestController {
 		);
 
 		return new \WP_REST_Response( $this->envelope( $result ), $this->statusFor( $result ) );
+	}
+
+	/** Create a full blog post draft (content + categories + tags + SEO + excerpt), atomic + verified. */
+	public function createPost( $request ) {
+		$auth = $this->authenticate( $request, KeyRecord::SCOPE_WRITE );
+		if ( ! $auth->authenticated() ) {
+			$this->audit( 'auth_denied', array( 'reason' => $auth->auditReason() ) );
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => $auth->reason() ), $auth->httpStatus() );
+		}
+
+		$spec = json_decode( (string) $request->get_body(), true );
+		if ( ! is_array( $spec ) || empty( $spec['title'] ) || empty( $spec['content'] ) ) {
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'title_and_content_required' ), 400 );
+		}
+
+		// If the content is Gutenberg block markup, validate Kadence blocks BEFORE creating the post,
+		// so a broken block (missing kbVersion / uniqueID) is rejected with hints, not saved unstyled.
+		$content = (string) $spec['content'];
+		if ( strpos( $content, '<!-- wp:' ) !== false ) {
+			$blocks     = parse_blocks( $content );
+			$validation = ( new KadenceValidator() )->validate( $blocks );
+			if ( ! $validation->isValid() ) {
+				return new \WP_REST_Response(
+					array( 'ok' => false, 'error' => 'invalid_kadence_blocks', 'violations' => $validation->toArray() ),
+					422
+				);
+			}
+		}
+
+		$result = ( new PostCreator() )->create( $spec );
+
+		$this->audit( 'post_create', array( 'key' => $auth->keyId(), 'status' => $result['status'], 'post_id' => $result['post_id'] ?? null ) );
+
+		$status = ( $result['status'] === 'committed' ) ? 201 : 409;
+		$result['ok'] = ( $result['status'] === 'committed' );
+		return new \WP_REST_Response( $result, $status );
 	}
 
 	private function authenticate( $request, string $requiredScope ): AuthResult {
