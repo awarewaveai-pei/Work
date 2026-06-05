@@ -18,15 +18,29 @@ use AwareWave\WpBridge\Transaction\Renderer;
 final class HttpRenderer implements Renderer {
 
 	public function render( string $url ): RenderObservation {
-		$bust = ( strpos( $url, '?' ) === false ? '?' : '&' ) . 'awbridge_nocache=' . (string) time();
+		$bust     = ( strpos( $url, '?' ) === false ? '?' : '&' ) . 'awbridge_nocache=' . (string) time();
+		$fetchUrl = $url . $bust;
+		$headers  = array( 'Cache-Control' => 'no-cache' );
+
+		// When the site must render itself via an INTERNAL address (behind a proxy / port-mapped in a
+		// container, where the public host:port isn't reachable from the server itself), connect to
+		// AWBRIDGE_RENDER_INTERNAL_BASE but preserve the original Host header so WordPress still sees
+		// its canonical host and does not redirect. Unset in normal production (the public URL is
+		// reachable from the box) — then it renders the URL as-is.
+		if ( defined( 'AWBRIDGE_RENDER_INTERNAL_BASE' ) && AWBRIDGE_RENDER_INTERNAL_BASE ) {
+			$parts            = wp_parse_url( $url );
+			$headers['Host']  = $parts['host'] . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' );
+			$pathQuery        = ( isset( $parts['path'] ) ? $parts['path'] : '/' ) . ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
+			$fetchUrl         = rtrim( (string) AWBRIDGE_RENDER_INTERNAL_BASE, '/' ) . $pathQuery . $bust;
+		}
 
 		$response = wp_remote_get(
-			$url . $bust,
+			$fetchUrl,
 			array(
 				'timeout'     => 15,
-				'redirection' => 2,
+				'redirection' => 0, // never follow redirects when verifying — a redirect IS a change to detect
 				'sslverify'   => false, // local/staging may use self-signed certs
-				'headers'     => array( 'Cache-Control' => 'no-cache' ),
+				'headers'     => $headers,
 			)
 		);
 

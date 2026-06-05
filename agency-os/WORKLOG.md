@@ -4,6 +4,26 @@
 
 ## 2026-06-05
 
+### wp-bridge — 從「不能跑」到「真站驗證 9/9」：runnable 層 + 端到端整合測試
+
+**背景**：使用者「把整個測試完，確認可以使用」。前 6 磚是 WP-free 核心（裝不進 WP）。本次補 runnable 層 + 起真 WordPress 端到端驗證。
+
+**[已修改]**（`packages/wp-bridge-plugin/`）
+- 外掛入口 `aware-wave-wp-bridge.php`（WP header + PSR-4 autoloader + activation hook + rest_api_init）。
+- `includes/Plugin/Activation.php`（dbDelta 建 awbridge_keys + awbridge_nonces）。
+- 具體實作：`Transaction/Impl/{OptionSnapshotter,HttpRenderer,NullCachePurger}.php`；`Operation/SetOptionOperation.php`（第一個真 Operation）；`Http/RestController.php`（REST 路由 + header→SignedRequest + RequestAuthenticator + dispatch WriteTransaction + AuthResult/TransactionResult→WP_REST_Response）。
+- HttpRenderer 支援 `AWBRIDGE_RENDER_INTERNAL_BASE`（站在 proxy/容器後用內部位址 render 自己，保留原 Host header 避 canonical redirect；redirection=0）。
+
+**[驗證結果]**（R0 四動作 — 真站實測）
+- REALTEST_EVIDENCE: tool=Bash(Docker) | env=WordPress 6.6 + PHP 8.2 + MariaDB 11（compose）| 外掛 activate + 建表成功、health 回 `sodium:true schema:{keys_ok,nonces_pk}` | cmd=`awbridge-itest.php run` | exit=0 | **9/9 PASS**：health、Ed25519 簽章寫入→200 committed→首頁標題真的變、bad-sig→401、replay→401、no-effect→409 rolled_back 自我修復、站保持健康。
+- REVIEW_WAIVED: NA -- runnable 層整合測試即 review；具體 impl 為薄 WP wrapper，核心已 critic 過。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=AWBRIDGE_RENDER_INTERNAL_BASE\|RestController\|SetOptionOperation | hits=0
+- 過程抓到並修：wp-env 卡版本解析→改 Docker compose；sandbox 擋網路→前景 sandbox-off；容器內 render localhost:8888 不通→內部位址 rewrite；REST trailing-slash 301→改 ?rest_route 形式。
+
+**[剩餘風險 / 待續]**
+- 現「能裝能跑且核心驗證」但只會一招（set_option）；離可賣還要：更多 Operation（發文/商品/Kadence block）、L1-L4、key 管理 admin UI（現靠 SQL insert）、client SDK、staging→prod 真客戶站驗證、打包/授權。
+- 本機 WP 沙盒：`d:\tmp\awbridge-compose.yml`（localhost:8888，admin/admin）；非 repo 檔。
+
 ### app.aware-wave.com — P1 Supabase Auth 正式上線 + 單一登入（cutover 完成）
 
 承上「P1 守門：Supabase Auth 身分層（code 完成未 deploy）」entry — **本段為 cutover 執行完成記錄**。
