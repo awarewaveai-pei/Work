@@ -4,6 +4,7 @@ import "./globals.css";
 import { PHProvider } from "./providers";
 import { PostHogAnalytics } from "./posthog-analytics";
 import { OpsInboxBadge } from "./ops/inbox/components/OpsInboxBadge";
+import { LogoutButton } from "./LogoutButton";
 
 export const metadata = { title: "Lobster Factory Admin" };
 
@@ -124,6 +125,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
               <div className="sidebar-footer">
                 aware-wave.com
+                <LogoutButton />
               </div>
             </nav>
 
