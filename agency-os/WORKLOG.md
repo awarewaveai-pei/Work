@@ -4,6 +4,28 @@
 
 ## 2026-06-05
 
+### app.aware-wave.com — P1 Supabase Auth 正式上線 + 單一登入（cutover 完成）
+
+承上「P1 守門：Supabase Auth 身分層（code 完成未 deploy）」entry — **本段為 cutover 執行完成記錄**。
+
+**[已執行]**
+- **建 admin 帳號**：GoTrue admin API（aware-wave project `supabase.aware-wave.com`，VBC 先列 users=0）。誤建 peijingartstudio→操作者更正→刪除→重建 `awarewaveai@gmail.com`（`app_metadata.ops_role=owner`, email_confirm）。密碼存 vault `APP_AWARE_WAVE_ADMIN_PASSWORD`。
+- **sg-deploy 兩次受阻→修**：① host typecheck gate 因 `/root/Work/.../next-admin` 缺 `@supabase/ssr`（新 dep）→ `npm ci` 該路徑（非 rsync 目標）。② smoke 自動回滾：新 middleware gate 首頁 `/`→307，舊 smoke 期望 2xx→誤判→`sg-deploy.sh` Step7 smoke 改探 `/login`+`/api/ops/summary`（commit `49699063`，DEPLOY_ROLLBACK_RUNBOOK 同步）。第三次 detached（setsid，避 SSH reset 殺 build）部署成功。
+- **移除 nginx basic-auth**：生效檔 `sites-enabled/app→aware-wave-app-api-subdomains.conf`（非孤兒 `sites-available/app`）8 行 auth_basic sed 移除 + backup + nginx -t + reload（commit `f65da41f`）。兩層登入→單層。
+
+**[驗證結果]**（REALTEST，全 production 實測）
+- REALTEST_EVIDENCE: tool=Bash/SSH | cmd=部署後 curl 矩陣 | exit=0 — deployed-commit=`49699063`；smoke 全 OK(/login→200, /api/ops/summary→200)；localhost: /ops/repairs 無 session→307→/login、/api/ops/repairs→401、probe+Bearer→200{ok:true}(C2)、/api/internal/commands/telegram→200(C1)；**spoof x-ops-claims-role:admin/x-user-role/x-ops-simulated-role→全 307**（middleware 剝除）；GoTrue password grant→access_token+ops_role=owner。
+- REALTEST_EVIDENCE: tool=Bash | cmd=公開 CF 路徑 curl | exit=0 — `app.aware-wave.com/`→307→/login（無 www-authenticate）、/login→200、公開路徑 spoof admin→307（middleware 經 nginx 注入仍剝除）。
+- BUGHUNT_WAIVED: SMOKE_COVERED -- 部署後 curl 矩陣已覆蓋所有 server-to-server 端點 + spoof 面；前 entry 已做 hasTrustedProxyAuth hits=0 抓蟲。
+
+**[剩餘風險/後續]**
+- 操作者瀏覽器登入實測待確認（email `awarewaveai@gmail.com` + vault 密碼）。
+- repo↔live nginx drift：live `aware-wave-app-api-subdomains.conf` 與 repo 行號/結構不同 → 僅 auth_basic 已對齊，其他 drift 待月巡。
+- nginx `proxy_set_header x-ops-claims-role admin/operator` 注入已被 middleware 剝除（無害）但語意過時 → 可後續清理。
+- B3 剩 P3/P6/P8/P10/P11。
+
+**[rollback]** code: `git revert` + sg-deploy 回 a831efd5(→403)；nginx: `cp <bak-20260605-authcutover> <file> && nginx -t && reload`；帳號: GoTrue admin DELETE。
+
 ### wp-bridge — Phase A 砌第六磚 KadenceValidator（寫前護欄，回應使用者 Kadence class 關切）
 
 **背景**：使用者問「Kadence block 要固定 class 才能發揮格式」→ 砌正是這道護欄。全權授權續砌。
