@@ -16,13 +16,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // M2: per-source token (falls back to shared OPS_INBOX_INGEST_TOKEN until provisioned).
   const auth = verifyIngestSource(req, "netdata");
-  if (!auth.ok) {
-    if (auth.reason === "bad_bearer" && req.headers.get("authorization")) {
-      Sentry.captureMessage("ops-inbox auth rejected: netdata token mismatch", "warning");
-    }
-    return new NextResponse("unauthorized", { status: 401 });
-  }
+  if (!auth.ok) return new NextResponse("unauthorized", { status: 401 });
 
   // C3 + M3 fix: bounded body read (256KB cap) preserving raw bytes for future HMAC.
   const body = await readWebhookBody(req);

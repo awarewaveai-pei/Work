@@ -116,4 +116,13 @@ describe("verifyIngestSource — deploy-safe fallback (per-source not yet provis
     process.env.OPS_INBOX_INGEST_TOKEN = LEGACY;
     expect(verifyIngestSource(reqWith(undefined), "uptime_kuma")).toEqual({ ok: false, reason: "bad_bearer" });
   });
+
+  it("empty-string per-source secret is treated as UNSET → legacy fallback (contract lock)", () => {
+    // process.env.X = "" is falsy under `if (perSourceSecret)`, so it falls through to
+    // the shared-token path. An empty token can never be a valid secret, and keeping the
+    // endpoint alive on the shared token is the deploy-safe behaviour. Locked by this test.
+    process.env.OPS_INBOX_SENTRY_TOKEN = "";
+    process.env.OPS_INBOX_INGEST_TOKEN = LEGACY;
+    expect(verifyIngestSource(reqWith(LEGACY), "sentry")).toEqual({ ok: true });
+  });
 });

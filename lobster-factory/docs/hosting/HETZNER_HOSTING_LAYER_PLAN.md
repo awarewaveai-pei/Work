@@ -287,7 +287,7 @@ Header：`Authorization: Bearer $HETZNER_STAGING_TOKEN`
 → staging/production **各開一 project**，各一個 Read+Write token。隔離靠 project 不靠權限。
 
 ## A.4 Cloud Firewall — `POST /v1/firewalls`
-rule 欄位：`direction`("in"/"out") / `protocol`("tcp"/"udp"/"icmp"/"esp"/"gre") / `port`("22"/"80-85"/"any") / `source_ips`[CIDR](in) / `destination_ips`[CIDR](out) / `description`
+rule 欄位：`direction`("in"/"out") / `protocol`("tcp"/"udp"/"icmp"/"esp"/"gre") / `port`("22"/"80-85"/"any") / `source_ips`(CIDR 列表，用於 in) / `destination_ips`(CIDR 列表，用於 out) / `description`
 - **inbound 隱含 deny-all**（每條 allow 要顯式）
 - **outbound 預設全開；一旦加任何 outbound rule → 變全擋**（要列全需要的 outbound）
 - apply：create server 帶 `firewalls[]`，或 `POST /v1/firewalls/{id}/actions/apply_to_resources`

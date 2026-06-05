@@ -16,13 +16,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // M2: per-source token (falls back to shared OPS_INBOX_INGEST_TOKEN until provisioned).
   const auth = verifyIngestSource(req, "sentry");
-  if (!auth.ok) {
-    if (auth.reason === "bad_bearer" && req.headers.get("authorization")) {
-      Sentry.captureMessage("ops-inbox auth rejected: sentry token mismatch", "warning");
-    }
-    return new NextResponse("unauthorized", { status: 401 });
-  }
+  if (!auth.ok) return new NextResponse("unauthorized", { status: 401 });
 
   // C3 + M3 fix: bounded body read via shared helper. Keeps raw text for future
   // per-source HMAC verification (Sentry signs the raw body bytes).
