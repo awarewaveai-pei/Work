@@ -36,9 +36,18 @@
 
 ---
 
-## 2. Sentry 矛盾 — 最高優先待驗（VBC）
+## 2. Sentry 矛盾 — ✅ 已由 Phase 0 SSH 實測解決（2026-06-05）
 
-**不可在未實測前下任何 Sentry 設計決定。** 三種可能現況：
+**結論：5 來源現全是 Tier-1（Bearer-only）。Tier-2 HMAC 是全新工程，非現況。**
+
+Phase 0 SSH SG `/root/lobster-phase1/.env` 證據（唯讀，未印值）：
+- 只有 `SENTRY_AUTH_TOKEN`（Sentry API 用）+ `SENTRY_DSN*`；**無任何 webhook 簽章 secret**（無 client secret / hook secret）。
+- Grafana 只有 `GRAFANA_SERVICE_ACCOUNT_TOKEN`（query API），**無 HMAC secret**。
+- → 接收端根本沒有可驗 `Sentry-Hook-Signature` / `X-Grafana-Alerting-Signature` 的 secret → **Tier-2 目前不存在**。要做需 Sentry 改 Internal Integration（sentry.io 操作）+ 加 client secret；Grafana 升 v12 + 加 secret。**Tier-2 = optional 新 initiative，不綁 M2 baseline。**
+- 額外發現：5 監控 webhook（sentry/grafana/netdata/uptime_kuma/posthog）近期**零流量**（health `ingest_fresh` 由內部 probe + `deploy` source 撐；近 8h incident 僅 2 筆 `deploy`）。對方 handoff 載 webhook 06-04 09:21 才從「全斷」修好 → 需獨立驗是否真復流（非 M2/M4 blocking）。
+- 協調：SG 有 `app.bak-20260605-authcutover` → 對方 nginx auth cutover 進行中，部署時機需錯開。
+
+下表為實測前的三假設（保留供歷史對照）；實測證明落在「現況靠 shared Bearer，無簽章」：
 
 | 假設 | 若為真，Sentry 現況 | 對策 |
 |------|-------------------|------|
