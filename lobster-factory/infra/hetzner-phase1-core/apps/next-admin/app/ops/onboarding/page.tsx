@@ -59,7 +59,6 @@ export default function OnboardingPage() {
 
   const [form, setForm] = useState<Partial<IntakeForm>>({
     industry: "service",
-    primary_goal: ["brand"],
     pages_needed: ["home", "about", "contact"],
     has_ecommerce: false,
     needs_crm: false,
@@ -372,7 +371,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* ── Step 2: 客群 & 目標 ── */}
+        {/* ── Step 2: 客群 ── */}
         {formStep === 2 && (
           <div className="intake-fields">
             <div className="form-row">
@@ -380,23 +379,7 @@ export default function OnboardingPage() {
               <textarea value={form.target_audience ?? ""} onChange={e => set("target_audience", e.target.value)}
                 placeholder="描述你的目標客戶，例：25-45 歲台灣女性，對健康生活有興趣" rows={4}
                 className="form-textarea" />
-            </div>
-            <div className="form-row">
-              <label className="form-label">建站主要目的 <span className="intake-required">*</span><span className="intake-hint-inline">（可多選）</span></label>
-              <div className="intake-chip-grid">
-                {PRIMARY_GOALS.map(g => {
-                  const active = (form.primary_goal ?? []).includes(g.value as IntakeForm["primary_goal"][0]);
-                  return (
-                    <label key={g.value} className={`intake-chip${active ? " active" : ""}`}>
-                      <input type="checkbox"
-                        checked={active}
-                        onChange={() => set("primary_goal", toggleArr(form.primary_goal ?? [], g.value as IntakeForm["primary_goal"][0]))}
-                        className="intake-chip-input" />
-                      {g.label}
-                    </label>
-                  );
-                })}
-              </div>
+              <p className="form-hint" style={{ marginTop: 4 }}>建站目的會從你下一步的「頁面 / 功能需求」自動判斷，不用另外填。</p>
             </div>
           </div>
         )}

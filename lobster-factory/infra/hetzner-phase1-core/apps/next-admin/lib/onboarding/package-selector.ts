@@ -30,8 +30,9 @@ export function selectPackage(form: IntakeForm): PackageSelection {
     };
   }
 
-  // Tourism / booking
-  if (form.industry === "tourism" || form.primary_goal.includes("booking") || form.needs_booking) {
+  // Tourism / booking — derived from concrete needs (the abstract "primary_goal" field was
+  // removed from the intake as redundant with industry + needs_booking + pages_needed).
+  if (form.industry === "tourism" || form.needs_booking || (form.pages_needed?.includes("booking") ?? false)) {
     return {
       package_slug: "wp-business",
       packs: ["base", "tourism"],

@@ -16,10 +16,14 @@ export interface IntakeForm {
   // Required
   company_name: string;
   industry: Industry;
-  primary_goal: PrimaryGoal[];
   pages_needed: PageType[];
   has_ecommerce: boolean;
   budget_tier: BudgetTier;
+
+  // Deprecated (2026-06-05): the abstract "建站主要目的" question was removed from the intake
+  // as redundant with industry + pages_needed + needs_ecommerce/booking/crm. Kept optional for
+  // backward-compat with already-stored intake_forms; no longer collected or required.
+  primary_goal?: PrimaryGoal[];
 
   // Optional
   brand_tagline?: string;
