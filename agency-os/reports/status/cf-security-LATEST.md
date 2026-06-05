@@ -1,6 +1,6 @@
 ﻿# Cloudflare security check
 
-- Generated: 2026-06-04 10:30:26
+- Generated: 2026-06-05 12:32:25
 - Zone: f21b1919632fee2221647908a94fdcac (aware-wave.com)
 - **Overall: WARN**
 
@@ -8,5 +8,5 @@
 | Check | Result |
 |-------|--------|
 | Bot Fight Mode | ON |
-| WAF firewall rules count | 1 |
+| WAF firewall rules count | 0 |
 | xmlrpc.php block rule | MISSING |
