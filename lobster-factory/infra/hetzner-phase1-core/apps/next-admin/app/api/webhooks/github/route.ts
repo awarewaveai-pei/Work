@@ -52,14 +52,18 @@ export async function POST(req: Request) {
   }
 
   const p = payload as Record<string, unknown>;
-  if (p.action !== "closed" || !(p.pull_request as Record<string, unknown>)?.merged) {
+  const pr = p.pull_request as Record<string, unknown> | undefined;
+
+  // Only PR *close* events drive a repair_run state change.
+  if (p.action !== "closed") {
     return NextResponse.json({ ignored: true, action: p.action });
   }
 
-  const prNumber = (p.pull_request as Record<string, unknown>)?.number as number | undefined;
+  const prNumber = pr?.number as number | undefined;
   if (!prNumber) {
     return new NextResponse("missing pr number", { status: 400 });
   }
+  const merged = Boolean(pr?.merged);
 
   const supabase = getSupabaseWriteClient();
   if (!supabase) {
@@ -79,23 +83,36 @@ export async function POST(req: Request) {
 
   if (!run) {
     // No matching repair_run — legitimate (PR unrelated to repair center)
-    return NextResponse.json({ matched: false, pr_number: prNumber });
+    return NextResponse.json({ matched: false, pr_number: prNumber, merged });
   }
 
   const r = run as RepairRun;
+
+  // P7 fix: a PR that is closed WITHOUT merge (operator abandoned it) used to be
+  // silently ignored, leaving the repair_run stuck at pr_ready forever. Route it to
+  // human_only so the operator is prompted to decide the next step.
+  const newState = merged ? "deploy_pending" : "human_only";
+  const auditAction = merged ? "pr_merged" : "pr_abandoned";
+  const auditDetail = merged
+    ? `PR #${prNumber} merged — transitioning pr_ready → deploy_pending`
+    : `PR #${prNumber} closed without merge — transitioning pr_ready → human_only (operator must decide next step)`;
+
   const newAudit = appendAudit(r.audit_log, {
     actor: "github-webhook",
-    action: "pr_merged",
-    detail: `PR #${prNumber} merged — transitioning pr_ready → deploy_pending`,
+    action: auditAction,
+    detail: auditDetail,
   });
+
+  const patch: Record<string, unknown> = {
+    state: newState,
+    audit_log: newAudit,
+    updated_at: new Date().toISOString(),
+  };
+  if (!merged) patch.needs_human_review = true;
 
   const { error: updateErr } = await supabase
     .from("repair_runs")
-    .update({
-      state: "deploy_pending",
-      audit_log: newAudit,
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", r.id)
     .eq("state", "pr_ready");
 
@@ -103,5 +120,5 @@ export async function POST(req: Request) {
     return new NextResponse("db write failed", { status: 500 });
   }
 
-  return NextResponse.json({ matched: true, repair_run_id: r.id, pr_number: prNumber, new_state: "deploy_pending" });
+  return NextResponse.json({ matched: true, repair_run_id: r.id, pr_number: prNumber, merged, new_state: newState });
 }

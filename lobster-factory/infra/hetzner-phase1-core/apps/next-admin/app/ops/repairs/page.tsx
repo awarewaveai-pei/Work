@@ -79,11 +79,18 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
     systemMode = String((modeRes.data as any)?.mode ?? "normal");
   }
 
-  const runsByIncident = new Map(runs.map((r) => [r.incident_id, r]));
-  const queue = incidents
-    .filter((i) => !runsByIncident.has(i.id))
-    .map((i) => ({ incident: i, policy: policyForIncident(i.source, i.severity) }));
   const activeRuns = runs.filter((r) => ACTIVE_STATES.includes(r.state));
+  // P5 fix: an incident leaves the queue only while a run still OWNS it — either in
+  // flight (ACTIVE_STATES) or parked in human_only (an operator took it over manually).
+  // Terminal resolved / rolled_back runs must NOT keep a still-open incident out of the
+  // queue: the operator needs to be able to retry. startRepairFromIncident() already
+  // reuses the existing run row (service.ts:99), so re-surfacing here is safe.
+  const ownedRunIncidentIds = new Set(
+    runs.filter((r) => ACTIVE_STATES.includes(r.state) || r.state === "human_only").map((r) => r.incident_id),
+  );
+  const queue = incidents
+    .filter((i) => !ownedRunIncidentIds.has(i.id))
+    .map((i) => ({ incident: i, policy: policyForIncident(i.source, i.severity) }));
   const recentRuns = runs.slice(0, 30);
   const blocked = systemMode !== "normal";
   const backupGate = readBackupGate();
@@ -132,7 +139,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
         {dbError && <Alert tone="danger" title="資料庫無法使用" body={dbError} />}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, marginBottom: 16 }}>
-          <Metric label="待處理佇列" value={queue.length} hint="尚未建立修復流程的可修復事件" />
+          <Metric label="待處理佇列" value={queue.length} hint="沒有進行中修復流程的可修復事件（含可重試的已結案事件）" />
           <Metric label="進行中修復" value={activeRuns.length} hint="尚未結案或改人工處理" />
           <Metric label="備份閘門" value={backupGate.ok ? backupGate.mode : "已阻擋"} hint="沒有備份就不建立 Issue" tone={backupGate.ok ? "ok" : "warn"} />
           <Metric label="GitHub 閘門" value={githubGate ? "已串接" : "已阻擋"} hint="建立 Issue 需要 token" tone={githubGate ? "ok" : "warn"} />
