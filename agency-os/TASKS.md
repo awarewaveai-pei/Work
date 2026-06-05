@@ -66,6 +66,7 @@
 - [ ] 大修 app.aware-wave.com（12個問題）— AI AGENT 先讀 APP_AWARE_WAVE_COMPLETE_REFERENCE.md → handoffs/2026-06-04-1730-ai-agent-redesign.md
 - [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售 → handoffs/2026-06-05-1948-wp-bridge-deploy-sell.md
 - [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item（Phase4Weekly 錯 repo / incidents API 藏 open / 5 webhook 零流量）→ handoffs/2026-06-05-2017-tomo-201752.md
+- [ ] Hetzner Hosting Layer：驗證 Phase 1 修正(M9/M7/M3/M10,已commit未驗證)+補WORKLOG R0+推進Phase 2(provisionClient CLI) → handoffs/2026-06-05-2030-tomo-203020.md
 
 #### 雙機環境 / 日常開工
 
