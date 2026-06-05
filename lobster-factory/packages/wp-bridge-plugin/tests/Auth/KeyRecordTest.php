@@ -49,9 +49,16 @@ final class KeyRecordTest extends TestCase {
 		$this->assertFalse( $k->isUsable(), 'an unrecognised status must NOT be usable' );
 	}
 
-	public function test_empty_ip_allowlist_permits_any_ip(): void {
-		$k = new KeyRecord( 'k1', 'pub', KeyRecord::SCOPE_READ, KeyRecord::STATUS_ACTIVE, array() );
+	public function test_null_ip_restriction_permits_any_ip(): void {
+		// null (default) = no restriction configured = any IP.
+		$k = new KeyRecord( 'k1', 'pub', KeyRecord::SCOPE_READ, KeyRecord::STATUS_ACTIVE, null );
 		$this->assertTrue( $k->ipAllowed( '203.0.113.7' ) );
+	}
+
+	public function test_empty_array_restriction_denies_all(): void {
+		// An explicit empty list = restricted to zero IPs = deny everything (fail-closed sentinel).
+		$k = new KeyRecord( 'k1', 'pub', KeyRecord::SCOPE_READ, KeyRecord::STATUS_ACTIVE, array() );
+		$this->assertFalse( $k->ipAllowed( '203.0.113.7' ) );
 	}
 
 	public function test_non_empty_ip_allowlist_restricts(): void {

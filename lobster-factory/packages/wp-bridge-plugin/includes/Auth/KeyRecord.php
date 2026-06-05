@@ -41,13 +41,17 @@ final class KeyRecord {
 	private $scope;
 	/** @var string One of STATUS_*. */
 	private $status;
-	/** @var string[] Allowed client IPs; empty array = any IP. */
-	private $ipAllowlist;
+	/**
+	 * @var string[]|null IP restriction. null = UNRESTRICTED (any IP). An array = restricted to
+	 * exactly those IPs; an EMPTY array therefore denies every IP. This null-vs-empty distinction is
+	 * what lets a corrupt allowlist fail CLOSED (deny) instead of fail OPEN (any IP) — see WpdbKeyStore.
+	 */
+	private $ipRestriction;
 
 	/**
-	 * @param string[] $ipAllowlist
+	 * @param string[]|null $ipRestriction null = any IP; array = only these (empty array = none).
 	 */
-	public function __construct( string $keyId, string $publicKeyBase64, string $scope, string $status, array $ipAllowlist = array() ) {
+	public function __construct( string $keyId, string $publicKeyBase64, string $scope, string $status, ?array $ipRestriction = null ) {
 		$this->keyId           = $keyId;
 		$this->publicKeyBase64 = $publicKeyBase64;
 		// Unknown scope/status must degrade to the SAFE option, never the permissive one.
@@ -55,7 +59,9 @@ final class KeyRecord {
 		$this->status          = in_array( $status, array( self::STATUS_ACTIVE, self::STATUS_RETIRING, self::STATUS_REVOKED ), true )
 			? $status
 			: self::STATUS_REVOKED;
-		$this->ipAllowlist     = array_values( array_filter( $ipAllowlist, 'is_string' ) );
+		$this->ipRestriction   = ( $ipRestriction === null )
+			? null
+			: array_values( array_filter( $ipRestriction, 'is_string' ) );
 	}
 
 	public function keyId(): string {
@@ -90,13 +96,14 @@ final class KeyRecord {
 	}
 
 	/**
-	 * Is $clientIp permitted by this key's allowlist? An empty allowlist means "any IP".
-	 * Comparison is exact-string (CIDR support, if ever needed, is a deliberate later addition).
+	 * Is $clientIp permitted? null restriction = any IP allowed. Otherwise the IP must be in the
+	 * list (an empty list denies everything). Comparison is exact-string (CIDR support, if ever
+	 * needed, is a deliberate later addition).
 	 */
 	public function ipAllowed( string $clientIp ): bool {
-		if ( $this->ipAllowlist === array() ) {
+		if ( $this->ipRestriction === null ) {
 			return true;
 		}
-		return in_array( $clientIp, $this->ipAllowlist, true );
+		return in_array( $clientIp, $this->ipRestriction, true );
 	}
 }

@@ -4,6 +4,27 @@
 
 ## 2026-06-05
 
+### wp-bridge — Phase A 砌第三磚 KeyStore（key_id→公鑰 + scope/status/IP）
+
+**背景**：續砌 wp-bridge 認證脊椎。操作者全權授權自主推進（界線：不對 LIVE soulful 真寫入）。
+
+**[已修改]**（`packages/wp-bridge-plugin/includes/Auth/`）
+- `KeyRecord`(值物件:scope read/write、status active/retiring/revoked、IP restriction)、`KeyStore`(介面)、`KeyStoreUnavailable`、`ArrayKeyStore`(測試)、`WpdbKeyStore`(production,prepared SELECT by PK) + 4 測試檔。
+- **least-privilege**：未知 scope→read、未知 status→revoked（白名單非黑名單）。rotation = 多 key 並存(active+retiring 皆 usable)；revoke = status flip 即時生效。
+- **review 驅動硬化**：is_array(row) guard（非陣列 row→fail-closed，不建空 record）；**IP 改 nullable 語意**（null=不限/空陣列=拒全部/**損毀非空→拒全部 fail-closed**，修掉「損毀→放行任何 IP」fail-open）；`hasExpectedColumns()` schema 自檢（防欄位漂移）；DDL：VARBINARY(191) byte-exact PK + public_key CHARACTER SET ascii。
+- ARRAY_A 裸常數 bug（WP 未載入時 fatal，REALTEST 抓到）→ 改字面 'ARRAY_A'。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -d extension=sodium d:\tmp\realtest-nonce.php` | exit=0 | ms=~700 — **49/49 PASS**（KeyStore 新增 16：KeyRecord 9 + ArrayKeyStore 2 + WpdbKeyStore 10，含 fail-closed/非陣列/損毀IP/schema自檢）；`php -l` 18/18。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2M/5n（critic：非陣列 row guard、schema 自檢、IP fail-open tension — **全修**）+ db-expert 0c/0M（schema 安全；提撤銷快取不變量 → 記入 DESIGN activation gate）。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=KeyStore\|KeyRecord\|awbridge_keys\|WpdbKeyStore | hits=0
+  - 新符號零 downstream 消費者（Router 磚未砌，預期）；命中全為新檔 + DESIGN/handoff/README/CODEBASE-MAP brick-order 引用（設計文件）。無平行 key 機制。
+- WORKLOG：本 entry。
+
+**[剩餘風險 / 待續]**
+- activation-brick 必接 gate：`hasExpectedColumns()` + `hasPrimaryKeyOnNonce()`；若加 object cache 包 key resolve()，撤銷端點須同步 `wp_cache_delete`（db-expert Q6）。
+- 下一磚：Http/Router + capability 斷言（scope→WP capability，串接 KeyStore→SignatureVerifier→NonceCache 三件成完整認證管線）。
+
 ### wp-bridge — 計畫深化 + Phase A 砌第二磚 NonceCache（防重放）
 
 **背景**：操作者要深化 aware-wave-wp-bridge 計畫「確保最完美」。先 grill-with-docs 對 repo 實況驗證 → 發現計畫已部分落地（DESIGN.md 為 git-tracked SSOT，Ed25519 SignatureVerifier 7/7 已成）。以 soulfulexpression.org 真實外掛 stack 校準。授權架構師決策續砌。
