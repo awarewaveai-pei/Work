@@ -259,6 +259,16 @@ services:
       NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://us.i.posthog.com}
       # Ops Inbox (Path B) — values from .env; see .env.example (never commit secrets)
       OPS_INBOX_INGEST_TOKEN: ${OPS_INBOX_INGEST_TOKEN:-}
+      # M2 per-source webhook tokens (auto-repair audit §M2). Empty = fall back to the
+      # shared OPS_INBOX_INGEST_TOKEN (deploy-safe default; behaviour unchanged until set).
+      OPS_INBOX_SENTRY_TOKEN: ${OPS_INBOX_SENTRY_TOKEN:-}
+      OPS_INBOX_GRAFANA_TOKEN: ${OPS_INBOX_GRAFANA_TOKEN:-}
+      OPS_INBOX_NETDATA_TOKEN: ${OPS_INBOX_NETDATA_TOKEN:-}
+      OPS_INBOX_UPTIME_KUMA_TOKEN: ${OPS_INBOX_UPTIME_KUMA_TOKEN:-}
+      OPS_INBOX_POSTHOG_TOKEN: ${OPS_INBOX_POSTHOG_TOKEN:-}
+      # Migration window: accept the legacy shared token too while platforms are
+      # re-pointed one at a time. Set "false" once every platform sends its own token.
+      OPS_INBOX_DUAL_ACCEPT_LEGACY: ${OPS_INBOX_DUAL_ACCEPT_LEGACY:-}
       OPS_INBOX_NOTIFY_ENABLED: ${OPS_INBOX_NOTIFY_ENABLED:-}
       OPS_INBOX_SLACK_INCIDENTS_WEBHOOK: ${OPS_INBOX_SLACK_INCIDENTS_WEBHOOK:-}
       OPS_INBOX_PUBLIC_URL: ${OPS_INBOX_PUBLIC_URL:-}
