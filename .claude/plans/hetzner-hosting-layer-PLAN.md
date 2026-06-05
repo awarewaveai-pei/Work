@@ -24,6 +24,36 @@
 
 ---
 
+## 現況分析（已親自實讀驗證，file:line — 不臆測）
+
+### 已確認修復（VBC 驗證，不重工）
+- **C1** approval gate ✅ `dispatch-action-run.ts:38-40`（ActionRunSchema 含 approval_required/status）、`:190`（PostgREST filter `or=(approval_required.eq.false,approval_status.eq.approved)`）、`:99-109`（dispatchRun guard）
+- **C3** SSRF ✅ `create-wp-site.ts:55-78`（noSsrfUrl）、`:82-87`（所有 integration URL 用 ssrfSafeUrl）
+- **M6** manifestPath allowlist ✅ `apply-manifest.ts:39-45`、`:122-125`
+- **M8** slug/wpPath regex ✅ `wp-install-plugins.ts:29-37`
+
+### 確認仍 OPEN（精確行號 = D2 修復目標）
+- **M10** `dispatch-action-run.ts:134-153` — mark-running→trigger→mark-dispatched 三段非原子，trigger 成功但 mark-dispatched 失敗 → 卡 running + trigger_run_id 遺失
+- **M9** `orchestrate-tenant-provisioning.ts:83-115` — for loop 內 webhook 無 try-catch，第 N 個 502 → 後續 provider 完全不跑、無補償
+- **M7** `installManifestStaging.ts:99-106` — `spawn(..., { env: { ...process.env, DRY_RUN } })` 繼承全部 secrets
+- **M3** `wp-install-plugins.ts:191-226` — dry-run 強設 `pluginStatus="installed"` → DB `status="completed"`（虛假）
+
+### 整合點與型別現況（D3 設計依據）
+- **插入點確認**：`create-wp-site.ts:136` 呼叫 `resolveStagingProvisioning()`，**之前無機層**，可直接插入。blocked 分支 `:142-182`（status="blocked" + DB writes disabled）= 機層 blocked 的鏡像範本。
+- **型別不一致（須先修）**：`resolveStagingProvisioning` 回 `{outcome:"blocked"}`（types.ts:26-35）但 `StagingProvisionAdapter` 契約回 `{blocked:true}`（stagingProvisionContract.ts:14-19）。**新 adapter 不可沿用矛盾，統一用 `outcome:` discriminant。**
+- **M1/M2 精確解**：`MockStagingSiteRef`/`VendorStagingSiteRef`（types.ts:4-21）無 `sshHost?` → `create-wp-site.ts:269,309` 才 fallback `TODO_from_staging_ref`。加 optional `sshHost?` 即消除（additive，向後相容）。InputSchema 已有 sshHost/sshCredentialsRef/wpPath（`:104-106`）。stagingRef 選擇三元 `:184-185` 需加機層 outcome 分支。
+- **env-gate 慣例確認**：LOBSTER_HOSTING_ADAPTER(default none) / LOBSTER_ENABLE_DB_WRITES(`:209-211`) / LOBSTER_EXECUTE_MANIFEST_STEPS(`:368-369`) / LOBSTER_SSH_KEY_<REF>(`wp-install-plugins.ts:52-57`)。`LOBSTER_SERVER_ADAPTER` 鏡像之。
+- **approval gate 現成**：`build/runs/route.ts:147-148`（approval_required/status 寫入）、`:114-132`（site_run_already_active 冪等 409）、`contracts.ts:282-453`（Profile A/B `approvalRequired=(env===production)`、Profile C 恆 true、全部 productionDeployAllowed=false）。serverPlan 接此機制即可。
+
+### Vault / 既有資產現況（D3/D4 可用性）
+- 🔴 **`HETZNER_API_TOKEN` 為空**（`mcp/user-env.ps1:14`）— Phase 3 真機開機**硬前提**，需一次性手動填（Hetzner dashboard → Security → API tokens）。`HETZNER_API_BASE_URL` 已有（`:12`）。
+- ✅ `CLOUDFLARE_API_TOKEN` 有效（`:8`）+ Zone ID `f21b1919632fee2221647908a94fdcac` → DNS 自動化 creds 備齊（但 repo **無 DNS record helper**，需新建）。
+- ✅ `RESEND_API_KEY` 有效（`:5`）→ SMTP 共用 pool 可立即用，friction #3 creds 解決。
+- ✅ `secrets-vault.ps1 -Action get -Name <KEY>`（確認旗標是 `-Name` 非 `-Key`）。
+- ⚠️ `install-maintenance-crons.sh` 冪等 + host 偵測，但**靠 hostname 比對 sg/eu**（`:35-43`）；`backup-phase1.sh` **寫死容器名** `lobster-wordpress-db`/`lobster-wordpress`（`:55,75`）→ 新租戶要復用，須**沿用同套容器命名**（見 D3 決策 3）。
+
+---
+
 ## 架構決策（R0，已分析，待使用者批准才實作）
 
 ### 決策 1 — 模組結構：演化現有，不建 `packages/hosting`
@@ -74,23 +104,34 @@
 
 ## D2 — 致命 Open-Gaps 修復（先穩骨幹）
 
-`lobster-factory/packages/workflows/src/`，按致命度：
-- **M9** `orchestrate-tenant-provisioning.ts:82-115` 中途失敗無 rollback → 階段化 compensating rollback（呼應 V2「production delete/rebuild blocked」「rollback plan required」）
-- **M7** `installManifestStaging.ts:99-106` spawn 繼承 process.env 含 secrets → env allowlist
-- **M10** `dispatch-action-run.ts:118-156` 非原子 dispatch → 原子條件 update（db-expert 審）
-- **M3** `wp-install-plugins.ts:160-186` dry-run 偽報 completed → `mode=skipped_dry_run`
-- **M1/M2** `create-wp-site.ts:222,323` TODO 佔位 SSH host → D3 機層產真值消除（同 PR）
+`lobster-factory/packages/workflows/src/`，按致命度（行號已實讀驗證）：
+- **M9** `orchestrate-tenant-provisioning.ts:83-115` — for loop 內 webhook 無 try-catch → 一個 502 中斷整圈、後續 provider 不跑。修：每 provider webhook 包 try-catch（失敗只記錄不 short-circuit）+ 階段化 compensating rollback（失敗的已開資源標記/銷毀，secretRef 進 error detail）。**最致命**。
+- **M7** `installManifestStaging.ts:99-106` — `spawn(..., { env: { ...process.env }})` 繼承全部 secrets。修：env allowlist（只傳 PATH/HOME/DRY_RUN + 該腳本明確需要的）。
+- **M10** `dispatch-action-run.ts:134-153` — mark-running→trigger→mark-dispatched 非原子。修：原子條件 update（trigger 後 mark-dispatched 用 `.eq("status","running")` 條件；失敗補償標記）。**db-expert 先審**。
+- **M3** `wp-install-plugins.ts:191-226` — dry-run 強設 `pluginStatus="installed"` → DB `status="completed"`。修：dry-run 寫獨立 `status`/`mode`（如 `dry_run_simulated`），不偽報 completed。
+- **M1/M2** `create-wp-site.ts:269,309` `TODO_from_staging_ref` → 隨 D3.0（ref 型別加 `sshHost?`）+ 機層產真值消除（同 PR）。
 
 ---
 
 ## D3 — HostingAdapter 升級 + HetznerHostingAdapter（動態層）
 
+### D3.0 前置（型別統一，最小改動，先做）
+- `types.ts`：`MockStagingSiteRef`/`VendorStagingSiteRef` 加 `sshHost?: string`、`ipv4?: string`（additive optional，不破壞既有 callers）→ 消除 M1/M2 的 fallback。
+- 統一 blocked 形狀：`StagingProvisionAdapter` 契約改回 `{ outcome: "blocked", ... }`（移除 `blocked: true`），與 `resolveStagingProvisioning` union 一致。**影響面**：僅 hosting/ 內部 + 1 caller（create-wp-site.ts），grep 確認無其他 consumer。rollback：revert 該 commit。
+- `create-wp-site.ts:184-185` stagingRef 三元加機層 outcome 分支。
+
+### 決策 3 — 租戶容器命名標準化（讓既有 backup/cron 腳本零修改復用）
+- **現況**：`backup-phase1.sh:55,75` 寫死 `lobster-wordpress-db`/`lobster-wordpress`；`install-maintenance-crons.sh:35-43` 靠 hostname 比對。
+- **風險**：新租戶容器名不同 → backup 腳本失效（silent）。改腳本 = 動到 production 既有資產（risk）。
+- **建議**：新租戶 cloud-init 渲染的 docker-compose **沿用同套容器命名 + `--host` 明確傳入**，腳本原封不動復用（不改 production 腳本 = 最小爆炸半徑）。若未來需多站/機，再參數化容器名（env-driven），列為 backlog 不在本期。
+
 ### 架構（依決策 1）
-升級 `packages/workflows/src/hosting/`：
-- `HostingAdapter` 廣義介面（createServer/createStaging/createSnapshot/restoreSnapshot/deleteEnvironment/getHealth/listResources/estimateCost）— V2 §29
-- `providers/hetzner/HetznerHostingAdapter.ts`（主檔）+ `policy.ts`（prod-delete block）+ `labels.ts`（cost-tracking schema）+ `cost.ts`（estimateCost）+ `types.ts`
+升級 `packages/workflows/src/hosting/`（演化現有，不建 packages/hosting）：
+- `HostingAdapter` 廣義介面（createServer/createStaging/createSnapshot/restoreSnapshot/deleteEnvironment/getHealth/listResources/estimateCost）— V2 §29；現有 `StagingProvisionAdapter` 成為 createStaging 內部實作。
+- `providers/hetzner/HetznerHostingAdapter.ts`（主檔）+ `policy.ts`（prod-delete/rebuild block）+ `labels.ts`（cost-tracking schema）+ `cost.ts`（estimateCost）+ `types.ts`
+- `providers/cloudflare/dns.ts`（**新**：A-record 建/更新/刪，idempotent；複用 `CLOUDFLARE_API_TOKEN` + Zone ID `f21b1919632fee2221647908a94fdcac`）— repo 現無此 helper，friction #1 本體。
 - `resolveServerProvisioning.ts`（機層進入點，鏡像 resolveStagingProvisioning env-gate）
-- `ssrf.ts`（抽 create-wp-site.ts:43-78 共用）
+- `ssrf.ts`（抽 create-wp-site.ts:55-78 共用，站層機層同一套）
 - cloud-init `infra/hetzner-provision/cloud-init/day1-hardening.yaml.tmpl` + `post-boot-bootstrap.sh`
 
 ### V2 補充併入（原計畫缺的 8 個自動化設計）
@@ -159,17 +200,24 @@ V2 §4 tiers 轉成 input schema + provisioning 參數：
 - 讓它真正順的底層 = **M9 rollback（失敗不留孤兒）+ C2 idempotent（重送回 reused 不重複計費）+ env gate dry-run** — 這三個是「順暢無阻」的工程本體，已在 D2/D3。
 
 **為達端到端順暢，需補的 3 個 friction（原計畫未明確）**：
-1. **Cloudflare DNS 自動化**：開機後自動建 A-record（新 server IP，proxied）。原計畫只有 DNS-01 cert（用 Cloudflare API），**沒有指向網站的 A-record**。→ 新增 `providers/cloudflare/dns.ts`（建/更新/刪 record，idempotent；複用既有 Cloudflare token）。無此步 = 客戶站開好但網域不通 = 卡。
-2. **Domain 來源決策**：客戶自帶網域（需 NS 委派或加 record 的手動步驟）vs 我們代管子網域（`<slug>.aware-wave.com` 全自動）。→ 建議：staging/preview 一律用我方子網域（全自動順暢）；正式網域客戶自帶（launch gate 內一次性設定）。寫進 D6 tier 流程。
-3. **SMTP 憑證策略**：FluentSMTP 需外部 SMTP key。per-client 申請 = 卡。→ 建議：共用 SES/Resend domain pool（子帳號/子網域），provisioning 自動帶入，零人工。憑證走 vault。
+1. **Cloudflare DNS 自動化**：開機後自動建 A-record（新 server IP，proxied）。原計畫只有 DNS-01 cert，**沒有指向網站的 A-record**。→ 新增 `providers/cloudflare/dns.ts`。**creds 已備**（CLOUDFLARE_API_TOKEN 有效 + Zone ID 已知），只缺 helper 程式。無此步 = 站開好但網址不通 = 卡。
+2. **Domain 來源決策**：客戶自帶網域 vs 我方子網域。→ 建議：staging/preview 一律 `<slug>.aware-wave.com`（全自動順暢）；正式網域客戶自帶（launch gate 內一次設定）。寫進 D6。
+3. **SMTP 憑證**：FluentSMTP 需外部 SMTP key。→ 建議共用 **Resend** pool（`RESEND_API_KEY` 已在 vault 且有效），provisioning 自動帶入，零人工。friction 已大幅降低。
 
-> 補上這 3 個，staging→交付才真正一鍵順暢；正式上線維持 1 個安全 approve。
+> 補上這 3 個，staging→交付才真正一鍵順暢；正式上線維持 1 個安全 approve。creds 現況：CF ✅ / Resend ✅ / **Hetzner ❌ 空（見前置條件）**。
+
+## 前置條件（Prerequisites，Phase 3 前必備）
+
+1. 🔴 **填入 `HETZNER_API_TOKEN`**（`mcp/user-env.ps1:14` 現為空）— 一次性手動：Hetzner Cloud Console → Security → API tokens → 建 **staging-scoped** token（依決策：read+create+delete staging）+ **production read/snapshot** token。寫入 vault（`secrets-vault.ps1 -Action set -Name HETZNER_STAGING_TOKEN`）。**無此 token，Phase 3 真機開機無法進行**（但 Phase 0-2 dry-run 不受影響）。
+2. ✅ Cloudflare token / Zone ID — 已備。
+3. ✅ Resend SMTP key — 已備。
+4. Hetzner 帳號健康（V2 §3）：確認非新帳號詐騙風險期、付款方式有效、deletion protection 流程。
 
 ## 執行順序（30 年紀律）
 
 - **Phase 0**：baseline checkpoint + 紅線給另一 AI + D1 SOP + D5 V2 入庫（純文件，Low risk，立即交付）
 - **Phase 1**：D2 修致命 gaps（M9→M7→M10→M3，R0 四動作 + critic，M10 經 db-expert）
-- **Phase 2**：D3 HostingAdapter 升級 + cloud-init + mock + dry-run + D4 OpenTofu 靜態（Layer 1 純本機驗證，不花錢）；M1/M2 同 PR 消除
+- **Phase 2**：D3.0 型別統一（先）→ D3 HostingAdapter 升級 + providers/hetzner + providers/cloudflare/dns + cloud-init + mock + dry-run + D4 OpenTofu 靜態（Layer 1 純本機驗證，不花錢）；M1/M2 同 PR 消除
 - **Phase 3**：真機驗收（cx22 開完即銷毀，High risk，需明示 go-ahead）
 - **Phase 4**：D6 tier 映射 + launch gate + field-test backlog
 
