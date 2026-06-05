@@ -4,6 +4,34 @@
 
 ## 2026-06-05
 
+### app.aware-wave.com — 塔羅牌印刷檔生成工具（MVP，本機 build/tsc 綠，待 SG deploy 驗 live gen）
+
+**背景**：使用者要在 app.aware-wave.com 加塔羅牌印刷檔生成工具。工作流（使用者確認）：文字生圖/以圖生圖生一張樣本→鎖風格→整套 78 張同風格→下載 PNG 印刷牌卡。提供的 `tarot-ai-generator.jsx` 是 artifact 原型（瀏覽器直打 anthropic、無 key、生 SVG），僅取其牌資料+版面。
+
+**三個釐清的硬約束（寫進決策）**：① $100 Claude 訂閱無法給網站程式用→必須 API key（app env 已有 REPLICATE_API_TOKEN+OPENAI_API_KEY）② Claude 不生 raster 圖，真實圖片只能用圖片模型 ③ SVG 做不到 img2img/吃上傳風格圖→確定走 PNG 圖片模型。使用者選：PNG 圖片模型 + 完整印刷牌卡 + FLUX/gpt-image-1 兩者皆支援。
+
+**[已修改]**（`infra/hetzner-phase1-core/apps/next-admin/`，純新增 + 1 行側欄 + 1 dep）
+- `app/tools/tarot/cards.ts` — 78 張牌資料（移植原型、修 mojibake）+ 每張 subjectPrompt + buildCardPrompt()。
+- `lib/tarot/image-gen.ts` — server 生成（FLUX `Prefer:wait`+poll / OpenAI gpt-image-1 generations+edits），AbortController timeout，統一回 data:png。
+- `app/api/tools/tarot/generate/route.ts` — POST，auth 重用 resolveOpsRole+canCreateAiImageJob（owner/admin/operator），輸入驗證。
+- `app/tools/tarot/TarotStudio.tsx`（`"use client"`）— Step1 風格預覽→鎖定→Step2 逐張批次 78（進度+單張重試）→Step3 canvas 組印刷牌卡+JSZip 下載。
+- `app/tools/tarot/renderPrintCard.ts` — client canvas 組 898×1488 PNG（70×120mm @300DPI 含出血）。
+- `app/tools/tarot/page.tsx`、`app/layout.tsx`（Content Tools 加 🔮 Tarot）、`package.json`（+jszip）。
+- **架構**：薄 server（金鑰只在 server，一張圖一 request 壓 nginx 60s 內，client 迴圈 78 次），組版/打包全在 client canvas（避開 R2/sharp/佇列）。MVP 不建 ai_image_jobs 佇列（無 worker 空殼）。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`next build`（清 .next 後）| exit=0 — 路由註冊 `ƒ /api/tools/tarot/generate` + `○ /tools/tarot`（7.76 kB）；server/client 邊界、jszip 動態 import、canvas 全編譯通過。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`tsc --noEmit` | exit=0（安全修正後再跑仍 0）。
+- REALTEST_WAIVED: QUERY_ONLY -- live 付費生成（FLUX/OpenAI）本機 .env.local 無此三 key（僅 SG server 有），無法本機實打；改為 SG deploy 後 smoke `/tools/tarot` + 真生一張驗證。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0C/3H/4M — H1 上游錯誤 body 外洩、H2 urlToDataUrl SSRF+無大小上限、H3 referenceImage 無大小/MIME 驗證 + M2 objectURL 洩漏 **已全部修**（image-gen 改 console.error+generic code、加 replicate.delivery host allowlist+20MB cap、route 加 png/jpeg/webp+9MB 驗證、TarotStudio revoke-on-replace+unmount cleanup）。M1/M3/L6（poll sleep abort、429 backoff、server 端 quota）列 enhancement 未做。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=canCreateAiImageJob\|resolveOpsRole\|roleHeader\|generateTarotImage\|tools/tarot | hits=0（call sites 與既有 ai-image-jobs route 一致；所有 tarot 命中皆 .next build 產物/gitignore，無 source stale）。
+
+**[剩餘風險 / 待續]**
+- **未 deploy**：需 `/check-drift`→`/verify`→go-ahead→`sg-deploy.sh next-admin`，並確認 SG container 內 REPLICATE_API_TOKEN/OPENAI_API_KEY 可讀 + smoke `/tools/tarot` 200 + 真生一張。
+- nginx 60s/req：gpt-image-1 高品質可能近上限（FLUX dev 通常 <30s）；對策調 quality/或單獨提高該 route proxy_read_timeout。
+- 成本：每套約 NT$60–150，UI 批次前 window.confirm 二次確認；**無 server 端 quota（L6）**，operator 角色可腳本刷 spend → 未來補。
+- enhancement：upscale 到精確 827×1417、R2 持久化、Trigger.dev 批次（免瀏覽器開著）。
+
 ### wp-bridge — 從「不能跑」到「真站驗證 9/9」：runnable 層 + 端到端整合測試
 
 **背景**：使用者「把整個測試完，確認可以使用」。前 6 磚是 WP-free 核心（裝不進 WP）。本次補 runnable 層 + 起真 WordPress 端到端驗證。

@@ -42,8 +42,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/ops/clients" className="sidebar-link" title="全客戶健康狀態 + WP 外掛更新">
                   <span className="sidebar-icon">👥</span> Clients
                 </Link>
-                <Link href="/ops/onboarding" className="sidebar-link" title="新客戶建站：填表 → Claude 生規格">
-                  <span className="sidebar-icon">✨</span> Onboarding
+                <Link href="/ops/onboarding" className="sidebar-link" title="建站第 1 步：客戶探索式問卷（公司/品牌/客群/目標/視覺）→ Claude 生成網站規格">
+                  <span className="sidebar-icon">✨</span> Onboarding（客戶 Intake）
                 </Link>
                 <Link href="/ops/integrations" className="sidebar-link" title="客戶工具串接狀態：監控 / 通知 / AI / GitHub">
                   <span className="sidebar-icon">⇄</span> Integrations
@@ -67,8 +67,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               {/* 4. 客戶開通（建立新東西）─────────────────── */}
               <div className="sidebar-section">
                 <div className="sidebar-section-label">Provisioning</div>
-                <Link href="/onboard" className="sidebar-link" title="新客戶上線精靈">
-                  <span className="sidebar-icon">✦</span> New Client
+                <Link href="/onboard" className="sidebar-link" title="建站第 2 步：技術建站精靈（客戶資訊 → 部門選型 M3 → 開通服務帳號 → 帶入 Build Console）。intake 之後的執行步驟">
+                  <span className="sidebar-icon">✦</span> 建站精靈（技術）
                 </Link>
                 <Link href="/build" className="sidebar-link" title="部署執行：plan_only 或 enqueue">
                   <span className="sidebar-icon">⚡</span> Build Console
