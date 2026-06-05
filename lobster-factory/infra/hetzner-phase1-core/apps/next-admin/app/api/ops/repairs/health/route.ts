@@ -296,6 +296,47 @@ function policyCatalogTextOk(): boolean {
   return [...sourcePolicyText, ...repairLabelText].every(textIsPresent) && REQUIRED_POLICY_TEXT.every((text) => catalogText.includes(text));
 }
 
+// P6 fix: the SSH script/auto-reboot probes (4 SSH connections) + GitHub API calls (2)
+// used to run on EVERY GET. This endpoint is public (nginx health location) and the Repair
+// Center page is force-dynamic, so each page load / monitor poll fired 4 fresh SSH connects —
+// heavy, and a DoS lever now that the route is reachable. Cache only the expensive probes for
+// PROBE_TTL_MS; the cheap, liveness-relevant bits (system_mode, active_runs) stay real-time.
+interface ExpensiveProbes {
+  scriptProbe: BackupScriptProbe;
+  githubCheck: GithubRepoCheck;
+  autoRebootProbe: AutoRebootProbe;
+}
+const PROBE_TTL_MS = 60_000;
+let probeCache: { at: number; data: ExpensiveProbes } | null = null;
+
+async function getExpensiveProbes(
+  backupMode: string,
+  githubToken: string,
+  githubOwner: string,
+  githubRepo: string,
+): Promise<{ probes: ExpensiveProbes; cached: boolean; ageMs: number }> {
+  const now = Date.now();
+  if (probeCache && now - probeCache.at < PROBE_TTL_MS) {
+    return { probes: probeCache.data, cached: true, ageMs: now - probeCache.at };
+  }
+  const [scriptProbe, githubCheck, autoRebootProbe] = await Promise.all([
+    probeBackupScripts(backupMode),
+    githubToken
+      ? checkGithubRepoAndApp(githubOwner, githubRepo, githubToken)
+      : Promise.resolve<GithubRepoCheck>({
+          repo_accessible: null,
+          push_access: null,
+          app_installed: null,
+          app_status: "error",
+          note: "Configure AUTO_REPAIR_GITHUB_TOKEN or GITHUB_TOKEN to enable GitHub handoff.",
+        }),
+    probeAutoRebootConfig(backupMode),
+  ]);
+  const data: ExpensiveProbes = { scriptProbe, githubCheck, autoRebootProbe };
+  probeCache = { at: now, data };
+  return { probes: data, cached: false, ageMs: 0 };
+}
+
 export async function GET() {
   const supabase = getSupabaseServerClient();
   const mode = await getCurrentSystemMode();
