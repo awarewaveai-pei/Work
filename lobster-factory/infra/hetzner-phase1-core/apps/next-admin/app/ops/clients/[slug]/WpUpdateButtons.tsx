@@ -19,26 +19,17 @@ interface Props {
   waves: WaveConfig;
 }
 
-const WAVE_META: Record<Wave, { label: string; colour: string; borderColour: string; desc: string }> = {
+const WAVE_META: Record<Wave, { label: string; desc: string }> = {
   wave1: {
     label: "Wave 1 — High Risk",
-    colour:
-      "bg-red-600 hover:bg-red-700 disabled:bg-red-900 text-white",
-    borderColour: "border-red-700",
     desc: "WooCommerce / Auth / Payment — one-by-one, stops on failure",
   },
   wave2: {
     label: "Wave 2 — Medium Risk",
-    colour:
-      "bg-amber-500 hover:bg-amber-600 disabled:bg-amber-800 text-white",
-    borderColour: "border-amber-600",
     desc: "Forms / SEO / Caching — one-by-one",
   },
   wave3: {
     label: "Wave 3 — Low Risk",
-    colour:
-      "bg-green-600 hover:bg-green-700 disabled:bg-green-900 text-white",
-    borderColour: "border-green-700",
     desc: "Utilities / Analytics — batch",
   },
 };
@@ -128,22 +119,17 @@ export function WpUpdateButtons({ slug, waves }: Props) {
   const pluginCount = (w: Wave) => waves[w]?.length ?? 0;
 
   return (
-    <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-zinc-100 uppercase tracking-wide">
-          WP Plugin Updates (SSH)
-        </h2>
+    <div className="wp-up-panel">
+      <div className="wp-up-head">
+        <h2 className="wp-up-title">WP Plugin Updates (SSH)</h2>
         {running && (
-          <button
-            onClick={abort}
-            className="text-xs px-2 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300"
-          >
+          <button onClick={abort} className="wp-up-abort">
             ⛔ Abort
           </button>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="wp-up-btn-row">
         {(["wave1", "wave2", "wave3"] as Wave[]).map((wave) => {
           const meta = WAVE_META[wave];
           const count = pluginCount(wave);
@@ -154,12 +140,12 @@ export function WpUpdateButtons({ slug, waves }: Props) {
               onClick={() => runWave(wave)}
               disabled={running !== null}
               title={meta.desc}
-              className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${meta.colour}`}
+              className={`wp-up-btn wp-up-${wave}`}
             >
               {isRunning ? (
-                <span className="flex items-center gap-1">
-                  <span className="animate-spin">⟳</span> {meta.label}
-                </span>
+                <>
+                  <span className="wp-up-spinner">⟳</span> {meta.label}
+                </>
               ) : (
                 `${meta.label} (${count})`
               )}
@@ -170,7 +156,7 @@ export function WpUpdateButtons({ slug, waves }: Props) {
 
       {log.length > 0 && (
         <div
-          className={`rounded border ${WAVE_META[running ?? "wave3"].borderColour} bg-black font-mono text-xs text-green-400 p-3 overflow-y-auto`}
+          className={`wp-up-log wp-up-log-${running ?? "wave3"}`}
           style={{ maxHeight: 320 }}
         >
           {log.map((line, i) => (

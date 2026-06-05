@@ -1380,3 +1380,92 @@ pre {
   background: var(--body-bg);
   border-color: #c0c8da;
 }
+
+/* ── WP Plugin Update Buttons (ops/clients/[slug]) ────────────────
+   Replaces former Tailwind classes (app ships no Tailwind). Real CSS
+   so :hover / :disabled / spinner keyframes work. */
+.wp-up-panel {
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wp-up-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wp-up-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+}
+
+.wp-up-abort {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  background: var(--body-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background .15s;
+}
+.wp-up-abort:hover { background: var(--bg-hover); }
+
+.wp-up-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wp-up-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 7px;
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+.wp-up-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.wp-up-wave1 { background: #dc2626; }
+.wp-up-wave1:not(:disabled):hover { background: #b91c1c; }
+.wp-up-wave2 { background: #f59e0b; }
+.wp-up-wave2:not(:disabled):hover { background: #d97706; }
+.wp-up-wave3 { background: #16a34a; }
+.wp-up-wave3:not(:disabled):hover { background: #15803d; }
+
+.wp-up-spinner {
+  display: inline-block;
+  animation: wp-up-spin 1s linear infinite;
+}
+@keyframes wp-up-spin { to { transform: rotate(360deg); } }
+
+.wp-up-log {
+  border: 1px solid var(--sidebar-border);
+  background: #07101f;
+  color: #4ade80;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  overflow-y: auto;
+}
+.wp-up-log-wave1 { border-color: #b91c1c; }
+.wp-up-log-wave2 { border-color: #d97706; }
+.wp-up-log-wave3 { border-color: #15803d; }
