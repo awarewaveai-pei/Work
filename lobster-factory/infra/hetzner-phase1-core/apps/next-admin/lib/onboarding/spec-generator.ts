@@ -54,6 +54,7 @@ Rules:
 - All text in ${form.language ?? "zh-TW"}
 - sitemap must include: home + pages_needed (${(form.pages_needed ?? []).join(", ")})
 - design.primary_color MUST be exactly #RRGGBB (e.g. #1a1a2e)
+- If the form provides primary_color and/or secondary_color, design MUST honour them (convert any plain-language description to the closest #RRGGBB). Only invent a color when the form leaves it blank, and any derived secondary_color must be harmonious with the primary. kadence.global_color_palette should lead with [primary, secondary].
 - seo.schema_type: "Store" if ecommerce, "LocalBusiness" if service/tourism, "Organization" otherwise
 - Add plugin_config.woocommerce only if has_ecommerce=true
 - Add plugin_config.fluentcrm only if needs_crm=true

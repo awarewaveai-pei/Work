@@ -27,6 +27,7 @@ export interface IntakeForm {
   reference_sites?: string[];       // max 3 URLs
   visual_style?: VisualStyle[];
   primary_color?: string;           // hex (#RRGGBB) or plain description
+  secondary_color?: string;         // optional brand accent; blank → Claude derives a harmonious one
   logo_status?: LogoStatus;
   product_type?: ProductType[];     // required when has_ecommerce = true
   needs_crm?: boolean;

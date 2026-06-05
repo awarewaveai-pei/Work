@@ -1471,3 +1471,426 @@ pre {
 .wp-up-log-wave1 { border-color: #b91c1c; }
 .wp-up-log-wave2 { border-color: #d97706; }
 .wp-up-log-wave3 { border-color: #15803d; }
+
+/* ── Intake (Onboarding Wizard) ───────────────────────────────
+   Prefix: .intake-*
+   Customer-facing 5-step intake form for new client onboarding.
+   Renders as a centred white card on the canvas background.
+───────────────────────────────────────────────────────────── */
+
+/* Page wrapper: centres the card on canvas */
+.intake-page-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px 64px;
+  min-height: calc(100vh - 64px);
+}
+
+/* Header above the card */
+.intake-page-head {
+  max-width: 640px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.intake-page-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.intake-page-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* The card itself */
+.intake-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 32px;
+  width: 100%;
+  max-width: 640px;
+}
+
+/* ── Step indicator ── */
+.intake-stepper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.intake-stepper-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+}
+
+/* The horizontal line that connects circles — sits between items */
+.intake-stepper-line {
+  position: absolute;
+  top: 14px;          /* vertically centres on the 28px circle */
+  right: 50%;
+  left: -50%;
+  height: 2px;
+  background: var(--card-border);
+  z-index: 0;
+  transition: background 0.3s;
+}
+
+.intake-stepper-line--filled {
+  background: var(--accent);
+}
+
+/* The numbered circle */
+.intake-stepper-circle {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  border: 2px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.intake-stepper-circle.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.intake-stepper-circle.done {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+  font-size: 11px;
+}
+
+/* Label under each circle */
+.intake-stepper-label {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.2;
+  transition: color 0.2s;
+}
+
+.intake-stepper-label.active {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.intake-stepper-label.done {
+  color: var(--green);
+}
+
+/* Step meta line (步驟 N/5 · 預估 X min) */
+.intake-step-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+/* Step title h2 */
+.intake-step-title {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+
+/* Fields container */
+.intake-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Required asterisk */
+.intake-required {
+  color: var(--accent);
+  margin-left: 2px;
+}
+
+/* Inline hint text next to labels */
+.intake-hint-inline {
+  font-size: 10.5px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+/* Error message inline */
+.intake-error-inline {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+  border-radius: 7px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+/* ── Multi-select chip grid ── */
+.intake-chip-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Chip: used for checkbox and button toggles */
+.intake-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  text-align: left;
+  user-select: none;
+}
+
+.intake-chip:hover {
+  border-color: var(--accent-hover);
+  background: var(--bg-hover);
+}
+
+.intake-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Wide chip spans full width — for feature toggles + radio groups */
+.intake-chip--wide {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+
+/* Sub-text inside wide chips (e.g. "WooCommerce") */
+.intake-chip-sub {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* Hide the raw input element inside chips */
+.intake-chip-input {
+  display: none;
+}
+
+/* ── Navigation row ── */
+.intake-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--card-border);
+  gap: 12px;
+}
+
+.intake-nav-next {
+  padding: 10px 24px;
+  font-size: 14px;
+}
+
+/* ── Result view ── */
+.intake-result-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.intake-result-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #16a34a;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.intake-result-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.intake-result-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.intake-spec-block {
+  background: var(--bg-subtle);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.intake-spec-block-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.intake-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--card-border);
+  align-items: center;
+}
+
+.intake-btn-full {
+  flex: 1;
+  min-width: 160px;
+  padding: 11px 20px;
+  font-size: 14px;
+}
+
+/* Success banner (build queued) */
+.intake-success-banner {
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: #166534;
+}
+
+.intake-success-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.intake-success-link:hover { text-decoration: underline; }
+
+/* Error block (full-page error state) */
+.intake-error-block {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  color: #991b1b;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* ── Processing state ── */
+.intake-processing {
+  text-align: center;
+  padding: 48px 32px;
+}
+
+.intake-processing-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  line-height: 1;
+}
+
+.intake-processing-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.intake-processing-bar {
+  margin: 20px auto 0;
+  width: 200px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--card-border);
+  overflow: hidden;
+}
+
+.intake-processing-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  animation: intake-progress-slide 1.8s ease-in-out infinite;
+}
+
+@keyframes intake-progress-slide {
+  0%   { transform: translateX(-100%); width: 60%; }
+  50%  { transform: translateX(80%);   width: 60%; }
+  100% { transform: translateX(200%);  width: 60%; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .intake-card {
+    padding: 20px 16px;
+  }
+
+  .intake-chip-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .intake-stepper-label {
+    display: none;   /* too cramped at 320px; circles + line remain */
+  }
+
+  .intake-nav-next {
+    flex: 1;
+  }
+}

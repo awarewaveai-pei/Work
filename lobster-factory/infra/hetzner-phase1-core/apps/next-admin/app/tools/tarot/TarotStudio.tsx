@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, type TarotCard } from "./cards";
 import { renderPrintCard } from "./renderPrintCard";
+// type-only import (erased at build — does not pull the server lib into the client bundle);
+// keeps the model union in sync with the server. img2img/cost stay local on purpose.
+import type { TarotModel } from "../../../lib/tarot/image-gen";
 
-type TarotModel = "flux-schnell" | "flux-dev" | "openai-low" | "openai-medium" | "openai-high";
 type Mode = "text" | "image";
 
 interface GenResponse {

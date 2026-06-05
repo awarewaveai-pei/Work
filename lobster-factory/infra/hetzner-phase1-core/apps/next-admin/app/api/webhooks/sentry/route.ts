@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { verifyIngestToken } from "@/lib/ops-inbox/verifyIngestToken";
+import { verifyIngestSource } from "@/lib/ops-inbox/verifyIngestToken";
 import { redactSecrets } from "@/lib/ops-inbox/redactSecrets";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { computeFingerprint } from "@/lib/ops-inbox/fingerprint";
@@ -16,7 +16,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  if (!verifyIngestToken(req)) {
+  const auth = verifyIngestSource(req, "sentry");
+  if (!auth.ok) {
+    if (auth.reason === "bad_bearer" && req.headers.get("authorization")) {
+      Sentry.captureMessage("ops-inbox auth rejected: sentry token mismatch", "warning");
+    }
     return new NextResponse("unauthorized", { status: 401 });
   }
 

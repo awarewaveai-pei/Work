@@ -7,7 +7,7 @@ import { redactSecrets } from "@/lib/ops-inbox/redactSecrets";
 import { computeTransition } from "@/lib/ops-inbox/transition";
 import { upsertIncidentAtomic } from "@/lib/ops-inbox/upsertIncidentAtomic";
 import type { Incident, IncidentSnapshot } from "@/lib/ops-inbox/types";
-import { verifyIngestToken } from "@/lib/ops-inbox/verifyIngestToken";
+import { verifyIngestSource } from "@/lib/ops-inbox/verifyIngestToken";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { triggerAutoClassify } from "@/lib/ops-inbox/ai/triggerAutoClassify";
 import { dispatchNotifications } from "@/lib/ops-inbox/notify/dispatcher";
@@ -16,7 +16,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  if (!verifyIngestToken(req)) return new NextResponse("unauthorized", { status: 401 });
+  const auth = verifyIngestSource(req, "uptime_kuma");
+  if (!auth.ok) {
+    if (auth.reason === "bad_bearer" && req.headers.get("authorization")) {
+      Sentry.captureMessage("ops-inbox auth rejected: uptime_kuma token mismatch", "warning");
+    }
+    return new NextResponse("unauthorized", { status: 401 });
+  }
 
   // C3 + M3 fix: bounded body read (256KB cap) preserving raw bytes for future HMAC.
   const body = await readWebhookBody(req);
