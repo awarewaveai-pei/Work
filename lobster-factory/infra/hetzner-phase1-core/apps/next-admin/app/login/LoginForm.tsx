@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/ssr";
 
 // Sanitise the post-login redirect target: only same-origin absolute paths, never an
@@ -13,7 +13,6 @@ function safeNext(raw: string | null): string {
 }
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
 
@@ -37,9 +36,10 @@ export function LoginForm() {
         setBusy(false);
         return;
       }
-      // Cookies are now set by the browser client; navigate and re-render server components.
-      router.replace(next);
-      router.refresh();
+      // Full-page navigation: the session cookie the browser client just set is sent on this
+      // real request so the middleware authenticates it. A soft router.replace() against the
+      // auth-gated target can hang or loop because the new cookie isn't picked up.
+      window.location.assign(next);
     } catch {
       setError("登入時發生未預期的錯誤，請稍後再試。");
       setBusy(false);

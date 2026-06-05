@@ -26,6 +26,10 @@ const PUBLIC_API_PATHS = new Set<string>([
   "/api/ops/inbox/digest",
   "/api/ops/inbox/incidents",
   "/api/ops/probe",
+  // Public health endpoint (nginx has a dedicated no-auth location for it; used by smoke +
+  // external uptime monitors). Its expensive SSH/GitHub probes are TTL-cached (see the route)
+  // so public reachability is not a DoS lever.
+  "/api/ops/repairs/health",
 ]);
 
 function isDevelopment(): boolean {

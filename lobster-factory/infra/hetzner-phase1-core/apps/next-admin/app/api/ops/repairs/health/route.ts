@@ -367,22 +367,14 @@ export async function GET() {
     tableError = res.error?.message ?? null;
   }
 
-  // GAP-01: SSH probe runs on every GET — real-time script existence check.
-  // GAP-03: GitHub check runs env var → comments API → unverified (three-tier).
-  // GAP-04: VPS auto-reboot config probe (B-Minimal) — same SSH credentials as GAP-01.
-  const [scriptProbe, githubCheck, autoRebootProbe] = await Promise.all([
-    probeBackupScripts(backupMode),
-    githubToken
-      ? checkGithubRepoAndApp(githubOwner, githubRepo, githubToken)
-      : Promise.resolve<GithubRepoCheck>({
-          repo_accessible: null,
-          push_access: null,
-          app_installed: null,
-          app_status: "error",
-          note: "Configure AUTO_REPAIR_GITHUB_TOKEN or GITHUB_TOKEN to enable GitHub handoff.",
-        }),
-    probeAutoRebootConfig(backupMode),
-  ]);
+  // GAP-01/03/04 (SSH + GitHub) are expensive and now served behind a TTL cache (P6).
+  const { probes, cached: probeCached, ageMs: probeAgeMs } = await getExpensiveProbes(
+    backupMode,
+    githubToken,
+    githubOwner,
+    githubRepo,
+  );
+  const { scriptProbe, githubCheck, autoRebootProbe } = probes;
 
   const ok = tableOk && mode === "normal" && backupConfigured && githubConfigured;
 
@@ -399,6 +391,7 @@ export async function GET() {
       eu_backup_required: euRequired,
       eu_backup_configured: euSsh,
       backup_script_probe: scriptProbe,
+      probe_cache: { cached: probeCached, age_ms: probeAgeMs, ttl_ms: PROBE_TTL_MS },
       github_configured: githubConfigured,
       github_repo_target: githubConfigured ? { owner: githubOwner, repo: githubRepo } : null,
       github_repo_accessible: githubCheck.repo_accessible,
