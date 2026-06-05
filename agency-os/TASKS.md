@@ -63,10 +63,11 @@
 - [x] **【✅ 2026-06-03 完成】Onboarding Portal §7 staging build 串接 + §8 Uptime Kuma env** — `POST /api/onboarding/trigger-build` 上線；idempotency + FK cross-validate + middleware matcher 修正；UPTIME_KUMA_URL 補入 docker-compose；real exec test PASS（run_id c9b6cc0e, intake_forms.status=building）。commit a573b759 + 59d4e7c。
 - [x] **【✅ 2026-06-03 完成】明天 carry-over：onboarding §7/§8 + scripts drift** — §7/§8 完成；scripts drift 仍開放（見工具層分類）
 - [x] **【✅ 2026-06-04 已解決，方案改變】** ~~Cloudflare WAF wp-login 規則改 ip.geoip.country~~ — geo 方案對全球跑的操作者不利（出國會自擋）。改用 **LLAR (Limit Login Attempts Reloaded)** 伺服器端防護替代，CF Custom WAF Rules 已清空不重建。證據 WORKLOG:121。handoff 174946 已可歸檔。
-- [ ] 大修 app.aware-wave.com（12個問題）— AI AGENT 先讀 APP_AWARE_WAVE_COMPLETE_REFERENCE.md → handoffs/2026-06-04-1730-ai-agent-redesign.md
+- [x] **【✅ 2026-06-05 完成上線】大修 app.aware-wave.com（12個問題）** — P1 Supabase Auth 登入上線（操作者實測 OK）+ P2-P12 全修全部署；onboarding intake 重設計+去重複。現況見 `docs/operations/APP_AWARE_WAVE_CURRENT_STATE.md`。後續 IA 重整 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 - [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售 → handoffs/2026-06-05-1948-wp-bridge-deploy-sell.md
 - [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item（Phase4Weekly 錯 repo / incidents API 藏 open / 5 webhook 零流量）→ handoffs/2026-06-05-2017-tomo-201752.md
 - [ ] Hetzner Hosting Layer：驗證 Phase 1 修正(M9/M7/M3/M10,已commit未驗證)+補WORKLOG R0+推進Phase 2(provisionClient CLI) → handoffs/2026-06-05-2030-tomo-203020.md
+- [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 
 #### 雙機環境 / 日常開工
 
