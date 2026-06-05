@@ -5,7 +5,7 @@ import { roleHeader } from "../../../lib/ops-role";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, type TarotCard } from "./cards";
 import { renderPrintCard } from "./renderPrintCard";
 
-type Provider = "flux" | "openai";
+type TarotModel = "flux-schnell" | "flux-dev" | "openai-low" | "openai-medium" | "openai-high";
 type Mode = "text" | "image";
 
 interface GenResponse {
@@ -23,11 +23,22 @@ interface BatchItem {
   error?: string;
 }
 
-// Rough cost per image (NT$) for the "generate all 78" confirmation.
-const COST_PER_IMG_NT: Record<Provider, number> = { flux: 1, openai: 2 };
+// Model menu, cheapest → priciest. costNt = rough NT$ per image (for the 78-card estimate).
+// img2img = whether the model uses an uploaded reference image for style transfer.
+const MODEL_OPTIONS: { value: TarotModel; label: string; costNt: number; img2img: boolean }[] = [
+  { value: "flux-schnell", label: "FLUX schnell · 最省 ~NT$0.1/張（整套約 NT$8）", costNt: 0.1, img2img: false },
+  { value: "openai-low", label: "gpt-image-1 低品質 · ~NT$0.5/張（整套約 NT$40）", costNt: 0.5, img2img: true },
+  { value: "flux-dev", label: "FLUX dev · 品質好 ~NT$1/張（整套約 NT$80）", costNt: 1, img2img: true },
+  { value: "openai-medium", label: "gpt-image-1 中品質 · ~NT$1.3/張（整套約 NT$100）", costNt: 1.3, img2img: true },
+  { value: "openai-high", label: "gpt-image-1 高品質 · ~NT$5.5/張（整套約 NT$430）", costNt: 5.5, img2img: true },
+];
+
+function modelOption(m: TarotModel) {
+  return MODEL_OPTIONS.find((o) => o.value === m) ?? MODEL_OPTIONS[0];
+}
 
 async function callGenerate(body: {
-  provider: Provider;
+  model: TarotModel;
   prompt: string;
   referenceImage?: string | null;
   seed?: number | null;
@@ -50,7 +61,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 export default function TarotStudio() {
-  const [provider, setProvider] = useState<Provider>("flux");
+  const [model, setModel] = useState<TarotModel>("flux-schnell");
   const [mode, setMode] = useState<Mode>("text");
   const [stylePrompt, setStylePrompt] = useState("");
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
@@ -107,7 +118,7 @@ export default function TarotStudio() {
     setLocked(false);
     try {
       const resp = await callGenerate({
-        provider,
+        model,
         prompt: buildCardPrompt(stylePrompt, PREVIEW_CARD),
         referenceImage: mode === "image" ? referenceImage : null,
         seed: null,
@@ -144,9 +155,9 @@ export default function TarotStudio() {
     patchItem(index, { status: "pending", error: undefined });
     try {
       const resp = await callGenerate({
-        provider,
+        model,
         prompt: buildCardPrompt(stylePrompt, card),
-        referenceImage: lockedRef, // enforce one consistent style across the deck
+        referenceImage: lockedRef, // enforce one consistent style across the deck (where the model supports img2img)
         seed: previewSeed, // FLUX reproducibility; ignored by openai
       });
       if (!resp.ok || !resp.image) {
@@ -169,9 +180,10 @@ export default function TarotStudio() {
   }
 
   async function generateBatch() {
-    const estNt = Math.round(TAROT_CARDS.length * COST_PER_IMG_NT[provider]);
+    const opt = modelOption(model);
+    const estNt = Math.round(TAROT_CARDS.length * opt.costNt);
     const ok = window.confirm(
-      `即將生成整套 ${TAROT_CARDS.length} 張塔羅牌（${provider.toUpperCase()}）。\n` +
+      `即將生成整套 ${TAROT_CARDS.length} 張塔羅牌（${model}）。\n` +
         `預估費用約 NT$${estNt}，全程約 20–40 分鐘，請保持此分頁開啟。\n\n確定開始？`,
     );
     if (!ok) return;
@@ -239,11 +251,19 @@ export default function TarotStudio() {
         <h2 style={{ fontSize: 15, margin: "0 0 14px" }}>Step 1 · 風格設計</h2>
 
         <div className="form-row">
-          <label className="form-label">圖片模型</label>
-          <select className="form-select" value={provider} onChange={(e) => setProvider(e.target.value as Provider)} disabled={locked}>
-            <option value="flux">FLUX（Replicate）· 風格參考最強，約 NT$1/張</option>
-            <option value="openai">gpt-image-1（OpenAI）· 指令遵循好，約 NT$2/張</option>
+          <label className="form-label">圖片模型（價格由低到高）</label>
+          <select className="form-select" value={model} onChange={(e) => setModel(e.target.value as TarotModel)} disabled={locked}>
+            {MODEL_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
+          {mode === "image" && !modelOption(model).img2img && (
+            <div className="form-hint" style={{ color: "var(--yellow)" }}>
+              ⚠ 此模型（{model}）不吃上傳參考圖，風格只靠「文字描述 + 固定 seed」維持一致；要用上傳圖當風格請選 FLUX dev 或 gpt-image-1。
+            </div>
+          )}
         </div>
 
         <div className="form-row">

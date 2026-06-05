@@ -1,20 +1,42 @@
 // Server-side image generation for the tarot print-file tool.
-// Two providers (both keys already in app env):
-//   - flux   → Replicate black-forest-labs/flux-dev (text2img + img2img/style ref via `image`)
-//   - openai → OpenAI gpt-image-1 (generations, or edits when a reference image is supplied)
-// Returns a uniform `data:image/png;base64,...` URL so the client treats both the same.
+// Models (both provider keys already in app env), cheapest → priciest:
+//   - flux-schnell  → Replicate flux-schnell (text2img only, no img2img) — ~10× cheaper than dev
+//   - flux-dev      → Replicate flux-dev (text2img + img2img/style ref via `image`)
+//   - openai-low/medium/high → OpenAI gpt-image-1 at that quality (generations, or edits w/ ref image)
+// Returns a uniform `data:image/png;base64,...` URL so the client treats them the same.
 // Mirrors the AbortController + timeout + key-check discipline of lib/onboarding/spec-generator.ts.
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
-const FLUX_MODEL = "black-forest-labs/flux-dev";
 const REPLICATE_POLL_MS = 2_500;
 
-export type TarotProvider = "flux" | "openai";
+export type TarotModel = "flux-schnell" | "flux-dev" | "openai-low" | "openai-medium" | "openai-high";
+
+interface ModelConfig {
+  provider: "flux" | "openai";
+  /** Replicate model slug (flux models only). */
+  fluxModel?: string;
+  /** Whether the model can consume a reference image for img2img / style transfer. */
+  supportsImg2img: boolean;
+  /** gpt-image-1 quality (openai models only). */
+  quality?: "low" | "medium" | "high";
+}
+
+export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
+  "flux-schnell": { provider: "flux", fluxModel: "black-forest-labs/flux-schnell", supportsImg2img: false },
+  "flux-dev": { provider: "flux", fluxModel: "black-forest-labs/flux-dev", supportsImg2img: true },
+  "openai-low": { provider: "openai", supportsImg2img: true, quality: "low" },
+  "openai-medium": { provider: "openai", supportsImg2img: true, quality: "medium" },
+  "openai-high": { provider: "openai", supportsImg2img: true, quality: "high" },
+};
+
+export function isTarotModel(v: unknown): v is TarotModel {
+  return typeof v === "string" && Object.prototype.hasOwnProperty.call(TAROT_MODELS, v);
+}
 
 export interface TarotGenParams {
-  provider: TarotProvider;
+  model: TarotModel;
   prompt: string;
-  /** data: URL of a reference image (enables img2img / style transfer). */
+  /** data: URL of a reference image (enables img2img / style transfer where the model supports it). */
   referenceImage?: string | null;
   /** Reproducibility seed (FLUX only; ignored by gpt-image-1). */
   seed?: number | null;
@@ -56,7 +78,7 @@ async function urlToDataUrl(url: string, signal: AbortSignal): Promise<string> {
 }
 
 // ── FLUX (Replicate) ──────────────────────────────────────────────────────────
-async function generateFlux(params: TarotGenParams, signal: AbortSignal): Promise<TarotGenResult> {
+async function generateFlux(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate_api_token" };
 
@@ -68,7 +90,8 @@ async function generateFlux(params: TarotGenParams, signal: AbortSignal): Promis
     num_outputs: 1,
     seed,
   };
-  if (params.referenceImage) {
+  // schnell has no `image` input — style consistency there relies on seed + prompt only.
+  if (config.supportsImg2img && params.referenceImage) {
     input.image = params.referenceImage; // img2img / style reference
     input.prompt_strength = 0.82; // keep some of the reference, follow the prompt
   }
@@ -79,7 +102,7 @@ async function generateFlux(params: TarotGenParams, signal: AbortSignal): Promis
     Prefer: "wait", // block up to ~60s for the result instead of returning immediately
   };
 
-  const createRes = await fetch(`https://api.replicate.com/v1/models/${FLUX_MODEL}/predictions`, {
+  const createRes = await fetch(`https://api.replicate.com/v1/models/${config.fluxModel}/predictions`, {
     method: "POST",
     headers,
     body: JSON.stringify({ input }),
@@ -120,11 +143,12 @@ async function generateFlux(params: TarotGenParams, signal: AbortSignal): Promis
 }
 
 // ── OpenAI gpt-image-1 ─────────────────────────────────────────────────────────
-async function generateOpenai(params: TarotGenParams, signal: AbortSignal): Promise<TarotGenResult> {
+async function generateOpenai(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { ok: false, error: "missing_openai_api_key" };
 
   const SIZE = "1024x1536"; // 2:3 portrait
+  const quality = config.quality ?? "medium";
   let res: Response;
 
   if (params.referenceImage) {
@@ -134,7 +158,7 @@ async function generateOpenai(params: TarotGenParams, signal: AbortSignal): Prom
     form.append("model", "gpt-image-1");
     form.append("prompt", params.prompt);
     form.append("size", SIZE);
-    form.append("quality", "medium");
+    form.append("quality", quality);
     form.append("image", new Blob([new Uint8Array(parsed.buffer)], { type: parsed.mime }), "reference.png");
     res = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",
@@ -146,7 +170,7 @@ async function generateOpenai(params: TarotGenParams, signal: AbortSignal): Prom
     res = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-image-1", prompt: params.prompt, size: SIZE, quality: "medium", n: 1 }),
+      body: JSON.stringify({ model: "gpt-image-1", prompt: params.prompt, size: SIZE, quality, n: 1 }),
       signal,
     });
   }
@@ -164,12 +188,13 @@ async function generateOpenai(params: TarotGenParams, signal: AbortSignal): Prom
 }
 
 export async function generateTarotImage(params: TarotGenParams): Promise<TarotGenResult> {
+  const config = TAROT_MODELS[params.model];
+  if (!config) return { ok: false, error: "unknown_model" };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GEN_TIMEOUT_MS);
   try {
-    if (params.provider === "flux") return await generateFlux(params, controller.signal);
-    if (params.provider === "openai") return await generateOpenai(params, controller.signal);
-    return { ok: false, error: "unknown_provider" };
+    if (config.provider === "flux") return await generateFlux(params, config, controller.signal);
+    return await generateOpenai(params, config, controller.signal);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg === "The operation was aborted." ? "generation_timeout" : msg };

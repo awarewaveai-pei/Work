@@ -1,19 +1,15 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
-import { generateTarotImage, type TarotProvider } from "../../../../../lib/tarot/image-gen";
+import { generateTarotImage, isTarotModel } from "../../../../../lib/tarot/image-gen";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 interface GenerateBody {
-  provider?: string;
+  model?: string;
   prompt?: string;
   referenceImage?: string | null;
   seed?: number | null;
-}
-
-function isProvider(v: unknown): v is TarotProvider {
-  return v === "flux" || v === "openai";
 }
 
 export async function POST(request: Request) {
@@ -29,8 +25,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
-  if (!isProvider(body.provider)) {
-    return NextResponse.json({ ok: false, error: "provider must be 'flux' or 'openai'" }, { status: 400 });
+  if (!isTarotModel(body.model)) {
+    return NextResponse.json(
+      { ok: false, error: "model must be one of flux-schnell|flux-dev|openai-low|openai-medium|openai-high" },
+      { status: 400 },
+    );
   }
   if (!body.prompt || body.prompt.trim().length < 3) {
     return NextResponse.json({ ok: false, error: "prompt is required (min length 3)" }, { status: 400 });
@@ -51,7 +50,7 @@ export async function POST(request: Request) {
   }
 
   const result = await generateTarotImage({
-    provider: body.provider,
+    model: body.model,
     prompt: body.prompt,
     referenceImage: body.referenceImage ?? null,
     seed: body.seed ?? null,
