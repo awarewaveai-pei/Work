@@ -33,6 +33,34 @@
 
 **[rollback]** P2 已 commit（`git revert cbe6d6e3`）；B2 git revert HEAD；皆未 deploy，prod 無影響。
 
+### app.aware-wave.com 大修 — P1 守門：Supabase Auth 身分層（一勞永逸，code 完成未 deploy）
+
+**根本問題**：app.aware-wave prod 全 403 不可用，根因非「nginx 漏一行」而是**從未有真實身分層**（middleware proxy-trust 403 + 角色永遠 fallback viewer）。操作者要「一勞永逸、最完善、30 年、她零 dashboard 動作」。
+
+**決策過程（VBC + 偵察）**：原議 CF Access（方案 B）→ 實測 CF Zero Trust **從未啟用**且 token 無權 bootstrap（`code 10000`），需操作者 dashboard 一步 → 操作者要「我全包」→ **改採 Supabase Auth**（app 本就 Supabase 原生、EU GoTrue 已跑、零外部依賴、未來 client portal 共用、零 dashboard）。身分提供者 = **Email+密碼**（方案 A，免 SMTP、service role 預建帳號）。
+
+**[已修改]**（全新增/重寫，nginx 不動）
+- `package.json`/`package-lock.json`：加 `@supabase/ssr`。
+- `lib/supabase/ssr.ts`（新）：browser client（登入）+ middleware client（cookie session）+ `isSupabaseAuthConfigured`。與既有 `supabase-server.ts`（data 層）分離。
+- `app/login/page.tsx` + `LoginForm.tsx`（新）：登入頁（fixed overlay 蓋 sidebar shell）+ `signInWithPassword` + open-redirect-guarded `next`。
+- `app/LogoutButton.tsx`（新）+ `layout.tsx`：sidebar footer 登出。
+- `middleware.ts`（重寫）：移除 proxy-trust 403；改 Supabase session gate → 解析 `app_metadata.ops_role`（伺服器控制）→ 注入 `x-ops-claims-role`（下游 RBAC 全不改）。**fail-closed**；**matcher 擴大保護整個 console**（原本只 /ops/*，Dashboard/Build/Onboard 等頁從未 gate = 安全洞）；server-to-server 端點（webhooks/internal/probe/summary/inbox bearer/wp-sync-key）正確豁免；claim header 無條件先剝除（anti-spoof）。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm run build`（next-admin，含 Edge middleware）| exit=0 | ms=~120000（×2）— Edge runtime 編譯 middleware 144kB、/login 路由建成、Suspense OK；tsc --noEmit exit=0。瀏覽器登入實測待 deploy 後（gated）。
+- REVIEW_DONE: critic=Deep（auth 安全審查，外部 oracle）| verdict=**Blocked→Safe** | findings=3 Critical+2 Major+1 Minor（matcher 擴大誤擋 Telegram 指令/probe 心跳/WP 自動化 server-to-server）→ **全修**（C1 排除 api/internal、C2 probe 入豁免、C3 x-ops-sync-key timing-safe 放行、M1 claim strip 無條件前置、M2 dev 限 NODE_ENV=development fail-closed、m1 safeNext 收緊）→ re-review **Safe**。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=hasTrustedProxyAuth | hits=0
+  - 移除符號全 repo 0 殘留：`hasTrustedProxyAuth`/`PROXY_AUTH_HEADER`/`x-ops-proxy-auth`（舊 proxy gate 完全移除，無 dangling）。新 symbol 僅新檔+消費者；`analytics.ts ops_role` 是無關 PostHog 屬性。
+- WORKLOG：本 entry。
+
+**[剩餘風險 / 待續]**（P1 尚未完成 — code done，未 deploy）
+- **待 provisioning（deploy 前必做）**：service role 在 Supabase 建 admin user（你的 email + 生成密碼進 vault + `app_metadata.ops_role=owner` + email_confirm）。先查既有 auth.users 避免重複（操作者提示可能已有帳號）。在伺服器端執行（容器已有 SUPABASE env，secrets 不落地筆電）。
+- **gated cutover（High-risk）**：sg-deploy 後 middleware 即強制登入。順序：provision → deploy → 你登入實測。失敗 rollback = git revert + sg-deploy 回 403（不更糟）。
+- **部署前 smoke**（critic 要求）：curl `/api/ops/probe`(Bearer)、`/api/internal/commands/telegram`(secret)、`/api/ops/clients/<slug>/wp-update`(sync-key) 確認非 401（middleware routing 不被 tsc/build 覆蓋）。
+- docs §3 認證架構待更新（CF→Supabase）。
+
+**[rollback]** 全在 git（未 deploy）：`git revert <commit>`；帳號可 service role 刪。
+
 ### AO-RESUME 反覆失敗根治 — Phase 1：git-align fetch stderr NativeCommandError（systemic bug class）
 
 **根本問題（非表面症狀）**：使用者回報 AO-RESUME「幾乎每次跑都爆、每次修 2-3 小時、所以這兩次只敢先 `git pull`」。今天（2026-06-05 03:01 UTC）hook 自動觸發的 `ao-resume.ps1 -FullMainlineParity` 回 `exit_code:1`，實際失敗點 = `scripts/git-align-main-aoresume-feature.ps1:140`：
