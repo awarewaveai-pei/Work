@@ -22,6 +22,11 @@ final class AdminPage {
 	const CAP  = 'manage_options';
 	const SLUG = 'aware-wave-bridge';
 
+	/** @var string|null private key (base64) just generated this request — shown ONCE below the form. */
+	private $generatedPrivateKey = null;
+	/** @var string|null key id just generated. */
+	private $generatedKeyId = null;
+
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'menu' ) );
 	}
@@ -76,6 +81,14 @@ final class AdminPage {
 		echo '<tr><th>Scope</th><td><select name="scope"><option value="write">write (read + write)</option><option value="read">read only</option></select></td></tr></table>';
 		submit_button( 'Generate key' );
 		echo '</form>';
+
+		if ( $this->generatedPrivateKey !== null ) {
+			echo '<div style="margin-top:8px;padding:14px;border:2px solid #d63638;background:#fff0f0;border-radius:6px;max-width:760px">';
+			echo '<p style="margin:0 0 6px;color:#d63638;font-weight:700">⚠️ PRIVATE KEY for <code>' . esc_html( (string) $this->generatedKeyId ) . '</code> — copy it NOW. Shown once, never again.</p>';
+			echo '<textarea readonly rows="3" style="width:100%;font-family:monospace;font-size:12px" onclick="this.select()">' . esc_textarea( $this->generatedPrivateKey ) . '</textarea>';
+			echo '<p style="margin:6px 0 0;color:#666">Click the box → Ctrl+C → save it in a password manager. The site only keeps the public key.</p>';
+			echo '</div>';
+		}
 
 		// --- Registered keys ---
 		echo '<h2>Registered keys</h2>';
@@ -154,10 +167,10 @@ final class AdminPage {
 		if ( ! $ok ) {
 			return array( 'type' => 'error', 'html' => 'Could not save key (duplicate id?).' );
 		}
-		return array(
-			'type' => 'success',
-			'html' => 'Key <code>' . esc_html( $keyId ) . '</code> created. <b>Copy the private key now — it is shown only once:</b><br><textarea readonly rows="3" style="width:100%;font-family:monospace" onclick="this.select()">' . esc_textarea( $private ) . '</textarea>',
-		);
+		// Stash for prominent display right below the Generate button (see render()).
+		$this->generatedPrivateKey = $private;
+		$this->generatedKeyId      = $keyId;
+		return array( 'type' => 'success', 'html' => 'Key <code>' . esc_html( $keyId ) . '</code> created — see the private key below. ⬇' );
 	}
 
 	/** @return array{type:string,html:string} */
