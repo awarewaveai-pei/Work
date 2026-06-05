@@ -6,6 +6,11 @@
 >
 > **進度（2026-05-30）**：安全脊椎已實作並驗證 —— `includes/Auth/SignatureVerifier.php`（Ed25519），
 > 真測 7/7 PASS（`php -d extension=sodium`）。後續見 §I Phase A 順序。
+>
+> **深化（2026-06-05，本檔由 `DESIGN.md` 改名為可辨識檔名）**：以 soulfulexpression.org 真實外掛 stack
+> 校準，補入 7 項實站護欄（§B 深層頁 verify=1；§D2 護欄 2-5；§E2 並行鎖=6；§I Phase C restore-drill 硬 gate=7）
+> 與安全地基決策（§I「安全地基」）。兩個 hard-to-reverse 決策（Ed25519、可逆性分類門控）另記
+> [ADR 007](../../../agency-os/docs/architecture/decisions/007-wp-bridge-ed25519-and-reversibility-gating.md)。
 
 ## Context（為什麼做、要達成什麼）
 同事 `jonjonesai` 做了一套讓 Claude 操作 WP 的工具(核心:GPL 外掛 `mega-kadence-bridge` + POD 建店 skill)。
@@ -62,6 +67,7 @@ AI 給規格 → 系統批量、可驗證、可回滾地把整站建好/改好�
 - **idempotency key**：重試不會重複套用。
 - **all-or-nothing batch**：`POST /batch` 多筆一起,任一驗證失敗 → 反序全回滾。
 - 回應契約(成功/`rolled_back`/`dry_run`)含 `render_hash_before/after`、`assertions`、`cache.purged_urls`、`rollback_token`、`audit_event_id`。
+- **verify URL 集合 ≠ 單一目標 URL（護欄 1，soulful 校準）**：影響「全站結構」的寫入（permalink 結構、theme-mod、template、taxonomy）必須 render-verify **一組深層頁樣本**（首頁 + ≥3 個深層 post/page/product/category URL），非只驗目標頁。根因：Permalink Manager Pro 改壞時首頁照常 render、深層頁全 404 → 單頁 verify 會假通過。樣本集存 tenant `bridge.verifyUrlSamples`，預設由 sitemap 抽樣。
 
 ---
 
@@ -79,6 +85,16 @@ AI 給規格 → 系統批量、可驗證、可回滾地把整站建好/改好�
 - **KadenceValidator**：每個 `kadence/rowlayout`/`column` 必含 `"kbVersion":2`(否則 RWD 靜默壞——他試錯學到的);`uniqueID` 非空且不重複;巢狀完整;`serialize(parse(x))===x`;`kadence/*` 區塊名白名單。違反 → `422` 帶 `block_index` + 修法 hint。
 - **WooValidator**：價格 decimal≥0、`sale<regular`、`stock_status` 列舉、SKU 不撞、狀態轉移合法、**絕不靜默刪訂單/明細**、變體父商品存在。
 - **Schema 驗證**：每端點 JSON-schema + 型別收斂後才 `update_option`/`set_theme_mod`;**禁 unserialize 不信任輸入**(修他的序列化注入風險)。
+
+---
+
+## D2. soulful 實站校準護欄（2026-06-05 深化 — DESIGN 通用設計對 soulful 真實 stack 的補完）
+> soulful 實際外掛（`agency-os/tenants/company-soulful-expression/core/wp-update-config.json` waves）：Kadence(+Pro) + **Astra-portfolio** + **CartFlows** + FluentForms/**FluentCRM**/**FluentSMTP** + **Permalink Manager Pro** + ACF Pro + Ultimate Member + Woo(+Points&Rewards) + LiteSpeed。通用 Kadence/Woo validator **覆蓋不足**，補三條：
+
+- **護欄 2 — PermalinkValidator（致命：改壞 = 全站深層頁 404）**：任何寫 `permalink_structure` / Permalink Manager Pro 的 option/CPT-rewrite 前，先 dry-run 算新規則對 ≥3 個深層頁的 URL 影響；apply 後強制走 §B 深層頁 verify；任一深層頁非 200 → 立即回滾。**permalink 結構寫入歸不可逆敏感類（見 §I 門控表）**。
+- **護欄 3 — Fluent 系寫入 = 側效類（會寄真信給訂閱者）**：`/forms/*` 讀取安全；但 **FluentCRM automation / campaign / contact-tag 觸發、FluentSMTP 寄送設定** 的寫入可能對真實訂閱者群發 → 歸**不可逆人工門控類，永不自動回滾**（§I 門控表）。FluentForms 的「送出測試」亦視為側效。
+- **護欄 4 — Astra-portfolio / CartFlows 無 L2 adapter → 落 L1 + 加倍保護**：這兩個外掛無友善型別端點，只能走 L1 通用原語 raw 寫入 → **強制 dry-run + 結構 schema 嗅探 + 深層頁 verify**，不得無 preview 直寫。CartFlows 的 flow/checkout 步驟改動歸側效類（影響結帳）。標記為「L1-only，validator backlog」。
+- **護欄 5 — L3 plugin 更新對 license-gated 外掛必 detect + refuse（禁 silent fail）**：soulful 有 5 個 license-gated 外掛（ACF Pro / Kadence Blocks Pro / Permalink Manager Pro / Astra Pro / Woo Points&Rewards），**WP-CLI 抓不到 license server → 更新會靜默失敗**。L3 `/plugins/update` 前先比對 **既有 SSOT `wp-update-config.json` 的 `licenseGated` 清單**（禁新建平行清單），命中 → 回 `409 license_required` + 「請 WP admin 手動更新」hint，**不得回報 completed**。對應既有 `wp-install-plugins.ts` 的 `mode=skipped_*` 範式。
 
 ---
 
@@ -107,6 +123,11 @@ WP 外掛只存**公鑰**。每請求簽章綁定 `METHOD\nPATH\nTIMESTAMP\nNONC
 |9|爆炸半徑|單 key 全權|read/write 分離 + rotation + IP allowlist|
 |10|靜默損毀|壞 Kadence block 無感|KadenceValidator 寫前 `422`|
 |11|寫了沒生效|fire-and-hope|self-healing transaction:render verify + 自動回滾|
+
+### E2. 並行寫入控制（護欄 6 — 多 AI session / 多操作者同時寫同站）
+威脅 #12：兩個 writer（bridge + 人工 / 兩個 AI session）同時對同一 tenant 寫入 → snapshot 互蓋、回滾還原到錯誤基準。
+- **緩解**：每筆寫入 transaction 開始前，取得 **per-tenant 寫入鎖**，**重用既有 `resource_locks` 表**（`packages/db/migrations` 已存在，禁新建平行鎖機制）。lock key = `wp-bridge:<tenant>:write`；持鎖期含 snapshot→apply→verify→commit；釋放於 commit 或 rollback 後。
+- 取鎖逾時 → `409 Conflict` + `retry_after`，不排隊盲等。`/health` 報目前持鎖狀態。read-scope 操作不取鎖。
 
 ---
 
@@ -143,7 +164,21 @@ WP 外掛只存**公鑰**。每請求簽章綁定 `METHOD\nPATH\nTIMESTAMP\nNONC
 **Phase A — 本機沙盒(風險 LOW)**：`bootstrap-local-wordpress-windows.ps1` 起本機 WP+Kadence+Woo,離線開發外掛 + PHPUnit + wp-env Integration,跑通完整迴路 + 自動回滾測試。**不碰任何線上站。多數工程在此完成且已可證明正確。**
   - 砌磚順序:✅SignatureVerifier(Ed25519,7/7) → NonceCache(單次性,fail-closed) → KeyStore(公鑰記錄+scope+rotation) → Http/Router+capability → 自我修復 Transaction+dry-run → KadenceValidator/WooValidator → CacheStrategy(LiteSpeed/Redis/Cloudflare) → L1 通用原語 → L3 plugin 生命週期 → L4 白名單 WP-CLI → PHPUnit+CI。
 **Phase B — repo 原生工具(風險 LOW–MEDIUM)**：落地外掛/OpenAPI/TS client/generators/`/wp-operate`/agent/CI/runbook。CI 閘啟用。僅 `lifecycle=provision_pending`,不寫 live。
-**Phase C — 上 staging 再上 prod(風險 MEDIUM–HIGH)**：先建 soulful **staging**(本就是待辦),裝外掛 → 唯讀+dry-run → 單筆低風險寫入(過 WPvivid 備份門控,scope=files+DB)→ staging 全綠才翻 `lifecycle:live` 開 prod 寫入,write-scope key 窄發。aware-wave 的 Cloudflare/Redis 路徑另行驗證。**HIGH 風險僅在 live-prod 寫入那一步,且全程門控。**
+**Phase C — 上 staging 再上 prod(風險 MEDIUM–HIGH)**：
+1. **建 soulful staging**（`ENVIRONMENT_REGISTRY.md` 現為 `provision_pending`，無 staging）→ 裝外掛 + 實際外掛集。
+2. **護欄 7 — restore drill 硬 gate（不可跳）**：在開放任何 live 寫入前，**必須對 staging 跑一次完整 restore drill 並證明 byte 還原**（soulful 的 `BACKUP_RESTORE_PROOF.md` 目前「未執行」= 安全網未驗）。drill 未綠 → live 寫入一律 `423 Locked`。
+3. staging 唯讀+dry-run → 單筆低風險寫入（過 WPvivid 備份門控,scope=files+DB）→ staging 全綠才翻 `lifecycle:live`。
+4. live 開放後 **按下方可逆性分類門控**；write-scope key 窄發。aware-wave 的 Cloudflare/Redis 路徑另行驗證。**HIGH 風險僅在 live-prod 寫入那一步,且全程門控。**
+
+### 安全地基（2026-06-05 架構決策，授權人：操作者；決策人：本專案架構師）
+**C → A 混合，B 永不當預設**：① 本機沙盒（Phase A）跑通完整迴路 + fatal 注入自動回滾 → ② 建 soulful staging + restore drill 硬 gate → ③ 才開 live，且按可逆性分類。理由：把「最快見效」收斂在「本機可全速、live 才慢」，爆炸半徑最小，符合 30-yr 紀律；Phase A 本來就是主戰場，不浪費。
+
+### 可逆性分類門控表（強制 — 每個寫入端點啟動時標類）
+| 類別 | 操作例 | 處置 |
+|------|--------|------|
+| **可逆（自動）** | blog 文章/頁面、option/meta、Kadence block、Woo 商品**草稿**欄位 | self-healing transaction → 沒生效自動回滾，無需人工 |
+| **不可逆敏感（人工門控，永不自動回滾）** | Woo 訂單刪改/退款/收款、**FluentCRM automation/campaign 觸發**、FluentSMTP 寄送、**permalink 結構**、CartFlows checkout flow、Woo 商品**發佈/下架/價格** | dry-run → Dashboard `approvals` 人按 approve → 才 commit；**絕不假裝能 undo 已寄出/已收款** |
+| **拒絕（不開放）** | 裸 SQL、任意 shell、`eval`、`db query` | L4 白名單外一律 `403` |
 
 ---
 

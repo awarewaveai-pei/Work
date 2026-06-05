@@ -136,9 +136,9 @@
 
 ### V2 補充併入（原計畫缺的 8 個自動化設計）
 1. **區域**：客戶交付站固定開 `sin`（Singapore）；控制平面留 `hel1`（Finland）。**public runtime 禁同步依賴 Finland**（checkout/login/cart）。input schema region enum 預設 sin。
-2. **Token 分權**：`HETZNER_STAGING_TOKEN`（create/delete staging）vs `HETZNER_PROD_TOKEN`（只讀+snapshot）vs break-glass（emergency store+approval+incident_id）。Adapter 依操作選 token；agent 預設只給 staging。
+2. **Token 隔離（官方查證修正）**：Hetzner token **無 per-action 細粒度**，只有 project 層 Read/Read+Write 且綁單一 project。→ 正解：**staging / production 各開一個 Hetzner Cloud project**，各自一個 Read+Write token（`HETZNER_STAGING_TOKEN`/`HETZNER_PROD_TOKEN`）。staging token 因綁 staging project 物理上碰不到 production。agent 只給 staging token。「不可刪 production」靠 project 隔離 + `policy.ts` 軟封鎖（非 token 權限）。break-glass = prod token 存 emergency store，用需 approval+incident_id。
 3. **Hetzner Cloud Firewall**（provider 層 allowlist）= 第二道，createServer 時 attach（D4 OpenTofu 管 firewall 範本）+ cloud-init iptables 第一道。
-4. **SMTP**：cloud-init/manifest 配置 FluentSMTP + 外部 SMTP(587)，**禁 local sendmail/25/465**（Hetzner 預設封鎖）。SPF/DKIM/DMARC 必設。
+4. **SMTP（官方查證修正）**：Hetzner 預設封鎖 **outbound 25/465**（解封需 ≥1 月帳齡+付款+開 ticket）。Resend 官方 SMTP 用 465 → **在 Hetzner 上必須改 port 587**（host `smtp.resend.com`、user 字面 `resend`、pass=API key、587/STARTTLS）。FluentSMTP「Other SMTP」填入。**禁 local sendmail**。SPF/DKIM/DMARC 必設。
 5. **帳務防呆**：關機仍計費 → staging retention（preview 7d / staging 30d 刪）；unused Primary IP/Volume/Snapshot 週清；新帳號不 day-1 大量開機。
 6. **Backup 現實**：Hetzner backup 不含 volume+綁 server → offsite 強制（R2/Storage Box）+ **pre-deploy/pre-update snapshot** 為 workflow 步驟。
 7. **Labels+命名**：`lf-{env}-{region}-{org}-{site}-{role}-{nn}` + 12 必填 label（org/workspace/project/site/env/plane/region/cost_center/owner/managed_by/provisioned_by/created_by_run_id）。
@@ -181,10 +181,12 @@ D1 戰術 SOP 與 V2 主檔互相 cross-ref（深度補廣度）。註冊治理�
 V2 §4 tiers 轉成 input schema + provisioning 參數：
 | tier | isolation | serverType | region | backup | RTO/RPO |
 |------|-----------|-----------|--------|--------|---------|
-| starter | shared (5-10 sites) | cx22 | sin | daily+offsite | 24h/24h |
-| business | dedicated/client | cx32 | sin | daily+pre-deploy snap | 8h/24h |
-| commerce | dedicated | cx42+ | sin | db+content daily+snap | 4h/6-24h |
-| premium | dedicated/managed | cx52+/外部 | sin | daily+/offsite | 1-4h/1-6h |
+| starter | shared (5-10 sites) | cpx11 (2vCPU/2GB) | sin | daily+offsite | 24h/24h |
+| business | dedicated/client | cpx21 (3vCPU/4GB) | sin | daily+pre-deploy snap | 8h/24h |
+| commerce | dedicated | cpx31 (4vCPU/8GB) | sin | db+content daily+snap | 4h/6-24h |
+| premium | dedicated/managed | cpx41+ (8vCPU/16GB)/外部 | sin | daily+/offsite | 1-4h/1-6h |
+
+> ⚠️ **server type 修正（官方查證）**：cx22/cx32/cx42/cx52（Intel Gen2）**2026-01-01 起停售**。Singapore 只保證 **AMD（cpx 系列）** 可用（cx Gen3 在 SIN 不確定、ARM cax 歐洲限定）。**實作時必須 runtime `GET /v1/server_types?location=sin` 確認可用機型**，不可硬編。上表 cpx 為建議起點。
 「客戶選方案」= 選 tier → 自動帶出 serverType/region/backup/RTO-RPO + production launch gate（14 項 checklist V2 §19）。
 
 ---
@@ -208,7 +210,7 @@ V2 §4 tiers 轉成 input schema + provisioning 參數：
 
 ## 前置條件（Prerequisites，Phase 3 前必備）
 
-1. 🔴 **填入 `HETZNER_API_TOKEN`**（`mcp/user-env.ps1:14` 現為空）— 一次性手動：Hetzner Cloud Console → Security → API tokens → 建 **staging-scoped** token（依決策：read+create+delete staging）+ **production read/snapshot** token。寫入 vault（`secrets-vault.ps1 -Action set -Name HETZNER_STAGING_TOKEN`）。**無此 token，Phase 3 真機開機無法進行**（但 Phase 0-2 dry-run 不受影響）。
+1. 🔴 **建 2 個 Hetzner project + token**（`HETZNER_API_TOKEN` 現空 `mcp/user-env.ps1:14`）— 一次性手動：Hetzner Console 建 **staging project** + **production project**，各建一個 Read+Write token（Hetzner 無細粒度權限，靠 project 隔離）。寫 vault：`secrets-vault.ps1 -Action set -Name HETZNER_STAGING_TOKEN` / `-Name HETZNER_PROD_TOKEN`。**無 token，Phase 3 真機無法進行**（Phase 0-2 dry-run 不受影響）。
 2. ✅ Cloudflare token / Zone ID — 已備。
 3. ✅ Resend SMTP key — 已備。
 4. Hetzner 帳號健康（V2 §3）：確認非新帳號詐騙風險期、付款方式有效、deletion protection 流程。
@@ -232,7 +234,85 @@ V2 §4 tiers 轉成 input schema + provisioning 參數：
 
 ## 風險與 Rollback
 - 整功能：`LOBSTER_SERVER_ADAPTER=none` 回現況；新檔 additive
-- 孤兒計費：M9 rollback + reaper 掃 orphan-pending 超時刪
+- 孤兒計費：M9 rollback + reaper 掃 orphan-pending 超時刪。**teardown 必須顯式 `DELETE /v1/primary_ips/{id}`**（官方：刪 server 不連帶刪 Primary IP，€0.50/月孤兒費）；backup 隨 server 刪、snapshot 不隨刪（長期保留靠 snapshot）。
 - firewall 鎖死：cloud-init 先 ACCEPT 22 再 DROP + Hetzner Console rescue break-glass
 - 真機開機 = High risk = 需明示 go-ahead
 - 另一 AI 並行：baseline diff + 紅線（packages/workflows / webhook routes / migrations / Repair Center）
+
+---
+
+# 附錄 A：Hetzner 官方查證技術規格（AI 執行依據）
+
+> 全部 2026-06-05 查證自官方 docs.hetzner.com / 官方 SDK（hcloud-go, hcloud-python）/ Cloudflare API / certbot 官方。每條可直接照打。**不可憑記憶改這些值。**
+
+## A.1 Create Server — `POST https://api.hetzner.cloud/v1/servers`
+Header：`Authorization: Bearer $HETZNER_STAGING_TOKEN`
+必填：`name`(RFC1123 唯一) / `server_type`(如 `"cpx21"`) / `image`(如 `"ubuntu-24.04"`)
+常用選填：`location`(`"sin"`/`"hel1"`) / `ssh_keys`[] / `user_data`(cloud-init，**≤32KiB**) / `labels`{} / `firewalls`[`{"firewall":{"id":N}}`] / `start_after_create`(預設 true) / `public_net`{enable_ipv4,enable_ipv6}
+回應 201：`server.id` / `server.status`(initializing→starting→**running**) / `server.public_net.ipv4.ip` / `server.public_net.ipv4.id`(Primary IP id) / `root_password`(僅未給 ssh_keys 時非 null) / `action.id`
+**poll**：`GET /v1/servers/{id}` 等 `status=="running"` 或 `GET /v1/actions/{id}` 等 `status=="success"`
+**rate limit**：3600 req/hr/token，超過 429（headers `ratelimit-remaining`/`ratelimit-reset`）
+
+## A.2 Server types（⚠️ 停售修正）
+- **停售（2026-01-01 起不可開）**：cx22/cx32/cx42/cx52（Intel Gen2）
+- **Singapore 可用 = AMD cpx**：cpx11(2/2/40)/cpx21(3/4/80)/cpx31(4/8/160)/cpx41(8/16/240)/cpx51(16/32/360)
+- cx23/33/43/53（Gen3）SIN 可用性不明；cax(ARM) 僅歐洲
+- **實作必跑** `GET /v1/server_types?location=sin` 取真實清單，不硬編
+- locations：`sin`(Singapore/ap-southeast) / `hel1`(Helsinki/eu-central) / `fsn1`/`nbg1`(DE) / `ash`/`hil`(US)
+- images：`ubuntu-24.04` / `ubuntu-22.04`（API 自動選對架構）
+
+## A.3 Token 權限模型（⚠️ 架構修正）
+只有 project 層 **Read** 或 **Read+Write**，**無 per-action 細粒度**，token 綁單一 project。
+→ staging/production **各開一 project**，各一個 Read+Write token。隔離靠 project 不靠權限。
+
+## A.4 Cloud Firewall — `POST /v1/firewalls`
+rule 欄位：`direction`("in"/"out") / `protocol`("tcp"/"udp"/"icmp"/"esp"/"gre") / `port`("22"/"80-85"/"any") / `source_ips`[CIDR](in) / `destination_ips`[CIDR](out) / `description`
+- **inbound 隱含 deny-all**（每條 allow 要顯式）
+- **outbound 預設全開；一旦加任何 outbound rule → 變全擋**（要列全需要的 outbound）
+- apply：create server 帶 `firewalls[]`，或 `POST /v1/firewalls/{id}/actions/apply_to_resources`
+- `set_rules` **整批覆蓋**（無 append）；上限 500 effective rules
+- **與機內 iptables 獨立兩層**（封包須兩層都過）→ D4 firewall + cloud-init iptables 雙層成立
+
+## A.5 cloud-init / user_data
+- 透過 create server `user_data` 字串傳，**≤32KiB**，首行 `#cloud-config`
+- modules：users / ssh_authorized_keys / write_files / runcmd / packages / package_update
+- 🔴 **machine 上任何 process 免授權可讀**（`http://169.254.169.254/hetzner/v1/userdata`）→ **絕不放機密**
+- 驗證：`cloud-init status --wait`（done/error）+ `/var/log/cloud-init-output.log`
+
+## A.6 Backup / Snapshot
+- enable backup：`POST /v1/servers/{id}/actions/enable_backup`，7 slots，費用=server 月費 20%
+- snapshot：`POST /v1/servers/{id}/actions/create_image` `{type:"snapshot",description,labels}`；€0.0143/GB/月；帳號上限 30 snapshots
+- 🔴 backup **綁 server、刪 server 連帶刪**；snapshot **不隨刪**（長期保留靠 snapshot）；**volume 都不含**；running snapshot **不保證一致**（DB 先 dump/quiesce）
+- **pre-deploy / pre-plugin-update snapshot 為 workflow 必經步驟**
+
+## A.7 Deletion protection / Delete / Primary IP（⚠️ teardown 修正）
+- protection **非 create 時**：`POST /v1/servers/{id}/actions/change_protection` `{delete:true,rebuild:true}`（delete 與 rebuild 須同值）；刪前先設 false
+- delete：`DELETE /v1/servers/{id}`（連帶刪 backup，保留 snapshot）
+- 🔴 **Primary IPv4 不隨 server 刪**（€0.50/月孤兒）→ teardown 顯式 `DELETE /v1/primary_ips/{id}`
+- rescue（逃生）：`POST /v1/servers/{id}/actions/enable_rescue` `{type:"linux64",ssh_keys:[id]}` 回 root_password；**窗口 60 分（從 enable 起算，非 reboot）**
+
+## A.8 SMTP（⚠️ port 修正）
+Hetzner 預設封鎖 outbound **25/465**（解封需 ≥1 月帳齡+付款+ console.hetzner.com/limits ticket）；**587 不封**。
+→ Resend 改 **587/STARTTLS**：host `smtp.resend.com`、user 字面 `resend`、pass=API key（不可用官方建議的 465）。
+
+## A.9 Terraform/OpenTofu（D4 靜態層）
+- provider `hetznercloud/hcloud` v1.64.0（2026-05-28），**OpenTofu 相容**（plugin protocol v6）
+- token：env `HCLOUD_TOKEN` 或 `provider "hcloud" { token = var.hcloud_token }`
+- `hcloud_server`：name/server_type/image/location/ssh_keys/firewall_ids/user_data(`templatefile`)/labels/`public_net{}`/`backups`/`delete_protection`/`rebuild_protection`
+- `hcloud_primary_ip`：`auto_delete`（設 false 避免隨 server 刪壞 state）；`datacenter` 已棄用→用 `location`（2026-07 移除）
+- `hcloud_firewall`：rule{direction/protocol/port/source_ips/description}
+- remote state = Hetzner Object Storage（S3 相容）或 R2：backend "s3" + `endpoints={s3="https://fsn1.your-objectstorage.com"}` + `region="main"`(忽略) + `use_path_style=true` + `skip_*=true`（Ceph 相容）；creds 走 `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`
+
+## A.10 Cloudflare DNS（friction #1，creds 已備）
+- 建 A：`POST /client/v4/zones/{zone_id}/dns_records` `{type:"A",name(FQDN),content(IPv4),proxied,ttl(1=auto)}`
+- 冪等：先 `GET .../dns_records?name[exact]=<fqdn>&type=A` → 空則 POST，有則 `PUT .../dns_records/{id}`
+- token 權限：Zone:DNS:Edit + Zone:Zone:Read；現有 `CLOUDFLARE_API_TOKEN`，Zone ID `f21b1919632fee2221647908a94fdcac`
+- DNS-01 cert：`apt install python3-certbot-dns-cloudflare`；creds `~/.secrets/certbot/cloudflare.ini`(`dns_cloudflare_api_token=...`, chmod 600)；`certbot certonly --dns-cloudflare --dns-cloudflare-credentials <ini> -d <d> -d "*.<d>"`；慢時加 `--dns-cloudflare-propagation-seconds 60`
+
+## A.11 WordPress 硬化（官方）
+- nginx 禁 uploads 執行 PHP：`location ~* /(wp-content|wp-includes)/.*\.(php|phps|phtml|phar)$ { deny all; return 403; }`（須對既有 plugin 測試）
+- wp-config：`DISALLOW_FILE_EDIT=true`、`FORCE_SSL_ADMIN=true`、`DISABLE_WP_CRON=true`（用系統 cron）；**`DISALLOW_FILE_MODS=true` 會擋 auto-update → 改走 WP-CLI/MainWP**（本團隊已用）
+- wc-core stack（V2 §11.3）：Kadence + Kadence Blocks + WooCommerce + CartFlows + Rank Math + FluentCRM + Fluent Forms + FluentSMTP
+
+## A.12 來源
+docs.hetzner.com/cloud（servers/firewalls/backups-snapshots/primary-ips/billing FAQ + creating-a-server/firewall）、docs.hetzner.com/cloud/api/getting-started、官方 SDK hcloud-go/hcloud-python、registry.terraform.io/providers/hetznercloud/hcloud、developers.cloudflare.com/api、certbot-dns-cloudflare.readthedocs.io、developer.wordpress.org/.../hardening、resend.com/docs/send-with-wordpress-smtp。（完整 URL 清單已在研究記錄）
