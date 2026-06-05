@@ -108,12 +108,15 @@ export default function TarotStudio() {
 
   async function generatePreview() {
     setMessage(null);
-    if (stylePrompt.trim().length < 3) {
-      setMessage("請先填寫風格描述（至少 3 字）");
+    if (mode === "image" && !referenceImage) {
+      setMessage("以圖生圖模式請先上傳一張參考圖（或切到文字模式並填描述）");
       return;
     }
-    if (mode === "image" && !referenceImage) {
-      setMessage("以圖生圖模式請先上傳一張參考圖");
+    // 風格描述為選填：只要有「上傳參考圖」或「至少 3 字描述」其一即可
+    const hasStyle = stylePrompt.trim().length >= 3;
+    const hasRef = mode === "image" && !!referenceImage;
+    if (!hasStyle && !hasRef) {
+      setMessage("請填風格描述（至少 3 字），或在「以圖生圖」模式上傳一張參考圖當風格");
       return;
     }
     setPreviewBusy(true);
@@ -294,7 +297,7 @@ export default function TarotStudio() {
         )}
 
         <div className="form-row">
-          <label className="form-label">風格描述</label>
+          <label className="form-label">風格描述{mode === "image" && referenceImage ? "（選填，已上傳參考圖可留空）" : ""}</label>
           <textarea
             className="form-textarea"
             placeholder="例：中世紀彩色鉛筆塔羅插畫，暖色仿古紙質感，金色裝飾邊框，神秘氛圍"
@@ -302,7 +305,7 @@ export default function TarotStudio() {
             onChange={(e) => setStylePrompt(e.target.value)}
             disabled={locked}
           />
-          <div className="form-hint">這段風格會套用到整套 78 張牌。</div>
+          <div className="form-hint">這段風格會套用到整套 78 張牌。上傳參考圖時可留空（以圖為準）。</div>
         </div>
 
         <button className="btn-primary" onClick={generatePreview} disabled={previewBusy || locked}>
