@@ -61,6 +61,8 @@ $oit        = $env:OPS_INBOX_INGEST_TOKEN
 # Optional — empty string is safe: syncEnvVars skips empty values
 $execSteps  = if ($env:LOBSTER_EXECUTE_MANIFEST_STEPS)  { $env:LOBSTER_EXECUTE_MANIFEST_STEPS }  else { "" }
 $wpSshKey   = if ($env:LOBSTER_WP_SSH_PRIVATE_KEY)      { $env:LOBSTER_WP_SSH_PRIVATE_KEY }      else { "" }
+# Hosting adapter (Stage 0): create-wp-site → real staging WP via provision-staging.
+$hostingTok = if ($env:LOBSTER_HOSTING_API_TOKEN)      { $env:LOBSTER_HOSTING_API_TOKEN }      else { "" }
 
 $deployBash = @"
 #!/bin/bash
@@ -89,6 +91,13 @@ export LOBSTER_SUPABASE_URL=https://supabase.aware-wave.com
 export LOBSTER_SUPABASE_SERVICE_ROLE_KEY='$srk'
 export LOBSTER_ENABLE_DB_WRITES=true
 export LOBSTER_MANIFEST_EXECUTION_MODE=off
+
+# Hosting adapter (Stage 0): make create-wp-site POST to provision-staging (real staging WP).
+# Empty token is safe — syncEnvVars skips empty values (adapter then stays blocked, not silent).
+export LOBSTER_HOSTING_ADAPTER=http_json
+export LOBSTER_HOSTING_PROVIDER_BASE_URL=https://app.aware-wave.com
+export LOBSTER_HOSTING_PROVISION_PATH=/api/internal/hosting/provision-staging
+export LOBSTER_HOSTING_API_TOKEN='$hostingTok'
 
 # AO org + infrastructure endpoints
 export LOBSTER_AO_ORG_ID=$AoOrgId
