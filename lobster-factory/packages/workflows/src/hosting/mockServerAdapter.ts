@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
-import type { MockServerRef } from "./serverTypes";
-import type { ServerProvisionInput } from "./providers/serverProvisionContract";
+import type { MockServerRef, ServerProvisionResult } from "./serverTypes";
+import type {
+  ServerProvisionAdapter,
+  ServerProvisionInput,
+} from "./providers/serverProvisionContract";
 
 /**
  * Deterministic, non-routable mock IPv4 from siteId (TEST-NET-3 / 203.0.113.0/24,
@@ -47,5 +50,16 @@ export function buildMockServerRef(input: ServerProvisionInput): MockServerRef {
       "LOBSTER_SERVER_ADAPTER=mock: no real Hetzner server, IP, or billing was created.",
       `Mock IPv4 ${ipv4} is RFC 5737 documentation space (never routable).`,
     ],
+  };
+}
+
+/** Mock implementation of the adapter interface — lets the orchestrator exercise the
+ *  full chain (including the `mock` outcome) without any real API. */
+export function createMockServerAdapter(): ServerProvisionAdapter {
+  return {
+    id: "mock",
+    async provisionServer(input: ServerProvisionInput): Promise<ServerProvisionResult> {
+      return { outcome: "mock", ref: buildMockServerRef(input) };
+    },
   };
 }

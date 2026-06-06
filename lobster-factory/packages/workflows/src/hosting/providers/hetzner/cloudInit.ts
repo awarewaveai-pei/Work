@@ -134,7 +134,7 @@ runcmd:
   # Apply firewall (items 3,4) — order matters: base rules then DOCKER-USER
   - iptables-restore < /etc/iptables/rules.v4
   - 'iptables -N DOCKER-USER 2>/dev/null || true'
-  - bash -c 'while read -r r; do [ -n "$r" ] && [ "${r:0:1}" != "#" ] && iptables $r 2>/dev/null || true; done < /etc/iptables/docker-user.rules'
+  - bash -c 'while read -r r; do [ -n "$r" ] && [ "\${r:0:1}" != "#" ] && iptables $r 2>/dev/null || true; done < /etc/iptables/docker-user.rules'
   - netfilter-persistent save || iptables-save > /etc/iptables/rules.v4
   - systemctl enable --now fail2ban || true
   - sysctl --system || true

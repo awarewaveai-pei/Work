@@ -8,9 +8,12 @@ export const maxDuration = 60;
 interface GenerateBody {
   model?: string;
   prompt?: string;
-  referenceImage?: string | null;
+  referenceImages?: unknown;
   seed?: number | null;
 }
+
+const MAX_REF_IMAGES = 5;
+const MAX_REF_CHARS = 12_000_000; // ~9 MB base64
 
 /** Map an internal error code to a human-readable (zh-TW) message for the UI. */
 function friendlyError(code: string): string {
@@ -46,16 +49,26 @@ export async function POST(request: Request) {
   if (!body.prompt || body.prompt.trim().length < 3) {
     return NextResponse.json({ ok: false, error: "prompt is required (min length 3)" }, { status: 400 });
   }
-  if (body.referenceImage != null) {
-    if (!/^data:image\/(png|jpe?g|webp);base64,/.test(body.referenceImage)) {
-      return NextResponse.json(
-        { ok: false, error: "referenceImage must be a base64 image data URL (png/jpeg/webp)" },
-        { status: 400 },
-      );
+  let referenceImages: string[] = [];
+  if (body.referenceImages != null) {
+    if (!Array.isArray(body.referenceImages)) {
+      return NextResponse.json({ ok: false, error: "referenceImages must be an array" }, { status: 400 });
     }
-    if (body.referenceImage.length > 12_000_000) {
-      return NextResponse.json({ ok: false, error: "referenceImage too large (max ~9MB)" }, { status: 413 });
+    if (body.referenceImages.length > MAX_REF_IMAGES) {
+      return NextResponse.json({ ok: false, error: `最多 ${MAX_REF_IMAGES} 張參考圖` }, { status: 400 });
     }
+    for (const ref of body.referenceImages) {
+      if (typeof ref !== "string" || !/^data:image\/(png|jpe?g|webp);base64,/.test(ref)) {
+        return NextResponse.json(
+          { ok: false, error: "每張參考圖須為 png/jpeg/webp 的 base64 data URL" },
+          { status: 400 },
+        );
+      }
+      if (ref.length > MAX_REF_CHARS) {
+        return NextResponse.json({ ok: false, error: "參考圖太大（單張上限 ~9MB）" }, { status: 413 });
+      }
+    }
+    referenceImages = body.referenceImages;
   }
   if (body.seed != null && (!Number.isInteger(body.seed) || body.seed < 0)) {
     return NextResponse.json({ ok: false, error: "seed must be a non-negative integer" }, { status: 400 });
@@ -64,7 +77,7 @@ export async function POST(request: Request) {
   const result = await generateTarotImage({
     model: body.model,
     prompt: body.prompt,
-    referenceImage: body.referenceImage ?? null,
+    referenceImages,
     seed: body.seed ?? null,
   });
 

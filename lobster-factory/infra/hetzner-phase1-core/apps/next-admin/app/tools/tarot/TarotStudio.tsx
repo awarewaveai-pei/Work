@@ -16,9 +16,9 @@ const GROUPS: { key: GroupKey; label: string }[] = [
 function inGroup(card: TarotCard, key: GroupKey): boolean {
   return key === "all" ? true : card.type === key;
 }
-import { renderPrintCard } from "./renderPrintCard";
+import { renderPrintCard, CARD_TEMPLATES, type CardTemplate } from "./renderPrintCard";
 // type-only import (erased at build — does not pull the server lib into the client bundle);
-// keeps the model union in sync with the server. img2img/cost stay local on purpose.
+// keeps the model union in sync with the server. maxRefs/cost stay local on purpose.
 import type { TarotModel } from "../../../lib/tarot/image-gen";
 
 type Mode = "text" | "image";
@@ -39,13 +39,13 @@ interface BatchItem {
 }
 
 // Model menu, cheapest → priciest. costNt = rough NT$ per image (for the 78-card estimate).
-// img2img = whether the model uses an uploaded reference image for style transfer.
-const MODEL_OPTIONS: { value: TarotModel; label: string; costNt: number; img2img: boolean }[] = [
-  { value: "flux-schnell", label: "FLUX schnell · 最省 ~NT$0.1/張（整套約 NT$8）", costNt: 0.1, img2img: false },
-  { value: "openai-low", label: "gpt-image-1 低品質 · ~NT$0.5/張（整套約 NT$40）", costNt: 0.5, img2img: true },
-  { value: "flux-dev", label: "FLUX dev · 品質好 ~NT$1/張（整套約 NT$80）", costNt: 1, img2img: true },
-  { value: "openai-medium", label: "gpt-image-1 中品質 · ~NT$1.3/張（整套約 NT$100）", costNt: 1.3, img2img: true },
-  { value: "openai-high", label: "gpt-image-1 高品質 · ~NT$5.5/張（整套約 NT$430）", costNt: 5.5, img2img: true },
+// maxRefs = how many reference images this model actually consumes (0 = text-only).
+const MODEL_OPTIONS: { value: TarotModel; label: string; costNt: number; maxRefs: number }[] = [
+  { value: "flux-schnell", label: "FLUX schnell · 最省 ~NT$0.1/張（整套約 NT$8）", costNt: 0.1, maxRefs: 0 },
+  { value: "openai-low", label: "gpt-image-1 低品質 · ~NT$0.5/張（整套約 NT$40）", costNt: 0.5, maxRefs: 5 },
+  { value: "flux-dev", label: "FLUX dev · 品質好 ~NT$1/張（整套約 NT$80）", costNt: 1, maxRefs: 1 },
+  { value: "openai-medium", label: "gpt-image-1 中品質 · ~NT$1.3/張（整套約 NT$100）", costNt: 1.3, maxRefs: 5 },
+  { value: "openai-high", label: "gpt-image-1 高品質 · ~NT$5.5/張（整套約 NT$430）", costNt: 5.5, maxRefs: 5 },
 ];
 
 function modelOption(m: TarotModel) {
@@ -55,7 +55,7 @@ function modelOption(m: TarotModel) {
 async function callGenerate(body: {
   model: TarotModel;
   prompt: string;
-  referenceImage?: string | null;
+  referenceImages?: string[];
   seed?: number | null;
 }): Promise<GenResponse> {
   const res = await fetch("/api/tools/tarot/generate", {
@@ -79,8 +79,9 @@ export default function TarotStudio() {
   const [model, setModel] = useState<TarotModel>("flux-schnell");
   const [mode, setMode] = useState<Mode>("text");
   const [group, setGroup] = useState<GroupKey>("major");
+  const [template, setTemplate] = useState<CardTemplate>("classic");
   const [stylePrompt, setStylePrompt] = useState("");
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [previewSeed, setPreviewSeed] = useState<number | null>(null);
@@ -93,8 +94,18 @@ export default function TarotStudio() {
   const [message, setMessage] = useState<string | null>(null);
 
   const doneCount = batch.filter((b) => b.status === "done").length;
+  const maxRefs = modelOption(model).maxRefs;
 
-  const lockedRef = referenceImage ?? previewImage;
+  // The deck's style anchor: explicit uploads (capped to the model's limit), else the locked preview.
+  // maxRefs === 0 (e.g. FLUX schnell) → no image is sent; style relies on prompt + seed.
+  const lockedRefs: string[] =
+    maxRefs === 0
+      ? []
+      : referenceImages.length > 0
+        ? referenceImages.slice(0, maxRefs)
+        : previewImage
+          ? [previewImage]
+          : [];
 
   // Revoke all card object URLs on unmount to avoid leaking blobs (78 + retries).
   const batchRef = useRef<BatchItem[]>([]);
@@ -108,29 +119,31 @@ export default function TarotStudio() {
     [],
   );
 
-  async function onPickReference(file: File | null) {
-    if (!file) {
-      setReferenceImage(null);
-      return;
-    }
+  async function onAddReferences(files: FileList | null) {
+    if (!files || files.length === 0) return;
     try {
-      setReferenceImage(await readFileAsDataUrl(file));
+      const added = await Promise.all(Array.from(files).map((f) => readFileAsDataUrl(f)));
+      setReferenceImages((prev) => [...prev, ...added].slice(0, maxRefs || 5));
     } catch {
       setMessage("參考圖讀取失敗");
     }
   }
 
+  function removeReference(index: number) {
+    setReferenceImages((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function generatePreview() {
     setMessage(null);
-    if (mode === "image" && !referenceImage) {
-      setMessage("以圖生圖模式請先上傳一張參考圖（或切到文字模式並填描述）");
+    if (mode === "image" && referenceImages.length === 0) {
+      setMessage("以圖生圖模式請先上傳至少一張參考圖（或切到文字模式並填描述）");
       return;
     }
     // 風格描述為選填：只要有「上傳參考圖」或「至少 3 字描述」其一即可
     const hasStyle = stylePrompt.trim().length >= 3;
-    const hasRef = mode === "image" && !!referenceImage;
+    const hasRef = mode === "image" && referenceImages.length > 0;
     if (!hasStyle && !hasRef) {
-      setMessage("請填風格描述（至少 3 字），或在「以圖生圖」模式上傳一張參考圖當風格");
+      setMessage("請填風格描述（至少 3 字），或在「以圖生圖」模式上傳參考圖當風格");
       return;
     }
     setPreviewBusy(true);
@@ -139,7 +152,7 @@ export default function TarotStudio() {
       const resp = await callGenerate({
         model,
         prompt: buildCardPrompt(stylePrompt, PREVIEW_CARD),
-        referenceImage: mode === "image" ? referenceImage : null,
+        referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
       });
       if (!resp.ok || !resp.image) {
@@ -176,14 +189,14 @@ export default function TarotStudio() {
       const resp = await callGenerate({
         model,
         prompt: buildCardPrompt(stylePrompt, card),
-        referenceImage: lockedRef, // enforce one consistent style across the deck (where the model supports img2img)
+        referenceImages: lockedRefs, // consistent style anchor across the deck (where the model supports it)
         seed: previewSeed, // FLUX reproducibility; ignored by openai
       });
       if (!resp.ok || !resp.image) {
         patchItem(index, { status: "error", error: resp.error ?? "unknown" });
         return;
       }
-      const blob = await renderPrintCard(card, resp.image);
+      const blob = await renderPrintCard(card, resp.image, template);
       const url = URL.createObjectURL(blob);
       // revoke any prior url for this slot (retry case) before replacing
       setBatch((prev) =>
