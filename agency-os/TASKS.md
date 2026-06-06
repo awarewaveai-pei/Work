@@ -59,6 +59,8 @@
 
 - [ ] Content Engine Phase 1 MVP — soulful 試點發第一篇 draft（spec §38/§44；§36 schema + §37 prompts；DataForSEO/Firecrawl 屬 Phase 2 別接）→ handoffs/2026-06-06-2029-tomo-202949.md
 
+- [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章（2-Gem: onboarding+content；定位鎖定 Arts Practice for Self-Discovery / Arts-Based Reflective Pedagogy；填真資料→文章可發布；spec §49 errata 待補）→ handoffs/2026-06-06-2044-seo-geo-content.md
+
 - [x] 補完 tomo critic findings apply — 驗收 2 Critical + 6 Major 全修完 → handoffs/2026-05-25-1418-tomo-critic-findings.md
 - [x] **【✅ 2026-06-02 完成】WeeklyReview auth 確認** — 先到 `claude.ai/code/routines` 確認 AgencyOS-WeeklyReview 無「re-authorize GitHub」警告（根因：2026-05-22 repo PUBLIC→PRIVATE 導致 2026-05-25 auto-disabled，今日已 re-enable via API）；若有警告 → 點進去重新授權；2026-06-01 01:00 UTC 後確認 `last_fired_at` 已更新
 - [ ] **【2026-06-05 06:00 UTC 後驗收】Phase4Weekly 第二次 scheduled fire** — 確認 routine 自動 fire 成功（無 `auto_disabled_*` ended_reason）。檢查：`agency-os/reports/repair-center/phase4-LATEST.md` 日期更新到 2026-06-05；若再 disable → `claude.ai/code/routines` 手動重新授權 GitHub connection（API re-enable 無法治本 OAuth token 失效）。同步 6/1 WeeklyReview 結果驗收 OAuth token 底層有效性。根因 + 一次性修法見 WORKLOG 2026-05-30 13:20 entry。
