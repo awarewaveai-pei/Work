@@ -17,7 +17,8 @@
 - doc：`APP_AWARE_WAVE_BUILD_ENGINE_STAGE0.md` 補三態回寫 + C 項 timeout 根因。
 
 **[驗證結果]**
-- REALTEST_EVIDENCE: tool=Bash/SSH | cmd=`curl -w time_total provision-staging (SG container-direct, no CF)` | exit=0 | ms=71093 — HTTP **200** + 完整成功回應（environmentId/wpRootPath/stagingSiteUrl=`https://aware-wave.com/staging/...` 格式正確）+ 站 `stage0-timing-f832c1` 建出。坐實 71s>45s 根因。（fix 後 redeploy + fresh run 達 `completed` 的 e2e 待補。）
+- REALTEST_EVIDENCE: tool=Bash/SSH | cmd=`curl -w time_total provision-staging (SG container-direct, no CF)` | exit=0 | ms=71093 — HTTP **200** + 完整成功回應（environmentId/wpRootPath/stagingSiteUrl=`https://aware-wave.com/staging/...` 格式正確）。坐實 71s>45s 根因。
+- REALTEST_EVIDENCE: tool=SSH/curl | cmd=`fresh pending ops_action_runs → dispatcher → create-wp-site (redeploy v20260606.31, timeout=95000)` | exit=0 | ms=75000 — run `655197bf` **status=completed**（started 10:30:55→ended 10:32:10，~75s 落在 95s 內）、error_summary=null、站 `stage0-final-e2e-6dae8e` wp-config:YES + **curl 200**。修復前同流程卡 `dispatched`；**閉環確證**。deploy「Found 17 env vars / Syncing 1（LOBSTER_HOSTING_HTTP_TIMEOUT_MS）/ v20260606.31 10 tasks」。
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1M/2m — 1 Major（ps1 hardcode→env-overridable）+ 2 Minor（blocked 語意 / CF ceiling）**全數採納修正**；0 Critical。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`LOBSTER_HOSTING_HTTP_TIMEOUT_MS\|markActionRunTerminal` | hits=10（皆預期 consumer：adapter 讀/config sync/deploy set/3 call sites；1 處 STAGE0 doc stale 主張同 commit 修正）。downstream `BuildRunStatus` union 已含 `blocked` → 寫入相容無破壞。
 
