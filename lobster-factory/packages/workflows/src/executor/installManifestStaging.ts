@@ -96,6 +96,12 @@ const MANIFEST_ENV_ALLOWLIST = [
   "TMPDIR",
   "TEMP",
   "TMP",
+  // wp-cli (PHP) + node resolve config/cache via these on minimal containers (all non-secret)
+  "USER",
+  "LOGNAME",
+  "XDG_CONFIG_HOME",
+  "XDG_CACHE_HOME",
+  "XDG_DATA_HOME",
   // Windows (bash.exe / node on win32)
   "SystemRoot",
   "windir",
