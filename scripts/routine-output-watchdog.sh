@@ -19,15 +19,16 @@
 #
 # Rollback: remove the cron line + `rm /root/.routine-watchdog-state`. Script is in repo.
 
-# bash locks its multibyte/lexer behaviour to the locale present at STARTUP, so an
-# inherited non-UTF-8 cron/ssh locale mangles the bilingual CJK string literals below
-# into mojibake (English stays fine). An in-script `export` is too late — the lexer has
-# already tokenised. So re-exec ONCE under a guaranteed-present UTF-8 locale (C.UTF-8 is
-# always available; en_US.UTF-8 is not reliably applied non-interactively). Root-caused
-# 2026-06-06 after the Chinese half of the alert arrived garbled.
-if [ "${LC_ALL:-}" != "C.UTF-8" ]; then exec env LC_ALL=C.UTF-8 LANG=C.UTF-8 bash "$0" "$@"; fi
-
 set -uo pipefail
+
+# Bilingual (中/EN) message templates are stored base64-encoded so the source stays pure
+# ASCII end-to-end. Raw CJK literals in this .sh got mojibake'd through the Windows-authored
+# -> git -> non-UTF-8 cron/bash chain (2026-06-06); base64 -d emits exact UTF-8 bytes
+# regardless of locale, so the Chinese half always renders correctly in Telegram.
+# Regenerate via: print template to a UTF-8 file, then `base64 -w0`. {{AFFECTED}} is filled
+# at runtime with an ASCII-only routine list.
+WARN_B64="4pqg77iPIOaOkueoi+WBpeW6t+itpuWgsSAvIFJvdXRpbmUgaGVhbHRoIGFsZXJ0CgrkuK3mlofvvJrmnInoh6rli5XmjpLnqIvmspLlnKjmm7TmlrDlroPnmoTloLHlkYrvvIjlj6/og73ljp/lm6DvvJrmjIflkJHpjK/oqqTnmoTlgInluqvvvI/mjojmrIrpgY7mnJ/vvI/ooqvlgZznlKjvvInvvIzku6PooajpgJnpoIXoh6rli5XljJblj6/og73pu5jpu5jlgZzmk7rkuobjgIIKRU46IEEgc2NoZWR1bGVkIGF1dG9tYXRpb24gc3RvcHBlZCB1cGRhdGluZyBpdHMgcmVwb3J0ICh3cm9uZyByZXBvIC8gZXhwaXJlZCBhdXRoIC8gZGlzYWJsZWQpLiBJdCBtYXkgaGF2ZSBzaWxlbnRseSBzdG9wcGVkLgoK5Y+X5b2x6Z+/IC8gQWZmZWN0ZWTvvIhQaGFzZTRXZWVrbHk9UGhhc2UgNCDlgaXmqqLvvIxXZWVrbHlSZXZpZXc96YCx5aCx77yMTW9udGhseVJldmlldz3mnIjloLHvvIk6Cnt7QUZGRUNURUR9fQrmgI7purzomZXnkIYgLyBXaGF0IHRvIGRvOgoxLiDplovllZ8gLyBPcGVuOiBodHRwczovL2NsYXVkZS5haS9jb2RlL3JvdXRpbmVzCjIuIOeiuuiqjeipsuaOkueoi+W3suWVn+eUqOOAgeS+hua6kOWAieW6q+eCuiBhd2FyZXdhdmVhaS1wZWkvV29yayAvIFZlcmlmeSBpdCBpcyBlbmFibGVkIGFuZCBpdHMgc291cmNlIHJlcG8gaXMgYXdhcmV3YXZlYWktcGVpL1dvcmsKMy4g5L+u5aW95b6M5LiL5qyh6Ieq5YuV6LeR5pyD5YaN5YKz5LiA5bCB44CM5bey5oGi5b6p44CNLyBPbmNlIGZpeGVkIHlvdSdsbCBnZXQgYSAicmVjb3ZlcmVkIiBtZXNzYWdlIG9uIHRoZSBuZXh0IHJ1bgoKKFNHIOawuOmBoOWcqOe3miB3YXRjaGRvZ++8jOavj+WkqSAwNzoxNyBVVEMg5qqi5p+l77yM5LiN6YeN6KSH5rSX54mIIC8gYWx3YXlzLW9uLCBkYWlseSwgZGUtZHVwbGljYXRlZCk="
+REC_B64="4pyFIOaOkueoi+W3suaBouW+qSAvIFJvdXRpbmVzIHJlY292ZXJlZAoK5Lit5paH77ya5YWI5YmN55Ww5bi455qE6Ieq5YuV5o6S56iL5bey5oGi5b6p77yM5aCx5ZGK5Y+I5q2j5bi45pu05paw5YiwIGF3YXJld2F2ZWFpLXBlaS9Xb3JrIOS6huOAggpFTjogVGhlIHByZXZpb3VzbHktZmFpbGluZyByb3V0aW5lKHMpIHJlY292ZXJlZCDigJQgcmVwb3J0cyBhcmUgbGFuZGluZyBpbiBhd2FyZXdhdmVhaS1wZWkvV29yayBhZ2Fpbi4="
 
 REPO=/root/Work
 ENVFILE=/root/lobster-phase1/.env
@@ -47,20 +48,21 @@ declare -A rpath=(
   [monthly]=agency-os/reports/monthly/monthly-review-LATEST.md
 )
 declare -A maxage=( [phase4]=8 [weekly]=9 [monthly]=35 )
-# Bilingual friendly names (中文 / English) so the phone alert is self-explanatory.
-declare -A rname=( [phase4]="Phase 4 健檢 / Phase4Weekly" [weekly]="週報 / WeeklyReview" [monthly]="月報 / MonthlyReview" )
+# ASCII-only routine names — the 中/EN legend lives in the base64 template, so this dynamic
+# list stays pure ASCII and is locale-safe to build/substitute in bash.
+declare -A rname=( [phase4]=Phase4Weekly [weekly]=WeeklyReview [monthly]=MonthlyReview )
 
 stale_lines=""
 stale_set=""
 for k in "${keys[@]}"; do
   ts=$(git log -1 --format=%ct origin/main -- "${rpath[$k]}" 2>/dev/null)
   if [ -z "$ts" ]; then
-    stale_lines+="• ${rname[$k]} — 報告從未產出 / report never produced"$'\n'
+    stale_lines+="- ${rname[$k]}: report never produced"$'\n'
     stale_set+="${k}:missing "
   else
     age=$(( (now - ts) / 86400 ))
     if [ "$age" -gt "${maxage[$k]}" ]; then
-      stale_lines+="• ${rname[$k]} — ${age} 天未更新 / ${age}d stale (max ${maxage[$k]}d)"$'\n'
+      stale_lines+="- ${rname[$k]}: ${age}d stale (max ${maxage[$k]}d)"$'\n'
       stale_set+="${k}:stale "
     fi
   fi
@@ -73,19 +75,11 @@ if [ "$stale_set" = "$prev" ]; then
 fi
 
 if [ -z "$stale_set" ]; then
-  msg="✅ 排程已恢復 / Routines recovered"$'\n\n'
-  msg+="中文：先前異常的自動排程已恢復，3 份報告（Phase 4 健檢、週報、月報）都正常更新了。"$'\n'
-  msg+="EN: The previously-failing routine(s) recovered — all 3 reports are fresh again in awarewaveai-pei/Work."
+  msg=$(printf '%s' "$REC_B64" | base64 -d)
 else
-  msg="⚠️ 排程健康警報 / Routine health alert"$'\n\n'
-  msg+="中文：有自動排程沒在更新它的報告。可能原因：指向錯誤的倉庫 / 授權過期 / 被停用 —— 代表這項自動化可能默默停擺了。"$'\n'
-  msg+="EN: A scheduled automation stopped updating its report (wrong repo / expired auth / disabled). It may have silently stopped."$'\n\n'
-  msg+="受影響 / Affected:"$'\n'"${stale_lines}"$'\n'
-  msg+="怎麼處理 / What to do:"$'\n'
-  msg+="1. 開 / Open: https://claude.ai/code/routines"$'\n'
-  msg+="2. 確認該排程已啟用、來源倉庫為 awarewaveai-pei/Work / Verify it is enabled and its source repo is awarewaveai-pei/Work"$'\n'
-  msg+="3. 修好後下次自動跑會再傳「已恢復」/ Once fixed, you'll get a 'recovered' message on the next run"$'\n\n'
-  msg+="(SG 永遠在線 watchdog，每天 07:17 UTC 檢查，不重複洗版 / always-on, daily, de-duplicated)"
+  tmpl=$(printf '%s' "$WARN_B64" | base64 -d)
+  # Substitute the ASCII affected list for the placeholder (UTF-8 template bytes untouched).
+  msg=${tmpl/'{{AFFECTED}}'/$stale_lines}
 fi
 
 if [ "$DRYRUN" = "--dry-run" ]; then
