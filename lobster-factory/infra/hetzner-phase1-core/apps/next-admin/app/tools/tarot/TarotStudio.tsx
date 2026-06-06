@@ -92,6 +92,7 @@ export default function TarotStudio() {
   const [batchBusy, setBatchBusy] = useState(false);
   const [zipBusy, setZipBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal
 
   const doneCount = batch.filter((b) => b.status === "done").length;
   const maxRefs = modelOption(model).maxRefs;
@@ -478,19 +479,23 @@ export default function TarotStudio() {
                 </span>
               </div>
               <div className="form-hint" style={{ marginBottom: 12 }}>
-                💡 點任一張卡 = 只生成（或重生）那一張。建議先點一張看風格滿不滿意，再「生成這組」。
+                💡 點<b>已完成</b>的卡 = 看大圖（裡面可重新生成）。點<b>空白卡</b> = 生成那一張。建議先生一張看滿不滿意再「生成這組」。
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                 {groupItems.map(({ it, i }) => (
                   <div
                     key={it.card.id}
-                    title={`${it.card.name}${it.error ? ` — ${it.error}` : ""}（點擊生成/重生）`}
-                    onClick={() => generateSingle(i)}
+                    title={`${it.card.name}${it.error ? ` — ${it.error}` : ""}`}
+                    onClick={() => {
+                      if (batchBusy) return;
+                      if (it.status === "done") setViewIndex(i);
+                      else generateSingle(i);
+                    }}
                     style={{
-                      width: 78,
-                      height: 130,
-                      borderRadius: 6,
+                      width: 132,
+                      height: 219,
+                      borderRadius: 8,
                       border: `1px solid ${it.card.colors[0]}55`,
                       background: it.card.colors[1],
                       position: "relative",
@@ -498,7 +503,7 @@ export default function TarotStudio() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 8,
+                      fontSize: 11,
                       color: it.card.colors[0],
                       textAlign: "center",
                       cursor: batchBusy ? "default" : "pointer",
@@ -509,15 +514,19 @@ export default function TarotStudio() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={it.url} alt={it.card.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     ) : it.status === "pending" ? (
-                      <span>⏳</span>
+                      <span>⏳ 生成中…</span>
                     ) : it.status === "error" ? (
                       <span>
-                        ⚠️
+                        ⚠️ 失敗
                         <br />
-                        重試
+                        點擊重試
                       </span>
                     ) : (
-                      <span style={{ padding: 4 }}>{it.card.name}</span>
+                      <span style={{ padding: 6 }}>
+                        {it.card.name}
+                        <br />
+                        <span style={{ opacity: 0.6 }}>（點擊生成）</span>
+                      </span>
                     )}
                   </div>
                 ))}
@@ -525,6 +534,47 @@ export default function TarotStudio() {
             </div>
           );
         })()}
+
+      {/* large-view modal */}
+      {viewIndex != null && batch[viewIndex]?.url && (
+        <div
+          onClick={() => setViewIndex(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.75)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 24,
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={batch[viewIndex].url}
+              alt={batch[viewIndex].card.name}
+              style={{ maxHeight: "78vh", maxWidth: "90vw", borderRadius: 10, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}
+            />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                className="btn-primary"
+                disabled={batchBusy}
+                onClick={() => {
+                  const idx = viewIndex;
+                  if (idx != null) void generateSingle(idx);
+                }}
+              >
+                {batchBusy ? "生成中…" : "🔄 重新生成這張"}
+              </button>
+              <button className="btn-secondary" onClick={() => setViewIndex(null)}>
+                關閉
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
