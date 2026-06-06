@@ -66,7 +66,9 @@
 - [x] **【✅ 2026-06-05 完成上線】大修 app.aware-wave.com（12個問題）** — P1 Supabase Auth 登入上線（操作者實測 OK）+ P2-P12 全修全部署；onboarding intake 重設計+去重複。現況見 `docs/operations/APP_AWARE_WAVE_CURRENT_STATE.md`。後續 IA 重整 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 - [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售 → handoffs/2026-06-05-1948-wp-bridge-deploy-sell.md
 - [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item（Phase4Weekly 錯 repo / incidents API 藏 open / 5 webhook 零流量）→ handoffs/2026-06-05-2017-tomo-201752.md
-- [ ] Hetzner Hosting Layer：驗證 Phase 1 修正(M9/M7/M3/M10,已commit未驗證)+補WORKLOG R0+推進Phase 2(provisionClient CLI) → handoffs/2026-06-05-2030-tomo-203020.md
+- [x] **【✅ 2026-06-06 完成】Hetzner Hosting Layer Phase 1 驗證** — M9/M7/M3/M10 經 tsc(我檔0錯)+vitest(18/18)+critic(無Critical)+db-expert(sound) 驗證；WORKLOG R0 證據已補。→ handoffs/2026-06-05-2030-tomo-203020.md
+- [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做，現 gated OFF）**：① M10 orphan reaper（claim 後 trigger 前 crash→卡 running 終態；需 claimed_at 時戳+reaper `dispatch-action-run.ts:157-180`）② partial index `create index concurrently idx_ops_action_runs_pending_dispatch on ops_action_runs(started_at) where status='pending'`
+- [ ] Hetzner Hosting Layer Phase 2：建 provisionClient.ts CLI + hetzner/cloudflare providers + cloud-init（全 dry-run；Phase 4 真機需 go-ahead+填 HETZNER token）→ handoffs/2026-06-05-2030-tomo-203020.md
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 - [ ] wp-bridge v0.3.0：使用者更新 soulful → AI 在真站建第一篇草稿（SE-01）+ 續做 operation → handoffs/2026-06-05-2039-tomo-203931.md
 

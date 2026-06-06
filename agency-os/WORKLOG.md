@@ -4,6 +4,27 @@
 
 ## 2026-06-06
 
+### Hetzner Hosting Layer — Phase 0 規劃入庫 + Phase 1 一鍵架站骨幹 4 致命 gap 修復
+
+**背景**：規劃「客戶一鍵租 Hetzner 主機」自動化。Phase 0 把計畫落 repo SSOT；Phase 1 先穩既有 provisioning building blocks（修 audit 開放的 M9/M7/M3/M10），為後續 provisionClient CLI（決策0：腳本SSOT+雙觸發，不用 Trigger.dev 主體）打底。全程 workflows 仍 env-gate OFF。
+
+**[已修改]**
+- Phase 0：`lobster-factory/docs/hosting/` 新增 PLAN + V2政策 + 戰術SOP（commit 5c42b580，已 push）
+- M9 `src/trigger/orchestrate-tenant-provisioning.ts:82-167` — provider loop 改 per-provider try-catch（step throw + webhook throw 各自隔離，失敗記錄+continue，不 short-circuit；webhook 失敗保留 secretRef 進 detail）。captureWorkflowException 用 `tags:{provider}`（SentryContext 無 provider 頂層鍵）
+- M7 `src/executor/installManifestStaging.ts` — 新 `buildManifestChildEnv()` 取代 `spawn env:{...process.env}`；default-deny allowlist（PATH/HOME/LANG/TMPDIR/XDG_*/USER/LOGNAME/Windows + DRY_RUN）+ opt-in `LOBSTER_MANIFEST_ENV_PASSTHROUGH`。腳本實讀僅需 PATH+DRY_RUN+node/wp
+- M3 `src/tasks/wp-install-plugins.ts:226-238` — dry-run 不再偽報；resultSummary jsonb 加 `mode`(live/dry_run)+`applied`(bool)。status enum 不可改（CHECK 限 5 值，0002_factory.sql:119）→ status=run完成、applied=是否真裝（db-expert 確認此分層 sound，勿加 migration）
+- M10 `src/db/supabase/supabaseRestInsert.ts`（supabaseRestPatch 加 optional `match`）+ `src/trigger/dispatch-action-run.ts`（`claimPendingRun` conditional PATCH `WHERE id AND status=eq.pending`，空陣列=別人搶先→skip）→ 防並發雙觸發
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc -p tsconfig.tmp.json`（臨時config，package無tsconfig）| exit=2 | 我4改檔中 orchestrate/installManifest/supabaseRest **0錯**；wp-install/dispatch 殘留錯全在未觸碰行（ssh2 any L3/92/100、event missing workflowId L183/198）=pre-existing（package從沒typecheck，20個既有錯非本次）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test`(vitest) | exit=0 | ms=212 | 18/18 pass 無 regression
+- REVIEW_DONE: critic=Deep | verdict=pass（無Critical，Low-Med risk）| findings=0c/3m/3n；db-expert verdict=sound（M10 CAS 在 READ COMMITTED 經 EvalPlanQual re-check exactly-one-winner；PostgREST 0-row PATCH+representation→`[]` 可靠；M3 分層正確勿加 migration）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=supabaseRestPatch,buildManifestChildEnv,claimPendingRun,result_summary | hits=0（supabaseRestPatch 6 callsite 全 positional+options，新 match optional→向後相容；新 symbol 僅內部用；applied/mode 無既有 consumer=純 additive）
+
+**[剩餘風險 / 上線前 follow-up]**（dispatcher gated OFF，非 merge-blocker，啟用 `LOBSTER_EXECUTE_*` 前必處理）
+- M10 orphan reaper：claim 標 running 後、trigger 前 crash → row 卡 running 終態（poll 只看 pending 永不重撈）。需 claimed_at 時戳 + reaper sweep。→ 記 TASKS
+- M10 partial index：poll `WHERE status=pending ORDER BY started_at` 無可用 index（既有 idx org-led），append-only 表 seq-scan 退化。需 `create index concurrently idx_ops_action_runs_pending_dispatch on (started_at) where status='pending'`。→ 記 TASKS
+
 ### app.aware-wave — Onboarding IA 重整 Phase 1：退役 ops-console（接續 handoff onboarding-ia-consolidation）
 
 **[已修改]**
