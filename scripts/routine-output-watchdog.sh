@@ -21,6 +21,11 @@
 
 set -uo pipefail
 
+# Force a guaranteed-present UTF-8 locale BEFORE building the bilingual (CJK) message.
+# The inherited cron/ssh locale is not reliably UTF-8 — without this the Chinese half
+# arrives as mojibake while English is fine (root-caused 2026-06-06). C.UTF-8 always exists.
+export LANG=C.UTF-8 LC_ALL=C.UTF-8
+
 REPO=/root/Work
 ENVFILE=/root/lobster-phase1/.env
 STATE=/root/.routine-watchdog-state
