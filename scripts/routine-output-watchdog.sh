@@ -19,12 +19,15 @@
 #
 # Rollback: remove the cron line + `rm /root/.routine-watchdog-state`. Script is in repo.
 
-set -uo pipefail
+# bash locks its multibyte/lexer behaviour to the locale present at STARTUP, so an
+# inherited non-UTF-8 cron/ssh locale mangles the bilingual CJK string literals below
+# into mojibake (English stays fine). An in-script `export` is too late — the lexer has
+# already tokenised. So re-exec ONCE under a guaranteed-present UTF-8 locale (C.UTF-8 is
+# always available; en_US.UTF-8 is not reliably applied non-interactively). Root-caused
+# 2026-06-06 after the Chinese half of the alert arrived garbled.
+if [ "${LC_ALL:-}" != "C.UTF-8" ]; then exec env LC_ALL=C.UTF-8 LANG=C.UTF-8 bash "$0" "$@"; fi
 
-# Force a guaranteed-present UTF-8 locale BEFORE building the bilingual (CJK) message.
-# The inherited cron/ssh locale is not reliably UTF-8 — without this the Chinese half
-# arrives as mojibake while English is fine (root-caused 2026-06-06). C.UTF-8 always exists.
-export LANG=C.UTF-8 LC_ALL=C.UTF-8
+set -uo pipefail
 
 REPO=/root/Work
 ENVFILE=/root/lobster-phase1/.env
