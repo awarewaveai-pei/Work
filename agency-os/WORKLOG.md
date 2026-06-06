@@ -46,6 +46,11 @@
 - 驗證：vitest **27/27 pass**（+9 新測）；tsc 新檔 **0 錯**（總 20 全 pre-existing）；全 env-gate OFF 零 prod 影響
 - 待續增量（皆可單測，真機驗收 Phase 4 需 token+go-ahead）：hetzner provider / cloudflare dns / cloud-init day1 模板 / provisionClient CLI + /provision-client 指令
 
+**[Phase 2d/2e — 完整 provisioning 層 + critic 安全修法]**（全 env-gate OFF，真機 Phase 4）
+- 新檔（皆 mock-fetch 單測）：`providers/hetzner/cloudInit.ts`（day1 #cloud-config renderer）/ `secretStore.ts`（ed25519 keygen+OpenSSH 編碼，私鑰只進 sink）/ `HetznerHostingAdapter.ts`（provisionServer：冪等 label/per-location cpx 確認/dry-run gate/poll/M9 rollback 刪 server+primary_ip）/ `providers/cloudflare/dns.ts`（A-record idempotent upsert/delete）/ `provision/provisionClient.ts`（SSOT 編排器 server→DNS）/`serverAdapterFactory.ts`（env→adapter+tier→cpx）/`cli.ts`（Phase-1 觸發）+ `.claude/commands/provision-client.md`
+- **critic 審出並全修（含 1 Critical）**：① 🔴 **cloud-init 只有 IPv4 firewall，IPv6 全開**（Hetzner 給 public /64，ip6tables 預設 ACCEPT＝挖礦威脅可從 v6 進）→ 加 `rules.v6`+`ip6tables-restore`+v6 DOCKER-USER ② DOCKER-USER 持久化：改 systemd unit（`After=docker.service`）survive reboot，取代 netfilter dump；day1-hardening.json 改反映**實際** iptables 狀態非 hardcoded ③ 去 root user key（least-priv，只 deploy+`PermitRootLogin no`）④ sshd 改 `sshd_config.d/99` drop-in 取代不可靠 sed ⑤ adapter：server_types 改**per-location** prices 確認（全域有≠SIN 有）⑥ 冪等只 reuse running+有IP 的 server，stuck/dead→blocked 不靜默 ⑦ poll 容忍暫時 API 錯（不因 429 誤刪健康機）⑧ teardown primaryIpId 未取得時先 GET resolve（防孤兒 IP）⑨ CLI domain 給了但缺 CF creds→警告不靜默；JSON.parse guard；assertNoSecretLeak 加 pubkey-prefix 檢查
+- 驗證：vitest **75/75 pass**（11 檔，+critic 修法測）；tsc 新檔 **0 錯**（總 20 全 pre-existing）；真機驗收（IPv6 port scan/DOCKER-USER 繞過/SMTP 587/cert）= Phase 4 需 HETZNER token+go-ahead
+
 ### app.aware-wave — Onboarding IA 重整 Phase 1：退役 ops-console（接續 handoff onboarding-ia-consolidation）
 
 **[已修改]**
