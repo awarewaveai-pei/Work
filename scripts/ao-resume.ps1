@@ -578,6 +578,26 @@ if (Test-Path -LiteralPath $autoRebootHealthScript) {
     $global:LASTEXITCODE = 0
 }
 
+# --- Claude routine output freshness (warn-only; surfaces silent routine failure at startup) ---
+# Rationale: a cloud routine whose source drifts / auth lapses / gets disabled stops landing
+# its report — and the operator should learn this at AO-RESUME (when they can act), not only
+# buried in the AO-CLOSE health gate. Writes reports/status/routine-freshness-LATEST.md, which
+# Claude reads at AO-RESUME §1 (same zero-effort pattern as backup-health / auto-reboot). The
+# always-on Telegram leg (for when the operator does NOT boot) lives on the EU VPS.
+$routineFreshScript = Join-Path $WorkRoot "scripts\check-routine-freshness.ps1"
+if (Test-Path -LiteralPath $routineFreshScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: Claude routine output freshness (warn-only) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $routineFreshScript -WorkRoot $WorkRoot
+    $rfExit = $LASTEXITCODE
+    if ($rfExit -ne 0) {
+        Write-Host "WARN: a Claude routine report is stale/missing (see agency-os/reports/status/routine-freshness-LATEST.md)." -ForegroundColor Yellow
+        Write-Host "      AO-RESUME continues because this check is warn-only." -ForegroundColor Yellow
+        Write-Host ""
+    }
+    $global:LASTEXITCODE = 0
+}
+
 # Fetch external signals (Telegram ops inbox + Slack) since last AO-CLOSE — non-blocking.
 # Pass -From explicitly so the gap window is always (last AO-CLOSE → now), not a stale fallback.
 $fetchSignalsScript = Join-Path $WorkRoot "scripts\fetch-external-signals.ps1"

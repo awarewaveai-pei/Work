@@ -303,11 +303,12 @@ export default function TarotStudio() {
               </option>
             ))}
           </select>
-          {mode === "image" && !modelOption(model).img2img && (
-            <div className="form-hint" style={{ color: "var(--yellow)" }}>
-              ⚠ 此模型（{model}）不吃上傳參考圖，風格只靠「文字描述 + 固定 seed」維持一致；要用上傳圖當風格請選 FLUX dev 或 gpt-image-1。
-            </div>
-          )}
+          <div className="form-hint">
+            📎 參考圖容量：
+            {maxRefs === 0
+              ? "此模型不吃參考圖（純文字生圖；要用上傳圖請改 FLUX dev = 1 張，或 gpt-image-1 = 最多 5 張）"
+              : `此模型最多吃 ${maxRefs} 張參考圖`}
+          </div>
         </div>
 
         <div className="form-row">
@@ -320,23 +321,80 @@ export default function TarotStudio() {
 
         {mode === "image" && (
           <div className="form-row">
-            <label className="form-label">參考圖（上傳）</label>
-            <input
-              type="file"
-              accept="image/*"
-              className="form-input"
-              disabled={locked}
-              onChange={(e) => onPickReference(e.target.files?.[0] ?? null)}
-            />
-            {referenceImage && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={referenceImage} alt="reference" style={{ marginTop: 8, maxHeight: 120, borderRadius: 8 }} />
+            <label className="form-label">參考圖（風格參考，可多張）</label>
+            {maxRefs === 0 ? (
+              <div className="form-hint" style={{ color: "var(--yellow)" }}>
+                ⚠ 目前模型不吃參考圖。改選 FLUX dev（1 張）或 gpt-image-1（最多 5 張）才會用到上傳圖。
+              </div>
+            ) : (
+              <>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="form-input"
+                  disabled={locked || referenceImages.length >= maxRefs}
+                  onChange={(e) => {
+                    void onAddReferences(e.target.files);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <div className="form-hint">
+                  已上傳 {referenceImages.length} / {maxRefs} 張
+                  {referenceImages.length >= maxRefs ? "（已達此模型上限）" : ""}
+                </div>
+              </>
+            )}
+            {referenceImages.length > 0 && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                {referenceImages.map((src, i) => (
+                  <div key={i} style={{ position: "relative" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={`ref ${i + 1}`} style={{ height: 90, borderRadius: 6, border: "1px solid var(--card-border)" }} />
+                    {!locked && (
+                      <button
+                        onClick={() => removeReference(i)}
+                        title="移除"
+                        style={{
+                          position: "absolute",
+                          top: -6,
+                          right: -6,
+                          width: 20,
+                          height: 20,
+                          borderRadius: "50%",
+                          border: "none",
+                          background: "#ef4444",
+                          color: "#fff",
+                          cursor: "pointer",
+                          fontSize: 12,
+                          lineHeight: "20px",
+                          padding: 0,
+                        }}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
 
         <div className="form-row">
-          <label className="form-label">風格描述{mode === "image" && referenceImage ? "（選填，已上傳參考圖可留空）" : ""}</label>
+          <label className="form-label">牌卡模板（套在生成圖上 + 自動加牌名）</label>
+          <select className="form-select" value={template} onChange={(e) => setTemplate(e.target.value as CardTemplate)}>
+            {CARD_TEMPLATES.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <div className="form-hint">每張下載的牌都會套這個框 + 自動加牌名。「無框」= 只給純藝術圖、不加字。</div>
+        </div>
+
+        <div className="form-row">
+          <label className="form-label">風格描述{mode === "image" && referenceImages.length > 0 ? "（選填，已上傳參考圖可留空）" : ""}</label>
           <textarea
             className="form-textarea"
             placeholder="例：中世紀彩色鉛筆塔羅插畫，暖色仿古紙質感，金色裝飾邊框，神秘氛圍"
