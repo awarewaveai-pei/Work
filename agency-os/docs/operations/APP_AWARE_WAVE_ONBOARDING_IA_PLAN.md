@@ -1,7 +1,7 @@
 # app.aware-wave.com — Onboarding / Provisioning 資訊架構（IA）重整計畫
 
 > **這份檔的用途**：app.aware-wave 後台的「建站/佈建」相關頁面目前**碎裂成 4 個互相重疊的介面**（操作者「不知道用哪個」）。本檔是把它們收斂成**一條連貫的客戶生命週期管線**的**正式計畫**——分析、目標架構、分階段實作、風險、回滾、驗證。改任何 code 前先讀本檔。
-> **狀態**：✅ **Phase 1 已實作**（2026-06-06：退役 ops-console redirect→/ops/clients + sidebar 移除 + canonical 管線文件）。Phase 2/3 待各自 R0 設計。決策已定：Q1=redirect / Q2=先做 Phase 1 / Q3=redirect 退役整頁。
+> **狀態**：📋 規劃完成、**尚未實作**（等操作者批准 Phase 1）。
 > **相關文件**：[`APP_AWARE_WAVE_CURRENT_STATE.md`](APP_AWARE_WAVE_CURRENT_STATE.md)（現況權威）、[`APP_AWARE_WAVE_COMPLETE_REFERENCE.md`](APP_AWARE_WAVE_COMPLETE_REFERENCE.md)（code 級參考）、[`../architecture/client-onboarding-portal-spec.md`](../architecture/client-onboarding-portal-spec.md)（Portal 14 段規格，未來願景）。
 > **建立**：2026-06-05。
 

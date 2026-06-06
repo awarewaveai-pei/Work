@@ -68,25 +68,6 @@ middleware `PUBLIC_API_PATHS` + 特殊規則放行（**仍會剝除 claim header
 - 導覽分區：Overview / Repair OS / Actions / Provisioning / Content Tools / System / External。
 - **命名統一**：`/ops/inbox` 一律稱 **「Ops Inbox」**（sidebar + Dashboard + 頁內 header 一致；不再有「Incident Engine」）。
 - **即時更新**：Repair Center（15s）/ Ops Inbox（20s）/ Approvals（20s）有 `AutoRefresh`（分頁可見時 `router.refresh()`，無 SSE）。
-- **`/ops-console` 已退役**（2026-06-05，IA 重整 Phase 1）：sidebar 已移除；route `redirect("/ops/clients")`。其內容全部已在 Clients / Build Console / `/onboard`，或屬靜態文件。元件（DepartmentSelector 等）保留。
-
----
-
-## 2.5 客戶生命週期管線（canonical — 建站該怎麼流）
-
-> 建站不是多個競爭頁面，是**一條管線的階段**。改任何建站/佈建相關頁前先對齊此圖。
-
-```
-[1 Intake]      →  [2 Spec]       →  [3 Review/Provision]  →  [4 Build]  →  [5 Live/Monitor]
-客戶探索問卷         Claude 生規格       技術審核+服務佈建          執行建站       上線+監控
-/ops/onboarding    generate-spec     /onboard 的技術步驟       /build       /ops/clients + Repair
-```
-
-- **Stage 1**（`/ops/onboarding`）：客戶 intake 問卷 → `WebsiteSpec`。
-- **Stage 3**（`/onboard`）：操作者技術配置（外掛包 / 部門 M3 / 服務帳號）。
-- **Stage 4**（`/build`）：**唯一**建站執行器（profile A/B/C → ops_action_runs → Trigger.dev）。
-- **兩種輸入、一條管線**：客戶問卷（AI）或操作者手動，最終共用 `/build`。
-- **待收斂（Phase 2/3，見 [`APP_AWARE_WAVE_ONBOARDING_IA_PLAN.md`](APP_AWARE_WAVE_ONBOARDING_IA_PLAN.md)）**：① intake 的 trigger-build 與 /onboard 兩條建 org 路徑收斂成一個 service ② intake → 技術步驟 → build 串成單一導引流程。
 
 ---
 
@@ -130,7 +111,7 @@ spoof x-ops-claims-role:admin 於 /ops/repairs → 期望 307（被剝除）
 | P8 | 無即時更新 | ✅ 已解（AutoRefresh polling）| `04869f73`（部署待 Tarot typecheck）|
 | P9 | AI label 寫死 Gemini | ✅ 已解（AutoSummary 動態 provider）| `a831efd5` |
 | P10 | Approvals 幾乎永遠空 | ✅ 已改善（空狀態誠實說明 + 導向 System Modes）| `04869f73`（部署待）|
-| P11 | Ops Console 孤兒頁 | ✅ **已退役**（IA Phase 1：sidebar 移除 + route redirect→/ops/clients；元件保留）|
+| P11 | Ops Console 孤兒頁 | ✅ 已改善（導向 banner，非破壞性保留）| `04869f73`（部署待）|
 | P12 | Inbox→Repair 單向導覽 | ✅ 已解（RepairPanel：狀態+連結 / 啟動修復）| `a831efd5` |
 
 > **12 問題全數處理。** P4 的釐清：原分析「兩入口做同樣的事」其實不準 —— `/ops/onboarding` 是客戶探索式 intake 問卷（`IntakeForm` type，對齊 [Client Onboarding Portal 規格](../architecture/client-onboarding-portal-spec.md)），`/onboard` 是 operator 技術建站精靈（slug/部門→Build Console），兩者是建站的**不同階段**。修法 = sidebar 標籤分清（「Onboarding（客戶 Intake）」第1步 / 「建站精靈（技術）」第2步），保留兩工具。未來 Onboarding Portal 完整實作時可再串成單一導引流程。
