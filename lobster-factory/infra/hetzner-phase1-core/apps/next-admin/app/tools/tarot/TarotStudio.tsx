@@ -361,59 +361,99 @@ export default function TarotStudio() {
         )}
       </div>
 
-      {/* ── Step 2 + 3: batch + download ──────────────────────── */}
-      {locked && (
-        <div className="card">
-          <h2 style={{ fontSize: 15, margin: "0 0 14px" }}>Step 2 · 整套生成與下載</h2>
+      {/* ── Step 2 + 3: per-group / per-card generation + download ──── */}
+      {locked &&
+        (() => {
+          const groupItems = batch.map((it, i) => ({ it, i })).filter(({ it }) => inGroup(it.card, group));
+          const groupDone = groupItems.filter(({ it }) => it.status === "done").length;
+          return (
+            <div className="card">
+              <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>Step 2 · 分組 / 單張生成與下載</h2>
 
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
-            <button className="btn-primary" onClick={generateBatch} disabled={batchBusy}>
-              {batchBusy ? `生成中… ${doneCount}/${TAROT_CARDS.length}` : `生成整套 ${TAROT_CARDS.length} 張`}
-            </button>
-            <button className="btn-secondary" onClick={downloadZip} disabled={zipBusy || doneCount === 0}>
-              {zipBusy ? "打包中…" : `下載 ZIP（${doneCount} 張）`}
-            </button>
-            <span className="form-hint">完成 {doneCount} / {TAROT_CARDS.length}</span>
-          </div>
-
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {batch.map((it, i) => (
-              <div
-                key={it.card.id}
-                title={`${it.card.name}${it.error ? ` — ${it.error}` : ""}`}
-                style={{
-                  width: 78,
-                  height: 130,
-                  borderRadius: 6,
-                  border: `1px solid ${it.card.colors[0]}55`,
-                  background: it.card.colors[1],
-                  position: "relative",
-                  overflow: "hidden",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 8,
-                  color: it.card.colors[0],
-                  textAlign: "center",
-                  cursor: it.status === "error" ? "pointer" : "default",
-                }}
-                onClick={it.status === "error" ? () => retryCard(i) : undefined}
-              >
-                {it.url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={it.url} alt={it.card.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : it.status === "pending" ? (
-                  <span>⏳</span>
-                ) : it.status === "error" ? (
-                  <span>⚠️<br />重試</span>
-                ) : (
-                  <span style={{ padding: 4 }}>{it.card.name}</span>
-                )}
+              {/* group filter chips */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                {GROUPS.map((g) => {
+                  const active = group === g.key;
+                  return (
+                    <button
+                      key={g.key}
+                      onClick={() => setGroup(g.key)}
+                      disabled={batchBusy}
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        cursor: batchBusy ? "default" : "pointer",
+                        border: `1px solid ${active ? "#6366f1" : "var(--card-border)"}`,
+                        background: active ? "#eef2ff" : "transparent",
+                        color: active ? "#4338ca" : "var(--text-muted)",
+                      }}
+                    >
+                      {g.label}
+                    </button>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+
+              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+                <button className="btn-primary" onClick={generateGroup} disabled={batchBusy}>
+                  {batchBusy ? `生成中… ${groupDone}/${groupItems.length}` : `生成這組 ${groupItems.length} 張`}
+                </button>
+                <button className="btn-secondary" onClick={downloadZip} disabled={zipBusy || doneCount === 0}>
+                  {zipBusy ? "打包中…" : `下載 ZIP（全部 ${doneCount} 張）`}
+                </button>
+                <span className="form-hint">
+                  這組 {groupDone}/{groupItems.length}　·　全部 {doneCount}/{TAROT_CARDS.length}
+                </span>
+              </div>
+              <div className="form-hint" style={{ marginBottom: 12 }}>
+                💡 點任一張卡 = 只生成（或重生）那一張。建議先點一張看風格滿不滿意，再「生成這組」。
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {groupItems.map(({ it, i }) => (
+                  <div
+                    key={it.card.id}
+                    title={`${it.card.name}${it.error ? ` — ${it.error}` : ""}（點擊生成/重生）`}
+                    onClick={() => generateSingle(i)}
+                    style={{
+                      width: 78,
+                      height: 130,
+                      borderRadius: 6,
+                      border: `1px solid ${it.card.colors[0]}55`,
+                      background: it.card.colors[1],
+                      position: "relative",
+                      overflow: "hidden",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 8,
+                      color: it.card.colors[0],
+                      textAlign: "center",
+                      cursor: batchBusy ? "default" : "pointer",
+                      opacity: batchBusy && it.status !== "pending" ? 0.6 : 1,
+                    }}
+                  >
+                    {it.url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={it.url} alt={it.card.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : it.status === "pending" ? (
+                      <span>⏳</span>
+                    ) : it.status === "error" ? (
+                      <span>
+                        ⚠️
+                        <br />
+                        重試
+                      </span>
+                    ) : (
+                      <span style={{ padding: 4 }}>{it.card.name}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }
