@@ -1,9 +1,16 @@
 # SEO/GEO 文章產出工具包（Prompt Kit）— 不寫程式版「引擎」
 
 > 用途：把 `wp-kadence-ai-seo-geo-content-engine.md`（產品規格 SSOT）裡的規則，濃縮成**可直接貼進 Claude / ChatGPT 重複使用**的提示詞流程。
-> 給誰：不想等系統開發完、現在就要產 SEO/GEO 文章的人（例如 Pei-Jing Art Studio 自己用）。
+> 給誰：不想等系統開發完、現在就要產 SEO/GEO 文章的人。**首要用途：https://soulfulexpression.org/ — art-based healing 教育法（EdD 申請 + 公開大眾）。**
 > 流程：填一次品牌檔 → 每篇文章跑 5 步 → 過品質閘 → 貼進 WordPress Kadence 草稿。
 > 對應規格章節都標在每步標題後（例：`§13`），要細節回去查 SSOT。
+>
+> **⚠️ 定位鐵則（每步都套用，因為這是 EdD + 心理健康/YMYL 領域）：**
+> - 定位為「**art-based healing 教育性 / 表達藝術方法**」，**不是臨床 art therapy**。只在「做出區分」時提 art therapy，不用它描述你自己的服務。
+> - **禁止**療效保證字眼：cure / heal / fix / treat / guaranteed / 保證 / 療癒疾病。
+> - EdD 可信度：能引用就引用真實學術來源（peer-reviewed / 權威機構），放進 References / Citation Box。
+> - 每篇放 disclaimer（非醫療/心理治療替代）+ 在地危機專線（台灣 1925 安心專線 / 1995 生命線）。
+> - 主語系 **英文**（en）；需要中文版時做雙語 + hreflang（§25.6）。
 
 ---
 
