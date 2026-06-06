@@ -125,8 +125,8 @@ final class BlockLibrary {
 			}
 			$body .= '<!-- wp:kadence/table-row {"uniqueID":"' . $rowId . '","row":' . (int) $r . '} -->' . $cm . '<!-- /wp:kadence/table-row -->';
 		}
-		// Iron-grey thin border on all sides (matches the styling pattern of soulful's real tables).
-		$border = '"borderStyle":[{"top":["#555555","solid",1],"right":["#555555","solid",1],"bottom":["#555555","solid",1],"left":["#555555","solid",1],"unit":"px"}]';
+		// Fixed table border: #A7A5A5, 1px, all sides (the standing default per operator instruction).
+		$border = '"borderStyle":[{"top":["#A7A5A5","solid",1],"right":["#A7A5A5","solid",1],"bottom":["#A7A5A5","solid",1],"left":["#A7A5A5","solid",1],"unit":"px"}]';
 		return '<!-- wp:kadence/table {"uniqueID":"' . $tableId . '","columns":' . $columns . ',"isFirstRowHeader":true,' . $border . ',"className":"is-style-stripes"} -->' . "\n"
 			. $body . "\n"
 			. '<!-- /wp:kadence/table -->';
