@@ -10,34 +10,6 @@
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
 const REPLICATE_POLL_MS = 2_500;
 
-// CJK / Japanese kana — FLUX & most image models follow English far better than Chinese,
-// so we translate the prompt to English once before generation (fail-open on any error).
-const CJK_RE = /[㐀-鿿豈-﫿぀-ヿ]/;
-async function toEnglishPrompt(prompt: string, signal: AbortSignal): Promise<string> {
-  if (!CJK_RE.test(prompt)) return prompt;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return prompt;
-  try {
-    const client = new Anthropic({ apiKey });
-    const msg = await client.messages.create(
-      {
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 700,
-        messages: [
-          {
-            role: "user",
-            content: `Translate this AI image-generation prompt into natural English, preserving all structure, art-direction terms, and intent. Output ONLY the translated prompt with no preamble:\n\n${prompt}`,
-          },
-        ],
-      },
-      { signal },
-    );
-    const block = msg.content.find((b) => b.type === "text");
-    return block && block.type === "text" && block.text.trim() ? block.text.trim() : prompt;
-  } catch {
-    return prompt; // never fail image generation because translation hiccupped
-  }
-}
 
 export type TarotModel = "flux-schnell" | "flux-dev" | "openai-low" | "openai-medium" | "openai-high";
 
@@ -238,10 +210,8 @@ export async function generateTarotImage(params: TarotGenParams): Promise<TarotG
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GEN_TIMEOUT_MS);
   try {
-    const prompt = await toEnglishPrompt(params.prompt, controller.signal);
-    const p: TarotGenParams = { ...params, prompt };
-    if (config.provider === "flux") return await generateFlux(p, config, controller.signal);
-    return await generateOpenai(p, config, controller.signal);
+    if (config.provider === "flux") return await generateFlux(params, config, controller.signal);
+    return await generateOpenai(params, config, controller.signal);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg === "The operation was aborted." ? "generation_timeout" : msg };
