@@ -90,7 +90,14 @@ export function createHetznerAdapter(deps: HetznerAdapterDeps): ServerProvisionA
       },
     });
     const text = await res.text().catch(() => "");
-    const body = text ? JSON.parse(text) : null;
+    let body: any = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      // Non-JSON 200 (proxy / nginx HTML error page) — surface cleanly, don't leak a raw SyntaxError.
+      if (!res.ok) throw new Error(`hetzner ${init?.method ?? "GET"} ${path} failed: ${res.status} ${res.statusText}`);
+      throw new Error(`hetzner ${init?.method ?? "GET"} ${path}: non-JSON response (${res.status})`);
+    }
     if (!res.ok) {
       const err = body?.error ? JSON.stringify(body.error) : `${res.status} ${res.statusText}`;
       throw new Error(`hetzner ${init?.method ?? "GET"} ${path} failed: ${err}`);
@@ -98,9 +105,12 @@ export function createHetznerAdapter(deps: HetznerAdapterDeps): ServerProvisionA
     return body;
   }
 
-  async function findExistingBySite(siteId: string): Promise<any | undefined> {
+  const REUSABLE_STATES = new Set(["running", "initializing", "starting"]);
+
+  /** All servers carrying this site's label (idempotency key). */
+  async function findServersBySite(siteId: string): Promise<any[]> {
     const body = await api(`/servers?label_selector=${encodeURIComponent(`${SITE_LABEL}=${siteId}`)}`);
-    return Array.isArray(body?.servers) ? body.servers[0] : undefined;
+    return Array.isArray(body?.servers) ? body.servers : [];
   }
 
   function refFromServer(server: any, input: ServerProvisionInput, sshCredentialsRef: string): ProvisionedServerRef {
@@ -122,14 +132,25 @@ export function createHetznerAdapter(deps: HetznerAdapterDeps): ServerProvisionA
   async function teardown(serverId: string, primaryIpId?: number): Promise<void> {
     // M9 compensating rollback. Best-effort; swallow secondary failures but never throw
     // out of the rollback (the caller already has the primary error).
+    // Resolve the Primary IP id BEFORE deleting the server — Hetzner does NOT auto-delete
+    // the Primary IPv4 with the server, so a missed id = €0.50/mo orphan billing (M9).
+    let ipId = primaryIpId;
+    if (ipId === undefined) {
+      try {
+        const s = await api(`/servers/${serverId}`);
+        ipId = s?.server?.public_net?.ipv4?.id;
+      } catch {
+        /* server may already be gone; nothing more we can resolve */
+      }
+    }
     try {
       await api(`/servers/${serverId}`, { method: "DELETE" });
     } catch {
       /* server may already be gone */
     }
-    if (primaryIpId !== undefined) {
+    if (ipId !== undefined) {
       try {
-        await api(`/primary_ips/${primaryIpId}`, { method: "DELETE" });
+        await api(`/primary_ips/${ipId}`, { method: "DELETE" });
       } catch {
         /* primary ip cleanup is best-effort */
       }
@@ -138,24 +159,43 @@ export function createHetznerAdapter(deps: HetznerAdapterDeps): ServerProvisionA
 
   async function provisionServer(input: ServerProvisionInput): Promise<ServerProvisionResult> {
     // 1. Idempotency (C2) — runs even in dry-run so a re-submit never appears to "create".
-    const existing = await findExistingBySite(input.siteId);
-    if (existing) {
-      return {
-        outcome: "reused",
-        ref: refFromServer(existing, input, `vault://LOBSTER_SSH_KEY_${input.siteId}`),
-      };
-    }
-
-    // 2. Runtime server-type availability (cx-series deprecated; SIN = AMD cpx only).
-    const typesBody = await api(`/server_types?per_page=50`);
-    const names: string[] = Array.isArray(typesBody?.server_types)
-      ? typesBody.server_types.map((t: any) => String(t.name))
-      : [];
-    if (names.length && !names.includes(input.serverType)) {
+    const matches = await findServersBySite(input.siteId);
+    if (matches.length) {
+      // Reuse only a healthy match WITH an IP. A stuck/dead match must be surfaced, not
+      // silently "reused" with an empty IP (which would skip DNS and look successful).
+      const usable = matches.find(
+        (s) => REUSABLE_STATES.has(String(s.status)) && s?.public_net?.ipv4?.ip
+      );
+      if (usable) {
+        return {
+          outcome: "reused",
+          ref: refFromServer(usable, input, `vault://LOBSTER_SSH_KEY_${input.siteId}`),
+        };
+      }
+      const states = matches.map((s) => `${s.id}:${s.status}`).join(", ");
       return {
         outcome: "blocked",
         adapter: "hetzner_cloud",
-        message: `serverType "${input.serverType}" not offered. Available: ${names.join(", ")}`,
+        message: `existing server(s) for site found but none healthy/reachable [${states}] — operator cleanup needed`,
+        missingEnv: [],
+      };
+    }
+
+    // 2. Runtime server-type availability IN THE TARGET LOCATION (cx deprecated; SIN = AMD
+    //    cpx only). A type can exist globally yet not be offered in `region` — checking the
+    //    per-location price entry avoids a guaranteed-to-fail billable create.
+    const typesBody = await api(`/server_types?per_page=50`);
+    const types: any[] = Array.isArray(typesBody?.server_types) ? typesBody.server_types : [];
+    const match = types.find((t) => String(t.name) === input.serverType);
+    const availableHere = types
+      .filter((t) => Array.isArray(t.prices) && t.prices.some((p: any) => p.location === input.region))
+      .map((t) => String(t.name));
+    const offeredHere = match && availableHere.includes(input.serverType);
+    if (types.length && !offeredHere) {
+      return {
+        outcome: "blocked",
+        adapter: "hetzner_cloud",
+        message: `serverType "${input.serverType}" not offered in ${input.region}. Available there: ${availableHere.join(", ") || "(none resolved)"}`,
         missingEnv: [],
       };
     }
@@ -206,7 +246,9 @@ export function createHetznerAdapter(deps: HetznerAdapterDeps): ServerProvisionA
       serverId = String(server.id);
       primaryIpId = server?.public_net?.ipv4?.id;
 
-      // 5. Poll until running.
+      // 5. Poll until running. A transient API blip (429/503) during boot must NOT tear
+      //    down a server that's about to be healthy — swallow poll errors, honour only the
+      //    wall-clock deadline.
       const deadline = Date.now() + pollTimeoutMs;
       let current = server;
       while (current.status !== "running") {
@@ -214,7 +256,12 @@ export function createHetznerAdapter(deps: HetznerAdapterDeps): ServerProvisionA
           throw new Error(`server ${serverId} did not reach running within ${pollTimeoutMs}ms`);
         }
         await sleep(pollIntervalMs);
-        const polled = await api(`/servers/${serverId}`);
+        let polled: any;
+        try {
+          polled = await api(`/servers/${serverId}`);
+        } catch {
+          continue; // transient error — retry until the deadline, don't abort+teardown
+        }
         current = polled.server;
       }
 

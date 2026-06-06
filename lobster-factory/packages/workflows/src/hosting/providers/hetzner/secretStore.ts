@@ -55,6 +55,7 @@ export type PutSecret = (ref: string, privateKeyPem: string) => Promise<void>;
 
 function refForSite(siteId: string): string {
   const norm = siteId.replace(/[^a-z0-9]/gi, "_").toUpperCase();
+  if (!norm) throw new Error("refForSite: siteId is empty — refusing to create a colliding key ref");
   return `vault://LOBSTER_SSH_KEY_${norm}`;
 }
 

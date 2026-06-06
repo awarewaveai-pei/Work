@@ -41,7 +41,13 @@ function mockHetzner(opts: {
       return json({ servers: opts.existing ?? [] });
     }
     if (method === "GET" && u.includes("/server_types")) {
-      return json({ server_types: (opts.serverTypes ?? ["cpx11", "cpx21", "cpx31"]).map((name) => ({ name })) });
+      // include per-location price entry (sin) — the adapter validates location availability
+      return json({
+        server_types: (opts.serverTypes ?? ["cpx11", "cpx21", "cpx31"]).map((name) => ({
+          name,
+          prices: [{ location: "sin" }],
+        })),
+      });
     }
     if (method === "POST" && u.endsWith("/servers")) {
       if (opts.createThrows) return json({ error: { message: "quota exceeded" } }, false);

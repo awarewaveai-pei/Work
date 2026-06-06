@@ -60,13 +60,22 @@ export async function runCli(argv: string[]): Promise<{ code: number; output: un
       ? { config: { apiToken: cfToken, zoneId: cfZone } }
       : undefined;
 
+  // friction #1 guard: a --domain with no Cloudflare creds would provision a host with no
+  // A-record (unreachable) and no warning. Surface it instead of silently skipping.
+  const warnings: string[] = [];
+  if (domain && !dns) {
+    warnings.push(
+      "--domain given but CLOUDFLARE_API_TOKEN/CLOUDFLARE_ZONE_ID missing — no A-record will be created (host will be unreachable by name)."
+    );
+  }
+
   const result = await provisionClient(
     { siteId, siteName, organizationId, region, serverType, domain },
     { serverAdapter, dns }
   );
 
   const code = result.status === "blocked" || result.status === "rolled_back" ? 1 : 0;
-  return { code, output: { tier, serverType, region, ...result } };
+  return { code, output: { tier, serverType, region, ...(warnings.length ? { warnings } : {}), ...result } };
 }
 
 // Direct-run entry (tsx). Guarded so importing this module for tests has no side effects.
