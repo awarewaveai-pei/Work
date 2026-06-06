@@ -6,6 +6,7 @@
 
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: postboot-stack-deploy → handoffs/2026-06-06-1925-postboot-stack-deploy.md
+- TOMORROW_CAPTURED: wp-bridge-v056-shipped → handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
 
 - AUTO_TASK_DONE: Phase4Weekly 第二次 scheduled fire
 
