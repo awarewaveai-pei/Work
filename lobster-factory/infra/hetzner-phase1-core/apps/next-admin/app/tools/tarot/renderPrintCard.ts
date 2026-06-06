@@ -108,7 +108,8 @@ export async function renderPrintCard(card: TarotCard, artDataUrl: string, templ
   drawCover(ctx, art, ART.x * PRINT_W, ART.y * PRINT_H, ART.w * PRINT_W, ART.h * PRINT_H);
 
   // Layer 3 — the transparent-centre frame on top (border + title panel overlay the artwork).
-  const frame = await loadImage(`/tarot-frames/${def.file}`);
+  // ?v cache-buster: frame files keep the same name across updates, so bump this when they change.
+  const frame = await loadImage(`/tarot-frames/${def.file}?v=2`);
   ctx.drawImage(frame, 0, 0, PRINT_W, PRINT_H);
 
   // Card name into the title panel (drawn last → always crisp).

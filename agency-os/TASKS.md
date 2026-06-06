@@ -72,6 +72,7 @@
 - [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做，現 gated OFF）**：① M10 orphan reaper（claim 後 trigger 前 crash→卡 running 終態；需 claimed_at 時戳+reaper `dispatch-action-run.ts:157-180`）② partial index `create index concurrently idx_ops_action_runs_pending_dispatch on ops_action_runs(started_at) where status='pending'`
 - [x] **【✅ 2026-06-06 完成+真機驗證】Hetzner 一鍵租機+硬化+DNS** — provisionClient.ts + hetzner/cloudflare providers + cloud-init 全寫完；真機 cpx12@sin 驗證通過（IPv4+IPv6 防火牆/key-only/無孤兒）。
 - [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）** — 程式+真機已驗過，**直接呼叫 `provisionClient()` 勿重寫**。recipe：`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`（app 端 `onboarding/trigger-build/route.ts` 頂部已留指標）。等 app 校正完再接。
+- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）** — 讓新機/客戶自帶機自動部署成 production 等級（Docker+Grafana/Loki/Netdata/Sentry+快取+swap+備份+限速/WAF/fail2ban）。**料件 90%+ 現成**，缺一個編排器 `provision-stack.sh`（串既有腳本，純 SSH，Vultr/DO/客戶自帶機通用）+ BYO adapter + swap。完整 R0 計畫：`lobster-factory/docs/hosting/SERVER_STACK_DEPLOYMENT_PLAN.md`。**禁止重寫既有 compose/腳本，只編排**。
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 - [ ] wp-bridge v0.3.0：使用者更新 soulful → AI 在真站建第一篇草稿（SE-01）+ 續做 operation → handoffs/2026-06-05-2039-tomo-203931.md
 
