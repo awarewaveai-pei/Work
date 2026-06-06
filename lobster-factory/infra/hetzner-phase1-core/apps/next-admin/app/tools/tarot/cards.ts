@@ -95,8 +95,15 @@ export const TAROT_CARDS: TarotCard[] = [...MAJOR, ...MINOR];
 /** The card used for the single style-preview generation. */
 export const PREVIEW_CARD: TarotCard = MAJOR[0]; // THE FOOL
 
-/** Build the full image-model prompt for one card given a user style description. */
+/**
+ * Build the full image-model prompt for one card given a user style/character description.
+ * The user's description REINTERPRETS the card's figures (e.g. "blue oil-painting cat" turns
+ * the Fool's traveler into a blue cat) instead of merely layering a style on a fixed human scene.
+ */
 export function buildCardPrompt(stylePrompt: string, card: TarotCard): string {
-  const style = stylePrompt.trim() || "ornate medieval colored-pencil tarot illustration, Rider-Waite inspired, warm antique paper";
-  return `${style}. Scene: ${card.subjectPrompt}. A single tarot card illustration titled "${card.name}", full vertical portrait composition, rich symbolic detail, no text, no border.`;
+  const style = stylePrompt.trim();
+  if (!style) {
+    return `Ornate medieval colored-pencil tarot illustration, Rider-Waite inspired, warm antique paper. Scene: ${card.subjectPrompt}. A single tarot card "${card.name}", full vertical portrait composition, rich symbolic detail, no text, no border.`;
+  }
+  return `A single tarot card illustration for "${card.name}". Keep this card's classic tarot iconography and composition (${card.subjectPrompt}), but REINTERPRET every character and the entire artwork according to this art direction — ${style} — applying it consistently to ALL figures (replace the human/animal characters with the described subject where applicable). Full vertical portrait, rich symbolic detail, cohesive consistent style, no text, no border.`;
 }

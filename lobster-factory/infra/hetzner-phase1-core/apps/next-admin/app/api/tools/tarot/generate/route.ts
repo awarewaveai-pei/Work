@@ -12,6 +12,18 @@ interface GenerateBody {
   seed?: number | null;
 }
 
+/** Map an internal error code to a human-readable (zh-TW) message for the UI. */
+function friendlyError(code: string): string {
+  if (code.includes("billing_hard_limit") || code.includes("insufficient_quota"))
+    return "OpenAI 帳號額度已達上限 — 請到 platform.openai.com → Billing 加額度後再試（FLUX 模型不受影響）。";
+  if (code.includes("missing_openai")) return "伺服器未設定 OpenAI 金鑰。";
+  if (code.includes("missing_replicate")) return "伺服器未設定 Replicate 金鑰。";
+  if (code.includes("content_policy") || code.includes("moderation"))
+    return "提示詞被內容安全政策擋下，請調整描述。";
+  if (code === "generation_timeout") return "生成逾時，請重試或改用較快的模型（FLUX schnell）。";
+  return `生成失敗：${code}`;
+}
+
 export async function POST(request: Request) {
   const resolved = resolveOpsRole(request);
   if (!canCreateAiImageJob(resolved.role)) {
@@ -56,8 +68,11 @@ export async function POST(request: Request) {
     seed: body.seed ?? null,
   });
 
-  if (!result.ok) {
-    return NextResponse.json(result, { status: 502 });
+  if (result.ok) {
+    return NextResponse.json(result);
   }
-  return NextResponse.json(result);
+  // Return HTTP 200 with ok:false so the JSON reaches the browser. A 5xx here would let
+  // nginx error_page replace the body with an HTML page → client sees "Unexpected token '<'".
+  const code = (result as { ok: false; error: string }).error;
+  return NextResponse.json({ ok: false, error: friendlyError(code), code });
 }

@@ -178,7 +178,13 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     console.error("[tarot] openai image failed", res.status, detail.slice(0, 500));
-    return { ok: false, error: `openai_${res.status}` };
+    let code = "";
+    try {
+      code = ((JSON.parse(detail) as { error?: { code?: string } })?.error?.code) ?? "";
+    } catch {
+      /* non-JSON error body */
+    }
+    return { ok: false, error: code ? `openai_${code}` : `openai_${res.status}` };
   }
 
   const json = (await res.json()) as { data?: { b64_json?: string }[] };
