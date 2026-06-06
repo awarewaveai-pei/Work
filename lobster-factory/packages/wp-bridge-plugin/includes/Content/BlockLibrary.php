@@ -134,9 +134,9 @@ final class BlockLibrary {
 
 	/** Kadence Accordion from panes [{title, content}]. content is plain text wrapped in a paragraph. */
 	public function accordion( array $panes ): string {
-		$accId = $this->uid();
-		$n     = count( $panes );
-		$pm    = '';
+		$accId       = $this->uid();
+		$n           = count( $panes );
+		$panesMarkup = array();
 		foreach ( array_values( $panes ) as $i => $pane ) {
 			$pid   = $this->uid();
 			$num   = $i + 1;
@@ -150,13 +150,16 @@ final class BlockLibrary {
 			$attrs = ( $num === 1 )
 				? '{"uniqueID":"' . $pid . '"}'
 				: '{"id":' . $num . ',"uniqueID":"' . $pid . '"}';
-			$pm .= '<!-- wp:kadence/pane ' . $attrs . ' -->' . "\n"
+			$panesMarkup[] = '<!-- wp:kadence/pane ' . $attrs . ' -->' . "\n"
 				. '<div class="wp-block-kadence-pane kt-accordion-pane kt-accordion-pane-' . $num . ' kt-pane' . $pid . '"><div class="kt-accordion-header-wrap"><button class="kt-blocks-accordion-header kt-acccordion-button-label-show" type="button"><span class="kt-blocks-accordion-title-wrap"><span class="kt-blocks-accordion-title">' . $title . '</span></span><span class="kt-blocks-accordion-icon-trigger"></span></button></div><div class="kt-accordion-panel"><div class="kt-accordion-panel-inner">' . $content . '</div></div></div>' . "\n"
 				. '<!-- /wp:kadence/pane -->';
 		}
+		// Sibling panes are separated by a blank line and sit flush against the inner-wrap open/close
+		// divs — byte-identical to a fresh editor-saved accordion (soulful post 7045).
+		$pm = implode( "\n\n", $panesMarkup );
 		return '<!-- wp:kadence/accordion {"uniqueID":"' . $accId . '","paneCount":' . $n . ',"startCollapsed":true} -->' . "\n"
-			. '<div class="wp-block-kadence-accordion alignnone"><div class="kt-accordion-wrap kt-accordion-id' . $accId . ' kt-accordion-has-' . $n . '-panes kt-active-pane-0 kt-accordion-block kt-pane-header-alignment-left kt-accodion-icon-style-basic kt-accodion-icon-side-right" style="max-width:none"><div class="kt-accordion-inner-wrap" data-allow-multiple-open="false" data-start-open="none">' . "\n"
-			. $pm . "\n"
+			. '<div class="wp-block-kadence-accordion alignnone"><div class="kt-accordion-wrap kt-accordion-id' . $accId . ' kt-accordion-has-' . $n . '-panes kt-active-pane-0 kt-accordion-block kt-pane-header-alignment-left kt-accodion-icon-style-basic kt-accodion-icon-side-right" style="max-width:none"><div class="kt-accordion-inner-wrap" data-allow-multiple-open="false" data-start-open="none">'
+			. $pm
 			. '</div></div></div>' . "\n"
 			. '<!-- /wp:kadence/accordion -->';
 	}

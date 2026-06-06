@@ -154,6 +154,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | MCP tool 回 401 / 403 / connection failed / empty API response | 跑 `/vault-status`；若顯示 key 缺口 → 跑 `/vault-sync` |
 | 使用者提到「客戶」/「soulful」/「WP 更新」/「外掛」/「maintenance」 | 先跑 `/client-status [slug]` 了解現況，再決定下一步 |
 | `/wp-maintenance safe-update` 完成 | 自動跑 `/playwright client <slug>` 確認無破壞 |
+| 使用者提到「一鍵架站」/「自動開站」/「provision」/「租主機」/「Hetzner 開機」/要在 app.aware-wave.com 加建站按鈕 | **先讀 [`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`](../lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md)**：「租 Hetzner 主機+day-1 硬化+DNS」**已寫好且真機驗證通過（2026-06-06）**，核心函式 `packages/workflows/src/provision/provisionClient.ts`。**直接呼叫，禁止重寫**。嵌進 app = 加 API route 呼叫 `provisionClient()`（雙觸發設計）。違反樣態：重新實作租機/cloud-init/secretStore 邏輯（已存在且驗過）。 |
 | Telegram bot 無回應 / 沉默 > 30 分鐘 / 使用者說「Telegram 壞了」/「指令沒反應」 | 跑 `/command-plane-verify` |
 | 使用者說「別的 AI 處理好了」/「另一個 session 做了 X」/「之前已經做過」/「似乎完成了」（任何基礎設施 / 安全 / 功能改動）| **VBC 協議（強制，R4 SSOT）**：① 先讀 `agency-os/WORKLOG.md` 最近 3 個 `## YYYY-MM-DD` 區塊，找對應 `[已修改]` / `AUTO_TASK_DONE` / `REALTEST_EVIDENCE` → 完整理解「做了什麼、用什麼替代方案」② 才做正向驗證（確認效果符合記錄）③ **禁止**：只查單點系統（CF API / git diff / VPS 單一服務）就宣告「沒做好」— 單層消失可能代表另一層已接手。根因：2026-06-04 CF WAF=0 rules 誤報案例（未讀 WORKLOG 確認 LLAR 已裝） |
 | 使用者說「doc 過時了」/「更新設計文件」/「SDD 跟程式碼不一致」/「文件同步一下」 | 跑 `/sdd-update` |
