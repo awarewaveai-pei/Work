@@ -4,6 +4,9 @@
 
 ## 2026-06-06
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: postboot-stack-deploy → handoffs/2026-06-06-1925-postboot-stack-deploy.md
+
 - AUTO_TASK_DONE: Phase4Weekly 第二次 scheduled fire
 
 ### app.aware-wave 一鍵架站 MASTER PLAN + 跨機開工必讀機制
