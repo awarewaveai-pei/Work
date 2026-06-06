@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-05 21:19:12
+- Generated: 2026-06-06 20:56:40
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,87 +219,169 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-05.md
-# Daily Note - 2026-06-05
+## 5) memory/daily/2026-06-06.md
+# Daily Note - 2026-06-06
+
+### Done (AO-CLOSE session 2026-06-06 ~20:44)
+- **SEO/GEO Content Engine 產品化**（doc-only）：spec → 通用引擎（prompt-kit + 2 顆 Gem onboarding/content）+ Soulful Expression 客戶內容（CONTENT_STRATEGY + 首篇 art-based-healing 文章範本）。
+- **定位鎖定**：公開 Arts Practice for Self-Discovery / EdD 框架 Arts-Based Reflective Pedagogy（Schön/Kolb/Mezirow）；非臨床 art therapy（YMYL 護欄）；域名保留 soulfulexpression.org，獨佔 WuSheng Healing Module™。
+- handoff `handoffs/2026-06-06-2044-seo-geo-content.md`；spec 主檔未動（另一 AI 編輯中）。
 
 
-### verify-recent --ack (2026-06-05T12:23:09.9555052Z)
+### verify-recent --ack (2026-06-06T04:03:04.8929092Z)
 
-**Reason**: tarot UX: 風格描述改選填(上傳參考圖即可) + 條件式 label 文字；tsc --noEmit green；TarotStudio.tsx 本 session 已 critic 兩次；純 guard 放寬/字串改動，無新邏輯路徑
+**Reason**: tarot 修 cat-deck: buildCardPrompt 重構(角色改造)+ image-gen 抽 openai error code + route friendly 錯誤訊息+HTTP200(避 nginx HTML 攔截); tsc --noEmit green; 純 string/錯誤映射，無新控制流/安全面
+
+**Acknowledged unverified files** (count=3):
+
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\cards.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\tarot\generate\route.ts`
+
+
+### verify-recent --ack (2026-06-06T04:14:44.9644364Z)
+
+**Reason**: tarot cat-deck 定版: buildCardPrompt 改用實測驗證過的贏家結構(MAIN CHARACTER lead + NOT-human 否定，flux-schnell 實生兩張全貓確認) + image-gen 加 CJK→英文自動翻譯(haiku, fail-open); tsc green
+
+**Acknowledged unverified files** (count=2):
+
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\cards.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
+
+
+### verify-recent --ack (2026-06-06T04:38:35.6609848Z)
+
+**Reason**: tarot UX: Step2 加牌組篩選(大牌/全部/權杖/聖杯/寶劍/錢幣)+單張點擊生成，不再強制一次跑78張; tsc green; 純 client UI/狀態，無 server/安全面
 
 **Acknowledged unverified files** (count=1):
 
 - `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
 
 
-### verify-recent --ack (2026-06-05T12:26:37.8959506Z)
+### verify-recent --ack (2026-06-06T04:46:01.5920157Z)
 
-**Reason**: M2/M4 Phase 1 已於本 session 完整驗證: tsc --noEmit exit 0 + npm test 197/197 (per-source 12 + V2 6 新測試) + critic x2 (M2 auth/M4 fingerprint, 無 Critical, Major/Minor 全修) + db-expert (0036 additive 安全). temp d:/tmp/*.sh = SSH 診斷 throwaway 非 repo code.
+**Reason**: Phase1 M9/M7/M3/M10 完整驗證已做: tsc(我4檔0錯,殘留20錯全pre-existing) + vitest 18/18 + critic 無Critical + db-expert sound + WORKLOG R0 證據齊(REALTEST/REVIEW/BUGHUNT). skill auto-tsc N/A因package無tsconfig,改臨時config手動跑
 
-**Acknowledged unverified files** (count=13):
-
-- `d:\tmp\sg-sentry-diag.sh`
-- `d:\tmp\sg-inc2.sh`
-- `d:\tmp\sg-webhook-flow.sh`
-- `d:\tmp\sg-inc3.sh`
-- `d:\tmp\eu-incident-truth.sh`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\ops-inbox\verifyIngestToken.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\sentry\route.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\uptime-kuma\route.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\netdata\route.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\grafana\route.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\webhooks\posthog\route.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\ops-inbox\fingerprint.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\ops-inbox\upsertIncidentAtomic.ts`
-
-
-### verify-recent --ack (2026-06-05T12:33:34.5933137Z)
-
-**Reason**: Phase 1 Hetzner hosting M9/M7/M3/M10 已由 auto-checkpoint commit (f7174a5a); 驗證(tsc/vitest/critic/db-expert)經 /tomo 明確 defer 至明天 handoff 2026-06-05-2030-tomo-203020.md step 1-5
-
-**Acknowledged unverified files** (count=5):
+**Acknowledged unverified files** (count=2):
 
 - `d:\Work\lobster-factory\packages\workflows\src\trigger\orchestrate-tenant-provisioning.ts`
 - `d:\Work\lobster-factory\packages\workflows\src\executor\installManifestStaging.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\tasks\wp-install-plugins.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\db\supabase\supabaseRestInsert.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\trigger\dispatch-action-run.ts`
 
 
-### Done — 塔羅牌印刷檔生成工具（本 session，已上線）
+### verify-recent --ack (2026-06-06T05:32:37.2263801Z)
 
-- **新功能**：app.aware-wave.com `/tools/tarot` — 文字/以圖生圖生風格樣本 → 鎖定 → 整套 78 張同風格 → client canvas 組印刷牌卡（70×120mm @300DPI 含出血）→ JSZip 下載 PNG。薄 server（金鑰只在 server，一張一 request），組版/打包全 client。
-- **模型選單（便宜→貴）**：flux-schnell（~NT$8/套，無 img2img）、openai-low、flux-dev（吃上傳圖）、openai-medium、openai-high。
-- **已部署 SG**：`5de1dd81`→`ccfbd176`，smoke 全綠。
-- **金鑰大坑**：部署後才發現 SG `.env` 完全沒 REPLICATE_API_TOKEN + next-admin compose 沒接 REPLICATE/OPENAI（只有 ANTHROPIC）+ 原 OPENAI 是 `sk-plac…` 假 key。憑證檔原 key 也全 401。修：compose 加兩 key（錨點 PORT 3000）+ .env 補（多份備份）+ 使用者給新 key。**新 Replicate `r8_MXAU…` 實測 flux-schnell 真生一張 5s ✓**；OpenAI `sk-proj-niF7…` key 有效但帳號 `billing_hard_limit_reached`。新 key 同步：憑證檔 + SG .env + vault。
-- **UX 修**：風格描述改選填（上傳參考圖即可）— 使用者上傳圖被「描述必填」silent-擋的回報。
-- **教訓**：explore agent 宣稱「.env 有 key」是假設，未驗證 → 部署後才爆。下次新功能依賴 server 端 secret，部署前先 SSH 確認該 secret 真的在目標 container env。
+**Reason**: Phase2 foundation 已驗證: tsc 新檔0錯(總20全pre-existing) + vitest 27/27(+9新測). 全env-gate OFF零prod. skill auto-tsc N/A因package無tsconfig,臨時config手動跑
 
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:dfb009080d41476d22c397945a259370d91cd6b57c3bd15dbc6e1b78a78895e5 -->
+**Acknowledged unverified files** (count=5):
 
-### claude 2026-06-05 20:55
-
-- **完成（一句）**: 塔羅牌印刷檔生成工具上線 `app.aware-wave.com/tools/tarot`（5 模型 flux-schnell ~NT$8 → gpt-image-high；client canvas 組印刷牌卡 70×120mm@300DPI 含出血 + JSZip 下載）+ 部署 SG `ccfbd176` + 金鑰 provisioning（補 REPLICATE/OPENAI 至 SG .env+compose+vault+憑證檔）+ UX 修（風格描述改選填，上傳參考圖即可）。
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot/*` + `lib/tarot/image-gen.ts` + `app/api/tools/tarot/generate/route.ts`
-  - `agency-os/WORKLOG.md` / `TASKS.md` / `memory/CONVERSATION_MEMORY.md` / `memory/daily/2026-06-05.md`（本 AO-CLOSE）
-- **Git**: `9ea345bd` / `ccfbd176`（均已 push）；SG deployed `ccfbd176`
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: （遠端／無 commit）OpenAI 帳號 `billing_hard_limit_reached` → gpt-image 三檔待使用者加額度；flux-schnell 無 img2img；新 key 已同步 SG+vault+憑證檔三處。健康 gate 3 項（archive-lift / ao-resume-archive / claude-sync drift）本次 AO-CLOSE 已自修。
+- `d:\Work\lobster-factory\packages\workflows\src\hosting\types.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\hosting\serverTypes.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\hosting\providers\serverProvisionContract.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\hosting\mockServerAdapter.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\hosting\resolveServerProvisioning.ts`
 
 
-### claude 2026-05-30 17:07
+### verify-recent --ack (2026-06-06T05:48:27.7681141Z)
 
-- **完成（一句）**: app.aware-wave.com 分析 → 修 `/api/ops/summary` 客戶來源統一並部署 production → playwright-runner CP950 修復 → 建 CP950 parse-break 機械閘（防整類復發）→ onboarding portal 研究跨機固化。
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/summary/route.ts`（已部署 0b992b6）
-  - `scripts/playwright-runner.ps1`（ASCII 化 2661e20）
-  - `scripts/audit-cp950-traps.ps1` + `scripts/system-health-check.ps1` + `scripts/generate-customer-delivery-status.ps1`（CP950 gate be04f36）
-  - `agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md` + `docs/spec/raw/*`（跨機固化 15e00ca+2f893c7）
-- **Git**: 0b992b6 / 2661e20 / be04f36 / 15e00ca / 2f893c7（均已 push）
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: onboarding portal 14 段規格仍待寫（研究完成、開工先讀 client-onboarding-portal-CODEBASE-MAP.md §0）。
+**Reason**: §11 watchdog extension = additive data-array entry (2 hashtables, same loop as proven Phase4 entry) to warn-only check. Verified: PS parse OK + audit-cp950-traps CLEAN. ASCII-only, zero CJK capture site, logic unchanged.
+
+**Acknowledged unverified files** (count=1):
+
+- `d:\Work\scripts\system-health-check.ps1`
+
+
+### verify-recent --ack (2026-06-06T06:14:49.2329111Z)
+
+**Reason**: tarot 模板選擇器(classic/minimal/dark/none)+多參考圖(referenceImage→referenceImages[]，每模型 maxRefs UI 動態顯示，gpt-image image[] 多圖，FLUX 用第一張)；tsc+next build green；client UI + route 陣列驗證 + image-gen 多圖
+
+**Acknowledged unverified files** (count=4):
+
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\renderPrintCard.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\tarot\generate\route.ts`
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+
+
+### verify-recent --ack (2026-06-06T06:15:27.3124221Z)
+
+**Reason**: routine-freshness AO-RESUME leg: check-routine-freshness.ps1 REAL-EXEC tested (correctly flags Monthly MISSING + Phase4/Weekly OK, status report written), param bug caught+fixed by exec test; both files PS parse OK + check-routine-freshness CP950 CLEAN; ao-resume.ps1 added block is output-capture-free (no new CP950 trap, mirrors proven auto-reboot block).
+
+**Acknowledged unverified files** (count=2):
+
+- `d:\Work\scripts\check-routine-freshness.ps1`
+- `d:\Work\scripts\ao-resume.ps1`
+
+
+### verify-recent --ack (2026-06-06T06:30:52.7313562Z)
+
+**Reason**: routine-output-watchdog.sh (SG always-on Telegram leg): bash -n SYNTAX OK. Real-exec is dry-run + live test ON SG post-deploy (script targets SG /root/Work checkout + /root/lobster-phase1/.env, cannot run locally). State-file dedup + send-only-on-200 + creds read locally on SG.
+
+**Acknowledged unverified files** (count=1):
+
+- `d:\Work\scripts\routine-output-watchdog.sh`
+
+
+### verify-recent --ack (2026-06-06T06:33:51.6552542Z)
+
+**Reason**: tarot gallery UX: 縮圖 78px→132px 放大 + 點已完成卡跳大圖 modal(內含重生鈕)+ 點空白卡才生成; tsc green; 純 client UI/狀態
+
+**Acknowledged unverified files** (count=1):
+
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+
+
+### verify-recent --ack (2026-06-06T06:39:05.1979131Z)
+
+**Reason**: tarot 模板選擇器改成縮圖預覽(每個模板用 renderPrintCard 渲染樣本/使用者圖, 點選, 高亮選中); tsc green; 純 client UI + canvas 渲染
+
+**Acknowledged unverified files** (count=1):
+
+- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+
+
+### verify-recent --ack (2026-06-06T06:39:24.3211949Z)
+
+**Reason**: watchdog message bilingual (中/EN) + explanatory + next-step. bash -n OK; live-tested on SG (re-send with new format).
+
+**Acknowledged unverified files** (count=1):
+
+- `d:\Work\scripts\routine-output-watchdog.sh`
+
+
+### verify-recent --ack (2026-06-06T06:43:40.6055425Z)
+
+**Reason**: workflows package has no local tsc (Trigger.dev project; type-check runs at 'trigger.dev deploy'). A1 trigger.config syncEnvVars + B create-wp-site writeback match existing supabaseRestPatch signature + dispatcher _dispatchedFromActionRunId pattern; deploy is the verification gate (next step).
+
+**Acknowledged unverified files** (count=2):
+
+- `d:\Work\lobster-factory\packages\workflows\trigger.config.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\trigger\create-wp-site.ts`
+
+
+### verify-recent --ack (2026-06-06T06:46:21.5239329Z)
+
+**Reason**: Phase2d/2e provisioning 層完整驗證: vitest 75/75 + tsc 新檔0錯(總20 pre-existing) + critic 審(1 Critical IPv6 firewall + 8 finding 全修) + cloud-init/dns/hetzner/secretStore mock-fetch 單測. 全env-gate OFF零prod. 真機=Phase4
+
+**Acknowledged unverified files** (count=8):
+
+- `d:\Work\lobster-factory\packages\workflows\src\hosting\providers\hetzner\cloudInit.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\hosting\providers\cloudflare\dns.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\hosting\providers\hetzner\HetznerHostingAdapter.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\hosting\providers\hetzner\secretStore.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\hosting\mockServerAdapter.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\provision\provisionClient.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\provision\serverAdapterFactory.ts`
+- `d:\Work\lobster-factory\packages\workflows\src\provision\cli.ts`
+
+
+### verify-recent --ack (2026-06-06T07:10:10.2544160Z)
+
+**Reason**: watchdog: force LC_ALL=C.UTF-8 to fix CJK mojibake (inherited cron locale not UTF-8; C.UTF-8 present+working verified via base64 decode). bash -n OK; live base64 verify on SG next.
+
+**Acknowledged unverified files** (count=1):
+
+
+_... 113 lines omitted._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
@@ -322,8 +404,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-
-**[驗證結果]**
 1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell test-stable-status.ps1 (4 cases) | exit=0 | result=ALL PASS（時間戳/報告名 churn→不寫；score 100→99.5 / exit 0→1→寫；首跑/缺檔→寫；regex 不誤傷 `- Health score:`/`- Health gate exit code:`）
    REALTEST_EVIDENCE: tool=Bash | cmd=run agency-os/scripts/system-guard.ps1 -WorkspaceRoot agency-os -Mode daily x2（排程實際呼叫） | exit=1(health FAIL 與 churn 無關) | result=LAST_SYSTEM_STATUS.md 兩次 SHA256 相同 60153216…（不再 churn）
    REALTEST_EVIDENCE: tool=Bash | cmd=audit-cp950-traps.ps1 -ParseBreakOnly | exit=0 | result=scanned=147 clean=147 drift=0，兩支 system-guard OK
@@ -381,4 +461,6 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
+
+
 

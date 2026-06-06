@@ -1,4 +1,4 @@
-﻿# Worklog
+# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
@@ -11,7 +11,27 @@
 - TOMORROW_CAPTURED: pod-studio-roadmap → handoffs/2026-06-06-2026-pod-studio-roadmap.md
 - TOMORROW_CAPTURED: seo-geo-content → handoffs/2026-06-06-2044-seo-geo-content.md
 
-- AUTO_TASK_DONE: Phase4Weekly 第二次 scheduled fire
+- AUTO_TASK_DONE_APPLIED (2026-06-06T12:56:41Z): Phase4Weekly 第二次 scheduled fire
+
+### SEO/GEO Content Engine 產品化 + Soulful Expression 定位/文章
+
+**目的**：把 `docs/wp-kadence-ai-seo-geo-content-engine.md`（3920 行 spec）落地成可用資產；客戶 Soulful Expression（art-based healing）要產 SEO/GEO 文章 + 佐證 EdD。
+
+**[已修改]**（全 doc-only `.md`）
+- 通用引擎層 `docs/seo-content/`：`prompt-kit.md`（STEP 0-6 無程式產文流程）、`GEM-1-onboarding-positioning.md` + `GEM-2-seo-geo-content-engine.md`（拆兩顆 Gem：onboard 一次 / 產文多次）、`spec-review-and-gaps.md`（spec 落地 errata A1-A4 平台現況 + B1-B5 缺口）、`articles/what-is-art-based-healing.md`（首篇合規範本）。
+- 客戶層 `agency-os/tenants/company-soulful-expression/sites/soulfulexpression-org/content/CONTENT_STRATEGY.md`（定位 SSOT）。
+- **定位拍板（鎖定）**：公開門面 Arts Practice for Self-Discovery；學術/EdD 框架 Arts-Based Reflective Pedagogy（理論 Schön/Kolb/Mezirow）；非臨床 art therapy（受規管詞避用，YMYL）。域名保留 soulfulexpression.org，策略 = 獨佔 WuSheng Healing Module™（紅海撞名解法）。
+- **未動** `docs/wp-kadence-...md`（另一 AI 並行編輯，operator 喊停）；§49 errata 暫存 spec-review 待 pull 後補。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 全部產出為 `.md` 文檔（spec/范本/Gem 規格/文章草稿/策略），無 code 檔（.ps1/.ts/.js/.sh/.py）改動。
+- REVIEW_WAIVED: DOC_ONLY -- 同上。
+- BUGHUNT_DONE: scope=docs/seo-content,agency-os | grep=Art-Based Healing Educator|art-based healing 教育性|Educational, Expressive-Arts Approach | hits=0（定位改動後跨檔確認無殘留舊字串，1 處 schema headline 已同步修正）
+- 真實 context 驗證：WebFetch soulfulexpression.org（確認服務/創辦人 Pei-Ching Huang/英文為主）+ WebSearch 確認品牌名紅海撞名（Soul Expression Arts 等近似名）。
+
+**[剩餘風險]**：文章 placeholder 待 operator 補真實資料（頭銜/EdD/價格/IG/學術引用）才可發布；client-vs-generic 分層未完（article 仍在 docs/，prompt-kit STEP 0 仍填 Soulful 未通用化）→ 見 handoff packet。
+
+**[rollback]**：純新增檔，刪 `docs/seo-content/` + tenant `content/` 即還原；spec 主檔未動無需 rollback。
 
 ### app.aware-wave 一鍵架站 MASTER PLAN + 跨機開工必讀機制
 
@@ -7445,7 +7465,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-06 11:18:46 UTC_
+_Last synced: 2026-06-06 12:56:36 UTC_
 
 ## 2026-03-20
 
@@ -8379,5 +8399,6 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
+
 
 
