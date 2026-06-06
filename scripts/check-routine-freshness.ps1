@@ -20,10 +20,18 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $WorkRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    [string] $WorkRoot
 )
 
 $ErrorActionPreference = "Stop"
+
+# Resolve $WorkRoot robustly. ao-resume.ps1 always passes -WorkRoot; the fallback only
+# matters for standalone runs. ($PSScriptRoot can be empty during param-default binding,
+# which crashed the first cut — caught by real-exec test, not parse.)
+if (-not $WorkRoot) {
+    $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+    $WorkRoot = (Resolve-Path (Join-Path $scriptDir "..")).Path
+}
 
 # Routine output contract — SSOT mirrored in system-health-check.ps1 §11.
 $routines = @(
