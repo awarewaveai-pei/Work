@@ -63,6 +63,20 @@ export default defineConfig({
         if (dbWrites.trim())  out.LOBSTER_ENABLE_DB_WRITES           = dbWrites.trim();
         if (execMode.trim())  out.LOBSTER_MANIFEST_EXECUTION_MODE    = execMode.trim();
 
+        // ── Hosting adapter (create-wp-site → real staging WP provisioning) ──
+        // LOBSTER_HOSTING_ADAPTER=http_json makes create-wp-site POST to the provision-staging
+        // control-plane endpoint (SSHes into the SG WordPress container + actually builds a
+        // staging WP). Without these, create-wp-site stays mock/idle and no real site is built.
+        // provision-staging verifies the same LOBSTER_HOSTING_API_TOKEN. (Onboarding Stage 0.)
+        const hostingAdapter = process.env.LOBSTER_HOSTING_ADAPTER ?? "";
+        const hostingBaseUrl = process.env.LOBSTER_HOSTING_PROVIDER_BASE_URL ?? "";
+        const hostingPath    = process.env.LOBSTER_HOSTING_PROVISION_PATH ?? "";
+        const hostingToken   = process.env.LOBSTER_HOSTING_API_TOKEN ?? "";
+        if (hostingAdapter.trim()) out.LOBSTER_HOSTING_ADAPTER           = hostingAdapter.trim();
+        if (hostingBaseUrl.trim()) out.LOBSTER_HOSTING_PROVIDER_BASE_URL = hostingBaseUrl.trim().replace(/\/$/, "");
+        if (hostingPath.trim())    out.LOBSTER_HOSTING_PROVISION_PATH     = hostingPath.trim();
+        if (hostingToken.trim())   out.LOBSTER_HOSTING_API_TOKEN          = hostingToken.trim();
+
         // ── Infrastructure endpoints (ao-infrastructure-check) ───────────────
         // LOBSTER_TRIGGER_PUBLIC_API_URL: set by lobster-trigger-deploy.ps1 to the public
         // HTTPS URL (https://trigger.aware-wave.com) so tasks get the correct runtime URL.
