@@ -40,6 +40,12 @@
 - M10 orphan reaper：claim 標 running 後、trigger 前 crash → row 卡 running 終態（poll 只看 pending 永不重撈）。需 claimed_at 時戳 + reaper sweep。→ 記 TASKS
 - M10 partial index：poll `WHERE status=pending ORDER BY started_at` 無可用 index（既有 idx org-led），append-only 表 seq-scan 退化。需 `create index concurrently idx_ops_action_runs_pending_dispatch on (started_at) where status='pending'`。→ 記 TASKS
 
+**[Phase 2 foundation — server-provisioning 機層骨架，可驗證增量]**
+- 新檔 `src/hosting/`：`serverTypes.ts`（ServerProvisionResult **完整 union 一次定全**：idle/mock/provisioned/reused/dry_run/rolled_back/blocked，30 年下游不用再改）+ `providers/serverProvisionContract.ts`（ServerProvisionAdapter 契約，內建 C2 冪等/M7 不洩密/M9 rollback/dry-run gate 規約）+ `mockServerAdapter.ts`（確定性 mock，IP 走 RFC 5737 文件空間 203.0.113.x 永不可路由）+ `resolveServerProvisioning.ts`（env-gate 進入點，鏡像 resolveStagingProvisioning；雙閘 `LOBSTER_SERVER_ADAPTER`+`LOBSTER_SERVER_PROVISION_ENABLED` 預設全 OFF）
+- D3.0：`types.ts` 兩 ref 加 `sshHost?`/`ipv4?`（additive，機層→站層 handoff；消 M1/M2 fallback 基礎）。dead contract `StagingProvisionBlocked{blocked:true}`（零實作）保守不重寫，新契約走 active `{outcome}` 慣例
+- 驗證：vitest **27/27 pass**（+9 新測）；tsc 新檔 **0 錯**（總 20 全 pre-existing）；全 env-gate OFF 零 prod 影響
+- 待續增量（皆可單測，真機驗收 Phase 4 需 token+go-ahead）：hetzner provider / cloudflare dns / cloud-init day1 模板 / provisionClient CLI + /provision-client 指令
+
 ### app.aware-wave — Onboarding IA 重整 Phase 1：退役 ops-console（接續 handoff onboarding-ia-consolidation）
 
 **[已修改]**

@@ -607,6 +607,25 @@ $routineOutputs = @(
         MaxAgeDays  = 8
         Routine     = "AgencyOS-RepairCenterPhase4Weekly"
         Hint        = "https://claude.ai/code/routines"
+    },
+    # 2026-06-06: extended to Weekly + Monthly outputs. Root cause that motivated this:
+    # all 3 routines' cloud `sources` had drifted to a now-deleted public repo, so their
+    # reports silently stopped landing in awarewaveai-pei/Work — yet only Phase 4 was
+    # watched here. A stale weekly/monthly LATEST now surfaces the same class of failure
+    # (routine disabled / wrong source / GitHub auth lapsed / crashed) at the next health gate.
+    @{
+        Name        = "Weekly review report freshness"
+        Path        = (Join-Path $monoRoot "agency-os\reports\weekly\weekly-automation-LATEST.md")
+        MaxAgeDays  = 9   # cron: Monday (every 7d) + 2d grace
+        Routine     = "AgencyOS-WeeklyReview"
+        Hint        = "https://claude.ai/code/routines"
+    },
+    @{
+        Name        = "Monthly review report freshness"
+        Path        = (Join-Path $monoRoot "agency-os\reports\monthly\monthly-review-LATEST.md")
+        MaxAgeDays  = 35  # cron: 1st of month (~28-31d) + grace
+        Routine     = "AgencyOS-MonthlyReview"
+        Hint        = "https://claude.ai/code/routines"
     }
 )
 # Layout guard: skip §11 entirely if $monoRoot doesn't actually contain agency-os/.
