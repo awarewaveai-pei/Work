@@ -3917,3 +3917,170 @@ final.md sha256: 646910b3e2472d1c9762f35f32b7c05bec4a0dd3e77dc929b5c5caf3085cc70
 ```
 
 本文件採用「v3.0 為主、final.md 補強」策略；若兩份文件有重複內容，保留較完整、較新、較適合開發落地的版本。所有新增 v2/v3 強化項，包括 NLP 語意覆蓋、Schema Linked Data Graph、Expert Reviewed System、Citation Box、Google Indexing API、Live Pricing、Cannibalization 防護、Core Web Vitals、AI Visibility Prompt Database 與 DB 全面更新，均已保留。
+
+---
+
+## 49. 自主營運層（Autonomous Operations Layer）
+
+> 本章來源：整合外部參考系統 `jonjonesai/templatized-jonops`（一套已實際在 cron 上運行的自主行銷 agent，34 支 skill）的**營運強項**。  
+> 整合原則：本 spec 第 1–48 章是**產品設計**（要蓋什麼）；本章是**營運模式**（怎麼每天無人值守地跑），並把參考系統的 SaaS 依賴改寫為 AwareWave 自有 stack。  
+> **不整合的部分**：參考系統預設 `status: publish` 自動發佈、無品質哲學層——本 spec 的 §32 品質門檻、§33 反 spam、§42 人審 checklist 的「draft-first + 人工審核」原則**完全保留，優先於本章任何自動化**。
+
+### 49.1 為什麼需要這一層
+
+第 1–48 章定義了「值得寫什麼、怎麼寫才有 SEO/GEO 價值、輸出什麼」。但一個真正的**代操（managed service）**系統還需要回答：
+
+```text
+誰在什麼時間自動觸發這些流程？
+某一步失敗了怎麼辦（重試？放棄？通知人？）
+人在什麼節點介入審核？
+內容以外的頻道（社群、電子報、外展）怎麼一起經營？
+```
+
+本章補上這四題。
+
+### 49.2 AwareWave Stack 對應（取代參考系統的 SaaS）
+
+代操所需的營運骨架，AwareWave 已有更好的自有版本，**不引進任何第三方 SaaS（不用 Metricool / Airtable / Sendy / Instantly）**：
+
+| 營運能力 | 參考系統用 | AwareWave 改用 |
+|---|---|---|
+| 狀態庫（keywords / briefs / articles…） | Airtable | **Supabase**（§36 schema） |
+| 排程 / 自動觸發 | cron | **Trigger.dev + n8n** |
+| 電子報 / 寄信 | Sendy | **Resend MCP** |
+| AI 出圖 / 出片 | ElevenLabs / Replicate | **Replicate MCP + Canva MCP** |
+| 社群多平台排程發佈 | Metricool | **自架 Postiz**（開源 AGPL；自處理 FB/IG/LinkedIn/TikTok/Pinterest/X/YT/GBP 的 OAuth 與 token 生命週期） |
+| 任務收件匣（人審） | Asana | **Telegram + agency-os/TASKS.md** |
+| 告警 | Telegram | **Telegram**（沿用既有 fetch-external-signals 管道） |
+| 冷外展寄信 | Instantly.ai | **暫不建**（見 §49.6 高風險頻道） |
+| SERP 爬取 / 關鍵字量 | Firecrawl / DataForSEO | **MVP 不用**；Phase 2 用 GSC（免費）+ 自建 TF-IDF（§10.1） |
+
+### 49.3 營運節奏（Cadence）
+
+每個品牌（project）的自動觸發節奏。**所有產出一律進 draft + 人審佇列，永不自動 publish。**
+
+| 流程 | 觸發 | 頻率 | 輸出 | 落地工具 |
+|---|---|---|---|---|
+| Keyword 發掘 | Trigger.dev 排程 | 每週一 | 新增 `keywords` rows | Phase 1 手動 / Phase 2 GSC |
+| Topic 評分 | keyword 更新後 | 每週 | `topics` + opportunity_score | AI（§37.1） |
+| Content Brief | 有 queued topic | 每週 | `content_briefs` | AI（§37.2） |
+| 文章生成 | 有 queued brief | 每日最多 N 篇/品牌 | `articles`（status=needs_review） | AI（§37.3）+ Replicate 出圖 |
+| 品質評分 | 文章生成後 | 即時 | `quality_scores` + §32 gate | AI（§37.4 GEO Audit） |
+| 人工審核 | 品質 gate 通過 | 人觸發 | status→published | 人 + Telegram 通知 |
+| 發佈 + 收錄推送 | 人核准後 | 即時 | WP draft→publish + Indexing API | wp-bridge / WP-CLI（§31） |
+| Content Refresh 掃描 | Trigger.dev 排程 | 每週 | refresh 建議進佇列 | §34 觸發條件 |
+| 每日 Watchdog | Trigger.dev 排程 | 每日最後 | 當日結果摘要 + 重試 | 見 §49.4 |
+
+**關鍵安全規則（沿用參考系統的 blog-writer 紀律）**：
+
+```text
+每個品牌每日最多 1 個「自主動作」（新文章 OR 舊文更新，二擇一，不可同時）
+高品質、慢、可信 > 大量、快、垃圾（呼應 §33 反 spam）
+產出永遠是 draft；publish 一定要人按下去
+```
+
+### 49.4 Watchdog / 重試 / 升級（來源：參考系統 daily-watchdog）
+
+每日最後一個排程任務，檢視當天所有自動流程結果，是整個系統的安全網。
+
+#### 重試紀律（核心規則）
+
+```text
+最多重試 1 次（one retry maximum）
+只重試「暫時性失敗」：API timeout、5xx、rate limit、讀取一致性延遲
+永久性失敗「絕不」重試，直接升級給人：
+  - 認證失敗（token 過期 / 401 / 403）
+  - 內容政策拒絕（平台 reject）
+  - 格式錯誤（schema invalid / 缺必填欄位）
+  - 品質 gate 未過（§32 不可發布條件）
+```
+
+#### 升級與告警
+
+```text
+1. 每日摘要寫入 agency-os/TASKS.md（人審收件匣）
+2. Telegram 推播：✅ 成功數 / ❌ 失敗數 / ⚠️ 跳過 / 🔁 已重試 / 🚨 NEEDS_OPERATOR
+3. 每個 NEEDS_OPERATOR 項附：品牌、流程、失敗原因、建議動作
+4. 重試前先確認狀態（例：文章是否其實已發佈，避免重複）
+```
+
+#### Watchdog DB 欄位（新增 ops_runs 表）
+
+```sql
+CREATE TABLE ops_runs (
+  id UUID PRIMARY KEY,
+  project_id UUID REFERENCES projects(id),
+  flow TEXT,                          -- keyword_discovery / brief / article / publish / refresh
+  status TEXT,                        -- success / failed / skipped / retried / needs_operator
+  failure_class TEXT,                 -- transient / auth / policy / format / quality_gate / none
+  retry_count INTEGER DEFAULT 0,
+  detail JSONB,
+  ran_at TIMESTAMP,
+  created_at TIMESTAMP
+);
+```
+
+### 49.5 人審收件匣（Human-in-the-loop Inbox）
+
+參考系統用 Asana 當人審收件匣；AwareWave 用 Telegram + `agency-os/TASKS.md`。
+
+```text
+品質 gate 通過的文章 → 進「待審」佇列，Telegram 通知操作者
+操作者用 §42 Human Review Checklist 逐項確認
+核准 → status=published → 觸發 §31 發佈 + Google Indexing API
+退回 → 標註原因 → 回 AI 修正佇列（不浪費已生成內容）
+所有 NEEDS_FACT_CHECK / NEEDS_BRAND_VERIFY 標記必須在審核時清空（§20.4）
+```
+
+### 49.6 內容以外的代操頻道
+
+本 spec 第 1–48 章只涵蓋 blog/SEO/GEO 內容。完整代操（managed marketing）還包含以下頻道，按風險排序整合：
+
+#### A. 社群排程發佈（低風險，Phase 3 後）
+
+```text
+工具：自架 Postiz（不自刻 OAuth、不用 Metricool）
+流程：文章/活動 → Canva/Replicate 出圖 → 客戶核准 → Postiz 排程多平台發佈
+平台 API 審核（Meta/TikTok/LinkedIn）由 Postiz 承擔，不重造輪子
+與內容引擎連動：每篇 published 文章可自動產生對應社群貼文草稿（仍須人審）
+```
+
+#### B. 電子報 / Email（低風險，Phase 2 後）
+
+```text
+工具：Resend MCP（不用 Sendy）
+用途：把 published 文章彙整成電子報、課程/活動通知、客戶名單經營
+合規：只寄給明確 opt-in 名單；每封含退訂連結（CAN-SPAM / GDPR）
+```
+
+#### C. B2B / 連結外展（高風險，預設不建）
+
+```text
+冷 email 外展（參考系統用 Instantly）：CAN-SPAM / GDPR / 寄信信譽風險
+資料抓取（LinkedIn / Google Maps / SERP scraper）：違反平台 ToS、IP 封鎖、法律前例
+紅線：在有合規寄信基礎 + 法務確認前「不建」此頻道
+若要做：走合規管道（購買 opt-in lead list / 官方 API），不用 scraper
+```
+
+### 49.7 營運安全紅線（本層的不可違反原則）
+
+```text
+1. 永不自動 publish——人審是強制門檻（優先於本章所有自動化）
+2. 每品牌每日最多 1 自主動作，杜絕 scaled content abuse（§33）
+3. 永久性失敗絕不重試，直接升級給人（§49.4）
+4. 不引進第三方行銷 SaaS——狀態/排程/寄信/出圖全走自有 stack
+5. 社群平台 OAuth 交給 Postiz；不自刻 7 平台 token 管理
+6. 高風險頻道（冷外展/scraper）在合規與法務確認前不建
+7. 所有對外發佈（社群/email）同樣套用品牌知識庫一致性（§19）與反誇大（§20.4）
+```
+
+### 49.8 與 Roadmap（§39）對應
+
+| 本層能力 | 對應 Roadmap 階段 |
+|---|---|
+| Cadence + Watchdog + 人審收件匣 + ops_runs 表 | Phase 1 末 ~ Phase 2 |
+| GSC 整合（取代付費關鍵字數據） | Phase 2 |
+| Resend 電子報頻道 | Phase 2 ~ Phase 3 |
+| Postiz 社群排程頻道 | Phase 3 後 |
+| 多客戶 agency 營運（白標報告 / 批次） | Phase 5（呼應 §39 Phase 5） |
+| B2B / 外展頻道 | 不在 roadmap，合規確認後另議 |
