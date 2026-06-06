@@ -6,7 +6,7 @@
 > 對應規格章節都標在每步標題後（例：`§13`），要細節回去查 SSOT。
 >
 > **⚠️ 定位鐵則（每步都套用，因為這是 EdD + 心理健康/YMYL 領域）：**
-> - 定位為「**art-based healing 教育性 / 表達藝術方法**」，**不是臨床 art therapy**。只在「做出區分」時提 art therapy，不用它描述你自己的服務。
+> - 公開門面用「**Arts Practice for Self-Discovery**」；學術/EdD 用「**Arts-Based Reflective Pedagogy**」（理論基礎 Schön / Kolb / Mezirow）。**不是臨床 art therapy**——只在「做出區分」時提 art therapy，不用它描述你自己的服務。
 > - **禁止**療效保證字眼：cure / heal / fix / treat / guaranteed / 保證 / 療癒疾病。
 > - EdD 可信度：能引用就引用真實學術來源（peer-reviewed / 權威機構），放進 References / Citation Box。
 > - 每篇放 disclaimer（非醫療/心理治療替代）+ 在地危機專線（台灣 1925 安心專線 / 1995 生命線）。
@@ -20,11 +20,13 @@
 
 ```yaml
 brand_name: "Soulful Expression"
-positioning: "art-based healing 教育性/表達藝術方法（NOT clinical art therapy）"
+public_label: "Arts Practice for Self-Discovery"             # 大眾門面用詞
+academic_framework: "Arts-Based Reflective Pedagogy"         # EdD/about/論文用；NOT clinical art therapy
+theory_base: ["Schön reflective practice", "Kolb experiential learning", "Mezirow transformative learning"]
 website: "https://soulfulexpression.org/"
 logo_url: "https://soulfulexpression.org/?"                   # NEEDS_BRAND_VERIFY
 founder_name: "Pei-Ching Huang"
-author_role: "Art-Based Healing Educator / EdD candidate"     # 確認你想用的頭銜
+author_role: "Arts-Based Educator / EdD candidate"            # 確認你想用的頭銜
 author_bio: "..."                                             # 只寫真實教育/實務背景，不編造資歷
 credentials: []                                               # 學歷/受訓/EdD 進程；沒有就留空，不要編
 signature_method: "WuSheng Healing Module™"                   # 你的專有教育框架

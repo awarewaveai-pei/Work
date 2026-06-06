@@ -1,18 +1,18 @@
-# What Is Art-Based Healing? An Educational, Expressive-Arts Approach to Wellbeing
+# What Is Art-Based Healing? An Arts Practice for Self-Discovery
 
 > Status: **Worked example (real)** for https://soulfulexpression.org/ — built from `wp-kadence-ai-seo-geo-content-engine.md`.
-> **Positioning (important):** Soulful Expression's work is framed as an **art-based healing *educational method*** (expressive-arts / self-development), **not clinical art therapy**. This framing (a) fits an **EdD** (Doctor of Education) positioning, (b) is safer than the regulated title "art therapist", and (c) still captures people searching "art therapy" via a clear FAQ distinction.
+> **Positioning (locked):** Public-facing label = **Arts Practice for Self-Discovery**. Academic/EdD framework = **Arts-Based Reflective Pedagogy** (theory base: Schön reflective practice · Kolb experiential learning · Mezirow transformative learning). It is an **educational, expressive-arts practice — NOT clinical art therapy**. This (a) fits an **EdD** (Doctor of Education) positioning, (b) avoids the regulated title "art therapist", and (c) still captures people searching "art therapy" via a clear FAQ distinction.
 > Markers: `NEEDS_BRAND_VERIFY` = replace with real info; `NEEDS_FACT_CHECK` = add academic source or delete; `NEEDS_REVIEWER` = have a qualified professional confirm wording.
-> SEO title: What Is Art-Based Healing? An Educational Expressive-Arts Approach
-> meta description: Art-based healing is an educational, expressive-arts approach to wellbeing — using creative making for self-reflection and growth. Learn how it works, who it's for, and how it differs from clinical art therapy.
+> SEO title: What Is Art-Based Healing? An Arts Practice for Self-Discovery
+> meta description: Art-based healing — an arts practice for self-discovery. A reflective, arts-based approach to wellbeing and growth. How it works, who it's for, and how it differs from clinical art therapy.
 > slug: what-is-art-based-healing
-> primary keyword: art-based healing | secondary: expressive arts, art for wellbeing, is art therapy the same as art class | intent: Know / Pillar (TOFU→MOFU) | language: en
+> primary keyword: art-based healing | secondary: arts practice for self-discovery, expressive arts, art for wellbeing, is art therapy the same as art class | intent: Know / Pillar (TOFU→MOFU) | language: en
 
 ---
 
 ## Quick Answer
 
-Art-based healing is an **educational, expressive-arts approach** that uses creative making — drawing, painting, collage, clay, symbolic work — as a way to reflect, regulate emotions, and grow in self-understanding. It is a *learning and self-development* practice, not a clinical treatment, and it needs no artistic skill: the value is in the process of making and the reflection that follows, not in producing a "good" piece. At Soulful Expression, this approach is delivered through structured healing modules (including the WuSheng Healing Module™) and guided sessions designed around education and personal growth. <!-- NEEDS_BRAND_VERIFY -->
+Art-based healing — at Soulful Expression, an **arts practice for self-discovery** — uses creative making (drawing, painting, collage, clay, symbolic work) as a way to reflect, regulate emotions, and grow in self-understanding. It is an *educational, expressive-arts* practice, not a clinical treatment, and it needs no artistic skill: the value is in the process of making and the reflection that follows, not in producing a "good" piece. The approach is grounded in established learning theory — **Arts-Based Reflective Pedagogy** (drawing on reflective practice, experiential learning, and transformative learning) — and delivered through structured healing modules (including the WuSheng Healing Module™) and guided sessions. <!-- NEEDS_BRAND_VERIFY -->
 
 <!-- wrap in div class="direct-answer" for Speakable -->
 
@@ -65,9 +65,15 @@ It may suit you if you:
 
 It is **not** a crisis service. If you are in immediate distress or thinking about harming yourself, contact local emergency services or a crisis line right away. <!-- localise; see disclaimer -->
 
-## What the research and field say
+## The educational foundations of this approach
 
-Expressive and arts-based approaches are an established area within education and the helping professions, with a growing body of scholarship on creativity, reflection, and wellbeing. <!-- NEEDS_FACT_CHECK: cite 1–3 peer-reviewed / authoritative sources here (e.g. journals on arts education, expressive arts, art therapy research) and list them in the references block. Essential for EdD credibility and AI citation. -->
+This is an *educational* practice, and it stands on well-established learning theory — what we call **Arts-Based Reflective Pedagogy**. Three traditions inform it:
+
+- **Reflective practice** — the idea that we learn by examining our own experience (Donald Schön's *reflective practitioner*). Art-making gives that reflection something concrete to look at. <!-- NEEDS_FACT_CHECK: cite Schön (1983) -->
+- **Experiential learning** — learning as a cycle of doing, reflecting, and applying (David Kolb's experiential learning cycle). Making, then noticing, then carrying insight forward mirrors that cycle. <!-- NEEDS_FACT_CHECK: cite Kolb (1984) -->
+- **Transformative learning** — how reflecting on experience can shift the assumptions we hold about ourselves (Jack Mezirow's transformative learning theory). This is where self-discovery becomes lasting change. <!-- NEEDS_FACT_CHECK: cite Mezirow (1991) -->
+
+Together they explain *why* a creative, reflective practice can support self-understanding — and they anchor this work in education rather than clinical treatment. <!-- NEEDS_FACT_CHECK: optionally add 1–2 sources on arts-based learning / expressive arts in education (e.g. Eisner, Barone & Leavy). Essential for EdD credibility and AI citation. -->
 
 ## Frequently asked questions
 
@@ -101,7 +107,10 @@ If you're curious whether it's right for you, the easiest first step is to **tak
 
 <!-- §15.5 Citation Box + §20 Evidence Layer. For EdD credibility this section is important: list real, citable sources you actually used. Example format below — replace with genuine references. -->
 
-- (Add 2–4 peer-reviewed / authoritative sources on expressive arts, arts in education, or wellbeing, with full URLs or DOIs.) <!-- NEEDS_FACT_CHECK -->
+- Schön, D. A. (1983). *The Reflective Practitioner: How Professionals Think in Action.* — reflective practice. <!-- NEEDS_FACT_CHECK: confirm edition/page -->
+- Kolb, D. A. (1984). *Experiential Learning: Experience as the Source of Learning and Development.* — experiential learning cycle. <!-- NEEDS_FACT_CHECK -->
+- Mezirow, J. (1991). *Transformative Dimensions of Adult Learning.* — transformative learning theory. <!-- NEEDS_FACT_CHECK -->
+- (Optional) add 1–2 sources on arts-based learning / expressive arts in education (e.g. Eisner; Barone & Leavy), with full URLs or DOIs. <!-- NEEDS_FACT_CHECK -->
 - Author's own facilitation practice and case reflections, Soulful Expression. <!-- NEEDS_BRAND_VERIFY -->
 
 ---
@@ -135,8 +144,8 @@ If you're curious whether it's right for you, the easiest first step is to **tak
     "@id": "https://soulfulexpression.org/about/#author",
     "name": "Pei-Ching Huang",
     "url": "https://soulfulexpression.org/about/",
-    "jobTitle": "Art-Based Healing Educator",
-    "knowsAbout": ["art-based healing", "expressive arts", "arts in education", "wellbeing"],
+    "jobTitle": "Arts-Based Educator",
+    "knowsAbout": ["arts practice for self-discovery", "arts-based reflective pedagogy", "expressive arts", "reflective learning", "transformative learning", "arts in education", "wellbeing"],
     "worksFor": { "@id": "https://soulfulexpression.org/#organization" },
     "sameAs": ["https://www.instagram.com/yourhandle"]
   },

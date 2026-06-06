@@ -133,3 +133,103 @@ tarot (已有) ──┐
 
 ## [Rollback 總則]
 每階段 = 純新增 + env flag（預設 OFF）+ additive migration。回滾 = flag off / 移除 route+lib / 刪外部 draft 商品。**不破壞** next-admin 既有路由、`ai_image_jobs`/`media_assets` 既有欄位、tarot 既有功能。
+
+---
+
+# 附錄 A — 操作者完整需求清單（本對話累積）
+
+## A1. 商業目標
+- 用 AI 生成設計 → 印成商品（POD）→ 上架自己的店賣。品牌 = **Soulful Expression**（靈性/塔羅調性）。
+- 賣貨店 = **操作者自己的 `soulfulexpression.org`**（Hostinger）；擬新增**商店子站**（建議 `shop.soulfulexpression.org`）跑 WooCommerce + POD，與品牌主站分離。
+- 印刷出貨 = **Printful**（操作者自己的帳號；Jon 的不可用）。
+- 最終要做到 Jon 的 MEGA 等級（見附錄 B），但**自建在 app.aware-wave.com**、單一棧、可長期維運。
+
+## A2. 塔羅工具（P1，多數已完成並部署 SG）
+| 需求 | 狀態 |
+|---|---|
+| 78 張塔羅 AI 生成、整套同風格、下載印刷檔 PNG（76×126mm @300DPI 含出血） | ✅ |
+| 文字生圖 / 以圖生圖 / 上傳風格參考圖 | ✅ |
+| 多模型可選（flux-schnell 最省→gpt-image-high），每模型顯示可吃幾張參考圖（maxRefs） | ✅ |
+| 角色改造：使用者描述（如「藍貓」）取代人物，整副變那個角色（非每張變色） | ✅ |
+| **不可用 Claude API 翻譯**（省錢）→ 已移除，prompt 直送圖片模型，建議打英文 | ✅ |
+| 上傳參考圖**自動縮圖**（避免 >10MB body → invalid_json） | ✅ |
+| 分組/單張生成（不強制 78 張一起；大牌/牌組/單張），點卡看大圖 + 重生 | ✅ |
+| 牌卡模板「選框 → 套上空白卡 → 下載正確成品」；模板要**有縮圖預覽**可選 | ✅ |
+| **不同風格的框**（6 個 AI 生成空心框：經典RW/手繪/中世紀/民俗/羊皮卷/哥德） | ✅ |
+| **3 層架構**：上=框線（壓在圖上）/ 中=塔羅圖 / 下=底色（透明中央框） | ✅ |
+| 模板選擇器放在「風格描述」後（UX 順序） | ✅ |
+| **待辦**：per-frame 藝術圖區域微調（尤其 gothic 太擠）；celestial 星月框補生（被內容過濾擋）；OpenAI gpt-image 待操作者加 billing；整副一致性（flux-dev 參考錨點） | ⏳ |
+
+## A3. 決策紀錄
+- 圖只活在瀏覽器 → 要**持久儲存**（P2a R2）。
+- 儲存選 **Cloudflare R2**（零 egress、S3 相容、已有 vault keys、架構合約指定）；不存 Hostinger 本機。
+- 不直接用 Jon 的 MEGA（私有碼/他的帳號/Streamlit 異棧）→ 自建擴充 next-admin。
+
+---
+
+# 附錄 B — Jon Jones 的 MEGA 完整功能/設定參考（操作者截圖整理，建置藍本）
+
+> MEGA = **Mass E-commerce Generator & Automator**（`app.mega.management` / `mockups.mega.management`，Streamlit，多用戶）。GitHub: jonjonesai（`store-drop-skill` = 建店那塊；MEGA app 設計生成段為私有/可能在 `templatized-jonops`）。
+
+## B1. 主流程（側欄 Progress 6 階段）
+`Idea（Claude 生 prompt）→ Generate（多模型並行 + 參考圖）→ Select（挑）→ Process（去背 + 壓縮）→ Mockup（Printful）→ Published（WooCommerce + 文案 + 定價）`
+
+## B2. 側欄導覽
+App / Settings / Analytics / Generators / Research / Mockup Explorer / My Designs / BG Removal Compare。（+ Mockup Studio 連結；多用戶 admin/beta）
+
+## B3. App 主頁
+- 橫幅：「You have N saved designs — reuse on a new product without regenerating」+ Browse My Designs。
+- **Step 1 Design Idea**：Generate Prompt（Claude）→ Image Prompt 文字框 → **Beautify**（Claude 美化）。
+- **Step 2 Generated Images**（多模型結果，可 Retry）。
+- **Step 3 Process & Create Mockup**：選定圖 → **去背樣式**（Preserve Design 溫和保留筆觸 / Strip Background 積極去白底）→ Process Artwork。
+- 側欄控制：**Theme / Vibe / Subject**（自由詞）、**Product** 下拉、**Style** 下拉（None/Art Deco/Kawaii/Line Art/Minimalist/Pop Art/Retro/Street Art/Typography/Vintage Poster/Watercolor/Other）、**Reference Image**（上傳，200MB/檔 PNG/JPG/WEBP，+ 第二張可選）、**Background Remover**（birefnet/bria_rmbg2/photoroom/pixian/**removal_ai 現用**/remove_bg）、**Generators** 勾選、Product Specs、Progress。
+
+## B4. Settings → API Connections（存進 .env）
+- **WooCommerce**：Store URL、Consumer Key、Consumer Secret；+ WP Username/Application Password（媒體上傳，繞過 Cloudinary fetch 不穩）。
+- **Printful**：API Key、Store ID、Test。
+- **Image Generation**：Provider（replicate）；**kie.ai**（替代供應商，便宜 25-40%）API Key。
+- **Replicate**：API Token、Test。
+- **Cloudinary**（圖床）：Cloud Name、API Key、API Secret、Test。
+- **Anthropic**（商品文案）：API Key、Test。
+- **Tinify**（壓縮）：API Key、Test。
+- **removal.ai**（去背）：API Key。
+- **Brand Assets**：Inside Label Logo URL。
+- **Size Guide**：Size Guide 頁 URL（自動附到服飾/泳裝商品描述）。
+- Test All Connections。
+
+## B5. Settings → Pricing Defaults（每商品零售價，持久 + 預填）
+- **Apparel**：T-shirt 24.99/26.99(plus)、Hoodie 49.99/54.99、Crew Neck Sweatshirt 32.99/34.99、Youth T-shirt 21.99、Sweatshirt 56.99/58.99、Hawaiian Shirt 49.99/51.99、Bodycon Dress 44.99、Swimsuit 49.99/51.99、Yoga Leggings 54.99、Baby Bodysuit 24.99。
+- **Headwear**：Beanie 29.99、Cuffed Beanie 29.99、Classic Snapback 34.99、Classic Dad Hat 32.99。
+- **Bags & Accessories**：Tote Bag 29.99、Fanny Pack 39.99、Backpack 58.99、iPhone Case 29.99、Samsung Case 29.99。
+- **Drinkware**：White Glossy Mug 11/15/20oz 14.99/16.99/18.99、Black Glossy Mug 11/15oz 16.99/18.99、Shaker Pint Glass 19.99、Water Bottle 34.99。
+- **Home & Living**：Basic Pillow 26.99、Wall Art Vertical 8x10/12x16/16x20 29.99/39.99/49.99、Wall Art Horizontal 10x8/16x12/20x16 29/39/49、Mousepad 19.99、Flag 32.99、Beach Towel 30x60/36x72 52.99/62.99。
+- **Stationery**：Sticker 3x3/4x4/5.5x5.5 3.99/4.99/5.99、Bumper Sticker 10.99。
+
+## B6. Settings → Users / Usage
+- 多用戶（admin + beta testers），跨 MEGA + Mockup Studio 共用。
+- 用量：每用戶 30 天視窗 **Products X/50、Generations X/250**，到期重置（配額控制）。
+
+## B7. Generators（Generator Registry，每 ~90 天更新）
+Active 6 / Reserve 1 / Deprecated 3 / Total 10。表欄：Name｜Developer｜Status｜Ratios｜Input Images｜Max Res｜Transparent BG｜Speed：
+- Ideogram V3（Ideogram AI，active，15 ratios，3 input，1536px，slow）
+- Flux 2 Pro（Black Forest Labs，active，11，8，2048px/4MP，fast）
+- Seedream 5 Lite（ByteDance，active，9，14，3072px/3K，medium）
+- GPT-Image 2（OpenAI，active，3，multiple，~1024-1536px，fast）
+- GPT-Image 2 (kie)（OpenAI via kie.ai，active，5，0，4K/2K，fast）
+- Nano Banana 2（Google DeepMind，active，15，14，4096px/4K，fast）
+- Flux 2 Max（Black Forest Labs，reserve，11，8，2048px/4MP，fast）
+- 每生成器詳情：slug、強弱項、Best For、支援 aspect ratios、**API 參數**（prompt / aspect_ratio / resolution 67 presets / magic_prompt_option / style_type / style_preset 64 / **style_reference_images 最多 3** / image inpainting + mask）、capabilities、新增/更新日期。
+
+## B8. Research（MEGA Research）
+「丟一個 niche → 生 10 個 design territories → 一鍵送進 MEGA」。Niche + **Audience**（Any/Female/Male/Gen X/Millennials/Gen Z/Moms/Dads…）+ **Tone**（Any/Humor·sarcasm/Nostalgic·retro/Premium·minimal/Dark·edgy/Wholesome/Rebellious/Patriotic…）→ Generate 10 territories。每日配額（如 20/20）。
+
+## B9. Mockup Explorer
+預生成 mockup 庫 — 瀏覽每個商品的每種 Printful mockup 樣式。挑 Product（Cached library / All MEGA products / Generate new）。例：Greeting Card Vertical（10 mockups）ID 568 → Flat 1-6、Lifestyle 1-3 變化。點 mockup 看 `option_group` 名（用在 `_extra_styles` / mockup configs）。
+
+## B10. My Designs
+「每張處理過的設計都存這，可換商品重用不必重生」。Filter Status/Type/Search。每張：縮圖、prompt·狀態(processed)·fullbleed·生成器、Reuse/Open/Delete。
+
+## B11. 整合服務清單（我們自建時要對應）
+Replicate（+ kie.ai 便宜替代）｜OpenAI gpt-image｜Anthropic（文案/prompt）｜removal.ai + birefnet/bria/photoroom/pixian/remove_bg（去背，多選可比較）｜Tinify（壓縮）｜Cloudinary（圖床，我們改用 **R2**）｜Printful（印刷+mockup+出貨）｜WooCommerce（上架）。
+
+> **自建對應原則**：我們不照搬廠商（圖床用 R2 不用 Cloudinary；去背先用 Replicate rmbg 不另接 removal.ai；多模型先用 FLUX/gpt-image 再擴），但**流程/功能/設定欄位以 MEGA 為功能藍本**。
