@@ -204,8 +204,32 @@ final class BlockLibrary {
 	 * @return array{content:string, unknown:string[]} content markup + any unsupported block types.
 	 */
 	public function compose( array $blocks ): array {
-		$inner   = array();
 		$unknown = array();
+		$inner   = $this->buildInner( $blocks, $unknown );
+
+		$rid     = $this->uid();
+		$cid     = $this->uid();
+		$content = '<!-- wp:kadence/rowlayout {"uniqueID":"' . $rid . '","columns":1,"colLayout":"equal","kbVersion":2} -->' . "\n"
+			. '<!-- wp:kadence/column {"uniqueID":"' . $cid . '","kbVersion":2} -->' . "\n"
+			. '<div class="wp-block-kadence-column kadence-column' . $cid . '"><div class="kt-inside-inner-col">' . "\n"
+			. implode( "\n\n", $inner ) . "\n"
+			. '</div></div>' . "\n"
+			. '<!-- /wp:kadence/column -->' . "\n"
+			. '<!-- /wp:kadence/rowlayout -->';
+
+		return array( 'content' => $content, 'unknown' => $unknown );
+	}
+
+	/**
+	 * Turn a list of block specs into an array of valid block-markup strings. Shared by compose() (which
+	 * wraps the result in a Row/Column) and by container blocks (tabs/accordion) that nest other blocks.
+	 *
+	 * @param array<int,array<string,mixed>> $blocks  each: {type, ...content}.
+	 * @param string[]                       $unknown collects any unsupported block types (by reference).
+	 * @return string[]
+	 */
+	private function buildInner( array $blocks, array &$unknown ): array {
+		$inner = array();
 		foreach ( $blocks as $b ) {
 			$type = isset( $b['type'] ) ? (string) $b['type'] : '';
 			switch ( $type ) {
@@ -248,6 +272,14 @@ final class BlockLibrary {
 				case 'accordion':
 					$inner[] = $this->accordion( (array) ( $b['panes'] ?? array() ) );
 					break;
+				case 'tabs':
+					$inner[] = $this->tabs( (array) ( $b['tabs'] ?? array() ) );
+					break;
+				case 'youtube':
+				case 'embed':
+				case 'video':
+					$inner[] = $this->youtube( (string) ( $b['url'] ?? '' ) );
+					break;
 				case 'infobox':
 				case 'info_box':
 					$inner[] = $this->infobox( (string) ( $b['title'] ?? '' ), (string) ( $b['text'] ?? '' ), (string) ( $b['cta'] ?? 'Read More' ) );
@@ -259,18 +291,7 @@ final class BlockLibrary {
 					$unknown[] = $type;
 			}
 		}
-
-		$rid     = $this->uid();
-		$cid     = $this->uid();
-		$content = '<!-- wp:kadence/rowlayout {"uniqueID":"' . $rid . '","columns":1,"colLayout":"equal","kbVersion":2} -->' . "\n"
-			. '<!-- wp:kadence/column {"uniqueID":"' . $cid . '","kbVersion":2} -->' . "\n"
-			. '<div class="wp-block-kadence-column kadence-column' . $cid . '"><div class="kt-inside-inner-col">' . "\n"
-			. implode( "\n\n", $inner ) . "\n"
-			. '</div></div>' . "\n"
-			. '<!-- /wp:kadence/column -->' . "\n"
-			. '<!-- /wp:kadence/rowlayout -->';
-
-		return array( 'content' => $content, 'unknown' => $unknown );
+		return $inner;
 	}
 }
 
