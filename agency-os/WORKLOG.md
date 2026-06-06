@@ -71,7 +71,14 @@
 **[Phase 2d/2e — 完整 provisioning 層 + critic 安全修法]**（全 env-gate OFF，真機 Phase 4）
 - 新檔（皆 mock-fetch 單測）：`providers/hetzner/cloudInit.ts`（day1 #cloud-config renderer）/ `secretStore.ts`（ed25519 keygen+OpenSSH 編碼，私鑰只進 sink）/ `HetznerHostingAdapter.ts`（provisionServer：冪等 label/per-location cpx 確認/dry-run gate/poll/M9 rollback 刪 server+primary_ip）/ `providers/cloudflare/dns.ts`（A-record idempotent upsert/delete）/ `provision/provisionClient.ts`（SSOT 編排器 server→DNS）/`serverAdapterFactory.ts`（env→adapter+tier→cpx）/`cli.ts`（Phase-1 觸發）+ `.claude/commands/provision-client.md`
 - **critic 審出並全修（含 1 Critical）**：① 🔴 **cloud-init 只有 IPv4 firewall，IPv6 全開**（Hetzner 給 public /64，ip6tables 預設 ACCEPT＝挖礦威脅可從 v6 進）→ 加 `rules.v6`+`ip6tables-restore`+v6 DOCKER-USER ② DOCKER-USER 持久化：改 systemd unit（`After=docker.service`）survive reboot，取代 netfilter dump；day1-hardening.json 改反映**實際** iptables 狀態非 hardcoded ③ 去 root user key（least-priv，只 deploy+`PermitRootLogin no`）④ sshd 改 `sshd_config.d/99` drop-in 取代不可靠 sed ⑤ adapter：server_types 改**per-location** prices 確認（全域有≠SIN 有）⑥ 冪等只 reuse running+有IP 的 server，stuck/dead→blocked 不靜默 ⑦ poll 容忍暫時 API 錯（不因 429 誤刪健康機）⑧ teardown primaryIpId 未取得時先 GET resolve（防孤兒 IP）⑨ CLI domain 給了但缺 CF creds→警告不靜默；JSON.parse guard；assertNoSecretLeak 加 pubkey-prefix 檢查
-- 驗證：vitest **75/75 pass**（11 檔，+critic 修法測）；tsc 新檔 **0 錯**（總 20 全 pre-existing）；真機驗收（IPv6 port scan/DOCKER-USER 繞過/SMTP 587/cert）= Phase 4 需 HETZNER token+go-ahead
+- 驗證：vitest **75/75 pass**（11 檔，+critic 修法測）；tsc 新檔 **0 錯**（總 20 全 pre-existing）
+
+**[Phase 4 — 真機驗收完成 ✅（隔離專案 lobster-staging，cpx12@sin，~€0.004，已銷毀無孤兒）]**
+- 使用者建 `lobster-staging` 隔離 Hetzner project（與 production 那 2 台 SG/EU 完全分開）+ 給 staging token（已寫 `AWARE_WAVE_CREDENTIALS.md` §十三，標明 prod/staging 兩 token）
+- 流程：真 `secretStore.ts` 生 ed25519 → 真 `cloudInit.ts` 渲染（**4201 bytes** < 32KiB）→ Hetzner API 開 cpx12@sin（~15s running）→ SSH 進真機驗 → 刪
+- **真機證實（Ubuntu 24.04.4 LTS）全數通過**：cloud-init `status: done`；**IPv4 `-P INPUT DROP`** 只開 22/80/443；**IPv6 `-P INPUT DROP`**（critic Critical #1 修法真機證實 v6 不再全開）；DOCKER-USER systemd unit `enabled`；sshd `permitrootlogin no`+`passwordauthentication no`；**ed25519 key-only 登入成功**（secretStore OpenSSH 編碼真機可用）；`day1-hardening.json={v4:1,v6:1,docker_user:1,ssh:key-only}` 反映實際狀態。外部 port：22 OPEN / 5432,9999 **filtered**（防火牆外部生效）
+- **真機抓到 mock 測不出的 bug + 修**：刪 server 後 `DELETE primary_ip` 回 `422 must_be_unassigned`（async 解綁）。實際 auto-created IP 預設 `auto_delete=true` 隨 server 自動刪（本次無孤兒），但 adapter teardown 對 `auto_delete=false` IP 有潛在孤兒風險 → **修 `HetznerHostingAdapter.ts` teardown**：刪 server 後 poll IP，gone(404)→done、unassigned→delete、still-assigned→retry（mock test 同步更新，vitest 75/75）
+- 結論：**一鍵架站系統程式 + 真機端到端全部驗證通過**。剩 D4 OpenTofu apply / 站層 WP-install 串接（皆非阻塞，env-gate OFF）
 
 ### app.aware-wave — Onboarding IA 重整 Phase 1：退役 ops-console（接續 handoff onboarding-ia-consolidation）
 
