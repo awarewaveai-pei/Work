@@ -6,6 +6,27 @@
 
 - AUTO_TASK_DONE: Phase4Weekly 第二次 scheduled fire
 
+### app.aware-wave 一鍵架站 MASTER PLAN + 跨機開工必讀機制
+
+**目的**：操作者要「之後動工時 AI 知道讀哪些檔就完全掌握狀況」+「我怕你忘記、我也不會記得」→ 建持久、跨機、自動觸發的閱讀機制。
+
+**[已修改]**
+- 新 `agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`：5 階段企業佈建總藍圖 SSOT（§0 願景原話 / §1 架構地圖含檔案+行號 / §2 現況矩陣 / §3 路線圖 Stage 0-5 / §4 護欄 / §5 持久化）+ 頂部「🚀 開工必讀（按順序）7 步」清單。
+- `agency-os/AGENTS.md`：自動規則 row——操作者提「app.aware-wave/onboarding/建站/佈建/Stage N/繼續」→ 先讀 master plan 7 步清單（git-synced，不依賴單機 memory）。
+- `agency-os/TASKS.md`：未完成區置頂加 MASTER PLAN 開放任務（下一步 = Stage 1 接通入口）。
+- auto-memory `project_app_aware_wave_master_plan.md`：瘦成純指標（指向 repo SSOT，不複製進度避免 drift；回應操作者「為何雙寫」質疑）。
+- `/doc-sync` 把 master plan 登錄進治理系統（PROGRAM_TIMELINE / AUDIT_REGISTRY / CHANGE_IMPACT_MATRIX metadata + 各 app.aware-wave 文件交叉引用）。
+
+**[驗證結果]**（doc-only）
+- REALTEST_WAIVED: DOC_ONLY -- 純文件/規則/索引，無程式邏輯改動。
+- REVIEW_WAIVED: DOC_ONLY -- 自審讀回結構正確；`/doc-sync` 全綠（0 broken link / 0 missing Owner / 0 warning）。
+- BUGHUNT_WAIVED: DOC_ONLY -- master plan 內每個檔案路徑/行號引用對照實際；單一真相設計（repo=內容，memory=指標）已消除雙寫 drift。
+- BUGHUNT_SCOPE_NARROW: 本任務純 doc/治理索引，無 symbol/schema/code 改動可跨檔抓。
+
+**[剩餘風險]** memory 不進 git → 公司桌機首次需手動複製或靠 AGENTS.md 規則（已涵蓋，memory 僅 bonus）。
+
+**[rollback]** 全可逆：刪 master plan 檔 + revert AGENTS.md/TASKS.md row。
+
 ### wp-bridge v0.5.6 — Kadence Tabs + YouTube block + 兩個真 bug 修復
 
 **根因（真站 post 7053 走真實 PostCreator 路徑坐實）**：
