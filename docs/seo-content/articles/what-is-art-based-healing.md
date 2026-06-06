@@ -161,7 +161,7 @@ If you're curious whether it's right for you, the easiest first step is to **tak
     "@context": "https://schema.org",
     "@type": "Article",
     "@id": "https://soulfulexpression.org/what-is-art-based-healing/#article",
-    "headline": "What Is Art-Based Healing? An Educational, Expressive-Arts Approach to Wellbeing",
+    "headline": "What Is Art-Based Healing? An Arts Practice for Self-Discovery",
     "description": "Art-based healing is an educational, expressive-arts approach to wellbeing. How it works, who it's for, and how it differs from clinical art therapy.",
     "url": "https://soulfulexpression.org/what-is-art-based-healing/",
     "author": { "@id": "https://soulfulexpression.org/about/#author" },
