@@ -39,19 +39,20 @@ declare -A rpath=(
   [monthly]=agency-os/reports/monthly/monthly-review-LATEST.md
 )
 declare -A maxage=( [phase4]=8 [weekly]=9 [monthly]=35 )
-declare -A rname=( [phase4]=Phase4Weekly [weekly]=WeeklyReview [monthly]=MonthlyReview )
+# Bilingual friendly names (中文 / English) so the phone alert is self-explanatory.
+declare -A rname=( [phase4]="Phase 4 健檢 / Phase4Weekly" [weekly]="週報 / WeeklyReview" [monthly]="月報 / MonthlyReview" )
 
 stale_lines=""
 stale_set=""
 for k in "${keys[@]}"; do
   ts=$(git log -1 --format=%ct origin/main -- "${rpath[$k]}" 2>/dev/null)
   if [ -z "$ts" ]; then
-    stale_lines+="- ${rname[$k]}: report MISSING in repo"$'\n'
+    stale_lines+="• ${rname[$k]} — 報告從未產出 / report never produced"$'\n'
     stale_set+="${k}:missing "
   else
     age=$(( (now - ts) / 86400 ))
     if [ "$age" -gt "${maxage[$k]}" ]; then
-      stale_lines+="- ${rname[$k]}: ${age}d old (max ${maxage[$k]}d)"$'\n'
+      stale_lines+="• ${rname[$k]} — ${age} 天未更新 / ${age}d stale (max ${maxage[$k]}d)"$'\n'
       stale_set+="${k}:stale "
     fi
   fi
@@ -64,9 +65,19 @@ if [ "$stale_set" = "$prev" ]; then
 fi
 
 if [ -z "$stale_set" ]; then
-  msg="OK Claude routines recovered — all 3 reports fresh again in awarewaveai-pei/Work."
+  msg="✅ 排程已恢復 / Routines recovered"$'\n\n'
+  msg+="中文：先前異常的自動排程已恢復，3 份報告（Phase 4 健檢、週報、月報）都正常更新了。"$'\n'
+  msg+="EN: The previously-failing routine(s) recovered — all 3 reports are fresh again in awarewaveai-pei/Work."
 else
-  msg="WARN Claude routine watchdog — report(s) not updating in awarewaveai-pei/Work:"$'\n'"${stale_lines}"$'\n'"A routine may have its source/auth drifted or be disabled. Check https://claude.ai/code/routines"
+  msg="⚠️ 排程健康警報 / Routine health alert"$'\n\n'
+  msg+="中文：有自動排程沒在更新它的報告。可能原因：指向錯誤的倉庫 / 授權過期 / 被停用 —— 代表這項自動化可能默默停擺了。"$'\n'
+  msg+="EN: A scheduled automation stopped updating its report (wrong repo / expired auth / disabled). It may have silently stopped."$'\n\n'
+  msg+="受影響 / Affected:"$'\n'"${stale_lines}"$'\n'
+  msg+="怎麼處理 / What to do:"$'\n'
+  msg+="1. 開 / Open: https://claude.ai/code/routines"$'\n'
+  msg+="2. 確認該排程已啟用、來源倉庫為 awarewaveai-pei/Work / Verify it is enabled and its source repo is awarewaveai-pei/Work"$'\n'
+  msg+="3. 修好後下次自動跑會再傳「已恢復」/ Once fixed, you'll get a 'recovered' message on the next run"$'\n\n'
+  msg+="(SG 永遠在線 watchdog，每天 07:17 UTC 檢查，不重複洗版 / always-on, daily, de-duplicated)"
 fi
 
 if [ "$DRYRUN" = "--dry-run" ]; then
