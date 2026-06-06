@@ -4,6 +4,8 @@
 
 ## 2026-06-06
 
+- AUTO_TASK_DONE: Phase4Weekly 第二次 scheduled fire
+
 ### 雲端排程三層警報系統（防 silent routine failure 復發）+ 雙語 Telegram + 維護手冊
 
 **根因（為什麼建）**：上述 routine source 漂移壞了數週**無任何機制偵測**。既有只有 system-health-check §11 監 Phase4 一個報告。建三層獨立警報，任一壞掉/使用者沒開機，另兩層仍通知。
