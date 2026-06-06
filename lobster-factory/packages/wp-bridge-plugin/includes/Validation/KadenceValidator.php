@@ -9,8 +9,11 @@
  * (`.kt-row-layout-id<uniqueID>`). So:
  *   - a MISSING/duplicate uniqueID means the generated class can't bind -> the block renders unstyled;
  *   - a MISSING `kbVersion:2` on layout blocks means the responsive (RWD) CSS path silently breaks
- *     on mobile while desktop looks fine — the nastiest failure, learned by trial and error;
- *   - an unknown `kadence/*` block name means Gutenberg invalidates the whole block (red error).
+ *     on mobile while desktop looks fine — the nastiest failure, learned by trial and error.
+ *
+ * We do NOT police kadence/* block NAMES against a whitelist: Kadence ships 80+ blocks (incl. child
+ * blocks like listitem/table-row/table-data/pane/singlebtn) and grows over time, so a whitelist
+ * false-positives on legitimate blocks. A genuinely typo'd name is caught by Gutenberg at render.
  *
  * Input is the PARSED block tree (WP parse_blocks() shape: each node has blockName/attrs/innerBlocks).
  * Parsing raw markup is WP's job (done by the REST glue); this validator is pure structure-checking so
@@ -26,16 +29,6 @@ final class KadenceValidator {
 
 	/** Layout blocks whose responsive CSS depends on kbVersion:2. */
 	private const REQUIRE_KB_VERSION = array( 'kadence/rowlayout', 'kadence/column' );
-
-	/** Known Kadence block names. An unknown kadence/* name is almost always a typo Gutenberg rejects. */
-	private const KADENCE_BLOCKS = array(
-		'kadence/rowlayout', 'kadence/column', 'kadence/advancedheading', 'kadence/spacer',
-		'kadence/advancedbtn', 'kadence/singlebtn', 'kadence/infobox', 'kadence/icon', 'kadence/iconlist',
-		'kadence/accordion', 'kadence/pane', 'kadence/tabs', 'kadence/tab', 'kadence/testimonials',
-		'kadence/image', 'kadence/advancedgallery', 'kadence/countup', 'kadence/countdown',
-		'kadence/lottie', 'kadence/form', 'kadence/advanced-form', 'kadence/posts', 'kadence/table',
-		'kadence/show-more', 'kadence/googlemaps', 'kadence/identity', 'kadence/navigation',
-	);
 
 	/**
 	 * @param array<int,array<string,mixed>> $blocks parsed block tree (WP parse_blocks shape).
@@ -81,11 +74,12 @@ final class KadenceValidator {
 	 * @param array<string,string> $seenIds
 	 */
 	private function checkKadenceBlock( string $name, array $block, string $path, array &$violations, array &$seenIds ): void {
-		if ( ! in_array( $name, self::KADENCE_BLOCKS, true ) ) {
-			$violations[] = new Violation( $path, 'unknown_kadence_block', "'{$name}' is not a recognised Kadence block; check for a typo or unsupported block" );
-			return; // unknown block: skip the attribute checks, the name itself is the problem
-		}
-
+		// NOTE: we deliberately do NOT reject "unknown" kadence/* block names. Kadence ships 80+ blocks
+		// (incl. child blocks like kadence/listitem, kadence/table-row, kadence/table-data, kadence/pane,
+		// kadence/singlebtn) and grows over time; a hardcoded whitelist false-positives on legitimate
+		// blocks and BLOCKS valid content (as harmful as missing a bad one). A genuinely typo'd block
+		// name is caught by Gutenberg's own block validation at render. We police only the two real,
+		// silent traps below: missing/duplicate uniqueID and missing kbVersion on layout blocks.
 		$attrs = ( isset( $block['attrs'] ) && is_array( $block['attrs'] ) ) ? $block['attrs'] : array();
 
 		// uniqueID: present, non-empty, and globally unique within this document.
