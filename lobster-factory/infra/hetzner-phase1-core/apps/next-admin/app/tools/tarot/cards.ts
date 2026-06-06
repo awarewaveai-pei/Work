@@ -105,5 +105,8 @@ export function buildCardPrompt(stylePrompt: string, card: TarotCard): string {
   if (!style) {
     return `Ornate medieval colored-pencil tarot illustration, Rider-Waite inspired, warm antique paper. Scene: ${card.subjectPrompt}. A single tarot card "${card.name}", full vertical portrait composition, rich symbolic detail, no text, no border.`;
   }
-  return `A single tarot card illustration for "${card.name}". Keep this card's classic tarot iconography and composition (${card.subjectPrompt}), but REINTERPRET every character and the entire artwork according to this art direction — ${style} — applying it consistently to ALL figures (replace the human/animal characters with the described subject where applicable). Full vertical portrait, rich symbolic detail, cohesive consistent style, no text, no border.`;
+  // Lead HARD with the user's description as the main character + an explicit "not a human"
+  // negation, so a themed deck (e.g. "blue oil-painting cat") fully replaces the figures
+  // instead of just tinting the standard human scene. (Empirically verified on FLUX schnell.)
+  return `Tarot card "${card.name}". MAIN CHARACTER & ART DIRECTION: ${style} — render the main figure ENTIRELY as this; if it names an animal or creature, do NOT draw a human, replace any person with it, and apply the style to the whole artwork. The character is posed in this classic tarot scene: ${card.subjectPrompt}. Vertical ornate tarot card portrait, rich symbolic detail, cohesive consistent style, no text, no border.`;
 }
