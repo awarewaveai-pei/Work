@@ -21,6 +21,7 @@ use AwareWave\WpBridge\Auth\SignatureVerifier;
 use AwareWave\WpBridge\Auth\WpdbKeyStore;
 use AwareWave\WpBridge\Auth\WpdbNonceStore;
 use AwareWave\WpBridge\Operation\SetOptionOperation;
+use AwareWave\WpBridge\Content\BlockLibrary;
 use AwareWave\WpBridge\Post\PostCreator;
 use AwareWave\WpBridge\Validation\KadenceValidator;
 use AwareWave\WpBridge\Transaction\Impl\HttpRenderer;
@@ -149,7 +150,24 @@ final class RestController {
 		}
 
 		$spec = json_decode( (string) $request->get_body(), true );
-		if ( ! is_array( $spec ) || empty( $spec['title'] ) || empty( $spec['content'] ) ) {
+		if ( ! is_array( $spec ) ) {
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'invalid_payload' ), 400 );
+		}
+
+		// Free composition: if the AI sent a "blocks" list, the BlockLibrary assembles valid Kadence
+		// markup from it (no fixed template — the block order/mix is whatever the content needs).
+		if ( isset( $spec['blocks'] ) && is_array( $spec['blocks'] ) ) {
+			$composed        = ( new BlockLibrary() )->compose( $spec['blocks'] );
+			$spec['content'] = $composed['content'];
+			if ( $composed['unknown'] !== array() ) {
+				return new \WP_REST_Response(
+					array( 'ok' => false, 'error' => 'unsupported_block_types', 'unknown' => array_values( array_unique( $composed['unknown'] ) ) ),
+					422
+				);
+			}
+		}
+
+		if ( empty( $spec['title'] ) || empty( $spec['content'] ) ) {
 			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'title_and_content_required' ), 400 );
 		}
 
