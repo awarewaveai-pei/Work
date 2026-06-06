@@ -4,6 +4,21 @@
 
 ## 2026-06-06
 
+### 修復 3 個雲端排程指向錯誤倉庫（Phase4Weekly / Monthly / Weekly）
+
+**根因**：3 個 Anthropic 雲端 routine 的 `session_context.sources` 漂移到 `peijingartstudio-pei/Work`（使用者較舊的**公開**倉庫，本日已由使用者刪除），而非正式私有倉庫 `awarewaveai-pei/Work`。文件 SSOT（`automation/claude-routines/{phase4-weekly,monthly-review,weekly-review}.md` 的 `Repo` 欄）本就寫對 awarewaveai；**是雲端實際設定與文件 SSOT 分歧、無機制偵測**。後果：① 週/月報/Phase4 健檢 push 到錯倉庫，正式倉庫 `phase4-LATEST.md` 停在 05-30；② 私有內容被餵進公開倉庫（曾一次 secret 洩漏 commit「Remove local MCP secrets」）；公開倉庫刪除後 3 routine 更會 clone 失敗全死。
+
+**[已修改]**：`RemoteTrigger update` 三 routine（trig_01JyFw78…/trig_01GWG3NQ…/trig_01WanBfv…）`sources` → `awarewaveai-pei/Work`。方法：GET 完整 job_config → 整包回送只換 URL（update 整包取代，最小 patch 會 400 缺 environment_id）→ prompt/env_id/tools/model/autofix 全保留。
+
+**[驗證結果]**：
+- REALTEST_EVIDENCE: tool=RemoteTrigger | 三 update 皆 HTTP 200，回傳確認 sources=awarewaveai-pei/Work 且 prompt 逐字完整。
+- 手動 run 被平台限制擋（`github_repo_access_denied — re-authorize GitHub`）；已測 DailyBriefing（一直指 awarewaveai、排程持續成功 fire）手動 run **同樣** denied → 證實為手動觸發路徑通用限制、非本改動所致；排程路徑可存取私有倉庫（DailyBriefing 為證）。改由下次排程 fire 自驗（Weekly 06-08 最快）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=peijingartstudio | hits=0 active（殘留僅 Backups/ 歷史檔）。
+
+**[剩餘風險]**：無機制比對「雲端 routine 實際 sources == 文件 SSOT」。建議 AO-RESUME/Claude session 定期 `RemoteTrigger list` 驗 sources（RemoteTrigger 僅 session 內可用，無法落地本機 cron）。使用者可選動作：`claude.ai/code/routines` re-authorize GitHub 以恢復手動 run（排程不受影響）。
+
+**[rollback]**：改前已 GET 原 config，update 回原 URL 即復原。
+
 ### Hetzner Hosting Layer — Phase 0 規劃入庫 + Phase 1 一鍵架站骨幹 4 致命 gap 修復
 
 **背景**：規劃「客戶一鍵租 Hetzner 主機」自動化。Phase 0 把計畫落 repo SSOT；Phase 1 先穩既有 provisioning building blocks（修 audit 開放的 M9/M7/M3/M10），為後續 provisionClient CLI（決策0：腳本SSOT+雙觸發，不用 Trigger.dev 主體）打底。全程 workflows 仍 env-gate OFF。
