@@ -96,7 +96,7 @@ export const orchestrateTenantProvisioning = task({
           captureWorkflowException(err, {
             workflowId: "orchestrate-tenant-provisioning",
             route: "providerLoop.step",
-            provider,
+            tags: { provider },
           });
           continue;
         }
@@ -147,7 +147,7 @@ export const orchestrateTenantProvisioning = task({
           captureWorkflowException(err, {
             workflowId: "orchestrate-tenant-provisioning",
             route: "providerLoop.webhook",
-            provider,
+            tags: { provider },
           });
         }
       }

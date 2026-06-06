@@ -129,7 +129,11 @@
 
 #### 工具層 / 基礎建設 / 治理
 
-- [ ] **【2026-06-05 開出】塔羅牌印刷檔工具 tarot 後續** — **【部分上線】** 已部署 SG `ccfbd176`，`/tools/tarot` FLUX 兩檔（schnell/dev）可用，OpenAI 三檔卡在帳號 billing。**待辦**：(a) 使用者加 OpenAI billing（`billing_hard_limit_reached`）後驗 gpt-image-1 low/medium/high 真生圖；(b) flux-schnell 無 img2img — 評估換 img2img-capable 便宜模型 或 UI 阻擋 schnell+image 組合；(c) enhancements：upscale→精確 827×1417、R2 持久化、Trigger.dev 批次（免瀏覽器開著）、server 端 quota（L6 防刷 spend）。**參考**：WORKLOG 2026-06-05 tarot entry。
+- [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**（操作者 2026-06-06 確認方向） — 終點：全部接 WooCommerce 賣貨（參考同事 jonjonesai 的 MEGA「Mass E-commerce Generator & Automator」Streamlit 工具：Research→Idea→Generate(多模型並行)→Select→Process(去背 removal.ai/Tinify)→Mockup(Printful)→Published(WooCommerce+Claude 文案+定價)）。
+  - **Phase 1（現在）tarot 做到好用**：✅ 角色改造(貓取代人, buildCardPrompt 贏家結構, `e6a3a72a`) ✅ 中文自動翻英(haiku) ✅ friendly 錯誤+HTTP200。**待**：(a) 整副 78 張一致性實測微調；(b) 「✨ 幫我想 prompt」按鈕(仿 MEGA Beautify, Claude 生 art-direction prompt)；(c) OpenAI gpt-image 待操作者加 billing(`billing_hard_limit_reached`)；(d) enhancements: upscale 827×1417 / R2 / Trigger.dev 批次 / server quota。
+  - **Phase 2 MEGA**：多商品 POD 流水線（多生成器、去背、Printful mockup、設計庫重用、多用戶用量限制）。工程量 ≈ 現 tarot 的 15-20×，需分期。
+  - **Phase 3 WooCommerce**：商品 publish + Claude 文案 + 定價/尺寸表（taiwanmerch.co 模式）。
+  - **參考**：WORKLOG 2026-06-05/06 tarot entries；MEGA 截圖(操作者提供)。
 
 - [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制** —— **【未開始】** **背景**：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（SG 公網告警器）**無 repo→SG 自動部署路徑**，靠手動 scp 到 `/usr/local/bin/endpoint-alert.sh`。`sync-hetzner-slack-alert-webhooks.ps1` 只寫 env 不部署腳本本體。30 年風險：SG 重建 / `.bak` 被清 → 腳本回退舊版且無人知。**DoD**：(a) 新 `scripts/sync-hetzner-endpoint-alert-script.ps1`（仿 `sync-hetzner-endpoint-alert-heartbeat.ps1`：base64 ship + backup + `bash -n` verify + sha 比對 + 一輪 `systemctl start` 驗收）；(b) 接入既有 infra sync 流程；(c) repo SSOT sha == SG sha 的 drift 檢查可選接 system-health-check。**參考**：本日 WORKLOG `## 2026-05-30 endpoint-alert.sh debounce`（debounce 部署即走此手動路徑）。
 
