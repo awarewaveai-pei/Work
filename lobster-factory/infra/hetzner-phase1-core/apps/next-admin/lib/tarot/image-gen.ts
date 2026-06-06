@@ -4,9 +4,8 @@
 //   - flux-dev      → Replicate flux-dev (text2img + img2img/style ref via `image`)
 //   - openai-low/medium/high → OpenAI gpt-image-1 at that quality (generations, or edits w/ ref image)
 // Returns a uniform `data:image/png;base64,...` URL so the client treats them the same.
-// Mirrors the AbortController + timeout + key-check discipline of lib/onboarding/spec-generator.ts.
-
-import Anthropic from "@anthropic-ai/sdk";
+// No Claude/Anthropic call here — prompts go straight to the image model (no extra API cost,
+// no translation step that could stall generation). Write prompts in English for best FLUX results.
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
 const REPLICATE_POLL_MS = 2_500;
