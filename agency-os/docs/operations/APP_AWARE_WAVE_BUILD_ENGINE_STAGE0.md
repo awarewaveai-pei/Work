@@ -20,7 +20,8 @@
 
 ## 2. 已完成（code，commit `847a6389`，重 deploy 才生效）
 - **A1** `trigger.config.ts` syncEnvVars 加 `LOBSTER_HOSTING_ADAPTER/PROVIDER_BASE_URL/PROVISION_PATH/API_TOKEN`。
-- **B** `create-wp-site.ts` 加 `markActionRunTerminal()` → 跑完/失敗回寫 `ops_action_runs.status`（gated 於 `LOBSTER_ENABLE_DB_WRITES`，best-effort 不 throw，用 dispatcher 傳的 `_dispatchedFromActionRunId`）。
+- **B** `create-wp-site.ts` 加 `markActionRunTerminal()` → 跑完 `completed` / 例外 `failed` / hosting 被擋 `blocked` 三態回寫 `ops_action_runs.status`（gated 於 `LOBSTER_ENABLE_DB_WRITES`，best-effort 不 throw，用 dispatcher 傳的 `_dispatchedFromActionRunId`；`blocked` 為 `BuildRunStatus` first-class 值，UI 已支援）。
+- **C**（2026-06-06 e2e 實測補）`LOBSTER_HOSTING_HTTP_TIMEOUT_MS=95000`：provision-staging 真實建站實測 ~71s，但 http_json adapter 預設 45s timeout 先觸發 → 回 `blocked_hosting_configuration`（站照建完，run 卻卡 `dispatched`）。調到 95s（CF ~100s ceiling 之下 fail-fast）。SSOT：`trigger.config.ts` syncEnvVars + `lobster-trigger-deploy.ps1`。
 
 ## 3. 活化 Runbook（turnkey，下一步點火）
 

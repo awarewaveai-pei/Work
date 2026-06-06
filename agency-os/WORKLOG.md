@@ -6,6 +6,21 @@
 
 - AUTO_TASK_DONE: Phase4Weekly 第二次 scheduled fire
 
+### app.aware-wave onboarding 建站引擎 Stage 0 — e2e 點火 + timeout 根因修復
+
+**根因（live e2e 坐實）**：onboarding「觸發建站」會建出真 staging WP 站（curl 200），但 `ops_action_runs` 永卡 `dispatched`、`workflow_runs` 無列。Trigger.dev run `run_cmq224df40xq71wv5wjqqxzvf` = **COMPLETED** 但 `output.status=blocked_hosting_configuration`、`hosting.message="Hosting API request timed out after 45000ms"`。實測 `provision-staging`（SSH→WP core→5 plugins）**~71s** > http_json adapter 預設 **45s** timeout → adapter abort → create-wp-site early-return `blocked`（跳過 persist + B writeback），但 provision-staging 伺服器端續跑完 → 站照建出來。「站建好卻顯示沒成功」矛盾的真因。
+
+**[已修改]**
+- `lobster-factory/packages/workflows/trigger.config.ts` — syncEnvVars 加 `LOBSTER_HOSTING_HTTP_TIMEOUT_MS`（env-driven，空值跳過）。
+- `scripts/lobster-trigger-deploy.ps1` — 加 `$hostingTimeout`（env-overridable，default **95000**）+ `export LOBSTER_HOSTING_HTTP_TIMEOUT_MS`。95s 落在 Cloudflare ~100s origin ceiling 之下 → fail-fast 乾淨訊息而非 CF 524（critic #3）。
+- `create-wp-site.ts` — `markActionRunTerminal` union 加 `"blocked"`；blocked 路徑補呼叫 `markActionRunTerminal(_dispatchedFromActionRunId, "blocked", {error_summary})`（critic #2，保留 ops 可觀測性；`blocked` 為 `BuildRunStatus` first-class 值，UI 已支援）。
+- doc：`APP_AWARE_WAVE_BUILD_ENGINE_STAGE0.md` 補三態回寫 + C 項 timeout 根因。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash/SSH | cmd=`curl -w time_total provision-staging (SG container-direct, no CF)` | exit=0 | ms=71093 — HTTP **200** + 完整成功回應（environmentId/wpRootPath/stagingSiteUrl=`https://aware-wave.com/staging/...` 格式正確）+ 站 `stage0-timing-f832c1` 建出。坐實 71s>45s 根因。（fix 後 redeploy + fresh run 達 `completed` 的 e2e 待補。）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1M/2m — 1 Major（ps1 hardcode→env-overridable）+ 2 Minor（blocked 語意 / CF ceiling）**全數採納修正**；0 Critical。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`LOBSTER_HOSTING_HTTP_TIMEOUT_MS\|markActionRunTerminal` | hits=10（皆預期 consumer：adapter 讀/config sync/deploy set/3 call sites；1 處 STAGE0 doc stale 主張同 commit 修正）。downstream `BuildRunStatus` union 已含 `blocked` → 寫入相容無破壞。
+
 ### 雲端排程三層警報系統（防 silent routine failure 復發）+ 雙語 Telegram + 維護手冊
 
 **根因（為什麼建）**：上述 routine source 漂移壞了數週**無任何機制偵測**。既有只有 system-health-check §11 監 Phase4 一個報告。建三層獨立警報，任一壞掉/使用者沒開機，另兩層仍通知。
