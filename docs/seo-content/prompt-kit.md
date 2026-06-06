@@ -19,25 +19,24 @@
 把下面填好，存起來。每次產文時整段貼進對話最前面。**AI 不准自行發明這裡沒有的資訊**（價格、資歷、媒體報導、評論）；缺的標 `NEEDS_BRAND_VERIFY`。
 
 ```yaml
-brand_name: "Pei-Jing Art Studio"
-alternate_names: ["Pei Jing Art Studio", "佩瑾水彩工作室"]   # 確認正確中文名
-website: "https://?"                                          # NEEDS_BRAND_VERIFY
-logo_url: "https://?"
-founder_name: "?"                                             # NEEDS_BRAND_VERIFY
-author_bio: "有 ? 年水彩教學經驗，專注成人初學者課程設計。"   # 只寫真實資歷
-credentials: []                                               # 學歷/證照/獲獎，沒有就留空，不要編
-services: ["成人初學者水彩課", "線上水彩課"]                   # 改成你真的有的
-courses: []                                                   # 課名/時數/形式
-pricing: []                                                   # 真實價格區間；沒公開就留空
-locations: []                                                 # 實體教室地址/服務地區
-case_studies: []                                              # 學生作品/成果（真實）
-testimonials: []                                              # 真實評價
-brand_voice: "專業、溫暖、實用、不誇大、像在跟初學者聊天"
-preferred_cta: ["預約體驗課", "加入課程候補名單", "私訊詢問"]
-forbidden_claims: ["保證學會", "保證成為畫家", "業界第一", "唯一"]
+brand_name: "Soulful Expression"
+positioning: "art-based healing 教育性/表達藝術方法（NOT clinical art therapy）"
+website: "https://soulfulexpression.org/"
+logo_url: "https://soulfulexpression.org/?"                   # NEEDS_BRAND_VERIFY
+founder_name: "Pei-Ching Huang"
+author_role: "Art-Based Healing Educator / EdD candidate"     # 確認你想用的頭銜
+author_bio: "..."                                             # 只寫真實教育/實務背景，不編造資歷
+credentials: []                                               # 學歷/受訓/EdD 進程；沒有就留空，不要編
+signature_method: "WuSheng Healing Module™"                   # 你的專有教育框架
+services: ["guided sessions", "healing modules", "assessments", "self-guided kits", "tool finder"]
+pricing: []                                                   # 公開才填，否則留空
+locations: ["Taiwan（+ international, online）"]
+case_studies: []                                              # 真實案例/反思（去識別化）
+brand_voice: "warm, credible, educational, gentle, non-clinical, 不誇大"
+preferred_cta: ["Start Your Journey (assessment)", "Book a Session", "Explore Healing Modules"]
+forbidden_claims: ["cure", "heal/treat illness", "guaranteed results", "替代醫療/心理治療", "diagnose"]
 social_profiles:                                              # sameAs，要真實存在且公開
   - "https://www.instagram.com/?"
-  - "https://www.youtube.com/@?"
 ```
 
 ---
@@ -47,8 +46,8 @@ social_profiles:                                              # sameAs，要真�
 貼上「品牌知識庫」後，接這段：
 
 ```text
-你是資深 SEO/GEO strategist。根據上面的品牌知識庫，針對 seed keyword「{{你的關鍵字，例如：水彩課程}}」，
-產生 15 個高潛力文章主題。每個主題輸出：
+你是資深 SEO/GEO strategist。根據上面的品牌知識庫，針對 seed keyword「{{你的關鍵字，例如：art-based healing / expressive arts / art for wellbeing}}」，
+產生 15 個高潛力文章主題。優先選你（教育者 / EdD）真的能提供第一手實務與可引用觀點的主題。每個主題輸出：
 1. topic（標題方向）
 2. primary keyword
 3. secondary keywords（3-5 個）
