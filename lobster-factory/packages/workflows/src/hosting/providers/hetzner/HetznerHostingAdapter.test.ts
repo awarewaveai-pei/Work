@@ -29,6 +29,7 @@ function mockHetzner(opts: {
 }) {
   const calls: Call[] = [];
   let pollCount = 0;
+  let pipDeleted = false;
   const json = (obj: any, ok = true) =>
     ({ ok, status: ok ? 200 : 422, statusText: "", text: async () => JSON.stringify(obj) }) as any;
 
@@ -36,6 +37,19 @@ function mockHetzner(opts: {
     const u = String(url);
     const method = init?.method ?? "GET";
     calls.push({ url: u, method, body: init?.body ? JSON.parse(init.body) : undefined, auth: init?.headers?.Authorization });
+
+    // Primary IP lifecycle (teardown): GET returns an unassigned IP until it's DELETEd, then 404.
+    if (/\/primary_ips\/999$/.test(u)) {
+      if (method === "DELETE") {
+        pipDeleted = true;
+        return json({ action: { id: 1 } });
+      }
+      if (method === "GET") {
+        return pipDeleted
+          ? json({ error: { message: "not_found" } }, false)
+          : json({ primary_ip: { id: 999, assignee_id: null } });
+      }
+    }
 
     if (method === "GET" && u.includes("/servers?label_selector")) {
       return json({ servers: opts.existing ?? [] });

@@ -148,11 +148,28 @@ export function createHetznerAdapter(deps: HetznerAdapterDeps): ServerProvisionA
     } catch {
       /* server may already be gone */
     }
+    // Primary IP cleanup (validated against the real API, Phase 4 2026-06-06):
+    // an auto-created IP (auto_delete=true — Hetzner's default) is removed by the server
+    // delete above. A separately-attached IP (auto_delete=false) persists and must be
+    // deleted explicitly — but ONLY once Hetzner finishes unassigning it, else the API
+    // returns 422 must_be_unassigned. Poll briefly; treat "gone" (404) as success.
     if (ipId !== undefined) {
-      try {
-        await api(`/primary_ips/${ipId}`, { method: "DELETE" });
-      } catch {
-        /* primary ip cleanup is best-effort */
+      for (let i = 0; i < 6; i++) {
+        let ip: any;
+        try {
+          ip = (await api(`/primary_ips/${ipId}`))?.primary_ip;
+        } catch {
+          break; // 404 → auto-deleted with the server / already gone
+        }
+        if (!ip) break;
+        if (!ip.assignee_id) {
+          try {
+            await api(`/primary_ips/${ipId}`, { method: "DELETE" });
+          } catch {
+            /* race with auto-delete — re-checked next iteration */
+          }
+        }
+        await sleep(2000);
       }
     }
   }
