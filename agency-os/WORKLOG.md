@@ -4,6 +4,26 @@
 
 ## 2026-06-06
 
+### 雲端排程三層警報系統（防 silent routine failure 復發）+ 雙語 Telegram + 維護手冊
+
+**根因（為什麼建）**：上述 routine source 漂移壞了數週**無任何機制偵測**。既有只有 system-health-check §11 監 Phase4 一個報告。建三層獨立警報，任一壞掉/使用者沒開機，另兩層仍通知。
+
+**[已修改]**
+- **Layer ① 開工**：新 `scripts/check-routine-freshness.ps1`（SSOT，3 報告 mtime 檢查，寫 `reports/status/routine-freshness-LATEST.md`）+ 接進 `scripts/ao-resume.ps1`（warn-only 區塊，mirror auto-reboot pattern）。
+- **Layer ② 收工**：`scripts/system-health-check.ps1` §11 `$routineOutputs` 從 1（Phase4）擴到 3（+週報+月報）。
+- **Layer ③ 永遠在線 Telegram**：新 `scripts/routine-output-watchdog.sh`（SG cron `17 7 * * * LC_ALL=C.UTF-8 ...`）。`git log` 讀報告最後 commit 日（純讀）、state 檔去重、send-only-on-200。creds 在 SG 本地讀。
+- **雙語 Telegram + 編碼根因**：CJK 經 Windows→git→非 UTF-8 cron bash 字串操作會 mojibake（英文沒事）。解：訊息以 **base64 模板嵌腳本**（原始碼純 ASCII）→ runtime `base64 -d` 到**檔案** + `LC_ALL=C awk` byte 模式插 ASCII 動態清單 → `curl --data-urlencode text@檔案`（bash 全程不碰 CJK）。
+- 文件：`runbooks/自動排程監控與手機Telegram警報-維護手冊.md`（技術）+ `agency-os/reports/2026-06-06-做了三件事-...-加裝手機通知.md`（白話）+ AGENTS.md §症狀→Runbook 路由表新 row。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash/SSH | `check-routine-freshness.ps1` real-exec 正確抓 Monthly MISSING + Phase4/Weekly OK（real-exec 抓到並修 param 預設 bug）；`routine-output-watchdog.sh` 真送 Telegram **http=200**；SG `python3` 驗解碼後 = **VALID UTF-8**（od `e2 9a a0`=⚠️ `e6 8e 92`=排）；**使用者手機實測中文正常顯示**。3 個 .ps1/.sh 全 PS-parse/bash-n OK + CP950 audit CLEAN。
+- REVIEW_DONE: 自審 + critic（earlier M2/M4 同 session）；編碼根因經 5 種解法逐一 real-exec 排除（literal→base64-template→file-based），python-on-SG 為 oracle（ssh→PowerShell 顯示路徑會誤顯示亂碼，非真實資料）。
+- BUGHUNT_DONE: scope=`agency-os scripts .claude runbooks` | grep=`routine-output-watchdog\|check-routine-freshness\|CLAUDE-ROUTINE-WATCHDOG` | hits=0 stale（舊 runbook 英文名已 git mv 改中文 + 更新 summary 內引用）。3 處 routine 清單（watchdog.sh / check-routine-freshness.ps1 / system-health §11）為 SSOT 鏡像，runbook §6 記同步要求。
+
+**[剩餘風險]**：無機制比對「雲端 routine 實際 sources == 文件 SSOT」（症狀層已覆蓋，根因層需 `RemoteTrigger list`，僅 session 內可用）。手動 `RemoteTrigger run` 受平台 `github_repo_access_denied` 限制（排程路徑不受影響，DailyBriefing 為證）。
+
+**[rollback]**：各層獨立可移除（runbook §7）；cron 刪行 + `rm /root/.routine-watchdog-state`；`git revert`。
+
 ### 修復 3 個雲端排程指向錯誤倉庫（Phase4Weekly / Monthly / Weekly）
 
 **根因**：3 個 Anthropic 雲端 routine 的 `session_context.sources` 漂移到 `peijingartstudio-pei/Work`（使用者較舊的**公開**倉庫，本日已由使用者刪除），而非正式私有倉庫 `awarewaveai-pei/Work`。文件 SSOT（`automation/claude-routines/{phase4-weekly,monthly-review,weekly-review}.md` 的 `Repo` 欄）本就寫對 awarewaveai；**是雲端實際設定與文件 SSOT 分歧、無機制偵測**。後果：① 週/月報/Phase4 健檢 push 到錯倉庫，正式倉庫 `phase4-LATEST.md` 停在 05-30；② 私有內容被餵進公開倉庫（曾一次 secret 洩漏 commit「Remove local MCP secrets」）；公開倉庫刪除後 3 routine 更會 clone 失敗全死。
