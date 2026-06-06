@@ -3,6 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, type TarotCard } from "./cards";
+
+type GroupKey = "all" | "major" | "wands" | "cups" | "swords" | "pentacles";
+const GROUPS: { key: GroupKey; label: string }[] = [
+  { key: "major", label: "大阿卡納 22" },
+  { key: "all", label: "全部 78 張" },
+  { key: "wands", label: "權杖 14" },
+  { key: "cups", label: "聖杯 14" },
+  { key: "swords", label: "寶劍 14" },
+  { key: "pentacles", label: "錢幣 14" },
+];
+function inGroup(card: TarotCard, key: GroupKey): boolean {
+  return key === "all" ? true : card.type === key;
+}
 import { renderPrintCard } from "./renderPrintCard";
 // type-only import (erased at build — does not pull the server lib into the client bundle);
 // keeps the model union in sync with the server. img2img/cost stay local on purpose.
@@ -65,6 +78,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
 export default function TarotStudio() {
   const [model, setModel] = useState<TarotModel>("flux-schnell");
   const [mode, setMode] = useState<Mode>("text");
+  const [group, setGroup] = useState<GroupKey>("major");
   const [stylePrompt, setStylePrompt] = useState("");
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
 
@@ -184,28 +198,40 @@ export default function TarotStudio() {
     }
   }
 
-  async function generateBatch() {
+  // Generate only the cards in the currently-selected group (大牌 / 全部 / 單一牌組).
+  async function generateGroup() {
+    const targets = batch.map((it, i) => ({ i, card: it.card })).filter(({ card }) => inGroup(card, group));
+    if (targets.length === 0) return;
     const opt = modelOption(model);
-    const estNt = Math.round(TAROT_CARDS.length * opt.costNt);
+    const estNt = Math.round(targets.length * opt.costNt);
+    const mins = Math.max(1, Math.round((targets.length * 20) / 60));
+    const label = GROUPS.find((g) => g.key === group)?.label ?? "";
     const ok = window.confirm(
-      `即將生成整套 ${TAROT_CARDS.length} 張塔羅牌（${model}）。\n` +
-        `預估費用約 NT$${estNt}，全程約 20–40 分鐘，請保持此分頁開啟。\n\n確定開始？`,
+      `即將生成 ${targets.length} 張（${label}，${model}）。\n` +
+        `預估費用約 NT$${estNt}，約 ${mins} 分鐘，請保持此分頁開啟。\n\n確定開始？`,
     );
     if (!ok) return;
-
     setBatchBusy(true);
     setMessage(null);
     try {
-      for (let i = 0; i < TAROT_CARDS.length; i++) {
-        await generateOne(TAROT_CARDS[i], i);
+      for (const t of targets) {
+        await generateOne(t.card, t.i);
       }
     } finally {
       setBatchBusy(false);
     }
   }
 
-  async function retryCard(index: number) {
-    await generateOne(batch[index].card, index);
+  // Generate (or regenerate) a single card — fast, no confirm.
+  async function generateSingle(index: number) {
+    if (batchBusy) return;
+    setBatchBusy(true);
+    setMessage(null);
+    try {
+      await generateOne(batch[index].card, index);
+    } finally {
+      setBatchBusy(false);
+    }
   }
 
   async function downloadZip() {
