@@ -52,9 +52,8 @@ export async function GET() {
 
   // Tenants are sourced ONLY from the live `organizations` table — the same
   // source `/ops/clients` reads. When Supabase is unavailable or errors, return
-  // an empty tenant list (ops-console renders an explicit empty state) rather
-  // than fabricating clients that diverge from reality. mediaRules / actions are
-  // legitimate static config and are always returned.
+  // an empty tenant list rather than fabricating clients that diverge from
+  // reality. mediaRules / actions are legitimate static config and are always returned.
   if (!supabase) {
     return NextResponse.json({
       generatedAt: new Date().toISOString(),

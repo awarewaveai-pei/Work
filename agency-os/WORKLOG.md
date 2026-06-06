@@ -2,6 +2,27 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-06
+
+### app.aware-wave — Onboarding IA 重整 Phase 1：退役 ops-console（接續 handoff onboarding-ia-consolidation）
+
+**[已修改]**
+- `app/ops-console/page.tsx`：整頁（孤兒：tenants snapshot=Clients / workflow runs=Build Console / DepartmentSelector=/onboard Step3 / 壞 AiJobForm）→ 改 `redirect("/ops/clients")`。元件（DepartmentSelector/AiJobForm/TenantConfigForm/OpsConsoleTelemetry）**保留**（/onboard 仍用 DepartmentSelector）。原檔 git 可還原。
+- `app/layout.tsx`：sidebar System 區移除 `<Link href="/ops-console">`。
+- `app/api/ops/summary/route.ts:55`：清掉提及 ops-console 的 stale 註解。
+- docs：`APP_AWARE_WAVE_CURRENT_STATE.md` 加 §2.5 客戶生命週期管線（canonical）+ 標 ops-console 退役 + §4 P11 更新；`APP_AWARE_WAVE_ONBOARDING_IA_PLAN.md` 狀態→Phase 1 已實作。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin，排除非本人 tarot）| exit=0 — 部署後 curl `/ops-console` 期望 307→/ops/clients（待 deploy 驗）。
+- REVIEW_DONE: critic=Quick | verdict=Safe | findings=0c/0m — 確認 redirect 未包 try/catch（NEXT_REDIRECT 正確傳播）、無 open-redirect、無其他頁連到 /ops-console、DepartmentSelector 在 /onboard 不受影響。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=href="/ops-console" | hits=0
+  - app code 無任何 Link/href/import 連到 /ops-console（移除 layout 那條後 0 個 live link；只剩 inert 註解，已清 summary/route.ts 那條）；docs 對 ops-console 的引用為刻意（plan/current-state 記錄退役）。`app/ops-console/` 資料夾名與 redirect 註解中的字串為預期存在。
+- WORKLOG：本 entry。
+
+**[剩餘風險/後續]** Phase 2（兩條建 org 路徑收斂）/ Phase 3（intake→技術步驟→build 串單一流程）各自另出 R0 設計。intake 觸發建站端到端仍待操作者實測（見 handoff）。
+
+**[rollback]** 純前端 + 文件：`git checkout HEAD~1 -- app/ops-console/page.tsx` + git revert layout/docs。
+
 ## 2026-06-05
 
 ### Tomorrow captured (/tomo)
