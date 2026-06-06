@@ -67,8 +67,11 @@ export function isTarotModel(v: unknown): v is TarotModel {
 export interface TarotGenParams {
   model: TarotModel;
   prompt: string;
-  /** data: URL of a reference image (enables img2img / style transfer where the model supports it). */
-  referenceImage?: string | null;
+  /**
+   * data: URLs of reference images for style transfer (where the model supports it).
+   * FLUX uses only the first; gpt-image-1 can consume several.
+   */
+  referenceImages?: string[];
   /** Reproducibility seed (FLUX only; ignored by gpt-image-1). */
   seed?: number | null;
 }
@@ -122,8 +125,10 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
     seed,
   };
   // schnell has no `image` input — style consistency there relies on seed + prompt only.
-  if (config.supportsImg2img && params.referenceImage) {
-    input.image = params.referenceImage; // img2img / style reference
+  // flux-dev img2img takes a single image, so we use the first reference.
+  const fluxRef = params.referenceImages?.[0];
+  if (config.supportsImg2img && fluxRef) {
+    input.image = fluxRef; // img2img / style reference
     input.prompt_strength = 0.82; // keep some of the reference, follow the prompt
   }
 
@@ -182,15 +187,19 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
   const quality = config.quality ?? "medium";
   let res: Response;
 
-  if (params.referenceImage) {
-    const parsed = parseDataUrl(params.referenceImage);
-    if (!parsed) return { ok: false, error: "invalid_reference_image" };
+  const refs = params.referenceImages ?? [];
+  if (refs.length > 0) {
     const form = new FormData();
     form.append("model", "gpt-image-1");
     form.append("prompt", params.prompt);
     form.append("size", SIZE);
     form.append("quality", quality);
-    form.append("image", new Blob([new Uint8Array(parsed.buffer)], { type: parsed.mime }), "reference.png");
+    // gpt-image-1 edits accepts multiple reference images via repeated image[] fields.
+    for (let i = 0; i < refs.length; i++) {
+      const parsed = parseDataUrl(refs[i]);
+      if (!parsed) return { ok: false, error: "invalid_reference_image" };
+      form.append("image[]", new Blob([new Uint8Array(parsed.buffer)], { type: parsed.mime }), `reference-${i}.png`);
+    }
     res = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}` },

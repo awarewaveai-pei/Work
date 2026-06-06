@@ -9,6 +9,15 @@ export const PRINT_H = 1488; // (120 + 6) mm
 const BLEED = 36; // ~3 mm
 const SAFE = 64; // safe inset from trim for the frame
 
+export type CardTemplate = "classic" | "minimal" | "dark" | "none";
+
+export const CARD_TEMPLATES: { key: CardTemplate; label: string }[] = [
+  { key: "classic", label: "經典金框（用牌組色）" },
+  { key: "minimal", label: "簡約白邊" },
+  { key: "dark", label: "深色神秘（金字）" },
+  { key: "none", label: "無框・純藝術滿版" },
+];
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -34,11 +43,9 @@ function drawCover(
   let sw = img.width;
   let sh = img.height;
   if (ir > r) {
-    // image wider than target — crop sides
     sw = img.height * r;
     sx = (img.width - sw) / 2;
   } else {
-    // image taller than target — crop top/bottom
     sh = img.width / r;
     sy = (img.height - sh) / 2;
   }
@@ -55,11 +62,28 @@ function fitFont(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, 
   return px;
 }
 
+/** Per-template colors. `classic` follows the card's own palette; others are fixed. */
+function templateColors(template: CardTemplate, card: TarotCard): { bg: string; border: string; text: string } {
+  switch (template) {
+    case "minimal":
+      return { bg: "#faf7f0", border: "#3a3a3a", text: "#2a2a2a" };
+    case "dark":
+      return { bg: "#120a24", border: "#c9a84c", text: "#e8d5a3" };
+    case "classic":
+    default:
+      return { bg: card.colors[1], border: card.colors[0], text: card.colors[0] };
+  }
+}
+
 /**
  * Render one print-ready card. `artDataUrl` is the raw AI artwork (data: URL).
- * Returns a PNG Blob sized PRINT_W × PRINT_H.
+ * Returns a PNG Blob sized PRINT_W × PRINT_H, framed per the chosen template.
  */
-export async function renderPrintCard(card: TarotCard, artDataUrl: string): Promise<Blob> {
+export async function renderPrintCard(
+  card: TarotCard,
+  artDataUrl: string,
+  template: CardTemplate = "classic",
+): Promise<Blob> {
   const art = await loadImage(artDataUrl);
 
   const canvas = document.createElement("canvas");
@@ -68,18 +92,25 @@ export async function renderPrintCard(card: TarotCard, artDataUrl: string): Prom
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas_2d_unavailable");
 
-  const border = card.colors[0];
-  const bg = card.colors[1];
+  // ── Template "none": full-bleed artwork, no frame or text ──────────────────
+  if (template === "none") {
+    drawCover(ctx, art, 0, 0, PRINT_W, PRINT_H);
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas_toBlob_failed"))), "image/png");
+    });
+  }
 
-  // 1. Bleed background (full canvas)
+  const { bg, border, text } = templateColors(template, card);
+
+  // 1. Bleed background
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, PRINT_W, PRINT_H);
 
-  // 2. Art window — 2:3 portrait inside the safe area, leaving room for numeral + name
+  // 2. Art window — 2:3 portrait
   const winX = SAFE;
   const winW = PRINT_W - SAFE * 2;
   const winY = 150;
-  const winH = Math.round(winW * 1.5); // 2:3
+  const winH = Math.round(winW * 1.5);
   ctx.save();
   ctx.beginPath();
   ctx.rect(winX, winY, winW, winH);
@@ -87,20 +118,24 @@ export async function renderPrintCard(card: TarotCard, artDataUrl: string): Prom
   drawCover(ctx, art, winX, winY, winW, winH);
   ctx.restore();
 
-  // thin frame around the art window
   ctx.strokeStyle = border;
   ctx.lineWidth = 4;
   ctx.strokeRect(winX, winY, winW, winH);
 
-  // 3. Outer decorative double border (inside the bleed)
+  // 3. Outer border — double for classic/dark, single thin for minimal
   ctx.strokeStyle = border;
-  ctx.lineWidth = 8;
-  ctx.strokeRect(BLEED, BLEED, PRINT_W - BLEED * 2, PRINT_H - BLEED * 2);
-  ctx.lineWidth = 2;
-  ctx.strokeRect(BLEED + 16, BLEED + 16, PRINT_W - (BLEED + 16) * 2, PRINT_H - (BLEED + 16) * 2);
+  if (template === "minimal") {
+    ctx.lineWidth = 3;
+    ctx.strokeRect(BLEED, BLEED, PRINT_W - BLEED * 2, PRINT_H - BLEED * 2);
+  } else {
+    ctx.lineWidth = 8;
+    ctx.strokeRect(BLEED, BLEED, PRINT_W - BLEED * 2, PRINT_H - BLEED * 2);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(BLEED + 16, BLEED + 16, PRINT_W - (BLEED + 16) * 2, PRINT_H - (BLEED + 16) * 2);
+  }
 
   // 4. Roman numeral (top)
-  ctx.fillStyle = border;
+  ctx.fillStyle = text;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = `600 44px Georgia, "Times New Roman", serif`;
@@ -110,7 +145,7 @@ export async function renderPrintCard(card: TarotCard, artDataUrl: string): Prom
   const nameMaxW = PRINT_W - SAFE * 2;
   const namePx = fitFont(ctx, card.name, nameMaxW, 52);
   ctx.font = `bold ${namePx}px Georgia, "Times New Roman", serif`;
-  ctx.fillStyle = border;
+  ctx.fillStyle = text;
   const nameY = winY + winH + (PRINT_H - BLEED - 16 - (winY + winH)) / 2;
   ctx.fillText(card.name, PRINT_W / 2, nameY);
 
