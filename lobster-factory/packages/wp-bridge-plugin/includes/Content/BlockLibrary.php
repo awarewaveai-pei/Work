@@ -67,10 +67,20 @@ final class BlockLibrary {
 		return '<!-- wp:shortcode -->' . "\n" . '[fluentform id="' . $formId . '"]' . "\n" . '<!-- /wp:shortcode -->';
 	}
 
-	public function image( string $url, string $alt = '' ): string {
-		$url = htmlspecialchars( $url, ENT_QUOTES );
-		$alt = htmlspecialchars( $alt, ENT_QUOTES );
-		return '<!-- wp:image --><figure class="wp-block-image"><img src="' . $url . '" alt="' . $alt . '"/></figure><!-- /wp:image -->';
+	/**
+	 * Image. With a media-library $id (after sideloading) it emits a real Kadence Image (Adv) block,
+	 * matching soulful's markup; without an id it falls back to a core image referencing the URL.
+	 */
+	public function image( string $url, string $alt = '', int $id = 0 ): string {
+		$u = htmlspecialchars( $url, ENT_QUOTES );
+		$a = htmlspecialchars( $alt, ENT_QUOTES );
+		if ( $id > 0 ) {
+			$uid = $this->uid();
+			return '<!-- wp:kadence/image {"id":' . $id . ',"sizeSlug":"full","linkDestination":"none","uniqueID":"' . $uid . '"} -->' . "\n"
+				. '<figure class="wp-block-kadence-image kb-image' . $uid . ' size-full"><img src="' . $u . '" alt="' . $a . '" class="kb-img wp-image-' . $id . '"/></figure>' . "\n"
+				. '<!-- /wp:kadence/image -->';
+		}
+		return '<!-- wp:image --><figure class="wp-block-image"><img src="' . $u . '" alt="' . $a . '"/></figure><!-- /wp:image -->';
 	}
 
 	public function spacer( int $height = 30 ): string {
