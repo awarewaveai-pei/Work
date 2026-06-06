@@ -1,41 +1,59 @@
 // Client-only: compose a print-ready tarot card PNG from AI artwork on a <canvas>.
 // Output: 898×1488 px = 76×126 mm @ 300 DPI (70×120 mm card + 3 mm bleed each side).
+//
+// Templates are AI-generated empty frame PNGs (public/tarot-frames/*.png): an ornate border
+// with a blank centre + blank title panel. We draw the frame, then composite the artwork into
+// the frame's blank-centre rect, then write the card name into the title panel.
 
 import type { TarotCard } from "./cards";
 
-// 300 DPI, 1 mm = 11.811 px
-export const PRINT_W = 898; // (70 + 6) mm
-export const PRINT_H = 1488; // (120 + 6) mm
-const BLEED = 36; // ~3 mm
-const SAFE = 64; // safe inset from trim for the frame
+export const PRINT_W = 898;
+export const PRINT_H = 1488;
 
-export type CardTemplate = "classic" | "minimal" | "dark" | "none";
+export type CardTemplate =
+  | "classic-rw"
+  | "handdrawn"
+  | "medieval"
+  | "folk"
+  | "parchment"
+  | "gothic"
+  | "none";
 
-export const CARD_TEMPLATES: { key: CardTemplate; label: string }[] = [
-  { key: "classic", label: "經典金框（用牌組色）" },
-  { key: "minimal", label: "簡約白邊" },
-  { key: "dark", label: "深色神秘（金字）" },
-  { key: "none", label: "無框・純藝術滿版" },
+interface FrameDef {
+  key: CardTemplate;
+  label: string;
+  /** file under /public/tarot-frames/ (omitted for "none"). */
+  file?: string;
+  /** blank-centre artwork rect, as fractions of the card. */
+  art?: { x: number; y: number; w: number; h: number };
+  /** vertical centre of the title text, as a fraction of card height. */
+  titleY?: number;
+  titleColor?: string;
+}
+
+export const CARD_TEMPLATES: FrameDef[] = [
+  { key: "classic-rw", label: "經典 Rider-Waite", file: "classic-rw.png", art: { x: 0.085, y: 0.07, w: 0.83, h: 0.76 }, titleY: 0.915, titleColor: "#3a2a1a" },
+  { key: "handdrawn", label: "手繪復古", file: "handdrawn.png", art: { x: 0.1, y: 0.085, w: 0.8, h: 0.73 }, titleY: 0.895, titleColor: "#3a2a1a" },
+  { key: "medieval", label: "中世紀手抄本", file: "medieval.png", art: { x: 0.1, y: 0.085, w: 0.8, h: 0.73 }, titleY: 0.905, titleColor: "#3a2a1a" },
+  { key: "folk", label: "民俗樸拙", file: "folk.png", art: { x: 0.12, y: 0.12, w: 0.76, h: 0.67 }, titleY: 0.905, titleColor: "#5a3a2a" },
+  { key: "parchment", label: "古董羊皮卷", file: "parchment.png", art: { x: 0.105, y: 0.085, w: 0.79, h: 0.72 }, titleY: 0.905, titleColor: "#4a3420" },
+  { key: "gothic", label: "哥德聖窗", file: "gothic.png", art: { x: 0.19, y: 0.205, w: 0.62, h: 0.585 }, titleY: 0.89, titleColor: "#3a2a1a" },
+  { key: "none", label: "無框・純藝術" },
 ];
+
+const FRAME_BY_KEY: Record<string, FrameDef> = Object.fromEntries(CARD_TEMPLATES.map((t) => [t.key, t]));
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("art_image_load_failed"));
+    img.onerror = () => reject(new Error(`image_load_failed: ${src.slice(0, 60)}`));
     img.src = src;
   });
 }
 
 /** Draw `img` to cover the rect (x,y,w,h), clipped — like CSS object-fit: cover. */
-function drawCover(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-) {
+function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
   const ir = img.width / img.height;
   const r = w / h;
   let sx = 0;
@@ -58,98 +76,61 @@ function fitFont(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, 
     ctx.font = `bold ${px}px Georgia, "Times New Roman", serif`;
     if (ctx.measureText(text).width <= maxWidth) break;
     px -= 2;
-  } while (px > 14);
+  } while (px > 12);
   return px;
 }
 
-/** Per-template colors. `classic` follows the card's own palette; others are fixed. */
-function templateColors(template: CardTemplate, card: TarotCard): { bg: string; border: string; text: string } {
-  switch (template) {
-    case "minimal":
-      return { bg: "#faf7f0", border: "#3a3a3a", text: "#2a2a2a" };
-    case "dark":
-      return { bg: "#120a24", border: "#c9a84c", text: "#e8d5a3" };
-    case "classic":
-    default:
-      return { bg: card.colors[1], border: card.colors[0], text: card.colors[0] };
-  }
+function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas_toBlob_failed"))), "image/png");
+  });
 }
 
 /**
- * Render one print-ready card. `artDataUrl` is the raw AI artwork (data: URL).
- * Returns a PNG Blob sized PRINT_W × PRINT_H, framed per the chosen template.
+ * Render one print-ready card: the chosen frame template with the artwork composited into its
+ * blank centre and the card name in the title panel. `template = "none"` → full-bleed artwork.
  */
-export async function renderPrintCard(
-  card: TarotCard,
-  artDataUrl: string,
-  template: CardTemplate = "classic",
-): Promise<Blob> {
+export async function renderPrintCard(card: TarotCard, artDataUrl: string, template: CardTemplate = "classic-rw"): Promise<Blob> {
   const art = await loadImage(artDataUrl);
-
   const canvas = document.createElement("canvas");
   canvas.width = PRINT_W;
   canvas.height = PRINT_H;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas_2d_unavailable");
 
-  // ── Template "none": full-bleed artwork, no frame or text ──────────────────
-  if (template === "none") {
+  const def = FRAME_BY_KEY[template] ?? FRAME_BY_KEY["classic-rw"];
+
+  // No-frame → full-bleed artwork.
+  if (!def.file || !def.art) {
     drawCover(ctx, art, 0, 0, PRINT_W, PRINT_H);
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas_toBlob_failed"))), "image/png");
-    });
+    return toBlob(canvas);
   }
 
-  const { bg, border, text } = templateColors(template, card);
+  // 1. frame background (ornate border + blank centre + blank title panel)
+  const frame = await loadImage(`/tarot-frames/${def.file}`);
+  ctx.drawImage(frame, 0, 0, PRINT_W, PRINT_H);
 
-  // 1. Bleed background
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, PRINT_W, PRINT_H);
-
-  // 2. Art window — 2:3 portrait
-  const winX = SAFE;
-  const winW = PRINT_W - SAFE * 2;
-  const winY = 150;
-  const winH = Math.round(winW * 1.5);
+  // 2. artwork into the frame's blank-centre rect (inset so it never covers the border)
+  const ax = def.art.x * PRINT_W;
+  const ay = def.art.y * PRINT_H;
+  const aw = def.art.w * PRINT_W;
+  const ah = def.art.h * PRINT_H;
   ctx.save();
   ctx.beginPath();
-  ctx.rect(winX, winY, winW, winH);
+  ctx.rect(ax, ay, aw, ah);
   ctx.clip();
-  drawCover(ctx, art, winX, winY, winW, winH);
+  drawCover(ctx, art, ax, ay, aw, ah);
   ctx.restore();
 
-  ctx.strokeStyle = border;
-  ctx.lineWidth = 4;
-  ctx.strokeRect(winX, winY, winW, winH);
-
-  // 3. Outer border — double for classic/dark, single thin for minimal
-  ctx.strokeStyle = border;
-  if (template === "minimal") {
-    ctx.lineWidth = 3;
-    ctx.strokeRect(BLEED, BLEED, PRINT_W - BLEED * 2, PRINT_H - BLEED * 2);
-  } else {
-    ctx.lineWidth = 8;
-    ctx.strokeRect(BLEED, BLEED, PRINT_W - BLEED * 2, PRINT_H - BLEED * 2);
-    ctx.lineWidth = 2;
-    ctx.strokeRect(BLEED + 16, BLEED + 16, PRINT_W - (BLEED + 16) * 2, PRINT_H - (BLEED + 16) * 2);
+  // 3. card name into the title panel
+  if (def.titleY) {
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const px = fitFont(ctx, card.name, aw * 0.92, 42);
+    ctx.font = `bold ${px}px Georgia, "Times New Roman", serif`;
+    ctx.fillStyle = def.titleColor ?? "#2a2a1a";
+    ctx.fillText(card.name, PRINT_W / 2, def.titleY * PRINT_H);
   }
 
-  // 4. Roman numeral (top)
-  ctx.fillStyle = text;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `600 44px Georgia, "Times New Roman", serif`;
-  ctx.fillText(card.roman, PRINT_W / 2, winY - 64);
-
-  // 5. Card name (bottom)
-  const nameMaxW = PRINT_W - SAFE * 2;
-  const namePx = fitFont(ctx, card.name, nameMaxW, 52);
-  ctx.font = `bold ${namePx}px Georgia, "Times New Roman", serif`;
-  ctx.fillStyle = text;
-  const nameY = winY + winH + (PRINT_H - BLEED - 16 - (winY + winH)) / 2;
-  ctx.fillText(card.name, PRINT_W / 2, nameY);
-
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas_toBlob_failed"))), "image/png");
-  });
+  return toBlob(canvas);
 }

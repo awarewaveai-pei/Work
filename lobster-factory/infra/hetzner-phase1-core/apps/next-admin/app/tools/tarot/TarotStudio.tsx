@@ -90,7 +90,7 @@ export default function TarotStudio() {
   const [model, setModel] = useState<TarotModel>("flux-schnell");
   const [mode, setMode] = useState<Mode>("text");
   const [group, setGroup] = useState<GroupKey>("major");
-  const [template, setTemplate] = useState<CardTemplate>("classic");
+  const [template, setTemplate] = useState<CardTemplate>("classic-rw");
   const [stylePrompt, setStylePrompt] = useState("");
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
