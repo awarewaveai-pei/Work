@@ -11,6 +11,25 @@
 - TOMORROW_CAPTURED: onboarding-ia-consolidation → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 - TOMORROW_CAPTURED: tomo-203931 → handoffs/2026-06-05-2039-tomo-203931.md
 
+### Auto-Repair M2/M4 Post-Phase 4 — Phase 1 code complete（per-source token + fingerprint salt，向後相容、未部署）
+
+**根因**：5 個監控 webhook 共用 1 個 bearer token（`verifyIngestToken.ts:5`）→ 一洩漏（2026-05-22 真實發生）可在 5 endpoint 偽造 incident（M2）+ 預先 seed fingerprint 靜默降級真告警（M4，fingerprint 純由 attacker 可控欄位推導）。
+
+**[已修改]（Phase 1，env 未設=現況 byte-identical，未部署）**
+- M2：新增 `verifyIngestSource()`（5 監控 webhook，per-source `OPS_INBOX_<SOURCE>_TOKEN` + dual-accept legacy fallback）；舊 `verifyIngestToken()` 不動（5 個 server-to-server/讀端點續用）。docker-compose + .env.example plumbing。
+- M4：新增 `computeFingerprintV2()` = HMAC-SHA256(key=salt, msg=v1)；`computeFingerprint()`（live dedup key）不動。`0036_fingerprint_v2.sql`（additive：nullable 欄 + RPC 擴尾參，ON CONFLICT 維持 v1；含 down-block + CREATE OR REPLACE；未 apply）。
+- 18 新測試（per-source 矩陣 12 + V2 6）。
+
+**[驗證結果]（R0 四動作）**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npm test` | exit=0 | result=tsc 0 errors + vitest 197/197（含 18 新測試）
+- REALTEST_WAIVED: QUERY_ONLY -- 0036 migration SQL 本機無真 DB，Phase 2 對 staging DB apply+驗（NOTIFY pgrst reload）
+- REVIEW_DONE: critic=Deep×2 | verdict=pass | findings=0 Critical；M2 1 Major(docker-compose env-passthrough)+2 Minor(captureMessage DoS/empty-string) 全修；M4 1 Major(sha256-concat→HMAC)+Minor(salt trim) 全修；db-expert 確認 0036 additive 安全（補 down-block + CREATE OR REPLACE）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=verifyIngestSource\|fingerprint_v2\|computeFingerprintV2\|OPS_INBOX_*_TOKEN\|OPS_INBOX_FINGERPRINT_SALT | hits=0 stale（R4 修 1 處 fingerprint.ts 內 stale 註解 sha256→HMAC）
+
+**[剩餘風險 / 下一步]**：Phase 2 rollout（secrets→vault→SG .env→sg-deploy→apply 0036→逐平台改 token→backfill v2→關 dual-accept）+ Phase 3 constraint 切換，均 operator-gated（High）。Tier-2 HMAC（Sentry/Grafana）+ replay 防護列 backlog（Phase 0 實證：無簽章 secret）。設計 SSOT: `reports/audit/auto-repair-m2-m4-design-research-2026-06-05.md`；handoff: `handoffs/2026-06-05-2017-tomo-201752.md`。AUDIT_REGISTRY M2/M4 已標 🟡 Phase 1 code complete。
+
+**[rollback]**：env 全未設=完全現況；`git revert`（1a/1b 各獨立邏輯）；0036 未 apply 前零影響。
+
 ### app.aware-wave.com — 塔羅牌印刷檔生成工具（已部署 SG `ccfbd176`，FLUX 真生圖驗證通過；OpenAI 待使用者加 billing）
 
 **背景**：使用者要在 app.aware-wave.com 加塔羅牌印刷檔生成工具。工作流（使用者確認）：文字生圖/以圖生圖生一張樣本→鎖風格→整套 78 張同風格→下載 PNG 印刷牌卡。提供的 `tarot-ai-generator.jsx` 是 artifact 原型（瀏覽器直打 anthropic、無 key、生 SVG），僅取其牌資料+版面。
