@@ -106,23 +106,33 @@ export async function renderPrintCard(card: TarotCard, artDataUrl: string, templ
     return toBlob(canvas);
   }
 
-  // 1. frame background (ornate border + blank centre + blank title panel)
-  const frame = await loadImage(`/tarot-frames/${def.file}`);
-  ctx.drawImage(frame, 0, 0, PRINT_W, PRINT_H);
-
-  // 2. artwork into the frame's blank-centre rect (inset so it never covers the border)
   const ax = def.art.x * PRINT_W;
   const ay = def.art.y * PRINT_H;
   const aw = def.art.w * PRINT_W;
   const ah = def.art.h * PRINT_H;
+
+  // 1. artwork fills the centre window (slight overflow so the border edge later sits on the art)
+  const pad = 10;
   ctx.save();
   ctx.beginPath();
-  ctx.rect(ax, ay, aw, ah);
+  ctx.rect(ax - pad, ay - pad, aw + pad * 2, ah + pad * 2);
   ctx.clip();
-  drawCover(ctx, art, ax, ay, aw, ah);
+  drawCover(ctx, art, ax - pad, ay - pad, aw + pad * 2, ah + pad * 2);
   ctx.restore();
 
-  // 3. card name into the title panel
+  // 2. border ON TOP of the art — the frame with its blank centre cleared to transparent,
+  // so the ornate border + title panel always overlay the artwork (never get covered by it).
+  const frame = await loadImage(`/tarot-frames/${def.file}`);
+  const overlay = document.createElement("canvas");
+  overlay.width = PRINT_W;
+  overlay.height = PRINT_H;
+  const octx = overlay.getContext("2d");
+  if (!octx) throw new Error("canvas_2d_unavailable");
+  octx.drawImage(frame, 0, 0, PRINT_W, PRINT_H);
+  octx.clearRect(ax, ay, aw, ah); // punch a transparent window where the art shows through
+  ctx.drawImage(overlay, 0, 0);
+
+  // 3. card name in the title panel (drawn last → always crisp, never covered)
   if (def.titleY) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
