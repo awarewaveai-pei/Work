@@ -6,6 +6,23 @@
 
 - AUTO_TASK_DONE: Phase4Weekly 第二次 scheduled fire
 
+### wp-bridge v0.5.6 — Kadence Tabs + YouTube block + 兩個真 bug 修復
+
+**根因（真站 post 7053 走真實 PostCreator 路徑坐實）**：
+1. **Accordion pane 2+ editor invalid**：現行 Kadence `kadence/pane` 第 2 個以後的 pane 必須帶 `"id":<n>` 屬性（第一個省略，預設 id=1 被 Gutenberg 丟棄）。舊 code 全不帶 id → 第 2+ pane 在編輯器顯示 "unexpected content"。前一輪誤加 `className`+重複 class 是錯的猜測（被她手動 recover 的殘留誤導），本次移除。對照「新鮮編輯器建立的 accordion」逐位元組驗證。
+2. **PostCreator 未 wp_slash**：`wp_insert_post()` 內部會 `wp_unslash()`（預期 `$_POST` 式 slashed 資料）；PostCreator 直傳未 slash 的 content → 反斜線跳脫的 block 屬性被破壞（`kadence/tabs` titles `<strong>` → `u003cstrong`）。修：args 包 `wp_slash()`。其他 block 無反斜線屬性所以一直沒踩到，tabs titles（含 `<strong>`）第一個暴露。
+
+**[已修改]**
+- `lobster-factory/packages/wp-bridge-plugin/includes/Content/BlockLibrary.php` — accordion pane id 修正（pane1 無 id、pane2+ `"id":N`、無 className、pane 間 `\n\n`）；新增 `youtube()`(core/embed)、`tabs()`(kadence/tabs>tab，`<ul>` 標題列依擷取樣式對齊 Kadence save()、anchor slug、id pattern)、`attrsJson()`(WP-faithful 屬性跳脫，runtime 用 serialize_block_attributes)；重構 compose() switch → `buildInner()` 讓 tab 可嵌任意 block。
+- `lobster-factory/packages/wp-bridge-plugin/includes/Post/PostCreator.php` — `wp_insert_post` args 包 `wp_slash()`。
+- `aware-wave-wp-bridge.php` — version 0.5.5 → 0.5.6。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp eval-file (real PostCreator->create) + wp post get 7053` | exit=0 | ms=~2000 — 回 `{"status":"committed","post_id":7053}`；read-back titles=`<strong>Overview</strong>`(反斜線保留)、accordion pane2=`{"id":2,...}`、youtube=core/embed figure、UNKNOWN=空。先前 7050(accordion)、7052(tabs pre-slash-fix 暴露 bug) 為過程證據。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n — nested image-in-tab 不會被 sideloadBlockImages 預處理(只掃 top-level image)；屬已知限制非回歸(tabs 為新路徑)。
+- BUGHUNT_DONE: scope=lobster-factory(wp-bridge-plugin/includes) | grep=`->compose\|->accordion\|->tabs\|->youtube\|buildInner` | hits=7 — 全為本次新 code + 唯一 RC caller(RestController:162)，compose() 回傳形狀未變、無 stale caller。
+- BUGHUNT_SCOPE_NARROW: wp-bridge 為獨立 clean-room plugin，無 agency-os/scripts downstream consumer；compose 對外介面僅 RestController 一處，已確認。
+
 ### app.aware-wave onboarding 建站引擎 Stage 0 — e2e 點火 + timeout 根因修復
 
 **根因（live e2e 坐實）**：onboarding「觸發建站」會建出真 staging WP 站（curl 200），但 `ops_action_runs` 永卡 `dispatched`、`workflow_runs` 無列。Trigger.dev run `run_cmq224df40xq71wv5wjqqxzvf` = **COMPLETED** 但 `output.status=blocked_hosting_configuration`、`hosting.message="Hosting API request timed out after 45000ms"`。實測 `provision-staging`（SSH→WP core→5 plugins）**~71s** > http_json adapter 預設 **45s** timeout → adapter abort → create-wp-site early-return `blocked`（跳過 persist + B writeback），但 provision-staging 伺服器端續跑完 → 站照建出來。「站建好卻顯示沒成功」矛盾的真因。
