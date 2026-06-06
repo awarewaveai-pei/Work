@@ -6,6 +6,22 @@
 
 ---
 
+## 🚀 開工必讀（按順序，讀完這 7 步即完全掌握狀況）
+
+> 操作者一說「繼續 app.aware-wave / 做 onboarding / 建站 / 佈建 / 做 Stage N」→ AI **依序**讀以下，不跳步。前 3 步給「藍圖+最新真相」，後 4 步給「程式+活資料」。
+
+1. **本檔全文**（§1 架構地圖 → §2 現況矩陣 → §3 路線圖 → §4 護欄）= 願景 + 做到哪 + 下一步。
+2. **`git log --oneline -15`** + `agency-os/WORKLOG.md` 最近 2 個 `## YYYY-MM-DD` 區塊 = 最新發生什麼（**最新 commit 是真相，勝過任何文件聲稱**；多檔被平行 session 觸碰過，遵 VBC）。
+3. **`APP_AWARE_WAVE_CURRENT_STATE.md`**（系統現狀）+ **`APP_AWARE_WAVE_BUILD_ENGINE_STAGE0.md`**（站層細節）+ **`EMBED_PROVISION_INTO_APP.md`**（機層租機 recipe）。
+4. **入口三件套程式**：`apps/next-admin/app/api/onboarding/{submit,generate-spec,trigger-build}/route.ts`（§1 表有行號）。
+5. **建站工作流**：`packages/workflows/src/trigger/{dispatch-action-run,create-wp-site}.ts` + `hosting/providers/httpJsonStagingAdapter.ts`。
+6. **活資料（DB 現況）**：SSH SG → query `intake_forms` / `ops_action_runs` 各狀態數量（看真實卡在哪，別猜）。指令範本見 STAGE0 文件 §3。
+7. **`agency-os/TASKS.md`** 搜 `MASTER PLAN` 那條 = 當前開放責任 + 即時下一步。
+
+讀完 1-7 即可動工；不確定卡點 → 先做 §3 Stage 1 的「精確診斷步驟」，不臆測。
+
+---
+
 ## 0. 願景（操作者原話，不要稀釋）
 
 > 客戶填資料（用 Fluent Form 或填完自動建立 FluentForm 資料 —— 因為要做 **CRM**），或我去填詳細資料和需求去**報價**，然後最後討論出來的結果**觸發建造出一個網站**，然後串聯 **Supabase Studio、n8n、Sentry、Netdata、Uptime Kuma、PostHog Cloud** 等等。
