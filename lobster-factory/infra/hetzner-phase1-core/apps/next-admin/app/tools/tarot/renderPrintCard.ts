@@ -27,12 +27,12 @@ interface FrameDef {
 }
 
 export const CARD_TEMPLATES: FrameDef[] = [
-  { key: "classic-rw", label: "經典 Rider-Waite", file: "classic-rw.png", titleY: 0.915, titleColor: "#3a2a1a" },
-  { key: "handdrawn", label: "手繪復古", file: "handdrawn.png", titleY: 0.9, titleColor: "#3a2a1a" },
-  { key: "medieval", label: "中世紀手抄本", file: "medieval.png", titleY: 0.91, titleColor: "#3a2a1a" },
-  { key: "folk", label: "民俗樸拙", file: "folk.png", titleY: 0.92, titleColor: "#5a3a2a" },
-  { key: "parchment", label: "古董羊皮卷", file: "parchment.png", titleY: 0.91, titleColor: "#4a3420" },
-  { key: "gothic", label: "哥德聖窗", file: "gothic.png", titleY: 0.9, titleColor: "#3a2a1a" },
+  { key: "classic-rw", label: "經典 Rider-Waite", file: "classic-rw.png", titleY: 0.945, titleColor: "#3a2a1a" },
+  { key: "handdrawn", label: "手繪復古", file: "handdrawn.png", titleY: 0.935, titleColor: "#3a2a1a" },
+  { key: "medieval", label: "中世紀手抄本", file: "medieval.png", titleY: 0.94, titleColor: "#3a2a1a" },
+  { key: "folk", label: "民俗樸拙", file: "folk.png", titleY: 0.94, titleColor: "#5a3a2a" },
+  { key: "parchment", label: "古董羊皮卷", file: "parchment.png", titleY: 0.94, titleColor: "#4a3420" },
+  { key: "gothic", label: "哥德聖窗", file: "gothic.png", titleY: 0.925, titleColor: "#3a2a1a" },
   { key: "none", label: "無框・純藝術" },
 ];
 
