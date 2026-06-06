@@ -4,13 +4,50 @@ import { newUuid } from "../utils/uid";
 import { buildWorkflowRunInsertSql } from "../db/sql/workflowRunsSql";
 import { buildWorkflowRunRow } from "../db/sql/workflowRunsSql";
 import { LobsterCatalogIds } from "../db/catalogIds";
-import { supabaseRestInsert } from "../db/supabase/supabaseRestInsert";
+import { supabaseRestInsert, supabaseRestPatch } from "../db/supabase/supabaseRestInsert";
 import { resolveStagingProvisioning } from "../hosting/resolveStagingProvisioning";
 import { captureWorkflowException } from "../observability/sentry";
 import { captureWorkflowEvent } from "../observability/posthog";
 import { runAllIntegrations, type BuildIntegrations } from "../integrations/integration-steps";
 
 const SUPPORTED_MANIFEST_SLUGS = ["wp-basic", "wp-business", "wc-core"] as const;
+
+/**
+ * Stage 0 (B): write the terminal status back to the originating `ops_action_runs` row so it
+ * no longer sticks at "dispatched". The dispatcher passes the run id as
+ * `_dispatchedFromActionRunId`. Gated on the same LOBSTER_ENABLE_DB_WRITES flag as the other
+ * persistence here; a no-op when the flag is off, the run id is absent, or creds are missing.
+ * Best-effort: never throws (status writeback must not mask the real workflow result).
+ */
+async function markActionRunTerminal(
+  runId: string | undefined,
+  status: "completed" | "failed",
+  extra: Record<string, unknown>,
+): Promise<void> {
+  if (!runId) return;
+  const enableDbWrites =
+    (process.env.LOBSTER_ENABLE_DB_WRITES || "").toLowerCase() === "true" ||
+    (process.env.LOBSTER_ENABLE_DB_WRITES || "") === "1";
+  if (!enableDbWrites) return;
+  const supabaseUrl = process.env.LOBSTER_SUPABASE_URL || "";
+  const serviceRoleKey = process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!supabaseUrl || !serviceRoleKey) return;
+  try {
+    await supabaseRestPatch(
+      { supabaseUrl, serviceRoleKey },
+      "ops_action_runs",
+      runId,
+      { status, ...extra },
+      { traceId: `create-wp-site-${status}-${runId}` },
+    );
+  } catch (e) {
+    logger.warn("create-wp-site: ops_action_runs status writeback failed (non-fatal)", {
+      runId,
+      status,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
 
 /** Build Console (`/build`) sends `clientName` / `packageSlug`; workflows use `siteName` / `manifestSlug`. */
 function normalizeBuildConsolePayload(raw: unknown): unknown {
@@ -414,6 +451,12 @@ export const createWpSite = task({
         pluginInstallTriggered: !!pluginInstallRunHandle,
       });
 
+      // Stage 0 (B): mark the originating ops_action_runs row terminal so it no longer
+      // sticks at "dispatched". Best-effort, gated on LOBSTER_ENABLE_DB_WRITES.
+      await markActionRunTerminal(input._dispatchedFromActionRunId, "completed", {
+        ended_at: new Date().toISOString(),
+      });
+
       return {
         status: finalStatus,
         input,
@@ -437,6 +480,16 @@ export const createWpSite = task({
         route: "task.run",
         payload,
       });
+      // Stage 0 (B): mark the run failed so it doesn't stick at "dispatched". Read the run id
+      // from the raw payload (input may be undefined if schema parse threw). Best-effort.
+      await markActionRunTerminal(
+        (payload as { _dispatchedFromActionRunId?: string } | null)?._dispatchedFromActionRunId,
+        "failed",
+        {
+          ended_at: new Date().toISOString(),
+          error_summary: (error instanceof Error ? error.message : String(error)).slice(0, 500),
+        },
+      );
       throw error;
     }
   },

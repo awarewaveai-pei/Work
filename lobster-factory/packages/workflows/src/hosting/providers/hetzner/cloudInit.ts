@@ -12,7 +12,12 @@
  * HARD RULES (official-source audited — see PLAN appendix A):
  *  - user_data is metadata-readable by ANY process with no auth → NEVER put a secret here.
  *  - user_data must stay <= 32 KiB (Hetzner limit). `renderDay1CloudInit` asserts this.
- *  - SSH: key-only, no passwords (item 5). Firewall: INPUT DROP + DOCKER-USER (items 3,4).
+ *  - SSH: key-only, no passwords (item 5), no root password login.
+ *  - Firewall MUST cover BOTH IPv4 and IPv6 — Hetzner gives every server a public /64,
+ *    and ip6tables defaults to ACCEPT, so an IPv4-only INPUT DROP leaves the host wide
+ *    open on v6 (and Docker would bind containers on ::). DOCKER-USER guards (items 3,4)
+ *    are re-applied by a systemd unit ordered After=docker.service so they survive the
+ *    auto-reboot this file also enables.
  */
 
 export const CLOUD_INIT_MAX_BYTES = 32_768;
@@ -29,24 +34,23 @@ export type Day1CloudInitParams = {
 };
 
 function assertNoSecretLeak(sshPublicKey: string): void {
-  // A public key starts with ssh-/ecdsa-/sk-; a private key block must never appear here.
-  if (/PRIVATE KEY/i.test(sshPublicKey)) {
+  const key = sshPublicKey.trim();
+  if (/PRIVATE KEY/i.test(key)) {
     throw new Error("cloud-init refuses a PRIVATE KEY in sshPublicKey — public key only");
+  }
+  // Defence in depth: only accept a recognised SSH public-key prefix, so a pasted token
+  // or PEM cert body cannot slip into metadata-readable user_data.
+  if (!/^(ssh-(ed25519|rsa|dss)|ecdsa-sha2-|sk-(ssh|ecdsa))/.test(key)) {
+    throw new Error("cloud-init sshPublicKey does not look like an OpenSSH public key");
   }
 }
 
 function indent(block: string, spaces: number): string {
   const pad = " ".repeat(spaces);
-  return block
-    .split("\n")
-    .map((l) => (l.length ? pad + l : l))
-    .join("\n");
+  return block.split("\n").map((l) => (l.length ? pad + l : l)).join("\n");
 }
 
-/**
- * The iptables ruleset: INPUT default DROP (only 22/80/443) + DOCKER-USER chain so
- * containers binding 0.0.0.0 cannot bypass the host firewall (the crypto-miner root cause).
- */
+// IPv4 INPUT default DROP — only lo / established / icmp / 22,80,443.
 const IPTABLES_RULES_V4 = `*filter
 :INPUT DROP [0:0]
 :FORWARD DROP [0:0]
@@ -60,12 +64,59 @@ const IPTABLES_RULES_V4 = `*filter
 COMMIT
 `;
 
-const DOCKER_USER_RULES = `# DOCKER-USER runs BEFORE the auto-generated DOCKER chain — this is the ONLY way to
-# stop a container that binds 0.0.0.0:<port> from being reachable past the host firewall.
--I DOCKER-USER -i eth0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
--I DOCKER-USER -i eth0 -p tcp --dport 443 -j ACCEPT
--I DOCKER-USER -i eth0 -p tcp --dport 80 -j ACCEPT
--I DOCKER-USER -i eth0 -j DROP
+// IPv6 mirror — without this the host is fully reachable on its public /64 (icmpv6 kept
+// for Path MTU Discovery / NDP, which IPv6 needs to function).
+const IPTABLES_RULES_V6 = `*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+-A INPUT -i lo -j ACCEPT
+-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+-A INPUT -p ipv6-icmp -j ACCEPT
+-A INPUT -p tcp --dport 22 -j ACCEPT
+-A INPUT -p tcp --dport 80 -j ACCEPT
+-A INPUT -p tcp --dport 443 -j ACCEPT
+COMMIT
+`;
+
+// Applied (v4 AND v6) by a systemd unit ordered After=docker.service so the guard is
+// re-installed every time Docker (re)creates its chains — surviving reboots. DOCKER-USER
+// runs BEFORE Docker's auto chain: the only way to stop a 0.0.0.0/:: container bind from
+// bypassing the host firewall (the crypto-miner root cause).
+const DOCKER_FIREWALL_SCRIPT = `#!/usr/bin/env bash
+# Idempotent DOCKER-USER guard for IPv4 + IPv6. Re-runnable; flushes then re-adds.
+set -u
+for ipt in iptables ip6tables; do
+  $ipt -N DOCKER-USER 2>/dev/null || true
+  $ipt -F DOCKER-USER 2>/dev/null || true
+  $ipt -A DOCKER-USER -i eth0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+  $ipt -A DOCKER-USER -i eth0 -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
+  $ipt -A DOCKER-USER -i eth0 -p tcp --dport 80 -j ACCEPT 2>/dev/null || true
+  $ipt -A DOCKER-USER -i eth0 -j DROP 2>/dev/null || true
+done
+`;
+
+const DOCKER_FIREWALL_UNIT = `[Unit]
+Description=AwareWave DOCKER-USER firewall guard (v4+v6)
+After=docker.service network-online.target
+Wants=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/awarewave-docker-firewall.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+`;
+
+// sshd_config.d drop-in (highest-numbered → wins over cloud-image drop-ins like
+// 50-cloud-init.conf). More reliable than in-place sed on a minimal/overridden config.
+const SSHD_HARDENING = `# AwareWave day-1 SSH hardening (item 5)
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
 `;
 
 export function renderDay1CloudInit(params: Day1CloudInitParams): {
@@ -77,20 +128,18 @@ export function renderDay1CloudInit(params: Day1CloudInitParams): {
   const rebootTime = params.autoRebootTime ?? "20:00";
   const pubkey = params.sshPublicKey.trim();
 
+  // Least privilege: ONLY the non-root deploy user gets the key + NOPASSWD sudo.
+  // root login is disabled (PermitRootLogin no) — no root key block.
   const userData = `#cloud-config
 hostname: ${params.hostname}
-# item 5: SSH key-only, no password auth, no root password login
 ssh_pwauth: false
-disable_root: false
+disable_root: true
 users:
   - name: ${deployUser}
     groups: [sudo]
     sudo: ["ALL=(ALL) NOPASSWD:ALL"]
     shell: /bin/bash
     lock_passwd: true
-    ssh_authorized_keys:
-      - ${pubkey}
-  - name: root
     ssh_authorized_keys:
       - ${pubkey}
 
@@ -103,16 +152,26 @@ packages:
   - jq
 
 write_files:
-  # items 3,4: INPUT default DROP (22/80/443 only) + DOCKER-USER bypass guard
   - path: /etc/iptables/rules.v4
     permissions: "0644"
     content: |
 ${indent(IPTABLES_RULES_V4, 6)}
-  - path: /etc/iptables/docker-user.rules
+  - path: /etc/iptables/rules.v6
     permissions: "0644"
     content: |
-${indent(DOCKER_USER_RULES, 6)}
-  # item 18: unattended-upgrades automatic reboot (staggered)
+${indent(IPTABLES_RULES_V6, 6)}
+  - path: /usr/local/bin/awarewave-docker-firewall.sh
+    permissions: "0755"
+    content: |
+${indent(DOCKER_FIREWALL_SCRIPT, 6)}
+  - path: /etc/systemd/system/awarewave-docker-firewall.service
+    permissions: "0644"
+    content: |
+${indent(DOCKER_FIREWALL_UNIT, 6)}
+  - path: /etc/ssh/sshd_config.d/99-awarewave-hardening.conf
+    permissions: "0644"
+    content: |
+${indent(SSHD_HARDENING, 6)}
   - path: /etc/apt/apt.conf.d/52awarewave-auto-reboot
     permissions: "0644"
     content: |
@@ -127,19 +186,18 @@ ${indent(DOCKER_USER_RULES, 6)}
       kernel.kptr_restrict=2
 
 runcmd:
-  # SSH hardening (item 5): no password, no root password login
-  - sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
-  - sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
   - systemctl reload ssh || systemctl reload sshd || true
-  # Apply firewall (items 3,4) — order matters: base rules then DOCKER-USER
+  # Apply firewall for BOTH stacks (items 3,4) — IPv4 then IPv6.
   - iptables-restore < /etc/iptables/rules.v4
-  - 'iptables -N DOCKER-USER 2>/dev/null || true'
-  - bash -c 'while read -r r; do [ -n "$r" ] && [ "\${r:0:1}" != "#" ] && iptables $r 2>/dev/null || true; done < /etc/iptables/docker-user.rules'
-  - netfilter-persistent save || iptables-save > /etc/iptables/rules.v4
+  - ip6tables-restore < /etc/iptables/rules.v6
+  - netfilter-persistent save || true
+  # DOCKER-USER guard via systemd (After=docker.service) so it persists across reboots.
+  - systemctl daemon-reload || true
+  - systemctl enable --now awarewave-docker-firewall.service || true
   - systemctl enable --now fail2ban || true
   - sysctl --system || true
-  # machine-readable acceptance report for the post-boot verifier to curl/scp
-  - 'printf ''{"day1_hardening":"applied","firewall":"input-drop+docker-user","ssh":"key-only","auto_reboot":"%s"}\\n'' "${rebootTime}" > /var/log/day1-hardening.json'
+  # Machine-readable acceptance report built from ACTUAL state (not a hardcoded string).
+  - 'V4=$(iptables -S INPUT 2>/dev/null | grep -c "DROP"); V6=$(ip6tables -S INPUT 2>/dev/null | grep -c "DROP"); DU=$(iptables -S DOCKER-USER 2>/dev/null | grep -c "DROP"); printf ''{"input_drop_v4":%s,"input_drop_v6":%s,"docker_user_drop":%s,"ssh":"key-only","auto_reboot":"%s"}\\n'' "\${V4:-0}" "\${V6:-0}" "\${DU:-0}" "${rebootTime}" > /var/log/day1-hardening.json'
 `;
 
   const bytes = Buffer.byteLength(userData, "utf8");

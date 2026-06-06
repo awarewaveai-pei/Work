@@ -52,6 +52,17 @@ function modelOption(m: TarotModel) {
   return MODEL_OPTIONS.find((o) => o.value === m) ?? MODEL_OPTIONS[0];
 }
 
+// Neutral gradient used to render template previews before the user has generated art.
+const PLACEHOLDER_ART =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='600'>" +
+      "<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>" +
+      "<stop offset='0' stop-color='#c9b8f8'/><stop offset='1' stop-color='#6d4c91'/>" +
+      "</linearGradient></defs><rect width='400' height='600' fill='url(#g)'/>" +
+      "<text x='200' y='310' font-size='34' fill='white' text-anchor='middle' opacity='0.75'>樣式預覽</text></svg>",
+  );
+
 async function callGenerate(body: {
   model: TarotModel;
   prompt: string;
@@ -93,6 +104,7 @@ export default function TarotStudio() {
   const [zipBusy, setZipBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal
+  const [templateThumbs, setTemplateThumbs] = useState<Record<string, string>>({});
 
   const doneCount = batch.filter((b) => b.status === "done").length;
   const maxRefs = modelOption(model).maxRefs;
@@ -119,6 +131,38 @@ export default function TarotStudio() {
     },
     [],
   );
+
+  // Render a small preview of every template (using the user's art if available) so the
+  // chooser shows the actual frame style, not just text.
+  useEffect(() => {
+    let cancelled = false;
+    const made: string[] = [];
+    (async () => {
+      const sample = previewImage ?? PLACEHOLDER_ART;
+      const next: Record<string, string> = {};
+      for (const t of CARD_TEMPLATES) {
+        try {
+          const blob = await renderPrintCard(PREVIEW_CARD, sample, t.key);
+          const url = URL.createObjectURL(blob);
+          made.push(url);
+          next[t.key] = url;
+        } catch {
+          /* ignore a single template render failure */
+        }
+      }
+      if (cancelled) {
+        made.forEach((u) => URL.revokeObjectURL(u));
+        return;
+      }
+      setTemplateThumbs((prev) => {
+        Object.values(prev).forEach((u) => URL.revokeObjectURL(u));
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [previewImage]);
 
   async function onAddReferences(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -383,15 +427,54 @@ export default function TarotStudio() {
         )}
 
         <div className="form-row">
-          <label className="form-label">牌卡模板（套在生成圖上 + 自動加牌名）</label>
-          <select className="form-select" value={template} onChange={(e) => setTemplate(e.target.value as CardTemplate)}>
-            {CARD_TEMPLATES.map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-          <div className="form-hint">每張下載的牌都會套這個框 + 自動加牌名。「無框」= 只給純藝術圖、不加字。</div>
+          <label className="form-label">牌卡模板（點選樣式）</label>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {CARD_TEMPLATES.map((t) => {
+              const active = template === t.key;
+              return (
+                <div
+                  key={t.key}
+                  onClick={() => setTemplate(t.key)}
+                  style={{ cursor: "pointer", textAlign: "center", width: 86 }}
+                >
+                  {templateThumbs[t.key] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={templateThumbs[t.key]}
+                      alt={t.label}
+                      style={{
+                        width: 86,
+                        height: 142,
+                        borderRadius: 6,
+                        objectFit: "cover",
+                        border: active ? "3px solid #6366f1" : "1px solid var(--card-border)",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 86,
+                        height: 142,
+                        borderRadius: 6,
+                        border: "1px solid var(--card-border)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 18,
+                        opacity: 0.5,
+                      }}
+                    >
+                      …
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, marginTop: 4, lineHeight: 1.3, color: active ? "#4338ca" : "var(--text-muted)" }}>
+                    {t.label}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="form-hint">每張下載的牌都會套這個框 + 自動加牌名。生成預覽後，這裡會用你的圖顯示各模板樣式。</div>
         </div>
 
         <div className="form-row">

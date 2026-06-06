@@ -18,9 +18,10 @@ describe("renderDay1CloudInit", () => {
 
   it("encodes the bare-metal hardening directives (items 3/4/5/18)", () => {
     const { userData } = renderDay1CloudInit(BASE);
-    // item 5: no password auth
+    // item 5: no password auth (via cloud-init module + sshd_config.d drop-in)
     expect(userData).toContain("ssh_pwauth: false");
     expect(userData).toContain("PasswordAuthentication no");
+    expect(userData).toContain("/etc/ssh/sshd_config.d/99-awarewave-hardening.conf");
     // items 3,4: INPUT DROP + DOCKER-USER bypass guard
     expect(userData).toContain(":INPUT DROP");
     expect(userData).toContain("DOCKER-USER");
@@ -30,6 +31,34 @@ describe("renderDay1CloudInit", () => {
     expect(userData).toContain('Automatic-Reboot "true"');
     // acceptance report for post-boot verifier
     expect(userData).toContain("/var/log/day1-hardening.json");
+  });
+
+  it("hardens BOTH IPv4 and IPv6 (Hetzner gives a public /64 — v6 must not be open)", () => {
+    const { userData } = renderDay1CloudInit(BASE);
+    expect(userData).toContain("/etc/iptables/rules.v6");
+    expect(userData).toContain("ip6tables-restore < /etc/iptables/rules.v6");
+    expect(userData).toContain("ipv6-icmp"); // NDP/PMTUD must stay open for v6 to work
+    // DOCKER-USER guard persisted via systemd ordered after docker (survives reboot)
+    expect(userData).toContain("awarewave-docker-firewall.service");
+    expect(userData).toContain("After=docker.service");
+    // the script applies the guard to both stacks
+    expect(userData).toContain("for ipt in iptables ip6tables");
+  });
+
+  it("least privilege: only the non-root deploy user gets the key; root login disabled", () => {
+    const { userData } = renderDay1CloudInit(BASE);
+    expect(userData).toContain("disable_root: true");
+    expect(userData).toContain("PermitRootLogin no");
+    expect(userData).toContain("name: deploy");
+    // no separate `name: root` user block granting key login
+    expect(userData).not.toMatch(/- name: root/);
+  });
+
+  it("acceptance report reflects ACTUAL iptables state, not a hardcoded string", () => {
+    const { userData } = renderDay1CloudInit(BASE);
+    expect(userData).toContain("iptables -S INPUT");
+    expect(userData).toContain("ip6tables -S INPUT");
+    expect(userData).toContain('"input_drop_v6"');
   });
 
   it("embeds the per-tenant public key and hostname", () => {

@@ -77,6 +77,103 @@ final class BlockLibrary {
 		return '<!-- wp:spacer {"height":"' . $height . 'px"} --><div style="height:' . $height . 'px" aria-hidden="true" class="wp-block-spacer"></div><!-- /wp:spacer -->';
 	}
 
+	public function divider(): string {
+		return '<!-- wp:separator --><hr class="wp-block-separator has-alpha-channel-opacity"/><!-- /wp:separator -->';
+	}
+
+	/** Kadence Icon List from plain-text items (matches soulful's real iconlist markup). @param string[] $items */
+	public function iconList( array $items ): string {
+		$listId = $this->uid();
+		$li     = '';
+		foreach ( $items as $text ) {
+			$iid = $this->uid();
+			$li .= '<!-- wp:kadence/listitem {"uniqueID":"' . $iid . '"} -->'
+				. '<li class="wp-block-kadence-listitem kt-svg-icon-list-item-wrap kt-svg-icon-list-item-' . $iid . '"><span data-name="USE_PARENT_DEFAULT_ICON" data-stroke="USE_PARENT_DEFAULT_WIDTH" data-class="kt-svg-icon-list-single" class="kadence-dynamic-icon"></span><span class="kt-svg-icon-list-text">' . $text . '</span></li>'
+				. '<!-- /wp:kadence/listitem -->';
+		}
+		return '<!-- wp:kadence/iconlist {"uniqueID":"' . $listId . '"} -->' . "\n"
+			. '<div class="wp-block-kadence-iconlist kt-svg-icon-list-items kt-svg-icon-list-items' . $listId . ' kt-svg-icon-list-columns-1 alignnone"><ul class="kt-svg-icon-list">' . $li . '</ul></div>' . "\n"
+			. '<!-- /wp:kadence/iconlist -->';
+	}
+
+	/** Kadence Table from a 2D array of cell strings (first row = header). @param string[][] $rows */
+	public function table( array $rows ): string {
+		if ( $rows === array() ) {
+			return '';
+		}
+		$columns = count( (array) $rows[0] );
+		$tableId = $this->uid();
+		$body    = '';
+		foreach ( $rows as $r => $cells ) {
+			$rowId = $this->uid();
+			$cm    = '';
+			foreach ( (array) $cells as $cell ) {
+				$cid = $this->uid();
+				$cm .= '<!-- wp:kadence/table-data {"uniqueID":"' . $cid . '","column":-1} -->'
+					. '<!-- wp:paragraph --><p>' . (string) $cell . '</p><!-- /wp:paragraph -->'
+					. '<!-- /wp:kadence/table-data -->';
+			}
+			$body .= '<!-- wp:kadence/table-row {"uniqueID":"' . $rowId . '","row":' . (int) $r . '} -->' . $cm . '<!-- /wp:kadence/table-row -->';
+		}
+		return '<!-- wp:kadence/table {"uniqueID":"' . $tableId . '","columns":' . $columns . ',"isFirstRowHeader":true,"className":"is-style-stripes"} -->' . "\n"
+			. $body . "\n"
+			. '<!-- /wp:kadence/table -->';
+	}
+
+	/** Kadence Accordion from panes [{title, content}]. content is plain text wrapped in a paragraph. */
+	public function accordion( array $panes ): string {
+		$accId = $this->uid();
+		$n     = count( $panes );
+		$pm    = '';
+		foreach ( array_values( $panes ) as $i => $pane ) {
+			$pid     = $this->uid();
+			$num     = $i + 1;
+			$title   = (string) ( $pane['title'] ?? '' );
+			$content = '<!-- wp:paragraph --><p>' . (string) ( $pane['content'] ?? '' ) . '</p><!-- /wp:paragraph -->';
+			$pm     .= '<!-- wp:kadence/pane {"uniqueID":"' . $pid . '"} -->' . "\n"
+				. '<div class="wp-block-kadence-pane kt-accordion-pane kt-accordion-pane-' . $num . ' kt-pane' . $pid . '"><div class="kt-accordion-header-wrap"><button class="kt-blocks-accordion-header kt-acccordion-button-label-show" type="button"><span class="kt-blocks-accordion-title-wrap"><span class="kt-blocks-accordion-title">' . $title . '</span></span><span class="kt-blocks-accordion-icon-trigger"></span></button></div><div class="kt-accordion-panel"><div class="kt-accordion-panel-inner">' . $content . '</div></div></div>' . "\n"
+				. '<!-- /wp:kadence/pane -->';
+		}
+		return '<!-- wp:kadence/accordion {"uniqueID":"' . $accId . '","paneCount":' . $n . ',"startCollapsed":true} -->' . "\n"
+			. '<div class="wp-block-kadence-accordion alignnone"><div class="kt-accordion-wrap kt-accordion-id' . $accId . ' kt-accordion-has-' . $n . '-panes kt-active-pane-0 kt-accordion-block kt-pane-header-alignment-left kt-accodion-icon-style-basic kt-accodion-icon-side-right" style="max-width:none"><div class="kt-accordion-inner-wrap" data-allow-multiple-open="false" data-start-open="none">' . "\n"
+			. $pm . "\n"
+			. '</div></div></div>' . "\n"
+			. '<!-- /wp:kadence/accordion -->';
+	}
+
+	/** Kadence Info Box — uses soulful's real captured skeleton (keeps styling), swaps title/text/cta. */
+	public function infobox( string $title, string $text, string $learnMore = 'Read More' ): string {
+		$tpl = @file_get_contents( __DIR__ . '/skeletons/infobox.tpl' );
+		if ( $tpl === false || $tpl === '' ) {
+			// Fallback: a minimal valid infobox if the skeleton asset is missing.
+			$id = $this->uid();
+			return '<!-- wp:kadence/infobox {"uniqueID":"' . $id . '"} -->'
+				. '<div id="kt-info-box' . $id . '" class="wp-block-kadence-infobox"><div class="kt-blocks-info-box-link-wrap info-box-link kt-blocks-info-box-media-align-top"><div class="kt-infobox-textcontent"><h5 class="kt-blocks-info-box-title">' . $title . '</h5><p class="kt-blocks-info-box-text">' . $text . '</p></div></div></div>'
+				. '<!-- /wp:kadence/infobox -->';
+		}
+		$tpl = str_replace( '_7287fb-2b', $this->uid(), $tpl );
+		$tpl = preg_replace_callback( '#(<h5 class="kt-blocks-info-box-title">).*?(</h5>)#s', function ( $m ) use ( $title ) {
+			return $m[1] . $title . $m[2];
+		}, $tpl );
+		$tpl = preg_replace_callback( '#(<p class="kt-blocks-info-box-text">).*?(</p>)#s', function ( $m ) use ( $text ) {
+			return $m[1] . $text . $m[2];
+		}, $tpl );
+		$tpl = preg_replace_callback( '#(<span class="kt-blocks-info-box-learnmore">).*?(</span>)#s', function ( $m ) use ( $learnMore ) {
+			return $m[1] . $learnMore . $m[2];
+		}, $tpl );
+		return trim( (string) $tpl );
+	}
+
+	/** Core gallery from image URLs (reliable; Kadence Advanced Gallery needs media-library IDs). @param string[] $urls */
+	public function gallery( array $urls ): string {
+		$imgs = '';
+		foreach ( $urls as $url ) {
+			$u     = htmlspecialchars( (string) $url, ENT_QUOTES );
+			$imgs .= '<!-- wp:image --><figure class="wp-block-image"><img src="' . $u . '" alt=""/></figure><!-- /wp:image -->';
+		}
+		return '<!-- wp:gallery {"linkTo":"none"} --><figure class="wp-block-gallery has-nested-images columns-default is-cropped">' . $imgs . '</figure><!-- /wp:gallery -->';
+	}
+
 	/**
 	 * Compose a free list of block specs into full post content, wrapped in a Kadence Row Layout/Column.
 	 *
@@ -114,6 +211,26 @@ final class BlockLibrary {
 					break;
 				case 'spacer':
 					$inner[] = $this->spacer( (int) ( $b['height'] ?? 30 ) );
+					break;
+				case 'divider':
+					$inner[] = $this->divider();
+					break;
+				case 'icon_list':
+				case 'iconlist':
+					$inner[] = $this->iconList( array_map( 'strval', (array) ( $b['items'] ?? array() ) ) );
+					break;
+				case 'table':
+					$inner[] = $this->table( (array) ( $b['rows'] ?? array() ) );
+					break;
+				case 'accordion':
+					$inner[] = $this->accordion( (array) ( $b['panes'] ?? array() ) );
+					break;
+				case 'infobox':
+				case 'info_box':
+					$inner[] = $this->infobox( (string) ( $b['title'] ?? '' ), (string) ( $b['text'] ?? '' ), (string) ( $b['cta'] ?? 'Read More' ) );
+					break;
+				case 'gallery':
+					$inner[] = $this->gallery( array_map( 'strval', (array) ( $b['urls'] ?? array() ) ) );
 					break;
 				default:
 					$unknown[] = $type;
