@@ -111,10 +111,13 @@ final class KadenceValidatorTest extends TestCase {
 		$this->assertContains( 'duplicate_unique_id', $codes );
 	}
 
-	public function test_unknown_kadence_block(): void {
-		$tree = array( $this->block( 'kadence/totally-made-up', array( 'uniqueID' => 'x' ) ) );
+	public function test_unrecognised_kadence_block_with_unique_id_passes(): void {
+		// We no longer whitelist block names (it false-positived on real child blocks like
+		// kadence/listitem / table-row / table-data). A well-formed kadence/* block passes; a genuine
+		// typo is caught by Gutenberg at render, not here.
+		$tree = array( $this->block( 'kadence/listitem', array( 'uniqueID' => 'x' ) ) );
 		$r    = ( new KadenceValidator() )->validate( $tree );
-		$this->assertSame( 'unknown_kadence_block', $r->violations()[0]->code() );
+		$this->assertTrue( $r->isValid() );
 	}
 
 	public function test_violation_path_points_at_nested_block(): void {
