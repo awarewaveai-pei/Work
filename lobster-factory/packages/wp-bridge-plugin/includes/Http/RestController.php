@@ -196,6 +196,28 @@ final class RestController {
 		return new \WP_REST_Response( $result, $status );
 	}
 
+	/**
+	 * Sideload image-block URLs into the media library so they become real Kadence Image blocks.
+	 * Walks the block list; for each 'image' block with a 'url' (and no id yet), downloads it and
+	 * injects the resulting media id + local url. Failures leave the block as a URL-only core image.
+	 *
+	 * @param array<int,array<string,mixed>> $blocks
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function sideloadBlockImages( array $blocks ): array {
+		$loader = new MediaSideloader();
+		foreach ( $blocks as $i => $b ) {
+			if ( ( ( $b['type'] ?? '' ) === 'image' ) && empty( $b['id'] ) && ! empty( $b['url'] ) ) {
+				$res = $loader->sideload( (string) $b['url'], (string) ( $b['alt'] ?? '' ) );
+				if ( $res !== null ) {
+					$blocks[ $i ]['id']  = $res['id'];
+					$blocks[ $i ]['url'] = $res['url'];
+				}
+			}
+		}
+		return $blocks;
+	}
+
 	private function authenticate( $request, string $requiredScope ): AuthResult {
 		global $wpdb;
 		$authenticator = new RequestAuthenticator(
