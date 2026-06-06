@@ -86,6 +86,33 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+// Downscale an uploaded reference image to a small JPEG data URL. A style reference does not
+// need full resolution, and keeping it small avoids the route's 10MB request-body limit
+// (a few full-res photos would blow past it → truncated body → "invalid_json").
+async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Promise<string> {
+  const dataUrl = await readFileAsDataUrl(file);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(dataUrl); // fall back to original if canvas unavailable
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => reject(new Error("image_decode_failed"));
+    img.src = dataUrl;
+  });
+}
+
 export default function TarotStudio() {
   const [model, setModel] = useState<TarotModel>("flux-schnell");
   const [mode, setMode] = useState<Mode>("text");
@@ -167,7 +194,8 @@ export default function TarotStudio() {
   async function onAddReferences(files: FileList | null) {
     if (!files || files.length === 0) return;
     try {
-      const added = await Promise.all(Array.from(files).map((f) => readFileAsDataUrl(f)));
+      // downscale each upload to a small JPEG so the request body stays well under the 10MB limit
+      const added = await Promise.all(Array.from(files).map((f) => downscaleImageFile(f)));
       setReferenceImages((prev) => [...prev, ...added].slice(0, maxRefs || 5));
     } catch {
       setMessage("參考圖讀取失敗");

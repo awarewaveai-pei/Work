@@ -34,13 +34,18 @@ final class PostCreator {
 		}
 
 		// 1. Insert the post. wp_insert_post with wp_error=true so a failure is observable.
+		// wp_slash() the args because wp_insert_post() internally wp_unslash()es them (it expects
+		// $_POST-style slashed data); without this, backslash-escaped block attributes such as the
+		// kadence/tabs `titles` (<strong>…) would be corrupted to u003cstrong on save.
 		$postId = wp_insert_post(
-			array(
-				'post_title'   => $title,
-				'post_content' => $content,
-				'post_excerpt' => $excerpt,
-				'post_status'  => $status,
-				'post_type'    => 'post',
+			wp_slash(
+				array(
+					'post_title'   => $title,
+					'post_content' => $content,
+					'post_excerpt' => $excerpt,
+					'post_status'  => $status,
+					'post_type'    => 'post',
+				)
 			),
 			true
 		);

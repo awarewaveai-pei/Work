@@ -164,6 +164,106 @@ final class BlockLibrary {
 			. '<!-- /wp:kadence/accordion -->';
 	}
 
+	/**
+	 * Serialise block attributes into the exact form WordPress writes inside a block comment
+	 * (<, >, & and -- escaped as \u00xx). Uses core's serialize_block_attributes at runtime; falls
+	 * back to an equivalent json_encode for unit tests. The kadence/tabs `titles` array carries inline
+	 * HTML (<strong>…</strong>), so this escaping is required or the comment breaks block parsing.
+	 */
+	private function attrsJson( array $attrs ): string {
+		if ( function_exists( 'serialize_block_attributes' ) ) {
+			return (string) serialize_block_attributes( $attrs );
+		}
+		$json = (string) json_encode( $attrs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$json = preg_replace( '/\\\\"/', '\\u0022', $json );
+		$json = preg_replace( '/--/', '\\u002d\\u002d', $json );
+		return (string) $json;
+	}
+
+	/** Core YouTube/video embed (core/embed). Pass the share/watch URL on its own line. */
+	public function youtube( string $url ): string {
+		$attrs = '{"url":' . wp_json_or_php( $url ) . ',"type":"video","providerNameSlug":"youtube","responsive":true,"className":"wp-embed-aspect-16-9 wp-has-aspect-ratio"}';
+		return '<!-- wp:embed ' . $attrs . ' -->' . "\n"
+			. '<figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube wp-embed-aspect-16-9 wp-has-aspect-ratio"><div class="wp-block-embed__wrapper">' . "\n"
+			. $url . "\n"
+			. '</div></figure>' . "\n"
+			. '<!-- /wp:embed -->';
+	}
+
+	/**
+	 * Kadence Tabs (kadence/tabs > kadence/tab). Each tab: {title, content} (one paragraph) or
+	 * {title, blocks:[…]} (any composed blocks). The title list <ul> is rendered to match Kadence's
+	 * save() for the captured styling attrs from soulful; the tab anchor slug + the "id" pattern on
+	 * tabs 2..N mirror a fresh editor-saved tabs block (post 7045). English titles only — the slug
+	 * strips non-ASCII, so CJK titles would not round-trip.
+	 *
+	 * @param array<int,array<string,mixed>> $tabs
+	 */
+	public function tabs( array $tabs ): string {
+		$tid        = $this->uid();
+		$n          = count( $tabs );
+		$currentTab = 1;
+		$titlesArr  = array();
+		$liMarkup   = array();
+		$tabMarkup  = array();
+		$unknown    = array();
+		foreach ( array_values( $tabs ) as $i => $tab ) {
+			$num   = $i + 1;
+			$title = (string) ( $tab['title'] ?? '' );
+			$slug  = strtolower( (string) preg_replace( '/[^a-zA-Z0-9]/', '', $title ) );
+			$titlesArr[] = array( 'text' => $title, 'icon' => '', 'iconSide' => 'right', 'onlyIcon' => false, 'subText' => '', 'anchor' => '' );
+			$state = ( $num === $currentTab ) ? 'active' : 'inactive';
+			$liMarkup[] = '<li id="tab-' . $slug . '" class="kt-title-item kt-title-item-' . $num . ' kt-tabs-svg-show-always kt-tabs-icon-side-right kt-tab-title-' . $state . '"><a href="#tab-' . $slug . '" data-tab="' . $num . '" class="kt-tab-title kt-tab-title-' . $num . ' "><span class="kt-title-text">' . $title . '</span></a></li>';
+
+			if ( isset( $tab['blocks'] ) && is_array( $tab['blocks'] ) ) {
+				$innerArr = $this->buildInner( $tab['blocks'], $unknown );
+			} else {
+				$innerArr = array( $this->paragraph( (string) ( $tab['content'] ?? '' ) ) );
+			}
+			$inner = implode( "\n\n", $innerArr );
+
+			$pid       = $this->uid();
+			$tabAttrs  = ( $num === 1 ) ? '{"uniqueID":"' . $pid . '"}' : '{"id":' . $num . ',"uniqueID":"' . $pid . '"}';
+			$tabMarkup[] = '<!-- wp:kadence/tab ' . $tabAttrs . ' -->' . "\n"
+				. '<div class="wp-block-kadence-tab kt-tab-inner-content kt-inner-tab-' . $num . ' kt-inner-tab' . $pid . '"><div class="kt-tab-inner-content-inner">' . $inner . '</div></div>' . "\n"
+				. '<!-- /wp:kadence/tab -->';
+		}
+
+		// Styling attrs captured verbatim from soulful's tabs block; key order mirrors the stored block.
+		$wrapAttrs = array(
+			'uniqueID'            => $tid,
+			'mobileLayout'        => 'accordion',
+			'currentTab'          => $currentTab,
+			'minHeight'           => 400,
+			'contentBorderStyles' => array( array( 'top' => array( '#bdbdbd', '', 1 ), 'right' => array( '#bdbdbd', '', 1 ), 'bottom' => array( '#bdbdbd', '', 1 ), 'left' => array( '#bdbdbd', '', 1 ), 'unit' => 'px' ) ),
+			'titles'              => $titlesArr,
+			'titleColor'          => '#ffffff',
+			'titleColorHover'     => 'palette1',
+			'titleColorActive'    => 'var(--global-palette5, #444444)',
+			'titleBg'             => 'palette3',
+			'titleBgHover'        => 'palette2',
+			'titleBgActive'       => 'palette2',
+			'titleBorder'         => 'palette1',
+			'titleBorderHover'    => 'palette2',
+			'titleBorderActive'   => 'palette2',
+			'titleBorderWidth'    => array( 4, 0, 4, 4 ),
+			'titleBorderRadius'   => array( 10, 0, 0, 10 ),
+			'titlePadding'        => array( 12, 8, 12, 20 ),
+			'titleMargin'         => array( 0, -4, 10, 0 ),
+			'sizeType'            => 'em',
+			'lineHeight'          => 1.4,
+			'lineType'            => 'em',
+		);
+
+		return '<!-- wp:kadence/tabs ' . $this->attrsJson( $wrapAttrs ) . ' -->' . "\n"
+			. '<div class="wp-block-kadence-tabs alignnone"><div class="kt-tabs-wrap kt-tabs-id' . $tid . ' kt-tabs-has-' . $n . '-tabs kt-active-tab-' . $currentTab . ' kt-tabs-layout-tabs kt-tabs-tablet-layout-inherit kt-tabs-mobile-layout-accordion kt-tab-alignment-left kt-create-accordion"><ul class="kt-tabs-title-list">'
+			. implode( '', $liMarkup )
+			. '</ul><div class="kt-tabs-content-wrap">'
+			. implode( "\n\n", $tabMarkup )
+			. '</div></div></div>' . "\n"
+			. '<!-- /wp:kadence/tabs -->';
+	}
+
 	/** Kadence Info Box — uses soulful's real captured skeleton (keeps styling), swaps title/text/cta. */
 	public function infobox( string $title, string $text, string $learnMore = 'Read More' ): string {
 		$tpl = @file_get_contents( __DIR__ . '/skeletons/infobox.tpl' );
