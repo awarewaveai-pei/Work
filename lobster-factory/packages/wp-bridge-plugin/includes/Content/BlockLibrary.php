@@ -219,7 +219,7 @@ final class BlockLibrary {
 					$inner[] = $this->form( (int) ( $b['form_id'] ?? 0 ) );
 					break;
 				case 'image':
-					$inner[] = $this->image( (string) ( $b['url'] ?? '' ), (string) ( $b['alt'] ?? '' ) );
+					$inner[] = $this->image( (string) ( $b['url'] ?? '' ), (string) ( $b['alt'] ?? '' ), (int) ( $b['id'] ?? 0 ) );
 					break;
 				case 'spacer':
 					$inner[] = $this->spacer( (int) ( $b['height'] ?? 30 ) );

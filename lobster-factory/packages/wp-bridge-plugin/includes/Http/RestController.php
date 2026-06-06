@@ -22,6 +22,7 @@ use AwareWave\WpBridge\Auth\WpdbKeyStore;
 use AwareWave\WpBridge\Auth\WpdbNonceStore;
 use AwareWave\WpBridge\Operation\SetOptionOperation;
 use AwareWave\WpBridge\Content\BlockLibrary;
+use AwareWave\WpBridge\Content\MediaSideloader;
 use AwareWave\WpBridge\Post\PostCreator;
 use AwareWave\WpBridge\Validation\KadenceValidator;
 use AwareWave\WpBridge\Transaction\Impl\HttpRenderer;
@@ -157,6 +158,7 @@ final class RestController {
 		// Free composition: if the AI sent a "blocks" list, the BlockLibrary assembles valid Kadence
 		// markup from it (no fixed template — the block order/mix is whatever the content needs).
 		if ( isset( $spec['blocks'] ) && is_array( $spec['blocks'] ) ) {
+			$spec['blocks']  = $this->sideloadBlockImages( $spec['blocks'] );
 			$composed        = ( new BlockLibrary() )->compose( $spec['blocks'] );
 			$spec['content'] = $composed['content'];
 			if ( $composed['unknown'] !== array() ) {
