@@ -63,6 +63,10 @@ $execSteps  = if ($env:LOBSTER_EXECUTE_MANIFEST_STEPS)  { $env:LOBSTER_EXECUTE_M
 $wpSshKey   = if ($env:LOBSTER_WP_SSH_PRIVATE_KEY)      { $env:LOBSTER_WP_SSH_PRIVATE_KEY }      else { "" }
 # Hosting adapter (Stage 0): create-wp-site → real staging WP via provision-staging.
 $hostingTok = if ($env:LOBSTER_HOSTING_API_TOKEN)      { $env:LOBSTER_HOSTING_API_TOKEN }      else { "" }
+# provision-staging real build ~71s; default 45s adapter timeout fired first -> run stuck.
+# Default 95000 (under Cloudflare's ~100s origin ceiling so the adapter fails fast with a clean
+# message rather than a CF 524); override via env if provision-staging is later moved off Cloudflare.
+$hostingTimeout = if ($env:LOBSTER_HOSTING_HTTP_TIMEOUT_MS) { $env:LOBSTER_HOSTING_HTTP_TIMEOUT_MS } else { "95000" }
 
 $deployBash = @"
 #!/bin/bash
@@ -98,9 +102,7 @@ export LOBSTER_HOSTING_ADAPTER=http_json
 export LOBSTER_HOSTING_PROVIDER_BASE_URL=https://app.aware-wave.com
 export LOBSTER_HOSTING_PROVISION_PATH=/api/internal/hosting/provision-staging
 export LOBSTER_HOSTING_API_TOKEN='$hostingTok'
-# provision-staging real build measured ~71s; adapter default 45s timed out → run stuck "dispatched".
-# 110s gives margin (adapter caps at 120s); 71s is under Cloudflare's ~100s origin ceiling.
-export LOBSTER_HOSTING_HTTP_TIMEOUT_MS=110000
+export LOBSTER_HOSTING_HTTP_TIMEOUT_MS='$hostingTimeout'
 
 # AO org + infrastructure endpoints
 export LOBSTER_AO_ORG_ID=$AoOrgId

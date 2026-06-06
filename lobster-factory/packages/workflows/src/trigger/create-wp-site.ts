@@ -21,7 +21,7 @@ const SUPPORTED_MANIFEST_SLUGS = ["wp-basic", "wp-business", "wc-core"] as const
  */
 async function markActionRunTerminal(
   runId: string | undefined,
-  status: "completed" | "failed",
+  status: "completed" | "failed" | "blocked",
   extra: Record<string, unknown>,
 ): Promise<void> {
   if (!runId) return;
@@ -208,8 +208,8 @@ export const createWpSite = task({
       // Defensive: a genuine block (adapter unconfigured, provider 5xx, or build exceeding the
       // Cloudflare ~100s ceiling) must still release the originating ops_action_runs from
       // "dispatched" — otherwise it hangs forever. Best-effort, gated on LOBSTER_ENABLE_DB_WRITES.
-      await markActionRunTerminal(input._dispatchedFromActionRunId, "failed", {
-        error_summary: hosting.message ?? "hosting provisioning blocked",
+      await markActionRunTerminal(input._dispatchedFromActionRunId, "blocked", {
+        error_summary: (hosting.message ?? "hosting provisioning blocked").slice(0, 500),
       });
       return {
         status: "blocked_hosting_configuration" as const,
