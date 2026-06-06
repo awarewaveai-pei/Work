@@ -74,18 +74,23 @@ if [ "$stale_set" = "$prev" ]; then
   exit 0
 fi
 
+# Build the message in a FILE — bash string ops corrupt multibyte UTF-8 under this host's
+# non-UTF-8 cron locale, so the CJK never passes through a bash variable. base64 -d emits
+# exact UTF-8 bytes; LC_ALL=C awk copies the CJK lines verbatim (byte mode) and splices in
+# the ASCII affected list; curl reads the file directly. 100% locale-independent.
+MSGFILE=$(mktemp "${TMPDIR:-/tmp}/wd_msg.XXXXXX")
+trap 'rm -f "$MSGFILE"' EXIT
 if [ -z "$stale_set" ]; then
-  msg=$(printf '%s' "$REC_B64" | base64 -d)
+  printf '%s' "$REC_B64" | base64 -d > "$MSGFILE"
 else
-  tmpl=$(printf '%s' "$WARN_B64" | base64 -d)
-  # Substitute the ASCII affected list for the placeholder (UTF-8 template bytes untouched).
-  msg=${tmpl/'{{AFFECTED}}'/$stale_lines}
+  printf '%s' "$WARN_B64" | base64 -d | LC_ALL=C awk -v aff="$stale_lines" \
+    'index($0,"{{AFFECTED}}"){printf "%s", aff; next} {print}' > "$MSGFILE"
 fi
 
 if [ "$DRYRUN" = "--dry-run" ]; then
   echo "[DRY-RUN] state would change: '${prev}' -> '${stale_set}'"
-  echo "[DRY-RUN] would send Telegram:"
-  echo "$msg"
+  echo "[DRY-RUN] message file ${MSGFILE}:"
+  cat "$MSGFILE"
   exit 0
 fi
 
@@ -103,7 +108,7 @@ for chat in $(echo "$CHATS" | tr ',' ' '); do
   code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 12 \
     "https://api.telegram.org/bot${TOKEN}/sendMessage" \
     --data-urlencode "chat_id=${chat}" \
-    --data-urlencode "text=${msg}")
+    --data-urlencode "text@${MSGFILE}")
   echo "watchdog: telegram chat=${chat} http=${code}"
   [ "$code" = "200" ] || sent_ok=0
 done
