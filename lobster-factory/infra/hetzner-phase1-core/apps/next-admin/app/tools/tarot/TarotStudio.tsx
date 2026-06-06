@@ -427,7 +427,19 @@ export default function TarotStudio() {
         )}
 
         <div className="form-row">
-          <label className="form-label">牌卡模板（點選樣式）</label>
+          <label className="form-label">風格描述{mode === "image" && referenceImages.length > 0 ? "（選填，已上傳參考圖可留空）" : ""}</label>
+          <textarea
+            className="form-textarea"
+            placeholder="例：中世紀彩色鉛筆塔羅插畫，暖色仿古紙質感，金色裝飾邊框，神秘氛圍"
+            value={stylePrompt}
+            onChange={(e) => setStylePrompt(e.target.value)}
+            disabled={locked}
+          />
+          <div className="form-hint">這段風格會套用到整套 78 張牌。上傳參考圖時可留空（以圖為準）。</div>
+        </div>
+
+        <div className="form-row">
+          <label className="form-label">牌卡模板（點選樣式 · 套在生成圖外當外框 + 牌名）</label>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {CARD_TEMPLATES.map((t) => {
               const active = template === t.key;
@@ -475,18 +487,6 @@ export default function TarotStudio() {
             })}
           </div>
           <div className="form-hint">每張下載的牌都會套這個框 + 自動加牌名。生成預覽後，這裡會用你的圖顯示各模板樣式。</div>
-        </div>
-
-        <div className="form-row">
-          <label className="form-label">風格描述{mode === "image" && referenceImages.length > 0 ? "（選填，已上傳參考圖可留空）" : ""}</label>
-          <textarea
-            className="form-textarea"
-            placeholder="例：中世紀彩色鉛筆塔羅插畫，暖色仿古紙質感，金色裝飾邊框，神秘氛圍"
-            value={stylePrompt}
-            onChange={(e) => setStylePrompt(e.target.value)}
-            disabled={locked}
-          />
-          <div className="form-hint">這段風格會套用到整套 78 張牌。上傳參考圖時可留空（以圖為準）。</div>
         </div>
 
         <button className="btn-primary" onClick={generatePreview} disabled={previewBusy || locked}>
