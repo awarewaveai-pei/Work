@@ -205,6 +205,12 @@ export const createWpSite = task({
         outputSnapshot: { hosting },
         artifacts: [],
       });
+      // Defensive: a genuine block (adapter unconfigured, provider 5xx, or build exceeding the
+      // Cloudflare ~100s ceiling) must still release the originating ops_action_runs from
+      // "dispatched" — otherwise it hangs forever. Best-effort, gated on LOBSTER_ENABLE_DB_WRITES.
+      await markActionRunTerminal(input._dispatchedFromActionRunId, "failed", {
+        error_summary: hosting.message ?? "hosting provisioning blocked",
+      });
       return {
         status: "blocked_hosting_configuration" as const,
         input,

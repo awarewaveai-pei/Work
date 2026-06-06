@@ -144,8 +144,10 @@ final class BlockLibrary {
 			// Inner blocks must be serialised EXACTLY as WordPress does (newlines inside the comment
 			// delimiters), or the kadence/pane InnerBlocks validation fails ("unexpected content").
 			$content = "<!-- wp:paragraph -->\n<p>" . (string) ( $pane['content'] ?? '' ) . "</p>\n<!-- /wp:paragraph -->";
-			$pm     .= '<!-- wp:kadence/pane {"uniqueID":"' . $pid . '"} -->' . "\n"
-				. '<div class="wp-block-kadence-pane kt-accordion-pane kt-accordion-pane-' . $num . ' kt-pane' . $pid . '"><div class="kt-accordion-header-wrap"><button class="kt-blocks-accordion-header kt-acccordion-button-label-show" type="button"><span class="kt-blocks-accordion-title-wrap"><span class="kt-blocks-accordion-title">' . $title . '</span></span><span class="kt-blocks-accordion-icon-trigger"></span></button></div><div class="kt-accordion-panel"><div class="kt-accordion-panel-inner">' . $content . '</div></div></div>' . "\n"
+			// Current Kadence pane requires an "id" attribute + a "kt-accordion-pane-N" className, or
+			// the editor flags the block as invalid (verified against a recovered pane on soulful).
+			$pm .= '<!-- wp:kadence/pane {"id":' . $num . ',"uniqueID":"' . $pid . '","className":"kt-accordion-pane-' . $num . '"} -->' . "\n"
+				. '<div class="wp-block-kadence-pane kt-accordion-pane kt-accordion-pane-' . $num . ' kt-pane' . $pid . ' kt-accordion-pane-' . $num . '"><div class="kt-accordion-header-wrap"><button class="kt-blocks-accordion-header kt-acccordion-button-label-show" type="button"><span class="kt-blocks-accordion-title-wrap"><span class="kt-blocks-accordion-title">' . $title . '</span></span><span class="kt-blocks-accordion-icon-trigger"></span></button></div><div class="kt-accordion-panel"><div class="kt-accordion-panel-inner">' . $content . '</div></div></div>' . "\n"
 				. '<!-- /wp:kadence/pane -->';
 		}
 		return '<!-- wp:kadence/accordion {"uniqueID":"' . $accId . '","paneCount":' . $n . ',"startCollapsed":true} -->' . "\n"

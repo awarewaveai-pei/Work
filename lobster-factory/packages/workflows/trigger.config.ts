@@ -76,6 +76,13 @@ export default defineConfig({
         if (hostingBaseUrl.trim()) out.LOBSTER_HOSTING_PROVIDER_BASE_URL = hostingBaseUrl.trim().replace(/\/$/, "");
         if (hostingPath.trim())    out.LOBSTER_HOSTING_PROVISION_PATH     = hostingPath.trim();
         if (hostingToken.trim())   out.LOBSTER_HOSTING_API_TOKEN          = hostingToken.trim();
+        // provision-staging (SSH + WP core + 5 plugins) measured at ~71s; the adapter's default
+        // 45s timeout fired first → create-wp-site returned blocked_hosting_configuration even
+        // though the site finished building server-side (run stuck "dispatched"). Raise to 110s
+        // (httpJsonStagingAdapter caps at 120s; Cloudflare's ~100s origin ceiling is the real bound,
+        // and 71s sits safely under it). Onboarding Stage 0 fix (2026-06-06).
+        const hostingTimeout = process.env.LOBSTER_HOSTING_HTTP_TIMEOUT_MS ?? "";
+        if (hostingTimeout.trim()) out.LOBSTER_HOSTING_HTTP_TIMEOUT_MS     = hostingTimeout.trim();
 
         // ── Infrastructure endpoints (ao-infrastructure-check) ───────────────
         // LOBSTER_TRIGGER_PUBLIC_API_URL: set by lobster-trigger-deploy.ps1 to the public
