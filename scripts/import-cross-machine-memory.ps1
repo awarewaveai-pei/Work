@@ -442,7 +442,11 @@ $secretsRoot = $env:AO_SYNC_SECRETS_ROOT
 # under CP950 on Big5 Windows → CJK paths mojibake in ao-resume-hook-last.json log_tail.
 # Functionality is unaffected (path is used via -LiteralPath); only the LOG display is masked.
 $secretsRootDisplay = if ($secretsRoot -and ($secretsRoot -match '[^\x00-\x7F]')) {
-    ('{0}\...\{1}' -f (Split-Path -Qualifier $secretsRoot), (Split-Path -Leaf $secretsRoot))
+    # Drive letter via regex (Split-Path -Qualifier throws on UNC paths); fall back to <sync>.
+    $qual = if ($secretsRoot -match '^([A-Za-z]:)') { $matches[1] } else { '<sync>' }
+    $leaf = Split-Path -Leaf $secretsRoot           # "MySecretVault" (ASCII)
+    if ($leaf -match '[^\x00-\x7F]') { $leaf = '<vault>' }   # mask if leaf itself is CJK
+    "$qual\...\$leaf"
 } else { $secretsRoot }
 if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
 
