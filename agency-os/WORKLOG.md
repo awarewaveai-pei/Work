@@ -4,7 +4,21 @@
 
 ## 2026-06-08
 
-- 05:38 : remote-monthly-agent: monthly review 2026-06 generated -> reports/monthly/monthly-review-2026-06.md (governance drift overall: WARN)
+### import-cross-machine-memory.ps1 — AO-RESUME secrets 路徑亂碼修復（display-only）
+
+**根因**：import 腳本是 ao-resume.ps1 的子進程（`& powershell.exe -File`）。它 Write-Host 印出 secrets vault 路徑 `G:\我的雲端硬碟\MySecretVault\...`（「我的雲端硬碟」= Google Drive 中文資料夾名）。父進程在 Big5/CP950 Windows 上 capture 子進程 stdout 時用 CP950 decode → CJK bytes mojibake 進 ao-resume-hook-last.json log_tail + console。**功能完全正常**（路徑經 `-LiteralPath` 使用，import 成功），純 log 顯示亂碼。
+
+**排除的修法（實證）**：① 子進程 `chcp 65001` — 無效（父進程 capture 時才 decode）② 父進程 `Invoke-WithUtf8Console` / `[Console]::OutputEncoding=UTF8` — 無效，因為 `[Console]::OutputEncoding` 只在進程**第一個 native command 之前**可改，ao-resume.ps1 跑到 import 時已執行數十個 native command，encoding 已 lock。③ 全域改 ao-resume.ps1 頂端 encoding — 有風險（影響所有 child capture，可能弄壞輸出 CP950 的工具），且違背 `_console-encoding-helpers.ps1` 「逐次包不全域改」設計哲學 → 不採用。
+
+**[已修改]** `scripts/import-cross-machine-memory.ps1`：加 `$secretsRootDisplay`（僅 log 用）— 路徑含非 ASCII 時遮罩中段為 `G:\...\MySecretVault`（drive letter via regex 避 Split-Path -Qualifier UNC throw；leaf 若也含 CJK 則 `<vault>`）。2 處 Write-Host（secrets header + path-not-found）改用 display 變數。`$secretsRoot` 本體所有 `-LiteralPath`/Copy-Item/Test-Path 不變。ao-resume.ps1 的 Invoke-WithUtf8Console 嘗試已回退（淨 0）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File import-cross-machine-memory.ps1` | exit=0 | 輸出 `secrets from G:\...\MySecretVault`（ASCII，不再亂碼）；先前實證父進程 CP950 capture 才是根因（手動 `[Console]::OutputEncoding=UTF8` round-trip 正確）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -ParseBreakOnly` | exit=0 | CLEAN（含新 CJK 註解，repo .ps1 無 BOM 仍安全）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — critic 實跑 11 edge case（empty/null/UNC/trailing-slash/root-only/lowercase/CJK-in-both）全正確；確認 display 變數零洩漏進檔案操作；`$matches` strict-mode-safe
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`Write-Host.*\$secretsRoot\b`\|`secretsRootDisplay` | hits=0 殘留（所有 Write-Host 已改 display；無其他 CJK 路徑印進 log）
+
+### ao-resume.md — 根治 git pull 失敗導致廢報告
 
 ### ao-resume.md — 根治 git pull 失敗導致廢報告
 
