@@ -239,7 +239,8 @@ Items that cannot proceed without a human choice or action. Each entry must incl
 3. Display by count:
    - **0 packets**: skip this sub-section entirely
    - **1–3 packets**: inline full packet markdown for each, separated by `---`
-   - **4+ packets**: inline the 3 most recent (by `YYYY-MM-DD-HHmm` filename prefix) in full; for the rest list: `- <slug> (handoffs/<filename>, created <date>)` and add: 「回覆「展開 packet <slug>」可查看完整內容」
+   - **4+ packets**: inline the 3 most recent (by `YYYY-MM-DD-HHmm` filename prefix) in full; for the rest, output a **白話表格**（不可只丟 slug 代號 — 使用者看不懂代號）：每列 `| 白話說明（一句，從 packet 的 hint/任務目標讀出）| 代號 slug |`，再加一行：「回覆「展開 packet <slug>」可查看完整內容」。
+     白話說明取自 packet frontmatter 的 `hint` 或 §1 任務目標，翻成使用者能懂的一句（例：`wp-bridge 外掛 v0.5.6 驗收 7053/7056`），**禁止只印檔名 slug**。
 4. **Missing packet file**: if pointer exists but file not found, print:
    `⚠️ packet 不見 (handoffs/<filename>) — 請確認 git pull 已完成`
    Do NOT fail AO-RESUME for a missing packet.
