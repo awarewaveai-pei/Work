@@ -1074,7 +1074,7 @@ try {
     $arDir = Join-Path $WorkRoot "agency-os\reports\ao-resume"
     $null = New-Item -ItemType Directory -Force -Path $arDir
     # Archive filenames use CST (UTC+8) — same convention as verify-aoresume-archive.ps1.
-    $arStampUtc = [DateTime]::Parse($nowStamp, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+    $arStampUtc = [DateTime]::Parse($nowStamp, $null, [System.Globalization.DateTimeStyles]::RoundtripKind)
     $arStampCst = $arStampUtc.AddHours(8)
     $arThreshold = $arStampCst.AddMinutes(-10)   # mirror gate's 10-min grace window
     # Skip if an archive already covers this stamp window (Claude or a prior run wrote it).

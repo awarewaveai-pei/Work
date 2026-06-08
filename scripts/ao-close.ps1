@@ -353,19 +353,28 @@ if (-not $SkipVerify -and (Test-Path -LiteralPath $verifyScript)) {
 $syncScript = Join-Path $WorkRoot "scripts\sync-claude-userlevel.ps1"
 if (Test-Path -LiteralPath $syncScript) {
     Write-Host "== AO-CLOSE: Claude Code sync self-heal (verify -> merge only if drift) ==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -Mode verify *> $null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  sync drift detected -> running -Mode merge -NoBackup (deterministic auto-heal)" -ForegroundColor Yellow
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -Mode merge -NoBackup
-        # Re-verify; if it still fails, do NOT swallow — let the health gate (check-claude-sync) surface it.
+    # try/catch: an unexpected fault must degrade to "let the health gate decide", never abort close
+    # (parity with the ao-resume skeleton block's non-fatal design). The & powershell.exe calls do not
+    # throw on non-zero exit, but $ErrorActionPreference='Stop' would surface any other terminating error.
+    try {
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -Mode verify *> $null
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "  sync self-heal OK (verify clean after merge)." -ForegroundColor Green
+        if ($LASTEXITCODE -ne 0) {
+            # merge WITH backup (default): the merge mutates ~/.claude/mcp.json, so a recovery copy is
+            # warranted here most of all; Initialize-BackupDir caps retention at 15 so this never spams.
+            Write-Host "  sync drift detected -> running -Mode merge (backup-first, retention-capped) auto-heal" -ForegroundColor Yellow
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -Mode merge
+            # Re-verify; if it still fails, do NOT swallow — let the health gate (check-claude-sync) surface it.
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -Mode verify *> $null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  sync self-heal OK (verify clean after merge)." -ForegroundColor Green
+            } else {
+                Write-Host "  WARN: sync still drifts after merge — health gate (check-claude-sync) will report specifics." -ForegroundColor Yellow
+            }
         } else {
-            Write-Host "  WARN: sync still drifts after merge — health gate (check-claude-sync) will report specifics." -ForegroundColor Yellow
+            Write-Host "  sync clean (no drift; no merge needed)." -ForegroundColor DarkGray
         }
-    } else {
-        Write-Host "  sync clean (no drift; no merge needed)." -ForegroundColor DarkGray
+    } catch {
+        Write-Host ("  WARN: sync self-heal errored (non-fatal; health gate will decide): {0}" -f $_.Exception.Message) -ForegroundColor Yellow
     }
 }
 # --- end Claude Code user-level sync self-heal ---

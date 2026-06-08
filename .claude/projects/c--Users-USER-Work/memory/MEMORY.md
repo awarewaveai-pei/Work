@@ -1,5 +1,6 @@
 ﻿# MEMORY INDEX
 
+- [No cargo-cult self-repair](feedback_no_cargo_cult_selfrepair.md) — Re-diagnose every gate fail with tools; never copy prior session's symptom label (6/8 AO-CLOSE root cause: copied misdiagnosis)
 - [AO-CLOSE health gate 100% enforcement](feedback_health_gate.md) — AO-CLOSE must be 100%; -AllowNonPerfectHealth/-SkipVerify forbidden without explicit user approval
 - [WP Plugin Auto-Install system](project_wp_plugin_autoinstall.md) — Current progress: core logic done, sg-deploy + Trigger.dev re-deploy still pending
 - [Credential locations (user-env.ps1)](reference_aware_wave_credentials.md) — 公司桌機: C:\Users\USER\Work\mcp\user-env.ps1 | 筆電: D:\Users\USER1115\Work\mcp\user-env.ps1 — read before any task needing a key

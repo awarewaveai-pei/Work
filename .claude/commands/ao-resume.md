@@ -288,6 +288,12 @@ Where `YYYY-MM-DD-HHmm` is the local time you began Step 1. Use the `Write` tool
 This is the only way the user can browse past AO-RESUME reports — skipping it
 silently breaks the workflow.
 
+> **Safety net (2026-06-08)**: `ao-resume.ps1` now auto-writes a clearly-marked
+> `<!-- AUTO-SKELETON -->` placeholder at this exact path if none exists, so a
+> forgotten Step 3 no longer hard-fails the next AO-CLOSE health gate. **This does
+> NOT excuse Step 3** — you must still overwrite the skeleton with the real
+> 七段式 report (same content as chat). A surviving skeleton = Step 3 was skipped.
+
 ### Prune old reports (>30 days)
 
 After writing today's file, list `agency-os/reports/ao-resume/*.md` (Glob),

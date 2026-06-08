@@ -4,6 +4,35 @@
 
 ## 2026-06-08
 
+### AO-CLOSE 復發三項徹查 + 根治（#2 archive preventer / #3 sync 自癒 + 誤診更正）
+
+**操作者問題**：6/5 AO-CLOSE 卡 30 分鐘才成功；6/6 也卡，叫 AI 看 6/5 作法 → 10 分鐘完成；「但我還沒維修這個問題」。要求徹查根因。
+
+**徹查結論（實證，非推測）**：6/5、6/6 報告各列「3 項 critical 自修」，6/6 報告自承「與 2026-06-05 同類」＝**照抄 6/5 workaround，未治本**。逐項驗證：
+- **#1 archive-lift**（`verify-archive-tasks-lift.ps1`）：真 bug（12-char sliding-window 措辭差一字誤判）。**今天稍早已治本** commit `8e77e474`。
+- **#2 AO-RESUME archive 缺**（gate 12d `verify-aoresume-archive.ps1`）：**真·結構缺口**。Step 3 寫 `reports/ao-resume/*.md` 是 Claude 手動動作；gate 是「收工偵測」非「開工預防」→ 開工忘寫，收工才 critical fail。6/5 補寫 `2026-06-05-1910.md`、6/6 補寫 `2026-06-06-1933.md`（兩天都真發生）。
+- **#3 「sync drift = hooks object→array」**：**誤診 + 照抄**。三證：① 實測 `verify-settings-governed-keys.mjs` 對 object-form hooks → exit 0（`canonical()`/`isAlwaysArray()` 自 **2026-05-14** 中和，早於 6/5/6/6）；② 6/5、6/6 **無 merge backup**（`agency-os/Backups/claude-userlevel-*` 從 0604 直跳 0608）→ merge 沒真跑；③ 6/2 backup `settings.json.before` 的 hooks **本來就是 array**（ARR[1]/ARR[4]），真正 drift 是 `mcp.json.before` 含 **22 個 MCP servers**（SSOT 強制 `{}`，runtime 重填）。「object→array」標籤從 6/2 起就錯並被照抄至 6/6。
+
+**[已修改]**
+- `scripts/ao-resume.ps1`（L1065-1124）：stamp 寫入後加 **archive skeleton preventer** — 該 stamp 無對應 archive 時自動寫 7 段 `<!-- AUTO-SKELETON -->` 佔位（CST=UTC+8 命名對齊 gate；10-min grace；if-not-exists 不蓋真報告；try/catch 非致命）。gate 12d 不再 hard-fail。
+- `scripts/ao-close.ps1`（L353-376）：health gate 前加 **sync 自癒** — `verify` → 偵測 drift 才 `merge`（含 backup，retention-capped）→ 重 verify；殘留 drift 不吞、落到真 health gate。try/catch 非致命。
+- `scripts/sync-claude-userlevel.ps1`（`Initialize-BackupDir`）：backup 保留最近 15 份（原積 43+）。
+- `.claude/commands/ao-close.md`：加「自修=重新診斷，禁止照抄上次症狀標籤」協定（6/6 照抄誤診根因）。
+- `.claude/commands/ao-resume.md`：Step 3 加 skeleton safety-net 說明（不豁免 Step 3）。
+- `agency-os/TASKS.md` L154：誤診更正 + 標 `[x]` 治本。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-aoresume-archive.ps1`（temp WorkRoot：空→FAIL exit1；skeleton-block 寫 `2026-06-08-0900.md`→PASS exit0；重跑→COVERED 冪等）| exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`sync-claude-userlevel.ps1 verify/merge`（污染 mcp.json→verify exit1；merge→normalized `{}`+backup→verify exit0；clean→exit0 零副作用；prune 後 backup count=15）| exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`system-health-check.ps1` | exit=0 | Score=100% (364/364)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile` ao-resume/ao-close/sync .ps1 + `audit-cp950-traps.ps1 -ParseBreakOnly` | exit=0 | 3檔 OK + CLEAN(150/150)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/2m+sugg — 2 Minor 全採納（ao-close 拿掉 `-NoBackup` 改 backup+prune；自癒包 try/catch）+ 冗餘 `.ToUniversalTime()` 移除；critic 確認自癒 fail-open 不吞錯/不 loop、skeleton race-tolerant 不蓋真報告、CST round-trip 對齊 gate
+- BUGHUNT_DONE: scope=scripts,agency-os,.claude | grep=`hooks.*object.*array`\|`sync-claude-userlevel`\|`verify-aoresume-archive`\|`AUTO-SKELETON` | hits=0 stale source（normalize-claude-settings.mjs 的 object→array 是 normalizer 實際機制 log 非過期主張；`.agency-state/*.log` 是 transient cache 下次 resume 重生）
+
+**[剩餘風險]** skeleton 佔位若 Claude 仍忘填 → gate 過但內容空（可見 `<!-- AUTO-SKELETON -->` 標記，doc 已明示須覆蓋，非 silent）。#3 mcp.json 目前已休眠（runtime 暫未重填），自癒為未來復活兜底。
+
+**[rollback]** 全可逆：revert 本 commit 即回原狀（無 schema/prod/DB 改動，純 AO 生命週期腳本 + doc）。
+
 ### check-cloudflare-security.ps1 -- 根治 CF rules=0 永久假 WARN 噪音
 
 **根因**：PASS 條件 (舊 line 89) `bot=ON AND rules>=3 AND xmlrpc` 反映舊策略「用 CF WAF 擋 wp-login」。但 2026-06-04 架構決策已改為 LLAR 伺服器端 (server-side: LLAR + nginx rate-limit + fail2ban)，CF WAF rules 刻意清空 (操作者全球跑，CF geo rules 會自鎖)。所以 rules=0 是預期最終狀態，腳本判定過時，每次 AO-RESUME 都印假 WARN。
