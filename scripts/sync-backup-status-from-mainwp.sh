@@ -17,8 +17,10 @@
 #      changed (anti-churn: an unchanged daily run produces no commit)
 #   5. commit + push only if something changed
 #
-# Cron (EU):  11 1 * * *  /root/Work/scripts/sync-backup-status-from-mainwp.sh  # 01:11 UTC daily
-# Dry run:    /root/Work/scripts/sync-backup-status-from-mainwp.sh --dry-run    # compute, never write/commit
+# Cron (EU):  11 1 * * *  LC_ALL=C.UTF-8 bash /root/Work/scripts/sync-backup-status-from-mainwp.sh >> /var/log/backup-status-sync.log 2>&1
+#             (01:11 UTC daily; LC_ALL=C.UTF-8 so python open() defaults to utf-8 under cron's bare locale;
+#              invoked via `bash` so no +x bit is needed -- setting +x would dirty the git tree on EU)
+# Dry run:    bash /root/Work/scripts/sync-backup-status-from-mainwp.sh --dry-run    # compute, never write/commit
 #
 # Rollback: remove the cron line. Script + helpers are in repo (scripts/lib/).
 #           git revert any bad commit; the JSON is human-editable as a fallback.
@@ -89,7 +91,10 @@ while IFS= read -r md; do
     log "$slug active but BACKUP_AUTO_STATUS.json missing -- skip"; warns=$((warns+1)); continue
   fi
 
-  site_id=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('mainwp_site_id',''))" "$json" 2>/dev/null)
+  # encoding='utf-8' is mandatory: the JSON can carry non-ASCII (e.g. an em-dash in a
+  # failure reason) and cron's locale may be POSIX/ascii, where a bare open() would raise
+  # UnicodeDecodeError. The cron line also sets LC_ALL=C.UTF-8 as belt-and-suspenders.
+  site_id=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1], encoding='utf-8')).get('mainwp_site_id',''))" "$json" 2>/dev/null)
   if ! echo "$site_id" | grep -qE '^[0-9]+$'; then
     log "$slug: no numeric mainwp_site_id -- skip"; warns=$((warns+1)); continue
   fi

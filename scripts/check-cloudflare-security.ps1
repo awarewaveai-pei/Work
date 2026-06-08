@@ -129,13 +129,13 @@ $lines = @(
     "| Check | Result |",
     "|-------|--------|",
     "| Bot Fight Mode | $botMode |",
-    "| WAF firewall rules count | $ruleCount$(if ($WpLoginProtectedByServerSide) { ' (by design — empty; server-side defense)' }) |",
+    "| WAF firewall rules count | $ruleCount$(if ($WpLoginProtectedByServerSide) { ' (by design -- empty; server-side defense)' }) |",
     "| xmlrpc.php block rule | $(if ($xmlrpcOk) { 'present' } elseif ($WpLoginProtectedByServerSide) { 'server-side (nginx/LLAR)' } else { 'MISSING' }) |"
 )
 if ($WpLoginProtectedByServerSide) {
     $lines += ""
     $lines += "## wp-login / xmlrpc protection"
-    $lines += "- Mode: **server-side** (LLAR + nginx rate-limit + fail2ban) — architecture decision 2026-06-04."
+    $lines += "- Mode: **server-side** (LLAR + nginx rate-limit + fail2ban) -- architecture decision 2026-06-04."
     $lines += "- CF WAF rules intentionally empty: operator travels globally; CF geo rules would self-lock. CF layer = Bot Fight Mode only."
     $lines += "- This check only verifies the CF layer (Bot Fight Mode). Server-side layer is verified separately (client-status / WP plugin checks)."
 }
