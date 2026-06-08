@@ -2,6 +2,35 @@
 
 Follow the AO-RESUME protocol (AGENTS.md §快速續接關鍵字).
 
+## Step 0-git — Git alignment pre-check (MANDATORY, runs before reading ANY state file)
+
+**Purpose**: prevent stale-data garbage reports when the hook's git-align failed silently.
+
+Run exactly these two commands (no retry loop, no ao-resume.ps1 re-run):
+
+```bash
+git fetch origin
+git rev-list --count HEAD..origin/main
+```
+
+- **Count = 0** → local is aligned. Proceed to Step 0.
+- **Count > 0** → local is behind. Run ONE pull attempt:
+  ```bash
+  git pull --ff-only origin main
+  ```
+  - **Pull succeeds** → set internal note `GIT_PULLED=true`. Proceed to Step 0.
+  - **Pull fails** (conflict / non-ff / network) → **⛔ STOP. Do NOT output the 7-segment report.**
+    Output exactly:
+    ```
+    ⛔ AO-RESUME ABORTED — git pull failed. Report would be based on stale data.
+    Error: [paste exact git error]
+    Fix: resolve manually (e.g. git pull --rebase origin main), then re-trigger AO-RESUME.
+    ```
+
+**Hard limits: one fetch, one conditional pull. No loops. No re-running ao-resume.ps1.**
+
+---
+
 ## Step 0 — Hook state check (MANDATORY before reading anything)
 
 Read `agency-os/.agency-state/ao-resume-hook-last.json`.
@@ -19,11 +48,19 @@ Hook ran successfully. Proceed to Step 1 reading files below.
 
 ### Case B1 — `finished_utc` is within 5 minutes AND `exit_code` is non-zero
 
-`ao-resume.ps1` just ran this session but health gates failed. Since 2026-06-01 `ao-resume.ps1` generates ALL state files even when health gates fail (soft-exit design), state files are fresh.
+First, scan `steps_summary` for a line containing `"main is now identical to origin/main"`:
 
-→ **Proceed directly to Step 1.** Read state files normally.
-→ In Section 1, the ⚠️ banner is MANDATORY (per Step 0a). Report specific health gate failures from `log_tail`.
+**B1-aligned** (line FOUND — git-align succeeded, only health gates failed):
+Since 2026-06-01 `ao-resume.ps1` generates ALL state files even when health gates fail (soft-exit design), state files ARE fresh.
+→ Proceed to Step 1. ⚠️ banner MANDATORY (per Step 0a) — report health gate failures from `log_tail`.
 → Do NOT re-run any scripts. No Step 0b needed.
+
+**B1-stale** (line NOT FOUND — git-align failed before state file generation):
+State files are from the PRIOR run. Do NOT trust them as current.
+→ Proceed to Step 1 using the stale state files (Step 0-git above has already pulled if needed).
+→ Do NOT re-run ao-resume.ps1.
+→ In Section 1, the following ⚠️ banner is MANDATORY as the FIRST LINE:
+  `⚠️ STALE STATE — git-align failed this run; data below is from a prior session and may be outdated.`
 
 ---
 
