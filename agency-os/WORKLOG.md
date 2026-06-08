@@ -4,6 +4,19 @@
 
 ## 2026-06-08
 
+### ao-resume.md — 根治 git pull 失敗導致廢報告
+
+**根因**：git-align 失敗時 ao-resume.ps1 提早 exit → state files 是舊的 → Case B1 邏輯誤判「exit!=0 + 5分鐘內 = fresh」→ Claude 讀舊 data 輸出廢報告，無告警。使用者曾多次遇到，AO-RESUME 花超過 30 分鐘（ao-resume.ps1 被重跑）。
+
+**[已修改]** `.claude/commands/ao-resume.md`：
+1. **新增 Step 0-git**（最頂端，讀任何 state file 之前）：`git fetch` + `git rev-list --count` → 若 behind → ONE `git pull --ff-only`；pull 失敗 → ⛔ STOP，拒絕輸出七段報告。明確禁止 loop 與重跑 ao-resume.ps1。
+2. **修正 Case B1**：掃 steps_summary 是否含「main is now identical to origin/main」；有 = B1-aligned（state fresh，現有行為）；沒有 = B1-stale（git-align 失敗，state 是舊的）→ 必加 STALE STATE banner，但不重跑任何 script。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 純 .md 協定文件，無 code 執行邏輯
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m -- 讀回確認 Step 0-git 在 Step 0 之前，B1-aligned/B1-stale 邏輯正確，hard limits 明確
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=ao-resume.md|Case B1|Step 0-git | hits=0 stale（ao-resume.md 是 SSOT，無其他副本需同步）
+
 ### verify-archive-tasks-lift.ps1 — 根治 archive lift gate 誤判
 
 **根因**：archive bullet 含 `（TASKS 已開 → handoffs/2026-06-06-2044）` 但 12-char sliding window 因插字（`引擎 +` vs `引擎產品化 +`）匹配失敗 → exit=1。
