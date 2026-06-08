@@ -20,8 +20,10 @@
 - REALTEST_EVIDENCE: tool=SSH(EU) | cmd=merge against live tenant JSON copy | exit=0 | CHANGED（EU /root/Work 落後47 commits、JSON 仍舊->正確偵測並寫 /tmp copy，真檔未污染）
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=1m(Major churn)+2min+1nit -> 全修 -> critic 二審 4/4 RESOLVED 無 regression（含驗證 warns/hard split 不吞 silent merge crash->hard）
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=BACKUP_AUTO_STATUS\|last_success.unix_utc\|sync-backup-status-from-mainwp | hits=0 stale — phase4-weekly-check.ps1:158 讀 `.last_success.unix_utc`，php emit+merge 保留，schema 相容；新腳本名無其他引用
+- REALTEST_EVIDENCE: tool=SSH(EU) | cmd=orchestrator `--dry-run` 端到端 live + REAL run（NOCHANGE→不commit→tree clean）+ cron 裝 01:11 UTC | exit=0 | idempotent 證實（DB 算出=已同步 JSON）
+- REALTEST_EVIDENCE: tool=SSH(EU) | cmd=`LC_ALL=POSIX python3 json.load(open(file[,encoding=utf-8]))` | exit=0 | locale 硬化驗證：JSON 含 em-dash（UTF-8），inline open() 補 encoding='utf-8'（Windows cp950 實爆過，ascii-locale host 風險）+ cron 加 LC_ALL=C.UTF-8 防禦縱深
 
-**[剩餘風險]** ① 單一 active tenant（soulful）；新 onboard 自動納入。② DB 持續斷則 warn+exit0 靜默，但 backstop 是 JSON 停更後 Phase4 staleness WARN 會回來（layered design）。③ cron 待裝（下一步）。
+**[剩餘風險]** ① 單一 active tenant（soulful）；新 onboard 自動納入。② DB 持續斷則 warn+exit0 靜默，但 backstop 是 JSON 停更後 Phase4 staleness WARN 會回來（layered design）。
 
 **[rollback]** 移除 EU cron 行；`git revert` 還原 3 檔；JSON 仍可手動編輯（fallback）。
 
