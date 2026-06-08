@@ -1,8 +1,10 @@
-# Worklog
+﻿# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-06-08
+
+- AUTO_TASK_DONE_APPLIED (2026-06-08T10:28:55Z): Claude Code user-level sync 反覆 drift
 
 ### AO-CLOSE 復發三項徹查 + 根治（#2 archive preventer / #3 sync 自癒 + 誤診更正）
 
@@ -65,7 +67,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=merge.py 3 churn cases（aged-out->NOCHANGE / 新備份->CHANGED / 無變->NOCHANGE）+ 複合鍵空 task_id->CHANGED | exit=0 | 全對；live JSON 經 git diff --quiet 確認未動（dry-run）
 - REALTEST_EVIDENCE: tool=SSH(EU) | cmd=merge against live tenant JSON copy | exit=0 | CHANGED（EU /root/Work 落後47 commits、JSON 仍舊->正確偵測並寫 /tmp copy，真檔未污染）
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=1m(Major churn)+2min+1nit -> 全修 -> critic 二審 4/4 RESOLVED 無 regression（含驗證 warns/hard split 不吞 silent merge crash->hard）
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=BACKUP_AUTO_STATUS\|last_success.unix_utc\|sync-backup-status-from-mainwp | hits=0 stale — phase4-weekly-check.ps1:158 讀 `.last_success.unix_utc`，php emit+merge 保留，schema 相容；新腳本名無其他引用
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=BACKUP_AUTO_STATUS\|last_success.unix_utc\|sync-backup-status-from-mainwp | hits=5 non-stale — `sync-backup-status-from-mainwp` 5 次命中全在同名 `.sh` 自身 header/cron/usage 註解（自我引用，非 stale 跨檔依賴）；phase4-weekly-check.ps1:158 讀 `.last_success.unix_utc`，php emit+merge 保留，schema 相容；無其他外部引用（hits=0 宣告經 bughunt-oracle 實測更正為 self-ref 5）
 - REALTEST_EVIDENCE: tool=SSH(EU) | cmd=orchestrator `--dry-run` 端到端 live + REAL run（NOCHANGE→不commit→tree clean）+ cron 裝 01:11 UTC | exit=0 | idempotent 證實（DB 算出=已同步 JSON）
 - REALTEST_EVIDENCE: tool=SSH(EU) | cmd=`LC_ALL=POSIX python3 json.load(open(file[,encoding=utf-8]))` | exit=0 | locale 硬化驗證：JSON 含 em-dash（UTF-8），inline open() 補 encoding='utf-8'（Windows cp950 實爆過，ascii-locale host 風險）+ cron 加 LC_ALL=C.UTF-8 防禦縱深
 
@@ -7586,7 +7588,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-06 12:56:36 UTC_
+_Last synced: 2026-06-08 10:30:51 UTC_
 
 ## 2026-03-20
 
@@ -8520,6 +8522,9 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
+
+
+
 
 
 

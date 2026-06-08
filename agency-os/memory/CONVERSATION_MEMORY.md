@@ -172,6 +172,7 @@
 4. 需要跨會話記憶，避免每次重講
 
 ## Progress Snapshot
+- **2026-06-08 AO-CLOSE 復發三項徹查治本**（commit `762dd1b1`）：操作者問「6/5 收工卡 30min、6/6 卡但照抄 6/5 作法 10min 完成、但根因沒修」。徹查證實 6/6 = cargo-cult 照抄 6/5 workaround。#1 archive-lift 今天稍早已修(`8e77e474`)；#2 AO-RESUME archive 缺 → `ao-resume.ps1` 開工自動寫 skeleton(preventer)；#3「hooks object→array」是**誤診被照抄**(真因 `~/.claude/mcp.json` runtime 重填,object/array 5/14 已治) → `ao-close.ps1` sync 自癒 + TASKS:154 更正。協定加「禁止照抄症狀標籤,每個 fail 重新診斷」。教訓存 memory `feedback_no_cargo_cult_selfrepair.md`。
 - 已建立 Agency OS v1 基礎文件與政策模板
 - 已建立 project-kit 接案模板骨架
 - 已建立 Cursor 規則，要求會話先讀記憶與進度文件
@@ -480,5 +481,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-06 12:56:36 UTC_
+_Last synced: 2026-06-08 10:19:21 UTC_
 

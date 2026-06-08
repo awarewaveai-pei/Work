@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-06 20:56:40
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-06-08 18:30:53
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -219,175 +219,82 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-06.md
-# Daily Note - 2026-06-06
+## 5) memory/daily/2026-06-08.md
+# Daily Note - 2026-06-08
 
-### Done (AO-CLOSE session 2026-06-06 ~20:44)
-- **SEO/GEO Content Engine 產品化**（doc-only）：spec → 通用引擎（prompt-kit + 2 顆 Gem onboarding/content）+ Soulful Expression 客戶內容（CONTENT_STRATEGY + 首篇 art-based-healing 文章範本）。
-- **定位鎖定**：公開 Arts Practice for Self-Discovery / EdD 框架 Arts-Based Reflective Pedagogy（Schön/Kolb/Mezirow）；非臨床 art therapy（YMYL 護欄）；域名保留 soulfulexpression.org，獨佔 WuSheng Healing Module™。
-- handoff `handoffs/2026-06-06-2044-seo-geo-content.md`；spec 主檔未動（另一 AI 編輯中）。
+## Done today
+(fill in at AO-CLOSE)
 
+## Current state
+(fill in at AO-CLOSE)
 
-### verify-recent --ack (2026-06-06T04:03:04.8929092Z)
+## Next steps
+(fill in at AO-CLOSE)
 
-**Reason**: tarot 修 cat-deck: buildCardPrompt 重構(角色改造)+ image-gen 抽 openai error code + route friendly 錯誤訊息+HTTP200(避 nginx HTML 攔截); tsc --noEmit green; 純 string/錯誤映射，無新控制流/安全面
+## Open tasks (auto-generated at 08:00 TPE)
+- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN** — Stage 1 接通入口：抓 spec_generated intake_forms → retry trigger-build → 修 role 403 / UI 跳回問題 → 完成一筆 onboarding 不碰 DB
+- [ ] POD Studio 路線圖 + tarot 框線收尾（框 png 未做；per-frame 微調 + celestial 補生）→ handoffs/2026-06-06-2026-pod-studio-roadmap.md
+- [ ] Content Engine Phase 1 MVP — soulful 試點發第一篇 draft（spec §38/§44；§36 schema + §37 prompts）→ handoffs/2026-06-06-2029-tomo-202949.md
+- [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章（2-Gem onboarding+content；定位鎖定；填真資料→文章可發布；spec §49 errata 待補）→ handoffs/2026-06-06-2044-seo-geo-content.md
+- [ ] Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) — Batch 3 完成（9f862d82）→ handoffs/2026-05-28-1807-batch-3-post-phase.md
+- [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售 → handoffs/2026-06-05-1948-wp-bridge-deploy-sell.md
+- [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side items → handoffs/2026-06-05-2017-tomo-201752.md
+- [ ] **Hetzner dispatcher 上線前 follow-up**（啟用 LOBSTER_EXECUTE_* 前必做）：M10 orphan reaper + partial index on ops_action_runs
+- [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）** — 直接呼叫 provisionClient()，勿重寫
+- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層** — 缺 provision-stack.sh 編排器 + BYO adapter + swap → handoffs/2026-06-06-1925-postboot-stack-deploy.md
+- [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console + verify intake 觸發建站 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
+- [ ] wp-bridge v0.3.0：使用者更新 soulful → AI 在真站建第一篇草稿（SE-01）→ handoffs/2026-06-05-2039-tomo-203931.md
+- [ ] wp-bridge v0.5.6 已發佈（Tabs+YouTube+accordion 修復）；驗收 7053/7056 + 選下一步 → handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
+- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** — 未開始
+- [ ] **既有站接手（Soulful Expression Art Therapy）** — 進行中；下一步 Day 1 Runbook §1.1–1.3 + Day 2 實機驗收
+- [ ] **既有站接手 Day 1（Soulful Expression）** — §1.2 ✅ §1.3 DB dump ✅；仍開放：§1.1 帳號層級權限確認（panel-level）
+- [ ] **新站建置（Scenery Travel Mongolia）** — 進行中；待選定主機商後 §2 建置實機 + 客戶訪談補 Discovery
+- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** — 待與客戶確認素材與頂級網域，選定主機商
+- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** — 阻塞：須 Hostinger/主機商操作與 DNS/SSL
+- [ ] `tenants/templates/` v2 — 未開始；依試點回填後再開
+- [ ] `lobster-factory` A10-2 商業閉環實跑 — 未開始
+- [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**（終點：全部接 WooCommerce 賣貨）
+- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制** — 未開始；需新 sync-hetzner-endpoint-alert-script.ps1
+- [ ] **【2026-06-02 開出】Claude Code settings.json hooks object↔array 反覆 drift** — 未開始；需確認 runtime 寫入格式並 normalize verify
+- [ ] **【2026-05-28 開出 — Phase Z Z4】scan-for-secrets known-suppressed baseline** — 未開始
+- [ ] **【2026-05-28 開出 — Phase Z Z5】AO-CLOSE health gate 補強（fetch-recency）** — 未開始
+- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）— 進行中；需每月 drift 記錄
+- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】** — 未開始；排 Phase 4 觀察期後（2026-06-19+）
+- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2** — 進行中；觀察期到期 2026-06-19；每週五 14:00 巡檢
+- [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
 
-**Acknowledged unverified files** (count=3):
-
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\cards.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\tarot\generate\route.ts`
-
-
-### verify-recent --ack (2026-06-06T04:14:44.9644364Z)
-
-**Reason**: tarot cat-deck 定版: buildCardPrompt 改用實測驗證過的贏家結構(MAIN CHARACTER lead + NOT-human 否定，flux-schnell 實生兩張全貓確認) + image-gen 加 CJK→英文自動翻譯(haiku, fail-open); tsc green
-
-**Acknowledged unverified files** (count=2):
-
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\cards.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
-
-
-### verify-recent --ack (2026-06-06T04:38:35.6609848Z)
-
-**Reason**: tarot UX: Step2 加牌組篩選(大牌/全部/權杖/聖杯/寶劍/錢幣)+單張點擊生成，不再強制一次跑78張; tsc green; 純 client UI/狀態，無 server/安全面
-
-**Acknowledged unverified files** (count=1):
-
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
-
-
-### verify-recent --ack (2026-06-06T04:46:01.5920157Z)
-
-**Reason**: Phase1 M9/M7/M3/M10 完整驗證已做: tsc(我4檔0錯,殘留20錯全pre-existing) + vitest 18/18 + critic 無Critical + db-expert sound + WORKLOG R0 證據齊(REALTEST/REVIEW/BUGHUNT). skill auto-tsc N/A因package無tsconfig,改臨時config手動跑
-
-**Acknowledged unverified files** (count=2):
-
-- `d:\Work\lobster-factory\packages\workflows\src\trigger\orchestrate-tenant-provisioning.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\executor\installManifestStaging.ts`
-
-
-### verify-recent --ack (2026-06-06T05:32:37.2263801Z)
-
-**Reason**: Phase2 foundation 已驗證: tsc 新檔0錯(總20全pre-existing) + vitest 27/27(+9新測). 全env-gate OFF零prod. skill auto-tsc N/A因package無tsconfig,臨時config手動跑
-
-**Acknowledged unverified files** (count=5):
-
-- `d:\Work\lobster-factory\packages\workflows\src\hosting\types.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\hosting\serverTypes.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\hosting\providers\serverProvisionContract.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\hosting\mockServerAdapter.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\hosting\resolveServerProvisioning.ts`
+## Yesterday context
+2026-06-03 machine appendix：monthly-system-review gates SKIPPED (ReportOnly)，Supabase memory 38.89%（< 85% 正常），wp-bridge plan deepen + rename + ADR 007 僅文件改動已完成（BUGHUNT_WAIVED DOC_ONLY）。
 
 
-### verify-recent --ack (2026-06-06T05:48:27.7681141Z)
+### verify-recent --ack (2026-06-08T09:29:26.8363750Z)
 
-**Reason**: §11 watchdog extension = additive data-array entry (2 hashtables, same loop as proven Phase4 entry) to warn-only check. Verified: PS parse OK + audit-cp950-traps CLEAN. ASCII-only, zero CJK capture site, logic unchanged.
-
-**Acknowledged unverified files** (count=1):
-
-- `d:\Work\scripts\system-health-check.ps1`
-
-
-### verify-recent --ack (2026-06-06T06:14:49.2329111Z)
-
-**Reason**: tarot 模板選擇器(classic/minimal/dark/none)+多參考圖(referenceImage→referenceImages[]，每模型 maxRefs UI 動態顯示，gpt-image image[] 多圖，FLUX 用第一張)；tsc+next build green；client UI + route 陣列驗證 + image-gen 多圖
+**Reason**: Full verify already completed this session: syntax 3/3 OK; critic Deep pass (2 minor adopted); real exec health 100% 364/364 + verify-aoresume-archive empty->FAIL skeleton->PASS + sync pollute->merge->{} e2e; cp950 CLEAN. See WORKLOG 2026-06-08.
 
 **Acknowledged unverified files** (count=4):
 
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\renderPrintCard.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\tarot\generate\route.ts`
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+- `c:\Users\USER\Work\scripts\ao-resume.ps1`
+- `c:\Users\USER\Work\scripts\ao-close.ps1`
+- `c:\Users\USER\Work\scripts\sync-claude-userlevel.ps1`
+- `C:\Users\USER\AppData\Local\Temp\aotest\skeleton-block-test.ps1`
 
 
-### verify-recent --ack (2026-06-06T06:15:27.3124221Z)
+### AO-CLOSE 復發三項徹查治本（session 10:07Z→close）
 
-**Reason**: routine-freshness AO-RESUME leg: check-routine-freshness.ps1 REAL-EXEC tested (correctly flags Monthly MISSING + Phase4/Weekly OK, status report written), param bug caught+fixed by exec test; both files PS parse OK + check-routine-freshness CP950 CLEAN; ao-resume.ps1 added block is output-capture-free (no new CP950 trap, mirrors proven auto-reboot block).
+**Done**: 徹查 6/5(30min)/6/6(10min 照抄) AO-CLOSE 困難根因 → 治本 commit `762dd1b1`。
+- #1 archive-lift：今天稍早已修 `8e77e474`。
+- #2 AO-RESUME archive 缺：`ao-resume.ps1` 開工自動寫 7 段 skeleton(preventer，gate 12d 不再 hard-fail)。
+- #3「sync drift=hooks object→array」：誤診且被照抄；真因 `~/.claude/mcp.json` runtime 重填(SSOT={})，object/array 5/14 已治。→ `ao-close.ps1` sync 自癒(verify→drift才merge→重verify，backup+15-cap prune，fail-open) + TASKS:154 誤診更正。
+- ao-close.md 加協定：禁止照抄上次症狀標籤、每個 gate fail 重新診斷。
+- 教訓 memory：feedback_no_cargo_cult_selfrepair.md。
 
-**Acknowledged unverified files** (count=2):
-
-- `d:\Work\scripts\check-routine-freshness.ps1`
-- `d:\Work\scripts\ao-resume.ps1`
-
-
-### verify-recent --ack (2026-06-06T06:30:52.7313562Z)
-
-**Reason**: routine-output-watchdog.sh (SG always-on Telegram leg): bash -n SYNTAX OK. Real-exec is dry-run + live test ON SG post-deploy (script targets SG /root/Work checkout + /root/lobster-phase1/.env, cannot run locally). State-file dedup + send-only-on-200 + creds read locally on SG.
-
-**Acknowledged unverified files** (count=1):
-
-- `d:\Work\scripts\routine-output-watchdog.sh`
-
-
-### verify-recent --ack (2026-06-06T06:33:51.6552542Z)
-
-**Reason**: tarot gallery UX: 縮圖 78px→132px 放大 + 點已完成卡跳大圖 modal(內含重生鈕)+ 點空白卡才生成; tsc green; 純 client UI/狀態
-
-**Acknowledged unverified files** (count=1):
-
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
-
-
-### verify-recent --ack (2026-06-06T06:39:05.1979131Z)
-
-**Reason**: tarot 模板選擇器改成縮圖預覽(每個模板用 renderPrintCard 渲染樣本/使用者圖, 點選, 高亮選中); tsc green; 純 client UI + canvas 渲染
-
-**Acknowledged unverified files** (count=1):
-
-- `d:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
-
-
-### verify-recent --ack (2026-06-06T06:39:24.3211949Z)
-
-**Reason**: watchdog message bilingual (中/EN) + explanatory + next-step. bash -n OK; live-tested on SG (re-send with new format).
-
-**Acknowledged unverified files** (count=1):
-
-- `d:\Work\scripts\routine-output-watchdog.sh`
-
-
-### verify-recent --ack (2026-06-06T06:43:40.6055425Z)
-
-**Reason**: workflows package has no local tsc (Trigger.dev project; type-check runs at 'trigger.dev deploy'). A1 trigger.config syncEnvVars + B create-wp-site writeback match existing supabaseRestPatch signature + dispatcher _dispatchedFromActionRunId pattern; deploy is the verification gate (next step).
-
-**Acknowledged unverified files** (count=2):
-
-- `d:\Work\lobster-factory\packages\workflows\trigger.config.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\trigger\create-wp-site.ts`
-
-
-### verify-recent --ack (2026-06-06T06:46:21.5239329Z)
-
-**Reason**: Phase2d/2e provisioning 層完整驗證: vitest 75/75 + tsc 新檔0錯(總20 pre-existing) + critic 審(1 Critical IPv6 firewall + 8 finding 全修) + cloud-init/dns/hetzner/secretStore mock-fetch 單測. 全env-gate OFF零prod. 真機=Phase4
-
-**Acknowledged unverified files** (count=8):
-
-- `d:\Work\lobster-factory\packages\workflows\src\hosting\providers\hetzner\cloudInit.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\hosting\providers\cloudflare\dns.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\hosting\providers\hetzner\HetznerHostingAdapter.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\hosting\providers\hetzner\secretStore.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\hosting\mockServerAdapter.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\provision\provisionClient.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\provision\serverAdapterFactory.ts`
-- `d:\Work\lobster-factory\packages\workflows\src\provision\cli.ts`
-
-
-### verify-recent --ack (2026-06-06T07:10:10.2544160Z)
-
-**Reason**: watchdog: force LC_ALL=C.UTF-8 to fix CJK mojibake (inherited cron locale not UTF-8; C.UTF-8 present+working verified via base64 decode). bash -n OK; live base64 verify on SG next.
-
-**Acknowledged unverified files** (count=1):
-
-
-_... 113 lines omitted._
+**Verify**: health 100%(364/364)；skeleton gate e2e；sync 自癒 e2e；critic Deep pass(2 minor 採納)；cp950 CLEAN。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-02 18:09:55`
+- Time: `2026-06-08 18:19:23`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -397,16 +304,13 @@ _... 113 lines omitted._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260602-180950.md`
-- Closeout: `reports/closeout/closeout-20260602-180955.md`
+- Health: `reports/health/health-20260608-181917.md`
+- Closeout: `reports/closeout/closeout-20260608-181923.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell test-stable-status.ps1 (4 cases) | exit=0 | result=ALL PASS（時間戳/報告名 churn→不寫；score 100→99.5 / exit 0→1→寫；首跑/缺檔→寫；regex 不誤傷 `- Health score:`/`- Health gate exit code:`）
-   REALTEST_EVIDENCE: tool=Bash | cmd=run agency-os/scripts/system-guard.ps1 -WorkspaceRoot agency-os -Mode daily x2（排程實際呼叫） | exit=1(health FAIL 與 churn 無關) | result=LAST_SYSTEM_STATUS.md 兩次 SHA256 相同 60153216…（不再 churn）
-   REALTEST_EVIDENCE: tool=Bash | cmd=audit-cp950-traps.ps1 -ParseBreakOnly | exit=0 | result=scanned=147 clean=147 drift=0，兩支 system-guard OK
 2. REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（七項逐一實測：regex 不誤傷、BOM/CRLF/trailing-newline 正規化、首跑、無 silent staleness、StrictMode-clean、兩份位元組相同；備註：Get-Content -Raw 在 PS5.1 已剝 BOM，TrimStart 為無害防禦性 no-op）
 3. BUGHUNT_DONE: scope=agency-os,scripts | grep=LAST_SYSTEM_STATUS,stableStatusOf | hits=0（唯一 writer=system-guard；無 stale 符號引用；verify-closeout 僅排除不依賴重寫）；額外發現 scripts vs agency-os/scripts 20 檔 drift → 已記 TASKS
 4. WORKLOG: this entry
@@ -461,6 +365,9 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
+
+
+
 
 
 
