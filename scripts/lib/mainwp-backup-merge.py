@@ -62,13 +62,19 @@ def main() -> None:
     if new_succ is None and new_fail is None:
         fail("parsed has neither success nor failure")
 
-    def task_id(obj):
-        return obj.get("task_id") if isinstance(obj, dict) else None
+    def ident(obj):
+        # Composite identity (task_id, unix_utc). task_id alone is the natural key, but
+        # WPvivid could in theory emit a row with no task_id (php defaults it to ""); the
+        # unix_utc then disambiguates two distinct backups so a real new one is never
+        # missed as NOCHANGE (critic 2026-06-08 defense-in-depth).
+        if not isinstance(obj, dict):
+            return None
+        return (obj.get("task_id") or "", obj.get("unix_utc"))
 
-    old_succ_id = task_id(existing.get("last_success"))
-    old_fail_id = task_id(existing.get("last_failure"))
-    new_succ_id = task_id(new_succ)
-    new_fail_id = task_id(new_fail)
+    old_succ_id = ident(existing.get("last_success"))
+    old_fail_id = ident(existing.get("last_failure"))
+    new_succ_id = ident(new_succ)
+    new_fail_id = ident(new_fail)
 
     # Anti-churn: compare against the value the merge will ACTUALLY write, not the raw
     # parse. The update guards below preserve the on-disk value when the parse yields None
