@@ -34,6 +34,8 @@
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2M/2m | 2 Major 全修（TASKS 驗證缺口 + BOM fragility）
 - BUGHUNT_DONE: scope=scripts,agency-os | grep=verify-archive-tasks-lift|archiveOnly | hits=2（verify ps1 本身 + system-health-check caller，無 stale）
 
+- 08:00 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-06-08.md
+
 ## 2026-06-06
 
 ### Tomorrow captured (/tomo)
