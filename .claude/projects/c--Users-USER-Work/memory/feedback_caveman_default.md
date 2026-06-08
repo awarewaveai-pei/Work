@@ -1,4 +1,4 @@
----
+﻿---
 name: caveman-default
 description: "This user always wants concise, compressed responses — caveman mode is the permanent default. Never use filler, pleasantries, or padding."
 metadata: 

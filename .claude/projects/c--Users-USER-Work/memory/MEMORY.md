@@ -24,4 +24,8 @@
 - [User travels internationally — no geo-based WAF](feedback_global_traveler.md) — User travels worldwide; Cloudflare country rules / IP CIDRs will block her abroad. Always use LLAR (server-side) not CF WAF for wp-login protection.
 - [VBC: Verify Before Conclude — never claim missing from one data point](feedback_claim_before_verify.md) — Before saying "X is broken/missing/not done", check if another layer replaced it. Read WORKLOG first when another session's work is in question. Root cause: 2026-06-04 CF WAF=0 → missed LLAR was installed.
 - [app.aware-wave.com 系統分析（2026-06-04 全讀）](project_app_aware_wave_analysis.md) — 徹底讀完全部 codebase + 12 個邏輯問題清單（auth 403/WpUpdateButtons 無樣式/3名1頁/2個onboarding/佇列邏輯/etc）
+- [app.aware-wave 一鍵架站 MASTER PLAN](project_app_aware_wave_master_plan.md) — 便條指向 repo SSOT `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`（5-stage 企業佈建藍圖；現況/進度一律以 repo 那份為準）
 - [Caveman mode is permanent default](feedback_caveman_default.md) — Always respond concise/compressed. Never wait for user to say "caveman". Drop only for destructive-op confirmations then resume.
+- [Routine watchdog system (2026-06-06)](project_routine_watchdog_system.md) — 3-layer alerts watching the 4 Claude cloud routines; don't rebuild; routine sources MUST be awarewaveai-pei/Work
+- [CJK bash/cron encoding trap](reference_cjk_bash_cron_encoding.md) — CJK from SG cron bash mojibakes; fix = base64+file+curl text@file; verify via python ON server not ssh→PowerShell
+- [Content engine SSOT](project_content_engine_ssot.md) — 代操/內容引擎 SSOT = docs/wp-kadence-ai-seo-geo-content-engine.md; MVP AI-first 無付費 SEO API; 社群層自架 Postiz; 不繞回 JonOps

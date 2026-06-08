@@ -1,4 +1,4 @@
----
+﻿---
 name: feedback_global_traveler
 description: "User travels internationally — any geography-based access control (Cloudflare WAF country rules, IP allowlists) will block them when abroad. Always prefer device/credential-based protection (LLAR, WP login lockout) over geo-based rules."
 metadata: 

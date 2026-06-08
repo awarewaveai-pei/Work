@@ -1,6 +1,6 @@
 # VPS auto-reboot health
 
-- Generated: 2026-06-06 11:32:35 UTC
+- Generated: 2026-06-08 01:19:51 UTC
 - **Overall: 🟢 PASS**
 - SSOT: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/`
 - Runbook: `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md`
@@ -10,18 +10,12 @@
 | VPS | Verdict | Auto-Reboot | Time | SSOT 52 | SSOT 53 | daemon | pending | kernel |
 |-----|---------|-------------|------|---------|---------|--------|---------|--------|
 | SG (5.223.93.113) | 🟢 healthy | true | 20:00 | ✓ | n/a | active/enabled | no | 6.8.0-124-generic |
-| EU (204.168.175.41) | 🟢 healthy | true | 20:30 | ✓ | ✓ | active/enabled | ⚠ yes | 5.15.0-179-generic |
-
-## Pending reboot (informational)
-
-- EU: `/var/run/reboot-required` present. Packages: `linux-image-5.15.0-181-generic,linux-base`. Auto-reboot window: next **20:30 UTC** (= 04:30 TPE).
-
-Action: none - let OS handle. If marker persists > 16h, AGENTS.md trigger rule escalates to manual `/sg-reboot` or `/eu-reboot`.
+| EU (204.168.175.41) | 🟢 healthy | true | 20:30 | ✓ | ✓ | active/enabled | no | 5.15.0-181-generic |
 
 ## Last reboot
 
 - SG: Wed Jun 3 20:00 still
-- EU: Fri May 22 04:15 still
+- EU: Sat Jun 6 20:30 still
 
 ---
 

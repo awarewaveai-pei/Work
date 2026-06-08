@@ -1,4 +1,4 @@
----
+﻿---
 name: feedback_claim_before_verify
 description: "VBC (Verify Before Conclude) — never declare \"X is broken/missing/not done\" from a single data point. Always read WORKLOG first when another session's work is in question."
 metadata: 

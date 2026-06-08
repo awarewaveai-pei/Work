@@ -1,4 +1,4 @@
----
+﻿---
 name: feedback-powershell-allow
 description: User frustrated by repeated PowerShell approval prompts — root cause and permanent fix applied
 metadata: 
