@@ -4,6 +4,8 @@
 
 ## 2026-06-08
 
+- 05:38 : remote-monthly-agent: monthly review 2026-06 generated -> reports/monthly/monthly-review-2026-06.md (governance drift overall: WARN)
+
 ### ao-resume.md — 根治 git pull 失敗導致廢報告
 
 **根因**：git-align 失敗時 ao-resume.ps1 提早 exit → state files 是舊的 → Case B1 邏輯誤判「exit!=0 + 5分鐘內 = fresh」→ Claude 讀舊 data 輸出廢報告，無告警。使用者曾多次遇到，AO-RESUME 花超過 30 分鐘（ao-resume.ps1 被重跑）。
