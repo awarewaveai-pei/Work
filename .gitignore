@@ -25,11 +25,10 @@ Backups/
 .claude/ide/
 .claude/paste-cache/
 .claude/plugins/
-.claude/projects/*
-!.claude/projects/c--Users-USER-Work/
-.claude/projects/c--Users-USER-Work/*
-!.claude/projects/c--Users-USER-Work/memory/
-!.claude/projects/c--Users-USER-Work/memory/**
+# memory 不進 git（CLAUDE.md R1）— 可能含敏感資料；跨機同步走 Google Drive vault
+# (export-cross-machine-memory.ps1 / import-cross-machine-memory.ps1)，非 git。
+# 還原 70fb8e51（2026-06-04 誤把 memory 納入 git，違反 R1，造成 ao-close guard 卡死）。
+.claude/projects/
 .claude/session-env/
 .claude/sessions/
 .claude/shell-snapshots/
