@@ -297,6 +297,7 @@ STEP 7 file template adds: `- Check 4 VPS auto-reboot SSOT: ${CHECK4_STATUS}${CH
 
 ## Related
 
+- **CHECK 3 truth-source writer**: `scripts/sync-backup-status-from-mainwp.sh` (EU VPS, daily cron 01:11 UTC) keeps each active tenant's `BACKUP_AUTO_STATUS.json` (read by CHECK 3 sub-check 3B) in sync with the MainWP DB `report_addon`. Before this existed (pre-2026-06-08) the JSON was hand-synced and lagged, causing false "backup Nd stale" WARNs — always VBC-verify against the DB before treating a 3B WARN as a real backup outage.
 - Fallback (manual run): `scripts/phase4-weekly-check.ps1` — kept as belt-and-suspenders backup
 - Watchdog: `scripts/system-health-check.ps1` §11
 - VPS auto-reboot SSOT: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/52awarewave-auto-reboot.conf`

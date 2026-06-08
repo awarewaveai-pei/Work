@@ -32,5 +32,5 @@
     { "iso_utc": "2026-06-01T00:15:04Z", "status": "Succeeded" },
     { "iso_utc": "2026-06-08T00:15:04Z", "status": "Succeeded" }
   ],
-  "future_automation": "TODO: automated sync from MainWP DB to this file. Routine runs in cloud (no EU SSH) so cannot query DB — needs an EU-side script (like routine-output-watchdog.sh) that queries report_addon and commits this JSON. Until then this file lags ~weekly and triggers false Phase4 WARN; verify via DB before acting (VBC). See agency-os/automation/claude-routines/phase4-weekly.md §future"
+  "automated_sync": "DONE 2026-06-08: scripts/sync-backup-status-from-mainwp.sh on EU VPS, daily cron 01:11 UTC, queries report_addon and rewrites this file only when the backup task changes. last_success/last_failure/synced_at_utc/synced_by/backup_history_since_last_sync are machine-owned; other fields stay human-editable. Manual fallback: edit by hand (the script preserves unlisted keys)."
 }
