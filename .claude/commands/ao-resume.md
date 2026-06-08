@@ -211,19 +211,18 @@ If nothing definitive, state that clearly and point to WORKLOG for reference.
   **Source rules**: derive blockers ONLY from (a) open `- [ ]` tasks in TASKS.md, (b) `is_fresh=true` external signals, (c) health check failures in ao-resume-hook log. **Never derive from `- [x]` items** (even if they appear in `### 未完成`); `[x]` = already resolved, not a blocker.
 
 **5. 未完成待辦（TASKS）**
-**按主題歸類**：把**同一主題的待辦併在一起**，不論它當初是哪天加的、原本寫在 TASKS.md 哪個 `####` 分類。使用者會在不同天、或臨時想到就加一段，導致同一件事散落各處 — 報告的職責就是把它們收攏到同一個主線下。
+**按邏輯動態歸納主題**：把**同一主題/同一 project 的待辦併在一起**，不論它當初哪天加的、原本寫在 TASKS.md 哪個 `####` 分類。使用者會隨 project 演進不斷加新主題、新項目 — 主題清單**不是固定的**，必須每次依「當下實際有哪些待辦」現場長出來。
 
-不照 TASKS.md 原始 `####` 分類整坨倒。把每個 open `- [ ]` 項收斂成一行、去掉冗字，依主題分進下列主線桶：
+**歸納方法（每次重新做，不靠寫死的清單）：**
+1. 讀完所有 open `- [ ]`，依任務內容/handoff 指向/關鍵字，判斷每項屬於哪個 project 或主題。
+2. 把指向同一 project / 同一目標的項目**聚成一個主題群**（群名直接用該 project 名，如「app.aware-wave 一鍵架站」「wp-bridge 外掛」「客戶試點 Soulful」…）。有新 project 就自然多一群；該 project 清空就不再出現。
+3. 群的排序：**進行中 / 今日主線優先**，其次按項目多寡或急迫度，零散收不進任何 project 的放最後一個「雜項」群。
+4. 每項收斂成一行、去冗字。
 
-- 🔥 **主線① 一鍵架站 app.aware-wave**（Stage 1 / Hetzner 嵌入 / onboarding IA / 客戶機部署 等）
-- 📝 **主線② 內容引擎 / 發文**（Content Engine / SEO-GEO / POD Studio / 塔羅 等）
-- 🔌 **主線③ wp-bridge 外掛**（驗收 / 建草稿 / 販售路徑 等）
-- 🏢 **客戶試點**（Soulful / Scenery / Next-Gen / templates）
-- 🛠 **維運 / 治理**（Auto-Repair / lobster-factory / 基礎建設 / 巡檢 等，多數不急）
-- 📱 **雜項**（出國前 SSH 設定 等）
+**鐵則：** 每個 open `- [ ]` 都要落到某一群，**一項不漏**；跳過所有 `- [x]`。
+Task count（所有群加總）must match `open-tasks-snapshot.md` Total open。對不上就說明原因。
 
-桶的順序固定如上；空桶省略。主線歸屬以任務內容判斷（看 handoff 指向或關鍵字）。**每個 open `- [ ]` 都要落到某個桶，一項不漏**；跳過所有 `- [x]`。
-Task count（所有桶加總）must match `open-tasks-snapshot.md` Total open。對不上就說明原因。
+> 反例（禁止）：把六個固定桶寫死照抄。主題是浮動的，要靠當下任務內容歸納，不是套模板。
 
 **6. 需決策**（選填 — 整節只在有內容時輸出）
 Items that cannot proceed without a human choice or action. Each entry must include:
