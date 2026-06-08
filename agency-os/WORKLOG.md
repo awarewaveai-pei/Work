@@ -15,7 +15,9 @@
 **[驗證結果]**
 - REALTEST_WAIVED: DOC_ONLY -- 純 .md 協定文件，無 code 執行邏輯
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m -- 讀回確認 Step 0-git 在 Step 0 之前，B1-aligned/B1-stale 邏輯正確，hard limits 明確
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=ao-resume.md|Case B1|Step 0-git | hits=0 stale（ao-resume.md 是 SSOT，無其他副本需同步）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git fetch origin && git rev-list --count HEAD..origin/main` | exit=0 | count=0 — Step 0-git 指令實際可用
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m — 讀回 ao-resume.md 確認 Step 0-git 在 Step 0 之前，B1-aligned/B1-stale 邏輯正確，hard limits 明確
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=Case B1|Step 0-git|B1-aligned|B1-stale | hits=6 active（agency-os/.cursor/rules/30-resume-keyword.mdc 3 處舊邏輯 → 已修並 sync mirror；.claude/commands/ao-resume.md 3 處新增 = 預期）
 
 ### verify-archive-tasks-lift.ps1 — 根治 archive lift gate 誤判
 
