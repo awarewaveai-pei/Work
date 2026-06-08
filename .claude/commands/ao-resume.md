@@ -137,11 +137,20 @@ Also read `agency-os/.agency-state/junction-last.json` if present:
 
 Then output the **AO-RESUME 七段式** response:
 
+> **輸出風格規範（強制，2026-06-08 使用者明示）— 「整理好，不要一坨」：**
+> 1. **七段編號結構不可拆**（§1–§7，無內容的段省略，不新增自創段號）。
+> 2. **每段收短、可掃讀**：能用表格就用表格；機器欄位（log_tail 原文、原始時戳串、source flag）翻成白話或省略，不直接貼。
+> 3. **§1 用精簡狀態表**（項目 | 狀態），一列一項；非問題的 WARN 要當場註明「非問題，原因…」（如 CF 規則=0 → LLAR 替代）。
+> 4. **§5 按主線歸類**（見該段規則），不照 TASKS.md 原始 `####` 分類整坨倒；每項一行、去掉冗字。
+> 5. **不重複**：同一份資訊只出現在一段，不要 §5 列完又在別段再列一次。
+> 6. 目標：整份比原始 hook 輸出短、但**一項待辦都不能少**。
+
 ---
 
 **1. 系統快照**
-One-line status: SG/EU 服務狀態 (UP/DOWN) | deploy drift commits | Git ahead/behind/dirty
+輸出一張精簡狀態表（`| 項目 | 狀態 |`），一列一項，涵蓋：SG/EU 服務、Git 對齊、整體健康%、備份、VPS 自動重啟、Cloudflare、排程新鮮度、跨機 import。
 Source: ao-resume-hook-last.json log_tail + health check output.
+非問題的 WARN（如 CF 規則=0 已用 LLAR 替代）必須當列註明「非問題 + 原因」，不可只丟一個 ⚠️。
 
 Smoke tests (from `smoke-LATEST.json`):
 - If file exists: 一行摘要 `🟢 Smoke PASS | n8n=ok | repair=ok` 或 `🔴 Smoke WARN | ...`
@@ -202,21 +211,17 @@ If nothing definitive, state that clearly and point to WORKLOG for reference.
   **Source rules**: derive blockers ONLY from (a) open `- [ ]` tasks in TASKS.md, (b) `is_fresh=true` external signals, (c) health check failures in ao-resume-hook log. **Never derive from `- [x]` items** (even if they appear in `### 未完成`); `[x]` = already resolved, not a blocker.
 
 **5. 未完成待辦（TASKS）**
-Group tasks by their `####` category header from TASKS.md. Output every open `- [ ]` item — do NOT summarize, skip, or flatten into a single list. **Skip all `- [x]` items**, including any that appear in `### 未完成` (they are completed; `### 未完成` is being cleaned up).
+**按主線歸類**（不照 TASKS.md 原始 `####` 分類整坨倒）。把每個 open `- [ ]` 項收斂成一行、去掉冗字，分進下列主線桶：
 
-Format:
-#### 雙機環境 / 日常開工
-- [ ] …
+- 🔥 **主線① 一鍵架站 app.aware-wave**（Stage 1 / Hetzner 嵌入 / onboarding IA / 客戶機部署 等）
+- 📝 **主線② 內容引擎 / 發文**（Content Engine / SEO-GEO / POD Studio / 塔羅 等）
+- 🔌 **主線③ wp-bridge 外掛**（驗收 / 建草稿 / 販售路徑 等）
+- 🏢 **客戶試點**（Soulful / Scenery / Next-Gen / templates）
+- 🛠 **維運 / 治理**（Auto-Repair / lobster-factory / 基礎建設 / 巡檢 等，多數不急）
+- 📱 **雜項**（出國前 SSH 設定 等）
 
-#### 客戶試點 — Soulful Expression
-- [ ] …
-
-#### 龍蝦工廠（lobster-factory）
-- [ ] …
-
-（以此類推，依 TASKS.md 中的 #### 順序輸出所有分類，空分類省略）
-
-Task count must match `open-tasks-snapshot.md` Total open. If it doesn't, explain why.
+桶的順序固定如上；空桶省略。主線歸屬以任務內容判斷（看 handoff 指向或關鍵字）。**每個 open `- [ ]` 都要落到某個桶，一項不漏**；跳過所有 `- [x]`。
+Task count（所有桶加總）must match `open-tasks-snapshot.md` Total open。對不上就說明原因。
 
 **6. 需決策**（選填 — 整節只在有內容時輸出）
 Items that cannot proceed without a human choice or action. Each entry must include:
