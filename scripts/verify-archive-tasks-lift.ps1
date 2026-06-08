@@ -185,12 +185,33 @@ $missing   = 0
 $skipped   = 0  # archive-only annotated
 
 foreach ($b in $bullets) {
-  # Archive-only escape hatch
+  # Archive-only escape hatch — explicit HTML comment
   if ($b.text -match '<!--\s*archive-only:\s*(.+?)\s*-->') {
     $reason = $matches[1].Trim()
     $skipped++
     Add-Finding 'info' "Archive-only (reason: $reason)" $b.text $b.section
     continue
+  }
+
+  # Auto archive-only: bullet explicitly says "TASKS 已開 / TASKS: / TASKS →"
+  # meaning the agent confirmed it is already tracked on the task board.
+  # Pattern: （TASKS or (TASKS or TASKS: anywhere in the bullet.
+  if ($b.text -match '[\(（]TASKS|TASKS:') {
+    $skipped++
+    Add-Finding 'info' "Archive-only (auto: bullet explicitly references TASKS board)" $b.text $b.section
+    continue
+  }
+
+  # Auto lifted: extract handoff slug and check if any TASKS - [ ] line has same slug.
+  # Matches patterns like: → handoffs/2026-06-06-2044-seo-geo-content.md
+  if ($b.text -match 'handoffs/([\d]{4}-[\d]{2}-[\d]{2}-[\d]{4}-[^)\s]+\.md)') {
+    $slug = $matches[1]
+    $slugEscaped = [regex]::Escape($slug)
+    if ($openTaskBlob -match $slugEscaped) {
+      $lifted++
+      Add-Finding 'info' "Lifted via handoff slug match: $slug" $b.text $b.section
+      continue
+    }
   }
 
   # Token strategy: prefer **bold-text** identifiers (operators write
