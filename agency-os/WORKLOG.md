@@ -2,6 +2,23 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-08
+
+### verify-archive-tasks-lift.ps1 — 根治 archive lift gate 誤判
+
+**根因**：archive bullet 含 `（TASKS 已開 → handoffs/2026-06-06-2044）` 但 12-char sliding window 因插字（`引擎 +` vs `引擎產品化 +`）匹配失敗 → exit=1。
+
+**[已修改]** `scripts/verify-archive-tasks-lift.ps1`：
+1. Handoff slug 交叉比對（含無 `.md` 副檔名）：TASKS 有相同 slug → lifted
+2. TASKS 明示偵測：`（TASKS`/`TASKS:` → 再跑 bold-token 驗證；token 找到 → lifted；未找 → warn（可見，不 hard-fail）
+3. BOM fragility：全形 `（` 移出 regex bracket class，避免 CP950 Unterminated [] set
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-archive-tasks-lift.ps1` | exit=0 | RESULT=PASS-WITH-SKIPPED
+- REALTEST_EVIDENCE: tool=Bash | cmd=`system-health-check.ps1` | exit=0 | Score=100% (364/364)
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2M/2m | 2 Major 全修（TASKS 驗證缺口 + BOM fragility）
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=verify-archive-tasks-lift|archiveOnly | hits=2（verify ps1 本身 + system-health-check caller，無 stale）
+
 ## 2026-06-06
 
 ### Tomorrow captured (/tomo)
