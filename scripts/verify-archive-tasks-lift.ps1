@@ -193,25 +193,43 @@ foreach ($b in $bullets) {
     continue
   }
 
-  # Auto archive-only: bullet explicitly says "TASKS 已開 / TASKS: / TASKS →"
-  # meaning the agent confirmed it is already tracked on the task board.
-  # Pattern: （TASKS or (TASKS or TASKS: anywhere in the bullet.
-  if ($b.text -match '[\(（]TASKS|TASKS:') {
-    $skipped++
-    Add-Finding 'info' "Archive-only (auto: bullet explicitly references TASKS board)" $b.text $b.section
-    continue
-  }
-
-  # Auto lifted: extract handoff slug and check if any TASKS - [ ] line has same slug.
-  # Matches patterns like: → handoffs/2026-06-06-2044-seo-geo-content.md
-  if ($b.text -match 'handoffs/([\d]{4}-[\d]{2}-[\d]{2}-[\d]{4}-[^)\s]+\.md)') {
+  # Auto lifted: bullet references a handoff slug that also appears in TASKS - [ ].
+  # Matches both: handoffs/2026-06-06-2044-slug.md  AND  handoffs/2026-06-06-2044 (no extension).
+  # This covers the common AO-CLOSE style "（TASKS 已開 → handoffs/YYYY-MM-DD-HHMM-slug）".
+  if ($b.text -match 'handoffs/(\d{4}-\d{2}-\d{2}-\d{4}(?:-[^)\s.]+)?)') {
     $slug = $matches[1]
     $slugEscaped = [regex]::Escape($slug)
     if ($openTaskBlob -match $slugEscaped) {
       $lifted++
-      Add-Finding 'info' "Lifted via handoff slug match: $slug" $b.text $b.section
+      Add-Finding 'info' "Lifted via handoff slug: $slug" $b.text $b.section
       continue
     }
+  }
+
+  # Auto-classify: bullet claims "（TASKS …" or "(TASKS" or "TASKS:" — already on task board.
+  # （ = full-width （ — avoids CP950/BOM encoding trap in regex bracket class.
+  # Runs token-matching to verify: if a bold token exists in TASKS → lifted (verified).
+  # If not verified → warn (visible in output/state-file, not a hard fail) rather than silent skip.
+  if ($b.text -match '[\(（]TASKS|TASKS:') {
+    $verifyTokens = @()
+    $cleanVerify  = ($b.text -replace '<!--.*?-->', '').Trim()
+    $boldVerify   = [regex]::Matches($cleanVerify, '\*\*([^*]+)\*\*')
+    foreach ($mv in $boldVerify) {
+      $bv = $mv.Groups[1].Value.Trim() -replace '`', ''
+      if ($bv.Length -ge 4 -and $bv.Length -le 80) { $verifyTokens += $bv }
+    }
+    $verifyMatched = $false
+    foreach ($tv in $verifyTokens) {
+      if ($openTaskBlob -match [regex]::Escape($tv)) { $verifyMatched = $true; break }
+    }
+    if ($verifyMatched) {
+      $lifted++
+      Add-Finding 'info' "Lifted via TASKS reference + token verified" $b.text $b.section
+    } else {
+      $skipped++
+      Add-Finding 'warn' "TASKS-ref auto-skipped but bold token not found in TASKS.md — verify manually or add archive-only comment" $b.text $b.section
+    }
+    continue
   }
 
   # Token strategy: prefer **bold-text** identifiers (operators write
