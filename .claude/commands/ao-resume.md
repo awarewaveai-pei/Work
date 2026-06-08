@@ -211,7 +211,9 @@ If nothing definitive, state that clearly and point to WORKLOG for reference.
   **Source rules**: derive blockers ONLY from (a) open `- [ ]` tasks in TASKS.md, (b) `is_fresh=true` external signals, (c) health check failures in ao-resume-hook log. **Never derive from `- [x]` items** (even if they appear in `### 未完成`); `[x]` = already resolved, not a blocker.
 
 **5. 未完成待辦（TASKS）**
-**按主線歸類**（不照 TASKS.md 原始 `####` 分類整坨倒）。把每個 open `- [ ]` 項收斂成一行、去掉冗字，分進下列主線桶：
+**按主題歸類**：把**同一主題的待辦併在一起**，不論它當初是哪天加的、原本寫在 TASKS.md 哪個 `####` 分類。使用者會在不同天、或臨時想到就加一段，導致同一件事散落各處 — 報告的職責就是把它們收攏到同一個主線下。
+
+不照 TASKS.md 原始 `####` 分類整坨倒。把每個 open `- [ ]` 項收斂成一行、去掉冗字，依主題分進下列主線桶：
 
 - 🔥 **主線① 一鍵架站 app.aware-wave**（Stage 1 / Hetzner 嵌入 / onboarding IA / 客戶機部署 等）
 - 📝 **主線② 內容引擎 / 發文**（Content Engine / SEO-GEO / POD Studio / 塔羅 等）
