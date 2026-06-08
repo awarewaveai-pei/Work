@@ -70,7 +70,14 @@ def main() -> None:
     new_succ_id = task_id(new_succ)
     new_fail_id = task_id(new_fail)
 
-    if old_succ_id == new_succ_id and old_fail_id == new_fail_id:
+    # Anti-churn: compare against the value the merge will ACTUALLY write, not the raw
+    # parse. The update guards below preserve the on-disk value when the parse yields None
+    # (a Succeeded/Failed task that aged out of the bounded report_addon history). So a
+    # None parse must NOT count as a change, or the file would be rewritten with only a
+    # fresh synced_at_utc on every run forever (critic 2026-06-08 finding #1).
+    succ_changed = new_succ is not None and new_succ_id != old_succ_id
+    fail_changed = new_fail is not None and new_fail_id != old_fail_id
+    if not succ_changed and not fail_changed:
         print("NOCHANGE")
         return
 
@@ -99,11 +106,21 @@ def main() -> None:
         return
 
     # Atomic write: tmp + replace. Trailing newline, 2-space indent (matches repo style).
-    tmp_path = json_path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(existing, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    os.replace(tmp_path, json_path)
+    # pid-suffixed tmp avoids collision between concurrent runs; try/finally removes a
+    # half-written tmp on crash so a stray *.tmp never trips the orchestrator's dirty-tree
+    # guard and wedges every future run (critic 2026-06-08 finding #2).
+    tmp_path = "{}.tmp.{}".format(json_path, os.getpid())
+    try:
+        with open(tmp_path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(existing, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        os.replace(tmp_path, json_path)
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
     print("CHANGED")
 
 

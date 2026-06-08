@@ -33,12 +33,22 @@ PARSE_PHP="$REPO/scripts/lib/mainwp-report-parse.php"
 MERGE_PY="$REPO/scripts/lib/mainwp-backup-merge.py"
 DRYRUN="${1:-}"
 
+# Reject a typo'd flag (e.g. --dryrun) -- otherwise it falls through as a LIVE run and
+# could push to prod when the operator meant to dry-run (critic 2026-06-08 nit #5).
+if [ -n "$DRYRUN" ] && [ "$DRYRUN" != "--dry-run" ]; then
+  echo "sync-backup: unknown arg '$DRYRUN'. Valid: (none) | --dry-run"; exit 2
+fi
+
 GIT_NAME="awarewave-eu-backup-sync"
 GIT_EMAIL="ops@aware-wave.com"
 
 log() { echo "sync-backup: $*"; }
 
 cd "$REPO" 2>/dev/null || { log "$REPO missing"; exit 1; }
+
+# Clean up any stray atomic-write tmp from a previously crashed run, so it does not trip the
+# dirty-tree guard below and wedge every future run (critic 2026-06-08 finding #2).
+rm -f agency-os/tenants/*/core/BACKUP_AUTO_STATUS.json.tmp.* 2>/dev/null
 
 # Never operate on a dirty tree -- would risk committing unrelated changes.
 if [ -n "$(git status --porcelain)" ]; then
@@ -58,7 +68,13 @@ PW=$(grep -E '^MYSQL_PASSWORD=' "$MAINWP_ENV" 2>/dev/null | head -1 | sed -E 's/
 
 NOW_UTC=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 changed=0
-errors=0
+# warns  = benign/transient (DB blip, tenant not ready yet) -> exit 0, retried next run
+# hard   = real contract break (merge returned ERROR:)       -> exit 1
+# Rationale: a daily cron must not cry wolf on transient skips, or the operator learns to
+# ignore its failure signal. The real backstop for a persistently-broken sync is the Phase 4
+# staleness WARN that returns once the JSON stops updating (critic 2026-06-08 finding #3).
+warns=0
+hard=0
 
 # Iterate active tenants only. not-onboarded tenants are silently skipped (Phase 4 SKIPs them too).
 while IFS= read -r md; do
@@ -70,23 +86,23 @@ while IFS= read -r md; do
   json="$dir/BACKUP_AUTO_STATUS.json"
   slug=$(echo "$dir" | sed -E 's|.*/tenants/([^/]+)/.*|\1|')
   if [ ! -f "$json" ]; then
-    log "$slug active but BACKUP_AUTO_STATUS.json missing -- skip"; errors=$((errors+1)); continue
+    log "$slug active but BACKUP_AUTO_STATUS.json missing -- skip"; warns=$((warns+1)); continue
   fi
 
   site_id=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('mainwp_site_id',''))" "$json" 2>/dev/null)
   if ! echo "$site_id" | grep -qE '^[0-9]+$'; then
-    log "$slug: no numeric mainwp_site_id -- skip"; errors=$((errors+1)); continue
+    log "$slug: no numeric mainwp_site_id -- skip"; warns=$((warns+1)); continue
   fi
 
   SER=$(docker exec "$DB_CONTAINER" mysql -umainwp -p"$PW" mainwp -N --raw \
         -e "SELECT option_value FROM mwp_mainwp_wpvividmeta WHERE site_id=${site_id} AND option_name='report_addon';" 2>/dev/null)
   if [ -z "$SER" ]; then
-    log "$slug (site_id=$site_id): no report_addon row -- skip"; errors=$((errors+1)); continue
+    log "$slug (site_id=$site_id): no report_addon row -- skip (transient/onboarding)"; warns=$((warns+1)); continue
   fi
 
   PARSED=$(docker exec -i -e SER="$SER" "$PHP_CONTAINER" php < "$PARSE_PHP" 2>/dev/null)
   if [ -z "$PARSED" ]; then
-    log "$slug (site_id=$site_id): php parse failed -- skip"; errors=$((errors+1)); continue
+    log "$slug (site_id=$site_id): php parse failed -- skip"; warns=$((warns+1)); continue
   fi
 
   result=$(PARSED="$PARSED" NOW_UTC="$NOW_UTC" python3 "$MERGE_PY" "$json" $DRYRUN 2>&1)
@@ -94,13 +110,13 @@ while IFS= read -r md; do
   case "$result" in
     CHANGED*)  changed=$((changed+1)) ;;
     NOCHANGE*) : ;;
-    *)         errors=$((errors+1)) ;;
+    *)         log "$slug: HARD merge error -- $result"; hard=$((hard+1)) ;;
   esac
 done < <(find agency-os/tenants -name BACKUP_RESTORE_PROOF.md -not -path '*template*' 2>/dev/null)
 
 if [ "$DRYRUN" = "--dry-run" ]; then
-  log "[DRY-RUN] would-change=$changed errors=$errors (no write, no commit)"
-  [ "$errors" -gt 0 ] && exit 1 || exit 0
+  log "[DRY-RUN] would-change=$changed warns=$warns hard=$hard (no write, no commit)"
+  [ "$hard" -gt 0 ] && exit 1 || exit 0
 fi
 
 if [ "$changed" -gt 0 ]; then
@@ -119,7 +135,7 @@ if [ "$changed" -gt 0 ]; then
     log "git commit produced nothing (race) -- skipping";
   fi
 else
-  log "no backup changes -- nothing to commit (errors=$errors)"
+  log "no backup changes -- nothing to commit (warns=$warns hard=$hard)"
 fi
 
-[ "$errors" -gt 0 ] && exit 1 || exit 0
+[ "$hard" -gt 0 ] && exit 1 || exit 0
