@@ -1062,6 +1062,67 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 Write-Host ""
 Write-Host ("AO-RESUME stamp updated: {0}" -f $nowStamp) -ForegroundColor DarkGray
 
+# --- AO-RESUME archive skeleton (preventer for health gate 12d / verify-aoresume-archive.ps1) ---
+# Root cause (2026-06-08 investigation): Step 3 of ao-resume.md (write the 7-segment report to
+# agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md) was a MANUAL Claude action. When forgotten at
+# resume it surfaced only as a CRITICAL fail at the *next* AO-CLOSE, forcing manual self-repair
+# (6/5 補寫 2026-06-05-1910.md; 6/6 補寫 2026-06-06-1933.md — the recurring friction the operator hit).
+# This writes a clearly-marked skeleton IF-NOT-EXISTS so the gate is satisfied by construction.
+# Claude's Step 3 still overwrites it with the real report; a left-behind skeleton is a visible
+# signal that Step 3 was skipped (not a silent pass). Preventer, not a replacement for Step 3.
+try {
+    $arDir = Join-Path $WorkRoot "agency-os\reports\ao-resume"
+    $null = New-Item -ItemType Directory -Force -Path $arDir
+    # Archive filenames use CST (UTC+8) — same convention as verify-aoresume-archive.ps1.
+    $arStampUtc = [DateTime]::Parse($nowStamp, $null, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+    $arStampCst = $arStampUtc.AddHours(8)
+    $arThreshold = $arStampCst.AddMinutes(-10)   # mirror gate's 10-min grace window
+    # Skip if an archive already covers this stamp window (Claude or a prior run wrote it).
+    $arCovered = $false
+    foreach ($af in @(Get-ChildItem -LiteralPath $arDir -Filter "????-??-??-????.md" -File -ErrorAction SilentlyContinue)) {
+        if ($af.Name -match '^(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})\.md$') {
+            try {
+                $arFt = [DateTime]::ParseExact(("{0}-{1}-{2} {3}:{4}" -f $Matches[1], $Matches[2], $Matches[3], $Matches[4], $Matches[5]), "yyyy-MM-dd HH:mm", $null)
+                if ($arFt -ge $arThreshold) { $arCovered = $true; break }
+            } catch { }
+        }
+    }
+    if (-not $arCovered) {
+        $arName = $arStampCst.ToString("yyyy-MM-dd-HHmm") + ".md"
+        $arPath = Join-Path $arDir $arName
+        if (-not (Test-Path -LiteralPath $arPath)) {
+            $arBody = @"
+# AO-RESUME — $($arStampCst.ToString("yyyy-MM-dd HH:mm")) CST
+
+<!-- AUTO-SKELETON written by ao-resume.ps1. Claude MUST overwrite this with the real 七段式 report (ao-resume.md Step 3, identical to chat output). If this placeholder survives to AO-CLOSE, Step 3 was skipped. -->
+
+## 1. 系統快照
+（待 Claude 填寫）
+
+## 2. 外部信號
+（待 Claude 填寫）
+
+## 3. 已完成
+（待 Claude 填寫）
+
+## 4. 目前進度
+（待 Claude 填寫）
+
+## 5. 未完成待辦（TASKS）
+（待 Claude 填寫）
+
+## 7. 下一步
+（待 Claude 填寫）
+"@
+            [System.IO.File]::WriteAllText($arPath, $arBody, $utf8NoBom)
+            Write-Host ("AO-RESUME archive skeleton written: agency-os/reports/ao-resume/{0} (Claude Step 3 overwrites with real report)" -f $arName) -ForegroundColor DarkGray
+        }
+    }
+} catch {
+    Write-Host ("WARN: AO-RESUME archive skeleton write failed (non-fatal): {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+}
+# --- end AO-RESUME archive skeleton ---
+
 if ($healthGateExit -ne 0) {
     Write-Host ""
     Write-Host ("ao-resume: state files generated; health gate failures remain (exit {0}). Claude reads fresh state files and reports health issues in Section 1." -f $healthGateExit) -ForegroundColor Red

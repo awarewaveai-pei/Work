@@ -4,6 +4,23 @@
 
 ## 2026-06-08
 
+### check-cloudflare-security.ps1 -- 根治 CF rules=0 永久假 WARN 噪音
+
+**根因**：PASS 條件 (舊 line 89) `bot=ON AND rules>=3 AND xmlrpc` 反映舊策略「用 CF WAF 擋 wp-login」。但 2026-06-04 架構決策已改為 LLAR 伺服器端 (server-side: LLAR + nginx rate-limit + fail2ban)，CF WAF rules 刻意清空 (操作者全球跑，CF geo rules 會自鎖)。所以 rules=0 是預期最終狀態，腳本判定過時，每次 AO-RESUME 都印假 WARN。
+
+**[已修改]** `scripts/check-cloudflare-security.ps1`：
+- 加 param `[bool]$WpLoginProtectedByServerSide = $true` (反映架構決策，可回退舊行為)
+- PASS 邏輯分兩模式：server-side (預設) PASS 只需 `bot=ON`；legacy ($false) 保留舊 `bot=ON AND rules>=3 AND xmlrpc`
+- bot=OFF / error 仍 WARN (真問題不吞)
+- 報告 + .NOTES 說明 server-side 防護，rules=0 標註 by-design
+- em-dash 全改 ASCII `--` (避 CP950 console 顯示亂碼)
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`check-cloudflare-security.ps1` (default) | exit=0 | 輸出 `PASS (bot=ON, rules=0)`；報告 Read 確認無亂碼、server-side 說明段正確
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -ParseBreakOnly` | exit=0 | CLEAN
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- bot=OFF/error 仍 WARN (真問題不吞)、consumer `system-health-check:559 -match PASS` 契約完好 (報告檔 PASS 字串只進磁碟不進 stdout)、StrictMode 安全
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`check-cloudflare-security`\|`cf-security` | hits=2 (system-health-check:555 caller 自動跟隨 PASS 字串；ao-resume:691 不傳 param 走預設) -- 無其他 consumer 需同步
+
 ### EU 端 BACKUP_AUTO_STATUS 自動同步 — 根治每週復發的假 Phase4 WARN
 
 **根因**：`BACKUP_AUTO_STATUS.json`（Phase4 routine 的備份 truth source）是**手動同步**，停在 2026-05-22。Phase4 routine 讀 `.last_success.unix_utc` 算 age，看到 16d 就 WARN。但 VBC 查 EU MainWP DB `report_addon`（site_id=2）證實備份**完全健康**（週 cron 6/01+6/08 都 Succeeded，只 5/25 因 Google Drive API 403 rate limit 失敗、後兩週自動恢復）。WARN 純因 JSON 陳舊。Cloud routine 在雲端跑、無 EU SSH，永遠無法自查 DB → 同步橋必須在 EU 本機。

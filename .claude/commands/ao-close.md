@@ -36,6 +36,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1
 
 If `system-health-check` is not 100%, attempt to self-repair. If repair succeeds, proceed. If repair fails, report the specific failing checks and halt — do NOT offer `-AllowNonPerfectHealth` or reduce the threshold.
 
+> **⚠️ 自修 = 重新診斷，禁止照抄症狀標籤（2026-06-08 根因）。**
+> 每個 health gate fail **必須當場用工具實測確認真因**，再修——**不得**複製上次 AO-CLOSE 報告的措辭當結論。
+> 真實教訓：6/5→6/6 把「sync drift = hooks object→array」原話照抄，但徹查證明該標籤從 6/2 就錯（真因是 `~/.claude/mcp.json` 被 runtime 重填，object↔array 早在 5/14 已由 `verify-settings-governed-keys.mjs` 中和）。照抄讓錯誤診斷與「已解決」假象一路傳遞，根因永不被修。
+> 規則：① fail 訊息來自哪個 gate script → 讀那支 script 的 exit 條件；② 跑該 gate 看**實際輸出**（如 `sync-claude-userlevel.ps1 -Mode verify` 印出 drifted key）；③ 修完**重跑該 gate 確認 exit 0**；④ 連動檢查段寫**這次實測到的真因**，不是上次的標籤。
+> 註：`ao-close.ps1` 已內建 Claude Code sync 自癒（verify→偵測 drift 才 merge），多數 sync drift 不再需要手動處理。
+
 Output the four sections (all covering 上次 AO-RESUME → 本次 AO-CLOSE):
 - **本輪完成**（上次 AO-RESUME 至今）
 - **未完成**

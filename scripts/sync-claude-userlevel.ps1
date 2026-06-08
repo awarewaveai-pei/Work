@@ -131,6 +131,17 @@ function Initialize-BackupDir {
   if (-not (Test-Path $BackupRoot)) {
     New-Item -ItemType Directory -Path $BackupRoot -Force | Out-Null
   }
+  # Retention prune (hygiene, 2026-06-08): keep the newest N backups, remove older ones.
+  # Without this, every -Mode merge accumulated a dir forever (43+ on 2026-06-08). Best-effort.
+  $keep = 15
+  try {
+    $backupParent = Split-Path -Parent $BackupRoot
+    $old = @(Get-ChildItem -LiteralPath $backupParent -Directory -Filter 'claude-userlevel-*' -ErrorAction SilentlyContinue |
+      Sort-Object Name -Descending | Select-Object -Skip $keep)
+    foreach ($d in $old) {
+      Remove-Item -LiteralPath $d.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  } catch { }
 }
 function Backup-Path([string]$Path, [string]$RelLabel) {
   if ($NoBackup) { return }
