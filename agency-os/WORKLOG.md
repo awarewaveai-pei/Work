@@ -4,6 +4,29 @@
 
 ## 2026-06-08
 
+### EU 端 BACKUP_AUTO_STATUS 自動同步 — 根治每週復發的假 Phase4 WARN
+
+**根因**：`BACKUP_AUTO_STATUS.json`（Phase4 routine 的備份 truth source）是**手動同步**，停在 2026-05-22。Phase4 routine 讀 `.last_success.unix_utc` 算 age，看到 16d 就 WARN。但 VBC 查 EU MainWP DB `report_addon`（site_id=2）證實備份**完全健康**（週 cron 6/01+6/08 都 Succeeded，只 5/25 因 Google Drive API 403 rate limit 失敗、後兩週自動恢復）。WARN 純因 JSON 陳舊。Cloud routine 在雲端跑、無 EU SSH，永遠無法自查 DB → 同步橋必須在 EU 本機。
+
+**[已修改]**（先手動修當下 WARN：commit cbbdb8c3 補登 JSON+proof 到 6/08，phase4 重跑全 PASS；本 entry 為根治）
+- `scripts/lib/mainwp-report-parse.php`（新）：在 mainwp-web 容器（php 8.2）內 `unserialize` report_addon → 算最新 Succeeded/Failed + 12 筆 history JSON。stdin 注入容器、SER 走 env、純 ASCII（locale-safe through cron→docker）
+- `scripts/lib/mainwp-backup-merge.py`（新）：host python3 merge 進 tenant JSON，**只在備份 task 變化才重寫**（複合鍵 `(task_id,unix_utc)` change-detection；aged-out=None 不觸發 churn）；保留所有靜態 metadata；pid-suffixed tmp + try/finally 原子寫
+- `scripts/sync-backup-status-from-mainwp.sh`（新）：orchestrator，迴圈 active tenants（自 JSON 讀 mainwp_site_id，無硬編）→ 唯讀 SELECT → parse → merge → 僅變化才 commit+push；dirty-tree abort、stray tmp 清理、benign skip(warns,exit0) vs hard error(exit1) 分離、typo'd flag reject、rebase-retry-once。pattern 沿用 `routine-output-watchdog.sh`
+- cron（EU）：`11 1 * * *` daily 01:11 UTC（待裝）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH(EU) | cmd=`docker exec mainwp-db mysql ... report_addon` -> `docker exec -i mainwp-web php < parse.php` | exit=0 | 對 production DB 正確算出 last_success=wpvivid-6e68a5af17f93(2026-06-08) + 7 筆 history；php -l CLEAN
+- REALTEST_EVIDENCE: tool=Bash | cmd=merge.py 3 churn cases（aged-out->NOCHANGE / 新備份->CHANGED / 無變->NOCHANGE）+ 複合鍵空 task_id->CHANGED | exit=0 | 全對；live JSON 經 git diff --quiet 確認未動（dry-run）
+- REALTEST_EVIDENCE: tool=SSH(EU) | cmd=merge against live tenant JSON copy | exit=0 | CHANGED（EU /root/Work 落後47 commits、JSON 仍舊->正確偵測並寫 /tmp copy，真檔未污染）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=1m(Major churn)+2min+1nit -> 全修 -> critic 二審 4/4 RESOLVED 無 regression（含驗證 warns/hard split 不吞 silent merge crash->hard）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=BACKUP_AUTO_STATUS\|last_success.unix_utc\|sync-backup-status-from-mainwp | hits=0 stale — phase4-weekly-check.ps1:158 讀 `.last_success.unix_utc`，php emit+merge 保留，schema 相容；新腳本名無其他引用
+
+**[剩餘風險]** ① 單一 active tenant（soulful）；新 onboard 自動納入。② DB 持續斷則 warn+exit0 靜默，但 backstop 是 JSON 停更後 Phase4 staleness WARN 會回來（layered design）。③ cron 待裝（下一步）。
+
+**[rollback]** 移除 EU cron 行；`git revert` 還原 3 檔；JSON 仍可手動編輯（fallback）。
+
+AUTO_TASK_DONE: EU-side BACKUP_AUTO_STATUS auto-sync 根治假 Phase4 WARN（php parse + py merge + sh orchestrator；critic 二審 clean；複合鍵 anti-churn）
+
 ### import-cross-machine-memory.ps1 — AO-RESUME secrets 路徑亂碼修復（display-only）
 
 **根因**：import 腳本是 ao-resume.ps1 的子進程（`& powershell.exe -File`）。它 Write-Host 印出 secrets vault 路徑 `G:\我的雲端硬碟\MySecretVault\...`（「我的雲端硬碟」= Google Drive 中文資料夾名）。父進程在 Big5/CP950 Windows 上 capture 子進程 stdout 時用 CP950 decode → CJK bytes mojibake 進 ao-resume-hook-last.json log_tail + console。**功能完全正常**（路徑經 `-LiteralPath` 使用，import 成功），純 log 顯示亂碼。
