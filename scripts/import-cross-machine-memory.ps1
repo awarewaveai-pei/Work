@@ -437,6 +437,13 @@ if ($candidateFolders.Count -gt 0 -and $memDest) {
 
 # ── 3. Secrets import ─────────────────────────────────────────────────────────
 $secretsRoot = $env:AO_SYNC_SECRETS_ROOT
+# ASCII-safe display form for log lines. The real path may contain CJK (Google Drive's
+# 「我的雲端硬碟」). This script runs as a child of ao-resume.ps1 whose stdout is captured
+# under CP950 on Big5 Windows → CJK paths mojibake in ao-resume-hook-last.json log_tail.
+# Functionality is unaffected (path is used via -LiteralPath); only the LOG display is masked.
+$secretsRootDisplay = if ($secretsRoot -and ($secretsRoot -match '[^\x00-\x7F]')) {
+    ('{0}\...\{1}' -f (Split-Path -Qualifier $secretsRoot), (Split-Path -Leaf $secretsRoot))
+} else { $secretsRoot }
 if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
 
     # Load manifest for logging only (not used in import decision logic).
@@ -642,10 +649,10 @@ if ($secretsRoot -and (Test-Path -LiteralPath $secretsRoot)) {
         Write-Host "  local state saved: $script:LocalStatePath" -ForegroundColor DarkGray
     }
 
-    Write-Host "== cross-machine import: secrets from $secretsRoot ==" -ForegroundColor Cyan
+    Write-Host "== cross-machine import: secrets from $secretsRootDisplay ==" -ForegroundColor Cyan
 
 } elseif ($secretsRoot) {
-    Write-Host "  AO_SYNC_SECRETS_ROOT set but path not found: $secretsRoot" -ForegroundColor Yellow
+    Write-Host "  AO_SYNC_SECRETS_ROOT set but path not found: $secretsRootDisplay" -ForegroundColor Yellow
     Write-Host "  Is Google Drive running? Is Cryptomator vault unlocked?" -ForegroundColor Yellow
 }
 
