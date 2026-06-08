@@ -6,8 +6,8 @@ backup_schedule: weekly
 backup_destination: googledrive
 backup_destination_label: "Update_Backup (WPvivid auth_id wpvivid-auth-ca9352c3bbbf3, MainWP remote_id wpvivid-remote-69ff0a63b77ab)"
 restore_drill_due_after: 2026-08-06   # baseline 2026-05-08 + 90 days
-last_known_success_utc: 2026-05-22T11:05:20Z
-last_known_success_task_id: wpvivid-ea9a8f38850c5
+last_known_success_utc: 2026-06-08T00:15:04Z
+last_known_success_task_id: wpvivid-6e68a5af17f93
 truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STATUS.json
 ---
 
@@ -66,6 +66,19 @@ truth_source: agency-os/tenants/company-soulful-expression/core/BACKUP_AUTO_STAT
 | Drive mtime | 2026-05-22 19:05 TPE |
 | Status (MainWP DB) | **Succeeded**（驗證自 `mwp_mainwp_wpvividmeta.report_addon`） |
 | Operator | WPvivid cron + 操作者 manual trigger via MainWP UI |
+
+## Backup Milestone — 2026-06-08（週備份持續健康，JSON 同步補登）
+
+2026-06-08 Phase 4 routine WARN（JSON 停在 5/22）觸發 VBC 查證，直接查 EU MainWP DB `report_addon`（site_id=2）取得完整 task 歷史：
+
+| backup_time (UTC) | task_id | status |
+|---|---|---|
+| 2026-05-22 11:05 | wpvivid-ea9a8f38850c5 | Succeeded |
+| 2026-05-25 00:15 | wpvivid-c9f8ea1a50284 | **Failed** — Google Drive API 403 rateLimitExceeded（暫時性）|
+| 2026-06-01 00:15 | wpvivid-b888aaeec2aa6 | Succeeded |
+| 2026-06-08 00:15 | wpvivid-6e68a5af17f93 | **Succeeded**（最新）|
+
+結論：週備份機制正常運作（cron `wpvivid_weekly` 每週日 00:15 UTC）。5/25 單次失敗為 Google Drive API 速率限制，**後兩次自動恢復**，無需處置。WARN 純因 `BACKUP_AUTO_STATUS.json` 為手動同步、停在 5/22 → 已補登至 6/08。根本治理（自動同步）見 JSON `future_automation`。
 
 ## Restore Drill Record
 
