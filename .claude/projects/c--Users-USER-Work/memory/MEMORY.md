@@ -29,3 +29,4 @@
 - [Routine watchdog system (2026-06-06)](project_routine_watchdog_system.md) — 3-layer alerts watching the 4 Claude cloud routines; don't rebuild; routine sources MUST be awarewaveai-pei/Work
 - [CJK bash/cron encoding trap](reference_cjk_bash_cron_encoding.md) — CJK from SG cron bash mojibakes; fix = base64+file+curl text@file; verify via python ON server not ssh→PowerShell
 - [Content engine SSOT](project_content_engine_ssot.md) — 代操/內容引擎 SSOT = docs/wp-kadence-ai-seo-geo-content-engine.md; MVP AI-first 無付費 SEO API; 社群層自架 Postiz; 不繞回 JonOps
+- [AO-RESUME clean report format](feedback_ao_resume_clean_format.md) — 開工報告保留七段式結構但要整理乾淨：§1 狀態表、§5 按主線歸類、不倒原始 hook；SSOT 在 .claude/commands/ao-resume.md
