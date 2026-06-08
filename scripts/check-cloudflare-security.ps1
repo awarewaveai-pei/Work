@@ -10,13 +10,23 @@
 .NOTES
   Checks:
     1. Bot Fight Mode (bot_management.fight_mode = true)
-    2. WAF firewall rules count >= 3 and xmlrpc.php block rule present
+    2. WAF firewall rules count + xmlrpc.php block rule (informational under server-side mode)
   Requires: CLOUDFLARE_API_TOKEN (vault or User registry)
             CLOUDFLARE_ZONE_ID (vault/env, default: f21b1919632fee2221647908a94fdcac)
+
+  PASS criteria depend on -WpLoginProtectedByServerSide:
+    $true  (default, current architecture since 2026-06-04): wp-login/xmlrpc are defended
+           server-side (LLAR + nginx rate-limit + fail2ban). CF WAF rules are intentionally
+           empty — operator travels globally and CF geo rules would self-lock her out.
+           PASS requires only Bot Fight Mode = ON. WAF rule count is informational, NOT a
+           health signal. (See WORKLOG 2026-06-04 + memory feedback_global_traveler.)
+    $false (legacy): CF WAF is the wp-login/xmlrpc defense — PASS requires bot=ON AND
+           rules>=3 AND xmlrpc block present. Set this only if reverting to CF-WAF defense.
 #>
 param(
     [string]$WorkRoot = "",
-    [string]$ZoneId   = "f21b1919632fee2221647908a94fdcac"
+    [string]$ZoneId   = "f21b1919632fee2221647908a94fdcac",
+    [bool]$WpLoginProtectedByServerSide = $true
 )
 
 Set-StrictMode -Version Latest
@@ -86,12 +96,24 @@ if (-not $token) {
         if (-not $errorMsg) { $errorMsg = "firewall/rules API: $($_.Exception.Message)" }
     }
 
-    if ($botMode -eq "ON" -and $ruleCount -ge 3 -and $xmlrpcOk) {
-        $overall = "PASS"
-    } elseif ($errorMsg) {
-        $overall = "WARN"
+    if ($WpLoginProtectedByServerSide) {
+        # wp-login/xmlrpc defended server-side (LLAR + nginx + fail2ban) since 2026-06-04.
+        # CF layer is only responsible for Bot Fight Mode; empty WAF rules are by design.
+        if ($botMode -eq "ON") {
+            $overall = "PASS"
+        } else {
+            # bot=OFF or error → genuine CF posture issue, still WARN.
+            $overall = "WARN"
+        }
     } else {
-        $overall = "WARN"
+        # Legacy CF-WAF defense mode: WAF rules ARE the wp-login/xmlrpc layer.
+        if ($botMode -eq "ON" -and $ruleCount -ge 3 -and $xmlrpcOk) {
+            $overall = "PASS"
+        } elseif ($errorMsg) {
+            $overall = "WARN"
+        } else {
+            $overall = "WARN"
+        }
     }
 }
 
@@ -107,9 +129,16 @@ $lines = @(
     "| Check | Result |",
     "|-------|--------|",
     "| Bot Fight Mode | $botMode |",
-    "| WAF firewall rules count | $ruleCount |",
-    "| xmlrpc.php block rule | $(if ($xmlrpcOk) { 'present' } else { 'MISSING' }) |"
+    "| WAF firewall rules count | $ruleCount$(if ($WpLoginProtectedByServerSide) { ' (by design — empty; server-side defense)' }) |",
+    "| xmlrpc.php block rule | $(if ($xmlrpcOk) { 'present' } elseif ($WpLoginProtectedByServerSide) { 'server-side (nginx/LLAR)' } else { 'MISSING' }) |"
 )
+if ($WpLoginProtectedByServerSide) {
+    $lines += ""
+    $lines += "## wp-login / xmlrpc protection"
+    $lines += "- Mode: **server-side** (LLAR + nginx rate-limit + fail2ban) — architecture decision 2026-06-04."
+    $lines += "- CF WAF rules intentionally empty: operator travels globally; CF geo rules would self-lock. CF layer = Bot Fight Mode only."
+    $lines += "- This check only verifies the CF layer (Bot Fight Mode). Server-side layer is verified separately (client-status / WP plugin checks)."
+}
 if ($errorMsg) { $lines += ""; $lines += "## Errors"; $lines += "- $errorMsg" }
 Set-Content -Path (Join-Path $reportDir "cf-security-LATEST.md") -Value ($lines -join "`r`n") -Encoding UTF8
 
