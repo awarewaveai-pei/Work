@@ -43,15 +43,6 @@ param(
     [switch]$Force   # Bypass local-modified check; always import vault version
 )
 
-# UTF-8 console output: this script runs as a child process (& powershell.exe -File)
-# of ao-resume.ps1, whose stdout is captured into ao-resume-hook-last.json's log_tail.
-# Without chcp 65001, CJK paths (e.g. Google Drive's 「我的雲端硬碟」 in AO_SYNC_SECRETS_ROOT)
-# are emitted as CP950 bytes and mojibake when the parent/hook decodes them as UTF-8.
-# Mirrors scripts/print-open-tasks.ps1 (same child-process + CJK-output situation).
-if ($PSVersionTable.PSVersion.Major -lt 7) {
-    try { chcp 65001 | Out-Null } catch {}
-}
-
 # ── 0. Load env vars — User registry always wins over stale process env ─────
 # Reason: process env vars can be stale (inherited from IDE started before setx ran).
 # Always prefer the persisted User registry value; fall back to process env only if registry is empty.
