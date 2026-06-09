@@ -22,9 +22,15 @@ final class BlockLibrary {
 	 * blocks, so a no-theme BlockLibrary() emits byte-identical markup to v0.5.6 (backward compat).
 	 * A caller (e.g. another tenant) passes overrides to __construct() to re-skin without touching code.
 	 */
+	// EVERY colour is a Kadence Global-Palette TOKEN (paletteN / CSS var), never a literal hex. Tokens
+	// render as live `var(--global-paletteN)`, so when the site owner edits the Kadence Global Palette the
+	// colours in already-published posts follow automatically — no regeneration. (Operator directive
+	// 2026-06-09 "全部吃 Kadence，WP 改顏色也要跟著改"; this supersedes the prior fixed table-border
+	// #A7A5A5 standing default.) Slots chosen by closest match to the previously-hardcoded values on the
+	// soulful reference palette (palette9 = lightest ≈ white text; palette5 = mid ≈ visible border).
 	private const DEFAULT_THEME = array(
 		// Kadence Tabs — title pill palette (Kadence "paletteN" tokens or literal #hex / CSS var).
-		'tabsTitleColor'        => '#ffffff',
+		'tabsTitleColor'        => 'palette9',
 		'tabsTitleColorHover'   => 'palette1',
 		'tabsTitleColorActive'  => 'var(--global-palette5, #444444)',
 		'tabsTitleBg'           => 'palette3',
@@ -33,9 +39,9 @@ final class BlockLibrary {
 		'tabsTitleBorder'       => 'palette1',
 		'tabsTitleBorderHover'  => 'palette2',
 		'tabsTitleBorderActive' => 'palette2',
-		'tabsContentBorder'     => '#bdbdbd',
+		'tabsContentBorder'     => 'palette5',
 		// Kadence Table — cell border colour (all four sides).
-		'tableBorder'           => '#A7A5A5',
+		'tableBorder'           => 'palette5',
 		// Kadence Info Box — brand container background. A Kadence palette TOKEN (not a literal hex), so it
 		// inherits the site's Global Palette automatically: palette1 = the site's primary brand colour
 		// (soulful: #1c3e5a navy). This is the "eat the WP settings" default — no per-tenant config. The
@@ -337,8 +343,9 @@ final class BlockLibrary {
 				. '<!-- /wp:kadence/infobox -->';
 		}
 		$tpl = str_replace( '_7287fb-2b', $this->uid(), $tpl );
-		// Re-skin the brand container background (both normal + hover are soulful's #31533d). Default
-		// theme value is #31533d, so a no-theme call is a no-op (byte-identical); a tenant overrides it.
+		// Swap the captured skeleton's literal brand colour (soulful's OLD green #31533d, in both the
+		// container bg + hover bg) for the theme token — default 'palette1' makes it inherit the site's
+		// Global Palette (live-follows WP palette edits), instead of being frozen as a stale hex.
 		$tpl = str_replace( '#31533d', $this->theme['infoboxBg'], $tpl );
 		$tpl = preg_replace_callback( '#(<h5 class="kt-blocks-info-box-title">).*?(</h5>)#s', function ( $m ) use ( $title ) {
 			return $m[1] . $title . $m[2];

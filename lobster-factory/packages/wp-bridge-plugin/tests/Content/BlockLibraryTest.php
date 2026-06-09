@@ -55,15 +55,17 @@ final class BlockLibraryTest extends TestCase {
 
 	// ---- Backward compatibility (defaults = soulful's captured values) ------
 
-	public function test_default_tabs_palette_is_soulful_baseline(): void {
+	/** Every default colour is a palette TOKEN (live-follows the site's Global Palette), never a hex. */
+	public function test_default_tabs_palette_are_inheriting_tokens(): void {
 		$out = ( new BlockLibrary() )->tabs( array( array( 'title' => 'Alpha', 'content' => 'a' ) ) );
-		$this->assertStringContainsString( '"titleColor":"#ffffff"', $out );
+		$this->assertStringContainsString( '"titleColor":"palette9"', $out );
 		$this->assertStringContainsString( '"titleBg":"palette3"', $out );
 	}
 
-	public function test_default_table_border_is_standing_default(): void {
+	public function test_default_table_border_inherits_palette(): void {
 		$out = ( new BlockLibrary() )->table( array( array( 'A' ), array( '1' ) ) );
-		$this->assertStringContainsString( '#A7A5A5', $out );
+		$this->assertStringContainsString( 'palette5', $out );
+		$this->assertStringNotContainsString( '#A7A5A5', $out, 'fixed hex border replaced by inheriting token' );
 	}
 
 	/** Brand bg inherits the site's Global Palette (palette1), NOT the captured stale green hex. */
@@ -79,7 +81,7 @@ final class BlockLibraryTest extends TestCase {
 		$out = ( new BlockLibrary( array( 'tabsTitleColor' => '#123456' ) ) )
 			->tabs( array( array( 'title' => 'A', 'content' => 'a' ) ) );
 		$this->assertStringContainsString( '"titleColor":"#123456"', $out );
-		$this->assertStringNotContainsString( '"titleColor":"#ffffff"', $out );
+		$this->assertStringNotContainsString( '"titleColor":"palette9"', $out );
 	}
 
 	public function test_theme_overrides_table_border(): void {
@@ -100,7 +102,7 @@ final class BlockLibraryTest extends TestCase {
 		$out = ( new BlockLibrary( array( 'bogusKey' => 'xyz' ) ) )
 			->tabs( array( array( 'title' => 'A', 'content' => 'a' ) ) );
 		$this->assertStringNotContainsString( 'xyz', $out );
-		$this->assertStringContainsString( '"titleColor":"#ffffff"', $out );
+		$this->assertStringContainsString( '"titleColor":"palette9"', $out );
 	}
 
 	// ---- Theme value validation (injection guards) --------------------------
@@ -110,7 +112,7 @@ final class BlockLibraryTest extends TestCase {
 		$evil = '#fff","solid",1]}],"className":"hacked","x":["';
 		$out  = ( new BlockLibrary( array( 'tableBorder' => $evil ) ) )->table( array( array( 'A' ), array( '1' ) ) );
 		$this->assertStringNotContainsString( 'hacked', $out, 'injected attribute must not reach output' );
-		$this->assertStringContainsString( '#A7A5A5', $out, 'invalid border falls back to default' );
+		$this->assertStringContainsString( 'palette5', $out, 'invalid border falls back to default token' );
 	}
 
 	/** The info-box bg is str_replaced into a block comment — a literal "-->" must be rejected. */
