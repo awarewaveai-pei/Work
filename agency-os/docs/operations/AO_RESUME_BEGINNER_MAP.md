@@ -94,4 +94,65 @@
 
 ---
 
-_建立：2026-06-09。SSOT：本檔（系統地圖 + 詞典）。報告格式 SSOT：`.claude/commands/ao-resume.md` + `.cursor/rules/30-resume-keyword.mdc`。_
+## 4. 指令控制台：「我想做 X → 下什麼」
+
+> 你**不需要記任何觸發詞或工具名**——直接用白話跟 Claude 講要做什麼即可，Claude 會自己選工具。下表是讓你知道「系統能幫你做哪些事」的全貌。`/xxx` 是 slash command（斜線指令）。
+
+| 我想做… | 用什麼 | 風險 |
+|---------|--------|------|
+| 看系統健不健康 | `/health`（不健康再 `/sync-check`）| 安全 |
+| 看今天有哪些待辦 | `/tasks` | 安全 |
+| 回顧今天做了什麼 | `/recap` | 安全 |
+| 查 gap 期間的告警／Slack／Telegram | `/signals` | 安全 |
+| 看某客戶站狀態 | `/client-status <客戶代號>` | 安全 |
+| 幫客戶站備份＋安全更新 | `/wp-maintenance`（完會自動跑 `/playwright client`）| 中 |
+| 跑瀏覽器測試／截圖／效能 | `/playwright smoke`｜`qa`｜`screenshot <url>`｜`perf` | 安全 |
+| 部署上線 | `/check-drift` → `/verify` → （確認）→ `/sg-deploy` | **高**（需你點頭）|
+| 技術選型 / A vs B / 架構決策 | `/decide` | 安全 |
+| 找 bug / 一直報錯 | 跟 Claude 說「diagnose this」 | 安全 |
+| 重啟 VPS | `/sg-reboot`｜`/eu-reboot` | **高**（需你點頭）|
+| 開工（出狀態報告）| 說「AO-RESUME」或打招呼 | 安全 |
+| 收工（寫日誌＋健康閘）| 說「收工／晚安／bye／done」 | 安全 |
+
+> **風險分級**：安全＝Claude 直接做；中＝先說計畫再做；**高＝停下等你明示 go-ahead**（部署/重啟/金流/資料庫不可逆操作）。
+
+---
+
+## 5. 出事了怎麼辦：症狀 → 急救手冊（runbook）
+
+> 看到紅燈🔴或下列症狀，直接叫 Claude「讀 <runbook 名>」或描述症狀，它會自動 triage。手冊全在 repo 根的 `runbooks/`。
+
+| 症狀 | 對應 runbook |
+|------|-------------|
+| 網站 502 / 很慢 / 記憶體爆（OOM）/ 容器一直重啟 | `HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` |
+| 不明高 CPU / 可疑程序 / 疑似挖礦入侵 | `HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md` |
+| 帳密外洩 / 未授權存取 / 安全事件 | `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md` |
+| Telegram bot 不回話 / 指令沒反應 | `COMMAND_PLANE_TELEGRAM_SILENCE_RUNBOOK.md` |
+| 被掃描攻擊 / DDoS / 要設防火牆規則 | `CLOUDFLARE-WAF-SETUP.md` |
+| Trigger.dev 部署失敗 | `TRIGGER-DEPLOY-CLOUDFLARE-BFM.md` |
+| 監控（Uptime Kuma）誤報 / 壞了 | `UPTIME-KUMA-MONITOR-FIX.md` |
+| VPS 該重啟但 16 小時沒處理 | `VPS-AUTO-REBOOT-RUNBOOK.md` |
+
+**原則**：你不必自己讀 runbook 動手——描述症狀給 Claude，它讀手冊、先 triage、危險操作會先問你。
+
+---
+
+## 6. 系統自動幫你做的事（你**不用管**的）
+
+> 知道「什麼是自動的」跟知道「什麼要你做」一樣重要——才不會瞎操心已經有人顧的事。
+
+| 自動任務 | 頻率 | 你要做的 |
+|---------|------|---------|
+| SG + EU 全站備份 | 每日（cron）| 無；AO-RESUME §1 會報備份年齡 |
+| EU 客戶站備份狀態同步 | 每日 01:11 UTC | 無；防 Phase4 假警報 |
+| VPS 自動重啟（記憶體釋放）| 每日 20:00 UTC | 無；<16h verdict🟢 自動處理 |
+| 開工自動健檢（health + smoke + 外部信號 + Cloudflare）| 每次 AO-RESUME | 無；結果直接進報告 §1/§2 |
+| Auto-Repair 巡檢（Phase 4）| 每週五 14:00 | 無；異常才會 surface |
+| 月度系統/Supabase/治理巡檢 | 每 30 天 | 無；結果進報告 §1 |
+| 雲端 4 routines + 3 層告警看門狗 | 持續 | 無；壞了會告警 |
+
+**心法**：報告沒提到的＝系統默默在顧。你只要管報告 **§6（需你決策／期限）** 和 **§7（下一步）** 點名的事。
+
+---
+
+_建立：2026-06-09。SSOT：本檔（系統地圖 + 詞典 + 控制台 + 急救 + 自動化清單）。報告格式 SSOT：`.claude/commands/ao-resume.md` + `.cursor/rules/30-resume-keyword.mdc`。指令/ runbook 變動時同 PR 更新本檔（R4）。_
