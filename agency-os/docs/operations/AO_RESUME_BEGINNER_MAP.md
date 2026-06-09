@@ -1,6 +1,6 @@
 # AO-RESUME 小白地圖 + 名詞詞典（看懂報告 → 學成專家）
 
-> **用途**：AO-RESUME 七段報告（§0–§7）裡的術語、機器、縮寫，在這裡一次查清楚。
+> **用途**：AO-RESUME 報告（§0–§8）裡的術語、機器、縮寫，在這裡一次查清楚。
 > 報告本身用「雙層敘述」——保留專業術語 + 附白話；想深入就來這查全名與出處。
 > **這份是靜態參考**：只在系統架構變動時更新，不是每天讀。報告 §0 末尾的 `📖` 連結指到這裡。
 >
@@ -59,11 +59,11 @@
 ### AO 生命週期（AwareWave Ops）
 | 名稱 | 作用 |
 |------|------|
-| **AO-RESUME** | 開工：讀狀態檔 → 輸出七段報告（本檔服務的對象）。|
+| **AO-RESUME** | 開工：讀狀態檔 → 輸出 AO-RESUME 報告（§0–§8，本檔服務的對象）。|
 | **AO-CLOSE** | 收工：寫 WORKLOG/memory → 跑 health gate（要求 100%）。|
 | **health gate** | 健康閘：system-health-check 的分數門檻，未達標 AO-CLOSE 會擋。|
 | **gap window** | 上次收工 → 這次開工之間的時間區間（用來抓未處理的外部信號）。|
-| **handoff packet** | 跨 session 交接包，放 `agency-os/handoffs/`，AO-RESUME §7 會 inline。|
+| **handoff packet** | 跨 session 交接包，放 `agency-os/handoffs/`，AO-RESUME §8 會 inline。|
 | **WORKLOG** | 工作日誌，記根因/步驟/驗證，是「30 秒故障手冊」。|
 | **VBC** | Verify Before Conclude（先查證再下結論）——說「X 壞了/缺了」前先查是否有替代方案接手。|
 | **REALTEST_EVIDENCE** | 真實測試證據行（R0 四動作之一），證明改動真的 invoke 過。|
