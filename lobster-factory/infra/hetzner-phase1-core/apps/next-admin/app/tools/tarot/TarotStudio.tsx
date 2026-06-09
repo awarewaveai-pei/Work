@@ -524,7 +524,7 @@ export default function TarotStudio() {
         {previewImage && (
           <div style={{ marginTop: 16, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewImage} alt="preview" style={{ width: 200, borderRadius: 10, border: "1px solid var(--card-border)" }} />
+            <img src={previewImage} alt="preview" style={{ width: 300, borderRadius: 10, border: "1px solid var(--card-border)" }} />
             <div>
               <div className="form-hint" style={{ marginBottom: 8 }}>
                 預覽牌：{PREVIEW_CARD.name}

@@ -8661,3 +8661,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`.roman`\|`MINOR_ROMAN` | hits=0 stale（.roman 僅 renderPrintCard.ts guard 內消費、MINOR_ROMAN 僅 cards.ts；agency-os/scripts 無命中）
 
 - BUGHUNT_WAIVED: NA -- buildCardPrompt prompt 字串內容調整（移除 tarot card/牌名字眼→純插圖無框無字），無控制流/型別變更；tsc 通過
+
+- BUGHUNT_WAIVED: NA -- 預覽圖寬 200->300 純 style 數值，無邏輯變更；tsc 通過
