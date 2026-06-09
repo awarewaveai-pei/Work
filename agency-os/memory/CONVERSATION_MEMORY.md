@@ -474,6 +474,12 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - **onboarding portal**：① debug log 清理交付（commit `d3c7dd2`，tsc 0 + 168 tests + critic 0/0/0，未 deploy）。**②③ §7/§8 不實作的 R0 理由**：`orchestrate-tenant-provisioning` 不建 WP 站、`create-wp-site` 需 4 UUID、已有 `/build` console + dispatch-action-run + ops/organizations pipeline → ②③ 必須 reuse 既有 pipeline（設計 pass），不得另造/不得猜。packet + TASKS 已更正前任「已串接」錯誤假設。
 - **行為教訓（已存 memory feedback_aoresume_execution_discipline）**：先動手才理解造成多小時混亂；不抓 ignore 捷徑、不刪操作者 signal 檔、Windows bash 用正斜線、.ps1 regex 不放字面 BOM。
 
+### 2026-06-09 下午 — Tarot 牌卡模板改正式直線外框
+- 操作者要：棄裝飾 PNG 外框（6 個從沒做好），改一般正式塔羅版式 + 三種簡單直線不同色外框（金/藏青/酒紅）；版式 = 上羅馬數字／中圖像直接嵌入／下牌名。
+- 做法 pivot：`renderPrintCard.ts` 從「3-layer PNG overlay（透明中心圖檔）」改為純 canvas 繪製（雙直線外框 + 圖像細框線 + roman/name 文字），零外部圖檔依賴。CardTemplate 7→3 key。`TarotStudio.tsx` 預設改 `gold`。
+- tsc：我改的兩檔 0 新錯誤（剩 jszip/@supabase/ssr 為本機缺 node_modules 既存）。canvas 像素需瀏覽器，待 staging 確認。**未部署**。
+- `public/tarot-frames/*.png` + middleware 白名單現未使用，保留不刪。rollback = git revert 即還原。
+
 ## Related Documents (Auto-Synced)
 - `.cursor/rules/00-session-bootstrap.mdc`
 - `.cursor/rules/10-memory-maintenance.mdc`
@@ -482,5 +488,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-09 03:56:12 UTC_
+_Last synced: 2026-06-09 06:53:21 UTC_
 

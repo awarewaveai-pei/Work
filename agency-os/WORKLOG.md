@@ -1,4 +1,4 @@
-﻿# Worklog
+# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
@@ -9,7 +9,7 @@
 
 ### Tarot 牌卡模板改為正式直線外框（3 色，canvas 全畫，棄 PNG overlay）
 
-- AUTO_TASK_DONE: tarot 框線收尾
+- AUTO_TASK_DONE_APPLIED (2026-06-09T06:53:44Z): tarot 框線收尾
 
 **根本問題**：舊版牌卡模板用 6 個 PNG overlay 外框（classic-rw/handdrawn/medieval/folk/parchment/gothic），依賴 `public/tarot-frames/*.png` 透明中心圖檔——但「框 png 還沒做好」（TASKS.md:58），裝飾框風格也非操作者要的正式塔羅版式。操作者要：一般正式 tarot background，三種簡單直線不同色外框挑選，生成圖直接嵌入，版式=上羅馬數字／中圖像／下牌名。
 
@@ -7704,7 +7704,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-09 03:56:12 UTC_
+_Last synced: 2026-06-09 06:53:21 UTC_
 
 ## 2026-03-20
 
@@ -8638,4 +8638,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
+
 

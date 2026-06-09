@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-09 11:56:22
+- Generated: 2026-06-09 14:53:43
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -223,13 +223,17 @@
 # Daily Note - 2026-06-09
 
 ## Done today
-(fill in at AO-CLOSE)
+（session window 12:01→14:47）
+- **Tarot 牌卡模板改正式直線外框**：棄 6-PNG-overlay 路線，改純 canvas 三色直線框（金/藏青/酒紅）。版式=上羅馬數字／中圖像直接嵌入／下牌名。改 `renderPrintCard.ts`（CardTemplate 7→3 key）+ `TarotStudio.tsx`（預設 gold + label）。tsc 我改的兩檔 0 新錯誤；canvas 像素渲染待 staging 瀏覽器確認。未部署（待操作者 go-ahead）。
+- 上午另已完成 ao-close.ps1 四相位重構（commit 1ee4bb4f，見 WORKLOG）。
 
 ## Current state
-(fill in at AO-CLOSE)
+- Tarot 工具框線收尾完成（pivot 至 canvas），TASKS:58 PNG-frame 路線整個失效。
+- 改動未 commit（本次 AO-CLOSE checkpoint 會帶上）、未部署。
 
 ## Next steps
-(fill in at AO-CLOSE)
+- 部署 tarot 改動：`/check-drift` → `/verify` → go-ahead → `/sg-deploy` → app.aware-wave.com 點預覽實測三色框 + 羅馬數字/牌名位置。
+- POD/MEGA roadmap（TASKS:145-149）續行。
 
 ## Open tasks (auto-generated at 08:00 TPE)
 - [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。**下一步 = Stage 1 接通入口**：抓 2 筆卡 `spec_generated` 的 intake_forms → retry `POST /api/onboarding/trigger-build` 看精確錯誤碼（最可疑 trigger-build/route.ts L35-39 role 403 或 UI「跳回第一步」沒帶 spec/intake id）→ 對症修 → onboarding UI 走完一筆不碰 DB 達 completed。後續 Stage 2 Fluent Form→intake 橋接+FluentCRM／Stage 3 報價／Stage 4 機層租機(provisionClient 已寫好未接)／Stage 5 串接 Supabase/n8n/Sentry/Netdata/Uptime Kuma/PostHog。**動前 `git log -5` + 讀 WORKLOG（trigger-build 平行 session 觸碰過，VBC）。**
@@ -311,7 +315,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-
 **[驗證結果]**
 1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell test-stable-status.ps1 (4 cases) | exit=0 | result=ALL PASS（時間戳/報告名 churn→不寫；score 100→99.5 / exit 0→1→寫；首跑/缺檔→寫；regex 不誤傷 `- Health score:`/`- Health gate exit code:`）
    REALTEST_EVIDENCE: tool=Bash | cmd=run agency-os/scripts/system-guard.ps1 -WorkspaceRoot agency-os -Mode daily x2（排程實際呼叫） | exit=1(health FAIL 與 churn 無關) | result=LAST_SYSTEM_STATUS.md 兩次 SHA256 相同 60153216…（不再 churn）
@@ -370,4 +373,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
+
 
