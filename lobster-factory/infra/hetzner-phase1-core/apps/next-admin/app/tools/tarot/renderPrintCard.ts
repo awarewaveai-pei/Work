@@ -15,15 +15,17 @@ export const PRINT_H = 1488;
 const BASE = "#f6efdf";
 
 // Layout (px on the 898×1488 canvas). All elements sit safely inside the 35px (3mm) bleed.
+// Artwork dominates the card (~76% of height) like a real Rider-Waite card: thin border,
+// a slim Roman-numeral band on top, the picture nearly full, a slim name band at the bottom.
 const LAYOUT = {
-  frameMargin: 60, // outer border inset from card edge
-  frameInner: 16, // gap from outer rule to the inner thin rule
-  romanY: 168, // vertical centre of the Roman numeral
-  artTop: 244, // artwork window top
-  artBottom: 1252, // artwork window bottom
-  artInset: 130, // artwork left/right inset from card edge
+  frameMargin: 46, // outer border inset from card edge
+  frameInner: 14, // gap from outer rule to the inner thin rule
+  romanY: 128, // vertical centre of the Roman numeral (top band)
+  artTop: 182, // artwork window top
+  artBottom: 1312, // artwork window bottom
+  artInset: 74, // artwork left/right inset from card edge
   artLinePad: 10, // gap between artwork edge and its keyline
-  nameY: 1356, // vertical centre of the card name
+  nameY: 1398, // vertical centre of the card name (bottom band)
 };
 
 export type CardTemplate = "gold" | "navy" | "wine";

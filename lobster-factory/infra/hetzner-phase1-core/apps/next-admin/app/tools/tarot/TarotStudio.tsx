@@ -468,14 +468,14 @@ export default function TarotStudio() {
 
         <div className="form-row">
           <label className="form-label">外框顏色（正式塔羅版式 · 上羅馬數字／中圖像／下牌名 · 三色直線外框）</label>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
             {CARD_TEMPLATES.map((t) => {
               const active = template === t.key;
               return (
                 <div
                   key={t.key}
                   onClick={() => setTemplate(t.key)}
-                  style={{ cursor: "pointer", textAlign: "center", width: 86 }}
+                  style={{ cursor: "pointer", textAlign: "center", width: 129 }}
                 >
                   {templateThumbs[t.key] ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -483,8 +483,8 @@ export default function TarotStudio() {
                       src={templateThumbs[t.key]}
                       alt={t.label}
                       style={{
-                        width: 86,
-                        height: 142,
+                        width: 129,
+                        height: 213,
                         borderRadius: 6,
                         objectFit: "cover",
                         border: active ? "3px solid #6366f1" : "1px solid var(--card-border)",
@@ -493,21 +493,21 @@ export default function TarotStudio() {
                   ) : (
                     <div
                       style={{
-                        width: 86,
-                        height: 142,
+                        width: 129,
+                        height: 213,
                         borderRadius: 6,
                         border: "1px solid var(--card-border)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 18,
+                        fontSize: 22,
                         opacity: 0.5,
                       }}
                     >
                       …
                     </div>
                   )}
-                  <div style={{ fontSize: 11, marginTop: 4, lineHeight: 1.3, color: active ? "#4338ca" : "var(--text-muted)" }}>
+                  <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.3, color: active ? "#4338ca" : "var(--text-muted)" }}>
                     {t.label}
                   </div>
                 </div>

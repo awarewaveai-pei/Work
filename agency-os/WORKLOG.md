@@ -8653,3 +8653,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
 
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): tarot 版面尺寸常數/style 數值微調，無邏輯變更，tsc 我改的兩檔 0 新錯
