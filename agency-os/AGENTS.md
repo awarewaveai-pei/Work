@@ -323,13 +323,13 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 ## Session 啟動順序（每次都做）
 
 SSOT：[`.claude/commands/ao-resume.md`](../.claude/commands/ao-resume.md)（Claude Code）/ `.cursor/rules/30-resume-keyword.mdc`（Cursor）。  
-Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hook-last.json` → 七段式輸出。兩者不一致時以各自 SSOT 為準。
+Hook `ao-resume-on-prompt.ps1` 自動觸發 → 讀 `.agency-state/ao-resume-hook-last.json` → AO-RESUME 報告（§0–§8）輸出。兩者不一致時以各自 SSOT 為準。
 
 ## AO-RESUME / AO-CLOSE 快速續接
 
 **雙機前提**：個人筆電 + 公司桌機兩台；所有環境以「repo 共用 + 各機獨立 env/vault」處理，不假設單機。
 
-**AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（300 秒去重）。代理讀狀態檔回七段式；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。  
+**AO-RESUME**：IDE hook 自動跑 `ao-resume.ps1 -FullMainlineParity` → 寫入 `.agency-state/ao-resume-hook-last.json`（300 秒去重）。代理讀狀態檔回 AO-RESUME 報告（§0–§8）；Exit 0 = 可開工；禁止叫使用者手動 pull。詳見 `.claude/commands/ao-resume.md`。  
 `ao-resume.ps1` 同時自動執行 `scripts/check-smoke-tests.ps1`（application-layer smoke：n8n MCP + Repair Center health + 客戶網站健康 + n8n workflow 失敗）→ 寫 `reports/status/smoke-LATEST.json` → Claude 在 §1 系統快照回報。使用者不需要記得跑 `/smoke-test`。  
 每 30 天自動執行月度三項檢查（warn-only）：`monthly-system-review.ps1` / `check-supabase-memory-monthly.ps1` / `check-governance-docs-drift.ps1`。結果寫 `reports/`，Claude 在 §1 回報。
 
@@ -372,5 +372,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-06-09 02:22:27 UTC_
+_Last synced: 2026-06-09 02:54:05 UTC_
 

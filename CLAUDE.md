@@ -40,7 +40,7 @@ SSOT：`mcp/registry.template.json`。改動後跑 `scripts/sync-mcp-config.ps1`
 
 ## AO 生命週期
 
-**開工**：對話第一句是問候 / 短句無明確目標（< 15 字）→ 直接執行 AO-RESUME，輸出七段式摘要。Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（300 秒去重）；Claude 讀狀態檔即可。  
+**開工**：對話第一句是問候 / 短句無明確目標（< 15 字）→ 直接執行 AO-RESUME，輸出 AO-RESUME 報告（§0–§8）摘要。Hook 已自動跑 `ao-resume.ps1 -FullMainlineParity`（300 秒去重）；Claude 讀狀態檔即可。  
 **收工**：任何關機/結束表達（「收工」「晚安」「bye」「done」「先這樣」「走了」等）→ 直接觸發完整 AO-CLOSE 流程（**預授權**：WORKLOG / memory / daily / reports 寫入及 ao-close.ps1 執行均直接進行，R0 逐項批准在此流程內不適用；gate 失敗時自修後重跑，禁止逐步請使用者同意）。
 
 ## VPS 並行衝突（drop-in 檔案）

@@ -966,7 +966,7 @@ try {
             Write-Host ("  action  : run /{0} (auto-runs pre-flight read-only; wait for go-ahead to reboot)" -f $slug) -ForegroundColor Cyan
             Write-Host ""
         }
-        Write-Host "Claude: surface this in your AO-RESUME 7-segment output immediately, do not bury it." -ForegroundColor Red
+        Write-Host "Claude: surface this in your AO-RESUME report immediately, do not bury it." -ForegroundColor Red
         Write-Host "==================================================================" -ForegroundColor Red
     }
 } catch {
@@ -1063,7 +1063,7 @@ Write-Host ""
 Write-Host ("AO-RESUME stamp updated: {0}" -f $nowStamp) -ForegroundColor DarkGray
 
 # --- AO-RESUME archive skeleton (preventer for health gate 12d / verify-aoresume-archive.ps1) ---
-# Root cause (2026-06-08 investigation): Step 3 of ao-resume.md (write the 7-segment report to
+# Root cause (2026-06-08 investigation): Step 3 of ao-resume.md (write the AO-RESUME report to
 # agency-os/reports/ao-resume/YYYY-MM-DD-HHmm.md) was a MANUAL Claude action. When forgotten at
 # resume it surfaced only as a CRITICAL fail at the *next* AO-CLOSE, forcing manual self-repair
 # (6/5 補寫 2026-06-05-1910.md; 6/6 補寫 2026-06-06-1933.md — the recurring friction the operator hit).
