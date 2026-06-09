@@ -33,6 +33,27 @@
 
 AUTO_TASK_DONE: AO-RESUME 報告 §0–§8 升級（+§0 TL;DR/+§6 阻塞獨立/雙層敘述/小白手冊 6 節）+ 全檔 renumber 收尾 + 衝突記憶重寫；parse+cp950+doc-sync+parity 全綠
 
+### §0/§6/§7 必印機械閘 — 把「自律」變「閘」（使用者：我不相信自律）
+
+**根本問題**：§0/§6/§7「必印」原本只靠 Claude 自律，無機械強制。`verify-aoresume-archive.ps1`（gate 12d）只驗 archive 檔存在+時戳，**不驗內容** → Claude 忘填或骨架存活仍 PASS。
+
+**[已修改]** `scripts/verify-aoresume-archive.ps1`：找到覆蓋 stamp 的 archive 後加**內容閘**——讀檔驗 4 條：① 無 `<!-- AUTO-SKELETON` 殘留 ② 無 skeleton placeholder（`Claude 填寫`）③④ 含 §0(一句話總結/TL;DR)/§6(阻塞與風險)/§7(需你決策) 關鍵字；任一缺 → exit 1（既有 FAIL 路徑，caller `system-health-check.ps1:800` Add-CriticalFailure → AO-CLOSE 硬擋）。exit 0/1/2 三碼契約不變。
+
+**CP950 trap（踩到並修正）**：首版把 CJK 字面值（`阻塞與風險`、全形 `（）`）寫進 BOM-less `.ps1` → Big5 console `powershell -File` 讀成亂碼 → parse break（與 audit-encoding 警告同類）。**根治**：match patterns 改用 `[char]0xXXXX` 碼點 runtime 組字串 + `.Contains()`，源碼 100% ASCII；temp 測試 driver 同樣 ASCII 化。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-aoresume-archive.ps1`（真 repo 今日 archive 有 §0/§6/§7）| exit=0 | PASS
+- REALTEST_EVIDENCE: tool=Bash | cmd=temp driver 3 案（CASE2 骨架存活→exit1 / CASE3 缺§6→exit1 / CASE4 完整→exit0）| 全 OK（含 `powershell -File` CP950 路徑乾淨，證 ASCII-safe）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile` + `audit-cp950-traps -ParseBreakOnly` | exit=0 | PARSE OK + CLEAN 150/150
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0M/0n — exit 0/1/2 契約保留；placeholder 改 `Claude 填寫`（distinctive）降誤殺；空態必印段仍含 header 關鍵字不誤殺
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`verify-aoresume-archive` | hits=caller `system-health-check.ps1:792-813`（消費 exit 0/1/2，default→critical；契約完好）+ WORKLOG/reports 歷史引用（非 stale）
+
+**[剩餘風險]** placeholder 檢查 `Claude 填寫` 理論上真內容若含此字串會誤殺（極罕；AUTO-SKELETON marker 為主防線）。關鍵字比對是 substring，不驗段落順序/完整性（僅驗「必印段存在且非骨架」，足夠擋 silent skip）。
+
+**[rollback]** `git revert` 還原單檔 `verify-aoresume-archive.ps1`；無 schema/prod/DB。
+
+AUTO_TASK_DONE: §0/§6/§7 必印機械閘（verify-aoresume-archive 內容驗證；CP950-safe [char] 碼點；4 案實測；caller 契約不變）
+
 ## 2026-06-08
 
 - AUTO_TASK_DONE_APPLIED (2026-06-08T10:28:55Z): Claude Code user-level sync 反覆 drift

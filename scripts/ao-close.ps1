@@ -95,8 +95,12 @@ if (Test-Path -LiteralPath $gateLib) {
 function Invoke-CloseoutGateDecision {
     param([Parameter(Mandatory = $true)] $Gate)
     if (Test-CloseoutShouldBlock $Gate) {
+        # Write-Host (NOT Write-Error): under $ErrorActionPreference='Stop' Write-Error throws a
+        # terminating exception, which would (a) make `return $true` dead code and (b) bury the clean
+        # consolidated report under a raw stack trace — defeating the whole point of batched reporting.
+        # The caller owns the exit via `if (Invoke-CloseoutGateDecision ...) { exit 1 }`.
         Write-Host ""
-        Write-Error (Get-CloseoutGateReport $Gate)
+        Write-Host (Get-CloseoutGateReport $Gate) -ForegroundColor Red
         return $true   # blocked
     }
     return $false       # clean
