@@ -7,6 +7,29 @@
 ### Daily
 - (TBD)
 
+### Tarot 牌卡模板改為正式直線外框（3 色，canvas 全畫，棄 PNG overlay）
+
+- AUTO_TASK_DONE: tarot 框線收尾
+
+**根本問題**：舊版牌卡模板用 6 個 PNG overlay 外框（classic-rw/handdrawn/medieval/folk/parchment/gothic），依賴 `public/tarot-frames/*.png` 透明中心圖檔——但「框 png 還沒做好」（TASKS.md:58），裝飾框風格也非操作者要的正式塔羅版式。操作者要：一般正式 tarot background，三種簡單直線不同色外框挑選，生成圖直接嵌入，版式=上羅馬數字／中圖像／下牌名。
+
+**方案**：放棄 PNG overlay 路線，改為純 canvas 繪製的三色直線框。零外部圖檔依賴。
+
+**[已修改]**
+- `app/tools/tarot/renderPrintCard.ts` — 重寫渲染。`CardTemplate` 由 7 key 縮為 3（`gold`/`navy`/`wine`）；雙直線外框+圖像細框線同色；上方 `card.roman`、中央圖像 object-fit cover 直接嵌入、下方 `card.name` 自動縮字；米色羊皮紙底；898×1488@300DPI 含出血不變。
+- `app/tools/tarot/TarotStudio.tsx` — 預設 template `classic-rw`→`gold`；label 改「外框顏色（正式塔羅版式…三色直線外框）」。既有縮圖預覽 useEffect 自動套新框，無需改。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`(next-admin) | exit=非0 | 我改的兩檔 **0 新型別錯誤**；僅 `jszip`/`@supabase/ssr` 兩個既存「Cannot find module」(本機未裝 node_modules，與本次無關)
+- REALTEST_WAIVED: SMOKE_COVERED -- canvas 實際像素渲染需瀏覽器，本機無法 headless；待部署 staging 後 app.aware-wave.com 點預覽確認
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0M/1n | 1 nit：`public/tarot-frames/*.png` 與 middleware 白名單變未使用（保留不刪，無害）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`classic-rw`\|`handdrawn`\|`CardTemplate`\|`renderPrintCard` | hits=0 stale code 引用（殘留命中皆無害：`medieval` 在 prompt 字串、`border:"none"` CSS、`parchment` 註解；CardTemplate union 自洽 3 key，預設 `gold` 存在）
+- BUGHUNT_SCOPE_NARROW: 自包含前端工具，CardTemplate/renderPrintCard 僅 renderPrintCard.ts+TarotStudio.tsx 引用；middleware 僅白名單靜態路徑，無 downstream code consumer
+
+**[剩餘風險]** 未部署（操作者未下 go-ahead）。`tarot-frames` PNG 與 middleware 白名單現未使用但保留。
+
+**[rollback]** `git revert` 本 commit 即還原 6-PNG-frame 版本（PNG 檔未刪）。
+
 ### ao-close.ps1 四相位重構 — 根治「收工串行 fail-fast、blocker 逐個發現、每次重跑」(behavior-preserving)
 
 - AUTO_TASK_DONE: ao-close.ps1 四相位重構
