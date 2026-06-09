@@ -1,39 +1,45 @@
 // Client-only: compose a print-ready tarot card PNG from AI artwork on a <canvas>.
 // Output: 898×1488 px = 76×126 mm @ 300 DPI (70×120 mm card + 3 mm bleed each side).
 //
-// 3 layers (bottom → top): base colour · generated artwork · transparent-centre frame PNG.
-// The frame PNGs (public/tarot-frames/*.png) have their blank centre flood-filled to transparent,
-// so the artwork shows through the centre while the ornate border + title panel overlay on top.
+// Formal straight-line tarot layout, drawn entirely on canvas (no PNG frame assets):
+//   parchment background · double straight-ruled border in the chosen colour ·
+//   ROMAN NUMERAL (top) · artwork (centre, embedded directly) · CARD NAME (bottom).
+// Three templates differ only by border/ink colour.
 
 import type { TarotCard } from "./cards";
 
 export const PRINT_W = 898;
 export const PRINT_H = 1488;
 
-// Bottom base colour — only ever visible if artwork has transparency (it doesn't); keeps edges clean.
-const BASE = "#f4ecd8";
-// Artwork window (fraction of card). Generous on purpose: each frame masks the overflow to its own
-// transparent hole shape (e.g. the gothic arch), so one window fits every template.
-const ART = { x: 0.05, y: 0.05, w: 0.9, h: 0.8 };
+// Parchment base — also shows in the top/bottom title margins around the artwork.
+const BASE = "#f6efdf";
 
-export type CardTemplate = "classic-rw" | "handdrawn" | "medieval" | "folk" | "parchment" | "gothic" | "none";
+// Layout (px on the 898×1488 canvas). All elements sit safely inside the 35px (3mm) bleed.
+const LAYOUT = {
+  frameMargin: 60, // outer border inset from card edge
+  frameInner: 16, // gap from outer rule to the inner thin rule
+  romanY: 168, // vertical centre of the Roman numeral
+  artTop: 244, // artwork window top
+  artBottom: 1252, // artwork window bottom
+  artInset: 130, // artwork left/right inset from card edge
+  artLinePad: 10, // gap between artwork edge and its keyline
+  nameY: 1356, // vertical centre of the card name
+};
+
+export type CardTemplate = "gold" | "navy" | "wine";
 
 interface FrameDef {
   key: CardTemplate;
   label: string;
-  file?: string; // under /public/tarot-frames/ (omitted for "none")
-  titleY?: number; // vertical centre of the title text, as a fraction of card height
-  titleColor?: string;
+  line: string; // border + keyline colour
+  ink: string; // Roman numeral + card name colour
+  bg: string; // parchment tint
 }
 
 export const CARD_TEMPLATES: FrameDef[] = [
-  { key: "classic-rw", label: "經典 Rider-Waite", file: "classic-rw.png", titleY: 0.945, titleColor: "#3a2a1a" },
-  { key: "handdrawn", label: "手繪復古", file: "handdrawn.png", titleY: 0.935, titleColor: "#3a2a1a" },
-  { key: "medieval", label: "中世紀手抄本", file: "medieval.png", titleY: 0.94, titleColor: "#3a2a1a" },
-  { key: "folk", label: "民俗樸拙", file: "folk.png", titleY: 0.94, titleColor: "#5a3a2a" },
-  { key: "parchment", label: "古董羊皮卷", file: "parchment.png", titleY: 0.94, titleColor: "#4a3420" },
-  { key: "gothic", label: "哥德聖窗", file: "gothic.png", titleY: 0.925, titleColor: "#3a2a1a" },
-  { key: "none", label: "無框・純藝術" },
+  { key: "gold", label: "金線", line: "#b0892b", ink: "#6d531a", bg: "#f7f0df" },
+  { key: "navy", label: "藏青", line: "#2c4570", ink: "#22324f", bg: "#f4f0e6" },
+  { key: "wine", label: "酒紅", line: "#7e2533", ink: "#5c1a24", bg: "#f7eee5" },
 ];
 
 const FRAME_BY_KEY: Record<string, FrameDef> = Object.fromEntries(CARD_TEMPLATES.map((t) => [t.key, t]));
@@ -82,9 +88,10 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 /**
- * Render one print-ready card with the 3-layer compose. `template = "none"` → full-bleed artwork.
+ * Render one print-ready card: parchment background, double straight-ruled colour border,
+ * Roman numeral on top, artwork embedded in the centre, card name on the bottom.
  */
-export async function renderPrintCard(card: TarotCard, artDataUrl: string, template: CardTemplate = "classic-rw"): Promise<Blob> {
+export async function renderPrintCard(card: TarotCard, artDataUrl: string, template: CardTemplate = "gold"): Promise<Blob> {
   const art = await loadImage(artDataUrl);
   const canvas = document.createElement("canvas");
   canvas.width = PRINT_W;
@@ -92,35 +99,47 @@ export async function renderPrintCard(card: TarotCard, artDataUrl: string, templ
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas_2d_unavailable");
 
-  const def = FRAME_BY_KEY[template] ?? FRAME_BY_KEY["classic-rw"];
+  const def = FRAME_BY_KEY[template] ?? CARD_TEMPLATES[0];
 
-  // No-frame → full-bleed artwork.
-  if (!def.file) {
-    drawCover(ctx, art, 0, 0, PRINT_W, PRINT_H);
-    return toBlob(canvas);
-  }
-
-  // Layer 1 — base colour.
-  ctx.fillStyle = BASE;
+  // Layer 1 — parchment background.
+  ctx.fillStyle = def.bg ?? BASE;
   ctx.fillRect(0, 0, PRINT_W, PRINT_H);
 
-  // Layer 2 — artwork in the central window (frame masks the overflow to its hole shape).
-  drawCover(ctx, art, ART.x * PRINT_W, ART.y * PRINT_H, ART.w * PRINT_W, ART.h * PRINT_H);
+  // Layer 2 — artwork embedded directly in the central window.
+  const ax = LAYOUT.artInset;
+  const aw = PRINT_W - LAYOUT.artInset * 2;
+  const ay = LAYOUT.artTop;
+  const ah = LAYOUT.artBottom - LAYOUT.artTop;
+  drawCover(ctx, art, ax, ay, aw, ah);
 
-  // Layer 3 — the transparent-centre frame on top (border + title panel overlay the artwork).
-  // ?v cache-buster: frame files keep the same name across updates, so bump this when they change.
-  const frame = await loadImage(`/tarot-frames/${def.file}?v=2`);
-  ctx.drawImage(frame, 0, 0, PRINT_W, PRINT_H);
+  // Layer 3 — straight-line frame + text, all in the template colour.
+  ctx.strokeStyle = def.line;
 
-  // Card name into the title panel (drawn last → always crisp).
-  if (def.titleY) {
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const px = fitFont(ctx, card.name, PRINT_W * 0.6, 40);
-    ctx.font = `bold ${px}px Georgia, "Times New Roman", serif`;
-    ctx.fillStyle = def.titleColor ?? "#2a2a1a";
-    ctx.fillText(card.name, PRINT_W / 2, def.titleY * PRINT_H);
-  }
+  // Outer double border (two concentric straight rectangles).
+  const m = LAYOUT.frameMargin;
+  ctx.lineWidth = 6;
+  ctx.strokeRect(m, m, PRINT_W - m * 2, PRINT_H - m * 2);
+  const mi = m + LAYOUT.frameInner;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(mi, mi, PRINT_W - mi * 2, PRINT_H - mi * 2);
+
+  // Thin keyline around the artwork window.
+  const p = LAYOUT.artLinePad;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(ax - p, ay - p, aw + p * 2, ah + p * 2);
+
+  // Roman numeral (top) — large serif, centred.
+  ctx.fillStyle = def.ink;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const romanPx = fitFont(ctx, card.roman, PRINT_W * 0.4, 72);
+  ctx.font = `bold ${romanPx}px Georgia, "Times New Roman", serif`;
+  ctx.fillText(card.roman, PRINT_W / 2, LAYOUT.romanY);
+
+  // Card name (bottom) — centred, auto-shrunk to fit.
+  const namePx = fitFont(ctx, card.name, PRINT_W * 0.7, 52);
+  ctx.font = `bold ${namePx}px Georgia, "Times New Roman", serif`;
+  ctx.fillText(card.name, PRINT_W / 2, LAYOUT.nameY);
 
   return toBlob(canvas);
 }

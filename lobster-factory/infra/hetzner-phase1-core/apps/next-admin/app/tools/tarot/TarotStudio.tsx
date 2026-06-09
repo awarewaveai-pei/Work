@@ -117,7 +117,7 @@ export default function TarotStudio() {
   const [model, setModel] = useState<TarotModel>("flux-schnell");
   const [mode, setMode] = useState<Mode>("text");
   const [group, setGroup] = useState<GroupKey>("major");
-  const [template, setTemplate] = useState<CardTemplate>("classic-rw");
+  const [template, setTemplate] = useState<CardTemplate>("gold");
   const [stylePrompt, setStylePrompt] = useState("");
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
@@ -467,7 +467,7 @@ export default function TarotStudio() {
         </div>
 
         <div className="form-row">
-          <label className="form-label">牌卡模板（點選樣式 · 套在生成圖外當外框 + 牌名）</label>
+          <label className="form-label">外框顏色（正式塔羅版式 · 上羅馬數字／中圖像／下牌名 · 三色直線外框）</label>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {CARD_TEMPLATES.map((t) => {
               const active = template === t.key;
