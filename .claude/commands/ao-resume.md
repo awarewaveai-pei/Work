@@ -138,7 +138,7 @@ Also read `agency-os/.agency-state/junction-last.json` if present:
 Then output the **AO-RESUME 七段式** response:
 
 > **輸出風格規範（強制，2026-06-08 使用者明示）— 「整理好，不要一坨」：**
-> 1. **段落編號結構不可拆**（§0 + §1–§7）；**§0 TL;DR 與 §6 需你決策必印**（即使空也印一行），其餘無內容的段省略，不新增自創段號。
+> 1. **段落編號結構不可拆**（§0 + §1–§8）；**§0 TL;DR、§6 阻塞與風險、§7 需你決策必印**（即使空也印一行），其餘無內容的段省略，不新增自創段號。
 > 2. **每段收短、可掃讀**：能用表格就用表格；機器欄位（log_tail 原文、原始時戳串、source flag）翻成白話或省略，不直接貼。
 > 3. **§1 用精簡狀態表**（項目 | 狀態），一列一項；非問題的 WARN 要當場註明「非問題，原因…」（如 CF 規則=0 → LLAR 替代）。
 > 4. **§5 按主線歸類**（見該段規則），不照 TASKS.md 原始 `####` 分類整坨倒；每項一行、去掉冗字。
@@ -156,7 +156,7 @@ Then output the **AO-RESUME 七段式** response:
 - **燈號**：🟢（health ≥99% 且無 fresh 告警）／🟡（有 WARN 或 health 95–99%）／🔴（health <95% 或有 critical／fresh incident）
 - **告警摘要**：本輪 fresh 外部信號數 + health 失分項合計；0 則寫「無告警」
 - **主線**：從 §5 主線群 + handoff 推今日最重要的一條
-- **今天建議**：§7 第一個具體動作，濃縮成一句
+- **今天建議**：§8 第一個具體動作，濃縮成一句
 末尾固定附小白入口一行：
 `📖 看不懂名詞／想知道哪台機器跑什麼 → docs/operations/AO_RESUME_BEGINNER_MAP.md`
 
@@ -225,8 +225,7 @@ If nothing definitive, state that clearly and point to WORKLOG for reference.
 **4. 目前進度**
 - Lobster Factory Milestone (M1~M5) + 今日 DoD
 - Git/Audit: exit code | AUDIT RESULT: PASS? | ahead=N behind=N
-- 阻塞/風險: list specific blockers with evidence; do NOT write just「無」— if none found, write「本次盤點：未見需立即處理之阻塞」and state the basis.
-  **Source rules**: derive blockers ONLY from (a) open `- [ ]` tasks in TASKS.md, (b) `is_fresh=true` external signals, (c) health check failures in ao-resume-hook log. **Never derive from `- [x]` items** (even if they appear in `### 未完成`); `[x]` = already resolved, not a blocker.
+（阻塞／風險已獨立為 §6，本段只講「進行到哪」，不重複列阻塞。）
 
 **5. 未完成待辦（TASKS）**
 **按邏輯動態歸納主題**：把**同一主題/同一 project 的待辦併在一起**，不論它當初哪天加的、原本寫在 TASKS.md 哪個 `####` 分類。使用者會隨 project 演進不斷加新主題、新項目 — 主題清單**不是固定的**，必須每次依「當下實際有哪些待辦」現場長出來。
@@ -242,7 +241,15 @@ Task count（所有群加總）must match `open-tasks-snapshot.md` Total open。
 
 > 反例（禁止）：把六個固定桶寫死照抄。主題是浮動的，要靠當下任務內容歸納，不是套模板。
 
-**6. 需你決策 / 期限提醒**（**必印** — 即使空也要印一行，永久區分「查過=無」與「漏了」）
+**6. 阻塞與風險**（**必印** — 一眼可見，不得埋進別段）
+列出**現在卡住／有風險／需注意**的事（這是「診斷」，不是「要你做的事」——那是 §7）。
+- 每項附 `file:line` 或具體證據；**禁止**只寫「無」二字。
+- **Source rules**：阻塞只能來自 (a) TASKS.md 的 open `- [ ]`、(b) `is_fresh=true` 外部信號、(c) ao-resume-hook health check 失敗。**禁止**從 `- [x]` 推導（已解決 ≠ 阻塞）。
+- 盤點後確無 → 寫「本次盤點：未見需立即處理之阻塞」**並一句說明依據**（如 Strict 結果、WORKLOG／memory 是否曾標記風險）。
+- **雙層**：技術阻塞保留術語＋附白話「這會擋住什麼、嚴不嚴重」。
+- 與 §7 邊界：阻塞若需**你**拍板 → 在 §7 引用，不在此重複全文（同資訊只出現一段）。
+
+**7. 需你決策 / 期限提醒**（**必印** — 即使空也要印一行，永久區分「查過=無」與「漏了」）
 
 分兩部分：
 
@@ -253,9 +260,9 @@ Task count（所有群加總）must match `open-tasks-snapshot.md` Total open。
 
 **(b) ⏰ 期限雷達** — 有明確時間死線的項目，從 §5 待辦 + handoff + WORKLOG 掃出（如「Phase 4 觀察期 X/XX 到期」「出國前 Termius 未設定」）。每項一行：`<項目> — 死線 <日期> — 剩 N 天`。
 
-**空態規則（強制）**：若 (a)(b) 皆無，印一行 `§6：本輪無需你做決定，無迫近期限。` — **不得整節省略**（靜默省略會讓人分不清「已查無事」還是「漏寫」）。
+**空態規則（強制）**：若 (a)(b) 皆無，印一行 `§7：本輪無需你做決定，無迫近期限。` — **不得整節省略**（靜默省略會讓人分不清「已查無事」還是「漏寫」）。
 
-**7. 下一步**
+**8. 下一步**
 
 **Pending handoff packets (check before first action)**:
 
