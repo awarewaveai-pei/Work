@@ -98,30 +98,131 @@ export const TAROT_CARDS: TarotCard[] = [...MAJOR, ...MINOR];
 /** The card used for the single style-preview generation. */
 export const PREVIEW_CARD: TarotCard = MAJOR[0]; // THE FOOL
 
-// The card frame + Roman numeral + card name are drawn by our own canvas overlay
-// (renderPrintCard.ts). The image model must therefore output ONLY the inner scene —
-// a full-bleed illustration with no card border, no frame, and no lettering — otherwise
-// the result is a card-inside-a-card with the title printed twice.
-const NO_FRAME_NO_TEXT =
-  "Full-bleed illustration that fills the whole image edge to edge. This is the inner artwork ONLY — " +
-  "NOT a finished tarot card: absolutely no card border, no decorative frame, no rounded card edges, " +
-  "no title bar or banner, no card name, no caption, no numerals, no letters, no text or writing anywhere in the image.";
+// ── Free (no-API) zh→en style lexicon ───────────────────────────────────────
+// FLUX's text encoder barely understands Chinese, so a Chinese style description
+// ("梵谷畫風") is mostly ignored. We translate known art-style terms to English
+// locally (zero cost, instant, deterministic) before composing the prompt.
+// Anything not in the table passes through unchanged — no worse than before.
+const STYLE_LEXICON: Record<string, string> = {
+  // artists
+  梵谷: "Van Gogh post-impressionist oil painting with swirling brushstrokes",
+  梵高: "Van Gogh post-impressionist oil painting with swirling brushstrokes",
+  莫內: "Monet impressionist painting",
+  莫奈: "Monet impressionist painting",
+  畢卡索: "Picasso cubist painting",
+  達利: "Salvador Dali surrealist painting",
+  克林姆: "Gustav Klimt art nouveau golden ornament",
+  宮崎駿: "Studio Ghibli anime",
+  吉卜力: "Studio Ghibli anime",
+  // media
+  水彩: "watercolor painting",
+  油畫: "oil painting",
+  壓克力: "acrylic painting",
+  素描: "pencil sketch",
+  鉛筆: "pencil drawing",
+  彩色鉛筆: "colored-pencil illustration",
+  炭筆: "charcoal drawing",
+  粉彩: "soft pastel painting",
+  水墨: "traditional Chinese ink wash painting",
+  國畫: "traditional Chinese ink wash painting",
+  中國風: "traditional Chinese art style",
+  浮世繪: "ukiyo-e Japanese woodblock print",
+  版畫: "woodcut print",
+  剪紙: "paper-cut collage",
+  彩繪玻璃: "stained glass",
+  馬賽克: "mosaic art",
+  刺繡: "embroidery art",
+  // styles / genres
+  動漫: "anime manga style",
+  日漫: "Japanese anime style",
+  二次元: "anime style",
+  動畫: "animation style",
+  漫畫: "comic book style",
+  卡通: "cartoon style",
+  像素: "pixel art",
+  點陣: "pixel art",
+  寫實: "photorealistic",
+  逼真: "photorealistic",
+  印象派: "impressionist painting",
+  後印象派: "post-impressionist painting",
+  表現主義: "expressionist painting",
+  超現實: "surrealist",
+  立體派: "cubist painting",
+  新藝術: "art nouveau",
+  裝飾藝術: "art deco",
+  普普: "pop art",
+  波普: "pop art",
+  塗鴉: "graffiti street art",
+  街頭: "street art",
+  極簡: "minimalist",
+  簡約: "minimalist",
+  復古: "vintage retro",
+  懷舊: "vintage nostalgic",
+  哥德: "gothic",
+  歌德: "gothic",
+  暗黑: "dark moody",
+  夢幻: "dreamy ethereal",
+  奇幻: "fantasy art",
+  童話: "fairytale storybook illustration",
+  繪本: "storybook illustration",
+  賽博龐克: "cyberpunk neon",
+  電馭叛客: "cyberpunk neon",
+  蒸汽龐克: "steampunk",
+  中世紀: "medieval",
+  霓虹: "neon glow",
+  唯美: "aesthetic and beautiful",
+  可愛: "cute kawaii",
+  黑白: "black and white monochrome",
+  // suffixes (kept last by length sort below)
+  畫風: " style",
+  風格: " style",
+};
+
+/**
+ * Replace known Chinese art-style terms with English. Longest keys first so
+ * compounds win (e.g. "梵谷畫風" → Van Gogh… , not "梵谷" + leftover "畫風").
+ * Free, local, no API call.
+ */
+export function localizeStyle(input: string): string {
+  let out = input;
+  for (const key of Object.keys(STYLE_LEXICON).sort((a, b) => b.length - a.length)) {
+    if (out.includes(key)) out = out.split(key).join(STYLE_LEXICON[key]);
+  }
+  return out.replace(/\s+/g, " ").trim();
+}
+
+/** Bilingual quick-pick chips for the style box (insert the English term FLUX understands). */
+export const STYLE_PRESETS: { zh: string; en: string }[] = [
+  { zh: "梵谷", en: "Van Gogh oil painting" },
+  { zh: "水彩", en: "watercolor painting" },
+  { zh: "油畫", en: "oil painting" },
+  { zh: "日系動漫", en: "anime manga style" },
+  { zh: "吉卜力", en: "Studio Ghibli anime" },
+  { zh: "水墨國畫", en: "Chinese ink wash painting" },
+  { zh: "浮世繪", en: "ukiyo-e woodblock" },
+  { zh: "賽博龐克", en: "cyberpunk neon" },
+  { zh: "復古插畫", en: "vintage illustration" },
+  { zh: "童話繪本", en: "fairytale storybook" },
+  { zh: "極簡", en: "minimalist" },
+  { zh: "哥德暗黑", en: "dark gothic" },
+];
 
 /**
  * Build the full image-model prompt for one card given a user style/character description.
- * The user's description REINTERPRETS the card's figures (e.g. "blue oil-painting cat" turns
- * the Fool's traveler into a blue cat) instead of merely layering a style on a fixed human scene.
  *
- * Note: the card's `name` is deliberately NOT passed to the model — naming the card makes the
- * model render the whole bordered, titled card. We want only the scene; our canvas adds the frame.
+ * FLUX (esp. schnell) has NO negative prompt and mis-reads negations — writing "no text",
+ * "no border", "no card name" makes it DRAW garbled text + a frame, because it only has the
+ * positive tokens "text / border / card name" to work with. So this prompt:
+ *   • describes ONLY what we want (never says no / not / without),
+ *   • never mentions "tarot card", "frame", "title" (those cues trigger a bordered, captioned card),
+ *   • leads with the user's style (FLUX weights early tokens most) and repeats it at the end.
+ * The frame + Roman numeral + card name are added afterwards by our canvas (renderPrintCard.ts).
  */
 export function buildCardPrompt(stylePrompt: string, card: TarotCard): string {
-  const style = stylePrompt.trim();
+  const style = localizeStyle(stylePrompt.trim());
   if (!style) {
-    return `Ornate medieval colored-pencil illustration, Rider-Waite inspired palette, warm antique paper texture. Scene: ${card.subjectPrompt}. Vertical composition, rich symbolic detail. ${NO_FRAME_NO_TEXT}`;
+    return `Ornate colored-pencil fantasy illustration, Rider-Waite inspired, warm antique palette. ${card.subjectPrompt}. Single vertical full-bleed scene, rich symbolic detail.`;
   }
-  // Lead HARD with the user's description as the main character + an explicit "not a human"
-  // negation, so a themed deck (e.g. "blue oil-painting cat") fully replaces the figures
-  // instead of just tinting the standard human scene. (Empirically verified on FLUX schnell.)
-  return `Illustration. MAIN CHARACTER & ART DIRECTION: ${style} — render the main figure ENTIRELY as this; if it names an animal or creature, do NOT draw a human, replace any person with it, and apply the style to the whole image. The character is posed in this classic scene: ${card.subjectPrompt}. Vertical composition, rich symbolic detail, cohesive consistent style. ${NO_FRAME_NO_TEXT}`;
+  // Style first and last (early + late reinforcement); plain scene description in between.
+  return `${style}. ${card.subjectPrompt} — the entire scene painted in ${style}; if the style names an animal or creature, the main figure is that creature instead of a person. Single vertical full-bleed scene, rich symbolic detail, cohesive ${style}.`;
 }

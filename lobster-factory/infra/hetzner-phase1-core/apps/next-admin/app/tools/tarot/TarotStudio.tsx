@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
-import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, type TarotCard } from "./cards";
+import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, type TarotCard } from "./cards";
 
 type GroupKey = "all" | "major" | "wands" | "cups" | "swords" | "pentacles";
 const GROUPS: { key: GroupKey; label: string }[] = [
@@ -456,14 +456,44 @@ export default function TarotStudio() {
 
         <div className="form-row">
           <label className="form-label">風格描述{mode === "image" && referenceImages.length > 0 ? "（選填，已上傳參考圖可留空）" : ""}</label>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+            {STYLE_PRESETS.map((p) => (
+              <button
+                key={p.en}
+                type="button"
+                disabled={locked}
+                onClick={() =>
+                  setStylePrompt((prev) => {
+                    const t = prev.trim();
+                    return t ? `${t}, ${p.en}` : p.en;
+                  })
+                }
+                title={`插入「${p.en}」`}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 14,
+                  fontSize: 12,
+                  cursor: locked ? "default" : "pointer",
+                  border: "1px solid var(--card-border)",
+                  background: "transparent",
+                  color: "var(--text-muted)",
+                  opacity: locked ? 0.5 : 1,
+                }}
+              >
+                {p.zh} <span style={{ opacity: 0.6 }}>{p.en}</span>
+              </button>
+            ))}
+          </div>
           <textarea
             className="form-textarea"
-            placeholder="例：中世紀彩色鉛筆塔羅插畫，暖色仿古紙質感，金色裝飾邊框，神秘氛圍"
+            placeholder="點上方按鈕快速插入，或自行輸入英文風格詞（FLUX 對英文最準）。例：Van Gogh oil painting, mystical atmosphere"
             value={stylePrompt}
             onChange={(e) => setStylePrompt(e.target.value)}
             disabled={locked}
           />
-          <div className="form-hint">這段風格會套用到整套 78 張牌。上傳參考圖時可留空（以圖為準）。</div>
+          <div className="form-hint">
+            這段風格會套用到整套 78 張牌。中文風格詞會自動轉成英文（免費）；要最準請用英文。風格不夠強時改用 FLUX dev 模型（吃 prompt 更準）。
+          </div>
         </div>
 
         <div className="form-row">

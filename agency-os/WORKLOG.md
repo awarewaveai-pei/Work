@@ -12,18 +12,19 @@
 **根因／動機**：① BlockLibrary 的 16 種積木真相只藏在 `buildInner()` switch，要排版的 AI/app 只能靠手寫 doc → 漂移。② `tabs()`/`infobox()`/`table()` 配色寫死 soulful 值（infobox `#31533d` 綠最明顯），換租戶會套錯色。
 
 **[已修改]**
-- `lobster-factory/packages/wp-bridge-plugin/includes/Content/BlockLibrary.php` — 加 `__construct(array $theme)` + `DEFAULT_THEME`（13 token，預設=既有寫死值）+ `isSafeColorToken()`（#hex/paletteN/var()/rgb 白名單，過濾注入）+ `manifest()`（16 型自描述：type/aliases/fields/example）；`tabs()`/`table()`/`infobox()` 改讀 `$this->theme`。
+- `lobster-factory/packages/wp-bridge-plugin/includes/Content/BlockLibrary.php` — 加 `__construct(array $theme)` + `DEFAULT_THEME`（13 token）+ `isSafeColorToken()`（#hex/paletteN/var()/rgb 白名單，過濾注入）+ `manifest()`（16 型自描述：type/aliases/fields/example）；`tabs()`/`table()`/`infobox()` 改讀 `$this->theme`。**關鍵設計（操作者定向「全部吃 WP 設定」）**：infobox 預設 `infoboxBg='palette1'`（Kadence palette TOKEN，非 hex）→ 自動繼承站台 Global Palette，零租戶設定。根因：infobox 原寫死 `#31533d`（soulful **舊綠品牌**殘留），但 SSH 讀 soulful 現行 palette = navy(`#1c3e5a` palette1/3/4)/amber(`#f6a241` palette2)/cream(`#f7f2ed` palette7-9)，綠色根本不在 palette 內 → 站上 infobox 是不搭新品牌的綠盒。改 palette1 後 soulful 自動 navy、任何站吃自己的。結構灰（table `#A7A5A5`/tabs `#bdbdbd`）WP palette 無對應槽，保留合理預設。
 - `includes/Http/RestController.php` — 註冊 `GET /blocks`（公開唯讀，回 manifest，結構同 /health）+ `blocks()` callback；`createPost` 讀 `$spec['theme']` 透傳 `new BlockLibrary($theme)`。
 - `aware-wave-wp-bridge.php` — 0.5.6 → 0.6.0（header + AWBRIDGE_VERSION）。
 - `tests/Content/BlockLibraryTest.php`（新）+ `phpunit.xml` 加 `tests/Content` 到 testsuite（critic Major：原本新測試不會被 CI 跑）。
 
 **[驗證結果]**
-- REALTEST_EVIDENCE: tool=Bash | cmd=`php awb-blocklib-tdd.php`（$env:TEMP 獨立 harness，真實 invoke BlockLibrary；本機 PHP 8.4 無 composer/mbstring 故 phpunit phar 跑不動，harness 行為等價委交測試）| exit=0 | ms=~200 — 65/65 pass：向後相容 golden 位元組相同（8144B no-theme snapshot 不變）、manifest 16 型全 compose 無 unknown、theme override（tabs/table/infobox）生效、注入 payload（table raw-concat / infobox `-->`）全擋下 fallback default、非字串值不丟 TypeError、合法 hex/palette/var 仍通。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php awb-blocklib-tdd.php`（$env:TEMP 獨立 harness，真實 invoke BlockLibrary；本機 PHP 8.4 無 composer/mbstring 故 phpunit phar 跑不動，harness 行為等價委交測試）| exit=0 | ms=~200 — 66/66 pass：no-theme golden 穩定（8146B 連跑兩次一致）、manifest 16 型全 compose 無 unknown、infobox 預設吃 palette1（無殘留綠 #31533d）、theme override（tabs/table/infobox）生效、注入 payload（table raw-concat / infobox `-->`）全擋下 fallback default、非字串值不丟 TypeError、合法 hex/palette/var 仍通。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh hostinger_soulful + wp option get kadence_global_palette --format=json` | exit=0 | ms=~3000 — 確認 soulful 現行 palette（navy/amber/cream），佐證 infobox 寫死綠 #31533d 為舊品牌殘留（唯讀，無寫入）。
 - REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/3M/1m/1s — 3 Major 全修：(M1) tableBorder raw-concat 注入→constructor 白名單過濾；(M2) infobox str_replace `-->` 注入→同上；(M3) phpunit.xml 漏 tests/Content→補上。Minor 非字串 TypeError 同 constructor 修。critic 確認向後相容 0 drift、GET /blocks 0 洩漏。
 - BUGHUNT_DONE: scope=lobster-factory(wp-bridge-plugin) | grep=`new BlockLibrary\(|->manifest\(|->compose\(|->tabs\(|->infobox\(|->table\(|/blocks` | hits=生產僅 2（RestController:86 /blocks 無 theme✓、:188 createPost theme 透傳✓），其餘為 BlockLibrary 內部 instance method（自動用 $this->theme）+ 測試檔。
 - BUGHUNT_SCOPE_NARROW: wp-bridge 為獨立 clean-room plugin，無 agency-os/scripts downstream；TS/JS grep（`aware-wave-bridge/v1|BlockLibrary|/blocks|wp-bridge-client`）跨 lobster-factory hits=0（wp-bridge-client SDK 尚未建）。根目錄 v0.1.0 殘骸無 Content/ 不受影響。
 
-**[剩餘風險]** GET /blocks 與 createPost theme 為 WP-coupled（register_rest_route / WP_REST_Response），本機無 WP 未做端點 e2e；待 soulful server WP-CLI 或下次 sg-deploy 真站驗。**未來方向**（操作者提案，待拍板）：硬編 brand 色（infobox `#31533d`）改為「讀站台 Kadence Global Palette」自動繼承，免每租戶手設 theme；需先讀 soulful 實際 palette 映射避免改動其現有外觀。
+**[剩餘風險]** ① GET /blocks 與 createPost theme 為 WP-coupled（register_rest_route / WP_REST_Response），本機無 WP 未做端點 e2e；待 soulful server WP-CLI 或下次 sg-deploy 真站驗。② infobox 預設 palette1 = soulful 上由綠轉 navy（**刻意修正**，非回歸——綠為舊品牌殘留），但需操作者確認 infobox 盒子要 navy(palette1) 還是 amber(palette2)；目前選 palette1（主品牌色，沿用「深色盒+淺字」設計）。③ theme override 為 opt-in 逃生艙，預設即繼承站台，操作者零設定。
 
 **[rollback]** 全可逆：`git revert` 該 commit；plugin 退回 v0.5.6 zip。theme 為 opt-in（不傳=既有行為）。
 

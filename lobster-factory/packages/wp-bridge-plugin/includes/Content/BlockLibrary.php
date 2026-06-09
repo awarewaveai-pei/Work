@@ -36,8 +36,11 @@ final class BlockLibrary {
 		'tabsContentBorder'     => '#bdbdbd',
 		// Kadence Table — cell border colour (all four sides).
 		'tableBorder'           => '#A7A5A5',
-		// Kadence Info Box — brand container background (the most tenant-identifying colour).
-		'infoboxBg'             => '#31533d',
+		// Kadence Info Box — brand container background. A Kadence palette TOKEN (not a literal hex), so it
+		// inherits the site's Global Palette automatically: palette1 = the site's primary brand colour
+		// (soulful: #1c3e5a navy). This is the "eat the WP settings" default — no per-tenant config. The
+		// captured skeleton's literal #31533d (soulful's OLD green) is swapped to this token at render.
+		'infoboxBg'             => 'palette1',
 	);
 
 	/** @var array<string,string> resolved theme = DEFAULT_THEME overlaid with caller overrides. */

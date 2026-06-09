@@ -66,9 +66,11 @@ final class BlockLibraryTest extends TestCase {
 		$this->assertStringContainsString( '#A7A5A5', $out );
 	}
 
-	public function test_default_infobox_brand_bg_unchanged(): void {
+	/** Brand bg inherits the site's Global Palette (palette1), NOT the captured stale green hex. */
+	public function test_default_infobox_bg_inherits_palette(): void {
 		$out = ( new BlockLibrary() )->infobox( 'T', 'B' );
-		$this->assertStringContainsString( '#31533d', $out );
+		$this->assertStringContainsString( '"containerBackground":"palette1"', $out );
+		$this->assertStringNotContainsString( '#31533d', $out, 'stale soulful green must not be emitted' );
 	}
 
 	// ---- Theme parameterisation --------------------------------------------
@@ -116,12 +118,12 @@ final class BlockLibraryTest extends TestCase {
 		$evil = '--> <script>x</script> <!-- ';
 		$out  = ( new BlockLibrary( array( 'infoboxBg' => $evil ) ) )->infobox( 'T', 'B' );
 		$this->assertStringNotContainsString( '<script>', $out );
-		$this->assertStringContainsString( '#31533d', $out, 'invalid bg falls back to default' );
+		$this->assertStringContainsString( '"containerBackground":"palette1"', $out, 'invalid bg falls back to default' );
 	}
 
 	public function test_non_string_theme_value_does_not_throw(): void {
 		$out = ( new BlockLibrary( array( 'infoboxBg' => array( 'x' ) ) ) )->infobox( 'T', 'B' );
-		$this->assertStringContainsString( '#31533d', $out );
+		$this->assertStringContainsString( '"containerBackground":"palette1"', $out );
 	}
 
 	/** Legitimate colour tokens (hex / palette / css var) must still be accepted. */
