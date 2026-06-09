@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-09 14:57:24
+- Generated: 2026-06-09 18:19:48
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -308,6 +308,19 @@
 - **對應 TASKS 子字串（可選）**: tarot 框線收尾
 - **風險／待辦（可選）**: 未部署（待操作者 go-ahead）；canvas 像素渲染待 staging 瀏覽器確認；tarot-frames PNG + middleware 白名單現未使用，保留不刪
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:6909326a9ef153b9f74fce81dbefddc4fa1282b01e32b0a323ed7349b3ee9d6b -->
+
+### claude 2026-06-09 18:09
+
+- **完成（一句）**: 修復 18:02 AO-RESUME 健檢 99.7% 失分（archive-lift gate）— 2 個 tarot deploy 流程提醒 bullet 標 archive-only，health 回 100%
+- **變更路徑**:
+  - `agency-os/reports/ao-close/2026-06-09-1457.md`
+  - `agency-os/WORKLOG.md`
+- **Git**: 本次 AO-CLOSE commit
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 無；純 archive 報告檔註解標記
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
@@ -329,25 +342,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-
-**[驗證結果]**
-1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell test-stable-status.ps1 (4 cases) | exit=0 | result=ALL PASS（時間戳/報告名 churn→不寫；score 100→99.5 / exit 0→1→寫；首跑/缺檔→寫；regex 不誤傷 `- Health score:`/`- Health gate exit code:`）
-   REALTEST_EVIDENCE: tool=Bash | cmd=run agency-os/scripts/system-guard.ps1 -WorkspaceRoot agency-os -Mode daily x2（排程實際呼叫） | exit=1(health FAIL 與 churn 無關) | result=LAST_SYSTEM_STATUS.md 兩次 SHA256 相同 60153216…（不再 churn）
-   REALTEST_EVIDENCE: tool=Bash | cmd=audit-cp950-traps.ps1 -ParseBreakOnly | exit=0 | result=scanned=147 clean=147 drift=0，兩支 system-guard OK
-2. REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（七項逐一實測：regex 不誤傷、BOM/CRLF/trailing-newline 正規化、首跑、無 silent staleness、StrictMode-clean、兩份位元組相同；備註：Get-Content -Raw 在 PS5.1 已剝 BOM，TrimStart 為無害防禦性 no-op）
-3. BUGHUNT_DONE: scope=agency-os,scripts | grep=LAST_SYSTEM_STATUS,stableStatusOf | hits=0（唯一 writer=system-guard；無 stale 符號引用；verify-closeout 僅排除不依賴重寫）；額外發現 scripts vs agency-os/scripts 20 檔 drift → 已記 TASKS
-4. WORKLOG: this entry
-
-**[剩餘風險]** 20 個核心腳本兩份 drift（含 AO 生命週期腳本）未 wrapper 化 — 已記 TASKS，未在本次處理。doc-sync 仍會 churn TASKS/WORKLOG/docs 的 `_Last synced` 時間戳（同類但獨立議題；AO-CLOSE 會 commit，session 啟動時通常已乾淨）。
-
-**[rollback]** `git revert <commit>` 還原兩支 system-guard.ps1。
-
-AUTO_TASK_DONE: system-guard LAST_SYSTEM_STATUS conditional-write（churn 治本，兩份同步 fix，換機 AO-RESUME 不再分歧）
-
-## 2026-06-02 — Onboarding Portal ① debug log 清理 + §7 架構 R0 發現（②③ 暫不實作的理由）
-
-**[任務]** 操作者交付 onboarding-portal-e2e packet 三步（① 清 debug logs → tsc/test → deploy；② 建 trigger-build route 接 orchestrate；③ §8 uptime_kuma）。授權我以技術負責人身分自行決定範圍。
-
 **[① 已完成]** `lib/onboarding/spec-generator.ts` 移除 9 行 debug `console.error`（只刪 log、保留全部 guard + return）。tsc --noEmit 0 errors、vitest 168/168 pass、critic Deep 0/0/0、無殘留 `console.*`。**未 sg-deploy**（log 清理零急迫，隨下次實質部署搭車，避免單獨為 cosmetic change 冒 prod 風險）。
 
 **[②③ R0 讀碼發現 — 不實作的理由]** packet §7 前任假設「呼叫 orchestrate-tenant-provisioning（已有 create-wp-site + apply-manifest）」與 code 不符：
@@ -388,4 +382,23 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
+
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): tarot 版面尺寸常數/style 數值微調，無邏輯變更，tsc 我改的兩檔 0 新錯
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node` 複現 cards.ts minor 生成邏輯印 78 張 | exit=0 | 大牌 0/I-XXI 全對、小牌 pip I-X + 宮廷牌空、78 unique names/ids 無重複
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/0n | index 對齊無 off-by-one、空字串 roman 被 guard 短路、band-centre 幾何兩標籤皆在帶內、最長牌名 THE HIGH PRIESTESS 64px ~630px < 664px 不溢出、無 numeric-roman 消費者
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`.roman`\|`MINOR_ROMAN` | hits=0 stale（.roman 僅 renderPrintCard.ts guard 內消費、MINOR_ROMAN 僅 cards.ts；agency-os/scripts 無命中）
+
+- BUGHUNT_WAIVED: NA -- buildCardPrompt prompt 字串內容調整（移除 tarot card/牌名字眼→純插圖無框無字），無控制流/型別變更；tsc 通過
+
+- BUGHUNT_WAIVED: NA -- 預覽圖寬 200->300 純 style 數值，無邏輯變更；tsc 通過
+
+### Tarot prompt 根因修正 — FLUX 否定句 backfire + 風格未吃 + 零成本中文詞典 + 風格按鈕 + 預覽放大
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node` 複現 localizeStyle+buildCardPrompt 四輸入(梵谷畫風/英文/水彩 cat/空) | exit=0 | 風格在前+結尾強化、零 no/not/without 否定句、中文自動轉英；空格修正後「哥德暗黑」→「gothic dark moody」不黏字
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/1m | 唯一 Minor=相鄰CJK黏字（已採 critic 建議加空格修）；double-replacement/longest-first sort/ReDoS/chip updater/殘留否定token 全 verified clean（66 詞 exhaustive sim）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`buildCardPrompt`\|`localizeStyle`\|`STYLE_PRESETS` | hits=0 stale；signature 不變、僅 TarotStudio 兩 call site + import 消費
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=Replicate flux-dev + flux-schnell 直打「Van Gogh oil painting...」prompt | exit=0 HTTP=201 succeeded | flux-dev 輸出實看=標準梵谷厚塗/漩渦黃日/鈷藍山（證明模型+prompt 完全吃風格）；根因=外框縮圖不重生成，使用者看舊圖誤判
+- BUGHUNT_WAIVED: NA -- TarotStudio previewStale 衍生旗標 + 警示橫幅 純 UI state，無資料/跨檔邏輯；tsc 通過
 

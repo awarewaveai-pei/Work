@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-06-09 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-09 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:6909326a9ef153b9f74fce81dbefddc4fa1282b01e32b0a323ed7349b3ee9d6b -->
 - **2026-06-09 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-09 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:a43a63b55d4f47cdc655b3857249b3722b722ef37fb17a309bffb8b0490c6314 -->
 - **2026-06-09 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-09 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:623db456f797cdc58e4211cb21d25545c228ef90e213cb4ebde9c155a0ffe96a -->
 - **2026-06-06 (AO-CLOSE, SEO/GEO Content Engine 產品化)** — 把 `docs/wp-kadence-ai-seo-geo-content-engine.md`（3920 行 spec）落地成可用資產（全 doc-only `.md`）。產出：通用引擎層 `docs/seo-content/`（`prompt-kit.md` 無程式產文流程 / `GEM-1-onboarding-positioning.md` + `GEM-2-seo-geo-content-engine.md` 兩顆 Gem：onboard 一次+產文多次 / `spec-review-and-gaps.md` 平台 errata / `articles/what-is-art-based-healing.md` 首篇範本）+ 客戶層 `tenants/company-soulful-expression/sites/soulfulexpression-org/content/CONTENT_STRATEGY.md`。**定位拍板（鎖定）**：公開門面 **Arts Practice for Self-Discovery** / 學術 EdD 框架 **Arts-Based Reflective Pedagogy**（理論 Schön/Kolb/Mezirow）/ 非臨床 art therapy（受規管詞避用，YMYL：禁療效保證+disclaimer+台灣危機專線 1925/1995）。域名 **保留 soulfulexpression.org**（域名關鍵字對 SEO 無影響；真風險=品牌紅海撞名 Soul Expression Arts 等 → 解法獨佔 WuSheng Healing Module™）。**未動** spec 主檔（另一 AI 並行編輯，operator 喊停）；§49 errata 暫存 spec-review 待 pull 後補。**待 operator 補真實資料**（頭銜/EdD/價格/IG/學術引用）文章才可發布。handoff: `handoffs/2026-06-06-2044-seo-geo-content.md`。
@@ -489,5 +490,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-09 06:57:14 UTC_
+_Last synced: 2026-06-09 10:19:43 UTC_
 

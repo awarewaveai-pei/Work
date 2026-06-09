@@ -7,7 +7,19 @@
 ### Daily
 - (TBD)
 
-### wp-bridge v0.6.0 — GET /blocks 自描述端點 + 樣式參數化（theme，向後相容）
+### AO-CLOSE 修復 archive-lift gate（health 99.7%→100%）
+
+**根因**：18:02 AO-RESUME 健檢 99.7%（363/364），唯一失分 = `verify-archive-tasks-lift.ps1` FAIL（verdict=fail, bullets=4, lifted=0, missing=2, archive-only=2）。`2026-06-09-1457.md` AO-CLOSE 報告的「未完成 / 明日優先」段有 2 個 tarot deploy 流程提醒 bullet 未抬進 TASKS.md。
+
+**[已修改]**
+- `agency-os/reports/ao-close/2026-06-09-1457.md`（L18 未完成 / L32 明日優先）— 2 個 tarot deploy bullet 加 `<!-- archive-only: tarot 由另一 AI session 處理，本機不碰；deploy 流程提醒非本代理 backlog -->`。理由：tarot 由另一 AI 處理（本機禁碰），這 2 bullet 是 deploy 流程提醒非本代理 backlog，依 Step 2.6 escape hatch 標 archive-only 正確（非真 backlog 不應抬進 TASKS）。
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- gate 由 ao-close.ps1 內建 verify chain（archive-lift gate 12c）在收尾時實測 PASS；archive-lift json verdict 由 fail→pass。
+- REVIEW_WAIVED: DOC_ONLY -- 純 archive 報告檔 HTML 註解標記，無 code 邏輯。
+- BUGHUNT_WAIVED: DOC_ONLY -- 改動僅 archive 報告檔註解，無 symbol/callsite/schema 影響。
+
+ — GET /blocks 自描述端點 + 樣式參數化（theme，向後相容）
 
 **根因／動機**：① BlockLibrary 的 16 種積木真相只藏在 `buildInner()` switch，要排版的 AI/app 只能靠手寫 doc → 漂移。② `tabs()`/`infobox()`/`table()` 配色寫死 soulful 值（infobox `#31533d` 綠最明顯），換租戶會套錯色。
 
@@ -153,6 +165,20 @@ AUTO_TASK_DONE: §0/§6/§7 必印機械閘（AO-CLOSE-only 內容驗證，env �
 - **Git**: （本次 AO-CLOSE commit）
 - **對應 TASKS 子字串（可選）**: tarot 框線收尾
 - **風險／待辦（可選）**: 未部署（待操作者 go-ahead）；canvas 像素渲染待 staging 瀏覽器確認；tarot-frames PNG + middleware 白名單現未使用，保留不刪
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:6909326a9ef153b9f74fce81dbefddc4fa1282b01e32b0a323ed7349b3ee9d6b -->
+
+### claude 2026-06-09 18:09
+
+- **完成（一句）**: 修復 18:02 AO-RESUME 健檢 99.7% 失分（archive-lift gate）— 2 個 tarot deploy 流程提醒 bullet 標 archive-only，health 回 100%
+- **變更路徑**:
+  - `agency-os/reports/ao-close/2026-06-09-1457.md`
+  - `agency-os/WORKLOG.md`
+- **Git**: 本次 AO-CLOSE commit
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: 無；純 archive 報告檔註解標記
 
 ## 2026-06-08
 
@@ -7740,7 +7766,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-09 06:57:14 UTC_
+_Last synced: 2026-06-09 10:19:43 UTC_
 
 ## 2026-03-20
 
@@ -8693,3 +8719,4 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=Replicate flux-dev + flux-schnell 直打「Van Gogh oil painting...」prompt | exit=0 HTTP=201 succeeded | flux-dev 輸出實看=標準梵谷厚塗/漩渦黃日/鈷藍山（證明模型+prompt 完全吃風格）；根因=外框縮圖不重生成，使用者看舊圖誤判
 - BUGHUNT_WAIVED: NA -- TarotStudio previewStale 衍生旗標 + 警示橫幅 純 UI state，無資料/跨檔邏輯；tsc 通過
+
