@@ -130,7 +130,8 @@ export default function TarotStudio() {
   const [batchBusy, setBatchBusy] = useState(false);
   const [zipBusy, setZipBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal
+  const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal (batch cards)
+  const [previewZoom, setPreviewZoom] = useState(false); // large-view modal (step-1 preview)
   const [templateThumbs, setTemplateThumbs] = useState<Record<string, string>>({});
 
   const doneCount = batch.filter((b) => b.status === "done").length;
@@ -554,7 +555,13 @@ export default function TarotStudio() {
         {previewImage && (
           <div style={{ marginTop: 16, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewImage} alt="preview" style={{ width: 300, borderRadius: 10, border: "1px solid var(--card-border)" }} />
+            <img
+              src={previewImage}
+              alt="preview"
+              onClick={() => setPreviewZoom(true)}
+              title="點擊放大"
+              style={{ width: 300, borderRadius: 10, border: "1px solid var(--card-border)", cursor: "zoom-in" }}
+            />
             <div>
               <div className="form-hint" style={{ marginBottom: 8 }}>
                 預覽牌：{PREVIEW_CARD.name}
@@ -714,6 +721,32 @@ export default function TarotStudio() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* large-view modal — step-1 style preview */}
+      {previewZoom && previewImage && (
+        <div
+          onClick={() => setPreviewZoom(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.75)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 24,
+            cursor: "zoom-out",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewImage}
+            alt="preview large"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: "90vh", maxWidth: "92vw", borderRadius: 10, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}
+          />
         </div>
       )}
     </div>

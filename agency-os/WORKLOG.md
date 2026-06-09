@@ -8684,3 +8684,8 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - BUGHUNT_WAIVED: NA -- buildCardPrompt prompt 字串內容調整（移除 tarot card/牌名字眼→純插圖無框無字），無控制流/型別變更；tsc 通過
 
 - BUGHUNT_WAIVED: NA -- 預覽圖寬 200->300 純 style 數值，無邏輯變更；tsc 通過
+
+### Tarot prompt 根因修正 — FLUX 否定句 backfire + 風格未吃 + 零成本中文詞典 + 風格按鈕 + 預覽放大
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node` 複現 localizeStyle+buildCardPrompt 四輸入(梵谷畫風/英文/水彩 cat/空) | exit=0 | 風格在前+結尾強化、零 no/not/without 否定句、中文自動轉英；空格修正後「哥德暗黑」→「gothic dark moody」不黏字
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/1m | 唯一 Minor=相鄰CJK黏字（已採 critic 建議加空格修）；double-replacement/longest-first sort/ReDoS/chip updater/殘留否定token 全 verified clean（66 詞 exhaustive sim）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`buildCardPrompt`\|`localizeStyle`\|`STYLE_PRESETS` | hits=0 stale；signature 不變、僅 TarotStudio 兩 call site + import 消費

@@ -186,7 +186,9 @@ const STYLE_LEXICON: Record<string, string> = {
 export function localizeStyle(input: string): string {
   let out = input;
   for (const key of Object.keys(STYLE_LEXICON).sort((a, b) => b.length - a.length)) {
-    if (out.includes(key)) out = out.split(key).join(STYLE_LEXICON[key]);
+    // Pad with spaces so adjacently-typed CJK terms (e.g. "哥德暗黑") don't fuse into
+    // "gothicdark moody"; the trailing whitespace-collapse cleans up the doubles.
+    if (out.includes(key)) out = out.split(key).join(` ${STYLE_LEXICON[key]} `);
   }
   return out.replace(/\s+/g, " ").trim();
 }
