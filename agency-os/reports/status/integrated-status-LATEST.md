@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-08 18:30:53
+- Generated: 2026-06-09 11:01:37
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,8 +219,8 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-08.md
-# Daily Note - 2026-06-08
+## 5) memory/daily/2026-06-09.md
+# Daily Note - 2026-06-09
 
 ## Done today
 (fill in at AO-CLOSE)
@@ -232,85 +232,65 @@
 (fill in at AO-CLOSE)
 
 ## Open tasks (auto-generated at 08:00 TPE)
-- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN** — Stage 1 接通入口：抓 spec_generated intake_forms → retry trigger-build → 修 role 403 / UI 跳回問題 → 完成一筆 onboarding 不碰 DB
-- [ ] POD Studio 路線圖 + tarot 框線收尾（框 png 未做；per-frame 微調 + celestial 補生）→ handoffs/2026-06-06-2026-pod-studio-roadmap.md
-- [ ] Content Engine Phase 1 MVP — soulful 試點發第一篇 draft（spec §38/§44；§36 schema + §37 prompts）→ handoffs/2026-06-06-2029-tomo-202949.md
-- [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章（2-Gem onboarding+content；定位鎖定；填真資料→文章可發布；spec §49 errata 待補）→ handoffs/2026-06-06-2044-seo-geo-content.md
-- [ ] Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) — Batch 3 完成（9f862d82）→ handoffs/2026-05-28-1807-batch-3-post-phase.md
+- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。**下一步 = Stage 1 接通入口**：抓 2 筆卡 `spec_generated` 的 intake_forms → retry `POST /api/onboarding/trigger-build` 看精確錯誤碼（最可疑 trigger-build/route.ts L35-39 role 403 或 UI「跳回第一步」沒帶 spec/intake id）→ 對症修 → onboarding UI 走完一筆不碰 DB 達 completed。後續 Stage 2 Fluent Form→intake 橋接+FluentCRM／Stage 3 報價／Stage 4 機層租機(provisionClient 已寫好未接)／Stage 5 串接 Supabase/n8n/Sentry/Netdata/Uptime Kuma/PostHog。**動前 `git log -5` + 讀 WORKLOG（trigger-build 平行 session 觸碰過，VBC）。**
+- [ ] POD Studio 路線圖 + tarot 框線收尾（框 png 還沒做好；per-frame 微調 + celestial 補生）→ handoffs/2026-06-06-2026-pod-studio-roadmap.md
+- [ ] Content Engine Phase 1 MVP — soulful 試點發第一篇 draft（spec §38/§44；§36 schema + §37 prompts；DataForSEO/Firecrawl 屬 Phase 2 別接）→ handoffs/2026-06-06-2029-tomo-202949.md
+- [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章（2-Gem: onboarding+content；定位鎖定 Arts Practice for Self-Discovery / Arts-Based Reflective Pedagogy；填真資料→文章可發布；spec §49 errata 待補）→ handoffs/2026-06-06-2044-seo-geo-content.md
+- [ ] Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) — Batch 3 已完成（9f862d82）→ handoffs/2026-05-28-1807-batch-3-post-phase.md
 - [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售 → handoffs/2026-06-05-1948-wp-bridge-deploy-sell.md
-- [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side items → handoffs/2026-06-05-2017-tomo-201752.md
-- [ ] **Hetzner dispatcher 上線前 follow-up**（啟用 LOBSTER_EXECUTE_* 前必做）：M10 orphan reaper + partial index on ops_action_runs
-- [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）** — 直接呼叫 provisionClient()，勿重寫
-- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層** — 缺 provision-stack.sh 編排器 + BYO adapter + swap → handoffs/2026-06-06-1925-postboot-stack-deploy.md
-- [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console + verify intake 觸發建站 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
-- [ ] wp-bridge v0.3.0：使用者更新 soulful → AI 在真站建第一篇草稿（SE-01）→ handoffs/2026-06-05-2039-tomo-203931.md
-- [ ] wp-bridge v0.5.6 已發佈（Tabs+YouTube+accordion 修復）；驗收 7053/7056 + 選下一步 → handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
-- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** — 未開始
-- [ ] **既有站接手（Soulful Expression Art Therapy）** — 進行中；下一步 Day 1 Runbook §1.1–1.3 + Day 2 實機驗收
-- [ ] **既有站接手 Day 1（Soulful Expression）** — §1.2 ✅ §1.3 DB dump ✅；仍開放：§1.1 帳號層級權限確認（panel-level）
-- [ ] **新站建置（Scenery Travel Mongolia）** — 進行中；待選定主機商後 §2 建置實機 + 客戶訪談補 Discovery
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** — 待與客戶確認素材與頂級網域，選定主機商
-- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** — 阻塞：須 Hostinger/主機商操作與 DNS/SSL
-- [ ] `tenants/templates/` v2 — 未開始；依試點回填後再開
-- [ ] `lobster-factory` A10-2 商業閉環實跑 — 未開始
-- [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**（終點：全部接 WooCommerce 賣貨）
-- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制** — 未開始；需新 sync-hetzner-endpoint-alert-script.ps1
-- [ ] **【2026-06-02 開出】Claude Code settings.json hooks object↔array 反覆 drift** — 未開始；需確認 runtime 寫入格式並 normalize verify
-- [ ] **【2026-05-28 開出 — Phase Z Z4】scan-for-secrets known-suppressed baseline** — 未開始
-- [ ] **【2026-05-28 開出 — Phase Z Z5】AO-CLOSE health gate 補強（fetch-recency）** — 未開始
-- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability）— 進行中；需每月 drift 記錄
-- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】** — 未開始；排 Phase 4 觀察期後（2026-06-19+）
-- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2** — 進行中；觀察期到期 2026-06-19；每週五 14:00 巡檢
+- [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item（Phase4Weekly 錯 repo / incidents API 藏 open / 5 webhook 零流量）→ handoffs/2026-06-05-2017-tomo-201752.md
+- [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做，現 gated OFF）**：① M10 orphan reaper（claim 後 trigger 前 crash→卡 running 終態；需 claimed_at 時戳+reaper `dispatch-action-run.ts:157-180`）② partial index `create index concurrently idx_ops_action_runs_pending_dispatch on ops_action_runs(started_at) where status='pending'`
+- [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）** — 程式+真機已驗過，**直接呼叫 `provisionClient()` 勿重寫**。recipe：`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`（app 端 `onboarding/trigger-build/route.ts` 頂部已留指標）。等 app 校正完再接。
+- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）** — 讓新機/客戶自帶機自動部署成 production 等級（Docker+Grafana/Loki/Netdata/Sentry+快取+swap+備份+限速/WAF/fail2ban）。**料件 90%+ 現成**，缺一個編排器 `provision-stack.sh`（串既有腳本，純 SSH，Vultr/DO/客戶自帶機通用）+ BYO adapter + swap。完整 R0 計畫：`lobster-factory/docs/hosting/SERVER_STACK_DEPLOYMENT_PLAN.md`。**禁止重寫既有 compose/腳本，只編排**。→ handoffs/2026-06-06-1925-postboot-stack-deploy.md
+- [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
+- [ ] wp-bridge v0.3.0：使用者更新 soulful → AI 在真站建第一篇草稿（SE-01）+ 續做 operation → handoffs/2026-06-05-2039-tomo-203931.md
+- [ ] wp-bridge v0.5.6 已發佈（Tabs+YouTube+accordion 修復）；驗收 7053/7056 + 選下一步（/blocks 端點 / 樣式參數化 / app.aware-wave Stage 1）→ handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
+- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】**
+- [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。
+- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中 2026-05-08】§1.2 ✅ §1.3 DB dump ✅**。§1.2 機讀基線完成（commit `b5cef4c`：WP 6.9.4 / PHP 8.2.30 / MariaDB 11.8.6 / Kadence 1.3.6 / 35 active plugins (16 有更新) / 2 admins / 138MB DB / 風險 Top 3）。§1.3 DB dump 完成（`soulful_db_20260508_160734.sql.gz`，15 MB，SHA256 `849db784…`，本機 + `BACKUP_RESTORE_PROOF.md #1`；restore drill 待 staging 建立後執行）。**仍開放（操作者必做）**：§1.1 帳號層級權限確認（Hostinger panel / DNS panel / WP admin browser login，純 SSH 無法驗證 panel-level access）。Day 2 staging 操作指引已備：`DAY2_STAGING_OPERATOR_GUIDE.md`；Day 3 更新計劃已備：`DAY3_SECURITY_PATCH_PLAN.md`。
+- [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。**下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
+- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架 + Discovery 骨架完成。**下一步：**與客戶確認素材與頂級網域，選定主機商 → 銜接 **`TASKS`**「Day 2 雲端 staging 實機驗收」。
+- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
+- [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
+- [ ] `lobster-factory` A10-2 商業閉環實跑 —— **【未開始】**
+- [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**（操作者 2026-06-06 確認方向） — 終點：全部接 WooCommerce 賣貨（參考同事 jonjonesai 的 MEGA「Mass E-commerce Generator & Automator」Streamlit 工具：Research→Idea→Generate(多模型並行)→Select→Process(去背 removal.ai/Tinify)→Mockup(Printful)→Published(WooCommerce+Claude 文案+定價)）。
+- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制** —— **【未開始】**
+- [ ] **【2026-05-28 開出 — Phase Z 後續 Z4】scan-for-secrets known-suppressed baseline** —— **【未開始】**
+- [ ] **【2026-05-28 開出 — Phase Z 後續 Z5】AO-CLOSE health gate 補強（fetch-recency）** —— **【未開始】**
+- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】**
+- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】** —— **【未開始】** 剩餘 7 Major + 9 Minor — 排 Phase 4 觀察期後（2026-06-19+）
+- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2 — Phase 4 觀察期進行中** —— **【進行中】** Phase 1+2+3 全部完成；Phase 4 觀察期到期：2026-06-19。
 - [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
 
 ## Yesterday context
-2026-06-03 machine appendix：monthly-system-review gates SKIPPED (ReportOnly)，Supabase memory 38.89%（< 85% 正常），wp-bridge plan deepen + rename + ADR 007 僅文件改動已完成（BUGHUNT_WAIVED DOC_ONLY）。
-
-
-### verify-recent --ack (2026-06-08T09:29:26.8363750Z)
-
-**Reason**: Full verify already completed this session: syntax 3/3 OK; critic Deep pass (2 minor adopted); real exec health 100% 364/364 + verify-aoresume-archive empty->FAIL skeleton->PASS + sync pollute->merge->{} e2e; cp950 CLEAN. See WORKLOG 2026-06-08.
-
-**Acknowledged unverified files** (count=4):
-
-- `c:\Users\USER\Work\scripts\ao-resume.ps1`
-- `c:\Users\USER\Work\scripts\ao-close.ps1`
-- `c:\Users\USER\Work\scripts\sync-claude-userlevel.ps1`
-- `C:\Users\USER\AppData\Local\Temp\aotest\skeleton-block-test.ps1`
-
-
-### AO-CLOSE 復發三項徹查治本（session 10:07Z→close）
-
-**Done**: 徹查 6/5(30min)/6/6(10min 照抄) AO-CLOSE 困難根因 → 治本 commit `762dd1b1`。
-- #1 archive-lift：今天稍早已修 `8e77e474`。
-- #2 AO-RESUME archive 缺：`ao-resume.ps1` 開工自動寫 7 段 skeleton(preventer，gate 12d 不再 hard-fail)。
-- #3「sync drift=hooks object→array」：誤診且被照抄；真因 `~/.claude/mcp.json` runtime 重填(SSOT={})，object/array 5/14 已治。→ `ao-close.ps1` sync 自癒(verify→drift才merge→重verify，backup+15-cap prune，fail-open) + TASKS:154 誤診更正。
-- ao-close.md 加協定：禁止照抄上次症狀標籤、每個 gate fail 重新診斷。
-- 教訓 memory：feedback_no_cargo_cult_selfrepair.md。
-
-**Verify**: health 100%(364/364)；skeleton gate e2e；sync 自癒 e2e；critic Deep pass(2 minor 採納)；cp950 CLEAN。
+最後 WORKLOG 更新於 2026-06-03，月度系統巡檢 gates=SKIPPED (ReportOnly)，Supabase memory 38.89% 健康，wp-bridge plan deepen + ADR 007 md-only 完成（BUGHUNT_WAIVED）。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-08 18:19:23`
-- Health score: **100%**
+- Time: `2026-06-09 11:01:29`
+- Health score: **99.7%**
 - Threshold: **100%**
-- Health gate exit code: **0**
+- Health gate exit code: **1**
 - Closeout report exists: **YES**
-- Result: **PASS**
-- Auto-repair attempted: **NO**
-- Auto-repair result: **N/A**
+- Result: **FAIL**
+- Auto-repair attempted: **YES**
+- Auto-repair result: **FAIL**
 
 ## Latest Reports
-- Health: `reports/health/health-20260608-181917.md`
-- Closeout: `reports/closeout/closeout-20260608-181923.md`
+- Health: `reports/health/health-20260609-110128.md`
+- Closeout: `reports/closeout/closeout-20260609-110110.md`
 
 ## Action
-- No blocking issue detected.
+- Blocking issues detected. Review latest health/closeout reports immediately.
 
 ## 7) WORKLOG.md tail (~60 lines)
+
+**[驗證結果]**
+1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell test-stable-status.ps1 (4 cases) | exit=0 | result=ALL PASS（時間戳/報告名 churn→不寫；score 100→99.5 / exit 0→1→寫；首跑/缺檔→寫；regex 不誤傷 `- Health score:`/`- Health gate exit code:`）
+   REALTEST_EVIDENCE: tool=Bash | cmd=run agency-os/scripts/system-guard.ps1 -WorkspaceRoot agency-os -Mode daily x2（排程實際呼叫） | exit=1(health FAIL 與 churn 無關) | result=LAST_SYSTEM_STATUS.md 兩次 SHA256 相同 60153216…（不再 churn）
+   REALTEST_EVIDENCE: tool=Bash | cmd=audit-cp950-traps.ps1 -ParseBreakOnly | exit=0 | result=scanned=147 clean=147 drift=0，兩支 system-guard OK
 2. REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（七項逐一實測：regex 不誤傷、BOM/CRLF/trailing-newline 正規化、首跑、無 silent staleness、StrictMode-clean、兩份位元組相同；備註：Get-Content -Raw 在 PS5.1 已剝 BOM，TrimStart 為無害防禦性 no-op）
 3. BUGHUNT_DONE: scope=agency-os,scripts | grep=LAST_SYSTEM_STATUS,stableStatusOf | hits=0（唯一 writer=system-guard；無 stale 符號引用；verify-closeout 僅排除不依賴重寫）；額外發現 scripts vs agency-os/scripts 20 檔 drift → 已記 TASKS
 4. WORKLOG: this entry
@@ -365,9 +345,4 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
-
-
-
-
-
 

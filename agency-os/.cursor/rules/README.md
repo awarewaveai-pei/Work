@@ -13,7 +13,7 @@
 - `00-session-bootstrap.mdc` — 新對話：昨日回顧 + 今日計畫 + 確認事項
 - `10-memory-maintenance.mdc` — 里程碑／長對話：寫回 `memory`
 - `20-doc-sync-closeout.mdc` — 改治理文件：doc-sync + health
-- `30-resume-keyword.mdc` — `AO-RESUME`：monorepo 根 **`.cursor/hooks.json`** 會先跑 **`ao-resume.ps1 -FullMainlineParity`**；代理再讀檔（含 **`ao-resume-hook-last.json`** 去重）；**七段式**回覆（含 **系統快照／外部信號／TASKS 每一條 `- [ ]` 全列**、**實質**阻塞／風險盤點，禁止過短）
+- `30-resume-keyword.mdc` — `AO-RESUME`：monorepo 根 **`.cursor/hooks.json`** 會先跑 **`ao-resume.ps1 -FullMainlineParity`**；代理再讀檔（含 **`ao-resume-hook-last.json`** 去重）；**AO-RESUME 報告（§0–§8）**回覆（含 **§0 TL;DR／系統快照／外部信號／TASKS 每一條 `- [ ]` 全列／§6 阻塞與風險／§7 需你決策**，禁止過短）
 - `40-shutdown-closeout.mdc` — `AO-CLOSE`：收工 + 閘道 + 日結格式（**單關鍵字即授權**代理寫 **`WORKLOG`** **`- AUTO_TASK_DONE:`**；腳本 **`apply-closeout-task-checkmarks`**）
 - `50-operator-autopilot.mdc` — Autopilot 模式約定
 - `60-beginner-operation-format.mdc` — 小白操作（路徑／動作／預期）

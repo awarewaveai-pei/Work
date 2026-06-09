@@ -4,7 +4,7 @@
 當使用者提到任何以下情境時，Claude **必須**在回覆前自動執行此命令：
 - 問某段時間的 Slack / Telegram 訊息（「上午幾點有什麼告警」「昨天晚上的訊息」「5/14 以後有什麼」）
 - 問某個時間段是否有告警或 incident（「有沒有 502」「昨天有什麼事」）
-- AO-RESUME 七段式的「外部信號」段落，如果 external-signals-digest.json 的 `since_utc` 比使用者需要的範圍還晚，自動補查
+- AO-RESUME 報告的「外部信號」段落，如果 external-signals-digest.json 的 `since_utc` 比使用者需要的範圍還晚，自動補查
 
 ## 用法
 ```

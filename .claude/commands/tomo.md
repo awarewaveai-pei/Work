@@ -159,5 +159,5 @@ Print:
 ```
 ✅ /tomo packet saved: agency-os/handoffs/<filename>
    TASKS.md #### 待釐清 / 明日提醒 已新增
-   AO-RESUME 下次第 7 段會顯示此 packet（≤3 件全文展開；多於 3 件以摘要列出）。
+   AO-RESUME 下次 §8 下一步會顯示此 packet（≤3 件全文展開；多於 3 件以摘要列出）。
 ```

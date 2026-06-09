@@ -19,7 +19,7 @@ git rev-list --count HEAD..origin/main
   git pull --ff-only origin main
   ```
   - **Pull succeeds** → set internal note `GIT_PULLED=true`. Proceed to Step 0.
-  - **Pull fails** (conflict / non-ff / network) → **⛔ STOP. Do NOT output the 7-segment report.**
+  - **Pull fails** (conflict / non-ff / network) → **⛔ STOP. Do NOT output the AO-RESUME report.**
     Output exactly:
     ```
     ⛔ AO-RESUME ABORTED — git pull failed. Report would be based on stale data.

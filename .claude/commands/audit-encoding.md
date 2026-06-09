@@ -45,7 +45,7 @@ Per AGENTS.md `## 代理自動工具使用規則`:
 |---------|--------|
 | 任何 Edit/Write 動到 `.ps1` 檔包含 `& ssh\|docker\|wp\|scp\|git\|kubectl\|helm\|curl\|wget` capture pattern | 立即跑 `/audit-encoding --file <changed-file>` 檢查該檔合規 |
 | 出現 `??` mojibake 或多 line 被吃換行的 CJK 輸出問題 | 跑 `/audit-encoding` 全掃定位來源 |
-| AO-RESUME 七段式報告中發現未預期的非 ASCII 行為 | 同上 |
+| AO-RESUME 報告中發現未預期的非 ASCII 行為 | 同上 |
 | 每月一次定期巡檢（手動觸發或排程）| `/audit-encoding`，將結果追加到 [agency-os/docs/operations/AUDIT_REGISTRY.md](../../agency-os/docs/operations/AUDIT_REGISTRY.md) |
 
 ## Fix template (when drift found)

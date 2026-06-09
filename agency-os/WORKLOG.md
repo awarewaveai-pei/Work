@@ -2,6 +2,37 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-09
+
+### Daily
+- (TBD)
+
+### AO-RESUME 報告升級 §1–§7 → §0–§8（小白可掌控 + 雙層敘述）+ renumber 全檔收尾
+
+**根本問題**：使用者要求 AO-RESUME 報告讓「小白完全掌握/掌控系統，且能學成專家」。原七段式（§1–§7）對已懂者夠用，但小白缺 (a) 一眼總覽 (b) 阻塞獨立可見 (c) 術語學習路徑 (d) 能下什麼指令/出事怎麼辦。
+
+**[已修改]**（使用者授權：全包方案B + D9 治理檔一起改）
+- `.claude/commands/ao-resume.md`：加 §0 TL;DR（必印，燈號🟢須 health=100%且exit=0）；阻塞與風險從 §4 子項升為**獨立 §6（必印）**；需你決策→§7（必印，加 ⏰ 期限雷達）；下一步→§8；§1 加**雙層判讀**（保留術語+附白話，術語首見加英文全名+出處）；Step 0a 補 §0 燈號連動；風格規範加雙層原則第7條。
+- `agency-os/.cursor/rules/30-resume-keyword.mdc`（正本）+ root 鏡像：同步上述（doc-sync 傳播，path-relativity 差異 by-design）。
+- `scripts/ao-resume.ps1`：骨架加 §0+§6，renumber §7/§8；2 處註解 7-segment→AO-RESUME report。
+- **新** `agency-os/docs/operations/AO_RESUME_BEGINNER_MAP.md`：6 節小白手冊（系統地圖/名詞詞典/怎麼讀報告/指令控制台/出事怎麼辦/系統自動做的事）。
+- `.cursor/rules/README.md`×2 + `00-session-bootstrap.mdc`×2 + `CLAUDE.md` + `AGENTS.md` + `SKILL_AND_COMMAND_INDEX.md` + `audit-encoding.md` + `signals.md` + `tomo.md`：暱稱「七段式」→「AO-RESUME 報告（§0–§8）」；tomo handoff inline「第7段」→§8。
+- 記憶：`feedback_ao_resume_clean_format.md` 重寫（§1–§7→§0–§8，消除「禁止加段」與本次擴充的衝突）；`project_tomo_command.md` 第7段→§8；`MEMORY.md` 索引更新。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile ao-resume.ps1` | exit=0 | PARSE OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -ParseBreakOnly` | exit=0 | CLEAN 150/150
+- REALTEST_EVIDENCE: tool=Bash | cmd=`doc-sync-automation.ps1 -AutoDetect` | exit=0 | 無 broken-link/missing-Owner；鏡像傳播
+- REALTEST_EVIDENCE: tool=Bash | cmd=`diff 正本 vs 鏡像 + sed -n 14p` | 我的改動段 identical（L14/§6/§7/§8 一致），10 diff 行全 pre-existing path-relativity（by-design）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0M/0n — Read 回 8 檔改動段，段號 §0–§8 全一致、必印標記齊、雙層規則明確、runbook 路徑修正（agency-os/runbooks→runbooks 根，Glob 驗 8 檔存在）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,.cursor | grep=`七段\|第7段\|§0–§7\|§7 會 inline\|7\. 下一步\|6\. 需決策.*選填` | hits=0（活檔；排除 sessions/plans/WORKLOG/archive 歷史快照 + feedback_operator_zero 非結構性暱稱）
+
+**[剩餘風險]** ① `.claude/plans/*`、`.claude/sessions/*` 歷史快照仍含「七段式/第7段」字樣（設計時快照，不竄改歷史）。② §0 燈號/§6 必印靠 Claude 自律；骨架佔位忘填留可見標記非 silent。③ feedback_operator_zero memory:38 保留「七段式」當口語（非結構斷言）。
+
+**[rollback]** 全 doc + 1 ps1 骨架文字 + 記憶；`git revert` 還原 repo 檔，記憶檔手動還原。無 code 邏輯/schema/prod。
+
+AUTO_TASK_DONE: AO-RESUME 報告 §0–§8 升級（+§0 TL;DR/+§6 阻塞獨立/雙層敘述/小白手冊 6 節）+ 全檔 renumber 收尾 + 衝突記憶重寫；parse+cp950+doc-sync+parity 全綠
+
 ## 2026-06-08
 
 - AUTO_TASK_DONE_APPLIED (2026-06-08T10:28:55Z): Claude Code user-level sync 反覆 drift
@@ -7588,7 +7619,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-09 02:54:05 UTC_
+_Last synced: 2026-06-09 03:01:09 UTC_
 
 ## 2026-03-20
 
@@ -8522,11 +8553,4 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
-
-
-
-
-
-
-
 

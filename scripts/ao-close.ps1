@@ -75,6 +75,33 @@ $healthReportUtils = Join-Path $WorkRoot "scripts\health-report-utils.ps1"
 if (Test-Path -LiteralPath $healthReportUtils) {
     . (Resolve-Path $healthReportUtils).Path
 }
+
+# Four-phase refactor (2026-06-09): single quality-gate collector. Quality gates record
+# pass/fail into $gate instead of exiting on first failure; one decision point before publish
+# reports ALL blockers at once (root-fix for the recurring serial-retry "30-min close").
+# Behavior contract: publish IFF zero blockers — identical commit decision to the old per-gate
+# exits, only batched reporting. Preconditions (git topology / infra) stay fail-fast below.
+$gateLib = Join-Path $WorkRoot "scripts\lib\ao-close-gates.ps1"
+if (Test-Path -LiteralPath $gateLib) {
+    . (Resolve-Path $gateLib).Path
+    $gate = New-CloseoutGate
+} else {
+    Write-Error "ao-close: missing quality-gate lib at $gateLib"
+    exit 1
+}
+
+# Single decision point: report every recorded blocker at once, then refuse to publish.
+# Called at the SkipPush exit (pre-stage gates only) and before commit (pre + post-stage gates).
+function Invoke-CloseoutGateDecision {
+    param([Parameter(Mandatory = $true)] $Gate)
+    if (Test-CloseoutShouldBlock $Gate) {
+        Write-Host ""
+        Write-Error (Get-CloseoutGateReport $Gate)
+        return $true   # blocked
+    }
+    return $false       # clean
+}
+
 $guardScript = Join-Path $agencyRoot "scripts\system-guard.ps1"
 if (-not (Test-Path -LiteralPath $guardScript)) {
     Write-Error "ao-close: missing system-guard at $guardScript"
@@ -227,10 +254,10 @@ if (-not $SkipInboxGuard -and $InboxGuardMode -ne "off") {
             if (-not $inboxExists) {
                 $msg = "ao-close: closeout-inbox missing at $inboxPath. Run scripts\init-closeout-inbox.ps1 and append today's entries."
                 if ($InboxGuardMode -eq "strict") {
-                    Write-Error $msg
-                    exit 1
+                    Add-CloseoutGateResult -Gate $gate -Name "closeout-inbox (strict)" -Failed $true -Detail $msg -Fix "run scripts\init-closeout-inbox.ps1 and append today's entries, or use -InboxGuardMode warn"
+                } else {
+                    Write-Warning $msg
                 }
-                Write-Warning $msg
             } else {
                 $inboxText = Get-Content -LiteralPath $inboxPath -Raw -Encoding UTF8
                 $todayToken = $today.ToString("yyyy-MM-dd")
@@ -243,10 +270,10 @@ if (-not $SkipInboxGuard -and $InboxGuardMode -ne "off") {
                 if (-not $hasTodaySection) {
                     $msg = "ao-close: unpushed commits exist today ($($todayCommits.Count)), but closeout-inbox has no real section for $todayToken. Add: '### <AGENT_ID> <yyyy-MM-dd HH:mm>' (or rely on merge after other agents append)."
                     if ($InboxGuardMode -eq "strict") {
-                        Write-Error $msg
-                        exit 1
+                        Add-CloseoutGateResult -Gate $gate -Name "closeout-inbox today section (strict)" -Failed $true -Detail $msg -Fix "add '### <AGENT_ID> <yyyy-MM-dd HH:mm>' to closeout-inbox, or use -InboxGuardMode warn"
+                    } else {
+                        Write-Warning $msg
                     }
-                    Write-Warning $msg
                 }
             }
         } else {
@@ -334,8 +361,7 @@ if (-not $SkipVerify -and (Test-Path -LiteralPath $verifyScript)) {
     Write-Host "== AO-CLOSE: verify-build-gates (lobster bootstrap + agency health) ==" -ForegroundColor Cyan
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $verifyScript -WorkRoot $WorkRoot
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "ao-close: verify-build-gates failed (exit $LASTEXITCODE). Fix before push."
-        exit $LASTEXITCODE
+        Add-CloseoutGateResult -Gate $gate -Name "verify-build-gates" -Failed $true -Detail "verify-build-gates exited $LASTEXITCODE (see output above)" -Fix "fix the failing build gate(s) reported above"
     }
 } elseif ($SkipVerify) {
     Write-Host "== AO-CLOSE: -SkipVerify set; skipping verify-build-gates ==" -ForegroundColor Yellow
@@ -385,8 +411,7 @@ if ($AllowNonPerfectHealth) { $guardArgs += @("-MinHealthScore", "0") }
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $guardScript @guardArgs
 $guardExit = $LASTEXITCODE
 if ($guardExit -ne 0) {
-    Write-Error "ao-close: system-guard failed (exit $guardExit). Fix health/closeout before push."
-    exit $guardExit
+    Add-CloseoutGateResult -Gate $gate -Name "system-guard (health/doc-sync/closeout)" -Failed $true -Detail "system-guard exited $guardExit" -Fix "fix the failing health/closeout items in LAST_SYSTEM_STATUS.md (doc-sync already ran)"
 }
 
 $genScript = Join-Path $agencyRoot "scripts\generate-integrated-status-report.ps1"
@@ -426,15 +451,13 @@ if (Test-Path -LiteralPath $healthDir) {
         }
         if ($null -ne $score) {
             if (($score -lt 100.0) -and (-not $AllowNonPerfectHealth)) {
-                Write-Error "ao-close: health score is $score% (<100%). Fix remaining checks or rerun with -AllowNonPerfectHealth only when explicitly approved."
-                exit 1
+                Add-CloseoutGateResult -Gate $gate -Name "health score 100%" -Failed $true -Detail "health score is $score% (<100%)" -Fix "fix the failing health checks (see reports/health), or rerun with -AllowNonPerfectHealth only when explicitly approved"
             }
             if (($score -lt 100.0) -and $AllowNonPerfectHealth) {
                 Write-Host "== AO-CLOSE: health score $score% allowed by -AllowNonPerfectHealth ==" -ForegroundColor Yellow
             }
         } elseif (-not $AllowNonPerfectHealth) {
-            Write-Error "ao-close: unable to parse health score from JSON or Markdown under $healthDir."
-            exit 1
+            Add-CloseoutGateResult -Gate $gate -Name "health score parse" -Failed $true -Detail "unable to parse health score from JSON or Markdown under $healthDir" -Fix "ensure system-health-check wrote a valid health-*.json/md, or rerun with -AllowNonPerfectHealth"
         }
     }
 }
@@ -466,6 +489,9 @@ Write-Host ""
 
 if ($SkipPush) {
     Write-Host "== AO-CLOSE: -SkipPush set; skipping git commit/push ==" -ForegroundColor Yellow
+    # Pre-stage quality gates still apply with -SkipPush (matches old per-gate exits, which
+    # fired before this point). Post-stage gates need git add, which -SkipPush never reaches.
+    if (Invoke-CloseoutGateDecision -Gate $gate) { exit 1 }
     exit 0
 }
 
@@ -484,19 +510,16 @@ try {
     }
 
     $staged = @(git diff --cached --name-only | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    foreach ($p in $staged) {
-        if ($p -match '(?i)(^|/)\.claude/|\.credentials\.json$|(^|/)mcp-local-wrappers/node_modules/') {
-            Write-Error "ao-close: blocked sensitive or ignored path from staging: $p"
-            exit 1
-        }
+    $sensitive = @($staged | Where-Object { $_ -match '(?i)(^|/)\.claude/|\.credentials\.json$|(^|/)mcp-local-wrappers/node_modules/' })
+    if ($sensitive.Count -gt 0) {
+        Add-CloseoutGateResult -Gate $gate -Name "sensitive path guard" -Failed $true -Detail ("staged sensitive/ignored path(s): " + ($sensitive -join ", ")) -Fix "git reset these paths and add to .gitignore; memory/.claude must not enter git (CLAUDE.md R1)"
     }
 
     # Routed through the EAP-protected lib helper: git diff can emit stderr (e.g. CRLF
     # warnings) which under EAP=Stop + 2>&1 throws NativeCommandError before $patch is set.
     $patch = (Invoke-SafeGitCapture -GitArgs @('diff', '--cached', '-U0') -WorkRoot $WorkRoot).Text
     if ($patch -match '(?m)^\+<<<<<<< ') {
-        Write-Error "ao-close: staged diff contains merge conflict markers (+<<<<<<<). Resolve conflicts before commit."
-        exit 1
+        Add-CloseoutGateResult -Gate $gate -Name "merge conflict markers" -Failed $true -Detail "staged diff contains +<<<<<<< conflict markers" -Fix "resolve the merge conflicts before commit"
     }
 
     $complScript = Join-Path $WorkRoot "scripts\verify-closeout-completeness.ps1"
@@ -504,10 +527,15 @@ try {
         Write-Host "== AO-CLOSE: verify-closeout-completeness ($CompletenessGate) ==" -ForegroundColor Cyan
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $complScript -WorkRoot $WorkRoot -Gate $CompletenessGate
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "ao-close: verify-closeout-completeness failed (exit $LASTEXITCODE). Add today WORKLOG evidence (- AUTO_TASK_DONE: and/or inbox merge block) or use -CompletenessGate warn / -SkipCompletenessGate."
-            exit $LASTEXITCODE
+            Add-CloseoutGateResult -Gate $gate -Name "verify-closeout-completeness ($CompletenessGate)" -Failed $true -Detail "completeness/bughunt-oracle gate exited $LASTEXITCODE (see output above)" -Fix "add today's WORKLOG evidence (- AUTO_TASK_DONE: and/or inbox merge block), or use -CompletenessGate warn / -SkipCompletenessGate"
         }
     }
+
+    # --- Phase 3 -> Phase 4 boundary: single decision point ---
+    # Every quality gate above (pre-stage + post-stage) recorded into $gate instead of exiting.
+    # Report ALL blockers at once and refuse to publish (commit/push/export) if any exist.
+    # This is the one-pass replacement for the old scattered per-gate `exit 1` calls.
+    if (Invoke-CloseoutGateDecision -Gate $gate) { exit 1 }
 
     $hasStaged = $staged.Count -gt 0
     if ($hasStaged) {

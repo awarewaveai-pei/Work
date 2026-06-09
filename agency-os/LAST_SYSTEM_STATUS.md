@@ -1,24 +1,18 @@
 ﻿# System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-08 18:19:23`
-- Health score: **100%**
+- Time: `2026-06-09 11:01:29`
+- Health score: **99.7%**
 - Threshold: **100%**
-- Health gate exit code: **0**
+- Health gate exit code: **1**
 - Closeout report exists: **YES**
-- Result: **PASS**
-- Auto-repair attempted: **NO**
-- Auto-repair result: **N/A**
+- Result: **FAIL**
+- Auto-repair attempted: **YES**
+- Auto-repair result: **FAIL**
 
 ## Latest Reports
-- Health: `reports/health/health-20260608-181917.md`
-- Closeout: `reports/closeout/closeout-20260608-181923.md`
+- Health: `reports/health/health-20260609-110128.md`
+- Closeout: `reports/closeout/closeout-20260609-110110.md`
 
 ## Action
-- No blocking issue detected.
-
-## Related Documents (Auto-Synced)
-- `.cursor/rules/30-resume-keyword.mdc`
-
-_Last synced: 2026-06-09 02:54:05 UTC_
-
+- Blocking issues detected. Review latest health/closeout reports immediately.
