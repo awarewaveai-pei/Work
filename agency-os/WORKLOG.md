@@ -7,6 +7,30 @@
 ### Daily
 - (TBD)
 
+### ao-close.ps1 四相位重構 — 根治「收工串行 fail-fast、blocker 逐個發現、每次重跑」(behavior-preserving)
+
+- AUTO_TASK_DONE: ao-close.ps1 四相位重構
+
+**根本問題**：AO-CLOSE 是 623 行、19 個散落 `exit 1`、7 個品質閘與 mutation 交錯的 fail-fast 串行管線。一個閘失敗就 abort → 操作者**一次只發現一個 blocker**、修完重跑、下一個又爆（半年來「收工花 30 分」根因；WORKLOG 2026-06-08「復發三項徹查」+ 965/979 多次重跑坐實）。使用者要「正確又快、不要補釘/恐怖平衡」。
+
+**方案（甲，兩步 refactor-specialist 紀律：先建 oracle、再重構）**：
+- **四相位**：P1 前置(git 拓樸/基建,fail-fast)→ P2 準備(mutation)→ P3 品質閘(單一 `$gate` 收集,不 fail-fast)→ P4 發布(commit/push/export,僅零 blocker 才跑)。
+- **單一閘機制**:新 lib `scripts/lib/ao-close-gates.ps1`(`New-CloseoutGate`/`Add-CloseoutGateResult`/`Test-CloseoutShouldBlock`/`Get-CloseoutGateReport`,仿 system-health-check Add-Check)。8 個品質閘 `exit`→`Add`;兩個決策點(`:503` SkipPush、`:547` 主)`Invoke-CloseoutGateDecision` 一次報全 blocker。
+- **關鍵發現**:system-guard 是子進程,其 `exit` 不終止 ao-close → 所有品質閘皆可收集,**零改外部 SSOT**。
+
+**[已修改]** `scripts/ao-close.ps1`(8 閘轉 Add + 2 決策點 + lib 接線 + Invoke-CloseoutGateDecision)、新 `scripts/lib/ao-close-gates.ps1`、新 `scripts/test/ao-close-gates.Tests.ps1`(19 例回歸 oracle)。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ao-close.ps1 -SkipPush`(真實 dirty 狀態) | exit=1 | **一次報出 4 個 blocker**(inbox/verify-build-gates/system-guard/health 99.7%)——舊版需 4 次重跑;報告乾淨無例外堆疊;blocked→無 commit/push
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ao-close-gates.Tests.ps1` | exit=0 | 19/19 pass(含「多 blocker 全收集不 fail-fast」關鍵例)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile ao-close.ps1` + `audit-cp950-traps.ps1` | exit=0 | OK + CLEAN
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1M/2m | **契約 PASS**(publish ⟺ 零 blocker,逐路徑驗證);1 Major(Invoke-CloseoutGateDecision 用 Write-Error 在 EAP=Stop 丟例外→死碼+髒報告)已修為 Write-Host;12 flag 全保留、8 閘全轉、所有前置/發布 fail-fast 不變
+- BUGHUNT_DONE: scope=scripts,agency-os,.claude | grep=`Invoke-CloseoutGateDecision`\|`New-CloseoutGate`\|`ao-close-gates` | hits=0 外部依賴(全在重構內部;agency-os wrapper 用 splat+`exit $LASTEXITCODE` 正確傳遞新退出碼)
+
+**[剩餘風險]** R2:collect-continue 讓 P2 mutation(doc-sync/checkmarks/git add)在有 blocker 時仍跑——皆冪等、本地、未發布,critic 確認無害。clean-path(零 blocker→發布)端到端證明待下次真實 AO-CLOSE(需先清當前 2 個真 blocker:archive-lift + inbox)。
+
+**[rollback]** revert 本 commit 即回 623 行 fail-fast 原版;lib/test 為純新增可刪。
+
 ### AO-RESUME 報告升級 §1–§7 → §0–§8（小白可掌控 + 雙層敘述）+ renumber 全檔收尾
 
 **根本問題**：使用者要求 AO-RESUME 報告讓「小白完全掌握/掌控系統，且能學成專家」。原七段式（§1–§7）對已懂者夠用，但小白缺 (a) 一眼總覽 (b) 阻塞獨立可見 (c) 術語學習路徑 (d) 能下什麼指令/出事怎麼辦。
