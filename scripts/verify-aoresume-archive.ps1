@@ -1,14 +1,17 @@
 <#
 .SYNOPSIS
-Gate 12d: verify that an AO-RESUME archive was written after the most recent ao-resume
-stamp AND that its mandatory sections (§0 TL;DR / §6 阻塞與風險 / §7 需你決策) are filled in
-(not a surviving AUTO-SKELETON / placeholder). Mechanical enforcement of "必印" sections
-(2026-06-09: replaces reliance on Claude self-discipline).
+Gate 12d: verify that an AO-RESUME archive was written after the most recent ao-resume stamp.
+At AO-CLOSE (env AORESUME_ARCHIVE_ENFORCE_CONTENT=1, set by ao-close.ps1) it ALSO verifies the
+mandatory sections (sec0 TL;DR / sec6 blockers-and-risks / sec7 needs-your-decision) are filled
+in and the AUTO-SKELETON was overwritten. Content enforcement is intentionally scoped to AO-CLOSE:
+during AO-RESUME the archive is legitimately a fresh skeleton (filled by Claude seconds later),
+so resume keeps the original existence-only behavior => no false-fail, no slow resume, no loop.
+This gate NEVER re-runs ao-resume.ps1, so it cannot cause the historical 30-min resume loop.
 
 Exit codes (consumed by system-health-check.ps1 gate 12d):
-  0  PASS  — archive exists AND mandatory §0/§6/§7 sections are present and filled
-  1  FAIL  — no matching archive (Step 3 skipped) OR archive content incomplete
-            (surviving skeleton / unfilled placeholder / missing 必印 section)
+  0  PASS  — archive exists (+ at AO-CLOSE: mandatory sec0/sec6/sec7 present and filled)
+  1  FAIL  — no matching archive (Step 3 skipped) OR (AO-CLOSE only) content incomplete
+            (surviving skeleton / unfilled placeholder / missing mandatory section)
   2  SKIP  — ao-resume stamp missing (fresh repo or ao-resume never ran)
 #>
 param (
@@ -76,54 +79,61 @@ foreach ($f in ($archives | Sort-Object Name -Descending)) {
 
 if ($found) {
     # --- Content gate (2026-06-09): existence alone is not enough. The mandatory
-    # sections (sec0 TL;DR / sec6 blockers-and-risks / sec7 needs-your-decision)
-    # must be actually filled in, and the AUTO-SKELETON must have been overwritten.
-    # Mechanical enforcement of the "must-print" sections (user: do not trust self-discipline).
-    # NOTE: CJK match patterns use \uXXXX escapes so this script stays ASCII-only source
-    # (BOM-less .ps1 + CJK literals = CP950 parse-break trap). Header keywords matched:
-    #   sec0 = U+4E00 U+53E5 U+8A71 U+7E3D U+7D50 (yi-ju-hua-zong-jie) or "TL;DR"
-    #   sec6 = U+963B U+585E U+8207 U+98A8 U+96AA (zu-se-yu-feng-xian)
-    #   sec7 = U+9700 U+4F60 U+6C7A U+7B56 (xu-ni-jue-ce)
-    #   placeholder = U+FF08 U+5F85 Claude U+586B U+5BEB U+FF09 (skeleton "to be filled by Claude")
-    $archivePath = Join-Path $archiveDir $newestMatch
-    $content = Get-Content -LiteralPath $archivePath -Raw -Encoding UTF8
-    $contentFailures = @()
-
-    if ($content -match '<!--\s*AUTO-SKELETON') {
-        $contentFailures += "AUTO-SKELETON placeholder survives (Step 3 skipped - overwrite with the real report)"
-    }
-    # Build CJK match strings from code points so this source stays ASCII-only
-    # (BOM-less .ps1 + literal CJK = CP950 parse-break trap). Code points:
-    #   sec0 one-line-summary = U+4E00 U+53E5 U+8A71 U+7E3D U+7D50
+    # sections (sec0 TL;DR / sec6 blockers-and-risks / sec7 needs-your-decision) must
+    # be filled in, and the AUTO-SKELETON must have been overwritten.
+    #
+    # SCOPED TO AO-CLOSE ONLY (env AORESUME_ARCHIVE_ENFORCE_CONTENT=1, set by ao-close.ps1).
+    # Why: during AO-RESUME the archive is a fresh skeleton (Claude fills it in Step 3,
+    # seconds later). Enforcing content during AO-RESUME would false-FAIL on every resume
+    # and is fragile to ao-resume.ps1 step ordering. At AO-CLOSE the real report must exist,
+    # so that is the correct (and only) place to hard-enforce. AO-RESUME / standalone /health
+    # keep the original existence-only behavior => zero new risk of slow resume or loops.
+    # No re-runs are ever triggered by this gate, so it cannot cause the 30-min resume loop.
+    #
+    # NOTE: CJK keywords are built from code points ([char]0xXXXX) to keep this source
+    # 100% ASCII (BOM-less .ps1 + literal CJK = CP950 parse-break trap). Keywords:
+    #   sec0 one-line-summary = U+4E00 U+53E5 U+8A71 U+7E3D U+7D50  (or ASCII "TL;DR")
     #   sec6 blockers-and-risks = U+963B U+585E U+8207 U+98A8 U+96AA
     #   sec7 needs-your-decision = U+9700 U+4F60 U+6C7A U+7B56
     #   skeleton placeholder tail = "Claude " + U+586B U+5BEB ("...fill in")
-    $kwSec0 = -join (@(0x4E00,0x53E5,0x8A71,0x7E3D,0x7D50) | ForEach-Object { [char]$_ })
-    $kwSec6 = -join (@(0x963B,0x585E,0x8207,0x98A8,0x96AA) | ForEach-Object { [char]$_ })
-    $kwSec7 = -join (@(0x9700,0x4F60,0x6C7A,0x7B56) | ForEach-Object { [char]$_ })
-    $kwPlaceholder = 'Claude ' + (-join (@(0x586B,0x5BEB) | ForEach-Object { [char]$_ }))
+    if ($env:AORESUME_ARCHIVE_ENFORCE_CONTENT -eq '1') {
+        $archivePath = Join-Path $archiveDir $newestMatch
+        $content = Get-Content -LiteralPath $archivePath -Raw -Encoding UTF8
+        $contentFailures = @()
 
-    if ($content.Contains($kwPlaceholder)) {
-        $contentFailures += "unfilled skeleton placeholder remains (a mandatory section was left blank)"
-    }
-    if (-not ($content.Contains($kwSec0) -or $content.Contains('TL;DR'))) {
-        $contentFailures += "sec0 TL;DR (one-line summary) missing - it is mandatory"
-    }
-    if (-not $content.Contains($kwSec6)) {
-        $contentFailures += "sec6 blockers-and-risks missing - it is mandatory"
-    }
-    if (-not $content.Contains($kwSec7)) {
-        $contentFailures += "sec7 needs-your-decision missing - it is mandatory"
+        if ($content -match '<!--\s*AUTO-SKELETON') {
+            $contentFailures += "AUTO-SKELETON placeholder survives (Step 3 skipped - overwrite with the real report)"
+        }
+        $kwSec0 = -join (@(0x4E00,0x53E5,0x8A71,0x7E3D,0x7D50) | ForEach-Object { [char]$_ })
+        $kwSec6 = -join (@(0x963B,0x585E,0x8207,0x98A8,0x96AA) | ForEach-Object { [char]$_ })
+        $kwSec7 = -join (@(0x9700,0x4F60,0x6C7A,0x7B56) | ForEach-Object { [char]$_ })
+        $kwPlaceholder = 'Claude ' + (-join (@(0x586B,0x5BEB) | ForEach-Object { [char]$_ }))
+
+        if ($content.Contains($kwPlaceholder)) {
+            $contentFailures += "unfilled skeleton placeholder remains (a mandatory section was left blank)"
+        }
+        if (-not ($content.Contains($kwSec0) -or $content.Contains('TL;DR'))) {
+            $contentFailures += "sec0 TL;DR (one-line summary) missing - it is mandatory"
+        }
+        if (-not $content.Contains($kwSec6)) {
+            $contentFailures += "sec6 blockers-and-risks missing - it is mandatory"
+        }
+        if (-not $content.Contains($kwSec7)) {
+            $contentFailures += "sec7 needs-your-decision missing - it is mandatory"
+        }
+
+        if ($contentFailures.Count -gt 0) {
+            Write-Host "verify-aoresume-archive: FAIL - archive $newestMatch exists but content is incomplete:"
+            foreach ($cf in $contentFailures) { Write-Host "  - $cf" }
+            Write-Host "  Fix: overwrite agency-os/reports/ao-resume/$newestMatch with the real AO-RESUME report (sec0-sec8; sec0/sec6/sec7 mandatory)."
+            exit 1
+        }
+
+        Write-Host "verify-aoresume-archive: PASS - archive $newestMatch covers ao-resume stamp $stampCstStr CST (AO-CLOSE content check: sec0/sec6/sec7 present)."
+        exit 0
     }
 
-    if ($contentFailures.Count -gt 0) {
-        Write-Host "verify-aoresume-archive: FAIL - archive $newestMatch exists but content is incomplete:"
-        foreach ($cf in $contentFailures) { Write-Host "  - $cf" }
-        Write-Host "  Fix: overwrite agency-os/reports/ao-resume/$newestMatch with the real AO-RESUME report (sec0-sec8; sec0/sec6/sec7 mandatory)."
-        exit 1
-    }
-
-    Write-Host "verify-aoresume-archive: PASS - archive $newestMatch covers ao-resume stamp $stampCstStr CST (mandatory sec0/sec6/sec7 present)."
+    Write-Host "verify-aoresume-archive: PASS - archive $newestMatch covers ao-resume stamp $stampCstStr CST (existence check; content enforced at AO-CLOSE)."
     exit 0
 }
 

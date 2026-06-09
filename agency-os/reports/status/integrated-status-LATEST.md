@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-09 11:01:37
+- Generated: 2026-06-09 11:40:14
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -286,7 +286,6 @@
 - Blocking issues detected. Review latest health/closeout reports immediately.
 
 ## 7) WORKLOG.md tail (~60 lines)
-
 **[驗證結果]**
 1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell test-stable-status.ps1 (4 cases) | exit=0 | result=ALL PASS（時間戳/報告名 churn→不寫；score 100→99.5 / exit 0→1→寫；首跑/缺檔→寫；regex 不誤傷 `- Health score:`/`- Health gate exit code:`）
    REALTEST_EVIDENCE: tool=Bash | cmd=run agency-os/scripts/system-guard.ps1 -WorkspaceRoot agency-os -Mode daily x2（排程實際呼叫） | exit=1(health FAIL 與 churn 無關) | result=LAST_SYSTEM_STATUS.md 兩次 SHA256 相同 60153216…（不再 churn）
@@ -345,4 +344,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
+
 

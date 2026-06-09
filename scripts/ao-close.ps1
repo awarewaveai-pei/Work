@@ -412,7 +412,12 @@ if (Test-Path -LiteralPath $syncScript) {
 Write-Host "== AO-CLOSE: system-guard (doc-sync + health + guard) ==" -ForegroundColor Cyan
 $guardArgs = @("-WorkspaceRoot", $agencyRoot, "-Mode", "manual")
 if ($AllowNonPerfectHealth) { $guardArgs += @("-MinHealthScore", "0") }
+# Enable AO-RESUME archive *content* enforcement (sec0/sec6/sec7 must be filled, no surviving
+# skeleton) ONLY here at AO-CLOSE. Inherited by the guard -> system-health-check ->
+# verify-aoresume-archive child processes. AO-RESUME leaves this unset = existence-only.
+$env:AORESUME_ARCHIVE_ENFORCE_CONTENT = '1'
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $guardScript @guardArgs
+$env:AORESUME_ARCHIVE_ENFORCE_CONTENT = $null
 $guardExit = $LASTEXITCODE
 if ($guardExit -ne 0) {
     Add-CloseoutGateResult -Gate $gate -Name "system-guard (health/doc-sync/closeout)" -Failed $true -Detail "system-guard exited $guardExit" -Fix "fix the failing health/closeout items in LAST_SYSTEM_STATUS.md (doc-sync already ran)"

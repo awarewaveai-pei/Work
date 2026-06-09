@@ -39,20 +39,22 @@ AUTO_TASK_DONE: AO-RESUME 報告 §0–§8 升級（+§0 TL;DR/+§6 阻塞獨立
 
 **[已修改]** `scripts/verify-aoresume-archive.ps1`：找到覆蓋 stamp 的 archive 後加**內容閘**——讀檔驗 4 條：① 無 `<!-- AUTO-SKELETON` 殘留 ② 無 skeleton placeholder（`Claude 填寫`）③④ 含 §0(一句話總結/TL;DR)/§6(阻塞與風險)/§7(需你決策) 關鍵字；任一缺 → exit 1（既有 FAIL 路徑，caller `system-health-check.ps1:800` Add-CriticalFailure → AO-CLOSE 硬擋）。exit 0/1/2 三碼契約不變。
 
+**鐵桶化（回應使用者「會不會無限循環/開工30分鐘」）**：內容閘**只在 AO-CLOSE 強制**（env `AORESUME_ARCHIVE_ENFORCE_CONTENT=1`，由 `ao-close.ps1` 在 guard 呼叫前設、後清；繼承到 guard→health-check→gate 子進程）。AO-RESUME / 獨立 `/health` 不設旗標 → 維持原 existence-only。理由：AO-RESUME 時 archive 是剛寫的骨架（Claude 數秒後 Step 3 才填），resume 也強制內容會每次假 FAIL 且依賴 `ao-resume.ps1`「health-check 跑在 stamp 更新前」隱含順序（脆弱）。**迴圈/速度安全**：本 gate 觸發 0 次 ao-resume.ps1 重跑（30 分鐘根源=git-align 失敗重跑，與此無關）；AO-CLOSE fail→Claude 寫報告（終止動作）→重跑→過，一次性無迴圈；內容檢查=毫秒檔案讀取。
+
 **CP950 trap（踩到並修正）**：首版把 CJK 字面值（`阻塞與風險`、全形 `（）`）寫進 BOM-less `.ps1` → Big5 console `powershell -File` 讀成亂碼 → parse break（與 audit-encoding 警告同類）。**根治**：match patterns 改用 `[char]0xXXXX` 碼點 runtime 組字串 + `.Contains()`，源碼 100% ASCII；temp 測試 driver 同樣 ASCII 化。
 
 **[驗證結果]**
-- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-aoresume-archive.ps1`（真 repo 今日 archive 有 §0/§6/§7）| exit=0 | PASS
-- REALTEST_EVIDENCE: tool=Bash | cmd=temp driver 3 案（CASE2 骨架存活→exit1 / CASE3 缺§6→exit1 / CASE4 完整→exit0）| 全 OK（含 `powershell -File` CP950 路徑乾淨，證 ASCII-safe）
-- REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile` + `audit-cp950-traps -ParseBreakOnly` | exit=0 | PARSE OK + CLEAN 150/150
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0M/0n — exit 0/1/2 契約保留；placeholder 改 `Claude 填寫`（distinctive）降誤殺；空態必印段仍含 header 關鍵字不誤殺
-- BUGHUNT_DONE: scope=scripts,agency-os | grep=`verify-aoresume-archive` | hits=caller `system-health-check.ps1:792-813`（消費 exit 0/1/2，default→critical；契約完好）+ WORKLOG/reports 歷史引用（非 stale）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`verify-aoresume-archive.ps1` 真 repo 兩 context（env 未設→existence PASS exit0；env=1→content PASS exit0，今日 archive 有 §0/§6/§7）| exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=temp driver scoped 4 案（**RESUME(env off)+骨架→PASS exit0** 關鍵案 / CLOSE(env on)+骨架→FAIL / CLOSE+缺§6→FAIL / CLOSE+完整→PASS）| 全 OK
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile` verify-aoresume-archive + ao-close + `audit-cp950-traps -ParseBreakOnly` | exit=0 | PARSE OK ×2 + CLEAN 150/150
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0M/0n — exit 0/1/2 契約保留；AO-RESUME 零影響（env 未設走 existence-only）；env var 子進程繼承（OS 保證）；placeholder `Claude 填寫` distinctive 降誤殺
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`verify-aoresume-archive`\|`AORESUME_ARCHIVE_ENFORCE_CONTENT` | hits=caller `system-health-check.ps1:792-813`（exit 0/1/2 契約完好）+ `ao-close.ps1` setter（新）；無 stale
 
-**[剩餘風險]** placeholder 檢查 `Claude 填寫` 理論上真內容若含此字串會誤殺（極罕；AUTO-SKELETON marker 為主防線）。關鍵字比對是 substring，不驗段落順序/完整性（僅驗「必印段存在且非骨架」，足夠擋 silent skip）。
+**[剩餘風險]** 內容閘只在 AO-CLOSE 跑 → 若操作者從不收工（不跑 AO-CLOSE）則內容不被驗（但 archive 存在仍驗；且不收工=不需收工 gate）。placeholder `Claude 填寫` 理論上真內容含此串會誤殺（極罕，AUTO-SKELETON marker 為主防線）。
 
-**[rollback]** `git revert` 還原單檔 `verify-aoresume-archive.ps1`；無 schema/prod/DB。
+**[rollback]** `git revert` 還原 2 檔（`verify-aoresume-archive.ps1` + `ao-close.ps1` 的 env 設定行）；無 schema/prod/DB。
 
-AUTO_TASK_DONE: §0/§6/§7 必印機械閘（verify-aoresume-archive 內容驗證；CP950-safe [char] 碼點；4 案實測；caller 契約不變）
+AUTO_TASK_DONE: §0/§6/§7 必印機械閘（AO-CLOSE-only 內容驗證，env 旗標鐵桶化；AO-RESUME 零影響無迴圈無慢；CP950-safe [char] 碼點；scoped 4 案實測）
 
 ## 2026-06-08
 
@@ -7640,7 +7642,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-09 03:01:09 UTC_
+_Last synced: 2026-06-09 03:33:00 UTC_
 
 ## 2026-03-20
 
@@ -8574,4 +8576,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
+
 
