@@ -98,18 +98,30 @@ export const TAROT_CARDS: TarotCard[] = [...MAJOR, ...MINOR];
 /** The card used for the single style-preview generation. */
 export const PREVIEW_CARD: TarotCard = MAJOR[0]; // THE FOOL
 
+// The card frame + Roman numeral + card name are drawn by our own canvas overlay
+// (renderPrintCard.ts). The image model must therefore output ONLY the inner scene —
+// a full-bleed illustration with no card border, no frame, and no lettering — otherwise
+// the result is a card-inside-a-card with the title printed twice.
+const NO_FRAME_NO_TEXT =
+  "Full-bleed illustration that fills the whole image edge to edge. This is the inner artwork ONLY — " +
+  "NOT a finished tarot card: absolutely no card border, no decorative frame, no rounded card edges, " +
+  "no title bar or banner, no card name, no caption, no numerals, no letters, no text or writing anywhere in the image.";
+
 /**
  * Build the full image-model prompt for one card given a user style/character description.
  * The user's description REINTERPRETS the card's figures (e.g. "blue oil-painting cat" turns
  * the Fool's traveler into a blue cat) instead of merely layering a style on a fixed human scene.
+ *
+ * Note: the card's `name` is deliberately NOT passed to the model — naming the card makes the
+ * model render the whole bordered, titled card. We want only the scene; our canvas adds the frame.
  */
 export function buildCardPrompt(stylePrompt: string, card: TarotCard): string {
   const style = stylePrompt.trim();
   if (!style) {
-    return `Ornate medieval colored-pencil tarot illustration, Rider-Waite inspired, warm antique paper. Scene: ${card.subjectPrompt}. A single tarot card "${card.name}", full vertical portrait composition, rich symbolic detail, no text, no border.`;
+    return `Ornate medieval colored-pencil illustration, Rider-Waite inspired palette, warm antique paper texture. Scene: ${card.subjectPrompt}. Vertical composition, rich symbolic detail. ${NO_FRAME_NO_TEXT}`;
   }
   // Lead HARD with the user's description as the main character + an explicit "not a human"
   // negation, so a themed deck (e.g. "blue oil-painting cat") fully replaces the figures
   // instead of just tinting the standard human scene. (Empirically verified on FLUX schnell.)
-  return `Tarot card "${card.name}". MAIN CHARACTER & ART DIRECTION: ${style} — render the main figure ENTIRELY as this; if it names an animal or creature, do NOT draw a human, replace any person with it, and apply the style to the whole artwork. The character is posed in this classic tarot scene: ${card.subjectPrompt}. Vertical ornate tarot card portrait, rich symbolic detail, cohesive consistent style, no text, no border.`;
+  return `Illustration. MAIN CHARACTER & ART DIRECTION: ${style} — render the main figure ENTIRELY as this; if it names an animal or creature, do NOT draw a human, replace any person with it, and apply the style to the whole image. The character is posed in this classic scene: ${card.subjectPrompt}. Vertical composition, rich symbolic detail, cohesive consistent style. ${NO_FRAME_NO_TEXT}`;
 }

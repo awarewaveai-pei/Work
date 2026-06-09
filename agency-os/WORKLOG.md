@@ -8659,3 +8659,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - REALTEST_EVIDENCE: tool=Bash | cmd=`node` 複現 cards.ts minor 生成邏輯印 78 張 | exit=0 | 大牌 0/I-XXI 全對、小牌 pip I-X + 宮廷牌空、78 unique names/ids 無重複
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/0n | index 對齊無 off-by-one、空字串 roman 被 guard 短路、band-centre 幾何兩標籤皆在帶內、最長牌名 THE HIGH PRIESTESS 64px ~630px < 664px 不溢出、無 numeric-roman 消費者
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`.roman`\|`MINOR_ROMAN` | hits=0 stale（.roman 僅 renderPrintCard.ts guard 內消費、MINOR_ROMAN 僅 cards.ts；agency-os/scripts 無命中）
+
+- BUGHUNT_WAIVED: NA -- buildCardPrompt prompt 字串內容調整（移除 tarot card/牌名字眼→純插圖無框無字），無控制流/型別變更；tsc 通過
