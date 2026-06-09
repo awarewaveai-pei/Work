@@ -1094,7 +1094,10 @@ try {
             $arBody = @"
 # AO-RESUME — $($arStampCst.ToString("yyyy-MM-dd HH:mm")) CST
 
-<!-- AUTO-SKELETON written by ao-resume.ps1. Claude MUST overwrite this with the real 七段式 report (ao-resume.md Step 3, identical to chat output). If this placeholder survives to AO-CLOSE, Step 3 was skipped. -->
+<!-- AUTO-SKELETON written by ao-resume.ps1. Claude MUST overwrite this with the real report (ao-resume.md Step 3, identical to chat output). §0 + §6 are MANDATORY (print even if empty). If this placeholder survives to AO-CLOSE, Step 3 was skipped. -->
+
+## 0. 一句話總結（TL;DR）
+（待 Claude 填寫）
 
 ## 1. 系統快照
 （待 Claude 填寫）
@@ -1110,6 +1113,9 @@ try {
 
 ## 5. 未完成待辦（TASKS）
 （待 Claude 填寫）
+
+## 6. 需你決策 / 期限提醒
+（待 Claude 填寫；空也要印一行）
 
 ## 7. 下一步
 （待 Claude 填寫）

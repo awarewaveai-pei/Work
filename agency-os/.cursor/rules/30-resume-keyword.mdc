@@ -37,9 +37,13 @@ When the user message contains `AO-RESUME`, before proposing any new implementat
 If opened folder is `agency-os` only, use paths as above; lobster paths are `../lobster-factory/docs/...`.（**僅開 agency-os 時**：`.agency-state/open-tasks-snapshot.md` 路徑同左，無 `agency-os/` 前綴。）
 
 3. **回覆結構（`AO-RESUME` 專用；禁止「過度精簡」到省略待辦或風險）**  
-   以下**七個頂層標題依序輸出**（繁中），每節都須有**可讀的實質內容**（禁止整節只剩一兩個字或「略」）：
+   以下**頂層標題依序輸出**（§0 + §1–§7，繁中），每節都須有**可讀的實質內容**（禁止整節只剩一兩個字或「略」）；**§0 TL;DR 與 §6 需你決策必印**（即使空也印一行）：
 
-   - **1. 系統快照** — One-line status：SG/EU 服務狀態（UP/DOWN 或「未取得」）｜deploy drift commits｜Git ahead/behind/dirty。來源以 `ao-resume-hook-last.json` 的 `log_tail`、`steps_summary`、health check output、以及當輪 `ao-resume.ps1` 終端輸出為準。若 cross-machine import 有結果，列出每個檔案狀態；若未執行，明寫「import 未執行 — [原因]」。
+   **全域原則 — 雙層敘述**：專業術語與白話**並存**，不可只留其一（保留術語讓進階者成長、附白話讓小白看懂）；術語／縮寫首次出現加一次「英文全名 + 中文 + 1 句出處」。目的：讓小白逐次學成專家，而非永遠依賴翻譯。
+
+   - **0. 一句話總結（TL;DR，必印，置頂）** — 一行讓小白讀完即掌握全局，固定三段以 `｜` 分隔：`<燈號🟢/🟡/🔴> 系統<健康狀態>・<告警摘要> ｜ 主線=<今日主線一句> ｜ 今天建議：<最該做的一件事>`。末尾固定附小白入口：`📖 看不懂名詞／哪台機器跑什麼 → docs/operations/AO_RESUME_BEGINNER_MAP.md`。
+
+   - **1. 系統快照** — One-line status：SG/EU 服務狀態（UP/DOWN 或「未取得」）｜deploy drift commits｜Git ahead/behind/dirty。來源以 `ao-resume-hook-last.json` 的 `log_tail`、`steps_summary`、health check output、以及當輪 `ao-resume.ps1` 終端輸出為準。若 cross-machine import 有結果，列出每個檔案狀態；若未執行，明寫「import 未執行 — [原因]」。**雙層判讀（強制）**：每個 WARN／skip／非 100% 項保留原始術語＋並附白話一句「代表什麼 + 要不要擔心 + 要不要你出手」，首見術語加英文全名＋中文＋出處。
 
    - **2. 外部信號** — 讀 `agency-os/.agency-state/external-signals-digest.json`（若存在）並先輸出 gap window（UTC 轉 CST/TPE）與可靠度。Telegram / Slack / Cloudflare security 只列 actionable items；若 digest stale、partial、failed，必須標明，不得把舊訊號當本輪未處理訊號。
 
@@ -56,7 +60,7 @@ If opened folder is `agency-os` only, use paths as above; lobster paths are `../
 
    - **5. 未完成待辦（TASKS，`- [ ]` 全列，依分類輸出）** — **必做**：以 **`open-tasks-snapshot.md`**（優先）與 **`agency-os/TASKS.md`** 對齊後，**依 `####` 分類標題分組輸出**——先印該 `####` 標題，再列其下所有 `- [ ]` 項，**完整複製原文**（checkbox 與文字均保留）；空分類省略。**禁止**將所有待辦壓成單一無分類清單，**禁止**只寫「見 TASKS」「共 N 條」而不列內文。**若** **Total open = 0**：寫「（0 條未完成）」**並**一句話確認。**條數必須**與快照／`print-open-tasks` **Total open** 一致（不一致須說明原因）。**若 Total open > 35**：仍**不得省略**任一行——可分段輸出（同一對話回合內接續貼上直至列完），並在首段註明「待辦較多，分 N 段列完」。**未全列 `- [ ]` 或未分類輸出，視為無效回覆，必須重出**。
 
-   - **6. 需決策**（選填 — 整節只在有內容時輸出）— 只列不能由代理自行推進、需要人類選擇或操作的項目。每項必含：類型（資源／策略／權限／外部）、說明、影響。
+   - **6. 需你決策 / 期限提醒**（**必印** — 即使空也印一行，永久區分「查過=無」與「漏了」）— **(a) 需決策**：不能由代理自行推進、需人類選擇或操作的項目，每項含類型（資源／策略／權限／外部）、說明、影響。**(b) ⏰ 期限雷達**：有明確死線的項目（如「Phase 4 觀察期 X/XX 到期」「出國前 Termius 未設定」），每項一行 `<項目> — 死線 <日期> — 剩 N 天`。**空態**：(a)(b) 皆無時印 `§6：本輪無需你做決定，無迫近期限。`，不得整節省略。
 
    - **7. 下一步** — 具體、可執行；若 **需決策** 有阻塞項，先寫需決策的第一動作；並保留下方第 6、7 點之雙機／筆電提醒（若適用）。
 
