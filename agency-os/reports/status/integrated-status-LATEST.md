@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-09 14:53:43
+- Generated: 2026-06-09 14:57:24
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -247,7 +247,8 @@
 - [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）** — 程式+真機已驗過，**直接呼叫 `provisionClient()` 勿重寫**。recipe：`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`（app 端 `onboarding/trigger-build/route.ts` 頂部已留指標）。等 app 校正完再接。
 - [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）** — 讓新機/客戶自帶機自動部署成 production 等級（Docker+Grafana/Loki/Netdata/Sentry+快取+swap+備份+限速/WAF/fail2ban）。**料件 90%+ 現成**，缺一個編排器 `provision-stack.sh`（串既有腳本，純 SSH，Vultr/DO/客戶自帶機通用）+ BYO adapter + swap。完整 R0 計畫：`lobster-factory/docs/hosting/SERVER_STACK_DEPLOYMENT_PLAN.md`。**禁止重寫既有 compose/腳本，只編排**。→ handoffs/2026-06-06-1925-postboot-stack-deploy.md
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
-- [ ] wp-bridge v0.3.0：使用者更新 soulful → AI 在真站建第一篇草稿（SE-01）+ 續做 operation → handoffs/2026-06-05-2039-tomo-203931.md
+- [x] **【✅ 2026-06-09 SE-01 已發文】wp-bridge v0.3.0：AI 在 soulful 真站建第一篇草稿（SE-01）** — 真站 post 7053/7056 committed（WORKLOG v0.5.6 entry）；剩餘 operation 見下行。
+- [ ] wp-bridge 續做 operation：featured image / update-existing-post / Woo product CRUD → handoffs/2026-06-05-2039-tomo-203931.md
 - [ ] wp-bridge v0.5.6 已發佈（Tabs+YouTube+accordion 修復）；驗收 7053/7056 + 選下一步（/blocks 端點 / 樣式參數化 / app.aware-wave Stage 1）→ handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
 - [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】**
 - [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。
@@ -294,6 +295,19 @@
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**: clean-path 一次過由本次 AO-CLOSE 實證（dogfood）
 
+## Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:a43a63b55d4f47cdc655b3857249b3722b722ef37fb17a309bffb8b0490c6314 -->
+
+### claude 2026-06-09 14:53
+
+- **完成（一句）**: Tarot 牌卡模板改正式直線外框（棄 6-PNG-overlay，改純 canvas 三色直線框：金/藏青/酒紅；版式=上羅馬數字／中圖像直接嵌入／下牌名）
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot/renderPrintCard.ts`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot/TarotStudio.tsx`
+- **Git**: （本次 AO-CLOSE commit）
+- **對應 TASKS 子字串（可選）**: tarot 框線收尾
+- **風險／待辦（可選）**: 未部署（待操作者 go-ahead）；canvas 像素渲染待 staging 瀏覽器確認；tarot-frames PNG + middleware 白名單現未使用，保留不刪
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
@@ -315,6 +329,7 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
+
 **[驗證結果]**
 1. REALTEST_EVIDENCE: tool=Bash | cmd=powershell test-stable-status.ps1 (4 cases) | exit=0 | result=ALL PASS（時間戳/報告名 churn→不寫；score 100→99.5 / exit 0→1→寫；首跑/缺檔→寫；regex 不誤傷 `- Health score:`/`- Health gate exit code:`）
    REALTEST_EVIDENCE: tool=Bash | cmd=run agency-os/scripts/system-guard.ps1 -WorkspaceRoot agency-os -Mode daily x2（排程實際呼叫） | exit=1(health FAIL 與 churn 無關) | result=LAST_SYSTEM_STATUS.md 兩次 SHA256 相同 60153216…（不再 churn）
@@ -373,5 +388,4 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
-
 

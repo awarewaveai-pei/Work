@@ -1,4 +1,4 @@
-# Worklog
+﻿# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
@@ -117,6 +117,20 @@ AUTO_TASK_DONE: §0/§6/§7 必印機械閘（AO-CLOSE-only 內容驗證，env �
 - **Git**: 1ee4bb4f
 - **對應 TASKS 子字串（可選）**:
 - **風險／待辦（可選）**: clean-path 一次過由本次 AO-CLOSE 實證（dogfood）
+
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:a43a63b55d4f47cdc655b3857249b3722b722ef37fb17a309bffb8b0490c6314 -->
+
+### claude 2026-06-09 14:53
+
+- **完成（一句）**: Tarot 牌卡模板改正式直線外框（棄 6-PNG-overlay，改純 canvas 三色直線框：金/藏青/酒紅；版式=上羅馬數字／中圖像直接嵌入／下牌名）
+- **變更路徑**:
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot/renderPrintCard.ts`
+  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot/TarotStudio.tsx`
+- **Git**: （本次 AO-CLOSE commit）
+- **對應 TASKS 子字串（可選）**: tarot 框線收尾
+- **風險／待辦（可選）**: 未部署（待操作者 go-ahead）；canvas 像素渲染待 staging 瀏覽器確認；tarot-frames PNG + middleware 白名單現未使用，保留不刪
 
 ## 2026-06-08
 
@@ -7704,7 +7718,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-09 06:53:21 UTC_
+_Last synced: 2026-06-09 06:57:14 UTC_
 
 ## 2026-03-20
 
@@ -8638,5 +8652,4 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
-
 
