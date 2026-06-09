@@ -8689,3 +8689,6 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - REALTEST_EVIDENCE: tool=Bash | cmd=`node` 複現 localizeStyle+buildCardPrompt 四輸入(梵谷畫風/英文/水彩 cat/空) | exit=0 | 風格在前+結尾強化、零 no/not/without 否定句、中文自動轉英；空格修正後「哥德暗黑」→「gothic dark moody」不黏字
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/1m | 唯一 Minor=相鄰CJK黏字（已採 critic 建議加空格修）；double-replacement/longest-first sort/ReDoS/chip updater/殘留否定token 全 verified clean（66 詞 exhaustive sim）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`buildCardPrompt`\|`localizeStyle`\|`STYLE_PRESETS` | hits=0 stale；signature 不變、僅 TarotStudio 兩 call site + import 消費
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=Replicate flux-dev + flux-schnell 直打「Van Gogh oil painting...」prompt | exit=0 HTTP=201 succeeded | flux-dev 輸出實看=標準梵谷厚塗/漩渦黃日/鈷藍山（證明模型+prompt 完全吃風格）；根因=外框縮圖不重生成，使用者看舊圖誤判
+- BUGHUNT_WAIVED: NA -- TarotStudio previewStale 衍生旗標 + 警示橫幅 純 UI state，無資料/跨檔邏輯；tsc 通過

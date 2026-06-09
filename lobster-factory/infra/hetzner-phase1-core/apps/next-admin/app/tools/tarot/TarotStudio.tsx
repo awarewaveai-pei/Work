@@ -132,10 +132,15 @@ export default function TarotStudio() {
   const [message, setMessage] = useState<string | null>(null);
   const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal (batch cards)
   const [previewZoom, setPreviewZoom] = useState(false); // large-view modal (step-1 preview)
+  const [previewSig, setPreviewSig] = useState<string | null>(null); // model+style that made the current preview
   const [templateThumbs, setTemplateThumbs] = useState<Record<string, string>>({});
 
   const doneCount = batch.filter((b) => b.status === "done").length;
   const maxRefs = modelOption(model).maxRefs;
+
+  // True when the user changed style/model after generating the current preview but hasn't
+  // regenerated — the frame thumbnails still show the OLD image, which reads as "style ignored".
+  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${model}::${stylePrompt.trim()}`;
 
   // The deck's style anchor: explicit uploads (capped to the model's limit), else the locked preview.
   // maxRefs === 0 (e.g. FLUX schnell) → no image is sent; style relies on prompt + seed.
@@ -235,6 +240,9 @@ export default function TarotStudio() {
       }
       setPreviewImage(resp.image);
       setPreviewSeed(resp.seed ?? null);
+      // remember what produced this preview so we can warn if the user later edits style/model
+      // without regenerating (the frame thumbnails reuse this image and would look "unchanged").
+      setPreviewSig(`${model}::${stylePrompt.trim()}`);
     } catch (e) {
       setMessage(`預覽生成失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -548,8 +556,29 @@ export default function TarotStudio() {
           <div className="form-hint">每張下載的牌都會套這個框 + 自動加牌名。生成預覽後，這裡會用你的圖顯示各模板樣式。</div>
         </div>
 
-        <button className="btn-primary" onClick={generatePreview} disabled={previewBusy || locked}>
-          {previewBusy ? "生成中…" : previewImage ? "重新生成預覽" : "生成風格預覽"}
+        {previewStale && (
+          <div
+            style={{
+              marginBottom: 10,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid #f59e0b",
+              background: "#fffbeb",
+              color: "#92400e",
+              fontSize: 13,
+            }}
+          >
+            ⚠ 你已更改風格或模型，但上方預覽與外框縮圖仍是<strong>舊圖</strong>。請按「重新生成預覽」套用新風格（縮圖不會自己更新）。
+          </div>
+        )}
+
+        <button
+          className="btn-primary"
+          onClick={generatePreview}
+          disabled={previewBusy || locked}
+          style={previewStale ? { boxShadow: "0 0 0 3px #fde68a" } : undefined}
+        >
+          {previewBusy ? "生成中…" : previewImage ? "重新生成預覽（套用新風格）" : "生成風格預覽"}
         </button>
 
         {previewImage && (
