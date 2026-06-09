@@ -63,6 +63,30 @@ final class RestController {
 				'callback'            => array( $this, 'createPost' ),
 			)
 		);
+
+		// Read-only capability manifest: which block types /post accepts + their fields + examples.
+		// Public (no signature) — it exposes no site data or secrets, only what the engine can build,
+		// so an AI/app discovers capabilities without a hand-written doc that drifts from the code.
+		register_rest_route(
+			AWBRIDGE_REST_NAMESPACE,
+			'/blocks',
+			array(
+				'methods'             => 'GET',
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'blocks' ),
+			)
+		);
+	}
+
+	/** Self-describing block manifest (see BlockLibrary::manifest()). */
+	public function blocks( $request ) {
+		return new \WP_REST_Response(
+			array(
+				'version' => AWBRIDGE_VERSION,
+				'blocks'  => ( new BlockLibrary() )->manifest(),
+			),
+			200
+		);
 	}
 
 	/** Public health probe: version, sodium, table integrity, server time (for clock-skew diagnosis). */
@@ -159,7 +183,9 @@ final class RestController {
 		// markup from it (no fixed template — the block order/mix is whatever the content needs).
 		if ( isset( $spec['blocks'] ) && is_array( $spec['blocks'] ) ) {
 			$spec['blocks']  = $this->sideloadBlockImages( $spec['blocks'] );
-			$composed        = ( new BlockLibrary() )->compose( $spec['blocks'] );
+			// Optional per-request styling overrides (tenant re-skin); defaults reproduce soulful's look.
+			$theme           = ( isset( $spec['theme'] ) && is_array( $spec['theme'] ) ) ? $spec['theme'] : array();
+			$composed        = ( new BlockLibrary( $theme ) )->compose( $spec['blocks'] );
 			$spec['content'] = $composed['content'];
 			if ( $composed['unknown'] !== array() ) {
 				return new \WP_REST_Response(

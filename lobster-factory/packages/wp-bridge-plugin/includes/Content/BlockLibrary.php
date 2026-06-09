@@ -17,6 +17,37 @@ namespace AwareWave\WpBridge\Content;
 
 final class BlockLibrary {
 
+	/**
+	 * Default styling tokens. The defaults are the exact values captured verbatim from soulful's real
+	 * blocks, so a no-theme BlockLibrary() emits byte-identical markup to v0.5.6 (backward compat).
+	 * A caller (e.g. another tenant) passes overrides to __construct() to re-skin without touching code.
+	 */
+	private const DEFAULT_THEME = array(
+		// Kadence Tabs — title pill palette (Kadence "paletteN" tokens or literal #hex / CSS var).
+		'tabsTitleColor'        => '#ffffff',
+		'tabsTitleColorHover'   => 'palette1',
+		'tabsTitleColorActive'  => 'var(--global-palette5, #444444)',
+		'tabsTitleBg'           => 'palette3',
+		'tabsTitleBgHover'      => 'palette2',
+		'tabsTitleBgActive'     => 'palette2',
+		'tabsTitleBorder'       => 'palette1',
+		'tabsTitleBorderHover'  => 'palette2',
+		'tabsTitleBorderActive' => 'palette2',
+		'tabsContentBorder'     => '#bdbdbd',
+		// Kadence Table — cell border colour (all four sides).
+		'tableBorder'           => '#A7A5A5',
+		// Kadence Info Box — brand container background (the most tenant-identifying colour).
+		'infoboxBg'             => '#31533d',
+	);
+
+	/** @var array<string,string> resolved theme = DEFAULT_THEME overlaid with caller overrides. */
+	private $theme;
+
+	/** @param array<string,string> $theme optional style overrides; unknown keys are ignored. */
+	public function __construct( array $theme = array() ) {
+		$this->theme = array_merge( self::DEFAULT_THEME, $theme );
+	}
+
 	private function uid(): string {
 		return 'awb' . bin2hex( random_bytes( 4 ) );
 	}
@@ -125,8 +156,10 @@ final class BlockLibrary {
 			}
 			$body .= '<!-- wp:kadence/table-row {"uniqueID":"' . $rowId . '","row":' . (int) $r . '} -->' . $cm . '<!-- /wp:kadence/table-row -->';
 		}
-		// Fixed table border: #A7A5A5, 1px, all sides (the standing default per operator instruction).
-		$border = '"borderStyle":[{"top":["#A7A5A5","solid",1],"right":["#A7A5A5","solid",1],"bottom":["#A7A5A5","solid",1],"left":["#A7A5A5","solid",1],"unit":"px"}]';
+		// Table border: 1px solid all sides. Colour defaults to #A7A5A5 (the standing default per operator
+		// instruction); a tenant theme can override via 'tableBorder'.
+		$bc     = $this->theme['tableBorder'];
+		$border = '"borderStyle":[{"top":["' . $bc . '","solid",1],"right":["' . $bc . '","solid",1],"bottom":["' . $bc . '","solid",1],"left":["' . $bc . '","solid",1],"unit":"px"}]';
 		return '<!-- wp:kadence/table {"uniqueID":"' . $tableId . '","columns":' . $columns . ',"isFirstRowHeader":true,' . $border . ',"className":"is-style-stripes"} -->' . "\n"
 			. $body . "\n"
 			. '<!-- /wp:kadence/table -->';
@@ -230,22 +263,25 @@ final class BlockLibrary {
 		}
 
 		// Styling attrs captured verbatim from soulful's tabs block; key order mirrors the stored block.
+		// Palette values come from $this->theme (defaults = soulful's captured values → no-theme is
+		// byte-identical; a tenant theme re-skins the title pills without code changes).
+		$cb        = $this->theme['tabsContentBorder'];
 		$wrapAttrs = array(
 			'uniqueID'            => $tid,
 			'mobileLayout'        => 'accordion',
 			'currentTab'          => $currentTab,
 			'minHeight'           => 400,
-			'contentBorderStyles' => array( array( 'top' => array( '#bdbdbd', '', 1 ), 'right' => array( '#bdbdbd', '', 1 ), 'bottom' => array( '#bdbdbd', '', 1 ), 'left' => array( '#bdbdbd', '', 1 ), 'unit' => 'px' ) ),
+			'contentBorderStyles' => array( array( 'top' => array( $cb, '', 1 ), 'right' => array( $cb, '', 1 ), 'bottom' => array( $cb, '', 1 ), 'left' => array( $cb, '', 1 ), 'unit' => 'px' ) ),
 			'titles'              => $titlesArr,
-			'titleColor'          => '#ffffff',
-			'titleColorHover'     => 'palette1',
-			'titleColorActive'    => 'var(--global-palette5, #444444)',
-			'titleBg'             => 'palette3',
-			'titleBgHover'        => 'palette2',
-			'titleBgActive'       => 'palette2',
-			'titleBorder'         => 'palette1',
-			'titleBorderHover'    => 'palette2',
-			'titleBorderActive'   => 'palette2',
+			'titleColor'          => $this->theme['tabsTitleColor'],
+			'titleColorHover'     => $this->theme['tabsTitleColorHover'],
+			'titleColorActive'    => $this->theme['tabsTitleColorActive'],
+			'titleBg'             => $this->theme['tabsTitleBg'],
+			'titleBgHover'        => $this->theme['tabsTitleBgHover'],
+			'titleBgActive'       => $this->theme['tabsTitleBgActive'],
+			'titleBorder'         => $this->theme['tabsTitleBorder'],
+			'titleBorderHover'    => $this->theme['tabsTitleBorderHover'],
+			'titleBorderActive'   => $this->theme['tabsTitleBorderActive'],
 			'titleBorderWidth'    => array( 4, 0, 4, 4 ),
 			'titleBorderRadius'   => array( 10, 0, 0, 10 ),
 			'titlePadding'        => array( 12, 8, 12, 20 ),
@@ -275,6 +311,9 @@ final class BlockLibrary {
 				. '<!-- /wp:kadence/infobox -->';
 		}
 		$tpl = str_replace( '_7287fb-2b', $this->uid(), $tpl );
+		// Re-skin the brand container background (both normal + hover are soulful's #31533d). Default
+		// theme value is #31533d, so a no-theme call is a no-op (byte-identical); a tenant overrides it.
+		$tpl = str_replace( '#31533d', $this->theme['infoboxBg'], $tpl );
 		$tpl = preg_replace_callback( '#(<h5 class="kt-blocks-info-box-title">).*?(</h5>)#s', function ( $m ) use ( $title ) {
 			return $m[1] . $title . $m[2];
 		}, $tpl );
@@ -318,6 +357,71 @@ final class BlockLibrary {
 			. '<!-- /wp:kadence/rowlayout -->';
 
 		return array( 'content' => $content, 'unknown' => $unknown );
+	}
+
+	/**
+	 * Self-describing capability manifest: every block type compose() accepts, its field contract, and a
+	 * working example. This is the single source of truth for the GET /blocks endpoint, so an AI/app can
+	 * discover what it can build WITHOUT a hand-written doc that drifts. The example of every entry is
+	 * exercised by the test suite (each must compose with no 'unknown'), binding this list to the
+	 * buildInner() switch — add a case without a manifest entry (or vice versa) and the suite fails.
+	 *
+	 * @return array<int,array{type:string,aliases:string[],desc:string,fields:array<int,array{name:string,type:string,required:bool,desc:string}>,example:array<string,mixed>}>
+	 */
+	public function manifest(): array {
+		$f = function ( string $name, string $type, bool $required, string $desc ): array {
+			return array( 'name' => $name, 'type' => $type, 'required' => $required, 'desc' => $desc );
+		};
+		return array(
+			array( 'type' => 'heading', 'aliases' => array(), 'desc' => 'Kadence advanced heading (h1–h6).',
+				'fields' => array( $f( 'text', 'string', true, 'Heading text (inline HTML allowed).' ), $f( 'level', 'int', false, 'Heading level 1–6 (default 2).' ) ),
+				'example' => array( 'text' => 'Section title', 'level' => 2 ) ),
+			array( 'type' => 'paragraph', 'aliases' => array( 'text' ), 'desc' => 'Body paragraph (Kadence advanced text).',
+				'fields' => array( $f( 'text', 'string', true, 'Paragraph HTML.' ) ),
+				'example' => array( 'text' => 'Some body copy.' ) ),
+			array( 'type' => 'button', 'aliases' => array(), 'desc' => 'Kadence advanced button.',
+				'fields' => array( $f( 'text', 'string', true, 'Button label.' ), $f( 'link', 'string', true, 'Target URL.' ) ),
+				'example' => array( 'text' => 'Learn more', 'link' => 'https://example.com' ) ),
+			array( 'type' => 'list', 'aliases' => array(), 'desc' => 'Core unordered (bullet) list.',
+				'fields' => array( $f( 'items', 'string[]', true, 'List items (inline HTML allowed).' ) ),
+				'example' => array( 'items' => array( 'First', 'Second' ) ) ),
+			array( 'type' => 'quote', 'aliases' => array(), 'desc' => 'Core blockquote.',
+				'fields' => array( $f( 'text', 'string', true, 'Quote HTML.' ) ),
+				'example' => array( 'text' => 'A memorable line.' ) ),
+			array( 'type' => 'form', 'aliases' => array(), 'desc' => 'Embed an existing Fluent Form by id.',
+				'fields' => array( $f( 'form_id', 'int', true, 'Fluent Forms form id.' ) ),
+				'example' => array( 'form_id' => 1 ) ),
+			array( 'type' => 'image', 'aliases' => array(), 'desc' => 'Image. With a media id → Kadence image; URL-only → core image (server sideloads URLs to media on POST /post).',
+				'fields' => array( $f( 'url', 'string', true, 'Image URL.' ), $f( 'alt', 'string', false, 'Alt text.' ), $f( 'id', 'int', false, 'Media-library attachment id (set by sideloader).' ) ),
+				'example' => array( 'url' => 'https://example.com/photo.jpg', 'alt' => 'A photo' ) ),
+			array( 'type' => 'spacer', 'aliases' => array(), 'desc' => 'Vertical spacer.',
+				'fields' => array( $f( 'height', 'int', false, 'Height in px (default 30).' ) ),
+				'example' => array( 'height' => 30 ) ),
+			array( 'type' => 'divider', 'aliases' => array(), 'desc' => 'Horizontal separator.',
+				'fields' => array(),
+				'example' => array() ),
+			array( 'type' => 'icon_list', 'aliases' => array( 'iconlist' ), 'desc' => 'Kadence icon list (default icon per item).',
+				'fields' => array( $f( 'items', 'string[]', true, 'Item texts.' ) ),
+				'example' => array( 'items' => array( 'Point one', 'Point two' ) ) ),
+			array( 'type' => 'table', 'aliases' => array(), 'desc' => 'Kadence table; first row is the header. Border colour from theme.',
+				'fields' => array( $f( 'rows', 'string[][]', true, '2D array of cells; row 0 = header.' ) ),
+				'example' => array( 'rows' => array( array( 'Col A', 'Col B' ), array( '1', '2' ) ) ) ),
+			array( 'type' => 'accordion', 'aliases' => array(), 'desc' => 'Kadence accordion of collapsible panes.',
+				'fields' => array( $f( 'panes', 'array', true, 'List of {title, content}.' ) ),
+				'example' => array( 'panes' => array( array( 'title' => 'Pane one', 'content' => 'Body one.' ), array( 'title' => 'Pane two', 'content' => 'Body two.' ) ) ) ),
+			array( 'type' => 'tabs', 'aliases' => array(), 'desc' => 'Kadence tabs. Each tab: {title, content} or {title, blocks:[…]}. English titles only (slug strips non-ASCII). Title palette from theme.',
+				'fields' => array( $f( 'tabs', 'array', true, 'List of {title, content|blocks}.' ) ),
+				'example' => array( 'tabs' => array( array( 'title' => 'Alpha', 'content' => 'First tab.' ), array( 'title' => 'Beta', 'content' => 'Second tab.' ) ) ) ),
+			array( 'type' => 'youtube', 'aliases' => array( 'embed', 'video' ), 'desc' => 'Core YouTube/video embed.',
+				'fields' => array( $f( 'url', 'string', true, 'Watch/share URL.' ) ),
+				'example' => array( 'url' => 'https://youtu.be/dQw4w9WgXcQ' ) ),
+			array( 'type' => 'infobox', 'aliases' => array( 'info_box' ), 'desc' => 'Kadence info box (captured skeleton). Brand background from theme.',
+				'fields' => array( $f( 'title', 'string', true, 'Box title.' ), $f( 'text', 'string', true, 'Box body.' ), $f( 'cta', 'string', false, 'Learn-more label (default "Read More").' ) ),
+				'example' => array( 'title' => 'Did you know?', 'text' => 'An interesting fact.', 'cta' => 'Read More' ) ),
+			array( 'type' => 'gallery', 'aliases' => array(), 'desc' => 'Core gallery from image URLs.',
+				'fields' => array( $f( 'urls', 'string[]', true, 'Image URLs.' ) ),
+				'example' => array( 'urls' => array( 'https://example.com/a.jpg', 'https://example.com/b.jpg' ) ) ),
+		);
 	}
 
 	/**
