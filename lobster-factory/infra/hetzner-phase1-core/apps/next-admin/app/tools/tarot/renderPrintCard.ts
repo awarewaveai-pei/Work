@@ -15,17 +15,17 @@ export const PRINT_H = 1488;
 const BASE = "#f6efdf";
 
 // Layout (px on the 898×1488 canvas). All elements sit safely inside the 35px (3mm) bleed.
-// Artwork dominates the card (~76% of height) like a real Rider-Waite card: thin border,
+// Artwork dominates the card (~75% of height) like a real Rider-Waite card: thin border,
 // a slim Roman-numeral band on top, the picture nearly full, a slim name band at the bottom.
+// The Roman numeral and the card name are each vertically centred *within their band* at
+// render time (computed from the frame + artwork rects) — not pinned to a hand-tuned Y.
 const LAYOUT = {
   frameMargin: 46, // outer border inset from card edge
   frameInner: 14, // gap from outer rule to the inner thin rule
-  romanY: 128, // vertical centre of the Roman numeral (top band)
-  artTop: 182, // artwork window top
-  artBottom: 1312, // artwork window bottom
+  artTop: 184, // artwork window top
+  artBottom: 1300, // artwork window bottom
   artInset: 74, // artwork left/right inset from card edge
   artLinePad: 10, // gap between artwork edge and its keyline
-  nameY: 1398, // vertical centre of the card name (bottom band)
 };
 
 export type CardTemplate = "gold" | "navy" | "wine";
@@ -130,18 +130,31 @@ export async function renderPrintCard(card: TarotCard, artDataUrl: string, templ
   ctx.lineWidth = 2;
   ctx.strokeRect(ax - p, ay - p, aw + p * 2, ah + p * 2);
 
-  // Roman numeral (top) — large serif, centred.
+  // Band geometry — the two text strips between the inner frame and the artwork keyline.
+  // Each label is centred *within its band* so it never drifts toward an edge.
+  const innerTop = mi;
+  const innerBottom = PRINT_H - mi;
+  const artKeyTop = ay - p;
+  const artKeyBottom = ay + ah + p;
+  const romanCenterY = (innerTop + artKeyTop) / 2;
+  const nameCenterY = (artKeyBottom + innerBottom) / 2;
+
   ctx.fillStyle = def.ink;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const romanPx = fitFont(ctx, card.roman, PRINT_W * 0.4, 72);
-  ctx.font = `bold ${romanPx}px Georgia, "Times New Roman", serif`;
-  ctx.fillText(card.roman, PRINT_W / 2, LAYOUT.romanY);
 
-  // Card name (bottom) — centred, auto-shrunk to fit.
-  const namePx = fitFont(ctx, card.name, PRINT_W * 0.7, 52);
+  // Roman numeral (top band) — large serif, vertically centred in its band.
+  // Court cards carry no numeral (card.roman === "") → leave the top band blank.
+  if (card.roman) {
+    const romanPx = fitFont(ctx, card.roman, PRINT_W * 0.4, 76);
+    ctx.font = `bold ${romanPx}px Georgia, "Times New Roman", serif`;
+    ctx.fillText(card.roman, PRINT_W / 2, romanCenterY);
+  }
+
+  // Card name (bottom band) — auto-shrunk to fit width, vertically centred in its band.
+  const namePx = fitFont(ctx, card.name, PRINT_W * 0.74, 64);
   ctx.font = `bold ${namePx}px Georgia, "Times New Roman", serif`;
-  ctx.fillText(card.name, PRINT_W / 2, LAYOUT.nameY);
+  ctx.fillText(card.name, PRINT_W / 2, nameCenterY);
 
   return toBlob(canvas);
 }

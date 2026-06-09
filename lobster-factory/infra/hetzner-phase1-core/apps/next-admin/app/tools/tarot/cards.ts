@@ -52,6 +52,9 @@ const SUITS: { name: string; key: TarotSuit; color: string; bg: string; element:
 
 const RANKS = ["ACE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN", "PAGE", "KNIGHT", "QUEEN", "KING"];
 const PIP_COUNT: Record<string, number> = { ACE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5, SIX: 6, SEVEN: 7, EIGHT: 8, NINE: 9, TEN: 10 };
+// Orthodox tarot numbering: pip cards Ace–Ten show Roman I–X; court cards (Page/Knight/Queen/King)
+// carry no numeral — only their title. Index 0–9 = pips, 10–13 = courts → "".
+const MINOR_ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "", "", "", ""];
 
 function minorSubject(rank: string, emblem: string, element: string): string {
   if (rank === "ACE") {
@@ -80,7 +83,7 @@ for (const suit of SUITS) {
     MINOR.push({
       id: nextId++,
       name: `${rank} OF ${suit.name}`,
-      roman: String(i + 1),
+      roman: MINOR_ROMAN[i],
       type: suit.key,
       theme: `${suit.theme}, ${rank.toLowerCase()} energy`,
       colors: [suit.color, suit.bg],
