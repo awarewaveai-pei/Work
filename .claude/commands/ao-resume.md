@@ -163,7 +163,11 @@ Then output the **AO-RESUME 七段式** response:
 輸出一張精簡狀態表（`| 項目 | 狀態 |`），一列一項，涵蓋：SG/EU 服務、Git 對齊、整體健康%、備份、VPS 自動重啟、Cloudflare、排程新鮮度、跨機 import。
 Source: ao-resume-hook-last.json log_tail + health check output.
 非問題的 WARN（如 CF 規則=0 已用 LLAR 替代）必須當列註明「非問題 + 原因」，不可只丟一個 ⚠️。
-**白話判讀（強制）**：每個 WARN／skip／非 100% 項，必須附一句「這代表什麼 + 要不要擔心 + 要不要你出手」，禁止只丟英文機器字串。例：`clients=skip:http401` → 譯成「客戶站健檢 token 過期，不影響網站運作，可稍後補」。
+**雙層判讀（強制，小白可懂＋專家可學）**：每個 WARN／skip／非 100% 項採「**保留專業術語 + 並附白話**」雙層，**不可只留其一**：
+- 保留原始機器字串／術語（讓進階讀者直接對照、可 grep、可成長為專家）
+- 同列或下方附白話一句：「這代表什麼 + 要不要擔心 + 要不要你出手」
+- **首次出現的術語／縮寫**加一次「英文全名 + 中文 + 1 句出處／作用」（對齊使用者學習偏好），同份報告之後不重複
+- 例：`clients=skip:http401` →「HTTP 401 = Unauthorized（未授權）；客戶站健檢用的 token 過期，**不影響網站運作**，可稍後補」
 
 Smoke tests (from `smoke-LATEST.json`):
 - If file exists: 一行摘要 `🟢 Smoke PASS | n8n=ok | repair=ok` 或 `🔴 Smoke WARN | ...`
@@ -237,11 +241,18 @@ Task count（所有群加總）must match `open-tasks-snapshot.md` Total open。
 
 > 反例（禁止）：把六個固定桶寫死照抄。主題是浮動的，要靠當下任務內容歸納，不是套模板。
 
-**6. 需決策**（選填 — 整節只在有內容時輸出）
-Items that cannot proceed without a human choice or action. Each entry must include:
+**6. 需你決策 / 期限提醒**（**必印** — 即使空也要印一行，永久區分「查過=無」與「漏了」）
+
+分兩部分：
+
+**(a) 需決策** — 無法在無人類選擇／動作下推進的項目。每項含：
 - 類型：[資源 / 策略 / 權限 / 外部]
 - 說明：what decision is needed
 - 影響：what is blocked until resolved
+
+**(b) ⏰ 期限雷達** — 有明確時間死線的項目，從 §5 待辦 + handoff + WORKLOG 掃出（如「Phase 4 觀察期 X/XX 到期」「出國前 Termius 未設定」）。每項一行：`<項目> — 死線 <日期> — 剩 N 天`。
+
+**空態規則（強制）**：若 (a)(b) 皆無，印一行 `§6：本輪無需你做決定，無迫近期限。` — **不得整節省略**（靜默省略會讓人分不清「已查無事」還是「漏寫」）。
 
 **7. 下一步**
 
