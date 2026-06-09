@@ -80,6 +80,21 @@ AUTO_TASK_DONE: AO-RESUME 報告 §0–§8 升級（+§0 TL;DR/+§6 阻塞獨立
 
 AUTO_TASK_DONE: §0/§6/§7 必印機械閘（AO-CLOSE-only 內容驗證，env 旗標鐵桶化；AO-RESUME 零影響無迴圈無慢；CP950-safe [char] 碼點；scoped 4 案實測）
 
+
+### Closeout inbox (AO-CLOSE auto, verbatim)
+<!-- ao-close-inbox-sha256:623db456f797cdc58e4211cb21d25545c228ef90e213cb4ebde9c155a0ffe96a -->
+
+### claude 2026-06-09 11:55
+
+- **完成（一句）**: ao-close.ps1 四相位重構 + 單一品質閘收集器（收工從串行 fail-fast 改為一次報全 blocker，behavior-preserving）
+- **變更路徑**:
+  - `scripts/ao-close.ps1`
+  - `scripts/lib/ao-close-gates.ps1`
+  - `scripts/test/ao-close-gates.Tests.ps1`
+- **Git**: 1ee4bb4f
+- **對應 TASKS 子字串（可選）**:
+- **風險／待辦（可選）**: clean-path 一次過由本次 AO-CLOSE 實證（dogfood）
+
 ## 2026-06-08
 
 - AUTO_TASK_DONE_APPLIED (2026-06-08T10:28:55Z): Claude Code user-level sync 反覆 drift
@@ -7666,7 +7681,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-09 03:33:00 UTC_
+_Last synced: 2026-06-09 03:56:12 UTC_
 
 ## 2026-03-20
 
@@ -8600,5 +8615,4 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
-
 
