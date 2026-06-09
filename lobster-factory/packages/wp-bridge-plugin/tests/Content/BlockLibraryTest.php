@@ -100,4 +100,36 @@ final class BlockLibraryTest extends TestCase {
 		$this->assertStringNotContainsString( 'xyz', $out );
 		$this->assertStringContainsString( '"titleColor":"#ffffff"', $out );
 	}
+
+	// ---- Theme value validation (injection guards) --------------------------
+
+	/** The table border is raw-concatenated into JSON — an injection payload must be rejected. */
+	public function test_table_border_injection_is_rejected(): void {
+		$evil = '#fff","solid",1]}],"className":"hacked","x":["';
+		$out  = ( new BlockLibrary( array( 'tableBorder' => $evil ) ) )->table( array( array( 'A' ), array( '1' ) ) );
+		$this->assertStringNotContainsString( 'hacked', $out, 'injected attribute must not reach output' );
+		$this->assertStringContainsString( '#A7A5A5', $out, 'invalid border falls back to default' );
+	}
+
+	/** The info-box bg is str_replaced into a block comment — a literal "-->" must be rejected. */
+	public function test_infobox_bg_comment_break_is_rejected(): void {
+		$evil = '--> <script>x</script> <!-- ';
+		$out  = ( new BlockLibrary( array( 'infoboxBg' => $evil ) ) )->infobox( 'T', 'B' );
+		$this->assertStringNotContainsString( '<script>', $out );
+		$this->assertStringContainsString( '#31533d', $out, 'invalid bg falls back to default' );
+	}
+
+	public function test_non_string_theme_value_does_not_throw(): void {
+		$out = ( new BlockLibrary( array( 'infoboxBg' => array( 'x' ) ) ) )->infobox( 'T', 'B' );
+		$this->assertStringContainsString( '#31533d', $out );
+	}
+
+	/** Legitimate colour tokens (hex / palette / css var) must still be accepted. */
+	public function test_legit_colour_tokens_are_accepted(): void {
+		$hex = ( new BlockLibrary( array( 'tableBorder' => '#abcdef' ) ) )->table( array( array( 'A' ), array( '1' ) ) );
+		$this->assertStringContainsString( '#abcdef', $hex );
+		$var = ( new BlockLibrary( array( 'tabsTitleColorActive' => 'var(--global-palette7, #000000)' ) ) )
+			->tabs( array( array( 'title' => 'A', 'content' => 'a' ) ) );
+		$this->assertStringContainsString( 'global-palette7', $var );
+	}
 }

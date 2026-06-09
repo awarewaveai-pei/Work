@@ -7,6 +7,26 @@
 ### Daily
 - (TBD)
 
+### wp-bridge v0.6.0 — GET /blocks 自描述端點 + 樣式參數化（theme，向後相容）
+
+**根因／動機**：① BlockLibrary 的 16 種積木真相只藏在 `buildInner()` switch，要排版的 AI/app 只能靠手寫 doc → 漂移。② `tabs()`/`infobox()`/`table()` 配色寫死 soulful 值（infobox `#31533d` 綠最明顯），換租戶會套錯色。
+
+**[已修改]**
+- `lobster-factory/packages/wp-bridge-plugin/includes/Content/BlockLibrary.php` — 加 `__construct(array $theme)` + `DEFAULT_THEME`（13 token，預設=既有寫死值）+ `isSafeColorToken()`（#hex/paletteN/var()/rgb 白名單，過濾注入）+ `manifest()`（16 型自描述：type/aliases/fields/example）；`tabs()`/`table()`/`infobox()` 改讀 `$this->theme`。
+- `includes/Http/RestController.php` — 註冊 `GET /blocks`（公開唯讀，回 manifest，結構同 /health）+ `blocks()` callback；`createPost` 讀 `$spec['theme']` 透傳 `new BlockLibrary($theme)`。
+- `aware-wave-wp-bridge.php` — 0.5.6 → 0.6.0（header + AWBRIDGE_VERSION）。
+- `tests/Content/BlockLibraryTest.php`（新）+ `phpunit.xml` 加 `tests/Content` 到 testsuite（critic Major：原本新測試不會被 CI 跑）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php awb-blocklib-tdd.php`（$env:TEMP 獨立 harness，真實 invoke BlockLibrary；本機 PHP 8.4 無 composer/mbstring 故 phpunit phar 跑不動，harness 行為等價委交測試）| exit=0 | ms=~200 — 65/65 pass：向後相容 golden 位元組相同（8144B no-theme snapshot 不變）、manifest 16 型全 compose 無 unknown、theme override（tabs/table/infobox）生效、注入 payload（table raw-concat / infobox `-->`）全擋下 fallback default、非字串值不丟 TypeError、合法 hex/palette/var 仍通。
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/3M/1m/1s — 3 Major 全修：(M1) tableBorder raw-concat 注入→constructor 白名單過濾；(M2) infobox str_replace `-->` 注入→同上；(M3) phpunit.xml 漏 tests/Content→補上。Minor 非字串 TypeError 同 constructor 修。critic 確認向後相容 0 drift、GET /blocks 0 洩漏。
+- BUGHUNT_DONE: scope=lobster-factory(wp-bridge-plugin) | grep=`new BlockLibrary\(|->manifest\(|->compose\(|->tabs\(|->infobox\(|->table\(|/blocks` | hits=生產僅 2（RestController:86 /blocks 無 theme✓、:188 createPost theme 透傳✓），其餘為 BlockLibrary 內部 instance method（自動用 $this->theme）+ 測試檔。
+- BUGHUNT_SCOPE_NARROW: wp-bridge 為獨立 clean-room plugin，無 agency-os/scripts downstream；TS/JS grep（`aware-wave-bridge/v1|BlockLibrary|/blocks|wp-bridge-client`）跨 lobster-factory hits=0（wp-bridge-client SDK 尚未建）。根目錄 v0.1.0 殘骸無 Content/ 不受影響。
+
+**[剩餘風險]** GET /blocks 與 createPost theme 為 WP-coupled（register_rest_route / WP_REST_Response），本機無 WP 未做端點 e2e；待 soulful server WP-CLI 或下次 sg-deploy 真站驗。**未來方向**（操作者提案，待拍板）：硬編 brand 色（infobox `#31533d`）改為「讀站台 Kadence Global Palette」自動繼承，免每租戶手設 theme；需先讀 soulful 實際 palette 映射避免改動其現有外觀。
+
+**[rollback]** 全可逆：`git revert` 該 commit；plugin 退回 v0.5.6 zip。theme 為 opt-in（不傳=既有行為）。
+
 ### Tarot 牌卡模板改為正式直線外框（3 色，canvas 全畫，棄 PNG overlay）
 
 - AUTO_TASK_DONE_APPLIED (2026-06-09T06:53:44Z): tarot 框線收尾

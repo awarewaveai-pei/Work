@@ -43,9 +43,32 @@ final class BlockLibrary {
 	/** @var array<string,string> resolved theme = DEFAULT_THEME overlaid with caller overrides. */
 	private $theme;
 
-	/** @param array<string,string> $theme optional style overrides; unknown keys are ignored. */
+	/**
+	 * @param array<string,string> $theme optional style overrides; unknown keys are ignored.
+	 *
+	 * Each override value is validated against a strict colour-token allowlist (#hex / Kadence paletteN /
+	 * CSS var() / rgb(a)) BEFORE it is merged. This is the single guard for every styling sink: the table
+	 * border is built by raw string concatenation and the info-box brand colour by str_replace into a
+	 * block-comment template, so an unvalidated value could inject block attributes or a literal "-->"
+	 * that breaks Kadence block parsing. Anything that is not a safe colour token (or not a string) is
+	 * dropped and the trusted default is used instead.
+	 */
 	public function __construct( array $theme = array() ) {
-		$this->theme = array_merge( self::DEFAULT_THEME, $theme );
+		$clean = array();
+		foreach ( $theme as $key => $value ) {
+			if ( is_string( $value ) && $this->isSafeColorToken( $value ) ) {
+				$clean[ $key ] = $value;
+			}
+		}
+		$this->theme = array_merge( self::DEFAULT_THEME, $clean );
+	}
+
+	/** True if $v is a safe CSS colour token: #hex(3/4/6/8) | Kadence paletteN | var(--x[, #hex]) | rgb(a)(). */
+	private function isSafeColorToken( string $v ): bool {
+		return (bool) preg_match( '/^#[0-9A-Fa-f]{3,8}$/', $v )
+			|| (bool) preg_match( '/^palette[0-9]$/', $v )
+			|| (bool) preg_match( '/^var\(--[A-Za-z0-9_-]+(,\s*#?[0-9A-Fa-f]{3,8})?\)$/', $v )
+			|| (bool) preg_match( '/^rgba?\([0-9,.\s]+\)$/', $v );
 	}
 
 	private function uid(): string {
