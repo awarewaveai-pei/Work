@@ -138,7 +138,7 @@ Also read `agency-os/.agency-state/junction-last.json` if present:
 Then output the **AO-RESUME 七段式** response:
 
 > **輸出風格規範（強制，2026-06-08 使用者明示）— 「整理好，不要一坨」：**
-> 1. **七段編號結構不可拆**（§1–§7，無內容的段省略，不新增自創段號）。
+> 1. **段落編號結構不可拆**（§0 + §1–§7）；**§0 TL;DR 與 §6 需你決策必印**（即使空也印一行），其餘無內容的段省略，不新增自創段號。
 > 2. **每段收短、可掃讀**：能用表格就用表格；機器欄位（log_tail 原文、原始時戳串、source flag）翻成白話或省略，不直接貼。
 > 3. **§1 用精簡狀態表**（項目 | 狀態），一列一項；非問題的 WARN 要當場註明「非問題，原因…」（如 CF 規則=0 → LLAR 替代）。
 > 4. **§5 按主線歸類**（見該段規則），不照 TASKS.md 原始 `####` 分類整坨倒；每項一行、去掉冗字。
@@ -147,10 +147,23 @@ Then output the **AO-RESUME 七段式** response:
 
 ---
 
+**0. 一句話總結（TL;DR，必印，置頂）**
+讓小白讀完**這一行**即掌握全局。格式固定三段，用 `｜` 分隔：
+```
+<燈號> 系統<一句健康狀態>・<告警摘要> ｜ 主線=<今日主線一句> ｜ 今天建議：<最該做的一件事>
+```
+- **燈號**：🟢（health ≥99% 且無 fresh 告警）／🟡（有 WARN 或 health 95–99%）／🔴（health <95% 或有 critical／fresh incident）
+- **告警摘要**：本輪 fresh 外部信號數 + health 失分項合計；0 則寫「無告警」
+- **主線**：從 §5 主線群 + handoff 推今日最重要的一條
+- **今天建議**：§7 第一個具體動作，濃縮成一句
+末尾固定附小白入口一行：
+`📖 看不懂名詞／想知道哪台機器跑什麼 → docs/operations/AO_RESUME_BEGINNER_MAP.md`
+
 **1. 系統快照**
 輸出一張精簡狀態表（`| 項目 | 狀態 |`），一列一項，涵蓋：SG/EU 服務、Git 對齊、整體健康%、備份、VPS 自動重啟、Cloudflare、排程新鮮度、跨機 import。
 Source: ao-resume-hook-last.json log_tail + health check output.
 非問題的 WARN（如 CF 規則=0 已用 LLAR 替代）必須當列註明「非問題 + 原因」，不可只丟一個 ⚠️。
+**白話判讀（強制）**：每個 WARN／skip／非 100% 項，必須附一句「這代表什麼 + 要不要擔心 + 要不要你出手」，禁止只丟英文機器字串。例：`clients=skip:http401` → 譯成「客戶站健檢 token 過期，不影響網站運作，可稍後補」。
 
 Smoke tests (from `smoke-LATEST.json`):
 - If file exists: 一行摘要 `🟢 Smoke PASS | n8n=ok | repair=ok` 或 `🔴 Smoke WARN | ...`
