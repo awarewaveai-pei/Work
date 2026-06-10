@@ -7,6 +7,17 @@
 ### Daily
 - (TBD)
 
+### Tarot 風格按鈕：32→99 全涵蓋 + toggle 選取 + 框內顯示實際英文（WYSIWYG）
+
+操作者回報三問：按鈕沒放全、按了沒回饋、無法確認詳盡描述有沒有套用。
+**[已修改]** `cards.ts` STYLE_PRESETS 32→99（每個 primary lexicon 風格都有鈕，西方+全亞洲畫家/媒材/風格四組）；`TarotStudio.tsx` chip 改 toggle：點擊把 `localizeStyle(zh)` 的**完整英文描述**插入/移除風格框（框內＝實際送模型文字，WYSIWYG），選取鈕實心高亮+✓。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`esbuild+node` | exit=0 | 99/99 presets 展開英文、0 dup key、toggle add→remove 乾淨 round-trip（中/首/尾/僅一/重複）、english passthrough 達 buildCardPrompt 輸出；tsc 僅 2 既有缺套件錯
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/2m | 重點疑慮 substring-includes 誤判經 critic 從源碼窮舉 99×99 證明 0 碰撞（impressionist/post-impressionist 安全，全描述第 2 字即分歧）；2 Minor 為潛在脆弱性（未來改 lexicon 才觸發）非阻擋
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`STYLE_PRESETS`\|`localizeStyle` | hits=0（scripts 0；agency-os 命中全為 WORKLOG/reports 歷史散文非 code；lobster-factory 僅 cards.ts 定義 + TarotStudio 消費，無 stale）
+**[剩餘風險]** Minor-1：toggle 用 substring 比對，未來若某風格描述變成另一個的子字串會誤判（今日窮舉 0 碰撞，安全）；Minor-2：手動編輯風格框會讓 ✓ 高亮失準（power-user 可接受）。
+**[rollback]** `git revert HEAD`（純前端字串/UI，無 DB/遷移）。
+
 ### Tarot 工具：78 張 RWS 忠實場景 + `{hero}` 主角替換系統 + 風格詞典豐富化（中西+全亞洲畫家）
 
 **根因/需求**：① 56 張小牌用公式 `minorSubject()` 生成（「N 個聖杯排好」），失去 Rider-Waite-Smith 各張獨立劇情 → 生成不忠實。② 主角替換（貓照片/卡通/真人/任意角色/都沒給）無乾淨機制，文字角色只能塞進畫風欄。③ `STYLE_LEXICON` 值僅短標籤（"Monet impressionist painting"），模型不認得名字就畫不出；畫家太少、缺東方與達文西。④ 風格按鈕只 12 個 curated，且 `key={p.en}` 未來易撞 key。
