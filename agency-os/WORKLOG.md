@@ -7,7 +7,20 @@
 ### Daily
 - (TBD)
 
-### Tarot 風格按鈕：32→99 全涵蓋 + toggle 選取 + 框內顯示實際英文（WYSIWYG）
+### wp-bridge v0.7.0：POST /product 端點（WooCommerce 簡單商品 CRUD-create）
+
+操作者要在 soulful LIVE 站發文 + 建商品。發文 wp-bridge 已能做；查 RestController 確認 v0.6.0 僅 `/health /option /post /blocks`，**無商品端點**（TASKS「Woo product CRUD」待辦）。新增端點，鏡像 PostCreator self-heal CREATE 範式。
+**[已修改]**
+- 新增 `lobster-factory/packages/wp-bridge-plugin/includes/Product/ProductCreator.php`：`WC_Product_Simple` atomic create → read-back verify → 失敗 `delete(true)` 整筆刪。`class_exists` 守門（無 Woo 不 fatal，回 `woocommerce_not_active`）。
+- `includes/Http/RestController.php`：`POST /product` route + `createProduct()`（SCOPE_WRITE 簽章，鏡像 createPost）+ `productErrorStatus()` reason→HTTP 映射。
+- `aware-wave-wp-bridge.php`：AWBRIDGE_VERSION + header 0.6.0→0.7.0（SemVer minor=新功能向後相容）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -l`（ProductCreator/RestController/主檔三檔）| exit=0 | ms=~200 —— 本地 wp-env 無 WooCommerce，端到端 `POST /product` 須部署有 Woo 的真站才能跑（LIVE 部署自測時補；此處 build-gate=syntax 綠）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2H/3m —— 2 High（H1 wp_slash 防 block-markup 描述損毀＝PostCreator 既有同款防護被漏；H2 price 拒科學記號+wc_format_decimal 正規化使 verify 有意義）+ M1（category 全有或全無，避免 live catalog 半分類靜默 commit）**已修**；M2/M3/S* 為 PostCreator 既有同款行為非回歸
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`createProduct`\|`ProductCreator`\|`/product`\|`0.6.0`\|`AWBRIDGE_VERSION` | hits=0 stale —— 單一 /product route 無衝突、AdminPage 讀常數自動帶 0.7.0、無殘留舊版號；README 為 L1-L4 願景模型非逐端點清單故無 stale claim
+**[剩餘風險]** ① 端到端未在真 Woo 跑（待 LIVE 自測）② soulful LIVE 部署＝High risk（操作者手動從 GitHub 更新外掛＝其 go-ahead）③ 商品/文章內容草稿待操作者定稿後才發（預設 status=draft 不直接公開/上架）。
+**[rollback]** `git revert 194df13d`（純新增端點，不動既有路徑）；外掛端回退＝重裝 v0.6.0。
+- commit: `194df13d` pushed origin/main 2026-06-10
 
 操作者回報三問：按鈕沒放全、按了沒回饋、無法確認詳盡描述有沒有套用。
 **[已修改]** `cards.ts` STYLE_PRESETS 32→99（每個 primary lexicon 風格都有鈕，西方+全亞洲畫家/媒材/風格四組）；`TarotStudio.tsx` chip 改 toggle：點擊把 `localizeStyle(zh)` 的**完整英文描述**插入/移除風格框（框內＝實際送模型文字，WYSIWYG），選取鈕實心高亮+✓。
