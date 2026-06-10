@@ -8,6 +8,8 @@
 // Style (artist / medium / genre) is layered separately by buildCardPrompt and never touches
 // the scene. Visual meta (colors/symbols) feeds the canvas print-card frame (renderPrintCard.ts).
 
+import { STYLE_CATALOG } from "./tarotStyles";
+
 export type TarotSuit = "major" | "wands" | "cups" | "swords" | "pentacles";
 
 export interface TarotCard {
@@ -173,286 +175,26 @@ export const TAROT_CARDS: TarotCard[] = [...MAJOR, ...MINOR];
 /** The card used for the single style-preview generation. */
 export const PREVIEW_CARD: TarotCard = MAJOR[0]; // THE FOOL
 
-// ── Free (no-API) zh→en style lexicon ───────────────────────────────────────
-// FLUX's text encoder barely understands Chinese, so a Chinese style description
-// ("梵谷畫風") is mostly ignored. We translate known art-style terms to English
-// locally (zero cost, instant, deterministic) before composing the prompt.
-// Anything not in the table passes through unchanged — no worse than before.
-// Each value names the artist/medium AND spells out its concrete visual DNA (palette, brushwork,
-// light, texture, mood). A bare label like "Monet impressionist painting" is ignored by models
-// that don't know the name; the descriptive features render the look even then. Keep entries
-// compact (~10-18 words) so the scene still fits the model's prompt budget.
-const STYLE_LEXICON: Record<string, string> = {
-  // ── Western painters ──────────────────────────────────────────────
-  梵谷: "Vincent van Gogh post-impressionist style, thick swirling impasto brushstrokes, vivid chrome-yellow and cobalt-blue, spiraling expressive skies, heavy visible texture",
-  梵高: "Vincent van Gogh post-impressionist style, thick swirling impasto brushstrokes, vivid chrome-yellow and cobalt-blue, spiraling expressive skies, heavy visible texture",
-  莫內: "Claude Monet impressionist style, soft broken brushstrokes, shimmering pastel light, hazy open-air atmosphere, blurred reflections on water",
-  莫奈: "Claude Monet impressionist style, soft broken brushstrokes, shimmering pastel light, hazy open-air atmosphere, blurred reflections on water",
-  馬內: "Édouard Manet style, bold flat brushwork, strong light-and-dark contrast, modern realist subjects, loose confident strokes",
-  雷諾瓦: "Pierre-Auguste Renoir impressionist style, soft feathery brushwork, warm glowing flesh tones, dappled sunlight, luminous joyful color",
-  竇加: "Edgar Degas style, soft pastel and oil, candid off-center composition, graceful dancers, warm diffused stage light",
-  德加: "Edgar Degas style, soft pastel and oil, candid off-center composition, graceful dancers, warm diffused stage light",
-  塞尚: "Paul Cézanne post-impressionist style, blocky geometric brush planes, muted earthy greens and ochres, solid structured forms",
-  高更: "Paul Gauguin post-impressionist style, flat areas of saturated color, bold dark outlines, symbolic tropical scenes",
-  秀拉: "Georges Seurat pointillist style, tiny dots of pure color, luminous shimmering surface, calm orderly composition",
-  馬諦斯: "Henri Matisse Fauvist style, bold flat vivid color, simplified organic shapes, expressive decorative patterns",
-  馬蒂斯: "Henri Matisse Fauvist style, bold flat vivid color, simplified organic shapes, expressive decorative patterns",
-  畢卡索: "Pablo Picasso cubist style, fragmented geometric planes, multiple simultaneous viewpoints, angular abstracted figures, muted greys and ochres",
-  達利: "Salvador Dalí surrealist style, hyper-real dreamlike imagery, melting distorted forms, vast empty landscapes, sharp uncanny detail",
-  米羅: "Joan Miró style, playful biomorphic shapes, bold primary colors on flat ground, whimsical abstract symbols",
-  康丁斯基: "Wassily Kandinsky abstract style, dynamic floating geometric shapes, bold musical color, energetic lines and circles",
-  蒙德里安: "Piet Mondrian De Stijl style, grid of thick black lines, flat blocks of primary red blue and yellow on white",
-  克林姆: "Gustav Klimt Art Nouveau style, shimmering gold-leaf ornament, decorative mosaic patterns, sensual elegant figures, byzantine richness",
-  慕夏: "Alphonse Mucha Art Nouveau style, elegant flowing linework, soft pastel decorative panels, ornate floral borders, graceful figures",
-  孟克: "Edvard Munch expressionist style, swirling anxious lines, intense emotional color, haunting distorted figures",
-  林布蘭: "Rembrandt Baroque style, dramatic chiaroscuro, warm golden light emerging from deep shadow, rich brown tones, soulful realism",
-  林布蘭特: "Rembrandt Baroque style, dramatic chiaroscuro, warm golden light emerging from deep shadow, rich brown tones, soulful realism",
-  維梅爾: "Johannes Vermeer style, soft natural daylight from a window, calm quiet interior, luminous blue and yellow, fine delicate realism",
-  卡拉瓦喬: "Caravaggio Baroque tenebrism, extreme dramatic light against deep darkness, intense realism, a spotlight on the figures",
-  達文西: "Leonardo da Vinci High Renaissance style, soft sfumato smoky shading, subtle chiaroscuro, muted earth tones, lifelike anatomy, serene atmospheric depth",
-  達芬奇: "Leonardo da Vinci High Renaissance style, soft sfumato smoky shading, subtle chiaroscuro, muted earth tones, lifelike anatomy, serene atmospheric depth",
-  米開朗基羅: "Michelangelo Renaissance style, powerful muscular sculpted figures, fresco color, heroic dynamic poses, idealized anatomy",
-  拉斐爾: "Raphael High Renaissance style, balanced harmonious composition, soft idealized faces, gentle clear color, graceful classical form",
-  波提切利: "Sandro Botticelli early Renaissance style, flowing linear grace, delicate pale figures, soft tempera color, mythological elegance",
-  透納: "J.M.W. Turner Romantic style, luminous atmospheric light, swirling mist and storm, dissolving golden seascapes, loose expressive color",
-  哥雅: "Francisco Goya style, dark dramatic Romanticism, muted earthy palette, haunting expressive figures, loose moody brushwork",
-  波希: "Hieronymus Bosch style, fantastical surreal medieval scenes, swarming bizarre creatures, intricate detail, dreamlike allegory",
-  維拉斯奎茲: "Diego Velázquez Baroque style, loose masterful brushwork, dignified realism, subtle silvery light, rich restrained color",
-  沃荷: "Andy Warhol Pop Art style, bold flat screen-print color, high-contrast repetition, vivid commercial pop palette",
-  安迪沃荷: "Andy Warhol Pop Art style, bold flat screen-print color, high-contrast repetition, vivid commercial pop palette",
-  // ── Asian painters & styles (pan-Asia: Japan / China / Korea / India / Persia / Tibet / SE Asia) ──
-  葛飾北齋: "Katsushika Hokusai ukiyo-e style, bold woodblock outlines, flat Prussian-blue and indigo, stylized waves and Mount Fuji, dynamic linework",
-  北齋: "Katsushika Hokusai ukiyo-e style, bold woodblock outlines, flat Prussian-blue and indigo, stylized waves and Mount Fuji, dynamic linework",
-  歌川廣重: "Utagawa Hiroshige ukiyo-e style, serene woodblock landscapes, softly gradated skies, poetic seasonal scenes, flat layered color",
-  廣重: "Utagawa Hiroshige ukiyo-e style, serene woodblock landscapes, softly gradated skies, poetic seasonal scenes, flat layered color",
-  伊藤若冲: "Itō Jakuchū Edo style, meticulous vivid birds and flowers, jewel-like color, intricate decorative detail on silk",
-  草間彌生: "Yayoi Kusama style, hypnotic polka dots, repeating nets, bold saturated color, immersive infinite pattern",
-  張大千: "Zhang Daqian style, Chinese ink with splashed vivid color, misty layered mountains, bold flowing washes, expressive white space",
-  齊白石: "Qi Baishi style, spontaneous Chinese ink, lively creatures, bold minimal strokes, generous white space",
-  徐悲鴻: "Xu Beihong style, expressive ink galloping horses, fluid energetic brushwork, Chinese ink fused with Western realism",
-  吳冠中: "Wu Guanzhong style, modern Chinese ink, light airy abstraction, fine black lines with scattered dots of color, lyrical white space",
-  八大山人: "Bada Shanren style, sparse minimalist ink, lone expressive bird or fish, bold empty space, eccentric brush",
-  村上隆: "Takashi Murakami superflat style, bright flat pop color, smiling cartoon flowers, glossy playful repeating patterns",
-  奈良美智: "Yoshitomo Nara style, simple flat backgrounds, big-eyed wistful children, soft muted palette, minimal clean lines",
-  宮崎駿: "Studio Ghibli / Hayao Miyazaki anime style, lush hand-painted backgrounds, soft warm color, whimsical detailed scenery, gentle painterly light",
-  吉卜力: "Studio Ghibli anime style, lush hand-painted backgrounds, soft warm color, whimsical detailed scenery, gentle painterly light",
-  // Korea
-  金弘道: "Kim Hong-do Joseon style, lively ink genre scenes of everyday life, light delicate color, fluid expressive brush",
-  申潤福: "Shin Yun-bok Joseon style, elegant refined figures, delicate linework, soft muted color, intimate genre scenes",
-  韓國民畫: "Korean minhwa folk-painting style, bold flat bright color, charming naive symbolism, decorative tigers and flowers",
-  // India
-  拉維瓦爾馬: "Raja Ravi Varma style, Indian academic realism, Hindu mythological figures, rich saturated color, theatrical lighting",
-  印度細密畫: "Indian Mughal miniature style, intricate fine detail, flat jewel-toned color, ornate decorative borders, delicate patterning",
-  // Persia / Middle East
-  波斯細密畫: "Persian miniature style, intricate flat patterning, luminous jewel colors, gold accents, ornate decorative detail",
-  // Tibet
-  唐卡: "Tibetan thangka style, precise symmetrical Buddhist iconography, vivid mineral colors, fine gold outlines, intricate sacred detail",
-  // Southeast Asia
-  阿莫索洛: "Fernando Amorsolo Filipino style, golden backlit rural scenes, warm glowing sunlight, idyllic genre realism",
-  泰國壁畫: "traditional Thai mural style, intricate gold linework, flat decorative figures, ornate temple patterning",
-  峇里島畫: "Balinese painting style, dense intricate detail, lush foliage, rhythmic stylized figures, earthy traditional color",
-  越南絹畫: "Vietnamese silk painting style, soft translucent layers on silk, gentle muted color, delicate graceful figures",
-  // ── media ─────────────────────────────────────────────────────────
-  水彩: "watercolor painting, soft translucent washes, bleeding pigments, luminous paper texture, gentle gradients",
-  油畫: "oil painting, rich blended color, visible brushwork, deep luminous tones, classical canvas texture",
-  壓克力: "acrylic painting, bright opaque color, crisp confident strokes, smooth modern finish",
-  素描: "pencil sketch, fine graphite hatching, soft tonal shading, hand-drawn linework on paper",
-  鉛筆: "pencil drawing, delicate graphite lines, soft shading, monochrome paper texture",
-  彩色鉛筆: "colored-pencil illustration, soft layered strokes, gentle blended hues, subtle paper grain",
-  炭筆: "charcoal drawing, bold smudged blacks, dramatic soft shading, expressive grainy texture",
-  粉彩: "soft pastel painting, velvety blended color, chalky matte texture, gentle dreamy light",
-  水墨: "traditional Chinese ink wash painting, fluid black brushstrokes, soft grey gradients, expressive empty space, rice-paper texture",
-  國畫: "traditional Chinese ink wash painting, fluid black brushstrokes, soft grey gradients, expressive empty space, rice-paper texture",
-  中國風: "traditional Chinese art style, elegant ink linework, refined classical motifs, harmonious composition",
-  浮世繪: "ukiyo-e Japanese woodblock print, bold flat outlines, layered flat color, stylized waves and patterns",
-  版畫: "woodcut print, bold carved black lines, high-contrast flat areas, rugged hand-printed texture",
-  剪紙: "paper-cut collage, crisp flat silhouettes, bold layered shapes, clean negative space",
-  彩繪玻璃: "stained glass style, glowing jewel-toned panels, bold black leading lines, radiant backlight",
-  馬賽克: "mosaic art, small colored tiles, textured grout grid, shimmering pieced-together image",
-  刺繡: "embroidery art, raised stitched threads, soft fabric texture, intricate needlework detail",
-  // ── styles / genres ───────────────────────────────────────────────
-  動漫: "anime manga style, clean cel-shaded color, expressive large eyes, crisp linework, vivid backgrounds",
-  日漫: "Japanese anime style, clean cel-shaded color, expressive large eyes, crisp linework",
-  二次元: "anime style, clean cel shading, bright saturated color, crisp outlines",
-  動畫: "animation style, smooth stylized shapes, bright flat color, playful character design",
-  漫畫: "comic book style, bold ink outlines, dynamic panels, halftone shading, punchy color",
-  卡通: "cartoon style, bold simple outlines, bright flat color, playful exaggerated shapes",
-  像素: "pixel art, blocky retro pixels, limited palette, crisp 8-bit shapes",
-  點陣: "pixel art, blocky retro pixels, limited palette, crisp 8-bit shapes",
-  寫實: "photorealistic, lifelike detail, natural lighting, realistic texture and depth",
-  逼真: "photorealistic, lifelike detail, natural lighting, realistic texture and depth",
-  印象派: "impressionist painting, soft broken brushstrokes, luminous light, hazy color, blurred edges",
-  後印象派: "post-impressionist painting, bold expressive brushwork, vivid non-natural color, structured form",
-  表現主義: "expressionist painting, distorted emotional forms, bold clashing color, energetic brushwork",
-  超現實: "surrealist style, dreamlike impossible imagery, uncanny juxtapositions, sharp detail",
-  立體派: "cubist painting, fragmented geometric planes, multiple viewpoints, angular abstracted forms",
-  新藝術: "Art Nouveau style, elegant flowing organic lines, ornate floral motifs, soft decorative color",
-  裝飾藝術: "Art Deco style, bold geometric symmetry, sleek metallic gold and black, elegant streamlined forms",
-  普普: "Pop Art style, bold flat color, high-contrast outlines, vivid commercial graphic look",
-  波普: "Pop Art style, bold flat color, high-contrast outlines, vivid commercial graphic look",
-  塗鴉: "graffiti street-art style, bold spray-paint color, dynamic lettering energy, urban wall texture",
-  街頭: "street-art style, bold spray-paint color, raw urban energy, layered textures",
-  極簡: "minimalist style, clean simple shapes, limited palette, generous negative space",
-  簡約: "minimalist style, clean simple shapes, limited palette, generous negative space",
-  復古: "vintage retro style, faded warm tones, aged paper texture, nostalgic mid-century look",
-  懷舊: "vintage nostalgic style, soft faded color, warm aged atmosphere, sentimental mood",
-  哥德: "gothic style, dark moody atmosphere, pointed arches, dramatic shadow, ornate macabre detail",
-  歌德: "gothic style, dark moody atmosphere, pointed arches, dramatic shadow, ornate macabre detail",
-  暗黑: "dark moody atmosphere, deep shadows, brooding low-key lighting, somber palette",
-  夢幻: "dreamy ethereal style, soft glowing light, pastel haze, gentle floating atmosphere",
-  奇幻: "fantasy art style, epic magical scenery, rich detailed worldbuilding, luminous atmosphere",
-  童話: "fairytale storybook illustration, whimsical soft watercolor, warm enchanting light, charming detail",
-  繪本: "storybook illustration, gentle hand-drawn charm, soft warm color, cozy whimsical mood",
-  賽博龐克: "cyberpunk style, neon-lit rain-slick city, glowing magenta and cyan, holographic signage, dark high-tech mood",
-  電馭叛客: "cyberpunk style, neon-lit rain-slick city, glowing magenta and cyan, holographic signage, dark high-tech mood",
-  蒸汽龐克: "steampunk style, brass gears and copper machinery, Victorian industrial design, warm sepia tones, intricate clockwork",
-  中世紀: "medieval style, illuminated-manuscript look, ornate gold borders, flat heraldic color, antique parchment",
-  霓虹: "neon glow style, vivid glowing light, electric color against darkness, luminous haze",
-  唯美: "aesthetic and beautiful style, delicate refined detail, soft harmonious color, graceful mood",
-  可愛: "cute kawaii style, soft rounded shapes, pastel candy color, charming adorable characters",
-  黑白: "black-and-white monochrome, high-contrast tones, no color, dramatic light and shadow",
-  // suffixes — skipped for the subject box via STYLE_SUFFIX_KEYS; matched last by length sort
-  畫風: " style",
-  風格: " style",
-};
+/**
+ * Quick-pick chips + style resolution, derived from STYLE_CATALOG (auto-generated from the
+ * 生圖風格 PROMPT docs). One button per style (103 total). `zh` is the display label
+ * shown in the textarea; its matching English `prompt` is what reaches the image model.
+ */
+export const STYLE_PRESETS: { zh: string; group: string }[] = STYLE_CATALOG.map((s) => ({ zh: s.zh, group: s.group }));
 
-// "畫風"/"風格" mean "…style" and only make sense in the STYLE box. When localizing the SUBJECT
-// (the character) we skip them, so "貓咪風格" doesn't become "貓咪 style" (a stray style token in
-// the character slot). They stay in the lexicon for the style box where they belong.
-const STYLE_SUFFIX_KEYS = new Set(["畫風", "風格"]);
+const STYLE_BY_LABEL = new Map(STYLE_CATALOG.map((s) => [s.zh, s.prompt] as const));
 
 /**
- * Replace known Chinese art-style terms with English. Longest keys first so
- * compounds win (e.g. "梵谷畫風" → Van Gogh… , not "梵谷" + leftover "畫風").
- * Free, local, no API call. Also used to localize the subject/character text —
- * pass { skipSuffixes: true } there so the "…style" suffixes are not applied.
+ * Resolve the style textarea (comma-separated zh labels) into the English actually sent to the
+ * image model. Each zh label maps to its catalog English prompt (STYLE_CATALOG / tarotStyles.ts);
+ * an unrecognised free-typed token passes through unchanged. zh labels never contain commas, so
+ * splitting on comma cleanly recovers the selected labels.
  */
-export function localizeStyle(input: string, opts: { skipSuffixes?: boolean } = {}): string {
-  let out = input;
-  for (const key of Object.keys(STYLE_LEXICON).sort((a, b) => b.length - a.length)) {
-    if (opts.skipSuffixes && STYLE_SUFFIX_KEYS.has(key)) continue;
-    // Pad with spaces so adjacently-typed CJK terms (e.g. "哥德暗黑") don't fuse into
-    // "gothicdark moody"; the trailing whitespace-collapse cleans up the doubles.
-    if (out.includes(key)) out = out.split(key).join(` ${STYLE_LEXICON[key]} `);
-  }
-  return out.replace(/\s+/g, " ").trim();
+export function resolveStylePrompt(raw: string): string {
+  const tokens = raw.split(",").map((t) => t.trim()).filter(Boolean);
+  if (!tokens.length) return "";
+  return tokens.map((t) => STYLE_BY_LABEL.get(t) ?? t).join(". ");
 }
-
-/**
- * Quick-pick chips. `zh` is a real STYLE_LEXICON key — clicking inserts the zh term, and
- * buildCardPrompt's localizeStyle expands it to the full rich description at generation time
- * (single source of truth — the chip never duplicates the description). `en` is just the
- * display gloss shown on the chip. Grouped by `group` for the UI section headers.
- */
-// Every primary STYLE_LEXICON style gets a chip here (synonyms/aliases omitted — they expand to
-// the same description). Keep each group's entries contiguous (the UI derives section order from
-// each group's first appearance). Guard: every `zh` MUST be a real lexicon key (node test asserts
-// it expands to English) — otherwise the chip inserts un-translatable CJK and the model ignores it.
-export const STYLE_PRESETS: { zh: string; en: string; group: string }[] = [
-  // ── 西方畫家 ──
-  { zh: "達文西", en: "Da Vinci", group: "西方畫家" },
-  { zh: "米開朗基羅", en: "Michelangelo", group: "西方畫家" },
-  { zh: "拉斐爾", en: "Raphael", group: "西方畫家" },
-  { zh: "波提切利", en: "Botticelli", group: "西方畫家" },
-  { zh: "卡拉瓦喬", en: "Caravaggio", group: "西方畫家" },
-  { zh: "林布蘭", en: "Rembrandt", group: "西方畫家" },
-  { zh: "維梅爾", en: "Vermeer", group: "西方畫家" },
-  { zh: "維拉斯奎茲", en: "Velázquez", group: "西方畫家" },
-  { zh: "哥雅", en: "Goya", group: "西方畫家" },
-  { zh: "波希", en: "Bosch", group: "西方畫家" },
-  { zh: "透納", en: "Turner", group: "西方畫家" },
-  { zh: "莫內", en: "Monet", group: "西方畫家" },
-  { zh: "馬內", en: "Manet", group: "西方畫家" },
-  { zh: "雷諾瓦", en: "Renoir", group: "西方畫家" },
-  { zh: "竇加", en: "Degas", group: "西方畫家" },
-  { zh: "塞尚", en: "Cézanne", group: "西方畫家" },
-  { zh: "秀拉", en: "Seurat", group: "西方畫家" },
-  { zh: "梵谷", en: "Van Gogh", group: "西方畫家" },
-  { zh: "高更", en: "Gauguin", group: "西方畫家" },
-  { zh: "孟克", en: "Munch", group: "西方畫家" },
-  { zh: "克林姆", en: "Klimt", group: "西方畫家" },
-  { zh: "慕夏", en: "Mucha", group: "西方畫家" },
-  { zh: "馬諦斯", en: "Matisse", group: "西方畫家" },
-  { zh: "畢卡索", en: "Picasso", group: "西方畫家" },
-  { zh: "達利", en: "Dalí", group: "西方畫家" },
-  { zh: "米羅", en: "Miró", group: "西方畫家" },
-  { zh: "康丁斯基", en: "Kandinsky", group: "西方畫家" },
-  { zh: "蒙德里安", en: "Mondrian", group: "西方畫家" },
-  { zh: "沃荷", en: "Warhol", group: "西方畫家" },
-  // ── 亞洲畫家 ──
-  { zh: "葛飾北齋", en: "Hokusai", group: "亞洲畫家" },
-  { zh: "歌川廣重", en: "Hiroshige", group: "亞洲畫家" },
-  { zh: "伊藤若冲", en: "Jakuchū", group: "亞洲畫家" },
-  { zh: "村上隆", en: "Murakami", group: "亞洲畫家" },
-  { zh: "奈良美智", en: "Nara", group: "亞洲畫家" },
-  { zh: "草間彌生", en: "Kusama", group: "亞洲畫家" },
-  { zh: "張大千", en: "Zhang Daqian", group: "亞洲畫家" },
-  { zh: "齊白石", en: "Qi Baishi", group: "亞洲畫家" },
-  { zh: "徐悲鴻", en: "Xu Beihong", group: "亞洲畫家" },
-  { zh: "吳冠中", en: "Wu Guanzhong", group: "亞洲畫家" },
-  { zh: "八大山人", en: "Bada Shanren", group: "亞洲畫家" },
-  { zh: "金弘道", en: "Kim Hong-do", group: "亞洲畫家" },
-  { zh: "申潤福", en: "Shin Yun-bok", group: "亞洲畫家" },
-  { zh: "韓國民畫", en: "Korean minhwa", group: "亞洲畫家" },
-  { zh: "拉維瓦爾馬", en: "Ravi Varma", group: "亞洲畫家" },
-  { zh: "印度細密畫", en: "Indian miniature", group: "亞洲畫家" },
-  { zh: "波斯細密畫", en: "Persian miniature", group: "亞洲畫家" },
-  { zh: "唐卡", en: "Thangka", group: "亞洲畫家" },
-  { zh: "阿莫索洛", en: "Amorsolo", group: "亞洲畫家" },
-  { zh: "泰國壁畫", en: "Thai mural", group: "亞洲畫家" },
-  { zh: "峇里島畫", en: "Balinese", group: "亞洲畫家" },
-  { zh: "越南絹畫", en: "Vietnamese silk", group: "亞洲畫家" },
-  // ── 媒材 ──
-  { zh: "水彩", en: "watercolor", group: "媒材" },
-  { zh: "油畫", en: "oil", group: "媒材" },
-  { zh: "壓克力", en: "acrylic", group: "媒材" },
-  { zh: "素描", en: "sketch", group: "媒材" },
-  { zh: "鉛筆", en: "pencil", group: "媒材" },
-  { zh: "彩色鉛筆", en: "colored pencil", group: "媒材" },
-  { zh: "炭筆", en: "charcoal", group: "媒材" },
-  { zh: "粉彩", en: "pastel", group: "媒材" },
-  { zh: "水墨", en: "Chinese ink", group: "媒材" },
-  { zh: "中國風", en: "Chinese style", group: "媒材" },
-  { zh: "浮世繪", en: "ukiyo-e", group: "媒材" },
-  { zh: "版畫", en: "woodcut", group: "媒材" },
-  { zh: "剪紙", en: "paper-cut", group: "媒材" },
-  { zh: "彩繪玻璃", en: "stained glass", group: "媒材" },
-  { zh: "馬賽克", en: "mosaic", group: "媒材" },
-  { zh: "刺繡", en: "embroidery", group: "媒材" },
-  // ── 風格 ──
-  { zh: "動漫", en: "anime", group: "風格" },
-  { zh: "動畫", en: "animation", group: "風格" },
-  { zh: "漫畫", en: "comic", group: "風格" },
-  { zh: "卡通", en: "cartoon", group: "風格" },
-  { zh: "吉卜力", en: "Ghibli", group: "風格" },
-  { zh: "像素", en: "pixel art", group: "風格" },
-  { zh: "寫實", en: "photoreal", group: "風格" },
-  { zh: "印象派", en: "impressionist", group: "風格" },
-  { zh: "後印象派", en: "post-impressionist", group: "風格" },
-  { zh: "表現主義", en: "expressionist", group: "風格" },
-  { zh: "超現實", en: "surreal", group: "風格" },
-  { zh: "立體派", en: "cubist", group: "風格" },
-  { zh: "新藝術", en: "art nouveau", group: "風格" },
-  { zh: "裝飾藝術", en: "art deco", group: "風格" },
-  { zh: "普普", en: "pop art", group: "風格" },
-  { zh: "塗鴉", en: "graffiti", group: "風格" },
-  { zh: "極簡", en: "minimalist", group: "風格" },
-  { zh: "復古", en: "vintage", group: "風格" },
-  { zh: "懷舊", en: "nostalgic", group: "風格" },
-  { zh: "哥德", en: "gothic", group: "風格" },
-  { zh: "暗黑", en: "dark", group: "風格" },
-  { zh: "夢幻", en: "dreamy", group: "風格" },
-  { zh: "奇幻", en: "fantasy", group: "風格" },
-  { zh: "童話", en: "fairytale", group: "風格" },
-  { zh: "繪本", en: "storybook", group: "風格" },
-  { zh: "賽博龐克", en: "cyberpunk", group: "風格" },
-  { zh: "蒸汽龐克", en: "steampunk", group: "風格" },
-  { zh: "中世紀", en: "medieval", group: "風格" },
-  { zh: "霓虹", en: "neon", group: "風格" },
-  { zh: "唯美", en: "aesthetic", group: "風格" },
-  { zh: "可愛", en: "kawaii", group: "風格" },
-  { zh: "黑白", en: "monochrome", group: "風格" },
-];
 
 // Default style used when the user gives none — keeps un-styled output looking like a deck.
 const DEFAULT_STYLE = "ornate colored-pencil fantasy illustration, Rider-Waite inspired, warm antique palette";
@@ -495,18 +237,17 @@ function normalizeSubject(s: string): string {
  * The frame + Roman numeral + card name are added afterwards by our canvas (renderPrintCard.ts).
  */
 export function buildCardPrompt(card: TarotCard, input: CardPromptInput = {}): string {
-  // Subject: localize known zh terms (skip the "…style" suffixes), strip a leading article,
-  // fall back to the card's hero when empty.
-  const subject = normalizeSubject(localizeStyle((input.subject ?? "").trim(), { skipSuffixes: true }));
+  // Subject: strip a leading article, fall back to the card's hero when empty.
+  const subject = normalizeSubject((input.subject ?? "").trim());
   const hero = subject || card.hero;
   const scene = card.scene.split("{hero}").join(hero);
 
-  const style = localizeStyle((input.style ?? "").trim());
+  // Resolve the style: chip labels → their catalog English prompt; unknown free-typed text passes through.
+  const style = resolveStylePrompt((input.style ?? "").trim());
   const lead = style || DEFAULT_STYLE;
 
-  // Style leads — FLUX weights early tokens most. The rich style descriptions are long (~25 words),
-  // so the tail uses a SHORT cohesion cue rather than restating the whole block: repeating ~25 words
-  // would push the prompt past the encoder window (CLIP-77 / T5-512) and drop the scene. The lead
-  // placement carries the style; the tail just asks for internal consistency.
+  // Style leads — FLUX weights early tokens most. Catalog descriptions are long (up to ~1500 chars),
+  // so the tail uses a SHORT cohesion cue rather than restating the whole block (restating would
+  // push well past the encoder window and drop the scene). The lead carries the style.
   return `${lead}. ${scene}. Single vertical full-bleed scene in one cohesive consistent art style, rich symbolic detail.`;
 }

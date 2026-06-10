@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
-import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, localizeStyle, type TarotCard } from "./cards";
+import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type TarotCard } from "./cards";
 
 type GroupKey = "all" | "major" | "wands" | "cups" | "swords" | "pentacles";
 const GROUPS: { key: GroupKey; label: string }[] = [
@@ -138,6 +138,10 @@ export default function TarotStudio() {
 
   const doneCount = batch.filter((b) => b.status === "done").length;
   const maxRefs = modelOption(model).maxRefs;
+
+  // Style box = comma-separated zh labels. zh labels never contain commas, so this cleanly
+  // recovers the selected chips (drives chip highlight + toggle).
+  const styleTokens = stylePrompt.split(",").map((s) => s.trim()).filter(Boolean);
 
   // True when the user changed style, model, subject, OR reference images after generating the
   // current preview but hasn't regenerated — the frame thumbnails still show the OLD image.
@@ -503,30 +507,25 @@ export default function TarotStudio() {
                 <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, opacity: 0.8 }}>{g}</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {STYLE_PRESETS.filter((p) => p.group === g).map((p) => {
-                    const applied = localizeStyle(p.zh); // the FULL English actually inserted + sent
-                    const selected = stylePrompt.includes(applied);
+                    const selected = styleTokens.includes(p.zh);
                     return (
                     <button
                       key={p.zh}
                       type="button"
                       disabled={locked}
                       onClick={() =>
-                        // Toggle the FULL English description in/out of the style box, so the box
-                        // shows EXACTLY what is sent to the model (WYSIWYG — user can verify it applied).
+                        // Toggle the zh label in/out of the box. The textarea shows Chinese; the
+                        // English catalog prompt is resolved + sent at generation time. zh labels
+                        // have no commas, so comma-split round-trips cleanly.
                         setStylePrompt((prev) => {
-                          if (prev.includes(applied)) {
-                            return prev
-                              .split(applied)
-                              .join("")
-                              .replace(/\s*,\s*,\s*/g, ", ")
-                              .replace(/^\s*,\s*|\s*,\s*$/g, "")
-                              .trim();
-                          }
-                          const t = prev.trim().replace(/,\s*$/, "");
-                          return t ? `${t}, ${applied}` : applied;
+                          const toks = prev.split(",").map((s) => s.trim()).filter(Boolean);
+                          const i = toks.indexOf(p.zh);
+                          if (i >= 0) toks.splice(i, 1);
+                          else toks.push(p.zh);
+                          return toks.join(", ");
                         })
                       }
-                      title={selected ? `移除「${p.en}」` : `加入：${applied}`}
+                      title={selected ? `移除 ${p.zh}` : `加入 ${p.zh}`}
                       style={{
                         padding: "4px 10px",
                         borderRadius: 14,
@@ -540,7 +539,7 @@ export default function TarotStudio() {
                       }}
                     >
                       {selected ? "✓ " : ""}
-                      {p.zh} <span style={{ opacity: selected ? 0.85 : 0.55 }}>{p.en}</span>
+                      {p.zh}
                     </button>
                     );
                   })}
@@ -550,14 +549,32 @@ export default function TarotStudio() {
           </div>
           <textarea
             className="form-textarea"
-            placeholder="點上方按鈕快速插入，或自行輸入英文風格詞（FLUX 對英文最準）。例：Van Gogh oil painting, mystical atmosphere"
+            placeholder="點上方按鈕選風格（顯示中文）。也可自行輸入。例：水彩｜透明淡彩暈染風格"
             value={stylePrompt}
             onChange={(e) => setStylePrompt(e.target.value)}
             disabled={locked}
           />
           <div className="form-hint">
-            <b>下面框裡的文字＝實際送進模型的風格 prompt</b>。點上方按鈕會把該畫家／風格的<b>完整視覺特徵</b>（色調、筆觸、光影）填進框裡，再點一次移除（按鈕打勾＝已選）。也可自行編輯／加字。整段套用到 78 張牌；風格不夠強時改用 FLUX dev 模型。
+            點按鈕選風格 → 框裡顯示<b>中文</b>（看得懂選了什麼），再點一次取消（打勾＝已選）。生成時自動把對應的<b>完整英文描述</b>送給圖片模型（見下方預覽）。整段套用到 78 張牌；風格不夠強時改用 FLUX dev 模型。
           </div>
+          {stylePrompt.trim() && (
+            <div
+              style={{
+                marginTop: 6,
+                padding: "8px 10px",
+                borderRadius: 6,
+                background: "rgba(99,102,241,0.07)",
+                border: "1px solid var(--card-border)",
+                fontSize: 11,
+                lineHeight: 1.5,
+                color: "var(--text-muted)",
+                maxHeight: 120,
+                overflow: "auto",
+              }}
+            >
+              🎨 <b>實際送給圖片模型的英文</b>：<span style={{ color: "var(--text)" }}>{resolveStylePrompt(stylePrompt)}</span>
+            </div>
+          )}
         </div>
 
         <div className="form-row">
