@@ -85,7 +85,7 @@
 - [x] **【✅ 2026-06-09 SE-01 已發文】wp-bridge v0.3.0：AI 在 soulful 真站建第一篇草稿（SE-01）** — soulful 真站 post 7053/7056 經真實 PostCreator 路徑 committed（WORKLOG 2026-06-09 v0.5.6 entry）。剩餘 operation（featured image / update-existing-post / Woo product CRUD）見下行待辦。
 - [x] wp-bridge 續做 operation：featured image（sideload→`_thumbnail_id`）/ update-existing-post（**注：Woo simple product CREATE 已於 v0.7.0 完成** — `ProductCreator` + `POST /product`，真站驗 product 7066 draft；剩 featured image / update-existing / product update+delete）→ handoffs/2026-06-05-2039-tomo-203931.md
 - [ ] **wp-bridge variable product 支援**：`ProductCreator` 目前只做 `WC_Product_Simple`；客製化 T-shirt 需 variable product（attributes 顏色 白/黑 × 尺寸 3L/2L/XL/L/M/S/XS + variations + 客製化圖案）。照 simple 範式擴 `WC_Product_Variable` + `WC_Product_Attribute` + 逐 variation atomic+讀回驗證+失敗整筆刪。操作者 2026-06-10 要求。
-- [ ] wp-bridge：唯一殘留＝**操作者開編輯器驗收 post 7053/7056 無 invalid content**（v0.5.6 三候選皆已 ship：/blocks 自描述端點 ✅、tabs/infobox 樣式參數化 ✅palette-token、Woo simple product ✅v0.7.0；引擎現為 v0.7.0、下一步方向＝app.aware-wave Stage 1 主線）→ handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
+- [x] **【✅ 2026-06-10 驗收完成】wp-bridge v0.5.6 引擎** — 操作者開後台確認 post 7053/7056 編輯器無 invalid content（伺服器端預檢全綠：parse_blocks 完整樹、freeform=0、accordion pane id 首省略+第2+遞增、tab id 正確）；v0.5.6 三候選皆已 ship（/blocks 端點 ✅、tabs/infobox 樣式 palette-token ✅、Woo simple product ✅v0.7.0）；引擎現為 v0.7.0、下一步方向＝app.aware-wave Stage 1 主線 → handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
 
 #### 雙機環境 / 日常開工
 

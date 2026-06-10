@@ -9,6 +9,10 @@
 - 發版工具化：`scripts/release-wp-bridge.sh` + `/wp-bridge-release` + runbook + AGENTS 自觸發（根因＝兩 repo，只 push Work ≠ 發版）。
 - AUTO_TASK_DONE_APPLIED (2026-06-10T09:33:36Z): wp-bridge 續做 operation：featured image
 - 待辦延伸：客製化 T-shirt = variable product（attributes 色×尺寸 + variations），ProductCreator 目前只做 simple → 下次開 ProductCreator variable 支援（已 lift 到 TASKS）。
+- **wp-bridge v0.5.6 引擎驗收完成 + 釐清「為何報告一直撈這項」**：根因＝AO-RESUME §8 只認 TASKS.md 未打勾且含 `→ handoffs/` 的 row（[ao-resume.md:269](.claude/commands/ao-resume.md#L269)），packet 檔僅 >90 天才 prune（:338）；TASKS.md:88 三候選（/blocks ✅v0.6、tabs/infobox 樣式 ✅palette-token、Woo simple product ✅v0.7.0）皆已 ship 卻漏翻牌 → 每次開機重撈。對 soulful 真站預檢 post 7053/7056：parse_blocks 樹完整、freeform=0、accordion pane id 首省略+第2+遞增（正是 v0.5.6 修法）、tab id 正確；操作者開後台確認編輯器無 invalid content。翻 TASKS:88 為 `- [x]`，§8 不再撈。
+  - REALTEST_EVIDENCE: tool=SSH | cmd=`ssh hostinger_soulful wp eval parse_blocks(7053/7056) + pane/tab id attrs` | exit=0 | ms=~4000
+  - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（純 TASKS/WORKLOG doc 改 + 真站唯讀驗證，無 code 改動）
+  - BUGHUNT_DONE: scope=agency-os,scripts | grep=`handoffs/2026-06-06-1929-wp-bridge-v056-shipped` | hits=1（唯一 driver=TASKS:88，已翻牌；packet 檔留至 90 天自然 prune）
 
 ### wp-bridge 發版工具化：scripts/release-wp-bridge.sh + /wp-bridge-release + runbook + AGENTS 自觸發
 
