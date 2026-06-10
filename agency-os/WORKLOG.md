@@ -7927,7 +7927,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-10 09:37:58 UTC_
+_Last synced: 2026-06-10 14:30:02 UTC_
 
 ## 2026-03-20
 
@@ -8886,3 +8886,4 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): release-wp-bridge.sh path variables only
+

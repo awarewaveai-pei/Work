@@ -9,6 +9,11 @@
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
 const REPLICATE_POLL_MS = 2_500;
+// flux-dev guidance scale. BFL recommends 1.5-5; >5 oversaturates / burns contrast. Higher =
+// closer prompt adherence, which pushes the chosen art style onto figures (flux under-styles
+// humans at the default 3). flux-schnell dropped guidance embeddings entirely, so guidance is a
+// no-op there and we never send it (could even 422). Tune here.
+const FLUX_DEV_GUIDANCE = 5;
 
 
 export type TarotModel = "flux-schnell" | "flux-dev" | "openai-low" | "openai-medium" | "openai-high";
@@ -95,6 +100,12 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
     num_outputs: 1,
     seed,
   };
+  // flux-dev follows the prompt more closely at higher guidance — this pushes the chosen painting
+  // style onto figures, which flux otherwise under-styles at the default 3. flux-schnell omits
+  // guidance embeddings, so it stays off there (sending it has no effect and may be rejected).
+  if (config.fluxModel === "black-forest-labs/flux-dev") {
+    input.guidance = FLUX_DEV_GUIDANCE;
+  }
   // schnell has no `image` input — style consistency there relies on seed + prompt only.
   // flux-dev img2img takes a single image, so we use the first reference.
   const fluxRef = params.referenceImages?.[0];

@@ -47,5 +47,5 @@
 - `scripts/system-guard.ps1`
 - `scripts/system-health-check.ps1`
 
-_Last synced: 2026-06-08 10:19:21 UTC_
+_Last synced: 2026-06-10 14:30:02 UTC_
 
