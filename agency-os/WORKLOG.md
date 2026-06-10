@@ -7818,7 +7818,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-10 02:32:12 UTC_
+_Last synced: 2026-06-10 02:52:56 UTC_
 
 ## 2026-03-20
 
@@ -8771,5 +8771,6 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=Replicate flux-dev + flux-schnell 直打「Van Gogh oil painting...」prompt | exit=0 HTTP=201 succeeded | flux-dev 輸出實看=標準梵谷厚塗/漩渦黃日/鈷藍山（證明模型+prompt 完全吃風格）；根因=外框縮圖不重生成，使用者看舊圖誤判
 - BUGHUNT_WAIVED: NA -- TarotStudio previewStale 衍生旗標 + 警示橫幅 純 UI state，無資料/跨檔邏輯；tsc 通過
+
 
 
