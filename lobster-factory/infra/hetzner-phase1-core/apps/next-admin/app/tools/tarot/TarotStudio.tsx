@@ -121,6 +121,10 @@ export default function TarotStudio() {
   const [stylePrompt, setStylePrompt] = useState("");
   const [subjectText, setSubjectText] = useState(""); // optional character override (text channel)
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  // The final English actually sent. Defaults to the auto-resolved English from the zh chips, but
+  // the user can edit it directly before generating; once edited, `styleEnglishEdited` pins their text.
+  const [styleEnglish, setStyleEnglish] = useState("");
+  const [styleEnglishEdited, setStyleEnglishEdited] = useState(false);
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [previewSeed, setPreviewSeed] = useState<number | null>(null);
@@ -143,10 +147,14 @@ export default function TarotStudio() {
   // recovers the selected chips (drives chip highlight + toggle).
   const styleTokens = stylePrompt.split(",").map((s) => s.trim()).filter(Boolean);
 
+  // English actually sent: the user's edited text if they touched it, else auto-resolved from chips.
+  const autoEnglish = resolveStylePrompt(stylePrompt);
+  const effectiveEnglish = styleEnglishEdited ? styleEnglish : autoEnglish;
+
   // True when the user changed style, model, subject, OR reference images after generating the
   // current preview but hasn't regenerated — the frame thumbnails still show the OLD image.
   // referenceImages.length is included because adding/removing refs changes the batch anchor.
-  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${model}::${stylePrompt.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`;
+  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${model}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`;
 
   // The deck's style anchor: explicit uploads (capped to the model's limit), else the locked preview.
   // maxRefs === 0 (e.g. FLUX schnell) → no image is sent; style relies on prompt + seed.
@@ -239,7 +247,7 @@ export default function TarotStudio() {
       return;
     }
     // 風格描述為選填：有「風格描述 ≥3 字」「角色描述 ≥2 字」「上傳參考圖」其一即可
-    const hasStyle = stylePrompt.trim().length >= 3;
+    const hasStyle = effectiveEnglish.trim().length >= 3;
     const hasSubject = subjectText.trim().length >= 2;
     const hasRef = mode === "image" && referenceImages.length > 0;
     if (!hasStyle && !hasSubject && !hasRef) {
@@ -251,7 +259,7 @@ export default function TarotStudio() {
     try {
       const resp = await callGenerate({
         model,
-        prompt: buildCardPrompt(PREVIEW_CARD, { style: stylePrompt, subject: subjectText }),
+        prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText }),
         referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
       });
@@ -263,7 +271,7 @@ export default function TarotStudio() {
       setPreviewSeed(resp.seed ?? null);
       // snapshot what produced this preview (model + style + subject + ref count) so previewStale
       // fires when any of those inputs change before the user regenerates.
-      setPreviewSig(`${model}::${stylePrompt.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
+      setPreviewSig(`${model}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
     } catch (e) {
       setMessage(`預覽生成失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -291,7 +299,7 @@ export default function TarotStudio() {
     try {
       const resp = await callGenerate({
         model,
-        prompt: buildCardPrompt(card, { style: stylePrompt, subject: subjectText }),
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
         referenceImages: lockedRefs, // consistent style anchor across the deck (where the model supports it)
         seed: previewSeed, // FLUX reproducibility; ignored by openai
       });
@@ -555,26 +563,53 @@ export default function TarotStudio() {
             disabled={locked}
           />
           <div className="form-hint">
-            點按鈕選風格 → 框裡顯示<b>中文</b>（看得懂選了什麼），再點一次取消（打勾＝已選）。生成時自動把對應的<b>完整英文描述</b>送給圖片模型（見下方預覽）。整段套用到 78 張牌；風格不夠強時改用 FLUX dev 模型。
+            點按鈕選風格 → 框裡顯示<b>中文</b>（看得懂選了什麼），再點一次取消（打勾＝已選）。對應的<b>完整英文</b>會帶到下方，<b>你可以直接編輯</b>，生成時送的就是下面那段。整段套用到 78 張牌；風格不夠強時改用 FLUX dev 模型。
           </div>
-          {stylePrompt.trim() && (
-            <div
-              style={{
-                marginTop: 6,
-                padding: "8px 10px",
-                borderRadius: 6,
-                background: "rgba(99,102,241,0.07)",
-                border: "1px solid var(--card-border)",
-                fontSize: 11,
-                lineHeight: 1.5,
-                color: "var(--text-muted)",
-                maxHeight: 120,
-                overflow: "auto",
-              }}
-            >
-              🎨 <b>實際送給圖片模型的英文</b>：<span style={{ color: "var(--text)" }}>{resolveStylePrompt(stylePrompt)}</span>
+
+          <div style={{ marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                🎨 <b>實際送給圖片模型的英文</b>（可直接改，改了就送這段）
+              </span>
+              {styleEnglishEdited && (
+                <button
+                  type="button"
+                  disabled={locked}
+                  onClick={() => {
+                    setStyleEnglish("");
+                    setStyleEnglishEdited(false);
+                  }}
+                  style={{
+                    fontSize: 11,
+                    padding: "1px 8px",
+                    borderRadius: 10,
+                    border: "1px solid var(--card-border)",
+                    background: "transparent",
+                    color: "var(--text-muted)",
+                    cursor: locked ? "default" : "pointer",
+                  }}
+                >
+                  ↻ 重設為中文對應
+                </button>
+              )}
             </div>
-          )}
+            <textarea
+              className="form-textarea"
+              style={{ minHeight: 90, fontSize: 12, lineHeight: 1.5, background: "rgba(99,102,241,0.06)" }}
+              placeholder="（選了上方風格這裡會自動帶出英文；也可自行修改或直接輸入英文）"
+              value={effectiveEnglish}
+              onChange={(e) => {
+                setStyleEnglish(e.target.value);
+                setStyleEnglishEdited(true);
+              }}
+              disabled={locked}
+            />
+            {styleEnglishEdited && (
+              <div className="form-hint" style={{ color: "var(--yellow)" }}>
+                ✏ 你已手動編輯英文 → 生成時送這段（已覆蓋中文按鈕的自動對應）。按「重設」恢復自動。
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="form-row">

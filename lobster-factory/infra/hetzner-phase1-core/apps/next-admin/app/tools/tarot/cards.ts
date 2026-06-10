@@ -200,8 +200,14 @@ export function resolveStylePrompt(raw: string): string {
 const DEFAULT_STYLE = "ornate colored-pencil fantasy illustration, Rider-Waite inspired, warm antique palette";
 
 export interface CardPromptInput {
-  /** User style text (artist / medium / genre). Optional → DEFAULT_STYLE. */
+  /** User style text as zh labels (resolved via resolveStylePrompt). Optional → DEFAULT_STYLE. */
   style?: string;
+  /**
+   * Pre-resolved English style, used VERBATIM as the lead (still length-capped) and bypassing
+   * resolveStylePrompt. Lets the UI send a user-edited English prompt exactly as typed. When set
+   * and non-empty it wins over `style`.
+   */
+  styleResolved?: string;
   /**
    * Subject / character override — WHO appears as the central figure(s). A noun phrase such as
    * "a fluffy orange cat", "a cartoon robot", "a smiling girl". Empty → the card's RWS default
@@ -242,8 +248,10 @@ export function buildCardPrompt(card: TarotCard, input: CardPromptInput = {}): s
   const hero = subject || card.hero;
   const scene = card.scene.split("{hero}").join(hero);
 
-  // Resolve the style: chip labels → their catalog English prompt; unknown free-typed text passes through.
-  let lead = resolveStylePrompt((input.style ?? "").trim()) || DEFAULT_STYLE;
+  // Style: a user-edited English override (styleResolved) wins and is used verbatim; otherwise
+  // resolve the zh chip labels → their catalog English prompt (unknown free text passes through).
+  const overrideEn = (input.styleResolved ?? "").trim();
+  let lead = (overrideEn || resolveStylePrompt((input.style ?? "").trim())) || DEFAULT_STYLE;
 
   // Cap the style so the tarot SCENE always fits inside the model's prompt window. Catalog prompts
   // are long (up to ~1500 chars); stacking two (e.g. painter + medium) overflows FLUX's encoder,
