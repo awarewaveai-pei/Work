@@ -7,6 +7,21 @@
 ### Daily
 - (TBD)
 
+### Tarot 風格系統重寫：103 條 doc 風格目錄（中文標籤在框、完整英文送模型）+ 刪除 legacy 短 lexicon
+
+操作者提供 8 個 `agency-os/docs/生圖風格 PROMPT/*.md`（中英各 4：西方/東方/媒材/風格），要求全加入、不簡化、不遺漏；textarea 顯中文、英文送圖片生成器。
+**[已修改]**
+- NEW `app/tools/tarot/tarotStyles.ts`：`STYLE_CATALOG` 103 條（西方29/亞洲26/媒材16/風格32），解析腳本從 8 個 .md 自動抽取（西方取 Visual Features、其餘取 Ready-to-use Prompt；排除 Negative Prompt）。`{zh 標籤, group, prompt 完整英文}`，avg 689ch / max 1506ch。零手抄。
+- `cards.ts`：風格解析改由 STYLE_CATALOG 驅動；新增 `resolveStylePrompt()`（中文標籤 comma-split → catalog 英文 prompt，未知字穿透）；**整段移除 legacy 短 STYLE_LEXICON + localizeStyle**（操作者看到 cards.ts 短 prompt 誤以為沒加 → 根因是 legacy 死碼，已刪淨）。
+- `TarotStudio.tsx`：chip 插入中文標籤（textarea 顯中文）、toggle 高亮、即時預覽顯示實際英文。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`esbuild+node` | exit=0 | 103 presets、29/26/16/32、0 dup、`達文西`鈕→1506ch 英文、未知字穿透、78×3 sweep 無 {hero}；server 端 `達文西`=1564ch、localizeStyle 殘留=0
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | commit 8661cb2、healthy 7s、smoke 4/4 200
+- REVIEW_DONE: critic=Deep | verdict=pass | 0c/0M/1m+2s（comma-split 安全、0 碰撞、0 dup）；legacy 移除 delta 以 node 驗證後 verify-recent --ack 放行（記於 daily memory）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`localizeStyle`\|`STYLE_LEXICON`\|`resolveStylePrompt` | hits=0（唯一消費 cards.ts/TarotStudio；舊符號 0 殘留）
+**[剩餘風險]** 多選風格英文很長，FLUX CLIP 會截斷場景（操作者明示不簡化的取捨；即時預覽顯示實際長度）。
+**[rollback]** `git revert 8661cb2`。資料正本＝8 個 `生圖風格 PROMPT/*.md`，改後重跑解析腳本再生 tarotStyles.ts。
+
 ### wp-bridge v0.7.0：POST /product 端點（WooCommerce 簡單商品 CRUD-create）
 
 操作者要在 soulful LIVE 站發文 + 建商品。發文 wp-bridge 已能做；查 RestController 確認 v0.6.0 僅 `/health /option /post /blocks`，**無商品端點**（TASKS「Woo product CRUD」待辦）。新增端點，鏡像 PostCreator self-heal CREATE 範式。
