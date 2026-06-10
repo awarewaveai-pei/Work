@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-10 09:12:50
+- Generated: 2026-06-10 10:32:23
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -285,7 +285,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-**[① 已完成]** `lib/onboarding/spec-generator.ts` 移除 9 行 debug `console.error`（只刪 log、保留全部 guard + return）。tsc --noEmit 0 errors、vitest 168/168 pass、critic Deep 0/0/0、無殘留 `console.*`。**未 sg-deploy**（log 清理零急迫，隨下次實質部署搭車，避免單獨為 cosmetic change 冒 prod 風險）。
 
 **[②③ R0 讀碼發現 — 不實作的理由]** packet §7 前任假設「呼叫 orchestrate-tenant-provisioning（已有 create-wp-site + apply-manifest）」與 code 不符：
 - `orchestrate-tenant-provisioning.ts`（讀畢）只 `runProviderStep` fan-out 佈建整合服務 + 寫 webhook，**不建 org/site、不觸發 create-wp-site**。
@@ -344,4 +343,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=Replicate flux-dev + flux-schnell 直打「Van Gogh oil painting...」prompt | exit=0 HTTP=201 succeeded | flux-dev 輸出實看=標準梵谷厚塗/漩渦黃日/鈷藍山（證明模型+prompt 完全吃風格）；根因=外框縮圖不重生成，使用者看舊圖誤判
 - BUGHUNT_WAIVED: NA -- TarotStudio previewStale 衍生旗標 + 警示橫幅 純 UI state，無資料/跨檔邏輯；tsc 通過
+
 

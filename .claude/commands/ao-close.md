@@ -95,21 +95,31 @@ On next AO-CLOSE / health-check, missing lifts will fail the 100% gate. Read
 
 ## Final Step — Archive the report (MANDATORY after the four sections)
 
-After printing the four-section output to chat, write the **exact same markdown** to:
+**`ao-close.ps1` now machine-writes a skeleton report** at the END of a successful close
+(2026-06-10), at the **exact path it prints** — look for:
 
 ```
-agency-os/reports/ao-close/YYYY-MM-DD-HHmm.md
+AO-CLOSE: report skeleton written -> agency-os/reports/ao-close/YYYY-MM-DD-HHmm.md
+AO-CLOSE: OVERWRITE that file with the full four-section report ...
 ```
 
-Where `YYYY-MM-DD-HHmm` is the local time you ran `ao-close.ps1`. Use the `Write` tool.
-This is the only way the user can browse past AO-CLOSE reports — skipping it
-silently breaks the workflow.
+That `YYYY-MM-DD-HHmm` is bound to the commit minute (NOT a wall-clock you pick), so a
+report **always exists** and the filename always matches the AO-CLOSE sync commit. Your job:
+**`Write` the exact same four-section markdown you printed to chat OVER that exact file**
+(do not pick your own timestamp; do not leave the `AUTO-SKELETON` stub). A new machine gate
+(`prior-close archive report guard`) blocks the NEXT close if that file is missing, so this
+is no longer discretionary.
+
+> If the script printed `report already present -> ...` instead, the file existed (e.g. you
+> pre-wrote it) — still overwrite it with the final four-section content.
 
 ### Prune old reports (>30 days)
 
 After writing today's file, list `agency-os/reports/ao-close/*.md` (Glob),
 parse the date prefix of each filename, and delete any whose date is more than
-30 days before today. Skip `README.md`. Use the `Bash` tool with `rm` — git
+30 days before today. **Never delete the most-recent report** (the one the gate keys off,
+i.e. the latest AO-CLOSE sync commit's file), even if a >30-day session gap would otherwise
+make it prunable. Skip `README.md`. Use the `Bash` tool with `rm` — git
 will track the deletions on the next commit.
 
 If the archive folder doesn't exist yet, create it first.

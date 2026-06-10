@@ -7,6 +7,53 @@
 ### Daily
 - (TBD)
 
+### Tarot 工具：78 張 RWS 忠實場景 + `{hero}` 主角替換系統 + 風格詞典豐富化（中西+全亞洲畫家）
+
+**根因/需求**：① 56 張小牌用公式 `minorSubject()` 生成（「N 個聖杯排好」），失去 Rider-Waite-Smith 各張獨立劇情 → 生成不忠實。② 主角替換（貓照片/卡通/真人/任意角色/都沒給）無乾淨機制，文字角色只能塞進畫風欄。③ `STYLE_LEXICON` 值僅短標籤（"Monet impressionist painting"），模型不認得名字就畫不出；畫家太少、缺東方與達文西。④ 風格按鈕只 12 個 curated，且 `key={p.en}` 未來易撞 key。
+
+**[已修改]**
+- `app/tools/tarot/cards.ts`：
+  - schema `subjectPrompt:string` → `scene:string`（含 `{hero}` 佔位）+ `hero:string`（預設主角，無冠詞）。情境/符號鎖死、主角解耦。
+  - 56 小牌：刪 `minorSubject()`/`PIP_COUNT`，改 `MINOR_SCENES` 逐張 RWS 劇情（三劍穿心下雨/十劍背插紅天/二錢無限緞帶雜耍…）。22 大牌轉 `{hero}` + 補細節。
+  - `buildCardPrompt(stylePrompt,card)` → `buildCardPrompt(card,{style?,subject?})`（options 物件，向後相容可擴充）。新增 `normalizeSubject()`（strip 前導冠詞，裸冠詞→空→fallback）+ `DEFAULT_STYLE`。
+  - `STYLE_LEXICON` 每值改「畫家+具體視覺特徵（色調/筆觸/光影/質感）」；新增 ~28 位中西+全亞洲畫家（達文西/林布蘭/維梅爾/卡拉瓦喬/慕夏/秀拉/馬諦斯…；北齋/廣重/張大千/齊白石/徐悲鴻/金弘道(韓)/拉維瓦爾馬(印)/波斯細密畫/唐卡(藏)/阿莫索洛(菲)/泰國壁畫/峇里島畫/越南絹畫/村上隆/奈良美智/宮崎駿/吉卜力）。`localizeStyle` 加 `{skipSuffixes}`（subject 不誤轉「風格/畫風」）。
+  - `STYLE_PRESETS` 加 `group`，32 鈕；`zh` 為 lexicon 鍵，點擊插入 zh 由 localize 展開（DRY 單一來源）。
+- `app/tools/tarot/TarotStudio.tsx`：加 `subjectText` state + 「主角/角色替換」輸入欄、串 2 個 call site（預覽 L250/整套 L290）、previewSig 加 subject、gate 加 hasSubject；chip 改分組渲染、`key={p.zh}`、插入 zh、加 group 標題與淡背景。
+
+**設計核心**：情境(WHAT，固定忠實) / 風格(HOW，正交) / 主角(WHO，`{hero}` 可換) 三維解耦。主角輸入靠「文字欄 or 參考圖 or 都沒有」三條**封閉輸入通道**覆蓋無限內容（非枚舉個案）。參考圖路徑不動 prompt（保留已驗證的貓牌 model 層換臉）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`esbuild cards.ts→mjs + node` 全 78 張 × {空/貓/the 主角} × {空/梵谷/唐卡 風格} sweep；+32 presets localize 展開；+ prompt 長度 | exit=0 | 結果：零 `{hero}` 殘留、無 "a a"/"a the" 文法錯、32 鈕全展開成豐富英文無殘留 CJK、Kusama group=亞洲、FOOL+梵谷 578 字 style 出現 1 次（critic 修 token 溢出後）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=2 | 僅 2 既有缺套件錯（jszip/@supabase/ssr），對改動零型別錯；buildCardPrompt 簽名改後 2 call site tsc 確認無漏
+- REVIEW_DONE: critic=Deep | verdict=pass（batch1）/ pass-warn（batch2）| findings batch1=0c/0M/2m、batch2=0c/0M/2m+2s；子字串碰撞（林布蘭/林布蘭特、北齋/葛飾北齋等）critic 實測證明長度排序保護安全；2 個 batch1 Minor（裸冠詞、subject 誤轉後綴）+ batch2 token 溢出 + Kusama group 全部已修
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`subjectPrompt`\|`minorSubject`\|`PIP_COUNT`\|`buildCardPrompt` | hits=0（tarot 目錄舊符號 0 殘留；buildCardPrompt 1 定義+2 call site 都更新新簽名）
+
+**[剩餘風險]**：① 視覺忠實度（RWS 圖像學）只能字串驗證，實際畫面需操作者部署後生一張人工看。② 使用者狂點多個畫家鈕仍可能 prompt 過長（已移除頭尾重複降低風險，但無硬上限）。③ 中文角色/風格非 lexicon 詞會原樣穿透（FLUX 讀不懂，同 style 欄既有限制）。
+**[rollback]**：`git checkout HEAD~1 -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot/cards.ts app/tools/tarot/TarotStudio.tsx`（純前端工具，無 DB/部署，零遷移風險）。
+
+### AO-CLOSE 流程修整：移除雙 IDE 遺留 inbox guard + 機器保證收尾報告（消滅「漏寫報告」整類）
+
+**根因（操作者三問）**：① AO-CLOSE 四段報告常被漏寫（靠 agent 自律，無機械保證）— 已發生多次。② closeout-inbox guard 是 Cursor+Claude 雙 IDE 並用時的協作機制；現單 AI（僅 Claude，直接寫 WORKLOG），guard 只剩摩擦（18:19 那輪 strict 擋我，逼我手填 `### claude` section = 治標）。③ primary `scripts/ao-close.ps1:29` 預設 `strict`、wrapper `agency-os/scripts/ao-close.ps1:14` 預設 `warn` — 兩進入點不一致且註解寫 warn 與 code strict 漂移。
+
+**[已修改]**
+- `scripts/ao-close.ps1` + `agency-os/scripts/ao-close.ps1`：`InboxGuardMode` 預設 `strict`/`warn` → **`off`**（兩進入點；wrapper L36 永遠 forward 自己預設會蓋 owner，故兩邊都要改）。merge-closeout-inbox 步驟保留為無害 no-op（空 inbox 自動 skip）；3 個 inbox 檔轉休眠不刪（避免連鎖 blast radius；Cursor 回歸翻回 strict 即可）。
+- `scripts/ao-close.ps1`（新 gate L296-326）：**prior-close archive report guard** — 上一個 `chore: AO-CLOSE sync <date> <hhmm>` commit 必須有對應 `reports/ao-close/<date>-<hhmm>.md`，缺則 `Add-CloseoutGateResult` 擋（deferred ratchet，同 archive-lift 模式）。含 **>30d prune-horizon skip**（critic m1：避免 gate 找一個被 prune 規則合法刪除的舊報告而永久誤擋）。
+- `scripts/ao-close.ps1`（L590/621/655-703）：**機器寫骨架報告** — 推送成功後用「與 commit subject 同一個 `$autoCloseStamp` 分鐘」寫 `reports/ao-close/<stamp>.md`（write-if-missing，best-effort try/catch 非致命），並印確切路徑要 agent 覆寫。**消滅 critic M1 時間戳漂移整類**：檔名 == commit 分鐘 by construction，報告永遠存在。骨架字串**全 ASCII**（CJK 放 PS 字串字面值 = CP950 parse-break trap，本次真實爆過一次，改 ASCII 修復）。
+- `.claude/commands/ao-close.md` Final Step：改為「覆寫 script 印出的確切骨架路徑」（不自選時間戳）+ prune「絕不刪最新報告」（m1 belt）。
+- `agency-os/docs/operations/end-of-day-checklist.md:36`：stale claim「inbox guard 預設 warn」→ off + 補新 gate/骨架步驟。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile` ×2（scripts/ + agency-os/scripts/ ao-close.ps1）| exit=0 | PARSE OK（首版 skeleton CJK 字面值→PARSE FAIL，ASCII 化後 PASS — 真實抓到 CP950 trap）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -ParseBreakOnly` | exit=0 | CLEAN scanned=152 clean=152 drift=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=gate happy+fail path harness（真 git log 反推 1819.md 存在→pass；fake 2099→Test-Path False→block）+ 30d-skip 邏輯（2026-06-09→CHECK / 2026-04-01→SKIP pruned）| exit=0 | 兩路 + horizon 皆符合預期
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ao-close.ps1 -SkipPush`（真實 invoke）| exit=見下 | 實測印出 `inbox guard disabled` + `prior-close report present: 2026-06-09-1819.md`（happy path e2e）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1M/2m/2s — M1 時間戳漂移**經 critic 確認為真結構性 bug**（非臆測），已用 skeleton-write 修；m1 prune>30d 已加 skip；m2 同-session re-close 經分析由 skeleton 設計自動解（第一輪擋→無 commit→查上一 session；成功→skeleton 已寫）。s1 inbox 移除無 silent-omission 回歸（completeness gate 收 AUTO_TASK_DONE 即可，verify-closeout-completeness.ps1:59/118-124 證實）。
+- BUGHUNT_DONE: scope=scripts,agency-os,.claude | grep=`prior-close archive report|autoCloseStamp|AUTO-SKELETON|InboxGuardMode|closeout-inbox` | hits=新 code 自身 + 既有 `verify-aoresume-archive.ps1` AO-RESUME 同款 pattern（marker 命名一致非衝突）+ end-of-day-checklist stale claim（已修）；無其他 stale。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/2m — **第二輪 critic**（審 review 後才加的 skeleton-write + 30d-skip 新段，上一輪 critic 沒看過）：核心不變式「檔名==commit 分鐘 by construction」確認成立、StrictMode scope 安全、format 等價 byte-identical、新段全 ASCII clean。2 Minor 已折回：(m#2) gate skip horizon `AddDays(-30)`→`-29`（skip 窗嚴格包住 pruner 刪除窗，防從本檔看不到的 off-by-one）；(m#1) skeleton 寫入改 tmp+Move-Item 原子化（house style + 防平行 session 同分鐘 race）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile` + `audit-cp950-traps -ParseBreakOnly`（2 Minor 折回後）| exit=0 | PARSE OK + CLEAN scanned=152 clean=152 drift=0
+- AUTO_TASK_DONE: AO-CLOSE 流程修整（ad-hoc，無對應 TASKS 開放項；inbox-off + 報告骨架機器寫入 + prior-close 報告 gate）
+- REALTEST_PENDING: 本輪 ao-close.ps1 真實 close 將 e2e 驗證 skeleton-write（寫本輪報告骨架後 agent 覆寫）。
+
 ## 2026-06-09
 
 ### Daily
@@ -7771,7 +7818,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-10 01:12:40 UTC_
+_Last synced: 2026-06-10 02:32:12 UTC_
 
 ## 2026-03-20
 
@@ -8724,4 +8771,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=Replicate flux-dev + flux-schnell 直打「Van Gogh oil painting...」prompt | exit=0 HTTP=201 succeeded | flux-dev 輸出實看=標準梵谷厚塗/漩渦黃日/鈷藍山（證明模型+prompt 完全吃風格）；根因=外框縮圖不重生成，使用者看舊圖誤判
 - BUGHUNT_WAIVED: NA -- TarotStudio previewStale 衍生旗標 + 警示橫幅 純 UI state，無資料/跨檔邏輯；tsc 通過
+
 

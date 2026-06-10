@@ -119,6 +119,7 @@ export default function TarotStudio() {
   const [group, setGroup] = useState<GroupKey>("major");
   const [template, setTemplate] = useState<CardTemplate>("gold");
   const [stylePrompt, setStylePrompt] = useState("");
+  const [subjectText, setSubjectText] = useState(""); // optional character override (text channel)
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -138,10 +139,10 @@ export default function TarotStudio() {
   const doneCount = batch.filter((b) => b.status === "done").length;
   const maxRefs = modelOption(model).maxRefs;
 
-  // True when the user changed style, model, OR reference images after generating the current
-  // preview but hasn't regenerated — the frame thumbnails still show the OLD image.
+  // True when the user changed style, model, subject, OR reference images after generating the
+  // current preview but hasn't regenerated — the frame thumbnails still show the OLD image.
   // referenceImages.length is included because adding/removing refs changes the batch anchor.
-  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${model}::${stylePrompt.trim()}::refs=${referenceImages.length}`;
+  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${model}::${stylePrompt.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`;
 
   // The deck's style anchor: explicit uploads (capped to the model's limit), else the locked preview.
   // maxRefs === 0 (e.g. FLUX schnell) → no image is sent; style relies on prompt + seed.
@@ -233,11 +234,12 @@ export default function TarotStudio() {
       setMessage("以圖生圖模式請先上傳至少一張參考圖（或切到文字模式並填描述）");
       return;
     }
-    // 風格描述為選填：只要有「上傳參考圖」或「至少 3 字描述」其一即可
+    // 風格描述為選填：有「風格描述 ≥3 字」「角色描述 ≥2 字」「上傳參考圖」其一即可
     const hasStyle = stylePrompt.trim().length >= 3;
+    const hasSubject = subjectText.trim().length >= 2;
     const hasRef = mode === "image" && referenceImages.length > 0;
-    if (!hasStyle && !hasRef) {
-      setMessage("請填風格描述（至少 3 字），或在「以圖生圖」模式上傳參考圖當風格");
+    if (!hasStyle && !hasSubject && !hasRef) {
+      setMessage("請填風格描述（至少 3 字）或角色描述，或在「以圖生圖」模式上傳參考圖");
       return;
     }
     setPreviewBusy(true);
@@ -245,7 +247,7 @@ export default function TarotStudio() {
     try {
       const resp = await callGenerate({
         model,
-        prompt: buildCardPrompt(stylePrompt, PREVIEW_CARD),
+        prompt: buildCardPrompt(PREVIEW_CARD, { style: stylePrompt, subject: subjectText }),
         referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
       });
@@ -255,9 +257,9 @@ export default function TarotStudio() {
       }
       setPreviewImage(resp.image);
       setPreviewSeed(resp.seed ?? null);
-      // snapshot what produced this preview (model + style + ref count) so previewStale fires
-      // when any of those inputs change before the user regenerates.
-      setPreviewSig(`${model}::${stylePrompt.trim()}::refs=${referenceImages.length}`);
+      // snapshot what produced this preview (model + style + subject + ref count) so previewStale
+      // fires when any of those inputs change before the user regenerates.
+      setPreviewSig(`${model}::${stylePrompt.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
     } catch (e) {
       setMessage(`預覽生成失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -285,7 +287,7 @@ export default function TarotStudio() {
     try {
       const resp = await callGenerate({
         model,
-        prompt: buildCardPrompt(stylePrompt, card),
+        prompt: buildCardPrompt(card, { style: stylePrompt, subject: subjectText }),
         referenceImages: lockedRefs, // consistent style anchor across the deck (where the model supports it)
         seed: previewSeed, // FLUX reproducibility; ignored by openai
       });
@@ -479,33 +481,57 @@ export default function TarotStudio() {
         )}
 
         <div className="form-row">
+          <label className="form-label">主角／角色替換（選填）</label>
+          <input
+            className="form-input"
+            placeholder="留空＝用標準塔羅人物。例：a fluffy orange cat / a cartoon robot / 一隻柴犬"
+            value={subjectText}
+            onChange={(e) => setSubjectText(e.target.value)}
+            disabled={locked}
+          />
+          <div className="form-hint">
+            換掉每張牌的主角，情境（姿勢、道具、符號）不變，整副 78 張同一角色。中文會自動轉英；用英文最準。
+            <b>上傳真人／角色照片</b>時這裡留空即可，模型會直接照圖換臉（走上方「以圖生圖」）。
+          </div>
+        </div>
+
+        <div className="form-row">
           <label className="form-label">風格描述{mode === "image" && referenceImages.length > 0 ? "（選填，已上傳參考圖可留空）" : ""}</label>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-            {STYLE_PRESETS.map((p) => (
-              <button
-                key={p.en}
-                type="button"
-                disabled={locked}
-                onClick={() =>
-                  setStylePrompt((prev) => {
-                    const t = prev.trim().replace(/,\s*$/, "");
-                    return t ? `${t}, ${p.en}` : p.en;
-                  })
-                }
-                title={`插入「${p.en}」`}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 14,
-                  fontSize: 12,
-                  cursor: locked ? "default" : "pointer",
-                  border: "1px solid var(--card-border)",
-                  background: "transparent",
-                  color: "var(--text-muted)",
-                  opacity: locked ? 0.5 : 1,
-                }}
-              >
-                {p.zh} <span style={{ opacity: 0.6 }}>{p.en}</span>
-              </button>
+          <div style={{ marginBottom: 8 }}>
+            {Array.from(new Set(STYLE_PRESETS.map((p) => p.group))).map((g) => (
+              <div key={g} style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, opacity: 0.8 }}>{g}</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {STYLE_PRESETS.filter((p) => p.group === g).map((p) => (
+                    <button
+                      key={p.zh}
+                      type="button"
+                      disabled={locked}
+                      onClick={() =>
+                        // Insert the zh key — buildCardPrompt's localizeStyle expands it to the
+                        // full rich style description at generation time (single source of truth).
+                        setStylePrompt((prev) => {
+                          const t = prev.trim().replace(/,\s*$/, "");
+                          return t ? `${t}, ${p.zh}` : p.zh;
+                        })
+                      }
+                      title={`插入「${p.zh}」（${p.en}）`}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 14,
+                        fontSize: 12,
+                        cursor: locked ? "default" : "pointer",
+                        border: "1px solid var(--card-border)",
+                        background: "rgba(127,127,127,0.08)",
+                        color: "var(--text-muted)",
+                        opacity: locked ? 0.5 : 1,
+                      }}
+                    >
+                      {p.zh} <span style={{ opacity: 0.55 }}>{p.en}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
           <textarea
@@ -516,7 +542,7 @@ export default function TarotStudio() {
             disabled={locked}
           />
           <div className="form-hint">
-            這段風格會套用到整套 78 張牌。中文風格詞會自動轉成英文（免費）；要最準請用英文。風格不夠強時改用 FLUX dev 模型（吃 prompt 更準）。
+            這段風格套用到整套 78 張牌。<b>點上方按鈕最準</b>——會自動帶入該畫家／風格的完整視覺特徵（色調、筆觸、光影），不只是名字。也可自行輸入；中文會自動轉英。風格不夠強時改用 FLUX dev 模型。
           </div>
         </div>
 

@@ -33,7 +33,7 @@
 
 - **使用者**：在**收關** Cursor 對話打 **`AO-CLOSE`** 即可（與單代理相同）。**收關代理**須在執行腳本前完成 rule **第 1 步**（**含**：若存在協作收件匣，讀取並併入進度檔；**勿**僅留 inbox 不寫 WORKLOG／memory）。
 - [ ] `powershell -ExecutionPolicy Bypass -File .\scripts\ao-close.ps1`
-  - 預設順序（詳見腳本與 **`.cursor/rules/40-shutdown-closeout.mdc` 第 2 步**）：**`ensure-daily-progress-scaffold`** → **closeout inbox guard**（預設 **warn**）→ **`merge-closeout-inbox-into-progress`**（verbatim 併入後重置 inbox）→ **`print-today-closeout-recap`** →（push 模式）**`git fetch`／落後攔截**→ **`verify-build-gates`** → **`system-guard`** → **`generate-integrated-status-report`** → health **100%** 檢查 → **`apply-closeout-task-checkmarks`** → **`git add`** → **`verify-closeout-completeness`**（預設 **strict**）→ **`commit`／`push`**
+  - 預設順序（詳見腳本與 **`.cursor/rules/40-shutdown-closeout.mdc` 第 2 步**）：**`ensure-daily-progress-scaffold`** → **closeout inbox guard**（預設 **off**，2026-06-10；單 AI 下 closeout-inbox 為雙 IDE 遺留，merge 仍跑為無害 no-op）→ **prior-close archive report guard**（驗上一輪 AO-CLOSE 報告存在，缺則擋）→ **`merge-closeout-inbox-into-progress`**（verbatim 併入後重置 inbox）→ **`print-today-closeout-recap`** →（push 模式）**`git fetch`／落後攔截**→ **`verify-build-gates`** → **`system-guard`** → **`generate-integrated-status-report`** → health **100%** 檢查 → **`apply-closeout-task-checkmarks`** → **`git add`** → **`verify-closeout-completeness`**（預設 **strict**）→ **`commit`／`push`** → **報告骨架機器寫入**（agent 覆寫成四段）
   - **全程 PASS**：推上後**公司機 `pull` 即完整**
   - **任一步 FAIL**：**不會 push**
   - 今夜不推遠端：`-SkipPush`（仍跑閘道與產報）
@@ -87,5 +87,5 @@
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-08 10:19:21 UTC_
+_Last synced: 2026-06-10 02:32:12 UTC_
 
