@@ -264,12 +264,16 @@ final class RestController {
 			case 'woocommerce_not_active':
 				return 422;
 			case 'name_and_price_required':
+			case 'name_required':
 			case 'price_not_numeric':
 			case 'invalid_sku':
+			case 'attributes_required':
+			case 'variations_required':
+			case 'variation_price_required':
 				return 400;
 			case 'sku_exists':
 				return 409;
-			default: // verify_failed, save_failed
+			default: // verify_failed, save_failed, variation_save_failed
 				return 409;
 		}
 	}
