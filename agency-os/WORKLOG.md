@@ -4,6 +4,13 @@
 
 ## 2026-06-10
 
+### Tarot Studio 風格注入畫家名字（風格準確度根因 — 操作者抓到 prompt 缺畫家名）
+
+**[已修改]** `lobster-factory/.../app/tools/tarot/cards.ts` `resolveStylePrompt`：操作者發現「沒把畫家名字灌進去 → 風格不準」。檢查證實 55 個畫家風格 prompt **0 個含畫家名**（測 17 大畫家全 0 命中；舊版也缺，非重寫造成）。根因＝畫家名是圖像模型最強風格錨點，我重寫只寫技法。修法：`resolveStylePrompt` 在畫家組（西方畫家/亞洲畫家）自動 prepend `In the style of <name>. `，名字從 zh 標籤抽（`artistName()` strip 前導 CJK + 取｜前；｜後 Latin fallback 補 Minhwa 類）；媒材/風格/無名傳統（唐卡/細密畫，prompt 已含傳統名）不加。runtime 注入、不改 103 條資料。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx __lt.ts`(resolveStylePrompt) | exit=0 | 梵谷→"In the style of Van Gogh."、Minhwa→"In the style of Minhwa."、唐卡/水彩/cyberpunk 無前綴；tsc --noEmit=0
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n（1 Minor＝Minhwa｜後名未抓，已補 fallback 修掉；critic 驗 43 名畫家 strip 乾淨、Velázquez/Cézanne/Dalí 變音字完整、map 無碰撞、STYLE_CAP 不截斷名字）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`resolveStylePrompt|STYLE_LEAD_BY_LABEL|artistName|painter-label-comma` | hits=0 破壞（呼叫者 buildCardPrompt:281 + TarotStudio:151 簽名未變；畫家標籤 0 個含逗號 split 安全；scripts/agency-os 命中皆 docs）
+
 ### Tarot Studio flux 呼叫補品質參數 + flux-dev guidance（解「人物不套風格」+ 量化降質）
 
 **[已修改]** `lobster-factory/.../lib/tarot/image-gen.ts`：操作者比對 Replicate playground 發現 app 的 flux 呼叫只送 5 欄、其餘吃 Replicate 預設（schnell 預設 `go_fast=true` = fp8 量化降質 + seed 不可重現）。補上：
