@@ -227,6 +227,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 改動 n8n workflow | 召喚 `n8n-engineer` |
 | 改動 nginx / docker-compose / Dockerfile | 先讀 `safe-infra-patch.sh` 規則，改後立即 health check |
 | 改動 WordPress 外掛 / 主題 / functions.php | 召喚 `wordpress-plugin-expert` |
+| 改動 wp-bridge 外掛 code（`lobster-factory/packages/wp-bridge-plugin/`）並要讓操作者拿到 → bump `AWBRIDGE_VERSION`（header+define 兩處）+ 通過 R0 後 **自動跑 `bash scripts/release-wp-bridge.sh`**（無需詢問），回報 Release URL。**核心坑**：外掛發佈正本是 `awarewaveai-pei/aware-wave-wp-bridge`（push tag `v*` → Action 出 zip）**不是 Work**；只 push Work ≠ 發版。詳 `runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md` / `.claude/commands/wp-bridge-release.md` |
 | 改動 `.ts/.tsx` 任何檔案 | 完成前跑 `npx tsc --noEmit`，型別錯誤不得宣告完成 |
 | 完成任何 code 改動（`.ps1/.ts/.tsx/.js/.sh/.py`）| 跑 `/verify-recent`（syntax + critic + exec）|
 | critic 回報 Critical 或 High 問題 | 召喚 `vuln-verifier` 寫 PoC 確認是否真實漏洞 |
