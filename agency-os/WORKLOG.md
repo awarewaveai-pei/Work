@@ -4,6 +4,9 @@
 
 ## 2026-06-10
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: add-tarot-models → handoffs/2026-06-11-0236-add-tarot-models.md
+
 ### Tarot Studio 風格注入畫家名字（風格準確度根因 — 操作者抓到 prompt 缺畫家名）
 
 **[已修改]** `lobster-factory/.../app/tools/tarot/cards.ts` `resolveStylePrompt`：操作者發現「沒把畫家名字灌進去 → 風格不準」。檢查證實 55 個畫家風格 prompt **0 個含畫家名**（測 17 大畫家全 0 命中；舊版也缺，非重寫造成）。根因＝畫家名是圖像模型最強風格錨點，我重寫只寫技法。修法：`resolveStylePrompt` 在畫家組（西方畫家/亞洲畫家）自動 prepend `In the style of <name>. `，名字從 zh 標籤抽（`artistName()` strip 前導 CJK + 取｜前；｜後 Latin fallback 補 Minhwa 類）；媒材/風格/無名傳統（唐卡/細密畫，prompt 已含傳統名）不加。runtime 注入、不改 103 條資料。
