@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-09 18:19:48
+- Generated: 2026-06-10 09:12:50
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,25 +219,20 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-09.md
-# Daily Note - 2026-06-09
+## 5) memory/daily/2026-06-10.md
+# Daily Note - 2026-06-10
 
 ## Done today
-（session window 12:01→14:47）
-- **Tarot 牌卡模板改正式直線外框**：棄 6-PNG-overlay 路線，改純 canvas 三色直線框（金/藏青/酒紅）。版式=上羅馬數字／中圖像直接嵌入／下牌名。改 `renderPrintCard.ts`（CardTemplate 7→3 key）+ `TarotStudio.tsx`（預設 gold + label）。tsc 我改的兩檔 0 新錯誤；canvas 像素渲染待 staging 瀏覽器確認。未部署（待操作者 go-ahead）。
-- 上午另已完成 ao-close.ps1 四相位重構（commit 1ee4bb4f，見 WORKLOG）。
+(fill in at AO-CLOSE)
 
 ## Current state
-- Tarot 工具框線收尾完成（pivot 至 canvas），TASKS:58 PNG-frame 路線整個失效。
-- 改動未 commit（本次 AO-CLOSE checkpoint 會帶上）、未部署。
+(fill in at AO-CLOSE)
 
 ## Next steps
-- 部署 tarot 改動：`/check-drift` → `/verify` → go-ahead → `/sg-deploy` → app.aware-wave.com 點預覽實測三色框 + 羅馬數字/牌名位置。
-- POD/MEGA roadmap（TASKS:145-149）續行。
+(fill in at AO-CLOSE)
 
 ## Open tasks (auto-generated at 08:00 TPE)
 - [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。**下一步 = Stage 1 接通入口**：抓 2 筆卡 `spec_generated` 的 intake_forms → retry `POST /api/onboarding/trigger-build` 看精確錯誤碼（最可疑 trigger-build/route.ts L35-39 role 403 或 UI「跳回第一步」沒帶 spec/intake id）→ 對症修 → onboarding UI 走完一筆不碰 DB 達 completed。後續 Stage 2 Fluent Form→intake 橋接+FluentCRM／Stage 3 報價／Stage 4 機層租機(provisionClient 已寫好未接)／Stage 5 串接 Supabase/n8n/Sentry/Netdata/Uptime Kuma/PostHog。**動前 `git log -5` + 讀 WORKLOG（trigger-build 平行 session 觸碰過，VBC）。**
-- [ ] POD Studio 路線圖 + tarot 框線收尾（框 png 還沒做好；per-frame 微調 + celestial 補生）→ handoffs/2026-06-06-2026-pod-studio-roadmap.md
 - [ ] Content Engine Phase 1 MVP — soulful 試點發第一篇 draft（spec §38/§44；§36 schema + §37 prompts；DataForSEO/Firecrawl 屬 Phase 2 別接）→ handoffs/2026-06-06-2029-tomo-202949.md
 - [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章（2-Gem: onboarding+content；定位鎖定 Arts Practice for Self-Discovery / Arts-Based Reflective Pedagogy；填真資料→文章可發布；spec §49 errata 待補）→ handoffs/2026-06-06-2044-seo-geo-content.md
 - [ ] Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) — Batch 3 已完成（9f862d82）→ handoffs/2026-05-28-1807-batch-3-post-phase.md
@@ -247,8 +242,7 @@
 - [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）** — 程式+真機已驗過，**直接呼叫 `provisionClient()` 勿重寫**。recipe：`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`（app 端 `onboarding/trigger-build/route.ts` 頂部已留指標）。等 app 校正完再接。
 - [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）** — 讓新機/客戶自帶機自動部署成 production 等級（Docker+Grafana/Loki/Netdata/Sentry+快取+swap+備份+限速/WAF/fail2ban）。**料件 90%+ 現成**，缺一個編排器 `provision-stack.sh`（串既有腳本，純 SSH，Vultr/DO/客戶自帶機通用）+ BYO adapter + swap。完整 R0 計畫：`lobster-factory/docs/hosting/SERVER_STACK_DEPLOYMENT_PLAN.md`。**禁止重寫既有 compose/腳本，只編排**。→ handoffs/2026-06-06-1925-postboot-stack-deploy.md
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
-- [x] **【✅ 2026-06-09 SE-01 已發文】wp-bridge v0.3.0：AI 在 soulful 真站建第一篇草稿（SE-01）** — 真站 post 7053/7056 committed（WORKLOG v0.5.6 entry）；剩餘 operation 見下行。
-- [ ] wp-bridge 續做 operation：featured image / update-existing-post / Woo product CRUD → handoffs/2026-06-05-2039-tomo-203931.md
+- [ ] wp-bridge 續做 operation：featured image（sideload→`_thumbnail_id`）/ update-existing-post / Woo product CRUD（每個照 PostCreator atomic+讀回驗證+失敗還原範式）→ handoffs/2026-06-05-2039-tomo-203931.md
 - [ ] wp-bridge v0.5.6 已發佈（Tabs+YouTube+accordion 修復）；驗收 7053/7056 + 選下一步（/blocks 端點 / 樣式參數化 / app.aware-wave Stage 1）→ handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
 - [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】**
 - [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。
@@ -259,67 +253,16 @@
 - [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
 - [ ] `lobster-factory` A10-2 商業閉環實跑 —— **【未開始】**
 - [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**（操作者 2026-06-06 確認方向） — 終點：全部接 WooCommerce 賣貨（參考同事 jonjonesai 的 MEGA「Mass E-commerce Generator & Automator」Streamlit 工具：Research→Idea→Generate(多模型並行)→Select→Process(去背 removal.ai/Tinify)→Mockup(Printful)→Published(WooCommerce+Claude 文案+定價)）。
-- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制** —— **【未開始】**
-- [ ] **【2026-05-28 開出 — Phase Z 後續 Z4】scan-for-secrets known-suppressed baseline** —— **【未開始】**
-- [ ] **【2026-05-28 開出 — Phase Z 後續 Z5】AO-CLOSE health gate 補強（fetch-recency）** —— **【未開始】**
-- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】**
+- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制** —— **【未開始】** **背景**：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（SG 公網告警器）**無 repo→SG 自動部署路徑**，靠手動 scp 到 `/usr/local/bin/endpoint-alert.sh`。`sync-hetzner-slack-alert-webhooks.ps1` 只寫 env 不部署腳本本體。30 年風險：SG 重建 / `.bak` 被清 → 腳本回退舊版且無人知。**DoD**：(a) 新 `scripts/sync-hetzner-endpoint-alert-script.ps1`（仿 `sync-hetzner-endpoint-alert-heartbeat.ps1`：base64 ship + backup + `bash -n` verify + sha 比對 + 一輪 `systemctl start` 驗收）；(b) 接入既有 infra sync 流程；(c) repo SSOT sha == SG sha 的 drift 檢查可選接 system-health-check。**參考**：本日 WORKLOG `## 2026-05-30 endpoint-alert.sh debounce`（debounce 部署即走此手動路徑）。
+- [ ] **【2026-05-28 開出 — Phase Z 後續 Z4】scan-for-secrets known-suppressed baseline** —— **【未開始】** **背景**：`scripts\scan-for-secrets.ps1`（透過 `verify-build-gates`）每次都印 ~24 條 WARN 對 `~/.claude/settings.json` + `mcp/user-env.ps1` 的 plaintext secrets。這些是 **gitignored** 且已治理（vault），噪音壓過真正新發現。**DoD**：(a) 加 `--known-suppressed-baseline` 旗標或 baseline file 列已治理 keys/files；(b) verify-build-gates 預設掛 baseline，新發現才印 WARN，舊已知 silent + 計數；(c) baseline 外的 finding → 紅字阻斷。**參考**：`agency-os/docs/operations/mcp-secrets-hardening-runbook.md §Local Plaintext Scanner`、本日 WORKLOG `## 2026-05-28 Phase Z`。**先決**：Phase Z A-C 已完成。
+- [ ] **【2026-05-28 開出 — Phase Z 後續 Z5】AO-CLOSE health gate 補強（fetch-recency）** —— **【未開始】** **背景**：Phase Z 加了 `scripts/ensure-claude-junction.ps1` (junction self-heal，已接入 system-health-check) 與 `git-fetch-last.json` ledger (`git-align-main-aoresume-feature.ps1` retry 3x)，但 health-check 還沒消費 ledger。**DoD**：(a) `scripts/system-health-check.ps1` 補 fetch-recency gate（讀 `agency-os/.agency-state/git-fetch-last.json`，若 `success=false` OR `finishedAtUtc` > 7 天 → WARN，> 30 天 → critical fail）；(b) gate 不能被 `-AllowNonPerfectHealth` 旁路；(c) AO-CLOSE 流程跑一次 dry-run 驗收。**參考**：本日 WORKLOG `## 2026-05-28 Phase Z`。**先決**：Phase Z A-C 已完成。
+- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
 - [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】** —— **【未開始】** 剩餘 7 Major + 9 Minor — 排 Phase 4 觀察期後（2026-06-19+）
-- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2 — Phase 4 觀察期進行中** —— **【進行中】** Phase 1+2+3 全部完成；Phase 4 觀察期到期：2026-06-19。
+- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2 — Phase 4 觀察期進行中** —— **【進行中】** Phase 1+2+3 全部完成，production smoke 18 checks / 0 failed；Phase 4 每週巡檢已啟動（每週五 14:00），觀察期到期：2026-06-19。
 - [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
 
 ## Yesterday context
-最後 WORKLOG 更新於 2026-06-03，月度系統巡檢 gates=SKIPPED (ReportOnly)，Supabase memory 38.89% 健康，wp-bridge plan deepen + ADR 007 md-only 完成（BUGHUNT_WAIVED）。
-
-
-### verify-recent --ack (2026-06-09T03:49:10.4465080Z)
-
-**Reason**: Four-phase ao-close refactor fully verified this session: 19/19 collector unit test; SkipPush integration shows 4 blockers batched in one pass + clean report + exit 1; critic Deep verdict=pass on behavior-preservation contract (1 Major Write-Error->Write-Host fixed); syntax OK; cp950 CLEAN; bughunt 0 external deps. See WORKLOG 2026-06-09.
-
-**Acknowledged unverified files** (count=3):
-
-- `c:\Users\USER\Work\scripts\lib\ao-close-gates.ps1`
-- `c:\Users\USER\Work\scripts\test\ao-close-gates.Tests.ps1`
-- `c:\Users\USER\Work\scripts\ao-close.ps1`
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:623db456f797cdc58e4211cb21d25545c228ef90e213cb4ebde9c155a0ffe96a -->
-
-### claude 2026-06-09 11:55
-
-- **完成（一句）**: ao-close.ps1 四相位重構 + 單一品質閘收集器（收工從串行 fail-fast 改為一次報全 blocker，behavior-preserving）
-- **變更路徑**:
-  - `scripts/ao-close.ps1`
-  - `scripts/lib/ao-close-gates.ps1`
-  - `scripts/test/ao-close-gates.Tests.ps1`
-- **Git**: 1ee4bb4f
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: clean-path 一次過由本次 AO-CLOSE 實證（dogfood）
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:a43a63b55d4f47cdc655b3857249b3722b722ef37fb17a309bffb8b0490c6314 -->
-
-### claude 2026-06-09 14:53
-
-- **完成（一句）**: Tarot 牌卡模板改正式直線外框（棄 6-PNG-overlay，改純 canvas 三色直線框：金/藏青/酒紅；版式=上羅馬數字／中圖像直接嵌入／下牌名）
-- **變更路徑**:
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot/renderPrintCard.ts`
-  - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot/TarotStudio.tsx`
-- **Git**: （本次 AO-CLOSE commit）
-- **對應 TASKS 子字串（可選）**: tarot 框線收尾
-- **風險／待辦（可選）**: 未部署（待操作者 go-ahead）；canvas 像素渲染待 staging 瀏覽器確認；tarot-frames PNG + middleware 白名單現未使用，保留不刪
-
-## Closeout inbox (AO-CLOSE auto, verbatim)
-<!-- ao-close-inbox-sha256:6909326a9ef153b9f74fce81dbefddc4fa1282b01e32b0a323ed7349b3ee9d6b -->
-
-### claude 2026-06-09 18:09
-
-- **完成（一句）**: 修復 18:02 AO-RESUME 健檢 99.7% 失分（archive-lift gate）— 2 個 tarot deploy 流程提醒 bullet 標 archive-only，health 回 100%
-- **變更路徑**:
-  - `agency-os/reports/ao-close/2026-06-09-1457.md`
-  - `agency-os/WORKLOG.md`
-- **Git**: 本次 AO-CLOSE commit
-- **對應 TASKS 子字串（可選）**:
-- **風險／待辦（可選）**: 無；純 archive 報告檔註解標記
+最後 WORKLOG 條目為塔羅牌工具相關修復：FLUX prompt 根因修正（否定句 backfire、風格未吃、中文詞典）、預覽圖放大（200→300）、buildCardPrompt 重構，critic Deep 驗收 pass（0c/0M/1m，Minor 已修）。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
