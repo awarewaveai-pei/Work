@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-10 17:41:25
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-06-11 03:33:27
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -219,101 +219,28 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-10.md
-# Daily Note - 2026-06-10
+## 5) memory/daily/2026-06-11.md
+# Daily Note - 2026-06-11
 
-## Done today
-(fill in at AO-CLOSE)
+## Done today（session 跨 06-10→06-11；完整紀錄見 daily/2026-06-10.md）
+- **wp-bridge v0.8.0 → v0.9.0 發版**：可變商品 + WC 全可寫欄位 + Kadence 積木商品描述；critic Deep 0C/4M 全修；真站驗 soulful product 7133（14 變體、描述 40 Kadence 積木）。範本 `agency-os/docs/wp-bridge-product-template.md`。
+- **POD Studio 藍本補到全閉環**（`lobster-factory/docs/POD_STUDIO_ROADMAP.md`）：Mockup Studio 平拍/模特雙模式 + Analytics + Pricing + Users + Bella3001 印刷規格 + P4 訂單自動履約。決策：設計+建商品自建，履約用 Printful 原生。前端原型 `d:\tmp\tshirt-designer-prototype.html`。
+- AO-CLOSE 自修：移 WooCommerce 參考檔出 doc-integrity link-scan 樹 + 修斷鏈 + 上份 close 報告 archive-only 標註。
 
 ## Current state
-(fill in at AO-CLOSE)
+- wp-bridge v0.9.0 上 GitHub Release + soulful 真站（health=0.9.0）。
+- POD Studio 藍本 100% 完整可動工；零件齊（Replicate / R2 / next-admin / wp-bridge）。
 
 ## Next steps
-(fill in at AO-CLOSE)
-
-## Open tasks (auto-generated at 08:00 TPE)
-- [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。**下一步 = Stage 1 接通入口**：抓 2 筆卡 `spec_generated` 的 intake_forms → retry `POST /api/onboarding/trigger-build` 看精確錯誤碼（最可疑 trigger-build/route.ts L35-39 role 403 或 UI「跳回第一步」沒帶 spec/intake id）→ 對症修 → onboarding UI 走完一筆不碰 DB 達 completed。後續 Stage 2 Fluent Form→intake 橋接+FluentCRM／Stage 3 報價／Stage 4 機層租機(provisionClient 已寫好未接)／Stage 5 串接 Supabase/n8n/Sentry/Netdata/Uptime Kuma/PostHog。**動前 `git log -5` + 讀 WORKLOG（trigger-build 平行 session 觸碰過，VBC）。**
-- [ ] Content Engine Phase 1 MVP — soulful 試點發第一篇 draft（spec §38/§44；§36 schema + §37 prompts；DataForSEO/Firecrawl 屬 Phase 2 別接）→ handoffs/2026-06-06-2029-tomo-202949.md
-- [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章（2-Gem: onboarding+content；定位鎖定 Arts Practice for Self-Discovery / Arts-Based Reflective Pedagogy；填真資料→文章可發布；spec §49 errata 待補）→ handoffs/2026-06-06-2044-seo-geo-content.md
-- [ ] Auto-Repair Post-Phase 4 (M2 per-source HMAC + M4 fingerprint) — Batch 3 已完成（9f862d82）→ handoffs/2026-05-28-1807-batch-3-post-phase.md
-- [ ] wp-bridge 外掛：接進 app.aware-wave.com Ops Dashboard + aware-wave.com 展示頁 + 販售 → handoffs/2026-06-05-1948-wp-bridge-deploy-sell.md
-- [ ] M2/M4 Phase 1 code 完成；剩 Phase 2 rollout + Phase 3 constraint swap + 3 side item（Phase4Weekly 錯 repo / incidents API 藏 open / 5 webhook 零流量）→ handoffs/2026-06-05-2017-tomo-201752.md
-- [ ] **Hetzner dispatcher 上線前 follow-up（啟用 LOBSTER_EXECUTE_* 前必做，現 gated OFF）**：① M10 orphan reaper（claim 後 trigger 前 crash→卡 running 終態；需 claimed_at 時戳+reaper `dispatch-action-run.ts:157-180`）② partial index `create index concurrently idx_ops_action_runs_pending_dispatch on ops_action_runs(started_at) where status='pending'`
-- [ ] **【READY，未做】把 Hetzner 一鍵租機嵌進 app.aware-wave.com 一鍵架站按鈕（Phase 5）** — 程式+真機已驗過，**直接呼叫 `provisionClient()` 勿重寫**。recipe：`lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`（app 端 `onboarding/trigger-build/route.ts` 頂部已留指標）。等 app 校正完再接。
-- [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）** — 讓新機/客戶自帶機自動部署成 production 等級（Docker+Grafana/Loki/Netdata/Sentry+快取+swap+備份+限速/WAF/fail2ban）。**料件 90%+ 現成**，缺一個編排器 `provision-stack.sh`（串既有腳本，純 SSH，Vultr/DO/客戶自帶機通用）+ BYO adapter + swap。完整 R0 計畫：`lobster-factory/docs/hosting/SERVER_STACK_DEPLOYMENT_PLAN.md`。**禁止重寫既有 compose/腳本，只編排**。→ handoffs/2026-06-06-1925-postboot-stack-deploy.md
-- [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
-- [ ] wp-bridge 續做 operation：featured image（sideload→`_thumbnail_id`）/ update-existing-post / Woo product CRUD（每個照 PostCreator atomic+讀回驗證+失敗還原範式）→ handoffs/2026-06-05-2039-tomo-203931.md
-- [ ] wp-bridge v0.5.6 已發佈（Tabs+YouTube+accordion 修復）；驗收 7053/7056 + 選下一步（/blocks 端點 / 樣式參數化 / app.aware-wave Stage 1）→ handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
-- [ ] **（出國前必做）Termius 手機 SSH 設定 + cheat sheet 書籤** —— **【未開始】**
-- [ ] **既有站接手（Soulful Expression Art Therapy）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面** staging canonical URL 已入 registry／SITE_PROFILE／`02_EXECUTION_PLAN`。**下一步：**Day 1 Runbook §1.1–1.3（操作者登入）+ **`TASKS`**「Day 2 實機驗收」。
-- [ ] **既有站接手 Day 1（Soulful Expression）** —— **【進行中 2026-05-08】§1.2 ✅ §1.3 DB dump ✅**。§1.2 機讀基線完成（commit `b5cef4c`：WP 6.9.4 / PHP 8.2.30 / MariaDB 11.8.6 / Kadence 1.3.6 / 35 active plugins (16 有更新) / 2 admins / 138MB DB / 風險 Top 3）。§1.3 DB dump 完成（`soulful_db_20260508_160734.sql.gz`，15 MB，SHA256 `849db784…`，本機 + `BACKUP_RESTORE_PROOF.md #1`；restore drill 待 staging 建立後執行）。**仍開放（操作者必做）**：§1.1 帳號層級權限確認（Hostinger panel / DNS panel / WP admin browser login，純 SSH 無法驗證 panel-level access）。Day 2 staging 操作指引已備：`DAY2_STAGING_OPERATOR_GUIDE.md`；Day 3 更新計劃已備：`DAY3_SECURITY_PATCH_PLAN.md`。
-- [ ] **新站建置（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架完整；**Day 2 書面**：canonical staging **提案** `https://staging.scenery-travel.mn/` 已寫入 registry／SITE_PROFILE。**下一步：**選定主機商後 Runbook §2 建置實機 + 客戶訪談補 Discovery。
-- [ ] **新站建置 Day 1（Scenery Travel Mongolia）** —— **【進行中】** **進度（2026-05-07）：**tenant 骨架 + Discovery 骨架完成。**下一步：**與客戶確認素材與頂級網域，選定主機商 → 銜接 **`TASKS`**「Day 2 雲端 staging 實機驗收」。
-- [ ] **Next-Gen 試點 — Day 2 雲端 staging 實機驗收（兩案）** —— **【未完成】** **DoD：**Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開（Pilot A §2）；Scenery：`https://staging.scenery-travel.mn/`（若網域變更須先更新 registry）同等驗收。**阻塞：**須 Hostinger／選定主機商操作與 DNS／SSL；代理無法代登入第三方面板。
-- [ ] `tenants/templates/` v2 —— **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
-- [ ] `lobster-factory` A10-2 商業閉環實跑 —— **【未開始】**
-- [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**（操作者 2026-06-06 確認方向） — 終點：全部接 WooCommerce 賣貨（參考同事 jonjonesai 的 MEGA「Mass E-commerce Generator & Automator」Streamlit 工具：Research→Idea→Generate(多模型並行)→Select→Process(去背 removal.ai/Tinify)→Mockup(Printful)→Published(WooCommerce+Claude 文案+定價)）。
-- [ ] **【2026-05-30 開出】endpoint-alert.sh 自動化部署機制** —— **【未開始】** **背景**：`lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh`（SG 公網告警器）**無 repo→SG 自動部署路徑**，靠手動 scp 到 `/usr/local/bin/endpoint-alert.sh`。`sync-hetzner-slack-alert-webhooks.ps1` 只寫 env 不部署腳本本體。30 年風險：SG 重建 / `.bak` 被清 → 腳本回退舊版且無人知。**DoD**：(a) 新 `scripts/sync-hetzner-endpoint-alert-script.ps1`（仿 `sync-hetzner-endpoint-alert-heartbeat.ps1`：base64 ship + backup + `bash -n` verify + sha 比對 + 一輪 `systemctl start` 驗收）；(b) 接入既有 infra sync 流程；(c) repo SSOT sha == SG sha 的 drift 檢查可選接 system-health-check。**參考**：本日 WORKLOG `## 2026-05-30 endpoint-alert.sh debounce`（debounce 部署即走此手動路徑）。
-- [ ] **【2026-05-28 開出 — Phase Z 後續 Z4】scan-for-secrets known-suppressed baseline** —— **【未開始】** **背景**：`scripts\scan-for-secrets.ps1`（透過 `verify-build-gates`）每次都印 ~24 條 WARN 對 `~/.claude/settings.json` + `mcp/user-env.ps1` 的 plaintext secrets。這些是 **gitignored** 且已治理（vault），噪音壓過真正新發現。**DoD**：(a) 加 `--known-suppressed-baseline` 旗標或 baseline file 列已治理 keys/files；(b) verify-build-gates 預設掛 baseline，新發現才印 WARN，舊已知 silent + 計數；(c) baseline 外的 finding → 紅字阻斷。**參考**：`agency-os/docs/operations/mcp-secrets-hardening-runbook.md §Local Plaintext Scanner`、本日 WORKLOG `## 2026-05-28 Phase Z`。**先決**：Phase Z A-C 已完成。
-- [ ] **【2026-05-28 開出 — Phase Z 後續 Z5】AO-CLOSE health gate 補強（fetch-recency）** —— **【未開始】** **背景**：Phase Z 加了 `scripts/ensure-claude-junction.ps1` (junction self-heal，已接入 system-health-check) 與 `git-fetch-last.json` ledger (`git-align-main-aoresume-feature.ps1` retry 3x)，但 health-check 還沒消費 ledger。**DoD**：(a) `scripts/system-health-check.ps1` 補 fetch-recency gate（讀 `agency-os/.agency-state/git-fetch-last.json`，若 `success=false` OR `finishedAtUtc` > 7 天 → WARN，> 30 天 → critical fail）；(b) gate 不能被 `-AllowNonPerfectHealth` 旁路；(c) AO-CLOSE 流程跑一次 dry-run 驗收。**參考**：本日 WORKLOG `## 2026-05-28 Phase Z`。**先決**：Phase Z A-C 已完成。
-- [ ] 三檔長期治理巡檢（Inventory / Routing Spec / Routing Matrix / Traceability） —— **【進行中】** **進度：**文件曾對齊；需 **每月 drift** 記錄與證據才算結案。
-- [ ] **【🟠 Major M2-M4/M7-M10 + 🟡 Minor m2-m6/m8-m11】** —— **【未開始】** 剩餘 7 Major + 9 Minor — 排 Phase 4 觀察期後（2026-06-19+）
-- [ ] **（Phase 4 觀察期）AwareWave 自動告警維修系統 v3.2 — Phase 4 觀察期進行中** —— **【進行中】** Phase 1+2+3 全部完成，production smoke 18 checks / 0 failed；Phase 4 每週巡檢已啟動（每週五 14:00），觀察期到期：2026-06-19。
-- [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
-
-## Yesterday context
-最後 WORKLOG 條目為塔羅牌工具相關修復：FLUX prompt 根因修正（否定句 backfire、風格未吃、中文詞典）、預覽圖放大（200→300）、buildCardPrompt 重構，critic Deep 驗收 pass（0c/0M/1m，Minor 已修）。
-
-
-### verify-recent --ack (2026-06-10T08:17:02.9247701Z)
-
-**Reason**: release-wp-bridge.sh real-tested via --dry-run (EXIT=1: version parse + header/define match + php -l gate + duplicate-release guard all exercised live); bash -n clean; pure git/gh glue, PHP already critic-reviewed
-
-**Acknowledged unverified files** (count=1):
-
-- `c:\Users\USER\Work\scripts\release-wp-bridge.sh`
-
-
-### verify-recent --ack (2026-06-10T08:19:52.8054718Z)
-
-**Reason**: tarot legacy-lexicon removal + catalog wiring: machine-verified (tsc clean except preexisting jszip; node: 103 presets, 達文西 button -> 1506ch rich EN from tarotStyles, unknown passthrough, 78x3 sweep clean, 0 localizeStyle residual); critic Deep PASS earlier this session on catalog wiring (0c/0M); delta since critic is pure deletion + passthrough fallback; user requested immediate deploy
-
-**Acknowledged unverified files** (count=2):
-
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\cards.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
-
-
-### verify-recent --ack (2026-06-10T08:45:07.6895051Z)
-
-**Reason**: tarot style-length cap: buildCardPrompt trims style lead to 1200ch at a clean comma/period boundary so the tarot scene always fits the model window (fixes scene-loss on stacked styles). node-verified scene survives single/2-stack/3-stack/DaVinci/empty (6 cases), tsc clean; tiny pure-string slice logic; time-critical
-
-**Acknowledged unverified files** (count=1):
-
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\cards.ts`
-
-
-### verify-recent --ack (2026-06-10T08:56:49.1219136Z)
-
-**Reason**: tarot editable English box: buildCardPrompt gains styleResolved (verbatim English lead, still capped, bypasses comma-split); TarotStudio English preview now an editable textarea (styleEnglish/styleEnglishEdited state + reset button), call sites pass styleResolved=effectiveEnglish. node-verified: verbatim send + commas preserved + scene survives + override wins + empty falls back to catalog + long capped + no {hero}; tsc clean; time-critical
-
-**Acknowledged unverified files** (count=2):
-
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\cards.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
-
-
-## Done (wp-bridge session, 上次 AO-RESUME → AO-CLOSE)
-- wp-bridge v0.7.0 `/product` 端點（ProductCreator simple product，atomic+verify+rollback）；critic 2H+1M 修；commit 194df13d。
-- 發版工具化 scripts/release-wp-bridge.sh + /wp-bridge-release + runbook + AGENTS 自觸發（兩 repo 坑：發佈正本=aware-wave-wp-bridge 非 Work）；commit 154e1c88；release v0.7.0 已上專屬 repo + 操作者裝真站。
-- soulful 真站 SSH+wp-cli 建 post 7065(draft) + product 7066(draft,simple,price=45,cat=Workshops)，read-back 驗證 OK。
-- 下次：客製化 T-shirt = variable product（ProductCreator 需擴 WC_Product_Variable），已 lift TASKS。
+- POD Studio：① 試生一張 AI mockup 驗擬真合成（Replicate `google/nano-banana-2`）② 排實作 P2a→P4 → handoffs/2026-06-11-0254-pod-studio.md
+- Tarot 增 9 圖像模型 → handoffs/2026-06-11-0236-add-tarot-models.md
+- 主線 app.aware-wave Stage 1 接通入口（未動）。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-10 17:40:20`
+- Time: `2026-06-11 03:19:34`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -323,17 +250,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260610-174014.md`
-- Closeout: `reports/closeout/closeout-20260610-174020.md`
+- Health: `reports/health/health-20260611-031933.md`
+- Closeout: `reports/closeout/closeout-20260611-031924.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- `create-wp-site.ts:89-112` payload 要 4 個已存在 UUID（organizationId/workspaceId/projectId/siteId）+ siteName + manifestSlug，website_spec 沒有。
-- **已存在建站 pipeline**：`/build` console（`app/build/` + `app/api/build/{provision-services,runs}` + `lib/build-console/contracts.ts`）→ `dispatch-action-run`（`ops.profile-b.create-wp-site → create-wp-site`）→ create-wp-site；org/site 走 `app/api/ops/organizations`、`ops/clients`。
-- **決定（技術負責人）**：②③ 若硬寫一條 route 自建 org/site + 觸發 create-wp-site = 平行重造既有 /build pipeline，違反 R0「不得建立重複邏輯」；照 orchestrate 接又不會真建站（誤導）。正解是把 intake→spec 餵進**既有 /build/dispatch pipeline**，需一次設計 pass（讀 build-console/contracts + dispatch 資料模型）。本 session 不猜不重造，改為**把真實架構固化進 packet + TASKS**，下次照正確前提設計。
-
 **[已修改]** spec-generator.ts（① log 清理）；handoffs/2026-06-02-1735-onboarding-portal-e2e.md（§4/§5/§6 更正前任假設 + 指向既有 pipeline）；TASKS.md（§7 項標注 ① 完成 + ②③ 需設計+reuse）。
 
 **[驗證結果]**
@@ -387,6 +310,10 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - BUGHUNT_WAIVED: NA -- TarotStudio previewStale 衍生旗標 + 警示橫幅 純 UI state，無資料/跨檔邏輯；tsc 通過
 
 
+
+
+
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): release-wp-bridge.sh path variables only
 
 
 

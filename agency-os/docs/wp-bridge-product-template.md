@@ -3,7 +3,7 @@
 > 用 AwareWave WP Bridge `POST /product` 端點建 WooCommerce 商品的**填空範本**。
 > 以後建任何商品（T-shirt / 馬克杯 / 海報 / 數位下載…）照這份填即可。
 > 對應 plugin 版本：**v0.9.0+**（`createProduct` 支援完整 WC 可寫欄位集 + Kadence 積木描述）。
-> 欄位定義正本：[`WooCommerce_REST_API_v3_Reference.md`](WooCommerce_REST_API_v3_Reference.md) §Product properties / §Product variation properties。
+> 欄位定義正本：[`WooCommerce_REST_API_v3_Reference.md`](../reference/WooCommerce_REST_API_v3_Reference.md) §Product properties / §Product variation properties。
 > 程式正本：`lobster-factory/packages/wp-bridge-plugin/includes/Product/ProductCreator.php`。
 
 ---

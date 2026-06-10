@@ -3,6 +3,8 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-06-11 (AO-CLOSE, wp-bridge v0.9.0 + POD Studio 藍本全閉環)** — ① **wp-bridge v0.8.0→v0.9.0 發版**：v0.8 可變商品（WC_Product_Variable atomic+rollback）；v0.9 = WC 全可寫欄位 + **Kadence 積木商品描述**（blocks[]→BlockLibrary，與 /post 同引擎）。critic Deep 0C/4M 全修（sale<regular reject / shipping_class auto-create / term-race recovery / meta 保留鍵 blocklist）。真站驗 soulful product 7133（14 變體 + 描述 40 Kadence 積木 12 型別 + 全欄位）。範本 SSOT `agency-os/docs/wp-bridge-product-template.md`。② **Tarot 103 prompt 重寫**（結構化修飾式+去場景污染+去 negative+畫家名錨）。③ **POD Studio 藍本補完**（`lobster-factory/docs/POD_STUDIO_ROADMAP.md`）：逆向同事 Jon MEGA 全功能（附錄 B：**Mockup Studio 平拍+模特雙模式** = AI 合成擬真商品圖／Analytics／Pricing base/plus／多租戶 Users／Bella3001 印刷規格 300DPI 3600×4800）+ **P4 訂單自動履約閉環**。**核心決策：設計+建商品自建（AI 加值，用 Replicate Nano Banana 2 合成），履約用 Printful 原生 WooCommerce 整合（免費自動，不重寫）**。前端設計器原型 `d:\tmp\tshirt-designer-prototype.html`（Fabric.js 可行性已證）。衫只做白+黑。明日動工：試生一張 AI mockup 驗擬真合成 → 排 P2a→P4。handoffs: `2026-06-11-0254-pod-studio.md` + `2026-06-11-0236-add-tarot-models.md`。
+
 - **2026-06-09 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-09 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:6909326a9ef153b9f74fce81dbefddc4fa1282b01e32b0a323ed7349b3ee9d6b -->
 - **2026-06-09 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-09 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:a43a63b55d4f47cdc655b3857249b3722b722ef37fb17a309bffb8b0490c6314 -->
 - **2026-06-09 (AO-CLOSE)**: closeout-inbox merged verbatim into WORKLOG + memory/daily; see WORKLOG ## 2026-06-09 / subsection "Closeout inbox (AO-CLOSE auto, verbatim)". <!-- ao-close-conv-inbox:623db456f797cdc58e4211cb21d25545c228ef90e213cb4ebde9c155a0ffe96a -->
@@ -497,5 +499,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-10 14:30:02 UTC_
+_Last synced: 2026-06-10 19:09:11 UTC_
 

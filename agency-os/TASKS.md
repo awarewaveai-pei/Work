@@ -85,7 +85,7 @@
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 - [x] **【✅ 2026-06-09 SE-01 已發文】wp-bridge v0.3.0：AI 在 soulful 真站建第一篇草稿（SE-01）** — soulful 真站 post 7053/7056 經真實 PostCreator 路徑 committed（WORKLOG 2026-06-09 v0.5.6 entry）。剩餘 operation（featured image / update-existing-post / Woo product CRUD）見下行待辦。
 - [x] wp-bridge 續做 operation：featured image（sideload→`_thumbnail_id`）/ update-existing-post（**注：Woo simple product CREATE 已於 v0.7.0 完成** — `ProductCreator` + `POST /product`，真站驗 product 7066 draft；剩 featured image / update-existing / product update+delete）→ handoffs/2026-06-05-2039-tomo-203931.md
-- [ ] **wp-bridge variable product 支援**：`ProductCreator` 目前只做 `WC_Product_Simple`；客製化 T-shirt 需 variable product（attributes 顏色 白/黑 × 尺寸 3L/2L/XL/L/M/S/XS + variations + 客製化圖案）。照 simple 範式擴 `WC_Product_Variable` + `WC_Product_Attribute` + 逐 variation atomic+讀回驗證+失敗整筆刪。操作者 2026-06-10 要求。
+- [x] **wp-bridge variable product 支援**：`ProductCreator` 目前只做 `WC_Product_Simple`；客製化 T-shirt 需 variable product（attributes 顏色 白/黑 × 尺寸 3L/2L/XL/L/M/S/XS + variations + 客製化圖案）。照 simple 範式擴 `WC_Product_Variable` + `WC_Product_Attribute` + 逐 variation atomic+讀回驗證+失敗整筆刪。操作者 2026-06-10 要求。
 - [x] **【✅ 2026-06-10 驗收完成】wp-bridge v0.5.6 引擎** — 操作者開後台確認 post 7053/7056 編輯器無 invalid content（伺服器端預檢全綠：parse_blocks 完整樹、freeform=0、accordion pane id 首省略+第2+遞增、tab id 正確）；v0.5.6 三候選皆已 ship（/blocks 端點 ✅、tabs/infobox 樣式 palette-token ✅、Woo simple product ✅v0.7.0）；引擎現為 v0.7.0、下一步方向＝app.aware-wave Stage 1 主線 → handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
 - [ ] Tarot Studio 增加 9 個圖像模型（ideogram-character/v4-turbo/v3-balanced/v2a-turbo/v4-quality + seedream-4.5 + nano-banana-2 + imagen-4 + flux-2-max）；各模型 input schema 不同需逐查，勿套 flux 參數 → handoffs/2026-06-11-0236-add-tarot-models.md
 
@@ -587,5 +587,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-10 14:30:02 UTC_
+_Last synced: 2026-06-10 19:25:21 UTC_
 
