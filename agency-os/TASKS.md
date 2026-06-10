@@ -81,7 +81,8 @@
 - [ ] **【計畫完成，未實作】客戶機「開機後全棧部署+維護」層（provider 無關）** — 讓新機/客戶自帶機自動部署成 production 等級（Docker+Grafana/Loki/Netdata/Sentry+快取+swap+備份+限速/WAF/fail2ban）。**料件 90%+ 現成**，缺一個編排器 `provision-stack.sh`（串既有腳本，純 SSH，Vultr/DO/客戶自帶機通用）+ BYO adapter + swap。完整 R0 計畫：`lobster-factory/docs/hosting/SERVER_STACK_DEPLOYMENT_PLAN.md`。**禁止重寫既有 compose/腳本，只編排**。→ handoffs/2026-06-06-1925-postboot-stack-deploy.md
 - [ ] app.aware-wave onboarding/provisioning IA 重整 — Phase 1 退役 ops-console（已規劃、Q1-Q3 已決、未動 code）+ verify intake 觸發建站 + Phase 2/3 → handoffs/2026-06-05-2028-onboarding-ia-consolidation.md
 - [x] **【✅ 2026-06-09 SE-01 已發文】wp-bridge v0.3.0：AI 在 soulful 真站建第一篇草稿（SE-01）** — soulful 真站 post 7053/7056 經真實 PostCreator 路徑 committed（WORKLOG 2026-06-09 v0.5.6 entry）。剩餘 operation（featured image / update-existing-post / Woo product CRUD）見下行待辦。
-- [ ] wp-bridge 續做 operation：featured image（sideload→`_thumbnail_id`）/ update-existing-post / Woo product CRUD（每個照 PostCreator atomic+讀回驗證+失敗還原範式）→ handoffs/2026-06-05-2039-tomo-203931.md
+- [x] wp-bridge 續做 operation：featured image（sideload→`_thumbnail_id`）/ update-existing-post（**注：Woo simple product CREATE 已於 v0.7.0 完成** — `ProductCreator` + `POST /product`，真站驗 product 7066 draft；剩 featured image / update-existing / product update+delete）→ handoffs/2026-06-05-2039-tomo-203931.md
+- [ ] **wp-bridge variable product 支援**：`ProductCreator` 目前只做 `WC_Product_Simple`；客製化 T-shirt 需 variable product（attributes 顏色 白/黑 × 尺寸 3L/2L/XL/L/M/S/XS + variations + 客製化圖案）。照 simple 範式擴 `WC_Product_Variable` + `WC_Product_Attribute` + 逐 variation atomic+讀回驗證+失敗整筆刪。操作者 2026-06-10 要求。
 - [ ] wp-bridge v0.5.6 已發佈（Tabs+YouTube+accordion 修復）；驗收 7053/7056 + 選下一步（/blocks 端點 / 樣式參數化 / app.aware-wave Stage 1）→ handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
 
 #### 雙機環境 / 日常開工
@@ -582,5 +583,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-09 06:57:14 UTC_
+_Last synced: 2026-06-10 09:37:58 UTC_
 

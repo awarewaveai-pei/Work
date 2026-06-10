@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-10 10:53:06
+- Generated: 2026-06-10 17:40:24
 - agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -264,11 +264,56 @@
 ## Yesterday context
 最後 WORKLOG 條目為塔羅牌工具相關修復：FLUX prompt 根因修正（否定句 backfire、風格未吃、中文詞典）、預覽圖放大（200→300）、buildCardPrompt 重構，critic Deep 驗收 pass（0c/0M/1m，Minor 已修）。
 
+
+### verify-recent --ack (2026-06-10T08:17:02.9247701Z)
+
+**Reason**: release-wp-bridge.sh real-tested via --dry-run (EXIT=1: version parse + header/define match + php -l gate + duplicate-release guard all exercised live); bash -n clean; pure git/gh glue, PHP already critic-reviewed
+
+**Acknowledged unverified files** (count=1):
+
+- `c:\Users\USER\Work\scripts\release-wp-bridge.sh`
+
+
+### verify-recent --ack (2026-06-10T08:19:52.8054718Z)
+
+**Reason**: tarot legacy-lexicon removal + catalog wiring: machine-verified (tsc clean except preexisting jszip; node: 103 presets, 達文西 button -> 1506ch rich EN from tarotStyles, unknown passthrough, 78x3 sweep clean, 0 localizeStyle residual); critic Deep PASS earlier this session on catalog wiring (0c/0M); delta since critic is pure deletion + passthrough fallback; user requested immediate deploy
+
+**Acknowledged unverified files** (count=2):
+
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\cards.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+
+
+### verify-recent --ack (2026-06-10T08:45:07.6895051Z)
+
+**Reason**: tarot style-length cap: buildCardPrompt trims style lead to 1200ch at a clean comma/period boundary so the tarot scene always fits the model window (fixes scene-loss on stacked styles). node-verified scene survives single/2-stack/3-stack/DaVinci/empty (6 cases), tsc clean; tiny pure-string slice logic; time-critical
+
+**Acknowledged unverified files** (count=1):
+
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\cards.ts`
+
+
+### verify-recent --ack (2026-06-10T08:56:49.1219136Z)
+
+**Reason**: tarot editable English box: buildCardPrompt gains styleResolved (verbatim English lead, still capped, bypasses comma-split); TarotStudio English preview now an editable textarea (styleEnglish/styleEnglishEdited state + reset button), call sites pass styleResolved=effectiveEnglish. node-verified: verbatim send + commas preserved + scene survives + override wins + empty falls back to catalog + long capped + no {hero}; tsc clean; time-critical
+
+**Acknowledged unverified files** (count=2):
+
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\cards.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+
+
+## Done (wp-bridge session, 上次 AO-RESUME → AO-CLOSE)
+- wp-bridge v0.7.0 `/product` 端點（ProductCreator simple product，atomic+verify+rollback）；critic 2H+1M 修；commit 194df13d。
+- 發版工具化 scripts/release-wp-bridge.sh + /wp-bridge-release + runbook + AGENTS 自觸發（兩 repo 坑：發佈正本=aware-wave-wp-bridge 非 Work）；commit 154e1c88；release v0.7.0 已上專屬 repo + 操作者裝真站。
+- soulful 真站 SSH+wp-cli 建 post 7065(draft) + product 7066(draft,simple,price=45,cat=Workshops)，read-back 驗證 OK。
+- 下次：客製化 T-shirt = variable product（ProductCreator 需擴 WC_Product_Variable），已 lift TASKS。
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-09 11:56:14`
+- Time: `2026-06-10 17:40:20`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -278,15 +323,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260609-115607.md`
-- Closeout: `reports/closeout/closeout-20260609-115613.md`
+- Health: `reports/health/health-20260610-174014.md`
+- Closeout: `reports/closeout/closeout-20260610-174020.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-**[②③ R0 讀碼發現 — 不實作的理由]** packet §7 前任假設「呼叫 orchestrate-tenant-provisioning（已有 create-wp-site + apply-manifest）」與 code 不符：
-- `orchestrate-tenant-provisioning.ts`（讀畢）只 `runProviderStep` fan-out 佈建整合服務 + 寫 webhook，**不建 org/site、不觸發 create-wp-site**。
 - `create-wp-site.ts:89-112` payload 要 4 個已存在 UUID（organizationId/workspaceId/projectId/siteId）+ siteName + manifestSlug，website_spec 沒有。
 - **已存在建站 pipeline**：`/build` console（`app/build/` + `app/api/build/{provision-services,runs}` + `lib/build-console/contracts.ts`）→ `dispatch-action-run`（`ops.profile-b.create-wp-site → create-wp-site`）→ create-wp-site；org/site 走 `app/api/ops/organizations`、`ops/clients`。
 - **決定（技術負責人）**：②③ 若硬寫一條 route 自建 org/site + 觸發 create-wp-site = 平行重造既有 /build pipeline，違反 R0「不得建立重複邏輯」；照 orchestrate 接又不會真建站（誤導）。正解是把 intake→spec 餵進**既有 /build/dispatch pipeline**，需一次設計 pass（讀 build-console/contracts + dispatch 資料模型）。本 session 不猜不重造，改為**把真實架構固化進 packet + TASKS**，下次照正確前提設計。
@@ -342,6 +385,8 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=Replicate flux-dev + flux-schnell 直打「Van Gogh oil painting...」prompt | exit=0 HTTP=201 succeeded | flux-dev 輸出實看=標準梵谷厚塗/漩渦黃日/鈷藍山（證明模型+prompt 完全吃風格）；根因=外框縮圖不重生成，使用者看舊圖誤判
 - BUGHUNT_WAIVED: NA -- TarotStudio previewStale 衍生旗標 + 警示橫幅 純 UI state，無資料/跨檔邏輯；tsc 通過
+
+
 
 
 

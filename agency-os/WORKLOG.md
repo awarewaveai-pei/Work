@@ -5,7 +5,21 @@
 ## 2026-06-10
 
 ### Daily
-- (TBD)
+- wp-bridge v0.7.0 `/product` 端點（Woo simple product）建好、critic 審過（2H+1M 修）、release 到專屬 repo、操作者裝上真站；soulful 真站建 post 7065 + product 7066（皆 draft）端到端驗證。
+- 發版工具化：`scripts/release-wp-bridge.sh` + `/wp-bridge-release` + runbook + AGENTS 自觸發（根因＝兩 repo，只 push Work ≠ 發版）。
+- AUTO_TASK_DONE_APPLIED (2026-06-10T09:33:36Z): wp-bridge 續做 operation：featured image
+- 待辦延伸：客製化 T-shirt = variable product（attributes 色×尺寸 + variations），ProductCreator 目前只做 simple → 下次開 ProductCreator variable 支援（已 lift 到 TASKS）。
+
+### wp-bridge 發版工具化：scripts/release-wp-bridge.sh + /wp-bridge-release + runbook + AGENTS 自觸發
+
+根因：wp-bridge 有兩個 GitHub repo（`Work` 開發副本 / `aware-wave-wp-bridge` 發佈正本，push tag `v*` → Action 出 zip），只 push Work ≠ 發版，本 session 第一次發 v0.7.0 繞錯路。操作者要求「全自動」。
+**[已修改]** `scripts/release-wp-bridge.sh`（同步 Work→正本 + 版本兩處一致檢查 + php -l + 防重複發版守門 + tag + 輪詢驗證 Release/zip）；`.claude/commands/wp-bridge-release.md`；`runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md`；`agency-os/AGENTS.md` 自觸發表加一列（改 wp-bridge code+bump 版本+過 R0 → 自動跑發版腳本）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/release-wp-bridge.sh --dry-run` + `bash -n` | exit=1（防重複守門正確擋下 v0.7.0 已存在）| ms=~2000 —— 版本解析 0.7.0、header/define 一致檢查、php -l gate 全綠、duplicate-release guard 觸發；syntax clean
+- REVIEW_WAIVED: NA -- 純 git/gh 編排 glue（無新業務邏輯）；PHP 端點已由 critic Deep 審過；release-wp-bridge.sh 經 dry-run 實測 + verify-recent --ack（記於 daily memory 2026-06-10）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`release-wp-bridge`\|`wp-bridge-release`\|`AWBRIDGE_VERSION` | hits=0 stale —— 新腳本/指令/runbook 自洽，AGENTS 自觸發列引用路徑經 Glob 確認存在
+**[剩餘風險]** 腳本假設 Work 副本 v0.6.0 base 與正本一致（本次 diff 證實只含商品新增）；未來若兩 repo 結構漂移需先對齊。
+**[rollback]** 刪 `scripts/release-wp-bridge.sh` / `.claude/commands/wp-bridge-release.md` / runbook + revert AGENTS 該列；commit `154e1c88`。
 
 ### Tarot 風格系統重寫：103 條 doc 風格目錄（中文標籤在框、完整英文送模型）+ 刪除 legacy 短 lexicon
 
@@ -7859,7 +7873,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-10 02:52:56 UTC_
+_Last synced: 2026-06-10 09:37:58 UTC_
 
 ## 2026-03-20
 
@@ -8812,6 +8826,8 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=Replicate flux-dev + flux-schnell 直打「Van Gogh oil painting...」prompt | exit=0 HTTP=201 succeeded | flux-dev 輸出實看=標準梵谷厚塗/漩渦黃日/鈷藍山（證明模型+prompt 完全吃風格）；根因=外框縮圖不重生成，使用者看舊圖誤判
 - BUGHUNT_WAIVED: NA -- TarotStudio previewStale 衍生旗標 + 警示橫幅 純 UI state，無資料/跨檔邏輯；tsc 通過
+
+
 
 
 

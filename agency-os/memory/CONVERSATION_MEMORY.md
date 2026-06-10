@@ -482,6 +482,13 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - tsc：我改的兩檔 0 新錯誤（剩 jszip/@supabase/ssr 為本機缺 node_modules 既存）。canvas 像素需瀏覽器，待 staging 確認。**未部署**。
 - `public/tarot-frames/*.png` + middleware 白名單現未使用，保留不刪。rollback = git revert 即還原。
 
+## 2026-06-10 — wp-bridge v0.7.0 商品端點 + 發版工具化 + soulful 真站發文/建商品
+- **新增 `/product` 端點**（v0.7.0）：`ProductCreator`（`WC_Product_Simple` atomic create + read-back verify + 失敗 `delete(true)`，鏡像 PostCreator），`POST /product` route。critic Deep 審：2 High（wp_slash 防 block-markup 損毀 / price 拒科學記號+wc_format_decimal 正規化）+ 1 Medium（category 全有或全無）全修。commit `194df13d`。
+- **兩 repo 坑（重要記憶）**：外掛發佈正本 = `awarewaveai-pei/aware-wave-wp-bridge`（push tag `v*` → Action 出 zip + Release），**不是 Work**。只 push Work ≠ 發版。第一次發 v0.7.0 繞錯路。→ 工具化 `scripts/release-wp-bridge.sh` + `/wp-bridge-release` + `runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md` + AGENTS 自觸發列（改 wp-bridge code+bump 版本+過 R0 → 自動發版）。commit `154e1c88`。操作者要求「全自動」。
+- **soulful 真站產出**：SSH+wp-cli 直呼 Creator（同 post 7053 路徑），建 **post 7065**（draft 文章）+ **product 7066**（draft，simple，price=45，cat=Workshops）。read-back 全正確。皆 draft 不公開，待操作者後台定稿發佈。
+- **下一步待辦（已 lift TASKS）**：客製化 T-shirt = WooCommerce **variable product**（顏色 白/黑 × 尺寸 3L/2L/XL/L/M/S/XS + variations + 客製圖案），`ProductCreator` 目前只做 simple，需擴 `WC_Product_Variable`。
+- 平行 session 同時做 tarot 103-style catalog（非本 session）。
+
 ## Related Documents (Auto-Synced)
 - `.cursor/rules/00-session-bootstrap.mdc`
 - `.cursor/rules/10-memory-maintenance.mdc`
@@ -490,5 +497,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-09 10:19:43 UTC_
+_Last synced: 2026-06-10 09:33:24 UTC_
 
