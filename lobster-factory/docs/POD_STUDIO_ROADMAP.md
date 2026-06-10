@@ -256,6 +256,36 @@ Active 6 / Reserve 1 / Deprecated 3 / Total 10。表欄：Name｜Developer｜Sta
 ## B9-A. Analytics（Generator 勝率追蹤 — 驅動「該留哪些模型」）
 「Win Rates：每個 generator 的圖被選為成品的頻率（最少 5 次出場才顯示率）」。表欄：Generator｜Appearances｜Wins｜Win Rate。另有 Recent Selections（generator｜product｜ratio｜date）。截圖數據：Nano Banana 2 6 出場 2 勝 33.3%、Flux 2 Pro 6/1/16.7%、Seedream 5 Lite/MAI/Ideogram 4/GPT-Image 2 (kie)/GPT-Image 2 皆 0 勝。→ 用途：每 ~90 天汰換生成器（B7 registry）時用真實勝率決定 active/deprecated。**自建對應**：記 `generation_runs`（model, product, ratio, selected_bool, ts）即可算同樣勝率。
 
+## B-Specs. Product Specs（每商品印刷規格 — ★ 生印刷檔的命脈，截圖確認 2026-06-11）
+
+> 範例：**Bella + Canvas 3001**（Printful **ID 71**，DTG，全球第一暢銷 POD 商品）。每個商品有自己一張這種規格表；建印刷檔/mockup 都吃它。
+
+**商品基本**
+- 技術 DTG（Direct-to-Garment）｜批發成本 11.25–19.69｜建議零售 24.99(base) / 26.99(2XL+)
+- 材質：100% 精梳環紡棉（**Heather 色含聚酯**）｜4.2 oz/yd²｜預縮｜側縫｜肩對肩貼條｜產地 NI/MX/HN/US
+- 尺寸：XS S M L XL 2XL 3XL 4XL 5XL
+- **顏色：全產品 84 色**（White/Black/Navy/Dark Grey/Ash/Athletic Heather/Army/Asphalt/Forest/Maroon/Military Green/Red/Royal…+70 含 Heather）。**操作者本案先做：黑 + 白**。
+
+**印刷規格（★ 真實值，以此生印刷檔 — 注意是 150 DPI，非我先前研究說的 300）**
+
+| 位置 | 尺寸 (px) | DPI | Fill |
+|------|-----------|-----|------|
+| Front（standard） | **1800 × 2400** | 150 | fit |
+| Front（large） | 2250 × 2700 | 150 | fit |
+| Back | 1800 × 2400 | 150 | fit |
+| Sleeve（左/右） | 450 × 450 | 150 | fit |
+| Label（內/外） | 600 × 525 | 150 | fit |
+
+**MEGA Config**：aspect ratio **2:3**、**sticker mode**（=去背）、**front placement only**（預設只印正面）。
+
+**賣家備註（直接影響文案/選色）**
+- 全球第一暢銷 POD；84 色 = niche targeting 最大彈性。
+- Heather 色含聚酯，手感略不同。
+- **淺色（白/淺）布料微透** → 賣白/淺色變體時文案要註明。
+- Plus 尺寸（2XL+）批發貴 $2–3，定價要反映（呼應 B5 base/plus 兩欄）。
+
+**自建對應**：`product_specs(printful_id, brand, model, technique, wholesale_min/max, retail_base/plus, placements jsonb[{name,w,h,dpi,fill}], colors[], sizes[])`。生印刷檔時取對應 placement 的 w×h 當輸出畫布；mockup 生成取 aspect 2:3 + front。**修正先前研究**：實際 Printful DTG 印刷檔走 **150 DPI**（1800×2400 正面），非 300 DPI/4500×5400（那是另一套 15×18" 新標準，此商品未用）。
+
 ## B10. My Designs
 「每張處理過的設計都存這，可換商品重用不必重生」。Filter Status/Type/Search。每張：縮圖、prompt·狀態(processed)·fullbleed·生成器、Reuse/Open/Delete。
 
