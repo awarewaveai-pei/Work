@@ -4,6 +4,17 @@
 
 ## 2026-06-10
 
+### Tarot Studio flux 呼叫補品質參數 + flux-dev guidance（解「人物不套風格」+ 量化降質）
+
+**[已修改]** `lobster-factory/.../lib/tarot/image-gen.ts`：操作者比對 Replicate playground 發現 app 的 flux 呼叫只送 5 欄、其餘吃 Replicate 預設（schnell 預設 `go_fast=true` = fp8 量化降質 + seed 不可重現）。補上：
+- `go_fast: false`（跑 bf16 原生權重，畫質升級 + seed 真可重現 — 賣牌必須）
+- `output_quality: 100` + `megapixels: "1"`（明確設滿，不吃預設）
+- `guidance: 5`（**僅 flux-dev**，`config.fluxModel === "black-forest-labs/flux-dev"` 條件；flux-schnell 蒸餾時移除 guidance embedding，送了無效甚至 422，故跳過 — web 查證 + critic 驗）
+診斷脈絡：同一段 prompt → gpt-image-1 畫出立體派人物、FLUX 畫寫實人物 → 證明非 prompt/JSON 問題，是 FLUX 人物先驗強；guidance 拉到 5 是 FLUX 端能做的最強 prompt 服從度（官方建議上限，>5 燒圖）；真要人物風格化仍建議 gpt-image-1。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`(next-admin) | exit=0 | ms=~28000（真實 Replicate 渲染需 server token，屬操作者部署後生圖驗證）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（model 字串守衛 byte-for-byte 對、schnell 不收 guidance、megapixels:"1" 字串型別正確、go_fast=false 在 58s timeout 內、img2img 區塊無 key 衝突）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`FLUX_DEV_GUIDANCE|generateTarotImage|go_fast` | hits=0 功能性（FLUX_DEV_GUIDANCE 只在 image-gen.ts 定義+使用；唯一 code 呼叫者 route.ts 簽名未變；agency-os/scripts 命中皆 docs/backups/reports 非 call-site）
+
 ### wp-bridge v0.9.0 — WooCommerce 完整欄位集 + Kadence 積木商品描述（可變商品全欄位 T-shirt 真站驗）
 
 **[已修改]**
