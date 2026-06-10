@@ -97,7 +97,13 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
     prompt: params.prompt,
     aspect_ratio: "2:3",
     output_format: "png",
+    output_quality: 100, // max quality (Replicate ignores this for png, but correct if format changes)
     num_outputs: 1,
+    megapixels: "1",     // render at full 1 megapixel
+    // go_fast=true (the Replicate default) runs an fp8-quantized model: faster + cheaper but LOWER
+    // fidelity, and NON-deterministic even with a fixed seed. For a sellable, reproducible deck we
+    // force the original bf16 weights. Both flux-schnell and flux-dev accept this input.
+    go_fast: false,
     seed,
   };
   // flux-dev follows the prompt more closely at higher guidance — this pushes the chosen painting
