@@ -8,9 +8,10 @@
 
 ## [任務理解]（根本問題，非表面症狀）
 
-操作者要的不是「一個塔羅工具」，而是**一條可長期營運的 print-on-demand 賣貨流水線**：
-`想點子 → 生成設計圖（文字/以圖）→ 去背 → 合成商品 mockup → 印刷出貨 → 上架 WooCommerce 賣`。
-塔羅工具是這條線的**第一格（Generate）**且只做一種商品；真正目標是把它**一般化成多商品流水線**並接上**印刷（Printful）+ 店面（WooCommerce）**。
+操作者要的不是「一個塔羅工具」，而是**一條可長期營運、全自動的 print-on-demand 賣貨流水線**：
+`想點子 → 生成設計圖（文字/以圖）→ 去背 → AI 合成 mockup → 在 Printful 建商品 → 上架 WooCommerce → 客人下單 → 自動轉 Printful 印刷出貨 → 物流回寫`。
+**全閉環關鍵（操作者 2026-06-11 點名）**：不只「建商品上架」，而是**有人下單後自動送 Printful 履約、印刷出貨、回寫追蹤**，全程無人手（見 §實作計畫 P4）。
+塔羅工具是這條線的**第一格（Generate）**且只做一種商品；真正目標是把它**一般化成多商品流水線**並接上**印刷+履約（Printful）+ 店面（WooCommerce）**。
 
 **核心約束**：最小、穩定、安全、可驗證、可回滾、可擴充刪減、30 年可跑；**重用既有控制面（`ai_image_jobs`/`media_assets`/R2 合約/build-console），不重造、不破壞 next-admin/tarot 既有功能。**
 
@@ -111,6 +112,21 @@ tarot (已有) ──┐
 - 金鑰 `WOO_STORE_URL/WOO_CK/WOO_CS`（操作者店的 consumer key/secret，最小權限）。
 - **High-risk（對 production 店建商品）**：draft 商品先，操作者 review 才 publish。
 - **驗證**：REALTEST 對 staging 或 draft 建一個測試商品 → 店後台可見。**rollback**：刪 draft。
+
+### P4 — 訂單自動履約（Woo 下單 → Printful 出貨 → 物流回寫）★ 整個生意的閉環，操作者 2026-06-11 點名
+> 前面 P2d/P3 只「建商品+上架」。真正賺錢的是**這段**：客人下單後自動印刷出貨，全程不用人手。
+
+**流程**：客人在 `shop.soulfulexpression.org` 下單 → 訂單自動送 Printful → Printful 收費印刷出貨 → 回寫追蹤碼到 Woo 訂單 + 通知客人。
+
+**兩條實作路線（決策）**：
+- **A（推薦，最小重工）= 用 Printful 官方 WooCommerce 整合做履約**。把店用 Printful plugin 連上 → P2d 建的是 Printful **sync product**（綁定 Woo 變體）→ Printful **自動匯入 Woo 訂單、自動扣款印刷出貨、自動回寫 tracking**。**免費（只付每筆履約成本）、久經考驗、含退款/缺貨處理**。我們**不重寫履約管線**。
+- **B（自建，更多控制）= 自己接 Printful Order API**：Woo webhook `order.created` → 我們的 endpoint → `POST /orders`（Woo line items 對應 Printful sync variant）→ 確認 → tracking webhook 回寫 Woo。控制力高但要自己處理付款授權/缺貨/退款/idempotency/對帳。
+
+**建議分工**：**設計+建商品（AI 加值）自建；履約（下單→印刷→出貨）用 Printful 原生**。即 P2d 把商品建成「綁 Woo 的 Printful sync product」，履約交給 Printful plugin（路線 A）。要更強掌控再評估 B。
+- **金鑰**：履約走 Printful plugin → 用操作者 Printful 帳號連店即可；走 B 才需 `POST /orders` 權限。
+- **High-risk（真金流+外部下單）**：先用 Printful **draft/manual-approve 訂單模式**跑通，確認對帳正確再開全自動。
+- **驗證**：REALTEST 下一筆測試單 → 確認 Printful 收到 draft 訂單 + 金額/變體/印刷檔正確。**rollback**：取消 draft 訂單（未進印刷前可取消）。
+- **冪等**：同一 Woo 訂單只能送 Printful 一次（存 `woo_order_id → printful_order_id` 對應，重送先查）。
 
 ---
 
