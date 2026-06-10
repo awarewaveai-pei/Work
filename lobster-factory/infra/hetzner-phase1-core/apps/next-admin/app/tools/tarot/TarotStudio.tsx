@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
-import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, type TarotCard } from "./cards";
+import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, localizeStyle, type TarotCard } from "./cards";
 
 type GroupKey = "all" | "major" | "wands" | "cups" | "swords" | "pentacles";
 const GROUPS: { key: GroupKey; label: string }[] = [
@@ -502,34 +502,48 @@ export default function TarotStudio() {
               <div key={g} style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, opacity: 0.8 }}>{g}</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {STYLE_PRESETS.filter((p) => p.group === g).map((p) => (
+                  {STYLE_PRESETS.filter((p) => p.group === g).map((p) => {
+                    const applied = localizeStyle(p.zh); // the FULL English actually inserted + sent
+                    const selected = stylePrompt.includes(applied);
+                    return (
                     <button
                       key={p.zh}
                       type="button"
                       disabled={locked}
                       onClick={() =>
-                        // Insert the zh key — buildCardPrompt's localizeStyle expands it to the
-                        // full rich style description at generation time (single source of truth).
+                        // Toggle the FULL English description in/out of the style box, so the box
+                        // shows EXACTLY what is sent to the model (WYSIWYG — user can verify it applied).
                         setStylePrompt((prev) => {
+                          if (prev.includes(applied)) {
+                            return prev
+                              .split(applied)
+                              .join("")
+                              .replace(/\s*,\s*,\s*/g, ", ")
+                              .replace(/^\s*,\s*|\s*,\s*$/g, "")
+                              .trim();
+                          }
                           const t = prev.trim().replace(/,\s*$/, "");
-                          return t ? `${t}, ${p.zh}` : p.zh;
+                          return t ? `${t}, ${applied}` : applied;
                         })
                       }
-                      title={`插入「${p.zh}」（${p.en}）`}
+                      title={selected ? `移除「${p.en}」` : `加入：${applied}`}
                       style={{
                         padding: "4px 10px",
                         borderRadius: 14,
                         fontSize: 12,
                         cursor: locked ? "default" : "pointer",
-                        border: "1px solid var(--card-border)",
-                        background: "rgba(127,127,127,0.08)",
-                        color: "var(--text-muted)",
+                        border: `1px solid ${selected ? "#6366f1" : "var(--card-border)"}`,
+                        background: selected ? "#6366f1" : "rgba(127,127,127,0.08)",
+                        color: selected ? "#fff" : "var(--text-muted)",
+                        fontWeight: selected ? 600 : 400,
                         opacity: locked ? 0.5 : 1,
                       }}
                     >
-                      {p.zh} <span style={{ opacity: 0.55 }}>{p.en}</span>
+                      {selected ? "✓ " : ""}
+                      {p.zh} <span style={{ opacity: selected ? 0.85 : 0.55 }}>{p.en}</span>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -542,7 +556,7 @@ export default function TarotStudio() {
             disabled={locked}
           />
           <div className="form-hint">
-            這段風格套用到整套 78 張牌。<b>點上方按鈕最準</b>——會自動帶入該畫家／風格的完整視覺特徵（色調、筆觸、光影），不只是名字。也可自行輸入；中文會自動轉英。風格不夠強時改用 FLUX dev 模型。
+            <b>下面框裡的文字＝實際送進模型的風格 prompt</b>。點上方按鈕會把該畫家／風格的<b>完整視覺特徵</b>（色調、筆觸、光影）填進框裡，再點一次移除（按鈕打勾＝已選）。也可自行編輯／加字。整段套用到 78 張牌；風格不夠強時改用 FLUX dev 模型。
           </div>
         </div>
 
