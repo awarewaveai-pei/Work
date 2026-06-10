@@ -138,9 +138,10 @@ export default function TarotStudio() {
   const doneCount = batch.filter((b) => b.status === "done").length;
   const maxRefs = modelOption(model).maxRefs;
 
-  // True when the user changed style/model after generating the current preview but hasn't
-  // regenerated — the frame thumbnails still show the OLD image, which reads as "style ignored".
-  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${model}::${stylePrompt.trim()}`;
+  // True when the user changed style, model, OR reference images after generating the current
+  // preview but hasn't regenerated — the frame thumbnails still show the OLD image.
+  // referenceImages.length is included because adding/removing refs changes the batch anchor.
+  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${model}::${stylePrompt.trim()}::refs=${referenceImages.length}`;
 
   // The deck's style anchor: explicit uploads (capped to the model's limit), else the locked preview.
   // maxRefs === 0 (e.g. FLUX schnell) → no image is sent; style relies on prompt + seed.
@@ -152,6 +153,11 @@ export default function TarotStudio() {
         : previewImage
           ? [previewImage]
           : [];
+
+  // Track current template-thumb blob URLs so we can revoke them without touching
+  // state — keeping the revocation outside state updaters avoids React 18 Strict Mode
+  // double-invoke blanking the thumbnails in development.
+  const thumbUrlsRef = useRef<string[]>([]);
 
   // Revoke all card object URLs on unmount to avoid leaking blobs (78 + retries).
   const batchRef = useRef<BatchItem[]>([]);
@@ -167,30 +173,39 @@ export default function TarotStudio() {
 
   // Render a small preview of every template (using the user's art if available) so the
   // chooser shows the actual frame style, not just text.
+  // Three renders run in parallel (Promise.all) — ~3× faster than sequential await.
   useEffect(() => {
     let cancelled = false;
-    const made: string[] = [];
     (async () => {
       const sample = previewImage ?? PLACEHOLDER_ART;
-      const next: Record<string, string> = {};
-      for (const t of CARD_TEMPLATES) {
-        try {
-          const blob = await renderPrintCard(PREVIEW_CARD, sample, t.key);
-          const url = URL.createObjectURL(blob);
-          made.push(url);
-          next[t.key] = url;
-        } catch {
-          /* ignore a single template render failure */
-        }
-      }
+      const results = await Promise.all(
+        CARD_TEMPLATES.map(async (t) => {
+          try {
+            const blob = await renderPrintCard(PREVIEW_CARD, sample, t.key);
+            return { key: t.key, url: URL.createObjectURL(blob) };
+          } catch {
+            return null;
+          }
+        }),
+      );
       if (cancelled) {
-        made.forEach((u) => URL.revokeObjectURL(u));
+        results.forEach((r) => r && URL.revokeObjectURL(r.url));
         return;
       }
-      setTemplateThumbs((prev) => {
-        Object.values(prev).forEach((u) => URL.revokeObjectURL(u));
-        return next;
-      });
+      const next: Record<string, string> = {};
+      const newUrls: string[] = [];
+      for (const r of results) {
+        if (r) {
+          next[r.key] = r.url;
+          newUrls.push(r.url);
+        }
+      }
+      // Revoke old URLs BEFORE calling setState — outside any updater function so
+      // React 18 Strict Mode's double-invoke of state updaters cannot re-revoke the
+      // freshly-created URLs (which would blank the thumbnails in development).
+      thumbUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      thumbUrlsRef.current = newUrls;
+      setTemplateThumbs(next);
     })();
     return () => {
       cancelled = true;
@@ -240,9 +255,9 @@ export default function TarotStudio() {
       }
       setPreviewImage(resp.image);
       setPreviewSeed(resp.seed ?? null);
-      // remember what produced this preview so we can warn if the user later edits style/model
-      // without regenerating (the frame thumbnails reuse this image and would look "unchanged").
-      setPreviewSig(`${model}::${stylePrompt.trim()}`);
+      // snapshot what produced this preview (model + style + ref count) so previewStale fires
+      // when any of those inputs change before the user regenerates.
+      setPreviewSig(`${model}::${stylePrompt.trim()}::refs=${referenceImages.length}`);
     } catch (e) {
       setMessage(`預覽生成失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -473,7 +488,7 @@ export default function TarotStudio() {
                 disabled={locked}
                 onClick={() =>
                   setStylePrompt((prev) => {
-                    const t = prev.trim();
+                    const t = prev.trim().replace(/,\s*$/, "");
                     return t ? `${t}, ${p.en}` : p.en;
                   })
                 }

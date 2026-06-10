@@ -178,6 +178,10 @@ const STYLE_LEXICON: Record<string, string> = {
   風格: " style",
 };
 
+// Precompute once — STYLE_LEXICON never changes at runtime; re-sorting on every
+// localizeStyle call (78× during batch generation) was wasted O(k log k) work.
+const SORTED_STYLE_KEYS = Object.keys(STYLE_LEXICON).sort((a, b) => b.length - a.length);
+
 /**
  * Replace known Chinese art-style terms with English. Longest keys first so
  * compounds win (e.g. "梵谷畫風" → Van Gogh… , not "梵谷" + leftover "畫風").
@@ -185,7 +189,7 @@ const STYLE_LEXICON: Record<string, string> = {
  */
 export function localizeStyle(input: string): string {
   let out = input;
-  for (const key of Object.keys(STYLE_LEXICON).sort((a, b) => b.length - a.length)) {
+  for (const key of SORTED_STYLE_KEYS) {
     // Pad with spaces so adjacently-typed CJK terms (e.g. "哥德暗黑") don't fuse into
     // "gothicdark moody"; the trailing whitespace-collapse cleans up the doubles.
     if (out.includes(key)) out = out.split(key).join(` ${STYLE_LEXICON[key]} `);
@@ -225,6 +229,7 @@ export function buildCardPrompt(stylePrompt: string, card: TarotCard): string {
   if (!style) {
     return `Ornate colored-pencil fantasy illustration, Rider-Waite inspired, warm antique palette. ${card.subjectPrompt}. Single vertical full-bleed scene, rich symbolic detail.`;
   }
-  // Style first and last (early + late reinforcement); plain scene description in between.
-  return `${style}. ${card.subjectPrompt} — the entire scene painted in ${style}; if the style names an animal or creature, the main figure is that creature instead of a person. Single vertical full-bleed scene, rich symbolic detail, cohesive ${style}.`;
+  // Style first and last (early + late reinforcement); scene in between.
+  // Middle repetition removed — some FLUX variants penalise exact-repeat tokens.
+  return `${style}. ${card.subjectPrompt} — if the style names an animal or creature, the main figure is that creature instead of a person. Single vertical full-bleed scene, rich symbolic detail, cohesive ${style}.`;
 }
