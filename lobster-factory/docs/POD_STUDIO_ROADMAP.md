@@ -198,6 +198,7 @@ App / Settings / Analytics / Generators / Research / Mockup Explorer / My Design
 - Test All Connections。
 
 ## B5. Settings → Pricing Defaults（每商品零售價，持久 + 預填）
+> 結構（截圖確認 2026-06-11）：每商品兩欄 **base / plus_sizes**（如 T-shirt base 24.99 / plus 26.99），「跨 session 持久，每次建商品自動預填，隨時可改」。Youth T-shirt 等單一尺寸只有一欄。**自建對應**：`pricing_defaults(product_type, base_price, plus_size_price)` 表，建商品時預填到 ProductSpec。
 - **Apparel**：T-shirt 24.99/26.99(plus)、Hoodie 49.99/54.99、Crew Neck Sweatshirt 32.99/34.99、Youth T-shirt 21.99、Sweatshirt 56.99/58.99、Hawaiian Shirt 49.99/51.99、Bodycon Dress 44.99、Swimsuit 49.99/51.99、Yoga Leggings 54.99、Baby Bodysuit 24.99。
 - **Headwear**：Beanie 29.99、Cuffed Beanie 29.99、Classic Snapback 34.99、Classic Dad Hat 32.99。
 - **Bags & Accessories**：Tote Bag 29.99、Fanny Pack 39.99、Backpack 58.99、iPhone Case 29.99、Samsung Case 29.99。
@@ -206,8 +207,10 @@ App / Settings / Analytics / Generators / Research / Mockup Explorer / My Design
 - **Stationery**：Sticker 3x3/4x4/5.5x5.5 3.99/4.99/5.99、Bumper Sticker 10.99。
 
 ## B6. Settings → Users / Usage
-- 多用戶（admin + beta testers），跨 MEGA + Mockup Studio 共用。
+- **多租戶 SaaS**（截圖確認 2026-06-11）：「Manage users across MEGA + Mockup Studio. Both apps read from the **same DB** — changes apply to both.」→ MEGA 與 Mockup Studio 共用同一用戶/DB。
+- 角色：`admin`（Jon）+ 多個 `beta` 角色（外部商家租戶，各綁自己的店）。Add user / 逐用戶展開設定。**（個別 email/店名屬他方私資料，不入庫；只記結構）**
 - 用量：每用戶 30 天視窗 **Products X/50、Generations X/250**，到期重置（配額控制）。
+- **自建對應**：`users(role admin|beta)` + `usage_windows(user_id, products_used, generations_used, window_start)`；MEGA 段與 Mockup Studio 段共用同一 Supabase（呼應我們「單一棧」原則）。
 
 ## B7. Generators（Generator Registry，每 ~90 天更新）
 Active 6 / Reserve 1 / Deprecated 3 / Total 10。表欄：Name｜Developer｜Status｜Ratios｜Input Images｜Max Res｜Transparent BG｜Speed：
