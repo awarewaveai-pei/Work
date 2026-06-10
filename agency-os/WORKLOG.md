@@ -8857,3 +8857,4 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): release-wp-bridge.sh path variables only
