@@ -250,14 +250,28 @@ Active 6 / Reserve 1 / Deprecated 3 / Total 10。表欄：Name｜Developer｜Sta
 
 > 獨立 companion app（`mockups.mega.management`），**與主流程的 Printful mockup（B9 Explorer）並行的第二條路**。差別：Explorer = Printful 預拍固定範本；**Studio = 用 AI 直接生一張擬真商品照**，把設計印在衫上 + 自帶場景/道具/模特兒。這條路比 Printful 靈活（自訂場景/道具/模特族裔），也是我們自建要走的路。截圖來源：操作者 2026-06-11。
 
-**輸入控制（截圖逐欄）**
+**Mockup Studio 有兩種輸出模式，控制欄不同（截圖逐欄，操作者 2026-06-11）**
+
+**共用控制**
 - **Product Type**：T-shirt / Hoodie / Sweatshirt / Tank Top / Youth Tee（單選）
-- **Color**：下拉（如 White `#f4f5f0`），顯示「N colors available for this product」
-- **Background Surface**：自由文字場景面（如 `light wooden table`）→ 平拍背景
-- **Style**：`Male (relaxed)` / `Female (scrunched)` → 模特性別 / 衫的擺放姿態
+- **Color**：下拉（如 White `#f4f5f0`），顯示「N colors available」（本案只用白/黑）
+- Clear inputs / Logout
+
+**模式 A — 平拍（flat-lay，衫平鋪桌面）**
+- **Background Surface**：自由文字場景面（如 `light wooden table`）
+- **Style**：`Male (relaxed)` / `Female (scrunched)` → 衫的擺放姿態
 - **Lighting**：`Soft top-down` / `Strong side-angle`
 - **Niche Props（3 角落道具）**：Bottom-Left（apparel prop，如珍奶）／Top-Right（niche prop 1，如台灣國旗）／Bottom-Right（niche prop 2，如福爾摩沙旅遊地圖）
-- Clear inputs / Logout
+
+**模式 B — 模特（model，真人穿著）★ 操作者口述的「生成模特兒」就是這組**
+- **Age Group**：`Adult` / `Youth`（單選）
+- **Model Description**：自由文字，描述模特族裔/膚色/性別/年齡/體型（如 `blonde Asian woman, 20s, slim`）
+- **Pose**：下拉 → `standing casually` / `walking` / `sitting` / `leaning against a wall` / `arms crossed confidently` / `giving a thumbs up` / `Other (custom)`
+- **Environment**：自由文字場景（如 `cafe interior with coffee cups`）
+- **Lighting**：下拉 → `Soft daylight` / `Editorial studio` / `Soft window light`
+- **Environmental Props（2 個）**：Top-Right（60% cropped，如 `bookshelves, computer desk`）／Bottom-Left（70% cropped，如 `leather chair, sports equipment`）
+
+> **自建對應（prompt 組裝）**：模式 B 把 Product+Color、Model Description、Pose、Environment、Lighting、2 道具組成一段結構化 prompt + 設計圖當 reference image → 餵 Nano Banana 2，生「某族裔模特兒以某姿勢、在某場景、某光線下，穿著印有此設計的衫」。模式 A 同理但無模特、改平拍 3 道具。兩模式共用同一生成後端，只是 prompt 模板不同。
 
 **模特版額外帶入（操作者口述，2026-06-11）**：合成「有模特兒」的商品圖時，prompt 額外帶入 → **產品（型號+色）、設計圖案、模特兒 種族膚色 / 性別 / 動作姿勢 / 場景**。即：不只平拍，可生「某族裔模特兒穿著印有此設計的衫、在某場景、某動作」的 lifestyle 照。
 
