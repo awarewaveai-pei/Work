@@ -270,7 +270,10 @@ final class RestController {
 			case 'attributes_required':
 			case 'variations_required':
 			case 'variation_price_required':
+			case 'variation_attribute_unknown':
 				return 400;
+			case 'duplicate_sku_in_request':
+				return 409;
 			case 'sku_exists':
 				return 409;
 			default: // verify_failed, save_failed, variation_save_failed

@@ -335,7 +335,16 @@ final class ProductCreator {
 			update_post_meta( $parentId, 'rank_math_title', sanitize_text_field( (string) $seo['title'] ) );
 		}
 
+		// Build the set of valid variation-enabled attribute slugs from the parent for key validation
+		$validVariationSlugs = array();
+		foreach ( $wooAttributes as $wooAttr ) {
+			if ( $wooAttr->get_variation() ) {
+				$validVariationSlugs[] = sanitize_title( $wooAttr->get_name() );
+			}
+		}
+
 		// Create variations
+		$seenSkus     = array();
 		$variationIds = array();
 		foreach ( $variationSpecs as $vSpec ) {
 			if ( ! is_array( $vSpec ) ) {
@@ -355,11 +364,16 @@ final class ProductCreator {
 				$vPrice = (string) wc_format_decimal( $vPrice );
 			}
 
-			// Normalize variation attribute keys to sanitize_title(name) — WC's local-attribute slug format
+			// Normalize variation attribute keys and validate against parent's variation-enabled slugs
 			$vAttrs = ( isset( $vSpec['attributes'] ) && is_array( $vSpec['attributes'] ) ) ? $vSpec['attributes'] : array();
 			$normalizedAttrs = array();
 			foreach ( $vAttrs as $attrName => $option ) {
-				$normalizedAttrs[ sanitize_title( strtolower( (string) $attrName ) ) ] = (string) $option;
+				$slug = sanitize_title( strtolower( (string) $attrName ) );
+				if ( $validVariationSlugs !== array() && ! in_array( $slug, $validVariationSlugs, true ) ) {
+					$this->rollbackProduct( $parentId );
+					return array( 'status' => 'rolled_back', 'reason' => 'variation_attribute_unknown', 'detail' => array( 'attribute' => (string) $attrName ) );
+				}
+				$normalizedAttrs[ $slug ] = (string) $option;
 			}
 
 			$variation = new \WC_Product_Variation();
@@ -370,6 +384,12 @@ final class ProductCreator {
 
 			$vSku = isset( $vSpec['sku'] ) ? trim( (string) $vSpec['sku'] ) : '';
 			if ( $vSku !== '' ) {
+				// Reject duplicates within this request before touching the DB
+				if ( isset( $seenSkus[ $vSku ] ) ) {
+					$this->rollbackProduct( $parentId );
+					return array( 'status' => 'rolled_back', 'reason' => 'duplicate_sku_in_request', 'detail' => array( 'sku' => $vSku ) );
+				}
+				$seenSkus[ $vSku ] = true;
 				if ( function_exists( 'wc_get_product_id_by_sku' ) && wc_get_product_id_by_sku( $vSku ) ) {
 					$this->rollbackProduct( $parentId );
 					return array( 'status' => 'rolled_back', 'reason' => 'sku_exists', 'detail' => array( 'sku' => $vSku ) );

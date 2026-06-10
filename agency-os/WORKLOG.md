@@ -4,6 +4,28 @@
 
 ## 2026-06-10
 
+### wp-bridge v0.8.0：variable product 支援（WooCommerce 變數商品，客製 T-shirt 實測）
+
+**[任務理解]** 操作者要求：用 AI 端到端實測，在真站建立一件「客製 T-shirt」變數商品（白/黑 × XS–3XL = 14 variations）。根本問題：`ProductCreator` v0.7.0 只支援 `WC_Product_Simple`，無法表達 variation。
+
+**[已修改]**
+- `lobster-factory/packages/wp-bridge-plugin/includes/Product/ProductCreator.php`：
+  - `create()` 開頭依 `type` 分派（`simple` 走原有路徑，`variable` 走新 `createVariable()`）
+  - 新增 `createVariable()`：`WC_Product_Variable` parent + `WC_Product_Attribute[]` + 逐 `WC_Product_Variation` atomic save → `WC_Product_Variable::sync($parentId)` → `verifyVariable()`（type=variable / name / status / children 數）→ 任一失敗 `rollbackProduct(true)` 整筆刪（WC cascade children）
+  - critic 修正（Major）：variation loop 前建 `$seenSkus` hash 偵測 payload 內 duplicate SKU → `duplicate_sku_in_request`；建 `$validVariationSlugs` 驗 variation 屬性 key → `variation_attribute_unknown`
+  - 新增 `verifyVariable()` / `rollbackProduct()` private helpers；`use MediaSideloader` 支援 `image_url` sideload
+- `includes/Http/RestController.php`：`productErrorStatus()` 補 `name_required / attributes_required / variations_required / variation_price_required / variation_attribute_unknown` → 400；`duplicate_sku_in_request` → 409；doc comment 更新
+- `aware-wave-wp-bridge.php`：version bump `0.7.0 → 0.8.0`（header + define 兩處）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH+wp-eval-file | cmd=`ProductCreator->create({type:variable, T-shirt White/Black × XS–3XL, 14 variations, price=45, sku=aw-tshirt-*})` | exit=0 | ms=~8000 — soulfulexpression.org 真站：`{status:committed, product_id:7068, variation_count:14}`；read-back `type=variable status=draft name=AwareWave Custom T-Shirt children=14 first=color:White,size:XS price=45 last=color:Black,size:3XL price=45` ✅；`/health → version=0.8.0 crypto_ready=True` ✅
+- REALTEST_WAIVED: NA -- rollback path 無法在真站直接觸發 mid-loop failure，但 orphan cascade 已由 critic 讀 WC_Product_Variable_Data_Store_CPT::delete_variations 源碼確認；BUGHUNT includes cross-file static analysis
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/2n/2s — 0 Critical；1 Major（duplicate SKU in-request）已修；2 Minor（attr key 驗證已修，price="0" 為策略保留）；2 Suggestion（variation count `<` vs `!==`，409 vs 422 for save_failed）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`createVariable|ProductCreator|variation_attribute_unknown|duplicate_sku_in_request|0\.7\.0|AWBRIDGE_VERSION` | hits=0 stale — 3 PHP 正本確認；agency-os 命中=既有 WORKLOG/memory 記錄（非 stale claim）；root `d:/Work/aware-wave-wp-bridge.php` v0.1.0 = 舊開發殘檔，不影響任何已部署服務，標注不修
+
+**[剩餘風險]** price="0" 允許（免費商品），策略決定，不修；`variation_save_failed` 映射 409（可考慮 422，留後處理）
+**[rollback]** `git revert HEAD`；外掛端回退裝 v0.7.0；草稿回退 `wp post delete 7068 --force`（cascade 刪 14 variations）
+
 ### Daily
 - wp-bridge v0.7.0 `/product` 端點（Woo simple product）建好、critic 審過（2H+1M 修）、release 到專屬 repo、操作者裝上真站；soulful 真站建 post 7065 + product 7066（皆 draft）端到端驗證。
 - 發版工具化：`scripts/release-wp-bridge.sh` + `/wp-bridge-release` + runbook + AGENTS 自觸發（根因＝兩 repo，只 push Work ≠ 發版）。
