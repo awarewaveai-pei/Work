@@ -6,6 +6,7 @@
 
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: add-tarot-models → handoffs/2026-06-11-0236-add-tarot-models.md
+- TOMORROW_CAPTURED: pod-studio → handoffs/2026-06-11-0254-pod-studio.md
 
 ### Tarot Studio 風格注入畫家名字（風格準確度根因 — 操作者抓到 prompt 缺畫家名）
 

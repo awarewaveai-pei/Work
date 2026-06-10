@@ -56,6 +56,7 @@
 - [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。**下一步 = Stage 1 接通入口**：抓 2 筆卡 `spec_generated` 的 intake_forms → retry `POST /api/onboarding/trigger-build` 看精確錯誤碼（最可疑 trigger-build/route.ts L35-39 role 403 或 UI「跳回第一步」沒帶 spec/intake id）→ 對症修 → onboarding UI 走完一筆不碰 DB 達 completed。後續 Stage 2 Fluent Form→intake 橋接+FluentCRM／Stage 3 報價／Stage 4 機層租機(provisionClient 已寫好未接)／Stage 5 串接 Supabase/n8n/Sentry/Netdata/Uptime Kuma/PostHog。**動前 `git log -5` + 讀 WORKLOG（trigger-build 平行 session 觸碰過，VBC）。**
 - [ ] **Stage 1 接通入口** — app.aware-wave 一鍵架站主線（抓 2 筆 `spec_generated` intake → retry trigger-build 看精確錯誤碼 → 對症修 → onboarding UI 走完一筆達 completed）。
 - [ ] **wp-bridge 續做 operation：featured image** / update-existing-post / product update+delete（v0.7.0 只做 product CREATE，其餘端點仍待補）。
+- [ ] **【POD Studio 自建動工】** 藍本已 100% 完整（`lobster-factory/docs/POD_STUDIO_ROADMAP.md`，附錄 B 全記錄 + Mockup Studio 平拍/模特雙模式 + P4 履約閉環）。明天：① 試生一張 AI mockup 驗證擬真合成（Replicate `google/nano-banana-2`，設計+白/黑 Bella3001+模特+場景）② 排實作 P2a→P4（履約用 Printful 原生，免費自動）→ handoffs/2026-06-11-0254-pod-studio.md
 
 - [x] POD Studio 路線圖 + tarot 框線收尾（框 png 還沒做好；per-frame 微調 + celestial 補生）→ handoffs/2026-06-06-2026-pod-studio-roadmap.md
 
