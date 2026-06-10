@@ -25,9 +25,12 @@ DRY_RUN=0
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=1
 
 REPO="awarewaveai-pei/aware-wave-wp-bridge"
-SRC="c:/Users/USER/Work/lobster-factory/packages/wp-bridge-plugin"
+# Derive repo root from script location — works on any machine, no hardcoded user path.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC="$(cd "${SCRIPT_DIR}/../lobster-factory/packages/wp-bridge-plugin" && pwd)"
 PLUGIN_FILE="$SRC/aware-wave-wp-bridge.php"
-TMP="c:/Users/USER/AppData/Local/Temp/awb-release"   # outside the Work repo: auto-checkpoint won't grab it
+# Use OS temp dir outside the Work repo so auto-checkpoint won't grab it.
+TMP="${TMPDIR:-${TEMP:-/tmp}}/awb-release"
 
 say() { echo "[release-wp-bridge] $*"; }
 die() { echo "[release-wp-bridge] ERROR: $*" >&2; exit 1; }
