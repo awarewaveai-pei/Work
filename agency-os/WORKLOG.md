@@ -30,12 +30,14 @@
 - `includes/Http/RestController.php`：`POST /product` route + `createProduct()`（SCOPE_WRITE 簽章，鏡像 createPost）+ `productErrorStatus()` reason→HTTP 映射。
 - `aware-wave-wp-bridge.php`：AWBRIDGE_VERSION + header 0.6.0→0.7.0（SemVer minor=新功能向後相容）。
 **[驗證結果]**
-- REALTEST_EVIDENCE: tool=Bash | cmd=`php -l`（ProductCreator/RestController/主檔三檔）| exit=0 | ms=~200 —— 本地 wp-env 無 WooCommerce，端到端 `POST /product` 須部署有 Woo 的真站才能跑（LIVE 部署自測時補；此處 build-gate=syntax 綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -l`（ProductCreator/RestController/主檔三檔）| exit=0 | ms=~200 —— 本地 wp-env 無 WooCommerce，build-gate=syntax 綠
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp eval-file (ProductCreator+PostCreator->create) + wp post get + wc_get_product` | exit=0 | ms=~3000 —— **真站 soulfulexpression.org v0.7.0 端到端**：ProductCreator->create() 回 `{status:committed,product_id:7066}`、read-back `type=simple price=45 cats=Workshops status=draft`；同跑 PostCreator 建 post 7065（draft）。同款 SSH+wp-cli 直呼路徑（如 post 7053）。health `version:0.7.0 crypto_ready:true keys_ok:true`
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2H/3m —— 2 High（H1 wp_slash 防 block-markup 描述損毀＝PostCreator 既有同款防護被漏；H2 price 拒科學記號+wc_format_decimal 正規化使 verify 有意義）+ M1（category 全有或全無，避免 live catalog 半分類靜默 commit）**已修**；M2/M3/S* 為 PostCreator 既有同款行為非回歸
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`createProduct`\|`ProductCreator`\|`/product`\|`0.6.0`\|`AWBRIDGE_VERSION` | hits=0 stale —— 單一 /product route 無衝突、AdminPage 讀常數自動帶 0.7.0、無殘留舊版號；README 為 L1-L4 願景模型非逐端點清單故無 stale claim
-**[剩餘風險]** ① 端到端未在真 Woo 跑（待 LIVE 自測）② soulful LIVE 部署＝High risk（操作者手動從 GitHub 更新外掛＝其 go-ahead）③ 商品/文章內容草稿待操作者定稿後才發（預設 status=draft 不直接公開/上架）。
-**[rollback]** `git revert 194df13d`（純新增端點，不動既有路徑）；外掛端回退＝重裝 v0.6.0。
-- commit: `194df13d` pushed origin/main 2026-06-10
+**[剩餘風險]** ① ~~端到端未在真 Woo 跑~~ **已驗**（7066 committed）② post 7065 / product 7066 皆 draft（不公開/不上架），待操作者後台檢視+定稿後自行發佈/上架。
+**[rollback]** `git revert 194df13d`（純新增端點）；外掛端回退＝重裝 v0.6.0；草稿回退＝`wp post delete 7065 7066 --force`。
+- commit: `194df13d`（端點）pushed origin/main；release **v0.7.0** = 專屬 repo `aware-wave-wp-bridge` tag→Action zip（操作者已裝真站）；發版工具化 commit `154e1c88`（scripts/release-wp-bridge.sh + /wp-bridge-release + runbook + AGENTS 自觸發）
+- 真站產出：post **7065**（draft）+ product **7066**（draft, simple, price=45, cat=Workshops）@ soulfulexpression.org
 
 操作者回報三問：按鈕沒放全、按了沒回饋、無法確認詳盡描述有沒有套用。
 **[已修改]** `cards.ts` STYLE_PRESETS 32→99（每個 primary lexicon 風格都有鈕，西方+全亞洲畫家/媒材/風格四組）；`TarotStudio.tsx` chip 改 toggle：點擊把 `localizeStyle(zh)` 的**完整英文描述**插入/移除風格框（框內＝實際送模型文字，WYSIWYG），選取鈕實心高亮+✓。
