@@ -243,11 +243,20 @@ export function buildCardPrompt(card: TarotCard, input: CardPromptInput = {}): s
   const scene = card.scene.split("{hero}").join(hero);
 
   // Resolve the style: chip labels → their catalog English prompt; unknown free-typed text passes through.
-  const style = resolveStylePrompt((input.style ?? "").trim());
-  const lead = style || DEFAULT_STYLE;
+  let lead = resolveStylePrompt((input.style ?? "").trim()) || DEFAULT_STYLE;
 
-  // Style leads — FLUX weights early tokens most. Catalog descriptions are long (up to ~1500 chars),
-  // so the tail uses a SHORT cohesion cue rather than restating the whole block (restating would
-  // push well past the encoder window and drop the scene). The lead carries the style.
+  // Cap the style so the tarot SCENE always fits inside the model's prompt window. Catalog prompts
+  // are long (up to ~1500 chars); stacking two (e.g. painter + medium) overflows FLUX's encoder,
+  // which then drops the scene entirely → "no tarot card". Trimming the style at a clean comma/period
+  // boundary guarantees the scene reaches the model. (The full catalog text is untouched; gpt-image,
+  // with its larger window, still benefits from a long lead within the cap.)
+  const STYLE_CAP = 1200;
+  if (lead.length > STYLE_CAP) {
+    const cut = lead.slice(0, STYLE_CAP);
+    const b = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf(", "));
+    lead = b > 300 ? cut.slice(0, b) : cut;
+  }
+
+  // Style leads — FLUX weights early tokens most. The tail is a short cohesion cue, not a restatement.
   return `${lead}. ${scene}. Single vertical full-bleed scene in one cohesive consistent art style, rich symbolic detail.`;
 }
