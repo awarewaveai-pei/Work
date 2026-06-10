@@ -284,7 +284,14 @@ Active 6 / Reserve 1 / Deprecated 3 / Total 10。表欄：Name｜Developer｜Sta
 - **淺色（白/淺）布料微透** → 賣白/淺色變體時文案要註明。
 - Plus 尺寸（2XL+）批發貴 $2–3，定價要反映（呼應 B5 base/plus 兩欄）。
 
-**自建對應**：`product_specs(printful_id, brand, model, technique, wholesale_min/max, retail_base/plus, placements jsonb[{name,w,h,dpi,fill}], colors[], sizes[])`。生印刷檔時取對應 placement 的 w×h 當輸出畫布；mockup 生成取 aspect 2:3 + front。**修正先前研究**：實際 Printful DTG 印刷檔走 **150 DPI**（1800×2400 正面），非 300 DPI/4500×5400（那是另一套 15×18" 新標準，此商品未用）。
+**自建對應**：`product_specs(printful_id, brand, model, technique, wholesale_min/max, retail_base/plus, placements jsonb[{name,w,h,dpi,fill}], colors[], sizes[])`。生印刷檔時取對應 placement 的 w×h 當輸出畫布；mockup 生成取 aspect 2:3 + front。
+
+**★ DPI 決策（操作者指定 2026-06-11）：我們目標 = 300 DPI，非 MEGA 的 150。**
+- MEGA 截圖用 **150 DPI / 1800×2400**（Printful 最低可接受；檔小生成快）。**我們要更高品質 → 走 300 DPI。**
+- 同物理尺寸換算（px ÷ DPI = 英吋）：12"×16" 正面 @ 300 DPI = **3600×4800 px**（= 150 版的 4 倍像素，更銳利）；15×18" 新標準 @ 300 = 4500×5400 px。Printful 上限 300，勿超過。
+- **障礙**：多數生成器解析度不足 4800px 高（Nano Banana 2 4K/4096、Seedream 3K、Flux 2048）→ 管線需補 **upscale**（= MEGA 的「Smart Image Tool」；自建用 **Replicate Real-ESRGAN**）。
+- **印刷檔管線**：生設計（模型最大解析）→ **Real-ESRGAN 放大到 3600×4800** → 去背 → 300 DPI 透明 PNG（印刷檔）。Mockup 另走 Studio（不需 300，螢幕看即可）。
+- `product_specs.placements.dpi` 存 **300**（我們的目標值），px 對應放大為 3600×4800（front standard）。
 
 ## B10. My Designs
 「每張處理過的設計都存這，可換商品重用不必重生」。Filter Status/Type/Search。每張：縮圖、prompt·狀態(processed)·fullbleed·生成器、Reuse/Open/Delete。
