@@ -10,8 +10,9 @@ param(
     [switch]$SkipTodayRecap,
     [switch]$SkipAutoTaskCheckmarks,
     [switch]$SkipInboxGuard,
+    # 2026-06-10: 預設 off（單 AI；closeout-inbox 為雙 IDE 遺留，見 owner script 註解）。
     [ValidateSet("warn", "strict", "off")]
-    [string]$InboxGuardMode = "warn",
+    [string]$InboxGuardMode = "off",
     [ValidateSet("off", "warn", "strict")]
     [string]$CompletenessGate = "strict",
     [switch]$SkipCompletenessGate
@@ -28,7 +29,7 @@ if (-not (Test-Path -LiteralPath $ownerScript)) {
 }
 
 # PSBoundParameters omits params the caller did not specify, so the owner would still use its
-# defaults (strict) unless we forward the wrapper-resolved mode explicitly.
+# default (off) unless we forward the wrapper-resolved mode explicitly.
 $splat = @{}
 foreach ($e in $PSBoundParameters.GetEnumerator()) {
     $splat[$e.Key] = $e.Value

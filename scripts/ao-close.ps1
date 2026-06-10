@@ -25,8 +25,11 @@ param(
     [switch]$SkipTodayRecap,
     [switch]$SkipAutoTaskCheckmarks,
     [switch]$SkipInboxGuard,
+    # 2026-06-10: 預設 off。closeout-inbox 是 Cursor+Claude 雙 IDE 時代的協作機制（協作 AI
+    # 寫 inbox → AO-CLOSE merge）。現為單 AI（僅 Claude，直接寫 WORKLOG），guard 只剩摩擦。
+    # merge 步驟保留為無害 no-op（空 inbox 自動 skip）。若日後 Cursor 回歸 → 設回 strict/warn。
     [ValidateSet("warn","strict","off")]
-    [string]$InboxGuardMode = "strict",
+    [string]$InboxGuardMode = "off",
     [ValidateSet("off", "warn", "strict")]
     [string]$CompletenessGate = "strict",
     [switch]$SkipCompletenessGate
@@ -226,7 +229,7 @@ if (Test-Path -LiteralPath $scaffoldScript) {
     }
 }
 
-# Inbox guard (before merge resets inbox). Default warn: do not block solo second close after auto-merge.
+# Inbox guard (before merge resets inbox). Default off (single-AI; closeout-inbox is dual-IDE legacy).
 if (-not $SkipInboxGuard -and $InboxGuardMode -ne "off") {
     Write-Host "== AO-CLOSE: closeout inbox guard ($InboxGuardMode) ==" -ForegroundColor Cyan
     Push-Location $WorkRoot
@@ -288,6 +291,34 @@ if (-not $SkipInboxGuard -and $InboxGuardMode -ne "off") {
     }
 } elseif ($SkipInboxGuard -or $InboxGuardMode -eq "off") {
     Write-Host "== AO-CLOSE: inbox guard disabled ==" -ForegroundColor DarkYellow
+}
+
+# Prior-close archive report guard (2026-06-10): every "[claude|cursor] chore: AO-CLOSE sync <date> <hhmm>"
+# commit must have a matching agency-os/reports/ao-close/<date>-<hhmm>.md (the four-section report the agent
+# writes per the ao-close skill Final Step). Root cause: the report write was agent-discretion and got
+# repeatedly forgotten (no machine check). This deferred ratchet validates the PREVIOUS close's report on the
+# NEXT close and blocks until written — same pattern as the archive-lift gate. Confident-parse + definite-
+# absence only: if no sync commit is found or the subject does not parse, it skips (never a false block).
+Write-Host "== AO-CLOSE: prior-close archive report guard ==" -ForegroundColor Cyan
+Push-Location $WorkRoot
+try {
+    $lastSyncSubject = (git log -1 --pretty=format:"%s" --grep="chore: AO-CLOSE sync" 2>$null)
+    if (-not [string]::IsNullOrWhiteSpace($lastSyncSubject)) {
+        $m = [regex]::Match($lastSyncSubject, 'AO-CLOSE sync (\d{4}-\d{2}-\d{2}) (\d{4})')
+        if ($m.Success) {
+            $rptName = "{0}-{1}.md" -f $m.Groups[1].Value, $m.Groups[2].Value
+            $rptPath = Join-Path $WorkRoot ("agency-os\reports\ao-close\" + $rptName)
+            if (-not (Test-Path -LiteralPath $rptPath)) {
+                Add-CloseoutGateResult -Gate $gate -Name "prior AO-CLOSE archive report" -Failed $true `
+                    -Detail "last AO-CLOSE sync commit ($($m.Groups[1].Value) $($m.Groups[2].Value)) has no archive report at agency-os/reports/ao-close/$rptName" `
+                    -Fix "write the four-section AO-CLOSE report to agency-os/reports/ao-close/$rptName (ao-close skill Final Step), then re-run ao-close.ps1"
+            } else {
+                Write-Host "  prior-close report present: $rptName" -ForegroundColor DarkGray
+            }
+        }
+    }
+} finally {
+    Pop-Location
 }
 
 $mergeInboxScript = Join-Path $WorkRoot "scripts\merge-closeout-inbox-into-progress.ps1"
