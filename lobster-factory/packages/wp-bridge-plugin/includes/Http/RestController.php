@@ -24,6 +24,7 @@ use AwareWave\WpBridge\Operation\SetOptionOperation;
 use AwareWave\WpBridge\Content\BlockLibrary;
 use AwareWave\WpBridge\Content\MediaSideloader;
 use AwareWave\WpBridge\Post\PostCreator;
+use AwareWave\WpBridge\Product\ProductCreator;
 use AwareWave\WpBridge\Validation\KadenceValidator;
 use AwareWave\WpBridge\Transaction\Impl\HttpRenderer;
 use AwareWave\WpBridge\Transaction\Impl\NullCachePurger;
@@ -61,6 +62,16 @@ final class RestController {
 				'methods'             => 'POST',
 				'permission_callback' => '__return_true',
 				'callback'            => array( $this, 'createPost' ),
+			)
+		);
+
+		register_rest_route(
+			AWBRIDGE_REST_NAMESPACE,
+			'/product',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'createProduct' ),
 			)
 		);
 
@@ -220,6 +231,47 @@ final class RestController {
 		$status = ( $result['status'] === 'committed' ) ? 201 : 409;
 		$result['ok'] = ( $result['status'] === 'committed' );
 		return new \WP_REST_Response( $result, $status );
+	}
+
+	/** Create a WooCommerce simple product (name + price + description + categories + SEO), atomic + verified. */
+	public function createProduct( $request ) {
+		$auth = $this->authenticate( $request, KeyRecord::SCOPE_WRITE );
+		if ( ! $auth->authenticated() ) {
+			$this->audit( 'auth_denied', array( 'reason' => $auth->auditReason() ) );
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => $auth->reason() ), $auth->httpStatus() );
+		}
+
+		$spec = json_decode( (string) $request->get_body(), true );
+		if ( ! is_array( $spec ) ) {
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'invalid_payload' ), 400 );
+		}
+
+		$result = ( new ProductCreator() )->create( $spec );
+
+		$this->audit( 'product_create', array( 'key' => $auth->keyId(), 'status' => $result['status'], 'product_id' => $result['product_id'] ?? null ) );
+
+		if ( $result['status'] === 'committed' ) {
+			$result['ok'] = true;
+			return new \WP_REST_Response( $result, 201 );
+		}
+		$result['ok'] = false;
+		return new \WP_REST_Response( $result, $this->productErrorStatus( $result['reason'] ?? '' ) );
+	}
+
+	/** Map a ProductCreator rollback reason to an HTTP status (bad input 400, conflict 409, dependency 422). */
+	private function productErrorStatus( string $reason ): int {
+		switch ( $reason ) {
+			case 'woocommerce_not_active':
+				return 422;
+			case 'name_and_price_required':
+			case 'price_not_numeric':
+			case 'invalid_sku':
+				return 400;
+			case 'sku_exists':
+				return 409;
+			default: // verify_failed, save_failed
+				return 409;
+		}
 	}
 
 	/**
