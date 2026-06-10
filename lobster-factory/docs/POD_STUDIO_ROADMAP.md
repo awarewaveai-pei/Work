@@ -227,7 +227,8 @@ Active 6 / Reserve 1 / Deprecated 3 / Total 10。表欄：Name｜Developer｜Sta
 「丟一個 niche → 生 10 個 design territories → 一鍵送進 MEGA」。Niche + **Audience**（Any/Female/Male/Gen X/Millennials/Gen Z/Moms/Dads…）+ **Tone**（Any/Humor·sarcasm/Nostalgic·retro/Premium·minimal/Dark·edgy/Wholesome/Rebellious/Patriotic…）→ Generate 10 territories。每日配額（如 20/20）。
 
 ## B9. Mockup Explorer
-預生成 mockup 庫 — 瀏覽每個商品的每種 Printful mockup 樣式。挑 Product（Cached library / All MEGA products / Generate new）。例：Greeting Card Vertical（10 mockups）ID 568 → Flat 1-6、Lifestyle 1-3 變化。點 mockup 看 `option_group` 名（用在 `_extra_styles` / mockup configs）。
+預生成 mockup 庫 — 瀏覽每個商品的每種 Printful mockup 樣式。挑 Product（Cached library / All MEGA products / **Generate new (not yet cached)**）。例：Unisex T-Shirt (Bella 3001) 19 mockups ID 71（flat / folded / 2-model）；Greeting Card Vertical 10 mockups ID 568 → Flat 1-6、Lifestyle 1-3。點 mockup 看 `option_group` 名（用在 `_extra_styles` / mockup configs）。
+> **「Generate new」流程未截圖（操作者 2026-06-11：不能點，會在同事 Printful 帳號留紀錄/可能計費）**。推斷：對未快取的商品呼叫 **Printful Mockup Generator API**（create-task → poll → 存進 cache）。**我們不需要這條** — 自建走 B9-S Mockup Studio（AI 合成），不依賴 Printful 預生成庫。
 
 ## B9-S. Mockup Studio（AI 合成 lifestyle/模特商品圖 — ★ 操作者要的「生成圖＋模特兒＋合成」就是這個）
 
@@ -264,7 +265,7 @@ Active 6 / Reserve 1 / Deprecated 3 / Total 10。表欄：Name｜Developer｜Sta
 - 技術 DTG（Direct-to-Garment）｜批發成本 11.25–19.69｜建議零售 24.99(base) / 26.99(2XL+)
 - 材質：100% 精梳環紡棉（**Heather 色含聚酯**）｜4.2 oz/yd²｜預縮｜側縫｜肩對肩貼條｜產地 NI/MX/HN/US
 - 尺寸：XS S M L XL 2XL 3XL 4XL 5XL
-- **顏色：全產品 84 色**（White/Black/Navy/Dark Grey/Ash/Athletic Heather/Army/Asphalt/Forest/Maroon/Military Green/Red/Royal…+70 含 Heather）。**操作者本案先做：黑 + 白**。
+- **顏色**：全產品支援 84 色，但 **★ 本案只做 White + Black 兩色（操作者拍板 2026-06-11）**。其餘 82 色不納入（之後要擴再開）。→ 變體只生 2 色 × N 尺寸；mockup 只需白衫/黑衫兩版。
 
 **印刷規格（★ 真實值，以此生印刷檔 — 注意是 150 DPI，非我先前研究說的 300）**
 
