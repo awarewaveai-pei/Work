@@ -4,6 +4,16 @@
 
 ## 2026-06-10
 
+### Tarot Studio 103 風格 prompt 全面重寫（結構化風格修飾式 + 去場景污染 + 去 negative）
+
+**[已修改]** `lobster-factory/.../app/tools/tarot/tarotStyles.ts`：操作者指示全 103 條改成 `[媒材+筆觸] + [構圖+光線] + [標誌母題/主體變形(只留質感)] + [色彩] + [情緒2-3詞]`。
+根因＝舊 prompt 是散文且**混入場景/主體名詞**（秀拉「riverside, park, seaside」、cyberpunk「city streets」、fairytale「forest, castle」），與 `cards.ts` 每張牌自帶的 `scene` 打架 → 違反 cards.ts:8「Style ... never touches the scene」契約。同時移除所有 negative（FLUX CFG=1 忽略 negation、gpt-image-1 無 negative 欄）。
+執行：4 個平行 subagent 各改一組（西方29/亞洲26/媒材16/風格32）→ `node apply_tarot_prompts.js` 只替換每行 prompt 值（zh/group 從原檔取，零 CJK 重打風險）→ `node fix_negations.js` 把 10 處殘留 negation 正面化（含 line 61「no blank space」最毒，FLUX 會反加空白）→ 更新 tarotStyles.ts header：標明「本檔為操作 SSOT、6 個 `生圖風格 PROMPT/*.md` 已 stale、無生成器、勿 regenerate 否則洗掉」。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`(next-admin) | exit=0 | ms=~30000（另 apply 腳本 replaced 103/103、fix 腳本 10/10）
+- REVIEW_DONE: critic=Quick(self) | verdict=pass | findings=0c/0m/0n（read-back 5 條確認 zh 保留+prompt 無截斷+陣列 `];` 收尾；純字串/資料改動無控制流）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`scene-nouns(riverside|castle|city|cypress|wheat field|forest|...) + negations(no|not|without|rather than|instead of) + STYLE_CATALOG|tarotStyles` | hits=0 真實洩漏（4 場景命中全誤報＝forest green 顏色×3 + temple mural 畫種名×1；negation 0；scripts/ 0 refs；下游 cards.ts STYLE_BY_LABEL/STYLE_PRESETS 僅依賴 shape，未破壞）
+- 剩餘風險：6 個正本 `.md` 仍舊散文（無生成器、.ts 為操作 SSOT、header 已警告）；真實出圖渲染需操作者在 app 內試拍驗證（tsc 僅 build gate，非渲染驗證）。
+
 ### wp-bridge v0.8.0：variable product 支援（WooCommerce 變數商品，客製 T-shirt 實測）
 
 **[任務理解]** 操作者要求：用 AI 端到端實測，在真站建立一件「客製 T-shirt」變數商品（白/黑 × XS–3XL = 14 variations）。根本問題：`ProductCreator` v0.7.0 只支援 `WC_Product_Simple`，無法表達 variation。
