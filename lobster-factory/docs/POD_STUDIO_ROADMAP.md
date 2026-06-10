@@ -226,6 +226,33 @@ Active 6 / Reserve 1 / Deprecated 3 / Total 10。表欄：Name｜Developer｜Sta
 ## B9. Mockup Explorer
 預生成 mockup 庫 — 瀏覽每個商品的每種 Printful mockup 樣式。挑 Product（Cached library / All MEGA products / Generate new）。例：Greeting Card Vertical（10 mockups）ID 568 → Flat 1-6、Lifestyle 1-3 變化。點 mockup 看 `option_group` 名（用在 `_extra_styles` / mockup configs）。
 
+## B9-S. Mockup Studio（AI 合成 lifestyle/模特商品圖 — ★ 操作者要的「生成圖＋模特兒＋合成」就是這個）
+
+> 獨立 companion app（`mockups.mega.management`），**與主流程的 Printful mockup（B9 Explorer）並行的第二條路**。差別：Explorer = Printful 預拍固定範本；**Studio = 用 AI 直接生一張擬真商品照**，把設計印在衫上 + 自帶場景/道具/模特兒。這條路比 Printful 靈活（自訂場景/道具/模特族裔），也是我們自建要走的路。截圖來源：操作者 2026-06-11。
+
+**輸入控制（截圖逐欄）**
+- **Product Type**：T-shirt / Hoodie / Sweatshirt / Tank Top / Youth Tee（單選）
+- **Color**：下拉（如 White `#f4f5f0`），顯示「N colors available for this product」
+- **Background Surface**：自由文字場景面（如 `light wooden table`）→ 平拍背景
+- **Style**：`Male (relaxed)` / `Female (scrunched)` → 模特性別 / 衫的擺放姿態
+- **Lighting**：`Soft top-down` / `Strong side-angle`
+- **Niche Props（3 角落道具）**：Bottom-Left（apparel prop，如珍奶）／Top-Right（niche prop 1，如台灣國旗）／Bottom-Right（niche prop 2，如福爾摩沙旅遊地圖）
+- Clear inputs / Logout
+
+**模特版額外帶入（操作者口述，2026-06-11）**：合成「有模特兒」的商品圖時，prompt 額外帶入 → **產品（型號+色）、設計圖案、模特兒 種族膚色 / 性別 / 動作姿勢 / 場景**。即：不只平拍，可生「某族裔模特兒穿著印有此設計的衫、在某場景、某動作」的 lifestyle 照。
+
+**產出範例（截圖）**：奶油色 tee 印「鼎泰豐 DIN TAI FUNG」平拍於木桌 + 筷子/湯匙叉 + 竹蒸籠小籠包；「I ❤ 台北」tee + 中華民國國旗道具。→ 設計、衫、場景、主題道具**一張 AI 圖同時生成**。
+
+**機制（推斷，合理且我們可複製）**：把上面所有控制組成一段結構化 prompt + **把設計圖當 reference image** → 餵多模態影像模型，由模型直接把設計「印」到衫上並處理皺褶/光線/透視。**不是手工 displacement map**；現代多模態模型（尤其 Nano Banana = Gemini image）擅長「把這個 logo/設計貼到這個產品/模特身上」的擬真合成 → 這也是它在 Analytics 勝率最高（33.3%）的原因。
+
+**Generators（截圖）**：Ideogram / Ideogram 4 / Flux 2 Pro / Seedream 5 Lite / **Nano Banana 2** / Nano Banana 2 (kie) / GPT-Image 2 / GPT-Image 2 (kie) / MAI Image 2.5。
+**Analytics 勝率（哪個模型的圖被選為成品）**：Nano Banana 2 = 33.3%（2/6）、Flux 2 Pro = 16.7%（1/6），其餘 <5 runs。→ **合成首選 Nano Banana 2**。
+
+**我們自建對應**：next-admin 加「Mockup Studio」頁，輸入同上 → 組 prompt + 設計當 reference → 走 **Replicate MCP**（已有）呼叫 **Nano Banana 2 / Flux / Seedream** → 產出擬真 mockup 存 R2。**不需要 Printful、不需要實拍範本庫、不需手工貼圖**。
+
+## B9-A. Analytics（Generator 勝率追蹤 — 驅動「該留哪些模型」）
+「Win Rates：每個 generator 的圖被選為成品的頻率（最少 5 次出場才顯示率）」。表欄：Generator｜Appearances｜Wins｜Win Rate。另有 Recent Selections（generator｜product｜ratio｜date）。截圖數據：Nano Banana 2 6 出場 2 勝 33.3%、Flux 2 Pro 6/1/16.7%、Seedream 5 Lite/MAI/Ideogram 4/GPT-Image 2 (kie)/GPT-Image 2 皆 0 勝。→ 用途：每 ~90 天汰換生成器（B7 registry）時用真實勝率決定 active/deprecated。**自建對應**：記 `generation_runs`（model, product, ratio, selected_bool, ts）即可算同樣勝率。
+
 ## B10. My Designs
 「每張處理過的設計都存這，可換商品重用不必重生」。Filter Status/Type/Search。每張：縮圖、prompt·狀態(processed)·fullbleed·生成器、Reuse/Open/Delete。
 
