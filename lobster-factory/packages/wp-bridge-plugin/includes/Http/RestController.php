@@ -233,7 +233,8 @@ final class RestController {
 		return new \WP_REST_Response( $result, $status );
 	}
 
-	/** Create a WooCommerce simple product (name + price + description + categories + SEO), atomic + verified. */
+	/** Create a WooCommerce product (simple or variable), atomic + verified. Description accepts a
+	 * blocks[] list composed to Kadence markup (same engine as POST /post), or raw description HTML. */
 	public function createProduct( $request ) {
 		$auth = $this->authenticate( $request, KeyRecord::SCOPE_WRITE );
 		if ( ! $auth->authenticated() ) {
@@ -244,6 +245,22 @@ final class RestController {
 		$spec = json_decode( (string) $request->get_body(), true );
 		if ( ! is_array( $spec ) ) {
 			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'invalid_payload' ), 400 );
+		}
+
+		// Free composition for the long description: a blocks[] list is assembled into valid Kadence
+		// markup by the SAME BlockLibrary that powers POST /post — so a product description is real
+		// Kadence blocks, not a bare <p>. The composed markup overrides any raw 'description' string.
+		if ( isset( $spec['blocks'] ) && is_array( $spec['blocks'] ) ) {
+			$spec['blocks'] = $this->sideloadBlockImages( $spec['blocks'] );
+			$theme          = ( isset( $spec['theme'] ) && is_array( $spec['theme'] ) ) ? $spec['theme'] : array();
+			$composed       = ( new BlockLibrary( $theme ) )->compose( $spec['blocks'] );
+			if ( $composed['unknown'] !== array() ) {
+				return new \WP_REST_Response(
+					array( 'ok' => false, 'error' => 'unsupported_block_types', 'unknown' => array_values( array_unique( $composed['unknown'] ) ) ),
+					422
+				);
+			}
+			$spec['description'] = $composed['content'];
 		}
 
 		$result = ( new ProductCreator() )->create( $spec );
@@ -271,6 +288,8 @@ final class RestController {
 			case 'variations_required':
 			case 'variation_price_required':
 			case 'variation_attribute_unknown':
+			case 'sale_price_not_numeric':
+			case 'sale_price_not_below_regular':
 				return 400;
 			case 'duplicate_sku_in_request':
 				return 409;

@@ -4,6 +4,24 @@
 
 ## 2026-06-10
 
+### wp-bridge v0.9.0 — WooCommerce 完整欄位集 + Kadence 積木商品描述（可變商品全欄位 T-shirt 真站驗）
+
+**[已修改]**
+- `lobster-factory/packages/wp-bridge-plugin/includes/Product/ProductCreator.php`：擴成支援 WC REST v3 **全部可寫欄位**（simple + variable parent + variation）。新增共用 `applyCommonFields($product,$spec,$isVariation)`（純加法，欄位存在才設；WC_Product_Variation 繼承 WC_Product → setter 共用；parent-only 欄位 featured/catalog_visibility/sold_individually/reviews_allowed/purchase_note/upsell/cross_sell 以 `!$isVariation` 守）。新增 `applySeo / applyMetaData(WC 保留鍵 blocklist) / applyBrands / collectImageSpec / resolveImages(多圖:首圖=featured 其餘=gallery) / resolveTermIds(race-safe) / isPlainPrice / normalizeStatus`。新增 reason：`sale_price_not_numeric` `sale_price_not_below_regular`。
+- `includes/Http/RestController.php`：`createProduct` 接 `blocks[]` → 同一套 `BlockLibrary->compose()` 組 Kadence 積木當描述（與 POST /post 同引擎，覆蓋 raw description）；`productErrorStatus` 加兩個 sale_price reason → 400。
+- `aware-wave-wp-bridge.php`：0.8.0 → 0.9.0（header + define）。
+- `agency-os/docs/wp-bridge-product-template.md`（新）：商品建立填空範本 SSOT — 全欄位表 + Kadence 描述（12 種積木）+ 可變/簡單商品完整 JSON + 雷區 + 驗收。
+- 根因：操作者要「商品所有欄位都填」+「描述用 Kadence 積木、多種不同性質」。v0.8.0 只支援欄位子集且描述只能塞純 `<p>`。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp eval-file ~/awb-tshirt-test.php`(soulful, ProductCreator->create 全欄位 variable spec) | exit=0 | ms=~8000 — product 7133 committed、14 變體(7134–7147)、image_id=7132、sku=AWB-TEE-PARENT；描述 40 個 kadence 積木 / 61 block / 12 型別(rowlayout+advancedheading+iconlist+accordion+tabs+table+infobox+advancedbtn+core list/quote/spacer/separator)；逐欄位 readback 通過(featured/catalog_visibility/weight/dims/purchase_note/2cats/3tags/default_attrs/meta/seo/變體 sale_price<regular/stock/weight/attrs/meta)。中途驗證迭代 7068→7084→7100(圖404 graceful)→7117(Kadence 描述)→7133(多積木)，前者皆 force-delete 清掉。
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/4M/4m — 4 Major 全屬「欄位默默沒生效卻 committed」違反 read-back 契約：①sale_price≥regular 默默丟棄→改 reject `sale_price_not_below_regular` ②shipping_class 無效 slug 默默 drop→改 auto-create（同 categories 策略）③resolveTermIds term race 誤 rollback→改從 term_exists WP_Error 撿回 term_id ④meta_data 可寫 `_price` 等 WC 保留鍵腐蝕狀態→改 blocklist + sanitize 變更即 skip。Minor: global_unique_id 吞例外(可接受)、stock float 截斷、變體未逐欄位 verify(coverage gap 記錄)。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`ProductCreator|sale_price_not_below_regular|sale_price_not_numeric|applyCommonFields` | hits=0 stale — ProductCreator 單一 callsite(RestController.php:266)；新 reason 兩處皆 map；無 product 測試檔需更新；template 引用正確。
+- 發版：`scripts/release-wp-bridge.sh` → v0.9.0 GitHub Release + zip（aware-wave-wp-bridge-v0.9.0.zip）。soulful 已直接 scp 三檔 + health=0.9.0 crypto=True。
+
+**[剩餘風險]** 變體未逐欄位 read-back（只驗 count/type/name/status；coverage gap，非 bug）；global_unique_id 重複 GTIN 被吞（Minor）；blocks→描述路徑的 RestController glue 是 createPost 的 17 行鏡像（已 lint，未經 critic 二審，但屬已驗 pattern 複製）。
+**[rollback]** 商品：force-delete product post（WC cascade 變體）。Plugin：裝回 v0.8.0 zip 或 git revert 本 commit。
+
 ### Tarot Studio 103 風格 prompt 全面重寫（結構化風格修飾式 + 去場景污染 + 去 negative）
 
 **[已修改]** `lobster-factory/.../app/tools/tarot/tarotStyles.ts`：操作者指示全 103 條改成 `[媒材+筆觸] + [構圖+光線] + [標誌母題/主體變形(只留質感)] + [色彩] + [情緒2-3詞]`。
