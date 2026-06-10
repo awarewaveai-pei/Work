@@ -184,16 +184,46 @@ export const STYLE_PRESETS: { zh: string; group: string }[] = STYLE_CATALOG.map(
 
 const STYLE_BY_LABEL = new Map(STYLE_CATALOG.map((s) => [s.zh, s.prompt] as const));
 
+// A painter's NAME is the single strongest style signal an image model has — it carries the whole
+// learned look in two tokens, far more than any technique description. The catalog prompts describe
+// only technique (brushwork / palette / composition), so for the painter groups we prepend
+// "In the style of <name>." as the lead. Genre / medium groups (媒材 / 風格) and tradition entries
+// with no individual name (e.g. 唐卡 / 細密畫 — already named inside their prompt) get no prefix.
+const PAINTER_GROUPS = new Set(["西方畫家", "亞洲畫家"]);
+/** Latin name inside a zh label: strip the leading CJK run, take the text before any "｜" marker.
+ *  "梵谷 Van Gogh" -> "Van Gogh"; "歌川廣重 Hiroshige｜…" -> "Hiroshige"; "唐卡｜…" -> "" (skipped). */
+function artistName(zh: string): string {
+  const afterCjk = zh.replace(/^[　-〿一-鿿豈-﫿·•\s]+/, "");
+  const head = afterCjk.split("｜")[0].trim();
+  if (/[A-Za-z]/.test(head)) return head;
+  // Some labels put the Latin name AFTER the "｜" (e.g. "韓國民畫｜Minhwa …"): take its leading Latin run.
+  const tail = afterCjk.split("｜").slice(1).join("｜").match(/[A-Za-z][A-Za-z .\-]*/);
+  return tail ? tail[0].trim() : "";
+}
+const STYLE_LEAD_BY_LABEL = new Map(
+  STYLE_CATALOG
+    .filter((s) => PAINTER_GROUPS.has(s.group))
+    .map((s) => [s.zh, artistName(s.zh)] as const)
+    .filter((pair) => pair[1].length > 0),
+);
+
 /**
  * Resolve the style textarea (comma-separated zh labels) into the English actually sent to the
  * image model. Each zh label maps to its catalog English prompt (STYLE_CATALOG / tarotStyles.ts);
- * an unrecognised free-typed token passes through unchanged. zh labels never contain commas, so
- * splitting on comma cleanly recovers the selected labels.
+ * painter-group labels are led by "In the style of <name>." — the name is the primary style anchor
+ * and the catalog text reinforces the technique. An unrecognised free-typed token passes through
+ * unchanged. zh labels never contain commas, so splitting on comma cleanly recovers the labels.
  */
 export function resolveStylePrompt(raw: string): string {
   const tokens = raw.split(",").map((t) => t.trim()).filter(Boolean);
   if (!tokens.length) return "";
-  return tokens.map((t) => STYLE_BY_LABEL.get(t) ?? t).join(". ");
+  return tokens
+    .map((t) => {
+      const body = STYLE_BY_LABEL.get(t) ?? t;
+      const name = STYLE_LEAD_BY_LABEL.get(t);
+      return name ? `In the style of ${name}. ${body}` : body;
+    })
+    .join(". ");
 }
 
 // Default style used when the user gives none — keeps un-styled output looking like a deck.
