@@ -226,7 +226,9 @@ export default function PublishWizard() {
             ③ 檢查 Printful 同步
           </button>
           {sync.state === "done" ? (
-            <span style={{ fontSize: 12 }}>{sync.synced ? "已同步 ✓ 可綁定" : "尚未同步 — Woo 外掛同步要等一下，稍後再按"}</span>
+            <span style={{ fontSize: 12 }}>
+              {sync.synced ? "已同步 ✓ 可綁定" : "尚未同步 — 確認商品已在後台 publish（draft 不會同步），再稍候重按"}
+            </span>
           ) : null}
           {sync.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{sync.error}</span> : null}
         </div>
