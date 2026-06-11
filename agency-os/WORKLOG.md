@@ -4,6 +4,22 @@
 
 ## 2026-06-11
 
+### POD Studio P2d：Printful PrintProvider 完成（讀路徑實測 PASS）— 含關鍵架構發現
+
+**[關鍵架構發現（live 401→查證→改道）]** 操作者的 Printful store `18314943` 是 **WooCommerce 平台型** → Printful v1 Products API（`POST /store/products` 直接建商品）被拒（"Manual Order / API platform only"，live 實測 + 官方文件雙確認）。**正確全自動串連** = ① Woo 端先建商品（**wp-bridge 已有**，v0.9.0 variable product）→ ② Printful 外掛自動 sync（`GET /sync/products` 對此 store 實測 200）→ ③ `PUT /sync/variants/{id}` 把每個變體綁 catalog variant + 印刷檔（R2 URL）→ ④ 履約原生自動。**黃金樣本**：店裡已有 `438286779 Soulful Expression Bloom T-Shirt`（9/9 synced，external_id=Woo post id，files=front_large/back/preview）= 操作者從 Printful 推的第一個商品，結構即我們要寫的目標格式。
+
+**[已修改]**
+- `lib/studio/print-provider.ts` — PrintProvider seam：`getCatalogVariants`（71=Bella3001 過濾色）/`listSyncProducts`/`getSyncProduct`/`linkSyncVariant`（PUT 綁定）；AbortController 25s、X-PF-Store-Id header、錯誤訊息 200 字截斷不洩 token
+- `app/api/tools/printful/sync/route.ts` — GET（list/detail/catalog 三用）+ PUT（link；printFileUrl 強制自家 designs bucket prefix）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx realtest_p2d.ts`（live Printful 唯讀）| exit=0 | catalog 71 white+black=18 變體、sync list=1 商品（Bloom 9/9）、detail 變體 5349325562→catalog 9575 + files 3 型；前置 curl 取證 400（store/products）vs 200（sync/products）
+- REVIEW_DONE: critic=Quick(self；模式同本日已審 route 慣例) | verdict=pass | findings=寫路徑（PUT link）刻意未對活商品實測 — **留到第一個真商品上架流程**（不動操作者既有 Bloom 商品）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`print-provider|linkSyncVariant|listSyncProducts|printful/sync` | hits=0 跨檔
+- tsc 0 錯（printful 檔）
+
+**[剩餘風險]** linkSyncVariant 寫路徑未實測（驗證計畫：首個新商品流程時 wp-bridge 建測試 draft → sync → link → 確認 Printful 端 files 正確 → 刪 draft）；印刷檔 300DPI 放大段（Real-ESRGAN）尚未接。**[rollback]** 2 新檔可刪；無 DB/外部狀態變更。
+
 ### POD Studio Mockup Studio 完成：B9-S 平拍/模特雙模式 + 鎖色鐵則內建（P0 學習正式工具化）
 
 **[已修改]**（3 新檔 + 2 修改；位置 = next-admin → 部署後在 app.aware-wave.com/tools/mockup）
