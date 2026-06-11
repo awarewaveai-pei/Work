@@ -4,6 +4,30 @@
 
 ## 2026-06-11
 
+### POD Studio P0 驗證：Nano Banana 2 擬真 mockup 合成 — PASS（白衫近完美、黑衫鎖色 prompt 可修）
+
+**[任務理解]** handoff `2026-06-11-0254-pod-studio.md` 指令 ①：用 Replicate `google/nano-banana-2` 試生設計圖+模特+場景 mockup，驗「擬真合成」可行性（整條 P2a→P4 流水線的先決）。設計圖用 soulful 既有 logo（4 色花卉+橘 S 曲線）。
+
+**[結果] ✅ PASS — 可排 P2a→P4 動工**
+- **白衫**（東亞女模/咖啡店/窗光）：設計重現 ~95%，色形全對、貼合胸口、皺褶光線自然 → `Downloads/pod-mockup-test/mockup-white-tee.png`（prediction `nxep4pg3g1rmy0cypjkbgvq1v0`）
+- **黑衫 v1**（黑人男模/街頭/golden hour）：構圖擬真，但**深藍花瓣被模型自動改成白/藍綠**（深色印深色衫的「適配」行為）+ 抱胸姿勢遮設計 → `mockup-black-tee.png`（`dvs4m9t0hxrmr0cypjkaejhv7c`）
+- **黑衫 v2**（prompt 加 CRITICAL COLOR FIDELITY 鎖色 + 手放兩側）：紅/深藍/橘/綠全保留 ~90%，無遮擋 → `mockup-black-tee-v2.png`（`caspt25y4nrmw0cypjks25gqjc`）
+- **學到的 prompt 規則（進 Mockup Studio 範本）**：① 深色衫必須逐色點名鎖色（"keep them navy, do NOT lighten"）② 姿勢避開遮胸（抱胸/雙手交叉）③ data URI 餵設計圖（Replicate worker 抓不到 soulfulexpression.org 外鏈，v1 白衫第一次 failed 即此因）
+- Schema 實測：`prompt + image_input(≤14) + resolution(1K/2K/4K) + aspect_ratio(15 種) + output_format(jpg/png)`；2K 3:4 一張 ~20-30s；連發吃 429 需 10-15s 間隔
+- 成本：3 張 2K 合計 < $0.25
+
+**[發現的問題（待修，需批准）]**
+1. **本機 REPLICATE_API_TOKEN 全失效**：vault + `mcp/user-env.ps1` 都是舊 token `r8_U…`（401）；SG 於 2026-06-05 已輪替為 `r8_MX…`（`.env.bak.replicate-newtoken-20260605-120511` 佐證，account API 200）→ 本機 vault/user-env/Replicate MCP 全 401。修法＝SG 現役 token 回填本機兩處。
+2. **CLAUDE.md doc drift**：寫 `secrets-vault.ps1 -Action get -Key <KEY_NAME>`，實際參數是 `-Name`（`scripts/secrets-vault.ps1:147` throw "Missing -Name"）。
+3. vault `get` 輸出格式是 `NAME=value` 整串，呼叫端需自行 split（`C:\Windows\Temp\query_replicate.ps1` 未 split 也是今晚 401 的第二層原因）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=SG curl api.replicate.com predictions create+poll ×3（nano-banana-2, data URI, 2K, 3:4）| exit=0 | 3/3 succeeded；account 200（SG token）vs 401（本機 token）
+- REVIEW_DONE: critic=Quick(self) | verdict=pass | findings=0c/0m/0n（驗證實驗，repo 無 code 改動；3 張產出人工目視評貼合度/皺褶/光線/鎖色）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`REPLICATE_API_TOKEN` | hits=stale token 證據鏈成立（vault+user-env 同舊值；SG .env 新值）；roadmap/handoff 主張與實測一致無 stale claim
+- 產物：`C:\Users\USER\Downloads\pod-mockup-test\`（design-logo / 3 mockups + previews）；temp 腳本均在 Temp 不進 repo
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial)：repo 改動僅 WORKLOG/TASKS；5 個 Temp 診斷腳本 syntax OK 且本 session 已全數真實執行（exit 0）
+
 ### fix: AO-RESUME 骨架加入「跨機 import 逐檔狀態」表（強制每次填，閘有牙）
 
 **[任務理解]** 操作者連抓三次本 session AO-RESUME 報告薄：① 整體薄 ② §1 跨機 import 壓成一行（範本 `ao-resume.md` L181-192 明文要求逐檔表，我自行省略）③ Step 3 archive 漏寫。根因＝我讀完 hook JSON 就自判「夠了」，跳過 `.claude/commands/ao-resume.md` 完整協議。骨架 `ao-resume.ps1` 雖有 §0-§8 佔位，但 §1 只給「（待 Claude 填寫）」一行，不含逐檔表 → 易被壓縮略過。操作者指示：把逐檔表做進骨架本體，每次必見。

@@ -57,7 +57,7 @@
 - [ ] **Stage 1 接通入口** — app.aware-wave 一鍵架站主線（抓 2 筆 `spec_generated` intake → retry trigger-build 看精確錯誤碼 → 對症修 → onboarding UI 走完一筆達 completed）。
 - [ ] **wp-bridge 續做 operation：featured image** / update-existing-post / product update+delete（v0.7.0 只做 product CREATE，其餘端點仍待補）。
 - [ ] **Tarot 增 9 個圖像模型** → handoffs/2026-06-11-0236-add-tarot-models.md（加 ideogram-character/v4-turbo/v3-balanced/v2a-turbo/v4-quality、seedream-4.5、nano-banana-2、imagen-4、flux-2-max 到 Tarot Studio 模型選單）。**核心坑**：9 個各有不同 Replicate input schema，勿套 flux 的 `go_fast/megapixels/guidance/num_inference_steps`（→ 422）；逐一查 schema。改 `image-gen.ts`(TAROT_MODELS:26) + `TarotStudio.tsx`(MODEL_OPTIONS:43) → tsc → /verify-recent → /sg-deploy。
-- [ ] **【POD Studio 自建動工】** 藍本已 100% 完整（`lobster-factory/docs/POD_STUDIO_ROADMAP.md`，附錄 B 全記錄 + Mockup Studio 平拍/模特雙模式 + P4 履約閉環）。明天：① 試生一張 AI mockup 驗證擬真合成（Replicate `google/nano-banana-2`，設計+白/黑 Bella3001+模特+場景）② 排實作 P2a→P4（履約用 Printful 原生，免費自動）→ handoffs/2026-06-11-0254-pod-studio.md
+- [ ] **【POD Studio 自建動工】** 藍本已 100% 完整（`lobster-factory/docs/POD_STUDIO_ROADMAP.md`）。✅ ① 擬真合成驗證 PASS（2026-06-11：nano-banana-2 白衫 ~95% 重現、黑衫 v2 鎖色 prompt ~90%；證據 WORKLOG 2026-06-11 + `Downloads/pod-mockup-test/`；prompt 規則：深色衫逐色鎖色、姿勢避遮胸、設計圖走 data URI）。**下一步 = ② P2a 儲存層動工**（R2 client + media_assets + My Designs；R0 計畫已在 roadmap §實作計畫，等批准）→ 之後 P2b 生成器 → P2c 去背 → Mockup Studio → P2d Printful（需操作者 Printful 帳號）→ P3 上架 → P4 履約（Printful 原生）。**先決小修**：本機 REPLICATE_API_TOKEN 已 stale（SG 2026-06-05 輪替未回填 vault/user-env → 本機 MCP 401）→ handoffs/2026-06-11-0254-pod-studio.md
 
 - [x] POD Studio 路線圖 + tarot 框線收尾（框 png 還沒做好；per-frame 微調 + celestial 補生）→ handoffs/2026-06-06-2026-pod-studio-roadmap.md
 
