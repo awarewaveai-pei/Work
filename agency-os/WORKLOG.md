@@ -4,6 +4,24 @@
 
 ## 2026-06-11
 
+### C1 修復方案完成：0038 media_assets reconcile migration（已寫+審，未套用 — 等操作者 go）
+
+**[任務理解]** critic C1：`0007:40` 與 `0011:35` 兩個互不相容的 `create table if not exists media_assets` → fresh DB 重放壞掉。操作者要求 R0 完整分析後妥善處理。
+
+**[現況分析/取證]** ① 線上 SG DB（REST select 實測）＝純 0011 shape，但 0007 兄弟表 decision_scores/merchandising_insights 存在（200）→ 證明 0007 跑過、media_assets 曾於 ~2026-04-25（0011 commit `5c0068bf`）被手動 drop+recreate 未留紀錄 ② migrations 無 runner 無 tracking table，慣例=手貼 SQL Editor ③ 0010 RLS 只 key organization_id 兩 shape 相容 ④ seeds 不碰此表 ⑤ db-expert 加抓：fresh replay 其實會在 0011:95（index 引用 asset_domain）**先報錯**，非全靜默。
+
+**[方案]** A=新增 0038 前向 reconcile（歷史檔不動）✅ 採用；B=改寫 0007 歷史 ❌（migration 不可變紀律）；C=只註記 ❌（DR 時炸在最壞時刻）。
+
+**[已修改]**（檔案已 commit `b8b31467`，**DB 未套用**）
+- `migrations/0038_media_assets_reconcile.sql` — idempotent：加 0011 canonical 欄位（if not exists）→ 鬆 0007 legacy NOT NULL（guarded）→ 條件式 canonical NOT NULL → CHECK constraints 用 **predicate-column guard**（活體 constraint 名未驗證，name-based 會裝重複）+ NOT VALID → unique index → `notify pgrst, 'reload schema'`（fresh replay 後 REST cache 必須刷）。含 fresh-replay 操作順序註記（0011:95 會先炸 → 0038 後重跑該行）。
+- `scripts/0038_media_assets_reconcile_down.sql` — down 檔（僅 fresh-replay 環境用，檔頭明示禁打 SG）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=SG curl Supabase REST（media_assets 行欄位枚舉 + decision_scores/merchandising_insights 200）+ git log -S 取證 | exit=0 | 線上 shape=0011 確認、0007 已套用確認
+- REVIEW_DONE: critic=Deep(db-expert) | verdict=pass | findings=0c/0M/3s（3 強化全折回：predicate guard / notify pgrst / 0011:95 線頭+down 檔）；db-expert 結論 commit=LOW、apply=LOW（無 table rewrite、SET NOT NULL 在線上短路不掃表）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`media_assets` migrations 全檔掃（0007/0010/0011/0014 四檔，RLS/seeds 相容性逐一驗）| hits=0 額外破壞
+- 套用步驟（等 go）：SG quiet window 貼 SQL Editor → 預期全 no-op → 驗 `select count(*) from media_assets` 不變 + designs route 仍 200。rollback：線上本來就是 no-op 無需回滾；fresh-replay 環境用 down 檔。
+
 ### POD Studio P2a 儲存層完成：R2 designs bucket + media_assets + My Designs 頁（flag 預設 OFF，未部署）
 
 **[任務理解]** P2a＝設計圖持久化地基（圖只活在瀏覽器 → R2 + DB + 列表頁）。操作者已批准 plan（`.claude/plans/pod-studio-p2a-p4-execution-PLAN.md`）後「開始執行」。
