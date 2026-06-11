@@ -4,6 +4,15 @@
 
 ## 2026-06-11
 
+### POD 一鍵上架第二輪部署：Publish 頁上線 + WPBRIDGE env；#7164 已 publish 待 Printful 匯入
+
+- deploy `a4fd0e95`（healthy 7s、4 smoke OK）；SG .env + server compose 補 `WPBRIDGE_BASE_URL/KEY_ID/PRIVATE_KEY`（compose 備份 `.bak.wpbridge-env-*`；container 內驗證 PK_LEN=88）
+- 操作者已把 #7164 publish（前台截圖確認可加購物車）。**Printful `/sync/products?status=all` 仍只有 Bloom** → Woo 端新商品不會即時出現在 Printful API 清單；待操作者開 Printful Dashboard → Stores → Soulful Expression 觸發匯入/或外掛排程後，Publish 頁 ③④ 即可完成綁定（link 寫路徑首驗）
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy + docker exec env + curl sync API | exit=0 | env 三件齊、deploy smoke 全過
+- REVIEW_WAIVED: NA -- 部署操作，無新 code
+- BUGHUNT_WAIVED: NA -- 同上
+
+
 ### POD Studio 一鍵上架鏈完成：upscaler + Ed25519 wp-bridge client + publish 編排 + Publish 頁（含三個 live 發現）
 
 **[已修改]**（6 新檔 + 2 修改；全鏈 = 設計 → 300DPI 印刷檔 → Woo 草稿 → 人審 publish → Printful sync → 綁印刷檔）
