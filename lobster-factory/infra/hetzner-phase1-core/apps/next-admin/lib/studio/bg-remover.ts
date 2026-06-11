@@ -35,47 +35,70 @@ export async function removeBackground(imageDataUrl: string): Promise<BgRemoveRe
   if (!token) return { ok: false, error: "missing_replicate" };
   const version = process.env.BG_REMOVER_VERSION ?? BG_REMOVER_VERSION_DEFAULT;
 
-  let res: Response;
+  // One controller for the whole operation so the deadline aborts in-flight
+  // requests too (loop-top checks alone cannot cancel a hung fetch).
+  const controller = new AbortController();
+  const killer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    res = await fetch("https://api.replicate.com/v1/predictions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        version,
-        input: { image: imageDataUrl, format: "png", background_type: "rgba" },
-      }),
-    });
-  } catch {
-    return { ok: false, error: "replicate_network_error" };
-  }
-  if (res.status === 429) return { ok: false, error: "replicate_429" };
-  if (!res.ok) return { ok: false, error: `replicate_${res.status}` };
+    let res: Response;
+    try {
+      res = await fetch("https://api.replicate.com/v1/predictions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          version,
+          input: { image: imageDataUrl, format: "png", background_type: "rgba" },
+        }),
+        signal: controller.signal,
+      });
+    } catch {
+      return { ok: false, error: controller.signal.aborted ? "generation_timeout" : "replicate_network_error" };
+    }
+    if (res.status === 429) return { ok: false, error: "replicate_429" };
+    if (!res.ok) return { ok: false, error: `replicate_${res.status}` };
 
-  let prediction = (await res.json()) as PredictionResponse;
-  const deadline = Date.now() + TIMEOUT_MS;
-  while (prediction.status === "starting" || prediction.status === "processing") {
-    if (Date.now() > deadline) return { ok: false, error: "generation_timeout" };
-    await sleep(POLL_INTERVAL_MS);
-    const poll = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!poll.ok) return { ok: false, error: `replicate_poll_${poll.status}` };
-    prediction = (await poll.json()) as PredictionResponse;
-  }
-  if (prediction.status !== "succeeded") {
-    return { ok: false, error: prediction.error ? String(prediction.error).slice(0, 200) : "bg_remove_failed" };
-  }
+    let prediction: PredictionResponse;
+    try {
+      prediction = (await res.json()) as PredictionResponse;
+    } catch {
+      return { ok: false, error: "replicate_bad_json" };
+    }
+    const deadline = Date.now() + TIMEOUT_MS;
+    while (prediction.status === "starting" || prediction.status === "processing") {
+      if (Date.now() > deadline) return { ok: false, error: "generation_timeout" };
+      await sleep(POLL_INTERVAL_MS);
+      try {
+        const poll = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (!poll.ok) return { ok: false, error: `replicate_poll_${poll.status}` };
+        prediction = (await poll.json()) as PredictionResponse;
+      } catch {
+        return { ok: false, error: controller.signal.aborted ? "generation_timeout" : "replicate_poll_network_error" };
+      }
+    }
+    if (prediction.status !== "succeeded") {
+      return { ok: false, error: prediction.error ? String(prediction.error).slice(0, 200) : "bg_remove_failed" };
+    }
 
-  const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-  if (!outputUrl || !/^https:\/\/replicate\.delivery\//.test(outputUrl)) {
-    return { ok: false, error: "output_url_not_allowed" };
+    const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+    if (!outputUrl || !/^https:\/\/replicate\.delivery\//.test(outputUrl)) {
+      return { ok: false, error: "output_url_not_allowed" };
+    }
+    try {
+      const dl = await fetch(outputUrl, { signal: controller.signal });
+      if (!dl.ok) return { ok: false, error: `fetch_output_failed_${dl.status}` };
+      const ab = await dl.arrayBuffer();
+      if (ab.byteLength > MAX_OUTPUT_BYTES) return { ok: false, error: "output_too_large" };
+      return { ok: true, image: `data:image/png;base64,${Buffer.from(ab).toString("base64")}` };
+    } catch {
+      return { ok: false, error: controller.signal.aborted ? "generation_timeout" : "fetch_output_network_error" };
+    }
+  } finally {
+    clearTimeout(killer);
   }
-  const dl = await fetch(outputUrl);
-  if (!dl.ok) return { ok: false, error: `fetch_output_failed_${dl.status}` };
-  const ab = await dl.arrayBuffer();
-  if (ab.byteLength > MAX_OUTPUT_BYTES) return { ok: false, error: "output_too_large" };
-  return { ok: true, image: `data:image/png;base64,${Buffer.from(ab).toString("base64")}` };
 }

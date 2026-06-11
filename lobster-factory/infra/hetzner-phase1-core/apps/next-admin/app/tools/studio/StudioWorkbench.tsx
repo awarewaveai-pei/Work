@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   STUDIO_MODEL_OPTIONS,
   type AspectRatio,
@@ -81,6 +81,7 @@ export default function StudioWorkbench() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [bgState, setBgState] = useState<"idle" | "removing" | "done" | "error">("idle");
   const [originalImage, setOriginalImage] = useState<string | null>(null);
+  const bgInFlight = useRef(false); // state lags a render — ref blocks same-tick double-click
 
   const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
   const modelOption = useMemo(() => STUDIO_MODEL_OPTIONS.find((m) => m.value === model), [model]);
@@ -160,6 +161,8 @@ export default function StudioWorkbench() {
 
   const removeBg = useCallback(async () => {
     if (gen.status !== "done" || !gen.image) return;
+    if (bgInFlight.current) return; // double-click = double Replicate charge
+    bgInFlight.current = true;
     setBgState("removing");
     try {
       const res = await fetch("/api/tools/studio/remove-bg", {
@@ -178,6 +181,8 @@ export default function StudioWorkbench() {
       setSaveState("idle"); // transparent version not saved yet
     } catch {
       setBgState("error");
+    } finally {
+      bgInFlight.current = false;
     }
   }, [gen]);
 

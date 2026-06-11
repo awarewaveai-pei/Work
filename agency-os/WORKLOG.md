@@ -4,6 +4,22 @@
 
 ## 2026-06-11
 
+### POD Studio P2c 去背完成 + Printful 憑證落定（store 已綁 Woo）
+
+**[已修改]**（P2c：2 新檔 + Studio UI 增量；零碰 tarot）
+- `lib/studio/bg-remover.ts` — Replicate `851-labs/background-remover`（24.9M runs，rgba 透明輸出；對比 birefnet/remove-bg/rembg 後選定）。version-pinned + `BG_REMOVER_VERSION` env override；**單一 AbortController 55s 貫穿全部 4 個 fetch**（critic Major：loop-top deadline 砍不掉 hung fetch）；poll/下載全包 try/catch 維持 `{ok:false}` 合約；output URL allowlist + 20MB cap
+- `app/api/tools/studio/remove-bg/route.ts` — 同 generate 的閘（flag + role）+ data URL 驗證
+- `StudioWorkbench.tsx` — 「去背（透明 PNG）」/「還原原圖」按鈕；`bgInFlight` **useRef** re-entrancy guard（state 慢一個 render，雙擊=雙扣費；含 finally 釋放）
+- **Printful 憑證（操作者提供）**：Access Key 寫入 `AWARE_WAVE_CREDENTIALS.md §三十一`（UTF-8+BOM 保留）+ vault `PRINTFUL_API_KEY`/`PRINTFUL_STORE_ID`。**實測 GET /stores 200 → store `18314943`「Soulful Expression」type=woocommerce = 外掛已綁站**，P2d 先決解除。APP 專用 key 留佔位待補。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx realtest_p2c.ts`（真打 Replicate 去背 soulful logo）| exit=0 | 輸出 7787 bytes、PNG IHDR colour_type=6（RGBA alpha 確認）→ `Downloads/pod-mockup-test/design-logo-nobg.png`；硬化後重跑仍 PASS；Printful curl /stores 200；tsc P2c 檔 0 錯
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/2M/2m（全修：poll/下載 fetch 無 try/catch 會炸 500 破 ok:false 合約；無 AbortSignal 會超 maxDuration；removeBg 雙擊雙扣費 → useRef guard）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`bg-remover|removeBackground|remove-bg|BG_REMOVER_VERSION` | hits=0 跨檔（僅新檔自身）
+- 自抓 bug：第一版 `bgInFlight.current=true` 無 finally 釋放 → 按鈕永久卡死；同 session 修掉
+
+**[剩餘風險]** route 層 end-to-end 留部署後 `/playwright smoke`；851-labs 為社群模型（version pin + env override 已備援，掛掉換 birefnet 一行 env）。**[rollback]** flag off 全 503；2 新檔可刪；UI 按鈕區塊還原。
+
 ### POD Studio P2b 一般化生成器完成：Studio facade + generate route + Design Studio 頁（flag 同 P2a，未部署）
 
 **[任務理解]** P2b＝把生成能力從 tarot 命名空間解耦給 POD 用。引擎（15 模型 combo-pack）已由 tarot session 完成 → **不重寫**，建 delegation seam。
