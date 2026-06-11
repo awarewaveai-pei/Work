@@ -21,7 +21,7 @@
 
 | 能力 | 現況 | 證據 |
 |---|---|---|
-| **設計生成** | ✅ 已有（tarot）：`app/tools/tarot/*` + `lib/tarot/image-gen.ts`（FLUX/gpt-image，route auth 重用 `resolveOpsRole`+`canCreateAiImageJob`） | 本 session 已建並部署 |
+| **設計生成** | ✅ 已有（tarot）：`app/tools/tarot/*` + `lib/tarot/image-gen.ts`（**15 模型組合包**：FLUX×3/gpt-image×3/ideogram×5/seedream/nano-banana×2/imagen-4，per-model `buildInput` 抽象 + 5 種 aspect ratio；用法/坑見 [`IMAGE_GEN_TOOLKIT.md`](IMAGE_GEN_TOOLKIT.md)；route auth 重用 `resolveOpsRole`+`canCreateAiImageJob`） | 2026-06-11 擴充並 live 驗證 6/6 schema 家族 |
 | **影像 job 佇列** | 🟡 控制面骨架在、**無 worker**：`ai_image_jobs` 表（status/output_asset_id/trace_id）+ `POST /api/ops/ai-image-jobs`；無消費者 | `packages/db/migrations/0011_*.sql`；`AiJobForm.tsx`「executor wiring comes after control-plane stable」 |
 | **持久儲存（R2）** | 🟡 **僅合約 + 表，無上傳程式碼**：`MEDIA_STORAGE_BOUNDARY_CONTRACT.md`（AI 圖→R2）+ `media_assets`(storage_backend r2)；vault 有 `CF_R2_ACCOUNT_ID/API_TOKEN/BUCKET`；manifest action type 有 `r2_put` 但 source 無 `S3Client`/`PutObject` | grep：source 無 aws-sdk client；只有 contract/ops-contracts |
 | **去背** | ❌ 無 | grep removal.ai/rmbg = 0 |
