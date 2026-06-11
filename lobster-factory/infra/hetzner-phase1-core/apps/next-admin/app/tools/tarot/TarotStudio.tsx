@@ -19,7 +19,7 @@ function inGroup(card: TarotCard, key: GroupKey): boolean {
 import { renderPrintCard, CARD_TEMPLATES, type CardTemplate } from "./renderPrintCard";
 // type-only import (erased at build — does not pull the server lib into the client bundle);
 // keeps the model union in sync with the server. maxRefs/cost stay local on purpose.
-import type { TarotModel, AspectRatio } from "../../../lib/tarot/image-gen";
+import type { TarotModel } from "../../../lib/tarot/image-gen";
 
 type Mode = "text" | "image";
 
@@ -64,14 +64,6 @@ const MODEL_OPTIONS: ModelOption[] = [
   { value: "openai-high",          label: "GPT-Image-1 高",       group: "OpenAI",   costNt: 5.5,  maxRefs: 5 },
 ];
 
-const ASPECT_RATIO_OPTIONS: { value: AspectRatio; label: string }[] = [
-  { value: "2:3",  label: "2:3 直" },
-  { value: "9:16", label: "9:16 手機" },
-  { value: "4:5",  label: "4:5 社群" },
-  { value: "1:1",  label: "1:1 方" },
-  { value: "3:2",  label: "3:2 橫" },
-];
-
 type CompareResult = { model: TarotModel; image: string | null; seed: number | null; error?: string; busy: boolean };
 
 function modelOption(m: TarotModel): ModelOption {
@@ -96,7 +88,6 @@ async function callGenerate(body: {
   prompt: string;
   referenceImages?: string[];
   seed?: number | null;
-  aspectRatio?: AspectRatio;
 }): Promise<GenResponse> {
   const res = await fetch("/api/tools/tarot/generate", {
     method: "POST",
@@ -146,7 +137,8 @@ export default function TarotStudio() {
   // Multi-select for comparison; batch generation always uses lockedModel (set at lock time).
   const [selectedModels, setSelectedModels] = useState<Set<TarotModel>>(new Set<TarotModel>(["flux-schnell"]));
   const [lockedModel, setLockedModel] = useState<TarotModel>("flux-schnell");
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("2:3");
+  // Tarot is print-fixed at 2:3 portrait — no ratio UI here. Other apps pass aspectRatio
+  // to the same API/toolkit (see lobster-factory/docs/IMAGE_GEN_TOOLKIT.md).
   const [compareResults, setCompareResults] = useState<CompareResult[]>([]);
   const [compareBusy, setCompareBusy] = useState(false);
   const [mode, setMode] = useState<Mode>("text");
@@ -189,7 +181,7 @@ export default function TarotStudio() {
   const effectiveEnglish = styleEnglishEdited ? styleEnglish : autoEnglish;
 
   // Stale when model selection, aspect ratio, style, subject, or refs changed after last generate.
-  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${activeModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}::ar=${aspectRatio}`;
+  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${activeModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`;
 
   // The deck's style anchor uses lockedModel's maxRefs (set at lock time, not current selection).
   const lockedMaxRefs = modelOption(lockedModel).maxRefs;
@@ -302,7 +294,6 @@ export default function TarotStudio() {
         prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText }),
         referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
-        aspectRatio,
       });
       if (!resp.ok || !resp.image) {
         setMessage(`預覽生成失敗：${resp.error ?? "unknown"}`);
@@ -310,7 +301,7 @@ export default function TarotStudio() {
       }
       setPreviewImage(resp.image);
       setPreviewSeed(resp.seed ?? null);
-      setPreviewSig(`${activeModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}::ar=${aspectRatio}`);
+      setPreviewSig(`${activeModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
     } catch (e) {
       setMessage(`預覽生成失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -334,7 +325,6 @@ export default function TarotStudio() {
             prompt,
             referenceImages: mode === "image" ? referenceImages.slice(0, modelOption(m).maxRefs) : [],
             seed: null,
-            aspectRatio,
           });
           return { model: m, image: resp.ok && resp.image ? resp.image : null, seed: resp.ok ? (resp.seed ?? null) : null, error: resp.ok ? undefined : (resp.error ?? "unknown"), busy: false };
         } catch (e) {
@@ -352,7 +342,7 @@ export default function TarotStudio() {
     setPreviewImage(r.image);
     setPreviewSeed(r.seed);
     setSelectedModels(new Set([r.model]));
-    setPreviewSig(`${r.model}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}::ar=${aspectRatio}`);
+    setPreviewSig(`${r.model}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
     setCompareResults([]);
   }
 
@@ -380,7 +370,6 @@ export default function TarotStudio() {
         prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
         referenceImages: lockedRefs,
         seed: previewSeed,
-        aspectRatio,
       });
       if (!resp.ok || !resp.image) {
         patchItem(index, { status: "error", error: resp.error ?? "unknown" });
@@ -540,37 +529,6 @@ export default function TarotStudio() {
                 ? "此模型不吃參考圖（純文字生圖）"
                 : `此模型最多吃 ${maxRefs} 張參考圖`}
           </div>
-        </div>
-
-        <div className="form-row">
-          <label className="form-label">畫面比例</label>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {ASPECT_RATIO_OPTIONS.map((ar) => {
-              const active = aspectRatio === ar.value;
-              return (
-                <button
-                  key={ar.value}
-                  type="button"
-                  disabled={locked}
-                  onClick={() => setAspectRatio(ar.value)}
-                  style={{
-                    padding: "5px 14px",
-                    borderRadius: 14,
-                    fontSize: 12,
-                    cursor: locked ? "default" : "pointer",
-                    border: `1px solid ${active ? "#0ea5e9" : "var(--card-border)"}`,
-                    background: active ? "#0ea5e9" : "rgba(127,127,127,0.08)",
-                    color: active ? "#fff" : "var(--text-muted)",
-                    fontWeight: active ? 600 : 400,
-                    opacity: locked ? 0.5 : 1,
-                  }}
-                >
-                  {ar.label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="form-hint">部分模型（Imagen 4、OpenAI）不支援所有比例，會自動映射到最近的比例。</div>
         </div>
 
         <div className="form-row">
