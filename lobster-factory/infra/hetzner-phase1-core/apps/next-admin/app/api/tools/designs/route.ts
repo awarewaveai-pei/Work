@@ -114,6 +114,7 @@ export async function POST(request: Request) {
       mime_type: parsed.mime,
       byte_size: uploaded.byteSize,
       checksum_sha256: uploaded.checksumSha256,
+      // Advisory only — caller-supplied, validated as UUID shape but not authenticated.
       created_by: body.actorUserId ?? null,
       metadata: {
         source: "pod-studio",
@@ -128,10 +129,11 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ ok: false, error: "insert_failed", details: error.message }, { status: 409 });
+    console.error("[designs] media_assets insert failed:", error.message);
+    return NextResponse.json({ ok: false, error: "insert_failed" }, { status: 409 });
   }
 
-  await supabase.from("ops_audit_events").insert({
+  const { error: auditError } = await supabase.from("ops_audit_events").insert({
     organization_id: organizationId,
     actor_user_id: body.actorUserId ?? null,
     actor_role: resolved.role,
@@ -146,6 +148,10 @@ export async function POST(request: Request) {
       role_source: resolved.source,
     },
   });
+  if (auditError) {
+    // Asset is already committed — do not fail the request, but never drop the trail silently.
+    console.warn("[designs] ops_audit_events insert failed:", auditError.message);
+  }
 
   return NextResponse.json({ ok: true, asset: data });
 }
@@ -155,7 +161,10 @@ export async function GET(request: Request) {
   if (!featureEnabled()) {
     return NextResponse.json({ ok: false, error: "pod_designs_disabled" }, { status: 503 });
   }
-  resolveOpsRole(request); // role resolution kept for parity/logging; reads are open to all ops roles
+  // Reads are open to all ops roles. The actual auth boundary for /api/* is the
+  // nginx basic-auth layer in front of next-admin on SG (OPS_BASIC_USER/OPS_BASIC_PASSWORD,
+  // lobster-phase1 nginx vhost) — same posture as the other /api/tools/* routes.
+  resolveOpsRole(request);
 
   const url = new URL(request.url);
   const organizationId = url.searchParams.get("organizationId") ?? defaultOrganizationId();
@@ -166,7 +175,9 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabase = getSupabaseReadClient() ?? getSupabaseWriteClient();
+  // Prefer the service-role client: media_assets has RLS keyed to Clerk JWTs, and this
+  // server route carries no user JWT — the anon client would silently return 0 rows.
+  const supabase = getSupabaseWriteClient() ?? getSupabaseReadClient();
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
   }
@@ -182,7 +193,8 @@ export async function GET(request: Request) {
     .limit(LIST_LIMIT);
 
   if (error) {
-    return NextResponse.json({ ok: false, error: "list_failed", details: error.message }, { status: 500 });
+    console.error("[designs] list failed:", error.message);
+    return NextResponse.json({ ok: false, error: "list_failed" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, assets: data ?? [] });
