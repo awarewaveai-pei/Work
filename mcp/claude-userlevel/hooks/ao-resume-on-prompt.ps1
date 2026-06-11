@@ -127,6 +127,10 @@ try {
     # changes only on /clear or a new terminal session — so it is a correct new-session signal,
     # immune to clock/date/late-night work. We auto-trigger ONLY when session_id changed.
     # Fail-safe: empty session_id (unexpected) => no auto-trigger (the user can type AO-RESUME).
+    # DELIBERATE DROP: the old 8h block also force-triggered when ao-resume-hook-last.json was
+    # missing/corrupt. That is intentionally gone — the new trigger keys off the separate
+    # ao-resume-last-session-id.txt, so json corruption no longer affects triggering, and a missing
+    # session-id file still triggers (lastSessionId="" != non-empty sessionId). Not an accidental loss.
     # ORDERING: MUST run BEFORE the dirty-tree short-circuit below (that branch exits early).
     $autoTriggerAoResume = $false
     $sessionIdFile = Join-Path $root "agency-os\.agency-state\ao-resume-last-session-id.txt"

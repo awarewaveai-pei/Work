@@ -1064,9 +1064,20 @@ if (Test-Path -LiteralPath $worklogSrcPath) {
 
 $nowStamp = (Get-Date).ToUniversalTime().ToString("o")
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-[System.IO.File]::WriteAllText($stampPath, $nowStamp + [Environment]::NewLine, $utf8NoBom)
-Write-Host ""
-Write-Host ("AO-RESUME stamp updated: {0}" -f $nowStamp) -ForegroundColor DarkGray
+# Advance ao-resume-last.txt ONLY for a real report-producing AO-RESUME (-WriteArchiveSkeleton).
+# The stamp is the AO-CLOSE archive-gate anchor (verify-aoresume-archive.ps1): it must move in
+# lockstep with the skeleton, else an auto-refresh / non-interactive run would advance the stamp
+# with no matching archive and falsely fail the gate at the next AO-CLOSE. Auto-refresh regenerates
+# state files only — it is NOT an AO-RESUME report event, so it must not move this anchor.
+# (Other consumers — fetch-external-signals fallback, print-today-closeout-recap — also want the
+# last REAL AO-RESUME time here, not an auto-refresh time.) Root cause: 2026-06-11 critic review.
+if ($WriteArchiveSkeleton) {
+    [System.IO.File]::WriteAllText($stampPath, $nowStamp + [Environment]::NewLine, $utf8NoBom)
+    Write-Host ""
+    Write-Host ("AO-RESUME stamp updated: {0}" -f $nowStamp) -ForegroundColor DarkGray
+} else {
+    Write-Host ("AO-RESUME stamp NOT advanced (auto-refresh / non-interactive; no archive expected, gate anchor unchanged)") -ForegroundColor DarkGray
+}
 
 # --- AO-RESUME archive skeleton (preventer for health gate 12d / verify-aoresume-archive.ps1) ---
 # Root cause (2026-06-08 investigation): Step 3 of ao-resume.md (write the AO-RESUME report to
