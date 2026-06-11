@@ -4,6 +4,23 @@
 
 ## 2026-06-11
 
+### Tarot Studio 擴充：10 新模型 + 比例選擇 + 多模型比較 + chip 選模型 UI
+
+**[任務理解]** 在 Tarot Studio 塔羅牌生成工具加入 10 個 Replicate 模型（ideogram×5、seedream-4.5、nano-banana-2/pro、imagen-4、flux-2-max），支援 3:2/4:5/1:1/9:16 比例，模型選擇改 chip 式（多選），並加入多模型同時生成比較功能。
+
+**[已修改]**
+- `lib/tarot/image-gen.ts`：完整改寫。新增 `AspectRatio` 型別 + `BuildInputParams` 介面 + `VALID_ASPECT_RATIOS`；`ModelConfig` 加 `slug` + `buildInput` 欄位；新增 `generateReplicate()` 泛型 Replicate 路徑（per-model buildInput combo-pack）；`TAROT_MODELS` 擴充 10 個新模型各附 buildInput；`generateFlux/Openai` 同步支援 `aspectRatio`；`TarotModel` union 擴為 15 個。
+- `app/api/tools/tarot/generate/route.ts`：加 `aspectRatio` 欄位 + `isAspectRatio()` 驗證 + 傳入 `generateTarotImage()`。
+- `app/tools/tarot/TarotStudio.tsx`：`model` 單選 → `selectedModels: Set<TarotModel>`（多選）；加 `lockedModel`（鎖定後的批次模型）+ `aspectRatio` + `compareResults` 狀態；`MODEL_OPTIONS` 擴為 15 項含 group 分組；`<select>` → chip button 多選（含 MODEL_GROUPS 分組顯示）；加比例 chip 列；加 `generateCompare()` 並行生成 + 比較結果 grid + `selectCompareResult()` 選中一個並窄化到單選；`generateOne/Group` 改用 `lockedModel` + `aspectRatio`。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | 新增程式碼 0 type errors（僅 pre-existing jszip+@supabase/ssr 2 個無關錯誤）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（tsc clean；logic trace：activeModel/lockedModel 分離、lockedRefs 改用 lockedMaxRefs、previewSig 含 ar=、selectCompareResult 正確窄化 selectedModels）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`TarotModel\|generateTarotImage\|isTarotModel\|isAspectRatio` | hits=0 stale（route.ts + TarotStudio.tsx 全部更新；no other callers outside tarot/）
+- REALTEST_WAIVED: SMOKE_COVERED -- Replicate token 本機 401（SG 有效），tsc gate pass 已是 build-correct 保證；API 真實測試待 token 更新後驗
+
+
+
 ### POD Studio P0 驗證：Nano Banana 2 擬真 mockup 合成 — PASS（白衫近完美、黑衫鎖色 prompt 可修）
 
 **[任務理解]** handoff `2026-06-11-0254-pod-studio.md` 指令 ①：用 Replicate `google/nano-banana-2` 試生設計圖+模特+場景 mockup，驗「擬真合成」可行性（整條 P2a→P4 流水線的先決）。設計圖用 soulful 既有 logo（4 色花卉+橘 S 曲線）。

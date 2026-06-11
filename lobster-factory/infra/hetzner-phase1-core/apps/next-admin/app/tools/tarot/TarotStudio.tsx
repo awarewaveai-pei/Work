@@ -39,18 +39,46 @@ interface BatchItem {
 }
 
 // Model menu, cheapest → priciest. costNt = rough NT$ per image (for the 78-card estimate).
-// maxRefs = how many reference images this model actually consumes (0 = text-only).
-const MODEL_OPTIONS: { value: TarotModel; label: string; costNt: number; maxRefs: number }[] = [
-  { value: "flux-schnell", label: "FLUX schnell · 最省 ~NT$0.1/張（整套約 NT$8）", costNt: 0.1, maxRefs: 0 },
-  { value: "openai-low", label: "gpt-image-1 低品質 · ~NT$0.5/張（整套約 NT$40）", costNt: 0.5, maxRefs: 5 },
-  { value: "flux-dev", label: "FLUX dev · 品質好 ~NT$1/張（整套約 NT$80）", costNt: 1, maxRefs: 1 },
-  { value: "openai-medium", label: "gpt-image-1 中品質 · ~NT$1.3/張（整套約 NT$100）", costNt: 1.3, maxRefs: 5 },
-  { value: "openai-high", label: "gpt-image-1 高品質 · ~NT$5.5/張（整套約 NT$430）", costNt: 5.5, maxRefs: 5 },
+// maxRefs = how many reference images this model consumes (0 = text-only).
+type ModelOption = { value: TarotModel; label: string; group: string; costNt: number; maxRefs: number };
+const MODEL_OPTIONS: ModelOption[] = [
+  // Budget
+  { value: "flux-schnell",         label: "FLUX schnell",         group: "BFL",      costNt: 0.1,  maxRefs: 0 },
+  // Ideogram
+  { value: "ideogram-v2a-turbo",   label: "Ideogram v2a Turbo",   group: "Ideogram", costNt: 1,    maxRefs: 0 },
+  { value: "ideogram-v3-balanced", label: "Ideogram v3 Balanced", group: "Ideogram", costNt: 2,    maxRefs: 0 },
+  { value: "ideogram-v4-turbo",    label: "Ideogram v4 Turbo",    group: "Ideogram", costNt: 1,    maxRefs: 0 },
+  { value: "ideogram-v4-quality",  label: "Ideogram v4 Quality",  group: "Ideogram", costNt: 3,    maxRefs: 0 },
+  { value: "ideogram-character",   label: "Ideogram Character",   group: "Ideogram", costNt: 5,    maxRefs: 1 },
+  // Creative
+  { value: "flux-dev",             label: "FLUX dev",             group: "BFL",      costNt: 1,    maxRefs: 1 },
+  { value: "flux-2-max",           label: "FLUX 2 Max",           group: "BFL",      costNt: 2.3,  maxRefs: 0 },
+  // Google / ByteDance
+  { value: "seedream-4.5",         label: "Seedream 4.5",         group: "Google+",  costNt: 1.3,  maxRefs: 0 },
+  { value: "nano-banana-2",        label: "Nano Banana 2",        group: "Google+",  costNt: 2.2,  maxRefs: 14 },
+  { value: "nano-banana-pro",      label: "Nano Banana Pro",      group: "Google+",  costNt: 4.4,  maxRefs: 8 },
+  { value: "imagen-4",             label: "Imagen 4",             group: "Google+",  costNt: 1.3,  maxRefs: 0 },
+  // OpenAI
+  { value: "openai-low",           label: "GPT-Image-1 低",       group: "OpenAI",   costNt: 0.5,  maxRefs: 5 },
+  { value: "openai-medium",        label: "GPT-Image-1 中",       group: "OpenAI",   costNt: 1.3,  maxRefs: 5 },
+  { value: "openai-high",          label: "GPT-Image-1 高",       group: "OpenAI",   costNt: 5.5,  maxRefs: 5 },
 ];
 
-function modelOption(m: TarotModel) {
+const ASPECT_RATIO_OPTIONS: { value: AspectRatio; label: string }[] = [
+  { value: "2:3",  label: "2:3 直" },
+  { value: "9:16", label: "9:16 手機" },
+  { value: "4:5",  label: "4:5 社群" },
+  { value: "1:1",  label: "1:1 方" },
+  { value: "3:2",  label: "3:2 橫" },
+];
+
+type CompareResult = { model: TarotModel; image: string | null; seed: number | null; error?: string; busy: boolean };
+
+function modelOption(m: TarotModel): ModelOption {
   return MODEL_OPTIONS.find((o) => o.value === m) ?? MODEL_OPTIONS[0];
 }
+
+const MODEL_GROUPS = Array.from(new Set(MODEL_OPTIONS.map((o) => o.group)));
 
 // Neutral gradient used to render template previews before the user has generated art.
 const PLACEHOLDER_ART =
@@ -68,6 +96,7 @@ async function callGenerate(body: {
   prompt: string;
   referenceImages?: string[];
   seed?: number | null;
+  aspectRatio?: AspectRatio;
 }): Promise<GenResponse> {
   const res = await fetch("/api/tools/tarot/generate", {
     method: "POST",
@@ -114,7 +143,12 @@ async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Pr
 }
 
 export default function TarotStudio() {
-  const [model, setModel] = useState<TarotModel>("flux-schnell");
+  // Multi-select for comparison; batch generation always uses lockedModel (set at lock time).
+  const [selectedModels, setSelectedModels] = useState<Set<TarotModel>>(new Set<TarotModel>(["flux-schnell"]));
+  const [lockedModel, setLockedModel] = useState<TarotModel>("flux-schnell");
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("2:3");
+  const [compareResults, setCompareResults] = useState<CompareResult[]>([]);
+  const [compareBusy, setCompareBusy] = useState(false);
   const [mode, setMode] = useState<Mode>("text");
   const [group, setGroup] = useState<GroupKey>("major");
   const [template, setTemplate] = useState<CardTemplate>("gold");
@@ -141,7 +175,10 @@ export default function TarotStudio() {
   const [templateThumbs, setTemplateThumbs] = useState<Record<string, string>>({});
 
   const doneCount = batch.filter((b) => b.status === "done").length;
-  const maxRefs = modelOption(model).maxRefs;
+  // For Step 1 UI (ref upload limit), use first selected model.
+  const activeModel: TarotModel = Array.from(selectedModels)[0] ?? "flux-schnell";
+  const maxRefs = modelOption(activeModel).maxRefs;
+  const isMultiModel = selectedModels.size > 1;
 
   // Style box = comma-separated zh labels. zh labels never contain commas, so this cleanly
   // recovers the selected chips (drives chip highlight + toggle).
@@ -151,18 +188,16 @@ export default function TarotStudio() {
   const autoEnglish = resolveStylePrompt(stylePrompt);
   const effectiveEnglish = styleEnglishEdited ? styleEnglish : autoEnglish;
 
-  // True when the user changed style, model, subject, OR reference images after generating the
-  // current preview but hasn't regenerated — the frame thumbnails still show the OLD image.
-  // referenceImages.length is included because adding/removing refs changes the batch anchor.
-  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${model}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`;
+  // Stale when model selection, aspect ratio, style, subject, or refs changed after last generate.
+  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${activeModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}::ar=${aspectRatio}`;
 
-  // The deck's style anchor: explicit uploads (capped to the model's limit), else the locked preview.
-  // maxRefs === 0 (e.g. FLUX schnell) → no image is sent; style relies on prompt + seed.
+  // The deck's style anchor uses lockedModel's maxRefs (set at lock time, not current selection).
+  const lockedMaxRefs = modelOption(lockedModel).maxRefs;
   const lockedRefs: string[] =
-    maxRefs === 0
+    lockedMaxRefs === 0
       ? []
       : referenceImages.length > 0
-        ? referenceImages.slice(0, maxRefs)
+        ? referenceImages.slice(0, lockedMaxRefs)
         : previewImage
           ? [previewImage]
           : [];
@@ -240,28 +275,34 @@ export default function TarotStudio() {
     setReferenceImages((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function generatePreview() {
+  function previewInputsValid(): boolean {
     setMessage(null);
     if (mode === "image" && referenceImages.length === 0) {
       setMessage("以圖生圖模式請先上傳至少一張參考圖（或切到文字模式並填描述）");
-      return;
+      return false;
     }
-    // 風格描述為選填：有「風格描述 ≥3 字」「角色描述 ≥2 字」「上傳參考圖」其一即可
     const hasStyle = effectiveEnglish.trim().length >= 3;
     const hasSubject = subjectText.trim().length >= 2;
     const hasRef = mode === "image" && referenceImages.length > 0;
     if (!hasStyle && !hasSubject && !hasRef) {
       setMessage("請填風格描述（至少 3 字）或角色描述，或在「以圖生圖」模式上傳參考圖");
-      return;
+      return false;
     }
+    return true;
+  }
+
+  async function generatePreview() {
+    if (!previewInputsValid()) return;
     setPreviewBusy(true);
     setLocked(false);
+    setCompareResults([]);
     try {
       const resp = await callGenerate({
-        model,
+        model: activeModel,
         prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText }),
         referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
+        aspectRatio,
       });
       if (!resp.ok || !resp.image) {
         setMessage(`預覽生成失敗：${resp.error ?? "unknown"}`);
@@ -269,9 +310,7 @@ export default function TarotStudio() {
       }
       setPreviewImage(resp.image);
       setPreviewSeed(resp.seed ?? null);
-      // snapshot what produced this preview (model + style + subject + ref count) so previewStale
-      // fires when any of those inputs change before the user regenerates.
-      setPreviewSig(`${model}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
+      setPreviewSig(`${activeModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}::ar=${aspectRatio}`);
     } catch (e) {
       setMessage(`預覽生成失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -279,11 +318,50 @@ export default function TarotStudio() {
     }
   }
 
+  // Multi-model comparison: generate same prompt on all selected models simultaneously.
+  async function generateCompare() {
+    if (!previewInputsValid()) return;
+    setCompareBusy(true);
+    setLocked(false);
+    const modelList = Array.from(selectedModels);
+    setCompareResults(modelList.map((m) => ({ model: m, image: null, seed: null, busy: true })));
+    const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText });
+    const results = await Promise.all(
+      modelList.map(async (m): Promise<CompareResult> => {
+        try {
+          const resp = await callGenerate({
+            model: m,
+            prompt,
+            referenceImages: mode === "image" ? referenceImages.slice(0, modelOption(m).maxRefs) : [],
+            seed: null,
+            aspectRatio,
+          });
+          return { model: m, image: resp.ok && resp.image ? resp.image : null, seed: resp.ok ? (resp.seed ?? null) : null, error: resp.ok ? undefined : (resp.error ?? "unknown"), busy: false };
+        } catch (e) {
+          return { model: m, image: null, seed: null, error: e instanceof Error ? e.message : String(e), busy: false };
+        }
+      }),
+    );
+    setCompareResults(results);
+    setCompareBusy(false);
+  }
+
+  // Pick a comparison result as the active preview → narrows to single model.
+  function selectCompareResult(r: CompareResult) {
+    if (!r.image) return;
+    setPreviewImage(r.image);
+    setPreviewSeed(r.seed);
+    setSelectedModels(new Set([r.model]));
+    setPreviewSig(`${r.model}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}::ar=${aspectRatio}`);
+    setCompareResults([]);
+  }
+
   function lockStyle() {
     if (!previewImage) return;
+    setLockedModel(activeModel); // freeze which model is used for batch generation
     setLocked(true);
+    setCompareResults([]);
     setBatch((prev) => {
-      // re-lock after a prior batch: revoke old blob urls before resetting
       prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
       return TAROT_CARDS.map((card) => ({ card, status: "idle" }));
     });
@@ -298,10 +376,11 @@ export default function TarotStudio() {
     patchItem(index, { status: "pending", error: undefined });
     try {
       const resp = await callGenerate({
-        model,
+        model: lockedModel,
         prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
-        referenceImages: lockedRefs, // consistent style anchor across the deck (where the model supports it)
-        seed: previewSeed, // FLUX reproducibility; ignored by openai
+        referenceImages: lockedRefs,
+        seed: previewSeed,
+        aspectRatio,
       });
       if (!resp.ok || !resp.image) {
         patchItem(index, { status: "error", error: resp.error ?? "unknown" });
@@ -326,12 +405,12 @@ export default function TarotStudio() {
   async function generateGroup() {
     const targets = batch.map((it, i) => ({ i, card: it.card })).filter(({ card }) => inGroup(card, group));
     if (targets.length === 0) return;
-    const opt = modelOption(model);
+    const opt = modelOption(lockedModel);
     const estNt = Math.round(targets.length * opt.costNt);
     const mins = Math.max(1, Math.round((targets.length * 20) / 60));
     const label = GROUPS.find((g) => g.key === group)?.label ?? "";
     const ok = window.confirm(
-      `即將生成 ${targets.length} 張（${label}，${model}）。\n` +
+      `即將生成 ${targets.length} 張（${label}，${lockedModel}）。\n` +
         `預估費用約 NT$${estNt}，約 ${mins} 分鐘，請保持此分頁開啟。\n\n確定開始？`,
     );
     if (!ok) return;
@@ -406,20 +485,92 @@ export default function TarotStudio() {
         <h2 style={{ fontSize: 15, margin: "0 0 14px" }}>Step 1 · 風格設計</h2>
 
         <div className="form-row">
-          <label className="form-label">圖片模型（價格由低到高）</label>
-          <select className="form-select" value={model} onChange={(e) => setModel(e.target.value as TarotModel)} disabled={locked}>
-            {MODEL_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+          <label className="form-label">
+            圖片模型{isMultiModel ? "（多選 → 生成比較）" : "（點選 → 生成預覽）"}
+          </label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {MODEL_GROUPS.map((group) => (
+              <div key={group}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{group}</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {MODEL_OPTIONS.filter((o) => o.group === group).map((o) => {
+                    const active = selectedModels.has(o.value);
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        disabled={locked}
+                        onClick={() => {
+                          setSelectedModels((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(o.value)) {
+                              if (next.size > 1) next.delete(o.value); // keep at least 1 selected
+                            } else {
+                              next.add(o.value);
+                            }
+                            return next;
+                          });
+                        }}
+                        title={`~NT$${o.costNt}/張${o.maxRefs > 0 ? `，最多 ${o.maxRefs} 張參考圖` : "，純文字"}`}
+                        style={{
+                          padding: "5px 12px",
+                          borderRadius: 14,
+                          fontSize: 12,
+                          cursor: locked ? "default" : "pointer",
+                          border: `1px solid ${active ? "#6366f1" : "var(--card-border)"}`,
+                          background: active ? "#6366f1" : "rgba(127,127,127,0.08)",
+                          color: active ? "#fff" : "var(--text-muted)",
+                          fontWeight: active ? 600 : 400,
+                          opacity: locked ? 0.5 : 1,
+                        }}
+                      >
+                        {active && selectedModels.size === 1 ? "✓ " : active ? "☑ " : ""}{o.label}
+                        <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>NT${o.costNt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
-          </select>
-          <div className="form-hint">
-            📎 參考圖容量：
-            {maxRefs === 0
-              ? "此模型不吃參考圖（純文字生圖；要用上傳圖請改 FLUX dev = 1 張，或 gpt-image-1 = 最多 5 張）"
-              : `此模型最多吃 ${maxRefs} 張參考圖`}
           </div>
+          <div className="form-hint" style={{ marginTop: 6 }}>
+            {isMultiModel
+              ? `已選 ${selectedModels.size} 個模型 → 點「生成比較」同時生成對比。`
+              : maxRefs === 0
+                ? "此模型不吃參考圖（純文字生圖）"
+                : `此模型最多吃 ${maxRefs} 張參考圖`}
+          </div>
+        </div>
+
+        <div className="form-row">
+          <label className="form-label">畫面比例</label>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {ASPECT_RATIO_OPTIONS.map((ar) => {
+              const active = aspectRatio === ar.value;
+              return (
+                <button
+                  key={ar.value}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => setAspectRatio(ar.value)}
+                  style={{
+                    padding: "5px 14px",
+                    borderRadius: 14,
+                    fontSize: 12,
+                    cursor: locked ? "default" : "pointer",
+                    border: `1px solid ${active ? "#0ea5e9" : "var(--card-border)"}`,
+                    background: active ? "#0ea5e9" : "rgba(127,127,127,0.08)",
+                    color: active ? "#fff" : "var(--text-muted)",
+                    fontWeight: active ? 600 : 400,
+                    opacity: locked ? 0.5 : 1,
+                  }}
+                >
+                  {ar.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="form-hint">部分模型（Imagen 4、OpenAI）不支援所有比例，會自動映射到最近的比例。</div>
         </div>
 
         <div className="form-row">
@@ -679,14 +830,85 @@ export default function TarotStudio() {
           </div>
         )}
 
-        <button
-          className="btn-primary"
-          onClick={generatePreview}
-          disabled={previewBusy || locked}
-          style={previewStale ? { boxShadow: "0 0 0 3px #fde68a" } : undefined}
-        >
-          {previewBusy ? "生成中…" : previewImage ? "重新生成預覽（套用新風格）" : "生成風格預覽"}
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {isMultiModel ? (
+            <button
+              className="btn-primary"
+              onClick={generateCompare}
+              disabled={compareBusy || locked}
+            >
+              {compareBusy ? `生成中… (${selectedModels.size} 個模型)` : `生成比較（${selectedModels.size} 個）`}
+            </button>
+          ) : (
+            <button
+              className="btn-primary"
+              onClick={generatePreview}
+              disabled={previewBusy || locked}
+              style={previewStale ? { boxShadow: "0 0 0 3px #fde68a" } : undefined}
+            >
+              {previewBusy ? "生成中…" : previewImage ? "重新生成預覽（套用新風格）" : "生成風格預覽"}
+            </button>
+          )}
+        </div>
+
+        {/* Multi-model comparison results */}
+        {compareResults.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13 }}>
+              比較結果（點選你喜歡的，進入整套生成）
+            </div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              {compareResults.map((r) => (
+                <div key={r.model} style={{ textAlign: "center", maxWidth: 220 }}>
+                  {r.busy ? (
+                    <div
+                      style={{
+                        width: 180,
+                        height: 270,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: "1px solid var(--card-border)",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      ⏳ 生成中…
+                    </div>
+                  ) : r.image ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={r.image}
+                        alt={r.model}
+                        onClick={() => selectCompareResult(r)}
+                        title="點擊選這個風格"
+                        style={{ width: 180, borderRadius: 8, border: "2px solid transparent", cursor: "pointer", display: "block" }}
+                      />
+                      <div style={{ fontSize: 11, marginTop: 4, color: "var(--text-muted)" }}>
+                        {modelOption(r.model).label}
+                      </div>
+                      <button
+                        className="btn-primary"
+                        style={{ marginTop: 6, fontSize: 11, padding: "4px 14px" }}
+                        onClick={() => selectCompareResult(r)}
+                      >
+                        選這個
+                      </button>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#ef4444", width: 180 }}>
+                      {modelOption(r.model).label}
+                      <br />
+                      ⚠ {r.error ?? "失敗"}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {previewImage && (
           <div style={{ marginTop: 16, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
