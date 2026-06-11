@@ -1100,7 +1100,20 @@ try {
 （待 Claude 填寫）
 
 ## 1. 系統快照
-（待 Claude 填寫）
+（待 Claude 填寫：精簡狀態表 | 項目 | 狀態 | — Git 對齊 / 整體健康% / Smoke / 備份 / VPS 自動重啟 / Cloudflare / 排程新鮮度 / 跨機 import）
+
+**跨機 import 逐檔狀態（secrets vault — 固定每次開機同步的檔，必填每一列）**
+
+| 檔案 | 狀態 |
+|------|------|
+| MEMORY.md | （待 Claude 填寫）|
+| user-env.ps1 | （待 Claude 填寫）|
+| .ssh/config | （待 Claude 填寫）|
+| .ssh/id_ed25519 (+.pub) | （待 Claude 填寫）|
+| .ssh/hetzner_trigger (+.pub) | （待 Claude 填寫）|
+| .ssh/hostinger_soulful | （待 Claude 填寫）|
+| AWARE_WAVE_CREDENTIALS.md | （待 Claude 填寫）|
+| ao-close-last.txt (gap 錨) | （待 Claude 填寫）|
 
 ## 2. 外部信號
 （待 Claude 填寫）

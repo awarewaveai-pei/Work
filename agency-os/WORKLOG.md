@@ -4,6 +4,20 @@
 
 ## 2026-06-11
 
+### fix: AO-RESUME 骨架加入「跨機 import 逐檔狀態」表（強制每次填，閘有牙）
+
+**[任務理解]** 操作者連抓三次本 session AO-RESUME 報告薄：① 整體薄 ② §1 跨機 import 壓成一行（範本 `ao-resume.md` L181-192 明文要求逐檔表，我自行省略）③ Step 3 archive 漏寫。根因＝我讀完 hook JSON 就自判「夠了」，跳過 `.claude/commands/ao-resume.md` 完整協議。骨架 `ao-resume.ps1` 雖有 §0-§8 佔位，但 §1 只給「（待 Claude 填寫）」一行，不含逐檔表 → 易被壓縮略過。操作者指示：把逐檔表做進骨架本體，每次必見。
+
+**[已修改]**
+- `scripts/ao-resume.ps1` skeleton heredoc（L1102-1116）：`## 1. 系統快照` 下加入「**跨機 import 逐檔狀態（secrets vault…）**」標題 + 8 列表（MEMORY.md / user-env.ps1 / .ssh/config / .ssh/id_ed25519 / .ssh/hetzner_trigger / .ssh/hostinger_soulful / AWARE_WAVE_CREDENTIALS.md / ao-close-last.txt），對齊範本 L191 點名 7 檔 + gap 錨。每列佔位用「（待 Claude 填寫）」**而非「（待填）」**—— 複用 AO-CLOSE 內容閘現有觸發字串（`verify-aoresume-archive.ps1` L112 `Contains('Claude 填寫')`），漏填任一列 → AO-CLOSE BLOCK，**無需改閘程式**。
+- 坑：`@"..."@` here-string 內反引號是 PS 跳脫字元，markdown code-span `` `user-env` ``→`` `u ``被當 Unicode escape、`` `ao-close` ``→`` `a ``當 bell（IDE diagnostic L1110 報錯）→ 改用純檔名無反引號。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`[Parser]::ParseFile('scripts/ao-resume.ps1')` + heredoc render via temp ps1 + regex 確認 8 列含閘觸發字串 | exit=0 | PARSE OK 0 errors；render 出 4 列待填表；gate-string embedded rows=4(anchor)
+- REVIEW_DONE: critic=Quick(self) | verdict=pass | findings=0c/0m/0n（read-back L1102-1116 CJK 無亂碼；複用現有 enforcement 無新邏輯；對齊範本 L181-192 點名清單）
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`AORESUME_ARCHIVE_ENFORCE_CONTENT|verify-aoresume-archive|待 Claude 填寫` | hits=0 破壞 —— 唯一 skeleton 消費者 verify-aoresume-archive.ps1 用 `Contains('Claude 填寫')`，新表 8 列皆含此字串→自動納入既有 AO-CLOSE 內容閘；env=1 由 ao-close.ps1:459 啟用（gate 確有牙）；無其他 parser 依賴骨架格式
+- 跨機：`scripts/` 走 git → 兩機 pull 自動同步（R1）
+
 ### fix: cross-machine memory local-backup 目錄失效
 
 **根因**：PowerShell 5.1 `switch ($x)` 會將 `$_` 覆寫為 switch 運算式的值（字串 `"unchanged"` 等），不再是 `ForEach-Object` pipeline 物件。`$_.Name` 在 switch 內變成 `$null` → `""` → `"memory/"` 無檔名 → `Invoke-LocalBackup` 的 dst 路徑結尾為 `\memory\`（無檔名）→ Windows 拋 "directory name is invalid"。  
