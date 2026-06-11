@@ -78,7 +78,15 @@ export async function POST(request: Request) {
     if (!r.ok) {
       return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
     }
-    return NextResponse.json({ ok: true, printFileUrl: r.printFileUrl, byteSize: r.byteSize, scaleUsed: r.scaleUsed });
+    return NextResponse.json({
+      ok: true,
+      printFileUrl: r.printFileUrl,
+      byteSize: r.byteSize,
+      inputLongEdgePx: r.inputLongEdgePx,
+      achievedLongEdgePx: r.achievedLongEdgePx,
+      meetsTarget: r.meetsTarget,
+      passes: r.passes,
+    });
   }
 
   // ── Step 2: create draft Woo product via wp-bridge ─────────────────────────
@@ -132,8 +140,8 @@ export async function POST(request: Request) {
     if (!isPrintfulConfigured()) {
       return NextResponse.json({ ok: false, error: "printful_not_configured" }, { status: 503 });
     }
-    if (!Number.isInteger(body.wooProductId)) {
-      return NextResponse.json({ ok: false, error: "wooProductId is required" }, { status: 400 });
+    if (!Number.isInteger(body.wooProductId) || (body.wooProductId as number) <= 0) {
+      return NextResponse.json({ ok: false, error: "wooProductId (positive integer) is required" }, { status: 400 });
     }
     const list = await listSyncProducts();
     if (!list.ok) {
@@ -148,8 +156,8 @@ export async function POST(request: Request) {
     if (!isPrintfulConfigured()) {
       return NextResponse.json({ ok: false, error: "printful_not_configured" }, { status: 503 });
     }
-    if (!Number.isInteger(body.wooProductId)) {
-      return NextResponse.json({ ok: false, error: "wooProductId is required" }, { status: 400 });
+    if (!Number.isInteger(body.wooProductId) || (body.wooProductId as number) <= 0) {
+      return NextResponse.json({ ok: false, error: "wooProductId (positive integer) is required" }, { status: 400 });
     }
     if (!body.printFileUrl || !body.printFileUrl.startsWith(designsBase)) {
       return NextResponse.json({ ok: false, error: "printFileUrl must be a My Designs asset URL" }, { status: 400 });
@@ -180,12 +188,21 @@ export async function POST(request: Request) {
 
     const results: { syncVariantId: number; status: string }[] = [];
     for (const variant of detail.value.variants) {
-      // Resolve color/size: prefer the deterministic variantMap from the create step;
-      // fall back to parsing the Printful-side name ("Title - White / S").
-      let colorSize = variant.externalId ? mapByVariation.get(variant.externalId) : undefined;
-      if (!colorSize) {
-        const m = /-\s*(White|Black)\s*\/\s*(\S+)\s*$/i.exec(variant.name);
-        if (m) colorSize = { color: m[1], size: m[2] };
+      // Authoritative source = the Printful-side variant name ("Title - White / S").
+      // The client-supplied variantMap is only a fallback, and when both exist they
+      // must AGREE — a mismatched map mislinks catalog variants/prices (critic 2026-06-11).
+      const m = /-\s*(White|Black)\s*\/\s*(\S+)\s*$/i.exec(variant.name);
+      const parsed = m ? { color: m[1], size: m[2] } : undefined;
+      const mapped = variant.externalId ? mapByVariation.get(variant.externalId) : undefined;
+      let colorSize = parsed ?? mapped;
+      if (
+        parsed &&
+        mapped &&
+        (parsed.color.toLowerCase() !== mapped.color.toLowerCase() ||
+          parsed.size.toLowerCase() !== mapped.size.toLowerCase())
+      ) {
+        results.push({ syncVariantId: variant.id, status: "skip_map_name_mismatch" });
+        continue;
       }
       if (!colorSize) {
         results.push({ syncVariantId: variant.id, status: "skip_unmapped" });

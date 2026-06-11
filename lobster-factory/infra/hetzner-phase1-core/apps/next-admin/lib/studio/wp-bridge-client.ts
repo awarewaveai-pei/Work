@@ -29,8 +29,9 @@ function getConfig(): { baseUrl: string; keyId: string; key: KeyObject } | null 
   try {
     const raw = Buffer.from(secretB64.trim(), "base64");
     // libsodium "secret key" = seed(32) + public(32); Node wants just the seed.
-    const seed = raw.length >= 64 ? raw.subarray(0, 32) : raw.subarray(0, 32);
-    if (seed.length !== 32) return null;
+    // Accept ONLY the two unambiguous encodings — anything else is a corrupt key.
+    if (raw.length !== 64 && raw.length !== 32) return null;
+    const seed = raw.subarray(0, 32);
     const key = createPrivateKey({
       key: Buffer.concat([PKCS8_ED25519_PREFIX, seed]),
       format: "der",

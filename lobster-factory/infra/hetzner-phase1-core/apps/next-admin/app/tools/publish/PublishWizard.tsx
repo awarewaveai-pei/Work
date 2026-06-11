@@ -26,7 +26,13 @@ export default function PublishWizard() {
   const [retailPrice, setRetailPrice] = useState("24.99");
   const [plusPrice, setPlusPrice] = useState("26.99");
 
-  const [upscale, setUpscale] = useState<{ state: StepState; printFileUrl?: string; error?: string }>({ state: "idle" });
+  const [upscale, setUpscale] = useState<{
+    state: StepState;
+    printFileUrl?: string;
+    achievedPx?: number | null;
+    meetsTarget?: boolean;
+    error?: string;
+  }>({ state: "idle" });
   const [create, setCreate] = useState<{
     state: StepState;
     productId?: number;
@@ -58,6 +64,14 @@ export default function PublishWizard() {
     return (await res.json()) as Record<string, unknown> & { ok: boolean; error?: string };
   }, []);
 
+  // Changing the design invalidates everything downstream (stale-print-file trap).
+  useEffect(() => {
+    setUpscale({ state: "idle" });
+    setCreate({ state: "idle" });
+    setSync({ state: "idle" });
+    setLink({ state: "idle" });
+  }, [designUrl]);
+
   const runUpscale = useCallback(async () => {
     if (!designUrl) return;
     setUpscale({ state: "running" });
@@ -66,7 +80,12 @@ export default function PublishWizard() {
       setUpscale({ state: "error", error: json.error });
       return;
     }
-    setUpscale({ state: "done", printFileUrl: json.printFileUrl as string });
+    setUpscale({
+      state: "done",
+      printFileUrl: json.printFileUrl as string,
+      achievedPx: json.achievedLongEdgePx as number | null,
+      meetsTarget: Boolean(json.meetsTarget),
+    });
   }, [designUrl, post]);
 
   const runCreate = useCallback(async () => {
@@ -199,7 +218,13 @@ export default function PublishWizard() {
             ① 放大成 300DPI 印刷檔
           </button>
           {upscale.printFileUrl ? (
-            <a href={upscale.printFileUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>印刷檔 ↗</a>
+            <>
+              <a href={upscale.printFileUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>印刷檔 ↗</a>
+              <span style={{ fontSize: 12, color: upscale.meetsTarget ? "#46a758" : "#f5a623" }}>
+                {upscale.achievedPx ? `${upscale.achievedPx}px` : "尺寸未知"}
+                {upscale.meetsTarget ? " ✓ 達標" : " ⚠ 未達 4800px — 印刷可能偏糊，建議換更大的設計圖"}
+              </span>
+            </>
           ) : null}
           {upscale.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{upscale.error}</span> : null}
         </div>
