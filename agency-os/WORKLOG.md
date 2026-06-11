@@ -4,6 +4,16 @@
 
 ## 2026-06-11
 
+### fix: cross-machine memory local-backup 目錄失效
+
+**根因**：PowerShell 5.1 `switch ($x)` 會將 `$_` 覆寫為 switch 運算式的值（字串 `"unchanged"` 等），不再是 `ForEach-Object` pipeline 物件。`$_.Name` 在 switch 內變成 `$null` → `""` → `"memory/"` 無檔名 → `Invoke-LocalBackup` 的 dst 路徑結尾為 `\memory\`（無檔名）→ Windows 拋 "directory name is invalid"。  
+**修改**：`scripts/import-cross-machine-memory.ps1:402-418`：switch 內的 `"memory/$($_.Name)"` 全替換為 `$fileKey`（switch 前已正確捕捉）。  
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell PS5.1 switch $_ shadowing test | exit=0 | ms=~500 — 確認 bug：`$_.Name=""` in switch；fix：`$fileKey="memory/test.md"` ✅
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0C/0M/0m/1S
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=\$_\.Name | hits=0 in switch blocks（其他命中全在 switch 外 ForEach-Object / Where-Object 內，安全）
+- BUGHUNT_SCOPE_NARROW: N/A — lobster-factory 不含此腳本邏輯
+
 ### AO-CLOSE task sync
 - AUTO_TASK_DONE_APPLIED (2026-06-10T19:19:44Z): wp-bridge variable product 支援
 - REVIEW_WAIVED: DOC_ONLY -- AO-CLOSE 本輪全 doc（WooCommerce 參考檔移位 + 連結修正 + WORKLOG/TASKS/memory/reports 寫入），無 code 改動
