@@ -4,6 +4,21 @@
 
 ## 2026-06-11
 
+### POD Studio Mockup Studio 完成：B9-S 平拍/模特雙模式 + 鎖色鐵則內建（P0 學習正式工具化）
+
+**[已修改]**（3 新檔 + 2 修改；位置 = next-admin → 部署後在 app.aware-wave.com/tools/mockup）
+- `lib/studio/mockup-prompt.ts` — **純函式 prompt 組裝器**（可測）：平拍（surface/擺放/光線/3 角落道具）+ 模特（年齡層/模特描述/姿勢/場景/光線/2 場景道具）兩模式；**內建三鐵則**：黑衫自動加 CRITICAL COLOR FIDELITY 鎖色塊、非遮胸姿勢自動加 "full chest visible and unobstructed"、`isChestOccludingPose()` 給 UI 警告（arms-crossed 標 ⚠）
+- `lib/studio/__tests__/mockup-prompt.test.ts` — 7 tests（鎖色觸發/遮胸 clause/道具注入/設計重現條款）
+- `app/tools/mockup/MockupStudio.tsx` + `page.tsx` — 設計圖雙來源（My Designs 縮圖點選用 R2 URL / 本機上傳 data URL）→ 控制欄 → 合成（預設 nano-banana-2，僅列吃參考圖模型）→ 存回 My Designs（prompt 前綴 `[mockup:mode:color]`）
+- `app/api/tools/studio/generate/route.ts` — refs 放行**自家 R2 designs bucket URL**（prefix allowlist，外部 URL 仍擋 SSRF）；`lib/storage/r2.ts` 加 `getDesignsPublicBase()`
+- `app/layout.tsx` — nav 加 Mockup 連結
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx realtest_mockup.ts`（buildModelMockupPrompt→facade→nano-banana-2 + image_input 全鏈）| exit=0 | 黑衫+東亞女模+畫室+塔羅牌道具 5.6MB 合成成功，目視：鎖色生效（紅/藍/橘/綠保留）、無遮擋、道具就位 → `Downloads/pod-mockup-test/mockup-studio-realtest.png`；tsc 0 錯；vitest 13/13（r2 6 + mockup-prompt 7）
+- REVIEW_DONE: critic=Standard(模式沿用本日三輪 critic 審過的 route/UI 慣例；新增面=純函式與 allowlist) | verdict=pass | findings=SSRF 考量已做（prefix 鎖自家 bucket）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`mockup-prompt|buildFlatMockupPrompt|buildModelMockupPrompt|getDesignsPublicBase|tools/mockup` | hits=0 跨檔
+**[rollback]** flag off 全 503；3 新檔可刪；route allowlist 兩行還原；nav 一行還原。
+
 ### POD Studio P2c 去背完成 + Printful 憑證落定（store 已綁 Woo）
 
 **[已修改]**（P2c：2 新檔 + Studio UI 增量；零碰 tarot）
