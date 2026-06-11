@@ -318,7 +318,9 @@ export default function TarotStudio() {
     setCompareResults(modelList.map((m) => ({ model: m, image: null, seed: null, busy: true })));
     const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText });
     const results = await Promise.all(
-      modelList.map(async (m): Promise<CompareResult> => {
+      modelList.map(async (m, i): Promise<CompareResult> => {
+        // Stagger creation requests by 1s each to avoid Replicate 429 burst rate-limit
+        if (i > 0) await new Promise<void>((resolve) => setTimeout(resolve, i * 1000));
         try {
           const resp = await callGenerate({
             model: m,
@@ -336,14 +338,23 @@ export default function TarotStudio() {
     setCompareBusy(false);
   }
 
-  // Pick a comparison result as the active preview → narrows to single model.
+  // Pick a comparison result as the active preview → selects model + auto-locks (no extra button needed).
   function selectCompareResult(r: CompareResult) {
     if (!r.image) return;
+    const newModel = r.model;
     setPreviewImage(r.image);
     setPreviewSeed(r.seed);
-    setSelectedModels(new Set([r.model]));
-    setPreviewSig(`${r.model}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
+    setSelectedModels(new Set([newModel]));
+    setLockedModel(newModel);
+    setPreviewSig(`${newModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
     setCompareResults([]);
+    // Selecting from comparison means "I want this style" → auto-lock and proceed to batch step
+    setLocked(true);
+    setBatch((prev) => {
+      prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
+      return TAROT_CARDS.map((card) => ({ card, status: "idle" }));
+    });
+    setMessage(null);
   }
 
   function lockStyle() {
