@@ -499,5 +499,5 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-10 19:09:11 UTC_
+_Last synced: 2026-06-11 03:55:50 UTC_
 

@@ -33,10 +33,10 @@
 - Schema 實測：`prompt + image_input(≤14) + resolution(1K/2K/4K) + aspect_ratio(15 種) + output_format(jpg/png)`；2K 3:4 一張 ~20-30s；連發吃 429 需 10-15s 間隔
 - 成本：3 張 2K 合計 < $0.25
 
-**[發現的問題（待修，需批准）]**
-1. **本機 REPLICATE_API_TOKEN 全失效**：vault + `mcp/user-env.ps1` 都是舊 token `r8_U…`（401）；SG 於 2026-06-05 已輪替為 `r8_MX…`（`.env.bak.replicate-newtoken-20260605-120511` 佐證，account API 200）→ 本機 vault/user-env/Replicate MCP 全 401。修法＝SG 現役 token 回填本機兩處。
-2. **CLAUDE.md doc drift**：寫 `secrets-vault.ps1 -Action get -Key <KEY_NAME>`，實際參數是 `-Name`（`scripts/secrets-vault.ps1:147` throw "Missing -Name"）。
-3. vault `get` 輸出格式是 `NAME=value` 整串，呼叫端需自行 split（`C:\Windows\Temp\query_replicate.ps1` 未 split 也是今晚 401 的第二層原因）。
+**[發現的問題 → 已修（2026-06-11 操作者批准「開始執行」後）]**
+1. ✅ **本機 REPLICATE_API_TOKEN stale**：`mcp/user-env.ps1` 是舊 token `r8_U…`（401 實測）；SG 於 2026-06-05 已輪替 `r8_MX…`（`.env.bak.replicate-newtoken-20260605-120511` 佐證，account 200）。**已回填**：user-env.ps1 + vault set + User registry 三處（backfill script 走 SSH 直取，token 不進對話/transcript；post-write account 200、registry `^r8_MX` 驗證 True）。Replicate MCP 下次重啟生效。
+2. ✅ **doc drift（修正定位：AGENTS.md:101 + AWAREWAVE_STACK_QUICKREF.md:79，初記 CLAUDE.md 有誤）**：`-Action get -Key` → 實際參數 `-Name`（`secrets-vault.ps1:147`）。兩處已修，並補註 `get` 輸出為**遮罩值**（`Mask-Value`，:150）僅供確認存在、實值消費走 user-env.ps1/env。
+3. （澄清）初測 vault「401」其實是遮罩值打 API 的假陽性；真 stale 證據 = user-env 明文 token 401。`get` 回 `NAME=遮罩值` 是設計行為非 bug。
 
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=SSH | cmd=SG curl api.replicate.com predictions create+poll ×3（nano-banana-2, data URI, 2K, 3:4）| exit=0 | 3/3 succeeded；account 200（SG token）vs 401（本機 token）
@@ -8024,7 +8024,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-10 19:25:22 UTC_
+_Last synced: 2026-06-11 03:55:50 UTC_
 
 ## 2026-03-20
 
@@ -8983,6 +8983,7 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): release-wp-bridge.sh path variables only
+
 
 
 
