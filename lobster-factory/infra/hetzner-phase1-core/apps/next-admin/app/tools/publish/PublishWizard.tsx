@@ -130,8 +130,8 @@ export default function PublishWizard() {
   return (
     <div style={{ padding: 16, maxWidth: 980 }}>
       <p style={{ opacity: 0.7, fontSize: 13 }}>
-        串連：設計圖 → ① 放大 300DPI 印刷檔 → ② 建 Woo 草稿商品（白/黑 × {SIZES.join("/")}）→ ③ 等 Printful 同步 → ④ 綁定印刷檔。
-        全程 draft，妳人工 review 後才 publish。
+        串連：設計圖 → ① 放大 300DPI 印刷檔 → ② 建 Woo <b>草稿</b>商品（白/黑 × {SIZES.join("/")}）→
+        人工到後台 review 並 <b>publish</b>（Printful 只同步已發布商品，可先設「隱藏」）→ ③ 檢查同步 → ④ 綁定印刷檔 → 設為可見開賣。
       </p>
 
       {/* design + mockup pickers */}
