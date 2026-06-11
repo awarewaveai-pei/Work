@@ -36,13 +36,14 @@
 - **Escalation**：migration 0007/0011 media_assets 雙定義衝突（TASKS 🔴 High 項，db-expert 審後另修）。
 - tarot→R2 wiring：等 tarot 模型彙總 session 完工再接（避撞 `image-gen.ts`）。
 
-### P2b — 一般化生成器
-- **做什麼**：`lib/tarot/image-gen.ts` 抽成 `lib/studio/image-provider.ts`（ImageProvider 介面）；新 `app/tools/studio`；tarot 變 preset 不破壞。
-- **Gate**：REALTEST 生一張非塔羅設計；tarot 既有功能 smoke 不變。
+### P2b — 一般化生成器 ✅ 完成 2026-06-11（commit fbc1b7b1）
+- `lib/studio/image-provider.ts` facade（委派 tarot 15 模型引擎，零重寫）+ `api/tools/studio/generate`（per-model refCap 單一真相源）+ Design Studio 頁（商品/主題/氛圍/風格 → prompt → 生成 → 存 My Designs）+ nav。
+- Gate 已過：REALTEST flux-schnell 真生成；tsc 0；critic 2M/3m 全修。
 
-### P2c — 去背
-- **做什麼**：`lib/studio/bg-remover.ts`（BgRemover 介面，首選 Replicate rmbg/birefnet，重用 token）。
-- **Gate**：REALTEST 去背一張 → 確認透明 alpha。
+### P2c — 去背 ✅ 完成 2026-06-11
+- `lib/studio/bg-remover.ts`（Replicate `851-labs/background-remover`，version pin + env override，AbortController 55s）+ `api/tools/studio/remove-bg` + Studio「去背/還原」按鈕。
+- Gate 已過：REALTEST 真去背、PNG IHDR colour_type=6（RGBA）確認；critic 2M 全修。
+- **Printful 憑證已落定**（CREDENTIALS.md §三十一 + vault ×4）：store `18314943` 已綁 Woo → **P2d 先決解除**。
 
 ### Mockup Studio 頁（隨 P2c 後）
 - **做什麼**：B9-S 雙模式（平拍/模特）控制欄 → 組 prompt + 設計 data URI → nano-banana-2 → 存 R2。**內建 §0 三條 prompt 鐵則**（深色鎖色範本、姿勢黑名單、data URI）。
