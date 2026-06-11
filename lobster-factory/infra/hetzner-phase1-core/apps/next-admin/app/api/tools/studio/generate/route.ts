@@ -6,6 +6,7 @@ import {
   isAspectRatio,
   STUDIO_MODEL_OPTIONS,
 } from "../../../../../lib/studio/image-provider";
+import { getDesignsPublicBase } from "../../../../../lib/storage/r2";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -81,11 +82,16 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    // data URLs, or our own designs bucket (My Designs picks travel as public URLs —
+    // Replicate fetches them directly; arbitrary外部 URL 仍擋掉避免 SSRF/權限外洩).
+    const designsBase = getDesignsPublicBase() + "/";
     let totalChars = 0;
     for (const ref of body.referenceImages) {
-      if (typeof ref !== "string" || !/^data:image\/(png|jpe?g|webp);base64,/.test(ref)) {
+      const isDataUrl = typeof ref === "string" && /^data:image\/(png|jpe?g|webp);base64,/.test(ref);
+      const isOwnDesignUrl = typeof ref === "string" && ref.startsWith(designsBase);
+      if (!isDataUrl && !isOwnDesignUrl) {
         return NextResponse.json(
-          { ok: false, error: "每張參考圖須為 png/jpeg/webp 的 base64 data URL" },
+          { ok: false, error: "每張參考圖須為 png/jpeg/webp 的 base64 data URL，或 My Designs 的圖庫 URL" },
           { status: 400 },
         );
       }

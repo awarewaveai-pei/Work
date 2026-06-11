@@ -42,6 +42,11 @@ export function isR2Configured(): boolean {
   return getR2Config() !== null;
 }
 
+/** Public serving origin of the designs bucket (no trailing slash). Not a secret. */
+export function getDesignsPublicBase(): string {
+  return (process.env.R2_DESIGNS_PUBLIC_BASE ?? DEFAULT_PUBLIC_BASE).replace(/\/+$/, "");
+}
+
 export function sha256Hex(buffer: Buffer): string {
   return createHash("sha256").update(buffer).digest("hex");
 }

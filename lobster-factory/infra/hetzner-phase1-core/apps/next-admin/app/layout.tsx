@@ -84,6 +84,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/tools/studio" className="sidebar-link" title="POD 設計生成器：主題/氛圍/風格 → 多模型生成 → 存入 My Designs">
                   <span className="sidebar-icon">✏</span> Studio
                 </Link>
+                <Link href="/tools/mockup" className="sidebar-link" title="AI 擬真商品照：設計圖 + 平拍/模特雙模式 + 鎖色鐵則 → Nano Banana 2 合成">
+                  <span className="sidebar-icon">👕</span> Mockup
+                </Link>
                 <Link href="/tools/designs" className="sidebar-link" title="已儲存設計庫（R2 持久化），可重用/下載">
                   <span className="sidebar-icon">🗂</span> My Designs
                 </Link>
