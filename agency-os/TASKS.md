@@ -56,12 +56,12 @@
 - [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。**下一步 = Stage 1 接通入口**：抓 2 筆卡 `spec_generated` 的 intake_forms → retry `POST /api/onboarding/trigger-build` 看精確錯誤碼（最可疑 trigger-build/route.ts L35-39 role 403 或 UI「跳回第一步」沒帶 spec/intake id）→ 對症修 → onboarding UI 走完一筆不碰 DB 達 completed。後續 Stage 2 Fluent Form→intake 橋接+FluentCRM／Stage 3 報價／Stage 4 機層租機(provisionClient 已寫好未接)／Stage 5 串接 Supabase/n8n/Sentry/Netdata/Uptime Kuma/PostHog。**動前 `git log -5` + 讀 WORKLOG（trigger-build 平行 session 觸碰過，VBC）。**
 - [ ] **Stage 1 接通入口** — app.aware-wave 一鍵架站主線（抓 2 筆 `spec_generated` intake → retry trigger-build 看精確錯誤碼 → 對症修 → onboarding UI 走完一筆達 completed）。
 - [ ] **wp-bridge 續做 operation：featured image** / update-existing-post / product update+delete（v0.7.0 只做 product CREATE，其餘端點仍待補）。
-- [ ] **Tarot 增 9 個圖像模型** → handoffs/2026-06-11-0236-add-tarot-models.md（加 ideogram-character/v4-turbo/v3-balanced/v2a-turbo/v4-quality、seedream-4.5、nano-banana-2、imagen-4、flux-2-max 到 Tarot Studio 模型選單）。**核心坑**：9 個各有不同 Replicate input schema，勿套 flux 的 `go_fast/megapixels/guidance/num_inference_steps`（→ 422）；逐一查 schema。改 `image-gen.ts`(TAROT_MODELS:26) + `TarotStudio.tsx`(MODEL_OPTIONS:43) → tsc → /verify-recent → /sg-deploy。
+- [x] **【✅ 2026-06-11 操作者確認完成】Tarot 增 9 個圖像模型** → handoffs/2026-06-11-0236-add-tarot-models.md（加 ideogram-character/v4-turbo/v3-balanced/v2a-turbo/v4-quality、seedream-4.5、nano-banana-2、imagen-4、flux-2-max 到 Tarot Studio 模型選單）。**核心坑**：9 個各有不同 Replicate input schema，勿套 flux 的 `go_fast/megapixels/guidance/num_inference_steps`（→ 422）；逐一查 schema。改 `image-gen.ts`(TAROT_MODELS:26) + `TarotStudio.tsx`(MODEL_OPTIONS:43) → tsc → /verify-recent → /sg-deploy。
 - [ ] **【POD Studio 自建動工】** 藍本已 100% 完整（`lobster-factory/docs/POD_STUDIO_ROADMAP.md`）。✅ ① 擬真合成驗證 PASS（2026-06-11：nano-banana-2 白衫 ~95% 重現、黑衫 v2 鎖色 prompt ~90%；證據 WORKLOG 2026-06-11 + `Downloads/pod-mockup-test/`；prompt 規則：深色衫逐色鎖色、姿勢避遮胸、設計圖走 data URI）。**下一步 = ② P2a 儲存層動工**（R2 client + media_assets + My Designs；R0 計畫已在 roadmap §實作計畫，等批准）→ 之後 P2b 生成器 → P2c 去背 → Mockup Studio → P2d Printful（需操作者 Printful 帳號）→ P3 上架 → P4 履約（Printful 原生）。**先決小修**：本機 REPLICATE_API_TOKEN 已 stale（SG 2026-06-05 輪替未回填 vault/user-env → 本機 MCP 401）→ handoffs/2026-06-11-0254-pod-studio.md
 
 - [x] POD Studio 路線圖 + tarot 框線收尾（框 png 還沒做好；per-frame 微調 + celestial 補生）→ handoffs/2026-06-06-2026-pod-studio-roadmap.md
 
-- [ ] Content Engine Phase 1 MVP — soulful 試點發第一篇 draft（spec §38/§44；§36 schema + §37 prompts；DataForSEO/Firecrawl 屬 Phase 2 別接）→ handoffs/2026-06-06-2029-tomo-202949.md
+- [x] **【✅ 2026-06-11 操作者確認完成】** Content Engine Phase 1 MVP — soulful 試點發第一篇 draft（spec §38/§44；§36 schema + §37 prompts；DataForSEO/Firecrawl 屬 Phase 2 別接）→ handoffs/2026-06-06-2029-tomo-202949.md
 
 - [ ] SEO/GEO 引擎產品化 + Soulful 定位/文章（2-Gem: onboarding+content；定位鎖定 Arts Practice for Self-Discovery / Arts-Based Reflective Pedagogy；填真資料→文章可發布；spec §49 errata 待補）→ handoffs/2026-06-06-2044-seo-geo-content.md
 
@@ -88,7 +88,7 @@
 - [x] wp-bridge 續做 operation：featured image（sideload→`_thumbnail_id`）/ update-existing-post（**注：Woo simple product CREATE 已於 v0.7.0 完成** — `ProductCreator` + `POST /product`，真站驗 product 7066 draft；剩 featured image / update-existing / product update+delete）→ handoffs/2026-06-05-2039-tomo-203931.md
 - [x] **wp-bridge variable product 支援**：`ProductCreator` 目前只做 `WC_Product_Simple`；客製化 T-shirt 需 variable product（attributes 顏色 白/黑 × 尺寸 3L/2L/XL/L/M/S/XS + variations + 客製化圖案）。照 simple 範式擴 `WC_Product_Variable` + `WC_Product_Attribute` + 逐 variation atomic+讀回驗證+失敗整筆刪。操作者 2026-06-10 要求。
 - [x] **【✅ 2026-06-10 驗收完成】wp-bridge v0.5.6 引擎** — 操作者開後台確認 post 7053/7056 編輯器無 invalid content（伺服器端預檢全綠：parse_blocks 完整樹、freeform=0、accordion pane id 首省略+第2+遞增、tab id 正確）；v0.5.6 三候選皆已 ship（/blocks 端點 ✅、tabs/infobox 樣式 palette-token ✅、Woo simple product ✅v0.7.0）；引擎現為 v0.7.0、下一步方向＝app.aware-wave Stage 1 主線 → handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md
-- [ ] Tarot Studio 增加 9 個圖像模型（ideogram-character/v4-turbo/v3-balanced/v2a-turbo/v4-quality + seedream-4.5 + nano-banana-2 + imagen-4 + flux-2-max）；各模型 input schema 不同需逐查，勿套 flux 參數 → handoffs/2026-06-11-0236-add-tarot-models.md
+- [x] **【✅ 2026-06-11 操作者確認完成】** Tarot Studio 增加 9 個圖像模型（ideogram-character/v4-turbo/v3-balanced/v2a-turbo/v4-quality + seedream-4.5 + nano-banana-2 + imagen-4 + flux-2-max）；各模型 input schema 不同需逐查，勿套 flux 參數 → handoffs/2026-06-11-0236-add-tarot-models.md
 
 #### 雙機環境 / 日常開工
 

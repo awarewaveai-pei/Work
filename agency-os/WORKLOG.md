@@ -4,6 +4,23 @@
 
 ## 2026-06-11
 
+### TASKS 結案打勾批次（操作者口頭驗收，AO-RESUME 去噪）
+
+**[任務理解]** 操作者明示以下皆已完成，要求 TASKS.md 打勾 + 清掉 AO-RESUME 重複出現的項目：① wp-bridge v0.5.6 驗收 7053/7056 + 選下一步（原已 [x]，無需動）② Tarot 增 9/10 圖像模型（TASKS 有兩筆重複列項 L59+L91，皆勾）③ SE-01 wp-bridge 私鑰輪替（操作者確認已輪替）④ Content Engine Phase 1 MVP soulful 首篇 draft。
+
+**[已修改]**
+- `agency-os/TASKS.md`：L59 + L91（Tarot 模型，重複兩筆）→ [x]；L64（Content Engine Phase 1 MVP）→ [x]。各加【✅ 2026-06-11 操作者確認完成】。
+- `agency-os/handoffs/2026-06-06-1929-wp-bridge-v056-shipped.md` §6：SE-01 私鑰外洩待輪替 → 標記已輪替完成（此行是 AO-RESUME 風險段反覆出現的源頭；TASKS 對應行原已 [x]，但風險敘述由 packet §6 + 前日 report 帶出，現已封源）。
+
+**[驗證結果]**
+- REALTEST_WAIVED: DOC_ONLY -- 純 TASKS/handoff 狀態標記，無程式行為
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（Read 讀回 4 處編輯行，checkbox 語法 + handoffs README「[x] = consumed, AO-RESUME skip」規則對齊）
+- BUGHUNT_DONE: scope=agency-os | grep=`add-tarot-models|tomo-202949|wp-bridge-v056-shipped|SE-01.*待輪替` | hits=0 stale（TASKS 4 筆相關行全 [x]；CONVERSATION_MEMORY 命中為 dated 歷史快照不改寫；AO-RESUME 舊 reports 為 archive 不回溯）
+- BUGHUNT_SCOPE_NARROW: 純 agency-os 治理文件狀態變更，無 scripts/lobster-factory 程式引用
+
+**[剩餘風險]** Tarot/Content Engine 為操作者口頭驗收（信任操作者宣告，未逐項重驗 deliverable）；若後續發現未完，重開新 TASKS 行而非 revert。
+**[rollback]** `git revert` 本 commit 即恢復原 checkbox 狀態。
+
 ### Tarot Studio 擴充：10 新模型 + 比例選擇 + 多模型比較 + chip 選模型 UI
 
 **[任務理解]** 在 Tarot Studio 塔羅牌生成工具加入 10 個 Replicate 模型（ideogram×5、seedream-4.5、nano-banana-2/pro、imagen-4、flux-2-max），支援 3:2/4:5/1:1/9:16 比例，模型選擇改 chip 式（多選），並加入多模型同時生成比較功能。

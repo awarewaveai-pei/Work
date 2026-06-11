@@ -49,5 +49,5 @@ source_session_summary: "Built/fixed the wp-bridge Kadence block library to v0.5
   - `wp_insert_post` 會 `wp_unslash` → 任何含反斜線跳脫的 block 屬性都要先 `wp_slash`。
   - tab 標題 anchor slug 用 `[^a-zA-Z0-9]` strip → **CJK 標題會變空 slug**(目前只支援英文 tab 標題)。
   - tab 內嵌 image 不會被 `sideloadBlockImages` 預處理(只掃 top-level)。
-  - **SE-01 私鑰仍外洩**(曾貼入對話)→ 待輪替:WP 後台 → AwareWave Bridge → Revoke SE-01 → 重生 → 新私鑰貼進 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`(勿貼對話)。
+  - ~~**SE-01 私鑰仍外洩**(曾貼入對話)→ 待輪替~~ **【✅ 2026-06-11 操作者確認已輪替完成，不再列入 AO-RESUME 風險段】**
   - 策略結論:plugin 當商品賣價值普通(Kadence 版本維護地獄 + 市場窄 + 平台風險);當 agency 基礎設施(AI 代管 WP 當服務)更值錢。
