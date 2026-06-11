@@ -29,6 +29,10 @@ interface SaveDesignBody {
   modelName?: string;
   organizationId?: string;
   actorUserId?: string;
+  /** Originating tool: "pod-studio" | "tarot" | "tarot-preview". Defaults to "pod-studio". */
+  source?: string;
+  /** For tarot: the card name (e.g. "The Fool"). */
+  cardName?: string;
 }
 
 /** POST — persist one generated design: data URL → R2 → media_assets (+ audit event). */
@@ -117,9 +121,10 @@ export async function POST(request: Request) {
       // Advisory only — caller-supplied, validated as UUID shape but not authenticated.
       created_by: body.actorUserId ?? null,
       metadata: {
-        source: "pod-studio",
+        source: body.source ?? "pod-studio",
         prompt: body.prompt ?? null,
         model_name: body.modelName ?? null,
+        card_name: body.cardName ?? null,
         actor_role: resolved.role,
         role_source: resolved.source,
         trace_id: traceId,

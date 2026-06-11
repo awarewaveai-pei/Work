@@ -362,6 +362,7 @@ export default function TarotStudio() {
     const newModel = r.model;
     compareGenIdRef.current++; // invalidate any in-flight compare so it won't repopulate after lock
     const { english, subject } = compareStyleRef.current; // use prompt that produced these images
+    saveToGallery(r.image, "tarot-preview", { model: newModel, prompt: english });
     setPreviewImage(r.image);
     setPreviewSeed(r.seed);
     setSelectedModels(new Set([newModel]));
@@ -380,6 +381,7 @@ export default function TarotStudio() {
 
   function lockStyle() {
     if (!previewImage) return;
+    saveToGallery(previewImage, "tarot-preview", { model: activeModel, prompt: effectiveEnglish });
     setLockedModel(activeModel); // freeze which model is used for batch generation
     setLocked(true);
     setCompareResults([]);
@@ -392,6 +394,21 @@ export default function TarotStudio() {
 
   function patchItem(index: number, patch: Partial<BatchItem>) {
     setBatch((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
+  }
+
+  // Fire-and-forget save to R2 gallery — never blocks generation or UI.
+  function saveToGallery(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string }) {
+    void fetch("/api/tools/designs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image,
+        source,
+        prompt: extra?.prompt ?? null,
+        modelName: extra?.model ?? lockedModel,
+        cardName: extra?.cardName ?? null,
+      }),
+    }).catch(() => {/* gallery save never blocks generation */});
   }
 
   async function generateOne(card: TarotCard, index: number): Promise<void> {
@@ -407,6 +424,10 @@ export default function TarotStudio() {
         patchItem(index, { status: "error", error: resp.error ?? "unknown" });
         return;
       }
+      saveToGallery(resp.image, "tarot", {
+        cardName: card.name,
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
+      });
       const blob = await renderPrintCard(card, resp.image, template);
       const url = URL.createObjectURL(blob);
       // revoke any prior url for this slot (retry case) before replacing
