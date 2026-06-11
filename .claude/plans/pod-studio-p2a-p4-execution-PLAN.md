@@ -29,11 +29,12 @@
 
 ## 執行順序（每階段 = 獨立可部署 + 可回滾的一個 PR；全部 feature-flag 預設 OFF）
 
-### P2a — 儲存層（R2 + media_assets + My Designs）★ 下一步，地基
-- **做什麼**：`lib/storage/r2.ts`（S3 相容 client，`CF_R2_*` vault keys，新 designs bucket 不用 lobster-backup）；生成成功 → 上傳 R2 → 寫 `media_assets`；新頁 `app/tools/designs`。
-- **Gate**：REALTEST 上傳一張 → curl R2 public URL 200 → media_assets 有列；tsc --noEmit = 0。
-- **Rollback**：flag off + 移除 route；表 additive 不動。
-- **先決**：無（vault 已有 R2 keys）。
+### P2a — 儲存層（R2 + media_assets + My Designs）✅ 完成 2026-06-11（未部署）
+- **實作**：`lib/storage/r2.ts`（**CF REST API 直 PUT，零 aws-sdk** — 沿用 SG `upload-to-r2.sh` 慣例；R2 keys 在 SG `.env`，非 vault）+ `app/api/tools/designs/route.ts`（POST 存/GET 列）+ `app/tools/designs` My Designs 頁 + vitest 6 tests。bucket `lobster-designs`（APAC）+ r2.dev public URL 已開。
+- **Gate 已過**：REALTEST PUT→public GET 200 byte-exact→media_assets 201→select-back；tsc 0 錯；critic Deep 2M/3m 全修。
+- **部署待辦**：SG env 加 `POD_DESIGNS_ENABLED=true` + `POD_DESIGNS_DEFAULT_ORG_ID=2bf60452-3d4d-47c2-9970-b9046ed1a35a`；`/sg-deploy` 等 go-ahead。
+- **Escalation**：migration 0007/0011 media_assets 雙定義衝突（TASKS 🔴 High 項，db-expert 審後另修）。
+- tarot→R2 wiring：等 tarot 模型彙總 session 完工再接（避撞 `image-gen.ts`）。
 
 ### P2b — 一般化生成器
 - **做什麼**：`lib/tarot/image-gen.ts` 抽成 `lib/studio/image-provider.ts`（ImageProvider 介面）；新 `app/tools/studio`；tarot 變 preset 不破壞。

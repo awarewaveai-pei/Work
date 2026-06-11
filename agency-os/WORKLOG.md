@@ -4,6 +4,31 @@
 
 ## 2026-06-11
 
+### POD Studio P2a 儲存層完成：R2 designs bucket + media_assets + My Designs 頁（flag 預設 OFF，未部署）
+
+**[任務理解]** P2a＝設計圖持久化地基（圖只活在瀏覽器 → R2 + DB + 列表頁）。操作者已批准 plan（`.claude/plans/pod-studio-p2a-p4-execution-PLAN.md`）後「開始執行」。
+
+**[已修改]**（全部純新增，next-admin；**刻意不碰** `lib/tarot/image-gen.ts`/`TarotStudio.tsx` — 並行 session 在做模型彙總，tarot→R2 wiring 留待之後小 PR）
+- `lib/storage/r2.ts` — CF REST API 直 PUT（Bearer `R2_API_TOKEN`，沿用 `upload-to-r2.sh` 慣例，**零 aws-sdk 依賴**）；`buildDesignKey`（designs/YYYY-MM/uuid.ext）/`parseImageDataUrl`/`sha256Hex`；env：`R2_DESIGNS_BUCKET`（預設 lobster-designs）/`R2_DESIGNS_PUBLIC_BASE`
+- `lib/storage/__tests__/r2.test.ts` — vitest 6 tests
+- `app/api/tools/designs/route.ts` — POST（dataURL→R2→media_assets insert+audit event；flag `POD_DESIGNS_ENABLED` + `canCreateAiImageJob` 閘）/ GET（列 60 筆，service-role client 避 RLS 空集合）
+- `app/tools/designs/page.tsx` + `DesignsGallery.tsx` — My Designs 列表（縮圖/複製 URL/下載）
+- **基礎設施**：R2 bucket `lobster-designs` 已建（APAC）+ r2.dev public domain 開通（`pub-a88b06f569bd41a3b9e27e29644d520e.r2.dev`）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx realtest_p2a.ts`（SG creds 經 env 注入，真打 R2+Supabase）| exit=0 | parse→R2 PUT 200→public GET 200（7801 bytes byte-exact）→media_assets insert 201（id=f916dcd4）→select-back 1 row；前置：CF API 建 bucket+managed domain 均 success:true；`npx tsc --noEmit` 本 PR 檔 0 錯；vitest 6/6
+- REVIEW_DONE: critic=Deep | verdict=warn→pass | findings=0c/2M/3m（in-scope 全修：M1 GET 改 service-role client 避 RLS 靜默空集合；M2 補 auth boundary 註解（nginx basic-auth）；m1 audit insert error 不再吞（console.warn）；m3 error.message 不外洩改 server log；m2 created_by 標 advisory）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`putDesignObject|buildDesignKey|parseImageDataUrl|POD_DESIGNS_ENABLED|lobster-designs|pod_designs_disabled` | hits=0 跨檔（僅 4 新檔自身）
+- 抓蟲途中修了抓蟲工具本身的 bug：`grep -v ".next"` 的 `.` 是 regex 任意字元 → 把 `next-admin` 路徑全濾掉造成假 0 命中；正確寫法 `grep -v "/\.next/"`
+
+**[剩餘風險 / Escalation]**
+- 🔴 **C1（critic 發現，out-of-scope）**：migration `0007_v3_skeleton_modules.sql:40` 與 `0011_ops_console_control_plane.sql:35` 都 `create table if not exists media_assets` 且 **shape 互不相容** — 0007 先跑的話 0011 靜默 no-op，本 route insert 必炸。線上 DB 是 0011 shape 所以 REALTEST 過；**fresh DB 重放會死**。→ 已開 TASKS：補 idempotent `alter table add column if not exists` migration（DB migration=High risk，動工前 db-expert 審 + 操作者 go）
+- s4：R2 PUT 成功但 DB insert 失敗 → 孤兒物件（UUID 不可猜、僅成本問題）；之後可加 best-effort delete 或對帳
+- tsc 全專案另有 pre-existing 錯（`jszip`/`@supabase/ssr`）屬並行 tarot session 進行中改動，非本 PR
+- **未部署**：deploy 前 SG 需設 env `POD_DESIGNS_ENABLED=true` + `POD_DESIGNS_DEFAULT_ORG_ID=2bf60452-3d4d-47c2-9970-b9046ed1a35a`（Soulful org）；`/sg-deploy` 等操作者 go-ahead
+
+**[rollback]** flag off（POD_DESIGNS_ENABLED 不設）即整路 503；或刪 4 新檔；bucket/表均 additive 不影響既有。
+
 ### TASKS 結案打勾批次（操作者口頭驗收，AO-RESUME 去噪）
 
 **[任務理解]** 操作者明示以下皆已完成，要求 TASKS.md 打勾 + 清掉 AO-RESUME 重複出現的項目：① wp-bridge v0.5.6 驗收 7053/7056 + 選下一步（原已 [x]，無需動）② Tarot 增 9/10 圖像模型（TASKS 有兩筆重複列項 L59+L91，皆勾）③ SE-01 wp-bridge 私鑰輪替（操作者確認已輪替）④ Content Engine Phase 1 MVP soulful 首篇 draft。
