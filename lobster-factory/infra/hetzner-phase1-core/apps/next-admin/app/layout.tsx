@@ -81,10 +81,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/tools/tarot" className="sidebar-link" title="塔羅牌印刷檔生成工具：AI 生成整套 78 張同風格牌卡">
                   <span className="sidebar-icon">🔮</span> Tarot
                 </Link>
-                <span className="sidebar-link-disabled">
-                  <span className="sidebar-icon">✏</span> Generator
-                  <span className="sidebar-coming-soon">Soon</span>
-                </span>
+                <Link href="/tools/studio" className="sidebar-link" title="POD 設計生成器：主題/氛圍/風格 → 多模型生成 → 存入 My Designs">
+                  <span className="sidebar-icon">✏</span> Studio
+                </Link>
+                <Link href="/tools/designs" className="sidebar-link" title="已儲存設計庫（R2 持久化），可重用/下載">
+                  <span className="sidebar-icon">🗂</span> My Designs
+                </Link>
                 <span className="sidebar-link-disabled">
                   <span className="sidebar-icon">◧</span> Templates
                   <span className="sidebar-coming-soon">Soon</span>

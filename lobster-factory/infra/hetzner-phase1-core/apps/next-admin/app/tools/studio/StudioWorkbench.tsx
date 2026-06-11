@@ -1,0 +1,287 @@
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
+import {
+  STUDIO_MODEL_OPTIONS,
+  type AspectRatio,
+  type StudioModel,
+} from "../../../lib/studio/image-provider";
+
+/** Product types steer the prompt suffix + default aspect ratio (print canvas comes later, P-print). */
+const PRODUCT_TYPES = [
+  { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: "t-shirt graphic design, centered composition, plain background" },
+  { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: "hoodie front print design, centered composition, plain background" },
+  { value: "mug", label: "Mug", aspect: "3:2" as AspectRatio, suffix: "mug wrap-around print design, horizontal composition, plain background" },
+  { value: "poster", label: "Poster / Wall Art", aspect: "2:3" as AspectRatio, suffix: "poster art print, full-bleed composition" },
+  { value: "sticker", label: "Sticker", aspect: "1:1" as AspectRatio, suffix: "die-cut sticker design, bold outline, plain background" },
+  { value: "none", label: "（不限商品）", aspect: "1:1" as AspectRatio, suffix: "" },
+];
+
+const STYLE_PRESETS = [
+  "None", "Art Deco", "Kawaii", "Line Art", "Minimalist", "Pop Art",
+  "Retro", "Street Art", "Typography", "Vintage Poster", "Watercolor",
+];
+
+const ASPECTS: AspectRatio[] = ["2:3", "3:2", "4:5", "1:1", "9:16"];
+
+interface GenState {
+  status: "idle" | "generating" | "done" | "error";
+  image?: string;
+  seed?: number | null;
+  error?: string;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("file_read_failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Same downscale rationale as TarotStudio: style refs don't need full resolution and the
+// request body must stay under the route limit.
+async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Promise<string> {
+  const dataUrl = await readFileAsDataUrl(file);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => reject(new Error("image_decode_failed"));
+    img.src = dataUrl;
+  });
+}
+
+export default function StudioWorkbench() {
+  const [model, setModel] = useState<StudioModel>("flux-schnell");
+  const [productType, setProductType] = useState("tshirt");
+  const [theme, setTheme] = useState("");
+  const [vibe, setVibe] = useState("");
+  const [subject, setSubject] = useState("");
+  const [style, setStyle] = useState("None");
+  const [prompt, setPrompt] = useState("");
+  const [promptTouched, setPromptTouched] = useState(false);
+  const [aspect, setAspect] = useState<AspectRatio>("4:5");
+  const [refImages, setRefImages] = useState<string[]>([]);
+  const [gen, setGen] = useState<GenState>({ status: "idle" });
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
+  const modelOption = useMemo(() => STUDIO_MODEL_OPTIONS.find((m) => m.value === model), [model]);
+  const maxRefs = modelOption?.maxRefs ?? 0;
+
+  const assembledPrompt = useMemo(() => {
+    const parts = [
+      subject.trim(),
+      theme.trim(),
+      vibe.trim(),
+      style !== "None" ? `${style} style` : "",
+      product.suffix,
+    ].filter(Boolean);
+    return parts.join(", ");
+  }, [subject, theme, vibe, style, product]);
+
+  const effectivePrompt = promptTouched ? prompt : assembledPrompt;
+
+  const onPickProduct = useCallback((value: string) => {
+    setProductType(value);
+    const p = PRODUCT_TYPES.find((x) => x.value === value);
+    if (p) setAspect(p.aspect);
+  }, []);
+
+  const onUploadRefs = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      const room = Math.max(0, maxRefs - refImages.length);
+      const picked = Array.from(files).slice(0, room);
+      const urls: string[] = [];
+      for (const f of picked) {
+        try {
+          urls.push(await downscaleImageFile(f));
+        } catch {
+          /* skip unreadable file */
+        }
+      }
+      setRefImages((prev) => [...prev, ...urls].slice(0, maxRefs));
+    },
+    [maxRefs, refImages.length],
+  );
+
+  const generate = useCallback(async () => {
+    if (!effectivePrompt || effectivePrompt.trim().length < 3) {
+      setGen({ status: "error", error: "請先填主題/描述（prompt 至少 3 字）" });
+      return;
+    }
+    setGen({ status: "generating" });
+    setSaveState("idle");
+    try {
+      const res = await fetch("/api/tools/studio/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          prompt: effectivePrompt,
+          referenceImages: refImages.slice(0, maxRefs),
+          aspectRatio: aspect,
+        }),
+      });
+      const json = (await res.json()) as { ok: boolean; image?: string; seed?: number | null; error?: string };
+      if (!json.ok || !json.image) {
+        setGen({ status: "error", error: json.error ?? `HTTP ${res.status}` });
+        return;
+      }
+      setGen({ status: "done", image: json.image, seed: json.seed ?? null });
+    } catch (err) {
+      setGen({ status: "error", error: err instanceof Error ? err.message : String(err) });
+    }
+  }, [model, effectivePrompt, refImages, maxRefs, aspect]);
+
+  const saveToDesigns = useCallback(async () => {
+    if (gen.status !== "done" || !gen.image) return;
+    setSaveState("saving");
+    try {
+      const res = await fetch("/api/tools/designs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: gen.image,
+          prompt: effectivePrompt,
+          modelName: model,
+        }),
+      });
+      const json = (await res.json()) as { ok: boolean; error?: string };
+      setSaveState(json.ok ? "saved" : "error");
+    } catch {
+      setSaveState("error");
+    }
+  }, [gen, effectivePrompt, model]);
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, padding: 16 }}>
+      {/* ── Controls ───────────────────────────────────────────── */}
+      <div className="build-panel" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+        <label style={{ fontSize: 13 }}>
+          商品類型
+          <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={productType} onChange={(e) => onPickProduct(e.target.value)}>
+            {PRODUCT_TYPES.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ fontSize: 13 }}>
+          主題 Subject
+          <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="例：lotus flower mandala" />
+        </label>
+        <label style={{ fontSize: 13 }}>
+          題材 Theme
+          <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="例：spiritual healing" />
+        </label>
+        <label style={{ fontSize: 13 }}>
+          氛圍 Vibe
+          <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
+        </label>
+        <label style={{ fontSize: 13 }}>
+          風格 Style
+          <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={style} onChange={(e) => setStyle(e.target.value)}>
+            {STYLE_PRESETS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ fontSize: 13 }}>
+          模型
+          <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={model} onChange={(e) => { setModel(e.target.value as StudioModel); setRefImages([]); }}>
+            {STUDIO_MODEL_OPTIONS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.group} · {m.label} (~NT${m.costNt}{m.maxRefs > 0 ? ` · ${m.maxRefs} 參考圖` : ""})
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ fontSize: 13 }}>
+          比例
+          <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={aspect} onChange={(e) => setAspect(e.target.value as AspectRatio)}>
+            {ASPECTS.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </label>
+
+        {maxRefs > 0 ? (
+          <label style={{ fontSize: 13 }}>
+            參考圖（{refImages.length}/{maxRefs}）
+            <input type="file" accept="image/png,image/jpeg,image/webp" multiple style={{ width: "100%", marginTop: 4 }} onChange={(e) => void onUploadRefs(e.target.files)} />
+            {refImages.length > 0 ? (
+              <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
+                {refImages.map((r, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={r} alt={`ref-${i}`} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, cursor: "pointer" }} title="點擊移除" onClick={() => setRefImages((prev) => prev.filter((_, j) => j !== i))} />
+                ))}
+              </div>
+            ) : null}
+          </label>
+        ) : null}
+
+        <button className="btn-primary" disabled={gen.status === "generating"} onClick={() => void generate()}>
+          {gen.status === "generating" ? "生成中…" : "生成"}
+        </button>
+      </div>
+
+      {/* ── Preview ───────────────────────────────────────────── */}
+      <div className="build-panel" style={{ padding: 14 }}>
+        <label style={{ fontSize: 13 }}>
+          Prompt（自動組裝，可直接改）
+          <textarea
+            className="btn-secondary"
+            style={{ width: "100%", marginTop: 4, minHeight: 72, fontFamily: "inherit" }}
+            value={effectivePrompt}
+            onChange={(e) => { setPrompt(e.target.value); setPromptTouched(true); }}
+          />
+        </label>
+        {promptTouched ? (
+          <button className="btn-secondary" style={{ fontSize: 12, marginTop: 4 }} onClick={() => { setPromptTouched(false); setPrompt(""); }}>
+            回到自動組裝
+          </button>
+        ) : null}
+
+        <div style={{ marginTop: 12 }}>
+          {gen.status === "idle" ? <p style={{ opacity: 0.6 }}>填好左側欄位後按「生成」。</p> : null}
+          {gen.status === "generating" ? <p style={{ opacity: 0.7 }}>生成中（依模型 5–60 秒）…</p> : null}
+          {gen.status === "error" ? <p style={{ color: "#e5484d" }}>{gen.error}</p> : null}
+          {gen.status === "done" && gen.image ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={gen.image} alt="generated design" style={{ maxWidth: "100%", maxHeight: 560, borderRadius: 8, background: "#111" }} />
+              <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+                <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
+                  {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
+                </button>
+                <a className="btn-secondary" href={gen.image} download="design.png">下載</a>
+                {gen.seed != null ? <span style={{ fontSize: 12, opacity: 0.6 }}>seed {gen.seed}</span> : null}
+                {saveState === "saved" ? <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a> : null}
+                {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗（檢查 POD_DESIGNS_ENABLED / 伺服器 log）</span> : null}
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
