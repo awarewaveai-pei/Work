@@ -4,6 +4,27 @@
 
 ## 2026-06-11
 
+### fix: AO-RESUME 孤兒空骨架根治 — 8h 時間代理 → 真實 session_id（凌晨/跨午夜免疫）
+
+**[任務理解]** `reports/ao-resume/` 出現沒人填的空骨架（孤兒：`2026-06-08-1807`、`2026-06-10-1718`）。操作者直覺「跨時間問題、做到凌晨」正確。根因＝兩機制相撞：① hook `ao-resume-on-prompt.ps1` 用「距上次 ao-resume 執行 >8h」當「新 session」代理（因為移植自 Cursor，讀 `conversation_id`/`generation_id`，Claude Code 不送 → 永遠空，只能退而用時間）→ 長 session 跨 8h（尤其凌晨）誤觸發 ② `ao-resume.ps1`（2026-06-08 加）每次執行都寫骨架。8h 觸發在非開工時段吐骨架但沒人填。
+
+**[現況分析]** claude-code-guide 權威查證 + **live payload 實測**：Claude Code UserPromptSubmit 送 `session_id`（= transcript UUID，整 session 穩定含 --continue/--resume，/clear 才換），無 conversation_id/generation_id。實測本 session `session_id=cdaa8aa8-...` 非空。`finished_utc`/`autoTriggerAoResume` 唯一 consumer = hook 自己。`ao-resume-last.txt` 戳記是多 consumer 錨點（AO-CLOSE 閘 + fetch-signals fallback + closeout-recap）。
+
+**[已修改]**
+- `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1`（SSOT）：① 新增讀 `$obj.session_id` ② 移除「>8h finished_utc」auto-trigger，改 `session_id != last`（state `ao-resume-last-session-id.txt`）才觸發；空 session_id → fail-safe 不觸發 ③ 執行前記錄 session_id ④ `$skelArg = if ($isAoResume) {@('-WriteArchiveSkeleton')} else {@()}` ⑤ meta 加 session_id ⑥ 註記刻意移除 json-corruption fallback。
+- `scripts/ao-resume.ps1`：① param 加 `[switch]$WriteArchiveSkeleton` ② 骨架寫入（L1107）opt-in 守衛 ③ **戳記寫入（L1074）也 gate 在 `-WriteArchiveSkeleton`**（critic Major 修正：戳記與骨架 lockstep，否則 auto-refresh 前進戳記卻無 archive → AO-CLOSE 閘誤 fail）。
+- 刪孤兒 `2026-06-08-1807.md` / `2026-06-10-1718.md`。
+- 已 sync 部署到 `~/.claude/hooks/`（兩機走 git + sync 同步）。
+- **設計**：戳記前進 ⟺ 骨架寫入 ⟺ 真開工（isAoResume）。boot/autopilot/auto-refresh 三類非互動路徑預設都不前進戳記、不寫骨架 → 零孤兒 + 零閘失敗。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`live hook payload capture` + `[Parser]::ParseFile x2` + `temp ps1: switch splat via powershell.exe -File + session_id 5-branch decision` | exit=0 | session_id=非空 UUID 確認；2 檔 parse 0 errors；splat ON→WriteArchiveSkeleton=True/OFF→False；session 決策：新→觸發、同→不、變→觸發、空→不、isAoResume→專路
+- REVIEW_DONE: critic=Deep | verdict=pass（2 輪）| findings=0c/1M→fixed/2m — critic 抓 Major「戳記前進無 archive → 閘 fail」→ option(a) gate 戳記修正 → 二輪 critic 確認 Major RESOLVED（四情境 a/b/c/d 全 PASS、無 StrictMode 問題、其他 consumer 僅安全過度包含）；殘 1 觀察 Minor（greeting-only 日戳記不前進，免動）
+- BUGHUNT_DONE: scope=scripts,mcp,agency-os,.claude | grep=`WriteArchiveSkeleton|ao-resume-last-session-id|autoTriggerAoResume|TotalHours -gt 8` | hits=0 stale — WriteArchiveSkeleton 僅宣告+2 用處+hook 傳遞；session-id 檔僅 hook；殘留 8h 只剩 1 行歷史註解（無 live 邏輯）；autoTriggerAoResume 無外部 consumer；其餘命中皆 sync backups/部署副本（預期）
+
+**[剩餘風險]** ① Cursor-launched session 不送 session_id → 該 IDE 不經此 hook auto-refresh（依賴明打 AO-RESUME；本機主用 Claude Code，可接受）② greeting-only 整天戳記不前進 → 三個唯讀 consumer 過度包含（安全方向，critic 確認無誤行為）。
+**[rollback]** `git revert` 本 commit（hook + ao-resume.ps1）；sync-claude-userlevel.ps1 -Mode merge 還原部署；孤兒已刪除不需復原。各檔獨立可回。
+
 ### C1 修復方案完成：0038 media_assets reconcile migration（已寫+審，未套用 — 等操作者 go）
 
 **[任務理解]** critic C1：`0007:40` 與 `0011:35` 兩個互不相容的 `create table if not exists media_assets` → fresh DB 重放壞掉。操作者要求 R0 完整分析後妥善處理。
@@ -20,7 +41,8 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=SG curl Supabase REST（media_assets 行欄位枚舉 + decision_scores/merchandising_insights 200）+ git log -S 取證 | exit=0 | 線上 shape=0011 確認、0007 已套用確認
 - REVIEW_DONE: critic=Deep(db-expert) | verdict=pass | findings=0c/0M/3s（3 強化全折回：predicate guard / notify pgrst / 0011:95 線頭+down 檔）；db-expert 結論 commit=LOW、apply=LOW（無 table rewrite、SET NOT NULL 在線上短路不掃表）
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`media_assets` migrations 全檔掃（0007/0010/0011/0014 四檔，RLS/seeds 相容性逐一驗）| hits=0 額外破壞
-- 套用步驟（等 go）：SG quiet window 貼 SQL Editor → 預期全 no-op → 驗 `select count(*) from media_assets` 不變 + designs route 仍 200。rollback：線上本來就是 no-op 無需回滾；fresh-replay 環境用 down 檔。
+- **✅ 已套用（操作者 go，2026-06-11）**：Supabase 實體在 **EU `supabase-db` container**（supabase.aware-wave.com，非 SG）。流程：pg_dump schema+full 備份（`/root/db-backups/media_assets-*-pre0038-*.sql` ×2）→ `psql -v ON_ERROR_STOP=1` 套用 → 結果與 db-expert 預測 100% 一致：全 no-op（13 個 already-exists skip notice）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=EU docker exec supabase-db psql 0038 + 三項驗證 | exit=0 | count=1 不變、columns=18（純 0011 canonical，無 legacy 欄滲入）、check constraints 恰 2 個無重複、PostgREST reload 後 REST 200
 
 ### POD Studio P2a 儲存層完成：R2 designs bucket + media_assets + My Designs 頁（flag 預設 OFF，未部署）
 
