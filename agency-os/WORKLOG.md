@@ -9169,3 +9169,16 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 
 
+
+### My Designs gallery filters + R2 env fix
+
+**[已修改]**
+- `app/tools/designs/DesignsGallery.tsx` — 新增 filter panel：工具/產品/主題/品牌/時間/排序；圖片 lightbox；client-side 過濾+排序
+- `app/api/tools/designs/route.ts` — SaveDesignBody 加 productType/theme/brand；metadata insert 加三欄；product_type server-side normalize "none"→null；insert fail 改 500
+- `app/tools/studio/StudioWorkbench.tsx` — saveToDesigns 送 source/productType/theme；dep array 補 productType+theme（critic Major fix）
+- `docker-compose.yml` — next-admin env 加 POD_DESIGNS_ENABLED/R2_API_TOKEN/R2_ACCOUNT_ID/R2_DESIGNS_BUCKET/R2_DESIGNS_PUBLIC_BASE/POD_DESIGNS_DEFAULT_ORG_ID
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- sg-deploy smoke pass; R2/Supabase POST tested in prior session (af2d8cc6)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/2n/2s | all Major+Minor fixed in same commit
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=saveToDesigns,saveToGallery,insert_failed,POD_DESIGNS_ENABLED | hits=0 outside changed files
