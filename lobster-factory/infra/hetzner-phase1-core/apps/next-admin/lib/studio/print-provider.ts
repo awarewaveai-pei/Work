@@ -102,7 +102,8 @@ export async function getCatalogVariants(
   const r = await pf<{ variants: { id: number; color: string; size: string; in_stock?: boolean }[] }>(
     `/products/${catalogProductId}`,
   );
-  if (!r.ok) return r;
+  // tsconfig here does not narrow `!r.ok` — same cast convention as the tarot/designs routes.
+  if (!r.ok) return { ok: false, error: (r as { ok: false; error: string }).error };
   const wanted = new Set(colors.map((c) => c.toLowerCase()));
   return {
     ok: true,
@@ -116,7 +117,7 @@ export async function listSyncProducts(): Promise<PrintfulResult<SyncProductSumm
   const r = await pf<
     { id: number; external_id?: string; name: string; synced?: number; variants?: number; thumbnail_url?: string }[]
   >(`/sync/products?limit=100`);
-  if (!r.ok) return r;
+  if (!r.ok) return { ok: false, error: (r as { ok: false; error: string }).error };
   return {
     ok: true,
     value: r.value.map((p) => ({
@@ -146,7 +147,7 @@ export async function getSyncProduct(
     }[];
   }
   const r = await pf<Raw>(`/sync/products/${id}`);
-  if (!r.ok) return r;
+  if (!r.ok) return { ok: false, error: (r as { ok: false; error: string }).error };
   const sp = r.value.sync_product;
   return {
     ok: true,

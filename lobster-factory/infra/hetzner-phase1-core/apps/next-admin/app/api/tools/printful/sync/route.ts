@@ -49,7 +49,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, error: "catalog must be a positive integer" }, { status: 400 });
     }
     const r = await getCatalogVariants(catalogId, colors);
-    if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 502 });
+    if (!r.ok) return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
     return NextResponse.json({ ok: true, variants: r.value });
   }
 
@@ -59,12 +59,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, error: "id must be a positive integer" }, { status: 400 });
     }
     const r = await getSyncProduct(productId);
-    if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 502 });
+    if (!r.ok) return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
     return NextResponse.json({ ok: true, ...r.value });
   }
 
   const r = await listSyncProducts();
-  if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 502 });
+  if (!r.ok) return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
   return NextResponse.json({ ok: true, products: r.value });
 }
 
@@ -113,6 +113,6 @@ export async function PUT(request: Request) {
     body.printFileUrl,
     body.retailPrice,
   );
-  if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 502 });
+  if (!r.ok) return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
   return NextResponse.json({ ok: true, result: r.value });
 }

@@ -215,7 +215,7 @@ export default function StudioWorkbench() {
     } catch {
       setSaveState("error");
     }
-  }, [gen, effectivePrompt, model]);
+  }, [gen, effectivePrompt, model, productType, theme]);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, padding: 16 }}>

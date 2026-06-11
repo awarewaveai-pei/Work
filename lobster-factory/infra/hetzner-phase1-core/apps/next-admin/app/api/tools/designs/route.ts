@@ -131,7 +131,7 @@ export async function POST(request: Request) {
         prompt: body.prompt ?? null,
         model_name: body.modelName ?? null,
         card_name: body.cardName ?? null,
-        product_type: body.productType ?? null,
+        product_type: body.productType && body.productType !== "none" ? body.productType : null,
         theme: body.theme ?? null,
         brand: body.brand ?? null,
         actor_role: resolved.role,
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error("[designs] media_assets insert failed:", error.message);
-    return NextResponse.json({ ok: false, error: "insert_failed" }, { status: 409 });
+    return NextResponse.json({ ok: false, error: "insert_failed" }, { status: 500 });
   }
 
   const { error: auditError } = await supabase.from("ops_audit_events").insert({
