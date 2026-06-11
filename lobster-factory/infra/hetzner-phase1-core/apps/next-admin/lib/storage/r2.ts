@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 /**
  * Cloudflare R2 object storage via the Cloudflare REST API.
@@ -62,7 +62,9 @@ export function buildDesignKey(mime: string, now: Date = new Date()): string | n
   if (!ext) return null;
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `designs/${yyyy}-${mm}/${crypto.randomUUID()}.${ext}`;
+  // Imported randomUUID (not global crypto) — SG host runs Node 18 where the
+  // crypto global is absent in the vitest/npm-test context (sg-deploy gate).
+  return `designs/${yyyy}-${mm}/${randomUUID()}.${ext}`;
 }
 
 /** Parse a base64 data URL into mime + buffer. Returns null when malformed or unsupported. */

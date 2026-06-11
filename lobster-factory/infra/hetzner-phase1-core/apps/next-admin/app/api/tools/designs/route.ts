@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: code }, { status: 502 });
   }
 
-  const traceId = crypto.randomUUID();
+  const traceId = randomUUID(); // node:crypto import — Node 18 on SG has no crypto global
   const { data, error } = await supabase
     .from("media_assets")
     .insert({
