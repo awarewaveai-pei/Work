@@ -17,7 +17,20 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | 新增程式碼 0 type errors（僅 pre-existing jszip+@supabase/ssr 2 個無關錯誤）
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（tsc clean；logic trace：activeModel/lockedModel 分離、lockedRefs 改用 lockedMaxRefs、previewSig 含 ar=、selectCompareResult 正確窄化 selectedModels）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`TarotModel\|generateTarotImage\|isTarotModel\|isAspectRatio` | hits=0 stale（route.ts + TarotStudio.tsx 全部更新；no other callers outside tarot/）
-- REALTEST_WAIVED: SMOKE_COVERED -- Replicate token 本機 401（SG 有效），tsc gate pass 已是 build-correct 保證；API 真實測試待 token 更新後驗
+- REALTEST_WAIVED: SMOKE_COVERED -- Replicate token 本機 401（SG 有效），tsc gate pass 已是 build-correct 保證；API 真實測試待 token 更新後驗（→ 已於下方續條完成真機驗證）
+
+### Tarot 模型 live schema 校正 + 6 schema 家族真機驗證（續上條）
+
+**[已修改]**
+- Token 同步（與並行 session 重疊、等冪）：SG 現役 token → 本機 vault + User registry；確認 `user-env.ps1` + `AWARE_WAVE_CREDENTIALS.md` 已是新值；CREDENTIALS.md UTF-8 BOM 保留驗證（EF BB BF）；本機 account API 200。
+- `lib/tarot/image-gen.ts` 依 live Replicate schema 修正 8 處（web research 與真機差異）：
+  ① imagen-4 無 seed、參數叫 `image_size` ② nano-banana-2/pro 無 seed ③ seedream-4.5 無 seed、用 `size` + 原生 `aspect_ratio`（含 4:5，原 SEEDREAM_RES 表刪除）④ flux-2-max 有原生 `aspect_ratio` enum、`prompt_upsampling` 不存在會 422（FLUX2MAX_DIMS 表刪除）⑤ ideogram v4 無 seed ⑥ ideogram-character 是 `character_reference_image` 單數 string 且 required（無 ref 時 buildInput throw）、rendering_speed enum `Default|Turbo|Quality` ⑦ v2a/v3 optional enum 大小寫 `Auto` 系（省略用預設）⑧ v2a aspect_ratio enum 無 4:5（真機 422 證實）→ map 3:4
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=Replicate predictions create+poll ×7（v2a/v4-turbo/seedream-4.5/nano-banana-2/imagen-4/flux-2-max + v2a retest）| exit=0 | 6/6 schema 家族 succeeded（14–28s/張）；v2a 首測 422 揭露 4:5 缺失 → 修後 succeeded
+- REVIEW_DONE: critic=Standard(self) | verdict=pass | findings=0c/0m/0n（測試 payload 與 buildInput 輸出逐欄一致；tsc 0 新錯誤；designs/route.ts 錯誤屬並行 session POD 新檔非本任務）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`SEEDREAM_RES\|FLUX2MAX_DIMS\|character_reference_images\|prompt_upsampling` | hits=0（刪除 symbol 無殘留 call site）
+- Seed 重現性註記：flux-schnell/dev、flux-2-max、ideogram v2a/v3/character 支援；**v4/seedream/nano-banana/imagen-4 無 seed**（同風格靠 prompt + ref image）
 
 
 

@@ -100,13 +100,14 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
   // v2a/v3 keep seed support; v4 dropped seed entirely (live schema 2026-06-11).
   // Optional enum params (style_type/magic_prompt_option) omitted — defaults are fine and the
   // live enum casing is "Auto"/"None" (sending "AUTO" would 422).
+  // v2a enum lacks 4:5 (live 422 verified 2026-06-11) — map to nearest 3:4.
   "ideogram-v2a-turbo": {
     provider: "replicate",
     slug: "ideogram-ai/ideogram-v2a-turbo",
     supportsImg2img: false,
     buildInput: ({ prompt, aspectRatio, seed }) => ({
       prompt,
-      aspect_ratio: aspectRatio,
+      aspect_ratio: aspectRatio === "4:5" ? "3:4" : aspectRatio,
       seed,
     }),
   },
