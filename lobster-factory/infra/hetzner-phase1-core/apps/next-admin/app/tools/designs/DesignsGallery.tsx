@@ -29,6 +29,7 @@ type TimeRange = "all" | "today" | "week" | "month";
 const TOOL_LABELS: Record<string, string> = {
   tarot: "Tarot 牌卡",
   "tarot-preview": "Tarot 預覽",
+  "tarot-compare": "Tarot 比較",
   "pod-studio": "Studio",
   mockup: "Mockup",
 };
@@ -46,7 +47,7 @@ function toolLabel(source: string | null | undefined): string {
 }
 
 function isTarot(source: string | null | undefined): boolean {
-  return source === "tarot" || source === "tarot-preview";
+  return source === "tarot" || source === "tarot-preview" || source === "tarot-compare";
 }
 
 function formatBytes(bytes: number | null): string {

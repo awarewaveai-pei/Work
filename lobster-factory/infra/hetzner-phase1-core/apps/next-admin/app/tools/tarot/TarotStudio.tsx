@@ -310,6 +310,7 @@ export default function TarotStudio() {
       setPreviewImage(resp.image);
       setPreviewSeed(resp.seed ?? null);
       setPreviewSig(`${activeModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
+      saveToGallery(resp.image, "tarot-preview", { model: activeModel, prompt: effectiveEnglish });
     } catch (e) {
       setMessage(`預覽生成失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -349,6 +350,9 @@ export default function TarotStudio() {
         result = { model: m, image: null, seed: null, error: e instanceof Error ? e.message : String(e), busy: false };
       }
       slots[i] = result;
+      if (result.image) {
+        saveToGallery(result.image, "tarot-compare", { model: m, prompt });
+      }
       if (compareGenIdRef.current === genId) {
         setCompareResults([...slots]); // update incrementally — completed cards appear immediately
       }
