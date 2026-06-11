@@ -2,7 +2,7 @@
 
 > SSOT：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/image-gen.ts`
 > 建立：2026-06-11（Tarot Studio 擴充）。所有 schema 均經 live Replicate API + 真實生成驗證（6/6 schema 家族 succeeded）。
-> 未來若抽成共用層，POD roadmap 計畫名稱為 `lib/studio/image-provider.ts`（見 `POD_STUDIO_ROADMAP.md` §P2a）——抽離時更新本檔路徑。
+> 共用層已存在（2026-06-11 P2b）：`lib/studio/image-provider.ts` = studio-neutral **facade**（delegation seam，零邏輯重複）。引擎本體仍在上方 SSOT 路徑；Studio/POD 呼叫端一律走 facade，引擎未來搬家只改 facade 一檔。
 
 ## 這是什麼
 

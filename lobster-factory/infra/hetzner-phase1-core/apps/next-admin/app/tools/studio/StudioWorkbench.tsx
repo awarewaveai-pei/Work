@@ -126,6 +126,10 @@ export default function StudioWorkbench() {
       setGen({ status: "error", error: "請先填主題/描述（prompt 至少 3 字）" });
       return;
     }
+    if (model === "ideogram-character" && refImages.length === 0) {
+      setGen({ status: "error", error: "Ideogram Character 需要至少 1 張角色參考圖" });
+      return;
+    }
     setGen({ status: "generating" });
     setSaveState("idle");
     try {
@@ -252,13 +256,21 @@ export default function StudioWorkbench() {
             className="btn-secondary"
             style={{ width: "100%", marginTop: 4, minHeight: 72, fontFamily: "inherit" }}
             value={effectivePrompt}
-            onChange={(e) => { setPrompt(e.target.value); setPromptTouched(true); }}
+            onChange={(e) => {
+              const v = e.target.value;
+              setPrompt(v);
+              // Clearing the box returns to auto-assembly instead of stranding an empty prompt.
+              setPromptTouched(v.trim().length > 0);
+            }}
           />
         </label>
         {promptTouched ? (
-          <button className="btn-secondary" style={{ fontSize: 12, marginTop: 4 }} onClick={() => { setPromptTouched(false); setPrompt(""); }}>
-            回到自動組裝
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+            <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => { setPromptTouched(false); setPrompt(""); }}>
+              回到自動組裝
+            </button>
+            <span style={{ fontSize: 12, opacity: 0.6 }}>手動編輯中 — 左側欄位暫不影響 prompt</span>
+          </div>
         ) : null}
 
         <div style={{ marginTop: 12 }}>
@@ -273,10 +285,16 @@ export default function StudioWorkbench() {
                 <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
                   {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
                 </button>
-                <a className="btn-secondary" href={gen.image} download="design.png">下載</a>
+                <a
+                  className="btn-secondary"
+                  href={gen.image}
+                  download={`design.${gen.image.startsWith("data:image/jpeg") ? "jpg" : gen.image.startsWith("data:image/webp") ? "webp" : "png"}`}
+                >
+                  下載
+                </a>
                 {gen.seed != null ? <span style={{ fontSize: 12, opacity: 0.6 }}>seed {gen.seed}</span> : null}
                 {saveState === "saved" ? <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a> : null}
-                {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗（檢查 POD_DESIGNS_ENABLED / 伺服器 log）</span> : null}
+                {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗（檢查 POD_DESIGNS_ENABLED 與 POD_DESIGNS_DEFAULT_ORG_ID / 伺服器 log）</span> : null}
               </div>
             </>
           ) : null}

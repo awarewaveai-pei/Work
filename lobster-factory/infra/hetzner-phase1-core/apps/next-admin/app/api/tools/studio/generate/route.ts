@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
-import { generateImage, isStudioModel, isAspectRatio } from "../../../../../lib/studio/image-provider";
+import {
+  generateImage,
+  isStudioModel,
+  isAspectRatio,
+  STUDIO_MODEL_OPTIONS,
+} from "../../../../../lib/studio/image-provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,9 +18,16 @@ interface GenerateBody {
   aspectRatio?: string;
 }
 
-// Same ceilings as the tarot generate route (shared engine, shared limits).
-const MAX_REF_IMAGES = 5;
-const MAX_REF_CHARS = 12_000_000; // ~9 MB base64
+// Per-image ceiling matches the tarot generate route; per-model count comes from
+// STUDIO_MODEL_OPTIONS (nano-banana-2 takes 14, most take 0–5). Refs are downscaled
+// client-side to ~1024px JPEG, so the total cap below is generous headroom while
+// still bounding the request body well under nginx client_max_body_size.
+const MAX_REF_CHARS = 12_000_000; // ~9 MB base64 per image
+const MAX_TOTAL_REF_CHARS = 24_000_000; // ~18 MB across all reference images
+
+function maxRefsForModel(model: string): number {
+  return STUDIO_MODEL_OPTIONS.find((m) => m.value === model)?.maxRefs ?? 0;
+}
 
 function friendlyError(code: string): string {
   if (code.includes("billing_hard_limit") || code.includes("insufficient_quota"))
@@ -24,6 +36,7 @@ function friendlyError(code: string): string {
   if (code.includes("missing_replicate")) return "伺服器未設定 Replicate 金鑰。";
   if (code.includes("content_policy") || code.includes("moderation"))
     return "提示詞被內容安全政策擋下，請調整描述。";
+  if (code.includes("character_reference_required")) return "此模型需要至少 1 張角色參考圖。";
   if (code === "generation_timeout") return "生成逾時，請重試或改用較快的模型（FLUX schnell）。";
   return `生成失敗：${code}`;
 }
@@ -61,9 +74,14 @@ export async function POST(request: Request) {
     if (!Array.isArray(body.referenceImages)) {
       return NextResponse.json({ ok: false, error: "referenceImages must be an array" }, { status: 400 });
     }
-    if (body.referenceImages.length > MAX_REF_IMAGES) {
-      return NextResponse.json({ ok: false, error: `最多 ${MAX_REF_IMAGES} 張參考圖` }, { status: 400 });
+    const refCap = maxRefsForModel(body.model);
+    if (body.referenceImages.length > refCap) {
+      return NextResponse.json(
+        { ok: false, error: refCap === 0 ? "此模型不吃參考圖" : `此模型最多 ${refCap} 張參考圖` },
+        { status: 400 },
+      );
     }
+    let totalChars = 0;
     for (const ref of body.referenceImages) {
       if (typeof ref !== "string" || !/^data:image\/(png|jpe?g|webp);base64,/.test(ref)) {
         return NextResponse.json(
@@ -73,6 +91,10 @@ export async function POST(request: Request) {
       }
       if (ref.length > MAX_REF_CHARS) {
         return NextResponse.json({ ok: false, error: "參考圖太大（單張上限 ~9MB）" }, { status: 413 });
+      }
+      totalChars += ref.length;
+      if (totalChars > MAX_TOTAL_REF_CHARS) {
+        return NextResponse.json({ ok: false, error: "參考圖總量太大（合計上限 ~18MB）" }, { status: 413 });
       }
     }
     referenceImages = body.referenceImages;

@@ -4,6 +4,25 @@
 
 ## 2026-06-11
 
+### POD Studio P2b 一般化生成器完成：Studio facade + generate route + Design Studio 頁（flag 同 P2a，未部署）
+
+**[任務理解]** P2b＝把生成能力從 tarot 命名空間解耦給 POD 用。引擎（15 模型 combo-pack）已由 tarot session 完成 → **不重寫**，建 delegation seam。
+
+**[已修改]**（4 新檔 + 2 修改；tarot 引擎/route/UI 零改動）
+- `lib/studio/image-provider.ts` — studio-neutral **facade**：re-export 引擎（`generateImage`/`isStudioModel`/`modelSupportsRefs`）+ `STUDIO_MODEL_OPTIONS`（15 模型 UI metadata，canonical going forward；TarotStudio 留本地副本如其註解）
+- `app/api/tools/studio/generate/route.ts` — 與 tarot route 同驗證；差異：`POD_DESIGNS_ENABLED` 閘 + **per-model refCap 取自 STUDIO_MODEL_OPTIONS**（修 critic M：UI 喊 14 張、route 卡 5 張的矛盾）+ 總量 18MB cap + `character_reference_required` 友善訊息
+- `app/tools/studio/page.tsx` + `StudioWorkbench.tsx` — Design Studio：商品類型（aspect+prompt 後綴）/Subject/Theme/Vibe/Style → 自動組裝 prompt（可手改，**清空自動回退**——critic M 修復）→ 模型選擇 → 參考圖（canvas 縮圖同 tarot 模式）→ 生成 → 預覽 → **存入 My Designs**（串 P2a POST /api/tools/designs）
+- `app/layout.tsx` — nav「Generator (Soon)」→ Studio + My Designs 連結
+- `docs/IMAGE_GEN_TOOLKIT.md` — 「未來若抽成共用層」過時句更新為 facade 已存在（R4）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx realtest_p2b.ts`（facade 直呼，本機新 token）| exit=0 | flux-schnell 真生成 647KB PNG + seed=539640013；首跑 429 露出**帳戶餘額 < $5 節流（6 req/min burst 1）→ 建議儲值**；tsc P2b 檔 0 錯；vitest 6/6
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2M/3m（全修：清空 prompt 卡死陷阱、maxRefs UI/route 矛盾改單一真相源、手動編輯提示、ideogram-character 無參考圖前端擋+友善錯誤、下載副檔名跟 MIME）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`image-provider|StudioWorkbench|STUDIO_MODEL_OPTIONS|tools/studio|isStudioModel` | hits=2 docs（IMAGE_GEN_TOOLKIT.md 過時句已修；POD_STUDIO_ROADMAP.md §P2b 為計畫描述非 stale）
+- route 層 end-to-end 留待部署後 `/playwright smoke`（facade 層已真測）
+
+**[剩餘風險]** Replicate 餘額 <$5 節流會讓多模型比較/連續生成卡 429（operator 儲值即解）；Studio 頁 UI 為 V1 簡版（Mockup Studio 雙模式控制欄在下一階段）。**[rollback]** flag off 即 generate/save 全 503；新檔可刪；layout 兩行還原。
+
 ### feat(tarot): 429修復 + 比較自動鎖定 + 亞洲畫家全名 + 吉卜力宮崎駿
 
 **[任務理解]** 截圖回報三問題：①FLUX schnell/2-Max 比較時 replicate_429；②點比較圖只放大不選擇；③吉卜力沒寫宮崎駿、亞洲畫家缺全名/原文。
