@@ -28,7 +28,7 @@
 **[任務理解]** 截圖回報三問題：①FLUX schnell/2-Max 比較時 replicate_429；②點比較圖只放大不選擇；③吉卜力沒寫宮崎駿、亞洲畫家缺全名/原文。
 
 **[已修改]**
-- `TarotStudio.tsx`: `generateCompare` — stagger by `Math.min(i,4)*1000ms` + genToken cancel guard（selectCompareResult後不repopulate）
+- `TarotStudio.tsx`: `generateCompare` — **v2: 改循序 for-loop**（每個模型完成後才啟動下一個；incremental setCompareResults；消除並發預測導致的 Replicate 429）+ genId guard on setCompareBusy（critic Minor fix）
 - `TarotStudio.tsx`: `selectCompareResult` — 新增auto-lock（直接進Step2不用再按「鎖定」）+ 用compareStyleRef捕捉比較當時的effectiveEnglish（避免prompt drift）
 - `TarotStudio.tsx`: 新增 `compareGenIdRef` / `compareStyleRef` refs
 - `tarotStyles.ts`: 11個亞洲畫家條目更新全名（葛飾北齋→Katsushika Hokusai、歌川廣重→Utagawa Hiroshige、伊藤若冲→Ito Jakuchu、村上隆→Takashi Murakami、奈良美智→Yoshitomo Nara、草間彌生→Yayoi Kusama、金弘道→Kim Hong-do 김홍도、申潤福→Shin Yun-bok 신윤복、拉維瓦爾馬→Raja Ravi Varma、阿莫索洛→Fernando Amorsolo）
@@ -36,8 +36,8 @@
 
 **[驗證結果]**
 - REALTEST_WAIVED: SMOKE_COVERED -- tarot UI needs browser; tsc+tests pass; will verify post-deploy via /playwright smoke
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/2m/1n (all addressed: genToken cancel guard + compareStyleRef added)
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=compareGenIdRef,compareStyleRef,selectCompareResult | hits=0 (new symbols, no stale callsites)
+- REVIEW_DONE: critic=Deep | verdict=pass/warn | findings=0c/0M/1m (setCompareBusy genId guard — applied)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=generateCompare,compareGenIdRef,setCompareBusy | hits=0 (only WORKLOG documentation lines, no stale code callsites)
 - npm test 203/203 pass; tsc noEmit — no new errors (pre-existing jszip/@supabase/ssr only)
 
 ### fix: AO-RESUME 孤兒空骨架根治 — 8h 時間代理 → 真實 session_id（凌晨/跨午夜免疫）

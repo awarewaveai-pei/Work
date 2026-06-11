@@ -315,7 +315,8 @@ export default function TarotStudio() {
     }
   }
 
-  // Multi-model comparison: generate same prompt on all selected models simultaneously.
+  // Multi-model comparison: run models sequentially (one at a time) to avoid Replicate 429.
+  // Results appear incrementally — each card updates as its model finishes.
   async function generateCompare() {
     if (!previewInputsValid()) return;
     setCompareBusy(true);
@@ -324,30 +325,32 @@ export default function TarotStudio() {
     const genId = ++compareGenIdRef.current;
     // Capture prompt at compare time; selectCompareResult reads these for previewSig.
     compareStyleRef.current = { english: effectiveEnglish, subject: subjectText };
-    setCompareResults(modelList.map((m) => ({ model: m, image: null, seed: null, busy: true })));
     const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText });
-    const results = await Promise.all(
-      modelList.map(async (m, i): Promise<CompareResult> => {
-        // Stagger creation requests; cap at 4s so large selections don't hang forever
-        if (i > 0) await new Promise<void>((resolve) => setTimeout(resolve, Math.min(i, 4) * 1000));
-        try {
-          const resp = await callGenerate({
-            model: m,
-            prompt,
-            referenceImages: mode === "image" ? referenceImages.slice(0, modelOption(m).maxRefs) : [],
-            seed: null,
-          });
-          return { model: m, image: resp.ok && resp.image ? resp.image : null, seed: resp.ok ? (resp.seed ?? null) : null, error: resp.ok ? undefined : (resp.error ?? "unknown"), busy: false };
-        } catch (e) {
-          return { model: m, image: null, seed: null, error: e instanceof Error ? e.message : String(e), busy: false };
-        }
-      }),
-    );
-    setCompareBusy(false);
-    // Skip repaint if selectCompareResult already locked a winner (token was incremented)
-    if (compareGenIdRef.current === genId) {
-      setCompareResults(results);
+    // Initialise all slots as busy so the UI shows every pending card immediately
+    const slots: CompareResult[] = modelList.map((m) => ({ model: m, image: null, seed: null, busy: true }));
+    setCompareResults([...slots]);
+
+    for (let i = 0; i < modelList.length; i++) {
+      if (compareGenIdRef.current !== genId) break; // user already selected a winner
+      const m = modelList[i];
+      let result: CompareResult;
+      try {
+        const resp = await callGenerate({
+          model: m,
+          prompt,
+          referenceImages: mode === "image" ? referenceImages.slice(0, modelOption(m).maxRefs) : [],
+          seed: null,
+        });
+        result = { model: m, image: resp.ok && resp.image ? resp.image : null, seed: resp.ok ? (resp.seed ?? null) : null, error: resp.ok ? undefined : (resp.error ?? "unknown"), busy: false };
+      } catch (e) {
+        result = { model: m, image: null, seed: null, error: e instanceof Error ? e.message : String(e), busy: false };
+      }
+      slots[i] = result;
+      if (compareGenIdRef.current === genId) {
+        setCompareResults([...slots]); // update incrementally — completed cards appear immediately
+      }
     }
+    if (compareGenIdRef.current === genId) setCompareBusy(false);
   }
 
   // Pick a comparison result as the active preview → selects model + auto-locks (no extra button needed).
