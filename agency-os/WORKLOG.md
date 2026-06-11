@@ -5,6 +5,10 @@
 ## 2026-06-11
 
 ### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: pod-publish-final-link → handoffs/2026-06-11-1743-pod-publish-final-link.md
+
+
+### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: tomo-173818 → handoffs/2026-06-11-1738-tomo-173818.md
 - TOMORROW_CAPTURED: tomo-173923 → handoffs/2026-06-11-1739-tomo-173923.md
 
