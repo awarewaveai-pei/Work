@@ -21,7 +21,13 @@
     # Default: missing feature branch (no local, no origin) does not fail the whole AO-RESUME; use `-FullMainlineRequireFeatureBranch` for legacy hard-fail.
     [switch]$FullMainlineRequireFeatureBranch,
     # Destructive: passed to git-align as `-AllowResetAheadOfOrigin` — allows reset --hard to drop unpublished commits on main.
-    [switch]$FullMainlineAllowResetAheadOfOrigin
+    [switch]$FullMainlineAllowResetAheadOfOrigin,
+    # OPT-IN: write the AO-RESUME archive skeleton (reports/ao-resume/<stamp>.md) only when set.
+    # The interactive hook (ao-resume-on-prompt.ps1) passes this ONLY for an explicit "AO-RESUME"
+    # prompt, where the agent will produce + archive a real report (ao-resume.md Step 3). Non-
+    # interactive runs (boot fallback, autopilot, new-session auto-refresh) omit it, so they never
+    # leave orphan skeletons. Root cause: 2026-06-11 investigation (orphans 2026-06-08-1807 / 2026-06-10-1718).
+    [switch]$WriteArchiveSkeleton
 )
 
 Set-StrictMode -Version Latest
@@ -1087,7 +1093,7 @@ try {
             } catch { }
         }
     }
-    if (-not $arCovered) {
+    if ($WriteArchiveSkeleton -and -not $arCovered) {
         $arName = $arStampCst.ToString("yyyy-MM-dd-HHmm") + ".md"
         $arPath = Join-Path $arDir $arName
         if (-not (Test-Path -LiteralPath $arPath)) {

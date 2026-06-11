@@ -71,6 +71,11 @@ try {
 
     $obj = $raw | ConvertFrom-Json
     $prompt = [string]$obj.prompt
+    # Claude Code UserPromptSubmit payload carries session_id (stable for the whole conversation;
+    # verified 2026-06-11 against the live payload). Cursor's conversation_id/generation_id are NOT
+    # sent by Claude Code, so the old hook read them and always got empty -> see auto-trigger block.
+    $sessionId = ""
+    if ($obj.PSObject.Properties.Name -contains "session_id") { $sessionId = [string]$obj.session_id }
     $isAoResume = Test-IsAoResumePrompt -Prompt $prompt
 
     $roots = @()
@@ -108,42 +113,31 @@ try {
         }
     }
 
-    # Auto-trigger AO-RESUME on first prompt of a new session (>8h since last successful run).
-    # Root cause of Class B failures (2026-05-29 analysis): when the user types a greeting
-    # or short message, CLAUDE.md auto-invokes AO-RESUME, but this hook only fires ao-resume.ps1
-    # for prompts starting with "AO-RESUME". Without this block, the state file stays stale
-    # (potentially days old) and Claude declares Case B, requiring manual intervention.
-    # With this block, any first-prompt-of-session auto-refreshes the AO-RESUME state if
-    # the last run was more than 8 hours ago.
-    # ORDERING: MUST run BEFORE the dirty-tree short-circuit below, because the dirty-tree
-    # branch exits early (exit 0) and would prevent this staleness check from ever running.
+    # Auto-trigger AO-RESUME on the first prompt of a GENUINELY NEW session.
+    # Original problem (Class B, 2026-05-29): when the user types a greeting (not literally
+    # "AO-RESUME"), CLAUDE.md auto-invokes AO-RESUME in the agent, but this hook only fired
+    # ao-resume.ps1 for prompts starting with "AO-RESUME" -> state file stayed days-stale.
+    # The 2026-05-29 fix used ">8h since last run" as a PROXY for "new session" — but only
+    # because the hook (ported from Cursor) read conversation_id/generation_id, which Claude
+    # Code never sends (always empty). That time-proxy misfired on long sessions crossing 8h
+    # (esp. working past midnight), writing orphan AO-RESUME skeletons (2026-06-08-1807,
+    # 2026-06-10-1718 — both ~8-9h after the morning resume, neither an actual open/close).
+    # Fix (2026-06-11): use the REAL Claude Code session_id (verified present in the live
+    # payload). session_id is stable for an entire conversation (incl. --continue/--resume) and
+    # changes only on /clear or a new terminal session — so it is a correct new-session signal,
+    # immune to clock/date/late-night work. We auto-trigger ONLY when session_id changed.
+    # Fail-safe: empty session_id (unexpected) => no auto-trigger (the user can type AO-RESUME).
+    # ORDERING: MUST run BEFORE the dirty-tree short-circuit below (that branch exits early).
     $autoTriggerAoResume = $false
-    if (-not $isAoResume) {
-        $earlyStateDir = Join-Path $root "agency-os\.agency-state"
-        $earlyJsonPath = Join-Path $earlyStateDir "ao-resume-hook-last.json"
+    $sessionIdFile = Join-Path $root "agency-os\.agency-state\ao-resume-last-session-id.txt"
+    if (-not $isAoResume -and $sessionId) {
+        $lastSessionId = ""
         try {
-            if (Test-Path -LiteralPath $earlyJsonPath) {
-                $earlyJson = Get-Content -LiteralPath $earlyJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
-                $hasFin = $earlyJson.PSObject.Properties.Name -contains 'finished_utc'
-                if ($hasFin -and $earlyJson.finished_utc -and ([string]$earlyJson.finished_utc) -ne 'null') {
-                    $lastFin = [DateTime]::Parse(
-                        [string]$earlyJson.finished_utc, $null,
-                        [System.Globalization.DateTimeStyles]::RoundtripKind
-                    )
-                    if (([DateTime]::UtcNow - $lastFin).TotalHours -gt 8) {
-                        $autoTriggerAoResume = $true
-                    }
-                } else {
-                    $autoTriggerAoResume = $true  # hook never completed cleanly
-                }
-            } else {
-                $autoTriggerAoResume = $true  # state file missing — first run
+            if (Test-Path -LiteralPath $sessionIdFile) {
+                $lastSessionId = (Get-Content -LiteralPath $sessionIdFile -Raw -Encoding UTF8).Trim()
             }
-        } catch {
-            # Unparseable or corrupt state file is the strongest signal to re-run ao-resume.ps1.
-            # A file that cannot be parsed cannot be trusted as evidence of a recent healthy run.
-            $autoTriggerAoResume = $true
-        }
+        } catch { $lastSessionId = "" }
+        if ($sessionId -ne $lastSessionId) { $autoTriggerAoResume = $true }
     }
 
     # Auto-checkpoint on every prompt if working tree is dirty — BUT only for plain
@@ -223,11 +217,23 @@ try {
         }
     }
 
+    # Record the session_id we are handling so the next prompt in THIS session does not re-trigger
+    # (only a genuinely new session_id should). Written before the run so a failing run still
+    # records the session (prevents a re-trigger loop on a broken session).
+    if ($sessionId) {
+        try { [System.IO.File]::WriteAllText($sessionIdFile, $sessionId, (New-Object System.Text.UTF8Encoding $false)) } catch { }
+    }
+
+    # Skeleton is OPT-IN: ao-resume.ps1 writes the AO-RESUME archive skeleton ONLY when this hook
+    # passes -WriteArchiveSkeleton, i.e. only for an explicit "AO-RESUME" prompt where the agent
+    # will produce + archive a real report (Step 3). Auto-refresh on a new session does NOT pass it,
+    # so non-interactive / new-session-without-AO-RESUME runs never leave orphan skeletons.
+    $skelArg = if ($isAoResume) { @('-WriteArchiveSkeleton') } else { @() }
     Push-Location -LiteralPath $root
     try {
         $savedEAP3 = $ErrorActionPreference; $ErrorActionPreference = "Continue"
         $resumeOut = @(
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $resumeScript -FullMainlineParity 2>&1
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $resumeScript -FullMainlineParity @skelArg 2>&1
         )
         $ErrorActionPreference = $savedEAP3
         $exit = $LASTEXITCODE
@@ -241,6 +247,7 @@ try {
 
     $meta = [ordered]@{
         hook_event        = "UserPromptSubmit"
+        session_id        = $sessionId
         generation_id     = $genId
         conversation_id   = $convId
         work_root         = $root
