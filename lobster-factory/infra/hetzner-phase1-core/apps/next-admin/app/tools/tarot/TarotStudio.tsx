@@ -1076,12 +1076,35 @@ export default function TarotStudio() {
           }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={batch[viewIndex].url}
-              alt={batch[viewIndex].card.name}
-              style={{ maxHeight: "78vh", maxWidth: "90vw", borderRadius: 10, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}
-            />
+            {/* image + loading overlay */}
+            <div style={{ position: "relative" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={batch[viewIndex].url}
+                alt={batch[viewIndex].card.name}
+                style={{
+                  maxHeight: "78vh", maxWidth: "90vw", borderRadius: 10,
+                  boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+                  opacity: batch[viewIndex].status === "pending" ? 0.35 : 1,
+                  transition: "opacity 0.2s",
+                }}
+              />
+              {batch[viewIndex].status === "pending" && (
+                <div style={{
+                  position: "absolute", inset: 0,
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  color: "#fff", fontSize: 16, fontWeight: 600, gap: 10,
+                }}>
+                  <div style={{ fontSize: 32, animation: "spin 1s linear infinite" }}>⏳</div>
+                  生成中，請稍候…
+                </div>
+              )}
+            </div>
+            {batch[viewIndex].status === "error" && (
+              <div style={{ color: "#f87171", fontSize: 13 }}>
+                ❌ {batch[viewIndex].error ?? "生成失敗"}
+              </div>
+            )}
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 className="btn-primary"

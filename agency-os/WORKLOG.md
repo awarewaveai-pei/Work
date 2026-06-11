@@ -9198,3 +9198,17 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - REALTEST_WAIVED: SMOKE_COVERED -- sg-deploy smoke pass; R2/Supabase POST tested in prior session (af2d8cc6)
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/2n/2s | all Major+Minor fixed in same commit
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=saveToDesigns,saveToGallery,insert_failed,POD_DESIGNS_ENABLED | hits=0 outside changed files
+
+### Gallery filter 重設計 + FLUX 300 DPI + r2.ts ?? → || 修復 + lightbox loading UX
+
+**[已修改]**
+1. `lib/storage/r2.ts:37,47` — `??` → `||` (both getR2Config + getDesignsPublicBase); fixes empty-string R2_DESIGNS_PUBLIC_BASE passthrough; getDesignsPublicBase() used as SSRF allowlist prefix in 3 routes
+2. `lib/tarot/image-gen.ts` — added FLUX_PRINT_DIMS (896×1488 for 2:3 = 300 DPI @ 7.6×12.6 cm); added `printQuality?: boolean` to TarotGenParams; generateFlux uses `aspect_ratio:"custom" + width/height` when printQuality=true (FLUX schnell/dev require "custom" for explicit dims), fallback to FLUX_PRINT_DIMS["2:3"] guards unknown aspect ratio
+3. `app/api/tools/tarot/generate/route.ts` — added `printQuality?: boolean` to GenerateBody; passes `printQuality: body.printQuality === true` to generateTarotImage
+4. `app/tools/tarot/TarotStudio.tsx` — callGenerate accepts printQuality; all 3 generation sites (generatePreview/generateCompare/generateOne) pass `printQuality: true`; batch lightbox now shows loading overlay (image opacity 0.35 + spinner text) when status==="pending", error display when status==="error"
+5. `app/tools/designs/DesignsGallery.tsx` — filter redesign: toolGroup() maps source to top-level tool (tarot/studio/mockup); assetProduct() maps to product group (tarot-card→塔羅牌/product_type/mockup-composite); toolOptions/productOptions use derived groups; badge shows TOOL_GROUP_LABELS["tarot"]="Tarot" + SOURCE_SUBTYPE subtype; filter matching uses toolGroup+assetProduct
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- npx tsc --noEmit EXIT:0; sg-deploy smoke will cover real exec; lightbox loading UX is UI-only change
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fixes | findings=1m(getDesignsPublicBase ??→||)/1m(FLUX custom dim)/1m(fallback guard) | all fixed same session
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|printQuality|toolGroup|assetProduct|getDesignsPublicBase | hits=8 all in expected changed files + 3 consumer routes (allowlist consumers — fixed upstream)
