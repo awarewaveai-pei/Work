@@ -4,6 +4,22 @@
 
 ## 2026-06-11
 
+### POD Studio 部署上線（操作者明示「部署」）：app.aware-wave.com 四工具 live
+
+**[已執行]**
+1. **Gates**：npm test 210/210；全專案 `tsc --noEmit` 歸 0（修 7 個自家 printful narrowing cast + `npm install` 補 jszip/@supabase/ssr 本機缺件）；compose 補 PRINTFUL env 傳遞（commit `24275994`）
+2. **SG .env**（備份 `.env.bak.pod-designs-env-20260611-073305`）：POD ×2 並行 session 已設（org=AwareWave Ops `39ad4149`，尊重不改）+ 我補 PRINTFUL ×2
+3. **sg-deploy next-admin**：commit `431afe53` healthy 1s、4 端點 smoke 全 OK；隨後並行 session 疊部署 `e7d151a1`（tarot 自動存圖庫）— ancestry 驗證 POD code 全在線上
+4. **Server compose 發現+修**：`/root/lobster-phase1` **非 git checkout**（rsync 部署，compose 為 server 本地管理）→ repo 的 compose PRINTFUL passthrough 不會自動到 server。照紅線：備份 `docker-compose.yml.bak.printful-env-*` → sed 加 2 行 → `up -d` → healthy 17s + `/login` `/api/ops/summary` 200。**教訓：server compose 改動要直接上 server 打，repo compose 只是文件化**
+5. **Playwright smoke**：22 passed；02-ops ×2 重跑過（transient）；**04-onboard ×2 fail = 非回歸**——spec 只帶 nginx basic-auth、未做 app session 登入；同日 `95e80904`「login hard-nav」修正後未登入一律導登入頁 → spec 假設失效（頁面本身 200、登入後正常）。已開 TASKS 修 spec。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh + docker exec env 檢查 + curl localhost 端點 | exit=0 | container healthy、`POD=true PF_STORE=18314943 PF_KEY=OjAV****`、/login + /api/ops/summary 200；Playwright 22 pass 證據 `reports/e2e/2026-06-11/smoke/`
+- REVIEW_DONE: critic=Quick(self) | verdict=pass | findings=0（部署操作無新 code；compose patch 2 行有備份可回滾）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`deployed-commit|431afe53` | hits=0 stale
+- rollback：sg-deploy 內建自動回滾未觸發；compose patch 可用 .bak 還原 + up -d
+
+
 ### POD Studio P2d：Printful PrintProvider 完成（讀路徑實測 PASS）— 含關鍵架構發現
 
 **[關鍵架構發現（live 401→查證→改道）]** 操作者的 Printful store `18314943` 是 **WooCommerce 平台型** → Printful v1 Products API（`POST /store/products` 直接建商品）被拒（"Manual Order / API platform only"，live 實測 + 官方文件雙確認）。**正確全自動串連** = ① Woo 端先建商品（**wp-bridge 已有**，v0.9.0 variable product）→ ② Printful 外掛自動 sync（`GET /sync/products` 對此 store 實測 200）→ ③ `PUT /sync/variants/{id}` 把每個變體綁 catalog variant + 印刷檔（R2 URL）→ ④ 履約原生自動。**黃金樣本**：店裡已有 `438286779 Soulful Expression Bloom T-Shirt`（9/9 synced，external_id=Woo post id，files=front_large/back/preview）= 操作者從 Printful 推的第一個商品，結構即我們要寫的目標格式。
