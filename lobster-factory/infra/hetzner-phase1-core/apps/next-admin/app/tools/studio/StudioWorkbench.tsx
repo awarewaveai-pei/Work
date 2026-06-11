@@ -79,6 +79,8 @@ export default function StudioWorkbench() {
   const [refImages, setRefImages] = useState<string[]>([]);
   const [gen, setGen] = useState<GenState>({ status: "idle" });
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [bgState, setBgState] = useState<"idle" | "removing" | "done" | "error">("idle");
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
 
   const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
   const modelOption = useMemo(() => STUDIO_MODEL_OPTIONS.find((m) => m.value === model), [model]);
@@ -132,6 +134,8 @@ export default function StudioWorkbench() {
     }
     setGen({ status: "generating" });
     setSaveState("idle");
+    setBgState("idle");
+    setOriginalImage(null);
     try {
       const res = await fetch("/api/tools/studio/generate", {
         method: "POST",
@@ -153,6 +157,37 @@ export default function StudioWorkbench() {
       setGen({ status: "error", error: err instanceof Error ? err.message : String(err) });
     }
   }, [model, effectivePrompt, refImages, maxRefs, aspect]);
+
+  const removeBg = useCallback(async () => {
+    if (gen.status !== "done" || !gen.image) return;
+    setBgState("removing");
+    try {
+      const res = await fetch("/api/tools/studio/remove-bg", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: gen.image }),
+      });
+      const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
+      if (!json.ok || !json.image) {
+        setBgState("error");
+        return;
+      }
+      setOriginalImage(gen.image);
+      setGen((prev) => ({ ...prev, image: json.image }));
+      setBgState("done");
+      setSaveState("idle"); // transparent version not saved yet
+    } catch {
+      setBgState("error");
+    }
+  }, [gen]);
+
+  const restoreOriginal = useCallback(() => {
+    if (!originalImage) return;
+    setGen((prev) => ({ ...prev, image: originalImage }));
+    setOriginalImage(null);
+    setBgState("idle");
+    setSaveState("idle");
+  }, [originalImage]);
 
   const saveToDesigns = useCallback(async () => {
     if (gen.status !== "done" || !gen.image) return;
@@ -285,6 +320,13 @@ export default function StudioWorkbench() {
                 <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
                   {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
                 </button>
+                <button className="btn-secondary" disabled={bgState === "removing" || bgState === "done"} onClick={() => void removeBg()}>
+                  {bgState === "done" ? "已去背 ✓" : bgState === "removing" ? "去背中…" : "去背（透明 PNG）"}
+                </button>
+                {bgState === "done" && originalImage ? (
+                  <button className="btn-secondary" style={{ fontSize: 12 }} onClick={restoreOriginal}>還原原圖</button>
+                ) : null}
+                {bgState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>去背失敗，請重試</span> : null}
                 <a
                   className="btn-secondary"
                   href={gen.image}
