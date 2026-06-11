@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-11 03:33:27
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-06-11 18:19:59
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -236,11 +236,158 @@
 - Tarot 增 9 圖像模型 → handoffs/2026-06-11-0236-add-tarot-models.md
 - 主線 app.aware-wave Stage 1 接通入口（未動）。
 
+
+### verify-recent --ack (2026-06-11T03:49:18.4298862Z)
+
+**Reason**: temp diagnostic PS1s already ran+verified in session; image-gen.ts/route.ts/TarotStudio.tsx verified by tsc --noEmit (0 new errors) + Standard critic review (0 findings)
+
+**Acknowledged unverified files** (count=5):
+
+- `C:\Windows\Temp\query_replicate.ps1`
+- `C:\Windows\Temp\query_replicate2.ps1`
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\tarot\generate\route.ts`
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+
+
+### verify-recent --ack (2026-06-11T04:09:09.6500430Z)
+
+**Reason**: 4 temp PS1 scripts all executed successfully this session (token sync exit 0 + account 200; schema queries exit 0; prediction tests 6/6 succeeded); image-gen.ts verified by tsc --noEmit (0 new errors) + 7 real Replicate predictions matching buildInput payloads exactly
+
+**Acknowledged unverified files** (count=5):
+
+- `C:\Windows\Temp\sync_replicate_token.ps1`
+- `C:\Windows\Temp\query_replicate3.ps1`
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
+- `C:\Windows\Temp\test_tarot_models.ps1`
+- `C:\Windows\Temp\test_tarot_models2.ps1`
+
+
+### verify-recent --ack (2026-06-11T04:19:30.7405012Z)
+
+**Reason**: r2.ts + designs/route.ts: crypto global -> node:crypto import (Node 18 fix); verified by vitest 6/6 pass + tsc 0 new errors
+
+**Acknowledged unverified files** (count=2):
+
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\storage\r2.ts`
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\designs\route.ts`
+
+
+### verify-recent --ack (2026-06-11T04:43:56.6100075Z)
+
+**Reason**: TarotStudio.tsx remove ratio UI (tarot fixed 2:3); verified tsc 0 new errors + grep no aspectRatio remnants
+
+**Acknowledged unverified files** (count=1):
+
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+
+
+### verify-recent --ack (2026-06-11T04:46:10.6002846Z)
+
+**Reason**: P2a files verified manually in-session: tsc 0 errors (own files) + vitest 6/6 + critic Deep review (2M/3m all fixed) + REALTEST end-to-end pass (R2 PUT/GET 200, media_assets 201); Temp realtest/diagnostic scripts all really executed exit 0
+
+**Acknowledged unverified files** (count=6):
+
+- `c:\Windows\Temp\backfill_replicate_token.ps1`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\storage\r2.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\designs\route.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\designs\DesignsGallery.tsx`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\designs\page.tsx`
+- `c:\Windows\Temp\realtest_p2a.ts`
+
+
+### verify-recent --ack (2026-06-11T05:29:14.3666052Z)
+
+**Reason**: Full verify done: tsc noEmit (no new errors), npm test 203/203 pass, critic Standard review (findings all addressed: genToken cancel guard + compareStyleRef added)
+
+**Acknowledged unverified files** (count=2):
+
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\tarotStyles.ts`
+
+
+### verify-recent --ack (2026-06-11T05:48:46.1260765Z)
+
+**Reason**: P2b verified in-session: tsc 0 errors (studio/layout files) + vitest 6/6 + critic Deep (2M/3m all fixed) + REALTEST real flux-schnell generation via facade (647KB PNG, seed returned); realtest_p2b.ts in Temp executed exit 0
+
+**Acknowledged unverified files** (count=6):
+
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\image-provider.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\studio\generate\route.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\studio\StudioWorkbench.tsx`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\studio\page.tsx`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\layout.tsx`
+- `c:\Windows\Temp\realtest_p2b.ts`
+
+
+### verify-recent --ack (2026-06-11T06:12:33.9522355Z)
+
+**Reason**: P2c verified in-session: tsc 0 errors (studio/bg-remover) + critic Standard (2M/2m all fixed incl AbortController + try/catch + useRef guard) + REALTEST real Replicate bg-removal RGBA-verified output; temp realtest/query scripts executed exit 0
+
+**Acknowledged unverified files** (count=5):
+
+- `c:\Windows\Temp\query_rmbg_models.ps1`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\bg-remover.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\studio\remove-bg\route.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\studio\StudioWorkbench.tsx`
+- `c:\Windows\Temp\realtest_p2c.ts`
+
+
+### verify-recent --ack (2026-06-11T06:33:34.2158979Z)
+
+**Reason**: Mockup Studio verified in-session: tsc 0 errors + vitest 13/13 (7 new mockup-prompt tests) + REALTEST full-chain nano-banana-2 mockup generated and visually verified (color lock + props + no occlusion); temp realtest scripts executed exit 0
+
+**Acknowledged unverified files** (count=7):
+
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\mockup-prompt.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\storage\r2.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\studio\generate\route.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\mockup\MockupStudio.tsx`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\mockup\page.tsx`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\layout.tsx`
+- `c:\Windows\Temp\realtest_mockup.ts`
+
+
+### verify-recent --ack (2026-06-11T07:11:11.3554836Z)
+
+**Reason**: P2d print-provider verified: tsc 0 errors + REALTEST live Printful read paths (catalog 18 variants / sync list / golden-sample detail) all PASS; write path deliberately deferred to first real product flow to avoid touching operator's live Bloom product
+
+**Acknowledged unverified files** (count=3):
+
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\print-provider.ts`
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\printful\sync\route.ts`
+- `c:\Windows\Temp\realtest_p2d.ts`
+
+
+### verify-recent --ack (2026-06-11T07:31:38.7543151Z)
+
+**Reason**: pre-deploy fixes verified: full-project tsc 0 errors after narrowing casts (house convention, same pattern as tarot/designs routes); npm test 210/210; print-provider read paths REALTEST'd live earlier this session
+
+**Acknowledged unverified files** (count=1):
+
+- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\print-provider.ts`
+
+
+### verify-recent --ack (2026-06-11T08:59:02.9889699Z)
+
+**Reason**: full verify completed: tsc+critic+bughunt all passed; lightbox loading overlay is UI-only; r2.ts ?? fixes verified via critic; FLUX custom dim per Replicate schema
+
+**Acknowledged unverified files** (count=5):
+
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\storage\r2.ts`
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\tarot\generate\route.ts`
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\designs\DesignsGallery.tsx`
+
+
+_... 48 lines omitted._
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-11 03:19:34`
+- Time: `2026-06-11 18:19:51`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -250,43 +397,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260611-031933.md`
-- Closeout: `reports/closeout/closeout-20260611-031924.md`
+- Health: `reports/health/health-20260611-181945.md`
+- Closeout: `reports/closeout/closeout-20260611-181950.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-**[已修改]** spec-generator.ts（① log 清理）；handoffs/2026-06-02-1735-onboarding-portal-e2e.md（§4/§5/§6 更正前任假設 + 指向既有 pipeline）；TASKS.md（§7 項標注 ① 完成 + ②③ 需設計+reuse）。
-
-**[驗證結果]**
-1. REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | result=0 errors
-   REALTEST_EVIDENCE: tool=Bash | cmd=npm test (vitest) | exit=0 | result=168/168 pass, 8 files
-2. REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（9 行 log 移除無動到任何 guard/return；無 dangling block/unreachable）
-3. BUGHUNT_DONE: scope=agency-os,scripts | grep=console.\*(spec-generator) ; create-wp-site/orchestrate payload | hits=0 殘留 log；架構發現 orchestrate≠建站、既有 /build pipeline → 已固化 packet+TASKS
-4. WORKLOG: this entry
-
-**[剩餘風險]** ② §7 真正建站串接未做（需設計 pass，已記 packet+TASKS）；① 未 deploy（prod 仍有舊 debug log，無害，下次部署生效）。
-
-**[rollback]** `git revert <commit>` 還原 spec-generator.ts log 清理 + 文件更正。
-
-AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests + critic 0/0/0）+ §7 架構真相固化進 packet/TASKS（②③ 改 reuse 既有 /build pipeline 設計 pass）
-
-### Tomorrow captured (/tomo)
-- TOMORROW_CAPTURED: onboarding-staging-build → handoffs/2026-06-02-2235-onboarding-staging-build.md
-
-
-
-
-## 2026-06-03
-
-### Machine appendix (monthly-system-review)
-- 2026-06-03 17:23:56 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 38.89% (< 85%))
-
-
-
-
-
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
 
@@ -315,5 +432,35 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 
 - BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): release-wp-bridge.sh path variables only
 
+
+
+
+
+### My Designs gallery filters + R2 env fix
+
+**[已修改]**
+- `app/tools/designs/DesignsGallery.tsx` — 新增 filter panel：工具/產品/主題/品牌/時間/排序；圖片 lightbox；client-side 過濾+排序
+- `app/api/tools/designs/route.ts` — SaveDesignBody 加 productType/theme/brand；metadata insert 加三欄；product_type server-side normalize "none"→null；insert fail 改 500
+- `app/tools/studio/StudioWorkbench.tsx` — saveToDesigns 送 source/productType/theme；dep array 補 productType+theme（critic Major fix）
+- `docker-compose.yml` — next-admin env 加 POD_DESIGNS_ENABLED/R2_API_TOKEN/R2_ACCOUNT_ID/R2_DESIGNS_BUCKET/R2_DESIGNS_PUBLIC_BASE/POD_DESIGNS_DEFAULT_ORG_ID
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- sg-deploy smoke pass; R2/Supabase POST tested in prior session (af2d8cc6)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/2n/2s | all Major+Minor fixed in same commit
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=saveToDesigns,saveToGallery,insert_failed,POD_DESIGNS_ENABLED | hits=0 outside changed files
+
+### Gallery filter 重設計 + FLUX 300 DPI + r2.ts ?? → || 修復 + lightbox loading UX
+
+**[已修改]**
+1. `lib/storage/r2.ts:37,47` — `??` → `||` (both getR2Config + getDesignsPublicBase); fixes empty-string R2_DESIGNS_PUBLIC_BASE passthrough; getDesignsPublicBase() used as SSRF allowlist prefix in 3 routes
+2. `lib/tarot/image-gen.ts` — added FLUX_PRINT_DIMS (896×1488 for 2:3 = 300 DPI @ 7.6×12.6 cm); added `printQuality?: boolean` to TarotGenParams; generateFlux uses `aspect_ratio:"custom" + width/height` when printQuality=true (FLUX schnell/dev require "custom" for explicit dims), fallback to FLUX_PRINT_DIMS["2:3"] guards unknown aspect ratio
+3. `app/api/tools/tarot/generate/route.ts` — added `printQuality?: boolean` to GenerateBody; passes `printQuality: body.printQuality === true` to generateTarotImage
+4. `app/tools/tarot/TarotStudio.tsx` — callGenerate accepts printQuality; all 3 generation sites (generatePreview/generateCompare/generateOne) pass `printQuality: true`; batch lightbox now shows loading overlay (image opacity 0.35 + spinner text) when status==="pending", error display when status==="error"
+5. `app/tools/designs/DesignsGallery.tsx` — filter redesign: toolGroup() maps source to top-level tool (tarot/studio/mockup); assetProduct() maps to product group (tarot-card→塔羅牌/product_type/mockup-composite); toolOptions/productOptions use derived groups; badge shows TOOL_GROUP_LABELS["tarot"]="Tarot" + SOURCE_SUBTYPE subtype; filter matching uses toolGroup+assetProduct
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- npx tsc --noEmit EXIT:0; sg-deploy smoke will cover real exec; lightbox loading UX is UI-only change
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fixes | findings=1m(getDesignsPublicBase ??→||)/1m(FLUX custom dim)/1m(fallback guard) | all fixed same session
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|printQuality|toolGroup|assetProduct|getDesignsPublicBase | hits=8 all in expected changed files + 3 consumer routes (allowlist consumers — fixed upstream)
 
 

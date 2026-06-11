@@ -499,5 +499,13 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-11 03:55:50 UTC_
+_Last synced: 2026-06-11 09:52:18 UTC_
+
+## 2026-06-11 — POD Studio 全產線一日上線（P0驗證→P2a/b/c/d→Mockup→一鍵上架→兩輪部署）
+- **P0 擬真合成驗證 PASS**：nano-banana-2 白衫 ~95%/黑衫鎖色後 ~90%。**三鐵則**（深色逐色鎖色／姿勢避遮胸／設計圖走 data URI）已工具化進 mockup-prompt.ts。
+- **全鏈上線 app.aware-wave.com**（deploy `a4fd0e95`）：Studio 生圖（15 模型 facade 委派 tarot 引擎零重寫）→ 去背（851-labs，RGBA 驗證）→ Mockup（B9-S 平拍/模特雙模式）→ My Designs（R2 `lobster-designs` bucket + media_assets）→ Publish 頁（①誠實 300DPI 放大（探測真尺寸+2段+achievedPx 警告）②wp-bridge Ed25519 簽章建 Woo 草稿 ③sync 檢查 ④綁印刷檔）。
+- **關鍵架構發現**：①Printful Woo 平台型 store 禁用 Products API → 正確鏈 = Woo 先建（wp-bridge）→ 外掛 sync → `PUT /sync/variants/{id}` 綁 catalog variant+印刷檔 ②Printful 只同步已發布商品（draft 不進清單）③wp-bridge `/product` 無 dry-run（假參數已移除；測試真建 draft #7164，SKU 唯一性擋住重複）④server compose 為本地管理（rsync 不帶），env passthrough 要直接上 server 打。
+- **C1 結案**：migration 0007/0011 media_assets 雙定義 → 0038 reconcile（db-expert 審 LOW）已套 EU supabase-db，全 no-op 如預測，DR 劇本修復。
+- **憑證**：REPLICATE token 三處回填（SG 6/5 輪替未同步本機=MCP 401 根因）；Printful Access+OAuth ×4 入 vault+CREDENTIALS §三十一；WPBRIDGE ×3 上 SG。vault `get` 輸出是遮罩值（設計）；`-Key`→`-Name` doc drift 修 2 檔。
+- **明日**：#7164 進 Printful dashboard 後跑 ③④（link 寫路徑首驗）→ P4 試單。packet: handoffs/2026-06-11-1743-pod-publish-final-link.md。Replicate 餘額 <$5 節流，建議儲值。
 

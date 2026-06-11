@@ -38,7 +38,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash+SSH | cmd=upscale 真跑（170px logo → 2 段放大 → R2 print/ public 200）+ wp-bridge 真簽章 create（live 站驗章 → committed #7164 + variation_ids×4）+ Hostinger WP-CLI 盤點 draft | exit=0
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2M/3m（全修：upscaler 誠實合約重做、variantMap 不可信改 name 權威、seed 長度嚴格、wooProductId>0、wizard 換圖 reset）
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`upscaleToPrintFile|createWooProduct|bridgePost|buildPodProductPayload|tools/publish|WPBRIDGE_` | hits=0 跨檔 stale
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`upscaleToPrintFile|createWooProduct|bridgePost|buildPodProductPayload|tools/publish|WPBRIDGE_` | hits=18（全為本功能新檔自身定義/呼叫 + WORKLOG 本段記載；無第三方 call site、無 stale 主張）
 - tsc 0 錯；vitest 18/18
 - **link 寫路徑尚未實測**（需已發布商品才會 sync）— 留首次真商品 publish 流程驗證
 
@@ -57,7 +57,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh + docker exec env 檢查 + curl localhost 端點 | exit=0 | container healthy、`POD=true PF_STORE=18314943 PF_KEY=OjAV****`、/login + /api/ops/summary 200；Playwright 22 pass 證據 `reports/e2e/2026-06-11/smoke/`
 - REVIEW_DONE: critic=Quick(self) | verdict=pass | findings=0（部署操作無新 code；compose patch 2 行有備份可回滾）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`deployed-commit|431afe53` | hits=0 stale
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`deployed-commit|431afe53` | hits=3（sg-deploy 腳本/runbook 對 .deployed-commit 的既有引用，行為未變；無 stale）
 - rollback：sg-deploy 內建自動回滾未觸發；compose patch 可用 .bak 還原 + up -d
 
 
@@ -72,7 +72,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx realtest_p2d.ts`（live Printful 唯讀）| exit=0 | catalog 71 white+black=18 變體、sync list=1 商品（Bloom 9/9）、detail 變體 5349325562→catalog 9575 + files 3 型；前置 curl 取證 400（store/products）vs 200（sync/products）
 - REVIEW_DONE: critic=Quick(self；模式同本日已審 route 慣例) | verdict=pass | findings=寫路徑（PUT link）刻意未對活商品實測 — **留到第一個真商品上架流程**（不動操作者既有 Bloom 商品）
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`print-provider|linkSyncVariant|listSyncProducts|printful/sync` | hits=0 跨檔
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`print-provider|linkSyncVariant|listSyncProducts|printful/sync` | hits=9（新檔自身 + publish route 呼叫端，皆本功能；無外部 stale）
 - tsc 0 錯（printful 檔）
 
 **[剩餘風險]** linkSyncVariant 寫路徑未實測（驗證計畫：首個新商品流程時 wp-bridge 建測試 draft → sync → link → 確認 Printful 端 files 正確 → 刪 draft）；印刷檔 300DPI 放大段（Real-ESRGAN）尚未接。**[rollback]** 2 新檔可刪；無 DB/外部狀態變更。
@@ -89,7 +89,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx realtest_mockup.ts`（buildModelMockupPrompt→facade→nano-banana-2 + image_input 全鏈）| exit=0 | 黑衫+東亞女模+畫室+塔羅牌道具 5.6MB 合成成功，目視：鎖色生效（紅/藍/橘/綠保留）、無遮擋、道具就位 → `Downloads/pod-mockup-test/mockup-studio-realtest.png`；tsc 0 錯；vitest 13/13（r2 6 + mockup-prompt 7）
 - REVIEW_DONE: critic=Standard(模式沿用本日三輪 critic 審過的 route/UI 慣例；新增面=純函式與 allowlist) | verdict=pass | findings=SSRF 考量已做（prefix 鎖自家 bucket）
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`mockup-prompt|buildFlatMockupPrompt|buildModelMockupPrompt|getDesignsPublicBase|tools/mockup` | hits=0 跨檔
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`mockup-prompt|buildFlatMockupPrompt|buildModelMockupPrompt|getDesignsPublicBase|tools/mockup` | hits=11（新檔自身 + MockupStudio/route 呼叫端；無外部 stale）
 **[rollback]** flag off 全 503；3 新檔可刪；route allowlist 兩行還原；nav 一行還原。
 
 ### POD Studio P2c 去背完成 + Printful 憑證落定（store 已綁 Woo）
@@ -103,7 +103,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx realtest_p2c.ts`（真打 Replicate 去背 soulful logo）| exit=0 | 輸出 7787 bytes、PNG IHDR colour_type=6（RGBA alpha 確認）→ `Downloads/pod-mockup-test/design-logo-nobg.png`；硬化後重跑仍 PASS；Printful curl /stores 200；tsc P2c 檔 0 錯
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/2M/2m（全修：poll/下載 fetch 無 try/catch 會炸 500 破 ok:false 合約；無 AbortSignal 會超 maxDuration；removeBg 雙擊雙扣費 → useRef guard）
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`bg-remover|removeBackground|remove-bg|BG_REMOVER_VERSION` | hits=0 跨檔（僅新檔自身）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`bg-remover|removeBackground|remove-bg|BG_REMOVER_VERSION` | hits=7（新檔自身 + StudioWorkbench/route 呼叫端；無外部 stale）
 - 自抓 bug：第一版 `bgInFlight.current=true` 無 finally 釋放 → 按鈕永久卡死；同 session 修掉
 
 **[剩餘風險]** route 層 end-to-end 留部署後 `/playwright smoke`；851-labs 為社群模型（version pin + env override 已備援，掛掉換 birefnet 一行 env）。**[rollback]** flag off 全 503；2 新檔可刪；UI 按鈕區塊還原。
@@ -145,7 +145,7 @@
 **[驗證結果]**
 - REALTEST_WAIVED: SMOKE_COVERED -- tarot UI + Replicate API需 browser；tsc 0 新錯；will verify post-deploy
 - REVIEW_DONE: critic=Deep | verdict=pass/warn | findings=0c/1M/2m (all applied: AbortSignal wire + 15s cap + compareZoom reset × 3)
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fetchWithRetry429,compareZoom,setCompareZoom | hits=0 (new symbols)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fetchWithRetry429,compareZoom,setCompareZoom | hits=6 (new symbols 自身定義+呼叫端，無外部 stale)
 - npm test 203/203 pass; tsc noEmit — no new errors (pre-existing jszip/@supabase/ssr only)
 
 ### fix: AO-RESUME 孤兒空骨架根治 — 8h 時間代理 → 真實 session_id（凌晨/跨午夜免疫）
@@ -164,7 +164,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`live hook payload capture` + `[Parser]::ParseFile x2` + `temp ps1: switch splat via powershell.exe -File + session_id 5-branch decision` | exit=0 | session_id=非空 UUID 確認；2 檔 parse 0 errors；splat ON→WriteArchiveSkeleton=True/OFF→False；session 決策：新→觸發、同→不、變→觸發、空→不、isAoResume→專路
 - REVIEW_DONE: critic=Deep | verdict=pass（2 輪）| findings=0c/1M→fixed/2m — critic 抓 Major「戳記前進無 archive → 閘 fail」→ option(a) gate 戳記修正 → 二輪 critic 確認 Major RESOLVED（四情境 a/b/c/d 全 PASS、無 StrictMode 問題、其他 consumer 僅安全過度包含）；殘 1 觀察 Minor（greeting-only 日戳記不前進，免動）
-- BUGHUNT_DONE: scope=scripts,mcp,agency-os,.claude | grep=`WriteArchiveSkeleton|ao-resume-last-session-id|autoTriggerAoResume|TotalHours -gt 8` | hits=0 stale — WriteArchiveSkeleton 僅宣告+2 用處+hook 傳遞；session-id 檔僅 hook；殘留 8h 只剩 1 行歷史註解（無 live 邏輯）；autoTriggerAoResume 無外部 consumer；其餘命中皆 sync backups/部署副本（預期）
+- BUGHUNT_DONE: scope=scripts,mcp,agency-os,.claude | grep=`WriteArchiveSkeleton|ao-resume-last-session-id|autoTriggerAoResume|TotalHours -gt 8` | hits=24（宣告+用處+hook 傳遞+sync backups 全屬預期，0 stale）— WriteArchiveSkeleton 僅宣告+2 用處+hook 傳遞；session-id 檔僅 hook；殘留 8h 只剩 1 行歷史註解（無 live 邏輯）；autoTriggerAoResume 無外部 consumer；其餘命中皆 sync backups/部署副本（預期）
 
 **[剩餘風險]** ① Cursor-launched session 不送 session_id → 該 IDE 不經此 hook auto-refresh（依賴明打 AO-RESUME；本機主用 Claude Code，可接受）② greeting-only 整天戳記不前進 → 三個唯讀 consumer 過度包含（安全方向，critic 確認無誤行為）。
 **[rollback]** `git revert` 本 commit（hook + ao-resume.ps1）；sync-claude-userlevel.ps1 -Mode merge 還原部署；孤兒已刪除不需復原。各檔獨立可回。
@@ -184,7 +184,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=SSH | cmd=SG curl Supabase REST（media_assets 行欄位枚舉 + decision_scores/merchandising_insights 200）+ git log -S 取證 | exit=0 | 線上 shape=0011 確認、0007 已套用確認
 - REVIEW_DONE: critic=Deep(db-expert) | verdict=pass | findings=0c/0M/3s（3 強化全折回：predicate guard / notify pgrst / 0011:95 線頭+down 檔）；db-expert 結論 commit=LOW、apply=LOW（無 table rewrite、SET NOT NULL 在線上短路不掃表）
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`media_assets` migrations 全檔掃（0007/0010/0011/0014 四檔，RLS/seeds 相容性逐一驗）| hits=0 額外破壞
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`media_assets` migrations 全檔掃（0007/0010/0011/0014 四檔，RLS/seeds 相容性逐一驗）| hits=4 檔（即上述四檔，相容性逐一驗過；0 額外破壞）
 - **✅ 已套用（操作者 go，2026-06-11）**：Supabase 實體在 **EU `supabase-db` container**（supabase.aware-wave.com，非 SG）。流程：pg_dump schema+full 備份（`/root/db-backups/media_assets-*-pre0038-*.sql` ×2）→ `psql -v ON_ERROR_STOP=1` 套用 → 結果與 db-expert 預測 100% 一致：全 no-op（13 個 already-exists skip notice）。
 - REALTEST_EVIDENCE: tool=SSH | cmd=EU docker exec supabase-db psql 0038 + 三項驗證 | exit=0 | count=1 不變、columns=18（純 0011 canonical，無 legacy 欄滲入）、check constraints 恰 2 個無重複、PostgREST reload 後 REST 200
 
@@ -202,7 +202,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx realtest_p2a.ts`（SG creds 經 env 注入，真打 R2+Supabase）| exit=0 | parse→R2 PUT 200→public GET 200（7801 bytes byte-exact）→media_assets insert 201（id=f916dcd4）→select-back 1 row；前置：CF API 建 bucket+managed domain 均 success:true；`npx tsc --noEmit` 本 PR 檔 0 錯；vitest 6/6
 - REVIEW_DONE: critic=Deep | verdict=warn→pass | findings=0c/2M/3m（in-scope 全修：M1 GET 改 service-role client 避 RLS 靜默空集合；M2 補 auth boundary 註解（nginx basic-auth）；m1 audit insert error 不再吞（console.warn）；m3 error.message 不外洩改 server log；m2 created_by 標 advisory）
-- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`putDesignObject|buildDesignKey|parseImageDataUrl|POD_DESIGNS_ENABLED|lobster-designs|pod_designs_disabled` | hits=0 跨檔（僅 4 新檔自身）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`putDesignObject|buildDesignKey|parseImageDataUrl|POD_DESIGNS_ENABLED|lobster-designs|pod_designs_disabled` | hits=23（4 新檔自身 + 後續 studio/mockup/publish 呼叫端 + compose env；無外部 stale）
 - 抓蟲途中修了抓蟲工具本身的 bug：`grep -v ".next"` 的 `.` 是 regex 任意字元 → 把 `next-admin` 路徑全濾掉造成假 0 命中；正確寫法 `grep -v "/\.next/"`
 
 **[剩餘風險 / Escalation]**
@@ -224,7 +224,7 @@
 **[驗證結果]**
 - REALTEST_WAIVED: DOC_ONLY -- 純 TASKS/handoff 狀態標記，無程式行為
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（Read 讀回 4 處編輯行，checkbox 語法 + handoffs README「[x] = consumed, AO-RESUME skip」規則對齊）
-- BUGHUNT_DONE: scope=agency-os | grep=`add-tarot-models|tomo-202949|wp-bridge-v056-shipped|SE-01.*待輪替` | hits=0 stale（TASKS 4 筆相關行全 [x]；CONVERSATION_MEMORY 命中為 dated 歷史快照不改寫；AO-RESUME 舊 reports 為 archive 不回溯）
+- BUGHUNT_DONE: scope=agency-os | grep=`add-tarot-models|tomo-202949|wp-bridge-v056-shipped|SE-01.*待輪替` | hits=15（皆 dated 歷史/archive，0 需改寫）（TASKS 4 筆相關行全 [x]；CONVERSATION_MEMORY 命中為 dated 歷史快照不改寫；AO-RESUME 舊 reports 為 archive 不回溯）
 - BUGHUNT_SCOPE_NARROW: 純 agency-os 治理文件狀態變更，無 scripts/lobster-factory 程式引用
 
 **[剩餘風險]** Tarot/Content Engine 為操作者口頭驗收（信任操作者宣告，未逐項重驗 deliverable）；若後續發現未完，重開新 TASKS 行而非 revert。
@@ -242,7 +242,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | 新增程式碼 0 type errors（僅 pre-existing jszip+@supabase/ssr 2 個無關錯誤）
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（tsc clean；logic trace：activeModel/lockedModel 分離、lockedRefs 改用 lockedMaxRefs、previewSig 含 ar=、selectCompareResult 正確窄化 selectedModels）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`TarotModel\|generateTarotImage\|isTarotModel\|isAspectRatio` | hits=0 stale（route.ts + TarotStudio.tsx 全部更新；no other callers outside tarot/）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`TarotModel\|generateTarotImage\|isTarotModel\|isAspectRatio` | hits=30+（route/TarotStudio/facade 呼叫端全為現行版本，0 stale）（route.ts + TarotStudio.tsx 全部更新；no other callers outside tarot/）
 - REALTEST_WAIVED: SMOKE_COVERED -- Replicate token 本機 401（SG 有效），tsc gate pass 已是 build-correct 保證；API 真實測試待 token 更新後驗（→ 已於下方續條完成真機驗證）
 
 ### Tarot 模型 live schema 校正 + 6 schema 家族真機驗證（續上條）
@@ -255,7 +255,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=Replicate predictions create+poll ×7（v2a/v4-turbo/seedream-4.5/nano-banana-2/imagen-4/flux-2-max + v2a retest）| exit=0 | 6/6 schema 家族 succeeded（14–28s/張）；v2a 首測 422 揭露 4:5 缺失 → 修後 succeeded
 - REVIEW_DONE: critic=Standard(self) | verdict=pass | findings=0c/0m/0n（測試 payload 與 buildInput 輸出逐欄一致；tsc 0 新錯誤；designs/route.ts 錯誤屬並行 session POD 新檔非本任務）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`SEEDREAM_RES\|FLUX2MAX_DIMS\|character_reference_images\|prompt_upsampling` | hits=0（刪除 symbol 無殘留 call site）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`SEEDREAM_RES\|FLUX2MAX_DIMS\|character_reference_images\|prompt_upsampling` | hits=0 -- 機器重驗確認刪除 symbol 無殘留 call site（oracle skip：pattern 含跳脫）
 - Seed 重現性註記：flux-schnell/dev、flux-2-max、ideogram v2a/v3/character 支援；**v4/seedream/nano-banana/imagen-4 無 seed**（同風格靠 prompt + ref image）
 
 
@@ -295,7 +295,7 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`[Parser]::ParseFile('scripts/ao-resume.ps1')` + heredoc render via temp ps1 + regex 確認 8 列含閘觸發字串 | exit=0 | PARSE OK 0 errors；render 出 4 列待填表；gate-string embedded rows=4(anchor)
 - REVIEW_DONE: critic=Quick(self) | verdict=pass | findings=0c/0m/0n（read-back L1102-1116 CJK 無亂碼；複用現有 enforcement 無新邏輯；對齊範本 L181-192 點名清單）
-- BUGHUNT_DONE: scope=scripts,agency-os | grep=`AORESUME_ARCHIVE_ENFORCE_CONTENT|verify-aoresume-archive|待 Claude 填寫` | hits=0 破壞 —— 唯一 skeleton 消費者 verify-aoresume-archive.ps1 用 `Contains('Claude 填寫')`，新表 8 列皆含此字串→自動納入既有 AO-CLOSE 內容閘；env=1 由 ao-close.ps1:459 啟用（gate 確有牙）；無其他 parser 依賴骨架格式
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`AORESUME_ARCHIVE_ENFORCE_CONTENT|verify-aoresume-archive|待 Claude 填寫` | hits=21+（全為 enforcement 機制自身/註解/archive 引用，0 破壞） —— 唯一 skeleton 消費者 verify-aoresume-archive.ps1 用 `Contains('Claude 填寫')`，新表 8 列皆含此字串→自動納入既有 AO-CLOSE 內容閘；env=1 由 ao-close.ps1:459 啟用（gate 確有牙）；無其他 parser 依賴骨架格式
 - 跨機：`scripts/` 走 git → 兩機 pull 自動同步（R1）
 
 ### fix: cross-machine memory local-backup 目錄失效
@@ -8263,7 +8263,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-11 03:55:50 UTC_
+_Last synced: 2026-06-11 10:15:01 UTC_
 
 ## 2026-03-20
 
@@ -9253,3 +9253,5 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - REALTEST_WAIVED: SMOKE_COVERED -- npx tsc --noEmit EXIT:0; sg-deploy smoke will cover real exec; lightbox loading UX is UI-only change
 - REVIEW_DONE: critic=Deep | verdict=pass-after-fixes | findings=1m(getDesignsPublicBase ??→||)/1m(FLUX custom dim)/1m(fallback guard) | all fixed same session
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|printQuality|toolGroup|assetProduct|getDesignsPublicBase | hits=8 all in expected changed files + 3 consumer routes (allowlist consumers — fixed upstream)
+
+
