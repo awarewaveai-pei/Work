@@ -4,6 +4,9 @@
 
 ## 2026-06-11
 
+### Tomorrow captured (/tomo)
+- TOMORROW_CAPTURED: tomo-173818 → handoffs/2026-06-11-1738-tomo-173818.md
+
 ### POD 一鍵上架第二輪部署：Publish 頁上線 + WPBRIDGE env；#7164 已 publish 待 Printful 匯入
 
 - deploy `a4fd0e95`（healthy 7s、4 smoke OK）；SG .env + server compose 補 `WPBRIDGE_BASE_URL/KEY_ID/PRIVATE_KEY`（compose 備份 `.bak.wpbridge-env-*`；container 內驗證 PK_LEN=88）
