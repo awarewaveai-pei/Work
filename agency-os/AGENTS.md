@@ -98,7 +98,7 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 
 SG `5.223.93.113` / EU `204.168.175.41` — 容器細節見 [`docs/operations/AWAREWAVE_STACK_QUICKREF.md`](docs/operations/AWAREWAVE_STACK_QUICKREF.md)。  
 ClickHouse 版本鎖定：`25.7.x`，**禁升 latest / 24.x**。  
-Secrets: `scripts/secrets-vault.ps1 -Action get -Key <KEY_NAME>`；key names 在 `mcp/user-env.ps1`；**禁止硬編**。
+Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME=遮罩值`，僅供確認存在；實值消費走 `mcp/user-env.ps1` / env）；key names 在 `mcp/user-env.ps1`；**禁止硬編**。
 
 **部署規則（強制）**：
 - SG 部署走 `/root/lobster-phase1/scripts/sg-deploy.sh`（**勿**直接 git pull）

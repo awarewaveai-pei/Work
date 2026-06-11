@@ -76,7 +76,7 @@
 
 ## Secrets / Email / Bot
 
-- Secrets: `scripts/secrets-vault.ps1 -Action get -Key <KEY_NAME>`；key names 在 `mcp/user-env.ps1`
+- Secrets: `scripts/secrets-vault.ps1 -Action get -Name <KEY_NAME>`（輸出 `NAME=遮罩值`，僅供確認存在；實值消費走 `mcp/user-env.ps1` / env）；key names 在 `mcp/user-env.ps1`
 - Email: Resend `noreply@aware-wave.com`
 - Telegram bot: 告警 + command plane（token 在 vault）
 
