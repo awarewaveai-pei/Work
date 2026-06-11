@@ -6,6 +6,7 @@
 
 ### Tomorrow captured (/tomo)
 - TOMORROW_CAPTURED: tomo-173818 → handoffs/2026-06-11-1738-tomo-173818.md
+- TOMORROW_CAPTURED: tomo-173923 → handoffs/2026-06-11-1739-tomo-173923.md
 
 ### POD 一鍵上架第二輪部署：Publish 頁上線 + WPBRIDGE env；#7164 已 publish 待 Printful 匯入
 
