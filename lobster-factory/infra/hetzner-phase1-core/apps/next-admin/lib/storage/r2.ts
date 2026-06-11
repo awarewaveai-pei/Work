@@ -34,7 +34,7 @@ function getR2Config(): { apiToken: string; accountId: string; bucket: string; p
     apiToken,
     accountId,
     bucket: process.env.R2_DESIGNS_BUCKET ?? DEFAULT_DESIGNS_BUCKET,
-    publicBase: (process.env.R2_DESIGNS_PUBLIC_BASE ?? DEFAULT_PUBLIC_BASE).replace(/\/+$/, ""),
+    publicBase: (process.env.R2_DESIGNS_PUBLIC_BASE || DEFAULT_PUBLIC_BASE).replace(/\/+$/, ""),
   };
 }
 
@@ -44,7 +44,7 @@ export function isR2Configured(): boolean {
 
 /** Public serving origin of the designs bucket (no trailing slash). Not a secret. */
 export function getDesignsPublicBase(): string {
-  return (process.env.R2_DESIGNS_PUBLIC_BASE ?? DEFAULT_PUBLIC_BASE).replace(/\/+$/, "");
+  return (process.env.R2_DESIGNS_PUBLIC_BASE || DEFAULT_PUBLIC_BASE).replace(/\/+$/, "");
 }
 
 export function sha256Hex(buffer: Buffer): string {

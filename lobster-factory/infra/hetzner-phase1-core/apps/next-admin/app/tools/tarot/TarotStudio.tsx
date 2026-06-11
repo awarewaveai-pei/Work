@@ -88,6 +88,7 @@ async function callGenerate(body: {
   prompt: string;
   referenceImages?: string[];
   seed?: number | null;
+  printQuality?: boolean;
 }): Promise<GenResponse> {
   const res = await fetch("/api/tools/tarot/generate", {
     method: "POST",
@@ -302,6 +303,7 @@ export default function TarotStudio() {
         prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText }),
         referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
+        printQuality: true,
       });
       if (!resp.ok || !resp.image) {
         setMessage(`預覽生成失敗：${resp.error ?? "unknown"}`);
@@ -344,6 +346,7 @@ export default function TarotStudio() {
           prompt,
           referenceImages: mode === "image" ? referenceImages.slice(0, modelOption(m).maxRefs) : [],
           seed: null,
+          printQuality: true,
         });
         result = { model: m, image: resp.ok && resp.image ? resp.image : null, seed: resp.ok ? (resp.seed ?? null) : null, error: resp.ok ? undefined : (resp.error ?? "unknown"), busy: false };
       } catch (e) {
@@ -423,6 +426,7 @@ export default function TarotStudio() {
         prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
         referenceImages: lockedRefs,
         seed: previewSeed,
+        printQuality: true,
       });
       if (!resp.ok || !resp.image) {
         patchItem(index, { status: "error", error: resp.error ?? "unknown" });

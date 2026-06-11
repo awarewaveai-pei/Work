@@ -59,6 +59,16 @@ interface ModelConfig {
   buildInput?: (p: BuildInputParams) => Record<string, unknown>;
 }
 
+// ── Print-quality pixel dimensions for FLUX (tarot card standard: 7.6×12.6 cm @ 300 DPI) ──
+// 7.6 cm × 300 / 2.54 = 897 px; 12.6 cm × 300 / 2.54 = 1488 px (both divisible by 16).
+const FLUX_PRINT_DIMS: Record<AspectRatio, [number, number]> = {
+  "2:3":  [896, 1488],  // portrait tarot: 7.6×12.6 cm @ 300 DPI
+  "3:2":  [1488, 896],
+  "4:5":  [1024, 1280],
+  "1:1":  [1200, 1200],
+  "9:16": [896, 1600],
+};
+
 // ── Aspect ratio mapping helpers (verified against live Replicate schemas 2026-06-11) ──
 
 // Ideogram v4 has NO aspect_ratio — resolution enum (WxH strings) only. NO seed either.
@@ -251,6 +261,9 @@ export interface TarotGenParams {
   seed?: number | null;
   /** Output aspect ratio. Defaults to "2:3" (traditional tarot portrait). */
   aspectRatio?: AspectRatio;
+  /** When true, FLUX models use explicit print-quality pixel dims instead of megapixels:"1".
+   *  Tarot cards: 300 DPI @ 7.6×12.6 cm = 896×1488 px. Studio/Mockup: omit (stays 1 MP). */
+  printQuality?: boolean;
 }
 
 export type TarotGenResult =
@@ -315,18 +328,33 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
   if (!token) return { ok: false, error: "missing_replicate_api_token" };
 
   const seed = params.seed ?? Math.floor(Math.random() * 1_000_000_000);
-  const input: Record<string, unknown> = {
-    prompt: params.prompt,
-    aspect_ratio: params.aspectRatio ?? "2:3",
-    output_format: "png",
-    output_quality: 100,
-    num_outputs: 1,
-    megapixels: "1",
-    // go_fast=true uses fp8-quantized weights: faster but NON-deterministic even with fixed seed.
-    // Force bf16 for reproducible deck generation.
-    go_fast: false,
-    seed,
-  };
+  const ar = (params.aspectRatio ?? "2:3") as AspectRatio;
+  // FLUX schnell/dev require aspect_ratio:"custom" to use explicit width/height (standard Replicate schema).
+  const printDims = FLUX_PRINT_DIMS[ar] ?? FLUX_PRINT_DIMS["2:3"];
+  const input: Record<string, unknown> = params.printQuality
+    ? {
+        prompt: params.prompt,
+        aspect_ratio: "custom",
+        width: printDims[0],
+        height: printDims[1],
+        output_format: "png",
+        output_quality: 100,
+        num_outputs: 1,
+        // go_fast=true uses fp8-quantized weights: faster but NON-deterministic even with fixed seed.
+        // Force bf16 for reproducible deck generation.
+        go_fast: false,
+        seed,
+      }
+    : {
+        prompt: params.prompt,
+        aspect_ratio: ar,
+        output_format: "png",
+        output_quality: 100,
+        num_outputs: 1,
+        megapixels: "1",
+        go_fast: false,
+        seed,
+      };
   if (config.fluxModel === "black-forest-labs/flux-dev") {
     input.guidance = FLUX_DEV_GUIDANCE;
   }

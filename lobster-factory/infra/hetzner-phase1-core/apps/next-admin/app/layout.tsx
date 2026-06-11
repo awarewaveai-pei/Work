@@ -90,6 +90,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/tools/designs" className="sidebar-link" title="已儲存設計庫（R2 持久化），可重用/下載">
                   <span className="sidebar-icon">🗂</span> My Designs
                 </Link>
+                <Link href="/tools/publish" className="sidebar-link" title="一鍵上架：設計 → 300DPI 印刷檔 → Woo 草稿商品 → Printful 綁定（draft 人審後 publish）">
+                  <span className="sidebar-icon">🛒</span> Publish
+                </Link>
                 <span className="sidebar-link-disabled">
                   <span className="sidebar-icon">◧</span> Templates
                   <span className="sidebar-coming-soon">Soon</span>

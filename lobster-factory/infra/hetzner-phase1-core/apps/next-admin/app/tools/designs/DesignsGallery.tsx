@@ -26,27 +26,48 @@ type LoadState = "loading" | "ready" | "error" | "disabled";
 type SortOrder = "desc" | "asc";
 type TimeRange = "all" | "today" | "week" | "month";
 
-const TOOL_LABELS: Record<string, string> = {
-  tarot: "Tarot 牌卡",
-  "tarot-preview": "Tarot 預覽",
-  "tarot-compare": "Tarot 比較",
-  "pod-studio": "Studio",
+/* ─── Source → top-level tool group ─────────────────────────── */
+function toolGroup(source: string | null | undefined): string {
+  if (!source) return "unknown";
+  if (source === "tarot" || source === "tarot-preview" || source === "tarot-compare") return "tarot";
+  if (source === "pod-studio") return "studio";
+  if (source === "mockup") return "mockup";
+  return source;
+}
+
+const TOOL_GROUP_LABELS: Record<string, string> = {
+  tarot: "Tarot",
+  studio: "Studio",
   mockup: "Mockup",
 };
 
+// Tiny subtype label shown inside the tool badge (empty string = no sub-label)
+const SOURCE_SUBTYPE: Record<string, string> = {
+  "tarot-preview": "預覽",
+  "tarot-compare": "比較",
+  tarot: "牌卡",
+};
+
+/* ─── Source → product group ─────────────────────────────────── */
+function assetProduct(asset: DesignAsset): string | null {
+  const src = asset.metadata?.source;
+  if (src === "tarot" || src === "tarot-preview" || src === "tarot-compare") return "tarot-card";
+  if (src === "pod-studio") return asset.metadata?.product_type ?? null;
+  if (src === "mockup") return "mockup-composite";
+  return null;
+}
+
 const PRODUCT_LABELS: Record<string, string> = {
+  "tarot-card": "塔羅牌",
   tshirt: "T-shirt",
   hoodie: "Hoodie",
   mug: "Mug",
   poster: "Poster",
   sticker: "Sticker",
+  "mockup-composite": "商品合成",
 };
 
-function toolLabel(source: string | null | undefined): string {
-  return TOOL_LABELS[source ?? ""] ?? source ?? "—";
-}
-
-function isTarot(source: string | null | undefined): boolean {
+function isTarotSrc(source: string | null | undefined): boolean {
   return source === "tarot" || source === "tarot-preview" || source === "tarot-compare";
 }
 
@@ -156,24 +177,33 @@ export default function DesignsGallery() {
   const toolOptions = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const a of assets) {
-      const k = a.metadata?.source ?? "unknown";
+      const k = toolGroup(a.metadata?.source);
       counts[k] = (counts[k] ?? 0) + 1;
     }
     return [
       { key: "all", label: "全部", count: assets.length },
-      ...Object.entries(counts).map(([k, n]) => ({ key: k, label: toolLabel(k), count: n })),
+      ...Object.entries(counts).map(([k, n]) => ({
+        key: k,
+        label: TOOL_GROUP_LABELS[k] ?? k,
+        count: n,
+      })),
     ];
   }, [assets]);
 
   const productOptions = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const a of assets) {
-      const k = a.metadata?.product_type;
+      const k = assetProduct(a);
       if (k) counts[k] = (counts[k] ?? 0) + 1;
     }
+    const total = Object.values(counts).reduce((s, n) => s + n, 0);
     return [
-      { key: "all", label: "全部", count: Object.values(counts).reduce((s, n) => s + n, 0) },
-      ...Object.entries(counts).map(([k, n]) => ({ key: k, label: PRODUCT_LABELS[k] ?? k, count: n })),
+      { key: "all", label: "全部", count: total },
+      ...Object.entries(counts).map(([k, n]) => ({
+        key: k,
+        label: PRODUCT_LABELS[k] ?? k,
+        count: n,
+      })),
     ];
   }, [assets]);
 
@@ -217,8 +247,8 @@ export default function DesignsGallery() {
       : null;
 
     const filtered = assets.filter((a) => {
-      if (filterTool !== "all" && (a.metadata?.source ?? "unknown") !== filterTool) return false;
-      if (filterProduct !== "all" && a.metadata?.product_type !== filterProduct) return false;
+      if (filterTool !== "all" && toolGroup(a.metadata?.source) !== filterTool) return false;
+      if (filterProduct !== "all" && assetProduct(a) !== filterProduct) return false;
       if (filterTheme !== "all" && a.metadata?.theme !== filterTheme) return false;
       if (filterBrand !== "all" && a.metadata?.brand !== filterBrand) return false;
       if (cutoff && new Date(a.created_at) < cutoff) return false;
@@ -315,21 +345,25 @@ export default function DesignsGallery() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
         {visible.map((asset) => {
           const src = asset.metadata?.source;
-          const cardAspect = isTarot(src) ? "2 / 3" : "1 / 1";
+          const grp = toolGroup(src);
+          const cardAspect = isTarotSrc(src) ? "2 / 3" : "1 / 1";
+          const subtype = SOURCE_SUBTYPE[src ?? ""] ?? "";
+          const product = assetProduct(asset);
           return (
             <div key={asset.id} className="build-panel" style={{ padding: 10 }}>
               {/* badges row */}
               <div style={{ fontSize: 11, marginBottom: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
                 <span style={{
-                  background: isTarot(src) ? "rgba(139,92,246,0.15)" : "rgba(59,130,246,0.15)",
-                  color: isTarot(src) ? "#a78bfa" : "#60a5fa",
+                  background: grp === "tarot" ? "rgba(139,92,246,0.15)" : grp === "studio" ? "rgba(59,130,246,0.15)" : "rgba(16,185,129,0.12)",
+                  color: grp === "tarot" ? "#a78bfa" : grp === "studio" ? "#60a5fa" : "#34d399",
                   borderRadius: 4, padding: "2px 7px",
                 }}>
-                  {toolLabel(src)}
+                  {TOOL_GROUP_LABELS[grp] ?? grp}
+                  {subtype ? <span style={{ opacity: 0.7, marginLeft: 4 }}>{subtype}</span> : null}
                 </span>
-                {asset.metadata?.product_type ? (
+                {product && product !== "tarot-card" ? (
                   <span style={{ background: "rgba(16,185,129,0.12)", color: "#34d399", borderRadius: 4, padding: "2px 7px" }}>
-                    {PRODUCT_LABELS[asset.metadata.product_type] ?? asset.metadata.product_type}
+                    {PRODUCT_LABELS[product] ?? product}
                   </span>
                 ) : null}
                 {asset.metadata?.brand ? (

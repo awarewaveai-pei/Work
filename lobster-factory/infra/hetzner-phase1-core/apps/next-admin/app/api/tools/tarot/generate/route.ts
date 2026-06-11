@@ -11,6 +11,7 @@ interface GenerateBody {
   referenceImages?: unknown;
   seed?: number | null;
   aspectRatio?: string;
+  printQuality?: boolean;
 }
 
 const MAX_REF_IMAGES = 5;
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
     referenceImages,
     seed: body.seed ?? null,
     aspectRatio: isAspectRatio(body.aspectRatio) ? body.aspectRatio : undefined,
+    printQuality: body.printQuality === true,
   });
 
   if (result.ok) {
