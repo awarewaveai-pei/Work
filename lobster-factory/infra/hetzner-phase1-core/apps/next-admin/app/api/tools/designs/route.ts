@@ -33,6 +33,12 @@ interface SaveDesignBody {
   source?: string;
   /** For tarot: the card name (e.g. "The Fool"). */
   cardName?: string;
+  /** Studio: product type key (tshirt / hoodie / mug / poster / sticker). */
+  productType?: string;
+  /** Studio: theme / style tag (e.g. "spiritual healing"). */
+  theme?: string;
+  /** Brand / client tag (e.g. "AwareWave", "soulful"). */
+  brand?: string;
 }
 
 /** POST — persist one generated design: data URL → R2 → media_assets (+ audit event). */
@@ -125,6 +131,9 @@ export async function POST(request: Request) {
         prompt: body.prompt ?? null,
         model_name: body.modelName ?? null,
         card_name: body.cardName ?? null,
+        product_type: body.productType ?? null,
+        theme: body.theme ?? null,
+        brand: body.brand ?? null,
         actor_role: resolved.role,
         role_source: resolved.source,
         trace_id: traceId,

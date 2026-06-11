@@ -205,6 +205,9 @@ export default function StudioWorkbench() {
           image: gen.image,
           prompt: effectivePrompt,
           modelName: model,
+          source: "pod-studio",
+          productType: productType !== "none" ? productType : undefined,
+          theme: theme.trim() || undefined,
         }),
       });
       const json = (await res.json()) as { ok: boolean; error?: string };
