@@ -96,7 +96,9 @@ export async function POST(request: Request) {
 
   const uploaded = await putDesignObject(objectKey, parsed.buffer, parsed.mime);
   if (!uploaded.ok) {
-    return NextResponse.json({ ok: false, error: uploaded.error }, { status: 502 });
+    // Same cast convention as tarot/generate route — tsconfig here does not narrow `!x.ok`.
+    const code = (uploaded as { ok: false; error: string }).error;
+    return NextResponse.json({ ok: false, error: code }, { status: 502 });
   }
 
   const traceId = crypto.randomUUID();
