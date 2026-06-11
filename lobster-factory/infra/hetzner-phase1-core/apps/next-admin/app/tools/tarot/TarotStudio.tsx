@@ -19,7 +19,7 @@ function inGroup(card: TarotCard, key: GroupKey): boolean {
 import { renderPrintCard, CARD_TEMPLATES, type CardTemplate } from "./renderPrintCard";
 // type-only import (erased at build — does not pull the server lib into the client bundle);
 // keeps the model union in sync with the server. maxRefs/cost stay local on purpose.
-import type { TarotModel } from "../../../lib/tarot/image-gen";
+import type { TarotModel, AspectRatio } from "../../../lib/tarot/image-gen";
 
 type Mode = "text" | "image";
 

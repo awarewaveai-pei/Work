@@ -1,43 +1,262 @@
 // Server-side image generation for the tarot print-file tool.
-// Models (both provider keys already in app env), cheapest → priciest:
-//   - flux-schnell  → Replicate flux-schnell (text2img only, no img2img) — ~10× cheaper than dev
-//   - flux-dev      → Replicate flux-dev (text2img + img2img/style ref via `image`)
-//   - openai-low/medium/high → OpenAI gpt-image-1 at that quality (generations, or edits w/ ref image)
-// Returns a uniform `data:image/png;base64,...` URL so the client treats them the same.
-// No Claude/Anthropic call here — prompts go straight to the image model (no extra API cost,
-// no translation step that could stall generation). Write prompts in English for best FLUX results.
+// Models (provider keys in app env), cheapest → priciest:
+//   flux-schnell/dev  → Replicate BFL (text2img; dev adds img2img)
+//   openai-low/med/hi → OpenAI gpt-image-1
+//   ideogram-*        → Ideogram via Replicate (v2a-turbo/v3-balanced/v4-turbo/v4-quality/character)
+//   seedream-4.5      → ByteDance Seedream via Replicate
+//   nano-banana-2/pro → Google Gemini Image via Replicate
+//   imagen-4          → Google Imagen 4 via Replicate
+//   flux-2-max        → BFL Flux.2 Max via Replicate
+// Returns uniform `data:image/png;base64,...` so the client treats all models the same.
+// Write prompts in English for best results — no Claude translation step.
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
 const REPLICATE_POLL_MS = 2_500;
-// flux-dev guidance scale. BFL recommends 1.5-5; >5 oversaturates / burns contrast. Higher =
-// closer prompt adherence, which pushes the chosen art style onto figures (flux under-styles
-// humans at the default 3). flux-schnell dropped guidance embeddings entirely, so guidance is a
-// no-op there and we never send it (could even 422). Tune here.
+// flux-dev guidance scale. BFL recommends 1.5–5; >5 oversaturates. Higher = closer prompt adherence
+// which pushes art style onto figures. flux-schnell dropped guidance entirely (sending it may 422).
 const FLUX_DEV_GUIDANCE = 5;
 
+export type TarotModel =
+  | "flux-schnell"
+  | "flux-dev"
+  | "openai-low"
+  | "openai-medium"
+  | "openai-high"
+  | "ideogram-v2a-turbo"
+  | "ideogram-v3-balanced"
+  | "ideogram-v4-turbo"
+  | "ideogram-v4-quality"
+  | "ideogram-character"
+  | "seedream-4.5"
+  | "nano-banana-2"
+  | "nano-banana-pro"
+  | "imagen-4"
+  | "flux-2-max";
 
-export type TarotModel = "flux-schnell" | "flux-dev" | "openai-low" | "openai-medium" | "openai-high";
+/** Canonical aspect ratio options. "2:3" is the traditional tarot portrait format. */
+export type AspectRatio = "2:3" | "3:2" | "4:5" | "1:1" | "9:16";
 
-interface ModelConfig {
-  provider: "flux" | "openai";
-  /** Replicate model slug (flux models only). */
-  fluxModel?: string;
-  /** Whether the model can consume a reference image for img2img / style transfer. */
-  supportsImg2img: boolean;
-  /** gpt-image-1 quality (openai models only). */
-  quality?: "low" | "medium" | "high";
+/** Input to a model's buildInput function — shared across all apps using this combo-pack. */
+export interface BuildInputParams {
+  prompt: string;
+  aspectRatio: AspectRatio;
+  seed: number;
+  referenceImages: string[]; // base64 data URLs or HTTPS URLs
 }
 
+interface ModelConfig {
+  provider: "flux" | "openai" | "replicate";
+  /** Replicate slug for legacy flux models (owner/name). */
+  fluxModel?: string;
+  /** Replicate slug for generic replicate models (owner/name). */
+  slug?: string;
+  supportsImg2img: boolean;
+  quality?: "low" | "medium" | "high";
+  /**
+   * Per-model input builder. Returns the full `input` object sent to the Replicate prediction API.
+   * This is the flexible combo-pack abstraction reusable across apps beyond Tarot Studio.
+   */
+  buildInput?: (p: BuildInputParams) => Record<string, unknown>;
+}
+
+// ── Aspect ratio mapping helpers ──────────────────────────────────────────────
+
+// Ideogram v4 uses a resolution enum (WxH strings) instead of aspect_ratio.
+// Verified from the v4 API resolution enum; "1792x2240" = 4:5 exact.
+const IDEOGRAM_V4_RES: Record<AspectRatio, string> = {
+  "2:3": "1664x2496",
+  "3:2": "2496x1664",
+  "4:5": "1792x2240",
+  "1:1": "2048x2048",
+  "9:16": "1440x2560",
+};
+
+// Seedream 4.5 uses descriptive resolution strings; 4:5 not in native enum → nearest square.
+const SEEDREAM_RES: Record<AspectRatio, string> = {
+  "2:3": "1664x2496 (2:3)",
+  "3:2": "2496x1664 (3:2)",
+  "4:5": "2048x2048 (1:1)", // no native 4:5 — nearest square
+  "1:1": "2048x2048 (1:1)",
+  "9:16": "1440x2560 (9:16)",
+};
+
+// Imagen 4 only exposes 5 ratios — unsupported ones map to nearest available.
+const IMAGEN4_AR: Record<AspectRatio, string> = {
+  "2:3": "3:4", // nearest portrait (0.75 vs 0.667)
+  "3:2": "4:3", // nearest landscape (1.333 vs 1.5)
+  "4:5": "3:4", // nearest portrait (0.75 vs 0.8)
+  "1:1": "1:1",
+  "9:16": "9:16",
+};
+
+// Flux-2-max uses explicit pixel dimensions (must be multiples of 16, max 4MP).
+const FLUX2MAX_DIMS: Record<AspectRatio, { width: number; height: number }> = {
+  "2:3": { width: 1024, height: 1536 }, // 1.57MP
+  "3:2": { width: 1536, height: 1024 }, // 1.57MP
+  "4:5": { width: 1024, height: 1280 }, // 1.31MP
+  "1:1": { width: 1024, height: 1024 }, // 1MP
+  "9:16": { width: 864, height: 1536 }, // 1.33MP (864/16=54 ✓, 1536/16=96 ✓)
+};
+
 export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
-  "flux-schnell": { provider: "flux", fluxModel: "black-forest-labs/flux-schnell", supportsImg2img: false },
-  "flux-dev": { provider: "flux", fluxModel: "black-forest-labs/flux-dev", supportsImg2img: true },
+  // ── Existing Flux (via Replicate) ──────────────────────────────────────────
+  "flux-schnell": {
+    provider: "flux",
+    fluxModel: "black-forest-labs/flux-schnell",
+    supportsImg2img: false,
+  },
+  "flux-dev": {
+    provider: "flux",
+    fluxModel: "black-forest-labs/flux-dev",
+    supportsImg2img: true,
+  },
+  // ── OpenAI gpt-image-1 ────────────────────────────────────────────────────
   "openai-low": { provider: "openai", supportsImg2img: true, quality: "low" },
   "openai-medium": { provider: "openai", supportsImg2img: true, quality: "medium" },
   "openai-high": { provider: "openai", supportsImg2img: true, quality: "high" },
+  // ── Ideogram via Replicate ────────────────────────────────────────────────
+  "ideogram-v2a-turbo": {
+    provider: "replicate",
+    slug: "ideogram-ai/ideogram-v2a-turbo",
+    supportsImg2img: false,
+    buildInput: ({ prompt, aspectRatio, seed }) => ({
+      prompt,
+      aspect_ratio: aspectRatio,
+      seed,
+      magic_prompt_option: "AUTO",
+    }),
+  },
+  "ideogram-v3-balanced": {
+    provider: "replicate",
+    slug: "ideogram-ai/ideogram-v3-balanced",
+    supportsImg2img: false,
+    buildInput: ({ prompt, aspectRatio, seed }) => ({
+      prompt,
+      aspect_ratio: aspectRatio,
+      seed,
+      style_type: "GENERAL",
+      magic_prompt_option: "AUTO",
+    }),
+  },
+  "ideogram-v4-turbo": {
+    provider: "replicate",
+    slug: "ideogram-ai/ideogram-v4-turbo",
+    supportsImg2img: false,
+    buildInput: ({ prompt, aspectRatio, seed }) => ({
+      prompt,
+      resolution: IDEOGRAM_V4_RES[aspectRatio],
+      seed,
+    }),
+  },
+  "ideogram-v4-quality": {
+    provider: "replicate",
+    slug: "ideogram-ai/ideogram-v4-quality",
+    supportsImg2img: false,
+    buildInput: ({ prompt, aspectRatio, seed }) => ({
+      prompt,
+      resolution: IDEOGRAM_V4_RES[aspectRatio],
+      seed,
+    }),
+  },
+  // character_reference_images accepts base64 data URIs on the Replicate wrapper.
+  "ideogram-character": {
+    provider: "replicate",
+    slug: "ideogram-ai/ideogram-character",
+    supportsImg2img: true,
+    buildInput: ({ prompt, aspectRatio, seed, referenceImages }) => {
+      const input: Record<string, unknown> = {
+        prompt,
+        aspect_ratio: aspectRatio,
+        seed,
+        rendering_speed: "BALANCED",
+      };
+      if (referenceImages.length > 0) {
+        input.character_reference_images = [referenceImages[0]];
+      }
+      return input;
+    },
+  },
+  // ── ByteDance Seedream via Replicate ──────────────────────────────────────
+  "seedream-4.5": {
+    provider: "replicate",
+    slug: "bytedance/seedream-4.5",
+    supportsImg2img: false,
+    buildInput: ({ prompt, aspectRatio, seed }) => ({
+      prompt,
+      resolution: SEEDREAM_RES[aspectRatio],
+      seed,
+    }),
+  },
+  // ── Google models via Replicate ───────────────────────────────────────────
+  "nano-banana-2": {
+    provider: "replicate",
+    slug: "google/nano-banana-2",
+    supportsImg2img: true,
+    buildInput: ({ prompt, aspectRatio, seed, referenceImages }) => {
+      const input: Record<string, unknown> = {
+        prompt,
+        aspect_ratio: aspectRatio,
+        seed,
+        resolution: "2K",
+        output_format: "png",
+      };
+      if (referenceImages.length > 0) {
+        input.image_input = referenceImages;
+      }
+      return input;
+    },
+  },
+  "nano-banana-pro": {
+    provider: "replicate",
+    slug: "google/nano-banana-pro",
+    supportsImg2img: true,
+    buildInput: ({ prompt, aspectRatio, seed, referenceImages }) => {
+      const input: Record<string, unknown> = {
+        prompt,
+        aspect_ratio: aspectRatio,
+        seed,
+        resolution: "2K",
+        output_format: "png",
+        allow_fallback_model: true,
+      };
+      if (referenceImages.length > 0) {
+        input.image_input = referenceImages;
+      }
+      return input;
+    },
+  },
+  "imagen-4": {
+    provider: "replicate",
+    slug: "google/imagen-4",
+    supportsImg2img: false,
+    buildInput: ({ prompt, aspectRatio, seed }) => ({
+      prompt,
+      aspect_ratio: IMAGEN4_AR[aspectRatio], // imagen-4 has only 5 native ratios
+      seed,
+    }),
+  },
+  // ── BFL Flux.2 Max via Replicate ──────────────────────────────────────────
+  "flux-2-max": {
+    provider: "replicate",
+    slug: "black-forest-labs/flux-2-max",
+    supportsImg2img: false,
+    buildInput: ({ prompt, aspectRatio, seed }) => ({
+      prompt,
+      ...FLUX2MAX_DIMS[aspectRatio],
+      seed,
+      output_format: "png",
+      prompt_upsampling: false,
+    }),
+  },
 };
 
 export function isTarotModel(v: unknown): v is TarotModel {
   return typeof v === "string" && Object.prototype.hasOwnProperty.call(TAROT_MODELS, v);
+}
+
+export const VALID_ASPECT_RATIOS: readonly AspectRatio[] = ["2:3", "3:2", "4:5", "1:1", "9:16"];
+export function isAspectRatio(v: unknown): v is AspectRatio {
+  return typeof v === "string" && (VALID_ASPECT_RATIOS as string[]).includes(v);
 }
 
 export interface TarotGenParams {
@@ -45,11 +264,13 @@ export interface TarotGenParams {
   prompt: string;
   /**
    * data: URLs of reference images for style transfer (where the model supports it).
-   * FLUX uses only the first; gpt-image-1 can consume several.
+   * FLUX uses only the first; gpt-image-1 can consume several; nano-banana accepts up to 14.
    */
   referenceImages?: string[];
-  /** Reproducibility seed (FLUX only; ignored by gpt-image-1). */
+  /** Reproducibility seed (most Replicate models; gpt-image-1 ignores it). */
   seed?: number | null;
+  /** Output aspect ratio. Defaults to "2:3" (traditional tarot portrait). */
+  aspectRatio?: AspectRatio;
 }
 
 export type TarotGenResult =
@@ -62,10 +283,9 @@ function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null 
   return { mime: m[1], buffer: Buffer.from(m[2], "base64") };
 }
 
-const MAX_OUTPUT_BYTES = 20 * 1024 * 1024; // 20 MB ceiling on a single generated image
+const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
 
-// Only fetch generated images from Replicate's own delivery hosts — prevents the
-// upstream JSON from steering a server-side fetch at an arbitrary/internal URL (SSRF).
+// Only fetch generated images from Replicate's own delivery hosts (SSRF guard).
 function isAllowedOutputUrl(raw: string): boolean {
   try {
     const u = new URL(raw);
@@ -87,7 +307,7 @@ async function urlToDataUrl(url: string, signal: AbortSignal): Promise<string> {
   return `data:${mime};base64,${Buffer.from(ab).toString("base64")}`;
 }
 
-// ── FLUX (Replicate) ──────────────────────────────────────────────────────────
+// ── FLUX (Replicate) — legacy path kept for backward compatibility ─────────────
 async function generateFlux(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate_api_token" };
@@ -95,35 +315,29 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
   const seed = params.seed ?? Math.floor(Math.random() * 1_000_000_000);
   const input: Record<string, unknown> = {
     prompt: params.prompt,
-    aspect_ratio: "2:3",
+    aspect_ratio: params.aspectRatio ?? "2:3",
     output_format: "png",
-    output_quality: 100, // max quality (Replicate ignores this for png, but correct if format changes)
+    output_quality: 100,
     num_outputs: 1,
-    megapixels: "1",     // render at full 1 megapixel
-    // go_fast=true (the Replicate default) runs an fp8-quantized model: faster + cheaper but LOWER
-    // fidelity, and NON-deterministic even with a fixed seed. For a sellable, reproducible deck we
-    // force the original bf16 weights. Both flux-schnell and flux-dev accept this input.
+    megapixels: "1",
+    // go_fast=true uses fp8-quantized weights: faster but NON-deterministic even with fixed seed.
+    // Force bf16 for reproducible deck generation.
     go_fast: false,
     seed,
   };
-  // flux-dev follows the prompt more closely at higher guidance — this pushes the chosen painting
-  // style onto figures, which flux otherwise under-styles at the default 3. flux-schnell omits
-  // guidance embeddings, so it stays off there (sending it has no effect and may be rejected).
   if (config.fluxModel === "black-forest-labs/flux-dev") {
     input.guidance = FLUX_DEV_GUIDANCE;
   }
-  // schnell has no `image` input — style consistency there relies on seed + prompt only.
-  // flux-dev img2img takes a single image, so we use the first reference.
   const fluxRef = params.referenceImages?.[0];
   if (config.supportsImg2img && fluxRef) {
-    input.image = fluxRef; // img2img / style reference
-    input.prompt_strength = 0.82; // keep some of the reference, follow the prompt
+    input.image = fluxRef;
+    input.prompt_strength = 0.82;
   }
 
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
-    Prefer: "wait", // block up to ~60s for the result instead of returning immediately
+    Prefer: "wait",
   };
 
   const createRes = await fetch(`https://api.replicate.com/v1/models/${config.fluxModel}/predictions`, {
@@ -145,7 +359,6 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
     urls?: { get?: string };
   };
 
-  // Prefer:wait usually returns succeeded; poll the get URL if it is still running.
   while (prediction.status === "starting" || prediction.status === "processing") {
     if (!prediction.urls?.get) break;
     await new Promise((r) => setTimeout(r, REPLICATE_POLL_MS));
@@ -155,23 +368,88 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
   }
 
   if (prediction.status !== "succeeded") {
-    console.error("[tarot] replicate prediction not succeeded", prediction.status, prediction.error ?? "");
+    console.error("[tarot] replicate not succeeded", prediction.status, prediction.error ?? "");
     return { ok: false, error: `replicate_${prediction.status}` };
   }
 
   const outUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
   if (!outUrl) return { ok: false, error: "replicate_empty_output" };
-
-  const image = await urlToDataUrl(outUrl, signal);
+  const image = await urlToDataUrl(outUrl as string, signal);
   return { ok: true, image, seed };
 }
 
-// ── OpenAI gpt-image-1 ─────────────────────────────────────────────────────────
+// ── Generic Replicate — new models via per-model buildInput abstraction ─────────
+async function generateReplicate(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
+  const token = process.env.REPLICATE_API_TOKEN;
+  if (!token) return { ok: false, error: "missing_replicate_api_token" };
+  if (!config.slug || !config.buildInput) return { ok: false, error: "model_config_incomplete" };
+
+  const seed = params.seed ?? Math.floor(Math.random() * 1_000_000_000);
+  const input = config.buildInput({
+    prompt: params.prompt,
+    aspectRatio: params.aspectRatio ?? "2:3",
+    seed,
+    referenceImages: params.referenceImages ?? [],
+  });
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+    Prefer: "wait",
+  };
+
+  const createRes = await fetch(`https://api.replicate.com/v1/models/${config.slug}/predictions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ input }),
+    signal,
+  });
+  if (!createRes.ok) {
+    const detail = await createRes.text().catch(() => "");
+    console.error(`[tarot] ${config.slug} create failed`, createRes.status, detail.slice(0, 500));
+    return { ok: false, error: `replicate_${createRes.status}` };
+  }
+
+  let prediction = (await createRes.json()) as {
+    status: string;
+    output?: string[] | string;
+    error?: string;
+    urls?: { get?: string };
+  };
+
+  while (prediction.status === "starting" || prediction.status === "processing") {
+    if (!prediction.urls?.get) break;
+    await new Promise((r) => setTimeout(r, REPLICATE_POLL_MS));
+    const pollRes = await fetch(prediction.urls.get, { headers: { Authorization: `Bearer ${token}` }, signal });
+    if (!pollRes.ok) return { ok: false, error: `replicate_poll_${pollRes.status}` };
+    prediction = await pollRes.json();
+  }
+
+  if (prediction.status !== "succeeded") {
+    console.error(`[tarot] ${config.slug} not succeeded`, prediction.status, prediction.error ?? "");
+    return { ok: false, error: `replicate_${prediction.status}` };
+  }
+
+  const outUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+  if (!outUrl) return { ok: false, error: "replicate_empty_output" };
+  const image = await urlToDataUrl(outUrl as string, signal);
+  return { ok: true, image, seed };
+}
+
+// ── OpenAI gpt-image-1 ──────────────────────────────────────────────────────────
 async function generateOpenai(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { ok: false, error: "missing_openai_api_key" };
 
-  const SIZE = "1024x1536"; // 2:3 portrait
+  // gpt-image-1 only supports three sizes; map unsupported ratios to nearest.
+  const sizeMap: Record<AspectRatio, string> = {
+    "2:3": "1024x1536",
+    "3:2": "1536x1024",
+    "4:5": "1024x1536", // no 4:5 — use portrait
+    "1:1": "1024x1024",
+    "9:16": "1024x1536", // no 9:16 — use portrait
+  };
+  const SIZE = sizeMap[params.aspectRatio ?? "2:3"];
   const quality = config.quality ?? "medium";
   let res: Response;
 
@@ -182,7 +460,6 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
     form.append("prompt", params.prompt);
     form.append("size", SIZE);
     form.append("quality", quality);
-    // gpt-image-1 edits accepts multiple reference images via repeated image[] fields.
     for (let i = 0; i < refs.length; i++) {
       const parsed = parseDataUrl(refs[i]);
       if (!parsed) return { ok: false, error: "invalid_reference_image" };
@@ -207,11 +484,7 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
     const detail = await res.text().catch(() => "");
     console.error("[tarot] openai image failed", res.status, detail.slice(0, 500));
     let code = "";
-    try {
-      code = ((JSON.parse(detail) as { error?: { code?: string } })?.error?.code) ?? "";
-    } catch {
-      /* non-JSON error body */
-    }
+    try { code = ((JSON.parse(detail) as { error?: { code?: string } })?.error?.code) ?? ""; } catch { /* non-JSON */ }
     return { ok: false, error: code ? `openai_${code}` : `openai_${res.status}` };
   }
 
@@ -228,6 +501,7 @@ export async function generateTarotImage(params: TarotGenParams): Promise<TarotG
   const timer = setTimeout(() => controller.abort(), GEN_TIMEOUT_MS);
   try {
     if (config.provider === "flux") return await generateFlux(params, config, controller.signal);
+    if (config.provider === "replicate") return await generateReplicate(params, config, controller.signal);
     return await generateOpenai(params, config, controller.signal);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

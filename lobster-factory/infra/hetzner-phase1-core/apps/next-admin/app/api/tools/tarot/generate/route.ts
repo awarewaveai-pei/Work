@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
-import { generateTarotImage, isTarotModel } from "../../../../../lib/tarot/image-gen";
+import { generateTarotImage, isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,6 +10,7 @@ interface GenerateBody {
   prompt?: string;
   referenceImages?: unknown;
   seed?: number | null;
+  aspectRatio?: string;
 }
 
 const MAX_REF_IMAGES = 5;
@@ -42,7 +43,13 @@ export async function POST(request: Request) {
 
   if (!isTarotModel(body.model)) {
     return NextResponse.json(
-      { ok: false, error: "model must be one of flux-schnell|flux-dev|openai-low|openai-medium|openai-high" },
+      { ok: false, error: "unknown model — check TarotModel type for valid values" },
+      { status: 400 },
+    );
+  }
+  if (body.aspectRatio != null && !isAspectRatio(body.aspectRatio)) {
+    return NextResponse.json(
+      { ok: false, error: "aspectRatio must be one of: 2:3 3:2 4:5 1:1 9:16" },
       { status: 400 },
     );
   }
@@ -79,6 +86,7 @@ export async function POST(request: Request) {
     prompt: body.prompt,
     referenceImages,
     seed: body.seed ?? null,
+    aspectRatio: isAspectRatio(body.aspectRatio) ? body.aspectRatio : undefined,
   });
 
   if (result.ok) {
