@@ -164,6 +164,18 @@ export default function DesignsGallery() {
 
   useEffect(() => { void load(); }, [load]);
 
+  // Auto-refresh: when user returns to this page (tab focus or navigation) after generating images elsewhere.
+  useEffect(() => {
+    const onVisible = () => { if (!document.hidden) void load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    // Also refresh every 30s while the page is open (covers same-tab usage).
+    const timer = setInterval(() => { if (!document.hidden) void load(); }, 30_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
+  }, [load]);
+
   const copyUrl = useCallback(async (asset: DesignAsset) => {
     if (!asset.object_url) return;
     try {

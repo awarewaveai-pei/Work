@@ -4,6 +4,30 @@
 
 ## 2026-06-11
 
+### POD Studio 一鍵上架鏈完成：upscaler + Ed25519 wp-bridge client + publish 編排 + Publish 頁（含三個 live 發現）
+
+**[已修改]**（6 新檔 + 2 修改；全鏈 = 設計 → 300DPI 印刷檔 → Woo 草稿 → 人審 publish → Printful sync → 綁印刷檔）
+- `lib/studio/upscaler.ts` — Real-ESRGAN（live version pin `b3ef1941…`）；**誠實合約**（critic Major 重做）：探測輸入真實尺寸（PNG IHDR/JPEG SOF 解析）→ 最多 2 段鏈式放大 → 量測輸出實際 px → 回報 `achievedLongEdgePx + meetsTarget`，UI 未達 4800px 顯示 ⚠ 警告，不再無條件號稱 300DPI
+- `lib/studio/wp-bridge-client.ts` — Ed25519 簽章 client（Node crypto，PKCS8 wrap libsodium seed；canonical 與 PHP 端 byte-exact — critic 用 roundtrip + live 雙驗證）；key 長度只收 32/64 嚴格拒絕
+- `lib/studio/pod-product.ts` + 13 tests — payload 純函式（白/黑 × 尺寸、2XL+ plus 價、SKU 唯一、強制 draft）
+- `app/api/tools/publish/route.ts` — upscale/create/status/link 四動作；link 以 **Printful 端 name 為權威**（variantMap 僅 fallback，不一致即 skip — critic 防錯綁）
+- `app/tools/publish/PublishWizard.tsx` + `page.tsx` + nav「🛒 Publish」；換設計圖自動 reset 下游步驟（防舊印刷檔誤綁）
+
+**[三個 live 發現（藍圖修正）]**
+1. **wp-bridge `/product` 沒有 dry-run**（只有 /option 有，`RestController:167`）——「dry-run 測試」實際真建了 draft 商品 **#7164「REALTEST Publish Chain Tee」**（白/黑×S/M，客人不可見）。已移除 client/route 的假 dryRun 參數 + 註解警告；**操作者可刪 7164 或留作首次全鏈測試品**。後兩次誤重跑被 `sku_exists` 409 擋（WP-CLI 實查確認只有一顆）
+2. **Printful 外掛只同步「已發布」商品**（draft 7164 不在 /sync/products）→ 串連順序修正：draft → 人審 publish（可先隱藏）→ sync → 綁定 → 設可見。UI/route 文案已照此改
+3. CP950 再現：temp .ps1 含全形字 → regex 爛 → key 抽取錯（len=7）；改純 ASCII regex 後過（len=88）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash+SSH | cmd=upscale 真跑（170px logo → 2 段放大 → R2 print/ public 200）+ wp-bridge 真簽章 create（live 站驗章 → committed #7164 + variation_ids×4）+ Hostinger WP-CLI 盤點 draft | exit=0
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2M/3m（全修：upscaler 誠實合約重做、variantMap 不可信改 name 權威、seed 長度嚴格、wooProductId>0、wizard 換圖 reset）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`upscaleToPrintFile|createWooProduct|bridgePost|buildPodProductPayload|tools/publish|WPBRIDGE_` | hits=0 跨檔 stale
+- tsc 0 錯；vitest 18/18
+- **link 寫路徑尚未實測**（需已發布商品才會 sync）— 留首次真商品 publish 流程驗證
+
+**[剩餘風險]** 部署後 SG 需加 env `WPBRIDGE_BASE_URL/WPBRIDGE_KEY_ID/WPBRIDGE_PRIVATE_KEY`（server compose + .env，照 PRINTFUL 模式）；plugin /product dry_run 支援已開 TASKS。**[rollback]** flag off 全 503；新檔可刪；#7164 後台可刪。
+
+
 ### POD Studio 部署上線（操作者明示「部署」）：app.aware-wave.com 四工具 live
 
 **[已執行]**
