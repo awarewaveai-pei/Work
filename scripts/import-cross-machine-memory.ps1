@@ -397,24 +397,22 @@ if ($candidateFolders.Count -gt 0 -and $memDest) {
                     $indDst  = Join-Path $memDest $_.Name
                     $fileKey = "memory/$($_.Name)"
                     $decision = Get-ImportDecision $indSrc $indDst $fileKey $false
+                    # Use $fileKey (captured before switch) instead of $_.Name inside switch blocks.
+                    # In PowerShell 5.1, switch ($x) overwrites $_ with $x — $_.Name would be $null.
                     switch ($decision) {
                         'unchanged' {
                             Update-LocalStateHash $fileKey (Get-SafeHash $indSrc)
-                            Write-Host "  cross-machine import: memory/$($_.Name) unchanged" -ForegroundColor DarkGray
+                            Write-Host "  cross-machine import: $fileKey unchanged" -ForegroundColor DarkGray
                         }
                         'local-modified' {
-                            Write-Host "  cross-machine import: memory/$($_.Name) CONFLICT — vault differs; local kept. Use -Force to take vault." -ForegroundColor Yellow
+                            Write-Host "  cross-machine import: $fileKey CONFLICT — vault differs; local kept. Use -Force to take vault." -ForegroundColor Yellow
                         }
                         'import' {
-                            Invoke-LocalBackup $indDst "memory/$($_.Name)"
+                            Invoke-LocalBackup $indDst $fileKey
                             if (Copy-Atomic $indSrc $indDst) {
-                                # Normalise UTF-8 BOM on the local copy so PowerShell never
-                                # misreads it as Big5. This changes the dst hash; store the
-                                # post-BOM hash so next sync sees 'unchanged' once the export
-                                # side also emits BOM (settles within 1-2 sync cycles).
                                 try { Set-Utf8BomOnFile -Path $indDst } catch { }
                                 Update-LocalStateHash $fileKey (Get-SafeHash $indDst)
-                                Write-Host "  cross-machine import: memory/$($_.Name) imported (UTF-8 BOM enforced)" -ForegroundColor Green
+                                Write-Host "  cross-machine import: $fileKey imported (UTF-8 BOM enforced)" -ForegroundColor Green
                             }
                         }
                     }
