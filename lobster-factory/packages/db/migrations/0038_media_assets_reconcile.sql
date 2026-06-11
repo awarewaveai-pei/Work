@@ -17,6 +17,13 @@
 --   * production (0011 shape):    every statement is a no-op.
 -- Legacy 0007 columns (asset_type / storage_key / status / updated_at) are KEPT
 -- (nullable) for compatibility — additive only, nothing is dropped.
+--
+-- ⚠ FRESH-REPLAY OPERATOR NOTE (db-expert 2026-06-11): on a broken sequential
+-- replay, 0011 itself ERRORS at line 95 (`create index idx_media_assets_org_domain`
+-- references asset_domain, which the 0007-shape table lacks). Disaster-recovery
+-- order is therefore: 0001..0010 → 0011 (index statement fails → continue) → ...
+-- → 0038 (this file) → re-run 0011 line 95. Down-migration:
+-- packages/db/scripts/0038_media_assets_reconcile_down.sql
 
 -- 1) Canonical columns (no-op where they already exist).
 alter table media_assets add column if not exists project_id uuid references projects(id) on delete set null;
@@ -67,27 +74,38 @@ begin
   end if;
 end $$;
 
--- 4) Canonical CHECK constraints (names match the ones PG auto-generates from the
---    inline checks in 0011, so this is a no-op on production). NOT VALID keeps any
---    pre-existing legacy rows from blocking the install; new writes are enforced.
+-- 4) Canonical CHECK constraints. Guarded by PREDICATE COLUMN, not constraint name —
+--    the live table was hand-recreated (2026-04-25, unrecorded), so its constraint
+--    names are unverified; a name-based guard could install duplicates (db-expert
+--    review 2026-06-11). NOT VALID keeps any pre-existing legacy rows from blocking
+--    the install; new writes are enforced.
 do $$
 begin
-  if not exists (select 1 from pg_constraint
-                 where conrelid = 'public.media_assets'::regclass
-                   and conname = 'media_assets_storage_backend_check') then
+  if not exists (select 1 from pg_constraint c
+                 where c.conrelid = 'public.media_assets'::regclass
+                   and c.contype = 'c'
+                   and pg_get_constraintdef(c.oid) ilike '%storage_backend%') then
     alter table media_assets
       add constraint media_assets_storage_backend_check
       check (storage_backend in ('r2', 'wp_uploads')) not valid;
   end if;
-  if not exists (select 1 from pg_constraint
-                 where conrelid = 'public.media_assets'::regclass
-                   and conname = 'media_assets_asset_domain_check') then
+  if not exists (select 1 from pg_constraint c
+                 where c.conrelid = 'public.media_assets'::regclass
+                   and c.contype = 'c'
+                   and pg_get_constraintdef(c.oid) ilike '%asset_domain%') then
     alter table media_assets
       add constraint media_assets_asset_domain_check
       check (asset_domain in ('ai_generated', 'wp_product', 'wp_blog')) not valid;
   end if;
 end $$;
+-- After applying & confirming no violating rows, optionally promote:
+--   alter table media_assets validate constraint media_assets_storage_backend_check;
+--   alter table media_assets validate constraint media_assets_asset_domain_check;
 
 -- 5) Canonical unique index (no-op by name on production).
 create unique index if not exists uq_media_assets_org_backend_key_version
   on media_assets(organization_id, storage_backend, object_key, version);
+
+-- 6) Supabase/PostgREST: reload the schema cache so REST sees new columns at once
+--    (harmless on a database that was already canonical).
+notify pgrst, 'reload schema';
