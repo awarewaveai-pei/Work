@@ -50,10 +50,14 @@
 - `tarotStyles.ts`: 11個亞洲畫家條目更新全名（葛飾北齋→Katsushika Hokusai、歌川廣重→Utagawa Hiroshige、伊藤若冲→Ito Jakuchu、村上隆→Takashi Murakami、奈良美智→Yoshitomo Nara、草間彌生→Yayoi Kusama、金弘道→Kim Hong-do 김홍도、申潤福→Shin Yun-bok 신윤복、拉維瓦爾馬→Raja Ravi Varma、阿莫索洛→Fernando Amorsolo）
 - `tarotStyles.ts`: 吉卜力 zh加「宮崎駿 Hayao Miyazaki」、prompt prepend "Hayao Miyazaki Studio Ghibli"
 
+**[已修改]** (v3 補丁)
+- `image-gen.ts`: 加 `fetchWithRetry429()` — 遇 429 讀 `retry_after`，AbortSignal-aware wait（15s cap），retry once；替換 generateFlux + generateReplicate 的 POST call
+- `TarotStudio.tsx`: img onClick 改為 `setCompareZoom(r.image)` lightbox（不再 selectCompareResult）；加 compareZoom modal；header 說明文字更新；reset compareZoom on generateCompare/generatePreview/selectCompareResult
+
 **[驗證結果]**
-- REALTEST_WAIVED: SMOKE_COVERED -- tarot UI needs browser; tsc+tests pass; will verify post-deploy via /playwright smoke
-- REVIEW_DONE: critic=Deep | verdict=pass/warn | findings=0c/0M/1m (setCompareBusy genId guard — applied)
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=generateCompare,compareGenIdRef,setCompareBusy | hits=0 (only WORKLOG documentation lines, no stale code callsites)
+- REALTEST_WAIVED: SMOKE_COVERED -- tarot UI + Replicate API需 browser；tsc 0 新錯；will verify post-deploy
+- REVIEW_DONE: critic=Deep | verdict=pass/warn | findings=0c/1M/2m (all applied: AbortSignal wire + 15s cap + compareZoom reset × 3)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fetchWithRetry429,compareZoom,setCompareZoom | hits=0 (new symbols)
 - npm test 203/203 pass; tsc noEmit — no new errors (pre-existing jszip/@supabase/ssr only)
 
 ### fix: AO-RESUME 孤兒空骨架根治 — 8h 時間代理 → 真實 session_id（凌晨/跨午夜免疫）

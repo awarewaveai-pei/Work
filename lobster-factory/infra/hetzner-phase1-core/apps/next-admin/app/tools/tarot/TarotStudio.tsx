@@ -163,6 +163,7 @@ export default function TarotStudio() {
   const [message, setMessage] = useState<string | null>(null);
   const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal (batch cards)
   const [previewZoom, setPreviewZoom] = useState(false); // large-view modal (step-1 preview)
+  const [compareZoom, setCompareZoom] = useState<string | null>(null); // large-view modal (compare grid)
   const [previewSig, setPreviewSig] = useState<string | null>(null); // model+style that made the current preview
   const [templateThumbs, setTemplateThumbs] = useState<Record<string, string>>({});
 
@@ -294,6 +295,7 @@ export default function TarotStudio() {
     setPreviewBusy(true);
     setLocked(false);
     setCompareResults([]);
+    setCompareZoom(null);
     try {
       const resp = await callGenerate({
         model: activeModel,
@@ -321,6 +323,7 @@ export default function TarotStudio() {
     if (!previewInputsValid()) return;
     setCompareBusy(true);
     setLocked(false);
+    setCompareZoom(null);
     const modelList = Array.from(selectedModels);
     const genId = ++compareGenIdRef.current;
     // Capture prompt at compare time; selectCompareResult reads these for previewSig.
@@ -365,6 +368,7 @@ export default function TarotStudio() {
     setLockedModel(newModel);
     setPreviewSig(`${newModel}::${english.trim()}::subj=${subject.trim()}::refs=${referenceImages.length}`);
     setCompareResults([]);
+    setCompareZoom(null);
     // Selecting from comparison means "I want this style" → auto-lock and proceed to batch step
     setLocked(true);
     setBatch((prev) => {
@@ -841,7 +845,7 @@ export default function TarotStudio() {
         {compareResults.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13 }}>
-              比較結果（點選你喜歡的，進入整套生成）
+              比較結果（點圖放大，按「選這個」進入整套生成）
             </div>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
               {compareResults.map((r) => (
@@ -868,9 +872,9 @@ export default function TarotStudio() {
                       <img
                         src={r.image}
                         alt={r.model}
-                        onClick={() => selectCompareResult(r)}
-                        title="點擊選這個風格"
-                        style={{ width: 180, borderRadius: 8, border: "2px solid transparent", cursor: "pointer", display: "block" }}
+                        onClick={() => setCompareZoom(r.image)}
+                        title="點擊放大"
+                        style={{ width: 180, borderRadius: 8, border: "2px solid transparent", cursor: "zoom-in", display: "block" }}
                       />
                       <div style={{ fontSize: 11, marginTop: 4, color: "var(--text-muted)" }}>
                         {modelOption(r.model).label}
@@ -1065,6 +1069,32 @@ export default function TarotStudio() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* large-view modal — compare grid image */}
+      {compareZoom && (
+        <div
+          onClick={() => setCompareZoom(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.75)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 24,
+            cursor: "zoom-out",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={compareZoom}
+            alt="compare large"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: "90vh", maxWidth: "92vw", borderRadius: 10, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}
+          />
         </div>
       )}
 

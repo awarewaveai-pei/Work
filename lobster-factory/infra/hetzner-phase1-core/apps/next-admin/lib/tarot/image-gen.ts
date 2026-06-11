@@ -287,6 +287,28 @@ async function urlToDataUrl(url: string, signal: AbortSignal): Promise<string> {
   return `data:${mime};base64,${Buffer.from(ab).toString("base64")}`;
 }
 
+// Retry once on Replicate 429 after honouring the retry_after window.
+// Account balance < $5 → burst=1, 6 req/min; retry_after is typically 3–12s.
+async function fetchWithRetry429(url: string, options: RequestInit & { signal?: AbortSignal }): Promise<Response> {
+  const res = await fetch(url, options);
+  if (res.status !== 429) return res;
+  const bodyText = await res.text().catch(() => "");
+  let waitMs = 12_000; // safe default above the max observed retry_after
+  try {
+    const b = JSON.parse(bodyText) as { retry_after?: number };
+    if (typeof b.retry_after === "number" && b.retry_after > 0)
+      waitMs = Math.min(15_000, Math.ceil(b.retry_after) * 1000 + 1_000); // cap at 15s; +1s cushion
+  } catch {}
+  console.info(`[tarot] 429 rate-limited — waiting ${waitMs}ms before retry`);
+  // Wire wait to the AbortSignal so the 58s route timeout can short-circuit before the 60s hard kill.
+  await new Promise<void>((resolve, reject) => {
+    if (options.signal?.aborted) return reject(new Error("The operation was aborted."));
+    const t = setTimeout(resolve, waitMs);
+    options.signal?.addEventListener("abort", () => { clearTimeout(t); reject(new Error("The operation was aborted.")); }, { once: true });
+  });
+  return fetch(url, options);
+}
+
 // ── FLUX (Replicate) — legacy path kept for backward compatibility ─────────────
 async function generateFlux(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
   const token = process.env.REPLICATE_API_TOKEN;
@@ -320,7 +342,7 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
     Prefer: "wait",
   };
 
-  const createRes = await fetch(`https://api.replicate.com/v1/models/${config.fluxModel}/predictions`, {
+  const createRes = await fetchWithRetry429(`https://api.replicate.com/v1/models/${config.fluxModel}/predictions`, {
     method: "POST",
     headers,
     body: JSON.stringify({ input }),
@@ -378,7 +400,7 @@ async function generateReplicate(params: TarotGenParams, config: ModelConfig, si
     Prefer: "wait",
   };
 
-  const createRes = await fetch(`https://api.replicate.com/v1/models/${config.slug}/predictions`, {
+  const createRes = await fetchWithRetry429(`https://api.replicate.com/v1/models/${config.slug}/predictions`, {
     method: "POST",
     headers,
     body: JSON.stringify({ input }),
