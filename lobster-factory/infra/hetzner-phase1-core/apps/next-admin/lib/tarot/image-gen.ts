@@ -59,10 +59,10 @@ interface ModelConfig {
   buildInput?: (p: BuildInputParams) => Record<string, unknown>;
 }
 
-// ── Aspect ratio mapping helpers ──────────────────────────────────────────────
+// ── Aspect ratio mapping helpers (verified against live Replicate schemas 2026-06-11) ──
 
-// Ideogram v4 uses a resolution enum (WxH strings) instead of aspect_ratio.
-// Verified from the v4 API resolution enum; "1792x2240" = 4:5 exact.
+// Ideogram v4 has NO aspect_ratio — resolution enum (WxH strings) only. NO seed either.
+// All five values below confirmed present in the live v4 resolution enum; 1792x2240 = 4:5 exact.
 const IDEOGRAM_V4_RES: Record<AspectRatio, string> = {
   "2:3": "1664x2496",
   "3:2": "2496x1664",
@@ -71,31 +71,13 @@ const IDEOGRAM_V4_RES: Record<AspectRatio, string> = {
   "9:16": "1440x2560",
 };
 
-// Seedream 4.5 uses descriptive resolution strings; 4:5 not in native enum → nearest square.
-const SEEDREAM_RES: Record<AspectRatio, string> = {
-  "2:3": "1664x2496 (2:3)",
-  "3:2": "2496x1664 (3:2)",
-  "4:5": "2048x2048 (1:1)", // no native 4:5 — nearest square
-  "1:1": "2048x2048 (1:1)",
-  "9:16": "1440x2560 (9:16)",
-};
-
-// Imagen 4 only exposes 5 ratios — unsupported ones map to nearest available.
+// Imagen 4 only exposes 5 ratios [1:1|9:16|16:9|3:4|4:3] — unsupported ones map to nearest.
 const IMAGEN4_AR: Record<AspectRatio, string> = {
-  "2:3": "3:4", // nearest portrait (0.75 vs 0.667)
-  "3:2": "4:3", // nearest landscape (1.333 vs 1.5)
-  "4:5": "3:4", // nearest portrait (0.75 vs 0.8)
+  "2:3": "3:4", // nearest portrait
+  "3:2": "4:3", // nearest landscape
+  "4:5": "3:4", // nearest portrait
   "1:1": "1:1",
   "9:16": "9:16",
-};
-
-// Flux-2-max uses explicit pixel dimensions (must be multiples of 16, max 4MP).
-const FLUX2MAX_DIMS: Record<AspectRatio, { width: number; height: number }> = {
-  "2:3": { width: 1024, height: 1536 }, // 1.57MP
-  "3:2": { width: 1536, height: 1024 }, // 1.57MP
-  "4:5": { width: 1024, height: 1280 }, // 1.31MP
-  "1:1": { width: 1024, height: 1024 }, // 1MP
-  "9:16": { width: 864, height: 1536 }, // 1.33MP (864/16=54 ✓, 1536/16=96 ✓)
 };
 
 export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
@@ -115,6 +97,9 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
   "openai-medium": { provider: "openai", supportsImg2img: true, quality: "medium" },
   "openai-high": { provider: "openai", supportsImg2img: true, quality: "high" },
   // ── Ideogram via Replicate ────────────────────────────────────────────────
+  // v2a/v3 keep seed support; v4 dropped seed entirely (live schema 2026-06-11).
+  // Optional enum params (style_type/magic_prompt_option) omitted — defaults are fine and the
+  // live enum casing is "Auto"/"None" (sending "AUTO" would 422).
   "ideogram-v2a-turbo": {
     provider: "replicate",
     slug: "ideogram-ai/ideogram-v2a-turbo",
@@ -123,7 +108,6 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
       prompt,
       aspect_ratio: aspectRatio,
       seed,
-      magic_prompt_option: "AUTO",
     }),
   },
   "ideogram-v3-balanced": {
@@ -134,69 +118,63 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
       prompt,
       aspect_ratio: aspectRatio,
       seed,
-      style_type: "GENERAL",
-      magic_prompt_option: "AUTO",
     }),
   },
   "ideogram-v4-turbo": {
     provider: "replicate",
     slug: "ideogram-ai/ideogram-v4-turbo",
     supportsImg2img: false,
-    buildInput: ({ prompt, aspectRatio, seed }) => ({
+    buildInput: ({ prompt, aspectRatio }) => ({
       prompt,
       resolution: IDEOGRAM_V4_RES[aspectRatio],
-      seed,
     }),
   },
   "ideogram-v4-quality": {
     provider: "replicate",
     slug: "ideogram-ai/ideogram-v4-quality",
     supportsImg2img: false,
-    buildInput: ({ prompt, aspectRatio, seed }) => ({
+    buildInput: ({ prompt, aspectRatio }) => ({
       prompt,
       resolution: IDEOGRAM_V4_RES[aspectRatio],
-      seed,
     }),
   },
-  // character_reference_images accepts base64 data URIs on the Replicate wrapper.
+  // character_reference_image is a SINGULAR string and REQUIRED (live schema).
   "ideogram-character": {
     provider: "replicate",
     slug: "ideogram-ai/ideogram-character",
     supportsImg2img: true,
     buildInput: ({ prompt, aspectRatio, seed, referenceImages }) => {
-      const input: Record<string, unknown> = {
+      if (referenceImages.length === 0) throw new Error("character_reference_required");
+      return {
         prompt,
         aspect_ratio: aspectRatio,
         seed,
-        rendering_speed: "BALANCED",
+        rendering_speed: "Default",
+        character_reference_image: referenceImages[0],
       };
-      if (referenceImages.length > 0) {
-        input.character_reference_images = [referenceImages[0]];
-      }
-      return input;
     },
   },
   // ── ByteDance Seedream via Replicate ──────────────────────────────────────
+  // Live schema: aspect_ratio enum includes ALL five of our ratios (incl. 4:5). No seed.
   "seedream-4.5": {
     provider: "replicate",
     slug: "bytedance/seedream-4.5",
     supportsImg2img: false,
-    buildInput: ({ prompt, aspectRatio, seed }) => ({
+    buildInput: ({ prompt, aspectRatio }) => ({
       prompt,
-      resolution: SEEDREAM_RES[aspectRatio],
-      seed,
+      aspect_ratio: aspectRatio,
+      size: "2K",
     }),
   },
-  // ── Google models via Replicate ───────────────────────────────────────────
+  // ── Google models via Replicate (no seed param on any of them) ────────────
   "nano-banana-2": {
     provider: "replicate",
     slug: "google/nano-banana-2",
     supportsImg2img: true,
-    buildInput: ({ prompt, aspectRatio, seed, referenceImages }) => {
+    buildInput: ({ prompt, aspectRatio, referenceImages }) => {
       const input: Record<string, unknown> = {
         prompt,
         aspect_ratio: aspectRatio,
-        seed,
         resolution: "2K",
         output_format: "png",
       };
@@ -210,11 +188,10 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
     provider: "replicate",
     slug: "google/nano-banana-pro",
     supportsImg2img: true,
-    buildInput: ({ prompt, aspectRatio, seed, referenceImages }) => {
+    buildInput: ({ prompt, aspectRatio, referenceImages }) => {
       const input: Record<string, unknown> = {
         prompt,
         aspect_ratio: aspectRatio,
-        seed,
         resolution: "2K",
         output_format: "png",
         allow_fallback_model: true,
@@ -229,23 +206,25 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
     provider: "replicate",
     slug: "google/imagen-4",
     supportsImg2img: false,
-    buildInput: ({ prompt, aspectRatio, seed }) => ({
+    buildInput: ({ prompt, aspectRatio }) => ({
       prompt,
-      aspect_ratio: IMAGEN4_AR[aspectRatio], // imagen-4 has only 5 native ratios
-      seed,
+      aspect_ratio: IMAGEN4_AR[aspectRatio], // only 5 native ratios
+      image_size: "2K",
+      output_format: "png",
     }),
   },
   // ── BFL Flux.2 Max via Replicate ──────────────────────────────────────────
+  // Live schema has a native aspect_ratio enum covering all five ratios — simpler than w×h.
   "flux-2-max": {
     provider: "replicate",
     slug: "black-forest-labs/flux-2-max",
     supportsImg2img: false,
     buildInput: ({ prompt, aspectRatio, seed }) => ({
       prompt,
-      ...FLUX2MAX_DIMS[aspectRatio],
+      aspect_ratio: aspectRatio,
+      resolution: "1 MP",
       seed,
       output_format: "png",
-      prompt_upsampling: false,
     }),
   },
 };
