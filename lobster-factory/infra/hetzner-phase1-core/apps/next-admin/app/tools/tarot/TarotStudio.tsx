@@ -201,6 +201,12 @@ export default function TarotStudio() {
 
   // Revoke all card object URLs on unmount to avoid leaking blobs (78 + retries).
   const batchRef = useRef<BatchItem[]>([]);
+  // Generation token: incremented on each generateCompare call and on selectCompareResult.
+  // The final setCompareResults is skipped if the token changed (prevents stale repaint after lock).
+  const compareGenIdRef = useRef(0);
+  // Prompt values captured at compare-generation time — used in selectCompareResult so that
+  // previewSig reflects the prompt that actually made the comparison images, not an edited value.
+  const compareStyleRef = useRef({ english: "", subject: "" });
   useEffect(() => {
     batchRef.current = batch;
   }, [batch]);
@@ -315,12 +321,15 @@ export default function TarotStudio() {
     setCompareBusy(true);
     setLocked(false);
     const modelList = Array.from(selectedModels);
+    const genId = ++compareGenIdRef.current;
+    // Capture prompt at compare time; selectCompareResult reads these for previewSig.
+    compareStyleRef.current = { english: effectiveEnglish, subject: subjectText };
     setCompareResults(modelList.map((m) => ({ model: m, image: null, seed: null, busy: true })));
     const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText });
     const results = await Promise.all(
       modelList.map(async (m, i): Promise<CompareResult> => {
-        // Stagger creation requests by 1s each to avoid Replicate 429 burst rate-limit
-        if (i > 0) await new Promise<void>((resolve) => setTimeout(resolve, i * 1000));
+        // Stagger creation requests; cap at 4s so large selections don't hang forever
+        if (i > 0) await new Promise<void>((resolve) => setTimeout(resolve, Math.min(i, 4) * 1000));
         try {
           const resp = await callGenerate({
             model: m,
@@ -334,19 +343,24 @@ export default function TarotStudio() {
         }
       }),
     );
-    setCompareResults(results);
     setCompareBusy(false);
+    // Skip repaint if selectCompareResult already locked a winner (token was incremented)
+    if (compareGenIdRef.current === genId) {
+      setCompareResults(results);
+    }
   }
 
   // Pick a comparison result as the active preview → selects model + auto-locks (no extra button needed).
   function selectCompareResult(r: CompareResult) {
     if (!r.image) return;
     const newModel = r.model;
+    compareGenIdRef.current++; // invalidate any in-flight compare so it won't repopulate after lock
+    const { english, subject } = compareStyleRef.current; // use prompt that produced these images
     setPreviewImage(r.image);
     setPreviewSeed(r.seed);
     setSelectedModels(new Set([newModel]));
     setLockedModel(newModel);
-    setPreviewSig(`${newModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
+    setPreviewSig(`${newModel}::${english.trim()}::subj=${subject.trim()}::refs=${referenceImages.length}`);
     setCompareResults([]);
     // Selecting from comparison means "I want this style" → auto-lock and proceed to batch step
     setLocked(true);
