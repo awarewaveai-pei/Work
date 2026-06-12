@@ -23,7 +23,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test\fetch-recency-gate.Tests.ps1` | exit=0 | result=`RESULT: 6 passed, 0 failed`
 - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\system-health-check.ps1 -WorkspaceRoot D:\Work\agency-os` | exit=0 | result=`Score: 100% (373/373)`，JSON check 含 `Git fetch ledger recency (git-fetch-last.json)` PASS。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-build-gates.ps1 -WorkRoot D:\Work` | exit=0 | result=`verify-build-gates: ALL PASSED`
-- NOTE: 第一次 `verify-build-gates` 失敗根因是無關的 Claude H2 sync drift；已跑 `scripts\sync-claude-userlevel.ps1 -Mode merge`，`scripts\check-claude-sync.ps1` PASS 後重跑 full gate 綠。
+- NOTE: 本輪 `verify-build-gates` 曾兩次被無關的 Claude H2 sync drift 擋住；已跑 `scripts\sync-claude-userlevel.ps1 -Mode merge`，`scripts\check-claude-sync.ps1` PASS 後重跑 full gate 綠。
 - REVIEW_DONE: critic=Standard(readback) | verdict=pass | findings=0c/0m/0n（readback `KnownSuppressedBaseline/SourceKey/known-suppressed`、gate 12e、baseline JSON；確認 baseline 不含 secret value，tracked finding 不可 suppression，critical fetch gate 進 `Add-CriticalFailure`。）
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`KnownSuppressedBaseline|scan-local-config-known-suppressed|Git fetch ledger recency|fetch-recency-gate|git-fetch-last.json` | hits=63（active TASKS/daily 已轉完成；舊 reports/WORKLOG 的 pending 文字屬歷史 snapshot，未當 active stale。）
 
