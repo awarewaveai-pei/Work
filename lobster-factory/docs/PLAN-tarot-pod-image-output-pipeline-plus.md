@@ -106,7 +106,8 @@ Canva 整合不進 MVP，移到 **Phase 1.5 POC**。
 | CMYK 輸出方案 | 待驗證假設：Sharp `toColorspace('cmyk')` → CMYK JPEG → pdf-lib `embedJpg()` → `/DeviceCMYK` PDF |
 | SVG / AI 格式 | 跳過。AI 生圖是 raster，raster 包 SVG 無意義，印刷廠 PDF 足夠 |
 | 色調匯出 | 一律 bake 進輸出檔。CSS filter 只做 preview |
-| POD 印刷 Printful | 不動。Printful 自行轉 CMYK，不走本流程 |
+| POD 印刷 Printful | **不動**。Printful 官方要求 sRGB（PNG/JPEG）；他們自己轉 CMYK，禁止送 CMYK 給 Printful。Printful path 走現有 `upscaler.ts`，不走本流程。([官方來源](https://www.printful.com/blog/everything-you-need-to-know-to-prepare-the-perfect-printfile)) |
+| POD 本地印刷廠 | 新增 `pod-print-pdf` preset。情境 A，需 Japan Color 2001 Coated ICC。與塔羅 PDF 同一 pipeline，preset 驅動不同尺寸 |
 | `upscaler.ts` | 不動。4800px 是 t-shirt 用途，塔羅不需要 |
 | DB schema | MVP 不異動 |
 | Auth / RLS | MVP 不異動，沿用既有機制 |
@@ -151,7 +152,7 @@ export type OutputPreset =
   | WebSquarePreset
   | WebTarotPreset
   | TarotPrintPdfPreset
-  | PodDownloadPdfPreset
+  | PodPrintPdfPreset
   | CanvasEditPreset
 
 /** POD Studio 網頁用 — 1000×1000 正方形補白 */
@@ -182,7 +183,7 @@ export type TarotPrintPdfPreset = {
   fit: 'cover'
 }
 
-export type PodDownloadPdfPreset = {
+export type PodPrintPdfPreset = {
   kind: 'pod-download-pdf'
   widthPx: number
   heightPx: number
