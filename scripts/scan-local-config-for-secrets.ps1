@@ -211,7 +211,7 @@ foreach ($rel in $targetPaths) {
     $tracked = Test-PathTrackedByGit -RelPath $rel
     $severity = if ($tracked) { "FAIL" } else { "WARN" }
 
-    $lines = Get-Content -LiteralPath $abs -Encoding UTF8
+    $lines = @(Get-Content -LiteralPath $abs -Encoding UTF8)
     for ($i = 0; $i -lt $lines.Count; $i++) {
         foreach ($p in $patterns) {
             $m = [regex]::Match($lines[$i], $p.Regex)
