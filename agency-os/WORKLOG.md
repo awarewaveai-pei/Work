@@ -2,6 +2,21 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-12
+
+### 修復兩個 critical health gate（開機 correctness 紅閘 → 100%）
+- **根因 1（archive-lift gate 12c）**：`verify-archive-tasks-lift` fail（missing:1）。2026-06-11-1820 AO-CLOSE archive 未完成 bullet `（主線）app.aware-wave Stage 1 接通入口` 無 `**bold**` → checker 走 plain-text prefix fallback，token 字首 `（主線）…` 與 TASKS.md:57 字序相反（`**Stage 1 接通入口** — app.aware-wave`）無法命中 → 偽陰性（任務其實已在 TASKS.md:56/57 追蹤）。**非真 silent drop**。
+- **修法 1**：`agency-os/reports/ao-close/2026-06-11-1820.md:28` 把識別字加粗 `**Stage 1 接通入口**`，走 checker 主設計 bold-token verified-lift 路徑（[verify-archive-tasks-lift.ps1:248](../scripts/verify-archive-tasks-lift.ps1#L248)）。同 bullet 在 2026-06-11-0333.md:22 前用 archive-only 逃生門處理過（先例一致）。**未改 checker 演算法**（加 plain-text sliding window 會升高 false-positive 風險，違 gate 目的）。
+- **根因 2（Claude Code sync gate H2）**：archive-lift 修好後浮出下一個 critical gate。`sync-claude-userlevel -Mode verify` drift：`~/.claude/settings.json` `permissions.deny` 缺 fork-bomb guard `Bash(:(){ *)`（live 19 條 vs repo SSOT `mcp/claude-userlevel/settings.template.json` 20 條）。repo 較新、只缺保護規則。
+- **修法 2**：`sync-claude-userlevel.ps1 -Mode merge`（repo→live，只新增 deny，零移除；附 backup `Backups/claude-userlevel-20260612-142138`）。**坑**：第一次 merge 後 live harness 曾以 session 啟動時記憶體版（19）回寫一次→暫時 revert；第二次 merge 後穩定（兩次讀一致 20+forkbomb）。
+- **[驗證結果]**：
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`verify-build-gates.ps1` | exit=0 | Score 100% (372/372) ALL PASSED（前: exit 1 / 99.7%）
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`check-claude-sync.ps1` | H2 PASS / Result PASS（前: HARD drift）
+  - REVIEW_DONE: critic=Quick | verdict=pass | 改後行 Read 回確認（archive bullet bold 結構正確；deny 20 條含 forkbomb）
+  - BUGHUNT_DONE: scope=agency-os/reports/ao-close,agency-os/TASKS.md | grep=`app.aware-wave Stage 1 接通入口` | hits=3（0333 archive-only 先例 + 兩個 `3.` 編號項非 `- ` bullet 不受 checker 解析，無 stale 衝突）
+  - BUGHUNT_SCOPE_NARROW: 改動限單一 archive .md 註記 + 非 git-tracked 的 live settings.json；無 scripts call-site 或 symbol 改動，不需 scripts/lobster-factory scope
+- **[rollback]**：archive → `git checkout agency-os/reports/ao-close/2026-06-11-1820.md`；settings → 還原 `Backups/claude-userlevel-20260612-142138`。
+
 ## 2026-06-11
 
 ### Tomorrow captured (/tomo)

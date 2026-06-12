@@ -7,8 +7,8 @@
                                          "table_ok":  true
                                      },
                    "client_sites":  "skip:http401",
-                   "n8n_mcp":  "ok",
+                   "n8n_mcp":  "fail:exit1",
                    "repair_center":  "ok"
                },
-    "generated":  "2026-06-12 14:27:11"
+    "generated":  "2026-06-12 14:30:57"
 }
