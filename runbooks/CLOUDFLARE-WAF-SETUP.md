@@ -35,12 +35,10 @@ Expression: (http.request.uri.path contains "/xmlrpc.php")
 Action: Block
 ```
 
-### Rule 2：封鎖敏感路徑暴力掃描
-```
-Expression: (http.request.uri.path contains "/wp-login.php" and not ip.geoip.country in {"TW" "HK" "SG" "JP" "US"})
-Action: Challenge
-```
-（調整 country 白名單為你實際使用地點）
+### Rule 2：wp-login 保護（DEPRECATED — 勿套用）
+> **⚠️ 已棄用**：geo/country 規則會封鎖出國中的操作者。
+> wp-login 保護改由伺服器端 LLAR（Limit Login Attempts Reloaded）+ nginx 負責。
+> 見 `§注意事項` 與 `§Origin Lockdown SOP`。
 
 ### Rule 3：保護 n8n webhook（限速）
 Dashboard → Security → WAF → Rate limiting rules

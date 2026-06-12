@@ -123,7 +123,7 @@ $lockdownIpCount = 0
 try {
     $sshKey = "$env:USERPROFILE\.ssh\hetzner_trigger"
     if (-not (Test-Path $sshKey)) { $sshKey = '~/.ssh/hetzner_trigger' }
-    $lockdownOut = & ssh -i $sshKey -o StrictHostKeyChecking=no -o ConnectTimeout=8 `
+    $lockdownOut = & ssh -i $sshKey -o StrictHostKeyChecking=no -o ConnectTimeout=8 -o BatchMode=yes `
         root@5.223.93.113 `
         "ipset list cf-ipv4 2>/dev/null | grep 'Number of entries' | awk '{print `$NF}'; iptables -C INPUT -p tcp --dport 443 -m set --match-set cf-ipv4 src -j ACCEPT 2>/dev/null && echo ACTIVE || echo INACTIVE" `
         2>$null

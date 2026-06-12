@@ -130,39 +130,47 @@ fetch_cf_ips_v6() {
 }
 
 # ---------------------------------------------------------------------------
-# ipset management
+# ipset management (atomic swap to avoid live-set empty window during refresh)
 # ---------------------------------------------------------------------------
-create_or_flush_ipset() {
-  local name="$1" family="$2"
-  if ipset list "$name" &>/dev/null; then
-    ipset flush "$name"
-    log "ipset $name flushed."
-  else
-    ipset create "$name" hash:net family "$family" maxelem 65536
-    log "ipset $name created (family $family)."
-  fi
-}
-
 populate_ipset_v4() {
   local ranges
   mapfile -t ranges < <(fetch_cf_ips_v4)
-  create_or_flush_ipset "$IPSET_V4" "inet"
-  for r in "${ranges[@]}"; do
-    [[ -z "$r" ]] && continue
-    ipset add "$IPSET_V4" "$r"
-  done
-  log "ipset $IPSET_V4 populated with ${#ranges[@]} ranges."
+  local count=${#ranges[@]}
+  local tmp="${IPSET_V4}-new"
+
+  if ipset list "$IPSET_V4" &>/dev/null; then
+    # Atomic swap: populate temp set, swap with live, destroy temp
+    ipset destroy "$tmp" 2>/dev/null || true
+    ipset create "$tmp" hash:net family inet maxelem 65536
+    for r in "${ranges[@]}"; do [[ -z "$r" ]] && continue; ipset add "$tmp" "$r"; done
+    ipset swap "$tmp" "$IPSET_V4"
+    ipset destroy "$tmp"
+    log "ipset $IPSET_V4 atomically refreshed with $count ranges."
+  else
+    ipset create "$IPSET_V4" hash:net family inet maxelem 65536
+    for r in "${ranges[@]}"; do [[ -z "$r" ]] && continue; ipset add "$IPSET_V4" "$r"; done
+    log "ipset $IPSET_V4 created with $count ranges."
+  fi
 }
 
 populate_ipset_v6() {
   local ranges
   mapfile -t ranges < <(fetch_cf_ips_v6)
-  create_or_flush_ipset "$IPSET_V6" "inet6"
-  for r in "${ranges[@]}"; do
-    [[ -z "$r" ]] && continue
-    ipset add "$IPSET_V6" "$r"
-  done
-  log "ipset $IPSET_V6 populated with ${#ranges[@]} ranges."
+  local count=${#ranges[@]}
+  local tmp="${IPSET_V6}-new"
+
+  if ipset list "$IPSET_V6" &>/dev/null; then
+    ipset destroy "$tmp" 2>/dev/null || true
+    ipset create "$tmp" hash:net family inet6 maxelem 65536
+    for r in "${ranges[@]}"; do [[ -z "$r" ]] && continue; ipset add "$tmp" "$r"; done
+    ipset swap "$tmp" "$IPSET_V6"
+    ipset destroy "$tmp"
+    log "ipset $IPSET_V6 atomically refreshed with $count ranges."
+  else
+    ipset create "$IPSET_V6" hash:net family inet6 maxelem 65536
+    for r in "${ranges[@]}"; do [[ -z "$r" ]] && continue; ipset add "$IPSET_V6" "$r"; done
+    log "ipset $IPSET_V6 created with $count ranges."
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -176,10 +184,18 @@ ipv6_rule_exists() { ip6tables -C "$@" 2>/dev/null; }
 # Rule logic:
 #   - Remove blanket ACCEPT tcp dport 80/443 from 0.0.0.0/0
 #   - Append CF ipset ACCEPT rules (idempotent via -C check)
-#   - INPUT policy DROP provides implicit deny for all non-CF traffic
+#   - Append explicit DROP for 80/443 (self-contained; does NOT rely on
+#     INPUT policy being DROP, which is not guaranteed on Docker hosts)
 # ---------------------------------------------------------------------------
 apply_ipv4_rules() {
   local preview="${1:-0}"
+
+  # Inform about INPUT policy (informational -- we add explicit DROP anyway)
+  local policy
+  policy=$(iptables -S | head -1 2>/dev/null || echo "unknown")
+  if [[ "$policy" != "-P INPUT DROP" ]]; then
+    log "INFO: INPUT policy is '$policy' (not DROP). Explicit DROP rules will be added for self-contained lockdown."
+  fi
 
   # Step 1: Remove blanket ACCEPT for tcp dport 80/443 (any source)
   for port in 80 443; do
@@ -207,26 +223,46 @@ apply_ipv4_rules() {
       fi
     fi
   done
+
+  # Step 3: Add explicit DROP for 80/443 (after CF-ACCEPT, catches all non-CF traffic)
+  # Self-contained: lockdown works regardless of INPUT chain policy.
+  for port in 80 443; do
+    if ipv4_rule_exists INPUT -p tcp --dport "$port" -j DROP; then
+      log "Explicit DROP for port $port already present -- skipping."
+    else
+      if [[ "$preview" == "1" ]]; then
+        log "[PREVIEW] Would ADD: iptables -A INPUT -p tcp --dport $port -j DROP"
+      else
+        iptables -A INPUT -p tcp --dport "$port" -j DROP
+        log "Added explicit DROP for tcp dport $port (self-contained deny, policy-independent)."
+      fi
+    fi
+  done
 }
 
 # ---------------------------------------------------------------------------
-# Core: apply CF lockdown rules to ip6tables (IPv6) + ufw cleanup
+# Core: apply CF lockdown rules to ip6tables (IPv6) + ufw cleanup (if present)
 # ---------------------------------------------------------------------------
 apply_ipv6_rules() {
   local preview="${1:-0}"
 
-  # Step 1: Remove ufw blanket allow for 80/443 if present
-  for port in 80 443; do
-    if ufw status 2>/dev/null | grep -qE "^${port}[[:space:]]"; then
-      if [[ "$preview" == "1" ]]; then
-        log "[PREVIEW] Would run: ufw delete allow ${port}/tcp"
-      else
-        ufw delete allow "${port}/tcp" 2>/dev/null || true
-        ufw delete allow "${port}"     2>/dev/null || true
-        log "Removed ufw blanket allow for port $port."
+  # Step 1: Remove ufw blanket allow for 80/443 if ufw is installed and has rules
+  if command -v ufw &>/dev/null; then
+    for port in 80 443; do
+      # Match both "80 " and "80/tcp" forms in ufw status output
+      if ufw status 2>/dev/null | grep -qE "^${port}[/[:space:]]"; then
+        if [[ "$preview" == "1" ]]; then
+          log "[PREVIEW] Would run: ufw delete allow ${port}/tcp"
+        else
+          ufw delete allow "${port}/tcp" 2>/dev/null || true
+          ufw delete allow "${port}"     2>/dev/null || true
+          log "Removed ufw blanket allow for port $port."
+        fi
       fi
-    fi
-  done
+    done
+  else
+    log "ufw not installed -- skipping ufw rule removal (expected on this server)."
+  fi
 
   # Step 2: Remove blanket ip6tables ACCEPT for 80/443 from any source
   for port in 80 443; do
@@ -254,6 +290,20 @@ apply_ipv6_rules() {
       fi
     fi
   done
+
+  # Step 4: Add explicit DROP for 80/443 in ip6tables (self-contained, policy-independent)
+  for port in 80 443; do
+    if ipv6_rule_exists INPUT -p tcp --dport "$port" -j DROP; then
+      log "Explicit ip6tables DROP for port $port already present -- skipping."
+    else
+      if [[ "$preview" == "1" ]]; then
+        log "[PREVIEW] Would ADD: ip6tables -A INPUT -p tcp --dport $port -j DROP"
+      else
+        ip6tables -A INPUT -p tcp --dport "$port" -j DROP
+        log "Added explicit ip6tables DROP for tcp dport $port."
+      fi
+    fi
+  done
 }
 
 # ---------------------------------------------------------------------------
@@ -277,16 +327,26 @@ schedule_auto_revert() {
   fi
 
   # Launch background revert process
-  (
-    sleep 120
-    echo "[cf-lockdown] AUTO-REVERT triggered -- restoring backup..."
-    iptables-restore  < "$backup_v4"
-    ip6tables-restore < "$backup_v6"
-    netfilter-persistent save 2>/dev/null || true
-    echo "[cf-lockdown] AUTO-REVERT complete."
-  ) &
-  echo $! > "$REVERT_PID_FILE"
-  log "Auto-revert PID: $(cat "$REVERT_PID_FILE")"
+  # Use setsid + disown so the process survives SSH session disconnect (SIGHUP immunity).
+  # I/O redirected away from the SSH pty to prevent blocking on session teardown.
+  local revert_script="/tmp/cf-lockdown-revert-$$.sh"
+  cat > "$revert_script" << REVERT_EOF
+#!/usr/bin/env bash
+sleep 120
+echo "[cf-lockdown] AUTO-REVERT triggered -- restoring backup..." >> /var/log/cf-lockdown-revert.log
+iptables-restore  < "$backup_v4"  >> /var/log/cf-lockdown-revert.log 2>&1
+ip6tables-restore < "$backup_v6"  >> /var/log/cf-lockdown-revert.log 2>&1
+netfilter-persistent save          >> /var/log/cf-lockdown-revert.log 2>&1 || true
+echo "[cf-lockdown] AUTO-REVERT complete." >> /var/log/cf-lockdown-revert.log
+rm -f "$revert_script"
+REVERT_EOF
+  chmod +x "$revert_script"
+  setsid bash "$revert_script" </dev/null >>/var/log/cf-lockdown-revert.log 2>&1 &
+  local revert_pid=$!
+  disown "$revert_pid"
+  echo "$revert_pid" > "$REVERT_PID_FILE"
+  log "Auto-revert PID: $revert_pid (setsid -- survives SSH disconnect)"
+  log "Revert log: /var/log/cf-lockdown-revert.log"
 }
 
 cancel_auto_revert() {

@@ -512,7 +512,7 @@ export async function toProductImage(
       ...(background ? { background } : {}),
     })
     .webp({ quality: 80 })
-    .withMetadata({ density: preset.dpi })
+    .withDensity(preset.dpi)  // withDensity 不附 sRGB ICC（web 端 sRGB 本就正確，統一用法）
     .toBuffer()
 }
 
@@ -692,12 +692,15 @@ export async function toPrintFile(
   if (colorGrade) img = img.modulate(colorGrade)
 
   // ── colorSpace 積木 ──
+  // ⚠️ [0-a] POC 實證（2026-06-12, sharp 0.35.1/libvips 8.18.3）：
+  //   .withMetadata({density}) 會附 sRGB ICC → 把 CMYK 轉回 3-channel sRGB（SOF=3）= 壞掉。
+  //   必須用 .withDensity() 才同時保 4-channel CMYK + 設 DPI。證據 d:\tmp\cmyk-poc\poc2.mjs。
   let imgBuf: Buffer
   if (dest.colorSpace === 'cmyk') {
     imgBuf = await img.toColorspace('cmyk').jpeg({ quality: 100 })
-      .withMetadata({ density: dest.dpi }).toBuffer()
+      .withDensity(dest.dpi).toBuffer()  // NOT withMetadata — 見上
   } else {
-    imgBuf = await img.png().withMetadata({ density: dest.dpi }).toBuffer()
+    imgBuf = await img.png().withDensity(dest.dpi).toBuffer()
   }
 
   // ── format 積木 ──
@@ -754,7 +757,7 @@ export async function applyOutputIntent(pdf: Buffer, icc: IccProfileName): Promi
 }
 ```
 
-> ⚠️ **部署影響（基建）**：next-admin Docker image 需裝 `ghostscript` + ICC profiles。Dockerfile 加 `apt-get install -y ghostscript icc-profiles-free`，Japan Color / SWOP profile 需自備（Adobe ICC 授權檔放 image 或 R2）。**這是 deploy 前必處理項，列入 [0-a-gs] gate。**
+> ⚠️ **部署影響（基建，已查證 base image）**：next-admin Dockerfile base = **`node:20-alpine`**（不是 Debian）。裝 gs 用 **`apk add --no-cache ghostscript`**（**不是 apt-get**）。Alpine **無 `icc-profiles-free` 套件** → 三個 ICC 檔（Japan Color 2001 / US SWOP / FOGRA39）全部手動 COPY 進 image 或啟動時從 R2 拉。Adobe profile（Japan Color / SWOP）需確認授權。**deploy 前必處理，列入 [0-a-gs] gate。**
 
 > **Sharp 版本備註**：鎖版本；`withMetadata({density})` v0.33+ deprecated，優先 `withDensity()`；density 寫入需 exiftool/identify 驗證，不只信 code。
 
@@ -937,7 +940,7 @@ crossOrigin: 'anonymous'
 |---|---|---|
 | `printQuality: boolean` | `image-gen.ts:264` | Flux 直接生成 896×1488，不需 upscale |
 | `FLUX_PRINT_DIMS` | `image-gen.ts:64` | 塔羅 px 尺寸 SSOT |
-| Sharp | `node_modules/sharp` | resize / CMYK / WebP / color grade |
+| Sharp | `node_modules/sharp@0.34.3`（**Next.js transitive，非直接 dep**）| resize / CMYK / WebP / color grade；**須 pin 為直接依賴**（見 §18.1）|
 | `putDesignObject()` | `lib/storage/r2.ts` | 存圖到 Cloudflare R2 |
 | `/tools/designs` | `app/tools/designs/DesignsGallery.tsx` | 設計存檔展示頁 |
 | Fabric.js 原型 | `d:\tmp\tshirt-designer-prototype.html` | Canvas editor 起點 |
@@ -951,7 +954,17 @@ Phase 0 是阻塞階段。未通過不得進 Phase 1 主線。
 
 ---
 
-## 14.1 [0-a] CMYK PDF + TrimBox POC
+## 14.1 [0-a] CMYK PDF + TrimBox POC — ✅ 本機 PASS（2026-06-12）
+
+> **本機已驗證**（win32 node 24, sharp 0.35.1/libvips 8.18.3, pdf-lib 1.17.1；證據 `d:\tmp\cmyk-poc\poc3.mjs`）：
+> - SOF components=4, sharp.space=cmyk, channels=4, density=300 ✓
+> - `/DeviceCMYK true` / `/DeviceRGB false` ✓
+> - `/Decode [1 0 1 0 1 0 1 0]`（pdf-lib 自動加，已實證）✓
+> - `/MediaBox [0 0 215.43 357.17]`(76×126mm) / `/TrimBox [8.5 8.5 206.93 348.66]`(offset 3mm+70×120mm) / `/BleedBox`=MediaBox ✓
+> - **關鍵修正**：`.withDensity()` 取代 `.withMetadata({density})`（後者附 sRGB ICC → 把 CMYK 轉回 RGB，SOF=3）。
+> - libvips 寫 APP14 Adobe marker(transform=0) → pdf-lib `/Decode` 應正確（非雙重反相）。
+>
+> **仍待**（本機做不到，需 [0-a-gs] Alpine/Docker + 人類）：① gs 實際 render 確認非反相 ② Alpine musl sharp CMYK 行為 ③ Acrobat preflight。
 
 目標：
 
@@ -1019,7 +1032,7 @@ grep -n "OutputIntent\|GTS_PDFX\|DestOutputProfile" chk.pdf
 驗收條件：
 
 ```txt
-☐ Docker image 裝得起 ghostscript（Dockerfile apt-get）
+☐ Docker image 裝得起 ghostscript（Alpine：`apk add --no-cache ghostscript`）
 ☐ ICC profile 檔存在於 image（Japan Color 2001 / SWOP / FOGRA39）
 ☐ 輸出 PDF 含 /OutputIntent + /GTS_PDFX + 嵌入 /DestOutputProfile
 ☐ TrimBox 經 gs 後仍保留
@@ -1554,27 +1567,31 @@ Canva export 是 async job，不可寫成同步 fetchFromCanva()。
 ```bash
 npm install pdf-lib   # embed + TrimBox/BleedBox（MIT）
 npm install fabric    # Canvas editor（MIT）
+npm install sharp     # ⚠️ 見下方說明：現為 Next.js transitive，必須 pin 為直接依賴
 ```
+
+> ⚠️ **sharp 真實狀態（已查證 package.json，2026-06-12）**：sharp **不在** next-admin `dependencies`，是 **Next.js 的 transitive dep**（`node_modules/sharp@0.34.3` 存在）。plan 原稱「已安裝不需新增」**錯誤**。風險：Next 改 optional dep → sharp 消失。**處置**：① `npm install sharp` pin 為直接依賴（鎖版本）② standalone build tracer 常漏原生模組（Dockerfile 已手動 COPY `@anthropic-ai`/`ssh2`）→ sharp 原生 binary 八成也要顯式 `COPY node_modules/sharp`，[0-a-gs] Docker build 一起驗。
 
 條件：
 
 ```txt
-pdf-lib：Phase 0 [0-a] 通過後正式採用。
-fabric：Phase 0 [0-b] App Router POC 通過後鎖版本。
+pdf-lib：Phase 0 [0-a] 通過後正式採用（[0-a] 本機已 PASS）。
+fabric ：Phase 0 [0-b] App Router POC 通過後鎖版本。
+sharp  ：pin 直接依賴；Alpine musl prebuilt CMYK 行為待 [0-a-gs] 容器驗。
 ```
-
-Sharp 已安裝，不需新增。
 
 ## 18.2 系統二進位 + ICC（情境 A 阻塞）
 
-> pdf-lib 無 OutputIntent（PR #1512 closed），情境 A 必須 Ghostscript。**這是基建改動，非 npm。**
+> pdf-lib 無 OutputIntent（PR #1512 closed），情境 A 必須 Ghostscript。**基建改動，非 npm。base = node:20-alpine。**
 
 ```dockerfile
-# next-admin Dockerfile 新增
-RUN apt-get update && apt-get install -y ghostscript icc-profiles-free && rm -rf /var/lib/apt/lists/*
-# Japan Color 2001 Coated / US Web Coated SWOP = Adobe ICC，授權檔需自備：
-#   放 image /usr/share/color/icc/ 或啟動時從 R2 拉
-# FOGRA39 在 icc-profiles-free 內（CoatedFOGRA39.icc）
+# next-admin Dockerfile 新增（Alpine — apk 不是 apt-get）
+RUN apk add --no-cache ghostscript
+# ⚠️ Alpine 無 icc-profiles-free 套件 → 三個 ICC 全手動：
+COPY icc/JapanColor2001Coated.icc icc/USWebCoatedSWOP.icc icc/CoatedFOGRA39.icc /usr/share/color/icc/
+# Japan Color / SWOP = Adobe ICC，需確認授權；FOGRA39 有免費等效（Coated FOGRA39 / openicc）
+# sharp 原生模組（standalone tracer 可能漏）：
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
 ```
 
 條件：
