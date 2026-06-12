@@ -1,4 +1,16 @@
-﻿| Origin lockdown (SG) | active |
+﻿# Cloudflare security check
+
+- Generated: 2026-06-12 16:44:30
+- Zone: f21b1919632fee2221647908a94fdcac (aware-wave.com)
+- **Overall: PASS**
+
+## Checks
+| Check | Result |
+|-------|--------|
+| Bot Fight Mode | ON |
+| WAF firewall rules count | 1 (by design -- empty; server-side defense) |
+| xmlrpc.php block rule | present |
+| Origin lockdown (SG) | active |
 | CF ipset cf-ipv4 entries | N/A |
 
 ## wp-login / xmlrpc protection
