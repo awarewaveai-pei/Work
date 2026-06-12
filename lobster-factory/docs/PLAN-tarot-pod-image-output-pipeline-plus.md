@@ -547,137 +547,229 @@ Future：
 lib/studio/to-print-pdf.ts
 ```
 
-## 10.1 PrintPreset
+## 10.0 印刷目的地積木（Composable Print Destinations）— SSOT
+
+> **2026-06-12 重大修訂**：印刷輸出改為**目的地驅動積木**。原因見下方兩個 ground-truth（已用 web-researcher 查證）。
+>
+> **Ground-truth 1（阻塞）**：[pdf-lib PR #1512](https://github.com/Hopding/pdf-lib/issues/1512)「加 OutputIntent」2024-04 被關閉未 merge，library 已停止維護。→ **pdf-lib 無法產生帶 ICC OutputIntent 的 PDF/X**。情境 A（直送印刷廠）必須 **Ghostscript** 後處理套 profile。pdf-lib 仍負責 embed CMYK JPEG + `setTrimBox()`/`setBleedBox()`（已確認支援）+ 自動 `/Decode` 反相修正。
+>
+> **Ground-truth 2（尺寸/色彩多樣性）**：國際塔羅 POD 各服務規格不一，**不全是 CMYK**。The Game Crafter **只收 RGB（CMYK 退件）**。國際標準成品 = **70×121mm**（≠ 台灣本地 70×120mm）。
+
+每個印刷目的地 = 一塊可組裝積木，欄位自選組合：
 
 ```ts
-export type PrintPreset =
-  | {
-      kind: 'tarot-print-pdf'
-      widthPx: 896
-      heightPx: 1488
-      widthCm: 7.6
-      heightCm: 12.6
-      dpi: 300
-      fit: 'cover'
-    }
-  | {
-      kind: 'pod-print-pdf'
-      widthPx: number
-      heightPx: number
-      dpi: 300
-      fit: 'contain' | 'cover'
-      widthCm?: number
-      heightCm?: number
-    }
+export type ColorSpaceTarget = 'cmyk' | 'srgb'
+export type IccProfileName =
+  | 'JapanColor2001Coated'   // 台灣 / 日 / 亞洲
+  | 'USWebCoatedSWOP'        // 美國
+  | 'CoatedFOGRA39'          // 歐洲
+export type PrintFileFormat = 'pdf' | 'png'
+
+export type PrintDestination = {
+  id: 'tw-local' | 'mpc' | 'tgc' | 'printninja'
+  label: string              // UI 顯示，例：「🇹🇼 本地印刷廠」
+  trimMm: [number, number]   // 成品尺寸 [w,h]，例 [70,120] / [70,121]
+  bleedMm: number            // 每邊出血，3 或 3.175
+  safeMm: number             // 安全框，3 或 5
+  dpi: 300
+  colorSpace: ColorSpaceTarget
+  iccProfile?: IccProfileName // 僅 colorSpace='cmyk' 且情境 A 時
+  format: PrintFileFormat
+  needsOutputIntent: boolean // cmyk+ICC → true → 走 Ghostscript pass
+}
 ```
+
+### 已查證目的地清單（DESTINATIONS SSOT）
+
+```ts
+export const PRINT_DESTINATIONS: Record<string, PrintDestination> = {
+  'tw-local': {
+    id: 'tw-local', label: '🇹🇼 本地印刷廠',
+    trimMm: [70, 120], bleedMm: 3, safeMm: 3, dpi: 300,
+    colorSpace: 'cmyk', iccProfile: 'JapanColor2001Coated',
+    format: 'pdf', needsOutputIntent: true,
+  },
+  'mpc': {
+    id: 'mpc', label: 'MakePlayingCards (US)',
+    trimMm: [70, 121], bleedMm: 3.175, safeMm: 3, dpi: 300,
+    colorSpace: 'cmyk', iccProfile: 'USWebCoatedSWOP',  // MPC 收 RGB 或 CMYK；要送 CMYK 則需此 profile
+    format: 'pdf', needsOutputIntent: true,
+  },
+  'tgc': {
+    id: 'tgc', label: 'The Game Crafter (US)',
+    trimMm: [70, 121], bleedMm: 3, safeMm: 3, dpi: 300,
+    colorSpace: 'srgb',           // ⚠️ TGC 只收 RGB，CMYK 退件
+    format: 'png', needsOutputIntent: false,
+  },
+  'printninja': {
+    id: 'printninja', label: 'PrintNinja offset (大量)',
+    trimMm: [70, 121], bleedMm: 3, safeMm: 5, dpi: 300,
+    colorSpace: 'cmyk', iccProfile: 'USWebCoatedSWOP',
+    format: 'pdf', needsOutputIntent: true,  // 多頁 PDF（整副牌），本 MVP 先做單張
+  },
+}
+```
+
+> **各服務真實規格佐證**（web-researcher，2026-06-12）：
+> - MPC tarot 70×121mm，bleed 1/8"(3.175mm)，min 897×1497px，收 RGB/CMYK，JPG/PNG/PDF/TIFF — [來源](https://www.makeplayingcards.com/design/custom-front-animated-tarot-size-playing-cards.html)
+> - TGC tarot 70×121mm，bleed 3mm，**RGB only（CMYK 退件）**，PNG — [來源](https://help.thegamecrafter.com/article/399-how-to-make-a-card-game-tarot-deck)
+> - PrintNinja tarot 70×121mm，bleed 3mm，safe 5mm，**CMYK 多頁 PDF** — [來源](https://printninja.com/printing-resource-center/printing-options/custom-game-printing/card-dimensions/tarot-style-playing-cards/)
+> - 國際 de-facto 標準 = 2.75×4.75"(70×121mm)，四家一致。
+
+### 積木組裝矩陣（pipeline 依欄位分支）
+
+```txt
+resize 到 (trim+bleed) px
+  ↓
+colorSpace 積木：
+  'cmyk' → Sharp .toColorspace('cmyk') .jpeg(q100)
+  'srgb' → 保留 sRGB（不轉）
+  ↓
+format 積木：
+  'pdf'  → pdf-lib embedJpg/embedPng + setMediaBox(bleed) + setTrimBox(trim) + setBleedBox(bleed)
+  'png'  → Sharp .png() 直出（TGC 路徑）
+  ↓
+needsOutputIntent 積木：
+  true   → Ghostscript pass：套 ICP profile → PDF/X-1a（情境 A 必須）
+  false  → 直接輸出（RGB POD 服務 / 情境 B）
+```
+
+每個工具掛載的目的地清單也是積木：Tarot 掛 `['tw-local','mpc','tgc','printninja']`；POD Studio 另定。
 
 ---
 
-## 10.2 PDF page size helper
+## 10.1 尺寸換算 helper（trim + bleed）
 
 ```ts
-function cmToPt(cm: number): number {
-  return (cm / 2.54) * 72
+const MM_PER_INCH = 25.4
+
+function mmToPx(mm: number, dpi: number): number {
+  return Math.round((mm / MM_PER_INCH) * dpi)
+}
+function mmToPt(mm: number): number {
+  return (mm / MM_PER_INCH) * 72
 }
 
-function pxToPt(px: number, dpi: number): number {
-  return (px / dpi) * 72
-}
-
-function getPdfPageSizePt(preset: PrintPreset): {
-  widthPt: number
-  heightPt: number
-} {
-  if (preset.widthCm && preset.heightCm) {
-    return {
-      widthPt: cmToPt(preset.widthCm),
-      heightPt: cmToPt(preset.heightCm),
-    }
-  }
-
+/** 回傳 artwork(含出血) 與 trim 的 px / pt 幾何 */
+function getPrintGeometry(d: PrintDestination) {
+  const [tw, th] = d.trimMm
+  const bleedW = tw + d.bleedMm * 2
+  const bleedH = th + d.bleedMm * 2
   return {
-    widthPt: pxToPt(preset.widthPx, preset.dpi),
-    heightPt: pxToPt(preset.heightPx, preset.dpi),
+    // 含出血 = MediaBox / BleedBox
+    bleedPx: [mmToPx(bleedW, d.dpi), mmToPx(bleedH, d.dpi)] as [number, number],
+    bleedPt: [mmToPt(bleedW), mmToPt(bleedH)] as [number, number],
+    // 成品 = TrimBox
+    trimPt: [mmToPt(tw), mmToPt(th)] as [number, number],
+    // TrimBox 在 MediaBox 內的偏移 = bleed
+    bleedOffsetPt: mmToPt(d.bleedMm),
   }
 }
 ```
 
+> 例（tw-local 70×120mm + 3mm bleed）：bleedPx ≈ [898, 1512]、bleedPt ≈ [215.4, 357.2]、trimPt ≈ [198.4, 340.2]、offset 8.5pt。
+> 註：現有 `FLUX_PRINT_DIMS["2:3"]=[896,1488]` 對應舊 76×126mm；新積木以 mm 為 SSOT 重算，生圖輸出 resize 到 destination 的 bleedPx（差 ~1% 可忽略，fit:cover）。
+
 ---
 
-## 10.3 toPrintPdf()
+## 10.2 toPrintFile()（積木組裝主函式）
 
 ```ts
 import sharp from 'sharp'
 import { PDFDocument } from 'pdf-lib'
 import type { ColorGradeParams } from './color-grade'
+import { applyOutputIntent } from './ghostscript-pdfx' // 見 10.3
 
-export async function toPrintPdf(
+export async function toPrintFile(
   input: Buffer,
-  preset: PrintPreset,
+  dest: PrintDestination,
   colorGrade?: ColorGradeParams
-): Promise<Buffer> {
-  let img = sharp(input, {
-    limitInputPixels: 50_000_000,
-  })
+): Promise<{ buffer: Buffer; mime: string }> {
+  const g = getPrintGeometry(dest)
 
-  if (colorGrade) {
-    img = img.modulate({
-      hue: colorGrade.hue,
-      saturation: colorGrade.saturation,
-      brightness: colorGrade.brightness,
-    })
+  let img = sharp(input, { limitInputPixels: 50_000_000 })
+    .resize(g.bleedPx[0], g.bleedPx[1], { fit: 'cover' })
+  if (colorGrade) img = img.modulate(colorGrade)
+
+  // ── colorSpace 積木 ──
+  let imgBuf: Buffer
+  if (dest.colorSpace === 'cmyk') {
+    imgBuf = await img.toColorspace('cmyk').jpeg({ quality: 100 })
+      .withMetadata({ density: dest.dpi }).toBuffer()
+  } else {
+    imgBuf = await img.png().withMetadata({ density: dest.dpi }).toBuffer()
   }
 
-  const cmykJpegBuffer = await img
-    .resize(preset.widthPx, preset.heightPx, {
-      fit: preset.fit,
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
-    })
-    .toColorspace('cmyk')
-    .jpeg({ quality: 100 })
-    .withMetadata({ density: preset.dpi })
-    .toBuffer()
-
-  const { widthPt, heightPt } = getPdfPageSizePt(preset)
+  // ── format 積木 ──
+  if (dest.format === 'png') {
+    return { buffer: imgBuf, mime: 'image/png' } // TGC sRGB PNG 直出
+  }
 
   const pdf = await PDFDocument.create()
-  const embedded = await pdf.embedJpg(cmykJpegBuffer)
+  const embedded = dest.colorSpace === 'cmyk'
+    ? await pdf.embedJpg(imgBuf)
+    : await pdf.embedPng(imgBuf)
+  const page = pdf.addPage(g.bleedPt)
+  page.drawImage(embedded, { x: 0, y: 0, width: g.bleedPt[0], height: g.bleedPt[1] })
+  page.setMediaBox(0, 0, g.bleedPt[0], g.bleedPt[1])
+  page.setBleedBox(0, 0, g.bleedPt[0], g.bleedPt[1])
+  page.setTrimBox(g.bleedOffsetPt, g.bleedOffsetPt, g.trimPt[0], g.trimPt[1])
+  let pdfBuf = Buffer.from(await pdf.save())
 
-  const page = pdf.addPage([widthPt, heightPt])
-  page.drawImage(embedded, {
-    x: 0,
-    y: 0,
-    width: widthPt,
-    height: heightPt,
-  })
-
-  const pdfBytes = await pdf.save()
-  return Buffer.from(pdfBytes)
+  // ── needsOutputIntent 積木 ──
+  if (dest.needsOutputIntent && dest.iccProfile) {
+    pdfBuf = await applyOutputIntent(pdfBuf, dest.iccProfile) // Ghostscript
+  }
+  return { buffer: pdfBuf, mime: 'application/pdf' }
 }
 ```
 
-> **效能備註**：上面 `modulate()` 在 `resize()` 之前，等於在全解析度上跑色調調整。正確性沒問題，但若要省一點，可改成先 `resize` 再 `modulate`。非阻塞。
+> **效能備註**：`modulate()` 已移到 `resize()` 之後（省全解析度運算）。
 
-> **Sharp 版本備註**：
-> - 鎖定 Sharp 版本，並在 Phase 0 驗證 DPI / density 是否真的寫入輸出檔。
-> - 若採用的 Sharp 版本支援 `withDensity(dpi)`，優先使用 `withDensity()` 設定 DPI。
-> - 若沿用 `withMetadata({ density })`，需用 `exiftool` / `identify` / PDF preflight 驗證 density 是否成功寫入，不可只相信程式碼。
-> - ICC 處理應使用 `withIccProfile()` / `keepIccProfile()` 或替代 pipeline 驗證；不要只靠 `toColorspace('cmyk')` 判定為印刷廠級色彩。
-> - `toColorspace('cmyk')` 可產生 4-channel DeviceCMYK，但不等於已滿足印刷廠指定 ICC profile（見 14.1a）。
+---
+
+## 10.3 Ghostscript OutputIntent（情境 A 必須）
+
+pdf-lib 無法加 ICC OutputIntent（PR #1512 closed）。用 Ghostscript 後處理：
+
+```ts
+// lib/studio/ghostscript-pdfx.ts
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+const execFileP = promisify(execFile)
+
+const ICC_PATHS: Record<IccProfileName, string> = {
+  JapanColor2001Coated: '/usr/share/color/icc/JapanColor2001Coated.icc',
+  USWebCoatedSWOP:       '/usr/share/color/icc/USWebCoatedSWOP.icc',
+  CoatedFOGRA39:         '/usr/share/color/icc/CoatedFOGRA39.icc',
+}
+
+export async function applyOutputIntent(pdf: Buffer, icc: IccProfileName): Promise<Buffer> {
+  // 寫暫存 → gs → 讀回（暫存路徑用 os.tmpdir()，非 repo）
+  // gs -dPDFX -dBATCH -dNOPAUSE -dPDFXCompatibilityPolicy=1
+  //    -sColorConversionStrategy=CMYK -sDEVICE=pdfwrite
+  //    -sOutputICCProfile=<ICC_PATHS[icc]> -sOutputFile=out.pdf in.pdf
+  // 實作見 Phase 0 [0-a-gs] POC
+  ...
+}
+```
+
+> ⚠️ **部署影響（基建）**：next-admin Docker image 需裝 `ghostscript` + ICC profiles。Dockerfile 加 `apt-get install -y ghostscript icc-profiles-free`，Japan Color / SWOP profile 需自備（Adobe ICC 授權檔放 image 或 R2）。**這是 deploy 前必處理項，列入 [0-a-gs] gate。**
+
+> **Sharp 版本備註**：鎖版本；`withMetadata({density})` v0.33+ deprecated，優先 `withDensity()`；density 寫入需 exiftool/identify 驗證，不只信 code。
 
 ---
 
 ## 10.4 重要警告
 
-這條 pipeline 只有在 Phase 0 POC 通過後才能進 Phase 1。
-
-必須驗證：
+此 pipeline 只有 Phase 0 POC 全通過才能進 Phase 1。必須驗證：
 
 ```txt
-Sharp CMYK JPEG → pdf-lib embedJpg → PDF image object 仍然是 /DeviceCMYK
+① CMYK 路徑：Sharp CMYK JPEG → pdf-lib embedJpg → /DeviceCMYK（未轉回 RGB）+ /Decode 未雙重反相
+② TrimBox：qpdf 驗 MediaBox/TrimBox/BleedBox 三框正確
+③ OutputIntent：Ghostscript 後 PDF/X-1a 帶 ICC，印刷廠 preflight 過
+④ sRGB 路徑（TGC）：PNG sRGB，無 CMYK 污染
 ```
-
-若 pdf-lib 會轉回 RGB，不能使用此 pipeline 進 MVP。
 
 ---
 
@@ -859,12 +951,12 @@ Phase 0 是阻塞階段。未通過不得進 Phase 1 主線。
 
 ---
 
-## 14.1 [0-a] CMYK PDF POC
+## 14.1 [0-a] CMYK PDF + TrimBox POC
 
 目標：
 
 ```txt
-驗證 Sharp CMYK JPEG + pdf-lib embedJpg 是否能產生真正 /DeviceCMYK PDF。
+驗證 Sharp CMYK JPEG + pdf-lib embedJpg → /DeviceCMYK PDF，且 MediaBox/TrimBox/BleedBox 三框正確。
 ```
 
 測試指令：
@@ -873,32 +965,79 @@ Phase 0 是阻塞階段。未通過不得進 Phase 1 主線。
 pdfimages -list output.pdf
 exiftool output.pdf
 qpdf --qdf --object-streams=disable output.pdf inspect.pdf
-grep -n "DeviceCMYK\|DeviceRGB\|ColorSpace\|Decode" inspect.pdf
+grep -n "DeviceCMYK\|DeviceRGB\|ColorSpace\|Decode\|MediaBox\|TrimBox\|BleedBox" inspect.pdf
 ```
 
 驗收條件：
 
 ```txt
-☐ PDF page size = 7.6 × 12.6 cm 對應 point size
-☐ 不是只有 300 DPI metadata
+☐ MediaBox = 含出血尺寸 (例 tw-local 76×126mm → 215.4×357.2pt)
+☐ TrimBox  = 成品尺寸 (70×120mm → 198.4×340.2pt)，offset 8.5pt(=3mm)
+☐ BleedBox = MediaBox
 ☐ image object /ColorSpace = /DeviceCMYK
 ☐ pdfimages -list 顯示 CMYK / 4-channel
 ☐ 未被轉回 /DeviceRGB
-☐ Adobe Acrobat preflight 顯示 CMYK
-☐ 黑色、膚色、暗部沒有 inversion
-☐ 黑色、膚色、暗部沒有明顯過暗
+☐ /Decode [1 0 1 0 1 0 1 0] 存在（pdf-lib 自動加，已確認 source code）
+☐ Adobe Acrobat preflight 顯示 CMYK，膚色/暗部無 inversion、無過暗
 ```
+
+> **已查證（web-researcher 2026-06-12）**：
+> - pdf-lib `setTrimBox()/setBleedBox()` 公開 API 存在 → TrimBox 可解。
+> - `embedJpg()` 對 4-channel JPEG **無條件** 加 `/Decode [1 0 1 0 1 0 1 0]`（[source](https://github.com/Hopding/pdf-lib/blob/master/src/core/embedders/JpegEmbedder.ts)）→ Photoshop/Sharp CMYK JPEG 反相自動修正。
+> - **但** pdf-lib **無 OutputIntent**（PR #1512 closed）→ 情境 A 的 ICP profile 必須走 [0-a-gs] Ghostscript，見下。
 
 已知失敗模式與對策：
 
 ```txt
-反相（negative / 負片）：
-  成因：CMYK JPEG 常帶 Adobe APP14 marker，存的是 inverted CMYK (YCCK)。
-        pdf-lib embedJpg 若未正確處理 APP14 transform flag，embed 後變負片。
-  徵兆：pdfimages 抽出來的圖整張反白 / 顏色相反。
-  對策：在 PDF image dict 加 /Decode [1 0 1 0 1 0 1 0] 反轉回來。
-        （這就是上面 grep 要抓 Decode 的原因。）
-  若 pdf-lib 無法手動加 Decode array → 列為 pdf-lib 失敗，走 14.2 gate。
+反相（negative）：embedJpg 已自動加 /Decode，但若 Sharp CMYK JPEG transform=0（非 YCCK）
+  可能被雙重反相。POC 必須目視抽出圖確認沒反白。若雙重反相 → 改 Ghostscript pipeline。
+```
+
+---
+
+## 14.1-gs [0-a-gs] Ghostscript ICC OutputIntent POC（情境 A 必須，阻塞）
+
+> pdf-lib 無 OutputIntent。情境 A 直送印刷廠**必須**此 POC 通過。
+
+目標：
+
+```txt
+驗證 Ghostscript 能把 pdf-lib 產出的 CMYK PDF 加 ICC OutputIntent → PDF/X-1a。
+```
+
+指令（Japan Color 2001 Coated 範例）：
+
+```bash
+gs -dPDFX -dBATCH -dNOPAUSE -dPDFXCompatibilityPolicy=1 \
+   -sColorConversionStrategy=CMYK -sDEVICE=pdfwrite \
+   -sOutputICCProfile=/usr/share/color/icc/JapanColor2001Coated.icc \
+   -sOutputFile=out_pdfx.pdf in.pdf
+qpdf --qdf out_pdfx.pdf chk.pdf
+grep -n "OutputIntent\|GTS_PDFX\|DestOutputProfile" chk.pdf
+```
+
+驗收條件：
+
+```txt
+☐ Docker image 裝得起 ghostscript（Dockerfile apt-get）
+☐ ICC profile 檔存在於 image（Japan Color 2001 / SWOP / FOGRA39）
+☐ 輸出 PDF 含 /OutputIntent + /GTS_PDFX + 嵌入 /DestOutputProfile
+☐ TrimBox 經 gs 後仍保留
+☐ 印刷廠 preflight 過（人類在環，見 §D）
+☐ 三個 profile 各跑一次（tw=Japan / us=SWOP / eu=FOGRA39）
+```
+
+> ⚠️ 部署門檻：Dockerfile 改動（裝 gs + profiles）必須在此 POC 一起驗，否則 Phase 1 寫好也 deploy 不了。
+
+---
+
+## 14.1-srgb [0-a-srgb] sRGB PNG POC（TGC 路徑）
+
+```txt
+☐ TGC 目的地 colorSpace='srgb' format='png' → Sharp 直出 sRGB PNG
+☐ 無 CMYK 污染（pdfimages/identify 確認 sRGB / 3-channel）
+☐ TrimBox 不適用（PNG 無 box；safe zone 由設計時保留）
+☐ 70×121mm + 3mm bleed = 897×1500px 尺寸正確
 ```
 
 ---
@@ -916,45 +1055,37 @@ Sharp toColorspace('cmyk') 是 naive 數學轉換，不帶 ICC profile。
    或印出來顏色偏掉（尤其膚色、企業色）。
 ```
 
-依「是否直送印刷廠」分流：
+**本案已定 = 情境 A（直送印刷廠）。** profile：台灣 Japan Color 2001 Coated / 美國 US Web Coated SWOP / 歐洲 FOGRA39（依目的地 destination.iccProfile）。
 
 ```txt
-情境 A：印刷用 PDF 會直送印刷廠
-  ☐ 先向印刷廠確認要哪個 CMYK profile
-     （台灣常見：Japan Color 2001 Coated；歐美：US Web Coated SWOP / FOGRA）
-  ☐ 評估用 sharp().withIccProfile(profilePath) 或在 pdf-lib 加 OutputIntent
-  ☐ POC 必須拿「真的有 profile 的 PDF」過印刷廠 preflight，不能只看 Acrobat 顯示 CMYK
-  ☐ 上面 14.1 的 naive CMYK 視為「不通過」
+情境 A（已採用）：印刷用 PDF 直送印刷廠
+  ☑ profile 已定（見 §10.0 PRINT_DESTINATIONS）
+  ☑ pdf-lib 無 OutputIntent → 走 [0-a-gs] Ghostscript 套 profile（已查證決定）
+  ☐ POC 必須拿「真的有 OutputIntent 的 PDF/X」過印刷廠 preflight，不能只看 Acrobat 顯示 CMYK
+  ☐ naive CMYK（無 OutputIntent）視為「不通過」
 
-情境 B：印刷用 PDF 只是客戶自行下載的高品質檔，不直送印刷廠
-  ☐ Sharp naive CMYK 可接受
-  ☐ 但此前提必須寫死在文件與 UI 文案（例：「高品質下載 PDF，送印前請與印刷廠確認色彩」）
-  ☐ 禁止之後把這條輸出直接拿去送印而不重做色彩管理
+例外：TGC 目的地不適用（colorSpace='srgb'，走 [0-a-srgb]）。
 ```
-
-**[0-a] 開始前，必須先決定本案是 A 還是 B。** 答案決定 CMYK 驗收門檻。
 
 ---
 
-## 14.2 [0-a-gate] CMYK PDF decision gate
+## 14.2 [0-a-gate] CMYK PDF decision gate（已定情境 A）
 
 ```txt
-前置：先確定情境 A（直送印刷廠）或 B（客戶自行下載）。見 14.1a。
+前置已定：情境 A 直送印刷廠。架構 = pdf-lib(embed+TrimBox) + Ghostscript(OutputIntent)。
 
-若 pdf-lib POC 通過，且色彩達到情境所需門檻（A 需 ICC / B 接受 naive）：
-  Phase 1 使用 pdf-lib pipeline。
+通過條件（全綠才進 Phase 1）：
+  ① [0-a]    pdf-lib → /DeviceCMYK + TrimBox 三框正確 + 無雙重反相
+  ② [0-a-gs] Ghostscript → PDF/X-1a 帶 ICC OutputIntent + Docker 裝得起 gs
+  ③ [0-a-srgb] TGC sRGB PNG 路徑乾淨
+  ④ 印刷廠 preflight 過（人類在環）
 
-若 pdf-lib embed 正確但情境 A 的 ICC 色彩不達標：
-  評估 pdf-lib 加 OutputIntent，或改 Ghostscript pipeline 套 profile。
+若 [0-a] 雙重反相無法修：
+  改全 Ghostscript pipeline（Sharp RGB → gs 一次轉 CMYK+OutputIntent）。
 
-若 pdf-lib POC 失敗（反相無法用 Decode 修正 / 無法產 DeviceCMYK），
-但 Ghostscript pipeline 通過：
-  Phase 1 改用 Ghostscript pipeline。
-
-若 pdf-lib 與 Ghostscript 都失敗：
-  MVP 取消 CMYK PDF。
-  本次只做 WebP + Fabric Canvas。
-  印刷 PDF 另開獨立 task。
+若 Docker 裝不起 gs / profile 取不到授權：
+  情境 A 暫時 degrade 為情境 B（naive CMYK + UI 警示「送印前確認色彩」），
+  Ghostscript 另開 infra task；不阻塞 WebP/Canvas/sRGB-POD 三軌上線。
 ```
 
 禁止狀態：
@@ -1418,22 +1549,42 @@ Canva export 是 async job，不可寫成同步 fetchFromCanva()。
 
 # 18. 新增依賴
 
+## 18.1 npm 套件
+
 ```bash
-npm install pdf-lib
-npm install fabric
+npm install pdf-lib   # embed + TrimBox/BleedBox（MIT）
+npm install fabric    # Canvas editor（MIT）
 ```
 
 條件：
 
 ```txt
-pdf-lib：
-  Phase 0 CMYK POC 通過後才正式採用。
-
-fabric：
-  Phase 0 App Router POC 通過後鎖版本。
+pdf-lib：Phase 0 [0-a] 通過後正式採用。
+fabric：Phase 0 [0-b] App Router POC 通過後鎖版本。
 ```
 
 Sharp 已安裝，不需新增。
+
+## 18.2 系統二進位 + ICC（情境 A 阻塞）
+
+> pdf-lib 無 OutputIntent（PR #1512 closed），情境 A 必須 Ghostscript。**這是基建改動，非 npm。**
+
+```dockerfile
+# next-admin Dockerfile 新增
+RUN apt-get update && apt-get install -y ghostscript icc-profiles-free && rm -rf /var/lib/apt/lists/*
+# Japan Color 2001 Coated / US Web Coated SWOP = Adobe ICC，授權檔需自備：
+#   放 image /usr/share/color/icc/ 或啟動時從 R2 拉
+# FOGRA39 在 icc-profiles-free 內（CoatedFOGRA39.icc）
+```
+
+條件：
+
+```txt
+ghostscript：[0-a-gs] POC 通過 + Docker build 驗證後採用。
+ICC profiles：確認授權（Adobe Japan Color/SWOP）或改用免費等效 profile。
+```
+
+> ⚠️ 此 Dockerfile 改動屬基建，deploy 走 `sg-deploy.sh`，需 healthcheck + smoke。改 Dockerfile → 召喚 devops 流程（safe-infra-patch 規則）。
 
 ---
 
@@ -1457,10 +1608,13 @@ Sharp 已安裝，不需新增。
 
 | 項目 | 性質 | 處置 |
 |---|---|---|
-| CMYK PDF | 阻塞風險 | Phase 0 POC，驗 `/DeviceCMYK` + preflight |
-| CMYK 色彩正確性 (ICC) | 阻塞風險 (情境 A) | 先確認直送印刷廠與否；A 需 ICC profile，見 14.1a |
-| CMYK JPEG 反相 | 阻塞風險 | `/Decode [1 0 1 0 1 0 1 0]` 對策，見 14.1 |
-| pdf-lib embed CMYK | 阻塞風險 | POC 通過才採用 |
+| CMYK PDF | 阻塞風險 | Phase 0 [0-a]，驗 `/DeviceCMYK` + TrimBox + preflight |
+| **pdf-lib 無 OutputIntent** | **阻塞風險（已查證）** | **PR #1512 closed → 情境 A 必須 Ghostscript 後處理 [0-a-gs]** |
+| **Ghostscript Docker 部署** | **阻塞風險（基建）** | **Dockerfile 裝 gs+ICC；[0-a-gs] gate 一起驗** |
+| CMYK 色彩正確性 (ICC) | 阻塞風險 (情境 A) | 已定情境 A；profile 依目的地，Ghostscript 套 |
+| CMYK JPEG 反相 | 已解（已查證） | embedJpg 自動加 `/Decode`；POC 驗無雙重反相 |
+| TrimBox/BleedBox | 必做 | pdf-lib `setTrimBox/setBleedBox`（已確認支援）|
+| 國際 POD 多色彩空間 | 必做 | TGC=sRGB PNG，不可寫死 CMYK；積木 colorSpace 欄位 |
 | Sharp 版本 / withMetadata | 必做 | 鎖版本，確認 density 寫入；v0.33+ 已 deprecated |
 | PDF page size | 必做 | 用 points，不靠 density metadata |
 | SSRF / API 安全 | 必做 | allowlist / size / timeout / auth |
@@ -1480,34 +1634,33 @@ Sharp 已安裝，不需新增。
 # 21. 最終施工順序
 
 ```txt
-Phase 0:
-  0-a CMYK PDF POC
-  0-b Fabric.js App Router POC
-  0-c API security POC
-
-Gate:
-  Phase 0 全部通過才進 Phase 1
+Phase 0（阻塞，全綠才進 Phase 1）:
+  0-a      CMYK PDF + TrimBox POC（pdf-lib）
+  0-a-gs   Ghostscript ICC OutputIntent POC + Docker build（情境 A 必須）
+  0-a-srgb sRGB PNG POC（TGC 路徑）
+  0-b      Fabric.js App Router POC
+  0-c      API security POC
 
 Phase 1:
   1-a image-provider printQuality
   1-b color-grade types + hook
-  1-c toProductImage
-  1-d toPrintPdf
-  1-e image process API
+  1-c toProductImage（preset-driven：web-tarot 667×1000 / web-square 1000×1000）
+  1-d toPrintFile（積木：PrintDestination 矩陣，pdf-lib + Ghostscript）
+  1-e image process API（discriminated union + SSRF + rate limit）
   1-f ColorGradePanel
-  1-g OutputTrackBar
+  1-g OutputTrackBar（含印刷目的地下拉：tw-local/mpc/tgc/printninja）
   1-h canvas page
-  1-i CanvasEditor
+  1-i CanvasEditor（三資產存 R2）
   1-j TarotStudio 接線
   1-k StudioWorkbench 接線
   1-l REALTEST
 
 Phase 1.5:
-  Canva POC
+  Canva POC（5-a~d）
 
 Phase 2:
-  customer-facing Canvas
-  WooCommerce / Printful integration
+  customer-facing Canvas + WooCommerce + Printful
+  整副牌多頁 PDF（PrintNinja offset）
 ```
 
 ---

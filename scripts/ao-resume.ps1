@@ -765,6 +765,16 @@ if ($runMonthly) {
         $global:LASTEXITCODE = 0
     } else { $monthlyResults["governance_drift"] = "SKIP" }
 
+    # 4. CF origin IP refresh (SSH to SG, warn-only)
+    $cfRefresh = Join-Path $WorkRoot "scripts\refresh-cf-origin-ips.ps1"
+    if (Test-Path -LiteralPath $cfRefresh) {
+        Write-Host "  -> refresh-cf-origin-ips..." -ForegroundColor DarkCyan
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $cfRefresh -WorkRoot $WorkRoot
+        $cfRefreshExit = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        $monthlyResults["cf_ip_refresh"] = if ($cfRefreshExit -eq 0) { "PASS" } else { "WARN" }
+        $global:LASTEXITCODE = 0
+    } else { $monthlyResults["cf_ip_refresh"] = "SKIP" }
+
     # Write consolidated monthly-LATEST.json to reports/status/ — single place to read.
     $monthlyStatusDir = Join-Path $WorkRoot "agency-os\reports\status"
     $null = New-Item -ItemType Directory -Force -Path $monthlyStatusDir
@@ -773,6 +783,7 @@ if ($runMonthly) {
         system_review    = $monthlyResults["system_review"]
         supabase_memory  = $monthlyResults["supabase_memory"]
         governance_drift = $monthlyResults["governance_drift"]
+        cf_ip_refresh    = $monthlyResults["cf_ip_refresh"]
     }
     $monthlyPayload | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $monthlyStatusDir "monthly-LATEST.json") -Encoding UTF8
 
@@ -787,11 +798,12 @@ if ($runMonthly) {
         system_review    = "系統架構 / build gates / 程式碼品質"
         supabase_memory  = "EU 資料庫記憶體使用量"
         governance_drift = "四份核心治理文件一致性"
+        cf_ip_refresh    = "CF origin IP ranges on SG ipset"
     }
 
     # Build body lines (技術術語 + 人話)
     $lines = @()
-    foreach ($key in @("system_review","supabase_memory","governance_drift")) {
+    foreach ($key in @("system_review","supabase_memory","governance_drift","cf_ip_refresh")) {
         $val   = $monthlyResults[$key]
         $icon  = if ($val -like "PASS*") { "✅" } elseif ($val -like "WARN*") { "⚠️" } elseif ($val -like "FAIL*") { "❌" } else { "⏭" }
         $lines += "$icon $($humanDesc[$key]): $val"

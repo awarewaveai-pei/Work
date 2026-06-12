@@ -63,24 +63,28 @@
 - [ ] **【POD Studio 自建動工】** plan=`.claude/plans/pod-studio-p2a-p4-execution-PLAN.md`；藍本=`lobster-factory/docs/POD_STUDIO_ROADMAP.md`。✅ ① 擬真合成驗證 PASS（nano-banana-2 白 ~95%/黑鎖色 ~90%，prompt 三鐵則進 plan §0）✅ 先決小修（REPLICATE token 回填 + vault doc drift）✅ ② **P2a 儲存層完成 2026-06-11**（`lib/storage/r2.ts`+route+My Designs 頁，REALTEST 全過，flag OFF **未部署**；deploy 時 SG 設 `POD_DESIGNS_ENABLED=true`+`POD_DESIGNS_DEFAULT_ORG_ID=2bf60452-…`）。✅ ③ P2b 生成器（facade+Studio 頁，fbc1b7b1）✅ ④ P2c 去背（851-labs，RGBA 驗證）✅ Printful 憑證落定（vault ×4；store 18314943 已綁 Woo — P2d 先決解除）。✅ ⑤ Mockup Studio（B9-S 雙模式+鎖色，REALTEST 目視 PASS）✅ ⑥ P2d PrintProvider（Woo 平台改道 sync API；讀路徑實測過）✅ ⑦ 一鍵上架鏈+Publish 頁（upscaler 誠實合約+Ed25519 client；兩輪部署 a4fd0e95 全上線）。**下一步 = link 寫路徑首驗（見【明日優先】packet）→ P3 上架定案（主站 Woo 已可用）→ P4 試單對帳**
 - [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，**R0 已批方案A**，照 packet 直接動工免重提案）→ handoffs/2026-06-11-1738-tomo-173818.md
 - [ ] **🎨 Image Output Pipeline**（SSOT: `lobster-factory/docs/PLAN-tarot-pod-image-output-pipeline-plus.md`）Tarot/POD: 色調→WebP/CMYK PDF(Japan Color 2001 Coated)/Fabric.js Canvas；Printful 走 sRGB `upscaler.ts` 不動；Canva Phase 1.5 POC
-  - **⚠️ Phase 0 阻塞 POC（三個全通過才進 Phase 1）**
-  - [ ] **[0-a]** CMYK PDF POC — Sharp CMYK JPEG + pdf-lib embedJpg → 驗 `/DeviceCMYK`；測 APP14 反相對策；驗 Japan Color 2001 Coated ICC 情境 A
-  - [ ] **[0-b]** Fabric.js + Next.js App Router POC — `/tools/canvas-poc`；CORS taint 測試；`toBlob()` export
-  - [ ] **[0-c]** API security POC — SSRF allowlist + private IP 擋截 + rate limit
+  - **印刷積木 SSOT**：`PrintDestination` 矩陣（tw-local/mpc/tgc/printninja）；國際標準 70×121mm；TGC=sRGB PNG（CMYK 退件）；情境 A 直送印刷廠。**已查證**：pdf-lib 無 OutputIntent（PR#1512 closed）→ Ghostscript 套 ICC；Printful 走 sRGB upscaler.ts 不動
+  - **⚠️ Phase 0 阻塞 POC（五個全通過才進 Phase 1）**
+  - [ ] **[0-a]** CMYK PDF + TrimBox POC — Sharp CMYK JPEG + pdf-lib embedJpg → `/DeviceCMYK` + setTrimBox/setBleedBox 三框；驗無雙重反相
+  - [ ] **[0-a-gs]** 🔴 Ghostscript ICC OutputIntent POC — gs → PDF/X-1a + Dockerfile 裝 ghostscript+ICC（情境 A 阻塞，基建改動，走 safe-infra-patch）
+  - [ ] **[0-a-srgb]** sRGB PNG POC — TGC 路徑，897×1500px 無 CMYK 污染
+  - [ ] **[0-b]** Fabric.js + Next.js App Router POC — `/tools/canvas-poc`；CORS taint；`toBlob()` export
+  - [ ] **[0-c]** API security POC — SSRF allowlist + private IP + rate limit
   - **Phase 1（Phase 0 全綠才開始）**
   - [ ] **[1-a S]** `lib/studio/image-provider.ts` — 透傳 `printQuality` 欄位
   - [ ] **[1-b S]** `lib/studio/color-grade.ts` — `ColorGradeParams` type + `useColorGrade()` hook
-  - [ ] **[1-c S]** `lib/studio/to-product-image.ts` — preset-driven WebP（Tarot: 667×1000 / POD: 1000×1000）
-  - [ ] **[1-d M]** `lib/studio/to-print-pdf.ts` — preset-driven CMYK PDF（tarot-print-pdf / pod-print-pdf；Japan Color 2001 Coated ICC）
+  - [ ] **[1-c S]** `lib/studio/to-product-image.ts` — preset-driven WebP（web-tarot 667×1000 / web-square 1000×1000）
+  - [ ] **[1-d M]** `lib/studio/to-print-file.ts` + `ghostscript-pdfx.ts` — PrintDestination 積木矩陣（pdf-lib embed+TrimBox → Ghostscript OutputIntent；sRGB PNG 分支）
   - [ ] **[1-e M]** `app/api/tools/image/process/route.ts` — discriminated union + SSRF guard + auth + rate limit
   - [ ] **[1-f S]** `components/tools/ColorGradePanel.tsx` — 色調/飽和/亮度三滑桿
-  - [ ] **[1-g S]** `components/tools/OutputTrackBar.tsx` — preset-aware 三按鈕（Canva = feature flag 隱藏）
+  - [ ] **[1-g S]** `components/tools/OutputTrackBar.tsx` — preset-aware；印刷鈕含目的地下拉（tw-local/mpc/tgc/printninja）；Canva feature flag 隱藏
   - [ ] **[1-h S]** `app/tools/canvas/page.tsx` — Canvas 路由
-  - [ ] **[1-i M]** `app/tools/canvas/CanvasEditor.tsx` — Fabric.js（沿用 Phase 0 POC 版本）；存 design.json+preview.webp+source-export.png → R2
-  - [ ] **[1-j S]** `TarotStudio.tsx` 接 ColorGradePanel + OutputTrackBar（preset: web-tarot / tarot-print-pdf / canvas-edit）
-  - [ ] **[1-k S]** `StudioWorkbench.tsx` 接 ColorGradePanel + OutputTrackBar（preset: web-square / pod-print-pdf / canvas-edit）
-  - **Phase 1.5（Phase 1 完成後）**
-  - [ ] **[5-a~d]** Canva API POC → OutputTrackBar 接線（見 plan §17）
+  - [ ] **[1-i M]** `app/tools/canvas/CanvasEditor.tsx` — Fabric.js（沿用 Phase 0 版本）；存 design.json+preview.webp+source-export.png → R2
+  - [ ] **[1-j S]** `TarotStudio.tsx` 接 ColorGradePanel + OutputTrackBar（web-tarot + 印刷四目的地 + canvas-edit）
+  - [ ] **[1-k S]** `StudioWorkbench.tsx` 接 ColorGradePanel + OutputTrackBar（web-square + pod 印刷 + canvas-edit；Printful 另走 upscaler.ts）
+  - **Phase 1.5 / Phase 2**
+  - [ ] **[5-a~d]** Canva API POC → OutputTrackBar 接線（plan §17）
+  - [ ] **Phase 2** customer-facing Canvas + WooCommerce + Printful；整副牌多頁 PDF（PrintNinja offset）
 
 - [x] **【✅ 2026-06-11 已套用】media_assets 雙重定義衝突修復（C1）**（critic C1，2026-06-11）— **修復檔已寫好 + db-expert 審過（verdict: commit LOW/apply LOW），只剩套用待操作者 go**：`migrations/0038_media_assets_reconcile.sql`（idempotent reconcile，線上=no-op，fresh replay=補齊 0011 canonical shape；含 predicate-based constraint guard + `notify pgrst` + fresh-replay 操作順序註記）+ down 檔 `scripts/0038_media_assets_reconcile_down.sql`。**套用方式**：SG quiet window 貼 Supabase SQL Editor（預期全 no-op，零鎖風險—db-expert 確認無 table rewrite）。佐證 WORKLOG 2026-06-11。
 - [x] POD Studio 路線圖 + tarot 框線收尾（框 png 還沒做好；per-frame 微調 + celestial 補生）→ handoffs/2026-06-06-2026-pod-studio-roadmap.md
