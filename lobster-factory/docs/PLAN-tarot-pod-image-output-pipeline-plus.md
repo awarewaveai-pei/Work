@@ -91,7 +91,7 @@ Canva 整合不進 MVP，移到 **Phase 1.5 POC**。
 | ColorGrade payload | 後端統一吃 `{ hue, saturation, brightness }` multiplier 格式 |
 | **CMYK ICC profile** | **Final+：先確認是否直送印刷廠；情境 A 需 ICC，naive CMYK 不夠（14.1a）** |
 | **CMYK 反相對策** | **Final+：Adobe APP14 / inverted CMYK → `/Decode` array（14.1）** |
-| **Sharp 版本** | **[0-a] 實證：`.withMetadata({density})` 破壞 CMYK（轉回 sRGB）→ 必用 `.withDensity()`；sharp 須 pin 直接依賴** |
+| **Sharp 版本** | **[0-a]/[1-c] 實證：`.withMetadata({density})` 破壞 CMYK；`.withDensity()` 需 sharp≥0.35 但 app=0.34.3 無此 method → CMYK/web 一律「不設 density」（PDF 幾何/pixel box 載重）；sharp 須 pin 直接依賴** |
 | **API rate limit** | **Final+：per-user，避免狂刷轉檔** |
 | **maxDuration** | **Final+：確認部署方案支援 60s（Vercel Hobby 只有 10s）** |
 
@@ -511,8 +511,7 @@ export async function toProductImage(
       fit: preset.fit,
       ...(background ? { background } : {}),
     })
-    .webp({ quality: 80 })
-    .withDensity(preset.dpi)  // withDensity 不附 sRGB ICC（web 端 sRGB 本就正確，統一用法）
+    .webp({ quality: 80 })  // 不設 density：web 螢幕忽略，sizing 由 pixel box 決定（見 §10.2 ⚠️）
     .toBuffer()
 }
 
@@ -760,7 +759,7 @@ export async function applyOutputIntent(pdf: Buffer, icc: IccProfileName): Promi
 
 > ⚠️ **部署影響（基建，已查證 base image）**：next-admin Dockerfile base = **`node:20-alpine`**（不是 Debian）。裝 gs 用 **`apk add --no-cache ghostscript`**（**不是 apt-get**）。Alpine **無 `icc-profiles-free` 套件** → 三個 ICC 檔（Japan Color 2001 / US SWOP / FOGRA39）全部手動 COPY 進 image 或啟動時從 R2 拉。Adobe profile（Japan Color / SWOP）需確認授權。**deploy 前必處理，列入 [0-a-gs] gate。**
 
-> **Sharp 版本備註**：鎖版本；`withMetadata({density})` v0.33+ deprecated，優先 `withDensity()`；density 寫入需 exiftool/identify 驗證，不只信 code。
+> **Sharp 版本備註**：app sharp=**0.34.3**（Next transitive，須 pin）。`withMetadata({density})` 破壞 CMYK（禁）；`withDensity()` 需 ≥0.35（app 無）→ **CMYK/web 不設 density**。若日後 pin 到 ≥0.35 且需印實體 density，可改 `withDensity()`，但 PDF 幾何已是實體尺寸載重，density 屬冗餘。
 
 ---
 
@@ -962,7 +961,7 @@ Phase 0 是阻塞階段。未通過不得進 Phase 1 主線。
 > - `/DeviceCMYK true` / `/DeviceRGB false` ✓
 > - `/Decode [1 0 1 0 1 0 1 0]`（pdf-lib 自動加，已實證）✓
 > - `/MediaBox [0 0 215.43 357.17]`(76×126mm) / `/TrimBox [8.5 8.5 206.93 348.66]`(offset 3mm+70×120mm) / `/BleedBox`=MediaBox ✓
-> - **關鍵修正**：`.withDensity()` 取代 `.withMetadata({density})`（後者附 sRGB ICC → 把 CMYK 轉回 RGB，SOF=3）。
+> - **關鍵修正**：CMYK **不設 density**（`.withMetadata({density})` 附 sRGB ICC 破壞 CMYK；`.withDensity()` 需 sharp≥0.35，app=0.34.3 無）。POC 在 0.35.1 用 withDensity 驗過，但 app 走「省略 density」路徑（poc2 變體 B 證 SOF=4）。
 > - libvips 寫 APP14 Adobe marker(transform=0) → pdf-lib `/Decode` 應正確（非雙重反相）。
 >
 > **仍待**（本機做不到，需 [0-a-gs] Alpine/Docker + 人類）：① gs 實際 render 確認非反相 ② Alpine musl sharp CMYK 行為 ③ Acrobat preflight。
@@ -1061,7 +1060,7 @@ grep -n "OutputIntent\|GTS_PDFX\|DestOutputProfile" chk.pdf
 > **本機已驗證**（sharp 0.35.1）：898×1500px, space=srgb, channels=3, density=300, format=png。無 CMYK 污染。
 
 ```txt
-☑ TGC 目的地 colorSpace='srgb' format='png' → Sharp 直出 sRGB PNG（withDensity，非 withMetadata）
+☑ TGC 目的地 colorSpace='srgb' format='png' → Sharp 直出 sRGB PNG（不設 density；禁 withMetadata）
 ☑ 無 CMYK 污染（sharp metadata: srgb / 3-channel）
 ☑ 70×121mm + 3mm bleed = 76×127mm @ 300 = 898×1500px 尺寸正確
 ☐ TrimBox 不適用（PNG 無 box；safe zone 由設計時保留）— 設計階段守 5mm 安全框
@@ -1633,7 +1632,7 @@ ICC profiles：確認授權（Adobe Japan Color/SWOP）或改用免費等效 pro
 | CMYK JPEG 反相 | 已解（已查證） | embedJpg 自動加 `/Decode`；POC 驗無雙重反相 |
 | TrimBox/BleedBox | 必做 | pdf-lib `setTrimBox/setBleedBox`（已確認支援）|
 | 國際 POD 多色彩空間 | 必做 | TGC=sRGB PNG，不可寫死 CMYK；積木 colorSpace 欄位 |
-| **Sharp withMetadata 破壞 CMYK** | **已實證並修正** | **`.withMetadata({density})` 附 sRGB ICC → CMYK 轉回 RGB；改用 `.withDensity()`（[0-a] POC 證實）** |
+| **Sharp withMetadata 破壞 CMYK** | **已實證並修正** | **`.withMetadata({density})` 附 sRGB ICC → CMYK 轉回 RGB；app=0.34.3 無 withDensity → CMYK/web 一律不設 density（[0-a]/[1-c] 實證）** |
 | Sharp 非直接依賴 | 必做 | transitive via Next.js；pin 直接 dep + Dockerfile COPY sharp |
 | PDF page size | 必做 | 用 points，不靠 density metadata |
 | SSRF / API 安全 | 必做 | allowlist / size / timeout / auth |
