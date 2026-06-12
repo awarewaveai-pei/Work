@@ -331,8 +331,109 @@ WORKLOG 格式：
 
 ---
 
+## 9. 出國免 SSH 部署：self-hosted GitHub Actions runner（手機觸發）
+
+**目的**：出國/漫遊時，不靠 SSH（VPS port 22 常被網路政策擋）、不把密鑰外帶，仍能用手機 GitHub app 一鍵部署。  
+**Owner workflow**：`.github/workflows/sg-deploy.yml`（`workflow_dispatch` 手動觸發）  
+**部署引擎**：沿用既有 `/root/lobster-phase1/scripts/sg-deploy.sh`（**零改寫**；tsc→npm test→build→healthcheck→smoke→auto-rollback 全包，見本檔 §2.1）
+
+### 9.1 架構決定（為什麼是 self-hosted runner）
+
+| 方案 | 密鑰是否外帶 | 是否對公網開 22 | 結論 |
+|:---|:---|:---|:---|
+| GHA 雲端 runner SSH 進 VPS | ❌ `hetzner_trigger` 私鑰要進 GitHub Secrets | ❌ 要開 | **否決**（違反 §2.4「30 年不外流」原則） |
+| **self-hosted runner 住 VPS** | ✅ 零外帶（runner 在本機跑 sg-deploy.sh） | ✅ 不用（runner 走 outbound 443 拉任務） | **採用** |
+| Telegram bot `/deploy` | ✅ | ✅ | 備援（command plane，另案） |
+
+> 同 §2.4 既有原則：「沒辦法 SSH 上 SG 而不把私鑰外帶（新增攻擊面）→ 改在 SG 本地跑」。self-hosted runner 是同一原則的延伸：執行體本身就在 VPS 上。
+
+### 9.2 安全前提（強制，裝前先確認）
+
+- **僅限 private repo**：`awarewaveai-pei/work` 為 private。**絕不可**把 self-hosted runner 接到 public repo（forked PR 可在你機器上執行任意程式）。
+- **僅 write 權限者可觸發**：`workflow_dispatch` 預設只有對 repo 有 write 權限的帳號能按 Run。
+- **merge 不會部署**：workflow 無 `push` 觸發；唯一觸發是人手點 Run（保留 High-risk prod deploy 的「自己按下去」紀律）。
+- **input 白名單**：workflow 內建 app allowlist（`next-admin node-api wordpress`，與 `sg-deploy.sh` RESTORABLE_APPS 同步）+ 用 env 傳值避免 `${{ }}` shell injection。
+
+> **⚠️ 主要殘留風險（critic 2026-06-12 標記，務必理解）**：self-hosted runner 會執行 `main` 上 `sg-deploy.yml` 的 `run:` 區塊。因此：
+> 1. **write 權限 ≈ SG VPS 的 root RCE**。任何能 push 到 `main` 的帳號可改寫 workflow 的 `run:` → 以 runner 身分執行任意程式碼。**`docker` group 等同 root**（可 `docker run -v /:/host`），故「非 root 但在 docker group」並非真正降權。
+> 2. **補償控制（二選一以上，強烈建議都做）**：
+>    - **GitHub Environment 審核閘**：repo Settings → Environments → `production-sg` → **Required reviewers** 設你自己/第二人。workflow 已掛 `environment: production-sg`，設好後每次 deploy 需按核准（即使是 `workflow_dispatch`）。
+>    - **main 分支保護**：開 branch protection（require PR review），讓「改 workflow → root RCE」這條路徑必經 review。
+>    - **最小權限 runner**：跑專屬低權使用者，透過**單一指令、無 args wildcard** 的 `sudoers` rule 呼叫 `sg-deploy.sh`，而非直接給 runner docker-group/root。
+> 3. **collaborator 授權即 prod-deploy 授權**：新增任何 write collaborator = 給予 prod 部署（root）能力，需據此審核。
+
+### 9.3 一次性安裝（在 SG VPS 上跑，約 10 分鐘）
+
+> 第一次裝 runner 仍需 SSH 一次（用 Termius 或在家用桌機）。裝好之後出國就免 SSH。
+
+```bash
+# --- 在 SG VPS（5.223.93.113）上，建議用專屬非 root 使用者，但需在 docker group ---
+# 1. 確認部署使用者能跑 docker（sg-deploy.sh 要 docker compose 權限）
+id                                   # 確認在 docker group；否則：sudo usermod -aG docker $USER && 重新登入
+test -x /root/lobster-phase1/scripts/sg-deploy.sh && echo "deploy script OK"
+
+# 2. 下載 runner（版本 + SHA256 以 GitHub 設定頁顯示的為準）
+mkdir -p ~/actions-runner && cd ~/actions-runner
+RUNNER_VER="2.319.1"   # 以 repo Settings → Actions → Runners → New self-hosted runner 顯示為準
+curl -o actions-runner.tar.gz -L \
+  "https://github.com/actions/runner/releases/download/v${RUNNER_VER}/actions-runner-linux-x64-${RUNNER_VER}.tar.gz"
+# 驗 checksum（防供應鏈竄改；<SHA> 複製自 GitHub 設定頁的安裝指令）
+echo "<SHA256_FROM_GITHUB_PAGE>  actions-runner.tar.gz" | shasum -a 256 -c
+tar xzf actions-runner.tar.gz
+
+# 3. 註冊（TOKEN 從 repo Settings → Actions → Runners → New self-hosted runner 複製，短效）
+#    labels 必須含 self-hosted,sg（workflow 的 runs-on 比對這兩個 label）
+./config.sh \
+  --url https://github.com/awarewaveai-pei/work \
+  --token <REGISTRATION_TOKEN> \
+  --name sg-vps \
+  --labels self-hosted,sg \
+  --unattended --replace
+
+# 4. 裝成 systemd 服務（開機自啟、掛了自動重啟）
+sudo ./svc.sh install
+sudo ./svc.sh start
+sudo ./svc.sh status        # 預期 active (running)
+```
+
+> **注意**：runner 進程要跑得起 `docker compose`（sg-deploy.sh 依賴）。若用非 root，務必在 `docker` group；root 則直接可用，但 §9.2 的 private-repo 前提更要嚴守。
+
+### 9.4 出國部署操作（手機）
+
+1. 手機 GitHub app（或瀏覽器）→ repo → **Actions** 分頁
+2. 選 **SG Deploy (self-hosted runner)** → **Run workflow**
+3. 填 `apps`（預設 `next-admin`；多個用空白分隔）/ 視需要勾 `dry_run`
+4. 看 job 紅/綠：
+   - **綠** = 部署成功且 smoke 通過
+   - **紅** = 任一 gate 失敗（tsc/test/build/smoke）；smoke 失敗時 sg-deploy.sh 已**自動 rollback** 到前一快照（見 §2.1 Step 7、§3）
+5. 想先驗證不真的部署 → 勾 `dry_run`（只 rsync -n，不 rebuild）
+
+### 9.5 健康檢查與故障
+
+| 症狀 | 處置 |
+|:---|:---|
+| Actions 點 Run 但卡 *Queued* 不動 | runner 離線。需 SSH 進 VPS：`cd ~/actions-runner && sudo ./svc.sh status`；停了 → `sudo ./svc.sh start`。**runner 自己離線時無法用 workflow 救**（雞生蛋）→ 用 Termius/Hetzner console |
+| job 紅在 "runner not found" | runner label 不含 `sg` 或未註冊；重跑 §9.3 step 3（`--labels self-hosted,sg`） |
+| job 紅在 sg-deploy gate | 照 log 修（tsc/test 失敗看 §2.1）；smoke 失敗已自動 rollback，舊版仍在跑 |
+| 機器整台 OOM/卡死 | runner 也躺了 → Termius SSH 或 Hetzner Cloud app 主控台（見 `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md`） |
+
+> **邊界**：self-hosted runner 只解「部署」。機器本身生病（OOM、docker daemon 掛、磁碟滿、要 reboot）runner 救不了，仍需 Termius / Hetzner console。出國前務必備好這兩個逃生門。
+
+### 9.6 移除 runner（汰換/重裝）
+
+```bash
+cd ~/actions-runner
+sudo ./svc.sh stop && sudo ./svc.sh uninstall
+./config.sh remove --token <REMOVAL_TOKEN>   # token 同從 Settings → Runners 取得
+```
+
+> **驗證**：移除後到 repo Settings → Actions → Runners 確認 `sg-vps` 已消失。若殘留「registered 但 dead」的 runner，workflow 仍會把 job 派給它而卡死 → 在該頁手動 Force remove。
+
+---
+
 ## Related Documents (Auto-Synced)
 
+- `.github/workflows/sg-deploy.yml`
 - `lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`
 - `lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh`
 - `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`

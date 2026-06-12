@@ -1,0 +1,88 @@
+name: SG Deploy (self-hosted runner)
+
+# Manual-trigger production deploy for the SG VPS (lobster-phase1).
+#
+# WHY self-hosted (not GHA SSH): the hetzner_trigger SSH key must NEVER leave the
+# VPS — DEPLOY_ROLLBACK_RUNBOOK.md §2.4 (30-year no-egress principle). A runner that
+# LIVES on the SG VPS needs no key egress: it just invokes the existing, fully-gated
+# /root/lobster-phase1/scripts/sg-deploy.sh (git pull -> tsc -> npm test -> build ->
+# healthcheck -> HTTP smoke -> auto-rollback on smoke fail).
+#
+# WHY workflow_dispatch only (no push trigger): prod deploy is High-risk per AGENTS.md
+# and requires explicit human go-ahead. Merging a PR must NOT deploy anything — a human
+# clicks "Run workflow" (e.g. from the GitHub mobile app while travelling). This keeps
+# the "press the button yourself" discipline while removing the need for SSH/Termius.
+#
+# Install/operate runbook: agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md §9.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: 'Apps to deploy (space-separated, e.g. "next-admin node-api")'
+        required: false
+        default: 'next-admin'
+        type: string
+      dry_run:
+        description: 'Dry run (rsync -n, no rebuild)'
+        required: false
+        default: false
+        type: boolean
+
+# Never run two deploys against the same VPS at once.
+concurrency:
+  group: sg-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # Runner must be installed on the SG VPS and registered with BOTH labels (self-hosted + sg).
+    runs-on: [self-hosted, sg]
+    # Approval gate: configure this Environment in repo Settings → Environments →
+    # production-sg → "Required reviewers" so a second person (or you) must approve each
+    # prod deploy. Without reviewers it still works, but write-access = root-equivalent RCE
+    # on the SG VPS (the runner runs this file's run: block). See RUNBOOK §9.2. Branch
+    # protection on main is the compensating control if no reviewers are set.
+    environment: production-sg
+    # NOTE: timeout-minutes bounds RUN time only, NOT queue time. If the runner is offline
+    # the job sits in Queued indefinitely — recover via RUNBOOK §9.5 (Termius/Hetzner console).
+    timeout-minutes: 20
+    steps:
+      - name: Validate input + run sg-deploy.sh on the SG VPS
+        # Inputs are passed via env (NOT interpolated into the script body) to avoid
+        # ${{ }} shell-injection. The allowlist loop further constrains the values.
+        env:
+          APPS: ${{ inputs.apps }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          DEPLOY_SCRIPT: /root/lobster-phase1/scripts/sg-deploy.sh
+        run: |
+          set -euo pipefail
+
+          # 0. Empty input -> default to next-admin (mirror sg-deploy.sh:50-52 contract,
+          #    so clearing the dispatch field behaves the same as the script's own default).
+          : "${APPS:=next-admin}"
+
+          # 1. Allowlist-validate every app token (also neutralises any injection attempt).
+          #    Keep this list in sync with sg-deploy.sh:60-65 RESTORABLE_APPS case.
+          ALLOWED="next-admin node-api wordpress"
+          for app in $APPS; do
+            case " $ALLOWED " in
+              *" $app "*) : ;;
+              *) echo "::error::App '$app' not in allowlist ($ALLOWED)"; exit 1 ;;
+            esac
+          done
+
+          # 2. Confirm we are actually on the SG VPS (the script only exists there).
+          [ -x "$DEPLOY_SCRIPT" ] || {
+            echo "::error::$DEPLOY_SCRIPT missing/not executable — is this runner on the SG VPS?";
+            exit 1;
+          }
+
+          # 3. Hand off to the battle-tested deploy script (it owns all the gates + rollback).
+          ARGS="$APPS"
+          [ "$DRY_RUN" = "true" ] && ARGS="$ARGS --dry-run"
+          echo "Running: $DEPLOY_SCRIPT $ARGS"
+          "$DEPLOY_SCRIPT" $ARGS
