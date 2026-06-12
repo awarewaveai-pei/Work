@@ -23,18 +23,22 @@ type WebPresetSpec = {
   width: number;
   height: number;
   fit: "cover" | "contain";
-  /** background for letterboxed (contain) area; omit for cover (no padding) */
-  background?: { r: number; g: number; b: number; alpha: number };
+  /**
+   * Opaque background. Used both for contain letterbox padding AND for the
+   * final `.flatten()` that removes any source alpha — see toProductImage().
+   * Required (not optional): web output must always be opaque white. A
+   * de-backgrounded subject (bg-remover.ts emits transparent PNG upstream)
+   * otherwise leaves transparent holes that show the page background, and a
+   * contain preset with no background gets Sharp's default BLACK letterbox.
+   */
+  background: { r: number; g: number; b: number; alpha: number };
 };
 
+const WHITE = { r: 255, g: 255, b: 255, alpha: 1 };
+
 export const WEB_PRESETS: Record<WebPreset, WebPresetSpec> = {
-  "web-tarot": { width: 667, height: 1000, fit: "cover" },
-  "web-square": {
-    width: 1000,
-    height: 1000,
-    fit: "contain",
-    background: { r: 255, g: 255, b: 255, alpha: 1 },
-  },
+  "web-tarot": { width: 667, height: 1000, fit: "cover", background: WHITE },
+  "web-square": { width: 1000, height: 1000, fit: "contain", background: WHITE },
 };
 
 const WEBP_QUALITY = 80;
@@ -54,15 +58,16 @@ export async function toProductImage(
   let img = sharp(input, { limitInputPixels: SHARP_LIMIT_INPUT_PIXELS }).resize(
     spec.width,
     spec.height,
-    spec.fit === "contain" && spec.background
-      ? { fit: "contain", background: spec.background }
-      : { fit: spec.fit }
+    { fit: spec.fit, background: spec.background } // background = contain letterbox fill
   );
 
   const mod = colorGrade && toSharpModulate(colorGrade);
   if (mod) img = img.modulate(mod);
 
-  return img.webp({ quality: WEBP_QUALITY }).toBuffer();
+  // Flatten any SOURCE alpha onto the opaque background. resize's `background`
+  // only fills letterbox padding, NOT pre-existing transparency — without this,
+  // a bg-removed subject keeps transparent holes in the WebP (critic 2026-06-12).
+  return img.flatten({ background: spec.background }).webp({ quality: WEBP_QUALITY }).toBuffer();
 }
 
 /** MVP convenience: encode the WebP as a data URL for direct <img src>. */

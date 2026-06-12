@@ -57,6 +57,36 @@ describe("to-product-image (real sharp bake)", () => {
     expect(m.width).toBe(667);
   });
 
+  it("flattens transparent (bg-removed) input to OPAQUE white — no alpha holes [critic Major]", async () => {
+    // bg-remover.ts emits transparent PNG upstream; web output must be opaque white,
+    // not show the page background through the subject's removed area.
+    const transparent = await sharp({
+      create: { width: 100, height: 150, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .png()
+      .toBuffer();
+    for (const preset of ["web-square", "web-tarot"] as const) {
+      const out = await toProductImage(transparent, preset);
+      const m = await sharp(out).metadata();
+      expect(m.hasAlpha).toBe(false); // alpha flattened away
+      // top-left pixel must be opaque white, not transparent/black
+      const { data } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+      expect([data[0], data[1], data[2]]).toEqual([255, 255, 255]);
+    }
+  });
+
+  it("contain letterbox padding is white, not Sharp's default black", async () => {
+    // wide input → web-square (1000×1000 contain) pads top/bottom; pad must be white
+    const wide = await sharp({
+      create: { width: 300, height: 60, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .png()
+      .toBuffer();
+    const out = await toProductImage(wide, "web-square");
+    const { data } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+    expect([data[0], data[1], data[2]]).toEqual([255, 255, 255]); // top row = letterbox = white
+  });
+
   it("data URL helper emits a webp base64 string", async () => {
     const url = await toProductImageDataUrl(await testInput(), "web-tarot");
     expect(url.startsWith("data:image/webp;base64,")).toBe(true);
