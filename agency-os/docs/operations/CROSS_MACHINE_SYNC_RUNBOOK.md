@@ -76,7 +76,7 @@ WARN: ~/.claude/ drifted from SSOT (mcp/claude-userlevel/).
 
 ---
 
-## 故障排除：多 session 並行下 settings.json 短暫漂移（2026-06-12 查清）
+## 故障排除：多 session 並行下 settings.json 短暫漂移（multi-session contention，2026-06-12 查清）
 
 **症狀**：跑了 `-Mode merge`（自報 `RESULT: PASS`、有 backup），但下一次獨立 `-Mode verify` / `check-claude-sync` 仍 `HARD drift`；手動讀 `~/.claude/settings.json` 一下對、一下又變回舊值。
 

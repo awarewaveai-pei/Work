@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Atomic "acknowledge risk + clear" for /verify-recent --ack.
 
@@ -64,7 +64,9 @@ if ($files.Count -eq 0) {
 # the high/normal tier definition NEVER drifts between the hooks and this script (R4). --ack still
 # clears (the gate is accident-prevention, not adversarial), but high-risk files (auth/payment/RLS/
 # migration/deploy) get a LOUD, distinct audit trail so an acknowledged shortcut on a dangerous path
-# is never invisible. node failure degrades safe → empty list → behaves exactly as before.
+# is never invisible. node failure degrades safe (empty list) -> behaves exactly as before.
+# NOTE: this file is ASCII-only on purpose (no BOM) -- non-ASCII glyphs in a CP950-decoded .ps1 get
+# written as '??' (CP950 trap, WORKLOG 2026-05-22 + critic 2026-06-12). Keep all output ASCII.
 $highRisk = @()
 try {
     $sharedJs = (Join-Path $WorkRoot "mcp\claude-userlevel\hooks\_verify-shared.js") -replace '\\', '/'
@@ -75,8 +77,8 @@ try {
     }
 } catch { $highRisk = @() }
 if ($highRisk.Count -gt 0) {
-    Write-Host "verify-recent-ack: ⚠ $($highRisk.Count) HIGH-RISK file(s) being acknowledged WITHOUT full verification:" -ForegroundColor Yellow
-    foreach ($hr in $highRisk) { Write-Host "  ⚠ $hr" -ForegroundColor Yellow }
+    Write-Host "verify-recent-ack: [!] $($highRisk.Count) HIGH-RISK file(s) being acknowledged WITHOUT full verification:" -ForegroundColor Yellow
+    foreach ($hr in $highRisk) { Write-Host "  [!] $hr" -ForegroundColor Yellow }
     Write-Host "verify-recent-ack: this is logged prominently to the daily audit. Prefer full /verify-recent for these." -ForegroundColor Yellow
 }
 
@@ -98,13 +100,13 @@ $auditBlock += ""
 foreach ($f in $files) { $auditBlock += "- ``$f``" }
 $auditBlock += ""
 if ($highRisk.Count -gt 0) {
-    $auditBlock += "**⚠ HIGH-RISK acknowledged WITHOUT full verification** (count=$($highRisk.Count)):"
+    $auditBlock += "**[!] HIGH-RISK acknowledged WITHOUT full verification** (count=$($highRisk.Count)):"
     $auditBlock += ""
     foreach ($hr in $highRisk) {
         $parts = $hr -split "`t", 2
         $hrFile = $parts[0]
         $hrWhy = if ($parts.Count -gt 1) { $parts[1] } else { 'high-risk' }
-        $auditBlock += "- ``$hrFile`` — **$hrWhy** (auth/payment/RLS/migration/deploy class — full verify was skipped)"
+        $auditBlock += "- ``$hrFile`` -- **$hrWhy** (auth/payment/RLS/migration/deploy class -- full verify was skipped)"
     }
     $auditBlock += ""
 }

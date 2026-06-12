@@ -8,9 +8,9 @@
 - **動機**：操作者問「剛處理的有值得做成 command/skill/runbook/script/hook 嗎」。R0 先讀現實避免造廢物：
   - 否決「一次列出所有紅閘」command — `system-health-check.ps1:877-878` 早已 join 全部 criticalFailures，本來就會。
   - 否決「AO-CLOSE 遇 sync drift 自動 merge」— `ao-close.ps1:424-445` 早有 sync self-heal。
-- **真缺口 = settings.json live-race 未 codify**：`~/.claude/settings.json` 由執行中 Claude session 持有，harness **頻繁**以啟動時記憶體版回寫，覆蓋 merge 結果。手動分兩次 Bash call（merge 然後 verify）必被回寫卡中間 → 看似 merge 沒生效。AO-CLOSE 免疫因父 Claude 被 block、單一 child process 原子完成。
+- **真缺口 = settings.json 多 session 並行漂移未 codify**：`D:\Work\.claude` 是 junction → `~/.claude`（同一檔）；同帳號同時跑 N 個 Claude session（實測 4 個 `claude.exe`），各自啟動時載入 settings.json、之後寫回自己的快照 → last-writer-wins，舊快照 session 一寫就蓋掉新 merge。**機制更正（2026-06-12 二次查清）**：原誤寫「單一 harness 頻繁以啟動記憶體回寫」（暗示單體 bug，錯）；真因是**多寫者共用一可變檔**。**嚴重性低**：實測唯一 flap 的 deny 只有 fork-bomb 守則（2026-05-07 才加）；其餘 19 條重要守則（rm -rf/force push/sudo…）每 session 一致穩定。非 code 可修的 bug（N session 共用 user config 本就 last-writer-wins）。手動分兩次 Bash call 之間數秒 wall-clock 給別 session 寫入窗口 → 看似 merge 沒生效。
 - **[已修改]**：
-  1. `agency-os/docs/operations/CROSS_MACHINE_SYNC_RUNBOOK.md` — 新增「故障排除：merge 後 verify 仍報漂移（live-race）」段（symptom/root cause/原理/三正解/判讀），含 dogfood 精煉：回寫頻繁觸發、唯一可靠綠=merge 與目標 gate 同一 invocation。
+  1. `agency-os/docs/operations/CROSS_MACHINE_SYNC_RUNBOOK.md` — 新增「故障排除：多 session 並行下 settings.json 短暫漂移」段（症狀/根因=多寫者共用一可變檔 last-writer-wins/嚴重性低=只 fork-bomb 一條 flap/處置=判讀優先或單一 invocation 縮窗口或等 session 收斂）。**機制經二次查清更正，非單體 harness bug**。
   2. `scripts/check-claude-sync.ps1:159-161` — H2 drift 的 `-Fix` 字串加 live-race hint（**全 ASCII 單引號 literal**，刻意避 CP950 trap）指向 runbook。
   3. `.claude/commands/ao-close.md` Step 2.5 — 已先前 codify archive-lift token gotcha（bullet 以 `（…）` 裝飾開頭時識別字須 bold）。
 - **連帶修復（同 session 並行衝突）**：verify-build-gates 重跑時 archive-lift 又紅 — 並行 cursor session 把 Tarot 調色任務升級重構為 `**🎨 Image Output Pipeline**`（ColorGradePanel 三滑桿），移除舊 handoff slug 173923 → archive bullet 錨點孤兒。**VBC**（git log -S 確認 slug 在 9255103a 被 supersede、非掉落；新行含 ColorGradePanel 色調/飽和/亮度）→ re-point archive bullet 至 `**Image Output Pipeline**`（verified-token lift）。
@@ -9291,3 +9291,15 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|printQuality|toolGroup|assetProduct|getDesignsPublicBase | hits=8 all in expected changed files + 3 consumer routes (allowlist consumers — fixed upstream)
 
 
+
+### live-race 機制更正 + verify-recent 清關（2026-06-12 追加）
+- **觸發**：操作者質疑「harness 頻繁回寫 settings.json」這個核心發現是否正確、是否真修掉。徹底重查。
+- **更正**：原機制錯。真因=**多 session 並行爭用**（`D:\Work\.claude` junction→`~/.claude` 同一檔；實測 4 個 `claude.exe`；各持啟動快照 last-writer-wins）。**非單體 harness bug、非「頻繁回寫」**。嚴重性低：唯一 flap deny=fork-bomb 守則（2026-05-07 加），19 條重要守則每 session 穩定。非 code 可修（N session 共用 user config 本就如此）。
+- **[已修改]**：CROSS_MACHINE_SYNC_RUNBOOK.md 故障段全重寫為正確機制+證據+低嚴重性+ multi-session anchor；check-claude-sync.ps1 `-Fix` hint 改為多-session 措辭；WORKLOG 前一條機制更正。
+- **[驗證結果]**：
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`& sync...merge; & verify-build-gates.ps1`（atomic）| exit=0 | Score 100% (372/372) + Doc integrity PASSED
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile check-claude-sync.ps1` | 0 parse errors
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File check-claude-sync.ps1` | 我的 -Fix 字串 0 trap（唯一 drift=line57 pre-existing out-of-scope）
+  - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n + 1 suggestion（採納：runbook 標題加 multi-session anchor）
+  - BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`頻繁回寫`+`頻繁以啟動時記憶體`+`live-race` | hits: WORKLOG 同 commit 修正、worklog-excerpt 自動鏡像 AO-CLOSE 重生、runbook:86 為刻意否定句（"不是...頻繁回寫"）保留
+- **[剩餘風險]**：mid-session settings.json 仍會在 fork-bomb 那條 flap（多 session 本質，良性）；真收斂在所有舊 session 結束後。已誠實記入 runbook，不再纏鬥。

@@ -120,28 +120,50 @@ function capStderr(lines) {
 // file-path granularity the hooks operate on. Reusable by other gates (high-risk-bash-warn,
 // auto-repair-guard) so the tier definition never drifts across tools.
 //
-// Design note: false positives fail SAFE (an innocent file matching "session"/"policy" is merely
-// asked for more verification, never less). Matching is on the lowercased forward-slash path.
-const RISK_HIGH_PATTERNS = [
-  { re: /(^|\/)migrations?\//,                         why: 'DB migration' },
-  { re: /\bmigration[s]?[._-]/,                        why: 'DB migration' },
-  { re: /(^|\/)auth(n|z)?(\/|[._-])/,                  why: 'auth' },
-  { re: /\b(oauth|login|signin|session-?token|jwt)\b/, why: 'auth/session' },
-  { re: /\brls\b|row-?level-?security/,                why: 'RLS' },
-  { re: /\b(permission|policy|policies|acl)\b/,         why: 'permission/policy' },
-  { re: /\b(secret|credential|vault|password|api[-_]?key|private[-_]?key)\b/, why: 'secrets' },
-  { re: /\.env(\.|$|[a-z]*$)/,                          why: 'env/secrets' },
-  { re: /\b(payment|billing|stripe|checkout|invoice|payout|refund)\b/, why: 'payment' },
-  { re: /\b(sg|eu)-?deploy\b|\bdeploy[._-]/,           why: 'deploy' },
-  { re: /(^|\/)dockerfile|docker-compose|\bnginx\b/,   why: 'infra (docker/nginx)' },
-  { re: /(^|\/)\.github\/workflows\//,                 why: 'CI workflow' },
+// Design note: false positives fail SAFE (an innocent file gets MORE verification, never less).
+// Two-stage match (case-insensitive), because this codebase is overwhelmingly camelCase TS/JS and a
+// plain \b-word regex misses authHelpers.ts / jwtVerify.ts / policyEngine.ts (critic 2026-06-12):
+//   1. PATH patterns — whole-path shapes that tokenisation can't see (.env, user-env, deploy scripts,
+//      docker-compose, CI workflows, secrets vault, MCP registry template).
+//   2. WORD set — split the path on BOTH non-alnum AND camelCase transitions, then match each lowered
+//      token exactly. So "authHelpers" -> [auth, helpers] -> hits 'auth'; "refundOrder" -> 'refund'.
+// 'session' is deliberately NOT a high word: it collides with this repo's AO-lifecycle session files
+// (ao-resume-last-session-id, etc.) which are not auth — those should stay 'normal'.
+const RISK_HIGH_PATHS = [
+  { re: /\.env(\.[^/]*)?$/i,                why: 'env/secrets' },
+  { re: /user-env/i,                       why: 'secrets (user-env)' },
+  { re: /secrets?-?vault/i,                why: 'secrets vault' },
+  { re: /registry\.template/i,             why: 'MCP secrets template' },
+  { re: /docker-?compose|(^|\/)dockerfile/i, why: 'infra (docker)' },
+  { re: /\bnginx\b/i,                       why: 'infra (nginx)' },
+  { re: /(^|\/)\.github\/workflows\//i,     why: 'CI workflow' },
+  { re: /(sg|eu)-deploy/i,                  why: 'deploy' },
+  { re: /deploy[^/]*\.(sh|ps1|ya?ml)$/i,    why: 'deploy script' },
+  { re: /(^|\/)migrations?\//i,             why: 'DB migration' },
 ];
+const RISK_HIGH_WORDS = {
+  auth: 'auth', authn: 'auth', authz: 'auth', authorize: 'auth', authorization: 'auth', oauth: 'auth',
+  login: 'auth', signin: 'auth', signon: 'auth', logout: 'auth', jwt: 'auth',
+  password: 'secrets', passwd: 'secrets', credential: 'secrets', credentials: 'secrets',
+  secret: 'secrets', secrets: 'secrets', vault: 'secrets', apikey: 'secrets', privatekey: 'secrets',
+  payment: 'payment', payments: 'payment', billing: 'payment', stripe: 'payment', checkout: 'payment',
+  refund: 'payment', payout: 'payment', invoice: 'payment',
+  rls: 'RLS', permission: 'permission', permissions: 'permission', acl: 'permission',
+  policy: 'permission/policy', policies: 'permission/policy',
+  migration: 'DB migration', migrations: 'DB migration',
+};
 
 // classifyRisk(filePath) -> { tier: 'high'|'normal', why: string|null }
 function classifyRisk(filePath) {
-  const p = String(filePath || '').replace(/\\/g, '/').toLowerCase();
-  for (const { re, why } of RISK_HIGH_PATTERNS) {
-    if (re.test(p)) return { tier: 'high', why };
+  const raw = String(filePath || '').replace(/\\/g, '/');
+  for (const { re, why } of RISK_HIGH_PATHS) {
+    if (re.test(raw)) return { tier: 'high', why };
+  }
+  // Split on non-alnum AND camelCase boundaries (insert a space at lower|digit -> Upper transitions).
+  const tokens = raw.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[^a-zA-Z0-9]+/);
+  for (const t of tokens) {
+    const why = RISK_HIGH_WORDS[t.toLowerCase()];
+    if (why) return { tier: 'high', why };
   }
   return { tier: 'normal', why: null };
 }
