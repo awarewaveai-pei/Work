@@ -6,12 +6,13 @@
  *   - web-square : 1000×1000, fit contain, white bg   (POD Studio square thumbnails)
  *
  * sRGB only — web is sRGB by definition. The print path (CMYK PDF) is to-print-file.ts.
- * Density is metadata-only at 72 (screens ignore it); real sizing is the pixel box.
+ * Real sizing is the pixel box; screens ignore embedded density, so we set none.
  *
- * ⚠️ Use `.withDensity()` NOT `.withMetadata({density})` — the latter attaches an
- * sRGB ICC that round-trips fine for WebP here, but we standardise on withDensity so
- * the same habit holds in to-print-file.ts where withMetadata silently breaks CMYK
- * (verified [0-a] POC 2026-06-12). Keep the two pipelines consistent.
+ * ⚠️ Density: do NOT call `.withMetadata({density})` — it attaches an sRGB ICC that
+ * silently breaks CMYK in to-print-file.ts (verified [0-a] POC 2026-06-12, poc2).
+ * `.withDensity()` would set DPI cleanly but needs sharp ≥0.35; this app is on 0.34.3
+ * (transitive via Next). Since density is non-load-bearing here (pixel box = sizing,
+ * PDF geometry = print sizing), we omit it entirely — version-robust + CMYK-safe.
  */
 import sharp from "sharp";
 import { toSharpModulate, type ColorGradeParams } from "./color-grade";
@@ -37,7 +38,6 @@ export const WEB_PRESETS: Record<WebPreset, WebPresetSpec> = {
 };
 
 const WEBP_QUALITY = 80;
-const WEB_DPI = 72;
 const SHARP_LIMIT_INPUT_PIXELS = 50_000_000;
 
 /**
@@ -62,7 +62,7 @@ export async function toProductImage(
   const mod = colorGrade && toSharpModulate(colorGrade);
   if (mod) img = img.modulate(mod);
 
-  return img.webp({ quality: WEBP_QUALITY }).withDensity(WEB_DPI).toBuffer();
+  return img.webp({ quality: WEBP_QUALITY }).toBuffer();
 }
 
 /** MVP convenience: encode the WebP as a data URL for direct <img src>. */
