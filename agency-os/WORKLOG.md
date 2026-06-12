@@ -4,6 +4,23 @@
 
 ## 2026-06-12
 
+### fix(telegram): /deploy_status 漏進 setMyCommands 選單清單（handler 已部署但選單看不到）
+
+**[任務理解]** 操作者回報「Telegram 沒有 /deploy_status」。根因：PR #13 加了 `deployStatusHandler`（registry index.ts）+ RISK_TABLE low + /help 文字，**但漏改 Telegram 選單 SSOT** `scripts/configure-telegram-webhook.ps1` 的 `$commands` 陣列（有 client_status 沒 deploy_status）。手打指令其實能用（handler 本次部署已 live），但「/」自動選單不顯示。
+
+**[已修改]**
+- `scripts/configure-telegram-webhook.ps1:126`：`$commands` 補 `deploy_status`（英文 description，置於 client_status 後維持唯讀指令分組）。
+- 重跑腳本 → Telegram `setMyCommands` 推送更新到 live bot（setWebhook 冪等重設）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell configure-telegram-webhook.ps1 -BaseUrl https://app.aware-wave.com` | exit=0 | result=`setMyCommands -> ok=True`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`getMyCommands API` | exit=0 | result=live 選單含 `status, client_status, deploy_status`（確認非只改腳本、已推到 bot）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（純 array 補一筆英文字串，無 capture site、無 CJK→無 CP950 trap、無 token 洩漏）
+- BUGHUNT_DONE: scope=scripts,agency-os | grep=`deploy_status` in setMyCommands callers | hits=0 其他 stale（command-plane-smoke.ps1 未硬列指令；start.ts /help + policyEngine + index registry 三處本就齊全，僅選單腳本漏）
+
+**[剩餘風險]** 無。選單僅影響自動完成顯示；handler 由本日綠部署 live。
+**[rollback]** `git revert` 該 commit + 重跑腳本（setMyCommands 會還原舊清單）。
+
 ### 出國免 SSH 部署：SG self-hosted runner 安裝 + production-sg environment + 首次試車部署
 
 **[任務理解]** 雲端 session 已 merge PR #13（`sg-deploy.yml` workflow_dispatch + DEPLOY_ROLLBACK_RUNBOOK §9）。完成最後落地：在 SG VPS 裝 GitHub Actions self-hosted runner，讓出國漫遊（port 22 常被擋）時用手機 GitHub app 一鍵部署，密鑰不外帶（runner 住在 VPS，直接呼叫既有全閘 sg-deploy.sh）。
