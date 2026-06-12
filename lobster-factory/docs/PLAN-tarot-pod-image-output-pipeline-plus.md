@@ -1100,11 +1100,13 @@ Sharp toColorspace('cmyk') 是 naive 數學轉換，不帶 ICC profile。
 ```txt
 前置已定：情境 A 直送印刷廠。架構 = pdf-lib(embed+TrimBox) + Ghostscript(OutputIntent)。
 
-通過條件（全綠才進 Phase 1）：
-  ① [0-a]    pdf-lib → /DeviceCMYK + TrimBox 三框正確 + 無雙重反相
-  ② [0-a-gs] Ghostscript → PDF/X-1a 帶 ICC OutputIntent + Docker 裝得起 gs
-  ③ [0-a-srgb] TGC sRGB PNG 路徑乾淨
-  ④ 印刷廠 preflight 過（人類在環）
+通過條件（更新 2026-06-12）：
+  ① [0-a]    ✅ 本機 PASS — /DeviceCMYK + /Decode + TrimBox 三框（withDensity 修正）
+  ② [0-a-srgb] ✅ 本機 PASS — TGC sRGB PNG 乾淨
+  ③ [0-c]    ✅ 本機 PASS — SSRF guard 12/12 + DNS-rebinding
+  ④ [0-a-gs] ⏳ 機制文件化 ✓；Alpine apk+musl sharp+Dockerfile COPY+ICC+印刷廠 preflight = 部署期/外部（不阻塞 Phase 1 code）
+  ⑤ [0-b]    ⏳ dynamic import 文件化 ✓；R2 CORS taint 併入 [1-i] integration test
+  → Phase 1 純程式碼可開始（gs/CORS 用介面隔離，各自閘在 deploy/[1-i]）
 
 若 [0-a] 雙重反相無法修：
   改全 Ghostscript pipeline（Sharp RGB → gs 一次轉 CMYK+OutputIntent）。
@@ -1122,13 +1124,9 @@ Sharp toColorspace('cmyk') 是 naive 數學轉換，不帶 ICC profile。
 
 ---
 
-## 14.3 [0-b] Fabric.js + Next.js App Router POC
+## 14.3 [0-b] Fabric.js + Next.js App Router POC — 併入 [1-i]（R0 決策 2026-06-12）
 
-POC 路由：
-
-```txt
-/tools/canvas-poc
-```
+> **架構決策**：`dynamic(()=>import('fabric'),{ssr:false})` 是文件化 Next.js App Router pattern（非真未知，不另做 throwaway POC）。唯一真未知 = **R2 CORS → canvas taint**，需「實 R2 image + browser 跑 toBlob」= integration test，本機 throwaway 驗不了。→ **併入 [1-i] CanvasEditor**，用真 R2 + Playwright 驗 taint。鎖 fabric 版本（v6）在 [1-i] 安裝時。下列為 [1-i] 驗收清單：
 
 驗收條件：
 

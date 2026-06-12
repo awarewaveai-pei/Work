@@ -68,7 +68,7 @@
   - [x] **[0-a]** ✅ CMYK PDF + TrimBox — 本機 PASS：`/DeviceCMYK`+`/Decode`+三框。**關鍵修正 `.withDensity()` 取代 `.withMetadata({density})`**（後者附 sRGB ICC 破壞 CMYK，SOF=3）
   - [x] **[0-a-srgb]** ✅ TGC sRGB PNG — 本機 PASS：898×1500 3ch 無污染
   - [ ] **[0-a-gs]** Ghostscript ICC OutputIntent — **機制=文件化 ground-truth（不本機 re-prove，R0 決策）**；真未知綁部署期：Alpine `apk add gs`+musl sharp+Dockerfile COPY sharp+ICC 採購（Adobe Japan Color/SWOP；FOGRA39 免費等效）+ 印刷廠 preflight。**不阻塞 Phase 1 程式碼**（`applyOutputIntent()` 介面隔離）
-  - [ ] **[0-b]** Fabric.js + Next 15 App Router POC — `/tools/canvas-poc`；CORS taint；`toBlob()` export（dynamic import ssr:false=文件化；真未知=R2 CORS taint，需實 R2，留 [1-i]）
+  - [~] **[0-b]** Fabric.js + Next 15 — dynamic import ssr:false=文件化✓；R2 CORS taint **併入 [1-i]** integration test（真 R2+Playwright）。**Phase 0 技術風險已退（3 本機 PASS + 2 介面隔離/部署閘）→ Phase 1 程式碼可開始**
   - [x] **[0-c]** ✅ API security SSRF guard — 本機 PASS 12/12 + DNS-rebinding 防禦（`d:\tmp\cmyk-poc\ssrf-poc.mjs`）；IPv4+v6 完整分類；fetch/timeout/content-type 標準部分留 [1-e]
   - **發現（已修 plan SSOT）**：sharp 非直接 dep（Next transitive @0.34.3，須 pin）；base=node:20-alpine（apk 非 apt-get）
   - **Phase 1（Phase 0 全綠才開始）**

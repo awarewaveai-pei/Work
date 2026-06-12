@@ -96,21 +96,30 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`curl -s -o /dev/null -w "%{http_code}\n" https://aware-wave.com/.aws/credentials` | exit=0 | result=403（CF WAF path block 生效）
 - REALTEST_EVIDENCE: tool=Bash | cmd=CF WAF Rate Limit POST API | exit=0 | `"success":true, rule_id=b8ffa72df8d44ea78a09bd0ababf8abb`
-- REALTEST_WAIVED: NA -- origin lockdown (Task 4) NOT YET APPLIED to SG; cf-origin-lockdown.sh 已建立但未 deploy，等 go-ahead
+- REALTEST_EVIDENCE: tool=SSH | cmd=`iptables -S INPUT | grep 443` on SG | cf-ipv4 ACCEPT + explicit DROP；cf-ipv4 15 entries；cf-ipv6 ACTIVE；persisted /etc/iptables/rules.v4 Jun12 09:10（Codex applied + confirmed）
 - REVIEW_DONE: critic=Deep | verdict=⚠ warn-then-fixed | findings=2C/4M/2m/2s — 2C(INPUT policy unverified→加 explicit DROP self-contained；auto-revert SIGHUP→setsid+disown+temp script) 4M(ufw restore missing/dead code→conditional+explicit ip6tables DROP；ufw regex→fix；check-cf.ps1 BatchMode→加；--refresh not atomic→ipset swap) 全修；geo Rule2→DEPRECATED；2m=fallback visibility/count parse(資訊性不修)
 - BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude | grep=`74c0e70b|origin-lockdown|cf-ipv4|SCANNER|BatchMode|setsid` | hits=1（CLOUDFLARE-WAF-SETUP.md:99 歷史說明行保留；PATCH URL line128 已修正；.claude/file-history 歸檔無法修改屬預期；AGENTS.md 無 stale hits）
 - audit-encoding: check-cloudflare-security.ps1 BOM=True CJK=False ✓；refresh-cf-origin-ips.ps1 BOM=True CJK=False ✓；ao-resume.ps1 BOM=True CJK=True（已有 CJK，BOM 保護，safe）✓
 
-**Task 4 完成（2026-06-12 17:10 CST）：**
+**Task 4 完成（2026-06-12 17:10 CST，Codex applied）：**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`cf-origin-lockdown.sh --apply && --confirm` | exit=0
 - REALTEST_EVIDENCE: tool=curl | cmd=`curl -sI https://aware-wave.com/` | CF-RAY=a0a7b8b5cdd35545-SIN HTTP/200 ✓（流過 CF 正常）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`iptables -L INPUT -n` | rules 6-9: CF-ACCEPT + explicit DROP 80/443 ✓ | SSH 22 untouched ✓
-- REALTEST_EVIDENCE: tool=Bash | cmd=`ip6tables -L INPUT -n` | rules 7-10: CF-ipv6-ACCEPT + DROP 80/443 ✓ | ufw6 chains empty（ufw 已移除，chains 殘留無害）✓
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ip6tables -L INPUT -n` | rules 7-10: CF-ipv6-ACCEPT + DROP 80/443 ✓
 - 備份: `/root/cf-lockdown-backup-20260612-090937/`
 
+**後續 critic 修正（commit b67b8b8b，2026-06-12 ~18:00 CST）：**
+cf-origin-lockdown.sh：2C fixes（explicit DROP self-contained 不依賴 INPUT policy；setsid+disown auto-revert 抗 SIGHUP）+ 4M fixes（ipset atomic swap；ip6tables explicit DROP；ufw conditional+regex；BatchMode=yes）已 committed 到 repo；**未 re-upload 到 SG**（現有 SG 版仍有這些 issues；需在下次 --refresh/--rollback 前 scp 更新版本）。
+
+**再驗（2026-06-12 18:26 CST，critic 修正後狀態確認）：**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -sk https://5.223.93.113:443 --ct 5 -o /dev/null -w "%{http_code}|%{time_total}s"` | result=000|5.0s（DROP ✓）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -s http://5.223.93.113:80 --ct 5 -o /dev/null -w "%{http_code}|%{time_total}s"` | result=000|0.16s（DROP ✓）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -sI https://aware-wave.com/ \| grep CF-RAY` | CF-RAY: a0a8284e0ce14aeb-SIN ✓（CF 路由正常）
+- REALTEST_EVIDENCE: tool=Bash | cmd=scanner paths 4x curl | /.env /.aws /wp-config /phpinfo → all 403 ✓
+
 **[剩餘風險]**
-1. CF WAF Rate Limit free plan 限制（period=10s only）— 高速但持續慢速 scanner 不會觸發。
-2. CF IP 月更新（--refresh）現在有效（lockdown 已 apply）。ao-resume.ps1 月度 check 會自動跑。
+1. CF WAF Rate Limit free plan 限制（period=10s only）— 持續慢速 scanner 不觸發，但已有 origin lockdown 兜底。
+2. cf-origin-lockdown.sh critic 修正版（git b67b8b8b）**尚未 scp 到 SG**。若需 --refresh 或 --rollback，先上傳：`scp -i ~/.ssh/hetzner_trigger lobster-factory/infra/hetzner-phase1-core/scripts/cf-origin-lockdown.sh root@5.223.93.113:/root/cf-origin-lockdown.sh`
 
 **[rollback]**
 - CF WAF rule：DELETE `8202ff335538476a89685341f6efde07`（API DELETE rule 即回）
