@@ -326,11 +326,11 @@ silently breaks the workflow.
 > NOT excuse Step 3** — you must still overwrite the skeleton with the real
 > AO-RESUME report (same content as chat). A surviving skeleton = Step 3 was skipped.
 
-### Prune old reports (>30 days)
+### Prune old reports (>90 days)
 
 After writing today's file, list `agency-os/reports/ao-resume/*.md` (Glob),
 parse the date prefix of each filename, and delete any whose date is more than
-30 days before today. Skip `README.md`. Use the `Bash` tool with `rm` — git
+90 days before today. Skip `README.md`. Use the `Bash` tool with `rm` — git
 will track the deletions on the next commit.
 
 If the archive folder doesn't exist yet, create it first.
