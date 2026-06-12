@@ -1,3 +1,11 @@
+# ⚠️ DEPRECATED — 請改用 SSOT
+
+> **此文件已被取代。** 新版完整 spec 在 [`PLAN-tarot-pod-image-output-pipeline-plus.md`](./PLAN-tarot-pod-image-output-pipeline-plus.md)
+> 
+> 主要差異：Phase 0 POC gates / CMYK ICC profile / SSRF 安全 / discriminated union API / Canva → Phase 1.5 / Tarot WebP = 667×1000 / POD PDF = 情境 A（直送本地印刷廠）
+
+---
+
 # PLAN: Tarot + POD Image Output Pipeline
 ## Color Grade → Web (WebP) / Print (CMYK PDF) / Canvas (Fabric.js) / Canva
 

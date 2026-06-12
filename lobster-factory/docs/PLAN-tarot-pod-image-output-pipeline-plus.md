@@ -80,7 +80,7 @@ Canva 整合不進 MVP，移到 **Phase 1.5 POC**。
 | CMYK PDF | Phase 0 阻塞 POC，驗證 `/DeviceCMYK` 與 preflight |
 | PDF page size | 必做，用 points 設定實體尺寸，不只靠 density metadata |
 | API 安全 | 必做 SSRF 防護、allowlist、timeout、size limit、auth |
-| POD Studio 印刷用 | 可做，但用 `pod-download-pdf`，不套塔羅 896×1488 |
+| POD Studio 印刷用 | `pod-print-pdf`，情境 A（ICC = Japan Color 2001 Coated）；Printful 走現有 sRGB `upscaler.ts` 不動 |
 | Canvas → Print | 必須回 Sharp CMYK pipeline，不能直接包 RGB PDF |
 | Fabric.js + Next.js | Phase 0 POC，確認 App Router、CORS、export taint |
 | Canvas export | 主線使用 `toBlob()` export PNG，不依賴 `toDataURL()` |
@@ -134,12 +134,13 @@ Canva 整合不進 MVP，移到 **Phase 1.5 POC**。
 
 ## 4.1 MVP 三軌
 
-| 按鍵 | 用途 | 像素 | DPI | 色空間 | 格式 | 狀態 |
-|---|---|---:|---:|---|---|---|
-| 🌐 網頁用 | 商品頁 / 社群 / preview | 1000×1000 | 72 | RGB | WebP `quality:80` | MVP |
-| 🖨 印刷用 | 塔羅印刷 PDF / POD 高品質下載 PDF | preset 決定 | 300 | CMYK | PDF | MVP，需 Phase 0 POC |
-| ✏️ 快速編輯 | in-app 文字、貼圖、構圖微調 | 原圖 | — | RGB | Fabric.js Canvas | MVP |
-| 🎨 Canva | 複雜排版、品牌模板 | 原圖 | — | RGB | Canva API | Future / Phase 1.5 |
+| 按鍵 | Tarot 用途 | POD 用途 | 像素 | DPI | 色空間 | 格式 | 狀態 |
+|---|---|---|---:|---:|---|---|---|
+| 🌐 網頁用 | 社群 / preview | 合成商品圖（網站展示）| Tarot:667×1000 / POD:1000×1000 | 72 | RGB | WebP `quality:80` | MVP |
+| 🖨 印刷用 | 送本地印刷廠 | 送本地印刷廠 | preset 決定 | 300 | CMYK | PDF + Japan Color 2001 Coated | MVP，需 Phase 0 POC |
+| ✏️ 快速編輯 | in-app 文字、貼圖、構圖微調 | 同左 | 原圖 | — | RGB | Fabric.js Canvas | MVP |
+| 🎨 Canva | 複雜排版、品牌模板 | 同左 | 原圖 | — | RGB | Canva API | Future / Phase 1.5 |
+| 📦 Printful | — | sRGB PNG → Printful API | upscaler.ts 輸出 | 300 | sRGB | PNG | 現有流程，不動 |
 
 ---
 
@@ -184,7 +185,7 @@ export type TarotPrintPdfPreset = {
 }
 
 export type PodPrintPdfPreset = {
-  kind: 'pod-download-pdf'
+  kind: 'pod-print-pdf'
   widthPx: number
   heightPx: number
   dpi: 300
@@ -216,21 +217,21 @@ Tarot Studio:
 
 POD Studio:
   ✅ web-square (1000×1000, contain, white bg)
-  ✅ pod-download-pdf
+  ✅ pod-print-pdf
   ✅ canvas-edit
   ⏳ Canva Future
 ```
 
 ---
 
-## 5.3 POD download PDF page size 規則
+## 5.3 POD print PDF page size 規則
 
-POD Studio 的「印刷用」文案必須避免讓人誤會是 Printful print file。
+POD Studio 的「印刷用」= 本地印刷廠 CMYK PDF（Printful 另走 sRGB `upscaler.ts`，不動）。
 
 UI 文案：
 
 ```txt
-高品質下載 PDF
+本地印刷 PDF（Japan Color 2001 Coated）
 ```
 
 不是：
@@ -239,7 +240,7 @@ UI 文案：
 Printful 印刷檔
 ```
 
-`pod-download-pdf` page size 規則：
+`pod-print-pdf` page size 規則：
 
 ```txt
 1. 若來源有明確商品尺寸：
@@ -248,9 +249,9 @@ Printful 印刷檔
 2. 若來源沒有明確商品尺寸：
    使用 pixel / 300dpi 換算 inch，再換算 points。
 
-3. 不保證符合任何 Printful template。
+3. 不接 Printful API，不進 WooCommerce checkout，不替代 upscaler.ts。
 
-4. 不接 Printful API，不進 WooCommerce checkout，不替代 upscaler.ts。
+4. ICC：Japan Color 2001 Coated（同 tarot-print-pdf）。
 ```
 
 換算公式：
@@ -372,11 +373,11 @@ export type WebImageProcessRequest = {
 export type PrintImageProcessRequest = {
   track: 'print'
   imageUrl: string
-  preset: 'tarot-print-pdf' | 'pod-download-pdf'
+  preset: 'tarot-print-pdf' | 'pod-print-pdf'
   colorGrade?: ColorGradeParams
 
   /**
-   * Required only for pod-download-pdf if dimensions cannot be inferred server-side.
+   * Required only for pod-print-pdf if dimensions cannot be inferred server-side.
    */
   podPreset?: {
     widthPx: number
@@ -560,7 +561,7 @@ export type PrintPreset =
       fit: 'cover'
     }
   | {
-      kind: 'pod-download-pdf'
+      kind: 'pod-print-pdf'
       widthPx: number
       heightPx: number
       dpi: 300
@@ -1096,7 +1097,7 @@ export function useColorGrade() {
 ☐ preset-driven
 ☐ 不寫死 896×1488
 ☐ tarot-print-pdf 使用 7.6×12.6cm points
-☐ pod-download-pdf 使用 cm 或 px/dpi 換算 points
+☐ pod-print-pdf 使用 cm 或 px/dpi 換算 points
 ☐ 可套 colorGrade
 ☐ Sharp resize
 ☐ Sharp toColorspace('cmyk')
@@ -1158,7 +1159,7 @@ MVP 三按鈕：
   → /api/tools/image/process track=web preset=web-square
 
 [🖨 印刷用]
-  → /api/tools/image/process track=print preset=tarot-print-pdf 或 pod-download-pdf
+  → /api/tools/image/process track=print preset=tarot-print-pdf 或 pod-print-pdf
   → toast: 轉換中…
 
 [✏️ 快速編輯]
@@ -1256,7 +1257,7 @@ preset：
 
 preset：
 ☐ web-square
-☐ pod-download-pdf
+☐ pod-print-pdf
 ☐ canvas-edit
 
 限制：
@@ -1315,7 +1316,7 @@ npx tsc --noEmit
 ☐ 調色 preview 正常
 ☐ 網頁用下載 WebP
 ☐ 高品質下載 PDF
-☐ PDF page size 符合 pod-download-pdf 規則
+☐ PDF page size 符合 pod-print-pdf 規則
 ☐ 不套 tarot 896×1488
 ☐ 不接 Printful
 ☐ 快速編輯可開 Canvas
@@ -1447,7 +1448,7 @@ Sharp 已安裝，不需新增。
 | API route | 刪除 `app/api/tools/image/process/route.ts` |
 | Canvas route | 刪除 `/tools/canvas` |
 | Canva | feature flag 關閉即可 |
-| POD PDF | 移除 `pod-download-pdf` preset |
+| POD PDF | 移除 `pod-print-pdf` preset |
 | Tarot PDF | 移除 `tarot-print-pdf` preset |
 
 ---
@@ -1468,7 +1469,7 @@ Sharp 已安裝，不需新增。
 | Fabric.js + Next.js | 必做 | Phase 0 POC，鎖版本 |
 | R2 CORS | 必做 | 避免 canvas taint |
 | Canva | 阻塞風險 | 移出 MVP，Phase 1.5 POC |
-| POD Studio PDF | 工程取捨 | 可接，但用 `pod-download-pdf` |
+| POD Studio PDF | 工程取捨 | 可接，但用 `pod-print-pdf` |
 | CSS preview 差異 | 工程取捨 | 加 disclaimer |
 | WebP data URL | 工程取捨 | MVP 可接受 |
 | Canvas `toDataURL()` | 避免主線使用 | 改 `toBlob()` PNG |
