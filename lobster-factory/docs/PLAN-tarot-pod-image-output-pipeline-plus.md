@@ -1044,13 +1044,15 @@ grep -n "OutputIntent\|GTS_PDFX\|DestOutputProfile" chk.pdf
 
 ---
 
-## 14.1-srgb [0-a-srgb] sRGB PNG POC（TGC 路徑）
+## 14.1-srgb [0-a-srgb] sRGB PNG POC（TGC 路徑）— ✅ 本機 PASS（2026-06-12）
+
+> **本機已驗證**（sharp 0.35.1）：898×1500px, space=srgb, channels=3, density=300, format=png。無 CMYK 污染。
 
 ```txt
-☐ TGC 目的地 colorSpace='srgb' format='png' → Sharp 直出 sRGB PNG
-☐ 無 CMYK 污染（pdfimages/identify 確認 sRGB / 3-channel）
-☐ TrimBox 不適用（PNG 無 box；safe zone 由設計時保留）
-☐ 70×121mm + 3mm bleed = 897×1500px 尺寸正確
+☑ TGC 目的地 colorSpace='srgb' format='png' → Sharp 直出 sRGB PNG（withDensity，非 withMetadata）
+☑ 無 CMYK 污染（sharp metadata: srgb / 3-channel）
+☑ 70×121mm + 3mm bleed = 76×127mm @ 300 = 898×1500px 尺寸正確
+☐ TrimBox 不適用（PNG 無 box；safe zone 由設計時保留）— 設計階段守 5mm 安全框
 ```
 
 ---
