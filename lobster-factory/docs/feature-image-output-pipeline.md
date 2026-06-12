@@ -1,6 +1,9 @@
 # Feature: Image Output Pipeline
 <!-- drafted by feature-plan skill, 2026-06-12 -->
 
+> ⚠️ **部分內容已被 SSOT 修正** — 施工以 [`PLAN-tarot-pod-image-output-pipeline-plus.md`](./PLAN-tarot-pod-image-output-pipeline-plus.md) 為準。
+> 本初稿兩處已被 [0-a] POC 推翻：① `withMetadata({density})` **會破壞 CMYK**（附 sRGB ICC 轉回 RGB）→ 改 `.withDensity()`；② Sharp **非「已安裝」**，是 Next.js transitive dep，須 pin 直接依賴。下方 §2-b「→ TIFF buffer」也過時（實為 CMYK JPEG）。
+
 ## 問題與目標
 
 **解決什麼問題？**  

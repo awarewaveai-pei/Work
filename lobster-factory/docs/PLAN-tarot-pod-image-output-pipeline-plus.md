@@ -91,7 +91,7 @@ Canva 整合不進 MVP，移到 **Phase 1.5 POC**。
 | ColorGrade payload | 後端統一吃 `{ hue, saturation, brightness }` multiplier 格式 |
 | **CMYK ICC profile** | **Final+：先確認是否直送印刷廠；情境 A 需 ICC，naive CMYK 不夠（14.1a）** |
 | **CMYK 反相對策** | **Final+：Adobe APP14 / inverted CMYK → `/Decode` array（14.1）** |
-| **Sharp 版本** | **Final+：鎖版本，`withMetadata` v0.33+ deprecated，確認 density** |
+| **Sharp 版本** | **[0-a] 實證：`.withMetadata({density})` 破壞 CMYK（轉回 sRGB）→ 必用 `.withDensity()`；sharp 須 pin 直接依賴** |
 | **API rate limit** | **Final+：per-user，避免狂刷轉檔** |
 | **maxDuration** | **Final+：確認部署方案支援 60s（Vercel Hobby 只有 10s）** |
 
@@ -1632,7 +1632,8 @@ ICC profiles：確認授權（Adobe Japan Color/SWOP）或改用免費等效 pro
 | CMYK JPEG 反相 | 已解（已查證） | embedJpg 自動加 `/Decode`；POC 驗無雙重反相 |
 | TrimBox/BleedBox | 必做 | pdf-lib `setTrimBox/setBleedBox`（已確認支援）|
 | 國際 POD 多色彩空間 | 必做 | TGC=sRGB PNG，不可寫死 CMYK；積木 colorSpace 欄位 |
-| Sharp 版本 / withMetadata | 必做 | 鎖版本，確認 density 寫入；v0.33+ 已 deprecated |
+| **Sharp withMetadata 破壞 CMYK** | **已實證並修正** | **`.withMetadata({density})` 附 sRGB ICC → CMYK 轉回 RGB；改用 `.withDensity()`（[0-a] POC 證實）** |
+| Sharp 非直接依賴 | 必做 | transitive via Next.js；pin 直接 dep + Dockerfile COPY sharp |
 | PDF page size | 必做 | 用 points，不靠 density metadata |
 | SSRF / API 安全 | 必做 | allowlist / size / timeout / auth |
 | API rate limit | 必做 | per-user，避免狂刷轉檔 |
