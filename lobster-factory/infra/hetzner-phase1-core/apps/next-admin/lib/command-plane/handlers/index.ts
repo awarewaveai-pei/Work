@@ -9,6 +9,7 @@ import { dailyReviewHandler } from "./dailyReview";
 import { weeklyReviewHandler } from "./weeklyReview";
 import { listFailedRunsHandler } from "./listFailedRuns";
 import { clientStatusHandler } from "./clientStatus";
+import { deployStatusHandler } from "./deployStatus";
 import { setSystemModeHandler } from "./systemModeControl";
 import { triggerWorkflowHandler } from "./triggerWorkflow";
 import { replayDeadLetterHandler } from "./replayDeadLetter";
@@ -23,6 +24,7 @@ export const phase1Handlers: Record<string, CommandHandler> = {
   "/weekly_review": weeklyReviewHandler,
   "/list_failed_runs": listFailedRunsHandler,
   "/client_status": clientStatusHandler,  // Phase 2c: client health + WP update summary
+  "/deploy_status": deployStatusHandler,  // read-only SG deploy visibility (travel ops; trigger stays on GitHub workflow_dispatch)
   // Phase 2a — kill-switch ENABLE (medium risk; unlock requires SSO/SQL).
   "/emergency_stop":   setSystemModeHandler("emergency_stop"),
   "/maintenance_mode": setSystemModeHandler("maintenance"),

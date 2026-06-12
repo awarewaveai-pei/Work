@@ -4,5 +4,6 @@
 |----------|----------------|------|
 | **`release-gate-main.yml`** | `pull_request` → `main`、`workflow_dispatch` | 龍蝦 **`npm run validate`**（無 Trigger deploy） |
 | **`lobster-workflows-validate-main.yml`** | `push` → `main` **且** 變更命中 `lobster-factory/packages/workflows/**` 或本檔；`workflow_dispatch` | **僅**龍蝦 **`npm run validate`**（**已移除** Trigger Cloud `deploy`） |
+| **`sg-deploy.yml`** | `workflow_dispatch`（手動，手機可觸發） | SG 生產部署：在 **self-hosted runner（住 SG VPS）** 跑既有 `sg-deploy.sh`（密鑰零外帶）。安裝/操作：`DEPLOY_ROLLBACK_RUNBOOK.md §9` |
 
 **SSOT（與 AO-CLOSE／Trigger 關係、Secrets、未來擴充 paths）**：`agency-os/docs/operations/github-actions-trigger-prod-deploy.md`
