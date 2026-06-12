@@ -54,27 +54,31 @@ process.stdin.on('end', () => {
     const cwd = filePath ? path.dirname(filePath) : process.cwd();
 
     // Window selection (2026-06-12): replace fixed `-10` (truncated sessions with >10 commits) with
-    // the FULL last completed session = [ao-resume-prev.txt -> ao-close-last.txt], uncapped. These
-    // anchors are written by ao-resume.ps1 (prev) and ao-close.ps1 (close) in agency-os/.agency-state.
-    // Fallback to `-10` if anchors are missing/malformed or the window yields zero commits.
-    const ISO = /^\d{4}-\d{2}-\d{2}T[\d:.+\-Z]+$/; // guard against shell injection from state files
+    // the FULL last completed session = [ao-close-prev.txt -> ao-close-last.txt], uncapped — i.e. all
+    // commits made between the previous AO-CLOSE and the last one. Both anchors are written by
+    // ao-close.ps1; closes are chronological so prev < last ALWAYS (window is never backwards/empty,
+    // no date-guard needed). Fallback to `-10` if anchors missing/malformed or the window is empty.
+    // Strict ISO shape so a corrupted-but-printable stamp falls back to -10 (not git fuzzy parsing).
+    const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+\-]\d{2}:?\d{2})$/;
     let windowDesc = 'last 10 commits';
     let logCmd = 'git log --oneline -10';
+    let rangedOut = null;
     try {
       const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf8', timeout: 5000, cwd }).trim();
       const stateDir = path.join(root, 'agency-os', '.agency-state');
-      const prev = fs.readFileSync(path.join(stateDir, 'ao-resume-prev.txt'), 'utf8').trim();
-      const close = fs.readFileSync(path.join(stateDir, 'ao-close-last.txt'), 'utf8').trim();
-      if (ISO.test(prev) && ISO.test(close)) {
-        const ranged = `git log --oneline --since="${prev}" --until="${close}"`;
+      const prev = fs.readFileSync(path.join(stateDir, 'ao-close-prev.txt'), 'utf8').trim();
+      const last = fs.readFileSync(path.join(stateDir, 'ao-close-last.txt'), 'utf8').trim();
+      if (ISO.test(prev) && ISO.test(last)) {
+        const ranged = `git log --oneline --since="${prev}" --until="${last}"`;
         const out = execSync(ranged, { encoding: 'utf8', timeout: 5000, cwd }).trim();
-        if (out) { logCmd = ranged; windowDesc = `last session ${prev.slice(0, 16)} -> ${close.slice(0, 16)} UTC`; }
+        if (out) { rangedOut = out; logCmd = ranged; windowDesc = `last session ${prev.slice(0, 16)} -> ${last.slice(0, 16)} UTC`; }
       }
     } catch (_) { /* anchors missing / not in repo — keep -10 fallback */ }
 
     let logLines = null;
     try {
-      const raw = execSync(logCmd, { encoding: 'utf8', timeout: 5000, cwd }).trim();
+      // Reuse the ranged output if we already captured it (avoid a second identical git call).
+      const raw = rangedOut !== null ? rangedOut : execSync(logCmd, { encoding: 'utf8', timeout: 5000, cwd }).trim();
       logLines = raw.split('\n').filter(Boolean);
     } catch (_) {
       // Not in a git repo, or git unavailable. Delete the flag we just created so a

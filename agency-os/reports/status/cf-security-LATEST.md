@@ -1,6 +1,6 @@
 ﻿# Cloudflare security check
 
-- Generated: 2026-06-12 14:35:37
+- Generated: 2026-06-12 14:41:13
 - Zone: f21b1919632fee2221647908a94fdcac (aware-wave.com)
 - **Overall: PASS**
 
@@ -8,8 +8,8 @@
 | Check | Result |
 |-------|--------|
 | Bot Fight Mode | ON |
-| WAF firewall rules count | 0 (by design -- empty; server-side defense) |
-| xmlrpc.php block rule | server-side (nginx/LLAR) |
+| WAF firewall rules count | 1 (by design -- empty; server-side defense) |
+| xmlrpc.php block rule | present |
 
 ## wp-login / xmlrpc protection
 - Mode: **server-side** (LLAR + nginx rate-limit + fail2ban) -- architecture decision 2026-06-04.

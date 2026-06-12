@@ -1072,27 +1072,6 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 # (Other consumers — fetch-external-signals fallback, print-today-closeout-recap — also want the
 # last REAL AO-RESUME time here, not an auto-refresh time.) Root cause: 2026-06-11 critic review.
 if ($WriteArchiveSkeleton) {
-    # Snapshot the OUTGOING resume stamp to ao-resume-prev.txt BEFORE overwriting, but ONLY when it is
-    # from a prior calendar day. ao-resume-prev then = the resume that STARTED the last completed work
-    # session; paired with ao-close-last.txt it bounds [last-session resume -> last-session close].
-    # Consumer: git-log-injector.js prints EVERY commit of that window (uncapped, replacing -10 which
-    # truncated sessions with >10 commits). The date-guard stops a same-day second resume from writing
-    # a stamp NEWER than ao-close-last, which would make the git --since/--until window backwards/empty.
-    $prevStampPath = Join-Path $stateDir "ao-resume-prev.txt"
-    if (Test-Path $stampPath) {
-        try {
-            $oldStamp = (Get-Content -Raw -LiteralPath $stampPath).Trim()
-            if ($oldStamp) {
-                $oldDate = ([datetimeoffset]::Parse($oldStamp)).UtcDateTime.ToString("yyyy-MM-dd")
-                $todayDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
-                if ($oldDate -ne $todayDate) {
-                    [System.IO.File]::WriteAllText($prevStampPath, $oldStamp + [Environment]::NewLine, $utf8NoBom)
-                }
-            }
-        } catch {
-            Write-Host ("   WARN: ao-resume-prev snapshot skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
-        }
-    }
     [System.IO.File]::WriteAllText($stampPath, $nowStamp + [Environment]::NewLine, $utf8NoBom)
     Write-Host ""
     Write-Host ("AO-RESUME stamp updated: {0}" -f $nowStamp) -ForegroundColor DarkGray

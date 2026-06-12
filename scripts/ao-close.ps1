@@ -740,6 +740,22 @@ try {
         $null = New-Item -ItemType Directory -Force -Path $closeStampDir
         $closeNow = (Get-Date).ToUniversalTime().ToString("o")
         $utf8NoBom2 = New-Object System.Text.UTF8Encoding $false
+        # Snapshot the OUTGOING close stamp to ao-close-prev.txt BEFORE overwriting ao-close-last.
+        # [ao-close-prev -> ao-close-last] then bounds the LAST completed work session (commits made
+        # between the previous close and this one). Consumer: git-log-injector.js prints every commit
+        # of that window, uncapped — replacing the fixed `-10` that truncated >10-commit sessions.
+        # Closes are chronological, so prev < last ALWAYS (never a backwards/empty window) and no
+        # date-guard is needed (unlike a resume-anchored design, which a same-day re-resume corrupts).
+        $closePrevPath = Join-Path $closeStampDir "ao-close-prev.txt"
+        if (Test-Path -LiteralPath $closeStampPath) {
+            try {
+                $closePrevTmp = "$closePrevPath.tmp"
+                [System.IO.File]::WriteAllText($closePrevTmp, ((Get-Content -Raw -LiteralPath $closeStampPath).Trim() + [Environment]::NewLine), $utf8NoBom2)
+                Move-Item -LiteralPath $closePrevTmp -Destination $closePrevPath -Force
+            } catch {
+                Write-Warning "AO-CLOSE: could not write ao-close-prev.txt (non-fatal): $_"
+            }
+        }
         [System.IO.File]::WriteAllText($closeStampTmp, $closeNow + [Environment]::NewLine, $utf8NoBom2)
         Move-Item -LiteralPath $closeStampTmp -Destination $closeStampPath -Force
         Write-Host ("AO-CLOSE: close stamp written ({0})" -f $closeNow) -ForegroundColor DarkGray
