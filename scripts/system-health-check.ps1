@@ -820,34 +820,17 @@ if (Test-Path -LiteralPath $aoResumeArchiveScript) {
 # so >30d stale or unreadable ledger cannot be bypassed by score relaxation.
 $fetchLedgerPath = Join-Path $monoRoot "agency-os\.agency-state\git-fetch-last.json"
 $fetchCheckName = "Git fetch ledger recency (git-fetch-last.json)"
-if (Test-Path -LiteralPath $fetchLedgerPath) {
-    try {
-        $fetchLedger = Get-Content -LiteralPath $fetchLedgerPath -Raw -Encoding UTF8 | ConvertFrom-Json
-        $finishedText = [string]$fetchLedger.finishedAtUtc
-        if ([string]::IsNullOrWhiteSpace($finishedText)) {
-            throw "finishedAtUtc missing"
-        }
-        $finishedUtc = ([datetime]::Parse($finishedText)).ToUniversalTime()
-        $ageDaysRaw = [Math]::Floor(((Get-Date).ToUniversalTime() - $finishedUtc).TotalDays)
-        $ageDays = [Math]::Max(0, $ageDaysRaw)
-        $success = [bool]$fetchLedger.success
-        $attempts = if ($fetchLedger.PSObject.Properties.Name -contains 'attempts') { [int]$fetchLedger.attempts } else { 0 }
-        $exitCode = if ($fetchLedger.PSObject.Properties.Name -contains 'exitCode') { [int]$fetchLedger.exitCode } else { 0 }
-
-        if ($ageDays -gt 30) {
-            Add-Check -Name $fetchCheckName -Pass $false -Detail ("FAIL: last fetch ledger is " + $ageDays + "d old (>30d), success=" + $success + ", exit=" + $exitCode)
-            Add-CriticalFailure -Reason "Git fetch ledger stale >30d; run AO-RESUME/git-align to refresh remote state"
-        } elseif ((-not $success) -or $ageDays -gt 7) {
-            Add-Check -Name $fetchCheckName -Pass $true -Detail ("WARN: success=" + $success + ", age=" + $ageDays + "d, attempts=" + $attempts + ", exit=" + $exitCode)
-        } else {
-            Add-Check -Name $fetchCheckName -Pass $true -Detail ("PASS: success=" + $success + ", age=" + $ageDays + "d, attempts=" + $attempts + ", exit=" + $exitCode)
-        }
-    } catch {
-        Add-Check -Name $fetchCheckName -Pass $false -Detail ("FAIL: unreadable ledger: " + $_.Exception.Message)
-        Add-CriticalFailure -Reason "Git fetch ledger unreadable; run AO-RESUME/git-align to regenerate agency-os/.agency-state/git-fetch-last.json"
+$fetchGateLib = Join-Path $monoRoot "scripts\lib\fetch-recency-gate.ps1"
+if (Test-Path -LiteralPath $fetchGateLib) {
+    . (Resolve-Path -LiteralPath $fetchGateLib).Path
+    $fetchGate = Test-GitFetchLedgerRecency -LedgerPath $fetchLedgerPath
+    Add-Check -Name $fetchCheckName -Pass ([bool]$fetchGate.pass) -Detail ([string]$fetchGate.detail)
+    if ($fetchGate.critical) {
+        Add-CriticalFailure -Reason ([string]$fetchGate.reason)
     }
 } else {
-    Add-Check -Name $fetchCheckName -Pass $true -Detail "WARN: ledger missing; run AO-RESUME/git-align to create agency-os/.agency-state/git-fetch-last.json"
+    Add-Check -Name $fetchCheckName -Pass $false -Detail "FAIL: missing scripts/lib/fetch-recency-gate.ps1"
+    Add-CriticalFailure -Reason "Missing fetch-recency gate helper scripts/lib/fetch-recency-gate.ps1"
 }
 
 $total = $checks.Count

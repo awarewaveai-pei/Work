@@ -32,12 +32,36 @@ describe("color-grade", () => {
     });
   });
 
-  it("NaN → neutral (no-op); ±Infinity → nearest bound (hostile payload defense)", () => {
-    expect(clampState({ hue: NaN, sat: Infinity, bri: -Infinity })).toEqual({
-      hue: GRADE_LIMITS.hue.neutral, // NaN has no ordering → neutral
-      sat: GRADE_LIMITS.sat.max, // +Infinity clamps to max
-      bri: GRADE_LIMITS.bri.min, // -Infinity clamps to min
-    });
+  it("any non-finite (NaN/±Infinity) → neutral no-op (hostile payload defense)", () => {
+    expect(clampState({ hue: NaN, sat: Infinity, bri: -Infinity })).toEqual(NEUTRAL_STATE);
+  });
+
+  it("non-number wire fields (undefined/null/string/missing) → neutral, never NaN [critic Critical]", () => {
+    // TS types are erased at runtime; a JSON body can carry any of these.
+    expect(clampState({ hue: undefined, sat: null, bri: "9" } as unknown as ColorGradeState)).toEqual(
+      NEUTRAL_STATE
+    );
+    expect(clampState({} as ColorGradeState)).toEqual(NEUTRAL_STATE); // missing keys
+    expect(clampState(null as unknown as ColorGradeState)).toEqual(NEUTRAL_STATE); // null object
+    const p = clampParams({ saturation: undefined, brightness: null, hue: "x" } as unknown as never);
+    expect(p).toEqual({ hue: 0, saturation: 1, brightness: 1 });
+  });
+
+  it("toSharpModulate never emits NaN/out-of-bounds for arbitrary garbage input", () => {
+    for (const bad of [
+      { hue: undefined, saturation: NaN, brightness: "9" },
+      { hue: Infinity, saturation: -Infinity, brightness: null },
+      {},
+      null,
+    ]) {
+      const m = toSharpModulate(bad as unknown as never);
+      if (m === undefined) continue; // neutral skip is fine
+      for (const v of [m.hue, m.saturation, m.brightness]) expect(Number.isFinite(v)).toBe(true);
+      expect(m.saturation).toBeGreaterThanOrEqual(0.5);
+      expect(m.saturation).toBeLessThanOrEqual(2);
+      expect(m.brightness).toBeGreaterThanOrEqual(0.5);
+      expect(m.brightness).toBeLessThanOrEqual(2);
+    }
   });
 
   it("clampParams bounds multipliers to 0.5..2", () => {

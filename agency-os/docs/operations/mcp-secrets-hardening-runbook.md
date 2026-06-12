@@ -148,6 +148,26 @@ mcp/user-env.ps1
 4. **完全結束 Cursor / Claude Code 後重開**（讓新 env 生效）
 5. 再跑 scanner 確認
 
+### Known-suppressed baseline (2026-06-12)
+
+`verify-build-gates.ps1` runs this scanner with:
+
+```powershell
+agency-os/config/scan-local-config-known-suppressed.json
+```
+
+Baseline rules are value-free and match only `file + pattern + sourceKey`.
+Tracked-file findings are never suppressible. With the baseline enabled:
+
+| Result | Meaning | Gate behavior |
+|---|---|---|
+| PASS | No visible findings; known local findings were suppressed | Continue |
+| FAIL exit 2 | Tracked secret OR baseline-miss local secret | Block `verify-build-gates` |
+
+When adding a suppression, include only the non-secret `sourceKey` printed by
+the scanner and a reason. Never add token values, redacted values, hashes, or
+full config lines to the baseline.
+
 ### Related
 
 - `scripts/scan-local-config-for-secrets.ps1`（本掃描器）

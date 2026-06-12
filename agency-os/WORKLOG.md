@@ -4,6 +4,41 @@
 
 ## 2026-06-12
 
+### feat(image-pipeline): Phase 0 POC 全退技術風險 + [1-b] color-grade.ts 交付
+
+**[任務理解]** Tarot/POD 影像輸出管線（色調→WebP/CMYK PDF/Canvas/Canva）。本 session：開工跑 Phase 0 de-risking + 進 Phase 1 第一個 code 任務。SSOT = `lobster-factory/docs/PLAN-tarot-pod-image-output-pipeline-plus.md`。
+
+**[已修改]**
+- `lib/studio/color-grade.ts`（新）— 純函式色調 seam（State↔Params、clamp、toSharpModulate、toCssFilter）
+- `lib/studio/__tests__/color-grade.test.ts`（新）— 10 cases 含 hostile-input
+- plan plus：修 4 個錯誤聲稱 + 記錄 POC 結果（withDensity / sharp-transitive / Alpine / [1-a] VBC）
+- TASKS.md：Phase 0/1 狀態
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/studio/__tests__/color-grade.test.ts` | exit=0 | ms=391（10/10 pass）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node d:\tmp\cmyk-poc\poc3.mjs`（[0-a] CMYK+TrimBox）| exit=0 | ms=~500（/DeviceCMYK+/Decode+三框）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node d:\tmp\cmyk-poc\ssrf-poc.mjs`（[0-c] SSRF）| exit=0 | 12/12+rebinding
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（0 error）
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=1c/1m/2n（Critical runtime type-hole: wire undefined/null/string→NaN→Sharp；已修 typeof+Number.isFinite→neutral + 補 hostile-input 測試 + clampParams SSOT neutrals）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`color-grade|stateToParams|toSharpModulate|ColorGradeParams` | hits=0（新檔無既有 callsite；plan 介面對齊）
+
+**[關鍵發現]**
+1. **`.withMetadata({density})` 破壞 CMYK** — 附 sRGB ICC 把 4ch CMYK 轉回 3ch RGB（SOF=3）。正解 `.withDensity()`。否則整條印刷軌 ship 假 CMYK。實證 d:\tmp\cmyk-poc\poc2.mjs。
+2. **sharp 非直接依賴** — Next.js transitive @0.34.3，須 pin + Dockerfile COPY。plan 原稱「已安裝」錯。
+3. **base=node:20-alpine** — gs 裝 `apk add` 非 apt-get；Alpine 無 icc-profiles-free，ICC 手動。
+4. **pdf-lib 無 OutputIntent**（PR#1512 closed）→ 情境 A 必 Ghostscript（部署期閘，介面 `applyOutputIntent()` 隔離，不阻塞 Phase 1 code）。
+5. **[1-a] 假任務** — printQuality 已透過 facade 透傳（TarotGenParams alias），plan 聲稱「沒 expose」錯，零重工。
+6. **國際塔羅標準 70×121mm**（≠ 本地 70×120）；TGC 只收 RGB。印刷積木 PrintDestination 矩陣。
+
+**[Phase 0 狀態]** [0-a]✅ [0-a-srgb]✅ [0-c]✅ 本機 PASS；[0-a-gs] 文件化+部署閘；[0-b] 併 [1-i]。技術風險已退 → Phase 1 code 開跑。
+
+**[剩餘風險]** Alpine musl sharp CMYK 行為（win32 已驗，musl 待容器）；ICC 採購授權；R2 CORS taint（[1-i] integration）。
+**[rollback]** color-grade.ts/test 為新檔，刪除不影響既有；plan/TASKS 為 doc。
+
+**[避免再發生]** ① Sharp CMYK 必用 `.withDensity()` 不用 `.withMetadata()` ② 宣稱「X 已安裝/已 expose」前先讀 package.json/型別定義（VBC）③ wire payload util 必須 runtime 守型別（TS 抹除），critic 是抓此類 hole 的外部 oracle。
+
+---
+
 ### fix(telegram): /deploy_status 漏進 setMyCommands 選單清單（handler 已部署但選單看不到）
 
 **[任務理解]** 操作者回報「Telegram 沒有 /deploy_status」。根因：PR #13 加了 `deployStatusHandler`（registry index.ts）+ RISK_TABLE low + /help 文字，**但漏改 Telegram 選單 SSOT** `scripts/configure-telegram-webhook.ps1` 的 `$commands` 陣列（有 client_status 沒 deploy_status）。手打指令其實能用（handler 本次部署已 live），但「/」自動選單不顯示。

@@ -1190,37 +1190,26 @@ Phase 1 只能在 Phase 0 通過後開始。
 
 ---
 
-### [1-b] `lib/studio/color-grade.ts`
+### [1-b] `lib/studio/color-grade.ts` — ✅ 已實作（2026-06-12）
 
-輸出：
-
-```ts
-export type ColorGradeParams = {
-  hue: number
-  saturation: number
-  brightness: number
-}
-
-export function toSharpModulateParams(params: ColorGradeParams) {
-  return {
-    hue: params.hue,
-    saturation: params.saturation,
-    brightness: params.brightness,
-  }
-}
-```
-
-若同檔也放 hook：
+> **已交付**（REALTEST vitest 10/10 + tsc 0 + critic 修 Critical/High/Med）。實際 export 比原 spec 豐富：
 
 ```ts
-export function useColorGrade() {
-  // returns:
-  // hue, sat, bri
-  // filterStyle
-  // colorGradeParams
-  // reset()
-}
+// 兩種 shape：ColorGradeState(UI, percent) ↔ ColorGradeParams(API, multiplier)
+export type ColorGradeState = { hue: number; sat: number; bri: number }   // sat/bri PERCENT
+export type ColorGradeParams = { hue: number; saturation: number; brightness: number } // MULTIPLIER
+export const GRADE_LIMITS    // SSOT 滑桿邊界 hue -30..30 / sat,bri 50..200 / neutral 0/100/100
+export const NEUTRAL_STATE
+export function clampState(s): ColorGradeState     // 非有限/非數字 → neutral（runtime 防禦）
+export function clampParams(p): ColorGradeParams
+export function stateToParams(s): ColorGradeParams // percent→multiplier（先 clamp）
+export function isNeutralState(s) / isNeutralParams(p)
+export function toSharpModulate(p): {...} | undefined  // neutral 時回 undefined（pipeline 跳過 op）
+export function toCssFilter(s): string             // 預覽 hue-rotate/saturate/brightness
 ```
+
+> **架構決策**：此檔**純函式無 React**（server 的 [1-c]/[1-d] 要 import）。`useColorGrade()` hook **不在此**，移 component 層（[1-f] ColorGradePanel），避免 React 進 server bundle。
+> **安全（critic Critical）**：TS 型別執行期抹除 → `clamp` 用 `typeof+Number.isFinite` 守，wire payload 的 undefined/null/string/缺欄位/±Infinity **一律 → neutral**，杜絕 NaN 進 `sharp.modulate()`。[1-e] API 邊界另做 schema 驗證（defense-in-depth）。
 
 ---
 
