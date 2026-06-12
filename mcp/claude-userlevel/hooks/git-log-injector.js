@@ -11,10 +11,11 @@
 //     only exit-2 error messages are visible (confirmed empirically 2026-05-27)
 //
 // Window (2026-06-12): the log shown is the FULL last completed session
-//   [ao-resume-prev.txt → ao-close-last.txt] (uncapped) so sessions with >10 commits are not
-//   truncated. Falls back to `git log --oneline -10` if either anchor is missing/malformed or the
-//   window has zero commits. Anchors live in agency-os/.agency-state (written by ao-resume.ps1 /
-//   ao-close.ps1). Operator request: "-10 不完整 / 萬一那天我有 30 個 commits".
+//   [ao-close-prev.txt → ao-close-last.txt] (uncapped) — every commit made between the previous
+//   AO-CLOSE and the last one — so sessions with >10 commits are not truncated. Falls back to
+//   `git log --oneline -10` if either anchor is missing/malformed or the window has zero commits.
+//   Both anchors are written by ao-close.ps1 (chronological, so prev < last always → never empty/
+//   backwards, no date-guard needed). Operator request: "-10 不完整 / 萬一那天我有 30 個 commits".
 //
 // SSOT: AGENTS.md R0 §禁止 "未跑 git log 即 Edit"
 // Companion: _verify-shared.js (SID derivation, logFailOpen)
