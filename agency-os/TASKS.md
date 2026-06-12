@@ -72,7 +72,7 @@
   - [x] **[0-c]** ✅ API security SSRF guard — 本機 PASS 12/12 + DNS-rebinding 防禦（`d:\tmp\cmyk-poc\ssrf-poc.mjs`）；IPv4+v6 完整分類；fetch/timeout/content-type 標準部分留 [1-e]
   - **發現（已修 plan SSOT）**：sharp 非直接 dep（Next transitive @0.34.3，須 pin）；base=node:20-alpine（apk 非 apt-get）
   - **Phase 1（Phase 0 全綠才開始）**
-  - [ ] **[1-a S]** `lib/studio/image-provider.ts` — 透傳 `printQuality` 欄位
+  - [x] **[1-a]** ✅ 零工作量（VBC）：printQuality 已透過 facade 透傳（`image-gen.ts:266` in TarotGenParams + `image-provider.ts:22` alias + L30-32 整包透傳）。plan 聲稱「沒 expose」=錯
   - [ ] **[1-b S]** `lib/studio/color-grade.ts` — `ColorGradeParams` type + `useColorGrade()` hook
   - [ ] **[1-c S]** `lib/studio/to-product-image.ts` — preset-driven WebP（web-tarot 667×1000 / web-square 1000×1000）
   - [ ] **[1-d M]** `lib/studio/to-print-file.ts` + `ghostscript-pdfx.ts` — PrintDestination 積木矩陣（pdf-lib embed+TrimBox → Ghostscript OutputIntent；sRGB PNG 分支）

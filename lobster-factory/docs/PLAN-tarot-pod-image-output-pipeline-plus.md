@@ -1179,20 +1179,14 @@ Phase 1 只能在 Phase 0 通過後開始。
 
 ## 15.1 後端核心
 
-### [1-a] `lib/studio/image-provider.ts`
+### [1-a] `lib/studio/image-provider.ts` — ✅ 已滿足，零工作量（VBC 2026-06-12）
 
-目標：
-
-```txt
-透傳 printQuality 欄位。
-facade 現在沒有 expose，需補上。
-```
-
-限制：
-
-```txt
-只加欄位透傳，不重構 image provider。
-```
+> **讀 code 推翻聲稱**：原稱「facade 沒 expose printQuality，需補上」= **錯**。
+> - `printQuality?: boolean` 在 `TarotGenParams`（`image-gen.ts:266`）
+> - `StudioGenParams = TarotGenParams`（`image-provider.ts:22`，純 type alias 無 Omit/Pick）
+> - `generateImage(params)` → `generateTarotImage(params)` 整包透傳（`image-provider.ts:30-32`）
+> → printQuality **已完整透過 facade 透傳**，無需改動。Studio caller 直接 `{...params, printQuality:true}` 即生效。
+> 「Studio 是否實際送 printQuality」屬 [1-d]/[1-j/k] 接線，非 facade 問題。
 
 ---
 
