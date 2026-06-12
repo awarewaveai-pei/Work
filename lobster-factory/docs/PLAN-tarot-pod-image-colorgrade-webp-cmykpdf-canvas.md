@@ -39,7 +39,23 @@
 - `✏️ 快速編輯`（Fabric.js）：文字疊加、貼圖、構圖微調，留在 app 內，無外部帳號需求
 - `🎨 Canva`：複雜排版、品牌模板、進階設計，跳出至 Canva，完成後 export 拉回 app
 
-**兩軌共同尾端**：編輯完成後 → OutputTrackBar 再選「網頁用」或「印刷用」匯出
+**兩軌共同流程**：
+```
+編輯完成
+  → putDesignObject(key, buffer)   ← lib/storage/r2.ts 已有
+  → 出現於 https://app.aware-wave.com/tools/designs
+  → OutputTrackBar 選「網頁用」或「印刷用」匯出
+```
+
+**兩個 Canvas 場景（共用 Fabric.js 核心）**：
+
+| | Phase 1（本次）| Phase 2（獨立 task）|
+|--|---------------|-------------------|
+| 對象 | 內部（admin）| 客戶端（customer-facing）|
+| 位置 | `/tools/canvas`（next-admin）| 商品頁（WooCommerce）|
+| 存設計 | R2 → `/tools/designs` | R2 or WC order meta |
+| 匯出 | WebP / CMYK PDF | Printful print file |
+| 購物車 | 無 | 接 WooCommerce + Printful |
 
 **塔羅尺寸根據**：7.6 × 12.6 cm @ 300 DPI = 896 × 1488 px（含出血，`FLUX_PRINT_DIMS["2:3"]` 已寫死於 `image-gen.ts:64`）
 
@@ -66,6 +82,8 @@ Tarot Studio          POD Studio (StudioWorkbench)
 | `printQuality: boolean` | `image-gen.ts:264` | Flux 直接生成 896×1488，不需 upscale |
 | `FLUX_PRINT_DIMS` | `image-gen.ts:64` | 塔羅 px 尺寸 SSOT |
 | Sharp（已安裝） | `node_modules/sharp` | 所有後處理：resize / CMYK / WebP |
+| `putDesignObject()` | `lib/storage/r2.ts` | 存圖到 Cloudflare R2 |
+| `/tools/designs` | `app/tools/designs/DesignsGallery.tsx` | 設計存檔展示頁（已上線）|
 | Fabric.js 原型 | `d:\tmp\tshirt-designer-prototype.html` | Canvas editor 起點 |
 | `upscaler.ts` | `lib/studio/upscaler.ts` | POD t-shirt 用，**本 feature 不碰** |
 
