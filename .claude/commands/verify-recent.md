@@ -10,6 +10,13 @@ Companion to the harness-enforced rule (`mcp/claude-userlevel/hooks/code-change-
 - `--ack "reason"` → **operator override**: log to daily memory + clear tracker. Use sparingly.
 - Unknown flag → **error and exit**; do NOT default to full verify.
 
+> **Risk-tier routing (2026-06-12).** The verify-gate hooks classify every tracked file via
+> `_verify-shared.classifyRisk()` and print its tier. **HIGH-risk files** (auth / RLS / permission /
+> secrets / `.env` / api-key / payment / migration / deploy / docker / nginx / CI) **must use full
+> verify (no arg)** — `--trivial` is NOT sufficient and `--ack` is discouraged (it still clears, but
+> `verify-recent-ack.ps1` writes a LOUD high-risk section to the daily audit so the shortcut is never
+> invisible). `--trivial` is appropriate only for **normal-tier** comment/rename/whitespace edits.
+
 ## Step 0 — Read tracker (SID via shared helper — same source of truth as JS hooks)
 
 Anchor everything to repo root so the SID cwd-fallback in `Get-VerifySid` matches what the
