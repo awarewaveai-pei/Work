@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
   Verifies Cloudflare security posture for aware-wave.com via API.
@@ -117,7 +117,27 @@ if (-not $token) {
     }
 }
 
-$stamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+$
+# 3. Origin lockdown (SSH to SG -- warn-only, never affects $overall PASS/FAIL)
+$lockdownStatus = 'unknown'
+$lockdownIpCount = 0
+try {
+    $sshKey = "$env:USERPROFILE\.ssh\hetzner_trigger"
+    if (-not (Test-Path $sshKey)) { $sshKey = '~/.ssh/hetzner_trigger' }
+    $lockdownOut = & ssh -i $sshKey -o StrictHostKeyChecking=no -o ConnectTimeout=8 `
+        root@5.223.93.113 `
+        "ipset list cf-ipv4 2>/dev/null | grep 'Number of entries' | awk '{print `$NF}'; iptables -C INPUT -p tcp --dport 443 -m set --match-set cf-ipv4 src -j ACCEPT 2>/dev/null && echo ACTIVE || echo INACTIVE" `
+        2>$null
+    if ($lockdownOut) {
+        $lockdownLines = @($lockdownOut | Where-Object { $_ -match '\S' })
+        $lockdownIpCount = [int]($lockdownLines[0] -replace '\D','')
+        $lockdownStatus  = if ($lockdownLines[-1] -match 'ACTIVE') { 'active' } else { 'inactive' }
+    }
+} catch {
+    $lockdownStatus = 'unreachable'
+}
+
+stamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
 $lines = @(
     "# Cloudflare security check",
     "",
@@ -131,6 +151,8 @@ $lines = @(
     "| Bot Fight Mode | $botMode |",
     "| WAF firewall rules count | $ruleCount$(if ($WpLoginProtectedByServerSide) { ' (by design -- empty; server-side defense)' }) |",
     "| xmlrpc.php block rule | $(if ($xmlrpcOk) { 'present' } elseif ($WpLoginProtectedByServerSide) { 'server-side (nginx/LLAR)' } else { 'MISSING' }) |"
+    "| Origin lockdown (SG) | $lockdownStatus$(if ($lockdownStatus -eq 'inactive') { ' warning: direct-origin attacks possible' }) |",
+    "| CF ipset cf-ipv4 entries | $(if ($lockdownIpCount -gt 0) { $lockdownIpCount } else { 'N/A' }) |"
 )
 if ($WpLoginProtectedByServerSide) {
     $lines += ""
@@ -139,9 +161,16 @@ if ($WpLoginProtectedByServerSide) {
     $lines += "- CF WAF rules intentionally empty: operator travels globally; CF geo rules would self-lock. CF layer = Bot Fight Mode only."
     $lines += "- This check only verifies the CF layer (Bot Fight Mode). Server-side layer is verified separately (client-status / WP plugin checks)."
 }
+$lines += ""
+$lines += "## Origin Lockdown (SG 5.223.93.113)"
+$lines += "- Status: **$lockdownStatus**"
+$lines += "- CF IPv4 ranges in ipset: $lockdownIpCount"
+$lines += '- Architecture: iptables allows only CF IPs on 80/443 -- direct-origin scanners DROP before nginx'
+$lines += '- To apply: /origin-lockdown apply (HIGH RISK, go-ahead required)'
+$lines += '- Runbook: runbooks/CLOUDFLARE-WAF-SETUP.md #Origin-Lockdown-SOP'
 if ($errorMsg) { $lines += ""; $lines += "## Errors"; $lines += "- $errorMsg" }
 Set-Content -Path (Join-Path $reportDir "cf-security-LATEST.md") -Value ($lines -join "`r`n") -Encoding UTF8
 
 $colour = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } else { "Yellow" }
-Write-Host "== Cloudflare security: $overall (bot=$botMode, rules=$ruleCount, xmlrpc=$xmlrpcOk) ==" -ForegroundColor $colour
+Write-Host "== Cloudflare security: $overall (bot=$botMode, rules=$ruleCount, xmlrpc=$xmlrpcOk, lockdown=$lockdownStatus) ==" -ForegroundColor $colour
 exit 0
