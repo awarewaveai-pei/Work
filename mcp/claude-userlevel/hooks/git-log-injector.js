@@ -1,5 +1,5 @@
 // PreToolUse on Write|Edit: show recent git log + BLOCK before first file edit this session.
-// Mechanizes M1 rule from AGENTS.md R0: "run git log --oneline -10 before every Edit"
+// Mechanizes M1 rule from AGENTS.md R0: "run git log before every Edit"
 // (root cause: 2026-05-22 14:38 re-work incident — parallel session had already fixed the issue)
 //
 // Behavior (exit-2 design, 2026-05-27):
@@ -10,7 +10,13 @@
 //   - Why exit-2 not exit-0: Claude Code does NOT forward exit-0 stderr to Claude's context;
 //     only exit-2 error messages are visible (confirmed empirically 2026-05-27)
 //
-// SSOT: AGENTS.md R0 §禁止 "未跑 git log --oneline -10 即 Edit"
+// Window (2026-06-12): the log shown is the FULL last completed session
+//   [ao-resume-prev.txt → ao-close-last.txt] (uncapped) so sessions with >10 commits are not
+//   truncated. Falls back to `git log --oneline -10` if either anchor is missing/malformed or the
+//   window has zero commits. Anchors live in agency-os/.agency-state (written by ao-resume.ps1 /
+//   ao-close.ps1). Operator request: "-10 不完整 / 萬一那天我有 30 個 commits".
+//
+// SSOT: AGENTS.md R0 §禁止 "未跑 git log 即 Edit"
 // Companion: _verify-shared.js (SID derivation, logFailOpen)
 
 const { execSync } = require('child_process');
@@ -47,9 +53,28 @@ process.stdin.on('end', () => {
       (Array.isArray(i.tool_input?.edits) && i.tool_input.edits[0]?.file_path) || null;
     const cwd = filePath ? path.dirname(filePath) : process.cwd();
 
+    // Window selection (2026-06-12): replace fixed `-10` (truncated sessions with >10 commits) with
+    // the FULL last completed session = [ao-resume-prev.txt -> ao-close-last.txt], uncapped. These
+    // anchors are written by ao-resume.ps1 (prev) and ao-close.ps1 (close) in agency-os/.agency-state.
+    // Fallback to `-10` if anchors are missing/malformed or the window yields zero commits.
+    const ISO = /^\d{4}-\d{2}-\d{2}T[\d:.+\-Z]+$/; // guard against shell injection from state files
+    let windowDesc = 'last 10 commits';
+    let logCmd = 'git log --oneline -10';
+    try {
+      const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf8', timeout: 5000, cwd }).trim();
+      const stateDir = path.join(root, 'agency-os', '.agency-state');
+      const prev = fs.readFileSync(path.join(stateDir, 'ao-resume-prev.txt'), 'utf8').trim();
+      const close = fs.readFileSync(path.join(stateDir, 'ao-close-last.txt'), 'utf8').trim();
+      if (ISO.test(prev) && ISO.test(close)) {
+        const ranged = `git log --oneline --since="${prev}" --until="${close}"`;
+        const out = execSync(ranged, { encoding: 'utf8', timeout: 5000, cwd }).trim();
+        if (out) { logCmd = ranged; windowDesc = `last session ${prev.slice(0, 16)} -> ${close.slice(0, 16)} UTC`; }
+      }
+    } catch (_) { /* anchors missing / not in repo — keep -10 fallback */ }
+
     let logLines = null;
     try {
-      const raw = execSync('git log --oneline -10', { encoding: 'utf8', timeout: 5000, cwd }).trim();
+      const raw = execSync(logCmd, { encoding: 'utf8', timeout: 5000, cwd }).trim();
       logLines = raw.split('\n').filter(Boolean);
     } catch (_) {
       // Not in a git repo, or git unavailable. Delete the flag we just created so a
@@ -68,7 +93,7 @@ process.stdin.on('end', () => {
     }
 
     // Show git log and block. Re-issue → flag EEXIST → pass through.
-    process.stderr.write('[Hook] GIT LOG — first Write/Edit this session. Check for parallel-session commits:\n');
+    process.stderr.write(`[Hook] GIT LOG (${windowDesc}) — first Write/Edit this session. Check for parallel-session commits:\n`);
     for (const line of logLines) process.stderr.write(`[Hook]   ${line}\n`);
     process.stderr.write('[Hook] Re-issue the same command to proceed.\n');
     process.stderr.write('', () => process.exit(2));
