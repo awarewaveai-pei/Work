@@ -4,6 +4,26 @@
 
 ## 2026-06-12
 
+### 工具化：把 live-race 教訓 codify 進 runbook + tool（可複用化）
+- **動機**：操作者問「剛處理的有值得做成 command/skill/runbook/script/hook 嗎」。R0 先讀現實避免造廢物：
+  - 否決「一次列出所有紅閘」command — `system-health-check.ps1:877-878` 早已 join 全部 criticalFailures，本來就會。
+  - 否決「AO-CLOSE 遇 sync drift 自動 merge」— `ao-close.ps1:424-445` 早有 sync self-heal。
+- **真缺口 = settings.json live-race 未 codify**：`~/.claude/settings.json` 由執行中 Claude session 持有，harness **頻繁**以啟動時記憶體版回寫，覆蓋 merge 結果。手動分兩次 Bash call（merge 然後 verify）必被回寫卡中間 → 看似 merge 沒生效。AO-CLOSE 免疫因父 Claude 被 block、單一 child process 原子完成。
+- **[已修改]**：
+  1. `agency-os/docs/operations/CROSS_MACHINE_SYNC_RUNBOOK.md` — 新增「故障排除：merge 後 verify 仍報漂移（live-race）」段（symptom/root cause/原理/三正解/判讀），含 dogfood 精煉：回寫頻繁觸發、唯一可靠綠=merge 與目標 gate 同一 invocation。
+  2. `scripts/check-claude-sync.ps1:159-161` — H2 drift 的 `-Fix` 字串加 live-race hint（**全 ASCII 單引號 literal**，刻意避 CP950 trap）指向 runbook。
+  3. `.claude/commands/ao-close.md` Step 2.5 — 已先前 codify archive-lift token gotcha（bullet 以 `（…）` 裝飾開頭時識別字須 bold）。
+- **連帶修復（同 session 並行衝突）**：verify-build-gates 重跑時 archive-lift 又紅 — 並行 cursor session 把 Tarot 調色任務升級重構為 `**🎨 Image Output Pipeline**`（ColorGradePanel 三滑桿），移除舊 handoff slug 173923 → archive bullet 錨點孤兒。**VBC**（git log -S 確認 slug 在 9255103a 被 supersede、非掉落；新行含 ColorGradePanel 色調/飽和/亮度）→ re-point archive bullet 至 `**Image Output Pipeline**`（verified-token lift）。
+- **[驗證結果]**：
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`& sync...merge; & verify-build-gates.ps1`（atomic 單 invocation）| exit=0 | **Score 100% (372/372) ALL PASSED** + Doc integrity PASSED
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`check-claude-sync.ps1`（atomic）| H2 PASS / deny=20 forkbomb=True
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File check-claude-sync.ps1` | 我的編輯 0 trap（唯一 drift=line57 pre-existing git capture，權威閘 lint-git-eap-safety 已判 violations:0，不在 scope）
+  - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n + 2 suggestion（採納 #1 軟化未驗證的「跑兩次穩定」主張；#2 anchor rot 略過因 live-race token 在標題可解析）
+  - BUGHUNT_DONE: scope=agency-os/docs,scripts,.claude | grep=`2026-06-11-1739-tomo-173923`+`Image Output Pipeline`+`sync-claude-userlevel.ps1 -Mode merge'` | hits: slug 已從 TASKS 移除(VBC 確認 supersede)、新追蹤點存在、-Fix 字串無其他 code 副本（僅 bash log）
+  - **DOGFOOD 實證**：本 session 親自踩 live-race 兩次，runbook atomic-invocation 正解逐字生效（這段工具化的最佳驗證）
+- **[剩餘風險]**：mid-session settings.json 仍會 flap（harness 持有），非 bug；AO-CLOSE 原子轉綠。runbook 判讀段已說明勿纏鬥。
+- **[rollback]**：`git checkout agency-os/docs/operations/CROSS_MACHINE_SYNC_RUNBOOK.md scripts/check-claude-sync.ps1 agency-os/reports/ao-close/2026-06-11-1820.md`。
+
 ### 修復兩個 critical health gate（開機 correctness 紅閘 → 100%）
 - **根因 1（archive-lift gate 12c）**：`verify-archive-tasks-lift` fail（missing:1）。2026-06-11-1820 AO-CLOSE archive 未完成 bullet `（主線）app.aware-wave Stage 1 接通入口` 無 `**bold**` → checker 走 plain-text prefix fallback，token 字首 `（主線）…` 與 TASKS.md:57 字序相反（`**Stage 1 接通入口** — app.aware-wave`）無法命中 → 偽陰性（任務其實已在 TASKS.md:56/57 追蹤）。**非真 silent drop**。
 - **修法 1**：`agency-os/reports/ao-close/2026-06-11-1820.md:28` 把識別字加粗 `**Stage 1 接通入口**`，走 checker 主設計 bold-token verified-lift 路徑（[verify-archive-tasks-lift.ps1:248](../scripts/verify-archive-tasks-lift.ps1#L248)）。同 bullet 在 2026-06-11-0333.md:22 前用 archive-only 逃生門處理過（先例一致）。**未改 checker 演算法**（加 plain-text sliding window 會升高 false-positive 風險，違 gate 目的）。

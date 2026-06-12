@@ -1,5 +1,5 @@
 # PLAN: Tarot + POD Image Output Pipeline
-## Color Grade → Web (WebP) / Print (CMYK PDF) / Canvas (Fabric.js)
+## Color Grade → Web (WebP) / Print (CMYK PDF) / Canvas (Fabric.js) / Canva
 
 > 定案日：2026-06-12｜詳細技術分析：`docs/feature-image-output-pipeline.md`
 
@@ -8,7 +8,7 @@
 ## 一句話說明
 
 在 Tarot Studio 和 POD Studio 的生圖結果下方加入：
-**① 色調滑桿** → **② 三軌輸出按鈕**（網頁用 / 印刷用 / Canvas 編輯）
+**① 色調滑桿** → **② 四軌輸出按鈕**（網頁用 / 印刷用 / 快速編輯 / Canva）
 
 ---
 
@@ -16,7 +16,8 @@
 
 | 決策 | 結論 |
 |------|------|
-| Canvas 編輯器 | Fabric.js in-app（移植現有原型 `d:\tmp\tshirt-designer-prototype.html`） |
+| 快速 Canvas 編輯器 | Fabric.js in-app（移植現有原型 `d:\tmp\tshirt-designer-prototype.html`） |
+| 進階 Canvas 編輯器 | Canva API via MCP（`import-design-from-url` → 使用者編輯 → `export-design` 拉回）|
 | CMYK 輸出方案 | Sharp `toColorspace('cmyk')` → CMYK JPEG → pdf-lib `embedJpg()` → `/DeviceCMYK` PDF ✅ |
 | SVG / AI 格式 | **跳過**：AI 生圖是點陣，raster 包 SVG 無意義，印刷廠 PDF 足夠 |
 | 色調匯出 | 一律 bake 進去（CSS filter 只是 preview） |
@@ -31,7 +32,14 @@
 |------|------|-----|--------|------|---------|
 | 🌐 **網頁用** | 1000 × 1000 | 72 | RGB | WebP `quality:80` | ~60 KB |
 | 🖨 **印刷用** | 896 × 1488 | 300 | CMYK | PDF（CMYK JPEG 內嵌）| ~2–3 MB |
-| 🎨 **Canvas** | 原圖 | — | RGB | 原圖送入 Fabric.js | — |
+| ✏️ **快速編輯** | 原圖 | — | RGB/CMYK | 原圖送入 Fabric.js | — |
+| 🎨 **Canva** | 原圖 | — | RGB/CMYK | Canva API import → export | — |
+
+**Canvas 兩軌定位**：
+- `✏️ 快速編輯`（Fabric.js）：文字疊加、貼圖、構圖微調，留在 app 內，無外部帳號需求
+- `🎨 Canva`：複雜排版、品牌模板、進階設計，跳出至 Canva，完成後 export 拉回 app
+
+**兩軌共同尾端**：編輯完成後 → OutputTrackBar 再選「網頁用」或「印刷用」匯出
 
 **塔羅尺寸根據**：7.6 × 12.6 cm @ 300 DPI = 896 × 1488 px（含出血，`FLUX_PRINT_DIMS["2:3"]` 已寫死於 `image-gen.ts:64`）
 
@@ -129,6 +137,15 @@ Tarot Studio          POD Studio (StudioWorkbench)
   - **依賴**：`npm install fabric`（尚未安裝）
 
 - [ ] **[3-b]** `app/tools/canvas/page.tsx` — `/tools/canvas` 路由
+
+### Day 7（同天）：Canva 整合（S）
+
+- [ ] **[3-c]** `lib/studio/canva-export.ts`
+  - `sendToCanva(imageUrl)` → Canva MCP `import-design-from-url` → 回傳 Canva design URL
+  - `fetchFromCanva(designId)` → Canva MCP `export-design` → 回傳 image URL
+- [ ] **[3-d]** OutputTrackBar `[🎨 Canva]` 按鈕接線
+  - 點擊 → 呼叫 `sendToCanva()` → 新分頁開 Canva 編輯
+  - 使用者完成後回 app → 觸發 `fetchFromCanva()` 拉回圖片 → 再選輸出軌
 
 ### Day 8：接線到現有工具
 
