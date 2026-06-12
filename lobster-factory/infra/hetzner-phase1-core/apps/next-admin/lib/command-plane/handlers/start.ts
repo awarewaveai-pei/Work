@@ -13,6 +13,7 @@ export const startHandler: CommandHandler = async () => {
     "• `/daily_review` — 24 小時 AI 摘要",
     "• `/weekly_review` — 7 天 AI 摘要",
     "• `/list_failed_runs` — 最近失敗 runs",
+    "• `/deploy_status` — SG 部署狀態 + drift（唯讀；部署用 GitHub app → SG Deploy）",
     "",
     "輸入 `/` 應該會顯示指令選單；不會的話直接打字傳。",
   ].join("\n");
