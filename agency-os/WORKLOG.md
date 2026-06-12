@@ -4,6 +4,25 @@
 
 ## 2026-06-12
 
+### diag(ops-inbox): webhook /api/webhooks/deploy 500「db write failed」根因 = migration 0036 未套用（schema drift，藏一週）+ 清 /root/Work EOL churn 解部署阻塞
+
+**[任務理解]** SG Deploy 失敗（防護鏈擋髒狀態）。兩件：① `/root/Work` 有本地改動擋 `git pull --ff-only` ② webhook 500 藏一週。
+
+**[已修改 / 診斷]**
+- **任務1（已修）**：`/root/Work scripts/check-cloudflare-security.ps1` 本地改動 = 純 EOL churn（單行 `\r\n`→`\n`），非任何人真實編輯 — `.gitattributes eol=crlf` vs committed blob mixed-EOL 的 git 衛生 artifact。`git checkout --` 清不掉（會 re-smudge churn）。**根因**：sg-deploy.sh:22 `REPO_DIR=/root/Work`、:78 `git pull --ff-only`；origin/main（550515bc，+40 檔）含該檔**真實內容更新**（新增 IPv6 lockdown）→ 本地 churn 擋 pull = 真正部署阻塞。已驗 `git merge-base --is-ancestor HEAD origin/main`=FF_SAFE → `git reset --hard origin/main` → tracked tree 乾淨，HEAD=550515bc，untracked `.bak/.log` 保留未動。**不可動 /root/lobster-phase1 .env：未動。**
+- **任務2（診斷，未修，待 go-ahead）**：webhook 500 = `db write failed`（route.ts:58 `upsertIncidentAtomic`）。容器內重現 PostgREST RPC 取原文：`PGRST202 / Could not find function public.upsert_incident_atomic(...p_fingerprint_v2...) in schema cache`，hint 顯示 live DB 只有舊 12-arg 簽章（無 p_fingerprint_v2）。**根因：部署的 code 呼叫 13-arg 新簽章（含 p_fingerprint_v2），但 migration `0036_fingerprint_v2.sql`（ADD COLUMN fingerprint_v2 + DROP/CREATE 13-arg function）未套用到 production Supabase。** 時間軸：06-05 HTTP200 → 06-09T07:04Z 首次 500（= 藏一週，那次部署 ship v2 code 沒套 0036）→ 06-11 再 500。probe 因 404 未建 row，無副作用。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`git reset --hard origin/main; git status --porcelain` | exit=0 | result=tracked clean, HEAD=550515bc, FF_SAFE 已驗
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin node probe.mjs`（POST rpc/upsert_incident_atomic）| exit=0 | result=`HTTP 404 PGRST202 ...p_fingerprint_v2... not found in schema cache`（原文）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`grep ops-inbox auto-deploy.log` | exit=0 | result=`06-09T07:04Z deploy_success FAILED: HTTP 500: db write failed`（首次）+ 06-11 復現
+- REVIEW_WAIVED: NA -- 無 code 改動（任務1=git reset；任務2=唯讀診斷）
+- BUGHUNT_DONE: scope=agency-os(此 worklog),lobster-factory | grep=`upsert_incident_atomic|fingerprint_v2|p_fingerprint_v2` | hits=確認 route.ts:58→upsertIncidentAtomic.ts:RPC call→0036 migration 三處一致；6 條呼叫路徑共用同函式（comment 證實）
+
+**[剩餘風險 / 待辦]** ① **webhook 500 仍在**：下次 SG Deploy job 會綠（部署成功）但 ops-inbox telemetry POST 仍 HTTP 500，直到 0036 套用 → 使用者「驗 ops-inbox HTTP 2xx」會失敗。修法=套 `0036_fingerprint_v2.sql`（High-risk DB migration，等明示 go-ahead；additive nullable 欄位+函式替換，rollback 在檔內 :112-117）。② `/deploy_status` 讀 ops_incidents source='deploy'，自 06-09 寫入全失敗 → 可能只見 ≤06-05 舊資料或空。③ **獨立發現**：middleware.ts Supabase auth 在 dashboard 路徑收 GoTrue 429「Rate limit exceeded」純文字 → JSON.parse 拋 AuthUnknownError（matcher 已排除 webhooks，與本 500 無關，另案）。④ 安全觀察：`/root/Work/.git/config` remote URL 內嵌 GitHub PAT，建議改 credential helper。
+**[rollback]** 任務1：`git reset --hard 12a9271f`（但無必要，FF 正確）。任務2：無改動。
+- TOMORROW_CAPTURED: to-print-file-pdfx → handoffs/2026-06-12-1859-to-print-file-pdfx.md
+
 ### Phase Z4/Z5 收斂 — secrets baseline + fetch-recency gate
 
 **[任務理解]** 操作者追問 `scan-for-secrets known-suppressed baseline` 與 `AO-CLOSE health gate 補 fetch-recency` 是否已做；查 WORKLOG / MEMORY 後確認仍是 open item，依指示「走 R0」補完。目標：壓已治理 local plaintext secret WARN 噪音，但新 finding 必須紅；health-check 必須消費 Phase Z `git-fetch-last.json` ledger，讓 fetch 失敗/過期不再只停留在 AO-RESUME 報告。
