@@ -59,17 +59,26 @@ process.stdin.on('end', () => {
     if (files.length === 0) { process.stdout.write(d); return; }
 
     // BLOCK. Cap output to STDERR_MAX_LINES so we don't flood Claude's context (C4).
+    const mt = shared.maxTier(files);
     process.stderr.write(`\n[Hook] BLOCKED: ${reason} refused — UNVERIFIED CODE FILES exist this session.\n`);
-    process.stderr.write(`[Hook] ${files.length} file(s) need verification:\n`);
+    process.stderr.write(`[Hook] ${files.length} file(s) need verification (tier=${mt.tier}):\n`);
     const lines = files.map(f => `[Hook]   - ${f}`);
     const [shown, hidden] = shared.capStderr(lines);
     for (const ln of shown) process.stderr.write(ln + '\n');
     if (hidden > 0) process.stderr.write(`[Hook]   ...and ${hidden} more (see ${tf})\n`);
     process.stderr.write('[Hook]\n');
-    process.stderr.write('[Hook] Run ONE of:\n');
-    process.stderr.write('[Hook]   /verify-recent           — full syntax + critic + real exec test (recommended)\n');
-    process.stderr.write('[Hook]   /verify-recent --trivial — syntax check only (for typo/comment-only edits)\n');
-    process.stderr.write('[Hook]   /verify-recent --ack     — acknowledge risk + clear without verification (logged to WORKLOG)\n');
+    if (mt.tier === 'high') {
+      // Risk-proportional routing (2026-06-12): high-risk paths must NOT be shortcut.
+      const reasons = [...new Set(mt.highFiles.map(h => h.why))].join(', ');
+      process.stderr.write(`[Hook] ⚠ HIGH-RISK CHANGE (${reasons}) — full verification is MANDATORY:\n`);
+      process.stderr.write('[Hook]   /verify-recent           — REQUIRED (syntax + critic + real exec test)\n');
+      process.stderr.write('[Hook]   --trivial / --ack are NOT appropriate for auth/payment/RLS/migration/deploy edits.\n');
+    } else {
+      process.stderr.write('[Hook] Tier=normal — pick by edit shape:\n');
+      process.stderr.write('[Hook]   /verify-recent           — full syntax + critic + real exec test (logic changes)\n');
+      process.stderr.write('[Hook]   /verify-recent --trivial — syntax only (comment/rename/whitespace-only edits)\n');
+      process.stderr.write('[Hook]   /verify-recent --ack     — acknowledge risk + clear without verification (logged)\n');
+    }
     process.stderr.write('[Hook]\n');
     process.stderr.write('[Hook] This rule is harness-enforced. SSOT: mcp/claude-userlevel/hooks/verify-gate-commit.js.\n');
     process.stderr.write('[Hook] It is accident-prevention only — see file header for scope.\n\n');

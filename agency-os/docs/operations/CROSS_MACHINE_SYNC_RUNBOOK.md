@@ -85,8 +85,8 @@ WARN: ~/.claude/ drifted from SSOT (mcp/claude-userlevel/).
 **這不是 SSOT 壞掉**：repo `mcp/claude-userlevel/settings.template.json` 永遠是正本；漂移的只是本機 ephemeral 檔。先 `git`-diff 該 template 確認正本完好，不要追幽靈。
 
 **正解（三選一）**：
-1. **手動修**：把 merge 與 verify 放進**同一個 shell invocation**（`& <sync> -Mode merge; & <sync> -Mode verify`），中間不要回到 Claude；或連跑兩次 merge 後即穩定（第二次後磁碟版與記憶體版一致，harness 回寫不再改變內容）。
-2. **不用手動修（推薦）**：`ao-close.ps1` 的 AO-CLOSE sync 自癒（`scripts/ao-close.ps1` §「Claude Code sync self-heal」）在**單一 script run 內**原子完成 verify→merge→re-verify，不受此 race 影響——直接收工讓它處理即可。
+1. **不用手動修（推薦、已機械驗證）**：`ao-close.ps1` 的 AO-CLOSE sync 自癒（`scripts/ao-close.ps1` §「Claude Code sync self-heal」）在**單一 script run 內**原子完成 verify→merge→re-verify，不受此 race 影響——直接收工讓它處理即可。
+2. **手動修**：把 merge 與 verify 放進**同一個 shell invocation**（`& <sync> -Mode merge; & <sync> -Mode verify`），中間不要回到 Claude，回寫窗口即關閉。（觀察過「連跑兩次 merge 後穩定」，但**未經機械驗證** harness 回寫究竟是 startup-snapshot 一次性還是事件觸發；故以「同一 invocation」為準，勿依賴「跑兩次」。）
 3. 換 IDE／重啟 session 後，harness 會以**新的（已 merge 的）磁碟版**重載，race 自然消失。
 
 > **跨機提醒**：此 race 只影響本機 ephemeral 檔，不影響 git-tracked SSOT，故**不需跨機同步任何東西**；另一台機器只要 `git pull` 取得 template 正本即正確。
