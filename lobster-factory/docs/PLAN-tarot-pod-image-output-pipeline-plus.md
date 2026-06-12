@@ -1148,22 +1148,28 @@ POC 路由：
 
 ---
 
-## 14.4 [0-c] image process API security POC
+## 14.4 [0-c] image process API security POC — ✅ 核心邏輯本機 PASS（2026-06-12）
 
-驗收條件：
+> **本機已驗證**（`d:\tmp\cmyk-poc\ssrf-poc.mjs`，純 node built-in，12/12 + rebinding）：
+> `assertSafeImageUrl()` guard — protocol→allowlist→DNS-resolve→IP 分類 四階段。
+> 重點：**DNS-rebinding 防禦已實證**（allowlisted host `cdn.aware-wave.com` 解析到 `10.1.2.3` 被 DNS 階段擋，非 allowlist）。
+> IP 分類涵蓋 IPv4（10/172.16/192.168/127/169.254/0/100.64 CGN/TEST-NET/reserved）+ IPv6（::1/fc/fd/fe80/::ffff: mapped）。
+> userinfo trick（`https://app.aware-wave.com@evil.com`）+ suffix trick（`app.aware-wave.com.evil.com`）皆擋。
 
 ```txt
-☐ allowlist host 生效
-☐ localhost 被擋
-☐ private IP 被擋
-☐ 169.254.169.254 被擋
-☐ redirect 到非 allowlist domain 被擋
-☐ 非 image content-type 被擋
-☐ 超過 max content-length 被擋
-☐ fetch timeout 生效
-☐ Sharp limitInputPixels 生效
-☐ 未授權 imageUrl 被擋
+☑ allowlist host 生效（Set.has，非 endsWith — 防 suffix trick）
+☑ localhost / 127.0.0.1 / ::1 被擋
+☑ private IP 被擋（v4+v6 完整範圍）
+☑ 169.254.169.254（cloud metadata）被擋
+☑ DNS rebinding（allowlisted→私有 IP）被擋 ← 核心防禦
+☑ 非法 protocol（ftp/userinfo trick）被擋
+☐ redirect 到非 allowlist domain 被擋（real impl: redirect:'manual' 逐 hop 重驗）— 待 [1-e] 接 fetch
+☐ 非 image content-type 被擋（HEAD/response header）— 待 [1-e]
+☐ 超過 max content-length 被擋 / fetch timeout / Sharp limitInputPixels — 待 [1-e]（標準）
+☐ 未授權 imageUrl 被擋（沿用既有 auth/ownership pattern，見 §B）— 待 [1-e]
 ```
+
+> **[1-e] 落地注意**：real impl 必須 `dns.promises.lookup(host,{all:true})` 解所有 A/AAAA + 對解析到的 IP fetch（帶 Host header）或 `redirect:'manual'` 逐 hop 重驗，杜絕 TOCTOU/redirect SSRF。POC 已證分類+rebinding 邏輯正確。
 
 ---
 
