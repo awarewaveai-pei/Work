@@ -4,6 +4,26 @@
 
 ## 2026-06-12
 
+### 出國免 SSH 部署：SG self-hosted runner 安裝 + production-sg environment + 首次試車部署
+
+**[任務理解]** 雲端 session 已 merge PR #13（`sg-deploy.yml` workflow_dispatch + DEPLOY_ROLLBACK_RUNBOOK §9）。完成最後落地：在 SG VPS 裝 GitHub Actions self-hosted runner，讓出國漫遊（port 22 常被擋）時用手機 GitHub app 一鍵部署，密鑰不外帶（runner 住在 VPS，直接呼叫既有全閘 sg-deploy.sh）。
+
+**[已修改 / 已建立]**
+- SG VPS `~/actions-runner/`：actions/runner **v2.335.1**（sha256 `4ef2f25...c8cf` 對官方 release body 驗過，供應鏈防竄改），`./config.sh` 註冊到 `https://github.com/awarewaveai-pei/Work`，name=`sg-vps`，labels=`self-hosted,sg`（workflow `runs-on: [self-hosted, sg]` 兩 label 比對），`--unattended --replace`。root 故加 `RUNNER_ALLOW_RUNASROOT=1`。
+- systemd 服務 `actions.runner.awarewaveai-pei-Work.sg-vps.service`：`sudo ./svc.sh install && start`，enabled（開機自啟）+ active(running)。
+- GitHub Environment `production-sg`：`gh api -X PUT` 建立（workflow `environment: production-sg` 引用解析）。**Required reviewers 設不上**（HTTP 422：private repo 需付費方案才支援 environment protection rule）→ 依指示跳過，不擋部署。**補償控制**：§9.2 指定的 main 分支保護為替代核准閘（「改 workflow→root RCE」必經 PR review）；reviewer 之後升級方案再手動補。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sudo ./svc.sh status` | exit=0 | result=`active (running)`, `√ Connected to GitHub`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`gh api repos/awarewaveai-pei/Work/actions/runners --jq ...` | exit=0 | result=`{name:sg-vps, status:online, labels:[self-hosted,Linux,X64,sg]}`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`gh workflow run sg-deploy.yml -f apps=next-admin` + `gh run watch 27406241409 --exit-status` | exit=0 | result=job 綠 `✓ deploy in 3m35s`（tsc→npm test→build→healthcheck→HTTP smoke→無 rollback 全通過）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl -s http://127.0.0.1:3002/login -o /dev/null -w %{http_code}` | exit=0 | result=`200`；container `lobster-next-admin Up (healthy)` 剛重建
+- REVIEW_WAIVED: NA -- 無 repo code 改動（純 VPS runner 安裝 + GitHub API 資源建立；workflow/runbook 由 PR #13 雲端 session 已 ship+review）
+- BUGHUNT_WAIVED: NA -- 無 symbol/schema/string 改動；不涉 call sites
+
+**[剩餘風險]** ① production-sg 無 required reviewer（billing 限制）→ 任何 write 權限者可手觸發 prod deploy（= SG root RCE，§9.2 已記載）；緩解靠 main 分支保護 + write collaborator 審核紀律；升級 GitHub 付費方案後手動補 reviewer=awarewaveai-pei。② runner 以 root 跑（§9.2 偏好專屬低權使用者；本機既有架構 root-only，沿用）。
+**[rollback]** 移除 runner：§9.6 `cd ~/actions-runner; sudo ./svc.sh stop && uninstall; ./config.sh remove --token <REMOVAL_TOKEN>`（token 從 Settings→Runners 取）。Environment：`gh api -X DELETE repos/awarewaveai-pei/Work/environments/production-sg`。
+
 ### git-log 閘視窗 + verify-gate 風險比例分級（操作者：-10 不完整／處理太久問是否善用工具）
 
 **[任務理解]** 兩件相連事：① git-log-injector 印固定 `-10` → 一天 >10 commit 會截斷（操作者「萬一 30 個 commit」）② 操作者抱怨小改動驗證儀式太重、問有無善用工具 → 引出 verify-gate 風險比例分級（齊頭式 → 按 file 風險分流）。
