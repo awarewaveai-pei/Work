@@ -8319,7 +8319,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-11 10:15:01 UTC_
+_Last synced: 2026-06-12 08:00:34 UTC_
 
 ## 2026-03-20
 
@@ -9323,3 +9323,4 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
   - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n + 1 suggestion（採納：runbook 標題加 multi-session anchor）
   - BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`頻繁回寫`+`頻繁以啟動時記憶體`+`live-race` | hits: WORKLOG 同 commit 修正、worklog-excerpt 自動鏡像 AO-CLOSE 重生、runbook:86 為刻意否定句（"不是...頻繁回寫"）保留
 - **[剩餘風險]**：mid-session settings.json 仍會在 fork-bomb 那條 flap（多 session 本質，良性）；真收斂在所有舊 session 結束後。已誠實記入 runbook，不再纏鬥。
+
