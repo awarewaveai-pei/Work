@@ -64,12 +64,13 @@
 - [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，**R0 已批方案A**，照 packet 直接動工免重提案）→ handoffs/2026-06-11-1738-tomo-173818.md
 - [ ] **🎨 Image Output Pipeline**（SSOT: `lobster-factory/docs/PLAN-tarot-pod-image-output-pipeline-plus.md`）Tarot/POD: 色調→WebP/CMYK PDF(Japan Color 2001 Coated)/Fabric.js Canvas；Printful 走 sRGB `upscaler.ts` 不動；Canva Phase 1.5 POC
   - **印刷積木 SSOT**：`PrintDestination` 矩陣（tw-local/mpc/tgc/printninja）；國際標準 70×121mm；TGC=sRGB PNG（CMYK 退件）；情境 A 直送印刷廠。**已查證**：pdf-lib 無 OutputIntent（PR#1512 closed）→ Ghostscript 套 ICC；Printful 走 sRGB upscaler.ts 不動
-  - **⚠️ Phase 0 阻塞 POC（五個全通過才進 Phase 1）**
-  - [ ] **[0-a]** CMYK PDF + TrimBox POC — Sharp CMYK JPEG + pdf-lib embedJpg → `/DeviceCMYK` + setTrimBox/setBleedBox 三框；驗無雙重反相
-  - [ ] **[0-a-gs]** 🔴 Ghostscript ICC OutputIntent POC — gs → PDF/X-1a + Dockerfile 裝 ghostscript+ICC（情境 A 阻塞，基建改動，走 safe-infra-patch）
-  - [ ] **[0-a-srgb]** sRGB PNG POC — TGC 路徑，897×1500px 無 CMYK 污染
-  - [ ] **[0-b]** Fabric.js + Next.js App Router POC — `/tools/canvas-poc`；CORS taint；`toBlob()` export
-  - [ ] **[0-c]** API security POC — SSRF allowlist + private IP + rate limit
+  - **Phase 0 POC（2/5 本機 PASS；證據 `d:\tmp\cmyk-poc\poc3.mjs`）**
+  - [x] **[0-a]** ✅ CMYK PDF + TrimBox — 本機 PASS：`/DeviceCMYK`+`/Decode`+三框。**關鍵修正 `.withDensity()` 取代 `.withMetadata({density})`**（後者附 sRGB ICC 破壞 CMYK，SOF=3）
+  - [x] **[0-a-srgb]** ✅ TGC sRGB PNG — 本機 PASS：898×1500 3ch 無污染
+  - [ ] **[0-a-gs]** Ghostscript ICC OutputIntent — **機制=文件化 ground-truth（不本機 re-prove，R0 決策）**；真未知綁部署期：Alpine `apk add gs`+musl sharp+Dockerfile COPY sharp+ICC 採購（Adobe Japan Color/SWOP；FOGRA39 免費等效）+ 印刷廠 preflight。**不阻塞 Phase 1 程式碼**（`applyOutputIntent()` 介面隔離）
+  - [ ] **[0-b]** Fabric.js + Next 15 App Router POC — `/tools/canvas-poc`；CORS taint；`toBlob()` export
+  - [ ] **[0-c]** API security POC — SSRF allowlist + private IP + rate limit（純邏輯，本機可驗，security 優先）
+  - **發現（已修 plan SSOT）**：sharp 非直接 dep（Next transitive @0.34.3，須 pin）；base=node:20-alpine（apk 非 apt-get）
   - **Phase 1（Phase 0 全綠才開始）**
   - [ ] **[1-a S]** `lib/studio/image-provider.ts` — 透傳 `printQuality` 欄位
   - [ ] **[1-b S]** `lib/studio/color-grade.ts` — `ColorGradeParams` type + `useColorGrade()` hook
