@@ -81,10 +81,16 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude | grep=`74c0e70b|origin-lockdown|cf-ipv4|SCANNER|BatchMode|setsid` | hits=1（CLOUDFLARE-WAF-SETUP.md:99 歷史說明行保留；PATCH URL line128 已修正；.claude/file-history 歸檔無法修改屬預期；AGENTS.md 無 stale hits）
 - audit-encoding: check-cloudflare-security.ps1 BOM=True CJK=False ✓；refresh-cf-origin-ips.ps1 BOM=True CJK=False ✓；ao-resume.ps1 BOM=True CJK=True（已有 CJK，BOM 保護，safe）✓
 
+**Task 4 完成（2026-06-12 17:10 CST）：**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`cf-origin-lockdown.sh --apply && --confirm` | exit=0
+- REALTEST_EVIDENCE: tool=curl | cmd=`curl -sI https://aware-wave.com/` | CF-RAY=a0a7b8b5cdd35545-SIN HTTP/200 ✓（流過 CF 正常）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`iptables -L INPUT -n` | rules 6-9: CF-ACCEPT + explicit DROP 80/443 ✓ | SSH 22 untouched ✓
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ip6tables -L INPUT -n` | rules 7-10: CF-ipv6-ACCEPT + DROP 80/443 ✓ | ufw6 chains empty（ufw 已移除，chains 殘留無害）✓
+- 備份: `/root/cf-lockdown-backup-20260612-090937/`
+
 **[剩餘風險]**
-1. **Origin Lockdown（Task 4）未 apply** — 最關鍵防線尚未啟動。直打 origin 的 scanner 仍可到達 nginx。需操作者 go-ahead。
-2. CF WAF Rate Limit free plan 限制（period=10s only）— 高速但持續慢速 scanner 不會觸發。
-3. CF IP 月更新（--refresh）需 lockdown 先 apply，否則 refresh-cf-origin-ips.ps1 status="skip"。
+1. CF WAF Rate Limit free plan 限制（period=10s only）— 高速但持續慢速 scanner 不會觸發。
+2. CF IP 月更新（--refresh）現在有效（lockdown 已 apply）。ao-resume.ps1 月度 check 會自動跑。
 
 **[rollback]**
 - CF WAF rule：DELETE `8202ff335538476a89685341f6efde07`（API DELETE rule 即回）
