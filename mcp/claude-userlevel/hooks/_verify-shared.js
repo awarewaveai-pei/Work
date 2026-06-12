@@ -131,6 +131,7 @@ function capStderr(lines) {
 // (ao-resume-last-session-id, etc.) which are not auth — those should stay 'normal'.
 const RISK_HIGH_PATHS = [
   { re: /\.env(\.[^/]*)?$/i,                why: 'env/secrets' },
+  { re: /api[-_]?key|private[-_]?key/i,    why: 'secrets (key)' },
   { re: /user-env/i,                       why: 'secrets (user-env)' },
   { re: /secrets?-?vault/i,                why: 'secrets vault' },
   { re: /registry\.template/i,             why: 'MCP secrets template' },

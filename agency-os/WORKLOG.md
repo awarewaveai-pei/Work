@@ -4,6 +4,26 @@
 
 ## 2026-06-12
 
+### git-log 閘視窗 + verify-gate 風險比例分級（操作者：-10 不完整／處理太久問是否善用工具）
+
+**[任務理解]** 兩件相連事：① git-log-injector 印固定 `-10` → 一天 >10 commit 會截斷（操作者「萬一 30 個 commit」）② 操作者抱怨小改動驗證儀式太重、問有無善用工具 → 引出 verify-gate 風險比例分級（齊頭式 → 按 file 風險分流）。
+
+**[已修改]**
+- `mcp/claude-userlevel/hooks/git-log-injector.js` + `scripts/ao-close.ps1`：`-10` → `git log --since=ao-close-prev --until=ao-close-last`（上一個完整 session 全部 commit，不設上限）。ao-close.ps1 覆寫 ao-close-last 前快照舊值→ao-close-prev（收工時序遞增→prev<last 恆成立、永不倒序、免 date-guard）。錨點缺/壞 ISO/空窗 → fallback -10；strict ISO regex；重用 ranged 輸出免二次 git。commit `e1f192f9`。
+- `mcp/claude-userlevel/hooks/_verify-shared.js`：新增 `classifyRisk(path)→{tier:high|normal,why}` + `maxTier(files)`（**風險分級 SSOT，可複用**）。HIGH = auth/RLS/permission/secrets/.env/api-key/payment/migration/deploy/docker/nginx/CI。**camelCase-aware**（path 先在 lower|digit→Upper 邊界插空格再 tokenize → `authHelpers`/`jwtVerify`/`policyEngine` 命中；critic 抓出 \b-word regex 漏掉本 repo camelCase 主流命名）。`session` 刻意不列（避免 AO session 檔誤判）。
+- `code-change-tracker.js` + `verify-gate-commit.js`：訊息按 tier 分流 — HIGH→「full /verify-recent REQUIRED, --trivial NOT sufficient」；normal→「pick by edit shape, --trivial 可用於 comment/rename」。**阻擋邏輯本身不變**（純 guidance routing，critic 確認無放行回歸）。
+- `scripts/verify-recent-ack.ps1`：--ack 時經 node 呼叫 JS SSOT 分級（無 PS-regex drift），HIGH-risk 檔在 daily audit 留 LOUD 區段（軟強制：仍清關，符合「accident-prevention 非 adversarial」哲學）。**+UTF-8 BOM**（檔含 pre-existing em-dash，no-BOM 在 CP950 會 `??`；critic 抓出我加的 ⚠/—/→ glyph 已 ship 過一次 `??` 進 daily → 全 de-glyph 成 ASCII + 補 BOM）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --check ×3 + PS parser ×2` + `classifyRisk 24 案`（含 critic camelCase/user-env/api-key 漏判 + AO-session/keyboard 假陽性守則）+ `hook e2e`（HIGH auth→⚠MANDATORY exit2 / normal→pick-by-shape / git-log ranged 40+筆·缺錨-10·壞ISO-10）+ `ack sandbox 真跑`（high-risk 區段 count=2 auth+migration 正確、normal 不洩漏、daily 0 non-ASCII 無??）+ `快照時序 C1-C3` + `sync 後 live==SSOT ×4` | exit=0
+- REVIEW_DONE: critic=Deep（2 輪）| verdict=pass | findings git-log: 0c/2M（resume錨點同日重開/漏收工漏commit→改收工錨點根除）；risk-gate: 1C（CP950 glyph→de-glyph+BOM）/3M（user-env normal→加path、camelCase漏判→tokenize、policyEngine→camelCase split、deploy過廣→移path-only）全修
+- BUGHUNT_DONE: scope=mcp,scripts,agency-os,.claude | grep=`classifyRisk|maxTier|RISK_HIGH_PATHS|RISK_HIGH_WORDS` | hits=12（2 consumer hooks 呼叫 maxTier + ack.ps1 node 呼叫 classifyRisk + 定義/export + 1 plan 圖示提及；無 stale、無未接 caller）
+- audit-encoding: verify-recent-ack.ps1 clean（capture-trap 0）；BOM 已補；ASCII-only 加註不可放 glyph
+- **跨機**：hooks SSOT=mcp/ → `sync-claude-userlevel.ps1 -Mode merge` 部署到 ~/.claude/（= D:\Work\.claude junction）；.ps1 走 git pull。發現並修正：e2e 測試跑 repo SSOT copy（最新），但 runtime 用 ~/.claude deployed copy（曾 stale）→ sync 後 4 檔 live==SSOT 確認。
+
+**[剩餘風險]** ① classifyRisk 是 path-based 啟發式，新風險路徑命名需補 pattern（fail-safe：漏判方向是「少驗證」，故 secrets/auth 類已盡量涵蓋）② verify-recent-ack.ps1 pre-existing em-dash 在 CP950 console 仍 mojibake（cosmetic，BOM 後檔內容正確、persisted 乾淨）③ tier routing 是 guidance + 軟 audit，非硬阻擋高風險走 --trivial（符合 gate「非 adversarial」哲學；要硬擋需再加閘）。
+**[rollback]** 各檔 `git revert` 獨立可回；ao-close-prev.txt / classifyRisk 純 additive；sync 還原走 Backups/claude-userlevel-20260612-154056。
+
 ### 工具化：把 live-race 教訓 codify 進 runbook + tool（可複用化）
 - **動機**：操作者問「剛處理的有值得做成 command/skill/runbook/script/hook 嗎」。R0 先讀現實避免造廢物：
   - 否決「一次列出所有紅閘」command — `system-health-check.ps1:877-878` 早已 join 全部 criticalFailures，本來就會。

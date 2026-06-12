@@ -94,9 +94,12 @@ curl -sSI https://aware-wave.com/xmlrpc.php | grep "HTTP"
 |---|---|
 | Zone（aware-wave.com） | `f21b1919632fee2221647908a94fdcac` |
 | Custom WAF Ruleset | `f290fd58b69c4cedb7a0688ca959034f` |
-| Block xmlrpc.php | `a881ce5e7b5841eca99fc797187020e9` |
-| Block sensitive file access（scanner paths） | `74c0e70b90874ea4b44926aecb44ae16` |
-| Challenge wp-login non-TW/SG | `（從 API list 查）` |
+| Block sensitive file access（scanner paths） | `8202ff335538476a89685341f6efde07` |
+| Rate Limit Ruleset | `e29e21021ab641b38a4067735a027907` |
+| Rate Limit Rule（>50 req/10s） | `b8ffa72df8d44ea78a09bd0ababf8abb` |
+
+> **注意**：`74c0e70b...`（舊 scanner-paths rule）已於 2026-06-04 隨 ruleset 清空時刪除。`8202ff33...` 為 2026-06-12 重建的新 rule。
+> wp-login/xmlrpc 改用伺服器端 LLAR + nginx 防護（操作者常出國，CF geo rule 會自己封自己）。
 
 ### 查現有規則
 
@@ -141,3 +144,86 @@ curl -s -o /dev/null -w "/etc/passwd: %{http_code}\n"       https://n8n.aware-wa
 curl -s -o /dev/null -w "/healthz: %{http_code}\n"         https://n8n.aware-wave.com/healthz
 curl -s -o /dev/null -w "/api/ops/summary: %{http_code}\n" https://app.aware-wave.com/api/ops/summary
 ```
+
+---
+
+## §Origin Lockdown SOP（Claude 自動使用）
+
+> **目標**：限制 SG VPS port 80/443 只接受 Cloudflare 出口 IP，攻擊者直打 origin IP 時在 iptables 層被 DROP，nginx 完全看不到，Netdata 不告警。
+> **根因**：2026-06-12 scanner 洪流事件 — 攻擊者繞過 CF 直打 origin，4500 req 打爆 Netdata bad_request %。
+
+### 狀態確認
+
+```bash
+ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113 \
+  "ipset list cf-ipv4 2>/dev/null | head -3 && \
+   iptables -C INPUT -p tcp --dport 443 -m set --match-set cf-ipv4 src -j ACCEPT 2>&1 \
+   && echo 'LOCKDOWN: ACTIVE' || echo 'LOCKDOWN: INACTIVE'"
+```
+
+也可用 `/origin-lockdown status`（Claude Code slash command）。
+
+### 首次部署（HIGH RISK — 需操作者 go-ahead）
+
+```bash
+# 1. 上傳 script
+scp -i ~/.ssh/hetzner_trigger \
+  lobster-factory/infra/hetzner-phase1-core/scripts/cf-origin-lockdown.sh \
+  root@5.223.93.113:/root/cf-origin-lockdown.sh
+
+# 2. Preview（確認 no 誤傷）
+ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113 "bash /root/cf-origin-lockdown.sh --preview"
+
+# 3. Apply（啟動 120 秒 auto-revert 計時器）
+ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113 "bash /root/cf-origin-lockdown.sh --apply"
+
+# 4. 驗收（120 秒內完成）
+curl -sI https://aware-wave.com/ | grep -E "HTTP|CF-Ray"   # 必須有 CF-Ray
+ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113 echo ok     # SSH 22 仍通
+# direct-IP 應 timeout（若能測試非 CF IP 的話）
+
+# 5. 確認並持久化
+ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113 "bash /root/cf-origin-lockdown.sh --confirm"
+```
+
+### CF IP 月更新（防止 CF 新增出口 IP 被誤擋）
+
+```bash
+ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113 "bash /root/cf-origin-lockdown.sh --refresh"
+```
+
+此操作只更新 ipset，不改 iptables 規則。`ao-resume.ps1` 每月自動觸發 `scripts/refresh-cf-origin-ips.ps1`。
+
+### Rollback（緊急，< 2 min）
+
+```bash
+# 方法 A：用 script
+ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113 "bash /root/cf-origin-lockdown.sh --rollback"
+
+# 方法 B：手動（備份在 /root/cf-lockdown-backup-YYYYMMDD-HHMMSS/）
+ssh -i ~/.ssh/hetzner_trigger root@5.223.93.113 \
+  "iptables-restore < /root/cf-lockdown-backup-*/rules.v4.bak && \
+   ip6tables-restore < /root/cf-lockdown-backup-*/rules.v6.bak && \
+   netfilter-persistent save"
+```
+
+### 架構說明
+
+```
+【加固後】
+攻擊者 → 直打 5.223.93.113:443 → iptables DROP（到不了 nginx）→ 零 log → 零告警
+合法用戶 → CF edge → CF IP（白名單）→ iptables ACCEPT → nginx → 正常
+
+【CF IP 白名單來源】
+IPv4（15 段）：173.245.48.0/20 等（同 nginx aware-wave-security.conf set_real_ip_from）
+IPv6（7 段）：2400:cb00::/32 等
+持久化：/etc/iptables/rules.v4 + rules.v6（iptables-persistent）
+```
+
+### 重要注意事項
+
+- **操作者出國無影響**：lockdown 是 IP-based（CF 出口 IP），非 geo rule，不會封自己
+- **SSH 22 不受影響**：lockdown 只動 80/443
+- **fail2ban 仍在**：lockdown 後 fail2ban 對直打 origin 的 IP 無作用（因 iptables DROP 更早），但 CF-proxied 流量的 real-IP banning 仍靠 nginx real_ip module
+- **IPv6**：ip6tables 同步鎖定，ufw 在此 server 未安裝
+- **Script**：`lobster-factory/infra/hetzner-phase1-core/scripts/cf-origin-lockdown.sh`
