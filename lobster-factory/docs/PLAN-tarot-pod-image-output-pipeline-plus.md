@@ -692,15 +692,16 @@ export async function toPrintFile(
   if (colorGrade) img = img.modulate(colorGrade)
 
   // ── colorSpace 積木 ──
-  // ⚠️ [0-a] POC 實證（2026-06-12, sharp 0.35.1/libvips 8.18.3）：
-  //   .withMetadata({density}) 會附 sRGB ICC → 把 CMYK 轉回 3-channel sRGB（SOF=3）= 壞掉。
-  //   必須用 .withDensity() 才同時保 4-channel CMYK + 設 DPI。證據 d:\tmp\cmyk-poc\poc2.mjs。
+  // ⚠️ density 處理（兩個 POC 實證 2026-06-12，d:\tmp\cmyk-poc\poc2.mjs）：
+  //   ① .withMetadata({density}) 附 sRGB ICC → CMYK 轉回 3ch sRGB（SOF=3）= 壞掉，禁用。
+  //   ② .withDensity() 乾淨但需 sharp ≥0.35；本 app sharp=0.34.3（Next transitive）無此 method。
+  //   ③ → CMYK 一律「不設 density」（poc2 變體 B：無 withMetadata → SOF=4 CMYK ✓）。
+  //   density 非載重：實體尺寸由 PDF MediaBox/TrimBox(points) 決定，effective DPI = px ÷ 實體尺寸。
   let imgBuf: Buffer
   if (dest.colorSpace === 'cmyk') {
-    imgBuf = await img.toColorspace('cmyk').jpeg({ quality: 100 })
-      .withDensity(dest.dpi).toBuffer()  // NOT withMetadata — 見上
+    imgBuf = await img.toColorspace('cmyk').jpeg({ quality: 100 }).toBuffer()  // 不設 density
   } else {
-    imgBuf = await img.png().withDensity(dest.dpi).toBuffer()
+    imgBuf = await img.png().toBuffer()
   }
 
   // ── format 積木 ──
