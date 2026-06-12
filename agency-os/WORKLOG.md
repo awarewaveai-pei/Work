@@ -15,7 +15,8 @@
   - REVIEW_DONE: critic=Quick | verdict=pass | 改後行 Read 回確認（archive bullet bold 結構正確；deny 20 條含 forkbomb）
   - BUGHUNT_DONE: scope=agency-os/reports/ao-close,agency-os/TASKS.md | grep=`app.aware-wave Stage 1 接通入口` | hits=3（0333 archive-only 先例 + 兩個 `3.` 編號項非 `- ` bullet 不受 checker 解析，無 stale 衝突）
   - BUGHUNT_SCOPE_NARROW: 改動限單一 archive .md 註記 + 非 git-tracked 的 live settings.json；無 scripts call-site 或 symbol 改動，不需 scripts/lobster-factory scope
-- **[rollback]**：archive → `git checkout agency-os/reports/ao-close/2026-06-11-1820.md`；settings → 還原 `Backups/claude-userlevel-20260612-142138`。
+- **[源頭修復｜防再發]**：抓蟲發現同一 `Stage 1 接通入口` bullet 在 0333+1820 兩份 archive 都絆倒 lift gate（各手補一次）= 重複 toil。改 [.claude/commands/ao-close.md](../.claude/commands/ao-close.md) Step 2.5 codify「bullet 以 `（主線）` 等括號裝飾開頭時，識別字必須 `**bold**`」規則（plain-text token 只讀前 ~30 字、被前綴裝飾破壞 → 偽陰性）。**未動 checker 演算法**（保守，避 false-positive）。sync-check H1-H3 全 PASS（command 跨機 parity 未破）。
+- **[rollback]**：archive → `git checkout agency-os/reports/ao-close/2026-06-11-1820.md`；settings → 還原 `Backups/claude-userlevel-20260612-142138`；ao-close.md → `git checkout .claude/commands/ao-close.md`。
 
 ## 2026-06-11
 

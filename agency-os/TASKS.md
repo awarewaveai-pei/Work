@@ -62,7 +62,18 @@
 - [x] **【✅ 2026-06-11 操作者確認完成】Tarot 增 9 個圖像模型** → handoffs/2026-06-11-0236-add-tarot-models.md（加 ideogram-character/v4-turbo/v3-balanced/v2a-turbo/v4-quality、seedream-4.5、nano-banana-2、imagen-4、flux-2-max 到 Tarot Studio 模型選單）。**核心坑**：9 個各有不同 Replicate input schema，勿套 flux 的 `go_fast/megapixels/guidance/num_inference_steps`（→ 422）；逐一查 schema。改 `image-gen.ts`(TAROT_MODELS:26) + `TarotStudio.tsx`(MODEL_OPTIONS:43) → tsc → /verify-recent → /sg-deploy。
 - [ ] **【POD Studio 自建動工】** plan=`.claude/plans/pod-studio-p2a-p4-execution-PLAN.md`；藍本=`lobster-factory/docs/POD_STUDIO_ROADMAP.md`。✅ ① 擬真合成驗證 PASS（nano-banana-2 白 ~95%/黑鎖色 ~90%，prompt 三鐵則進 plan §0）✅ 先決小修（REPLICATE token 回填 + vault doc drift）✅ ② **P2a 儲存層完成 2026-06-11**（`lib/storage/r2.ts`+route+My Designs 頁，REALTEST 全過，flag OFF **未部署**；deploy 時 SG 設 `POD_DESIGNS_ENABLED=true`+`POD_DESIGNS_DEFAULT_ORG_ID=2bf60452-…`）。✅ ③ P2b 生成器（facade+Studio 頁，fbc1b7b1）✅ ④ P2c 去背（851-labs，RGBA 驗證）✅ Printful 憑證落定（vault ×4；store 18314943 已綁 Woo — P2d 先決解除）。✅ ⑤ Mockup Studio（B9-S 雙模式+鎖色，REALTEST 目視 PASS）✅ ⑥ P2d PrintProvider（Woo 平台改道 sync API；讀路徑實測過）✅ ⑦ 一鍵上架鏈+Publish 頁（upscaler 誠實合約+Ed25519 client；兩輪部署 a4fd0e95 全上線）。**下一步 = link 寫路徑首驗（見【明日優先】packet）→ P3 上架定案（主站 Woo 已可用）→ P4 試單對帳**
 - [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，**R0 已批方案A**，照 packet 直接動工免重提案）→ handoffs/2026-06-11-1738-tomo-173818.md
-- [ ] Tarot 生成圖調色階/飽和度/亮度功能（方案 A/B/C 待選）→ handoffs/2026-06-11-1739-tomo-173923.md
+- [ ] **🎨 Image Output Pipeline**（feature doc: `lobster-factory/docs/feature-image-output-pipeline.md`，2026-06-12 定案）決策：react-konva→Fabric.js in-app / 色調 bake 進匯出 / 塔羅印刷 CMYK PDF 896×1488 @300DPI / POD 不走 CMYK
+  - [ ] **[0-a S]** `image-provider.ts` 透傳 `printQuality` 欄位（facade 現在沒 expose）
+  - [ ] **[1-a S]** `lib/studio/color-grade.ts` — useColorGrade hook + colorGradeParams
+  - [ ] **[1-b S]** `components/tools/ColorGradePanel.tsx` — 色調/飽和/亮度三滑桿
+  - [ ] **[1-c S]** `components/tools/OutputTrackBar.tsx` — 🌐網頁用 / 🖨印刷用 / 🎨Canvas 三按鈕
+  - [ ] **[2-a S]** `lib/studio/to-product-image.ts` — Sharp 1000px JPEG 72 DPI
+  - [ ] **[2-b M]** `lib/studio/to-print-pdf.ts` — Sharp CMYK 300 DPI + pdf-lib（塔羅專用）
+  - [ ] **[2-c M]** `app/api/tools/image/process/route.ts` — 統一後處理入口
+  - [ ] **[3-a M]** `app/tools/canvas/CanvasEditor.tsx` — Fabric.js editor（移植 d:\tmp\tshirt-designer-prototype.html）
+  - [ ] **[3-b S]** `app/tools/canvas/page.tsx` — /tools/canvas 路由
+  - [ ] **[4-a S]** `TarotStudio.tsx` 接 ColorGradePanel + OutputTrackBar（無 AspectRatioSelector）
+  - [ ] **[4-b S]** `StudioWorkbench.tsx` 接 ColorGradePanel + OutputTrackBar
 
 - [x] **【✅ 2026-06-11 已套用】media_assets 雙重定義衝突修復（C1）**（critic C1，2026-06-11）— **修復檔已寫好 + db-expert 審過（verdict: commit LOW/apply LOW），只剩套用待操作者 go**：`migrations/0038_media_assets_reconcile.sql`（idempotent reconcile，線上=no-op，fresh replay=補齊 0011 canonical shape；含 predicate-based constraint guard + `notify pgrst` + fresh-replay 操作順序註記）+ down 檔 `scripts/0038_media_assets_reconcile_down.sql`。**套用方式**：SG quiet window 貼 Supabase SQL Editor（預期全 no-op，零鎖風險—db-expert 確認無 table rewrite）。佐證 WORKLOG 2026-06-11。
 - [x] POD Studio 路線圖 + tarot 框線收尾（框 png 還沒做好；per-frame 微調 + celestial 補生）→ handoffs/2026-06-06-2026-pod-studio-roadmap.md

@@ -60,6 +60,17 @@ silent drop.
 For each bullet planned:
 1. Identify a distinctive token (typically the **bold-text title** like `**Batch 3**`).
 2. Grep `agency-os/TASKS.md` for `^- \[ \]` lines containing the token.
+
+> **Token gotcha (codified 2026-06-12 after 2nd recurrence)**: the matcher only
+> reads the FIRST ~30 chars of an *un-bolded* bullet. A bullet that LEADS with
+> parenthetical/decoration prefix — `（主線）…`, `（次要）…`, `【明日優先】…` — yields a
+> useless prefix token and FAILS the lift gate even when the task IS on TASKS.md
+> (false negative, not a real silent-drop). **Rule: whenever a bullet leads with
+> such decoration, wrap the exact identifier that appears in the TASKS.md `- [ ]`
+> line in `**bold**`** so the bold-token path matches regardless of prefix —
+> e.g. `- （主線）app.aware-wave **Stage 1 接通入口**（本日未動）。`. The same
+> `Stage 1 接通入口` bullet defeated the gate in BOTH the 0333 and 1820 archives
+> on 2026-06-11 before this was codified.
 3. If no match: add a new `- [ ]` entry to TASKS.md under the appropriate
    `####` section, commit it as part of this AO-CLOSE.
 4. If the item is genuinely transient (e.g. already resolved during the
