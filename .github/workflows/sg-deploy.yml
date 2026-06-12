@@ -86,3 +86,47 @@ jobs:
           [ "$DRY_RUN" = "true" ] && ARGS="$ARGS --dry-run"
           echo "Running: $DEPLOY_SCRIPT $ARGS"
           "$DEPLOY_SCRIPT" $ARGS
+
+      - name: Report deploy event to ops-inbox (best-effort)
+        # Feeds the same ops_incidents pipeline as auto-deploy-next-admin.sh
+        # post_to_ops_inbox() (payload contract: normalize/deploy.ts), so
+        # /deploy_status and AO-RESUME deploy_events see GHA deploys too.
+        # Best-effort by design: telemetry must never change the deploy outcome,
+        # so every failure path here exits 0.
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          APPS: ${{ inputs.apps }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -u
+          [ "$DRY_RUN" = "true" ] && { echo "ops-inbox skipped: dry run"; exit 0; }
+          TOKEN=$(grep -m1 '^OPS_INBOX_INGEST_TOKEN=' /root/lobster-phase1/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || true)
+          [ -n "${TOKEN:-}" ] || { echo "ops-inbox skipped: OPS_INBOX_INGEST_TOKEN not found in staging .env"; exit 0; }
+          : "${APPS:=next-admin}"
+          EVENT=deploy_failed
+          [ "$JOB_STATUS" = "success" ] && EVENT=deploy_success
+          DEPLOYED=$(tr -d '[:space:]' < /root/lobster-phase1/.deployed-commit 2>/dev/null || echo unknown)
+          git -C /root/Work fetch -q origin main 2>/dev/null || true
+          ORIGIN=$(git -C /root/Work rev-parse origin/main 2>/dev/null || echo unknown)
+          BEHIND=$(git -C /root/Work rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
+          [[ "$BEHIND" =~ ^[0-9]+$ ]] || BEHIND=0
+          RUN_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          # Re-apply the allowlist: this step runs on failure paths where the
+          # deploy step's validation may not have completed, and app names are
+          # interpolated into the JSON payload.
+          for app in $APPS; do
+            case " next-admin node-api wordpress " in
+              *" $app "*) : ;;
+              *) echo "ops-inbox skipped for '$app': not in allowlist"; continue ;;
+            esac
+            payload=$(printf '{"event":"%s","app":"%s","deployed_commit":"%s","origin_commit":"%s","behind":%s,"run_at":"%s"}' \
+              "$EVENT" "$app" "${DEPLOYED:0:12}" "${ORIGIN:0:12}" "$BEHIND" "$RUN_AT")
+            http=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \
+              -X POST -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${TOKEN}" \
+              --data "$payload" \
+              "http://127.0.0.1:3002/api/webhooks/deploy" || echo 000)
+            echo "ops-inbox: $app $EVENT -> HTTP $http"
+          done
+          exit 0
