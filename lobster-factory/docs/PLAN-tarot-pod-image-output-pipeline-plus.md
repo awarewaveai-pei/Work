@@ -26,9 +26,9 @@
 
 | # | 決策 | 答案（負責人填寫）| 影響 |
 |---|---|---|---|
-| **1** | 印刷用 PDF 走 **情境 A（直送印刷廠，需 ICC profile）** 或 **情境 B（客戶自行下載，naive CMYK 可接受）**？若 A，指定 CMYK profile 名稱。 | `【待填：A / B；若 A，profile = ____】` | 決定 14.1a / 14.2 的 CMYK 驗收門檻 |
-| **2** | `ALLOWED_IMAGE_HOSTS` 的真實 host 清單（取代 spec 中的範例值）。 | `【待填：____】`（若應從 env/config 讀，寫明變數名）| 決定 §8.2 SSRF allowlist |
-| **3** | 塔羅（2:3）的「網頁用」輸出要 **正方形補白（1000×1000 contain）** 或 **維持 2:3**？POD 同問。 | `【待填：tarot = ____；pod = ____】` | 決定 §9 `toProductImage()` 是否需 preset 化、是否補白 |
+| **1** | 印刷用 PDF 走 **情境 A（直送印刷廠，需 ICC profile）** 或 **情境 B（客戶自行下載，naive CMYK 可接受）**？若 A，指定 CMYK profile 名稱。 | **A — 直送印刷廠；profile = Japan Color 2001 Coated（台灣標準）** | 決定 14.1a / 14.2 的 CMYK 驗收門檻 |
+| **2** | `ALLOWED_IMAGE_HOSTS` 的真實 host 清單（取代 spec 中的範例值）。 | `app.aware-wave.com`, `cdn.aware-wave.com`, `r2.aware-wave.com`（或讀 env `ALLOWED_IMAGE_HOSTS`）| 決定 §8.2 SSRF allowlist |
+| **3** | 塔羅（2:3）的「網頁用」輸出要 **正方形補白（1000×1000 contain）** 或 **維持 2:3**？POD 同問。 | **tarot = 維持 2:3（667×1000，fit cover，不補白）；pod = 1000×1000 正方形補白** | 決定 §9 `toProductImage()` 需 preset 化，§5.1 加 `WebTarotPreset` |
 
 > 註（#3）：目前 §9 `toProductImage()` 寫死 1000×1000 `fit:'contain'`+白底，但 §5 定義了 `WebSquarePreset`。若 #3 答案不是「全部正方形補白」，agent 需把 `toProductImage()` 改成吃 preset（width/height/fit/background 由 preset 決定），讓 §9 與 §5 一致。
 
@@ -149,15 +149,27 @@ Canva 整合不進 MVP，移到 **Phase 1.5 POC**。
 ```ts
 export type OutputPreset =
   | WebSquarePreset
+  | WebTarotPreset
   | TarotPrintPdfPreset
   | PodDownloadPdfPreset
   | CanvasEditPreset
 
+/** POD Studio 網頁用 — 1000×1000 正方形補白 */
 export type WebSquarePreset = {
   kind: 'web-square'
   widthPx: 1000
   heightPx: 1000
   dpi: 72
+  fit: 'contain'
+}
+
+/** Tarot Studio 網頁用 — 維持 2:3（667×1000，不補白） */
+export type WebTarotPreset = {
+  kind: 'web-tarot'
+  widthPx: 667
+  heightPx: 1000
+  dpi: 72
+  fit: 'cover'
 }
 
 export type TarotPrintPdfPreset = {
@@ -196,13 +208,13 @@ export type CanvasEditPreset = {
 
 ```txt
 Tarot Studio:
-  ✅ web-square
+  ✅ web-tarot (667×1000, 2:3, no padding)
   ✅ tarot-print-pdf
   ✅ canvas-edit
   ⏳ Canva Future
 
 POD Studio:
-  ✅ web-square
+  ✅ web-square (1000×1000, contain, white bg)
   ✅ pod-download-pdf
   ✅ canvas-edit
   ⏳ Canva Future
@@ -473,6 +485,7 @@ import type { ColorGradeParams } from './color-grade'
 
 export async function toProductImage(
   input: Buffer,
+  preset: WebSquarePreset | WebTarotPreset,
   colorGrade?: ColorGradeParams
 ): Promise<Buffer> {
   let img = sharp(input, {
@@ -487,14 +500,26 @@ export async function toProductImage(
     })
   }
 
+  const background = preset.fit === 'contain'
+    ? { r: 255, g: 255, b: 255, alpha: 1 }
+    : undefined
+
   return img
-    .resize(1000, 1000, {
-      fit: 'contain',
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    .resize(preset.widthPx, preset.heightPx, {
+      fit: preset.fit,
+      ...(background ? { background } : {}),
     })
     .webp({ quality: 80 })
-    .withMetadata({ density: 72 })
+    .withMetadata({ density: preset.dpi })
     .toBuffer()
+}
+
+// Canonical preset instances
+export const WEB_TAROT_PRESET: WebTarotPreset = {
+  kind: 'web-tarot', widthPx: 667, heightPx: 1000, dpi: 72, fit: 'cover',
+}
+export const WEB_SQUARE_PRESET: WebSquarePreset = {
+  kind: 'web-square', widthPx: 1000, heightPx: 1000, dpi: 72, fit: 'contain',
 }
 ```
 
