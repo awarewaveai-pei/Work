@@ -68,7 +68,19 @@ process.stdin.on('end', () => {
     for (const ln of shown) process.stderr.write(ln + '\n');
     if (hidden > 0) process.stderr.write(`[Hook] ...and ${hidden} more file(s) modified\n`);
     process.stderr.write('[Hook] Run /verify-recent before declaring done (syntax + critic + real exec test).\n');
-    process.stderr.write('[Hook] Override (trivial edit only): /verify-recent --trivial. Last resort: /verify-recent --ack.\n');
+
+    // Risk-tier routing (2026-06-12): tell Claude which verify level fits so low-risk edits can take
+    // the fast --trivial path with confidence, while high-risk paths are flagged as full-verify-only.
+    const mt = shared.maxTier(tracked);
+    if (mt.tier === 'high') {
+      const reasons = [...new Set(mt.highFiles.map(h => h.why))].join(', ');
+      process.stderr.write(`[Hook] ⚠ HIGH-RISK PATH (${reasons}) — full /verify-recent REQUIRED; --trivial is NOT sufficient here.\n`);
+      for (const h of mt.highFiles.slice(0, shared.STDERR_MAX_LINES)) {
+        process.stderr.write(`[Hook]     high-risk: ${h.file} (${h.why})\n`);
+      }
+    } else {
+      process.stderr.write('[Hook] Tier=normal. Comment/rename-only edits may use /verify-recent --trivial. Last resort: /verify-recent --ack.\n');
+    }
 
     // PS1-specific: CP950 encoding trap (2026-05-22 backfill-missed-daily.ps1 incident)
     const hasPsFiles = tracked.some(f => /\.ps1$/i.test(f));

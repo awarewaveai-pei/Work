@@ -111,6 +111,51 @@ function capStderr(lines) {
   return [lines.slice(0, STDERR_MAX_LINES), lines.length - STDERR_MAX_LINES];
 }
 
+// --- Risk classifier (added 2026-06-12) ---------------------------------------------------------
+// SINGLE SOURCE OF TRUTH for "how dangerous is a change to this file?". Consumed by the verify-gate
+// trio to route verification effort: HIGH-risk paths (auth / payment / RLS / migration / secrets /
+// deploy / infra) MUST get full verification (critic + real exec test) and may NOT be shortcut via
+// /verify-recent --trivial; NORMAL paths follow the standard flow (and a comment/rename-only edit
+// can legitimately use --trivial). This mirrors AGENTS.md §操作風險分級 (Low/Medium/High) but at the
+// file-path granularity the hooks operate on. Reusable by other gates (high-risk-bash-warn,
+// auto-repair-guard) so the tier definition never drifts across tools.
+//
+// Design note: false positives fail SAFE (an innocent file matching "session"/"policy" is merely
+// asked for more verification, never less). Matching is on the lowercased forward-slash path.
+const RISK_HIGH_PATTERNS = [
+  { re: /(^|\/)migrations?\//,                         why: 'DB migration' },
+  { re: /\bmigration[s]?[._-]/,                        why: 'DB migration' },
+  { re: /(^|\/)auth(n|z)?(\/|[._-])/,                  why: 'auth' },
+  { re: /\b(oauth|login|signin|session-?token|jwt)\b/, why: 'auth/session' },
+  { re: /\brls\b|row-?level-?security/,                why: 'RLS' },
+  { re: /\b(permission|policy|policies|acl)\b/,         why: 'permission/policy' },
+  { re: /\b(secret|credential|vault|password|api[-_]?key|private[-_]?key)\b/, why: 'secrets' },
+  { re: /\.env(\.|$|[a-z]*$)/,                          why: 'env/secrets' },
+  { re: /\b(payment|billing|stripe|checkout|invoice|payout|refund)\b/, why: 'payment' },
+  { re: /\b(sg|eu)-?deploy\b|\bdeploy[._-]/,           why: 'deploy' },
+  { re: /(^|\/)dockerfile|docker-compose|\bnginx\b/,   why: 'infra (docker/nginx)' },
+  { re: /(^|\/)\.github\/workflows\//,                 why: 'CI workflow' },
+];
+
+// classifyRisk(filePath) -> { tier: 'high'|'normal', why: string|null }
+function classifyRisk(filePath) {
+  const p = String(filePath || '').replace(/\\/g, '/').toLowerCase();
+  for (const { re, why } of RISK_HIGH_PATTERNS) {
+    if (re.test(p)) return { tier: 'high', why };
+  }
+  return { tier: 'normal', why: null };
+}
+
+// maxTier(files) -> { tier, highFiles: [{file, why}] }. Aggregates a list to the strictest tier.
+function maxTier(files) {
+  const highFiles = [];
+  for (const f of files) {
+    const c = classifyRisk(f);
+    if (c.tier === 'high') highFiles.push({ file: f, why: c.why });
+  }
+  return { tier: highFiles.length ? 'high' : 'normal', highFiles };
+}
+
 // Persistent fail-open audit log. When a gate hook catches an unexpected exception, we MUST log
 // loudly so the operator can audit later (current behavior: pass through silently is a security gap
 // per critic C2). Writes a one-line record to ~/.claude/verify-gate-failures.log.
@@ -140,4 +185,6 @@ module.exports = {
   writeTracker,
   capStderr,
   logFailOpen,
+  classifyRisk,
+  maxTier,
 };
