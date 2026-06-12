@@ -84,10 +84,15 @@ export function stateToParams(s: ColorGradeState): ColorGradeParams {
 
 /** Clamp a wire-supplied ColorGradeParams into Sharp-safe multiplier bounds. */
 export function clampParams(p: ColorGradeParams): ColorGradeParams {
+  const o = (p ?? {}) as Partial<ColorGradeParams>; // tolerate null/garbage object
   return {
-    hue: clamp(p.hue, GRADE_LIMITS.hue.min, GRADE_LIMITS.hue.max, 0),
-    saturation: clamp(p.saturation, GRADE_LIMITS.sat.min / 100, GRADE_LIMITS.sat.max / 100, 1),
-    brightness: clamp(p.brightness, GRADE_LIMITS.bri.min / 100, GRADE_LIMITS.bri.max / 100, 1),
+    hue: clamp(o.hue, GRADE_LIMITS.hue.min, GRADE_LIMITS.hue.max, GRADE_LIMITS.hue.neutral),
+    saturation: clamp(
+      o.saturation, GRADE_LIMITS.sat.min / 100, GRADE_LIMITS.sat.max / 100, GRADE_LIMITS.sat.neutral / 100
+    ),
+    brightness: clamp(
+      o.brightness, GRADE_LIMITS.bri.min / 100, GRADE_LIMITS.bri.max / 100, GRADE_LIMITS.bri.neutral / 100
+    ),
   };
 }
 
