@@ -47,15 +47,23 @@ export const NEUTRAL_STATE: ColorGradeState = {
   bri: GRADE_LIMITS.bri.neutral,
 };
 
-const clamp = (v: number, min: number, max: number): number =>
-  Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : min;
+// Defense-in-depth: TS types are erased at runtime, so wire payloads can carry
+// undefined/null/strings/missing keys. Anything that is not a FINITE number
+// (NaN, ±Infinity, non-number) collapses to the neutral no-op — it must never
+// reach Sharp.modulate() as NaN/extreme. The API boundary ([1-e]) also schema-
+// validates; this is the second line so a slip can't push an out-of-bounds bake.
+const clamp = (v: unknown, min: number, max: number, neutral: number): number =>
+  typeof v === "number" && Number.isFinite(v)
+    ? Math.min(max, Math.max(min, v))
+    : neutral;
 
 /** Clamp a (possibly user/wire-supplied) state into valid slider bounds. */
 export function clampState(s: ColorGradeState): ColorGradeState {
+  const o = (s ?? {}) as Partial<ColorGradeState>; // tolerate null/garbage object
   return {
-    hue: clamp(s.hue, GRADE_LIMITS.hue.min, GRADE_LIMITS.hue.max),
-    sat: clamp(s.sat, GRADE_LIMITS.sat.min, GRADE_LIMITS.sat.max),
-    bri: clamp(s.bri, GRADE_LIMITS.bri.min, GRADE_LIMITS.bri.max),
+    hue: clamp(o.hue, GRADE_LIMITS.hue.min, GRADE_LIMITS.hue.max, GRADE_LIMITS.hue.neutral),
+    sat: clamp(o.sat, GRADE_LIMITS.sat.min, GRADE_LIMITS.sat.max, GRADE_LIMITS.sat.neutral),
+    bri: clamp(o.bri, GRADE_LIMITS.bri.min, GRADE_LIMITS.bri.max, GRADE_LIMITS.bri.neutral),
   };
 }
 
@@ -77,9 +85,9 @@ export function stateToParams(s: ColorGradeState): ColorGradeParams {
 /** Clamp a wire-supplied ColorGradeParams into Sharp-safe multiplier bounds. */
 export function clampParams(p: ColorGradeParams): ColorGradeParams {
   return {
-    hue: clamp(p.hue, GRADE_LIMITS.hue.min, GRADE_LIMITS.hue.max),
-    saturation: clamp(p.saturation, GRADE_LIMITS.sat.min / 100, GRADE_LIMITS.sat.max / 100),
-    brightness: clamp(p.brightness, GRADE_LIMITS.bri.min / 100, GRADE_LIMITS.bri.max / 100),
+    hue: clamp(p.hue, GRADE_LIMITS.hue.min, GRADE_LIMITS.hue.max, 0),
+    saturation: clamp(p.saturation, GRADE_LIMITS.sat.min / 100, GRADE_LIMITS.sat.max / 100, 1),
+    brightness: clamp(p.brightness, GRADE_LIMITS.bri.min / 100, GRADE_LIMITS.bri.max / 100, 1),
   };
 }
 

@@ -32,10 +32,10 @@ describe("color-grade", () => {
     });
   });
 
-  it("clamps NaN/Infinity to the safe minimum (hostile payload defense)", () => {
+  it("NaN → neutral (no-op); ±Infinity → nearest bound (hostile payload defense)", () => {
     expect(clampState({ hue: NaN, sat: Infinity, bri: -Infinity })).toEqual({
-      hue: GRADE_LIMITS.hue.min,
-      sat: GRADE_LIMITS.sat.max, // Infinity clamps to max
+      hue: GRADE_LIMITS.hue.neutral, // NaN has no ordering → neutral
+      sat: GRADE_LIMITS.sat.max, // +Infinity clamps to max
       bri: GRADE_LIMITS.bri.min, // -Infinity clamps to min
     });
   });

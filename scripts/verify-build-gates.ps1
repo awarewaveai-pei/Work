@@ -73,9 +73,14 @@ if (Test-Path -LiteralPath $adrIdx) {
 $secretScan = Join-Path $WorkRoot "scripts\scan-local-config-for-secrets.ps1"
 if (Test-Path -LiteralPath $secretScan) {
     Write-Host "== Local config: scan-for-secrets ==" -ForegroundColor Cyan
-    & powershell -ExecutionPolicy Bypass -NoProfile -File $secretScan -WorkRoot $WorkRoot -Quiet
+    $secretBaseline = Join-Path $WorkRoot "agency-os\config\scan-local-config-known-suppressed.json"
+    $secretArgs = @("-WorkRoot", $WorkRoot, "-Quiet")
+    if (Test-Path -LiteralPath $secretBaseline) {
+        $secretArgs += @("-KnownSuppressedBaseline", $secretBaseline)
+    }
+    & powershell -ExecutionPolicy Bypass -NoProfile -File $secretScan @secretArgs
     if ($LASTEXITCODE -eq 2) {
-        Write-Error "verify-build-gates: scan-local-config-for-secrets FAIL (secret in tracked file). See runbook."
+        Write-Error "verify-build-gates: scan-local-config-for-secrets FAIL (tracked secret or baseline-miss local secret). See runbook."
         exit $LASTEXITCODE
     }
     if ($LASTEXITCODE -eq 1) {

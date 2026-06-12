@@ -813,6 +813,43 @@ if (Test-Path -LiteralPath $aoResumeArchiveScript) {
     Add-Check -Name "AO-RESUME archive written (verify-aoresume-archive.ps1)" -Pass $true -Detail "Skipped: scripts/verify-aoresume-archive.ps1 not present"
 }
 
+# 12e) Git fetch ledger recency.
+# Phase Z5 (2026-06-12) consumes the Phase Z git-fetch-last.json ledger written by
+# git-align-main-aoresume-feature.ps1. The health score may be relaxed by
+# ao-close.ps1 -AllowNonPerfectHealth, but criticalFailures still block publish,
+# so >30d stale or unreadable ledger cannot be bypassed by score relaxation.
+$fetchLedgerPath = Join-Path $monoRoot "agency-os\.agency-state\git-fetch-last.json"
+$fetchCheckName = "Git fetch ledger recency (git-fetch-last.json)"
+if (Test-Path -LiteralPath $fetchLedgerPath) {
+    try {
+        $fetchLedger = Get-Content -LiteralPath $fetchLedgerPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $finishedText = [string]$fetchLedger.finishedAtUtc
+        if ([string]::IsNullOrWhiteSpace($finishedText)) {
+            throw "finishedAtUtc missing"
+        }
+        $finishedUtc = ([datetime]::Parse($finishedText)).ToUniversalTime()
+        $ageDaysRaw = [Math]::Floor(((Get-Date).ToUniversalTime() - $finishedUtc).TotalDays)
+        $ageDays = [Math]::Max(0, $ageDaysRaw)
+        $success = [bool]$fetchLedger.success
+        $attempts = if ($fetchLedger.PSObject.Properties.Name -contains 'attempts') { [int]$fetchLedger.attempts } else { 0 }
+        $exitCode = if ($fetchLedger.PSObject.Properties.Name -contains 'exitCode') { [int]$fetchLedger.exitCode } else { 0 }
+
+        if ($ageDays -gt 30) {
+            Add-Check -Name $fetchCheckName -Pass $false -Detail ("FAIL: last fetch ledger is " + $ageDays + "d old (>30d), success=" + $success + ", exit=" + $exitCode)
+            Add-CriticalFailure -Reason "Git fetch ledger stale >30d; run AO-RESUME/git-align to refresh remote state"
+        } elseif ((-not $success) -or $ageDays -gt 7) {
+            Add-Check -Name $fetchCheckName -Pass $true -Detail ("WARN: success=" + $success + ", age=" + $ageDays + "d, attempts=" + $attempts + ", exit=" + $exitCode)
+        } else {
+            Add-Check -Name $fetchCheckName -Pass $true -Detail ("PASS: success=" + $success + ", age=" + $ageDays + "d, attempts=" + $attempts + ", exit=" + $exitCode)
+        }
+    } catch {
+        Add-Check -Name $fetchCheckName -Pass $false -Detail ("FAIL: unreadable ledger: " + $_.Exception.Message)
+        Add-CriticalFailure -Reason "Git fetch ledger unreadable; run AO-RESUME/git-align to regenerate agency-os/.agency-state/git-fetch-last.json"
+    }
+} else {
+    Add-Check -Name $fetchCheckName -Pass $true -Detail "WARN: ledger missing; run AO-RESUME/git-align to create agency-os/.agency-state/git-fetch-last.json"
+}
+
 $total = $checks.Count
 $passed = @($checks | Where-Object { $_.pass }).Count
 $failed = $total - $passed

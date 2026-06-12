@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "description": "Known, already-governed local plaintext findings for scripts/scan-local-config-for-secrets.ps1. Do not store secret values here.",
+  "lastReviewed": "2026-06-12",
+  "suppressions": [
+    {
+      "file": ".claude/settings.json",
+      "pattern": "Google app password (4x4x4)",
+      "sourceKey": "line:12",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "API_AWAREWAVE_BEARER_TOKEN",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "APP_AWAREWAVE_BEARER_TOKEN",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "Postgres DSN with password",
+      "sourceKey": "SUPABASE_AWAREWAVE_POSTGRES_DSN",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "SUPABASE_B_SERVICE_ROLE_KEY",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "SUPABASE_A_SERVICE_ROLE_KEY",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "N8N_AUTH_BEARER_TOKEN",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "N8N_API_KEY",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "Uptime Kuma API key",
+      "sourceKey": "UPTIME_KUMA_API_KEY",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "GitHub PAT (classic)",
+      "sourceKey": "GITHUB_PERSONAL_ACCESS_TOKEN",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "GitHub PAT (classic)",
+      "sourceKey": "COPILOT_MCP_BEARER_TOKEN",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "Google API key",
+      "sourceKey": "GEMINI_API_KEY",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    }
+  ]
+}

@@ -25,9 +25,14 @@
 .PARAMETER Quiet
   Suppress non-essential output. Always prints findings + final verdict.
 
+.PARAMETER KnownSuppressedBaseline
+  Optional JSON baseline of already-governed gitignored findings. The baseline
+  must not contain secret values. Matching WARN findings are hidden; new
+  baseline-miss findings fail with exit 2.
+
 .NOTES
-  Schema version: 1
-  Last reviewed: 2026-05-07
+  Schema version: 2
+  Last reviewed: 2026-06-12
   Owner: agency-os
   Related: agency-os/docs/operations/mcp-secrets-hardening-runbook.md §Local Plaintext Scanner
 
@@ -41,6 +46,7 @@ param(
     [switch]$Strict,
     [string[]]$Path,
     [switch]$Quiet,
+    [string]$KnownSuppressedBaseline = "",
     [string]$WorkRoot = ""
 )
 
@@ -88,6 +94,38 @@ $defaultPaths = @(
 $targetPaths = if ($Path) { $Path } else { $defaultPaths }
 
 # ============================================================================
+# Known-suppressed baseline. Match key: file + pattern + sourceKey.
+# SourceKey is a non-secret label, usually an env var name. The baseline is
+# intentionally value-free, so it can be committed safely.
+# ============================================================================
+$baselineMode = -not [string]::IsNullOrWhiteSpace($KnownSuppressedBaseline)
+$baselineSuppressions = @()
+
+function Normalize-RelPath {
+    param([string]$RelPath)
+    return (($RelPath -replace '\\', '/') -replace '^\./', '').ToLowerInvariant()
+}
+
+if ($baselineMode) {
+    $baselinePath = if ([System.IO.Path]::IsPathRooted($KnownSuppressedBaseline)) {
+        $KnownSuppressedBaseline
+    } else {
+        Join-Path $WorkRoot $KnownSuppressedBaseline
+    }
+    if (-not (Test-Path -LiteralPath $baselinePath)) {
+        Write-Host "scan-local-config-for-secrets: FAIL -- known-suppressed baseline not found: $baselinePath" -ForegroundColor Red
+        exit 2
+    }
+    try {
+        $baselineRaw = Get-Content -LiteralPath $baselinePath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $baselineSuppressions = @($baselineRaw.suppressions | Where-Object { -not ($_.PSObject.Properties.Name -contains 'enabled') -or $_.enabled -ne $false })
+    } catch {
+        Write-Host "scan-local-config-for-secrets: FAIL -- cannot parse known-suppressed baseline: $($_.Exception.Message)" -ForegroundColor Red
+        exit 2
+    }
+}
+
+# ============================================================================
 # Helpers
 # ============================================================================
 function Test-PathTrackedByGit {
@@ -111,6 +149,52 @@ function Get-Redacted {
     return $Match.Substring(0, 4) + "***" + $Match.Substring($Match.Length - 4, 4)
 }
 
+function Get-SourceKey {
+    param(
+        [string]$Line,
+        [int]$LineNumber
+    )
+
+    $sourceKeyPatterns = @(
+        '(?i)\$env:([A-Z][A-Z0-9_]{2,})',
+        '(?i)\b([A-Z][A-Z0-9_]{2,})\s*=',
+        '(?i)"([A-Z][A-Z0-9_]{2,})"\s*:'
+    )
+    foreach ($rx in $sourceKeyPatterns) {
+        $m = [regex]::Match($Line, $rx)
+        if ($m.Success) {
+            return $m.Groups[1].Value.ToUpperInvariant()
+        }
+    }
+
+    return "line:$LineNumber"
+}
+
+function Test-KnownSuppressed {
+    param(
+        [string]$File,
+        [string]$Pattern,
+        [string]$SourceKey
+    )
+    if (-not $baselineMode) { return $false }
+
+    $fileNorm = Normalize-RelPath -RelPath $File
+    foreach ($s in $baselineSuppressions) {
+        $sFile = Normalize-RelPath -RelPath ([string]$s.file)
+        $sPattern = [string]$s.pattern
+        $sSourceKey = ([string]$s.sourceKey).ToUpperInvariant()
+        if (
+            $sFile -eq $fileNorm -and
+            $sPattern -eq $Pattern -and
+            $sSourceKey -eq $SourceKey.ToUpperInvariant()
+        ) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 # ============================================================================
 # Scan
 # ============================================================================
@@ -132,13 +216,17 @@ foreach ($rel in $targetPaths) {
         foreach ($p in $patterns) {
             $m = [regex]::Match($lines[$i], $p.Regex)
             if ($m.Success) {
+                $sourceKey = Get-SourceKey -Line $lines[$i] -LineNumber ($i + 1)
+                $suppressed = (-not $tracked) -and (Test-KnownSuppressed -File $rel -Pattern $p.Name -SourceKey $sourceKey)
                 $findings += [pscustomobject]@{
-                    File     = $rel
-                    Line     = $i + 1
-                    Pattern  = $p.Name
-                    Tracked  = $tracked
-                    Severity = $severity
-                    Redacted = Get-Redacted -Match $m.Value
+                    File       = $rel
+                    Line       = $i + 1
+                    Pattern    = $p.Name
+                    SourceKey  = $sourceKey
+                    Tracked    = $tracked
+                    Severity   = $severity
+                    Suppressed = $suppressed
+                    Redacted   = Get-Redacted -Match $m.Value
                 }
                 break
             }
@@ -155,22 +243,32 @@ if (-not $Quiet) {
     Write-Host "  WorkRoot: $WorkRoot"
     Write-Host "  Files scanned: $scannedCount"
     Write-Host "  Patterns: $($patterns.Count)"
+    if ($baselineMode) {
+        Write-Host "  Known-suppressed baseline: $KnownSuppressedBaseline ($($baselineSuppressions.Count) rule(s))"
+    }
 }
 
-if ($findings.Count -eq 0) {
-    Write-Host "scan-local-config-for-secrets: PASS (no plaintext secrets in local config)" -ForegroundColor Green
+$suppressedFindings = @($findings | Where-Object { $_.Suppressed })
+$visibleFindings = @($findings | Where-Object { -not $_.Suppressed })
+
+if ($visibleFindings.Count -eq 0) {
+    if ($suppressedFindings.Count -gt 0) {
+        Write-Host "scan-local-config-for-secrets: PASS ($($suppressedFindings.Count) known-suppressed local finding(s) hidden)" -ForegroundColor Green
+    } else {
+        Write-Host "scan-local-config-for-secrets: PASS (no plaintext secrets in local config)" -ForegroundColor Green
+    }
     exit 0
 }
 
 Write-Host ""
-Write-Host "Findings ($($findings.Count)):" -ForegroundColor Yellow
-foreach ($f in $findings) {
+Write-Host "Findings ($($visibleFindings.Count) visible$(if ($suppressedFindings.Count -gt 0) { ", $($suppressedFindings.Count) suppressed" })):" -ForegroundColor Yellow
+foreach ($f in $visibleFindings) {
     $color = if ($f.Severity -eq "FAIL") { "Red" } else { "Yellow" }
-    Write-Host ("  [{0}] {1}:{2}  {3}  match={4}  tracked={5}" -f $f.Severity, $f.File, $f.Line, $f.Pattern, $f.Redacted, $f.Tracked) -ForegroundColor $color
+    Write-Host ("  [{0}] {1}:{2}  {3}  source={4}  match={5}  tracked={6}" -f $f.Severity, $f.File, $f.Line, $f.Pattern, $f.SourceKey, $f.Redacted, $f.Tracked) -ForegroundColor $color
 }
 
-$hasFail = (@($findings | Where-Object { $_.Severity -eq "FAIL" })).Count -gt 0
-$hasWarn = (@($findings | Where-Object { $_.Severity -eq "WARN" })).Count -gt 0
+$hasFail = (@($visibleFindings | Where-Object { $_.Severity -eq "FAIL" })).Count -gt 0
+$hasWarn = (@($visibleFindings | Where-Object { $_.Severity -eq "WARN" })).Count -gt 0
 
 Write-Host ""
 if ($hasFail) {
@@ -180,6 +278,12 @@ if ($hasFail) {
 }
 
 if ($hasWarn) {
+    if ($baselineMode) {
+        Write-Host "scan-local-config-for-secrets: FAIL (baseline mode) -- new unsuppressed local secret finding(s)." -ForegroundColor Red
+        Write-Host "  Add only already-governed findings to the known-suppressed baseline; never add secret values."
+        Write-Host "Recipe: see agency-os/docs/operations/mcp-secrets-hardening-runbook.md §Local Plaintext Scanner"
+        exit 2
+    }
     if ($Strict) {
         Write-Host "scan-local-config-for-secrets: FAIL (strict mode) — secret(s) in gitignored local config files." -ForegroundColor Red
         Write-Host "Recipe: see agency-os/docs/operations/mcp-secrets-hardening-runbook.md §Local Plaintext Scanner"
