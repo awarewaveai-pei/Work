@@ -76,28 +76,29 @@ WARN: ~/.claude/ drifted from SSOT (mcp/claude-userlevel/).
 
 ---
 
-## 故障排除：merge 後 verify 仍報漂移（live-race，2026-06-12 codified）
+## 故障排除：多 session 並行下 settings.json 短暫漂移（2026-06-12 查清）
 
-**症狀**：跑了 `-Mode merge`（自報 `RESULT: PASS`、有 backup），但下一次 `-Mode verify` / `check-claude-sync` 仍 `HARD drift`；手動讀 `~/.claude/settings.json` 一下是對的、一下又變回舊值（典型：`permissions.deny` 少一條、`hooks.*` 從 array 變回 object）。
+**症狀**：跑了 `-Mode merge`（自報 `RESULT: PASS`、有 backup），但下一次獨立 `-Mode verify` / `check-claude-sync` 仍 `HARD drift`；手動讀 `~/.claude/settings.json` 一下對、一下又變回舊值。
 
-**根因**：`~/.claude/settings.json` 由**正在執行的 Claude Code session** 持有。session 啟動時把該檔載入記憶體；harness 在某些事件會以**啟動時的舊記憶體版回寫整個檔**，覆蓋 merge 剛寫入的正確內容。因此 merge 與 verify 若分成**兩次獨立 invoke**、中間有任何 Claude 動作（tool call、permission 事件），就會被回寫卡在中間 → 看似 merge「沒生效」。
+**根因（多 session 並行爭用，非單體 harness bug）**：
+- `D:\Work\.claude` 是 **junction → `C:\Users\<user>\.claude`**（同一個實體檔；`Get-Item ... .LinkType=Junction` 可驗）。
+- 同一帳號同時開 **N 個 Claude Code session**（2026-06-12 實測 = 4 個 `claude.exe`，啟動時間各異）。每個 session 在**啟動時把 settings.json 載入記憶體**，之後在 permission/persist 事件**寫回自己的快照**。
+- 若某 session 啟動時磁碟是舊值，它記憶體就是舊值；它一寫回就把別的 session 剛 merge 的新值蓋掉 → 看似「merge 沒生效」。這是 **N 個寫者共用一個可變檔 + last-writer-wins**，不是某個 harness「頻繁回寫」。
 
-**這不是 SSOT 壞掉**：repo `mcp/claude-userlevel/settings.template.json` 永遠是正本；漂移的只是本機 ephemeral 檔。先 `git`-diff 該 template 確認正本完好，不要追幽靈。
+**嚴重性：低（良性）**。2026-06-12 實測**唯一**會 flap 的 deny 只有 fork-bomb 守則 `Bash(:(){ *)`（2026-05-07 才加進 SSOT）；其餘 19 條重要守則（`rm -rf`、force push、`sudo`、`git reset --hard`…）**每個 session 都一致穩定**，不受影響。亦即真正的安全護欄不會掉，只有一條冷門守則在 ephemeral 檔上短暫缺席。`mcp/claude-userlevel/settings.template.json`（git SSOT）永遠正確。
 
-> **關鍵原理（2026-06-12 dogfood 實測）**：回寫**頻繁觸發**（疑似每個 tool-use／permission 週期），**不是**啟動時一次性。因此「跑兩次 merge」**不會**讓它持久穩定——下一個獨立 gate run 仍會 flap。唯一可靠的綠 = 把 merge 與「要它綠的那個 gate」放進**同一個 child process invocation**：父 Claude 被 block 等待該 process 時不採取動作 → harness 無回寫窗口。
+**這不是該用 code「修掉」的 bug**：N 個 session 共用一個 user-level config，本來就會 last-writer-wins。無法 mid-session 強制它持久——除非關掉其他 session。
 
-**正解（三選一）**：
-1. **不用手動修（推薦、已機械驗證）**：`ao-close.ps1` 的 AO-CLOSE sync 自癒（`scripts/ao-close.ps1` §「Claude Code sync self-heal」）在**單一 script run 內**原子完成 verify→merge→health-check，期間父 Claude 被 block，不受此 race 影響——直接收工讓它處理即可。
-2. **手動要某 gate 綠**：把 merge 與該 gate 串進**同一個 invocation**，例：
+**處置**：
+1. **判讀優先（多數情況）**：mid-session 看到此單條 deny drift = 已知良性現象，**不需纏鬥**。git SSOT 正確即可。
+2. **要某 gate 立刻綠**：把 merge 與該 gate 串進**同一個 invocation**（把 race 窗口從「分鐘級」縮到「毫秒級」，多 session 下仍非 100% 保證，但實務夠用）：
    ```powershell
    powershell -Command "& scripts/sync-claude-userlevel.ps1 -Mode merge *>$null; & scripts/verify-build-gates.ps1"
    ```
-   ⚠️ **只對該 invocation 有效**；跑完回到 Claude 後，下次獨立 `check-claude-sync` 仍可能 flap。**不要**把 merge 與 verify 拆成兩次 Bash call（中間 Claude 動作 = harness 回寫窗口，這正是 2026-06-12 困惑根因）。
-3. 換 IDE／重啟 session 後，harness 以**新的（已 merge 的）磁碟版**重載，race 永久消失。
+   **不要**把 merge 與 verify 拆成兩次 Bash call（中間數秒 wall-clock 給別的 session 寫入窗口 = 2026-06-12 困惑根因）。
+3. **真正收斂**：等所有舊 session 結束、新 session 從最終磁碟版重載即一致；`ao-close.ps1` sync 自癒（`§「Claude Code sync self-heal」`）在單一 process 內 re-merge，是每個 session 收工的收斂點。
 
-> **判讀**：mid-session 看到此 drift **不代表壞掉**，repo SSOT 永遠正確。它在 AO-CLOSE（原子）或重啟後自然轉綠；不需 mid-session 反覆纏鬥。
-
-> **跨機提醒**：此 race 只影響本機 ephemeral 檔，不影響 git-tracked SSOT，故**不需跨機同步任何東西**；另一台機器只要 `git pull` 取得 template 正本即正確。
+> **跨機提醒**：只影響本機 ephemeral 檔，不影響 git-tracked SSOT；另一台機器 `git pull` 取得 template 正本即正確，**不需跨機同步任何東西**。
 
 ---
 

@@ -158,7 +158,7 @@ if (Test-Path -LiteralPath $syncScript) {
             $tail = ($verifyOut | Select-Object -Last 5) -join ' | '
             Add-Finding -Severity 'hard' -Check 'H2: sync-claude-userlevel -Mode verify' `
                 -Detail "Drift detected (exit $verifyExit). Last output: $tail" `
-                -Fix 'powershell -File scripts\sync-claude-userlevel.ps1 -Mode merge  [if drift PERSISTS after merge: live Claude session may revert ~/.claude/settings.json between invocations -- run merge+verify in ONE shell, or let AO-CLOSE self-heal. See CROSS_MACHINE_SYNC_RUNBOOK.md live-race section]'
+                -Fix 'powershell -File scripts\sync-claude-userlevel.ps1 -Mode merge  [if drift PERSISTS: N concurrent Claude sessions share ~/.claude (junction) and each writes its own settings.json snapshot -- benign multi-session contention, only the fork-bomb deny flaps. Run merge+gate in ONE invocation, or let AO-CLOSE/session-restart converge. See CROSS_MACHINE_SYNC_RUNBOOK.md multi-session section]'
         }
     } catch {
         Add-Finding -Severity 'hard' -Check 'H2: sync-claude-userlevel -Mode verify' `
