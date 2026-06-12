@@ -58,6 +58,39 @@
 - **[源頭修復｜防再發]**：抓蟲發現同一 `Stage 1 接通入口` bullet 在 0333+1820 兩份 archive 都絆倒 lift gate（各手補一次）= 重複 toil。改 [.claude/commands/ao-close.md](../.claude/commands/ao-close.md) Step 2.5 codify「bullet 以 `（主線）` 等括號裝飾開頭時，識別字必須 `**bold**`」規則（plain-text token 只讀前 ~30 字、被前綴裝飾破壞 → 偽陰性）。**未動 checker 演算法**（保守，避 false-positive）。sync-check H1-H3 全 PASS（command 跨機 parity 未破）。
 - **[rollback]**：archive → `git checkout agency-os/reports/ao-close/2026-06-11-1820.md`；settings → 還原 `Backups/claude-userlevel-20260612-142138`；ao-close.md → `git checkout .claude/commands/ao-close.md`。
 
+### Scanner 洪流事件應對 — 三層防禦（CF WAF + Origin Lockdown 架構）
+
+**[任務理解]** 根本問題：185.177.72.0/24 scanner 直打 SG origin IP 5.223.93.113:443，完全繞過 Cloudflare → nginx 見到 4500+ bad request，Netdata bad_request % 觸警，操作者收到連續通知。nginx log 確認攻擊者 IP 非 CF proxy IP（if real attacker IP 出現在 log = 繞 CF 確定）。
+
+**[已修改]**
+1. **CF WAF Custom Rule**（live via API）：重建 scanner path block rule `8202ff335538476a89685341f6efde07`（舊 `74c0e70b` 於 2026-06-04 ruleset 清空時刪除）。封鎖 `/.env`, `/.git`, `/.aws/`, `/.ssh/`, `/wp-config`, `/phpinfo`, `/etc/passwd`, `/etc/shadow`, `/.htaccess`, `/.DS_Store`, `/config.php`。
+2. **CF WAF Rate Limit Rule**（live via API）：`b8ffa72df8d44ea78a09bd0ababf8abb`，>50 req/10s block（free plan 限制：period=10s, mitigation_timeout=10s）。
+3. **`lobster-factory/infra/hetzner-phase1-core/scripts/cf-origin-lockdown.sh`**（NEW）：完整 bash script，--preview/--apply/--confirm/--rollback/--refresh。ipset cf-ipv4（15 ranges）+ cf-ipv6（7 ranges）。--apply 啟動 120s auto-revert 計時器。**尚未 apply 到 SG（Task 4，待 go-ahead）**。
+4. **`runbooks/CLOUDFLARE-WAF-SETUP.md`**（UPDATED）：補 §Origin Lockdown SOP（部署步驟/rollback/架構圖）+ 修正固定 ID 表（舊 rule 已改）+ 修正 §API 維護 PATCH command rule ID（`74c0e70b` → `8202ff335538476a89685341f6efde07`）。
+5. **`runbooks/SCANNER-ATTACK-RESPONSE-RUNBOOK.md`**（NEW）：分診 triage、decision tree（Lockdown active/inactive 分支）、CF WAF 驗證 curl、IP block API、損害評估清單、WORKLOG template。
+6. **`.claude/commands/origin-lockdown.md`**（NEW）：`/origin-lockdown` slash command（status/preview/refresh/apply/rollback）。
+7. **`scripts/check-cloudflare-security.ps1`**（EXTENDED）：加第三項 check — SSH SG 驗 ipset cf-ipv4 + iptables rule 存在；report 增「Origin lockdown (SG)」行。
+8. **`scripts/refresh-cf-origin-ips.ps1`**（NEW）：定期 SSH SG 跑 `--refresh` + 寫 `reports/status/cf-iprefresh-LATEST.json`。
+9. **`scripts/ao-resume.ps1`**（UPDATED）：加月度 `cf_ip_refresh` check block（第四項月度任務）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -s -o /dev/null -w "%{http_code}\n" https://aware-wave.com/.aws/credentials` | exit=0 | result=403（CF WAF path block 生效）
+- REALTEST_EVIDENCE: tool=Bash | cmd=CF WAF Rate Limit POST API | exit=0 | `"success":true, rule_id=b8ffa72df8d44ea78a09bd0ababf8abb`
+- REALTEST_WAIVED: NA -- origin lockdown (Task 4) NOT YET APPLIED to SG; cf-origin-lockdown.sh 已建立但未 deploy，等 go-ahead
+- REVIEW_DONE: critic=Deep | verdict=pending（背景執行中，完成後更新）| findings=TBD
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude | grep=`74c0e70b|origin-lockdown|cf-ipv4|SCANNER` | hits=1（CLOUDFLARE-WAF-SETUP.md:128 PATCH rule ID 舊值，已修正為 `8202ff33`）
+- audit-encoding: check-cloudflare-security.ps1 BOM=True CJK=False ✓；refresh-cf-origin-ips.ps1 BOM=True CJK=False ✓；ao-resume.ps1 BOM=True CJK=True（已有 CJK，BOM 保護，safe）✓
+
+**[剩餘風險]**
+1. **Origin Lockdown（Task 4）未 apply** — 最關鍵防線尚未啟動。直打 origin 的 scanner 仍可到達 nginx。需操作者 go-ahead。
+2. CF WAF Rate Limit free plan 限制（period=10s only）— 高速但持續慢速 scanner 不會觸發。
+3. CF IP 月更新（--refresh）需 lockdown 先 apply，否則 refresh-cf-origin-ips.ps1 status="skip"。
+
+**[rollback]**
+- CF WAF rule：DELETE `8202ff335538476a89685341f6efde07`（API DELETE rule 即回）
+- Origin Lockdown（若 apply 後）：`/origin-lockdown rollback` 或 `iptables-restore < /root/cf-lockdown-backup-*/rules.v4.bak`
+- .ps1 改動：`git revert` 或 `git checkout HEAD~1 -- scripts/check-cloudflare-security.ps1`
+
 ## 2026-06-11
 
 ### Tomorrow captured (/tomo)

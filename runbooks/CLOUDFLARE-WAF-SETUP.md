@@ -125,7 +125,7 @@ NEW_EXPR='(http.request.uri.path contains "/.env" or http.request.uri.path conta
 PAYLOAD=$(python3 -c "import json,sys; print(json.dumps({'action':'block','expression':sys.argv[1],'description':'Block sensitive file access (scanner paths)','enabled':True}))" "$NEW_EXPR")
 
 curl -s -X PATCH \
-  "https://api.cloudflare.com/client/v4/zones/f21b1919632fee2221647908a94fdcac/rulesets/f290fd58b69c4cedb7a0688ca959034f/rules/74c0e70b90874ea4b44926aecb44ae16" \
+  "https://api.cloudflare.com/client/v4/zones/f21b1919632fee2221647908a94fdcac/rulesets/f290fd58b69c4cedb7a0688ca959034f/rules/8202ff335538476a89685341f6efde07" \
   -H "Authorization: Bearer $CF_TOKEN" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD" | python3 -c "import json,sys; d=json.load(sys.stdin); print('success:', d['success'])"
