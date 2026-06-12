@@ -98,7 +98,7 @@ if (-not $token) {
 
     if ($WpLoginProtectedByServerSide) {
         # wp-login/xmlrpc defended server-side (LLAR + nginx + fail2ban) since 2026-06-04.
-        # CF layer is only responsible for Bot Fight Mode; empty WAF rules are by design.
+        # CF wp-login geo rules are intentionally absent; scanner/path rules may exist.
         if ($botMode -eq "ON") {
             $overall = "PASS"
         } else {
@@ -120,17 +120,30 @@ if (-not $token) {
 # 3. Origin lockdown (SSH to SG -- warn-only, never affects $overall PASS/FAIL)
 $lockdownStatus = 'unknown'
 $lockdownIpCount = 0
+$lockdownIpv6Count = 0
 try {
     $sshKey = "$env:USERPROFILE\.ssh\hetzner_trigger"
     if (-not (Test-Path $sshKey)) { $sshKey = '~/.ssh/hetzner_trigger' }
     $lockdownOut = & ssh -i $sshKey -o StrictHostKeyChecking=no -o ConnectTimeout=8 -o BatchMode=yes `
         root@5.223.93.113 `
-        "ipset list cf-ipv4 2>/dev/null | grep 'Number of entries' | awk '{print `$NF}'; iptables -C INPUT -p tcp --dport 443 -m set --match-set cf-ipv4 src -j ACCEPT 2>/dev/null && echo ACTIVE || echo INACTIVE" `
+        "echo V4=`$(ipset list cf-ipv4 2>/dev/null | awk '/Number of entries/ {print `$NF}'); echo V6=`$(ipset list cf-ipv6 2>/dev/null | awk '/Number of entries/ {print `$NF}'); iptables -C INPUT -p tcp --dport 443 -m set --match-set cf-ipv4 src -j ACCEPT 2>/dev/null && echo V4_RULE=ACTIVE || echo V4_RULE=INACTIVE; ip6tables -C INPUT -p tcp --dport 443 -m set --match-set cf-ipv6 src -j ACCEPT 2>/dev/null && echo V6_RULE=ACTIVE || echo V6_RULE=INACTIVE" `
         2>$null
     if ($lockdownOut) {
         $lockdownLines = @($lockdownOut | Where-Object { $_ -match '\S' })
-        $lockdownIpCount = [int]($lockdownLines[0] -replace '\D','')
-        $lockdownStatus  = if ($lockdownLines[-1] -match 'ACTIVE') { 'active' } else { 'inactive' }
+        $v4Rule = 'INACTIVE'
+        $v6Rule = 'INACTIVE'
+        foreach ($line in $lockdownLines) {
+            if ($line -match '^V4=(\d+)$') { $lockdownIpCount = [int]$Matches[1] }
+            elseif ($line -match '^V6=(\d+)$') { $lockdownIpv6Count = [int]$Matches[1] }
+            elseif ($line -match '^V4_RULE=(ACTIVE|INACTIVE)$') { $v4Rule = $Matches[1] }
+            elseif ($line -match '^V6_RULE=(ACTIVE|INACTIVE)$') { $v6Rule = $Matches[1] }
+        }
+        $lockdownStatus = if (
+            $lockdownIpCount -gt 0 -and
+            $lockdownIpv6Count -gt 0 -and
+            $v4Rule -eq 'ACTIVE' -and
+            $v6Rule -eq 'ACTIVE'
+        ) { 'active' } else { 'inactive' }
     }
 } catch {
     $lockdownStatus = 'unreachable'
@@ -148,24 +161,31 @@ $lines = @(
     "| Check | Result |",
     "|-------|--------|",
     "| Bot Fight Mode | $botMode |",
-    "| WAF firewall rules count | $ruleCount$(if ($WpLoginProtectedByServerSide) { ' (by design -- empty; server-side defense)' }) |",
+    "| WAF firewall rules count | $ruleCount$(if ($WpLoginProtectedByServerSide) { ' (informational; wp-login is server-side)' }) |",
     "| xmlrpc.php block rule | $(if ($xmlrpcOk) { 'present' } elseif ($WpLoginProtectedByServerSide) { 'server-side (nginx/LLAR)' } else { 'MISSING' }) |",
     "| Origin lockdown (SG) | $lockdownStatus$(if ($lockdownStatus -eq 'inactive') { ' warning: direct-origin attacks possible' }) |",
-    "| CF ipset cf-ipv4 entries | $(if ($lockdownIpCount -gt 0) { $lockdownIpCount } else { 'N/A' }) |"
+    "| CF ipset cf-ipv4 entries | $(if ($lockdownIpCount -gt 0) { $lockdownIpCount } else { 'N/A' }) |",
+    "| CF ipset cf-ipv6 entries | $(if ($lockdownIpv6Count -gt 0) { $lockdownIpv6Count } else { 'N/A' }) |"
 )
 if ($WpLoginProtectedByServerSide) {
     $lines += ""
     $lines += "## wp-login / xmlrpc protection"
     $lines += "- Mode: **server-side** (LLAR + nginx rate-limit + fail2ban) -- architecture decision 2026-06-04."
-    $lines += "- CF WAF rules intentionally empty: operator travels globally; CF geo rules would self-lock. CF layer = Bot Fight Mode only."
-    $lines += "- This check only verifies the CF layer (Bot Fight Mode). Server-side layer is verified separately (client-status / WP plugin checks)."
+    $lines += "- CF WAF wp-login geo rules are intentionally absent: operator travels globally; CF geo rules would self-lock."
+    $lines += "- CF WAF scanner/path rules may exist, but wp-login health is judged by the server-side layer."
+    $lines += "- This check verifies CF posture plus Origin Lockdown; WordPress plugin protection is verified separately (client-status / WP plugin checks)."
 }
 $lines += ""
 $lines += "## Origin Lockdown (SG 5.223.93.113)"
 $lines += "- Status: **$lockdownStatus**"
 $lines += "- CF IPv4 ranges in ipset: $lockdownIpCount"
+$lines += "- CF IPv6 ranges in ipset: $lockdownIpv6Count"
 $lines += '- Architecture: iptables allows only CF IPs on 80/443 -- direct-origin scanners DROP before nginx'
-$lines += '- To apply: /origin-lockdown apply (HIGH RISK, go-ahead required)'
+if ($lockdownStatus -eq 'active') {
+    $lines += '- Maintenance: use /origin-lockdown status or scripts/refresh-cf-origin-ips.ps1; rollback only for emergency recovery.'
+} else {
+    $lines += '- To apply: /origin-lockdown apply (HIGH RISK, go-ahead required)'
+}
 $lines += '- Runbook: runbooks/CLOUDFLARE-WAF-SETUP.md #Origin-Lockdown-SOP'
 if ($errorMsg) { $lines += ""; $lines += "## Errors"; $lines += "- $errorMsg" }
 Set-Content -Path (Join-Path $reportDir "cf-security-LATEST.md") -Value ($lines -join "`r`n") -Encoding UTF8
