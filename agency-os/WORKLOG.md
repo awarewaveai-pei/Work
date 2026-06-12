@@ -77,8 +77,8 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`curl -s -o /dev/null -w "%{http_code}\n" https://aware-wave.com/.aws/credentials` | exit=0 | result=403（CF WAF path block 生效）
 - REALTEST_EVIDENCE: tool=Bash | cmd=CF WAF Rate Limit POST API | exit=0 | `"success":true, rule_id=b8ffa72df8d44ea78a09bd0ababf8abb`
 - REALTEST_WAIVED: NA -- origin lockdown (Task 4) NOT YET APPLIED to SG; cf-origin-lockdown.sh 已建立但未 deploy，等 go-ahead
-- REVIEW_DONE: critic=Deep | verdict=pending（背景執行中，完成後更新）| findings=TBD
-- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude | grep=`74c0e70b|origin-lockdown|cf-ipv4|SCANNER` | hits=1（CLOUDFLARE-WAF-SETUP.md:128 PATCH rule ID 舊值，已修正為 `8202ff33`）
+- REVIEW_DONE: critic=Deep | verdict=⚠ warn-then-fixed | findings=2C/4M/2m/2s — 2C(INPUT policy unverified→加 explicit DROP self-contained；auto-revert SIGHUP→setsid+disown+temp script) 4M(ufw restore missing/dead code→conditional+explicit ip6tables DROP；ufw regex→fix；check-cf.ps1 BatchMode→加；--refresh not atomic→ipset swap) 全修；geo Rule2→DEPRECATED；2m=fallback visibility/count parse(資訊性不修)
+- BUGHUNT_DONE: scope=agency-os,scripts,runbooks,.claude | grep=`74c0e70b|origin-lockdown|cf-ipv4|SCANNER|BatchMode|setsid` | hits=1（CLOUDFLARE-WAF-SETUP.md:99 歷史說明行保留；PATCH URL line128 已修正；.claude/file-history 歸檔無法修改屬預期；AGENTS.md 無 stale hits）
 - audit-encoding: check-cloudflare-security.ps1 BOM=True CJK=False ✓；refresh-cf-origin-ips.ps1 BOM=True CJK=False ✓；ao-resume.ps1 BOM=True CJK=True（已有 CJK，BOM 保護，safe）✓
 
 **[剩餘風險]**
