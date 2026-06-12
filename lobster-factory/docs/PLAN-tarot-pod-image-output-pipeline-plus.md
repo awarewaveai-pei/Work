@@ -1008,14 +1008,25 @@ grep -n "DeviceCMYK\|DeviceRGB\|ColorSpace\|Decode\|MediaBox\|TrimBox\|BleedBox"
 
 ---
 
-## 14.1-gs [0-a-gs] Ghostscript ICC OutputIntent POC（情境 A 必須，阻塞）
+## 14.1-gs [0-a-gs] Ghostscript ICC OutputIntent（情境 A 必須）
 
-> pdf-lib 無 OutputIntent。情境 A 直送印刷廠**必須**此 POC 通過。
+> **架構決策（2026-06-12，R0）**：gs `-dPDFX` OutputIntent 是 20 年成熟功能、web-researcher 已給確切指令 = **文件化 ground-truth，非真未知**。**不本機 re-prove**（本機裝 gs 無法驗下列任一真未知，徒增系統改動）。此項拆兩段：
+>
+> **[0-a-gs] 機制 = ✓ 文件化**（pdf-lib 無 OutputIntent→PR#1512 closed；gs 指令見下）。**不需本機 POC。**
+>
+> **真正待驗的未知（綁定在部署期，需 Docker/Alpine 或外部方）**：
+> 1. `apk add ghostscript` 在 node:20-alpine 裝得起 + gs 含 PDF/X 支援？（→ Dockerfile 改動時驗）
+> 2. sharp-on-musl 的 CMYK 行為與 win32 一致？（→ 同上，容器內重跑 [0-a] poc3.mjs）
+> 3. ICC 採購：Adobe Japan Color 2001 / SWOP 授權檔（→ 外部，使用者；FOGRA39 有免費等效）
+> 4. Dockerfile standalone COPY sharp 原生 binary 成功？（→ Dockerfile 改動時驗）
+> 5. 真印刷廠 preflight 過？（→ 外部，人類在環）
+>
+> → 結論：[0-a-gs] **不阻塞 Phase 1 純程式碼**（toPrintFile 積木可先寫，gs pass 用 `applyOutputIntent()` 介面隔離）；只阻塞「情境 A 印刷檔正式輸出」。降級路徑見 §14.2。
 
-目標：
+目標（部署期驗證）：
 
 ```txt
-驗證 Ghostscript 能把 pdf-lib 產出的 CMYK PDF 加 ICC OutputIntent → PDF/X-1a。
+在 node:20-alpine 容器內驗證 gs 把 pdf-lib CMYK PDF 加 ICC OutputIntent → PDF/X-1a。
 ```
 
 指令（Japan Color 2001 Coated 範例）：
