@@ -73,8 +73,8 @@
   - **發現（已修 plan SSOT）**：sharp 非直接 dep（Next transitive @0.34.3，須 pin）；base=node:20-alpine（apk 非 apt-get）
   - **Phase 1（Phase 0 全綠才開始）**
   - [x] **[1-a]** ✅ 零工作量（VBC）：printQuality 已透過 facade 透傳（`image-gen.ts:266` in TarotGenParams + `image-provider.ts:22` alias + L30-32 整包透傳）。plan 聲稱「沒 expose」=錯
-  - [ ] **[1-b S]** `lib/studio/color-grade.ts` — `ColorGradeParams` type + `useColorGrade()` hook
-  - [ ] **[1-c S]** `lib/studio/to-product-image.ts` — preset-driven WebP（web-tarot 667×1000 / web-square 1000×1000）
+  - [x] **[1-b]** ✅ `lib/studio/color-grade.ts` — 純函式 seam（State↔Params/clamp/toSharpModulate/toCssFilter）；vitest 10/10 + tsc 0 + critic 修 Critical（runtime type-hole）。hook 移 component 層
+  - [x] **[1-c]** ✅ `lib/studio/to-product-image.ts` — preset WebP（web-tarot 667×1000 cover / web-square 1000×1000 contain）；vitest 6/6 真 sharp bake + tsc 0。**發現 app sharp=0.34.3 無 withDensity（需 0.35）→ CMYK/web 不設 density**
   - [ ] **[1-d M]** `lib/studio/to-print-file.ts` + `ghostscript-pdfx.ts` — PrintDestination 積木矩陣（pdf-lib embed+TrimBox → Ghostscript OutputIntent；sRGB PNG 分支）
   - [ ] **[1-e M]** `app/api/tools/image/process/route.ts` — discriminated union + SSRF guard + auth + rate limit
   - [ ] **[1-f S]** `components/tools/ColorGradePanel.tsx` — 色調/飽和/亮度三滑桿

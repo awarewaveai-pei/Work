@@ -4,26 +4,60 @@
 
 ## 2026-06-12
 
+### Phase Z4/Z5 收斂 — secrets baseline + fetch-recency gate
+
+**[任務理解]** 操作者追問 `scan-for-secrets known-suppressed baseline` 與 `AO-CLOSE health gate 補 fetch-recency` 是否已做；查 WORKLOG / MEMORY 後確認仍是 open item，依指示「走 R0」補完。目標：壓已治理 local plaintext secret WARN 噪音，但新 finding 必須紅；health-check 必須消費 Phase Z `git-fetch-last.json` ledger，讓 fetch 失敗/過期不再只停留在 AO-RESUME 報告。
+
+**[已修改]**
+- `scripts/scan-local-config-for-secrets.ps1`：新增 `-KnownSuppressedBaseline`；baseline match key = `file + pattern + sourceKey`；tracked finding 永遠不可 suppression；baseline 外 local finding 在 baseline mode exit 2；visible finding 額外印 non-secret `source=...`。
+- `agency-os/config/scan-local-config-known-suppressed.json`：新增 value-free baseline，壓 14 條已治理 local WARN；只存 file/pattern/sourceKey/reason，不存 token、hash、redacted value 或原始 config line。
+- `scripts/verify-build-gates.ps1`：預設掛 baseline；scanner exit 2 視為 tracked secret 或 baseline-miss local secret，直接 fail gate。
+- `scripts/lib/fetch-recency-gate.ps1`：新增 ledger recency helper；missing ledger = WARN/pass，recent `success=false` = WARN/pass，>7d stale = WARN/pass，>30d stale 或 malformed/unreadable = critical fail。
+- `scripts/system-health-check.ps1`：新增 gate 12e `Git fetch ledger recency (git-fetch-last.json)`；critical failure 走 `Add-CriticalFailure`，不能被 `-AllowNonPerfectHealth` 分數放寬繞過。
+- `scripts/test/scan-local-config-for-secrets.Tests.ps1`、`scripts/test/fetch-recency-gate.Tests.ps1`：新增 Pester-free regression tests。
+- `agency-os/docs/operations/mcp-secrets-hardening-runbook.md`、`agency-os/TASKS.md`、`agency-os/memory/daily/2026-06-12.md`：補 baseline/health-gate 操作說明與完成狀態。
+
+**[驗證結果]**（R0）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\scan-local-config-for-secrets.ps1 -WorkRoot D:\Work -KnownSuppressedBaseline agency-os\config\scan-local-config-known-suppressed.json` | exit=0 | result=`scan-local-config-for-secrets: PASS (14 known-suppressed local finding(s) hidden)`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test\scan-local-config-for-secrets.Tests.ps1` | exit=0 | result=`RESULT: 6 passed, 0 failed`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test\fetch-recency-gate.Tests.ps1` | exit=0 | result=`RESULT: 6 passed, 0 failed`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\system-health-check.ps1 -WorkspaceRoot D:\Work\agency-os` | exit=0 | result=`Score: 100% (373/373)`，JSON check 含 `Git fetch ledger recency (git-fetch-last.json)` PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-build-gates.ps1 -WorkRoot D:\Work` | exit=0 | result=`verify-build-gates: ALL PASSED`
+- NOTE: 第一次 `verify-build-gates` 失敗根因是無關的 Claude H2 sync drift；已跑 `scripts\sync-claude-userlevel.ps1 -Mode merge`，`scripts\check-claude-sync.ps1` PASS 後重跑 full gate 綠。
+- REVIEW_DONE: critic=Standard(readback) | verdict=pass | findings=0c/0m/0n（readback `KnownSuppressedBaseline/SourceKey/known-suppressed`、gate 12e、baseline JSON；確認 baseline 不含 secret value，tracked finding 不可 suppression，critical fetch gate 進 `Add-CriticalFailure`。）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`KnownSuppressedBaseline|scan-local-config-known-suppressed|Git fetch ledger recency|fetch-recency-gate|git-fetch-last.json` | hits=63（active TASKS/daily 已轉完成；舊 reports/WORKLOG 的 pending 文字屬歷史 snapshot，未當 active stale。）
+
+**[剩餘風險]**
+- `.claude/settings.json` 該筆 baseline 用 `line:12` fallback，因該行沒有 non-secret key；若 runtime 重排，scanner 會 baseline-miss exit 2，需要人工重新 review baseline。
+- Recent fetch failure 依 DoD 是 WARN/pass；只有 >30d 或 ledger unreadable 才 critical。
+
+**[rollback]** 刪 `agency-os/config/scan-local-config-known-suppressed.json`、`scripts/lib/fetch-recency-gate.ps1`、兩個 `scripts/test/*` 新檔；還原 `scan-local-config-for-secrets.ps1`、`verify-build-gates.ps1`、`system-health-check.ps1`、runbook/TASKS/memory/WORKLOG 相關段落。
+
+---
+
 ### feat(image-pipeline): Phase 0 POC 全退技術風險 + [1-b] color-grade.ts 交付
 
 **[任務理解]** Tarot/POD 影像輸出管線（色調→WebP/CMYK PDF/Canvas/Canva）。本 session：開工跑 Phase 0 de-risking + 進 Phase 1 第一個 code 任務。SSOT = `lobster-factory/docs/PLAN-tarot-pod-image-output-pipeline-plus.md`。
 
 **[已修改]**
-- `lib/studio/color-grade.ts`（新）— 純函式色調 seam（State↔Params、clamp、toSharpModulate、toCssFilter）
+- `lib/studio/color-grade.ts`（新）[1-b]— 純函式色調 seam（State↔Params、clamp、toSharpModulate、toCssFilter）
 - `lib/studio/__tests__/color-grade.test.ts`（新）— 10 cases 含 hostile-input
-- plan plus：修 4 個錯誤聲稱 + 記錄 POC 結果（withDensity / sharp-transitive / Alpine / [1-a] VBC）
+- `lib/studio/to-product-image.ts`（新）[1-c]— preset WebP（web-tarot 667×1000 cover / web-square 1000×1000 contain）
+- `lib/studio/__tests__/to-product-image.test.ts`（新）— 6 cases 真 sharp bake
+- plan plus：修 5 個錯誤聲稱 + 記錄 POC 結果（withDensity→不設density / sharp-transitive / Alpine / [1-a] VBC）
 - TASKS.md：Phase 0/1 狀態
 
 **[驗證結果]**（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/studio/__tests__/color-grade.test.ts` | exit=0 | ms=391（10/10 pass）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/studio/__tests__/to-product-image.test.ts` | exit=0 | ms=896（6/6 真 sharp 0.34.3 bake；667×1000/1000×1000 WebP sRGB <100KB）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`node d:\tmp\cmyk-poc\poc3.mjs`（[0-a] CMYK+TrimBox）| exit=0 | ms=~500（/DeviceCMYK+/Decode+三框）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`node d:\tmp\cmyk-poc\ssrf-poc.mjs`（[0-c] SSRF）| exit=0 | 12/12+rebinding
-- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（0 error）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（0 error，含 to-product-image）
 - REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=1c/1m/2n（Critical runtime type-hole: wire undefined/null/string→NaN→Sharp；已修 typeof+Number.isFinite→neutral + 補 hostile-input 測試 + clampParams SSOT neutrals）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`color-grade|stateToParams|toSharpModulate|ColorGradeParams` | hits=0（新檔無既有 callsite；plan 介面對齊）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`color-grade|toSharpModulate|withDensity` | hits=0 stray code（app 僅註解提及 withDensity；plan 5 處皆解釋性 prose；新檔無既有 callsite）
 
 **[關鍵發現]**
-1. **`.withMetadata({density})` 破壞 CMYK** — 附 sRGB ICC 把 4ch CMYK 轉回 3ch RGB（SOF=3）。正解 `.withDensity()`。否則整條印刷軌 ship 假 CMYK。實證 d:\tmp\cmyk-poc\poc2.mjs。
+1. **`.withMetadata({density})` 破壞 CMYK** — 附 sRGB ICC 把 4ch CMYK 轉回 3ch RGB（SOF=3）。**且 `.withDensity()` 需 sharp≥0.35，app=0.34.3 無此 method（tsc 抓到，POC 0.35.1 誤導）→ CMYK/web 一律「不設 density」**（PDF 幾何/pixel box 載重）。實證 poc2 變體 B。
 2. **sharp 非直接依賴** — Next.js transitive @0.34.3，須 pin + Dockerfile COPY。plan 原稱「已安裝」錯。
 3. **base=node:20-alpine** — gs 裝 `apk add` 非 apt-get；Alpine 無 icc-profiles-free，ICC 手動。
 4. **pdf-lib 無 OutputIntent**（PR#1512 closed）→ 情境 A 必 Ghostscript（部署期閘，介面 `applyOutputIntent()` 隔離，不阻塞 Phase 1 code）。
@@ -9443,4 +9477,3 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
   - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n + 1 suggestion（採納：runbook 標題加 multi-session anchor）
   - BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`頻繁回寫`+`頻繁以啟動時記憶體`+`live-race` | hits: WORKLOG 同 commit 修正、worklog-excerpt 自動鏡像 AO-CLOSE 重生、runbook:86 為刻意否定句（"不是...頻繁回寫"）保留
 - **[剩餘風險]**：mid-session settings.json 仍會在 fork-bomb 那條 flap（多 session 本質，良性）；真收斂在所有舊 session 結束後。已誠實記入 runbook，不再纏鬥。
-

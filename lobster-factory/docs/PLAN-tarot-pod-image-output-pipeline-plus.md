@@ -1213,20 +1213,17 @@ export function toCssFilter(s): string             // 預覽 hue-rotate/saturate
 
 ---
 
-### [1-c] `lib/studio/to-product-image.ts`
+### [1-c] `lib/studio/to-product-image.ts` — ✅ 已實作（2026-06-12）
 
-實作 WebP 輸出。
-
-需求：
+> **已交付**（REALTEST vitest 6/6 真 sharp 0.34.3 bake + tsc 0）。`toProductImage(input, preset, colorGrade?)` + `toProductImageDataUrl()`；`WEB_PRESETS` 積木。
 
 ```txt
-☐ resize 1000×1000
-☐ fit contain
-☐ background white or transparent，依產品需求決定
-☐ WebP quality 80
-☐ density 72
-☐ 可套 colorGrade
-☐ MVP 可回 data URL
+☑ web-tarot 667×1000 fit:cover（不補白，保 2:3）
+☑ web-square 1000×1000 fit:contain 白底
+☑ WebP quality 80（實測 <100KB）
+☑ 不設 density（withDensity 需 0.35，app 0.34.3 無；web sizing=pixel box，見 §10.2 ⚠️）
+☑ 可套 colorGrade（toSharpModulate；neutral skip；garbage→neutral 防禦）
+☑ MVP 可回 data URL（toProductImageDataUrl）
 ```
 
 ---
