@@ -1101,7 +1101,7 @@ Sharp toColorspace('cmyk') 是 naive 數學轉換，不帶 ICC profile。
 前置已定：情境 A 直送印刷廠。架構 = pdf-lib(embed+TrimBox) + Ghostscript(OutputIntent)。
 
 通過條件（更新 2026-06-12）：
-  ① [0-a]    ✅ 本機 PASS — /DeviceCMYK + /Decode + TrimBox 三框（withDensity 修正）
+  ① [0-a]    ✅ 本機 PASS — /DeviceCMYK + /Decode + TrimBox 三框（CMYK 不設 density）
   ② [0-a-srgb] ✅ 本機 PASS — TGC sRGB PNG 乾淨
   ③ [0-c]    ✅ 本機 PASS — SSRF guard 12/12 + DNS-rebinding
   ④ [0-a-gs] ⏳ 機制文件化 ✓；Alpine apk+musl sharp+Dockerfile COPY+ICC+印刷廠 preflight = 部署期/外部（不阻塞 Phase 1 code）
