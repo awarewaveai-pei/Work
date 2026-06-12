@@ -72,8 +72,9 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`node d:\tmp\cmyk-poc\poc3.mjs`（[0-a] CMYK+TrimBox）| exit=0 | ms=~500（/DeviceCMYK+/Decode+三框）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`node d:\tmp\cmyk-poc\ssrf-poc.mjs`（[0-c] SSRF）| exit=0 | 12/12+rebinding
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（0 error，含 to-product-image）
-- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=1c/1m/2n（Critical runtime type-hole: wire undefined/null/string→NaN→Sharp；已修 typeof+Number.isFinite→neutral + 補 hostile-input 測試 + clampParams SSOT neutrals）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`color-grade|toSharpModulate|withDensity` | hits=0 stray code（app 僅註解提及 withDensity；plan 5 處皆解釋性 prose；新檔無既有 callsite）
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=1c/1m/2n（color-grade Critical runtime type-hole: wire undefined/null/string→NaN→Sharp；已修 typeof+Number.isFinite→neutral + hostile-input 測試 + SSOT neutrals）
+- REVIEW_DONE: critic=Deep(to-product-image 首 critic) | verdict=fail→fixed | findings=1M/1m/1s（**Major: web-square white-bg 沒 flatten 既有 alpha → bg-removed 主體留透明洞**；已修 `.flatten({background})` 兩 preset 統一不透明白 + 補 transparent-input/letterbox-white 測試 8/8）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`color-grade|toSharpModulate|withDensity|toProductImage|WEB_PRESETS` | hits=0 external callsite（新檔；callers 在 [1-e]/[1-j/k]；app 僅註解提及 withDensity；plan withDensity 皆解釋性 prose）
 
 **[關鍵發現]**
 1. **`.withMetadata({density})` 破壞 CMYK** — 附 sRGB ICC 把 4ch CMYK 轉回 3ch RGB（SOF=3）。**且 `.withDensity()` 需 sharp≥0.35，app=0.34.3 無此 method（tsc 抓到，POC 0.35.1 誤導）→ CMYK/web 一律「不設 density」**（PDF 幾何/pixel box 載重）。實證 poc2 變體 B。
