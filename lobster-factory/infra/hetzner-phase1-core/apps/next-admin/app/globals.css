@@ -2047,6 +2047,10 @@ pre {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
+  /* Each card sizes to its OWN content. Without this, grid's default align-items:stretch
+     makes every card in a row as tall as the tallest — so expanding one prompt stretches
+     all its row-mates (leaving a big gap above their bottom-pinned action row). */
+  align-items: start;
 }
 
 /* ── Individual card ── */
@@ -2273,12 +2277,14 @@ pre {
 }
 
 .designs-prompt-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
   gap: 4px;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 10.5px;
+  padding: 6px 11px;
+  border-radius: 7px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid var(--btn-secondary-border);
@@ -2316,10 +2322,12 @@ pre {
 }
 
 .designs-action-btn {
+  flex: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 5px 11px;
+  padding: 6px 8px;
   border-radius: 7px;
   font-size: 11.5px;
   font-weight: 600;
@@ -2344,7 +2352,6 @@ pre {
   background: rgba(16,185,129,0.05);
 }
 .designs-action-btn--danger {
-  margin-left: auto;
   color: var(--red);
   border-color: rgba(239,68,68,0.2);
 }
