@@ -8,6 +8,7 @@ import {
 } from "../../../lib/studio/model-options";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
+import { bakeCssFilter } from "@/components/tools/bake-css-filter";
 
 /** Product types steer the prompt suffix + default aspect ratio (print canvas comes later, P-print). */
 const PRODUCT_TYPES = [
@@ -201,11 +202,14 @@ export default function StudioWorkbench() {
     if (gen.status !== "done" || !gen.image) return;
     setSaveState("saving");
     try {
+      // Bake the colour adjustment into the saved image so My Designs matches the preview
+      // (洞2 fix). Neutral grade → bakeCssFilter returns the image unchanged.
+      const image = await bakeCssFilter(gen.image, grade.cssFilter);
       const res = await fetch("/api/tools/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          image: gen.image,
+          image,
           prompt: effectivePrompt,
           modelName: model,
           source: "pod-studio",
@@ -220,7 +224,26 @@ export default function StudioWorkbench() {
     } catch {
       setSaveState("error");
     }
-  }, [gen, effectivePrompt, model, productType, theme, style, subject]);
+  }, [gen, effectivePrompt, model, productType, theme, style, subject, grade.cssFilter]);
+
+  // Download the current image with the colour adjustment baked in (洞2 fix).
+  const downloadGraded = useCallback(async () => {
+    if (!gen.image) return;
+    const baked = await bakeCssFilter(gen.image, grade.cssFilter);
+    const ext = grade.neutral
+      ? gen.image.startsWith("data:image/jpeg")
+        ? "jpg"
+        : gen.image.startsWith("data:image/webp")
+          ? "webp"
+          : "png"
+      : "png"; // baked output is always PNG
+    const a = document.createElement("a");
+    a.href = baked;
+    a.download = `design.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }, [gen.image, grade.cssFilter, grade.neutral]);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, padding: 16 }}>
