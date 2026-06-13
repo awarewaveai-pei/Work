@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { STYLE_PRESETS } from "../tarot/tarotStyles";
+import { STYLE_PRESETS } from "../tarot/cards";
 
 interface AssetMetadata {
   prompt?: string | null;
@@ -725,24 +725,68 @@ export default function DesignsGallery() {
                 {new Date(asset.created_at).toLocaleString("zh-TW")}
               </div>
 
-              {asset.metadata?.prompt ? (
-                <div style={{
-                  fontSize: 11, opacity: 0.5, marginTop: 4,
-                  display: "-webkit-box", WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical", overflow: "hidden",
-                }} title={asset.metadata.prompt}>
-                  {asset.metadata.prompt}
-                </div>
-              ) : null}
+              {/* picked style chips — 畫家 / 媒材 / 風格 (so she can reference + reuse later) */}
+              {(asset.metadata?.style_tags?.length ?? 0) > 0 ? (() => {
+                const grouped = groupStyleTags(asset.metadata!.style_tags!);
+                return (
+                  <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 3 }}>
+                    {STYLE_KIND_ORDER.filter((k) => grouped[k].length > 0).map((k) => (
+                      <div key={k} style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                        <span style={{ fontSize: 10, opacity: 0.5, minWidth: 30 }}>{k}</span>
+                        {grouped[k].map((t) => (
+                          <span
+                            key={t}
+                            style={{ fontSize: 10, background: "rgba(139,92,246,0.12)", color: "#a78bfa", borderRadius: 4, padding: "1px 6px" }}
+                          >
+                            {shortStyleLabel(t)}
+                          </span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })() : null}
+
+              {asset.metadata?.prompt ? (() => {
+                const expanded = expandedIds.has(asset.id);
+                return (
+                  <div style={{ marginTop: 4 }}>
+                    <div
+                      style={{
+                        fontSize: 11, opacity: 0.5,
+                        whiteSpace: expanded ? "pre-wrap" : undefined,
+                        wordBreak: "break-word",
+                        ...(expanded
+                          ? {}
+                          : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }),
+                      }}
+                    >
+                      {asset.metadata.prompt}
+                    </div>
+                    <button
+                      className="btn-secondary"
+                      style={{ fontSize: 10, padding: "1px 6px", marginTop: 3 }}
+                      onClick={() => toggleExpanded(asset.id)}
+                    >
+                      {expanded ? "收合" : "展開完整 prompt"}
+                    </button>
+                  </div>
+                );
+              })() : null}
 
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                 <button className="btn-secondary" style={{ fontSize: 11 }} onClick={() => void copyUrl(asset)}>
                   {copiedId === asset.id ? "已複製 ✓" : "複製 URL"}
                 </button>
                 {asset.object_url ? (
-                  <a className="btn-secondary" style={{ fontSize: 11 }} href={asset.object_url} download>
-                    下載
-                  </a>
+                  <button
+                    className="btn-secondary"
+                    style={{ fontSize: 11 }}
+                    disabled={downloadingId === asset.id}
+                    onClick={() => void downloadOne(asset)}
+                  >
+                    {downloadingId === asset.id ? "下載中…" : "下載"}
+                  </button>
                 ) : null}
                 <button
                   className="btn-secondary"
