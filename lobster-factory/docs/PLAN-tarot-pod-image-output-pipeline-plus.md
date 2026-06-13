@@ -731,7 +731,12 @@ export async function toPrintFile(
 
 ---
 
-## 10.3 Ghostscript OutputIntent（情境 A 必須）
+## 10.3 Ghostscript OutputIntent（情境 A 必須）— ✅ 程式碼+REALTEST 完成（2026-06-13）
+
+> **[0-a-gs] 已實作並真機驗證**：`gs -dPDFX` **單獨不產 `/OutputIntent`**（critic 證實）→ 必須配 `PDFX_def.ps` pdfmark（`lib/studio/pdfx-def.ts` 生成，def 排 input 前）。**Alpine REALTEST PASS**（SG VPS `node:20-alpine` + `apk add ghostscript` gs **10.06.0**）：`/OutputIntent`×2 + `PDF/X-1a:2001` + `/DeviceCMYK`×1（未轉 RGB）+ `/DestOutputProfile`×1；bundled `/usr/share/ghostscript/iccprofiles/default_cmyk.icc` 存在（不需外部 ICC 即可出 OutputIntent）。
+> **ICC 授權結論**：Adobe（JapanColor/SWOP）不可散布；ECI 不可散布；**basICColor `ISOcoated_v2_bas.ICC`=CC 可商用**（TW/EU coated 最佳免費具名）；MVP 預設用 bundled SWOP（合法 PDF/X-1a，色彩=SWOP），region-accurate profile 走 `POD_ICC_*` env 零改碼換入（採購待辦）。
+> **部署=High risk，待 go-ahead**：步驟/驗證/rollback 見 `runbooks/POD-PRINT-ICC-DEPLOY-RUNBOOK.md`。Dockerfile（`apk add ghostscript`）+ compose（`POD_OUTPUT_INTENT_DEPLOYED:-false` + `POD_ICC_*`）已就緒。
+> **下方原始 spec 為設計期草稿，實作以 `pdfx-def.ts` + `ghostscript-pdfx.ts` + runbook 為準**（差異：用 PDFX_def.ps pdfmark 非 `-sOutputICCProfile`；ICC 走 bundled+resolver 非寫死 `/usr/share/color/icc/`）。
 
 pdf-lib 無法加 ICC OutputIntent（PR #1512 closed）。用 Ghostscript 後處理：
 

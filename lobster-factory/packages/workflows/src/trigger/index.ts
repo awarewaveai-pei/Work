@@ -6,3 +6,4 @@ export { dispatchActionRun, dispatchActionRunSchedule } from "./dispatch-action-
 export { aoInfrastructureCheck, aoInfrastructureCheckSchedule } from "./ao-infrastructure-check";
 export { adoptClientOs } from "./adopt-client-os";
 export { wpInstallPlugins } from "../tasks/wp-install-plugins";
+export { tarotBatchGenerate } from "./tarot-batch-generate";

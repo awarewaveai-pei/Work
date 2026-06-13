@@ -24,7 +24,10 @@ import {
   PRINT_DESTINATIONS,
   type PrintDestinationId,
 } from "../../../../../lib/studio/to-print-file";
-import { OutputIntentNotDeployedError } from "../../../../../lib/studio/ghostscript-pdfx";
+import {
+  OutputIntentNotDeployedError,
+  GsOutputIntentMissingError,
+} from "../../../../../lib/studio/ghostscript-pdfx";
 import { clampParams, type ColorGradeParams } from "../../../../../lib/studio/color-grade";
 
 export const runtime = "nodejs";
@@ -158,6 +161,17 @@ export async function POST(request: Request) {
         ok: false,
         error: "印刷檔 ICC 色彩管理尚未部署 — 目前僅 The Game Crafter（sRGB PNG）可下載；CMYK 印刷檔待 Ghostscript 上線。",
         code: "output_intent_not_deployed",
+      });
+    }
+    if (err instanceof GsOutputIntentMissingError) {
+      // Deploy flag is ON but gs produced no /OutputIntent — a server-side config error
+      // (bad POD_ICC_* path / gs version). Retrying won't help; surface it distinctly so
+      // it's not mistaken for a transient bake failure.
+      console.error(`[image/process] OutputIntent missing (print config error):`, err.message);
+      return NextResponse.json({
+        ok: false,
+        error: "印刷檔色彩設定有誤（ICC OutputIntent 未產生）— 請聯繫管理員檢查印刷設定，重試無法解決。",
+        code: "output_intent_failed",
       });
     }
     // Log the raw library message server-side only; return a generic code so we don't

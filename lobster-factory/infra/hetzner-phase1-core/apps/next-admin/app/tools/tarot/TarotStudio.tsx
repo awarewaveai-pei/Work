@@ -166,6 +166,11 @@ export default function TarotStudio() {
   const [batchBusy, setBatchBusy] = useState(false);
   const [zipBusy, setZipBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // Background batch (Trigger.dev)
+  const [bgJobId, setBgJobId]       = useState<string | null>(null);
+  const [bgStatus, setBgStatus]     = useState<string>("idle"); // idle|pending|running|done|error
+  const [bgProgress, setBgProgress] = useState({ done: 0, total: 0 });
+  const [bgLoadBusy, setBgLoadBusy] = useState(false);
   const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal (batch cards)
   const [previewZoom, setPreviewZoom] = useState(false); // large-view modal (step-1 preview)
   const [compareZoom, setCompareZoom] = useState<string | null>(null); // large-view modal (compare grid)
@@ -264,6 +269,28 @@ export default function TarotStudio() {
       cancelled = true;
     };
   }, [previewImage]);
+
+  // Poll background batch status every 8s while running.
+  useEffect(() => {
+    if (!bgJobId || bgStatus === "done" || bgStatus === "error" || bgStatus === "idle") return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/tools/tarot/batch/${bgJobId}`, {
+          headers: { ...roleHeader("operator") },
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { ok: boolean; job?: { status: string; completedCards: number; totalCards: number } };
+        if (!data.ok || !data.job) return;
+        const j = data.job;
+        setBgProgress({ done: j.completedCards, total: j.totalCards });
+        if (j.status === "done" || j.status === "error") {
+          setBgStatus(j.status);
+          clearInterval(interval);
+        }
+      } catch { /* ignore poll errors */ }
+    }, 8_000);
+    return () => clearInterval(interval);
+  }, [bgJobId, bgStatus]);
 
   async function onAddReferences(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -513,6 +540,88 @@ export default function TarotStudio() {
     }
   }
 
+  // Launch a Trigger.dev background batch for all 78 cards (browser can be closed).
+  async function startBackgroundBatch() {
+    const opt = modelOption(lockedModel);
+    const estNt = Math.round(78 * opt.costNt);
+    const ok = window.confirm(
+      `背景批次生成 78 張（${lockedModel}）。\n` +
+        `預估費用約 NT$${estNt}，約 20-90 分鐘在伺服器背景執行，可關閉瀏覽器。\n` +
+        `生成完成後回來按「載入批次結果」即可。\n\n確定開始？`,
+    );
+    if (!ok) return;
+    setBgStatus("pending");
+    setBgProgress({ done: 0, total: 78 });
+    setMessage(null);
+    try {
+      const cards = TAROT_CARDS.map((card, i) => ({
+        index: i,
+        name: card.name,
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
+      }));
+      const res = await fetch("/api/tools/tarot/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
+        body: JSON.stringify({
+          cards,
+          model: lockedModel,
+          aspectRatio: "2:3",
+          seed: previewSeed,
+        }),
+      });
+      const data = (await res.json()) as { ok: boolean; jobId?: string; totalCards?: number; error?: string };
+      if (!data.ok || !data.jobId) {
+        setMessage(`背景批次啟動失敗：${data.error ?? "unknown"}`);
+        setBgStatus("idle");
+        return;
+      }
+      setBgJobId(data.jobId);
+      setBgStatus("running");
+      setMessage(`背景批次已啟動 (job: ${data.jobId.slice(0, 8)}) — 可關閉瀏覽器，8 秒自動更新進度。`);
+    } catch (e) {
+      setMessage(`背景批次失敗：${e instanceof Error ? e.message : String(e)}`);
+      setBgStatus("idle");
+    }
+  }
+
+  // Load results from a completed background batch into the local batch grid.
+  async function loadBatchResults() {
+    if (!bgJobId) return;
+    setBgLoadBusy(true);
+    setMessage("載入背景批次結果中…");
+    try {
+      const res = await fetch(`/api/tools/tarot/batch/${bgJobId}`, {
+        headers: { ...roleHeader("operator") },
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        job?: { results: Array<{ cardIndex: number; cardName: string; url: string }> };
+        error?: string;
+      };
+      if (!data.ok || !data.job) {
+        setMessage(`載入失敗：${data.error ?? "unknown"}`);
+        return;
+      }
+      const results = data.job.results;
+      setBatch((prev) => {
+        const next = [...prev];
+        for (const r of results) {
+          if (r.cardIndex >= 0 && r.cardIndex < next.length && r.url) {
+            const existing = next[r.cardIndex];
+            if (existing.url) URL.revokeObjectURL(existing.url);
+            next[r.cardIndex] = { ...existing, status: "done", url: r.url, blob: undefined };
+          }
+        }
+        return next;
+      });
+      setMessage(`已載入 ${results.length} 張背景批次結果。如需含框 ZIP，請點「下載 ZIP」（會自動套框）。`);
+    } catch (e) {
+      setMessage(`載入失敗：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBgLoadBusy(false);
+    }
+  }
+
   // Generate (or regenerate) a single card — fast, no confirm.
   async function generateSingle(index: number) {
     if (batchBusy) return;
@@ -526,7 +635,7 @@ export default function TarotStudio() {
   }
 
   async function downloadZip() {
-    const done = batch.filter((b) => b.status === "done" && b.blob);
+    const done = batch.filter((b) => b.status === "done" && (b.blob || b.url));
     if (done.length === 0) {
       setMessage("還沒有可下載的牌卡");
       return;
@@ -536,7 +645,25 @@ export default function TarotStudio() {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
       for (const it of batch) {
-        if (it.status === "done" && it.blob) {
+        if (it.status !== "done") continue;
+        // Cards from background batch have url (R2) but no blob — render the print card on demand.
+        if (!it.blob && it.url) {
+          try {
+            const imgRes = await fetch(it.url);
+            const imgBlob = await imgRes.blob();
+            const artDataUrl: string = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = () => reject(new Error("read_error"));
+              reader.readAsDataURL(imgBlob);
+            });
+            const printBlob = await renderPrintCard(it.card, artDataUrl, template);
+            const safe = it.card.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
+            zip.file(`${String(it.card.id).padStart(2, "0")}_${safe}.png`, printBlob);
+          } catch { /* skip unrenderable cards */ }
+          continue;
+        }
+        if (it.blob) {
           const safe = it.card.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
           zip.file(`${String(it.card.id).padStart(2, "0")}_${safe}.png`, it.blob);
         }
@@ -1079,6 +1206,54 @@ export default function TarotStudio() {
                 <span className="form-hint">
                   這組 {groupDone}/{groupItems.length}　·　全部 {doneCount}/{TAROT_CARDS.length}
                 </span>
+              </div>
+
+              {/* Background batch (Trigger.dev) */}
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 8, padding: "10px 12px", borderRadius: 8, border: "1px solid var(--card-border)", background: "rgba(99,102,241,0.04)" }}>
+                <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>⚡ 背景批次（78 張）</span>
+                {bgStatus === "idle" && (
+                  <button
+                    className="btn-secondary"
+                    disabled={batchBusy}
+                    onClick={() => void startBackgroundBatch()}
+                    title="在伺服器背景生成全 78 張，可關閉瀏覽器"
+                    style={{ fontSize: 12 }}
+                  >
+                    🚀 背景生成全 78 張
+                  </button>
+                )}
+                {(bgStatus === "pending" || bgStatus === "running") && (
+                  <span style={{ fontSize: 12, color: "#6366f1" }}>
+                    進行中 {bgProgress.done}/{bgProgress.total} 張…
+                    {bgJobId && <span style={{ color: "var(--text-muted)", marginLeft: 6 }}>job: {bgJobId.slice(0, 8)}</span>}
+                  </span>
+                )}
+                {bgStatus === "done" && (
+                  <>
+                    <span style={{ fontSize: 12, color: "#10b981" }}>✅ 完成 {bgProgress.done}/{bgProgress.total} 張</span>
+                    <button
+                      className="btn-primary"
+                      disabled={bgLoadBusy}
+                      onClick={() => void loadBatchResults()}
+                      style={{ fontSize: 12 }}
+                    >
+                      {bgLoadBusy ? "載入中…" : "載入批次結果"}
+                    </button>
+                  </>
+                )}
+                {bgStatus === "error" && (
+                  <>
+                    <span style={{ fontSize: 12, color: "#ef4444" }}>❌ 部分失敗 {bgProgress.done}/{bgProgress.total}</span>
+                    <button
+                      className="btn-secondary"
+                      disabled={bgLoadBusy}
+                      onClick={() => void loadBatchResults()}
+                      style={{ fontSize: 12 }}
+                    >
+                      {bgLoadBusy ? "載入中…" : "載入已完成的"}
+                    </button>
+                  </>
+                )}
               </div>
               <div className="form-hint" style={{ marginBottom: 12 }}>
                 💡 點<b>已完成</b>的卡 = 看大圖（裡面可重新生成）。點<b>空白卡</b> = 生成那一張。建議先生一張看滿不滿意再「生成這組」。

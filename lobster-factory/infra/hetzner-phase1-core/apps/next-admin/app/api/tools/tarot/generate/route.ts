@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { generateTarotImage, isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
+import { checkAndConsumeQuota } from "../../../../../lib/tarot/quota";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -80,6 +81,14 @@ export async function POST(request: Request) {
   }
   if (body.seed != null && (!Number.isInteger(body.seed) || body.seed < 0)) {
     return NextResponse.json({ ok: false, error: "seed must be a non-negative integer" }, { status: 400 });
+  }
+
+  const quota = checkAndConsumeQuota();
+  if (!quota.ok) {
+    return NextResponse.json(
+      { ok: false, error: `每日生成上限已達（${quota.limit} 張），UTC 00:00 重置。`, code: "quota_exceeded" },
+      { status: 429 },
+    );
   }
 
   const result = await generateTarotImage({

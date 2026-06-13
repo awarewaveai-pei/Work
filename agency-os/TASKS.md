@@ -70,7 +70,7 @@
   - **Phase 0 POC（2/5 本機 PASS；證據 `d:\tmp\cmyk-poc\poc3.mjs`）**
   - [x] **[0-a]** ✅ CMYK PDF + TrimBox — 本機 PASS：`/DeviceCMYK`+`/Decode`+三框。**關鍵修正 `.withDensity()` 取代 `.withMetadata({density})`**（後者附 sRGB ICC 破壞 CMYK，SOF=3）
   - [x] **[0-a-srgb]** ✅ TGC sRGB PNG — 本機 PASS：898×1500 3ch 無污染
-  - [ ] **[0-a-gs]** Ghostscript ICC OutputIntent — **機制=文件化 ground-truth（不本機 re-prove，R0 決策）**；真未知綁部署期：Alpine `apk add gs`+musl sharp+Dockerfile COPY sharp+ICC 採購（Adobe Japan Color/SWOP；FOGRA39 免費等效）+ 印刷廠 preflight。**不阻塞 Phase 1 程式碼**（`applyOutputIntent()` 介面隔離）
+  - [~] **[0-a-gs]** Ghostscript ICC OutputIntent — **程式碼+REALTEST 完成 2026-06-13**：`pdfx-def.ts`(PDFX_def.ps pdfmark)+`ghostscript-pdfx.ts`(真 gs+timeout+後驗 /OutputIntents&/DestOutputProfile)+Dockerfile(`apk add ghostscript`)+compose(`POD_OUTPUT_INTENT_DEPLOYED`+`POD_ICC_*`)。**SG Alpine 真機 REALTEST PASS**（gs 10.06.0：/OutputIntent×2+PDF/X-1a:2001+DeviceCMYK 未轉 RGB+DestOutputProfile）。vitest 11/11+tsc 0+critic（修 gs timeout+route GsOutputIntentMissingError branch）。**剩：SG prod 部署（High risk, go-ahead）+ ICC 採購（Japan Color 色彩精準，MVP 用 bundled SWOP）**。runbook=`runbooks/POD-PRINT-ICC-DEPLOY-RUNBOOK.md`
   - [~] **[0-b]** Fabric.js + Next 15 — dynamic import ssr:false=文件化✓；R2 CORS taint **併入 [1-i]** integration test（真 R2+Playwright）。**Phase 0 技術風險已退（3 本機 PASS + 2 介面隔離/部署閘）→ Phase 1 程式碼可開始**
   - [x] **[0-c]** ✅ API security SSRF guard — 本機 PASS 12/12 + DNS-rebinding 防禦（`d:\tmp\cmyk-poc\ssrf-poc.mjs`）；IPv4+v6 完整分類；fetch/timeout/content-type 標準部分留 [1-e]
   - **發現（已修 plan SSOT）**：sharp 非直接 dep（Next transitive @0.34.3，須 pin）；base=node:20-alpine（apk 非 apt-get）
@@ -182,7 +182,7 @@
 #### 工具層 / 基礎建設 / 治理
 
 - [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**（操作者 2026-06-06 確認方向） — 終點：全部接 WooCommerce 賣貨（參考同事 jonjonesai 的 MEGA「Mass E-commerce Generator & Automator」Streamlit 工具：Research→Idea→Generate(多模型並行)→Select→Process(去背 removal.ai/Tinify)→Mockup(Printful)→Published(WooCommerce+Claude 文案+定價)）。
-  - **Phase 1（現在）tarot 做到好用**：✅ 角色改造(貓取代人, buildCardPrompt 贏家結構, `e6a3a72a`) ✅ 中文自動翻英(haiku) ✅ friendly 錯誤+HTTP200 ✅ 「✨ 幫我想 prompt」按鈕(`suggest-prompt` route, Claude Haiku art-direction) ✅ batch skip-done(跳過已完成牌張, 加「重新生成全組」, `3c4fbcba`)。**待**：(a) 整副 78 張一致性實測微調（需操作者實際跑 batch 觀察風格一致性）；(c) OpenAI gpt-image 待操作者加 billing(`billing_hard_limit_reached`)；(d) enhancements: upscale 827×1417 / Trigger.dev 批次 / server quota。
+  - **Phase 1（現在）tarot 做到好用**：✅ 角色改造(貓取代人, buildCardPrompt 贏家結構, `e6a3a72a`) ✅ 中文自動翻英(haiku) ✅ friendly 錯誤+HTTP200 ✅ 「✨ 幫我想 prompt」按鈕(`suggest-prompt` route, Claude Haiku art-direction) ✅ batch skip-done(跳過已完成牌張, 加「重新生成全組」, `3c4fbcba`)。**待**：(a) 整副 78 張一致性實測微調（需操作者實際跑 batch 觀察）；(c) OpenAI gpt-image 待操作者加 billing；✅ (d-1) Trigger.dev 背景批次(`tarot-batch-generate` task + `/api/tools/tarot/batch`) ✅ (d-2) server quota(`TAROT_DAILY_LIMIT` env)。**⚠️ 操作者待辦**：① SG `.env` + EU Trigger.dev env 加 `BATCH_INTERNAL_SECRET=<隨機 32 字>` ② 重新 deploy `packages/workflows`（`/trigger-deploy`）。(d-3) upscale 827×1417 — FLUX megapixels schema 只有 "0.25"|"1"（無 "4"），Ideogram v4/Seedream 原生已超過目標；Real-ESRGAN upscaler 另 PR。
   - **Phase 2 MEGA**：多商品 POD 流水線（多生成器、去背、Printful mockup、設計庫重用、多用戶用量限制）。工程量 ≈ 現 tarot 的 15-20×，需分期。
   - **Phase 3 WooCommerce**：商品 publish + Claude 文案 + 定價/尺寸表（taiwanmerch.co 模式）。
   - **參考**：WORKLOG 2026-06-05/06 tarot entries；MEGA 截圖(操作者提供)。

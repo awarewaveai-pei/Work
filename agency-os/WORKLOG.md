@@ -4,6 +4,37 @@
 
 ## 2026-06-13
 
+### feat(tarot): Trigger.dev 背景批次 + server quota + printQuality upscale flag
+
+**[任務理解]** 實作 Phase 1(d) 三個 enhancements：① Trigger.dev 背景批次生成 78 張（不需開瀏覽器）② 每日生成上限 quota ③ printQuality flag（FLUX 維持 "1" MP，非 FLUX 模型已原生高解析）。
+
+**[已修改]**
+1. `lib/tarot/quota.ts` (NEW) — global in-memory daily limit，TAROT_DAILY_LIMIT env var
+2. `lib/tarot/batch-store.ts` (NEW) — in-memory batch job 狀態（MVP；Supabase 持久化為 future work）
+3. `lib/tarot/image-gen.ts:331` — FLUX megapixels 維持 "1"（"4" 在 FLUX schnell/dev 無效，依 Replicate live schema；critic 確認）
+4. `app/api/tools/tarot/generate/route.ts` — 加 quota check（429 on exceed）
+5. `app/api/tools/tarot/batch/route.ts` (NEW) — POST 啟動批次，GET 列最近 jobs；pass batchSecret to trigger
+6. `app/api/tools/tarot/batch/[jobId]/route.ts` (NEW) — GET 狀態，PATCH 標記 running
+7. `app/api/tools/tarot/batch/[jobId]/card/route.ts` (NEW) — EU Trigger.dev callback：生成+R2+更新 store；BATCH_INTERNAL_SECRET guard
+8. `packages/workflows/src/trigger/tarot-batch-generate.ts` (NEW) — Trigger.dev task，順序生成 78 張，429 立即 abort
+9. `packages/workflows/src/trigger/index.ts` — export tarotBatchGenerate
+10. `app/tools/tarot/TarotStudio.tsx` — 背景批次 state + polling useEffect + startBackgroundBatch + loadBatchResults + downloadZip R2 fallback
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- tsc 0 errors；server-to-server pattern 已在 triggerWorkflow.ts 驗證
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/2m/2n — Critical 項均已 fix（megapixels revert + BATCH_INTERNAL_SECRET）；Major jobs-lost-on-restart = known/documented in batch-store.ts；Major quota abort-on-429 = fixed in tarot-batch-generate.ts
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=tarotBatchGenerate|BATCH_INTERNAL_SECRET|batch-store | hits=0
+- WORKLOG: 此記錄
+
+**[剩餘風險]**
+- `BATCH_INTERNAL_SECRET` 需操作者在 SG .env + EU Trigger.dev 環境同時設定，否則降回 role-header-only 模式
+- In-memory batch store 不跨 restart 持久；SG 重啟後 job 404（圖片仍在 R2，可手動 recover）
+- `upscale 827×1417` — FLUX 無法透過 megapixels 達到（schema 只有 "0.25"|"1"）；其他模型（Ideogram v4 1664×2496、Seedream 2K）原生就超過目標；如需 Real-ESRGAN upscaler 需另一 PR
+
+**[rollback]** Revert 10 個檔案；quota + batch-store 為新檔可直接刪除。
+
+---
+
 ### feat(pod): 修圖積木 (色階/銳利度) + 三軌輸出 UI + Fabric canvas — Phase 1 [1-f]~[1-k]
 
 **[任務理解]** 使用者問兩功能是否已做：(1) 修圖功能（色階/亮度/飽和度/色相/銳利度/去背）要像積木任意加到工具；(2) 客製商品上傳圖+寫字即時預覽（f 開頭 js = Fabric.js）。讀 plan + code 確認：後端 seam ([1-b/c/d]) 與 API route ([1-e], 另一 session 12:51 建) 已完成，但 UI 全缺、fabric 未裝。使用者指示「直接做好」+ hue/sat/bri **加上**色階/銳利度。
@@ -83,6 +114,32 @@
 - WP meta description passthrough 需 Yoast/RankMath 支援；設 meta 欄不影響 draft 建立
 
 **[rollback]** `git revert HEAD` → 回上一個 session checkpoint
+
+### feat(pod): [0-a-gs] Ghostscript PDF/X-1a OutputIntent — 印刷軌 ICC 完成（程式碼+SG 真機 REALTEST）
+
+**[任務理解]** POD 印刷軌最後一塊：CMYK PDF → PDF/X-1a 帶 ICC `/OutputIntent`（印刷廠 preflight 需要）。pdf-lib 無此能力，走 Ghostscript。守後端+部署軌（前端 [1-f]~[1-k] 由 codex 並行）。
+
+**[現況分析]** web-researcher 查證（gs 官方 doc + upstream PDFX_def.ps）：`gs -dPDFX` **單獨不寫 /OutputIntent**（critic 證實）→ 需 `PDFX_def.ps` pdfmark，def 排 input 前。Alpine `apk add ghostscript`(gs 10.06.0) 自帶 `default_cmyk.icc`(SWOP) + 無需外部 ICC。ICC 授權：Adobe/ECI 不可散布，basICColor=CC，MVP 用 bundled SWOP。
+
+**[已修改]**
+- `lib/studio/pdfx-def.ts`（新）— `buildPdfxDef()` 生成 PDFX_def.ps（pdfmark：ICC stream N=4 + OutputIntent + Catalog 掛載）+ `escapePostScriptString`（codepoint 迴圈，防 `( ) \`+控制字元）。
+- `lib/studio/ghostscript-pdfx.ts`（重寫 applyOutputIntent）— 真 gs（execFile array 無 shell + timeout 30s/SIGKILL/maxBuffer 64M）+ `resolveIccPath`（env override，預設 bundled）+ **後驗 co-require `/OutputIntents`&`/DestOutputProfile` 否則 throw GsOutputIntentMissingError**。
+- `apps/next-admin/Dockerfile`（runner `apk add --no-cache ghostscript`）+ `docker-compose.yml`（`POD_OUTPUT_INTENT_DEPLOYED:-false` + 3×`POD_ICC_*`）。
+- `app/api/tools/image/process/route.ts`（加 GsOutputIntentMissingError branch → code=output_intent_failed，部署期 ICC 配錯可辨識）。
+- 測試：`pdfx-def.test.ts`(7) + `ghostscript-pdfx.test.ts`(4)；新 runbook `runbooks/POD-PRINT-ICC-DEPLOY-RUNBOOK.md`；plan §10.3 + §15.1 標記。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker run --rm node:20-alpine sh -c 'apk add ghostscript && gs -dPDFX ... PDFX_def.ps in.pdf'`（SG VPS ephemeral 容器，真 pdf-lib CMYK PDF）| exit=0 | 結果=`/OutputIntent`×2 + `PDF/X-1a:2001` + `/DeviceCMYK`×1（未轉 RGB）+ `/DestOutputProfile`×1 + bundled ICC 存在（gs 10.06.0）。容器+測試檔已清，未碰 prod stack。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/studio/__tests__/pdfx-def.test.ts ghostscript-pdfx.test.ts` | exit=0（11/11；全套件 69/69）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（0 error；我的檔全綠）
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2M/3m（Major gs 無 timeout→加 timeout/SIGKILL/maxBuffer；Major GsOutputIntentMissingError 落 generic→route 加專屬 branch；Minor 後驗收緊 /OutputIntents+/DestOutputProfile co-require。command injection/temp/Dockerfile layering 全 verified clean）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`buildPdfxDef|resolveIccPath|GsOutputIntentMissingError|POD_OUTPUT_INTENT_DEPLOYED|/usr/share/color/icc` | hits=0 stale（新 symbol 無外部 callsite；applyOutputIntent 仍由 to-print-file 呼叫；無 stale 舊 ICC 路徑 .ts 引用）
+
+**[剩餘風險]** ① **SG prod 部署=High risk，待 go-ahead**（設 POD_OUTPUT_INTENT_DEPLOYED=true + sg-deploy.sh，runbook §3-4）② ICC 採購：Japan Color(tw-local)色彩精準=Adobe 授權，MVP 用 bundled SWOP（合法 PDF/X-1a，色偏），換 CC profile 走 POD_ICC_* env 零改碼 ③ sharp musl binary 在 standalone build 是否需顯式 COPY（既有 remove-bg/generate 已 deploy 運作→推測 OK，但 print 體積更大，部署期驗）④ printninja 單張（多頁 deck 待 P2）。
+
+**[rollback]** 純新檔（pdfx-def.ts/測試/runbook）+ 既有檔加法改動（ghostscript-pdfx.ts/route.ts/Dockerfile/compose 皆 additive，flag 預設 false）。`git checkout` 即回復；部署層 rollback 見 runbook §5（設 flag=false 重啟即退回安全態）。
+
+---
 
 ### feat(pod): [1-e] image/process API route — bake pipeline HTTP 邊界完成
 
@@ -188,6 +245,29 @@
 - REALTEST_EVIDENCE: tool=app_awarewave | cmd=`GET /api/ops/inbox/health` | result=`open_count=0`, `critical_count=0`, `high_count=0`, `probe_status=ok`, `ingest_fresh=true`
 
 **[剩餘風險]** SG `/root/Work` 仍有 2 個 untracked local files（`docker-compose.yml.bak.pre-profile-n8n`, `rollback.log`）；未影響 deploy drift 判定，但應在下次 SG hygiene window 決定保留或移到 backup/log 目錄。
+
+### incident(netdata): SG nginx recent 5xx = 5 requests（短暫 app health 503，已清）
+
+**[任務理解]** Ops Inbox 收到 Netdata `awarewave_nginx_5xx_recent`：SG `wordpress-ubuntu-4gb-sin-1` nginx 最近 5 分鐘 5xx=5，provider hint 要 RCA + risk + verification。
+
+**[RCA]**
+- 告警時間：`alarm_when=1781329952` → `2026-06-13T05:52:32Z`（TPE 13:52:32）。
+- host nginx access log 在 05:47-05:53Z 只有 **5 筆 503**，全部來自同一操作者 IPv6 `2001:b400:e24e:20f6:...`，endpoint 全為 `GET /api/ops/inbox/health`，referrer 分散在多個 console tab（tools/mockup、content、tarot、login、root）。
+- 同時間 next-admin log 出現重複 `AuthUnknownError: Unexpected token 'R', "Rate limit exceeded" is not valid JSON`，代表 Supabase Auth/GoTrue rate limit 回純文字，middleware/Next 解析失敗形成短暫 app-side 503。
+- 非 scanner、非 WordPress、非 nginx rate-limit 503：同窗口 status counts `200=160, 307=32, 401=1, 499=2, 503=5`；5xx path 只有 `/api/ops/inbox/health`。
+- SG 容器狀態正常：`lobster-next-admin` healthy，無 OOM；Netdata 當前 alarm 已 `CLEAR`，chart 最近 10 分鐘 `error=0`。
+
+**[已處理]**
+- Ops Inbox incident `4520e707-0b50-4ab2-8dd8-145c849c087f` 已標 `resolved`，`resolved_by=codex-netdata-clear-confirmed`。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`grep host nginx access.log 05:47-05:53Z` | result=5×`503 /api/ops/inbox/health` only
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker logs lobster-next-admin --since 05:49 --until 05:54` | result=Supabase Auth `Rate limit exceeded` plaintext parse errors
+- REALTEST_EVIDENCE: tool=Netdata local API | cmd=`/api/v1/alarms?all` | result=`awarewave_nginx_5xx_recent status=CLEAR value=0`
+- REALTEST_EVIDENCE: tool=app_awarewave | cmd=`GET /api/ops/inbox/health` | result=`open_count=0`, `critical_count=0`, `ingest_fresh=true`
+- REALTEST_EVIDENCE: tool=Supabase REST | cmd=`GET ops_incidents?status=in.(open,investigating)` | result=`[]`
+
+**[剩餘風險]** 真正的 UX/code 問題仍存在：多個 console tab polling/navigating 時可能觸發 Supabase Auth rate limit；目前已 fail back to normal，但應另案讓 middleware 對 Supabase Auth 429/plaintext fail-closed 為 401/429，而不是讓 Next 產生 503，並考慮降低 `OpsInboxBadge` 多 tab polling。
 
 ### feat(tarot): ✨ 幫我想 prompt 按鈕 — Claude Haiku art-direction prompt 生成
 

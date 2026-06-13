@@ -131,12 +131,20 @@ export async function applyOutputIntent(pdf: Buffer, icc: IccProfileName): Promi
     });
     await fs.writeFile(inPath, pdf);
     await fs.writeFile(defPath, defPs, "latin1"); // PostScript is latin1/ASCII, not UTF-8
-    await execFileP("gs", gsArgs(defPath, inPath, outPath));
+    // Bound the child: a pathological/malformed PDF must not hang gs forever (Next's
+    // maxDuration does NOT kill the spawned process). maxBuffer covers gs stderr warnings.
+    await execFileP("gs", gsArgs(defPath, inPath, outPath), {
+      timeout: 30_000,
+      killSignal: "SIGKILL",
+      maxBuffer: 64 * 1024 * 1024,
+    });
 
     const out = await fs.readFile(outPath);
     // Post-verify: gs is silent on a failed pdfmark. -dPDFX forces PDF 1.3 (no object
-    // streams) so the Catalog /OutputIntent is plaintext-greppable here.
-    if (!out.includes(Buffer.from("/OutputIntent"))) {
+    // streams) so the Catalog keys are plaintext-greppable. Co-require the Catalog array
+    // key /OutputIntents AND /DestOutputProfile (the embedded ICC ref) so a stray
+    // "/OutputIntent" inside input content can't false-pass a silently-failed pdfmark.
+    if (!out.includes(Buffer.from("/OutputIntents")) || !out.includes(Buffer.from("/DestOutputProfile"))) {
       throw new GsOutputIntentMissingError(icc);
     }
     return Buffer.from(out);
