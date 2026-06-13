@@ -57,6 +57,20 @@
 
 ---
 
+### fix(gate): RankMath KB 方括號檔名 + data: URI 害 verify-build-gates 失敗
+
+根因：`802b634a` RankMath KB 匯入的第三方抓取 .md 帶兩類毒：① inline `data:image/svg+xml,...` 被 `validate-doc-integrity.mjs` 當相對檔連結 → broken_link；② 檔名 `...the [year] Shortcode.md` 的 `[year]` 在 `system-health-check.ps1` mojibake 掃描的 `Get-Content -Raw -Path` 被當 glob 字元類別 → FileSystem-only 動態參數 `-Raw` 無法綁 → `NamedParameterNotFound` → health 0%。兩者連鎖 → `/verify` FAIL → 擋部署。
+
+[已修改] ① `validate-doc-integrity.mjs`：`resolveLink` 加 `URI_SCHEME=/^[a-z][a-z0-9+.-]+:/i` 豁免所有非檔案 scheme（data:/tel:/ftp:…；2+ 字元避開 Windows `C:` 碰撞）+ walk 排除 `RankMath-KB` 匯入夾。② `system-health-check.ps1`：mojibake 掃描 3 處 `-Path`→`-LiteralPath`（對齊檔內既有 6 處慣例）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=node validate-doc-integrity.mjs | exit=0 | Doc integrity PASSED
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell system-health-check.ps1 | exit=0 | Score 100% (373/373)
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell verify-build-gates.ps1 | exit=0 | ALL PASSED
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（regex 18 案例實測無 over-match；RankMath-KB 無 inbound authored 連結；3 處 -LiteralPath 無 wildcard 依賴）
+- BUGHUNT_DONE: scope=scripts,lobster-factory,agency-os | grep=URI_SCHEME\|RankMath-KB\|LiteralPath | hits=0（新符號僅存於 2 staged 檔；無 downstream consumer）
+
+---
+
 ### feat(pod): [0-a-gs] Ghostscript ICC OutputIntent 上線 SG prod
 
 POD_OUTPUT_INTENT_DEPLOYED=true 寫入 `/root/lobster-phase1/.env`；SG docker-compose.yml 補 POD_OUTPUT_INTENT_DEPLOYED / POD_ICC_* 四個 env var；`docker compose up -d next-admin`（無 rebuild，gs 已在 image，容器 healthy 8s 後）。

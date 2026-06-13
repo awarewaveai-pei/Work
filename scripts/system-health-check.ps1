@@ -325,7 +325,7 @@ foreach ($uf in $utf8Files) {
     $full = Join-Path $root $uf
     if (Test-Path $full) {
         try {
-            $null = Get-Content -Raw -Path $full -Encoding UTF8
+            $null = Get-Content -Raw -LiteralPath $full -Encoding UTF8
             Add-Check -Name ("UTF8 readable: " + $uf) -Pass $true -Detail "OK"
         } catch {
             Add-Check -Name ("UTF8 readable: " + $uf) -Pass $false -Detail $_.Exception.Message
@@ -347,7 +347,10 @@ foreach ($sp in $scanPaths) {
         $files = Get-ChildItem -Path $sp -Recurse -File -Filter "*.md"
         foreach ($f in $files) {
             $mojibakeScanned++
-            $text = Get-Content -Raw -Encoding UTF8 -Path $f.FullName
+            # -LiteralPath (not -Path): filenames with glob metachars like "[year]"
+            # (RankMath KB import) make -Path resolve as a wildcard → the FileSystem-only
+            # dynamic -Raw param won't bind → spurious NamedParameterNotFound (2026-06-14).
+            $text = Get-Content -Raw -Encoding UTF8 -LiteralPath $f.FullName
             if (Contains-Mojibake -Text $text) {
                 $rel = $f.FullName
                 $rootNorm = [System.IO.Path]::GetFullPath($root)
@@ -360,7 +363,7 @@ foreach ($sp in $scanPaths) {
         }
     } else {
         $mojibakeScanned++
-        $text = Get-Content -Raw -Encoding UTF8 -Path $sp
+        $text = Get-Content -Raw -Encoding UTF8 -LiteralPath $sp
         if (Contains-Mojibake -Text $text) {
             $rel = [System.IO.Path]::GetFullPath($sp)
             $rootNorm = [System.IO.Path]::GetFullPath($root)
