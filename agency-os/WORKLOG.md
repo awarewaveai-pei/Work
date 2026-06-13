@@ -4,6 +4,19 @@
 
 ## 2026-06-14
 
+### feat(studio): 語意化下載檔名 產品-主圖名稱-風格.ext（全 6 下載點）
+
+根因：studio 所有下載點檔名寫死（route `web-tarot.webp`/`web-square.webp`、CanvasEditor `canvas-design.png`、StudioWorkbench `design.png`、Tarot deck zip `tarot-deck-print.zip`）→ 操作者下載整資料夾無法辨識來源（screenshot 回報）。所謂「語意化檔名設定沒吃到」實為**該設定從未實作**。
+
+[已修改] 新 `lib/studio/semantic-filename.ts`（純 client-safe，零 node import；`buildSemanticFilename`/`buildSemanticBase`/`extOf`）由現有 state（productType/subject/style）組名；非法字元(`\p{Cc}` 控制字元 + `/ \ : * ? " < > |` + dot)→dash、content-less 段丟棄、code-point slice 防 surrogate 切半、全空 fallback 舊名。client 覆寫 `a.download`（**不動 route.ts** → route.test 15/15 仍綠）；canvas 走 sessionStorage 帶 base name + CanvasEditor mount consume-and-clear（修 critic Major：sidebar 直連 bypass 繼承 stale 名）。wired: OutputTrackBar(fileMeta prop)/StudioWorkbench/TarotStudio。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run semantic-filename.test.ts route.test.ts canvas-deps.test.ts | exit=0 | 28 pass (13 semantic+14 route+1 canvas-deps)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | 0 type errors
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/4n（2 Major 均已修：CANVAS_NAME_KEY sidebar-bypass stale-leak → consume-and-clear；控制字元 strip 已由 `\p{Cc}` 覆蓋）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=buildSemanticFilename\|buildSemanticBase\|CANVAS_NAME_KEY | hits=0（唯一無碰撞符號，僅存在於 staged 檔；`fileMeta`/`openInCanvas` 另查亦無遺漏 consumer，僅 node_modules `fileMetadata` 子字串噪音；agency-os/scripts 無 stale 檔名聲稱）
+
+---
+
 ### feat(pod): [0-a-gs] Ghostscript ICC OutputIntent 上線 SG prod
 
 POD_OUTPUT_INTENT_DEPLOYED=true 寫入 `/root/lobster-phase1/.env`；SG docker-compose.yml 補 POD_OUTPUT_INTENT_DEPLOYED / POD_ICC_* 四個 env var；`docker compose up -d next-admin`（無 rebuild，gs 已在 image，容器 healthy 8s 後）。
