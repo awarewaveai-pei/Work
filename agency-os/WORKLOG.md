@@ -34,7 +34,12 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ownDesignUrlToBlob|isAllowedInputUrl|getDesignsPublicBase | hits=0 -- 新符號(ownDesignUrlToBlob/isAllowedInputUrl/OPENAI_REF_MIME) 單一 call site；getDesignsPublicBase 與其他 4 route 用法一致，無 stale consumer
 - verify-build-gates: ALL PASSED (health 100% 373/373)
 **[剩餘風險]** 真正 OpenAI 端對端(含計費)尚未跑，上線後驗；Replicate 路徑不受影響。
-**[rollback]** `git checkout lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/image-gen.ts`
+**[rollback]** `git checkout lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/image-gen.ts`（未上線時）；已上線回滾見 DEPLOY_ROLLBACK_RUNBOOK §2.1
+**[部署]** sg-deploy.sh next-admin → SG 5.223.93.113，exit=0。deployed commit `88254fd3`（我的 commit 34eb8772 為其祖先；部署源 /root/Work git grep `ownDesignUrlToBlob`=2 確認含修復）。container lobster-next-admin healthy after 7s；sg-deploy 內建 smoke 4/4 OK（/login 200、/api/ops/summary 200、wordpress 200、node-api health 200）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=/root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=~180000
+**[部署後 smoke 註記]** playwright smoke 兩次紅（9→12 failed，失敗集不一致=flaky）。失敗全與本修零重疊：①04-onboard=本機缺 OPS_BASIC creds（fresh-machine env gap，skill 明載）②mobile-smoke 基本 200/ops-dashboard/repair-health=本機 IP 並發觸發 CF transient（手動 curl n8n=200、prod 端點健康）。判定非 deploy regression（失敗集 flaky + 手動 prod 探測健康 + sg-deploy 自身 smoke 全綠）。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl https://app.aware-wave.com/{api/health,onboard,tools/mockup} + n8n/healthz | exit=0 -- n8n=200、mockup 頁 307→auth(存在)、api-health/onboard 401/307=無 creds 預期值
+**[剩餘風險]** mockup 真正端對端（GPT-Image-1 + 圖庫圖 + 計費 OpenAI call）尚未在 prod 跑；邏輯已由 vitest 6/6 證實。
 ### deploy(trigger): tarot-batch-generate deployed to EU ??v20260613.2
 **[隞餃??圾]** Deploy packages/workflows to EU self-hosted Trigger.dev (	rigger.aware-wave.com). New task 	arot-batch-generate added; 	rigger.config.ts syncEnvVars now includes BATCH_INTERNAL_SECRET.
 **[撌脖耨?鉛** No code change in this session ??deploy only.
