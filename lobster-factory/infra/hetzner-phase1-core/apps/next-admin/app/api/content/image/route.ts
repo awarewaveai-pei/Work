@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 // Platform presets for social media images
-export const PLATFORM_IMAGE_SPECS: Record<string, { label: string; width: number; height: number; note: string }> = {
+const PLATFORM_IMAGE_SPECS: Record<string, { label: string; width: number; height: number; note: string }> = {
   instagram_square:    { label: "Instagram 方形貼文",   width: 1080, height: 1080, note: "1:1 通用貼文" },
   instagram_portrait:  { label: "Instagram 直式貼文",   width: 1080, height: 1350, note: "4:5 最大面積" },
   instagram_story:     { label: "Instagram 限時/Reels", width: 1080, height: 1920, note: "9:16 全螢幕" },

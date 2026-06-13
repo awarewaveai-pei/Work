@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { WpSite } from "@/app/api/content/sites/route";
+import type { WpSite } from "@/lib/content/wp-sites";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
-import type { PLATFORM_IMAGE_SPECS } from "@/app/api/content/image/route";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -879,6 +878,69 @@ export default function ContentStudio() {
             <div className="form-hint">伺服器端抓取頁面文字注入提示詞（每個 URL 最多 3000 字元）。</div>
           </SectionToggle>
 
+          {/* ── 品牌聲音 ── */}
+          <SectionToggle label="品牌聲音（Brand Voice）— 分析範例文字，自動萃取寫作風格" open={showBrandVoice} onToggle={() => setShowBrandVoice(v => !v)}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+              <div>
+                <label className="form-label">品牌 / 客戶名稱</label>
+                <input className="form-input" value={bvProfileName} onChange={e => setBvProfileName(e.target.value)}
+                  placeholder="例：Soulful Expression" />
+              </div>
+              <div>
+                <label className="form-label">從 URL 擷取（選填）</label>
+                <input className="form-input" value={bvSampleUrl} onChange={e => setBvSampleUrl(e.target.value)}
+                  placeholder="https://example.com/about" />
+              </div>
+            </div>
+            <label className="form-label">範例文字（貼入品牌文章或 About 頁面，至少 50 字）</label>
+            <textarea className="form-textarea" style={{ minHeight: "100px" }}
+              value={bvSampleText} onChange={e => setBvSampleText(e.target.value)}
+              placeholder="貼入品牌文章、廣告文案或 About 頁面文字…" />
+            <div style={{ display: "flex", gap: "10px", marginTop: "10px", alignItems: "center", flexWrap: "wrap" }}>
+              <button className="btn-secondary" onClick={handleAnalyzeBrandVoice}
+                disabled={bvLoading || (!bvSampleText.trim() && !bvSampleUrl.trim())}
+                style={{ fontSize: "12px" }}>
+                {bvLoading ? "分析中…" : "🔍 分析品牌聲音"}
+              </button>
+              {bvProfile && (
+                <button className="btn-primary" onClick={handleApplyBrandVoice} style={{ fontSize: "12px" }}>
+                  {bvApplied ? "✓ 已套用" : "✨ 注入文章提示詞"}
+                </button>
+              )}
+              {bvError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{bvError}</span>}
+            </div>
+            {bvProfile && (
+              <div style={{ marginTop: "12px", padding: "12px", background: "var(--bg-hover, #f5f5f5)", borderRadius: "6px", fontSize: "12px" }}>
+                <div style={{ fontWeight: 600, marginBottom: "8px", color: "var(--text-primary)" }}>{bvProfile.name} — 品牌聲音摘要</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
+                  <div><span style={{ color: "var(--text-muted)" }}>語調：</span>{bvProfile.tone}</div>
+                  <div><span style={{ color: "var(--text-muted)" }}>詞彙：</span>{bvProfile.vocabulary}</div>
+                  <div><span style={{ color: "var(--text-muted)" }}>句型：</span>{bvProfile.sentenceStyle}</div>
+                  <div><span style={{ color: "var(--text-muted)" }}>個性：</span>{bvProfile.personality.join("、")}</div>
+                </div>
+                {bvProfile.preferWords.length > 0 && (
+                  <div style={{ marginTop: "6px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>偏好用詞：</span>
+                    {bvProfile.preferWords.map((w, i) => (
+                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#dcfce7", color: "#166534", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
+                    ))}
+                  </div>
+                )}
+                {bvProfile.avoidWords.length > 0 && (
+                  <div style={{ marginTop: "4px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>避免用詞：</span>
+                    {bvProfile.avoidWords.map((w, i) => (
+                      <span key={i} style={{ display: "inline-block", padding: "1px 6px", background: "#fee2e2", color: "#991b1b", borderRadius: "3px", marginRight: "4px", marginBottom: "2px", fontSize: "11px" }}>{w}</span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ marginTop: "8px", padding: "8px", background: "var(--bg-card)", borderRadius: "4px", borderLeft: "3px solid #5855d0", fontSize: "11px", lineHeight: 1.5 }}>
+                  {bvProfile.promptInjection}
+                </div>
+              </div>
+            )}
+          </SectionToggle>
+
           {/* ── 品牌語調 ── */}
           <SectionToggle label="品牌語調 / 進階指示" open={showAdvanced} onToggle={() => setShowAdvanced(v => !v)}>
             <textarea className="form-textarea" style={{ minHeight: "90px" }}
@@ -978,6 +1040,69 @@ export default function ContentStudio() {
                 可直接編輯後推送。<code>{"<!-- NEEDS_BRAND_VERIFY -->"}</code> = 填入真實品牌資料。
               </div>
 
+              {/* ── 社群圖片生成 ── */}
+              {genStatus === "done" && hasContent && (
+                <div style={{ marginTop: "16px", borderTop: "1px solid var(--card-border)", paddingTop: "14px" }}>
+                  <button onClick={() => setShowImgGen(v => !v)}
+                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "var(--text-primary)", padding: 0 }}>
+                    {showImgGen ? "▲" : "▼"} 社群圖片生成
+                  </button>
+                  {showImgGen && (
+                    <div style={{ marginTop: "12px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                        <div>
+                          <label className="form-label">目標平台 / 尺寸</label>
+                          <select className="form-select" value={imgPlatform} onChange={e => setImgPlatform(e.target.value)}>
+                            {PLATFORM_IMG_PRESETS.map(p => (
+                              <option key={p.platform} value={p.platform}>{p.label} — {p.w}×{p.h}（{p.note}）</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <label className="form-label">圖片描述提示詞</label>
+                      <textarea className="form-textarea" style={{ minHeight: "72px" }}
+                        value={imgPrompt} onChange={e => setImgPrompt(e.target.value)}
+                        placeholder={`例：${form.keyword}主題的概念插圖，溫暖色調，簡潔留白，適合社群媒體`} />
+                      <div style={{ marginTop: "8px", display: "flex", gap: "10px", alignItems: "center" }}>
+                        <button className="btn-primary" style={{ fontSize: "12px", padding: "6px 16px" }}
+                          onClick={handleGenerateImage} disabled={imgLoading || !imgPrompt.trim()}>
+                          {imgLoading ? "生成中…" : "🎨 生成圖片"}
+                        </button>
+                        {imgError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{imgError}</span>}
+                      </div>
+                      {/* Platform specs reference */}
+                      <div style={{ marginTop: "12px" }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" }}>各平台標準尺寸參考：</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                          {PLATFORM_IMG_PRESETS.map(p => (
+                            <button key={p.platform} onClick={() => setImgPlatform(p.platform)}
+                              style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", cursor: "pointer",
+                                border: imgPlatform === p.platform ? "1px solid #5855d0" : "1px solid var(--card-border)",
+                                background: imgPlatform === p.platform ? "#ede9fe" : "var(--bg-card)",
+                                color: imgPlatform === p.platform ? "#5855d0" : "var(--text-muted)" }}>
+                              {p.label} {p.w}×{p.h}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {imgResult && (
+                        <div style={{ marginTop: "12px" }}>
+                          <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "6px" }}>
+                            {imgResult.spec.label} — {imgResult.spec.width}×{imgResult.spec.height}
+                          </div>
+                          <img src={imgResult.imageUrl} alt="Generated social media image"
+                            style={{ maxWidth: "100%", borderRadius: "8px", border: "1px solid var(--card-border)" }} />
+                          <a href={imgResult.imageUrl} download="social-image.webp" target="_blank" rel="noopener noreferrer"
+                            style={{ display: "inline-block", marginTop: "8px", fontSize: "12px", color: "#5855d0" }}>
+                            ↓ 下載圖片
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ── 社群分發 ── */}
               {genStatus === "done" && hasContent && (
                 <div style={{ marginTop: "16px", borderTop: "1px solid var(--card-border)", paddingTop: "14px" }}>
@@ -1021,8 +1146,10 @@ export default function ContentStudio() {
                           {Object.entries(synContent).map(([key, content]) => {
                             const labelMap: Record<string, string> = {
                               twitter_single: "Twitter / X", twitter_thread: "Twitter Thread",
+                              instagram: "Instagram", threads: "Threads",
                               linkedin: "LinkedIn", facebook: "Facebook",
-                              whatsapp: "WhatsApp", pinterest: "Pinterest", email: "Email 電子報",
+                              tiktok: "TikTok", whatsapp: "WhatsApp",
+                              pinterest: "Pinterest", reddit: "Reddit", email: "Email 電子報",
                             };
                             return (
                               <div key={key} style={{ border: "1px solid var(--card-border)", borderRadius: "6px", padding: "10px 12px" }}>
