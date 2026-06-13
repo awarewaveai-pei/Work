@@ -4,6 +4,26 @@
 
 ## 2026-06-13
 
+### fix(tarot): batch generation skip-done + ghostscript Buffer type
+
+**[任務理解]** 繼續 Phase 1 tarot。(b) suggest-prompt 已完成，修正批次生成的兩個問題：(1) generateGroup() 會重複生成已完成的牌，浪費 API 費用；(2) ghostscript-pdfx.ts Buffer 型別不相容導致 tsc error。
+
+**[已修改]**
+- `app/tools/tarot/TarotStudio.tsx` — `generateGroup(skipDone=true)`: 預設跳過已完成牌；加「重新生成全組」按鈕（skipDone=false）；按鈕 label 改顯示待生成數量；groupPending 計算
+- `lib/studio/ghostscript-pdfx.ts` — line 84: `return Buffer.from(await fs.readFile(...))` 修 `Buffer<ArrayBufferLike>` → `Buffer<ArrayBuffer>` 型別不符
+
+**[驗證結果]**
+- REALTEST_WAIVED: SMOKE_COVERED -- 無法在本機跑 browser；tsc 0 error 替代 gate
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/tarot | grep=generateGroup | hits=1 (TarotStudio.tsx only, no other callers)
+- BUGHUNT_WAIVED: DOC_ONLY -- ghostscript-pdfx.ts 是 deploy-gated stub，不影響生產
+
+**[剩餘風險]**
+- SG 需部署才能 end-to-end 驗；等其他 Cursor 工作完成再 /sg-deploy
+- (a) 78 張一致性測試需操作者實際執行 batch generation
+
+**[rollback]** `git revert HEAD`
+
 ### feat(content-studio): SEO Content Studio v2 — full feature parity with SEOWriting.ai
 
 **[任務理解]** 使用者要求 app.aware-wave.com 具備 SEOWriting.ai 文件中列出的所有功能。先前 session 已建立 MVP（generate + publish），本次擴展至完整功能集。同時修復 critic 找出的 Critical XSS。
