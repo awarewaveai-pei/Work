@@ -65,6 +65,11 @@ Sitemap: https://example.com/sitemap_index.xml
 - `/wp-admin/`（但允許 `/wp-admin/admin-ajax.php`）
 - 搜尋結果頁：`Disallow: /?s=`
 
+**AI 爬蟲（選擇性）**：
+- `GPTBot`（OpenAI 訓練爬蟲）可封鎖 → 不影響 ChatGPT Search 搜尋索引
+- `OAI-SearchBot` **不可封鎖** → 這是 ChatGPT Search 的搜尋索引爬蟲
+- `CCBot`（Common Crawl）可封鎖 → 供 AI 訓練資料用
+
 > 不要用 robots.txt 阻止不想出現在搜尋的頁面 — 改用 `noindex` meta tag。
 
 ---
@@ -610,13 +615,18 @@ Google 的 Core Web Vitals 是排名信號。
 □ Permalink 結構設定為 /%postname%/
 □ HTTPS 啟用且強制
 □ Favicon 已設定（≥48×48 px 正方形）
-□ robots.txt 正確（不封鎖 CSS/JS/圖片）
+□ robots.txt 正確（不封鎖 CSS/JS/圖片/OAI-SearchBot/Bingbot）
 □ RankMath 已安裝並完成 Wizard
-□ XML Sitemap 已啟用
+□ XML Sitemap 已啟用（200 URLs/頁、images ON、featured images ON）
 □ Sitemap 已提交至 Google Search Console
+□ Sitemap 已提交至 Bing Webmaster Tools（ChatGPT Search 需要）
 □ Search Console 驗證完成
+□ Bing Webmaster Tools 驗證完成
 □ OG Image 已設定（1200×630 px，無文字 Logo）
 □ Organization Schema 已填寫（Logo、社群連結）
+□ Author Archives 策略決定（Index = E-E-A-T / Noindex = thin content）
+□ 作者 bio / 頭像 / 社群連結已填寫（E-E-A-T 信號）
+□ llms.txt 模組已啟用（AI Search 引導）
 □ datePublished/dateModified 隨文章自動更新
 □ 行動版頁面正常顯示
 □ 頁面速度基準線記錄（PageSpeed Insights 分數）
@@ -636,5 +646,10 @@ Google 的 Core Web Vitals 是排名信號。
 | `4_排名與搜尋外觀.md` | 結構化資料、署名日期、Discover 圖片、Favicon |
 | `5_監控與偵錯.md` | Search Console、流量診斷 |
 | `6_網站專屬指南.md` | 多語系 hreflang、分頁、電商 schema |
+| `RankMath-KB/Getting Started/` | 安裝、Setup Wizard、24 項測試評分、Image SEO、Author SEO |
+| `RankMath-KB/Schema/` | Article/BlogPosting schema、Author SEO、Schema 選擇指南 |
+| `RankMath-KB/Sitemaps/` | Sitemap 設定、圖片 sitemap、Bing 提交 |
+| `RankMath-KB/Miscellaneous/` | ChatGPT Search 索引、圖片命名、Thin content |
+| `RankMath-KB/404 & Redirections/` | 301/302 重定向、404 監控 |
 
-_最後更新：2026-06-14_
+_最後更新：2026-06-14（RankMath KB 554 篇文章全面研究後）_
