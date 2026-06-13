@@ -1548,9 +1548,20 @@ export default function ContentStudio() {
                 focusKeyword={form.keyword}
                 seoTitle={metaData?.seoTitle ?? ""}
                 metaDescription={metaData?.metaDesc ?? ""}
-                slug={slugify(form.keyword)}
+                slug={slugHint || slugify(form.keyword)}
                 onFixApply={handleFixApply}
               />
+
+              {/* ── 自動圖片生成進度 ── */}
+              {autoImgN > 0 && (
+                <div style={{
+                  marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
+                  background: "#f0f9ff", border: "1px solid #bae6fd",
+                  fontSize: "12px", color: "#0284c7",
+                }}>
+                  🎨 正在生成 {autoImgN} 張圖片…
+                </div>
+              )}
 
               {/* ── 社群圖片生成 ── */}
               {genStatus === "done" && hasContent && (

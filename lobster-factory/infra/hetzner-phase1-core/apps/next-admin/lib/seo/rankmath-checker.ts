@@ -70,6 +70,9 @@ function getParagraphs(md: string): string[] {
 
 function getIntroWords(md: string, count = 150): string {
   const plain = stripMarkdown(md);
+  // For CJK-dominant text, every character is a "word" — slice by char instead
+  const hasCjk = /[一-鿿㐀-䶿]/.test(plain);
+  if (hasCjk) return plain.slice(0, count * 3).toLowerCase(); // 3 bytes per CJK ≈ reasonable window
   return plain.split(/\s+/).slice(0, count).join(" ").toLowerCase();
 }
 
@@ -101,12 +104,18 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
   });
 
   // 3. kw-in-slug
-  const slugPass = slug.toLowerCase().includes(kwSlug) || slug.toLowerCase().includes(kw.replace(/\s+/g, ""));
+  const kwIsAsciiSlug = /^[\x00-\x7F]+$/.test(kw);
+  // For non-ASCII (CJK) keywords the AI generates an English SLUG_HINT — any non-empty slug is acceptable
+  const slugPass = kwIsAsciiSlug
+    ? (slug.toLowerCase().includes(kwSlug) || slug.toLowerCase().includes(kw.replace(/\s+/g, "")))
+    : slug.length > 0;
   checks.push({
     id: "kw-in-slug",
     label: "Focus keyword in URL slug",
     pass: slugPass,
-    detail: slugPass ? `"${kwSlug}" found in slug "${slug}"` : `"${kwSlug}" not found in slug "${slug}"`,
+    detail: slugPass
+      ? `slug "${slug}" set (CJK keyword → English slug accepted)`
+      : (kwIsAsciiSlug ? `"${kwSlug}" not found in slug "${slug}"` : "No slug set"),
   });
 
   // 4. kw-in-intro
