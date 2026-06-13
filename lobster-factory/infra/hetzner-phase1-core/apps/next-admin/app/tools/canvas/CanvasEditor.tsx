@@ -69,6 +69,8 @@ export default function CanvasEditor() {
   const [textSize, setTextSize] = useState(48);
   const [textSelected, setTextSelected] = useState(false);
   const [imageSelected, setImageSelected] = useState(false); // an image object is selected → show 調色
+  const [anySelected, setAnySelected] = useState(false); // any object selected → enable per-object tools
+  const [lockSelected, setLockSelected] = useState(false); // selected object is locked (防呆 block)
   const grade = useColorGrade(); // 修圖積木 applied to the selected image via Fabric filters
 
   // ── init fabric canvas + load handed-off source image (client only) ──
@@ -109,12 +111,16 @@ export default function CanvasEditor() {
           setTextSelected(false);
         }
         setImageSelected(o?.type === "image");
+        setAnySelected(!!o);
+        setLockSelected(!!(o as { lockMovementX?: boolean } | null)?.lockMovementX);
       };
       canvas.on("selection:created", syncFromSelection);
       canvas.on("selection:updated", syncFromSelection);
       canvas.on("selection:cleared", () => {
         setTextSelected(false);
         setImageSelected(false);
+        setAnySelected(false);
+        setLockSelected(false);
       });
 
       const source = typeof window !== "undefined" ? sessionStorage.getItem(CANVAS_SOURCE_KEY) : null;
@@ -240,6 +246,55 @@ export default function CanvasEditor() {
     canvas.requestRenderAll();
   }, []);
 
+  // 🔒 物件鎖定積木 — lock/unlock the selected object's move/scale/rotate (防客人弄壞底圖).
+  const toggleLock = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const o = canvas.getActiveObject() as
+      | (FabricObject & {
+          lockMovementX?: boolean;
+          set: (p: Record<string, unknown>) => void;
+        })
+      | null;
+    if (!o) return;
+    const lock = !o.lockMovementX;
+    o.set({
+      lockMovementX: lock,
+      lockMovementY: lock,
+      lockScalingX: lock,
+      lockScalingY: lock,
+      lockRotation: lock,
+      hasControls: !lock,
+      selectable: true,
+    });
+    setLockSelected(lock);
+    canvas.requestRenderAll();
+  }, []);
+
+  // 🔷 形狀積木 — add a basic shape (rect / circle / line) at canvas centre.
+  const addShape = useCallback((kind: "rect" | "circle" | "line") => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    void import("fabric").then((fabric) => {
+      if (fabricRef.current !== canvas) return;
+      const cx = canvas.getWidth() / 2;
+      const cy = canvas.getHeight() / 2;
+      const common = { fill: "transparent", stroke: "#111111", strokeWidth: 4 };
+      let shape: FabricObject;
+      if (kind === "rect") {
+        shape = new fabric.Rect({ left: cx, top: cy, originX: "center", originY: "center", width: 200, height: 140, ...common });
+      } else if (kind === "circle") {
+        shape = new fabric.Circle({ left: cx, top: cy, originX: "center", originY: "center", radius: 90, ...common });
+      } else {
+        shape = new fabric.Line([cx - 120, cy, cx + 120, cy], { stroke: "#111111", strokeWidth: 4 });
+      }
+      canvas.add(shape);
+      canvas.setActiveObject(shape);
+      setAnySelected(true);
+      canvas.requestRenderAll();
+    });
+  }, []);
+
   /** Flatten the canvas to a PNG data URL (codebase convention — see file header). */
   const exportPng = useCallback((): string | null => {
     const canvas = fabricRef.current;
@@ -306,6 +361,19 @@ export default function CanvasEditor() {
           />
         </label>
         <button className="btn-secondary" disabled={!ready} onClick={deleteSelected}>刪除選取</button>
+        {/* 🔷 形狀積木 */}
+        <button className="btn-secondary" disabled={!ready} onClick={() => addShape("rect")} title="加方框">▭</button>
+        <button className="btn-secondary" disabled={!ready} onClick={() => addShape("circle")} title="加圓形">◯</button>
+        <button className="btn-secondary" disabled={!ready} onClick={() => addShape("line")} title="加線條">／</button>
+        {/* 🔒 物件鎖定積木 */}
+        <button
+          className="btn-secondary"
+          disabled={!ready || !anySelected}
+          onClick={toggleLock}
+          title="鎖定／解鎖選取物件（防誤移）"
+        >
+          {lockSelected ? "🔒 已鎖定" : "🔓 鎖定"}
+        </button>
         <span style={{ flex: 1 }} />
         <button className="btn-primary" disabled={!ready} onClick={download}>下載 PNG</button>
         <button
