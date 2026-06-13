@@ -4,6 +4,21 @@
 
 ## 2026-06-14
 
+### feat(canvas): Canvas 編輯器加調色工具包（Fabric filters）+ 部署
+
+**[任務理解]** 使用者：`/tools/canvas` 應該也要有那組調色工具包。實況確認 CanvasEditor 無調色（grep 空）= 缺口。
+**[已修改]**
+- `app/tools/canvas/fabric-filters.ts`（新）— `buildFabricImageFilters(fabricNS, params)`：ColorGradeParams → Fabric filter（hue→HueRotation/sat→Saturation/bri→Brightness/levels→Contrast/gamma→Gamma/sharpen→Convolute）。純映射，fabric NS 由 caller 動態傳入。
+- `app/tools/canvas/CanvasEditor.tsx` — useColorGrade + 偵測選取圖(type==='image') + grade.params 變更 useEffect 套 filter 到選取圖 + applyFilters + 顯示 ColorGradePanel（選圖時）。WYSIWYG：filter 結果=toDataURL 匯出像素，無預覽落差。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node -e fabric.filters` | 確認 Saturation/HueRotation/Brightness/Contrast/Gamma/Convolute 全存在 + FabricImage.applyFilters=function
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` + `npm run build` | exit=0/0
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | deployed=640c2bf1 | healthy 6s | smoke 4/4 200
+- REVIEW_WAIVED: SMOKE_COVERED -- 複用既驗 ColorGradePanel；fabric filter API 已 node 驗存在；canvas runtime 無 headless browser exec，build 為 gate
+- BUGHUNT_DONE: scope=lobster-factory | grep=buildFabricImageFilters\|imageSelected | hits=0 stale
+**[待辦]** Q2 Adobe 色彩平衡（新積木）：簡版全域中間調 3 軸（建議）vs 完整陰影/中間調/亮部 9 軸 — 待使用者選規模。
+**[部署]** SG 640c2bf1 LIVE。
+
 ### docs(seo): RankMath KB 554-file 本地實際文章徹底研究 → 應用至文章生成與架站清單
 
 根因：前次 RankMath 研究用 URL 索引（非實際文章）→ 以 web fetch 補充，但深度不足。使用者找到本地 `docs/RankMath/RankMath-KB/`（11資料夾、554篇完整 KB 文章），要求徹底研究並全面應用。
