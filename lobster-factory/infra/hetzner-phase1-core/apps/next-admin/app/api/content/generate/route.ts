@@ -137,7 +137,8 @@ function buildUserPrompt(params: {
   lines.push(`Primary keyword: ${params.keyword}`);
   if (params.title.trim()) lines.push(`Article title: ${params.title.trim()}`);
   lines.push(`Language: ${params.language}`);
-  if (params.targetCountry && params.targetCountry !== "Global") {
+  const isGlobalAudience = !params.targetCountry || params.targetCountry === "Global" || params.targetCountry === "全球（不指定）";
+  if (!isGlobalAudience) {
     lines.push(`Target country/audience: ${params.targetCountry}`);
   }
   lines.push(`Article type: ${params.articleType}`);
@@ -306,7 +307,7 @@ export async function POST(req: Request): Promise<Response> {
   const rawMedia = (body.media ?? {}) as Record<string, unknown>;
   const media: MediaHub = {
     aiImages:           str(rawMedia.aiImages, "none"),
-    imageCount:         typeof rawMedia.imageCount === "number" ? rawMedia.imageCount : 3,
+    imageCount:         typeof rawMedia.imageCount === "number" ? Math.min(Math.max(1, rawMedia.imageCount), 10) : 3,
     imageSize:          str(rawMedia.imageSize, "1344x768"),
     imageStyle:         str(rawMedia.imageStyle),
     imageInstructions:  str(rawMedia.imageInstructions),
@@ -314,7 +315,7 @@ export async function POST(req: Request): Promise<Response> {
     includeKeywordAlt:  bool(rawMedia.includeKeywordAlt, true),
     autoAltText:        bool(rawMedia.autoAltText, false),
     youtubeSource:      str(rawMedia.youtubeSource, "none"),
-    youtubeCount:       typeof rawMedia.youtubeCount === "number" ? rawMedia.youtubeCount : 1,
+    youtubeCount:       typeof rawMedia.youtubeCount === "number" ? Math.min(Math.max(1, rawMedia.youtubeCount), 5) : 1,
     youtubeLayout:      str(rawMedia.youtubeLayout, "distribute"),
     strictUnderHeadings: bool(rawMedia.strictUnderHeadings, false),
   };
