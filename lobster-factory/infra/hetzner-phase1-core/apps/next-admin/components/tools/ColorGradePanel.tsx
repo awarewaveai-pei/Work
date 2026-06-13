@@ -73,6 +73,14 @@ const GROUPS: { title: string; rows: SliderRow[] }[] = [
       { key: "sharpen", label: "銳利化 Sharpen", min: GRADE_LIMITS.sharpen.min, max: GRADE_LIMITS.sharpen.max, step: 0.5, fmt: (v) => (v === 0 ? "關" : `${v}`) },
     ],
   },
+  {
+    title: "色彩平衡 Color Balance",
+    rows: [
+      { key: "balCR", label: "青 ↔ 紅", min: GRADE_LIMITS.balCR.min, max: GRADE_LIMITS.balCR.max, step: 1, fmt: (v) => `${v > 0 ? "+" : ""}${v}` },
+      { key: "balMG", label: "洋紅 ↔ 綠", min: GRADE_LIMITS.balMG.min, max: GRADE_LIMITS.balMG.max, step: 1, fmt: (v) => `${v > 0 ? "+" : ""}${v}` },
+      { key: "balYB", label: "黃 ↔ 藍", min: GRADE_LIMITS.balYB.min, max: GRADE_LIMITS.balYB.max, step: 1, fmt: (v) => `${v > 0 ? "+" : ""}${v}` },
+    ],
+  },
 ];
 
 type Props = {

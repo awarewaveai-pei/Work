@@ -42,6 +42,24 @@ export function buildFabricImageFilters(
   if (p.gamma > 1 && F.Gamma) {
     out.push(new F.Gamma({ gamma: [p.gamma, p.gamma, p.gamma] }));
   }
+  // Colour balance → ColorMatrix per-channel offset (5th column, 0..1 scale; matches the
+  // Sharp ±100→±60/255 mapping). 青紅/洋紅綠/黃藍 add to R/G/B respectively.
+  const balR = ((p.balCR ?? 0) * 0.6) / 255;
+  const balG = ((p.balMG ?? 0) * 0.6) / 255;
+  const balB = ((p.balYB ?? 0) * 0.6) / 255;
+  if ((balR !== 0 || balG !== 0 || balB !== 0) && F.ColorMatrix) {
+    out.push(
+      new F.ColorMatrix({
+        // prettier-ignore
+        matrix: [
+          1, 0, 0, 0, balR,
+          0, 1, 0, 0, balG,
+          0, 0, 1, 0, balB,
+          0, 0, 0, 1, 0,
+        ],
+      })
+    );
+  }
   if (p.sharpen > 0 && F.Convolute) {
     out.push(new F.Convolute({ matrix: [0, -1, 0, -1, 5, -1, 0, -1, 0] }));
   }

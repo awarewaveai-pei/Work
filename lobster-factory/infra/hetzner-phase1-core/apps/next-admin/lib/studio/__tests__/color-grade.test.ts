@@ -31,6 +31,9 @@ describe("color-grade", () => {
       white: 255,
       gamma: 1,
       sharpen: 0,
+      balCR: 0,
+      balMG: 0,
+      balYB: 0,
     });
   });
 
@@ -40,7 +43,15 @@ describe("color-grade", () => {
     };
     expect(stateToParams(s)).toEqual({
       hue: 0, saturation: 1, brightness: 1, black: 20, white: 230, gamma: 1.8, sharpen: 3,
+      balCR: 0, balMG: 0, balYB: 0,
     });
+  });
+
+  it("colour balance passes through stateToParams unchanged (−100..100)", () => {
+    const s = { hue: 0, sat: 100, bri: 100, balCR: 40, balMG: -30, balYB: 100 } as ColorGradeState;
+    const p = stateToParams(s);
+    expect([p.balCR, p.balMG, p.balYB]).toEqual([40, -30, 100]);
+    expect(isNeutralParams(p)).toBe(false);
   });
 
   it("clamps out-of-range state to slider bounds (all blocks)", () => {
@@ -55,6 +66,9 @@ describe("color-grade", () => {
       white: GRADE_LIMITS.white.min,
       gamma: GRADE_LIMITS.gamma.max,
       sharpen: GRADE_LIMITS.sharpen.max,
+      balCR: 0,
+      balMG: 0,
+      balYB: 0,
     });
   });
 
@@ -92,8 +106,9 @@ describe("color-grade", () => {
   });
 
   it("clampParams bounds multipliers (sat/bri 0.5..2, gamma 1..3)", () => {
-    expect(clampParams({ hue: 100, saturation: 9, brightness: 0, gamma: 99 } as never)).toEqual({
+    expect(clampParams({ hue: 100, saturation: 9, brightness: 0, gamma: 99, balCR: 999, balYB: -999 } as never)).toEqual({
       hue: 30, saturation: 2, brightness: 0.5, black: 0, white: 255, gamma: 3, sharpen: 0,
+      balCR: 100, balMG: 0, balYB: -100,
     });
   });
 

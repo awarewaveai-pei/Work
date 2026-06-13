@@ -48,11 +48,19 @@ export type ColorGradeState = {
   gamma?: number;
   /** sharpen sigma, 0..10 (0 = off / neutral) */
   sharpen?: number;
+  // Colour balance (Adobe-style, global midtone), each -100..100, neutral 0.
+  /** 青↔紅 Cyan–Red: + adds red, − adds cyan */
+  balCR?: number;
+  /** 洋紅↔綠 Magenta–Green: + adds green, − adds magenta */
+  balMG?: number;
+  /** 黃↔藍 Yellow–Blue: + adds blue, − adds yellow */
+  balYB?: number;
 };
 
 /**
  * Server/API payload. saturation/brightness/gamma are MULTIPLIERS (1 = neutral);
- * black/white are 0..255 levels points; sharpen is a Sharp sigma.
+ * black/white are 0..255 levels points; sharpen is a Sharp sigma; balCR/MG/YB are
+ * −100..100 colour-balance offsets (same units as the UI state).
  */
 export type ColorGradeParams = {
   /** degrees, -30..30 */
@@ -70,6 +78,12 @@ export type ColorGradeParams = {
   gamma?: number;
   /** sharpen sigma, 0..10 */
   sharpen?: number;
+  /** 青↔紅 Cyan–Red, −100..100 */
+  balCR?: number;
+  /** 洋紅↔綠 Magenta–Green, −100..100 */
+  balMG?: number;
+  /** 黃↔藍 Yellow–Blue, −100..100 */
+  balYB?: number;
 };
 
 /** Slider bounds (single source of truth for UI + clamps). */
@@ -81,6 +95,9 @@ export const GRADE_LIMITS = {
   white: { min: 191, max: 255, neutral: 255 },
   gamma: { min: 100, max: 300, neutral: 100 },
   sharpen: { min: 0, max: 10, neutral: 0 },
+  balCR: { min: -100, max: 100, neutral: 0 },
+  balMG: { min: -100, max: 100, neutral: 0 },
+  balYB: { min: -100, max: 100, neutral: 0 },
 } as const;
 
 export const NEUTRAL_STATE: ColorGradeState = {
@@ -91,6 +108,9 @@ export const NEUTRAL_STATE: ColorGradeState = {
   white: GRADE_LIMITS.white.neutral,
   gamma: GRADE_LIMITS.gamma.neutral,
   sharpen: GRADE_LIMITS.sharpen.neutral,
+  balCR: 0,
+  balMG: 0,
+  balYB: 0,
 };
 
 export const NEUTRAL_PARAMS: ColorGradeParams = {
@@ -101,6 +121,9 @@ export const NEUTRAL_PARAMS: ColorGradeParams = {
   white: 255,
   gamma: 1,
   sharpen: 0,
+  balCR: 0,
+  balMG: 0,
+  balYB: 0,
 };
 
 // Defense-in-depth: TS types are erased at runtime, so wire payloads can carry
@@ -129,6 +152,9 @@ export function clampState(s: ColorGradeState): ColorGradeState {
       GRADE_LIMITS.sharpen.max,
       GRADE_LIMITS.sharpen.neutral
     ),
+    balCR: clamp(o.balCR, GRADE_LIMITS.balCR.min, GRADE_LIMITS.balCR.max, GRADE_LIMITS.balCR.neutral),
+    balMG: clamp(o.balMG, GRADE_LIMITS.balMG.min, GRADE_LIMITS.balMG.max, GRADE_LIMITS.balMG.neutral),
+    balYB: clamp(o.balYB, GRADE_LIMITS.balYB.min, GRADE_LIMITS.balYB.max, GRADE_LIMITS.balYB.neutral),
   };
 }
 
@@ -142,7 +168,10 @@ export function isNeutralState(s: ColorGradeState): boolean {
     c.black === GRADE_LIMITS.black.neutral &&
     c.white === GRADE_LIMITS.white.neutral &&
     c.gamma === GRADE_LIMITS.gamma.neutral &&
-    c.sharpen === GRADE_LIMITS.sharpen.neutral
+    c.sharpen === GRADE_LIMITS.sharpen.neutral &&
+    c.balCR === 0 &&
+    c.balMG === 0 &&
+    c.balYB === 0
   );
 }
 
@@ -157,6 +186,9 @@ export function stateToParams(s: ColorGradeState): ColorGradeParams {
     white: c.white,
     gamma: c.gamma / 100,
     sharpen: c.sharpen,
+    balCR: c.balCR,
+    balMG: c.balMG,
+    balYB: c.balYB,
   };
 }
 
@@ -179,6 +211,9 @@ export function clampParams(p: ColorGradeParams): ColorGradeParams {
     sharpen: clamp(
       o.sharpen, GRADE_LIMITS.sharpen.min, GRADE_LIMITS.sharpen.max, GRADE_LIMITS.sharpen.neutral
     ),
+    balCR: clamp(o.balCR, GRADE_LIMITS.balCR.min, GRADE_LIMITS.balCR.max, GRADE_LIMITS.balCR.neutral),
+    balMG: clamp(o.balMG, GRADE_LIMITS.balMG.min, GRADE_LIMITS.balMG.max, GRADE_LIMITS.balMG.neutral),
+    balYB: clamp(o.balYB, GRADE_LIMITS.balYB.min, GRADE_LIMITS.balYB.max, GRADE_LIMITS.balYB.neutral),
   };
 }
 
@@ -191,8 +226,22 @@ export function isNeutralParams(p: ColorGradeParams): boolean {
     c.black === 0 &&
     c.white === 255 &&
     c.gamma === 1 &&
-    c.sharpen === 0
+    c.sharpen === 0 &&
+    c.balCR === 0 &&
+    c.balMG === 0 &&
+    c.balYB === 0
   );
+}
+
+/** Colour-balance per-channel additive offset (0..255 scale). undefined when neutral. */
+const BALANCE_SCALE = 0.6; // ±100 → ±60 on the 0..255 channel
+export function toSharpBalance(p: ColorGradeParams): { r: number; g: number; b: number } | undefined {
+  const c = clampParams(p);
+  const r = (c.balCR ?? 0) * BALANCE_SCALE;
+  const g = (c.balMG ?? 0) * BALANCE_SCALE;
+  const b = (c.balYB ?? 0) * BALANCE_SCALE;
+  if (r === 0 && g === 0 && b === 0) return undefined;
+  return { r, g, b };
 }
 
 // ── Per-block Sharp descriptors (pure, unit-testable without Sharp) ──
@@ -249,6 +298,11 @@ export function applyColorGrade(img: Sharp, params: ColorGradeParams): Sharp {
 
   const lv = toSharpLevels(c);
   if (lv) out = out.linear(lv.a, lv.b);
+
+  // Colour balance — per-channel additive offset (青紅/洋紅綠/黃藍). Sharp .linear with
+  // arrays applies per-channel: out = 1·in + offset, clamped internally to 0..255.
+  const bal = toSharpBalance(c);
+  if (bal) out = out.linear([1, 1, 1], [bal.r, bal.g, bal.b]);
 
   // Sharp .gamma() valid range is 1.0..3.0; 1.0 is the identity (skip it).
   if (c.gamma > 1) out = out.gamma(c.gamma);
