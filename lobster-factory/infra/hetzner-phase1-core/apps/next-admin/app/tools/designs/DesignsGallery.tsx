@@ -26,21 +26,6 @@ type LoadState = "loading" | "ready" | "error" | "disabled";
 type SortOrder = "desc" | "asc";
 type TimeRange = "all" | "today" | "week" | "month";
 
-/* ─── Source → top-level tool group ─────────────────────────── */
-function toolGroup(source: string | null | undefined): string {
-  if (!source) return "unknown";
-  if (source === "tarot" || source === "tarot-preview" || source === "tarot-compare") return "tarot";
-  if (source === "pod-studio") return "studio";
-  if (source === "mockup") return "mockup";
-  return source;
-}
-
-const TOOL_GROUP_LABELS: Record<string, string> = {
-  tarot: "Tarot",
-  studio: "Studio",
-  mockup: "Mockup",
-};
-
 const MODEL_LABELS: Record<string, string> = {
   "flux-schnell": "FLUX schnell",
   "flux-dev": "FLUX dev",
@@ -59,21 +44,17 @@ const MODEL_LABELS: Record<string, string> = {
   "openai-high": "GPT-Image-1 高",
 };
 
-// Tiny subtype label shown inside the tool badge (empty string = no sub-label)
+const TOOL_GROUP_LABELS: Record<string, string> = {
+  tarot: "Tarot",
+  studio: "Studio",
+  mockup: "Mockup",
+};
+
 const SOURCE_SUBTYPE: Record<string, string> = {
   "tarot-preview": "預覽",
   "tarot-compare": "比較",
   tarot: "牌卡",
 };
-
-/* ─── Source → product group ─────────────────────────────────── */
-function assetProduct(asset: DesignAsset): string | null {
-  const src = asset.metadata?.source;
-  if (src === "tarot" || src === "tarot-preview" || src === "tarot-compare") return "tarot-card";
-  if (src === "pod-studio") return asset.metadata?.product_type ?? null;
-  if (src === "mockup") return "mockup-composite";
-  return null;
-}
 
 const PRODUCT_LABELS: Record<string, string> = {
   "tarot-card": "塔羅牌",
@@ -84,6 +65,22 @@ const PRODUCT_LABELS: Record<string, string> = {
   sticker: "Sticker",
   "mockup-composite": "商品合成",
 };
+
+function toolGroup(source: string | null | undefined): string {
+  if (!source) return "unknown";
+  if (source === "tarot" || source === "tarot-preview" || source === "tarot-compare") return "tarot";
+  if (source === "pod-studio") return "studio";
+  if (source === "mockup") return "mockup";
+  return source;
+}
+
+function assetProduct(asset: DesignAsset): string | null {
+  const src = asset.metadata?.source;
+  if (src === "tarot" || src === "tarot-preview" || src === "tarot-compare") return "tarot-card";
+  if (src === "pod-studio") return asset.metadata?.product_type ?? null;
+  if (src === "mockup") return "mockup-composite";
+  return null;
+}
 
 function isTarotSrc(source: string | null | undefined): boolean {
   return source === "tarot" || source === "tarot-preview" || source === "tarot-compare";
@@ -118,30 +115,30 @@ function Chips({
   options,
   value,
   onChange,
+  showEmpty = false,
 }: {
   label: string;
   options: { key: string; label: string; count: number }[];
   value: string;
   onChange: (v: string) => void;
+  showEmpty?: boolean;
 }) {
-  if (options.every((o) => o.key !== "all" && o.count === 0)) return null;
+  const visible = options.filter((o) => o.key === "all" || showEmpty || o.count > 0);
+  if (visible.every((o) => o.key !== "all" && o.count === 0) && !showEmpty) return null;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
       <span style={{ fontSize: 11, opacity: 0.55, minWidth: 36 }}>{label}</span>
-      {options.map((o) => {
-        if (o.key !== "all" && o.count === 0) return null;
-        return (
-          <button
-            key={o.key}
-            className={value === o.key ? "btn-primary" : "btn-secondary"}
-            style={{ fontSize: 11, padding: "3px 10px" }}
-            onClick={() => onChange(o.key)}
-          >
-            {o.label}
-            {o.key !== "all" && <span style={{ opacity: 0.6, marginLeft: 4 }}>({o.count})</span>}
-          </button>
-        );
-      })}
+      {visible.map((o) => (
+        <button
+          key={o.key}
+          className={value === o.key ? "btn-primary" : "btn-secondary"}
+          style={{ fontSize: 11, padding: "3px 10px" }}
+          onClick={() => onChange(o.key)}
+        >
+          {o.label}
+          {o.key !== "all" && <span style={{ opacity: 0.6, marginLeft: 4 }}>({o.count})</span>}
+        </button>
+      ))}
     </div>
   );
 }
@@ -154,8 +151,11 @@ export default function DesignsGallery() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<string | null>(null);
 
+  /* multi-select */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   /* filters */
-  const [filterTool, setFilterTool] = useState("all");
   const [filterModel, setFilterModel] = useState("all");
   const [filterProduct, setFilterProduct] = useState("all");
   const [filterTheme, setFilterTheme] = useState("all");
@@ -184,11 +184,9 @@ export default function DesignsGallery() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Auto-refresh: when user returns to this page (tab focus or navigation) after generating images elsewhere.
   useEffect(() => {
     const onVisible = () => { if (!document.hidden) void load(); };
     document.addEventListener("visibilitychange", onVisible);
-    // Refresh every 5 min while page is open (covers same-tab usage without being disruptive).
     const timer = setInterval(() => { if (!document.hidden) void load(); }, 300_000);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
@@ -213,6 +211,7 @@ export default function DesignsGallery() {
       const json = (await res.json()) as { ok: boolean; error?: string };
       if (json.ok) {
         setAssets((prev) => prev.filter((a) => a.id !== asset.id));
+        setSelectedIds((prev) => { const n = new Set(prev); n.delete(asset.id); return n; });
       } else {
         alert(`刪除失敗：${json.error ?? "unknown"}`);
       }
@@ -223,19 +222,29 @@ export default function DesignsGallery() {
     }
   }, []);
 
-  /* ─── derive filter option lists from actual data ─── */
-  const toolOptions = useMemo(() => {
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }, []);
+
+  /* ─── derive filter option lists ─── */
+  const modelOptions = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const a of assets) {
-      const k = toolGroup(a.metadata?.source);
-      counts[k] = (counts[k] ?? 0) + 1;
+      const k = a.metadata?.model_name;
+      if (k) counts[k] = (counts[k] ?? 0) + 1;
     }
+    const total = Object.values(counts).reduce((s, n) => s + n, 0);
     return [
-      { key: "all", label: "全部", count: assets.length },
-      ...Object.entries(counts).map(([k, n]) => ({
+      { key: "all", label: "全部", count: total },
+      ...Object.keys(MODEL_LABELS).map((k) => ({
         key: k,
-        label: TOOL_GROUP_LABELS[k] ?? k,
-        count: n,
+        label: MODEL_LABELS[k],
+        count: counts[k] ?? 0,
       })),
     ];
   }, [assets]);
@@ -258,9 +267,7 @@ export default function DesignsGallery() {
   }, [assets]);
 
   const themeOptions = useMemo(() => {
-    const vals = unique(
-      assets.map((a) => a.metadata?.theme).filter((t): t is string => !!t)
-    );
+    const vals = unique(assets.map((a) => a.metadata?.theme).filter((t): t is string => !!t));
     const counts: Record<string, number> = {};
     for (const a of assets) {
       const k = a.metadata?.theme;
@@ -272,27 +279,8 @@ export default function DesignsGallery() {
     ];
   }, [assets]);
 
-  const modelOptions = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const a of assets) {
-      const k = a.metadata?.model_name;
-      if (k) counts[k] = (counts[k] ?? 0) + 1;
-    }
-    const total = Object.values(counts).reduce((s, n) => s + n, 0);
-    return [
-      { key: "all", label: "全部", count: total },
-      ...Object.entries(counts).map(([k, n]) => ({
-        key: k,
-        label: MODEL_LABELS[k] ?? k,
-        count: n,
-      })),
-    ];
-  }, [assets]);
-
   const brandOptions = useMemo(() => {
-    const vals = unique(
-      assets.map((a) => a.metadata?.brand).filter((b): b is string => !!b)
-    );
+    const vals = unique(assets.map((a) => a.metadata?.brand).filter((b): b is string => !!b));
     const counts: Record<string, number> = {};
     for (const a of assets) {
       const k = a.metadata?.brand;
@@ -314,7 +302,6 @@ export default function DesignsGallery() {
       : null;
 
     const filtered = assets.filter((a) => {
-      if (filterTool !== "all" && toolGroup(a.metadata?.source) !== filterTool) return false;
       if (filterModel !== "all" && a.metadata?.model_name !== filterModel) return false;
       if (filterProduct !== "all" && assetProduct(a) !== filterProduct) return false;
       if (filterTheme !== "all" && a.metadata?.theme !== filterTheme) return false;
@@ -323,10 +310,35 @@ export default function DesignsGallery() {
       return true;
     });
 
-    return sortOrder === "asc"
-      ? [...filtered].reverse()
-      : filtered;
-  }, [assets, filterTool, filterModel, filterProduct, filterTheme, filterBrand, filterTime, sortOrder]);
+    return sortOrder === "asc" ? [...filtered].reverse() : filtered;
+  }, [assets, filterModel, filterProduct, filterTheme, filterBrand, filterTime, sortOrder]);
+
+  /* bulk delete — scoped to visible set so filtered-out assets are never deleted */
+  const bulkDelete = useCallback(async () => {
+    const ids = visible.filter((a) => selectedIds.has(a.id)).map((a) => a.id);
+    if (ids.length === 0) return;
+    if (!confirm(`確定刪除選取的 ${ids.length} 張圖片？此操作無法復原。`)) return;
+    setBulkDeleting(true);
+    let failed = 0;
+    let done = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/tools/designs?id=${id}`, { method: "DELETE" });
+        const json = (await res.json()) as { ok: boolean };
+        if (json.ok) {
+          done++;
+          setAssets((prev) => prev.filter((a) => a.id !== id));
+          setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+        } else {
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+    setBulkDeleting(false);
+    if (failed > 0) alert(`${failed} 張刪除失敗（${done} 張成功）`);
+  }, [visible, selectedIds]);
 
   /* ─── early returns ─── */
   if (state === "disabled") {
@@ -356,10 +368,7 @@ export default function DesignsGallery() {
     <div style={{ padding: 16 }}>
       {/* ── Filter panel ─────────────────────────────────────────── */}
       <div className="build-panel" style={{ padding: "10px 14px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-        <Chips label="工具" options={toolOptions} value={filterTool} onChange={setFilterTool} />
-        {modelOptions.some((o) => o.key !== "all" && o.count > 0) && (
-          <Chips label="模型" options={modelOptions} value={filterModel} onChange={setFilterModel} />
-        )}
+        <Chips label="模型" options={modelOptions} value={filterModel} onChange={setFilterModel} showEmpty />
         {hasProducts && (
           <Chips label="產品" options={productOptions} value={filterProduct} onChange={setFilterProduct} />
         )}
@@ -408,9 +417,40 @@ export default function DesignsGallery() {
         </div>
       </div>
 
-      <div style={{ opacity: 0.6, fontSize: 12, marginBottom: 10 }}>
-        顯示 {visible.length} / {assets.length} 張
-      </div>
+      {/* ── Bulk action toolbar ───────────────────────────────────── */}
+      {(() => {
+        const visibleSelected = visible.filter((a) => selectedIds.has(a.id)).length;
+        const allVisibleSelected = visibleSelected === visible.length && visible.length > 0;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ opacity: 0.6, fontSize: 12 }}>顯示 {visible.length} / {assets.length} 張</span>
+            <span style={{ flex: 1 }} />
+            <button
+              className="btn-secondary"
+              style={{ fontSize: 11 }}
+              onClick={() => {
+                if (allVisibleSelected) {
+                  setSelectedIds(new Set());
+                } else {
+                  setSelectedIds(new Set(visible.map((a) => a.id)));
+                }
+              }}
+            >
+              {allVisibleSelected ? "取消全選" : "全選"}
+            </button>
+            {visibleSelected > 0 && (
+              <button
+                className="btn-secondary"
+                style={{ fontSize: 11, color: "#f87171" }}
+                disabled={bulkDeleting}
+                onClick={() => void bulkDelete()}
+              >
+                {bulkDeleting ? "刪除中…" : `刪除 ${visibleSelected} 張`}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Grid ─────────────────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
@@ -420,10 +460,25 @@ export default function DesignsGallery() {
           const cardAspect = isTarotSrc(src) ? "2 / 3" : "1 / 1";
           const subtype = SOURCE_SUBTYPE[src ?? ""] ?? "";
           const product = assetProduct(asset);
+          const isSelected = selectedIds.has(asset.id);
           return (
-            <div key={asset.id} className="build-panel" style={{ padding: 10 }}>
-              {/* badges row */}
-              <div style={{ fontSize: 11, marginBottom: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+            <div
+              key={asset.id}
+              className="build-panel"
+              style={{
+                padding: 10,
+                outline: isSelected ? "2px solid #5855d0" : "none",
+                outlineOffset: 2,
+              }}
+            >
+              {/* badges + checkbox row */}
+              <div style={{ fontSize: 11, marginBottom: 6, display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleSelect(asset.id)}
+                  style={{ marginRight: 2, cursor: "pointer" }}
+                />
                 <span style={{
                   background: grp === "tarot" ? "rgba(139,92,246,0.15)" : grp === "studio" ? "rgba(59,130,246,0.15)" : "rgba(16,185,129,0.12)",
                   color: grp === "tarot" ? "#a78bfa" : grp === "studio" ? "#60a5fa" : "#34d399",

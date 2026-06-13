@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import type { CalendarPost } from "@/app/api/content/calendar/route";
-import type { WpSite } from "@/app/api/content/sites/route";
+import type { WpSite } from "@/lib/content/wp-sites";
 
 type ViewMode = "week" | "month";
 

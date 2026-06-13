@@ -223,6 +223,15 @@ export default function ContentStudio() {
   const [bvError,           setBvError]           = useState("");
   const [bvApplied,         setBvApplied]         = useState(false);
 
+  // Trending keywords panel
+  const [showTrending,    setShowTrending]    = useState(false);
+  const [trendGeo,        setTrendGeo]        = useState("TW");
+  const [trendingItems,   setTrendingItems]   = useState<Array<{ title: string; traffic: string; relatedQueries: string[] }>>([]);
+  const [trendLoading,    setTrendLoading]    = useState(false);
+  const [suggestResults,  setSuggestResults]  = useState<string[]>([]);
+  const [questionResults, setQuestionResults] = useState<string[]>([]);
+  const [trendTab,        setTrendTab]        = useState<"trending" | "suggest" | "questions">("trending");
+
   // Image generation
   const [showImgGen,      setShowImgGen]      = useState(false);
   const [imgPrompt,       setImgPrompt]       = useState("");
@@ -369,6 +378,48 @@ export default function ContentStudio() {
       const json = await res.json() as { ok: boolean; outline?: string };
       if (json.ok && json.outline) { setF("outline", json.outline); if (!showOutline) setShowOutline(true); }
     } catch { /* silent */ } finally { setOutlineLoading(false); }
+  }
+
+  // ─── Trending Keywords ───────────────────────────────────────────────────────
+
+  async function fetchTrending() {
+    setTrendLoading(true);
+    try {
+      const res  = await fetch(`/api/content/trending?type=trending&geo=${trendGeo}`);
+      const data = await res.json() as { ok: boolean; items?: Array<{ title: string; traffic: string; relatedQueries: string[] }> };
+      if (data.ok) setTrendingItems(data.items ?? []);
+    } catch { /* silent */ }
+    finally { setTrendLoading(false); }
+  }
+
+  async function fetchSuggest(kw: string) {
+    if (!kw.trim()) return;
+    setTrendLoading(true);
+    const hl = (form.language === "繁體中文" || form.language === "簡體中文") ? "zh-TW" : "en";
+    try {
+      const res  = await fetch(`/api/content/trending?type=suggest&q=${encodeURIComponent(kw)}&hl=${hl}`);
+      const data = await res.json() as { ok: boolean; suggestions?: string[] };
+      if (data.ok) setSuggestResults(data.suggestions ?? []);
+    } catch { /* silent */ }
+    finally { setTrendLoading(false); }
+  }
+
+  async function fetchQuestions(kw: string) {
+    if (!kw.trim()) return;
+    setTrendLoading(true);
+    const hl = (form.language === "繁體中文" || form.language === "簡體中文") ? "zh-TW" : "en";
+    try {
+      const res  = await fetch(`/api/content/trending?type=questions&q=${encodeURIComponent(kw)}&hl=${hl}`);
+      const data = await res.json() as { ok: boolean; questions?: string[] };
+      if (data.ok) setQuestionResults(data.questions ?? []);
+    } catch { /* silent */ }
+    finally { setTrendLoading(false); }
+  }
+
+  function pickTrendKeyword(kw: string) {
+    setActiveTab("generate");
+    setF("keyword", kw);
+    setShowTrending(false);
   }
 
   // ─── Brand Voice ─────────────────────────────────────────────────────────
@@ -639,6 +690,121 @@ export default function ContentStudio() {
             📅 內容行事曆
           </a>
         </div>
+      </div>
+
+      {/* ── Trending Keywords Panel ── */}
+      <div className="form-block" style={{ marginBottom: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button onClick={() => setShowTrending(v => !v)}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", padding: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>🔥</span> {showTrending ? "▲" : "▼"} 熱門搜尋 / 關鍵字探索
+            </button>
+            {showTrending && (
+              <div style={{ display: "flex", gap: "4px" }}>
+                {(["trending", "suggest", "questions"] as const).map(t => (
+                  <button key={t} onClick={() => setTrendTab(t)}
+                    style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer",
+                      background: trendTab === t ? "var(--btn-primary-bg, #5855d0)" : "var(--bg-card)",
+                      color: trendTab === t ? "#fff" : "var(--text-muted)" }}>
+                    {t === "trending" ? "今日熱搜" : t === "suggest" ? "搜尋建議" : "相關問題"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {showTrending && (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {trendTab === "trending" && (
+                <select value={trendGeo} onChange={e => setTrendGeo(e.target.value)}
+                  className="form-select" style={{ fontSize: "11px", padding: "3px 8px" }}>
+                  <option value="TW">台灣</option>
+                  <option value="HK">香港</option>
+                  <option value="SG">新加坡</option>
+                  <option value="US">美國</option>
+                  <option value="GB">英國</option>
+                  <option value="JP">日本</option>
+                  <option value="AU">澳洲</option>
+                </select>
+              )}
+              <button className="btn-secondary" style={{ fontSize: "11px", padding: "3px 10px" }}
+                onClick={() => {
+                  if (trendTab === "trending") void fetchTrending();
+                  else if (trendTab === "suggest") void fetchSuggest(form.keyword || "");
+                  else void fetchQuestions(form.keyword || "");
+                }}
+                disabled={trendLoading || ((trendTab === "suggest" || trendTab === "questions") && !form.keyword.trim())}>
+                {trendLoading ? "載入中…" : "搜尋"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {showTrending && (
+          <div style={{ marginTop: "12px" }}>
+            {/* Trending tab */}
+            {trendTab === "trending" && trendingItems.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {trendingItems.map((item, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "0", borderRadius: "6px", overflow: "hidden",
+                    border: "1px solid var(--card-border)", background: "var(--bg-card)" }}>
+                    <button onClick={() => pickTrendKeyword(item.title)}
+                      style={{ padding: "5px 10px", background: "none", border: "none", cursor: "pointer",
+                        fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", fontWeight: 500 }}
+                      title={`點擊使用此關鍵字${item.relatedQueries.length > 0 ? "；相關：" + item.relatedQueries.slice(0, 3).join("、") : ""}`}>
+                      {item.title}
+                    </button>
+                    {item.traffic && (
+                      <span style={{ padding: "3px 6px", fontSize: "10px", background: "#fef3c7", color: "#92400e", borderLeft: "1px solid var(--card-border)" }}>
+                        {item.traffic}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {trendTab === "trending" && trendingItems.length === 0 && !trendLoading && (
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>點擊「搜尋」載入今日 Google 熱搜關鍵字</div>
+            )}
+
+            {/* Suggest tab */}
+            {trendTab === "suggest" && suggestResults.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {suggestResults.map((s, i) => (
+                  <button key={i} onClick={() => pickTrendKeyword(s)}
+                    style={{ padding: "5px 12px", background: "var(--bg-card)", border: "1px solid var(--card-border)",
+                      borderRadius: "6px", cursor: "pointer", fontSize: "12px", color: "var(--text-primary)" }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            {trendTab === "suggest" && suggestResults.length === 0 && !trendLoading && (
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                {form.keyword.trim() ? "點擊「搜尋」取得 Google 自動完成建議" : "請先輸入主要關鍵字，再搜尋建議"}
+              </div>
+            )}
+
+            {/* Questions tab */}
+            {trendTab === "questions" && questionResults.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                {questionResults.map((q, i) => (
+                  <button key={i} onClick={() => pickTrendKeyword(q)}
+                    style={{ padding: "6px 12px", background: "var(--bg-card)", border: "1px solid var(--card-border)",
+                      borderRadius: "6px", cursor: "pointer", fontSize: "12px", color: "var(--text-primary)",
+                      textAlign: "left", width: "100%", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ color: "#5855d0", fontWeight: 600 }}>?</span>{q}
+                  </button>
+                ))}
+              </div>
+            )}
+            {trendTab === "questions" && questionResults.length === 0 && !trendLoading && (
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                {form.keyword.trim() ? "點擊「搜尋」取得相關問題（適合做 FAQ 或 How-to 文章）" : "請先輸入主要關鍵字"}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Tab bar ── */}
