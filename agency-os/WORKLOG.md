@@ -15,7 +15,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`+`npm run build` | exit=0/0
 - REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | deployed=bf6a7c50 | healthy 7s | smoke 4/4 200
 - REVIEW_DONE: critic=Deep | verdict=warn→pass | findings=0c/3M(全修) -- #2 stale-export async gap→fabricNS ref 同步套用；#1/#4 dispose-race sticky fallback→canvas key={image} 換新節點；#3 uncapped canvas OOM→MAX_EDGE 2048 封頂
-- BUGHUNT_DONE: scope=lobster-factory | grep=GradedPreview\|exportPng\|previewRef | hits=0 stale
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=GradedPreview\|exportPng\|previewRef | hits=0 stale（符號為 next-admin-local，agency-os/scripts 無 callsite）
 **[剩餘風險]** Tarot 78 張 deck（renderPrintCard）仍 CSS ctx.filter（gamma/銳利度不入 deck，僅預覽+Canvas 顯示）；Studio 快速下載封頂 2048px（印刷級走 OutputTrackBar Sharp）。
 **[部署]** SG bf6a7c50 LIVE。
 
