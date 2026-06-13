@@ -3,6 +3,19 @@
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-06-13
+
+### feat(calendar): WP post 編輯 API + 行事曆 EditModal（排程/立即發布/刪除）
+
+**[已修改]**
+- `app/api/content/wp-post/route.ts` — PATCH（更新 date/status/title，proxy to WP REST API）+ DELETE（trash）；server-side token resolution via getWpSites()；postId 必須為正整數
+- `app/tools/content/calendar/ContentCalendar.tsx` — EditModal：datetime picker（site-local TZ，無 new Date() 轉換）+ useEffect re-sync on save + 立即發布 + 儲存排程 + 移至垃圾桶確認；week view 顯示時間卡片；sidebar 狀態 stats panel；default view=week
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --eval "toDatetimeLocal/fromDatetimeLocal round-trip" | exit=0 | ms=<100 — round-trip OK, no new Date() TZ shift
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --eval "postId validation" | exit=0 | ms=<100 — float/negative/0/null all REJECT; positive integers pass
+- REVIEW_DONE: critic=Standard | verdict=2 Major fixed (TZ shift + stale dateVal), 1 Minor fixed (postId) | findings=0c/2m/3n→0c/0m/1n (remaining: "42abc"→42 is parseInt behavior, WP 404s anyway)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fromDatetimeLocal,toDatetimeLocal,getSiteToken | hits=0 (both functions file-local; getSiteToken defined+used in wp-post/route.ts only)
+
 ### feat(designs): My Designs 顯示風格 chips + 完整 prompt 展開 + 修下載 + 語意化檔名
 **[任務理解]** `/tools/designs` 使用者 4 需求：①顯示生成時按過的畫家/媒材/風格鍵（可日後參考重用）②prompt 可展開看完整 ③下載鍵變「開圖」非真下載 ④檔名無設計（要 產品-主圖-畫家/媒材/風格）。
 **[根因]** 生成時 `saveToGallery` 只存最終英文 prompt，zh chips（`stylePrompt`/`styleTokens`）丟失（route.ts metadata 無 style_tags/subject 欄）；下載用 `<a href={R2url} download>` 跨域 → `download` 屬性被瀏覽器忽略 → 開圖；檔名 = `designs/YYYY-MM/<uuid>.ext` 純 UUID。
