@@ -368,6 +368,60 @@ RankMath 自動加入，確認以下欄位：
 
 ---
 
+## Phase 3B：Bing + AI Search 設定（ChatGPT Search / AI Overview 來源）
+
+> 根據：`RankMath-KB/Miscellaneous/How to Get Your Site Indexed in ChatGPT Search.md`
+> ChatGPT Search 主要依賴 **Bing 索引** + **OAI-SearchBot 爬蟲**。未在 Bing 建立索引 = 不會出現在 ChatGPT 答案中。
+
+### 3B.1 Bing Webmaster Tools 設定
+
+- [ ] 前往 [Bing Webmaster Tools](https://www.bing.com/webmasters/)
+- [ ] 驗證網站：RankMath → General Settings → Webmaster Tools → 貼入 Bing 驗證碼
+- [ ] 提交 Sitemap 至 Bing：Bing Webmaster → Sitemaps → 加入 `sitemap_index.xml`
+- [ ] 在 Bing URL Inspection 工具確認關鍵頁面已被爬取
+
+**捷徑**：若已在 Google Search Console 驗證，可在 Bing 直接匯入 GSC 屬性（加速驗證）
+
+### 3B.2 robots.txt 對 AI 爬蟲的設定
+
+```
+# 預設 — Rank Math 不封鎖任何爬蟲：
+User-agent: *
+Allow: /
+
+# 選擇性：只封鎖 AI 訓練爬蟲（不影響 ChatGPT Search 搜尋索引）
+User-agent: GPTBot
+Disallow: /
+
+# 絕對不封鎖（否則網站不會出現在 ChatGPT Search）：
+# OAI-SearchBot — ChatGPT Search 索引爬蟲
+# Bingbot — Bing 索引爬蟲
+```
+
+- [ ] 確認 `OAI-SearchBot` 和 `Bingbot` 未被 robots.txt 封鎖
+- [ ] 可使用 Rank Math Robots.txt Tester 驗證：輸入 User-agent `OAI-SearchBot` → 應顯示 Allowed
+
+### 3B.3 llms.txt 模組（引導 AI 爬蟲抓取重要頁面）
+
+- [ ] Rank Math → Dashboard → Modules → 啟用 **LLMS Txt** 模組
+- [ ] Rank Math → General Settings → Edit llms.txt
+  - 選擇包含的 Post Types（Posts、Pages）
+  - 設定連結數量（建議：最重要的 50–100 篇）
+  - 加入自訂 URL（服務頁、About 頁）
+- [ ] 驗證：瀏覽 `https://example.com/llms.txt` 確認輸出正確
+
+> `llms.txt` 讓 ChatGPT 知道哪些頁面最重要，改善 AI 引用準確度。
+
+### 3B.4 AI 搜尋內容最佳化原則
+
+以下格式讓 AI 平台更易引用文章：
+- 每個 H2 開頭第一句 = 完整可引用的答案（已在 SYSTEM_PROMPT 強制）
+- 短段落（<120 字）+ bullet points + Q&A 格式（FAQ section）
+- 具體數字、日期、來源名稱（「根據 [Source] ([Year])…」）
+- 實體清晰（人名、地名、品牌名第一次出現時全名拼出）
+
+---
+
 ## Phase 4：Core Web Vitals 優化
 
 Google 的 Core Web Vitals 是排名信號。
