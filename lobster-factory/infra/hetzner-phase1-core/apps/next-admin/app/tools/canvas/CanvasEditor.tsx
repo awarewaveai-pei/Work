@@ -27,6 +27,12 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 export default function CanvasEditor() {
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
+  // Fabric v6/v7 dispose() is async (awaits an in-flight rAF render before detaching).
+  // React 18 StrictMode mounts effects twice (mount→cleanup→mount); reusing the SAME
+  // <canvas> node before the prior dispose finishes throws "already initialized" / leaks
+  // listeners (fabricjs/fabric.js#10482, #8899). We park the dispose promise here and the
+  // next mount AWAITS it before constructing a new Canvas on the node.
+  const disposeRef = useRef<Promise<void> | null>(null);
   const [ready, setReady] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +43,14 @@ export default function CanvasEditor() {
     let canvas: FabricCanvas | null = null;
 
     (async () => {
+      // Let any previous instance finish tearing down before we reuse the DOM node.
+      if (disposeRef.current) {
+        try {
+          await disposeRef.current;
+        } catch {
+          /* prior dispose errors are non-fatal here */
+        }
+      }
       const fabric = await import("fabric");
       if (disposed || !canvasElRef.current) return;
 
@@ -70,9 +84,15 @@ export default function CanvasEditor() {
     return () => {
       disposed = true;
       // dispose() detaches DOM listeners; ref cleared so a fast remount can't double-dispose.
+      // Park the (async) dispose promise so the next mount can await it before reinit.
       const c = fabricRef.current;
       fabricRef.current = null;
-      void c?.dispose();
+      disposeRef.current = c
+        ? Promise.resolve(c.dispose()).then(
+            () => undefined,
+            () => undefined
+          )
+        : null;
     };
   }, []);
 
