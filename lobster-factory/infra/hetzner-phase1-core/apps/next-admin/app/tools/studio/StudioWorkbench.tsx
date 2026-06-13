@@ -9,6 +9,7 @@ import {
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import { bakeCssFilter } from "@/components/tools/bake-css-filter";
+import GradedPreview, { type GradedPreviewHandle } from "@/components/tools/GradedPreview";
 import { buildSemanticFilename, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
 
 /** Product types steer the prompt suffix + default aspect ratio (print canvas comes later, P-print). */
@@ -86,7 +87,8 @@ export default function StudioWorkbench() {
   const [bgState, setBgState] = useState<"idle" | "removing" | "done" | "error">("idle");
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const bgInFlight = useRef(false); // state lags a render — ref blocks same-tick double-click
-  const grade = useColorGrade(); // 修圖積木：色彩/色階/銳利度 (live CSS preview + server bake)
+  const grade = useColorGrade(); // 修圖積木：色彩/色階/銳利度
+  const previewRef = useRef<GradedPreviewHandle>(null); // true WYSIWYG preview (Fabric); export === preview
 
   const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
 
@@ -214,9 +216,9 @@ export default function StudioWorkbench() {
     if (gen.status !== "done" || !gen.image) return;
     setSaveState("saving");
     try {
-      // Bake the colour adjustment into the saved image so My Designs matches the preview
-      // (洞2 fix). Neutral grade → bakeCssFilter returns the image unchanged.
-      const image = await bakeCssFilter(gen.image, grade.cssFilter);
+      // Save exactly what the WYSIWYG preview shows (full-res Fabric export). Falls back to
+      // the CSS bake, then the raw image, if the Fabric canvas isn't ready (洞2 + WYSIWYG fix).
+      const image = previewRef.current?.exportPng() ?? (await bakeCssFilter(gen.image, grade.cssFilter));
       const res = await fetch("/api/tools/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -241,14 +243,18 @@ export default function StudioWorkbench() {
   // Download the current image with the colour adjustment baked in (洞2 fix).
   const downloadGraded = useCallback(async () => {
     if (!gen.image) return;
-    const baked = await bakeCssFilter(gen.image, grade.cssFilter);
-    const ext = grade.neutral
-      ? gen.image.startsWith("data:image/jpeg")
-        ? "jpg"
-        : gen.image.startsWith("data:image/webp")
-          ? "webp"
-          : "png"
-      : "png"; // baked output is always PNG
+    // Download exactly what the WYSIWYG preview shows (full-res Fabric export), falling back
+    // to the CSS bake / raw image if the Fabric canvas isn't ready yet.
+    const fromPreview = previewRef.current?.exportPng();
+    const baked = fromPreview ?? (await bakeCssFilter(gen.image, grade.cssFilter));
+    const ext =
+      !fromPreview && grade.neutral
+        ? gen.image.startsWith("data:image/jpeg")
+          ? "jpg"
+          : gen.image.startsWith("data:image/webp")
+            ? "webp"
+            : "png"
+        : "png"; // Fabric/baked output is always PNG
     const a = document.createElement("a");
     a.href = baked;
     a.download = buildSemanticFilename({ ...fileMeta, track: "原圖" }, ext, `design.${ext}`);
@@ -362,8 +368,8 @@ export default function StudioWorkbench() {
           {gen.status === "error" ? <p style={{ color: "#e5484d" }}>{gen.error}</p> : null}
           {gen.status === "done" && gen.image ? (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={gen.image} alt="generated design" style={{ maxWidth: "100%", maxHeight: 560, borderRadius: 8, background: "#111", filter: grade.cssFilter }} />
+              {/* True WYSIWYG preview — every slider (incl. gamma/sharpen) shows its real effect. */}
+              <GradedPreview ref={previewRef} image={gen.image} params={grade.params} maxHeight={560} />
               <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
                 <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
                   {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
+import GradedPreview from "@/components/tools/GradedPreview";
 import { buildSemanticFilename } from "@/lib/studio/semantic-filename";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type TarotCard } from "./cards";
 
@@ -1131,14 +1132,10 @@ export default function TarotStudio() {
 
         {previewImage && (
           <div style={{ marginTop: 16, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={previewImage}
-              alt="preview"
-              onClick={() => setPreviewZoom(true)}
-              title="點擊放大"
-              style={{ width: 300, borderRadius: 10, border: "1px solid var(--card-border)", cursor: "zoom-in", filter: grade.cssFilter }}
-            />
+            {/* True WYSIWYG preview — gamma/sharpen/levels show their real effect (not CSS). */}
+            <div onClick={() => setPreviewZoom(true)} title="點擊放大" style={{ cursor: "zoom-in", border: "1px solid var(--card-border)", borderRadius: 10, lineHeight: 0 }}>
+              <GradedPreview image={previewImage} params={grade.params} maxWidth={300} maxHeight={450} />
+            </div>
             <div>
               <div className="form-hint" style={{ marginBottom: 8 }}>
                 預覽牌：{PREVIEW_CARD.name}

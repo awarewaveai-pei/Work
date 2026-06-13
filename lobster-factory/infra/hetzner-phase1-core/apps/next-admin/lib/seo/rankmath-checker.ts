@@ -13,6 +13,8 @@ export interface RankMathCheck {
   label: string;
   pass: boolean;
   detail: string;
+  /** Actionable improvement hint — only set on failed checks */
+  suggestion?: string;
 }
 
 export interface RankMathReport {
@@ -233,6 +235,30 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
     pass: slugLenPass,
     detail: `${slug.length} characters`,
   });
+
+  // Attach actionable suggestions to failed checks
+  const _suggestions: Record<string, string> = {
+    "kw-in-title":    `在 SEO 標題前半段加入「${kw}」（例：「${kw}：完整指南」）`,
+    "kw-in-meta":     `在 meta 描述前 80 字自然帶入「${kw}」`,
+    "kw-in-slug":     `URL slug 加入「${kwSlug}」（例：${kwSlug}-guide）`,
+    "kw-in-intro":    `在文章前 150 字的引言自然提及「${kw}」`,
+    "kw-in-h2h3":     `在至少一個 H2/H3 標題中加入「${kw}」`,
+    "word-count":     `擴充文章到 600+ 字：加入案例、背景說明、FAQ 段落`,
+    "kw-density":     density < 0.005
+      ? `密度偏低（${densityPct}%）；在正文中再自然提及「${kw}」幾次`
+      : `密度過高（${densityPct}%）；部分重複改用同義詞或代名詞`,
+    "external-links": `加入 1+ 個外部參考連結（例：[研究來源](https://example.com)）`,
+    "internal-links": `加入 1+ 個站內連結（例：[延伸閱讀](/related-article)）`,
+    "para-length":    `${longParas.length} 個段落超過 120 字；拆分成較短段落，每段聚焦一個概念`,
+    "title-length":   titleLen < 30
+      ? `SEO 標題過短（${titleLen} 字元）；擴展到 30–60 字元`
+      : `SEO 標題過長（${titleLen} 字元）；縮短到 60 字元以內`,
+    "meta-length":    metaLen < 120
+      ? `Meta 描述過短（${metaLen} 字元）；補充到 120–160 字元，加入關鍵字與行動 CTA`
+      : `Meta 描述過長（${metaLen} 字元）；截短到 160 字元以內`,
+    "slug-length":    `URL slug 過長（${slug.length} 字元）；縮短到 75 字元以內`,
+  };
+  checks.forEach(c => { if (!c.pass) c.suggestion = _suggestions[c.id]; });
 
   const passed = checks.filter(c => c.pass).length;
   const total = checks.length;
