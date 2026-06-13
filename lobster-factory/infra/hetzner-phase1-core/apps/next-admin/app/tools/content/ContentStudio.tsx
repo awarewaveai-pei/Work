@@ -219,8 +219,16 @@ function downloadMd(text: string, filename = "article.md") {
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
 const DEFAULT_STRUCTURE: ArticleStructure = {
-  quickAnswer: true, keyTakeaways: true,
-  comparisonTable: true, faq: true, conclusion: true,
+  quickAnswer: true, keyTakeaways: true, comparisonTable: true, faq: true, conclusion: true,
+  tables: true, h3: true, lists: true, italics: true, quotes: true, bold: true,
+};
+
+const DEFAULT_MEDIA: MediaHub = {
+  aiImages: "none", imageCount: 3, imageSize: "1344x768",
+  imageStyle: "", imageInstructions: "", brandName: "",
+  includeKeywordAlt: true, autoAltText: false,
+  youtubeSource: "none", youtubeCount: 1, youtubeLayout: "distribute",
+  strictUnderHeadings: false,
 };
 
 const DEFAULT_FORM: GenerateForm = {
@@ -231,6 +239,8 @@ const DEFAULT_FORM: GenerateForm = {
   details: "", nlpKeywords: "", outline: "", externalLinks: "",
   internalLinks: "", referenceUrls: "",
   structure: { ...DEFAULT_STRUCTURE },
+  introHookBrief: "", introHookType: "",
+  media: { ...DEFAULT_MEDIA },
   generateMeta: true, scheduleDate: "",
 };
 
@@ -322,6 +332,7 @@ export default function ContentStudio() {
   const [showIntLinks, setShowIntLinks] = useState(false);
   const [showConnWeb,  setShowConnWeb]  = useState(false);
   const [showStruct,   setShowStruct]   = useState(true);
+  const [showMedia,    setShowMedia]    = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Syndication
@@ -351,7 +362,10 @@ export default function ContentStudio() {
     articleSize: "medium", tone: "Friendly", pointOfView: "none",
     readability: "8th grade (recommended)", removeAiWords: "none", model: "claude-sonnet-4-6",
     details: "", externalLinks: "",
-    structure: { ...DEFAULT_STRUCTURE }, generateMeta: false,
+    structure: { ...DEFAULT_STRUCTURE },
+    introHookBrief: "", introHookType: "",
+    media: { ...DEFAULT_MEDIA },
+    generateMeta: false,
   });
 
   // Abort refs
@@ -382,6 +396,11 @@ export default function ContentStudio() {
   const setStruct = useCallback(
     (key: keyof ArticleStructure, value: boolean) =>
       setForm(prev => ({ ...prev, structure: { ...prev.structure, [key]: value } })),
+    []
+  );
+  const setMedia = useCallback(
+    <K extends keyof MediaHub>(key: K, value: MediaHub[K]) =>
+      setForm(prev => ({ ...prev, media: { ...prev.media, [key]: value } })),
     []
   );
 
@@ -709,8 +728,9 @@ export default function ContentStudio() {
   const checkLabel: React.CSSProperties = { display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer", userSelect: "none" };
 
   const structLabels: Record<keyof ArticleStructure, string> = {
-    quickAnswer: "快速解答", keyTakeaways: "重點摘要",
-    comparisonTable: "比較表格", faq: "FAQ 常見問答", conclusion: "結語 CTA",
+    quickAnswer: "快速解答", keyTakeaways: "Key Takeaways", comparisonTable: "比較表格",
+    faq: "FAQ", conclusion: "Conclusion", tables: "Tables", h3: "H3",
+    lists: "Lists", italics: "Italics", quotes: "Quotes", bold: "Bold",
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -987,19 +1007,176 @@ export default function ContentStudio() {
           </div>
 
           {/* ── 文章結構 ── */}
-          <SectionToggle label="文章結構" open={showStruct} onToggle={() => setShowStruct(v => !v)}>
-            <div style={checkRow}>
-              {(Object.keys(DEFAULT_STRUCTURE) as (keyof ArticleStructure)[]).map(key => (
-                <label key={key} style={checkLabel}>
-                  <input type="checkbox" checked={form.structure[key]} onChange={e => setStruct(key, e.target.checked)} disabled={isGenerating} />
-                  {structLabels[key]}
-                </label>
+          <SectionToggle label="Structure" open={showStruct} onToggle={() => setShowStruct(v => !v)}>
+            {/* Introductory Hook Brief */}
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <label className="form-label" style={{ margin: 0 }}>Introductory Hook Brief</label>
+                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{form.introHookBrief.length}/500</span>
+              </div>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+                {HOOK_TYPES.map(ht => (
+                  <button key={ht} type="button"
+                    onClick={() => setF("introHookType", form.introHookType === ht ? "" : ht)}
+                    disabled={isGenerating}
+                    style={{ padding: "3px 10px", borderRadius: "20px", fontSize: "11px", cursor: "pointer",
+                      border: "1px solid var(--card-border)",
+                      background: form.introHookType === ht ? "var(--btn-primary-bg, #5855d0)" : "transparent",
+                      color: form.introHookType === ht ? "#fff" : "var(--text-muted)" }}>
+                    {ht}
+                  </button>
+                ))}
+              </div>
+              <textarea className="form-textarea" style={{ minHeight: "72px" }}
+                value={form.introHookBrief} maxLength={500} disabled={isGenerating}
+                onChange={e => setF("introHookBrief", e.target.value)}
+                placeholder="Enter the type of hook for the article's opening sentence" />
+            </div>
+
+            {/* Yes/No dropdowns grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px 16px", marginBottom: "12px" }}>
+              {(["conclusion", "tables", "h3", "lists", "italics", "quotes", "keyTakeaways", "faq", "bold"] as const).map(key => (
+                <div key={key}>
+                  <label className="form-label" style={{ marginBottom: "4px" }}>{structLabels[key]}</label>
+                  <select className="form-select" value={form.structure[key] ? "yes" : "no"} disabled={isGenerating}
+                    onChange={e => setStruct(key, e.target.value === "yes")}>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </div>
               ))}
             </div>
-            <div style={{ marginTop: "10px" }}>
-              <label style={checkLabel}>
-                <input type="checkbox" checked={form.generateMeta} onChange={e => setF("generateMeta", e.target.checked)} disabled={isGenerating} />
-                自動生成 SEO 標題 + Meta 描述
+
+            <label style={checkLabel}>
+              <input type="checkbox" checked={form.generateMeta} onChange={e => setF("generateMeta", e.target.checked)} disabled={isGenerating} />
+              自動生成 SEO 標題 + Meta 描述
+            </label>
+          </SectionToggle>
+
+          {/* ── Media Hub ── */}
+          <SectionToggle label="Media Hub" open={showMedia} onToggle={() => setShowMedia(v => !v)}>
+            <div style={{ background: "#fffef0", border: "1px solid #fde68a", borderRadius: "6px", padding: "14px" }}>
+              {/* Row 1: AI Images + count + size + style */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto 1fr", gap: "12px", marginBottom: "12px", alignItems: "end" }}>
+                <div>
+                  <label className="form-label">AI Images</label>
+                  <select className="form-select" value={form.media.aiImages} disabled={isGenerating}
+                    onChange={e => setMedia("aiImages", e.target.value)}>
+                    {AI_IMAGE_PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Number of images</label>
+                  <select className="form-select" value={form.media.imageCount}
+                    disabled={isGenerating || form.media.aiImages === "none"}
+                    onChange={e => setMedia("imageCount", Number(e.target.value))}>
+                    {[1,2,3,4,5].map(n => <option key={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Image Size</label>
+                  <select className="form-select" value={form.media.imageSize}
+                    disabled={isGenerating || form.media.aiImages === "none"}
+                    onChange={e => setMedia("imageSize", e.target.value)}>
+                    {IMAGE_SIZES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label className="form-label" style={{ margin: 0 }}>Image style</label>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{form.media.imageStyle.length}/50</span>
+                  </div>
+                  <input className="form-input" value={form.media.imageStyle} maxLength={50}
+                    disabled={isGenerating || form.media.aiImages === "none"}
+                    onChange={e => setMedia("imageStyle", e.target.value)} placeholder="None" />
+                </div>
+              </div>
+
+              {/* Row 2: Additional Instructions + Brand Name */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label className="form-label" style={{ margin: 0 }}>Additional Instructions</label>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{form.media.imageInstructions.length}/100</span>
+                  </div>
+                  <input className="form-input" value={form.media.imageInstructions} maxLength={100}
+                    disabled={isGenerating || form.media.aiImages === "none"}
+                    onChange={e => setMedia("imageInstructions", e.target.value)}
+                    placeholder="Enter details or creative directions" />
+                </div>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label className="form-label" style={{ margin: 0 }}>Brand Name</label>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{form.media.brandName.length}/30</span>
+                  </div>
+                  <input className="form-input" value={form.media.brandName} maxLength={30}
+                    disabled={isGenerating || form.media.aiImages === "none"}
+                    onChange={e => setMedia("brandName", e.target.value)}
+                    placeholder="Enter your brand name" />
+                </div>
+              </div>
+
+              {/* Alt-text checkboxes */}
+              <div style={{ marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", cursor: "pointer", userSelect: "none" }}>
+                  <input type="checkbox" style={{ marginTop: "2px", flexShrink: 0 }}
+                    checked={form.media.includeKeywordAlt}
+                    disabled={isGenerating || form.media.aiImages === "none"}
+                    onChange={e => setMedia("includeKeywordAlt", e.target.checked)} />
+                  <span style={{ lineHeight: 1.4 }}>
+                    Include the main keyword in the first image as Alt-text.{" "}
+                    <span style={{ color: "var(--btn-primary-bg, #5855d0)" }}>Relevant keywords will be picked up and added to the rest of the images.</span>
+                  </span>
+                </label>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", cursor: "pointer", userSelect: "none" }}>
+                  <input type="checkbox" style={{ marginTop: "2px", flexShrink: 0 }}
+                    checked={form.media.autoAltText}
+                    disabled={isGenerating || form.media.aiImages === "none"}
+                    onChange={e => setMedia("autoAltText", e.target.checked)} />
+                  <span style={{ lineHeight: 1.4, color: "var(--btn-primary-bg, #5855d0)" }}>
+                    Adds informative Alt-text to images based on their content, providing a clear description of what is depicted to improve SEO.
+                  </span>
+                </label>
+              </div>
+
+              {/* YouTube row */}
+              <div style={{ display: "grid", gridTemplateColumns: "auto auto 1fr", gap: "12px", marginBottom: "12px", alignItems: "end" }}>
+                <div>
+                  <label className="form-label">YouTube videos</label>
+                  <select className="form-select" value={form.media.youtubeSource} disabled={isGenerating}
+                    onChange={e => setMedia("youtubeSource", e.target.value)}>
+                    <option value="none">None</option>
+                    <option value="auto">Auto（AI 建議）</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Number of videos</label>
+                  <select className="form-select" value={form.media.youtubeCount}
+                    disabled={isGenerating || form.media.youtubeSource === "none"}
+                    onChange={e => setMedia("youtubeCount", Number(e.target.value))}>
+                    <option>1</option><option>2</option><option>3</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Layout Options</label>
+                  <select className="form-select" value={form.media.youtubeLayout}
+                    disabled={isGenerating || form.media.youtubeSource === "none"}
+                    onChange={e => setMedia("youtubeLayout", e.target.value)}>
+                    {LAYOUT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Strict under headings */}
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", cursor: "pointer", userSelect: "none" }}>
+                <input type="checkbox" style={{ marginTop: "2px", flexShrink: 0 }}
+                  checked={form.media.strictUnderHeadings}
+                  disabled={isGenerating || (form.media.aiImages === "none" && form.media.youtubeSource === "none")}
+                  onChange={e => setMedia("strictUnderHeadings", e.target.checked)} />
+                <span style={{ lineHeight: 1.4 }}>
+                  <span style={{ color: "var(--btn-primary-bg, #5855d0)" }}>All media elements will be placed strictly under the headings.</span>
+                  {" "}<span style={{ color: "var(--text-muted)" }}>If disabled, the AI will decide and find the best placement.</span>
+                </span>
               </label>
             </div>
           </SectionToggle>

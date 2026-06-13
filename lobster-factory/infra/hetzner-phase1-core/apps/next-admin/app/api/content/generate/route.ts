@@ -56,6 +56,27 @@ interface ArticleStructure {
   comparisonTable?: boolean;
   faq?: boolean;
   conclusion?: boolean;
+  tables?: boolean;
+  h3?: boolean;
+  lists?: boolean;
+  italics?: boolean;
+  quotes?: boolean;
+  bold?: boolean;
+}
+
+interface MediaHub {
+  aiImages?: string;
+  imageCount?: number;
+  imageSize?: string;
+  imageStyle?: string;
+  imageInstructions?: string;
+  brandName?: string;
+  includeKeywordAlt?: boolean;
+  autoAltText?: boolean;
+  youtubeSource?: string;
+  youtubeCount?: number;
+  youtubeLayout?: string;
+  strictUnderHeadings?: boolean;
 }
 
 const ALLOWED_MODELS = [
@@ -99,6 +120,9 @@ function buildUserPrompt(params: {
   internalLinks: string[];
   referenceContext: string;
   structure: ArticleStructure;
+  introHookBrief: string;
+  introHookType: string;
+  media: MediaHub | null;
   generateMeta: boolean;
 }): string {
   const lines: string[] = [];
@@ -124,11 +148,26 @@ function buildUserPrompt(params: {
 
   // Structure overrides
   const s = params.structure;
-  if (s.quickAnswer === false)    lines.push("DO NOT include a Quick Answer section.");
-  if (s.keyTakeaways === false)   lines.push("DO NOT include a Key Takeaways section.");
+  if (s.quickAnswer === false)     lines.push("DO NOT include a Quick Answer section.");
+  if (s.keyTakeaways === false)    lines.push("DO NOT include a Key Takeaways section.");
   if (s.comparisonTable === false) lines.push("DO NOT include a comparison or evaluation table.");
-  if (s.faq === false)            lines.push("DO NOT include a FAQ section.");
-  if (s.conclusion === false)     lines.push("DO NOT include a Conclusion section.");
+  if (s.faq === false)             lines.push("DO NOT include a FAQ section.");
+  if (s.conclusion === false)      lines.push("DO NOT include a Conclusion section.");
+  if (s.tables === false)          lines.push("DO NOT include any data tables.");
+  if (s.h3 === false)              lines.push("DO NOT use H3 sub-headings.");
+  if (s.lists === false)           lines.push("DO NOT use bullet lists or numbered lists.");
+  if (s.italics === false)         lines.push("DO NOT use italic text.");
+  if (s.quotes === false)          lines.push("DO NOT include block quotes.");
+  if (s.bold === false)            lines.push("DO NOT use bold text for emphasis.");
+
+  // Introductory hook
+  if (params.introHookType || params.introHookBrief.trim()) {
+    lines.push("");
+    const hookParts: string[] = [];
+    if (params.introHookType) hookParts.push(`type: ${params.introHookType}`);
+    if (params.introHookBrief.trim()) hookParts.push(params.introHookBrief.trim());
+    lines.push(`Opening hook for the article's first sentence — ${hookParts.join(". ")}`);
+  }
 
   // Remove AI words
   if (params.removeAiWords === "basic") {
@@ -175,6 +214,39 @@ function buildUserPrompt(params: {
     validInternal.forEach(u => lines.push(`- ${u.trim()}`));
   }
 
+  // Media instructions
+  const m = params.media;
+  if (m) {
+    if (m.aiImages && m.aiImages !== "none") {
+      const count = m.imageCount ?? 3;
+      const sizeLabel = m.imageSize?.replace("x", "×") ?? "";
+      lines.push("");
+      lines.push("IMAGE PLACEHOLDERS:");
+      lines.push(`- Include ${count} image placeholder(s) in the article${sizeLabel ? ` (suggested size: ${sizeLabel})` : ""}`);
+      if (m.imageStyle)        lines.push(`- Image style: ${m.imageStyle}`);
+      if (m.imageInstructions) lines.push(`- Creative direction: ${m.imageInstructions}`);
+      if (m.brandName)         lines.push(`- Brand: ${m.brandName}`);
+      if (m.includeKeywordAlt) lines.push(`- First image alt-text must include the primary keyword`);
+      if (m.autoAltText)       lines.push(`- Write descriptive SEO alt-text for every image placeholder`);
+      if (m.strictUnderHeadings) lines.push(`- Place all images strictly under an H2 or H3 heading`);
+      lines.push(`- Format each placeholder as: ![alt-text here](IMAGE_PLACEHOLDER_N) where N = 1, 2, 3...`);
+    }
+    if (m.youtubeSource && m.youtubeSource !== "none") {
+      const layoutMap: Record<string, string> = {
+        distribute: "distributed evenly throughout the article",
+        after_intro: "after the introduction",
+        after_h2: "after each major H2 section",
+      };
+      const count = m.youtubeCount ?? 1;
+      const placement = layoutMap[m.youtubeLayout ?? "distribute"] ?? "distributed evenly";
+      lines.push("");
+      lines.push("YOUTUBE VIDEO PLACEHOLDERS:");
+      lines.push(`- Include ${count} YouTube embed placeholder(s), ${placement}`);
+      if (m.strictUnderHeadings) lines.push(`- Place under headings only`);
+      lines.push(`- Format each as: [YOUTUBE_PLACEHOLDER_N: <suggested search query for a relevant video>]`);
+    }
+  }
+
   lines.push("");
   lines.push("Write the complete article now.");
 
@@ -218,11 +290,33 @@ export async function POST(req: Request): Promise<Response> {
 
   const rawStruct = (body.structure ?? {}) as Record<string, unknown>;
   const structure: ArticleStructure = {
-    quickAnswer:    bool(rawStruct.quickAnswer),
-    keyTakeaways:   bool(rawStruct.keyTakeaways),
+    quickAnswer:     bool(rawStruct.quickAnswer),
+    keyTakeaways:    bool(rawStruct.keyTakeaways),
     comparisonTable: bool(rawStruct.comparisonTable),
-    faq:            bool(rawStruct.faq),
-    conclusion:     bool(rawStruct.conclusion),
+    faq:             bool(rawStruct.faq),
+    conclusion:      bool(rawStruct.conclusion),
+    tables:          bool(rawStruct.tables),
+    h3:              bool(rawStruct.h3),
+    lists:           bool(rawStruct.lists),
+    italics:         bool(rawStruct.italics),
+    quotes:          bool(rawStruct.quotes),
+    bold:            bool(rawStruct.bold),
+  };
+
+  const rawMedia = (body.media ?? {}) as Record<string, unknown>;
+  const media: MediaHub = {
+    aiImages:           str(rawMedia.aiImages, "none"),
+    imageCount:         typeof rawMedia.imageCount === "number" ? rawMedia.imageCount : 3,
+    imageSize:          str(rawMedia.imageSize, "1344x768"),
+    imageStyle:         str(rawMedia.imageStyle),
+    imageInstructions:  str(rawMedia.imageInstructions),
+    brandName:          str(rawMedia.brandName),
+    includeKeywordAlt:  bool(rawMedia.includeKeywordAlt, true),
+    autoAltText:        bool(rawMedia.autoAltText, false),
+    youtubeSource:      str(rawMedia.youtubeSource, "none"),
+    youtubeCount:       typeof rawMedia.youtubeCount === "number" ? rawMedia.youtubeCount : 1,
+    youtubeLayout:      str(rawMedia.youtubeLayout, "distribute"),
+    strictUnderHeadings: bool(rawMedia.strictUnderHeadings, false),
   };
 
   const maxTokens  = SIZE_TOKENS[str(body.articleSize, "medium")] ?? 4096;
@@ -262,6 +356,9 @@ export async function POST(req: Request): Promise<Response> {
     internalLinks,
     referenceContext,
     structure,
+    introHookBrief: str(body.introHookBrief),
+    introHookType:  str(body.introHookType),
+    media,
     generateMeta: bool(body.generateMeta, false),
   });
 
