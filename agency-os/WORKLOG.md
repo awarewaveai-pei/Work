@@ -25,6 +25,30 @@
 **[rollback]** 0036 檔內 :112-117：restore 12-arg 函式（見備份檔/0035）→ DROP COLUMN fingerprint_v2 → `NOTIFY pgrst,'reload schema'`。
 - AUTO_TASK_DONE: 套 `0036_fingerprint_v2.sql` 到 production Supabase
 
+## 2026-06-13
+
+### fix(command-plane): reset accidental Telegram kill switch + hide kill-switch slash menu entries
+
+**[任務理解]** 操作者誤觸 Telegram `/maintenance_mode`，處理中又誤觸 `/emergency_stop`。目標：立即恢復 Command Plane `normal`，並降低 Telegram slash menu 再次誤觸風險；不移除 emergency handler，保留手打緊急鎖定能力。
+
+**[已修改 / 已處理]**
+- Supabase REST 讀 `public.system_modes` global row，確認先前狀態為 `maintenance`，原因 `Set via Telegram by user 8286448653 (command: /maintenance_mode)`，`set_at=2026-06-12T17:14:07.922Z`。
+- PATCH global row 回 `normal` 後，讀到新的 Telegram `command_requests.source_event_id=99786581`：`/emergency_stop` 於 `2026-06-13T03:32:14.581Z` 完成並把 mode 改為 `emergency_stop`。
+- 再次 PATCH global row：`mode=normal`，`reason=Reset via Codex after accidental Telegram /emergency_stop on 2026-06-13T03:32:14.581Z`，`set_at=2026-06-13T03:32:52.413Z`。
+- `scripts/configure-telegram-webhook.ps1`：確認 repo SSOT 的 `setMyCommands` 清單已不含 `emergency_stop` / `maintenance_mode` / `read_only_mode`，並依此重推 live Telegram slash menu；handler 不變，仍可手動輸入。
+- `scripts/secrets-vault.ps1`：修正 `-Action run` 執行純 PowerShell command 時 `$LASTEXITCODE` 未設定造成成功後 false exit 1 的問題。
+- 使用 vault 重新推送 Telegram webhook + commands：`setWebhook -> ok=True`、`setMyCommands -> ok=True`。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=MCP Supabase REST | cmd=`GET /rest/v1/system_modes?...` | result=`mode=normal`, `set_at=2026-06-13T03:32:52.413+00:00`
+- REALTEST_EVIDENCE: tool=MCP app_awarewave | cmd=`GET /api/ops/repairs/health` | result=`ok=true`, `system_mode=normal`
+- REALTEST_EVIDENCE: tool=Telegram API via vault | cmd=`getMyCommands` | result=live commands are `status, health, daily_review, weekly_review, list_failed_runs, client_status, deploy_status, trigger_staging_workflow, replay_dead_letter`; kill-switch commands absent.
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`secrets-vault.ps1 -Action run -Names TELEGRAM_BOT_TOKEN -Command "Write-Host vault-run-ok"` | exit=0 | result=`vault-run-ok`
+
+**[剩餘風險]** `/emergency_stop` / `/maintenance_mode` / `/read_only_mode` 仍可手動輸入；這是刻意保留的 emergency path。若要完全禁止 Telegram kill switch，需改 `policyEngine.ts` 風險/來源策略並重跑 smoke/deploy，另案處理。
+
+**[rollback]** 還原 `scripts/configure-telegram-webhook.ps1` 三個 command entries 後重跑 `scripts/secrets-vault.ps1 -Action run -Names TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET -Command ".\scripts\configure-telegram-webhook.ps1 -BaseUrl https://app.aware-wave.com"`；`secrets-vault.ps1` false-exit 修正可用 git revert 還原。
+
 ## 2026-06-12
 
 ### diag(ops-inbox): webhook /api/webhooks/deploy 500「db write failed」根因 = migration 0036 未套用（schema drift，藏一週）+ 清 /root/Work EOL churn 解部署阻塞

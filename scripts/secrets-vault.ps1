@@ -204,7 +204,11 @@ Then reload Cursor. See agency-os/docs/operations/mcp-add-server-quickstart.md (
             Set-Item -Path ("Env:{0}" -f $n) -Value $plain
         }
         Invoke-Expression $Command
-        exit $LASTEXITCODE
+        $lastExit = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
+        if ($lastExit) {
+            exit ([int]$lastExit.Value)
+        }
+        exit 0
     }
 
     "import-mcp" {
