@@ -165,6 +165,7 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
     buildInput: ({ prompt, aspectRatio }) => ({
       prompt,
       aspect_ratio: aspectRatio,
+      size: "2K",
     }),
   },
   // ── Google models via Replicate (no seed param on any of them) ────────────
@@ -176,6 +177,8 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
       const input: Record<string, unknown> = {
         prompt,
         aspect_ratio: aspectRatio,
+        resolution: "2K",
+        output_format: "png",
       };
       if (referenceImages.length > 0) {
         input.image_input = referenceImages;
@@ -191,6 +194,8 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
       const input: Record<string, unknown> = {
         prompt,
         aspect_ratio: aspectRatio,
+        resolution: "2K",
+        output_format: "png",
         allow_fallback_model: true,
       };
       if (referenceImages.length > 0) {
@@ -206,6 +211,8 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
     buildInput: ({ prompt, aspectRatio }) => ({
       prompt,
       aspect_ratio: IMAGEN4_AR[aspectRatio], // only 5 native ratios
+      image_size: "2K",
+      output_format: "png",
     }),
   },
   // ── BFL Flux.2 Max via Replicate ──────────────────────────────────────────
@@ -217,7 +224,9 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
     buildInput: ({ prompt, aspectRatio, seed }) => ({
       prompt,
       aspect_ratio: aspectRatio,
+      resolution: "1 MP",
       seed,
+      output_format: "png",
     }),
   },
 };
