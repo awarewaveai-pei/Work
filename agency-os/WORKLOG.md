@@ -3,6 +3,22 @@
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-06-13
+### feat(designs): My Designs 顯示風格 chips + 完整 prompt 展開 + 修下載 + 語意化檔名
+**[任務理解]** `/tools/designs` 使用者 4 需求：①顯示生成時按過的畫家/媒材/風格鍵（可日後參考重用）②prompt 可展開看完整 ③下載鍵變「開圖」非真下載 ④檔名無設計（要 產品-主圖-畫家/媒材/風格）。
+**[根因]** 生成時 `saveToGallery` 只存最終英文 prompt，zh chips（`stylePrompt`/`styleTokens`）丟失（route.ts metadata 無 style_tags/subject 欄）；下載用 `<a href={R2url} download>` 跨域 → `download` 屬性被瀏覽器忽略 → 開圖；檔名 = `designs/YYYY-MM/<uuid>.ext` 純 UUID。
+**[已修改]**（4 檔，全加法，jsonb metadata 免 migration、向後相容）
+- `app/api/tools/designs/route.ts` — `SaveDesignBody` 加 `styleTags?/subject?`；`sanitizeStyleTags()`（≤24 tags、≤120 字、type-guard）；metadata 寫 `style_tags`/`subject`
+- `app/tools/tarot/TarotStudio.tsx` — `saveToGallery` 帶 `styleTags: styleTokens` + `subject: subjectText`（closure 現值）
+- `app/tools/studio/StudioWorkbench.tsx` — `saveToDesigns` 帶 `styleTags: style!=="None"?[style]:[]` + `subject`
+- `app/tools/designs/DesignsGallery.tsx` — import `STYLE_PRESETS`(from ../tarot/cards, SSOT) 建 group map；`styleKind/groupStyleTags/shortStyleLabel/designBaseName`；①卡片分組 chips(畫家/媒材/風格) ②prompt 展開/收合 toggle(`expandedIds`) ③下載改 `fetch→blob→downloadBlob`(+`downloadingId`，fetch 失敗 fallback 開分頁並 alert 提示) ④`zipEntryName`+單張下載共用 `designBaseName`(產品-主圖-style，空段省略，fallback "design")；`safeFilePart` 硬化(去頭尾點/空白 + Windows 保留名前綴)
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 -- 修正 import(STYLE_PRESETS 在 cards.ts 非 tarotStyles.ts)後歸零
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run | exit=0 | ms=1530 -- 19 files / 272 tests all pass，無 regression（共用 import 未破壞）
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/3n -- M1(safeFilePart 空/結尾點/保留名)已修；N3(R2 CORS fallback 靜默)已加可見 alert（且 bulkDownload 早用同一 fetch 已驗 CORS 通）；M2(Studio 英文 token 歸風格)為設計即此、v1 接受；N1/N2 既有 pattern/已聲明可接受風險
+- BUGHUNT_DONE: scope=lobster-factory(next-admin),agency-os,scripts | grep=styleTags\|style_tags\|designBaseName\|zipEntryName\|groupStyleTags\|sanitizeStyleTags | hits=0 -- 全 call sites 一致（producer: TarotStudio/StudioWorkbench；consumer: route.ts metadata + designBaseName）；zipEntryName 第2參數改 `_index` 仍簽名相容
+**[剩餘風險]** 改動須 sg-deploy 才生效（尚未部署，等使用者 go-ahead）；舊圖無 style_tags → chips 不顯示（預期，向後相容）；Studio 風格僅單行「風格」chip（非分三組，因 Studio 只有單一 style 下拉）。
+**[rollback]** `git checkout` 該 4 檔。
+
 ### fix(studio): mockup invalid_reference_image — OpenAI 路徑接受 My Designs R2 URL
 **[任務理解]** `/tools/mockup` 在「GPT-Image-1 模型 + My Designs 圖庫圖」回 `生成失敗：invalid_reference_image`。
 **[根因]** `lib/tarot/image-gen.ts` `generateOpenai` 用 `parseDataUrl()` 處理 reference image，只認 `data:` URL；圖庫圖是 R2 public https URL → 回 null → invalid_reference_image。Replicate 模型(nano-banana等)直接 fetch URL 故正常，僅 gpt-image-1 路徑中招。route 驗證(studio/generate) 本就放行 own-design URL，是引擎端不支援。

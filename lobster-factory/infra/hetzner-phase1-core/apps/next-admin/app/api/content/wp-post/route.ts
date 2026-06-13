@@ -1,0 +1,108 @@
+import { NextResponse } from "next/server";
+import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { getWpSites } from "@/lib/content/wp-sites";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// Resolve site token server-side from siteId
+async function getSiteToken(siteId: string): Promise<{ url: string; token: string } | null> {
+  const { sites, tokens } = await getWpSites();
+  const site = sites.find(s => s.id === siteId);
+  if (!site) return null;
+  const token = tokens[siteId];
+  if (!token) return null;
+  return { url: site.url, token };
+}
+
+// PATCH /api/content/wp-post — update WP post (date, status, title)
+export async function PATCH(req: Request): Promise<Response> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
+
+  let body: Record<string, unknown>;
+  try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
+
+  const siteId = typeof body.siteId === "string" ? body.siteId.trim() : "";
+  const postId = typeof body.postId === "number" ? body.postId : parseInt(String(body.postId), 10);
+  if (!siteId) return NextResponse.json({ ok: false, error: "siteId required" }, { status: 400 });
+  if (!postId || isNaN(postId)) return NextResponse.json({ ok: false, error: "postId required" }, { status: 400 });
+
+  const site = await getSiteToken(siteId);
+  if (!site) return NextResponse.json({ ok: false, error: "Site not found or token missing" }, { status: 404 });
+
+  // Build WP patch payload — only include explicitly provided fields
+  const wpPatch: Record<string, unknown> = {};
+  if (typeof body.date === "string" && body.date.trim()) wpPatch.date = body.date.trim();
+  if (typeof body.status === "string" && ["draft", "publish", "future", "pending"].includes(body.status))
+    wpPatch.status = body.status;
+  if (typeof body.title === "string" && body.title.trim()) wpPatch.title = body.title.trim();
+
+  if (Object.keys(wpPatch).length === 0)
+    return NextResponse.json({ ok: false, error: "No fields to update" }, { status: 400 });
+
+  const endpoint = `${site.url}/wp-json/wp/v2/posts/${postId}`;
+  let res: Response;
+  try {
+    res = await fetch(endpoint, {
+      method: "POST", // WP REST API uses POST for updates (with _method or just POST)
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${site.token}`,
+        "X-HTTP-Method-Override": "PUT",
+      },
+      body: JSON.stringify(wpPatch),
+      signal: AbortSignal.timeout(12000),
+    });
+  } catch {
+    return NextResponse.json({ ok: false, error: "WordPress connection failed" }, { status: 502 });
+  }
+
+  const json = await res.json().catch(() => ({})) as Record<string, unknown>;
+
+  if (!res.ok) {
+    const msg = typeof json.message === "string" ? json.message.slice(0, 200) : `WP error ${res.status}`;
+    return NextResponse.json({ ok: false, error: msg }, { status: res.status });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    post: {
+      id: json.id,
+      status: json.status,
+      date: json.date,
+      link: json.link,
+    },
+  });
+}
+
+// DELETE /api/content/wp-post — move WP post to trash
+export async function DELETE(req: Request): Promise<Response> {
+  const { role } = resolveOpsRole(req);
+  if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
+
+  let body: Record<string, unknown>;
+  try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
+
+  const siteId = typeof body.siteId === "string" ? body.siteId.trim() : "";
+  const postId = typeof body.postId === "number" ? body.postId : parseInt(String(body.postId), 10);
+  if (!siteId || !postId || isNaN(postId))
+    return NextResponse.json({ ok: false, error: "siteId and postId required" }, { status: 400 });
+
+  const site = await getSiteToken(siteId);
+  if (!site) return NextResponse.json({ ok: false, error: "Site not found" }, { status: 404 });
+
+  let res: Response;
+  try {
+    res = await fetch(`${site.url}/wp-json/wp/v2/posts/${postId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${site.token}` },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    return NextResponse.json({ ok: false, error: "WordPress connection failed" }, { status: 502 });
+  }
+
+  if (!res.ok) return NextResponse.json({ ok: false, error: `WP error ${res.status}` }, { status: res.status });
+  return NextResponse.json({ ok: true });
+}

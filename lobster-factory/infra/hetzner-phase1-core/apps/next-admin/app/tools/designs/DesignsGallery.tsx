@@ -130,11 +130,15 @@ function assetExtension(asset: DesignAsset): string {
 }
 
 function safeFilePart(value: string | null | undefined, fallback: string): string {
-  const cleaned = (value ?? "")
+  let cleaned = (value ?? "")
     .trim()
     .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, "-")
     .replace(/\s+/g, " ")
-    .slice(0, 80);
+    .replace(/^[.\s]+|[.\s]+$/g, "") // Windows silently trims leading/trailing dots → hidden/empty files
+    .slice(0, 80)
+    .replace(/[.\s]+$/g, ""); // the slice above can re-expose a trailing dot
+  // Windows reserved device names would make the file unusable — prefix to neutralise.
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(cleaned)) cleaned = `_${cleaned}`;
   return cleaned || fallback;
 }
 
@@ -337,7 +341,9 @@ export default function DesignsGallery() {
       const blob = await res.blob();
       downloadBlob(blob, `${designBaseName(asset)}.${assetExtension(asset)}`);
     } catch {
+      // R2 fetch blocked (CORS / network) — fall back to opening, but say so: opening ≠ saving.
       window.open(asset.object_url, "_blank", "noopener");
+      alert("無法直接下載（可能被瀏覽器阻擋），已改開新分頁，請在圖片上按右鍵另存。");
     } finally {
       setDownloadingId(null);
     }
