@@ -503,7 +503,7 @@ export default function TarotStudio() {
     setMessage(null);
     try {
       for (const t of targets) {
-        await generateOne(t.card, t.i);
+        await generateOne(t.it.card, t.i);
       }
     } finally {
       setBatchBusy(false);
