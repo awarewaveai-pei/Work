@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { WpSite } from "@/lib/content/wp-sites";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
+import type { RankMathReport } from "@/lib/seo/rankmath-checker";
+import { SeoCheckPanel } from "./SeoCheckPanel";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
