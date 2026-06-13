@@ -69,7 +69,7 @@ export async function GET(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
-  const { sites, tokens } = getWpSites();
+  const { sites, tokens } = await getWpSites();
   if (sites.length === 0) {
     return NextResponse.json({ ok: false, error: "No WordPress sites configured" }, { status: 503 });
   }

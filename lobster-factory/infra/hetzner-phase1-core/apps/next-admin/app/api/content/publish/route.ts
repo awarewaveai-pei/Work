@@ -158,7 +158,7 @@ export async function POST(req: Request): Promise<Response> {
   let jwtToken: string | undefined;
 
   if (siteId) {
-    const { sites, tokens } = getWpSites();
+    const { sites, tokens } = await getWpSites();
     const site = sites.find(s => s.id === siteId);
     if (!site) return new NextResponse(`Site '${siteId}' not found`, { status: 400 });
     wpApiUrl = site.url;

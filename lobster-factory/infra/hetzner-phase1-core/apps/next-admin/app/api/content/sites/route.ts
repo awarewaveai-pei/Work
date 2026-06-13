@@ -9,6 +9,6 @@ export async function GET(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
-  const { sites } = getWpSites();
+  const { sites } = await getWpSites();
   return NextResponse.json({ ok: true, sites });
 }
