@@ -688,7 +688,7 @@ export default function ContentStudio() {
     try {
       const res  = await fetch("/api/content/publish", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown: generated, slug: slugify(form.keyword), seoTitle: metaData?.seoTitle, metaDescription: metaData?.metaDesc, scheduleDate: form.scheduleDate || undefined, siteId: selectedSiteId || undefined }),
+        body: JSON.stringify({ markdown: generated, slug: slugHint || slugify(form.keyword), seoTitle: metaData?.seoTitle, metaDescription: metaData?.metaDesc, focusKeyword: form.keyword, scheduleDate: form.scheduleDate || undefined, siteId: selectedSiteId || undefined }),
       });
       const json = await res.json() as { ok: boolean; error?: string; edit_url?: string; view_url?: string };
       if (!json.ok) { setPubStatus("error"); setPubError(json.error ?? "未知錯誤"); }
