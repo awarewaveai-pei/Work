@@ -9935,3 +9935,14 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|aspect_ratio.*custom|printDims | hits=0
 - REALTEST_WAIVED: NA -- live FLUX call not needed; schema confirmed via Replicate API; 422 root cause identified from SG server logs
 
+## 2026-06-13 feat(content-studio): Media Hub + expanded Structure section
+
+### [已修改]
+- `ContentStudio.tsx`: Added `MediaHub` interface + `ArticleStructure` extended (tables/h3/lists/italics/quotes/bold). Structure section replaced with intro hook brief + type chip buttons + Yes/No dropdowns. New Media Hub section (AI images: provider/count/size/style/instructions/brand name/alt-text; YouTube: count/layout; strict-under-headings). New constants HOOK_TYPES, AI_IMAGE_PROVIDERS, IMAGE_SIZES, LAYOUT_OPTIONS. `setMedia` callback, `showMedia` state, `DEFAULT_MEDIA`, updated `bulkSettings`.
+- `generate/route.ts`: Extended `ArticleStructure` + added `MediaHub` interface. `buildUserPrompt` accepts `introHookBrief`/`introHookType`/`media`; emits IMAGE_PLACEHOLDER_N and YOUTUBE_PLACEHOLDER_N prompt instructions. Fixed pre-existing targetCountry sentinel mismatch (`"Global"` vs `"全球（不指定）"`). Clamped imageCount (1–10) and youtubeCount (1–5) server-side.
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --input-type=module (targetCountry/clamp/size-label logic) | exit=0 | ms=<1000 — all 5 assertions PASSED
+- REVIEW_DONE: critic=Standard | verdict=pass (2 majors fixed: clamp + targetCountry sentinel) | findings=0c/2m/2n
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=imageCount|youtubeCount|introHookBrief|targetCountry.*Global | hits=0
+
