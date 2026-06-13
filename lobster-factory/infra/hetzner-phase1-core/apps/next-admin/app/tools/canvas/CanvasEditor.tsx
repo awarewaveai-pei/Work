@@ -374,8 +374,20 @@ export default function CanvasEditor() {
 
       {error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{error}</span> : null}
 
-      <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: "fit-content", background: "#fff" }}>
-        <canvas ref={canvasElRef} width={800} height={800} />
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: "fit-content", background: "#fff" }}>
+          <canvas ref={canvasElRef} width={800} height={800} />
+        </div>
+        {/* 調色工具包 — appears when an image is selected; applies via Fabric filters (WYSIWYG). */}
+        {imageSelected ? (
+          <div style={{ width: 260 }}>
+            <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
+          </div>
+        ) : (
+          <div style={{ width: 260, fontSize: 12, opacity: 0.55, paddingTop: 8 }}>
+            點選一張圖片即可調色（色相／亮度／飽和／色階／銳利度）。
+          </div>
+        )}
       </div>
     </div>
   );
