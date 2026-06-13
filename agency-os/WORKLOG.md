@@ -234,6 +234,31 @@ POD_OUTPUT_INTENT_DEPLOYED=true 寫入 `/root/lobster-phase1/.env`；SG docker-c
 
 ---
 
+### feat(seo): RankMath SEO check panel in ContentStudio
+
+**[任務理解]** Generate 完成後自動顯示 RankMath 分數 + 未通過項目，讓使用者在 Publish 前看到 SEO 狀態。
+
+**[已修改]**
+- `app/tools/content/SeoCheckPanel.tsx`（新建）— 純 display component：分數圓圈（green/orange/red）+ 未通過列表（展開通過項目）
+- `app/tools/content/ContentStudio.tsx`（5處修改）
+  - import `RankMathReport` + `SeoCheckPanel`
+  - state: `seoReport` + `seoChecking`
+  - `seoRunRef` — 防 stale result race（critic fix）
+  - `handleGenerate` 成功後 background fetch `/api/content/seo-check`，帶 `.catch()` guard（critic fix）
+  - JSX 插入 `<SeoCheckPanel>` 於 meta grid 下方
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx rankmath-checker.ts` (10/13 pass, score=77 orange) | exit=0 | ms=~5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=~15000
+- REVIEW_DONE: critic=Deep | verdict=pass-after-fix | findings=0c/1m/1n fixed (catch+runId added)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`SeoCheckPanel|seoReport|seoChecking` | hits=0 (only in two new/edited files)
+
+**[剩餘風險]** CJK 文章 word-count/density 計算偏差（space-split 不適用中文）— 另立 issue
+
+**[rollback]** `git revert 672ce691` + `git rm SeoCheckPanel.tsx`
+
+---
+
 ## 2026-06-13
 
 ### feat(pod): 修圖積木(色階/亮度/飽和/色相/銳利度) + 三軌輸出 UI + Fabric canvas 還原 — Phase 1 [1-b/c/d/f/g/h/i/j/k]
