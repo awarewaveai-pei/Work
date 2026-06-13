@@ -2,6 +2,29 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-14
+
+### feat(seo): 全面強化文章生成 SYSTEM_PROMPT + WP 架站 SEO 清單
+
+**[任務理解]** 使用者提供完整 Google SEO 官方文件 6 份，要求徹底研究並運用在：① 文章生成 SYSTEM_PROMPT ② WordPress 網站架設 SEO 規範。
+
+**[已修改]**
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api\content/generate/route.ts`
+  - SYSTEM_PROMPT 從 27 行擴展至 ~90 行，新增 5 大區塊：E-E-A-T / GEO-AI 優化 / 圖片 SEO / 結構化資料提示 / 內容新鮮度
+  - 重要 fix：alt 範例移除 FORBIDDEN 詞（therapist/healing）、日期改 `<!-- PUBLISH_DATE -->` placeholder、AI 透明聲明改為 internal instruction（不插入文章本文）、統一引用格式 `[Source] ([Year])`
+- `agency-os/docs/seo/WP_SITE_SEO_SETUP_CHECKLIST.md`（新建）— 10 Phase 架站清單 + 15 項 Launch Checklist
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` (after all fixes) | exit=0 | ms=<60000
+- REVIEW_DONE: critic=Deep | verdict=warn→pass-after-fix | findings=2c/2m/1n fixed, 1s kept
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`art therapist|PUBLISH_DATE|AI content transparency` | hits=3 (全部為人工撰寫品牌文件，非 AI 生成文章，合規)
+
+**[剩餘風險]** `<!-- PUBLISH_DATE -->` 需 publish flow 替換邏輯（目前 CMS 人工處理）
+
+**[rollback]** `git revert HEAD`
+
+---
+
 ## 2026-06-13
 
 ### feat(pod): 修圖積木(色階/亮度/飽和/色相/銳利度) + 三軌輸出 UI + Fabric canvas 還原 — Phase 1 [1-b/c/d/f/g/h/i/j/k]
