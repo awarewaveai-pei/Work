@@ -14,8 +14,9 @@
  */
 import { useCallback, useState } from "react";
 import { roleHeader } from "@/lib/ops-role";
-import { PRINT_DESTINATIONS, type PrintDestinationId } from "@/lib/studio/to-print-file";
+import { PRINT_DESTINATIONS, type PrintDestinationId } from "@/lib/studio/print-destinations";
 import { isNeutralParams, type ColorGradeParams } from "@/lib/studio/color-grade";
+import { openInCanvas } from "@/components/tools/canvas-handoff";
 
 type ProcessResponse = {
   ok: boolean;
@@ -35,8 +36,6 @@ type Props = {
   colorGrade?: ColorGradeParams;
   /** print destinations to offer; omit/empty → hide the print track */
   printDestinations?: PrintDestinationId[];
-  /** open the Fabric.js quick editor; omit → button shows 即將推出 */
-  onOpenCanvas?: () => void;
 };
 
 function triggerDownload(dataUrl: string, filename: string) {
@@ -53,7 +52,6 @@ export default function OutputTrackBar({
   source,
   colorGrade,
   printDestinations,
-  onOpenCanvas,
 }: Props) {
   const [busy, setBusy] = useState<null | "web" | "print">(null);
   const [error, setError] = useState<string | null>(null);
@@ -127,15 +125,14 @@ export default function OutputTrackBar({
           </>
         ) : null}
 
-        {onOpenCanvas ? (
-          <button className="btn-secondary" disabled={busy !== null} onClick={onOpenCanvas}>
-            ✏️ 快速編輯
-          </button>
-        ) : (
-          <button className="btn-secondary" disabled title="Fabric.js 編輯器即將推出">
-            ✏️ 快速編輯（即將推出）
-          </button>
-        )}
+        <button
+          className="btn-secondary"
+          disabled={busy !== null}
+          onClick={() => openInCanvas(image)}
+          title="上傳圖案／加文字／微調構圖"
+        >
+          ✏️ 快速編輯
+        </button>
       </div>
 
       {error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{error}</span> : null}

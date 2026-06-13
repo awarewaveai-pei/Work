@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
+import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
+import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type TarotCard } from "./cards";
 
 type GroupKey = "all" | "major" | "wands" | "cups" | "swords" | "pentacles";
@@ -169,6 +171,7 @@ export default function TarotStudio() {
   const [compareZoom, setCompareZoom] = useState<string | null>(null); // large-view modal (compare grid)
   const [previewSig, setPreviewSig] = useState<string | null>(null); // model+style that made the current preview
   const [templateThumbs, setTemplateThumbs] = useState<Record<string, string>>({});
+  const grade = useColorGrade(); // 修圖積木：色彩/色階/銳利度 (live CSS preview + server bake)
 
   const doneCount = batch.filter((b) => b.status === "done").length;
   // For Step 1 UI (ref upload limit), use first selected model.
@@ -991,7 +994,7 @@ export default function TarotStudio() {
               alt="preview"
               onClick={() => setPreviewZoom(true)}
               title="點擊放大"
-              style={{ width: 300, borderRadius: 10, border: "1px solid var(--card-border)", cursor: "zoom-in" }}
+              style={{ width: 300, borderRadius: 10, border: "1px solid var(--card-border)", cursor: "zoom-in", filter: grade.cssFilter }}
             />
             <div>
               <div className="form-hint" style={{ marginBottom: 8 }}>
@@ -1007,6 +1010,19 @@ export default function TarotStudio() {
                   解除鎖定，重新設計
                 </button>
               )}
+              {/* 輸出軌 ([1-g])：塔羅卡 4 目的地，尺寸正確（70×120/121mm）。色階/銳利度由 server bake。 */}
+              <div style={{ marginTop: 12 }}>
+                <OutputTrackBar
+                  image={previewImage}
+                  source="tarot"
+                  colorGrade={grade.params}
+                  printDestinations={["tw-local", "mpc", "tgc", "printninja"]}
+                />
+              </div>
+            </div>
+            {/* 修圖積木 ([1-f])：色彩/色階/銳利度滑桿，即時 CSS 預覽。 */}
+            <div style={{ width: 260 }}>
+              <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
             </div>
           </div>
         )}

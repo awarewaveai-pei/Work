@@ -15,13 +15,11 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import type { IccProfileName } from "./print-destinations";
 
 const execFileP = promisify(execFile);
 
-export type IccProfileName =
-  | "JapanColor2001Coated" // 台灣 / 日 / 亞洲
-  | "USWebCoatedSWOP" // 美國
-  | "CoatedFOGRA39"; // 歐洲
+export type { IccProfileName }; // re-export so existing importers of this module keep working
 
 /** Absolute paths inside the deployed image (populated at [0-a-gs] deploy gate). */
 export const ICC_PATHS: Record<IccProfileName, string> = {
