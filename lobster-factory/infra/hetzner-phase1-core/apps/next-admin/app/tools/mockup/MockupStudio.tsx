@@ -53,7 +53,10 @@ export default function MockupStudio() {
   const [garment, setGarment] = useState("tshirt");
   const [color, setColor] = useState<GarmentColor>("white");
   const [model, setModel] = useState<StudioModel>("nano-banana-2");
-  const [aspect, setAspect] = useState<AspectRatio>("3:4" as AspectRatio);
+  // Default to a supported portrait ratio. "3:4" is NOT in VALID_ASPECT_RATIOS
+  // (lib/tarot/image-gen.ts) — the studio generate route rejects it with 400, so it
+  // must never be an input here. 4:5 is the closest supported apparel/portrait ratio.
+  const [aspect, setAspect] = useState<AspectRatio>("4:5");
   // flat controls
   const [surface, setSurface] = useState("light wooden table");
   const [flatStyle, setFlatStyle] = useState(FLAT_STYLES[0].value);
@@ -296,7 +299,7 @@ export default function MockupStudio() {
         <label style={{ fontSize: 13 }}>
           比例
           <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={aspect} onChange={(e) => setAspect(e.target.value as AspectRatio)}>
-            {(["3:4", "4:5", "1:1", "2:3", "3:2", "9:16"] as const).filter((a, i, arr) => arr.indexOf(a) === i).map((a) => (
+            {(["4:5", "1:1", "2:3", "3:2", "9:16"] as const).filter((a, i, arr) => arr.indexOf(a) === i).map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
