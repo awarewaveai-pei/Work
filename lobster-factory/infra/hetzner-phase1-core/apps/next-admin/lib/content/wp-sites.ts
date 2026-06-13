@@ -1,3 +1,5 @@
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+
 export interface WpSite {
   id: string;
   name: string;
@@ -7,7 +9,7 @@ export interface WpSite {
 
 const COLORS = ["#5855d0", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
 
-export function getWpSites(): { sites: WpSite[]; tokens: Record<string, string> } {
+function getWpSitesFromEnv(): { sites: WpSite[]; tokens: Record<string, string> } {
   const sites: WpSite[] = [];
   const tokens: Record<string, string> = {};
 
@@ -32,4 +34,27 @@ export function getWpSites(): { sites: WpSite[]; tokens: Record<string, string> 
   }
 
   return { sites, tokens };
+}
+
+// DB-first with env-var fallback. Token never exposed in returned `sites` array.
+export async function getWpSites(): Promise<{ sites: WpSite[]; tokens: Record<string, string> }> {
+  try {
+    const supabase = getSupabaseWriteClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("wp_sites")
+        .select("id, name, url, token, color")
+        .eq("active", true)
+        .order("created_at");
+
+      if (!error && data && data.length > 0) {
+        const rows = data as Array<{ id: string; name: string; url: string; token: string; color: string }>;
+        const sites = rows.map(r => ({ id: r.id, name: r.name, url: r.url.replace(/\/$/, ""), color: r.color }));
+        const tokens = Object.fromEntries(rows.map(r => [r.id, r.token]));
+        return { sites, tokens };
+      }
+    }
+  } catch { /* fall through */ }
+
+  return getWpSitesFromEnv();
 }

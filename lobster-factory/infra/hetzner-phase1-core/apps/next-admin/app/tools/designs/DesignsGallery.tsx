@@ -109,6 +109,63 @@ function unique<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
 }
 
+const MIME_EXTENSION: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+function assetExtension(asset: DesignAsset): string {
+  const keyMatch = asset.object_key.match(/\.([a-z0-9]+)$/i);
+  if (keyMatch?.[1]) {
+    const ext = keyMatch[1].toLowerCase();
+    return ext === "jpeg" ? "jpg" : ext;
+  }
+  return MIME_EXTENSION[asset.mime_type ?? ""] ?? "png";
+}
+
+function safeFilePart(value: string | null | undefined, fallback: string): string {
+  const cleaned = (value ?? "")
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, "-")
+    .replace(/\s+/g, " ")
+    .slice(0, 80);
+  return cleaned || fallback;
+}
+
+function zipEntryName(asset: DesignAsset, index: number, used: Set<string>): string {
+  const label =
+    asset.metadata?.card_name ??
+    asset.metadata?.theme ??
+    asset.metadata?.model_name ??
+    `design-${index + 1}`;
+  const base = safeFilePart(`${label}-${asset.id.slice(0, 8)}`, `design-${index + 1}`);
+  const ext = assetExtension(asset);
+  let candidate = `${base}.${ext}`;
+  let suffix = 2;
+  while (used.has(candidate.toLowerCase())) {
+    candidate = `${base}-${suffix}.${ext}`;
+    suffix++;
+  }
+  used.add(candidate.toLowerCase());
+  return candidate;
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadTimestamp(now = new Date()): string {
+  return now.toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "-");
+}
+
 /* ─── Filter chips ──────────────────────────────────────────────── */
 function Chips({
   label,
@@ -154,6 +211,9 @@ export default function DesignsGallery() {
   /* multi-select */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [bulkDownloadDone, setBulkDownloadDone] = useState(0);
+  const [bulkDownloadTotal, setBulkDownloadTotal] = useState(0);
 
   /* filters */
   const [filterModel, setFilterModel] = useState("all");
@@ -340,6 +400,56 @@ export default function DesignsGallery() {
     if (failed > 0) alert(`${failed} 張刪除失敗（${done} 張成功）`);
   }, [visible, selectedIds]);
 
+  /* bulk download — scoped to visible set so filtered-out assets are never downloaded */
+  const bulkDownload = useCallback(async () => {
+    const selected = visible.filter((a) => selectedIds.has(a.id) && a.object_url);
+    if (selected.length === 0) return;
+
+    setBulkDownloading(true);
+    setBulkDownloadDone(0);
+    setBulkDownloadTotal(selected.length);
+    let failed = 0;
+    let added = 0;
+
+    try {
+      const { default: JSZip } = await import("jszip");
+      const zip = new JSZip();
+      const usedNames = new Set<string>();
+
+      for (const [index, asset] of selected.entries()) {
+        try {
+          const res = await fetch(asset.object_url!, { cache: "no-store" });
+          if (!res.ok) {
+            failed++;
+            continue;
+          }
+          const blob = await res.blob();
+          zip.file(zipEntryName(asset, index, usedNames), blob);
+          added++;
+        } catch {
+          failed++;
+        } finally {
+          setBulkDownloadDone((prev) => prev + 1);
+        }
+      }
+
+      if (added === 0) {
+        alert("下載失敗：沒有可打包的檔案。");
+        return;
+      }
+
+      const out = await zip.generateAsync({ type: "blob" });
+      downloadBlob(out, `designs-${downloadTimestamp()}.zip`);
+      if (failed > 0) {
+        alert(`已下載 ${added} 張，${failed} 張失敗。`);
+      }
+    } finally {
+      setBulkDownloading(false);
+      setBulkDownloadDone(0);
+      setBulkDownloadTotal(0);
+    }
+  }, [visible, selectedIds]);
+
   /* ─── early returns ─── */
   if (state === "disabled") {
     return <p style={{ padding: 16, opacity: 0.7 }}>My Designs 尚未啟用 — 伺服器設定 <code>POD_DESIGNS_ENABLED=true</code> 後生效。</p>;
@@ -419,7 +529,9 @@ export default function DesignsGallery() {
 
       {/* ── Bulk action toolbar ───────────────────────────────────── */}
       {(() => {
-        const visibleSelected = visible.filter((a) => selectedIds.has(a.id)).length;
+        const selectedVisible = visible.filter((a) => selectedIds.has(a.id));
+        const visibleSelected = selectedVisible.length;
+        const downloadableSelected = selectedVisible.filter((a) => a.object_url).length;
         const allVisibleSelected = visibleSelected === visible.length && visible.length > 0;
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -441,8 +553,18 @@ export default function DesignsGallery() {
             {visibleSelected > 0 && (
               <button
                 className="btn-secondary"
+                style={{ fontSize: 11 }}
+                disabled={bulkDownloading || bulkDeleting || downloadableSelected === 0}
+                onClick={() => void bulkDownload()}
+              >
+                {bulkDownloading ? `打包中 ${bulkDownloadDone}/${bulkDownloadTotal}` : `下載 ${downloadableSelected} 張`}
+              </button>
+            )}
+            {visibleSelected > 0 && (
+              <button
+                className="btn-secondary"
                 style={{ fontSize: 11, color: "#f87171" }}
-                disabled={bulkDeleting}
+                disabled={bulkDeleting || bulkDownloading}
                 onClick={() => void bulkDelete()}
               >
                 {bulkDeleting ? "刪除中…" : `刪除 ${visibleSelected} 張`}
