@@ -4,6 +4,22 @@
 
 ## 2026-06-14
 
+### feat(studio): Adobe 色彩平衡（第 6 塊積木）+ 部署
+
+**[任務理解]** 使用者要 Adobe 色彩平衡。做簡版全域中間調 3 軸（青紅/洋紅綠/黃藍），接進可插拔 color-grade seam。
+**[已修改]**
+- `lib/studio/color-grade.ts` — balCR/balMG/balYB（-100..100，neutral 0）入 State/Params/GRADE_LIMITS/clamp/neutral/stateToParams（identity）；`toSharpBalance`（±100→±60/255）；applyColorGrade 用 `.linear([1,1,1],[r,g,b])` per-channel offset。
+- `app/tools/canvas/fabric-filters.ts` — ColorMatrix per-channel offset（同 scale）。
+- `components/tools/ColorGradePanel.tsx` — 「色彩平衡」滑桿組。
+- `lib/studio/__tests__/color-grade.test.ts` — 補 balance 測試 + explicit toEqual 欄位。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`vitest run lib/studio` | 84/84（含新 balance 測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`+`npm run build` | exit=0/0（過程中 tsc 暫紅是並行 session 的 printful-mockup 型別錯，非本變更；其自行修復後綠）
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | deployed=95f3ea9b（含 4b2c2b71，balCR×12）| healthy 6s | smoke 4/4 200
+- BUGHUNT_DONE: scope=lobster-factory | grep=balCR\|toSharpBalance | hits=0 stale
+**[剩餘風險]** 色彩平衡無 CSS analog → 不入 toCssFilter（故 Tarot deck renderPrintCard 不顯示）；但 Studio/Tarot 預覽已是 Fabric WYSIWYG 會顯示，Sharp bake 也正確。
+**[部署]** SG 95f3ea9b LIVE。**[待辦]** ③ Fabric 功能批次（A 可再編輯存檔 → B 陰影/描邊/圖層 → C 形狀遮罩/自由繪筆 → D 群組/漸層/SVG/裁切/混合）。
+
 ### feat(studio): 即時真實調色預覽 (Fabric WYSIWYG) — 解「看不到怎麼調整」+ 部署
 
 **[任務理解]** 使用者：gamma/銳利度等滑桿在 Tarot/Studio 預覽看不到效果（CSS filter 限制），「看不到要怎麼調整」。
