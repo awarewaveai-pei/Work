@@ -83,6 +83,33 @@ export function parseImageDataUrl(dataUrl: string): { mime: string; buffer: Buff
   }
 }
 
+/** Delete one object from the designs bucket. Returns ok:true on success or 404 (already gone). */
+export async function deleteDesignObject(
+  objectKey: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const config = getR2Config();
+  if (!config) return { ok: false, error: "r2_not_configured" };
+
+  const url =
+    `https://api.cloudflare.com/client/v4/accounts/${config.accountId}` +
+    `/r2/buckets/${config.bucket}/objects/${encodeURIComponent(objectKey).replace(/%2F/g, "/")}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${config.apiToken}` },
+    });
+  } catch {
+    return { ok: false, error: "r2_network_error" };
+  }
+  // 404 = already deleted; treat as success (idempotent delete).
+  if (!res.ok && res.status !== 404) {
+    return { ok: false, error: `r2_delete_failed_${res.status}` };
+  }
+  return { ok: true };
+}
+
 /**
  * Upload one object to the designs bucket. Returns the public URL on success.
  * Caller is responsible for size limits; this function only transports bytes.

@@ -46,6 +46,30 @@ describe("to-product-image (real sharp bake)", () => {
     expect((await sharp(neutral).metadata()).width).toBe(1000);
   });
 
+  it("levels block actually bakes: gray-128 with black-point=64 → pixels darken [REALTEST]", async () => {
+    const gray = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: { r: 128, g: 128, b: 128 } },
+    })
+      .png()
+      .toBuffer();
+    // levels {black:64}: input 128 → (128-64)·255/(255-64) = 64·255/191 ≈ 85 (darker).
+    // (white-point slider min is 191, so the brighten direction is bounded; black-point
+    //  gives a clean, observable shift that proves the .linear() block runs.)
+    const out = await toProductImage(gray, "web-square", {
+      hue: 0, saturation: 1, brightness: 1, black: 64,
+    });
+    const { data } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+    const mid = (500 * 1000 + 500) * 3; // center pixel = content (square contain, no letterbox)
+    expect(data[mid]).toBeLessThan(110); // darkened from 128 by the levels block
+  });
+
+  it("sharpen block bakes without throwing and keeps a valid webp", async () => {
+    const out = await toProductImage(await testInput(), "web-square", {
+      hue: 0, saturation: 1, brightness: 1, sharpen: 5,
+    });
+    expect((await sharp(out).metadata()).format).toBe("webp");
+  });
+
   it("garbage colorGrade (NaN/undefined) does not corrupt the bake [defense-in-depth]", async () => {
     const out = await toProductImage(await testInput(), "web-tarot", {
       hue: NaN,

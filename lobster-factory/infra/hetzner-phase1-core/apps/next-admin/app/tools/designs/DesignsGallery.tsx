@@ -151,6 +151,7 @@ export default function DesignsGallery() {
   const [state, setState] = useState<LoadState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<string | null>(null);
 
   /* filters */
@@ -187,8 +188,8 @@ export default function DesignsGallery() {
   useEffect(() => {
     const onVisible = () => { if (!document.hidden) void load(); };
     document.addEventListener("visibilitychange", onVisible);
-    // Also refresh every 30s while the page is open (covers same-tab usage).
-    const timer = setInterval(() => { if (!document.hidden) void load(); }, 30_000);
+    // Refresh every 5 min while page is open (covers same-tab usage without being disruptive).
+    const timer = setInterval(() => { if (!document.hidden) void load(); }, 300_000);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       clearInterval(timer);
@@ -202,6 +203,24 @@ export default function DesignsGallery() {
       setCopiedId(asset.id);
       setTimeout(() => setCopiedId(null), 1500);
     } catch { /* clipboard unavailable */ }
+  }, []);
+
+  const deleteAsset = useCallback(async (asset: DesignAsset) => {
+    if (!confirm(`刪除這張圖片？此操作無法復原。`)) return;
+    setDeletingId(asset.id);
+    try {
+      const res = await fetch(`/api/tools/designs?id=${asset.id}`, { method: "DELETE" });
+      const json = (await res.json()) as { ok: boolean; error?: string };
+      if (json.ok) {
+        setAssets((prev) => prev.filter((a) => a.id !== asset.id));
+      } else {
+        alert(`刪除失敗：${json.error ?? "unknown"}`);
+      }
+    } catch {
+      alert("刪除失敗：網路錯誤");
+    } finally {
+      setDeletingId(null);
+    }
   }, []);
 
   /* ─── derive filter option lists from actual data ─── */
@@ -480,6 +499,14 @@ export default function DesignsGallery() {
                     下載
                   </a>
                 ) : null}
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: 11, marginLeft: "auto", color: "#f87171" }}
+                  disabled={deletingId === asset.id}
+                  onClick={() => void deleteAsset(asset)}
+                >
+                  {deletingId === asset.id ? "刪除中…" : "刪除"}
+                </button>
               </div>
             </div>
           );

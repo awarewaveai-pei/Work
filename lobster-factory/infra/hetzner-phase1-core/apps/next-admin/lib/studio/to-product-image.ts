@@ -15,7 +15,7 @@
  * PDF geometry = print sizing), we omit it entirely — version-robust + CMYK-safe.
  */
 import sharp from "sharp";
-import { toSharpModulate, type ColorGradeParams } from "./color-grade";
+import { applyColorGrade, type ColorGradeParams } from "./color-grade";
 
 export type WebPreset = "web-tarot" | "web-square";
 
@@ -61,8 +61,8 @@ export async function toProductImage(
     { fit: spec.fit, background: spec.background } // background = contain letterbox fill
   );
 
-  const mod = colorGrade && toSharpModulate(colorGrade);
-  if (mod) img = img.modulate(mod);
+  // Composable color blocks (modulate → levels → gamma → sharpen); each neutral-skipped.
+  if (colorGrade) img = applyColorGrade(img, colorGrade);
 
   // Flatten any SOURCE alpha onto the opaque background. resize's `background`
   // only fills letterbox padding, NOT pre-existing transparency — without this,

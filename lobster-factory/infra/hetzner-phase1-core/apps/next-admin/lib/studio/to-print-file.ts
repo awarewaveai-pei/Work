@@ -19,7 +19,7 @@
  */
 import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
-import { toSharpModulate, type ColorGradeParams } from "./color-grade";
+import { applyColorGrade, type ColorGradeParams } from "./color-grade";
 import { applyOutputIntent, type IccProfileName } from "./ghostscript-pdfx";
 
 export type ColorSpaceTarget = "cmyk" | "srgb";
@@ -154,8 +154,8 @@ export async function toPrintFile(
     g.bleedPx[1],
     { fit: "cover" }
   );
-  const mod = colorGrade && toSharpModulate(colorGrade);
-  if (mod) img = img.modulate(mod);
+  // Composable color blocks (modulate → levels → gamma → sharpen); each neutral-skipped.
+  if (colorGrade) img = applyColorGrade(img, colorGrade);
 
   // Flatten any SOURCE alpha onto white paper. The upstream producer bg-remover.ts
   // emits a TRANSPARENT RGBA PNG; without this the TGC sRGB/PNG branch keeps 4ch

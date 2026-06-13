@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { buildDesignKey, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
+import { buildDesignKey, deleteDesignObject, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -168,6 +168,73 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, asset: data });
+}
+
+/** DELETE — remove one design from R2 and media_assets. Requires canCreateAiImageJob. */
+export async function DELETE(request: Request) {
+  if (!featureEnabled()) {
+    return NextResponse.json({ ok: false, error: "pod_designs_disabled" }, { status: 503 });
+  }
+  const resolved = resolveOpsRole(request);
+  if (!canCreateAiImageJob(resolved.role)) {
+    return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
+  }
+
+  const url = new URL(request.url);
+  const assetId = url.searchParams.get("id");
+  if (!assetId || !isUuid(assetId)) {
+    return NextResponse.json({ ok: false, error: "id (UUID) query param required" }, { status: 400 });
+  }
+
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, error: "supabase_write_not_configured" }, { status: 503 });
+  }
+
+  // Fetch the asset to get object_key before deleting.
+  const { data: asset, error: fetchErr } = await supabase
+    .from("media_assets")
+    .select("id,object_key,organization_id,metadata")
+    .eq("id", assetId)
+    .eq("storage_backend", "r2")
+    .eq("asset_domain", "ai_generated")
+    .single();
+
+  if (fetchErr || !asset) {
+    return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  }
+
+  // Delete from R2 first (idempotent — 404 treated as success).
+  const r2Result = await deleteDesignObject(asset.object_key);
+  if (!r2Result.ok) {
+    console.error("[designs] R2 delete failed:", (r2Result as { ok: false; error: string }).error);
+    return NextResponse.json({ ok: false, error: (r2Result as { ok: false; error: string }).error }, { status: 502 });
+  }
+
+  // Remove row from media_assets.
+  const { error: deleteErr } = await supabase
+    .from("media_assets")
+    .delete()
+    .eq("id", assetId);
+
+  if (deleteErr) {
+    console.error("[designs] media_assets delete failed:", deleteErr.message);
+    return NextResponse.json({ ok: false, error: "delete_failed" }, { status: 500 });
+  }
+
+  // Audit trail.
+  const traceId = randomUUID();
+  await supabase.from("ops_audit_events").insert({
+    organization_id: asset.organization_id,
+    actor_role: resolved.role,
+    event_type: "design_asset_deleted",
+    target_type: "media_assets",
+    target_id: assetId,
+    trace_id: traceId,
+    payload: { object_key: asset.object_key, role_source: resolved.source },
+  });
+
+  return NextResponse.json({ ok: true });
 }
 
 /** GET — list saved designs (newest first). Any ops role may read. */
