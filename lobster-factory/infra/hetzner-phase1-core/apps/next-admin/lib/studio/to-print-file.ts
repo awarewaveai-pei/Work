@@ -157,6 +157,13 @@ export async function toPrintFile(
   const mod = colorGrade && toSharpModulate(colorGrade);
   if (mod) img = img.modulate(mod);
 
+  // Flatten any SOURCE alpha onto white paper. The upstream producer bg-remover.ts
+  // emits a TRANSPARENT RGBA PNG; without this the TGC sRGB/PNG branch keeps 4ch
+  // transparent holes, and the CMYK/JPEG branch drops alpha implicitly (sharp-version
+  // dependent). White = the print substrate. Mirrors to-product-image.ts:70 (critic
+  // Major, 2026-06-13). fit:'cover' adds no letterbox, so only source alpha matters.
+  img = img.flatten({ background: { r: 255, g: 255, b: 255 } });
+
   // ── colorSpace block ── (NO density — see file header)
   let imgBuf: Buffer;
   if (dest.colorSpace === "cmyk") {
@@ -178,7 +185,7 @@ export async function toPrintFile(
   page.setMediaBox(0, 0, g.bleedPt[0], g.bleedPt[1]);
   page.setBleedBox(0, 0, g.bleedPt[0], g.bleedPt[1]);
   page.setTrimBox(g.bleedOffsetPt, g.bleedOffsetPt, g.trimPt[0], g.trimPt[1]);
-  let pdfBuf = Buffer.from(await pdf.save());
+  let pdfBuf: Buffer = Buffer.from(await pdf.save());
 
   // ── needsOutputIntent block ── (Ghostscript ICC pass; deploy-gated stub for now)
   if (dest.needsOutputIntent && dest.iccProfile) {
