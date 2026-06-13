@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import type { WpSite } from "@/app/api/content/sites/route";
+import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
+import type { PLATFORM_IMAGE_SPECS } from "@/app/api/content/image/route";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -59,12 +62,30 @@ const AI_MODELS = [
 ];
 
 const SYN_PLATFORMS = [
-  { key: "twitter",   label: "Twitter / X",  hasThread: true },
-  { key: "linkedin",  label: "LinkedIn",      hasThread: false },
+  { key: "twitter",   label: "Twitter / X",  hasThread: true  },
+  { key: "instagram", label: "Instagram",     hasThread: false },
+  { key: "threads",   label: "Threads",       hasThread: false },
   { key: "facebook",  label: "Facebook",      hasThread: false },
-  { key: "whatsapp",  label: "WhatsApp",      hasThread: false },
+  { key: "linkedin",  label: "LinkedIn",      hasThread: false },
+  { key: "tiktok",    label: "TikTok",        hasThread: false },
   { key: "pinterest", label: "Pinterest",     hasThread: false },
+  { key: "whatsapp",  label: "WhatsApp",      hasThread: false },
+  { key: "reddit",    label: "Reddit",        hasThread: false },
   { key: "email",     label: "Email 電子報",  hasThread: false },
+];
+
+// Platform image specs (dimensions for social media)
+const PLATFORM_IMG_PRESETS: Array<{ platform: string; label: string; w: number; h: number; note: string }> = [
+  { platform: "instagram_square",   label: "IG 方形",      w: 1080, h: 1080, note: "1:1 貼文" },
+  { platform: "instagram_portrait", label: "IG 直式",      w: 1080, h: 1350, note: "4:5 貼文" },
+  { platform: "instagram_story",    label: "IG 限時",      w: 1080, h: 1920, note: "9:16 Story/Reels" },
+  { platform: "facebook_link",      label: "FB 連結",      w: 1200, h: 630,  note: "1.91:1" },
+  { platform: "twitter_post",       label: "X 貼文",       w: 1200, h: 675,  note: "16:9" },
+  { platform: "threads_square",     label: "Threads",      w: 1080, h: 1080, note: "1:1" },
+  { platform: "linkedin_post",      label: "LinkedIn",     w: 1200, h: 627,  note: "1.91:1" },
+  { platform: "pinterest_pin",      label: "Pinterest",    w: 1000, h: 1500, note: "2:3 Pin" },
+  { platform: "reddit_post",        label: "Reddit",       w: 1200, h: 628,  note: "1.91:1" },
+  { platform: "tiktok_thumbnail",   label: "TikTok 封面",  w: 1080, h: 1920, note: "9:16" },
 ];
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -189,6 +210,28 @@ export default function ContentStudio() {
 
   const [activeTab, setActiveTab] = useState<Tab>("generate");
 
+  // Multi-site
+  const [wpSites,       setWpSites]       = useState<WpSite[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+
+  // Brand Voice
+  const [showBrandVoice,    setShowBrandVoice]    = useState(false);
+  const [bvSampleText,      setBvSampleText]      = useState("");
+  const [bvSampleUrl,       setBvSampleUrl]       = useState("");
+  const [bvProfileName,     setBvProfileName]     = useState("我的品牌");
+  const [bvLoading,         setBvLoading]         = useState(false);
+  const [bvProfile,         setBvProfile]         = useState<BrandVoiceProfile | null>(null);
+  const [bvError,           setBvError]           = useState("");
+  const [bvApplied,         setBvApplied]         = useState(false);
+
+  // Image generation
+  const [showImgGen,      setShowImgGen]      = useState(false);
+  const [imgPrompt,       setImgPrompt]       = useState("");
+  const [imgPlatform,     setImgPlatform]     = useState("instagram_square");
+  const [imgLoading,      setImgLoading]      = useState(false);
+  const [imgResult,       setImgResult]       = useState<{ imageUrl: string; spec: { label: string; width: number; height: number } } | null>(null);
+  const [imgError,        setImgError]        = useState("");
+
   // Generate
   const [form, setForm]           = useState<GenerateForm>(DEFAULT_FORM);
   const [generated, setGenerated] = useState("");
@@ -258,6 +301,19 @@ export default function ContentStudio() {
   const humAbortRef  = useRef<AbortController | null>(null);
   const bulkAbortRef = useRef<AbortController | null>(null);
 
+  // ─── Load WP sites ────────────────────────────────────────────────────────
+  useEffect(() => {
+    fetch("/api/content/sites")
+      .then(r => r.json())
+      .then((data: { ok: boolean; sites?: WpSite[] }) => {
+        if (data.ok && data.sites?.length) {
+          setWpSites(data.sites);
+          setSelectedSiteId(data.sites[0].id);
+        }
+      })
+      .catch(() => {/* silent — single-site env works without this */});
+  }, []);
+
   // ─── Form helpers ──────────────────────────────────────────────────────────
 
   const setF = useCallback(
@@ -316,6 +372,48 @@ export default function ContentStudio() {
     } catch { /* silent */ } finally { setOutlineLoading(false); }
   }
 
+  // ─── Brand Voice ─────────────────────────────────────────────────────────
+
+  async function handleAnalyzeBrandVoice() {
+    if (!bvSampleText.trim() && !bvSampleUrl.trim()) return;
+    setBvLoading(true); setBvError(""); setBvProfile(null); setBvApplied(false);
+    try {
+      const res  = await fetch("/api/content/brand-voice", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: bvSampleText, url: bvSampleUrl, name: bvProfileName }),
+      });
+      const json = await res.json() as { ok: boolean; profile?: BrandVoiceProfile; error?: string };
+      if (!json.ok || !json.profile) { setBvError(json.error ?? "分析失敗"); }
+      else { setBvProfile(json.profile); }
+    } catch { setBvError("網路錯誤，請重試"); }
+    finally { setBvLoading(false); }
+  }
+
+  function handleApplyBrandVoice() {
+    if (!bvProfile) return;
+    const existing = form.details.trim();
+    const voiceBlock = `=== 品牌聲音（${bvProfile.name}）===\n${bvProfile.promptInjection}\n偏好用詞：${bvProfile.preferWords.join("、")}\n避免用詞：${bvProfile.avoidWords.join("、")}`;
+    setF("details", existing ? `${existing}\n\n${voiceBlock}` : voiceBlock);
+    setBvApplied(true);
+  }
+
+  // ─── Image Generation ─────────────────────────────────────────────────────
+
+  async function handleGenerateImage() {
+    if (!imgPrompt.trim()) return;
+    setImgLoading(true); setImgError(""); setImgResult(null);
+    try {
+      const res  = await fetch("/api/content/image", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: imgPrompt, platform: imgPlatform }),
+      });
+      const json = await res.json() as { ok: boolean; imageUrl?: string; spec?: { label: string; width: number; height: number }; error?: string };
+      if (!json.ok || !json.imageUrl) { setImgError(json.error ?? "圖片生成失敗"); }
+      else { setImgResult({ imageUrl: json.imageUrl, spec: json.spec! }); }
+    } catch { setImgError("網路錯誤，請重試"); }
+    finally { setImgLoading(false); }
+  }
+
   // ─── Generate article ────────────────────────────────────────────────────
 
   async function handleGenerate() {
@@ -370,7 +468,7 @@ export default function ContentStudio() {
     try {
       const res  = await fetch("/api/content/publish", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown: generated, slug: slugify(form.keyword), seoTitle: metaData?.seoTitle, metaDescription: metaData?.metaDesc, scheduleDate: form.scheduleDate || undefined }),
+        body: JSON.stringify({ markdown: generated, slug: slugify(form.keyword), seoTitle: metaData?.seoTitle, metaDescription: metaData?.metaDesc, scheduleDate: form.scheduleDate || undefined, siteId: selectedSiteId || undefined }),
       });
       const json = await res.json() as { ok: boolean; error?: string; edit_url?: string; view_url?: string };
       if (!json.ok) { setPubStatus("error"); setPubError(json.error ?? "未知錯誤"); }
@@ -519,6 +617,30 @@ export default function ContentStudio() {
 
   return (
     <div style={{ padding: "24px", maxWidth: "1400px" }}>
+
+      {/* ── Header: title + site selector + calendar link ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+        <h1 style={{ fontSize: "20px", fontWeight: 700, margin: 0 }}>內容工作室</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {wpSites.length > 1 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>發布到：</span>
+              <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
+                className="form-select" style={{ fontSize: "12px", padding: "4px 8px" }}>
+                {wpSites.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <a href="/tools/content/calendar"
+            style={{ fontSize: "12px", padding: "5px 12px", border: "1px solid var(--card-border)",
+              borderRadius: "6px", color: "var(--text-muted)", textDecoration: "none",
+              background: "var(--bg-card)", display: "flex", alignItems: "center", gap: "5px" }}>
+            📅 內容行事曆
+          </a>
+        </div>
+      </div>
 
       {/* ── Tab bar ── */}
       <div style={{ display: "flex", borderBottom: "1px solid var(--card-border)", marginBottom: "24px" }}>

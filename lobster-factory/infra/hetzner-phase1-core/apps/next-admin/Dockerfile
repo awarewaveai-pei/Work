@@ -31,6 +31,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+# Ghostscript for the POD print track ([0-a-gs]): turns pdf-lib's CMYK PDF into PDF/X-1a
+# with an embedded ICC /OutputIntent (lib/studio/ghostscript-pdfx.ts). Bundles a SWOP
+# CMYK profile at /usr/share/ghostscript/iccprofiles/default_cmyk.icc (the default
+# DestOutputProfile). Enable the pass at runtime with POD_OUTPUT_INTENT_DEPLOYED=true.
+RUN apk add --no-cache ghostscript
+
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 --ingroup nodejs nextjs
 

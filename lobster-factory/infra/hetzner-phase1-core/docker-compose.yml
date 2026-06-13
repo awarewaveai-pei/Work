@@ -365,6 +365,15 @@ services:
       # Printful (POD fulfillment, Woo-platform store — sync API only)
       PRINTFUL_API_KEY: ${PRINTFUL_API_KEY:-}
       PRINTFUL_STORE_ID: ${PRINTFUL_STORE_ID:-}
+      # POD print track ([0-a-gs]): enable the Ghostscript PDF/X-1a OutputIntent pass.
+      # Default OFF — CMYK print destinations return a clear "not deployed" error until
+      # gs is in the image (it now is, via Dockerfile) AND this flag is set true.
+      POD_OUTPUT_INTENT_DEPLOYED: ${POD_OUTPUT_INTENT_DEPLOYED:-false}
+      # Optional per-profile ICC override paths (drop a licensed/CC .icc into the image,
+      # point here — no code change). Empty → bundled SWOP default_cmyk.icc.
+      POD_ICC_JapanColor2001Coated: ${POD_ICC_JapanColor2001Coated:-}
+      POD_ICC_USWebCoatedSWOP: ${POD_ICC_USWebCoatedSWOP:-}
+      POD_ICC_CoatedFOGRA39: ${POD_ICC_CoatedFOGRA39:-}
     ports:
       - "${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000"
     depends_on:

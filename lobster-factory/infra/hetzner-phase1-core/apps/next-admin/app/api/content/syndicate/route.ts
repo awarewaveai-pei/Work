@@ -8,10 +8,14 @@ export const dynamic = "force-dynamic";
 const PLATFORM_SPECS: Record<string, string> = {
   twitter_single:  "Twitter/X (single tweet): max 280 chars total including hashtags. Punchy, hook-first. 2-3 relevant hashtags at end.",
   twitter_thread:  "Twitter/X Thread: 5-7 tweets. Tweet 1 = hook + main insight. Tweets 2-6 = one key point each (max 250 chars per tweet, numbered '2/7', '3/7' etc). Last tweet = CTA with article link placeholder [LINK]. Format: each tweet on its own line, start with tweet number.",
+  instagram:       "Instagram caption: 125-150 words visible (first 3 lines are most important — hook immediately). Storytelling style. End with clear CTA. 20-30 hashtags in first comment (list them after a line break, starting with #). Include [LINK] placeholder where appropriate.",
+  threads:         "Threads post: Conversational, authentic, community-first. 100-200 words. No hashtag spam (max 3 if any). Warm and direct voice. End with a thought-provoking question to drive replies.",
   linkedin:        "LinkedIn: Professional post 150-300 words. Open with a strong hook (bold first line), share 3 key insights as bullet points, end with a question or CTA. 3-5 relevant hashtags at end.",
   facebook:        "Facebook: Conversational post 80-180 words. Warm, engaging tone. Start with a relatable question or surprising fact. No hashtags needed.",
   whatsapp:        "WhatsApp broadcast message: Short, friendly, personal tone. 50-100 words. No hashtags. Include article link placeholder [LINK] at end. Use simple formatting (no markdown).",
   pinterest:       "Pinterest pin description: 100-200 words. Visual, inspirational tone. Include 5-8 relevant keywords woven in naturally. End with clear CTA ('Save this for later!' or 'Click to read more!'). Include relevant hashtags.",
+  reddit:          "Reddit post: Authentic, value-first tone — redditors hate promotional language. Title: curiosity-driven question or surprising insight (max 300 chars). Body: detailed, humble, share personal experience or data. No hashtags. No promotional links unless it genuinely adds value. Format: Title on first line, then 'BODY:' then the post body.",
+  tiktok:          "TikTok video caption: Ultra-short, high-energy. Max 100 words. Hook in first sentence ('POV:', 'Tell me why', 'This changed how I...'). 3-5 trending hashtags. End with a challenge or duet prompt if applicable.",
   email:           "Email newsletter snippet: Subject line + preview text + body (150-250 words). Format as:\nSUBJECT: [subject here]\nPREVIEW: [preview text under 100 chars]\nBODY:\n[newsletter body]\n\nBe personal, conversational, and end with a clear CTA button text in [brackets].",
 };
 

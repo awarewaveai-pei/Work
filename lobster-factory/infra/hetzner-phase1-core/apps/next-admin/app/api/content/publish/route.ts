@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { getWpSites } from "@/app/api/content/sites/route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -136,12 +137,6 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("forbidden", { status: 403 });
   }
 
-  const wpApiUrl = process.env.WP_API_URL;
-  const jwtToken = process.env.WORDPRESS_JWT_TOKEN;
-  if (!wpApiUrl || !jwtToken) {
-    return new NextResponse("WP_API_URL or WORDPRESS_JWT_TOKEN not configured", { status: 503 });
-  }
-
   let body: {
     markdown?: unknown;
     slug?: unknown;
@@ -149,11 +144,32 @@ export async function POST(req: Request): Promise<Response> {
     metaDescription?: unknown;
     categories?: unknown;
     scheduleDate?: unknown;
+    siteId?: unknown;
   };
   try {
     body = await req.json();
   } catch {
     return new NextResponse("invalid json", { status: 400 });
+  }
+
+  // Resolve target site: use siteId if provided, otherwise fall back to env vars
+  const siteId = typeof body.siteId === "string" ? body.siteId.trim() : "";
+  let wpApiUrl: string | undefined;
+  let jwtToken: string | undefined;
+
+  if (siteId) {
+    const { sites, tokens } = getWpSites();
+    const site = sites.find(s => s.id === siteId);
+    if (!site) return new NextResponse(`Site '${siteId}' not found`, { status: 400 });
+    wpApiUrl = site.url;
+    jwtToken = tokens[siteId];
+  } else {
+    wpApiUrl = process.env.WP_API_URL;
+    jwtToken = process.env.WORDPRESS_JWT_TOKEN;
+  }
+
+  if (!wpApiUrl || !jwtToken) {
+    return new NextResponse("WP_API_URL or WORDPRESS_JWT_TOKEN not configured", { status: 503 });
   }
 
   const markdown = (typeof body.markdown === "string" ? body.markdown : "").trim();
