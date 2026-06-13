@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 // POST /api/content/sites/[id]/test — server-side WP connection test
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const { id } = await params;
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
@@ -19,7 +20,7 @@ export async function POST(
   const { data, error } = await supabase
     .from("wp_sites")
     .select("url, token")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error || !data)

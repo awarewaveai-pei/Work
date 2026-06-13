@@ -5,7 +5,7 @@ import {
   STUDIO_MODEL_OPTIONS,
   type AspectRatio,
   type StudioModel,
-} from "../../../lib/studio/image-provider";
+} from "../../../lib/studio/model-options";
 import {
   GARMENTS,
   FLAT_STYLES,

@@ -39,6 +39,24 @@ interface SaveDesignBody {
   theme?: string;
   /** Brand / client tag (e.g. "AwareWave", "soulful"). */
   brand?: string;
+  /** Style chips the user picked (zh labels — painter / medium / style). Lets the gallery
+   *  show what was selected and rebuild a meaningful filename. Empty for img2img / no style. */
+  styleTags?: string[];
+  /** Main subject of the image (tarot subject override, or studio subject) — for filename. */
+  subject?: string;
+}
+
+/** Keep only clean string tags, trim, drop blanks, cap count + length (defensive against junk). */
+function sanitizeStyleTags(tags: unknown): string[] {
+  if (!Array.isArray(tags)) return [];
+  const out: string[] = [];
+  for (const t of tags) {
+    if (typeof t !== "string") continue;
+    const v = t.trim();
+    if (v) out.push(v.slice(0, 120));
+    if (out.length >= 24) break;
+  }
+  return out;
 }
 
 /** POST — persist one generated design: data URL → R2 → media_assets (+ audit event). */
@@ -134,6 +152,8 @@ export async function POST(request: Request) {
         product_type: body.productType && body.productType !== "none" ? body.productType : null,
         theme: body.theme ?? null,
         brand: body.brand ?? null,
+        style_tags: sanitizeStyleTags(body.styleTags),
+        subject: body.subject?.trim() || null,
         actor_role: resolved.role,
         role_source: resolved.source,
         trace_id: traceId,

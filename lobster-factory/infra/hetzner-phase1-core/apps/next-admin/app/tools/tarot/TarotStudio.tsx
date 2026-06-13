@@ -464,6 +464,9 @@ export default function TarotStudio() {
   }
 
   // Fire-and-forget save to R2 gallery — never blocks generation or UI.
+  // styleTags (the picked zh chips) + subject ride along so the gallery can show what was
+  // selected and build a meaningful filename. Read from current state — for compare's async
+  // loop the chips rarely change mid-run, same posture as lockedModel below.
   function saveToGallery(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string }) {
     void fetch("/api/tools/designs", {
       method: "POST",
@@ -474,6 +477,8 @@ export default function TarotStudio() {
         prompt: extra?.prompt ?? null,
         modelName: extra?.model ?? lockedModel,
         cardName: extra?.cardName ?? null,
+        styleTags: styleTokens,
+        subject: subjectText.trim() || undefined,
       }),
     }).catch(() => {/* gallery save never blocks generation */});
   }

@@ -9,8 +9,9 @@ export const dynamic = "force-dynamic";
 // PATCH /api/content/sites/[id] — update site (token optional)
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const { id } = await params;
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
@@ -32,7 +33,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from("wp_sites")
     .update(patch)
-    .eq("id", params.id)
+    .eq("id", id)
     .select("id, name, url, color, active, note, created_at, token")
     .single();
 
@@ -59,8 +60,9 @@ export async function PATCH(
 // DELETE /api/content/sites/[id]
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const { id } = await params;
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
@@ -70,7 +72,7 @@ export async function DELETE(
   const { error } = await supabase
     .from("wp_sites")
     .delete()
-    .eq("id", params.id);
+    .eq("id", id);
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

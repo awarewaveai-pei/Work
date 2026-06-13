@@ -5,7 +5,7 @@ import {
   STUDIO_MODEL_OPTIONS,
   type AspectRatio,
   type StudioModel,
-} from "../../../lib/studio/image-provider";
+} from "../../../lib/studio/model-options";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 
@@ -211,6 +211,8 @@ export default function StudioWorkbench() {
           source: "pod-studio",
           productType: productType !== "none" ? productType : undefined,
           theme: theme.trim() || undefined,
+          styleTags: style !== "None" ? [style] : [],
+          subject: subject.trim() || undefined,
         }),
       });
       const json = (await res.json()) as { ok: boolean; error?: string };
@@ -218,7 +220,7 @@ export default function StudioWorkbench() {
     } catch {
       setSaveState("error");
     }
-  }, [gen, effectivePrompt, model, productType, theme]);
+  }, [gen, effectivePrompt, model, productType, theme, style, subject]);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, padding: 16 }}>
