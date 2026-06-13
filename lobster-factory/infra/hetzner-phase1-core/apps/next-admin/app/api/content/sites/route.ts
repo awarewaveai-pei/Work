@@ -13,6 +13,7 @@ export interface ManagedSite {
   color: string;
   active: boolean;
   tokenSet: boolean;
+  usernameSet: boolean;
   note: string | null;
   source: "db" | "env";
   createdAt?: string;
@@ -27,13 +28,13 @@ export async function GET(req: Request): Promise<Response> {
   if (supabase) {
     const { data, error } = await supabase
       .from("wp_sites")
-      .select("id, name, url, color, active, note, created_at, token")
+      .select("id, name, url, color, active, note, created_at, token, username")
       .order("created_at");
 
     if (!error && data) {
       const sites: ManagedSite[] = (data as Array<{
         id: string; name: string; url: string; color: string;
-        active: boolean; note: string | null; created_at: string; token: string;
+        active: boolean; note: string | null; created_at: string; token: string; username: string;
       }>).map(r => ({
         id: r.id,
         name: r.name,
@@ -41,6 +42,7 @@ export async function GET(req: Request): Promise<Response> {
         color: r.color,
         active: r.active,
         tokenSet: Boolean(r.token),
+        usernameSet: Boolean(r.username),
         note: r.note,
         source: "db" as const,
         createdAt: r.created_at,
@@ -55,6 +57,7 @@ export async function GET(req: Request): Promise<Response> {
     ...s,
     active: true,
     tokenSet: true,
+    usernameSet: Boolean(s.username),
     note: null,
     source: "env" as const,
   }));
@@ -72,21 +75,23 @@ export async function POST(req: Request): Promise<Response> {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
 
-  const name  = typeof body.name  === "string" ? body.name.trim()  : "";
-  const url   = typeof body.url   === "string" ? body.url.trim().replace(/\/$/, "") : "";
-  const token = typeof body.token === "string" ? body.token.trim() : "";
-  const color = typeof body.color === "string" ? body.color.trim() : "#5855d0";
-  const note  = typeof body.note  === "string" ? body.note.trim() || null : null;
+  const name     = typeof body.name     === "string" ? body.name.trim()  : "";
+  const url      = typeof body.url      === "string" ? body.url.trim().replace(/\/$/, "") : "";
+  const username = typeof body.username === "string" ? body.username.trim() : "";
+  const token    = typeof body.token    === "string" ? body.token.trim() : "";
+  const color    = typeof body.color    === "string" ? body.color.trim() : "#5855d0";
+  const note     = typeof body.note     === "string" ? body.note.trim() || null : null;
 
-  if (!name)  return NextResponse.json({ ok: false, error: "name required" }, { status: 400 });
-  if (!url)   return NextResponse.json({ ok: false, error: "url required" }, { status: 400 });
-  if (!token) return NextResponse.json({ ok: false, error: "token required" }, { status: 400 });
+  if (!name)     return NextResponse.json({ ok: false, error: "name required" }, { status: 400 });
+  if (!url)      return NextResponse.json({ ok: false, error: "url required" }, { status: 400 });
+  if (!username) return NextResponse.json({ ok: false, error: "username required" }, { status: 400 });
+  if (!token)    return NextResponse.json({ ok: false, error: "Application Password required" }, { status: 400 });
   if (!/^https?:\/\//i.test(url))
     return NextResponse.json({ ok: false, error: "url 必須以 http:// 或 https:// 開頭" }, { status: 400 });
 
   const { data, error } = await supabase
     .from("wp_sites")
-    .insert({ name, url, token, color, note, active: true })
+    .insert({ name, url, username, token, color, note, active: true })
     .select("id, name, url, color, active, note, created_at")
     .single();
 
@@ -103,6 +108,7 @@ export async function POST(req: Request): Promise<Response> {
     color: row.color,
     active: row.active,
     tokenSet: true,
+    usernameSet: true,
     note: row.note,
     source: "db",
     createdAt: row.created_at,

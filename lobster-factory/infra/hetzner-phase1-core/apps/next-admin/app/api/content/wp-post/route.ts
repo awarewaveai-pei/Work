@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { getWpSites } from "@/lib/content/wp-sites";
+import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Resolve site token server-side from siteId
-async function getSiteToken(siteId: string): Promise<{ url: string; token: string } | null> {
-  const { sites, tokens } = await getWpSites();
+// Resolve site auth server-side from siteId
+async function getSiteAuth(siteId: string): Promise<{ url: string; authHeader: string } | null> {
+  const { sites, tokens, usernames } = await getWpSites();
   const site = sites.find(s => s.id === siteId);
   if (!site) return null;
   const token = tokens[siteId];
   if (!token) return null;
-  return { url: site.url, token };
+  return { url: site.url, authHeader: wpAuthHeader(usernames[siteId] ?? "", token) };
 }
 
 // PATCH /api/content/wp-post — update WP post (date, status, title)
@@ -29,7 +29,7 @@ export async function PATCH(req: Request): Promise<Response> {
   if (!siteId) return NextResponse.json({ ok: false, error: "siteId required" }, { status: 400 });
   if (isNaN(postId)) return NextResponse.json({ ok: false, error: "postId must be a positive integer" }, { status: 400 });
 
-  const site = await getSiteToken(siteId);
+  const site = await getSiteAuth(siteId);
   if (!site) return NextResponse.json({ ok: false, error: "Site not found or token missing" }, { status: 404 });
 
   // Build WP patch payload — only include explicitly provided fields
@@ -49,7 +49,7 @@ export async function PATCH(req: Request): Promise<Response> {
       method: "POST", // WP REST API uses POST for updates (with _method or just POST)
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${site.token}`,
+        Authorization: site.authHeader,
         "X-HTTP-Method-Override": "PUT",
       },
       body: JSON.stringify(wpPatch),
@@ -91,14 +91,14 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!siteId || isNaN(postId))
     return NextResponse.json({ ok: false, error: "siteId and postId (positive integer) required" }, { status: 400 });
 
-  const site = await getSiteToken(siteId);
+  const site = await getSiteAuth(siteId);
   if (!site) return NextResponse.json({ ok: false, error: "Site not found" }, { status: 404 });
 
   let res: Response;
   try {
     res = await fetch(`${site.url}/wp-json/wp/v2/posts/${postId}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${site.token}` },
+      headers: { Authorization: site.authHeader },
       signal: AbortSignal.timeout(10000),
     });
   } catch {

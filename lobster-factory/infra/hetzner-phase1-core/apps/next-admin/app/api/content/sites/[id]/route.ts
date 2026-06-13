@@ -26,15 +26,16 @@ export async function PATCH(
   if (typeof body.url    === "string")  patch.url    = body.url.trim().replace(/\/$/, "");
   if (typeof body.color  === "string")  patch.color  = body.color.trim();
   if (typeof body.active === "boolean") patch.active = body.active;
-  if (typeof body.note   === "string")  patch.note   = body.note.trim() || null;
-  // Token only updated when explicitly provided and non-empty
-  if (typeof body.token  === "string" && body.token.trim()) patch.token = body.token.trim();
+  if (typeof body.note     === "string")  patch.note     = body.note.trim() || null;
+  if (typeof body.username === "string" && body.username.trim()) patch.username = body.username.trim();
+  // Token/AppPassword only updated when explicitly provided and non-empty
+  if (typeof body.token    === "string" && body.token.trim()) patch.token = body.token.trim();
 
   const { data, error } = await supabase
     .from("wp_sites")
     .update(patch)
     .eq("id", id)
-    .select("id, name, url, color, active, note, created_at, token")
+    .select("id, name, url, color, active, note, created_at, token, username")
     .single();
 
   if (error) {
@@ -42,7 +43,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: error.message }, { status });
   }
 
-  const row = data as { id: string; name: string; url: string; color: string; active: boolean; note: string | null; created_at: string; token: string };
+  const row = data as { id: string; name: string; url: string; color: string; active: boolean; note: string | null; created_at: string; token: string; username: string };
   const site: ManagedSite = {
     id: row.id,
     name: row.name,
@@ -50,6 +51,7 @@ export async function PATCH(
     color: row.color,
     active: row.active,
     tokenSet: Boolean(row.token),
+    usernameSet: Boolean(row.username),
     note: row.note,
     source: "db",
     createdAt: row.created_at,

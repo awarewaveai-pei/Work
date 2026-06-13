@@ -4,6 +4,35 @@
 
 ## 2026-06-14
 
+### feat(wp-sites): WP 認證從 JWT 改為 Application Password + Cloudflare rate limit 修復
+
+**[任務理解]** soulfulexpression.org 無 JWT Auth 外掛（/wp-json/jwt-auth/v1/token → 404）。改用 WP 內建 Application Password（WP 5.6+，Basic auth）。同時修 Cloudflare rate limit 誤擋 Next.js RSC prefetch burst（app.aware-wave.com 被 50 req/10s 規則打到）。
+
+**[已修改]**
+- `lobster-factory/packages/db/migrations/0040_wp_sites_add_username.sql` — ADD COLUMN username text NOT NULL DEFAULT ''；已套用到 EU Supabase
+- `lib/content/wp-sites.ts` — WpSite 加 username；getWpSites() 回傳 usernames record；export wpAuthHeader(username, token)（有 username → Basic base64；空 → Bearer 舊 JWT 回退）
+- `app/api/content/sites/route.ts` — ManagedSite 加 usernameSet；POST 要求 username；GET 回 usernameSet boolean
+- `app/api/content/sites/[id]/route.ts` — PATCH 支援 username 更新
+- `app/api/content/sites/[id]/test/route.ts` — 改 Basic auth；錯誤訊息更新
+- `app/api/content/calendar/route.ts` — fetchSitePosts 加 username param，改 wpAuthHeader
+- `app/api/content/publish/route.ts` — 改走 getWpSites() env fallback（支援 WP_SITE_i_*）；env 無 siteId 改用 sites[0]（critic Major fix）
+- `app/api/content/wp-post/route.ts` — getSiteToken → getSiteAuth，回傳 authHeader
+- `app/tools/content/sites/SiteManager.tsx` — 加 username 欄位；JWT Token → Application Password；usernameSet 顯示
+- `app/tools/content/ContentStudio.tsx` — bulk-publish 補 siteId（critic Major fix）
+- Cloudflare rate limit rule `b8ffa72d` expression 加 `and http.host ne "app.aware-wave.com"` 排除 ops console
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node -e "wpAuthHeader test"` | exit=0 | ms=<100 (3 cases: Basic spaces-stripped / Bearer fallback / no-space pass — ALL PASS)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=<60000
+- REVIEW_DONE: critic=Deep | verdict=warn→pass-after-fix | findings=2m fixed (bulk-publish siteId missing; publish env-fallback ignores WP_SITE_i_*), 2n fixed (Supabase error log; 403 msg), 1n deferred (username can't clear — doc-only issue)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=getSiteToken,jwtToken,Bearer.*site | hits=0 (getSiteToken renamed getSiteAuth; all Bearer WP calls migrated; prior WORKLOG confirms getSiteToken was file-local)
+
+**[剩餘風險]** 現有 DB 中的 wp_sites row（Soulful Expression）username 欄位是空字串，需用戶重新新增含 username 的版本（現有舊 row 沒 username，test 仍會 401）
+
+**[rollback]** `git revert HEAD`；EU DB 回滾：`ALTER TABLE wp_sites DROP COLUMN username;`
+
+---
+
 ### feat(seo): 全面強化文章生成 SYSTEM_PROMPT + WP 架站 SEO 清單
 
 **[任務理解]** 使用者提供完整 Google SEO 官方文件 6 份，要求徹底研究並運用在：① 文章生成 SYSTEM_PROMPT ② WordPress 網站架設 SEO 規範。

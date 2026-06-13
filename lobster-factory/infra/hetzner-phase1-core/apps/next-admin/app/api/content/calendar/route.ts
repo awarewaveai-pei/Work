@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { getWpSites } from "@/lib/content/wp-sites";
+import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +24,7 @@ async function fetchSitePosts(
   siteColor: string,
   siteUrl: string,
   token: string,
+  username: string,
   statuses: string[],
   after?: string,
 ): Promise<CalendarPost[]> {
@@ -38,7 +39,7 @@ async function fetchSitePosts(
 
   try {
     const res = await fetch(`${siteUrl}/wp-json/wp/v2/posts?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: wpAuthHeader(username, token) },
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return [];
@@ -69,7 +70,7 @@ export async function GET(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
-  const { sites, tokens } = await getWpSites();
+  const { sites, tokens, usernames } = await getWpSites();
   if (sites.length === 0) {
     return NextResponse.json({ ok: false, error: "No WordPress sites configured" }, { status: 503 });
   }
@@ -85,6 +86,7 @@ export async function GET(req: Request): Promise<Response> {
       fetchSitePosts(
         site.id, site.name, site.color, site.url,
         tokens[site.id] ?? "",
+        usernames[site.id] ?? "",
         ["draft", "future", "publish"],
         after,
       )

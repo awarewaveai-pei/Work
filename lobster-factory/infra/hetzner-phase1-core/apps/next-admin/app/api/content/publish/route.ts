@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { getWpSites } from "@/lib/content/wp-sites";
+import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -156,20 +156,29 @@ export async function POST(req: Request): Promise<Response> {
   // Resolve target site: use siteId if provided, otherwise fall back to env vars
   const siteId = typeof body.siteId === "string" ? body.siteId.trim() : "";
   let wpApiUrl: string | undefined;
-  let jwtToken: string | undefined;
+  let wpToken: string | undefined;
+  let wpUsername = "";
 
+  const { sites, tokens, usernames } = await getWpSites();
   if (siteId) {
-    const { sites, tokens } = await getWpSites();
     const site = sites.find(s => s.id === siteId);
     if (!site) return new NextResponse(`Site '${siteId}' not found`, { status: 400 });
-    wpApiUrl = site.url;
-    jwtToken = tokens[siteId];
+    wpApiUrl   = site.url;
+    wpToken    = tokens[siteId];
+    wpUsername = usernames[siteId] ?? "";
+  } else if (sites.length > 0) {
+    // No explicit siteId — fall back to first available site (DB or env)
+    const site = sites[0];
+    wpApiUrl   = site.url;
+    wpToken    = tokens[site.id];
+    wpUsername = usernames[site.id] ?? "";
   } else {
+    // Last-resort legacy env vars (single-site deployments without WP_SITE_i_* scheme)
     wpApiUrl = process.env.WP_API_URL;
-    jwtToken = process.env.WORDPRESS_JWT_TOKEN;
+    wpToken  = process.env.WORDPRESS_JWT_TOKEN;
   }
 
-  if (!wpApiUrl || !jwtToken) {
+  if (!wpApiUrl || !wpToken) {
     return new NextResponse("WP_API_URL or WORDPRESS_JWT_TOKEN not configured", { status: 503 });
   }
 
@@ -221,7 +230,7 @@ export async function POST(req: Request): Promise<Response> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${jwtToken}`,
+        Authorization: wpAuthHeader(wpUsername, wpToken),
       },
       body: JSON.stringify(payload),
     });

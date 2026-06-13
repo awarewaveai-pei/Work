@@ -8,7 +8,7 @@ const PRESET_COLORS = [
   "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16",
 ];
 
-const EMPTY_FORM = { name: "", url: "", token: "", color: "#5855d0", note: "" };
+const EMPTY_FORM = { name: "", url: "", username: "", token: "", color: "#5855d0", note: "" };
 
 type TestResult = { ok: boolean; message: string } | null;
 
@@ -108,8 +108,8 @@ function SiteCard({
         {site.note && (
           <div style={{ color: "#666", fontSize: 12, marginTop: 2, paddingLeft: 18 }}>{site.note}</div>
         )}
-        <div style={{ paddingLeft: 18, marginTop: 4, fontSize: 12, color: site.tokenSet ? "#10b981" : "#ef4444" }}>
-          Token：{site.tokenSet ? "已設定 ✓" : "未設定 ✗"}
+        <div style={{ paddingLeft: 18, marginTop: 4, fontSize: 12, color: site.usernameSet ? "#10b981" : "#f59e0b" }}>
+          用戶：{site.usernameSet ? "已設定 ✓" : "未設定"} ／ 密碼：{site.tokenSet ? "已設定 ✓" : "未設定 ✗"}
         </div>
         {testResult && (
           <div
@@ -253,23 +253,36 @@ function SiteForm({
         </label>
       </div>
 
-      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ color: "#aaa", fontSize: 13 }}>
-          JWT Token *
-          {isEdit && <span style={{ color: "#666", marginLeft: 6 }}>（留空 = 不變更現有 Token）</span>}
-        </span>
-        <input
-          style={inputStyle}
-          type="password"
-          placeholder={isEdit ? "輸入新 Token 才更新，留空維持原本" : "eyJhbGciOi…"}
-          value={form.token}
-          onChange={e => set("token", e.target.value)}
-          autoComplete="new-password"
-        />
-        <span style={{ color: "#666", fontSize: 11 }}>
-          從 WP Admin → JWT Authentication → 取得 Token（需安裝 JWT Auth 外掛）
-        </span>
-      </label>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ color: "#aaa", fontSize: 13 }}>WP 用戶名稱 *</span>
+          <input
+            style={inputStyle}
+            placeholder="例：admin"
+            value={form.username}
+            onChange={e => set("username", e.target.value)}
+            autoComplete="username"
+          />
+          <span style={{ color: "#666", fontSize: 11 }}>WP 登入帳號</span>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ color: "#aaa", fontSize: 13 }}>
+            Application Password *
+            {isEdit && <span style={{ color: "#666", marginLeft: 6 }}>（留空 = 不變更）</span>}
+          </span>
+          <input
+            style={inputStyle}
+            type="password"
+            placeholder={isEdit ? "留空維持原本" : "xxxx xxxx xxxx xxxx xxxx xxxx"}
+            value={form.token}
+            onChange={e => set("token", e.target.value)}
+            autoComplete="new-password"
+          />
+          <span style={{ color: "#666", fontSize: 11 }}>
+            WP Admin → 用戶 → 個人資料 → Application Passwords
+          </span>
+        </label>
+      </div>
 
       <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <span style={{ color: "#aaa", fontSize: 13 }}>標籤顏色</span>
@@ -357,7 +370,8 @@ export default function SiteManager() {
     const patch: Record<string, string | boolean> = {
       name: form.name, url: form.url, color: form.color, note: form.note,
     };
-    if (form.token) patch.token = form.token;
+    if (form.username) patch.username = form.username;
+    if (form.token)    patch.token    = form.token;
     try {
       const res = await fetch(`/api/content/sites/${editingSite.id}`, {
         method: "PATCH",
@@ -468,6 +482,7 @@ export default function SiteManager() {
               id: site.id,
               name: site.name,
               url: site.url,
+              username: "",
               token: "",
               color: site.color,
               note: site.note ?? "",

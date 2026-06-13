@@ -698,7 +698,7 @@ export default function ContentStudio() {
     try {
       const res  = await fetch("/api/content/publish", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown: row.article, slug: slugify(row.keyword) }),
+        body: JSON.stringify({ markdown: row.article, slug: slugify(row.keyword), siteId: selectedSiteId || undefined }),
       });
       const json = await res.json() as { ok: boolean; edit_url?: string };
       if (json.ok) setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "done", pubUrl: json.edit_url ?? "" } : r));
