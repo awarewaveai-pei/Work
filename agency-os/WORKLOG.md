@@ -4,6 +4,37 @@
 
 ## 2026-06-13
 
+### feat(pod): 修圖積木(色階/亮度/飽和/色相/銳利度) + 三軌輸出 UI + Fabric canvas 還原 — Phase 1 [1-b/c/d/f/g/h/i/j/k]
+
+**[任務理解]** 使用者問兩功能做了沒：① 修圖（色階/亮度/飽和/色相/銳利度/去背）要像積木可任意加到工具 ② 客製商品上傳圖+寫文字+即時預覽（fabric.js）。實況：後端 seam 已交付但「對使用者不可達」（無 UI），且 fabric canvas 被另一 session 誤刪。
+
+**[已修改]**
+- `lib/studio/color-grade.ts` — 擴展為 5 可插拔積木：在既有 hue/sat/bri(modulate) 上加 **levels**(black/white point → Sharp `.linear`)、**gamma**(Sharp `.gamma` 1.0–3.0)、**sharpen**(Sharp `.sharpen` sigma)；新增 `applyColorGrade(img,params)` 組裝器（modulate→levels→gamma→sharpen 固定序，各積木中性跳過）+ `toSharpLevels()`。新欄位 optional（向後相容：既有 {hue,saturation,brightness} 呼叫零改）。type-only `import type {Sharp}` 保 seam 純淨。
+- `lib/studio/print-destinations.ts`（新建）— 純資料模組（types + PRINT_DESTINATIONS + getPrintGeometry），**零 sharp/pdf-lib/node import**。修真實 `next build` 失敗（client 元件 import to-print-file → sharp → `node:events` 進瀏覽器 bundle）。
+- `lib/studio/to-print-file.ts` / `to-product-image.ts` — 改呼叫 `applyColorGrade`；to-print-file 從 print-destinations import + re-export（向後相容 route.ts/tests）。
+- `lib/studio/ghostscript-pdfx.ts` — IccProfileName 改 type-only import 自 print-destinations（與並行 CMYK session 的 PDF/X 升級協同，無衝突）。
+- `components/tools/ColorGradePanel.tsx`（新建）— 7 滑桿分三組(色彩/色階/銳利度) + useColorGrade hook + CSS 即時預覽 + disclaimer。
+- `components/tools/OutputTrackBar.tsx`（新建）— 🌐網頁/🖨印刷(目的地下拉)/✏️編輯，POST /api/tools/image/process → 下載結果。
+- `components/tools/canvas-handoff.ts`（新建）— base64 圖太大無法走 query string → sessionStorage 交接。
+- `app/tools/canvas/{CanvasEditor,page}.tsx`（還原+修）— fabric v7 dynamic import(client-only) 編輯器；**critic Major 修正**：dispose 改為 await 前一個 dispose promise 才重建（StrictMode remount race，fabricjs#10482）。
+- `app/tools/studio/StudioWorkbench.tsx` + `app/tools/tarot/TarotStudio.tsx` — 生成預覽下方接 ColorGradePanel+OutputTrackBar（img 套 cssFilter；tarot=web-tarot 2:3 + 4 卡目的地，pod=web-square 無 print）。
+- `package.json` — fabric@^7.4.0（並行 session 誤刪兩次，已附 Dockerfile:5 `npm ci` 證據定案）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm run build` | exit=0 -- 整棵樹(含並行 content/CMYK session)production build 綠，`/tools/canvas` 路由出現(1.47kB)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/studio app/api/tools/image` | exit=0 -- 58/58 pass（含新增 levels bake REALTEST：gray-128+black-point=64 → 像素壓暗<110 證明 .linear 真套）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m(Major:fabric dispose race→已修)/4minor(latent/server-guarded,記錄不動) -- 確認 levels 數學、NaN→neutral 防禦端到端、client/server boundary(無 sharp 進瀏覽器)、無 XSS/role bypass
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=applyColorGrade\|toSharpModulate\|PRINT_DESTINATIONS\|openInCanvas\|CANVAS_SOURCE_KEY | hits=0 -- 無 stale inline modulate、無懸空 handoff 引用、re-export 涵蓋所有舊 importer(build 證)
+
+**[多 session 衝突處理]** 並行 Cursor/Sonnet session(FullMainlineParity loop)以「fabric 害 sg-deploy 需手動 npm install」為由刪 canvas+fabric=**理由錯**（Dockerfile:5 `npm ci||npm install` 自動裝）。已附證據還原+push。CMYK PDF/X pipeline 由另一 session 完整擁有(SG Alpine REALTEST 過，deploy-gated)，未碰。
+
+**[決策]** ① 不自跑 /sg-deploy：另一 session 主動掌 SG 部署節奏(a4832569@22:55) + CMYK pipeline 待 go-ahead，我確保 HEAD deploy-safe(已達)讓下次部署搭車 ② POD 服飾印刷目的地暫緩：pipeline 由 CMYK session 主動改 + 需設計決策(商品/尺寸/DTF) + 非使用者原始需求；POD 網頁軌已可下載修圖結果。
+
+**[剩餘風險]** fabric 可能被那個 loop session 再刪(需使用者停掉它)；fabric canvas 的 R2-CORS taint 僅整合測試可驗(data-URL 路徑安全，R2-URL 路徑待 Playwright)。
+
+**[rollback]** 前端積木：移除 import 不影響生圖；canvas：刪 app/tools/canvas + OutputTrackBar 的 ✏️；`npm uninstall fabric`。commits b3459d05/e826638c/4f1f71e1。
+
 ### design(designs): My Designs gallery UI 重新設計（frontend-designer agent）
 **[任務理解]** 使用者嫌 `/tools/designs` 卡片 UI 醜，要求用「Claude Design」（= frontend-designer agent）重新設計。
 **[根因]** 卡片用深色 inline 樣式（chip `#a78bfa`、圖底 `#111`）配白卡 → 與全站淺色系統（globals.css indigo `#6366f1`）衝突；間距擁擠、無層次、inline 樣式與 `.intake-*/.build-*` 慣例脫節。
@@ -8923,7 +8954,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-12 08:00:34 UTC_
+_Last synced: 2026-06-13 15:09:29 UTC_
 
 ## 2026-03-20
 
@@ -9959,4 +9990,5 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REALTEST_EVIDENCE: tool=Bash | cmd=node --input-type=module (targetCountry/clamp/size-label logic) | exit=0 | ms=<1000 — all 5 assertions PASSED
 - REVIEW_DONE: critic=Standard | verdict=pass (2 majors fixed: clamp + targetCountry sentinel) | findings=0c/2m/2n
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=imageCount|youtubeCount|introHookBrief|targetCountry.*Global | hits=0
+
 
