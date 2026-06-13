@@ -2,6 +2,29 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-13
+
+### fix(ops-inbox): 套用 migration 0036 到 production Supabase — webhook deploy 500 修復完成（PGRST202 消除）
+
+**[任務理解]** 承 2026-06-12 診斷：webhook `/api/webhooks/deploy` 500「db write failed」根因 = migration 0036 未套用。操作者明示 go-ahead（「套下去」）→ 套用至 production EU self-hosted Supabase。
+
+**[已修改]**
+- production Supabase（EU `204.168.175.41` `supabase-db`，endpoint `supabase.aware-wave.com`）套用 `0036_fingerprint_v2.sql`：`ALTER TABLE ops_incidents ADD COLUMN fingerprint_v2 text` + DROP 12-arg / CREATE 13-arg `upsert_incident_atomic`（trailing `p_fingerprint_v2 DEFAULT NULL`）+ `NOTIFY pgrst,'reload schema'`。
+- **權限坑**：`postgres` 角色非 superuser（self-hosted Supabase），`ops_incidents` owner=`supabase_admin` → 首次以 postgres 套用 `ERROR: must be owner`（單交易已 rollback，無部分套用）。改以 `supabase_admin`（唯一 superuser）套用，完成後 `ALTER FUNCTION ... OWNER TO postgres` 還原 0035 既有 posture（保留已知可寫 grants）。
+- 雲端提醒排程 `trig_012NGUD1vUpsZ1Xyxk2qswYT` 已 disable（任務完成，不需明日提醒）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`cat 0036.sql \| docker exec -i supabase-db psql -U supabase_admin -1 -v ON_ERROR_STOP=1`（SHA256 `3f84531b…4b72` 與本機 repo byte-identical）| exit=0 | result=`ALTER TABLE / DROP FUNCTION / CREATE FUNCTION / COMMENT`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`psql pg_proc/information_schema` | exit=0 | result=函式現 13-arg `(...,boolean,text)` owner=postgres；欄位 `fingerprint_v2 text YES`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin node probe.mjs`（POST rest/rpc/upsert_incident_atomic，合法 enum 值）| exit=0 | result=**HTTP 200** row 建立含 fingerprint_v2（PGRST202 消失）；probe row 已 `DELETE 1`，remaining=0
+- REVIEW_DONE: critic=Standard（self）| verdict=pass | 0036 idempotent（IF NOT EXISTS / IF EXISTS / OR REPLACE）、additive、單交易原子、owner 還原；中途 23502/23514 為 probe 合成值違反 ops_incidents not-null/CHECK（external_id NOT NULL、severity∈low..critical、signal_type=deployment、environment∈dev/staging/prod），非 migration 缺陷
+- BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=`upsert_incident_atomic\|fingerprint_v2\|p_fingerprint_v2` | hits=route.ts:58→upsertIncidentAtomic.ts→0036 三處一致；6 條 webhook 路由共用此 RPC，trailing DEFAULT NULL 確保未傳 v2 的舊呼叫仍相容
+- 備份：EU `/root/0036-backup-20260613-033553/`（舊 12-arg 函式定義 + ops_incidents schema）
+
+**[剩餘風險]** ① 下次 SG Deploy 結尾 ops-inbox POST 應回 HTTP 2xx（real e2e 待操作者重觸發確認）；`/deploy_status` 套用後一次成功部署起才有新事件。② 獨立未解：middleware.ts Supabase auth 收 GoTrue 429「Rate limit exceeded」純文字 → JSON.parse 拋 AuthUnknownError（dashboard 路徑，另案）。③ 安全：`/root/Work/.git/config` remote 內嵌 PAT，建議改 credential helper。
+**[rollback]** 0036 檔內 :112-117：restore 12-arg 函式（見備份檔/0035）→ DROP COLUMN fingerprint_v2 → `NOTIFY pgrst,'reload schema'`。
+- AUTO_TASK_DONE: 套 `0036_fingerprint_v2.sql` 到 production Supabase
+
 ## 2026-06-12
 
 ### diag(ops-inbox): webhook /api/webhooks/deploy 500「db write failed」根因 = migration 0036 未套用（schema drift，藏一週）+ 清 /root/Work EOL churn 解部署阻塞
