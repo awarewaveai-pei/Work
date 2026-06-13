@@ -296,15 +296,45 @@ function isAllowedInputUrl(raw: string): boolean {
   }
 }
 
-async function ownDesignUrlToBlob(url: string, signal: AbortSignal): Promise<Blob | null> {
-  const res = await fetch(url, { signal });
+// gpt-image-1 /images/edits only accepts these three; map to the filename extension
+// OpenAI expects. Anything else is rejected here with a clear cause rather than letting
+// OpenAI bounce the whole request with an opaque error.
+const OPENAI_REF_MIME: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+async function ownDesignUrlToBlob(
+  url: string,
+  signal: AbortSignal,
+): Promise<{ blob: Blob; ext: string } | null> {
+  // redirect:"manual" fails closed (opaque status 0 → !res.ok) so a 3xx cannot bounce
+  // off the allowlisted origin and defeat isAllowedInputUrl's SSRF guard.
+  const res = await fetch(url, { signal, redirect: "manual" });
   if (!res.ok) return null;
-  const declared = Number(res.headers.get("content-length") ?? "0");
-  if (declared > MAX_OUTPUT_BYTES) return null;
-  const ab = await res.arrayBuffer();
-  if (ab.byteLength > MAX_OUTPUT_BYTES) return null;
-  const mime = res.headers.get("content-type") ?? "image/png";
-  return new Blob([new Uint8Array(ab)], { type: mime });
+  const mime = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  const ext = OPENAI_REF_MIME[mime];
+  if (!ext) return null;
+  if (Number(res.headers.get("content-length") ?? "0") > MAX_OUTPUT_BYTES) return null;
+  // Stream with a hard ceiling: content-length can be absent on chunked responses, so we
+  // must bound the read itself — never buffer the whole body before checking its size
+  // (an oversized object would OOM the box, which is already memory-constrained).
+  const reader = res.body?.getReader();
+  if (!reader) return null;
+  const chunks: BlobPart[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_OUTPUT_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return { blob: new Blob(chunks, { type: mime }), ext };
 }
 
 async function urlToDataUrl(url: string, signal: AbortSignal): Promise<string> {
@@ -500,13 +530,13 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
     for (let i = 0; i < refs.length; i++) {
       const ref = refs[i];
       const parsed = parseDataUrl(ref);
-      const blob = parsed
-        ? new Blob([new Uint8Array(parsed.buffer)], { type: parsed.mime })
-        : isAllowedInputUrl(ref)
-          ? await ownDesignUrlToBlob(ref, signal)
-          : null;
-      if (!blob) return { ok: false, error: "invalid_reference_image" };
-      form.append("image[]", blob, `reference-${i}.png`);
+      if (parsed) {
+        form.append("image[]", new Blob([new Uint8Array(parsed.buffer)], { type: parsed.mime }), `reference-${i}.png`);
+        continue;
+      }
+      const fetched = isAllowedInputUrl(ref) ? await ownDesignUrlToBlob(ref, signal) : null;
+      if (!fetched) return { ok: false, error: "invalid_reference_image" };
+      form.append("image[]", fetched.blob, `reference-${i}.${fetched.ext}`);
     }
     res = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",

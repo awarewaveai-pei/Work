@@ -127,6 +127,10 @@ export default defineConfig({
         const wpSshKey = process.env.LOBSTER_WP_SSH_PRIVATE_KEY ?? "";
         if (wpSshKey.trim()) out.LOBSTER_WP_SSH_PRIVATE_KEY = wpSshKey.trim();
 
+        // ── Tarot batch generation ────────────────────────────────────────────
+        const batchSecret = process.env.BATCH_INTERNAL_SECRET ?? "";
+        if (batchSecret.trim()) out.BATCH_INTERNAL_SECRET = batchSecret.trim();
+
         return out;
       }),
     ],
