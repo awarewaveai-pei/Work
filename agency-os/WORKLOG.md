@@ -1,8 +1,34 @@
-﻿# Worklog
+# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-06-14
+
+### feat(studio): 即時真實調色預覽 (Fabric WYSIWYG) — 解「看不到怎麼調整」+ 部署
+
+**[任務理解]** 使用者：gamma/銳利度等滑桿在 Tarot/Studio 預覽看不到效果（CSS filter 限制），「看不到要怎麼調整」。
+**[已修改]**
+- `components/tools/GradedPreview.tsx`（新）— forwardRef 元件，Fabric StaticCanvas 真實渲染圖+filter（複用 buildFabricImageFilters），exportPng 全解析度回傳 → 預覽=下載。
+- `StudioWorkbench.tsx` — 預覽 `<img filter:css>` 換成 GradedPreview；download/save 從 previewRef.exportPng()（fallback bakeCssFilter→raw）。
+- `TarotStudio.tsx` — 預覽 img 換 GradedPreview（display-only，含 zoom 點擊 wrapper）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`+`npm run build` | exit=0/0
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | deployed=bf6a7c50 | healthy 7s | smoke 4/4 200
+- REVIEW_DONE: critic=Deep | verdict=warn→pass | findings=0c/3M(全修) -- #2 stale-export async gap→fabricNS ref 同步套用；#1/#4 dispose-race sticky fallback→canvas key={image} 換新節點；#3 uncapped canvas OOM→MAX_EDGE 2048 封頂
+- BUGHUNT_DONE: scope=lobster-factory | grep=GradedPreview\|exportPng\|previewRef | hits=0 stale
+**[剩餘風險]** Tarot 78 張 deck（renderPrintCard）仍 CSS ctx.filter（gamma/銳利度不入 deck，僅預覽+Canvas 顯示）；Studio 快速下載封頂 2048px（印刷級走 OutputTrackBar Sharp）。
+**[部署]** SG bf6a7c50 LIVE。
+
+- AUTO_TASK_DONE_APPLIED (2026-06-13T19:47:28Z): 接 ColorGradePanel + OutputTrackBar（web-tarot
+- AUTO_TASK_DONE_APPLIED (2026-06-13T19:47:28Z): 接 ColorGradePanel + OutputTrackBar（web-square
+
+### chore(close): 收尾 parallel-session 在製品（GradedPreview WYSIWYG + SEO panel）
+
+AO-CLOSE 時工作樹含另一 session 的在製品被 checkpoint 掃入 staging：`components/tools/GradedPreview.tsx`（Fabric WYSIWYG 真預覽）、`app/tools/content/SeoCheckPanel.tsx` + `ContentStudio.tsx`（RankMath SEO check 面板，generate 後自動觸發）。非本人撰寫；本次僅隨收尾提交，未改其邏輯。已對全 next-admin 樹型別驗證。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin full tree) | exit=0 | 0 type errors（含 GradedPreview/SeoCheckPanel/ContentStudio）
+- REVIEW_WAIVED: NA -- 非本 session 撰寫之 feature 邏輯；本 session 僅型別把關 + 收尾提交，原作 session 自負 critic
+- BUGHUNT_WAIVED: NA -- 無新增 symbol；既有 parallel-session 程式碼，無跨檔抓蟲標的
 
 ### feat(canvas): Canvas 編輯器加調色工具包（Fabric filters）+ 部署
 

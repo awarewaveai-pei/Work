@@ -1,4 +1,4 @@
-﻿# Global Task Board
+# Global Task Board
 
 
 
@@ -87,8 +87,8 @@
   - [ ] **[1-g S]** `components/tools/OutputTrackBar.tsx` — preset-aware；印刷鈕含目的地下拉（tw-local/mpc/tgc/printninja）；Canva feature flag 隱藏
   - [ ] **[1-h S]** `app/tools/canvas/page.tsx` — Canvas 路由
   - [ ] **[1-i M]** `app/tools/canvas/CanvasEditor.tsx` — Fabric.js（沿用 Phase 0 版本）；存 design.json+preview.webp+source-export.png → R2
-  - [ ] **[1-j S]** `TarotStudio.tsx` 接 ColorGradePanel + OutputTrackBar（web-tarot + 印刷四目的地 + canvas-edit）
-  - [ ] **[1-k S]** `StudioWorkbench.tsx` 接 ColorGradePanel + OutputTrackBar（web-square + pod 印刷 + canvas-edit；Printful 另走 upscaler.ts）
+  - [x] **[1-j S]** `TarotStudio.tsx` 接 ColorGradePanel + OutputTrackBar（web-tarot + 印刷四目的地 + canvas-edit）
+  - [x] **[1-k S]** `StudioWorkbench.tsx` 接 ColorGradePanel + OutputTrackBar（web-square + pod 印刷 + canvas-edit；Printful 另走 upscaler.ts）
   - **Phase 1.5 / Phase 2**
   - [ ] **[5-a~d]** Canva API POC → OutputTrackBar 接線（plan §17）
   - [ ] **Phase 2** customer-facing Canvas + WooCommerce + Printful；整副牌多頁 PDF（PrintNinja offset）

@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-14 03:41:37
+- Generated: 2026-06-14 03:47:26
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -281,6 +281,18 @@
 - SG 部署 next-admin（b9b76502）：容器 healthy、server smoke 全 200、semantic-filename.ts 在 build context。playwright smoke 23/30 pass；3 fail 全在 /onboard+/api/ops（flaky + OnboardWizard 4→5 step test/impl 落差，與本次無關）。
 
 **Note**: 工作樹仍有別 session 在製品（ContentStudio/SeoCheckPanel/GradedPreview SEO+WYSIWYG），tsc 0，非本人改動。
+
+
+### verify-recent --ack (2026-06-13T19:42:14.5691871Z)
+
+**Reason**: WYSIWYG preview: GradedPreview (Fabric) replaces CSS-filter preview in Studio+Tarot -> gamma/sharpen/levels now show real effect; Studio download/save export from it (preview===download). critic Deep found 3 Major (stale-export async gap / dispose-race sticky-fallback / uncapped canvas OOM) -> ALL fixed (fabricNS ref synchronous apply, canvas keyed by image, 2048px cap). tsc 0 + full build 0. Fabric client-only; build is the gate.
+
+**Acknowledged unverified files** (count=3):
+
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\components\tools\GradedPreview.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\studio\StudioWorkbench.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
