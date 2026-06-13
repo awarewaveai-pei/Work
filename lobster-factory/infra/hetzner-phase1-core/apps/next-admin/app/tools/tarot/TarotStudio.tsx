@@ -651,6 +651,10 @@ export default function TarotStudio() {
     try {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
+      // Snapshot the deck colour-grade once (洞1: background-batch cards have only an R2 url,
+      // not a pre-graded blob, so they must be (re)graded here too — foreground cards' blobs
+      // were already graded in generateOne). One snapshot = uniform deck, no mid-zip drift.
+      const deckFilter = grade.neutral ? undefined : grade.cssFilter;
       for (const it of batch) {
         if (it.status !== "done") continue;
         // Cards from background batch have url (R2) but no blob — render the print card on demand.
@@ -664,7 +668,7 @@ export default function TarotStudio() {
               reader.onerror = () => reject(new Error("read_error"));
               reader.readAsDataURL(imgBlob);
             });
-            const printBlob = await renderPrintCard(it.card, artDataUrl, template);
+            const printBlob = await renderPrintCard(it.card, artDataUrl, template, deckFilter);
             const safe = it.card.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
             zip.file(`${String(it.card.id).padStart(2, "0")}_${safe}.png`, printBlob);
           } catch { /* skip unrenderable cards */ }
