@@ -4,6 +4,22 @@
 
 ## 2026-06-13
 
+### fix(repair-center): Soulful Supabase env synced; blocker recast to NXDOMAIN
+
+**[任務理解]** Repair Center 顯示 `soulful-expression` Supabase 補件失敗：`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY` missing。目標是處理 production `next-admin` 實際 env 缺口，並確認 blocker 是否消失。
+
+**[處理結果]**
+- 本機 secure vault 已有 `SUPABASE_SOULFULEXPRESSION_URL` / `SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY`；SG `/root/lobster-phase1/.env` 與 `/root/Work/lobster-factory/infra/hetzner-phase1-core/.env` 缺值。
+- 已同步 4 個 env key 到 SG 兩份 env store（含 `SUPABASE_A_*` alias），備份：`.env.bak.soulful-20260613T061140Z`。
+- 已 `docker compose --env-file .env up -d --force-recreate --no-deps next-admin`，`lobster-next-admin` healthy，容器內 `SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY` len=219。
+- 後續驗證發現 `https://mffjqjiidbeibilmxzef.supabase.co` DNS 為 NXDOMAIN（本機、SG host、container、1.1.1.1 均不解析）；Supabase management token 401，無法自動列 project 找新 ref。
+- 已更新 `tenant_integration_bindings` id `54cc468c-1c1e-4b59-adbc-faa96669b560` 的 `last_health_check`：不再回報 missing service role key，改回報 provider hostname NXDOMAIN；status 仍 failed，避免隱藏真實外部專案問題。
+- 2026-06-13T06:27Z 使用者恢復 Supabase project 後重驗：DNS 已恢復，SG `next-admin` 容器用現有 credential 打 `/rest/v1/` 回 HTTP 200；已把同一筆 integration 更新為 `status=active`、`last_error=null`、`last_health_check.ok=true`。
+
+**[剩餘風險]** 若 Soulful Supabase project 再次暫停/關閉，Repair Center 會重新 failed；目前 key/env/provider API 均已通。
+
+---
+
 ### feat(tarot): Trigger.dev 背景批次 + server quota + printQuality upscale flag
 
 **[任務理解]** 實作 Phase 1(d) 三個 enhancements：① Trigger.dev 背景批次生成 78 張（不需開瀏覽器）② 每日生成上限 quota ③ printQuality flag（FLUX 維持 "1" MP，非 FLUX 模型已原生高解析）。
