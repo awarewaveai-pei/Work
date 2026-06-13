@@ -87,6 +87,32 @@ const PLATFORM_IMG_PRESETS: Array<{ platform: string; label: string; w: number; 
   { platform: "tiktok_thumbnail",   label: "TikTok 封面",  w: 1080, h: 1920, note: "9:16" },
 ];
 
+const HOOK_TYPES = [
+  "Question",
+  "Statistical or Fact",
+  "Quotation",
+  "Anecdotal or Story",
+  "Personal or Emotional",
+] as const;
+
+const AI_IMAGE_PROVIDERS = [
+  { value: "none",      label: "None" },
+  { value: "replicate", label: "Replicate（AI 生圖）" },
+];
+
+const IMAGE_SIZES = [
+  { value: "1344x768",  label: "1344×768（16:9）" },
+  { value: "1024x1024", label: "1024×1024（1:1）" },
+  { value: "768x1344",  label: "768×1344（9:16）" },
+  { value: "1200x630",  label: "1200×630（OG）" },
+];
+
+const LAYOUT_OPTIONS = [
+  { value: "distribute",  label: "Distribute evenly" },
+  { value: "after_intro", label: "After introduction" },
+  { value: "after_h2",    label: "After each H2" },
+];
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Tab       = "generate" | "humanize" | "bulk";
@@ -103,6 +129,27 @@ interface ArticleStructure {
   comparisonTable: boolean;
   faq: boolean;
   conclusion: boolean;
+  tables: boolean;
+  h3: boolean;
+  lists: boolean;
+  italics: boolean;
+  quotes: boolean;
+  bold: boolean;
+}
+
+interface MediaHub {
+  aiImages: string;
+  imageCount: number;
+  imageSize: string;
+  imageStyle: string;
+  imageInstructions: string;
+  brandName: string;
+  includeKeywordAlt: boolean;
+  autoAltText: boolean;
+  youtubeSource: string;
+  youtubeCount: number;
+  youtubeLayout: string;
+  strictUnderHeadings: boolean;
 }
 
 interface GenerateForm {
@@ -124,6 +171,9 @@ interface GenerateForm {
   internalLinks: string;
   referenceUrls: string;
   structure: ArticleStructure;
+  introHookBrief: string;
+  introHookType: string;
+  media: MediaHub;
   generateMeta: boolean;
   scheduleDate: string;
 }
