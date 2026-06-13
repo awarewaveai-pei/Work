@@ -4,6 +4,18 @@
 
 ## 2026-06-13
 
+### fix(mockup): aspect 預設/選項移除不支援的 3:4（mockup 預設設定第一次合成就失敗）
+**[任務理解]** 使用者回報 `/tools/mockup` 仍「生成失敗」。深查發現**兩個獨立 bug**：① invalid_reference_image（OpenAI+圖庫，已於前 commit 修復並驗證）② aspect 預設 `3:4` 不被後端接受。
+**[根因]** `3:4` 不在 `VALID_ASPECT_RATIOS`（`lib/studio/model-options.ts` + `lib/tarot/image-gen.ts` 兩份 byte-identical，route 用前者）。MockupStudio L56 預設 `"3:4" as AspectRatio`（硬轉繞過 TS）+ L299 下拉含 3:4 → studio generate route line 64 `!isAspectRatio("3:4")` → HTTP 400「aspectRatio must be one of: 2:3 3:2 4:5 1:1 9:16」。用預設設定按合成必失敗。`3:4` 在 image-gen.ts 僅為 imagen/ideogram 的內部映射目標，非合法輸入。
+**[已修改]** 僅 `app/tools/mockup/MockupStudio.tsx`：預設 `"3:4" as AspectRatio` → `"4:5"`（支援的直式比例，免 cast）；下拉移除 `3:4`，剩 `4:5/1:1/2:3/3:2/9:16`（= VALID_ASPECT_RATIOS 全集）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=SSH(prod 容器內 node) | cmd=複刻 generateOpenai：fetch 圖庫 png → ownDesignUrlToBlob → OpenAI v1/images/edits | exit=0 -- ownDesignUrlToBlob OK(png,2.5MB)、OpenAI edits status=200 回真圖 b64(~2MB)。證明 #1(invalid_reference_image) 修復在生產端對端成立；27 張設計全 image/png|jpeg、R2 content-type 正常
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n -- 5 個 option + 預設全 ∈ VALID_ASPECT_RATIOS；onChange `as AspectRatio` cast 現安全；無 3:4 殘留(僅註解)；generate flow 無 regression
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep="3:4" | hits=0 -- code path 中 3:4 僅存在於 image-gen.ts 映射目標(合法用途)；MockupStudio 修後僅註解提及；TarotStudio/StudioWorkbench 無 3:4
+**[剩餘風險]** 需 sg-deploy 才生效。invalid_reference_image 已驗修復；若使用者仍見該錯，需提供 model+上傳/圖庫+比例+DevTools 實際 JSON（目前所有可測輸入皆成功）。
+**[rollback]** `git checkout app/tools/mockup/MockupStudio.tsx`
+
 ### feat(calendar): WP post 編輯 API + 行事曆 EditModal（排程/立即發布/刪除）
 
 **[已修改]**
