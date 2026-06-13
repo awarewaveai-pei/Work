@@ -21,6 +21,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Canvas as FabricCanvas, FabricObject } from "fabric";
 import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_SOURCE_KEY, CANVAS_NAME_KEY } from "@/components/tools/canvas-handoff";
+import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
+import { buildFabricImageFilters } from "./fabric-filters";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -66,6 +68,8 @@ export default function CanvasEditor() {
   const [textColor, setTextColor] = useState("#111111");
   const [textSize, setTextSize] = useState(48);
   const [textSelected, setTextSelected] = useState(false);
+  const [imageSelected, setImageSelected] = useState(false); // an image object is selected → show 調色
+  const grade = useColorGrade(); // 修圖積木 applied to the selected image via Fabric filters
 
   // ── init fabric canvas + load handed-off source image (client only) ──
   useEffect(() => {
@@ -104,10 +108,14 @@ export default function CanvasEditor() {
         } else {
           setTextSelected(false);
         }
+        setImageSelected(o?.type === "image");
       };
       canvas.on("selection:created", syncFromSelection);
       canvas.on("selection:updated", syncFromSelection);
-      canvas.on("selection:cleared", () => setTextSelected(false));
+      canvas.on("selection:cleared", () => {
+        setTextSelected(false);
+        setImageSelected(false);
+      });
 
       const source = typeof window !== "undefined" ? sessionStorage.getItem(CANVAS_SOURCE_KEY) : null;
       if (typeof window !== "undefined") {
@@ -150,6 +158,27 @@ export default function CanvasEditor() {
         : null;
     };
   }, []);
+
+  // Apply the colour-grade to the selected IMAGE whenever a slider moves (Fabric filters).
+  // Canvas is WYSIWYG: the filtered pixels are exactly what toDataURL exports.
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const obj = canvas.getActiveObject();
+    if (!obj || obj.type !== "image") return;
+    let cancelled = false;
+    void import("fabric").then((fabric) => {
+      if (cancelled || fabricRef.current !== canvas) return;
+      const ns = fabric as unknown as { filters: Record<string, new (o?: Record<string, unknown>) => object> };
+      const target = obj as unknown as { filters: object[]; applyFilters: () => void };
+      target.filters = buildFabricImageFilters(ns, grade.params);
+      target.applyFilters();
+      canvas.requestRenderAll();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [grade.params]);
 
   const addText = useCallback(() => {
     const canvas = fabricRef.current;
