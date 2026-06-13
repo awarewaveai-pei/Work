@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseMiddlewareClient, isSupabaseAuthConfigured } from "@/lib/supabase/ssr";
+import { getFreshCachedRole, getStaleCachedRole, cacheValidatedRole } from "@/lib/supabase/session-cache";
 import type { OpsRole } from "@/lib/ops-contracts";
 
 // Identity layer for the admin console (Supabase Auth, email+password).
@@ -54,6 +55,32 @@ function hasValidSyncKey(request: NextRequest): boolean {
   return timingSafeEqualStr(provided, expected);
 }
 
+// The @supabase/ssr session lives in cookie(s) named `sb-<ref>-auth-token`, chunked as
+// `…-auth-token.0` / `.1` when large. Their combined value uniquely identifies the current
+// token state and rotates on refresh — a stable, self-invalidating cache key.
+const AUTH_COOKIE_RE = /^sb-.*-auth-token(\.\d+)?$/;
+function readSessionCacheKey(request: NextRequest): string | null {
+  const parts = request.cookies
+    .getAll()
+    .filter(c => AUTH_COOKIE_RE.test(c.name))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(c => `${c.name}=${c.value}`);
+  return parts.length > 0 ? parts.join("|") : null;
+}
+
+// Distinguish "couldn't reach / was throttled by the auth server" (transient) from
+// "the token is absent or invalid" (authoritative). Only transient failures may fall back to a
+// recently-cached validation; a real auth rejection always fails closed.
+function isTransientAuthError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { name?: string; status?: number; message?: string };
+  if (e.status === 429 || e.status === 502 || e.status === 503 || e.status === 504) return true;
+  if (e.name === "AuthRetryableFetchError" || e.name === "AuthUnknownError") return true;
+  const msg = (e.message ?? "").toLowerCase();
+  return msg.includes("rate limit") || msg.includes("fetch failed")
+    || msg.includes("network") || msg.includes("timeout");
+}
+
 function resolveRoleFromUser(appMetadata: Record<string, unknown> | undefined): OpsRole {
   const raw = String(appMetadata?.ops_role ?? "").trim().toLowerCase();
   if (raw === "owner" || raw === "admin" || raw === "operator" || raw === "viewer") {
@@ -96,30 +123,53 @@ export async function middleware(request: NextRequest) {
     return blockedResponse(request);
   }
 
+  const sessionKey = readSessionCacheKey(request);
+
+  // Fast path: this exact token was validated over the network moments ago. Re-use that result
+  // and skip the auth call. This collapses a page-load's parallel sub-requests into ~1 upstream
+  // validation, which is what prevents the burst from tripping Cloudflare's per-IP rate limit on
+  // the auth host (the root cause of logged-in users being bounced to /login).
+  if (sessionKey) {
+    const fresh = getFreshCachedRole(sessionKey);
+    if (fresh) {
+      baseHeaders.set("x-ops-claims-role", fresh);
+      return NextResponse.next({ request: { headers: baseHeaders } });
+    }
+  }
+
   const { supabase, response } = createSupabaseMiddlewareClient(request);
 
-  let appMetadata: Record<string, unknown> | undefined;
-  let authed = false;
+  let role: OpsRole | null = null;
+  let refreshedCookies = false;
   try {
     const { data, error } = await supabase.auth.getUser();
     if (!error && data.user) {
-      authed = true;
-      appMetadata = data.user.app_metadata as Record<string, unknown> | undefined;
+      role = resolveRoleFromUser(data.user.app_metadata as Record<string, unknown> | undefined);
+      refreshedCookies = true;
+      if (sessionKey) cacheValidatedRole(sessionKey, role);
+    } else if (error && sessionKey && isTransientAuthError(error)) {
+      // Auth server unreachable / throttled — don't punish a logged-in user. Trust the last
+      // good validation for THIS token if it is still within the stale window.
+      role = getStaleCachedRole(sessionKey);
     }
-  } catch {
-    // Network / auth-server failure → fail closed below.
+  } catch (err) {
+    if (sessionKey && isTransientAuthError(err)) {
+      role = getStaleCachedRole(sessionKey);
+    }
+    // Any other throw → role stays null → fail closed below.
   }
 
-  if (!authed) {
+  if (!role) {
     return blockedResponse(request);
   }
 
-  const role = resolveRoleFromUser(appMetadata);
   baseHeaders.set("x-ops-claims-role", role);
 
   const finalResponse = NextResponse.next({ request: { headers: baseHeaders } });
   // Preserve any refreshed-session cookies the Supabase client wrote onto `response`.
-  for (const cookie of response.cookies.getAll()) finalResponse.cookies.set(cookie);
+  if (refreshedCookies) {
+    for (const cookie of response.cookies.getAll()) finalResponse.cookies.set(cookie);
+  }
   return finalResponse;
 }
 

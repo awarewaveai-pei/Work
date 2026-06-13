@@ -86,6 +86,8 @@ export default function StudioWorkbench() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [bgState, setBgState] = useState<"idle" | "removing" | "done" | "error">("idle");
   const [originalImage, setOriginalImage] = useState<string | null>(null);
+  const [mockupState, setMockupState] = useState<"idle" | "generating" | "done" | "error">("idle");
+  const [mockupUrl, setMockupUrl] = useState<string | null>(null);
   const bgInFlight = useRef(false); // state lags a render — ref blocks same-tick double-click
   const grade = useColorGrade(); // 修圖積木：色彩/色階/銳利度
   const previewRef = useRef<GradedPreviewHandle>(null); // true WYSIWYG preview (Fabric); export === preview
@@ -155,6 +157,8 @@ export default function StudioWorkbench() {
     setSaveState("idle");
     setBgState("idle");
     setOriginalImage(null);
+    setMockupState("idle");
+    setMockupUrl(null);
     try {
       const res = await fetch("/api/tools/studio/generate", {
         method: "POST",
@@ -210,7 +214,30 @@ export default function StudioWorkbench() {
     setOriginalImage(null);
     setBgState("idle");
     setSaveState("idle");
+    setMockupState("idle");
+    setMockupUrl(null);
   }, [originalImage]);
+
+  const generateMockupFromDesign = useCallback(async () => {
+    if (gen.status !== "done" || !gen.image) return;
+    setMockupState("generating");
+    try {
+      const res = await fetch("/api/tools/studio/mockup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: gen.image, productType }),
+      });
+      const json = (await res.json()) as { ok: boolean; mockup_url?: string; error?: string };
+      if (!json.ok || !json.mockup_url) {
+        setMockupState("error");
+        return;
+      }
+      setMockupUrl(json.mockup_url);
+      setMockupState("done");
+    } catch {
+      setMockupState("error");
+    }
+  }, [gen, productType]);
 
   const saveToDesigns = useCallback(async () => {
     if (gen.status !== "done" || !gen.image) return;
@@ -381,6 +408,16 @@ export default function StudioWorkbench() {
                   <button className="btn-secondary" style={{ fontSize: 12 }} onClick={restoreOriginal}>還原原圖</button>
                 ) : null}
                 {bgState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>去背失敗，請重試</span> : null}
+                {bgState === "done" && productType === "tshirt" ? (
+                  <button
+                    className="btn-secondary"
+                    disabled={mockupState === "generating" || mockupState === "done"}
+                    onClick={() => void generateMockupFromDesign()}
+                  >
+                    {mockupState === "done" ? "產品預覽 ✓" : mockupState === "generating" ? "生成 Mockup…" : "產品 Mockup"}
+                  </button>
+                ) : null}
+                {mockupState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>Mockup 失敗，請重試</span> : null}
                 <button className="btn-secondary" onClick={() => void downloadGraded()}>
                   下載{!grade.neutral ? "（含調色）" : ""}
                 </button>
@@ -388,6 +425,15 @@ export default function StudioWorkbench() {
                 {saveState === "saved" ? <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a> : null}
                 {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗（檢查 POD_DESIGNS_ENABLED 與 POD_DESIGNS_DEFAULT_ORG_ID / 伺服器 log）</span> : null}
               </div>
+
+              {/* Printful product mockup preview */}
+              {mockupUrl ? (
+                <div style={{ marginTop: 14 }}>
+                  <p style={{ fontSize: 13, marginBottom: 6, opacity: 0.7 }}>產品預覽（Printful Mockup）</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={mockupUrl} alt="product mockup" style={{ maxWidth: 320, borderRadius: 8, border: "1px solid var(--border)" }} />
+                </div>
+              ) : null}
 
               {/* 修圖積木 + 輸出軌 ([1-f]/[1-g])。POD 商品印刷檔（非卡片尺寸）為後續切片，此處不給 print 目的地。 */}
               <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "flex-start", flexWrap: "wrap" }}>

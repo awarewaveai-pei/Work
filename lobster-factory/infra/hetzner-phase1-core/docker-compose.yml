@@ -330,6 +330,8 @@ services:
       TRIGGER_API_URL: ${TRIGGER_API_URL:-https://api.trigger.dev}
       BATCH_INTERNAL_SECRET: ${BATCH_INTERNAL_SECRET:-}
       TAROT_DAILY_LIMIT: ${TAROT_DAILY_LIMIT:-300}
+      PRINTFUL_API_KEY: ${PRINTFUL_API_KEY:-}
+      PRINTFUL_STORE_ID: ${PRINTFUL_STORE_ID:-}
       # Repair OS Integrations: provider health adapters use reference-only secrets from env.
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       CLOUDFLARE_AUTH_BEARER_TOKEN: ${CLOUDFLARE_AUTH_BEARER_TOKEN:-}
