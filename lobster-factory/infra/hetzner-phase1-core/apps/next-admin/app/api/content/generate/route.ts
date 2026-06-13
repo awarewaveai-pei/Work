@@ -66,6 +66,14 @@ GEO / AI SEARCH OPTIMISATION (optimise for AI Overview, AI Mode, RAG-based citat
 - Answer multi-part and complex questions fully — AI search rewards comprehensive coverage over brevity
 - Unique value rule: every paragraph must add information the reader cannot find in the first three Google results — if it cannot, cut it
 
+GEO / AI CITATION MECHANICS (2026 research-backed — mandatory):
+- ANSWER CAPSULE (single most important GEO signal — 72% of ChatGPT-cited pages have this): the opening 1–2 sentences of EVERY H2 section must form a self-contained answer capsule of 120–150 characters. CRITICAL RULE: never place a hyperlink inside the answer capsule sentence — links in direct-answer text reduce AI citation likelihood. Place any supporting links in the paragraph that follows, not in the capsule itself.
+- SUB-QUERY COVERAGE: anticipate 3–5 sub-questions users might ask about the topic and give each a dedicated H2 or H3 section. AI engines (ChatGPT, Perplexity, Gemini) decompose complex queries into sub-queries and cite the best per-sub-query answer — an article covering more sub-queries earns more citation slots.
+- ORIGINAL PERSPECTIVE (2nd strongest citation predictor): include at least one section with first-hand insight, original data, a unique angle, or a named case study that no generic article would contain. Label it implicitly by the voice: "In practice…", "Our experience shows…", "What most guides miss…"
+- NAMED EXPERT ATTRIBUTION: include at least one quote or finding attributed to a real person with name + title + organization (e.g., "According to Dr. Jane Lim, researcher at NUS, …"). AI systems treat named expert attribution as a strong trustworthiness signal. If no external expert, the author's own credentials must be stated explicitly.
+- RECENCY SIGNAL: at least one statistic or data point must be from within the last 12 months — cite with year. AI citation rates drop sharply for content older than 3 months; fresh data signals the article is current and worth citing.
+- GEO ANTI-PATTERNS (never do these in this article): ❌ No hyperlinks inside direct-answer capsule sentences ❌ No content hidden behind accordions/tabs (AI cannot see JavaScript-toggled content) ❌ No walls of text — even one bulleted sub-point breaks dense prose into extractable units ❌ No unsourced statistics — every number needs "according to [Source] ([Year])"
+
 RANK MATH COMPLIANCE (24-test scoring system — target ≥81 green):
 
 BASIC SEO — 7 tests:
@@ -100,6 +108,7 @@ STRUCTURED DATA HINTS (for the CMS to apply):
 - For topic pages: include clear who/what/where/when entity signals that structured data can reinforce
 - URL slug hint: emit <!-- SLUG_HINT: primary-keyword-slug --> at the very end of the article (after the last section) — use lowercase, hyphens only, no stop words; total URL including domain must be ≤75 characters
 - Schema type: articles should use BlogPosting (more specific than Article — Google recommends using the most specific applicable type)
+- FAQPage schema: every ## FAQ section the CMS will convert to FAQPage JSON-LD — write each FAQ answer as a standalone paragraph (no "see above", no cross-references) because AI engines cite FAQ Q&A pairs directly. Each FAQ answer must fully answer its question in 40–120 words without referencing other parts of the article.
 
 CONTENT FRESHNESS SIGNALS:
 - When citing research or statistics, always include the year (e.g. "a 2024 study by…")
