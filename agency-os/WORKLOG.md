@@ -4,6 +4,44 @@
 
 ## 2026-06-14
 
+### feat(seo): RankMath KB 全覆蓋 — 24測試完整規則 + Setup向導詳設 + Schema + 模組
+
+**[任務理解]** 使用者提供 RankMath 完整 KB（12 份文件索引）要求徹底研究並運用在文章生成和 WP 架站。文件是文章標題索引，需 fetch 原始文章內容。
+
+**[已修改]**
+- `lobster-factory/.../generate/route.ts` — SYSTEM_PROMPT:
+  - H1標題擴展為明確的 4 項 Title Readability 測試（Power Word/Number/Sentiment/關鍵字位置）
+  - RANK MATH COMPLIANCE 重寫為完整 24 測試 3 分類（Basic SEO 7項 / Additional SEO 10項 / Content Readability 3項）
+  - 新增 `<!-- SLUG_HINT: ... -->` placeholder + BlogPosting schema type hint
+- `agency-os/docs/seo/WP_SITE_SEO_SETUP_CHECKLIST.md` — 新增：
+  - 2.1 Setup Wizard 詳細步驟（Logo 112px/OG 1200×630/Nofollow+新分頁外連）
+  - 2.3 BlogPosting schema 預設 + Author/Date/Search noindex
+  - 2.7 完整 24 測試逐項清單
+  - 2.8 Image SEO 模組（auto-ALT `%focus_kw% - %filename%`）
+  - 2.9 模組啟用清單（Breadcrumbs/404/Redirections/Schema/IndexNow）
+  - 2.10 FAQ Schema 指引（Google 2026 已停止 FAQ rich results；AI 平台仍有效）
+
+**研究來源（fetch 驗證）**：11 篇 RankMath KB 文章
+- score-100-in-tests：24 項測試完整清單（非 21 項 — 4 Title Readability + 3 Content Readability + 7 Basic + 10 Additional）
+- general-tab：meta box 介面解析
+- article-schema：BlogPosting 更精確；reviewedBy entity 支援 E-E-A-T；Author URL 需啟用 author archive
+- how-to-setup：Setup Wizard 各步驟；Optimization → Nofollow/新分頁/Noindex Archives
+- titles-and-meta：Noindex Author/Date/Search 設定位置
+- image-seo：Image SEO 模組動態套用（不修改 DB）
+- faq-schema-block：**Google 2026 已完全停止 FAQ rich snippets**；仍建議加（AI 平台引用）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` (string literals only) | exit=0 (only pre-existing wp-post error) | ms=<60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m (string-literal + doc edits, no logic change)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`SLUG_HINT|BlogPosting|Power Word|24.test` | hits=0 (新增內容僅在 generate/route.ts + checklist)
+- BUGHUNT_WAIVED: DOC_ONLY -- WP_SITE_SEO_SETUP_CHECKLIST.md 為純文件
+
+**[剩餘風險]** `<!-- SLUG_HINT -->` 需 publish flow 解析邏輯（目前人工處理）；FAQ block 需 Block Editor（Classic Editor 不支援）
+
+**[rollback]** `git revert 802b634a`
+
+---
+
 ### feat(wp-sites): WP 認證從 JWT 改為 Application Password + Cloudflare rate limit 修復
 
 **[任務理解]** soulfulexpression.org 無 JWT Auth 外掛（/wp-json/jwt-auth/v1/token → 404）。改用 WP 內建 Application Password（WP 5.6+，Basic auth）。同時修 Cloudflare rate limit 誤擋 Next.js RSC prefetch burst（app.aware-wave.com 被 50 req/10s 規則打到）。
