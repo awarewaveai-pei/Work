@@ -89,6 +89,7 @@ export default function StudioWorkbench() {
   const [mockupState, setMockupState] = useState<"idle" | "generating" | "done" | "error">("idle");
   const [mockupUrl, setMockupUrl] = useState<string | null>(null);
   const bgInFlight = useRef(false); // state lags a render — ref blocks same-tick double-click
+  const mockupInFlight = useRef(false);
   const grade = useColorGrade(); // 修圖積木：色彩/色階/銳利度
   const previewRef = useRef<GradedPreviewHandle>(null); // true WYSIWYG preview (Fabric); export === preview
 
@@ -220,6 +221,8 @@ export default function StudioWorkbench() {
 
   const generateMockupFromDesign = useCallback(async () => {
     if (gen.status !== "done" || !gen.image) return;
+    if (mockupInFlight.current) return;
+    mockupInFlight.current = true;
     setMockupState("generating");
     try {
       const res = await fetch("/api/tools/studio/mockup", {
@@ -236,6 +239,8 @@ export default function StudioWorkbench() {
       setMockupState("done");
     } catch {
       setMockupState("error");
+    } finally {
+      mockupInFlight.current = false;
     }
   }, [gen, productType]);
 

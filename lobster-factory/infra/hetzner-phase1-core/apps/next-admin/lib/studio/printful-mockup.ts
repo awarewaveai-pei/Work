@@ -1,14 +1,23 @@
 /**
- * Printful Mockup Generator — uploads design to Printful file library then
- * calls the mockup generator to composite it onto a product photo.
+ * Printful Mockup Generator — uploads design to R2, then composites it onto
+ * a product photo via the Printful Mockup Generator API.
  *
- * Flow: base64 dataURL → Printful /files upload → Printful /mockup-generator
+ * Flow: base64 dataURL → R2 upload (public URL) → Printful mockup-generator
  *       → poll until completed → return mockup_url (CDN JPEG)
  *
- * Only PRINTFUL_API_KEY + PRINTFUL_STORE_ID needed (same token for both calls).
+ * Requires: PRINTFUL_API_KEY, PRINTFUL_STORE_ID, R2_* (existing designs bucket).
+ * The Printful Mockup API needs a publicly reachable URL; R2 is the same bucket
+ * used by `saveToDesigns` — no new infrastructure needed.
  */
 
+import {
+  parseImageDataUrl,
+  buildDesignKey,
+  putDesignObject,
+} from "../storage/r2";
+
 const PRINTFUL_API = "https://api.printful.com";
+const FETCH_TIMEOUT_MS = 25_000;
 const POLL_INTERVAL_MS = 3_000;
 const POLL_TIMEOUT_MS = 60_000;
 
@@ -18,7 +27,7 @@ const PRODUCT_CONFIG = {
     product_id: 71,    // Bella + Canvas 3001 Unisex Staple T-Shirt
     variant_id: 4012,  // White / M
     placement: "front" as const,
-    // Printfile 1 = 1800×2400 @ 150DPI (the standard front print area)
+    // Printfile 1 = 1800×2400 @ 150DPI (standard front print area)
     area_width: 1800,
     area_height: 2400,
     design_width: 1440,
@@ -38,46 +47,10 @@ function sleep(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
 
-/** Upload a base64 data URL to Printful file library and return the CDN URL. */
-async function uploadFileToPrintful(
-  imageDataUrl: string,
-  apiKey: string,
-  storeId: string,
-): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  let res: Response;
-  try {
-    res = await fetch(`${PRINTFUL_API}/files`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "X-PF-Store-Id": storeId,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        type: "default",
-        data_url: imageDataUrl,
-        filename: "design.png",
-      }),
-    });
-  } catch {
-    return { ok: false, error: "printful_upload_network_error" };
-  }
-
-  let json: Record<string, unknown>;
-  try {
-    json = (await res.json()) as Record<string, unknown>;
-  } catch {
-    return { ok: false, error: "printful_upload_bad_json" };
-  }
-
-  if (!res.ok || (json.code as number) >= 400) {
-    const msg = (json.result as string) ?? (json.error as { message?: string })?.message ?? "upload_failed";
-    return { ok: false, error: `printful_upload_${res.status}: ${msg}`.slice(0, 200) };
-  }
-
-  const url = (json.result as Record<string, unknown>)?.url as string | undefined;
-  if (!url) return { ok: false, error: "printful_upload_no_url" };
-  return { ok: true, url };
+function timedFetch(url: string, init?: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
 /** Generate a product mockup using the Printful Mockup Generator. */
@@ -95,15 +68,21 @@ export async function generateMockup(
   }
   const cfg = PRODUCT_CONFIG[productType as ProductType];
 
-  // ── Step 1: upload design to Printful file library ─────────────────────────
-  const upload = await uploadFileToPrintful(imageDataUrl, apiKey, storeId);
-  if (!upload.ok) return { ok: false as const, error: (upload as { ok: false; error: string }).error };
-  const fileUrl = upload.url;
+  // ── Step 1: parse base64 and upload to R2 ──────────────────────────────────
+  const parsed = parseImageDataUrl(imageDataUrl);
+  if (!parsed) return { ok: false, error: "image_parse_failed" };
+
+  const objectKey = buildDesignKey(parsed.mime);
+  if (!objectKey) return { ok: false, error: "unsupported_image_mime" };
+
+  const r2 = await putDesignObject(objectKey, parsed.buffer, parsed.mime);
+  if (!r2.ok) return { ok: false, error: `r2_upload_failed: ${(r2 as { ok: false; error: string }).error}` };
+  const imageUrl = r2.publicUrl;
 
   // ── Step 2: create mockup task ─────────────────────────────────────────────
   let taskRes: Response;
   try {
-    taskRes = await fetch(`${PRINTFUL_API}/mockup-generator/create-task/${cfg.product_id}`, {
+    taskRes = await timedFetch(`${PRINTFUL_API}/mockup-generator/create-task/${cfg.product_id}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -115,7 +94,7 @@ export async function generateMockup(
         files: [
           {
             placement: cfg.placement,
-            image_url: fileUrl,
+            image_url: imageUrl,
             position: {
               area_width: cfg.area_width,
               area_height: cfg.area_height,
@@ -129,8 +108,9 @@ export async function generateMockup(
         format: "jpg",
       }),
     });
-  } catch {
-    return { ok: false, error: "printful_task_network_error" };
+  } catch (e) {
+    const aborted = e instanceof Error && e.name === "AbortError";
+    return { ok: false, error: aborted ? "printful_task_timeout" : "printful_task_network_error" };
   }
 
   let taskJson: Record<string, unknown>;
@@ -140,12 +120,13 @@ export async function generateMockup(
     return { ok: false, error: "printful_task_bad_json" };
   }
 
-  if (!taskRes.ok || (taskJson.code as number) >= 400) {
-    const msg = (taskJson.result as string) ?? "task_create_failed";
-    return { ok: false, error: `printful_task_${taskRes.status}: ${msg}`.slice(0, 200) };
+  const taskCode = taskJson.code as number | undefined;
+  if (!taskRes.ok || (taskCode !== undefined && taskCode >= 400)) {
+    const msg = (taskJson.error as { message?: string } | undefined)?.message ?? `task_create_${taskRes.status}`;
+    return { ok: false, error: msg.slice(0, 200) };
   }
 
-  const taskKey = (taskJson.result as Record<string, unknown>)?.task_key as string | undefined;
+  const taskKey = (taskJson.result as Record<string, unknown> | undefined)?.task_key as string | undefined;
   if (!taskKey) return { ok: false, error: "printful_task_no_key" };
 
   // ── Step 3: poll until completed ───────────────────────────────────────────
@@ -155,7 +136,7 @@ export async function generateMockup(
 
     let pollRes: Response;
     try {
-      pollRes = await fetch(
+      pollRes = await timedFetch(
         `${PRINTFUL_API}/mockup-generator/task?task_key=${taskKey}`,
         {
           headers: {

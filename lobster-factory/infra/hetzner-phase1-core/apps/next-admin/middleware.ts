@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseMiddlewareClient, isSupabaseAuthConfigured } from "@/lib/supabase/ssr";
-import { getFreshCachedRole, getStaleCachedRole, cacheValidatedRole } from "@/lib/supabase/session-cache";
+import { getFreshCachedRole, consumeStaleCachedRole, cacheValidatedRole } from "@/lib/supabase/session-cache";
 import type { OpsRole } from "@/lib/ops-contracts";
 
 // Identity layer for the admin console (Supabase Auth, email+password).
@@ -76,9 +76,15 @@ function isTransientAuthError(err: unknown): boolean {
   const e = err as { name?: string; status?: number; message?: string };
   if (e.status === 429 || e.status === 502 || e.status === 503 || e.status === 504) return true;
   if (e.name === "AuthRetryableFetchError" || e.name === "AuthUnknownError") return true;
-  const msg = (e.message ?? "").toLowerCase();
-  return msg.includes("rate limit") || msg.includes("fetch failed")
-    || msg.includes("network") || msg.includes("timeout");
+  // Substring fallback only when there is NO authoritative HTTP status (status 0/undefined =
+  // the request never got a real auth verdict). This prevents a genuine 4xx auth REJECTION whose
+  // message happens to contain one of these words from being misclassified as transient.
+  if (e.status === undefined || e.status === 0) {
+    const msg = (e.message ?? "").toLowerCase();
+    return msg.includes("rate limit") || msg.includes("fetch failed")
+      || msg.includes("network") || msg.includes("timeout");
+  }
+  return false;
 }
 
 function resolveRoleFromUser(appMetadata: Record<string, unknown> | undefined): OpsRole {
@@ -131,7 +137,7 @@ export async function middleware(request: NextRequest) {
   // the auth host (the root cause of logged-in users being bounced to /login).
   if (sessionKey) {
     const fresh = getFreshCachedRole(sessionKey);
-    if (fresh) {
+    if (fresh !== null) {
       baseHeaders.set("x-ops-claims-role", fresh);
       return NextResponse.next({ request: { headers: baseHeaders } });
     }
@@ -149,17 +155,17 @@ export async function middleware(request: NextRequest) {
       if (sessionKey) cacheValidatedRole(sessionKey, role);
     } else if (error && sessionKey && isTransientAuthError(error)) {
       // Auth server unreachable / throttled — don't punish a logged-in user. Trust the last
-      // good validation for THIS token if it is still within the stale window.
-      role = getStaleCachedRole(sessionKey);
+      // good validation for THIS token if it is still within the stale window and under cap.
+      role = consumeStaleCachedRole(sessionKey);
     }
   } catch (err) {
     if (sessionKey && isTransientAuthError(err)) {
-      role = getStaleCachedRole(sessionKey);
+      role = consumeStaleCachedRole(sessionKey);
     }
     // Any other throw → role stays null → fail closed below.
   }
 
-  if (!role) {
+  if (role === null) {
     return blockedResponse(request);
   }
 
