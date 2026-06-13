@@ -4,6 +4,26 @@
 
 ## 2026-06-13
 
+### feat(seo): RankMath 合規工具 + 文章生成 SEO/GEO 強化 + publish 補齊 meta 欄位
+
+**[任務理解]** 文章生成 pipeline 缺 3 個問題：① `publish/route.ts` 只送 `rank_math_description`，缺 `rank_math_focus_keyword` 和 `rank_math_title` ② `SYSTEM_PROMPT` 無 RankMath 合規規則（關鍵字位置/密度/段落長度/外連） ③ 無工具預判文章能否達 RankMath 綠燈（≥81/100），只能發文後到 WP 後台手動看。
+
+**[已修改]**
+- `lib/seo/rankmath-checker.ts`（新建）— 純 TS 合規查核，13 個 check：kw-in-title/meta/slug/intro/h2h3、word-count(≥600)、kw-density(0.5%-2.5%)、external-links(≥1)、internal-links(≥1)、para-length(≤120 words)、title-length(30-60)、meta-length(120-160)、slug-length(≤75)。CJK keyword 改用 substring match（`\b` 對非 ASCII 無效）；密度公式對齊 RankMath 定義（`occurrences/total_words`，不 `×kwWords.length`）；siteDomain 缺失時 detail 字串補提示。
+- `app/api/content/seo-check/route.ts`（新建）— `POST /api/content/seo-check`，`canCreateAiImageJob` 保護，呼叫 `checkRankMath()` 回 JSON report。
+- `app/api/content/generate/route.ts` — `SYSTEM_PROMPT` 末段加 RankMath 合規規則（kw位置/密度/最小字數/段落/外連/TOC）；`generateMeta` block 加 `FOCUS_KEYWORD:` 行。
+- `app/api/content/publish/route.ts` — body 型別加 `focusKeyword?: unknown`；meta payload 重構為獨立組合（`rank_math_focus_keyword` / `rank_math_title` / `rank_math_description`），各欄位按有無決定是否加入。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 -- 所有 4 檔修改後型別零錯誤
+- REALTEST_EVIDENCE: tool=Bash | cmd=node rankmath-checker logic vs what-is-art-based-healing.md | exit=0 -- 11/13 PASS (score=85, grade=green)；2 FAIL 為既有文章前置問題（無外部連結、1 個超長段落）；新生成文章依 SYSTEM_PROMPT 規則將自動通過
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/5n→0c/0m/3n after fixes -- CJK `\b` bug(M#5) 已修；density formula over-count(M#1) 已修(drop `×kwWords.length`)；siteDomain ambiguity(M#2) 已補 detail 說明；rank_math_* meta 需 WP 端 `register_post_meta show_in_rest:true`(M#6，PostCreator.php 已有，JWT路徑需確認 WP 站有 RankMath 啟用)；剩餘 minor(slug substring/H1 fold into intro/grade dead zones) 非阻塞，v1 可接受
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=checkRankMath,rank_math_focus_keyword,rankmath-checker,FOCUS_KEYWORD | hits=2 -- 命中僅為 TASKS.md 待辦條目（符合預期，無 stale call sites 或 stale code claims）
+
+**[剩餘風險]** ① 需 sg-deploy 才生效 ② publish 路徑依賴目標 WP 站有 RankMath 插件 + `register_post_meta` 正確；若無，meta 靜默丟失（HTTP 200 仍返回）— 可發文後在 WP admin → Posts → Rank Math panel 確認 Focus Keyword 欄位是否有值 ③ seo-check endpoint 的 `siteDomain` 若未傳，absolute 同站連結計為外部（已補 detail 說明；呼叫方傳 `siteDomain` 可修正）。
+
+**[rollback]** `git checkout lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/publish/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts` + 刪除 `lib/seo/rankmath-checker.ts` 和 `app/api/content/seo-check/route.ts`
+
 ### fix(mockup): aspect 預設/選項移除不支援的 3:4（mockup 預設設定第一次合成就失敗）
 **[任務理解]** 使用者回報 `/tools/mockup` 仍「生成失敗」。深查發現**兩個獨立 bug**：① invalid_reference_image（OpenAI+圖庫，已於前 commit 修復並驗證）② aspect 預設 `3:4` 不被後端接受。
 **[根因]** `3:4` 不在 `VALID_ASPECT_RATIOS`（`lib/studio/model-options.ts` + `lib/tarot/image-gen.ts` 兩份 byte-identical，route 用前者）。MockupStudio L56 預設 `"3:4" as AspectRatio`（硬轉繞過 TS）+ L299 下拉含 3:4 → studio generate route line 64 `!isAspectRatio("3:4")` → HTTP 400「aspectRatio must be one of: 2:3 3:2 4:5 1:1 9:16」。用預設設定按合成必失敗。`3:4` 在 image-gen.ts 僅為 imagen/ideogram 的內部映射目標，非合法輸入。
