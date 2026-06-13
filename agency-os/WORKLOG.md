@@ -4,6 +4,46 @@
 
 ## 2026-06-14
 
+### fix(pod): 修圖/canvas 三個產品邏輯洞（使用者回報）+ 重部署 SG
+
+**[任務理解]** 使用者實測 production 後回報修圖/canvas「功能不健全、有邏輯問題」：① 塔羅調色後，後續批次生成的 78 張卡不吃調整 ② Canvas 文字無中英字型/顏色選擇 ③（延伸）POD 存檔/下載不吃調色。
+
+**[根因 file:line]**
+- 洞1：`generateOne` [TarotStudio.tsx:486] 每張卡 prompt+seed 重生，`renderPrintCard` [renderPrintCard.ts:73] 吃原圖無 filter；調色只活在預覽 CSS + OutputTrackBar 下載鈕。
+- 洞2：`saveToDesigns`/下載 [StudioWorkbench.tsx] 用原始 gen.image。
+- 洞3：`addText` [CanvasEditor.tsx:104] 寫死 fontSize:48/fill:#111/sans-serif。
+
+**[已修改]**
+- `renderPrintCard.ts` — 加 `colorFilter?` 參數，`ctx.filter` 只套 artwork（frame/text 前 reset "none"）。
+- `TarotStudio.tsx` — `generateOne`(前景) + `downloadZip`(背景批次 R2 路徑) 都傳 `grade.cssFilter` → 整副 78 張一致調色（**critic Major catch：downloadZip 原本漏 → 已補**，背景批次 ZIP 是「關瀏覽器」主流程）。
+- `components/tools/bake-css-filter.ts`（新）— client canvas bake CSS filter（neutral/error → 原圖直通，永不 reject）。
+- `StudioWorkbench.tsx` — `saveToDesigns`+`downloadGraded` 輸出含調色。
+- `CanvasEditor.tsx` — FONT_OPTIONS（中:黑/明/楷/圓 + 英:sans/serif/mono/手寫 font stacks）+ 顏色 picker + 字級 slider；選取文字同步控制列；套用 active/新文字。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm run build` | exit=0（兩次：critic Major 修正前後）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 ｜ `npx vitest run lib/studio app/api/tools/image` 70/70
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | deployed=e6ed6616 | healthy 7s | smoke 4/4 200
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -u .. /tools/{tarot,studio,canvas} | 全 307（route 存在+auth 重導，studio 首次 000 為瞬時，重試 307）
+- REVIEW_DONE: critic=Deep | verdict=warn→pass | findings=0c/1M(downloadZip 漏 grade→已修)/3m(已評估:snapshot 行為刻意/crossOrigin 對 data-url inert/remote-url latent，皆非阻塞)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=renderPrintCard\|bakeCssFilter\|FONT_OPTIONS\|applyTextStyle | hits=0 stale -- 3 個 renderPrintCard callsites：line242 模板縮圖(刻意不套色,正確)/506/671 兩出卡路徑已套色
+
+**[剩餘風險]** 調色用 CSS filter（gamma/sharpen 無 canvas-filter 對應，與預覽一致，高保真走 OutputTrackBar 的 Sharp）；中文字型靠檢視者系統字型（Win JhengHei/Mac PingFang，未來可加 web-font）。
+**[部署]** SG production e6ed6616（prev 45fe09e5），LIVE。
+**[rollback]** `git revert e6ed6616` + 相關 checkpoint；或移除各 colorFilter 參數還原。
+
+### fix(db): migration 0036_fingerprint_v2 套用 production Supabase
+
+根因：`upsert_incident_atomic` 12-arg 舊簽章在 DB，code 已升 13-arg → PGRST202 → `/api/webhooks/deploy` 500「db write failed」卡 2 週。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl POST /api/webhooks/deploy` | exit=0 | ms=<2000 → HTTP 200 `{"incident_id":"32584fe1...","transition":"new","occurrence_count":1}`
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（加法式 migration，backward-compat 保證在 SQL 內）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=upsert_incident_atomic | hits=1 confirmed aligned
+- REALTEST_WAIVED: NA -- migration only, no code files changed
+
+---
+
 ### feat(seo): RankMath KB 全覆蓋 — 24測試完整規則 + Setup向導詳設 + Schema + 模組
 
 **[任務理解]** 使用者提供 RankMath 完整 KB（12 份文件索引）要求徹底研究並運用在文章生成和 WP 架站。文件是文章標題索引，需 fetch 原始文章內容。
