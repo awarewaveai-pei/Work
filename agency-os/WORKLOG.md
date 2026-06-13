@@ -3,7 +3,33 @@
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-06-13
-
+### fix(studio): mockup invalid_reference_image — OpenAI 路徑接受 My Designs R2 URL
+**[任務理解]** `/tools/mockup` 在「GPT-Image-1 模型 + My Designs 圖庫圖」回 `生成失敗：invalid_reference_image`。
+**[根因]** `lib/tarot/image-gen.ts` `generateOpenai` 用 `parseDataUrl()` 處理 reference image，只認 `data:` URL；圖庫圖是 R2 public https URL → 回 null → invalid_reference_image。Replicate 模型(nano-banana等)直接 fetch URL 故正常，僅 gpt-image-1 路徑中招。route 驗證(studio/generate) 本就放行 own-design URL，是引擎端不支援。
+**[已修改]** 僅 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/image-gen.ts`
+- import `getDesignsPublicBase`(與 route 同 SSOT 白名單)
+- `isAllowedInputUrl`: SSRF guard，只准 designs bucket origin(https + host 精確比對 + base+"/" prefix)
+- `ownDesignUrlToBlob`: fetch own-design URL → Blob；`redirect:"manual"` 鎖 3xx 繞道；content-type 白名單 png/jpeg/webp；streaming reader + 20MB 硬上限(content-length 缺失也不會先整包進記憶體 → 防 OOM)
+- OpenAI ref loop: data URL→parseDataUrl，否則 own-design URL→fetch；副檔名依實際 mime。引擎層修 = TarotStudio/StudioWorkbench 共用一併修
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/tarot/__tests__/image-gen-ref.tmp.test.ts | exit=0 | ms=423 -- 6/6 pass: ①own-design URL→ok+OpenAI 收到 FormData ②data URL 無 regression ③外部 https→擋+不呼叫 OpenAI ④prefix-host 繞道→擋 ⑤非圖 content-type→擋 ⑥無 content-length 超大串流→擋(OOM guard)。temp test 已刪
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/3n -- 3 Major(OOM/mime/redirect) 全數已修，SSRF guard 經 bypass(suffix/subdomain/@userinfo/query) 實測 verified clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ownDesignUrlToBlob|isAllowedInputUrl|getDesignsPublicBase | hits=0 -- 新符號(ownDesignUrlToBlob/isAllowedInputUrl/OPENAI_REF_MIME) 單一 call site；getDesignsPublicBase 與其他 4 route 用法一致，無 stale consumer
+- verify-build-gates: ALL PASSED (health 100% 373/373)
+**[剩餘風險]** 真正 OpenAI 端對端(含計費)尚未跑，上線後驗；Replicate 路徑不受影響。
+**[rollback]** `git checkout lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/image-gen.ts`
+### deploy(trigger): tarot-batch-generate deployed to EU ??v20260613.2
+**[隞餃??圾]** Deploy packages/workflows to EU self-hosted Trigger.dev (	rigger.aware-wave.com). New task 	arot-batch-generate added; 	rigger.config.ts syncEnvVars now includes BATCH_INTERNAL_SECRET.
+**[撌脖耨?鉛** No code change in this session ??deploy only.
+**[撽?蝯?]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/lobster-trigger-deploy.ps1 | exit=0 | ms=~120000
+- Milestones confirmed: [deploy] Vault secrets loaded ??| [deploy] SERVICE_ROLE_KEY obtained (length=180) ??| === Patch buildImage.js === ??| buildImage.js patched: TRIGGER_API_URL -> http://127.0.0.1:8030 ??| Found 17 env vars to sync ??| Successfully deployed version 20260613.2 ??- Deployment: https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/eshkb6ly
+- Version: 20260613.2 | Tasks detected: 11 | syncEnvVars: 17 vars (BATCH_INTERNAL_SECRET confirmed in trigger.config.ts syncEnvVars block line 131-132; user-env.ps1 persisted BATCH_INTERNAL_SECRET before deploy)
+- Indexer stage #16 [indexer 2/2] passed ??no Cloudflare BFM block (sed patch + --network=host bypassed)
+- REVIEW_WAIVED: NA -- deploy-only, no code change
+- BUGHUNT_WAIVED: NA -- deploy-only
+- AUTO_TASK_DONE: Trigger workflows 摰 deploy ??https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/eshkb6ly ??v20260613.2
 ### feat(content-studio): WP 多站點管理 UI + Supabase CRUD
 
 **[任務理解]** 使用者要求：設一個地方讓使用者可以填入資料 connect to WP 後台，新增和移除網站連結（因客戶可能新增或終止契約）。需要 Supabase 持久化，Token 絕不回傳到 client。
@@ -9842,3 +9868,4 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REVIEW_DONE: critic=Standard | verdict=pass (after full rewrite) | findings=2c/0m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|aspect_ratio.*custom|printDims | hits=0
 - REALTEST_WAIVED: NA -- live FLUX call not needed; schema confirmed via Replicate API; 422 root cause identified from SG server logs
+
