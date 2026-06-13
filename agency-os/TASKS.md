@@ -182,7 +182,7 @@
 #### 工具層 / 基礎建設 / 治理
 
 - [ ] **【2026-06-05 開出】塔羅牌工具 → MEGA → WooCommerce 三階段路線圖**（操作者 2026-06-06 確認方向） — 終點：全部接 WooCommerce 賣貨（參考同事 jonjonesai 的 MEGA「Mass E-commerce Generator & Automator」Streamlit 工具：Research→Idea→Generate(多模型並行)→Select→Process(去背 removal.ai/Tinify)→Mockup(Printful)→Published(WooCommerce+Claude 文案+定價)）。
-  - **Phase 1（現在）tarot 做到好用**：✅ 角色改造(貓取代人, buildCardPrompt 贏家結構, `e6a3a72a`) ✅ 中文自動翻英(haiku) ✅ friendly 錯誤+HTTP200。**待**：(a) 整副 78 張一致性實測微調；(b) 「✨ 幫我想 prompt」按鈕(仿 MEGA Beautify, Claude 生 art-direction prompt)；(c) OpenAI gpt-image 待操作者加 billing(`billing_hard_limit_reached`)；(d) enhancements: upscale 827×1417 / R2 / Trigger.dev 批次 / server quota。
+  - **Phase 1（現在）tarot 做到好用**：✅ 角色改造(貓取代人, buildCardPrompt 贏家結構, `e6a3a72a`) ✅ 中文自動翻英(haiku) ✅ friendly 錯誤+HTTP200 ✅ 「✨ 幫我想 prompt」按鈕(`suggest-prompt` route, Claude Haiku art-direction) ✅ batch skip-done(跳過已完成牌張, 加「重新生成全組」, `3c4fbcba`)。**待**：(a) 整副 78 張一致性實測微調（需操作者實際跑 batch 觀察風格一致性）；(c) OpenAI gpt-image 待操作者加 billing(`billing_hard_limit_reached`)；(d) enhancements: upscale 827×1417 / Trigger.dev 批次 / server quota。
   - **Phase 2 MEGA**：多商品 POD 流水線（多生成器、去背、Printful mockup、設計庫重用、多用戶用量限制）。工程量 ≈ 現 tarot 的 15-20×，需分期。
   - **Phase 3 WooCommerce**：商品 publish + Claude 文案 + 定價/尺寸表（taiwanmerch.co 模式）。
   - **參考**：WORKLOG 2026-06-05/06 tarot entries；MEGA 截圖(操作者提供)。
