@@ -59,14 +59,15 @@ interface ModelConfig {
   buildInput?: (p: BuildInputParams) => Record<string, unknown>;
 }
 
-// ── Print-quality pixel dimensions for FLUX (tarot card standard: 7.6×12.6 cm @ 300 DPI) ──
-// 7.6 cm × 300 / 2.54 = 897 px; 12.6 cm × 300 / 2.54 = 1488 px (both divisible by 16).
+// ── Print-quality pixel dimensions for FLUX (capped at Replicate le=1440 hard limit) ──
+// Target was 7.6×12.6 cm @ 300 DPI = 897×1488, but Replicate FLUX enforces width/height ≤ 1440.
+// All values are multiples of 16 (FLUX requirement). 2:3 and 3:2 recalculated at the 1440 ceiling.
 const FLUX_PRINT_DIMS: Record<AspectRatio, [number, number]> = {
-  "2:3":  [896, 1488],  // portrait tarot: 7.6×12.6 cm @ 300 DPI
-  "3:2":  [1488, 896],
-  "4:5":  [1024, 1280],
-  "1:1":  [1200, 1200],
-  "9:16": [896, 1600],
+  "2:3":  [960, 1440],   // exact 2:3 at ceiling — was [896, 1488] which 422'd (h > 1440)
+  "3:2":  [1440, 960],   // exact 3:2 at ceiling — was [1488, 896] which 422'd (w > 1440)
+  "4:5":  [1024, 1280],  // within limit
+  "1:1":  [1200, 1200],  // within limit
+  "9:16": [816, 1440],   // ≈9:16 (0.7% off) — was [896, 1600] which 422'd (h > 1440)
 };
 
 // ── Aspect ratio mapping helpers (verified against live Replicate schemas 2026-06-11) ──
@@ -329,13 +330,12 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
 
   const seed = params.seed ?? Math.floor(Math.random() * 1_000_000_000);
   const ar = (params.aspectRatio ?? "2:3") as AspectRatio;
-  // FLUX schnell/dev require aspect_ratio:"custom" to use explicit width/height (standard Replicate schema).
+  // Live Replicate FLUX enum excludes "custom" (422 verified 2026-06-12). Pass width+height without aspect_ratio.
   const printDims = FLUX_PRINT_DIMS[ar] ?? FLUX_PRINT_DIMS["2:3"];
   const input: Record<string, unknown> = params.printQuality
     ? {
         prompt: params.prompt,
-        // aspect_ratio is mutually exclusive with width/height on Replicate FLUX.
-        // "custom" is not in the live enum → 422. Omit it and let the model derive ratio from dims.
+        // "custom" removed from live enum (422 from server 2026-06-12). Width+height passed directly.
         width: printDims[0],
         height: printDims[1],
         output_format: "png",

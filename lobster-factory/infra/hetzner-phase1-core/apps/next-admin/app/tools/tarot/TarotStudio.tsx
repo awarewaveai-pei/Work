@@ -153,6 +153,8 @@ export default function TarotStudio() {
   const [styleEnglish, setStyleEnglish] = useState("");
   const [styleEnglishEdited, setStyleEnglishEdited] = useState(false);
 
+  const [suggestBusy, setSuggestBusy] = useState(false);
+
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [previewSeed, setPreviewSeed] = useState<number | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -289,6 +291,34 @@ export default function TarotStudio() {
       return false;
     }
     return true;
+  }
+
+  async function suggestPrompt() {
+    const hint = stylePrompt.trim() || subjectText.trim();
+    if (!hint) {
+      setMessage("請先在「風格描述」或「主角」欄填入提示，再讓 AI 幫你生成 prompt");
+      return;
+    }
+    setSuggestBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/tools/tarot/suggest-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
+        body: JSON.stringify({ hint, subject: subjectText.trim() || undefined }),
+      });
+      const data = (await res.json()) as { ok: boolean; prompt?: string; error?: string };
+      if (!data.ok || !data.prompt) {
+        setMessage(`AI 無法生成 prompt：${data.error ?? "unknown"}`);
+        return;
+      }
+      setStyleEnglish(data.prompt);
+      setStyleEnglishEdited(true);
+    } catch (e) {
+      setMessage(`AI 生成失敗：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSuggestBusy(false);
+    }
   }
 
   async function generatePreview() {
@@ -737,10 +767,29 @@ export default function TarotStudio() {
           </div>
 
           <div style={{ marginTop: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
               <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
                 🎨 <b>實際送給圖片模型的英文</b>（可直接改，改了就送這段）
               </span>
+              <button
+                type="button"
+                disabled={locked || suggestBusy}
+                onClick={() => void suggestPrompt()}
+                title="用 AI 根據你的風格提示自動生成英文 art-direction prompt"
+                style={{
+                  fontSize: 11,
+                  padding: "3px 10px",
+                  borderRadius: 10,
+                  border: "1px solid #6366f1",
+                  background: locked || suggestBusy ? "rgba(127,127,127,0.08)" : "#eef2ff",
+                  color: locked || suggestBusy ? "var(--text-muted)" : "#4338ca",
+                  cursor: locked || suggestBusy ? "default" : "pointer",
+                  fontWeight: 500,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {suggestBusy ? "✨ AI 生成中…" : "✨ 幫我想 prompt"}
+              </button>
               {styleEnglishEdited && (
                 <button
                   type="button"
