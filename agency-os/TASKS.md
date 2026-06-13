@@ -51,7 +51,7 @@
 ### 未完成
 
 #### 待釐清 / 明日提醒
-> `/tomo` 自動寫入此分類；handoff packet 路徑見 `agency-os/handoffs/`
+> `/tomo` 自動寫入此分類
 
 - [ ] **【明日提醒 2026-06-13｜High-risk DB migration，需 go-ahead】套 `lobster-factory/packages/db/migrations/0036_fingerprint_v2.sql` 到 production Supabase** — 修 webhook `/api/webhooks/deploy` 持續 500「db write failed」。根因：部署 code 呼叫 RPC `upsert_incident_atomic` 13-arg 新簽章（含 `p_fingerprint_v2`），live DB 只有舊 12-arg → PGRST202『function ... p_fingerprint_v2 ... not found in schema cache』。06-09 首次失敗藏一週。0036 = ADD COLUMN fingerprint_v2(nullable) + DROP/CREATE 13-arg function（rollback 在檔內 :112-117）。**套用後驗證**：重觸發 SG Deploy → 結尾 ops-inbox POST 應回 HTTP 2xx 而非 500；Telegram `/deploy_status` 應見新 deploy 事件。背景 WORKLOG 2026-06-12 commit `012929d5`。雲端排程提醒已建：routine `trig_012NGUD1vUpsZ1Xyxk2qswYT`（reminder-only）。
 - [ ] **【進行中｜app.aware-wave 一鍵架站總藍圖】MASTER PLAN = `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`**（5 階段路線圖 SSOT）。✅ Stage 0 建站引擎閉環已驗（run 655197bf completed + curl 200，2026-06-06）。**下一步 = Stage 1 接通入口**：抓 2 筆卡 `spec_generated` 的 intake_forms → retry `POST /api/onboarding/trigger-build` 看精確錯誤碼（最可疑 trigger-build/route.ts L35-39 role 403 或 UI「跳回第一步」沒帶 spec/intake id）→ 對症修 → onboarding UI 走完一筆不碰 DB 達 completed。後續 Stage 2 Fluent Form→intake 橋接+FluentCRM／Stage 3 報價／Stage 4 機層租機(provisionClient 已寫好未接)／Stage 5 串接 Supabase/n8n/Sentry/Netdata/Uptime Kuma/PostHog。**動前 `git log -5` + 讀 WORKLOG（trigger-build 平行 session 觸碰過，VBC）。**

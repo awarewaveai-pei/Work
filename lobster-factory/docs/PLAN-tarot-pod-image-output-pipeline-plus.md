@@ -1247,22 +1247,22 @@ export function toCssFilter(s): string             // 預覽 hue-rotate/saturate
 
 ---
 
-### [1-e] `app/api/tools/image/process/route.ts`
+### [1-e] `app/api/tools/image/process/route.ts` — ✅ 已實作（2026-06-13）
 
-需求：
+> **已交付**：vitest 14/14（route handler 直呼）+ `tsc --noEmit` 0 + critic Deep（修 Major canvas mime 謊報 + Minor 錯誤洩漏）。全 studio+image 套件 50→54 綠無 regression。
 
 ```txt
-☐ runtime nodejs
-☐ maxDuration 60
-☐ discriminated union request validation
-☐ auth
-☐ imageUrl security guard
-☐ fetch image
-☐ web → toProductImage()
-☐ print → toPrintPdf()
-☐ canvas → return imageUrl
-☐ 錯誤訊息清楚
+☑ runtime nodejs + maxDuration 60
+☑ discriminated union 驗證（mode: web|print|canvas，各分支再驗 preset/destination，無 fall-through）
+☑ auth（resolveOpsRole + canCreateAiImageJob→403）+ flag（POD_DESIGNS_ENABLED→503）
+☑ 安全：input=base64 data URL（無任意 URL fetch = SSRF 零表面）— 刻意偏離 plan「fetch image/imageUrl guard」採 codebase 安全慣例（remove-bg:31）
+☑ web → toProductImage()（sRGB WebP data URL）
+☑ print → toPrintFile()（CMYK PDF / TGC sRGB PNG；OutputIntent gate throw → catch 轉 ok:false code=output_intent_not_deployed，非 500）
+☑ canvas → pass-through echo（mime/ext 由實際 data URL 推導，非硬編）
+☑ 錯誤訊息清楚（友善中文 + code；lib 內部訊息只 log server-side 不外洩）
 ```
+
+> **剩餘風險**：① body-size = nginx `client_max_body_size 50M` 邊界（共用慣例，remove-bg/generate 同；非本 PR 引入）② consumer UI（[1-f]/[1-j/k]）尚未接 → endpoint 已就緒待 wire。
 
 ---
 

@@ -57,6 +57,12 @@ function decodeDataUrl(dataUrl: string): Buffer {
   return Buffer.from(dataUrl.slice(comma + 1), "base64");
 }
 
+/** Map a DATA_URL_RE subtype capture (png|jpeg|jpg|webp) to mime + file extension. */
+function mimeAndExt(subtype: string): { mime: string; ext: string } {
+  const norm = subtype === "jpg" ? "jpeg" : subtype; // canonical mime subtype
+  return { mime: `image/${norm}`, ext: norm === "jpeg" ? "jpg" : norm };
+}
+
 /**
  * Normalise an optional colorGrade payload. TS types are erased at runtime, so this
  * is the API boundary's schema check (color-grade.ts:54 "second line"): anything that
@@ -94,21 +100,25 @@ export async function POST(request: Request) {
     return jsonError("mode must be one of: web | print | canvas", 400);
   }
 
-  // Shared: every mode needs a valid base64 data-URL image.
-  if (typeof body.image !== "string" || !DATA_URL_RE.test(body.image)) {
+  // Shared: every mode needs a valid base64 data-URL image. Capture the subtype so
+  // canvas pass-through reports the REAL mime (not a hardcoded png lie — critic Major).
+  const imageMatch = typeof body.image === "string" ? body.image.match(DATA_URL_RE) : null;
+  if (!imageMatch) {
     return jsonError("image must be a png/jpeg/webp base64 data URL", 400);
   }
-  if (body.image.length > MAX_IMAGE_CHARS) {
+  const image = body.image as string;
+  if (image.length > MAX_IMAGE_CHARS) {
     return jsonError("image too large (~9MB limit)", 413);
   }
-  const input = decodeDataUrl(body.image);
+  const input = decodeDataUrl(image);
   const colorGrade = normaliseColorGrade(body.colorGrade);
 
   try {
     if (mode === "canvas") {
       // Pass-through: editing is client-side (Fabric.js). Echo the validated image
-      // back unchanged so the caller has one consistent contract across modes.
-      return NextResponse.json({ ok: true, mode, image: body.image, mime: "image/png", filename: "canvas.png" });
+      // back unchanged, with mime/ext derived from the actual input data URL.
+      const { mime, ext } = mimeAndExt(imageMatch[1]);
+      return NextResponse.json({ ok: true, mode, image, mime, filename: `canvas.${ext}` });
     }
 
     if (mode === "web") {
@@ -150,7 +160,10 @@ export async function POST(request: Request) {
         code: "output_intent_not_deployed",
       });
     }
+    // Log the raw library message server-side only; return a generic code so we don't
+    // leak sharp/pdf-lib internals (paths, pixel-limit detail) to the client (critic Minor).
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ ok: false, error: `image_process_failed: ${message}`, code: "bake_failed" });
+    console.error(`[image/process] bake failed (mode=${mode}):`, message);
+    return NextResponse.json({ ok: false, error: "影像處理失敗，請重試或換一張圖。", code: "bake_failed" });
   }
 }

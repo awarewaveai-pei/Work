@@ -57,6 +57,28 @@ describe("POST /api/tools/image/process — gates", () => {
     const r2 = await POST(makeRequest({ mode: "print", image: img, destination: "nope" }, OP));
     expect(r2.status).toBe(400);
   });
+
+  it("413 when image exceeds the size ceiling", async () => {
+    const huge = "data:image/png;base64," + "A".repeat(12_000_001);
+    const res = await POST(makeRequest({ mode: "web", image: huge, preset: "web-square" }, OP));
+    expect(res.status).toBe(413);
+  });
+
+  it("valid prefix + garbage base64 payload → ok:false bake_failed (caught, not 500)", async () => {
+    const res = await POST(
+      makeRequest({ mode: "web", image: "data:image/png;base64,@@@@notvalid", preset: "web-square" }, OP),
+    );
+    expect(res.status).toBe(200); // caught, not 500
+    const j = await res.json();
+    expect(j.ok).toBe(false);
+    expect(j.code).toBe("bake_failed");
+  });
+
+  it("mpc (CMYK) also hits the OutputIntent deploy gate (same as tw-local)", async () => {
+    const res = await POST(makeRequest({ mode: "print", image: await pngDataUrl(), destination: "mpc" }, OP));
+    expect(res.status).toBe(200);
+    expect((await res.json()).code).toBe("output_intent_not_deployed");
+  });
 });
 
 describe("POST /api/tools/image/process — bake modes", () => {
@@ -96,13 +118,28 @@ describe("POST /api/tools/image/process — bake modes", () => {
     expect(j.code).toBe("output_intent_not_deployed");
   });
 
-  it("canvas → echoes the validated image back", async () => {
+  it("canvas → echoes the validated image back with the REAL mime (not hardcoded png)", async () => {
     const img = await pngDataUrl();
     const res = await POST(makeRequest({ mode: "canvas", image: img }, OP));
     expect(res.status).toBe(200);
     const j = await res.json();
     expect(j.ok).toBe(true);
     expect(j.image).toBe(img);
+    expect(j.mime).toBe("image/png");
+    expect(j.filename).toBe("canvas.png");
+  });
+
+  it("canvas with a webp input reports image/webp, NOT image/png [critic Major]", async () => {
+    const buf = await sharp({
+      create: { width: 50, height: 50, channels: 3, background: { r: 1, g: 2, b: 3 } },
+    })
+      .webp()
+      .toBuffer();
+    const img = `data:image/webp;base64,${buf.toString("base64")}`;
+    const res = await POST(makeRequest({ mode: "canvas", image: img }, OP));
+    const j = await res.json();
+    expect(j.mime).toBe("image/webp");
+    expect(j.filename).toBe("canvas.webp");
   });
 
   it("garbage colorGrade does not 500 the web bake [defense-in-depth]", async () => {
