@@ -134,15 +134,18 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
     detail: `${wordCount} words (min 600)`,
   });
 
-  // 7. kw-density
+  // 7. kw-density (RankMath: occurrences / total words)
   const kwWords = kw.split(/\s+/);
+  const kwIsAscii = /^[\x00-\x7F]+$/.test(kw);
   let kwOccurrences = 0;
-  if (kwWords.length === 1) {
+  if (kwWords.length === 1 && kwIsAscii) {
+    // ASCII single-word: word-boundary match
     kwOccurrences = (plain.match(new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g")) ?? []).length;
   } else {
+    // Multi-word OR CJK: plain substring (\b doesn't work for non-ASCII)
     kwOccurrences = (plain.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length;
   }
-  const density = wordCount > 0 ? (kwOccurrences * kwWords.length) / wordCount : 0;
+  const density = wordCount > 0 ? kwOccurrences / wordCount : 0;
   const densityPct = Math.round(density * 1000) / 10;
   const densityPass = density >= 0.005 && density <= 0.025;
   checks.push({
@@ -184,7 +187,9 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
     id: "internal-links",
     label: "At least 1 internal link",
     pass: intPass,
-    detail: intPass ? `${intlinkCount} internal link(s) found` : "No internal links found",
+    detail: intPass
+      ? `${intlinkCount} internal link(s) found`
+      : `No internal links found${!siteDomain ? " (pass siteDomain to count absolute same-site links)" : ""}`,
   });
 
   // 10. para-length
