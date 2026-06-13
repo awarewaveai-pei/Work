@@ -26,7 +26,12 @@ export interface RankMathReport {
 }
 
 function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
+  const cjkCount = (text.match(/[一-鿿㐀-䶿＀-￯　-〿]/g) ?? []).length;
+  const latinCount = text
+    .replace(/[一-鿿㐀-䶿＀-￯　-〿]/g, " ")
+    .split(/\s+/)
+    .filter(w => /[a-zA-Z0-9]/.test(w)).length;
+  return cjkCount + latinCount;
 }
 
 function stripMarkdown(md: string): string {
