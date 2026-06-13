@@ -142,6 +142,7 @@ export async function POST(req: Request): Promise<Response> {
     slug?: unknown;
     seoTitle?: unknown;
     metaDescription?: unknown;
+    focusKeyword?: unknown;
     categories?: unknown;
     scheduleDate?: unknown;
     siteId?: unknown;
@@ -199,11 +200,19 @@ export async function POST(req: Request): Promise<Response> {
     payload.date = body.scheduleDate.trim();
   }
 
+  const metaPayload: Record<string, string> = {};
   if (typeof body.metaDescription === "string" && body.metaDescription.trim()) {
-    payload.meta = {
-      _yoast_wpseo_metadesc: body.metaDescription.trim(),
-      rank_math_description: body.metaDescription.trim(),
-    };
+    metaPayload._yoast_wpseo_metadesc = body.metaDescription.trim();
+    metaPayload.rank_math_description  = body.metaDescription.trim();
+  }
+  if (typeof body.seoTitle === "string" && body.seoTitle.trim()) {
+    metaPayload.rank_math_title = body.seoTitle.trim();
+  }
+  if (typeof body.focusKeyword === "string" && body.focusKeyword.trim()) {
+    metaPayload.rank_math_focus_keyword = body.focusKeyword.trim();
+  }
+  if (Object.keys(metaPayload).length > 0) {
+    payload.meta = metaPayload;
   }
 
   let res: Response;

@@ -24,9 +24,10 @@ export async function PATCH(req: Request): Promise<Response> {
   try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
 
   const siteId = typeof body.siteId === "string" ? body.siteId.trim() : "";
-  const postId = typeof body.postId === "number" ? body.postId : parseInt(String(body.postId), 10);
+  const rawId = typeof body.postId === "number" ? body.postId : parseInt(String(body.postId), 10);
+  const postId = Number.isInteger(rawId) && rawId > 0 ? rawId : NaN;
   if (!siteId) return NextResponse.json({ ok: false, error: "siteId required" }, { status: 400 });
-  if (!postId || isNaN(postId)) return NextResponse.json({ ok: false, error: "postId required" }, { status: 400 });
+  if (isNaN(postId)) return NextResponse.json({ ok: false, error: "postId must be a positive integer" }, { status: 400 });
 
   const site = await getSiteToken(siteId);
   if (!site) return NextResponse.json({ ok: false, error: "Site not found or token missing" }, { status: 404 });
@@ -85,9 +86,10 @@ export async function DELETE(req: Request): Promise<Response> {
   try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
 
   const siteId = typeof body.siteId === "string" ? body.siteId.trim() : "";
-  const postId = typeof body.postId === "number" ? body.postId : parseInt(String(body.postId), 10);
-  if (!siteId || !postId || isNaN(postId))
-    return NextResponse.json({ ok: false, error: "siteId and postId required" }, { status: 400 });
+  const rawDelId = typeof body.postId === "number" ? body.postId : parseInt(String(body.postId), 10);
+  const postId = Number.isInteger(rawDelId) && rawDelId > 0 ? rawDelId : NaN;
+  if (!siteId || isNaN(postId))
+    return NextResponse.json({ ok: false, error: "siteId and postId (positive integer) required" }, { status: 400 });
 
   const site = await getSiteToken(siteId);
   if (!site) return NextResponse.json({ ok: false, error: "Site not found" }, { status: 404 });

@@ -48,14 +48,16 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
+// WP returns post.date as site-local time with no TZ offset (e.g. "2026-06-13T14:00:00").
+// Do NOT round-trip through new Date() — that would shift by the browser's UTC offset.
+// datetime-local input uses the same YYYY-MM-DDTHH:MM format, so we just slice/pad.
 function toDatetimeLocal(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return iso.slice(0, 16); // "2026-06-13T14:00:00" → "2026-06-13T14:00"
 }
 
 function fromDatetimeLocal(val: string): string {
-  return new Date(val).toISOString().replace(/\.\d{3}Z$/, "");
+  // Return site-local as WP expects: YYYY-MM-DDTHH:MM:SS (no TZ offset)
+  return val.length === 16 ? `${val}:00` : val;
 }
 
 const DOW_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
@@ -70,7 +72,10 @@ interface EditModalProps {
 }
 
 function EditModal({ post, onClose, onSaved, onDeleted }: EditModalProps) {
-  const [dateVal, setDateVal]   = useState(toDatetimeLocal(post.date));
+  const [dateVal, setDateVal]   = useState(() => toDatetimeLocal(post.date));
+
+  // Re-sync when post.date changes after a save (prevents stale field on re-edit)
+  useEffect(() => { setDateVal(toDatetimeLocal(post.date)); }, [post.date]);
   const [saving, setSaving]     = useState(false);
   const [publishing, setPub]    = useState(false);
   const [deleting, setDeleting] = useState(false);
