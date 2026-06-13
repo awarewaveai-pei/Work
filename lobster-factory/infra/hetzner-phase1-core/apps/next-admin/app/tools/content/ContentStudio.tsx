@@ -550,6 +550,7 @@ export default function ContentStudio() {
     setGenerated(""); setMetaData(null);
     setGenStatus("streaming"); setGenError("");
     setPubStatus("idle"); setPubResult(null);
+    setSeoReport(null); setSeoChecking(false);
     setShowSyn(false); setSynStatus("idle"); setSynContent({});
 
     try {
@@ -579,6 +580,23 @@ export default function ContentStudio() {
       if (meta) { setMetaData(meta); setGenerated(stripMeta(text)); }
       else        { setGenerated(text); }
       setGenStatus("done");
+
+      // fire SEO check in background — non-blocking
+      const seoMd = meta ? stripMeta(text) : text;
+      setSeoChecking(true);
+      fetch("/api/content/seo-check", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          markdown: seoMd,
+          focusKeyword: form.keyword,
+          seoTitle: meta?.seoTitle ?? "",
+          metaDescription: meta?.metaDesc ?? "",
+          slug: slugify(form.keyword),
+        }),
+      })
+        .then(r => r.ok ? r.json() as Promise<RankMathReport> : null)
+        .then(j => { if (j) setSeoReport(j); })
+        .finally(() => setSeoChecking(false));
     } catch (err) {
       if ((err as Error).name === "AbortError") setGenStatus("idle");
       else { setGenStatus("error"); setGenError("產生失敗，請重試"); }
@@ -1444,6 +1462,9 @@ export default function ContentStudio() {
               <div className="form-hint" style={{ marginTop: "6px" }}>
                 可直接編輯後推送。<code>{"<!-- NEEDS_BRAND_VERIFY -->"}</code> = 填入真實品牌資料。
               </div>
+
+              {/* ── RankMath SEO 合規分數 ── */}
+              <SeoCheckPanel report={seoReport} loading={seoChecking} />
 
               {/* ── 社群圖片生成 ── */}
               {genStatus === "done" && hasContent && (
