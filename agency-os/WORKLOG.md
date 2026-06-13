@@ -4,6 +4,39 @@
 
 ## 2026-06-13
 
+### feat(pod): 修圖積木 (色階/銳利度) + 三軌輸出 UI + Fabric canvas — Phase 1 [1-f]~[1-k]
+
+**[任務理解]** 使用者問兩功能是否已做：(1) 修圖功能（色階/亮度/飽和度/色相/銳利度/去背）要像積木任意加到工具；(2) 客製商品上傳圖+寫字即時預覽（f 開頭 js = Fabric.js）。讀 plan + code 確認：後端 seam ([1-b/c/d]) 與 API route ([1-e], 另一 session 12:51 建) 已完成，但 UI 全缺、fabric 未裝。使用者指示「直接做好」+ hue/sat/bri **加上**色階/銳利度。
+
+**[已修改]**
+- `lib/studio/color-grade.ts` — 擴 seam 加 3 積木：levels (`toSharpLevels` → Sharp `.linear(a,b)` 黑/白點 input remap) + gamma (`.gamma` 1.0–3.0) + sharpen (`.sharpen` sigma)；新增 `applyColorGrade(img, params)` 組裝器（modulate→levels→gamma→sharpen，每塊中性跳過，**積木 SSOT 單一處**）；新欄位 **optional**（向後相容既有 3-field 呼叫）；`import type { Sharp }` 純型別（client-safe）
+- `lib/studio/print-destinations.ts` — **NEW 純資料模組**：types + `PRINT_DESTINATIONS` + `IccProfileName` + geometry，零 sharp/pdf-lib/node import（client 可安全 import）
+- `lib/studio/to-print-file.ts` — 改用 `applyColorGrade`；資料層拆到 print-destinations 並 re-export（route.ts 等既有 importer 不變）
+- `lib/studio/to-product-image.ts` — 改用 `applyColorGrade`
+- `lib/studio/ghostscript-pdfx.ts` — `IccProfileName` 移到 print-destinations，type-only import 回來 re-export
+- `components/tools/ColorGradePanel.tsx` — **NEW** [1-f]：7 滑桿（色彩/色階/銳利度三組）+ `useColorGrade` hook + reset + CSS 即時預覽 + disclaimer
+- `components/tools/OutputTrackBar.tsx` — **NEW** [1-g]：🌐網頁/🖨印刷(目的地下拉)/✏️快速編輯；POST `/api/tools/image/process`；deploy-gate CMYK 友善訊息
+- `components/tools/canvas-handoff.ts` — **NEW**：sessionStorage 交接（base64 圖太大無法走 query string）
+- `app/tools/canvas/page.tsx` + `CanvasEditor.tsx` — **NEW** [1-h/i]：Fabric.js v7 編輯器（dynamic import 不進 server bundle / 上傳圖 / 加文字 IText / 拖拉縮放 / export PNG / 存 designs / 下載）
+- `app/tools/studio/StudioWorkbench.tsx` [1-k] + `app/tools/tarot/TarotStudio.tsx` [1-j] — 接 ColorGradePanel + OutputTrackBar；預覽圖套 cssFilter；Tarot 給 4 卡片目的地（尺寸正確），POD 不給（卡片尺寸不適服飾，不假造）
+- 測試：`__tests__/color-grade.test.ts` + `to-product-image.test.ts` 擴充（新積木 + levels 真 bake REALTEST）
+- 裝 `fabric@^7.4.0`（直接 dep，已 pin）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm run build` | exit=0 | ms=120000 (Next prod build；/tools/canvas + /tools/studio + /tools/tarot 全編譯；fabric 正確打包；**抓到並修真實 bug**：client 元件 import to-print-file 把 sharp 拉進瀏覽器 bundle → node:events webpack fail → 拆 print-destinations 純資料模組修復)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/studio app/api/tools/image` | exit=0 | ms=1110 (58/58 pass)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n (修 2 個我新寫的 Minor：CanvasEditor 存檔加 roleHeader 防 403；addText/uploadImage await 後重檢 fabricRef 防 disposed-canvas 操作)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=toSharpModulate\|PRINT_DESTINATIONS\|IccProfileName\|getPrintGeometry\|applyColorGrade | hits=0 (無 stale call site；route.ts 走 re-export，build 已證解析；agency-os/scripts 命中 0)
+
+**[剩餘風險]**
+- R2 CORS → canvas taint 為 integration test（plan §14.3，需真 R2 + 瀏覽器），本機/build 驗不到；今 handoff 只傳 data URL（無 taint），維持此不變式即安全
+- 印刷 CMYK PDF 仍 deploy-gated（[0-a-gs] Alpine gs + ICC 未部署）；TGC sRGB PNG 可用，CMYK 目的地會回友善 ok:false
+- POD 商品（非卡片尺寸）印刷檔為後續切片，目前 POD 只開 web+canvas+調色
+- 需 SG 部署才能 end-to-end UI 驗（瀏覽器拖滑桿/開 canvas）
+
+**[rollback]** `git revert HEAD`（前端積木移除不影響生圖；`npm uninstall fabric`）
+
 ### fix(tarot): batch generation skip-done + ghostscript Buffer type
 
 **[任務理解]** 繼續 Phase 1 tarot。(b) suggest-prompt 已完成，修正批次生成的兩個問題：(1) generateGroup() 會重複生成已完成的牌，浪費 API 費用；(2) ghostscript-pdfx.ts Buffer 型別不相容導致 tsc error。

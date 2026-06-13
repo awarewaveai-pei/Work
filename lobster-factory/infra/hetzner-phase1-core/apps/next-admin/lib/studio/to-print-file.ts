@@ -46,7 +46,7 @@ export type PrintFileResult = { buffer: Buffer; mime: string };
 
 /**
  * Bake one print file for a destination. `colorGrade` is optional and routed through
- * `toSharpModulate` (neutral-skipped, garbage→neutral defense — same contract as [1-c]).
+ * `applyColorGrade` (each block neutral-skipped, garbage→neutral defense — same as [1-c]).
  *
  * Branches per plan §10.2: resize → colorSpace block → format block → outputIntent block.
  */

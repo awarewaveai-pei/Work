@@ -19,6 +19,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Canvas as FabricCanvas, FabricObject } from "fabric";
+import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_SOURCE_KEY } from "@/components/tools/canvas-handoff";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -79,6 +80,7 @@ export default function CanvasEditor() {
     const canvas = fabricRef.current;
     if (!canvas) return;
     void import("fabric").then((fabric) => {
+      if (fabricRef.current !== canvas) return; // unmounted/disposed mid-import
       const text = new fabric.IText("雙擊編輯文字", {
         left: canvas.getWidth() / 2,
         top: canvas.getHeight() / 2,
@@ -102,6 +104,7 @@ export default function CanvasEditor() {
       const dataUrl = reader.result as string;
       void import("fabric").then(async (fabric) => {
         const img = await fabric.FabricImage.fromURL(dataUrl, { crossOrigin: "anonymous" });
+        if (fabricRef.current !== canvas) return; // unmounted/disposed mid-import/decode
         const scale = Math.min((canvas.getWidth() * 0.6) / (img.width || 1), 1);
         img.scale(scale);
         canvas.add(img);
@@ -149,7 +152,7 @@ export default function CanvasEditor() {
     try {
       const res = await fetch("/api/tools/designs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
         body: JSON.stringify({ image: png, prompt: "canvas edit", modelName: "canvas", source: "canvas" }),
       });
       const json = (await res.json()) as { ok: boolean; error?: string };

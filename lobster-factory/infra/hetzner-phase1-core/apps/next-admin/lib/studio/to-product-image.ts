@@ -46,7 +46,7 @@ const SHARP_LIMIT_INPUT_PIXELS = 50_000_000;
 
 /**
  * Bake one web WebP. `colorGrade` is optional and clamped/neutral-checked inside
- * `toSharpModulate` (no-op skipped). Returns the encoded WebP buffer.
+ * `applyColorGrade` (each block no-op skipped). Returns the encoded WebP buffer.
  */
 export async function toProductImage(
   input: Buffer,
