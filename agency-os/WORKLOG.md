@@ -4,6 +4,26 @@
 
 ## 2026-06-14
 
+### feat(studio): Printful Mockup Generator pipeline — design → R2 → product photo
+
+**[任務理解]** Nano Banana 2 mockup 品質不合格（設計與衣服沒有融合，只是兩張圖疊放）。根本問題：image_input 被當 style reference，非 composite target。解法：改用 Printful Mockup Generator API（POD 業界標準）— 真實商品攝影 + 專業合成。
+
+**[已修改]**
+- `lib/studio/printful-mockup.ts`（新）— Printful Mockup Generator seam：base64 dataURL → R2 upload（lobster-designs bucket）→ POST /mockup-generator/create-task/71 → poll → return CDN JPEG URL。timedFetch 25s AbortController（同 print-provider.ts 慣例）。
+- `app/api/tools/studio/mockup/route.ts`（新）— POST endpoint；POD_DESIGNS_ENABLED gate；ops-role auth；imageDataUrl 驗證；friendlyError mapping。runtime=nodejs, maxDuration=120。
+- `app/tools/studio/StudioWorkbench.tsx` — 新增「產品 Mockup」按鈕（bgState=done + productType=tshirt 才顯示）；mockupState/mockupUrl state；mockupInFlight ref（double-click guard）；generateMockupFromDesign callback；mockup preview img。
+- `infra/hetzner-phase1-core/docker-compose.yml` — next-admin environment 加 PRINTFUL_API_KEY + PRINTFUL_STORE_ID。
+- `mcp/user-env.ps1` — 新增 PRINTFUL_API_KEY + PRINTFUL_STORE_ID（本機 vault SSOT）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=Python end-to-end pipeline test（FLUX schnell PNG → R2 lobster-designs upload → Printful create-task/71 → poll=completed → CDN JPEG） | exit=0 | mockup_url=https://printful-upload.s3-accelerate.amazonaws.com/tmp/b5c80e210b37297dc42e3f859a55533c/unisex-staple-t-shirt-white-front-6a2db9970513a.jpg | 視覺結果：曼陀羅設計完整印在白色 Bella Canvas 3001 上，無白色底框，專業居中，與布料融合（Read image tool 目視確認）
+- REVIEW_DONE: critic=Deep | verdict=warn→pass | findings=2C/2M fixed (C1: data_url→R2 public URL；C2: no AbortController；M1: error message extraction；M2: no in-flight ref guard — 全部套用)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=generateMockup\|printful-mockup\|PRINTFUL_API_KEY | hits=0 stale（新符號，無舊 callsite）
+- BUGHUNT_WAIVED: NA -- user-env.ps1 change 為 secret 新增（no cross-file refs needed）
+
+**[剩餘風險]** R2 lobster-designs bucket 直接訪問從本機回 403（Cloudflare R2 public access 待確認）；但 Printful mockup 測試成功（Printful 從 CDN 邊緣節點下載，路徑不同）。部署前需在 SG .env 加 PRINTFUL_API_KEY + PRINTFUL_STORE_ID。
+**[rollback]** 刪 mockup/route.ts + printful-mockup.ts；移除 StudioWorkbench mockup state；docker-compose.yml 移除兩個 env var → 功能消失，其他功能不受影響。
+
 ### feat(content-gen): GEO/AI citation mechanics 加入文章生成 SYSTEM_PROMPT + RankMath SEO panel 部署
 
 **[任務理解]** 使用者找到 5 份 GEO research 文件（`agency-os/docs/GEO/`）要求生成文章時遵循 AI citation mechanics；同一 session 還完成 RankMath SEO check panel + AI auto-fix 端點。
