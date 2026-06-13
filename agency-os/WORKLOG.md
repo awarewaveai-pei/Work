@@ -47,6 +47,21 @@
 
 **[rollback]** 還原 `scripts/configure-telegram-webhook.ps1` 三個 command entries 後重跑 `scripts/secrets-vault.ps1 -Action run -Names TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET -Command ".\scripts\configure-telegram-webhook.ps1 -BaseUrl https://app.aware-wave.com"`；`secrets-vault.ps1` false-exit 修正可用 git revert 還原。
 
+### chore(ops-inbox): clear stale open incidents behind Telegram /health WARN
+
+**[任務理解]** Telegram `/health` 顯示 `Health: WARN`，但 `critical=0`、`errors(24h)=0`、probe fresh。依 handler ladder，WARN 來源是 `open incidents: 6`。
+
+**[已處理]**
+- 列出 6 筆 `ops_incidents.status in (open, investigating)`：4 筆五月 Sentry drill/synthetic、1 筆 `SG next-admin auto-deployed OK` 但仍 open、1 筆 2026-06-05 `SG next-admin auto-deploy FAILED`。
+- SSH SG 驗證現況：`HEAD=1b70ce6d`、`ORIGIN=1b70ce6d`、`BEHIND=0`、`AHEAD=0`、`lobster-next-admin Up (healthy)`；因此 deploy failed 也是 stale incident。
+- 將 6 筆 stale incidents 全部 PATCH 為 `resolved`，`resolved_by=codex`。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Supabase REST | cmd=`GET ops_incidents?status=in.(open,investigating)` | result=`[]`
+- REALTEST_EVIDENCE: tool=app_awarewave | cmd=`GET /api/ops/inbox/health` | result=`open_count=0`, `critical_count=0`, `high_count=0`, `probe_status=ok`, `ingest_fresh=true`
+
+**[剩餘風險]** SG `/root/Work` 仍有 2 個 untracked local files（`docker-compose.yml.bak.pre-profile-n8n`, `rollback.log`）；未影響 deploy drift 判定，但應在下次 SG hygiene window 決定保留或移到 backup/log 目錄。
+
 ### feat(tarot): ✨ 幫我想 prompt 按鈕 — Claude Haiku art-direction prompt 生成
 
 **[任務理解]** TASKS Phase 1 (b)：在塔羅工具英文框旁加「✨ 幫我想 prompt」按鈕，仿 MEGA Beautify；使用者輸入中/英 style hint → Claude Haiku-4-5 生成完整 art-direction English prompt → 填回英文框。
