@@ -378,6 +378,7 @@ export default function ContentStudio() {
   const abortRef     = useRef<AbortController | null>(null);
   const humAbortRef  = useRef<AbortController | null>(null);
   const bulkAbortRef = useRef<AbortController | null>(null);
+  const seoRunRef    = useRef(0);
 
   // ─── Load WP sites ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -582,7 +583,8 @@ export default function ContentStudio() {
       setGenStatus("done");
 
       // fire SEO check in background — non-blocking
-      const seoMd = meta ? stripMeta(text) : text;
+      const seoMd  = meta ? stripMeta(text) : text;
+      const myRun  = ++seoRunRef.current;
       setSeoChecking(true);
       fetch("/api/content/seo-check", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -595,8 +597,9 @@ export default function ContentStudio() {
         }),
       })
         .then(r => r.ok ? r.json() as Promise<RankMathReport> : null)
-        .then(j => { if (j) setSeoReport(j); })
-        .finally(() => setSeoChecking(false));
+        .then(j => { if (j && myRun === seoRunRef.current) setSeoReport(j); })
+        .catch(() => { if (myRun === seoRunRef.current) setSeoReport(null); })
+        .finally(() => { if (myRun === seoRunRef.current) setSeoChecking(false); });
     } catch (err) {
       if ((err as Error).name === "AbortError") setGenStatus("idle");
       else { setGenStatus("error"); setGenError("產生失敗，請重試"); }
