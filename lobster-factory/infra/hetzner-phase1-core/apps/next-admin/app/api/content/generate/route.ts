@@ -50,6 +50,29 @@ interface ArticleStructure {
   conclusion?: boolean;
 }
 
+const ALLOWED_MODELS = [
+  "claude-haiku-4-5-20251001",
+  "claude-sonnet-4-6",
+  "claude-opus-4-8",
+];
+
+async function fetchUrlText(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return "";
+    const html = await res.text();
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+      .slice(0, 3000);
+  } catch {
+    return "";
+  }
+}
+
 function buildUserPrompt(params: {
   keyword: string;
   title: string;
@@ -65,6 +88,8 @@ function buildUserPrompt(params: {
   nlpKeywords: string;
   outline: string;
   externalLinks: string[];
+  internalLinks: string[];
+  referenceContext: string;
   structure: ArticleStructure;
   generateMeta: boolean;
 }): string {
@@ -118,12 +143,28 @@ function buildUserPrompt(params: {
     lines.push(params.outline.trim());
   }
 
+  // Reference context (Connect to Web)
+  if (params.referenceContext.trim()) {
+    lines.push("");
+    lines.push("=== REFERENCE CONTENT (use as factual context, cite appropriately) ===");
+    lines.push(params.referenceContext.trim());
+    lines.push("=== END REFERENCE CONTENT ===");
+  }
+
   // External links
   const validLinks = params.externalLinks.filter(u => /^https?:\/\//.test(u.trim()));
   if (validLinks.length > 0) {
     lines.push("");
     lines.push("External links to include naturally as contextual anchors:");
     validLinks.forEach(u => lines.push(`- ${u.trim()}`));
+  }
+
+  // Internal links
+  const validInternal = params.internalLinks.filter(u => /^(https?:\/\/|\/[/#])/.test(u.trim()));
+  if (validInternal.length > 0) {
+    lines.push("");
+    lines.push("Internal links to weave naturally into the article content (use relevant anchor text, not 'click here'):");
+    validInternal.forEach(u => lines.push(`- ${u.trim()}`));
   }
 
   lines.push("");
@@ -176,21 +217,41 @@ export async function POST(req: Request): Promise<Response> {
   };
 
   const maxTokens  = SIZE_TOKENS[str(body.articleSize, "medium")] ?? 4096;
+  // Fetch reference URLs (Connect to Web)
+  const referenceUrls = sarr(body.referenceUrls).filter(u => /^https?:\/\//.test(u)).slice(0, 3);
+  let referenceContext = "";
+  if (referenceUrls.length > 0) {
+    const fetched = await Promise.all(referenceUrls.map(async (url) => {
+      const text = await fetchUrlText(url);
+      return text ? `--- Source: ${url} ---\n${text}` : "";
+    }));
+    referenceContext = fetched.filter(Boolean).join("\n\n");
+  }
+
+  // Internal links
+  const internalLinks = sarr(body.internalLinks).filter(u => /^(https?:\/\/|\/[/#])/.test(u.trim())).slice(0, 10);
+
+  // Model selection (default: sonnet)
+  const requestedModel = str(body.model, "claude-sonnet-4-6");
+  const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : "claude-sonnet-4-6";
+
   const userPrompt = buildUserPrompt({
     keyword,
-    title:        str(body.title),
-    language:     str(body.language, "English"),
+    title:         str(body.title),
+    language:      str(body.language, "English"),
     targetCountry: str(body.targetCountry, "Global"),
-    articleType:  str(body.articleType, "Pillar Article"),
-    articleSize:  str(body.articleSize, "medium"),
-    tone:         str(body.tone, "Friendly"),
-    pointOfView:  str(body.pointOfView, "none"),
-    readability:  str(body.readability, "8th grade"),
+    articleType:   str(body.articleType, "Pillar Article"),
+    articleSize:   str(body.articleSize, "medium"),
+    tone:          str(body.tone, "Friendly"),
+    pointOfView:   str(body.pointOfView, "none"),
+    readability:   str(body.readability, "8th grade"),
     removeAiWords: str(body.removeAiWords, "none"),
-    details:      str(body.details),
-    nlpKeywords:  str(body.nlpKeywords),
-    outline:      str(body.outline),
+    details:       str(body.details),
+    nlpKeywords:   str(body.nlpKeywords),
+    outline:       str(body.outline),
     externalLinks: sarr(body.externalLinks),
+    internalLinks,
+    referenceContext,
     structure,
     generateMeta: bool(body.generateMeta, false),
   });
@@ -203,7 +264,7 @@ export async function POST(req: Request): Promise<Response> {
       const encoder = new TextEncoder();
       try {
         anthropicStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
+          model,
           max_tokens: maxTokens,
           system: SYSTEM_PROMPT,
           messages: [{ role: "user", content: userPrompt }],
