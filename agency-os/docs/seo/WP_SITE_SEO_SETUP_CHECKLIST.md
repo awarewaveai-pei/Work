@@ -212,6 +212,33 @@ RankMath 自動加入，確認以下欄位：
 - [ ] 定期監控：Performance → Queries（CTR、曝光次數）
 - [ ] 設定 Email 通知（手動操作問題、安全問題）
 
+### 3.4 Looker Studio 監控儀表板（進階）
+
+> 根據：`5_監控與偵錯.md §使用 Looker Studio 建立儀表板`
+
+將 Search Console + GA4 整合成一個儀表板，長期追蹤趨勢：
+
+| 指標 | 來源 |
+|------|------|
+| Sessions（工作階段）| GA4 |
+| Engagement rate（互動率）| GA4 |
+| Returning users（回訪者）| GA4 |
+| Clicks（點擊次數）| Search Console |
+| Impressions（曝光次數）| Search Console |
+| CTR（點擊率）| Search Console |
+| Average position（平均排名）| Search Console |
+
+- [ ] 在 Looker Studio 建立報告，資料來源：Google Search Console + GA4
+- [ ] 設定日期篩選（預設：過去 3 個月）
+- [ ] 監控關鍵字：流量下降 > 20% → 診斷根因（演算法更新 / 技術問題 / 安全問題 / 季節性）
+
+**流量下降診斷流程（File 5 SSOT）**：
+1. 演算法更新 → 檢查內容品質（E-E-A-T）
+2. 技術問題 → 查 Search Console Coverage 報告
+3. 安全問題 → 查 Security Issues 報告
+4. 手動處罰 → 查 Manual Actions 報告
+5. 季節性 → 對照 Google Trends
+
 ---
 
 ## Phase 4：Core Web Vitals 優化
@@ -253,6 +280,24 @@ Google 的 Core Web Vitals 是排名信號。
 - [ ] 按鈕可點擊區域 ≥48×48 px
 - [ ] 避免水平滾動
 
+### 5.1 插頁式廣告與彈出視窗規範（Page Experience 信號）
+
+> 根據：`4_排名與搜尋外觀.md §插頁式廣告`（侵入性彈窗會損害排名）
+
+**禁止（會被 Google 懲罰）**：
+- 進入頁面後立即顯示遮蓋主要內容的彈窗
+- 跳轉到另一頁要求使用者先同意隱私政策才能繼續
+- 整頁式廣告（sticky footer 除外）
+
+**允許**：
+- Cookie 同意欄（橫幅式，不遮蓋主要內容）
+- 延遲 30 秒後的小型訂閱提示（不遮蓋全頁）
+- 法律要求的年齡驗證
+
+- [ ] 若有 Cookie banner → 使用橫幅式（非全頁彈窗）
+- [ ] 若有訂閱 popup → 延遲顯示、可立即關閉、不遮蓋主要內容
+- [ ] 行動裝置不顯示全頁廣告
+
 ---
 
 ## Phase 6：多語系設定（若適用）
@@ -279,6 +324,22 @@ Google 的 Core Web Vitals 是排名信號。
 | 子網域 | `zh.example.com` | 技術資源受限時 |
 
 > 根據：`6_網站專屬指南.md §多語言與國際化`
+
+### 6.2 分頁（Pagination）最佳做法
+
+> 根據：`6_網站專屬指南.md §分頁網頁`
+
+適用於部落格列表頁、文章列表頁、分類頁。
+
+- [ ] 分頁使用 `<a href="?page=2">` 連結（**不用 JavaScript 按鈕**）— Google 必須能爬取連結
+- [ ] 每個分頁有獨立 URL（`/blog/page/2/`，WordPress 預設已符合）
+- [ ] **不使用** URL fragment 作為分頁（`/blog#page2` → Google 忽略 #）
+- [ ] 篩選 URL 變體（`?color=red&size=L`）設為 `noindex`（避免索引太多相似頁）
+- [ ] 分頁本身（`?page=2`）不設 noindex — 讓 Google 透過分頁發現更多文章
+- [ ] 確認 RankMath Sitemap 不含分頁 URL
+- [ ] **無限滾動頁面**需提供分頁備用版本（Google 無法「滾動」頁面；Infinite Scroll = 需同時有 `?page=N` 版本）
+
+> **XML Sitemap 注意**（根據 `3_檢索及建立索引.md`）：Google 忽略 `<priority>` 和 `<changefreq>` 值；`<lastmod>` 必須準確且可驗證才有效。RankMath 自動產生 XML Sitemap，放置網站根目錄。
 
 ---
 

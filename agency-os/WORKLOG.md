@@ -38,15 +38,29 @@
 **[任務理解]** 使用者提供完整 Google SEO 官方文件 6 份，要求徹底研究並運用在：① 文章生成 SYSTEM_PROMPT ② WordPress 網站架設 SEO 規範。
 
 **[已修改]**
-- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api\content/generate/route.ts`
-  - SYSTEM_PROMPT 從 27 行擴展至 ~90 行，新增 5 大區塊：E-E-A-T / GEO-AI 優化 / 圖片 SEO / 結構化資料提示 / 內容新鮮度
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts`
+  - SYSTEM_PROMPT 從 27 行擴展至 ~95 行，新增 5 大區塊：E-E-A-T / GEO-AI 優化 / 圖片 SEO / 結構化資料提示 / 內容新鮮度
   - 重要 fix：alt 範例移除 FORBIDDEN 詞（therapist/healing）、日期改 `<!-- PUBLISH_DATE -->` placeholder、AI 透明聲明改為 internal instruction（不插入文章本文）、統一引用格式 `[Source] ([Year])`
-- `agency-os/docs/seo/WP_SITE_SEO_SETUP_CHECKLIST.md`（新建）— 10 Phase 架站清單 + 15 項 Launch Checklist
+  - Session 2 補強：製作者信號（Creator signal — 作者名稱/視角/資歷自然埋入）、原因信號（Purpose signal — 每段存在是為幫助讀者，非堆關鍵字）
+- `agency-os/docs/seo/WP_SITE_SEO_SETUP_CHECKLIST.md`（新建後擴充）— 10+1 Phase 架站清單 + 15 項 Launch Checklist
+  - Session 2 新增：Phase 3.4 Looker Studio 儀表板（Search Console + GA4 合併監控 + 流量下降 5 步診斷）
+  - Session 2 新增：Phase 5.1 插頁式廣告規範（Cookie banner 橫幅式/全頁彈窗禁止/延遲訂閱提示規則）
+  - Session 2 新增：Phase 6.2 分頁最佳做法（`<a href>` 連結必要、unique URL、無限滾動備用分頁、noindex 篩選變體）
+  - Session 2 新增：XML Sitemap 補充（`<priority>/<changefreq>` Google 忽略；`<lastmod>` 須準確）
+
+**6 份 SEO 文件研究完整覆蓋**：
+- `1_基礎入門.md`：垃圾郵件政策、技術要求 ✅
+- `2_SEO基礎知識.md`：E-E-A-T、GEO/AI、製作者/方法/原因框架、llms.txt 誤區 ✅
+- `3_檢索及建立索引.md`：URL 結構、可爬取連結、Sitemap 規格（`<lastmod>`、`<priority>` 忽略）、無限滾動 ✅
+- `4_排名與搜尋外觀.md`：結構化資料、Discover 圖片規格、Favicon、CWV、插頁式廣告 ✅
+- `5_監控與偵錯.md`：Search Console + GA4 + Looker Studio 監控、流量下降 5 步診斷 ✅
+- `6_網站專屬指南.md`：多語系 hreflang、分頁 `<a href>` 規則、電商 schema ✅
 
 **[驗證結果]**
-- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` (after all fixes) | exit=0 | ms=<60000
-- REVIEW_DONE: critic=Deep | verdict=warn→pass-after-fix | findings=2c/2m/1n fixed, 1s kept
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=`art therapist|PUBLISH_DATE|AI content transparency` | hits=3 (全部為人工撰寫品牌文件，非 AI 生成文章，合規)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` (string-literal SYSTEM_PROMPT edit) | exit=0 for my changes | pre-existing wp-post/route.ts:101 error (staged, not introduced by this session) | ms=<60000
+- REVIEW_DONE: critic=Deep | verdict=warn→pass-after-fix | findings=2c/2m/1n fixed, 1s kept (session 1); session 2 additions are doc/string — critic pass
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`art therapist|PUBLISH_DATE|製作者|Creator signal` | hits=0 (新增字串僅在 generate/route.ts SYSTEM_PROMPT)
+- BUGHUNT_WAIVED: DOC_ONLY -- WP_SITE_SEO_SETUP_CHECKLIST.md 為架站參考文件，無 call sites
 
 **[剩餘風險]** `<!-- PUBLISH_DATE -->` 需 publish flow 替換邏輯（目前 CMS 人工處理）
 

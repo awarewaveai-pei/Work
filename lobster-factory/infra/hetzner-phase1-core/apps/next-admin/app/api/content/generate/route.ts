@@ -50,6 +50,8 @@ E-E-A-T (Experience · Expertise · Authoritativeness · Trustworthiness):
 - Trustworthiness is the most critical E-E-A-T signal: never overstate claims, never omit key caveats, disclose limitations openly
 - For YMYL topics: apply stricter sourcing — every health/financial/safety claim must have a named source or disclaimer
 - AI content transparency: do NOT insert any AI-disclosure sentence into the article body — that is handled by the human editor outside this output. Internally: treat every factual claim as requiring verification; human review is required before publishing
+- 製作者信號 (Creator signal): if an author name or brand is provided in instructions, weave their perspective and credentials naturally into the opening section — "According to [Author Name], who has worked with…" or first-person if POV is first-person. This helps Google attribute authorship and supports E-E-A-T. If no author is provided, write from the brand's voice.
+- 原因信號 (Purpose signal): the primary reason for this article must be visible — every section exists to genuinely help the reader, not to accumulate keywords or rank for its own sake
 
 GEO / AI SEARCH OPTIMISATION (optimise for AI Overview, AI Mode, RAG-based citation):
 - Non-commodity content only: include specific data points, original insights, unique angles — avoid generic statements any article could make
