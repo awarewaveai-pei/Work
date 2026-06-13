@@ -363,13 +363,9 @@ export default function StudioWorkbench() {
                   <button className="btn-secondary" style={{ fontSize: 12 }} onClick={restoreOriginal}>還原原圖</button>
                 ) : null}
                 {bgState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>去背失敗，請重試</span> : null}
-                <a
-                  className="btn-secondary"
-                  href={gen.image}
-                  download={`design.${gen.image.startsWith("data:image/jpeg") ? "jpg" : gen.image.startsWith("data:image/webp") ? "webp" : "png"}`}
-                >
-                  下載
-                </a>
+                <button className="btn-secondary" onClick={() => void downloadGraded()}>
+                  下載{!grade.neutral ? "（含調色）" : ""}
+                </button>
                 {gen.seed != null ? <span style={{ fontSize: 12, opacity: 0.6 }}>seed {gen.seed}</span> : null}
                 {saveState === "saved" ? <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a> : null}
                 {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗（檢查 POD_DESIGNS_ENABLED 與 POD_DESIGNS_DEFAULT_ORG_ID / 伺服器 log）</span> : null}
