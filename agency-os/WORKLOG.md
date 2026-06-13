@@ -4,6 +4,31 @@
 
 ## 2026-06-14
 
+### docs(seo): RankMath KB 554-file 本地實際文章徹底研究 → 應用至文章生成與架站清單
+
+根因：前次 RankMath 研究用 URL 索引（非實際文章）→ 以 web fetch 補充，但深度不足。使用者找到本地 `docs/RankMath/RankMath-KB/`（11資料夾、554篇完整 KB 文章），要求徹底研究並全面應用。
+
+研究範圍：Getting Started(85)、Schema(84)、Content AI(87)、Sitemaps(25)、404&Redirections(31)、Miscellaneous(86)。
+
+主要發現並應用的新知：
+
+**WP_SITE_SEO_SETUP_CHECKLIST.md 改動（commit 6f01bf23）**：
+1. Author Archives 矛盾修正：「單一作者 Noindex」→ 依 E-E-A-T 策略決定（Index=E-E-A-T；Noindex=thin content）
+2. Phase 2.10 Author SEO 全新章節：WP Profile 設定、Author Robots Meta Index、ProfilePage Schema、Author Card
+3. Sitemap 設定補齊：200 URLs/頁（Google 偏好）、Images Sitemaps ON、Include Featured Images ON、新增 Bing 提交
+4. Phase 3B「Bing + AI Search」全新章節：Bing 驗證/sitemap、robots.txt OAI-SearchBot/GPTBot 設定、llms.txt 模組
+5. robots.txt 加入 AI 爬蟲策略（GPTBot 可封鎖訓練；OAI-SearchBot 不可封鎖）
+6. Launch Checklist 加入 Bing/llms.txt/Author 檢查項
+
+**generate/route.ts SYSTEM_PROMPT 改動（checkpoint commit）**：
+- Image filename rule 補齊：max 5 words、hyphens ONLY（no underscores）、all lowercase
+
+- REALTEST_WAIVED: DOC_ONLY -- documentation-only changes to WP checklist; string-literal-only edit to SYSTEM_PROMPT; tsc exit=0 confirmed
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m (doc-only changes; SYSTEM_PROMPT string change is additive clarification)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=WP_SITE_SEO_SETUP_CHECKLIST\|SYSTEM_PROMPT | hits=0 (no stale cross-references to old Author Archives Noindex claim or old filename rule)
+
+---
+
 ### feat(studio): 語意化下載檔名 產品-主圖名稱-風格.ext（全 6 下載點）
 
 根因：studio 所有下載點檔名寫死（route `web-tarot.webp`/`web-square.webp`、CanvasEditor `canvas-design.png`、StudioWorkbench `design.png`、Tarot deck zip `tarot-deck-print.zip`）→ 操作者下載整資料夾無法辨識來源（screenshot 回報）。所謂「語意化檔名設定沒吃到」實為**該設定從未實作**。
