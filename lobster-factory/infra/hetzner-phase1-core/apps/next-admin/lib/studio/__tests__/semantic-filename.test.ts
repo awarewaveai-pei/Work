@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSemanticFilename, extOf } from "../semantic-filename";
+import { buildSemanticFilename, buildSemanticBase, extOf } from "../semantic-filename";
 
 describe("buildSemanticFilename", () => {
   it("joins 產品-主圖名稱-風格-軌 with the given extension", () => {
@@ -35,6 +35,32 @@ describe("buildSemanticFilename", () => {
       "web-square.webp",
     );
     expect(buildSemanticFilename({}, "png", "design.png")).toBe("design.png");
+  });
+
+  it("strips ASCII control chars (un-saveable on Windows)", () => {
+    expect(buildSemanticFilename({ subject: "abc" }, "png", "f.png")).toBe("a-b-c.png");
+  });
+
+  it("drops content-less segments (dot-only / punctuation-only) instead of forming '.-.-.'", () => {
+    expect(buildSemanticFilename({ subject: ". . .", style: "水彩" }, "png", "f.png")).toBe("水彩.png");
+    // dots inside a real segment are normalised, never left as a leading dot
+    expect(buildSemanticFilename({ subject: "v1.2.3" }, "png", "f.png")).toBe("v1-2-3.png");
+  });
+
+  it("truncates on code points so a surrogate pair is never split", () => {
+    const out = buildSemanticFilename({ subject: "a".repeat(119) + "😀" }, "png", "f.png");
+    // last base char must be the whole emoji or the trimmed 'a', never a lone surrogate
+    expect(out).not.toMatch(/[\uD800-\uDBFF]\./); // no high surrogate immediately before ".png"
+  });
+
+  it("returns base with no trailing dot when ext is empty", () => {
+    expect(buildSemanticFilename({ subject: "hi" }, "", "fb.png")).toBe("hi");
+  });
+
+  it("buildSemanticBase returns the extension-less base, or undefined when empty", () => {
+    expect(buildSemanticBase({ product: "塔羅卡", subject: "月亮" })).toBe("塔羅卡-月亮");
+    expect(buildSemanticBase({})).toBeUndefined();
+    expect(buildSemanticBase({ subject: "///" })).toBeUndefined();
   });
 
   it("caps the base length under filesystem limits", () => {

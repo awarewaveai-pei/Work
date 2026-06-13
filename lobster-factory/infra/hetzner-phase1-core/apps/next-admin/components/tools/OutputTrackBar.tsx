@@ -19,6 +19,7 @@ import { isNeutralParams, type ColorGradeParams } from "@/lib/studio/color-grade
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import {
   buildSemanticFilename,
+  buildSemanticBase,
   extOf,
   type SemanticFileMeta,
 } from "@/lib/studio/semantic-filename";
@@ -151,15 +152,7 @@ export default function OutputTrackBar({
           className="btn-secondary"
           disabled={busy !== null}
           onClick={() =>
-            openInCanvas(
-              image,
-              fileMeta
-                ? buildSemanticFilename({ ...fileMeta, track: "編輯" }, "png", "").replace(
-                    /\.png$/,
-                    "",
-                  ) || undefined
-                : undefined,
-            )
+            openInCanvas(image, fileMeta ? buildSemanticBase({ ...fileMeta, track: "編輯" }) : undefined)
           }
           title="上傳圖案／加文字／微調構圖"
         >

@@ -54,6 +54,10 @@ export default function CanvasEditor() {
   // listeners (fabricjs/fabric.js#10482, #8899). We park the dispose promise here and the
   // next mount AWAITS it before constructing a new Canvas on the node.
   const disposeRef = useRef<Promise<void> | null>(null);
+  // Semantic download base name carried across the handoff (產品-主圖名稱-風格-編輯). Read +
+  // cleared once on mount so it binds to THIS handoff and can't leak into a later direct
+  // (sidebar-link) visit; set-only-when-found survives StrictMode's double mount.
+  const nameRef = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +110,13 @@ export default function CanvasEditor() {
       canvas.on("selection:cleared", () => setTextSelected(false));
 
       const source = typeof window !== "undefined" ? sessionStorage.getItem(CANVAS_SOURCE_KEY) : null;
+      if (typeof window !== "undefined") {
+        const handoffName = sessionStorage.getItem(CANVAS_NAME_KEY);
+        if (handoffName) {
+          nameRef.current = handoffName; // set-only-when-found → StrictMode-safe
+          sessionStorage.removeItem(CANVAS_NAME_KEY); // consume so a later direct visit can't inherit it
+        }
+      }
       if (source) {
         try {
           const img = await fabric.FabricImage.fromURL(source, { crossOrigin: "anonymous" });
@@ -212,11 +223,9 @@ export default function CanvasEditor() {
   const download = useCallback(() => {
     const png = exportPng();
     if (!png) return;
-    // Use the semantic base name carried across the handoff (產品-主圖名稱-風格-編輯);
-    // fall back to the old fixed name when the editor was opened without metadata.
-    const base =
-      (typeof window !== "undefined" ? sessionStorage.getItem(CANVAS_NAME_KEY) : null) ||
-      "canvas-design";
+    // Use the semantic base name captured from the handoff on mount (nameRef); fall back
+    // to the old fixed name when the editor was opened without metadata (e.g. sidebar link).
+    const base = nameRef.current || "canvas-design";
     const a = document.createElement("a");
     a.href = png;
     a.download = `${base}.png`;

@@ -92,14 +92,14 @@ export default function StudioWorkbench() {
 
   // Semantic-filename metadata for downloads (產品-主圖名稱-風格). Built from the same
   // controls that steer the prompt; "None"/"不限商品" segments drop out via seg().
-  const fileMeta = useMemo<SemanticFileMeta>(
-    () => ({
-      product: product.value !== "none" ? product.label : undefined,
+  const fileMeta = useMemo<SemanticFileMeta>(() => {
+    const p = PRODUCT_TYPES.find((x) => x.value === productType);
+    return {
+      product: p && p.value !== "none" ? p.label : undefined,
       subject: subject.trim() || theme.trim() || undefined,
       style: style !== "None" ? style : undefined,
-    }),
-    [product, subject, theme, style],
-  );
+    };
+  }, [productType, subject, theme, style]);
   const modelOption = useMemo(() => STUDIO_MODEL_OPTIONS.find((m) => m.value === model), [model]);
   const maxRefs = modelOption?.maxRefs ?? 0;
 
