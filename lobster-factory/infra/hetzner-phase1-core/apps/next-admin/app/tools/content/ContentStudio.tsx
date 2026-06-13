@@ -201,13 +201,26 @@ function slugify(text: string): string {
 }
 
 function extractMeta(text: string): MetaData | null {
-  const m = text.match(/<!-- CONTENT_META_START -->\s*SEO_TITLE:\s*([^\n]+)\s*META_DESC:\s*([^\n]+)\s*<!-- CONTENT_META_END -->/);
-  if (!m) return null;
-  return { seoTitle: m[1].trim(), metaDesc: m[2].trim() };
+  const block = text.match(/<!-- CONTENT_META_START -->([\s\S]*?)<!-- CONTENT_META_END -->/);
+  if (!block) return null;
+  const inner  = block[1];
+  const titleM = inner.match(/SEO_TITLE:\s*(.+)/);
+  const metaM  = inner.match(/META_DESC:\s*(.+)/);
+  if (!titleM || !metaM) return null;
+  return { seoTitle: titleM[1].trim(), metaDesc: metaM[1].trim() };
+}
+
+function extractSlugHint(text: string): string {
+  const m = text.match(/<!--\s*SLUG_HINT:\s*([a-z0-9][a-z0-9-]*)\s*-->/);
+  return m ? m[1] : "";
 }
 
 function stripMeta(text: string): string {
   return text.replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "").trim();
+}
+
+function stripSlugHint(text: string): string {
+  return text.replace(/<!--\s*SLUG_HINT:[^>]*-->/g, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function downloadMd(text: string, filename = "article.md") {
@@ -317,6 +330,12 @@ export default function ContentStudio() {
   // SEO check
   const [seoReport,   setSeoReport]   = useState<RankMathReport | null>(null);
   const [seoChecking, setSeoChecking] = useState(false);
+
+  // Slug hint (parsed from <!-- SLUG_HINT: ... --> in generated article)
+  const [slugHint, setSlugHint] = useState("");
+
+  // Auto-image generation counter (0 = idle, N = N images pending)
+  const [autoImgN, setAutoImgN] = useState(0);
 
   // Title suggestions
   const [titleLoading, setTitleLoading]   = useState(false);
@@ -552,6 +571,7 @@ export default function ContentStudio() {
     setGenStatus("streaming"); setGenError("");
     setPubStatus("idle"); setPubResult(null);
     setSeoReport(null); setSeoChecking(false);
+    setSlugHint(""); setAutoImgN(0);
     setShowSyn(false); setSynStatus("idle"); setSynContent({});
 
     try {
@@ -577,33 +597,68 @@ export default function ContentStudio() {
       }
       text += dec.decode();
 
-      const meta = extractMeta(text);
-      if (meta) { setMetaData(meta); setGenerated(stripMeta(text)); }
-      else        { setGenerated(text); }
+      const meta    = extractMeta(text);
+      const hint    = extractSlugHint(text);
+      const cleanMd = stripSlugHint(meta ? stripMeta(text) : text);
+      if (meta) setMetaData(meta);
+      setGenerated(cleanMd);
+      setSlugHint(hint);
       setGenStatus("done");
 
       // fire SEO check in background — non-blocking
-      const seoMd  = meta ? stripMeta(text) : text;
-      const myRun  = ++seoRunRef.current;
+      const myRun = ++seoRunRef.current;
       setSeoChecking(true);
       fetch("/api/content/seo-check", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          markdown: seoMd,
+          markdown: cleanMd,
           focusKeyword: form.keyword,
           seoTitle: meta?.seoTitle ?? "",
           metaDescription: meta?.metaDesc ?? "",
-          slug: slugify(form.keyword),
+          slug: hint || slugify(form.keyword),
         }),
       })
         .then(r => r.ok ? r.json() as Promise<RankMathReport> : null)
         .then(j => { if (j && myRun === seoRunRef.current) setSeoReport(j); })
         .catch(() => { if (myRun === seoRunRef.current) setSeoReport(null); })
         .finally(() => { if (myRun === seoRunRef.current) setSeoChecking(false); });
+
+      // Auto-replace IMAGE_PLACEHOLDERs via Replicate if AI images enabled
+      if (form.media.aiImages !== "none") {
+        void autoReplaceImages(cleanMd, myRun);
+      }
     } catch (err) {
       if ((err as Error).name === "AbortError") setGenStatus("idle");
       else { setGenStatus("error"); setGenError("產生失敗，請重試"); }
     }
+  }
+
+  // ─── Auto-replace IMAGE_PLACEHOLDER_N with Replicate URLs ─────────────────
+
+  async function autoReplaceImages(md: string, genRun: number) {
+    const placeholders = [...md.matchAll(/!\[([^\]]*)\]\(IMAGE_PLACEHOLDER_(\d+)\)/g)];
+    if (!placeholders.length) return;
+    setAutoImgN(placeholders.length);
+    let remaining = placeholders.length;
+    for (const m of placeholders) {
+      if (genRun !== seoRunRef.current) break; // user re-generated, abort
+      const altText = m[1].trim() || form.keyword;
+      const n = m[2];
+      try {
+        const res = await fetch("/api/content/image", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: altText, platform: "twitter_post" }),
+        });
+        if (genRun !== seoRunRef.current) break;
+        const json = await res.json() as { ok: boolean; imageUrl?: string };
+        if (json.ok && json.imageUrl) {
+          setGenerated(prev => prev.replace(`IMAGE_PLACEHOLDER_${n}`, json.imageUrl!));
+        }
+      } catch { /* skip this placeholder */ }
+      remaining--;
+      setAutoImgN(remaining);
+    }
+    setAutoImgN(0);
   }
 
   // ─── SEO Fix Apply ────────────────────────────────────────────────────────
@@ -617,7 +672,7 @@ export default function ContentStudio() {
     setSeoChecking(true);
     fetch("/api/content/seo-check", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markdown: fixedMd, focusKeyword: form.keyword, seoTitle: title, metaDescription: metaDesc, slug: slugify(form.keyword) }),
+      body: JSON.stringify({ markdown: fixedMd, focusKeyword: form.keyword, seoTitle: title, metaDescription: metaDesc, slug: slugHint || slugify(form.keyword) }),
     })
       .then(r => r.ok ? r.json() as Promise<RankMathReport> : null)
       .then(j => { if (j && myRun === seoRunRef.current) setSeoReport(j); })
