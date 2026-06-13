@@ -4,6 +4,27 @@
 
 ## 2026-06-14
 
+### feat(pod): [0-a-gs] Ghostscript ICC OutputIntent 上線 SG prod
+
+POD_OUTPUT_INTENT_DEPLOYED=true 寫入 `/root/lobster-phase1/.env`；SG docker-compose.yml 補 POD_OUTPUT_INTENT_DEPLOYED / POD_ICC_* 四個 env var；`docker compose up -d next-admin`（無 rebuild，gs 已在 image，容器 healthy 8s 後）。
+
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=gs PDFX_def.ps in.pdf → grep OutputIntent | exit=0 | /OutputIntent×2 ✓ PDF/X-1a:2001 ✓ GTS_PDFX ✓
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=docker exec lobster-next-admin gs --version + env | exit=0 | 10.06.0 ICC_OK POD_OUTPUT_INTENT_DEPLOYED=true
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: NA -- env/compose-only change on SG server, no repo code changed
+
+---
+
+### fix(db): migration 0036_fingerprint_v2 套用 production Supabase
+
+根因：`upsert_incident_atomic` 12-arg 舊簽章在 DB，code 已升 13-arg → PGRST202 → `/api/webhooks/deploy` 500「db write failed」卡 2 週。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl POST /api/webhooks/deploy | exit=0 | HTTP 200 `{"incident_id":"32584fe1...","transition":"new","occurrence_count":1}`
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: NA -- DB-only change, no repo code changed
+
+---
+
 ### fix(pod): 修圖/canvas 三個產品邏輯洞（使用者回報）+ 重部署 SG
 
 **[任務理解]** 使用者實測 production 後回報修圖/canvas「功能不健全、有邏輯問題」：① 塔羅調色後，後續批次生成的 78 張卡不吃調整 ② Canvas 文字無中英字型/顏色選擇 ③（延伸）POD 存檔/下載不吃調色。
