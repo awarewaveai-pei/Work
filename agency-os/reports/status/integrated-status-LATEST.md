@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-11 18:19:59
-- agency-os root: `C:\Users\USER\Work\agency-os`
+- Generated: 2026-06-14 03:41:37
+- agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -219,175 +219,74 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-11.md
-# Daily Note - 2026-06-11
-
-## Done today（session 跨 06-10→06-11；完整紀錄見 daily/2026-06-10.md）
-- **wp-bridge v0.8.0 → v0.9.0 發版**：可變商品 + WC 全可寫欄位 + Kadence 積木商品描述；critic Deep 0C/4M 全修；真站驗 soulful product 7133（14 變體、描述 40 Kadence 積木）。範本 `agency-os/docs/wp-bridge-product-template.md`。
-- **POD Studio 藍本補到全閉環**（`lobster-factory/docs/POD_STUDIO_ROADMAP.md`）：Mockup Studio 平拍/模特雙模式 + Analytics + Pricing + Users + Bella3001 印刷規格 + P4 訂單自動履約。決策：設計+建商品自建，履約用 Printful 原生。前端原型 `d:\tmp\tshirt-designer-prototype.html`。
-- AO-CLOSE 自修：移 WooCommerce 參考檔出 doc-integrity link-scan 樹 + 修斷鏈 + 上份 close 報告 archive-only 標註。
-
-## Current state
-- wp-bridge v0.9.0 上 GitHub Release + soulful 真站（health=0.9.0）。
-- POD Studio 藍本 100% 完整可動工；零件齊（Replicate / R2 / next-admin / wp-bridge）。
-
-## Next steps
-- POD Studio：① 試生一張 AI mockup 驗擬真合成（Replicate `google/nano-banana-2`）② 排實作 P2a→P4 → handoffs/2026-06-11-0254-pod-studio.md
-- Tarot 增 9 圖像模型 → handoffs/2026-06-11-0236-add-tarot-models.md
-- 主線 app.aware-wave Stage 1 接通入口（未動）。
+## 5) memory/daily/2026-06-14.md
+# Daily Note - 2026-06-14
 
 
-### verify-recent --ack (2026-06-11T03:49:18.4298862Z)
+### verify-recent --ack (2026-06-13T17:21:59.3946498Z)
 
-**Reason**: temp diagnostic PS1s already ran+verified in session; image-gen.ts/route.ts/TarotStudio.tsx verified by tsc --noEmit (0 new errors) + Standard critic review (0 findings)
-
-**Acknowledged unverified files** (count=5):
-
-- `C:\Windows\Temp\query_replicate.ps1`
-- `C:\Windows\Temp\query_replicate2.ps1`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\tarot\generate\route.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
-
-
-### verify-recent --ack (2026-06-11T04:09:09.6500430Z)
-
-**Reason**: 4 temp PS1 scripts all executed successfully this session (token sync exit 0 + account 200; schema queries exit 0; prediction tests 6/6 succeeded); image-gen.ts verified by tsc --noEmit (0 new errors) + 7 real Replicate predictions matching buildInput payloads exactly
-
-**Acknowledged unverified files** (count=5):
-
-- `C:\Windows\Temp\sync_replicate_token.ps1`
-- `C:\Windows\Temp\query_replicate3.ps1`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
-- `C:\Windows\Temp\test_tarot_models.ps1`
-- `C:\Windows\Temp\test_tarot_models2.ps1`
-
-
-### verify-recent --ack (2026-06-11T04:19:30.7405012Z)
-
-**Reason**: r2.ts + designs/route.ts: crypto global -> node:crypto import (Node 18 fix); verified by vitest 6/6 pass + tsc 0 new errors
-
-**Acknowledged unverified files** (count=2):
-
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\storage\r2.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\designs\route.ts`
-
-
-### verify-recent --ack (2026-06-11T04:43:56.6100075Z)
-
-**Reason**: TarotStudio.tsx remove ratio UI (tarot fixed 2:3); verified tsc 0 new errors + grep no aspectRatio remnants
+**Reason**: String-literal-only addition to SYSTEM_PROMPT (2 lines: Creator/Purpose signals) — no logic change; Deep critic ran prior session REVIEW_DONE=pass; tsc exit=0
 
 **Acknowledged unverified files** (count=1):
 
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\generate\route.ts`
 
 
-### verify-recent --ack (2026-06-11T04:46:10.6002846Z)
+### verify-recent --ack (2026-06-13T17:58:04.9809900Z)
 
-**Reason**: P2a files verified manually in-session: tsc 0 errors (own files) + vitest 6/6 + critic Deep review (2M/3m all fixed) + REALTEST end-to-end pass (R2 PUT/GET 200, media_assets 201); Temp realtest/diagnostic scripts all really executed exit 0
-
-**Acknowledged unverified files** (count=6):
-
-- `c:\Windows\Temp\backfill_replicate_token.ps1`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\storage\r2.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\designs\route.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\designs\DesignsGallery.tsx`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\designs\page.tsx`
-- `c:\Windows\Temp\realtest_p2a.ts`
-
-
-### verify-recent --ack (2026-06-11T05:29:14.3666052Z)
-
-**Reason**: Full verify done: tsc noEmit (no new errors), npm test 203/203 pass, critic Standard review (findings all addressed: genToken cancel guard + compareStyleRef added)
-
-**Acknowledged unverified files** (count=2):
-
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\tarotStyles.ts`
-
-
-### verify-recent --ack (2026-06-11T05:48:46.1260765Z)
-
-**Reason**: P2b verified in-session: tsc 0 errors (studio/layout files) + vitest 6/6 + critic Deep (2M/3m all fixed) + REALTEST real flux-schnell generation via facade (647KB PNG, seed returned); realtest_p2b.ts in Temp executed exit 0
-
-**Acknowledged unverified files** (count=6):
-
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\image-provider.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\studio\generate\route.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\studio\StudioWorkbench.tsx`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\studio\page.tsx`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\layout.tsx`
-- `c:\Windows\Temp\realtest_p2b.ts`
-
-
-### verify-recent --ack (2026-06-11T06:12:33.9522355Z)
-
-**Reason**: P2c verified in-session: tsc 0 errors (studio/bg-remover) + critic Standard (2M/2m all fixed incl AbortController + try/catch + useRef guard) + REALTEST real Replicate bg-removal RGBA-verified output; temp realtest/query scripts executed exit 0
+**Reason**: 3 product-logic fixes (canvas text font/colour/size; tarot grade->all 78 cards incl background-ZIP path; POD save/download bake grade). Verified: npx tsc --noEmit EXIT=0; full npm run build EXIT=0; vitest 70/70; critic Deep reviewed all 5 files -> found Major (洞1 incomplete on downloadZip path) which I then FIXED (TarotStudio.tsx:671 now passes deckFilter), re-tsc 0 + re-build 0. Canvas/bake are client-only DOM (no headless browser exec available; build is the gate).
 
 **Acknowledged unverified files** (count=5):
 
-- `c:\Windows\Temp\query_rmbg_models.ps1`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\bg-remover.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\studio\remove-bg\route.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\studio\StudioWorkbench.tsx`
-- `c:\Windows\Temp\realtest_p2c.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\renderPrintCard.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\components\tools\bake-css-filter.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\studio\StudioWorkbench.tsx`
 
 
-### verify-recent --ack (2026-06-11T06:33:34.2158979Z)
+### verify-recent --ack (2026-06-13T17:58:21.6173564Z)
 
-**Reason**: Mockup Studio verified in-session: tsc 0 errors + vitest 13/13 (7 new mockup-prompt tests) + REALTEST full-chain nano-banana-2 mockup generated and visually verified (color lock + props + no occlusion); temp realtest scripts executed exit 0
-
-**Acknowledged unverified files** (count=7):
-
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\mockup-prompt.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\storage\r2.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\studio\generate\route.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\mockup\MockupStudio.tsx`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\mockup\page.tsx`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\layout.tsx`
-- `c:\Windows\Temp\realtest_mockup.ts`
-
-
-### verify-recent --ack (2026-06-11T07:11:11.3554836Z)
-
-**Reason**: P2d print-provider verified: tsc 0 errors + REALTEST live Printful read paths (catalog 18 variants / sync list / golden-sample detail) all PASS; write path deliberately deferred to first real product flow to avoid touching operator's live Bloom product
-
-**Acknowledged unverified files** (count=3):
-
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\print-provider.ts`
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\printful\sync\route.ts`
-- `c:\Windows\Temp\realtest_p2d.ts`
-
-
-### verify-recent --ack (2026-06-11T07:31:38.7543151Z)
-
-**Reason**: pre-deploy fixes verified: full-project tsc 0 errors after narrowing casts (house convention, same pattern as tarot/designs routes); npm test 210/210; print-provider read paths REALTEST'd live earlier this session
+**Reason**: String-literal-only additions to SYSTEM_PROMPT (24-test breakdown + slug hint + BlogPosting type); WP checklist doc-only; tsc exit=0; RankMath KB research evidence in WORKLOG
 
 **Acknowledged unverified files** (count=1):
 
-- `c:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\print-provider.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\generate\route.ts`
 
 
-### verify-recent --ack (2026-06-11T08:59:02.9889699Z)
+### verify-recent --ack (2026-06-13T18:47:50.9650071Z)
 
-**Reason**: full verify completed: tsc+critic+bughunt all passed; lightbox loading overlay is UI-only; r2.ts ?? fixes verified via critic; FLUX custom dim per Replicate schema
+**Reason**: Image filename comment-only string edit in SYSTEM_PROMPT — added max 5 words + hyphens ONLY clarification; no logic change; tsc exit=0
 
-**Acknowledged unverified files** (count=5):
+**Acknowledged unverified files** (count=1):
 
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\storage\r2.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\tarot\image-gen.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\tarot\generate\route.ts`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
-- `C:\Users\USER\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\designs\DesignsGallery.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\generate\route.ts`
 
 
-_... 48 lines omitted._
+### verify-recent --ack (2026-06-13T18:57:29.1267422Z)
+
+**Reason**: Canvas colour toolkit: CanvasEditor + fabric-filters.ts apply ColorGrade sliders to selected image via Fabric filters (HueRotation/Saturation/Brightness/Contrast/Gamma/Convolute — all verified present via node + applyFilters is a fn). tsc 0 + full build 0. WYSIWYG (filtered pixels = toDataURL export); no headless browser to exec-test fabric runtime, build is the gate.
+
+**Acknowledged unverified files** (count=2):
+
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\fabric-filters.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
+
+
+### Session: 語意化下載檔名 + gate 修復 + SG 部署
+
+**Done today**
+- feat(studio) 語意化下載檔名 `產品-主圖名稱-風格.ext`：新 `lib/studio/semantic-filename.ts`（純 client-safe）wired 全 6 下載點（OutputTrackBar/StudioWorkbench/TarotStudio/CanvasEditor）。client 覆寫 `a.download`，server route.ts 不動（route.test 15/15 綠）。tsc 0 + vitest 28 pass + critic Deep（2 Major 已修：CANVAS_NAME_KEY sidebar-bypass stale-leak、控制字元）。commit 1b53dc3e。
+- fix(gate) verify-build-gates 被 RankMath KB（802b634a）卡：① `validate-doc-integrity.mjs` data: URI 被當相對連結 → 加 URI_SCHEME 豁免 + 排除 RankMath-KB 夾；② `system-health-check.ps1` 檔名 `[year]` glob 害 `Get-Content -Raw -Path` 動態參數 -Raw 無法綁 → 3 處改 -LiteralPath。health 100%(373/373)、verify ALL PASSED。commit e182cd21。
+- SG 部署 next-admin（b9b76502）：容器 healthy、server smoke 全 200、semantic-filename.ts 在 build context。playwright smoke 23/30 pass；3 fail 全在 /onboard+/api/ops（flaky + OnboardWizard 4→5 step test/impl 落差，與本次無關）。
+
+**Note**: 工作樹仍有別 session 在製品（ContentStudio/SeoCheckPanel/GradedPreview SEO+WYSIWYG），tsc 0，非本人改動。
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-11 18:19:51`
+- Time: `2026-06-14 03:41:28`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -397,59 +296,13 @@ _... 48 lines omitted._
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260611-181945.md`
-- Closeout: `reports/closeout/closeout-20260611-181950.md`
+- Health: `reports/health/health-20260614-034127.md`
+- Closeout: `reports/closeout/closeout-20260613-230929.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-
-- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); wp-bridge plan deepen + rename + ADR 007 (md-only)
-
-
-- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): tarot 版面尺寸常數/style 數值微調，無邏輯變更，tsc 我改的兩檔 0 新錯
-
-- REALTEST_EVIDENCE: tool=Bash | cmd=`node` 複現 cards.ts minor 生成邏輯印 78 張 | exit=0 | 大牌 0/I-XXI 全對、小牌 pip I-X + 宮廷牌空、78 unique names/ids 無重複
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/0n | index 對齊無 off-by-one、空字串 roman 被 guard 短路、band-centre 幾何兩標籤皆在帶內、最長牌名 THE HIGH PRIESTESS 64px ~630px < 664px 不溢出、無 numeric-roman 消費者
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`.roman`\|`MINOR_ROMAN` | hits=0 stale（.roman 僅 renderPrintCard.ts guard 內消費、MINOR_ROMAN 僅 cards.ts；agency-os/scripts 無命中）
-
-- BUGHUNT_WAIVED: NA -- buildCardPrompt prompt 字串內容調整（移除 tarot card/牌名字眼→純插圖無框無字），無控制流/型別變更；tsc 通過
-
-- BUGHUNT_WAIVED: NA -- 預覽圖寬 200->300 純 style 數值，無邏輯變更；tsc 通過
-
-### Tarot prompt 根因修正 — FLUX 否定句 backfire + 風格未吃 + 零成本中文詞典 + 風格按鈕 + 預覽放大
-- REALTEST_EVIDENCE: tool=Bash | cmd=`node` 複現 localizeStyle+buildCardPrompt 四輸入(梵谷畫風/英文/水彩 cat/空) | exit=0 | 風格在前+結尾強化、零 no/not/without 否定句、中文自動轉英；空格修正後「哥德暗黑」→「gothic dark moody」不黏字
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/1m | 唯一 Minor=相鄰CJK黏字（已採 critic 建議加空格修）；double-replacement/longest-first sort/ReDoS/chip updater/殘留否定token 全 verified clean（66 詞 exhaustive sim）
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`buildCardPrompt`\|`localizeStyle`\|`STYLE_PRESETS` | hits=0 stale；signature 不變、僅 TarotStudio 兩 call site + import 消費
-
-- REALTEST_EVIDENCE: tool=Bash | cmd=Replicate flux-dev + flux-schnell 直打「Van Gogh oil painting...」prompt | exit=0 HTTP=201 succeeded | flux-dev 輸出實看=標準梵谷厚塗/漩渦黃日/鈷藍山（證明模型+prompt 完全吃風格）；根因=外框縮圖不重生成，使用者看舊圖誤判
-- BUGHUNT_WAIVED: NA -- TarotStudio previewStale 衍生旗標 + 警示橫幅 純 UI state，無資料/跨檔邏輯；tsc 通過
-
-
-
-
-
-- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial): release-wp-bridge.sh path variables only
-
-
-
-
-
-### My Designs gallery filters + R2 env fix
-
-**[已修改]**
-- `app/tools/designs/DesignsGallery.tsx` — 新增 filter panel：工具/產品/主題/品牌/時間/排序；圖片 lightbox；client-side 過濾+排序
-- `app/api/tools/designs/route.ts` — SaveDesignBody 加 productType/theme/brand；metadata insert 加三欄；product_type server-side normalize "none"→null；insert fail 改 500
-- `app/tools/studio/StudioWorkbench.tsx` — saveToDesigns 送 source/productType/theme；dep array 補 productType+theme（critic Major fix）
-- `docker-compose.yml` — next-admin env 加 POD_DESIGNS_ENABLED/R2_API_TOKEN/R2_ACCOUNT_ID/R2_DESIGNS_BUCKET/R2_DESIGNS_PUBLIC_BASE/POD_DESIGNS_DEFAULT_ORG_ID
-
-**[驗證結果]**
-- REALTEST_WAIVED: SMOKE_COVERED -- sg-deploy smoke pass; R2/Supabase POST tested in prior session (af2d8cc6)
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/2n/2s | all Major+Minor fixed in same commit
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=saveToDesigns,saveToGallery,insert_failed,POD_DESIGNS_ENABLED | hits=0 outside changed files
-
-### Gallery filter 重設計 + FLUX 300 DPI + r2.ts ?? → || 修復 + lightbox loading UX
 
 **[已修改]**
 1. `lib/storage/r2.ts:37,47` — `??` → `||` (both getR2Config + getDesignsPublicBase); fixes empty-string R2_DESIGNS_PUBLIC_BASE passthrough; getDesignsPublicBase() used as SSRF allowlist prefix in 3 routes
@@ -462,5 +315,51 @@ _... 48 lines omitted._
 - REALTEST_WAIVED: SMOKE_COVERED -- npx tsc --noEmit EXIT:0; sg-deploy smoke will cover real exec; lightbox loading UX is UI-only change
 - REVIEW_DONE: critic=Deep | verdict=pass-after-fixes | findings=1m(getDesignsPublicBase ??→||)/1m(FLUX custom dim)/1m(fallback guard) | all fixed same session
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|printQuality|toolGroup|assetProduct|getDesignsPublicBase | hits=8 all in expected changed files + 3 consumer routes (allowlist consumers — fixed upstream)
+
+
+
+### live-race 機制更正 + verify-recent 清關（2026-06-12 追加）
+- **觸發**：操作者質疑「harness 頻繁回寫 settings.json」這個核心發現是否正確、是否真修掉。徹底重查。
+- **更正**：原機制錯。真因=**多 session 並行爭用**（`D:\Work\.claude` junction→`~/.claude` 同一檔；實測 4 個 `claude.exe`；各持啟動快照 last-writer-wins）。**非單體 harness bug、非「頻繁回寫」**。嚴重性低：唯一 flap deny=fork-bomb 守則（2026-05-07 加），19 條重要守則每 session 穩定。非 code 可修（N session 共用 user config 本就如此）。
+- **[已修改]**：CROSS_MACHINE_SYNC_RUNBOOK.md 故障段全重寫為正確機制+證據+低嚴重性+ multi-session anchor；check-claude-sync.ps1 `-Fix` hint 改為多-session 措辭；WORKLOG 前一條機制更正。
+- **[驗證結果]**：
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`& sync...merge; & verify-build-gates.ps1`（atomic）| exit=0 | Score 100% (372/372) + Doc integrity PASSED
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile check-claude-sync.ps1` | 0 parse errors
+  - REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File check-claude-sync.ps1` | 我的 -Fix 字串 0 trap（唯一 drift=line57 pre-existing out-of-scope）
+  - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n + 1 suggestion（採納：runbook 標題加 multi-session anchor）
+  - BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`頻繁回寫`+`頻繁以啟動時記憶體`+`live-race` | hits: WORKLOG 同 commit 修正、worklog-excerpt 自動鏡像 AO-CLOSE 重生、runbook:86 為刻意否定句（"不是...頻繁回寫"）保留
+- **[剩餘風險]**：mid-session settings.json 仍會在 fork-bomb 那條 flap（多 session 本質，良性）；真收斂在所有舊 session 結束後。已誠實記入 runbook，不再纏鬥。
+
+## 2026-06-13 tarot FLUX printQuality 422 fix
+
+### [任務理解]
+app.aware-wave.com/tools/tarot FLUX 模型回傳 replicate_422。
+
+### [根因]
+SG log: `input.aspect_ratio: must be one of 1:1|16:9|...|9:21` — "custom" 不在 live enum。
+printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
+進一步確認：flux-schnell live schema (via API) 完全無 width/height 欄位，只接受 aspect_ratio enum + megapixels。
+→ FLUX 根本不支援自訂 print 尺寸，printQuality path 是死碼。
+
+### [已修改]
+- `lib/tarot/image-gen.ts`: 移除 `FLUX_PRINT_DIMS` 常數（死碼），移除 generateFlux printQuality ternary，統一走 `aspect_ratio: ar` 路徑。
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=ssh SG `docker logs lobster-next-admin | grep replicate` | exit=0 | ms=N/A — 422 log found: `aspect_ratio must be one of...`, "custom" missing from enum
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl Replicate API schema flux-schnell | exit=0 | ms=N/A — confirmed Input params: no width/height; aspect_ratio default=1:1
+- REVIEW_DONE: critic=Standard | verdict=pass (after full rewrite) | findings=2c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|aspect_ratio.*custom|printDims | hits=0
+- REALTEST_WAIVED: NA -- live FLUX call not needed; schema confirmed via Replicate API; 422 root cause identified from SG server logs
+
+## 2026-06-13 feat(content-studio): Media Hub + expanded Structure section
+
+### [已修改]
+- `ContentStudio.tsx`: Added `MediaHub` interface + `ArticleStructure` extended (tables/h3/lists/italics/quotes/bold). Structure section replaced with intro hook brief + type chip buttons + Yes/No dropdowns. New Media Hub section (AI images: provider/count/size/style/instructions/brand name/alt-text; YouTube: count/layout; strict-under-headings). New constants HOOK_TYPES, AI_IMAGE_PROVIDERS, IMAGE_SIZES, LAYOUT_OPTIONS. `setMedia` callback, `showMedia` state, `DEFAULT_MEDIA`, updated `bulkSettings`.
+- `generate/route.ts`: Extended `ArticleStructure` + added `MediaHub` interface. `buildUserPrompt` accepts `introHookBrief`/`introHookType`/`media`; emits IMAGE_PLACEHOLDER_N and YOUTUBE_PLACEHOLDER_N prompt instructions. Fixed pre-existing targetCountry sentinel mismatch (`"Global"` vs `"全球（不指定）"`). Clamped imageCount (1–10) and youtubeCount (1–5) server-side.
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --input-type=module (targetCountry/clamp/size-label logic) | exit=0 | ms=<1000 — all 5 assertions PASSED
+- REVIEW_DONE: critic=Standard | verdict=pass (2 majors fixed: clamp + targetCountry sentinel) | findings=0c/2m/2n
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=imageCount|youtubeCount|introHookBrief|targetCountry.*Global | hits=0
 
 
