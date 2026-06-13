@@ -59,16 +59,6 @@ interface ModelConfig {
   buildInput?: (p: BuildInputParams) => Record<string, unknown>;
 }
 
-// ── Print-quality pixel dimensions for FLUX (capped at Replicate le=1440 hard limit) ──
-// Target was 7.6×12.6 cm @ 300 DPI = 897×1488, but Replicate FLUX enforces width/height ≤ 1440.
-// All values are multiples of 16 (FLUX requirement). 2:3 and 3:2 recalculated at the 1440 ceiling.
-const FLUX_PRINT_DIMS: Record<AspectRatio, [number, number]> = {
-  "2:3":  [960, 1440],   // exact 2:3 at ceiling — was [896, 1488] which 422'd (h > 1440)
-  "3:2":  [1440, 960],   // exact 3:2 at ceiling — was [1488, 896] which 422'd (w > 1440)
-  "4:5":  [1024, 1280],  // within limit
-  "1:1":  [1200, 1200],  // within limit
-  "9:16": [816, 1440],   // ≈9:16 (0.7% off) — was [896, 1600] which 422'd (h > 1440)
-};
 
 // ── Aspect ratio mapping helpers (verified against live Replicate schemas 2026-06-11) ──
 
@@ -330,32 +320,20 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
 
   const seed = params.seed ?? Math.floor(Math.random() * 1_000_000_000);
   const ar = (params.aspectRatio ?? "2:3") as AspectRatio;
-  // Live Replicate FLUX enum excludes "custom" (422 verified 2026-06-12). Pass width+height without aspect_ratio.
-  const printDims = FLUX_PRINT_DIMS[ar] ?? FLUX_PRINT_DIMS["2:3"];
-  const input: Record<string, unknown> = params.printQuality
-    ? {
-        prompt: params.prompt,
-        // "custom" removed from live enum (422 from server 2026-06-12). Width+height passed directly.
-        width: printDims[0],
-        height: printDims[1],
-        output_format: "png",
-        output_quality: 100,
-        num_outputs: 1,
-        // go_fast=true uses fp8-quantized weights: faster but NON-deterministic even with fixed seed.
-        // Force bf16 for reproducible deck generation.
-        go_fast: false,
-        seed,
-      }
-    : {
-        prompt: params.prompt,
-        aspect_ratio: ar,
-        output_format: "png",
-        output_quality: 100,
-        num_outputs: 1,
-        megapixels: "1",
-        go_fast: false,
-        seed,
-      };
+  // FLUX schnell/dev only accept aspect_ratio from a named enum — no width/height params in schema.
+  // printQuality is a no-op for FLUX; use aspect_ratio for all requests.
+  const input: Record<string, unknown> = {
+    prompt: params.prompt,
+    aspect_ratio: ar,
+    output_format: "png",
+    output_quality: 100,
+    num_outputs: 1,
+    megapixels: "1",
+    // go_fast=true uses fp8-quantized weights: faster but NON-deterministic even with fixed seed.
+    // Force bf16 for reproducible deck generation.
+    go_fast: false,
+    seed,
+  };
   if (config.fluxModel === "black-forest-labs/flux-dev") {
     input.guidance = FLUX_DEV_GUIDANCE;
   }

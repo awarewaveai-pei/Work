@@ -25,8 +25,6 @@
 **[rollback]** 0036 檔內 :112-117：restore 12-arg 函式（見備份檔/0035）→ DROP COLUMN fingerprint_v2 → `NOTIFY pgrst,'reload schema'`。
 - AUTO_TASK_DONE: 套 `0036_fingerprint_v2.sql` 到 production Supabase
 
-## 2026-06-13
-
 ### fix(command-plane): reset accidental Telegram kill switch + hide kill-switch slash menu entries
 
 **[任務理解]** 操作者誤觸 Telegram `/maintenance_mode`，處理中又誤觸 `/emergency_stop`。目標：立即恢復 Command Plane `normal`，並降低 Telegram slash menu 再次誤觸風險；不移除 emergency handler，保留手打緊急鎖定能力。
@@ -48,6 +46,25 @@
 **[剩餘風險]** `/emergency_stop` / `/maintenance_mode` / `/read_only_mode` 仍可手動輸入；這是刻意保留的 emergency path。若要完全禁止 Telegram kill switch，需改 `policyEngine.ts` 風險/來源策略並重跑 smoke/deploy，另案處理。
 
 **[rollback]** 還原 `scripts/configure-telegram-webhook.ps1` 三個 command entries 後重跑 `scripts/secrets-vault.ps1 -Action run -Names TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET -Command ".\scripts\configure-telegram-webhook.ps1 -BaseUrl https://app.aware-wave.com"`；`secrets-vault.ps1` false-exit 修正可用 git revert 還原。
+
+### feat(tarot): ✨ 幫我想 prompt 按鈕 — Claude Haiku art-direction prompt 生成
+
+**[任務理解]** TASKS Phase 1 (b)：在塔羅工具英文框旁加「✨ 幫我想 prompt」按鈕，仿 MEGA Beautify；使用者輸入中/英 style hint → Claude Haiku-4-5 生成完整 art-direction English prompt → 填回英文框。
+
+**[已修改]**
+- 新增 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/tarot/suggest-prompt/route.ts`：POST endpoint，auth=`canCreateAiImageJob`，Haiku-4-5 生 40-80 字英文 art-direction prompt（material+brushwork / composition+light / palette / mood），ONLY style，no scene subjects
+- `TarotStudio.tsx:156`：新增 `suggestBusy` state
+- `TarotStudio.tsx:296-321`：`suggestPrompt()` function — 取 stylePrompt||subjectText 為 hint，POST `/api/tools/tarot/suggest-prompt`，成功填 styleEnglish+setStyleEnglishEdited(true)
+- `TarotStudio.tsx:771-797`：UI 按鈕「✨ 幫我想 prompt」/ loading 態「✨ AI 生成中…」，位於英文 textarea label 旁
+
+**[驗證結果]**
+- REALTEST_WAIVED: NA -- 部署後 SG real exec 驗證（server-side Haiku API call，無法本機 test）
+- REVIEW_DONE: critic=Quick | verdict=pass | route auth+input guard ok，Haiku model ID 正確（`claude-haiku-4-5-20251001`），SDK import 已在 package.json；UI disabled when locked/busy，void safeguard on async click
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`suggest-prompt\|suggestPrompt` | hits=0（新檔，無 stale 宣稱）
+- BUGHUNT_WAIVED: lobster-factory scope already verified in route.ts + TarotStudio.tsx — no downstream consumers yet
+
+**[剩餘風險]** ANTHROPIC_API_KEY 需在 SG `.env` 設定（docker-compose 已 wire）；Haiku API call ~0.5s，不佔生圖 quota。
+**[rollback]** git revert 移除 suggest-prompt/route.ts + 還原 TarotStudio.tsx 兩處改動。
 
 ## 2026-06-12
 
@@ -9544,3 +9561,24 @@ AUTO_TASK_DONE: onboarding spec-generator debug log 清理（tsc 0 + 168 tests +
   - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n + 1 suggestion（採納：runbook 標題加 multi-session anchor）
   - BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`頻繁回寫`+`頻繁以啟動時記憶體`+`live-race` | hits: WORKLOG 同 commit 修正、worklog-excerpt 自動鏡像 AO-CLOSE 重生、runbook:86 為刻意否定句（"不是...頻繁回寫"）保留
 - **[剩餘風險]**：mid-session settings.json 仍會在 fork-bomb 那條 flap（多 session 本質，良性）；真收斂在所有舊 session 結束後。已誠實記入 runbook，不再纏鬥。
+
+## 2026-06-13 tarot FLUX printQuality 422 fix
+
+### [任務理解]
+app.aware-wave.com/tools/tarot FLUX 模型回傳 replicate_422。
+
+### [根因]
+SG log: `input.aspect_ratio: must be one of 1:1|16:9|...|9:21` — "custom" 不在 live enum。
+printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
+進一步確認：flux-schnell live schema (via API) 完全無 width/height 欄位，只接受 aspect_ratio enum + megapixels。
+→ FLUX 根本不支援自訂 print 尺寸，printQuality path 是死碼。
+
+### [已修改]
+- `lib/tarot/image-gen.ts`: 移除 `FLUX_PRINT_DIMS` 常數（死碼），移除 generateFlux printQuality ternary，統一走 `aspect_ratio: ar` 路徑。
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=ssh SG `docker logs lobster-next-admin | grep replicate` | exit=0 | ms=N/A — 422 log found: `aspect_ratio must be one of...`, "custom" missing from enum
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl Replicate API schema flux-schnell | exit=0 | ms=N/A — confirmed Input params: no width/height; aspect_ratio default=1:1
+- REVIEW_DONE: critic=Standard | verdict=pass (after full rewrite) | findings=2c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|aspect_ratio.*custom|printDims | hits=0
+- REALTEST_WAIVED: NA -- live FLUX call not needed; schema confirmed via Replicate API; 422 root cause identified from SG server logs
