@@ -757,25 +757,24 @@ export default function DesignsGallery() {
                 const expanded = expandedIds.has(asset.id);
                 return (
                   <div style={{ marginTop: 4 }}>
-                    <div
-                      style={{
-                        fontSize: 11, opacity: 0.5,
-                        whiteSpace: expanded ? "pre-wrap" : undefined,
-                        wordBreak: "break-word",
-                        ...(expanded
-                          ? {}
-                          : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }),
-                      }}
-                    >
-                      {asset.metadata.prompt}
-                    </div>
                     <button
                       className="btn-secondary"
-                      style={{ fontSize: 10, padding: "1px 6px", marginTop: 3 }}
+                      style={{ fontSize: 10, padding: "1px 6px" }}
                       onClick={() => toggleExpanded(asset.id)}
                     >
-                      {expanded ? "收合" : "展開完整 prompt"}
+                      {expanded ? "收合 prompt ▴" : "Prompt ▾"}
                     </button>
+                    {/* Text stays hidden until expanded — keeps the card clean. */}
+                    {expanded ? (
+                      <div
+                        style={{
+                          fontSize: 11, opacity: 0.5, marginTop: 4,
+                          whiteSpace: "pre-wrap", wordBreak: "break-word",
+                        }}
+                      >
+                        {asset.metadata.prompt}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })() : null}
