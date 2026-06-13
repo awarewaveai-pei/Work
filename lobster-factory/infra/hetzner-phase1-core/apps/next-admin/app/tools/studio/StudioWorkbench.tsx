@@ -84,6 +84,7 @@ export default function StudioWorkbench() {
   const [bgState, setBgState] = useState<"idle" | "removing" | "done" | "error">("idle");
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const bgInFlight = useRef(false); // state lags a render — ref blocks same-tick double-click
+  const grade = useColorGrade(); // 修圖積木：色彩/色階/銳利度 (live CSS preview + server bake)
 
   const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
   const modelOption = useMemo(() => STUDIO_MODEL_OPTIONS.find((m) => m.value === model), [model]);
@@ -325,7 +326,7 @@ export default function StudioWorkbench() {
           {gen.status === "done" && gen.image ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={gen.image} alt="generated design" style={{ maxWidth: "100%", maxHeight: 560, borderRadius: 8, background: "#111" }} />
+              <img src={gen.image} alt="generated design" style={{ maxWidth: "100%", maxHeight: 560, borderRadius: 8, background: "#111", filter: grade.cssFilter }} />
               <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
                 <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
                   {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
@@ -347,6 +348,16 @@ export default function StudioWorkbench() {
                 {gen.seed != null ? <span style={{ fontSize: 12, opacity: 0.6 }}>seed {gen.seed}</span> : null}
                 {saveState === "saved" ? <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a> : null}
                 {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗（檢查 POD_DESIGNS_ENABLED 與 POD_DESIGNS_DEFAULT_ORG_ID / 伺服器 log）</span> : null}
+              </div>
+
+              {/* 修圖積木 + 輸出軌 ([1-f]/[1-g])。POD 商品印刷檔（非卡片尺寸）為後續切片，此處不給 print 目的地。 */}
+              <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+                <div style={{ width: 260 }}>
+                  <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
+                </div>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <OutputTrackBar image={gen.image} source="pod" colorGrade={grade.params} />
+                </div>
               </div>
             </>
           ) : null}
