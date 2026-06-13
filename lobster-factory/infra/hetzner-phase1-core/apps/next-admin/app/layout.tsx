@@ -90,6 +90,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/tools/mockup" className="sidebar-link" title="AI 擬真商品照：設計圖 + 平拍/模特雙模式 + 鎖色鐵則 → Nano Banana 2 合成">
                   <span className="sidebar-icon">👕</span> Mockup
                 </Link>
+                <Link href="/tools/canvas" className="sidebar-link" title="快速編輯 Canvas：上傳圖案 + 加文字 + 拖曳/縮放/旋轉，即時預覽 → 下載 PNG 或存入 My Designs（Fabric.js）">
+                  <span className="sidebar-icon">🎨</span> Canvas Editor
+                </Link>
                 <Link href="/tools/designs" className="sidebar-link" title="已儲存設計庫（R2 持久化），可重用/下載">
                   <span className="sidebar-icon">🗂</span> My Designs
                 </Link>
