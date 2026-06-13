@@ -51,6 +51,30 @@
 
 **[rollback]** `git revert HEAD` → 回上一個 session checkpoint
 
+### feat(pod): [1-e] image/process API route — bake pipeline HTTP 邊界完成
+
+**[任務理解]** 把 [1-c] toProductImage + [1-d] toPrintFile 接上 HTTP，讓 UI 可呼叫。整合點，非新邏輯。
+
+**[已修改]**
+- `app/api/tools/image/process/route.ts`（新）— 單 route 三模式 discriminated union（web/print/canvas）。flag→auth→mode 驗證→各分支再驗 preset/destination→bake→catch OutputIntent gate。base64 in/out。
+- `app/api/tools/image/process/route.test.ts`（新）— 14 測試（首個 route-handler 直呼測試）。
+- plan §15.1 [1-e] ✅；TASKS.md ✅。
+
+**[現況分析]** 複用既有 7 route 慣例：`resolveOpsRole`+`canCreateAiImageJob`→403（ops-role.ts:68）、`POD_DESIGNS_ENABLED`→503、HTTP 200+ok:false（nginx error_page）、base64 data URL input（remove-bg:31，非 URL fetch=SSRF 零表面）。`toPrintFile` cmyk 目的地 throw `OutputIntentNotDeployedError` → route catch 轉友善 ok:false（非 500）。注：色彩管線 colorGrade 與 cursor 並行 session 的 `applyColorGrade` 擴充相容（route 用 clampParams，API 未變；my 24 測試綠）。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/api/tools/image/process/route.test.ts` | exit=0 | ms=283（14/14：403/503/invalid mode/invalid dataurl/invalid preset+dest/413/garbage-payload→bake_failed/web→webp/print-tgc→png/print-tw-local+mpc gate/canvas echo+webp mime/garbage colorGrade）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/api/tools/image/process/route.test.ts lib/studio/__tests__/to-print-file.test.ts` | exit=0 | ms=283（24/24 含 [1-d] 回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/2M/4m（Major canvas mime 謊報[硬編 png 不管 webp/jpeg]→從 data URL 推導；Major body-size DoS→確認 nginx client_max_body_size 50M 已覆蓋[共用慣例非本 PR]；Minor 錯誤訊息洩漏 lib 內部→改 log server-side+generic；補 413/invalid-payload/canvas-mime 測試）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`tools/image/process|image/process` | hits=0（無 consumer：UI [1-f]/[1-j/k] 待接=預期）
+
+**[剩餘風險]** ① body-size 上限走 nginx 50M（共用慣例，request.json() 在 12MB gate 前 buffer，但邊界 50M 非無界）② consumer UI 尚未接 ③ canvas 為 client-side Fabric.js pass-through echo（MVP，編輯邏輯在前端）④ cursor 並行 session 的 color-grade.ts 擴充（applyColorGrade）working-tree 未提交且其 toSharpLevels 測試 1 fail（其 WIP，非本 PR；我只 commit route + docs，不碰其 4 檔）。
+
+**[rollback]** 純新檔：`git checkout`/`rm` route.ts + route.test.ts；plan/TASKS revert。無既有檔案改動。
+
+---
+
 ### feat(pod): [1-d] to-print-file.ts + ghostscript-pdfx.ts 印刷軌核心完成
 
 **[任務理解]** POD/Tarot 印刷檔生成核心。承 handoff `2026-06-12-1859-to-print-file-pdfx.md`。目的地驅動積木：cmyk→pdf-lib CMYK PDF（三框）、srgb→PNG 直出（TGC）；ICC OutputIntent 走 Ghostscript（部署期，介面隔離讓純程式碼可完成）。
