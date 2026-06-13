@@ -4,6 +4,26 @@
 
 ## 2026-06-14
 
+### fix(admin-auth): /tools/content 功能壞了 根因 = CF rate-limit 踢登入使用者
+
+**[任務理解]** 使用者回報 app.aware-wave.com/tools/content「功能壞了」。表面像發布/行事曆掛掉；真實根因是整個 console 的 auth gate 在使用者操作時把人踢回 /login。
+
+**[現況分析 / VBC]** debugger 靜態推測「WP username 空 → publish 401」**經實測為錯**：DB wp_sites row username=`peijingartstudio` + App Password 正常，SG 容器實測 WP REST `GET /posts`=200、`users/me`=200。改查容器 log → 狂噴 `AuthUnknownError: "Rate limit exceeded" is not valid JSON`。鏈：middleware 每 request 呼叫 `supabase.auth.getUser()`（網路驗證 supabase.aware-wave.com）→ 單頁載入數十並行子請求全從 SG 單一 IP 5.223.93.113 出 → 撞 Cloudflare scanner-flood rule（50/10s，原只排除 app 子網域）→ CF 回純文字 "Rate limit exceeded"（429）→ supabase-js JSON.parse 爆 → middleware catch 視為未登入 → fail-closed 踢 /login。
+
+**[已修改]**
+- (A 韌性) `lib/supabase/session-cache.ts`（新）+ `middleware.ts` — 驗證快取（FRESH 15s 跳網路驗證、STALE 120s transient 失敗 fallback 上限 8 次）；transient/authoritative error 分類；偽 token 永無快取項 → 仍 fail-closed。
+- (A 測試) `lib/supabase/__tests__/session-cache.test.ts`（新，5 測試）。
+- (B CF, 手動) zone aware-wave.com ruleset http_ratelimit rule `b8ffa72d…` 表達式加 `and http.host ne "supabase.aware-wave.com"`（免費方案不允許 `ip.src`，故比照 app 用 host-level 排除）。backup: `D:/tmp/cf-rule-backup.json`。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=SG container node fetch burst 180 req supabase /auth/v1/user（CF 修前後對比） | exit=0 | 修前 rate-limited=120/180；修後=0/180（FIXED）。WP REST 實測 GET /posts=200 users/me=200。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0C/1M/2sugg（全採納：撤銷窗口 MAX_STALE_USES 上限、prune delete-before-set LRU、isTransientAuthError 限縮 status 0/undefined）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit 與 npx vitest run | exit=0 | 287 既有 + 5 新測試全過
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=getStaleCachedRole\|consumeStaleCachedRole\|getFreshCachedRole\|cacheValidatedRole\|session-cache | hits=0 stale（舊名 getStaleCachedRole 全域 0 命中=rename 完整；新符號僅 3 處 in-module）
+
+**[剩餘風險]** B 移除 supabase.aware-wave.com 的 CF scanner-flood 防護（GoTrue 自身限流 + CF L3/4 DDoS 仍在；與既有 app 子網域排除同邏輯）。A 部署待 sg-deploy。
+**[rollback]** A: revert commit + sg-deploy。B: `Invoke-RestMethod PUT` 還原 `D:/tmp/cf-rule-backup.json` 的 expression（移除 supabase 排除條款）。
+
 ### feat(studio): Printful Mockup Generator pipeline — design → R2 → product photo
 
 **[任務理解]** Nano Banana 2 mockup 品質不合格（設計與衣服沒有融合，只是兩張圖疊放）。根本問題：image_input 被當 style reference，非 composite target。解法：改用 Printful Mockup Generator API（POD 業界標準）— 真實商品攝影 + 專業合成。
