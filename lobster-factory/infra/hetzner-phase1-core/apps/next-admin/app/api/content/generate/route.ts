@@ -183,8 +183,9 @@ function buildUserPrompt(params: {
     lines.push("");
     lines.push("IMPORTANT: After the full article, append exactly this meta block:");
     lines.push("<!-- CONTENT_META_START -->");
-    lines.push("SEO_TITLE: [50-60 char SEO title]");
-    lines.push("META_DESC: [145-155 char meta description]");
+    lines.push("SEO_TITLE: [50-60 char SEO title, primary keyword in first half of title]");
+    lines.push("META_DESC: [145-155 char meta description, includes primary keyword]");
+    lines.push("FOCUS_KEYWORD: [the primary keyword exactly as provided]");
     lines.push("<!-- CONTENT_META_END -->");
   }
 
