@@ -6,27 +6,31 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const SIZE_TOKENS: Record<string, number> = {
-  short: 2048,
-  medium: 4096,
-  long: 6144,
-};
+const SIZE_TOKENS: Record<string, number> = { short: 2048, medium: 4096, long: 6144 };
+const SIZE_WORDS: Record<string, string>  = { short: "~1200", medium: "~2500", long: "~4000" };
 
-const SIZE_WORDS: Record<string, string> = {
-  short: "~1200",
-  medium: "~2500",
-  long: "~4000",
-};
+const AI_WORDS_BASIC = [
+  "Additionally", "Furthermore", "Moreover", "In conclusion",
+  "It's worth noting", "It's important to note", "Delve into",
+  "Comprehensive", "Leverage", "Utilize", "Navigating", "Showcasing",
+];
+const AI_WORDS_EXTENDED = [
+  ...AI_WORDS_BASIC,
+  "Multifaceted", "Nuanced", "In the realm of", "In today's world",
+  "In today's digital age", "Ever-evolving", "Vibrant", "Foster",
+  "Facilitate", "Paramount", "Subsequently", "Accordingly",
+  "Harnessing", "Elevating", "Robust", "Seamlessly", "Transformative",
+];
 
 const SYSTEM_PROMPT = `You are a professional SEO/GEO content writer. Write a complete, publication-ready article in Markdown.
 
-OUTPUT FORMAT (follow this order exactly):
+DEFAULT OUTPUT FORMAT (follow unless overridden in user instructions):
 1. # H1 title
 2. ## Quick Answer (80–150 words; first sentence directly answers the main question)
 3. ## Key Takeaways (4–5 bullet points)
 4. Main body sections — each H2 answers one specific reader question; use H3 sub-sections where helpful
 5. At least one comparison or evaluation table
-6. ## FAQ (5–8 questions; each answer is 40–120 words; first sentence directly answers; no vague pronouns like "this" or "the above")
+6. ## FAQ (5–8 questions; each answer is 40–120 words; first sentence directly answers; no vague pronouns)
 7. ## Conclusion (with a clear CTA)
 
 RULES:
@@ -38,16 +42,31 @@ RULES:
 - No keyword stuffing — use the primary keyword naturally
 - FAQ answers must be self-contained; spell out names/brand/place instead of using "it", "this approach", "above"`;
 
+interface ArticleStructure {
+  quickAnswer?: boolean;
+  keyTakeaways?: boolean;
+  comparisonTable?: boolean;
+  faq?: boolean;
+  conclusion?: boolean;
+}
+
 function buildUserPrompt(params: {
   keyword: string;
   title: string;
   language: string;
+  targetCountry: string;
   articleType: string;
   articleSize: string;
   tone: string;
   pointOfView: string;
   readability: string;
+  removeAiWords: string;
   details: string;
+  nlpKeywords: string;
+  outline: string;
+  externalLinks: string[];
+  structure: ArticleStructure;
+  generateMeta: boolean;
 }): string {
   const lines: string[] = [];
 
@@ -61,13 +80,64 @@ function buildUserPrompt(params: {
   lines.push(`Primary keyword: ${params.keyword}`);
   if (params.title.trim()) lines.push(`Article title: ${params.title.trim()}`);
   lines.push(`Language: ${params.language}`);
+  if (params.targetCountry && params.targetCountry !== "Global") {
+    lines.push(`Target country/audience: ${params.targetCountry}`);
+  }
   lines.push(`Article type: ${params.articleType}`);
   lines.push(`Target length: ${SIZE_WORDS[params.articleSize] ?? "~2500"} words`);
   lines.push(`Tone of voice: ${params.tone}`);
   if (params.pointOfView !== "none") lines.push(`Point of view: ${params.pointOfView}`);
   lines.push(`Text readability: ${params.readability}`);
+
+  // Structure overrides
+  const s = params.structure;
+  if (s.quickAnswer === false)    lines.push("DO NOT include a Quick Answer section.");
+  if (s.keyTakeaways === false)   lines.push("DO NOT include a Key Takeaways section.");
+  if (s.comparisonTable === false) lines.push("DO NOT include a comparison or evaluation table.");
+  if (s.faq === false)            lines.push("DO NOT include a FAQ section.");
+  if (s.conclusion === false)     lines.push("DO NOT include a Conclusion section.");
+
+  // Remove AI words
+  if (params.removeAiWords === "basic") {
+    lines.push(`\nAVOID these overused AI filler words: ${AI_WORDS_BASIC.join(", ")}`);
+  } else if (params.removeAiWords === "extended") {
+    lines.push(`\nAVOID these overused AI filler words: ${AI_WORDS_EXTENDED.join(", ")}`);
+  }
+
+  // NLP keywords
+  if (params.nlpKeywords.trim()) {
+    lines.push("");
+    lines.push("SEO/NLP keywords to include naturally (do not keyword-stuff):");
+    lines.push(params.nlpKeywords.trim());
+  }
+
+  // Custom outline
+  if (params.outline.trim()) {
+    lines.push("");
+    lines.push("Custom article outline (follow this heading structure exactly):");
+    lines.push(params.outline.trim());
+  }
+
+  // External links
+  const validLinks = params.externalLinks.filter(u => /^https?:\/\//.test(u.trim()));
+  if (validLinks.length > 0) {
+    lines.push("");
+    lines.push("External links to include naturally as contextual anchors:");
+    validLinks.forEach(u => lines.push(`- ${u.trim()}`));
+  }
+
   lines.push("");
   lines.push("Write the complete article now.");
+
+  // Meta generation
+  if (params.generateMeta) {
+    lines.push("");
+    lines.push("IMPORTANT: After the full article, append exactly this meta block:");
+    lines.push("<!-- CONTENT_META_START -->");
+    lines.push("SEO_TITLE: [50-60 char SEO title]");
+    lines.push("META_DESC: [145-155 char meta description]");
+    lines.push("<!-- CONTENT_META_END -->");
+  }
 
   return lines.join("\n");
 }
@@ -81,42 +151,70 @@ export async function POST(req: Request): Promise<Response> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return new NextResponse("ANTHROPIC_API_KEY not configured", { status: 503 });
 
-  let body: Record<string, string>;
+  let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const keyword = (body.keyword ?? "").trim();
+  const str  = (v: unknown, fb = "") => (typeof v === "string" ? v : fb);
+  const bool = (v: unknown, fb = true) => (typeof v === "boolean" ? v : fb);
+  const sarr = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+
+  const keyword = str(body.keyword).trim();
   if (!keyword) return new NextResponse("keyword required", { status: 400 });
 
-  const maxTokens = SIZE_TOKENS[body.articleSize ?? "medium"] ?? 4096;
+  const rawStruct = (body.structure ?? {}) as Record<string, unknown>;
+  const structure: ArticleStructure = {
+    quickAnswer:    bool(rawStruct.quickAnswer),
+    keyTakeaways:   bool(rawStruct.keyTakeaways),
+    comparisonTable: bool(rawStruct.comparisonTable),
+    faq:            bool(rawStruct.faq),
+    conclusion:     bool(rawStruct.conclusion),
+  };
+
+  const maxTokens  = SIZE_TOKENS[str(body.articleSize, "medium")] ?? 4096;
   const userPrompt = buildUserPrompt({
     keyword,
-    title: body.title ?? "",
-    language: body.language ?? "English",
-    articleType: body.articleType ?? "Pillar Article",
-    articleSize: body.articleSize ?? "medium",
-    tone: body.tone ?? "Friendly",
-    pointOfView: body.pointOfView ?? "none",
-    readability: body.readability ?? "8th grade",
-    details: body.details ?? "",
+    title:        str(body.title),
+    language:     str(body.language, "English"),
+    targetCountry: str(body.targetCountry, "Global"),
+    articleType:  str(body.articleType, "Pillar Article"),
+    articleSize:  str(body.articleSize, "medium"),
+    tone:         str(body.tone, "Friendly"),
+    pointOfView:  str(body.pointOfView, "none"),
+    readability:  str(body.readability, "8th grade"),
+    removeAiWords: str(body.removeAiWords, "none"),
+    details:      str(body.details),
+    nlpKeywords:  str(body.nlpKeywords),
+    outline:      str(body.outline),
+    externalLinks: sarr(body.externalLinks),
+    structure,
+    generateMeta: bool(body.generateMeta, false),
   });
 
   const client = new Anthropic({ apiKey });
+  let anthropicStream: ReturnType<typeof client.messages.stream> | null = null;
 
   const readable = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
       try {
-        const stream = client.messages.stream({
+        anthropicStream = client.messages.stream({
           model: "claude-sonnet-4-6",
           max_tokens: maxTokens,
           system: SYSTEM_PROMPT,
           messages: [{ role: "user", content: userPrompt }],
         });
-        for await (const event of stream) {
+
+        req.signal.addEventListener("abort", () => {
+          anthropicStream?.abort();
+        });
+
+        for await (const event of anthropicStream) {
+          if (req.signal.aborted) break;
           if (
             event.type === "content_block_delta" &&
             event.delta.type === "text_delta"
@@ -125,12 +223,17 @@ export async function POST(req: Request): Promise<Response> {
           }
         }
       } catch (err) {
-        controller.enqueue(
-          encoder.encode(`\n\n<!-- GENERATION_ERROR: ${String(err)} -->`),
-        );
+        if (!req.signal.aborted) {
+          const isAnthropicErr = err instanceof Error && err.message.length > 0;
+          const msg = isAnthropicErr ? "Claude API error" : "Unknown error";
+          controller.enqueue(encoder.encode(`\n\n<!-- GENERATION_ERROR: ${msg} -->`));
+        }
       } finally {
         controller.close();
       }
+    },
+    cancel() {
+      anthropicStream?.abort();
     },
   });
 

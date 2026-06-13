@@ -4,34 +4,89 @@ import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function safeUrl(escapedUrl: string): string {
+  const raw = escapedUrl
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"');
+  if (/^(https?:|mailto:)/i.test(raw)) {
+    try {
+      const u = new URL(raw);
+      return ["http:", "https:", "mailto:"].includes(u.protocol) ? escapeHtml(raw) : "#";
+    } catch { return "#"; }
+  }
+  if (/^[/#]/.test(raw)) return escapeHtml(raw);
+  return "#";
+}
+
+function inline(s: string): string {
+  const e = escapeHtml(s);
+  return e
+    .replace(/`([^`]+)`/g, (_m, c) => `<code>${c}</code>`)
+    .replace(/\*\*([^*]+)\*\*/g, (_m, c) => `<strong>${c}</strong>`)
+    .replace(/\*([^*]+)\*/g, (_m, c) => `<em>${c}</em>`)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text, url) =>
+      `<a href="${safeUrl(url)}">${text}</a>`
+    );
+}
+
 function markdownToHtml(md: string): string {
-  const lines = md.split("\n");
+  // Strip meta block before converting
+  const clean = md
+    .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
+    .trim();
+
+  const lines = clean.split("\n");
   const out: string[] = [];
   let inList = false;
+  let inOl = false;
   let inTable = false;
+  let tableHasHeader = false;
 
   for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
+    const line = lines[i];
 
     // Table rows
     if (line.trim().startsWith("|")) {
-      if (!inTable) { out.push("<table>"); inTable = true; }
-      // separator row
-      if (/^\|[\s\-|]+\|$/.test(line.trim())) continue;
+      if (!inTable) { out.push("<table>"); inTable = true; tableHasHeader = false; }
+      if (/^\|[\s\-|:]+\|$/.test(line.trim())) continue; // separator row
       const cells = line.split("|").slice(1, -1).map(c => c.trim());
-      const tag = i === 0 || (lines[i - 1]?.trim().startsWith("|") === false) ? "th" : "td";
-      out.push("<tr>" + cells.map(c => `<${tag}>${inline(c)}</${tag}>`).join("") + "</tr>");
+      if (!tableHasHeader) {
+        out.push("<thead><tr>" + cells.map(c => `<th>${inline(c)}</th>`).join("") + "</tr></thead><tbody>");
+        tableHasHeader = true;
+      } else {
+        out.push("<tr>" + cells.map(c => `<td>${inline(c)}</td>`).join("") + "</tr>");
+      }
       continue;
     }
-    if (inTable) { out.push("</table>"); inTable = false; }
+    if (inTable) { out.push("</tbody></table>"); inTable = false; tableHasHeader = false; }
 
-    // List items
+    // Unordered list
     if (/^[-*+]\s/.test(line)) {
+      if (inOl) { out.push("</ol>"); inOl = false; }
       if (!inList) { out.push("<ul>"); inList = true; }
       out.push(`<li>${inline(line.replace(/^[-*+]\s/, ""))}</li>`);
       continue;
     }
     if (inList) { out.push("</ul>"); inList = false; }
+
+    // Ordered list
+    const olMatch = line.match(/^\d+\.\s+(.*)/);
+    if (olMatch) {
+      if (!inOl) { out.push("<ol>"); inOl = true; }
+      out.push(`<li>${inline(olMatch[1])}</li>`);
+      continue;
+    }
+    if (inOl) { out.push("</ol>"); inOl = false; }
 
     // Headings
     const h6 = line.match(/^######\s+(.*)/); if (h6) { out.push(`<h6>${inline(h6[1])}</h6>`); continue; }
@@ -42,10 +97,13 @@ function markdownToHtml(md: string): string {
     const h1 = line.match(/^#\s+(.*)/);      if (h1) { out.push(`<h1>${inline(h1[1])}</h1>`); continue; }
 
     // Blockquote
-    if (line.startsWith("> ")) { out.push(`<blockquote><p>${inline(line.slice(2))}</p></blockquote>`); continue; }
+    if (line.startsWith("> ")) {
+      out.push(`<blockquote><p>${inline(line.slice(2))}</p></blockquote>`);
+      continue;
+    }
 
-    // HTML comments pass through (NEEDS_BRAND_VERIFY etc.)
-    if (line.trim().startsWith("<!--")) { out.push(line); continue; }
+    // HTML comments — only pure comment lines (NEEDS_BRAND_VERIFY etc.)
+    if (/^<!--.*-->$/.test(line.trim())) { out.push(line.trim()); continue; }
 
     // Empty line
     if (!line.trim()) { out.push(""); continue; }
@@ -53,16 +111,9 @@ function markdownToHtml(md: string): string {
     out.push(`<p>${inline(line)}</p>`);
   }
   if (inList) out.push("</ul>");
-  if (inTable) out.push("</table>");
+  if (inOl) out.push("</ol>");
+  if (inTable) out.push("</tbody></table>");
   return out.join("\n");
-}
-
-function inline(s: string): string {
-  return s
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
 }
 
 function extractH1(md: string): string {
@@ -92,11 +143,12 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   let body: {
-    markdown?: string;
-    slug?: string;
-    seoTitle?: string;
-    metaDescription?: string;
-    categories?: number[];
+    markdown?: unknown;
+    slug?: unknown;
+    seoTitle?: unknown;
+    metaDescription?: unknown;
+    categories?: unknown;
+    scheduleDate?: unknown;
   };
   try {
     body = await req.json();
@@ -104,12 +156,13 @@ export async function POST(req: Request): Promise<Response> {
     return new NextResponse("invalid json", { status: 400 });
   }
 
-  const markdown = (body.markdown ?? "").trim();
+  const markdown = (typeof body.markdown === "string" ? body.markdown : "").trim();
   if (!markdown) return new NextResponse("markdown required", { status: 400 });
 
   const h1 = extractH1(markdown);
-  const title = h1 || "Untitled Article";
-  const slug = body.slug?.trim() || slugify(h1 || "article");
+  const seoTitle = typeof body.seoTitle === "string" ? body.seoTitle.trim() : "";
+  const title = seoTitle || h1 || "Untitled Article";
+  const slug = (typeof body.slug === "string" ? body.slug.trim() : "") || slugify(h1 || "article");
   const content = markdownToHtml(markdown);
 
   const base = wpApiUrl.replace(/\/+$/, "");
@@ -121,7 +174,21 @@ export async function POST(req: Request): Promise<Response> {
     slug,
     status: "draft",
   };
-  if (body.categories?.length) payload.categories = body.categories;
+
+  if (Array.isArray(body.categories) && body.categories.length > 0) {
+    payload.categories = body.categories.filter(c => Number.isInteger(c));
+  }
+
+  if (typeof body.scheduleDate === "string" && body.scheduleDate.trim()) {
+    payload.date = body.scheduleDate.trim();
+  }
+
+  if (typeof body.metaDescription === "string" && body.metaDescription.trim()) {
+    payload.meta = {
+      _yoast_wpseo_metadesc: body.metaDescription.trim(),
+      rank_math_description: body.metaDescription.trim(),
+    };
+  }
 
   let res: Response;
   try {
@@ -133,8 +200,8 @@ export async function POST(req: Request): Promise<Response> {
       },
       body: JSON.stringify(payload),
     });
-  } catch (err) {
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 502 });
+  } catch {
+    return NextResponse.json({ ok: false, error: "WordPress connection failed" }, { status: 502 });
   }
 
   let json: unknown;
@@ -143,8 +210,8 @@ export async function POST(req: Request): Promise<Response> {
   if (!res.ok) {
     const msg =
       typeof json === "object" && json !== null && "message" in json
-        ? String((json as { message: unknown }).message)
-        : `wp_${res.status}`;
+        ? String((json as { message: unknown }).message).slice(0, 200)
+        : `WP error ${res.status}`;
     return NextResponse.json({ ok: false, error: msg }, { status: res.status });
   }
 
