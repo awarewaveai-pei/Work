@@ -41,7 +41,7 @@ AO-CLOSE 時工作樹含另一 session 的在製品被 checkpoint 掃入 staging
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` + `npm run build` | exit=0/0
 - REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | deployed=640c2bf1 | healthy 6s | smoke 4/4 200
 - REVIEW_WAIVED: SMOKE_COVERED -- 複用既驗 ColorGradePanel；fabric filter API 已 node 驗存在；canvas runtime 無 headless browser exec，build 為 gate
-- BUGHUNT_DONE: scope=lobster-factory | grep=buildFabricImageFilters\|imageSelected | hits=0 stale
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=buildFabricImageFilters\|imageSelected | hits=0 stale（符號為 next-admin-local，agency-os/scripts 無 callsite）
 **[待辦]** Q2 Adobe 色彩平衡（新積木）：簡版全域中間調 3 軸（建議）vs 完整陰影/中間調/亮部 9 軸 — 待使用者選規模。
 **[部署]** SG 640c2bf1 LIVE。
 
