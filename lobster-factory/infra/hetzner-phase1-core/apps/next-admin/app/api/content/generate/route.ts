@@ -89,7 +89,7 @@ CONTENT READABILITY — 3 tests:
 IMAGE PLACEHOLDERS (when images are requested):
 - Alt text rule: describe the image content concisely + include the primary keyword ONCE where it fits naturally; NEVER keyword-stuff alt text
 - First image alt text: must include the primary keyword (e.g. "instructor guiding a small-group creative expression session using watercolour")
-- Recommended filename format (add as a comment): <!-- filename: descriptive-words-with-hyphens.jpg -->
+- Filename format (add as a comment): <!-- filename: descriptive-words-with-hyphens.jpg --> — max 5 words, hyphens ONLY (no underscores, no spaces), all lowercase, naturally includes primary keyword ONCE
 - Google Discover optimisation: recommend 16:9 format at 1280×720 px minimum (>300k total pixels); avoid images with heavy text overlays
 - Use descriptive alt text for accessibility: describe what is literally shown, not what you want it to say
 - NEVER use CSS background for SEO-critical images — always use the ![alt](url) Markdown img format

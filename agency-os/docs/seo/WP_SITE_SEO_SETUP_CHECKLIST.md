@@ -136,7 +136,10 @@ Sitemap: https://example.com/sitemap_index.xml
 - [ ] Article Type → Blog Post
 
 **Noindex 設定（Titles & Meta → Misc Pages & Authors）：**
-- [ ] Author Archives → 單一作者網站選 **Noindex**（避免重複內容）
+- [ ] Author Archives → **依策略決定**：
+  - 若有 E-E-A-T 策略（作者有 bio / 社群連結 / ProfilePage Schema）→ **Index**（幫助 Google 識別作者可信度）
+  - 若作者頁是空頁 / thin content → **Noindex**（避免稀釋 PageRank）
+  - 預設：若作者有完整個人頁面，選 **Index**；否則選 Noindex
 - [ ] Date Archives → 關閉或 **Noindex**（爬蟲配額浪費）
 - [ ] Search Results → **Noindex Search Results 啟用**（搜尋頁是 thin content）
 - [ ] Noindex Empty Category and Tag Archives → **啟用**
@@ -147,10 +150,14 @@ Sitemap: https://example.com/sitemap_index.xml
 ### 2.4 Sitemap 設定
 
 - [ ] Rank Math → Sitemap Settings → 啟用 XML Sitemap
+- [ ] **Links Per Sitemap** → 設為 **200**（Google 對小型 sitemap 回應更快）
 - [ ] 確認 Posts / Pages / Categories 均已啟用
 - [ ] 排除：Login 頁、Thank You 頁、管理頁
-- [ ] Image Sitemap：啟用（幫助圖片被索引）
+- [ ] **Images in Sitemaps** → **啟用**（圖片搜尋索引）
+- [ ] **Include Featured Images** → **啟用**（特色圖片列入 sitemap）
 - [ ] Sitemap URL：`https://example.com/sitemap_index.xml`
+- [ ] 提交至 **Google Search Console**（見 Phase 3）
+- [ ] 提交至 **Bing Webmaster Tools**（ChatGPT Search 依賴 Bing 索引 — 見 Phase 3B）
 
 ---
 
@@ -262,7 +269,35 @@ RankMath 自動加入，確認以下欄位：
 - [ ] **IndexNow** 模組 → 啟用（文章發布/更新時自動通知 Bing/其他搜尋引擎，加速索引）
   - IndexNow → Settings → Select Search Engines → 選 Bing（+ 其他）
 
-### 2.10 FAQ Schema 使用指引
+### 2.10 Author SEO 設定（E-E-A-T 信號）
+
+> 根據：`RankMath-KB/Schema/How to Implement Author SEO.md` — 作者可信度是 E-E-A-T 核心信號
+
+**作者個人頁面設定（WordPress → Users → Profile）**：
+- [ ] 真實姓名（First Name / Last Name）
+- [ ] Biographical Info（Bio）：包含專業背景、領域、獎項、學歷
+- [ ] 真實頭像（透過 Gravatar — 不用預設圖示）
+- [ ] Website URL
+- [ ] 社群連結：Facebook / Twitter / LinkedIn（主題支援時）
+
+**RankMath Author SEO 設定**：
+- [ ] Rank Math SEO → Titles & Meta → Authors
+- [ ] Authors → Author Robots Meta → 選 **Index**（若作者有完整頁面）
+- [ ] 在 Rank Math 的 Profile 欄位填入：Additional Profile URLs（其他社群 / 發表平台）
+- [ ] 在作者頁面加入 **sameAs** 連結（社群帳號 URL 列表）
+
+**E-E-A-T 額外加強**：
+- [ ] 主題支援 Author Card（文章末尾顯示作者 bio + 頭像 + 社群連結）
+- [ ] 文章 byline 顯示作者名稱並連結至作者頁（讓 Google 可爬取）
+- [ ] 用 Google Rich Results Test 確認 Article Schema 含 `author.url` 欄位
+
+**Schema 設定（ProfilePage Schema）**：
+- [ ] 進入作者頁面 → Rank Math → Schema → Schema Generator → 選 **Person** 類型
+- [ ] 填入 name、url、sameAs（社群連結陣列）、description（bio）
+
+---
+
+### 2.11 FAQ Schema 使用指引
 
 > 根據：`RankMath-KB_Schema.md` → FAQ Schema block 文章
 
