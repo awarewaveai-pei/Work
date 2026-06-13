@@ -40,7 +40,15 @@ RULES:
 - YMYL (health/wellness/mental health): include a brief disclaimer that this is educational content — not medical treatment, psychotherapy, or a substitute for professional care. Add crisis line if content is Taiwan-facing: 台灣安心專線 1925 / 生命線 1995
 - FORBIDDEN: cure / treat illness / heal illness / diagnose / guaranteed results / therapy (unless drawing a clear distinction from your own service) / therapist (same rule)
 - No keyword stuffing — use the primary keyword naturally
-- FAQ answers must be self-contained; spell out names/brand/place instead of using "it", "this approach", "above"`;
+- FAQ answers must be self-contained; spell out names/brand/place instead of using "it", "this approach", "above"
+
+RANK MATH COMPLIANCE (mandatory for every article):
+- Primary keyword must appear in: H1 title, first paragraph (within first 150 words), at least one H2 or H3 heading
+- Keyword density: 1–1.5%; do not repeat exact phrase more than once per 100 words
+- Minimum 600 words; target 1200+ for medium, 2500+ for long
+- No paragraph longer than 120 words; split into shorter paragraphs
+- Include at least 1 external reference link cited inline with natural anchor text
+- For articles >1500 words: add a Table of Contents (bulleted list) immediately after H1`;
 
 interface ArticleStructure {
   quickAnswer?: boolean;
