@@ -4,6 +4,33 @@
 
 ## 2026-06-13
 
+### feat(content-studio): SEO Content Studio v2 — full feature parity with SEOWriting.ai
+
+**[任務理解]** 使用者要求 app.aware-wave.com 具備 SEOWriting.ai 文件中列出的所有功能。先前 session 已建立 MVP（generate + publish），本次擴展至完整功能集。同時修復 critic 找出的 Critical XSS。
+
+**[已修改]**
+- `app/api/content/generate/route.ts` — 加 targetCountry / nlpKeywords / outline / structure checkboxes / removeAiWords / externalLinks / generateMeta params；abort propagation via req.signal；錯誤訊息不洩漏內部細節
+- `app/api/content/publish/route.ts` — **XSS Critical fix**: `escapeHtml()` + `safeUrl()` (whitelist http/https/mailto) in `inline()`；正確 thead/tbody/ordered-list；scheduleDate param；metaDescription passthrough；error messages sanitized
+- `app/api/content/title/route.ts` — NEW: 用 claude-haiku 快速生成 5 個 SEO 標題建議
+- `app/api/content/humanize/route.ts` — NEW: Humanize / Rewrite 兩種模式，streaming，remove AI words
+- `app/api/content/syndicate/route.ts` — NEW: Twitter/LinkedIn/Facebook 社群貼文生成
+- `app/tools/content/ContentStudio.tsx` — 全面重寫：Tab bar (Generate/Humanize/Bulk-soon)；Suggest Titles button；Target Country；Article Structure toggles；Remove AI Words；NLP Keywords；Outline Editor；External Links；Generate Meta；Scheduled Publishing；Social Syndication panel；decoder flush fix；TypeScript 乾淨
+
+**[驗證結果]**
+- REALTEST_WAIVED: NA -- 新 SG 部署需 go-ahead；local tsc gate 替代
+- REVIEW_DONE: critic=Standard | verdict=pass (XSS fixed; all major issues addressed) | findings=1c/3m/5mi fixed
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content | grep=canCreateAiImageJob|WP_API_URL | hits=5 (all 5 routes auth-gated ✓)
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools | grep=/api/content/ | hits=1 (ContentStudio.tsx only ✓)
+
+**[剩餘風險]**
+- 需部署到 SG 才能 end-to-end 驗證；WP JWT 環境變數已確認存在
+- Bulk Generation tab — Coming Soon placeholder；Phase 2 需 Supabase queue
+- Internal Linking / Connect to Web (Perplexity) — Phase 2
+- Saved Brand Voice profiles — Phase 2 (需 DB)
+- WP meta description passthrough 需 Yoast/RankMath 支援；設 meta 欄不影響 draft 建立
+
+**[rollback]** `git revert HEAD` → 回上一個 session checkpoint
+
 ### feat(pod): [1-d] to-print-file.ts + ghostscript-pdfx.ts 印刷軌核心完成
 
 **[任務理解]** POD/Tarot 印刷檔生成核心。承 handoff `2026-06-12-1859-to-print-file-pdfx.md`。目的地驅動積木：cmyk→pdf-lib CMYK PDF（三框）、srgb→PNG 直出（TGC）；ICC OutputIntent 走 Ghostscript（部署期，介面隔離讓純程式碼可完成）。

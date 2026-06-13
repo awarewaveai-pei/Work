@@ -481,10 +481,15 @@ export default function TarotStudio() {
     }
   }
 
-  // Generate only the cards in the currently-selected group (大牌 / 全部 / 單一牌組).
-  async function generateGroup() {
-    const targets = batch.map((it, i) => ({ i, card: it.card })).filter(({ card }) => inGroup(card, group));
-    if (targets.length === 0) return;
+  // Generate pending/failed cards in the currently-selected group (skips already-done by default).
+  // skipDone=false regenerates everything (full redo).
+  async function generateGroup(skipDone = true) {
+    const all = batch.map((it, i) => ({ it, i })).filter(({ it }) => inGroup(it.card, group));
+    const targets = skipDone ? all.filter(({ it }) => it.status !== "done") : all;
+    if (targets.length === 0) {
+      if (skipDone) setMessage("這組的牌都已生成完畢，點「重新生成全組」可覆蓋重做。");
+      return;
+    }
     const opt = modelOption(lockedModel);
     const estNt = Math.round(targets.length * opt.costNt);
     const mins = Math.max(1, Math.round((targets.length * 20) / 60));
@@ -1012,6 +1017,7 @@ export default function TarotStudio() {
         (() => {
           const groupItems = batch.map((it, i) => ({ it, i })).filter(({ it }) => inGroup(it.card, group));
           const groupDone = groupItems.filter(({ it }) => it.status === "done").length;
+          const groupPending = groupItems.filter(({ it }) => it.status !== "done").length;
           return (
             <div className="card">
               <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>Step 2 · 分組 / 單張生成與下載</h2>
@@ -1042,9 +1048,15 @@ export default function TarotStudio() {
               </div>
 
               <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
-                <button className="btn-primary" onClick={generateGroup} disabled={batchBusy}>
-                  {batchBusy ? `生成中… ${groupDone}/${groupItems.length}` : `生成這組 ${groupItems.length} 張`}
+                <button className="btn-primary" onClick={() => void generateGroup(true)} disabled={batchBusy || groupPending === 0}>
+                  {batchBusy ? `生成中… ${groupDone}/${groupItems.length}` : `生成未完成 ${groupPending} 張`}
                 </button>
+                {groupDone > 0 && (
+                  <button className="btn-secondary" onClick={() => void generateGroup(false)} disabled={batchBusy}
+                    title="重新生成這組所有牌（包含已完成的），會覆蓋現有結果">
+                    重新生成全組
+                  </button>
+                )}
                 <button className="btn-secondary" onClick={downloadZip} disabled={zipBusy || doneCount === 0}>
                   {zipBusy ? "打包中…" : `下載 ZIP（全部 ${doneCount} 張）`}
                 </button>
