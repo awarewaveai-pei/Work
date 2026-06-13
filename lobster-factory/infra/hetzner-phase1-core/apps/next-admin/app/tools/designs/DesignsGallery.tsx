@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { STYLE_PRESETS } from "../tarot/tarotStyles";
 
 interface AssetMetadata {
   prompt?: string | null;
@@ -10,6 +11,10 @@ interface AssetMetadata {
   product_type?: string | null;
   theme?: string | null;
   brand?: string | null;
+  /** Style chips the user picked at generation time (zh labels). */
+  style_tags?: string[] | null;
+  /** Main subject (tarot subject override / studio subject) — feeds the download filename. */
+  subject?: string | null;
 }
 
 interface DesignAsset {
@@ -133,13 +138,48 @@ function safeFilePart(value: string | null | undefined, fallback: string): strin
   return cleaned || fallback;
 }
 
-function zipEntryName(asset: DesignAsset, index: number, used: Set<string>): string {
-  const label =
-    asset.metadata?.card_name ??
-    asset.metadata?.theme ??
-    asset.metadata?.model_name ??
-    `design-${index + 1}`;
-  const base = safeFilePart(`${label}-${asset.id.slice(0, 8)}`, `design-${index + 1}`);
+/* ─── Style chip classification (SSOT = tarot STYLE_PRESETS) ──────── */
+const PAINTER_GROUPS = new Set(["西方畫家", "亞洲畫家"]);
+const STYLE_GROUP_BY_LABEL = new Map(STYLE_PRESETS.map((p) => [p.zh, p.group] as const));
+type StyleKind = "畫家" | "媒材" | "風格";
+const STYLE_KIND_ORDER: StyleKind[] = ["畫家", "媒材", "風格"];
+
+function styleKind(label: string): StyleKind {
+  const g = STYLE_GROUP_BY_LABEL.get(label);
+  if (g && PAINTER_GROUPS.has(g)) return "畫家";
+  if (g === "媒材") return "媒材";
+  return "風格"; // catalog 風格 group + any free-typed / studio token
+}
+
+function groupStyleTags(tags: string[]): Record<StyleKind, string[]> {
+  const out: Record<StyleKind, string[]> = { "畫家": [], "媒材": [], "風格": [] };
+  for (const t of tags) out[styleKind(t)].push(t);
+  return out;
+}
+
+/** Compact a zh label for filenames: keep the lead before "｜" (e.g. "水彩｜…" → "水彩"). */
+function shortStyleLabel(zh: string): string {
+  return zh.split("｜")[0].trim();
+}
+
+/**
+ * Filename stem: 產品-主圖-畫家/媒材/風格.
+ * 主圖 = card_name → subject → theme; style tags joined with "+"; any empty part is dropped
+ * (so img2img / no-style images just get 產品-主圖). Falls back to "design" when all empty.
+ */
+function designBaseName(asset: DesignAsset): string {
+  const product = PRODUCT_LABELS[assetProduct(asset) ?? ""] ?? "";
+  const subject = asset.metadata?.card_name ?? asset.metadata?.subject ?? asset.metadata?.theme ?? "";
+  const styleLabel = (asset.metadata?.style_tags ?? [])
+    .map(shortStyleLabel)
+    .filter(Boolean)
+    .join("+");
+  const parts = [product, subject, styleLabel].filter(Boolean);
+  return safeFilePart(parts.join("-"), "design");
+}
+
+function zipEntryName(asset: DesignAsset, _index: number, used: Set<string>): string {
+  const base = designBaseName(asset);
   const ext = assetExtension(asset);
   let candidate = `${base}.${ext}`;
   let suffix = 2;
@@ -206,6 +246,8 @@ export default function DesignsGallery() {
   const [errorMessage, setErrorMessage] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [zoom, setZoom] = useState<string | null>(null);
 
   /* multi-select */
@@ -282,6 +324,32 @@ export default function DesignsGallery() {
     }
   }, []);
 
+
+  /* Single-image download — the <a download> attribute is ignored for cross-origin R2 URLs
+     (browser opens the image instead), so fetch the bytes and save a blob with our own filename.
+     Falls back to opening in a new tab if the fetch is blocked. Same pattern as bulkDownload. */
+  const downloadOne = useCallback(async (asset: DesignAsset) => {
+    if (!asset.object_url) return;
+    setDownloadingId(asset.id);
+    try {
+      const res = await fetch(asset.object_url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      downloadBlob(blob, `${designBaseName(asset)}.${assetExtension(asset)}`);
+    } catch {
+      window.open(asset.object_url, "_blank", "noopener");
+    } finally {
+      setDownloadingId(null);
+    }
+  }, []);
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }, []);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
