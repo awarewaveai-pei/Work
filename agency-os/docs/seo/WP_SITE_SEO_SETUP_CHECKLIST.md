@@ -74,9 +74,24 @@ Sitemap: https://example.com/sitemap_index.xml
 ### 2.1 RankMath 安裝與啟用
 
 - [ ] 安裝 RankMath SEO 外掛
-- [ ] 完成 Setup Wizard（選 Advanced 模式以獲完整功能）
+- [ ] 完成 Setup Wizard（選 **Advanced 模式**，Easy 模式功能不全）
+- [ ] 連結 Rank Math 帳號（未連結 = 多數 PRO 功能無法使用）
 - [ ] 連結 Google Search Console（Rank Math → General Settings → Webmaster Tools）
 - [ ] 連結 Google Analytics 4（Rank Math → General Settings → Analytics）
+
+**Setup Wizard 關鍵設定（Your Site 步驟）**：
+- [ ] Website Type：Personal Blog / Business（決定 Organization vs Person schema）
+- [ ] Organization Logo：上傳最小 **112×112 px** 正方形圖（用於 Google Knowledge Panel）
+- [ ] Default Social Share Image：**1200×630 px**（無圖文章的 OG 備用圖）
+
+**Setup Wizard → Optimization 步驟**：
+- [ ] Noindex Empty Category and Tag Archives → **啟用**（空存檔浪費爬蟲配額）
+- [ ] Nofollow External Links → **啟用**（所有外連預設 nofollow，節省 PageRank；個別可設白名單）
+- [ ] Open External Links in New Tab → **啟用**（自動加 target="_blank"）
+
+**Setup Wizard → Analytics 步驟**：
+- [ ] Enable Index Status tab → **啟用**（Rank Math Analytics → Index Status 顯示已/未索引頁面）
+- [ ] Exclude logged-in users → **啟用**（避免自己瀏覽污染數據）
 
 ---
 
@@ -112,9 +127,20 @@ Sitemap: https://example.com/sitemap_index.xml
 ```
 
 **Meta Description（全站預設）：**
-- 145–155 字元
+- 50–160 字元（理想 155–160 字元）
 - 含主要關鍵字
 - 包含品牌名稱
+
+**Schema 設定（Posts section）：**
+- [ ] Schema Type → **BlogPosting**（比 Article 更精確，Google 建議使用最具體的類型）
+- [ ] Article Type → Blog Post
+
+**Noindex 設定（Titles & Meta → Misc Pages & Authors）：**
+- [ ] Author Archives → 單一作者網站選 **Noindex**（避免重複內容）
+- [ ] Date Archives → 關閉或 **Noindex**（爬蟲配額浪費）
+- [ ] Search Results → **Noindex Search Results 啟用**（搜尋頁是 thin content）
+- [ ] Noindex Empty Category and Tag Archives → **啟用**
+- [ ] Noindex Password Protected Pages → **啟用**
 
 ---
 
@@ -172,13 +198,79 @@ RankMath 自動加入，確認以下欄位：
 | 欄位 | 必填 | 說明 |
 |------|------|------|
 | Focus Keyword | ✅ | 主要關鍵字，由文章生成系統自動填入 |
-| SEO Title | ✅ | 50–60 字元，關鍵字在前半段 |
-| Meta Description | ✅ | 145–155 字元，含關鍵字 |
+| SEO Title | ✅ | 50–60 字元，關鍵字在前半段（前 50%） |
+| Meta Description | ✅ | 50–160 字元，含關鍵字 |
 | OG Image | ✅ | 1200×630 px，16:9，無大量文字 |
-| Schema Type | ✅ | Article 或 BlogPosting |
+| Schema Type | ✅ | BlogPosting（預設已設） |
 | Canonical URL | 按需 | 如有重複內容則設定 |
 
-**目標分數：≥81（綠燈）**
+**目標分數：≥81（綠燈）** — 24 項測試完整清單：
+
+**Basic SEO（7 項）**：
+- [ ] 關鍵字在 SEO Title（前 50% 位置）
+- [ ] 關鍵字在 Meta Description
+- [ ] 關鍵字在 URL slug
+- [ ] 關鍵字在文章前 10% 內容（約前 150 字）
+- [ ] 關鍵字出現在整個文章主體
+- [ ] 字數 ≥ 600（≥2,500 words = 100% 分）
+- [ ] Product Schema（WooCommerce 才適用，一般部落格跳過）
+
+**Additional SEO（10 項）**：
+- [ ] 關鍵字在 H2 或 H3 標題
+- [ ] 關鍵字在至少一張圖片的 Alt Text
+- [ ] 關鍵字密度 1%–1.5%（>2.5% 被視為 stuffing）
+- [ ] URL slug ≤75 字元
+- [ ] 有外部連結（dofollow）
+- [ ] 有 dofollow 的外連（預設外連 nofollow 時需手動設部分為 dofollow）
+- [ ] 有內部連結
+- [ ] 主要關鍵字未重複用於其他頁面
+- [ ] 使用 Content AI（PRO 功能）
+- [ ] 允許評論（WooCommerce 才適用）
+
+**Title Readability（4 項）**：
+- [ ] 關鍵字在 SEO Title 前半段
+- [ ] Title 含情感 Sentiment（正面或負面）
+- [ ] Title 含 Power Word（ultimate/proven/essential 等）
+- [ ] Title 含數字（"7 Ways" / "5 Steps"）
+
+**Content Readability（3 項）**：
+- [ ] 目錄（Table of Contents）已加入
+- [ ] 所有段落 < 120 字
+- [ ] 文章含 ≥4 張圖片或影片
+
+### 2.8 Image SEO 模組
+
+> Rank Math → Dashboard → 啟用 **Image SEO** 模組 → General Settings → Images
+
+- [ ] Add Missing ALT Attributes → **啟用**（動態補全所有無 alt 的圖片）
+- [ ] Image Alt Attribute Format → `%focus_kw% - %filename%`（加關鍵字）
+- [ ] Add Missing Title Attributes → **啟用**（搜尋引擎理解圖片）
+- [ ] Title Attribute Format → `%title%`（使用文章標題）
+
+> 注意：Rank Math 的 Image SEO 是動態套用（render time），不修改 DB 中圖片原始資料。
+
+### 2.9 必要模組啟用清單
+
+> Rank Math → Dashboard → Modules
+
+- [ ] **Breadcrumbs** 模組 → 啟用（顯示階層導覽；提供 BreadcrumbList Schema）
+  - 啟用後在主題加入 `<?php rank_math_the_breadcrumbs(); ?>` 或使用 widget
+- [ ] **404 Monitor** 模組 → 啟用（監控 404 錯誤，自動產生重新導向建議）
+- [ ] **Redirections** 模組 → 啟用（管理 301/302/410 重新導向，代替 Redirection 外掛）
+- [ ] **Image SEO** 模組 → 啟用（見 2.8）
+- [ ] **Schema** 模組 → 啟用（結構化資料，預設應已啟用）
+- [ ] **IndexNow** 模組 → 啟用（文章發布/更新時自動通知 Bing/其他搜尋引擎，加速索引）
+  - IndexNow → Settings → Select Search Engines → 選 Bing（+ 其他）
+
+### 2.10 FAQ Schema 使用指引
+
+> 根據：`RankMath-KB_Schema.md` → FAQ Schema block 文章
+
+- **Google 於 2023 年起縮減、2026 年完全停止支援 FAQ Rich Results（不再顯示在搜尋結果）**
+- 仍建議使用 FAQ block 原因：改善使用者體驗 + **AI 平台（ChatGPT Search / AI Overview）** 更易解析正確答案
+- 使用方式：Block Editor → 搜尋「FAQ by Rank Math」→ 加入文章
+- 每篇文章只使用 1 個 FAQ block
+- RankMath 自動將 FAQ 嵌套在 Article Schema 內（`subjectOf`），更精確
 
 ---
 
