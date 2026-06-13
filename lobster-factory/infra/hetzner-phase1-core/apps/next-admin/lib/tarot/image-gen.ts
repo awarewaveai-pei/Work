@@ -10,6 +10,8 @@
 // Returns uniform `data:image/png;base64,...` so the client treats all models the same.
 // Write prompts in English for best results — no Claude translation step.
 
+import { getDesignsPublicBase } from "../storage/r2";
+
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
 const REPLICATE_POLL_MS = 2_500;
 // flux-dev guidance scale. BFL recommends 1.5–5; >5 oversaturates. Higher = closer prompt adherence
@@ -279,6 +281,32 @@ function isAllowedOutputUrl(raw: string): boolean {
   }
 }
 
+// Inbound reference images may arrive as our own My Designs picks — public R2 URLs
+// (Replicate models fetch those directly; gpt-image-1 needs raw bytes). Only the
+// designs bucket's own public origin is fetchable here (SSRF guard, same allowlist
+// the studio route validates against via getDesignsPublicBase).
+function isAllowedInputUrl(raw: string): boolean {
+  const base = getDesignsPublicBase();
+  if (!raw.startsWith(base + "/")) return false;
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && u.host === new URL(base).host;
+  } catch {
+    return false;
+  }
+}
+
+async function ownDesignUrlToBlob(url: string, signal: AbortSignal): Promise<Blob | null> {
+  const res = await fetch(url, { signal });
+  if (!res.ok) return null;
+  const declared = Number(res.headers.get("content-length") ?? "0");
+  if (declared > MAX_OUTPUT_BYTES) return null;
+  const ab = await res.arrayBuffer();
+  if (ab.byteLength > MAX_OUTPUT_BYTES) return null;
+  const mime = res.headers.get("content-type") ?? "image/png";
+  return new Blob([new Uint8Array(ab)], { type: mime });
+}
+
 async function urlToDataUrl(url: string, signal: AbortSignal): Promise<string> {
   if (!isAllowedOutputUrl(url)) throw new Error("output_url_not_allowed");
   const res = await fetch(url, { signal });
@@ -470,9 +498,15 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
     form.append("size", SIZE);
     form.append("quality", quality);
     for (let i = 0; i < refs.length; i++) {
-      const parsed = parseDataUrl(refs[i]);
-      if (!parsed) return { ok: false, error: "invalid_reference_image" };
-      form.append("image[]", new Blob([new Uint8Array(parsed.buffer)], { type: parsed.mime }), `reference-${i}.png`);
+      const ref = refs[i];
+      const parsed = parseDataUrl(ref);
+      const blob = parsed
+        ? new Blob([new Uint8Array(parsed.buffer)], { type: parsed.mime })
+        : isAllowedInputUrl(ref)
+          ? await ownDesignUrlToBlob(ref, signal)
+          : null;
+      if (!blob) return { ok: false, error: "invalid_reference_image" };
+      form.append("image[]", blob, `reference-${i}.png`);
     }
     res = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",
