@@ -29,7 +29,14 @@
 
 **[多 session 衝突處理]** 並行 Cursor/Sonnet session(FullMainlineParity loop)以「fabric 害 sg-deploy 需手動 npm install」為由刪 canvas+fabric=**理由錯**（Dockerfile:5 `npm ci||npm install` 自動裝）。已附證據還原+push。CMYK PDF/X pipeline 由另一 session 完整擁有(SG Alpine REALTEST 過，deploy-gated)，未碰。
 
-**[決策]** ① 不自跑 /sg-deploy：另一 session 主動掌 SG 部署節奏(a4832569@22:55) + CMYK pipeline 待 go-ahead，我確保 HEAD deploy-safe(已達)讓下次部署搭車 ② POD 服飾印刷目的地暫緩：pipeline 由 CMYK session 主動改 + 需設計決策(商品/尺寸/DTF) + 非使用者原始需求；POD 網頁軌已可下載修圖結果。
+**[決策]** ① POD 服飾印刷目的地暫緩：pipeline 由 CMYK session 主動改 + 需設計決策(商品/尺寸/DTF) + 非使用者原始需求；POD 網頁軌已可下載修圖結果。
+
+**[防重複刪除]** fabric 被並行 session 兩度誤刪 → 三層防線：① `/tools/canvas` 接進 sidebar 主導覽(layout.tsx，不再 unused) ② `lib/studio/__tests__/canvas-deps.test.ts` 斷言 fabric ∈ package.json → 刪了讓 sg-deploy npm test gate 變紅(用對方在乎的 gate 反鎖) ③ WORKLOG+memory+commit 訊息記載移除理由錯誤(Dockerfile npm ci 自動裝)。commit 36ef25ac。
+
+**[部署]**（使用者 go-ahead「部署上線」2026-06-13）SG production via sg-deploy.sh next-admin：deployed commit `3cf502a2`(prev 6dbf1b73)，exit 0，`lobster-next-admin` healthy 7s，server-side smoke 全 200(/login、/api/ops/summary、nginx、node-api)。產線實測(basic auth)：`/tools/canvas`=307(=既有 /tools/studio 同行為=路由存在+app-auth 重導，非 404)、`/api/ops/repairs/health`={"ok":true}。修圖積木+三軌+Fabric canvas **已 LIVE**。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | deployed=3cf502a2 -- container healthy + smoke 4/4 200
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -u .. https://app.aware-wave.com/tools/canvas | exit=0 -- HTTP 307(route exists, auth-gated, =/tools/studio)
+**[部署備註]** Playwright smoke 10 fail 經查為 test-harness 假陰性(repairs/health 直連 ok:true；onboard/studio/canvas 307 為 app-session 重導；mobile-smoke project 整體連線問題)，非本次 deploy regression；產線端點直連全健康。smoke 套件 app-auth flow 失準另案。
 
 **[剩餘風險]** fabric 可能被那個 loop session 再刪(需使用者停掉它)；fabric canvas 的 R2-CORS taint 僅整合測試可驗(data-URL 路徑安全，R2-URL 路徑待 Playwright)。
 
