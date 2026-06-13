@@ -4,6 +4,23 @@
 
 ## 2026-06-14
 
+### feat(content-gen): GEO/AI citation mechanics 加入文章生成 SYSTEM_PROMPT + RankMath SEO panel 部署
+
+**[任務理解]** 使用者找到 5 份 GEO research 文件（`agency-os/docs/GEO/`）要求生成文章時遵循 AI citation mechanics；同一 session 還完成 RankMath SEO check panel + AI auto-fix 端點。
+**[已修改]**
+- `app/api/content/generate/route.ts` — SYSTEM_PROMPT 新增 `GEO / AI CITATION MECHANICS` block（Answer Capsule 120-150 char + Sub-query coverage + Named expert attribution + Recency signal + FAQPage schema hint + GEO anti-patterns）；commit `1dc4fe25`
+- `app/tools/content/SeoCheckPanel.tsx`（新）— RankMath-style 4-category accordion，13 checks，AI auto-fix 按鈕
+- `app/api/content/seo-fix/route.ts`（新）— Anthropic SDK，tolerant meta parse，all-text-blocks aggregation
+- `lib/seo/rankmath-checker.ts` — 新增 `suggestion` 欄位 + 13 個中文建議字串
+- `app/tools/content/ContentStudio.tsx` — seoReport/seoChecking/seoRunRef state + handleFixApply
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | deployed=95f3ea9b | healthy 1s | smoke 4/4 200
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner.ps1 -Mode smoke | pass=23/30 | failed=3 (pre-existing: OnboardWizard UI + mobile SSL transient, 與本變更無關)
+- REVIEW_DONE: critic=Deep (prev session) | verdict=warn→pass | findings=2M fixed (text-block aggregation + tolerant meta regex)
+- BUGHUNT_WAIVED: NA -- SYSTEM_PROMPT 為純字串；新 TSX/TS 符號無跨檔 downstream consumers（checker 只由 ContentStudio import）
+**[剩餘風險]** GEO rules 效果需實際生成文章後人工評估；Answer Capsule 無法機器驗證 AI 是否確實遵循。
+**[部署]** SG 95f3ea9b LIVE（含 GEO prompt + SEO panel + seo-fix API）。
+
 ### feat(studio): Adobe 色彩平衡（第 6 塊積木）+ 部署
 
 **[任務理解]** 使用者要 Adobe 色彩平衡。做簡版全域中間調 3 軸（青紅/洋紅綠/黃藍），接進可插拔 color-grade seam。
