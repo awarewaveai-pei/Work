@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Canvas as FabricCanvas, FabricObject } from "fabric";
 import { roleHeader } from "@/lib/ops-role";
-import { CANVAS_SOURCE_KEY } from "@/components/tools/canvas-handoff";
+import { CANVAS_SOURCE_KEY, CANVAS_NAME_KEY } from "@/components/tools/canvas-handoff";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -212,9 +212,14 @@ export default function CanvasEditor() {
   const download = useCallback(() => {
     const png = exportPng();
     if (!png) return;
+    // Use the semantic base name carried across the handoff (產品-主圖名稱-風格-編輯);
+    // fall back to the old fixed name when the editor was opened without metadata.
+    const base =
+      (typeof window !== "undefined" ? sessionStorage.getItem(CANVAS_NAME_KEY) : null) ||
+      "canvas-design";
     const a = document.createElement("a");
     a.href = png;
-    a.download = "canvas-design.png";
+    a.download = `${base}.png`;
     document.body.appendChild(a);
     a.click();
     a.remove();

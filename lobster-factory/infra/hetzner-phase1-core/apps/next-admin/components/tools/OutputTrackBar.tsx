@@ -17,6 +17,11 @@ import { roleHeader } from "@/lib/ops-role";
 import { PRINT_DESTINATIONS, type PrintDestinationId } from "@/lib/studio/print-destinations";
 import { isNeutralParams, type ColorGradeParams } from "@/lib/studio/color-grade";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
+import {
+  buildSemanticFilename,
+  extOf,
+  type SemanticFileMeta,
+} from "@/lib/studio/semantic-filename";
 
 type ProcessResponse = {
   ok: boolean;
@@ -36,6 +41,11 @@ type Props = {
   colorGrade?: ColorGradeParams;
   /** print destinations to offer; omit/empty → hide the print track */
   printDestinations?: PrintDestinationId[];
+  /**
+   * Semantic-filename metadata (產品/主圖名稱/風格). When present, downloads are named
+   * 產品-主圖名稱-風格-軌.ext instead of the server's fixed preset name. Omit → fixed name.
+   */
+  fileMeta?: SemanticFileMeta;
 };
 
 function triggerDownload(dataUrl: string, filename: string) {
@@ -52,6 +62,7 @@ export default function OutputTrackBar({
   source,
   colorGrade,
   printDestinations,
+  fileMeta,
 }: Props) {
   const [busy, setBusy] = useState<null | "web" | "print">(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,14 +87,25 @@ export default function OutputTrackBar({
           setError(json.error ?? `HTTP ${res.status}`);
           return;
         }
-        triggerDownload(json.image, json.filename ?? `output.${track === "web" ? "webp" : "bin"}`);
+        // Server returns a fixed name (web-tarot.webp / print-tgc.png …). When the studio
+        // supplied fileMeta, re-name client-side to 產品-主圖名稱-風格-軌.ext (a.download wins
+        // over the server filename); otherwise keep the server name as-is.
+        const fallback = json.filename ?? `output.${track === "web" ? "webp" : "bin"}`;
+        const name = fileMeta
+          ? buildSemanticFilename(
+              { ...fileMeta, track: track === "web" ? "網頁" : "印刷" },
+              extOf(json.filename, track === "web" ? "webp" : "bin"),
+              fallback,
+            )
+          : fallback;
+        triggerDownload(json.image, name);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
         setBusy(null);
       }
     },
-    [image, grade]
+    [image, grade, fileMeta]
   );
 
   const webPreset = source === "tarot" ? "web-tarot" : "web-square";
@@ -128,7 +150,17 @@ export default function OutputTrackBar({
         <button
           className="btn-secondary"
           disabled={busy !== null}
-          onClick={() => openInCanvas(image)}
+          onClick={() =>
+            openInCanvas(
+              image,
+              fileMeta
+                ? buildSemanticFilename({ ...fileMeta, track: "編輯" }, "png", "").replace(
+                    /\.png$/,
+                    "",
+                  ) || undefined
+                : undefined,
+            )
+          }
           title="上傳圖案／加文字／微調構圖"
         >
           ✏️ 快速編輯

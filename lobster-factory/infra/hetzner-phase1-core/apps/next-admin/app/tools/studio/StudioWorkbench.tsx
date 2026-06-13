@@ -9,6 +9,7 @@ import {
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import { bakeCssFilter } from "@/components/tools/bake-css-filter";
+import { buildSemanticFilename, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
 
 /** Product types steer the prompt suffix + default aspect ratio (print canvas comes later, P-print). */
 const PRODUCT_TYPES = [
@@ -88,6 +89,17 @@ export default function StudioWorkbench() {
   const grade = useColorGrade(); // 修圖積木：色彩/色階/銳利度 (live CSS preview + server bake)
 
   const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
+
+  // Semantic-filename metadata for downloads (產品-主圖名稱-風格). Built from the same
+  // controls that steer the prompt; "None"/"不限商品" segments drop out via seg().
+  const fileMeta = useMemo<SemanticFileMeta>(
+    () => ({
+      product: product.value !== "none" ? product.label : undefined,
+      subject: subject.trim() || theme.trim() || undefined,
+      style: style !== "None" ? style : undefined,
+    }),
+    [product, subject, theme, style],
+  );
   const modelOption = useMemo(() => STUDIO_MODEL_OPTIONS.find((m) => m.value === model), [model]);
   const maxRefs = modelOption?.maxRefs ?? 0;
 
@@ -239,11 +251,11 @@ export default function StudioWorkbench() {
       : "png"; // baked output is always PNG
     const a = document.createElement("a");
     a.href = baked;
-    a.download = `design.${ext}`;
+    a.download = buildSemanticFilename({ ...fileMeta, track: "原圖" }, ext, `design.${ext}`);
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }, [gen.image, grade.cssFilter, grade.neutral]);
+  }, [gen.image, grade.cssFilter, grade.neutral, fileMeta]);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, padding: 16 }}>
@@ -377,7 +389,7 @@ export default function StudioWorkbench() {
                   <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
                 </div>
                 <div style={{ flex: 1, minWidth: 240 }}>
-                  <OutputTrackBar image={gen.image} source="pod" colorGrade={grade.params} />
+                  <OutputTrackBar image={gen.image} source="pod" colorGrade={grade.params} fileMeta={fileMeta} />
                 </div>
               </div>
             </>

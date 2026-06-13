@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
+import { buildSemanticFilename } from "@/lib/studio/semantic-filename";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type TarotCard } from "./cards";
 
 type GroupKey = "all" | "major" | "wands" | "cups" | "swords" | "pentacles";
@@ -683,7 +684,11 @@ export default function TarotStudio() {
       const url = URL.createObjectURL(out);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "tarot-deck-print.zip";
+      a.download = buildSemanticFilename(
+        { product: "塔羅整套", style: stylePrompt.trim() || undefined },
+        "zip",
+        "tarot-deck-print.zip",
+      );
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -1155,6 +1160,11 @@ export default function TarotStudio() {
                   source="tarot"
                   colorGrade={grade.params}
                   printDestinations={["tw-local", "mpc", "tgc", "printninja"]}
+                  fileMeta={{
+                    product: "塔羅卡",
+                    subject: subjectText.trim() || undefined,
+                    style: stylePrompt.trim() || undefined,
+                  }}
                 />
               </div>
             </div>
