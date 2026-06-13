@@ -1,16 +1,40 @@
 "use client";
 
-import type { RankMathReport } from "@/lib/seo/rankmath-checker";
+import { useState } from "react";
+import type { RankMathReport, RankMathCheck } from "@/lib/seo/rankmath-checker";
+
+interface FixResponse {
+  ok: boolean;
+  markdown?: string;
+  seoTitle?: string;
+  metaDescription?: string;
+  error?: string;
+}
 
 interface Props {
   report: RankMathReport | null;
   loading: boolean;
+  // For AI fix
+  articleMarkdown?: string;
+  focusKeyword?: string;
+  seoTitle?: string;
+  metaDescription?: string;
+  slug?: string;
+  onFixApply?: (md: string, meta?: { seoTitle: string; metaDesc: string }) => void;
 }
 
 const GRADE_COLOR = { green: "#22c55e", orange: "#f97316", red: "#ef4444" };
 const GRADE_LABEL = { green: "🟢 良好", orange: "🟠 待改善", red: "🔴 需加強" };
 
-export function SeoCheckPanel({ report, loading }: Props) {
+export function SeoCheckPanel({
+  report, loading,
+  articleMarkdown, focusKeyword, seoTitle, metaDescription, slug,
+  onFixApply,
+}: Props) {
+  const [fixing,     setFixing]     = useState(false);
+  const [fixError,   setFixError]   = useState("");
+  const [fixSuccess, setFixSuccess] = useState(false);
+
   if (!report && !loading) return null;
 
   if (loading) {
@@ -22,12 +46,50 @@ export function SeoCheckPanel({ report, loading }: Props) {
   }
   if (!report) return null;
 
-  const color  = GRADE_COLOR[report.grade];
-  const failed = report.checks.filter(c => !c.pass);
-  const passed = report.checks.filter(c => c.pass);
+  const color   = GRADE_COLOR[report.grade];
+  const failed  = report.checks.filter(c => !c.pass);
+  const passed  = report.checks.filter(c => c.pass);
+  const canFix  = !!onFixApply && !!articleMarkdown && !!focusKeyword && failed.length > 0;
+
+  async function handleFix() {
+    if (!canFix || fixing) return;
+    setFixing(true);
+    setFixError("");
+    setFixSuccess(false);
+    try {
+      const res = await fetch("/api/content/seo-fix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          markdown: articleMarkdown,
+          focusKeyword,
+          seoTitle: seoTitle ?? "",
+          metaDescription: metaDescription ?? "",
+          slug: slug ?? "",
+          failedChecks: failed as RankMathCheck[],
+        }),
+      });
+      const json = await res.json() as FixResponse;
+      if (!json.ok || !json.markdown) {
+        setFixError(json.error ?? "AI 修正失敗，請重試");
+        return;
+      }
+      // Pass partial meta if either field was improved
+      const meta = (json.seoTitle || json.metaDescription)
+        ? { seoTitle: json.seoTitle ?? seoTitle ?? "", metaDesc: json.metaDescription ?? metaDescription ?? "" }
+        : undefined;
+      onFixApply!(json.markdown, meta);
+      setFixSuccess(true);
+    } catch {
+      setFixError("網路錯誤，請重試");
+    } finally {
+      setFixing(false);
+    }
+  }
 
   return (
     <div style={{ marginTop: "16px", borderTop: "1px solid var(--card-border)", paddingTop: "14px" }}>
+      {/* Score row */}
       <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
         <div style={{
           width: 56, height: 56, borderRadius: "50%",
@@ -46,23 +108,63 @@ export function SeoCheckPanel({ report, loading }: Props) {
         </div>
       </div>
 
+      {/* Failed checks with suggestions */}
       {failed.length > 0 && (
         <div style={{ marginTop: "12px" }}>
-          <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "5px" }}>未通過：</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+            未通過項目（可改善）：
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {failed.map(c => (
-              <div key={c.id} style={{ display: "flex", gap: "6px", fontSize: "12px" }}>
-                <span style={{ color: "#ef4444", flexShrink: 0 }}>✗</span>
-                <span style={{ color: "var(--text-primary)", fontWeight: 500, flexShrink: 0 }}>{c.label}</span>
-                <span style={{ color: "var(--text-muted)" }}>— {c.detail}</span>
+              <div key={c.id} style={{
+                background: "var(--bg-page, #f8f9fc)",
+                border: "1px solid var(--card-border)",
+                borderLeft: "3px solid #ef4444",
+                borderRadius: "6px",
+                padding: "8px 10px",
+              }}>
+                <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: c.suggestion ? "4px" : 0 }}>
+                  <span style={{ color: "#ef4444", fontSize: "12px", flexShrink: 0 }}>✗</span>
+                  <span style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "12px" }}>{c.label}</span>
+                  <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>（{c.detail}）</span>
+                </div>
+                {c.suggestion && (
+                  <div style={{ fontSize: "12px", color: "var(--text-muted)", paddingLeft: "18px" }}>
+                    💡 {c.suggestion}
+                  </div>
+                )}
               </div>
             ))}
           </div>
+
+          {/* AI fix button */}
+          {canFix && (
+            <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <button
+                className="btn-primary"
+                onClick={handleFix}
+                disabled={fixing}
+                style={{ fontSize: "13px", padding: "8px 18px" }}
+              >
+                {fixing ? "🤖 AI 修正中…" : "🤖 AI 自動修正 SEO"}
+              </button>
+              {fixError && (
+                <span style={{ fontSize: "12px", color: "var(--color-error, #ef4444)" }}>{fixError}</span>
+              )}
+              {fixSuccess && (
+                <span style={{ fontSize: "12px", color: "#22c55e" }}>✓ 已更新文章，重新計分中…</span>
+              )}
+              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                AI 會針對上列失敗項目修正，保留原有風格
+              </span>
+            </div>
+          )}
         </div>
       )}
 
+      {/* Passed checks (collapsed) */}
       {passed.length > 0 && (
-        <details style={{ marginTop: "8px" }}>
+        <details style={{ marginTop: "10px" }}>
           <summary style={{ fontSize: "12px", color: "var(--text-muted)", cursor: "pointer", userSelect: "none" }}>
             ▶ 通過項目（{passed.length}）
           </summary>

@@ -606,6 +606,25 @@ export default function ContentStudio() {
     }
   }
 
+  // ─── SEO Fix Apply ────────────────────────────────────────────────────────
+
+  function handleFixApply(fixedMd: string, fixedMeta?: { seoTitle: string; metaDesc: string }) {
+    setGenerated(fixedMd);
+    if (fixedMeta) setMetaData({ seoTitle: fixedMeta.seoTitle, metaDesc: fixedMeta.metaDesc });
+    const title    = fixedMeta?.seoTitle  ?? metaData?.seoTitle  ?? "";
+    const metaDesc = fixedMeta?.metaDesc  ?? metaData?.metaDesc  ?? "";
+    const myRun    = ++seoRunRef.current;
+    setSeoChecking(true);
+    fetch("/api/content/seo-check", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markdown: fixedMd, focusKeyword: form.keyword, seoTitle: title, metaDescription: metaDesc, slug: slugify(form.keyword) }),
+    })
+      .then(r => r.ok ? r.json() as Promise<RankMathReport> : null)
+      .then(j => { if (j && myRun === seoRunRef.current) setSeoReport(j); })
+      .catch(() => { if (myRun === seoRunRef.current) setSeoReport(null); })
+      .finally(() => { if (myRun === seoRunRef.current) setSeoChecking(false); });
+  }
+
   // ─── Publish ─────────────────────────────────────────────────────────────
 
   async function handlePublish() {
@@ -1467,7 +1486,16 @@ export default function ContentStudio() {
               </div>
 
               {/* ── RankMath SEO 合規分數 ── */}
-              <SeoCheckPanel report={seoReport} loading={seoChecking} />
+              <SeoCheckPanel
+                report={seoReport}
+                loading={seoChecking}
+                articleMarkdown={generated}
+                focusKeyword={form.keyword}
+                seoTitle={metaData?.seoTitle ?? ""}
+                metaDescription={metaData?.metaDesc ?? ""}
+                slug={slugify(form.keyword)}
+                onFixApply={handleFixApply}
+              />
 
               {/* ── 社群圖片生成 ── */}
               {genStatus === "done" && hasContent && (

@@ -47,11 +47,12 @@ export async function POST(req: Request): Promise<Response> {
   const seoTitle       = str(body.seoTitle).trim();
   const metaDescription = str(body.metaDescription).trim();
   const slug           = str(body.slug).trim();
-  const failedChecks   = Array.isArray(body.failedChecks) ? (body.failedChecks as RankMathCheck[]) : [];
+  const failedChecks   = (Array.isArray(body.failedChecks) ? body.failedChecks : [])
+    .filter((c: unknown) => c && typeof (c as RankMathCheck).label === "string" && typeof (c as RankMathCheck).detail === "string") as RankMathCheck[];
 
   if (!markdown)     return new NextResponse("markdown required", { status: 400 });
   if (!focusKeyword) return new NextResponse("focusKeyword required", { status: 400 });
-  if (failedChecks.length === 0) return NextResponse.json({ ok: true, markdown, seoTitle, metaDescription });
+  if (failedChecks.length === 0) return NextResponse.json({ ok: true, markdown });
 
   const failedList = failedChecks
     .map(c => `- **${c.label}**: ${c.detail}${c.suggestion ? `\n  建議：${c.suggestion}` : ""}`)
@@ -81,18 +82,21 @@ Please output the COMPLETE improved article. Fix ONLY the listed failed checks �
       messages: [{ role: "user", content: userPrompt }],
     });
 
-    const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+    // Aggregate all text blocks (Anthropic may return multiple content blocks)
+    const text = msg.content.filter(b => b.type === "text").map(b => (b as { type: "text"; text: string }).text).join("");
     if (!text) return new NextResponse("empty response from AI", { status: 502 });
 
-    // Parse optional meta block
-    const metaMatch = text.match(
-      /<!-- CONTENT_META_START -->\s*SEO_TITLE:\s*([^\n]+)\s*META_DESC:\s*([^\n]+)\s*<!-- CONTENT_META_END -->/
-    );
-    const fixedSeoTitle       = metaMatch ? metaMatch[1].trim() : undefined;
-    const fixedMetaDescription = metaMatch ? metaMatch[2].trim() : undefined;
-    const fixedMarkdown = text
-      .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
-      .trim();
+    // Parse optional meta block — use tolerant per-field regexes before stripping
+    const blockMatch = text.match(/<!-- CONTENT_META_START -->([\s\S]*?)<!-- CONTENT_META_END -->/);
+    const block = blockMatch ? blockMatch[1] : "";
+    const titleMatch = block.match(/SEO_TITLE:\s*(.+)/);
+    const metaDescMatch = block.match(/META_DESC:\s*(.+)/);
+    const fixedSeoTitle        = titleMatch    ? titleMatch[1].trim()    : undefined;
+    const fixedMetaDescription = metaDescMatch ? metaDescMatch[1].trim() : undefined;
+    // Strip the block only when successfully parsed (or when block was present but fields missing)
+    const fixedMarkdown = blockMatch
+      ? text.replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "").trim()
+      : text.trim();
 
     return NextResponse.json({
       ok: true,
