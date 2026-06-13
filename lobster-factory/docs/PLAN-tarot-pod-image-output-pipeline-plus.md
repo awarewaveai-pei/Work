@@ -1228,24 +1228,22 @@ export function toCssFilter(s): string             // 預覽 hue-rotate/saturate
 
 ---
 
-### [1-d] `lib/studio/to-print-pdf.ts`
+### [1-d] `lib/studio/to-print-file.ts` + `ghostscript-pdfx.ts` — ✅ 已實作（2026-06-13）
 
-實作 print PDF 輸出。
-
-需求：
+> **正名**：原稱 `to-print-pdf.ts`；實檔 `to-print-file.ts`（目的地驅動，PDF **與** PNG 雙輸出，名稱反映 TGC sRGB PNG 路徑）。**已交付**：vitest 10/10 真 sharp+pdf-lib bake + `tsc --noEmit` 0 + critic（修 Major #1 alpha flatten + false-green #5）。pdf-lib@1.17.1 已 `npm install`（直接 dep）。
 
 ```txt
-☐ preset-driven
-☐ 不寫死 896×1488
-☐ tarot-print-pdf 使用 7.6×12.6cm points
-☐ pod-print-pdf 使用 cm 或 px/dpi 換算 points
-☐ 可套 colorGrade
-☐ Sharp resize
-☐ Sharp toColorspace('cmyk')
-☐ JPEG quality 100
-☐ pdf-lib embedJpg
-☐ Phase 0 POC 通過後才能 merge
+☑ destination-driven（PRINT_DESTINATIONS SSOT：tw-local/mpc/tgc/printninja）
+☑ 不寫死 896×1488（getPrintGeometry mm→px/pt，trim+bleed）
+☑ cmyk 分支：Sharp toColorspace('cmyk').jpeg(q100) 不設 density（sharp 0.34.5<0.35 無 withDensity）
+☑ srgb 分支：PNG 直出（TGC，CMYK 退件）
+☑ pdf-lib embedJpg/embedPng + MediaBox/BleedBox/TrimBox 三框
+☑ 可套 colorGrade（toSharpModulate；garbage→neutral 防禦）
+☑ 透明 RGBA（bg-remover 上游）flatten 白底（critic Major，兩分支皆驗）
+☑ OutputIntent deploy-gate：applyOutputIntent stub，POD_OUTPUT_INTENT_DEPLOYED!=true 時 throw（不靜默輸出非 PDF/X）
 ```
+
+> **deploy 待辦（[0-a-gs]）**：① Alpine `apk add ghostscript` ② 3 個 ICC COPY 進 image ③ `POD_OUTPUT_INTENT_DEPLOYED=true` ④ **驗實際產出含 `/OutputIntent`**（critic #2：`gs -dPDFX` 多半需 PDFXDEF pdfmark，否則 warn「no OutputIntent」仍綠 → 部署期 `grep -a OutputIntent out.pdf` 確認）。
 
 ---
 

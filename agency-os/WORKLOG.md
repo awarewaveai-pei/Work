@@ -4,6 +4,29 @@
 
 ## 2026-06-13
 
+### feat(pod): [1-d] to-print-file.ts + ghostscript-pdfx.ts 印刷軌核心完成
+
+**[任務理解]** POD/Tarot 印刷檔生成核心。承 handoff `2026-06-12-1859-to-print-file-pdfx.md`。目的地驅動積木：cmyk→pdf-lib CMYK PDF（三框）、srgb→PNG 直出（TGC）；ICC OutputIntent 走 Ghostscript（部署期，介面隔離讓純程式碼可完成）。
+
+**[已修改]**
+- `lib/studio/to-print-file.ts`（新）— `PrintDestination` type + `PRINT_DESTINATIONS` SSOT（tw-local/mpc/tgc/printninja）+ `getPrintGeometry()`（mm→px/pt）+ `toPrintFile()`（resize→flatten白底→colorSpace分支→format分支→outputIntent分支）。
+- `lib/studio/ghostscript-pdfx.ts`（新）— `applyOutputIntent()` deploy-gated（`POD_OUTPUT_INTENT_DEPLOYED!=true` 時 throw `OutputIntentNotDeployedError`，不靜默輸出非 PDF/X）+ `ICC_PATHS` + gs 指令 sketch。
+- `lib/studio/__tests__/to-print-file.test.ts`（新）— 10 測試。
+- `package.json` — `pdf-lib@^1.17.1` 直接 dep。
+- plan §15.1 [1-d] 標 ✅ + 正名；TASKS.md ×2 標 ✅。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/studio/__tests__/to-print-file.test.ts` | exit=0 | ms=230（10/10 真 sharp+pdf-lib bake：getPrintGeometry 數學、CMYK /DeviceCMYK+/Decode+三框、TGC sRGB PNG、透明 RGBA flatten 兩分支、OutputIntent gate throw）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=N（0 errors；修 Buffer<ArrayBuffer> vs ArrayBufferLike 型別窄化）
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1M/4m（Major #1 缺 alpha flatten[bg-remover 透明上游]→已加白底 flatten 兩分支；#5 false-green 測試→加 RGBA fixture；#2 gs PDFXDEF gap→記 deploy 待辦；#3/#4 minor 接受）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`toPrintFile|to-print-file|to-print-pdf|applyOutputIntent` | hits=0（無實際 callsite：[1-e] route 尚未建=預期；無 stale `to-print-pdf` consumer；色grep 命中皆檔頭註解）
+
+**[剩餘風險]** ① gs OutputIntent 真實輸出未驗（deploy-gated；critic #2 警告 `-dPDFX` 多半需 PDFXDEF pdfmark，部署期須 `grep -a OutputIntent` 確認）② sharp pin 留 Dockerfile（§18.1，未在此 downgrade 0.34.5→0.34.3 避免衝突）③ printninja 單張（offset 大量需多頁 PDF，本 MVP 未做）④ embedPng 分支（srgb+pdf）SSOT 無此組合=未測 dead code。
+
+**[rollback]** 純新檔：`git checkout lib/studio/to-print-file.ts lib/studio/ghostscript-pdfx.ts lib/studio/__tests__/to-print-file.test.ts` + `npm uninstall pdf-lib`。
+
+---
+
 ### fix(ops-inbox): 套用 migration 0036 到 production Supabase — webhook deploy 500 修復完成（PGRST202 消除）
 
 **[任務理解]** 承 2026-06-12 診斷：webhook `/api/webhooks/deploy` 500「db write failed」根因 = migration 0036 未套用。操作者明示 go-ahead（「套下去」）→ 套用至 production EU self-hosted Supabase。
