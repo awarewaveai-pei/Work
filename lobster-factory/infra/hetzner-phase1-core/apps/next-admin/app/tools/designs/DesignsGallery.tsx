@@ -41,6 +41,24 @@ const TOOL_GROUP_LABELS: Record<string, string> = {
   mockup: "Mockup",
 };
 
+const MODEL_LABELS: Record<string, string> = {
+  "flux-schnell": "FLUX schnell",
+  "flux-dev": "FLUX dev",
+  "flux-2-max": "FLUX 2 Max",
+  "ideogram-v2a-turbo": "Ideogram v2a Turbo",
+  "ideogram-v3-balanced": "Ideogram v3 Balanced",
+  "ideogram-v4-turbo": "Ideogram v4 Turbo",
+  "ideogram-v4-quality": "Ideogram v4 Quality",
+  "ideogram-character": "Ideogram Character",
+  "seedream-4.5": "Seedream 4.5",
+  "nano-banana-2": "Nano Banana 2",
+  "nano-banana-pro": "Nano Banana Pro",
+  "imagen-4": "Imagen 4",
+  "openai-low": "GPT-Image-1 低",
+  "openai-medium": "GPT-Image-1 中",
+  "openai-high": "GPT-Image-1 高",
+};
+
 // Tiny subtype label shown inside the tool badge (empty string = no sub-label)
 const SOURCE_SUBTYPE: Record<string, string> = {
   "tarot-preview": "預覽",
@@ -137,6 +155,7 @@ export default function DesignsGallery() {
 
   /* filters */
   const [filterTool, setFilterTool] = useState("all");
+  const [filterModel, setFilterModel] = useState("all");
   const [filterProduct, setFilterProduct] = useState("all");
   const [filterTheme, setFilterTheme] = useState("all");
   const [filterBrand, setFilterBrand] = useState("all");
@@ -234,6 +253,23 @@ export default function DesignsGallery() {
     ];
   }, [assets]);
 
+  const modelOptions = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const a of assets) {
+      const k = a.metadata?.model_name;
+      if (k) counts[k] = (counts[k] ?? 0) + 1;
+    }
+    const total = Object.values(counts).reduce((s, n) => s + n, 0);
+    return [
+      { key: "all", label: "全部", count: total },
+      ...Object.entries(counts).map(([k, n]) => ({
+        key: k,
+        label: MODEL_LABELS[k] ?? k,
+        count: n,
+      })),
+    ];
+  }, [assets]);
+
   const brandOptions = useMemo(() => {
     const vals = unique(
       assets.map((a) => a.metadata?.brand).filter((b): b is string => !!b)
@@ -260,6 +296,7 @@ export default function DesignsGallery() {
 
     const filtered = assets.filter((a) => {
       if (filterTool !== "all" && toolGroup(a.metadata?.source) !== filterTool) return false;
+      if (filterModel !== "all" && a.metadata?.model_name !== filterModel) return false;
       if (filterProduct !== "all" && assetProduct(a) !== filterProduct) return false;
       if (filterTheme !== "all" && a.metadata?.theme !== filterTheme) return false;
       if (filterBrand !== "all" && a.metadata?.brand !== filterBrand) return false;
@@ -270,7 +307,7 @@ export default function DesignsGallery() {
     return sortOrder === "asc"
       ? [...filtered].reverse()
       : filtered;
-  }, [assets, filterTool, filterProduct, filterTheme, filterBrand, filterTime, sortOrder]);
+  }, [assets, filterTool, filterModel, filterProduct, filterTheme, filterBrand, filterTime, sortOrder]);
 
   /* ─── early returns ─── */
   if (state === "disabled") {
@@ -301,6 +338,9 @@ export default function DesignsGallery() {
       {/* ── Filter panel ─────────────────────────────────────────── */}
       <div className="build-panel" style={{ padding: "10px 14px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
         <Chips label="工具" options={toolOptions} value={filterTool} onChange={setFilterTool} />
+        {modelOptions.some((o) => o.key !== "all" && o.count > 0) && (
+          <Chips label="模型" options={modelOptions} value={filterModel} onChange={setFilterModel} />
+        )}
         {hasProducts && (
           <Chips label="產品" options={productOptions} value={filterProduct} onChange={setFilterProduct} />
         )}
