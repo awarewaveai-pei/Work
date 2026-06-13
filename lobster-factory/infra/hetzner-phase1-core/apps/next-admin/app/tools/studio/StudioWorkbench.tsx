@@ -6,6 +6,8 @@ import {
   type AspectRatio,
   type StudioModel,
 } from "../../../lib/studio/image-provider";
+import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
+import OutputTrackBar from "@/components/tools/OutputTrackBar";
 
 /** Product types steer the prompt suffix + default aspect ratio (print canvas comes later, P-print). */
 const PRODUCT_TYPES = [
