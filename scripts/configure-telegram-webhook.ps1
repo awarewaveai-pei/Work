@@ -124,9 +124,8 @@ $commands = @(
   @{ command = 'list_failed_runs' ; description = 'Recent failed command_requests + workflow_runs' },
   @{ command = 'client_status'    ; description = 'Health + WP update status for all clients (or /client_status <slug>)' },
   @{ command = 'deploy_status'    ; description = 'SG deploy events + drift (read-only; deploy via GitHub app -> SG Deploy)' },
-  @{ command = 'emergency_stop'   ; description = 'Lock all commands (unlock via SQL/ops console only)' },
-  @{ command = 'maintenance_mode' ; description = 'Block non-low commands (e.g. during ops work)' },
-  @{ command = 'read_only_mode'   ; description = 'Allow only low-risk read commands' },
+  # Kill-switch commands stay executable when typed manually, but are hidden
+  # from Telegram's slash menu to reduce accidental taps.
   @{ command = 'trigger_staging_workflow' ; description = 'Kick off allowlisted Trigger.dev task (e.g. ao-infrastructure-check)' },
   @{ command = 'replay_dead_letter'       ; description = 'Diagnostic lookup of error_event by uuid' }
 )

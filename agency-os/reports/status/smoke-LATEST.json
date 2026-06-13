@@ -2,8 +2,8 @@
     "checks":  {
                    "n8n_failures":  "skip:exception",
                    "client_sites":  "skip:http401",
-                   "n8n_mcp":  "ok",
+                   "n8n_mcp":  "fail:exit1",
                    "repair_center":  "skip:http503"
                },
-    "generated":  "2026-06-13 11:28:15"
+    "generated":  "2026-06-13 11:33:11"
 }
