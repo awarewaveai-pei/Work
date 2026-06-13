@@ -8,8 +8,8 @@
   </profiles>
 
   <!--
-    Docker mem_limit for clickhouse service = 2048m.
-    Internal cap is set to ~1.6 GiB (1717986918 bytes) to leave ~400 MiB headroom
+    Docker mem_limit for clickhouse service = 4096m.
+    Internal cap is set to ~3.5 GiB (3758096384 bytes) to leave ~512 MiB headroom
     for OS page cache and Docker overhead.
 
     History: originally set to 800 MB (800000000) which was too low once
@@ -21,7 +21,7 @@
     TTL policies below keep system logs bounded by retention windows so RSS
     does not creep up without action.
   -->
-  <max_server_memory_usage>1717986918</max_server_memory_usage>
+  <max_server_memory_usage>3758096384</max_server_memory_usage>
 
   <!-- ── System log TTL: tiered retention policy ──────────────────────────
        Rationale:

@@ -334,7 +334,8 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
   const input: Record<string, unknown> = params.printQuality
     ? {
         prompt: params.prompt,
-        aspect_ratio: "custom",
+        // aspect_ratio is mutually exclusive with width/height on Replicate FLUX.
+        // "custom" is not in the live enum → 422. Omit it and let the model derive ratio from dims.
         width: printDims[0],
         height: printDims[1],
         output_format: "png",
