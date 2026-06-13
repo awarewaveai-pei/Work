@@ -24,6 +24,27 @@ import { CANVAS_SOURCE_KEY } from "@/components/tools/canvas-handoff";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
+/**
+ * Font choices for the text tool. Each value is a CSS font-family STACK (canvas 2D / Fabric
+ * resolve fallbacks), covering Windows + macOS system fonts so CJK renders without a web-font
+ * download: 黑體=JhengHei/PingFang, 明體=Noto/PMingLiU serif, 楷書=DFKai/Kaiti.
+ */
+const FONT_OPTIONS: { label: string; value: string }[] = [
+  { label: "黑體（中）", value: '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif' },
+  { label: "明體（中）", value: '"Noto Serif TC","Source Han Serif TC","PMingLiU",serif' },
+  { label: "楷書（中）", value: '"DFKai-SB","BiauKai","Kaiti TC",serif' },
+  { label: "圓體（中）", value: '"Yuanti TC","Microsoft JhengHei","Noto Sans TC",sans-serif' },
+  { label: "Sans (En)", value: "Arial,Helvetica,sans-serif" },
+  { label: "Serif (En)", value: 'Georgia,"Times New Roman",serif' },
+  { label: "Mono (En)", value: '"Courier New",monospace' },
+  { label: "手寫 (En)", value: '"Comic Sans MS","Segoe Script",cursive' },
+];
+
+/** Fabric text-like object types whose font/colour/size the toolbar can edit. */
+function isTextObject(o: { type?: string } | null | undefined): boolean {
+  return !!o && (o.type === "i-text" || o.type === "text" || o.type === "textbox");
+}
+
 export default function CanvasEditor() {
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
@@ -36,6 +57,11 @@ export default function CanvasEditor() {
   const [ready, setReady] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
+  // Text style controls — drive new text + the currently-selected text object.
+  const [textFont, setTextFont] = useState(FONT_OPTIONS[0].value);
+  const [textColor, setTextColor] = useState("#111111");
+  const [textSize, setTextSize] = useState(48);
+  const [textSelected, setTextSelected] = useState(false);
 
   // ── init fabric canvas + load handed-off source image (client only) ──
   useEffect(() => {
@@ -60,6 +86,24 @@ export default function CanvasEditor() {
       });
       fabricRef.current = canvas;
       setReady(true);
+
+      // Keep the toolbar in sync with the selected text object (and vice-versa).
+      const syncFromSelection = () => {
+        const o = canvas.getActiveObject() as
+          | { type?: string; fontFamily?: unknown; fill?: unknown; fontSize?: unknown }
+          | null;
+        if (isTextObject(o)) {
+          setTextSelected(true);
+          if (typeof o!.fontFamily === "string") setTextFont(o!.fontFamily);
+          if (typeof o!.fill === "string") setTextColor(o!.fill);
+          if (typeof o!.fontSize === "number") setTextSize(o!.fontSize);
+        } else {
+          setTextSelected(false);
+        }
+      };
+      canvas.on("selection:created", syncFromSelection);
+      canvas.on("selection:updated", syncFromSelection);
+      canvas.on("selection:cleared", () => setTextSelected(false));
 
       const source = typeof window !== "undefined" ? sessionStorage.getItem(CANVAS_SOURCE_KEY) : null;
       if (source) {
@@ -106,14 +150,26 @@ export default function CanvasEditor() {
         top: canvas.getHeight() / 2,
         originX: "center",
         originY: "center",
-        fontSize: 48,
-        fill: "#111111",
-        fontFamily: "sans-serif",
+        fontSize: textSize,
+        fill: textColor,
+        fontFamily: textFont,
       });
       canvas.add(text);
       canvas.setActiveObject(text);
+      setTextSelected(true);
       canvas.requestRenderAll();
     });
+  }, [textFont, textColor, textSize]);
+
+  /** Apply a font/colour/size change to the selected text object (no-op if none). */
+  const applyTextStyle = useCallback((patch: Record<string, unknown>) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const o = canvas.getActiveObject();
+    if (isTextObject(o as { type?: string } | null)) {
+      (o as unknown as { set: (p: Record<string, unknown>) => void }).set(patch);
+      canvas.requestRenderAll();
+    }
   }, []);
 
   const uploadImage = useCallback((file: File | null) => {
@@ -216,6 +272,61 @@ export default function CanvasEditor() {
         >
           {saveState === "saved" ? "已存入 ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
         </button>
+      </div>
+
+      {/* Text style controls — apply to the selected text, or set defaults for the next ＋文字. */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", fontSize: 12 }}>
+        <span style={{ opacity: 0.6 }}>
+          文字{textSelected ? "（套用到選取）" : "（新文字預設）"}：
+        </span>
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          字型
+          <select
+            className="btn-secondary"
+            value={textFont}
+            disabled={!ready}
+            onChange={(e) => {
+              setTextFont(e.target.value);
+              applyTextStyle({ fontFamily: e.target.value });
+            }}
+          >
+            {FONT_OPTIONS.map((f) => (
+              <option key={f.label} value={f.value} style={{ fontFamily: f.value }}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          顏色
+          <input
+            type="color"
+            value={textColor}
+            disabled={!ready}
+            onChange={(e) => {
+              setTextColor(e.target.value);
+              applyTextStyle({ fill: e.target.value });
+            }}
+            style={{ width: 32, height: 24, padding: 0, border: "1px solid var(--card-border)", borderRadius: 4, cursor: "pointer" }}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          字級
+          <input
+            type="range"
+            min={8}
+            max={200}
+            step={1}
+            value={textSize}
+            disabled={!ready}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setTextSize(v);
+              applyTextStyle({ fontSize: v });
+            }}
+          />
+          <span style={{ width: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{textSize}</span>
+        </label>
       </div>
 
       {error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{error}</span> : null}

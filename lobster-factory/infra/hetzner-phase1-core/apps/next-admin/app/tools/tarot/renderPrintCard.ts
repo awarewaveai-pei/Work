@@ -93,7 +93,17 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
  * Render one print-ready card: parchment background, double straight-ruled colour border,
  * Roman numeral on top, artwork embedded in the centre, card name on the bottom.
  */
-export async function renderPrintCard(card: TarotCard, artDataUrl: string, template: CardTemplate = "gold"): Promise<Blob> {
+/**
+ * @param colorFilter optional CSS filter string (from ColorGrade `toCssFilter`) applied to the
+ *   ARTWORK only — not the frame/text — so a whole locked deck shares the preview's adjustment
+ *   (hue/sat/bri/levels-as-contrast; gamma/sharpen have no canvas-filter analog, same as preview).
+ */
+export async function renderPrintCard(
+  card: TarotCard,
+  artDataUrl: string,
+  template: CardTemplate = "gold",
+  colorFilter?: string,
+): Promise<Blob> {
   const art = await loadImage(artDataUrl);
   const canvas = document.createElement("canvas");
   canvas.width = PRINT_W;
@@ -112,7 +122,10 @@ export async function renderPrintCard(card: TarotCard, artDataUrl: string, templ
   const aw = PRINT_W - LAYOUT.artInset * 2;
   const ay = LAYOUT.artTop;
   const ah = LAYOUT.artBottom - LAYOUT.artTop;
+  // Apply the locked deck colour-grade to the ARTWORK only (reset before the frame/text).
+  if (colorFilter && colorFilter !== "none") ctx.filter = colorFilter;
   drawCover(ctx, art, ax, ay, aw, ah);
+  ctx.filter = "none";
 
   // Layer 3 — straight-line frame + text, all in the template colour.
   ctx.strokeStyle = def.line;

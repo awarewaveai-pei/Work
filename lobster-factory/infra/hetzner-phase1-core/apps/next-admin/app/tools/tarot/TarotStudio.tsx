@@ -501,7 +501,9 @@ export default function TarotStudio() {
         cardName: card.name,
         prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
       });
-      const blob = await renderPrintCard(card, resp.image, template);
+      // Apply the deck's colour-grade to every card (洞1 fix): the adjustment made on the
+      // preview now propagates to all 78 cards' print render — not just the preview download.
+      const blob = await renderPrintCard(card, resp.image, template, grade.neutral ? undefined : grade.cssFilter);
       const url = URL.createObjectURL(blob);
       // revoke any prior url for this slot (retry case) before replacing
       setBatch((prev) =>
