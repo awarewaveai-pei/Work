@@ -4,6 +4,20 @@
 
 ## 2026-06-13
 
+### design(designs): My Designs gallery UI 重新設計（frontend-designer agent）
+**[任務理解]** 使用者嫌 `/tools/designs` 卡片 UI 醜，要求用「Claude Design」（= frontend-designer agent）重新設計。
+**[根因]** 卡片用深色 inline 樣式（chip `#a78bfa`、圖底 `#111`）配白卡 → 與全站淺色系統（globals.css indigo `#6366f1`）衝突；間距擁擠、無層次、inline 樣式與 `.intake-*/.build-*` 慣例脫節。
+**[已修改]**（2 檔，純視覺層，零行為改動）
+- `app/globals.css` — 新增 `.designs-*` CSS block（~230 行，沿用 `.intake-*` 慣例）：filter panel、pill chips、card anatomy、圖框（2:3 tarot / 1:1 square，淺底 `--bg-subtle` 取代 `#111`，hover scale）、淺色語意 badge、分組 style chips（indigo `--accent-light` pill）、prompt toggle、action row、bulk toolbar、lightbox（backdrop blur + fade-in）、640/1024 RWD
+- `app/tools/designs/DesignsGallery.tsx` — markup 全面改用 `.designs-*` class，移除所有 inline 樣式；handler/state/條件/資料流完全不動
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 -- 全專案 0 error（含 designs）
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/0n -- 12/12 行為 parity 全保留（無漏 handler、downloadOne blob 修復未被 revert、prompt 預設收合、chips 分組、filter/bulk/lightbox/polling 全在）；唯一 Major（safeFilePart:135 正則「改成 `* -`」）經 `od -c` hexdump **證實為誤判**：該位置實為原始控制位元組 `\0`(U+0000)+`037`(U+001F)，git diff 對該行**無變更**，控制字元過濾仍在、空白仍保留 → 無 regression
+- BUGHUNT_DONE: scope=lobster-factory(next-admin) | grep=designs-(className coverage)\|safeFilePart | hits=0 -- critic 交叉比對所有 `designs-*` className 皆有對應 CSS（無 unstyled）；CSS brace 348/348 平衡；filename 邏輯（safeFilePart/designBaseName/zipEntryName）未被移除
+**[剩餘風險]** critic 對原始控制位元組的渲染誤判（非 code 問題，僅 reviewer 視覺陷阱）；其餘無。
+**[部署]** SG production `a4832569`，容器 healthy 7s，smoke 全 200。redesign 已 live。
+**[rollback]** `git checkout <pre-redesign-commit> -- app/globals.css app/tools/designs/DesignsGallery.tsx`（redesign 在 checkpoint 8359eced/a4375395）
+
 ### feat(seo): RankMath 合規工具 + 文章生成 SEO/GEO 強化 + publish 補齊 meta 欄位
 
 **[任務理解]** 文章生成 pipeline 缺 3 個問題：① `publish/route.ts` 只送 `rank_math_description`，缺 `rank_math_focus_keyword` 和 `rank_math_title` ② `SYSTEM_PROMPT` 無 RankMath 合規規則（關鍵字位置/密度/段落長度/外連） ③ 無工具預判文章能否達 RankMath 綠燈（≥81/100），只能發文後到 WP 後台手動看。
