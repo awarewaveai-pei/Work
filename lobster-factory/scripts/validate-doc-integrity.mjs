@@ -38,7 +38,10 @@ function walkMarkdownFiles(rootDir, out = []) {
   for (const ent of entries) {
     const full = path.join(rootDir, ent.name);
     if (ent.isDirectory()) {
-      if (ent.name === "node_modules" || ent.name === ".git" || ent.name === "dist") continue;
+      // RankMath-KB = third-party RankMath knowledge-base articles imported HTML→MD (2026-06-14).
+      // Their links are scrape artifacts (bare domains, Cloudflare /cdn-cgi/ email-protection,
+      // in-page anchor words) that we neither author nor maintain → exclude from link integrity.
+      if (ent.name === "node_modules" || ent.name === ".git" || ent.name === "dist" || ent.name === "RankMath-KB") continue;
       walkMarkdownFiles(full, out);
     } else if (ent.isFile() && ent.name.endsWith(".md")) {
       out.push(full);
@@ -88,9 +91,15 @@ function extractLinks(mdContent) {
   return links;
 }
 
+// A non-file URI scheme: 2+ char scheme name + ":" (data:, mailto:, tel:, ftp:, http(s): …).
+// Requires ≥2 chars so a Windows drive-letter path ("C:\...") is NOT mistaken for a scheme.
+// data: URIs (inline SVG placeholders in imported KB articles) were being resolved as relative
+// file paths → spurious broken_link failures (RankMath KB import, 2026-06-14).
+const URI_SCHEME = /^[a-z][a-z0-9+.-]+:/i;
+
 function resolveLink(fromFile, href) {
   const noAnchor = href.split("#")[0].trim();
-  if (!noAnchor || noAnchor.startsWith("http://") || noAnchor.startsWith("https://") || noAnchor.startsWith("mailto:")) {
+  if (!noAnchor || URI_SCHEME.test(noAnchor)) {
     return null;
   }
   if (noAnchor.startsWith("//")) return null;
