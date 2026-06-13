@@ -4,6 +4,28 @@
 
 ## 2026-06-13
 
+### feat(content-studio): WP 多站點管理 UI + Supabase CRUD
+
+**[任務理解]** 使用者要求：設一個地方讓使用者可以填入資料 connect to WP 後台，新增和移除網站連結（因客戶可能新增或終止契約）。需要 Supabase 持久化，Token 絕不回傳到 client。
+
+**[已修改]**
+- `lobster-factory/packages/db/migrations/0039_wp_sites.sql` — 新表：`wp_sites(id uuid PK, name, url unique, token, color, active, note, created_at, updated_at)`；RLS enabled + no policies（service role only）
+- `lib/content/wp-sites.ts` — `getWpSites()` 改為 async；DB-first（service role query `wp_sites` where active=true）+ env-var fallback
+- `app/api/content/sites/route.ts` — GET（列表，不含 token；DB-first + env fallback）+ POST（新增，validation + 409 dedup）；export `ManagedSite` interface
+- `app/api/content/sites/[id]/route.ts` — PATCH（更新 name/url/color/active/note/token optional）+ DELETE
+- `app/api/content/sites/[id]/test/route.ts` — POST server-side WP 連線測試（`/wp-json/wp/v2/users/me`）
+- `app/tools/content/sites/page.tsx` — server wrapper
+- `app/tools/content/sites/SiteManager.tsx` — 完整 client UI：列表/新增表單/編輯/停用/測試/移除確認
+- `ContentStudio.tsx` — header 加「🔗 網站管理」link
+
+**[驗證結果]**
+- REALTEST_WAIVED: NA -- TSC passed clean (0 errors); all new routes are content-layer CRUD over Supabase service role; no prod deploy; DB migration not yet applied
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n (ack via verify-recent-ack)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=getWpSites | hits=3 (sites/route.ts + calendar/route.ts + publish/route.ts — all already await)
+- BUGHUNT_WAIVED: NA -- no renamed symbols; `ManagedSite` is new, no stale callers
+
+**[剩餘風險]** `0039_wp_sites.sql` 需手動 apply 到 Supabase（EU instance）後功能才生效；apply 前 DB sites = empty → fallback to env vars（不影響現有功能）。
+
 ### fix(repair-center): Soulful Supabase env synced; blocker recast to NXDOMAIN
 
 **[任務理解]** Repair Center 顯示 `soulful-expression` Supabase 補件失敗：`SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY` missing。目標是處理 production `next-admin` 實際 env 缺口，並確認 blocker 是否消失。
