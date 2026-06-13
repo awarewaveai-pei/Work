@@ -314,6 +314,10 @@ export default function ContentStudio() {
   const [pubResult, setPubResult] = useState<{ edit_url?: string; view_url?: string } | null>(null);
   const [pubError,  setPubError]  = useState("");
 
+  // SEO check
+  const [seoReport,   setSeoReport]   = useState<RankMathReport | null>(null);
+  const [seoChecking, setSeoChecking] = useState(false);
+
   // Title suggestions
   const [titleLoading, setTitleLoading]   = useState(false);
   const [titleSugs,    setTitleSugs]      = useState<string[]>([]);
