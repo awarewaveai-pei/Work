@@ -109,6 +109,32 @@ type CanvasTool = {
 
 ---
 
+## 4b. Photoshop 功能對照（使用者：全部能做的都加）
+
+| PS 功能 | 對應做法 | 狀態 |
+|---|---|---|
+| 色階 Levels / 亮度對比 / 色相飽和 / 色彩平衡 / 銳利化 | color-grade 積木 | ✅ |
+| 一鍵濾鏡（復古/拍立得…）/ 反相 / 灰階 | Fabric 預設 filter | ✅ |
+| 移除背景 / 內容感知填色(物件移除) | bg-remover / inpaint(bria) | ✅ |
+| 文字（字型/顏色/大小）| Fabric IText | ✅ |
+| 圖層樣式：透明度 / 混合模式 / 陰影 / 描邊 | 物件效果面板 | ✅ |
+| 翻轉 H/V / 旋轉 / 縮放 | Fabric transform | ✅(翻轉/旋轉/縮放) |
+| 形狀（方/圓/線）| Fabric shapes | ✅ |
+| 物件鎖定 | lock props | ✅ |
+| 自然飽和 Vibrance / 高斯模糊 Gaussian Blur / 雜訊 | Fabric Vibrance/Blur/Noise filter | ⏳ 下批(加進 color 積木) |
+| 色溫 / 照片濾鏡 / 色調分離 Posterize / 臨界值 Threshold / 曝光 | ColorMatrix/gamma 近似 | ⏳ |
+| 圖層面板（重排/顯隱/改名/複製/群組）| Fabric layering/group/clone | ⏳ |
+| 裁切 Crop / 畫布大小 | canvas/image crop | ⏳ |
+| 形狀遮罩 / 剪裁遮罩 clipPath | Fabric clipPath | ⏳ |
+| 文字沿路徑 / 逐字樣式 / 變形文字 | Fabric text | ⏳ |
+| 自由繪筆 / 橡皮擦 / 漸層工具 / 油漆桶 | Fabric brushes/Gradient | ⏳ |
+| 生成填色(prompt) / 擴圖 / 換天空 | Replicate FLUX-Fill/outpaint | ⏳ |
+| 風格轉換 / 上色 / 超解析 | Replicate | ⏳(超解析已有 upscaler) |
+| Undo/Redo / 可再編輯存檔 | toJSON 快照/設計檔 | ⏳ |
+| 透視/扭曲/液化 / 斜角浮雕 / 內外光暈 | 進階(部分 Fabric 做不到，需自繪) | ⏳/部分不可 |
+
+> 註：少數 PS 功能（液化 Liquify、進階濾鏡、智慧物件）瀏覽器+Fabric 無原生支援，需大量自繪或外部服務；會標「部分不可」並用替代方案。
+
 ## 5. 待解技術點
 
 - **filter 合併（批次 1 阻塞點）**：`buildFabricImageFilters` 目前 `img.filters = [...]` 覆寫。RemoveColor/預設要與 color-grade 共存 → 需把 filter 來源分層（grade filters + tool filters 合併成一個 list）。
