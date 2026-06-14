@@ -85,7 +85,6 @@ BASIC SEO — 7 tests:
 
 ADDITIONAL SEO — 10 tests:
 - At least 1 external link with DOFOLLOW (standard href link, no rel="nofollow"); cite as "[Source Name] ([Year])"
-- At least 1 internal link with fully descriptive anchor text — never "read more", "here", "click here", "this article"
 - Primary keyword must appear in at least one image's ALT text in the article body
 - Emit <!-- SLUG_HINT: primary-keyword-slug --> at end of article — CMS uses this as URL slug (must contain keyword; ideally ≤75 total URL characters)
 

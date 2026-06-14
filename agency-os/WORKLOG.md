@@ -10487,3 +10487,17 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1M/1m/1s -- Major: realSources 無驗證直接注入 prompt (FIXED: double-filter); Minor: keyword raw in Perplexity query (bounded, acceptable); Suggestion: typeof check (FIXED)
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=fetchRealSources|realSources | hits=0
 - REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke verifies generate endpoint; Perplexity verified separately via existing MCP integration
+
+## 2026-06-14 feat(trending): Perplexity replacement + ILJ SYSTEM_PROMPT fix
+
+### [已修改]
+- trending/route.ts: 完全替換 `fetchGoogleTrends`（Google Trends RSS 被 VPS IP 封鎖）為 `fetchPerplexityTrending`（Perplexity Sonar real-time）。suggest/questions 保留 Google Autocomplete，若回空則 fallback 至 Perplexity。修了 `Promise.allSettled`（原 `Promise.all` — 一個 prefix 失敗會掛整個 questions endpoint）。case-insensitive dedup。parseJsonStrings 的 line-split fallback 過濾掉 raw JSON 行。
+- generate/route.ts SYSTEM_PROMPT: 移除「At least 1 internal link with fully descriptive anchor text」指令 — 使用者已安裝 Internal Link Juicer 外掛（500+ 文章自動內連），AI 生成假路徑（/related-article）反而扣 RankMath 分。用戶自行提供內連仍正常走 buildUserPrompt 的 validInternal 邏輯。
+- ContentStudio.tsx: 更新兩個空狀態文字，移除「Google」品牌標籤，改成「Perplexity 即時資料」。
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (excluding pre-existing CanvasEditor.tsx:274) | exit=0 | ms=<60000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/2m/1s -- Minor: parseJsonStrings line-split JSON garbage (FIXED), dead category field (FIXED); Suggestion: case-sensitive Set dedup (FIXED)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=fetchGoogleTrends|pickTrendKeyword|internal.link | hits=0
+- BUGHUNT_WAIVED: NA -- ContentStudio.tsx UI text only change; generate/route.ts SYSTEM_PROMPT text only removal
+

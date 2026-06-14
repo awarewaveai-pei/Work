@@ -957,7 +957,7 @@ export default function ContentStudio() {
               </div>
             )}
             {trendTab === "trending" && trendingItems.length === 0 && !trendLoading && (
-              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>點擊「搜尋」載入今日 Google 熱搜關鍵字</div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>點擊「搜尋」載入今日熱搜關鍵字（Perplexity 即時資料）</div>
             )}
 
             {/* Suggest tab */}
@@ -974,7 +974,7 @@ export default function ContentStudio() {
             )}
             {trendTab === "suggest" && suggestResults.length === 0 && !trendLoading && (
               <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                {form.keyword.trim() ? "點擊「搜尋」取得 Google 自動完成建議" : "請先輸入主要關鍵字，再搜尋建議"}
+                {form.keyword.trim() ? "點擊「搜尋」取得搜尋建議" : "請先輸入主要關鍵字，再搜尋建議"}
               </div>
             )}
 
