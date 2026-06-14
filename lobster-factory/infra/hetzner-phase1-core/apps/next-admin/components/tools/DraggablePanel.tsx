@@ -20,10 +20,12 @@ type Props = {
   title: string;
   defaultPos: Pos;
   width?: number;
+  defaultCollapsed?: boolean;
   children: React.ReactNode;
 };
 
-const LS_PREFIX = "canvas-panel-pos:";
+// v2: reset everyone's saved positions to the new tidy stacked defaults (old layout overlapped).
+const LS_PREFIX = "canvas-panel-pos-v2:";
 
 /** Clamp into the visible viewport (keep at least 40px reachable so the header stays grabbable). */
 function clampPos(p: Pos): Pos {
@@ -45,9 +47,9 @@ function loadPos(id: string, fallback: Pos): Pos {
   return fallback;
 }
 
-export default function DraggablePanel({ id, title, defaultPos, width = 260, children }: Props) {
+export default function DraggablePanel({ id, title, defaultPos, width = 260, defaultCollapsed = false, children }: Props) {
   const [pos, setPos] = useState<Pos>(defaultPos);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
   const posRef = useRef<Pos>(defaultPos);

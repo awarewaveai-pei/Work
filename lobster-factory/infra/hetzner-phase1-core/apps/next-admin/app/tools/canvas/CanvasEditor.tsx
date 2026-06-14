@@ -526,7 +526,13 @@ export default function CanvasEditor() {
       if (mode === "erase") {
         const h = (e: { path?: FabricObject }) => {
           if (e.path) {
-            (e.path as unknown as { set: (p: Record<string, unknown>) => void }).set({ globalCompositeOperation: "destination-out" });
+            // destination-out erases below; non-selectable + non-evented so it doesn't sit on
+            // top intercepting clicks (otherwise you can't select/edit the text underneath).
+            (e.path as unknown as { set: (p: Record<string, unknown>) => void }).set({
+              globalCompositeOperation: "destination-out",
+              selectable: false,
+              evented: false,
+            });
             canvas.requestRenderAll();
           }
         };
@@ -966,7 +972,7 @@ export default function CanvasEditor() {
         </div>
 
         {/* 📐 畫布尺寸 / DPI — 公分/公釐 + DPI 自設（參考 vector-trace-demo）。永遠顯示，可拖。 */}
-        <DraggablePanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 820, y: 560 }} width={236}>
+        <DraggablePanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 816, y: 0 }} width={236}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
             <div style={{ display: "flex", gap: 8 }}>
               <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1002,7 +1008,7 @@ export default function CanvasEditor() {
 
         {/* 🗂 圖層面板 — reorder / show-hide / duplicate / delete, top layer first. */}
         {layers.length > 0 ? (
-          <DraggablePanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 820, y: 0 }} width={220}>
+          <DraggablePanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={240} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 520, overflowY: "auto" }}>
               {layers.map((o, i) => {
                 const vis = (o as unknown as { visible?: boolean }).visible !== false;
@@ -1023,7 +1029,7 @@ export default function CanvasEditor() {
 
         {/* 🎨 物件效果（PS 圖層樣式）— shown for ANY selected object (text/image/shape). */}
         {anySelected ? (
-          <DraggablePanel id="effects" title="🎨 物件效果" defaultPos={{ x: 1052, y: 0 }} width={260}>
+          <DraggablePanel id="effects" title="🎨 物件效果" defaultPos={{ x: 816, y: 286 }} width={260} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
               <span style={{ display: "flex", justifyContent: "space-between" }}><span>透明度</span><span style={{ opacity: 0.7 }}>{objOpacity}%</span></span>
@@ -1074,11 +1080,11 @@ export default function CanvasEditor() {
         {imageSelected ? (
           <>
           {/* 3 個獨立可拖面板：調色 / 濾鏡效果 / AI 去除 */}
-          <DraggablePanel id="grade" title="🎨 調色 / 修圖" defaultPos={{ x: 1332, y: 0 }} width={272}>
+          <DraggablePanel id="grade" title="🎨 調色 / 修圖" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
             <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
           </DraggablePanel>
 
-          <DraggablePanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 1332, y: 332 }} width={272}>
+          <DraggablePanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 <button
@@ -1118,7 +1124,7 @@ export default function CanvasEditor() {
             </div>
           </DraggablePanel>
 
-          <DraggablePanel id="inpaint" title="🪄 去除不要的部分（AI）" defaultPos={{ x: 1332, y: 560 }} width={272}>
+          <DraggablePanel id="inpaint" title="🪄 去除不要的部分（AI）" defaultPos={{ x: 816, y: 412 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {!inpaintMode ? (
                 <button className="btn-secondary" onClick={startInpaint}>開始塗抹要去除的地方</button>
@@ -1156,7 +1162,7 @@ export default function CanvasEditor() {
 
         {/* 🔤 字型庫 — Google Fonts (中/英) + 上傳字型 + 粗體/斜體/底線, shown when text selected. */}
         {textSelected ? (
-          <DraggablePanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 820, y: 380 }} width={240}>
+          <DraggablePanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 816, y: 454 }} width={240} defaultCollapsed>
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
               <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
               <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
