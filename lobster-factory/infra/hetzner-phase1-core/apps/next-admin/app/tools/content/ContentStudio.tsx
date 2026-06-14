@@ -1383,13 +1383,13 @@ export default function ContentStudio() {
           {/* ── 內部連結 ── */}
           <SectionToggle label="內部連結（Internal Links）" open={showIntLinks} onToggle={() => setShowIntLinks(v => !v)}>
             <label className="form-label" style={{ marginTop: 0 }}>
-              指定要插入的站內連結
-              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— 每行一個，最多 10 個</span>
+              強制引用的站內頁面
+              <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— 每行一個，最多 10 個（絕對 URL 或 /路徑）</span>
             </label>
             <textarea className="form-textarea" style={{ minHeight: "90px" }}
               value={form.internalLinks} onChange={e => setF("internalLinks", e.target.value)} disabled={isGenerating}
-              placeholder={"https://soulful.com/art-therapy-basics\nhttps://soulful.com/workshop-schedule\n/about-us"} />
-            <div className="form-hint">AI 會根據上下文選擇合適的錨文字插入連結。</div>
+              placeholder={"https://soulfulexpression.org/art-therapy-basics\n/workshop-schedule\n/about-us"} />
+            <div className="form-hint">站內連結已由 Internal Link Juicer 外掛自動處理。此欄位用於強制 AI 引用特定頁面（例如相關工作坊或課程頁面）。</div>
           </SectionToggle>
 
           {/* ── 外部連結 ── */}
@@ -1427,6 +1427,9 @@ export default function ContentStudio() {
                 <label className="form-label">從 URL 擷取（選填）</label>
                 <input className="form-input" value={bvSampleUrl} onChange={e => setBvSampleUrl(e.target.value)}
                   placeholder="https://example.com/about" />
+                {bvSampleUrl.trim() && !bvSampleText.trim() && (
+                  <div className="form-hint" style={{ color: "#f97316" }}>伺服器端抓取頁面文字；若 URL 需登入或封鎖爬蟲則會靜默失敗，建議同時貼入範例文字。</div>
+                )}
               </div>
             </div>
             <label className="form-label">範例文字（貼入品牌文章或 About 頁面，至少 50 字）</label>
@@ -1876,6 +1879,26 @@ export default function ContentStudio() {
                   </select>
                 </div>
               ))}
+            </div>
+
+            <div className="form-block" style={{ marginBottom: "16px" }}>
+              <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "10px", color: "var(--text-primary)" }}>發布設定</div>
+              <div style={{ marginBottom: "8px" }}>
+                <label className="form-label">WP 分類（逗號分隔）</label>
+                <input className="form-input"
+                  value={bulkSettings.wpCategories}
+                  onChange={e => setBulkSettings(prev => ({ ...prev, wpCategories: e.target.value }))}
+                  disabled={bulkRunning}
+                  placeholder="療癒, 工作坊, 心理健康" />
+              </div>
+              <div>
+                <label className="form-label">WP 標籤（逗號分隔）</label>
+                <input className="form-input"
+                  value={bulkSettings.wpTags}
+                  onChange={e => setBulkSettings(prev => ({ ...prev, wpTags: e.target.value }))}
+                  disabled={bulkRunning}
+                  placeholder="藝術療癒, 正念, 自我成長" />
+              </div>
             </div>
 
             <button className="btn-primary" onClick={handleBulkRun}
