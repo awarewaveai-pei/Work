@@ -18,7 +18,8 @@
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`node pf_realtest.cjs`（app sharp via NODE_PATH，TEMP 隔離） | exit=0 | `original_pixel_identical:true`（原圖模式像素級相同）、120×180→resample 3200×4800（命中 4800px=300DPI@16in、保比例）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=~60000（critic 修正後重跑仍綠）
-- REVIEW_DONE: critic=Deep | verdict=warn→pass-after-fix | findings=0c/2M/4m → 2 Major 全修（productimage fetch 補 timeout+60MB cap 防 OOM-DoS；link 攜帶 faithful 旗標防 ai-enhance 冒充忠實）+ Minor 修（stale action 字串、badge「達 300DPI」→「達標(≥225DPI)」誠實化、產品圖重跑替換）；critic 另確認 SSRF guard/redirect-manual/role-gate/error-shape 全 clean
+- REVIEW_DONE: critic=Deep | verdict=warn→pass-after-fix | findings=0c/2M/4m → 2 Major 全修（productimage fetch 補 timeout+60MB cap 防 OOM-DoS；link 攜帶 faithful 旗標防 ai-enhance 冒充忠實）+ Minor 修（stale action 字串、badge「達 300DPI」→「達標(≥225DPI)」誠實化、產品圖重跑替換+切換設計移除舊圖）；critic 另確認 SSRF guard/redirect-manual/role-gate/error-shape 全 clean
+- REVIEW_DONE: critic=Deep(re-review fixes) | verdict=pass | findings=0c/0M/1m(pre-existing 非回歸,已順修)/1suggestion(streaming cap,parity 非回歸) -- 6 處修正全確認正確且無新 Critical/Major，「safe to merge/deploy」
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`buildFaithfulPrintFile\|dpiAtFullPrint\|productimage\|printMode\|PrintFileMode` | hits=0 stale（全部命中為本次 3 檔的定義+自身 callsite；新符號 next-admin-local 無 downstream consumer；唯一 publish route 消費者=PublishWizard，回應向後相容）
 
 **[剩餘風險]** ① 尚未 sg-deploy（程式已就緒，部署為後續步驟）② 2K 原圖直用滿版約 156 DPI（Printful 最低 150 可接受，超大滿版略軟）— UI 已誠實顯示真實 DPI，由人決定換更大設計或開 resample ③ Real-ESRGAN「ai-enhance」仍可選用但已明確標非忠實。
