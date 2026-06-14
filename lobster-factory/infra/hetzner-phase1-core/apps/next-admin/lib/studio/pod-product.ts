@@ -15,9 +15,13 @@ export interface PodProductParams {
   retailPrice: string; // "24.99"
   plusPrice?: string; // "26.99" — falls back to retailPrice
   sizes?: string[];
-  shortDescription?: string;
+  shortDescription?: string; // HTML; AI copy fills this (answer capsule + bullets)
   mockupUrls?: string[]; // first = main image
   designName?: string; // for SKU seed
+  /** AI-generated benefit/feature bullets (Phase 4) — used when shortDescription is absent. */
+  bullets?: string[];
+  /** RankMath SEO meta — wp-bridge ProductCreator.applySeo writes these to the product. */
+  seo?: { focus_keyword?: string; title?: string; description?: string };
 }
 
 export interface PodVariantPlan {
@@ -61,23 +65,33 @@ export function buildVariantPlan(params: PodProductParams): PodVariantPlan[] {
 export function buildPodProductPayload(params: PodProductParams): Record<string, unknown> {
   const sizes = params.sizes && params.sizes.length > 0 ? params.sizes : POD_SIZES_DEFAULT;
   const plan = buildVariantPlan(params);
+  // AI bullets (Phase 4) drive the icon_list + short_description fallback; otherwise
+  // fall back to the original Bella 3001 boilerplate so nothing regresses.
+  const bullets =
+    params.bullets && params.bullets.length > 0
+      ? params.bullets
+      : ["100% ring-spun cotton", "Unisex regular fit", "White / Black", "Printed to order — less waste"];
+  const shortDescription =
+    params.shortDescription ??
+    `<p>${params.title} — premium unisex tee, white/black.</p><ul>${bullets.map((b) => `<li>${b}</li>`).join("")}</ul>`;
   return {
     type: "variable",
     name: params.title,
     ...(params.slug ? { slug: params.slug } : {}),
     status: "draft", // human review before publish — never auto-publish (template §4)
     catalog_visibility: "visible",
-    short_description: params.shortDescription ?? `<p>${params.title} — premium unisex tee, white/black.</p>`,
+    short_description: shortDescription,
+    // RankMath SEO meta — written by wp-bridge ProductCreator.applySeo (v0.9.0+, live-verified).
+    ...(params.seo && (params.seo.focus_keyword || params.seo.title || params.seo.description)
+      ? { seo: params.seo }
+      : {}),
     blocks: [
       { type: "heading", text: params.title, level: 2 },
       {
         type: "paragraph",
         text: "Soft, breathable Bella+Canvas 3001 unisex tee printed on demand with water-based inks.",
       },
-      {
-        type: "icon_list",
-        items: ["100% ring-spun cotton", "Unisex regular fit", "White / Black", "Printed to order — less waste"],
-      },
+      { type: "icon_list", items: bullets },
       { type: "heading", text: "Care", level: 3 },
       { type: "list", items: ["Machine wash cold, inside out", "Hang dry", "Do not iron the print"] },
     ],

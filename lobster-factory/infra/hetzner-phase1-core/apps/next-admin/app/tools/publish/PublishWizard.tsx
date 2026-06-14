@@ -32,6 +32,19 @@ export default function PublishWizard() {
   const [title, setTitle] = useState("");
   const [retailPrice, setRetailPrice] = useState("24.99");
   const [plusPrice, setPlusPrice] = useState("26.99");
+  const [keywordHint, setKeywordHint] = useState("");
+  // AI SEO/GEO/AEO/RankMath product copy (Phase 4).
+  const [copy, setCopy] = useState<{
+    state: StepState;
+    focusKeyword?: string;
+    metaTitle?: string;
+    metaDescription?: string;
+    shortDescriptionHtml?: string;
+    bullets?: string[];
+    rankGrade?: "green" | "orange" | "red";
+    rankScore?: number;
+    error?: string;
+  }>({ state: "idle" });
 
   const [printMode, setPrintMode] = useState<PrintMode>("original");
   const [upscale, setUpscale] = useState<{
@@ -86,6 +99,7 @@ export default function PublishWizard() {
     if (stale) setMockupUrls((prev) => prev.filter((u) => u !== stale));
     lastProductUrlRef.current = null;
     setProductImg({ state: "idle" });
+    setCopy({ state: "idle" });
     setCreate({ state: "idle" });
     setSync({ state: "idle" });
     setLink({ state: "idle" });
@@ -131,6 +145,39 @@ export default function PublishWizard() {
     setProductImg({ state: "done", url });
   }, [designUrl, productImg.url, post]);
 
+  const runCopy = useCallback(async () => {
+    setCopy({ state: "running" });
+    const design = designs.find((d) => d.object_url === designUrl);
+    const json = await post({
+      action: "copy",
+      designPrompt: design?.metadata?.prompt ?? undefined,
+      subject: title.trim() || undefined,
+      productType: "tshirt",
+      focusKeywordHint: keywordHint.trim() || undefined,
+    });
+    if (!json.ok) {
+      setCopy({ state: "error", error: json.error });
+      return;
+    }
+    const c = json.copy as {
+      productTitle: string; focusKeyword: string; metaTitle: string;
+      metaDescription: string; shortDescriptionHtml: string; bullets: string[];
+    };
+    const rm = json.rankMath as { grade: "green" | "orange" | "red"; score: number } | undefined;
+    // Fill the product title if the operator left it blank — never overwrite their input.
+    setTitle((prev) => (prev.trim().length === 0 ? c.productTitle : prev));
+    setCopy({
+      state: "done",
+      focusKeyword: c.focusKeyword,
+      metaTitle: c.metaTitle,
+      metaDescription: c.metaDescription,
+      shortDescriptionHtml: c.shortDescriptionHtml,
+      bullets: c.bullets,
+      rankGrade: rm?.grade,
+      rankScore: rm?.score,
+    });
+  }, [designs, designUrl, title, keywordHint, post]);
+
   const runCreate = useCallback(async () => {
     setCreate({ state: "running" });
     const json = await post({
@@ -140,6 +187,12 @@ export default function PublishWizard() {
       plusPrice,
       sizes: SIZES,
       mockupUrls,
+      // AI copy (Phase 4) — short description body + bullets + RankMath SEO meta.
+      shortDescription: copy.shortDescriptionHtml,
+      bullets: copy.bullets,
+      seo: copy.focusKeyword
+        ? { focus_keyword: copy.focusKeyword, title: copy.metaTitle, description: copy.metaDescription }
+        : undefined,
     });
     if (!json.ok) {
       setCreate({ state: "error", error: json.error });
@@ -151,7 +204,7 @@ export default function PublishWizard() {
       editUrl: json.edit_url as string | undefined,
       variantMap: json.variantMap as VariantMapEntry[],
     });
-  }, [title, retailPrice, plusPrice, mockupUrls, post]);
+  }, [title, retailPrice, plusPrice, mockupUrls, copy, post]);
 
   const runStatus = useCallback(async () => {
     if (!create.productId) return;
@@ -253,6 +306,27 @@ export default function PublishWizard() {
           Plus 價（2XL+）
           <input className="btn-secondary" style={{ width: 110, marginTop: 4 }} value={plusPrice} onChange={(e) => setPlusPrice(e.target.value)} />
         </label>
+      </div>
+
+      {/* AI product copy — SEO / GEO / AEO / RankMath */}
+      <div className="build-panel" style={{ padding: 14, marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <span>{pill(copy.state)}</span>
+        <label style={{ fontSize: 12, flex: "1 1 220px" }}>
+          焦點關鍵字（可留空，AI 自選）
+          <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={keywordHint} onChange={(e) => setKeywordHint(e.target.value)} placeholder="例：spiritual lotus t-shirt" />
+        </label>
+        <button className="btn-secondary" disabled={copy.state === "running"} onClick={() => void runCopy()}>
+          {copy.state === "running" ? "生成文案中…" : "AI 生成 SEO 文案（標題＋描述＋RankMath meta）"}
+        </button>
+        {copy.state === "done" ? (
+          <span style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ color: copy.rankGrade === "green" ? "#46a758" : copy.rankGrade === "orange" ? "#f5a623" : "#e5484d" }}>
+              RankMath {copy.rankScore}/100（{copy.rankGrade}）· 焦點字：{copy.focusKeyword}
+            </span>
+            <span style={{ opacity: 0.7 }}>建立草稿時會帶入短描述 + RankMath meta（焦點字/SEO 標題/描述）</span>
+          </span>
+        ) : null}
+        {copy.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{copy.error}</span> : null}
       </div>
 
       {/* steps */}

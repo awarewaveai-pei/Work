@@ -4,6 +4,7 @@ import { buildDesignKey, getDesignsPublicBase, putDesignObject } from "../../../
 import { upscaleToPrintFile } from "../../../../lib/studio/upscaler";
 import { buildFaithfulPrintFile } from "../../../../lib/studio/print-file";
 import { toProductImage } from "../../../../lib/studio/to-product-image";
+import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import {
@@ -40,18 +41,27 @@ function gate(request: Request): NextResponse | null {
 }
 
 interface PublishBody {
-  action?: "upscale" | "productimage" | "create" | "status" | "link";
+  action?: "upscale" | "productimage" | "copy" | "create" | "status" | "link";
   // upscale / productimage
   designUrl?: string;
   longEdgePx?: number;
   // upscale fidelity: default "original" (100% faithful). "ai-enhance" = Real-ESRGAN (not faithful).
   printMode?: "original" | "resample" | "ai-enhance";
+  // copy (AI SEO/GEO/AEO/RankMath product copy)
+  designPrompt?: string;
+  subject?: string;
+  productType?: string;
+  theme?: string;
+  brand?: string;
+  focusKeywordHint?: string;
   // create
   title?: string;
   retailPrice?: string;
   plusPrice?: string;
   sizes?: string[];
   shortDescription?: string;
+  bullets?: string[];
+  seo?: { focus_keyword?: string; title?: string; description?: string };
   mockupUrls?: string[];
   // status / link
   wooProductId?: number;
@@ -172,6 +182,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, productImageUrl: put.publicUrl, byteSize: put.byteSize });
   }
 
+  // ── Step 1c: AI product copy (SEO + GEO + AEO + RankMath) ───────────────────
+  if (body.action === "copy") {
+    const r = await generateProductCopy({
+      designPrompt: body.designPrompt,
+      subject: body.subject,
+      productType: body.productType,
+      theme: body.theme,
+      brand: body.brand,
+      focusKeywordHint: body.focusKeywordHint,
+      siteDomain: (() => {
+        try {
+          return process.env.WPBRIDGE_BASE_URL ? new URL(process.env.WPBRIDGE_BASE_URL).host : undefined;
+        } catch {
+          return undefined;
+        }
+      })(),
+    });
+    if (!r.ok) {
+      const code = (r as { ok: false; error: string }).error;
+      let friendly = `文案生成失敗：${code}`;
+      if (code === "missing_anthropic_key") friendly = "伺服器未設定 ANTHROPIC_API_KEY。";
+      if (code === "anthropic_auth_error") friendly = "Anthropic 金鑰錯誤（401/403）。";
+      if (code === "anthropic_rate_limit") friendly = "Anthropic 流量限制，請稍後重試。";
+      if (code === "anthropic_overloaded") friendly = "Anthropic 服務忙碌，請稍後重試。";
+      return NextResponse.json({ ok: false, error: friendly, code });
+    }
+    return NextResponse.json({ ok: true, copy: r.copy, rankMath: r.rankMath });
+  }
+
   // ── Step 2: create draft Woo product via wp-bridge ─────────────────────────
   if (body.action === "create") {
     if (!isBridgeConfigured()) {
@@ -196,6 +235,8 @@ export async function POST(request: Request) {
       plusPrice: body.plusPrice,
       sizes: body.sizes,
       shortDescription: body.shortDescription,
+      bullets: Array.isArray(body.bullets) ? body.bullets.filter((b) => typeof b === "string") : undefined,
+      seo: body.seo && typeof body.seo === "object" ? body.seo : undefined,
       mockupUrls,
     };
     // Always a real write (plugin has no /product dry-run) — payload is draft-status.
@@ -310,5 +351,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, syncProductId: found.id, linkedCount, total: results.length, results });
   }
 
-  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|create|status|link" }, { status: 400 });
+  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|copy|create|status|link" }, { status: 400 });
 }
