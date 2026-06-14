@@ -355,7 +355,7 @@ export default function CanvasEditor() {
   // 〽️ 文字沿路徑 — make the selected text follow a curved (arc) path, or straighten it.
   const applyTextArc = useCallback((on: boolean) => {
     const canvas = fabricRef.current;
-    const o = canvas?.getActiveObject() as (Record<string, unknown> & { width?: number }) | null;
+    const o = canvas?.getActiveObject() as unknown as (Record<string, unknown> & { width?: number }) | null;
     if (!canvas || !o || !isTextObject(o as { type?: string })) return;
     if (!on) {
       (o as unknown as { set: (p: Record<string, unknown>) => void }).set({ path: null });
@@ -962,12 +962,14 @@ export default function CanvasEditor() {
 
         {/* 調色工具包 — appears when an image is selected; applies via Fabric filters (WYSIWYG). */}
         {imageSelected ? (
-          <DraggablePanel id="image-tools" title="🖼 影像工具" defaultPos={{ x: 1052, y: 392 }} width={272}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <>
+          {/* 3 個獨立可拖面板：調色 / 濾鏡效果 / AI 去除 */}
+          <DraggablePanel id="grade" title="🎨 調色 / 修圖" defaultPos={{ x: 1052, y: 0 }} width={272}>
             <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
-            {/* 🎨 一鍵濾鏡預設 + ✂️ 免費去白底 (Fabric filters, 與調色共存) */}
-            <div className="build-panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              <strong style={{ fontSize: 13 }}>🎨 濾鏡 / 去背</strong>
+          </DraggablePanel>
+
+          <DraggablePanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 1052, y: 332 }} width={272}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 <button
                   className="btn-secondary"
@@ -1004,10 +1006,10 @@ export default function CanvasEditor() {
                 </label>
               ))}
             </div>
+          </DraggablePanel>
 
-            {/* 🪄 AI 去除不要的部分 (bria/eraser) */}
-            <div className="build-panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              <strong style={{ fontSize: 13 }}>🪄 去除不要的部分（AI）</strong>
+          <DraggablePanel id="inpaint" title="🪄 去除不要的部分（AI）" defaultPos={{ x: 1052, y: 560 }} width={272}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {!inpaintMode ? (
                 <button className="btn-secondary" onClick={startInpaint}>開始塗抹要去除的地方</button>
               ) : (
@@ -1038,8 +1040,8 @@ export default function CanvasEditor() {
                 </>
               )}
             </div>
-            </div>
           </DraggablePanel>
+          </>
         ) : null}
 
         {/* 🔤 字型庫 — Google Fonts (中/英) + 上傳字型 + 粗體/斜體/底線, shown when text selected. */}
