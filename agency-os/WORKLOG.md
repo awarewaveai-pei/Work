@@ -4,6 +4,28 @@
 
 ## 2026-06-15
 
+### feat(pod): 服飾 POD Phase 2a — Printful 多風格 mockup（含真人模特，全忠實）+ 一鍵存圖庫
+
+**[任務理解]** 使用者要服飾商品圖含：衣服圖、模特圖（且「圖案 100% 忠實、衣服款式=Printful 實售款」）。現況 `generateMockup` 只回第 1 張 mockup（白/M 正面），無模特、無多風格，且 Printful CDN URL 進不了 Publish（publish create 過濾 designsBase）。
+
+**[現況分析（live 查證，非猜）]** SSH 實測 Printful API：① `mockup-generator/create-task/71` 預設只回 Flat+Ghost；加 `option_groups:["Men's Lifestyle",...]` → `extra[]` 含「Men's Lifestyle / Front|Back」=真人模特實拍（v2 `catalog-products/71/mockup-styles` 確認有 742 Couple's/744-745 Men's Lifestyle/747 Women's）。② mockup URL host=`printful-upload.s3-accelerate.amazonaws.com`，路徑含 `/tmp/` = **暫存會過期** → 必須存進 R2 持久化。③ 該 URL `curl -I`=**200 直出、0 重導、image/jpeg**（故 redirect:manual 安全不破壞）。全部 mockup 皆忠實（Printful 貼真實檔到真衣服，非 AI 重繪）。
+
+**[已修改]**
+- `lib/studio/printful-mockup.ts` — create-task 加 `MOCKUP_OPTION_GROUPS`（Flat/Ghost/各 Lifestyle/Couple's/Kids；Printful 靜默忽略無效組）；完成時從 primary + `extra[]` 組 `MockupView[]`（url/label/group/view/lifestyle 旗標），URL 去重、lifestyle 排首。回 `{ok, mockup_url(向後相容), mockups[]}`。critic 修：primary 不再硬標 Flat/Front（改優先用 extra[] 真實 group，避免誤標 lifestyle 為 Flat）；task_key 加 encodeURIComponent。
+- `app/api/tools/designs/route.ts` — POST 加 `sourceUrl` 模式（Printful mockup CDN → 存 My Designs）：`fetchPrintfulMockup` SSRF allowlist（host∈{printful-upload.s3-accelerate.amazonaws.com, files.cdn.printful.com}、https-only、redirect:manual fail-closed）、content-type∈{jpeg/png/webp}、20MB cap、25s timeout；其餘走原 R2+media_assets insert。
+- `app/tools/studio/StudioWorkbench.tsx` — mockup 預覽從單張改風格網格（🧍模特/👕產品 圖示 + label）；`saveMockupToDesigns(m)` POST `{sourceUrl}` per view（per-url 儲存狀態）；type-only import MockupView（不洩 server code 進 bundle）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=Printful create-task option_groups=["Men's Lifestyle"]+task poll+`curl -I` mockup URL | exit=0 | extra[] 含 Men's Lifestyle Front/Back（真模特）、CDN URL 200 直出 image/jpeg 0 重導
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node p2a_realtest.cjs`（TEMP 隔離） | exit=0 | parse 5 unique views（primary==flat-front 正確去重）、lifestyle 排首、2 模特款；allowlist 接受 printful host、擋 evil.com/http/`...amazonaws.com.evil.com` suffix
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REVIEW_DONE: critic=Deep | verdict=Low-Medium→pass-after-verify | findings=0c/2M/4m → Major1(redirect:manual 疑破壞存圖)經 live curl 證 200 直出=非 bug；Major2(primary 誤標)已修為 extra[]-優先；Minor task_key encode 已修；critic 確認 S3 virtual-host allowlist 為 bucket-pinned SSRF-safe、auth gate、type-only import、空陣列雙端守衛全 clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`MockupView\|fetchPrintfulMockup\|saveMockupToDesigns\|MOCKUP_OPTION_GROUPS\|sourceUrl\|mockup_url` | hits=0 stale（唯一符號僅本 3 檔；外部命中為巧合：integration-steps `resourceUrl` 子字串、CanvasEditor 本地變數 sourceUrl posts {image,mask} 不同端點、IncidentCard resourceUrl）
+
+**[剩餘風險]** ① 尚未 sg-deploy ② lifestyle 模特款可能受 variant 顏色限制（White/M 已驗有 Men's Lifestyle；其他色/Women's 未逐一驗）③ size guard 的 content-length 檢查可被 chunked 繞過，真正上限是下載後 byteLength（host 為信任的 Printful，風險低，與既有 print-file 同模式）。
+
+**[rollback]** flag(`POD_DESIGNS_ENABLED`)後；`git revert`；mockup 回傳 mockups[] 向後相容（mockup_url 仍在）。designs route sourceUrl 為新增分支，移除不影響原 image 路徑。
+
 ### feat(pod): 服飾 POD Phase 1 — 100% 忠實印刷檔（取代 Real-ESRGAN 預設）+ 純圖案產品圖
 
 **[任務理解]** 使用者對服飾 POD 下了鐵律：商品圖/印刷檔上的圖案必須與生成的原圖「100% 一模一樣」，不可被 AI 重新詮釋。現況印刷檔走 `upscaler.ts`（Real-ESRGAN AI 超解析）→ **會合成新像素 = 改像素 = 違反鐵律**。這是 Phase 1 要修的根本問題（非表面）。
