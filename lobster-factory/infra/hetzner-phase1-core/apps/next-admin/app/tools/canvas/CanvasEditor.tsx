@@ -78,6 +78,13 @@ export default function CanvasEditor() {
   const [brushSize, setBrushSize] = useState(34);
   const inpaintImgRef = useRef<FabricObject | null>(null); // image being edited in inpaint mode
   const inpaintPathsRef = useRef<FabricObject[]>([]); // strokes painted as the mask
+  // 🎨 物件效果（PS 圖層樣式）— apply to the selected object (text/image/shape).
+  const [objOpacity, setObjOpacity] = useState(100);
+  const [objBlend, setObjBlend] = useState("normal");
+  const [objShadow, setObjShadow] = useState(false);
+  const [objStroke, setObjStroke] = useState(false);
+  const [objStrokeColor, setObjStrokeColor] = useState("#000000");
+  const [objStrokeWidth, setObjStrokeWidth] = useState(4);
   const grade = useColorGrade(); // 修圖積木 applied to the selected image via Fabric filters
 
   // ── init fabric canvas + load handed-off source image (client only) ──
@@ -120,6 +127,17 @@ export default function CanvasEditor() {
         setImageSelected(o?.type === "image");
         setAnySelected(!!o);
         setLockSelected(!!(o as { lockMovementX?: boolean } | null)?.lockMovementX);
+        const e = o as
+          | { opacity?: number; globalCompositeOperation?: string; shadow?: unknown; stroke?: unknown; strokeWidth?: number }
+          | null;
+        if (e) {
+          if (typeof e.opacity === "number") setObjOpacity(Math.round(e.opacity * 100));
+          setObjBlend(e.globalCompositeOperation || "normal");
+          setObjShadow(!!e.shadow);
+          setObjStroke(!!e.stroke && (e.strokeWidth ?? 0) > 0);
+          if (typeof e.stroke === "string") setObjStrokeColor(e.stroke);
+          if (typeof e.strokeWidth === "number" && e.strokeWidth > 0) setObjStrokeWidth(e.strokeWidth);
+        }
       };
       canvas.on("selection:created", syncFromSelection);
       canvas.on("selection:updated", syncFromSelection);
@@ -227,6 +245,42 @@ export default function CanvasEditor() {
       canvas.requestRenderAll();
     }
   }, []);
+
+  // 🎨 物件效果 — set any property on the active object (opacity/blend/stroke/flip).
+  const setActiveProp = useCallback((patch: Record<string, unknown>) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const o = canvas.getActiveObject();
+    if (!o) return;
+    (o as unknown as { set: (p: Record<string, unknown>) => void }).set(patch);
+    canvas.requestRenderAll();
+  }, []);
+
+  const flipActive = useCallback((axis: "x" | "y") => {
+    const canvas = fabricRef.current;
+    const o = canvas?.getActiveObject() as (FabricObject & { flipX?: boolean; flipY?: boolean }) | null;
+    if (!canvas || !o) return;
+    setActiveProp(axis === "x" ? { flipX: !o.flipX } : { flipY: !o.flipY });
+  }, [setActiveProp]);
+
+  // Drop shadow needs the Fabric Shadow class (dynamic import).
+  const toggleShadow = useCallback((on: boolean) => {
+    setObjShadow(on);
+    const canvas = fabricRef.current;
+    if (!canvas?.getActiveObject()) return;
+    if (!on) {
+      setActiveProp({ shadow: null });
+      return;
+    }
+    void import("fabric").then((fabric) => {
+      setActiveProp({ shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.45)", blur: 16, offsetX: 6, offsetY: 6 }) });
+    });
+  }, [setActiveProp]);
+
+  const toggleStroke = useCallback((on: boolean) => {
+    setObjStroke(on);
+    setActiveProp(on ? { stroke: objStrokeColor, strokeWidth: objStrokeWidth } : { stroke: null, strokeWidth: 0 });
+  }, [setActiveProp, objStrokeColor, objStrokeWidth]);
 
   const uploadImage = useCallback((file: File | null) => {
     const canvas = fabricRef.current;
@@ -584,6 +638,45 @@ export default function CanvasEditor() {
         <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: "fit-content", background: "#fff" }}>
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
+
+        {/* 🎨 物件效果（PS 圖層樣式）— shown for ANY selected object (text/image/shape). */}
+        {anySelected ? (
+          <div className="build-panel" style={{ width: 260, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+            <strong style={{ fontSize: 13 }}>🎨 物件效果</strong>
+            <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ display: "flex", justifyContent: "space-between" }}><span>透明度</span><span style={{ opacity: 0.7 }}>{objOpacity}%</span></span>
+              <input type="range" min={0} max={100} value={objOpacity} onChange={(e) => { const v = Number(e.target.value); setObjOpacity(v); setActiveProp({ opacity: v / 100 }); }} />
+            </label>
+            <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
+              混合模式
+              <select className="btn-secondary" value={objBlend} onChange={(e) => { setObjBlend(e.target.value); setActiveProp({ globalCompositeOperation: e.target.value === "normal" ? "source-over" : e.target.value }); }}>
+                {["normal", "multiply", "screen", "overlay", "darken", "lighten", "difference", "color-dodge", "color-burn", "soft-light", "hard-light"].map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </label>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => flipActive("x")}>↔ 水平翻轉</button>
+              <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => flipActive("y")}>↕ 垂直翻轉</button>
+            </div>
+            <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="checkbox" checked={objShadow} onChange={(e) => toggleShadow(e.target.checked)} /> 陰影 Drop shadow
+            </label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" checked={objStroke} onChange={(e) => toggleStroke(e.target.checked)} /> 描邊 Stroke
+              </label>
+              {objStroke ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 22 }}>
+                  <input type="color" value={objStrokeColor} onChange={(e) => { setObjStrokeColor(e.target.value); setActiveProp({ stroke: e.target.value }); }} style={{ width: 30, height: 22, padding: 0 }} />
+                  <input type="range" min={1} max={40} value={objStrokeWidth} onChange={(e) => { const w = Number(e.target.value); setObjStrokeWidth(w); setActiveProp({ strokeWidth: w }); }} style={{ flex: 1 }} />
+                  <span style={{ width: 22, textAlign: "right" }}>{objStrokeWidth}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         {/* 調色工具包 — appears when an image is selected; applies via Fabric filters (WYSIWYG). */}
         {imageSelected ? (
           <div style={{ width: 260, display: "flex", flexDirection: "column", gap: 10 }}>
