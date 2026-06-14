@@ -74,6 +74,7 @@ function getParagraphs(md: string): string[] {
 function getIntroWords(md: string, count = 150): string {
   const plain = stripMarkdown(md);
   // For CJK/kana/hangul-dominant text, every character is a "word" — slice by char
+  CJK_RE.lastIndex = 0; // reset g-flag state to avoid cross-request lastIndex drift
   if (CJK_RE.test(plain)) return plain.slice(0, count * 3).toLowerCase();
   return plain.split(/\s+/).slice(0, count).join(" ").toLowerCase();
 }

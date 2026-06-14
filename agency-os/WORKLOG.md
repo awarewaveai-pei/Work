@@ -4,6 +4,22 @@
 
 ## 2026-06-15
 
+### feat(trending): multi-source 熱搜 — Google News RSS + Reddit Atom + PTT Gossiping
+
+**[已修改]**
+- `app/api/content/trending/route.ts` — 加 `source?` 欄位至 `TrendingItem`；新 `fetchRedditTrending`（geo-mapped Atom RSS，無 key）；新 `fetchPttTrending`（PTT Gossiping HTML scrape + push count，over18 cookie）；handler 改 `Promise.allSettled` 並行三源；TW geo 加 PTT；Google News title strip 改用 space-dash-space 避免截斷 "COVID-19" 等連字詞；PTT 改整列 r-ent block 解析修正刪除文章錯位。
+- `app/tools/content/ContentStudio.tsx` — trendingItems state 加 `source?`；加 source badge（Redis=橘/PTT=綠）；空狀態 hint 改 "Google News / Reddit / PTT"。
+- `lib/seo/rankmath-checker.ts` — `CJK_RE.lastIndex = 0` reset before `.test()` 避免跨 request g-flag lastIndex drift。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=~15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node -e "hyphen-strip regex test"` | exit=0 — 5/5 PASS (COVID-19 不截斷)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node -e "CJK_RE lastIndex fix test"` | exit=0 — reset 正確
+- REVIEW_DONE: critic=Deep | verdict=2-major-fixed/pass | findings=0c/2M(fixed)/3m/1s — M1: CJK_RE lastIndex(已修)；M2: PTT 刪除文章錯位(已修)；m1: Google News hyphen(已修)；m2: CJK punct word count(可接受)；m3: empty kw guard(upstream 已保護)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`fetchPttTrending|fetchRedditTrending|fetchGoogleNewsTrending|CJK_RE` | hits=0 — WORKLOG 內歷史提及不為 stale call site
+
+
+
 ### feat(pod): 服飾 POD Phase 3 — 台灣本地印刷檔目的地 seam（業界預設）
 
 **[任務理解]** 使用者要服飾「也要台灣本地印刷」（雙履約：Printful 國際 + 台灣本地 DTG/絹印）。台灣印刷廠檔案規格未知 → 用 DTG 業界預設做可設定 seam，拿到實際規格再填。

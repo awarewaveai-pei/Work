@@ -81,8 +81,9 @@ async function fetchGoogleNewsTrending(geo: string): Promise<TrendingItem[]> {
       const titleM = block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
       if (!titleM) continue;
       // Strip " - Publisher" suffix (e.g. "颱風來了 - 東森新聞" → "颱風來了")
+      // Use space-surrounded dash to avoid stripping hyphenated terms like "COVID-19" or "GPT-4"
       const full = titleM[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
-      const title = full.replace(/\s*[-–—]\s*[^\s-–—].{2,35}$/, "").trim() || full;
+      const title = full.replace(/\s+[-–—]\s+[^\s].{1,35}$/, "").trim() || full;
       if (title.length < 4) continue;
       items.push({ title, traffic: "", category: "", relatedQueries: [] });
     }
@@ -147,24 +148,19 @@ async function fetchPttTrending(): Promise<TrendingItem[]> {
     if (!res.ok) return [];
     const html = await res.text();
     const items: TrendingItem[] = [];
-    // Extract post titles: <div class="title"><a href="...">TITLE</a></div>
-    const titleRe = /<div class="title">\s*<a href="[^"]*">([^<]+)<\/a>/g;
-    // Extract push counts: <div class="nrec"><span class="...">COUNT</span></div>
-    const pushRe = /<div class="nrec"><span[^>]*>([^<]+)<\/span><\/div>/g;
-    const titles: string[] = [];
-    const pushes: string[] = [];
+    // Parse each r-ent row as a unit so deleted posts (no <a> in .title) don't shift push counts
+    const rowRe = /<div class="r-ent">([\s\S]*?)<\/div>\s*<\/div>/g;
     let m: RegExpExecArray | null;
-    while ((m = titleRe.exec(html)) !== null) {
-      const t = m[1].trim();
-      if (t.length > 3) titles.push(t);
-    }
-    while ((m = pushRe.exec(html)) !== null) {
-      pushes.push(m[1].trim());
-    }
-    for (let i = 0; i < Math.min(titles.length, 10); i++) {
-      const push = pushes[i] ?? "";
+    while ((m = rowRe.exec(html)) !== null && items.length < 10) {
+      const row = m[1];
+      const titleM = row.match(/<div class="title">\s*<a href="[^"]*">([^<]+)<\/a>/);
+      if (!titleM) continue; // deleted / removed post — skip entirely
+      const title = titleM[1].trim();
+      if (title.length <= 3) continue;
+      const pushM = row.match(/<div class="nrec"><span[^>]*>([^<]*)<\/span><\/div>/);
+      const push = pushM ? pushM[1].trim() : "";
       const traffic = /^\d+$/.test(push) ? `${push}推` : push === "爆" ? "爆推" : "";
-      items.push({ title: titles[i], traffic, category: "", relatedQueries: [], source: "PTT" });
+      items.push({ title, traffic, category: "", relatedQueries: [], source: "PTT" });
     }
     return items;
   } catch { return []; }
