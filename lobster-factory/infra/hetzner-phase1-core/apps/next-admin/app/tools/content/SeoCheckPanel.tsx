@@ -45,6 +45,11 @@ const CATEGORIES: { key: string; label: string; ids: string[] }[] = [
     label: "Content Readability",
     ids: ["para-length", "meta-length"],
   },
+  {
+    key: "aeo",
+    label: "AEO / GEO (AI Engine Optimization)",
+    ids: ["aeo-quick-answer", "aeo-subquery-coverage", "aeo-date-signal"],
+  },
 ];
 
 const GRADE_COLOR = { green: "#22c55e", orange: "#f97316", red: "#ef4444" };
