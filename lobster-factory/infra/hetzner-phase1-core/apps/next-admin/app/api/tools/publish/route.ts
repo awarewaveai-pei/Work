@@ -4,6 +4,7 @@ import { buildDesignKey, getDesignsPublicBase, putDesignObject } from "../../../
 import { upscaleToPrintFile } from "../../../../lib/studio/upscaler";
 import { buildFaithfulPrintFile } from "../../../../lib/studio/print-file";
 import { toProductImage } from "../../../../lib/studio/to-product-image";
+import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
@@ -41,10 +42,13 @@ function gate(request: Request): NextResponse | null {
 }
 
 interface PublishBody {
-  action?: "upscale" | "productimage" | "copy" | "create" | "status" | "link";
-  // upscale / productimage
+  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link";
+  // upscale / productimage / flatlay
   designUrl?: string;
   longEdgePx?: number;
+  // flatlay (faithful real-design overlay)
+  bgColor?: string; // "#rrggbb"
+  bgUrl?: string; // optional decorative background from My Designs (R2)
   // upscale fidelity: default "original" (100% faithful). "ai-enhance" = Real-ESRGAN (not faithful).
   printMode?: "original" | "resample" | "ai-enhance";
   // copy (AI SEO/GEO/AEO/RankMath product copy)
@@ -180,6 +184,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: (put as { ok: false; error: string }).error }, { status: 502 });
     }
     return NextResponse.json({ ok: true, productImageUrl: put.publicUrl, byteSize: put.byteSize });
+  }
+
+  // ── Step 1d: faithful flat-lay — real design overlaid on a background (no AI redraw) ──
+  if (body.action === "flatlay") {
+    if (!body.designUrl || !body.designUrl.startsWith(designsBase)) {
+      return NextResponse.json({ ok: false, error: "designUrl must be a My Designs asset URL" }, { status: 400 });
+    }
+    if (body.bgUrl && !body.bgUrl.startsWith(designsBase)) {
+      return NextResponse.json({ ok: false, error: "bgUrl must be a My Designs asset URL" }, { status: 400 });
+    }
+    // Size+timeout-capped fetch of an allowlisted designs-bucket asset (OOM/SSRF guard).
+    const fetchAsset = async (url: string): Promise<Buffer | null> => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 25_000);
+      try {
+        const res = await fetch(url, { redirect: "manual", signal: ctrl.signal });
+        if (!res.ok) return null;
+        if (Number(res.headers.get("content-length") ?? "0") > 60 * 1024 * 1024) return null;
+        const ab = await res.arrayBuffer();
+        if (ab.byteLength > 60 * 1024 * 1024) return null;
+        return Buffer.from(ab);
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(t);
+      }
+    };
+    const designBuf = await fetchAsset(body.designUrl);
+    if (!designBuf) return NextResponse.json({ ok: false, error: "design_fetch_failed" }, { status: 502 });
+    const bgImageBuffer = body.bgUrl ? (await fetchAsset(body.bgUrl)) ?? undefined : undefined;
+    const bgColor = body.bgColor ? parseHexColor(body.bgColor) ?? undefined : undefined;
+    const r = await composeFlatlay(designBuf, { bgColor, bgImageBuffer });
+    if (!r.ok) {
+      return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
+    }
+    const key = buildDesignKey("image/webp");
+    if (!key) return NextResponse.json({ ok: false, error: "unsupported_image_mime" }, { status: 500 });
+    const put = await putDesignObject(key, r.buffer, "image/webp");
+    if (!put.ok) {
+      return NextResponse.json({ ok: false, error: (put as { ok: false; error: string }).error }, { status: 502 });
+    }
+    return NextResponse.json({ ok: true, flatlayUrl: put.publicUrl, byteSize: put.byteSize });
   }
 
   // ── Step 1c: AI product copy (SEO + GEO + AEO + RankMath) ───────────────────
@@ -351,5 +397,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, syncProductId: found.id, linkedCount, total: results.length, results });
   }
 
-  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|copy|create|status|link" }, { status: 400 });
+  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|flatlay|copy|create|status|link" }, { status: 400 });
 }

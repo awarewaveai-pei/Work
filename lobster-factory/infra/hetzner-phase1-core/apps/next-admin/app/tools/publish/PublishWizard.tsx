@@ -58,9 +58,13 @@ export default function PublishWizard() {
     error?: string;
   }>({ state: "idle" });
   const [productImg, setProductImg] = useState<{ state: StepState; url?: string; error?: string }>({ state: "idle" });
-  // Latest product-image URL, readable inside the design-change effect without making it a dep.
+  const [flatlayBg, setFlatlayBg] = useState("#f5f3ee");
+  const [flatlay, setFlatlay] = useState<{ state: StepState; url?: string; error?: string }>({ state: "idle" });
+  // Latest derived-image URLs, readable inside the design-change effect without making them deps.
   const lastProductUrlRef = useRef<string | null>(null);
   useEffect(() => { lastProductUrlRef.current = productImg.url ?? null; }, [productImg.url]);
+  const lastFlatlayUrlRef = useRef<string | null>(null);
+  useEffect(() => { lastFlatlayUrlRef.current = flatlay.url ?? null; }, [flatlay.url]);
   const [create, setCreate] = useState<{
     state: StepState;
     productId?: number;
@@ -100,6 +104,10 @@ export default function PublishWizard() {
     if (stale) setMockupUrls((prev) => prev.filter((u) => u !== stale));
     lastProductUrlRef.current = null;
     setProductImg({ state: "idle" });
+    const staleFlat = lastFlatlayUrlRef.current;
+    if (staleFlat) setMockupUrls((prev) => prev.filter((u) => u !== staleFlat));
+    lastFlatlayUrlRef.current = null;
+    setFlatlay({ state: "idle" });
     setCopy({ state: "idle" });
     setCreate({ state: "idle" });
     setSync({ state: "idle" });
@@ -145,6 +153,23 @@ export default function PublishWizard() {
     });
     setProductImg({ state: "done", url });
   }, [designUrl, productImg.url, post]);
+
+  // Faithful flat-lay: the REAL design composited on a background (no AI redraw).
+  const runFlatlay = useCallback(async () => {
+    if (!designUrl) return;
+    setFlatlay({ state: "running" });
+    const json = await post({ action: "flatlay", designUrl, bgColor: flatlayBg });
+    if (!json.ok) {
+      setFlatlay({ state: "error", error: json.error });
+      return;
+    }
+    const url = json.flatlayUrl as string;
+    setMockupUrls((prev) => {
+      const without = flatlay.url ? prev.filter((u) => u !== flatlay.url) : prev;
+      return without.includes(url) ? without : [...without, url];
+    });
+    setFlatlay({ state: "done", url });
+  }, [designUrl, flatlayBg, flatlay.url, post]);
 
   const runCopy = useCallback(async () => {
     setCopy({ state: "running" });
@@ -386,6 +411,20 @@ export default function PublishWizard() {
           </button>
           {productImg.state === "done" ? <span style={{ fontSize: 12, color: "#46a758" }}>已加入商品照 ✓（純圖案，忠實）</span> : null}
           {productImg.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{productImg.error}</span> : null}
+        </div>
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span>{pill(flatlay.state)}</span>
+          <button className="btn-secondary" disabled={!designUrl || flatlay.state === "running"} onClick={() => void runFlatlay()}>
+            ⊕ 真實平拍（設計 overlay 到背景，忠實）
+          </button>
+          <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+            背景色
+            <input type="color" value={flatlayBg} onChange={(e) => setFlatlayBg(e.target.value)} style={{ width: 32, height: 24, padding: 0, border: "none", background: "none" }} />
+          </label>
+          <span style={{ fontSize: 11, opacity: 0.6 }}>（要 AI 裝飾背景：先在 Studio 生成無圖案的背景圖，之後版本可選為底）</span>
+          {flatlay.state === "done" ? <span style={{ fontSize: 12, color: "#46a758" }}>已加入商品照 ✓（真實設計，非 AI 重繪）</span> : null}
+          {flatlay.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{flatlay.error}</span> : null}
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>

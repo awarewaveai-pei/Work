@@ -4,6 +4,25 @@
 
 ## 2026-06-15
 
+### feat(pod): 服飾 POD Phase 2b — 平拍真實 overlay（設計忠實，與 AI 平拍雙軌）
+
+**[任務理解]** 使用者要平拍圖雙軌：保留既有 AI 平拍（MockupStudio，氛圍好）+ 新增「真實設計 overlay 到背景」忠實版（設計不被 AI 重繪）。
+
+**[已修改]**
+- `lib/studio/flatlay.ts`（新）— `composeFlatlay(designBuffer,opts)`：sharp 把**真實設計** fit:inside 縮放 + gravity:centre 合成到背景（純色 bgColor 或 bgImageBuffer 裝飾底）→ WebP q82 顯示圖。設計僅縮放置中、零 AI 重繪 = 符合使用者「真實 overlay 非重畫」規則（display 圖，非印刷檔）。size 400-4000/padding 0-0.4 clamp；`parseHexColor`。critic 防呆註解：design 刻意不 flatten（保透明浮於底）、bgImage 優先於 bgColor。
+- `app/api/tools/publish/route.ts` — 新 `action:"flatlay"`（gate 同其他）：designUrl + 可選 bgUrl 皆須 designsBase；`fetchAsset`（redirect:manual + 25s + 60MB cap，同 productimage 硬化）；composeFlatlay → putDesignObject(webp) → flatlayUrl。
+- `app/tools/publish/PublishWizard.tsx` — 「真實平拍」鈕 + 背景色 `<input type=color>`（runFlatlay）→ flatlayUrl 加進商品照；lastFlatlayUrlRef 換設計時清舊圖（同 productImg 模式）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node flatlay_test.cjs`（app sharp，TEMP 隔離） | exit=0 | 輸出 1200×1200 webp、**中心像素=設計色(255,1,0) 證真實設計置中合成**、角落=背景色、bgImageBuffer 路徑 1000×1000 webp、parseHexColor 有效→{r,g,b}/亂值→null
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REVIEW_DONE: critic=Deep | verdict=Low/pass | findings=0c/0M/2m（皆「符合 productimage/print-file 既有硬化、刻意設計」確認，非待修）→ 加防呆註解 2 行；critic 確認 SSRF（雙 fetch designsBase+manual-redirect fail-closed）、80M px sharp 上限、error-shape、忠實標示全 clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`composeFlatlay\|parseHexColor\|FlatlayOptions\|runFlatlay\|flatlayUrl` | hits=0 stale（唯一符號僅本 3 檔）
+
+**[剩餘風險]** ① 透明底設計需先去背 ② AI 裝飾背景目前需手動：在 Studio 生成無圖案背景圖、之後版本接 bgUrl 選底（action 已支援 bgUrl，UI 待補）③ 尚未 sg-deploy ④ 缺 content-length 時靠下載後 byteLength cap（同 productimage/print-file，信任 R2，60MB/fetch）。
+
+**[rollback]** flag(`POD_DESIGNS_ENABLED`)後；刪 flatlay.ts（純新增）；移除 route flatlay action + wizard 鈕不影響其他。
+
 ### feat(trending): multi-source 熱搜 — Google News RSS + Reddit Atom + PTT Gossiping
 
 **[已修改]**
