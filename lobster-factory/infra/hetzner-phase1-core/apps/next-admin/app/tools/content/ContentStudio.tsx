@@ -823,9 +823,20 @@ export default function ContentStudio() {
     if (!row || !row.article.trim()) return;
     setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "publishing" } : r));
     try {
+      const cats = bulkSettings.wpCategories.split(",").map(s => s.trim()).filter(Boolean);
+      const tags = bulkSettings.wpTags.split(",").map(s => s.trim()).filter(Boolean);
       const res  = await fetch("/api/content/publish", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown: row.article, slug: slugify(row.keyword), siteId: selectedSiteId || undefined }),
+        body: JSON.stringify({
+          markdown:        row.article,
+          slug:            slugify(row.keyword),
+          siteId:          selectedSiteId || undefined,
+          seoTitle:        row.seoTitle   || undefined,
+          metaDescription: row.metaDesc   || undefined,
+          focusKeyword:    row.focusKeyword || row.keyword,
+          categories:      cats.length ? cats : undefined,
+          tags:            tags.length ? tags : undefined,
+        }),
       });
       const json = await res.json() as { ok: boolean; edit_url?: string };
       if (json.ok) setBulkRows(prev => prev.map(r => r.id === rowId ? { ...r, pubStatus: "done", pubUrl: json.edit_url ?? "" } : r));
