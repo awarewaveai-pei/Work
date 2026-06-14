@@ -22,7 +22,7 @@ import type { Canvas as FabricCanvas, FabricObject } from "fabric";
 import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_SOURCE_KEY, CANVAS_NAME_KEY } from "@/components/tools/canvas-handoff";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
-import { buildFabricImageFilters } from "./fabric-filters";
+import { buildFabricImageFilters, buildPresetFilters, PRESET_FILTERS } from "./fabric-filters";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -71,6 +71,8 @@ export default function CanvasEditor() {
   const [imageSelected, setImageSelected] = useState(false); // an image object is selected → show 調色
   const [anySelected, setAnySelected] = useState(false); // any object selected → enable per-object tools
   const [lockSelected, setLockSelected] = useState(false); // selected object is locked (防呆 block)
+  const [presetId, setPresetId] = useState<string | null>(null); // one-click look preset (active image)
+  const [removeWhite, setRemoveWhite] = useState(false); // free chroma-key white-bg removal
   const grade = useColorGrade(); // 修圖積木 applied to the selected image via Fabric filters
 
   // ── init fabric canvas + load handed-off source image (client only) ──
@@ -165,8 +167,8 @@ export default function CanvasEditor() {
     };
   }, []);
 
-  // Apply the colour-grade to the selected IMAGE whenever a slider moves (Fabric filters).
-  // Canvas is WYSIWYG: the filtered pixels are exactly what toDataURL exports.
+  // Apply colour-grade + preset/RemoveColor to the selected IMAGE (Fabric filters), combined so
+  // both coexist. Canvas is WYSIWYG: the filtered pixels are exactly what toDataURL exports.
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -177,14 +179,17 @@ export default function CanvasEditor() {
       if (cancelled || fabricRef.current !== canvas) return;
       const ns = fabric as unknown as { filters: Record<string, new (o?: Record<string, unknown>) => object> };
       const target = obj as unknown as { filters: object[]; applyFilters: () => void };
-      target.filters = buildFabricImageFilters(ns, grade.params);
+      target.filters = [
+        ...buildFabricImageFilters(ns, grade.params),
+        ...buildPresetFilters(ns, presetId, removeWhite),
+      ];
       target.applyFilters();
       canvas.requestRenderAll();
     });
     return () => {
       cancelled = true;
     };
-  }, [grade.params]);
+  }, [grade.params, presetId, removeWhite]);
 
   const addText = useCallback(() => {
     const canvas = fabricRef.current;
@@ -448,8 +453,35 @@ export default function CanvasEditor() {
         </div>
         {/* 調色工具包 — appears when an image is selected; applies via Fabric filters (WYSIWYG). */}
         {imageSelected ? (
-          <div style={{ width: 260 }}>
+          <div style={{ width: 260, display: "flex", flexDirection: "column", gap: 10 }}>
             <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
+            {/* 🎨 一鍵濾鏡預設 + ✂️ 免費去白底 (Fabric filters, 與調色共存) */}
+            <div className="build-panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <strong style={{ fontSize: 13 }}>🎨 濾鏡 / 去背</strong>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: 12, fontWeight: presetId === null ? 700 : 400 }}
+                  onClick={() => setPresetId(null)}
+                >
+                  原圖
+                </button>
+                {PRESET_FILTERS.map((p) => (
+                  <button
+                    key={p.id}
+                    className="btn-secondary"
+                    style={{ fontSize: 12, fontWeight: presetId === p.id ? 700 : 400 }}
+                    onClick={() => setPresetId(presetId === p.id ? null : p.id)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" checked={removeWhite} onChange={(e) => setRemoveWhite(e.target.checked)} />
+                ✂️ 去白底（免費，近白色變透明）
+              </label>
+            </div>
           </div>
         ) : (
           <div style={{ width: 260, fontSize: 12, opacity: 0.55, paddingTop: 8 }}>

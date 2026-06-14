@@ -19,6 +19,40 @@ const clampN = (v: number, lo: number, hi: number): number => Math.min(hi, Math.
 
 type FilterCtor = new (opts?: Record<string, unknown>) => object;
 
+/** One-click look presets → the matching Fabric filter class name. */
+export const PRESET_FILTERS: { id: string; label: string; cls: string }[] = [
+  { id: "sepia", label: "復古", cls: "Sepia" },
+  { id: "vintage", label: "Vintage", cls: "Vintage" },
+  { id: "polaroid", label: "拍立得", cls: "Polaroid" },
+  { id: "kodachrome", label: "Koda", cls: "Kodachrome" },
+  { id: "brownie", label: "Brownie", cls: "Brownie" },
+  { id: "bw", label: "黑白", cls: "BlackWhite" },
+  { id: "gray", label: "灰階", cls: "Grayscale" },
+  { id: "invert", label: "反相", cls: "Invert" },
+];
+
+/**
+ * Preset look + free chroma-key removal — built SEPARATELY from the colour-grade filters so
+ * both can coexist on one image (the apply site concats grade + preset filter lists). RemoveColor
+ * strips a near-white background (distance tolerance) for free, no Replicate call.
+ */
+export function buildPresetFilters(
+  fabricNS: { filters: Record<string, FilterCtor> },
+  presetId: string | null,
+  removeWhite: boolean
+): object[] {
+  const F = fabricNS.filters;
+  const out: object[] = [];
+  if (removeWhite && F.RemoveColor) {
+    out.push(new F.RemoveColor({ color: "#ffffff", distance: 0.12 }));
+  }
+  if (presetId) {
+    const preset = PRESET_FILTERS.find((p) => p.id === presetId);
+    if (preset && F[preset.cls]) out.push(new F[preset.cls]());
+  }
+  return out;
+}
+
 export function buildFabricImageFilters(
   fabricNS: { filters: Record<string, FilterCtor> },
   p: ColorGradeParams
