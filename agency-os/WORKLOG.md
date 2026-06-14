@@ -4,6 +4,16 @@
 
 ## 2026-06-14
 
+### feat(canvas): PS 物件效果（圖層樣式）+ Photoshop 功能總目錄 + 部署
+
+**[已修改]** `app/tools/canvas/CanvasEditor.tsx` — 物件效果面板（任何選取物件）：透明度/混合模式(globalCompositeOperation)/翻轉H,V/陰影(Fabric Shadow)/描邊(色+寬)；`DESIGN_EDITOR_TOOLKIT_PLAN.md` 加 PS 功能對照表（已做/待做/部分不可）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | `npx tsc --noEmit`+`npm run build` exit=0/0
+- REALTEST_EVIDENCE: tool=SSH | sg-deploy.sh next-admin exit=0 | deployed=dde97615 | healthy 6s | smoke 4/4 200
+- REVIEW_DONE: critic=Deep | warn→pass | 0c/2M(全修：blend normal↔source-over 讀對映、toggleShadow capture-object 防 async 套錯)/1m(stroke 重置)
+- BUGHUNT_DONE: scope=app | grep=setActiveProp\|toggleShadow | hits=0 stale
+**[部署]** SG dde97615 LIVE。**[待辦]** 依 PLAN §4b PS 目錄續批：影像 filter(Vibrance/Blur/Noise/色溫/Posterize)→圖層面板→裁切→剪裁遮罩→生成填色/擴圖→Undo/Redo+存檔。
+
 ### AUTO_TASK_DONE: Trigger workflows deploy — dispatch-action-run + dispatch-action-run-schedule — v20260614.1
 
 **Deploy result**: version `20260614.1` deployed to `trigger.aware-wave.com` (proj `proj_6c4f24492a705729fc2c`)
