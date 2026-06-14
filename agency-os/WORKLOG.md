@@ -4,6 +4,25 @@
 
 ## 2026-06-15
 
+### feat(postiz): Task 2 — Bluesky 連接 + 端到端發文驗證通過
+
+**[任務理解]** 接續 Postiz Task 1，要把第一個社群平台接上並證明「程式→Postiz→真實社群帳號」整條管線可發文。
+
+**[現況分析]** 原計畫 Reddit 先行，但 Reddit dev-app 建立一路卡（app 名含空格被 regex 擋、"Unable to add account"、developers.reddit.com Devvit 誤導）→ 改 pivot **Bluesky**（handle + app password，免 OAuth/免審核/免伺服器設定）。使用者自行在 Postiz UI 連上 `soulfulexpression.bsky.social`。
+
+**[已修改]** 無 code 改動（純驗證 + 運維）。Postiz 連接 1 個 Bluesky 頻道（DID did:plc:nmhbv3...）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH/curl | cmd=POST /api/posts(type=now) → Post state QUEUE→PUBLISHED → Bluesky public API getAuthorFeed 確認貼文 live(uri .../post/3mobfe4i7ms22) | exit=0 | 整條 API→Postiz→Bluesky 真實發文打通
+- REALTEST_EVIDENCE: tool=SSH | cmd=第二篇 now 貼文「不重啟 worker」自動 QUEUE→PUBLISHED 16s | exit=0 | 確認 worker 穩定自動消化
+- REALTEST_EVIDENCE: tool=curl | cmd=Bluesky createSession + deleteRecord ×2 → feed 空；Postiz Post 表清 0、Integration 保留 | exit=0 | 公開測試貼文+內部記錄全清乾淨
+- REVIEW_WAIVED: NA -- 無 code 改動
+- BUGHUNT_WAIVED: NA -- 無 code 改動
+
+**[發現/根因]** 發文一度卡 `QUEUE`：worker 程序 online 但沒消化 Redis `bull:post:wait` 佇列 → `pm2 restart workers` 後立即發出，且後續貼文自動消化。根因 = Task 1 除錯期狂重啟容器留下的一次性 worker stale 狀態，正常運作不復現（已用第二篇驗證）。
+**[剩餘風險]** 觀察點：若未來容器重啟後貼文卡 QUEUE → `docker exec postiz pm2 restart workers`。憑證已寫 `AWARE_WAVE_CREDENTIALS.md`（Bluesky app password）。
+**[下一步]** 接 Content Studio 社群面板呼叫 Postiz API（Task 3/5）；或續開其他平台 dev app（Reddit 待 Reddit 後台修穩 / Meta IG-FB / LinkedIn）。
+
 ### feat(pod): 服飾 POD Phase 2a — Printful 多風格 mockup（含真人模特，全忠實）+ 一鍵存圖庫
 
 **[任務理解]** 使用者要服飾商品圖含：衣服圖、模特圖（且「圖案 100% 忠實、衣服款式=Printful 實售款」）。現況 `generateMockup` 只回第 1 張 mockup（白/M 正面），無模特、無多風格，且 Printful CDN URL 進不了 Publish（publish create 過濾 designsBase）。
