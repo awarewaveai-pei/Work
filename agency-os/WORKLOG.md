@@ -2,6 +2,26 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-15
+
+### fix(content-studio): ContentStudio 全部待調整清單（10 項）+ AEO scoring
+
+**[任務理解]** 上一 session 完成熱門搜尋 Perplexity 替換後，使用者要求處理 ContentStudio 完整待調整清單。
+
+**[已修改]**
+- `ContentStudio.tsx`: MetaData 加 `focusKeyword?`；extractMeta 解析 FOCUS_KEYWORD；BulkRow 加 seoTitle?/metaDesc?/focusKeyword?；handleBulkRun 解析+儲存 meta 並 stripSlugHint(stripMeta())；handleBulkPublish 補 seoTitle/metaDescription/focusKeyword/categories/tags；internalLinks filter `/^(https?:\/\/|\/)/`；Internal Links 標籤/placeholder 更新（ILJ 說明）；Brand Voice URL 靜默失敗警示；Bulk 設定 UI 加 wpCategories/wpTags 輸入、generateMeta 開關
+- `generate/route.ts`: internalLinks filter 統一為 `/^(https?:\/\/|\/)/`（消除前端/後端不一致）
+- `rankmath-checker.ts`: 新增 3 個 AEO check（aeo-quick-answer 含 zh alias/aeo-subquery-coverage/aeo-date-signal）
+- `SeoCheckPanel.tsx`: 新增 AEO/GEO 分類群組
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~30000 (no errors)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/1n — 修正：aeo-quick-answer 加中文 alias；server internalLinks filter 對齊；bulk stripSlugHint；bulk generateMeta checkbox
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=handleBulkPublish,extractMeta,aeo-quick-answer,BulkRow | hits=0
+
+**[剩餘風險]** aeo-subquery-coverage 計數包含結構性 H2（非純子主題）；可接受（標示明確）。
+**[rollback]** git revert 上述 checkpoint commits。
+
 ## 2026-06-14
 
 ### feat(postiz): 自架社群發佈 Postiz 上線 EU（Task 1 / 社群整合計畫）
