@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { APPAREL_PRINT_DESTINATIONS } from "@/lib/studio/apparel-print-destinations";
 
 interface DesignAsset {
   id: string;
@@ -362,6 +363,20 @@ export default function PublishWizard() {
           ) : null}
           {upscale.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{upscale.error}</span> : null}
         </div>
+
+        {/* Phase 3: two fulfilment routes for the same faithful print file */}
+        {upscale.printFileUrl ? (
+          <div style={{ fontSize: 11, opacity: 0.85, paddingLeft: 26, display: "flex", flexDirection: "column", gap: 3 }}>
+            <span>🌎 {APPAREL_PRINT_DESTINATIONS.printful.note}</span>
+            <span>
+              🇹🇼 {APPAREL_PRINT_DESTINATIONS["tw-local"].note}{" "}
+              <a href={upscale.printFileUrl} download target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>
+                下載台灣印刷檔 ↧
+              </a>
+              {upscale.faithful ? "" : "（注意：目前是 AI 增強檔，非 100% 忠實）"}
+            </span>
+          </div>
+        ) : null}
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <span>{pill(productImg.state)}</span>

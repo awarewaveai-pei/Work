@@ -4,6 +4,25 @@
 
 ## 2026-06-15
 
+### feat(vector-editor): 嵌入向量設計工具到 /tools/vector-editor（app.aware-wave.com）
+
+**[任務理解]** 使用者把獨立做好的免費向量設計工具（原 `D:\tmp` 單檔 HTML，14 積木）上線到 app.aware-wave.com。前端嵌入 + AI 去背重用既有 Replicate API，不新增 prod 服務/容器（最小爆炸半徑）。
+
+**[現況分析]** next-admin = Next.js 15 App Router，SG VPS docker-compose，middleware Supabase 全站登入保護。既有 `/tools/*` 頁面慣例 + 既有 `/api/tools/studio/remove-bg`（Replicate 去背，需 `POD_DESIGNS_ENABLED`+角色）。git log 確認並行 session 改 canvas（09b81ee4）+ product-copy.ts，無衝突（只動新檔 + 隔離編輯，commit 不含 product-copy.ts）。
+
+**[已修改]**
+- `apps/next-admin/public/vector-editor.html`（新）— 自包含 Fabric.js 編輯器 14 積木；積木 8「AI 去背」改打 `/api/tools/studio/remove-bg`（JSON `{image:dataUrl}`→`{ok,image}`），移除本機 rembg 依賴
+- `apps/next-admin/app/tools/vector-editor/page.tsx`（新）— 登入保護頁，iframe 載入 html，進 Content Tools 側欄
+- `apps/next-admin/middleware.ts` — matcher 白名單加 `vector-editor.html`（沿用 tarot-frames 慣例）讓靜態檔可載，受保護路由不受影響
+- `apps/next-admin/app/layout.tsx` — 側欄 Vector Editor 連結
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm run build` | exit=0 | ms=90000 | /tools/vector-editor 路由 build 出（○ static）、middleware 編譯 144kB
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=Claude Preview MCP 瀏覽器實跑 14 積木逐一 eval 驗證 | exit=0 | ms=0 | 全通過 0 console error（過程抓修：字型 flex 壓縮空白、解散 O(N²) 卡死、Mockup 抓整張畫布、文字沿路徑矩陣快取）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/1m（middleware regex `.` 未跳脫，與既有白名單同慣例、無實際攻擊面，非阻擋）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`vector-editor` | hits=0 stale（唯一命中為本次新增的 3 個 next-admin 檔，無跨檔過期引用）
+
 ### feat(pod): 服飾 POD Phase 4 — AI 商品文案產生器（SEO/GEO/AEO/RankMath 合規）
 
 **[任務理解]** 使用者要 POD 商品文案 AI 撰寫，且須符合 SEO/GEO/AEO/RankMath。`/tools/content` 是部落格 SEO 長文管線（2,500 字、需 4+ H2/外連），不適合商品短描述 → 做專屬商品文案產生器。

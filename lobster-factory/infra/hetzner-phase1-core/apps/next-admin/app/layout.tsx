@@ -93,6 +93,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/tools/canvas" className="sidebar-link" title="快速編輯 Canvas：上傳圖案 + 加文字 + 拖曳/縮放/旋轉，即時預覽 → 下載 PNG 或存入 My Designs（Fabric.js）">
                   <span className="sidebar-icon">🎨</span> Canvas Editor
                 </Link>
+                <Link href="/tools/vector-editor" className="sidebar-link" title="向量設計工具：影像描圖向量化 + 字型庫 + QR/條碼 + 環形文字/文字沿路徑 + 去白底/AI去背 + Mockup + 出血裁切 + 批次匯出（14 積木）">
+                  <span className="sidebar-icon">✒</span> Vector Editor
+                </Link>
                 <Link href="/tools/designs" className="sidebar-link" title="已儲存設計庫（R2 持久化），可重用/下載">
                   <span className="sidebar-icon">🗂</span> My Designs
                 </Link>
