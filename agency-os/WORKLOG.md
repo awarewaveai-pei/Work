@@ -4,6 +4,30 @@
 
 ## 2026-06-15
 
+### feat(pod): 服飾 POD Phase 4 — AI 商品文案產生器（SEO/GEO/AEO/RankMath 合規）
+
+**[任務理解]** 使用者要 POD 商品文案 AI 撰寫，且須符合 SEO/GEO/AEO/RankMath。`/tools/content` 是部落格 SEO 長文管線（2,500 字、需 4+ H2/外連），不適合商品短描述 → 做專屬商品文案產生器。
+
+**[現況分析（VBC live 查證）]** wp-bridge `ProductCreator.applySeo`（commit 1091884d v0.9.0，2026-06-10）payload `seo:{focus_keyword,title,description}` → 寫 `rank_math_*` post meta。**live health 端點確認 soulfulexpression.org 現跑 v0.9.0、crypto_ready:true** → seo 欄位真的會寫進線上商品 RankMath meta，非過時假設。`checkRankMath()`（lib/seo）可複用。`@anthropic-ai/sdk` + ANTHROPIC_API_KEY 已在 SG。
+
+**[已修改]**
+- `lib/studio/product-copy.ts`（新）— `generateProductCopy`：Claude（ANTHROPIC_MODEL??claude-sonnet-4-6）+ system prompt 編碼 RankMath+GEO(answer capsule)+AEO 商品規則 → JSON{productTitle,focusKeyword,metaTitle,metaDescription,shortDescriptionHtml,bullets}。`extractJson`(去 fence+slice)、`clampLen`(metaTitle≤60/metaDesc≤156 詞界裁切，**因 LLM 不守長度限制——REALTEST 實得 81/163**)、`sanitizeProductHtml`(allowlist p/ul/li/strong、strip 全屬性+script/style，**不依賴下游 kses**)、bullets `plainText` 去標籤。RankMath 自評只算**商品適用子集**(去 word-count/links/multi-H2/date 等部落格專屬，避免誤評低分)。never throws。
+- `lib/studio/pod-product.ts` — PodProductParams +`bullets?`+`seo?`；payload 用 AI bullets 組 icon_list + short_description fallback；有 seo 才加 seo block。
+- `app/api/tools/publish/route.ts` — 新 `action:"copy"`(gate 同其他)→ generateProductCopy + 友善錯誤；`create` 傳 bullets+seo 給 buildPodProductPayload。
+- `app/tools/publish/PublishWizard.tsx` — 焦點關鍵字輸入 + 「AI 生成 SEO 文案」鈕(runCopy)→ 標題空才填、顯示 RankMath 等級；runCreate 帶 shortDescription/bullets/seo。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=live Anthropic messages API（我的真實 system prompt + lotus mandala brief） | exit=0 | 6 key 全齊、焦點字在 productTitle+metaTitle、shortDesc `<p>` answer-capsule 開頭、6 bullets；抓到 metaTitle=81/metaDesc=163 超限 → clampLen 修
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node`（TEMP 隔離）clampLen+extractJson+sanitizer | exit=0 | clamp 81→59/163→154 保焦點字無尾標點；extractJson raw/fenced/prose 皆過；**sanitizer 擋下 onclick/script/img+onerror/anchor/style 全部 XSS payload（ALL_SAFE:true）**、保留 p/ul/li/strong、tag 小寫化
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=`curl wp-bridge health` | exit=0 | live=v0.9.0 crypto_ready:true（seo 欄位部署確認）
+- REVIEW_DONE: critic=Deep | verdict=Medium→pass-after-fix | findings=0c/2M/3m → 2 Major(LLM HTML→short_description 無逸出、僅靠 wp-bridge user-0 kses 隱性保護)已在 TS server 邊界修(sanitizeProductHtml allowlist + bullets plainText，送進 bridge 即乾淨)；Suggestion(部落格 RankMath 誤評商品)修為商品適用子集評分 + slug 改用 focusKeyword
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`generateProductCopy\|sanitizeProductHtml\|PRODUCT_RELEVANT_CHECKS\|runCopy\|focusKeywordHint` | hits=0 stale（唯一符號僅本 3 檔；sync-claude-userlevel.ps1 命中為 loose `action.*copy` 通用詞非本符號）
+
+**[剩餘風險]** ① 尚未 sg-deploy ② **wp-bridge PHP 端 defense-in-depth 待補**（`ProductCreator` short_description 應加 `wp_kses_post`、`BlockLibrary::iconList` 應 `esc_html` — 屬另一 repo release；現有 WP kses 預設 + 本次 TS sanitize 雙重保護，故非當前漏洞，列為 wp-bridge 後續強化）③ `copy` action 為計費 LLM 呼叫，僅 role gate 無 rate-limit（內部 ops 用戶，blast=成本非資料，後續可加 cap）。
+
+**[rollback]** flag(`POD_DESIGNS_ENABLED`)後；`git revert`；product-copy.ts 可整檔刪；pod-product/route 的 seo+bullets 為新增選用欄位，移除不影響原 create 路徑。
+
 ### feat(canvas): PS 目錄剩餘 4 項 — 生成填色/擴圖/Posterize/圖層改名群組/設計檔存載
 
 **[任務理解]** 接續 Canvas 編輯器 PS 功能目錄，把最後一批做完：生成填色+擴圖（Replicate）、Posterize（色調分離）、圖層改名/群組、可再編輯存檔。全部積木化讓其他 AI 可用。

@@ -84,6 +84,59 @@ function asString(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+/**
+ * Clamp to a hard char limit at a word boundary. RankMath fails the SEO-title test
+ * above 60 chars and the meta-description test above ~160 — and the LLM does NOT reliably
+ * obey those limits (REALTEST 2026-06-15: it returned an 81-char title, 163-char desc).
+ * So we enforce deterministically in code, never trusting the model for a hard constraint.
+ * The focus keyword sits at the FRONT of both fields, so trimming the tail keeps it.
+ */
+function clampLen(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s.,;:|–-]+$/, "").trim();
+}
+
+/**
+ * Sanitise the model's short-description HTML at the trust boundary (this server runtime).
+ * The LLM output is UNTRUSTED — never rely on the prompt's tag restriction, nor on
+ * WordPress kses-by-default downstream (critic 2026-06-15: that protection is implicit and
+ * could vanish if the bridge ever authenticates a WP user). Keep only <p><ul><li><strong>,
+ * strip ALL attributes (kills onerror=/onclick=), and drop <script>/<style> blocks entirely.
+ */
+const ALLOWED_HTML_TAGS = new Set(["p", "ul", "li", "strong", "/p", "/ul", "/li", "/strong"]);
+function sanitizeProductHtml(html: string): string {
+  return html
+    .replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, "")
+    .replace(/<\s*(\/?)\s*([a-zA-Z0-9]+)\b[^>]*>/g, (_m, slash: string, tag: string) =>
+      ALLOWED_HTML_TAGS.has(`${slash}${tag.toLowerCase()}`) ? `<${slash}${tag.toLowerCase()}>` : "",
+    )
+    .trim();
+}
+
+/** Bullets must be plain text — strip any markup the model slipped in. */
+function plainText(s: string): string {
+  return s.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+// RankMath checks that actually apply to a short PRODUCT page. The checker is tuned for
+// 600+ word blog posts, so blog-only checks (word count, external/internal links, multi-H2
+// AEO coverage, article date) would cap any product at "red" regardless of copy quality —
+// a misleading grade. We score the product-relevant subset instead (critic 2026-06-15).
+const PRODUCT_RELEVANT_CHECKS = new Set([
+  "kw-in-title",
+  "kw-in-meta",
+  "kw-in-slug",
+  "kw-in-intro",
+  "kw-density",
+  "para-length",
+  "title-length",
+  "meta-length",
+  "slug-length",
+  "aeo-quick-answer",
+]);
+
 /** Generate SEO/GEO/AEO/RankMath product copy. Never throws — returns ok:false on failure. */
 export async function generateProductCopy(input: ProductCopyInput): Promise<ProductCopyResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -128,14 +181,16 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
   }
 
   const bullets = Array.isArray(parsed.bullets)
-    ? parsed.bullets.map(asString).filter((b) => b.length > 0).slice(0, 8)
+    ? parsed.bullets.map((b) => plainText(asString(b))).filter((b) => b.length > 0).slice(0, 8)
     : [];
   const copy: ProductCopy = {
     productTitle: asString(parsed.productTitle),
     focusKeyword: asString(parsed.focusKeyword),
-    metaTitle: asString(parsed.metaTitle),
-    metaDescription: asString(parsed.metaDescription),
-    shortDescriptionHtml: asString(parsed.shortDescriptionHtml),
+    // Hard SEO limits enforced in code — the LLM does not obey them reliably (see clampLen).
+    metaTitle: clampLen(asString(parsed.metaTitle), 60),
+    metaDescription: clampLen(asString(parsed.metaDescription), 156),
+    // Untrusted LLM HTML — sanitise at this boundary, not downstream (see sanitizeProductHtml).
+    shortDescriptionHtml: sanitizeProductHtml(asString(parsed.shortDescriptionHtml)),
     bullets,
   };
   if (!copy.productTitle || !copy.shortDescriptionHtml || !copy.focusKeyword) {
@@ -149,14 +204,23 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
     copy.shortDescriptionHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
     ...copy.bullets.map((b) => `- ${b}`),
   ].join("\n\n");
-  const rankMath = checkRankMath({
+  const full = checkRankMath({
     markdown,
     focusKeyword: copy.focusKeyword,
     seoTitle: copy.metaTitle,
     metaDescription: copy.metaDescription,
-    slug: copy.productTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
+    // Seed the slug from the focus keyword (truthful kw-in-slug score; Woo derives the real slug).
+    slug: copy.focusKeyword.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
     siteDomain: input.siteDomain,
   });
+  // Score only the product-relevant subset — the full checker is blog-tuned and would
+  // report a misleadingly low grade for a (correctly) short product page.
+  const checks = full.checks.filter((c) => PRODUCT_RELEVANT_CHECKS.has(c.id));
+  const passed = checks.filter((c) => c.pass).length;
+  const total = checks.length || 1;
+  const score = Math.round((passed / total) * 100);
+  const grade: RankMathReport["grade"] = score >= 81 ? "green" : score >= 51 ? "orange" : "red";
+  const rankMath: RankMathReport = { score, grade, checks, passed, total };
 
   return { ok: true, copy, rankMath };
 }
