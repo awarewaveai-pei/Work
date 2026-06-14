@@ -80,6 +80,12 @@ export default function CanvasEditor() {
   const [noisev, setNoisev] = useState(0); // 雜訊 0..100
   const [temp, setTemp] = useState(0); // 色溫 -100(冷)..100(暖)
   const [layers, setLayers] = useState<FabricObject[]>([]); // 圖層面板 (top layer first)
+  // ↩️ Undo/Redo — JSON snapshots of the canvas.
+  const undoStack = useRef<string[]>([]);
+  const redoStack = useRef<string[]>([]);
+  const restoringRef = useRef(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   // 畫布尺寸 / DPI（公分↔像素；參考 vector-trace-demo）
   const [szW, setSzW] = useState(9);
   const [szH, setSzH] = useState(5.4);
@@ -173,10 +179,15 @@ export default function CanvasEditor() {
         setLockSelected(false);
       });
       // 🗂 keep the layer panel in sync with the object stack.
-      const onStack = () => setLayers([...canvas.getObjects()].reverse());
+      const onStack = () => {
+        setLayers([...canvas.getObjects()].reverse());
+        snapshot(); // record an undo step on add/remove/modify
+      };
       canvas.on("object:added", onStack);
       canvas.on("object:removed", onStack);
-      onStack();
+      canvas.on("object:modified", onStack);
+      setLayers([...canvas.getObjects()].reverse());
+      snapshot(); // initial baseline so the first edit is undoable
 
       const source = typeof window !== "undefined" ? sessionStorage.getItem(CANVAS_SOURCE_KEY) : null;
       if (typeof window !== "undefined") {
@@ -384,6 +395,49 @@ export default function CanvasEditor() {
     const c = fabricRef.current;
     if (c) setLayers([...c.getObjects()].reverse());
   }, []);
+
+  // ↩️ Undo/Redo — snapshot canvas JSON after each change; restore on undo/redo.
+  const snapshot = useCallback(() => {
+    if (restoringRef.current) return;
+    const c = fabricRef.current as unknown as { toJSON: () => unknown } | null;
+    if (!c) return;
+    undoStack.current.push(JSON.stringify(c.toJSON()));
+    if (undoStack.current.length > 60) undoStack.current.shift();
+    redoStack.current = [];
+    setCanUndo(undoStack.current.length > 1);
+    setCanRedo(false);
+  }, []);
+  const restore = useCallback(
+    (json: string) => {
+      const c = fabricRef.current as unknown as
+        | { loadFromJSON: (j: unknown, cb: () => void) => void; requestRenderAll: () => void }
+        | null;
+      if (!c) return;
+      restoringRef.current = true;
+      c.loadFromJSON(JSON.parse(json), () => {
+        c.requestRenderAll();
+        restoringRef.current = false;
+        refreshLayers();
+      });
+    },
+    [refreshLayers]
+  );
+  const undo = useCallback(() => {
+    if (undoStack.current.length < 2) return;
+    const cur = undoStack.current.pop();
+    if (cur) redoStack.current.push(cur);
+    restore(undoStack.current[undoStack.current.length - 1]);
+    setCanUndo(undoStack.current.length > 1);
+    setCanRedo(redoStack.current.length > 0);
+  }, [restore]);
+  const redo = useCallback(() => {
+    const next = redoStack.current.pop();
+    if (!next) return;
+    undoStack.current.push(next);
+    restore(next);
+    setCanUndo(undoStack.current.length > 1);
+    setCanRedo(redoStack.current.length > 0);
+  }, [restore]);
   const selectLayer = useCallback((o: FabricObject) => {
     const c = fabricRef.current;
     if (!c) return;
@@ -842,6 +896,8 @@ export default function CanvasEditor() {
       </p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <button className="btn-secondary" disabled={!ready || !canUndo} onClick={undo} title="復原 (Undo)">↩️</button>
+        <button className="btn-secondary" disabled={!ready || !canRedo} onClick={redo} title="重做 (Redo)">↪️</button>
         <button className="btn-secondary" disabled={!ready} onClick={addText}>＋ 文字</button>
         <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }}>
           ＋ 上傳圖案
