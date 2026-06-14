@@ -1,9 +1,15 @@
 /**
  * Printful Mockup Generator — uploads design to R2, then composites it onto
- * a product photo via the Printful Mockup Generator API.
+ * product photos via the Printful Mockup Generator API.
  *
  * Flow: base64 dataURL → R2 upload (public URL) → Printful mockup-generator
- *       → poll until completed → return mockup_url (CDN JPEG)
+ *       → poll until completed → return ALL mockup styles (Printful CDN JPEGs).
+ *
+ * Every mockup is FAITHFUL: Printful places the artist's real uploaded file onto a
+ * real garment photo — it never reinterprets the design (unlike AI redraw). The
+ * styles come back via the task's `extra[]` array. We request the lifestyle/model
+ * groups explicitly so real-model shots are included (live-verified 2026-06-15:
+ * option_groups ["Men's Lifestyle", …] → extra[] gains "Men's Lifestyle / Front|Back").
  *
  * Requires: PRINTFUL_API_KEY, PRINTFUL_STORE_ID, R2_* (existing designs bucket).
  * The Printful Mockup API needs a publicly reachable URL; R2 is the same bucket
@@ -39,9 +45,43 @@ const PRODUCT_CONFIG = {
 
 type ProductType = keyof typeof PRODUCT_CONFIG;
 
+// Mockup style groups to request. Printful returns whatever's valid for the product
+// and silently ignores unknown groups (live-verified 2026-06-15). "Flat"/"Ghost" are
+// clean product shots; the "*Lifestyle"/"Couple's"/"Kids" groups are real-model photos.
+const MOCKUP_OPTION_GROUPS = [
+  "Flat",
+  "Ghost",
+  "Men's Lifestyle",
+  "Women's Lifestyle",
+  "Couple's",
+  "Kids",
+  "Lifestyle",
+];
+
+/** One generated mockup view. `url` is a Printful CDN JPEG; every one is faithful. */
+export interface MockupView {
+  url: string;
+  /** e.g. "Men's Lifestyle · Front" — group + view for the picker. */
+  label: string;
+  group: string;
+  view: string;
+  /** true when this is a real-model lifestyle shot (vs flat/ghost product shot). */
+  lifestyle: boolean;
+}
+
 export type MockupResult =
-  | { ok: true; mockup_url: string }
+  // mockup_url kept for backward-compat (= the first/primary view).
+  | { ok: true; mockup_url: string; mockups: MockupView[] }
   | { ok: false; error: string };
+
+const LIFESTYLE_GROUP_RE = /lifestyle|couple|kids|women|men/i;
+
+/** Order: real-model lifestyle first (hero shots), then flat, then ghost. */
+function rankGroup(group: string): number {
+  if (LIFESTYLE_GROUP_RE.test(group)) return 0;
+  if (/flat/i.test(group)) return 1;
+  return 2;
+}
 
 function sleep(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
@@ -91,6 +131,7 @@ export async function generateMockup(
       },
       body: JSON.stringify({
         variant_ids: [cfg.variant_id],
+        option_groups: MOCKUP_OPTION_GROUPS,
         files: [
           {
             placement: cfg.placement,
@@ -160,10 +201,36 @@ export async function generateMockup(
     const status = result?.status as string | undefined;
 
     if (status === "completed") {
-      const mockups = result?.mockups as Array<Record<string, unknown>> | undefined;
-      const mockupUrl = mockups?.[0]?.mockup_url as string | undefined;
-      if (!mockupUrl) return { ok: false, error: "printful_no_mockup_url" };
-      return { ok: true, mockup_url: mockupUrl };
+      const rawMockups = (result?.mockups as Array<Record<string, unknown>> | undefined) ?? [];
+      const views: MockupView[] = [];
+      const seen = new Set<string>();
+      for (const m of rawMockups) {
+        const primary = m.mockup_url as string | undefined;
+        // The primary url is the default front view; the labelled variants live in extra[].
+        const extra = (m.extra as Array<Record<string, unknown>> | undefined) ?? [];
+        const candidates: { url?: string; group: string; view: string }[] = [
+          ...(primary ? [{ url: primary, group: "Flat", view: "Front" }] : []),
+          ...extra.map((e) => ({
+            url: e.url as string | undefined,
+            group: (e.option_group as string | undefined) ?? "Flat",
+            view: (e.option as string | undefined) ?? (e.title as string | undefined) ?? "",
+          })),
+        ];
+        for (const c of candidates) {
+          if (!c.url || seen.has(c.url)) continue;
+          seen.add(c.url);
+          views.push({
+            url: c.url,
+            group: c.group,
+            view: c.view,
+            label: c.view ? `${c.group} · ${c.view}` : c.group,
+            lifestyle: LIFESTYLE_GROUP_RE.test(c.group),
+          });
+        }
+      }
+      if (views.length === 0) return { ok: false, error: "printful_no_mockup_url" };
+      views.sort((a, b) => rankGroup(a.group) - rankGroup(b.group));
+      return { ok: true, mockup_url: views[0].url, mockups: views };
     }
 
     if (status === "failed") {
