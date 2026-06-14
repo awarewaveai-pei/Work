@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface DesignAsset {
   id: string;
@@ -44,6 +44,9 @@ export default function PublishWizard() {
     error?: string;
   }>({ state: "idle" });
   const [productImg, setProductImg] = useState<{ state: StepState; url?: string; error?: string }>({ state: "idle" });
+  // Latest product-image URL, readable inside the design-change effect without making it a dep.
+  const lastProductUrlRef = useRef<string | null>(null);
+  useEffect(() => { lastProductUrlRef.current = productImg.url ?? null; }, [productImg.url]);
   const [create, setCreate] = useState<{
     state: StepState;
     productId?: number;
@@ -78,6 +81,10 @@ export default function PublishWizard() {
   // Changing the design invalidates everything downstream (stale-print-file trap).
   useEffect(() => {
     setUpscale({ state: "idle" });
+    // Drop the previous design's product image from the picker (it's stale now).
+    const stale = lastProductUrlRef.current;
+    if (stale) setMockupUrls((prev) => prev.filter((u) => u !== stale));
+    lastProductUrlRef.current = null;
     setProductImg({ state: "idle" });
     setCreate({ state: "idle" });
     setSync({ state: "idle" });
