@@ -132,11 +132,17 @@ export default function CanvasEditor() {
           | null;
         if (e) {
           if (typeof e.opacity === "number") setObjOpacity(Math.round(e.opacity * 100));
-          setObjBlend(e.globalCompositeOperation || "normal");
+          // Fabric's default GCO is "source-over"; map it back to the UI's "normal" (critic M1).
+          setObjBlend(
+            e.globalCompositeOperation && e.globalCompositeOperation !== "source-over"
+              ? e.globalCompositeOperation
+              : "normal"
+          );
           setObjShadow(!!e.shadow);
           setObjStroke(!!e.stroke && (e.strokeWidth ?? 0) > 0);
-          if (typeof e.stroke === "string") setObjStrokeColor(e.stroke);
-          if (typeof e.strokeWidth === "number" && e.strokeWidth > 0) setObjStrokeWidth(e.strokeWidth);
+          // Reset to defaults when the new object has no stroke (critic M3 — avoid stale carry-over).
+          setObjStrokeColor(typeof e.stroke === "string" ? e.stroke : "#000000");
+          setObjStrokeWidth(typeof e.strokeWidth === "number" && e.strokeWidth > 0 ? e.strokeWidth : 4);
         }
       };
       canvas.on("selection:created", syncFromSelection);
@@ -267,15 +273,20 @@ export default function CanvasEditor() {
   const toggleShadow = useCallback((on: boolean) => {
     setObjShadow(on);
     const canvas = fabricRef.current;
-    if (!canvas?.getActiveObject()) return;
+    const o = canvas?.getActiveObject() as (FabricObject & { set: (p: Record<string, unknown>) => void }) | null;
+    if (!canvas || !o) return;
     if (!on) {
-      setActiveProp({ shadow: null });
+      o.set({ shadow: null });
+      canvas.requestRenderAll();
       return;
     }
+    // Capture the target object now; if selection moves during the async import, don't mis-apply (critic M2).
     void import("fabric").then((fabric) => {
-      setActiveProp({ shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.45)", blur: 16, offsetX: 6, offsetY: 6 }) });
+      if (fabricRef.current !== canvas || canvas.getActiveObject() !== o) return;
+      o.set({ shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.45)", blur: 16, offsetX: 6, offsetY: 6 }) });
+      canvas.requestRenderAll();
     });
-  }, [setActiveProp]);
+  }, []);
 
   const toggleStroke = useCallback((on: boolean) => {
     setObjStroke(on);

@@ -3,7 +3,8 @@
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-06-14
-n### AUTO_TASK_DONE: Trigger workflows deploy — dispatch-action-run + dispatch-action-run-schedule — v20260614.1
+
+### AUTO_TASK_DONE: Trigger workflows deploy — dispatch-action-run + dispatch-action-run-schedule — v20260614.1
 
 **Deploy result**: version `20260614.1` deployed to `trigger.aware-wave.com` (proj `proj_6c4f24492a705729fc2c`)
 - All milestones passed: Vault secrets loaded / SERVICE_ROLE_KEY obtained / buildImage.js patched / Deploy succeeded
