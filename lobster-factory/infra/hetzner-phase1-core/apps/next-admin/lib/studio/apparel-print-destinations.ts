@@ -4,7 +4,7 @@
  *
  * Two fulfilment routes for the same design, decided by the artist (2026-06-15):
  *   - printful   : international fulfilment. Printful prints from the file linked in the
- *                  publish chain; PNG, its mockup/printfile area is 12×16 in @ up to 300 DPI.
+ *                  publish chain; PNG, its printfile area is 12×16 in (16 in = long edge) @ up to 300 DPI.
  *   - tw-local   : Taiwan local print shop (DTG / screen / heat-transfer). The artist
  *                  downloads a print-ready file and sends it to the shop herself.
  *

@@ -4,6 +4,26 @@
 
 ## 2026-06-15
 
+### feat(pod): 服飾 POD Phase 3 — 台灣本地印刷檔目的地 seam（業界預設）
+
+**[任務理解]** 使用者要服飾「也要台灣本地印刷」（雙履約：Printful 國際 + 台灣本地 DTG/絹印）。台灣印刷廠檔案規格未知 → 用 DTG 業界預設做可設定 seam，拿到實際規格再填。
+
+**[現況分析]** Phase 1 的 `buildFaithfulPrintFile`（resample 模式）已能產 4800px 忠實 PNG，sharp PNG 重編碼保留 alpha（去背後即透明底）。故 TW 本地印刷檔 = 既有引擎產物，Phase 3 只需宣告目的地規格 + UI surface，不重造引擎。
+
+**[已修改]**
+- `lib/studio/apparel-print-destinations.ts`（新，純資料 SSOT，零 import，client-safe）— `APPAREL_PRINT_DESTINATIONS`：`printful`（auto-link 國際履約）+ `tw-local`（download 台灣本地，業界預設透明底 PNG/300DPI/4800px）。拿到廠商規格後改此檔。
+- `app/tools/publish/PublishWizard.tsx` — 印刷檔產生後顯示兩條履約指引；台灣印刷檔提供「開啟（右鍵另存）」連結（critic：R2 跨來源 download attr 無效，改開分頁另存）；AI 增強檔加非忠實提醒。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REALTEST_WAIVED: SMOKE_COVERED -- 印刷檔產物本身為 Phase 1 已 REALTEST 過的 buildFaithfulPrintFile（resample 4800px PNG）；本 phase 僅新增純資料目的地 + UI 文字/連結，無新執行邏輯
+- REVIEW_DONE: critic=Deep | verdict=Low/pass | findings=0c/0M/1m → 跨來源 download attr cosmetic（已改「開啟（右鍵另存）」+ 移除 download attr）；資料模組型別一致、JSX guarded/auto-escaped 全 clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`APPAREL_PRINT_DESTINATIONS\|apparel-print-destinations\|ApparelPrintDestination` | hits=0 stale（僅本 2 檔：定義 + 唯一消費者 PublishWizard）
+
+**[剩餘風險]** ① 台灣印刷廠**實際規格未確認** → 目前用 DTG 業界預設（透明底 PNG/300DPI/4800px）；拿到廠商規格須更新 `apparel-print-destinations.ts`（SSOT）② 透明底需使用者先在 Studio 去背 ③ 尚未 sg-deploy。
+
+**[rollback]** flag(`POD_DESIGNS_ENABLED`)後；刪 apparel-print-destinations.ts（純新增）；移除 PublishWizard 的指引 block 不影響上架邏輯。
+
 ### feat(vector-editor): 嵌入向量設計工具到 /tools/vector-editor（app.aware-wave.com）
 
 **[任務理解]** 使用者把獨立做好的免費向量設計工具（原 `D:\tmp` 單檔 HTML，14 積木）上線到 app.aware-wave.com。前端嵌入 + AI 去背重用既有 Replicate API，不新增 prod 服務/容器（最小爆炸半徑）。

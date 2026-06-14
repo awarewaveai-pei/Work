@@ -370,8 +370,9 @@ export default function PublishWizard() {
             <span>🌎 {APPAREL_PRINT_DESTINATIONS.printful.note}</span>
             <span>
               🇹🇼 {APPAREL_PRINT_DESTINATIONS["tw-local"].note}{" "}
-              <a href={upscale.printFileUrl} download target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>
-                下載台灣印刷檔 ↧
+              {/* R2 is cross-origin → the download attr is ignored by browsers; open in a tab and 另存 instead. */}
+              <a href={upscale.printFileUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>
+                開啟台灣印刷檔（右鍵另存）↗
               </a>
               {upscale.faithful ? "" : "（注意：目前是 AI 增強檔，非 100% 忠實）"}
             </span>
