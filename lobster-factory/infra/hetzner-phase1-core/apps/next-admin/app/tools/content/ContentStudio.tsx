@@ -178,6 +178,8 @@ interface GenerateForm {
   media: MediaHub;
   generateMeta: boolean;
   scheduleDate: string;
+  wpCategories: string;
+  wpTags: string;
 }
 
 interface MetaData { seoTitle: string; metaDesc: string; }
@@ -257,6 +259,7 @@ const DEFAULT_FORM: GenerateForm = {
   introHookBrief: "", introHookType: "",
   media: { ...DEFAULT_MEDIA },
   generateMeta: true, scheduleDate: "",
+  wpCategories: "", wpTags: "",
 };
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -391,6 +394,7 @@ export default function ContentStudio() {
     introHookBrief: "", introHookType: "",
     media: { ...DEFAULT_MEDIA },
     generateMeta: false,
+    wpCategories: "", wpTags: "",
   });
 
   // Abort refs
@@ -688,7 +692,17 @@ export default function ContentStudio() {
     try {
       const res  = await fetch("/api/content/publish", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown: generated, slug: slugHint || slugify(form.keyword), seoTitle: metaData?.seoTitle, metaDescription: metaData?.metaDesc, focusKeyword: form.keyword, scheduleDate: form.scheduleDate || undefined, siteId: selectedSiteId || undefined }),
+        body: JSON.stringify({
+          markdown: generated,
+          slug: slugHint || slugify(form.keyword),
+          seoTitle: metaData?.seoTitle,
+          metaDescription: metaData?.metaDesc,
+          focusKeyword: form.keyword,
+          scheduleDate: form.scheduleDate || undefined,
+          siteId: selectedSiteId || undefined,
+          categories: form.wpCategories ? form.wpCategories.split(",").map(s => s.trim()).filter(Boolean) : undefined,
+          tags: form.wpTags ? form.wpTags.split(",").map(s => s.trim()).filter(Boolean) : undefined,
+        }),
       });
       const json = await res.json() as { ok: boolean; error?: string; edit_url?: string; view_url?: string };
       if (!json.ok) { setPubStatus("error"); setPubError(json.error ?? "未知錯誤"); }
@@ -1470,6 +1484,20 @@ export default function ContentStudio() {
                   )}
                 </div>
                 <div className="form-hint" style={{ marginTop: 4 }}>狀態保持「草稿」，需從 WP 後台手動發布。</div>
+              </div>
+              <div style={{ flex: 1, minWidth: "160px" }}>
+                <label className="form-label">分類（逗號分隔）</label>
+                <input className="form-input" style={{ width: "100%" }}
+                  value={form.wpCategories} onChange={e => setF("wpCategories", e.target.value)}
+                  placeholder="芳療, DIY 保養, 精油教學" disabled={isGenerating} />
+                <div className="form-hint" style={{ marginTop: 4 }}>不存在的分類會自動建立。</div>
+              </div>
+              <div style={{ flex: 1, minWidth: "160px" }}>
+                <label className="form-label">標籤（逗號分隔）</label>
+                <input className="form-input" style={{ width: "100%" }}
+                  value={form.wpTags} onChange={e => setF("wpTags", e.target.value)}
+                  placeholder="檸檬精油, 精油配方, 天然保養" disabled={isGenerating} />
+                <div className="form-hint" style={{ marginTop: 4 }}>不存在的標籤會自動建立。</div>
               </div>
             </div>
           </div>

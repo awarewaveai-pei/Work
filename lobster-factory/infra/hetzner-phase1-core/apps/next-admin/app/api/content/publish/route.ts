@@ -35,7 +35,8 @@ function inline(s: string): string {
     .replace(/`([^`]+)`/g, (_m, c) => `<code>${c}</code>`)
     .replace(/\*\*([^*]+)\*\*/g, (_m, c) => `<strong>${c}</strong>`)
     .replace(/\*([^*]+)\*/g, (_m, c) => `<em>${c}</em>`)
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text, url) =>
+    // Links only — negative lookbehind so image syntax ![ is not treated as a link
+    .replace(/(?<!!)\[([^\]]+)\]\(([^)]+)\)/g, (_m, text, url) =>
       `<a href="${safeUrl(url)}">${text}</a>`
     );
 }
@@ -103,6 +104,17 @@ function markdownToHtml(md: string): string {
       continue;
     }
 
+    // Standalone images (full-line image syntax)
+    const imgMatch = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imgMatch) {
+      const [, alt, url] = imgMatch;
+      const safeImgUrl = /^https?:\/\//.test(url.trim()) ? escapeHtml(url.trim()) : "";
+      if (safeImgUrl) {
+        out.push(`<figure><img src="${safeImgUrl}" alt="${escapeHtml(alt)}" style="max-width:100%;height:auto;" /></figure>`);
+      }
+      continue;
+    }
+
     // HTML comments — only pure comment lines (NEEDS_BRAND_VERIFY etc.)
     if (/^<!--.*-->$/.test(line.trim())) { out.push(line.trim()); continue; }
 
@@ -131,6 +143,43 @@ function slugify(text: string): string {
     .slice(0, 60);
 }
 
+/** Resolve WP term names → IDs; creates missing terms. Returns empty array on auth/network errors. */
+async function resolveTermIds(
+  names: string[],
+  taxonomy: "categories" | "tags",
+  authHeader: string,
+  base: string,
+): Promise<number[]> {
+  const ids: number[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    if (!name) continue;
+    try {
+      // Search for existing term first
+      const searchRes = await fetch(
+        `${base}/wp-json/wp/v2/${taxonomy}?search=${encodeURIComponent(name)}&per_page=10`,
+        { headers: { Authorization: authHeader } },
+      );
+      if (searchRes.ok) {
+        const terms = await searchRes.json() as Array<{ id: number; name: string }>;
+        const match = terms.find(t => t.name.toLowerCase() === name.toLowerCase());
+        if (match) { ids.push(match.id); continue; }
+      }
+      // Create term
+      const createRes = await fetch(`${base}/wp-json/wp/v2/${taxonomy}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: authHeader },
+        body: JSON.stringify({ name }),
+      });
+      if (createRes.ok) {
+        const term = await createRes.json() as { id?: number };
+        if (term.id) ids.push(term.id);
+      }
+    } catch { /* skip this term */ }
+  }
+  return ids;
+}
+
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
@@ -144,6 +193,7 @@ export async function POST(req: Request): Promise<Response> {
     metaDescription?: unknown;
     focusKeyword?: unknown;
     categories?: unknown;
+    tags?: unknown;
     scheduleDate?: unknown;
     siteId?: unknown;
   };
@@ -201,8 +251,19 @@ export async function POST(req: Request): Promise<Response> {
     status: "draft",
   };
 
-  if (Array.isArray(body.categories) && body.categories.length > 0) {
-    payload.categories = body.categories.filter(c => Number.isInteger(c));
+  // Resolve category + tag names → WP term IDs
+  const authHdr = wpAuthHeader(wpUsername, wpToken);
+  const catNames = (Array.isArray(body.categories) ? body.categories : [])
+    .map(c => String(c).trim()).filter(Boolean);
+  const tagNames = (Array.isArray(body.tags) ? body.tags : [])
+    .map(t => String(t).trim()).filter(Boolean);
+  if (catNames.length > 0) {
+    const catIds = await resolveTermIds(catNames, "categories", authHdr, base);
+    if (catIds.length > 0) payload.categories = catIds;
+  }
+  if (tagNames.length > 0) {
+    const tagIds = await resolveTermIds(tagNames, "tags", authHdr, base);
+    if (tagIds.length > 0) payload.tags = tagIds;
   }
 
   if (typeof body.scheduleDate === "string" && body.scheduleDate.trim()) {
@@ -230,7 +291,7 @@ export async function POST(req: Request): Promise<Response> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: wpAuthHeader(wpUsername, wpToken),
+        Authorization: authHdr,
       },
       body: JSON.stringify(payload),
     });
