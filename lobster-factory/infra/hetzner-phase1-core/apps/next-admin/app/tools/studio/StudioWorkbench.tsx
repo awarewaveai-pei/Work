@@ -11,6 +11,8 @@ import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import { bakeCssFilter } from "@/components/tools/bake-css-filter";
 import GradedPreview, { type GradedPreviewHandle } from "@/components/tools/GradedPreview";
 import { buildSemanticFilename, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
+// type-only import — printful-mockup is server-side (sharp/r2); erased from the client bundle.
+import type { MockupView } from "@/lib/studio/printful-mockup";
 
 /** Product types steer the prompt suffix + default aspect ratio (print canvas comes later, P-print). */
 const PRODUCT_TYPES = [
@@ -87,7 +89,9 @@ export default function StudioWorkbench() {
   const [bgState, setBgState] = useState<"idle" | "removing" | "done" | "error">("idle");
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [mockupState, setMockupState] = useState<"idle" | "generating" | "done" | "error">("idle");
-  const [mockupUrl, setMockupUrl] = useState<string | null>(null);
+  // All Printful mockup styles (flat / ghost / real-model lifestyle) — every one faithful.
+  const [mockups, setMockups] = useState<MockupView[]>([]);
+  const [savedMockups, setSavedMockups] = useState<Record<string, "saving" | "saved" | "error">>({});
   const bgInFlight = useRef(false); // state lags a render — ref blocks same-tick double-click
   const mockupInFlight = useRef(false);
   const grade = useColorGrade(); // 修圖積木：色彩/色階/銳利度
@@ -216,7 +220,8 @@ export default function StudioWorkbench() {
     setBgState("idle");
     setSaveState("idle");
     setMockupState("idle");
-    setMockupUrl(null);
+    setMockups([]);
+    setSavedMockups({});
   }, [originalImage]);
 
   const generateMockupFromDesign = useCallback(async () => {
@@ -230,12 +235,12 @@ export default function StudioWorkbench() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: gen.image, productType }),
       });
-      const json = (await res.json()) as { ok: boolean; mockup_url?: string; error?: string };
-      if (!json.ok || !json.mockup_url) {
+      const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
+      if (!json.ok || !json.mockups || json.mockups.length === 0) {
         setMockupState("error");
         return;
       }
-      setMockupUrl(json.mockup_url);
+      setMockups(json.mockups);
       setMockupState("done");
     } catch {
       setMockupState("error");
@@ -243,6 +248,32 @@ export default function StudioWorkbench() {
       mockupInFlight.current = false;
     }
   }, [gen, productType]);
+
+  // Persist one Printful mockup (temporary CDN URL) into My Designs so it can be used
+  // as a Woo product image in the Publish wizard. Server fetches the allowlisted CDN URL.
+  const saveMockupToDesigns = useCallback(async (m: MockupView) => {
+    if (savedMockups[m.url] === "saving" || savedMockups[m.url] === "saved") return;
+    setSavedMockups((prev) => ({ ...prev, [m.url]: "saving" }));
+    try {
+      const res = await fetch("/api/tools/designs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceUrl: m.url,
+          prompt: effectivePrompt,
+          modelName: model,
+          source: "printful-mockup",
+          productType: productType !== "none" ? productType : undefined,
+          subject: m.label,
+          styleTags: [m.group],
+        }),
+      });
+      const json = (await res.json()) as { ok: boolean; error?: string };
+      setSavedMockups((prev) => ({ ...prev, [m.url]: json.ok ? "saved" : "error" }));
+    } catch {
+      setSavedMockups((prev) => ({ ...prev, [m.url]: "error" }));
+    }
+  }, [savedMockups, effectivePrompt, model, productType]);
 
   const saveToDesigns = useCallback(async () => {
     if (gen.status !== "done" || !gen.image) return;
@@ -419,7 +450,7 @@ export default function StudioWorkbench() {
                     disabled={mockupState === "generating" || mockupState === "done"}
                     onClick={() => void generateMockupFromDesign()}
                   >
-                    {mockupState === "done" ? "產品預覽 ✓" : mockupState === "generating" ? "生成 Mockup…" : "產品 Mockup"}
+                    {mockupState === "done" ? "產品預覽 ✓" : mockupState === "generating" ? "生成 Mockup…" : "產品 Mockup（多風格＋模特）"}
                   </button>
                 ) : null}
                 {mockupState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>Mockup 失敗，請重試</span> : null}
@@ -431,12 +462,39 @@ export default function StudioWorkbench() {
                 {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗（檢查 POD_DESIGNS_ENABLED 與 POD_DESIGNS_DEFAULT_ORG_ID / 伺服器 log）</span> : null}
               </div>
 
-              {/* Printful product mockup preview */}
-              {mockupUrl ? (
+              {/* Printful product mockups — all faithful (real garment + real file); 模特款=真人實拍 */}
+              {mockups.length > 0 ? (
                 <div style={{ marginTop: 14 }}>
-                  <p style={{ fontSize: 13, marginBottom: 6, opacity: 0.7 }}>產品預覽（Printful Mockup）</p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={mockupUrl} alt="product mockup" style={{ maxWidth: 320, borderRadius: 8, border: "1px solid var(--border)" }} />
+                  <p style={{ fontSize: 13, marginBottom: 6, opacity: 0.7 }}>
+                    產品預覽（Printful · 設計 100% 忠實）— 平放/鬼影/真人模特；按「存到我的設計」即可在 Publish 當商品圖
+                  </p>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    {mockups.map((m) => {
+                      const st = savedMockups[m.url];
+                      return (
+                        <div key={m.url} style={{ width: 180 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={m.url}
+                            alt={m.label}
+                            style={{ width: 180, height: 180, objectFit: "contain", background: "#111", borderRadius: 8, border: "1px solid var(--border)" }}
+                          />
+                          <div style={{ fontSize: 11, marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                            {m.lifestyle ? <span title="真人模特">🧍</span> : <span title="產品實拍">👕</span>}
+                            <span style={{ opacity: 0.8 }}>{m.label}</span>
+                          </div>
+                          <button
+                            className="btn-secondary"
+                            style={{ fontSize: 11, marginTop: 3, width: "100%" }}
+                            disabled={st === "saving" || st === "saved"}
+                            onClick={() => void saveMockupToDesigns(m)}
+                          >
+                            {st === "saved" ? "已存 ✓" : st === "saving" ? "儲存中…" : st === "error" ? "重試存圖" : "存到我的設計"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : null}
 

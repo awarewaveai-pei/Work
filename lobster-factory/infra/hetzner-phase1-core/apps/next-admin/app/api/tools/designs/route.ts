@@ -9,7 +9,50 @@ export const maxDuration = 60;
 
 // Same ceiling as the tarot reference-image path (~9 MB of base64).
 const MAX_IMAGE_CHARS = 12_000_000;
+const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const LIST_LIMIT = 60;
+
+// `sourceUrl` lets the client persist a Printful mockup (temporary S3 URL — note the
+// "/tmp/" path, it expires) into My Designs. Allowlist ONLY Printful's mockup CDN hosts
+// (SSRF guard) — verified live 2026-06-15. Never fetch an arbitrary client-supplied URL.
+const PRINTFUL_MOCKUP_HOSTS = new Set([
+  "printful-upload.s3-accelerate.amazonaws.com",
+  "files.cdn.printful.com",
+]);
+const SOURCE_MIME_OK: Record<string, true> = { "image/jpeg": true, "image/png": true, "image/webp": true };
+
+/** Fetch a Printful-CDN mockup into a buffer (SSRF-guarded, size+timeout capped). */
+async function fetchPrintfulMockup(
+  sourceUrl: string,
+): Promise<{ ok: true; mime: string; buffer: Buffer } | { ok: false; status: number; error: string }> {
+  try {
+    const u = new URL(sourceUrl);
+    if (u.protocol !== "https:" || !PRINTFUL_MOCKUP_HOSTS.has(u.host)) {
+      return { ok: false, status: 400, error: "sourceUrl host not allowed (Printful mockup CDN only)" };
+    }
+  } catch {
+    return { ok: false, status: 400, error: "sourceUrl is not a valid URL" };
+  }
+  const controller = new AbortController();
+  const killer = setTimeout(() => controller.abort(), 25_000);
+  try {
+    // redirect:"manual" fails closed — a 3xx cannot bounce off the allowlisted host.
+    const res = await fetch(sourceUrl, { signal: controller.signal, redirect: "manual" });
+    if (!res.ok) return { ok: false, status: 502, error: `source_fetch_failed_${res.status}` };
+    const mime = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    if (!SOURCE_MIME_OK[mime]) return { ok: false, status: 415, error: `unsupported source mime: ${mime || "unknown"}` };
+    if (Number(res.headers.get("content-length") ?? "0") > MAX_SOURCE_BYTES) {
+      return { ok: false, status: 413, error: "source image too large" };
+    }
+    const ab = await res.arrayBuffer();
+    if (ab.byteLength > MAX_SOURCE_BYTES) return { ok: false, status: 413, error: "source image too large" };
+    return { ok: true, mime, buffer: Buffer.from(ab) };
+  } catch {
+    return { ok: false, status: 502, error: controller.signal.aborted ? "source_fetch_timeout" : "source_fetch_network_error" };
+  } finally {
+    clearTimeout(killer);
+  }
+}
 
 function featureEnabled(): boolean {
   return process.env.POD_DESIGNS_ENABLED === "true";
@@ -25,6 +68,8 @@ function isUuid(value: string): boolean {
 
 interface SaveDesignBody {
   image?: string;
+  /** Alternative to `image`: a Printful mockup CDN URL to persist into My Designs. */
+  sourceUrl?: string;
   prompt?: string;
   modelName?: string;
   organizationId?: string;
@@ -76,18 +121,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
-  if (!body.image || typeof body.image !== "string") {
-    return NextResponse.json({ ok: false, error: "image (base64 data URL) is required" }, { status: 400 });
-  }
-  if (body.image.length > MAX_IMAGE_CHARS) {
-    return NextResponse.json({ ok: false, error: "image too large (~9MB limit)" }, { status: 413 });
-  }
-  const parsed = parseImageDataUrl(body.image);
-  if (!parsed) {
-    return NextResponse.json(
-      { ok: false, error: "image must be a png/jpeg/webp base64 data URL" },
-      { status: 400 },
-    );
+  // Two input modes: a base64 data URL (`image`), or a Printful mockup CDN URL (`sourceUrl`).
+  let parsed: { mime: string; buffer: Buffer };
+  if (typeof body.sourceUrl === "string" && body.sourceUrl.length > 0) {
+    const fetched = await fetchPrintfulMockup(body.sourceUrl);
+    if (!fetched.ok) {
+      return NextResponse.json({ ok: false, error: fetched.error }, { status: fetched.status });
+    }
+    parsed = { mime: fetched.mime, buffer: fetched.buffer };
+  } else {
+    if (!body.image || typeof body.image !== "string") {
+      return NextResponse.json({ ok: false, error: "image (base64 data URL) or sourceUrl is required" }, { status: 400 });
+    }
+    if (body.image.length > MAX_IMAGE_CHARS) {
+      return NextResponse.json({ ok: false, error: "image too large (~9MB limit)" }, { status: 413 });
+    }
+    const p = parseImageDataUrl(body.image);
+    if (!p) {
+      return NextResponse.json(
+        { ok: false, error: "image must be a png/jpeg/webp base64 data URL" },
+        { status: 400 },
+      );
+    }
+    parsed = p;
   }
   const organizationId = body.organizationId ?? defaultOrganizationId();
   if (!organizationId || !isUuid(organizationId)) {
