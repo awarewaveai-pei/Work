@@ -754,17 +754,21 @@ export default function CanvasEditor() {
     const objects = active.getObjects();
     void import("fabric").then((fabric) => {
       if (fabricRef.current !== canvas) return;
+      // Gate the object:removed×N + object:added burst so the whole group op = ONE undo step.
+      restoringRef.current = true;
       canvas.discardActiveObject();
       objects.forEach((o) => canvas.remove(o));
       const group = new fabric.Group(objects);
       canvas.add(group);
       canvas.setActiveObject(group);
+      restoringRef.current = false;
       setGroupSelected(true);
       setMultiSelected(false);
       canvas.requestRenderAll();
       refreshLayers();
+      snapshot();
     });
-  }, [refreshLayers]);
+  }, [refreshLayers, snapshot]);
 
   // 🗂 解散群組 — Fabric v6/v7 removed group.toActiveSelection(); removeAll() restores each child's
   // world coords, then destroy() tears the group down (fabricjs discussion #10028).
@@ -775,15 +779,19 @@ export default function CanvasEditor() {
       | { type?: string; removeAll?: () => FabricObject[]; destroy?: () => void }
       | null;
     if (!group || group.type !== "group" || !group.removeAll) return;
+    // Gate the burst so ungroup = ONE undo step (mirrors groupSelection).
+    restoringRef.current = true;
     const children = group.removeAll();
     canvas.remove(group as unknown as FabricObject);
     group.destroy?.();
     children.forEach((o) => canvas.add(o));
     canvas.discardActiveObject();
+    restoringRef.current = false;
     setGroupSelected(false);
     canvas.requestRenderAll();
     refreshLayers();
-  }, [refreshLayers]);
+    snapshot();
+  }, [refreshLayers, snapshot]);
 
   // 🎚 色調分離 Posterize — Fabric has no Posterize filter, so bake it: render the selected image
   // (filters included) at NATURAL resolution + no transform, quantize on a 2D canvas, then swap the
@@ -804,7 +812,9 @@ export default function CanvasEditor() {
       const src = img.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
       const out = await posterizeDataUrl(src, posterLevels);
       const fabric = await import("fabric");
-      if (fabricRef.current !== canvas) return;
+      // Selection may have moved/deleted during the CPU bake — don't replace a stale object
+      // (mirrors toggleShadow's guard: check canvas AND that img is still the active object).
+      if (fabricRef.current !== canvas || canvas.getActiveObject() !== img) return;
       const baked = await fabric.FabricImage.fromURL(out, { crossOrigin: "anonymous" });
       // withoutTransform gave natural pixels → reapply the original scale/angle/origin to land it
       // exactly where the old object sat.
@@ -853,7 +863,8 @@ export default function CanvasEditor() {
         return;
       }
       const fabric = await import("fabric");
-      if (fabricRef.current !== canvas) return;
+      // Replicate poll is multi-second — bail if the user changed/deleted the selection meanwhile.
+      if (fabricRef.current !== canvas || canvas.getActiveObject() !== img) return;
       const ext = await fabric.FabricImage.fromURL(json.image, { crossOrigin: "anonymous" });
       ext.set({ scaleX: img.scaleX ?? 1, scaleY: img.scaleY ?? 1, originX: "center", originY: "center", name: img.name });
       canvas.remove(img);
@@ -911,6 +922,11 @@ export default function CanvasEditor() {
           refreshLayers();
           restoringRef.current = false;
           snapshot(); // record the loaded design as an undo baseline
+        }).catch(() => {
+          // A structurally-valid-but-bad fabric JSON can reject inside loadFromJSON — don't strand
+          // restoringRef=true (that would silently disable ALL future undo snapshots).
+          restoringRef.current = false;
+          setError("設計檔載入失敗（內容無法解析）");
         });
       };
       reader.readAsText(file);

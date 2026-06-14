@@ -32,8 +32,13 @@ export async function posterizeDataUrl(dataUrl: string, levels: number): Promise
     im.onerror = () => reject(new Error("posterize_decode_failed"));
     im.src = dataUrl;
   });
-  const w = Math.max(1, img.naturalWidth || img.width);
-  const h = Math.max(1, img.naturalHeight || img.height);
+  const nw = Math.max(1, img.naturalWidth || img.width);
+  const nh = Math.max(1, img.naturalHeight || img.height);
+  // Cap the working resolution so a 6000²+ print-res source can't OOM the tab (two 4·w·h buffers).
+  const MAX_EDGE = 4096;
+  const fit = Math.min(1, MAX_EDGE / Math.max(nw, nh));
+  const w = Math.max(1, Math.round(nw * fit));
+  const h = Math.max(1, Math.round(nh * fit));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
