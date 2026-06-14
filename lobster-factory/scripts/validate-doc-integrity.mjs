@@ -39,9 +39,11 @@ function walkMarkdownFiles(rootDir, out = []) {
     const full = path.join(rootDir, ent.name);
     if (ent.isDirectory()) {
       // RankMath-KB = third-party RankMath knowledge-base articles imported HTML→MD (2026-06-14).
-      // Their links are scrape artifacts (bare domains, Cloudflare /cdn-cgi/ email-protection,
-      // in-page anchor words) that we neither author nor maintain → exclude from link integrity.
-      if (ent.name === "node_modules" || ent.name === ".git" || ent.name === "dist" || ent.name === "RankMath-KB") continue;
+      // GEO = externally-imported SEO/GEO reference guides (LLMrefs/Ayzeo/Semrush/Profound/Google,
+      // 2026-06-15). Both hold scrape artifacts (site-relative paths like /search/docs/...,
+      // bare domains, in-page anchor words) that we neither author nor maintain → exclude from
+      // link integrity.
+      if (ent.name === "node_modules" || ent.name === ".git" || ent.name === "dist" || ent.name === "RankMath-KB" || ent.name === "GEO") continue;
       walkMarkdownFiles(full, out);
     } else if (ent.isFile() && ent.name.endsWith(".md")) {
       out.push(full);

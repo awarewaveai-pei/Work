@@ -510,3 +510,11 @@ _Last synced: 2026-06-12 08:00:34 UTC_
 - **明日**：#7164 進 Printful dashboard 後跑 ③④（link 寫路徑首驗）→ P4 試單。packet: handoffs/2026-06-11-1743-pod-publish-final-link.md。Replicate 餘額 <$5 節流，建議儲值。
 
 
+
+## 2026-06-12 → 06-15 — POD/Content/Canvas 全產線深化 + 服飾 POD 上線 + 社群發佈
+- **POD 服飾 Phase 1-4 上線 app.aware-wave.com**（deploy `37dfba85`，smoke 24 pass）：Phase 1 100% 忠實印刷檔（取代 Real-ESRGAN 預設，鐵律=圖案不被 AI 重新詮釋）+ 純圖案產品圖；Phase 2a Printful 多風格 mockup（含真人模特，全忠實）+ 一鍵存圖庫；Phase 2b 平拍真實 overlay（設計忠實，與 AI 平拍雙軌）；Phase 3 台灣本地印刷檔目的地 seam（DTG 業界預設，待實際規格回填）；Phase 4 AI 商品文案（SEO/GEO/AEO/RankMath 合規）。**後續未做見 TASKS line 81**（非 100% 完成）。
+- **Canvas 編輯器 PS 功能目錄全上線**（`/tools/canvas`）：影像效果積木（Vibrance/高斯模糊/雜訊/色溫）、圖層面板（reorder/顯隱/複製/刪除/改名/群組）、Undo/Redo（Fabric v7 loadFromJSON Promise + re-applyFilters，cap 20）、生成填色/擴圖（flux-fill-pro）、Posterize、設計檔 .design.json 存載、字型庫（Google Fonts CJK+Latin+上傳）、去白底 RemoveColor、物件鎖定/形狀 blocks、WYSIWYG 調色預覽（Fabric）。**驗證債：使用者尚未瀏覽器實測**（Claude 無登入 session，TASKS line 68）。
+- **Content Studio / SEO-GEO 深化**：RankMath KB 554-file 深研 → 全覆蓋規則 + Setup 向導 + Schema + SEO check panel + AI auto-fix；GEO citation mechanics 進 SYSTEM_PROMPT（answer capsule/sub-query/expert quote/FAQPage schema）；trending 多源（Google News + Reddit RSS + PTT scraping，Google Trends RSS 被 VPS IP 封→Perplexity Sonar 替代）；generate 接 Perplexity 真實外連來源；Media Hub + Structure section 擴充；移除 AI 假內連（用戶裝 Internal Link Juicer）。
+- **Postiz 自架社群發佈上線 EU**（Task 1+2）：Bluesky connected（app password，pivot from Reddit，後者 dev-app 建立被擋）；端到端發佈驗證 QUEUE→PUBLISHED→feed live。**AGPL 紅線：禁 fork/改原始碼，預設 draft+人審**。計畫 SSOT=POSTIZ_SOCIAL_PUBLISHING_PLAN.md（7 task，TASKS line 57 進行中）。
+- **app.aware-wave Stage 1 接通入口完成（06-14）**：trigger-build 403 修復（dual-path auth `x-ops-sync-key`，8b1d6d86）+ dispatcher kick fallback（TRIGGER_ACCESS_TOKEN）+ dispatch-action-run-schedule 每分鐘 cron。下一步 Stage 2 Fluent Form→intake 橋接。
+- **其他**：WP auth 遷 Application Password + rate limit 修；admin-auth middleware 不再 bounce 已登入用戶；Printful Mockup Generator pipeline（design→R2→product photo）；可編輯 calendar（reschedule/publish-now/delete）；My Designs gallery UI redesign；tarot FLUX printQuality 422 fix。

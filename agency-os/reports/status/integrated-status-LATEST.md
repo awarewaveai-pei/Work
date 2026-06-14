@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-14 03:53:07
+- Generated: 2026-06-15 03:48:45
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -219,86 +219,97 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-06-14.md
-# Daily Note - 2026-06-14
+## 5) memory/daily/2026-06-15.md
+# Daily Note - 2026-06-15
 
 
-### verify-recent --ack (2026-06-13T17:21:59.3946498Z)
+### verify-recent --ack (2026-06-14T16:40:17.2392392Z)
 
-**Reason**: String-literal-only addition to SYSTEM_PROMPT (2 lines: Creator/Purpose signals) — no logic change; Deep critic ran prior session REVIEW_DONE=pass; tsc exit=0
+**Reason**: 影像工具拆 3 獨立可拖面板(調色/濾鏡/AI去除) + 畫布尺寸/DPI(cm,mm) + clipPath 遮罩 + 文字弧形. critic Deep FAIL→fixed: Critical (setDimensions 不縮放內容 → 改 viewportTransform zoom + 既有物件等比重縮 + exportPng 暫還原 zoom 出全 real-px) + Major (init 清 canvasMetaRef 防 stale 倍率 / grade-effects 預設位置碰撞移到 x=1332). tsc 0 + full build 0. 注:Fabric viewport/zoom 行為無 headless browser 可測,build 為 gate,需使用者瀏覽器實測畫布尺寸縮放+匯出。
 
 **Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\generate\route.ts`
-
-
-### verify-recent --ack (2026-06-13T17:58:04.9809900Z)
-
-**Reason**: 3 product-logic fixes (canvas text font/colour/size; tarot grade->all 78 cards incl background-ZIP path; POD save/download bake grade). Verified: npx tsc --noEmit EXIT=0; full npm run build EXIT=0; vitest 70/70; critic Deep reviewed all 5 files -> found Major (洞1 incomplete on downloadZip path) which I then FIXED (TarotStudio.tsx:671 now passes deckFilter), re-tsc 0 + re-build 0. Canvas/bake are client-only DOM (no headless browser exec available; build is the gate).
-
-**Acknowledged unverified files** (count=5):
 
 - `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\renderPrintCard.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\components\tools\bake-css-filter.ts`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\studio\StudioWorkbench.tsx`
 
 
-### verify-recent --ack (2026-06-13T17:58:21.6173564Z)
+### verify-recent --ack (2026-06-14T17:27:56.9712965Z)
 
-**Reason**: String-literal-only additions to SYSTEM_PROMPT (24-test breakdown + slug hint + BlogPosting type); WP checklist doc-only; tsc exit=0; RankMath KB research evidence in WORKLOG
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\generate\route.ts`
-
-
-### verify-recent --ack (2026-06-13T18:47:50.9650071Z)
-
-**Reason**: Image filename comment-only string edit in SYSTEM_PROMPT — added max 5 words + hyphens ONLY clarification; no logic change; tsc exit=0
-
-**Acknowledged unverified files** (count=1):
-
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\generate\route.ts`
-
-
-### verify-recent --ack (2026-06-13T18:57:29.1267422Z)
-
-**Reason**: Canvas colour toolkit: CanvasEditor + fabric-filters.ts apply ColorGrade sliders to selected image via Fabric filters (HueRotation/Saturation/Brightness/Contrast/Gamma/Convolute — all verified present via node + applyFilters is a fn). tsc 0 + full build 0. WYSIWYG (filtered pixels = toDataURL export); no headless browser to exec-test fabric runtime, build is the gate.
+**Reason**: 兩 bug 修: ① 橡皮擦後無法編輯文字 — erase 筆畫 set selectable:false,evented:false 讓點擊穿透到下層文字; ② 排版壞掉 — 浮動面板重新排成右側單欄整齊堆疊(x=816)、畫布尺寸展開其餘 defaultCollapsed、LS_PREFIX bump v2 重置舊壞位置。都是 targeted 屬性/排版修正,tsc 0 + build 0. REVIEW_WAIVED: 簡單 prop/layout 改動,無邏輯/資料面,build 為 gate。
 
 **Acknowledged unverified files** (count=2):
 
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\fabric-filters.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\components\tools\DraggablePanel.tsx`
+
+
+### verify-recent --ack (2026-06-14T17:38:30.6567833Z)
+
+**Reason**: 工具面板改右側固定可捲動側欄(vector-trace-demo 風格,使用者要求,取代浮動拖曳): 新 SidebarPanel(collapsible <details>-style, drop-in 同 props 但忽略定位) + CanvasEditor 容器改 flex row + canvas 左/側欄右(width 300, maxHeight calc(100vh-130px) overflow auto), 面板垂直堆疊可收合(畫布尺寸開其餘收). replace_all DraggablePanel→SidebarPanel. tsc 0 + full build 0, JSX balanced. REVIEW_WAIVED: 排版重構,純 flex+collapsible,build 為 gate。
+
+**Acknowledged unverified files** (count=2):
+
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\components\tools\SidebarPanel.tsx`
 - `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
 
 
-### Session: 語意化下載檔名 + gate 修復 + SG 部署
+### verify-recent --ack (2026-06-14T18:00:04.5405657Z)
 
-**Done today**
-- feat(studio) 語意化下載檔名 `產品-主圖名稱-風格.ext`：新 `lib/studio/semantic-filename.ts`（純 client-safe）wired 全 6 下載點（OutputTrackBar/StudioWorkbench/TarotStudio/CanvasEditor）。client 覆寫 `a.download`，server route.ts 不動（route.test 15/15 綠）。tsc 0 + vitest 28 pass + critic Deep（2 Major 已修：CANVAS_NAME_KEY sidebar-bypass stale-leak、控制字元）。commit 1b53dc3e。
-- fix(gate) verify-build-gates 被 RankMath KB（802b634a）卡：① `validate-doc-integrity.mjs` data: URI 被當相對連結 → 加 URI_SCHEME 豁免 + 排除 RankMath-KB 夾；② `system-health-check.ps1` 檔名 `[year]` glob 害 `Get-Content -Raw -Path` 動態參數 -Raw 無法綁 → 3 處改 -LiteralPath。health 100%(373/373)、verify ALL PASSED。commit e182cd21。
-- SG 部署 next-admin（b9b76502）：容器 healthy、server smoke 全 200、semantic-filename.ts 在 build context。playwright smoke 23/30 pass；3 fail 全在 /onboard+/api/ops（flaky + OnboardWizard 4→5 step test/impl 落差，與本次無關）。
+**Reason**: Undo/Redo (↩️↪️): JSON snapshots + restore. critic Deep FAIL→fixed all Critical/Major per spec(已對 Fabric v7 source 驗): #1 loadFromJSON 是 Promise 第2參 reviver 非 callback → 改 .then() 讓 restoringRef 留 true 到 load 完(否則 snapshot 迴圈污染 stack); #2 restore 後對 image re-applyFilters(否則 undo 丟調色); #3 cap 60→20(base64 圖記憶體); #6 draw/inpaint 模式禁用 undo; 還原 zoom。tsc 0 + full build 0. 注:loadFromJSON Promise/filter re-apply 行為無 headless browser 可測,需使用者實測 undo/redo。
 
-**Note**: 工作樹仍有別 session 在製品（ContentStudio/SeoCheckPanel/GradedPreview SEO+WYSIWYG），tsc 0，非本人改動。
+**Acknowledged unverified files** (count=1):
+
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
 
 
-### verify-recent --ack (2026-06-13T19:42:14.5691871Z)
+### verify-recent --ack (2026-06-14T18:45:40.7465471Z)
 
-**Reason**: WYSIWYG preview: GradedPreview (Fabric) replaces CSS-filter preview in Studio+Tarot -> gamma/sharpen/levels now show real effect; Studio download/save export from it (preview===download). critic Deep found 3 Major (stale-export async gap / dispose-race sticky-fallback / uncapped canvas OOM) -> ALL fixed (fabricNS ref synchronous apply, canvas keyed by image, 2048px cap). tsc 0 + full build 0. Fabric client-only; build is the gate.
+**Reason**: PS catalog 4-feature batch: 生成填色+擴圖(flux-fill-pro)/Posterize(bake)/圖層改名+群組/設計檔存載. critic WARN 0c/3m/3n→全修: selection-race guard(getActiveObject()!==img) on posterize+outpaint; group/ungroup restoringRef-gated single snapshot; importDesign .catch unstrand restoringRef; posterize MAX_EDGE 4096 OOM cap. outpaint enum 已對 pinned flux-fill-pro 41c767bc curl 驗證吻合. tsc 0 + build 0; canvas 1.48kB(no Buffer leak via outpaint-presets pure-data split).
 
-**Acknowledged unverified files** (count=3):
+**Acknowledged unverified files** (count=5):
 
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\components\tools\GradedPreview.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\studio\StudioWorkbench.tsx`
-- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\tarot\TarotStudio.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\generative-fill.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\tools\studio\genfill\route.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\posterize.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\studio\outpaint-presets.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\canvas\CanvasEditor.tsx`
 
+
+### verify-recent --ack (2026-06-14T19:12:46.9661927Z)
+
+**Reason**: Full verify done: tsc --noEmit clean, critic deep (2 major fixed: PTT row-align + CJK_RE lastIndex, minor: hyphen-strip), bughunt scope=agency-os+scripts hits=0, REALTEST: tsc+regex node tests all pass
+
+**Acknowledged unverified files** (count=5):
+
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\content\ContentStudio.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\lib\seo\rankmath-checker.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\tools\content\SeoCheckPanel.tsx`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\generate\route.ts`
+- `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\trending\route.ts`
+
+
+
+## Session 收工 (AO-CLOSE 2026-06-15) — 窗口 06-12 → 06-15
+
+### Done this session (上次 AO-RESUME 06-12 至今)
+- **POD 服飾 Phase 1-4 上線** app.aware-wave.com (deploy `37dfba85`, smoke 24 pass)：忠實印刷檔 / Printful 多風格+真人模特 mockup+存圖庫 / 平拍真實 overlay 雙軌 / 台灣本地印刷檔 seam / AI 商品文案 SEO-GEO-AEO-RankMath。後續未做見 TASKS line 81。
+- **Canvas `/tools/canvas` PS 功能目錄全 build+deploy**：影像效果積木 / 圖層面板 / Undo-Redo / 生成填色+擴圖 / Posterize / 設計檔存載 / 字型庫 / 去白底 / WYSIWYG 調色。**驗證債**：使用者瀏覽器實測未做 (TASKS line 68)。
+- **Content Studio / SEO-GEO**：RankMath KB 554-file 全覆蓋 + SEO check panel + AI auto-fix；GEO citation 進 SYSTEM_PROMPT；trending 多源 (News+Reddit+PTT+Perplexity)；generate 接 Perplexity 真實來源；Media Hub。
+- **Postiz 自架社群發佈 EU 上線** (Task 1+2)：Bluesky connected + 端到端發佈驗證 (pivot from Reddit)。AGPL 紅線：禁 fork、預設 draft+人審。
+- **app.aware-wave Stage 1 接通入口完成 (06-14)**：trigger-build 403 dual-path auth + dispatcher kick fallback + 每分鐘 cron。
+- 其他：WP auth→Application Password、admin-auth middleware fix、可編輯 calendar、My Designs UI、tarot FLUX 422 fix。
+
+### 未完成 / 明日優先
+- Canvas `/tools/canvas` 整輪瀏覽器實測 (Undo/Redo, genfill, 群組/Posterize/.design 存載) — TASKS line 68
+- Postiz Content Studio 接真實發佈 (7 task 進行中) — TASKS line 57
+- POD 服飾 Phase 1-4 後續未做項 — TASKS line 81
+- Mockup Studio 功能異常診斷 (操作者回報，缺症狀) — TASKS line 88
+- app.aware-wave Stage 2 Fluent Form→intake 橋接+FluentCRM — TASKS line 72
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `manual`
-- Time: `2026-06-14 03:41:28`
+- Time: `2026-06-15 03:48:38`
 - Health score: **100%**
 - Threshold: **100%**
 - Health gate exit code: **0**
@@ -308,56 +319,13 @@
 - Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20260614-034127.md`
+- Health: `reports/health/health-20260615-034832.md`
 - Closeout: `reports/closeout/closeout-20260613-230929.md`
 
 ## Action
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-
-**[已修改]**
-1. `lib/storage/r2.ts:37,47` — `??` → `||` (both getR2Config + getDesignsPublicBase); fixes empty-string R2_DESIGNS_PUBLIC_BASE passthrough; getDesignsPublicBase() used as SSRF allowlist prefix in 3 routes
-2. `lib/tarot/image-gen.ts` — added FLUX_PRINT_DIMS (896×1488 for 2:3 = 300 DPI @ 7.6×12.6 cm); added `printQuality?: boolean` to TarotGenParams; generateFlux uses `aspect_ratio:"custom" + width/height` when printQuality=true (FLUX schnell/dev require "custom" for explicit dims), fallback to FLUX_PRINT_DIMS["2:3"] guards unknown aspect ratio
-3. `app/api/tools/tarot/generate/route.ts` — added `printQuality?: boolean` to GenerateBody; passes `printQuality: body.printQuality === true` to generateTarotImage
-4. `app/tools/tarot/TarotStudio.tsx` — callGenerate accepts printQuality; all 3 generation sites (generatePreview/generateCompare/generateOne) pass `printQuality: true`; batch lightbox now shows loading overlay (image opacity 0.35 + spinner text) when status==="pending", error display when status==="error"
-5. `app/tools/designs/DesignsGallery.tsx` — filter redesign: toolGroup() maps source to top-level tool (tarot/studio/mockup); assetProduct() maps to product group (tarot-card→塔羅牌/product_type/mockup-composite); toolOptions/productOptions use derived groups; badge shows TOOL_GROUP_LABELS["tarot"]="Tarot" + SOURCE_SUBTYPE subtype; filter matching uses toolGroup+assetProduct
-
-**[驗證結果]**
-- REALTEST_WAIVED: SMOKE_COVERED -- npx tsc --noEmit EXIT:0; sg-deploy smoke will cover real exec; lightbox loading UX is UI-only change
-- REVIEW_DONE: critic=Deep | verdict=pass-after-fixes | findings=1m(getDesignsPublicBase ??→||)/1m(FLUX custom dim)/1m(fallback guard) | all fixed same session
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|printQuality|toolGroup|assetProduct|getDesignsPublicBase | hits=8 all in expected changed files + 3 consumer routes (allowlist consumers — fixed upstream)
-
-
-
-### live-race 機制更正 + verify-recent 清關（2026-06-12 追加）
-- **觸發**：操作者質疑「harness 頻繁回寫 settings.json」這個核心發現是否正確、是否真修掉。徹底重查。
-- **更正**：原機制錯。真因=**多 session 並行爭用**（`D:\Work\.claude` junction→`~/.claude` 同一檔；實測 4 個 `claude.exe`；各持啟動快照 last-writer-wins）。**非單體 harness bug、非「頻繁回寫」**。嚴重性低：唯一 flap deny=fork-bomb 守則（2026-05-07 加），19 條重要守則每 session 穩定。非 code 可修（N session 共用 user config 本就如此）。
-- **[已修改]**：CROSS_MACHINE_SYNC_RUNBOOK.md 故障段全重寫為正確機制+證據+低嚴重性+ multi-session anchor；check-claude-sync.ps1 `-Fix` hint 改為多-session 措辭；WORKLOG 前一條機制更正。
-- **[驗證結果]**：
-  - REALTEST_EVIDENCE: tool=Bash | cmd=`& sync...merge; & verify-build-gates.ps1`（atomic）| exit=0 | Score 100% (372/372) + Doc integrity PASSED
-  - REALTEST_EVIDENCE: tool=Bash | cmd=`Parser::ParseFile check-claude-sync.ps1` | 0 parse errors
-  - REALTEST_EVIDENCE: tool=Bash | cmd=`audit-cp950-traps.ps1 -File check-claude-sync.ps1` | 我的 -Fix 字串 0 trap（唯一 drift=line57 pre-existing out-of-scope）
-  - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n + 1 suggestion（採納：runbook 標題加 multi-session anchor）
-  - BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=`頻繁回寫`+`頻繁以啟動時記憶體`+`live-race` | hits: WORKLOG 同 commit 修正、worklog-excerpt 自動鏡像 AO-CLOSE 重生、runbook:86 為刻意否定句（"不是...頻繁回寫"）保留
-- **[剩餘風險]**：mid-session settings.json 仍會在 fork-bomb 那條 flap（多 session 本質，良性）；真收斂在所有舊 session 結束後。已誠實記入 runbook，不再纏鬥。
-
-## 2026-06-13 tarot FLUX printQuality 422 fix
-
-### [任務理解]
-app.aware-wave.com/tools/tarot FLUX 模型回傳 replicate_422。
-
-### [根因]
-SG log: `input.aspect_ratio: must be one of 1:1|16:9|...|9:21` — "custom" 不在 live enum。
-printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
-進一步確認：flux-schnell live schema (via API) 完全無 width/height 欄位，只接受 aspect_ratio enum + megapixels。
-→ FLUX 根本不支援自訂 print 尺寸，printQuality path 是死碼。
-
-### [已修改]
-- `lib/tarot/image-gen.ts`: 移除 `FLUX_PRINT_DIMS` 常數（死碼），移除 generateFlux printQuality ternary，統一走 `aspect_ratio: ar` 路徑。
-
-### [驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=ssh SG `docker logs lobster-next-admin | grep replicate` | exit=0 | ms=N/A — 422 log found: `aspect_ratio must be one of...`, "custom" missing from enum
 - REALTEST_EVIDENCE: tool=Bash | cmd=curl Replicate API schema flux-schnell | exit=0 | ms=N/A — confirmed Input params: no width/height; aspect_ratio default=1:1
 - REVIEW_DONE: critic=Standard | verdict=pass (after full rewrite) | findings=2c/0m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|aspect_ratio.*custom|printDims | hits=0
@@ -374,4 +342,47 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REVIEW_DONE: critic=Standard | verdict=pass (2 majors fixed: clamp + targetCountry sentinel) | findings=0c/2m/2n
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=imageCount|youtubeCount|introHookBrief|targetCountry.*Global | hits=0
 
+
+
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=countWords|resolveTermIds|imgRunRef|CJK_RE | hits=0 (no stale call sites outside modified files)
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1M/2m/2s -- Major: JP/KO kana/hangul missing from CJK range (FIXED before commit); Minor: resolveTermIds silent drop, inline images literal-text; Suggestions: imgRunRef decoupling (FIXED), imgRunRef reset
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<30000
+- REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke checks WP publish endpoint; CJK word-count verified by critic empirically
+
+## 2026-06-14 fix(publish): excerpt + YouTube placeholder
+
+### [已修改]
+- publish/route.ts: extractExcerpt() 從 ## Quick Answer 或首段抓 WP excerpt; YouTube placeholder [YOUTUBE_PLACEHOLDER_N: q] 轉 styled div; 修 3 個 Minor (comment strip non-greedy, heading strip anchored, fallback first paragraph)
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<60000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/0M/3m -- all 3 Minor fixed before commit (comment strip, heading anchor, fallback para)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=extractExcerpt|YOUTUBE_PLACEHOLDER | hits=0
+- REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke verifies publish endpoint live
+
+## 2026-06-14 feat(generate): Perplexity real external sources
+
+### [已修改]
+- generate/route.ts: fetchRealSources() 呼叫 Perplexity Sonar，回傳最多 5 個真實外連 URL；注入 prompt 並限制 Claude 只用這些；Major fix: 雙層 URL 驗證（fetch 結果 + prompt 注入前都 filter /^https?:\/\// + 無空白字元）
+- docker-compose.yml: 加 PERPLEXITY_API_KEY env 到 next-admin service
+- SG .env: 手動加入 PERPLEXITY_API_KEY
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<60000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1M/1m/1s -- Major: realSources 無驗證直接注入 prompt (FIXED: double-filter); Minor: keyword raw in Perplexity query (bounded, acceptable); Suggestion: typeof check (FIXED)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=fetchRealSources|realSources | hits=0
+- REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke verifies generate endpoint; Perplexity verified separately via existing MCP integration
+
+## 2026-06-14 feat(trending): Perplexity replacement + ILJ SYSTEM_PROMPT fix
+
+### [已修改]
+- trending/route.ts: 完全替換 `fetchGoogleTrends`（Google Trends RSS 被 VPS IP 封鎖）為 `fetchPerplexityTrending`（Perplexity Sonar real-time）。suggest/questions 保留 Google Autocomplete，若回空則 fallback 至 Perplexity。修了 `Promise.allSettled`（原 `Promise.all` — 一個 prefix 失敗會掛整個 questions endpoint）。case-insensitive dedup。parseJsonStrings 的 line-split fallback 過濾掉 raw JSON 行。
+- generate/route.ts SYSTEM_PROMPT: 移除「At least 1 internal link with fully descriptive anchor text」指令 — 使用者已安裝 Internal Link Juicer 外掛（500+ 文章自動內連），AI 生成假路徑（/related-article）反而扣 RankMath 分。用戶自行提供內連仍正常走 buildUserPrompt 的 validInternal 邏輯。
+- ContentStudio.tsx: 更新兩個空狀態文字，移除「Google」品牌標籤，改成「Perplexity 即時資料」。
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (excluding pre-existing CanvasEditor.tsx:274) | exit=0 | ms=<60000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/2m/1s -- Minor: parseJsonStrings line-split JSON garbage (FIXED), dead category field (FIXED); Suggestion: case-sensitive Set dedup (FIXED)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=fetchGoogleTrends|pickTrendKeyword|internal.link | hits=0
+- BUGHUNT_WAIVED: NA -- ContentStudio.tsx UI text only change; generate/route.ts SYSTEM_PROMPT text only removal
 

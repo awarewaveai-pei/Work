@@ -4,6 +4,11 @@
 
 ## 2026-06-15
 
+<!-- AO-CLOSE session window 2026-06-12 → 2026-06-15。下列 milestone 證據行（非 umbrella 任務閉合；對應 TASKS 多為 multi-part 進行中項，逐項勾選不適用）。-->
+- AUTO_TASK_DONE: 服飾 POD Phase 1-4 全功能部署上線 app.aware-wave.com (deploy 37dfba85, smoke 24 pass) — 忠實印刷檔/Printful 多風格+真人模特 mockup+存圖庫/平拍真實 overlay 雙軌/台灣本地印刷檔 seam/AI 商品文案 SEO-GEO-AEO-RankMath
+- AUTO_TASK_DONE: Postiz 自架社群發佈 EU 上線 Task 1+2 — Bluesky connected (app password) + 端到端發佈驗證 QUEUE→PUBLISHED→feed live (pivot from Reddit dev-app block)
+- AUTO_TASK_DONE: Canvas /tools/canvas PS 功能目錄全 build+deploy — 影像效果積木/圖層面板/Undo-Redo/生成填色+擴圖/Posterize/設計檔存載/字型庫/去白底/WYSIWYG 調色 (瀏覽器實測仍為驗證債 TASKS line 68)
+
 ### feat(pod): 服飾 POD Phase 2b — 平拍真實 overlay（設計忠實，與 AI 平拍雙軌）
 
 **[任務理解]** 使用者要平拍圖雙軌：保留既有 AI 平拍（MockupStudio，氛圍好）+ 新增「真實設計 overlay 到背景」忠實版（設計不被 AI 重繪）。
