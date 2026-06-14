@@ -158,6 +158,11 @@ export default function CanvasEditor() {
         setAnySelected(false);
         setLockSelected(false);
       });
+      // 🗂 keep the layer panel in sync with the object stack.
+      const onStack = () => setLayers([...canvas.getObjects()].reverse());
+      canvas.on("object:added", onStack);
+      canvas.on("object:removed", onStack);
+      onStack();
 
       const source = typeof window !== "undefined" ? sessionStorage.getItem(CANVAS_SOURCE_KEY) : null;
       if (typeof window !== "undefined") {
@@ -216,7 +221,7 @@ export default function CanvasEditor() {
       target.filters = [
         ...buildFabricImageFilters(ns, grade.params),
         ...buildPresetFilters(ns, presetId, removeWhite),
-        ...buildEffectFilters(ns, { vibrance, blur: blurv, noise: noisev }),
+        ...buildEffectFilters(ns, { vibrance, blur: blurv, noise: noisev, temp }),
       ];
       target.applyFilters();
       canvas.requestRenderAll();
@@ -224,7 +229,7 @@ export default function CanvasEditor() {
     return () => {
       cancelled = true;
     };
-  }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev]);
+  }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev, temp]);
 
   const addText = useCallback(() => {
     const canvas = fabricRef.current;
@@ -722,6 +727,28 @@ export default function CanvasEditor() {
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
+        {/* 🗂 圖層面板 — reorder / show-hide / duplicate / delete, top layer first. */}
+        {layers.length > 0 ? (
+          <div className="build-panel" style={{ width: 220, padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+            <strong style={{ fontSize: 13 }}>🗂 圖層（{layers.length}）</strong>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 520, overflowY: "auto" }}>
+              {layers.map((o, i) => {
+                const vis = (o as unknown as { visible?: boolean }).visible !== false;
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, border: "1px solid var(--card-border)", borderRadius: 4, padding: "3px 5px" }}>
+                    <button title="顯示/隱藏" onClick={() => toggleLayerVisible(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>{vis ? "👁" : "🚫"}</button>
+                    <button onClick={() => selectLayer(o)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: vis ? 1 : 0.45 }}>{layerLabel(o)}</button>
+                    <button title="上移" onClick={() => moveLayer(o, "up")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>↑</button>
+                    <button title="下移" onClick={() => moveLayer(o, "down")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>↓</button>
+                    <button title="複製" onClick={() => duplicateLayer(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>⧉</button>
+                    <button title="刪除" onClick={() => deleteLayer(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#e5484d" }}>🗑</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
         {/* 🎨 物件效果（PS 圖層樣式）— shown for ANY selected object (text/image/shape). */}
         {anySelected ? (
           <div className="build-panel" style={{ width: 260, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -793,6 +820,7 @@ export default function CanvasEditor() {
               {/* 影像效果積木：自然飽和 / 高斯模糊 / 雜訊 */}
               {[
                 { label: "自然飽和", v: vibrance, set: setVibrance, min: -100, max: 100 },
+                { label: "色溫 冷↔暖", v: temp, set: setTemp, min: -100, max: 100 },
                 { label: "高斯模糊", v: blurv, set: setBlurv, min: 0, max: 100 },
                 { label: "雜訊", v: noisev, set: setNoisev, min: 0, max: 100 },
               ].map((row) => (
