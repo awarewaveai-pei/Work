@@ -151,6 +151,37 @@ const ALLOWED_MODELS = [
   "claude-opus-4-8",
 ];
 
+/** Call Perplexity Sonar to get 3–5 real, verified external source URLs for the keyword. */
+async function fetchRealSources(keyword: string, language: string): Promise<string[]> {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  if (!apiKey) return [];
+  try {
+    const res = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "sonar",
+        messages: [{
+          role: "user",
+          content: `Find 5 authoritative external web sources about: "${keyword}". Prefer academic journals, established health organizations, government sites, or reputable publications. Language preference: ${language}. List the 5 most relevant URLs only.`,
+        }],
+        search_recency_filter: "year",
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { citations?: unknown[] };
+    return (data.citations ?? [])
+      .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u) && !/[\s\n\r]/.test(u))
+      .slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
 async function fetchUrlText(url: string): Promise<string> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
@@ -183,6 +214,7 @@ function buildUserPrompt(params: {
   nlpKeywords: string;
   outline: string;
   externalLinks: string[];
+  realSources: string[];
   internalLinks: string[];
   referenceContext: string;
   structure: ArticleStructure;
@@ -265,12 +297,21 @@ function buildUserPrompt(params: {
     lines.push("=== END REFERENCE CONTENT ===");
   }
 
-  // External links
+  // External links — user-provided first, then Perplexity-verified sources
   const validLinks = params.externalLinks.filter(u => /^https?:\/\//.test(u.trim()));
   if (validLinks.length > 0) {
     lines.push("");
     lines.push("External links to include naturally as contextual anchors:");
     validLinks.forEach(u => lines.push(`- ${u.trim()}`));
+    lines.push("IMPORTANT: Only use the URLs listed above for external links. Do NOT invent or guess other URLs.");
+  } else if (params.realSources.length > 0) {
+    const safeSources = params.realSources.filter(u => /^https?:\/\//.test(u.trim()) && !/[\s\n\r]/.test(u));
+    if (safeSources.length > 0) {
+    lines.push("");
+    lines.push("VERIFIED EXTERNAL SOURCES (real URLs found via web search — use ONLY these for external links, do NOT invent other URLs):");
+    safeSources.forEach(u => lines.push(`- ${u}`));
+    lines.push("Cite each source naturally in the body text where contextually relevant. Do not cluster all citations in one place.");
+    }
   }
 
   // Internal links
@@ -401,6 +442,12 @@ export async function POST(req: Request): Promise<Response> {
   // Internal links
   const internalLinks = sarr(body.internalLinks).filter(u => /^(https?:\/\/|\/[/#])/.test(u.trim())).slice(0, 10);
 
+  // Perplexity real sources — only when user hasn't provided their own external links
+  const userExternalLinks = sarr(body.externalLinks);
+  const realSources = userExternalLinks.length === 0
+    ? await fetchRealSources(keyword, str(body.language, "English"))
+    : [];
+
   // Model selection (default: sonnet)
   const requestedModel = str(body.model, "claude-sonnet-4-6");
   const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : "claude-sonnet-4-6";
@@ -419,7 +466,8 @@ export async function POST(req: Request): Promise<Response> {
     details:       str(body.details),
     nlpKeywords:   str(body.nlpKeywords),
     outline:       str(body.outline),
-    externalLinks: sarr(body.externalLinks),
+    externalLinks: userExternalLinks,
+    realSources,
     internalLinks,
     referenceContext,
     structure,

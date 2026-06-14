@@ -296,6 +296,7 @@ services:
       COMMAND_PLANE_DEFAULT_WORKSPACE_ID: ${COMMAND_PLANE_DEFAULT_WORKSPACE_ID:-}
       # AI handlers (/daily_review, /weekly_review) — falls back to raw JSON if unset
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
       # Repair Center: backup gate + GitHub handoff + Slack interactive approval
       AUTO_REPAIR_BACKUP_WEBHOOK_URL: ${AUTO_REPAIR_BACKUP_WEBHOOK_URL:-}
       AUTO_REPAIR_BACKUP_WEBHOOK_TOKEN: ${AUTO_REPAIR_BACKUP_WEBHOOK_TOKEN:-}
