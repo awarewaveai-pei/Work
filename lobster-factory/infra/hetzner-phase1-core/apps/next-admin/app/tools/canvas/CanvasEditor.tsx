@@ -24,6 +24,7 @@ import { CANVAS_SOURCE_KEY, CANVAS_NAME_KEY } from "@/components/tools/canvas-ha
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS } from "./fabric-filters";
 import DraggablePanel from "@/components/tools/DraggablePanel";
+import FontLibrary from "@/components/tools/FontLibrary";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -267,6 +268,15 @@ export default function CanvasEditor() {
       canvas.requestRenderAll();
     }
   }, []);
+
+  /** Toggle a boolean-ish text style (bold/italic/underline) by reading the active object. */
+  const toggleText = useCallback((prop: "fontWeight" | "fontStyle" | "underline") => {
+    const o = fabricRef.current?.getActiveObject() as unknown as Record<string, unknown> | null;
+    if (!o || !isTextObject(o as { type?: string })) return;
+    if (prop === "fontWeight") applyTextStyle({ fontWeight: o.fontWeight === "bold" ? "normal" : "bold" });
+    else if (prop === "fontStyle") applyTextStyle({ fontStyle: o.fontStyle === "italic" ? "normal" : "italic" });
+    else applyTextStyle({ underline: !o.underline });
+  }, [applyTextStyle]);
 
   // 🎨 物件效果 — set any property on the active object (opacity/blend/stroke/flip).
   const setActiveProp = useCallback((patch: Record<string, unknown>) => {
@@ -970,6 +980,24 @@ export default function CanvasEditor() {
               )}
             </div>
             </div>
+          </DraggablePanel>
+        ) : null}
+
+        {/* 🔤 字型庫 — Google Fonts (中/英) + 上傳字型 + 粗體/斜體/底線, shown when text selected. */}
+        {textSelected ? (
+          <DraggablePanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 820, y: 380 }} width={240}>
+            <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+              <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
+              <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
+              <button className="btn-secondary" style={{ fontSize: 13, textDecoration: "underline" }} title="底線（切換）" onClick={() => toggleText("underline")}>U</button>
+            </div>
+            <FontLibrary
+              current={textFont}
+              onPick={(family) => {
+                setTextFont(family);
+                applyTextStyle({ fontFamily: family });
+              }}
+            />
           </DraggablePanel>
         ) : null}
       </div>

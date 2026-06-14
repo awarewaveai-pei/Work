@@ -33,14 +33,16 @@ export default function FontLibrary({ current, onPick }: Props) {
   }, []);
 
   const list = useMemo(() => {
-    const all = [...uploaded, ...GOOGLE_FONTS];
+    // Uploaded first, then Google fonts; dedup by name so an upload that shadows a Google
+    // family doesn't render twice (would collide on the React key). Uploaded wins.
+    const seen = new Set<string>();
+    const all = [...uploaded, ...GOOGLE_FONTS].filter((f) => (seen.has(f) ? false : (seen.add(f), true)));
     const q = filter.trim().toLowerCase();
     return all.filter((f) => {
-      const up = uploaded.includes(f);
       if (cat === "cjk" && !CJK_FONTS.includes(f)) return false;
       if (cat === "latin" && !LATIN_FONTS.includes(f)) return false; // Latin tab = Latin only
       if (q && !f.toLowerCase().includes(q)) return false;
-      return up || true;
+      return true;
     });
   }, [uploaded, filter, cat]);
 
