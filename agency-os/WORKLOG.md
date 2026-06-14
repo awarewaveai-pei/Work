@@ -4,6 +4,34 @@
 
 ## 2026-06-15
 
+### feat(canvas): PS 目錄剩餘 4 項 — 生成填色/擴圖/Posterize/圖層改名群組/設計檔存載
+
+**[任務理解]** 接續 Canvas 編輯器 PS 功能目錄，把最後一批做完：生成填色+擴圖（Replicate）、Posterize（色調分離）、圖層改名/群組、可再編輯存檔。全部積木化讓其他 AI 可用。
+
+**[現況分析]** 讀 CanvasEditor.tsx（1268 行）+ fabric-filters.ts + inpaint.ts/route（mirror 基準）。`git log` 看 checkpoint commits（Undo/Redo 剛上線 5b73b77d）。查證三件未知：① web-researcher 確認 Fabric v6/v7 已移除 `toGroup()`/`toActiveSelection()` → 手刻 discard→remove→`new Group` / `removeAll`→destroy；② `FabricObject.customProperties=['name']` 類層級 round-trip toJSON；③ curl Replicate pinned `flux-fill-pro 41c767bc` 拿 version + outpaint enum（同一模型同時有 mask 生成填色 + outpaint 擴圖）。
+
+**[已修改]**
+- `lib/studio/generative-fill.ts`（新）— flux-fill-pro client，mirror inpaint.ts（poll/timeout/allowlist 同構）；`{image,prompt,mask?,outpaint?}`，outpaint 優先於 mask。
+- `lib/studio/outpaint-presets.ts`（新）— 純資料 enum + 中文 label，拆出讓 client 免 import Buffer/process.env（mirror print-destinations split）。
+- `lib/studio/posterize.ts`（新）— 純 `quantizeRgb` + 瀏覽器 offscreen bake（MAX_EDGE 4096 OOM cap）。
+- `app/api/tools/studio/genfill/route.ts`（新）— mirror inpaint route；flag/role/data-URL/size/preset 驗證。
+- `app/tools/canvas/CanvasEditor.tsx`（大改）— maskMode remove|fill 分支（同 mask painter，fill 走 /genfill+prompt）；applyOutpaint（下拉預設，無座標數學）；posterizeSelected（bake，保 scale/angle/name）；group/ungroupSelection；renameLayer（雙擊/✏️）；exportDesign/importDesign（.design.json 可再編輯）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=curl | cmd=GET api.replicate.com/v1/models/black-forest-labs/flux-fill-pro → latest_version=41c767bc + outpaint enum=['None','Zoom out 1.5x','Zoom out 2x','Make square','Left/Right/Top/Bottom outpaint'] | exit=0 | OUTPAINT_PRESETS 與 pinned 版本 enum 完全吻合（critic 拿 429 無法驗的唯一風險點，我已實機 curl 驗）
+- REALTEST_EVIDENCE: tool=SSH/curl | cmd=POST http://127.0.0.1:3002/api/tools/studio/genfill (deployed 09b81ee4) → HTTP 401，與已驗證的 /inpaint route 同樣 401 | exit=0 | genfill route 已掛載且與 proven inpaint 同層 auth gate（實際生成需登入瀏覽器）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~60000 | 型別 0 error
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run build → /tools/canvas 1.48kB | exit=0 | build 0；canvas bundle 無 Buffer 漏（outpaint-presets 純資料拆分生效）
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → smoke 4/4 200 (/login /api/ops/summary nginx node-api) | exit=0 | deployed 09b81ee4
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/3n（lib+route production-clean 為 inpaint faithful mirror；3 major 全在 client handler 的 selection-race/undo granularity）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=generativeFill/OUTPAINT_PRESETS/posterizeDataUrl/genfill/customProperties call sites | hits=0（新 symbol，無 stale 既有引用；client 僅 import 純資料模組）
+
+**[剩餘風險]** Replicate 實際生成（生成填色/擴圖）+ Fabric group/outpaint/posterize/設計檔存載的瀏覽器互動未實測（無登入 session）— 需使用者實測。flux-fill-pro 生成需 POD_DESIGNS_ENABLED + operator role + 花費。
+
+**[rollback]** `git revert 09b81ee4`（+ 前置 checkpoint commits）→ sg-deploy.sh next-admin；新檔（generative-fill/outpaint-presets/posterize/genfill route）為純新增，移除不影響既有 inpaint/canvas。
+
+**[修復根因]** critic 3 major 全修：posterize/outpaint 加 `getActiveObject()!==img` guard（mirror toggleShadow，防 await 中 selection 變動換錯物件）；group/ungroup restoringRef-gated 單一 snapshot（否則 N 個 object:removed 各推一格 undo）；importDesign `.catch` 防 loadFromJSON reject 把 restoringRef 卡 true 而靜默停掉所有 undo。
+
 ### feat(postiz): Task 2 — Bluesky 連接 + 端到端發文驗證通過
 
 **[任務理解]** 接續 Postiz Task 1，要把第一個社群平台接上並證明「程式→Postiz→真實社群帳號」整條管線可發文。
