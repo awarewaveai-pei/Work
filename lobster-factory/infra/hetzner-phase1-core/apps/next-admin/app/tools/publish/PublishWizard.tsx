@@ -43,7 +43,7 @@ export default function PublishWizard() {
     meetsTarget?: boolean;
     error?: string;
   }>({ state: "idle" });
-  const [productImg, setProductImg] = useState<{ state: StepState; error?: string }>({ state: "idle" });
+  const [productImg, setProductImg] = useState<{ state: StepState; url?: string; error?: string }>({ state: "idle" });
   const [create, setCreate] = useState<{
     state: StepState;
     productId?: number;
@@ -52,7 +52,7 @@ export default function PublishWizard() {
     error?: string;
   }>({ state: "idle" });
   const [sync, setSync] = useState<{ state: StepState; synced?: boolean; error?: string }>({ state: "idle" });
-  const [link, setLink] = useState<{ state: StepState; linkedCount?: number; total?: number; error?: string }>({ state: "idle" });
+  const [link, setLink] = useState<{ state: StepState; linkedCount?: number; total?: number; faithful?: boolean; error?: string }>({ state: "idle" });
 
   useEffect(() => {
     void (async () => {
@@ -116,9 +116,13 @@ export default function PublishWizard() {
       return;
     }
     const url = json.productImageUrl as string;
-    setMockupUrls((prev) => (prev.includes(url) ? prev : [...prev, url]));
-    setProductImg({ state: "done" });
-  }, [designUrl, post]);
+    // Replace the prior product image (each run mints a fresh UUID URL) — don't accumulate.
+    setMockupUrls((prev) => {
+      const without = productImg.url ? prev.filter((u) => u !== productImg.url) : prev;
+      return without.includes(url) ? without : [...without, url];
+    });
+    setProductImg({ state: "done", url });
+  }, [designUrl, productImg.url, post]);
 
   const runCreate = useCallback(async () => {
     setCreate({ state: "running" });
@@ -168,8 +172,10 @@ export default function PublishWizard() {
       setLink({ state: "error", error: json.error });
       return;
     }
-    setLink({ state: "done", linkedCount: json.linkedCount as number, total: json.total as number });
-  }, [create.productId, create.variantMap, upscale.printFileUrl, retailPrice, plusPrice, post]);
+    // Carry the bound print file's faithfulness through so the success line can't
+    // claim "100% 忠實" over an ai-enhance file (critic 2026-06-15).
+    setLink({ state: "done", linkedCount: json.linkedCount as number, total: json.total as number, faithful: upscale.faithful });
+  }, [create.productId, create.variantMap, upscale.printFileUrl, upscale.faithful, retailPrice, plusPrice, post]);
 
   const pill = (state: StepState) =>
     state === "done" ? "✅" : state === "running" ? "⏳" : state === "error" ? "❌" : "⬜";
@@ -269,7 +275,7 @@ export default function PublishWizard() {
                 {upscale.achievedPx ? `${upscale.achievedPx}px` : "尺寸未知"}
                 {upscale.dpi ? ` · 滿版約 ${upscale.dpi} DPI` : ""}
                 {upscale.faithful ? " · 100% 忠實" : " · AI 增強(非忠實)"}
-                {upscale.meetsTarget ? " ✓ 達 300DPI" : " ⚠ 未達 300DPI(滿版可能略軟；小尺寸印刷仍清晰)"}
+                {upscale.meetsTarget ? " ✓ 達標(≥225 DPI)" : " ⚠ 未達 300DPI(滿版可能略軟；小尺寸印刷仍清晰)"}
               </span>
             </>
           ) : null}
@@ -324,7 +330,9 @@ export default function PublishWizard() {
             ④ 綁定印刷檔（全部變體）
           </button>
           {link.state === "done" ? (
-            <span style={{ fontSize: 12 }}>綁定 {link.linkedCount}/{link.total} ✓ — 後台 review 後 publish 即可開賣</span>
+            <span style={{ fontSize: 12 }}>
+              綁定 {link.linkedCount}/{link.total} ✓（印刷檔：{link.faithful ? "100% 忠實" : "AI 增強，非忠實"}）— 後台 review 後 publish 即可開賣
+            </span>
           ) : null}
           {link.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{link.error}</span> : null}
         </div>
