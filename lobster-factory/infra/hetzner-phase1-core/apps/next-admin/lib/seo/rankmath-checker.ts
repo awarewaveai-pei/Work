@@ -252,27 +252,60 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
     detail: `${slug.length} characters`,
   });
 
+  // ── AEO / GEO checks ─────────────────────────────────────────────────────
+
+  // 14. aeo-quick-answer — direct answer capsule (## Quick Answer section)
+  const hasQuickAnswer = /^##\s+Quick Answer/m.test(markdown);
+  checks.push({
+    id: "aeo-quick-answer",
+    label: "AEO: Quick Answer section present",
+    pass: hasQuickAnswer,
+    detail: hasQuickAnswer ? "## Quick Answer section found" : "Missing ## Quick Answer section",
+  });
+
+  // 15. aeo-subquery-coverage — ≥4 H2/H3 headings covering multiple sub-topics
+  const h2h3Count = (markdown.match(/^#{2,3}\s/gm) ?? []).length;
+  const subqueryPass = h2h3Count >= 4;
+  checks.push({
+    id: "aeo-subquery-coverage",
+    label: "AEO: ≥ 4 H2/H3 sub-topic headings",
+    pass: subqueryPass,
+    detail: `${h2h3Count} H2/H3 headings found (min 4 for AEO coverage)`,
+  });
+
+  // 16. aeo-date-signal — content references a year (recency signal for AI engines)
+  const dateSignalPass = /\b20[2-9]\d\b/.test(plain);
+  checks.push({
+    id: "aeo-date-signal",
+    label: "AEO: Year/date signal in content",
+    pass: dateSignalPass,
+    detail: dateSignalPass ? "Year reference found (recency signal)" : "No year reference found",
+  });
+
   // Attach actionable suggestions to failed checks
   const _suggestions: Record<string, string> = {
-    "kw-in-title":    `在 SEO 標題前半段加入「${kw}」（例：「${kw}：完整指南」）`,
-    "kw-in-meta":     `在 meta 描述前 80 字自然帶入「${kw}」`,
-    "kw-in-slug":     `URL slug 加入「${kwSlug}」（例：${kwSlug}-guide）`,
-    "kw-in-intro":    `在文章前 150 字的引言自然提及「${kw}」`,
-    "kw-in-h2h3":     `在至少一個 H2/H3 標題中加入「${kw}」`,
-    "word-count":     `擴充文章到 600+ 字：加入案例、背景說明、FAQ 段落`,
-    "kw-density":     density < 0.005
+    "kw-in-title":          `在 SEO 標題前半段加入「${kw}」（例：「${kw}：完整指南」）`,
+    "kw-in-meta":           `在 meta 描述前 80 字自然帶入「${kw}」`,
+    "kw-in-slug":           `URL slug 加入「${kwSlug}」（例：${kwSlug}-guide）`,
+    "kw-in-intro":          `在文章前 150 字的引言自然提及「${kw}」`,
+    "kw-in-h2h3":           `在至少一個 H2/H3 標題中加入「${kw}」`,
+    "word-count":           `擴充文章到 600+ 字：加入案例、背景說明、FAQ 段落`,
+    "kw-density":           density < 0.005
       ? `密度偏低（${densityPct}%）；在正文中再自然提及「${kw}」幾次`
       : `密度過高（${densityPct}%）；部分重複改用同義詞或代名詞`,
-    "external-links": `加入 1+ 個外部參考連結（例：[研究來源](https://example.com)）`,
-    "internal-links": `加入 1+ 個站內連結（例：[延伸閱讀](/related-article)）`,
-    "para-length":    `${longParas.length} 個段落超過 120 字；拆分成較短段落，每段聚焦一個概念`,
-    "title-length":   titleLen < 30
+    "external-links":       `加入 1+ 個外部參考連結（例：[研究來源](https://example.com)）`,
+    "internal-links":       `加入 1+ 個站內連結（例：[延伸閱讀](/related-article)）`,
+    "para-length":          `${longParas.length} 個段落超過 120 字；拆分成較短段落，每段聚焦一個概念`,
+    "title-length":         titleLen < 30
       ? `SEO 標題過短（${titleLen} 字元）；擴展到 30–60 字元`
       : `SEO 標題過長（${titleLen} 字元）；縮短到 60 字元以內`,
-    "meta-length":    metaLen < 120
+    "meta-length":          metaLen < 120
       ? `Meta 描述過短（${metaLen} 字元）；補充到 120–160 字元，加入關鍵字與行動 CTA`
       : `Meta 描述過長（${metaLen} 字元）；截短到 160 字元以內`,
-    "slug-length":    `URL slug 過長（${slug.length} 字元）；縮短到 75 字元以內`,
+    "slug-length":          `URL slug 過長（${slug.length} 字元）；縮短到 75 字元以內`,
+    "aeo-quick-answer":     `加入 ## Quick Answer 段落（文章開頭 2–3 句直接回答問題，方便 AI 引用）`,
+    "aeo-subquery-coverage": `增加 H2/H3 小標題（涵蓋更多子問題面向，目前 ${h2h3Count} 個，需至少 4 個）`,
+    "aeo-date-signal":      `在內文加入年份或「2024 年研究」等時間標記，提高 AI 引用可信度`,
   };
   checks.forEach(c => { if (!c.pass) c.suggestion = _suggestions[c.id]; });
 
