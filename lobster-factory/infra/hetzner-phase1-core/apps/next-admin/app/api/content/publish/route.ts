@@ -146,6 +146,25 @@ function extractH1(md: string): string {
   return m?.[1]?.trim() ?? "";
 }
 
+function extractExcerpt(md: string): string {
+  // Strip meta block + comments
+  const clean = md
+    .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
+    .replace(/<!--[^>]*-->/g, "")
+    .trim();
+  // Prefer ## Quick Answer section
+  const qaMatch = clean.match(/##\s+Quick Answer\s*\n([\s\S]+?)(?=\n##|\n#|$)/);
+  const source = qaMatch ? qaMatch[1] : clean;
+  return source
+    .replace(/!\[.*?\]\(.*?\)/g, "")                // images
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")         // links → text
+    .replace(/#{1,6}\s+/g, "")                       // headings
+    .replace(/[`*_~>|]/g, "")                        // inline markup
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -256,10 +275,12 @@ export async function POST(req: Request): Promise<Response> {
   const base = wpApiUrl.replace(/\/+$/, "");
   const endpoint = `${base}/wp-json/wp/v2/posts`;
 
+  const excerpt = extractExcerpt(markdown);
   const payload: Record<string, unknown> = {
     title,
     content,
     slug,
+    excerpt,
     status: "draft",
   };
 
