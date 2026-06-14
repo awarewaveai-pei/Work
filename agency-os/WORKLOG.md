@@ -4,6 +4,29 @@
 
 ## 2026-06-14
 
+### feat(postiz): 自架社群發佈 Postiz 上線 EU（Task 1 / 社群整合計畫）
+
+**[任務理解]** Content Studio 社群面板只生成文案無法發佈；自架 Postiz 當「連帳號+排程/即時發」控制塔。計畫 SSOT `docs/operations/POSTIZ_SOCIAL_PUBLISHING_PLAN.md`。
+
+**[現況分析]** EU 只剩 ~2.3GB RAM。Postiz v2.12+ 強制 Temporal+ES（太重）→ 選 **v2.11.3**（最後免 Temporal 版）+ 硬 mem_limit（cgroup 上限，超標只 kill 自己）。
+
+**[已修改]**
+- `lobster-factory/infra/postiz/docker-compose.yml`（repo SSOT；部署正本 EU `/root/postiz/`）— Postiz v2.11.3 + redis，reuse supabase-db 開獨立 `postiz` DB，local volume 存圖，nginx `postiz.aware-wave.com`→127.0.0.1:4007，CF DNS proxied，LE SAN cert。mem_limit 1400m。
+- secrets：`POSTIZ_JWT_SECRET`/`POSTIZ_DB_PASSWORD`/`POSTIZ_ADMIN_PASSWORD` 入 vault。
+- `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`（使用者本機，非 repo）— append Postiz 登入區塊（UTF-8+BOM 保留、Python append 不覆蓋）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH/curl | cmd=origin /api/auth/login(awarewaveai@gmail.com)=200, register(valid payload)="Registration is disabled"（已鎖）, 公開 https://postiz.aware-wave.com/auth=200 | exit=0
+- REALTEST_EVIDENCE: tool=SSH | cmd=backend bind :3000 + "Nest application successfully started 🚀 :3000" + free -h | exit=0 | EU 餘 2.2GB、Postiz 943MiB/1.37GiB、supabase-db/n8n 健康
+- REVIEW_WAIVED: NA -- infra compose 佈建，非 code 邏輯
+- BUGHUNT_WAIVED: NA -- 新服務佈建，無既有 symbol/callsite 受影響
+
+**[踩雷修正]** ① 註冊頁只顯示 Google（email 表單在下方）② `NEXT_PUBLIC_BACKEND_URL` 漏 `/api` + `BACKEND_INTERNAL_URL` 應為 `localhost:3000`（v2.11.3 內部 nginx:5000→backend:3000/frontend:4200）③ 無 email provider → `NOT_SECURED=true` 跳確認信 ④ 探測誤建 x@x.co 已刪；admin 由 peijing 改為 awarewaveai（使用者指定）⑤ mem 1200m 開機尖峰致後端 hang → 調 1400m + force-recreate 後正常綁 3000。
+
+**[剩餘風險]** 圖片 local volume（正式發佈前升 R2，需 R2 S3 key pair）。X 發文要付費層→使用者選跳過。觀察 Postiz mem 24h。
+**[rollback]** `docker compose -f /root/postiz/docker-compose.yml down` + 移 CF DNS/nginx + drop postiz DB；prod 零影響。
+**[下一步]** Task 2：開 Meta(IG/FB)+Reddit+LinkedIn dev app（免費）callback 指向 Postiz。
+
 ### feat(canvas): PS 物件效果（圖層樣式）+ Photoshop 功能總目錄 + 部署
 
 **[已修改]** `app/tools/canvas/CanvasEditor.tsx` — 物件效果面板（任何選取物件）：透明度/混合模式(globalCompositeOperation)/翻轉H,V/陰影(Fabric Shadow)/描邊(色+寬)；`DESIGN_EDITOR_TOOLKIT_PLAN.md` 加 PS 功能對照表（已做/待做/部分不可）。

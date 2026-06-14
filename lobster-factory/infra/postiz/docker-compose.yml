@@ -33,7 +33,7 @@ services:
       options:
         max-size: "25m"
         max-file: "5"
-    mem_limit: 1200m
+    mem_limit: 1400m
     cpus: "1.0"
     ports:
       - '127.0.0.1:4007:5000'
