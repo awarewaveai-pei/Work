@@ -147,19 +147,28 @@ function extractH1(md: string): string {
 }
 
 function extractExcerpt(md: string): string {
-  // Strip meta block + comments
   const clean = md
     .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
-    .replace(/<!--[^>]*-->/g, "")
+    .replace(/<!--[\s\S]*?-->/g, "")  // non-greedy: handles comments containing >
     .trim();
-  // Prefer ## Quick Answer section
-  const qaMatch = clean.match(/##\s+Quick Answer\s*\n([\s\S]+?)(?=\n##|\n#|$)/);
-  const source = qaMatch ? qaMatch[1] : clean;
+  // Prefer ## Quick Answer section (lookahead anchored to line-start headings)
+  const qaMatch = clean.match(/##\s+Quick Answer\s*\n([\s\S]+?)(?=\n#{1,6}\s|$)/);
+  let source: string;
+  if (qaMatch) {
+    source = qaMatch[1];
+  } else {
+    // First non-heading, non-empty paragraph
+    source = clean
+      .split(/\n{2,}/)
+      .map(b => b.trim())
+      .find(b => b.length > 30 && !/^#{1,6}\s/.test(b) && !/^<!--/.test(b) && !/^\[/.test(b) && !/^!/.test(b))
+      ?? "";
+  }
   return source
-    .replace(/!\[.*?\]\(.*?\)/g, "")                // images
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")         // links → text
-    .replace(/#{1,6}\s+/g, "")                       // headings
-    .replace(/[`*_~>|]/g, "")                        // inline markup
+    .replace(/!\[.*?\]\(.*?\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")     // only strip # at line start (preserves C#, F#)
+    .replace(/[`*_~>|]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 300);

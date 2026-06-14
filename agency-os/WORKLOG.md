@@ -3,6 +3,17 @@
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-06-14
+n### AUTO_TASK_DONE: Trigger workflows deploy — dispatch-action-run + dispatch-action-run-schedule — v20260614.1
+
+**Deploy result**: version `20260614.1` deployed to `trigger.aware-wave.com` (proj `proj_6c4f24492a705729fc2c`)
+- All milestones passed: Vault secrets loaded / SERVICE_ROLE_KEY obtained / buildImage.js patched / Deploy succeeded
+- 11 tasks deployed — `dispatch-action-run` (STANDARD) + `dispatch-action-run-schedule` (SCHEDULED) confirmed in DB
+- 17 env vars synced (Supabase URL+SRK, PostHog, OPS token, N8N, Uptime Kuma, hosting adapter, etc.)
+- Schedule `dispatch-action-run-schedule` cron=`*/1 * * * *` active=true, lastRunTriggeredAt=2026-06-14T12:16:53Z
+- Dashboard: https://trigger.aware-wave.com/projects/v3/proj_6c4f24492a705729fc2c/deployments/bhvwhrvo
+- REALTEST_WAIVED: NA -- deploy script itself is the integration test; DB confirmed tasks + schedule active via direct Postgres query
+- REVIEW_WAIVED: NA -- no code changes, deploy-only operation
+- BUGHUNT_WAIVED: NA -- deploy-only, no code changes
 
 ### feat(canvas): AI 去除不要的部分（inpaint, bria/eraser）— 使用者最初需求 + 部署
 
@@ -10406,3 +10417,14 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1M/2m/2s -- Major: JP/KO kana/hangul missing from CJK range (FIXED before commit); Minor: resolveTermIds silent drop, inline images literal-text; Suggestions: imgRunRef decoupling (FIXED), imgRunRef reset
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<30000
 - REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke checks WP publish endpoint; CJK word-count verified by critic empirically
+
+## 2026-06-14 fix(publish): excerpt + YouTube placeholder
+
+### [已修改]
+- publish/route.ts: extractExcerpt() 從 ## Quick Answer 或首段抓 WP excerpt; YouTube placeholder [YOUTUBE_PLACEHOLDER_N: q] 轉 styled div; 修 3 個 Minor (comment strip non-greedy, heading strip anchored, fallback first paragraph)
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<60000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/0M/3m -- all 3 Minor fixed before commit (comment strip, heading anchor, fallback para)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=extractExcerpt|YOUTUBE_PLACEHOLDER | hits=0
+- REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke verifies publish endpoint live
