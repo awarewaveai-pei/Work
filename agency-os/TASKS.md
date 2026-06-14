@@ -86,8 +86,8 @@
   - [x] **[1-e M]** `app/api/tools/image/process/route.ts` — discriminated union（web/print/canvas）+ auth + flag + base64-input(SSRF零表面) + OutputIntent gate catch ✅ 2026-06-13（vitest 14/14 + tsc 0 + critic）。consumer UI（[1-f]/[1-j/k]）待接
   - [x] **[1-f S]** `components/tools/ColorGradePanel.tsx` — 色調/飽和/亮度三滑桿 ✅ 2026-06-14（已存在全實作：useColorGrade hook + 四群組滑桿 + GRADE_LIMITS SSOT）
   - [x] **[1-g S]** `components/tools/OutputTrackBar.tsx` — preset-aware；印刷鈕含目的地下拉（tw-local/mpc/tgc/printninja）；Canva feature flag 隱藏 ✅ 2026-06-14（已存在全實作：web/print/canvas 三軌 + PRINT_DESTINATIONS + semantic filename）
-  - [ ] **[1-h S]** `app/tools/canvas/page.tsx` — Canvas 路由
-  - [ ] **[1-i M]** `app/tools/canvas/CanvasEditor.tsx` — Fabric.js（沿用 Phase 0 版本）；存 design.json+preview.webp+source-export.png → R2
+  - [x] **[1-h S]** `app/tools/canvas/page.tsx` — Canvas 路由 ✅ 2026-06-14（已存在，546 bytes，canvas route LIVE）
+  - [x] **[1-i M]** `app/tools/canvas/CanvasEditor.tsx` — Fabric.js（沿用 Phase 0 版本）；存 design.json+preview.webp+source-export.png → R2 ✅ 2026-06-14（已存在 36KB + fabric-filters.ts；inpaint+toolkit batches 0+1 已部署 2026-06-14）
   - [x] **[1-j S]** `TarotStudio.tsx` 接 ColorGradePanel + OutputTrackBar（web-tarot + 印刷四目的地 + canvas-edit）
   - [x] **[1-k S]** `StudioWorkbench.tsx` 接 ColorGradePanel + OutputTrackBar（web-square + pod 印刷 + canvas-edit；Printful 另走 upscaler.ts）
   - **Phase 1.5 / Phase 2**
