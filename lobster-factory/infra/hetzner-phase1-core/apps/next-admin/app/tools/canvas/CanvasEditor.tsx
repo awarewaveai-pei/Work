@@ -73,6 +73,11 @@ export default function CanvasEditor() {
   const [lockSelected, setLockSelected] = useState(false); // selected object is locked (防呆 block)
   const [presetId, setPresetId] = useState<string | null>(null); // one-click look preset (active image)
   const [removeWhite, setRemoveWhite] = useState(false); // free chroma-key white-bg removal
+  const [inpaintMode, setInpaintMode] = useState(false); // 🪄 painting a removal mask
+  const [inpaintBusy, setInpaintBusy] = useState(false);
+  const [brushSize, setBrushSize] = useState(34);
+  const inpaintImgRef = useRef<FabricObject | null>(null); // image being edited in inpaint mode
+  const inpaintPathsRef = useRef<FabricObject[]>([]); // strokes painted as the mask
   const grade = useColorGrade(); // 修圖積木 applied to the selected image via Fabric filters
 
   // ── init fabric canvas + load handed-off source image (client only) ──
@@ -300,6 +305,118 @@ export default function CanvasEditor() {
     });
   }, []);
 
+  // 🪄 AI 去除不要的部分 — paint a mask over the unwanted region, send image+mask to bria/eraser.
+  const startInpaint = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const img = canvas.getActiveObject();
+    if (!img || img.type !== "image") return;
+    inpaintImgRef.current = img;
+    inpaintPathsRef.current = [];
+    img.set({ selectable: false });
+    canvas.discardActiveObject();
+    void import("fabric").then((fabric) => {
+      if (fabricRef.current !== canvas) return;
+      const brush = new fabric.PencilBrush(canvas);
+      brush.color = "rgba(220,40,40,0.55)"; // visible red while painting; recoloured white for the mask
+      brush.width = brushSize;
+      canvas.freeDrawingBrush = brush;
+      canvas.isDrawingMode = true;
+      const onPath = (e: { path?: FabricObject }) => {
+        if (e.path) inpaintPathsRef.current.push(e.path);
+      };
+      (canvas as unknown as { __inpaintOnPath?: typeof onPath }).__inpaintOnPath = onPath;
+      canvas.on("path:created", onPath as never);
+      setInpaintMode(true);
+      canvas.requestRenderAll();
+    });
+  }, [brushSize]);
+
+  const exitInpaint = useCallback((keepPaths: boolean) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.isDrawingMode = false;
+    const handler = (canvas as unknown as { __inpaintOnPath?: (e: unknown) => void }).__inpaintOnPath;
+    if (handler) canvas.off("path:created", handler as never);
+    if (!keepPaths) {
+      inpaintPathsRef.current.forEach((p) => canvas.remove(p));
+    }
+    inpaintPathsRef.current = [];
+    inpaintImgRef.current?.set({ selectable: true });
+    inpaintImgRef.current = null;
+    setInpaintMode(false);
+    canvas.requestRenderAll();
+  }, []);
+
+  const applyInpaint = useCallback(async () => {
+    const canvas = fabricRef.current;
+    const img = inpaintImgRef.current as
+      | (FabricObject & { width?: number; getBoundingRect: () => { left: number; top: number; width: number; height: number } })
+      | null;
+    if (!canvas || !img) return;
+    if (inpaintPathsRef.current.length === 0) {
+      setError("請先在要去除的地方塗抹一下");
+      return;
+    }
+    setInpaintBusy(true);
+    setError(null);
+    try {
+      const bbox = img.getBoundingRect();
+      const mult = Math.min(4, Math.max(1, (img.width ?? bbox.width) / Math.max(1, bbox.width)));
+      const crop = { left: bbox.left, top: bbox.top, width: bbox.width, height: bbox.height, multiplier: mult, format: "png" as const };
+
+      // Source = the image as seen (filters baked), strokes hidden.
+      inpaintPathsRef.current.forEach((p) => p.set({ visible: false }));
+      canvas.requestRenderAll();
+      const sourceUrl = canvas.toDataURL(crop);
+
+      // Mask = white strokes on black, image hidden, same crop+multiplier → matches source size.
+      const prevBg = (canvas as unknown as { backgroundColor?: string }).backgroundColor;
+      img.set({ visible: false });
+      inpaintPathsRef.current.forEach((p) => p.set({ visible: true, stroke: "#ffffff", fill: "" }));
+      (canvas as unknown as { backgroundColor: string }).backgroundColor = "#000000";
+      canvas.requestRenderAll();
+      const maskUrl = canvas.toDataURL(crop);
+
+      // restore visual state before the (slow) network call
+      img.set({ visible: true });
+      (canvas as unknown as { backgroundColor: string | undefined }).backgroundColor = prevBg;
+      inpaintPathsRef.current.forEach((p) => p.set({ visible: false }));
+      canvas.requestRenderAll();
+
+      const res = await fetch("/api/tools/studio/inpaint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
+        body: JSON.stringify({ image: sourceUrl, mask: maskUrl }),
+      });
+      const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
+      if (!json.ok || !json.image) {
+        setError(json.error ?? "去除失敗，請重試");
+        inpaintPathsRef.current.forEach((p) => p.set({ visible: true, stroke: "rgba(220,40,40,0.55)" }));
+        canvas.requestRenderAll();
+        return;
+      }
+      // Replace the edited image's pixels with the cleaned result (keep position/scale).
+      const fabric = await import("fabric");
+      if (fabricRef.current !== canvas) return;
+      const cleaned = await fabric.FabricImage.fromURL(json.image, { crossOrigin: "anonymous" });
+      cleaned.set({ left: img.left, top: img.top, scaleX: img.scaleX, scaleY: img.scaleY, angle: img.angle, originX: img.originX, originY: img.originY });
+      inpaintPathsRef.current.forEach((p) => canvas.remove(p));
+      inpaintPathsRef.current = [];
+      canvas.remove(img);
+      canvas.add(cleaned);
+      canvas.setActiveObject(cleaned);
+      inpaintImgRef.current = null;
+      canvas.isDrawingMode = false;
+      setInpaintMode(false);
+      canvas.requestRenderAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setInpaintBusy(false);
+    }
+  }, []);
+
   /** Flatten the canvas to a PNG data URL (codebase convention — see file header). */
   const exportPng = useCallback((): string | null => {
     const canvas = fabricRef.current;
@@ -481,6 +598,40 @@ export default function CanvasEditor() {
                 <input type="checkbox" checked={removeWhite} onChange={(e) => setRemoveWhite(e.target.checked)} />
                 ✂️ 去白底（免費，近白色變透明）
               </label>
+            </div>
+
+            {/* 🪄 AI 去除不要的部分 (bria/eraser) */}
+            <div className="build-panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <strong style={{ fontSize: 13 }}>🪄 去除不要的部分（AI）</strong>
+              {!inpaintMode ? (
+                <button className="btn-secondary" onClick={startInpaint}>開始塗抹要去除的地方</button>
+              ) : (
+                <>
+                  <p style={{ fontSize: 12, opacity: 0.7, margin: 0 }}>用紅筆塗在想清掉的物件上，再按「套用」。</p>
+                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    筆刷
+                    <input
+                      type="range"
+                      min={8}
+                      max={120}
+                      value={brushSize}
+                      onChange={(e) => {
+                        const w = Number(e.target.value);
+                        setBrushSize(w);
+                        const c = fabricRef.current;
+                        if (c?.freeDrawingBrush) c.freeDrawingBrush.width = w;
+                      }}
+                    />
+                    <span style={{ width: 28, textAlign: "right" }}>{brushSize}</span>
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn-primary" disabled={inpaintBusy} onClick={() => void applyInpaint()}>
+                      {inpaintBusy ? "AI 處理中…" : "✅ 套用去除"}
+                    </button>
+                    <button className="btn-secondary" disabled={inpaintBusy} onClick={() => exitInpaint(false)}>✖ 取消</button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ) : (
