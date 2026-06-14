@@ -80,6 +80,13 @@ export default function CanvasEditor() {
   const [noisev, setNoisev] = useState(0); // 雜訊 0..100
   const [temp, setTemp] = useState(0); // 色溫 -100(冷)..100(暖)
   const [layers, setLayers] = useState<FabricObject[]>([]); // 圖層面板 (top layer first)
+  // 畫布尺寸 / DPI（公分↔像素；參考 vector-trace-demo）
+  const [szW, setSzW] = useState(9);
+  const [szH, setSzH] = useState(5.4);
+  const [szUnit, setSzUnit] = useState<"cm" | "mm">("cm");
+  const [szDpi, setSzDpi] = useState(300);
+  const [szInfo, setSzInfo] = useState<string | null>(null);
+  const canvasMetaRef = useRef<{ realW: number; realH: number; dispScale: number; dpi: number } | null>(null);
   const [drawMode, setDrawMode] = useState<"off" | "draw" | "erase">("off"); // 自由繪筆 / 橡皮擦
   const [drawColor, setDrawColor] = useState("#111111");
   const [drawWidth, setDrawWidth] = useState(6);
@@ -439,6 +446,24 @@ export default function CanvasEditor() {
     }
     return `🔷 ${t ?? "物件"}`;
   }
+
+  // 📐 畫布尺寸 / DPI — cm/mm → px (round(cm·dpi/2.54)); resize the Fabric canvas to a scaled
+  // display (≤ MAX_DISP) and store real px + scale so export can render at full DPI.
+  const applyCanvasSize = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const MAX_DISP = 820;
+    const cm = (v: number) => (szUnit === "mm" ? v / 10 : v);
+    const realW = Math.max(1, Math.round((cm(szW) * szDpi) / 2.54));
+    const realH = Math.max(1, Math.round((cm(szH) * szDpi) / 2.54));
+    const dispScale = Math.min(1, MAX_DISP / Math.max(realW, realH));
+    canvas.setDimensions({ width: Math.round(realW * dispScale), height: Math.round(realH * dispScale) });
+    canvasMetaRef.current = { realW, realH, dispScale, dpi: szDpi };
+    const cmW = +((realW / szDpi) * 2.54).toFixed(2);
+    const cmH = +((realH / szDpi) * 2.54).toFixed(2);
+    setSzInfo(`真實 ${realW}×${realH}px @${szDpi}DPI = ${cmW}×${cmH}cm（預覽 ${Math.round(dispScale * 100)}%）`);
+    canvas.requestRenderAll();
+  }, [szW, szH, szUnit, szDpi]);
 
   // ✏️ 自由繪筆 / 🧹 橡皮擦 — change the canvas interaction mode. Eraser = a PencilBrush path
   // with globalCompositeOperation 'destination-out' (Fabric v7 has no EraserBrush), so the
