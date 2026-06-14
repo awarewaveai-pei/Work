@@ -319,6 +319,58 @@ export default function CanvasEditor() {
     setActiveProp(on ? { stroke: objStrokeColor, strokeWidth: objStrokeWidth } : { stroke: null, strokeWidth: 0 });
   }, [setActiveProp, objStrokeColor, objStrokeWidth]);
 
+  // ✂️ 剪裁遮罩 clipPath — clip the selected object to a circle / rounded-rect (or none).
+  const applyClip = useCallback((shape: "none" | "circle" | "round") => {
+    const canvas = fabricRef.current;
+    const o = canvas?.getActiveObject() as
+      | (FabricObject & { width?: number; height?: number; set: (p: Record<string, unknown>) => void })
+      | null;
+    if (!canvas || !o) return;
+    if (shape === "none") {
+      o.set({ clipPath: undefined });
+      canvas.requestRenderAll();
+      return;
+    }
+    void import("fabric").then((fabric) => {
+      if (fabricRef.current !== canvas) return;
+      const w = o.width ?? 100;
+      const h = o.height ?? 100;
+      const clip =
+        shape === "circle"
+          ? new fabric.Circle({ radius: Math.min(w, h) / 2, originX: "center", originY: "center" })
+          : new fabric.Rect({
+              width: w,
+              height: h,
+              rx: Math.min(w, h) * 0.15,
+              ry: Math.min(w, h) * 0.15,
+              originX: "center",
+              originY: "center",
+            });
+      // clipPath positioned relative to the object's centre (default, non-absolute).
+      o.set({ clipPath: clip });
+      canvas.requestRenderAll();
+    });
+  }, []);
+
+  // 〽️ 文字沿路徑 — make the selected text follow a curved (arc) path, or straighten it.
+  const applyTextArc = useCallback((on: boolean) => {
+    const canvas = fabricRef.current;
+    const o = canvas?.getActiveObject() as (Record<string, unknown> & { width?: number }) | null;
+    if (!canvas || !o || !isTextObject(o as { type?: string })) return;
+    if (!on) {
+      (o as unknown as { set: (p: Record<string, unknown>) => void }).set({ path: null });
+      canvas.requestRenderAll();
+      return;
+    }
+    void import("fabric").then((fabric) => {
+      if (fabricRef.current !== canvas) return;
+      const len = Math.max(220, (o.width ?? 220) * 1.5);
+      const arc = new fabric.Path(`M 0 80 Q ${len / 2} -20 ${len} 80`, { fill: "", stroke: "" });
+      (o as unknown as { set: (p: Record<string, unknown>) => void }).set({ path: arc });
+      canvas.requestRenderAll();
+    });
+  }, []);
+
   // 🗂 圖層面板 — snapshot the canvas object stack (top layer first for display).
   const refreshLayers = useCallback(() => {
     const c = fabricRef.current;
@@ -897,6 +949,13 @@ export default function CanvasEditor() {
             {!imageSelected ? (
               <button className="btn-secondary" style={{ fontSize: 12 }} onClick={applyGradient} title="把選取的文字/形狀填成漸層（左色用畫筆顏色）">🌈 漸層填色</button>
             ) : null}
+            {/* ✂️ 剪裁遮罩 clipPath */}
+            <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
+              <span style={{ opacity: 0.6 }}>遮罩</span>
+              <button className="btn-secondary" style={{ fontSize: 12 }} title="圓形遮罩" onClick={() => applyClip("circle")}>⬤</button>
+              <button className="btn-secondary" style={{ fontSize: 12 }} title="圓角遮罩" onClick={() => applyClip("round")}>▢</button>
+              <button className="btn-secondary" style={{ fontSize: 12 }} title="移除遮罩" onClick={() => applyClip("none")}>無</button>
+            </div>
           </div>
           </DraggablePanel>
         ) : null}
