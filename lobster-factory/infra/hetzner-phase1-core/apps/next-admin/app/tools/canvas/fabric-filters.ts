@@ -40,13 +40,28 @@ export const PRESET_FILTERS: { id: string; label: string; cls: string }[] = [
  */
 export function buildEffectFilters(
   fabricNS: { filters: Record<string, FilterCtor> },
-  eff: { vibrance?: number; blur?: number; noise?: number }
+  eff: { vibrance?: number; blur?: number; noise?: number; temp?: number }
 ): object[] {
   const F = fabricNS.filters;
   const out: object[] = [];
   if (eff.vibrance && F.Vibrance) out.push(new F.Vibrance({ vibrance: clampN(eff.vibrance / 100, -1, 1) }));
   if (eff.blur && F.Blur) out.push(new F.Blur({ blur: clampN(eff.blur / 100, 0, 1) }));
   if (eff.noise && F.Noise) out.push(new F.Noise({ noise: clampN(eff.noise * 6, 0, 600) }));
+  // 色溫 temperature: warm (+) adds red / removes blue; cool (−) the reverse. ColorMatrix offset.
+  if (eff.temp && F.ColorMatrix) {
+    const t = clampN((eff.temp / 100) * 0.25, -0.25, 0.25);
+    out.push(
+      new F.ColorMatrix({
+        // prettier-ignore
+        matrix: [
+          1, 0, 0, 0, t,
+          0, 1, 0, 0, 0,
+          0, 0, 1, 0, -t,
+          0, 0, 0, 1, 0,
+        ],
+      })
+    );
+  }
   return out;
 }
 

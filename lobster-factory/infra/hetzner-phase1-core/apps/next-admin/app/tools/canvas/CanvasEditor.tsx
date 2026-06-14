@@ -76,6 +76,8 @@ export default function CanvasEditor() {
   const [vibrance, setVibrance] = useState(0); // 自然飽和 -100..100
   const [blurv, setBlurv] = useState(0); // 高斯模糊 0..100
   const [noisev, setNoisev] = useState(0); // 雜訊 0..100
+  const [temp, setTemp] = useState(0); // 色溫 -100(冷)..100(暖)
+  const [layers, setLayers] = useState<FabricObject[]>([]); // 圖層面板 (top layer first)
   const [inpaintMode, setInpaintMode] = useState(false); // 🪄 painting a removal mask
   const [inpaintBusy, setInpaintBusy] = useState(false);
   const [brushSize, setBrushSize] = useState(34);
@@ -296,6 +298,72 @@ export default function CanvasEditor() {
     setObjStroke(on);
     setActiveProp(on ? { stroke: objStrokeColor, strokeWidth: objStrokeWidth } : { stroke: null, strokeWidth: 0 });
   }, [setActiveProp, objStrokeColor, objStrokeWidth]);
+
+  // 🗂 圖層面板 — snapshot the canvas object stack (top layer first for display).
+  const refreshLayers = useCallback(() => {
+    const c = fabricRef.current;
+    if (c) setLayers([...c.getObjects()].reverse());
+  }, []);
+  const selectLayer = useCallback((o: FabricObject) => {
+    const c = fabricRef.current;
+    if (!c) return;
+    c.setActiveObject(o);
+    c.requestRenderAll();
+  }, []);
+  const toggleLayerVisible = useCallback((o: FabricObject) => {
+    const c = fabricRef.current;
+    if (!c) return;
+    (o as unknown as { visible?: boolean; set: (p: Record<string, unknown>) => void }).set({
+      visible: !(o as unknown as { visible?: boolean }).visible,
+    });
+    c.requestRenderAll();
+    refreshLayers();
+  }, [refreshLayers]);
+  const moveLayer = useCallback((o: FabricObject, dir: "up" | "down") => {
+    const c = fabricRef.current as unknown as {
+      bringObjectForward?: (o: FabricObject) => void;
+      sendObjectBackwards?: (o: FabricObject) => void;
+      requestRenderAll: () => void;
+    } | null;
+    if (!c) return;
+    if (dir === "up") c.bringObjectForward?.(o);
+    else c.sendObjectBackwards?.(o);
+    c.requestRenderAll();
+    refreshLayers();
+  }, [refreshLayers]);
+  const duplicateLayer = useCallback((o: FabricObject) => {
+    const c = fabricRef.current;
+    if (!c) return;
+    void (o as unknown as { clone: () => Promise<FabricObject> }).clone().then((clone) => {
+      if (fabricRef.current !== c) return;
+      (clone as unknown as { set: (p: Record<string, unknown>) => void }).set({
+        left: ((o as unknown as { left?: number }).left ?? 0) + 24,
+        top: ((o as unknown as { top?: number }).top ?? 0) + 24,
+      });
+      c.add(clone);
+      c.setActiveObject(clone);
+      c.requestRenderAll();
+      refreshLayers();
+    });
+  }, [refreshLayers]);
+  const deleteLayer = useCallback((o: FabricObject) => {
+    const c = fabricRef.current;
+    if (!c) return;
+    c.remove(o);
+    c.requestRenderAll();
+    refreshLayers();
+  }, [refreshLayers]);
+
+  function layerLabel(o: FabricObject): string {
+    const t = (o as { type?: string }).type;
+    if (t === "i-text" || t === "textbox" || t === "text") {
+      const s = String((o as { text?: string }).text ?? "文字").slice(0, 10);
+      return `📝 ${s}`;
+    }
+    if (t === "image") return "🖼 圖片";
+    if (t === "path") return "✏️ 筆畫";
+    return `🔷 ${t ?? "物件"}`;
+  }
 
   const uploadImage = useCallback((file: File | null) => {
     const canvas = fabricRef.current;
