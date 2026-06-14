@@ -8,8 +8,8 @@
  * editor's panels become "rearrangeable" (使用者可自己拉工具位置). Render these inside a
  * `position: relative` container; each panel is `position: absolute` within it.
  *
- * Pointer-events based drag (works mouse + touch). Position is clamped to >= 0 so a panel can't
- * be dragged fully off the top/left. Double-click the header to reset to the default position.
+ * Pointer-events based drag (mouse + touch). Position clamped into the viewport so a panel can't
+ * be stranded off-screen. Double-click the header to reset to the default position.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -25,13 +25,20 @@ type Props = {
 
 const LS_PREFIX = "canvas-panel-pos:";
 
+/** Clamp into the visible viewport (keep at least 40px reachable so the header stays grabbable). */
+function clampPos(p: Pos): Pos {
+  const maxX = typeof window !== "undefined" ? Math.max(0, window.innerWidth - 40) : 4000;
+  const maxY = typeof window !== "undefined" ? Math.max(0, window.innerHeight - 40) : 4000;
+  return { x: Math.min(Math.max(0, p.x), maxX), y: Math.min(Math.max(0, p.y), maxY) };
+}
+
 function loadPos(id: string, fallback: Pos): Pos {
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(LS_PREFIX + id);
     if (!raw) return fallback;
     const p = JSON.parse(raw) as Pos;
-    if (typeof p.x === "number" && typeof p.y === "number") return { x: Math.max(0, p.x), y: Math.max(0, p.y) };
+    if (Number.isFinite(p?.x) && Number.isFinite(p?.y)) return clampPos(p);
   } catch {
     /* ignore corrupt value */
   }
@@ -41,7 +48,10 @@ function loadPos(id: string, fallback: Pos): Pos {
 export default function DraggablePanel({ id, title, defaultPos, width = 260, children }: Props) {
   const [pos, setPos] = useState<Pos>(defaultPos);
   const [collapsed, setCollapsed] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+  const posRef = useRef<Pos>(defaultPos);
+  posRef.current = pos;
 
   // hydrate persisted position on mount (client only — avoids SSR mismatch)
   useEffect(() => {
@@ -60,31 +70,29 @@ export default function DraggablePanel({ id, title, defaultPos, width = 260, chi
     [id]
   );
 
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      // ignore clicks on the collapse button
-      if ((e.target as HTMLElement).dataset.noDrag) return;
-      dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    },
-    [pos]
-  );
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("[data-no-drag]")) return; // collapse btn etc.
+    dragRef.current = { dx: e.clientX - posRef.current.x, dy: e.clientY - posRef.current.y };
+    setDragging(true);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return;
-    setPos({ x: Math.max(0, e.clientX - dragRef.current.dx), y: Math.max(0, e.clientY - dragRef.current.dy) });
+    setPos(clampPos({ x: e.clientX - dragRef.current.dx, y: e.clientY - dragRef.current.dy }));
   }, []);
 
-  const onPointerUp = useCallback(
+  const endDrag = useCallback(
     (e: React.PointerEvent) => {
-      if (dragRef.current) {
-        dragRef.current = null;
+      if (!dragRef.current) return;
+      dragRef.current = null;
+      setDragging(false);
+      try {
         (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-        setPos((p) => {
-          persist(p);
-          return p;
-        });
+      } catch {
+        /* capture may already be gone on cancel */
       }
+      persist(posRef.current);
     },
     [persist]
   );
@@ -102,14 +110,20 @@ export default function DraggablePanel({ id, title, defaultPos, width = 260, chi
         left: pos.x,
         top: pos.y,
         width,
-        zIndex: dragRef.current ? 50 : 10,
+        padding: 0, // override .build-panel's 24px so the header spans the edge
+        zIndex: dragging ? 50 : 10,
         boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
       }}
     >
       <div
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onLostPointerCapture={() => {
+          dragRef.current = null;
+          setDragging(false);
+        }}
         onDoubleClick={resetPos}
         title="拖曳移動，雙擊還原位置"
         style={{
