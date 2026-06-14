@@ -23,7 +23,7 @@ import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_SOURCE_KEY, CANVAS_NAME_KEY } from "@/components/tools/canvas-handoff";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS } from "./fabric-filters";
-import DraggablePanel from "@/components/tools/DraggablePanel";
+import SidebarPanel from "@/components/tools/SidebarPanel";
 import FontLibrary from "@/components/tools/FontLibrary";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -965,14 +965,14 @@ export default function CanvasEditor() {
 
       {error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{error}</span> : null}
 
-      {/* 工具面板可自由拖曳（DraggablePanel）；位置存 localStorage。 */}
+      {/* 工具面板可自由拖曳（SidebarPanel）；位置存 localStorage。 */}
       <div style={{ position: "relative", minHeight: 824 }}>
         <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: 802, background: "#fff" }}>
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
         {/* 📐 畫布尺寸 / DPI — 公分/公釐 + DPI 自設（參考 vector-trace-demo）。永遠顯示，可拖。 */}
-        <DraggablePanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 816, y: 0 }} width={236}>
+        <SidebarPanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 816, y: 0 }} width={236}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
             <div style={{ display: "flex", gap: 8 }}>
               <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1004,11 +1004,11 @@ export default function CanvasEditor() {
             <button className="btn-primary" onClick={applyCanvasSize}>套用畫布尺寸</button>
             {szInfo ? <span style={{ fontSize: 11, opacity: 0.7 }}>{szInfo}</span> : null}
           </div>
-        </DraggablePanel>
+        </SidebarPanel>
 
         {/* 🗂 圖層面板 — reorder / show-hide / duplicate / delete, top layer first. */}
         {layers.length > 0 ? (
-          <DraggablePanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={240} defaultCollapsed>
+          <SidebarPanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 816, y: 244 }} width={240} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 520, overflowY: "auto" }}>
               {layers.map((o, i) => {
                 const vis = (o as unknown as { visible?: boolean }).visible !== false;
@@ -1024,12 +1024,12 @@ export default function CanvasEditor() {
                 );
               })}
             </div>
-          </DraggablePanel>
+          </SidebarPanel>
         ) : null}
 
         {/* 🎨 物件效果（PS 圖層樣式）— shown for ANY selected object (text/image/shape). */}
         {anySelected ? (
-          <DraggablePanel id="effects" title="🎨 物件效果" defaultPos={{ x: 816, y: 286 }} width={260} defaultCollapsed>
+          <SidebarPanel id="effects" title="🎨 物件效果" defaultPos={{ x: 816, y: 286 }} width={260} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
               <span style={{ display: "flex", justifyContent: "space-between" }}><span>透明度</span><span style={{ opacity: 0.7 }}>{objOpacity}%</span></span>
@@ -1073,18 +1073,18 @@ export default function CanvasEditor() {
               <button className="btn-secondary" style={{ fontSize: 12 }} title="移除遮罩" onClick={() => applyClip("none")}>無</button>
             </div>
           </div>
-          </DraggablePanel>
+          </SidebarPanel>
         ) : null}
 
         {/* 調色工具包 — appears when an image is selected; applies via Fabric filters (WYSIWYG). */}
         {imageSelected ? (
           <>
           {/* 3 個獨立可拖面板：調色 / 濾鏡效果 / AI 去除 */}
-          <DraggablePanel id="grade" title="🎨 調色 / 修圖" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
+          <SidebarPanel id="grade" title="🎨 調色 / 修圖" defaultPos={{ x: 816, y: 328 }} width={272} defaultCollapsed>
             <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
-          </DraggablePanel>
+          </SidebarPanel>
 
-          <DraggablePanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
+          <SidebarPanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 816, y: 370 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 <button
@@ -1122,9 +1122,9 @@ export default function CanvasEditor() {
                 </label>
               ))}
             </div>
-          </DraggablePanel>
+          </SidebarPanel>
 
-          <DraggablePanel id="inpaint" title="🪄 去除不要的部分（AI）" defaultPos={{ x: 816, y: 412 }} width={272} defaultCollapsed>
+          <SidebarPanel id="inpaint" title="🪄 去除不要的部分（AI）" defaultPos={{ x: 816, y: 412 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {!inpaintMode ? (
                 <button className="btn-secondary" onClick={startInpaint}>開始塗抹要去除的地方</button>
@@ -1156,13 +1156,13 @@ export default function CanvasEditor() {
                 </>
               )}
             </div>
-          </DraggablePanel>
+          </SidebarPanel>
           </>
         ) : null}
 
         {/* 🔤 字型庫 — Google Fonts (中/英) + 上傳字型 + 粗體/斜體/底線, shown when text selected. */}
         {textSelected ? (
-          <DraggablePanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 816, y: 454 }} width={240} defaultCollapsed>
+          <SidebarPanel id="fonts" title="🔤 字型庫" defaultPos={{ x: 816, y: 454 }} width={240} defaultCollapsed>
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
               <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
               <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
@@ -1177,7 +1177,7 @@ export default function CanvasEditor() {
                 applyTextStyle({ fontFamily: family });
               }}
             />
-          </DraggablePanel>
+          </SidebarPanel>
         ) : null}
       </div>
     </div>
