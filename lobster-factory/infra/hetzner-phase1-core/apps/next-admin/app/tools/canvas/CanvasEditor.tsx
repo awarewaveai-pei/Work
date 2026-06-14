@@ -318,9 +318,9 @@ export default function CanvasEditor() {
   const toggleLayerVisible = useCallback((o: FabricObject) => {
     const c = fabricRef.current;
     if (!c) return;
-    (o as unknown as { visible?: boolean; set: (p: Record<string, unknown>) => void }).set({
-      visible: !(o as unknown as { visible?: boolean }).visible,
-    });
+    // Normalise: undefined visible counts as shown, so the first hide-click actually hides.
+    const shown = (o as unknown as { visible?: boolean }).visible !== false;
+    (o as unknown as { set: (p: Record<string, unknown>) => void }).set({ visible: !shown });
     c.requestRenderAll();
     refreshLayers();
   }, [refreshLayers]);
