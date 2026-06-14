@@ -4,6 +4,22 @@
 
 ## 2026-06-14
 
+### feat(canvas): AI 去除不要的部分（inpaint, bria/eraser）— 使用者最初需求 + 部署
+
+**[任務理解]** 使用者第一句就要「去除圖中某個不要的部分」（≠ 去背）。要「最好的」→ 商用 POD 選 bria/eraser（SOTA 物件移除 + 授權資料訓練，無版權風險）。web-researcher 比較 LaMa/FLUX-Fill/bria 後選 bria/eraser；curl 確認 version 2757d1ac + image/mask 吃 data-URI。
+**[已修改]**
+- `lib/studio/inpaint.ts`（新）— `removeObject(image,mask)` → Replicate bria/eraser，鏡像 bg-remover（pin version、poll、abort/timeout、SSRF allowlist replicate.delivery+data:、20MB 上限）。
+- `app/api/tools/studio/inpaint/route.ts`（新）— POST {image,mask}，ops-role auth + POD gate + 雙欄 data-URL 驗證 + size 上限。
+- `app/tools/canvas/CanvasEditor.tsx` — 框選遮罩 UI：startInpaint（PencilBrush 紅筆 + path:created 收集）/exitInpaint/applyInpaint（source 隱藏筆畫、mask 隱藏圖+黑底白筆畫，同 bbox crop+multiplier toDataURL → 免座標數學）→ 換上清乾淨的圖。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=curl | cmd=GET replicate /v1/models/bria/eraser | version=2757d1ac, image/mask format=uri 確認
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`+`npm run build` | exit=0/0（critic 修正前後）
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | deployed=0885874 | healthy 6s | smoke 4/4 200
+- REVIEW_DONE: critic=Deep | verdict=warn→pass | findings=0c/2M(全修：成功路徑 off() listener 漏接 + 旋轉圖 getBoundingRect 守衛)/3m -- SSRF allowlist/abort/auth/mask-source 對齊(未旋轉)皆 verified clean
+- BUGHUNT_DONE: scope=app,lib | grep=removeObject\|/api/tools/studio/inpaint | hits=0 stale（route↔lib↔canvas 三點一線）
+**[剩餘風險]** 旋轉圖需先轉正才可去除（已守衛擋下）；遮罩在 ≤4× bbox 解析度（非永遠原生）；上游 proxy 須剝除 client 偽造的 claims header（route 信任邊界，既有）。
+**[部署]** SG 0885874 LIVE。**[待辦]** batch 2 物件屬性/圖層/逐字色、batch 4 ⭐web-font、batch 3 其餘 AI（擴圖/換背景）、5~7。
+
 ### feat(canvas): 可組裝編輯器工具包 batch 0+1（物件鎖定/形狀/濾鏡預設/免費去白底）+ 藍圖 SSOT
 
 **[任務理解]** 使用者要把編輯器做成「可組裝積木工具包」，各 host 自選要哪些積木，靈活運用。建框架 + 藍圖，分批塞積木。
