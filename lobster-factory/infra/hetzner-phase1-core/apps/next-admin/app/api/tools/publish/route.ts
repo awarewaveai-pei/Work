@@ -128,15 +128,32 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    // Size + timeout caps mirror print-file.ts — the SG host is OOM-prone and the
+    // designs bucket is user-writable, so never buffer an unbounded body (critic 2026-06-15).
+    const PRODUCTIMAGE_MAX_BYTES = 60 * 1024 * 1024;
+    const piController = new AbortController();
+    const piKiller = setTimeout(() => piController.abort(), 25_000);
     let inputBuffer: Buffer;
     try {
-      const res = await fetch(body.designUrl, { redirect: "manual" });
+      const res = await fetch(body.designUrl, { redirect: "manual", signal: piController.signal });
       if (!res.ok) {
         return NextResponse.json({ ok: false, error: `fetch_input_failed_${res.status}` }, { status: 502 });
       }
-      inputBuffer = Buffer.from(await res.arrayBuffer());
+      if (Number(res.headers.get("content-length") ?? "0") > PRODUCTIMAGE_MAX_BYTES) {
+        return NextResponse.json({ ok: false, error: "input_too_large" }, { status: 413 });
+      }
+      const ab = await res.arrayBuffer();
+      if (ab.byteLength > PRODUCTIMAGE_MAX_BYTES) {
+        return NextResponse.json({ ok: false, error: "input_too_large" }, { status: 413 });
+      }
+      inputBuffer = Buffer.from(ab);
     } catch {
-      return NextResponse.json({ ok: false, error: "fetch_input_network_error" }, { status: 502 });
+      return NextResponse.json(
+        { ok: false, error: piController.signal.aborted ? "fetch_input_timeout" : "fetch_input_network_error" },
+        { status: 502 },
+      );
+    } finally {
+      clearTimeout(piKiller);
     }
     let webp: Buffer;
     try {
