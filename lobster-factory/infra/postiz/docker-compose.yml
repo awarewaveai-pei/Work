@@ -1,3 +1,11 @@
+# Postiz (self-hosted social publishing) — EU VPS (204.168.175.41).
+# DEPLOYED COPY lives at /root/postiz/docker-compose.yml on the EU box (with a sibling .env
+# holding POSTIZ_DB_PASSWORD / POSTIZ_JWT_SECRET — never committed). This repo copy is the SSOT;
+# keep the two in sync. Lightweight v2.11.3 (pre-Temporal/Elasticsearch) to fit the shared box;
+# hard mem_limit caps blast radius so Postiz can never OOM the host's Supabase/n8n/Trigger.
+# Reuses the existing supabase-db Postgres (dedicated `postiz` DB+role). Public via nginx vhost
+# postiz.aware-wave.com → 127.0.0.1:4007. Internal layout: nginx:5000 → backend:3000 (/api) +
+# frontend:4200 (/) — hence NEXT_PUBLIC_BACKEND_URL ends in /api and BACKEND_INTERNAL_URL=:3000.
 name: postiz
 
 services:
@@ -34,12 +42,16 @@ services:
       - REDIS_URL=redis://postiz-redis:6379
       - JWT_SECRET=${POSTIZ_JWT_SECRET}
       - FRONTEND_URL=https://postiz.aware-wave.com
-      - NEXT_PUBLIC_BACKEND_URL=https://postiz.aware-wave.com
-      - BACKEND_INTERNAL_URL=http://postiz:5000
+      - NEXT_PUBLIC_BACKEND_URL=https://postiz.aware-wave.com/api
+      - BACKEND_INTERNAL_URL=http://localhost:3000
       - MAIN_URL=https://postiz.aware-wave.com
       - IS_GENERAL=true
       - RUN_CRON=true
-      - DISABLE_REGISTRATION=false
+      # NOT_SECURED skips email-activation (no SMTP/Resend wired yet) so local email+password
+      # registration completes without a confirmation mail.
+      - NOT_SECURED=true
+      # Locked after the first (admin) account was created. Flip to false only to add another user.
+      - DISABLE_REGISTRATION=true
       - STORAGE_PROVIDER=local
       - UPLOAD_DIRECTORY=/uploads
       - NEXT_PUBLIC_UPLOAD_DIRECTORY=/uploads

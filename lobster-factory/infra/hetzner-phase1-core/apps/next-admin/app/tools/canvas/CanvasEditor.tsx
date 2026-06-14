@@ -370,7 +370,10 @@ export default function CanvasEditor() {
       return `📝 ${s}`;
     }
     if (t === "image") return "🖼 圖片";
-    if (t === "path") return "✏️ 筆畫";
+    if (t === "path") {
+      // destination-out paths are eraser strokes (they erase whatever is below them).
+      return (o as { globalCompositeOperation?: string }).globalCompositeOperation === "destination-out" ? "🧹 擦除" : "✏️ 筆畫";
+    }
     return `🔷 ${t ?? "物件"}`;
   }
 
@@ -392,6 +395,11 @@ export default function CanvasEditor() {
     }
     void import("fabric").then((fabric) => {
       if (fabricRef.current !== canvas) return;
+      // Re-detach post-await: a cold import could let a fast toggle attach two handlers (critic M1).
+      if (drawHandlerRef.current) {
+        canvas.off("path:created", drawHandlerRef.current as never);
+        drawHandlerRef.current = null;
+      }
       const brush = new fabric.PencilBrush(canvas);
       brush.width = drawWidth;
       brush.color = mode === "erase" ? "rgba(0,0,0,1)" : drawColor;
@@ -418,7 +426,8 @@ export default function CanvasEditor() {
     if (!canvas || !o) return;
     void import("fabric").then((fabric) => {
       if (fabricRef.current !== canvas) return;
-      const w = (o as unknown as { width?: number }).width ?? 200;
+      const oo = o as unknown as { width?: number; scaleX?: number };
+      const w = (oo.width ?? 200) * (oo.scaleX ?? 1); // scaled width so the gradient spans the visible object (critic M5)
       const grad = new fabric.Gradient({
         type: "linear",
         coords: { x1: 0, y1: 0, x2: w, y2: 0 },
@@ -874,7 +883,9 @@ export default function CanvasEditor() {
                 </div>
               ) : null}
             </div>
-            <button className="btn-secondary" style={{ fontSize: 12 }} onClick={applyGradient} title="把選取物件填成漸層（左色用畫筆顏色）">🌈 漸層填色</button>
+            {!imageSelected ? (
+              <button className="btn-secondary" style={{ fontSize: 12 }} onClick={applyGradient} title="把選取的文字/形狀填成漸層（左色用畫筆顏色）">🌈 漸層填色</button>
+            ) : null}
           </div>
         ) : null}
 
