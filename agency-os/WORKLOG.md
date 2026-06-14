@@ -68,7 +68,7 @@
 - `app/api/onboarding/trigger-build/route.ts` — 加 `import timingSafeEqual`；新增 `SYNC_KEY = process.env.OPS_PROXY_SHARED_SECRET`；auth check 改為 `role in allowed || hasSyncKey`（同 wp-update 模式）。middleware.ts 維持不動。
 **[驗證結果]**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` (next-admin) | exit=0 | 0 type errors
-- REALTEST_EVIDENCE: tool=curl (post-deploy) | target=`/api/onboarding/trigger-build` | expected=ok:true（待部署後補）
+- REALTEST_EVIDENCE: tool=curl | cmd=POST /api/onboarding/trigger-build x-ops-sync-key | exit=200 | ok=true | run_id=b344f86e | org+ws+proj+site built | manifest_downgraded=true | dispatcher_kick=no_secret (gate OFF)
 - REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=1M(middleware注入過寬→改 route 自驗)
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=trigger-build\|OPS_PROXY_SHARED_SECRET | hits=0 stale（trigger-build 唯一 callsite = onboarding/page.tsx:135 用 browser session，無 server-to-server caller 需更新）
 
