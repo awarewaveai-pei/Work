@@ -396,28 +396,40 @@ export default function CanvasEditor() {
     if (c) setLayers([...c.getObjects()].reverse());
   }, []);
 
-  // ↩️ Undo/Redo — snapshot canvas JSON after each change; restore on undo/redo.
+  // ↩️ Undo/Redo — snapshot {canvas JSON, zoom} after each change; restore on undo/redo.
   const snapshot = useCallback(() => {
     if (restoringRef.current) return;
-    const c = fabricRef.current as unknown as { toJSON: () => unknown } | null;
+    const c = fabricRef.current as unknown as { toJSON: () => unknown; getZoom: () => number } | null;
     if (!c) return;
-    undoStack.current.push(JSON.stringify(c.toJSON()));
-    if (undoStack.current.length > 60) undoStack.current.shift();
+    undoStack.current.push(JSON.stringify({ json: c.toJSON(), zoom: c.getZoom() }));
+    if (undoStack.current.length > 20) undoStack.current.shift(); // cap: base64 imgs are heavy
     redoStack.current = [];
     setCanUndo(undoStack.current.length > 1);
     setCanRedo(false);
   }, []);
   const restore = useCallback(
-    (json: string) => {
+    (snap: string) => {
       const c = fabricRef.current as unknown as
-        | { loadFromJSON: (j: unknown, cb: () => void) => void; requestRenderAll: () => void }
+        | {
+            loadFromJSON: (j: unknown) => Promise<unknown>;
+            requestRenderAll: () => void;
+            setZoom: (z: number) => void;
+            getObjects: () => FabricObject[];
+          }
         | null;
       if (!c) return;
-      restoringRef.current = true;
-      c.loadFromJSON(JSON.parse(json), () => {
+      const parsed = JSON.parse(snap) as { json: unknown; zoom?: number };
+      restoringRef.current = true; // stays true until load resolves (v7 loadFromJSON is async)
+      void c.loadFromJSON(parsed.json).then(() => {
+        if (typeof parsed.zoom === "number") c.setZoom(parsed.zoom);
+        // loadFromJSON restores the filter MODEL but not the rendered result — re-apply.
+        c.getObjects().forEach((o) => {
+          const im = o as unknown as { type?: string; filters?: unknown[]; applyFilters?: () => void };
+          if (im.type === "image" && im.filters && im.filters.length > 0 && im.applyFilters) im.applyFilters();
+        });
         c.requestRenderAll();
-        restoringRef.current = false;
         refreshLayers();
+        restoringRef.current = false; // only now are all object:added events done
       });
     },
     [refreshLayers]
@@ -896,8 +908,8 @@ export default function CanvasEditor() {
       </p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button className="btn-secondary" disabled={!ready || !canUndo} onClick={undo} title="復原 (Undo)">↩️</button>
-        <button className="btn-secondary" disabled={!ready || !canRedo} onClick={redo} title="重做 (Redo)">↪️</button>
+        <button className="btn-secondary" disabled={!ready || !canUndo || drawMode !== "off" || inpaintMode} onClick={undo} title="復原 (Undo)">↩️</button>
+        <button className="btn-secondary" disabled={!ready || !canRedo || drawMode !== "off" || inpaintMode} onClick={redo} title="重做 (Redo)">↪️</button>
         <button className="btn-secondary" disabled={!ready} onClick={addText}>＋ 文字</button>
         <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }}>
           ＋ 上傳圖案
