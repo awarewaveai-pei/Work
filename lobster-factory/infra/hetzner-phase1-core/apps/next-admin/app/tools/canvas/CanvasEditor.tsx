@@ -22,7 +22,7 @@ import type { Canvas as FabricCanvas, FabricObject } from "fabric";
 import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_SOURCE_KEY, CANVAS_NAME_KEY } from "@/components/tools/canvas-handoff";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
-import { buildFabricImageFilters, buildPresetFilters, PRESET_FILTERS } from "./fabric-filters";
+import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS } from "./fabric-filters";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -73,6 +73,9 @@ export default function CanvasEditor() {
   const [lockSelected, setLockSelected] = useState(false); // selected object is locked (防呆 block)
   const [presetId, setPresetId] = useState<string | null>(null); // one-click look preset (active image)
   const [removeWhite, setRemoveWhite] = useState(false); // free chroma-key white-bg removal
+  const [vibrance, setVibrance] = useState(0); // 自然飽和 -100..100
+  const [blurv, setBlurv] = useState(0); // 高斯模糊 0..100
+  const [noisev, setNoisev] = useState(0); // 雜訊 0..100
   const [inpaintMode, setInpaintMode] = useState(false); // 🪄 painting a removal mask
   const [inpaintBusy, setInpaintBusy] = useState(false);
   const [brushSize, setBrushSize] = useState(34);
@@ -211,6 +214,7 @@ export default function CanvasEditor() {
       target.filters = [
         ...buildFabricImageFilters(ns, grade.params),
         ...buildPresetFilters(ns, presetId, removeWhite),
+        ...buildEffectFilters(ns, { vibrance, blur: blurv, noise: noisev }),
       ];
       target.applyFilters();
       canvas.requestRenderAll();
@@ -218,7 +222,7 @@ export default function CanvasEditor() {
     return () => {
       cancelled = true;
     };
-  }, [grade.params, presetId, removeWhite]);
+  }, [grade.params, presetId, removeWhite, vibrance, blurv, noisev]);
 
   const addText = useCallback(() => {
     const canvas = fabricRef.current;
@@ -718,6 +722,17 @@ export default function CanvasEditor() {
                 <input type="checkbox" checked={removeWhite} onChange={(e) => setRemoveWhite(e.target.checked)} />
                 ✂️ 去白底（免費，近白色變透明）
               </label>
+              {/* 影像效果積木：自然飽和 / 高斯模糊 / 雜訊 */}
+              {[
+                { label: "自然飽和", v: vibrance, set: setVibrance, min: -100, max: 100 },
+                { label: "高斯模糊", v: blurv, set: setBlurv, min: 0, max: 100 },
+                { label: "雜訊", v: noisev, set: setNoisev, min: 0, max: 100 },
+              ].map((row) => (
+                <label key={row.label} style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ display: "flex", justifyContent: "space-between" }}><span>{row.label}</span><span style={{ opacity: 0.7 }}>{row.v}</span></span>
+                  <input type="range" min={row.min} max={row.max} value={row.v} onChange={(e) => row.set(Number(e.target.value))} />
+                </label>
+              ))}
             </div>
 
             {/* 🪄 AI 去除不要的部分 (bria/eraser) */}

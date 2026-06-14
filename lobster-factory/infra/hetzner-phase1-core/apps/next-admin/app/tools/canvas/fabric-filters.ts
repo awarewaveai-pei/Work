@@ -32,6 +32,25 @@ export const PRESET_FILTERS: { id: string; label: string; cls: string }[] = [
 ];
 
 /**
+ * Extra image-effect filters (Photoshop-style), built separately and concat'd with grade +
+ * preset filters at the apply site so all coexist on one image.
+ *   - vibrance −100..100 → Fabric Vibrance (-1..1)  自然飽和
+ *   - blur       0..100   → Fabric Blur (0..1)        高斯模糊
+ *   - noise      0..100   → Fabric Noise (0..~600)    雜訊
+ */
+export function buildEffectFilters(
+  fabricNS: { filters: Record<string, FilterCtor> },
+  eff: { vibrance?: number; blur?: number; noise?: number }
+): object[] {
+  const F = fabricNS.filters;
+  const out: object[] = [];
+  if (eff.vibrance && F.Vibrance) out.push(new F.Vibrance({ vibrance: clampN(eff.vibrance / 100, -1, 1) }));
+  if (eff.blur && F.Blur) out.push(new F.Blur({ blur: clampN(eff.blur / 100, 0, 1) }));
+  if (eff.noise && F.Noise) out.push(new F.Noise({ noise: clampN(eff.noise * 6, 0, 600) }));
+  return out;
+}
+
+/**
  * Preset look + free chroma-key removal — built SEPARATELY from the colour-grade filters so
  * both can coexist on one image (the apply site concats grade + preset filter lists). RemoveColor
  * strips a near-white background (distance tolerance) for free, no Replicate call.
