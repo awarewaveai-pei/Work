@@ -515,6 +515,7 @@ export default function CanvasEditor() {
     if (!canvas) return;
     const img = canvas.getActiveObject();
     if (!img || img.type !== "image") return;
+    applyDrawMode("off"); // inpaint and free-draw both use isDrawingMode — keep them exclusive
     inpaintImgRef.current = img;
     inpaintPathsRef.current = [];
     img.set({ selectable: false });
@@ -534,7 +535,7 @@ export default function CanvasEditor() {
       setInpaintMode(true);
       canvas.requestRenderAll();
     });
-  }, [brushSize]);
+  }, [brushSize, applyDrawMode]);
 
   const exitInpaint = useCallback((keepPaths: boolean) => {
     const canvas = fabricRef.current;
@@ -716,6 +717,33 @@ export default function CanvasEditor() {
         >
           {lockSelected ? "🔒 已鎖定" : "🔓 鎖定"}
         </button>
+        {/* ✏️ 自由繪筆 / 🧹 橡皮擦 — toggle drawing mode (exits inpaint first) */}
+        <button
+          className="btn-secondary"
+          disabled={!ready || inpaintMode}
+          style={{ fontWeight: drawMode === "draw" ? 700 : 400 }}
+          onClick={() => applyDrawMode(drawMode === "draw" ? "off" : "draw")}
+          title="自由繪筆"
+        >
+          ✏️ 畫筆
+        </button>
+        <button
+          className="btn-secondary"
+          disabled={!ready || inpaintMode}
+          style={{ fontWeight: drawMode === "erase" ? 700 : 400 }}
+          onClick={() => applyDrawMode(drawMode === "erase" ? "off" : "erase")}
+          title="橡皮擦（擦掉畫到的地方）"
+        >
+          🧹 橡皮擦
+        </button>
+        {drawMode !== "off" ? (
+          <>
+            {drawMode === "draw" ? (
+              <input type="color" value={drawColor} title="畫筆顏色" onChange={(e) => { setDrawColor(e.target.value); const c = fabricRef.current; if (c?.freeDrawingBrush) c.freeDrawingBrush.color = e.target.value; }} style={{ width: 30, height: 24, padding: 0 }} />
+            ) : null}
+            <input type="range" min={1} max={80} value={drawWidth} title="筆刷大小" onChange={(e) => { const w = Number(e.target.value); setDrawWidth(w); const c = fabricRef.current; if (c?.freeDrawingBrush) c.freeDrawingBrush.width = w; }} />
+          </>
+        ) : null}
         <span style={{ flex: 1 }} />
         <button className="btn-primary" disabled={!ready} onClick={download}>下載 PNG</button>
         <button
@@ -846,6 +874,7 @@ export default function CanvasEditor() {
                 </div>
               ) : null}
             </div>
+            <button className="btn-secondary" style={{ fontSize: 12 }} onClick={applyGradient} title="把選取物件填成漸層（左色用畫筆顏色）">🌈 漸層填色</button>
           </div>
         ) : null}
 
