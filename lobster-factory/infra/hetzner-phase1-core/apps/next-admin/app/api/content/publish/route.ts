@@ -104,6 +104,18 @@ function markdownToHtml(md: string): string {
       continue;
     }
 
+    // YouTube placeholder — [YOUTUBE_PLACEHOLDER_N: search query]
+    const ytMatch = line.trim().match(/^\[YOUTUBE_PLACEHOLDER_(\d+):\s*(.+)\]$/);
+    if (ytMatch) {
+      const [, n, query] = ytMatch;
+      out.push(
+        `<div class="youtube-placeholder" data-query="${escapeHtml(query.trim())}" style="padding:24px;background:#f8f8f8;border:2px dashed #ccc;text-align:center;margin:16px 0;">` +
+        `🎬 YouTube #${n}：${escapeHtml(query.trim())}` +
+        `</div>`
+      );
+      continue;
+    }
+
     // Standalone images (full-line image syntax)
     const imgMatch = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
     if (imgMatch) {
