@@ -965,13 +965,26 @@ export default function CanvasEditor() {
 
       {error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{error}</span> : null}
 
-      {/* 工具面板可自由拖曳（SidebarPanel）；位置存 localStorage。 */}
-      <div style={{ position: "relative", minHeight: 824 }}>
-        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: 802, background: "#fff" }}>
+      {/* 畫布 + 右側可捲動工具欄（vector-trace-demo 風格）。面板垂直堆疊、可收合。 */}
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: 802, background: "#fff", flexShrink: 0 }}>
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
-        {/* 📐 畫布尺寸 / DPI — 公分/公釐 + DPI 自設（參考 vector-trace-demo）。永遠顯示，可拖。 */}
+        {/* 右側工具欄：固定寬、超出時捲動 */}
+        <div
+          style={{
+            width: 300,
+            flexShrink: 0,
+            maxHeight: "calc(100vh - 130px)",
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            paddingRight: 4,
+          }}
+        >
+        {/* 📐 畫布尺寸 / DPI — 公分/公釐 + DPI 自設（參考 vector-trace-demo）。 */}
         <SidebarPanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 816, y: 0 }} width={236}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
             <div style={{ display: "flex", gap: 8 }}>
@@ -1179,6 +1192,7 @@ export default function CanvasEditor() {
             />
           </SidebarPanel>
         ) : null}
+        </div>
       </div>
     </div>
   );

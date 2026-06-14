@@ -4,6 +4,27 @@
 
 ## 2026-06-15
 
+### feat(pod): 服飾 POD Phase 1 — 100% 忠實印刷檔（取代 Real-ESRGAN 預設）+ 純圖案產品圖
+
+**[任務理解]** 使用者對服飾 POD 下了鐵律：商品圖/印刷檔上的圖案必須與生成的原圖「100% 一模一樣」，不可被 AI 重新詮釋。現況印刷檔走 `upscaler.ts`（Real-ESRGAN AI 超解析）→ **會合成新像素 = 改像素 = 違反鐵律**。這是 Phase 1 要修的根本問題（非表面）。
+
+**[現況分析]** 讀全生圖引擎 `lib/tarot/image-gen.ts`：所有 AI 模型最大原生輸出 ≈ 2K（Ideogram v4 quality 2496px 最高，nano-banana/seedream/imagen "2K"，FLUX/GPT-Image 1024–1536px）。**無任何模型原生輸出 4800px（300DPI@16in）**。故「原生印刷級免放大」物理不可達；唯一忠實路徑 = 原圖直用（100% 像素相同，DPI 隨尺寸）或 Lanczos 確定性放大（不發明內容、會軟）。Real-ESRGAN 必須降為 opt-in。`git log` 確認 studio 區近期僅 colour-balance/filename，無並行同議題改動。
+
+**[已修改]**
+- `lib/studio/print-file.ts`（新）— `buildFaithfulPrintFile(designUrl,{mode})`：`original`=sharp 無損 PNG 重編碼（像素不變）；`resample`=sharp `lanczos3` 放大到 4800px（確定性插值、零 AI 補圖、不 downscale）。SSRF guard（designsBase prefix + redirect:manual fail-closed）、60MB cap、誠實回報 `dpiAtFullPrint`（longEdge/16in）+ `meetsTarget`。
+- `app/api/tools/publish/route.ts` — `upscale` action 加 `printMode`（預設 `original` 忠實；`ai-enhance`→舊 Real-ESRGAN，回 `faithful:false`）；新 `productimage` action（設計→`toProductImage(web-square)` WebP ~100KB→R2，加 timeout+size cap）；fallback 錯誤字串補 productimage。
+- `app/tools/publish/PublishWizard.tsx` — 印刷檔模式 `<select>`（原圖/忠實放大/AI 增強）；誠實 DPI 顯示（「滿版約 N DPI · 100% 忠實/AI 增強」「達標(≥225DPI)」）；純圖案產品圖按鈕（加入商品照、重跑替換不累積）；link 成功列標示印刷檔忠實度（防 ai-enhance 被冒充「100% 忠實」）；printMode 變更 reset upscale+link。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node pf_realtest.cjs`（app sharp via NODE_PATH，TEMP 隔離） | exit=0 | `original_pixel_identical:true`（原圖模式像素級相同）、120×180→resample 3200×4800（命中 4800px=300DPI@16in、保比例）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=~60000（critic 修正後重跑仍綠）
+- REVIEW_DONE: critic=Deep | verdict=warn→pass-after-fix | findings=0c/2M/4m → 2 Major 全修（productimage fetch 補 timeout+60MB cap 防 OOM-DoS；link 攜帶 faithful 旗標防 ai-enhance 冒充忠實）+ Minor 修（stale action 字串、badge「達 300DPI」→「達標(≥225DPI)」誠實化、產品圖重跑替換）；critic 另確認 SSRF guard/redirect-manual/role-gate/error-shape 全 clean
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`buildFaithfulPrintFile\|dpiAtFullPrint\|productimage\|printMode\|PrintFileMode` | hits=0 stale（全部命中為本次 3 檔的定義+自身 callsite；新符號 next-admin-local 無 downstream consumer；唯一 publish route 消費者=PublishWizard，回應向後相容）
+
+**[剩餘風險]** ① 尚未 sg-deploy（程式已就緒，部署為後續步驟）② 2K 原圖直用滿版約 156 DPI（Printful 最低 150 可接受，超大滿版略軟）— UI 已誠實顯示真實 DPI，由人決定換更大設計或開 resample ③ Real-ESRGAN「ai-enhance」仍可選用但已明確標非忠實。
+
+**[rollback]** 三檔皆 flag(`POD_DESIGNS_ENABLED`)後；`git revert` 本 commit 即回 Real-ESRGAN 預設；`lib/studio/print-file.ts` 可整檔刪（無 downstream）。
+
 ### fix(content-studio): ContentStudio 全部待調整清單（10 項）+ AEO scoring
 
 **[任務理解]** 上一 session 完成熱門搜尋 Perplexity 替換後，使用者要求處理 ContentStudio 完整待調整清單。
