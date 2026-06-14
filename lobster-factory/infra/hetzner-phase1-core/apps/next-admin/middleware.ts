@@ -116,9 +116,16 @@ export async function middleware(request: NextRequest) {
   baseHeaders.delete(SIMULATED_HEADER);
   const passthrough = () => NextResponse.next({ request: { headers: baseHeaders } });
 
-  // Server-to-server: own-Bearer /api/ops endpoints, or a valid x-ops-sync-key automation
-  // call. Authorization is enforced by the route's own token check.
-  if (PUBLIC_API_PATHS.has(pathname) || hasValidSyncKey(request)) {
+  // Server-to-server: own-Bearer /api/ops endpoints with no browser session needed.
+  // Authorization is enforced by the route's own token check.
+  if (PUBLIC_API_PATHS.has(pathname)) {
+    return passthrough();
+  }
+  // x-ops-sync-key automation (wp-update, wp-report, trigger-build, etc.). Middleware owns
+  // the key validation; downstream routes use resolveOpsRole → inject operator role so
+  // existing RBAC checks work without each route re-validating the key.
+  if (hasValidSyncKey(request)) {
+    baseHeaders.set("x-ops-claims-role", "operator");
     return passthrough();
   }
 
