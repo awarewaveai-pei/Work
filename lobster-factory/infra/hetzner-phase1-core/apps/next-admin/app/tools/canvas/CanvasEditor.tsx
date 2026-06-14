@@ -25,6 +25,9 @@ import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePan
 import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS } from "./fabric-filters";
 import SidebarPanel from "@/components/tools/SidebarPanel";
 import FontLibrary from "@/components/tools/FontLibrary";
+import { posterizeDataUrl } from "@/lib/studio/posterize";
+// Pure-data import only (NOT generative-fill.ts — that uses Buffer/process.env, server-only).
+import { OUTPAINT_PRESETS, OUTPAINT_LABELS, type OutpaintPreset } from "@/lib/studio/outpaint-presets";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
