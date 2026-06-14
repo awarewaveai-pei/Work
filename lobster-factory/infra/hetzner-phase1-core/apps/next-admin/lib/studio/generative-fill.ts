@@ -16,24 +16,18 @@
  * REPLICATE_API_TOKEN. `image`/`mask` are `format: uri` inputs → base64 data URLs work directly.
  */
 
+import { OUTPAINT_PRESETS, type OutpaintPreset } from "./outpaint-presets";
+
+// Re-export so existing server-side imports (the route) keep resolving from this module.
+export { OUTPAINT_PRESETS };
+export type { OutpaintPreset };
+
 const FLUX_FILL_PRO_VERSION_DEFAULT =
   "41c767bcbfffe54ef8f05eb4d0100f9314790f7fc43a7b88d73ec06839deddb9"; // black-forest-labs/flux-fill-pro (pinned 2026-06-15)
 
 const POLL_INTERVAL_MS = 2_000;
 const TIMEOUT_MS = 55_000; // route maxDuration is 60s — leave headroom
 const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
-
-/** Allowed outpaint presets — must match the model's `outpaint` enum exactly. */
-export const OUTPAINT_PRESETS = [
-  "Zoom out 1.5x",
-  "Zoom out 2x",
-  "Make square",
-  "Left outpaint",
-  "Right outpaint",
-  "Top outpaint",
-  "Bottom outpaint",
-] as const;
-export type OutpaintPreset = (typeof OUTPAINT_PRESETS)[number];
 
 export type GenerativeFillResult =
   | { ok: true; image: string } // data URL of the generated image
