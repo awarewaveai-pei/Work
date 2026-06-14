@@ -25,10 +25,13 @@ export interface RankMathReport {
   total: number;
 }
 
+// Each CJK/kana/hangul character counts as one word (no spaces between them).
+const CJK_RE = /[　-鿿ꥠ-꥿가-퟿豈-﫿︰-﹏＀-￯]/g;
+
 function countWords(text: string): number {
-  const cjkCount = (text.match(/[一-鿿㐀-䶿＀-￯　-〿]/g) ?? []).length;
+  const cjkCount = (text.match(CJK_RE) ?? []).length;
   const latinCount = text
-    .replace(/[一-鿿㐀-䶿＀-￯　-〿]/g, " ")
+    .replace(CJK_RE, " ")
     .split(/\s+/)
     .filter(w => /[a-zA-Z0-9]/.test(w)).length;
   return cjkCount + latinCount;
@@ -70,9 +73,8 @@ function getParagraphs(md: string): string[] {
 
 function getIntroWords(md: string, count = 150): string {
   const plain = stripMarkdown(md);
-  // For CJK-dominant text, every character is a "word" — slice by char instead
-  const hasCjk = /[一-鿿㐀-䶿]/.test(plain);
-  if (hasCjk) return plain.slice(0, count * 3).toLowerCase(); // 3 bytes per CJK ≈ reasonable window
+  // For CJK/kana/hangul-dominant text, every character is a "word" — slice by char
+  if (CJK_RE.test(plain)) return plain.slice(0, count * 3).toLowerCase();
   return plain.split(/\s+/).slice(0, count).join(" ").toLowerCase();
 }
 

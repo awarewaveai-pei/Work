@@ -402,6 +402,7 @@ export default function ContentStudio() {
   const humAbortRef  = useRef<AbortController | null>(null);
   const bulkAbortRef = useRef<AbortController | null>(null);
   const seoRunRef    = useRef(0);
+  const imgRunRef    = useRef(0);
 
   // ─── Load WP sites ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -629,7 +630,8 @@ export default function ContentStudio() {
 
       // Auto-replace IMAGE_PLACEHOLDERs via Replicate if AI images enabled
       if (form.media.aiImages !== "none") {
-        void autoReplaceImages(cleanMd, myRun);
+        const myImgRun = ++imgRunRef.current;
+        void autoReplaceImages(cleanMd, myImgRun);
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") setGenStatus("idle");
@@ -645,7 +647,7 @@ export default function ContentStudio() {
     setAutoImgN(placeholders.length);
     let remaining = placeholders.length;
     for (const m of placeholders) {
-      if (genRun !== seoRunRef.current) break; // user re-generated, abort
+      if (genRun !== imgRunRef.current) break; // user re-generated, abort
       const altText = m[1].trim() || form.keyword;
       const n = m[2];
       try {
@@ -653,7 +655,7 @@ export default function ContentStudio() {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: altText, platform: "twitter_post" }),
         });
-        if (genRun !== seoRunRef.current) break;
+        if (genRun !== imgRunRef.current) break;
         const json = await res.json() as { ok: boolean; imageUrl?: string };
         if (json.ok && json.imageUrl) {
           setGenerated(prev => prev.replace(`IMAGE_PLACEHOLDER_${n}`, json.imageUrl!));

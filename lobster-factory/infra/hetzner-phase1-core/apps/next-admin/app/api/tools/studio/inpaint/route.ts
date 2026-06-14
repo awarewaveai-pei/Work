@@ -1,0 +1,39 @@
+import { NextResponse } from "next/server";
+import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
+import { removeObject } from "../../../../../lib/studio/inpaint";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const MAX_IMAGE_CHARS = 12_000_000; // ~9 MB base64, same ceiling as remove-bg / designs save
+const DATA_URL_RE = /^data:image\/(png|jpe?g|webp);base64,/;
+
+export async function POST(request: Request) {
+  if (process.env.POD_DESIGNS_ENABLED !== "true") {
+    return NextResponse.json({ ok: false, error: "pod_designs_disabled" }, { status: 503 });
+  }
+  const resolved = resolveOpsRole(request);
+  if (!canCreateAiImageJob(resolved.role)) {
+    return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
+  }
+
+  let body: { image?: string; mask?: string };
+  try {
+    body = (await request.json()) as { image?: string; mask?: string };
+  } catch {
+    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
+  }
+  if (typeof body.image !== "string" || typeof body.mask !== "string") {
+    return NextResponse.json({ ok: false, error: "image and mask (base64 data URLs) are required" }, { status: 400 });
+  }
+  if (body.image.length > MAX_IMAGE_CHARS || body.mask.length > MAX_IMAGE_CHARS) {
+    return NextResponse.json({ ok: false, error: "image/mask too large (~9MB limit)" }, { status: 413 });
+  }
+  if (!DATA_URL_RE.test(body.image) || !DATA_URL_RE.test(body.mask)) {
+    return NextResponse.json({ ok: false, error: "image/mask must be png/jpeg/webp base64 data URLs" }, { status: 400 });
+  }
+
+  const result = await removeObject(body.image, body.mask);
+  // HTTP 200 with ok:false on failure — same nginx error_page rationale as the other studio routes.
+  return NextResponse.json(result);
+}

@@ -10385,3 +10385,8 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=imageCount|youtubeCount|introHookBrief|targetCountry.*Global | hits=0
 
 
+
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=countWords|resolveTermIds|imgRunRef|CJK_RE | hits=0 (no stale call sites outside modified files)
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1M/2m/2s -- Major: JP/KO kana/hangul missing from CJK range (FIXED before commit); Minor: resolveTermIds silent drop, inline images literal-text; Suggestions: imgRunRef decoupling (FIXED), imgRunRef reset
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<30000
+- REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke checks WP publish endpoint; CJK word-count verified by critic empirically
