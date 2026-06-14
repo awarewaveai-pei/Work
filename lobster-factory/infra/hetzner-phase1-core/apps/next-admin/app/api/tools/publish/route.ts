@@ -310,5 +310,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, syncProductId: found.id, linkedCount, total: results.length, results });
   }
 
-  return NextResponse.json({ ok: false, error: "action must be upscale|create|status|link" }, { status: 400 });
+  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|create|status|link" }, { status: 400 });
 }
