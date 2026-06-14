@@ -178,7 +178,7 @@ export async function generateMockup(
     let pollRes: Response;
     try {
       pollRes = await timedFetch(
-        `${PRINTFUL_API}/mockup-generator/task?task_key=${taskKey}`,
+        `${PRINTFUL_API}/mockup-generator/task?task_key=${encodeURIComponent(taskKey)}`,
         {
           headers: {
             Authorization: `Bearer ${apiKey}`,
