@@ -9,6 +9,7 @@ interface TrendingItem {
   traffic: string;
   category: string;
   relatedQueries: string[];
+  source?: string;
 }
 
 // ─── Perplexity helper ───────────────────────────────────────────────────────
@@ -84,6 +85,86 @@ async function fetchGoogleNewsTrending(geo: string): Promise<TrendingItem[]> {
       const title = full.replace(/\s*[-–—]\s*[^\s-–—].{2,35}$/, "").trim() || full;
       if (title.length < 4) continue;
       items.push({ title, traffic: "", category: "", relatedQueries: [] });
+    }
+    return items;
+  } catch { return []; }
+}
+
+// ─── Reddit Atom RSS — free, no key, works from VPS ────────────────────────
+
+const REDDIT_GEO_SUBS: Record<string, string[]> = {
+  TW: ["taiwan", "worldnews"],
+  HK: ["hongkong", "worldnews"],
+  SG: ["singapore", "worldnews"],
+  US: ["news", "worldnews"],
+  GB: ["unitedkingdom", "worldnews"],
+  JP: ["japan", "worldnews"],
+  AU: ["australia", "worldnews"],
+};
+
+async function fetchRedditTrending(geo: string): Promise<TrendingItem[]> {
+  const subs = (REDDIT_GEO_SUBS[geo] ?? REDDIT_GEO_SUBS.US).join("+");
+  const url = `https://www.reddit.com/r/${subs}.rss?limit=20`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "ContentStudio/1.0 (educational aggregator; +https://aware-wave.com)",
+        "Accept": "application/rss+xml, application/xml, text/xml",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const items: TrendingItem[] = [];
+    // Atom feed uses <entry> not <item>
+    const entryRe = /<entry>([\s\S]*?)<\/entry>/g;
+    let m: RegExpExecArray | null;
+    while ((m = entryRe.exec(xml)) !== null && items.length < 10) {
+      const block = m[1];
+      const titleM = block.match(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
+      if (!titleM) continue;
+      const title = titleM[1]
+        .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+      if (title.length < 4 || title.toLowerCase() === "reddit: the front page of the internet") continue;
+      items.push({ title, traffic: "", category: "", relatedQueries: [], source: "Reddit" });
+    }
+    return items;
+  } catch { return []; }
+}
+
+// ─── PTT Gossiping HTML scrape — works from VPS with over18 cookie ───────────
+
+async function fetchPttTrending(): Promise<TrendingItem[]> {
+  try {
+    const res = await fetch("https://www.ptt.cc/bbs/Gossiping/index.html", {
+      headers: {
+        "Cookie": "over18=1",
+        "User-Agent": "Mozilla/5.0 (compatible; ContentStudio/1.0)",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+    const items: TrendingItem[] = [];
+    // Extract post titles: <div class="title"><a href="...">TITLE</a></div>
+    const titleRe = /<div class="title">\s*<a href="[^"]*">([^<]+)<\/a>/g;
+    // Extract push counts: <div class="nrec"><span class="...">COUNT</span></div>
+    const pushRe = /<div class="nrec"><span[^>]*>([^<]+)<\/span><\/div>/g;
+    const titles: string[] = [];
+    const pushes: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = titleRe.exec(html)) !== null) {
+      const t = m[1].trim();
+      if (t.length > 3) titles.push(t);
+    }
+    while ((m = pushRe.exec(html)) !== null) {
+      pushes.push(m[1].trim());
+    }
+    for (let i = 0; i < Math.min(titles.length, 10); i++) {
+      const push = pushes[i] ?? "";
+      const traffic = /^\d+$/.test(push) ? `${push}推` : push === "爆" ? "爆推" : "";
+      items.push({ title: titles[i], traffic, category: "", relatedQueries: [], source: "PTT" });
     }
     return items;
   } catch { return []; }
@@ -168,7 +249,16 @@ export async function GET(req: Request): Promise<Response> {
   const hl    = url.searchParams.get("hl") ?? (geo === "TW" || geo === "HK" ? "zh-TW" : "en");
 
   if (type === "trending") {
-    const items = await fetchGoogleNewsTrending(geo);
+    const sources: Promise<TrendingItem[]>[] = [
+      fetchGoogleNewsTrending(geo),
+      fetchRedditTrending(geo),
+    ];
+    if (geo === "TW") sources.push(fetchPttTrending());
+    const settled = await Promise.allSettled(sources);
+    const items: TrendingItem[] = [];
+    for (const r of settled) {
+      if (r.status === "fulfilled") items.push(...r.value);
+    }
     return NextResponse.json({ ok: true, items, geo });
   }
 

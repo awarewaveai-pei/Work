@@ -308,7 +308,7 @@ export default function ContentStudio() {
   // Trending keywords panel
   const [showTrending,    setShowTrending]    = useState(false);
   const [trendGeo,        setTrendGeo]        = useState("TW");
-  const [trendingItems,   setTrendingItems]   = useState<Array<{ title: string; traffic: string; relatedQueries: string[] }>>([]);
+  const [trendingItems,   setTrendingItems]   = useState<Array<{ title: string; traffic: string; relatedQueries: string[]; source?: string }>>([]);
   const [trendLoading,    setTrendLoading]    = useState(false);
   const [suggestResults,  setSuggestResults]  = useState<string[]>([]);
   const [questionResults, setQuestionResults] = useState<string[]>([]);
@@ -959,26 +959,39 @@ export default function ContentStudio() {
             {/* Trending tab */}
             {trendTab === "trending" && trendingItems.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                {trendingItems.map((item, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "0", borderRadius: "6px", overflow: "hidden",
-                    border: "1px solid var(--card-border)", background: "var(--bg-card)" }}>
-                    <button onClick={() => pickTrendKeyword(item.title)}
-                      style={{ padding: "5px 10px", background: "none", border: "none", cursor: "pointer",
-                        fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", fontWeight: 500 }}
-                      title={`點擊使用此關鍵字${item.relatedQueries.length > 0 ? "；相關：" + item.relatedQueries.slice(0, 3).join("、") : ""}`}>
-                      {item.title}
-                    </button>
-                    {item.traffic && (
-                      <span style={{ padding: "3px 6px", fontSize: "10px", background: "#fef3c7", color: "#92400e", borderLeft: "1px solid var(--card-border)" }}>
-                        {item.traffic}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                {trendingItems.map((item, i) => {
+                  const srcColor: Record<string, { bg: string; text: string }> = {
+                    Reddit: { bg: "#ff4500", text: "#fff" },
+                    PTT:    { bg: "#006e2e", text: "#fff" },
+                  };
+                  const sc = item.source ? (srcColor[item.source] ?? { bg: "#e0e7ff", text: "#3730a3" }) : null;
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "0", borderRadius: "6px", overflow: "hidden",
+                      border: "1px solid var(--card-border)", background: "var(--bg-card)" }}>
+                      {sc && (
+                        <span style={{ padding: "3px 6px", fontSize: "9px", fontWeight: 700, background: sc.bg, color: sc.text,
+                          borderRight: "1px solid rgba(0,0,0,0.1)", letterSpacing: "0.03em", flexShrink: 0 }}>
+                          {item.source}
+                        </span>
+                      )}
+                      <button onClick={() => pickTrendKeyword(item.title)}
+                        style={{ padding: "5px 10px", background: "none", border: "none", cursor: "pointer",
+                          fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", fontWeight: 500 }}
+                        title={`點擊使用此關鍵字${item.relatedQueries.length > 0 ? "；相關：" + item.relatedQueries.slice(0, 3).join("、") : ""}`}>
+                        {item.title}
+                      </button>
+                      {item.traffic && (
+                        <span style={{ padding: "3px 6px", fontSize: "10px", background: "#fef3c7", color: "#92400e", borderLeft: "1px solid var(--card-border)" }}>
+                          {item.traffic}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
             {trendTab === "trending" && trendingItems.length === 0 && !trendLoading && (
-              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>點擊「搜尋」載入今日熱搜關鍵字（Perplexity 即時資料）</div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>點擊「搜尋」載入今日熱搜（Google News / Reddit / PTT）</div>
             )}
 
             {/* Suggest tab */}

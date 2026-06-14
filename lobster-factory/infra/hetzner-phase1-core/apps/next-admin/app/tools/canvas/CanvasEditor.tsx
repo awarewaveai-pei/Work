@@ -100,9 +100,18 @@ export default function CanvasEditor() {
   const [drawColor, setDrawColor] = useState("#111111");
   const [drawWidth, setDrawWidth] = useState(6);
   const drawHandlerRef = useRef<((e: { path?: FabricObject }) => void) | null>(null);
-  const [inpaintMode, setInpaintMode] = useState(false); // 🪄 painting a removal mask
+  const [inpaintMode, setInpaintMode] = useState(false); // 🪄 painting a mask (removal or fill)
   const [inpaintBusy, setInpaintBusy] = useState(false);
+  const [maskMode, setMaskMode] = useState<"remove" | "fill">("remove"); // what the painted mask does
+  const [fillPrompt, setFillPrompt] = useState(""); // 生成填色 prompt (AI fills the masked area)
   const [brushSize, setBrushSize] = useState(34);
+  // 🖼 擴圖 outpaint (flux-fill-pro) + 色調分離 posterize — both replace the selected image's pixels.
+  const [outpaintDir, setOutpaintDir] = useState<OutpaintPreset>("Zoom out 1.5x");
+  const [genBusy, setGenBusy] = useState(false); // outpaint / posterize in flight
+  const [posterLevels, setPosterLevels] = useState(5);
+  // 🗂 群組 — track whether the active selection can be grouped / ungrouped.
+  const [multiSelected, setMultiSelected] = useState(false); // ActiveSelection (≥2 objects)
+  const [groupSelected, setGroupSelected] = useState(false); // a single Group object
   const inpaintImgRef = useRef<FabricObject | null>(null); // image being edited in inpaint mode
   const inpaintPathsRef = useRef<FabricObject[]>([]); // strokes painted as the mask
   // 🎨 物件效果（PS 圖層樣式）— apply to the selected object (text/image/shape).
@@ -131,6 +140,11 @@ export default function CanvasEditor() {
       const fabric = await import("fabric");
       if (disposed || !canvasElRef.current) return;
 
+      // Persist our custom `name` (圖層改名) through toJSON/loadFromJSON + design save. Must be set
+      // class-level BEFORE any object is created (Fabric v7 concatenates customProperties into
+      // every toObject; per-instance assignment is ignored). Confirmed: fabricjs discussion #10176.
+      (fabric.FabricObject as unknown as { customProperties: string[] }).customProperties = ["name"];
+
       canvas = new fabric.Canvas(canvasElRef.current, {
         backgroundColor: "#ffffff",
         preserveObjectStacking: true,
@@ -154,6 +168,8 @@ export default function CanvasEditor() {
         }
         setImageSelected(o?.type === "image");
         setAnySelected(!!o);
+        setMultiSelected((o as { type?: string } | null)?.type === "activeselection");
+        setGroupSelected((o as { type?: string } | null)?.type === "group");
         setLockSelected(!!(o as { lockMovementX?: boolean } | null)?.lockMovementX);
         const e = o as
           | { opacity?: number; globalCompositeOperation?: string; shadow?: unknown; stroke?: unknown; strokeWidth?: number }
@@ -179,6 +195,8 @@ export default function CanvasEditor() {
         setTextSelected(false);
         setImageSelected(false);
         setAnySelected(false);
+        setMultiSelected(false);
+        setGroupSelected(false);
         setLockSelected(false);
       });
       // 🗂 keep the layer panel in sync with the object stack.
@@ -502,9 +520,22 @@ export default function CanvasEditor() {
     c.requestRenderAll();
     refreshLayers();
   }, [refreshLayers]);
+  // ✏️ 圖層改名 — set a custom `name` (persisted via FabricObject.customProperties). prompt() is
+  // bulletproof across browsers; the layer panel + layerLabel read this name first.
+  const renameLayer = useCallback((o: FabricObject) => {
+    const cur = String((o as unknown as { name?: string }).name ?? "");
+    const next = typeof window !== "undefined" ? window.prompt("圖層名稱", cur) : null;
+    if (next === null) return; // cancelled
+    (o as unknown as { set: (p: Record<string, unknown>) => void }).set({ name: next.trim() || undefined });
+    snapshot(); // record an undo step (set() doesn't fire object:modified)
+    refreshLayers();
+  }, [refreshLayers]);
 
   function layerLabel(o: FabricObject): string {
+    const custom = (o as unknown as { name?: string }).name;
+    if (custom) return `🏷 ${custom.slice(0, 14)}`; // 改過名的圖層優先顯示名稱
     const t = (o as { type?: string }).type;
+    if (t === "group") return "🗂 群組";
     if (t === "i-text" || t === "textbox" || t === "text") {
       const s = String((o as { text?: string }).text ?? "文字").slice(0, 10);
       return `📝 ${s}`;
@@ -711,8 +742,185 @@ export default function CanvasEditor() {
     });
   }, []);
 
+  // 🗂 群組 — convert an ActiveSelection (≥2 objects) into a persistent Group. Fabric v6/v7
+  // removed activeSelection.toGroup(); the manual recipe is discard (children → world coords) →
+  // remove from canvas → new Group(objects) (re-parents into group-local coords) → add.
+  // (web-researcher confirmed against fabricjs #7670 / source 2026-06-15.)
+  const groupSelection = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject() as unknown as { type?: string; getObjects?: () => FabricObject[] } | null;
+    if (!active || active.type !== "activeselection" || !active.getObjects) return;
+    const objects = active.getObjects();
+    void import("fabric").then((fabric) => {
+      if (fabricRef.current !== canvas) return;
+      canvas.discardActiveObject();
+      objects.forEach((o) => canvas.remove(o));
+      const group = new fabric.Group(objects);
+      canvas.add(group);
+      canvas.setActiveObject(group);
+      setGroupSelected(true);
+      setMultiSelected(false);
+      canvas.requestRenderAll();
+      refreshLayers();
+    });
+  }, [refreshLayers]);
+
+  // 🗂 解散群組 — Fabric v6/v7 removed group.toActiveSelection(); removeAll() restores each child's
+  // world coords, then destroy() tears the group down (fabricjs discussion #10028).
+  const ungroupSelection = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const group = canvas.getActiveObject() as unknown as
+      | { type?: string; removeAll?: () => FabricObject[]; destroy?: () => void }
+      | null;
+    if (!group || group.type !== "group" || !group.removeAll) return;
+    const children = group.removeAll();
+    canvas.remove(group as unknown as FabricObject);
+    group.destroy?.();
+    children.forEach((o) => canvas.add(o));
+    canvas.discardActiveObject();
+    setGroupSelected(false);
+    canvas.requestRenderAll();
+    refreshLayers();
+  }, [refreshLayers]);
+
+  // 🎚 色調分離 Posterize — Fabric has no Posterize filter, so bake it: render the selected image
+  // (filters included) at NATURAL resolution + no transform, quantize on a 2D canvas, then swap the
+  // pixels back keeping the object's scale/angle/name. Non-destructive to layout; undoable.
+  const posterizeSelected = useCallback(async () => {
+    const canvas = fabricRef.current;
+    const img = canvas?.getActiveObject() as
+      | (FabricObject & {
+          left?: number; top?: number; scaleX?: number; scaleY?: number; angle?: number;
+          originX?: string; originY?: string; name?: string;
+          toDataURL?: (o?: Record<string, unknown>) => string;
+        })
+      | null;
+    if (!canvas || !img || img.type !== "image" || !img.toDataURL) return;
+    setGenBusy(true);
+    setError(null);
+    try {
+      const src = img.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
+      const out = await posterizeDataUrl(src, posterLevels);
+      const fabric = await import("fabric");
+      if (fabricRef.current !== canvas) return;
+      const baked = await fabric.FabricImage.fromURL(out, { crossOrigin: "anonymous" });
+      // withoutTransform gave natural pixels → reapply the original scale/angle/origin to land it
+      // exactly where the old object sat.
+      baked.set({
+        left: img.left, top: img.top, angle: img.angle,
+        scaleX: img.scaleX, scaleY: img.scaleY,
+        originX: img.originX, originY: img.originY, name: img.name,
+      });
+      canvas.remove(img);
+      canvas.add(baked);
+      canvas.setActiveObject(baked);
+      canvas.requestRenderAll();
+      refreshLayers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setGenBusy(false);
+    }
+  }, [posterLevels, refreshLayers]);
+
+  // 🖼 擴圖 Outpaint — extend the selected image with flux-fill-pro's outpaint presets (no mask,
+  // no coordinate math). Sends the natural-res image + prompt + preset; replaces with the larger
+  // result at the SAME per-pixel scale so original content keeps size and the new area extends out.
+  const applyOutpaint = useCallback(async () => {
+    const canvas = fabricRef.current;
+    const img = canvas?.getActiveObject() as
+      | (FabricObject & { scaleX?: number; scaleY?: number; name?: string; toDataURL?: (o?: Record<string, unknown>) => string })
+      | null;
+    if (!canvas || !img || img.type !== "image" || !img.toDataURL) return;
+    if (fillPrompt.trim().length < 2) {
+      setError("請先描述要生成的內容（prompt）");
+      return;
+    }
+    setGenBusy(true);
+    setError(null);
+    try {
+      const src = img.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
+      const res = await fetch("/api/tools/studio/genfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
+        body: JSON.stringify({ image: src, prompt: fillPrompt.trim(), outpaint: outpaintDir }),
+      });
+      const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
+      if (!json.ok || !json.image) {
+        setError(json.error ?? "擴圖失敗，請重試");
+        return;
+      }
+      const fabric = await import("fabric");
+      if (fabricRef.current !== canvas) return;
+      const ext = await fabric.FabricImage.fromURL(json.image, { crossOrigin: "anonymous" });
+      ext.set({ scaleX: img.scaleX ?? 1, scaleY: img.scaleY ?? 1, originX: "center", originY: "center", name: img.name });
+      canvas.remove(img);
+      canvas.add(ext);
+      canvas.centerObject(ext);
+      canvas.setActiveObject(ext);
+      canvas.requestRenderAll();
+      refreshLayers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setGenBusy(false);
+    }
+  }, [fillPrompt, outpaintDir, refreshLayers]);
+
+  // 💾 設計檔（可再編輯）— export the full canvas JSON (custom `name` included via customProperties)
+  // so a design can be reloaded and keep editing. Client-only: download a .design.json blob.
+  const exportDesign = useCallback(() => {
+    const c = fabricRef.current as unknown as { toJSON: () => unknown } | null;
+    if (!c) return;
+    const json = JSON.stringify(c.toJSON());
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${nameRef.current || "canvas-design"}.design.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const importDesign = useCallback(
+    (file: File | null) => {
+      const c = fabricRef.current as unknown as
+        | { loadFromJSON: (j: unknown) => Promise<unknown>; requestRenderAll: () => void; getObjects: () => FabricObject[] }
+        | null;
+      if (!c || !file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        let json: unknown;
+        try {
+          json = JSON.parse(reader.result as string);
+        } catch {
+          setError("設計檔格式錯誤，無法載入");
+          return;
+        }
+        restoringRef.current = true; // block snapshot() during the load's object:added burst
+        void c.loadFromJSON(json).then(() => {
+          c.getObjects().forEach((o) => {
+            const im = o as unknown as { type?: string; filters?: unknown[]; applyFilters?: () => void };
+            if (im.type === "image" && im.filters && im.filters.length > 0 && im.applyFilters) im.applyFilters();
+          });
+          c.requestRenderAll();
+          refreshLayers();
+          restoringRef.current = false;
+          snapshot(); // record the loaded design as an undo baseline
+        });
+      };
+      reader.readAsText(file);
+    },
+    [refreshLayers, snapshot]
+  );
+
   // 🪄 AI 去除不要的部分 — paint a mask over the unwanted region, send image+mask to bria/eraser.
-  const startInpaint = useCallback(() => {
+  const startInpaint = useCallback((mode: "remove" | "fill") => {
+    setMaskMode(mode);
     const canvas = fabricRef.current;
     if (!canvas) return;
     const img = canvas.getActiveObject();
@@ -768,7 +976,11 @@ export default function CanvasEditor() {
     // getBoundingRect returns an axis-aligned box; a rotated image would mis-crop the mask and
     // double-rotate the replacement (critic Major). Require an upright image (angle 0).
     if (((img as { angle?: number }).angle ?? 0) % 360 !== 0) {
-      setError("請先把這張圖轉正（角度歸零）再去除");
+      setError("請先把這張圖轉正（角度歸零）再處理");
+      return;
+    }
+    if (maskMode === "fill" && fillPrompt.trim().length < 2) {
+      setError("請先描述要生成的內容（prompt）");
       return;
     }
     setInpaintBusy(true);
@@ -797,14 +1009,19 @@ export default function CanvasEditor() {
       inpaintPathsRef.current.forEach((p) => p.set({ visible: false }));
       canvas.requestRenderAll();
 
-      const res = await fetch("/api/tools/studio/inpaint", {
+      const endpoint = maskMode === "fill" ? "/api/tools/studio/genfill" : "/api/tools/studio/inpaint";
+      const payload =
+        maskMode === "fill"
+          ? { image: sourceUrl, mask: maskUrl, prompt: fillPrompt.trim() }
+          : { image: sourceUrl, mask: maskUrl };
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body: JSON.stringify({ image: sourceUrl, mask: maskUrl }),
+        body: JSON.stringify(payload),
       });
       const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
       if (!json.ok || !json.image) {
-        setError(json.error ?? "去除失敗，請重試");
+        setError(json.error ?? (maskMode === "fill" ? "生成失敗，請重試" : "去除失敗，請重試"));
         inpaintPathsRef.current.forEach((p) => p.set({ visible: true, stroke: "rgba(220,40,40,0.55)" }));
         canvas.requestRenderAll();
         return;
@@ -838,7 +1055,7 @@ export default function CanvasEditor() {
     } finally {
       setInpaintBusy(false);
     }
-  }, []);
+  }, [maskMode, fillPrompt]);
 
   /** Flatten the canvas to a PNG data URL (codebase convention — see file header). */
   const exportPng = useCallback((): string | null => {
@@ -941,6 +1158,13 @@ export default function CanvasEditor() {
         >
           {lockSelected ? "🔒 已鎖定" : "🔓 鎖定"}
         </button>
+        {/* 🗂 群組 / 解散群組 — group an active multi-selection, ungroup a selected group */}
+        {multiSelected ? (
+          <button className="btn-secondary" disabled={!ready} onClick={groupSelection} title="把選取的多個物件組成群組">🗂 群組</button>
+        ) : null}
+        {groupSelected ? (
+          <button className="btn-secondary" disabled={!ready} onClick={ungroupSelection} title="把群組拆回個別物件">🗂 解散</button>
+        ) : null}
         {/* ✏️ 自由繪筆 / 🧹 橡皮擦 — toggle drawing mode (exits inpaint first) */}
         <button
           className="btn-secondary"
@@ -969,6 +1193,21 @@ export default function CanvasEditor() {
           </>
         ) : null}
         <span style={{ flex: 1 }} />
+        {/* 💾 設計檔（可再編輯）— export/import the full canvas JSON */}
+        <button className="btn-secondary" disabled={!ready} onClick={exportDesign} title="匯出可再編輯的設計檔（.design.json）">💾 設計檔</button>
+        <label className="btn-secondary" style={{ cursor: ready ? "pointer" : "default" }} title="載入先前匯出的設計檔">
+          📂 載入
+          <input
+            type="file"
+            accept="application/json,.json"
+            style={{ display: "none" }}
+            disabled={!ready}
+            onChange={(e) => {
+              importDesign(e.target.files?.[0] ?? null);
+              e.target.value = "";
+            }}
+          />
+        </label>
         <button className="btn-primary" disabled={!ready} onClick={download}>下載 PNG</button>
         <button
           className="btn-primary"
@@ -1099,7 +1338,8 @@ export default function CanvasEditor() {
                 return (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, border: "1px solid var(--card-border)", borderRadius: 4, padding: "3px 5px" }}>
                     <button title="顯示/隱藏" onClick={() => toggleLayerVisible(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>{vis ? "👁" : "🚫"}</button>
-                    <button onClick={() => selectLayer(o)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: vis ? 1 : 0.45 }}>{layerLabel(o)}</button>
+                    <button onClick={() => selectLayer(o)} onDoubleClick={() => renameLayer(o)} title="點選圖層（雙擊改名）" style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: vis ? 1 : 0.45 }}>{layerLabel(o)}</button>
+                    <button title="改名" onClick={() => renameLayer(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>✏️</button>
                     <button title="上移" onClick={() => moveLayer(o, "up")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>↑</button>
                     <button title="下移" onClick={() => moveLayer(o, "down")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>↓</button>
                     <button title="複製" onClick={() => duplicateLayer(o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>⧉</button>
@@ -1208,13 +1448,27 @@ export default function CanvasEditor() {
             </div>
           </SidebarPanel>
 
-          <SidebarPanel id="inpaint" title="🪄 去除不要的部分（AI）" defaultPos={{ x: 816, y: 412 }} width={272} defaultCollapsed>
+          <SidebarPanel id="inpaint" title="🪄 去除 / 生成填色（AI）" defaultPos={{ x: 816, y: 412 }} width={272} defaultCollapsed>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {!inpaintMode ? (
-                <button className="btn-secondary" onClick={startInpaint}>開始塗抹要去除的地方</button>
+                <>
+                  <button className="btn-secondary" onClick={() => startInpaint("remove")}>🪄 去除不要的部分</button>
+                  <button className="btn-secondary" onClick={() => startInpaint("fill")}>✨ 生成填色（塗哪生哪）</button>
+                </>
               ) : (
                 <>
-                  <p style={{ fontSize: 12, opacity: 0.7, margin: 0 }}>用紅筆塗在想清掉的物件上，再按「套用」。</p>
+                  <p style={{ fontSize: 12, opacity: 0.7, margin: 0 }}>
+                    {maskMode === "fill" ? "用紅筆塗在要重新生成的區域，填描述後按套用。" : "用紅筆塗在想清掉的物件上，再按套用。"}
+                  </p>
+                  {maskMode === "fill" ? (
+                    <input
+                      className="btn-secondary"
+                      placeholder="要生成什麼，例如：一片藍天 / 紅玫瑰"
+                      value={fillPrompt}
+                      onChange={(e) => setFillPrompt(e.target.value)}
+                      style={{ fontSize: 12 }}
+                    />
+                  ) : null}
                   <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
                     筆刷
                     <input
@@ -1233,12 +1487,45 @@ export default function CanvasEditor() {
                   </label>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button className="btn-primary" disabled={inpaintBusy} onClick={() => void applyInpaint()}>
-                      {inpaintBusy ? "AI 處理中…" : "✅ 套用去除"}
+                      {inpaintBusy ? "AI 處理中…" : maskMode === "fill" ? "✨ 套用生成" : "✅ 套用去除"}
                     </button>
                     <button className="btn-secondary" disabled={inpaintBusy} onClick={() => exitInpaint(false)}>✖ 取消</button>
                   </div>
                 </>
               )}
+            </div>
+          </SidebarPanel>
+
+          {/* 🖼 擴圖（flux-fill-pro outpaint）+ 🎚 色調分離（bake）— both replace the selected image. */}
+          <SidebarPanel id="genfx" title="🖼 擴圖 / 🎚 色調分離" defaultPos={{ x: 816, y: 454 }} width={272} defaultCollapsed>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>🖼 擴圖 Outpaint（AI 往外補畫面）</span>
+                <input
+                  className="btn-secondary"
+                  placeholder="描述整體場景，例如：海邊草地"
+                  value={fillPrompt}
+                  onChange={(e) => setFillPrompt(e.target.value)}
+                  style={{ fontSize: 12 }}
+                />
+                <select className="btn-secondary" value={outpaintDir} onChange={(e) => setOutpaintDir(e.target.value as OutpaintPreset)} style={{ fontSize: 12 }}>
+                  {OUTPAINT_PRESETS.map((p) => (
+                    <option key={p} value={p}>{OUTPAINT_LABELS[p]}</option>
+                  ))}
+                </select>
+                <button className="btn-primary" disabled={genBusy} onClick={() => void applyOutpaint()}>
+                  {genBusy ? "AI 處理中…" : "套用擴圖"}
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: "1px solid var(--card-border)", paddingTop: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>🎚 色調分離 Posterize</span>
+                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  色階數
+                  <input type="range" min={2} max={16} value={posterLevels} onChange={(e) => setPosterLevels(Number(e.target.value))} style={{ flex: 1 }} />
+                  <span style={{ width: 22, textAlign: "right" }}>{posterLevels}</span>
+                </label>
+                <button className="btn-secondary" disabled={genBusy} onClick={() => void posterizeSelected()}>套用色調分離</button>
+              </div>
             </div>
           </SidebarPanel>
           </>
