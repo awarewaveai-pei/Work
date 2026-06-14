@@ -2,10 +2,11 @@
  * After enqueueing `ops_action_runs`, optionally wake Trigger.dev so `dispatch-action-run`
  * runs immediately instead of waiting for the cron schedule (~1 min).
  *
- * Env:
- *   TRIGGER_SECRET_KEY — required to kick (same key as workflow deploy / Trigger dashboard)
- *   TRIGGER_API_URL — Management API base, default https://api.trigger.dev (cloud).
- *     Self-host example: https://trigger.aware-wave.com (confirm path matches your Trigger release).
+ * Env (checked in order):
+ *   TRIGGER_SECRET_KEY   — dedicated Management API key (preferred)
+ *   TRIGGER_ACCESS_TOKEN — project access token (tr_prod_*); accepted by Trigger.dev v4 Management API
+ *   TRIGGER_API_URL      — Management API base, default https://api.trigger.dev (cloud).
+ *     Self-host example: https://trigger.aware-wave.com
  */
 
 export type DispatcherKickResult =
@@ -13,7 +14,10 @@ export type DispatcherKickResult =
   | { attempted: true; ok: boolean; httpStatus: number; detail?: string };
 
 export async function kickActionRunDispatcher(): Promise<DispatcherKickResult> {
-  const secret = process.env.TRIGGER_SECRET_KEY?.trim();
+  const secret = (
+    process.env.TRIGGER_SECRET_KEY?.trim() ||
+    process.env.TRIGGER_ACCESS_TOKEN?.trim()
+  );
   if (!secret) {
     return { attempted: false, reason: "no_secret" };
   }

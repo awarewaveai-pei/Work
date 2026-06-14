@@ -358,6 +358,12 @@ export default function CanvasEditor() {
       setError("請先在要去除的地方塗抹一下");
       return;
     }
+    // getBoundingRect returns an axis-aligned box; a rotated image would mis-crop the mask and
+    // double-rotate the replacement (critic Major). Require an upright image (angle 0).
+    if (((img as { angle?: number }).angle ?? 0) % 360 !== 0) {
+      setError("請先把這張圖轉正（角度歸零）再去除");
+      return;
+    }
     setInpaintBusy(true);
     setError(null);
     try {
@@ -408,10 +414,20 @@ export default function CanvasEditor() {
       canvas.setActiveObject(cleaned);
       inpaintImgRef.current = null;
       canvas.isDrawingMode = false;
+      // Detach the path:created listener (critic Major #1 — success path must not leak it).
+      const handler = (canvas as unknown as { __inpaintOnPath?: (e: unknown) => void }).__inpaintOnPath;
+      if (handler) {
+        canvas.off("path:created", handler as never);
+        delete (canvas as unknown as { __inpaintOnPath?: unknown }).__inpaintOnPath;
+      }
       setInpaintMode(false);
       canvas.requestRenderAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      // Restore the red strokes so a thrown error is retryable (critic Minor #3).
+      const c = fabricRef.current;
+      inpaintPathsRef.current.forEach((p) => p.set({ visible: true, stroke: "rgba(220,40,40,0.55)", fill: "" }));
+      c?.requestRenderAll();
     } finally {
       setInpaintBusy(false);
     }
