@@ -26,6 +26,18 @@
 - REVIEW_WAIVED: NA -- no code changes, deploy-only operation
 - BUGHUNT_WAIVED: NA -- deploy-only, no code changes
 
+### fix(dispatcher): kick-dispatcher fallback TRIGGER_ACCESS_TOKEN + [1-f][1-g] mark done
+
+**[任務理解]** `dispatcher_kick: no_secret` 根因：SG container `TRIGGER_SECRET_KEY=`（空），`TRIGGER_ACCESS_TOKEN=tr_prod_*` 有設但 kick-dispatcher.ts 不讀它。修法：加 `|| process.env.TRIGGER_ACCESS_TOKEN` fallback（同 `tarot/batch/route.ts:20` + `triggerWorkflow.ts:46` 已有 pattern）。[1-f][1-g] 已存在完整實作，只差 TASKS 未打勾。
+**[已修改]**
+- `lib/kick-dispatcher.ts` — secret fallback chain: TRIGGER_SECRET_KEY → TRIGGER_ACCESS_TOKEN（tr_prod_* = environment-scoped，Trigger.dev v4 Management API 接受）。
+- `agency-os/TASKS.md` — [1-f] ColorGradePanel + [1-g] OutputTrackBar 打勾（已存在全實作）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | 0 errors
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run` | exit=0 | 292/292
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0C/0M
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=kickActionRunDispatcher | hits=8（2 callers + doc refs, all correct）
+
 ### feat(canvas): AI 去除不要的部分（inpaint, bria/eraser）— 使用者最初需求 + 部署
 
 **[任務理解]** 使用者第一句就要「去除圖中某個不要的部分」（≠ 去背）。要「最好的」→ 商用 POD 選 bria/eraser（SOTA 物件移除 + 授權資料訓練，無版權風險）。web-researcher 比較 LaMa/FLUX-Fill/bria 後選 bria/eraser；curl 確認 version 2757d1ac + image/mask 吃 data-URI。
