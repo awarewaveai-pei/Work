@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
-import { getDesignsPublicBase } from "../../../../lib/storage/r2";
+import { buildDesignKey, getDesignsPublicBase, putDesignObject } from "../../../../lib/storage/r2";
 import { upscaleToPrintFile } from "../../../../lib/studio/upscaler";
+import { buildFaithfulPrintFile } from "../../../../lib/studio/print-file";
+import { toProductImage } from "../../../../lib/studio/to-product-image";
 import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import {
@@ -17,10 +19,13 @@ export const maxDuration = 120; // upscale step can take ~1-2 min
 
 /**
  * One-click publish chain, split into bounded steps (each < nginx timeout):
- *   upscale → Real-ESRGAN print file into the designs bucket
- *   create  → wp-bridge draft Woo product (Color×Size variations, mockup images)
- *   status  → has the Printful plugin synced the Woo product yet?
- *   link    → bind every synced variant to its Bella 3001 catalog variant + print file
+ *   upscale     → print file into the designs bucket. printMode决定忠实度:
+ *                 "original" (default, 100% 像素忠实) / "resample" (Lanczos 忠实放大) /
+ *                 "ai-enhance" (Real-ESRGAN — 非忠实, opt-in only)
+ *   productimage→ bake the design itself into a web-square WebP product image (~100KB)
+ *   create      → wp-bridge draft Woo product (Color×Size variations, mockup images)
+ *   status      → has the Printful plugin synced the Woo product yet?
+ *   link        → bind every synced variant to its Bella 3001 catalog variant + print file
  */
 
 function gate(request: Request): NextResponse | null {
@@ -35,10 +40,12 @@ function gate(request: Request): NextResponse | null {
 }
 
 interface PublishBody {
-  action?: "upscale" | "create" | "status" | "link";
-  // upscale
+  action?: "upscale" | "productimage" | "create" | "status" | "link";
+  // upscale / productimage
   designUrl?: string;
   longEdgePx?: number;
+  // upscale fidelity: default "original" (100% faithful). "ai-enhance" = Real-ESRGAN (not faithful).
+  printMode?: "original" | "resample" | "ai-enhance";
   // create
   title?: string;
   retailPrice?: string;
@@ -66,7 +73,8 @@ export async function POST(request: Request) {
   }
   const designsBase = getDesignsPublicBase() + "/";
 
-  // ── Step 1: upscale design → 300DPI print file ─────────────────────────────
+  // ── Step 1: design → print file ────────────────────────────────────────────
+  // Default = faithful (100% pixel-identical artwork). ai-enhance = Real-ESRGAN opt-in.
   if (body.action === "upscale") {
     if (!body.designUrl || !body.designUrl.startsWith(designsBase)) {
       return NextResponse.json(
@@ -74,19 +82,77 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const r = await upscaleToPrintFile(body.designUrl, body.longEdgePx ?? null);
+    const mode = body.printMode ?? "original";
+    if (mode === "ai-enhance") {
+      // Real-ESRGAN — sharper but synthesises detail (NOT 100% faithful). Explicit opt-in.
+      const r = await upscaleToPrintFile(body.designUrl, body.longEdgePx ?? null);
+      if (!r.ok) {
+        return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
+      }
+      return NextResponse.json({
+        ok: true,
+        printFileUrl: r.printFileUrl,
+        mode: "ai-enhance",
+        faithful: false,
+        byteSize: r.byteSize,
+        inputLongEdgePx: r.inputLongEdgePx,
+        achievedLongEdgePx: r.achievedLongEdgePx,
+        meetsTarget: r.meetsTarget,
+        passes: r.passes,
+      });
+    }
+    // "original" | "resample" — faithful (no AI hallucination).
+    const r = await buildFaithfulPrintFile(body.designUrl, { mode });
     if (!r.ok) {
       return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
     }
     return NextResponse.json({
       ok: true,
       printFileUrl: r.printFileUrl,
+      mode: r.mode,
+      faithful: true,
       byteSize: r.byteSize,
       inputLongEdgePx: r.inputLongEdgePx,
-      achievedLongEdgePx: r.achievedLongEdgePx,
+      achievedLongEdgePx: r.longEdgePx,
+      dpiAtFullPrint: r.dpiAtFullPrint,
       meetsTarget: r.meetsTarget,
-      passes: r.passes,
+      passes: 0,
     });
+  }
+
+  // ── Step 1b: design → web product image (faithful WebP ~100KB, no reinterpretation) ──
+  if (body.action === "productimage") {
+    if (!body.designUrl || !body.designUrl.startsWith(designsBase)) {
+      return NextResponse.json(
+        { ok: false, error: "designUrl must be a My Designs asset URL" },
+        { status: 400 },
+      );
+    }
+    let inputBuffer: Buffer;
+    try {
+      const res = await fetch(body.designUrl, { redirect: "manual" });
+      if (!res.ok) {
+        return NextResponse.json({ ok: false, error: `fetch_input_failed_${res.status}` }, { status: 502 });
+      }
+      inputBuffer = Buffer.from(await res.arrayBuffer());
+    } catch {
+      return NextResponse.json({ ok: false, error: "fetch_input_network_error" }, { status: 502 });
+    }
+    let webp: Buffer;
+    try {
+      // web-square: 1000×1000 contain on white — the design composited only by scale/letterbox,
+      // never reinterpreted (sharp deterministic). sRGB WebP for product pages.
+      webp = await toProductImage(inputBuffer, "web-square");
+    } catch {
+      return NextResponse.json({ ok: false, error: "product_image_encode_failed" }, { status: 502 });
+    }
+    const key = buildDesignKey("image/webp");
+    if (!key) return NextResponse.json({ ok: false, error: "unsupported_image_mime" }, { status: 500 });
+    const put = await putDesignObject(key, webp, "image/webp");
+    if (!put.ok) {
+      return NextResponse.json({ ok: false, error: (put as { ok: false; error: string }).error }, { status: 502 });
+    }
+    return NextResponse.json({ ok: true, productImageUrl: put.publicUrl, byteSize: put.byteSize });
   }
 
   // ── Step 2: create draft Woo product via wp-bridge ─────────────────────────

@@ -15,8 +15,15 @@ interface VariantMapEntry {
 }
 
 type StepState = "idle" | "running" | "done" | "error";
+type PrintMode = "original" | "resample" | "ai-enhance";
 
 const SIZES = ["S", "M", "L", "XL", "2XL"];
+
+const PRINT_MODE_LABEL: Record<PrintMode, string> = {
+  original: "原圖（100% 忠實）",
+  resample: "忠實放大（Lanczos，較軟）",
+  "ai-enhance": "AI 增強（Real-ESRGAN，非 100% 忠實）",
+};
 
 export default function PublishWizard() {
   const [designs, setDesigns] = useState<DesignAsset[]>([]);
@@ -26,13 +33,17 @@ export default function PublishWizard() {
   const [retailPrice, setRetailPrice] = useState("24.99");
   const [plusPrice, setPlusPrice] = useState("26.99");
 
+  const [printMode, setPrintMode] = useState<PrintMode>("original");
   const [upscale, setUpscale] = useState<{
     state: StepState;
     printFileUrl?: string;
     achievedPx?: number | null;
+    dpi?: number;
+    faithful?: boolean;
     meetsTarget?: boolean;
     error?: string;
   }>({ state: "idle" });
+  const [productImg, setProductImg] = useState<{ state: StepState; error?: string }>({ state: "idle" });
   const [create, setCreate] = useState<{
     state: StepState;
     productId?: number;
@@ -67,15 +78,21 @@ export default function PublishWizard() {
   // Changing the design invalidates everything downstream (stale-print-file trap).
   useEffect(() => {
     setUpscale({ state: "idle" });
+    setProductImg({ state: "idle" });
     setCreate({ state: "idle" });
     setSync({ state: "idle" });
     setLink({ state: "idle" });
   }, [designUrl]);
+  // Changing the fidelity mode invalidates the print file (and the link bound to it).
+  useEffect(() => {
+    setUpscale({ state: "idle" });
+    setLink({ state: "idle" });
+  }, [printMode]);
 
   const runUpscale = useCallback(async () => {
     if (!designUrl) return;
     setUpscale({ state: "running" });
-    const json = await post({ action: "upscale", designUrl });
+    const json = await post({ action: "upscale", designUrl, printMode });
     if (!json.ok) {
       setUpscale({ state: "error", error: json.error });
       return;
@@ -84,8 +101,23 @@ export default function PublishWizard() {
       state: "done",
       printFileUrl: json.printFileUrl as string,
       achievedPx: json.achievedLongEdgePx as number | null,
+      dpi: json.dpiAtFullPrint as number | undefined,
+      faithful: Boolean(json.faithful),
       meetsTarget: Boolean(json.meetsTarget),
     });
+  }, [designUrl, printMode, post]);
+
+  const runProductImage = useCallback(async () => {
+    if (!designUrl) return;
+    setProductImg({ state: "running" });
+    const json = await post({ action: "productimage", designUrl });
+    if (!json.ok) {
+      setProductImg({ state: "error", error: json.error });
+      return;
+    }
+    const url = json.productImageUrl as string;
+    setMockupUrls((prev) => (prev.includes(url) ? prev : [...prev, url]));
+    setProductImg({ state: "done" });
   }, [designUrl, post]);
 
   const runCreate = useCallback(async () => {
@@ -149,7 +181,7 @@ export default function PublishWizard() {
   return (
     <div style={{ padding: 16, maxWidth: 980 }}>
       <p style={{ opacity: 0.7, fontSize: 13 }}>
-        串連：設計圖 → ① 放大 300DPI 印刷檔 → ② 建 Woo <b>草稿</b>商品（白/黑 × {SIZES.join("/")}）→
+        串連：設計圖 → ① 產生印刷檔（預設<b>原圖 100% 忠實</b>，不改像素）→ ② 建 Woo <b>草稿</b>商品（白/黑 × {SIZES.join("/")}）→
         人工到後台 review 並 <b>publish</b>（Printful 只同步已發布商品，可先設「隱藏」）→ ③ 檢查同步 → ④ 綁定印刷檔 → 設為可見開賣。
       </p>
 
@@ -212,21 +244,45 @@ export default function PublishWizard() {
 
       {/* steps */}
       <div className="build-panel" style={{ padding: 14, marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <span>{pill(upscale.state)}</span>
+          <label style={{ fontSize: 12 }}>
+            印刷檔模式{" "}
+            <select
+              className="btn-secondary"
+              value={printMode}
+              onChange={(e) => setPrintMode(e.target.value as PrintMode)}
+              style={{ fontSize: 12 }}
+            >
+              {(Object.keys(PRINT_MODE_LABEL) as PrintMode[]).map((m) => (
+                <option key={m} value={m}>{PRINT_MODE_LABEL[m]}</option>
+              ))}
+            </select>
+          </label>
           <button className="btn-primary" disabled={!designUrl || upscale.state === "running"} onClick={() => void runUpscale()}>
-            ① 放大成 300DPI 印刷檔
+            ① 產生印刷檔
           </button>
           {upscale.printFileUrl ? (
             <>
               <a href={upscale.printFileUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>印刷檔 ↗</a>
               <span style={{ fontSize: 12, color: upscale.meetsTarget ? "#46a758" : "#f5a623" }}>
                 {upscale.achievedPx ? `${upscale.achievedPx}px` : "尺寸未知"}
-                {upscale.meetsTarget ? " ✓ 達標" : " ⚠ 未達 4800px — 印刷可能偏糊，建議換更大的設計圖"}
+                {upscale.dpi ? ` · 滿版約 ${upscale.dpi} DPI` : ""}
+                {upscale.faithful ? " · 100% 忠實" : " · AI 增強(非忠實)"}
+                {upscale.meetsTarget ? " ✓ 達 300DPI" : " ⚠ 未達 300DPI(滿版可能略軟；小尺寸印刷仍清晰)"}
               </span>
             </>
           ) : null}
           {upscale.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{upscale.error}</span> : null}
+        </div>
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <span>{pill(productImg.state)}</span>
+          <button className="btn-secondary" disabled={!designUrl || productImg.state === "running"} onClick={() => void runProductImage()}>
+            ⊕ 把這張設計做成產品圖（加入商品照）
+          </button>
+          {productImg.state === "done" ? <span style={{ fontSize: 12, color: "#46a758" }}>已加入商品照 ✓（純圖案，忠實）</span> : null}
+          {productImg.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{productImg.error}</span> : null}
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
