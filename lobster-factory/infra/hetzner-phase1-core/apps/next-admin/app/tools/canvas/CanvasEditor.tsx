@@ -78,6 +78,10 @@ export default function CanvasEditor() {
   const [noisev, setNoisev] = useState(0); // 雜訊 0..100
   const [temp, setTemp] = useState(0); // 色溫 -100(冷)..100(暖)
   const [layers, setLayers] = useState<FabricObject[]>([]); // 圖層面板 (top layer first)
+  const [drawMode, setDrawMode] = useState<"off" | "draw" | "erase">("off"); // 自由繪筆 / 橡皮擦
+  const [drawColor, setDrawColor] = useState("#111111");
+  const [drawWidth, setDrawWidth] = useState(6);
+  const drawHandlerRef = useRef<((e: { path?: FabricObject }) => void) | null>(null);
   const [inpaintMode, setInpaintMode] = useState(false); // 🪄 painting a removal mask
   const [inpaintBusy, setInpaintBusy] = useState(false);
   const [brushSize, setBrushSize] = useState(34);
@@ -369,6 +373,64 @@ export default function CanvasEditor() {
     if (t === "path") return "✏️ 筆畫";
     return `🔷 ${t ?? "物件"}`;
   }
+
+  // ✏️ 自由繪筆 / 🧹 橡皮擦 — change the canvas interaction mode. Eraser = a PencilBrush path
+  // with globalCompositeOperation 'destination-out' (Fabric v7 has no EraserBrush), so the
+  // stroke punches through whatever is below it. Mutually exclusive with inpaint mode.
+  const applyDrawMode = useCallback((mode: "off" | "draw" | "erase") => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    // detach any previous erase path:created handler
+    if (drawHandlerRef.current) {
+      canvas.off("path:created", drawHandlerRef.current as never);
+      drawHandlerRef.current = null;
+    }
+    if (mode === "off") {
+      canvas.isDrawingMode = false;
+      setDrawMode("off");
+      return;
+    }
+    void import("fabric").then((fabric) => {
+      if (fabricRef.current !== canvas) return;
+      const brush = new fabric.PencilBrush(canvas);
+      brush.width = drawWidth;
+      brush.color = mode === "erase" ? "rgba(0,0,0,1)" : drawColor;
+      canvas.freeDrawingBrush = brush;
+      canvas.isDrawingMode = true;
+      if (mode === "erase") {
+        const h = (e: { path?: FabricObject }) => {
+          if (e.path) {
+            (e.path as unknown as { set: (p: Record<string, unknown>) => void }).set({ globalCompositeOperation: "destination-out" });
+            canvas.requestRenderAll();
+          }
+        };
+        canvas.on("path:created", h as never);
+        drawHandlerRef.current = h;
+      }
+      setDrawMode(mode);
+    });
+  }, [drawColor, drawWidth]);
+
+  // 🌈 漸層填色 — apply a 2-stop linear gradient as the selected object's fill.
+  const applyGradient = useCallback(() => {
+    const canvas = fabricRef.current;
+    const o = canvas?.getActiveObject();
+    if (!canvas || !o) return;
+    void import("fabric").then((fabric) => {
+      if (fabricRef.current !== canvas) return;
+      const w = (o as unknown as { width?: number }).width ?? 200;
+      const grad = new fabric.Gradient({
+        type: "linear",
+        coords: { x1: 0, y1: 0, x2: w, y2: 0 },
+        colorStops: [
+          { offset: 0, color: drawColor },
+          { offset: 1, color: "#ffffff" },
+        ],
+      });
+      (o as unknown as { set: (p: Record<string, unknown>) => void }).set({ fill: grad });
+      canvas.requestRenderAll();
+    });
+  }, [drawColor]);
 
   const uploadImage = useCallback((file: File | null) => {
     const canvas = fabricRef.current;
