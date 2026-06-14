@@ -741,7 +741,10 @@ export default function CanvasEditor() {
     if (!canvas) return null;
     canvas.discardActiveObject(); // drop selection handles from the export
     canvas.requestRenderAll();
-    return canvas.toDataURL({ format: "png", multiplier: 1 });
+    // Export at full DPI: if a print canvas size is set, undo the display down-scale.
+    const m = canvasMetaRef.current;
+    const multiplier = m && m.dispScale > 0 ? 1 / m.dispScale : 1;
+    return canvas.toDataURL({ format: "png", multiplier });
   }, []);
 
   const download = useCallback(() => {
@@ -915,6 +918,41 @@ export default function CanvasEditor() {
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
+        {/* 📐 畫布尺寸 / DPI — 公分/公釐 + DPI 自設（參考 vector-trace-demo）。永遠顯示，可拖。 */}
+        <DraggablePanel id="canvas-size" title="📐 畫布尺寸 / DPI" defaultPos={{ x: 820, y: 560 }} width={236}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                寬
+                <input className="btn-secondary" type="number" min={0.1} step={0.1} value={szW} onChange={(e) => setSzW(Number(e.target.value))} />
+              </label>
+              <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                高
+                <input className="btn-secondary" type="number" min={0.1} step={0.1} value={szH} onChange={(e) => setSzH(Number(e.target.value))} />
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                單位
+                <select className="btn-secondary" value={szUnit} onChange={(e) => setSzUnit(e.target.value as "cm" | "mm")}>
+                  <option value="cm">公分 cm</option>
+                  <option value="mm">公釐 mm</option>
+                </select>
+              </label>
+              <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                DPI
+                <select className="btn-secondary" value={szDpi} onChange={(e) => setSzDpi(Number(e.target.value))}>
+                  {[72, 150, 300, 600].map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <button className="btn-primary" onClick={applyCanvasSize}>套用畫布尺寸</button>
+            {szInfo ? <span style={{ fontSize: 11, opacity: 0.7 }}>{szInfo}</span> : null}
+          </div>
+        </DraggablePanel>
+
         {/* 🗂 圖層面板 — reorder / show-hide / duplicate / delete, top layer first. */}
         {layers.length > 0 ? (
           <DraggablePanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 820, y: 0 }} width={220}>
@@ -1076,6 +1114,8 @@ export default function CanvasEditor() {
               <button className="btn-secondary" style={{ fontSize: 13, fontWeight: 700 }} title="粗體（切換）" onClick={() => toggleText("fontWeight")}>B</button>
               <button className="btn-secondary" style={{ fontSize: 13, fontStyle: "italic" }} title="斜體（切換）" onClick={() => toggleText("fontStyle")}>I</button>
               <button className="btn-secondary" style={{ fontSize: 13, textDecoration: "underline" }} title="底線（切換）" onClick={() => toggleText("underline")}>U</button>
+              <button className="btn-secondary" style={{ fontSize: 12 }} title="文字沿弧形路徑" onClick={() => applyTextArc(true)}>〽️ 弧形</button>
+              <button className="btn-secondary" style={{ fontSize: 12 }} title="取消弧形（拉直）" onClick={() => applyTextArc(false)}>直</button>
             </div>
             <FontLibrary
               current={textFont}
