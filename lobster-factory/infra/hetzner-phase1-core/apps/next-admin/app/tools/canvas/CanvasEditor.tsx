@@ -23,6 +23,7 @@ import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_SOURCE_KEY, CANVAS_NAME_KEY } from "@/components/tools/canvas-handoff";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import { buildFabricImageFilters, buildPresetFilters, buildEffectFilters, PRESET_FILTERS } from "./fabric-filters";
+import DraggablePanel from "@/components/tools/DraggablePanel";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -821,15 +822,15 @@ export default function CanvasEditor() {
 
       {error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{error}</span> : null}
 
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: "fit-content", background: "#fff" }}>
+      {/* 工具面板可自由拖曳（DraggablePanel）；位置存 localStorage。 */}
+      <div style={{ position: "relative", minHeight: 824 }}>
+        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: 802, background: "#fff" }}>
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
         {/* 🗂 圖層面板 — reorder / show-hide / duplicate / delete, top layer first. */}
         {layers.length > 0 ? (
-          <div className="build-panel" style={{ width: 220, padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-            <strong style={{ fontSize: 13 }}>🗂 圖層（{layers.length}）</strong>
+          <DraggablePanel id="layers" title={`🗂 圖層（${layers.length}）`} defaultPos={{ x: 820, y: 0 }} width={220}>
             <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 520, overflowY: "auto" }}>
               {layers.map((o, i) => {
                 const vis = (o as unknown as { visible?: boolean }).visible !== false;
@@ -845,13 +846,13 @@ export default function CanvasEditor() {
                 );
               })}
             </div>
-          </div>
+          </DraggablePanel>
         ) : null}
 
         {/* 🎨 物件效果（PS 圖層樣式）— shown for ANY selected object (text/image/shape). */}
         {anySelected ? (
-          <div className="build-panel" style={{ width: 260, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-            <strong style={{ fontSize: 13 }}>🎨 物件效果</strong>
+          <DraggablePanel id="effects" title="🎨 物件效果" defaultPos={{ x: 1052, y: 0 }} width={260}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <label style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
               <span style={{ display: "flex", justifyContent: "space-between" }}><span>透明度</span><span style={{ opacity: 0.7 }}>{objOpacity}%</span></span>
               <input type="range" min={0} max={100} value={objOpacity} onChange={(e) => { const v = Number(e.target.value); setObjOpacity(v); setActiveProp({ opacity: v / 100 }); }} />
@@ -887,11 +888,13 @@ export default function CanvasEditor() {
               <button className="btn-secondary" style={{ fontSize: 12 }} onClick={applyGradient} title="把選取的文字/形狀填成漸層（左色用畫筆顏色）">🌈 漸層填色</button>
             ) : null}
           </div>
+          </DraggablePanel>
         ) : null}
 
         {/* 調色工具包 — appears when an image is selected; applies via Fabric filters (WYSIWYG). */}
         {imageSelected ? (
-          <div style={{ width: 260, display: "flex", flexDirection: "column", gap: 10 }}>
+          <DraggablePanel id="image-tools" title="🖼 影像工具" defaultPos={{ x: 1052, y: 392 }} width={272}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
             {/* 🎨 一鍵濾鏡預設 + ✂️ 免費去白底 (Fabric filters, 與調色共存) */}
             <div className="build-panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -966,12 +969,9 @@ export default function CanvasEditor() {
                 </>
               )}
             </div>
-          </div>
-        ) : (
-          <div style={{ width: 260, fontSize: 12, opacity: 0.55, paddingTop: 8 }}>
-            點選一張圖片即可調色（色相／亮度／飽和／色階／銳利度）。
-          </div>
-        )}
+            </div>
+          </DraggablePanel>
+        ) : null}
       </div>
     </div>
   );
