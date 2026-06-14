@@ -10451,3 +10451,16 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/0M/3m -- all 3 Minor fixed before commit (comment strip, heading anchor, fallback para)
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=extractExcerpt|YOUTUBE_PLACEHOLDER | hits=0
 - REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke verifies publish endpoint live
+
+## 2026-06-14 feat(generate): Perplexity real external sources
+
+### [已修改]
+- generate/route.ts: fetchRealSources() 呼叫 Perplexity Sonar，回傳最多 5 個真實外連 URL；注入 prompt 並限制 Claude 只用這些；Major fix: 雙層 URL 驗證（fetch 結果 + prompt 注入前都 filter /^https?:\/\// + 無空白字元）
+- docker-compose.yml: 加 PERPLEXITY_API_KEY env 到 next-admin service
+- SG .env: 手動加入 PERPLEXITY_API_KEY
+
+### [驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<60000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1M/1m/1s -- Major: realSources 無驗證直接注入 prompt (FIXED: double-filter); Minor: keyword raw in Perplexity query (bounded, acceptable); Suggestion: typeof check (FIXED)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=fetchRealSources|realSources | hits=0
+- REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke verifies generate endpoint; Perplexity verified separately via existing MCP integration
