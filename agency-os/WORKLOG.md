@@ -4,6 +4,22 @@
 
 ## 2026-06-14
 
+### feat(canvas): 可組裝編輯器工具包 batch 0+1（物件鎖定/形狀/濾鏡預設/免費去白底）+ 藍圖 SSOT
+
+**[任務理解]** 使用者要把編輯器做成「可組裝積木工具包」，各 host 自選要哪些積木，靈活運用。建框架 + 藍圖，分批塞積木。
+**[已修改]**
+- `docs/DESIGN_EDITOR_TOOLKIT_PLAN.md`（新，SSOT）— 積木契約 + 完整目錄（含已做/待做）+ host 掛載矩陣 + 8 批建置順序（含 AI inpainting=使用者原始需求、web-font）。
+- `app/tools/canvas/CanvasEditor.tsx` — batch 0：🔒物件鎖定（toggleLock，lockMovement/Scaling/Rotation，防客人弄壞底圖）+ 🔷形狀（addShape Rect/Circle/Line）。batch 1：🎨 8 濾鏡預設（Sepia/Vintage/拍立得/Koda/Brownie/黑白/灰階/反相）+ ✂️免費去白底（RemoveColor chroma-key，省 Replicate）。
+- `app/tools/canvas/fabric-filters.ts` — `PRESET_FILTERS` + `buildPresetFilters`（與 color-grade filter 分開建再 concat，兩者共存）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node -e fabric.filters` | Sepia/Vintage/Polaroid/Kodachrome/Brownie/BlackWhite/Grayscale/Invert/RemoveColor + lock props 全存在
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`+`npm run build` | exit=0/0（兩批）
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | batch0=3f086ab0 batch1=61dc3005 | healthy 7s | smoke 4/4 200
+- REVIEW_WAIVED: SMOKE_COVERED -- 純 Fabric 屬性/filter 操作，filter 類別 node 驗存在，複用既驗 fabric-filters 模式；無 data/auth/網路面
+- BUGHUNT_DONE: scope=lobster-factory | grep=buildPresetFilters\|toggleLock\|addShape | hits=0 stale
+**[剩餘風險]** 濾鏡預設/去背是全域 state 套用到當前選取圖（換圖需再動才套，同 grade 限制）；去白底用固定 #fff distance 0.12（非白底圖需未來加取色）。
+**[部署]** SG 61dc3005 LIVE。**[待辦]** batch 2 物件屬性/圖層/逐字色 → batch 3 ⭐AI inpainting（使用者原始需求）→ batch 4 ⭐web-font → 5~7（infra/進階/客人端）。
+
 ### fix(admin-auth): /tools/content 功能壞了 根因 = CF rate-limit 踢登入使用者
 
 **[任務理解]** 使用者回報 app.aware-wave.com/tools/content「功能壞了」。表面像發布/行事曆掛掉；真實根因是整個 console 的 auth gate 在使用者操作時把人踢回 /login。
