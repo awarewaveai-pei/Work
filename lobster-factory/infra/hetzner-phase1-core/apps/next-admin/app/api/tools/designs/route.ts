@@ -126,7 +126,9 @@ export async function POST(request: Request) {
   if (typeof body.sourceUrl === "string" && body.sourceUrl.length > 0) {
     const fetched = await fetchPrintfulMockup(body.sourceUrl);
     if (!fetched.ok) {
-      return NextResponse.json({ ok: false, error: fetched.error }, { status: fetched.status });
+      // tsconfig here does not narrow `!x.ok` — same cast convention as the rest of this route.
+      const f = fetched as { ok: false; status: number; error: string };
+      return NextResponse.json({ ok: false, error: f.error }, { status: f.status });
     }
     parsed = { mime: fetched.mime, buffer: fetched.buffer };
   } else {

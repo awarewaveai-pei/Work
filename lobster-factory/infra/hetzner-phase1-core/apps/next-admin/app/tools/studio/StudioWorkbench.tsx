@@ -163,7 +163,8 @@ export default function StudioWorkbench() {
     setBgState("idle");
     setOriginalImage(null);
     setMockupState("idle");
-    setMockupUrl(null);
+    setMockups([]);
+    setSavedMockups({});
     try {
       const res = await fetch("/api/tools/studio/generate", {
         method: "POST",
