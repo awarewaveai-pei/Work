@@ -44,6 +44,20 @@
 **[剩餘風險]** R2 lobster-designs bucket 直接訪問從本機回 403（Cloudflare R2 public access 待確認）；但 Printful mockup 測試成功（Printful 從 CDN 邊緣節點下載，路徑不同）。部署前需在 SG .env 加 PRINTFUL_API_KEY + PRINTFUL_STORE_ID。
 **[rollback]** 刪 mockup/route.ts + printful-mockup.ts；移除 StudioWorkbench mockup state；docker-compose.yml 移除兩個 env var → 功能消失，其他功能不受影響。
 
+### fix(onboarding): trigger-build 403 — 加 x-ops-sync-key 雙路徑驗證
+
+**[任務理解]** Stage 1 接通入口：`POST /api/onboarding/trigger-build` 用 `x-ops-sync-key` 呼叫時回 403 forbidden（role=viewer）。根本問題：middleware sync-key passthrough 不注入 `x-ops-claims-role`，`resolveOpsRole` 拿不到 role → 回 viewer → route 拒絕。
+**[現況分析]** `wp-update/route.ts` + `wp-report/route.ts` 已有相同問題的解法：route 內自驗 sync-key（`isAuthorized` helper），不依賴 middleware 注入 role。`trigger-build` 缺此 fallback。middleware 改法（注入 operator）被 critic 評為 🟠 Major（blast radius 過大，使 OPS_PROXY_SHARED_SECRET 提權至所有 `/api/ops/*`）→ 棄用，改走 route 自驗。
+**[已修改]**
+- `app/api/onboarding/trigger-build/route.ts` — 加 `import timingSafeEqual`；新增 `SYNC_KEY = process.env.OPS_PROXY_SHARED_SECRET`；auth check 改為 `role in allowed || hasSyncKey`（同 wp-update 模式）。middleware.ts 維持不動。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` (next-admin) | exit=0 | 0 type errors
+- REALTEST_EVIDENCE: tool=curl (post-deploy) | target=`/api/onboarding/trigger-build` | expected=ok:true（待部署後補）
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=1M(middleware注入過寬→改 route 自驗)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=trigger-build\|OPS_PROXY_SHARED_SECRET | hits=0 stale（trigger-build 唯一 callsite = onboarding/page.tsx:135 用 browser session，無 server-to-server caller 需更新）
+
+**[剩餘風險]** `timingSafeEqual` 在 `hasSyncKey` 評算時若 key 為空字串（OPS_PROXY_SHARED_SECRET 未設）→ `SYNC_KEY=""` → `timingSafeEqual("", "")` = true（長度 0 XOR 0 = 0）= 允許空 key 繞過。但 `!!(SYNC_KEY && ...)` 已有 short-circuit guard，`SYNC_KEY=""` 時 `!!("" && ...)` = false → 不允許。已驗正確。
+
 ### feat(content-gen): GEO/AI citation mechanics 加入文章生成 SYSTEM_PROMPT + RankMath SEO panel 部署
 
 **[任務理解]** 使用者找到 5 份 GEO research 文件（`agency-os/docs/GEO/`）要求生成文章時遵循 AI citation mechanics；同一 session 還完成 RankMath SEO check panel + AI auto-fix 端點。
