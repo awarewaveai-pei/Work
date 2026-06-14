@@ -50,37 +50,42 @@ function parseJsonStrings(text: string): string[] {
     .filter(l => l.length > 3 && l.length < 300 && !l.startsWith("{") && !l.startsWith("[") && !l.includes('":"'));
 }
 
-// ─── Trending via Perplexity (Google Trends RSS is blocked from VPS IPs) ─────
+// ─── Google News RSS — free, no API key, works from VPS ─────────────────────
 
-async function fetchPerplexityTrending(geo: string): Promise<TrendingItem[]> {
-  const geoNames: Record<string, string> = {
-    TW: "Taiwan", HK: "Hong Kong", SG: "Singapore",
-    US: "United States", GB: "United Kingdom", JP: "Japan", AU: "Australia",
-  };
-  const geoName = geoNames[geo] ?? geo;
+const GEO_RSS: Record<string, { hl: string; gl: string; ceid: string }> = {
+  TW: { hl: "zh-TW", gl: "TW", ceid: "TW:zh-Hant" },
+  HK: { hl: "zh-HK", gl: "HK", ceid: "HK:zh-Hant" },
+  SG: { hl: "en-SG", gl: "SG", ceid: "SG:en" },
+  US: { hl: "en-US", gl: "US", ceid: "US:en" },
+  GB: { hl: "en-GB", gl: "GB", ceid: "GB:en" },
+  JP: { hl: "ja",    gl: "JP", ceid: "JP:ja"    },
+  AU: { hl: "en-AU", gl: "AU", ceid: "AU:en"    },
+};
+
+async function fetchGoogleNewsTrending(geo: string): Promise<TrendingItem[]> {
+  const p = GEO_RSS[geo] ?? GEO_RSS.TW;
+  const url = `https://news.google.com/rss?hl=${p.hl}&gl=${p.gl}&ceid=${p.ceid}`;
   try {
-    const content = await perplexityChat(
-      `List the top 15 trending search topics in ${geoName} right now. ` +
-      `For each item include: title (the search term), estimated traffic (e.g. "50K+"), and 2-3 related queries. ` +
-      `Reply ONLY as a valid JSON array with no markdown fences: ` +
-      `[{"title":"...","traffic":"...","relatedQueries":["...","..."]}]`,
-      12000,
-    );
-    if (!content) return [];
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
-    const raw = JSON.parse(jsonMatch[0]) as Array<Record<string, unknown>>;
-    return raw
-      .filter(it => typeof it.title === "string" && (it.title as string).trim())
-      .map(it => ({
-        title: String(it.title).trim(),
-        traffic: typeof it.traffic === "string" ? it.traffic : "",
-        category: "",
-        relatedQueries: Array.isArray(it.relatedQueries)
-          ? (it.relatedQueries as unknown[]).filter((q): q is string => typeof q === "string").slice(0, 5)
-          : [],
-      }))
-      .slice(0, 20);
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ContentStudio/1.0)" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const items: TrendingItem[] = [];
+    const itemRe = /<item>([\s\S]*?)<\/item>/g;
+    let m: RegExpExecArray | null;
+    while ((m = itemRe.exec(xml)) !== null && items.length < 20) {
+      const block = m[1];
+      const titleM = block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
+      if (!titleM) continue;
+      // Strip " - Publisher" suffix (e.g. "颱風來了 - 東森新聞" → "颱風來了")
+      const full = titleM[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+      const title = full.replace(/\s*[-–—]\s*[^\s-–—].{2,35}$/, "").trim() || full;
+      if (title.length < 4) continue;
+      items.push({ title, traffic: "", category: "", relatedQueries: [] });
+    }
+    return items;
   } catch { return []; }
 }
 
@@ -163,7 +168,7 @@ export async function GET(req: Request): Promise<Response> {
   const hl    = url.searchParams.get("hl") ?? (geo === "TW" || geo === "HK" ? "zh-TW" : "en");
 
   if (type === "trending") {
-    const items = await fetchPerplexityTrending(geo);
+    const items = await fetchGoogleNewsTrending(geo);
     return NextResponse.json({ ok: true, items, geo });
   }
 

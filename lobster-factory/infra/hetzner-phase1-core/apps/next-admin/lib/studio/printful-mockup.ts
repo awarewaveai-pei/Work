@@ -206,16 +206,18 @@ export async function generateMockup(
       const seen = new Set<string>();
       for (const m of rawMockups) {
         const primary = m.mockup_url as string | undefined;
-        // The primary url is the default front view; the labelled variants live in extra[].
+        // The labelled variants (incl. their true group: Flat/Ghost/Lifestyle) live in extra[].
+        // Prefer those — never assume the primary's group (it could be a lifestyle render).
+        // Fall back to the primary only when extra[] is absent (defensive — every observed
+        // response includes the front view in extra, so the primary is normally a dup of it).
         const extra = (m.extra as Array<Record<string, unknown>> | undefined) ?? [];
-        const candidates: { url?: string; group: string; view: string }[] = [
-          ...(primary ? [{ url: primary, group: "Flat", view: "Front" }] : []),
-          ...extra.map((e) => ({
-            url: e.url as string | undefined,
-            group: (e.option_group as string | undefined) ?? "Flat",
-            view: (e.option as string | undefined) ?? (e.title as string | undefined) ?? "",
-          })),
-        ];
+        const labeled = extra.map((e) => ({
+          url: e.url as string | undefined,
+          group: (e.option_group as string | undefined) ?? "Flat",
+          view: (e.option as string | undefined) ?? (e.title as string | undefined) ?? "",
+        }));
+        const candidates: { url?: string; group: string; view: string }[] =
+          labeled.length > 0 ? labeled : primary ? [{ url: primary, group: "Product", view: "Front" }] : [];
         for (const c of candidates) {
           if (!c.url || seen.has(c.url)) continue;
           seen.add(c.url);
