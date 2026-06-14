@@ -803,7 +803,7 @@ export default function ContentStudio() {
         }
         text += dec.decode();
         const bulkMeta  = extractMeta(text);
-        const finalText = stripMeta(text);
+        const finalText = stripSlugHint(stripMeta(text));
         setBulkRows(prev => prev.map((r, idx) => idx === i ? {
           ...r, status: "done", article: finalText,
           seoTitle:     bulkMeta?.seoTitle,
@@ -1879,6 +1879,16 @@ export default function ContentStudio() {
                   </select>
                 </div>
               ))}
+              <div style={{ marginBottom: "8px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer", userSelect: "none" }}>
+                  <input type="checkbox"
+                    checked={bulkSettings.generateMeta}
+                    onChange={e => setBulkSettings(prev => ({ ...prev, generateMeta: e.target.checked }))}
+                    disabled={bulkRunning} />
+                  產生 SEO Meta（標題 / 摘要 / 關鍵字）
+                </label>
+                <div className="form-hint">開啟後批量發布時自動帶入 SEO 欄位</div>
+              </div>
             </div>
 
             <div className="form-block" style={{ marginBottom: "16px" }}>

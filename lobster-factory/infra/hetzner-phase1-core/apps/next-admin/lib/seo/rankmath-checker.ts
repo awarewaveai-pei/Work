@@ -254,13 +254,13 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
 
   // ── AEO / GEO checks ─────────────────────────────────────────────────────
 
-  // 14. aeo-quick-answer — direct answer capsule (## Quick Answer section)
-  const hasQuickAnswer = /^##\s+Quick Answer/m.test(markdown);
+  // 14. aeo-quick-answer — direct answer capsule (## Quick Answer or localized equivalent)
+  const hasQuickAnswer = /^##\s+(Quick Answer|快速解答|快速回答|快速答案|簡短答案)/im.test(markdown);
   checks.push({
     id: "aeo-quick-answer",
     label: "AEO: Quick Answer section present",
     pass: hasQuickAnswer,
-    detail: hasQuickAnswer ? "## Quick Answer section found" : "Missing ## Quick Answer section",
+    detail: hasQuickAnswer ? "Quick Answer / 快速解答 section found" : "Missing Quick Answer section (or 快速解答 / 快速回答)",
   });
 
   // 15. aeo-subquery-coverage — ≥4 H2/H3 headings covering multiple sub-topics

@@ -314,7 +314,7 @@ function buildUserPrompt(params: {
   }
 
   // Internal links
-  const validInternal = params.internalLinks.filter(u => /^(https?:\/\/|\/[/#])/.test(u.trim()));
+  const validInternal = params.internalLinks.filter(u => /^(https?:\/\/|\/)/.test(u.trim()));
   if (validInternal.length > 0) {
     lines.push("");
     lines.push("Internal links to weave naturally into the article content (use relevant anchor text, not 'click here'):");
@@ -439,7 +439,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // Internal links
-  const internalLinks = sarr(body.internalLinks).filter(u => /^(https?:\/\/|\/[/#])/.test(u.trim())).slice(0, 10);
+  const internalLinks = sarr(body.internalLinks).filter(u => /^(https?:\/\/|\/)/.test(u.trim())).slice(0, 10);
 
   // Perplexity real sources — only when user hasn't provided their own external links
   const userExternalLinks = sarr(body.externalLinks);
