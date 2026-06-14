@@ -127,6 +127,7 @@ export default function CanvasEditor() {
         preserveObjectStacking: true,
       });
       fabricRef.current = canvas;
+      canvasMetaRef.current = null; // fresh canvas → no print-size meta (critic: stale meta would corrupt export)
       setReady(true);
 
       // Keep the toolbar in sync with the selected text object (and vice-versa).
@@ -450,13 +451,42 @@ export default function CanvasEditor() {
   // 📐 畫布尺寸 / DPI — cm/mm → px (round(cm·dpi/2.54)); resize the Fabric canvas to a scaled
   // display (≤ MAX_DISP) and store real px + scale so export can render at full DPI.
   const applyCanvasSize = useCallback(() => {
-    const canvas = fabricRef.current;
+    const canvas = fabricRef.current as unknown as {
+      getWidth: () => number;
+      getZoom: () => number;
+      getObjects: () => FabricObject[];
+      setZoom: (z: number) => void;
+      setDimensions: (d: { width: number; height: number }) => void;
+      requestRenderAll: () => void;
+    } | null;
     if (!canvas) return;
     const MAX_DISP = 820;
     const cm = (v: number) => (szUnit === "mm" ? v / 10 : v);
     const realW = Math.max(1, Math.round((cm(szW) * szDpi) / 2.54));
     const realH = Math.max(1, Math.round((cm(szH) * szDpi) / 2.54));
     const dispScale = Math.min(1, MAX_DISP / Math.max(realW, realH));
+
+    // The OLD working width in real-coordinate space (before this resize). First time = the
+    // current element width ÷ current zoom; after a prior sizing = the stored realW.
+    const prev = canvasMetaRef.current;
+    const oldRealW = prev ? prev.realW : canvas.getWidth() / (canvas.getZoom() || 1);
+    const factor = oldRealW > 0 ? realW / oldRealW : 1;
+    // Rescale existing objects proportionally so the design keeps its relative layout
+    // (setDimensions alone would NOT scale content — critic Critical 2026-06-14).
+    if (Math.abs(factor - 1) > 1e-4) {
+      canvas.getObjects().forEach((o) => {
+        const oo = o as unknown as { left?: number; top?: number; scaleX?: number; scaleY?: number; set: (p: Record<string, unknown>) => void; setCoords: () => void };
+        oo.set({
+          left: (oo.left ?? 0) * factor,
+          top: (oo.top ?? 0) * factor,
+          scaleX: (oo.scaleX ?? 1) * factor,
+          scaleY: (oo.scaleY ?? 1) * factor,
+        });
+        oo.setCoords();
+      });
+    }
+    // Work in real-coordinate space, zoomed down to fit the display element.
+    canvas.setZoom(dispScale);
     canvas.setDimensions({ width: Math.round(realW * dispScale), height: Math.round(realH * dispScale) });
     canvasMetaRef.current = { realW, realH, dispScale, dpi: szDpi };
     const cmW = +((realW / szDpi) * 2.54).toFixed(2);
@@ -737,14 +767,31 @@ export default function CanvasEditor() {
 
   /** Flatten the canvas to a PNG data URL (codebase convention — see file header). */
   const exportPng = useCallback((): string | null => {
-    const canvas = fabricRef.current;
+    const canvas = fabricRef.current as unknown as {
+      discardActiveObject: () => void;
+      requestRenderAll: () => void;
+      toDataURL: (o: Record<string, unknown>) => string;
+      getZoom: () => number;
+      setZoom: (z: number) => void;
+      setDimensions: (d: { width: number; height: number }) => void;
+    } | null;
     if (!canvas) return null;
     canvas.discardActiveObject(); // drop selection handles from the export
-    canvas.requestRenderAll();
-    // Export at full DPI: if a print canvas size is set, undo the display down-scale.
     const m = canvasMetaRef.current;
-    const multiplier = m && m.dispScale > 0 ? 1 / m.dispScale : 1;
-    return canvas.toDataURL({ format: "png", multiplier });
+    if (!m) {
+      canvas.requestRenderAll();
+      return canvas.toDataURL({ format: "png", multiplier: 1 });
+    }
+    // Print canvas set: temporarily reset zoom + render at full real px so the export is
+    // full-DPI (toDataURL honours viewportTransform; restore the display afterwards).
+    const zoom = canvas.getZoom();
+    canvas.setZoom(1);
+    canvas.setDimensions({ width: m.realW, height: m.realH });
+    const url = canvas.toDataURL({ format: "png", multiplier: 1 });
+    canvas.setZoom(zoom);
+    canvas.setDimensions({ width: Math.round(m.realW * m.dispScale), height: Math.round(m.realH * m.dispScale) });
+    canvas.requestRenderAll();
+    return url;
   }, []);
 
   const download = useCallback(() => {
@@ -1027,11 +1074,11 @@ export default function CanvasEditor() {
         {imageSelected ? (
           <>
           {/* 3 個獨立可拖面板：調色 / 濾鏡效果 / AI 去除 */}
-          <DraggablePanel id="grade" title="🎨 調色 / 修圖" defaultPos={{ x: 1052, y: 0 }} width={272}>
+          <DraggablePanel id="grade" title="🎨 調色 / 修圖" defaultPos={{ x: 1332, y: 0 }} width={272}>
             <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
           </DraggablePanel>
 
-          <DraggablePanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 1052, y: 332 }} width={272}>
+          <DraggablePanel id="filters" title="🎨 濾鏡 / 去背 / 效果" defaultPos={{ x: 1332, y: 332 }} width={272}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 <button
@@ -1071,7 +1118,7 @@ export default function CanvasEditor() {
             </div>
           </DraggablePanel>
 
-          <DraggablePanel id="inpaint" title="🪄 去除不要的部分（AI）" defaultPos={{ x: 1052, y: 560 }} width={272}>
+          <DraggablePanel id="inpaint" title="🪄 去除不要的部分（AI）" defaultPos={{ x: 1332, y: 560 }} width={272}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {!inpaintMode ? (
                 <button className="btn-secondary" onClick={startInpaint}>開始塗抹要去除的地方</button>

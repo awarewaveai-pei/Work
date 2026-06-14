@@ -182,7 +182,7 @@ interface GenerateForm {
   wpTags: string;
 }
 
-interface MetaData { seoTitle: string; metaDesc: string; }
+interface MetaData { seoTitle: string; metaDesc: string; focusKeyword?: string; }
 
 interface BulkRow {
   id: number;
@@ -192,6 +192,9 @@ interface BulkRow {
   error: string;
   pubStatus: "idle" | "publishing" | "done" | "error";
   pubUrl: string;
+  seoTitle?: string;
+  metaDesc?: string;
+  focusKeyword?: string;
 }
 
 type BulkSettings = Omit<GenerateForm, "keyword" | "title" | "scheduleDate" | "nlpKeywords" | "outline" | "internalLinks" | "referenceUrls">;
@@ -209,7 +212,8 @@ function extractMeta(text: string): MetaData | null {
   const titleM = inner.match(/SEO_TITLE:\s*(.+)/);
   const metaM  = inner.match(/META_DESC:\s*(.+)/);
   if (!titleM || !metaM) return null;
-  return { seoTitle: titleM[1].trim(), metaDesc: metaM[1].trim() };
+  const kwM = inner.match(/FOCUS_KEYWORD:\s*(.+)/);
+  return { seoTitle: titleM[1].trim(), metaDesc: metaM[1].trim(), focusKeyword: kwM?.[1]?.trim() };
 }
 
 function extractSlugHint(text: string): string {
@@ -581,7 +585,7 @@ export default function ContentStudio() {
 
     try {
       const externalLinks = form.externalLinks.split("\n").map(u => u.trim()).filter(u => /^https?:\/\//.test(u)).slice(0, 5);
-      const internalLinks = form.internalLinks.split("\n").map(u => u.trim()).filter(u => u).slice(0, 10);
+      const internalLinks = form.internalLinks.split("\n").map(u => u.trim()).filter(u => /^(https?:\/\/|\/)/.test(u)).slice(0, 10);
       const referenceUrls = form.referenceUrls.split("\n").map(u => u.trim()).filter(u => /^https?:\/\//.test(u)).slice(0, 3);
 
       const res = await fetch("/api/content/generate", {
@@ -798,8 +802,14 @@ export default function ContentStudio() {
           setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, article: text } : r));
         }
         text += dec.decode();
+        const bulkMeta  = extractMeta(text);
         const finalText = stripMeta(text);
-        setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "done", article: finalText } : r));
+        setBulkRows(prev => prev.map((r, idx) => idx === i ? {
+          ...r, status: "done", article: finalText,
+          seoTitle:     bulkMeta?.seoTitle,
+          metaDesc:     bulkMeta?.metaDesc,
+          focusKeyword: bulkMeta?.focusKeyword || rows[i].keyword,
+        } : r));
       } catch (err) {
         if ((err as Error).name === "AbortError") break;
         setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "error", error: String(err) } : r));
