@@ -88,15 +88,7 @@ Register-ScheduledTask -TaskName $nameDaily `
     -Trigger (New-ScheduledTaskTrigger -Daily -At $at) `
     -Settings $settings -Principal $principal -Force | Out-Null
 
-# --- OnStartup (hidden + silent; background report only, no popup) ---
-$argStartup = New-GuardArg -ModeArgs ("-WorkspaceRoot '{0}' -Mode startup -HideUi" -f $rootSq) -LogStem "SystemGuard-OnStart"
-Register-ScheduledTask -TaskName $nameStartup `
-    -Action (New-ScheduledTaskAction -Execute "powershell.exe" -Argument $argStartup) `
-    -Trigger (New-ScheduledTaskTrigger -AtStartup) `
-    -Settings $settings -Principal $principal -Force | Out-Null
+Get-ScheduledTask -TaskName $nameDaily -TaskPath '\' -ErrorAction Stop | Out-Null
 
-Get-ScheduledTask -TaskName $nameDaily   -TaskPath '\' -ErrorAction Stop | Out-Null
-Get-ScheduledTask -TaskName $nameStartup -TaskPath '\' -ErrorAction Stop | Out-Null
-
-Write-Output "Registered system guard scheduled tasks (Daily $DailyTime + OnStartup; both hidden/silent via Register-ScheduledTask — no schtasks 261-char limit)."
-Write-Output "Verify: Get-ScheduledTask -TaskName 'AgencyOS-SystemGuard-*' | Select TaskName,State"
+Write-Output "Registered system guard scheduled task (Daily $DailyTime; hidden/silent via Register-ScheduledTask — no schtasks 261-char limit)."
+Write-Output "Verify: Get-ScheduledTask -TaskName 'AgencyOS-SystemGuard-Daily' | Select TaskName,State"
