@@ -182,7 +182,7 @@ interface GenerateForm {
   wpTags: string;
 }
 
-interface MetaData { seoTitle: string; metaDesc: string; focusKeyword?: string; }
+interface MetaData { seoTitle: string; metaDesc: string; focusKeyword?: string; categories?: string[]; tags?: string[]; }
 
 interface BulkRow {
   id: number;
@@ -212,8 +212,17 @@ function extractMeta(text: string): MetaData | null {
   const titleM = inner.match(/SEO_TITLE:\s*(.+)/);
   const metaM  = inner.match(/META_DESC:\s*(.+)/);
   if (!titleM || !metaM) return null;
-  const kwM = inner.match(/FOCUS_KEYWORD:\s*(.+)/);
-  return { seoTitle: titleM[1].trim(), metaDesc: metaM[1].trim(), focusKeyword: kwM?.[1]?.trim() };
+  const kwM  = inner.match(/FOCUS_KEYWORD:\s*(.+)/);
+  const catM = inner.match(/CATEGORIES:\s*(.+)/);
+  const tagM = inner.match(/TAGS:\s*(.+)/);
+  const splitCsv = (s?: string) => (s ? s.split(",").map(x => x.trim()).filter(Boolean) : undefined);
+  return {
+    seoTitle: titleM[1].trim(),
+    metaDesc: metaM[1].trim(),
+    focusKeyword: kwM?.[1]?.trim(),
+    categories: splitCsv(catM?.[1]),
+    tags: splitCsv(tagM?.[1]),
+  };
 }
 
 function extractSlugHint(text: string): string {
@@ -706,8 +715,13 @@ export default function ContentStudio() {
           focusKeyword: form.keyword,
           scheduleDate: form.scheduleDate || undefined,
           siteId: selectedSiteId || undefined,
-          categories: form.wpCategories ? form.wpCategories.split(",").map(s => s.trim()).filter(Boolean) : undefined,
-          tags: form.wpTags ? form.wpTags.split(",").map(s => s.trim()).filter(Boolean) : undefined,
+          // Manual form fields win; fall back to the AI-suggested CATEGORIES/TAGS from the meta block.
+          categories: form.wpCategories
+            ? form.wpCategories.split(",").map(s => s.trim()).filter(Boolean)
+            : (metaData?.categories?.length ? metaData.categories : undefined),
+          tags: form.wpTags
+            ? form.wpTags.split(",").map(s => s.trim()).filter(Boolean)
+            : (metaData?.tags?.length ? metaData.tags : undefined),
         }),
       });
       const json = await res.json() as { ok: boolean; error?: string; edit_url?: string; view_url?: string };

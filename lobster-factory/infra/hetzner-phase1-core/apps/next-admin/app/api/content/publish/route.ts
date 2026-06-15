@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { isBridgeConfigured, bridgeBaseUrl, createPost } from "@/lib/studio/wp-bridge-client";
+import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -279,12 +281,59 @@ export async function POST(req: Request): Promise<Response> {
   const seoTitle = typeof body.seoTitle === "string" ? body.seoTitle.trim() : "";
   const title = seoTitle || h1 || "Untitled Article";
   const slug = (typeof body.slug === "string" ? body.slug.trim() : "") || slugify(h1 || "article");
-  const content = markdownToHtml(markdown);
 
   const base = wpApiUrl.replace(/\/+$/, "");
+  const excerpt = extractExcerpt(markdown);
+
+  // Category + tag names — shared by the Bridge path and the standard-REST path.
+  const catNames = (Array.isArray(body.categories) ? body.categories : [])
+    .map(c => String(c).trim()).filter(Boolean);
+  const tagNames = (Array.isArray(body.tags) ? body.tags : [])
+    .map(t => String(t).trim()).filter(Boolean);
+
+  // ── WP Bridge path ───────────────────────────────────────────────────────
+  // When the target site IS the configured bridge site, route through the signed /post endpoint:
+  // the plugin composes real Kadence blocks, sideloads in-article images into the media library,
+  // and persists Rank Math SEO meta server-side (standard WP REST silently drops the unregistered
+  // rank_math_focus_keyword meta). Gate on a hostname match so an article for a NON-bridge site is
+  // never mis-published to the bridge site; non-bridge sites keep the standard-REST path below.
+  const bridgeBase = isBridgeConfigured() ? bridgeBaseUrl() : null;
+  let bridgeHostMatch = false;
+  if (bridgeBase) {
+    try { bridgeHostMatch = new URL(bridgeBase).host === new URL(base).host; } catch { bridgeHostMatch = false; }
+  }
+  if (bridgeHostMatch) {
+    const blocks = markdownToBlocks(markdown);
+    if (blocks.length === 0) return new NextResponse("no publishable content", { status: 400 });
+    const seo: { focus_keyword?: string; description?: string; title?: string } = {};
+    if (typeof body.focusKeyword === "string" && body.focusKeyword.trim()) seo.focus_keyword = body.focusKeyword.trim();
+    if (typeof body.metaDescription === "string" && body.metaDescription.trim()) seo.description = body.metaDescription.trim();
+    if (seoTitle) seo.title = seoTitle;
+    const result = await createPost({
+      title,
+      blocks,
+      status: "draft",
+      excerpt,
+      categories: catNames,
+      tags: tagNames,
+      seo: Object.keys(seo).length > 0 ? seo : undefined,
+    });
+    if (!result.ok) {
+      // tsconfig has strict:false → discriminated-union narrowing via `!result.ok` does not
+      // expose `.error`; cast to the error arm (same idiom as app/api/tools/publish/route.ts:292).
+      return NextResponse.json(
+        { ok: false, error: `bridge: ${(result as { ok: false; error: string }).error}` },
+        { status: 502 },
+      );
+    }
+    const v = result.value;
+    return NextResponse.json({ ok: true, post_id: v.post_id, edit_url: v.edit_url });
+  }
+
+  // ── Standard WP REST path (non-bridge sites) ──────────────────────────────
+  const content = markdownToHtml(markdown);
   const endpoint = `${base}/wp-json/wp/v2/posts`;
 
-  const excerpt = extractExcerpt(markdown);
   const payload: Record<string, unknown> = {
     title,
     content,
@@ -295,10 +344,6 @@ export async function POST(req: Request): Promise<Response> {
 
   // Resolve category + tag names → WP term IDs
   const authHdr = wpAuthHeader(wpUsername, wpToken);
-  const catNames = (Array.isArray(body.categories) ? body.categories : [])
-    .map(c => String(c).trim()).filter(Boolean);
-  const tagNames = (Array.isArray(body.tags) ? body.tags : [])
-    .map(t => String(t).trim()).filter(Boolean);
   if (catNames.length > 0) {
     const catIds = await resolveTermIds(catNames, "categories", authHdr, base);
     if (catIds.length > 0) payload.categories = catIds;

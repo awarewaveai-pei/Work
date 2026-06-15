@@ -48,6 +48,15 @@ export function isBridgeConfigured(): boolean {
 }
 
 /**
+ * The configured bridge site's base URL (no trailing slash), or null if the bridge is not
+ * configured / the key is corrupt. Used by the publish route to gate Bridge routing on a hostname
+ * match — so an article destined for a non-bridge site is NOT mis-published to the bridge site.
+ */
+export function bridgeBaseUrl(): string | null {
+  return getConfig()?.baseUrl ?? null;
+}
+
+/**
  * Signed POST to a bridge route. `path` is relative to the namespace, e.g. "/product".
  * dryRun is ONLY honored by the /option route (RestController:167) — /product and
  * /post COMMIT regardless (live-verified 2026-06-11: a "dry-run" create produced
@@ -130,4 +139,36 @@ export function createWooProduct(
   payload: Record<string, unknown>,
 ): Promise<BridgeResult<BridgeProductResponse>> {
   return bridgePost<BridgeProductResponse>("/product", payload, { timeoutMs: 90_000 });
+}
+
+export interface BridgePostResponse {
+  status: string; // committed | rolled_back
+  ok?: boolean;
+  post_id?: number;
+  edit_url?: string;
+  reason?: string;
+  detail?: unknown;
+}
+
+export interface BridgePostSpec {
+  title: string;
+  /** Bridge composes these into Kadence markup (BlockLibrary.compose) and sideloads image URLs. */
+  blocks: unknown[];
+  status?: "draft" | "pending" | "publish";
+  excerpt?: string;
+  categories?: string[];
+  tags?: string[];
+  seo?: { focus_keyword?: string; description?: string; title?: string };
+}
+
+/**
+ * Create a full blog post draft through the Bridge `/post` route: blocks[] → Kadence, in-article
+ * image URLs sideloaded into the media library, Rank Math SEO meta set server-side, categories/tags
+ * created+assigned — all atomic with read-back verify + rollback on the plugin side.
+ * ⚠ ALWAYS a real write (no dry-run for /post). Defaults to status:"draft".
+ */
+export function createPost(
+  spec: BridgePostSpec,
+): Promise<BridgeResult<BridgePostResponse>> {
+  return bridgePost<BridgePostResponse>("/post", { status: "draft", ...spec }, { timeoutMs: 90_000 });
 }
