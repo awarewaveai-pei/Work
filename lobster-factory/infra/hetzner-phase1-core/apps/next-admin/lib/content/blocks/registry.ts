@@ -1,6 +1,7 @@
 /**
  * registry.ts — 內容引擎「積木註冊骨架」（後端 Block Registry）
  *
+ * 契約 SSOT：./README.md（前後端積木契約）。
  * 這是 `public/vector-editor.html` 的 `AB.registerBlock` 在後端的鏡像：
  *   - 每個積木自我註冊：`register({ id, kind, title, run })`（檔案被 import 時執行）
  *   - 只透過 `ctx` 溝通，不碰全域 → 整段可移植、可單獨刪

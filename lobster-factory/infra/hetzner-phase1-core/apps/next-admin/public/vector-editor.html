@@ -899,7 +899,7 @@ document.getElementById('loadProj').onchange=(e)=>{
 
 // ========================================================
 // 🧩 積木系統 Block Registry — 讓功能變成可抽換/可移植的真積木
-// 寫法見 BLOCKS.md。每個積木 = registerBlock({id,title,icon,mount(ctx,body)})
+// 契約 SSOT 見 lib/content/blocks/README.md。每個積木 = registerBlock({id,title,icon,mount(ctx,body)})
 // ctx 提供共用能力，積木不直接碰全域，就能單獨抽到別的專案。
 // ========================================================
 const AB = (function(){
