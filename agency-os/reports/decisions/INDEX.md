@@ -9,6 +9,7 @@ For each entry: open the linked file for the full report including debate transc
 | Date | Decision | Recommendation | Confidence | File |
 |------|----------|---------------|------------|------|
 | 2026-05-09 | 為 30 個客戶 WP 站選擇統一管理平台 | MainWP (self-hosted) | 0.83 | [2026-05-09-choose-wordpress-management-platform.md](2026-05-09-choose-wordpress-management-platform.md) |
+| 2026-06-15 | Build vs buy vs hybrid for AwareWave automated daily zh-TW SEO/GEO content pipeline | BUILD on existing stack (+ narrow topic-discovery feed) | 0.80 | [2026-06-15-build-zh-tw-content-pipeline.md](2026-06-15-build-zh-tw-content-pipeline.md) |
 
 ---
 
