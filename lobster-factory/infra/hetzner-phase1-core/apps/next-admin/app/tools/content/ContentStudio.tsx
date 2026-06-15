@@ -756,7 +756,8 @@ export default function ContentStudio() {
             : (metaData?.tags?.length ? metaData.tags : undefined),
           // Issue 四: hero image (Bridge path only — plugin sets it as the post thumbnail).
           featuredImageUrl: heroImageUrl || undefined,
-          featuredImageAlt: form.keyword || undefined,
+          // alt only meaningful with a hero URL (plugin reads alt solely inside its featured-image block).
+          featuredImageAlt: heroImageUrl && form.keyword ? form.keyword : undefined,
           // Issue 七: focus keyword → ILJ ilj_linkdefinition so other posts auto-link to this one.
           internalLinkKeywords: form.keyword.trim() ? [form.keyword.trim()] : undefined,
         }),

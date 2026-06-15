@@ -79,6 +79,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed) | 4 改動 TS 檔零型別錯（其餘 fabric/pdf-lib 既存 missing-dep）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`php -l`（PostCreator/RankMathPowerWords/bootstrap/test）| exit=0 | 全無語法錯
 - REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1M/2m/2nit — **Major：ContentStudio hero 競態**（imgRunRef 只在 aiImages!=="none" 分支遞增 → 重生成時關掉 AI 圖會讓前一輪慢 hero fetch 漏寫到新文章＝錯誤 featured 圖，靜默）→ 修為起手無條件遞增；Suggestion：`set_post_thumbnail` 回傳值取代多餘 `has_post_thumbnail`（已採）。Minor（hero attachment post_parent=0 孤兒、test assertion 略鬆）critic 判定可延後。merge 無條件對非 CJK 站零害經實跑確認。
+- REVIEW_DONE: critic=Deep(第2輪/4 TS 檔) | verdict=pass | findings=0c/0M/2m — race fix 經三情境追蹤確認正確（ON→ON / ON→OFF / abort-mid-hero 三路 generation-counter guard 全閉）；Minor#1 `featuredImageAlt` 在無 hero 時仍送（plugin 僅於 featured-image 區塊讀 alt＝no-op）→ **已套 1 行 guard** `heroImageUrl && form.keyword ? form.keyword : undefined`（ContentStudio.tsx:759），tsc 重驗零錯；Minor#2 全形/NBSP→ASCII 空白正規化（RankMath token 切詞，upstream 殘留，prompt-only 為正確最小範圍，延後）。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`featured_image_url\|internal_link_keywords\|ilj_linkdefinition\|RankMathPowerWords\|featuredImageUrl\|internalLinkKeywords\|generateHeroImage` | hits=0 stale — 全部命中均在本次 8 改動檔內，無 downstream 消費端、無過期文件聲稱（WORKLOG/worklog-excerpt 的「待 P3」註記由本 entry 結案，非待修）。RankMath KB doc line 558 證實 filter 簽章＝實作相符。
 
 **[剩餘風險]**
