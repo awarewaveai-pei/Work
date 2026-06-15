@@ -365,6 +365,9 @@ function buildUserPrompt(params: {
       lines.push(`- Include ${count} YouTube embed placeholder(s), ${placement}`);
       if (m.strictUnderHeadings) lines.push(`- Place under headings only`);
       lines.push(`- Format each as: [YOUTUBE_PLACEHOLDER_N: <suggested search query for a relevant video>]`);
+      // The publish pipeline resolves/embeds (or drops) a placeholder only when it is ALONE on its
+      // line; an inline placeholder would leak raw "[YOUTUBE_PLACEHOLDER_N: ...]" text to the live post.
+      lines.push(`- CRITICAL: put each placeholder ALONE on its own line, with a blank line before and after. Never inline inside a sentence. Never use the "]" character inside the search query.`);
     }
   }
 

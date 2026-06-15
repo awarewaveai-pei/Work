@@ -34,7 +34,9 @@ export type Block =
  * with the canonical watch URL on its own line, so this is the only YouTube path the converter sees.
  */
 function isYouTubeUrl(url: string): boolean {
-  return /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)[\w-]{6,}/i.test(url);
+  // Accept-set kept in lockstep with ContentStudio.canonicalYouTube() (the producer/SSOT) and with the
+  // identical copy in app/api/content/publish/route.ts: an 11-char video id under a YouTube host.
+  return /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtube-nocookie\.com\/embed\/|youtu\.be\/)[\w-]{11}/i.test(url);
 }
 
 function escapeHtml(s: string): string {
@@ -83,6 +85,10 @@ export function markdownToBlocks(md: string): Block[] {
   const clean = md
     .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
     .replace(/<!--\s*SLUG_HINT:[^>]*-->/g, "")
+    // Drop any UNRESOLVED YouTube placeholder, even if the model emitted it inline rather than on its
+    // own line. By publish time a resolved placeholder is already a bare watch URL (no longer matches),
+    // so this scrubs only the leftover authoring cue and never a real embed. (critic 2026-06-15 Major)
+    .replace(/\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]/g, "")
     .trim();
 
   const lines = clean.split("\n");
@@ -165,15 +171,12 @@ export function markdownToBlocks(md: string): Block[] {
       continue;
     }
 
-    // Standalone YouTube URL → real embed block (resolved placeholder lands here)
+    // Standalone YouTube URL → real embed block (resolved placeholder lands here).
+    // (Unresolved placeholders were already scrubbed during preprocessing above.)
     if (isYouTubeUrl(trimmed)) {
       blocks.push({ type: "embed", url: trimmed });
       continue;
     }
-
-    // YouTube placeholder still unresolved (operator pasted no URL) — drop it.
-    // Shipping a "🎬 query" paragraph to the live post would leak an internal authoring cue.
-    if (/^\[YOUTUBE_PLACEHOLDER_(\d+):\s*(.+)\]$/.test(trimmed)) continue;
 
     // Pure HTML comment line (NEEDS_BRAND_VERIFY etc.) — skip
     if (/^<!--.*-->$/.test(trimmed)) continue;

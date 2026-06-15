@@ -62,5 +62,8 @@ Example format (primary keyword "art therapy" — exact in 1–2, variants elsew
   });
 
   const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
+  // A truncated/empty completion would otherwise return ok:true with a blank outline, making the
+  // UI's "✨ 自動生成大綱" button a silent no-op. Surface it as a failure instead. (critic 2026-06-15)
+  if (!text) return NextResponse.json({ ok: false, error: "empty outline" }, { status: 502 });
   return NextResponse.json({ ok: true, outline: text });
 }

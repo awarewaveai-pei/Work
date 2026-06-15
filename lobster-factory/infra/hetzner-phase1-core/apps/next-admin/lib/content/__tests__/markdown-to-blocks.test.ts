@@ -84,8 +84,13 @@ describe("markdownToBlocks", () => {
     expect(watch[0]).toEqual({ type: "embed", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" });
     const short = markdownToBlocks("https://youtu.be/dQw4w9WgXcQ");
     expect(short[0]).toEqual({ type: "embed", url: "https://youtu.be/dQw4w9WgXcQ" });
-    const shorts = markdownToBlocks("https://www.youtube.com/shorts/abc123XYZ");
-    expect(shorts[0]).toEqual({ type: "embed", url: "https://www.youtube.com/shorts/abc123XYZ" });
+    const shorts = markdownToBlocks("https://www.youtube.com/shorts/aBcDeFgHiJk");
+    expect(shorts[0]).toEqual({ type: "embed", url: "https://www.youtube.com/shorts/aBcDeFgHiJk" });
+  });
+
+  it("rejects a YouTube-shaped URL with a too-short video id (must be 11 chars)", () => {
+    const blocks = markdownToBlocks("https://www.youtube.com/shorts/abc123");
+    expect(blocks.filter(b => b.type === "embed")).toHaveLength(0);
   });
 
   it("does not treat a non-YouTube URL as an embed (falls back to paragraph)", () => {
@@ -101,5 +106,14 @@ describe("markdownToBlocks", () => {
     expect(allText).not.toContain("🎬");
     // The surrounding paragraphs survive; only the placeholder line is removed.
     expect(blocks.filter(b => b.type === "paragraph")).toHaveLength(2);
+  });
+
+  it("scrubs an INLINE unresolved placeholder so it never leaks mid-sentence (critic Major)", () => {
+    const blocks = markdownToBlocks("看這段影片 [YOUTUBE_PLACEHOLDER_1: cats] 很有趣");
+    const allText = JSON.stringify(blocks);
+    expect(allText).not.toContain("YOUTUBE_PLACEHOLDER");
+    // The sentence text on either side of the placeholder survives in one paragraph.
+    expect(allText).toContain("看這段影片");
+    expect(allText).toContain("很有趣");
   });
 });

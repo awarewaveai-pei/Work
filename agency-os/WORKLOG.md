@@ -4,6 +4,36 @@
 
 ## 2026-06-15
 
+### feat(content-engine): Phase 2 YouTube 真嵌入（手貼 URL→core/embed）+ Phase 3 可編輯大綱強制標題關鍵字
+
+**[任務理解]** 使用者 5 點需求中的 (2) YouTube 影片仍未生成 + (3)(4) 大綱要先看、可改、每個標題含關鍵字。Phase 2：把生成文中的 `[YOUTUBE_PLACEHOLDER_N: query]` 變成可在 ContentStudio 手貼 YouTube URL → 發佈時輸出**真 Gutenberg core/embed**（非死框 div）。Phase 3：大綱 endpoint 加「每個 H2/H3/H4 含關鍵字或變體」規則（與 CJK 4–6 次精確上限調和）。**VBC 實證**：可編輯大綱 UI／`/api/content/outline`／generate 的 `outline` 參數**早已存在**（不重建）；WP Bridge plugin `BlockLibrary.youtube()`+`compose() case 'embed'`**早已支援 embed**（不需 plugin 改動/發版）。唯一真缺口：① 佔位符無解析路徑 ② 大綱 endpoint 無關鍵字規則。
+
+**[根因]**（VBC，非表面）
+- **YouTube 不顯示**：`generate:367` 只吐 `[YOUTUBE_PLACEHOLDER_N]` 文字佔位；`autoReplaceImages` 只處理圖，佔位符**從無解析路徑** → 直接以原始文字流入貼文（或被舊「死框 div」包住，非真嵌入）。
+- **未解析佔位符洩漏**：佔位符可能被模型 inline 寫進句中（非獨佔一行），舊 per-line drop 只擋整行 → inline 殘留洩漏到 live post（critic Major #1）。
+- **大綱無關鍵字規則**：`/api/content/outline` prompt 完全沒提關鍵字覆蓋，生成的大綱標題不含關鍵字 → 即使 generate 嚴格遵循大綱也繼承缺陷。
+
+**[已修改]**
+- `lib/content/markdown-to-blocks.ts` — Block union 加 `{ type:"embed"; url }`；新 `isYouTubeUrl()`（11 字 video id + YouTube host set，與 ContentStudio.canonicalYouTube 及 publish 副本逐字鎖步）；preprocessing `clean` 鏈加全域 inline scrub `\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]`（擋 inline 殘留）；loop 內獨佔行 YouTube URL → push embed block（取代舊 per-line placeholder drop）。
+- `lib/content/__tests__/markdown-to-blocks.test.ts` — +5 測（embed watch/youtu.be/shorts；非 YouTube URL 回退 paragraph；<11 字 id 拒絕；獨佔行佔位符丟棄不洩漏 🎬；inline 佔位符 scrub 兩側句子存活）→ 共 15 測全綠。
+- `app/api/content/publish/route.ts` — 新 `isYouTubeUrl()`（與 blocks 副本逐字相同）；markdownToHtml `clean` 鏈加同款全域 scrub；舊死框 div（109-119）改為「YouTube URL 獨佔一行原樣輸出」→ WP autoembed(priority 8) 在 wpautop 前吃掉它變真嵌入（標準 REST 路徑）。
+- `app/tools/content/ContentStudio.tsx` — Phase 2：新 state `ytUrlInputs`；computed `ytPlaceholders`（matchAll 抽 N+query）；`canonicalYouTube()`（watch/youtu.be/embed/shorts/live→規範 watch URL）+`resolveYouTube()`（替換佔位符為規範 URL）；每佔位符紅底貼 URL UI（Enter/「嵌入」鈕，無效 URL disabled）。Phase 3：大綱編輯器 label 改「先看大綱、可改再生成全文」+ hint「每個標題含關鍵字或近義變體」。
+- `app/api/content/outline/route.ts` — prompt 加 `Primary keyword:` 行 + KEYWORD COVERAGE 規則（關鍵字/變體須現於每個 H2/H3/H4）+ ANTI-STUFFING 規則（精確詞僅 1–2 標題；CJK 4–6× 上限）+ `#### H4`；max_tokens 600→700；空完成 guard（`if(!text) 502`，避免靜默 no-op）。
+- `app/api/content/generate/route.ts` — YouTube 佔位符 prompt 加 own-line invariant 硬約束（每佔位符獨佔一行、前後空行、句中禁 inline、query 內禁 `]`）→ 修 critic Major #1 根源。
+
+**[驗證結果]**（R0 四動作齊全）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/__tests__/markdown-to-blocks.test.ts` | exit=0 | ms≈900 — **15/15 pass**（含 embed watch/youtu.be/shorts、<11字拒絕、inline+獨佔行 scrub）；`npx tsc --noEmit` 我改的 6 檔零型別錯（fabric/pdf-lib TS2307 為 pre-existing 本地 node_modules 缺，非本次檔案，Docker `npm ci` 安裝 → 不阻部署）。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/2M/數 minor — 2 Major **全修**：#1 own-line invariant 未強制致 inline 洩漏 → generate prompt 硬化 + 兩 converter 全域非錨定 scrub + 移除冗餘 per-line drop；#2 `isYouTubeUrl{6,}` vs `canonicalYouTube{11}` 分歧 → 兩副本收緊 {11} + host set 對齊（m.+youtube-nocookie）+ 鎖步註解。修後 0 Critical/0 Major。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`YOUTUBE_PLACEHOLDER\|markdownToBlocks` | hits=2 — 全庫 grep `YOUTUBE_PLACEHOLDER` 命中 7 檔（5 本次改動 code 檔 + 2 文件）；`markdownToBlocks` 命中 5 檔（全 code + WORKLOG）。扣除本次 staged code 檔後，唯 2 文件殘留：①`agency-os/WORKLOG.md:10868`（歷史 append-only「死框 div」聲稱，**被本日新段取代**，不改寫）②`agency-os/reports/status/integrated-status-LATEST.md:355`（**auto-generated** 鏡像 WORKLOG:10868，由 `scripts/generate-integrated-status-report.ps1` 從 WORKLOG 重生，不手改）。**無 live-code call site 漏網**：plugin `case 'embed'`/`youtube()` 早存在、`markdownToBlocks` 唯一 caller 是 `publish:325`（Bridge path）+ 測試。
+- WORKLOG: 本段。
+
+**[剩餘風險]**
+- **YouTube 自動搜尋延後 Phase 4**：Google/YouTube Data API key **無效**（已實測 HTTP 400 API_KEY_INVALID，hash 確認 env==file）→ 自動找片需使用者用 §30 Google 帳號（peijingartstudio@gmail.com）建新 key 並啟用 YouTube Data API。Phase 2 = 手貼 URL（現可完整 REALTEST）。
+- **未部署 = 真站仍跑舊碼**：Phase 1–3 需一次 sg-deploy 才生效（plugin 無需發版）。
+- 標準 REST 路徑（非 Bridge 站）靠 WP autoembed 吃裸 URL；Bridge 站走 embed block。兩路徑皆已處理但僅 Bridge path 有 vitest 覆蓋（標準路徑為 WP 原生行為，低風險）。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/markdown-to-blocks.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/__tests__/markdown-to-blocks.test.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/publish/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/content/ContentStudio.tsx lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/outline/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts`
+
 ### fix(content-engine): Phase 1 媒體比例 bug + 標題關鍵字覆蓋（flux aspect_ratio 真根因）
 
 **[任務理解]** 使用者批評：給了全部 SEO/GEO/RankMath 文件，生成文章仍不合規 — 圖比例不對（要 3:2/4:3/16:9）、圖要 ~100K 存 WP media、H2/H3/H4 都要關鍵字。先做 Phase 1（媒體層 + 標題規則），不先空跑部署（避免再次看到沒修好的結果）。

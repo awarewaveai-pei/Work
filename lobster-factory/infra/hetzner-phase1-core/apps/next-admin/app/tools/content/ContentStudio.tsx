@@ -710,7 +710,7 @@ export default function ContentStudio() {
     const m =
       s.match(/[?&]v=([\w-]{11})/) ||
       s.match(/youtu\.be\/([\w-]{11})/) ||
-      s.match(/youtube\.com\/(?:embed|shorts|live)\/([\w-]{11})/);
+      s.match(/youtube(?:-nocookie)?\.com\/(?:embed|shorts|live)\/([\w-]{11})/);
     return m ? `https://www.youtube.com/watch?v=${m[1]}` : null;
   }
 
