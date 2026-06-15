@@ -25,12 +25,12 @@ const AI_WORDS_EXTENDED = [
 const SYSTEM_PROMPT = `You are a professional SEO/GEO content writer. Write a complete, publication-ready article in Markdown.
 
 DEFAULT OUTPUT FORMAT (follow unless overridden in user instructions):
-1. # H1 title — MUST satisfy all 4 RankMath Title Readability tests:
+1. # H1 title — the article's ONLY H1: use "# " exactly once, on the very first line, and NEVER use "# " (single-hash heading) again anywhere in the body. MUST satisfy all 4 RankMath Title Readability tests:
    • Primary keyword in first 50% of the title
-   • Include a POWER WORD: ultimate / proven / essential / expert / complete / effective / simple / step-by-step / critical / best
-   • Include a NUMBER where natural ("7 Ways…", "5 Steps…", "10 Tips…") — omit only when it would sound forced
+   • Include a POWER WORD matching the article's LANGUAGE — English: ultimate / proven / essential / expert / complete / effective / simple / step-by-step / critical / best. For CJK languages, a localized power-word list is supplied in the instructions below — use one of those (the English list will not register).
+   • Include a NUMBER — write it as an Arabic digit (7, 5, 10, 2026), never spelled out or as a CJK numeral (七/五), because RankMath's number test only detects digits. Required for list/how-to articles; omit only when a number would genuinely distort the topic.
    • Convey clear positive or negative SENTIMENT (curiosity, urgency, relief, excitement)
-   • Length: 50–60 characters; descriptive, not clickbait
+   • Length: 50–60 characters for Latin-script languages, 14–30 characters for CJK; descriptive, not clickbait
 2. ## Quick Answer (80–150 words; FIRST SENTENCE directly answers the main question — no buildup)
 3. ## Key Takeaways (4–5 bullet points)
 4. Main body sections — each H2 opens with a 1–2 sentence direct answer BEFORE elaborating (optimises for AI Overview citation and Featured Snippets); use H3 sub-sections where helpful
@@ -78,9 +78,9 @@ RANK MATH COMPLIANCE (24-test scoring system — target ≥81 green):
 
 BASIC SEO — 7 tests:
 - Primary keyword in H1 title (already covered above) AND in the first 10% of body text (≈ first 150 words)
-- Primary keyword in at least one H2 or H3 heading (not just in H1)
+- Primary keyword (or a close variant / partial phrase / LSI term) must appear in EVERY H2, H3 AND H4 heading — every sub-heading should signal the topic, not just one. RECONCILE with the CJK exact-keyword cap below: write the EXACT focus keyword in only 1–2 headings; in all the other headings use a synonym, a shorter partial phrase, or a closely-related term, so each heading reinforces the topic WITHOUT breaching the 4–6× exact-keyword limit (keyword-stuffing penalty)
 - All focus keywords must appear naturally throughout the body — not clustered
-- Keyword density 1%–1.5%; exceeding 2.5% triggers a keyword-stuffing penalty — never exceed
+- Keyword density 1%–1.5%; exceeding 2.5% triggers a keyword-stuffing penalty — never exceed. For CJK languages (Chinese/Japanese/Korean) RankMath cannot tokenize the text, counts very few "words", and reports density 5–10× higher than reality — so DO NOT chase a percentage; instead obey the hard exact-keyword-repetition cap given in the CJK compliance block in the instructions below
 - Minimum 600 words; 2,500+ words = RankMath content-length 100% score
 
 ADDITIONAL SEO — 10 tests:
@@ -89,7 +89,7 @@ ADDITIONAL SEO — 10 tests:
 - Emit <!-- SLUG_HINT: primary-keyword-slug --> at end of article — CMS uses this as URL slug (must contain keyword; ideally ≤75 total URL characters)
 
 CONTENT READABILITY — 3 tests:
-- Table of Contents: include for ALL articles (bulleted list placed immediately after the H1 — RankMath detects it for "Jump to" snippet eligibility)
+- Do NOT write a manual Table of Contents. The WordPress theme (Kadence) auto-generates the TOC from the heading structure; a hand-written list would duplicate it. Just produce a clean, well-ordered H2/H3 outline so the automatic TOC is correct.
 - All paragraphs strictly < 120 words — split any long passage into multiple shorter paragraphs, no exceptions
 - Media: include at least 4 image placeholder blocks throughout the article body (1 image passes the test; 4+ earns 100% for this test)
 
@@ -244,6 +244,20 @@ function buildUserPrompt(params: {
   if (params.pointOfView !== "none") lines.push(`Point of view: ${params.pointOfView}`);
   lines.push(`Text readability: ${params.readability}`);
 
+  // CJK RankMath compliance — RankMath cannot tokenize Chinese/Japanese/Korean, so its
+  // English power-word list, sentiment list, and density % all misfire. Emit a targeted,
+  // language-aware reinforcement block when the article language is CJK.
+  const isCJK = /chinese|mandarin|cantonese|japanese|korean|zh-tw|zh-cn|zh-hk|zh-mo|ja-jp|ko-kr|中文|繁體|繁体|简体|簡體|漢語|汉语|粵語|廣東話|國語|国语|台語|台语|日本|日語|日语|한국|韓國|韩国|국어/i.test(params.language);
+  if (isCJK) {
+    lines.push("");
+    lines.push("=== CJK RANKMATH COMPLIANCE (this article is in a CJK language — follow strictly) ===");
+    lines.push("• TITLE power word: use ONE of these localized power words in the H1/SEO title (RankMath's English list will not match CJK; a matching server-side list is registered for the site): 終極 / 必備 / 實證 / 專家 / 完整 / 有效 / 簡單 / 關鍵 / 最佳 / 免費 / 立即 / 秘訣 / 揭密 / 一次搞懂 / 高效 / 避免 / 不可不知 / 獨家 / 快速 / 突破。CRITICAL FORMAT: RankMath detects the power word by splitting the title on SPACES, so the chosen word MUST stand alone as its own space-separated token — write 「兒童藝術治療 完整 指南」(✓ 完整 is its own token), NOT 「完整指南」(✗ glued, will not register). Put a half-width space before and after the power word. Do NOT use overclaim words like 保證／治癒 in YMYL (health) titles — they violate the trust rules above.");
+    lines.push("• TITLE number: include an Arabic digit in the title (例：「7 個」「5 步驟」「2026 年」) — do NOT use CJK numerals（七、五、十）, RankMath only detects 0-9 digits.");
+    lines.push("• KEYWORD FREQUENCY (critical — this SUPERSEDES both the density % rule AND the earlier 'keyword must appear throughout the body / not clustered' rule): RankMath cannot count CJK words, so it undercounts total words and the focus-keyword density reads 5–10× too high (a prior article hit 13.04%). Use the EXACT focus keyword AT MOST 4–6 times in the WHOLE article: once in the H1, once in the first paragraph, once in a single H2/H3, and 1–3 times in the body. For every other reference use a synonym, a shorter partial phrase, or a pronoun（它／這套方法／本服務／該工具）. NEVER write the exact keyword more than 6 times total.");
+    lines.push("• HEADINGS keyword coverage: every H2/H3/H4 must carry the topic, but to stay under the 4–6× exact-keyword cap, put the EXACT focus keyword in only 1–2 headings and use a synonym / shorter partial phrase / related term（同義詞、部分詞、相關詞）in all the rest. Example for focus「兒童藝術治療」: H2「兒童藝術治療 的核心原理」(exact, ✓ space-tokenised) → H2「為什麼 繪畫表達 能療癒情緒」(variant) → H3「家長如何在家陪伴 創作」(related). Never repeat the exact keyword in every heading — that breaches the cap and reads as stuffing.");
+    lines.push("=== END CJK RANKMATH COMPLIANCE ===");
+  }
+
   // Structure overrides
   const s = params.structure;
   if (s.quickAnswer === false)     lines.push("DO NOT include a Quick Answer section.");
@@ -326,10 +340,10 @@ function buildUserPrompt(params: {
   if (m) {
     if (m.aiImages && m.aiImages !== "none") {
       const count = m.imageCount ?? 3;
-      const sizeLabel = m.imageSize?.replace("x", "×") ?? "";
+      const ratioLabel = m.imageSize?.trim() ?? ""; // now an aspect ratio (e.g. "16:9"), not a px size
       lines.push("");
       lines.push("IMAGE PLACEHOLDERS:");
-      lines.push(`- Include ${count} image placeholder(s) in the article${sizeLabel ? ` (suggested size: ${sizeLabel})` : ""}`);
+      lines.push(`- Include ${count} image placeholder(s) in the article${ratioLabel ? ` (aspect ratio: ${ratioLabel})` : ""}`);
       if (m.imageStyle)        lines.push(`- Image style: ${m.imageStyle}`);
       if (m.imageInstructions) lines.push(`- Creative direction: ${m.imageInstructions}`);
       if (m.brandName)         lines.push(`- Brand: ${m.brandName}`);
@@ -351,6 +365,9 @@ function buildUserPrompt(params: {
       lines.push(`- Include ${count} YouTube embed placeholder(s), ${placement}`);
       if (m.strictUnderHeadings) lines.push(`- Place under headings only`);
       lines.push(`- Format each as: [YOUTUBE_PLACEHOLDER_N: <suggested search query for a relevant video>]`);
+      // The publish pipeline resolves/embeds (or drops) a placeholder only when it is ALONE on its
+      // line; an inline placeholder would leak raw "[YOUTUBE_PLACEHOLDER_N: ...]" text to the live post.
+      lines.push(`- CRITICAL: put each placeholder ALONE on its own line, with a blank line before and after. Never inline inside a sentence. Never use the "]" character inside the search query.`);
     }
   }
 
@@ -360,11 +377,13 @@ function buildUserPrompt(params: {
   // Meta generation
   if (params.generateMeta) {
     lines.push("");
-    lines.push("IMPORTANT: After the full article, append exactly this meta block:");
+    lines.push("IMPORTANT: After the full article, append exactly this meta block (one field per line, keep the exact KEY: prefixes):");
     lines.push("<!-- CONTENT_META_START -->");
-    lines.push("SEO_TITLE: [50-60 char SEO title, primary keyword in first half of title]");
-    lines.push("META_DESC: [145-155 char meta description, includes primary keyword]");
+    lines.push("SEO_TITLE: [SEO title — 50-60 chars for Latin scripts / 14-30 chars for CJK; primary keyword in first half; include a power word AND an Arabic-digit number]");
+    lines.push("META_DESC: [meta description — 145-155 chars for Latin scripts / 60-80 chars for CJK; includes primary keyword]");
     lines.push("FOCUS_KEYWORD: [the primary keyword exactly as provided]");
+    lines.push("CATEGORIES: [1-2 broad, conventional WordPress category names for this article, comma-separated — prefer terms a site would already have; do NOT invent narrow one-off categories]");
+    lines.push("TAGS: [4-6 specific topical tags, comma-separated]");
     lines.push("<!-- CONTENT_META_END -->");
   }
 
@@ -414,7 +433,7 @@ export async function POST(req: Request): Promise<Response> {
   const media: MediaHub = {
     aiImages:           str(rawMedia.aiImages, "none"),
     imageCount:         typeof rawMedia.imageCount === "number" ? Math.min(Math.max(1, rawMedia.imageCount), 10) : 3,
-    imageSize:          str(rawMedia.imageSize, "1344x768"),
+    imageSize:          str(rawMedia.imageSize, "16:9"), // flux aspect_ratio (px-size format retired)
     imageStyle:         str(rawMedia.imageStyle),
     imageInstructions:  str(rawMedia.imageInstructions),
     brandName:          str(rawMedia.brandName),

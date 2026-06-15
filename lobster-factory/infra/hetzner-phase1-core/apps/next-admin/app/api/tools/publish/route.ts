@@ -9,8 +9,11 @@ import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import {
+  createDraftOrderOnNative,
+  createSyncProductOnNative,
   getCatalogVariants,
   getSyncProduct,
+  isNativeStoreConfigured,
   isPrintfulConfigured,
   linkSyncVariant,
   listSyncProducts,
@@ -42,7 +45,7 @@ function gate(request: Request): NextResponse | null {
 }
 
 interface PublishBody {
-  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link";
+  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link" | "pfcreate" | "pforder";
   // upscale / productimage / flatlay
   designUrl?: string;
   longEdgePx?: number;
@@ -60,6 +63,7 @@ interface PublishBody {
   focusKeywordHint?: string;
   // create
   title?: string;
+  designName?: string; // reserved — SKUs are owned by `create` and echoed via variantMap; pfcreate consumes them
   retailPrice?: string;
   plusPrice?: string;
   sizes?: string[];
@@ -70,7 +74,21 @@ interface PublishBody {
   // status / link
   wooProductId?: number;
   printFileUrl?: string;
-  variantMap?: { variationId: number; color: string; size: string }[];
+  variantMap?: { variationId: number; color: string; size: string; sku?: string; price?: string }[];
+  // pforder (P4 draft fulfillment — Woo order → Printful DRAFT print order, no confirm)
+  wooOrderId?: number;
+  recipient?: {
+    name?: string;
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state_code?: string;
+    country_code?: string;
+    zip?: string;
+    email?: string;
+    phone?: string;
+  };
+  items?: { sku?: string; quantity?: number }[];
 }
 
 const PRICE_RE = /^\d+(\.\d{1,2})?$/;
@@ -294,15 +312,26 @@ export async function POST(request: Request) {
     const value = r.value;
     // Pair returned variation_ids (creation order) with our deterministic plan order.
     const plan = buildVariantPlan(params);
-    const variantMap =
-      value.variation_ids && value.variation_ids.length === plan.length
-        ? value.variation_ids.map((variationId, i) => ({
-            variationId,
-            color: plan[i].color,
-            size: plan[i].size,
-          }))
-        : [];
-    return NextResponse.json({ ok: true, ...value, variantMap });
+    const variantMapComplete = Boolean(value.variation_ids && value.variation_ids.length === plan.length);
+    const variantMap = variantMapComplete
+      ? value.variation_ids!.map((variationId, i) => ({
+          variationId,
+          color: plan[i].color,
+          size: plan[i].size,
+          sku: plan[i].sku,
+          price: plan[i].price,
+        }))
+      : [];
+    // m5: when Woo returns a different count of variation_ids than our plan, the SKU map is dropped.
+    // Surface that AT THE SOURCE (not two steps later as a pfcreate 422) so it's attributable here.
+    return NextResponse.json({
+      ok: true,
+      ...value,
+      variantMap,
+      ...(variantMapComplete
+        ? {}
+        : { variantMapDropped: true, expectedVariantCount: plan.length, gotVariationIds: value.variation_ids?.length ?? 0 }),
+    });
   }
 
   // ── Step 3: has Printful synced the new Woo product? ───────────────────────
@@ -397,5 +426,246 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, syncProductId: found.id, linkedCount, total: results.length, results });
   }
 
-  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|flatlay|copy|create|status|link" }, { status: 400 });
+  // ── Step 3+4 (native): create the Printful product AND bind every variant + print file in ONE
+  //    API call. Replaces the status/link dance, which only works for the Woo-platform store and
+  //    is blocked there anyway (no API to import an externally-created Woo product). The native
+  //    "Manual Order / API platform" store accepts POST /store/products → fully automatic.
+  if (body.action === "pfcreate") {
+    if (!isNativeStoreConfigured()) {
+      return NextResponse.json(
+        { ok: false, error: "printful_native_store_not_configured", hint: "Set PRINTFUL_NATIVE_STORE_ID." },
+        { status: 503 },
+      );
+    }
+    if (!Number.isInteger(body.wooProductId) || (body.wooProductId as number) <= 0) {
+      return NextResponse.json({ ok: false, error: "wooProductId (positive integer) is required" }, { status: 400 });
+    }
+    if (!body.title || body.title.trim().length < 3) {
+      return NextResponse.json({ ok: false, error: "title is required (min 3 chars)" }, { status: 400 });
+    }
+    if (!body.printFileUrl || !body.printFileUrl.startsWith(designsBase)) {
+      return NextResponse.json({ ok: false, error: "printFileUrl must be a My Designs asset URL" }, { status: 400 });
+    }
+    if (!body.retailPrice || !PRICE_RE.test(body.retailPrice)) {
+      return NextResponse.json({ ok: false, error: "retailPrice must look like 24.99" }, { status: 400 });
+    }
+    if (body.plusPrice !== undefined && !PRICE_RE.test(body.plusPrice)) {
+      return NextResponse.json({ ok: false, error: "plusPrice must look like 26.99" }, { status: 400 });
+    }
+    // SKUs are owned by the `create` step (the P4 join key) and echoed back in its variantMap.
+    // pfcreate CONSUMES that map verbatim — it must NOT rebuild the plan, because a rebuild keyed on
+    // a different designName/sizes would silently diverge from the Woo product's SKUs (critic
+    // 2026-06-15 #4). No usable variantMap = caller skipped `create` → fail loud.
+    const vmap = (body.variantMap ?? []).filter(
+      (m) =>
+        typeof m?.sku === "string" &&
+        m.sku.length > 0 &&
+        typeof m?.price === "string" &&
+        PRICE_RE.test(m.price) &&
+        typeof m?.color === "string" &&
+        typeof m?.size === "string",
+    );
+    if (vmap.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "variantMap_required — call `create` first and pass back its variantMap (carries the authoritative SKUs + prices).",
+        },
+        { status: 400 },
+      );
+    }
+    const catalog = await getCatalogVariants(71, ["White", "Black"]);
+    if (!catalog.ok) {
+      return NextResponse.json({ ok: false, error: (catalog as { ok: false; error: string }).error }, { status: 502 });
+    }
+    const catalogByKey = new Map(catalog.value.map((v) => [`${v.color.toLowerCase()}|${v.size.toLowerCase()}`, v.id]));
+    const variants: { externalId: string; catalogVariantId: number; retailPrice: string; printFileUrl: string }[] = [];
+    const skipped: { sku: string; reason: string }[] = [];
+    for (const m of vmap) {
+      const catalogId = catalogByKey.get(`${m.color.toLowerCase()}|${m.size.toLowerCase()}`);
+      if (!catalogId) {
+        skipped.push({ sku: m.sku as string, reason: `no_catalog_${m.color}_${m.size}` });
+        continue;
+      }
+      variants.push({
+        externalId: m.sku as string,
+        catalogVariantId: catalogId,
+        retailPrice: m.price as string,
+        printFileUrl: body.printFileUrl,
+      });
+    }
+    // Fail loud on ANY unresolved variant — a partial native product can't fulfill every Woo SKU,
+    // and a silent skip would only surface when a customer's paid order has no Printful counterpart.
+    if (skipped.length > 0) {
+      return NextResponse.json(
+        { ok: false, error: "catalog_resolution_incomplete", skipped, resolved: variants.length },
+        { status: 422 },
+      );
+    }
+    const thumb = (body.mockupUrls ?? []).find((u) => typeof u === "string" && u.startsWith(designsBase));
+    const created = await createSyncProductOnNative({
+      name: body.title.trim(),
+      externalId: String(body.wooProductId),
+      thumbnailUrl: thumb,
+      variants,
+    });
+    if (!created.ok) {
+      const e = (created as { ok: false; error: string }).error;
+      // Idempotency-precheck / timeout / network failures are transient and safe to retry — same class
+      // as reReadFailed below. Surface 503 retryable so the operator retries instead of giving up.
+      const transient =
+        e.startsWith("idempotency_precheck_failed") || e.includes("timeout") || e.includes("network_error");
+      return NextResponse.json(
+        { ok: false, error: e, ...(transient ? { retryable: true } : {}) },
+        { status: transient ? 503 : 502 },
+      );
+    }
+    if (created.value.reReadFailed) {
+      // Product WAS created on Printful but the variant read-back failed — do NOT report success.
+      // A retry hits the idempotency pre-check (external_id already exists) and recovers the ids.
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "created_but_readback_failed",
+          syncProductId: created.value.id,
+          retryable: true,
+          hint: "Product exists on Printful; re-run pfcreate to fetch its variant ids (idempotent).",
+        },
+        { status: 503 },
+      );
+    }
+    // M1/M3: pfcreate OWNS the completeness assertion — the native product must bind exactly as many
+    // variants as we sent (every Woo SKU). A shortfall means some paid SKU would have no Printful
+    // counterpart at P4 fulfillment, so fail loud rather than report a false success.
+    if (created.value.incompleteVariants) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "native_product_incomplete",
+          syncProductId: created.value.id,
+          expected: variants.length,
+          got: created.value.variantCount,
+          linkedVariants: created.value.variants,
+          hint: "Printful bound fewer variants than sent — inspect the product on Printful before fulfillment.",
+        },
+        { status: 422 },
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      syncProductId: created.value.id,
+      alreadyExisted: created.value.alreadyExisted,
+      variantCount: created.value.variantCount,
+      linkedVariants: created.value.variants,
+    });
+  }
+
+  // ── P4 (native): forward a (paid) Woo order to Printful as a DRAFT print order. NO confirm — the
+  //    draft sits in the dashboard, is NOT charged, and is NOT printed. This is the fulfillment seam.
+  //    CONTRACT: the caller passes ONLY Printful-fulfillable lines in `items` — it must drop shipping /
+  //    fee / discount / non-POD product lines from the Woo order BEFORE calling. This handler does NOT
+  //    silently skip lines: any unrecognised/malformed item fail-louds the WHOLE request (so an order is
+  //    never partially fulfilled). A future Woo-order webhook reuses createDraftOrderOnNative unchanged.
+  if (body.action === "pforder") {
+    if (!isNativeStoreConfigured()) {
+      return NextResponse.json(
+        { ok: false, error: "printful_native_store_not_configured", hint: "Set PRINTFUL_NATIVE_STORE_ID." },
+        { status: 503 },
+      );
+    }
+    // Defensive caps — a malformed/hostile payload must not make us build an unbounded POST.
+    const MAX_ITEMS = 100;
+    const MAX_QTY = 1000;
+    const MAX_FIELD = 200;
+    if (!Number.isInteger(body.wooOrderId) || (body.wooOrderId as number) <= 0) {
+      return NextResponse.json({ ok: false, error: "wooOrderId (positive integer) is required" }, { status: 400 });
+    }
+    const r = body.recipient;
+    if (!r) {
+      return NextResponse.json(
+        { ok: false, error: "recipient_incomplete", missing: ["name", "address1", "city", "country_code", "zip"] },
+        { status: 400 },
+      );
+    }
+    const requiredRecipient = ["name", "address1", "city", "country_code", "zip"] as const;
+    const missing = requiredRecipient.filter((k) => typeof r[k] !== "string" || (r[k] as string).trim().length === 0);
+    if (missing.length > 0) {
+      return NextResponse.json({ ok: false, error: "recipient_incomplete", missing }, { status: 400 });
+    }
+    const country = (r.country_code as string).trim().toUpperCase();
+    // Printful rejects US / CA / AU orders without a state/province code — fail loud here rather than
+    // after the order POST (a rejected POST would leave the operator guessing why no draft appeared).
+    if (["US", "CA", "AU"].includes(country) && (typeof r.state_code !== "string" || r.state_code.trim().length === 0)) {
+      return NextResponse.json({ ok: false, error: "state_code_required_for_country", country }, { status: 400 });
+    }
+    // Recipient field bounds + email shape — reject an oversized field or a malformed email here, so a
+    // downstream Printful rejection can't be misread as "no draft was needed".
+    const recipientFields = [
+      "name", "address1", "address2", "city", "state_code", "country_code", "zip", "email", "phone",
+    ] as const;
+    for (const k of recipientFields) {
+      const v = r[k];
+      if (typeof v === "string" && v.length > MAX_FIELD) {
+        return NextResponse.json({ ok: false, error: "recipient_field_too_long", field: k }, { status: 400 });
+      }
+    }
+    if (typeof r.email === "string" && r.email.trim().length > 0 && !r.email.includes("@")) {
+      return NextResponse.json({ ok: false, error: "recipient_email_invalid" }, { status: 400 });
+    }
+    // Every line must resolve to {non-empty sku, positive-int quantity}. A silently dropped line would
+    // under-fill the print order, so reject the whole request if ANY item is malformed (fail loud).
+    const rawItems = Array.isArray(body.items) ? body.items : [];
+    if (rawItems.length > MAX_ITEMS) {
+      return NextResponse.json({ ok: false, error: "too_many_items", max: MAX_ITEMS, got: rawItems.length }, { status: 400 });
+    }
+    const items: { sku: string; quantity: number }[] = [];
+    for (const it of rawItems) {
+      if (typeof it?.sku !== "string" || it.sku.trim().length === 0 || it.sku.length > MAX_FIELD) continue;
+      if (!Number.isInteger(it?.quantity) || (it.quantity as number) <= 0 || (it.quantity as number) > MAX_QTY) continue;
+      items.push({ sku: it.sku.trim(), quantity: it.quantity as number });
+    }
+    if (items.length === 0 || items.length !== rawItems.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "items_required — each item needs a non-empty sku and a positive integer quantity",
+          got: rawItems.length,
+          valid: items.length,
+        },
+        { status: 400 },
+      );
+    }
+    const recipient = {
+      name: (r.name as string).trim(),
+      address1: (r.address1 as string).trim(),
+      city: (r.city as string).trim(),
+      country_code: country,
+      zip: (r.zip as string).trim(),
+      ...(typeof r.state_code === "string" && r.state_code.trim() ? { state_code: r.state_code.trim() } : {}),
+      ...(typeof r.address2 === "string" && r.address2.trim() ? { address2: r.address2.trim() } : {}),
+      ...(typeof r.email === "string" && r.email.trim() ? { email: r.email.trim() } : {}),
+      ...(typeof r.phone === "string" && r.phone.trim() ? { phone: r.phone.trim() } : {}),
+    };
+    const order = await createDraftOrderOnNative({ externalId: String(body.wooOrderId), recipient, items });
+    if (!order.ok) {
+      const e = (order as { ok: false; error: string }).error;
+      // Idempotency-precheck / timeout / network failures are transient and safe to retry (the read-
+      // before-write guard means a retry never duplicates a draft). Surface 503 retryable.
+      const transient =
+        e.startsWith("idempotency_precheck_failed") || e.includes("timeout") || e.includes("network_error");
+      return NextResponse.json(
+        { ok: false, error: e, ...(transient ? { retryable: true } : {}) },
+        { status: transient ? 503 : 502 },
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      draft: true,
+      printfulOrderId: order.value.printfulOrderId,
+      status: order.value.status,
+      alreadyExisted: order.value.alreadyExisted,
+    });
+  }
+
+  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|flatlay|copy|create|status|link|pfcreate|pforder" }, { status: 400 });
 }

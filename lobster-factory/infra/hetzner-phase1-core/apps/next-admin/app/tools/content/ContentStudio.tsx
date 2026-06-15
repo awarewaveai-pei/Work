@@ -102,11 +102,15 @@ const AI_IMAGE_PROVIDERS = [
   { value: "replicate", label: "Replicate（AI 生圖）" },
 ];
 
+// Media ratios = flux-schnell aspect_ratio enum values (these are sent through verbatim and actually
+// take effect; the old "1344x768"-style size strings were ignored by the model — every image came out
+// 1:1). 16:9 / 3:2 / 4:3 are the article-body friendly horizontals; 1:1 / 9:16 kept for social reuse.
 const IMAGE_SIZES = [
-  { value: "1344x768",  label: "1344×768（16:9）" },
-  { value: "1024x1024", label: "1024×1024（1:1）" },
-  { value: "768x1344",  label: "768×1344（9:16）" },
-  { value: "1200x630",  label: "1200×630（OG）" },
+  { value: "16:9", label: "16:9（橫式 · Google Discover 最佳）" },
+  { value: "3:2",  label: "3:2（橫式 · 攝影比例）" },
+  { value: "4:3",  label: "4:3（橫式 · 經典）" },
+  { value: "1:1",  label: "1:1（方形）" },
+  { value: "9:16", label: "9:16（直式）" },
 ];
 
 const LAYOUT_OPTIONS = [
@@ -182,7 +186,7 @@ interface GenerateForm {
   wpTags: string;
 }
 
-interface MetaData { seoTitle: string; metaDesc: string; focusKeyword?: string; }
+interface MetaData { seoTitle: string; metaDesc: string; focusKeyword?: string; categories?: string[]; tags?: string[]; }
 
 interface BulkRow {
   id: number;
@@ -212,8 +216,17 @@ function extractMeta(text: string): MetaData | null {
   const titleM = inner.match(/SEO_TITLE:\s*(.+)/);
   const metaM  = inner.match(/META_DESC:\s*(.+)/);
   if (!titleM || !metaM) return null;
-  const kwM = inner.match(/FOCUS_KEYWORD:\s*(.+)/);
-  return { seoTitle: titleM[1].trim(), metaDesc: metaM[1].trim(), focusKeyword: kwM?.[1]?.trim() };
+  const kwM  = inner.match(/FOCUS_KEYWORD:\s*(.+)/);
+  const catM = inner.match(/CATEGORIES:\s*(.+)/);
+  const tagM = inner.match(/TAGS:\s*(.+)/);
+  const splitCsv = (s?: string) => (s ? s.split(",").map(x => x.trim()).filter(Boolean) : undefined);
+  return {
+    seoTitle: titleM[1].trim(),
+    metaDesc: metaM[1].trim(),
+    focusKeyword: kwM?.[1]?.trim(),
+    categories: splitCsv(catM?.[1]),
+    tags: splitCsv(tagM?.[1]),
+  };
 }
 
 function extractSlugHint(text: string): string {
@@ -245,7 +258,7 @@ const DEFAULT_STRUCTURE: ArticleStructure = {
 };
 
 const DEFAULT_MEDIA: MediaHub = {
-  aiImages: "none", imageCount: 3, imageSize: "1344x768",
+  aiImages: "none", imageCount: 3, imageSize: "16:9",
   imageStyle: "", imageInstructions: "", brandName: "",
   includeKeywordAlt: true, autoAltText: false,
   youtubeSource: "none", youtubeCount: 1, youtubeLayout: "distribute",
@@ -343,6 +356,14 @@ export default function ContentStudio() {
 
   // Auto-image generation counter (0 = idle, N = N images pending)
   const [autoImgN, setAutoImgN] = useState(0);
+
+  // YouTube placeholder resolution (Phase 2): per-placeholder URL the operator pastes. No YouTube
+  // Data API key yet, so resolution is manual — auto-search is deferred to the Phase 4 daily pipeline.
+  const [ytUrlInputs, setYtUrlInputs] = useState<Record<string, string>>({});
+
+  // Dedicated hero / featured image (issue 四) — generated at generation time, threaded to publish.
+  const [heroImageUrl, setHeroImageUrl] = useState("");
+  const [heroLoading,  setHeroLoading]  = useState(false);
 
   // Title suggestions
   const [titleLoading, setTitleLoading]   = useState(false);
@@ -581,7 +602,12 @@ export default function ContentStudio() {
     setPubStatus("idle"); setPubResult(null);
     setSeoReport(null); setSeoChecking(false);
     setSlugHint(""); setAutoImgN(0);
+    setHeroImageUrl(""); setHeroLoading(false);
     setShowSyn(false); setSynStatus("idle"); setSynContent({});
+    // Invalidate any in-flight image/hero writers from a PREVIOUS run NOW — unconditionally, even if
+    // this run won't generate images. Bumping only inside the aiImages!=="none" branch let a slow hero
+    // fetch from run A resolve and overwrite run B's (image-less) article with a mismatched hero.
+    ++imgRunRef.current;
 
     try {
       const externalLinks = form.externalLinks.split("\n").map(u => u.trim()).filter(u => /^https?:\/\//.test(u)).slice(0, 5);
@@ -632,10 +658,13 @@ export default function ContentStudio() {
         .catch(() => { if (myRun === seoRunRef.current) setSeoReport(null); })
         .finally(() => { if (myRun === seoRunRef.current) setSeoChecking(false); });
 
-      // Auto-replace IMAGE_PLACEHOLDERs via Replicate if AI images enabled
+      // Auto-replace IMAGE_PLACEHOLDERs via Replicate if AI images enabled. imgRunRef was already
+      // bumped at the top of this run (see reset block); capture it here without bumping again.
       if (form.media.aiImages !== "none") {
-        const myImgRun = ++imgRunRef.current;
+        const myImgRun = imgRunRef.current;
         void autoReplaceImages(cleanMd, myImgRun);
+        // Issue 四: also generate a dedicated hero/featured image (OG ratio) for the post thumbnail.
+        void generateHeroImage(meta?.seoTitle || form.title || form.keyword, myImgRun);
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") setGenStatus("idle");
@@ -657,7 +686,9 @@ export default function ContentStudio() {
       try {
         const res = await fetch("/api/content/image", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: altText, platform: "twitter_post" }),
+          // form.media.imageSize is now a flux aspect_ratio (e.g. "16:9") — pass it so the chosen
+          // ratio actually applies to body images (previously hardcoded twitter_post → ignored → 1:1).
+          body: JSON.stringify({ prompt: altText, platform: "twitter_post", aspectRatio: form.media.imageSize }),
         });
         if (genRun !== imgRunRef.current) break;
         const json = await res.json() as { ok: boolean; imageUrl?: string };
@@ -669,6 +700,49 @@ export default function ContentStudio() {
       setAutoImgN(remaining);
     }
     setAutoImgN(0);
+  }
+
+  // ─── YouTube placeholder resolution (Phase 2) ─────────────────────────────
+  // Extract the 11-char video id from any common YouTube URL shape and return the canonical
+  // watch URL (strips playlist / tracking params). null if the input is not a YouTube URL.
+  function canonicalYouTube(raw: string): string | null {
+    const s = raw.trim();
+    const m =
+      s.match(/[?&]v=([\w-]{11})/) ||
+      s.match(/youtu\.be\/([\w-]{11})/) ||
+      s.match(/youtube(?:-nocookie)?\.com\/(?:embed|shorts|live)\/([\w-]{11})/);
+    return m ? `https://www.youtube.com/watch?v=${m[1]}` : null;
+  }
+
+  // Replace `[YOUTUBE_PLACEHOLDER_N: query]` with the canonical watch URL on its own line. Both publish
+  // paths then turn that bare URL into a real embed (markdownToBlocks → embed block → plugin youtube();
+  // standard REST → WP autoembed). n is a digit string from the placeholder regex, safe to interpolate.
+  function resolveYouTube(n: string, rawUrl: string) {
+    const canon = canonicalYouTube(rawUrl);
+    if (!canon) return;
+    setGenerated(prev => prev.replace(new RegExp(`\\[YOUTUBE_PLACEHOLDER_${n}:[^\\]]*\\]`), canon));
+    setYtUrlInputs(prev => { const next = { ...prev }; delete next[n]; return next; });
+  }
+
+  // ─── Hero (featured) image ────────────────────────────────────────────────
+  // Issue 四: generate ONE dedicated hero image at facebook_link (1200×630, OG/featured ratio) so the
+  // published post has a feature image. Threaded to publish as featured_image_url; the WP Bridge plugin
+  // sideloads it and sets the post thumbnail (best-effort — a failure here never blocks publishing).
+  async function generateHeroImage(topic: string, genRun: number) {
+    const prompt = topic.trim() || form.keyword.trim();
+    if (!prompt) return;
+    setHeroLoading(true);
+    try {
+      const res = await fetch("/api/content/image", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        // Hero/featured = 16:9 (Google Discover + OG preview both favour the wide ratio).
+        body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9" }),
+      });
+      if (genRun !== imgRunRef.current) return; // user re-generated, abort
+      const json = await res.json() as { ok: boolean; imageUrl?: string };
+      if (json.ok && json.imageUrl) setHeroImageUrl(json.imageUrl);
+    } catch { /* best-effort: no hero image */ }
+    finally { if (genRun === imgRunRef.current) setHeroLoading(false); }
   }
 
   // ─── SEO Fix Apply ────────────────────────────────────────────────────────
@@ -706,8 +780,19 @@ export default function ContentStudio() {
           focusKeyword: form.keyword,
           scheduleDate: form.scheduleDate || undefined,
           siteId: selectedSiteId || undefined,
-          categories: form.wpCategories ? form.wpCategories.split(",").map(s => s.trim()).filter(Boolean) : undefined,
-          tags: form.wpTags ? form.wpTags.split(",").map(s => s.trim()).filter(Boolean) : undefined,
+          // Manual form fields win; fall back to the AI-suggested CATEGORIES/TAGS from the meta block.
+          categories: form.wpCategories
+            ? form.wpCategories.split(",").map(s => s.trim()).filter(Boolean)
+            : (metaData?.categories?.length ? metaData.categories : undefined),
+          tags: form.wpTags
+            ? form.wpTags.split(",").map(s => s.trim()).filter(Boolean)
+            : (metaData?.tags?.length ? metaData.tags : undefined),
+          // Issue 四: hero image (Bridge path only — plugin sets it as the post thumbnail).
+          featuredImageUrl: heroImageUrl || undefined,
+          // alt only meaningful with a hero URL (plugin reads alt solely inside its featured-image block).
+          featuredImageAlt: heroImageUrl && form.keyword ? form.keyword : undefined,
+          // Issue 七: focus keyword → ILJ ilj_linkdefinition so other posts auto-link to this one.
+          internalLinkKeywords: form.keyword.trim() ? [form.keyword.trim()] : undefined,
         }),
       });
       const json = await res.json() as { ok: boolean; error?: string; edit_url?: string; view_url?: string };
@@ -852,6 +937,11 @@ export default function ContentStudio() {
   const hasContent   = generated.trim().length > 0;
   const isHumanizing = humStatus === "streaming";
   const hasHumOutput = humOutput.trim().length > 0;
+
+  // Unresolved YouTube placeholders still in the draft, in document order. Each needs a real watch URL
+  // pasted before publish — otherwise publish/route + markdownToBlocks drop the line cleanly.
+  const ytPlaceholders = [...generated.matchAll(/\[YOUTUBE_PLACEHOLDER_(\d+):\s*([^\]]+)\]/g)]
+    .map(m => ({ n: m[1], query: m[2].trim() }));
 
   // ─── Styles ───────────────────────────────────────────────────────────────
 
@@ -1377,11 +1467,11 @@ export default function ContentStudio() {
           </SectionToggle>
 
           {/* ── 大綱編輯器 ── */}
-          <SectionToggle label="大綱編輯器（自訂 H2/H3 標題）" open={showOutline} onToggle={() => setShowOutline(v => !v)}>
+          <SectionToggle label="大綱編輯器（先看大綱、可改再生成全文）" open={showOutline} onToggle={() => setShowOutline(v => !v)}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
               <label className="form-label" style={{ marginTop: 0, marginBottom: 0 }}>
                 自訂大綱
-                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— ## 為 H2，### 為 H3</span>
+                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— ## H2、### H3、#### H4；每個標題含關鍵字或近義變體，生成全文時嚴格遵循</span>
               </label>
               <button className="btn-secondary" style={{ fontSize: "12px" }}
                 onClick={handleGenOutline} disabled={isGenerating || !form.keyword.trim() || outlineLoading}>
@@ -1627,6 +1717,48 @@ export default function ContentStudio() {
                   fontSize: "12px", color: "#0284c7",
                 }}>
                   🎨 正在生成 {autoImgN} 張圖片…
+                </div>
+              )}
+
+              {/* ── 精選圖片（hero）生成狀態 ── */}
+              {(heroLoading || heroImageUrl) && (
+                <div style={{
+                  marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
+                  background: heroImageUrl ? "#f0fdf4" : "#f0f9ff",
+                  border: `1px solid ${heroImageUrl ? "#bbf7d0" : "#bae6fd"}`,
+                  fontSize: "12px", color: heroImageUrl ? "#16a34a" : "#0284c7",
+                }}>
+                  {heroLoading ? "🖼️ 正在生成精選圖片（featured image）…" : "🖼️ 精選圖片已就緒，發佈時自動設為文章首圖"}
+                </div>
+              )}
+
+              {/* ── YouTube 影片嵌入（Phase 2：貼 URL 解析 placeholder）── */}
+              {ytPlaceholders.length > 0 && (
+                <div style={{
+                  marginTop: "10px", padding: "12px 14px", borderRadius: "6px",
+                  background: "#fef2f2", border: "1px solid #fecaca", fontSize: "12px", color: "#b91c1c",
+                }}>
+                  <div style={{ fontWeight: 600, marginBottom: "8px" }}>
+                    🎬 {ytPlaceholders.length} 個 YouTube 影片待嵌入
+                    <span style={{ fontWeight: 400, color: "#9ca3af", marginLeft: 6 }}>
+                      貼上 YouTube 網址→自動轉真嵌入；留空發佈時自動移除
+                    </span>
+                  </div>
+                  {ytPlaceholders.map(({ n, query }) => (
+                    <div key={n} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
+                      <span style={{ minWidth: "180px", color: "#6b7280" }}>#{n}：建議搜尋「{query}」</span>
+                      <input
+                        style={{ flex: 1, minWidth: "220px", fontSize: "12px", padding: "5px 8px",
+                          border: "1px solid #fecaca", borderRadius: "4px", background: "#fff", color: "#111" }}
+                        placeholder="https://www.youtube.com/watch?v=…"
+                        value={ytUrlInputs[n] ?? ""}
+                        onChange={e => setYtUrlInputs(prev => ({ ...prev, [n]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === "Enter") resolveYouTube(n, ytUrlInputs[n] ?? ""); }} />
+                      <button className="btn-secondary" style={{ fontSize: "12px", padding: "5px 12px" }}
+                        disabled={!canonicalYouTube(ytUrlInputs[n] ?? "")}
+                        onClick={() => resolveYouTube(n, ytUrlInputs[n] ?? "")}>嵌入</button>
+                    </div>
+                  ))}
                 </div>
               )}
 

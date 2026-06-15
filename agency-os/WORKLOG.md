@@ -4,6 +4,232 @@
 
 ## 2026-06-15
 
+### AO-CLOSE gate section — security + AI Models guide
+
+Closeout inbox (AO-CLOSE auto): security remediation + Content Tools AI Models guide deployed and recorded.
+
+- Security scan remediation: `lobster-factory/packages/workflows` esbuild override updated `^0.28.0` -> `^0.28.1`; lockfile refreshed; `npm audit --audit-level=high`, `npm audit --audit-level=moderate`, `npm test` (75/75), and `npm run audit:workflows-security` all passed.
+- AI Models guide: added `/tools/ai-models` under Content Tools sidebar; compares text generation tools, 15 image models, and vibe coding tools; image cost is per-image only, not 78-card deck cost.
+- Production deploy: SG `sg-deploy.sh next-admin` deployed commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`; prod gates passed (`tsc`, vitest 24 files / 316 tests, healthy container, smoke OK).
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run typecheck; npm run build` (next-admin) | exit=0 | ms=N/A
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/root/lobster-phase1/scripts/sg-deploy.sh next-admin` | exit=0 | ms=N/A
+- REVIEW_WAIVED: NA -- static typed comparison data + route/sidebar wiring; typecheck/build/prod smoke covered integration
+- BUGHUNT_WAIVED: NA -- no cross-file behavior contract beyond new route/sidebar and static model data; grep confirmed no deck-cost strings remained
+
+## 2026-06-15
+
+### feat(content-engine): Phase 2 YouTube 真嵌入（手貼 URL→core/embed）+ Phase 3 可編輯大綱強制標題關鍵字
+
+**[任務理解]** 使用者 5 點需求中的 (2) YouTube 影片仍未生成 + (3)(4) 大綱要先看、可改、每個標題含關鍵字。Phase 2：把生成文中的 `[YOUTUBE_PLACEHOLDER_N: query]` 變成可在 ContentStudio 手貼 YouTube URL → 發佈時輸出**真 Gutenberg core/embed**（非死框 div）。Phase 3：大綱 endpoint 加「每個 H2/H3/H4 含關鍵字或變體」規則（與 CJK 4–6 次精確上限調和）。**VBC 實證**：可編輯大綱 UI／`/api/content/outline`／generate 的 `outline` 參數**早已存在**（不重建）；WP Bridge plugin `BlockLibrary.youtube()`+`compose() case 'embed'`**早已支援 embed**（不需 plugin 改動/發版）。唯一真缺口：① 佔位符無解析路徑 ② 大綱 endpoint 無關鍵字規則。
+
+**[根因]**（VBC，非表面）
+- **YouTube 不顯示**：`generate:367` 只吐 `[YOUTUBE_PLACEHOLDER_N]` 文字佔位；`autoReplaceImages` 只處理圖，佔位符**從無解析路徑** → 直接以原始文字流入貼文（或被舊「死框 div」包住，非真嵌入）。
+- **未解析佔位符洩漏**：佔位符可能被模型 inline 寫進句中（非獨佔一行），舊 per-line drop 只擋整行 → inline 殘留洩漏到 live post（critic Major #1）。
+- **大綱無關鍵字規則**：`/api/content/outline` prompt 完全沒提關鍵字覆蓋，生成的大綱標題不含關鍵字 → 即使 generate 嚴格遵循大綱也繼承缺陷。
+
+**[已修改]**
+- `lib/content/markdown-to-blocks.ts` — Block union 加 `{ type:"embed"; url }`；新 `isYouTubeUrl()`（11 字 video id + YouTube host set，與 ContentStudio.canonicalYouTube 及 publish 副本逐字鎖步）；preprocessing `clean` 鏈加全域 inline scrub `\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]`（擋 inline 殘留）；loop 內獨佔行 YouTube URL → push embed block（取代舊 per-line placeholder drop）。
+- `lib/content/__tests__/markdown-to-blocks.test.ts` — +5 測（embed watch/youtu.be/shorts；非 YouTube URL 回退 paragraph；<11 字 id 拒絕；獨佔行佔位符丟棄不洩漏 🎬；inline 佔位符 scrub 兩側句子存活）→ 共 15 測全綠。
+- `app/api/content/publish/route.ts` — 新 `isYouTubeUrl()`（與 blocks 副本逐字相同）；markdownToHtml `clean` 鏈加同款全域 scrub；舊死框 div（109-119）改為「YouTube URL 獨佔一行原樣輸出」→ WP autoembed(priority 8) 在 wpautop 前吃掉它變真嵌入（標準 REST 路徑）。
+- `app/tools/content/ContentStudio.tsx` — Phase 2：新 state `ytUrlInputs`；computed `ytPlaceholders`（matchAll 抽 N+query）；`canonicalYouTube()`（watch/youtu.be/embed/shorts/live→規範 watch URL）+`resolveYouTube()`（替換佔位符為規範 URL）；每佔位符紅底貼 URL UI（Enter/「嵌入」鈕，無效 URL disabled）。Phase 3：大綱編輯器 label 改「先看大綱、可改再生成全文」+ hint「每個標題含關鍵字或近義變體」。
+- `app/api/content/outline/route.ts` — prompt 加 `Primary keyword:` 行 + KEYWORD COVERAGE 規則（關鍵字/變體須現於每個 H2/H3/H4）+ ANTI-STUFFING 規則（精確詞僅 1–2 標題；CJK 4–6× 上限）+ `#### H4`；max_tokens 600→700；空完成 guard（`if(!text) 502`，避免靜默 no-op）。
+- `app/api/content/generate/route.ts` — YouTube 佔位符 prompt 加 own-line invariant 硬約束（每佔位符獨佔一行、前後空行、句中禁 inline、query 內禁 `]`）→ 修 critic Major #1 根源。
+
+**[驗證結果]**（R0 四動作齊全）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/__tests__/markdown-to-blocks.test.ts` | exit=0 | ms≈900 — **15/15 pass**（含 embed watch/youtu.be/shorts、<11字拒絕、inline+獨佔行 scrub）；`npx tsc --noEmit` 我改的 6 檔零型別錯（fabric/pdf-lib TS2307 為 pre-existing 本地 node_modules 缺，非本次檔案，Docker `npm ci` 安裝 → 不阻部署）。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/2M/數 minor — 2 Major **全修**：#1 own-line invariant 未強制致 inline 洩漏 → generate prompt 硬化 + 兩 converter 全域非錨定 scrub + 移除冗餘 per-line drop；#2 `isYouTubeUrl{6,}` vs `canonicalYouTube{11}` 分歧 → 兩副本收緊 {11} + host set 對齊（m.+youtube-nocookie）+ 鎖步註解。修後 0 Critical/0 Major。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`YOUTUBE_PLACEHOLDER\|markdownToBlocks` | hits=2 — 全庫 grep `YOUTUBE_PLACEHOLDER` 命中 7 檔（5 本次改動 code 檔 + 2 文件）；`markdownToBlocks` 命中 5 檔（全 code + WORKLOG）。扣除本次 staged code 檔後，唯 2 文件殘留：①`agency-os/WORKLOG.md:10868`（歷史 append-only「死框 div」聲稱，**被本日新段取代**，不改寫）②`agency-os/reports/status/integrated-status-LATEST.md:355`（**auto-generated** 鏡像 WORKLOG:10868，由 `scripts/generate-integrated-status-report.ps1` 從 WORKLOG 重生，不手改）。**無 live-code call site 漏網**：plugin `case 'embed'`/`youtube()` 早存在、`markdownToBlocks` 唯一 caller 是 `publish:325`（Bridge path）+ 測試。
+- WORKLOG: 本段。
+
+**[剩餘風險]**
+- **YouTube 自動搜尋延後 Phase 4**：Google/YouTube Data API key **無效**（已實測 HTTP 400 API_KEY_INVALID，hash 確認 env==file）→ 自動找片需使用者用 §30 Google 帳號（peijingartstudio@gmail.com）建新 key 並啟用 YouTube Data API。Phase 2 = 手貼 URL（現可完整 REALTEST）。
+- **未部署 = 真站仍跑舊碼**：Phase 1–3 需一次 sg-deploy 才生效（plugin 無需發版）。
+- 標準 REST 路徑（非 Bridge 站）靠 WP autoembed 吃裸 URL；Bridge 站走 embed block。兩路徑皆已處理但僅 Bridge path 有 vitest 覆蓋（標準路徑為 WP 原生行為，低風險）。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/markdown-to-blocks.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/__tests__/markdown-to-blocks.test.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/publish/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/content/ContentStudio.tsx lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/outline/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts`
+
+### fix(content-engine): Phase 1 媒體比例 bug + 標題關鍵字覆蓋（flux aspect_ratio 真根因）
+
+**[任務理解]** 使用者批評：給了全部 SEO/GEO/RankMath 文件，生成文章仍不合規 — 圖比例不對（要 3:2/4:3/16:9）、圖要 ~100K 存 WP media、H2/H3/H4 都要關鍵字。先做 Phase 1（媒體層 + 標題規則），不先空跑部署（避免再次看到沒修好的結果）。
+
+**[根因]**（VBC 實證，非表面）
+- **圖比例**：`/api/content/image` 用 Replicate `flux-schnell`，但該模型**無 `width`/`height` 參數**（真實 API schema 驗證：唯一形狀控制是 `aspect_ratio` enum + `megapixels`）。舊碼傳 width/height → **被靜默忽略 → 每張圖都出預設 1:1**。`lib/tarot/image-gen.ts:389` 既有正確用法（`megapixels:"1"`+aspect_ratio）獨立佐證。
+- **imageSize 下拉無效**：下拉值只當 prompt 文字（`generate:343`），真生圖硬編 `platform:"twitter_post"`（`ContentStudio:687`）→ 選什麼都沒差。
+- **標題關鍵字**：`generate:81` 只要求「至少一個 H2/H3」含關鍵字。
+
+**[已修改]**
+- `app/api/content/image/route.ts` — `PLATFORM_IMAGE_SPECS` 每項加 `aspect`（映射到 flux enum 最近比例）；新 `ALLOWED_ASPECT` set；POST 接受 `body.aspectRatio` 覆寫（驗證後用，否則回退 `spec.aspect`）；input 改傳 `aspect_ratio`+`megapixels:"1"`（移除無效 width/height）；`output_quality` 90→82（webp@1MP ≈ 37–150K，~100K 目標）；response 回 `aspectRatio`+`spec.aspect`。
+- `app/tools/content/ContentStudio.tsx` — `IMAGE_SIZES` 改為比例值（16:9/3:2/4:3/1:1/9:16，棄 px 字串）；`DEFAULT_MEDIA.imageSize` "1344x768"→"16:9"；`autoReplaceImages` body 圖傳 `aspectRatio: form.media.imageSize`；`generateHeroImage` hero 傳 `aspectRatio:"16:9"`（Google Discover+OG）。
+- `app/api/content/generate/route.ts` — `:81` 標題規則改「關鍵字或變體須出現在**每個** H2/H3/H4」，並明示與 CJK 4–6 次精確上限調和（多數標題用變體/LSI，僅 1–2 個用精確詞）；CJK 區塊加 HEADINGS bullet 含具體範例；媒體 hint「suggested size」→「aspect ratio」；`:433` 死的 `"1344x768"` fallback → `"16:9"`（critic 採納）。
+
+**[驗證結果]**（R0 四動作齊全）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Invoke-RestMethod flux-schnell predictions aspect_ratio={3:2,4:3,16:9}` | exit=0 | 真打 Replicate prod API 出三張圖實測尺寸 **3:2→1216×832(1.462) / 4:3→1152×896(1.286) / 16:9→1344×768(1.75)** 全為正確橫式（**非 1:1=1.0**）→ 鐵證修正成功+反證舊碼必出方形；webp@q82 ≈ 37KB（簡單圖；複雜圖趨近 100K）。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/2m — 0 Critical/0 Major；Minor#1 `generate:433` 死 fallback **已採納修正**；Minor#2 手動面板 px 顯示標籤 cosmetic（延後）；critic 獨立驗 `megapixels:"1"` 須字串（對照 tarot 路徑）、比例字串全中 flux enum、無 callers 讀被移除欄位、無 `WxH` parser 殘留、tsc 三檔零錯。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`1344x768\|768x1344\|imageSize\|aspectRatio` | hits=0 — 唯一 `1344x768` 殘留是本人解說註解（同 commit 入庫）；`tarot/image-gen.ts:516` 是獨立 tarot 模組自身對照表（非本引擎）；OG doc `1200x630` 是 RankMath KB 文字；`imageSize` 消費端全在本次 3 改檔內，agency-os/scripts 零 stale。
+- WORKLOG: 本段。
+
+**[剩餘風險]**
+- **非 Bridge 站 body 圖仍會失效**（明確延後）：走 Bridge 的站 `RestController.php:314` 會 sideload body 圖入 WP media（持久）；非 Bridge 站走標準 REST（`publish:357`）直接嵌 Replicate 臨時 URL → 過期不顯示。本回合只修比例；「全站圖入 media」需確保客戶站都走 Bridge 或在標準 REST 路徑補 sideload（Phase 1b 候選）。
+- ~100K 為目標非保證：q82 隨內容複雜度 37–150K 浮動；可接受（小=快、夠清晰）。
+- 手動生圖面板 px 顯示（`ContentStudio:1752`）仍標平台參考尺寸，與實際 1MP 輸出略差（cosmetic）。
+- **未部署 = 真站仍跑舊碼**：本修正需一次部署（Phase 1–3 修完後）才生效。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/image/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/content/ContentStudio.tsx lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts`
+
+### feat(pod): A1 native Printful store 全自動建品（消除 #7164 手動匯入）— 已部署 prod + 真機 REALTEST 通過 ✅
+
+**[任務理解]** 使用者問「#7164 觸發匯入怎麼觸發？應該要全自動」。根因不是「忘了觸發」：app 把 POD 商品建在 **WooCommerce-platform** 的 Printful store（18314943），該平台**沒有 API 匯入外部 Woo 商品**，本質上只能進 Printful dashboard 手動匯入。要全自動，必須改建在**已存在的 native store**（18324409，"Manual Order / API platform"），它接受 `POST /store/products`（一次 call 建品+綁 catalog variants+上 print files）。本回合做 A1（建品全自動，純 API+env，Medium 風險可回滾）；A2（P4 訂單真金流 fulfillment，High 風險）明確延後待 A1 REALTEST 通過+使用者批准 draft 模式。
+
+**[已修改]**
+- `lib/studio/print-provider.ts` — `pf()` 加 `timeoutMs` option；`PrintfulResult` error variant 加 `status?`/`code?`（thread 結構化訊號）；`listSyncProducts(storeId?)` / `getSyncProduct(id, storeId?)` 加 store 覆寫；抽 `mapSyncProductDetail` 共用 mapper；新 `findSyncProductByExternalId`（tri-state 冪等查詢，`/sync/products/@{external_id}`）；新 `createSyncProductOnNative`（冪等預查→既有不重建 / `reReadFailed` flag / `incompleteVariants` flag / external_id round-trip guard / 60s POST timeout）；新 `nativeStoreId()` / `isNativeStoreConfigured()`。
+- `app/api/tools/publish/route.ts` — `create` action 的 variantMap 回 `sku`+`price`（權威 SKU 來源）+ `variantMapDropped` 診斷；新 `pfcreate` action：**吃 create 的 variantMap 當權威來源不重建 plan**（消除 designName/sizes SKU 分歧）、catalog 沒對到 fail-loud 422、`reReadFailed`→503 retryable、`incompleteVariants`→422、transient error→503。
+- `docker-compose.yml` — 兩個 env block 加 `PRINTFUL_NATIVE_STORE_ID: ${PRINTFUL_NATIVE_STORE_ID:-}` + 註解描述 native store 用途。
+
+**[驗證結果]**（R0 四動作；**已部署 prod + 真機 REALTEST 通過**）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed files) | print-provider.ts + publish/route.ts 零型別錯（總 20 錯全為既存 fabric/pdf-lib missing-dep，Docker npm ci 解）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`（host typecheck→npm test→build→up→healthcheck→smoke 全 gate）| exit=0 | `.deployed-commit=9669c1db`（prev 37dfba85）；container `Up (healthy) after 7s`；smoke 4/4 OK（/login 200、/api/ops/summary 200、nginx/wp 200、node-api 200）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin node -e <probe>` GET `/sync/products` X-PF-Store-Id=18324409 | exit=0 | `{native_store_id:"18324409",key_present:true,http:200,code:200,total:0}` — **env var 確認載入容器 + native store 可達**（修 compose-drift 後）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec ... POST /store/products`（payload 鏡像 `createSyncProductOnNative`：sync_product+sync_variant variant_id=4025+front print file）→ 驗 id → DELETE | exit=0 | **POST `{http:200,code:200,created_id:439513286}` → DELETE `{http:200,code:200}`** — **決定性：native store 接受全自動建品（woo store 18314943 會回 platform-rejection）；自清理刪除無殘留、無 Woo 污染、無金流**。A1 假設在真機鐵證通過。
+- **部署根因發現（DEPLOY BUG，已修）**：首次 sg-deploy 後 probe 顯示容器內 `PRINTFUL_NATIVE_STORE_ID` undefined（Printful 回 400 "requires store_id"）。根因：**runtime compose `/root/lobster-phase1/docker-compose.yml` 是與 repo compose 結構分歧的獨立檔**；sg-deploy 只 rsync 源碼（apps/）但 `docker compose up` 用 server-local compose → repo compose 的 env 行從未傳播到 prod。修法（safe-infra-patch 紀律）：備份 `docker-compose.yml.bak-a1-20260615` → sed 插入 `PRINTFUL_NATIVE_STORE_ID: ${PRINTFUL_NATIVE_STORE_ID:-}`（clone PRINTFUL_STORE_ID 行避免 tab/縮排陷阱）→ `python3 yaml.safe_load` 驗 YAML_OK → `.env` append `PRINTFUL_NATIVE_STORE_ID=18324409`（備份 `.env.bak-20260615-a1`）→ `docker compose up -d next-admin` 重建 → 上方 probe 確認載入。
+- REVIEW_DONE: critic=Standard×2 | verdict=fail→warn→pass | 第1回 1c/3m（冪等雙建/re-read 靜默成功/partial-catalog 靜默 skip/designName SKU 分歧 — 全修）；第2回 surfaced 3 同類殘留 M1/M2/M3 + 3 minor，全修；第3回 **PASS**（M2 substring-404 false-positive→改 `code===404` 結構化偵測、M3 partial-bind→`incompleteVariants` 422、M1 完整性斷言移入 pfcreate、m4 transient→503、m5 dropped 診斷、m6 external_id guard 全 CLOSED，無新缺陷）。第4回（**本 session 跨 compaction 獨立重確認，對照 on-disk 現態 + Printful v1 docs**）仍 **PASS**（0c/0M）：四大不變量全 hold（冪等/`code===404` 判別/SKU 消費不重建/fail-loud 無假 200）；驗 `POST /store/products` 回傳 `result.id` 直取正確、消費端 arity 向後相容、pod-product 測試 5/5。僅 2 個 benign 🟡（見剩餘風險），critic 判定非 blocker。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`listSyncProducts\|createSyncProductOnNative\|findSyncProductByExternalId\|isNativeStoreConfigured\|nativeStoreId\|PrintfulResult\|pfcreate\|variantMap\|PRINTFUL_NATIVE_STORE_ID` | hits=5 files（2 改檔 + docker-compose 本人改 + 2 消費端驗證安全）；agency-os/scripts 各 0 stale。消費端：`printful/sync/route.ts` 全用舊 arity（`listSyncProducts()`/`getSyncProduct(id)`，optional 參數向後相容）；`PublishWizard.tsx:255` 走 `create→link` 舊流程只讀 variantMap 的 color/size/variationId（新增 sku/price 為 additive 安全）。**pfcreate 尚未接進前端 UI**（A1 為後端能力；REALTEST 直接打 endpoint，UI 接線為部署驗證後的後續）。
+
+**[剩餘風險]**
+- **compose-drift（infra-process gap，待和解）**：runtime `/root/lobster-phase1/docker-compose.yml` 與 repo `docker-compose.yml` 結構分歧；sg-deploy 不 sync compose → 任何 repo compose 的 env/service 改動都不會自動上 prod（本次 PRINTFUL_NATIVE_STORE_ID 即踩此坑，已手動補 runtime compose）。後續應：① 將兩份 compose 和解為單一 SSOT 或 ② 在 sg-deploy 加 compose drift 檢查/同步步驟。目前 runtime 已手補，功能正常但下次新 env 仍會再踩。
+- ~~pfcreate 未接前端~~ **✅ 已解決（見下方接線 entry）**：PublishWizard 已加「🚀 ③ 一鍵上 Printful（native 全自動）」主按鈕；舊 `create→status→link` Woo 手動 dance 收進 `<details>` legacy fallback。
+- native store 建的 Printful 商品與 Woo storefront 商品**僅以 SKU 連結**（P4 join key）；P4 fulfillment（A2）尚未實作，目前 native 建品只是讓 Printful 端可下單，未自動轉單。
+- `PRINTFUL_NATIVE_STORE_ID` 未設則 pfcreate 回 503 not_configured（fail-closed，不影響既有 create/link 流程）。
+- （benign 🟡，critic 第4回標非 blocker，後續 hardening 候選）transient 分類器 `route.ts:502` 用 free-text `includes("timeout"/"network_error")` 比對 Printful body message → 含「timeout」字樣的 Printful 4xx 可能被誤判 503-retryable（後果良性：操作者重試→冪等預查乾淨解決，無腐化無假 200）；可改比對結構化 token（`printful_timeout`/`printful_network_error`）`===`/`startsWith`。
+- （benign 🟡）冪等命中既有商品時 `incompleteVariants` 僅比 variant **數量**不比 SKU；同 wooProductId 改標題後（不同 SKU seed）以相同 variant 數重發，pfcreate 會回首發商品的 SKU。機率低且有界（P4 join 鍵在 Woo variation SKU，只在 create 種一次、改名不變動，join 仍解析）；可選擇交叉比對既有 SKU vs 進來的 vmap SKU 強制 retryable，或文件標註「改名後重發不支援」。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/studio/print-provider.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/publish/route.ts lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`；已部署則 sg-deploy rollback + 從 native store 刪除測試 sync product。
+
+### feat(pod): A1 接線 — PublishWizard 一鍵 native 全自動按鈕（消除 status→link Woo 手動 dance）
+
+**[任務理解]** A1 後端能力（pfcreate action）已部署+真機 REALTEST 通過，但操作者 UI 仍是舊 `create→status→link` 流程（要人到 Woo 後台手動 publish 才同步）。使用者「全部處理好」→ 把前端接到 pfcreate，讓「建品+綁變體+印刷檔」真正一鍵全自動。
+
+**[已修改]**
+- `app/tools/publish/PublishWizard.tsx` — ① `VariantMapEntry` 加 `sku`/`price`（吃 create 權威 SKU）；② 新 `pfcreate` state（含 `faithful` capture）+ `create` state 加 `variantMapDropped`；③ designUrl/printMode reset effects 連帶 reset pfcreate；④ 新 `runPfcreate` callback（post `action:pfcreate`，帶 create.variantMap 逐字消費）；⑤ 新主按鈕「🚀 ③ 一鍵上 Printful（native 全自動）」，舊 ③status/④link 降級進 `<details>` legacy fallback；⑥ intro 文案改述一鍵 native 路徑；⑦ 抽 module 級 `hasUsablePfMap()` predicate **鏡像後端 vmap filter**（route.ts:444-452 + PRICE_RE:79），按鈕 disabled / runPfcreate early-return / 橘色警告三處共用同一判斷。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0(publish 檔零錯) | PublishWizard.tsx + route.ts 無型別錯（總 20 錯全為既存 fabric/pdf-lib missing-dep，與本檔無關，Docker build 裝）。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/1n（+1 suggestion）。先前 Major（後端軟成功 `variantMapDropped` 前端未接住→🚀 按鈕可點但保證 400+誤導訊息）**已閉環**（:78 state type / :254 capture / :508 disabled / :296 early-return / :529 橘色警告 五處驗證）。React hooks exhaustive-deps 完整（`runPfcreate` deps 含 `upscale.faithful`+`pfcreate.state`）、雙提交競態雙層防護、faithful 標籤對齊 runLink、橘色警告無誤觸發/漏觸發。唯一 Minor（前端 disabled 只比長度不比欄位品質的隱性耦合）**本回合已修**：抽共用 `hasUsablePfMap()` predicate 鏡像後端 sku 非空+price 過 PRICE_RE。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`pfcreate\|variantMapDropped\|variantMap_required\|expectedVariantCount\|gotVariationIds\|18324409` | hits=2 files（PublishWizard.tsx 前端 + route.ts 後端，契約前後端一致：:318 emit variantMapDropped / :47+:418 pfcreate action union+handler / :457 variantMap_required 400）；agency-os 僅 WORKLOG 自身引用、scripts 0 命中、0 stale claim。
+- WORKLOG: 本 entry。
+
+**[剩餘風險]**
+- UI 改動尚未部署到 prod（需 sg-deploy 才能瀏覽器 e2e；deploy 後建議 `/playwright smoke` + 提議真實 create+pfcreate 一次端到端（會建真 Woo+Printful 商品，需事後清理，非金流））。
+- （benign 🟡，critic suggestion）`create.state==="error"` 時橘色警告分支走「需先完成①②」灰字（實際 create error 已於按鈕行內顯示），語意稍弱，可不改。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/publish/PublishWizard.tsx`（純前端，未部署前零風險；已部署則 sg-deploy 回滾上一 commit）。
+
+### feat(content-engine): P1 生成端 SEO/RankMath CJK 合規（issues 二/三/B/C/五/六/九）
+
+**[任務理解]** 使用者要 /tools/content 生成文章時就符合 SEO/GEO/AEO/RankMath，不靠事後 SEO 調整器。9 問題中 P1 處理純生成側（免發外掛版）：標題力量詞+數字、CJK 關鍵字密度、AI 建議分類/標籤、移除手動目錄、單一 H1。
+
+**[根因]** ① 標題力量詞清單只有英文 → CJK 文章 RankMath 標題測試永遠不過。② 本地 `rankmath-checker.ts` 把每個 CJK 字當 1 word，密度 0.5% 下限 → 需 ~12 次關鍵字才過 → 正是這個隱性壓力造成關鍵字堆疊 → 真實 RankMath（whitespace tokenizer，~92 words）讀成 13.04%。生成器與本地檢查器對 CJK 互相矛盾（標題長度、密度方向相反）。③ 系統提示硬性要求「永遠加目錄」與使用者「WP/Kadence 已有目錄」衝突。
+
+**[已修改]**
+- `app/api/content/generate/route.ts`（SYSTEM_PROMPT）— 標題改語言感知力量詞 + 強制阿拉伯數字 + 「唯一 H1，body 不得再用 `# `」（issue 二防呆）；密度行加 CJK 注記；移除「always include TOC」改為「不要手寫目錄，Kadence 自動生成」（issue 九）。
+- `app/api/content/generate/route.ts`（buildUserPrompt）— 新 `isCJK` 偵測（含 zh-tw/粵語/國語/台語 等）→ 推送 CJK RANKMATH COMPLIANCE 區塊：在地化力量詞清單（已剔除 `保證` 避免與 YMYL FORBIDDEN 衝突）、標題阿拉伯數字、精確關鍵字 ≤4–6 次硬上限（明示 supersede「density % + 不得 clustered」兩條舊規）。meta 區塊加 `CATEGORIES:` / `TAGS:`（issue 五/六，生成端先出，P2 才解析消費）。
+- `lib/seo/rankmath-checker.ts` — 新 `hasCjk()` helper；`title-length` 加 CJK 分支（14–30 字元，對應像素寬截斷）；`kw-density` 改用 `articleIsCjk = kwIsCjk || hasCjk(markdown)`（鍵接**文章腳本**而非僅關鍵字）→ 絕對出現次數 band（2–8，取代不可靠的 %）；空關鍵字以 `if (kw.length > 0)` 防呆（避免 `\b\b` regex 報 542% 假值）；兩者 suggestion 文案 CJK 化。**理由**：檢查器與生成器必須對 CJK 一致，否則合規文章在 dashboard 顯紅、操作者「修正」即把改動還原（critic 跨檔發現）。
+- `lib/seo/__tests__/rankmath-checker.test.ts`（新）— 9 案例回歸測試鎖定 CJK 契約（先前無測試；含 ASCII 關鍵字落在 CJK 文章須用次數 band、空關鍵字不報假密度兩個 critic 回合案例）。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/seo/__tests__/rankmath-checker.test.ts` | exit=0 | ms=541 | 9/9 pass（CJK kw 5×→pass、12×→fail堆疊、1×→fail稀疏、英文仍用%band；CJK 標題 15字→pass、6字→fail、英文 46字→pass；**+ASCII 關鍵字 6× 落 CJK 文章→次數 band pass（re-stuffing guard）、空關鍵字→不報假密度**）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed files) | generate/route.ts + rankmath-checker.ts 零型別錯（其餘 fabric/pdf-lib 為既存 missing-dep，Docker npm ci 解）
+- REVIEW_DONE: critic=Standard×2 | verdict=warn→fixed | findings 第1回 0c/4m/2n（跨檔 CJK 矛盾：標題長度/密度/「throughout」override/保證 overclaim 全 fold-in）；**第2回 0c/1m/1n — Major：密度 CJK 判定鍵接關鍵字而非文章腳本 → ASCII 關鍵字落 CJK 文章在 6 次（prompt 合規上限）讀 0.488%<0.5% 顯紅逼 re-stuffing；Minor：空關鍵字 `\b\b` 報 542%。兩者已修並加測試鎖定**
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`articleIsCjk|kwIsCjk|hasCjk|title-length|kw-density|checkRankMath` | hits=0 stale — `articleIsCjk` 僅存於 rankmath-checker.ts（無 dangling 消費端）；消費端（SeoCheckPanel/seo-fix/product-copy）全以 check.id 鍵接（id 未變），label 改動僅顯示用；extractMeta 逐鍵解析忽略未知行，新增 CATEGORIES/TAGS 不破壞
+
+**[剩餘風險]**
+- 力量詞測試在真實 WP 仍需伺服器端 filter `rank_math/metabox/power_words` 註冊 CJK 詞才會過（→ 併入 P3，否則 prompt 承諾無人 enforce）。
+- CATEGORIES/TAGS 生成端已出但 P2 尚未解析 → 目前仍 inert（issue 五/六 端到端待 P2）。
+- issue 二（2 個 H1）真正修正在 P2：publish 需把 leading `# Title` 抽為 WP post title 並從 body 移除；生成端單一 H1 僅防呆。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/seo/rankmath-checker.ts` + 刪除新測試檔。
+
+### feat(content-engine): P2 publish 導向 WP Bridge /post（issues 二/A/五/六 端到端）
+
+**[任務理解]** 把 /tools/content 發佈路徑導向 AwareWave WP Bridge 簽章 `/post` route：伺服器端組真 Kadence blocks、sideload 內文圖到媒體庫、用 `update_post_meta` 落 Rank Math SEO meta（標準 WP REST 對未註冊 meta key 靜默丟棄＝issue A 根因）。同時根治 issue 二（雙 H1）：leading `# Title` 抽為 WP post title、body 不再帶 H1。
+
+**[根因]** ① 舊路徑 `markdownToHtml` 把 leading `# Title` 渲成 `<h1>`，WP 又把 post title 渲成 H1 → 雙 H1。② 標準 WP REST 對 `rank_math_focus_keyword`（未 show_in_rest 註冊）靜默丟棄 → focus keyword 永遠不落後台（issue A）。③ AI 生成的 CATEGORIES/TAGS（P1 已出）尚無消費端（issue 五/六 inert）。
+
+**[已修改]**
+- `lib/content/markdown-to-blocks.ts`（新）— `markdownToBlocks(md): Block[]`：markdown → Bridge `blocks[]`（BlockLibrary.compose 契約）。單一 H1 保證（level-1 heading `continue` 丟棄，post title 獨佔 H1＝issue 二）；inline md→**safe** HTML（escape-first 再 code/bold/italic/link，`safeUrl` 對 url 二次 escape + protocol allowlist）；table/list/quote/divider/image（僅 http(s)）/YouTube placeholder fallback；CONTENT_META + SLUG_HINT strip。理由：BlockLibrary 把 block text **不 escape** 直接插 markup（BlockLibrary.php:91/119/186），converter 是唯一防線。
+- `lib/studio/wp-bridge-client.ts` — `bridgeBaseUrl()`（取設定 baseUrl，供 publish route hostname gate）、`BridgePostResponse`/`BridgePostSpec` interface、`createPost(spec)`（簽章 POST `/post`，預設 status:"draft"，timeout 90s）。
+- `app/api/content/publish/route.ts` — 新 Bridge 分支（hostname-gated：`new URL(bridgeBase).host === new URL(base).host`，防把非 bridge 站文章誤發到 bridge 站＝R0 最小爆炸半徑）；`catNames`/`tagNames`/`base`/`excerpt` 上移為兩路徑共用；`scheduleDate` fail-loud 400 guard（PostCreator 尚無 post_date，拒絕而非靜默丟棄使用者排程意圖＝critic Major）；`strict:false` 下 BridgeResult 窄化用 cast idiom（鏡像 tools/publish/route.ts:292）。非 bridge 站維持 standard REST 全不變。
+- `app/tools/content/ContentStudio.tsx` — `extractMeta` 加解析 CONTENT_META 的 `CATEGORIES:`/`TAGS:`（issue 五/六）；`handlePublish` 表單分類/標籤為空時回退 AI 抽取值。
+- `lib/content/__tests__/markdown-to-blocks.test.ts`（新）— 10 案例（drop leading H1、h2–h6 level、bullet/ordered list、table skip separator、blockquote、image 僅 http(s)、inline safe HTML + `<script>` escape、strip CONTENT_META/SLUG_HINT、divider）。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/__tests__/markdown-to-blocks.test.ts` | exit=0 | ms=570 | 10/10 pass
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/seo/__tests__/rankmath-checker.test.ts` | exit=0 | ms=541 | 9/9 pass（publish-route 重構零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed files) | 4 改動檔零型別錯（其餘僅 fabric/pdf-lib 既存 missing-dep，Docker npm ci 解）
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1M/4m/3nit — **Major：`scheduleDate` 在 Bridge 分支靜默丟棄**（standard 路徑 honor → payload.date，UI 有排程控件）→ 修為 fail-loud 400。XSS 面 critic 實跑 ~25 payloads（javascript:/data:/vbscript:/屬性突破/comment 突破）全中和（safeUrl 二次 escape + inline escape-first），確認 converter 為唯一防線且穩固，0 Critical。Minor（slug 未透傳/502 壓平 409+422/table edge）→ 併 P3 或 documented。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`markdownToBlocks|bridgeBaseUrl|createPost` | hits=0 stale — `markdownToBlocks`/`bridgeBaseUrl` + TS `createPost` 僅新 converter/client 定義 + 單一 publish-route 消費端；WORKLOG/RestController.php 的 `createPost` 命中為 **PHP 外掛端方法**（不同符號，無碰撞）。
+
+**[剩餘風險]**
+- issue A（focus keyword 落 meta）端到端需 Bridge 站實際設定（`WPBRIDGE_BASE_URL`/`KEY_ID`/`PRIVATE_KEY`）+ 真機 POST 驗證；本次為碼層 + 單元測試，未對 soulful 真站打 `/post`（QUERY_ONLY scope，Bridge 真寫＝High-risk 待操作者明示）。
+- issue 四（featured image）/ issue 七（ILJ `ilj_linkdefinition` keyword meta）/ issue C（`rank_math/metabox/power_words` CJK filter）端到端仍需 **P3 外掛改動**（PostCreator featured_media sideload + set_post_thumbnail）+ 另一 repo `awarewaveai-pei/aware-wave-wp-bridge` tag→Action release。
+- slug 在 Bridge 路徑未透傳（PostCreator 無 post_name）→ WP 由 title 自動推導；P3 補 `post_name`。
+- Bridge 409/422 內容錯誤目前壓平為 502（error reason 字串保留）→ P3 status passthrough。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/publish/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/studio/wp-bridge-client.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/content/ContentStudio.tsx` + 刪除 `lib/content/markdown-to-blocks.ts` 與其測試檔。
+
+### feat(content-engine): P3 外掛＋生成端 featured image / ILJ / power_words（issues 四/七/C 端到端）
+
+**[任務理解]** 收尾 9 問題剩餘三項，跨 next-admin 生成/發佈側 + WP Bridge 外掛側端到端串接：issue 四（精選圖片）、issue 七（Internal Link Juicer 關鍵字 meta）、issue C（RankMath 標題力量詞 CJK 註冊）。featured image 來源經使用者決策＝**生成端產專屬 hero 圖**（OG 比例 1200×630），透過 publish→Bridge spec 透傳，外掛 sideload 後 set_post_thumbnail。
+
+**[根因]** ① issue 四：發佈鏈無 featured image 概念，PostCreator 從不設縮圖 → 文章無首圖、社群分享無 OG 圖。② issue 七：ILJ 的 `ilj_linkdefinition` meta 從未寫入 → 其他文章不會自動連回本文（內鏈關鍵字欄空白）。③ issue C：RankMath 標題力量詞偵測為**前端 JS**讀 `rank_math/metabox/power_words` 過濾後的清單，且**無 zh 力量詞檔** → CJK 站該 filter 收到 `[]`，任何中文標題永遠拿不到力量詞分（P1 prompt 已承諾「伺服器端清單已註冊」但實際從未建立）。
+
+**[已修改]**
+- `packages/wp-bridge-plugin/includes/Content/RankMathPowerWords.php`（新）— 註冊 20 個繁中力量詞到 `rank_math/metabox/power_words`（SSOT 鏡像 generate route CJK 區塊 line 254）。`filter()` 無條件 merge + dedup（2 字 CJK token 永不匹配空白切詞的拉丁標題 → 對非 CJK 站零害；亦能在 zh 站跑 en_US WP locale 時生效，避免 locale-gate 漏接）；非字串/非陣列輸入容錯。
+- `packages/wp-bridge-plugin/aware-wave-wp-bridge.php` — bootstrap 註冊 `RankMathPowerWords`。
+- `packages/wp-bridge-plugin/includes/Post/PostCreator.php` — ① best-effort featured image：sideload `featured_image_url` → `set_post_thumbnail`（alt 帶 focus keyword；**不**納入 verify gate，鏡像 ProductCreator featured 處理，圖抓失敗不得 rollback 好文章）→ 回傳 `featured_set`。② ILJ：`internal_link_keywords` 陣列 → `update_post_meta('ilj_linkdefinition', $arr)`（純 PHP indexed array，WP 自動 serialize；**不**預 serialize/逗號字串，符合 ILJ `Postmeta::fromMeta()` is_array 契約；draft 的 index rebuild 延到 publish，無需手動觸發）。
+- `packages/wp-bridge-plugin/tests/Content/RankMathPowerWordsTest.php`（新）— words()/filter() 單元測試。
+- `lib/studio/wp-bridge-client.ts` — `BridgePostSpec` 加 `featured_image_url?`/`featured_image_alt?`/`internal_link_keywords?`；`BridgePostResponse` 加 `featured_set?`。
+- `app/api/content/publish/route.ts` — body 加三欄；Bridge 分支讀 `featuredImageUrl`/`featuredImageAlt`/`internalLinkKeywords`（trim + filter Boolean + 空陣列→undefined）透傳 createPost；回應帶 `featured_set`。RestController 直接整包 `$spec` 傳 PostCreator（line 227 無白名單）→ 三新欄免改 RestController。
+- `app/tools/content/ContentStudio.tsx` — `generateHeroImage()`（生成完成後以 seoTitle/title/keyword 為 prompt 打 `/api/content/image` platform `facebook_link` 1200×630）；`handlePublish` 透傳 `featuredImageUrl`(hero)/`featuredImageAlt`(form.keyword)/`internalLinkKeywords`([focus keyword])；hero 生成中/就緒 UI 指示；generate 起手不分支地 `++imgRunRef.current` 失效前一輪 in-flight hero writer（critic Major fix）。
+- `app/api/content/generate/route.ts`（CJK 區塊 line 254）— 力量詞行加「**必須以半形空格獨立成 token**」格式硬要求（「兒童藝術治療 完整 指南」✓ vs「完整指南」✗）：RankMath JS 以 `title.split(' ')` 切詞，黏連的 CJK 力量詞即使在清單也不會被偵測 → 註冊清單為必要但不充分，token 化是另一半。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -r '<require RankMathPowerWords; 10 assertions>'` | exit=0 | 10/10 pass（20 詞無重複、SSOT 樣本在、YMYL overclaim 剔除、zh 空清單→全清單、英文 merge 保留+去重 overlap、null/非字串容錯）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/__tests__/markdown-to-blocks.test.ts` | exit=0 | ms=9 | 10/10 pass（next-admin 改動零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed) | 4 改動 TS 檔零型別錯（其餘 fabric/pdf-lib 既存 missing-dep）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -l`（PostCreator/RankMathPowerWords/bootstrap/test）| exit=0 | 全無語法錯
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1M/2m/2nit — **Major：ContentStudio hero 競態**（imgRunRef 只在 aiImages!=="none" 分支遞增 → 重生成時關掉 AI 圖會讓前一輪慢 hero fetch 漏寫到新文章＝錯誤 featured 圖，靜默）→ 修為起手無條件遞增；Suggestion：`set_post_thumbnail` 回傳值取代多餘 `has_post_thumbnail`（已採）。Minor（hero attachment post_parent=0 孤兒、test assertion 略鬆）critic 判定可延後。merge 無條件對非 CJK 站零害經實跑確認。
+- REVIEW_DONE: critic=Deep(第2輪/4 TS 檔) | verdict=pass | findings=0c/0M/2m — race fix 經三情境追蹤確認正確（ON→ON / ON→OFF / abort-mid-hero 三路 generation-counter guard 全閉）；Minor#1 `featuredImageAlt` 在無 hero 時仍送（plugin 僅於 featured-image 區塊讀 alt＝no-op）→ **已套 1 行 guard** `heroImageUrl && form.keyword ? form.keyword : undefined`（ContentStudio.tsx:759），tsc 重驗零錯；Minor#2 全形/NBSP→ASCII 空白正規化（RankMath token 切詞，upstream 殘留，prompt-only 為正確最小範圍，延後）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`featured_image_url\|internal_link_keywords\|ilj_linkdefinition\|RankMathPowerWords\|featuredImageUrl\|internalLinkKeywords\|generateHeroImage` | hits=0 stale — 全部命中均在本次 8 改動檔內，無 downstream 消費端、無過期文件聲稱（WORKLOG/worklog-excerpt 的「待 P3」註記由本 entry 結案，非待修）。RankMath KB doc line 558 證實 filter 簽章＝實作相符。
+
+**[剩餘風險]**
+- 三項端到端仍需對 soulful 真站打簽章 `/post`（Bridge 真寫＝High-risk，待操作者明示 + `WPBRIDGE_BASE_URL`/`KEY_ID`/`PRIVATE_KEY` 設定）；本次碼層 + 單元/真執行測試完成，未對真站驗證。
+- 外掛改動需經**另一 repo** `awarewaveai-pei/aware-wave-wp-bridge` tag→Action 出 zip 才算發版（只 push Work ≠ 發版）；版號待 bump（`AWBRIDGE_VERSION` 0.9.0 → 0.10.0，header line 6 + define line 25 兩處）+ `bash scripts/release-wp-bridge.sh`，**發版前知會操作者**。
+- issue C 即使 PHP filter + token 化 prompt 雙管，RankMath 對 CJK 的空白切詞仍是上游限制（純無空白中文標題不可靠）；mitigation 已盡（文件 + prompt 強制 token 化），殘留為 RankMath upstream。
+- hero attachment 孤兒（post_parent=0）：與既有 sideloadBlockImages 共用路徑，縮圖功能正常（_thumbnail_id 已設），僅媒體庫顯「未附加」，延後。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/packages/wp-bridge-plugin/aware-wave-wp-bridge.php lobster-factory/packages/wp-bridge-plugin/includes/Post/PostCreator.php lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/studio/wp-bridge-client.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/publish/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/content/ContentStudio.tsx lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts` + 刪除 `includes/Content/RankMathPowerWords.php` 與 `tests/Content/RankMathPowerWordsTest.php`。
+
+### fix(ao-resume): import 前移至 git-align 前 + auto-resolve regex 擴展
+
+**[根因]**
+`import-cross-machine-memory.ps1`（原 L539）被 L415 `exit $alignExit` 硬阻斷。
+git-align 失敗（phase4-2026-06-12.md 日期命名 → 不符 -LATEST regex → rebase abort → exit=1）時，import 永遠跳過。
+Import 讀 Google Drive vault（全 gitignored），與 git 狀態邏輯獨立，不應被 git-align 成功與否決定。
+
+**[已修改]**
+- `scripts/ao-resume.ps1:142` — nonLatest filter 加 `-and $_ -notmatch '(?:^|[/\\])agency-os[/\\]reports[/\\]'`
+  — agency-os/reports/ 下生成報告全部可 auto-resolve（--theirs），防止日期命名報告觸發 rebase abort
+- `scripts/ao-resume.ps1:347` — 插入 import block（unconditional，在 FullMainlineParity 前）
+- `scripts/ao-resume.ps1:539`（原位）— 刪除舊 import block（已搬移）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File $TEMP/test-regex.ps1` | exit=0 | 5/5 regex 案例全 OK（match=True for reports paths, False for WORKLOG/scripts/reports-archive）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n — 唯一 suggestion = leading-separator bug `[/\\]` → 已在 commit 前修為 `(?:^|[/\\])`
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=import-cross-machine-memory | hits=0（no stale call sites — doc refs are descriptive only）
+- push: `08d418be` main → origin/main OK
+
+**[rollback]** `git revert c8ea1141 08d418be`（兩個 commit 還原，import 回原位）
+
 <!-- AO-CLOSE session window 2026-06-12 → 2026-06-15。下列 milestone 證據行（非 umbrella 任務閉合；對應 TASKS 多為 multi-part 進行中項，逐項勾選不適用）。-->
 - AUTO_TASK_DONE: 服飾 POD Phase 1-4 全功能部署上線 app.aware-wave.com (deploy 37dfba85, smoke 24 pass) — 忠實印刷檔/Printful 多風格+真人模特 mockup+存圖庫/平拍真實 overlay 雙軌/台灣本地印刷檔 seam/AI 商品文案 SEO-GEO-AEO-RankMath
 - AUTO_TASK_DONE: Postiz 自架社群發佈 EU 上線 Task 1+2 — Bluesky connected (app password) + 端到端發佈驗證 QUEUE→PUBLISHED→feed live (pivot from Reddit dev-app block)
@@ -215,6 +441,8 @@
 
 **[剩餘風險]** aeo-subquery-coverage 計數包含結構性 H2（非純子主題）；可接受（標示明確）。
 **[rollback]** git revert 上述 checkpoint commits。
+
+- 01:12 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-06-15.md
 
 ## 2026-06-14
 
@@ -10715,3 +10943,23 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=fetchGoogleTrends|pickTrendKeyword|internal.link | hits=0
 - BUGHUNT_WAIVED: NA -- ContentStudio.tsx UI text only change; generate/route.ts SYSTEM_PROMPT text only removal
 
+## 2026-06-15 security + AI Models guide + prod deploy
+
+### packages/workflows weekly security audit remediation
+- Weekly dependency scan reported esbuild advisory in `lobster-factory/packages/workflows` (`total=3 critical=0 high=3 moderate=0`).
+- Fixed workflows package override by updating esbuild from `^0.28.0` to `^0.28.1` and refreshed lockfile.
+- Verification: `npm audit --audit-level=high`, `npm audit --audit-level=moderate`, `npm test` (75/75), and `npm run audit:workflows-security` all passed.
+- GitHub tracking issue exists: #15.
+
+### Content Tools AI Models comparison page
+- Added `/tools/ai-models` under Content Tools sidebar, positioned between SEO Content and Tarot.
+- Built a clean comparison UI for three adjacent decision surfaces: text generation tools, image generation models, and vibe coding tools.
+- Image model table uses per-image cost only, not 78-card deck cost, and covers the 15 app image models requested by the operator.
+- Data includes model strengths, tradeoffs, style tendencies, cost notes, prompt/image input constraints where available, speed class, ratios, and source links.
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run typecheck` (next-admin) | exit=0 | result=tsc clean
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run build` (next-admin) | exit=0 | result=Next production build passed; route table includes `/tools/ai-models`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/root/lobster-phase1/scripts/sg-deploy.sh next-admin` | exit=0 | result=deployed commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy gates | exit=0 | result=tsc passed; vitest 24 files / 316 tests passed; container healthy after 7s; smoke OK for `/login`, `/api/ops/summary`, nginx/wordpress, node-api
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`curl.exe -I https://app.aware-wave.com/tools/ai-models` | exit=0 | result=307 to `/login?next=%2Ftools%2Fai-models` as expected behind auth; `/login` returns 200
+- REVIEW_WAIVED: CONTENT_DATA_UI -- static comparison page + typed data tables; build/typecheck/deploy smoke covered runtime integration
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=`78 張約|全套成本|fullDeckNt|15 個圖片模型比較` | hits=0 after moving comparison out of Tarot and using per-image cost only

@@ -37,6 +37,12 @@ function countWords(text: string): number {
   return cjkCount + latinCount;
 }
 
+/** True if the string contains any CJK/kana/hangul character. Resets the g-flag lastIndex first. */
+function hasCjk(text: string): boolean {
+  CJK_RE.lastIndex = 0;
+  return CJK_RE.test(text);
+}
+
 function stripMarkdown(md: string): string {
   return md
     .replace(/!\[.*?\]\(.*?\)/g, "")  // images
@@ -153,25 +159,41 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
     detail: `${wordCount} words (min 600)`,
   });
 
-  // 7. kw-density (RankMath: occurrences / total words)
+  // 7. kw-density (RankMath: occurrences / total words; CJK uses an absolute-count band)
   const kwWords = kw.split(/\s+/);
   const kwIsAscii = /^[\x00-\x7F]+$/.test(kw);
+  const kwIsCjk = hasCjk(kw);
+  // Whether to judge keyword frequency by an absolute occurrence band instead of a %.
+  // Key on the ARTICLE script, not just the keyword: a CJK-language article uses a broken
+  // char-based word count, so even an ASCII focus keyword (e.g. an English brand term) must
+  // use the occurrence band — otherwise a prompt-compliant 6× keyword reads <0.5% and the UI
+  // pushes re-stuffing. Mirrors the generator's language-based isCJK (generate/route.ts).
+  const articleIsCjk = kwIsCjk || hasCjk(markdown);
   let kwOccurrences = 0;
-  if (kwWords.length === 1 && kwIsAscii) {
-    // ASCII single-word: word-boundary match
-    kwOccurrences = (plain.match(new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g")) ?? []).length;
-  } else {
-    // Multi-word OR CJK: plain substring (\b doesn't work for non-ASCII)
-    kwOccurrences = (plain.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length;
+  if (kw.length > 0) {
+    if (kwWords.length === 1 && kwIsAscii) {
+      // ASCII single-word: word-boundary match
+      kwOccurrences = (plain.match(new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g")) ?? []).length;
+    } else {
+      // Multi-word OR CJK: plain substring (\b doesn't work for non-ASCII)
+      kwOccurrences = (plain.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length;
+    }
   }
   const density = wordCount > 0 ? kwOccurrences / wordCount : 0;
   const densityPct = Math.round(density * 1000) / 10;
-  const densityPass = density >= 0.005 && density <= 0.025;
+  // CJK: neither RankMath nor this checker can tokenize CJK words, so the % is unreliable.
+  // Chasing a 0.5% floor on char-counted CJK forced ~12 keyword uses, which real RankMath
+  // reads as ~13% (keyword stuffing). For CJK articles, judge by an absolute occurrence band.
+  const densityPass = articleIsCjk
+    ? (kwOccurrences >= 2 && kwOccurrences <= 8)
+    : (density >= 0.005 && density <= 0.025);
   checks.push({
     id: "kw-density",
-    label: "Keyword density 0.5%–2.5%",
+    label: articleIsCjk ? "Keyword frequency 2–8 (CJK)" : "Keyword density 0.5%–2.5%",
     pass: densityPass,
-    detail: `${densityPct}% (${kwOccurrences} occurrences in ${wordCount} words)`,
+    detail: articleIsCjk
+      ? `${kwOccurrences} exact occurrences (CJK % unreliable; target 2–8)`
+      : `${densityPct}% (${kwOccurrences} occurrences in ${wordCount} words)`,
   });
 
   // 8. external-links
@@ -224,12 +246,13 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
       : `${longParas.length} paragraph(s) exceed 120 words`,
   });
 
-  // 11. title-length
+  // 11. title-length (CJK glyphs are ~2× width → a shorter char budget maps to the same pixel width)
   const titleLen = seoTitle.length;
-  const titleLenPass = titleLen >= 30 && titleLen <= 60;
+  const titleIsCjk = hasCjk(seoTitle);
+  const titleLenPass = titleIsCjk ? (titleLen >= 14 && titleLen <= 30) : (titleLen >= 30 && titleLen <= 60);
   checks.push({
     id: "title-length",
-    label: "SEO title 30–60 characters",
+    label: titleIsCjk ? "SEO title 14–30 characters (CJK)" : "SEO title 30–60 characters",
     pass: titleLenPass,
     detail: `${titleLen} characters`,
   });
@@ -291,15 +314,23 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
     "kw-in-intro":          `在文章前 150 字的引言自然提及「${kw}」`,
     "kw-in-h2h3":           `在至少一個 H2/H3 標題中加入「${kw}」`,
     "word-count":           `擴充文章到 600+ 字：加入案例、背景說明、FAQ 段落`,
-    "kw-density":           density < 0.005
-      ? `密度偏低（${densityPct}%）；在正文中再自然提及「${kw}」幾次`
-      : `密度過高（${densityPct}%）；部分重複改用同義詞或代名詞`,
+    "kw-density":           articleIsCjk
+      ? (kwOccurrences < 2
+          ? `精確關鍵字次數偏少（${kwOccurrences} 次）；在標題、引言、一個 H2/H3 各自然帶入一次`
+          : `精確關鍵字重複過多（${kwOccurrences} 次）；CJK 密度 % 不可靠，其餘改用同義詞/代名詞，精確關鍵字控制在 2–6 次`)
+      : (density < 0.005
+          ? `密度偏低（${densityPct}%）；在正文中再自然提及「${kw}」幾次`
+          : `密度過高（${densityPct}%）；部分重複改用同義詞或代名詞`),
     "external-links":       `加入 1+ 個外部參考連結（例：[研究來源](https://example.com)）`,
     "internal-links":       `加入 1+ 個站內連結（例：[延伸閱讀](/related-article)）`,
     "para-length":          `${longParas.length} 個段落超過 120 字；拆分成較短段落，每段聚焦一個概念`,
-    "title-length":         titleLen < 30
-      ? `SEO 標題過短（${titleLen} 字元）；擴展到 30–60 字元`
-      : `SEO 標題過長（${titleLen} 字元）；縮短到 60 字元以內`,
+    "title-length":         titleIsCjk
+      ? (titleLen < 14
+          ? `CJK 標題過短（${titleLen} 字元）；擴展到 14–30 字元，含關鍵字＋力量詞＋阿拉伯數字`
+          : `CJK 標題過長（${titleLen} 字元）；縮短到 30 字元以內，避免 RankMath 截斷`)
+      : (titleLen < 30
+          ? `SEO 標題過短（${titleLen} 字元）；擴展到 30–60 字元`
+          : `SEO 標題過長（${titleLen} 字元）；縮短到 60 字元以內`),
     "meta-length":          metaLen < 120
       ? `Meta 描述過短（${metaLen} 字元）；補充到 120–160 字元，加入關鍵字與行動 CTA`
       : `Meta 描述過長（${metaLen} 字元）；截短到 160 字元以內`,

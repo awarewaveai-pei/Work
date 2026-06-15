@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { isBridgeConfigured, bridgeBaseUrl, createPost } from "@/lib/studio/wp-bridge-client";
+import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,10 +43,21 @@ function inline(s: string): string {
     );
 }
 
+/** A standalone YouTube watch/share/embed/shorts URL — emitted bare so WP autoembed (priority 8,
+ *  before wpautop) fetches oEmbed and renders the responsive iframe. Byte-identical to the copy in
+ *  lib/content/markdown-to-blocks.ts; both stay in lockstep with ContentStudio.canonicalYouTube(). */
+function isYouTubeUrl(url: string): boolean {
+  return /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtube-nocookie\.com\/embed\/|youtu\.be\/)[\w-]{11}/i.test(url);
+}
+
 function markdownToHtml(md: string): string {
   // Strip meta block before converting
   const clean = md
     .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
+    // Drop any UNRESOLVED YouTube placeholder, even if emitted inline (defense-in-depth so a stray
+    // "[YOUTUBE_PLACEHOLDER_N: ...]" cue never reaches a live post). Resolved ones are already bare
+    // watch URLs by now and don't match. (critic 2026-06-15 Major)
+    .replace(/\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]/g, "")
     .trim();
 
   const lines = clean.split("\n");
@@ -104,15 +117,11 @@ function markdownToHtml(md: string): string {
       continue;
     }
 
-    // YouTube placeholder — [YOUTUBE_PLACEHOLDER_N: search query]
-    const ytMatch = line.trim().match(/^\[YOUTUBE_PLACEHOLDER_(\d+):\s*(.+)\]$/);
-    if (ytMatch) {
-      const [, n, query] = ytMatch;
-      out.push(
-        `<div class="youtube-placeholder" data-query="${escapeHtml(query.trim())}" style="padding:24px;background:#f8f8f8;border:2px dashed #ccc;text-align:center;margin:16px 0;">` +
-        `🎬 YouTube #${n}：${escapeHtml(query.trim())}` +
-        `</div>`
-      );
+    // Standalone YouTube URL → emit bare on its own line so WP autoembed renders the iframe.
+    // (Resolved placeholder lands here once ContentStudio swaps in the canonical watch URL;
+    //  unresolved placeholders were already scrubbed during preprocessing above.)
+    if (isYouTubeUrl(line.trim())) {
+      out.push(line.trim());
       continue;
     }
 
@@ -236,6 +245,9 @@ export async function POST(req: Request): Promise<Response> {
     tags?: unknown;
     scheduleDate?: unknown;
     siteId?: unknown;
+    featuredImageUrl?: unknown;
+    featuredImageAlt?: unknown;
+    internalLinkKeywords?: unknown;
   };
   try {
     body = await req.json();
@@ -279,12 +291,79 @@ export async function POST(req: Request): Promise<Response> {
   const seoTitle = typeof body.seoTitle === "string" ? body.seoTitle.trim() : "";
   const title = seoTitle || h1 || "Untitled Article";
   const slug = (typeof body.slug === "string" ? body.slug.trim() : "") || slugify(h1 || "article");
-  const content = markdownToHtml(markdown);
 
   const base = wpApiUrl.replace(/\/+$/, "");
+  const excerpt = extractExcerpt(markdown);
+
+  // Category + tag names — shared by the Bridge path and the standard-REST path.
+  const catNames = (Array.isArray(body.categories) ? body.categories : [])
+    .map(c => String(c).trim()).filter(Boolean);
+  const tagNames = (Array.isArray(body.tags) ? body.tags : [])
+    .map(t => String(t).trim()).filter(Boolean);
+
+  // ── WP Bridge path ───────────────────────────────────────────────────────
+  // When the target site IS the configured bridge site, route through the signed /post endpoint:
+  // the plugin composes real Kadence blocks, sideloads in-article images into the media library,
+  // and persists Rank Math SEO meta server-side (standard WP REST silently drops the unregistered
+  // rank_math_focus_keyword meta). Gate on a hostname match so an article for a NON-bridge site is
+  // never mis-published to the bridge site; non-bridge sites keep the standard-REST path below.
+  const bridgeBase = isBridgeConfigured() ? bridgeBaseUrl() : null;
+  let bridgeHostMatch = false;
+  if (bridgeBase) {
+    try { bridgeHostMatch = new URL(bridgeBase).host === new URL(base).host; } catch { bridgeHostMatch = false; }
+  }
+  if (bridgeHostMatch) {
+    // The Bridge /post route creates a draft only — the plugin's PostCreator has no post_date
+    // support yet (scheduling is a P3 plugin item). Fail loud rather than silently dropping a
+    // user-set schedule (the standard-REST path below honors body.scheduleDate via payload.date).
+    if (typeof body.scheduleDate === "string" && body.scheduleDate.trim()) {
+      return NextResponse.json(
+        { ok: false, error: "scheduling is not yet supported for this site; publish without a schedule date" },
+        { status: 400 },
+      );
+    }
+    const blocks = markdownToBlocks(markdown);
+    if (blocks.length === 0) return new NextResponse("no publishable content", { status: 400 });
+    const seo: { focus_keyword?: string; description?: string; title?: string } = {};
+    if (typeof body.focusKeyword === "string" && body.focusKeyword.trim()) seo.focus_keyword = body.focusKeyword.trim();
+    if (typeof body.metaDescription === "string" && body.metaDescription.trim()) seo.description = body.metaDescription.trim();
+    if (seoTitle) seo.title = seoTitle;
+    // Issue 四: a dedicated hero image generated at generation time → plugin sideloads + sets as
+    // featured (best-effort). Issue 七: focus keyword (+ related terms) → ILJ ilj_linkdefinition meta.
+    const featuredImageUrl =
+      typeof body.featuredImageUrl === "string" && body.featuredImageUrl.trim() ? body.featuredImageUrl.trim() : undefined;
+    const featuredImageAlt =
+      typeof body.featuredImageAlt === "string" && body.featuredImageAlt.trim() ? body.featuredImageAlt.trim() : undefined;
+    const internalLinkKeywords = (Array.isArray(body.internalLinkKeywords) ? body.internalLinkKeywords : [])
+      .map(k => String(k).trim()).filter(Boolean);
+    const result = await createPost({
+      title,
+      blocks,
+      status: "draft",
+      excerpt,
+      categories: catNames,
+      tags: tagNames,
+      seo: Object.keys(seo).length > 0 ? seo : undefined,
+      featured_image_url: featuredImageUrl,
+      featured_image_alt: featuredImageAlt,
+      internal_link_keywords: internalLinkKeywords.length > 0 ? internalLinkKeywords : undefined,
+    });
+    if (!result.ok) {
+      // tsconfig has strict:false → discriminated-union narrowing via `!result.ok` does not
+      // expose `.error`; cast to the error arm (same idiom as app/api/tools/publish/route.ts:292).
+      return NextResponse.json(
+        { ok: false, error: `bridge: ${(result as { ok: false; error: string }).error}` },
+        { status: 502 },
+      );
+    }
+    const v = result.value;
+    return NextResponse.json({ ok: true, post_id: v.post_id, edit_url: v.edit_url, featured_set: v.featured_set });
+  }
+
+  // ── Standard WP REST path (non-bridge sites) ──────────────────────────────
+  const content = markdownToHtml(markdown);
   const endpoint = `${base}/wp-json/wp/v2/posts`;
 
-  const excerpt = extractExcerpt(markdown);
   const payload: Record<string, unknown> = {
     title,
     content,
@@ -295,10 +374,6 @@ export async function POST(req: Request): Promise<Response> {
 
   // Resolve category + tag names → WP term IDs
   const authHdr = wpAuthHeader(wpUsername, wpToken);
-  const catNames = (Array.isArray(body.categories) ? body.categories : [])
-    .map(c => String(c).trim()).filter(Boolean);
-  const tagNames = (Array.isArray(body.tags) ? body.tags : [])
-    .map(t => String(t).trim()).filter(Boolean);
   if (catNames.length > 0) {
     const catIds = await resolveTermIds(catNames, "categories", authHdr, base);
     if (catIds.length > 0) payload.categories = catIds;

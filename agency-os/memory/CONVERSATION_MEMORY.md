@@ -518,3 +518,9 @@ _Last synced: 2026-06-12 08:00:34 UTC_
 - **Postiz 自架社群發佈上線 EU**（Task 1+2）：Bluesky connected（app password，pivot from Reddit，後者 dev-app 建立被擋）；端到端發佈驗證 QUEUE→PUBLISHED→feed live。**AGPL 紅線：禁 fork/改原始碼，預設 draft+人審**。計畫 SSOT=POSTIZ_SOCIAL_PUBLISHING_PLAN.md（7 task，TASKS line 57 進行中）。
 - **app.aware-wave Stage 1 接通入口完成（06-14）**：trigger-build 403 修復（dual-path auth `x-ops-sync-key`，8b1d6d86）+ dispatcher kick fallback（TRIGGER_ACCESS_TOKEN）+ dispatch-action-run-schedule 每分鐘 cron。下一步 Stage 2 Fluent Form→intake 橋接。
 - **其他**：WP auth 遷 Application Password + rate limit 修；admin-auth middleware 不再 bounce 已登入用戶；Printful Mockup Generator pipeline（design→R2→product photo）；可編輯 calendar（reschedule/publish-now/delete）；My Designs gallery UI redesign；tarot FLUX printQuality 422 fix。
+
+## 2026-06-15 — workflows security fix + Content Tools AI Models guide live
+- **weekly workflows security audit 修復**：esbuild advisory 由 `lobster-factory/packages/workflows` override `^0.28.0` 升到 `^0.28.1`，lockfile refreshed；`npm audit --audit-level=high`、`npm audit --audit-level=moderate`、`npm test` 75/75、`npm run audit:workflows-security` 全 PASS；GitHub issue #15 已存在追蹤。
+- **AI Models 指南上線**：原本使用者想放 Tarot，後更正要放 Content Tools，因生圖工具會被多處共用。新 route `/tools/ai-models` 已加入 sidebar（SEO Content 下、Tarot 上），正式站 deploy commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`。
+- **頁面內容**：三個相鄰比較區：文字生成工具（OpenAI/Claude/Gemini/Perplexity/Grok）、圖片生成模型（15 個 app 現有模型，成本改成每張，不是 78 張）、Vibe Coding 工具（Codex/Claude Code/Gemini/Perplexity/Grok）。表格呈現優劣、風格、速度、成本、prompt/image input、比例與來源連結。
+- **部署證據**：local `npm run typecheck` + `npm run build` PASS；SG `sg-deploy.sh next-admin` PASS；prod gates `tsc` PASS、vitest 24 files / 316 tests PASS、container healthy after 7s、smoke `/login` + `/api/ops/summary` + nginx/wordpress + node-api OK。`/tools/ai-models` 未登入時 307 到 login（符合 auth middleware）。

@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-15 03:48:45
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-06-15 17:30:49
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -305,6 +305,21 @@
 - Mockup Studio 功能異常診斷 (操作者回報，缺症狀) — TASKS line 88
 - app.aware-wave Stage 2 Fluent Form→intake 橋接+FluentCRM — TASKS line 72
 
+## Session 收工追加 (AO-CLOSE 2026-06-15) — 安全修補 + AI Models
+
+### Done this session (上次 AO-RESUME 至今)
+- **workflows weekly security audit 修復**：esbuild override `^0.28.0` → `^0.28.1`；`npm audit --audit-level=high`、`npm audit --audit-level=moderate`、`npm test` 75/75、`npm run audit:workflows-security` 全 PASS；GitHub issue #15 已追蹤。
+- **AI Models guide 已上線 Content Tools**：新增 `/tools/ai-models`，sidebar 放在 SEO Content 下、Tarot 上；比較文字生成、15 個圖片模型、Vibe Coding 工具。
+- **成本口徑修正**：圖片模型改為「每張成本」，不再顯示 78 張全套成本；頁面資料包含優劣、風格、速度、費用、prompt/image input、圖案比例與來源。
+- **prod deploy 完成**：commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`；SG deploy gates 通過：tsc PASS、vitest 24 files / 316 tests PASS、container healthy、smoke all OK。
+
+### 未完成 / 明日優先
+- Canvas `/tools/canvas` 整輪瀏覽器實測 (Undo/Redo, genfill, 群組/Posterize/.design 存載) — TASKS line 68
+- Postiz Content Studio 接真實發佈 (7 task 進行中) — TASKS line 57
+- POD 服飾 Phase 1-4 後續未做項 — TASKS line 81
+- Mockup Studio 功能異常診斷 (操作者回報，缺症狀) — TASKS line 88
+- app.aware-wave Stage 2 Fluent Form→intake 橋接+FluentCRM — TASKS line 72
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
@@ -326,26 +341,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- REALTEST_EVIDENCE: tool=Bash | cmd=curl Replicate API schema flux-schnell | exit=0 | ms=N/A — confirmed Input params: no width/height; aspect_ratio default=1:1
-- REVIEW_DONE: critic=Standard | verdict=pass (after full rewrite) | findings=2c/0m/0n
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=FLUX_PRINT_DIMS|aspect_ratio.*custom|printDims | hits=0
-- REALTEST_WAIVED: NA -- live FLUX call not needed; schema confirmed via Replicate API; 422 root cause identified from SG server logs
-
-## 2026-06-13 feat(content-studio): Media Hub + expanded Structure section
-
-### [已修改]
-- `ContentStudio.tsx`: Added `MediaHub` interface + `ArticleStructure` extended (tables/h3/lists/italics/quotes/bold). Structure section replaced with intro hook brief + type chip buttons + Yes/No dropdowns. New Media Hub section (AI images: provider/count/size/style/instructions/brand name/alt-text; YouTube: count/layout; strict-under-headings). New constants HOOK_TYPES, AI_IMAGE_PROVIDERS, IMAGE_SIZES, LAYOUT_OPTIONS. `setMedia` callback, `showMedia` state, `DEFAULT_MEDIA`, updated `bulkSettings`.
-- `generate/route.ts`: Extended `ArticleStructure` + added `MediaHub` interface. `buildUserPrompt` accepts `introHookBrief`/`introHookType`/`media`; emits IMAGE_PLACEHOLDER_N and YOUTUBE_PLACEHOLDER_N prompt instructions. Fixed pre-existing targetCountry sentinel mismatch (`"Global"` vs `"全球（不指定）"`). Clamped imageCount (1–10) and youtubeCount (1–5) server-side.
-
-### [驗證結果]
-- REALTEST_EVIDENCE: tool=Bash | cmd=node --input-type=module (targetCountry/clamp/size-label logic) | exit=0 | ms=<1000 — all 5 assertions PASSED
-- REVIEW_DONE: critic=Standard | verdict=pass (2 majors fixed: clamp + targetCountry sentinel) | findings=0c/2m/2n
-- BUGHUNT_DONE: scope=agency-os,scripts | grep=imageCount|youtubeCount|introHookBrief|targetCountry.*Global | hits=0
-
-
-
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=countWords|resolveTermIds|imgRunRef|CJK_RE | hits=0 (no stale call sites outside modified files)
-- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1M/2m/2s -- Major: JP/KO kana/hangul missing from CJK range (FIXED before commit); Minor: resolveTermIds silent drop, inline images literal-text; Suggestions: imgRunRef decoupling (FIXED), imgRunRef reset
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<30000
 - REALTEST_WAIVED: SMOKE_COVERED -- deploy smoke checks WP publish endpoint; CJK word-count verified by critic empirically
 
@@ -386,3 +381,23 @@
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=fetchGoogleTrends|pickTrendKeyword|internal.link | hits=0
 - BUGHUNT_WAIVED: NA -- ContentStudio.tsx UI text only change; generate/route.ts SYSTEM_PROMPT text only removal
 
+## 2026-06-15 security + AI Models guide + prod deploy
+
+### packages/workflows weekly security audit remediation
+- Weekly dependency scan reported esbuild advisory in `lobster-factory/packages/workflows` (`total=3 critical=0 high=3 moderate=0`).
+- Fixed workflows package override by updating esbuild from `^0.28.0` to `^0.28.1` and refreshed lockfile.
+- Verification: `npm audit --audit-level=high`, `npm audit --audit-level=moderate`, `npm test` (75/75), and `npm run audit:workflows-security` all passed.
+- GitHub tracking issue exists: #15.
+
+### Content Tools AI Models comparison page
+- Added `/tools/ai-models` under Content Tools sidebar, positioned between SEO Content and Tarot.
+- Built a clean comparison UI for three adjacent decision surfaces: text generation tools, image generation models, and vibe coding tools.
+- Image model table uses per-image cost only, not 78-card deck cost, and covers the 15 app image models requested by the operator.
+- Data includes model strengths, tradeoffs, style tendencies, cost notes, prompt/image input constraints where available, speed class, ratios, and source links.
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run typecheck` (next-admin) | exit=0 | result=tsc clean
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run build` (next-admin) | exit=0 | result=Next production build passed; route table includes `/tools/ai-models`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/root/lobster-phase1/scripts/sg-deploy.sh next-admin` | exit=0 | result=deployed commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy gates | exit=0 | result=tsc passed; vitest 24 files / 316 tests passed; container healthy after 7s; smoke OK for `/login`, `/api/ops/summary`, nginx/wordpress, node-api
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`curl.exe -I https://app.aware-wave.com/tools/ai-models` | exit=0 | result=307 to `/login?next=%2Ftools%2Fai-models` as expected behind auth; `/login` returns 200
+- REVIEW_WAIVED: CONTENT_DATA_UI -- static comparison page + typed data tables; build/typecheck/deploy smoke covered runtime integration
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=`78 張約|全套成本|fullDeckNt|15 個圖片模型比較` | hits=0 after moving comparison out of Tarot and using per-image cost only
