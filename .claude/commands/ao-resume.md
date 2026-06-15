@@ -189,7 +189,11 @@ List every file checked, with one of these statuses:
 - — 同機工作流（skipped）— 只有單機在用，無跨機 AO-SYNC 資料夾
 
 Files to report: `MEMORY.md`、`user-env.ps1`、`.ssh/hetzner_trigger`、`.ssh/id_ed25519`、`.ssh/hostinger_soulful`、`.ssh/config`、`AWARE_WAVE_CREDENTIALS.md`
-If import did not run (hook missing / E:\ not mounted / G:\ not accessible), write「import 未執行 — [原因]」and list what needs to be fixed.
+
+**🔴 鐵則（強制，無例外）：8 檔表格必須每次出現，縮成一行 = 違規。**
+- Import 正常執行 → 每列填實際狀態（✅/✔/📋/⚠/—）
+- Import 未執行（hook 失敗 / vault 掛載缺失 / git-align 中止）→ 每列填 `— import 未執行 — [原因]`，並在表格後加一行說明需做什麼。
+- **禁止**：把 8 檔表格壓縮為「跨機 import 未執行」一行（根因：2026-06-15 使用者反覆要求後仍缺失）
 
 **2. 外部信號**
 Read `agency-os/.agency-state/external-signals-digest.json`.
