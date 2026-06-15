@@ -4,6 +4,22 @@
 
 ## 2026-06-16
 
+### fix(doc-sync): Resolve-Path -LiteralPath 修 PropertyNotFound 紅字閃窗 + 揭 schtasks 261 SSOT bug
+**[任務理解]** 使用者回報「好幾次跳出 PowerShell 視窗、紅字、一秒消失」。非 Claude/Cursor 開窗，而是 Windows 工作排程 `AgencyOS-SystemGuard-Daily` 任務跑時閃現。表面是 UI 噪音，根因有二層。
+**[根因]**（VBC，雙層）
+- **紅字源頭**：`agency-os/scripts/doc-sync-automation.ps1:37` `To-RelPath` 用 `(Resolve-Path $fullPath).Path` 漏 `-LiteralPath`。`Detect-ChangedFiles` 遞迴掃到含中括號檔名 `docs/RankMath/RankMath-KB/Developers/Set the Current Year in Post Title Using the [year] Shortcode.md` 時，`[year]` 被當萬用字元 → 無 match → `$null.Path` → 在 `Set-StrictMode -Version Latest`（line 10）下噴 `PropertyNotFoundStrict`。同檔名先前已於 commit `e182cd21` 弄壞過 verify-build-gates（慣犯）。system-guard 仍 exit 0（紅字非致命），故是「報錯但沒壞」。
+- **視窗可見**：`AgencyOS-SystemGuard-Daily` live 任務缺 `-WindowStyle Hidden`（其他 4 個 AgencyOS 任務皆隱藏）。深查發現 SSOT `agency-os/automation/REGISTER_SYSTEM_GUARD_TASKS.ps1` 真 bug：`schtasks /TR` 上限 261 字元，但其組出的隱藏版指令（launcher + base64 ExtraArgs）= 308 字元 → schtasks 拒建（實測 exit -2147467259「/TR 不可超過 261 個字元」）→ 3 個 guard 任務（Daily/Startup/Logoff）全建不起來，只剩更早期、夠短、未隱藏的舊 Daily 殘留在閃。
+**[已修改]**
+- `agency-os/scripts/doc-sync-automation.ps1:37` — `Resolve-Path $fullPath` → `Resolve-Path -LiteralPath $fullPath`（一行；對齊同檔/同庫既有 `-LiteralPath` 慣例）。
+- live 任務 `AgencyOS-SystemGuard-Daily`（非 repo）— 以 PowerShell `Set-ScheduledTask`（ScheduledTasks 模組，無 261 限制）改 Action 為隱藏 launcher 版（`-WindowStyle Hidden` + `-HideUi`）。SSOT registrar 的 261 bug 本 commit 未動（含 OnStartup 開檔副作用，待後續決策）。
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`doc-sync-automation.ps1 -AutoDetect -SkipApply -SkipReport` | exit=0 | 修後輸出 `PropertyNotFound|找不到屬性|ForEach-Object :` 命中=0（修前必噴），中括號檔 `[year] Shortcode.md` 正常被掃到。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Set-ScheduledTask`+`Start-ScheduledTask AgencyOS-SystemGuard-Daily` | exit=0 | 讀回 Hidden=True/Launcher=True；觸發後 LastTaskResult=0、無視窗。
+- REVIEW_WAIVED: NA -- 單行 `-LiteralPath` 補強（行為純收嚴：原失敗 path 改正確 literal 解析），real-run 已證 PropertyNotFound 歸零，且對齊 weekly-system-review.ps1:30/33 等既有 `-LiteralPath` callsite。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Resolve-Path` | hits=1 — 全 scripts 掃 `Resolve-Path`，其餘漏 `-LiteralPath` 者皆只解析 workspace/script 根路徑（`$InputRoot`/`$PSScriptRoot`/`$WorkRoot`，不含中括號）→ 非同 bug class；唯一解析任意 repo 列舉檔的就是 line 37 → 已修。
+**[剩餘風險]** SSOT `REGISTER_SYSTEM_GUARD_TASKS.ps1` 261 bug 未修 → 公司桌機可能卡同款會閃的舊任務、未來重註冊仍失敗。修法（改 ScheduledTasks 模組）+ OnStartup 靜默化待使用者決策後續。
+**[rollback]** doc-sync：`git checkout HEAD~1 -- agency-os/scripts/doc-sync-automation.ps1`。live 任務：重跑 `REGISTER_SYSTEM_GUARD_TASKS.ps1`（會回到舊行為）或 `Set-ScheduledTask` 還原 Action。
+
 ### fix(pod): A1 hardening — 結構化 transient classifier + SKU-faithful 冪等（關 critic 2 benign 🟡）
 **[任務理解]** 使用者「POD 處理到哪? 繼續下去」+「都要」。VBC 釐清：POD 程式碼全已上線（prod=`5b8c97ac`，A1 後端+wiring 皆 live，drift -AppCodeOnly=PASS behind 0），剩餘 6 項多卡操作者。可完全自走的只有 #5 = 關 A1 critic 標記的 2 個 benign 🟡。
 **[已修改]**
