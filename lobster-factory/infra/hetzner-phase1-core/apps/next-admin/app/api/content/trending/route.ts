@@ -1,170 +1,12 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { runTrending, perplexityChat, parseJsonStrings } from "@/lib/content/trending-sources";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-interface TrendingItem {
-  title: string;
-  traffic: string;
-  category: string;
-  relatedQueries: string[];
-  source?: string;
-}
-
-// ─── Perplexity helper ───────────────────────────────────────────────────────
-
-async function perplexityChat(prompt: string, timeoutMs = 10000): Promise<string> {
-  const apiKey = process.env.PERPLEXITY_API_KEY;
-  if (!apiKey) return "";
-  try {
-    const res = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "sonar",
-        messages: [{ role: "user", content: prompt }],
-        search_recency_filter: "day",
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return "";
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return data.choices?.[0]?.message?.content ?? "";
-  } catch { return ""; }
-}
-
-// Parse a JSON array out of AI text (handles markdown code fences + line-split fallback)
-function parseJsonStrings(text: string): string[] {
-  const jsonMatch = text.match(/\[[\s\S]*?\]/);
-  if (jsonMatch) {
-    try {
-      const arr = JSON.parse(jsonMatch[0]) as unknown[];
-      const items = arr.filter((s): s is string => typeof s === "string" && s.trim().length > 0);
-      if (items.length > 0) return items;
-    } catch { /* fall through to line-split */ }
-  }
-  // Fallback: numbered / bulleted lines — drop lines that look like raw JSON
-  return text
-    .split("\n")
-    .map(l => l.replace(/^[\d\-•*\s.]+/, "").replace(/^["']|["']$/g, "").trim())
-    .filter(l => l.length > 3 && l.length < 300 && !l.startsWith("{") && !l.startsWith("[") && !l.includes('":"'));
-}
-
-// ─── Google News RSS — free, no API key, works from VPS ─────────────────────
-
-const GEO_RSS: Record<string, { hl: string; gl: string; ceid: string }> = {
-  TW: { hl: "zh-TW", gl: "TW", ceid: "TW:zh-Hant" },
-  HK: { hl: "zh-HK", gl: "HK", ceid: "HK:zh-Hant" },
-  SG: { hl: "en-SG", gl: "SG", ceid: "SG:en" },
-  US: { hl: "en-US", gl: "US", ceid: "US:en" },
-  GB: { hl: "en-GB", gl: "GB", ceid: "GB:en" },
-  JP: { hl: "ja",    gl: "JP", ceid: "JP:ja"    },
-  AU: { hl: "en-AU", gl: "AU", ceid: "AU:en"    },
-};
-
-async function fetchGoogleNewsTrending(geo: string): Promise<TrendingItem[]> {
-  const p = GEO_RSS[geo] ?? GEO_RSS.TW;
-  const url = `https://news.google.com/rss?hl=${p.hl}&gl=${p.gl}&ceid=${p.ceid}`;
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; ContentStudio/1.0)" },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return [];
-    const xml = await res.text();
-    const items: TrendingItem[] = [];
-    const itemRe = /<item>([\s\S]*?)<\/item>/g;
-    let m: RegExpExecArray | null;
-    while ((m = itemRe.exec(xml)) !== null && items.length < 20) {
-      const block = m[1];
-      const titleM = block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
-      if (!titleM) continue;
-      // Strip " - Publisher" suffix (e.g. "颱風來了 - 東森新聞" → "颱風來了")
-      // Use space-surrounded dash to avoid stripping hyphenated terms like "COVID-19" or "GPT-4"
-      const full = titleM[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
-      const title = full.replace(/\s+[-–—]\s+[^\s].{1,35}$/, "").trim() || full;
-      if (title.length < 4) continue;
-      items.push({ title, traffic: "", category: "", relatedQueries: [] });
-    }
-    return items;
-  } catch { return []; }
-}
-
-// ─── Reddit Atom RSS — free, no key, works from VPS ────────────────────────
-
-const REDDIT_GEO_SUBS: Record<string, string[]> = {
-  TW: ["taiwan", "worldnews"],
-  HK: ["hongkong", "worldnews"],
-  SG: ["singapore", "worldnews"],
-  US: ["news", "worldnews"],
-  GB: ["unitedkingdom", "worldnews"],
-  JP: ["japan", "worldnews"],
-  AU: ["australia", "worldnews"],
-};
-
-async function fetchRedditTrending(geo: string): Promise<TrendingItem[]> {
-  const subs = (REDDIT_GEO_SUBS[geo] ?? REDDIT_GEO_SUBS.US).join("+");
-  const url = `https://www.reddit.com/r/${subs}.rss?limit=20`;
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "ContentStudio/1.0 (educational aggregator; +https://aware-wave.com)",
-        "Accept": "application/rss+xml, application/xml, text/xml",
-      },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return [];
-    const xml = await res.text();
-    const items: TrendingItem[] = [];
-    // Atom feed uses <entry> not <item>
-    const entryRe = /<entry>([\s\S]*?)<\/entry>/g;
-    let m: RegExpExecArray | null;
-    while ((m = entryRe.exec(xml)) !== null && items.length < 10) {
-      const block = m[1];
-      const titleM = block.match(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
-      if (!titleM) continue;
-      const title = titleM[1]
-        .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-        .replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
-      if (title.length < 4 || title.toLowerCase() === "reddit: the front page of the internet") continue;
-      items.push({ title, traffic: "", category: "", relatedQueries: [], source: "Reddit" });
-    }
-    return items;
-  } catch { return []; }
-}
-
-// ─── PTT Gossiping HTML scrape — works from VPS with over18 cookie ───────────
-
-async function fetchPttTrending(): Promise<TrendingItem[]> {
-  try {
-    const res = await fetch("https://www.ptt.cc/bbs/Gossiping/index.html", {
-      headers: {
-        "Cookie": "over18=1",
-        "User-Agent": "Mozilla/5.0 (compatible; ContentStudio/1.0)",
-      },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return [];
-    const html = await res.text();
-    const items: TrendingItem[] = [];
-    // Parse each r-ent row as a unit so deleted posts (no <a> in .title) don't shift push counts
-    const rowRe = /<div class="r-ent">([\s\S]*?)<\/div>\s*<\/div>/g;
-    let m: RegExpExecArray | null;
-    while ((m = rowRe.exec(html)) !== null && items.length < 10) {
-      const row = m[1];
-      const titleM = row.match(/<div class="title">\s*<a href="[^"]*">([^<]+)<\/a>/);
-      if (!titleM) continue; // deleted / removed post — skip entirely
-      const title = titleM[1].trim();
-      if (title.length <= 3) continue;
-      const pushM = row.match(/<div class="nrec"><span[^>]*>([^<]*)<\/span><\/div>/);
-      const push = pushM ? pushM[1].trim() : "";
-      const traffic = /^\d+$/.test(push) ? `${push}推` : push === "爆" ? "爆推" : "";
-      items.push({ title, traffic, category: "", relatedQueries: [], source: "PTT" });
-    }
-    return items;
-  } catch { return []; }
-}
+// 熱門/趨勢來源已統整成「搜尋積木」：@/lib/content/trending-sources（可增刪來源 registry）。
+// 本檔只保留 keyword 探索工具（suggest / questions），並沿用積木匯出的 Perplexity 共用工具。
 
 // ─── Google Autocomplete (primary for suggest/questions; may also be blocked) ─
 
@@ -245,16 +87,7 @@ export async function GET(req: Request): Promise<Response> {
   const hl    = url.searchParams.get("hl") ?? (geo === "TW" || geo === "HK" ? "zh-TW" : "en");
 
   if (type === "trending") {
-    const sources: Promise<TrendingItem[]>[] = [
-      fetchGoogleNewsTrending(geo),
-      fetchRedditTrending(geo),
-    ];
-    if (geo === "TW") sources.push(fetchPttTrending());
-    const settled = await Promise.allSettled(sources);
-    const items: TrendingItem[] = [];
-    for (const r of settled) {
-      if (r.status === "fulfilled") items.push(...r.value);
-    }
+    const items = await runTrending(geo);   // 搜尋積木：跑所有啟用且符合 geo 的來源
     return NextResponse.json({ ok: true, items, geo });
   }
 

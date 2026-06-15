@@ -77,16 +77,31 @@ function decodeEntities(s: string): string {
     .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 
-/** SSRF guard: https only, no internal/loopback hosts. Used for any non-hardcoded feed URL. */
+/**
+ * SSRF guard: https only, no internal/loopback/private hosts. Used for any
+ * non-hardcoded (env / future DB-UI) feed URL.
+ *
+ * 限制：只比對 URL 字面 host，不解析 DNS → 擋不住 DNS rebinding（公開域名解到
+ * 169.254.169.254 等內網）。因此 env CONTENT_TRENDING_FEEDS 視為「受信任營運者」輸入；
+ * 未來 DB/UI 開放任意使用者貼 feed 時，必須在 fetch 前加 DNS 解析後比對或 allowlist。
+ */
 function isSafePublicHttps(rawUrl: string): boolean {
   let u: URL;
   try { u = new URL(rawUrl); } catch { return false; }
   if (u.protocol !== "https:") return false;
-  const h = u.hostname.toLowerCase();
+  let h = u.hostname.toLowerCase();
+  if (h.startsWith("[") && h.endsWith("]")) h = h.slice(1, -1);  // 去 IPv6 中括號
+  // 名稱型
   if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal")) return false;
+  // IPv4 私有/迴圈/link-local/CGNAT(100.64/10)
   if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return false;
   if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return false;
-  if (h === "::1" || h === "[::1]") return false;
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(h)) return false;
+  // IPv6 迴圈/ULA(fc00::/7)/link-local(fe80::/10)/IPv4-mapped(::ffff:)
+  if (h === "::1") return false;
+  if (h.startsWith("fc") || h.startsWith("fd")) return false;
+  if (h.startsWith("fe8") || h.startsWith("fe9") || h.startsWith("fea") || h.startsWith("feb")) return false;
+  if (h.includes("::ffff:")) return false;
   return true;
 }
 
@@ -204,7 +219,11 @@ const reddit = rssSource({
   geos: "*",
   limit: 10,
   source: "Reddit",
-  headers: { Accept: "application/rss+xml, application/xml, text/xml" },
+  // Reddit 封鎖瀏覽器偽裝/通用 UA（403/429）→ 必須帶原本的描述性 UA，否則整個 Reddit 源變空。
+  headers: {
+    "User-Agent": "ContentStudio/1.0 (educational aggregator; +https://aware-wave.com)",
+    Accept: "application/rss+xml, application/xml, text/xml",
+  },
   url: (geo) => {
     const subs = (REDDIT_GEO_SUBS[geo] ?? REDDIT_GEO_SUBS.US).join("+");
     return `https://www.reddit.com/r/${subs}.rss?limit=20`;
@@ -249,7 +268,7 @@ const perplexity: TrendingSource = {
     const content = await perplexityChat(
       `List 10 trending news topics or hot search terms right now in ${where}. ` +
       `Language: ${lang}. Reply ONLY as a JSON array of short title strings, no markdown.`,
-      10000,
+      8000,  // 與其他來源 8s timeout 對齊，避免 Perplexity 拖長熱門 feed 的 p99
     );
     return parseJsonStrings(content).slice(0, 10).map(title => ({
       title, traffic: "", category: "", relatedQueries: [], source: "Perplexity",
