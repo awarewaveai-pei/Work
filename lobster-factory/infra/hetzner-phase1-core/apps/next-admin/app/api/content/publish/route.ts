@@ -303,6 +303,15 @@ export async function POST(req: Request): Promise<Response> {
     try { bridgeHostMatch = new URL(bridgeBase).host === new URL(base).host; } catch { bridgeHostMatch = false; }
   }
   if (bridgeHostMatch) {
+    // The Bridge /post route creates a draft only — the plugin's PostCreator has no post_date
+    // support yet (scheduling is a P3 plugin item). Fail loud rather than silently dropping a
+    // user-set schedule (the standard-REST path below honors body.scheduleDate via payload.date).
+    if (typeof body.scheduleDate === "string" && body.scheduleDate.trim()) {
+      return NextResponse.json(
+        { ok: false, error: "scheduling is not yet supported for this site; publish without a schedule date" },
+        { status: 400 },
+      );
+    }
     const blocks = markdownToBlocks(markdown);
     if (blocks.length === 0) return new NextResponse("no publishable content", { status: 400 });
     const seo: { focus_keyword?: string; description?: string; title?: string } = {};

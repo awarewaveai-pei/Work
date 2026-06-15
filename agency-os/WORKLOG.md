@@ -29,6 +29,34 @@
 
 **[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/seo/rankmath-checker.ts` + 刪除新測試檔。
 
+### feat(content-engine): P2 publish 導向 WP Bridge /post（issues 二/A/五/六 端到端）
+
+**[任務理解]** 把 /tools/content 發佈路徑導向 AwareWave WP Bridge 簽章 `/post` route：伺服器端組真 Kadence blocks、sideload 內文圖到媒體庫、用 `update_post_meta` 落 Rank Math SEO meta（標準 WP REST 對未註冊 meta key 靜默丟棄＝issue A 根因）。同時根治 issue 二（雙 H1）：leading `# Title` 抽為 WP post title、body 不再帶 H1。
+
+**[根因]** ① 舊路徑 `markdownToHtml` 把 leading `# Title` 渲成 `<h1>`，WP 又把 post title 渲成 H1 → 雙 H1。② 標準 WP REST 對 `rank_math_focus_keyword`（未 show_in_rest 註冊）靜默丟棄 → focus keyword 永遠不落後台（issue A）。③ AI 生成的 CATEGORIES/TAGS（P1 已出）尚無消費端（issue 五/六 inert）。
+
+**[已修改]**
+- `lib/content/markdown-to-blocks.ts`（新）— `markdownToBlocks(md): Block[]`：markdown → Bridge `blocks[]`（BlockLibrary.compose 契約）。單一 H1 保證（level-1 heading `continue` 丟棄，post title 獨佔 H1＝issue 二）；inline md→**safe** HTML（escape-first 再 code/bold/italic/link，`safeUrl` 對 url 二次 escape + protocol allowlist）；table/list/quote/divider/image（僅 http(s)）/YouTube placeholder fallback；CONTENT_META + SLUG_HINT strip。理由：BlockLibrary 把 block text **不 escape** 直接插 markup（BlockLibrary.php:91/119/186），converter 是唯一防線。
+- `lib/studio/wp-bridge-client.ts` — `bridgeBaseUrl()`（取設定 baseUrl，供 publish route hostname gate）、`BridgePostResponse`/`BridgePostSpec` interface、`createPost(spec)`（簽章 POST `/post`，預設 status:"draft"，timeout 90s）。
+- `app/api/content/publish/route.ts` — 新 Bridge 分支（hostname-gated：`new URL(bridgeBase).host === new URL(base).host`，防把非 bridge 站文章誤發到 bridge 站＝R0 最小爆炸半徑）；`catNames`/`tagNames`/`base`/`excerpt` 上移為兩路徑共用；`scheduleDate` fail-loud 400 guard（PostCreator 尚無 post_date，拒絕而非靜默丟棄使用者排程意圖＝critic Major）；`strict:false` 下 BridgeResult 窄化用 cast idiom（鏡像 tools/publish/route.ts:292）。非 bridge 站維持 standard REST 全不變。
+- `app/tools/content/ContentStudio.tsx` — `extractMeta` 加解析 CONTENT_META 的 `CATEGORIES:`/`TAGS:`（issue 五/六）；`handlePublish` 表單分類/標籤為空時回退 AI 抽取值。
+- `lib/content/__tests__/markdown-to-blocks.test.ts`（新）— 10 案例（drop leading H1、h2–h6 level、bullet/ordered list、table skip separator、blockquote、image 僅 http(s)、inline safe HTML + `<script>` escape、strip CONTENT_META/SLUG_HINT、divider）。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/__tests__/markdown-to-blocks.test.ts` | exit=0 | ms=570 | 10/10 pass
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/seo/__tests__/rankmath-checker.test.ts` | exit=0 | ms=541 | 9/9 pass（publish-route 重構零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed files) | 4 改動檔零型別錯（其餘僅 fabric/pdf-lib 既存 missing-dep，Docker npm ci 解）
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1M/4m/3nit — **Major：`scheduleDate` 在 Bridge 分支靜默丟棄**（standard 路徑 honor → payload.date，UI 有排程控件）→ 修為 fail-loud 400。XSS 面 critic 實跑 ~25 payloads（javascript:/data:/vbscript:/屬性突破/comment 突破）全中和（safeUrl 二次 escape + inline escape-first），確認 converter 為唯一防線且穩固，0 Critical。Minor（slug 未透傳/502 壓平 409+422/table edge）→ 併 P3 或 documented。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`markdownToBlocks|bridgeBaseUrl|createPost` | hits=0 stale — `markdownToBlocks`/`bridgeBaseUrl` + TS `createPost` 僅新 converter/client 定義 + 單一 publish-route 消費端；WORKLOG/RestController.php 的 `createPost` 命中為 **PHP 外掛端方法**（不同符號，無碰撞）。
+
+**[剩餘風險]**
+- issue A（focus keyword 落 meta）端到端需 Bridge 站實際設定（`WPBRIDGE_BASE_URL`/`KEY_ID`/`PRIVATE_KEY`）+ 真機 POST 驗證；本次為碼層 + 單元測試，未對 soulful 真站打 `/post`（QUERY_ONLY scope，Bridge 真寫＝High-risk 待操作者明示）。
+- issue 四（featured image）/ issue 七（ILJ `ilj_linkdefinition` keyword meta）/ issue C（`rank_math/metabox/power_words` CJK filter）端到端仍需 **P3 外掛改動**（PostCreator featured_media sideload + set_post_thumbnail）+ 另一 repo `awarewaveai-pei/aware-wave-wp-bridge` tag→Action release。
+- slug 在 Bridge 路徑未透傳（PostCreator 無 post_name）→ WP 由 title 自動推導；P3 補 `post_name`。
+- Bridge 409/422 內容錯誤目前壓平為 502（error reason 字串保留）→ P3 status passthrough。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/publish/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/studio/wp-bridge-client.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/content/ContentStudio.tsx` + 刪除 `lib/content/markdown-to-blocks.ts` 與其測試檔。
+
 ### fix(ao-resume): import 前移至 git-align 前 + auto-resolve regex 擴展
 
 **[根因]**
