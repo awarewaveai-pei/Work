@@ -1,0 +1,21 @@
+# 核心
+anthropic>=0.39.0
+openai>=1.40.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# 影片 / 圖片 / 配音
+# moviepy 2.x 移除了 moviepy.editor 並改名 set_duration->with_duration 等 API，
+# 本專案用的是 1.x API，務必鎖在 <2.0，否則 import 即失敗。
+moviepy>=1.0.3,<2.0.0
+pillow>=10.0.0
+edge-tts>=6.1.0
+
+# YouTube 上傳
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-api-python-client>=2.100.0
+
+# 熱門議題來源（選用；不用可不裝）
+pytrends>=4.9.0
+praw>=7.7.0
