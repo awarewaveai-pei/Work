@@ -4,7 +4,35 @@
 
 ## 2026-06-15
 
-### feat(pod): A1 native Printful store 全自動建品（消除 #7164 手動匯入）— 程式碼+靜態 gate 完成，待部署 REALTEST
+### fix(content-engine): Phase 1 媒體比例 bug + 標題關鍵字覆蓋（flux aspect_ratio 真根因）
+
+**[任務理解]** 使用者批評：給了全部 SEO/GEO/RankMath 文件，生成文章仍不合規 — 圖比例不對（要 3:2/4:3/16:9）、圖要 ~100K 存 WP media、H2/H3/H4 都要關鍵字。先做 Phase 1（媒體層 + 標題規則），不先空跑部署（避免再次看到沒修好的結果）。
+
+**[根因]**（VBC 實證，非表面）
+- **圖比例**：`/api/content/image` 用 Replicate `flux-schnell`，但該模型**無 `width`/`height` 參數**（真實 API schema 驗證：唯一形狀控制是 `aspect_ratio` enum + `megapixels`）。舊碼傳 width/height → **被靜默忽略 → 每張圖都出預設 1:1**。`lib/tarot/image-gen.ts:389` 既有正確用法（`megapixels:"1"`+aspect_ratio）獨立佐證。
+- **imageSize 下拉無效**：下拉值只當 prompt 文字（`generate:343`），真生圖硬編 `platform:"twitter_post"`（`ContentStudio:687`）→ 選什麼都沒差。
+- **標題關鍵字**：`generate:81` 只要求「至少一個 H2/H3」含關鍵字。
+
+**[已修改]**
+- `app/api/content/image/route.ts` — `PLATFORM_IMAGE_SPECS` 每項加 `aspect`（映射到 flux enum 最近比例）；新 `ALLOWED_ASPECT` set；POST 接受 `body.aspectRatio` 覆寫（驗證後用，否則回退 `spec.aspect`）；input 改傳 `aspect_ratio`+`megapixels:"1"`（移除無效 width/height）；`output_quality` 90→82（webp@1MP ≈ 37–150K，~100K 目標）；response 回 `aspectRatio`+`spec.aspect`。
+- `app/tools/content/ContentStudio.tsx` — `IMAGE_SIZES` 改為比例值（16:9/3:2/4:3/1:1/9:16，棄 px 字串）；`DEFAULT_MEDIA.imageSize` "1344x768"→"16:9"；`autoReplaceImages` body 圖傳 `aspectRatio: form.media.imageSize`；`generateHeroImage` hero 傳 `aspectRatio:"16:9"`（Google Discover+OG）。
+- `app/api/content/generate/route.ts` — `:81` 標題規則改「關鍵字或變體須出現在**每個** H2/H3/H4」，並明示與 CJK 4–6 次精確上限調和（多數標題用變體/LSI，僅 1–2 個用精確詞）；CJK 區塊加 HEADINGS bullet 含具體範例；媒體 hint「suggested size」→「aspect ratio」；`:433` 死的 `"1344x768"` fallback → `"16:9"`（critic 採納）。
+
+**[驗證結果]**（R0 四動作齊全）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`Invoke-RestMethod flux-schnell predictions aspect_ratio={3:2,4:3,16:9}` | exit=0 | 真打 Replicate prod API 出三張圖實測尺寸 **3:2→1216×832(1.462) / 4:3→1152×896(1.286) / 16:9→1344×768(1.75)** 全為正確橫式（**非 1:1=1.0**）→ 鐵證修正成功+反證舊碼必出方形；webp@q82 ≈ 37KB（簡單圖；複雜圖趨近 100K）。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/2m — 0 Critical/0 Major；Minor#1 `generate:433` 死 fallback **已採納修正**；Minor#2 手動面板 px 顯示標籤 cosmetic（延後）；critic 獨立驗 `megapixels:"1"` 須字串（對照 tarot 路徑）、比例字串全中 flux enum、無 callers 讀被移除欄位、無 `WxH` parser 殘留、tsc 三檔零錯。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`1344x768\|768x1344\|imageSize\|aspectRatio` | hits=0 — 唯一 `1344x768` 殘留是本人解說註解（同 commit 入庫）；`tarot/image-gen.ts:516` 是獨立 tarot 模組自身對照表（非本引擎）；OG doc `1200x630` 是 RankMath KB 文字；`imageSize` 消費端全在本次 3 改檔內，agency-os/scripts 零 stale。
+- WORKLOG: 本段。
+
+**[剩餘風險]**
+- **非 Bridge 站 body 圖仍會失效**（明確延後）：走 Bridge 的站 `RestController.php:314` 會 sideload body 圖入 WP media（持久）；非 Bridge 站走標準 REST（`publish:357`）直接嵌 Replicate 臨時 URL → 過期不顯示。本回合只修比例；「全站圖入 media」需確保客戶站都走 Bridge 或在標準 REST 路徑補 sideload（Phase 1b 候選）。
+- ~100K 為目標非保證：q82 隨內容複雜度 37–150K 浮動；可接受（小=快、夠清晰）。
+- 手動生圖面板 px 顯示（`ContentStudio:1752`）仍標平台參考尺寸，與實際 1MP 輸出略差（cosmetic）。
+- **未部署 = 真站仍跑舊碼**：本修正需一次部署（Phase 1–3 修完後）才生效。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/image/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/content/ContentStudio.tsx lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts`
+
+### feat(pod): A1 native Printful store 全自動建品（消除 #7164 手動匯入）— 已部署 prod + 真機 REALTEST 通過 ✅
 
 **[任務理解]** 使用者問「#7164 觸發匯入怎麼觸發？應該要全自動」。根因不是「忘了觸發」：app 把 POD 商品建在 **WooCommerce-platform** 的 Printful store（18314943），該平台**沒有 API 匯入外部 Woo 商品**，本質上只能進 Printful dashboard 手動匯入。要全自動，必須改建在**已存在的 native store**（18324409，"Manual Order / API platform"），它接受 `POST /store/products`（一次 call 建品+綁 catalog variants+上 print files）。本回合做 A1（建品全自動，純 API+env，Medium 風險可回滾）；A2（P4 訂單真金流 fulfillment，High 風險）明確延後待 A1 REALTEST 通過+使用者批准 draft 模式。
 
@@ -13,13 +41,18 @@
 - `app/api/tools/publish/route.ts` — `create` action 的 variantMap 回 `sku`+`price`（權威 SKU 來源）+ `variantMapDropped` 診斷；新 `pfcreate` action：**吃 create 的 variantMap 當權威來源不重建 plan**（消除 designName/sizes SKU 分歧）、catalog 沒對到 fail-loud 422、`reReadFailed`→503 retryable、`incompleteVariants`→422、transient error→503。
 - `docker-compose.yml` — 兩個 env block 加 `PRINTFUL_NATIVE_STORE_ID: ${PRINTFUL_NATIVE_STORE_ID:-}` + 註解描述 native store 用途。
 
-**[驗證結果]**（R0 四動作；**runtime REALTEST 待部署**）
-- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed files) | print-provider.ts + publish/route.ts 零型別錯（總 20 錯全為既存 fabric/pdf-lib missing-dep，Docker npm ci 解）。**runtime e2e（curl pfcreate→native store 驗 product+variants+print files bound）仍待部署**：需先在 VPS 設 `PRINTFUL_NATIVE_STORE_ID=18324409` + sg-deploy（等 go-ahead）— 本回合靜態 gate 全綠，未宣告 task 完成。
+**[驗證結果]**（R0 四動作；**已部署 prod + 真機 REALTEST 通過**）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed files) | print-provider.ts + publish/route.ts 零型別錯（總 20 錯全為既存 fabric/pdf-lib missing-dep，Docker npm ci 解）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`（host typecheck→npm test→build→up→healthcheck→smoke 全 gate）| exit=0 | `.deployed-commit=9669c1db`（prev 37dfba85）；container `Up (healthy) after 7s`；smoke 4/4 OK（/login 200、/api/ops/summary 200、nginx/wp 200、node-api 200）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin node -e <probe>` GET `/sync/products` X-PF-Store-Id=18324409 | exit=0 | `{native_store_id:"18324409",key_present:true,http:200,code:200,total:0}` — **env var 確認載入容器 + native store 可達**（修 compose-drift 後）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec ... POST /store/products`（payload 鏡像 `createSyncProductOnNative`：sync_product+sync_variant variant_id=4025+front print file）→ 驗 id → DELETE | exit=0 | **POST `{http:200,code:200,created_id:439513286}` → DELETE `{http:200,code:200}`** — **決定性：native store 接受全自動建品（woo store 18314943 會回 platform-rejection）；自清理刪除無殘留、無 Woo 污染、無金流**。A1 假設在真機鐵證通過。
+- **部署根因發現（DEPLOY BUG，已修）**：首次 sg-deploy 後 probe 顯示容器內 `PRINTFUL_NATIVE_STORE_ID` undefined（Printful 回 400 "requires store_id"）。根因：**runtime compose `/root/lobster-phase1/docker-compose.yml` 是與 repo compose 結構分歧的獨立檔**；sg-deploy 只 rsync 源碼（apps/）但 `docker compose up` 用 server-local compose → repo compose 的 env 行從未傳播到 prod。修法（safe-infra-patch 紀律）：備份 `docker-compose.yml.bak-a1-20260615` → sed 插入 `PRINTFUL_NATIVE_STORE_ID: ${PRINTFUL_NATIVE_STORE_ID:-}`（clone PRINTFUL_STORE_ID 行避免 tab/縮排陷阱）→ `python3 yaml.safe_load` 驗 YAML_OK → `.env` append `PRINTFUL_NATIVE_STORE_ID=18324409`（備份 `.env.bak-20260615-a1`）→ `docker compose up -d next-admin` 重建 → 上方 probe 確認載入。
 - REVIEW_DONE: critic=Standard×2 | verdict=fail→warn→pass | 第1回 1c/3m（冪等雙建/re-read 靜默成功/partial-catalog 靜默 skip/designName SKU 分歧 — 全修）；第2回 surfaced 3 同類殘留 M1/M2/M3 + 3 minor，全修；第3回 **PASS**（M2 substring-404 false-positive→改 `code===404` 結構化偵測、M3 partial-bind→`incompleteVariants` 422、M1 完整性斷言移入 pfcreate、m4 transient→503、m5 dropped 診斷、m6 external_id guard 全 CLOSED，無新缺陷）。第4回（**本 session 跨 compaction 獨立重確認，對照 on-disk 現態 + Printful v1 docs**）仍 **PASS**（0c/0M）：四大不變量全 hold（冪等/`code===404` 判別/SKU 消費不重建/fail-loud 無假 200）；驗 `POST /store/products` 回傳 `result.id` 直取正確、消費端 arity 向後相容、pod-product 測試 5/5。僅 2 個 benign 🟡（見剩餘風險），critic 判定非 blocker。
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`listSyncProducts\|createSyncProductOnNative\|findSyncProductByExternalId\|isNativeStoreConfigured\|nativeStoreId\|PrintfulResult\|pfcreate\|variantMap\|PRINTFUL_NATIVE_STORE_ID` | hits=5 files（2 改檔 + docker-compose 本人改 + 2 消費端驗證安全）；agency-os/scripts 各 0 stale。消費端：`printful/sync/route.ts` 全用舊 arity（`listSyncProducts()`/`getSyncProduct(id)`，optional 參數向後相容）；`PublishWizard.tsx:255` 走 `create→link` 舊流程只讀 variantMap 的 color/size/variationId（新增 sku/price 為 additive 安全）。**pfcreate 尚未接進前端 UI**（A1 為後端能力；REALTEST 直接打 endpoint，UI 接線為部署驗證後的後續）。
 
 **[剩餘風險]**
-- pfcreate 未接前端：操作者尚無「一鍵全自動」按鈕；需部署+REALTEST 通過後，把 publish 按鈕從 `create→status→link`（Woo 手動 publish dance）改為 `create→pfcreate`（native 全自動）。
+- **compose-drift（infra-process gap，待和解）**：runtime `/root/lobster-phase1/docker-compose.yml` 與 repo `docker-compose.yml` 結構分歧；sg-deploy 不 sync compose → 任何 repo compose 的 env/service 改動都不會自動上 prod（本次 PRINTFUL_NATIVE_STORE_ID 即踩此坑，已手動補 runtime compose）。後續應：① 將兩份 compose 和解為單一 SSOT 或 ② 在 sg-deploy 加 compose drift 檢查/同步步驟。目前 runtime 已手補，功能正常但下次新 env 仍會再踩。
+- pfcreate 未接前端：操作者尚無「一鍵全自動」按鈕；需把 publish 按鈕從 `create→status→link`（Woo 手動 publish dance）改為 `create→pfcreate`（native 全自動）。**部署+真機 REALTEST 已通過**，此項為純前端接線後續。
 - native store 建的 Printful 商品與 Woo storefront 商品**僅以 SKU 連結**（P4 join key）；P4 fulfillment（A2）尚未實作，目前 native 建品只是讓 Printful 端可下單，未自動轉單。
 - `PRINTFUL_NATIVE_STORE_ID` 未設則 pfcreate 回 503 not_configured（fail-closed，不影響既有 create/link 流程）。
 - （benign 🟡，critic 第4回標非 blocker，後續 hardening 候選）transient 分類器 `route.ts:502` 用 free-text `includes("timeout"/"network_error")` 比對 Printful body message → 含「timeout」字樣的 Printful 4xx 可能被誤判 503-retryable（後果良性：操作者重試→冪等預查乾淨解決，無腐化無假 200）；可改比對結構化 token（`printful_timeout`/`printful_network_error`）`===`/`startsWith`。
