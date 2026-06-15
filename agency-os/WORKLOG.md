@@ -4,6 +4,29 @@
 
 ## 2026-06-15
 
+### feat(pod): A1 native Printful store 全自動建品（消除 #7164 手動匯入）— 程式碼+靜態 gate 完成，待部署 REALTEST
+
+**[任務理解]** 使用者問「#7164 觸發匯入怎麼觸發？應該要全自動」。根因不是「忘了觸發」：app 把 POD 商品建在 **WooCommerce-platform** 的 Printful store（18314943），該平台**沒有 API 匯入外部 Woo 商品**，本質上只能進 Printful dashboard 手動匯入。要全自動，必須改建在**已存在的 native store**（18324409，"Manual Order / API platform"），它接受 `POST /store/products`（一次 call 建品+綁 catalog variants+上 print files）。本回合做 A1（建品全自動，純 API+env，Medium 風險可回滾）；A2（P4 訂單真金流 fulfillment，High 風險）明確延後待 A1 REALTEST 通過+使用者批准 draft 模式。
+
+**[已修改]**
+- `lib/studio/print-provider.ts` — `pf()` 加 `timeoutMs` option；`PrintfulResult` error variant 加 `status?`/`code?`（thread 結構化訊號）；`listSyncProducts(storeId?)` / `getSyncProduct(id, storeId?)` 加 store 覆寫；抽 `mapSyncProductDetail` 共用 mapper；新 `findSyncProductByExternalId`（tri-state 冪等查詢，`/sync/products/@{external_id}`）；新 `createSyncProductOnNative`（冪等預查→既有不重建 / `reReadFailed` flag / `incompleteVariants` flag / external_id round-trip guard / 60s POST timeout）；新 `nativeStoreId()` / `isNativeStoreConfigured()`。
+- `app/api/tools/publish/route.ts` — `create` action 的 variantMap 回 `sku`+`price`（權威 SKU 來源）+ `variantMapDropped` 診斷；新 `pfcreate` action：**吃 create 的 variantMap 當權威來源不重建 plan**（消除 designName/sizes SKU 分歧）、catalog 沒對到 fail-loud 422、`reReadFailed`→503 retryable、`incompleteVariants`→422、transient error→503。
+- `docker-compose.yml` — 兩個 env block 加 `PRINTFUL_NATIVE_STORE_ID: ${PRINTFUL_NATIVE_STORE_ID:-}` + 註解描述 native store 用途。
+
+**[驗證結果]**（R0 四動作；**runtime REALTEST 待部署**）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed files) | print-provider.ts + publish/route.ts 零型別錯（總 20 錯全為既存 fabric/pdf-lib missing-dep，Docker npm ci 解）。**runtime e2e（curl pfcreate→native store 驗 product+variants+print files bound）仍待部署**：需先在 VPS 設 `PRINTFUL_NATIVE_STORE_ID=18324409` + sg-deploy（等 go-ahead）— 本回合靜態 gate 全綠，未宣告 task 完成。
+- REVIEW_DONE: critic=Standard×2 | verdict=fail→warn→pass | 第1回 1c/3m（冪等雙建/re-read 靜默成功/partial-catalog 靜默 skip/designName SKU 分歧 — 全修）；第2回 surfaced 3 同類殘留 M1/M2/M3 + 3 minor，全修；第3回 **PASS**（M2 substring-404 false-positive→改 `code===404` 結構化偵測、M3 partial-bind→`incompleteVariants` 422、M1 完整性斷言移入 pfcreate、m4 transient→503、m5 dropped 診斷、m6 external_id guard 全 CLOSED，無新缺陷）。第4回（**本 session 跨 compaction 獨立重確認，對照 on-disk 現態 + Printful v1 docs**）仍 **PASS**（0c/0M）：四大不變量全 hold（冪等/`code===404` 判別/SKU 消費不重建/fail-loud 無假 200）；驗 `POST /store/products` 回傳 `result.id` 直取正確、消費端 arity 向後相容、pod-product 測試 5/5。僅 2 個 benign 🟡（見剩餘風險），critic 判定非 blocker。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`listSyncProducts\|createSyncProductOnNative\|findSyncProductByExternalId\|isNativeStoreConfigured\|nativeStoreId\|PrintfulResult\|pfcreate\|variantMap\|PRINTFUL_NATIVE_STORE_ID` | hits=5 files（2 改檔 + docker-compose 本人改 + 2 消費端驗證安全）；agency-os/scripts 各 0 stale。消費端：`printful/sync/route.ts` 全用舊 arity（`listSyncProducts()`/`getSyncProduct(id)`，optional 參數向後相容）；`PublishWizard.tsx:255` 走 `create→link` 舊流程只讀 variantMap 的 color/size/variationId（新增 sku/price 為 additive 安全）。**pfcreate 尚未接進前端 UI**（A1 為後端能力；REALTEST 直接打 endpoint，UI 接線為部署驗證後的後續）。
+
+**[剩餘風險]**
+- pfcreate 未接前端：操作者尚無「一鍵全自動」按鈕；需部署+REALTEST 通過後，把 publish 按鈕從 `create→status→link`（Woo 手動 publish dance）改為 `create→pfcreate`（native 全自動）。
+- native store 建的 Printful 商品與 Woo storefront 商品**僅以 SKU 連結**（P4 join key）；P4 fulfillment（A2）尚未實作，目前 native 建品只是讓 Printful 端可下單，未自動轉單。
+- `PRINTFUL_NATIVE_STORE_ID` 未設則 pfcreate 回 503 not_configured（fail-closed，不影響既有 create/link 流程）。
+- （benign 🟡，critic 第4回標非 blocker，後續 hardening 候選）transient 分類器 `route.ts:502` 用 free-text `includes("timeout"/"network_error")` 比對 Printful body message → 含「timeout」字樣的 Printful 4xx 可能被誤判 503-retryable（後果良性：操作者重試→冪等預查乾淨解決，無腐化無假 200）；可改比對結構化 token（`printful_timeout`/`printful_network_error`）`===`/`startsWith`。
+- （benign 🟡）冪等命中既有商品時 `incompleteVariants` 僅比 variant **數量**不比 SKU；同 wooProductId 改標題後（不同 SKU seed）以相同 variant 數重發，pfcreate 會回首發商品的 SKU。機率低且有界（P4 join 鍵在 Woo variation SKU，只在 create 種一次、改名不變動，join 仍解析）；可選擇交叉比對既有 SKU vs 進來的 vmap SKU 強制 retryable，或文件標註「改名後重發不支援」。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/studio/print-provider.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/publish/route.ts lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`；已部署則 sg-deploy rollback + 從 native store 刪除測試 sync product。
+
 ### feat(content-engine): P1 生成端 SEO/RankMath CJK 合規（issues 二/三/B/C/五/六/九）
 
 **[任務理解]** 使用者要 /tools/content 生成文章時就符合 SEO/GEO/AEO/RankMath，不靠事後 SEO 調整器。9 問題中 P1 處理純生成側（免發外掛版）：標題力量詞+數字、CJK 關鍵字密度、AI 建議分類/標籤、移除手動目錄、單一 H1。

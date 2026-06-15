@@ -62,7 +62,7 @@ interface PublishBody {
   focusKeywordHint?: string;
   // create
   title?: string;
-  designName?: string; // SKU seed — pfcreate must rebuild the SAME plan/SKUs as `create`
+  designName?: string; // reserved — SKUs are owned by `create` and echoed via variantMap; pfcreate consumes them
   retailPrice?: string;
   plusPrice?: string;
   sizes?: string[];
@@ -73,7 +73,7 @@ interface PublishBody {
   // status / link
   wooProductId?: number;
   printFileUrl?: string;
-  variantMap?: { variationId: number; color: string; size: string }[];
+  variantMap?: { variationId: number; color: string; size: string; sku?: string; price?: string }[];
 }
 
 const PRICE_RE = /^\d+(\.\d{1,2})?$/;
@@ -297,15 +297,26 @@ export async function POST(request: Request) {
     const value = r.value;
     // Pair returned variation_ids (creation order) with our deterministic plan order.
     const plan = buildVariantPlan(params);
-    const variantMap =
-      value.variation_ids && value.variation_ids.length === plan.length
-        ? value.variation_ids.map((variationId, i) => ({
-            variationId,
-            color: plan[i].color,
-            size: plan[i].size,
-          }))
-        : [];
-    return NextResponse.json({ ok: true, ...value, variantMap });
+    const variantMapComplete = Boolean(value.variation_ids && value.variation_ids.length === plan.length);
+    const variantMap = variantMapComplete
+      ? value.variation_ids!.map((variationId, i) => ({
+          variationId,
+          color: plan[i].color,
+          size: plan[i].size,
+          sku: plan[i].sku,
+          price: plan[i].price,
+        }))
+      : [];
+    // m5: when Woo returns a different count of variation_ids than our plan, the SKU map is dropped.
+    // Surface that AT THE SOURCE (not two steps later as a pfcreate 422) so it's attributable here.
+    return NextResponse.json({
+      ok: true,
+      ...value,
+      variantMap,
+      ...(variantMapComplete
+        ? {}
+        : { variantMapDropped: true, expectedVariantCount: plan.length, gotVariationIds: value.variation_ids?.length ?? 0 }),
+    });
   }
 
   // ── Step 3: has Printful synced the new Woo product? ───────────────────────
@@ -426,31 +437,55 @@ export async function POST(request: Request) {
     if (body.plusPrice !== undefined && !PRICE_RE.test(body.plusPrice)) {
       return NextResponse.json({ ok: false, error: "plusPrice must look like 26.99" }, { status: 400 });
     }
+    // SKUs are owned by the `create` step (the P4 join key) and echoed back in its variantMap.
+    // pfcreate CONSUMES that map verbatim — it must NOT rebuild the plan, because a rebuild keyed on
+    // a different designName/sizes would silently diverge from the Woo product's SKUs (critic
+    // 2026-06-15 #4). No usable variantMap = caller skipped `create` → fail loud.
+    const vmap = (body.variantMap ?? []).filter(
+      (m) =>
+        typeof m?.sku === "string" &&
+        m.sku.length > 0 &&
+        typeof m?.price === "string" &&
+        PRICE_RE.test(m.price) &&
+        typeof m?.color === "string" &&
+        typeof m?.size === "string",
+    );
+    if (vmap.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "variantMap_required — call `create` first and pass back its variantMap (carries the authoritative SKUs + prices).",
+        },
+        { status: 400 },
+      );
+    }
     const catalog = await getCatalogVariants(71, ["White", "Black"]);
     if (!catalog.ok) {
       return NextResponse.json({ ok: false, error: (catalog as { ok: false; error: string }).error }, { status: 502 });
     }
     const catalogByKey = new Map(catalog.value.map((v) => [`${v.color.toLowerCase()}|${v.size.toLowerCase()}`, v.id]));
-    // Rebuild the SAME variant plan `create` used → SKUs match the Woo product (the P4 join key).
-    const plan = buildVariantPlan({
-      title: body.title.trim(),
-      retailPrice: body.retailPrice,
-      plusPrice: body.plusPrice,
-      sizes: body.sizes,
-      designName: body.designName,
-    });
     const variants: { externalId: string; catalogVariantId: number; retailPrice: string; printFileUrl: string }[] = [];
     const skipped: { sku: string; reason: string }[] = [];
-    for (const p of plan) {
-      const catalogId = catalogByKey.get(`${p.color.toLowerCase()}|${p.size.toLowerCase()}`);
+    for (const m of vmap) {
+      const catalogId = catalogByKey.get(`${m.color.toLowerCase()}|${m.size.toLowerCase()}`);
       if (!catalogId) {
-        skipped.push({ sku: p.sku, reason: `no_catalog_${p.color}_${p.size}` });
+        skipped.push({ sku: m.sku as string, reason: `no_catalog_${m.color}_${m.size}` });
         continue;
       }
-      variants.push({ externalId: p.sku, catalogVariantId: catalogId, retailPrice: p.price, printFileUrl: body.printFileUrl });
+      variants.push({
+        externalId: m.sku as string,
+        catalogVariantId: catalogId,
+        retailPrice: m.price as string,
+        printFileUrl: body.printFileUrl,
+      });
     }
-    if (variants.length === 0) {
-      return NextResponse.json({ ok: false, error: "no_catalog_variants_resolved", skipped }, { status: 502 });
+    // Fail loud on ANY unresolved variant — a partial native product can't fulfill every Woo SKU,
+    // and a silent skip would only surface when a customer's paid order has no Printful counterpart.
+    if (skipped.length > 0) {
+      return NextResponse.json(
+        { ok: false, error: "catalog_resolution_incomplete", skipped, resolved: variants.length },
+        { status: 422 },
+      );
     }
     const thumb = (body.mockupUrls ?? []).find((u) => typeof u === "string" && u.startsWith(designsBase));
     const created = await createSyncProductOnNative({
@@ -460,14 +495,53 @@ export async function POST(request: Request) {
       variants,
     });
     if (!created.ok) {
-      return NextResponse.json({ ok: false, error: (created as { ok: false; error: string }).error }, { status: 502 });
+      const e = (created as { ok: false; error: string }).error;
+      // Idempotency-precheck / timeout / network failures are transient and safe to retry — same class
+      // as reReadFailed below. Surface 503 retryable so the operator retries instead of giving up.
+      const transient =
+        e.startsWith("idempotency_precheck_failed") || e.includes("timeout") || e.includes("network_error");
+      return NextResponse.json(
+        { ok: false, error: e, ...(transient ? { retryable: true } : {}) },
+        { status: transient ? 503 : 502 },
+      );
+    }
+    if (created.value.reReadFailed) {
+      // Product WAS created on Printful but the variant read-back failed — do NOT report success.
+      // A retry hits the idempotency pre-check (external_id already exists) and recovers the ids.
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "created_but_readback_failed",
+          syncProductId: created.value.id,
+          retryable: true,
+          hint: "Product exists on Printful; re-run pfcreate to fetch its variant ids (idempotent).",
+        },
+        { status: 503 },
+      );
+    }
+    // M1/M3: pfcreate OWNS the completeness assertion — the native product must bind exactly as many
+    // variants as we sent (every Woo SKU). A shortfall means some paid SKU would have no Printful
+    // counterpart at P4 fulfillment, so fail loud rather than report a false success.
+    if (created.value.incompleteVariants) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "native_product_incomplete",
+          syncProductId: created.value.id,
+          expected: variants.length,
+          got: created.value.variantCount,
+          linkedVariants: created.value.variants,
+          hint: "Printful bound fewer variants than sent — inspect the product on Printful before fulfillment.",
+        },
+        { status: 422 },
+      );
     }
     return NextResponse.json({
       ok: true,
       syncProductId: created.value.id,
+      alreadyExisted: created.value.alreadyExisted,
       variantCount: created.value.variantCount,
       linkedVariants: created.value.variants,
-      skipped,
     });
   }
 
