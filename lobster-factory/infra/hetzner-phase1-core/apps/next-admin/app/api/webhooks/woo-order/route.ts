@@ -161,9 +161,12 @@ export async function POST(req: Request) {
   if (!parsed.ok) {
     // tsconfig here does not narrow `!parsed.ok` — same cast convention as the print-provider routes.
     const err = parsed as { ok: false; reason: string; status: number };
-    // 200 for "nothing to fulfill" (no POD lines) so Woo does not retry a benign no-op; 4xx otherwise.
-    const ignored = err.status === 200;
-    return NextResponse.json({ ok: ignored, ...(ignored ? { ignored: true } : {}), error: err.reason }, { status: err.status });
+    // 200 = "nothing to fulfill" (no POD lines): a benign no-op Woo should NOT retry → ok:true+reason
+    // (never an `error` field, to keep ok/error mutually exclusive for log parsers). 4xx = real reject.
+    if (err.status === 200) {
+      return NextResponse.json({ ok: true, ignored: true, reason: err.reason });
+    }
+    return NextResponse.json({ ok: false, error: err.reason }, { status: err.status });
   }
   const okParsed = parsed as { ok: true; externalId: string; recipient: Record<string, string>; items: { sku: string; quantity: number }[] };
 

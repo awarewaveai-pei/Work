@@ -1,6 +1,15 @@
 import { createHmac } from "node:crypto";
-import { describe, expect, it } from "vitest";
-import { parseWooOrder, verifyWooSignature } from "./route";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Mock the fulfillment seam so handler tests can assert it is (or is NOT) called — the kill-switch
+// regression guard for the money red-line.
+const createDraftOrderOnNative = vi.fn();
+vi.mock("../../../../lib/studio/print-provider", () => ({
+  createDraftOrderOnNative: (...a: unknown[]) => createDraftOrderOnNative(...a),
+  isNativeStoreConfigured: () => true,
+}));
+
+import { parseWooOrder, verifyWooSignature, POST } from "./route";
 
 const baseOrder = {
   id: 7164,
@@ -82,5 +91,66 @@ describe("verifyWooSignature", () => {
   it("rejects when secret or header is absent", async () => {
     expect(await verifyWooSignature(body, goodSig, undefined)).toBe(false);
     expect(await verifyWooSignature(body, null, secret)).toBe(false);
+  });
+});
+
+describe("POST handler — safety gates", () => {
+  const secret = "shh-secret";
+  const sign = (b: string) => createHmac("sha256", secret).update(b).digest("base64");
+  const post = (body: string, headers: Record<string, string> = {}) =>
+    POST(new Request("http://x/api/webhooks/woo-order", { method: "POST", headers, body }));
+
+  beforeEach(() => {
+    createDraftOrderOnNative.mockReset();
+    createDraftOrderOnNative.mockResolvedValue({ ok: true, value: { printfulOrderId: 1, status: "draft", alreadyExisted: false } });
+    process.env.WC_WEBHOOK_SECRET = secret;
+  });
+  afterEach(() => {
+    delete process.env.POD_AUTO_FULFILL_ENABLED;
+    delete process.env.WC_WEBHOOK_SECRET;
+  });
+
+  it("KILL SWITCH OFF (default): ignores and NEVER calls the fulfillment seam (money red-line guard)", async () => {
+    delete process.env.POD_AUTO_FULFILL_ENABLED; // default off
+    const body = JSON.stringify(baseOrder);
+    const res = await post(body, { "x-wc-webhook-signature": sign(body) });
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json).toMatchObject({ ok: true, ignored: true, reason: "auto_fulfill_disabled" });
+    expect(createDraftOrderOnNative).not.toHaveBeenCalled();
+  });
+
+  it("non-'true' flag values stay dormant (fail-closed)", async () => {
+    process.env.POD_AUTO_FULFILL_ENABLED = "TRUE"; // not the exact literal
+    const body = JSON.stringify(baseOrder);
+    await post(body, { "x-wc-webhook-signature": sign(body) });
+    expect(createDraftOrderOnNative).not.toHaveBeenCalled();
+  });
+
+  it("ON + bad signature: 401, never fulfills", async () => {
+    process.env.POD_AUTO_FULFILL_ENABLED = "true";
+    const body = JSON.stringify(baseOrder);
+    const res = await post(body, { "x-wc-webhook-signature": "wrong" });
+    expect(res.status).toBe(401);
+    expect(createDraftOrderOnNative).not.toHaveBeenCalled();
+  });
+
+  it("ON + good signature + refunded status: ignored, never fulfills", async () => {
+    process.env.POD_AUTO_FULFILL_ENABLED = "true";
+    const body = JSON.stringify({ ...baseOrder, status: "refunded" });
+    const res = await post(body, { "x-wc-webhook-signature": sign(body) });
+    const json = await res.json();
+    expect(json).toMatchObject({ ignored: true, reason: "status_not_paid" });
+    expect(createDraftOrderOnNative).not.toHaveBeenCalled();
+  });
+
+  it("ON + good signature + paid order: creates exactly one DRAFT", async () => {
+    process.env.POD_AUTO_FULFILL_ENABLED = "true";
+    const body = JSON.stringify(baseOrder);
+    const res = await post(body, { "x-wc-webhook-signature": sign(body) });
+    const json = await res.json();
+    expect(json).toMatchObject({ ok: true, draft: true, printfulOrderId: 1 });
+    expect(createDraftOrderOnNative).toHaveBeenCalledTimes(1);
+    expect(createDraftOrderOnNative).toHaveBeenCalledWith(expect.objectContaining({ externalId: "7164" }));
   });
 });
