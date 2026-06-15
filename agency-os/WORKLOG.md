@@ -1,8 +1,29 @@
-# Worklog
+﻿# Worklog
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
 ## 2026-06-16
+
+### fix(content-engine): /api/content/title 補 RankMath 標題合規（使用者抓到「建議標題」不含數字/力量詞）
+
+**[任務理解]** 使用者在 `/tools/content` 按「✨ 建議標題」，截圖顯示 5 個建議標題（如「Art Therapy Modules: Healing Through Creative Expression」）**全無阿拉伯數字、無/弱力量詞**，質問「這沒遵循 SEO/GEO/AEO/RankMath」。先前我宣稱生成端已全套 RankMath = **過度宣稱**：我只驗了文章生成（generate route 的 H1 規則），沒驗「建議標題」這支**獨立 endpoint**。
+
+**[根因]**（VBC）`/api/content/title/route.ts` 的 prompt 與文章生成 H1 規則**從未同步**：只要求「50-70 字、自然含關鍵字、具體、避免標題黨」——**完全沒有** RankMath 標題四測（關鍵字前 50% / power word / 阿拉伯數字 / 情緒），長度窗也錯（RankMath 要 ≤60 Latin / 14-30 CJK）。generate route 的 H1（`:28-33`）與 CJK 區塊（`:254-255`）規則完整，但這支當初獨立寫、沒繼承。
+
+**[已修改]**
+- `app/api/content/title/route.ts` — 加 `isCJK`（regex 與 generate:250 逐字相同）+ 語言感知 `rankMathRules`：CJK 分支用 generate:254-255 的 20 詞在地力量詞清單 + 空格 tokenize 規則（「藝術治療 完整 指南」✓）+ 阿拉伯數字規則（禁 CJK 數字）；Latin 分支用英文 power word + 數字 + 關鍵字前 50% + 情緒 + 50-60 字。prompt 結尾強制「5 條全部滿足所有規則」。`max_tokens` 400→500（容納較長 CJK 規則注入）。critic Minor 採納：Latin NUMBER 規則由「list/how-to 才強制」收緊為無條件（標題短、加數字不扭曲主題），消除與結尾「全部都要」的矛盾、並與 CJK 分支對稱。
+
+**[驗證結果]**（R0 四動作齊全）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python test-title.py`（真打 Anthropic Haiku，英文 keyword「art therapy modules」+ CJK「兒童藝術治療」各生 5 標題，正則驗數字+力量詞）| exit=0 | **EN 5/5 + CJK 5/5 全 num=True pow=True**（如「7 Essential Art Therapy Modules…」「10 Proven…」「5 Critical…」）；對比舊輸出（截圖無數字）= 鐵證修正生效。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/2m — CJK power-word 清單 + 空格 token 規則 + 阿拉伯數字規則確認為 generate:254-255 **逐字無漂移複製**；isCJK regex byte-identical；caller 契約未變；無 rule/example 矛盾。2 Minor 之一（Latin NUMBER mandatory vs 條件式矛盾）已採納修正。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`api/content/title\|handleSuggestTitles` | hits=1 — 唯一 caller `ContentStudio.tsx:469 handleSuggestTitles`，送 `{keyword,language,articleType}`、收 `{ok,titles}`，本次未動請求/回應契約 → 無 caller 破壞；tsc title/route.ts 0 型別錯。
+- WORKLOG: 本段。
+
+**[剩餘風險]**
+- **未部署 = 真站仍跑舊 prompt**：本修正需一次 sg-deploy 才在 `/tools/content` 生效（prod 現 commit `1b081764`）。
+- critic 2 個 suggestion（`keyword.slice(200)` 長度上限、空結果回 `ok:false`）為 title+keywords 兩 sibling 共有的 house convention，非本次回歸，未改（避免 scope creep）。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/title/route.ts`
 
 ### fix(doc-sync): Resolve-Path -LiteralPath 修 PropertyNotFound 紅字閃窗 + 揭 schtasks 261 SSOT bug
 **[任務理解]** 使用者回報「好幾次跳出 PowerShell 視窗、紅字、一秒消失」。非 Claude/Cursor 開窗，而是 Windows 工作排程 `AgencyOS-SystemGuard-Daily` 任務跑時閃現。表面是 UI 噪音，根因有二層。
@@ -9915,7 +9936,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-13 15:09:29 UTC_
+_Last synced: 2026-06-15 18:34:48 UTC_
 
 ## 2026-03-20
 
@@ -11016,3 +11037,4 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REALTEST_EVIDENCE: tool=PowerShell | cmd=`curl.exe -I https://app.aware-wave.com/tools/ai-models` | exit=0 | result=307 to `/login?next=%2Ftools%2Fai-models` as expected behind auth; `/login` returns 200
 - REVIEW_WAIVED: CONTENT_DATA_UI -- static comparison page + typed data tables; build/typecheck/deploy smoke covered runtime integration
 - BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=`78 張約|全套成本|fullDeckNt|15 個圖片模型比較` | hits=0 after moving comparison out of Tarot and using per-image cost only
+

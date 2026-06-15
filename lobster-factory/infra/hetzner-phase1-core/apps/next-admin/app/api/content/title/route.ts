@@ -38,7 +38,7 @@ export async function POST(req: Request): Promise<Response> {
     : `RANKMATH TITLE RULES (follow all — these mirror the RankMath Title Readability tests):
 - KEYWORD POSITION: place the primary keyword "${keyword}" within the FIRST 50% of the title.
 - POWER WORD (mandatory): include ONE of: ultimate / proven / essential / expert / complete / effective / simple / step-by-step / critical / best / definitive / surprising.
-- NUMBER (mandatory): include an Arabic digit (7, 5, 10, 2026) — never spelled out. Required for list/how-to titles; for other types include one unless it genuinely distorts the topic.
+- NUMBER (mandatory): include an Arabic digit (7, 5, 10, 2026) — never spelled out as words. A title is short, so a number almost never distorts the topic; include one in every title.
 - SENTIMENT: convey clear positive or negative sentiment (curiosity, urgency, relief, excitement).
 - LENGTH: 50–60 characters; descriptive, not clickbait.
 - YMYL safety: for health/wellness topics never use overclaim words like cure / guaranteed / heal.`;
