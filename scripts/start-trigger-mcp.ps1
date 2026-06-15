@@ -27,7 +27,13 @@ if (-not [string]::IsNullOrWhiteSpace($env:TRIGGER_API_URL)) {
 }
 $command = $prefix + "npx -y trigger.dev@latest mcp --project-ref `"$ProjectRef`""
 
-& powershell -ExecutionPolicy Bypass -File $vaultScript `
+# Resolve powershell.exe by absolute path: when launched as an MCP server the child
+# process PATH may omit System32\WindowsPowerShell, so a bare `powershell` token raises
+# CommandNotFoundException (root cause of 2026-06-15 "Could not attach to MCP server trigger").
+$psExe = Join-Path $PSHOME 'powershell.exe'
+if (-not (Test-Path -LiteralPath $psExe)) { $psExe = 'powershell' }
+
+& $psExe -ExecutionPolicy Bypass -File $vaultScript `
     -Action run `
     -Names @($TokenName) `
     -Command $command
