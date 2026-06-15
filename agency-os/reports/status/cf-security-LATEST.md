@@ -1,15 +1,15 @@
 ﻿# Cloudflare security check
 
-- Generated: 2026-06-16 01:05:27
+- Generated: 2026-06-16 01:27:33
 - Zone: f21b1919632fee2221647908a94fdcac (aware-wave.com)
-- **Overall: PASS**
+- **Overall: WARN**
 
 ## Checks
 | Check | Result |
 |-------|--------|
-| Bot Fight Mode | ON |
-| WAF firewall rules count | 1 (informational; wp-login is server-side) |
-| xmlrpc.php block rule | present |
+| Bot Fight Mode | error |
+| WAF firewall rules count | 0 (informational; wp-login is server-side) |
+| xmlrpc.php block rule | server-side (nginx/LLAR) |
 | Origin lockdown (SG) | active |
 | CF ipset cf-ipv4 entries | 15 |
 | CF ipset cf-ipv6 entries | 7 |
@@ -27,3 +27,6 @@
 - Architecture: iptables allows only CF IPs on 80/443 -- direct-origin scanners DROP before nginx
 - Maintenance: use /origin-lockdown status or scripts/refresh-cf-origin-ips.ps1; rollback only for emergency recovery.
 - Runbook: runbooks/CLOUDFLARE-WAF-SETUP.md #Origin-Lockdown-SOP
+
+## Errors
+- bot_management API: 遠端伺服器傳回一個錯誤: (401) 未經授權。
