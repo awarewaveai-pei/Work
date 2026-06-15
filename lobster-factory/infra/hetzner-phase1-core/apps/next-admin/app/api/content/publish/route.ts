@@ -136,8 +136,13 @@ function markdownToHtml(md: string): string {
       continue;
     }
 
-    // HTML comments — only pure comment lines (NEEDS_BRAND_VERIFY etc.)
-    if (/^<!--.*-->$/.test(line.trim())) { out.push(line.trim()); continue; }
+    // HTML comments — only pure comment lines (NEEDS_BRAND_VERIFY etc.). Defense-in-depth: never
+    // emit internal generation markers into the live post even if upstream stripping missed one.
+    if (/^<!--.*-->$/.test(line.trim())) {
+      if (/<!--\s*GENERATION_(?:TRUNCATED|ERROR):/.test(line)) continue;
+      out.push(line.trim());
+      continue;
+    }
 
     // Empty line
     if (!line.trim()) { out.push(""); continue; }

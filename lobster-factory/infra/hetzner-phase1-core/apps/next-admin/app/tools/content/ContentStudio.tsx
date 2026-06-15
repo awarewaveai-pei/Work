@@ -199,6 +199,7 @@ interface BulkRow {
   seoTitle?: string;
   metaDesc?: string;
   focusKeyword?: string;
+  truncated?: boolean;
 }
 
 type BulkSettings = Omit<GenerateForm, "keyword" | "title" | "scheduleDate" | "nlpKeywords" | "outline" | "internalLinks" | "referenceUrls">;
@@ -646,10 +647,12 @@ export default function ContentStudio() {
       }
       text += dec.decode();
 
-      // Detect + strip the server-side truncation marker so it never leaks into the article.
-      const truncated = /<!--\s*GENERATION_TRUNCATED:/.test(text);
+      // Detect + strip BOTH server-side markers so neither leaks into the published article body
+      // (the standard REST publish path passes pure comment lines through verbatim — critic Major).
+      const truncated  = /<!--\s*GENERATION_TRUNCATED:/.test(text);
+      const genErrored = /<!--\s*GENERATION_ERROR:/.test(text);
       setGenTruncated(truncated);
-      const detrunc = text.replace(/\n*<!--\s*GENERATION_TRUNCATED:[^>]*-->/g, "");
+      const detrunc = text.replace(/\n*<!--\s*GENERATION_(?:TRUNCATED|ERROR):[^>]*-->/g, "");
 
       const meta    = extractMeta(detrunc);
       const hint    = extractSlugHint(detrunc);
@@ -657,6 +660,9 @@ export default function ContentStudio() {
       if (meta) setMetaData(meta);
       setGenerated(cleanMd);
       setSlugHint(hint);
+      // A mid-stream API error arrives as stream CONTENT, not a thrown exception — surface it as an
+      // error (not a false "done") and skip SEO-check/image fill on an incomplete article.
+      if (genErrored) { setGenStatus("error"); setGenError("產生過程發生錯誤，文章可能不完整，請重試"); return; }
       setGenStatus("done");
 
       // fire SEO check in background — non-blocking
@@ -906,10 +912,13 @@ export default function ContentStudio() {
           setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, article: text } : r));
         }
         text += dec.decode();
-        const bulkMeta  = extractMeta(text);
-        const finalText = stripSlugHint(stripMeta(text));
+        // Strip BOTH server markers before they reach the published post body (critic Major).
+        const bulkTruncated = /<!--\s*GENERATION_TRUNCATED:/.test(text);
+        const bulkClean = text.replace(/\n*<!--\s*GENERATION_(?:TRUNCATED|ERROR):[^>]*-->/g, "");
+        const bulkMeta  = extractMeta(bulkClean);
+        const finalText = stripSlugHint(stripMeta(bulkClean));
         setBulkRows(prev => prev.map((r, idx) => idx === i ? {
-          ...r, status: "done", article: finalText,
+          ...r, status: "done", article: finalText, truncated: bulkTruncated,
           seoTitle:     bulkMeta?.seoTitle,
           metaDesc:     bulkMeta?.metaDesc,
           focusKeyword: bulkMeta?.focusKeyword || rows[i].keyword,
@@ -2111,6 +2120,9 @@ export default function ContentStudio() {
                           {row.status === "idle" ? "待處理" : row.status === "running" ? "產文中…" : row.status === "done" ? "✓ 完成" : "✗ 失敗"}
                         </span>
                         <span style={{ fontWeight: 500, fontSize: "13px" }}>{row.keyword}</span>
+                        {row.status === "done" && row.truncated && (
+                          <span title="文章可能被截斷，建議改短篇或拆主題重生成" style={{ fontSize: "11px", color: "#f59e0b", fontWeight: 500 }}>⚠ 截斷</span>
+                        )}
                       </div>
                       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                         {row.status === "done" && (
