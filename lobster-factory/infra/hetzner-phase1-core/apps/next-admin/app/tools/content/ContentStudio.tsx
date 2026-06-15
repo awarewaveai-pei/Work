@@ -596,6 +596,10 @@ export default function ContentStudio() {
     setSlugHint(""); setAutoImgN(0);
     setHeroImageUrl(""); setHeroLoading(false);
     setShowSyn(false); setSynStatus("idle"); setSynContent({});
+    // Invalidate any in-flight image/hero writers from a PREVIOUS run NOW — unconditionally, even if
+    // this run won't generate images. Bumping only inside the aiImages!=="none" branch let a slow hero
+    // fetch from run A resolve and overwrite run B's (image-less) article with a mismatched hero.
+    ++imgRunRef.current;
 
     try {
       const externalLinks = form.externalLinks.split("\n").map(u => u.trim()).filter(u => /^https?:\/\//.test(u)).slice(0, 5);
@@ -646,9 +650,10 @@ export default function ContentStudio() {
         .catch(() => { if (myRun === seoRunRef.current) setSeoReport(null); })
         .finally(() => { if (myRun === seoRunRef.current) setSeoChecking(false); });
 
-      // Auto-replace IMAGE_PLACEHOLDERs via Replicate if AI images enabled
+      // Auto-replace IMAGE_PLACEHOLDERs via Replicate if AI images enabled. imgRunRef was already
+      // bumped at the top of this run (see reset block); capture it here without bumping again.
       if (form.media.aiImages !== "none") {
-        const myImgRun = ++imgRunRef.current;
+        const myImgRun = imgRunRef.current;
         void autoReplaceImages(cleanMd, myImgRun);
         // Issue 四: also generate a dedicated hero/featured image (OG ratio) for the post thumbnail.
         void generateHeroImage(meta?.seoTitle || form.title || form.keyword, myImgRun);

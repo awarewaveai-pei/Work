@@ -104,8 +104,9 @@ final class PostCreator {
 			}
 			$media = ( new MediaSideloader() )->sideload( $featuredUrl, $featAlt );
 			if ( $media && ! empty( $media['id'] ) ) {
-				set_post_thumbnail( $postId, (int) $media['id'] );
-				$featuredSet = has_post_thumbnail( $postId );
+				// set_post_thumbnail() returns the meta id (truthy) on success, false on failure — use it
+				// directly instead of a second has_post_thumbnail() read.
+				$featuredSet = (bool) set_post_thumbnail( $postId, (int) $media['id'] );
 			}
 		}
 

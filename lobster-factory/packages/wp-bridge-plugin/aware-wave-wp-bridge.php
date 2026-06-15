@@ -57,3 +57,8 @@ add_action(
 
 // Operator admin screen (status, one-click key generation, live self-test).
 ( new Admin\AdminPage() )->register();
+
+// Register the Traditional-Chinese power-word list with Rank Math so CJK titles can score the SEO
+// Title Readability "power word" point (Rank Math ships no zh power-word file). SSOT mirror of the
+// content generator's CJK compliance block.
+( new Content\RankMathPowerWords() )->register();
