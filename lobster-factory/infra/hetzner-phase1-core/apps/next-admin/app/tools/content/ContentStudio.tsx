@@ -357,6 +357,10 @@ export default function ContentStudio() {
   // Auto-image generation counter (0 = idle, N = N images pending)
   const [autoImgN, setAutoImgN] = useState(0);
 
+  // YouTube placeholder resolution (Phase 2): per-placeholder URL the operator pastes. No YouTube
+  // Data API key yet, so resolution is manual — auto-search is deferred to the Phase 4 daily pipeline.
+  const [ytUrlInputs, setYtUrlInputs] = useState<Record<string, string>>({});
+
   // Dedicated hero / featured image (issue 四) — generated at generation time, threaded to publish.
   const [heroImageUrl, setHeroImageUrl] = useState("");
   const [heroLoading,  setHeroLoading]  = useState(false);
@@ -698,6 +702,28 @@ export default function ContentStudio() {
     setAutoImgN(0);
   }
 
+  // ─── YouTube placeholder resolution (Phase 2) ─────────────────────────────
+  // Extract the 11-char video id from any common YouTube URL shape and return the canonical
+  // watch URL (strips playlist / tracking params). null if the input is not a YouTube URL.
+  function canonicalYouTube(raw: string): string | null {
+    const s = raw.trim();
+    const m =
+      s.match(/[?&]v=([\w-]{11})/) ||
+      s.match(/youtu\.be\/([\w-]{11})/) ||
+      s.match(/youtube\.com\/(?:embed|shorts|live)\/([\w-]{11})/);
+    return m ? `https://www.youtube.com/watch?v=${m[1]}` : null;
+  }
+
+  // Replace `[YOUTUBE_PLACEHOLDER_N: query]` with the canonical watch URL on its own line. Both publish
+  // paths then turn that bare URL into a real embed (markdownToBlocks → embed block → plugin youtube();
+  // standard REST → WP autoembed). n is a digit string from the placeholder regex, safe to interpolate.
+  function resolveYouTube(n: string, rawUrl: string) {
+    const canon = canonicalYouTube(rawUrl);
+    if (!canon) return;
+    setGenerated(prev => prev.replace(new RegExp(`\\[YOUTUBE_PLACEHOLDER_${n}:[^\\]]*\\]`), canon));
+    setYtUrlInputs(prev => { const next = { ...prev }; delete next[n]; return next; });
+  }
+
   // ─── Hero (featured) image ────────────────────────────────────────────────
   // Issue 四: generate ONE dedicated hero image at facebook_link (1200×630, OG/featured ratio) so the
   // published post has a feature image. Threaded to publish as featured_image_url; the WP Bridge plugin
@@ -911,6 +937,11 @@ export default function ContentStudio() {
   const hasContent   = generated.trim().length > 0;
   const isHumanizing = humStatus === "streaming";
   const hasHumOutput = humOutput.trim().length > 0;
+
+  // Unresolved YouTube placeholders still in the draft, in document order. Each needs a real watch URL
+  // pasted before publish — otherwise publish/route + markdownToBlocks drop the line cleanly.
+  const ytPlaceholders = [...generated.matchAll(/\[YOUTUBE_PLACEHOLDER_(\d+):\s*([^\]]+)\]/g)]
+    .map(m => ({ n: m[1], query: m[2].trim() }));
 
   // ─── Styles ───────────────────────────────────────────────────────────────
 
@@ -1436,11 +1467,11 @@ export default function ContentStudio() {
           </SectionToggle>
 
           {/* ── 大綱編輯器 ── */}
-          <SectionToggle label="大綱編輯器（自訂 H2/H3 標題）" open={showOutline} onToggle={() => setShowOutline(v => !v)}>
+          <SectionToggle label="大綱編輯器（先看大綱、可改再生成全文）" open={showOutline} onToggle={() => setShowOutline(v => !v)}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
               <label className="form-label" style={{ marginTop: 0, marginBottom: 0 }}>
                 自訂大綱
-                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— ## 為 H2，### 為 H3</span>
+                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— ## H2、### H3、#### H4；每個標題含關鍵字或近義變體，生成全文時嚴格遵循</span>
               </label>
               <button className="btn-secondary" style={{ fontSize: "12px" }}
                 onClick={handleGenOutline} disabled={isGenerating || !form.keyword.trim() || outlineLoading}>
@@ -1698,6 +1729,36 @@ export default function ContentStudio() {
                   fontSize: "12px", color: heroImageUrl ? "#16a34a" : "#0284c7",
                 }}>
                   {heroLoading ? "🖼️ 正在生成精選圖片（featured image）…" : "🖼️ 精選圖片已就緒，發佈時自動設為文章首圖"}
+                </div>
+              )}
+
+              {/* ── YouTube 影片嵌入（Phase 2：貼 URL 解析 placeholder）── */}
+              {ytPlaceholders.length > 0 && (
+                <div style={{
+                  marginTop: "10px", padding: "12px 14px", borderRadius: "6px",
+                  background: "#fef2f2", border: "1px solid #fecaca", fontSize: "12px", color: "#b91c1c",
+                }}>
+                  <div style={{ fontWeight: 600, marginBottom: "8px" }}>
+                    🎬 {ytPlaceholders.length} 個 YouTube 影片待嵌入
+                    <span style={{ fontWeight: 400, color: "#9ca3af", marginLeft: 6 }}>
+                      貼上 YouTube 網址→自動轉真嵌入；留空發佈時自動移除
+                    </span>
+                  </div>
+                  {ytPlaceholders.map(({ n, query }) => (
+                    <div key={n} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
+                      <span style={{ minWidth: "180px", color: "#6b7280" }}>#{n}：建議搜尋「{query}」</span>
+                      <input
+                        style={{ flex: 1, minWidth: "220px", fontSize: "12px", padding: "5px 8px",
+                          border: "1px solid #fecaca", borderRadius: "4px", background: "#fff", color: "#111" }}
+                        placeholder="https://www.youtube.com/watch?v=…"
+                        value={ytUrlInputs[n] ?? ""}
+                        onChange={e => setYtUrlInputs(prev => ({ ...prev, [n]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === "Enter") resolveYouTube(n, ytUrlInputs[n] ?? ""); }} />
+                      <button className="btn-secondary" style={{ fontSize: "12px", padding: "5px 12px" }}
+                        disabled={!canonicalYouTube(ytUrlInputs[n] ?? "")}
+                        onClick={() => resolveYouTube(n, ytUrlInputs[n] ?? "")}>嵌入</button>
+                    </div>
+                  ))}
                 </div>
               )}
 

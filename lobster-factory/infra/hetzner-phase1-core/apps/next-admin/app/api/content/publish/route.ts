@@ -43,6 +43,12 @@ function inline(s: string): string {
     );
 }
 
+/** A standalone YouTube watch/share/embed/shorts URL — emitted bare so WP autoembed (priority 8,
+ *  before wpautop) fetches oEmbed and renders the responsive iframe. Mirrors markdown-to-blocks.ts. */
+function isYouTubeUrl(url: string): boolean {
+  return /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)[\w-]{6,}/i.test(url);
+}
+
 function markdownToHtml(md: string): string {
   // Strip meta block before converting
   const clean = md
@@ -106,17 +112,16 @@ function markdownToHtml(md: string): string {
       continue;
     }
 
-    // YouTube placeholder — [YOUTUBE_PLACEHOLDER_N: search query]
-    const ytMatch = line.trim().match(/^\[YOUTUBE_PLACEHOLDER_(\d+):\s*(.+)\]$/);
-    if (ytMatch) {
-      const [, n, query] = ytMatch;
-      out.push(
-        `<div class="youtube-placeholder" data-query="${escapeHtml(query.trim())}" style="padding:24px;background:#f8f8f8;border:2px dashed #ccc;text-align:center;margin:16px 0;">` +
-        `🎬 YouTube #${n}：${escapeHtml(query.trim())}` +
-        `</div>`
-      );
+    // Standalone YouTube URL → emit bare on its own line so WP autoembed renders the iframe.
+    // (Resolved placeholder lands here once ContentStudio swaps in the canonical watch URL.)
+    if (isYouTubeUrl(line.trim())) {
+      out.push(line.trim());
       continue;
     }
+
+    // YouTube placeholder still unresolved — drop it (no operator URL pasted).
+    // Never ship the gray "🎬 query" cue to a live post; it is an internal authoring marker.
+    if (/^\[YOUTUBE_PLACEHOLDER_(\d+):\s*(.+)\]$/.test(line.trim())) continue;
 
     // Standalone images (full-line image syntax)
     const imgMatch = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);

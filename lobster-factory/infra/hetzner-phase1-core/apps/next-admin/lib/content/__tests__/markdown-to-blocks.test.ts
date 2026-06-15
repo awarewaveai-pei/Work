@@ -78,4 +78,28 @@ describe("markdownToBlocks", () => {
     const blocks = markdownToBlocks("段落一\n\n---\n\n段落二");
     expect(types(blocks)).toContain("divider");
   });
+
+  it("turns a standalone YouTube URL into an embed block (watch / youtu.be / shorts)", () => {
+    const watch = markdownToBlocks("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+    expect(watch[0]).toEqual({ type: "embed", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" });
+    const short = markdownToBlocks("https://youtu.be/dQw4w9WgXcQ");
+    expect(short[0]).toEqual({ type: "embed", url: "https://youtu.be/dQw4w9WgXcQ" });
+    const shorts = markdownToBlocks("https://www.youtube.com/shorts/abc123XYZ");
+    expect(shorts[0]).toEqual({ type: "embed", url: "https://www.youtube.com/shorts/abc123XYZ" });
+  });
+
+  it("does not treat a non-YouTube URL as an embed (falls back to paragraph)", () => {
+    const blocks = markdownToBlocks("https://example.com/some-article");
+    expect(blocks.filter(b => b.type === "embed")).toHaveLength(0);
+    expect(blocks[0].type).toBe("paragraph");
+  });
+
+  it("drops an unresolved YouTube placeholder instead of leaking '🎬 query' into the post", () => {
+    const blocks = markdownToBlocks("前言\n\n[YOUTUBE_PLACEHOLDER_1: 兒童藝術治療入門影片]\n\n結語");
+    const allText = JSON.stringify(blocks);
+    expect(allText).not.toContain("YOUTUBE_PLACEHOLDER");
+    expect(allText).not.toContain("🎬");
+    // The surrounding paragraphs survive; only the placeholder line is removed.
+    expect(blocks.filter(b => b.type === "paragraph")).toHaveLength(2);
+  });
 });

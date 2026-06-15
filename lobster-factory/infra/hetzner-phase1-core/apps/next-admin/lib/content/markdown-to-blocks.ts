@@ -23,8 +23,19 @@ export type Block =
   | { type: "list"; items: string[] }
   | { type: "quote"; text: string }
   | { type: "image"; url: string; alt: string }
+  | { type: "embed"; url: string }
   | { type: "table"; rows: string[][] }
   | { type: "divider" };
+
+/**
+ * A standalone YouTube watch/share/embed/shorts URL on its own line becomes an embed block,
+ * which BlockLibrary.compose() maps via `case 'embed'` → youtube($url) to real core/embed
+ * Gutenberg markup. ContentStudio resolves a `[YOUTUBE_PLACEHOLDER_N: query]` by replacing it
+ * with the canonical watch URL on its own line, so this is the only YouTube path the converter sees.
+ */
+function isYouTubeUrl(url: string): boolean {
+  return /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)[\w-]{6,}/i.test(url);
+}
 
 function escapeHtml(s: string): string {
   return s
@@ -154,12 +165,15 @@ export function markdownToBlocks(md: string): Block[] {
       continue;
     }
 
-    // YouTube placeholder (unresolved) — keep the intent as a paragraph, don't drop it
-    const yt = trimmed.match(/^\[YOUTUBE_PLACEHOLDER_(\d+):\s*(.+)\]$/);
-    if (yt) {
-      blocks.push({ type: "paragraph", text: `🎬 ${inline(yt[2].trim())}` });
+    // Standalone YouTube URL → real embed block (resolved placeholder lands here)
+    if (isYouTubeUrl(trimmed)) {
+      blocks.push({ type: "embed", url: trimmed });
       continue;
     }
+
+    // YouTube placeholder still unresolved (operator pasted no URL) — drop it.
+    // Shipping a "🎬 query" paragraph to the live post would leak an internal authoring cue.
+    if (/^\[YOUTUBE_PLACEHOLDER_(\d+):\s*(.+)\]$/.test(trimmed)) continue;
 
     // Pure HTML comment line (NEEDS_BRAND_VERIFY etc.) — skip
     if (/^<!--.*-->$/.test(trimmed)) continue;
