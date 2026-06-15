@@ -4,6 +4,31 @@
 
 ## 2026-06-15
 
+### feat(content-engine): P1 生成端 SEO/RankMath CJK 合規（issues 二/三/B/C/五/六/九）
+
+**[任務理解]** 使用者要 /tools/content 生成文章時就符合 SEO/GEO/AEO/RankMath，不靠事後 SEO 調整器。9 問題中 P1 處理純生成側（免發外掛版）：標題力量詞+數字、CJK 關鍵字密度、AI 建議分類/標籤、移除手動目錄、單一 H1。
+
+**[根因]** ① 標題力量詞清單只有英文 → CJK 文章 RankMath 標題測試永遠不過。② 本地 `rankmath-checker.ts` 把每個 CJK 字當 1 word，密度 0.5% 下限 → 需 ~12 次關鍵字才過 → 正是這個隱性壓力造成關鍵字堆疊 → 真實 RankMath（whitespace tokenizer，~92 words）讀成 13.04%。生成器與本地檢查器對 CJK 互相矛盾（標題長度、密度方向相反）。③ 系統提示硬性要求「永遠加目錄」與使用者「WP/Kadence 已有目錄」衝突。
+
+**[已修改]**
+- `app/api/content/generate/route.ts`（SYSTEM_PROMPT）— 標題改語言感知力量詞 + 強制阿拉伯數字 + 「唯一 H1，body 不得再用 `# `」（issue 二防呆）；密度行加 CJK 注記；移除「always include TOC」改為「不要手寫目錄，Kadence 自動生成」（issue 九）。
+- `app/api/content/generate/route.ts`（buildUserPrompt）— 新 `isCJK` 偵測（含 zh-tw/粵語/國語/台語 等）→ 推送 CJK RANKMATH COMPLIANCE 區塊：在地化力量詞清單（已剔除 `保證` 避免與 YMYL FORBIDDEN 衝突）、標題阿拉伯數字、精確關鍵字 ≤4–6 次硬上限（明示 supersede「density % + 不得 clustered」兩條舊規）。meta 區塊加 `CATEGORIES:` / `TAGS:`（issue 五/六，生成端先出，P2 才解析消費）。
+- `lib/seo/rankmath-checker.ts` — 新 `hasCjk()` helper；`title-length` 加 CJK 分支（14–30 字元，對應像素寬截斷）；`kw-density` 改用 `articleIsCjk = kwIsCjk || hasCjk(markdown)`（鍵接**文章腳本**而非僅關鍵字）→ 絕對出現次數 band（2–8，取代不可靠的 %）；空關鍵字以 `if (kw.length > 0)` 防呆（避免 `\b\b` regex 報 542% 假值）；兩者 suggestion 文案 CJK 化。**理由**：檢查器與生成器必須對 CJK 一致，否則合規文章在 dashboard 顯紅、操作者「修正」即把改動還原（critic 跨檔發現）。
+- `lib/seo/__tests__/rankmath-checker.test.ts`（新）— 9 案例回歸測試鎖定 CJK 契約（先前無測試；含 ASCII 關鍵字落在 CJK 文章須用次數 band、空關鍵字不報假密度兩個 critic 回合案例）。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/seo/__tests__/rankmath-checker.test.ts` | exit=0 | ms=541 | 9/9 pass（CJK kw 5×→pass、12×→fail堆疊、1×→fail稀疏、英文仍用%band；CJK 標題 15字→pass、6字→fail、英文 46字→pass；**+ASCII 關鍵字 6× 落 CJK 文章→次數 band pass（re-stuffing guard）、空關鍵字→不報假密度**）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed files) | generate/route.ts + rankmath-checker.ts 零型別錯（其餘 fabric/pdf-lib 為既存 missing-dep，Docker npm ci 解）
+- REVIEW_DONE: critic=Standard×2 | verdict=warn→fixed | findings 第1回 0c/4m/2n（跨檔 CJK 矛盾：標題長度/密度/「throughout」override/保證 overclaim 全 fold-in）；**第2回 0c/1m/1n — Major：密度 CJK 判定鍵接關鍵字而非文章腳本 → ASCII 關鍵字落 CJK 文章在 6 次（prompt 合規上限）讀 0.488%<0.5% 顯紅逼 re-stuffing；Minor：空關鍵字 `\b\b` 報 542%。兩者已修並加測試鎖定**
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`articleIsCjk|kwIsCjk|hasCjk|title-length|kw-density|checkRankMath` | hits=0 stale — `articleIsCjk` 僅存於 rankmath-checker.ts（無 dangling 消費端）；消費端（SeoCheckPanel/seo-fix/product-copy）全以 check.id 鍵接（id 未變），label 改動僅顯示用；extractMeta 逐鍵解析忽略未知行，新增 CATEGORIES/TAGS 不破壞
+
+**[剩餘風險]**
+- 力量詞測試在真實 WP 仍需伺服器端 filter `rank_math/metabox/power_words` 註冊 CJK 詞才會過（→ 併入 P3，否則 prompt 承諾無人 enforce）。
+- CATEGORIES/TAGS 生成端已出但 P2 尚未解析 → 目前仍 inert（issue 五/六 端到端待 P2）。
+- issue 二（2 個 H1）真正修正在 P2：publish 需把 leading `# Title` 抽為 WP post title 並從 body 移除；生成端單一 H1 僅防呆。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/seo/rankmath-checker.ts` + 刪除新測試檔。
+
 ### fix(ao-resume): import 前移至 git-align 前 + auto-resolve regex 擴展
 
 **[根因]**
