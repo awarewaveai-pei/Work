@@ -10,12 +10,14 @@
 - **紅字源頭**：`agency-os/scripts/doc-sync-automation.ps1:37` `To-RelPath` 用 `(Resolve-Path $fullPath).Path` 漏 `-LiteralPath`。`Detect-ChangedFiles` 遞迴掃到含中括號檔名 `docs/RankMath/RankMath-KB/Developers/Set the Current Year in Post Title Using the [year] Shortcode.md` 時，`[year]` 被當萬用字元 → 無 match → `$null.Path` → 在 `Set-StrictMode -Version Latest`（line 10）下噴 `PropertyNotFoundStrict`。同檔名先前已於 commit `e182cd21` 弄壞過 verify-build-gates（慣犯）。system-guard 仍 exit 0（紅字非致命），故是「報錯但沒壞」。
 - **視窗可見**：`AgencyOS-SystemGuard-Daily` live 任務缺 `-WindowStyle Hidden`（其他 4 個 AgencyOS 任務皆隱藏）。深查發現 SSOT `agency-os/automation/REGISTER_SYSTEM_GUARD_TASKS.ps1` 真 bug：`schtasks /TR` 上限 261 字元，但其組出的隱藏版指令（launcher + base64 ExtraArgs）= 308 字元 → schtasks 拒建（實測 exit -2147467259「/TR 不可超過 261 個字元」）→ 3 個 guard 任務（Daily/Startup/Logoff）全建不起來，只剩更早期、夠短、未隱藏的舊 Daily 殘留在閃。
 **[已修改]**
-- `agency-os/scripts/doc-sync-automation.ps1:37` — `Resolve-Path $fullPath` → `Resolve-Path -LiteralPath $fullPath`（一行；對齊同檔/同庫既有 `-LiteralPath` 慣例）。
+- `agency-os/scripts/doc-sync-automation.ps1:37` — `Resolve-Path $fullPath` → `Resolve-Path -LiteralPath $fullPath`（auto-detect 路徑；對齊同檔/同庫既有 `-LiteralPath` 慣例）。
+- `agency-os/scripts/doc-sync-automation.ps1:277` — `Test-Path $full` → `Test-Path -LiteralPath $full`（critic 揪出的同 bug class：`-ChangedFiles` 顯式輸入路徑含中括號時會被**靜默丟棄**，比 crash 更糟）。
 - live 任務 `AgencyOS-SystemGuard-Daily`（非 repo）— 以 PowerShell `Set-ScheduledTask`（ScheduledTasks 模組，無 261 限制）改 Action 為隱藏 launcher 版（`-WindowStyle Hidden` + `-HideUi`）。SSOT registrar 的 261 bug 本 commit 未動（含 OnStartup 開檔副作用，待後續決策）。
 **[驗證結果]**（R0 四動作）
 - REALTEST_EVIDENCE: tool=Bash | cmd=`doc-sync-automation.ps1 -AutoDetect -SkipApply -SkipReport` | exit=0 | 修後輸出 `PropertyNotFound|找不到屬性|ForEach-Object :` 命中=0（修前必噴），中括號檔 `[year] Shortcode.md` 正常被掃到。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`Set-ScheduledTask`+`Start-ScheduledTask AgencyOS-SystemGuard-Daily` | exit=0 | 讀回 Hidden=True/Launcher=True；觸發後 LastTaskResult=0、無視窗。
-- REVIEW_WAIVED: NA -- 單行 `-LiteralPath` 補強（行為純收嚴：原失敗 path 改正確 literal 解析），real-run 已證 PropertyNotFound 歸零，且對齊 weekly-system-review.ps1:30/33 等既有 `-LiteralPath` callsite。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`doc-sync-automation.ps1 -ChangedFiles '...[year] Shortcode.md' -SkipApply -SkipReport` | exit=0 | 修後該中括號檔出現於 Changed/Impacted（修前會被 line 277 靜默丟棄）。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1M/1m — line 37 改動 critic 判 PASS（非括號 path 行為不變、5 個 To-RelPath call site 皆傳具體檔路徑無 glob 意圖）；1 Major = 同 bug class 的 line 277 `Test-Path` 漏 `-LiteralPath`（本 commit 同步修並 REALTEST）；1 Minor = line 37 mid-enumeration TOCTOU（critic 自評對維護腳本可接受，列剩餘風險）。
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`Resolve-Path` | hits=1 — 全 scripts 掃 `Resolve-Path`，其餘漏 `-LiteralPath` 者皆只解析 workspace/script 根路徑（`$InputRoot`/`$PSScriptRoot`/`$WorkRoot`，不含中括號）→ 非同 bug class；唯一解析任意 repo 列舉檔的就是 line 37 → 已修。
 **[剩餘風險]** SSOT `REGISTER_SYSTEM_GUARD_TASKS.ps1` 261 bug 未修 → 公司桌機可能卡同款會閃的舊任務、未來重註冊仍失敗。修法（改 ScheduledTasks 模組）+ OnStartup 靜默化待使用者決策後續。
 **[rollback]** doc-sync：`git checkout HEAD~1 -- agency-os/scripts/doc-sync-automation.ps1`。live 任務：重跑 `REGISTER_SYSTEM_GUARD_TASKS.ps1`（會回到舊行為）或 `Set-ScheduledTask` 還原 Action。

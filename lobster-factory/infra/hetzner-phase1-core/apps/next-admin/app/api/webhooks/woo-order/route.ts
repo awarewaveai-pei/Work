@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createDraftOrderOnNative, isNativeStoreConfigured } from "../../../../lib/studio/printful-order";
+import { createDraftOrderOnNative, isNativeStoreConfigured } from "../../../../lib/studio/print-provider";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -159,13 +159,16 @@ export async function POST(req: Request) {
 
   const parsed = parseWooOrder(order);
   if (!parsed.ok) {
+    // tsconfig here does not narrow `!parsed.ok` — same cast convention as the print-provider routes.
+    const err = parsed as { ok: false; reason: string; status: number };
     // 200 for "nothing to fulfill" (no POD lines) so Woo does not retry a benign no-op; 4xx otherwise.
-    const ignored = parsed.status === 200;
-    return NextResponse.json({ ok: ignored, ...(ignored ? { ignored: true } : {}), error: parsed.reason }, { status: parsed.status });
+    const ignored = err.status === 200;
+    return NextResponse.json({ ok: ignored, ...(ignored ? { ignored: true } : {}), error: err.reason }, { status: err.status });
   }
+  const okParsed = parsed as { ok: true; externalId: string; recipient: Record<string, string>; items: { sku: string; quantity: number }[] };
 
   // DRAFT-ONLY. createDraftOrderOnNative POSTs with NO confirm — not charged, not printed.
-  const result = await createDraftOrderOnNative({ externalId: parsed.externalId, recipient: parsed.recipient as never, items: parsed.items });
+  const result = await createDraftOrderOnNative({ externalId: okParsed.externalId, recipient: okParsed.recipient as never, items: okParsed.items });
   if (!result.ok) {
     const e = (result as { ok: false; error: string }).error;
     // A retry never duplicates (idempotency pre-check); 502 lets Woo's retry recover transient blips.

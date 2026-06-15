@@ -274,7 +274,7 @@ function Invoke-Once {
     } else {
         foreach ($item in $InputChanged) {
             $full = if ([System.IO.Path]::IsPathRooted($item)) { $item } else { Join-Path $Root $item }
-            if (Test-Path $full) {
+            if (Test-Path -LiteralPath $full) {
                 $changed += (To-RelPath -Root $Root -PathValue $full)
             }
         }

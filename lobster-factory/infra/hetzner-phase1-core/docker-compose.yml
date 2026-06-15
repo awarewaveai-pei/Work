@@ -334,6 +334,11 @@ services:
       PRINTFUL_API_KEY: ${PRINTFUL_API_KEY:-}
       PRINTFUL_STORE_ID: ${PRINTFUL_STORE_ID:-}
       PRINTFUL_NATIVE_STORE_ID: ${PRINTFUL_NATIVE_STORE_ID:-}
+      # POD auto-fulfillment (Woo paid order -> Printful DRAFT). Kill switch, DEFAULT OFF: the
+      # /api/webhooks/woo-order route is dormant until set true. DRAFT-only (no charge/print) even
+      # when on. WC_WEBHOOK_SECRET = the WooCommerce webhook secret used to HMAC-verify the payload.
+      POD_AUTO_FULFILL_ENABLED: ${POD_AUTO_FULFILL_ENABLED:-false}
+      WC_WEBHOOK_SECRET: ${WC_WEBHOOK_SECRET:-}
       # Repair OS Integrations: provider health adapters use reference-only secrets from env.
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       CLOUDFLARE_AUTH_BEARER_TOKEN: ${CLOUDFLARE_AUTH_BEARER_TOKEN:-}
@@ -374,6 +379,9 @@ services:
       PRINTFUL_API_KEY: ${PRINTFUL_API_KEY:-}
       PRINTFUL_STORE_ID: ${PRINTFUL_STORE_ID:-}
       PRINTFUL_NATIVE_STORE_ID: ${PRINTFUL_NATIVE_STORE_ID:-}
+      # POD auto-fulfillment (Woo paid order -> Printful DRAFT). Kill switch, DEFAULT OFF. DRAFT-only.
+      POD_AUTO_FULFILL_ENABLED: ${POD_AUTO_FULFILL_ENABLED:-false}
+      WC_WEBHOOK_SECRET: ${WC_WEBHOOK_SECRET:-}
       # POD print track ([0-a-gs]): enable the Ghostscript PDF/X-1a OutputIntent pass.
       # Default OFF — CMYK print destinations return a clear "not deployed" error until
       # gs is in the image (it now is, via Dockerfile) AND this flag is set true.
