@@ -57,6 +57,38 @@
 
 **[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/publish/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/studio/wp-bridge-client.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/content/ContentStudio.tsx` + 刪除 `lib/content/markdown-to-blocks.ts` 與其測試檔。
 
+### feat(content-engine): P3 外掛＋生成端 featured image / ILJ / power_words（issues 四/七/C 端到端）
+
+**[任務理解]** 收尾 9 問題剩餘三項，跨 next-admin 生成/發佈側 + WP Bridge 外掛側端到端串接：issue 四（精選圖片）、issue 七（Internal Link Juicer 關鍵字 meta）、issue C（RankMath 標題力量詞 CJK 註冊）。featured image 來源經使用者決策＝**生成端產專屬 hero 圖**（OG 比例 1200×630），透過 publish→Bridge spec 透傳，外掛 sideload 後 set_post_thumbnail。
+
+**[根因]** ① issue 四：發佈鏈無 featured image 概念，PostCreator 從不設縮圖 → 文章無首圖、社群分享無 OG 圖。② issue 七：ILJ 的 `ilj_linkdefinition` meta 從未寫入 → 其他文章不會自動連回本文（內鏈關鍵字欄空白）。③ issue C：RankMath 標題力量詞偵測為**前端 JS**讀 `rank_math/metabox/power_words` 過濾後的清單，且**無 zh 力量詞檔** → CJK 站該 filter 收到 `[]`，任何中文標題永遠拿不到力量詞分（P1 prompt 已承諾「伺服器端清單已註冊」但實際從未建立）。
+
+**[已修改]**
+- `packages/wp-bridge-plugin/includes/Content/RankMathPowerWords.php`（新）— 註冊 20 個繁中力量詞到 `rank_math/metabox/power_words`（SSOT 鏡像 generate route CJK 區塊 line 254）。`filter()` 無條件 merge + dedup（2 字 CJK token 永不匹配空白切詞的拉丁標題 → 對非 CJK 站零害；亦能在 zh 站跑 en_US WP locale 時生效，避免 locale-gate 漏接）；非字串/非陣列輸入容錯。
+- `packages/wp-bridge-plugin/aware-wave-wp-bridge.php` — bootstrap 註冊 `RankMathPowerWords`。
+- `packages/wp-bridge-plugin/includes/Post/PostCreator.php` — ① best-effort featured image：sideload `featured_image_url` → `set_post_thumbnail`（alt 帶 focus keyword；**不**納入 verify gate，鏡像 ProductCreator featured 處理，圖抓失敗不得 rollback 好文章）→ 回傳 `featured_set`。② ILJ：`internal_link_keywords` 陣列 → `update_post_meta('ilj_linkdefinition', $arr)`（純 PHP indexed array，WP 自動 serialize；**不**預 serialize/逗號字串，符合 ILJ `Postmeta::fromMeta()` is_array 契約；draft 的 index rebuild 延到 publish，無需手動觸發）。
+- `packages/wp-bridge-plugin/tests/Content/RankMathPowerWordsTest.php`（新）— words()/filter() 單元測試。
+- `lib/studio/wp-bridge-client.ts` — `BridgePostSpec` 加 `featured_image_url?`/`featured_image_alt?`/`internal_link_keywords?`；`BridgePostResponse` 加 `featured_set?`。
+- `app/api/content/publish/route.ts` — body 加三欄；Bridge 分支讀 `featuredImageUrl`/`featuredImageAlt`/`internalLinkKeywords`（trim + filter Boolean + 空陣列→undefined）透傳 createPost；回應帶 `featured_set`。RestController 直接整包 `$spec` 傳 PostCreator（line 227 無白名單）→ 三新欄免改 RestController。
+- `app/tools/content/ContentStudio.tsx` — `generateHeroImage()`（生成完成後以 seoTitle/title/keyword 為 prompt 打 `/api/content/image` platform `facebook_link` 1200×630）；`handlePublish` 透傳 `featuredImageUrl`(hero)/`featuredImageAlt`(form.keyword)/`internalLinkKeywords`([focus keyword])；hero 生成中/就緒 UI 指示；generate 起手不分支地 `++imgRunRef.current` 失效前一輪 in-flight hero writer（critic Major fix）。
+- `app/api/content/generate/route.ts`（CJK 區塊 line 254）— 力量詞行加「**必須以半形空格獨立成 token**」格式硬要求（「兒童藝術治療 完整 指南」✓ vs「完整指南」✗）：RankMath JS 以 `title.split(' ')` 切詞，黏連的 CJK 力量詞即使在清單也不會被偵測 → 註冊清單為必要但不充分，token 化是另一半。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -r '<require RankMathPowerWords; 10 assertions>'` | exit=0 | 10/10 pass（20 詞無重複、SSOT 樣本在、YMYL overclaim 剔除、zh 空清單→全清單、英文 merge 保留+去重 overlap、null/非字串容錯）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/__tests__/markdown-to-blocks.test.ts` | exit=0 | ms=9 | 10/10 pass（next-admin 改動零回歸）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0(changed) | 4 改動 TS 檔零型別錯（其餘 fabric/pdf-lib 既存 missing-dep）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -l`（PostCreator/RankMathPowerWords/bootstrap/test）| exit=0 | 全無語法錯
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1M/2m/2nit — **Major：ContentStudio hero 競態**（imgRunRef 只在 aiImages!=="none" 分支遞增 → 重生成時關掉 AI 圖會讓前一輪慢 hero fetch 漏寫到新文章＝錯誤 featured 圖，靜默）→ 修為起手無條件遞增；Suggestion：`set_post_thumbnail` 回傳值取代多餘 `has_post_thumbnail`（已採）。Minor（hero attachment post_parent=0 孤兒、test assertion 略鬆）critic 判定可延後。merge 無條件對非 CJK 站零害經實跑確認。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`featured_image_url\|internal_link_keywords\|ilj_linkdefinition\|RankMathPowerWords\|featuredImageUrl\|internalLinkKeywords\|generateHeroImage` | hits=0 stale — 全部命中均在本次 8 改動檔內，無 downstream 消費端、無過期文件聲稱（WORKLOG/worklog-excerpt 的「待 P3」註記由本 entry 結案，非待修）。RankMath KB doc line 558 證實 filter 簽章＝實作相符。
+
+**[剩餘風險]**
+- 三項端到端仍需對 soulful 真站打簽章 `/post`（Bridge 真寫＝High-risk，待操作者明示 + `WPBRIDGE_BASE_URL`/`KEY_ID`/`PRIVATE_KEY` 設定）；本次碼層 + 單元/真執行測試完成，未對真站驗證。
+- 外掛改動需經**另一 repo** `awarewaveai-pei/aware-wave-wp-bridge` tag→Action 出 zip 才算發版（只 push Work ≠ 發版）；版號待 bump（`AWBRIDGE_VERSION` 0.9.0 → 0.10.0，header line 6 + define line 25 兩處）+ `bash scripts/release-wp-bridge.sh`，**發版前知會操作者**。
+- issue C 即使 PHP filter + token 化 prompt 雙管，RankMath 對 CJK 的空白切詞仍是上游限制（純無空白中文標題不可靠）；mitigation 已盡（文件 + prompt 強制 token 化），殘留為 RankMath upstream。
+- hero attachment 孤兒（post_parent=0）：與既有 sideloadBlockImages 共用路徑，縮圖功能正常（_thumbnail_id 已設），僅媒體庫顯「未附加」，延後。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/packages/wp-bridge-plugin/aware-wave-wp-bridge.php lobster-factory/packages/wp-bridge-plugin/includes/Post/PostCreator.php lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/studio/wp-bridge-client.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/publish/route.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/content/ContentStudio.tsx lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/generate/route.ts` + 刪除 `includes/Content/RankMathPowerWords.php` 與 `tests/Content/RankMathPowerWordsTest.php`。
+
 ### fix(ao-resume): import 前移至 git-align 前 + auto-resolve regex 擴展
 
 **[根因]**
