@@ -1,0 +1,9 @@
+{
+  "id": "2",
+  "subject": "publish/route.ts: pfcreate action",
+  "description": "新增 action pfcreate：build plan → 解 catalog id → createSyncProductOnNative 一次建綁；取代 status+link 阻塞",
+  "activeForm": "加 pfcreate action",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

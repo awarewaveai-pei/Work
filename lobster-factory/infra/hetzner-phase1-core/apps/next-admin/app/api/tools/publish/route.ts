@@ -9,8 +9,10 @@ import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import {
+  createSyncProductOnNative,
   getCatalogVariants,
   getSyncProduct,
+  isNativeStoreConfigured,
   isPrintfulConfigured,
   linkSyncVariant,
   listSyncProducts,
@@ -42,7 +44,7 @@ function gate(request: Request): NextResponse | null {
 }
 
 interface PublishBody {
-  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link";
+  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link" | "pfcreate";
   // upscale / productimage / flatlay
   designUrl?: string;
   longEdgePx?: number;
@@ -60,6 +62,7 @@ interface PublishBody {
   focusKeywordHint?: string;
   // create
   title?: string;
+  designName?: string; // SKU seed — pfcreate must rebuild the SAME plan/SKUs as `create`
   retailPrice?: string;
   plusPrice?: string;
   sizes?: string[];
@@ -397,5 +400,76 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, syncProductId: found.id, linkedCount, total: results.length, results });
   }
 
-  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|flatlay|copy|create|status|link" }, { status: 400 });
+  // ── Step 3+4 (native): create the Printful product AND bind every variant + print file in ONE
+  //    API call. Replaces the status/link dance, which only works for the Woo-platform store and
+  //    is blocked there anyway (no API to import an externally-created Woo product). The native
+  //    "Manual Order / API platform" store accepts POST /store/products → fully automatic.
+  if (body.action === "pfcreate") {
+    if (!isNativeStoreConfigured()) {
+      return NextResponse.json(
+        { ok: false, error: "printful_native_store_not_configured", hint: "Set PRINTFUL_NATIVE_STORE_ID." },
+        { status: 503 },
+      );
+    }
+    if (!Number.isInteger(body.wooProductId) || (body.wooProductId as number) <= 0) {
+      return NextResponse.json({ ok: false, error: "wooProductId (positive integer) is required" }, { status: 400 });
+    }
+    if (!body.title || body.title.trim().length < 3) {
+      return NextResponse.json({ ok: false, error: "title is required (min 3 chars)" }, { status: 400 });
+    }
+    if (!body.printFileUrl || !body.printFileUrl.startsWith(designsBase)) {
+      return NextResponse.json({ ok: false, error: "printFileUrl must be a My Designs asset URL" }, { status: 400 });
+    }
+    if (!body.retailPrice || !PRICE_RE.test(body.retailPrice)) {
+      return NextResponse.json({ ok: false, error: "retailPrice must look like 24.99" }, { status: 400 });
+    }
+    if (body.plusPrice !== undefined && !PRICE_RE.test(body.plusPrice)) {
+      return NextResponse.json({ ok: false, error: "plusPrice must look like 26.99" }, { status: 400 });
+    }
+    const catalog = await getCatalogVariants(71, ["White", "Black"]);
+    if (!catalog.ok) {
+      return NextResponse.json({ ok: false, error: (catalog as { ok: false; error: string }).error }, { status: 502 });
+    }
+    const catalogByKey = new Map(catalog.value.map((v) => [`${v.color.toLowerCase()}|${v.size.toLowerCase()}`, v.id]));
+    // Rebuild the SAME variant plan `create` used → SKUs match the Woo product (the P4 join key).
+    const plan = buildVariantPlan({
+      title: body.title.trim(),
+      retailPrice: body.retailPrice,
+      plusPrice: body.plusPrice,
+      sizes: body.sizes,
+      designName: body.designName,
+    });
+    const variants: { externalId: string; catalogVariantId: number; retailPrice: string; printFileUrl: string }[] = [];
+    const skipped: { sku: string; reason: string }[] = [];
+    for (const p of plan) {
+      const catalogId = catalogByKey.get(`${p.color.toLowerCase()}|${p.size.toLowerCase()}`);
+      if (!catalogId) {
+        skipped.push({ sku: p.sku, reason: `no_catalog_${p.color}_${p.size}` });
+        continue;
+      }
+      variants.push({ externalId: p.sku, catalogVariantId: catalogId, retailPrice: p.price, printFileUrl: body.printFileUrl });
+    }
+    if (variants.length === 0) {
+      return NextResponse.json({ ok: false, error: "no_catalog_variants_resolved", skipped }, { status: 502 });
+    }
+    const thumb = (body.mockupUrls ?? []).find((u) => typeof u === "string" && u.startsWith(designsBase));
+    const created = await createSyncProductOnNative({
+      name: body.title.trim(),
+      externalId: String(body.wooProductId),
+      thumbnailUrl: thumb,
+      variants,
+    });
+    if (!created.ok) {
+      return NextResponse.json({ ok: false, error: (created as { ok: false; error: string }).error }, { status: 502 });
+    }
+    return NextResponse.json({
+      ok: true,
+      syncProductId: created.value.id,
+      variantCount: created.value.variantCount,
+      linkedVariants: created.value.variants,
+      skipped,
+    });
+  }
+
+  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|flatlay|copy|create|status|link|pfcreate" }, { status: 400 });
 }

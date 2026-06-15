@@ -1,0 +1,9 @@
+{
+  "id": "3",
+  "subject": "docker-compose + tsc + critic + bughunt",
+  "description": "compose 加 PRINTFUL_NATIVE_STORE_ID；npx tsc --noEmit；/review critic；跨檔抓蟲；WORKLOG",
+  "activeForm": "驗證四動作",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

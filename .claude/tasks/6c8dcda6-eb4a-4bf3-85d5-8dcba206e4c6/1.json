@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "subject": "print-provider.ts: native store API 創建函式",
+  "description": "pf() 加 storeId override；新增 nativeStoreId/isNativeStoreConfigured + createSyncProductOnNative (POST /store/products native + re-read variant ids)；getSyncProduct 加 storeId 參數",
+  "activeForm": "改 print-provider.ts native 函式",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": []
+}

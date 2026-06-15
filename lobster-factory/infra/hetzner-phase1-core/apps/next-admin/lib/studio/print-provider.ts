@@ -57,19 +57,39 @@ export function isPrintfulConfigured(): boolean {
   return getConfig() !== null;
 }
 
-async function pf<T>(path: string, init?: { method?: string; body?: unknown }): Promise<PrintfulResult<T>> {
-  const config = getConfig();
-  if (!config) return { ok: false, error: "printful_not_configured" };
+/** The native "Manual Order / API platform" store id, or null if not configured. */
+export function nativeStoreId(): string | null {
+  return process.env.PRINTFUL_NATIVE_STORE_ID || null;
+}
+
+/**
+ * Native store usable for API product creation (POST /store/products) and order forwarding.
+ * The Woo-platform store rejects both; the native store is what makes publishing full-auto.
+ */
+export function isNativeStoreConfigured(): boolean {
+  return Boolean(process.env.PRINTFUL_API_KEY && process.env.PRINTFUL_NATIVE_STORE_ID);
+}
+
+async function pf<T>(
+  path: string,
+  init?: { method?: string; body?: unknown; storeId?: string; timeoutMs?: number },
+): Promise<PrintfulResult<T>> {
+  const token = process.env.PRINTFUL_API_KEY;
+  // Default store = PRINTFUL_STORE_ID (the Woo-platform store). A `storeId` override targets a
+  // different store — e.g. the native "Manual Order / API platform" store, the only one that
+  // accepts API product creation (POST /store/products) for full-auto publishing.
+  const storeId = init?.storeId ?? process.env.PRINTFUL_STORE_ID;
+  if (!token || !storeId) return { ok: false, error: "printful_not_configured" };
   const controller = new AbortController();
-  const killer = setTimeout(() => controller.abort(), 25_000);
+  const killer = setTimeout(() => controller.abort(), init?.timeoutMs ?? 25_000);
   try {
     let res: Response;
     try {
       res = await fetch(`${API_BASE}${path}`, {
         method: init?.method ?? "GET",
         headers: {
-          Authorization: `Bearer ${config.token}`,
-          "X-PF-Store-Id": config.storeId,
+          Authorization: `Bearer ${token}`,
+          "X-PF-Store-Id": storeId,
           ...(init?.body !== undefined ? { "Content-Type": "application/json" } : {}),
         },
         body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
@@ -133,6 +153,7 @@ export async function listSyncProducts(): Promise<PrintfulResult<SyncProductSumm
 
 export async function getSyncProduct(
   id: number,
+  storeId?: string,
 ): Promise<PrintfulResult<{ product: SyncProductSummary; variants: SyncVariantDetail[] }>> {
   interface Raw {
     sync_product: { id: number; external_id?: string; name: string; synced?: number; thumbnail_url?: string };
@@ -146,7 +167,7 @@ export async function getSyncProduct(
       files?: { type?: string; url?: string; preview_url?: string }[];
     }[];
   }
-  const r = await pf<Raw>(`/sync/products/${id}`);
+  const r = await pf<Raw>(`/sync/products/${id}`, storeId ? { storeId } : undefined);
   if (!r.ok) return { ok: false, error: (r as { ok: false; error: string }).error };
   const sp = r.value.sync_product;
   return {
@@ -194,4 +215,78 @@ export async function linkSyncVariant(
   };
   if (retailPrice) body.retail_price = retailPrice;
   return pf<{ id: number }>(`/sync/variants/${syncVariantId}`, { method: "PUT", body });
+}
+
+export interface CreateNativeVariantInput {
+  /** Woo SKU — the fulfillment lookup key (becomes the sync variant external_id). */
+  externalId: string;
+  /** Printful catalog variant id (Bella 3001 White/M etc.). */
+  catalogVariantId: number;
+  retailPrice: string;
+  printFileUrl: string;
+}
+
+/**
+ * Full-auto product creation on the NATIVE ("Manual Order / API platform") store.
+ *
+ * Unlike the Woo-platform store — which has NO API to import an externally-created Woo product
+ * and forces a human into the Printful dashboard — the native store accepts POST /store/products,
+ * creating the sync product AND binding every catalog variant + front print file in ONE call.
+ * No dashboard, no "import", fully automatic.
+ *
+ * external_id mapping (the link back to the Woo storefront, used by P4 order fulfillment):
+ *   sync_product.external_id = Woo product id   ·   sync_variant.external_id = Woo SKU
+ *
+ * The POST response does not reliably carry the created sync_variant ids, so we re-read the
+ * product to return SKU → sync_variant_id, which P4 needs to resolve a paid Woo order line into
+ * a Printful POST /orders item.
+ */
+export async function createSyncProductOnNative(input: {
+  name: string;
+  externalId: string;
+  thumbnailUrl?: string;
+  variants: CreateNativeVariantInput[];
+}): Promise<
+  PrintfulResult<{
+    id: number;
+    variantCount: number;
+    variants: { id: number; externalId: string | null; catalogVariantId: number | null }[];
+  }>
+> {
+  const storeId = process.env.PRINTFUL_NATIVE_STORE_ID;
+  if (!storeId) return { ok: false, error: "printful_native_store_not_configured" };
+  if (input.variants.length === 0) return { ok: false, error: "no_variants" };
+  const body = {
+    sync_product: {
+      name: input.name,
+      external_id: input.externalId,
+      ...(input.thumbnailUrl ? { thumbnail: input.thumbnailUrl } : {}),
+    },
+    sync_variants: input.variants.map((v) => ({
+      external_id: v.externalId,
+      variant_id: v.catalogVariantId,
+      retail_price: v.retailPrice,
+      files: [{ type: "front", url: v.printFileUrl }],
+    })),
+  };
+  const created = await pf<{ id: number }>(`/store/products`, { method: "POST", body, storeId });
+  if (!created.ok) return { ok: false, error: (created as { ok: false; error: string }).error };
+  // Re-read to obtain authoritative sync_variant ids + external_ids for P4 fulfillment lookup.
+  const detail = await getSyncProduct(created.value.id, storeId);
+  if (!detail.ok) {
+    // The product WAS created — surface its id so the caller can recover instead of double-creating.
+    return { ok: true, value: { id: created.value.id, variantCount: 0, variants: [] } };
+  }
+  return {
+    ok: true,
+    value: {
+      id: created.value.id,
+      variantCount: detail.value.variants.length,
+      variants: detail.value.variants.map((v) => ({
+        id: v.id,
+        externalId: v.externalId,
+        catalogVariantId: v.catalogVariantId,
+      })),
+    },
+  };
 }
