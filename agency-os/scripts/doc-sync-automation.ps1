@@ -34,7 +34,7 @@ function To-RelPath {
     param([string]$Root, [string]$PathValue)
     $rootUri = New-Object System.Uri(($Root.TrimEnd('\') + '\'))
     $fullPath = if ([System.IO.Path]::IsPathRooted($PathValue)) { $PathValue } else { Join-Path $Root $PathValue }
-    $fileUri = New-Object System.Uri((Resolve-Path $fullPath).Path)
+    $fileUri = New-Object System.Uri((Resolve-Path -LiteralPath $fullPath).Path)
     return [System.Uri]::UnescapeDataString($rootUri.MakeRelativeUri($fileUri).ToString()).Replace('\', '/')
 }
 

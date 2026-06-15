@@ -16,7 +16,9 @@
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/2n — 2 Minor（duplicate-input-SKU 可 mask incompleteVariants）本輪以 vmap dup-sku guard 全關；regression-toward-502 兩情境（`idempotency_precheck_failed:printful_timeout` + 裸 `printful_timeout`）皆經 critic 追證確認新 classifier 仍涵蓋；null hole（externalId string|null）confirmed 無 false-negative。
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`isTransientPfError\|incompleteVariants\|skuMismatch\|includes("timeout")` | hits=3 files — 舊 free-text 殘留 **0**；isTransientPfError 1def+2call；incompleteVariants 消費端（route 422 + print-provider 產生）一致；agency-os/scripts 0 stale。
 - 驗證等效已登記 `verify-recent-ack`（daily 2026-06-16.md 審計），commit gate 通過。
-**[剩餘風險]** 未部署 prod（HEAD vs `5b8c97ac`，純 next-admin code → 需一次 sg-deploy 生效，High-risk 待 go-ahead）。功能行為純收嚴（誤判 503→正確 502 / SKU 腐化→422 fail-loud），無對外行為放寬。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/root/lobster-phase1/scripts/sg-deploy.sh next-admin`（host npm test→build→healthcheck→smoke gate）| exit=0 | `.deployed-commit=1b081764`（prev `5b8c97ac`）；container `Up healthy after 6s`；smoke 4/4（/login 200、/api/ops/summary 200、nginx/wp 200、node-api 200）。deployed source 實 grep 確認 `isTransientPfError`×3 + `skuMismatch`×2 = 兩 fix 真上 prod。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke` | exit=1 | **24 pass / 2 fail / 4 skip**；2 fail 皆 `04-onboard-page.spec.ts`（OnboardWizard auth anchor）= **TASKS line 76 既有 harness 問題（spec 缺 app login，只帶 nginx basic-auth）**，與 POD publish 改動無關，**非部署回歸**。POD 相關 smoke 全綠。
+**[剩餘風險]** 無（已部署 prod 並驗）。功能行為純收嚴（誤判 503→正確 502 / SKU 腐化→422 fail-loud），無對外行為放寬。
 **[rollback]** `git checkout 5b8c97ac -- <三檔>`；未部署故 prod 不受影響。
 
 ## 2026-06-15
