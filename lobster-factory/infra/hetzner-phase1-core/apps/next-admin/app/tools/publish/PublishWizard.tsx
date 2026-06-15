@@ -13,6 +13,9 @@ interface VariantMapEntry {
   variationId: number;
   color: string;
   size: string;
+  // Echoed by `create` — the authoritative SKU (P4 join key) + price that pfcreate consumes verbatim.
+  sku: string;
+  price: string;
 }
 
 type StepState = "idle" | "running" | "done" | "error";
@@ -25,6 +28,16 @@ const PRINT_MODE_LABEL: Record<PrintMode, string> = {
   resample: "忠實放大（Lanczos，較軟）",
   "ai-enhance": "AI 增強（Real-ESRGAN，非 100% 忠實）",
 };
+
+// Mirror the backend pfcreate vmap filter (route.ts:444-452 + PRICE_RE :79): a usable native-path map
+// needs ≥1 entry AND every entry carries a non-empty SKU + a well-formed price. Sharing ONE predicate
+// front↔back keeps the 🚀 button's disabled state aligned with the 400 (variantMap_required) contract even
+// if buildVariantPlan changes its price/SKU format later (critic 2026-06-15 — hidden-coupling guard).
+const PF_PRICE_RE = /^\d+(\.\d{1,2})?$/;
+const hasUsablePfMap = (vmap?: VariantMapEntry[]): boolean =>
+  Array.isArray(vmap) &&
+  vmap.length > 0 &&
+  vmap.every((m) => typeof m?.sku === "string" && m.sku.length > 0 && typeof m?.price === "string" && PF_PRICE_RE.test(m.price));
 
 export default function PublishWizard() {
   const [designs, setDesigns] = useState<DesignAsset[]>([]);
@@ -70,10 +83,26 @@ export default function PublishWizard() {
     productId?: number;
     editUrl?: string;
     variantMap?: VariantMapEntry[];
+    // Woo returned a different variation_id count than our plan → SKU map dropped at the source.
+    // The native one-click path needs the SKU map, so surface this and steer to the legacy fallback.
+    variantMapDropped?: boolean;
     error?: string;
   }>({ state: "idle" });
   const [sync, setSync] = useState<{ state: StepState; synced?: boolean; error?: string }>({ state: "idle" });
   const [link, setLink] = useState<{ state: StepState; linkedCount?: number; total?: number; faithful?: boolean; error?: string }>({ state: "idle" });
+  // Native store one-click: create Printful product + bind every variant + print file in ONE call
+  // (replaces the status→link dance, which only ever worked via manual dashboard import on the Woo store).
+  const [pfcreate, setPfcreate] = useState<{
+    state: StepState;
+    syncProductId?: number;
+    variantCount?: number;
+    alreadyExisted?: boolean;
+    // Captured at create-time so the success line can't claim "100% 忠實" over an ai-enhance file
+    // (same trap runLink guards against — upscale.faithful could drift; the reset effects keep it honest).
+    faithful?: boolean;
+    retryable?: boolean;
+    error?: string;
+  }>({ state: "idle" });
 
   useEffect(() => {
     void (async () => {
@@ -112,11 +141,13 @@ export default function PublishWizard() {
     setCreate({ state: "idle" });
     setSync({ state: "idle" });
     setLink({ state: "idle" });
+    setPfcreate({ state: "idle" });
   }, [designUrl]);
-  // Changing the fidelity mode invalidates the print file (and the link bound to it).
+  // Changing the fidelity mode invalidates the print file (and anything bound to it).
   useEffect(() => {
     setUpscale({ state: "idle" });
     setLink({ state: "idle" });
+    setPfcreate({ state: "idle" });
   }, [printMode]);
 
   const runUpscale = useCallback(async () => {
@@ -229,6 +260,8 @@ export default function PublishWizard() {
       productId: json.product_id as number,
       editUrl: json.edit_url as string | undefined,
       variantMap: json.variantMap as VariantMapEntry[],
+      // Surface the source-side "SKU map dropped" signal so the native path can refuse and steer to legacy.
+      variantMapDropped: Boolean(json.variantMapDropped),
     });
   }, [title, retailPrice, plusPrice, mockupUrls, copy, post]);
 
@@ -263,6 +296,40 @@ export default function PublishWizard() {
     setLink({ state: "done", linkedCount: json.linkedCount as number, total: json.total as number, faithful: upscale.faithful });
   }, [create.productId, create.variantMap, upscale.printFileUrl, upscale.faithful, retailPrice, plusPrice, post]);
 
+  // Native full-auto: one call creates the Printful product, binds every catalog variant, AND uploads
+  // the print file — no dashboard import, no "is it synced yet?" polling. Consumes create's variantMap
+  // verbatim (authoritative SKUs) and the upscaled print file. Replaces runStatus + runLink.
+  const runPfcreate = useCallback(async () => {
+    if (!create.productId || !upscale.printFileUrl) return;
+    // Backend rejects a variantMap whose entries lack a usable SKU/price with 400 (variantMap_required);
+    // mirror that exact contract here so the button never fires a guaranteed-to-fail call with a misleading
+    // error. Also block double-submit.
+    if (!hasUsablePfMap(create.variantMap)) return;
+    if (pfcreate.state === "running") return;
+    setPfcreate({ state: "running" });
+    const json = await post({
+      action: "pfcreate",
+      wooProductId: create.productId,
+      title,
+      printFileUrl: upscale.printFileUrl,
+      retailPrice,
+      plusPrice,
+      variantMap: create.variantMap ?? [],
+      mockupUrls,
+    });
+    if (!json.ok) {
+      setPfcreate({ state: "error", error: json.error, retryable: Boolean(json.retryable) });
+      return;
+    }
+    setPfcreate({
+      state: "done",
+      syncProductId: json.syncProductId as number,
+      variantCount: json.variantCount as number,
+      alreadyExisted: Boolean(json.alreadyExisted),
+      faithful: upscale.faithful,
+    });
+  }, [create.productId, create.variantMap, upscale.printFileUrl, upscale.faithful, title, retailPrice, plusPrice, mockupUrls, pfcreate.state, post]);
+
   const pill = (state: StepState) =>
     state === "done" ? "✅" : state === "running" ? "⏳" : state === "error" ? "❌" : "⬜";
 
@@ -274,7 +341,7 @@ export default function PublishWizard() {
     <div style={{ padding: 16, maxWidth: 980 }}>
       <p style={{ opacity: 0.7, fontSize: 13 }}>
         串連：設計圖 → ① 產生印刷檔（預設<b>原圖 100% 忠實</b>，不改像素）→ ② 建 Woo <b>草稿</b>商品（白/黑 × {SIZES.join("/")}）→
-        人工到後台 review 並 <b>publish</b>（Printful 只同步已發布商品，可先設「隱藏」）→ ③ 檢查同步 → ④ 綁定印刷檔 → 設為可見開賣。
+        ③ <b>🚀 一鍵上 Printful</b>（native store 全自動：一次建品＋綁所有變體＋上傳印刷檔，<b>免後台手動匯入</b>）→ 後台 review 後 publish 開賣。
       </p>
 
       {/* design + mockup pickers */}
@@ -443,35 +510,79 @@ export default function PublishWizard() {
           {create.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{create.error}</span> : null}
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <span>{pill(sync.state)}</span>
-          <button className="btn-secondary" disabled={!create.productId || sync.state === "running"} onClick={() => void runStatus()}>
-            ③ 檢查 Printful 同步
-          </button>
-          {sync.state === "done" ? (
-            <span style={{ fontSize: 12 }}>
-              {sync.synced ? "已同步 ✓ 可綁定" : "尚未同步 — 確認商品已在後台 publish（draft 不會同步），再稍候重按"}
-            </span>
-          ) : null}
-          {sync.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{sync.error}</span> : null}
-        </div>
-
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <span>{pill(link.state)}</span>
+        {/* ③ Native store ONE-CLICK full automation — the primary path. One API call creates the
+            Printful product, binds every variant, AND uploads the print file. No dashboard import. */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span>{pill(pfcreate.state)}</span>
           <button
             className="btn-primary"
-            disabled={!sync.synced || !upscale.printFileUrl || link.state === "running"}
-            onClick={() => void runLink()}
+            disabled={!create.productId || !upscale.printFileUrl || !hasUsablePfMap(create.variantMap) || pfcreate.state === "running"}
+            onClick={() => void runPfcreate()}
+            title="一次建立 Printful 商品 + 綁定所有變體 + 上傳印刷檔（native store，全自動，免後台手動匯入）"
           >
-            ④ 綁定印刷檔（全部變體）
+            🚀 ③ 一鍵上 Printful（native 全自動：建品＋綁變體＋印刷檔）
           </button>
-          {link.state === "done" ? (
-            <span style={{ fontSize: 12 }}>
-              綁定 {link.linkedCount}/{link.total} ✓（印刷檔：{link.faithful ? "100% 忠實" : "AI 增強，非忠實"}）— 後台 review 後 publish 即可開賣
+          {pfcreate.state === "done" ? (
+            <span style={{ fontSize: 12, color: "#46a758" }}>
+              {pfcreate.alreadyExisted ? "已存在（冪等命中）" : "已建立"} ✓ Printful #{pfcreate.syncProductId} · {pfcreate.variantCount} 變體已綁印刷檔（{pfcreate.faithful ? "100% 忠實" : "AI 增強，非忠實"}）— 免手動匯入
             </span>
           ) : null}
-          {link.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{link.error}</span> : null}
+          {pfcreate.error ? (
+            <span style={{ color: "#e5484d", fontSize: 12 }}>
+              {pfcreate.error}{pfcreate.retryable ? "（可重試）" : ""}
+            </span>
+          ) : null}
         </div>
+        {!create.productId || !upscale.printFileUrl ? (
+          <div style={{ fontSize: 11, opacity: 0.6, paddingLeft: 26 }}>
+            需先完成 ① 產生印刷檔 + ② 建 Woo 草稿商品，才能一鍵上架。
+          </div>
+        ) : create.variantMapDropped || !hasUsablePfMap(create.variantMap) ? (
+          // create 成功但 Woo 回傳的 variation_id 數與計畫不符 → SKU 對照表在源頭被丟棄，native 路徑無 SKU 可綁。
+          <div style={{ fontSize: 11, color: "#f5a623", paddingLeft: 26 }}>
+            ⚠ 建立草稿時 Woo 回傳的變體數與計畫不符，SKU 對照表未產生，無法走一鍵 native 路徑。
+            請改用下方「進階：舊 Woo store 手動同步路徑」，或重新建立草稿商品（②）。
+          </div>
+        ) : null}
+
+        {/* Legacy fallback: the Woo-platform store manual sync dance — demoted (it requires a human
+            dashboard import and never achieved full automation; the native path above supersedes it). */}
+        <details style={{ paddingLeft: 26 }}>
+          <summary style={{ fontSize: 11, opacity: 0.6, cursor: "pointer" }}>
+            進階：舊 Woo store 手動同步路徑（③ 檢查同步 / ④ 綁定）
+          </summary>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <span>{pill(sync.state)}</span>
+              <button className="btn-secondary" disabled={!create.productId || sync.state === "running"} onClick={() => void runStatus()}>
+                ③ 檢查 Printful 同步
+              </button>
+              {sync.state === "done" ? (
+                <span style={{ fontSize: 12 }}>
+                  {sync.synced ? "已同步 ✓ 可綁定" : "尚未同步 — 確認商品已在後台 publish（draft 不會同步），再稍候重按"}
+                </span>
+              ) : null}
+              {sync.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{sync.error}</span> : null}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <span>{pill(link.state)}</span>
+              <button
+                className="btn-primary"
+                disabled={!sync.synced || !upscale.printFileUrl || link.state === "running"}
+                onClick={() => void runLink()}
+              >
+                ④ 綁定印刷檔（全部變體）
+              </button>
+              {link.state === "done" ? (
+                <span style={{ fontSize: 12 }}>
+                  綁定 {link.linkedCount}/{link.total} ✓（印刷檔：{link.faithful ? "100% 忠實" : "AI 增強，非忠實"}）— 後台 review 後 publish 即可開賣
+                </span>
+              ) : null}
+              {link.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{link.error}</span> : null}
+            </div>
+          </div>
+        </details>
       </div>
     </div>
   );

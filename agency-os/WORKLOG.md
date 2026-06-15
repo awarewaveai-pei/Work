@@ -52,13 +52,32 @@
 
 **[剩餘風險]**
 - **compose-drift（infra-process gap，待和解）**：runtime `/root/lobster-phase1/docker-compose.yml` 與 repo `docker-compose.yml` 結構分歧；sg-deploy 不 sync compose → 任何 repo compose 的 env/service 改動都不會自動上 prod（本次 PRINTFUL_NATIVE_STORE_ID 即踩此坑，已手動補 runtime compose）。後續應：① 將兩份 compose 和解為單一 SSOT 或 ② 在 sg-deploy 加 compose drift 檢查/同步步驟。目前 runtime 已手補，功能正常但下次新 env 仍會再踩。
-- pfcreate 未接前端：操作者尚無「一鍵全自動」按鈕；需把 publish 按鈕從 `create→status→link`（Woo 手動 publish dance）改為 `create→pfcreate`（native 全自動）。**部署+真機 REALTEST 已通過**，此項為純前端接線後續。
+- ~~pfcreate 未接前端~~ **✅ 已解決（見下方接線 entry）**：PublishWizard 已加「🚀 ③ 一鍵上 Printful（native 全自動）」主按鈕；舊 `create→status→link` Woo 手動 dance 收進 `<details>` legacy fallback。
 - native store 建的 Printful 商品與 Woo storefront 商品**僅以 SKU 連結**（P4 join key）；P4 fulfillment（A2）尚未實作，目前 native 建品只是讓 Printful 端可下單，未自動轉單。
 - `PRINTFUL_NATIVE_STORE_ID` 未設則 pfcreate 回 503 not_configured（fail-closed，不影響既有 create/link 流程）。
 - （benign 🟡，critic 第4回標非 blocker，後續 hardening 候選）transient 分類器 `route.ts:502` 用 free-text `includes("timeout"/"network_error")` 比對 Printful body message → 含「timeout」字樣的 Printful 4xx 可能被誤判 503-retryable（後果良性：操作者重試→冪等預查乾淨解決，無腐化無假 200）；可改比對結構化 token（`printful_timeout`/`printful_network_error`）`===`/`startsWith`。
 - （benign 🟡）冪等命中既有商品時 `incompleteVariants` 僅比 variant **數量**不比 SKU；同 wooProductId 改標題後（不同 SKU seed）以相同 variant 數重發，pfcreate 會回首發商品的 SKU。機率低且有界（P4 join 鍵在 Woo variation SKU，只在 create 種一次、改名不變動，join 仍解析）；可選擇交叉比對既有 SKU vs 進來的 vmap SKU 強制 retryable，或文件標註「改名後重發不支援」。
 
 **[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/studio/print-provider.ts lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/publish/route.ts lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`；已部署則 sg-deploy rollback + 從 native store 刪除測試 sync product。
+
+### feat(pod): A1 接線 — PublishWizard 一鍵 native 全自動按鈕（消除 status→link Woo 手動 dance）
+
+**[任務理解]** A1 後端能力（pfcreate action）已部署+真機 REALTEST 通過，但操作者 UI 仍是舊 `create→status→link` 流程（要人到 Woo 後台手動 publish 才同步）。使用者「全部處理好」→ 把前端接到 pfcreate，讓「建品+綁變體+印刷檔」真正一鍵全自動。
+
+**[已修改]**
+- `app/tools/publish/PublishWizard.tsx` — ① `VariantMapEntry` 加 `sku`/`price`（吃 create 權威 SKU）；② 新 `pfcreate` state（含 `faithful` capture）+ `create` state 加 `variantMapDropped`；③ designUrl/printMode reset effects 連帶 reset pfcreate；④ 新 `runPfcreate` callback（post `action:pfcreate`，帶 create.variantMap 逐字消費）；⑤ 新主按鈕「🚀 ③ 一鍵上 Printful（native 全自動）」，舊 ③status/④link 降級進 `<details>` legacy fallback；⑥ intro 文案改述一鍵 native 路徑；⑦ 抽 module 級 `hasUsablePfMap()` predicate **鏡像後端 vmap filter**（route.ts:444-452 + PRICE_RE:79），按鈕 disabled / runPfcreate early-return / 橘色警告三處共用同一判斷。
+
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0(publish 檔零錯) | PublishWizard.tsx + route.ts 無型別錯（總 20 錯全為既存 fabric/pdf-lib missing-dep，與本檔無關，Docker build 裝）。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/1n（+1 suggestion）。先前 Major（後端軟成功 `variantMapDropped` 前端未接住→🚀 按鈕可點但保證 400+誤導訊息）**已閉環**（:78 state type / :254 capture / :508 disabled / :296 early-return / :529 橘色警告 五處驗證）。React hooks exhaustive-deps 完整（`runPfcreate` deps 含 `upscale.faithful`+`pfcreate.state`）、雙提交競態雙層防護、faithful 標籤對齊 runLink、橘色警告無誤觸發/漏觸發。唯一 Minor（前端 disabled 只比長度不比欄位品質的隱性耦合）**本回合已修**：抽共用 `hasUsablePfMap()` predicate 鏡像後端 sku 非空+price 過 PRICE_RE。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`pfcreate\|variantMapDropped\|variantMap_required\|expectedVariantCount\|gotVariationIds\|18324409` | hits=2 files（PublishWizard.tsx 前端 + route.ts 後端，契約前後端一致：:318 emit variantMapDropped / :47+:418 pfcreate action union+handler / :457 variantMap_required 400）；agency-os 僅 WORKLOG 自身引用、scripts 0 命中、0 stale claim。
+- WORKLOG: 本 entry。
+
+**[剩餘風險]**
+- UI 改動尚未部署到 prod（需 sg-deploy 才能瀏覽器 e2e；deploy 後建議 `/playwright smoke` + 提議真實 create+pfcreate 一次端到端（會建真 Woo+Printful 商品，需事後清理，非金流））。
+- （benign 🟡，critic suggestion）`create.state==="error"` 時橘色警告分支走「需先完成①②」灰字（實際 create error 已於按鈕行內顯示），語意稍弱，可不改。
+
+**[rollback]** `git checkout HEAD -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/publish/PublishWizard.tsx`（純前端，未部署前零風險；已部署則 sg-deploy 回滾上一 commit）。
 
 ### feat(content-engine): P1 生成端 SEO/RankMath CJK 合規（issues 二/三/B/C/五/六/九）
 
