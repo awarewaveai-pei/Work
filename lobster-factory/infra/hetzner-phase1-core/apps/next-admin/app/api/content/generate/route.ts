@@ -275,6 +275,22 @@ function buildUserPrompt(params: {
   if (s.quotes === false)          lines.push("DO NOT include block quotes.");
   if (s.bold === false)            lines.push("DO NOT use bold text for emphasis.");
 
+  // Positive enforcement — the negative `=== false` opt-outs above are NOT enough. When these
+  // sections are enabled the model still silently skips them, relying on the system prompt default
+  // (user-reported 2026-06-16: TABLES/FAQ/QUOTES toggled Yes but absent from the output). List the
+  // enabled-but-skip-prone elements as hard REQUIRED items so they actually appear.
+  const required: string[] = [];
+  if (s.comparisonTable !== false)      required.push("at least one comparison or evaluation table using markdown table syntax (| column | column |)");
+  else if (s.tables !== false)          required.push("at least one data table where it genuinely helps the reader, using markdown table syntax");
+  if (s.faq !== false)                  required.push("a \"## FAQ\" section near the end with 5-8 question-and-answer pairs; each answer 40-120 words and self-contained (RankMath converts this to FAQPage schema)");
+  if (s.quotes !== false)               required.push("at least one markdown blockquote — a line beginning with \"> \" — highlighting a key insight or a sourced quotation");
+  if (s.keyTakeaways !== false)         required.push("a \"## Key Takeaways\" section with 4-5 bullet points");
+  if (required.length > 0) {
+    lines.push("");
+    lines.push("REQUIRED ELEMENTS — the finished article MUST contain EVERY item below. Do NOT skip any; if one feels redundant include it anyway in the most natural place:");
+    required.forEach(r => lines.push(`- ${r}`));
+  }
+
   // Introductory hook
   if (params.introHookType || params.introHookBrief.trim()) {
     lines.push("");
