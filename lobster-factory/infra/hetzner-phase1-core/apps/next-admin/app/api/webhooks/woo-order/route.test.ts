@@ -45,26 +45,27 @@ describe("parseWooOrder", () => {
     if (r.ok) expect(r.recipient.address1).toBe("Bill St 1");
   });
 
+  // tsconfig here does not narrow `!r.ok` — cast the failure variant (same convention as route.ts).
+  const asErr = (r: ReturnType<typeof parseWooOrder>) => r as { ok: false; reason: string; status: number };
+
   it("skips non-POD (no-SKU) lines; an order with zero POD lines is a 200 no-op", () => {
     const r = parseWooOrder({ ...baseOrder, line_items: [{ quantity: 1 }, { sku: "  ", quantity: 1 }] });
     expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.reason).toBe("no_pod_line_items");
-      expect(r.status).toBe(200); // benign — Woo should not retry
-    }
+    expect(asErr(r).reason).toBe("no_pod_line_items");
+    expect(asErr(r).status).toBe(200); // benign — Woo should not retry
   });
 
   it("rejects a missing order id (400)", () => {
     const r = parseWooOrder({ ...baseOrder, id: undefined });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.status).toBe(400);
+    expect(asErr(r).status).toBe(400);
   });
 
   it("requires state_code for US/CA/AU", () => {
     const us = { ...baseOrder, shipping: { ...baseOrder.shipping, country: "US", state: undefined } };
     const r = parseWooOrder(us);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("state_code_required_for_country");
+    expect(asErr(r).reason).toBe("state_code_required_for_country");
   });
 
   it("drops a line whose quantity is non-positive / non-integer", () => {
