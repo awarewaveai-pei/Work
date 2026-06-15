@@ -31,7 +31,12 @@ $command = $prefix + "npx -y trigger.dev@latest mcp --project-ref `"$ProjectRef`
 # process PATH may omit System32\WindowsPowerShell, so a bare `powershell` token raises
 # CommandNotFoundException (root cause of 2026-06-15 "Could not attach to MCP server trigger").
 $psExe = Join-Path $PSHOME 'powershell.exe'
-if (-not (Test-Path -LiteralPath $psExe)) { $psExe = 'powershell' }
+if (-not (Test-Path -LiteralPath $psExe)) {
+    # pwsh 7 host: $PSHOME holds pwsh.exe, not powershell.exe. Fall back to the
+    # well-known absolute Windows PowerShell 5.1 path before the PATH-dependent bare token.
+    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if (-not (Test-Path -LiteralPath $psExe)) { $psExe = 'powershell' }
+}
 
 & $psExe -ExecutionPolicy Bypass -File $vaultScript `
     -Action run `
