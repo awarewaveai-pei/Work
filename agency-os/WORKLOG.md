@@ -87,7 +87,12 @@
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/2n+2s — end-to-end 追金流：唯一 mutating call `POST /orders` body 無 confirm 欄、path 非 `?confirm=1` → **無扣款送印路徑**；kill-switch fail-closed；HMAC 無繞過（empty secret/sig→false、raw-body 一致、base64 對 Woo `WC_Webhook::generate_signature`、constant-time）。Minor#1（`ok:true`+`error` 矛盾）**已修**（200 no-op 改 reason）；Suggestion#3（handler 守門 test）**已加**。
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`POD_AUTO_FULFILL_ENABLED\|WC_WEBHOOK_SECRET\|parseWooOrder\|verifyWooSignature\|woo-order\|confirm` | hits=新 route+test+compose 兩 block | 新 symbol 無外部 stale consumer；webhook 內 `confirm` 僅在「明確不存在」註解 = 金流紅線完好；agency-os/scripts 0。
 - 驗證等效登記 `verify-recent-ack`（daily 2026-06-16.md）。
-**[剩餘風險]** 未部署 prod（待 go-ahead；flag default off → 即使部署也 dormant，零金流）。**啟用需操作者三步**：① SG `.env` 設 `POD_AUTO_FULFILL_ENABLED=true` + `WC_WEBHOOK_SECRET=<隨機>` ② WP admin 加 Woo webhook（order.updated/created → `https://app.aware-wave.com/api/webhooks/woo-order`，secret 同上）③ 即便啟用仍 **draft-only**，真送印需未來明確加 confirm（金流紅線，測試結束再議）。未來 confirm phase 前應改用 webhook topic header 判狀態（partial-refund-still-processing edge）。
+**[部署 + 兩個 CI-gate 抓到的修]** 使用者打錯字（真意「不要」）→ 釐清後選 A（部署 + dormant）。部署過程 deploy gate 連抓兩個本機被環境掩蓋的問題（gate 價值實證）：
+- 修① `f3c4d981`：server vitest 無 global `crypto`（`ReferenceError`，6 test fail，npm-test gate abort）→ 改 `node:crypto` createHmac+timingSafeEqual（codebase HMAC 慣例）。
+- 修② `e336d5da`：`next build` 拒絕 route 模組 export 非 handler（`Route does not match required types`；`tsc --noEmit` 不檢此條）→ 純函式 parseWooOrder/verifyWooSignature 移至 `lib/studio/woo-webhook.ts`，route 只 export POST/runtime/dynamic。本機補跑**真 `next build`**確認 route 進 manifest 才重 deploy。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | `.deployed-commit=e336d5da`（prev 1b081764）；gate 全綠（tsc + npm test 333/333 + build + healthcheck 7s + smoke 4/4）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec ... node fetch POST /api/webhooks/woo-order body={}` | exit=0 | 容器 `POD_AUTO_FULFILL_ENABLED=[]`（空）→ probe 回 `http=200 {"ok":true,"ignored":true,"reason":"auto_fulfill_disabled"}` = **已上 prod 且完全 dormant，零 fulfillment**。
+**[剩餘風險]** 無（已部署、dormant、零金流）。**啟用需操作者三步**：① SG `.env` 設 `POD_AUTO_FULFILL_ENABLED=true` + `WC_WEBHOOK_SECRET=<隨機>`（改 env 需 `docker compose up -d` 重啟容器，無需重新 deploy code）② WP admin 加 Woo webhook（order.updated/created → `https://app.aware-wave.com/api/webhooks/woo-order`，secret 同上）③ 即便啟用仍 **draft-only**，真送印需未來明確加 confirm（金流紅線，測試結束再議）。未來 confirm phase 前應改用 webhook topic header 判狀態（partial-refund-still-processing edge）。
 **[rollback]** `git checkout ad14f5f1~1 -- <route+test+compose>`；未部署故 prod 不受影響；flag off 故即使部署也無行為改變。
 
 ## 2026-06-15

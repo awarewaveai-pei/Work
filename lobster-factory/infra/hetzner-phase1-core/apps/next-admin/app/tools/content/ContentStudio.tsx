@@ -341,6 +341,7 @@ export default function ContentStudio() {
   const [metaData,  setMetaData]  = useState<MetaData | null>(null);
   const [genStatus, setGenStatus] = useState<GenStatus>("idle");
   const [genError,  setGenError]  = useState("");
+  const [genTruncated, setGenTruncated] = useState(false);
 
   // Publish
   const [pubStatus, setPubStatus] = useState<PubStatus>("idle");
@@ -598,7 +599,7 @@ export default function ContentStudio() {
     abortRef.current = ac;
 
     setGenerated(""); setMetaData(null);
-    setGenStatus("streaming"); setGenError("");
+    setGenStatus("streaming"); setGenError(""); setGenTruncated(false);
     setPubStatus("idle"); setPubResult(null);
     setSeoReport(null); setSeoChecking(false);
     setSlugHint(""); setAutoImgN(0);
@@ -611,8 +612,21 @@ export default function ContentStudio() {
 
     try {
       const externalLinks = form.externalLinks.split("\n").map(u => u.trim()).filter(u => /^https?:\/\//.test(u)).slice(0, 5);
-      const internalLinks = form.internalLinks.split("\n").map(u => u.trim()).filter(u => /^(https?:\/\/|\/)/.test(u)).slice(0, 10);
+      const userInternal  = form.internalLinks.split("\n").map(u => u.trim()).filter(u => /^(https?:\/\/|\/)/.test(u));
       const referenceUrls = form.referenceUrls.split("\n").map(u => u.trim()).filter(u => /^https?:\/\//.test(u)).slice(0, 3);
+
+      // Auto-fetch REAL related posts from the target site so the model weaves genuine internal
+      // links instead of fabricating fake URLs. Best-effort — failure just falls back to user links.
+      let autoInternal: string[] = [];
+      try {
+        const rp = await fetch("/api/content/related-posts", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keyword: form.keyword, siteId: selectedSiteId || undefined }),
+        });
+        const rpJson = await rp.json() as { ok: boolean; posts?: Array<{ link: string }> };
+        if (rpJson.ok && rpJson.posts?.length) autoInternal = rpJson.posts.map(p => p.link);
+      } catch { /* best-effort: no auto internal links */ }
+      const internalLinks = [...new Set([...userInternal, ...autoInternal])].slice(0, 10);
 
       const res = await fetch("/api/content/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -632,9 +646,14 @@ export default function ContentStudio() {
       }
       text += dec.decode();
 
-      const meta    = extractMeta(text);
-      const hint    = extractSlugHint(text);
-      const cleanMd = stripSlugHint(meta ? stripMeta(text) : text);
+      // Detect + strip the server-side truncation marker so it never leaks into the article.
+      const truncated = /<!--\s*GENERATION_TRUNCATED:/.test(text);
+      setGenTruncated(truncated);
+      const detrunc = text.replace(/\n*<!--\s*GENERATION_TRUNCATED:[^>]*-->/g, "");
+
+      const meta    = extractMeta(detrunc);
+      const hint    = extractSlugHint(detrunc);
+      const cleanMd = stripSlugHint(meta ? stripMeta(detrunc) : detrunc);
       if (meta) setMetaData(meta);
       setGenerated(cleanMd);
       setSlugHint(hint);
@@ -1651,6 +1670,11 @@ export default function ContentStudio() {
                   產出文章
                   {isGenerating && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>串流中…</span>}
                   {genStatus === "done" && <span style={{ fontWeight: 400, color: "#22c55e", marginLeft: 8 }}>✓ 完成</span>}
+                  {genStatus === "done" && genTruncated && (
+                    <span style={{ fontWeight: 500, color: "#f59e0b", marginLeft: 8, fontSize: "12px" }}>
+                      ⚠ 可能被截斷（超過長度上限）— 建議選短篇或拆主題重新生成
+                    </span>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                   {hasContent && (

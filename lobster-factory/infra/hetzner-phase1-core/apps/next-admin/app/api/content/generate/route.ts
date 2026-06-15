@@ -6,7 +6,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const SIZE_TOKENS: Record<string, number> = { short: 2048, medium: 4096, long: 6144 };
+// Output token budgets. Raised 2026-06-16: the old medium=4096 truncated rich articles
+// (tables + nested H3 + lists) mid-sentence, cutting off the trailing CONTENT_META block →
+// empty SEO title/description → RankMath score collapsed. Headroom now fits article + meta.
+const SIZE_TOKENS: Record<string, number> = { short: 4096, medium: 8192, long: 16384 };
 const SIZE_WORDS: Record<string, string>  = { short: "~1200", medium: "~2500", long: "~4000" };
 
 const AI_WORDS_BASIC = [
@@ -327,12 +330,18 @@ function buildUserPrompt(params: {
     }
   }
 
-  // Internal links
+  // Internal links — provide REAL site URLs to weave; HARD-forbid the model from inventing any.
+  // Root cause (2026-06-16, user-reported live bug): unlike the external-links block which carries
+  // an anti-invention guard, this block had none → when no internal links were supplied the model
+  // fabricated fake internal URLs (e.g. /related-article) to satisfy RankMath's internal-link test.
   const validInternal = params.internalLinks.filter(u => /^(https?:\/\/|\/)/.test(u.trim()));
   if (validInternal.length > 0) {
     lines.push("");
-    lines.push("Internal links to weave naturally into the article content (use relevant anchor text, not 'click here'):");
+    lines.push("Internal links — weave these REAL existing site URLs naturally into the body using descriptive anchor text (never 'click here'). CRITICAL: use ONLY these exact URLs for internal links; NEVER invent, guess, modify, or fabricate any other internal or relative URL:");
     validInternal.forEach(u => lines.push(`- ${u.trim()}`));
+  } else {
+    lines.push("");
+    lines.push("Internal links: NONE provided. Do NOT add any internal links, and NEVER invent, guess, or fabricate internal/relative URLs (e.g. /related-article, /some-page). The site auto-links internally via a plugin — leave internal linking entirely to it. An article with zero internal links is correct here; a fabricated internal link is a serious error.");
   }
 
   // Media instructions
@@ -371,13 +380,14 @@ function buildUserPrompt(params: {
     }
   }
 
-  lines.push("");
-  lines.push("Write the complete article now.");
-
-  // Meta generation
+  // Meta generation — emit the meta block FIRST, before the article body. Root cause fix
+  // (2026-06-16): it was previously appended LAST, so when a long article hit the token limit
+  // the body truncated and the meta block was never produced → empty SEO title/description →
+  // RankMath score collapsed. extractMeta() locates the block by regex regardless of position,
+  // so emitting it first guarantees the SEO title/desc survive even if the body is cut short.
   if (params.generateMeta) {
     lines.push("");
-    lines.push("IMPORTANT: After the full article, append exactly this meta block (one field per line, keep the exact KEY: prefixes):");
+    lines.push("OUTPUT ORDER (follow EXACTLY): FIRST output the meta block below verbatim (keep the exact comment markers and KEY: prefixes, one field per line). THEN, immediately after the <!-- CONTENT_META_END --> line, write the complete article. Do NOT place the meta block at the end.");
     lines.push("<!-- CONTENT_META_START -->");
     lines.push("SEO_TITLE: [SEO title — 50-60 chars for Latin scripts / 14-30 chars for CJK; primary keyword in first half; include a power word AND an Arabic-digit number]");
     lines.push("META_DESC: [meta description — 145-155 chars for Latin scripts / 60-80 chars for CJK; includes primary keyword]");
@@ -385,6 +395,11 @@ function buildUserPrompt(params: {
     lines.push("CATEGORIES: [1-2 broad, conventional WordPress category names for this article, comma-separated — prefer terms a site would already have; do NOT invent narrow one-off categories]");
     lines.push("TAGS: [4-6 specific topical tags, comma-separated]");
     lines.push("<!-- CONTENT_META_END -->");
+    lines.push("");
+    lines.push("Now output the meta block above, then write the complete article below it.");
+  } else {
+    lines.push("");
+    lines.push("Write the complete article now.");
   }
 
   return lines.join("\n");
@@ -520,6 +535,15 @@ export async function POST(req: Request): Promise<Response> {
             event.delta.type === "text_delta"
           ) {
             controller.enqueue(encoder.encode(event.delta.text));
+          }
+        }
+
+        // Truncation guard: surface a max_tokens cutoff instead of silently shipping a
+        // half-written article (the old 4096 budget truncated invisibly — 2026-06-16 root cause).
+        if (!req.signal.aborted) {
+          const finalMsg = await anthropicStream.finalMessage().catch(() => null);
+          if (finalMsg?.stop_reason === "max_tokens") {
+            controller.enqueue(encoder.encode("\n\n<!-- GENERATION_TRUNCATED: hit the output length limit; pick a shorter article size or split the topic -->"));
           }
         }
       } catch (err) {
