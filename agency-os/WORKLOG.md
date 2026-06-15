@@ -43,6 +43,20 @@
 **[剩餘風險]** ① SSOT `REGISTER_SYSTEM_GUARD_TASKS.ps1` 261 bug 未修 → 公司桌機可能卡同款會閃的舊任務、未來重註冊仍失敗。修法（改 ScheduledTasks 模組）+ OnStartup 靜默化待使用者決策後續。② line 37 mid-enumeration TOCTOU（檔在 Get-ChildItem 與 To-RelPath 間被刪）會丟 PathNotFound 終止錯而非 `$null.Path` 神祕錯 —— critic 自評對維護腳本可接受，未加 guard。
 **[rollback]** doc-sync：`git checkout HEAD~1 -- agency-os/scripts/doc-sync-automation.ps1`。live 任務：重跑 `REGISTER_SYSTEM_GUARD_TASKS.ps1`（會回到舊行為）或 `Set-ScheduledTask` 還原 Action。
 
+### fix(scheduled-tasks): REGISTER_SYSTEM_GUARD_TASKS 改 Register-ScheduledTask 模組 — 修 schtasks /TR 261 SSOT bug
+**[任務理解]** 承上：紅字閃窗的「視窗可見」層根因 = SSOT 註冊器無法建出隱藏任務。使用者指示「修」。
+**[根因]** `schtasks.exe /TR` 上限 261 字元；隱藏版指令（launcher + base64 ExtraArgs）= 308 字 → 靜默建不起來（實測 exit -2147467259「/TR 不可超過 261」）→ 三個 guard 任務全建不起，只剩更早期、短、未隱藏的舊 Daily 殘留閃窗。另：`schtasks /SC ONLOGOFF` 非有效 trigger（從沒建起）；`/SC ONSTART` 需系統管理員（非提權 HRESULT 0x80070005）。
+**[已修改]**
+- `agency-os/automation/REGISTER_SYSTEM_GUARD_TASKS.ps1` + `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`（兩份 byte-identical）— 由 `schtasks.exe` 改用 ScheduledTasks 模組 `Register-ScheduledTask`（無 261 限制），照抄已驗證的 `automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1` 範式。只註冊 **Daily**（隱藏 `-WindowStyle Hidden` + `-HideUi` 靜默、免提權）。丟棄 OnStartup（需提權+從未運作；開機健檢已由 AO-RESUME+雲端 routine 涵蓋）與 OnLogoff（trigger 無效）。移除 `-NoOpenStatusOnStartup` 參數（隨彈窗行為一併刪）。launcher 查找改**位置健壯**（候選 `$root\scripts` + `$root\..\scripts`）使兩份可 byte-identical。
+- live 任務 `AgencyOS-SystemGuard-Daily`（非 repo）— 先前 Set-ScheduledTask + 本次重跑註冊器，最終指向 canonical（agency-os）guard、隱藏。
+- `agency-os/docs/operations/system-guard-and-notification.md` — 更新 §註冊排程：反映模組化、Daily-only、靜默、移除 `-NoOpenStatusOnStartup`、261 根因（R4 stale doc 同 commit 修）。
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`REGISTER_SYSTEM_GUARD_TASKS.ps1`（兩位置各跑）| exit=0 | 兩份皆註冊成功、Daily Hidden=True/Launcher=True/OpenStatus=False；`Start-ScheduledTask` 跑到完成 LastTaskResult=0、無視窗。修前同一隱藏指令經 schtasks 必 261 失敗。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1M/2m — Major = repo-root stale 雙胞（仍 schtasks 261 版）→ 本 commit 同步改 byte-identical + 位置健壯 launcher 解析（critic review 後新增的 delta 經兩位置 REALTEST 證實解析正確）；Minor = HH/mm 範圍未檢（與 weekly 範式一致，cast 會 loud throw）。
+- BUGHUNT_DONE: scope=agency-os,scripts,automation | grep=`SystemGuard-OnStartup\|SystemGuard-OnLogoff\|NoOpenStatusOnStartup\|ONLOGOFF` | hits=2 — ① `system-guard-and-notification.md` stale `-NoOpenStatusOnStartup`（本 commit 修）；② `REGISTER_AUTOPILOT_PHASE1_TASKS.ps1:92` 同 bug class 的 `/SC ONLOGOFF`（**不同功能 out-of-scope**，已開背景任務 task_6edca498 追蹤，不在本 commit 動）。無其他 code call site。
+**[剩餘風險]** ① `REGISTER_AUTOPILOT_PHASE1_TASKS.ps1` 的 ONLOGOFF 同類 bug 未修（已 spawn_task 追蹤）。② OnStartup/OnLogoff 永久停用 — 若日後要開機/登出健檢需以 event trigger + 提權重新設計。
+**[rollback]** `git checkout HEAD~1 -- agency-os/automation/REGISTER_SYSTEM_GUARD_TASKS.ps1 automation/REGISTER_SYSTEM_GUARD_TASKS.ps1 agency-os/docs/operations/system-guard-and-notification.md`；live 任務不受影響（既有隱藏 Daily 續用）。
+
 ### fix(pod): A1 hardening — 結構化 transient classifier + SKU-faithful 冪等（關 critic 2 benign 🟡）
 **[任務理解]** 使用者「POD 處理到哪? 繼續下去」+「都要」。VBC 釐清：POD 程式碼全已上線（prod=`5b8c97ac`，A1 後端+wiring 皆 live，drift -AppCodeOnly=PASS behind 0），剩餘 6 項多卡操作者。可完全自走的只有 #5 = 關 A1 critic 標記的 2 個 benign 🟡。
 **[已修改]**
