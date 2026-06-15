@@ -238,6 +238,9 @@ export async function POST(req: Request): Promise<Response> {
     tags?: unknown;
     scheduleDate?: unknown;
     siteId?: unknown;
+    featuredImageUrl?: unknown;
+    featuredImageAlt?: unknown;
+    internalLinkKeywords?: unknown;
   };
   try {
     body = await req.json();
@@ -318,6 +321,14 @@ export async function POST(req: Request): Promise<Response> {
     if (typeof body.focusKeyword === "string" && body.focusKeyword.trim()) seo.focus_keyword = body.focusKeyword.trim();
     if (typeof body.metaDescription === "string" && body.metaDescription.trim()) seo.description = body.metaDescription.trim();
     if (seoTitle) seo.title = seoTitle;
+    // Issue 四: a dedicated hero image generated at generation time → plugin sideloads + sets as
+    // featured (best-effort). Issue 七: focus keyword (+ related terms) → ILJ ilj_linkdefinition meta.
+    const featuredImageUrl =
+      typeof body.featuredImageUrl === "string" && body.featuredImageUrl.trim() ? body.featuredImageUrl.trim() : undefined;
+    const featuredImageAlt =
+      typeof body.featuredImageAlt === "string" && body.featuredImageAlt.trim() ? body.featuredImageAlt.trim() : undefined;
+    const internalLinkKeywords = (Array.isArray(body.internalLinkKeywords) ? body.internalLinkKeywords : [])
+      .map(k => String(k).trim()).filter(Boolean);
     const result = await createPost({
       title,
       blocks,
@@ -326,6 +337,9 @@ export async function POST(req: Request): Promise<Response> {
       categories: catNames,
       tags: tagNames,
       seo: Object.keys(seo).length > 0 ? seo : undefined,
+      featured_image_url: featuredImageUrl,
+      featured_image_alt: featuredImageAlt,
+      internal_link_keywords: internalLinkKeywords.length > 0 ? internalLinkKeywords : undefined,
     });
     if (!result.ok) {
       // tsconfig has strict:false → discriminated-union narrowing via `!result.ok` does not
@@ -336,7 +350,7 @@ export async function POST(req: Request): Promise<Response> {
       );
     }
     const v = result.value;
-    return NextResponse.json({ ok: true, post_id: v.post_id, edit_url: v.edit_url });
+    return NextResponse.json({ ok: true, post_id: v.post_id, edit_url: v.edit_url, featured_set: v.featured_set });
   }
 
   // ── Standard WP REST path (non-bridge sites) ──────────────────────────────

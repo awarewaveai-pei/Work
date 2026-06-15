@@ -14,12 +14,15 @@
 
 namespace AwareWave\WpBridge\Post;
 
+use AwareWave\WpBridge\Content\MediaSideloader;
+
 final class PostCreator {
 
 	/**
 	 * @param array<string,mixed> $spec title, content, status(draft), categories[], tags[], excerpt,
-	 *                                  seo{focus_keyword, description, title}.
-	 * @return array<string,mixed> status: committed|rolled_back ; post_id ; edit_url ; reason ; detail
+	 *                                  seo{focus_keyword, description, title},
+	 *                                  featured_image_url, featured_image_alt, internal_link_keywords[].
+	 * @return array<string,mixed> status: committed|rolled_back ; post_id ; edit_url ; featured_set ; reason ; detail
 	 */
 	public function create( array $spec ): array {
 		$title   = isset( $spec['title'] ) ? (string) $spec['title'] : '';
@@ -88,6 +91,35 @@ final class PostCreator {
 			update_post_meta( $postId, 'rank_math_title', sanitize_text_field( (string) $seo['title'] ) );
 		}
 
+		// Featured image (issue 四): sideload the hero URL into the media library and set it as the post
+		// thumbnail. Alt text carries the focus keyword for SEO. BEST-EFFORT — a transient image fetch
+		// failure must NOT roll back an otherwise-good article (mirrors ProductCreator's featured handling,
+		// which never verify-gates the image). The committed response reports whether it landed.
+		$featuredSet = false;
+		$featuredUrl = isset( $spec['featured_image_url'] ) ? trim( (string) $spec['featured_image_url'] ) : '';
+		if ( $featuredUrl !== '' ) {
+			$featAlt = isset( $spec['featured_image_alt'] ) ? (string) $spec['featured_image_alt'] : '';
+			if ( $featAlt === '' && isset( $seo['focus_keyword'] ) ) {
+				$featAlt = (string) $seo['focus_keyword'];
+			}
+			$media = ( new MediaSideloader() )->sideload( $featuredUrl, $featAlt );
+			if ( $media && ! empty( $media['id'] ) ) {
+				set_post_thumbnail( $postId, (int) $media['id'] );
+				$featuredSet = has_post_thumbnail( $postId );
+			}
+		}
+
+		// Internal Link Juicer keywords (issue 七): write the ILJ link definition so OTHER posts that
+		// mention these keywords auto-link to THIS post. ILJ stores a plain indexed array under
+		// `ilj_linkdefinition`; WP auto-serializes it (do NOT pre-serialize / pass a comma string —
+		// ILJ's Postmeta::fromMeta() checks is_array()). Index rebuild only fires on save_post for a
+		// PUBLISHED post, so for a draft the links activate when the post is later published — no manual
+		// rebuild needed here. Best-effort: a missing/inactive ILJ plugin just no-ops this meta row.
+		$iljKeywords = $this->stringList( $spec['internal_link_keywords'] ?? array() );
+		if ( $iljKeywords !== array() ) {
+			update_post_meta( $postId, 'ilj_linkdefinition', $iljKeywords );
+		}
+
 		// 3. Read-back verify. If any requested part didn't land, the post is partial -> delete it all.
 		$problems = $this->verify( $postId, $title, $status, $categories, $seo );
 		if ( $problems !== array() ) {
@@ -96,10 +128,11 @@ final class PostCreator {
 		}
 
 		return array(
-			'status'   => 'committed',
-			'post_id'  => $postId,
-			'edit_url' => admin_url( 'post.php?post=' . $postId . '&action=edit' ),
-			'reason'   => 'ok',
+			'status'       => 'committed',
+			'post_id'      => $postId,
+			'edit_url'     => admin_url( 'post.php?post=' . $postId . '&action=edit' ),
+			'featured_set' => $featuredSet,
+			'reason'       => 'ok',
 		);
 	}
 

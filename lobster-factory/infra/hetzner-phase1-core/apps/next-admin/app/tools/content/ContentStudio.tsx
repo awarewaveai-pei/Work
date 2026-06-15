@@ -353,6 +353,10 @@ export default function ContentStudio() {
   // Auto-image generation counter (0 = idle, N = N images pending)
   const [autoImgN, setAutoImgN] = useState(0);
 
+  // Dedicated hero / featured image (issue 四) — generated at generation time, threaded to publish.
+  const [heroImageUrl, setHeroImageUrl] = useState("");
+  const [heroLoading,  setHeroLoading]  = useState(false);
+
   // Title suggestions
   const [titleLoading, setTitleLoading]   = useState(false);
   const [titleSugs,    setTitleSugs]      = useState<string[]>([]);
@@ -590,6 +594,7 @@ export default function ContentStudio() {
     setPubStatus("idle"); setPubResult(null);
     setSeoReport(null); setSeoChecking(false);
     setSlugHint(""); setAutoImgN(0);
+    setHeroImageUrl(""); setHeroLoading(false);
     setShowSyn(false); setSynStatus("idle"); setSynContent({});
 
     try {
@@ -645,6 +650,8 @@ export default function ContentStudio() {
       if (form.media.aiImages !== "none") {
         const myImgRun = ++imgRunRef.current;
         void autoReplaceImages(cleanMd, myImgRun);
+        // Issue 四: also generate a dedicated hero/featured image (OG ratio) for the post thumbnail.
+        void generateHeroImage(meta?.seoTitle || form.title || form.keyword, myImgRun);
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") setGenStatus("idle");
@@ -678,6 +685,26 @@ export default function ContentStudio() {
       setAutoImgN(remaining);
     }
     setAutoImgN(0);
+  }
+
+  // ─── Hero (featured) image ────────────────────────────────────────────────
+  // Issue 四: generate ONE dedicated hero image at facebook_link (1200×630, OG/featured ratio) so the
+  // published post has a feature image. Threaded to publish as featured_image_url; the WP Bridge plugin
+  // sideloads it and sets the post thumbnail (best-effort — a failure here never blocks publishing).
+  async function generateHeroImage(topic: string, genRun: number) {
+    const prompt = topic.trim() || form.keyword.trim();
+    if (!prompt) return;
+    setHeroLoading(true);
+    try {
+      const res = await fetch("/api/content/image", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, platform: "facebook_link" }),
+      });
+      if (genRun !== imgRunRef.current) return; // user re-generated, abort
+      const json = await res.json() as { ok: boolean; imageUrl?: string };
+      if (json.ok && json.imageUrl) setHeroImageUrl(json.imageUrl);
+    } catch { /* best-effort: no hero image */ }
+    finally { if (genRun === imgRunRef.current) setHeroLoading(false); }
   }
 
   // ─── SEO Fix Apply ────────────────────────────────────────────────────────
@@ -722,6 +749,11 @@ export default function ContentStudio() {
           tags: form.wpTags
             ? form.wpTags.split(",").map(s => s.trim()).filter(Boolean)
             : (metaData?.tags?.length ? metaData.tags : undefined),
+          // Issue 四: hero image (Bridge path only — plugin sets it as the post thumbnail).
+          featuredImageUrl: heroImageUrl || undefined,
+          featuredImageAlt: form.keyword || undefined,
+          // Issue 七: focus keyword → ILJ ilj_linkdefinition so other posts auto-link to this one.
+          internalLinkKeywords: form.keyword.trim() ? [form.keyword.trim()] : undefined,
         }),
       });
       const json = await res.json() as { ok: boolean; error?: string; edit_url?: string; view_url?: string };
@@ -1641,6 +1673,18 @@ export default function ContentStudio() {
                   fontSize: "12px", color: "#0284c7",
                 }}>
                   🎨 正在生成 {autoImgN} 張圖片…
+                </div>
+              )}
+
+              {/* ── 精選圖片（hero）生成狀態 ── */}
+              {(heroLoading || heroImageUrl) && (
+                <div style={{
+                  marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
+                  background: heroImageUrl ? "#f0fdf4" : "#f0f9ff",
+                  border: `1px solid ${heroImageUrl ? "#bbf7d0" : "#bae6fd"}`,
+                  fontSize: "12px", color: heroImageUrl ? "#16a34a" : "#0284c7",
+                }}>
+                  {heroLoading ? "🖼️ 正在生成精選圖片（featured image）…" : "🖼️ 精選圖片已就緒，發佈時自動設為文章首圖"}
                 </div>
               )}
 

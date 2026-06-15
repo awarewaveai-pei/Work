@@ -146,6 +146,8 @@ export interface BridgePostResponse {
   ok?: boolean;
   post_id?: number;
   edit_url?: string;
+  /** Did the featured image (hero) land? Best-effort on the plugin side — false ≠ post failed. */
+  featured_set?: boolean;
   reason?: string;
   detail?: unknown;
 }
@@ -159,6 +161,12 @@ export interface BridgePostSpec {
   categories?: string[];
   tags?: string[];
   seo?: { focus_keyword?: string; description?: string; title?: string };
+  /** Issue 四: hero image URL the plugin sideloads + sets as post thumbnail (best-effort). */
+  featured_image_url?: string;
+  /** Alt text for the featured image; defaults to focus_keyword on the plugin side. */
+  featured_image_alt?: string;
+  /** Issue 七: keywords written to ILJ's `ilj_linkdefinition` meta for auto internal-linking. */
+  internal_link_keywords?: string[];
 }
 
 /**
