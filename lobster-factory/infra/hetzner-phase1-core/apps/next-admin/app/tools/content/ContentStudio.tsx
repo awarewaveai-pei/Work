@@ -102,11 +102,15 @@ const AI_IMAGE_PROVIDERS = [
   { value: "replicate", label: "Replicate（AI 生圖）" },
 ];
 
+// Media ratios = flux-schnell aspect_ratio enum values (these are sent through verbatim and actually
+// take effect; the old "1344x768"-style size strings were ignored by the model — every image came out
+// 1:1). 16:9 / 3:2 / 4:3 are the article-body friendly horizontals; 1:1 / 9:16 kept for social reuse.
 const IMAGE_SIZES = [
-  { value: "1344x768",  label: "1344×768（16:9）" },
-  { value: "1024x1024", label: "1024×1024（1:1）" },
-  { value: "768x1344",  label: "768×1344（9:16）" },
-  { value: "1200x630",  label: "1200×630（OG）" },
+  { value: "16:9", label: "16:9（橫式 · Google Discover 最佳）" },
+  { value: "3:2",  label: "3:2（橫式 · 攝影比例）" },
+  { value: "4:3",  label: "4:3（橫式 · 經典）" },
+  { value: "1:1",  label: "1:1（方形）" },
+  { value: "9:16", label: "9:16（直式）" },
 ];
 
 const LAYOUT_OPTIONS = [
@@ -254,7 +258,7 @@ const DEFAULT_STRUCTURE: ArticleStructure = {
 };
 
 const DEFAULT_MEDIA: MediaHub = {
-  aiImages: "none", imageCount: 3, imageSize: "1344x768",
+  aiImages: "none", imageCount: 3, imageSize: "16:9",
   imageStyle: "", imageInstructions: "", brandName: "",
   includeKeywordAlt: true, autoAltText: false,
   youtubeSource: "none", youtubeCount: 1, youtubeLayout: "distribute",
@@ -678,7 +682,9 @@ export default function ContentStudio() {
       try {
         const res = await fetch("/api/content/image", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: altText, platform: "twitter_post" }),
+          // form.media.imageSize is now a flux aspect_ratio (e.g. "16:9") — pass it so the chosen
+          // ratio actually applies to body images (previously hardcoded twitter_post → ignored → 1:1).
+          body: JSON.stringify({ prompt: altText, platform: "twitter_post", aspectRatio: form.media.imageSize }),
         });
         if (genRun !== imgRunRef.current) break;
         const json = await res.json() as { ok: boolean; imageUrl?: string };
@@ -703,7 +709,8 @@ export default function ContentStudio() {
     try {
       const res = await fetch("/api/content/image", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, platform: "facebook_link" }),
+        // Hero/featured = 16:9 (Google Discover + OG preview both favour the wide ratio).
+        body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9" }),
       });
       if (genRun !== imgRunRef.current) return; // user re-generated, abort
       const json = await res.json() as { ok: boolean; imageUrl?: string };

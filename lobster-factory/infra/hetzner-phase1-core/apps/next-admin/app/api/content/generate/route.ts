@@ -78,7 +78,7 @@ RANK MATH COMPLIANCE (24-test scoring system — target ≥81 green):
 
 BASIC SEO — 7 tests:
 - Primary keyword in H1 title (already covered above) AND in the first 10% of body text (≈ first 150 words)
-- Primary keyword in at least one H2 or H3 heading (not just in H1)
+- Primary keyword (or a close variant / partial phrase / LSI term) must appear in EVERY H2, H3 AND H4 heading — every sub-heading should signal the topic, not just one. RECONCILE with the CJK exact-keyword cap below: write the EXACT focus keyword in only 1–2 headings; in all the other headings use a synonym, a shorter partial phrase, or a closely-related term, so each heading reinforces the topic WITHOUT breaching the 4–6× exact-keyword limit (keyword-stuffing penalty)
 - All focus keywords must appear naturally throughout the body — not clustered
 - Keyword density 1%–1.5%; exceeding 2.5% triggers a keyword-stuffing penalty — never exceed. For CJK languages (Chinese/Japanese/Korean) RankMath cannot tokenize the text, counts very few "words", and reports density 5–10× higher than reality — so DO NOT chase a percentage; instead obey the hard exact-keyword-repetition cap given in the CJK compliance block in the instructions below
 - Minimum 600 words; 2,500+ words = RankMath content-length 100% score
@@ -254,6 +254,7 @@ function buildUserPrompt(params: {
     lines.push("• TITLE power word: use ONE of these localized power words in the H1/SEO title (RankMath's English list will not match CJK; a matching server-side list is registered for the site): 終極 / 必備 / 實證 / 專家 / 完整 / 有效 / 簡單 / 關鍵 / 最佳 / 免費 / 立即 / 秘訣 / 揭密 / 一次搞懂 / 高效 / 避免 / 不可不知 / 獨家 / 快速 / 突破。CRITICAL FORMAT: RankMath detects the power word by splitting the title on SPACES, so the chosen word MUST stand alone as its own space-separated token — write 「兒童藝術治療 完整 指南」(✓ 完整 is its own token), NOT 「完整指南」(✗ glued, will not register). Put a half-width space before and after the power word. Do NOT use overclaim words like 保證／治癒 in YMYL (health) titles — they violate the trust rules above.");
     lines.push("• TITLE number: include an Arabic digit in the title (例：「7 個」「5 步驟」「2026 年」) — do NOT use CJK numerals（七、五、十）, RankMath only detects 0-9 digits.");
     lines.push("• KEYWORD FREQUENCY (critical — this SUPERSEDES both the density % rule AND the earlier 'keyword must appear throughout the body / not clustered' rule): RankMath cannot count CJK words, so it undercounts total words and the focus-keyword density reads 5–10× too high (a prior article hit 13.04%). Use the EXACT focus keyword AT MOST 4–6 times in the WHOLE article: once in the H1, once in the first paragraph, once in a single H2/H3, and 1–3 times in the body. For every other reference use a synonym, a shorter partial phrase, or a pronoun（它／這套方法／本服務／該工具）. NEVER write the exact keyword more than 6 times total.");
+    lines.push("• HEADINGS keyword coverage: every H2/H3/H4 must carry the topic, but to stay under the 4–6× exact-keyword cap, put the EXACT focus keyword in only 1–2 headings and use a synonym / shorter partial phrase / related term（同義詞、部分詞、相關詞）in all the rest. Example for focus「兒童藝術治療」: H2「兒童藝術治療 的核心原理」(exact, ✓ space-tokenised) → H2「為什麼 繪畫表達 能療癒情緒」(variant) → H3「家長如何在家陪伴 創作」(related). Never repeat the exact keyword in every heading — that breaches the cap and reads as stuffing.");
     lines.push("=== END CJK RANKMATH COMPLIANCE ===");
   }
 
@@ -339,10 +340,10 @@ function buildUserPrompt(params: {
   if (m) {
     if (m.aiImages && m.aiImages !== "none") {
       const count = m.imageCount ?? 3;
-      const sizeLabel = m.imageSize?.replace("x", "×") ?? "";
+      const ratioLabel = m.imageSize?.trim() ?? ""; // now an aspect ratio (e.g. "16:9"), not a px size
       lines.push("");
       lines.push("IMAGE PLACEHOLDERS:");
-      lines.push(`- Include ${count} image placeholder(s) in the article${sizeLabel ? ` (suggested size: ${sizeLabel})` : ""}`);
+      lines.push(`- Include ${count} image placeholder(s) in the article${ratioLabel ? ` (aspect ratio: ${ratioLabel})` : ""}`);
       if (m.imageStyle)        lines.push(`- Image style: ${m.imageStyle}`);
       if (m.imageInstructions) lines.push(`- Creative direction: ${m.imageInstructions}`);
       if (m.brandName)         lines.push(`- Brand: ${m.brandName}`);
@@ -429,7 +430,7 @@ export async function POST(req: Request): Promise<Response> {
   const media: MediaHub = {
     aiImages:           str(rawMedia.aiImages, "none"),
     imageCount:         typeof rawMedia.imageCount === "number" ? Math.min(Math.max(1, rawMedia.imageCount), 10) : 3,
-    imageSize:          str(rawMedia.imageSize, "1344x768"),
+    imageSize:          str(rawMedia.imageSize, "16:9"), // flux aspect_ratio (px-size format retired)
     imageStyle:         str(rawMedia.imageStyle),
     imageInstructions:  str(rawMedia.imageInstructions),
     brandName:          str(rawMedia.brandName),

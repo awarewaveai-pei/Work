@@ -5,26 +5,35 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-// Platform presets for social media images
-const PLATFORM_IMAGE_SPECS: Record<string, { label: string; width: number; height: number; note: string }> = {
-  instagram_square:    { label: "Instagram 方形貼文",   width: 1080, height: 1080, note: "1:1 通用貼文" },
-  instagram_portrait:  { label: "Instagram 直式貼文",   width: 1080, height: 1350, note: "4:5 最大面積" },
-  instagram_story:     { label: "Instagram 限時/Reels", width: 1080, height: 1920, note: "9:16 全螢幕" },
-  facebook_link:       { label: "Facebook 連結預覽",    width: 1200, height: 630,  note: "1.91:1 連結縮圖" },
-  facebook_square:     { label: "Facebook 方形貼文",    width: 1080, height: 1080, note: "1:1" },
-  facebook_story:      { label: "Facebook 限時動態",    width: 1080, height: 1920, note: "9:16" },
-  twitter_post:        { label: "X/Twitter 貼文",       width: 1200, height: 675,  note: "16:9 嵌入圖" },
-  threads_square:      { label: "Threads 方形",         width: 1080, height: 1080, note: "1:1" },
-  threads_portrait:    { label: "Threads 直式",         width: 1080, height: 1350, note: "4:5" },
-  linkedin_post:       { label: "LinkedIn 貼文",        width: 1200, height: 627,  note: "1.91:1" },
-  pinterest_pin:       { label: "Pinterest Pin",        width: 1000, height: 1500, note: "2:3 直式最佳" },
-  whatsapp_square:     { label: "WhatsApp 分享圖",      width: 1080, height: 1080, note: "1:1" },
-  reddit_post:         { label: "Reddit 貼文縮圖",      width: 1200, height: 628,  note: "1.91:1" },
-  tiktok_thumbnail:    { label: "TikTok 封面",          width: 1080, height: 1920, note: "9:16 封面圖" },
-  youtube_thumbnail:   { label: "YouTube 縮圖",         width: 1280, height: 720,  note: "16:9" },
+// Flux-schnell does NOT accept width/height — its ONLY shape control is `aspect_ratio` (a fixed enum)
+// plus `megapixels`. Passing width/height is silently ignored and EVERY image comes back at the
+// default 1:1 (verified against the live Replicate model schema). So each platform preset carries the
+// nearest supported aspect_ratio; width/height stay only as human-readable reference in the response.
+// Allowed flux aspect_ratio enum: 1:1 16:9 21:9 3:2 2:3 4:5 5:4 3:4 4:3 9:16 9:21.
+const PLATFORM_IMAGE_SPECS: Record<string, { label: string; width: number; height: number; aspect: string; note: string }> = {
+  instagram_square:    { label: "Instagram 方形貼文",   width: 1080, height: 1080, aspect: "1:1",  note: "1:1 通用貼文" },
+  instagram_portrait:  { label: "Instagram 直式貼文",   width: 1080, height: 1350, aspect: "4:5",  note: "4:5 最大面積" },
+  instagram_story:     { label: "Instagram 限時/Reels", width: 1080, height: 1920, aspect: "9:16", note: "9:16 全螢幕" },
+  facebook_link:       { label: "Facebook 連結預覽",    width: 1200, height: 675,  aspect: "16:9", note: "16:9 連結縮圖" },
+  facebook_square:     { label: "Facebook 方形貼文",    width: 1080, height: 1080, aspect: "1:1",  note: "1:1" },
+  facebook_story:      { label: "Facebook 限時動態",    width: 1080, height: 1920, aspect: "9:16", note: "9:16" },
+  twitter_post:        { label: "X/Twitter 貼文",       width: 1200, height: 675,  aspect: "16:9", note: "16:9 嵌入圖" },
+  threads_square:      { label: "Threads 方形",         width: 1080, height: 1080, aspect: "1:1",  note: "1:1" },
+  threads_portrait:    { label: "Threads 直式",         width: 1080, height: 1350, aspect: "4:5",  note: "4:5" },
+  linkedin_post:       { label: "LinkedIn 貼文",        width: 1200, height: 675,  aspect: "16:9", note: "16:9" },
+  pinterest_pin:       { label: "Pinterest Pin",        width: 1000, height: 1500, aspect: "2:3",  note: "2:3 直式最佳" },
+  whatsapp_square:     { label: "WhatsApp 分享圖",      width: 1080, height: 1080, aspect: "1:1",  note: "1:1" },
+  reddit_post:         { label: "Reddit 貼文縮圖",      width: 1200, height: 675,  aspect: "16:9", note: "16:9" },
+  tiktok_thumbnail:    { label: "TikTok 封面",          width: 1080, height: 1920, aspect: "9:16", note: "9:16 封面圖" },
+  youtube_thumbnail:   { label: "YouTube 縮圖",         width: 1280, height: 720,  aspect: "16:9", note: "16:9" },
 };
 
 const VALID_PLATFORMS = new Set(Object.keys(PLATFORM_IMAGE_SPECS));
+
+// The flux-schnell aspect_ratio enum (verified live). A request may pass an explicit `aspectRatio`
+// to override the platform's default — this is what lets the article media-ratio dropdown (16:9 / 3:2
+// / 4:3 / 1:1 / 9:16) actually take effect instead of being ignored.
+const ALLOWED_ASPECT = new Set(["1:1", "16:9", "21:9", "3:2", "2:3", "4:5", "5:4", "3:4", "4:3", "9:16", "9:21"]);
 
 // Replicate Flux Schnell — fast, cheap, good for social graphics
 const REPLICATE_MODEL = "black-forest-labs/flux-schnell";
@@ -73,6 +82,12 @@ export async function POST(req: Request): Promise<Response> {
     ? PLATFORM_IMAGE_SPECS[platform]
     : PLATFORM_IMAGE_SPECS.instagram_square;
 
+  // An explicit, valid aspectRatio overrides the platform default (this is what makes the article
+  // media-ratio dropdown real). Anything outside the flux enum falls back to the platform's aspect.
+  const aspectRatio = (typeof body.aspectRatio === "string" && ALLOWED_ASPECT.has(body.aspectRatio))
+    ? body.aspectRatio
+    : spec.aspect;
+
   // Enhance prompt for social media context
   const enhancedPrompt = `${prompt}, professional social media graphic, high quality, clean composition, no text overlay`;
 
@@ -87,12 +102,15 @@ export async function POST(req: Request): Promise<Response> {
     body: JSON.stringify({
       input: {
         prompt: enhancedPrompt,
-        width: spec.width,
-        height: spec.height,
+        // flux-schnell shape control: aspect_ratio (enum) + megapixels. width/height are NOT inputs.
+        aspect_ratio: aspectRatio,
+        megapixels: "1",
         num_outputs: 1,
         num_inference_steps: 4,
         output_format: "webp",
-        output_quality: 90,
+        // q82 webp at 1 MP lands ≈ 100 KB — small enough to sideload cleanly into the WP media library
+        // and fast on the page, while staying visually clean for article hero/body imagery.
+        output_quality: 82,
       },
     }),
   });
@@ -117,7 +135,8 @@ export async function POST(req: Request): Promise<Response> {
     ok: true,
     imageUrl: prediction.output[0],
     platform,
-    spec: { label: spec.label, width: spec.width, height: spec.height, note: spec.note },
+    aspectRatio,
+    spec: { label: spec.label, width: spec.width, height: spec.height, aspect: aspectRatio, note: spec.note },
   });
 }
 
