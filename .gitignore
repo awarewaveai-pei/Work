@@ -64,6 +64,7 @@ agency-os/.agency-state/ao-resume-hook-fail.log
 agency-os/.agency-state/sync-check-last.json
 agency-os/.agency-state/external-signals-digest.json
 agency-os/.agency-state/ao-close-last.txt
+agency-os/.agency-state/ao-close-prev.txt
 agency-os/.agency-state/closeout-inbox.md
 agency-os/.agency-state/doc-sync-state.json
 agency-os/.agency-state/worklog-excerpt.md
