@@ -482,6 +482,22 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    // SKUs are the P4 join key AND the native faithfulness check's identity (print-provider.ts:320
+    // tests input ⊆ existing — sound as set-equality ONLY when input SKUs are distinct). A duplicate
+    // SKU in the map would let a partial bind pass the completeness gate, so reject it at the source.
+    const seenSkus = new Set<string>();
+    const dupSku = vmap.find((m) => {
+      const s = m.sku as string;
+      if (seenSkus.has(s)) return true;
+      seenSkus.add(s);
+      return false;
+    });
+    if (dupSku) {
+      return NextResponse.json(
+        { ok: false, error: "duplicate_sku", sku: dupSku.sku, hint: "variantMap must carry one row per SKU." },
+        { status: 422 },
+      );
+    }
     const catalog = await getCatalogVariants(71, ["White", "Black"]);
     if (!catalog.ok) {
       return NextResponse.json({ ok: false, error: (catalog as { ok: false; error: string }).error }, { status: 502 });
