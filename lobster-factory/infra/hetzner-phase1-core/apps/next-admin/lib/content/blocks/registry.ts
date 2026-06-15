@@ -42,9 +42,13 @@ export function register(block: ContentBlock): void {
   else REGISTRY.push(block);
 }
 
-/** 取某個 kind 的所有「啟用中」積木（編排器用）。 */
-export function byKind(kind: BlockKind): ContentBlock[] {
-  return REGISTRY.filter(b => b.kind === kind && b.enabled !== false);
+/**
+ * 取某個 kind 的所有「啟用中」積木（編排器用）。
+ * TOut 由呼叫端標註該 kind 的 run 輸出型別（例：byKind<TrendingItem[]>("search")），
+ * 讓呼叫端不必 unchecked cast；仍建議在消費端對 run 結果做 runtime 形狀防護。
+ */
+export function byKind<TOut = unknown>(kind: BlockKind): ContentBlock<TOut>[] {
+  return REGISTRY.filter(b => b.kind === kind && b.enabled !== false) as ContentBlock<TOut>[];
 }
 
 /** 總清單 manifest：列出全系統已註冊積木（給管理 UI / 偵錯）。 */

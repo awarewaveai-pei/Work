@@ -43,11 +43,17 @@ $guardPath = Join-Path $root "scripts\system-guard.ps1"
 if (-not (Test-Path -LiteralPath $guardPath)) {
     throw "Missing system-guard.ps1 at $guardPath"
 }
-$monorepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
-$launcher = Join-Path $monorepoRoot "scripts\scheduled-task-launcher.ps1"
-if (-not (Test-Path -LiteralPath $launcher)) {
-    throw "Missing scheduled-task-launcher.ps1 at $launcher (expected monorepo root scripts)."
+# Location-robust launcher lookup so this file is byte-identical at BOTH installed depths:
+#   agency-os/automation/  -> launcher is at <root>/../scripts  (monorepo root)
+#   automation/ (repo root) -> launcher is at <root>/scripts
+$launcher = @(
+    (Join-Path $root "scripts\scheduled-task-launcher.ps1"),
+    (Join-Path (Join-Path $root "..") "scripts\scheduled-task-launcher.ps1")
+) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $launcher) {
+    throw "Missing scheduled-task-launcher.ps1 (looked under '$root\scripts' and '$root\..\scripts')."
 }
+$launcher = (Resolve-Path -LiteralPath $launcher).Path
 
 $nameDaily   = "AgencyOS-SystemGuard-Daily"
 $nameStartup = "AgencyOS-SystemGuard-OnStartup"

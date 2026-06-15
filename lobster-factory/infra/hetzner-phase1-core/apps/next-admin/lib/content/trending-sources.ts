@@ -316,18 +316,22 @@ searchBlock({
         source: name,
       });
     }
-  } catch { /* malformed env → no custom feeds */ }
+  } catch (e) {
+    // malformed env → no custom feeds，但要看得見（不要靜默吞掉設定錯誤）
+    console.warn("[trending] CONTENT_TRENDING_FEEDS 解析失敗，已略過自訂來源：", (e as Error).message);
+  }
 })();
 
 // ─── 對外入口（編排器 / route 用） ───────────────────────────────────────────
 
 /** 搜尋積木的彙整入口：跑所有啟用且符合 geo 的 search block。 */
 export async function runTrending(geo: string): Promise<TrendingItem[]> {
-  const blocks = byKind("search").filter(b => geoMatch(b, geo));
+  const blocks = byKind<TrendingItem[]>("search").filter(b => geoMatch(b, geo));
   const settled = await Promise.allSettled(blocks.map(b => b.run({ geo })));
   const items: TrendingItem[] = [];
   for (const r of settled) {
-    if (r.status === "fulfilled") items.push(...(r.value as TrendingItem[]));
+    // runtime 護欄：未來別處註冊的 search block 若回傳非陣列也不會炸（registry 的 run 是 unknown）
+    if (r.status === "fulfilled" && Array.isArray(r.value)) items.push(...r.value);
   }
   return items;
 }

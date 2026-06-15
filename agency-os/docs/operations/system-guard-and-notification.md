@@ -16,13 +16,14 @@
 ## 執行模式
 - `manual`：手動觸發
 - `daily`：每日固定時段
-- `pre_shutdown`：登出前（接近關機前）
-- `startup`：開機後立即檢查
+- `pre_shutdown`：登出前（`system-guard.ps1` 仍支援，但不再由排程自動觸發 — 見下）
+- `startup`：開機後立即檢查（`system-guard.ps1` 仍支援，但不再由排程自動觸發 — 見下）
 
 ## 註冊排程
 - `powershell -ExecutionPolicy Bypass -File .\automation\REGISTER_SYSTEM_GUARD_TASKS.ps1 -DailyTime 22:30`
-- 預設會在開機守護後開啟 `LAST_SYSTEM_STATUS.md`
-- 若不想開啟：加 `-NoOpenStatusOnStartup`
+- 改用 `Register-ScheduledTask` 模組註冊（2026-06-16）：只註冊 **Daily** 一個任務，**隱藏視窗 + `-HideUi` 靜默**（不再開啟 `LAST_SYSTEM_STATUS.md` 彈窗）。
+- **不再註冊 OnStartup / OnLogoff**：OnStartup 需系統管理員（非提權註冊會 HRESULT 0x80070005）且從未成功註冊，開機健檢已由 AO-RESUME + 雲端 routine 涵蓋；schtasks `/SC ONLOGOFF` 為無效 trigger。`-NoOpenStatusOnStartup` 參數已隨彈窗行為一併移除。
+- 根因背景：舊版用 `schtasks /TR`（261 字元上限），但隱藏 launcher 指令約 308 字元 → 靜默建不起來，殘留舊的未隱藏 Daily 會閃紅字視窗。
 
 ## 手動立即執行
 - `powershell -ExecutionPolicy Bypass -File .\scripts\system-guard.ps1 -Mode manual`

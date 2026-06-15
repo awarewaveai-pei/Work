@@ -1,8 +1,25 @@
+# Registers system guard scheduled tasks via Register-ScheduledTask (ScheduledTasks module).
+#
+# WHY the module (not schtasks.exe): schtasks /TR caps the action string at 261 chars.
+# The hidden launcher command (scheduled-task-launcher.ps1 + base64 ExtraArgs) is ~308 chars,
+# so the old schtasks-based registrar silently failed to create the hidden tasks — leaving an
+# older, short, NON-hidden Daily task that flashed a red PowerShell window on every run
+# (root cause 2026-06-16; mirrors the proven REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1 pattern).
+# Register-ScheduledTask has no such length limit.
+#
+# Task: Daily (-Daily) only — runs hidden (-WindowStyle Hidden) and silent (-HideUi: write
+# reports in the background, NO status-file popup). Registers WITHOUT elevation.
+# OnStartup/OnLogoff were dropped on purpose:
+#   - OnStartup (-AtStartup / schtasks ONSTART) requires admin to register (HRESULT 0x80070005
+#     non-elevated) and never functioned; boot-time health is already covered by AO-RESUME +
+#     the cloud routines, so it is redundant.
+#   - OnLogoff: schtasks /SC ONLOGOFF is not a valid trigger and New-ScheduledTaskTrigger has no
+#     logoff trigger; the pre_shutdown guard value is marginal.
+
 param(
     [string]$WorkspaceRoot = "",
     [string]$DailyTime = "22:30",
     [switch]$NoInteractive,
-    [switch]$NoOpenStatusOnStartup,
     [switch]$RemoveOnly
 )
 
@@ -11,24 +28,9 @@ $ErrorActionPreference = "Stop"
 
 function Resolve-WorkspaceRoot {
     param([string]$InputRoot)
-    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path $InputRoot).Path }
-    if ($PSScriptRoot) { return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path }
+    if ($InputRoot -and (Test-Path -LiteralPath $InputRoot)) { return (Resolve-Path -LiteralPath $InputRoot).Path }
+    if ($PSScriptRoot) { return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path }
     return (Get-Location).Path
-}
-
-function Invoke-Schtasks {
-    param([string[]]$Args)
-    $output = & schtasks.exe @Args 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw ("schtasks failed: " + ($output | Out-String))
-    }
-    return ($output | Out-String).Trim()
-}
-
-function Quote-Arg {
-    param([string]$Value)
-    if ($null -eq $Value) { return '""' }
-    return '"' + $Value.Replace('"', '""') + '"'
 }
 
 function Encode-ExtraArgsB64 {
@@ -37,19 +39,29 @@ function Encode-ExtraArgsB64 {
 }
 
 $root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
-$guardPath = Join-Path $root "scripts/system-guard.ps1"
-$monorepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$launcher = Join-Path $monorepoRoot "scripts\scheduled-task-launcher.ps1"
-if (-not (Test-Path -LiteralPath $launcher)) {
-    throw "Missing scheduled-task-launcher.ps1 at $launcher (expected monorepo root scripts)."
+$guardPath = Join-Path $root "scripts\system-guard.ps1"
+if (-not (Test-Path -LiteralPath $guardPath)) {
+    throw "Missing system-guard.ps1 at $guardPath"
 }
+# Location-robust launcher lookup so this file is byte-identical at BOTH installed depths:
+#   agency-os/automation/  -> launcher is at <root>/../scripts  (monorepo root)
+#   automation/ (repo root) -> launcher is at <root>/scripts
+$launcher = @(
+    (Join-Path $root "scripts\scheduled-task-launcher.ps1"),
+    (Join-Path (Join-Path $root "..") "scripts\scheduled-task-launcher.ps1")
+) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $launcher) {
+    throw "Missing scheduled-task-launcher.ps1 (looked under '$root\scripts' and '$root\..\scripts')."
+}
+$launcher = (Resolve-Path -LiteralPath $launcher).Path
 
-$nameDaily = "AgencyOS-SystemGuard-Daily"
-$nameLogoff = "AgencyOS-SystemGuard-OnLogoff"
+$nameDaily   = "AgencyOS-SystemGuard-Daily"
 $nameStartup = "AgencyOS-SystemGuard-OnStartup"
+$nameLogoff  = "AgencyOS-SystemGuard-OnLogoff"   # legacy — removed below (never functioned)
 
-foreach ($n in @($nameDaily, $nameLogoff, $nameStartup)) {
-    try { Invoke-Schtasks -Args @("/Delete", "/F", "/TN", $n) | Out-Null } catch {}
+# Remove any prior copies (incl. the stale non-hidden Daily and never-created Logoff/Startup).
+foreach ($n in @($nameDaily, $nameStartup, $nameLogoff)) {
+    Unregister-ScheduledTask -TaskName $n -Confirm:$false -ErrorAction SilentlyContinue
 }
 
 if ($RemoveOnly) {
@@ -57,41 +69,32 @@ if ($RemoveOnly) {
     exit 0
 }
 
-$guardPathQuoted = Quote-Arg -Value $guardPath
-$launcherQuoted = Quote-Arg -Value $launcher
 $rootSq = $root.Replace("'", "''")
 
-$trDaily = "powershell -NoProfile -WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File " + $launcherQuoted +
-    " -TargetScript " + $guardPathQuoted +
-    " -ExtraArgsB64 " + (Encode-ExtraArgsB64 -Plain ("-WorkspaceRoot '{0}' -Mode daily -HideUi" -f $rootSq)) +
-    " -LogStem " + (Quote-Arg "SystemGuard-Daily")
-
-$trLogoff = "powershell -NoProfile -WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File " + $launcherQuoted +
-    " -TargetScript " + $guardPathQuoted +
-    " -ExtraArgsB64 " + (Encode-ExtraArgsB64 -Plain ("-WorkspaceRoot '{0}' -Mode pre_shutdown -HideUi" -f $rootSq)) +
-    " -LogStem " + (Quote-Arg "SystemGuard-Logoff")
-
-$startupArgs = "-WorkspaceRoot '{0}' -Mode startup" -f $rootSq
-if (-not $NoOpenStatusOnStartup) {
-    $startupArgs += " -OpenStatusFile"
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+if ($NoInteractive) {
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType S4U -RunLevel Limited
 } else {
-    # 未要求開啟狀態檔時改為完全背景（無 Popup／不開檔）
-    $startupArgs += " -HideUi"
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
 }
-$trStartup = "powershell -NoProfile -WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File " + $launcherQuoted +
-    " -TargetScript " + $guardPathQuoted +
-    " -ExtraArgsB64 " + (Encode-ExtraArgsB64 -Plain $startupArgs) +
-    " -LogStem " + (Quote-Arg "SystemGuard-OnStart")
 
-    $it = @()
-    if (-not $NoInteractive) { $it = @("/IT") }
+function New-GuardArg {
+    param([string]$ModeArgs, [string]$LogStem)
+    $b64 = Encode-ExtraArgsB64 -Plain $ModeArgs
+    return "-NoProfile -WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File `"$launcher`" -TargetScript `"$guardPath`" -ExtraArgsB64 $b64 -LogStem `"$LogStem`""
+}
 
-Invoke-Schtasks -Args (@("/Create", "/F", "/SC", "DAILY", "/TN", $nameDaily, "/TR", $trDaily, "/ST", $DailyTime) + $it) | Out-Null
-Invoke-Schtasks -Args (@("/Create", "/F", "/SC", "ONLOGOFF", "/TN", $nameLogoff, "/TR", $trLogoff) + $it) | Out-Null
-Invoke-Schtasks -Args (@("/Create", "/F", "/SC", "ONSTART", "/TN", $nameStartup, "/TR", $trStartup) + $it) | Out-Null
+# --- Daily (hidden + silent) ---
+$parts = $DailyTime.Split(":")
+if ($parts.Count -lt 2) { throw "DailyTime must be HH:mm (got: $DailyTime)" }
+$at = Get-Date -Hour ([int]$parts[0]) -Minute ([int]$parts[1]) -Second 0
+$argDaily = New-GuardArg -ModeArgs ("-WorkspaceRoot '{0}' -Mode daily -HideUi" -f $rootSq) -LogStem "SystemGuard-Daily"
+Register-ScheduledTask -TaskName $nameDaily `
+    -Action (New-ScheduledTaskAction -Execute "powershell.exe" -Argument $argDaily) `
+    -Trigger (New-ScheduledTaskTrigger -Daily -At $at) `
+    -Settings $settings -Principal $principal -Force | Out-Null
 
-Invoke-Schtasks -Args @("/Query", "/TN", $nameDaily) | Out-Null
-Invoke-Schtasks -Args @("/Query", "/TN", $nameLogoff) | Out-Null
-Invoke-Schtasks -Args @("/Query", "/TN", $nameStartup) | Out-Null
+Get-ScheduledTask -TaskName $nameDaily -TaskPath '\' -ErrorAction Stop | Out-Null
 
-Write-Output "Registered system guard scheduled tasks."
+Write-Output "Registered system guard scheduled task (Daily $DailyTime; hidden/silent via Register-ScheduledTask — no schtasks 261-char limit)."
+Write-Output "Verify: Get-ScheduledTask -TaskName 'AgencyOS-SystemGuard-Daily' | Select TaskName,State"
