@@ -9,7 +9,8 @@ vi.mock("../../../../lib/studio/print-provider", () => ({
   isNativeStoreConfigured: () => true,
 }));
 
-import { parseWooOrder, verifyWooSignature, POST } from "./route";
+import { parseWooOrder, verifyWooSignature } from "../../../../lib/studio/woo-webhook";
+import { POST } from "./route";
 
 const baseOrder = {
   id: 7164,
