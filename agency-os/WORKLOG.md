@@ -2,6 +2,23 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-16
+
+### fix(pod): A1 hardening — 結構化 transient classifier + SKU-faithful 冪等（關 critic 2 benign 🟡）
+**[任務理解]** 使用者「POD 處理到哪? 繼續下去」+「都要」。VBC 釐清：POD 程式碼全已上線（prod=`5b8c97ac`，A1 後端+wiring 皆 live，drift -AppCodeOnly=PASS behind 0），剩餘 6 項多卡操作者。可完全自走的只有 #5 = 關 A1 critic 標記的 2 個 benign 🟡。
+**[已修改]**
+- `app/api/tools/publish/route.ts` — ① 新 module-level `isTransientPfError(e)`（route.ts:101）：只比結構化 token（`startsWith("idempotency_precheck_failed")` / `=== "printful_timeout"` / `=== "printful_network_error"`），取代原 free-text `e.includes("timeout"|"network_error")`。根因：`pf()` 在 clean HTTP error（print-provider.ts:117）把 Printful body message 逐字 slice 進 error string，含「timeout」字樣的 4xx 會被誤判 503-retryable。兩 call site（pfcreate:524 / pforder:661）共用。② vmap 建構處加 duplicate-SKU guard（→422 `duplicate_sku`），使下游 set-subset 邏輯 provably = set-equality。
+- `lib/studio/print-provider.ts` — `createSyncProductOnNative` 冪等命中分支：`incompleteVariants` 原僅比 variant **數量**。改名後 Woo 商品 reseed 不同 SKU 但同數量 → 靜默回首發 SKU 腐化 P4 join。新增 `skuMismatch`（input SKU 不在 existing set → true）OR 進 `incompleteVariants`（route 映射 422）。POST-path（:382）刻意維持 count-only（新建時 SKU 即送出值，無 reseed 風險）。
+- `lib/studio/__tests__/native-sync-product.test.ts`（新）— mock fetch 驗 createSyncProductOnNative 冪等命中：clean-hit(同 SKU)→incompleteVariants=false / renamed-reseed(同數量異 SKU)→true。
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin）| exit=0 | route.ts+print-provider.ts 0 型別錯（其餘 fabric/pdf-lib missing-dep 為既存，Docker npm ci 解）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run` | exit=0 | **318/318 pass**（含新 native-sync-product.test.ts 2 tests；renamed-reseed 案證明 SKU guard 生效）。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/2n — 2 Minor（duplicate-input-SKU 可 mask incompleteVariants）本輪以 vmap dup-sku guard 全關；regression-toward-502 兩情境（`idempotency_precheck_failed:printful_timeout` + 裸 `printful_timeout`）皆經 critic 追證確認新 classifier 仍涵蓋；null hole（externalId string|null）confirmed 無 false-negative。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`isTransientPfError\|incompleteVariants\|skuMismatch\|includes("timeout")` | hits=3 files — 舊 free-text 殘留 **0**；isTransientPfError 1def+2call；incompleteVariants 消費端（route 422 + print-provider 產生）一致；agency-os/scripts 0 stale。
+- 驗證等效已登記 `verify-recent-ack`（daily 2026-06-16.md 審計），commit gate 通過。
+**[剩餘風險]** 未部署 prod（HEAD vs `5b8c97ac`，純 next-admin code → 需一次 sg-deploy 生效，High-risk 待 go-ahead）。功能行為純收嚴（誤判 503→正確 502 / SKU 腐化→422 fail-loud），無對外行為放寬。
+**[rollback]** `git checkout 5b8c97ac -- <三檔>`；未部署故 prod 不受影響。
+
 ## 2026-06-15
 
 ### AO-CLOSE gate section — security + AI Models guide
