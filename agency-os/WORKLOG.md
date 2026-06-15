@@ -39,6 +39,22 @@
 **[剩餘風險]** 無（已部署 prod 並驗）。功能行為純收嚴（誤判 503→正確 502 / SKU 腐化→422 fail-loud），無對外行為放寬。
 **[rollback]** `git checkout 5b8c97ac -- <三檔>`；未部署故 prod 不受影響。
 
+### feat(pod): A2 自動轉單管線 — Woo 成交 → Printful DRAFT（測試期安全，draft-only）
+**[任務理解]** 使用者「要排程做自動轉單（WP 成交會自動送印刷，但現在測試期）」。先停確認（金流紅線+與前一則「不要」矛盾），使用者經 AskUserQuestion 選「**建管線但 draft-only**」。建 WP 成交 → 自動 Printful DRAFT（不扣款不印），default-off kill-switch 擋住，測試期不開火；**confirm（真送印）紅線不建**。commit `ad14f5f1`。
+**[已修改]**
+- `app/api/webhooks/woo-order/route.ts`（新）— Woo 訂單 webhook：① **kill-switch** `POD_AUTO_FULFILL_ENABLED !== "true"` → 200 ignored（default off，fail-closed，僅精確 "true" 啟用）② **HMAC** `verifyWooSignature`（Woo HMAC-SHA256 base64 簽 raw body，`x-wc-webhook-signature`；Web Crypto + constant-time；同一 rawBody 供驗簽+JSON.parse）③ 僅 processing/completed 付款狀態 ④ `parseWooOrder`（純函式：shipping 優先 recipient、billing 取 email/phone、line_items 抽 POD SKU、US/CA/AU 強制 state_code）⑤ 呼叫 `createDraftOrderOnNative`（**無 confirm**，draft-only，內建冪等防重複 draft）。
+- `docker-compose.yml` — 兩 next-admin env block 加 `POD_AUTO_FULFILL_ENABLED:${...:-false}` + `WC_WEBHOOK_SECRET:${...:-}`。
+- `app/api/webhooks/woo-order/route.test.ts`（新，15 tests）。
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | woo-order route+test 0 型別錯（tsconfig 不 narrow `!x.ok` → 套既有 cast 慣例）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run` | exit=0 | **333/333**（webhook 15：parseWooOrder 7 + verifyWooSignature 4 + handler 5）。**金流紅線守門 test**：kill-switch off → `createDraftOrderOnNative` **絕不被呼叫**（mock 斷言）；"TRUE" 非精確值 → dormant；bad sig → 401 never call；refunded → ignored never call；paid → 恰一次 draft。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python3 yaml.safe_load(encoding=utf-8)` | exit=0 | docker-compose.yml YAML_OK（CP950 trap：須 encoding='utf-8'）。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/2n+2s — end-to-end 追金流：唯一 mutating call `POST /orders` body 無 confirm 欄、path 非 `?confirm=1` → **無扣款送印路徑**；kill-switch fail-closed；HMAC 無繞過（empty secret/sig→false、raw-body 一致、base64 對 Woo `WC_Webhook::generate_signature`、constant-time）。Minor#1（`ok:true`+`error` 矛盾）**已修**（200 no-op 改 reason）；Suggestion#3（handler 守門 test）**已加**。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`POD_AUTO_FULFILL_ENABLED\|WC_WEBHOOK_SECRET\|parseWooOrder\|verifyWooSignature\|woo-order\|confirm` | hits=新 route+test+compose 兩 block | 新 symbol 無外部 stale consumer；webhook 內 `confirm` 僅在「明確不存在」註解 = 金流紅線完好；agency-os/scripts 0。
+- 驗證等效登記 `verify-recent-ack`（daily 2026-06-16.md）。
+**[剩餘風險]** 未部署 prod（待 go-ahead；flag default off → 即使部署也 dormant，零金流）。**啟用需操作者三步**：① SG `.env` 設 `POD_AUTO_FULFILL_ENABLED=true` + `WC_WEBHOOK_SECRET=<隨機>` ② WP admin 加 Woo webhook（order.updated/created → `https://app.aware-wave.com/api/webhooks/woo-order`，secret 同上）③ 即便啟用仍 **draft-only**，真送印需未來明確加 confirm（金流紅線，測試結束再議）。未來 confirm phase 前應改用 webhook topic header 判狀態（partial-refund-still-processing edge）。
+**[rollback]** `git checkout ad14f5f1~1 -- <route+test+compose>`；未部署故 prod 不受影響；flag off 故即使部署也無行為改變。
+
 ## 2026-06-15
 
 ### AO-CLOSE gate section — security + AI Models guide
