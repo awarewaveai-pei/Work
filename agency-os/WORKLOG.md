@@ -4,6 +4,20 @@
 
 ## 2026-06-15
 
+### AO-CLOSE gate section — security + AI Models guide
+
+Closeout inbox (AO-CLOSE auto): security remediation + Content Tools AI Models guide deployed and recorded.
+
+- Security scan remediation: `lobster-factory/packages/workflows` esbuild override updated `^0.28.0` -> `^0.28.1`; lockfile refreshed; `npm audit --audit-level=high`, `npm audit --audit-level=moderate`, `npm test` (75/75), and `npm run audit:workflows-security` all passed.
+- AI Models guide: added `/tools/ai-models` under Content Tools sidebar; compares text generation tools, 15 image models, and vibe coding tools; image cost is per-image only, not 78-card deck cost.
+- Production deploy: SG `sg-deploy.sh next-admin` deployed commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`; prod gates passed (`tsc`, vitest 24 files / 316 tests, healthy container, smoke OK).
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run typecheck; npm run build` (next-admin) | exit=0 | ms=N/A
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/root/lobster-phase1/scripts/sg-deploy.sh next-admin` | exit=0 | ms=N/A
+- REVIEW_WAIVED: NA -- static typed comparison data + route/sidebar wiring; typecheck/build/prod smoke covered integration
+- BUGHUNT_WAIVED: NA -- no cross-file behavior contract beyond new route/sidebar and static model data; grep confirmed no deck-cost strings remained
+
+## 2026-06-15
+
 ### feat(content-engine): Phase 2 YouTube 真嵌入（手貼 URL→core/embed）+ Phase 3 可編輯大綱強制標題關鍵字
 
 **[任務理解]** 使用者 5 點需求中的 (2) YouTube 影片仍未生成 + (3)(4) 大綱要先看、可改、每個標題含關鍵字。Phase 2：把生成文中的 `[YOUTUBE_PLACEHOLDER_N: query]` 變成可在 ContentStudio 手貼 YouTube URL → 發佈時輸出**真 Gutenberg core/embed**（非死框 div）。Phase 3：大綱 endpoint 加「每個 H2/H3/H4 含關鍵字或變體」規則（與 CJK 4–6 次精確上限調和）。**VBC 實證**：可編輯大綱 UI／`/api/content/outline`／generate 的 `outline` 參數**早已存在**（不重建）；WP Bridge plugin `BlockLibrary.youtube()`+`compose() case 'embed'`**早已支援 embed**（不需 plugin 改動/發版）。唯一真缺口：① 佔位符無解析路徑 ② 大綱 endpoint 無關鍵字規則。
@@ -10929,3 +10943,23 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=fetchGoogleTrends|pickTrendKeyword|internal.link | hits=0
 - BUGHUNT_WAIVED: NA -- ContentStudio.tsx UI text only change; generate/route.ts SYSTEM_PROMPT text only removal
 
+## 2026-06-15 security + AI Models guide + prod deploy
+
+### packages/workflows weekly security audit remediation
+- Weekly dependency scan reported esbuild advisory in `lobster-factory/packages/workflows` (`total=3 critical=0 high=3 moderate=0`).
+- Fixed workflows package override by updating esbuild from `^0.28.0` to `^0.28.1` and refreshed lockfile.
+- Verification: `npm audit --audit-level=high`, `npm audit --audit-level=moderate`, `npm test` (75/75), and `npm run audit:workflows-security` all passed.
+- GitHub tracking issue exists: #15.
+
+### Content Tools AI Models comparison page
+- Added `/tools/ai-models` under Content Tools sidebar, positioned between SEO Content and Tarot.
+- Built a clean comparison UI for three adjacent decision surfaces: text generation tools, image generation models, and vibe coding tools.
+- Image model table uses per-image cost only, not 78-card deck cost, and covers the 15 app image models requested by the operator.
+- Data includes model strengths, tradeoffs, style tendencies, cost notes, prompt/image input constraints where available, speed class, ratios, and source links.
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run typecheck` (next-admin) | exit=0 | result=tsc clean
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`npm run build` (next-admin) | exit=0 | result=Next production build passed; route table includes `/tools/ai-models`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/root/lobster-phase1/scripts/sg-deploy.sh next-admin` | exit=0 | result=deployed commit `5b8c97ac59e5da7d194db7256c1db27f8a503552`
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy gates | exit=0 | result=tsc passed; vitest 24 files / 316 tests passed; container healthy after 7s; smoke OK for `/login`, `/api/ops/summary`, nginx/wordpress, node-api
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=`curl.exe -I https://app.aware-wave.com/tools/ai-models` | exit=0 | result=307 to `/login?next=%2Ftools%2Fai-models` as expected behind auth; `/login` returns 200
+- REVIEW_WAIVED: CONTENT_DATA_UI -- static comparison page + typed data tables; build/typecheck/deploy smoke covered runtime integration
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=`78 張約|全套成本|fullDeckNt|15 個圖片模型比較` | hits=0 after moving comparison out of Tarot and using per-image cost only

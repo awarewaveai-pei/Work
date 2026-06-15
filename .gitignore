@@ -41,6 +41,7 @@ Backups/
 .claude/skills/*/.cache/
 
 .claude/telemetry/
+.claude/tasks/
 .claude/worktrees/
 # Claude Code built-in agent READMEs (auto-generated, no project content)
 .claude/agents/README.md

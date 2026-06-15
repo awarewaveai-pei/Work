@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "description": "Known, already-governed local plaintext findings for scripts/scan-local-config-for-secrets.ps1. Do not store secret values here.",
-  "lastReviewed": "2026-06-12",
+  "lastReviewed": "2026-06-15",
   "suppressions": [
     {
       "file": ".claude/settings.json",
@@ -86,6 +86,72 @@
       "pattern": "Google API key",
       "sourceKey": "GEMINI_API_KEY",
       "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
+    },
+    {
+      "file": ".claude/settings.json",
+      "pattern": "Google app password (4x4x4)",
+      "sourceKey": "line:15",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": ".claude/settings.json",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "line:75",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": ".claude/settings.json",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "line:76",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": ".claude/settings.json",
+      "pattern": "Postgres DSN with password",
+      "sourceKey": "line:77",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": ".claude/settings.json",
+      "pattern": "Uptime Kuma API key",
+      "sourceKey": "line:82",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": ".claude/settings.json",
+      "pattern": "Trigger.dev token",
+      "sourceKey": "line:83",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": ".claude/settings.json",
+      "pattern": "Trigger.dev token",
+      "sourceKey": "line:100",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": ".claude/settings.json",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "line:104",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": ".claude/settings.json",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "line:106",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": ".claude/settings.json",
+      "pattern": "JWT (Supabase / generic)",
+      "sourceKey": "line:108",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
+    },
+    {
+      "file": ".claude/settings.local.json",
+      "pattern": "GitHub PAT (classic)",
+      "sourceKey": "GH_TOKEN",
+      "reason": "Known local Claude runtime config; gitignored; value governed through local machine secret hygiene."
     }
   ]
 }
