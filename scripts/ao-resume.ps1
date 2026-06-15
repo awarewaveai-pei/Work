@@ -139,7 +139,7 @@ function Invoke-NonFastForwardRecovery {
             return $pullExit
         }
 
-        $nonLatest = @($conflicted | Where-Object { $_ -notmatch '-LATEST\.(md|json|txt)$' })
+        $nonLatest = @($conflicted | Where-Object { $_ -notmatch '-LATEST\.(md|json|txt)$' -and $_ -notmatch '[/\\]agency-os[/\\]reports[/\\]' })
         if ($nonLatest.Count -gt 0) {
             # Conflict in real code/docs — cannot auto-resolve; require human decision.
             Write-Host "AO-RESUME: pull --rebase conflict in non-LATEST files — cannot auto-resolve. Aborting rebase." -ForegroundColor Red
@@ -344,6 +344,20 @@ if ($rulesConsistencyExit -ne 0) {
     exit $rulesConsistencyExit
 }
 
+# --- Cross-machine memory import — runs BEFORE git-align (unconditional) ---
+# Import reads Google Drive vault (all target files are gitignored); logically
+# independent of git state. Must not be gated on git-align success.
+$importMemScript = Join-Path $WorkRoot "scripts\import-cross-machine-memory.ps1"
+if (Test-Path -LiteralPath $importMemScript) {
+    Write-Host ""
+    Write-Host "== AO-RESUME: cross-machine memory import (auto) ==" -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $importMemScript -WorkRoot $WorkRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARN: import-cross-machine-memory returned non-zero." -ForegroundColor Yellow
+    }
+    $global:LASTEXITCODE = 0
+}
+
 # Optional: hard-reset local main to origin/main, then ensure feature branch contains main (no nested ao-resume — we run once below).
 if ($FullMainlineParity) {
     if ($SkipStrictEnvironmentAudit) {
@@ -534,20 +548,6 @@ if ($script:StrictEnvAudit) {
             if ($healthGateExit -eq 0) { $healthGateExit = $LASTEXITCODE }
         }
     }
-}
-
-# --- Cross-machine memory import (auto; non-blocking) ---
-# Imports MEMORY.md from Desktop\AO-SYNC-*\ if a newer version exists.
-# Silent no-op when no AO-SYNC folder is present (normal for primary/laptop machine).
-$importMemScript = Join-Path $WorkRoot "scripts\import-cross-machine-memory.ps1"
-if (Test-Path -LiteralPath $importMemScript) {
-    Write-Host ""
-    Write-Host "== AO-RESUME: cross-machine memory import (auto) ==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $importMemScript -WorkRoot $WorkRoot
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "WARN: import-cross-machine-memory returned non-zero." -ForegroundColor Yellow
-    }
-    $global:LASTEXITCODE = 0
 }
 
 # --- Backup health snapshot (warn-only; AO-RESUME companion report) ---
