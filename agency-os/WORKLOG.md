@@ -4,6 +4,34 @@
 
 ## 2026-06-16
 
+### fix(content-engine): generate route 品質修正包 — 截斷吃掉 SEO meta + 內部假連結 + 真實相關文章連結
+
+**[任務理解]** 使用者實測 `/tools/content` 生成文章只有 56/100，且已發佈文章放**假的內部連結**。三個 live bug：(1) 長文撞 max_tokens 被截斷 → 寫在最尾的 CONTENT_META（SEO 標題/描述）沒生出來 → 空白 → RankMath 一次掛 4 項。(2) 內部連結 prompt 無防造假護欄（只有外連有）→ 沒提供內連時模型自編假網址（`/related-article`）。(3) 沒有真實相關文章連結。
+
+**[根因]**（file:line 實證，非猜測）
+- **截斷**：`generate/route.ts:9` `medium=4096`；CONTENT_META block 指示「After the full article, append」=寫在最尾 → body 截斷時 meta 永遠寫不到 → `extractMeta` null → seo-check 收 `seoTitle:"" metaDesc:""`。streaming 無 `stop_reason` 偵測 → 靜默截斷。
+- **假內連**：`:319` 防造假護欄**只保護外連**；內連 block（`:330-336`）無護欄且僅在操作者提供時才加 → 沒提供時模型為滿足 RankMath 內連測試自編假 URL。
+- **無相關文章**：模型不知站上有哪些真文章。
+
+**[已修改]**
+- `app/api/content/generate/route.ts` — ① `SIZE_TOKENS` 2048/4096/6144→**4096/8192/16384**（截斷主因）② CONTENT_META block **移到文章最前**（prompt 改「FIRST 輸出 meta，THEN 文章」；extractMeta/stripMeta regex 全文搜位置無關 → body 截斷 SEO 標題/描述仍保住）③ 內連 block 兩分支都加防造假硬規則 ④ streaming 後加 `finalMessage()` 截斷偵測吐 `<!-- GENERATION_TRUNCATED -->` marker。
+- `app/api/content/related-posts/route.ts`（**新**）— POST `{keyword,siteId?}`：`getWpSites()` 解析站 URL → **同時查 `/wp/v2/posts` + `/pages`**（相關內容兩種都有，REALTEST 證實）→ 交錯合併去重 → 回真實 permalink。錯誤降級回空（不阻生成）。
+- `app/tools/content/ContentStudio.tsx` — handleGenerate 生成前取真實相關文章 URL 併入 internalLinks（Set 去重 slice 10）；`genTruncated` state + 剝除 GENERATION_TRUNCATED/ERROR marker + 截斷琥珀警告；GENERATION_ERROR 設 error（非假 done）。bulk 同步剝 marker + truncated 旗標 + ⚠ badge（critic Major #2）。
+- `app/api/content/publish/route.ts` — 防禦縱深：丟棄 `GENERATION_(TRUNCATED|ERROR)` 註解行，永不進 live HTML（critic Major #1）。
+
+**[驗證結果]**（R0 四動作齊全）
+- REALTEST_EVIDENCE: tool=Bash/curl | cmd=soulful WP REST `posts+pages?search=art therapy&orderby=relevance` 合併模擬 route 輸出 | exit=0 | **回 5 個真實相關連結**（`insights/art-therapy-explained/...`、`art-therapy-kits/`）→ 證實資料源有效；`npx tsc --noEmit` 4 改檔 0 型別錯。
+- REVIEW_DONE: critic=Deep | verdict=warn→（修後）pass | findings=0c/2M/3m — 2 Major 全修：#1 GENERATION_ERROR 未剝經 publish:140 漏進 live post → 單篇+bulk 剝兩 marker + publish 防禦縱深 + 設 error 狀態；#2 bulk 無防護 → 同步剝+旗標+badge。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`related-posts\|GENERATION_TRUNCATED\|GENERATION_ERROR\|SIZE_TOKENS` | hits=0 stale — related-posts 唯一 caller=ContentStudio:623；GENERATION marker emit/consume/drop 三端齊全；SIZE_TOKENS 定義:12 消費:463 一致；Bridge path 本就 skip 純註解行。agency-os/scripts 零 stale。
+- WORKLOG: 本段。
+
+**[剩餘風險]**
+- **生成端 e2e 為 deploy-gated**：meta-first + 截斷 + 真實內連完整 e2e 需 sg-deploy 後真站生成一篇驗證（本次證實 related-posts 資料源 + tsc + critic）。
+- 已發佈含假連結舊文章（expressive-arts-emotional-wellness，現 404）需另以 WP-CLI 清理。
+- streaming 中短暫顯示 meta 註解 block（cosmetic，done 後剝除）。
+
+**[rollback]** `git checkout HEAD -- .../app/api/content/generate/route.ts .../app/api/content/publish/route.ts .../app/tools/content/ContentStudio.tsx` + 刪 `app/api/content/related-posts/route.ts`
+
 ### fix(content-engine): /api/content/title 補 RankMath 標題合規（使用者抓到「建議標題」不含數字/力量詞）
 
 **[任務理解]** 使用者在 `/tools/content` 按「✨ 建議標題」，截圖顯示 5 個建議標題（如「Art Therapy Modules: Healing Through Creative Expression」）**全無阿拉伯數字、無/弱力量詞**，質問「這沒遵循 SEO/GEO/AEO/RankMath」。先前我宣稱生成端已全套 RankMath = **過度宣稱**：我只驗了文章生成（generate route 的 H1 規則），沒驗「建議標題」這支**獨立 endpoint**。
