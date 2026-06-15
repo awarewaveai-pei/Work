@@ -4,6 +4,24 @@
 
 ## 2026-06-16
 
+### fix(content-engine): 結構開關「Yes」未強制 include — TABLES/FAQ/QUOTES 勾了卻沒出來
+
+**[任務理解]** 使用者勾選 TABLES/FAQ/QUOTES=Yes，但生成文章這三項全沒出現（文章未截斷，有完整 Conclusion）。承上「generate 品質修正包」同檔追加修正。
+
+**[根因]** `generate/route.ts:264-276` 結構區段**只在 `=== false` 時加否定指令**（"DO NOT include …"）；設 Yes 時**什麼都不加**，純靠 SYSTEM_PROMPT 預設 → 模型選擇性跳過 FAQ/表格/引用。有負面 opt-out，無正面強制 include。
+
+**[已修改]** `app/api/content/generate/route.ts` — 否定區段後加正面 `REQUIRED ELEMENTS` 區塊：啟用（`!== false`）的易跳過項（比較表格／資料表 fallback、`## FAQ` 5-8 QA、blockquote、Key Takeaways）列為硬 MUST。
+
+**[驗證結果]**（R0）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python test-struct.py`（真打 Anthropic Haiku 帶 REQUIRED ELEMENTS 生短文，正則驗 markdown 表格/`## FAQ`/blockquote/Key Takeaways）| exit=0 | **TABLE/FAQ/BLOCKQUOTE/KEY-TAKEAWAYS 全 PASS**（舊行為會跳過）；`npx tsc --noEmit` generate route 0 型別錯。
+- REVIEW_WAIVED: NA -- 純 prompt 正面強制字串追加，無控制流/型別契約改動；REALTEST 直接證實行為。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`REQUIRED ELEMENTS\|comparisonTable\|s\.faq\|s\.quotes` | hits=0 stale — structure 欄位消費端僅 buildUserPrompt（同檔）；ContentStudio DEFAULT_STRUCTURE 全 true 與新邏輯相容；無其他 consumer。
+- WORKLOG: 本段。
+
+**[剩餘風險]** 同 bundle：完整 e2e deploy-gated（本次 REALTEST 已證實 prompt 行為）。隨同一次 sg-deploy 生效。
+
+**[rollback]** `git checkout HEAD -- .../app/api/content/generate/route.ts`（保留 bundle 其他改動則用 git revert 本 commit）
+
 ### fix(content-engine): generate route 品質修正包 — 截斷吃掉 SEO meta + 內部假連結 + 真實相關文章連結
 
 **[任務理解]** 使用者實測 `/tools/content` 生成文章只有 56/100，且已發佈文章放**假的內部連結**。三個 live bug：(1) 長文撞 max_tokens 被截斷 → 寫在最尾的 CONTENT_META（SEO 標題/描述）沒生出來 → 空白 → RankMath 一次掛 4 項。(2) 內部連結 prompt 無防造假護欄（只有外連有）→ 沒提供內連時模型自編假網址（`/related-article`）。(3) 沒有真實相關文章連結。
