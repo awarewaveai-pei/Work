@@ -1,0 +1,17 @@
+# 密鑰與認證
+.env
+client_secrets.json
+youtube_token.json
+*.token.json
+
+# 產出與暫存
+output/
+temp/
+autopublish.log
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
