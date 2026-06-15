@@ -19,7 +19,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`doc-sync-automation.ps1 -ChangedFiles '...[year] Shortcode.md' -SkipApply -SkipReport` | exit=0 | 修後該中括號檔出現於 Changed/Impacted（修前會被 line 277 靜默丟棄）。
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1M/1m — line 37 改動 critic 判 PASS（非括號 path 行為不變、5 個 To-RelPath call site 皆傳具體檔路徑無 glob 意圖）；1 Major = 同 bug class 的 line 277 `Test-Path` 漏 `-LiteralPath`（本 commit 同步修並 REALTEST）；1 Minor = line 37 mid-enumeration TOCTOU（critic 自評對維護腳本可接受，列剩餘風險）。
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`Resolve-Path` | hits=1 — 全 scripts 掃 `Resolve-Path`，其餘漏 `-LiteralPath` 者皆只解析 workspace/script 根路徑（`$InputRoot`/`$PSScriptRoot`/`$WorkRoot`，不含中括號）→ 非同 bug class；唯一解析任意 repo 列舉檔的就是 line 37 → 已修。
-**[剩餘風險]** SSOT `REGISTER_SYSTEM_GUARD_TASKS.ps1` 261 bug 未修 → 公司桌機可能卡同款會閃的舊任務、未來重註冊仍失敗。修法（改 ScheduledTasks 模組）+ OnStartup 靜默化待使用者決策後續。
+**[剩餘風險]** ① SSOT `REGISTER_SYSTEM_GUARD_TASKS.ps1` 261 bug 未修 → 公司桌機可能卡同款會閃的舊任務、未來重註冊仍失敗。修法（改 ScheduledTasks 模組）+ OnStartup 靜默化待使用者決策後續。② line 37 mid-enumeration TOCTOU（檔在 Get-ChildItem 與 To-RelPath 間被刪）會丟 PathNotFound 終止錯而非 `$null.Path` 神祕錯 —— critic 自評對維護腳本可接受，未加 guard。
 **[rollback]** doc-sync：`git checkout HEAD~1 -- agency-os/scripts/doc-sync-automation.ps1`。live 任務：重跑 `REGISTER_SYSTEM_GUARD_TASKS.ps1`（會回到舊行為）或 `Set-ScheduledTask` 還原 Action。
 
 ### fix(pod): A1 hardening — 結構化 transient classifier + SKU-faithful 冪等（關 critic 2 benign 🟡）
