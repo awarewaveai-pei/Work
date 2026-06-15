@@ -216,6 +216,8 @@
 **[剩餘風險]** aeo-subquery-coverage 計數包含結構性 H2（非純子主題）；可接受（標示明確）。
 **[rollback]** git revert 上述 checkpoint commits。
 
+- 01:12 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-06-15.md
+
 ## 2026-06-14
 
 ### feat(postiz): 自架社群發佈 Postiz 上線 EU（Task 1 / 社群整合計畫）
