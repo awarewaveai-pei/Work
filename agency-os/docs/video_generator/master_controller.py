@@ -108,7 +108,8 @@ def process_topic(row):
 
     # 多平台發佈
     publish_results = publisher.publish_all(
-        topic_id, article, output_files, video_meta, social_summary
+        topic_id, article, output_files, video_meta, social_summary,
+        hero_image=result.get("hero_image", ""),
     )
 
     # 備份

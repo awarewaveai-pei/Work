@@ -17,17 +17,22 @@
 
 ```bash
 sudo apt install ffmpeg fonts-noto-cjk
-pip install anthropic openai edge-tts requests moviepy pillow \
-    google-auth google-auth-oauthlib google-api-python-client \
-    pytrends praw
+pip install -r requirements.txt   # moviepy 已鎖 1.0.3（程式用 1.x API，2.x 會炸）
 ```
 
 ## 設定步驟
 
 1. `setup.sql` → Supabase SQL Editor 執行
-2. `config.py` → 填入所有 API Key
+2. **密鑰走環境變數（不再編輯 config.py）**：`cp .env.example .env` → 填值 → 載入：
+   ```bash
+   set -a; source .env; set +a        # Linux/macOS
+   ```
+   沒填的欄位對應功能會自動略過，不會報錯。
 3. YouTube OAuth → 放 client_secrets.json 到同資料夾
 4. Freepik 素材 → 下載後放到 assets/backgrounds/ 和 assets/characters/
+
+> **密鑰原則**：所有 key 從環境變數讀取，禁止寫進 `config.py` / commit 進 git。
+> 本機可由 vault（`mcp/user-env.ps1`）注入；VPS cron 用 systemd `EnvironmentFile`。
 
 ## 執行
 
@@ -74,6 +79,15 @@ developers.pinterest.com → 建立 app → 取得 access token
 
 ### LinkedIn
 linkedin.com/developers → 建立 app → 申請 w_member_social 權限
+
+## 重要行為（v3 修正後）
+
+- **IG / Pinterest**：發圖前會先把第一張場景圖上傳到 **WordPress 媒體庫**取得公開 URL（兩平台 API 都強制要公開 URL）。所以這兩個平台需要 WordPress 設定正確才會發。
+- **TikTok**：未審核（unaudited）的 app 只能 `SELF_ONLY`，預設即此。app 通過 audit 後才把 `TIKTOK_PRIVACY=PUBLIC_TO_EVERYONE`。
+- **Reddit**：自動發文易被當 spam ban，**預設關閉**。確認目標 subreddit 規則允許後，設 `REDDIT_ENABLE=true` + `REDDIT_SUBREDDITS=...`。
+- **冪等**：同一主題重跑時，已成功（`publish_log.status=done`）的平台會自動略過，不會重傳 YouTube 造成重複影片。
+- **成本**：Claude 費用依實際 token 用量計算（非寫死），記入 `cost_log`。
+- **JSON 穩健性**：Claude 回傳非合法 JSON 時自動重試（最多 2 次）再失敗才中止該主題。
 
 ## 每月費用估算
 

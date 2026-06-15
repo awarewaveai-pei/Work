@@ -93,6 +93,14 @@ interface PublishBody {
 
 const PRICE_RE = /^\d+(\.\d{1,2})?$/;
 
+// Transient = safe to retry (the read-before-write idempotency guard means a retry never duplicates).
+// STRUCTURED tokens only: pf() (print-provider.ts:103) emits `printful_timeout` / `printful_network_error`
+// for real transport failures, but on a clean HTTP error (line 117) it slices the upstream Printful body
+// message verbatim — a 4xx whose text merely contains "timeout"/"network_error" must NOT be misread as
+// 503-retryable. `idempotency_precheck_failed:*` stays a prefix match (its inner reason is itself transient).
+const isTransientPfError = (e: string): boolean =>
+  e.startsWith("idempotency_precheck_failed") || e === "printful_timeout" || e === "printful_network_error";
+
 export async function POST(request: Request) {
   const blocked = gate(request);
   if (blocked) return blocked;
@@ -513,8 +521,7 @@ export async function POST(request: Request) {
       const e = (created as { ok: false; error: string }).error;
       // Idempotency-precheck / timeout / network failures are transient and safe to retry — same class
       // as reReadFailed below. Surface 503 retryable so the operator retries instead of giving up.
-      const transient =
-        e.startsWith("idempotency_precheck_failed") || e.includes("timeout") || e.includes("network_error");
+      const transient = isTransientPfError(e);
       return NextResponse.json(
         { ok: false, error: e, ...(transient ? { retryable: true } : {}) },
         { status: transient ? 503 : 502 },
@@ -651,8 +658,7 @@ export async function POST(request: Request) {
       const e = (order as { ok: false; error: string }).error;
       // Idempotency-precheck / timeout / network failures are transient and safe to retry (the read-
       // before-write guard means a retry never duplicates a draft). Surface 503 retryable.
-      const transient =
-        e.startsWith("idempotency_precheck_failed") || e.includes("timeout") || e.includes("network_error");
+      const transient = isTransientPfError(e);
       return NextResponse.json(
         { ok: false, error: e, ...(transient ? { retryable: true } : {}) },
         { status: transient ? 503 : 502 },

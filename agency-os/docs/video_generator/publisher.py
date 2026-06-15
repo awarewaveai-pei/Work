@@ -4,22 +4,83 @@ publisher.py
 """
 
 import os
+import time
 import requests
 import json
 from pathlib import Path
 from config import *
 
 def log_publish(topic_id, platform, status, url="", error=""):
+    if not SUPABASE_URL:
+        return
     headers = {
         "apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
     }
-    requests.post(
-        f"{SUPABASE_URL}/rest/v1/publish_log",
-        headers=headers,
-        json={"topic_id": topic_id, "platform": platform, "status": status, "url": url, "error": error},
-        timeout=10,
-    )
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/publish_log",
+            headers=headers,
+            json={"topic_id": topic_id, "platform": platform, "status": status, "url": url, "error": str(error)[:500]},
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"   ⚠️  log_publish：{e}")
+
+
+# ══════════════════════════════════════
+# 冪等：查已成功的平台，避免重傳（例如 YouTube 已上傳但 WP 失敗時重跑）
+# ══════════════════════════════════════
+def get_done_platforms(topic_id):
+    """回傳 {platform: url} of 已 status=done 的紀錄。"""
+    if not SUPABASE_URL:
+        return {}
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/publish_log",
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+            params={"topic_id": f"eq.{topic_id}", "status": "eq.done", "select": "platform,url"},
+            timeout=10,
+        )
+        if r.ok:
+            return {row["platform"]: row.get("url", "") for row in r.json()}
+    except Exception as e:
+        print(f"   ⚠️  讀取發佈記錄：{e}")
+    return {}
+
+
+def _yt_embed(video_id):
+    return (f'<div style="position:relative;padding-bottom:56.25%;height:0;">'
+            f'<iframe src="https://www.youtube.com/embed/{video_id}" '
+            f'style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" '
+            f'allowfullscreen loading="lazy"></iframe></div>')
+
+
+# ══════════════════════════════════════
+# WordPress 媒體上傳 → 取得公開圖片 URL（IG / Pinterest 都強制需要公開 URL）
+# ══════════════════════════════════════
+def upload_wp_media(image_path):
+    if not WP_URL or not image_path or not os.path.exists(image_path):
+        return ""
+    try:
+        fn = os.path.basename(image_path)
+        ext = os.path.splitext(fn)[1].lower()
+        mime = "image/png" if ext == ".png" else "image/jpeg"
+        with open(image_path, "rb") as f:
+            r = requests.post(
+                f"{WP_URL}/wp-json/wp/v2/media",
+                auth=(WP_USERNAME, WP_PASSWORD),
+                headers={"Content-Disposition": f'attachment; filename="{fn}"', "Content-Type": mime},
+                data=f.read(), timeout=60,
+            )
+        if r.ok:
+            url = r.json().get("source_url", "")
+            print(f"   ✅ WP 媒體：{url}")
+            return url
+        print(f"   ⚠️  WP 媒體上傳：{r.status_code} {r.text[:120]}")
+    except Exception as e:
+        print(f"   ⚠️  WP 媒體上傳：{e}")
+    return ""
 
 # ══════════════════════════════════════
 # 1. YouTube
@@ -60,7 +121,7 @@ def publish_youtube(video_path, meta):
             _, response = req.next_chunk()
         video_id = response["id"]
         url = f"https://www.youtube.com/watch?v={video_id}"
-        embed = f'<div style="position:relative;padding-bottom:56.25%;height:0;"><iframe src="https://www.youtube.com/embed/{video_id}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allowfullscreen loading="lazy"></iframe></div>'
+        embed = _yt_embed(video_id)
         print(f"   ✅ YouTube：{url}")
         return {"url": url, "embed": embed, "video_id": video_id}
     except Exception as e:
@@ -116,22 +177,26 @@ def publish_wordpress(article, embed_code, youtube_url):
 # ══════════════════════════════════════
 # 3. Instagram
 # ══════════════════════════════════════
-def publish_instagram(image_path, caption):
+def publish_instagram(image_url, caption):
     if not META_ACCESS_TOKEN or not META_INSTAGRAM_ID:
         print("   ⏭️  Instagram：未設定")
         return None
+    if not image_url:
+        print("   ⏭️  Instagram：無公開圖片 URL，略過")
+        return None
     try:
-        # 上傳圖片容器
+        # 上傳圖片容器（image_url 必須是公開可存取的 URL）
         r = requests.post(
             f"https://graph.facebook.com/v18.0/{META_INSTAGRAM_ID}/media",
             params={
-                "image_url": image_path,  # 需要是公開 URL
+                "image_url": image_url,
                 "caption": caption[:2200],
                 "access_token": META_ACCESS_TOKEN,
             }, timeout=15
         )
         if not r.ok: raise Exception(r.text)
         container_id = r.json()["id"]
+        time.sleep(5)  # 等 Meta 處理容器，否則 media_publish 可能回 not ready
         # 發佈
         r2 = requests.post(
             f"https://graph.facebook.com/v18.0/{META_INSTAGRAM_ID}/media_publish",
@@ -222,7 +287,7 @@ def publish_tiktok(video_path, title):
             json={
                 "post_info": {
                     "title": title[:150],
-                    "privacy_level": "PUBLIC_TO_EVERYONE",
+                    "privacy_level": TIKTOK_PRIVACY,  # 未審核 app 須為 SELF_ONLY，否則 init 會被拒
                     "disable_duet": False,
                     "disable_comment": False,
                     "disable_stitch": False,
@@ -387,76 +452,127 @@ def publish_bluesky(text, url=""):
 # ══════════════════════════════════════
 # 主發佈函式（一次發佈全部平台）
 # ══════════════════════════════════════
-def publish_all(topic_id, article, video_files, meta, summary_text):
+def publish_all(topic_id, article, video_files, meta, summary_text, hero_image=""):
     """
     video_files: dict，例 {"youtube_linkedin": "/path/youtube.mp4", ...}
     summary_text: 社群發文的摘要文字
+    hero_image:   第一張場景圖的本地路徑（會上傳 WP 媒體庫供 IG/Pinterest 使用）
+
+    冪等：已 status=done 的平台會跳過，避免重跑時重傳 YouTube 等造成重複內容。
     """
     print("\n📡 開始多平台發佈...")
     results = {}
+    done = get_done_platforms(topic_id)
+    if done:
+        print(f"   ↩️  偵測到已發佈平台，將略過：{', '.join(done.keys())}")
+
+    # 先把 hero 圖上傳到 WP 媒體庫，取得公開 URL（IG / Pinterest 需要）
+    hero_url = upload_wp_media(hero_image) if hero_image else ""
 
     # 1. YouTube
-    yt = publish_youtube(video_files.get("youtube_linkedin", ""), meta)
-    if yt:
-        results["youtube"] = yt["url"]
-        log_publish(topic_id, "youtube", "done", yt["url"])
+    if "youtube" in done:
+        yt_url = done["youtube"]
+        vid = yt_url.split("v=")[-1] if "v=" in yt_url else ""
+        yt = {"url": yt_url, "embed": _yt_embed(vid), "video_id": vid} if yt_url else None
+        results["youtube"] = yt_url
+        print("   ↩️  YouTube：已發佈，略過")
     else:
-        log_publish(topic_id, "youtube", "failed")
+        yt = publish_youtube(video_files.get("youtube_linkedin", ""), meta)
+        if yt:
+            results["youtube"] = yt["url"]
+            log_publish(topic_id, "youtube", "done", yt["url"])
+        else:
+            log_publish(topic_id, "youtube", "failed")
 
     # 2. WordPress（需要 YouTube embed code）
-    embed_code = yt["embed"] if yt else ""
-    wp_url = publish_wordpress(article, embed_code, results.get("youtube", ""))
-    if wp_url:
-        results["wordpress"] = wp_url
-        log_publish(topic_id, "wordpress", "done", wp_url)
+    if "wordpress" in done:
+        results["wordpress"] = done["wordpress"]
+        print("   ↩️  WordPress：已發佈，略過")
     else:
-        log_publish(topic_id, "wordpress", "failed")
+        embed_code = yt["embed"] if yt else ""
+        wp_url = publish_wordpress(article, embed_code, results.get("youtube", ""))
+        if wp_url:
+            results["wordpress"] = wp_url
+            log_publish(topic_id, "wordpress", "done", wp_url)
+        else:
+            log_publish(topic_id, "wordpress", "failed")
 
     # 社群摘要（加上 WP 連結）
-    social_text = f"{summary_text}\n\n🔗 {results.get('wordpress', '')}"
+    wp_link = results.get("wordpress", "")
+    social_text = f"{summary_text}\n\n🔗 {wp_link}" if wp_link else summary_text
 
     # 3. Facebook
-    fb = publish_facebook(social_text, results.get("wordpress", ""))
-    if fb: results["facebook"] = fb
-    log_publish(topic_id, "facebook", "done" if fb else "failed")
+    if "facebook" not in done:
+        fb = publish_facebook(social_text, wp_link)
+        if fb:
+            results["facebook"] = fb
+            log_publish(topic_id, "facebook", "done", str(fb))
+        else:
+            log_publish(topic_id, "facebook", "failed")
 
-    # 4. Instagram（用第一張場景圖）
-    # 注意：Instagram 需要公開圖片 URL，這裡暫時略過圖片上傳
-    ig = publish_instagram("", social_text[:2200])
-    if ig: results["instagram"] = ig
-    log_publish(topic_id, "instagram", "done" if ig else "skipped")
+    # 4. Instagram（用 hero 圖的公開 URL）
+    if "instagram" not in done:
+        ig = publish_instagram(hero_url, social_text[:2200])
+        if ig:
+            results["instagram"] = ig
+            log_publish(topic_id, "instagram", "done", str(ig))
+        else:
+            log_publish(topic_id, "instagram", "skipped")
 
     # 5. LinkedIn
-    li = publish_linkedin(social_text[:3000], results.get("wordpress", ""))
-    if li: results["linkedin"] = li
-    log_publish(topic_id, "linkedin", "done" if li else "failed")
+    if "linkedin" not in done:
+        li = publish_linkedin(social_text[:3000], wp_link)
+        if li:
+            results["linkedin"] = li
+            log_publish(topic_id, "linkedin", "done", str(li))
+        else:
+            log_publish(topic_id, "linkedin", "failed")
 
     # 6. TikTok
-    tt = publish_tiktok(video_files.get("tiktok", ""), meta["title"])
-    if tt: results["tiktok"] = tt
-    log_publish(topic_id, "tiktok", "done" if tt else "failed")
+    if "tiktok" not in done:
+        tt = publish_tiktok(video_files.get("tiktok", ""), meta["title"])
+        if tt:
+            results["tiktok"] = tt
+            log_publish(topic_id, "tiktok", "done", str(tt))
+        else:
+            log_publish(topic_id, "tiktok", "failed")
 
     # 7. Threads
-    th = publish_threads(social_text[:500])
-    if th: results["threads"] = th
-    log_publish(topic_id, "threads", "done" if th else "failed")
+    if "threads" not in done:
+        th = publish_threads(social_text[:500])
+        if th:
+            results["threads"] = th
+            log_publish(topic_id, "threads", "done", str(th))
+        else:
+            log_publish(topic_id, "threads", "failed")
 
-    # 8. Pinterest
-    pi = publish_pinterest("", article["title"], article.get("meta_description",""), results.get("wordpress",""))
-    if pi: results["pinterest"] = pi
-    log_publish(topic_id, "pinterest", "done" if pi else "failed")
+    # 8. Pinterest（用 hero 圖的公開 URL）
+    if "pinterest" not in done:
+        pi = publish_pinterest(hero_url, article["title"], article.get("meta_description", ""), wp_link)
+        if pi:
+            results["pinterest"] = pi
+            log_publish(topic_id, "pinterest", "done", str(pi))
+        else:
+            log_publish(topic_id, "pinterest", "skipped" if not hero_url else "failed")
 
-    # 9. Reddit
-    if REDDIT_SUBREDDITS:
-        rd = publish_reddit(article["title"], summary_text, REDDIT_SUBREDDITS[0], results.get("wordpress",""))
-        if rd: results["reddit"] = rd
-        log_publish(topic_id, "reddit", "done" if rd else "failed")
+    # 9. Reddit（預設關閉；REDDIT_ENABLE=true 且有目標 sub 才發，避免 spam ban）
+    if "reddit" not in done and REDDIT_ENABLE and REDDIT_SUBREDDITS:
+        rd = publish_reddit(article["title"], summary_text, REDDIT_SUBREDDITS[0], wp_link)
+        if rd:
+            results["reddit"] = rd
+            log_publish(topic_id, "reddit", "done", str(rd))
+        else:
+            log_publish(topic_id, "reddit", "failed")
 
     # 10. Bluesky
-    bsky = publish_bluesky(social_text[:300], results.get("wordpress",""))
-    if bsky: results["bluesky"] = bsky
-    log_publish(topic_id, "bluesky", "done" if bsky else "failed")
+    if "bluesky" not in done:
+        bsky = publish_bluesky(social_text[:300], wp_link)
+        if bsky:
+            results["bluesky"] = bsky
+            log_publish(topic_id, "bluesky", "done", str(bsky))
+        else:
+            log_publish(topic_id, "bluesky", "failed")
 
-    done = sum(1 for v in results.values() if v)
-    print(f"\n   📊 發佈完成：{done}/10 個平台成功")
+    success = sum(1 for v in results.values() if v)
+    print(f"\n   📊 發佈完成：{success} 個平台成功（含略過 {len(done)} 個）")
     return results

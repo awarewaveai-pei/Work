@@ -312,13 +312,19 @@ export async function createSyncProductOnNative(input: {
     return { ok: false, error: `idempotency_precheck_failed:${(existing as { ok: false; error: string }).error}` };
   }
   if (existing.value) {
+    // Faithfulness check on an idempotent hit. Count alone is insufficient: re-sending the same Woo
+    // product after a title change reseeds different SKUs, so a same-count product would silently
+    // return the FIRST run's SKUs and corrupt the P4 join. Flag incomplete unless every incoming SKU
+    // is bound on the existing product (external_id = Woo SKU, per the mapping above).
+    const existingSkus = new Set(existing.value.variants.map((v) => v.externalId));
+    const skuMismatch = input.variants.some((v) => !existingSkus.has(v.externalId));
     return {
       ok: true,
       value: {
         id: existing.value.product.id,
         alreadyExisted: true,
         reReadFailed: false,
-        incompleteVariants: existing.value.variants.length !== input.variants.length,
+        incompleteVariants: existing.value.variants.length !== input.variants.length || skuMismatch,
         variantCount: existing.value.variants.length,
         variants: existing.value.variants.map((v) => ({
           id: v.id,
