@@ -1,17 +1,18 @@
 /**
- * trending-sources.ts — 搜尋積木（熱門/趨勢來源 registry）
+ * trending-sources.ts — 搜尋積木家族（kind:"search"）
  *
- * 把原本散在 route.ts handler 裡寫死的來源（Google News / Reddit / PTT）統整成
- * 「一個積木 + 內部來源 registry」。對外只暴露 runTrending()；對內每個來源是一筆
- * TrendingSource，可增（registerSource / 內建陣列 / env 自訂 feed）、可刪（enabled:false）。
+ * 每個熱門/趨勢來源 = 一個自我註冊的 block（register() into ./blocks/registry）。
+ * 這是「真積木註冊系統」的第一批：搜尋源全部 register 進共用 registry，
+ * 編排器只需 byKind("search") 就能跑全部，不必認識任何單一來源。
  *
- * 增刪方式：
- *   - 程式內建：改 BUILTIN_SOURCES 陣列一筆
- *   - 任意 RSS/Atom：rssSource({...}) 工廠一行
- *   - 營運自訂（免改 code）：env CONTENT_TRENDING_FEEDS = JSON 陣列
- *       例：[{"id":"hn","label":"Hacker News","url":"https://hnrss.org/frontpage","geos":"*"}]
- *   - 未來 DB+UI 層：再呼叫 registerSource() 把 DB rows 注入即可（介面已就緒）
+ * 增刪來源 3 種：
+ *   ① 內建開關      該 block 加 enabled:false（刪整段 = 徹底移除）
+ *   ② 加任意 RSS    rssSearchBlock({...}) 一行 + register
+ *   ③ 免改 code     env CONTENT_TRENDING_FEEDS = JSON 陣列（見下）
+ *   ④ 未來 DB/UI    呼叫 registry.register() 把 DB rows 注入即可（介面已就緒）
  */
+
+import { register, byKind, geoMatch, type BlockCtx } from "./blocks/registry";
 
 export interface TrendingItem {
   title: string;
@@ -19,18 +20,6 @@ export interface TrendingItem {
   category: string;
   relatedQueries: string[];
   source?: string;
-}
-
-export interface SourceCtx {
-  geo: string;
-}
-
-export interface TrendingSource {
-  id: string;
-  label: string;
-  enabled?: boolean;            // 預設 true；false = 停用（保留設定不刪）
-  geos?: string[] | "*";        // 限定地區或 "*" 全通；省略視為 "*"
-  fetch: (ctx: SourceCtx) => Promise<TrendingItem[]>;
 }
 
 // ─── 共用工具 ────────────────────────────────────────────────────────────────
@@ -81,9 +70,9 @@ function decodeEntities(s: string): string {
  * SSRF guard: https only, no internal/loopback/private hosts. Used for any
  * non-hardcoded (env / future DB-UI) feed URL.
  *
- * 限制：只比對 URL 字面 host，不解析 DNS → 擋不住 DNS rebinding（公開域名解到
- * 169.254.169.254 等內網）。因此 env CONTENT_TRENDING_FEEDS 視為「受信任營運者」輸入；
- * 未來 DB/UI 開放任意使用者貼 feed 時，必須在 fetch 前加 DNS 解析後比對或 allowlist。
+ * 限制：只比對 URL 字面 host，不解析 DNS → 擋不住 DNS rebinding。因此 env
+ * CONTENT_TRENDING_FEEDS 視為「受信任營運者」輸入；未來開放任意使用者貼 feed 時，
+ * 必須在 fetch 前加 DNS 解析後比對或 allowlist。
  */
 function isSafePublicHttps(rawUrl: string): boolean {
   let u: URL;
@@ -91,17 +80,14 @@ function isSafePublicHttps(rawUrl: string): boolean {
   if (u.protocol !== "https:") return false;
   let h = u.hostname.toLowerCase();
   if (h.startsWith("[") && h.endsWith("]")) h = h.slice(1, -1);  // 去 IPv6 中括號
-  // 名稱型
   if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal")) return false;
-  // IPv4 私有/迴圈/link-local/CGNAT(100.64/10)
   if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return false;
   if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return false;
-  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(h)) return false;
-  // IPv6 迴圈/ULA(fc00::/7)/link-local(fe80::/10)/IPv4-mapped(::ffff:)
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(h)) return false;  // CGNAT 100.64/10
   if (h === "::1") return false;
-  if (h.startsWith("fc") || h.startsWith("fd")) return false;
-  if (h.startsWith("fe8") || h.startsWith("fe9") || h.startsWith("fea") || h.startsWith("feb")) return false;
-  if (h.includes("::ffff:")) return false;
+  if (h.startsWith("fc") || h.startsWith("fd")) return false;            // ULA fc00::/7
+  if (h.startsWith("fe8") || h.startsWith("fe9") || h.startsWith("fea") || h.startsWith("feb")) return false; // link-local
+  if (h.includes("::ffff:")) return false;                              // IPv4-mapped
   return true;
 }
 
@@ -117,7 +103,7 @@ async function safeFetchText(url: string, timeoutMs = 8000, headers: Record<stri
   return text.length > MAX_FEED_BYTES ? text.slice(0, MAX_FEED_BYTES) : text;
 }
 
-/** Unified RSS (<item>) + Atom (<entry>) title extractor — covers Google News, Reddit, any custom feed. */
+/** Unified RSS (<item>) + Atom (<entry>) title extractor — Google News, Reddit, any custom feed. */
 function extractFeedItems(
   xml: string,
   opts: { limit: number; source?: string; stripPublisherSuffix?: boolean },
@@ -141,10 +127,35 @@ function extractFeedItems(
   return items;
 }
 
-/** Factory: turn any RSS/Atom feed URL into a TrendingSource (one line per feed). */
-export function rssSource(opts: {
+// ─── 搜尋 block 工廠 ─────────────────────────────────────────────────────────
+
+interface SearchBlockDef {
   id: string;
-  label: string;
+  title: string;
+  icon?: string;
+  geos?: string[] | "*";
+  enabled?: boolean;
+  run: (geo: string) => Promise<TrendingItem[]>;
+}
+
+/** 把一個搜尋來源包成 kind:"search" 的 ContentBlock（run 從 ctx 取 geo）。 */
+function searchBlock(def: SearchBlockDef) {
+  register({
+    id: def.id,
+    title: def.title,
+    icon: def.icon,
+    kind: "search",
+    enabled: def.enabled,
+    geos: def.geos ?? "*",
+    run: (ctx: BlockCtx) => def.run(String(ctx.geo ?? "TW")),
+  });
+}
+
+/** 任意 RSS/Atom feed → 搜尋 block（一行加一個來源）。 */
+function rssSearchBlock(opts: {
+  id: string;
+  title: string;
+  icon?: string;
   url: string | ((geo: string) => string);
   geos?: string[] | "*";
   enabled?: boolean;
@@ -152,28 +163,29 @@ export function rssSource(opts: {
   stripPublisherSuffix?: boolean;
   headers?: Record<string, string>;
   source?: string;
-}): TrendingSource {
-  return {
+}) {
+  searchBlock({
     id: opts.id,
-    label: opts.label,
-    enabled: opts.enabled,
+    title: opts.title,
+    icon: opts.icon,
     geos: opts.geos ?? "*",
-    fetch: async ({ geo }) => {
+    enabled: opts.enabled,
+    run: async (geo) => {
       const url = typeof opts.url === "function" ? opts.url(geo) : opts.url;
       if (!isSafePublicHttps(url)) return [];
       try {
         const xml = await safeFetchText(url, 8000, opts.headers);
         return extractFeedItems(xml, {
           limit: opts.limit ?? 20,
-          source: opts.source ?? opts.label,
+          source: opts.source ?? opts.title,
           stripPublisherSuffix: opts.stripPublisherSuffix ?? false,
         });
       } catch { return []; }
     },
-  };
+  });
 }
 
-// ─── 內建來源 ────────────────────────────────────────────────────────────────
+// ─── 地區設定 ────────────────────────────────────────────────────────────────
 
 const GEO_RSS: Record<string, { hl: string; gl: string; ceid: string }> = {
   TW: { hl: "zh-TW", gl: "TW", ceid: "TW:zh-Hant" },
@@ -200,9 +212,13 @@ const GEO_NAME: Record<string, string> = {
   US: "the United States", GB: "the United Kingdom", JP: "Japan", AU: "Australia",
 };
 
-const googleNews = rssSource({
-  id: "google-news",
-  label: "Google News",
+// ─── 註冊搜尋積木（檔案 import 時自我註冊） ──────────────────────────────────
+
+// ① Google News RSS
+rssSearchBlock({
+  id: "search/google-news",
+  title: "Google News",
+  icon: "📰",
   geos: "*",
   limit: 20,
   stripPublisherSuffix: true,
@@ -213,13 +229,14 @@ const googleNews = rssSource({
   },
 });
 
-const reddit = rssSource({
-  id: "reddit",
-  label: "Reddit",
+// ② Reddit Atom RSS（必須帶描述性 UA，否則 Reddit 403/429 → 整源變空）
+rssSearchBlock({
+  id: "search/reddit",
+  title: "Reddit",
+  icon: "👽",
   geos: "*",
   limit: 10,
   source: "Reddit",
-  // Reddit 封鎖瀏覽器偽裝/通用 UA（403/429）→ 必須帶原本的描述性 UA，否則整個 Reddit 源變空。
   headers: {
     "User-Agent": "ContentStudio/1.0 (educational aggregator; +https://aware-wave.com)",
     Accept: "application/rss+xml, application/xml, text/xml",
@@ -230,11 +247,13 @@ const reddit = rssSource({
   },
 });
 
-const ptt: TrendingSource = {
-  id: "ptt-gossiping",
-  label: "PTT 八卦版",
+// ③ PTT 八卦版（HTML scrape；僅 TW）
+searchBlock({
+  id: "search/ptt",
+  title: "PTT 八卦版",
+  icon: "🗣️",
   geos: ["TW"],
-  fetch: async () => {
+  run: async () => {
     try {
       const html = await safeFetchText("https://www.ptt.cc/bbs/Gossiping/index.html", 8000, { Cookie: "over18=1" });
       const items: TrendingItem[] = [];
@@ -254,73 +273,61 @@ const ptt: TrendingSource = {
       return items;
     } catch { return []; }
   },
-};
+});
 
-const perplexity: TrendingSource = {
-  id: "perplexity",
-  label: "Perplexity 即時",
-  enabled: !!process.env.PERPLEXITY_API_KEY,
+// ④ Perplexity 即時網路熱門（key 在才啟用）
+searchBlock({
+  id: "search/perplexity",
+  title: "Perplexity 即時",
+  icon: "🔮",
   geos: "*",
-  fetch: async ({ geo }) => {
+  enabled: !!process.env.PERPLEXITY_API_KEY,
+  run: async (geo) => {
     const hl = geo === "TW" || geo === "HK" ? "zh-TW" : "en";
     const lang = hl.startsWith("zh") ? "Traditional Chinese" : "English";
     const where = GEO_NAME[geo] ?? "the world";
     const content = await perplexityChat(
       `List 10 trending news topics or hot search terms right now in ${where}. ` +
       `Language: ${lang}. Reply ONLY as a JSON array of short title strings, no markdown.`,
-      8000,  // 與其他來源 8s timeout 對齊，避免 Perplexity 拖長熱門 feed 的 p99
+      8000,  // 與其他來源 8s timeout 對齊，避免拖長熱門 feed p99
     );
     return parseJsonStrings(content).slice(0, 10).map(title => ({
       title, traffic: "", category: "", relatedQueries: [], source: "Perplexity",
     }));
   },
-};
+});
 
-// 營運自訂 feed（env，免改 code 即可增刪；未來 DB+UI 走同一條 registerSource）
-function loadEnvCustomFeeds(): TrendingSource[] {
+// ⑤ 營運自訂 feed（env，免改 code 增刪；未來 DB/UI 走同一條 register）
+(function registerEnvCustomFeeds() {
   const raw = process.env.CONTENT_TRENDING_FEEDS;
-  if (!raw) return [];
+  if (!raw) return;
   try {
-    const arr = JSON.parse(raw) as Array<{ id: string; label: string; url: string; geos?: string[] | "*"; enabled?: boolean }>;
-    return arr
-      .filter(f => f && f.id && f.url && isSafePublicHttps(f.url))
-      .map(f => rssSource({ id: f.id, label: f.label || f.id, url: f.url, geos: f.geos ?? "*", enabled: f.enabled, source: f.label || f.id }));
-  } catch { return []; }
-}
+    const arr = JSON.parse(raw) as Array<{ id: string; label?: string; title?: string; url: string; geos?: string[] | "*"; enabled?: boolean }>;
+    for (const f of arr) {
+      if (!f || !f.id || !f.url || !isSafePublicHttps(f.url)) continue;
+      const name = f.title || f.label || f.id;
+      rssSearchBlock({
+        id: f.id.startsWith("search/") ? f.id : `search/${f.id}`,
+        title: name,
+        icon: "🔗",
+        url: f.url,
+        geos: f.geos ?? "*",
+        enabled: f.enabled,
+        source: name,
+      });
+    }
+  } catch { /* malformed env → no custom feeds */ }
+})();
 
-// ─── Registry ────────────────────────────────────────────────────────────────
+// ─── 對外入口（編排器 / route 用） ───────────────────────────────────────────
 
-const SOURCES: TrendingSource[] = [
-  googleNews,
-  reddit,
-  ptt,
-  perplexity,
-  ...loadEnvCustomFeeds(),
-];
-
-/** 動態加一個來源（DB/UI 層注入用）。 */
-export function registerSource(s: TrendingSource): void {
-  const i = SOURCES.findIndex(x => x.id === s.id);
-  if (i >= 0) SOURCES[i] = s; else SOURCES.push(s);
-}
-
-/** 列出已註冊來源（給管理 UI / 偵錯）。 */
-export function listSources(): Array<{ id: string; label: string; enabled: boolean; geos: string[] | "*" }> {
-  return SOURCES.map(s => ({ id: s.id, label: s.label, enabled: s.enabled !== false, geos: s.geos ?? "*" }));
-}
-
-function geoMatch(s: TrendingSource, geo: string): boolean {
-  const g = s.geos ?? "*";
-  return g === "*" || g.includes(geo);
-}
-
-/** 搜尋積木對外唯一入口：跑所有啟用且符合 geo 的來源，彙整結果。 */
+/** 搜尋積木的彙整入口：跑所有啟用且符合 geo 的 search block。 */
 export async function runTrending(geo: string): Promise<TrendingItem[]> {
-  const active = SOURCES.filter(s => s.enabled !== false && geoMatch(s, geo));
-  const settled = await Promise.allSettled(active.map(s => s.fetch({ geo })));
+  const blocks = byKind("search").filter(b => geoMatch(b, geo));
+  const settled = await Promise.allSettled(blocks.map(b => b.run({ geo })));
   const items: TrendingItem[] = [];
   for (const r of settled) {
-    if (r.status === "fulfilled") items.push(...r.value);
+    if (r.status === "fulfilled") items.push(...(r.value as TrendingItem[]));
   }
   return items;
 }
