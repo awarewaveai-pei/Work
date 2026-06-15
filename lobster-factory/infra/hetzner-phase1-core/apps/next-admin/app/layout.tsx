@@ -81,6 +81,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/tools/content" className="sidebar-link" title="SEO/GEO 文章產出：關鍵字 → AI 產文 → WordPress 草稿一鍵推送">
                   <span className="sidebar-icon">✍</span> SEO Content
                 </Link>
+                <Link href="/tools/ai-models" className="sidebar-link" title="文字生成、Vibe Coding、圖片生成模型選型與成本比較">
+                  <span className="sidebar-icon">AI</span> AI Models
+                </Link>
                 <Link href="/tools/tarot" className="sidebar-link" title="塔羅牌印刷檔生成工具：AI 生成整套 78 張同風格牌卡">
                   <span className="sidebar-icon">🔮</span> Tarot
                 </Link>
