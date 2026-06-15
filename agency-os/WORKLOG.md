@@ -4,6 +4,27 @@
 
 ## 2026-06-15
 
+### fix(ao-resume): import 前移至 git-align 前 + auto-resolve regex 擴展
+
+**[根因]**
+`import-cross-machine-memory.ps1`（原 L539）被 L415 `exit $alignExit` 硬阻斷。
+git-align 失敗（phase4-2026-06-12.md 日期命名 → 不符 -LATEST regex → rebase abort → exit=1）時，import 永遠跳過。
+Import 讀 Google Drive vault（全 gitignored），與 git 狀態邏輯獨立，不應被 git-align 成功與否決定。
+
+**[已修改]**
+- `scripts/ao-resume.ps1:142` — nonLatest filter 加 `-and $_ -notmatch '(?:^|[/\\])agency-os[/\\]reports[/\\]'`
+  — agency-os/reports/ 下生成報告全部可 auto-resolve（--theirs），防止日期命名報告觸發 rebase abort
+- `scripts/ao-resume.ps1:347` — 插入 import block（unconditional，在 FullMainlineParity 前）
+- `scripts/ao-resume.ps1:539`（原位）— 刪除舊 import block（已搬移）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File $TEMP/test-regex.ps1` | exit=0 | 5/5 regex 案例全 OK（match=True for reports paths, False for WORKLOG/scripts/reports-archive）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n — 唯一 suggestion = leading-separator bug `[/\\]` → 已在 commit 前修為 `(?:^|[/\\])`
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=import-cross-machine-memory | hits=0（no stale call sites — doc refs are descriptive only）
+- push: `08d418be` main → origin/main OK
+
+**[rollback]** `git revert c8ea1141 08d418be`（兩個 commit 還原，import 回原位）
+
 <!-- AO-CLOSE session window 2026-06-12 → 2026-06-15。下列 milestone 證據行（非 umbrella 任務閉合；對應 TASKS 多為 multi-part 進行中項，逐項勾選不適用）。-->
 - AUTO_TASK_DONE: 服飾 POD Phase 1-4 全功能部署上線 app.aware-wave.com (deploy 37dfba85, smoke 24 pass) — 忠實印刷檔/Printful 多風格+真人模特 mockup+存圖庫/平拍真實 overlay 雙軌/台灣本地印刷檔 seam/AI 商品文案 SEO-GEO-AEO-RankMath
 - AUTO_TASK_DONE: Postiz 自架社群發佈 EU 上線 Task 1+2 — Bluesky connected (app password) + 端到端發佈驗證 QUEUE→PUBLISHED→feed live (pivot from Reddit dev-app block)
