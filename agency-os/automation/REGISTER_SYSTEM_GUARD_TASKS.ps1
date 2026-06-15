@@ -7,10 +7,14 @@
 # (root cause 2026-06-16; mirrors the proven REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1 pattern).
 # Register-ScheduledTask has no such length limit.
 #
-# Tasks: Daily (-Daily) + OnStartup (-AtStartup). Both run hidden (-WindowStyle Hidden) and
-# silent (-HideUi: write reports in the background, NO status-file popup).
-# OnLogoff was dropped: schtasks /SC ONLOGOFF is not a valid trigger (it never registered) and
-# New-ScheduledTaskTrigger has no logoff trigger; the pre_shutdown guard value is marginal.
+# Task: Daily (-Daily) only — runs hidden (-WindowStyle Hidden) and silent (-HideUi: write
+# reports in the background, NO status-file popup). Registers WITHOUT elevation.
+# OnStartup/OnLogoff were dropped on purpose:
+#   - OnStartup (-AtStartup / schtasks ONSTART) requires admin to register (HRESULT 0x80070005
+#     non-elevated) and never functioned; boot-time health is already covered by AO-RESUME +
+#     the cloud routines, so it is redundant.
+#   - OnLogoff: schtasks /SC ONLOGOFF is not a valid trigger and New-ScheduledTaskTrigger has no
+#     logoff trigger; the pre_shutdown guard value is marginal.
 
 param(
     [string]$WorkspaceRoot = "",
