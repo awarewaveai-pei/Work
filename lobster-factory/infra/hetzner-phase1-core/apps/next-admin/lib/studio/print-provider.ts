@@ -383,3 +383,111 @@ export async function createSyncProductOnNative(input: {
     },
   };
 }
+
+/** Recipient address for a Printful order. Printful requires name/address1/city/country_code/zip;
+ *  state_code is additionally required for US / CA / AU. Forwarded verbatim — validated upstream. */
+export interface DraftOrderRecipient {
+  name: string;
+  address1: string;
+  city: string;
+  country_code: string;
+  zip: string;
+  state_code?: string;
+  address2?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface DraftOrderItem {
+  /** Woo SKU. Sent as the order item's external_variant_id; Printful resolves it to the native
+   *  sync_variant whose external_id we set to this SKU at creation — so one order can span multiple
+   *  sync products with no local lookup, and an unknown SKU makes Printful reject the whole POST. */
+  sku: string;
+  quantity: number;
+}
+
+interface RawOrder {
+  id: number;
+  external_id?: string;
+  status?: string;
+}
+
+/**
+ * Create a DRAFT fulfillment order on the NATIVE store from a (paid) Woo order — P4 fulfillment.
+ *
+ * ⚠ DRAFT-ONLY BY DESIGN (money-path safety): this calls POST /orders with NO `confirm`, so Printful
+ * creates the order as a *draft* — it sits in the dashboard, is NOT charged, and is NOT sent to
+ * production. The confirmation step (which charges + prints) is deliberately absent here and must
+ * stay a separate, explicit action. DO NOT append `?confirm=1` to this call or add a confirm path.
+ *
+ * Idempotency: a retried/duplicate fulfillment for the same Woo order must NOT create a second draft.
+ * We read GET /orders/@{externalId} first (external_id = Woo order id); a clean Printful 404 proves
+ * absence (safe to create), while any other lookup failure leaves absence UNPROVEN, so we refuse to
+ * create (no duplicate-draft risk). Same tri-state contract as findSyncProductByExternalId.
+ *
+ * Item resolution: each item carries the Woo SKU as external_variant_id; an unknown SKU makes
+ * Printful reject the POST and create NO order (fail loud — never a partial order).
+ */
+export async function createDraftOrderOnNative(input: {
+  /** Woo order id — the idempotency key (becomes the Printful order external_id). */
+  externalId: string;
+  recipient: DraftOrderRecipient;
+  items: DraftOrderItem[];
+}): Promise<
+  PrintfulResult<{
+    printfulOrderId: number;
+    status: string;
+    alreadyExisted: boolean;
+  }>
+> {
+  const storeId = process.env.PRINTFUL_NATIVE_STORE_ID;
+  if (!storeId) return { ok: false, error: "printful_native_store_not_configured" };
+  if (input.items.length === 0) return { ok: false, error: "no_items" };
+  // Defense-in-depth: every caller (the pforder route today, a Woo webhook tomorrow) must pass a
+  // complete recipient. Re-assert a required-field floor here so a future caller that skips the
+  // route's validation can't post a half-addressed order whose Printful rejection would be opaque.
+  const rcp = input.recipient;
+  if (!rcp || [rcp.name, rcp.address1, rcp.city, rcp.country_code, rcp.zip].some((v) => typeof v !== "string" || v.trim().length === 0)) {
+    return { ok: false, error: "recipient_incomplete" };
+  }
+
+  // Idempotency pre-check — read the order by external_id (= Woo order id) on the native store.
+  const existing = await pf<RawOrder>(`/orders/@${encodeURIComponent(input.externalId)}`, { storeId });
+  if (existing.ok) {
+    // Trust the "already exists" verdict ONLY if the body is a real order (numeric id) and — when
+    // Printful echoes it — its external_id matches. A 200 with an empty/null/mismatched result (proxy
+    // cache, API quirk, recycled id) must NOT fabricate a false alreadyExisted, which would silently
+    // DROP this paid order's draft. When ambiguous, refuse with a retryable error (the route classifies
+    // the `idempotency_precheck_failed:` prefix as transient) rather than guessing.
+    if (
+      typeof existing.value?.id === "number" &&
+      (existing.value.external_id === undefined || existing.value.external_id === input.externalId)
+    ) {
+      return {
+        ok: true,
+        value: { printfulOrderId: existing.value.id, status: existing.value.status ?? "unknown", alreadyExisted: true },
+      };
+    }
+    return { ok: false, error: "idempotency_precheck_failed:ambiguous_existing_order" };
+  }
+  // Lookup failed. Only a genuine Printful application 404 (JSON body code === 404) proves the order
+  // is absent and safe to create. Any other failure (network/timeout/gateway/auth) leaves absence
+  // unproven → refuse, so a transient blip can never spawn a duplicate draft.
+  const lookupErr = existing as { ok: false; error: string; status?: number; code?: number };
+  if (lookupErr.code !== 404) {
+    return { ok: false, error: `idempotency_precheck_failed:${lookupErr.error}` };
+  }
+
+  const body = {
+    external_id: input.externalId,
+    recipient: input.recipient,
+    items: input.items.map((it) => ({ external_variant_id: it.sku, quantity: it.quantity })),
+  };
+  // POST /orders with NO confirm → Printful creates a DRAFT. Never append ?confirm here (see ⚠ above).
+  const created = await pf<RawOrder>(`/orders`, { method: "POST", body, storeId, timeoutMs: 45_000 });
+  if (!created.ok) return { ok: false, error: (created as { ok: false; error: string }).error };
+  return {
+    ok: true,
+    value: { printfulOrderId: created.value.id, status: created.value.status ?? "draft", alreadyExisted: false },
+  };
+}

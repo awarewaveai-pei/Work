@@ -9,6 +9,7 @@ import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
 import {
+  createDraftOrderOnNative,
   createSyncProductOnNative,
   getCatalogVariants,
   getSyncProduct,
@@ -44,7 +45,7 @@ function gate(request: Request): NextResponse | null {
 }
 
 interface PublishBody {
-  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link" | "pfcreate";
+  action?: "upscale" | "productimage" | "flatlay" | "copy" | "create" | "status" | "link" | "pfcreate" | "pforder";
   // upscale / productimage / flatlay
   designUrl?: string;
   longEdgePx?: number;
@@ -74,6 +75,20 @@ interface PublishBody {
   wooProductId?: number;
   printFileUrl?: string;
   variantMap?: { variationId: number; color: string; size: string; sku?: string; price?: string }[];
+  // pforder (P4 draft fulfillment — Woo order → Printful DRAFT print order, no confirm)
+  wooOrderId?: number;
+  recipient?: {
+    name?: string;
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state_code?: string;
+    country_code?: string;
+    zip?: string;
+    email?: string;
+    phone?: string;
+  };
+  items?: { sku?: string; quantity?: number }[];
 }
 
 const PRICE_RE = /^\d+(\.\d{1,2})?$/;
@@ -545,5 +560,112 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|flatlay|copy|create|status|link|pfcreate" }, { status: 400 });
+  // ── P4 (native): forward a (paid) Woo order to Printful as a DRAFT print order. NO confirm — the
+  //    draft sits in the dashboard, is NOT charged, and is NOT printed. This is the fulfillment seam.
+  //    CONTRACT: the caller passes ONLY Printful-fulfillable lines in `items` — it must drop shipping /
+  //    fee / discount / non-POD product lines from the Woo order BEFORE calling. This handler does NOT
+  //    silently skip lines: any unrecognised/malformed item fail-louds the WHOLE request (so an order is
+  //    never partially fulfilled). A future Woo-order webhook reuses createDraftOrderOnNative unchanged.
+  if (body.action === "pforder") {
+    if (!isNativeStoreConfigured()) {
+      return NextResponse.json(
+        { ok: false, error: "printful_native_store_not_configured", hint: "Set PRINTFUL_NATIVE_STORE_ID." },
+        { status: 503 },
+      );
+    }
+    // Defensive caps — a malformed/hostile payload must not make us build an unbounded POST.
+    const MAX_ITEMS = 100;
+    const MAX_QTY = 1000;
+    const MAX_FIELD = 200;
+    if (!Number.isInteger(body.wooOrderId) || (body.wooOrderId as number) <= 0) {
+      return NextResponse.json({ ok: false, error: "wooOrderId (positive integer) is required" }, { status: 400 });
+    }
+    const r = body.recipient;
+    if (!r) {
+      return NextResponse.json(
+        { ok: false, error: "recipient_incomplete", missing: ["name", "address1", "city", "country_code", "zip"] },
+        { status: 400 },
+      );
+    }
+    const requiredRecipient = ["name", "address1", "city", "country_code", "zip"] as const;
+    const missing = requiredRecipient.filter((k) => typeof r[k] !== "string" || (r[k] as string).trim().length === 0);
+    if (missing.length > 0) {
+      return NextResponse.json({ ok: false, error: "recipient_incomplete", missing }, { status: 400 });
+    }
+    const country = (r.country_code as string).trim().toUpperCase();
+    // Printful rejects US / CA / AU orders without a state/province code — fail loud here rather than
+    // after the order POST (a rejected POST would leave the operator guessing why no draft appeared).
+    if (["US", "CA", "AU"].includes(country) && (typeof r.state_code !== "string" || r.state_code.trim().length === 0)) {
+      return NextResponse.json({ ok: false, error: "state_code_required_for_country", country }, { status: 400 });
+    }
+    // Recipient field bounds + email shape — reject an oversized field or a malformed email here, so a
+    // downstream Printful rejection can't be misread as "no draft was needed".
+    const recipientFields = [
+      "name", "address1", "address2", "city", "state_code", "country_code", "zip", "email", "phone",
+    ] as const;
+    for (const k of recipientFields) {
+      const v = r[k];
+      if (typeof v === "string" && v.length > MAX_FIELD) {
+        return NextResponse.json({ ok: false, error: "recipient_field_too_long", field: k }, { status: 400 });
+      }
+    }
+    if (typeof r.email === "string" && r.email.trim().length > 0 && !r.email.includes("@")) {
+      return NextResponse.json({ ok: false, error: "recipient_email_invalid" }, { status: 400 });
+    }
+    // Every line must resolve to {non-empty sku, positive-int quantity}. A silently dropped line would
+    // under-fill the print order, so reject the whole request if ANY item is malformed (fail loud).
+    const rawItems = Array.isArray(body.items) ? body.items : [];
+    if (rawItems.length > MAX_ITEMS) {
+      return NextResponse.json({ ok: false, error: "too_many_items", max: MAX_ITEMS, got: rawItems.length }, { status: 400 });
+    }
+    const items: { sku: string; quantity: number }[] = [];
+    for (const it of rawItems) {
+      if (typeof it?.sku !== "string" || it.sku.trim().length === 0 || it.sku.length > MAX_FIELD) continue;
+      if (!Number.isInteger(it?.quantity) || (it.quantity as number) <= 0 || (it.quantity as number) > MAX_QTY) continue;
+      items.push({ sku: it.sku.trim(), quantity: it.quantity as number });
+    }
+    if (items.length === 0 || items.length !== rawItems.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "items_required — each item needs a non-empty sku and a positive integer quantity",
+          got: rawItems.length,
+          valid: items.length,
+        },
+        { status: 400 },
+      );
+    }
+    const recipient = {
+      name: (r.name as string).trim(),
+      address1: (r.address1 as string).trim(),
+      city: (r.city as string).trim(),
+      country_code: country,
+      zip: (r.zip as string).trim(),
+      ...(typeof r.state_code === "string" && r.state_code.trim() ? { state_code: r.state_code.trim() } : {}),
+      ...(typeof r.address2 === "string" && r.address2.trim() ? { address2: r.address2.trim() } : {}),
+      ...(typeof r.email === "string" && r.email.trim() ? { email: r.email.trim() } : {}),
+      ...(typeof r.phone === "string" && r.phone.trim() ? { phone: r.phone.trim() } : {}),
+    };
+    const order = await createDraftOrderOnNative({ externalId: String(body.wooOrderId), recipient, items });
+    if (!order.ok) {
+      const e = (order as { ok: false; error: string }).error;
+      // Idempotency-precheck / timeout / network failures are transient and safe to retry (the read-
+      // before-write guard means a retry never duplicates a draft). Surface 503 retryable.
+      const transient =
+        e.startsWith("idempotency_precheck_failed") || e.includes("timeout") || e.includes("network_error");
+      return NextResponse.json(
+        { ok: false, error: e, ...(transient ? { retryable: true } : {}) },
+        { status: transient ? 503 : 502 },
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      draft: true,
+      printfulOrderId: order.value.printfulOrderId,
+      status: order.value.status,
+      alreadyExisted: order.value.alreadyExisted,
+    });
+  }
+
+  return NextResponse.json({ ok: false, error: "action must be upscale|productimage|flatlay|copy|create|status|link|pfcreate|pforder" }, { status: 400 });
 }
