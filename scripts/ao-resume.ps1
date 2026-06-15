@@ -139,7 +139,7 @@ function Invoke-NonFastForwardRecovery {
             return $pullExit
         }
 
-        $nonLatest = @($conflicted | Where-Object { $_ -notmatch '-LATEST\.(md|json|txt)$' -and $_ -notmatch '[/\\]agency-os[/\\]reports[/\\]' })
+        $nonLatest = @($conflicted | Where-Object { $_ -notmatch '-LATEST\.(md|json|txt)$' -and $_ -notmatch '(?:^|[/\\])agency-os[/\\]reports[/\\]' })
         if ($nonLatest.Count -gt 0) {
             # Conflict in real code/docs — cannot auto-resolve; require human decision.
             Write-Host "AO-RESUME: pull --rebase conflict in non-LATEST files — cannot auto-resolve. Aborting rebase." -ForegroundColor Red
