@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createDraftOrderOnNative, isNativeStoreConfigured } from "../../../../lib/studio/print-provider";
 
@@ -45,26 +46,21 @@ interface WooOrder {
   line_items?: { sku?: string; quantity?: number }[];
 }
 
-/** Constant-time string compare (avoids leaking the secret via timing). */
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
 /**
  * Verify the WooCommerce webhook signature. Woo signs the RAW request body with HMAC-SHA256 keyed by
- * the webhook secret and sends it base64-encoded in `x-wc-webhook-signature`. Mirrors the github
- * webhook route's Web-Crypto pattern, only the digest encoding differs (base64, not hex).
+ * the webhook secret and sends it base64-encoded in `x-wc-webhook-signature`. Uses node:crypto
+ * (createHmac) — the codebase HMAC convention (see the slack-commands route) — NOT the Web-Crypto
+ * global, which is absent in the vitest test environment (deploy npm-test gate caught that). Kept
+ * async so callers need not change.
  */
 export async function verifyWooSignature(rawBody: string, signatureHeader: string | null, secret: string | undefined): Promise<boolean> {
   if (!secret || !signatureHeader) return false;
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(rawBody));
-  const computed = btoa(String.fromCharCode(...new Uint8Array(sig)));
-  return safeEqual(computed, signatureHeader);
+  const computed = createHmac("sha256", secret).update(rawBody, "utf8").digest("base64");
+  const a = Buffer.from(computed);
+  const b = Buffer.from(signatureHeader);
+  // timingSafeEqual throws on length mismatch — length-gate first (base64-SHA256 is a fixed 44 chars,
+  // so the length check leaks nothing about the secret).
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 type ParseResult =
