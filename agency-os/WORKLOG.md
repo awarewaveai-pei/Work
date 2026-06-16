@@ -4,6 +4,44 @@
 
 ## 2026-06-16
 
+### fix(hooks): ao-resume-on-prompt + post-push hook 加 -WindowStyle Hidden（消開機/每訊息 powershell 閃窗 真根因）
+**[徹底根因]** 使用者反覆回報「送訊息就跳好幾次紅字 powershell 視窗」。全面盤點（procmon + settings.json hook 清單 + ao-resume spawn 追蹤）確認**真根因非 MCP/Codex**（那是另一層）：
+- `settings.json` `UserPromptSubmit` hook = `ao-resume-on-prompt.ps1`（`powershell.exe` **無 `-WindowStyle Hidden`**），**每則訊息觸發**（300s 去重）。
+- 它跑 `ao-resume.ps1 -FullMainlineParity`，內部 spawn **~21 個獨立 `& powershell.exe -File`** 子程序（sync-verify/git-align/checkpoint/import-memory/print-tasks/mcp-sync/userlevel-sync/deps/machine-audit/backup-health/auto-reboot-health/routine-fresh…）→ 每個一個 console 視窗 → 「好幾次」；git-align/audit-Strict 等偶發紅字。
+- 證據：hook 狀態檔 mtime 與使用者送訊息時間吻合（23:11）。第二來源 = `PostToolUse` hook `post-push-trigger-deploy.ps1`（每 push，同樣無隱藏）。
+**[已修改]** SSOT `mcp/claude-userlevel/settings.template.json`（L51/L139）+ live `~/.claude/settings.json`（L695/L784）：兩個 hook command 加 `-WindowStyle Hidden`。原理：`powershell -WindowStyle Hidden` 給隱藏 console，`&` spawn 的子程序共用同一隱藏 console → 整串不顯示。**未動 ao-resume.ps1**（核心、每訊息跑，21 處改動風險過高；先用低風險頂層 hook 修，不足再升級子呼叫）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=ConvertFrom-Json 兩 settings 檔 | exit=0 | 皆 valid JSON；各 2 個 hook 帶 `-WindowStyle Hidden`。實際視窗消失與否須使用者**重啟 Claude Code** 後目視確認（環境無法 headless 驗證視窗）。
+- REVIEW: 純加 window-style flag，無 hook 邏輯改動；hook 行為（ao-resume 仍照跑）不變。
+- BUGHUNT_DONE: scope=mcp,agency-os | grep=`ao-resume-on-prompt\|post-push-trigger-deploy` settings hook | hits=2檔×2hook — 全部已帶 Hidden；其餘 node/bash hook 不開 powershell 視窗。
+**[剩餘風險]** ① 須**重啟 Claude Code** 讀新 settings 才生效。② 若子程序各自配置新 console（而非共用 hook 的隱藏 console），頂層 hook Hidden 不足 → 需再對 ao-resume.ps1/commit-checkpoint.ps1 的 `& powershell.exe` 加 Hidden（升級方案，待目視確認後決定）。③ ao-resume.ps1 有雙副本（scripts/ + agency-os/scripts/），升級時兩份都要改。
+**[rollback]** `git checkout HEAD~1 -- mcp/claude-userlevel/settings.template.json` + 還原 live settings.json。
+
+### feat(video-service): 桌機 YouTube 影片管線落 main + 修 Pillow/moviepy 相容崩潰 bug + 合成核心 real-test 通過（Phase 0）
+
+**[任務理解]** 使用者「接著做 video generator」，指桌機 web session（branch `claude/youtube-automation-video-072tz5`，commit `c1aa1d36`）建的全自動影片管線（文章→卡通影片→YouTube+WP）。該成果**未進 main**、桌機只做 py_compile **從未 e2e 跑過**。使用者授權「你決定，要最完善可跑 30 年可回滾零重工」。
+
+**[現況分析]** ① 桌機 monolith 自寫了文章生成/圖片/發佈，但這三樣 next-admin 已是 production（20 route + `lib/content/blocks/`），重複維護＝30 年漂移。② `publish_wordpress()` 直連 WP REST app-password ＝ 踩 master plan R4 紅線（WP 須走 wp-bridge Ed25519 簽章，有 read-back+rollback）。③ `CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` 鎖定影片＝Python 微服務（A2，與桌機一致）。④ 落腳處：桌機放 `Projects/internal/`（僅 .gitkeep，無部署 infra）；`apps/`（next-admin/node-api 同級）才是可部署服務家、繼承 sg-deploy 閘。
+
+**[建議方案]** 保留影片合成核心（唯一缺的新能力），其餘接既有 production；分階段每階段獨立可 revert。Phase 0＝搬正位置+發佈閘預設關+補 real-test。Phase 1＝抽 render-only 微服務介面 + `video-pipeline.ts` 積木接 pipeline.ts、發佈走 wp-bridge。Phase 2＝容器化+sg-deploy+healthcheck+smoke。
+
+**[已修改]**
+- `Projects/internal/youtube-automation/` → `lobster-factory/infra/hetzner-phase1-core/apps/video-service/`（git mv 保留 history；commit `037f57b9` cherry-pick 桌機原作 + `b7f5762a` relocation）。
+- `config.py` + `.env.example`：發佈閘安全預設翻轉 `WP_ENABLE`/`YOUTUBE_ENABLE` true→false、`WP_STATUS` publish→draft、`YOUTUBE_PRIVACY` public→private（render-only 定位，發佈不繞 wp-bridge）。
+- `pipeline.py` L32-36：**修真 bug** — requirements 同鎖 `pillow>=10`+`moviepy<2` 互不相容（Pillow≥10 移除 `Image.ANTIALIAS`、moviepy 1.x resize 仍引用 → 每次 Ken Burns 必崩）。加 `getattr(Image,"Resampling",Image).LANCZOS` 相容 shim（hasattr 守冪等、getattr 守版本降級）。桌機只 py_compile 沒跑到所以沒發現。
+- `README.md` L35：舊路徑 `cd Projects/internal/...` → 新位置（stale 抓蟲修）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`venv python D:/tmp/vtest_synthesis.py`（stub 圖+真 Edge TTS+moviepy 合成+ffmpeg 多尺寸，ffmpeg -i 解析驗尺寸）| exit=0 | `REALTEST_SYNTHESIS_PASS` — 4 格式尺寸全正確（1920x1080/1080x1920/1080x1080/1280x720），base mp4 189KB。修 ANTIALIAS 前同測 AttributeError 崩→修後綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`vault run -Names OPENAI_API_KEY -- venv python D:/tmp/vtest_api.py` | exit=0 | `PARSE_JSON_OK`（`_parse_json` fenced+prose 自訂解析 PASS）；**DALL-E 回 401 invalid api key + Claude 回 401**（vault 兩把直連 key 失效，非 code 問題；variance 防護正確抓到 fallback 退色塊假陽性 var=0.0）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（+1 suggestion，已採納硬化 Resampling 耦合）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`Projects/internal/youtube-automation\|ANTIALIAS\|video-service` | hits=1（README L35 stale 路徑，同 commit 修）；服務目前 standalone 無 caller（Phase 1 才接線）。
+
+**[剩餘風險]** ⚠️ vault 的 `ANTHROPIC_API_KEY` + `OPENAI_API_KEY` 兩把直連 key 皆 401 失效，待使用者刷新（Claude Code 走登入、主力 image-gen 走 Replicate，故默默過期）。影片 monolith 的發佈層仍含 R4 違規碼但發佈閘預設全關（dormant），Phase 1 改走 wp-bridge 前不得啟用。YouTube 上傳路徑未驗（需 OAuth client_secrets）。
+
+**[rollback]** `git revert b7f5762a`（relocation+預設）/ 連 `037f57b9`（整批移除）；shim 與 README 修正含在後續 commit，單獨 revert 即可。
+- AUTO_TASK_DONE (2026-06-16): video-service Phase 0 — 落 main + ANTIALIAS bug 修 + 合成核心 real-test 通過。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
