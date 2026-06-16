@@ -343,7 +343,8 @@ $ownLatestDateStr = $allFolders | ForEach-Object {
 # Own machine's full export timestamp (for the same-date tie-break below). Folder names carry
 # the date only, so two machines that export on the same calendar day are indistinguishable by
 # name; the manifest exported_utc breaks the tie. Null when own machine has no manifest yet.
-$ownExportUtc = $null
+$ownExportUtc   = $null
+$ownSecretsRoot = $null
 if ($ownLatestDateStr) {
     $ownFolder = $allFolders | Where-Object { $_.Name -eq "AO-SYNC-$ownLatestDateStr-$machineTag" } | Select-Object -First 1
     $ownSecretsRoot = if ($env:AO_SYNC_SECRETS_ROOT) { $env:AO_SYNC_SECRETS_ROOT }
