@@ -93,6 +93,7 @@
 | **WordPress 客戶站外掛標準堆疊**（選型 + 組合邏輯） | [WP_CLIENT_PLUGIN_STACK.md](WP_CLIENT_PLUGIN_STACK.md) |
 | MainWP + WPvivid 備份 gate / safe update | [MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md](MAINWP_WPVIVID_CLIENT_BACKUP_RUNBOOK.md) |
 | 電商專案 Playbook | [ecommerce-project-playbook.md](ecommerce-project-playbook.md) |
+| **POD 履約標準（新客戶走 Native／不走外掛）** | [POD_FULFILLMENT_PLAYBOOK_native-over-plugin.md](POD_FULFILLMENT_PLAYBOOK_native-over-plugin.md) |
 
 ### 事件／上線 Runbook（專案級）
 

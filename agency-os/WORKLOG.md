@@ -134,7 +134,7 @@
 
 **[決策 — soulful 維持外掛履約，A2 不接 soulful]** SKU mismatch 揭露雙履約機制衝突。使用者線索「之後還會有別客戶做 POD」→ 定 go-forward 標準而非修一次性。**處置**：① 刪除今早建的 soulful webhook 4+5（`wp wc webhook delete 4 5 --user=5 --force` ✅，soulful 回今早原狀，只剩原 Printful 外掛 webhook 1-3，外掛繼續履約）② SG A2 flag **保留啟用**（給未來 A1 native 建站、未裝 Printful 外掛的客戶）。**go-forward**：新客戶走 native（A1 建品 + A2 履約，需先建 A2 confirm phase）；既有已用外掛的 soulful 不遷移（live client 低爆炸半徑）。
 
-**[剩餘風險]** ① confirm/charge/print 🔴 仍未建（金流紅線）→ native 履約在 confirm 建好前只到 draft（人工在 Printful dashboard 確認）。② A2 觀察性：route 不寫 server log，未來 confirm phase 前須補結構化 log。③ 多客戶 POD 履約標準（native vs 外掛）為待定架構決策，已記 TASKS。
+**[剩餘風險]** ① confirm/charge/print 🔴 仍未建（金流紅線）→ native 履約在 confirm 建好前只到 draft（人工在 Printful dashboard 確認）。② A2 觀察性：route 不寫 server log，未來 confirm phase 前須補結構化 log。③ 多客戶 POD 履約標準（native vs 外掛）**已正式定案**：SOP `docs/operations/POD_FULFILLMENT_PLAYBOOK_native-over-plugin.md` + 決策 `docs/architecture/decisions/008-pod-fulfillment-native-store-over-plugin.md`（ADR_INDEX 已更新，verify-adr-index OK 8 ADR）；OPS_DOCS_INDEX 已連結。go-forward：新客戶 native、soulful 不遷移、多平台走 adapter（multi-platform-delivery-architecture.md）。
 
 **[rollback]** SG：`.env` 兩行移除（或設 false）+ `cp docker-compose.yml.bak-a2-20260616-145056 docker-compose.yml`→`docker compose up -d next-admin`。soulful：`wp wc webhook delete 4 5 --user=5`。
 
