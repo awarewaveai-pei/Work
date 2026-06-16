@@ -529,8 +529,10 @@ export default function ContentStudio() {
     structure: { ...DEFAULT_STRUCTURE },
     introHookBrief: "", introHookType: "",
     media: { ...DEFAULT_MEDIA },
+    marketing: { ...DEFAULT_MARKETING },
     generateMeta: false,
     wpCategories: "", wpTags: "",
+    patternCount: 0,
   });
 
   // Abort refs
