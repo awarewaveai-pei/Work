@@ -219,6 +219,7 @@
                                           }
                             },
                     "trigger":  {
+                                    "clients":  { "codex":  { "exclude":  true } },
                                     "enabled":  true,
                                     "transport":  "stdio",
                                     "command":  "powershell",
@@ -317,6 +318,7 @@
                                            }
                                },
                     "chatgpt-fast":  {
+                                         "clients":  { "codex":  { "exclude":  true } },
                                          "enabled":  true,
                                          "transport":  "stdio",
                                          "command":  "powershell",
@@ -335,6 +337,7 @@
                                                  }
                                      },
                     "chatgpt-latest":  {
+                                           "clients":  { "codex":  { "exclude":  true } },
                                            "enabled":  true,
                                            "transport":  "stdio",
                                            "command":  "powershell",
@@ -353,6 +356,7 @@
                                                    }
                                        },
                     "gemini-fast":  {
+                                        "clients":  { "codex":  { "exclude":  true } },
                                         "enabled":  true,
                                         "transport":  "stdio",
                                         "command":  "powershell",
@@ -371,6 +375,7 @@
                                                 }
                                     },
                     "gemini-latest":  {
+                                          "clients":  { "codex":  { "exclude":  true } },
                                           "enabled":  true,
                                           "transport":  "stdio",
                                           "command":  "powershell",
@@ -389,6 +394,7 @@
                                                   }
                                       },
                     "grok-fast":  {
+                                      "clients":  { "codex":  { "exclude":  true } },
                                       "enabled":  true,
                                       "transport":  "stdio",
                                       "command":  "powershell",
@@ -407,6 +413,7 @@
                                               }
                                   },
                     "grok-latest":  {
+                                        "clients":  { "codex":  { "exclude":  true } },
                                         "enabled":  true,
                                         "transport":  "stdio",
                                         "command":  "powershell",
