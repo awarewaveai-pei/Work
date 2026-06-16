@@ -58,7 +58,8 @@
 | **P5** | `publish/social`：lib/content/postiz.ts + /api/content/social-publish（draft 預設）| ⛔ | — | Med-High | 待+憑證 |
 | **P6** | 🗑️ 刪 Python publisher.py 直連（grep 確認無 caller）| 🔲 | — | Med | 待 |
 | **P7** | `video/pipeline` 積木 + Python 微服務骨架（圖→TTS→ffmpeg 本機驗證）| 🟡 骨架✅本機驗證✅／積木接線🔲 | `037f57b9`+`b7f5762a`+`186f6e72` | Med | 部分 |
-| **P7 註** | 微服務骨架已落 `apps/video-service/`（桌機原作搬正位+發佈閘預設關 render-only）。合成核心 real-test 通過（真 Edge TTS+moviepy Ken Burns+CJK 字幕+ffmpeg 四尺寸驗尺寸）。修 Pillow≥10/moviepy<2 ANTIALIAS 相容崩潰 bug。**剩**：`video-pipeline.ts` 積木接 pipeline.ts（Phase 1）；發佈一律走 wp-bridge（R4），微服務只 render-only。⚠️ vault Anthropic+OpenAI 直連 key 皆 401 待刷新。 | | | |
+| **P7 註** | 微服務骨架已落 `apps/video-service/`（桌機原作搬正位+發佈閘預設關 render-only）。合成核心 real-test 通過（真 Edge TTS+moviepy Ken Burns+CJK 字幕+ffmpeg 四尺寸驗尺寸）。修 Pillow≥10/moviepy<2 ANTIALIAS 相容崩潰 bug。Phase 1a 切出 render-only `render_video()`。完整 topic→影片 e2e 真實通過（真 key+gpt-image-1）。**剩**：`video-pipeline.ts` 積木接 pipeline.ts（Phase 1b）；發佈走 wp-bridge（R4）。 | | | |
+| **P7 決策（2026-06-17 鎖定）** | **畫面＝混合**：AI 自訂圖走 Replicate **Flux**（schnell≈$0.003/張 近免費／dev-pro 更頂）＝重用 next-admin `generateTarotImage`；B-roll 走**免費 Pexels 影片庫**（需免費 API key，待操作者註冊）。**配音＝Edge TTS**（免費神經語音，維持）。**禁 dall-e-3**（帳號無權限，用 gpt-image-1/Flux）。成本目標 ≈ $0.02/支。render 層需擴充支援「靜圖 Ken Burns + 實拍影片片段」混合合成。 | | | |
 | **P8** | 微服務容器化 + 部署 + healthcheck + smoke（SG/EU）| 🔲 | — | Med-High | 待 |
 | **P9** | 全管線端到端 + R8/R9 gate + Telegram 通知 + WORKLOG | 🔲 | — | Med | 待 |
 
