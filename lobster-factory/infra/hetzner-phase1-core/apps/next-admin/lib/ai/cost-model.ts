@@ -139,9 +139,10 @@ export interface InfraCost {
 }
 
 export const INFRA_MONTHLY: InfraCost[] = [
-  // Hetzner real (Cloud API /v1/pricing 2026-06-17): account billed in USD, vat 0 — values as-is.
-  { key: "hetzner-sg", label: "Hetzner SG VPS (5.223.93.113, cpx22 2c/4GB, sin)", usdPerMonth: 30.99, estimate: false, note: "真實 $30.99/月 USD (cpx22 sin：$22.99 + 新加坡加價 $8)，Hetzner pricing API (currency=USD)" },
-  { key: "hetzner-eu", label: "Hetzner EU VPS (204.168.175.41, cpx32 4c/8GB, hel1)", usdPerMonth: 41.99, estimate: false, note: "真實 $41.99/月 USD (cpx32 hel1)，Hetzner pricing API；Supabase/n8n/Postiz/Trigger 全自託管於此" },
+  // Hetzner real = console PRICE field (screenshots 2026-06-17), account's locked-in rate (NOT the
+  // API /v1/pricing list price of $30.99/$41.99 — that's the current catalog, higher than billed).
+  { key: "hetzner-sg", label: "Hetzner SG VPS (5.223.93.113, CPX22 2c/4GB, sin)", usdPerMonth: 18.49, estimate: false, note: "真實 $18.49/月 (Hetzner console PRICE；含新加坡加價)" },
+  { key: "hetzner-eu", label: "Hetzner EU VPS (204.168.175.41, CPX32 4c/8GB, hel1)", usdPerMonth: 16.49, estimate: false, note: "真實 $16.49/月 (Hetzner console PRICE)；Supabase/n8n/Postiz/Trigger 全自託管於此" },
   { key: "cloudflare", label: "Cloudflare (DNS/WAF/R2)", usdPerMonth: 0, estimate: false, note: "真實: 2 zones (aware-wave.com / weartheworld.org) 皆 Free plan $0，CF API；R2 在免費額度內(10GB)，量大再加" },
   { key: "domains", label: "網域續約攤提 (aware-wave / weartheworld / soulful)", usdPerMonth: 8, estimate: true, note: "registrar 不在 CF/Hetzner API；soulful ~$80/年(Hostinger 待確認 line items)；攤成月" },
   { key: "saas-other", label: "其他 SaaS (Sentry/PostHog 等，若付費)", usdPerMonth: 0, estimate: true, note: "推測免費額度；有付費方案再加" },

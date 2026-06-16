@@ -111,6 +111,11 @@ export default function PublishWizard() {
     retryable?: boolean;
     error?: string;
   }>({ state: "idle" });
+  // One-click orchestrator state. runAll runs every step in sequence (print file → product image →
+  // flat-lay → AI copy → Woo product → Printful native), threading each step's RESULT through LOCAL
+  // variables — React state is async, so later steps cannot read the state earlier ones just set
+  // (the stale-closure trap the per-step run* functions avoid by being clicked one at a time).
+  const [allRun, setAllRun] = useState<{ state: StepState; stage?: string; error?: string }>({ state: "idle" });
 
   useEffect(() => {
     void (async () => {
