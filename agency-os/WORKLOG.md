@@ -251,6 +251,24 @@ AUTO_TASK_DONE: POD A2 自動轉單啟用 draft-only — SG flag+secret+compose 
 **[剩餘風險]** ① 須**重啟 Codex** 才生效（running Codex 仍有舊 21）。② Codex 仍啟 15 個 server（各閃視窗，但無紅字 trigger loop）；要更少可再排除 consumer app（airtable/canva/replicate/resend/wordpress 對 Codex coding 無用）。③ 桌機需 git pull + sync 套用。
 **[rollback]** `git checkout HEAD~1 -- mcp/registry.template.json` 後重跑 `sync-mcp-config.ps1`。
 
+### claude 2026-06-17 — soulful 整頓階段：草稿清理 + SEO meta 批量 + 圖片 alt 批量（live prod，WP-CLI/LLM）
+
+**[任務理解]** 使用者策略「先把網站架好整頓好，再衝流量」→ GSC 等流量階段工具確認延後（VBC：soulful 28 天僅 2 點擊/327 曝光，現階段 GSC API 整合不划算；且 GSC 帳號 = `graphicdesignpeijing@gmail.com`，soulful Site Kit 已驗證 owner_id=3）。整頓階段執行三批：
+
+**[已修改]（全 live prod soulful，via SSH+WP-CLI，無 repo code 改動）**
+1. **草稿垃圾清理**：34 草稿 → trash 13 個（測試/重複/範本垃圾）。**轉址安全檢查**：13 個全空 slug 或範本 slug + 0 站內連結 = 從沒發佈過 → 無需 301。用 `wp_trash_post`（垃圾桶可復原，非永久刪）。3144「Art」(空內容,slug=art,精確/art 被連=0) **保留待使用者決定**（垃圾 vs 佔位 slug）。
+2. **SEO meta 批量**：79 已發佈頁（排除 cart/checkout/sign-in 等功能頁）→ OpenAI gpt-4o-mini 批量生成 focus_keyword + meta_description（語言自適應、≤155字、JSON mode、8/批）→ WP-CLI 只填空白寫回 `rank_math_description`(79)+`rank_math_focus_keyword`(64,保留既有15)。**覆蓋率：缺描述 84→5、缺關鍵字 69→5**（剩 5 = 功能頁，正確）。修 6 個英文頁誤配簡中關鍵字。
+3. **圖片 alt 批量**：591 圖、409 缺 alt → 清理檔名（多為 Midjourney prompt/描述 slug，免 vision）→ LLM 生成（≤120字、無「image of」贅詞）→ 寫回 `_wp_attachment_image_alt`。**391 內容圖全補（2 輪：343+48），缺 alt 409→18**（18 = 故意跳過的螢幕截圖/lenovo/未用垃圾）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp eval-file`(trash 13 + 寫回 meta/alt + 重新統計) | exit=0 | ms=~5000 — trash 13✓草稿34→21；meta 覆蓋 84→5 desc / 69→5 kw；alt 409→18；皆 WP-CLI 重新 COUNT 驗證
+- REVIEW_DONE: critic=Quick | verdict=pass | 抓到並修 6 個英文頁簡中關鍵字（langcheck 後直接改正）+ 草稿轉址安全檢查（slug+inbound）防誤 404
+- BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=`rank_math_description|_wp_attachment_image_alt|expressive-arts-emotional-wellness` | hits=只填空白不覆蓋既有；功能頁正確排除；無 repo consumer 受影響（純 live DB 寫入）
+
+**[剩餘風險]** 13 草稿在垃圾桶（30天可復原）；meta/alt 為新增 meta（rollback=清除）；3144 待決定；薄內容頁(~15)/分類合併(42個)/1 相對連結(/portal/creation-wall) 整頓清單未做。LLM 生成的 meta/alt 建議使用者抽查數則確認語氣。
+
+**[rollback]** 草稿：垃圾桶還原；meta：清 rank_math_description/focus_keyword（這批為填空白新增）；alt：清 _wp_attachment_image_alt。
+
 ### claude 2026-06-16 — Content Studio 三項收尾：草稿持久化/trending 源（VBC=已建已部署）+ 清 soulful 假連結
 
 **[任務理解]** 使用者「都處理」剩 3 項：① 生成草稿持久化（A Supabase / B localStorage 待選）② trending 來源擴充（「都要」）③ 清 soulful 假連結文章。
