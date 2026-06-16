@@ -1,6 +1,8 @@
 export type StudioModel =
   | "flux-schnell"
   | "flux-dev"
+  | "flux-kontext-dev"
+  | "flux-kontext-pro"
   | "openai-low"
   | "openai-medium"
   | "openai-high"
@@ -34,6 +36,8 @@ export interface StudioModelOption {
 export const STUDIO_MODEL_OPTIONS: readonly StudioModelOption[] = [
   { value: "flux-schnell", label: "FLUX schnell", group: "BFL", costNt: 0.1, maxRefs: 0 },
   { value: "flux-dev", label: "FLUX dev", group: "BFL", costNt: 1, maxRefs: 1 },
+  { value: "flux-kontext-dev", label: "FLUX Kontext Dev", group: "BFL", costNt: 1.5, maxRefs: 1 },
+  { value: "flux-kontext-pro", label: "FLUX Kontext Pro", group: "BFL", costNt: 3.5, maxRefs: 1 },
   { value: "flux-2-max", label: "FLUX 2 Max", group: "BFL", costNt: 2.3, maxRefs: 0 },
   { value: "ideogram-v2a-turbo", label: "Ideogram v2a Turbo", group: "Ideogram", costNt: 1, maxRefs: 0 },
   { value: "ideogram-v3-balanced", label: "Ideogram v3 Balanced", group: "Ideogram", costNt: 2, maxRefs: 0 },

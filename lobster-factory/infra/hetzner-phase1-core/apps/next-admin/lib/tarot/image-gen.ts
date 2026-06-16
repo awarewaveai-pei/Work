@@ -21,6 +21,8 @@ const FLUX_DEV_GUIDANCE = 5;
 export type TarotModel =
   | "flux-schnell"
   | "flux-dev"
+  | "flux-kontext-dev"
+  | "flux-kontext-pro"
   | "openai-low"
   | "openai-medium"
   | "openai-high"
@@ -101,6 +103,38 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
     provider: "flux",
     fluxModel: "black-forest-labs/flux-dev",
     supportsImg2img: true,
+  },
+  // ── BFL FLUX Kontext (in-context image editing via Replicate) ─────────────
+  // input_image accepts a single reference URL/base64; aspect_ratio passes through as BFL string.
+  // Kontext is designed to incorporate a reference image contextually into a new generation,
+  // making it well-suited for mockup (design → garment) use cases.
+  "flux-kontext-dev": {
+    provider: "replicate",
+    slug: "black-forest-labs/flux-kontext-dev",
+    supportsImg2img: true,
+    buildInput: ({ prompt, aspectRatio, referenceImages }) => {
+      const input: Record<string, unknown> = {
+        prompt,
+        aspect_ratio: aspectRatio,
+        output_format: "png",
+      };
+      if (referenceImages.length > 0) input.input_image = referenceImages[0];
+      return input;
+    },
+  },
+  "flux-kontext-pro": {
+    provider: "replicate",
+    slug: "black-forest-labs/flux-kontext-pro",
+    supportsImg2img: true,
+    buildInput: ({ prompt, aspectRatio, referenceImages }) => {
+      const input: Record<string, unknown> = {
+        prompt,
+        aspect_ratio: aspectRatio,
+        output_format: "png",
+      };
+      if (referenceImages.length > 0) input.input_image = referenceImages[0];
+      return input;
+    },
   },
   // ── OpenAI gpt-image-1 ────────────────────────────────────────────────────
   "openai-low": { provider: "openai", supportsImg2img: true, quality: "low" },
