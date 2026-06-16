@@ -25,6 +25,7 @@ use AwareWave\WpBridge\Content\BlockLibrary;
 use AwareWave\WpBridge\Content\MediaSideloader;
 use AwareWave\WpBridge\Post\PostCreator;
 use AwareWave\WpBridge\Product\ProductCreator;
+use AwareWave\WpBridge\Newsletter\NewsletterCreator;
 use AwareWave\WpBridge\Validation\KadenceValidator;
 use AwareWave\WpBridge\Transaction\Impl\HttpRenderer;
 use AwareWave\WpBridge\Transaction\Impl\NullCachePurger;
@@ -72,6 +73,18 @@ final class RestController {
 				'methods'             => 'POST',
 				'permission_callback' => '__return_true',
 				'callback'            => array( $this, 'createProduct' ),
+			)
+		);
+
+		// Create a FluentCRM email campaign as a DRAFT only (never schedules, never sends — see
+		// NewsletterCreator). The operator reviews recipients and sends manually in FluentCRM.
+		register_rest_route(
+			AWBRIDGE_REST_NAMESPACE,
+			'/newsletter',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'createNewsletter' ),
 			)
 		);
 
@@ -273,6 +286,50 @@ final class RestController {
 		}
 		$result['ok'] = false;
 		return new \WP_REST_Response( $result, $this->productErrorStatus( $result['reason'] ?? '' ) );
+	}
+
+	/**
+	 * Create a FluentCRM email campaign as a DRAFT. Signed write (SCOPE_WRITE). NEVER sends — the
+	 * draft is the deliverable; the operator reviews recipients and sends manually in FluentCRM.
+	 */
+	public function createNewsletter( $request ) {
+		$auth = $this->authenticate( $request, KeyRecord::SCOPE_WRITE );
+		if ( ! $auth->authenticated() ) {
+			$this->audit( 'auth_denied', array( 'reason' => $auth->auditReason() ) );
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => $auth->reason() ), $auth->httpStatus() );
+		}
+
+		$spec = json_decode( (string) $request->get_body(), true );
+		if ( ! is_array( $spec ) ) {
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'invalid_payload' ), 400 );
+		}
+
+		$result = ( new NewsletterCreator() )->create( $spec );
+
+		$this->audit(
+			'newsletter_draft_create',
+			array( 'key' => $auth->keyId(), 'status' => $result['status'], 'campaign_id' => $result['campaign_id'] ?? null )
+		);
+
+		if ( $result['status'] === 'committed' ) {
+			$result['ok'] = true;
+			return new \WP_REST_Response( $result, 201 );
+		}
+
+		$result['ok'] = false;
+		return new \WP_REST_Response( $result, $this->newsletterErrorStatus( $result['reason'] ?? '' ) );
+	}
+
+	/** Map a NewsletterCreator failure reason to an HTTP status. */
+	private function newsletterErrorStatus( string $reason ): int {
+		switch ( $reason ) {
+			case 'fluentcrm_not_active':
+				return 422; // dependency missing
+			case 'title_subject_body_required':
+				return 400; // bad input
+			default: // create_failed / unexpected_non_draft_status
+				return 409;
+		}
 	}
 
 	/** Map a ProductCreator rollback reason to an HTTP status (bad input 400, conflict 409, dependency 422). */
