@@ -22,6 +22,29 @@
 
 **[rollback]** `git revert <本 commit>`（僅 ContentStudio.tsx 兩行 className）。
 
+### feat(content-blocks): P3 — `quality/check`（seo-check）抽 core + 包積木（route 薄殼共用，行為保留）
+
+**[任務理解]** Content Pipeline Blocks 主計畫 T1 鎖定順序 P3：把 `app/api/content/seo-check/route.ts` POST handler 的檢測核心抽成 `lib/content/quality/seo-check-core.ts`，route 變薄殼（只管 HTTP：role/json/還原 NextResponse），再包一個 `quality/check` 積木 headless 共用同一 core。原則同 P1/P2：**一段邏輯、兩個入口（route 給 UI、積木給 headless）、零重複**，行為 byte-identical、可回滾。
+
+**[現況分析（VBC）]** `git log` → 近期皆 checkpoint。原 route 邏輯極輕：role gate→json parse→body 寬鬆 coerce（`str()` fallback + `.trim()`，`siteDomain` 走 `|| undefined`——load-bearing，`checkRankMath` 在 `!siteDomain` 分支不同評分，`""` vs `undefined` 會改分）→ 兩個必填閘（markdown / focusKeyword 各回 400 text）→ `checkRankMath`（純函式，無 I/O）→ 成功回 JSON report。**wire-format 不對稱**：失敗回 **text**（`new NextResponse(string,{status})`）、成功回 **JSON**（`NextResponse.json(report)`）——薄殼須原樣保留。`checkRankMath` 同步 → core 同步、積木 async `run` 自動包 Promise。`tsconfig strict:false` → `!result.ok` 不 narrow → cast（idiom 同 publish/route.ts、newsletter/route.ts:213）。
+
+**[已修改]**
+1. `lib/content/quality/seo-check-core.ts`（**新**）— `runSeoCheck(body)` 同步函式，verbatim 搬原 route preamble（`str()`/`.trim()`/`siteDomain || undefined`/兩個 400 訊息字串）+ 回結構化 union `SeoCheckResult = {ok:true,report} | {ok:false,status,error}`。
+2. `app/api/content/seo-check/route.ts` — 重寫為 ~36 行薄殼：role→403 "forbidden" / json→400 "invalid json" / `runSeoCheck(body)` → 失敗 cast `SeoCheckFailure` 回 `new NextResponse(fail.error,{status})`（text）、成功 cast `SeoCheckSuccess` 回 `NextResponse.json(ok.report)`（JSON）。wire-format byte-identical。
+3. `lib/content/blocks/seo-check.ts`（**新**）— 自註冊 `quality/check` 積木（kind=quality、enabled），`run(ctx)` 把 ctx 當 `SeoCheckInput` 傳 `runSeoCheck`（core 自行 coerce，多餘 geo 等欄位忽略）。dormant（無 import = 不在 registry，接 P4 編排器才活）。
+4. `lib/content/blocks/README.md` — manifest 補 `quality/check` 列。
+5. 本檔 + `agency-os/TASKS.md:77` + 主計畫 §0.5/A5/§3 — P3 標 ✅ + capability 註明 seo-check 已抽 core。
+6. **R4 stale-claim 修（同議題、同 commit）**：REALTEST 實測 `total:16` 戳破文件「24 點」舊聲稱——`rankmath-checker.ts` 實為 16 個 `checks.push`（grep 確認）。修正 6 處「24 點」→「16 點」：route.ts:9、README.md:95、seo-check.ts:7、seo-check-core.ts:10、主計畫 A5/§3。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（×2：抽 core 後 + 註解修「24→16」後）&& `npx tsx <import seo-check-core>` 4 案 | exit=0 — tsc EXIT=0 兩次；tsx 實 invoke `runSeoCheck`（offline 純函式）：T1 空 markdown→`{ok:false,status:400,error:"markdown required"}`；T2 空 focusKeyword→`{ok:false,status:400,error:"focusKeyword required"}`；T3 有效輸入→`{ok:true,report:{score:44,grade:"red",passed:7,total:16,checks:16}}`；T4 非字串 markdown(123)→`str()` coerce 成 `""`→「markdown required」（與原 route coercion 一致）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — critic 外部 oracle 確認 wire 邊界 byte-identical（失敗 text／成功 JSON／400/403 狀態碼一致）、role gate 順序保留（在 json parse 前）、sync core／async 積木 `run` 正確（`checkRankMath` 純運算，積木自動 Promise.resolve 包覆）、discriminated-union cast 在 `strict:false` 下 sound、`siteDomain || undefined` 評分分支已保留。1 個 P4-接線 Suggestion（非缺陷）：編排器接 `byKind("quality")` 時須處理積木回 `ok:false` 分支（`SeoCheckResult` 是 union，不可盲目 `ctx = await b.run(ctx)` 把失敗 union 當下游 ctx）——記入 P4 風險。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`runSeoCheck\|seo-check-core\|SeoCheckInput\|SeoCheckResult\|SeoCheckSuccess\|SeoCheckFailure\|quality/check\|24 點` | hits=0(殘留) — 所有 symbol 命中皆在本次新檔 + 主計畫 P3 列；`ContentStudio.tsx:781/:1000` 既有 caller POST 打 `/api/content/seo-check` 路徑（HTTP 邊界，無內部 symbol 耦合）→ 薄殼保留路徑/wire 故行為不變；「24 點」repo-wide 殘留=0（6 處全修）；scripts=0。
+
+**[剩餘風險]** ① 積木 dormant，未接 P4 編排器（與 `publish/wordpress`/`article/generate` 同狀態，刻意）。② critic 的 P4-orchestrator Suggestion：接線時須分支處理 `ok:false`（見上）。③ 文件「24 點」舊數字由本次 REALTEST 戳破並全修為 16；若未來 `rankmath-checker.ts` 增減 check 數，文件數字須同步（屬 rankmath 檔自身議題，非本積木層）。
+
+**[rollback]** `git revert` P3 commits；core/積木為新增檔，刪除即移除；route 可由 git 還原回 inline 版（preamble verbatim 保存於 core，無資訊遺失）。
+
 ### feat(content-blocks): P2 — `article/generate` 抽 core + 包積木（route 薄殼共用，行為保留）
 
 **[任務理解]** Content Pipeline Blocks 主計畫 T1 鎖定順序 P2：把 `app/api/content/generate/route.ts` POST handler 的全文生成核心抽成 `lib/content/article/generate-core.ts`，route 變薄殼（只管 HTTP/串流/role/apiKey），再包一個 `article/generate` 積木 headless 共用同一 core。原則：**一段邏輯、兩個入口（route 給 UI 串流、積木給 headless）、零重複**，行為 byte-identical、可回滾。
