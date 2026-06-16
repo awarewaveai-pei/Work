@@ -60,7 +60,13 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`marketContext\|patternCount\|existingCategories\|KADENCE_PATTERN\|isOpenAiModel\|streamOpenAiGeneration\|compileMarketingBrief\|api/content/(categories\|patterns\|market-analysis)` | hits=7 — 全部侷限在改/建的檔，無外部 stale call site、無 downstream consumer 需同步（headless block 走同一 core，新欄位皆 optional 透明）
 
 **[剩餘風險→已解]** ⚠️ 初測 vault `mcp/user-env.ps1:90` 的 `OPENAI_API_KEY` 401 失效。使用者提供 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md` 內**有效 key**（`sk-proj-…DgPrUA`，REALTEST 200 + 4 model id 全存在）→ 已同步進 user-env.ps1:90（gitignored）+ live GPT 串流 REALTEST 通過。**部署補洞**：`docker-compose.yml` next-admin **原缺 `OPENAI_API_KEY` env**（只有 node-api 有）→ 已補 `OPENAI_API_KEY: ${OPENAI_API_KEY:-}`（`.env.example:98` 已文件化）。
-**[仍待]** ① **SG host `.env` 須填有效 OPENAI_API_KEY** 才能讓線上 GPT 生成運作。② #6 完整 pattern 清單需帶 token/部署後驗。③ **未部署**：全部須 sg-deploy；#6 另需 wp-bridge 0.12.0 release。
+**[部署完成 2026-06-17]**
+- SG `.env:147` 經查**已是有效 key**（後綴 PrUA = CREDENTIALS.md 那把），無需改；staging compose `:254` 早有 `OPENAI_API_KEY` passthrough（我的 repo compose 改動實為修 repo↔staging drift）。
+- REALTEST_EVIDENCE: tool=SSH(hetzner-ssh) | cmd=`sg-deploy.sh next-admin` | exit=0 | image built、`.deployed-commit=72cc23d6`(含 643303b9+096c5761)、next-admin 7s healthy、HTTP smoke 全 200(/login、/api/ops/summary、nginx、node-api)
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv OPENAI_API_KEY/PERPLEXITY_API_KEY` | exit=0 | 容器實際拿到 OPENAI(sk-pro…PrUA 有效)+PERPLEXITY → GPT(#1)+市場分析(#5) 線上可用
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke` | exit=0 | 26 passed/0 failed/6 skipped(無 auth 項)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`release-wp-bridge.sh` | exit=0 | wp-bridge **v0.12.0 發版**，asset `aware-wave-wp-bridge-v0.12.0.zip` 已出（release.yml Action verified）
+**[仍待]** #6 patterns 要在 **soulful 安裝/更新 wp-bridge 0.12.0**（zip 已發佈，屬 operator/MainWP 安裝步驟）才會在站上渲染；安裝前發文章插入 pattern 仍安全（舊版插件遇 `wp:block ref` 由 WP 核心解析，非 bridge 專屬）。
 **[rollback]** 程式皆已隨 checkpoint commit 進 main；如需回退按檔 `git checkout` 個別檔；plugin 未 release 故站上零影響。
 
 ### fix(hooks): ao-resume-on-prompt + post-push hook 加 -WindowStyle Hidden（消開機/每訊息 powershell 閃窗 真根因）
