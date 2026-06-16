@@ -4,6 +4,29 @@
 
 ## 2026-06-16
 
+### feat(content-studio): Media Hub 生圖積木整合 Phase 2 — 5 模型精選 + 風格預設 + img2img + 固定 seed
+
+**[任務理解]** 操作者要把自己的生圖積木（`lib/tarot/image-gen.ts`，15 模型 combo-pack，塔羅工具同源）接進內容工作室 Media Hub：① AI Images 下拉給她的模型（非寫死 flux-schnell）② IMAGE STYLE 有風格套風格、無則留白 ③ 以圖生圖（img2img 參考圖）④ 固定風格靠 seed（客戶要某風格可重現）。已批准決策：比例=方案 A（擴 toolkit `AspectRatio` type，image-gen.ts SSOT additive）；模型=精選子集（5 個非全 15）。
+
+**[現況分析（VBC）]** `git log` → 並行 cursor session 正動 mockup 線（ef133862 FLUX Kontext、b2bdbfe8/868bdf79 model descriptor/cost），檔域 `PublishWizard/model-options/model-comparison/image-gen`，**與本檔（content/image route + ContentStudio）不重疊**——逐檔 diff 確認後只 commit 自己兩檔，不碰 cursor dirty 檔。5 模型 capability matrix 讀真 `TAROT_MODELS` 推導（非臆測）：seed 由 provider 決定（flux 必 seed / replicate 看 `buildInput` 是否轉發）、img2img 看 `supportsImg2img`。風格雙流：`zh` key 餵文章產生器（hint）、resolved 英文 `.prompt` 餵 image route。route 已委派 `generateTarotImage`（task #2，本 session 補 critic 修）。
+
+**[已修改]**
+1. `app/api/content/image/route.ts` — 委派 `generateTarotImage({model,prompt,aspectRatio,seed,referenceImages})` + R2 持久化；`PLATFORM_IMAGE_SPECS` 15 預設 aspect 全為 `AspectRatio` 成員；`DEFAULT_MODEL=flux-schnell`（舊行為保留）；未知非空 model→400；img2img 參考圖驗證（≤5 張 / ≤12M chars / png|jpe?g|webp data-url）；`friendlyError` 8 碼→中文；`ok:false` 回 HTTP 200 讓 client 顯友善訊息。
+2. `app/tools/content/ContentStudio.tsx` — `AI_IMAGE_PROVIDERS`（none+5 模型，各帶 `seed`/`img2img` 能力旗）；`MediaHub` 加 `imageStyle`(STYLE_CATALOG zh key)/`imageSeed`/`imageRefData`；`mediaImageParams()` 組 model+resolved style+seed+ref；IMAGE STYLE→grouped `<select>`（STYLE_GROUPS）；Row 1b 參考圖上傳（FileReader→data-url）+ seed input（皆 model-gated disabled）；body+hero 兩 call site `...mediaImageParams()`。
+3. `app/tools/content/contentStudioImageModels.test.ts`（**新**，已 commit bf70554f）— 永久契約測：5 模型 mirror 對 `TAROT_MODELS` 驗 `isTarotModel`/`supportsImg2img`/seed-honour（flux 直驗、replicate 用 `buildInput({seed:12345}).seed===12345`）+ STYLE_CATALOG 解析。24 tests。
+4. **critic 修（0 Critical / 2 Major / 3 Minor / 1 Suggestion，全採納）**：M1 圖生失敗靜默吞→加 `imgGenWarn` state，`autoReplaceImages`/`generateHeroImage` 捕 `ok:false`+catch、run-guard 顯黃字警告橫幅（可關）；M2 客端 8MB 檔大守門（base64 前擋）+ `saveDraft` formSnapshot 剝除 `imageRefData`（多 MB base64 不入每次 autosave）；m1 `FileReader.onerror`；m2 seed clamp uint32（`Math.min(Number,4294967295)`，input `max`）；m3 route `styleMod.slice(0,600)`；Suggestion route R2 put 失敗保留 data-url（不合成 `${base}/${key}` 死連結，移除 unused `getDesignsPublicBase` import）。
+5. **critic 二輪 m（stale warning，已修）**：`autoReplaceImages` 的 `setImgGenWarn("")` 在 no-placeholder early-return 之後 → 無圖重生會留 run A 舊警告；reset block(line 729) 補 `setImgGenWarn("")` 每輪起手清空。
+
+**[驗證結果]**（R0 四動作齊全）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin 全專案，兩次：critic 修後 + stale-warning 修後）| exit=0 — 型別 0 錯。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/tools/content/contentStudioImageModels.test.ts` | exit=0 | tests=24/24 PASS — 5 模型 capability matrix 對真 `TAROT_MODELS` 全中（seed/img2img 旗皆吻合 toolkit 真實行為）；STYLE_CATALOG 解析「梵谷 Van Gogh」→含 impasto、未知 key→undefined。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/0M/1m — 外部 oracle 二輪複審 10 處修正逐一確認落地（imgGenWarn run-guard 正確、seed clamp NaN/空/超大 edge 皆對、`getDesignsPublicBase` 移除無 dangling、`imageRefData` 唯一持久化路徑已剝除）；唯一 Minor（stale warning）已即修並 tsc 複驗。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`imgGenWarn\|mediaImageParams\|imageRefData` | hits=0 — 三新符號僅存於 staged 兩檔 + 契約測（皆已 commit），無跨檔 stale 引用；agency-os 命中皆 append-only WORKLOG 史料（描述 route 早期狀態，不 retro 改）。consumer-check：`getDesignsPublicBase` 仍由 6 檔（studio/generate、publish、print-file、r2.ts export、tarot batch card、printful sync）合法使用→route.ts 移除為 local-only 安全。scripts=0。
+
+**[剩餘風險]** ① 部署未執行——本輪只 commit（dba6d74f 經 auto-checkpoint 落 main），**SG 部署待操作者明示 go-ahead**（route+UI 改動 Med，需 deploy flow `/check-drift`→`/verify`→go→`sg-deploy`→`/playwright smoke`）。② OpenAI 模型（gpt-image-1）帳號 billing hard limit 仍在（既知，非本次）——精選 5 模型刻意全 flux/replicate 避開。③ 並行 cursor mockup 線同改 image-gen.ts，未來若 AspectRatio enum 再動，契約測會 loud-fail（設計如此）。
+
+**[rollback]** `git revert dba6d74f`（含 route.ts + ContentStudio.tsx 全部 Phase-2 + critic 修）；契約測（bf70554f）獨立可留；無 DB/migration/auth 改動，純前端 + API route 委派，回滾零資料風險。
+
 ### feat(content-blocks): P4 — `byKind()` headless 編排器（article→quality→publish 跑通成 WP draft）
 
 **[任務理解]** Content Pipeline Blocks 主計畫 T1 鎖定順序 P4：把 P1–P3 抽好的 dormant 積木（`article/generate`/`quality/check`/`publish/wordpress`）接進一條 headless 管線，端到端「文章→品質→WP draft」。原則：**編排器零改積木契約**——只多三行 side-effect import 讓積木自註冊（README 契約「加新積木 = 新檔 register() 一次；編排器永遠不改，只新增 import」）。**LIVE 端到端跑（真 token + 真寫客戶 WP draft）非本 build 範圍**，另需 go-ahead。
