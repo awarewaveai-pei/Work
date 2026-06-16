@@ -37,16 +37,16 @@ IMAGE_SIZE     = os.getenv("IMAGE_SIZE", "1792x1024")
 WP_URL      = os.getenv("WP_URL", "")
 WP_USERNAME = os.getenv("WP_USERNAME", "")
 WP_PASSWORD = os.getenv("WP_PASSWORD", "")          # WordPress 應用程式密碼
-WP_STATUS   = os.getenv("WP_STATUS", "publish")     # publish / draft
-WP_ENABLE   = _bool("WP_ENABLE", "true")            # 設 false 可跳過 WP 發佈
+WP_STATUS   = os.getenv("WP_STATUS", "draft")       # publish / draft（render-only 預設 draft，安全）
+WP_ENABLE   = _bool("WP_ENABLE", "false")           # 預設 OFF：本服務只渲染，發佈由 next-admin wp-bridge 路徑負責（master plan R4）
 
 # ─────────────────────────────────────────
 # YouTube OAuth
 # ─────────────────────────────────────────
 YOUTUBE_CLIENT_SECRETS = os.getenv("YOUTUBE_CLIENT_SECRETS", "client_secrets.json")
 YOUTUBE_TOKEN_FILE     = os.getenv("YOUTUBE_TOKEN_FILE", "youtube_token.json")
-YOUTUBE_PRIVACY        = os.getenv("YOUTUBE_PRIVACY", "public")  # public / unlisted / private
-YOUTUBE_ENABLE         = _bool("YOUTUBE_ENABLE", "true")
+YOUTUBE_PRIVACY        = os.getenv("YOUTUBE_PRIVACY", "private")  # public / unlisted / private（預設 private，安全）
+YOUTUBE_ENABLE         = _bool("YOUTUBE_ENABLE", "false")         # 預設 OFF：render-only，發佈待 Phase 1 整合決定
 
 # ─────────────────────────────────────────
 # 影片設定

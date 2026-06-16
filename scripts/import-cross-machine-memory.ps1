@@ -371,9 +371,9 @@ $candidateFolders = @(
         #   same date           -> compare full manifest timestamps (fixes 2026-06-16 same-day skip bug)
         #   older / unreadable   -> skip (protect fresh local data)
         (
-            $ownLatestDateStr -eq $null -or
+            $null -eq $ownLatestDateStr -or
             $_.DateStr -gt $ownLatestDateStr -or
-            ($_.DateStr -eq $ownLatestDateStr -and (Test-SameDateOtherNewer $_ $ownExportUtc))
+            ($_.DateStr -eq $ownLatestDateStr -and (Test-SameDateOtherNewer $_ $ownExportUtc $ownSecretsRoot))
         )
     } | Sort-Object DateStr -Descending   # newest date first
 )

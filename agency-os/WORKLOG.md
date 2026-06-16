@@ -4,6 +4,28 @@
 
 ## 2026-06-16
 
+### claude 2026-06-16 — fix(cross-machine): import 同日 tie-break（folder-date → manifest timestamp）+ 手動套用桌機 export
+
+**[任務理解]** 兩件事：(1) 使用者手動把桌機 Google Drive export 下載到 `C:\Users\user1115\Desktop\20260616 G`，要套用到本機（筆電 LAPTOP-R7I86OR5）；(2) 修根因 —— 跨機 import 用資料夾名「日期(yyyy-MM-dd)」比新舊（`import-cross-machine-memory.ps1` 舊 L331 `$_.DateStr -gt $ownLatestDateStr`），同一天的他機較新匯出被 `-gt`=false 排除 → 整批 skip。今天桌機 07:29 UTC 比筆電 00:34 UTC 新卻同日被跳過 = bug。
+
+**[現況分析 / VBC]** 先讀 hook log（非記憶）：本輪開機 hook exit=1，git-align 在 rebase conflict（`ao-resume-last-session-id.txt` modify/delete）中止、狀態檔未生成；手動 `pull --rebase`（解衝突取刪除）+ push + 重跑 ao-resume.ps1 exit=0 修復。import skip 真實傷害經逐檔 SHA 比對：secrets 7/7 + credentials + 54/59 memory **早已 byte-identical**，**唯 5 個 memory `.md` DIFF**（4 個只缺 UTF-8 BOM、1 個 `project_pod_a2_fulfillment_deferred.md` 有實質新內容）。git log -8 該腳本：近期僅 checkpoint + `4dbaf035 Phase Z`，無並行 session 搶改。完整時戳唯一來源＝vault root `.manifest-<MACHINE>.json` 的 `exported_utc`（ao-close-last.txt 早有同款 ISO 時戳比對 `bdbbfde`，方向一致）。
+
+**[已修改]**
+1. `agency-os 記憶`（非 repo，`~/.claude/projects/D--Work/memory/`）：5 個 DIFF memory `.md` 以桌機版覆蓋（方向驗證：本機版 mtime 全早於桌機匯出 15:29 CST）；舊版備份於 `D:\tmp\memory-backup-20260616-220352\`。其餘（secrets/ssh/credentials/54 memory）SHA 相同未動。
+2. `scripts/import-cross-machine-memory.ps1` — 新增 `Get-MachineExportUtc($SecretsRoot,$Machine)`（讀 `.manifest-<Machine>.json` exported_utc → [datetime] UTC；缺/壞回 $null）+ `Test-SameDateOtherNewer($Entry,$OwnUtc,$SecretsRoot)`（同日 + 他機 exported_utc 嚴格 > 自機 → $true；非 new-format/無 FolderMachine/任一時戳缺 → $false 安全 skip）；candidate 選擇加 `$ownExportUtc`/`$ownSecretsRoot` + 第三 clause 做同日 tie-break；skip 訊息更新。
+3. **critic（外部 oracle）修**：Major — `Test-SameDateOtherNewer` 改收 `$SecretsRoot` 參數、由 caller 傳已解析的 `$ownSecretsRoot`（兩機 manifest 同根），不再自推、與自機側 `$env:AO_SYNC_SECRETS_ROOT` 優先序一致；Minor — `$null -eq $ownLatestDateStr`（null 放左）+ `$ownSecretsRoot=$null` 初始化防 StrictMode + clock-skew 假設註解。
+
+**[驗證結果]**（R0 四動作齊全）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File <temp test>`（AST 從真檔載入兩函式，對真 G: vault manifest）| exit=0 | tests=7/7 PASS — DESKTOP exported_utc 07:29:29Z > LAPTOP 00:34:45Z 確認；T1 同日他機較新(explicit root)→True、T6 空 root fallback→True、T2 同時戳/T3 manifest 缺/T4 old-format/T5 ownUtc null/T7 錯 root→皆 False（安全 skip）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell PSParser::Tokenize` | exit=0 — parse 0 errors（兩輪編輯後各一次）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1M/3m+1s — 外部 oracle trace 全檔 + export 對應檔 + 三種 path mode（env-var/auto-detect/Desktop-fallback）live 驗 null/datetime coercion（`[datetime] -gt $null`=True 的 foot-gun 不可達，雙 `-not` 守門短路）；Major（secretsRoot 不對稱）已即修並複驗；確認未破壞「不同日/排除自機/old-format/MEMORY.md 下游」既有邏輯，每個失敗模式皆退回舊 safe-skip（無拿舊蓋新回歸）。
+- BUGHUNT_DONE: scope=scripts,agency-os,.claude | grep=`Get-MachineExportUtc\|Test-SameDateOtherNewer\|ownExportUtc\|same date or newer than all\|import-cross-machine-memory` | hits=0(external) — 三新符號僅本檔自用（defs+call sites），無外部 caller；舊 skip 訊息字串 0 外部依賴；唯一 production caller `ao-resume.ps1:350` 把整支當黑箱、介面/exit code 未變。
+- audit-cp950-traps: CLEAN（exit 0，無 external-command capture site；兩輪編輯後各驗一次）。
+
+**[剩餘風險]** ① critic Minor #2（MEMORY.md 下游 skip 訊息 line ~466 同日 vs 同日顯示「older(date)」可能讓人困惑）= 純顯示、互斥分支、無邏輯影響，未改（記此處待未來順手修）。② clock-skew：同日 tie-break 信任兩機 wall-clock，假設 NTP 同步、窗限同一日（已加註解）。③ Desktop-fallback 模式無 manifest → tie-break 退回 skip（該模式本就無時戳可比）。
+
+**[rollback]** `git revert` 本 commit（純比對邏輯 additive，無 DB/auth/金流/migration）；memory 5 檔可從 `D:\tmp\memory-backup-20260616-220352\` 復原；回滾後行為退回「同日即 skip」舊狀態，零資料風險。
+
 ### claude 2026-06-16 — REALTEST: bridge /newsletter → soulful FluentCRM 草稿（e2e 閉環，零改 code）
 
 **[任務理解]** 使用者交辦三項：① REALTEST 連 soulful 真建 FluentCRM 草稿→驗 draft→刪除（不寄不留痕）② 發版 release-wp-bridge.sh（兩 repo）→ soulful 更新外掛 ③ next-admin `/api/content/newsletter` route + ContentStudio 推送按鈕。
