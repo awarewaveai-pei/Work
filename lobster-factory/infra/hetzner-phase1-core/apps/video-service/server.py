@@ -32,19 +32,26 @@ import pipeline
 
 PORT = int(os.getenv("VIDEO_SERVICE_PORT", "8732"))
 MAX_ASSET_BYTES = int(os.getenv("RENDER_MAX_ASSET_MB", "200")) * 1024 * 1024
+MAX_SCENES = int(os.getenv("RENDER_MAX_SCENES", "30"))
+MAX_BODY_BYTES = int(os.getenv("RENDER_MAX_BODY_KB", "256")) * 1024  # JSON 很小（素材是 URL/路徑非內嵌）
 _render_lock = threading.Lock()
 
 
 def _is_safe_https_url(url: str) -> bool:
-    """https-only + 解析後擋私有/迴圈/link-local/保留位址（基本 SSRF 防護）。"""
+    """https-only + 解析後 **allowlist**：只放行公網位址（is_global，fails-closed）。
+    自動擋私有/迴圈/link-local/保留/multicast/CGNAT(100.64/10)；IPv4-mapped 先正規化。
+    ⚠️ 殘留風險：DNS-rebinding TOCTOU —— 此處解析與 requests 下載各自解析一次，理論上可
+    在兩次間切換 IP。本服務綁 127.0.0.1 且呼叫者為受信任 next-admin 積木（素材來自
+    Flux/Pexels 公網 CDN），故為可接受 interim；Phase 2 對外暴露前須改「解析一次→pin IP 連線」。"""
     try:
         u = urlparse(url)
         if u.scheme != "https" or not u.hostname:
             return False
         for *_, sockaddr in socket.getaddrinfo(u.hostname, 443):
             ip = ipaddress.ip_address(sockaddr[0])
-            if (ip.is_private or ip.is_loopback or ip.is_link_local
-                    or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            if ip.ipv4_mapped:            # 正規化 ::ffff:a.b.c.d，避免版本相依繞過
+                ip = ip.ipv4_mapped
+            if not ip.is_global:          # allowlist：非公網一律擋
                 return False
         return True
     except Exception:
@@ -52,7 +59,7 @@ def _is_safe_https_url(url: str) -> bool:
 
 
 def _materialize_asset(asset: str, idx: int) -> str:
-    """本機路徑 → 直接用；https URL → 過 guard 後下載（大小上限）。"""
+    """本機路徑 → 直接用；https URL → 過 guard 後下載（不跟隨重導向、大小上限）。"""
     if not asset.startswith(("http://", "https://")):
         if not os.path.exists(asset):
             raise ValueError(f"asset[{idx}] 本機檔不存在: {asset}")
@@ -63,7 +70,10 @@ def _materialize_asset(asset: str, idx: int) -> str:
     config.TEMP_DIR.mkdir(parents=True, exist_ok=True)
     dst = str(config.TEMP_DIR / f"asset_{idx}{ext}")
     total = 0
-    with requests.get(asset, stream=True, timeout=60) as r:
+    # allow_redirects=False：重導向可繞過 guard（甚至降級 http / 指向私有 IP）→ 一律拒
+    with requests.get(asset, stream=True, timeout=60, allow_redirects=False) as r:
+        if 300 <= r.status_code < 400:
+            raise ValueError(f"asset[{idx}] 不允許重導向（{r.status_code}）")
         r.raise_for_status()
         with open(dst, "wb") as f:
             for chunk in r.iter_content(65536):
@@ -80,11 +90,13 @@ def render_request(payload: dict) -> dict:
     out_name = payload.get("out_name", "video")
     if not isinstance(scenes, list) or not scenes:
         raise ValueError("scenes 必須是非空 list")
+    if len(scenes) > MAX_SCENES:
+        raise ValueError(f"scenes 過多（{len(scenes)} > {MAX_SCENES}）")
     if not isinstance(assets, list) or len(assets) != len(scenes):
         raise ValueError("assets 必須與 scenes 等長")
-    visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
-    with _render_lock:  # 序列化：CPU-bound + 共用 TEMP_DIR
+    with _render_lock:  # 序列化：materialize(下載)+render 全程獨佔 TEMP_DIR（防並行撞檔）
         try:
+            visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
             outputs, _base, out_dir = pipeline.render_video(scenes, visual_files, out_name)
             # outputs 落在 out_dir（持久）；_base 在 TEMP_DIR 會被 cleanup 清掉，不回傳
             return {"outputs": {k: str(v) for k, v in outputs.items()}, "out_dir": str(out_dir)}
@@ -113,6 +125,9 @@ class _Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
+            if length > MAX_BODY_BYTES:
+                self._json(413, {"error": f"body 過大（{length} > {MAX_BODY_BYTES}）"})
+                return
             payload = json.loads(self.rfile.read(length) or b"{}")
             self._json(200, render_request(payload))
         except ValueError as e:

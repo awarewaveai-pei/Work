@@ -2,6 +2,22 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-17
+
+### feat(pod): PublishWizard 真・全部一鍵 — 印刷檔＋商品圖＋合成圖＋文案＋Woo＋Printful native 串成單一按鈕
+
+**[任務理解]** 使用者澄清核心需求（強調數十次）：建一個 POD 商品要**一次完成** Printful native + WooCommerce，含 **WebP 商品圖 + 合成平拍圖傳到 WP**，不要分步重工。釐清現況：系統本來就 Woo+native 共用同一組 SKU（`create` 產 SKU → `pfcreate` 消費；圖經 `mockupUrls` 進 Woo `images`），但 UI 是 6 顆分步按鈕；先前誤把「上 Printful」當終點講 + 拿外掛建的舊商品(7149)測 SKU 誤報，已對使用者更正。
+**[現況分析]** `PublishWizard.tsx` 各 `run*` 從 React state/closure 讀上一步結果（分步點擊才安全）。直接依序呼叫會踩 stale closure（state 非同步）。`git log` 確認最近相關 commit=`a7509451`（當初加 ③ native 按鈕），無並行 session 搶改。
+**[方案]** 方案A（採用）：新增 orchestrator `runAll`，直接依序 `post()` 6 步，每步結果走**區域變數**串接（不讀 state），同步 setX 點亮既有 pill；加「🚀 全部一鍵完成」主按鈕。最小爆炸半徑，不動既有分步邏輯。方案B（否決）：重構所有 run* 改回傳值——觸及更多行、風險高。
+**[已修改]** 僅 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/publish/PublishWizard.tsx`：① `runAll` useCallback（6 步本地串接，copy best-effort 非致命，gallery=existing∪商品圖∪合成圖 dedup）② 主一鍵按鈕 + 進度/完成/錯誤狀態 ③ `busy` 守門加進所有分步按鈕 ④ critic 後修：mockupUrls 改 `useRef` 快照（防中途勾選被吞）、執行中鎖設計圖/勾選框、`runAllLatch` 同步 re-entrancy（防 within-tick 雙擊重複建單）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | 改後重跑仍 0（型別 gate 綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test`(vitest) | exit=0 | 379/379 passed（deploy gate；無連帶破壞）
+- REVIEW_DONE: critic=Deep | verdict=pass（0 Critical/0 High）| findings=3 actionable（mockupUrls stale-input、中途換設計圖未鎖、雙擊 latch）→ **全部已修**；critic 已逐項確認 payload 與後端 contract 一致、step 結果皆走本地變數、copy 非致命處理正確。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=`runAll\|allRun\|runAllLatch\|/api/tools/publish` | hits=0（真實符號僅在 PublishWizard.tsx；clients page 命中為 `installRuns` 子字串誤判；docs「一鍵上 Printful」指既有 ③ 按鈕，本次只加上層按鈕未移除步驟 → 無 stale）
+**[剩餘風險]** ① 尚未部署 prod（需 sg-deploy，使用者 go-ahead）② live 瀏覽器 e2e（真建 Woo 草稿+native 商品）屬操作者驅動，未在本機跑（不污染客戶店）③ runAll 內 `designs` 仍讀閉包，但僅 mount 抓一次，安全。
+**[rollback]** 單檔改動，`git revert` 或還原 PublishWizard.tsx 即可；無 schema/infra/contract 變更。
+
 ## 2026-06-16
 
 ### fix(secret-baseline): 加 TRIGGER_ACCESS_TOKEN 進 known-suppressed — 修 ao-resume exit 1（自作良性）

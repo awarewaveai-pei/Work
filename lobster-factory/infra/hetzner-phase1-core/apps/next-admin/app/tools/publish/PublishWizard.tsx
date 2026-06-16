@@ -86,6 +86,14 @@ export default function PublishWizard() {
   useEffect(() => { lastProductUrlRef.current = productImg.url ?? null; }, [productImg.url]);
   const lastFlatlayUrlRef = useRef<string | null>(null);
   useEffect(() => { lastFlatlayUrlRef.current = flatlay.url ?? null; }, [flatlay.url]);
+  // Live snapshot of the operator's mockup picks — runAll reads THIS (not its frozen closure) so a
+  // checkbox toggled during the multi-minute run is still reflected in the published gallery.
+  const mockupUrlsRef = useRef<string[]>(mockupUrls);
+  useEffect(() => { mockupUrlsRef.current = mockupUrls; }, [mockupUrls]);
+  // Synchronous re-entrancy latch for runAll — closes the check-then-act gap that the async
+  // `busy`-disabled button leaves open (a within-tick double-click would otherwise start two
+  // parallel publish chains → duplicate Woo products, since `create` is not idempotent).
+  const runAllLatch = useRef(false);
   const [create, setCreate] = useState<{
     state: StepState;
     productId?: number;
@@ -382,8 +390,9 @@ export default function PublishWizard() {
   // results are threaded through LOCAL vars (not state) so a later step never reads a stale closure.
   // Each step also updates its own state so the existing pills + success lines render as it progresses.
   const runAll = useCallback(async () => {
-    if (!designUrl || title.trim().length < 3 || allRun.state === "running") return;
-
+    if (!designUrl || title.trim().length < 3 || runAllLatch.current) return;
+    runAllLatch.current = true;
+    try {
     // 1) print file (faithful upscale)
     setAllRun({ state: "running", stage: "① 產生印刷檔" });
     setUpscale({ state: "running" });
@@ -430,7 +439,7 @@ export default function PublishWizard() {
 
     // assemble the product gallery: existing user picks + the two freshly generated images (dedup,
     // insertion order preserved — first entry is Woo's main image).
-    const gallery = Array.from(new Set([...mockupUrls, productImageUrl, flatlayUrl]));
+    const gallery = Array.from(new Set([...mockupUrlsRef.current, productImageUrl, flatlayUrl]));
     setMockupUrls(gallery);
 
     // 4) AI SEO/GEO copy — BEST EFFORT (a copy failure must not abort the publish; create tolerates
@@ -534,7 +543,10 @@ export default function PublishWizard() {
     });
 
     setAllRun({ state: "done" });
-  }, [designUrl, title, printMode, flatlayBg, mockupUrls, designs, keywordHint, retailPrice, plusPrice, allRun.state, post]);
+    } finally {
+      runAllLatch.current = false;
+    }
+  }, [designUrl, title, printMode, flatlayBg, designs, keywordHint, retailPrice, plusPrice, post]);
 
   const busy = allRun.state === "running";
 
@@ -542,6 +554,7 @@ export default function PublishWizard() {
     state === "done" ? "✅" : state === "running" ? "⏳" : state === "error" ? "❌" : "⬜";
 
   const toggleMockup = (url: string) => {
+    if (busy) return; // never mutate the gallery mid-publish
     setMockupUrls((prev) => (prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]));
   };
 
@@ -574,14 +587,16 @@ export default function PublishWizard() {
                     objectFit: "contain",
                     background: "#111",
                     borderRadius: 6,
-                    cursor: "pointer",
+                    cursor: busy ? "not-allowed" : "pointer",
+                    opacity: busy ? 0.55 : 1,
                     border: isDesign ? "2px solid #4f8cff" : "2px solid transparent",
                   }}
-                  onClick={() => setDesignUrl(d.object_url)}
+                  onClick={() => { if (!busy) setDesignUrl(d.object_url); }}
                 />
                 <input
                   type="checkbox"
                   checked={isMockup}
+                  disabled={busy}
                   onChange={() => toggleMockup(d.object_url!)}
                   style={{ position: "absolute", top: 2, right: 2 }}
                   title="加入商品照"
