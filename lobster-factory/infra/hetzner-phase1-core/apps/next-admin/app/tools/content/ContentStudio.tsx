@@ -1800,11 +1800,21 @@ export default function ContentStudio() {
                       disabled={isGenerating || form.media.aiImages === "none" || !selectedImageModel.img2img}
                       onChange={e => {
                         const file = e.target.files?.[0];
+                        e.target.value = ""; // allow re-selecting the same file after a remove
                         if (!file) return;
+                        // Reject oversize before encoding: an 8 MB raw file → ~11 M base64 chars, still
+                        // under the route's 12 M-char guard. Larger would 413 at the API; catch it here
+                        // with a clear message instead of base64-ing megabytes only to bounce it.
+                        const MAX_REF_BYTES = 8 * 1024 * 1024;
+                        if (file.size > MAX_REF_BYTES) {
+                          setImgGenWarn(`參考圖過大（${(file.size / 1048576).toFixed(1)}MB，上限 8MB），請壓縮後再上傳`);
+                          return;
+                        }
+                        setImgGenWarn("");
                         const reader = new FileReader();
                         reader.onload = () => setMedia("imageRefData", typeof reader.result === "string" ? reader.result : "");
+                        reader.onerror = () => setImgGenWarn("參考圖讀取失敗，請改用其他圖片");
                         reader.readAsDataURL(file);
-                        e.target.value = ""; // allow re-selecting the same file after a remove
                       }} />
                   )}
                 </div>

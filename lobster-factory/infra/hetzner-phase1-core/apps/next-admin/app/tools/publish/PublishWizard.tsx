@@ -210,7 +210,7 @@ export default function PublishWizard() {
     setFlatlay({ state: "done", url });
   }, [designUrl, flatlayBg, flatlay.url, post]);
 
-  const runCopy = useCallback(async (fixHints?: string[]): Promise<{ ok: boolean; error?: string }> => {
+  const runCopy = useCallback(async (fixHints?: string[]): Promise<{ ok: boolean; error?: string; message?: string }> => {
     const isFix = Array.isArray(fixHints) && fixHints.length > 0;
     // Initial generation: show the spinner pill (panel hidden until done). A fix re-gen keeps the
     // existing report on screen — the panel's own "AI 修正中…" flag signals progress — then swaps the
@@ -234,6 +234,20 @@ export default function PublishWizard() {
       metaDescription: string; shortDescriptionHtml: string; bullets: string[];
     };
     const rm = json.rankMath as RankMathReport | undefined;
+    // Never-regress guard: a fix is a full re-roll, so a fresh generation can score LOWER than the
+    // version on screen (stochastic). If so, KEEP the current copy and discard the re-roll — the
+    // operator never loses ground by clicking 「AI 自動修正」. Read the live score via copyRef (not the
+    // `copy` closure, which is stale inside this useCallback).
+    if (isFix) {
+      const prevScore = copyRef.current.rankMath?.score ?? -1;
+      const newScore = rm?.score ?? -1;
+      if (prevScore >= 0 && newScore < prevScore) {
+        return {
+          ok: true,
+          message: `重生${newScore < 0 ? "未取得分數" : ` ${newScore} 分`}未超過原版，保留 ${prevScore} 分`,
+        };
+      }
+    }
     // Fill the product title if the operator left it blank — never overwrite their input.
     setTitle((prev) => (prev.trim().length === 0 ? c.productTitle : prev));
     setCopy({
@@ -243,10 +257,19 @@ export default function PublishWizard() {
       metaDescription: c.metaDescription,
       shortDescriptionHtml: c.shortDescriptionHtml,
       bullets: c.bullets,
-      rankGrade: rm?.grade,
-      rankScore: rm?.score,
       rankMath: rm,
     });
+    if (isFix) {
+      const prevScore = copyRef.current.rankMath?.score ?? -1;
+      const newScore = rm?.score ?? -1;
+      const message =
+        prevScore < 0
+          ? undefined
+          : newScore > prevScore
+            ? `${prevScore} → ${newScore} ↑`
+            : `維持 ${newScore} 分`;
+      return { ok: true, message };
+    }
     return { ok: true };
   }, [designs, designUrl, title, keywordHint, post]);
 
