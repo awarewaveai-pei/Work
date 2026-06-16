@@ -430,6 +430,10 @@ export default function ContentStudio() {
   const [synContent,  setSynContent]  = useState<Record<string, string>>({});
   const [synCopied,   setSynCopied]   = useState<Record<string, boolean>>({});
 
+  // Newsletter (FluentCRM draft push — draft only, never sends; wp-bridge /newsletter)
+  const [nlStatus, setNlStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [nlResult, setNlResult] = useState<{ edit_url?: string; error?: string } | null>(null);
+
   // Humanize
   const [humMode,    setHumMode]    = useState<HumMode>("humanize");
   const [humInput,   setHumInput]   = useState("");
@@ -696,6 +700,7 @@ export default function ContentStudio() {
     setDraftId(""); setDraftSaveState("idle"); // fresh generation → new draft row
     setHeroImageUrl(""); setHeroLoading(false);
     setShowSyn(false); setSynStatus("idle"); setSynContent({});
+    setNlStatus("idle"); setNlResult(null);
     // Invalidate any in-flight image/hero writers from a PREVIOUS run NOW — unconditionally, even if
     // this run won't generate images. Bumping only inside the aiImages!=="none" branch let a slow hero
     // fetch from run A resolve and overwrite run B's (image-less) article with a mismatched hero.
@@ -1044,6 +1049,26 @@ export default function ContentStudio() {
       if (json.ok && json.posts) { setSynContent(json.posts); setSynStatus("done"); }
       else                       { setSynStatus("error"); }
     } catch { setSynStatus("error"); }
+  }
+
+  // ─── Newsletter (FluentCRM draft, never sends) ─────────────────────────────
+
+  async function handlePushNewsletter() {
+    if (!generated.trim()) return;
+    const subject = (metaData?.seoTitle || form.title || form.keyword || "").trim();
+    if (!subject) {
+      setNlStatus("error"); setNlResult({ error: "缺少主旨（請先填 SEO 標題或關鍵字）" }); return;
+    }
+    setNlStatus("sending"); setNlResult(null);
+    try {
+      const res = await fetch("/api/content/newsletter", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markdown: generated, subject, title: subject, preview: metaData?.metaDesc }),
+      });
+      const json = await res.json().catch(() => ({})) as { ok?: boolean; edit_url?: string; error?: string; reason?: string };
+      if (res.ok && json.ok) { setNlStatus("done"); setNlResult({ edit_url: json.edit_url }); }
+      else { setNlStatus("error"); setNlResult({ error: json.error || json.reason || `推送失敗（${res.status}）` }); }
+    } catch { setNlStatus("error"); setNlResult({ error: "連線失敗" }); }
   }
 
   // ─── Humanize ────────────────────────────────────────────────────────────
@@ -2189,6 +2214,34 @@ export default function ContentStudio() {
                           })}
                         </div>
                       )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── 電子報草稿（FluentCRM，只建草稿不寄出）── */}
+              {genStatus === "done" && hasContent && (
+                <div style={{ marginTop: "16px", borderTop: "1px solid var(--card-border)", paddingTop: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                    <button className="btn-primary" style={{ fontSize: "12px", padding: "5px 14px" }}
+                      onClick={handlePushNewsletter} disabled={nlStatus === "sending"}>
+                      {nlStatus === "sending" ? "推送中…" : "📧 推送到 FluentCRM 草稿"}
+                    </button>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                      只建立草稿，不會寄出 — 收件人與寄送請在 FluentCRM 人工確認
+                    </span>
+                  </div>
+                  {nlStatus === "done" && (
+                    <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--text-primary)" }}>
+                      ✓ 已建立 FluentCRM 草稿
+                      {nlResult?.edit_url && (
+                        <> — <a href={nlResult.edit_url} target="_blank" rel="noopener noreferrer" style={{ color: "#5855d0" }}>在 FluentCRM 開啟</a></>
+                      )}
+                    </div>
+                  )}
+                  {nlStatus === "error" && (
+                    <div style={{ marginTop: "8px", fontSize: "12px", color: "#c0392b" }}>
+                      ⚠ {nlResult?.error ?? "推送失敗"}
                     </div>
                   )}
                 </div>
