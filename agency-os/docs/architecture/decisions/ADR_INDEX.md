@@ -34,6 +34,7 @@
 | [005-supabase-sor-vs-wordpress-runtime-db.md](005-supabase-sor-vs-wordpress-runtime-db.md) | SoR 在 Supabase；WP DB 為執行期 | 2026-04-02 |
 | [006-supabase-tenant-isolation-and-clerk-mapping.md](006-supabase-tenant-isolation-and-clerk-mapping.md) | 多租戶 RLS + Clerk 對照原則 | 2026-04-02 |
 | [007-wp-bridge-ed25519-and-reversibility-gating.md](007-wp-bridge-ed25519-and-reversibility-gating.md) | wp-bridge Ed25519 簽章 + 可逆性分類門控 | 2026-06-05 |
+| [008-pod-fulfillment-native-store-over-plugin.md](008-pod-fulfillment-native-store-over-plugin.md) | POD 履約走 Native store（不走 Printful 外掛）；新客戶 native、soulful 不遷移 | 2026-06-16 |
 
 ## 本機檢查（可選）
 
