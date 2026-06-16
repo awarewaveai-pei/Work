@@ -4,6 +4,12 @@
 
 ## 2026-06-16
 
+### fix(secret-baseline): 加 TRIGGER_ACCESS_TOKEN 進 known-suppressed — 修 ao-resume exit 1（自作良性）
+**[根因]** 診斷使用者問的「ao-resume hook exit_code=1」：追到 `verify-build-gates.ps1:73` → `scan-local-config-for-secrets: FAIL (baseline mode)`。具體 = 我稍早把 `TRIGGER_ACCESS_TOKEN`（`tr_prod_*`）填進 `mcp/user-env.ps1:73`（修 trigger MCP），掃描器偵測到**不在 known-suppressed baseline 的新本機密鑰** → FAIL → ao-resume `$healthGateExit=1`。**非外洩**：finding `tracked=False`（user-env.ps1 = gitignored 合法密鑰庫，15 finding 全在裡面）；system-health 本身 100%/0-fail/Critical-Gate-PASS。純 baseline 漂移防呆。
+**[已修改]** `agency-os/config/scan-local-config-known-suppressed.json` 加 1 條 suppression（`mcp/user-env.ps1` + `Trigger.dev token` + `TRIGGER_ACCESS_TOKEN`，只存非密鑰標籤）。
+**[驗證結果]** REALTEST: `verify-build-gates.ps1` 修前 EXIT=1（scan FAIL）→ 加 baseline 後 **EXIT=0**。→ 下次 ao-resume exit 0；AO-CLOSE 100% gate 不再被此擋。BUGHUNT: 掃描器 15 finding 唯一未 baselined = 此 token，其餘 14 已在。
+**[剩餘風險]** 無。baseline 不含密鑰值；user-env.ps1 仍 gitignored。
+
 ### feat(ops): /ops/costs AI+工具成本會計 — cost-model SSOT + ai_call_logs 精準 token ledger + 滑桿月費試算 + 報表 CLI
 
 **[任務理解]** 使用者問「Calculate AI and tool costs for aware-wave app 還沒完成吧」→ 確認：無此產物（僅 /tools/ai-models 單價參考頁）。需求三層全做（單次成本 / 月估算 / 接真實資料）+ 文字成本「即時精準」（每次 API 回應帶 usage，app 先前 streaming 後丟棄 → 零記錄）。決策：分頁（/ops/costs 屬 ops 會計層，非 /tools 選型）；含 ai_call_logs 表把每次 usage 落帳（真數非估算）。
