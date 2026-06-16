@@ -164,6 +164,20 @@
 **[剩餘風險]** B-roll 抓取（Pexels）尚未接 — 待操作者提供免費 Pexels API key；積木 `video-pipeline.ts`（串 Flux+Pexels+render）為下一步。
 - AUTO_TASK_DONE (2026-06-17): video-service 混合 render 核心完成（靜圖+實拍影片同管線，含資源洩漏修），real-test 通過。
 
+### feat(video-service): HTTP render 微服務 `server.py`（service↔積木介面）+ 安全硬化
+
+**[任務理解]** service↔`video/pipeline` 積木的介面定為 HTTP（apps/ 部署家、乾淨邊界、解鎖 Phase 2 容器化）。零新依賴。
+
+**[已修改]** 新 `server.py`：stdlib `ThreadingHTTPServer` 綁 127.0.0.1:8732；`GET /health`、`POST /render`（scenes+assets→`pipeline.render_video`，render 全域序列化）。assets 支援本機路徑(dev)或 https URL(prod 下載)。critic WARN 後硬化：① **真 bug 修**：materialize(下載)移進 render lock → 並行請求不再撞 TEMP_DIR `asset_0.png`。② SSRF guard 改 `is_global` allowlist（fails-closed，自動擋 CGNAT 100.64/私有/保留）+ IPv4-mapped 正規化。③ `allow_redirects=False`+拒 3xx（擋重導向繞過/http 降級）。④ scenes 數量上限(30)+body 上限(256KB→413)。⑤ TOCTOU(DNS-rebind)留註解（127.0.0.1+信任積木呼叫者，Phase 2 對外前改 pin-IP）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`venv python D:/tmp/vtest_server.py` | exit=0 | `REALTEST_SERVER_PASS` — render_request 完整合成四尺寸 + HEALTH 200 + 參數不符 400 + SSRF guard 擋 https://127.0.0.1 (400) + 未知路徑 404。
+- REVIEW_DONE: critic=Deep | verdict=warn→已修（1 today-bug temp-clobber + 4 SSRF 缺口全處理；TOCTOU 文件化）| findings=0c/0M(fixed)。critic 確認無注入/無硬編密鑰/127.0.0.1 綁定正確。
+- BUGHUNT_DONE: scope=lobster-factory(video-service) | grep=`render_request\|_materialize_asset\|_is_safe_https_url\|_render_lock` | hits=皆同檔定義+自用，無外部 caller（積木 Phase 1b 才接）。
+
+**[剩餘風險]** TOCTOU 對外暴露前須改 pin-IP（已註解）；local-path 分支信任邊界依賴 127.0.0.1+積木不轉發使用者路徑（已註解）。積木 `video-pipeline.ts` 為下一步。
+- AUTO_TASK_DONE (2026-06-17): video-service HTTP render 微服務 server.py 建好 + critic 安全硬化（SSRF/temp-clobber/redirect/上限），real-test 通過。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
