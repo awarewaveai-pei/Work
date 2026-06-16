@@ -93,6 +93,20 @@
 **[rollback]** `git revert b7f5762a`（relocation+預設）/ 連 `037f57b9`（整批移除）；shim 與 README 修正含在後續 commit，單獨 revert 即可。
 - AUTO_TASK_DONE (2026-06-16): video-service Phase 0 — 落 main + ANTIALIAS bug 修 + 合成核心 real-test 通過。
 
+### refactor(video-service): Phase 1a — 切出 render-only 入口 `render_video()`（積木化前置）
+
+**[任務理解]** 使用者明確「生成影片是一個積木（需註冊，我們有註冊方式）」+「app.aware-wave 直連 Claude/OpenAI 用很多」。修正架構：影片＝`video/pipeline` 積木（`register()`，kind `"video"` 已在 registry.ts:18），重用既有 article core(Claude)+image-gen(`generateTarotImage` Replicate/Flux/gpt-image-1)+publish/wordpress(wp-bridge)，Python 服務縮到只剩獨有的「影片合成」。
+
+**[已修改]** `pipeline.py`：新增 `render_video(scenes, image_files, out_name)` render-only 入口（只 TTS+合成+多尺寸，不生腳本/不生圖/不發佈；含 scenes≠images 數量 guard；回傳 output_files/base_video/out_dir）。`run()` 改委派 render_video（零重複），移除 run 頂層多餘 out_dir 建立 → render_video 為 out_dir SSOT（修 critic 抓到的空名 fallback 分歧）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`venv python D:/tmp/vtest_synthesis.py`（改測 render_video 入口）| exit=0 | `REALTEST_SYNTHESIS_PASS`+`MISMATCH_GUARD_OK` — 四尺寸全正確、長度不符 raise ValueError。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n（out_dir 空名分歧，已修為 render_video SSOT）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`render_video` | hits=2（1 def + 1 run 委派 caller，皆同檔；無外部 caller，積木 Phase 1b 才接）。
+
+**[剩餘風險]** 積木 `video-pipeline.ts` 尚未建（Phase 1b）；service→block 介面（subprocess JSON vs HTTP）待定。
+- AUTO_TASK_DONE (2026-06-16): video-service Phase 1a — render-only `render_video()` 入口切出 + run 委派，real-test 通過。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
