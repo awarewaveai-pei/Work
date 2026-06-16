@@ -726,7 +726,8 @@ export default function ContentStudio() {
     setGenStatus("streaming"); setGenError(""); setGenTruncated(false);
     setPubStatus("idle"); setPubResult(null);
     setSeoReport(null); setSeoChecking(false);
-    setSlugHint(""); setAutoImgN(0);
+    setSlugHint(""); setAutoImgN(0); setImgGenWarn(""); // clear here too: autoReplaceImages' clear sits
+    // after its no-placeholder early-return, so an image-less re-gen would otherwise keep run A's warning
     setDraftId(""); setDraftSaveState("idle"); // fresh generation → new draft row
     setHeroImageUrl(""); setHeroLoading(false);
     setShowSyn(false); setSynStatus("idle"); setSynContent({});
@@ -855,7 +856,9 @@ export default function ContentStudio() {
           meta: payload.meta,
           slugHint: payload.slugHint || null,
           seoScore: payload.seoScore ?? null,
-          formSnapshot: form,
+          // Persist the form but drop the reference-image data URL — it's a transient img2img input
+          // (multi-MB base64) that would bloat every autosave row; it never needs to survive a reload.
+          formSnapshot: { ...form, media: { ...form.media, imageRefData: "" } },
           siteId: UUID_RE.test(selectedSiteId) ? selectedSiteId : undefined,
         }),
       });
@@ -947,7 +950,9 @@ export default function ContentStudio() {
     if (style) out.imageStyle = style.prompt;
     const cap = AI_IMAGE_PROVIDERS.find(p => p.value === m.aiImages);
     const seedStr = m.imageSeed.trim();
-    if (cap?.seed && /^\d+$/.test(seedStr)) out.seed = Number(seedStr);
+    // Clamp to uint32 — image backends (flux / replicate) expect a 0…4294967295 seed; a longer digit
+    // string would become 1e20+ and silently 422 the request. Math.min handles even Infinity safely.
+    if (cap?.seed && /^\d+$/.test(seedStr)) out.seed = Math.min(Number(seedStr), 4294967295);
     if (cap?.img2img && m.imageRefData) out.referenceImages = [m.imageRefData];
     return out;
   }
@@ -1825,7 +1830,7 @@ export default function ContentStudio() {
                       {selectedImageModel.seed ? "（固定風格可重現）" : "（此模型不支援）"}
                     </span>
                   </label>
-                  <input className="form-input" type="number" min={0} inputMode="numeric"
+                  <input className="form-input" type="number" min={0} max={4294967295} inputMode="numeric"
                     value={form.media.imageSeed}
                     disabled={isGenerating || form.media.aiImages === "none" || !selectedImageModel.seed}
                     onChange={e => setMedia("imageSeed", e.target.value)}
@@ -2244,6 +2249,21 @@ export default function ContentStudio() {
                   fontSize: "12px", color: heroImageUrl ? "#16a34a" : "#0284c7",
                 }}>
                   {heroLoading ? "🖼️ 正在生成精選圖片（featured image）…" : "🖼️ 精選圖片已就緒，發佈時自動設為文章首圖"}
+                </div>
+              )}
+
+              {/* ── 圖片生成警告（ok:false / 連線失敗 / 參考圖被拒）── */}
+              {imgGenWarn && (
+                <div style={{
+                  marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
+                  background: "#fffbeb", border: "1px solid #fde68a",
+                  fontSize: "12px", color: "#b45309",
+                  display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px",
+                }}>
+                  <span>⚠️ {imgGenWarn}</span>
+                  <button type="button" onClick={() => setImgGenWarn("")}
+                    style={{ background: "none", border: "none", color: "#b45309", cursor: "pointer", fontSize: "14px", lineHeight: 1, padding: 0 }}
+                    aria-label="關閉警告">×</button>
                 </div>
               )}
 

@@ -12,7 +12,6 @@ import {
   parseImageDataUrl,
   buildDesignKey,
   putDesignObject,
-  getDesignsPublicBase,
 } from "@/lib/storage/r2";
 
 export const runtime = "nodejs";
@@ -128,7 +127,9 @@ export async function POST(req: Request): Promise<Response> {
   // Style modifier (already resolved to an English style prompt by the client from STYLE_CATALOG).
   // When present, let the art style drive; otherwise keep the original social-graphic enhancement so
   // existing no-style behaviour is unchanged.
-  const styleMod = typeof body.imageStyle === "string" ? body.imageStyle.trim() : "";
+  // Bound the style modifier — it's an English style prompt resolved client-side from STYLE_CATALOG,
+  // but a hostile / buggy caller could send arbitrary length; 600 chars is far above any real preset.
+  const styleMod = (typeof body.imageStyle === "string" ? body.imageStyle.trim() : "").slice(0, 600);
   const finalPrompt = styleMod
     ? `${prompt}, ${styleMod}`
     : `${prompt}, professional social media graphic, high quality, clean composition, no text overlay`;
@@ -149,7 +150,9 @@ export async function POST(req: Request): Promise<Response> {
       const key = buildDesignKey(parsed.mime);
       if (key) {
         const put = await putDesignObject(key, parsed.buffer, parsed.mime);
-        imageUrl = put.ok ? put.publicUrl : `${getDesignsPublicBase()}/${key}`;
+        // Only swap in the public URL on a confirmed write. On failure keep the data URL (imageUrl
+        // already = result.image) — synthesizing `${base}/${key}` would hand back a 404 dead link.
+        if (put.ok) imageUrl = put.publicUrl;
       }
     }
   }

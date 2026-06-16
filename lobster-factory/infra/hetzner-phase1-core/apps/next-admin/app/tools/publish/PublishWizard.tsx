@@ -234,19 +234,18 @@ export default function PublishWizard() {
       metaDescription: string; shortDescriptionHtml: string; bullets: string[];
     };
     const rm = json.rankMath as RankMathReport | undefined;
-    // Never-regress guard: a fix is a full re-roll, so a fresh generation can score LOWER than the
-    // version on screen (stochastic). If so, KEEP the current copy and discard the re-roll — the
-    // operator never loses ground by clicking 「AI 自動修正」. Read the live score via copyRef (not the
-    // `copy` closure, which is stale inside this useCallback).
-    if (isFix) {
-      const prevScore = copyRef.current.rankMath?.score ?? -1;
-      const newScore = rm?.score ?? -1;
-      if (prevScore >= 0 && newScore < prevScore) {
-        return {
-          ok: true,
-          message: `重生${newScore < 0 ? "未取得分數" : ` ${newScore} 分`}未超過原版，保留 ${prevScore} 分`,
-        };
-      }
+    // Never-regress guard (fix path only): a fix is a full re-roll, so a fresh generation is stochastic.
+    // Rule: adopt the re-roll ONLY when it scores STRICTLY higher than what's on screen — equal or lower
+    // keeps the current copy. (Equal score = no improvement, so don't churn the operator's copy for a
+    // wash.) Capture the on-screen score BEFORE mutating, via copyRef (the `copy` closure is stale inside
+    // this useCallback). (-1 prevScore = first fix / no baseline → always adopt.)
+    const prevScore = isFix ? copyRef.current.rankMath?.score ?? -1 : -1;
+    const newScore = rm?.score ?? -1;
+    if (isFix && prevScore >= 0 && newScore <= prevScore) {
+      return {
+        ok: true,
+        message: `重生${newScore < 0 ? "未取得分數" : ` ${newScore} 分`}未超過原版，保留 ${prevScore} 分`,
+      };
     }
     // Fill the product title if the operator left it blank — never overwrite their input.
     setTitle((prev) => (prev.trim().length === 0 ? c.productTitle : prev));
@@ -259,16 +258,9 @@ export default function PublishWizard() {
       bullets: c.bullets,
       rankMath: rm,
     });
+    // Reached only on a strictly-better re-roll (or the first generation with no prior baseline).
     if (isFix) {
-      const prevScore = copyRef.current.rankMath?.score ?? -1;
-      const newScore = rm?.score ?? -1;
-      const message =
-        prevScore < 0
-          ? undefined
-          : newScore > prevScore
-            ? `${prevScore} → ${newScore} ↑`
-            : `維持 ${newScore} 分`;
-      return { ok: true, message };
+      return { ok: true, message: prevScore < 0 ? undefined : `${prevScore} → ${newScore} ↑` };
     }
     return { ok: true };
   }, [designs, designUrl, title, keywordHint, post]);
