@@ -246,6 +246,15 @@ interface GenerateForm {
 
 interface MetaData { seoTitle: string; metaDesc: string; focusKeyword?: string; categories?: string[]; tags?: string[]; }
 
+// #5 — shape returned by /api/content/market-analysis (mirrors its MarketAnalysis interface).
+interface MarketAnalysisResult {
+  competitors: string[];
+  painPoints: string[];
+  searchIntent: string[];
+  objections: string[];
+  differentiators: string[];
+}
+
 // Light row from GET /api/content/drafts (list). Full draft (markdown + form snapshot) is fetched
 // on-demand via GET ?id=. See migration 0041_content_drafts.sql + app/api/content/drafts/route.ts.
 interface DraftListItem {
@@ -278,6 +287,25 @@ interface BulkRow {
 type BulkSettings = Omit<GenerateForm, "keyword" | "title" | "scheduleDate" | "nlpKeywords" | "outline" | "internalLinks" | "referenceUrls">;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// #4 — compile the structured marketing brief into a human-readable instruction block that gets
+// prepended to `details`. Returns "" when nothing is filled in, so an empty brief adds nothing.
+function compileMarketingBrief(m: MarketingBrief): string {
+  const stageLabel = FUNNEL_STAGES.find(s => s.value === m.funnelStage)?.label ?? "";
+  const priceLabel = PRICE_POSITIONS.find(p => p.value === m.pricePositioning)?.label ?? "";
+  const rows: string[] = [];
+  if (m.audience.trim())          rows.push(`目標受眾: ${m.audience.trim()}`);
+  if (m.positioning.trim())       rows.push(`品牌定位: ${m.positioning.trim()}`);
+  if (m.usp.trim())               rows.push(`獨特賣點/差異化: ${m.usp.trim()}`);
+  if (m.funnelStage)              rows.push(`漏斗階段: ${stageLabel}（請對齊此階段的讀者心態與行動呼籲）`);
+  if (m.primaryCta.trim())        rows.push(`主要行動呼籲 (CTA): ${m.primaryCta.trim()}`);
+  if (m.emotionalTriggers.trim()) rows.push(`情緒觸發點/讀者渴望: ${m.emotionalTriggers.trim()}`);
+  if (m.objections.trim())        rows.push(`需化解的疑慮/抗拒點: ${m.objections.trim()}`);
+  if (m.pricePositioning)         rows.push(`價格定位: ${priceLabel}`);
+  if (m.forbiddenClaims.trim())   rows.push(`避免使用/禁用聲明: ${m.forbiddenClaims.trim()}`);
+  if (rows.length === 0) return "";
+  return ["=== 行銷簡報 (Marketing Brief) — 依此精準打中目標、提高轉換 ===", ...rows, "=== END 行銷簡報 ==="].join("\n");
+}
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").slice(0, 60);
@@ -402,6 +430,17 @@ export default function ContentStudio() {
   const [bvError,           setBvError]           = useState("");
   const [bvApplied,         setBvApplied]         = useState(false);
 
+  // #5 — Competitor & pain-point analysis (Perplexity-backed /api/content/market-analysis)
+  const [showMarket,     setShowMarket]     = useState(false);
+  const [marketLoading,  setMarketLoading]  = useState(false);
+  const [marketAnalysis, setMarketAnalysis] = useState<MarketAnalysisResult | null>(null);
+  const [marketContext,  setMarketContext]  = useState(""); // ready-to-inject block; sent with generate
+  const [marketError,    setMarketError]    = useState("");
+
+  // #6 — Available Kadence synced patterns on the target site (/api/content/patterns)
+  const [availablePatterns, setAvailablePatterns] = useState<Array<{ id: number; title: string }>>([]);
+  const [patternsLoading,   setPatternsLoading]   = useState(false);
+
   // Trending keywords panel
   const [showTrending,    setShowTrending]    = useState(false);
   const [trendGeo,        setTrendGeo]        = useState("TW");
@@ -493,6 +532,8 @@ export default function ContentStudio() {
   const [showStruct,   setShowStruct]   = useState(true);
   const [showMedia,    setShowMedia]    = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showMarketing, setShowMarketing] = useState(false); // #4 structured brand-tone form
+  const [showPatterns, setShowPatterns] = useState(false);   // #6 Kadence funnel patterns
 
   // Syndication
   const [showSyn,     setShowSyn]     = useState(false);
@@ -587,6 +628,11 @@ export default function ContentStudio() {
   const setMedia = useCallback(
     <K extends keyof MediaHub>(key: K, value: MediaHub[K]) =>
       setForm(prev => ({ ...prev, media: { ...prev.media, [key]: value } })),
+    []
+  );
+  const setMkt = useCallback(
+    <K extends keyof MarketingBrief>(key: K, value: MarketingBrief[K]) =>
+      setForm(prev => ({ ...prev, marketing: { ...prev.marketing, [key]: value } })),
     []
   );
 
@@ -734,6 +780,11 @@ export default function ContentStudio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showTrending, trendTab]);
 
+  // #6 — (re)load available Kadence patterns when the funnel section is open and the target site changes.
+  useEffect(() => {
+    if (showPatterns) void loadPatterns();
+  }, [showPatterns, loadPatterns]);
+
   // ─── Brand Voice ─────────────────────────────────────────────────────────
 
   async function handleAnalyzeBrandVoice() {
@@ -758,6 +809,36 @@ export default function ContentStudio() {
     setF("details", existing ? `${existing}\n\n${voiceBlock}` : voiceBlock);
     setBvApplied(true);
   }
+
+  // ─── #5 Market analysis (competitor + pain-point) ──────────────────────────
+
+  async function handleMarketAnalysis() {
+    if (!form.keyword.trim() || marketLoading) return;
+    setMarketLoading(true); setMarketError(""); setMarketAnalysis(null); setMarketContext("");
+    const brand = bvProfileName || (wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.name || "";
+    try {
+      const res  = await fetch("/api/content/market-analysis", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyword: form.keyword, brand, audience: form.marketing.audience, language: form.language }),
+      });
+      const json = await res.json() as { ok: boolean; analysis?: MarketAnalysisResult; context?: string; error?: string };
+      if (!json.ok || !json.analysis) { setMarketError(json.error ?? "分析失敗"); }
+      else { setMarketAnalysis(json.analysis); setMarketContext(json.context ?? ""); }
+    } catch { setMarketError("網路錯誤，請重試"); }
+    finally { setMarketLoading(false); }
+  }
+
+  // ─── #6 Load available Kadence synced patterns for the selected site ───────
+
+  const loadPatterns = useCallback(async () => {
+    setPatternsLoading(true);
+    try {
+      const res  = await fetch(`/api/content/patterns${selectedSiteId ? `?siteId=${encodeURIComponent(selectedSiteId)}` : ""}`);
+      const json = await res.json() as { ok: boolean; patterns?: Array<{ id: number; title: string }> };
+      if (json.ok && json.patterns) setAvailablePatterns(json.patterns);
+    } catch { /* silent — funnel patterns are optional */ }
+    finally { setPatternsLoading(false); }
+  }, [selectedSiteId]);
 
   // ─── Image Generation ─────────────────────────────────────────────────────
 
