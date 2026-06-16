@@ -4,6 +4,30 @@
 
 ## 2026-06-16
 
+### feat(content-blocks): P4 — `byKind()` headless 編排器（article→quality→publish 跑通成 WP draft）
+
+**[任務理解]** Content Pipeline Blocks 主計畫 T1 鎖定順序 P4：把 P1–P3 抽好的 dormant 積木（`article/generate`/`quality/check`/`publish/wordpress`）接進一條 headless 管線，端到端「文章→品質→WP draft」。原則：**編排器零改積木契約**——只多三行 side-effect import 讓積木自註冊（README 契約「加新積木 = 新檔 register() 一次；編排器永遠不改，只新增 import」）。**LIVE 端到端跑（真 token + 真寫客戶 WP draft）非本 build 範圍**，另需 go-ahead。
+
+**[現況分析（VBC）]** `git log` → 近期皆 checkpoint + image-model 無關改動（b2bdbfe8/868bdf79），無並行 session 動 pipeline。三積木回**不同形狀的 discriminated-union**（article→`{ok,markdown}`、quality→`{ok,report}`、publish→`{ok,post_id,wire}`），共享 `ok` 判別子 → 編排器須逐階段檢 `ok` 短路。**search 不入迴圈**：search 積木回 `TrendingItem[]`（彙整型，`runTrending`），與 `{ok}`-union 形狀不相容 → 誠實修正 §10「search→…」措辭：search 是上游 producer，呼叫端先 `runTrending` 選題、再把 keyword 餵進管線。`tsconfig strict:false` → `!ok` 不 narrow，用 runtime 形狀防護 + cast。**draft-first 紅線**（R2）寫死在 `wordpress-core.ts:370/:402` `status:"draft"`，pipeline 不可達不可改（critic 已驗未繞過）。R8/R9（Semantic Coverage / per-client distinctiveness gate）屬 P9，本檔不做。
+
+**[已修改]**
+1. `lib/content/pipeline.ts`（**新**）— headless 編排器 `runContentPipeline(input, opts)`：3 行 side-effect import 自註冊積木；`DEFAULT_STAGES=["article","quality","publish"]`；`ctx={...input}`（caller input 不被改）；`focusKeyword == null` 鬆散預設沿用 `keyword`（保留空字串=錯誤語意）；逐階段 `byKind(kind)` → **一 kind 一積木**（取 `blocks[0]`，>1 則 `console.warn` 並忽略其餘，避免靜默重複發佈）→ try/catch 防 throw（→500）→ 形狀防護（null/非物件/`ok!==true` → 短路，status 取 `out?.status||500`）→ `mergeStageOutput`（article→`ctx.markdown`、quality→`ctx.qualityReport`、publish 終端）→ 成功 push record。`stopBefore` 安全用途（跑到品質就停不寫 WP）。
+2. **critic M1（Major，已修）**：generate-core 在 stream truncate/error 時仍回 `ok:true`、把 `<!-- GENERATION_TRUNCATED:` / `<!-- GENERATION_ERROR:` marker 嵌進 markdown 字串（generate-core.ts:590/597）→ headless 自走會把殘缺稿當成功發佈。pipeline.ts article 階段合併後**後驗** `/<!-- GENERATION_(ERROR|TRUNCATED):/`，命中即短路 `failedStage:"article"` status 502，不續跑 quality/publish。
+3. **critic M2（Minor，已修）**：原 `for (const block of blocks)` 會跑某 kind 全部積木、publish 只留最後一筆 → 改取 `blocks[0]` + >1 告警（線性資料流契約：單鏈非 fan-out）。
+4. **critic M3（Minor，已修）**：article 回 `ok:true` 但 markdown 非可用字串 → 顯式短路 `failedStage:"article"` 502（不誤歸因給 quality 的「markdown required」400）。
+5. **R4 stale-claim 修（同 commit）**：3 積木檔頭註解「目前尚未接進 `byKind(...)` 編排器（屬 P4）」→「P4 已接進…（`pipeline.ts` side-effect import）」（article-generate.ts:10、publish-wordpress.ts:9、seo-check.ts:9）。
+6. 主計畫 §0.5 P4 🔲→✅ + §2 diagram（article/quality/publish ✅ 收斂、video ❌ P7）+ §3（新增 `runContentPipeline` 編排器列）+ §10 P4 列；`agency-os/TASKS.md:77` P4 接線完成註。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin 全專案）| exit=0 — 控制流重構後型別 0 錯。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx p4_pipeline_realtest.ts`（offline、零 token、零 WP 寫，stub 三積木經 `register()` id-replace）| exit=0 | cases=44/44 PASS — S0 真積木自註冊；S1 happy path（markdown 串接 article→quality→publish、focusKeyword 由 keyword 預設）；S2 article 失敗短路（下游不跑）；S3 quality 失敗短路 publish 前；S4 stopBefore publish（不寫 WP）；S5 malformed undefined→500；S6 throw→catch 500；**S7 M1 marker（TRUNCATED+ERROR 兩變體）→article 502 短路、publish 不跑**；**S8 M3 ok 但無/非字串 markdown→article 502（非誤歸 quality）**；**S9 M2 兩 publish 積木→只跑首個 + warn（無靜默雙發）**。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — 外部 oracle 二輪複審：確認 M1/M2/M3 實質修復（逐行 trace 對照 generate-core marker 字面）、三短路皆 `return` 非 `break`、empty-array guard 在 `blocks[0]` 前（無 undefined-deref）、ctx 隔離保留、**draft-first 紅線未繞過**（pipeline 不注入非 draft status）、focusKeyword `== null` 正確、publish 單積木 path 正確 record+save publishResult、無下游 consumer 回歸（`runContentPipeline` 全 repo hits=1 自身）。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`runContentPipeline\|PipelineStageKind\|尚未接進\|屬 P4` | hits=0(殘留) — `runContentPipeline`/`PipelineStageKind` 命中皆在 pipeline.ts 自身（無外部 caller）；3 積木檔「尚未接進…屬 P4」stale 聲稱全修；scripts=0。
+
+**[剩餘風險]** ① **LIVE 端到端跑未執行**（真 Claude token + 真寫客戶 WP draft）——Med-High，刻意 hold 待 go-ahead，非 P4 build 範圍。② R8/R9 語意覆蓋/per-client distinctiveness gate 屬 P9，本管線不 gate 品質（只附 `qualityReport`）。③ 一 kind 一積木設計：未來若要 fan-out（多 publish 目標）須改編排器（目前 warn+取首個）。④ search 為上游 producer，呼叫端須自行 `runTrending` 選題餵 keyword（管線不含 search 階段）。
+
+**[rollback]** `git revert <本 commit>`；`pipeline.ts` 為新增檔（刪除即移除接線，三積木回 dormant，route/UI 行為零影響）；3 積木檔僅註解改動，無邏輯變更。
+
 ### fix(content-studio): U-Width 補完 — 熱門搜尋 + 文章設定 兩塊加寬（產文頁全寬一致）
 
 **[任務理解]** 部署上線後操作者再抓：產文頁「熱門搜尋/關鍵字探索」+「文章設定」仍窄（640px），與全寬的 SectionToggle 區段（Structure/Media…）視覺不一致。上輪 U-Width 只加寬發布設定+產出文章，漏這兩塊。

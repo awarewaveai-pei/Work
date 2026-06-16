@@ -101,7 +101,8 @@
 │
 └─ 積木 registry 層（registry.ts）── headless 自動化骨架
      byKind("search") ✅ 已收斂（5 積木：google-news/reddit/ptt/perplexity/env-feeds + DB 臨時源）
-     byKind("article"|"quality"|"video"|"publish") ❌ 尚未收斂
+     byKind("article"|"quality"|"publish") ✅ P4 已收斂進 pipeline.ts（headless article→quality→publish→WP draft）
+     byKind("video") ❌ 尚未收斂（P7）
 ```
 
 **收斂方法（零重複的關鍵）**：route 目前邏輯內嵌在 handler。要包成積木又不重複 → **抽共用 core**：把 route 核心邏輯抽成 `lib/content/<kind>/*-core.ts` 純函式，**route handler 與新積木都 import 同一個 core**。route 對 UI 行為完全不變，積木讓 `byKind()` 也能在 headless 管線跑同一段邏輯。這是「行為保留重構（behavior-preserving refactor）」，非重寫。
@@ -115,7 +116,8 @@
 |---|---|
 | `BlockKind = search\|article\|video\|quality\|publish\|product` | registry.ts:18 |
 | `register()` / `byKind()` / `listAll()` / `geoMatch()` | registry.ts:40 / :51 / :56 / :66 |
-| 編排器：`for (const b of byKind(kind)) ctx = await b.run(ctx)` | registry.ts:13-15 |
+| 編排器骨架範例 | registry.ts:13-15 |
+| **P4 實際 headless 編排器** `runContentPipeline()`（article→quality→publish，逐階段 `ok` 短路 + try/catch + 形狀防護 + article GENERATION marker 後驗）| `lib/content/pipeline.ts:89` |
 
 ### search ✅（唯一已收斂的積木家族，`lib/content/trending-sources.ts`）
 | 積木 | file:line |
@@ -266,7 +268,7 @@
 | **P1** | 抽 `publish/wordpress` core + 包積木（行為保留，route 不變）| Low-Med | 是 |
 | **P2** | 抽 `article/generate` core + 包積木 | Low-Med | 是 |
 | **P3** | 抽 `quality/check`（seo-check）core + 包積木 | Low | 否（新增非破壞）|
-| **P4** | `byKind()` 串 search→article→quality→publish，端到端 headless 跑通「文章→品質→WP draft」| Med | 是 |
+| **P4 ✅** | `byKind()` 串 article→quality→publish headless 跑通「文章→品質→WP draft」（`pipeline.ts`；search 改列上游 producer，不入迴圈）。**活化 LIVE 端到端跑（真 token + 真寫客戶 WP draft）另需 go-ahead，非 P4 build 範圍** | Med | 是（已 ✓） |
 | **P5** | `publish/social`：`lib/content/postiz.ts` + `/api/content/social-publish`（draft 預設）接 Postiz | **Med-High** | 是（憑證）|
 | **P6** | **刪** Python publisher.py 直連（grep 確認無 caller）| Med | 是（刪碼）|
 | **P7** | `video/pipeline` block 介面 + Python 微服務骨架（圖→TTS→ffmpeg，本機驗證）| Med | 是 |
