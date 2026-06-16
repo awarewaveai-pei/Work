@@ -26,7 +26,7 @@
 - REALTEST_EVIDENCE: tool=curl | cmd=`GET soulful /wp/v2/categories` | exit=0 | 回真實分類（AI Drafts/Art Therapy/…）；`/wp/v2/blocks` 無 auth 回空陣列（驗 no-token guard 正確）
 - REALTEST_EVIDENCE: tool=Bash | cmd=Perplexity sonar market-analysis prompt | exit=0 | `PARSE_OK` 五 key 齊、真實痛點內容
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content app/tools/content` | exit=0 | 42 tests pass（含新增 3 個 #6 pattern 測試）
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/4n — 全部修正（mid-stream OpenAI error frame 偵測、siteUrl 資訊揭露移除、SSE 單行假設文件化、entity decode 共用化、patternCount NaN guard、isOpenAiModel 死碼簡化）
+- REVIEW_DONE: critic=Deep×2 | verdict=pass | 第一輪 0c/3m/4n + 第二輪 0c/1m/2n — 全部修正。第一輪：mid-stream OpenAI error frame 偵測、siteUrl 揭露移除、SSE 單行假設文件化、entity decode 共用化(新 wp-entities.ts)、patternCount NaN guard、isOpenAiModel 死碼簡化。第二輪（驗最終狀態+新檔）抓到**真 Major**：`resolveTermIds`(wordpress-core:275) 拿解碼後 AI 分類名比對 WP 編碼 `t.name` → 不符建重複（#3 在 REST 路徑復發）→ 修為 `decodeWpEntities(t.name)` 比對；+ wp-entities 單次解碼意圖註記、generate body 剝 imageRefData。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`marketContext\|patternCount\|existingCategories\|KADENCE_PATTERN\|isOpenAiModel\|streamOpenAiGeneration\|compileMarketingBrief\|api/content/(categories\|patterns\|market-analysis)` | hits=7 — 全部侷限在改/建的檔，無外部 stale call site、無 downstream consumer 需同步（headless block 走同一 core，新欄位皆 optional 透明）
 
 **[剩餘風險]** ⚠️ **vault `OPENAI_API_KEY` 直連 401 失效**（與同日 video-service 發現一致：直連 key 默默過期）→ GPT 程式碼正確且優雅降級（401 yield `GENERATION_ERROR`、UI 顯示錯誤、Claude 不受影響），但**GPT 實際生成在使用者刷新 key 前無法運作**。GPT model id（gpt-5.5/5.4/mini/4o）因 key 401 無法對帳，刷新後須確認帳號實際可用 id。#6 完整 pattern 清單需帶 token/部署後驗（無 token 時站上 blocks 不可見）。**未部署**：全部須 sg-deploy；#6 另需 wp-bridge 0.12.0 release。
