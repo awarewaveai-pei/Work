@@ -1,7 +1,7 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-06-16 08:34:38
-- agency-os root: `D:\Work\agency-os`
+- Generated: 2026-06-16 15:29:22
+- agency-os root: `C:\Users\USER\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
 >
@@ -23,7 +23,7 @@
 ## 3) Lobster Factory Master Checklist - open items (sections A-C, before section D)
 - [ ] A7. 串接 WordPress 真正 provision/shell execution（仍須 guardrails；**manifest 套用 shell 已具備**，全站自動建站仍待 hosting adapter）→ 對應 v1.2 Phase 4 - [ ] A10-2. **商業閉環**：新客戶從建立→驗收 + 生產 Trigger 全鏈固定證據（對齊 `agency-os/tenants/NEW_TENANT_ONBOARDING_SOP.md` 實跑）→ 對應 v1.2 Phase 4 + Section 8 - [ ] A11. **制度治理層**（v2.0 新增）：補齊 v1.2 新增 12 個制度章節對應的 schema、policy、docs → 見 C6、C7 - [ ] **C5-1.** Observability：Sentry（錯誤追蹤）+ PostHog（產品分析）→ v1.2 Phase 7 - [ ] **C5-2.** Edge/Security：Cloudflare（WAF/CDN/Rate limit）→ v1.2 Section 3 + 22 - [ ] **C5-3.** Secrets：1Password Secrets Automation（或同級）→ v1.2 Section 3 Secrets Manager - [ ] **C5-4.** Identity/Org：Clerk/WorkOS/Auth0（三選一）→ v1.2 Section 15.1 - [ ] **C5-5.** Cost/Decision：成本與決策引擎可觀測化（budget/ROI guardrails）→ v1.2 Section 25 + 36 - [ ] **C5-6.** 後續建議：Langfuse / Upstash / Stripe / Object Storage / Search - [ ] **C6-1.** Canonical Naming Policy 文件 + 命名 audit script - [ ] **C6-2.** Environment & Release Policy + Change Freeze 機制 - [ ] **C6-3.** Backup & DR Policy + restore 測試程序 - [ ] **C6-4.** Idempotency Keys + Resource Locking - [ ] **C6-5.** Plugin Registry + Plugin License Governance - [ ] **C6-6.** Domain / DNS / Email Deliverability Policy - [ ] **C6-7.** Testing Strategy — Contract Tests for ProviderAdapters - [ ] **C6-8.** Client Data Lifecycle + Offboarding Workflow - [ ] **C6-9.** Cost Allocation + Profitability Snapshots - [ ] **C6-10.** Client Communication Policy + Notification Templates - [ ] **C6-11.** Architecture Decision Records（第一批 10 個） - [ ] **C6-12.** Known Conflicts Log 文件（跨版本矛盾追蹤） - [ ] **`0010_release_freezes.sql`**（C6-2） - [ ] **`0011_restore_runs.sql`**（C6-3） - [ ] **`0012_idempotency_and_locks.sql`**（C6-4） - [ ] **`0013_plugin_registry.sql`**（C6-5） - [ ] **`0014_domains_dns.sql`**（C6-6） - [ ] **`0015_client_offboarding.sql`**（C6-8）
 
-*Checklist path:* `D:\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
+*Checklist path:* `C:\Users\USER\Work\lobster-factory\docs\LOBSTER_FACTORY_MASTER_CHECKLIST_v2.md`
 
 ## 4) memory/CONVERSATION_MEMORY.md (excerpts)
 
@@ -225,6 +225,16 @@
 ## Done today
 （窗：上次 AO-CLOSE 2026-06-15 17:30 → 本次 2026-06-16 08:2x；全為 06-16 凌晨主線）
 
+### AO-CLOSE 15:xx addendum — full window since last AO-RESUME
+（窗：上次 AO-RESUME `2026-06-11T05:07:44.9574023Z` → 本次 AO-CLOSE；跨 06-11 至 06-16，不限今日）
+
+- **POD / Printful / WooCommerce**：POD Studio 從生成器、去背、Mockup、PrintProvider sync、R2 gallery、Publish page 到 wp-bridge product path 全線推進；A1 native store 一鍵建品 live + hardening；A2 Woo paid-order webhook 已部署但 dormant，只會建 Printful DRAFT，confirm/扣款/送印紅線未建。
+- **Content Engine / Content Studio**：RankMath CJK/title 合規、WP Bridge publish path、featured hero/ILJ/power words、YouTube embed、keyword outline、真實 related-posts、假內連防禦、截斷 guard、structure toggle 正向強制、AI Models guide、USD cost SSOT、FLUX Kontext、mockup descriptors、Brand Voice 自動帶入、Media Hub 生圖積木等均已落地。
+- **Content blocks registry**：search registry live；product-copy / quality/check block 驗證；P4 headless pipeline 已能 article -> quality -> publish -> WP draft；Media Hub 5 模型/風格/img2img/seed 已整合。
+- **Canvas / browser testing**：新增 `/browser-test` command + AGENTS trigger；Canvas e2e 與 Mockup Studio 驗證債清零，剩下 mockup 若仍異常需操作者提供具體畫面/console/network。
+- **Ops / infra / governance**：archive-lift/git-log/verify-gate 風險分層修正；doc-sync LiteralPath 修紅字；SystemGuard registrar 改 Register-ScheduledTask；Trigger MCP fallback 修；self-hosted runner + workflow_dispatch deploy；origin lockdown scanner；GHA deploy events to ops-inbox；Telegram `/deploy_status`。
+- **Security**：Defender incident 已入 TASKS 明日正式資安複盤；目前 threat inactive/non-executed，但仍要清 temp ps1、審 registrar/launcher、驗 scheduled task action、評估 hook 升級。
+
 **Content Engine（generate 品質鏈，已部署 SG）**
 - 品質修正包 `1e1d55cf`：截斷修正（SIZE_TOKENS 2048/4096/6144→4096/8192/16384 + CONTENT_META 移到文章最前，body 截斷仍保住 SEO 標題/描述）+ 內連防造假護欄（兩分支）+ 新 `related-posts/route.ts`（查真站 posts+pages 回真實 permalink）+ streaming 截斷偵測 marker。critic Deep 2 Major 全修（GENERATION_ERROR 剝除 + bulk path + publish 防禦縱深）。
 - 結構開關「Yes」正面強制 `fd965dbc`：TABLES/FAQ/QUOTES 勾了卻沒出 → generate route 加 `REQUIRED ELEMENTS` 硬 MUST。REALTEST 真打 Haiku 全 PASS。
@@ -368,6 +378,11 @@
 - `D:\Work\lobster-factory\infra\hetzner-phase1-core\apps\next-admin\app\api\content\generate\route.ts`
 - `D:\tmp\test-struct.py`
 
+
+### verify-recent --ack (2026-06-16T05:38:19.6208596Z)
+
+_... 13 lines omitted._
+
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
@@ -389,7 +404,6 @@
 - No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-
 ## 2026-06-14 fix(publish): excerpt + YouTube placeholder
 
 ### [已修改]
@@ -447,5 +461,6 @@
 - REALTEST_EVIDENCE: tool=PowerShell | cmd=`curl.exe -I https://app.aware-wave.com/tools/ai-models` | exit=0 | result=307 to `/login?next=%2Ftools%2Fai-models` as expected behind auth; `/login` returns 200
 - REVIEW_WAIVED: CONTENT_DATA_UI -- static comparison page + typed data tables; build/typecheck/deploy smoke covered runtime integration
 - BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=`78 張約|全套成本|fullDeckNt|15 個圖片模型比較` | hits=0 after moving comparison out of Tarot and using per-image cost only
+
 
 

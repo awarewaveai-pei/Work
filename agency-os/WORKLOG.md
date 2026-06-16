@@ -4,6 +4,13 @@
 
 ## 2026-06-16
 
+### AO-CLOSE task sync — 15:xx session close
+
+- AUTO_TASK_DONE_APPLIED (2026-06-16T07:27:00Z): Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測
+- REALTEST_WAIVED: DOC_ONLY -- AO-CLOSE delta is closeout prose, memory/daily updates, generated status reports, and doc-sync mirror output; `ao-close.ps1` already ran verify-build-gates and health with score 100% (366/366) before the completeness gate.
+- REVIEW_WAIVED: DOC_ONLY -- no new application logic in this closeout delta; staged non-code/doc-sync/status changes are mechanical closeout artifacts plus hand-written summaries.
+- BUGHUNT_WAIVED: DOC_ONLY -- no symbol, schema, route, or runtime behavior change introduced by this closeout delta; stale-reference search is not applicable to generated doc/status output.
+
 ### fix(seo-panel): /tools/publish SEO 面板修正到完美 — 圓環儀表重設計 + AI 修正永不退步 + 4 客觀缺陷修
 
 **[任務理解]** 操作者：「把這個設計修正到完美」，範圍選定「全修 + 視覺重新設計」→ 方向 A（圓環儀表）。4 客觀缺陷：① AI 自動修正非單調（80→90→80，全重生機制使分數可倒退）→ 改永不退步；② na 列「不適用」雙重冗字；③ 寫死色 `#22c55e`/`#f97316` 脫離 app 自身色階（系統 green=`#10b981`、amber=`#f59e0b`，舊色更亮不一致）；④ `PublishWizard` dead state 欄位 `rankGrade`/`rankScore`（前 WORKLOG 06-16:116/136 剩餘風險②③標「留待後續清/已知接受」，本檔即收斂該兩項）。
@@ -10343,7 +10350,30 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-16 00:31:38 UTC_
+_Last synced: 2026-06-16 07:29:11 UTC_
+
+## 2026-06-16 AO-CLOSE prep — 15:xx session close
+
+### [Session window]
+- Last AO-RESUME marker: `2026-06-11T05:07:44.9574023Z`; this closeout covers the full 2026-06-11 afternoon through 2026-06-16 afternoon window, not just today's work.
+
+### [Completed this window]
+- POD Studio / Printful chain advanced from P2b/P2c/P2d to live Publish flow: Studio facade, remove-bg, Mockup Studio, PrintProvider sync route, R2 gallery, Publish page, wp-bridge product path, deployment evidence, and #7164 follow-up handoff all recorded.
+- Content Studio / Content Engine deepened: RankMath CJK compliance, WP Bridge publish path, featured hero / ILJ / power words, YouTube embeds, keyword-enforced editable outline, title route compliance, fake internal-link prevention, related-posts real permalink lookup, truncation guard, and structure toggle positive enforcement.
+- POD A1/A2: native store one-click product creation moved live, A1 hardening landed, Woo paid-order webhook now creates Printful DRAFT only behind `POD_AUTO_FULFILL_ENABLED` kill-switch; confirm/auto-charge path intentionally not built.
+- Canvas / Mockup verification wave: browser-test command and AGENTS trigger were added; Canvas e2e and mockup studio verification debt were checkpointed as cleared, with later mockup task narrowed to operator-symptom collection only.
+- Content blocks registry moved forward: search registry live, product-copy / quality blocks verified, P4 headless pipeline wired article -> quality -> publish -> WP draft, and Media Hub generation blocks integrated across 5 models/styles/img2img/seed.
+- Infrastructure / governance: AO archive-lift and git-log window fixes, verify-gate risk-tier routing, health critical repairs, doc-sync LiteralPath fix, SystemGuard scheduled-task registrar rewrite, Trigger MCP pwsh fallback, self-hosted runner / workflow_dispatch deploy path, origin-lockdown scanner work, GHA deploy events to ops-inbox, Telegram `/deploy_status`, and status report refreshes.
+- Security / operations: Defender incident was captured as a formal next-day security follow-up with evidence; Cloudflare vault and SystemGuard company-desktop handoff packets were created; Phase 4 weekly check passed.
+- Product/help surfaces: AI Models guide, USD image-model cost SSOT, structured mockup model descriptor controls, FLUX Kontext Dev/Pro, Brand Voice customer auto-fill, teaser hero Outlook fix, and Content Studio A/B/C rollout notes were added.
+- AUTO_TASK_DONE: Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測
+
+### [Still open]
+- Postiz integration remains open beyond Bluesky E2E: more platforms, API client, account UI, Content Studio real publish panel, onboarding/runbook, and R2 storage upgrade remain.
+- FluentCRM newsletter draft route is WIP and unreleased: bridge route exists locally with php-l checks, but REALTEST, release 0.11.0, next-admin route, and ContentStudio button remain.
+- Content Studio generated drafts are still volatile; Supabase durable drafts vs localStorage autosave is undecided.
+- Trending source expansion still needs either the user's feed/source list or a feed-management UI decision.
+- Defender incident follow-up remains tomorrow's security priority even though current threat state is inactive.
 
 ## 2026-03-20
 
@@ -11444,5 +11474,6 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REALTEST_EVIDENCE: tool=PowerShell | cmd=`curl.exe -I https://app.aware-wave.com/tools/ai-models` | exit=0 | result=307 to `/login?next=%2Ftools%2Fai-models` as expected behind auth; `/login` returns 200
 - REVIEW_WAIVED: CONTENT_DATA_UI -- static comparison page + typed data tables; build/typecheck/deploy smoke covered runtime integration
 - BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=`78 張約|全套成本|fullDeckNt|15 個圖片模型比較` | hits=0 after moving comparison out of Tarot and using per-image cost only
+
 
 

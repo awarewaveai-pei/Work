@@ -500,7 +500,17 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-06-16 00:31:38 UTC_
+_Last synced: 2026-06-16 07:27:18 UTC_
+
+## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
+
+- **POD / Printful / Woo**: POD Studio moved through generator, remove-bg, mockup, PrintProvider sync, R2 gallery, Publish page, and wp-bridge product path. A1 native product creation is live/hardened. A2 Woo paid-order webhook is deployed but dormant: it only creates Printful DRAFT orders behind `POD_AUTO_FULFILL_ENABLED`; no confirm/charge path exists and that remains a red-line future task.
+- **Content engine**: major quality fixes landed: RankMath CJK/title compliance, WP Bridge publish handoff, featured hero / ILJ / power words, YouTube real embeds, keyword-enforced outline, fake internal-link prevention, real related-post lookup, truncation marker/meta-first guard, and positive enforcement for table/FAQ/quote/summary toggles.
+- **Content blocks / studio**: search registry and content block registry are live; product-copy and quality/check blocks were verified; P4 headless pipeline now runs article -> quality -> publish -> WP draft; Media Hub image-generation block integration added 5 models/styles/img2img/seed; UI added AI Models guide, USD cost SSOT, FLUX Kontext Dev/Pro, structured mockup controls, Brand Voice customer auto-fill, and email teaser fixes.
+- **Canvas / browser testing**: browser-test command and AGENTS trigger added; Canvas e2e and mockup studio verification debt were checkpointed as cleared. Remaining mockup task is no longer server-side health; it is waiting for operator symptom details if the UI still misbehaves.
+- **Ops / infra**: closeout/archive-lift/git-log rules repaired; verify-gate risk-tier routing added; doc-sync LiteralPath fix and SystemGuard Register-ScheduledTask rewrite landed; Trigger MCP pwsh fallback fixed; self-hosted runner/workflow_dispatch deploy path and origin-lockdown scanner work landed; GHA deploy events now report to ops-inbox; Telegram `/deploy_status` command added.
+- **Security**: Windows Defender incident captured as formal 2026-06-17 follow-up. Current evidence points to Claude Desktop automation invoking Git Bash + temp ps1 + ExecutionPolicy Bypass + scheduled task test, with Defender showing inactive/non-executed threat after removal and quick scan. Still treat as real incident tomorrow: delete temp script, inspect registrar/launcher, verify live scheduled task action, consider hook escalation.
+- **Open next**: Postiz multi-platform + ContentStudio publish integration; FluentCRM newsletter REALTEST/release/UI; generated draft persistence; trending source expansion; clean old fake-link article; Cloudflare migration billing/DNS steps; POD A1 real e2e and A2 enablement only after operator test/approval.
 
 ## 2026-06-11 — POD Studio 全產線一日上線（P0驗證→P2a/b/c/d→Mockup→一鍵上架→兩輪部署）
 - **P0 擬真合成驗證 PASS**：nano-banana-2 白衫 ~95%/黑衫鎖色後 ~90%。**三鐵則**（深色逐色鎖色／姿勢避遮胸／設計圖走 data URI）已工具化進 mockup-prompt.ts。
