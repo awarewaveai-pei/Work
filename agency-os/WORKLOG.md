@@ -115,6 +115,18 @@
 **[剩餘風險]** 積木 `video-pipeline.ts` 尚未建（Phase 1b）；service→block 介面（subprocess JSON vs HTTP）待定。
 - AUTO_TASK_DONE (2026-06-16): video-service Phase 1a — render-only `render_video()` 入口切出 + run 委派，real-test 通過。
 
+### test(video-service): 完整 topic→影片 e2e 真實驗證通過（refreshed keys）+ dall-e-3 不可用發現
+
+**[現況]** 本機 vault 的 ANTHROPIC/OPENAI 兩把 key 之前 401 → 從 `AWARE_WAVE_CREDENTIALS.md`（信用 SSOT）解析現用 key 刷新 vault（`secrets-vault set`，DPAPI 加密，不回顯不進 git）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`vault run -Names ANTHROPIC,OPENAI -- venv python D:/tmp/vtest_e2e2.py`（主題→Claude 文章+腳本→2 張真 gpt-image-1 圖→Edge TTS→moviepy→ffmpeg）| exit=0 | `REALTEST_E2E_PASS` — 產出真影片四尺寸（YT 3.96MB/TikTok 4.0MB/IG 2.75MB/Twitter 2.14MB），已交付操作者。發佈閘全關。
+- **發現**：① ANTHROPIC key 刷新後生文/腳本正常（8 場景）。② OPENAI key 認證通過但 `dall-e-3` 回 400「model does not exist」→ **本帳號無 dall-e-3 權限、用的是 `gpt-image-1`**（next-admin image-gen 同款）。桌機 monolith `config.IMAGE_MODEL=dall-e-3` + `generate_scene_image`（size 1792x1024/quality standard/讀 url）對 gpt-image-1 全錯（gpt-image-1 用 1536x1024/low-med-high/回 b64）。
+- **結論**：印證 Phase 1b 架構 —— 影片積木的圖**走 next-admin 既有 `generateTarotImage`(gpt-image-1)**，不留 Python 直連。Python `run()` 的 legacy 圖路徑待 Phase 1b 取代（不另修，否則重工）。
+
+**[剩餘風險]** 標準 `run()` 互動工具在 Phase 1b 前無法生圖（dall-e-3 不可用）；要單獨用需先補 gpt-image-1 參數 —— 但既定方向是積木走 next-admin，故不修。
+- AUTO_TASK_DONE (2026-06-17): video-service 完整 topic→影片 e2e 真實驗證通過（真 key+gpt-image-1，影片已交付）；vault key 從信用檔刷新。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
