@@ -98,7 +98,7 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
         position: "absolute", inset: 0,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       }}>
-        <span style={{ fontSize: 20, fontWeight: 600, lineHeight: 1, color: "var(--text-primary)" }}>{score}</span>
+        <span style={{ fontSize: 20, fontWeight: 600, lineHeight: 1, color: "var(--text-primary)" }}>{safe}</span>
         <span style={{ fontSize: 10, color: "var(--text-muted)" }}>/ 100</span>
       </div>
     </div>
