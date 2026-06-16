@@ -353,6 +353,7 @@ export default function ContentStudio() {
   const [showBrandVoice,    setShowBrandVoice]    = useState(false);
   const [bvSampleText,      setBvSampleText]      = useState("");
   const [bvSampleUrl,       setBvSampleUrl]       = useState("");
+  const [bvUrlTouched,      setBvUrlTouched]       = useState(false); // stop auto-fill once operator edits the URL
   const [bvProfileName,     setBvProfileName]     = useState("我的品牌");
   const [bvNameTouched,     setBvNameTouched]     = useState(false); // stop auto-fill once operator edits the name
   const [bvLoading,         setBvLoading]         = useState(false);
@@ -518,6 +519,15 @@ export default function ContentStudio() {
     const site = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
     if (site?.name) setBvProfileName(site.name);
   }, [wpSites, selectedSiteId, bvNameTouched]);
+
+  // #2 — Brand-voice sample URL follows the selected client's site URL (operator reported it was not
+  // auto-filling). We default to the site's /about page (the richest brand-voice source); cleared the
+  // moment the operator edits the field manually (bvUrlTouched). Mirrors the name auto-fill above.
+  useEffect(() => {
+    if (bvUrlTouched) return;
+    const site = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
+    if (site?.url) setBvSampleUrl(`${site.url.replace(/\/$/, "")}/about`);
+  }, [wpSites, selectedSiteId, bvUrlTouched]);
 
   // ─── Form helpers ──────────────────────────────────────────────────────────
 
