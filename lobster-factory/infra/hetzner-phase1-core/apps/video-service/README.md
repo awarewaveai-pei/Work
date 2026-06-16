@@ -32,7 +32,7 @@ controller.py ── 逐題呼叫 ──▶ pipeline.run()
 ## 安裝
 
 ```bash
-cd Projects/internal/youtube-automation
+cd lobster-factory/infra/hetzner-phase1-core/apps/video-service
 
 # 1. 系統依賴
 sudo apt install ffmpeg fonts-noto-cjk      # Windows 請自行安裝 ffmpeg 並加 PATH

@@ -898,9 +898,34 @@ export default function ContentStudio() {
       } catch { /* best-effort: no auto internal links */ }
       const internalLinks = [...new Set([...userInternal, ...autoInternal])].slice(0, 10);
 
+      // #3 — fetch the site's REAL existing categories so the model classifies into them instead of
+      // inventing near-duplicates. Best-effort; failure just falls back to the generic CATEGORIES rule.
+      let existingCategories: string[] = [];
+      try {
+        const cr = await fetch(`/api/content/categories${selectedSiteId ? `?siteId=${encodeURIComponent(selectedSiteId)}` : ""}`);
+        const crJson = await cr.json() as { ok: boolean; categories?: string[] };
+        if (crJson.ok && crJson.categories?.length) existingCategories = crJson.categories;
+      } catch { /* best-effort */ }
+
+      // #4 — fold the structured marketing brief into `details` (backend contract unchanged).
+      const brief = compileMarketingBrief(form.marketing);
+      const rawDetails = form.details.trim();
+      const effectiveDetails = brief ? (rawDetails ? `${brief}\n\n${rawDetails}` : brief) : rawDetails;
+
+      // #6 — only send patterns when the operator asked for ≥1 funnel and the site has patterns.
+      const wantPatterns = form.patternCount > 0 && availablePatterns.length > 0;
+
       const res = await fetch("/api/content/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, externalLinks, internalLinks, referenceUrls }),
+        body: JSON.stringify({
+          ...form,
+          details: effectiveDetails,
+          externalLinks, internalLinks, referenceUrls,
+          existingCategories,              // #3
+          marketContext,                   // #5 (empty unless analysis was run)
+          patterns: wantPatterns ? availablePatterns : [],  // #6
+          patternCount: wantPatterns ? form.patternCount : 0,
+        }),
         signal: ac.signal,
       });
       if (!res.ok || !res.body) { setGenStatus("error"); setGenError(`伺服器錯誤：${res.status}`); return; }
@@ -2244,11 +2269,131 @@ export default function ContentStudio() {
             )}
           </SectionToggle>
 
-          {/* ── 品牌語調 ── */}
-          <SectionToggle label="品牌語調 / 進階指示" open={showAdvanced} onToggle={() => setShowAdvanced(v => !v)}>
+          {/* ── #4 品牌語調 / 精準行銷（結構化表單）── */}
+          <SectionToggle label="🎯 品牌語調 / 精準行銷（填表單，打中目標）" open={showMarketing} onToggle={() => setShowMarketing(v => !v)}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div>
+                <label className="form-label" style={{ marginTop: 0 }}>目標受眾</label>
+                <input className="form-input" value={form.marketing.audience} disabled={isGenerating}
+                  onChange={e => setMkt("audience", e.target.value)} placeholder="例：台灣成人，對表達藝術有興趣" />
+              </div>
+              <div>
+                <label className="form-label" style={{ marginTop: 0 }}>品牌定位（一句話）</label>
+                <input className="form-input" value={form.marketing.positioning} disabled={isGenerating}
+                  onChange={e => setMkt("positioning", e.target.value)} placeholder="例：陪伴而非治療的藝術自我探索空間" />
+              </div>
+              <div>
+                <label className="form-label">獨特賣點 / 差異化（USP）</label>
+                <input className="form-input" value={form.marketing.usp} disabled={isGenerating}
+                  onChange={e => setMkt("usp", e.target.value)} placeholder="例：跨文化、結構化模組、真人帶領" />
+              </div>
+              <div>
+                <label className="form-label">漏斗階段</label>
+                <select className="form-select" value={form.marketing.funnelStage} disabled={isGenerating}
+                  onChange={e => setMkt("funnelStage", e.target.value)}>
+                  {FUNNEL_STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">主要行動呼籲（CTA）</label>
+                <input className="form-input" value={form.marketing.primaryCta} disabled={isGenerating}
+                  onChange={e => setMkt("primaryCta", e.target.value)} placeholder="例：預約免費體驗工作坊" />
+              </div>
+              <div>
+                <label className="form-label">價格定位</label>
+                <select className="form-select" value={form.marketing.pricePositioning} disabled={isGenerating}
+                  onChange={e => setMkt("pricePositioning", e.target.value)}>
+                  {PRICE_POSITIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">情緒觸發點 / 讀者渴望</label>
+                <input className="form-input" value={form.marketing.emotionalTriggers} disabled={isGenerating}
+                  onChange={e => setMkt("emotionalTriggers", e.target.value)} placeholder="例：渴望被理解、想找回創造力" />
+              </div>
+              <div>
+                <label className="form-label">需化解的疑慮 / 抗拒點</label>
+                <input className="form-input" value={form.marketing.objections} disabled={isGenerating}
+                  onChange={e => setMkt("objections", e.target.value)} placeholder="例：我沒有繪畫天份／會不會很貴" />
+              </div>
+            </div>
+            <label className="form-label">避免使用 / 禁用聲明（逗號分隔）</label>
+            <input className="form-input" value={form.marketing.forbiddenClaims} disabled={isGenerating}
+              onChange={e => setMkt("forbiddenClaims", e.target.value)} placeholder="例：治癒, 治療疾病, 保證療效" />
+            <div className="form-hint" style={{ marginTop: 4 }}>此表單會編譯成行銷簡報，連同下方「進階指示」一起注入。留空的欄位不影響。</div>
+          </SectionToggle>
+
+          {/* ── #5 競業與痛點分析 ── */}
+          <SectionToggle label="🔍 競業與痛點分析（多角度市場研究）" open={showMarket} onToggle={() => setShowMarket(v => !v)}>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "8px" }}>
+              <button className="btn-secondary" onClick={handleMarketAnalysis}
+                disabled={marketLoading || !form.keyword.trim()} style={{ fontSize: "12px" }}>
+                {marketLoading ? "分析中（約 10–30 秒）…" : "🔍 分析競業與痛點"}
+              </button>
+              {marketContext && <span style={{ color: "#16a34a", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
+              {marketError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{marketError}</span>}
+            </div>
+            <div className="form-hint">用 Perplexity 即時搜尋，從競爭對手、讀者痛點、搜尋意圖、轉換疑慮、差異化機會五個角度分析，結果會引導文章定位。需先填關鍵字。</div>
+            {marketAnalysis && (
+              <div style={{ marginTop: "12px", display: "grid", gap: "10px", fontSize: "12px" }}>
+                {([
+                  ["讀者痛點", marketAnalysis.painPoints, "#fee2e2", "#991b1b"],
+                  ["搜尋意圖 / 角度", marketAnalysis.searchIntent, "#dbeafe", "#1e40af"],
+                  ["轉換疑慮", marketAnalysis.objections, "#fef3c7", "#92400e"],
+                  ["競爭對手", marketAnalysis.competitors, "#f3e8ff", "#6b21a8"],
+                  ["差異化機會", marketAnalysis.differentiators, "#dcfce7", "#166534"],
+                ] as [string, string[], string, string][]).filter(([, arr]) => arr.length > 0).map(([title, arr, bg, fg]) => (
+                  <div key={title}>
+                    <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>{title}</div>
+                    <div>
+                      {arr.map((x, i) => (
+                        <span key={i} style={{ display: "inline-block", padding: "2px 7px", background: bg, color: fg, borderRadius: "3px", marginRight: "4px", marginBottom: "4px" }}>{x}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionToggle>
+
+          {/* ── #6 Kadence 漏斗 Patterns ── */}
+          <SectionToggle label="🧲 Kadence 漏斗 Patterns（在文章插入 CTA 區塊）" open={showPatterns} onToggle={() => setShowPatterns(v => !v)}>
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", marginBottom: "8px" }}>
+              <div>
+                <label className="form-label" style={{ marginTop: 0 }}>插入數量</label>
+                <select className="form-select" style={{ width: "auto" }} value={String(form.patternCount)} disabled={isGenerating}
+                  onChange={e => setF("patternCount", parseInt(e.target.value, 10))}>
+                  {[0, 1, 2, 3, 4].map(n => <option key={n} value={n}>{n === 0 ? "0（關閉）" : `${n} 個`}</option>)}
+                </select>
+              </div>
+              <button className="btn-secondary" onClick={() => void loadPatterns()} disabled={patternsLoading} style={{ fontSize: "12px" }}>
+                {patternsLoading ? "讀取中…" : "↻ 重新讀取站上 Patterns"}
+              </button>
+            </div>
+            <div className="form-hint">
+              AI 會從下方站上既有的 synced patterns 中，挑選最相關的 {form.patternCount || "N"} 個，插入文章漏斗點（引言後、中段、結論前）。發布時自動轉成真實的 Kadence pattern 區塊。
+            </div>
+            {availablePatterns.length > 0 ? (
+              <div style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {availablePatterns.map(p => (
+                  <span key={p.id} style={{ display: "inline-block", padding: "2px 8px", background: "var(--bg-hover, #f5f5f5)", borderRadius: "4px", fontSize: "12px", color: "var(--text-primary)" }}>
+                    #{p.id} {p.title}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="form-hint" style={{ marginTop: 8, color: "var(--text-muted)" }}>
+                {patternsLoading ? "" : "尚未讀取到 patterns（站台需設定連線權杖；按上方重新讀取）。"}
+              </div>
+            )}
+          </SectionToggle>
+
+          {/* ── 品牌語調（進階 raw，向後相容）── */}
+          <SectionToggle label="品牌語調 / 進階指示（原始文字，選填）" open={showAdvanced} onToggle={() => setShowAdvanced(v => !v)}>
             <textarea className="form-textarea" style={{ minHeight: "90px" }}
               value={form.details} onChange={e => setF("details", e.target.value)} disabled={isGenerating}
               placeholder={`brand_name: "Soulful Expression"\nforbidden_claims: ["治癒", "治療疾病"]\naudience: 台灣成人，對表達藝術有興趣`} />
+            <div className="form-hint" style={{ marginTop: 4 }}>自由文字會接在上方「精準行銷」表單之後一起注入。已用表單者此欄可留空。</div>
           </SectionToggle>
 
           {/* ── 發布設定 ── */}
