@@ -1237,18 +1237,18 @@ export default function ContentStudio() {
             </button>
             {showTrending && (
               <div style={{ display: "flex", gap: "4px" }}>
-                {(["trending", "suggest", "questions"] as const).map(t => (
+                {(["trending", "suggest", "questions", "sources"] as const).map(t => (
                   <button key={t} onClick={() => setTrendTab(t)}
                     style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer",
                       background: trendTab === t ? "var(--btn-primary-bg, #5855d0)" : "var(--bg-card)",
                       color: trendTab === t ? "#fff" : "var(--text-muted)" }}>
-                    {t === "trending" ? "今日熱搜" : t === "suggest" ? "搜尋建議" : "相關問題"}
+                    {t === "trending" ? "今日熱搜" : t === "suggest" ? "搜尋建議" : t === "questions" ? "相關問題" : "⚙️ 管理來源"}
                   </button>
                 ))}
               </div>
             )}
           </div>
-          {showTrending && (
+          {showTrending && trendTab !== "sources" && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               {trendTab === "trending" && (
                 <select value={trendGeo} onChange={e => setTrendGeo(e.target.value)}
@@ -1312,7 +1312,9 @@ export default function ContentStudio() {
               </div>
             )}
             {trendTab === "trending" && trendingItems.length === 0 && !trendLoading && (
-              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>點擊「搜尋」載入今日熱搜（Google News / Reddit / PTT）</div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                點擊「搜尋」載入今日熱搜（內建：Google News / Reddit / PTT / Perplexity，外加你在「⚙️ 管理來源」新增的自訂 RSS 來源）
+              </div>
             )}
 
             {/* Suggest tab */}
@@ -1349,6 +1351,59 @@ export default function ContentStudio() {
             {trendTab === "questions" && questionResults.length === 0 && !trendLoading && (
               <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                 {form.keyword.trim() ? "點擊「搜尋」取得相關問題（適合做 FAQ 或 How-to 文章）" : "請先輸入主要關鍵字"}
+              </div>
+            )}
+
+            {/* Sources management tab (migration 0042) */}
+            {trendTab === "sources" && (
+              <div>
+                <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "10px", lineHeight: 1.6 }}>
+                  內建來源：📰 Google News · 👽 Reddit · 🗣️ PTT · 🔮 Perplexity（不可刪）。
+                  下方可新增自訂 RSS / Atom feed（須為公開 https 網址），會跟內建來源一起出現在「今日熱搜」。
+                </div>
+
+                {/* Add form */}
+                <div style={{ display: "flex", gap: "6px", marginBottom: "12px", flexWrap: "wrap" }}>
+                  <input className="form-input" value={newSourceLabel} onChange={e => setNewSourceLabel(e.target.value)}
+                    placeholder="來源名稱（例：科技報橘）" style={{ flex: "1 1 140px", fontSize: "12px" }} disabled={addingSource} />
+                  <input className="form-input" value={newSourceUrl} onChange={e => setNewSourceUrl(e.target.value)}
+                    placeholder="RSS 網址 https://…/feed" style={{ flex: "2 1 240px", fontSize: "12px" }} disabled={addingSource}
+                    onKeyDown={e => { if (e.key === "Enter") void addSource(); }} />
+                  <button className="btn-primary" style={{ fontSize: "12px", padding: "5px 14px" }}
+                    onClick={() => void addSource()} disabled={addingSource || !newSourceLabel.trim() || !newSourceUrl.trim()}>
+                    {addingSource ? "新增中…" : "+ 新增"}
+                  </button>
+                </div>
+                {sourcesError && <div style={{ fontSize: "12px", color: "var(--color-error, #ef4444)", marginBottom: "8px" }}>{sourcesError}</div>}
+
+                {/* DB sources list */}
+                {sourcesLoading && <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>讀取中…</div>}
+                {!sourcesLoading && trendSources.length === 0 && !sourcesError && (
+                  <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>尚無自訂來源。貼一個 RSS 網址即可新增。</div>
+                )}
+                {trendSources.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {trendSources.map(s => (
+                      <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 10px",
+                        border: "1px solid var(--card-border)", borderRadius: "6px", background: "var(--bg-card)",
+                        opacity: s.enabled ? 1 : 0.55 }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", flexShrink: 0 }}>
+                          <input type="checkbox" checked={s.enabled} onChange={e => void toggleSource(s.id, e.target.checked)} />
+                        </label>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>🔗 {s.label}</div>
+                          <div style={{ fontSize: "10px", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {s.url}{Array.isArray(s.geos) ? ` · ${s.geos.join("/")}` : ""}
+                          </div>
+                        </div>
+                        <button className="btn-secondary" style={{ fontSize: "11px", padding: "3px 9px", color: "var(--color-error, #ef4444)", flexShrink: 0 }}
+                          onClick={() => { if (window.confirm(`刪除來源「${s.label}」？`)) void deleteSource(s.id); }}>
+                          刪除
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
