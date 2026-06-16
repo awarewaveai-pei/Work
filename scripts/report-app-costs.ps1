@@ -26,25 +26,35 @@
 [CmdletBinding()]
 param(
   [int]$Days = 30,
-  [string]$OutDir = (Join-Path $PSScriptRoot "..\agency-os\reports\cost")
+  [string]$OutDir = ""
 )
 
 $ErrorActionPreference = "Stop"
 
+# Resolve script dir robustly: $PSScriptRoot can be empty in a param default under -File on some
+# hosts, so compute it in the body with a fallback.
+$ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+if (-not $OutDir) { $OutDir = Join-Path $ScriptDir "..\agency-os\reports\cost" }
+
 function Get-SupabaseCreds {
-  $url = $env:SUPABASE_URL
-  $key = $env:SUPABASE_SERVICE_ROLE_KEY
+  # The app (next-admin) talks to the AwareWave Supabase. In the SG container the canonical names are
+  # SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY; locally mcp/user-env.ps1 aliases them as
+  # SUPABASE_AWAREWAVE_*. Accept either (canonical first, then the AwareWave alias).
+  function Resolve-Env([string[]]$names) { foreach ($n in $names) { $v = [Environment]::GetEnvironmentVariable($n); if ($v) { return $v } } return $null }
+
+  $url = Resolve-Env @("SUPABASE_URL", "SUPABASE_AWAREWAVE_URL")
+  $key = Resolve-Env @("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY")
   if (-not $url -or -not $key) {
-    $userEnv = Join-Path $PSScriptRoot "..\mcp\user-env.ps1"
+    $userEnv = Join-Path $script:ScriptDir "..\mcp\user-env.ps1"
     if (Test-Path $userEnv) {
       Write-Host "[info] SUPABASE creds not in env; dot-sourcing mcp/user-env.ps1"
       . $userEnv
-      $url = $env:SUPABASE_URL
-      $key = $env:SUPABASE_SERVICE_ROLE_KEY
+      $url = Resolve-Env @("SUPABASE_URL", "SUPABASE_AWAREWAVE_URL")
+      $key = Resolve-Env @("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_AWAREWAVE_SERVICE_ROLE_KEY")
     }
   }
   if (-not $url -or -not $key) {
-    throw "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set. Set them in env or mcp/user-env.ps1."
+    throw "SUPABASE_URL/_SERVICE_ROLE_KEY (or SUPABASE_AWAREWAVE_*) not set. Set them in env or mcp/user-env.ps1."
   }
   return @{ Url = $url.TrimEnd("/"); Key = $key }
 }
