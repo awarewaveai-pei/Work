@@ -2,9 +2,12 @@
 
 > **這份是什麼**：繁中內容生產管線（搜尋熱點 → 文章 → 品質 → 影片 → 發佈）以「積木（block）registry」收斂成**無人值守自動化管線**的**單一藍圖 SSOT**。
 > **給 AI 看的開工指南**：任何 session 接到「video generator / 內容管線 / content pipeline / 積木 / Postiz / 自動發佈」相關任務，**先讀這份**，照「§0 開工必讀」5 分鐘掌握現況、紅線、下一步。
-> **狀態**：藍圖已定且**已用真實 code 校正**（file:line 佐證）。**程式碼尚未動工**，等操作者拍板 §13 決策。
-> **最後更新**：2026-06-16（v2，真讀 20 route + registry + video_generator + Postiz 後重寫，修正 v1 把 article/quality/publish 誤標為「roadmap」的錯誤）
+> **狀態**：藍圖已定 + 真實 code 校正（file:line 佐證）+ **方向決策已鎖定**（見下）。**程式碼尚未動工**（P0 doc 完成；P1 起待 go-ahead）。
+> **已鎖定決策（2026-06-16，operator 授權「你決定」）**：① 順序 **T1**＝先收斂既有積木、影片最後 ② 範圍 **S1**＝全 kind 收斂成 headless 自動化骨架 ③ 影片 **A2**＝Python 微服務 ④ 發佈唯二路徑＝Postiz(社群)+wp-bridge(WP)，**刪 publisher.py 直連**。
+> **最後更新**：2026-06-16（v3，鎖定方向決策 + 加入 §0.5 進度總帳）
 > **負責層級**：架構師 / 工程 / 安全 / QA / PM（R0 全程適用）
+>
+> **⚠️ 給每個 session 的鐵律**：完成任一階段 → **立刻更新 §0.5 進度總帳的狀態欄 + 填 commit hash**。總帳是「做過/沒做」的唯一真相；plan 其餘段落是設計依據，進度只看 §0.5。
 
 ---
 
@@ -21,6 +24,51 @@
 9. `agency-os/docs/operations/POSTIZ_SOCIAL_PUBLISHING_PLAN.md` — Postiz 已部署、整合 Task 3 未動
 
 **一句話現況**：管線「文章生成 / 品質 / WordPress 發佈」**早就是 production code**（20 個 route），只是**只有 search 那層真的包成積木**；**影片是唯一零實作的 kind，而且被一份已簽決策 defer 到 post-Wave-2**；Postiz 社群發佈已部署但**零整合碼**；Python `publisher.py` 的 10 平台直連**重複且踩紅線**（要刪不要接）。
+
+---
+
+## §0.5 進度總帳（STATUS LEDGER — 唯一進度真相，每階段完成必更新）
+
+> 圖例：✅ 已完成 ｜ 🚧 進行中 ｜ 🔲 待做 ｜ ⛔ 卡住(等決策/憑證) ｜ 🗑️ 待刪
+
+### A. 已完成 ✅（**別重做** — 這些是地基）
+| # | 項目 | 證據 file:line / commit |
+|---|---|---|
+| A1 | 積木 registry 合約（register/byKind/listAll/geoMatch）| registry.ts:18,40,51,56,66 |
+| A2 | **search 積木家族**（google-news/reddit/ptt/perplexity/env-feed/DB 臨時源）| trending-sources.ts:251,266,284,312,334,205 |
+| A3 | **article route ×7**（generate 串流/title/keywords/outline/related-posts/humanize/drafts）| generate:424、title:8、keywords:8、outline:10、related-posts:15、humanize:22、drafts:72 |
+| A4 | brand-voice route | brand-voice/route.ts:34 |
+| A5 | **quality route ×3**（seo-check RankMath 24 點/seo-fix/image Flux）| seo-check:8、seo-fix:28、image:67 |
+| A6 | **publish route**（wp-bridge Ed25519 + 標準 REST 雙路徑，**draft-first**）| publish/route.ts:237,309-366,347,368-438 |
+| A7 | wp-post / newsletter(FluentCRM 草稿) / calendar | wp-post:19、newsletter:132、calendar:69 |
+| A8 | WP 站台 CRUD（sites / [id] / test）| sites/route.ts |
+| A9 | ContentStudio UI（4 tab，全活）| ContentStudio.tsx |
+| A10 | DB migration 0041 drafts / 0042 content_sources | migrations/ |
+| A11 | **Postiz 已部署**（v2.11.3 EU，postiz.aware-wave.com）| commit a951190c（2026-06-14）|
+| A12 | 本檔藍圖 + 進度總帳（P0）| 本檔 v3 |
+
+### B. 待做 🔲（依鎖定順序 T1：先收斂、影片最後）
+| Phase | 項目 | 狀態 | commit | 風險 | go-ahead |
+|---|---|---|---|---|---|
+| **P0** | 藍圖 + 進度總帳 | ✅ | （本次）| Low | — |
+| **P1** | `publish/wordpress` 抽 core + 包積木（行為保留）| 🔲 | — | Low-Med | 待 |
+| **P2** | `article/generate` 抽 core + 包積木 | 🔲 | — | Low-Med | 待 |
+| **P3** | `quality/check`(seo-check) 抽 core + 包積木 | 🔲 | — | Low | — |
+| **P4** | `byKind()` 串 search→article→quality→publish headless 跑通 | 🔲 | — | Med | 待 |
+| **P5** | `publish/social`：lib/content/postiz.ts + /api/content/social-publish（draft 預設）| ⛔ | — | Med-High | 待+憑證 |
+| **P6** | 🗑️ 刪 Python publisher.py 直連（grep 確認無 caller）| 🔲 | — | Med | 待 |
+| **P7** | `video/pipeline` 積木 + Python 微服務骨架（圖→TTS→ffmpeg 本機驗證）| 🔲 | — | Med | 待 |
+| **P8** | 微服務容器化 + 部署 + healthcheck + smoke（SG/EU）| 🔲 | — | Med-High | 待 |
+| **P9** | 全管線端到端 + R8/R9 gate + Telegram 通知 + WORKLOG | 🔲 | — | Med | 待 |
+
+### C. 待刪 🗑️ / 卡住 ⛔
+| 項目 | 狀態 | 原因 |
+|---|---|---|
+| Python `publisher.py` 10 平台直連 | 🗑️ P6 刪 | 踩 R1(兩套社群)+R4(繞 wp-bridge) |
+| Python quality_control / topic_fetcher / growth / master_controller | 🗑️ 不移植 | next-admin 已有對應能力（A3/A5/A2/registry）|
+| P5 Postiz 整合 | ⛔ | 等 §13-4 平台/帳號授權決策 |
+
+**進度判讀規則**：A 段＝已是 production，動它前先讀勿重寫；B 段由上而下做，每完成一列把 🔲→✅ 並填 commit；C 段 P6 才執行刪除（刪前 grep）。
 
 ---
 
@@ -197,19 +245,20 @@
 
 ---
 
-## §9 建議方案
+## §9 決定方案（已鎖定 2026-06-16，operator 授權「你決定」）
 
-**前提先問 owner（§13）**。架構師預設建議：
+- **順序 = T1**：先收斂既有積木（article/quality/publish）成 headless 骨架，**影片放最後**（尊重 R5 deferral，影片在 Wave 1/2 骨架穩定後才做）。
+- **範圍 = S1**：全 kind 收斂成 headless 自動化骨架（每日 topic→article→quality→video→publish-draft 可無人值守跑），與互動 UI 並存。
 - **影片形式 = A2 微服務**（最小重工、爆炸半徑最小、可獨立 rollback）。
-- **發佈唯二合法路徑**：社群 = Postiz；WordPress = wp-bridge。**刪 publisher.py 直連**。
-- **時機/範圍**：若 owner 要 headless 自動化 → S1 全收斂、T1 影片最後（尊重 deferral）；若 owner 此刻就是要影片 → T2，明確 override R5 後，影片 block 優先，但仍 draft-first / 唯二發佈路徑 / 不開 bulk。
+- **發佈唯二合法路徑**：社群 = Postiz；WordPress = wp-bridge。**P6 刪 publisher.py 直連**。
 - 全程 **R2 draft-first + R8 quality gate + R9 per-client 指標**，不踩任何紅線。
+- **執行紀律**：每階段 R0 四動作驗證（§11）；完成即更新 §0.5 總帳。
 
 ---
 
 ## §10 分階段實作（每階段獨立可驗收/可回滾）
 
-> 順序依 §13 決策調整。以下為「S1+T1」預設排法；若 T2，把 P-video 提前到 P1。
+> **已鎖定 S1+T1**（見 §9/§13）。即時進度看 §0.5 總帳；下表為設計細節。
 
 | Phase | 內容 | 風險 | 需 go-ahead |
 |---|---|---|---|
@@ -220,7 +269,7 @@
 | **P4** | `byKind()` 串 search→article→quality→publish，端到端 headless 跑通「文章→品質→WP draft」| Med | 是 |
 | **P5** | `publish/social`：`lib/content/postiz.ts` + `/api/content/social-publish`（draft 預設）接 Postiz | **Med-High** | 是（憑證）|
 | **P6** | **刪** Python publisher.py 直連（grep 確認無 caller）| Med | 是（刪碼）|
-| **P-video（T1=P7／T2=P1）** | `video/pipeline` block 介面 + Python 微服務骨架（圖→TTS→ffmpeg，本機驗證）| Med | 是（+ R5 override）|
+| **P7** | `video/pipeline` block 介面 + Python 微服務骨架（圖→TTS→ffmpeg，本機驗證）| Med | 是 |
 | **P8** | 微服務容器化 + 部署 + healthcheck + smoke（SG/EU）| **Med-High** | 是（deploy）|
 | **P9** | 全管線端到端 + draft-first 驗收 + R8/R9 gate + Telegram 通知 + WORKLOG | Med | 是 |
 
@@ -246,13 +295,15 @@
 
 ---
 
-## §13 待操作者決策（動工前需明確批准）
+## §13 決策狀態
 
-1. **【關鍵】影片時機**：`2026-06-15` 決策把 full AI video gen **defer 到 post-Wave-2**（R5）。你現在要它 = 等於做那個「獨立決策」override。**確認現在就把 video block 列為優先（T2）？還是先收斂既有積木、影片放最後（T1）？**
-2. **收斂範圍**：你要的是「headless 每日自動化管線」（S1，全 kind 積木化）？還是只把影片做成積木、其餘維持現有 UI route（S2，churn 最小）？
-3. **方向批准**：同意 A2 微服務 + 唯二發佈路徑（Postiz 社群 / wp-bridge WP）+ 刪 publisher.py 直連？
-4. **Postiz 範圍**：接哪些平台 / 哪些帳號需 OAuth（P5 前需要；X 暫緩 $100/mo）？
-5. **逐階段 go-ahead**：Med 以上階段逐個明示 go-ahead（P0/P3 Low 直接做）。
+| # | 決策 | 狀態 |
+|---|---|---|
+| 1 | 影片時機（T1 vs T2）| ✅ **T1**（先收斂、影片最後）— operator 2026-06-16 |
+| 2 | 收斂範圍（S1 vs S2）| ✅ **S1**（全 kind headless）— architect 決（operator 授權「你決定」）|
+| 3 | 方向（A2 微服務 + 唯二發佈路徑 + 刪 publisher.py）| ✅ 採用 — architect 決 |
+| 4 | **Postiz 範圍**：接哪些平台 / 帳號 OAuth | ⛔ **未決**（P5 前需要；X 暫緩 $100/mo）— 屆時問 |
+| 5 | 逐階段 go-ahead（Med 以上）| 🔲 每階段執行前確認（P0/P3 Low 直接做）|
 
 ---
 

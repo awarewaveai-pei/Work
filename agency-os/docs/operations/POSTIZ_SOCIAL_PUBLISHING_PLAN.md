@@ -23,8 +23,31 @@
 | D4 | 模式對應 | Task 0 確認 Postiz API 是否原生支援 draft/scheduled/publish-now；若無 draft，「人審」=排程遠期+Telegram 通知 |
 | D5 | 審核順序 + X 預算 | 先送 Meta(IG+FB)+Reddit+LinkedIn；X 發文 API 要付費層（$100/月起）→ 確認預算；TikTok 延後 |
 
+## Task 0 結果（Postiz Public API 契約事實表，✅ 已完成 2026-06-16）
+
+> **⚠ 狀態校正（VBC 2026-06-16）**：本檔原為 2026-06-14 PLANNED 草案，**Task 1（部署）其實早已完成** — Postiz v2.11.3 已上線 `postiz.aware-wave.com`（EU，commit `a951190c`「Postiz live on EU (Task 1)」），且 **Bluesky 端到端發文已實測通過（2026-06-15）**。**社群層 live-status SSOT = [`CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md`](CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md) §0.5/A11**（本檔為 API 契約細節補充，狀態以該檔為準）。故下表是**整合碼（Task 3）的契約參考**，不是「待部署」清單。
+>
+> 來源：官方 `docs.postiz.com/public-api`（WebFetch 2026-06-16）。Postiz 已部署，契約可直接對已上線的 `/public/v1` 用 curl 對照鎖定。
+
+| 項目 | 事實（verbatim 欄位名） | 信心 |
+|------|------------------------|------|
+| Base path | `https://{NEXT_PUBLIC_BACKEND_URL}/public/v1`（public API 與 app 內部 API 分離） | 高 |
+| Auth（驗證） | header `Authorization: <api_key>`（**raw key，無 `Bearer` 前綴**）；key 在 Postiz UI `Settings > Developers > Public API` 產生（per-workspace） | 高 |
+| 建立貼文（create post） | `POST /public/v1/posts` | 高 |
+| 貼文 body | `{ type, date(ISO-8601), shortLink(bool), tags[], posts[] }`；每個 `posts[]` = `{ integration:{ id }, value:[{ content, image:[{ id, path }] }], settings:{ __type:<platform>, …平台專屬 } }`（一個 entry 對一個已連接 channel，帶該平台文案+媒體） | 高 |
+| **type enum** | **`draft` / `schedule` / `now`** — **`draft` = 存草稿、永不自動發** | 高 |
+| 列出已連接 channel（integrations） | `GET /public/v1/integrations`（doc 未列完整 response 欄位；至少含 `id`，平台/名稱/disabled 待 Task 1 後 curl 補） | 高（path）/ 中（欄位） |
+| 媒體上傳（upload） | `POST /public/v1/upload`，`multipart/form-data` 欄位 `file` → 回 `{ id, path }`，於貼文 `image:[{ id }]` 引用 | 高 |
+| Rate limit | **90 req/hr 自架**（cloud 100），**僅限 create-post endpoint**；自架可調 env `API_LIMIT` | 高 |
+| 帳號連接（OAuth connect） | **不走 public API** — 連帳號是 Postiz web UI 的 OAuth flow（per platform）。public API 只「列已連接」+「建貼文」 | 高 |
+| 自架部署需求（Task 1 用） | Docker image `ghcr.io/gitroomhq/postiz-app`；需 Postgres + Redis；核心 env（`MAIN_URL`/`FRONTEND_URL`/`NEXT_PUBLIC_BACKEND_URL`/`JWT_SECRET`/`DATABASE_URL`/`REDIS_URL`/`STORAGE_PROVIDER`）+ 各平台 OAuth app 憑證 | 中（以 Task 1 部署時官方 compose/configuration 文件為準） |
+
+**對 D4 的結論**：Postiz **原生支援 `draft`** → 「排程草稿+人審」= 建貼文 `type:"draft"`，操作者在 Postiz UI 審核後手動發；「即時」= `type:"now"`（per-post 明確動作+確認，符合 spec §49.7 紅線）。**無需** 原 D4 假設的「排程遠期+Telegram 通知」workaround。
+
+**gate 解除**：Task 1（部署）與 Task 3（`lib/content/postiz.ts` + `/api/content/social-publish`，draft 預設 = `type:"draft"`）可照此契約開工。唯一仍待部署後實測的細節：`GET /integrations` 完整 response 欄位（用於 UI 逐平台 gate）。
+
 ## Task 分解（六要素契約見原始 planner 輸出；摘要）
-- **Task 0** `web-researcher`：Postiz 部署需求 + API 契約（env、post 狀態、媒體上傳、OAuth flow）事實表。**先做，gate 一切。**
+- **Task 0** `web-researcher`：✅ 完成（見上「Task 0 結果」事實表，2026-06-16）。Postiz API 原生 draft/schedule/now，gate 已解除。
 - **Task 1** `devops-engineer`：EU 架 Postiz `postiz.aware-wave.com`（新 `infra/postiz/docker-compose.yml` + CF DNS + nginx）。**今天可開始**，不需 dev app。
 - **Task 2** `web-researcher`+操作者：各平台 dev app + 審核送件，callback 指向 Postiz。**今天開始**（長外部瓶頸，並行）。
 - **Task 3** `fullstack-engineer`：`lib/content/postiz.ts` + `/api/content/social-publish` route（雙模式、draft 預設）。不卡審核。
