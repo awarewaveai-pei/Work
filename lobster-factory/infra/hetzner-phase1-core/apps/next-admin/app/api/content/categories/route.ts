@@ -42,9 +42,9 @@ export async function GET(req: Request): Promise<Response> {
     if (!res.ok) return NextResponse.json({ ok: true, categories: [] });
     const raw = await res.json() as Array<{ id?: number; name?: string; count?: number }>;
     const categories = raw
-      .map(c => (typeof c.name === "string" ? c.name.replace(/&amp;/g, "&").replace(/&#0?39;/g, "'").replace(/&#[0-9]+;/g, "").trim() : ""))
+      .map(c => (typeof c.name === "string" ? decodeWpEntities(c.name) : ""))
       .filter(name => name && name.toLowerCase() !== "uncategorized" && name !== "未分類");
-    return NextResponse.json({ ok: true, categories, siteUrl: site.url });
+    return NextResponse.json({ ok: true, categories });
   } catch {
     return NextResponse.json({ ok: true, categories: [] });
   }

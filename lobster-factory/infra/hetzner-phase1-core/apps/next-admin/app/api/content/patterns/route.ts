@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { decodeWpEntities } from "@/lib/content/wp-entities";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,10 +48,9 @@ export async function GET(req: Request): Promise<Response> {
       .filter(p => typeof p.id === "number" && p.id > 0)
       .map(p => ({
         id: p.id!,
-        title: (p.title?.rendered ?? `Pattern ${p.id}`)
-          .replace(/&amp;/g, "&").replace(/&#0?39;/g, "'").replace(/&#[0-9]+;/g, "").replace(/<[^>]+>/g, "").trim() || `Pattern ${p.id}`,
+        title: decodeWpEntities(p.title?.rendered ?? "") || `Pattern ${p.id}`,
       }));
-    return NextResponse.json({ ok: true, patterns, siteUrl: site.url });
+    return NextResponse.json({ ok: true, patterns });
   } catch {
     return NextResponse.json({ ok: true, patterns: [] });
   }

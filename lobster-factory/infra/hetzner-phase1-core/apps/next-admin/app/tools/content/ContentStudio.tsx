@@ -2363,7 +2363,7 @@ export default function ContentStudio() {
               <div>
                 <label className="form-label" style={{ marginTop: 0 }}>插入數量</label>
                 <select className="form-select" style={{ width: "auto" }} value={String(form.patternCount)} disabled={isGenerating}
-                  onChange={e => setF("patternCount", parseInt(e.target.value, 10))}>
+                  onChange={e => setF("patternCount", Number(e.target.value) || 0)}>
                   {[0, 1, 2, 3, 4].map(n => <option key={n} value={n}>{n === 0 ? "0（關閉）" : `${n} 個`}</option>)}
                 </select>
               </div>
