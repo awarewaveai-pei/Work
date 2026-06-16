@@ -4,7 +4,30 @@
 
 ## 2026-06-16
 
-### feat(content-studio): 6 項強化 — 多供應商模型(Claude+GPT)/brand-voice URL 自動帶入/分類抓站上現有/品牌語調結構化表單/競業痛點分析/Kadence 漏斗 patterns + AEO
+### feat(ops): /ops/costs AI+工具成本會計 — cost-model SSOT + ai_call_logs 精準 token ledger + 滑桿月費試算 + 報表 CLI
+
+**[任務理解]** 使用者問「Calculate AI and tool costs for aware-wave app 還沒完成吧」→ 確認：無此產物（僅 /tools/ai-models 單價參考頁）。需求三層全做（單次成本 / 月估算 / 接真實資料）+ 文字成本「即時精準」（每次 API 回應帶 usage，app 先前 streaming 後丟棄 → 零記錄）。決策：分頁（/ops/costs 屬 ops 會計層，非 /tools 選型）；含 ai_call_logs 表把每次 usage 落帳（真數非估算）。
+
+**[已修改]**
+- 新 `lib/ai/cost-model.ts`：單價 SSOT（文字 token 價數值化、圖 18 模型 costUsd、工具/基建月費；TWD_RATE 單一來源）。基建月費 repo 零記錄 → 標 `estimate:true` 待使用者填實際帳單。
+- 新 `lib/ai/cost-calculator.ts`：純函式 `textCallCostUsd`/`imageCostUsd`/`estimateMonthly`/`resolveTextRate`（含 dated-id 正規化，防 Opus/Fable/GPT 回 dated id 默默落 Sonnet fallback 被誤價）；+ vitest 19 案。
+- 新 `lib/ai/log-ai-call.ts`：best-effort（try/catch 吞錯、絕不阻斷/拋出）寫 ai_call_logs；rate_fallback 旗標讓未定價模型可見不隱藏。
+- migration `0043_ai_call_logs.sql`：純 CREATE TABLE + RLS deny-anon（仿 0033）。**未套用 prod**（High-risk DB，待 go-ahead）。
+- 接 10 文字呼叫點 logAiCall（非串流 outline/title/keywords/syndicate/brand-voice/seo-fix + product-copy；串流 humanize + article generate-core 兩供應商：Anthropic finalMessage / OpenAI stream_options usage frame）。
+- 新 `app/ops/costs/page.tsx`（server，真實花費 §A：ai_call_logs 精準 + ai_image_jobs status=completed 量×費率）+ `CostEstimator.tsx`（滑桿三維：量級/每客戶/逐功能 + 基建 toggle）。
+- 新 `scripts/report-app-costs.ps1`：真打 Supabase 出月報；文字 $ 取已存 cost_usd（零費率重複 → 無 SSOT drift）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | clean（含 critic 修正後重跑）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/ai/__tests__/cost-calculator.test.ts` | exit=0 | 19/19 pass
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/report-app-costs.ps1 -Days 30` | exit=0 | 真打 AwareWave Supabase：ai_image_jobs 查 OK（0 completed/30d）、ai_call_logs 404（migration 0043 未套 prod，graceful 處理）、報表寫出
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/4n — 三 Major 全修：①ai_image_jobs 漏 status=completed→失敗單被計費（page+script）②model id 正規化（dated id 落 fallback 誤價）+rate_fallback 旗標 ③NT() 依 NTD 量級捨入（sub-NT$1 不再被吞成 NT$1）；Minor：OpenAI cacheReadMult 0.1→0.5、token NaN/負值 guard、PS markdown `|` escape
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`logAiCall\|cost-model\|cost-calculator\|ai_call_logs\|estimateMonthly\|/ops/costs\|report-app-costs` | hits=16(next-admin 全為本次新建檔)+scripts 1(本檔)+agency-os(報表/WORKLOG/state) — 無外部 stale call site；generate-core logAiCall 確認僅 3 處（import+雙路徑）無重複；VBC 確認並行 Cursor session 僅「協調記述」非重複建置（git diff HEAD 我方檔全 0、generate-core 無重複呼叫）
+
+**[剩餘風險]** ① **migration 0043 未套 prod**（High-risk DB，待 go-ahead）→ 套用前文字 logAiCall insert 落空（best-effort 吞錯，路由不受影響），文字真數從套用後起算。② **未 sg-deploy** → /ops/costs 頁與 logging 上線需部署。③ 基建月費為估算佔位（Hetzner/CF 帳單 repo 無記錄），待使用者填實際數字並把 `estimate` 設 false。④ 圖片成本＝量×費率（ai_image_jobs 無 cost 欄），非逐筆實扣（與文字不同）。
+**[rollback]** 全為新增/閘控：新檔 `git rm`、route logAiCall 行移除、migration 未套故 prod 零影響；/ops/costs 為新路由不影響既有頁。
+
+ — 多供應商模型(Claude+GPT)/brand-voice URL 自動帶入/分類抓站上現有/品牌語調結構化表單/競業痛點分析/Kadence 漏斗 patterns + AEO
 
 **[任務理解]** 使用者在 app.aware-wave.com/tools/content 列 6 項需求 + 「其他能提高 SEO/GEO/AEO/RankMath 行銷」的加值。決策：模型「只要 GPT」（Claude+OpenAI 雙供應商）、「一次全做完再交付」。
 
