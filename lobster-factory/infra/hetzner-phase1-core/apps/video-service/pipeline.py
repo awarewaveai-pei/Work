@@ -38,9 +38,13 @@ if not hasattr(Image, "ANTIALIAS"):
 
 import edge_tts
 from moviepy.editor import (
-    ImageClip, AudioFileClip, CompositeVideoClip,
-    concatenate_videoclips,
+    ImageClip, VideoFileClip, AudioFileClip, CompositeVideoClip,
+    concatenate_videoclips, vfx,
 )
+
+# 影片片段（Pexels B-roll）與靜圖（Flux）的副檔名判別 — 混合 render 用
+_VIDEO_EXTS = (".mp4", ".mov", ".webm", ".m4v", ".mkv")
+_IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
 
 # Google / YouTube
 from google.oauth2.credentials import Credentials
@@ -277,13 +281,36 @@ def ken_burns(img_path: str, duration: float, w: int, h: int) -> ImageClip:
     return clip
 
 
-def compose_base_video(scenes: list, image_files: list, audio_files: list, out_name: str) -> str:
+def _fit_video_clip(video_path: str, duration: float, w: int, h: int):
+    """實拍 B-roll 片段：去原音（用 TTS 旁白）、cover-fit 到 w×h、loop/trim 對齊配音時長。"""
+    clip = VideoFileClip(video_path).without_audio()
+    clip = clip.resize(height=h)
+    if clip.w < w:
+        clip = clip.resize(width=w)
+    clip = clip.crop(x_center=clip.w / 2, y_center=clip.h / 2, width=w, height=h)
+    if clip.duration < duration:
+        clip = clip.fx(vfx.loop, duration=duration)  # 太短 → 無縫循環補滿
+    else:
+        clip = clip.subclip(0, duration)              # 太長 → 裁到旁白長
+    return clip.set_duration(duration)
+
+
+def make_visual_clip(asset_path: str, duration: float, w: int, h: int):
+    """混合 render 派發：靜圖 → Ken Burns；實拍影片 → _fit_video_clip。
+    依副檔名判別；未知副檔名當靜圖處理（保守，與舊行為一致）。"""
+    ext = os.path.splitext(asset_path)[1].lower()
+    if ext in _VIDEO_EXTS:
+        return _fit_video_clip(asset_path, duration, w, h)
+    return ken_burns(asset_path, duration, w, h)
+
+
+def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_name: str) -> str:
     print(f"\n[4/6] 合成基礎影片（{config.BASE_WIDTH}x{config.BASE_HEIGHT}）...")
     clips = []
-    for scene, img_path, audio_path in zip(scenes, image_files, audio_files):
+    for scene, asset_path, audio_path in zip(scenes, visual_files, audio_files):
         audio = AudioFileClip(audio_path)
         duration = audio.duration + 0.5
-        bg = ken_burns(img_path, duration, config.BASE_WIDTH, config.BASE_HEIGHT)
+        bg = make_visual_clip(asset_path, duration, config.BASE_WIDTH, config.BASE_HEIGHT)
         subtitle = make_subtitle_overlay(scene["narration"], duration, config.BASE_WIDTH, config.BASE_HEIGHT)
         composite = CompositeVideoClip([bg, subtitle]).set_audio(audio)
         clips.append(composite)
@@ -445,21 +472,23 @@ def cleanup():
 # ═══════════════════════════════════════════
 # Render-only 入口（給 next-admin video/pipeline 積木呼叫）
 # ═══════════════════════════════════════════
-def render_video(scenes: list, image_files: list, out_name: str):
-    """只做合成：scenes(含 narration) + 已備妥的場景圖 → 配音 → 合成 → 多尺寸輸出。
+def render_video(scenes: list, visual_files: list, out_name: str):
+    """只做合成：scenes(含 narration) + 已備妥的視覺素材 → 配音 → 合成 → 多尺寸輸出。
 
-    刻意「不」生腳本、不生圖、不發佈 —— 那三件由 next-admin 既有能力負責
-    （article core / image-gen / wp-bridge），本服務只保留它獨有的影片合成價值。
+    visual_files 每項可為「靜圖（Flux）」或「實拍影片片段（Pexels B-roll）」，
+    由 make_visual_clip 依副檔名自動派發（混合 render）。
+    刻意「不」生腳本、不生圖/抓素材、不發佈 —— 那些由 next-admin 既有能力負責
+    （article core / image-gen / Pexels fetch / wp-bridge），本服務只保留影片合成價值。
     回傳 (output_files: dict, base_video: str, out_dir: Path)。呼叫端負責 cleanup()。
     """
-    if len(scenes) != len(image_files):
-        raise ValueError(f"scenes({len(scenes)}) 與 image_files({len(image_files)}) 數量不一致")
+    if len(scenes) != len(visual_files):
+        raise ValueError(f"scenes({len(scenes)}) 與 visual_files({len(visual_files)}) 數量不一致")
     safe_name = re.sub(r"[^\w一-鿿]", "_", out_name)[:40] or "video"
     out_dir = config.OUTPUT_DIR / safe_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     audio_files = generate_audio(scenes)
-    base_video = compose_base_video(scenes, image_files, audio_files, safe_name)
+    base_video = compose_base_video(scenes, visual_files, audio_files, safe_name)
     output_files = export_all_formats(base_video, out_dir)
     return output_files, base_video, out_dir
 
