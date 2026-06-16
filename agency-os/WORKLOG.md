@@ -4,6 +4,26 @@
 
 ## 2026-06-16
 
+### feat(wp-bridge): FluentCRM newsletter draft route — 簽章寫入 DRAFT campaign（WIP，未發版）
+
+**[任務理解]** 使用者要 `/tools/content` 的「Email 電子報」能推進 WordPress FluentCRM 變草稿 campaign。**紅線：只草稿、永不寄**（FluentCRM 寄出不可逆、人工門控，治理 `WP_BRIDGE_CONTROL_PLANE_DESIGN.md:192`）。路徑 A = bridge plugin 加簽章路由（Fluent 與 bridge 同 WP，PHP 直呼 Campaign model，免外部 key）。
+
+**[已修改]**（plugin code 進 git checkpoint `363bdace`；TASKS queue commit `49a10bcd`）
+- `includes/Newsletter/NewsletterCreator.php`（新）— 只傳 content 欄位 → 靠 Campaign model `creating` boot hook 天然落 `status=draft`/`type=campaign`；建後**斷言 `status===draft`**，非 draft 即 fail（紅線守門）。
+- `includes/Http/RestController.php` — 加 `/newsletter` 路由（SCOPE_WRITE、簽章）+ `newsletter_draft_create` handler + `newsletterErrorStatus()` reason→HTTP 映射。
+- `aware-wave-wp-bridge.php` — `AWBRIDGE_VERSION` + plugin header 0.10.0 → **0.11.0**（兩處）。
+
+**[驗證結果]**（R0）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -l`（NewsletterCreator.php + includes/Http/RestController.php + aware-wave-wp-bridge.php，本機 AO-CLOSE 重跑）| exit=0 | 三檔 `No syntax errors detected`；版本 grep 確認 header+define 皆 0.11.0、route `/newsletter` 已註冊（RestController.php:83）。
+- REALTEST_WAIVED: NA -- runtime e2e（soulful 真建 draft → 驗 FluentCRM 後台 status=draft → 刪除）刻意延後至**使用者 go-ahead**（寄信不可逆紅線，WIP 未發版）。地基真機已驗：soulful FluentCRM 3.1.0 active + Campaign creating hook + `fc_campaigns`（2026-06-16）。
+- REVIEW_WAIVED: NA -- 未發版、未接 next-admin；發版前走 `release-wp-bridge.sh` + 正式 REALTEST 時再做 critic。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=`newsletter\|NewsletterCreator\|newsletterErrorStatus\|AWBRIDGE_VERSION` | hits=route+creator+version 三處一致 | 無外部 stale consumer（next-admin `/api/content/newsletter` route 尚未建 = 無 caller 待破壞）；version 0.11.0 header/define 同步。
+- WORKLOG: 本段。
+
+**[剩餘風險]** ① **未發版** = soulful 仍跑 0.10.0；正本 repo `awarewaveai-pei/aware-wave-wp-bridge` 未 tag、無 installable zip（只 push Work ≠ 發版）。② 收件人是否強制清空待使用者拍板（預設保留 FluentCRM 原生 subscribers=all，因永不寄、操作者送前必過收件人步驟）。③ next-admin `/api/content/newsletter` route + ContentStudio 推送按鈕未建。詳 TASKS line 60。
+
+**[rollback]** `git checkout 363bdace~1 -- lobster-factory/packages/wp-bridge-plugin/`（未發版、未接前端，prod soulful 不受影響）。
+
 ### fix(content-engine): 結構開關「Yes」未強制 include — TABLES/FAQ/QUOTES 勾了卻沒出來
 
 **[任務理解]** 使用者勾選 TABLES/FAQ/QUOTES=Yes，但生成文章這三項全沒出現（文章未截斷，有完整 Conclusion）。承上「generate 品質修正包」同檔追加修正。
@@ -10001,7 +10021,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-15 18:34:48 UTC_
+_Last synced: 2026-06-16 00:31:38 UTC_
 
 ## 2026-03-20
 
@@ -11102,4 +11122,5 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REALTEST_EVIDENCE: tool=PowerShell | cmd=`curl.exe -I https://app.aware-wave.com/tools/ai-models` | exit=0 | result=307 to `/login?next=%2Ftools%2Fai-models` as expected behind auth; `/login` returns 200
 - REVIEW_WAIVED: CONTENT_DATA_UI -- static comparison page + typed data tables; build/typecheck/deploy smoke covered runtime integration
 - BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=`78 張約|全套成本|fullDeckNt|15 個圖片模型比較` | hits=0 after moving comparison out of Tarot and using per-image cost only
+
 
