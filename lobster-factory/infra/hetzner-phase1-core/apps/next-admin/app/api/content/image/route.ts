@@ -1,16 +1,36 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import {
+  generateTarotImage,
+  isTarotModel,
+  isAspectRatio,
+  type TarotModel,
+  type AspectRatio,
+} from "@/lib/tarot/image-gen";
+import {
+  isR2Configured,
+  parseImageDataUrl,
+  buildDesignKey,
+  putDesignObject,
+  getDesignsPublicBase,
+} from "@/lib/storage/r2";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-// Flux-schnell does NOT accept width/height — its ONLY shape control is `aspect_ratio` (a fixed enum)
-// plus `megapixels`. Passing width/height is silently ignored and EVERY image comes back at the
-// default 1:1 (verified against the live Replicate model schema). So each platform preset carries the
-// nearest supported aspect_ratio; width/height stay only as human-readable reference in the response.
-// Allowed flux aspect_ratio enum: 1:1 16:9 21:9 3:2 2:3 4:5 5:4 3:4 4:3 9:16 9:21.
-const PLATFORM_IMAGE_SPECS: Record<string, { label: string; width: number; height: number; aspect: string; note: string }> = {
+// Content Studio image route — now DELEGATES to the shared image-gen toolkit (lib/tarot/image-gen.ts,
+// the same 15-model combo-pack the Tarot tool uses) instead of hardcoding flux-schnell. This lets the
+// Media Hub pick a model, apply a style preset, send a reference image (img2img) and pin a seed.
+// The toolkit returns a `data:image/png;base64,…` URL; we persist that to R2 and hand back a stable
+// public https URL as `imageUrl` (the 3 client consumers embed it into markdown / the hero slot and WP
+// sideloads it at publish). Falls back to the data URL when R2 is unconfigured. HTTP 200 + ok:false on
+// a generation failure so the client surfaces a friendly message instead of a network error.
+
+// Platform presets carry only the human-readable label/size for the manual "社群圖片生成" panel and
+// supply the DEFAULT aspect when an explicit one isn't passed. All `aspect` values below are members of
+// the toolkit AspectRatio union, so they validate cleanly via isAspectRatio.
+const PLATFORM_IMAGE_SPECS: Record<string, { label: string; width: number; height: number; aspect: AspectRatio; note: string }> = {
   instagram_square:    { label: "Instagram 方形貼文",   width: 1080, height: 1080, aspect: "1:1",  note: "1:1 通用貼文" },
   instagram_portrait:  { label: "Instagram 直式貼文",   width: 1080, height: 1350, aspect: "4:5",  note: "4:5 最大面積" },
   instagram_story:     { label: "Instagram 限時/Reels", width: 1080, height: 1920, aspect: "9:16", note: "9:16 全螢幕" },
@@ -30,46 +50,31 @@ const PLATFORM_IMAGE_SPECS: Record<string, { label: string; width: number; heigh
 
 const VALID_PLATFORMS = new Set(Object.keys(PLATFORM_IMAGE_SPECS));
 
-// The flux-schnell aspect_ratio enum (verified live). A request may pass an explicit `aspectRatio`
-// to override the platform's default — this is what lets the article media-ratio dropdown (16:9 / 3:2
-// / 4:3 / 1:1 / 9:16) actually take effect instead of being ignored.
-const ALLOWED_ASPECT = new Set(["1:1", "16:9", "21:9", "3:2", "2:3", "4:5", "5:4", "3:4", "4:3", "9:16", "9:21"]);
+// Default model when none is supplied (legacy callers + the "replicate"/"none" sentinel) — keeps the
+// previous behaviour (flux-schnell) byte-for-byte for any request that doesn't opt into a model.
+const DEFAULT_MODEL: TarotModel = "flux-schnell";
 
-// Replicate Flux Schnell — fast, cheap, good for social graphics
-const REPLICATE_MODEL = "black-forest-labs/flux-schnell";
+// Reference-image (img2img) guards — mirror app/api/tools/tarot/generate/route.ts.
+const MAX_REF_IMAGES = 5;
+const MAX_REF_CHARS = 12_000_000; // ~9 MB decoded; one big reference photo
+const REF_DATA_RE = /^data:image\/(?:png|jpe?g|webp);base64,/;
 
-interface ReplicatePrediction {
-  id: string;
-  status: "starting" | "processing" | "succeeded" | "failed" | "canceled";
-  output?: string[];
-  error?: string;
-}
-
-async function waitForPrediction(
-  id: string,
-  token: string,
-  maxWaitMs = 90_000,
-): Promise<ReplicatePrediction> {
-  const start = Date.now();
-  while (Date.now() - start < maxWaitMs) {
-    await new Promise(r => setTimeout(r, 2000));
-    const res = await fetch(`https://api.replicate.com/v1/predictions/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json() as ReplicatePrediction;
-    if (data.status === "succeeded" || data.status === "failed" || data.status === "canceled") {
-      return data;
-    }
+function friendlyError(code: string): string {
+  switch (code) {
+    case "missing_replicate_api_token": return "圖片服務未設定 Replicate 金鑰，請聯絡管理員";
+    case "missing_openai_api_token":    return "OpenAI 圖片服務未設定金鑰，請改用其他模型";
+    case "character_reference_required":return "此模型需要至少一張參考圖（img2img）";
+    case "generation_timeout":          return "圖片生成逾時，請重試或改用較快的模型";
+    case "output_too_large":            return "生成的圖片過大，請重試";
+    case "output_url_not_allowed":      return "圖片來源不被允許（安全防護）";
+    case "unknown_model":               return "未知的圖片模型";
+    default:                            return `圖片生成失敗：${code}`;
   }
-  throw new Error("Replicate prediction timed out");
 }
 
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
-
-  const replicateToken = process.env.REPLICATE_API_TOKEN;
-  if (!replicateToken) return new NextResponse("REPLICATE_API_TOKEN not configured", { status: 503 });
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return new NextResponse("invalid json", { status: 400 }); }
@@ -82,60 +87,80 @@ export async function POST(req: Request): Promise<Response> {
     ? PLATFORM_IMAGE_SPECS[platform]
     : PLATFORM_IMAGE_SPECS.instagram_square;
 
-  // An explicit, valid aspectRatio overrides the platform default (this is what makes the article
-  // media-ratio dropdown real). Anything outside the flux enum falls back to the platform's aspect.
-  const aspectRatio = (typeof body.aspectRatio === "string" && ALLOWED_ASPECT.has(body.aspectRatio))
+  // Model: explicit > legacy "replicate"/"none"/absent → flux-schnell. An unknown but non-empty model
+  // string is a client bug → 400 so it surfaces instead of silently falling back.
+  const rawModel = typeof body.model === "string" ? body.model : "";
+  let model: TarotModel;
+  if (rawModel === "" || rawModel === "replicate" || rawModel === "none") {
+    model = DEFAULT_MODEL;
+  } else if (isTarotModel(rawModel)) {
+    model = rawModel;
+  } else {
+    return NextResponse.json({ ok: false, error: "invalid_model" }, { status: 400 });
+  }
+
+  // Aspect ratio: explicit valid > platform default (already an AspectRatio) > 16:9.
+  const aspectRatio: AspectRatio = isAspectRatio(body.aspectRatio)
     ? body.aspectRatio
-    : spec.aspect;
+    : (isAspectRatio(spec.aspect) ? spec.aspect : "16:9");
 
-  // Enhance prompt for social media context
-  const enhancedPrompt = `${prompt}, professional social media graphic, high quality, clean composition, no text overlay`;
+  // Seed (reproducible / fixed style) — non-negative integer only; otherwise random (null).
+  const seed = Number.isInteger(body.seed) && (body.seed as number) >= 0 ? (body.seed as number) : null;
 
-  // Start Replicate prediction
-  const createRes = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${replicateToken}`,
-      "Content-Type": "application/json",
-      "Prefer": "wait",
-    },
-    body: JSON.stringify({
-      input: {
-        prompt: enhancedPrompt,
-        // flux-schnell shape control: aspect_ratio (enum) + megapixels. width/height are NOT inputs.
-        aspect_ratio: aspectRatio,
-        megapixels: "1",
-        num_outputs: 1,
-        num_inference_steps: 4,
-        output_format: "webp",
-        // q82 webp at 1 MP lands ≈ 100 KB — small enough to sideload cleanly into the WP media library
-        // and fast on the page, while staying visually clean for article hero/body imagery.
-        output_quality: 82,
-      },
-    }),
-  });
-
-  if (!createRes.ok) {
-    const err = await createRes.text();
-    return NextResponse.json({ ok: false, error: `Replicate error: ${err.slice(0, 200)}` }, { status: 502 });
+  // Reference images (img2img). Optional; only validate when present.
+  let referenceImages: string[] | undefined;
+  if (Array.isArray(body.referenceImages) && body.referenceImages.length > 0) {
+    const refs = body.referenceImages.filter((r): r is string => typeof r === "string");
+    if (refs.length > MAX_REF_IMAGES) {
+      return NextResponse.json({ ok: false, error: `最多 ${MAX_REF_IMAGES} 張參考圖` }, { status: 400 });
+    }
+    for (const r of refs) {
+      if (!REF_DATA_RE.test(r)) {
+        return NextResponse.json({ ok: false, error: "參考圖格式須為 png/jpg/webp 的 data URL" }, { status: 400 });
+      }
+      if (r.length > MAX_REF_CHARS) {
+        return NextResponse.json({ ok: false, error: "參考圖過大（上限約 9MB）" }, { status: 413 });
+      }
+    }
+    if (refs.length > 0) referenceImages = refs;
   }
 
-  let prediction = await createRes.json() as ReplicatePrediction;
+  // Style modifier (already resolved to an English style prompt by the client from STYLE_CATALOG).
+  // When present, let the art style drive; otherwise keep the original social-graphic enhancement so
+  // existing no-style behaviour is unchanged.
+  const styleMod = typeof body.imageStyle === "string" ? body.imageStyle.trim() : "";
+  const finalPrompt = styleMod
+    ? `${prompt}, ${styleMod}`
+    : `${prompt}, professional social media graphic, high quality, clean composition, no text overlay`;
 
-  // If not immediately done (Prefer: wait), poll
-  if (prediction.status !== "succeeded" && prediction.status !== "failed") {
-    prediction = await waitForPrediction(prediction.id, replicateToken);
+  const result = await generateTarotImage({ model, prompt: finalPrompt, aspectRatio, seed, referenceImages });
+
+  if (!result.ok) {
+    const code = (result as { ok: false; error: string }).error;
+    return NextResponse.json({ ok: false, error: friendlyError(code), code }, { status: 200 });
   }
 
-  if (prediction.status !== "succeeded" || !prediction.output?.[0]) {
-    return NextResponse.json({ ok: false, error: prediction.error ?? "Image generation failed" }, { status: 500 });
+  // Persist the data URL to R2 → stable public https URL (consumers embed it into markdown / the hero
+  // slot; WP sideloads at publish). Fall back to the raw data URL when R2 isn't configured.
+  let imageUrl = result.image;
+  if (isR2Configured()) {
+    const parsed = parseImageDataUrl(result.image);
+    if (parsed) {
+      const key = buildDesignKey(parsed.mime);
+      if (key) {
+        const put = await putDesignObject(key, parsed.buffer, parsed.mime);
+        imageUrl = put.ok ? put.publicUrl : `${getDesignsPublicBase()}/${key}`;
+      }
+    }
   }
 
   return NextResponse.json({
     ok: true,
-    imageUrl: prediction.output[0],
+    imageUrl,
+    model,
     platform,
     aspectRatio,
+    seed: result.seed,
     spec: { label: spec.label, width: spec.width, height: spec.height, aspect: aspectRatio, note: spec.note },
   });
 }
