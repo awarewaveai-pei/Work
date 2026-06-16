@@ -4,6 +4,20 @@
 
 ## 2026-06-16
 
+### fix(mcp): MONOREPO_ROOT 未設 → 開機 9 個 MCP server 閃紅字視窗（筆電真根因）
+**[任務理解]** 使用者回報筆電「一開機跳出好幾次 PowerShell 紅字視窗、一秒消失」，**公司桌機沒有**。先前同 session 修的 doc-sync `-LiteralPath` + SystemGuard registrar 261 是**另一個症狀**（22:30 Daily 視窗 + doc-sync 紅字），**非開機閃窗**。VBC 重查：排程任務全排除（TaskScheduler 操作記錄開機後 0 任務啟動；AgencyOS 任務皆隱藏無 boot/logon 觸發；啟動資料夾/Run 機碼無 .ps1）。
+**[根因]** `.mcp.json`（`sync-mcp-config.ps1` 生成）對每個 powershell-launched MCP server 用 `-File ${env:MONOREPO_ROOT}\scripts\*.ps1`（line 160-161 刻意設計，git 共用、兩機不同碟靠各機 env var 解析）。**筆電 `MONOREPO_ROOT` User+Machine 範圍皆空**（`[Environment]::GetEnvironmentVariable('MONOREPO_ROOT','User')` = ''），→ MCP host（Claude Code/Cursor）一開機啟動時路徑變 `\scripts\run-llm-mcp.ps1` → powershell `-File 檔案不存在` 紅字（實測 exit -196608）→ 9 個 powershell server（gemini/chatgpt/grok ×fast/latest + postgres + trigger + filesystem）各閃一個 → 「好幾次」。桌機有設故不閃。**系統 gap**：`sync-mcp-config.ps1` 製造此依賴卻無任何腳本保證該 env var 存在（memory feedback_git_push.md 已註明是前置條件、bootstrap 沒設）。
+**[已修改]**
+- 筆電 User env：`MONOREPO_ROOT=D:\Work`（`[Environment]::SetEnvironmentVariable(...,'User')`，機器本地非 git）。
+- `scripts/sync-mcp-config.ps1`（line ~611-623）— 寫完 `.mcp.json` 後新增 self-consistency 區塊：確保 User env `MONOREPO_ROOT` = `$WorkspaceRoot.TrimEnd('\')`（對齊 sync-claude-userlevel.ps1 慣例）；idempotent、User scope、loud log + restart 提示。讓「製造依賴的腳本自己滿足依賴」→ 防新機/變數被清復發。
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=破掉路徑 `powershell -File \scripts\run-llm-mcp.ps1` | exit=-196608 | 噴「-File 參數的檔案不存在」紅字 = 複現開機閃窗來源；設 MONOREPO_ROOT 後解析為 `D:\Work\scripts\run-llm-mcp.ps1`（存在），launcher 啟動無紅字。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`sync-mcp-config.ps1` | exit=0 | 印 `[env] MONOREPO_ROOT (User) ok = D:\Work`，`.mcp.json`/`.cursor/mcp.json` git 無變動（冪等）。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/0m — 5 焦點全清（$WorkspaceRoot 非空有 Resolve-Path 保證、StrictMode `$null -ne` 安全、scope 正確、side effect 自洽 loud、跨機覆寫即正確行為）；唯一 informational = 尾斜線正規化，已 `.TrimEnd('\')` 硬化。
+- BUGHUNT_DONE: scope=scripts,mcp | grep=`SetEnvironmentVariable.*MONOREPO_ROOT` | hits=1 — 新行是唯一 setter（無衝突）；6 個 consumer 僅讀（sync-claude-userlevel.ps1 / verify-settings-governed-keys.mjs / sync-claude-to-codex.ps1 / .mcp.json）。
+**[剩餘風險]** ① env var 變更只對「新啟動」進程生效 → 使用者須重啟 MCP host 或重開機才見效（下次開機紅字應消失）。② 8 個 `cmd /c npx` server 不依賴 MONOREPO_ROOT，可能仍閃短暫 cmd 視窗但**不紅**（非錯誤）；若要連那也消除需另做隱藏視窗包裝（cosmetic，非本次）。③ 桌機既有 MONOREPO_ROOT 已正確，不受影響。
+**[rollback]** `git checkout HEAD~1 -- scripts/sync-mcp-config.ps1`；env var：`[Environment]::SetEnvironmentVariable('MONOREPO_ROOT',$null,'User')`（不建議，會重現問題）。
+
 ### AO-CLOSE task sync — 15:xx session close
 
 - AUTO_TASK_DONE_APPLIED (2026-06-16T07:27:00Z): Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測

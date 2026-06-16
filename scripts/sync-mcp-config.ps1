@@ -614,12 +614,13 @@ if (-not $SkipWorkspaceConfig) {
     # '\scripts\*.ps1' path -> each MCP server flashes a red "file not found" console window on
     # every host launch (root cause 2026-06-16: laptop had MONOREPO_ROOT unset; desktop had it set).
     # The script that creates the dependency must guarantee it. Idempotent; User scope (no elevation).
+    $monoValue = $WorkspaceRoot.TrimEnd('\')   # match .TrimEnd('\') normalization in sync-claude-userlevel.ps1
     $monoCurrent = [Environment]::GetEnvironmentVariable('MONOREPO_ROOT', 'User')
-    if ($monoCurrent -ne $WorkspaceRoot) {
-        [Environment]::SetEnvironmentVariable('MONOREPO_ROOT', $WorkspaceRoot, 'User')
-        Write-Host "[env] MONOREPO_ROOT (User) set -> $WorkspaceRoot (was: '$monoCurrent'). Restart the MCP host (Claude Code / Cursor / Claude Desktop) to apply." -ForegroundColor Yellow
+    if ($monoCurrent -ne $monoValue) {
+        [Environment]::SetEnvironmentVariable('MONOREPO_ROOT', $monoValue, 'User')
+        Write-Host "[env] MONOREPO_ROOT (User) set -> $monoValue (was: '$monoCurrent'). Restart the MCP host (Claude Code / Cursor / Claude Desktop) to apply." -ForegroundColor Yellow
     } else {
-        Write-Host "[env] MONOREPO_ROOT (User) ok = $WorkspaceRoot" -ForegroundColor Gray
+        Write-Host "[env] MONOREPO_ROOT (User) ok = $monoValue" -ForegroundColor Gray
     }
 
     # .cursor/mcp.json — Cursor project MCP; uses ${workspaceFolder} per Cursor docs
