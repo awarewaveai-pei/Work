@@ -4,6 +4,31 @@
 
 ## 2026-06-16
 
+### feat(content-blocks): 商品文案 → `product/copy` 積木 + publish UI 套完整 RankMath/SEO/GEO/AEO 面板 + AI 修正（方案B）
+
+**[任務理解]** 操作者要：① 把 `generateProductCopy`（`lib/studio/product-copy.ts`）做成積木註冊系統的積木（可移植、日後複用）；② publish UI 套上 `/tools/content` 的 SEO/GEO/AEO/RankSEO 功能。選定**方案B**＝註冊積木 + 把完整 16 項 RankMath 面板 + AI 自動修正搬進商品發佈頁（非僅最小註冊）。
+
+**[現況分析（VBC）]** `git log --oneline -10` → 近期皆 checkpoint commits；後端積木 registry（`lib/content/blocks/registry.ts`）已存在，pattern 為「每積木自註冊 `register({id,kind,title,run})`、只透過 ctx 溝通、檔案存在即可移植」（鏡像前端 `AB.registerBlock`）。確認 `BlockKind` **無 exhaustive switch** 消費，只有 `byKind()` filter → 加 kind 安全 additive。SeoCheckPanel 為 blog（ContentStudio）+ 商品共用 UI。`product-copy.ts` core 已被另一並行 session（見下方 content-studio entry）標為 WIP；本 entry 即該 WIP 的收斂正本。
+
+**[已修改]**
+1. `lib/content/blocks/registry.ts` — `BlockKind` 加 `"product"`（additive）。
+2. `lib/content/blocks/product-copy.ts`（**新**）— 自註冊 `product/copy` 積木，包 `generateProductCopy`，headless 入口；與 route `action:"copy"` 共用同一 core，零重複。
+3. `lib/seo/rankmath-checker.ts` — `RankMathCheck` 加選用 `na?:boolean`（additive；`checkRankMath` 本身永不設，只下游 product flow 設）。
+4. `lib/studio/product-copy.ts` — (a) 加 `improveHints?:string[]`，修正時把失敗檢查回饋給模型重生全文（商品文案是結構化 6 欄，不能走 markdown `/api/content/seo-fix`）；(b) 評分改為保留全 16 項、blog 專屬 6 項標 `na`、score/grade 只計 applicable（10 項）→ 結果與舊 filter 版數學等價（9/10→90/green）；(c) `sanitizeProductHtml` 加第三道：殘留非允許標籤的 `<` escape 成 `&lt;`（堵截斷式 `<img onerror=…` 無 `>` 漏網，critic 2026-06-15）。
+5. `app/api/tools/publish/route.ts` — `action:"copy"` 收 `fixHints?` → 轉 `improveHints`。
+6. `app/tools/content/SeoCheckPanel.tsx` — 加選用 `onFix`（商品重生路徑，優先於 markdown `onFixApply`）；na 列中性灰呈現、排除錯誤計數；`defaultOpen` 改 na-exclusive 與徽章一致（critic）。
+7. `app/tools/publish/PublishWizard.tsx` — 渲染 `<SeoCheckPanel onFix={fixCopy}>`；`runCopy(fixHints?)` 回 `{ok,error}`，修正重生不洗掉面板。
+8. `lib/content/blocks/README.md` + `agency-os/docs/operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` — manifest/§3 補 `product/copy` 與 `BlockKind` 列（後者為 R4 stale-claim 修正，同 commit）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` && `npx vitest run lib/seo lib/studio lib/content` && `node -e <sanitize 6-case>` | exit=0 | ms=2800（tsc EXIT=0；vitest 96 passed/12 files；sanitizer 6 案：允許標籤保留、`<img onerror=` →`&lt;`、`<script>`移除、屬性剝除全部正確）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n（critic 外部 oracle 確認 na-scoring 與舊版數學等價、無除零、na 不洩漏進分數/錯誤計數/修正 hints、blog flow 向後相容、修正重生無迴圈/race；3 minor 全部折回：defaultOpen na-exclusive、sanitizer 第三道、README inline enum）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`improveHints\|fixHints\|product/copy\|.na\|onFix\|rankMath\|BlockKind\|byKind\|RankMathCheck\|generateProductCopy` | hits=1（`title/route.ts:30` `rankMathRules` 區域變數＝false positive，不相關；`CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md:116` stale `BlockKind` enum → 已同 commit 修；scripts=0）
+
+**[剩餘風險]** ① 積木尚未接 P4 編排器（與 `publish/wordpress` 同狀態，刻意；無 import = 不存在於 registry）。② `PublishWizard` 殘留 `rankGrade/rankScore` state 欄位現為 dead（被 `rankMath` 取代），無 tsc/lint 錯，留待後續清。③ AI 修正重生為使用者點擊驅動、無自動迴圈，但每次重生為一次 Anthropic 呼叫（成本）。
+
+**[rollback]** `git revert <hash>` 即可；積木檔（新增）刪除即移除，`BlockKind`/`na?` 為 additive 移除不影響既有 blog flow。
+
 ### feat(content-studio): Phase-2 UX 批次（U-Width/U-Buttons/FluentCRM teaser/F-Sites/F-TitleSentiment）+ Brand Voice 客戶名自動帶入
 
 **[任務理解]** 操作者用 Chrome 實測 `/tools/content` 後給一批 UI/功能回饋 + 1 個新需求。根本問題分兩類：(a) 既有改動**已 commit 但她看的是線上舊版**（未 deploy，所以測無變化）；(b) Brand Voice「品牌/客戶名稱」與目標客戶（wpSites）沒接線，需重打。

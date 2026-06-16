@@ -113,7 +113,7 @@
 ### 積木 registry（`lib/content/blocks/registry.ts`）
 | 合約 | file:line |
 |---|---|
-| `BlockKind = search\|article\|video\|quality\|publish` | registry.ts:18 |
+| `BlockKind = search\|article\|video\|quality\|publish\|product` | registry.ts:18 |
 | `register()` / `byKind()` / `listAll()` / `geoMatch()` | registry.ts:40 / :51 / :56 / :66 |
 | 編排器：`for (const b of byKind(kind)) ctx = await b.run(ctx)` | registry.ts:13-15 |
 

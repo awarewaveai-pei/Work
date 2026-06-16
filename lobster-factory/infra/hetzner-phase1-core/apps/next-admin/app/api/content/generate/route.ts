@@ -43,21 +43,30 @@ export async function POST(req: Request): Promise<Response> {
   }
   const { config } = prepared as ArticlePrepareSuccess;
 
+  // Abort plumbing — restore the original route's belt-and-suspenders (the pre-refactor route had
+  // BOTH a req.signal listener AND cancel(){ anthropicStream.abort() }). In App Router the request
+  // abort event is not reliably fired on client disconnect, so the ReadableStream cancel() hook is
+  // the dependable backstop. Both feed one controller whose signal the core generator listens on to
+  // abort the in-flight Anthropic stream (→ no wasted tokens / held connection on disconnect).
+  const ac = new AbortController();
+  if (req.signal.aborted) ac.abort();
+  else req.signal.addEventListener("abort", () => ac.abort());
+
   const readable = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
       try {
-        // req.signal aborts on client disconnect → the generator aborts the Anthropic stream
-        // (it registers its own abort listener), so an empty cancel() is sufficient here.
-        for await (const chunk of streamArticleGeneration(config, apiKey, req.signal)) {
-          if (req.signal.aborted) break;
+        for await (const chunk of streamArticleGeneration(config, apiKey, ac.signal)) {
+          if (ac.signal.aborted) break;
           controller.enqueue(encoder.encode(chunk));
         }
       } finally {
         controller.close();
       }
     },
-    cancel() {},
+    cancel() {
+      ac.abort();
+    },
   });
 
   return new Response(readable, {
