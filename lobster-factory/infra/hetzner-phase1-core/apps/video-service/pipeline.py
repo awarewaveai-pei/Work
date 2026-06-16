@@ -281,9 +281,18 @@ def ken_burns(img_path: str, duration: float, w: int, h: int) -> ImageClip:
     return clip
 
 
-def _fit_video_clip(video_path: str, duration: float, w: int, h: int):
-    """實拍 B-roll 片段：去原音（用 TTS 旁白）、cover-fit 到 w×h、loop/trim 對齊配音時長。"""
-    clip = VideoFileClip(video_path).without_audio()
+def _fit_video_clip(video_path: str, duration: float, w: int, h: int, open_sources: list = None):
+    """實拍 B-roll 片段：去原音（用 TTS 旁白）、cover-fit 到 w×h、loop/trim 對齊配音時長。
+
+    VideoFileClip 會開 ffmpeg reader subprocess/fd → 必須在 write_videofile 後關閉，否則
+    長壽 worker（next-admin/Trigger.dev 重複呼叫）會累積洩漏。把 source handle 收進
+    open_sources，由 compose_base_video 在 finally 統一 close（不能在這裡 close，
+    衍生 clip 寫檔前還需要 reader）。
+    """
+    src = VideoFileClip(video_path)
+    if open_sources is not None:
+        open_sources.append(src)
+    clip = src.without_audio()
     clip = clip.resize(height=h)
     if clip.w < w:
         clip = clip.resize(width=w)
@@ -292,37 +301,51 @@ def _fit_video_clip(video_path: str, duration: float, w: int, h: int):
         clip = clip.fx(vfx.loop, duration=duration)  # 太短 → 無縫循環補滿
     else:
         clip = clip.subclip(0, duration)              # 太長 → 裁到旁白長
-    return clip.set_duration(duration)
+    return clip.set_duration(duration)                # subclip 分支需要；loop 分支冪等
 
 
-def make_visual_clip(asset_path: str, duration: float, w: int, h: int):
+def make_visual_clip(asset_path: str, duration: float, w: int, h: int, open_sources: list = None):
     """混合 render 派發：靜圖 → Ken Burns；實拍影片 → _fit_video_clip。
-    依副檔名判別；未知副檔名當靜圖處理（保守，與舊行為一致）。"""
+    依副檔名判別；未知副檔名當靜圖處理（保守，與舊行為一致）。
+    open_sources：影片 source handle 收集清單（供呼叫端寫檔後 close）。"""
     ext = os.path.splitext(asset_path)[1].lower()
     if ext in _VIDEO_EXTS:
-        return _fit_video_clip(asset_path, duration, w, h)
+        return _fit_video_clip(asset_path, duration, w, h, open_sources)
     return ken_burns(asset_path, duration, w, h)
 
 
 def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_name: str) -> str:
     print(f"\n[4/6] 合成基礎影片（{config.BASE_WIDTH}x{config.BASE_HEIGHT}）...")
     clips = []
-    for scene, asset_path, audio_path in zip(scenes, visual_files, audio_files):
-        audio = AudioFileClip(audio_path)
-        duration = audio.duration + 0.5
-        bg = make_visual_clip(asset_path, duration, config.BASE_WIDTH, config.BASE_HEIGHT)
-        subtitle = make_subtitle_overlay(scene["narration"], duration, config.BASE_WIDTH, config.BASE_HEIGHT)
-        composite = CompositeVideoClip([bg, subtitle]).set_audio(audio)
-        clips.append(composite)
-        print(f"   scene {scene['id']} ({duration:.1f}s)")
+    open_sources = []   # AudioFileClip / VideoFileClip readers — 寫檔後統一關閉，防 fd/subprocess 洩漏
+    final = None
+    try:
+        for scene, asset_path, audio_path in zip(scenes, visual_files, audio_files):
+            audio = AudioFileClip(audio_path)
+            open_sources.append(audio)
+            duration = audio.duration + 0.5
+            bg = make_visual_clip(asset_path, duration, config.BASE_WIDTH, config.BASE_HEIGHT, open_sources)
+            subtitle = make_subtitle_overlay(scene["narration"], duration, config.BASE_WIDTH, config.BASE_HEIGHT)
+            composite = CompositeVideoClip([bg, subtitle]).set_audio(audio)
+            clips.append(composite)
+            print(f"   scene {scene['id']} ({duration:.1f}s)")
 
-    base_path = str(config.TEMP_DIR / f"{out_name}_base.mp4")
-    concatenate_videoclips(clips, method="compose").write_videofile(
-        base_path, fps=config.FPS, codec="libx264", audio_codec="aac",
-        temp_audiofile=str(config.TEMP_DIR / "tmp_audio.m4a"),
-        remove_temp=True, logger="bar",
-    )
-    return base_path
+        base_path = str(config.TEMP_DIR / f"{out_name}_base.mp4")
+        final = concatenate_videoclips(clips, method="compose")
+        final.write_videofile(
+            base_path, fps=config.FPS, codec="libx264", audio_codec="aac",
+            temp_audiofile=str(config.TEMP_DIR / "tmp_audio.m4a"),
+            remove_temp=True, logger="bar",
+        )
+        return base_path
+    finally:
+        # 寫檔完成後才關閉所有 reader（衍生 clip 寫檔前仍依賴 source）
+        for c in [final, *clips, *open_sources]:
+            try:
+                if c is not None:
+                    c.close()
+            except Exception:
+                pass
 
 
 # ═══════════════════════════════════════════
