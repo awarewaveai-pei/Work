@@ -377,6 +377,167 @@ export default function PublishWizard() {
     });
   }, [create.productId, create.variantMap, upscale.printFileUrl, upscale.faithful, title, retailPrice, plusPrice, mockupUrls, pfcreate.state, post]);
 
+  // 🚀 ONE-CLICK: print file → product image → flat-lay → AI copy → Woo product → Printful native, in
+  // sequence, aborting on the first hard failure. Each step's payload MIRRORS its run* function above;
+  // results are threaded through LOCAL vars (not state) so a later step never reads a stale closure.
+  // Each step also updates its own state so the existing pills + success lines render as it progresses.
+  const runAll = useCallback(async () => {
+    if (!designUrl || title.trim().length < 3 || allRun.state === "running") return;
+
+    // 1) print file (faithful upscale)
+    setAllRun({ state: "running", stage: "① 產生印刷檔" });
+    setUpscale({ state: "running" });
+    const up = await post({ action: "upscale", designUrl, printMode });
+    if (!up.ok) {
+      setUpscale({ state: "error", error: up.error });
+      setAllRun({ state: "error", stage: "① 印刷檔", error: up.error });
+      return;
+    }
+    const printFileUrl = up.printFileUrl as string;
+    const faithful = Boolean(up.faithful);
+    setUpscale({
+      state: "done",
+      printFileUrl,
+      achievedPx: up.achievedLongEdgePx as number | null,
+      dpi: up.dpiAtFullPrint as number | undefined,
+      faithful,
+      meetsTarget: Boolean(up.meetsTarget),
+    });
+
+    // 2) WebP product image → gallery
+    setAllRun({ state: "running", stage: "商品圖" });
+    setProductImg({ state: "running" });
+    const pi = await post({ action: "productimage", designUrl });
+    if (!pi.ok) {
+      setProductImg({ state: "error", error: pi.error });
+      setAllRun({ state: "error", stage: "商品圖", error: pi.error });
+      return;
+    }
+    const productImageUrl = pi.productImageUrl as string;
+    setProductImg({ state: "done", url: productImageUrl });
+
+    // 3) faithful flat-lay composite → gallery
+    setAllRun({ state: "running", stage: "合成平拍圖" });
+    setFlatlay({ state: "running" });
+    const fl = await post({ action: "flatlay", designUrl, bgColor: flatlayBg });
+    if (!fl.ok) {
+      setFlatlay({ state: "error", error: fl.error });
+      setAllRun({ state: "error", stage: "合成平拍圖", error: fl.error });
+      return;
+    }
+    const flatlayUrl = fl.flatlayUrl as string;
+    setFlatlay({ state: "done", url: flatlayUrl });
+
+    // assemble the product gallery: existing user picks + the two freshly generated images (dedup,
+    // insertion order preserved — first entry is Woo's main image).
+    const gallery = Array.from(new Set([...mockupUrls, productImageUrl, flatlayUrl]));
+    setMockupUrls(gallery);
+
+    // 4) AI SEO/GEO copy — BEST EFFORT (a copy failure must not abort the publish; create tolerates
+    // an absent description/seo and falls back to boilerplate).
+    setAllRun({ state: "running", stage: "AI 文案（可略）" });
+    setCopy({ state: "running" });
+    let shortDescription: string | undefined;
+    let bullets: string[] | undefined;
+    let seo: { focus_keyword?: string; title?: string; description?: string } | undefined;
+    const design = designs.find((d) => d.object_url === designUrl);
+    const cp = await post({
+      action: "copy",
+      designPrompt: design?.metadata?.prompt ?? undefined,
+      subject: title.trim() || undefined,
+      productType: "tshirt",
+      focusKeywordHint: keywordHint.trim() || undefined,
+    });
+    if (cp.ok) {
+      const c = cp.copy as {
+        productTitle: string; focusKeyword: string; metaTitle: string;
+        metaDescription: string; shortDescriptionHtml: string; bullets: string[];
+      };
+      setCopy({
+        state: "done",
+        focusKeyword: c.focusKeyword,
+        metaTitle: c.metaTitle,
+        metaDescription: c.metaDescription,
+        shortDescriptionHtml: c.shortDescriptionHtml,
+        bullets: c.bullets,
+        rankMath: cp.rankMath as RankMathReport | undefined,
+      });
+      shortDescription = c.shortDescriptionHtml;
+      bullets = c.bullets;
+      seo = c.focusKeyword ? { focus_keyword: c.focusKeyword, title: c.metaTitle, description: c.metaDescription } : undefined;
+    } else {
+      setCopy({ state: "error", error: cp.error }); // non-fatal — publish continues without SEO copy
+    }
+
+    // 5) Woo product (draft) via wp-bridge — variable product + gallery images + variants/SKUs + SEO
+    setAllRun({ state: "running", stage: "建 Woo 商品" });
+    setCreate({ state: "running" });
+    const cr = await post({
+      action: "create",
+      title,
+      retailPrice,
+      plusPrice,
+      sizes: SIZES,
+      mockupUrls: gallery,
+      shortDescription,
+      bullets,
+      seo,
+    });
+    if (!cr.ok) {
+      setCreate({ state: "error", error: cr.error });
+      setAllRun({ state: "error", stage: "建 Woo 商品", error: cr.error });
+      return;
+    }
+    const productId = cr.product_id as number;
+    const variantMap = cr.variantMap as VariantMapEntry[];
+    setCreate({
+      state: "done",
+      productId,
+      editUrl: cr.edit_url as string | undefined,
+      variantMap,
+      variantMapDropped: Boolean(cr.variantMapDropped),
+    });
+    if (!hasUsablePfMap(variantMap)) {
+      // Woo returned a different variation count than the plan → no SKU map → native path can't bind.
+      setAllRun({
+        state: "error",
+        stage: "上 Printful",
+        error: "Woo 變體數與計畫不符，SKU 對照表未產生 — Woo 商品已建好，請用下方分步「🚀 ③」重試或重建草稿。",
+      });
+      return;
+    }
+
+    // 6) Printful native — one call: create product + bind every variant + upload print file
+    setAllRun({ state: "running", stage: "上 Printful native" });
+    setPfcreate({ state: "running" });
+    const pf = await post({
+      action: "pfcreate",
+      wooProductId: productId,
+      title,
+      printFileUrl,
+      retailPrice,
+      plusPrice,
+      variantMap,
+      mockupUrls: gallery,
+    });
+    if (!pf.ok) {
+      setPfcreate({ state: "error", error: pf.error, retryable: Boolean(pf.retryable) });
+      setAllRun({ state: "error", stage: "上 Printful native", error: pf.error });
+      return;
+    }
+    setPfcreate({
+      state: "done",
+      syncProductId: pf.syncProductId as number,
+      variantCount: pf.variantCount as number,
+      alreadyExisted: Boolean(pf.alreadyExisted),
+      faithful,
+    });
+
+    setAllRun({ state: "done" });
+  }, [designUrl, title, printMode, flatlayBg, mockupUrls, designs, keywordHint, retailPrice, plusPrice, allRun.state, post]);
+
+  const busy = allRun.state === "running";
+
   const pill = (state: StepState) =>
     state === "done" ? "✅" : state === "running" ? "⏳" : state === "error" ? "❌" : "⬜";
 
@@ -455,7 +616,7 @@ export default function PublishWizard() {
           焦點關鍵字（可留空，AI 自選）
           <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={keywordHint} onChange={(e) => setKeywordHint(e.target.value)} placeholder="例：spiritual lotus t-shirt" />
         </label>
-        <button className="btn-secondary" disabled={copy.state === "running"} onClick={() => void runCopy()}>
+        <button className="btn-secondary" disabled={busy || copy.state === "running"} onClick={() => void runCopy()}>
           {copy.state === "running" ? "生成文案中…" : "AI 生成 SEO 文案（標題＋描述＋RankMath meta）"}
         </button>
         {copy.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{copy.error}</span> : null}
@@ -478,6 +639,30 @@ export default function PublishWizard() {
         ) : null}
       </div>
 
+      {/* 🚀 ONE-CLICK — runs every step in sequence. The individual step buttons below stay for
+          partial re-runs / advanced control, but this is the primary path. */}
+      <div className="build-panel" style={{ padding: 14, marginTop: 10, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          className="btn-primary"
+          style={{ fontSize: 15, padding: "10px 18px" }}
+          disabled={!designUrl || title.trim().length < 3 || busy}
+          onClick={() => void runAll()}
+          title="一次跑完：產生印刷檔 → 商品圖 → 合成平拍圖 → AI 文案 → 建 Woo 草稿（含全部圖）→ 上 Printful native（建品＋綁變體＋印刷檔）"
+        >
+          🚀 全部一鍵完成（印刷檔＋商品圖＋合成圖＋文案＋Woo＋Printful）
+        </button>
+        {busy ? <span style={{ fontSize: 13, color: "#4f8cff" }}>⏳ {allRun.stage}…</span> : null}
+        {allRun.state === "done" ? (
+          <span style={{ fontSize: 13, color: "#46a758" }}>✅ 全部完成：Woo 草稿 + Printful native 都建好了（含全部商品圖）— 後台 review 後 publish 即可開賣</span>
+        ) : null}
+        {allRun.state === "error" ? (
+          <span style={{ fontSize: 13, color: "#e5484d" }}>❌ 卡在「{allRun.stage}」：{allRun.error}（下方可從該步分步續做）</span>
+        ) : null}
+        {!designUrl || title.trim().length < 3 ? (
+          <span style={{ fontSize: 11, opacity: 0.6 }}>需先選一張設計圖 + 填商品名稱（≥3 字）</span>
+        ) : null}
+      </div>
+
       {/* steps */}
       <div className="build-panel" style={{ padding: 14, marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -495,7 +680,7 @@ export default function PublishWizard() {
               ))}
             </select>
           </label>
-          <button className="btn-primary" disabled={!designUrl || upscale.state === "running"} onClick={() => void runUpscale()}>
+          <button className="btn-primary" disabled={busy || !designUrl || upscale.state === "running"} onClick={() => void runUpscale()}>
             ① 產生印刷檔
           </button>
           {upscale.printFileUrl ? (
@@ -529,7 +714,7 @@ export default function PublishWizard() {
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <span>{pill(productImg.state)}</span>
-          <button className="btn-secondary" disabled={!designUrl || productImg.state === "running"} onClick={() => void runProductImage()}>
+          <button className="btn-secondary" disabled={busy || !designUrl || productImg.state === "running"} onClick={() => void runProductImage()}>
             ⊕ 把這張設計做成產品圖（加入商品照）
           </button>
           {productImg.state === "done" ? <span style={{ fontSize: 12, color: "#46a758" }}>已加入商品照 ✓（純圖案，忠實）</span> : null}
@@ -538,7 +723,7 @@ export default function PublishWizard() {
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <span>{pill(flatlay.state)}</span>
-          <button className="btn-secondary" disabled={!designUrl || flatlay.state === "running"} onClick={() => void runFlatlay()}>
+          <button className="btn-secondary" disabled={busy || !designUrl || flatlay.state === "running"} onClick={() => void runFlatlay()}>
             ⊕ 真實平拍（設計 overlay 到背景，忠實）
           </button>
           <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
@@ -554,7 +739,7 @@ export default function PublishWizard() {
           <span>{pill(create.state)}</span>
           <button
             className="btn-primary"
-            disabled={create.state === "running" || title.trim().length < 3}
+            disabled={busy || create.state === "running" || title.trim().length < 3}
             onClick={() => void runCreate()}
           >
             ② 建 Woo 草稿商品（wp-bridge）
@@ -572,7 +757,7 @@ export default function PublishWizard() {
           <span>{pill(pfcreate.state)}</span>
           <button
             className="btn-primary"
-            disabled={!create.productId || !upscale.printFileUrl || !hasUsablePfMap(create.variantMap) || pfcreate.state === "running"}
+            disabled={busy || !create.productId || !upscale.printFileUrl || !hasUsablePfMap(create.variantMap) || pfcreate.state === "running"}
             onClick={() => void runPfcreate()}
             title="一次建立 Printful 商品 + 綁定所有變體 + 上傳印刷檔（native store，全自動，免後台手動匯入）"
           >
@@ -610,7 +795,7 @@ export default function PublishWizard() {
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <span>{pill(sync.state)}</span>
-              <button className="btn-secondary" disabled={!create.productId || sync.state === "running"} onClick={() => void runStatus()}>
+              <button className="btn-secondary" disabled={busy || !create.productId || sync.state === "running"} onClick={() => void runStatus()}>
                 ③ 檢查 Printful 同步
               </button>
               {sync.state === "done" ? (
@@ -625,7 +810,7 @@ export default function PublishWizard() {
               <span>{pill(link.state)}</span>
               <button
                 className="btn-primary"
-                disabled={!sync.synced || !upscale.printFileUrl || link.state === "running"}
+                disabled={busy || !sync.synced || !upscale.printFileUrl || link.state === "running"}
                 onClick={() => void runLink()}
               >
                 ④ 綁定印刷檔（全部變體）
