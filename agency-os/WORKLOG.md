@@ -4,6 +4,29 @@
 
 ## 2026-06-16
 
+### test(canvas+mockup): Canvas e2e + Mockup Studio 瀏覽器實測 — 兩條驗證債清零
+
+**[任務理解]** AO-RESUME 報告標記兩條「卡操作者」驗證債：Canvas `/tools/canvas` 整輪 e2e 及 Mockup Studio 診斷（server-side 已排除）。本 session 用 Chrome MCP 直接驅動瀏覽器實測。
+
+**Canvas e2e 結果（PASS）**：套用畫布尺寸（1063×638px @300DPI）✓、加文字物件 ✓、存入 My Designs 成功（canvas·28KB 出現於 `/tools/designs`）✓、下載 PNG toDataURL 24342 bytes ✓、0 JS errors。
+
+**Canvas Bug（非阻塞）**：`+ 文字` 每次新增兩個重疊 i-text（top 246 vs 248），導致疊字。原因待查（React StrictMode 雙調用或 onClick 重複）。
+
+**Mockup Studio 結果（PASS）**：POST `/api/tools/studio/generate` 200 ✓。白色 T-shirt 印「Claude e2e Test ✓」lifestyle mockup 正確生成（1664×2496px）✓。
+
+**Mockup Studio 症狀（非阻塞）**：`page-d83f6d8cba0c1375.js` chunk 初始解析凍結 compositor（截圖 CDP timeout 約 30s）；JS main thread 存活，hydration 完成後功能全正常。根因：大型 chunk main thread perf，建議 dynamic import 延遲載入。
+
+[已修改] 無 code 改動（純測試記錄）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=mcp__Claude_in_Chrome | cmd=navigate+click+JS e2e | exit=0 | ms=~120000 | result=Canvas 存入成功；Mockup POST /generate 200，mockup 圖片渲染正確
+- REVIEW_WAIVED: DOC_ONLY -- 純測試記錄，無 code 改動
+- BUGHUNT_DONE: scope=agency-os scripts | grep=Canvas e2e|Mockup Studio|驗證債 | hits=5 | 均為 AO-RESUME/WORKLOG/TASKS 引用，無 code stale claims
+- BUGHUNT_SCOPE_NARROW: lobster-factory 未含 — 無 code 改動，canvas/mockup API routes 未修改
+
+AUTO_TASK_DONE: Canvas e2e 整輪瀏覽器實測
+AUTO_TASK_DONE: Mockup Studio 診斷
+
 ### fix(ao-resume): untrack machine-local .agency-state state files + defense-in-depth whitelist
 
 **根本問題**：3 個機器本地狀態檔（`ao-close-prev.txt`、`ao-resume-last-session-id.txt`、`monthly-checks-last.txt`）被 git tracking。雙 IDE 每次 checkpoint commit 均修改這些檔案 → rebase 衝突 → `ao-resume.ps1` 自解白名單未覆蓋 → exit=1，需人工介入。

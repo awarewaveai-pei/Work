@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { runTrending, perplexityChat, parseJsonStrings } from "@/lib/content/trending-sources";
+import { runTrending, perplexityChat, parseJsonStrings, buildDbSearchBlocks } from "@/lib/content/trending-sources";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,6 +75,23 @@ async function fetchRelatedQuestions(keyword: string, hl: string): Promise<strin
   return fetchPerplexityQuestions(keyword, hl);
 }
 
+// ─── Operator-managed DB sources → ephemeral search blocks ───────────────────
+
+async function loadDbSourceBlocks() {
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from("content_sources")
+      .select("id, label, url, geos, enabled")
+      .eq("enabled", true);
+    if (error || !data) return [];
+    return buildDbSearchBlocks(data as Array<{ id: string; label: string; url: string; geos: string[] | "*" | null; enabled: boolean }>);
+  } catch {
+    return [];   // DB hiccup must not break trending — built-in blocks still run
+  }
+}
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export async function GET(req: Request): Promise<Response> {
@@ -87,7 +105,10 @@ export async function GET(req: Request): Promise<Response> {
   const hl    = url.searchParams.get("hl") ?? (geo === "TW" || geo === "HK" ? "zh-TW" : "en");
 
   if (type === "trending") {
-    const items = await runTrending(geo);   // 搜尋積木：跑所有啟用且符合 geo 的來源
+    // Operator-managed DB sources (migration 0042) run alongside the built-in blocks. Built ephemerally
+    // per request so a UI deletion takes effect immediately (best-effort: DB miss falls back to built-ins).
+    const extra = await loadDbSourceBlocks();
+    const items = await runTrending(geo, extra);   // 搜尋積木：跑所有啟用且符合 geo 的來源
     return NextResponse.json({ ok: true, items, geo });
   }
 

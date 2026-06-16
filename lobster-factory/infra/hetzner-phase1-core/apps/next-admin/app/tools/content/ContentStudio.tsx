@@ -341,7 +341,15 @@ export default function ContentStudio() {
   const [trendLoading,    setTrendLoading]    = useState(false);
   const [suggestResults,  setSuggestResults]  = useState<string[]>([]);
   const [questionResults, setQuestionResults] = useState<string[]>([]);
-  const [trendTab,        setTrendTab]        = useState<"trending" | "suggest" | "questions">("trending");
+  const [trendTab,        setTrendTab]        = useState<"trending" | "suggest" | "questions" | "sources">("trending");
+
+  // Operator-managed trending sources (migration 0042 / /api/content/sources)
+  const [trendSources,    setTrendSources]    = useState<Array<{ id: string; label: string; url: string; geos: string[] | "*"; enabled: boolean }>>([]);
+  const [sourcesLoading,  setSourcesLoading]  = useState(false);
+  const [sourcesError,    setSourcesError]    = useState("");
+  const [newSourceLabel,  setNewSourceLabel]  = useState("");
+  const [newSourceUrl,    setNewSourceUrl]    = useState("");
+  const [addingSource,    setAddingSource]    = useState(false);
 
   // Image generation
   const [showImgGen,      setShowImgGen]      = useState(false);
@@ -572,6 +580,63 @@ export default function ContentStudio() {
     setF("keyword", kw);
     setShowTrending(false);
   }
+
+  // ─── Trending source management (migration 0042) ──────────────────────────
+
+  async function loadSources() {
+    setSourcesLoading(true); setSourcesError("");
+    try {
+      const res  = await fetch("/api/content/sources");
+      const json = await res.json() as { ok: boolean; sources?: typeof trendSources; error?: string };
+      if (json.ok && json.sources) setTrendSources(json.sources);
+      else setSourcesError(json.error ?? "讀取失敗");
+    } catch { setSourcesError("網路錯誤，請重試"); }
+    finally { setSourcesLoading(false); }
+  }
+
+  async function addSource() {
+    const label = newSourceLabel.trim();
+    const url   = newSourceUrl.trim();
+    if (!label || !url || addingSource) return;
+    setAddingSource(true); setSourcesError("");
+    try {
+      const res  = await fetch("/api/content/sources", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label, url }),
+      });
+      const json = await res.json() as { ok: boolean; source?: typeof trendSources[number]; error?: string };
+      if (json.ok && json.source) {
+        setTrendSources(prev => [json.source!, ...prev]);
+        setNewSourceLabel(""); setNewSourceUrl("");
+      } else setSourcesError(json.error ?? "新增失敗");
+    } catch { setSourcesError("網路錯誤，請重試"); }
+    finally { setAddingSource(false); }
+  }
+
+  async function toggleSource(id: string, enabled: boolean) {
+    try {
+      const res  = await fetch("/api/content/sources", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, enabled }),
+      });
+      const json = await res.json() as { ok: boolean; source?: typeof trendSources[number] };
+      if (json.ok && json.source) setTrendSources(prev => prev.map(s => s.id === id ? json.source! : s));
+    } catch { /* silent — refresh reconciles */ }
+  }
+
+  async function deleteSource(id: string) {
+    try {
+      const res  = await fetch(`/api/content/sources?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const json = await res.json() as { ok: boolean };
+      if (json.ok) setTrendSources(prev => prev.filter(s => s.id !== id));
+    } catch { /* silent */ }
+  }
+
+  // Load sources when the management subtab opens.
+  useEffect(() => {
+    if (showTrending && trendTab === "sources") void loadSources();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTrending, trendTab]);
 
   // ─── Brand Voice ─────────────────────────────────────────────────────────
 

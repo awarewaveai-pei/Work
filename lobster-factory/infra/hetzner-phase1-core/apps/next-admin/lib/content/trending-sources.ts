@@ -12,7 +12,7 @@
  *   ④ 未來 DB/UI    呼叫 registry.register() 把 DB rows 注入即可（介面已就緒）
  */
 
-import { register, byKind, geoMatch, type BlockCtx } from "./blocks/registry";
+import { register, byKind, geoMatch, type BlockCtx, type ContentBlock } from "./blocks/registry";
 
 export interface TrendingItem {
   title: string;
@@ -74,7 +74,7 @@ function decodeEntities(s: string): string {
  * CONTENT_TRENDING_FEEDS 視為「受信任營運者」輸入；未來開放任意使用者貼 feed 時，
  * 必須在 fetch 前加 DNS 解析後比對或 allowlist。
  */
-function isSafePublicHttps(rawUrl: string): boolean {
+export function isSafePublicHttps(rawUrl: string): boolean {
   let u: URL;
   try { u = new URL(rawUrl); } catch { return false; }
   if (u.protocol !== "https:") return false;
@@ -151,8 +151,7 @@ function searchBlock(def: SearchBlockDef) {
   });
 }
 
-/** 任意 RSS/Atom feed → 搜尋 block（一行加一個來源）。 */
-function rssSearchBlock(opts: {
+interface RssBlockDef {
   id: string;
   title: string;
   icon?: string;
@@ -163,14 +162,19 @@ function rssSearchBlock(opts: {
   stripPublisherSuffix?: boolean;
   headers?: Record<string, string>;
   source?: string;
-}) {
-  searchBlock({
+}
+
+/** Build (but do NOT register) a kind:"search" block from an RSS/Atom feed def. */
+function makeRssBlock(opts: RssBlockDef): ContentBlock<TrendingItem[]> {
+  return {
     id: opts.id,
     title: opts.title,
     icon: opts.icon,
-    geos: opts.geos ?? "*",
+    kind: "search",
     enabled: opts.enabled,
-    run: async (geo) => {
+    geos: opts.geos ?? "*",
+    run: async (ctx: BlockCtx) => {
+      const geo = String(ctx.geo ?? "TW");
       const url = typeof opts.url === "function" ? opts.url(geo) : opts.url;
       if (!isSafePublicHttps(url)) return [];
       try {
@@ -182,7 +186,36 @@ function rssSearchBlock(opts: {
         });
       } catch { return []; }
     },
-  });
+  };
+}
+
+/** 任意 RSS/Atom feed → 搜尋 block（一行加一個內建來源；register 進共用 registry）。 */
+function rssSearchBlock(opts: RssBlockDef) {
+  register(makeRssBlock(opts));
+}
+
+/**
+ * DB-managed sources → ephemeral search blocks (NOT registered).
+ *
+ * Built per-request and passed to runTrending(geo, extraBlocks) so a deletion in the UI takes effect
+ * immediately. Registering them into the module-global registry would retain removed sources until the
+ * process restarts — hence ephemeral. SSRF: isSafePublicHttps is re-checked at fetch time inside
+ * makeRssBlock (operator-trusted input; same posture as env feeds).
+ */
+export function buildDbSearchBlocks(
+  rows: Array<{ id: string; label: string; url: string; geos: string[] | "*" | null; enabled: boolean }>,
+): ContentBlock<TrendingItem[]>[] {
+  return rows
+    .filter(r => r.enabled && r.url && isSafePublicHttps(r.url))
+    .map(r => makeRssBlock({
+      id: `search/db/${r.id}`,
+      title: r.label || r.id,
+      icon: "🔗",
+      url: r.url,
+      geos: r.geos ?? "*",
+      enabled: true,
+      source: r.label || r.id,
+    }));
 }
 
 // ─── 地區設定 ────────────────────────────────────────────────────────────────
@@ -324,9 +357,15 @@ searchBlock({
 
 // ─── 對外入口（編排器 / route 用） ───────────────────────────────────────────
 
-/** 搜尋積木的彙整入口：跑所有啟用且符合 geo 的 search block。 */
-export async function runTrending(geo: string): Promise<TrendingItem[]> {
-  const blocks = byKind<TrendingItem[]>("search").filter(b => geoMatch(b, geo));
+/**
+ * 搜尋積木的彙整入口：跑所有啟用且符合 geo 的 search block。
+ * extraBlocks = 每次請求臨時建立的 DB 來源（見 buildDbSearchBlocks），不進全域 registry。
+ */
+export async function runTrending(geo: string, extraBlocks: ContentBlock<TrendingItem[]>[] = []): Promise<TrendingItem[]> {
+  const blocks = [
+    ...byKind<TrendingItem[]>("search"),
+    ...extraBlocks.filter(b => b.enabled !== false),
+  ].filter(b => geoMatch(b, geo));
   const settled = await Promise.allSettled(blocks.map(b => b.run({ geo })));
   const items: TrendingItem[] = [];
   for (const r of settled) {
