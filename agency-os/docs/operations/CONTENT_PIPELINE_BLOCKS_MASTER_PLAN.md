@@ -39,7 +39,7 @@
 | A3 | **article route ×7**（generate 串流/title/keywords/outline/related-posts/humanize/drafts）| generate:424、title:8、keywords:8、outline:10、related-posts:15、humanize:22、drafts:72 |
 | A4 | brand-voice route | brand-voice/route.ts:34 |
 | A5 | **quality route ×3**（seo-check RankMath 24 點/seo-fix/image Flux）| seo-check:8、seo-fix:28、image:67 |
-| A6 | **publish route**（wp-bridge Ed25519 + 標準 REST 雙路徑，**draft-first**）| publish/route.ts:237,309-366,347,368-438 |
+| A6 | **publish 核心**（wp-bridge Ed25519 + 標準 REST 雙路徑，**draft-first**）；P1 後抽成 core，route 為薄殼、積木共用 | wordpress-core.ts:283 `publishToWordPress`、publish/route.ts（HTTP 殼）、blocks/publish-wordpress.ts（積木）|
 | A7 | wp-post / newsletter(FluentCRM 草稿) / calendar | wp-post:19、newsletter:132、calendar:69 |
 | A8 | WP 站台 CRUD（sites / [id] / test）| sites/route.ts |
 | A9 | ContentStudio UI（4 tab，全活）| ContentStudio.tsx |
@@ -51,7 +51,7 @@
 | Phase | 項目 | 狀態 | commit | 風險 | go-ahead |
 |---|---|---|---|---|---|
 | **P0** | 藍圖 + 進度總帳 | ✅ | （本次）| Low | — |
-| **P1** | `publish/wordpress` 抽 core + 包積木（行為保留）| 🔲 | — | Low-Med | 待 |
+| **P1** | `publish/wordpress` 抽 core + 包積木（行為保留）| ✅ | a488ae79（core/route/積木）+ 收尾本次 | Low-Med | ✓ |
 | **P2** | `article/generate` 抽 core + 包積木 | 🔲 | — | Low-Med | 待 |
 | **P3** | `quality/check`(seo-check) 抽 core + 包積木 | 🔲 | — | Low | — |
 | **P4** | `byKind()` 串 search→article→quality→publish headless 跑通 | 🔲 | — | Med | 待 |

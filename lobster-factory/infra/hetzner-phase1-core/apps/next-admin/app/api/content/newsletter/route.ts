@@ -45,7 +45,7 @@ function inline(s: string): string {
 
 /**
  * Email-flavored markdown → HTML. Deliberately distinct from the WP publish converter
- * (app/api/content/publish/route.ts markdownToHtml): an email client has no WP autoembed, so a bare
+ * (lib/content/publish/wordpress-core.ts markdownToHtml): an email client has no WP autoembed, so a bare
  * YouTube URL would render as raw text — here we turn standalone links into anchors instead. Tables
  * are flattened to nothing fancy; images are kept as <img>. Internal generation markers are scrubbed.
  */

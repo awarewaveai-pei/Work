@@ -14,7 +14,7 @@
  *
  * Inline formatting (bold/italic/code/link) is converted to safe HTML here because BlockLibrary
  * passes a block's text straight into the markup without escaping; the same escaping idiom as
- * app/api/content/publish/route.ts is reused locally to keep this module self-contained.
+ * lib/content/publish/wordpress-core.ts is reused locally to keep this module self-contained.
  */
 
 export type Block =
@@ -35,7 +35,7 @@ export type Block =
  */
 function isYouTubeUrl(url: string): boolean {
   // Accept-set kept in lockstep with ContentStudio.canonicalYouTube() (the producer/SSOT) and with the
-  // identical copy in app/api/content/publish/route.ts: an 11-char video id under a YouTube host.
+  // identical copy in lib/content/publish/wordpress-core.ts: an 11-char video id under a YouTube host.
   return /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtube-nocookie\.com\/embed\/|youtu\.be\/)[\w-]{11}/i.test(url);
 }
 

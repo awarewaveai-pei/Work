@@ -4,6 +4,32 @@
 
 ## 2026-06-16
 
+### refactor(content-blocks): P1 — publish/wordpress 抽 core（一段邏輯兩入口）+ headless 積木（行為保留）
+
+**[任務理解]** Content Pipeline Blocks master plan 鎖定順序 T1 第一階段：把 `app/api/content/publish/route.ts` POST 的核心發佈邏輯抽成純函式 `publishToWordPress()`，route 改薄殼呼叫它，再加 `publish/wordpress` 積木 in-process 呼叫同一個 core。目標：headless 編排與 UI 共用一段邏輯、零重複、行為位元不變、可 revert。非表面「複製一份給積木」（會雙寫漂移）。
+
+**[現況分析（VBC）]** 動工前 `git log --oneline -12` 確認無並行 session 改過 publish route（僅 checkpoint + browser-test）。讀 route 全文 440 行 + **兩消費端**（ContentStudio `handlePublish`:1006 / `handleBulkPublish`:1177，皆 `await res.json()`）。關鍵控制流發現：原 route 對 text 錯誤回應（forbidden/markdown required/site not found…）會讓單篇 UI 的 `res.json()` throw → catch → 顯示「網路錯誤」（非真實訊息）= **現行行為，必須保留** → core 回傳須帶 `wire:"text"|"json"` 區分序列化。依賴簽章逐一確認：`createPost`/`getWpSites`/`wpAuthHeader`/`isBridgeConfigured`/`bridgeBaseUrl` 全吻合 route 既有用法（不猜）。
+
+**[已修改]**
+- **NEW** `lib/content/publish/wordpress-core.ts`（464 行）：抽 route POST 核心成純函式 `publishToWordPress(body: WordPressPublishInput): Promise<WordPressPublishResult>`。含全部 helper（escapeHtml/safeUrl/inline/isYouTubeUrl/markdownToHtml/extractH1/extractExcerpt/slugify/resolveTermIds，**逐字搬移**）+ site 解析 + Bridge(Ed25519 簽章)↔標準 REST 雙路徑（draft-first）。回傳結構化結果：成功 `{ok,post_id,edit_url,(featured_set|view_url)}`；失敗 `{ok:false,status,error,wire}`（wire 保留原 text/json 序列化）。不做角色閘（HTTP 殼職責，留 route）、不依賴 Request/NextResponse → 可單測、可移植。
+- **REWRITTEN** `app/api/content/publish/route.ts`（440→43 行）：薄殼。角色閘 `canCreateAiImageJob` + `req.json()` 解析留在 route（需 req），呼叫 core，依 `result.ok` / `wire` 還原成位元相同的 NextResponse。
+- **NEW** `lib/content/blocks/publish-wordpress.ts`：註冊 `publish/wordpress` 積木（kind:publish），`run(ctx)` 把 ctx 當 input 傳同一個 core。**休眠**：尚未被任何檔 import → register() runtime 不執行、byKind("publish") 未呼叫（按設計，接線屬 P4）。
+- **stale 修（R4 同 commit）** 3 處：`markdown-to-blocks.ts:17,38` + `newsletter/route.ts:48` — markdownToHtml/isYouTubeUrl/escapeHtml「逐字副本/同款 idiom 在 publish/route.ts」之指向更新為 `lib/content/publish/wordpress-core.ts`（函式已搬離 route）。
+- master plan §0.5 P1 🔲→✅（commit a488ae79）、A6 列 location 更新指向 core。
+- **⚠ 並行工作樹事件**：core/route/積木三檔在我寫完後、收尾前，被另一 session 的 commit `a488ae79`（訊息 "docs(content-studio)... Postiz Task1"）**順手掃進**（共用工作樹 dirty 檔被該 commit 一併提交）。code 正確無虞（critic 正是拿 `a488ae79~1` 當 before-image 逐行 diff 驗證），僅 commit 訊息與內容不符；本收尾 commit 補 WORKLOG + ledger + stale 修。再次驗證「雙 session 同樹」風險（記憶體 feedback_all_machines_sync / git_log_before_edit）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin 全專案）| exit=0 | ms~ — 真 build gate（非 vitest）全綠，含 strict:false 下 route `result as WordPressPublishFailure` cast 無型別錯；core 的 `wire` 字面型別 `"text"|"json"` 與全部 return 對齊。
+- REALTEST_EVIDENCE: tool=Bash（critic 子代理執行）| cmd=`node JSON.stringify(success object)` 對 Bridge/REST 兩種成功回應 | exit=0 | 與原 route 回應**位元相同**（無多餘 undefined 鍵改變 bytes）— 行為保留的決定性證據。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n — 外部 oracle 拿 git before-image `a488ae79~1:publish/route.ts`（439 行）逐行 diff：helpers 位元相同（原 10-235 vs core 52-277）；**12 種回應變體**（status code + text/json body shape + JSON 鍵 + 序列化 bytes）建一一對應表全數重現，零 divergence；5 個 text 錯誤維持 wire:"text"、4 個 json 錯誤維持 wire:"json"，無翻轉；draft-first 硬鎖（core 兩寫入點 hardcode status:"draft"，從不讀 body.status，惡意 ctx.status:"publish" 被靜默忽略）；積木休眠=零攻擊面；strict:false discriminated-union cast 安全（tsc exit 0）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`publishToWordPress\|content/publish/route\|publish/route.ts markdownToHtml\|identical copy in app/api/content/publish` | hits=`publishToWordPress` 僅 core(定義)+route(import)+積木(import) 三處、**無其他 consumer**（route 內部函式從未 export，零外部依賴）；3 處 stale 註解已同 commit 修；WORKLOG 歷史條目 append-only 不改；`POSTIZ_SOCIAL_PUBLISHING_PLAN.md:14` 對 route 的 `:135-138/:201` 行號早已 stale（屬 P5 修，非本次引入）。
+
+**[剩餘風險]** ① 積木 register() 未被觸發（無 import）→ runtime 休眠，需 P4 接 byKind 才生效（按設計，非缺陷）。② POSTIZ plan 對 publish route 的行號 stale（P5 重訪）。③ 共用工作樹並行 commit 風險再現（a488ae79）。
+
+**[rollback]** 精準回 P1：`git checkout a488ae79~1 -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/publish/route.ts` + 刪 `lib/content/publish/wordpress-core.ts`、`lib/content/blocks/publish-wordpress.ts`；收尾文件/stale 修用 `git revert <收尾hash>`。**勿** `git revert a488ae79`（會連帶還原別 session 的 WORKLOG/Postiz 改動）。
+
+AUTO_TASK_DONE: P1 publish/wordpress 抽 core（純函式 publishToWordPress）+ 薄殼 route（440→43 行）+ headless 積木，行為位元保留（critic before-image diff PASS、tsc exit 0、12 回應變體一一對應），master plan §0.5 P1→✅（code 落 a488ae79，收尾本 commit）
+
 ### feat(content-studio): Content Studio A/B/C 三批上線 — drafts/sources 表 + FluentCRM 草稿層；wp-bridge v0.11.0 發版 + soulful 實測；Postiz API 契約
 
 **[任務理解]** 使用者授權三件套（前次 AskUserQuestion）：Q1 全套上線（migrations 0041 `content_drafts`+0042 `content_sources` apply 到 prod Supabase〔High-risk〕→ sg-deploy next-admin 帶 A/B/C 全碼）；Q2 wp-bridge 0.11.0 發版（two-repo flow）+ soulful 真草稿建→驗 status=draft→刪；Q3 Postiz Public API 契約研究（read-only，寫成 Task 0 交付）。三批均 draft-only 紅線（FluentCRM 永不寄送）。
