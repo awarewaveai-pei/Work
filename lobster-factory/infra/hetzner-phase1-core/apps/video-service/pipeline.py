@@ -443,6 +443,28 @@ def cleanup():
 
 
 # ═══════════════════════════════════════════
+# Render-only 入口（給 next-admin video/pipeline 積木呼叫）
+# ═══════════════════════════════════════════
+def render_video(scenes: list, image_files: list, out_name: str):
+    """只做合成：scenes(含 narration) + 已備妥的場景圖 → 配音 → 合成 → 多尺寸輸出。
+
+    刻意「不」生腳本、不生圖、不發佈 —— 那三件由 next-admin 既有能力負責
+    （article core / image-gen / wp-bridge），本服務只保留它獨有的影片合成價值。
+    回傳 (output_files: dict, base_video: str, out_dir: Path)。呼叫端負責 cleanup()。
+    """
+    if len(scenes) != len(image_files):
+        raise ValueError(f"scenes({len(scenes)}) 與 image_files({len(image_files)}) 數量不一致")
+    safe_name = re.sub(r"[^\w一-鿿]", "_", out_name)[:40] or "video"
+    out_dir = config.OUTPUT_DIR / safe_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    audio_files = generate_audio(scenes)
+    base_video = compose_base_video(scenes, image_files, audio_files, safe_name)
+    output_files = export_all_formats(base_video, out_dir)
+    return output_files, base_video, out_dir
+
+
+# ═══════════════════════════════════════════
 # 可程式化進入點（給 controller 呼叫）
 # ═══════════════════════════════════════════
 def run(mode: str, topic: str = "", article_title: str = "", article_content: str = "") -> dict:
@@ -461,9 +483,8 @@ def run(mode: str, topic: str = "", article_title: str = "", article_content: st
         video_meta = data["video"]
 
         image_files = generate_all_images(video_meta["scenes"])
-        audio_files = generate_audio(video_meta["scenes"])
-        base_video = compose_base_video(video_meta["scenes"], image_files, audio_files, safe_name)
-        output_files = export_all_formats(base_video, out_dir)
+        # 合成走共用的 render-only 入口（零重複；run 額外負責生腳本/生圖/發佈）
+        output_files, base_video, out_dir = render_video(video_meta["scenes"], image_files, safe_name)
 
         youtube_url = embed_code = ""
         if config.YOUTUBE_ENABLE:

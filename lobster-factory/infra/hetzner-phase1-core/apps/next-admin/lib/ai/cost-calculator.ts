@@ -19,9 +19,28 @@ import {
   INFRA_MONTHLY,
   TWD_RATE,
   type FeatureProfile,
+  type TextRate,
 } from "./cost-model";
 
 export const usdToNtd = (usd: number): number => Math.round(usd * TWD_RATE * 100) / 100;
+
+/** Clamp a token count to a non-negative finite integer (a malformed usage frame could carry NaN). */
+const safeTok = (n: number | undefined): number => Math.max(0, Number(n) || 0);
+
+/**
+ * Resolve the rate for a model id, tolerating the dated/normalized id the API ECHOES back (which can
+ * differ from the alias the code SENT — e.g. send `claude-sonnet-4-6`, get `claude-sonnet-4-6-20260101`).
+ * Without this, a dated Opus/Fable/GPT id would miss the table and be silently mispriced at the Sonnet
+ * fallback rate. `fallback: true` signals an unpriced model so callers can flag it instead of hiding it.
+ */
+export function resolveTextRate(model: string): { rate: TextRate; matchedKey: string; fallback: boolean } {
+  if (TEXT_RATES[model]) return { rate: TEXT_RATES[model], matchedKey: model, fallback: false };
+  const undated = model.replace(/-\d{8}$/, "");
+  if (TEXT_RATES[undated]) return { rate: TEXT_RATES[undated], matchedKey: undated, fallback: false };
+  const prefix = Object.keys(TEXT_RATES).find((k) => model.startsWith(k));
+  if (prefix) return { rate: TEXT_RATES[prefix], matchedKey: prefix, fallback: false };
+  return { rate: TEXT_RATES[FALLBACK_TEXT_MODEL], matchedKey: FALLBACK_TEXT_MODEL, fallback: true };
+}
 
 /** Exact USD for one text call. cacheRead/cacheWrite optional; unknown model → fallback rate. */
 export function textCallCostUsd(args: {
@@ -31,14 +50,14 @@ export function textCallCostUsd(args: {
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
 }): number {
-  const rate = TEXT_RATES[args.model] ?? TEXT_RATES[FALLBACK_TEXT_MODEL];
+  const { rate } = resolveTextRate(args.model);
   const inM = rate.inputPerM / 1_000_000;
   const outM = rate.outputPerM / 1_000_000;
   const cost =
-    args.inputTokens * inM +
-    args.outputTokens * outM +
-    (args.cacheReadTokens ?? 0) * inM * rate.cacheReadMult +
-    (args.cacheWriteTokens ?? 0) * inM * rate.cacheWriteMult;
+    safeTok(args.inputTokens) * inM +
+    safeTok(args.outputTokens) * outM +
+    safeTok(args.cacheReadTokens) * inM * rate.cacheReadMult +
+    safeTok(args.cacheWriteTokens) * inM * rate.cacheWriteMult;
   return cost;
 }
 

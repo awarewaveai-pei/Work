@@ -12,8 +12,7 @@
  * The Anthropic SDK response carries `.usage` (input_tokens, output_tokens, cache_*); we read it.
  */
 import { getSupabaseWriteClient } from "../supabase-server";
-import { textCallCostUsd } from "./cost-calculator";
-import { TEXT_RATES } from "./cost-model";
+import { textCallCostUsd, resolveTextRate } from "./cost-calculator";
 
 /** Shape of the `usage` block on an Anthropic Messages response (subset we need). */
 export interface AnthropicUsageLike {
@@ -95,20 +94,22 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
     if (!supabase) return; // write client not configured — silently skip, never break the feature
 
     const costUsd = textCallCostUsd({ model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens });
-    const vendor = TEXT_RATES[model]?.vendor ?? null;
+    // Resolve via the same normalizer the cost uses, so vendor + the unpriced-model flag are accurate
+    // even when the API echoes a dated id. rate_fallback surfaces mispriced models instead of hiding them.
+    const resolved = resolveTextRate(model);
 
     await supabase.from("ai_call_logs").insert({
       organization_id: organizationId ?? null,
       route,
       model,
-      vendor,
+      vendor: resolved.rate.vendor,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       cache_read_tokens: cacheReadTokens,
       cache_write_tokens: cacheWriteTokens,
       cost_usd: Number(costUsd.toFixed(6)),
       actor_role: actorRole ?? null,
-      metadata: metadata ?? {},
+      metadata: resolved.fallback ? { ...(metadata ?? {}), rate_fallback: true, matched_rate: resolved.matchedKey } : (metadata ?? {}),
     });
   } catch {
     // Swallow — observability must never break the feature it observes.
