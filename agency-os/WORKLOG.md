@@ -15,7 +15,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npm test`(vitest) | exit=0 | 379/379 passed（deploy gate；無連帶破壞）
 - REVIEW_DONE: critic=Deep | verdict=pass（0 Critical/0 High）| findings=3 actionable（mockupUrls stale-input、中途換設計圖未鎖、雙擊 latch）→ **全部已修**；critic 已逐項確認 payload 與後端 contract 一致、step 結果皆走本地變數、copy 非致命處理正確。
 - BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=`runAll\|allRun\|runAllLatch\|/api/tools/publish` | hits=0（真實符號僅在 PublishWizard.tsx；clients page 命中為 `installRuns` 子字串誤判；docs「一鍵上 Printful」指既有 ③ 按鈕，本次只加上層按鈕未移除步驟 → 無 stale）
-**[剩餘風險]** ① 尚未部署 prod（需 sg-deploy，使用者 go-ahead）② live 瀏覽器 e2e（真建 Woo 草稿+native 商品）屬操作者驅動，未在本機跑（不污染客戶店）③ runAll 內 `designs` 仍讀閉包，但僅 mount 抓一次，安全。
+**[剩餘風險]** ① **✅ 已部署 prod**（sg-deploy `c2bf5674`，prev `8a4727a5`；container 6s healthy + HTTP smoke 4/4 + 部署 bundle grep 證實含「全部一鍵完成」+ Playwright smoke 26/0/6）② live 瀏覽器 e2e（真建 Woo 草稿+native 商品）屬操作者驅動，未在本機跑（不污染客戶店）③ runAll 內 `designs` 仍讀閉包，但僅 mount 抓一次，安全。
 **[rollback]** 單檔改動，`git revert` 或還原 PublishWizard.tsx 即可；無 schema/infra/contract 變更。
 
 ## 2026-06-16
