@@ -66,7 +66,7 @@ interface ModelConfig {
 
 // Ideogram v4 has NO aspect_ratio — resolution enum (WxH strings) only. NO seed either.
 // All five values below confirmed present in the live v4 resolution enum; 1792x2240 = 4:5 exact.
-// 4:3/3:4/16:9 entries are approximate ~3-4MP values (unverified against live enum; v4 is no-ref so not used in mockup tool).
+// 4:3/3:4/16:9 entries are approximate ~3-4MP values (unverified against live enum; may 422 on v4).
 const IDEOGRAM_V4_RES: Record<AspectRatio, string> = {
   "2:3": "1664x2496",
   "3:2": "2496x1664",

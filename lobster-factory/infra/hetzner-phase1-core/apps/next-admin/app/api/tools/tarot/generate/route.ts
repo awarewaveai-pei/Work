@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   }
   if (body.aspectRatio != null && !isAspectRatio(body.aspectRatio)) {
     return NextResponse.json(
-      { ok: false, error: "aspectRatio must be one of: 2:3 3:2 4:5 1:1 9:16" },
+      { ok: false, error: "aspectRatio must be one of: 1:1 2:3 3:2 4:3 3:4 4:5 9:16 16:9" },
       { status: 400 },
     );
   }
