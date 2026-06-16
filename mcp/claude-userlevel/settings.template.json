@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ~/.claude/hooks/ao-resume-on-prompt.ps1",
+            "command": "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ~/.claude/hooks/ao-resume-on-prompt.ps1",
             "timeout": 1200
           }
         ]
@@ -136,7 +136,7 @@
           {
             "type": "command",
             "if": "Bash(*git push*)",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ~/.claude/hooks/post-push-trigger-deploy.ps1",
+            "command": "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ~/.claude/hooks/post-push-trigger-deploy.ps1",
             "timeout": 360000,
             "statusMessage": "Checking if Trigger.dev auto-deploy is needed..."
           }
