@@ -1,13 +1,24 @@
 /**
- * Smoke 04 — /onboard page renders the OnboardWizard UI
+ * Smoke 04 — /onboard serves the real, hydrated app (not a 404 / stale bundle)
  *
  * Why this exists:
  *   Smoke 02 only checks that routes return non-5xx. /onboard sits behind
  *   nginx auth_basic, so an unauthenticated 401 looked like "PASS" while
  *   the actual Next.js page could be 404 or stuck on an older bundle.
- *   This spec authenticates with HTTP Basic and asserts the wizard's
- *   stable Chinese text anchors are present — catching "deployed but
- *   page didn't actually load" regressions on every /sg-deploy.
+ *
+ * Two auth layers (important — this is why the assertions look the way they do):
+ *   1. nginx auth_basic  — passed here via `httpCredentials` (OPS_BASIC_*).
+ *   2. app-level Supabase login — NOT passed: the smoke harness has no app
+ *      session. Against prod (app.aware-wave.com) /onboard therefore correctly
+ *      renders the Admin Console *login gate*, never the wizard. Provisioning a
+ *      client must never be reachable unauthenticated, so this is by design.
+ *
+ *   The reachable contract without app credentials is: "the route serves the
+ *   real hydrated app shell + login gate" — a 404 / dead bundle renders none of
+ *   those anchors. Deep "authenticated wizard body" coverage (the 5-step
+ *   progress / "shipped 4-step but loaded old 3-step" regression) needs an app
+ *   session and lives in the `test.fixme` below, pending a seeded Supabase E2E
+ *   account wired into tests/e2e/helpers/env.ts. Parked, not deleted.
  *
  * Credentials:
  *   OPS_BASIC_USER / OPS_BASIC_PASSWORD env vars (set in mcp/user-env.ps1).
