@@ -57,7 +57,8 @@
 | **P4** | `byKind()` 串 article→quality→publish headless 跑通成 WP draft（編排器 `lib/content/pipeline.ts`；search 為上游 producer 不入迴圈，理由見檔頭）| ✅ | `f0c8f750`（docs/WORKLOG）+ `bf70554f`（pipeline.ts+3 積木 code）；44/44 REALTEST、tsc 0、critic PASS 0c0m0n | Med | ✓ |
 | **P5** | `publish/social`：lib/content/postiz.ts + /api/content/social-publish（draft 預設）| ⛔ | — | Med-High | 待+憑證 |
 | **P6** | 🗑️ 刪 Python publisher.py 直連（grep 確認無 caller）| 🔲 | — | Med | 待 |
-| **P7** | `video/pipeline` 積木 + Python 微服務骨架（圖→TTS→ffmpeg 本機驗證）| 🔲 | — | Med | 待 |
+| **P7** | `video/pipeline` 積木 + Python 微服務骨架（圖→TTS→ffmpeg 本機驗證）| 🟡 骨架✅本機驗證✅／積木接線🔲 | `037f57b9`+`b7f5762a`+`186f6e72` | Med | 部分 |
+| **P7 註** | 微服務骨架已落 `apps/video-service/`（桌機原作搬正位+發佈閘預設關 render-only）。合成核心 real-test 通過（真 Edge TTS+moviepy Ken Burns+CJK 字幕+ffmpeg 四尺寸驗尺寸）。修 Pillow≥10/moviepy<2 ANTIALIAS 相容崩潰 bug。**剩**：`video-pipeline.ts` 積木接 pipeline.ts（Phase 1）；發佈一律走 wp-bridge（R4），微服務只 render-only。⚠️ vault Anthropic+OpenAI 直連 key 皆 401 待刷新。 | | | |
 | **P8** | 微服務容器化 + 部署 + healthcheck + smoke（SG/EU）| 🔲 | — | Med-High | 待 |
 | **P9** | 全管線端到端 + R8/R9 gate + Telegram 通知 + WORKLOG | 🔲 | — | Med | 待 |
 
