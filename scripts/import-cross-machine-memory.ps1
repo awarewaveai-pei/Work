@@ -146,11 +146,15 @@ function Get-MachineExportUtc([string]$SecretsRoot, [string]$Machine) {
 # True when an other-machine folder dated the SAME calendar day as own machine carries a
 # strictly newer manifest timestamp (folder names hold date only -> must compare full UTC).
 # Unreadable / missing timestamps -> $false (keep the safe "skip same-date" behaviour).
-function Test-SameDateOtherNewer($Entry, $OwnUtc) {
+function Test-SameDateOtherNewer($Entry, $OwnUtc, [string]$SecretsRoot) {
     if (-not $Entry.IsNewFormat -or -not $Entry.FolderMachine -or -not $OwnUtc) { return $false }
-    $sr = Split-Path (Split-Path $Entry.Folder.FullName -Parent) -Parent
+    # Both machines' manifests live in the SAME secrets root, so reuse the caller-resolved root
+    # (honours $env:AO_SYNC_SECRETS_ROOT, same precedence as the own-side lookup) and only fall
+    # back to deriving from the folder path when the caller passed nothing.
+    $sr = if ($SecretsRoot) { $SecretsRoot } else { Split-Path (Split-Path $Entry.Folder.FullName -Parent) -Parent }
     $otherUtc = Get-MachineExportUtc $sr $Entry.FolderMachine
     if (-not $otherUtc) { return $false }
+    # Assumes both machines are NTP-synced; collision window is bounded to a single calendar day.
     return ($otherUtc -gt $OwnUtc)
 }
 
