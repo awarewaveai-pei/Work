@@ -336,6 +336,18 @@ $ownLatestDateStr = $allFolders | ForEach-Object {
     if ($_.Name -match "^AO-SYNC-(\d{4}-\d{2}-\d{2})-$([regex]::Escape($machineTag))$") { $matches[1] }
 } | Sort-Object -Descending | Select-Object -First 1
 
+# Own machine's full export timestamp (for the same-date tie-break below). Folder names carry
+# the date only, so two machines that export on the same calendar day are indistinguishable by
+# name; the manifest exported_utc breaks the tie. Null when own machine has no manifest yet.
+$ownExportUtc = $null
+if ($ownLatestDateStr) {
+    $ownFolder = $allFolders | Where-Object { $_.Name -eq "AO-SYNC-$ownLatestDateStr-$machineTag" } | Select-Object -First 1
+    $ownSecretsRoot = if ($env:AO_SYNC_SECRETS_ROOT) { $env:AO_SYNC_SECRETS_ROOT }
+                      elseif ($ownFolder) { Split-Path (Split-Path $ownFolder.FullName -Parent) -Parent }
+                      else { $null }
+    $ownExportUtc = Get-MachineExportUtc $ownSecretsRoot $machineTag
+}
+
 $candidateFolders = @(
     $allFolders | ForEach-Object {
         $name = $_.Name
@@ -349,14 +361,20 @@ $candidateFolders = @(
         $_ -ne $null -and
         # Exclude own machine folders
         -not ($_.IsNewFormat -and $_.FolderMachine -eq $machineTag) -and
-        # Only import if other machine's export is strictly newer than own machine's latest export.
-        # Prevents overwriting fresh local data with stale data from another machine.
-        ($ownLatestDateStr -eq $null -or $_.DateStr -gt $ownLatestDateStr)
+        # Import when the other machine's export is newer than own machine's latest export:
+        #   newer date          -> always import
+        #   same date           -> compare full manifest timestamps (fixes 2026-06-16 same-day skip bug)
+        #   older / unreadable   -> skip (protect fresh local data)
+        (
+            $ownLatestDateStr -eq $null -or
+            $_.DateStr -gt $ownLatestDateStr -or
+            ($_.DateStr -eq $ownLatestDateStr -and (Test-SameDateOtherNewer $_ $ownExportUtc))
+        )
     } | Sort-Object DateStr -Descending   # newest date first
 )
 
 if ($ownLatestDateStr -and $candidateFolders.Count -eq 0 -and $allFolders.Count -gt 0) {
-    Write-Host "  cross-machine import: skipped — own machine export ($ownLatestDateStr) is same date or newer than all other-machine exports" -ForegroundColor DarkGray
+    Write-Host "  cross-machine import: skipped — no other-machine export newer than own machine's latest ($ownLatestDateStr); local is current" -ForegroundColor DarkGray
 }
 
 # ── MEMORY.md import ──────────────────────────────────────────────────────────
