@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { decodeWpEntities } from "@/lib/content/wp-entities";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

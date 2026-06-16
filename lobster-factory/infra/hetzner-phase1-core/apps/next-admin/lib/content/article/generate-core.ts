@@ -166,9 +166,13 @@ const ALLOWED_MODELS = [
   ...OPENAI_MODELS,
 ];
 
-/** True when the model should stream via the OpenAI Chat Completions path rather than Anthropic. */
+/**
+ * True when the model should stream via the OpenAI Chat Completions path rather than Anthropic.
+ * `model` is always an ALLOWED_MODELS member by the time it reaches here (prepareArticleGeneration
+ * clamps anything else to sonnet), so a plain membership check is exact — no prefix heuristic needed.
+ */
 function isOpenAiModel(model: string): boolean {
-  return OPENAI_MODELS.includes(model) || /^(gpt-|o\d)/.test(model);
+  return OPENAI_MODELS.includes(model);
 }
 
 /** Call Perplexity Sonar to get 3–5 real, verified external source URLs for the keyword. */
@@ -770,7 +774,11 @@ async function* streamOpenAiGeneration(
       const { done, value } = await reader.read();
       if (done) break;
       buf += dec.decode(value, { stream: true });
-      // SSE frames are separated by blank lines; each carries one or more `data: {json}` lines.
+      // OpenAI Chat Completions emits each event as a SINGLE-line `data: {json}` frame (the JSON never
+      // contains a raw newline), so line-based parsing is correct here. We split on "\n" and keep the
+      // trailing partial line in `buf` so a frame split across two network chunks reassembles. (If the
+      // provider ever emitted multi-line `data:` payloads per the SSE spec, this would need event-based
+      // accumulation on "\n\n" — not the case for OpenAI today; critic 2026-06-16 Major, documented.)
       const frames = buf.split("\n");
       buf = frames.pop() ?? ""; // keep the trailing partial line for the next read
       for (const line of frames) {
@@ -782,7 +790,15 @@ async function* streamOpenAiGeneration(
           const j = JSON.parse(payload) as {
             choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>;
             usage?: { prompt_tokens?: number; completion_tokens?: number };
+            error?: { message?: string };
           };
+          // Mid-stream error frame (content filter / quota exhausted mid-generation). Surface it as a
+          // GENERATION_ERROR — matching the Anthropic path — instead of silently shipping a partial
+          // article as "done" (critic 2026-06-16 Major).
+          if (j.error) {
+            yield `\n\n<!-- GENERATION_ERROR: OpenAI stream error -->`;
+            return;
+          }
           const choice = j.choices?.[0];
           const piece = choice?.delta?.content;
           if (piece) yield piece;
