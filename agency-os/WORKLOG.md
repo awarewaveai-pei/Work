@@ -4,6 +4,23 @@
 
 ## 2026-06-16
 
+### fix(content-studio): U-Width 補完 — 熱門搜尋 + 文章設定 兩塊加寬（產文頁全寬一致）
+
+**[任務理解]** 部署上線後操作者再抓：產文頁「熱門搜尋/關鍵字探索」+「文章設定」仍窄（640px），與全寬的 SectionToggle 區段（Structure/Media…）視覺不一致。上輪 U-Width 只加寬發布設定+產出文章，漏這兩塊。
+
+**[現況分析]** `.form-block{max-width:640px}` 為根因；但 `form-block` 另被 `login/LoginForm.tsx`、`ops-console/TenantConfigForm.tsx`、`ops-console/AiJobForm.tsx` 使用（那邊 640px cap 合理）→ **不可改 globals.css 根治**。維持既有 pattern：逐塊加 `form-block--wide`（globals.css:579 = max-width:none）。SectionToggle 區段本就無 form-block class → 撐滿 1400px 容器，故顯寬。其他頁籤（humanize/bulk/drafts）全 form-block 無 SectionToggle 鄰居 → 內部一致，不在本次範圍。
+
+**[已修改]** `ContentStudio.tsx`：line 1295（熱門搜尋 panel）+ 1522（文章設定 block）`className="form-block"` → `"form-block form-block--wide"`。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin 全專案）| exit=0 — 純 className 加既有 class 無型別/語法破壞。
+- REVIEW_WAIVED: NA -- 純 CSS class toggle（加既有 `form-block--wide`），零邏輯/狀態/資料流改動，與 critic 上輪已 Deep-pass 的 3 塊（目標客戶/發布設定/產出文章）同 pattern。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`form-block--wide\|form-block` | hits=`form-block` 5 檔（ContentStudio + globals.css 定義 + login + ops-console×2）；login/ops-console 刻意保留 640px cap（未動）；`form-block--wide` 定義存在 globals.css:579，無 stale。
+
+**[剩餘風險]** humanize/bulk/drafts 頁籤仍 640px（內部一致，未抓）；操作者若要全頁籤統一加寬再補。
+
+**[rollback]** `git revert <本 commit>`（僅 ContentStudio.tsx 兩行 className）。
+
 ### feat(content-blocks): 商品文案 → `product/copy` 積木 + publish UI 套完整 RankMath/SEO/GEO/AEO 面板 + AI 修正（方案B）
 
 **[任務理解]** 操作者要：① 把 `generateProductCopy`（`lib/studio/product-copy.ts`）做成積木註冊系統的積木（可移植、日後複用）；② publish UI 套上 `/tools/content` 的 SEO/GEO/AEO/RankSEO 功能。選定**方案B**＝註冊積木 + 把完整 16 項 RankMath 面板 + AI 自動修正搬進商品發佈頁（非僅最小註冊）。

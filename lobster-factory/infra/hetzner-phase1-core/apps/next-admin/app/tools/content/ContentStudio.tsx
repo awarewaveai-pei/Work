@@ -1292,7 +1292,7 @@ export default function ContentStudio() {
       </div>
 
       {/* ── Trending Keywords Panel ── */}
-      <div className="form-block" style={{ marginBottom: "16px" }}>
+      <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <button onClick={() => setShowTrending(v => !v)}
@@ -1519,7 +1519,7 @@ export default function ContentStudio() {
             </div>
           </div>
 
-          <div className="form-block" style={{ marginBottom: "16px" }}>
+          <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
             <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "14px", color: "var(--text-primary)" }}>文章設定</div>
 
             {/* 關鍵字 + 標題 */}
