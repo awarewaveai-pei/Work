@@ -1249,6 +1249,10 @@ export default function ContentStudio() {
   const isHumanizing = humStatus === "streaming";
   const hasHumOutput = humOutput.trim().length > 0;
 
+  // Capabilities of the currently-selected image model — gates the Seed + 參考圖(img2img) controls so the
+  // UI never offers a knob the model silently ignores. Falls back to "none" (no caps) for unknown values.
+  const selectedImageModel = AI_IMAGE_PROVIDERS.find(p => p.value === form.media.aiImages) ?? AI_IMAGE_PROVIDERS[0];
+
   // Unresolved YouTube placeholders still in the draft, in document order. Each needs a real watch URL
   // pasted before publish — otherwise publish/route + markdownToBlocks drop the line cleanly.
   const ytPlaceholders = [...generated.matchAll(/\[YOUTUBE_PLACEHOLDER_(\d+):\s*([^\]]+)\]/g)]
