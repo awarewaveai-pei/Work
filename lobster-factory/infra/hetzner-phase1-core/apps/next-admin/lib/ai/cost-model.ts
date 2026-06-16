@@ -141,9 +141,10 @@ export interface InfraCost {
 }
 
 export const INFRA_MONTHLY: InfraCost[] = [
-  { key: "hetzner-sg", label: "Hetzner SG VPS (5.223.93.113, ~4GB)", usdPerMonth: 9, estimate: true, note: "未記錄於 repo；查 Hetzner console 實際方案" },
-  { key: "hetzner-eu", label: "Hetzner EU VPS (204.168.175.41, cpx32)", usdPerMonth: 15, estimate: true, note: "未記錄；Supabase/n8n/Postiz/Trigger 全自託管於此" },
-  { key: "cloudflare", label: "Cloudflare (DNS/WAF/R2)", usdPerMonth: 0, estimate: true, note: "推測 Free plan；R2 儲存依用量另計，確認後改" },
-  { key: "domains", label: "網域續約攤提 (aware-wave + soulful)", usdPerMonth: 8, estimate: true, note: "soulful ~$80/年 待確認 line items；攤成月" },
-  { key: "saas-other", label: "其他 SaaS (Sentry/PostHog 等，若付費)", usdPerMonth: 0, estimate: true, note: "目前推測免費/自託管；有付費方案再加" },
+  // Hetzner real (Cloud API 2026-06-16): EUR billed, net==gross. usdPerMonth = EUR × EUR_USD_RATE.
+  { key: "hetzner-sg", label: "Hetzner SG VPS (5.223.93.113, cpx22 2c/4GB, sin)", usdPerMonth: Math.round(30.99 * EUR_USD_RATE * 100) / 100, estimate: false, note: "真實: €30.99/月 (€22.99 + sin €8 加價)，Hetzner API" },
+  { key: "hetzner-eu", label: "Hetzner EU VPS (204.168.175.41, cpx32 4c/8GB, hel1)", usdPerMonth: Math.round(41.99 * EUR_USD_RATE * 100) / 100, estimate: false, note: "真實: €41.99/月，Hetzner API；Supabase/n8n/Postiz/Trigger 全自託管於此" },
+  { key: "cloudflare", label: "Cloudflare (DNS/WAF/R2)", usdPerMonth: 0, estimate: false, note: "真實: 2 zones (aware-wave.com / weartheworld.org) 皆 Free plan $0，CF API；R2 在免費額度內(10GB)，量大再加" },
+  { key: "domains", label: "網域續約攤提 (aware-wave / weartheworld / soulful)", usdPerMonth: 8, estimate: true, note: "registrar 不在 CF/Hetzner API；soulful ~$80/年(Hostinger 待確認 line items)；攤成月" },
+  { key: "saas-other", label: "其他 SaaS (Sentry/PostHog 等，若付費)", usdPerMonth: 0, estimate: true, note: "推測免費額度；有付費方案再加" },
 ];
