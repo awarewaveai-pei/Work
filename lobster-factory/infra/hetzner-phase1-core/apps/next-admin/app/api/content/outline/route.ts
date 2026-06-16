@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,6 +61,8 @@ Example format (primary keyword "art therapy" — exact in 1–2, variants elsew
 ## Conclusion: Making Creative Healing Part of Life`,
     }],
   });
+
+  void logAiCall({ route: "/api/content/outline", response: msg, actorRole: role });
 
   const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
   // A truncated/empty completion would otherwise return ok:true with a blank outline, making the

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +71,8 @@ Use these exact keys: ${platforms.map(p => `"${p}"`).join(", ")}
 Example: {"twitter_single": "...", "linkedin": "...", "email": "..."}`,
     }],
   });
+
+  void logAiCall({ route: "/api/content/syndicate", response: msg, actorRole: role });
 
   const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "{}";
   try {

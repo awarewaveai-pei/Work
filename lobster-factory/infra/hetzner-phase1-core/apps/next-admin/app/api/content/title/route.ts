@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +62,8 @@ Return ONLY a valid JSON array of 5 title strings, nothing else.
 Example: ["Title One Here", "Title Two Here", "Title Three Here", "Title Four Here", "Title Five Here"]`,
     }],
   });
+
+  void logAiCall({ route: "/api/content/title", response: msg, actorRole: role });
 
   const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "[]";
   try {

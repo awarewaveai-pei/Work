@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,8 @@ Return ONLY a valid JSON array of 20 keyword strings, no explanations.
 Example: ["keyword one", "phrase two", "term three"]`,
     }],
   });
+
+  void logAiCall({ route: "/api/content/keywords", response: msg, actorRole: role });
 
   const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "[]";
   try {

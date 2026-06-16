@@ -116,4 +116,25 @@ describe("markdownToBlocks", () => {
     expect(allText).toContain("看這段影片");
     expect(allText).toContain("很有趣");
   });
+
+  // #6 — Kadence funnel patterns
+  it("turns a standalone [KADENCE_PATTERN: id] into a pattern block (#6)", () => {
+    const blocks = markdownToBlocks("前言\n\n[KADENCE_PATTERN: 7207]\n\n結語");
+    expect(blocks).toContainEqual({ type: "pattern", ref: 7207 });
+    expect(blocks.filter(b => b.type === "paragraph")).toHaveLength(2);
+  });
+
+  it("drops a KADENCE_PATTERN with a zero/invalid ref instead of emitting ref:0 (#6)", () => {
+    const blocks = markdownToBlocks("[KADENCE_PATTERN: 0]");
+    expect(blocks.filter(b => b.type === "pattern")).toHaveLength(0);
+  });
+
+  it("scrubs an INLINE KADENCE_PATTERN so the raw cue never leaks mid-sentence (#6)", () => {
+    const blocks = markdownToBlocks("快來看 [KADENCE_PATTERN: 7207] 這個方案");
+    const allText = JSON.stringify(blocks);
+    expect(allText).not.toContain("KADENCE_PATTERN");
+    expect(allText).not.toContain("pattern"); // not promoted to a pattern block when inline
+    expect(allText).toContain("快來看");
+    expect(allText).toContain("這個方案");
+  });
 });

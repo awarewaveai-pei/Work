@@ -67,7 +67,9 @@
 - 觀察性缺口（記錄）：`docker logs lobster-next-admin` 只見啟動 log，route 不寫請求/錯誤 log → A2 失敗只能從 HTTP response 看，伺服器端無痕跡（未來 confirm phase 前建議加結構化 log）。
 - 根因：soulful Woo 商品（7149）經官方 Printful 外掛上架到**平台店 18314943**，A1 native 建品在**18324409**，兩店變體 SKU 不同 → A2（打 native）對 platform-store SKU 全 miss。**決策待使用者**：對齊 SKU（native 上架）vs 不對 soulful 用 A2（外掛已履約）vs 收斂為單一履約路徑。
 
-**[剩餘風險]** ① 真實 soulful 訂單現會觸發 A2 但 SKU 未對齊前全 502 benign fail（零草稿；伺服器端無 log，靠 Woo webhook delivery log 觀察）。② confirm/charge/print 🔴 仍未建（金流紅線）。③ 兩 Printful 店並存（平台 18314943 外掛履約 + native 18324409 A2 草稿）+ 兩履約機制並行 = 架構待收斂，使用者須決策。
+**[決策 — soulful 維持外掛履約，A2 不接 soulful]** SKU mismatch 揭露雙履約機制衝突。使用者線索「之後還會有別客戶做 POD」→ 定 go-forward 標準而非修一次性。**處置**：① 刪除今早建的 soulful webhook 4+5（`wp wc webhook delete 4 5 --user=5 --force` ✅，soulful 回今早原狀，只剩原 Printful 外掛 webhook 1-3，外掛繼續履約）② SG A2 flag **保留啟用**（給未來 A1 native 建站、未裝 Printful 外掛的客戶）。**go-forward**：新客戶走 native（A1 建品 + A2 履約，需先建 A2 confirm phase）；既有已用外掛的 soulful 不遷移（live client 低爆炸半徑）。
+
+**[剩餘風險]** ① confirm/charge/print 🔴 仍未建（金流紅線）→ native 履約在 confirm 建好前只到 draft（人工在 Printful dashboard 確認）。② A2 觀察性：route 不寫 server log，未來 confirm phase 前須補結構化 log。③ 多客戶 POD 履約標準（native vs 外掛）為待定架構決策，已記 TASKS。
 
 **[rollback]** SG：`.env` 兩行移除（或設 false）+ `cp docker-compose.yml.bak-a2-20260616-145056 docker-compose.yml`→`docker compose up -d next-admin`。soulful：`wp wc webhook delete 4 5 --user=5`。
 

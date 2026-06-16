@@ -17,6 +17,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { checkRankMath, type RankMathReport, type RankMathCheck } from "../seo/rankmath-checker";
+import { logAiCall } from "../ai/log-ai-call";
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 
@@ -187,6 +188,7 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
     const block = response.content.find((c) => c.type === "text");
     if (!block || block.type !== "text") return { ok: false, error: "empty_response" };
     text = block.text;
+    void logAiCall({ route: "lib/studio/product-copy", response });
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       if (err.status === 401 || err.status === 403) return { ok: false, error: "anthropic_auth_error" };

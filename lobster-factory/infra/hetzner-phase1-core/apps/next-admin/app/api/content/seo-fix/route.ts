@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 import type { RankMathCheck } from "@/lib/seo/rankmath-checker";
 
 export const runtime = "nodejs";
@@ -81,6 +82,8 @@ Please output the COMPLETE improved article. Fix ONLY the listed failed checks â
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
     });
+
+    void logAiCall({ route: "/api/content/seo-fix", response: msg, actorRole: role });
 
     // Aggregate all text blocks (Anthropic may return multiple content blocks)
     const text = msg.content.filter(b => b.type === "text").map(b => (b as { type: "text"; text: string }).text).join("");
