@@ -23,7 +23,13 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n — note：soulful 既有 Printful 外掛 webhook(id1-3)→`store=18314943`(平台店,`PRINTFUL_STORE_ID`) 與 A2 native 店 `18324409`(`PRINTFUL_NATIVE_STORE_ID`) **不同店**；A2 draft-only 附加路徑，不改既有外掛履約，無雙扣款/雙印。SKU caveat：Woo 商品 SKU 非 native 變體 SKU 時 A2 draft benign fail(502,retry,零草稿) 直到上架 native 商品。
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=`POD_AUTO_FULFILL_ENABLED\|WC_WEBHOOK_SECRET\|woo-order\|18314943\|18324409` | hits=memory/WORKLOG 既有記錄一致無 stale；無 repo code 改動（純 prod machine-local config + soulful Woo 設定）。
 
-**[剩餘風險]** ① 真實 soulful 訂單現會自動觸發 A2 建 native 草稿；SKU 未對齊前多 benign fail（看 next-admin log）。② confirm/charge/print 🔴 仍未建（金流紅線）。③ 兩 Printful 店並存（平台 18314943 外掛履約 + native 18324409 A2 草稿）使用者須知。
+**[後續實測 — 真實 SKU 端到端 / SKU mismatch 確認]** 用 soulful t-shirt 7149 真變體 SKU `6A2A474EBBAF7_M`（Printful 外掛 sync 到平台店 18314943 的）+ 完整 TW 地址 + processing 簽章 payload 打 A2：
+- REALTEST_EVIDENCE: tool=curl | cmd=`POST 127.0.0.1:3002/api/webhooks/woo-order`（真 SKU signed）| exit=0 | **http=502 `{"ok":false,"error":"Item 0: Sync variant not found"}`** = native 店 18324409 無此變體 → SKU mismatch 確認（benign fail，Woo 重試但永遠 fail 直到對齊）。
+- REALTEST_EVIDENCE: tool=curl | cmd=`GET api.printful.com/orders/@880001 (X-PF-Store-Id=18324409)` | exit=0 | **http=404 Not Found** = A2 SKU-fail **未建出任何草稿**，零污染零金流。
+- 觀察性缺口（記錄）：`docker logs lobster-next-admin` 只見啟動 log，route 不寫請求/錯誤 log → A2 失敗只能從 HTTP response 看，伺服器端無痕跡（未來 confirm phase 前建議加結構化 log）。
+- 根因：soulful Woo 商品（7149）經官方 Printful 外掛上架到**平台店 18314943**，A1 native 建品在**18324409**，兩店變體 SKU 不同 → A2（打 native）對 platform-store SKU 全 miss。**決策待使用者**：對齊 SKU（native 上架）vs 不對 soulful 用 A2（外掛已履約）vs 收斂為單一履約路徑。
+
+**[剩餘風險]** ① 真實 soulful 訂單現會觸發 A2 但 SKU 未對齊前全 502 benign fail（零草稿；伺服器端無 log，靠 Woo webhook delivery log 觀察）。② confirm/charge/print 🔴 仍未建（金流紅線）。③ 兩 Printful 店並存（平台 18314943 外掛履約 + native 18324409 A2 草稿）+ 兩履約機制並行 = 架構待收斂，使用者須決策。
 
 **[rollback]** SG：`.env` 兩行移除（或設 false）+ `cp docker-compose.yml.bak-a2-20260616-145056 docker-compose.yml`→`docker compose up -d next-admin`。soulful：`wp wc webhook delete 4 5 --user=5`。
 

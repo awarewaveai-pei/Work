@@ -780,10 +780,6 @@ export default function ContentStudio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showTrending, trendTab]);
 
-  // #6 — (re)load available Kadence patterns when the funnel section is open and the target site changes.
-  useEffect(() => {
-    if (showPatterns) void loadPatterns();
-  }, [showPatterns, loadPatterns]);
 
   // ─── Brand Voice ─────────────────────────────────────────────────────────
 
@@ -839,6 +835,11 @@ export default function ContentStudio() {
     } catch { /* silent — funnel patterns are optional */ }
     finally { setPatternsLoading(false); }
   }, [selectedSiteId]);
+
+  // #6 — (re)load available Kadence patterns when the funnel section is open and the target site changes.
+  useEffect(() => {
+    if (showPatterns) void loadPatterns();
+  }, [showPatterns, loadPatterns]);
 
   // ─── Image Generation ─────────────────────────────────────────────────────
 

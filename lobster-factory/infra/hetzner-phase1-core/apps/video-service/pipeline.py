@@ -33,7 +33,8 @@ from PIL import Image, ImageDraw, ImageFont
 # requirements 同時鎖 pillow>=10 + moviepy<2，故必須在 import moviepy 前補回相容別名。
 # 守 hasattr 保證冪等，未來換 Pillow<10 時自動無作用。
 if not hasattr(Image, "ANTIALIAS"):
-    Image.ANTIALIAS = Image.Resampling.LANCZOS
+    # getattr 守 Resampling：未來若放寬 pin 到 Pillow<9.1（無 Resampling）也優雅降級不二次崩
+    Image.ANTIALIAS = getattr(Image, "Resampling", Image).LANCZOS
 
 import edge_tts
 from moviepy.editor import (
