@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-06-16T01:52:54.7838838Z",
+    "generatedAt":  "2026-06-16T02:13:36.7101357Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -12,8 +12,8 @@
                "retention_days":  "7",
                "retention_source":  "static",
                "backup_size":  "8.3G",
-               "latest_time":  "2026-06-15 02:30:58",
-               "oldest_time":  "2026-06-08 02:00:01",
+               "latest_time":  "2026-06-16 02:00:01",
+               "oldest_time":  "2026-06-09 02:00:01",
                "backup_age_days":  "0"
            },
     "eu":  {
@@ -24,8 +24,8 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "4.8G",
-               "latest_time":  "2026-06-15 02:30:37",
+               "backup_size":  "5.0G",
+               "latest_time":  "2026-06-16 02:00:58",
                "oldest_time":  "2026-06-08 02:30:32",
                "backup_age_days":  "0"
            },
