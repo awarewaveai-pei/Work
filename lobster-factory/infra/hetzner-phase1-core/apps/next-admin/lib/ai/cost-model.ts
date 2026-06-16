@@ -42,9 +42,9 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "claude-sonnet-4-6":         { inputPerM: 3, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Sonnet 4.6", vendor: "Anthropic" },
   "claude-opus-4-8":           { inputPerM: 5, outputPerM: 25, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Opus 4.8", vendor: "Anthropic" },
   "claude-fable-5":            { inputPerM: 10, outputPerM: 50, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Fable 5", vendor: "Anthropic" },
-  "gpt-5.5":                   { inputPerM: 5, outputPerM: 30, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.5", vendor: "OpenAI" },
-  "gpt-5.4":                   { inputPerM: 2.5, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4", vendor: "OpenAI" },
-  "gpt-5.4-mini":              { inputPerM: 0.75, outputPerM: 4.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 mini", vendor: "OpenAI" },
+  "gpt-5.5":                   { inputPerM: 5, outputPerM: 30, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-5.5", vendor: "OpenAI" },
+  "gpt-5.4":                   { inputPerM: 2.5, outputPerM: 15, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-5.4", vendor: "OpenAI" },
+  "gpt-5.4-mini":              { inputPerM: 0.75, outputPerM: 4.5, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-5.4 mini", vendor: "OpenAI" },
   "gpt-4o":                    { inputPerM: 2.5, outputPerM: 10, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o", vendor: "OpenAI" },
   // Perplexity Sonar: token price + per-request search fee (~$5/1000 req). Token side only here;
   // the search fee is small and folded into the estimate's per-article assumption (TEXT_FEATURES.extraUsd).
