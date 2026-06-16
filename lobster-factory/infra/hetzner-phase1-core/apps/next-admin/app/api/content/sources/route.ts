@@ -40,14 +40,17 @@ function toItem(r: SourceRow) {
   };
 }
 
-// Parse the geos field from a request body into "*" | string[] (filtered to the allowlist).
-function parseGeos(raw: unknown): "*" | string[] {
-  if (raw === "*" || raw == null) return "*";
+// Parse the geos field from a request body. "*" / null / non-array ⇒ all geos. A non-empty array
+// that filters to NOTHING (e.g. all typos) is a caller error ⇒ { error } so the route returns 400,
+// instead of silently widening the source to every region. (critic 2026-06-16 Minor)
+function parseGeos(raw: unknown): { geos: "*" | string[] } | { error: string } {
+  if (raw === "*" || raw == null) return { geos: "*" };
   if (Array.isArray(raw)) {
     const list = raw.filter((g): g is string => typeof g === "string" && VALID_GEOS.has(g));
-    return list.length ? list : "*";
+    if (list.length === 0) return { error: `geos 無有效地區（允許：${[...VALID_GEOS].join("/")}）` };
+    return { geos: list };
   }
-  return "*";
+  return { geos: "*" };
 }
 
 // GET /api/content/sources — list operator-managed sources (newest first)
@@ -81,12 +84,14 @@ export async function POST(req: Request): Promise<Response> {
 
   const label = typeof body.label === "string" ? body.label.trim() : "";
   const url   = typeof body.url   === "string" ? body.url.trim()   : "";
-  const geos  = parseGeos(body.geos);
+  const geosParsed = parseGeos(body.geos);
 
   if (!label) return NextResponse.json({ ok: false, error: "名稱必填" }, { status: 400 });
   if (!url)   return NextResponse.json({ ok: false, error: "Feed 網址必填" }, { status: 400 });
   if (!isSafePublicHttps(url))
     return NextResponse.json({ ok: false, error: "網址必須是公開的 https 網址（不可為內部/私有位址）" }, { status: 400 });
+  if ("error" in geosParsed) return NextResponse.json({ ok: false, error: geosParsed.error }, { status: 400 });
+  const geos = geosParsed.geos;
 
   const { data, error } = await supabase
     .from("content_sources")
@@ -115,7 +120,11 @@ export async function PATCH(req: Request): Promise<Response> {
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (typeof body.enabled === "boolean") patch.enabled = body.enabled;
   if (typeof body.label === "string" && body.label.trim()) patch.label = body.label.trim();
-  if ("geos" in body) patch.geos = parseGeos(body.geos);
+  if ("geos" in body) {
+    const gp = parseGeos(body.geos);
+    if ("error" in gp) return NextResponse.json({ ok: false, error: gp.error }, { status: 400 });
+    patch.geos = gp.geos;
+  }
   if (typeof body.url === "string" && body.url.trim()) {
     const url = body.url.trim();
     if (!isSafePublicHttps(url))

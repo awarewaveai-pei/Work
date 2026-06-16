@@ -1055,6 +1055,14 @@ export default function ContentStudio() {
 
   async function handlePushNewsletter() {
     if (!generated.trim()) return;
+    // Unresolved image placeholders → the email body would silently drop those images. Block so the
+    // operator waits for AI images to finish (mirrors the YOUTUBE placeholder gate) rather than
+    // shipping a draft with missing images. (critic 2026-06-16 Minor)
+    if (/IMAGE_PLACEHOLDER_\d+/.test(generated)) {
+      setNlStatus("error");
+      setNlResult({ error: "圖片尚未產生完成（仍有未替換的圖片佔位），請稍候再推送" });
+      return;
+    }
     const subject = (metaData?.seoTitle || form.title || form.keyword || "").trim();
     if (!subject) {
       setNlStatus("error"); setNlResult({ error: "缺少主旨（請先填 SEO 標題或關鍵字）" }); return;

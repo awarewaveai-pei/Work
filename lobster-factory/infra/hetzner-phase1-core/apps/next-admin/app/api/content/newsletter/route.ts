@@ -52,6 +52,7 @@ function inline(s: string): string {
 function markdownToEmailHtml(md: string): string {
   const clean = md
     .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
+    .replace(/<!--\s*SLUG_HINT:[^>]*-->/g, "")   // self-contained scrub (client strips it too)
     .replace(/\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]/g, "")
     .replace(/<!--\s*GENERATION_(?:TRUNCATED|ERROR):[\s\S]*?-->/g, "")
     .trim();

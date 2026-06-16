@@ -160,6 +160,7 @@ Autopilot 模式：進度對話回報為主；`AO-CLOSE` 時依各 IDE SSOT 回�
 | 使用者說「別的 AI 處理好了」/「另一個 session 做了 X」/「之前已經做過」/「似乎完成了」（任何基礎設施 / 安全 / 功能改動）| **VBC 協議（強制，R4 SSOT）**：① 先讀 `agency-os/WORKLOG.md` 最近 3 個 `## YYYY-MM-DD` 區塊，找對應 `[已修改]` / `AUTO_TASK_DONE` / `REALTEST_EVIDENCE` → 完整理解「做了什麼、用什麼替代方案」② 才做正向驗證（確認效果符合記錄）③ **禁止**：只查單點系統（CF API / git diff / VPS 單一服務）就宣告「沒做好」— 單層消失可能代表另一層已接手。根因：2026-06-04 CF WAF=0 rules 誤報案例（未讀 WORKLOG 確認 LLAR 已裝） |
 | 使用者說「doc 過時了」/「更新設計文件」/「SDD 跟程式碼不一致」/「文件同步一下」 | 跑 `/sdd-update` |
 | 使用者說「跑 QA」/「找 bug」/「上線前測試」/「幫我測試一下」 | 跑 `/qa-review` |
+| 使用者說「幫我測」/「瀏覽器測試」/「browser test」/「Chrome 測一下」/「live test」/「測一下 XXX 頁面」/「幫我跑一下 e2e」 | 跑 `browser-test` skill（Chrome MCP 驅動真實 Chrome；先 `list_connected_browsers` 確認擴充功能已連線）|
 | 任何 non-trivial R0 任務完成（輸出 [已修改] 後，準備進下一個任務）| 跑 `/checkpoint`（mid-session git save；tree 乾淨時靜默跳過） |
 | Repair Center 告警（`/api/ops/repairs/health` 回 503 / `ok: false` / Phase 4 失敗）| 跑 `/phase4-check`；若持續失敗 → 讀 `runbooks/HETZNER-SERVER-502-OOM-EMERGENCY-PLAYBOOK.md` |
 | 使用者提到「vault」/「密鑰」/「secret 不見了」/「API key 哪裡找」 | 跑 `/vault-status` 確認庫存；缺口 → `/vault-sync` |
