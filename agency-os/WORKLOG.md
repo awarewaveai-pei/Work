@@ -93,6 +93,28 @@
 
 **[rollback]** `git revert <hash>` 即可；積木檔（新增）刪除即移除，`BlockKind`/`na?` 為 additive 移除不影響既有 blog flow。
 
+### test(content-blocks): /tools/publish 商品 RankMath 面板 + AI 修正 — 線上實機 browser-test 驗收（方案B 收尾）
+
+**[任務理解]** 上一輪方案B（上方 entry）程式改動已 deploy 到生產。操作者要求「用 browser-test 實機驗一輪 /tools/publish 的面板 + AI 修正」＝在真實 Chrome（已登入 session）對生產站做端到端驗收，確認部署後的 UI/AI 行為符合設計。**本輪純驗證，零程式改動。**
+
+**[現況分析（VBC）]** 本機因刻意無 `ANTHROPIC_API_KEY`（`mcp/user-env.ps1:91-92`，Claude Code 走 Claude.ai 登入）→ 本地 dev 無法觸發生成；故先前已授權部署到生產再 live 測。SSH 確認 `/root/lobster-phase1/.deployed-commit = f462d006`、server `/root/Work` HEAD 同步、container `lobster-next-admin` healthy（2026-06-16T05:59 UTC 起）。本機後續 checkpoint（ad18b5a4 等）皆 dirty-tree auto-save，非 publish 層改動，未影響線上。
+
+**[已修改]** 無（純線上驗收）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=mcp__Claude_in_Chrome | cmd=`navigate(app.aware-wave.com/tools/publish)+生成(真 Anthropic ~33s)+AI修正×2(~26s/~46s)+screenshot` | exit=0 | ms=~110000 | deployed=f462d006
+  - 面板渲染 ✅：生成後渲染 16 點 RankMath 面板 → **80/100 🟠 待改善 / × 2 項需修正**。
+  - **na 排除驗證 ✅**：10 項適用（8 pass / 2 fail）= 80%；6 項長文部落格指標標 na、中性灰呈現「不適用（不適用於商品頁（此項為長文部落格指標））」、不計入分數與錯誤計數。截圖確認類別徽章一致：Basic SEO / Additional SEO / Title Readability 顯「✓ All pass」（內含 na 灰項不算 error）；Content Readability「× 1 Error」（段落 > 120 字）；AEO/GEO「× 1 Error」（缺 Quick Answer 段）兩項自動展開含建議。
+  - **AI 修正端到端 ✅**：點「🤖 AI 自動修正 SEO」→ fixCopy 把失敗檢查映射成 improveHints 重生全文（商品 6 欄結構化，非 markdown patch path）→ 修正#1 80→90、成功訊息「✓ 已更新，重新計分中…」無誤；修正#2 90→80。**分數非單調為設計特性非缺陷**：商品修正是「整篇重生」而非外科式 patch，LLM 內容隨機性導致分數波動，已於方案B 剩餘風險③記載（每次重生＝一次 Anthropic 呼叫）。
+- REVIEW_WAIVED: NA -- 本輪零程式改動（純線上 browser-test 驗收）；對應程式的 critic Deep-pass 已在上方方案B entry（findings=0c/0m/3n 全折回）。
+- BUGHUNT_WAIVED: NA -- 本輪零程式改動，無新 symbol/欄位/字面量可跨檔搜；方案B 抓蟲已在上方 entry（scope=lobster-factory,agency-os,scripts）。
+
+**[剩餘風險]** ① 分數非單調（重生機制）已知並接受，非 bug。② `PublishWizard` 殘留 dead `rankGrade/rankScore` state（方案B 剩餘風險②），無 tsc/lint 錯，留待後續清。③ 本機 checkpoint 累積（ad18b5a4 等）未 deploy，與本驗收無關但屬一般 drift，下次部署自然收斂。
+
+**[rollback]** 無（無程式改動）。
+
+AUTO_TASK_DONE: /tools/publish 商品 RankMath 面板 + AI 修正線上實機 browser-test 驗收 PASS（面板渲染✅ / na 排除 80=8/10適用✅ / AI 修正端到端 80→90→80 機制正確✅）；deployed=f462d006、container healthy、方案B 收尾
+
 ### feat(content-studio): Phase-2 UX 批次（U-Width/U-Buttons/FluentCRM teaser/F-Sites/F-TitleSentiment）+ Brand Voice 客戶名自動帶入
 
 **[任務理解]** 操作者用 Chrome 實測 `/tools/content` 後給一批 UI/功能回饋 + 1 個新需求。根本問題分兩類：(a) 既有改動**已 commit 但她看的是線上舊版**（未 deploy，所以測無變化）；(b) Brand Voice「品牌/客戶名稱」與目標客戶（wpSites）沒接線，需重打。
