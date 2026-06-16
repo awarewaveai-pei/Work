@@ -4,6 +4,38 @@
 
 ## 2026-06-16
 
+### feat(content-studio): Content Studio A/B/C 三批上線 — drafts/sources 表 + FluentCRM 草稿層；wp-bridge v0.11.0 發版 + soulful 實測；Postiz API 契約
+
+**[任務理解]** 使用者授權三件套（前次 AskUserQuestion）：Q1 全套上線（migrations 0041 `content_drafts`+0042 `content_sources` apply 到 prod Supabase〔High-risk〕→ sg-deploy next-admin 帶 A/B/C 全碼）；Q2 wp-bridge 0.11.0 發版（two-repo flow）+ soulful 真草稿建→驗 status=draft→刪；Q3 Postiz Public API 契約研究（read-only，寫成 Task 0 交付）。三批均 draft-only 紅線（FluentCRM 永不寄送）。
+
+**[現況分析（VBC）]** 動工前讀 `CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` v3：發現 Postiz **早已部署**（v2.11.3 live `postiz.aware-wave.com`，commit `a951190c`，Bluesky e2e 2026-06-15）。故 Q3 不是「待部署」而是「整合碼契約參考」；`POSTIZ_SOCIAL_PUBLISHING_PLAN.md` 原 PLANNED 草案的 Task 1 framing 為 stale → 同 pass 修正（見 BUGHUNT）。
+
+**[已修改]**
+- `migrations 0041`（`content_drafts`）+ `0042`（`content_sources`）apply 到 prod EU Supabase（`supabase_admin` role，因 `postgres` 無 `auth` schema USAGE；未碰 auth/RLS grant，守 Auto-Repair 紅線）。
+- next-admin A/B/C 全碼 sg-deploy（commit `22cfcb88`）：`/api/content/sources`（GET/POST/PATCH/DELETE，ops-role gate + service-role + SSRF guard）、`/api/content/drafts` 持久化、`lib/studio/wp-bridge-client.ts createNewsletter`、wp-bridge `includes/Newsletter/NewsletterCreator.php`（FluentCRM draft-only）。
+- wp-bridge `0.11.0` 發版（正本 repo `awarewaveai-pei/aware-wave-wp-bridge`，tag `v0.11.0` → release.yml 出 zip）。
+- soulful 外掛 0.10.0→0.11.0（`wp plugin install --force`，先備份）。
+- `POSTIZ_SOCIAL_PUBLISHING_PLAN.md`：Task 0 契約事實表 + D4 結論（原生 draft，無需 Telegram workaround）+ VBC 狀態校正 banner（Task 1 已完成）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node isolate2-0041.mjs`（SSH-tunnel DSN，BEGIN/migration/ROLLBACK 隔離跑 0041/0042 DDL）| exit=0 | migrations 套用無誤；`supabase_admin` 過 policy DDL（`postgres` 在 `CREATE POLICY` 撞 event-trigger 42501，已隔離確認非資料層問題）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node realtest-content-routes.mjs`（prod DSN，sources/drafts SELECT + service-role INSERT→read-back→DELETE round-trip）| exit=0 | `SOURCES rows=0 / DRAFTS rows=0`（空表 baseline）、`INSERT_OK` jsonb `geos:"*"`/`enabled:true` defaults 生效、`DELETE_OK count=1`、`SOURCES_AFTER count=0`（無殘留）。POST/GET/DELETE 的 DB 操作對真 schema 全綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=sg-deploy next-admin smoke check | exit=0 | HTTP 200（commit `22cfcb88`）；auth boundary：public curl `/api/content/sources` → middleware.ts:102 攔 `401`（session-gate fail-closed，證實 service-role-only 表不可未授權觸及）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`release-wp-bridge.sh`（php -l gate on includes/ → clone 正本 repo → mirror → tag `v0.11.0` → poll asset）| exit=0 | `RELEASE OK: v0.11.0 with asset aware-wave-wp-bridge-v0.11.0.zip`（php-lint 全綠=真 PHP build gate）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp eval-file awb-newsletter-realtest.php`（soulful 真 FluentCRM：NewsletterCreator->create → 獨立 read-back `Campaign::find` → delete → 確認 gone）| exit=0 | `{"create":{"status":"committed","campaign_id":2,"campaign_status":"draft"},"readback_status":"draft","readback_type":"campaign","deleted_confirmed":true}` — 決定性證實草稿紅線：建出來就是 draft（無 recipients/schedule，永不寄送）、self-cleanup 無孤兒。route 註冊證據：`/newsletter` 簽章請求 → `HTTP=401 {"ok":false,"error":"unknown_or_bad_signature"}`（vs bogus path `HTTP=404` baseline）= route 存在且簽章驗證生效。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n — 本 session 重跑 critic 外部 oracle 覆 7 個 A/B/C 檔（含 live SSRF 20-encoding bypass test 全擋、newsletter builder 10 XSS payload 全中和）：invariants (a) middleware header-strip 反 spoof + fail-closed 401 / (b) service-role null→503 無 silent deref / (c) newsletter draft-only（TS+PHP 雙層，含紅線 assertion）/ (d) SSRF guard / (e) 無 injection/secret leak 全成立。2 Minor 皆非安全 correctness polish（parseGeos object→`*` widening 宜回 400；rejected markdown link 殘留 `)`）→ spawn_task 跟進，不擴本 commit。tsc `npm run typecheck` exit=0。
+- REVIEW_WAIVED: DOC_ONLY -- `POSTIZ_SOCIAL_PUBLISHING_PLAN.md` 文件編輯。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`content_drafts\|content_sources\|Postiz\|Task 0\|Task 1\|type:"draft"` | hits=Postiz doc Task 1 framing stale（master plan 證實已部署）→ 同 pass 修 3 處（top 狀態行 / facts-table row label「Task 1 用」→「Task 1 ✅ 已上線」/ gate 解除行「Task 1 與 Task 3」→「Task 1 已完成，剩 Task 3」）。content_drafts/content_sources 引用對得上 migration + route projection，無 stale。
+- BUGHUNT_SCOPE_NARROW: lobster-factory 未含 cross-file catch-up — A/B/C code 為前 session 已 critic+部署的既存碼，本 session 僅 deploy + 文件校正，未改 symbol/schema。
+
+**[剩餘風險]** Postiz 整合碼（Task 3 `lib/content/postiz.ts`+`/api/content/social-publish`）未寫；`GET /integrations` 完整 response 欄位待整合時對 live `/public/v1` curl 補。Content Studio sources/drafts UI 接線（Batch B 面板）未在本批，A/B 資料層已就緒。
+
+**[rollback]** next-admin：revert `22cfcb88`，sg-deploy 自動 rollback。migrations：`content_drafts`/`content_sources` 為新增表，drop 即回（無既有資料依賴）。wp-bridge：soulful 重裝 0.10.0 zip；release tag 不可撤但無副作用（未自動推送任何站）。
+
+AUTO_TASK_DONE: Q1 Content Studio A/B/C migrations apply + sg-deploy（commit 22cfcb88，data-layer round-trip + 401 auth boundary 實測）
+AUTO_TASK_DONE: Q2 wp-bridge v0.11.0 發版（two-repo flow）+ soulful 草稿 create→readback=draft→delete 端到端實測
+AUTO_TASK_DONE: Q3 Postiz Public API 契約研究（Task 0 交付，D4 答原生 draft）+ VBC Task 1 已部署狀態校正
+
 ### test(pod-a2): A2 自動轉單兩層實測 — webhook 邏輯 + 真 Printful draft 端到端（prod 仍 dormant）
 
 **[任務理解]** 使用者「A2 啟用 我不會 你幫我」→ AskUserQuestion 答「你幫我測試」。選最安全路徑：**不開 prod flag、不碰真實客戶訂單**，驗證 A2 draft-only 管線能對真 Printful 建草稿且只到 draft（不扣款不印），測完自清理。VBC 註記：本 session 稍早差點重做「A1 hardening 2🟡」，讀 WORKLOG line 126 發現上一 session 已做+部署 `1b081764`，擋下重工。
