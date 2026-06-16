@@ -4,6 +4,26 @@
 
 ## 2026-06-16
 
+### test(pod-a2): A2 自動轉單兩層實測 — webhook 邏輯 + 真 Printful draft 端到端（prod 仍 dormant）
+
+**[任務理解]** 使用者「A2 啟用 我不會 你幫我」→ AskUserQuestion 答「你幫我測試」。選最安全路徑：**不開 prod flag、不碰真實客戶訂單**，驗證 A2 draft-only 管線能對真 Printful 建草稿且只到 draft（不扣款不印），測完自清理。VBC 註記：本 session 稍早差點重做「A1 hardening 2🟡」，讀 WORKLOG line 126 發現上一 session 已做+部署 `1b081764`，擋下重工。
+
+**[已修改]** 無 code 改動（純測試記錄）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run woo`（next-admin）| exit=0 | **15/15 pass** — webhook HMAC 簽章/解析/狀態守門（僅 processing+completed）/flag 守門/冪等防重複草稿全綠。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin node -`（鏡像 createSyncProductOnNative+createDraftOrderOnNative：建丟棄品→POST /orders 無 confirm→GET 驗 status→DELETE 單+品）| exit=0 | **建品 200 / SKU synced=true / POST /orders status=`draft`（不扣款不印）/ 刪單 200 / 刪品 200 / store 剩 0 件無殘留**。決定性證實 A2 只建 draft、confirm 路徑不存在、清理乾淨。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec ... node -e 檢查 env` | exit=0 | prod 容器 `POD_AUTO_FULFILL_ENABLED=(unset/false)`、`WC_WEBHOOK_SECRET=(unset)`、`PRINTFUL_NATIVE_STORE_ID=18324409`、API key set → **A2 prod 仍完全 dormant，真實訂單零反應，全程未啟用**。
+- REVIEW_WAIVED: DOC_ONLY -- 純測試記錄，無 code 改動。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`POD_AUTO_FULFILL_ENABLED\|woo-order\|createDraftOrderOnNative\|isTransientPfError\|skuMismatch` | hits=A1 hardening 2🟡 確認已修+部署（route.ts:101 結構化 token、print-provider.ts:320 skuMismatch），無 stale；memory `project_pod_a2_fulfillment_deferred` 已補記 hardening done。
+- BUGHUNT_SCOPE_NARROW: lobster-factory 未含 — 無 code 改動，僅讀取既有 A2 程式驗證行為。
+
+**[現在能做到的程度]** 客人 Woo 付款 → 系統可全自動在 Printful 建**草稿單**（前提：開 flag，現關）；草稿→確認扣款/送印/出貨的 confirm 步驟 🔴 仍未建（金流紅線，待使用者批准）。flag 關=全手動；flag 開=自動建草稿待人工審核按確認。完全無人化買→印→寄尚達不到。
+
+**[剩餘風險]** A2 啟用仍卡操作者 2 步（SG `.env` 設 flag+`WC_WEBHOOK_SECRET`、WP 加 Woo webhook → `/api/webhooks/woo-order`），等使用者測試期結束明示再做。
+
+AUTO_TASK_DONE: A2 自動轉單 webhook 單元測試 15/15 + 真 Printful draft 端到端實測（self-cleanup，prod 未啟用）
+
 ### test(canvas+mockup): Canvas e2e + Mockup Studio 瀏覽器實測 — 兩條驗證債清零
 
 **[任務理解]** AO-RESUME 報告標記兩條「卡操作者」驗證債：Canvas `/tools/canvas` 整輪 e2e 及 Mockup Studio 診斷（server-side 已排除）。本 session 用 Chrome MCP 直接驅動瀏覽器實測。
