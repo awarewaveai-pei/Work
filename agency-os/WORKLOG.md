@@ -133,6 +133,20 @@
 **[剩餘風險]** 標準 `run()` 互動工具在 Phase 1b 前無法生圖（dall-e-3 不可用）；要單獨用需先補 gpt-image-1 參數 —— 但既定方向是積木走 next-admin，故不修。
 - AUTO_TASK_DONE (2026-06-17): video-service 完整 topic→影片 e2e 真實驗證通過（真 key+gpt-image-1，影片已交付）；vault key 從信用檔刷新。
 
+### feat(video-service): 混合 render 核心 — 靜圖(Ken Burns) + 實拍影片(B-roll) 同管線合成
+
+**[任務理解]** 操作者選「不花錢+品質超好」→ 鎖定混合畫面（AI 自訂 Flux 圖 schnell≈$0.003/張 近免費 + 免費 Pexels 實拍 B-roll）+ 免費 Edge TTS。render 層原本只吃靜圖，需擴充能同時吃實拍影片片段。
+
+**[已修改]** `pipeline.py`：① import `VideoFileClip`/`vfx` + `_VIDEO_EXTS`/`_IMAGE_EXTS`。② 新 `_fit_video_clip()`（去原音、cover-fit w×h、太短 `vfx.loop` 補滿/太長 subclip 裁切、對齊配音長）。③ 新 `make_visual_clip()` 依副檔名派發（影片→_fit_video_clip／其餘→ken_burns，未知當靜圖保守 fallback）。④ `compose_base_video`/`render_video` 參數 `image_files`→`visual_files`，compose 改用 make_visual_clip。⑤ **資源洩漏修**（critic Major）：收集 AudioFileClip/VideoFileClip readers 進 open_sources，write_videofile 後 `finally` 統一 close → 修 ffmpeg subprocess/fd 洩漏（長壽 worker 必要），WinError 6 消失。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`venv python D:/tmp/vtest_hybrid.py`（1 靜圖 Ken Burns + 1 段 2s 實拍片段，刻意短於旁白測 loop）| exit=0 | `REALTEST_HYBRID_PASS` — 四尺寸全正確、混合合成無崩、修復後 WinError 6 消失。
+- REVIEW_DONE: critic=Deep | verdict=pass（1 Major resource leak 已修 + 1 Minor 已加註解）| findings=0c/0m(fixed)/2n。critic 確認 moviepy 1.x API 正確、cover-fit 對 portrait/landscape/square 皆正確。
+- BUGHUNT_DONE: scope=lobster-factory(video-service) | grep=`make_visual_clip\|_fit_video_clip\|visual_files\|image_files\|ken_burns` | hits=多筆皆同檔一致（image_files 僅 legacy generate_all_images + run 委派，位置參數相容；無外部 caller）。
+
+**[剩餘風險]** B-roll 抓取（Pexels）尚未接 — 待操作者提供免費 Pexels API key；積木 `video-pipeline.ts`（串 Flux+Pexels+render）為下一步。
+- AUTO_TASK_DONE (2026-06-17): video-service 混合 render 核心完成（靜圖+實拍影片同管線，含資源洩漏修），real-test 通過。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
