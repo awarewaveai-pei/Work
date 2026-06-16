@@ -608,6 +608,20 @@ if (-not $SkipWorkspaceConfig) {
     $workspacePath = Join-Path $WorkspaceRoot ".mcp.json"
     Write-Utf8NoBomFile -Path $workspacePath -Content ($claudeProjectDoc | ConvertTo-Json -Depth 20)
 
+    # Self-consistency: the .mcp.json just written references ${env:MONOREPO_ROOT} for every
+    # powershell-launched server's -File path (see Convert-ServerToClaudeProjectConfig / line ~161).
+    # If that USER env var is unset, Claude Code / Cursor expand it to '' -> broken
+    # '\scripts\*.ps1' path -> each MCP server flashes a red "file not found" console window on
+    # every host launch (root cause 2026-06-16: laptop had MONOREPO_ROOT unset; desktop had it set).
+    # The script that creates the dependency must guarantee it. Idempotent; User scope (no elevation).
+    $monoCurrent = [Environment]::GetEnvironmentVariable('MONOREPO_ROOT', 'User')
+    if ($monoCurrent -ne $WorkspaceRoot) {
+        [Environment]::SetEnvironmentVariable('MONOREPO_ROOT', $WorkspaceRoot, 'User')
+        Write-Host "[env] MONOREPO_ROOT (User) set -> $WorkspaceRoot (was: '$monoCurrent'). Restart the MCP host (Claude Code / Cursor / Claude Desktop) to apply." -ForegroundColor Yellow
+    } else {
+        Write-Host "[env] MONOREPO_ROOT (User) ok = $WorkspaceRoot" -ForegroundColor Gray
+    }
+
     # .cursor/mcp.json — Cursor project MCP; uses ${workspaceFolder} per Cursor docs
     $workspaceServers = @{}
     foreach ($name in ($servers.Keys | Sort-Object)) {
