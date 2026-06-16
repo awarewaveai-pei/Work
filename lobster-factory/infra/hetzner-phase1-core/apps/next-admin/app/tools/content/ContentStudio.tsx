@@ -2060,8 +2060,12 @@ export default function ContentStudio() {
               </div>
               <div>
                 <label className="form-label">從 URL 擷取（選填）</label>
-                <input className="form-input" value={bvSampleUrl} onChange={e => setBvSampleUrl(e.target.value)}
+                <input className="form-input" value={bvSampleUrl}
+                  onChange={e => { setBvSampleUrl(e.target.value); setBvUrlTouched(true); }}
                   placeholder="https://example.com/about" />
+                {!bvUrlTouched && bvSampleUrl.trim() && (
+                  <div className="form-hint">已自動帶入目標客戶 About 頁，可直接覆寫。</div>
+                )}
                 {bvSampleUrl.trim() && !bvSampleText.trim() && (
                   <div className="form-hint" style={{ color: "#f97316" }}>伺服器端抓取頁面文字；若 URL 需登入或封鎖爬蟲則會靜默失敗，建議同時貼入範例文字。</div>
                 )}
