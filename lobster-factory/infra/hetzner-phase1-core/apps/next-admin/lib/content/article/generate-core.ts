@@ -141,11 +141,28 @@ interface MediaHub {
   strictUnderHeadings?: boolean;
 }
 
+// Allowed generation models across providers. Anthropic ids route through the SDK stream; any id
+// in OPENAI_MODELS routes through the OpenAI Chat Completions SSE path (isOpenAiModel). Keep this in
+// lockstep with ContentStudio.AI_MODELS (the UI dropdown) — a model the UI offers but this list omits
+// silently falls back to sonnet (see prepareArticleGeneration model selection).
+const OPENAI_MODELS = [
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-4o",
+];
 const ALLOWED_MODELS = [
   "claude-haiku-4-5-20251001",
   "claude-sonnet-4-6",
   "claude-opus-4-8",
+  "claude-fable-5",
+  ...OPENAI_MODELS,
 ];
+
+/** True when the model should stream via the OpenAI Chat Completions path rather than Anthropic. */
+function isOpenAiModel(model: string): boolean {
+  return OPENAI_MODELS.includes(model) || /^(gpt-|o\d)/.test(model);
+}
 
 /** Call Perplexity Sonar to get 3–5 real, verified external source URLs for the keyword. */
 async function fetchRealSources(keyword: string, language: string): Promise<string[]> {
@@ -218,6 +235,10 @@ function buildUserPrompt(params: {
   introHookType: string;
   media: MediaHub | null;
   generateMeta: boolean;
+  existingCategories: string[];   // #3 — real category names already on the target site
+  marketContext: string;          // #5 — competitor + pain-point research block
+  patterns: { id: number; title: string }[]; // #6 — saved Kadence synced patterns on the site
+  patternCount: number;           // #6 — how many funnel patterns to weave in (0 = none)
 }): string {
   const lines: string[] = [];
 
@@ -324,6 +345,18 @@ function buildUserPrompt(params: {
     lines.push("=== END REFERENCE CONTENT ===");
   }
 
+  // #5 — Competitor & pain-point market context. Researched up-front (Perplexity) and injected so
+  // the article is positioned against real competitors and speaks to real reader pains, not generic
+  // filler. The model must USE this to differentiate; it must NOT name competitors disparagingly or
+  // copy their copy — synthesise a stronger, reader-first angle.
+  if (params.marketContext.trim()) {
+    lines.push("");
+    lines.push("=== MARKET CONTEXT (competitor landscape + reader pain points — use to sharpen positioning) ===");
+    lines.push(params.marketContext.trim());
+    lines.push("HOW TO USE THIS: address the reader pain points directly (ideally in the Quick Answer and FAQ); carve out a differentiated angle vs the competitor landscape WITHOUT naming or disparaging competitors; lead with the unique value this brand offers that the alternatives miss.");
+    lines.push("=== END MARKET CONTEXT ===");
+  }
+
   // External links — user-provided first, then Perplexity-verified sources
   const validLinks = params.externalLinks.filter(u => /^https?:\/\//.test(u.trim()));
   if (validLinks.length > 0) {
@@ -391,6 +424,24 @@ function buildUserPrompt(params: {
     }
   }
 
+  // #6 — Kadence synced patterns (funnels / CTAs). The site owner has hand-designed reusable
+  // patterns (wp_block posts, e.g. "btn_Explore Collaboration Paths"). We let the writer drop 2-4 of
+  // them at high-intent moments so each article funnels readers toward a real conversion block. The
+  // model only emits a placeholder by id; the publish pipeline resolves it to <!-- wp:block ref --> so
+  // the live, brand-styled pattern renders. Never invent ids — use ONLY the ids listed here.
+  if (params.patternCount > 0 && params.patterns.length > 0) {
+    lines.push("");
+    lines.push("=== KADENCE FUNNEL PATTERNS (insert real call-to-action blocks at high-intent moments) ===");
+    lines.push(`Insert ${params.patternCount} of the following pre-built patterns into the article body. Choose the ones most relevant to the topic and reader intent:`);
+    params.patterns.forEach(p => lines.push(`- id ${p.id}: ${p.title}`));
+    lines.push("PLACEMENT RULES:");
+    lines.push("- Put each chosen pattern ALONE on its own line, with a blank line before and after — NEVER inline inside a sentence or heading.");
+    lines.push("- Format each EXACTLY as: [KADENCE_PATTERN: <id>] using ONLY an id from the list above (e.g. [KADENCE_PATTERN: 7207]). Do NOT add the title, do NOT invent ids.");
+    lines.push("- Place them at natural funnel points: typically one after the introduction / Quick Answer (awareness→interest), one mid-article after a value-rich section (consideration), and one near the Conclusion (decision). Space them out — never two in a row.");
+    lines.push("- The pattern IS the call-to-action — do NOT also write a separate text CTA right next to it.");
+    lines.push("=== END KADENCE FUNNEL PATTERNS ===");
+  }
+
   // Meta generation — emit the meta block FIRST, before the article body. Root cause fix
   // (2026-06-16): it was previously appended LAST, so when a long article hit the token limit
   // the body truncated and the meta block was never produced → empty SEO title/description →
@@ -403,7 +454,13 @@ function buildUserPrompt(params: {
     lines.push("SEO_TITLE: [SEO title — 50-60 chars for Latin scripts / 14-30 chars for CJK; primary keyword in first half; include a power word AND an Arabic-digit number]");
     lines.push("META_DESC: [meta description — 145-155 chars for Latin scripts / 60-80 chars for CJK; includes primary keyword]");
     lines.push("FOCUS_KEYWORD: [the primary keyword exactly as provided]");
-    lines.push("CATEGORIES: [1-2 broad, conventional WordPress category names for this article, comma-separated — prefer terms a site would already have; do NOT invent narrow one-off categories]");
+    if (params.existingCategories.length > 0) {
+      // #3 — feed the site's REAL category list so the model classifies into an existing taxonomy
+      // instead of inventing a near-duplicate ("Art Therapy" vs an existing "Art therapy").
+      lines.push(`CATEGORIES: [pick the 1-2 BEST-FITTING categories for this article from the site's EXISTING categories below — copy the names EXACTLY (same spelling/case), comma-separated. Only if NONE genuinely fit, propose one broad new category. EXISTING CATEGORIES: ${params.existingCategories.join(", ")}]`);
+    } else {
+      lines.push("CATEGORIES: [1-2 broad, conventional WordPress category names for this article, comma-separated — prefer terms a site would already have; do NOT invent narrow one-off categories]");
+    }
     lines.push("TAGS: [4-6 specific topical tags, comma-separated]");
     lines.push("<!-- CONTENT_META_END -->");
     lines.push("");
@@ -518,6 +575,24 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
   const requestedModel = str(body.model, "claude-sonnet-4-6");
   const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : "claude-sonnet-4-6";
 
+  // #3 / #5 / #6 inputs — all best-effort: the UI fetches existing categories + patterns and runs the
+  // market analysis up-front, then forwards them here. Missing/empty just disables that enhancement.
+  const existingCategories = sarr(body.existingCategories).map(s => s.trim()).filter(Boolean).slice(0, 40);
+  const marketContext = str(body.marketContext).slice(0, 6000);
+  const rawPatterns = Array.isArray(body.patterns) ? body.patterns : [];
+  const patterns = rawPatterns
+    .map((p): { id: number; title: string } | null => {
+      const o = p as Record<string, unknown>;
+      const id = typeof o.id === "number" ? o.id : Number(o.id);
+      const title = typeof o.title === "string" ? o.title : "";
+      return Number.isInteger(id) && id > 0 ? { id, title: title.slice(0, 120) } : null;
+    })
+    .filter((p): p is { id: number; title: string } => p !== null)
+    .slice(0, 20);
+  const patternCount = typeof body.patternCount === "number"
+    ? Math.min(Math.max(0, Math.floor(body.patternCount)), 4)
+    : 0;
+
   const userPrompt = buildUserPrompt({
     keyword,
     title:         str(body.title),
@@ -541,6 +616,10 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
     introHookType:  str(body.introHookType),
     media,
     generateMeta: bool(body.generateMeta, false),
+    existingCategories,
+    marketContext,
+    patterns,
+    patternCount,
   });
 
   return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt } };
@@ -558,6 +637,13 @@ export async function* streamArticleGeneration(
   apiKey: string,
   signal?: AbortSignal,
 ): AsyncGenerator<string, void, unknown> {
+  // Provider routing (P2 積木化 — multi-provider). GPT models stream through the OpenAI Chat
+  // Completions SSE path; everything else stays on the byte-identical Anthropic path below. The
+  // system + user prompt are provider-agnostic, so only the transport differs.
+  if (isOpenAiModel(config.model)) {
+    yield* streamOpenAiGeneration(config, signal);
+    return;
+  }
   const client = new Anthropic({ apiKey });
   let anthropicStream: ReturnType<typeof client.messages.stream> | null = null;
   try {
@@ -618,4 +704,87 @@ export async function generateArticleMarkdown(
     markdown += chunk;
   }
   return { ok: true, markdown };
+}
+
+/**
+ * Stream an article from OpenAI via the Chat Completions SSE endpoint (zero new npm dependency —
+ * raw fetch, mirroring fetchRealSources' Perplexity call). Yields the same text-delta contract as
+ * the Anthropic path and emits the same GENERATION_TRUNCATED / GENERATION_ERROR markers under the
+ * same conditions so the UI + headless block handle both providers identically.
+ *
+ * Param notes: `max_completion_tokens` (not the deprecated `max_tokens`) is the universal budget
+ * field accepted by both gpt-4o and the gpt-5.x reasoning models — the latter REJECT `max_tokens`.
+ * Temperature is intentionally omitted: reasoning models 400 on any non-default temperature.
+ */
+async function* streamOpenAiGeneration(
+  config: ArticlePreparedConfig,
+  signal?: AbortSignal,
+): AsyncGenerator<string, void, unknown> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    yield "\n\n<!-- GENERATION_ERROR: OPENAI_API_KEY not configured -->";
+    return;
+  }
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        max_completion_tokens: config.maxTokens,
+        stream: true,
+        messages: [
+          { role: "system", content: config.system },
+          { role: "user", content: config.userPrompt },
+        ],
+      }),
+      signal,
+    });
+    if (!res.ok || !res.body) {
+      yield `\n\n<!-- GENERATION_ERROR: OpenAI API error (${res.status}) -->`;
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    let finishReason = "";
+    while (true) {
+      if (signal?.aborted) break;
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      // SSE frames are separated by blank lines; each carries one or more `data: {json}` lines.
+      const frames = buf.split("\n");
+      buf = frames.pop() ?? ""; // keep the trailing partial line for the next read
+      for (const line of frames) {
+        const t = line.trim();
+        if (!t.startsWith("data:")) continue;
+        const payload = t.slice(5).trim();
+        if (payload === "[DONE]") continue;
+        try {
+          const j = JSON.parse(payload) as {
+            choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>;
+          };
+          const choice = j.choices?.[0];
+          const piece = choice?.delta?.content;
+          if (piece) yield piece;
+          if (choice?.finish_reason) finishReason = choice.finish_reason;
+        } catch { /* skip a partial/non-JSON keepalive frame */ }
+      }
+    }
+
+    // Truncation guard — parallel to the Anthropic stop_reason==="max_tokens" check.
+    if (!signal?.aborted && finishReason === "length") {
+      yield "\n\n<!-- GENERATION_TRUNCATED: hit the output length limit; pick a shorter article size or split the topic -->";
+    }
+  } catch (err) {
+    if (!signal?.aborted) {
+      const msg = err instanceof Error && err.message.length > 0 ? "OpenAI API error" : "Unknown error";
+      yield `\n\n<!-- GENERATION_ERROR: ${msg} -->`;
+    }
+  }
 }
