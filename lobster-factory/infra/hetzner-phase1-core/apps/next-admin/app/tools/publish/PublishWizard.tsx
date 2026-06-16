@@ -277,7 +277,7 @@ export default function PublishWizard() {
   // copy is structured (6 fields), so the fix is a re-generate — NOT the Markdown /api/content/seo-fix
   // rewrite path (that endpoint only handles free-form blog articles).
   const fixCopy = useCallback(
-    async (failed: RankMathCheck[]): Promise<{ ok: boolean; error?: string }> => {
+    async (failed: RankMathCheck[]): Promise<{ ok: boolean; error?: string; message?: string }> => {
       const hints = failed.map((c) => c.suggestion || c.label).filter((h) => h.length > 0);
       if (hints.length === 0) return { ok: true };
       return runCopy(hints);
