@@ -72,6 +72,24 @@ const AI_MODELS = [
 ];
 const AI_MODEL_GROUPS = [...new Set(AI_MODELS.map(m => m.group))];
 
+// #4 — Marketing brief selects. Funnel stage steers the article's intent + which CTA to lean on;
+// price positioning steers tone/word choice. Both compile into the generation `details` block.
+const FUNNEL_STAGES = [
+  { value: "",              label: "不指定" },
+  { value: "awareness",     label: "認知（剛發現問題，建立信任）" },
+  { value: "interest",      label: "興趣（在比較方案、找資訊）" },
+  { value: "consideration", label: "考慮（評估是否適合自己）" },
+  { value: "decision",      label: "決策（準備行動／購買）" },
+  { value: "retention",     label: "留存（既有客戶深化關係）" },
+];
+const PRICE_POSITIONS = [
+  { value: "",        label: "不指定" },
+  { value: "premium", label: "高端精品（強調價值與稀缺）" },
+  { value: "midhigh", label: "中高端（品質與專業）" },
+  { value: "mid",     label: "中端（性價比）" },
+  { value: "value",   label: "平價親民（可近性）" },
+];
+
 const SYN_PLATFORMS = [
   { key: "twitter",   label: "Twitter / X",  hasThread: true  },
   { key: "instagram", label: "Instagram",     hasThread: false },
@@ -182,6 +200,20 @@ interface MediaHub {
   strictUnderHeadings: boolean;
 }
 
+// #4 — structured marketing brief. Compiled into a YAML-ish block prepended to `details` at generate
+// time (compileMarketingBrief), so the backend contract is unchanged (it still reads only `details`).
+interface MarketingBrief {
+  audience: string;          // 目標受眾
+  forbiddenClaims: string;   // 避免使用／禁用聲明（逗號分隔）
+  positioning: string;       // 品牌定位一句話
+  usp: string;               // 獨特賣點／差異化
+  primaryCta: string;        // 主要行動呼籲目標
+  funnelStage: string;       // 漏斗階段 (FUNNEL_STAGES value)
+  pricePositioning: string;  // 價格定位 (PRICE_POSITIONS value)
+  objections: string;        // 客戶常見疑慮／抗拒點
+  emotionalTriggers: string; // 情緒觸發點／渴望
+}
+
 interface GenerateForm {
   keyword: string;
   title: string;
@@ -204,10 +236,12 @@ interface GenerateForm {
   introHookBrief: string;
   introHookType: string;
   media: MediaHub;
+  marketing: MarketingBrief;
   generateMeta: boolean;
   scheduleDate: string;
   wpCategories: string;
   wpTags: string;
+  patternCount: number;   // #6 — how many Kadence funnel patterns to weave in (0 = off)
 }
 
 interface MetaData { seoTitle: string; metaDesc: string; focusKeyword?: string; categories?: string[]; tags?: string[]; }
@@ -306,6 +340,11 @@ const DEFAULT_MEDIA: MediaHub = {
   strictUnderHeadings: false,
 };
 
+const DEFAULT_MARKETING: MarketingBrief = {
+  audience: "", forbiddenClaims: "", positioning: "", usp: "", primaryCta: "",
+  funnelStage: "", pricePositioning: "", objections: "", emotionalTriggers: "",
+};
+
 const DEFAULT_FORM: GenerateForm = {
   keyword: "", title: "", language: "English", targetCountry: "全球（不指定）",
   articleType: "Pillar Article", articleSize: "medium", tone: "Friendly",
@@ -316,8 +355,10 @@ const DEFAULT_FORM: GenerateForm = {
   structure: { ...DEFAULT_STRUCTURE },
   introHookBrief: "", introHookType: "",
   media: { ...DEFAULT_MEDIA },
+  marketing: { ...DEFAULT_MARKETING },
   generateMeta: true, scheduleDate: "",
   wpCategories: "", wpTags: "",
+  patternCount: 0,
 };
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
