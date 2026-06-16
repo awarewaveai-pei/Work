@@ -7,8 +7,8 @@
  * 一段邏輯、兩個入口、零重複。串流屬 route（積木回傳值，不串流）；RankMath/SEO/GEO 等生成規則由 core 保證，
  * 積木不繞過、不另寫生成邏輯。輸出（含 GENERATION_TRUNCATED / GENERATION_ERROR 標記）與 route 串流結果逐字相同。
  *
- * 註冊即生效：本檔被 import 時執行 `register()`。目前尚未接進 `byKind("article")` 編排器（屬 P4），
- * 此檔先把積木做出來、可被 import；接線在 P4 完成（編排器永遠不改，只新增 import）。
+ * 註冊即生效：本檔被 import 時執行 `register()`。P4 已接進 `byKind("article")` 編排器
+ * （`lib/content/pipeline.ts` side-effect import 本檔，跑 article→quality→publish；編排器永遠不改，只新增 import）。
  */
 import { register, type BlockCtx } from "./registry";
 import {

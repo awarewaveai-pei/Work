@@ -931,6 +931,23 @@ export default function ContentStudio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seoReport]);
 
+  // Build the shared image-gen params (model + resolved style + seed + reference image) sent to
+  // /api/content/image by every Media-Hub image call site (body + hero). Style is stored as the
+  // STYLE_CATALOG `zh` key and resolved here to its English `.prompt` (what the model actually reads);
+  // seed + referenceImages are only attached when the selected model supports them, so a model that
+  // ignores them never receives a no-op field. Returns a partial body to spread onto the fetch payload.
+  function mediaImageParams(): { model: string; imageStyle?: string; seed?: number; referenceImages?: string[] } {
+    const m = form.media;
+    const out: { model: string; imageStyle?: string; seed?: number; referenceImages?: string[] } = { model: m.aiImages };
+    const style = m.imageStyle ? STYLE_CATALOG.find(s => s.zh === m.imageStyle) : undefined;
+    if (style) out.imageStyle = style.prompt;
+    const cap = AI_IMAGE_PROVIDERS.find(p => p.value === m.aiImages);
+    const seedStr = m.imageSeed.trim();
+    if (cap?.seed && /^\d+$/.test(seedStr)) out.seed = Number(seedStr);
+    if (cap?.img2img && m.imageRefData) out.referenceImages = [m.imageRefData];
+    return out;
+  }
+
   // ─── Auto-replace IMAGE_PLACEHOLDER_N with Replicate URLs ─────────────────
 
   async function autoReplaceImages(md: string, genRun: number) {
@@ -947,7 +964,8 @@ export default function ContentStudio() {
           method: "POST", headers: { "Content-Type": "application/json" },
           // form.media.imageSize is now a flux aspect_ratio (e.g. "16:9") — pass it so the chosen
           // ratio actually applies to body images (previously hardcoded twitter_post → ignored → 1:1).
-          body: JSON.stringify({ prompt: altText, platform: "twitter_post", aspectRatio: form.media.imageSize }),
+          // mediaImageParams() adds the chosen model + style preset + seed + reference image (img2img).
+          body: JSON.stringify({ prompt: altText, platform: "twitter_post", aspectRatio: form.media.imageSize, ...mediaImageParams() }),
         });
         if (genRun !== imgRunRef.current) break;
         const json = await res.json() as { ok: boolean; imageUrl?: string };
@@ -994,8 +1012,9 @@ export default function ContentStudio() {
     try {
       const res = await fetch("/api/content/image", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        // Hero/featured = 16:9 (Google Discover + OG preview both favour the wide ratio).
-        body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9" }),
+        // Hero/featured = 16:9 (Google Discover + OG preview both favour the wide ratio). Same model +
+        // style + seed + reference image as the body images so the hero matches the article's look.
+        body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams() }),
       });
       if (genRun !== imgRunRef.current) return; // user re-generated, abort
       const json = await res.json() as { ok: boolean; imageUrl?: string };
@@ -1726,13 +1745,65 @@ export default function ContentStudio() {
                   </select>
                 </div>
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <label className="form-label" style={{ margin: 0 }}>Image style</label>
-                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{form.media.imageStyle.length}/50</span>
-                  </div>
-                  <input className="form-input" value={form.media.imageStyle} maxLength={50}
+                  <label className="form-label">Image style / 風格預設</label>
+                  <select className="form-select" value={form.media.imageStyle}
                     disabled={isGenerating || form.media.aiImages === "none"}
-                    onChange={e => setMedia("imageStyle", e.target.value)} placeholder="None" />
+                    onChange={e => setMedia("imageStyle", e.target.value)}>
+                    <option value="">None（不套用風格）</option>
+                    {STYLE_GROUPS.map(g => (
+                      <optgroup key={g} label={g}>
+                        {STYLE_CATALOG.filter(s => s.group === g).map(s => (
+                          <option key={s.zh} value={s.zh}>{s.zh}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 1b: Reference image (img2img / 以圖生圖) + Seed (固定風格 / 種子值) — model-gated */}
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "12px", marginBottom: "12px", alignItems: "end" }}>
+                <div>
+                  <label className="form-label">
+                    參考圖 / img2img{" "}
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 400 }}>
+                      {selectedImageModel.img2img ? "（以圖生圖：上傳一張參考圖）" : "（此模型不支援）"}
+                    </span>
+                  </label>
+                  {form.media.imageRefData ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <img src={form.media.imageRefData} alt="參考圖"
+                        style={{ width: "44px", height: "44px", objectFit: "cover", borderRadius: "4px", border: "1px solid var(--card-border)" }} />
+                      <button type="button" className="btn-secondary" style={{ fontSize: "12px", padding: "4px 10px" }}
+                        disabled={isGenerating}
+                        onClick={() => setMedia("imageRefData", "")}>移除參考圖</button>
+                    </div>
+                  ) : (
+                    <input type="file" accept="image/png,image/jpeg,image/webp"
+                      className="form-input"
+                      disabled={isGenerating || form.media.aiImages === "none" || !selectedImageModel.img2img}
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => setMedia("imageRefData", typeof reader.result === "string" ? reader.result : "");
+                        reader.readAsDataURL(file);
+                        e.target.value = ""; // allow re-selecting the same file after a remove
+                      }} />
+                  )}
+                </div>
+                <div>
+                  <label className="form-label">
+                    Seed / 種子值{" "}
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 400 }}>
+                      {selectedImageModel.seed ? "（固定風格可重現）" : "（此模型不支援）"}
+                    </span>
+                  </label>
+                  <input className="form-input" type="number" min={0} inputMode="numeric"
+                    value={form.media.imageSeed}
+                    disabled={isGenerating || form.media.aiImages === "none" || !selectedImageModel.seed}
+                    onChange={e => setMedia("imageSeed", e.target.value)}
+                    placeholder="隨機" />
                 </div>
               </div>
 

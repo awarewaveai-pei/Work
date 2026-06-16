@@ -6,8 +6,8 @@
  *   - 本積木 = 編排器 headless 入口（從 ctx 取參數 → 同一個 core）
  * 一段邏輯、兩個入口、零重複。draft-first 與 Bridge↔REST 雙路徑由 core 保證，積木不繞過、不另寫發佈邏輯。
  *
- * 註冊即生效：本檔被 import 時執行 `register()`。目前尚未接進 `byKind("publish")` 編排器（屬 P4），
- * 此檔先把積木做出來、可被 import；接線在 P4 完成（編排器永遠不改，只新增 import）。
+ * 註冊即生效：本檔被 import 時執行 `register()`。P4 已接進 `byKind("publish")` 編排器
+ * （`lib/content/pipeline.ts` side-effect import 本檔，為管線終端 draft-first 發佈；編排器永遠不改，只新增 import）。
  */
 import { register, type BlockCtx } from "./registry";
 import {

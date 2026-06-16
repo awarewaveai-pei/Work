@@ -54,7 +54,7 @@
 | **P1** | `publish/wordpress` 抽 core + 包積木（行為保留）| ✅ | a488ae79（core/route/積木）+ 收尾本次 | Low-Med | ✓ |
 | **P2** | `article/generate` 抽 core + 包積木（行為保留：route 薄殼共用 core 串流，積木 headless 收集）| ✅ | 76f2d262（core/route/積木）+ bc405328（abort belt-and-suspenders 修）+ 收尾本次 | Low-Med | ✓ |
 | **P3** | `quality/check`(seo-check) 抽 core + 包積木（行為保留：route 薄殼共用 core）| ✅ | 收尾本次（core=seo-check-core.ts／route 薄殼／blocks/seo-check.ts）| Low | — |
-| **P4** | `byKind()` 串 search→article→quality→publish headless 跑通 | 🔲 | — | Med | 待 |
+| **P4** | `byKind()` 串 article→quality→publish headless 跑通成 WP draft（編排器 `lib/content/pipeline.ts`；search 為上游 producer 不入迴圈，理由見檔頭）| ✅ | `PIPELINE_P4_HASH`（本次：pipeline.ts + 3 積木接線；44/44 REALTEST、tsc 0、critic PASS 0c0m0n）| Med | ✓ |
 | **P5** | `publish/social`：lib/content/postiz.ts + /api/content/social-publish（draft 預設）| ⛔ | — | Med-High | 待+憑證 |
 | **P6** | 🗑️ 刪 Python publisher.py 直連（grep 確認無 caller）| 🔲 | — | Med | 待 |
 | **P7** | `video/pipeline` 積木 + Python 微服務骨架（圖→TTS→ffmpeg 本機驗證）| 🔲 | — | Med | 待 |
