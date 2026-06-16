@@ -23,6 +23,19 @@
 
 **[rollback]** 無 code 變更需回滾；測試草稿 #4 已刪、soulful 回 baseline。TASKS 勾選回退即 `git revert`。
 
+### fix(mcp): Codex 排除 6 LLM 橋接 + trigger — 減少開機閃窗（procmon 證實 host=codex.exe）
+**[任務理解]** 承上「又跳了、一次2個」。procmon（Win32 process-creation 監聽 75s）證實閃窗的 MCP server **parent=codex.exe**（不是 Claude Code）—— Codex 啟動/重載時一口氣開 ~21 個 stdio MCP server，每個 powershell/cmd 開一個 console 視窗。「一次2個」= trigger 的雙 powershell 鏈（`start-trigger-mcp.ps1` → `secrets-vault.ps1 ... npx trigger.dev mcp`）crash-loop。使用者選「精簡 Codex MCP 清單」。
+**[根因]** Codex 是 coding agent，卻被塞 6 個 LLM 橋接（chatgpt/gemini/grok × fast/latest，對 Codex 零價值）+ trigger（deploy-only、crash-loop）。`registry.template.json` 未對 Codex 排除它們。
+**[已修改]**
+- `mcp/registry.template.json` — 對 7 個 server（trigger / chatgpt-fast / chatgpt-latest / gemini-fast / gemini-latest / grok-fast / grok-latest）加 `"clients": { "codex": { "exclude": true } }`（用既有 `Should-IncludeServer` 機制 sync-mcp-config.ps1:248-258）。僅排除 Codex，其他 client 不動。
+- 跑 `sync-mcp-config.ps1` 重生 codex config.toml（21→15）。
+**[驗證結果]**（R0 四動作）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`ConvertFrom-Json` + `sync-mcp-config.ps1` | exit=0 | 模板 JSON 有效；codex config.toml 由含 chatgpt/gemini/grok/trigger → 15 個（無此 7）；`.mcp.json` 仍含全部 7（只排除 codex）。procmon 先前證實 22:10 codex 確實啟動這些 powershell server。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0 — 純宣告式 client-exclude flag，無邏輯改動、無 secret；7 個 Edit 各以唯一 server-name 行錨定；JSON 有效性已驗。
+- BUGHUNT_DONE: scope=scripts,mcp | grep=`clients.*codex.*exclude\|Should-IncludeServer` | hits=1機制 | exclude 僅影響 codex client（Convert-ServerToCodexToml gate sync-mcp-config.ps1:476），.mcp.json/.cursor/claude 不受影響（實測 7 個仍在 .mcp.json）。
+**[剩餘風險]** ① 須**重啟 Codex** 才生效（running Codex 仍有舊 21）。② Codex 仍啟 15 個 server（各閃視窗，但無紅字 trigger loop）；要更少可再排除 consumer app（airtable/canva/replicate/resend/wordpress 對 Codex coding 無用）。③ 桌機需 git pull + sync 套用。
+**[rollback]** `git checkout HEAD~1 -- mcp/registry.template.json` 後重跑 `sync-mcp-config.ps1`。
+
 ### fix(mcp): MONOREPO_ROOT 未設 → 開機 9 個 MCP server 閃紅字視窗（筆電真根因）
 **[任務理解]** 使用者回報筆電「一開機跳出好幾次 PowerShell 紅字視窗、一秒消失」，**公司桌機沒有**。先前同 session 修的 doc-sync `-LiteralPath` + SystemGuard registrar 261 是**另一個症狀**（22:30 Daily 視窗 + doc-sync 紅字），**非開機閃窗**。VBC 重查：排程任務全排除（TaskScheduler 操作記錄開機後 0 任務啟動；AgencyOS 任務皆隱藏無 boot/logon 觸發；啟動資料夾/Run 機碼無 .ps1）。
 **[根因]** `.mcp.json`（`sync-mcp-config.ps1` 生成）對每個 powershell-launched MCP server 用 `-File ${env:MONOREPO_ROOT}\scripts\*.ps1`（line 160-161 刻意設計，git 共用、兩機不同碟靠各機 env var 解析）。**筆電 `MONOREPO_ROOT` User+Machine 範圍皆空**（`[Environment]::GetEnvironmentVariable('MONOREPO_ROOT','User')` = ''），→ MCP host（Claude Code/Cursor）一開機啟動時路徑變 `\scripts\run-llm-mcp.ps1` → powershell `-File 檔案不存在` 紅字（實測 exit -196608）→ 9 個 powershell server（gemini/chatgpt/grok ×fast/latest + postgres + trigger + filesystem）各閃一個 → 「好幾次」。桌機有設故不閃。**系統 gap**：`sync-mcp-config.ps1` 製造此依賴卻無任何腳本保證該 env var 存在（memory feedback_git_push.md 已註明是前置條件、bootstrap 沒設）。
