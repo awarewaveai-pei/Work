@@ -145,7 +145,7 @@ function buildTeaserHtml(opts: { title: string; excerpt: string; heroImage?: str
   const parts: string[] = [];
   parts.push('<div style="max-width:600px;margin:0 auto;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">');
   if (hero) {
-    parts.push(`<img src="${escapeHtml(hero)}" alt="${escapeHtml(title)}" style="width:100%;max-width:600px;height:auto;border-radius:12px;margin:0 0 20px;display:block;" />`);
+    parts.push(`<img src="${escapeHtml(hero)}" alt="${escapeHtml(title)}" width="600" style="width:100%;max-width:600px;height:auto;border-radius:12px;margin:0 0 20px;display:block;" />`);
   }
   if (title) {
     parts.push(`<h1 style="font-size:24px;line-height:1.3;margin:0 0 14px;color:#111827;font-weight:700;">${escapeHtml(title)}</h1>`);

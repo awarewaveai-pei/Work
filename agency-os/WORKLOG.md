@@ -4,6 +4,27 @@
 
 ## 2026-06-16
 
+### feat(content-studio): Phase-2 UX 批次（U-Width/U-Buttons/FluentCRM teaser/F-Sites/F-TitleSentiment）+ Brand Voice 客戶名自動帶入
+
+**[任務理解]** 操作者用 Chrome 實測 `/tools/content` 後給一批 UI/功能回饋 + 1 個新需求。根本問題分兩類：(a) 既有改動**已 commit 但她看的是線上舊版**（未 deploy，所以測無變化）；(b) Brand Voice「品牌/客戶名稱」與目標客戶（wpSites）沒接線，需重打。
+
+**[現況分析（VBC）]** `git log --oneline -12` → 本批前一輪改動經 checkpoint commits（b667c815 等）進樹但缺正式 WORKLOG；工作樹另有並行 Cursor session 的 POD product-copy WIP（`rankmath-checker.ts` 加 `na?`、`product-copy.ts`/`blocks/*`、`SeoCheckPanel.tsx`、`publish/route.ts`）— **非本議題，本 commit 不碰**。讀 ContentStudio.tsx：wpSites 由 `/api/content/sites` async 載入、`selectedSiteId=sites[0].id`；Brand Voice `bvProfileName` 預設「我的品牌」獨立於客戶選擇。
+
+**[已修改]**
+- `ContentStudio.tsx`（本輪）：Brand Voice 客戶名自動帶入 — 新增 `bvNameTouched` state；新 useEffect 接 `[wpSites,selectedSiteId,bvNameTouched]`，未手動編輯前自動填 `wpSites.find(id)??[0]` 的 name、跟著目標客戶下拉切換；input onChange 標記 touched 後永久停止覆蓋；加 form-hint 說明來源。`bvProfileName` 刻意不入 dep（write-only，critic 確認無 loop）。
+- `newsletter/route.ts`（本輪）：teaser hero `<img>` 加 `width="600"` HTML 屬性（Outlook 桌面版忽略 CSS max-width，會用原圖 native px 撐爆 — critic 上輪建議）。
+- 前輪已 commit（本條補正式驗證紀錄）：U-Width（`form-block--wide` modifier 套用發布設定+產出文章兩塊）、U-Buttons（複製/下載/推送列移到 textarea 下方）、FluentCRM teaser 精簡卡（`mode:"teaser"`→`buildTeaserHtml` CTA email + nlArticleUrl 連結輸入 + 漸層 UI，維持 draft-only 紅線）、F-Sites（📍 目標客戶區塊一律顯示）、F-TitleSentiment（title+generate prompt 強制 RankMath 字面 sentiment 詞）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin 全專案，含本輪 ContentStudio + newsletter 改動）| exit=0 | ms~ — 真 build gate 全綠。
+- REALTEST_EVIDENCE: tool=Bash（前輪 docker exec node fetch 探測）| cmd=`node -e fetch(Perplexity sonar)` inside lobster-next-admin | exit=non-2xx | result=HTTP 401 `insufficient_quota` — F-ExternalLink 根因＝Perplexity 帳戶額度用罄（key 存在 len53 prefix pplx-g3a），`fetchRealSources` 回 []→無外部連結。**非 code bug，需帳戶儲值**（操作者動作，我無法代付）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（1 可選 nit：DRY 重複 lookup，不必改）— 外部 oracle 確認 useEffect 無 infinite loop（bvProfileName 不入 dep 正確）、async race 正確（sites 載入後 effect 重跑填名）、empty name 有 `if(site?.name)` 守、width 屬性靜態字面零注入面。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`bvNameTouched\|bvProfileName\|品牌/客戶名稱` | hits=0（`bvNameTouched` 僅 ContentStudio.tsx＝本檔 staged 經 oracle 排除；agency-os/docs 無 stale 宣稱）。
+
+**[剩餘風險]** ① 整批仍**未 deploy 到線上** → 操作者測線上仍見舊版，需 `/check-drift`→`/verify`→sg-deploy（已提議，等 go-ahead）。② F-ExternalLink 待 Perplexity 儲值才會出外部連結。③ 共用工作樹並行 Cursor session（POD product-copy）dirty 檔同存，commit 已隔離只取本議題 2 檔。
+
+**[rollback]** `git revert <本 commit hash>`（只含 ContentStudio.tsx + newsletter/route.ts 兩檔，不影響並行 session 的 product-copy WIP）。
+
 ### refactor(content-blocks): P1 — publish/wordpress 抽 core（一段邏輯兩入口）+ headless 積木（行為保留）
 
 **[任務理解]** Content Pipeline Blocks master plan 鎖定順序 T1 第一階段：把 `app/api/content/publish/route.ts` POST 的核心發佈邏輯抽成純函式 `publishToWordPress()`，route 改薄殼呼叫它，再加 `publish/wordpress` 積木 in-process 呼叫同一個 core。目標：headless 編排與 UI 共用一段邏輯、零重複、行為位元不變、可 revert。非表面「複製一份給積木」（會雙寫漂移）。

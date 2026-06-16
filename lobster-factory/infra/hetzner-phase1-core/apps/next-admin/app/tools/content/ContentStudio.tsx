@@ -329,6 +329,7 @@ export default function ContentStudio() {
   const [bvSampleText,      setBvSampleText]      = useState("");
   const [bvSampleUrl,       setBvSampleUrl]       = useState("");
   const [bvProfileName,     setBvProfileName]     = useState("我的品牌");
+  const [bvNameTouched,     setBvNameTouched]     = useState(false); // stop auto-fill once operator edits the name
   const [bvLoading,         setBvLoading]         = useState(false);
   const [bvProfile,         setBvProfile]         = useState<BrandVoiceProfile | null>(null);
   const [bvError,           setBvError]           = useState("");
@@ -480,6 +481,14 @@ export default function ContentStudio() {
       })
       .catch(() => {/* silent — single-site env works without this */});
   }, []);
+
+  // Brand Voice name follows the selected target client (📍 目標客戶) — so the operator never
+  // re-types "Soulful Expression". Stops the moment they edit the field manually (bvNameTouched).
+  useEffect(() => {
+    if (bvNameTouched) return;
+    const site = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
+    if (site?.name) setBvProfileName(site.name);
+  }, [wpSites, selectedSiteId, bvNameTouched]);
 
   // ─── Form helpers ──────────────────────────────────────────────────────────
 
@@ -1897,8 +1906,12 @@ export default function ContentStudio() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
               <div>
                 <label className="form-label">品牌 / 客戶名稱</label>
-                <input className="form-input" value={bvProfileName} onChange={e => setBvProfileName(e.target.value)}
+                <input className="form-input" value={bvProfileName}
+                  onChange={e => { setBvProfileName(e.target.value); setBvNameTouched(true); }}
                   placeholder="例：Soulful Expression" />
+                {!bvNameTouched && wpSites.length > 0 && (
+                  <div className="form-hint">已自動帶入目標客戶「{(wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.name}」，可直接覆寫。</div>
+                )}
               </div>
               <div>
                 <label className="form-label">從 URL 擷取（選填）</label>
