@@ -11,10 +11,14 @@
  * lib/tarot/model-comparison.ts; OpenAI image API; Perplexity Sonar; Gemini Flash-Lite. Currency:
  * NT$ via TWD_RATE (single source — mirrors app/tools/ai-models/page.tsx, keep in sync).
  *
- * ⚠️ INFRA numbers are ESTIMATES — no recurring cost is documented anywhere in the repo (Explore
- * 2026-06-16: all infra is self-hosted on 2 Hetzner VPS, plan/price not recorded). Replace each
- * `estimate: true` line with the real bill figure from the Hetzner / Cloudflare / registrar console.
+ * INFRA: Hetzner + Cloudflare figures are REAL (pulled 2026-06-16 from the Hetzner Cloud API
+ * /v1/servers and the Cloudflare /zones API). Hetzner bills EUR (account net==gross, no VAT applied);
+ * stored here in USD at EUR→USD = 1.08 (see EUR_USD_RATE), original EUR in each note. Domains +
+ * other SaaS remain `estimate: true` (registrar/SaaS billing is not in the Hetzner/CF APIs).
  */
+
+/** EUR→USD used to express Hetzner's EUR bill in the model's USD unit. Update if the rate drifts. */
+export const EUR_USD_RATE = 1.08;
 
 /** USD → NT$ reference rate. Mirrors app/tools/ai-models/page.tsx:12 — update both together. */
 export const TWD_RATE = 32;

@@ -59,7 +59,8 @@
 - REVIEW_DONE: critic=Deep×2 | verdict=pass | 第一輪 0c/3m/4n + 第二輪 0c/1m/2n — 全部修正。第一輪：mid-stream OpenAI error frame 偵測、siteUrl 揭露移除、SSE 單行假設文件化、entity decode 共用化(新 wp-entities.ts)、patternCount NaN guard、isOpenAiModel 死碼簡化。第二輪（驗最終狀態+新檔）抓到**真 Major**：`resolveTermIds`(wordpress-core:275) 拿解碼後 AI 分類名比對 WP 編碼 `t.name` → 不符建重複（#3 在 REST 路徑復發）→ 修為 `decodeWpEntities(t.name)` 比對；+ wp-entities 單次解碼意圖註記、generate body 剝 imageRefData。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`marketContext\|patternCount\|existingCategories\|KADENCE_PATTERN\|isOpenAiModel\|streamOpenAiGeneration\|compileMarketingBrief\|api/content/(categories\|patterns\|market-analysis)` | hits=7 — 全部侷限在改/建的檔，無外部 stale call site、無 downstream consumer 需同步（headless block 走同一 core，新欄位皆 optional 透明）
 
-**[剩餘風險]** ⚠️ **vault `OPENAI_API_KEY` 直連 401 失效**（與同日 video-service 發現一致：直連 key 默默過期）→ GPT 程式碼正確且優雅降級（401 yield `GENERATION_ERROR`、UI 顯示錯誤、Claude 不受影響），但**GPT 實際生成在使用者刷新 key 前無法運作**。GPT model id（gpt-5.5/5.4/mini/4o）因 key 401 無法對帳，刷新後須確認帳號實際可用 id。#6 完整 pattern 清單需帶 token/部署後驗（無 token 時站上 blocks 不可見）。**未部署**：全部須 sg-deploy；#6 另需 wp-bridge 0.12.0 release。
+**[剩餘風險→已解]** ⚠️ 初測 vault `mcp/user-env.ps1:90` 的 `OPENAI_API_KEY` 401 失效。使用者提供 `C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md` 內**有效 key**（`sk-proj-…DgPrUA`，REALTEST 200 + 4 model id 全存在）→ 已同步進 user-env.ps1:90（gitignored）+ live GPT 串流 REALTEST 通過。**部署補洞**：`docker-compose.yml` next-admin **原缺 `OPENAI_API_KEY` env**（只有 node-api 有）→ 已補 `OPENAI_API_KEY: ${OPENAI_API_KEY:-}`（`.env.example:98` 已文件化）。
+**[仍待]** ① **SG host `.env` 須填有效 OPENAI_API_KEY** 才能讓線上 GPT 生成運作。② #6 完整 pattern 清單需帶 token/部署後驗。③ **未部署**：全部須 sg-deploy；#6 另需 wp-bridge 0.12.0 release。
 **[rollback]** 程式皆已隨 checkpoint commit 進 main；如需回退按檔 `git checkout` 個別檔；plugin 未 release 故站上零影響。
 
 ### fix(hooks): ao-resume-on-prompt + post-push hook 加 -WindowStyle Hidden（消開機/每訊息 powershell 閃窗 真根因）
