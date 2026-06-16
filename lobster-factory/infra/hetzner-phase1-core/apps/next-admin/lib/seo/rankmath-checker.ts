@@ -15,6 +15,14 @@ export interface RankMathCheck {
   detail: string;
   /** Actionable improvement hint — only set on failed checks */
   suggestion?: string;
+  /**
+   * Not applicable to this content type — excluded from score / grade / error counts and rendered
+   * neutrally in the panel. The blog flow never sets it (every check is applicable to a long article);
+   * the product flow marks blog-only checks (word count, links, multi-H2 AEO …) N/A so a correctly
+   * short product page isn't red-graded for lacking article structure. Additive: `checkRankMath`
+   * itself never sets `na` — only downstream consumers (lib/studio/product-copy.ts) do.
+   */
+  na?: boolean;
 }
 
 export interface RankMathReport {

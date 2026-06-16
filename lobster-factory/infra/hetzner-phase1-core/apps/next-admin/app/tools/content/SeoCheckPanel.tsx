@@ -20,6 +20,13 @@ interface Props {
   metaDescription?: string;
   slug?: string;
   onFixApply?: (md: string, meta?: { seoTitle: string; metaDesc: string }) => void;
+  /**
+   * Custom fix path (e.g. product copy, which is structured 6 fields — not a Markdown article that
+   * /api/content/seo-fix can rewrite). When provided, it REPLACES the built-in markdown-fix fetch:
+   * the panel calls onFix(failedChecks) and the caller regenerates the copy. Receives only the
+   * applicable failed checks (N/A excluded). Returns ok / error so the panel can show feedback.
+   */
+  onFix?: (failed: RankMathCheck[]) => Promise<{ ok: boolean; error?: string }>;
 }
 
 // ── Category groupings matching RankMath sidebar ──────────────────────────────
@@ -56,38 +63,46 @@ const GRADE_COLOR = { green: "#22c55e", orange: "#f97316", red: "#ef4444" };
 const GRADE_LABEL = { green: "🟢 良好", orange: "🟠 待改善", red: "🔴 需加強" };
 
 function CheckRow({ check }: { check: RankMathCheck }) {
-  const [open, setOpen] = useState(!check.pass);
+  const isNa = !!check.na;
+  const [open, setOpen] = useState(!check.pass && !isNa);
+  const clickable = !isNa && !!check.suggestion;
   return (
     <div
       style={{
         display: "flex", alignItems: "flex-start", gap: "8px",
         padding: "7px 0",
         borderBottom: "1px solid var(--card-border)",
-        cursor: check.suggestion ? "pointer" : "default",
+        cursor: clickable ? "pointer" : "default",
+        opacity: isNa ? 0.6 : 1,
       }}
-      onClick={() => check.suggestion && setOpen(v => !v)}
+      onClick={() => clickable && setOpen(v => !v)}
     >
-      {/* Circle icon */}
+      {/* Circle icon — N/A renders neutral grey (not red), so it never reads as a failure */}
       <span style={{
         flexShrink: 0, width: 18, height: 18, borderRadius: "50%",
-        background: check.pass ? "#22c55e" : "#ef4444",
+        background: isNa ? "#9ca3af" : check.pass ? "#22c55e" : "#ef4444",
         display: "flex", alignItems: "center", justifyContent: "center",
         marginTop: "1px",
         fontSize: "11px", color: "#fff", fontWeight: 700,
       }}>
-        {check.pass ? "✓" : "✕"}
+        {isNa ? "–" : check.pass ? "✓" : "✕"}
       </span>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: "12px", color: "var(--text-primary)", lineHeight: 1.4 }}>
+        <div style={{ fontSize: "12px", color: isNa ? "var(--text-muted)" : "var(--text-primary)", lineHeight: 1.4 }}>
           {check.label}
-          {!check.pass && (
+          {isNa && (
+            <span style={{ color: "var(--text-muted)", marginLeft: "4px", fontSize: "11px" }}>
+              — 不適用（{check.detail}）
+            </span>
+          )}
+          {!check.pass && !isNa && (
             <span style={{ color: "var(--text-muted)", marginLeft: "4px", fontSize: "11px" }}>
               — {check.detail}
             </span>
           )}
         </div>
-        {!check.pass && check.suggestion && open && (
+        {!check.pass && !isNa && check.suggestion && open && (
           <div style={{
             marginTop: "4px", fontSize: "11px", color: "#f97316",
             background: "#fff7ed", borderRadius: "4px", padding: "4px 6px",
@@ -110,7 +125,9 @@ function CategoryBlock({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const catChecks = checks.filter(c => category.ids.includes(c.id));
-  const errors = catChecks.filter(c => !c.pass).length;
+  const applicable = catChecks.filter(c => !c.na);
+  const errors = applicable.filter(c => !c.pass).length;
+  const allNa = catChecks.length > 0 && applicable.length === 0;
 
   return (
     <div style={{ borderBottom: "1px solid var(--card-border)" }}>
@@ -135,7 +152,15 @@ function CategoryBlock({
               × {errors} Error{errors > 1 ? "s" : ""}
             </span>
           )}
-          {errors === 0 && (
+          {errors === 0 && allNa && (
+            <span style={{
+              fontSize: "11px", color: "var(--text-muted)", background: "var(--bg-page, #f1f5f9)",
+              borderRadius: "12px", padding: "1px 7px", fontWeight: 600,
+            }}>
+              — 不適用
+            </span>
+          )}
+          {errors === 0 && !allNa && (
             <span style={{
               fontSize: "11px", color: "#22c55e", background: "#f0fdf4",
               borderRadius: "12px", padding: "1px 7px", fontWeight: 600,
@@ -160,7 +185,7 @@ function CategoryBlock({
 export function SeoCheckPanel({
   report, loading,
   articleMarkdown, focusKeyword, seoTitle, metaDescription, slug,
-  onFixApply,
+  onFixApply, onFix,
 }: Props) {
   const [fixing,     setFixing]     = useState(false);
   const [fixError,   setFixError]   = useState("");
@@ -178,14 +203,24 @@ export function SeoCheckPanel({
   if (!report) return null;
 
   const color     = GRADE_COLOR[report.grade];
-  const failed    = report.checks.filter(c => !c.pass);
-  const canFix    = !!onFixApply && !!articleMarkdown && !!focusKeyword && failed.length > 0;
+  // N/A checks are not failures — exclude them from the fixable set, the error count, and the badge.
+  const failed    = report.checks.filter(c => !c.pass && !c.na);
+  // Two fix paths: a custom onFix (product copy → regenerate) takes precedence; otherwise the
+  // built-in Markdown rewrite via /api/content/seo-fix (blog article) requires markdown + keyword.
+  const canFix    = failed.length > 0 && (!!onFix || (!!onFixApply && !!articleMarkdown && !!focusKeyword));
   const totalErrs = failed.length;
 
   async function handleFix() {
     if (!canFix || fixing) return;
     setFixing(true); setFixError(""); setFixSuccess(false);
     try {
+      // Custom path (product): the caller regenerates the structured copy from the failed checks.
+      if (onFix) {
+        const r = await onFix(failed);
+        if (!r.ok) { setFixError(r.error ?? "AI 修正失敗"); return; }
+        setFixSuccess(true);
+        return;
+      }
       const res  = await fetch("/api/content/seo-fix", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -245,7 +280,9 @@ export function SeoCheckPanel({
       <div style={{ padding: "0 12px" }}>
         {CATEGORIES.map(cat => {
           const catChecks = report.checks.filter(c => cat.ids.includes(c.id));
-          const catErrors = catChecks.filter(c => !c.pass).length;
+          // Match the badge: N/A checks aren't errors, so a category rendering "✓ All pass" (or
+          // "— 不適用") must not auto-expand. Blog flow sets no na → identical to before (critic 2026-06-15).
+          const catErrors = catChecks.filter(c => !c.pass && !c.na).length;
           return (
             <CategoryBlock
               key={cat.key}

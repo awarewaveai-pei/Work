@@ -15,7 +15,7 @@
  * 加新積木 = 新檔 register() 一次；編排器永遠不改。
  */
 
-export type BlockKind = "search" | "article" | "video" | "quality" | "publish";
+export type BlockKind = "search" | "article" | "video" | "quality" | "publish" | "product";
 
 /** 積木執行上下文。各 kind 讀自己需要的欄位；保持鬆散以容納未來 kind。 */
 export interface BlockCtx {

@@ -16,7 +16,7 @@
  * lib/command-plane/handlers/_anthropic.ts.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { checkRankMath, type RankMathReport } from "../seo/rankmath-checker";
+import { checkRankMath, type RankMathReport, type RankMathCheck } from "../seo/rankmath-checker";
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 
@@ -32,6 +32,13 @@ export interface ProductCopyInput {
   focusKeywordHint?: string;
   /** Store domain, for the RankMath self-score (internal vs external links). */
   siteDomain?: string;
+  /**
+   * Re-generation hints: when the operator clicks "AI 自動修正 SEO" in the publish UI, the failed
+   * RankMath checks' suggestions are passed back here so the model regenerates the FULL copy fixing
+   * each one (product copy is structured 6 fields — it cannot be markdown-rewritten like a blog
+   * article, so the fix path is a re-generate with hints, not the /api/content/seo-fix endpoint).
+   */
+  improveHints?: string[];
 }
 
 export interface ProductCopy {
@@ -112,6 +119,13 @@ function sanitizeProductHtml(html: string): string {
     .replace(/<\s*(\/?)\s*([a-zA-Z0-9]+)\b[^>]*>/g, (_m, slash: string, tag: string) =>
       ALLOWED_HTML_TAGS.has(`${slash}${tag.toLowerCase()}`) ? `<${slash}${tag.toLowerCase()}>` : "",
     )
+    // Final guard: a truncated/malformed tag with no ">" (e.g. "<img src=x onerror=…" at EOF) slips
+    // past the pass above, and a browser tokenizer can still re-form it into a live tag. Escape every
+    // residual "<" that isn't one of the four allowed tag tokens to &lt; — so the sanitizer is airtight
+    // on its own (critic 2026-06-15), not reliant on downstream WordPress kses. (A "<" that DOES have a
+    // later ">" is consumed as a bogus tag by the pass above; that's pre-existing and harmless here,
+    // since the LLM is instructed to emit only <p>/<ul>/<li>/<strong> — no literal "<" in copy.)
+    .replace(/<(?!\/?(?:p|ul|li|strong)>)/gi, "&lt;")
     .trim();
 }
 
@@ -151,6 +165,16 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
     focus_keyword_hint: input.focusKeywordHint ?? null,
   };
 
+  // On a fix re-generation, tell the model exactly which RankMath checks the previous copy failed
+  // (the checker's suggestions are human-readable, often zh-TW) — it produces a full fresh copy that
+  // resolves them while keeping every base rule. Bounded to 12 hints (a report has 16 checks max).
+  const hints = Array.isArray(input.improveHints)
+    ? input.improveHints.map((h) => (typeof h === "string" ? h.trim() : "")).filter((h) => h.length > 0).slice(0, 12)
+    : [];
+  const userContent = hints.length > 0
+    ? `Product design brief:\n${JSON.stringify(brief, null, 2)}\n\nThe previous copy FAILED these RankMath / SEO / AEO checks. Regenerate the FULL copy so every one passes, while still obeying all the base RULES above:\n${hints.map((h) => `- ${h}`).join("\n")}`
+    : `Product design brief:\n${JSON.stringify(brief, null, 2)}`;
+
   const client = new Anthropic({ apiKey });
   let text: string;
   try {
@@ -158,7 +182,7 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
       model: MODEL,
       max_tokens: 1200,
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: `Product design brief:\n${JSON.stringify(brief, null, 2)}` }],
+      messages: [{ role: "user", content: userContent }],
     });
     const block = response.content.find((c) => c.type === "text");
     if (!block || block.type !== "text") return { ok: false, error: "empty_response" };
@@ -213,11 +237,20 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
     slug: copy.focusKeyword.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
     siteDomain: input.siteDomain,
   });
-  // Score only the product-relevant subset — the full checker is blog-tuned and would
-  // report a misleadingly low grade for a (correctly) short product page.
-  const checks = full.checks.filter((c) => PRODUCT_RELEVANT_CHECKS.has(c.id));
-  const passed = checks.filter((c) => c.pass).length;
-  const total = checks.length || 1;
+  // Keep ALL 16 checks so the publish UI shows the familiar full RankMath panel, but mark the
+  // blog-only ones N/A: the checker is tuned for 600+ word articles, so word-count / external+internal
+  // links / multi-H2 AEO coverage / article date would cap a (correctly) short product page at "red"
+  // regardless of copy quality. N/A checks are excluded from score / grade / error counts (critic
+  // 2026-06-15). Score is computed on the product-relevant subset only — same result as the prior
+  // filtered report (e.g. 9/10 → 90 / green), just now carrying the N/A rows for the panel.
+  const checks: RankMathCheck[] = full.checks.map((c) =>
+    PRODUCT_RELEVANT_CHECKS.has(c.id)
+      ? c
+      : { ...c, na: true, suggestion: undefined, detail: "不適用於商品頁（此項為長文部落格指標）" },
+  );
+  const applicable = checks.filter((c) => !c.na);
+  const passed = applicable.filter((c) => c.pass).length;
+  const total = applicable.length || 1;
   const score = Math.round((passed / total) * 100);
   const grade: RankMathReport["grade"] = score >= 81 ? "green" : score >= 51 ? "orange" : "red";
   const rankMath: RankMathReport = { score, grade, checks, passed, total };

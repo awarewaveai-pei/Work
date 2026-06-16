@@ -61,6 +61,8 @@ interface PublishBody {
   theme?: string;
   brand?: string;
   focusKeywordHint?: string;
+  // copy fix re-generation: failed-check hints fed back to regenerate compliant copy
+  fixHints?: string[];
   // create
   title?: string;
   designName?: string; // reserved — SKUs are owned by `create` and echoed via variantMap; pfcreate consumes them
@@ -263,6 +265,9 @@ export async function POST(request: Request) {
       theme: body.theme,
       brand: body.brand,
       focusKeywordHint: body.focusKeywordHint,
+      improveHints: Array.isArray(body.fixHints)
+        ? body.fixHints.filter((h) => typeof h === "string")
+        : undefined,
       siteDomain: (() => {
         try {
           return process.env.WPBRIDGE_BASE_URL ? new URL(process.env.WPBRIDGE_BASE_URL).host : undefined;

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APPAREL_PRINT_DESTINATIONS } from "@/lib/studio/apparel-print-destinations";
+import { SeoCheckPanel } from "@/app/tools/content/SeoCheckPanel";
+import type { RankMathReport, RankMathCheck } from "@/lib/seo/rankmath-checker";
 
 interface DesignAsset {
   id: string;
@@ -57,6 +59,8 @@ export default function PublishWizard() {
     bullets?: string[];
     rankGrade?: "green" | "orange" | "red";
     rankScore?: number;
+    // Full 16-check RankMath report (6 blog-only checks marked N/A) → rendered in <SeoCheckPanel>.
+    rankMath?: RankMathReport;
     error?: string;
   }>({ state: "idle" });
 
@@ -202,8 +206,12 @@ export default function PublishWizard() {
     setFlatlay({ state: "done", url });
   }, [designUrl, flatlayBg, flatlay.url, post]);
 
-  const runCopy = useCallback(async () => {
-    setCopy({ state: "running" });
+  const runCopy = useCallback(async (fixHints?: string[]): Promise<{ ok: boolean; error?: string }> => {
+    const isFix = Array.isArray(fixHints) && fixHints.length > 0;
+    // Initial generation: show the spinner pill (panel hidden until done). A fix re-gen keeps the
+    // existing report on screen — the panel's own "AI 修正中…" flag signals progress — then swaps the
+    // fresh report in place (don't blank to "running", which would unmount the panel mid-fix).
+    if (!isFix) setCopy({ state: "running" });
     const design = designs.find((d) => d.object_url === designUrl);
     const json = await post({
       action: "copy",
@@ -211,16 +219,17 @@ export default function PublishWizard() {
       subject: title.trim() || undefined,
       productType: "tshirt",
       focusKeywordHint: keywordHint.trim() || undefined,
+      ...(isFix ? { fixHints } : {}),
     });
     if (!json.ok) {
-      setCopy({ state: "error", error: json.error });
-      return;
+      if (!isFix) setCopy({ state: "error", error: json.error });
+      return { ok: false, error: json.error };
     }
     const c = json.copy as {
       productTitle: string; focusKeyword: string; metaTitle: string;
       metaDescription: string; shortDescriptionHtml: string; bullets: string[];
     };
-    const rm = json.rankMath as { grade: "green" | "orange" | "red"; score: number } | undefined;
+    const rm = json.rankMath as RankMathReport | undefined;
     // Fill the product title if the operator left it blank — never overwrite their input.
     setTitle((prev) => (prev.trim().length === 0 ? c.productTitle : prev));
     setCopy({
@@ -232,8 +241,22 @@ export default function PublishWizard() {
       bullets: c.bullets,
       rankGrade: rm?.grade,
       rankScore: rm?.score,
+      rankMath: rm,
     });
+    return { ok: true };
   }, [designs, designUrl, title, keywordHint, post]);
+
+  // Product AI-fix: regenerate the copy, feeding the failed checks' suggestions back as hints. Product
+  // copy is structured (6 fields), so the fix is a re-generate — NOT the Markdown /api/content/seo-fix
+  // rewrite path (that endpoint only handles free-form blog articles).
+  const fixCopy = useCallback(
+    async (failed: RankMathCheck[]): Promise<{ ok: boolean; error?: string }> => {
+      const hints = failed.map((c) => c.suggestion || c.label).filter((h) => h.length > 0);
+      if (hints.length === 0) return { ok: true };
+      return runCopy(hints);
+    },
+    [runCopy],
+  );
 
   const runCreate = useCallback(async () => {
     setCreate({ state: "running" });
@@ -411,15 +434,24 @@ export default function PublishWizard() {
         <button className="btn-secondary" disabled={copy.state === "running"} onClick={() => void runCopy()}>
           {copy.state === "running" ? "生成文案中…" : "AI 生成 SEO 文案（標題＋描述＋RankMath meta）"}
         </button>
-        {copy.state === "done" ? (
-          <span style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ color: copy.rankGrade === "green" ? "#46a758" : copy.rankGrade === "orange" ? "#f5a623" : "#e5484d" }}>
-              RankMath {copy.rankScore}/100（{copy.rankGrade}）· 焦點字：{copy.focusKeyword}
-            </span>
-            <span style={{ opacity: 0.7 }}>建立草稿時會帶入短描述 + RankMath meta（焦點字/SEO 標題/描述）</span>
-          </span>
-        ) : null}
         {copy.error ? <span style={{ color: "#e5484d", fontSize: 12 }}>{copy.error}</span> : null}
+        {copy.state === "done" && copy.rankMath ? (
+          <div style={{ flexBasis: "100%" }}>
+            <span style={{ fontSize: 11, opacity: 0.7 }}>
+              建立草稿（②）時會自動帶入短描述 + RankMath meta（焦點字／SEO 標題／描述）。下方為完整
+              RankMath / SEO / GEO / AEO 檢測（長文專屬項標「不適用」，分數只計商品適用項）；
+              失敗項可按「🤖 AI 自動修正 SEO」重新生成文案：
+            </span>
+            <SeoCheckPanel
+              report={copy.rankMath}
+              loading={false}
+              focusKeyword={copy.focusKeyword}
+              seoTitle={copy.metaTitle}
+              metaDescription={copy.metaDescription}
+              onFix={fixCopy}
+            />
+          </div>
+        ) : null}
       </div>
 
       {/* steps */}

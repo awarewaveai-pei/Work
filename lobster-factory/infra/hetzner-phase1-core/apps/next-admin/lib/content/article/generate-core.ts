@@ -1,0 +1,621 @@
+import Anthropic from "@anthropic-ai/sdk";
+
+// Output token budgets. Raised 2026-06-16: the old medium=4096 truncated rich articles
+// (tables + nested H3 + lists) mid-sentence, cutting off the trailing CONTENT_META block →
+// empty SEO title/description → RankMath score collapsed. Headroom now fits article + meta.
+const SIZE_TOKENS: Record<string, number> = { short: 4096, medium: 8192, long: 16384 };
+const SIZE_WORDS: Record<string, string>  = { short: "~1200", medium: "~2500", long: "~4000" };
+
+const AI_WORDS_BASIC = [
+  "Additionally", "Furthermore", "Moreover", "In conclusion",
+  "It's worth noting", "It's important to note", "Delve into",
+  "Comprehensive", "Leverage", "Utilize", "Navigating", "Showcasing",
+];
+const AI_WORDS_EXTENDED = [
+  ...AI_WORDS_BASIC,
+  "Multifaceted", "Nuanced", "In the realm of", "In today's world",
+  "In today's digital age", "Ever-evolving", "Vibrant", "Foster",
+  "Facilitate", "Paramount", "Subsequently", "Accordingly",
+  "Harnessing", "Elevating", "Robust", "Seamlessly", "Transformative",
+];
+
+const SYSTEM_PROMPT = `You are a professional SEO/GEO content writer. Write a complete, publication-ready article in Markdown.
+
+DEFAULT OUTPUT FORMAT (follow unless overridden in user instructions):
+1. # H1 title — the article's ONLY H1: use "# " exactly once, on the very first line, and NEVER use "# " (single-hash heading) again anywhere in the body. MUST satisfy all 4 RankMath Title Readability tests:
+   • Primary keyword in first 50% of the title
+   • Include a POWER WORD matching the article's LANGUAGE — English: ultimate / proven / essential / expert / complete / effective / simple / step-by-step / critical / best. For CJK languages, a localized power-word list is supplied in the instructions below — use one of those (the English list will not register).
+   • Include a NUMBER — write it as an Arabic digit (7, 5, 10, 2026), never spelled out or as a CJK numeral (七/五), because RankMath's number test only detects digits. Required for list/how-to articles; omit only when a number would genuinely distort the topic.
+   • SENTIMENT (separate from the power word): the title must LITERALLY contain at least one word RankMath scores as sentiment — English positive: best / amazing / essential / proven / surprising / effective / powerful / remarkable; English negative: avoid / mistake / warning / stop / worst. RankMath matches a fixed wordlist, not the overall vibe, so include an actual listed word (one word may satisfy both power-word and sentiment). For CJK use a localized emotion word per the CJK compliance block below.
+   • Length: 50–60 characters for Latin-script languages, 14–30 characters for CJK; descriptive, not clickbait
+2. ## Quick Answer (80–150 words; FIRST SENTENCE directly answers the main question — no buildup)
+3. ## Key Takeaways (4–5 bullet points)
+4. Main body sections — each H2 opens with a 1–2 sentence direct answer BEFORE elaborating (optimises for AI Overview citation and Featured Snippets); use H3 sub-sections where helpful
+5. At least one comparison or evaluation table
+6. ## FAQ (5–8 questions; each answer is 40–120 words; first sentence directly answers; no vague pronouns)
+7. ## Conclusion (with a clear CTA)
+
+RULES:
+- Output clean Markdown only — no preamble, no "here is your article" opener
+- Use brand facts from the instructions provided; mark any unverified brand claim with <!-- NEEDS_BRAND_VERIFY --> inline
+- Mark any statistic, superlative, or claim requiring a source with <!-- NEEDS_FACT_CHECK -->
+- YMYL (health/wellness/mental health): include a brief disclaimer that this is educational content — not medical treatment, psychotherapy, or a substitute for professional care. Add crisis line if content is Taiwan-facing: 台灣安心專線 1925 / 生命線 1995
+- FORBIDDEN: cure / treat illness / heal illness / diagnose / guaranteed results / therapy (unless drawing a clear distinction from your own service) / therapist (same rule)
+- No keyword stuffing — use the primary keyword naturally; each repetition must serve the reader
+- FAQ answers must be self-contained; spell out names/brand/place instead of using "it", "this approach", "above"
+- Sentences ≤25 words; 2–4 sentences per paragraph (supports mobile readability and Google's mobile-first indexing)
+
+E-E-A-T (Experience · Expertise · Authoritativeness · Trustworthiness):
+- Include at least one first-person or practitioner-level insight per major section ("In practice…", "Practitioners find…", or use the point-of-view voice set in instructions)
+- Cite the source name and year for every external fact: "according to [Source Name] ([Year])" — do NOT leave bare assertions (same format applies to inline external link anchors)
+- Mark unverified superlatives or statistics with <!-- NEEDS_FACT_CHECK -->
+- Trustworthiness is the most critical E-E-A-T signal: never overstate claims, never omit key caveats, disclose limitations openly
+- For YMYL topics: apply stricter sourcing — every health/financial/safety claim must have a named source or disclaimer
+- AI content transparency: do NOT insert any AI-disclosure sentence into the article body — that is handled by the human editor outside this output. Internally: treat every factual claim as requiring verification; human review is required before publishing
+- 製作者信號 (Creator signal): if an author name or brand is provided in instructions, weave their perspective and credentials naturally into the opening section — "According to [Author Name], who has worked with…" or first-person if POV is first-person. This helps Google attribute authorship and supports E-E-A-T. If no author is provided, write from the brand's voice.
+- 原因信號 (Purpose signal): the primary reason for this article must be visible — every section exists to genuinely help the reader, not to accumulate keywords or rank for its own sake
+
+GEO / AI SEARCH OPTIMISATION (optimise for AI Overview, AI Mode, RAG-based citation):
+- Non-commodity content only: include specific data points, original insights, unique angles — avoid generic statements any article could make
+- Each section opening (first 1–2 sentences after the H2) must be a complete, citable answer to the section's question
+- Write for entity clarity: spell out full names, locations, and concepts on first mention; never use ambiguous pronouns
+- Include specific numbers, percentages, or dates where relevant (AI systems prefer concrete facts over vague qualifiers)
+- Answer multi-part and complex questions fully — AI search rewards comprehensive coverage over brevity
+- Unique value rule: every paragraph must add information the reader cannot find in the first three Google results — if it cannot, cut it
+
+GEO / AI CITATION MECHANICS (2026 research-backed — mandatory):
+- ANSWER CAPSULE (single most important GEO signal — 72% of ChatGPT-cited pages have this): the opening 1–2 sentences of EVERY H2 section must form a self-contained answer capsule of 120–150 characters. CRITICAL RULE: never place a hyperlink inside the answer capsule sentence — links in direct-answer text reduce AI citation likelihood. Place any supporting links in the paragraph that follows, not in the capsule itself.
+- SUB-QUERY COVERAGE: anticipate 3–5 sub-questions users might ask about the topic and give each a dedicated H2 or H3 section. AI engines (ChatGPT, Perplexity, Gemini) decompose complex queries into sub-queries and cite the best per-sub-query answer — an article covering more sub-queries earns more citation slots.
+- ORIGINAL PERSPECTIVE (2nd strongest citation predictor): include at least one section with first-hand insight, original data, a unique angle, or a named case study that no generic article would contain. Label it implicitly by the voice: "In practice…", "Our experience shows…", "What most guides miss…"
+- NAMED EXPERT ATTRIBUTION: include at least one quote or finding attributed to a real person with name + title + organization (e.g., "According to Dr. Jane Lim, researcher at NUS, …"). AI systems treat named expert attribution as a strong trustworthiness signal. If no external expert, the author's own credentials must be stated explicitly.
+- RECENCY SIGNAL: at least one statistic or data point must be from within the last 12 months — cite with year. AI citation rates drop sharply for content older than 3 months; fresh data signals the article is current and worth citing.
+- GEO ANTI-PATTERNS (never do these in this article): ❌ No hyperlinks inside direct-answer capsule sentences ❌ No content hidden behind accordions/tabs (AI cannot see JavaScript-toggled content) ❌ No walls of text — even one bulleted sub-point breaks dense prose into extractable units ❌ No unsourced statistics — every number needs "according to [Source] ([Year])"
+
+RANK MATH COMPLIANCE (24-test scoring system — target ≥81 green):
+
+BASIC SEO — 7 tests:
+- Primary keyword in H1 title (already covered above) AND in the first 10% of body text (≈ first 150 words)
+- Primary keyword (or a close variant / partial phrase / LSI term) must appear in EVERY H2, H3 AND H4 heading — every sub-heading should signal the topic, not just one. RECONCILE with the CJK exact-keyword cap below: write the EXACT focus keyword in only 1–2 headings; in all the other headings use a synonym, a shorter partial phrase, or a closely-related term, so each heading reinforces the topic WITHOUT breaching the 4–6× exact-keyword limit (keyword-stuffing penalty)
+- All focus keywords must appear naturally throughout the body — not clustered
+- Keyword density 1%–1.5%; exceeding 2.5% triggers a keyword-stuffing penalty — never exceed. For CJK languages (Chinese/Japanese/Korean) RankMath cannot tokenize the text, counts very few "words", and reports density 5–10× higher than reality — so DO NOT chase a percentage; instead obey the hard exact-keyword-repetition cap given in the CJK compliance block in the instructions below
+- Minimum 600 words; 2,500+ words = RankMath content-length 100% score
+
+ADDITIONAL SEO — 10 tests:
+- At least 1 external link with DOFOLLOW (standard href link, no rel="nofollow"); cite as "[Source Name] ([Year])"
+- Primary keyword must appear in at least one image's ALT text in the article body
+- Emit <!-- SLUG_HINT: primary-keyword-slug --> at end of article — CMS uses this as URL slug (must contain keyword; ideally ≤75 total URL characters)
+
+CONTENT READABILITY — 3 tests:
+- Do NOT write a manual Table of Contents. The WordPress theme (Kadence) auto-generates the TOC from the heading structure; a hand-written list would duplicate it. Just produce a clean, well-ordered H2/H3 outline so the automatic TOC is correct.
+- All paragraphs strictly < 120 words — split any long passage into multiple shorter paragraphs, no exceptions
+- Media: include at least 4 image placeholder blocks throughout the article body (1 image passes the test; 4+ earns 100% for this test)
+
+IMAGE PLACEHOLDERS (when images are requested):
+- Alt text rule: describe the image content concisely + include the primary keyword ONCE where it fits naturally; NEVER keyword-stuff alt text
+- First image alt text: must include the primary keyword (e.g. "instructor guiding a small-group creative expression session using watercolour")
+- Filename format (add as a comment): <!-- filename: descriptive-words-with-hyphens.jpg --> — max 5 words, hyphens ONLY (no underscores, no spaces), all lowercase, naturally includes primary keyword ONCE
+- Google Discover optimisation: recommend 16:9 format at 1280×720 px minimum (>300k total pixels); avoid images with heavy text overlays
+- Use descriptive alt text for accessibility: describe what is literally shown, not what you want it to say
+- NEVER use CSS background for SEO-critical images — always use the ![alt](url) Markdown img format
+
+STRUCTURED DATA HINTS (for the CMS to apply):
+- Include a visible date placeholder (do NOT guess a date): emit exactly <!-- PUBLISH_DATE --> where the byline date should appear — the CMS will replace it with the real publish date to keep it consistent with datePublished in the Article schema
+- For Article/BlogPosting schema: the CMS datePublished and dateModified must match visible dates — so never emit a literal month/year in the article body
+- For topic pages: include clear who/what/where/when entity signals that structured data can reinforce
+- URL slug hint: emit <!-- SLUG_HINT: primary-keyword-slug --> at the very end of the article (after the last section) — use lowercase, hyphens only, no stop words; total URL including domain must be ≤75 characters
+- Schema type: articles should use BlogPosting (more specific than Article — Google recommends using the most specific applicable type)
+- FAQPage schema: every ## FAQ section the CMS will convert to FAQPage JSON-LD — write each FAQ answer as a standalone paragraph (no "see above", no cross-references) because AI engines cite FAQ Q&A pairs directly. Each FAQ answer must fully answer its question in 40–120 words without referencing other parts of the article.
+
+CONTENT FRESHNESS SIGNALS:
+- When citing research or statistics, always include the year (e.g. "a 2024 study by…")
+- Use "As of [year]" when describing a current state that may change
+- Avoid phrases like "recently" or "currently" — they become inaccurate quickly`;
+
+
+interface ArticleStructure {
+  quickAnswer?: boolean;
+  keyTakeaways?: boolean;
+  comparisonTable?: boolean;
+  faq?: boolean;
+  conclusion?: boolean;
+  tables?: boolean;
+  h3?: boolean;
+  lists?: boolean;
+  italics?: boolean;
+  quotes?: boolean;
+  bold?: boolean;
+}
+
+interface MediaHub {
+  aiImages?: string;
+  imageCount?: number;
+  imageSize?: string;
+  imageStyle?: string;
+  imageInstructions?: string;
+  brandName?: string;
+  includeKeywordAlt?: boolean;
+  autoAltText?: boolean;
+  youtubeSource?: string;
+  youtubeCount?: number;
+  youtubeLayout?: string;
+  strictUnderHeadings?: boolean;
+}
+
+const ALLOWED_MODELS = [
+  "claude-haiku-4-5-20251001",
+  "claude-sonnet-4-6",
+  "claude-opus-4-8",
+];
+
+/** Call Perplexity Sonar to get 3–5 real, verified external source URLs for the keyword. */
+async function fetchRealSources(keyword: string, language: string): Promise<string[]> {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  if (!apiKey) return [];
+  try {
+    const res = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "sonar",
+        messages: [{
+          role: "user",
+          content: `Find 5 authoritative external web sources about: "${keyword}". Prefer academic journals, established health organizations, government sites, or reputable publications. Language preference: ${language}. List the 5 most relevant URLs only.`,
+        }],
+        search_recency_filter: "year",
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { citations?: unknown[] };
+    return (data.citations ?? [])
+      .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u) && !/[\s\n\r]/.test(u))
+      .slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchUrlText(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return "";
+    const html = await res.text();
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+      .slice(0, 3000);
+  } catch {
+    return "";
+  }
+}
+
+function buildUserPrompt(params: {
+  keyword: string;
+  title: string;
+  language: string;
+  targetCountry: string;
+  articleType: string;
+  articleSize: string;
+  tone: string;
+  pointOfView: string;
+  readability: string;
+  removeAiWords: string;
+  details: string;
+  nlpKeywords: string;
+  outline: string;
+  externalLinks: string[];
+  realSources: string[];
+  internalLinks: string[];
+  referenceContext: string;
+  structure: ArticleStructure;
+  introHookBrief: string;
+  introHookType: string;
+  media: MediaHub | null;
+  generateMeta: boolean;
+}): string {
+  const lines: string[] = [];
+
+  if (params.details.trim()) {
+    lines.push("=== BRAND / ADDITIONAL INSTRUCTIONS ===");
+    lines.push(params.details.trim());
+    lines.push("=== END INSTRUCTIONS ===");
+    lines.push("");
+  }
+
+  lines.push(`Primary keyword: ${params.keyword}`);
+  if (params.title.trim()) lines.push(`Article title: ${params.title.trim()}`);
+  lines.push(`Language: ${params.language}`);
+  const isGlobalAudience = !params.targetCountry || params.targetCountry === "Global" || params.targetCountry === "全球（不指定）";
+  if (!isGlobalAudience) {
+    lines.push(`Target country/audience: ${params.targetCountry}`);
+  }
+  lines.push(`Article type: ${params.articleType}`);
+  lines.push(`Target length: ${SIZE_WORDS[params.articleSize] ?? "~2500"} words`);
+  lines.push(`Tone of voice: ${params.tone}`);
+  if (params.pointOfView !== "none") lines.push(`Point of view: ${params.pointOfView}`);
+  lines.push(`Text readability: ${params.readability}`);
+
+  // CJK RankMath compliance — RankMath cannot tokenize Chinese/Japanese/Korean, so its
+  // English power-word list, sentiment list, and density % all misfire. Emit a targeted,
+  // language-aware reinforcement block when the article language is CJK.
+  const isCJK = /chinese|mandarin|cantonese|japanese|korean|zh-tw|zh-cn|zh-hk|zh-mo|ja-jp|ko-kr|中文|繁體|繁体|简体|簡體|漢語|汉语|粵語|廣東話|國語|国语|台語|台语|日本|日語|日语|한국|韓國|韩国|국어/i.test(params.language);
+  if (isCJK) {
+    lines.push("");
+    lines.push("=== CJK RANKMATH COMPLIANCE (this article is in a CJK language — follow strictly) ===");
+    lines.push("• TITLE power word: use ONE of these localized power words in the H1/SEO title (RankMath's English list will not match CJK; a matching server-side list is registered for the site): 終極 / 必備 / 實證 / 專家 / 完整 / 有效 / 簡單 / 關鍵 / 最佳 / 免費 / 立即 / 秘訣 / 揭密 / 一次搞懂 / 高效 / 避免 / 不可不知 / 獨家 / 快速 / 突破。CRITICAL FORMAT: RankMath detects the power word by splitting the title on SPACES, so the chosen word MUST stand alone as its own space-separated token — write 「兒童藝術治療 完整 指南」(✓ 完整 is its own token), NOT 「完整指南」(✗ glued, will not register). Put a half-width space before and after the power word. Do NOT use overclaim words like 保證／治癒 in YMYL (health) titles — they violate the trust rules above.");
+    lines.push("• TITLE number: include an Arabic digit in the title (例：「7 個」「5 步驟」「2026 年」) — do NOT use CJK numerals（七、五、十）, RankMath only detects 0-9 digits.");
+    lines.push("• TITLE sentiment: include a localized emotion word as its OWN space-separated token (正面：驚人／必看／有效／實用／安心；負面：避免／別再／小心／錯誤). RankMath's built-in sentiment list is English so this test may still warn for CJK unless a localized list is registered server-side — include the emotion word regardless so the title reads compellingly and stays ready if the list is added.");
+    lines.push("• KEYWORD FREQUENCY (critical — this SUPERSEDES both the density % rule AND the earlier 'keyword must appear throughout the body / not clustered' rule): RankMath cannot count CJK words, so it undercounts total words and the focus-keyword density reads 5–10× too high (a prior article hit 13.04%). Use the EXACT focus keyword AT MOST 4–6 times in the WHOLE article: once in the H1, once in the first paragraph, once in a single H2/H3, and 1–3 times in the body. For every other reference use a synonym, a shorter partial phrase, or a pronoun（它／這套方法／本服務／該工具）. NEVER write the exact keyword more than 6 times total.");
+    lines.push("• HEADINGS keyword coverage: every H2/H3/H4 must carry the topic, but to stay under the 4–6× exact-keyword cap, put the EXACT focus keyword in only 1–2 headings and use a synonym / shorter partial phrase / related term（同義詞、部分詞、相關詞）in all the rest. Example for focus「兒童藝術治療」: H2「兒童藝術治療 的核心原理」(exact, ✓ space-tokenised) → H2「為什麼 繪畫表達 能療癒情緒」(variant) → H3「家長如何在家陪伴 創作」(related). Never repeat the exact keyword in every heading — that breaches the cap and reads as stuffing.");
+    lines.push("=== END CJK RANKMATH COMPLIANCE ===");
+  }
+
+  // Structure overrides
+  const s = params.structure;
+  if (s.quickAnswer === false)     lines.push("DO NOT include a Quick Answer section.");
+  if (s.keyTakeaways === false)    lines.push("DO NOT include a Key Takeaways section.");
+  if (s.comparisonTable === false) lines.push("DO NOT include a comparison or evaluation table.");
+  if (s.faq === false)             lines.push("DO NOT include a FAQ section.");
+  if (s.conclusion === false)      lines.push("DO NOT include a Conclusion section.");
+  if (s.tables === false)          lines.push("DO NOT include any data tables.");
+  if (s.h3 === false)              lines.push("DO NOT use H3 sub-headings.");
+  if (s.lists === false)           lines.push("DO NOT use bullet lists or numbered lists.");
+  if (s.italics === false)         lines.push("DO NOT use italic text.");
+  if (s.quotes === false)          lines.push("DO NOT include block quotes.");
+  if (s.bold === false)            lines.push("DO NOT use bold text for emphasis.");
+
+  // Positive enforcement — the negative `=== false` opt-outs above are NOT enough. When these
+  // sections are enabled the model still silently skips them, relying on the system prompt default
+  // (user-reported 2026-06-16: TABLES/FAQ/QUOTES toggled Yes but absent from the output). List the
+  // enabled-but-skip-prone elements as hard REQUIRED items so they actually appear.
+  const required: string[] = [];
+  if (s.comparisonTable !== false)      required.push("at least one comparison or evaluation table using markdown table syntax (| column | column |)");
+  else if (s.tables !== false)          required.push("at least one data table where it genuinely helps the reader, using markdown table syntax");
+  if (s.faq !== false)                  required.push("a \"## FAQ\" section near the end with 5-8 question-and-answer pairs; each answer 40-120 words and self-contained (RankMath converts this to FAQPage schema)");
+  if (s.quotes !== false)               required.push("at least one markdown blockquote — a line beginning with \"> \" — highlighting a key insight or a sourced quotation");
+  if (s.keyTakeaways !== false)         required.push("a \"## Key Takeaways\" section with 4-5 bullet points");
+  if (required.length > 0) {
+    lines.push("");
+    lines.push("REQUIRED ELEMENTS — the finished article MUST contain EVERY item below. Do NOT skip any; if one feels redundant include it anyway in the most natural place:");
+    required.forEach(r => lines.push(`- ${r}`));
+  }
+
+  // Introductory hook
+  if (params.introHookType || params.introHookBrief.trim()) {
+    lines.push("");
+    const hookParts: string[] = [];
+    if (params.introHookType) hookParts.push(`type: ${params.introHookType}`);
+    if (params.introHookBrief.trim()) hookParts.push(params.introHookBrief.trim());
+    lines.push(`Opening hook for the article's first sentence — ${hookParts.join(". ")}`);
+  }
+
+  // Remove AI words
+  if (params.removeAiWords === "basic") {
+    lines.push(`\nAVOID these overused AI filler words: ${AI_WORDS_BASIC.join(", ")}`);
+  } else if (params.removeAiWords === "extended") {
+    lines.push(`\nAVOID these overused AI filler words: ${AI_WORDS_EXTENDED.join(", ")}`);
+  }
+
+  // NLP keywords
+  if (params.nlpKeywords.trim()) {
+    lines.push("");
+    lines.push("SEO/NLP keywords to include naturally (do not keyword-stuff):");
+    lines.push(params.nlpKeywords.trim());
+  }
+
+  // Custom outline
+  if (params.outline.trim()) {
+    lines.push("");
+    lines.push("Custom article outline (follow this heading structure exactly):");
+    lines.push(params.outline.trim());
+  }
+
+  // Reference context (Connect to Web)
+  if (params.referenceContext.trim()) {
+    lines.push("");
+    lines.push("=== REFERENCE CONTENT (use as factual context, cite appropriately) ===");
+    lines.push(params.referenceContext.trim());
+    lines.push("=== END REFERENCE CONTENT ===");
+  }
+
+  // External links — user-provided first, then Perplexity-verified sources
+  const validLinks = params.externalLinks.filter(u => /^https?:\/\//.test(u.trim()));
+  if (validLinks.length > 0) {
+    lines.push("");
+    lines.push("External links to include naturally as contextual anchors:");
+    validLinks.forEach(u => lines.push(`- ${u.trim()}`));
+    lines.push("IMPORTANT: Only use the URLs listed above for external links. Do NOT invent or guess other URLs.");
+  } else if (params.realSources.length > 0) {
+    const safeSources = params.realSources.filter(u => /^https?:\/\//.test(u.trim()) && !/[\s\n\r]/.test(u));
+    if (safeSources.length > 0) {
+    lines.push("");
+    lines.push("VERIFIED EXTERNAL SOURCES (real URLs found via web search — use ONLY these for external links, do NOT invent other URLs):");
+    safeSources.forEach(u => lines.push(`- ${u}`));
+    lines.push("Cite each source naturally in the body text where contextually relevant. Do not cluster all citations in one place.");
+    }
+  }
+
+  // Internal links — provide REAL site URLs to weave; HARD-forbid the model from inventing any.
+  // Root cause (2026-06-16, user-reported live bug): unlike the external-links block which carries
+  // an anti-invention guard, this block had none → when no internal links were supplied the model
+  // fabricated fake internal URLs (e.g. /related-article) to satisfy RankMath's internal-link test.
+  const validInternal = params.internalLinks.filter(u => /^(https?:\/\/|\/)/.test(u.trim()));
+  if (validInternal.length > 0) {
+    lines.push("");
+    lines.push("Internal links — weave these REAL existing site URLs naturally into the body using descriptive anchor text (never 'click here'). CRITICAL: use ONLY these exact URLs for internal links; NEVER invent, guess, modify, or fabricate any other internal or relative URL:");
+    validInternal.forEach(u => lines.push(`- ${u.trim()}`));
+  } else {
+    lines.push("");
+    lines.push("Internal links: NONE provided. Do NOT add any internal links, and NEVER invent, guess, or fabricate internal/relative URLs (e.g. /related-article, /some-page). The site auto-links internally via a plugin — leave internal linking entirely to it. An article with zero internal links is correct here; a fabricated internal link is a serious error.");
+  }
+
+  // Media instructions
+  const m = params.media;
+  if (m) {
+    if (m.aiImages && m.aiImages !== "none") {
+      const count = m.imageCount ?? 3;
+      const ratioLabel = m.imageSize?.trim() ?? ""; // now an aspect ratio (e.g. "16:9"), not a px size
+      lines.push("");
+      lines.push("IMAGE PLACEHOLDERS:");
+      lines.push(`- Include ${count} image placeholder(s) in the article${ratioLabel ? ` (aspect ratio: ${ratioLabel})` : ""}`);
+      if (m.imageStyle)        lines.push(`- Image style: ${m.imageStyle}`);
+      if (m.imageInstructions) lines.push(`- Creative direction: ${m.imageInstructions}`);
+      if (m.brandName)         lines.push(`- Brand: ${m.brandName}`);
+      if (m.includeKeywordAlt) lines.push(`- First image alt-text must include the primary keyword`);
+      if (m.autoAltText)       lines.push(`- Write descriptive SEO alt-text for every image placeholder`);
+      if (m.strictUnderHeadings) lines.push(`- Place all images strictly under an H2 or H3 heading`);
+      lines.push(`- Format each placeholder as: ![alt-text here](IMAGE_PLACEHOLDER_N) where N = 1, 2, 3...`);
+    }
+    if (m.youtubeSource && m.youtubeSource !== "none") {
+      const layoutMap: Record<string, string> = {
+        distribute: "distributed evenly throughout the article",
+        after_intro: "after the introduction",
+        after_h2: "after each major H2 section",
+      };
+      const count = m.youtubeCount ?? 1;
+      const placement = layoutMap[m.youtubeLayout ?? "distribute"] ?? "distributed evenly";
+      lines.push("");
+      lines.push("YOUTUBE VIDEO PLACEHOLDERS:");
+      lines.push(`- Include ${count} YouTube embed placeholder(s), ${placement}`);
+      if (m.strictUnderHeadings) lines.push(`- Place under headings only`);
+      lines.push(`- Format each as: [YOUTUBE_PLACEHOLDER_N: <suggested search query for a relevant video>]`);
+      // The publish pipeline resolves/embeds (or drops) a placeholder only when it is ALONE on its
+      // line; an inline placeholder would leak raw "[YOUTUBE_PLACEHOLDER_N: ...]" text to the live post.
+      lines.push(`- CRITICAL: put each placeholder ALONE on its own line, with a blank line before and after. Never inline inside a sentence. Never use the "]" character inside the search query.`);
+    }
+  }
+
+  // Meta generation — emit the meta block FIRST, before the article body. Root cause fix
+  // (2026-06-16): it was previously appended LAST, so when a long article hit the token limit
+  // the body truncated and the meta block was never produced → empty SEO title/description →
+  // RankMath score collapsed. extractMeta() locates the block by regex regardless of position,
+  // so emitting it first guarantees the SEO title/desc survive even if the body is cut short.
+  if (params.generateMeta) {
+    lines.push("");
+    lines.push("OUTPUT ORDER (follow EXACTLY): FIRST output the meta block below verbatim (keep the exact comment markers and KEY: prefixes, one field per line). THEN, immediately after the <!-- CONTENT_META_END --> line, write the complete article. Do NOT place the meta block at the end.");
+    lines.push("<!-- CONTENT_META_START -->");
+    lines.push("SEO_TITLE: [SEO title — 50-60 chars for Latin scripts / 14-30 chars for CJK; primary keyword in first half; include a power word AND an Arabic-digit number]");
+    lines.push("META_DESC: [meta description — 145-155 chars for Latin scripts / 60-80 chars for CJK; includes primary keyword]");
+    lines.push("FOCUS_KEYWORD: [the primary keyword exactly as provided]");
+    lines.push("CATEGORIES: [1-2 broad, conventional WordPress category names for this article, comma-separated — prefer terms a site would already have; do NOT invent narrow one-off categories]");
+    lines.push("TAGS: [4-6 specific topical tags, comma-separated]");
+    lines.push("<!-- CONTENT_META_END -->");
+    lines.push("");
+    lines.push("Now output the meta block above, then write the complete article below it.");
+  } else {
+    lines.push("");
+    lines.push("Write the complete article now.");
+  }
+
+  return lines.join("\n");
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core entry points (P2 積木化). Shared by the streaming HTTP route
+// (app/api/content/generate/route.ts) and the headless block
+// (lib/content/blocks/article-generate.ts): 一段邏輯、兩個入口、零重複.
+// Everything ABOVE this line is the verbatim original route logic (lines 9-423),
+// moved unchanged so behaviour is byte-identical.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ArticleGenerateInput = Record<string, unknown>;
+
+export interface ArticlePreparedConfig {
+  model: string;
+  maxTokens: number;
+  system: string;
+  userPrompt: string;
+}
+
+export interface ArticleGenerateFailure {
+  ok: false;
+  status: number;
+  error: string;
+}
+
+export interface ArticlePrepareSuccess {
+  ok: true;
+  config: ArticlePreparedConfig;
+}
+
+export type ArticlePrepareResult = ArticlePrepareSuccess | ArticleGenerateFailure;
+
+/**
+ * Validate + coerce the request body into a ready-to-stream Anthropic config. Byte-identical to the
+ * original route POST preamble (old lines 441-528): same str/bool/sarr coercion, same defaults, same
+ * Perplexity real-source fetch and reference-URL fetch. Returns a discriminated result; the only
+ * validation failure is an empty keyword (400), matching the original route exactly.
+ */
+export async function prepareArticleGeneration(body: ArticleGenerateInput): Promise<ArticlePrepareResult> {
+  const str  = (v: unknown, fb = "") => (typeof v === "string" ? v : fb);
+  const bool = (v: unknown, fb = true) => (typeof v === "boolean" ? v : fb);
+  const sarr = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+
+  const keyword = str(body.keyword).trim();
+  if (!keyword) return { ok: false, status: 400, error: "keyword required" };
+
+  const rawStruct = (body.structure ?? {}) as Record<string, unknown>;
+  const structure: ArticleStructure = {
+    quickAnswer:     bool(rawStruct.quickAnswer),
+    keyTakeaways:    bool(rawStruct.keyTakeaways),
+    comparisonTable: bool(rawStruct.comparisonTable),
+    faq:             bool(rawStruct.faq),
+    conclusion:      bool(rawStruct.conclusion),
+    tables:          bool(rawStruct.tables),
+    h3:              bool(rawStruct.h3),
+    lists:           bool(rawStruct.lists),
+    italics:         bool(rawStruct.italics),
+    quotes:          bool(rawStruct.quotes),
+    bold:            bool(rawStruct.bold),
+  };
+
+  const rawMedia = (body.media ?? {}) as Record<string, unknown>;
+  const media: MediaHub = {
+    aiImages:           str(rawMedia.aiImages, "none"),
+    imageCount:         typeof rawMedia.imageCount === "number" ? Math.min(Math.max(1, rawMedia.imageCount), 10) : 3,
+    imageSize:          str(rawMedia.imageSize, "16:9"), // flux aspect_ratio (px-size format retired)
+    imageStyle:         str(rawMedia.imageStyle),
+    imageInstructions:  str(rawMedia.imageInstructions),
+    brandName:          str(rawMedia.brandName),
+    includeKeywordAlt:  bool(rawMedia.includeKeywordAlt, true),
+    autoAltText:        bool(rawMedia.autoAltText, false),
+    youtubeSource:      str(rawMedia.youtubeSource, "none"),
+    youtubeCount:       typeof rawMedia.youtubeCount === "number" ? Math.min(Math.max(1, rawMedia.youtubeCount), 5) : 1,
+    youtubeLayout:      str(rawMedia.youtubeLayout, "distribute"),
+    strictUnderHeadings: bool(rawMedia.strictUnderHeadings, false),
+  };
+
+  const maxTokens  = SIZE_TOKENS[str(body.articleSize, "medium")] ?? 4096;
+  // Fetch reference URLs (Connect to Web)
+  const referenceUrls = sarr(body.referenceUrls).filter(u => /^https?:\/\//.test(u)).slice(0, 3);
+  let referenceContext = "";
+  if (referenceUrls.length > 0) {
+    const fetched = await Promise.all(referenceUrls.map(async (url) => {
+      const text = await fetchUrlText(url);
+      return text ? `--- Source: ${url} ---\n${text}` : "";
+    }));
+    referenceContext = fetched.filter(Boolean).join("\n\n");
+  }
+
+  // Internal links
+  const internalLinks = sarr(body.internalLinks).filter(u => /^(https?:\/\/|\/)/.test(u.trim())).slice(0, 10);
+
+  // Perplexity real sources — only when user hasn't provided their own external links
+  const userExternalLinks = sarr(body.externalLinks);
+  const realSources = userExternalLinks.length === 0
+    ? await fetchRealSources(keyword, str(body.language, "English"))
+    : [];
+
+  // Model selection (default: sonnet)
+  const requestedModel = str(body.model, "claude-sonnet-4-6");
+  const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : "claude-sonnet-4-6";
+
+  const userPrompt = buildUserPrompt({
+    keyword,
+    title:         str(body.title),
+    language:      str(body.language, "English"),
+    targetCountry: str(body.targetCountry, "Global"),
+    articleType:   str(body.articleType, "Pillar Article"),
+    articleSize:   str(body.articleSize, "medium"),
+    tone:          str(body.tone, "Friendly"),
+    pointOfView:   str(body.pointOfView, "none"),
+    readability:   str(body.readability, "8th grade"),
+    removeAiWords: str(body.removeAiWords, "none"),
+    details:       str(body.details),
+    nlpKeywords:   str(body.nlpKeywords),
+    outline:       str(body.outline),
+    externalLinks: userExternalLinks,
+    realSources,
+    internalLinks,
+    referenceContext,
+    structure,
+    introHookBrief: str(body.introHookBrief),
+    introHookType:  str(body.introHookType),
+    media,
+    generateMeta: bool(body.generateMeta, false),
+  });
+
+  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt } };
+}
+
+/**
+ * Stream the article as text deltas. Byte-identical to the original route ReadableStream body
+ * (old lines 533-575): same Anthropic stream call, same abort wiring, same max_tokens truncation
+ * marker and same error marker under the same conditions. The route wraps this generator in a
+ * ReadableStream; the block collects it into a string. `signal` is the request abort signal —
+ * Next.js aborts it on client disconnect, equivalent to the original route cancel() → abort().
+ */
+export async function* streamArticleGeneration(
+  config: ArticlePreparedConfig,
+  apiKey: string,
+  signal?: AbortSignal,
+): AsyncGenerator<string, void, unknown> {
+  const client = new Anthropic({ apiKey });
+  let anthropicStream: ReturnType<typeof client.messages.stream> | null = null;
+  try {
+    anthropicStream = client.messages.stream({
+      model: config.model,
+      max_tokens: config.maxTokens,
+      system: config.system,
+      messages: [{ role: "user", content: config.userPrompt }],
+    });
+
+    signal?.addEventListener("abort", () => {
+      anthropicStream?.abort();
+    });
+
+    for await (const event of anthropicStream) {
+      if (signal?.aborted) break;
+      if (
+        event.type === "content_block_delta" &&
+        event.delta.type === "text_delta"
+      ) {
+        yield event.delta.text;
+      }
+    }
+
+    // Truncation guard: surface a max_tokens cutoff instead of silently shipping a
+    // half-written article (the old 4096 budget truncated invisibly — 2026-06-16 root cause).
+    if (!signal?.aborted) {
+      const finalMsg = await anthropicStream.finalMessage().catch(() => null);
+      if (finalMsg?.stop_reason === "max_tokens") {
+        yield "\n\n<!-- GENERATION_TRUNCATED: hit the output length limit; pick a shorter article size or split the topic -->";
+      }
+    }
+  } catch (err) {
+    if (!signal?.aborted) {
+      const isAnthropicErr = err instanceof Error && err.message.length > 0;
+      const msg = isAnthropicErr ? "Claude API error" : "Unknown error";
+      yield `\n\n<!-- GENERATION_ERROR: ${msg} -->`;
+    }
+  }
+}
+
+/**
+ * Headless one-shot: prepare → collect the full generation into a markdown string. Used by the
+ * article/generate block. Returns the same validation-failure shape as prepare. The streamed markers
+ * (GENERATION_TRUNCATED / GENERATION_ERROR) are kept verbatim in the markdown — the caller decides
+ * how to surface them, exactly as the streaming UI does after reading the stream.
+ */
+export async function generateArticleMarkdown(
+  body: ArticleGenerateInput,
+  apiKey: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true; markdown: string } | ArticleGenerateFailure> {
+  const prepared = await prepareArticleGeneration(body);
+  if (!prepared.ok) return prepared as ArticleGenerateFailure;
+  const { config } = prepared as ArticlePrepareSuccess;
+  let markdown = "";
+  for await (const chunk of streamArticleGeneration(config, apiKey, signal)) {
+    markdown += chunk;
+  }
+  return { ok: true, markdown };
+}
