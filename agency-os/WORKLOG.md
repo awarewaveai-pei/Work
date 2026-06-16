@@ -36,6 +36,26 @@
 **[剩餘風險]** ① 須**重啟 Codex** 才生效（running Codex 仍有舊 21）。② Codex 仍啟 15 個 server（各閃視窗，但無紅字 trigger loop）；要更少可再排除 consumer app（airtable/canva/replicate/resend/wordpress 對 Codex coding 無用）。③ 桌機需 git pull + sync 套用。
 **[rollback]** `git checkout HEAD~1 -- mcp/registry.template.json` 後重跑 `sync-mcp-config.ps1`。
 
+### claude 2026-06-16 — Content Studio 三項收尾：草稿持久化/trending 源（VBC=已建已部署）+ 清 soulful 假連結
+
+**[任務理解]** 使用者「都處理」剩 3 項：① 生成草稿持久化（A Supabase / B localStorage 待選）② trending 來源擴充（「都要」）③ 清 soulful 假連結文章。
+
+**[現況分析 / VBC]** 動手前先查實際狀態（延續本 session newsletter 的 VBC 教訓）→ ①②**早被前 session 建好且部署運作，TASKS 描述過時**：
+- **① 草稿持久化**：方案 A 已選 — `0041_content_drafts.sql` + `app/api/content/drafts/route.ts`（GET/POST upsert/DELETE 完整）+ ContentStudio auto-save +「我的草稿」頁籤。真機驗：SG 容器查 prod DB `supabase.aware-wave.com` → `content_drafts` http=200 **已有 1 筆真草稿**。
+- **② trending 源**：5 內建源（+perplexity +env-custom-rss）+ `0042_content_sources.sql` + `/api/content/sources`（operator 免 deploy 加 RSS，isSafePublicHttps SSRF guard）。真機驗：`content_sources` http=200 (0 rows，就緒)。剩 Inoreader/NewsAPI 需憑證未做。
+
+**[已修改]** ③ 唯一真待辦：soulful draft 7207 de-link 假連結（`wp eval-file` preg_replace，保留文字移除假 href）。+ TASKS line 61/62/63 → `[x]`。**無 next-admin code 改動**（①② 既存且運行中）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin node`（prod supabase REST count content_drafts/content_sources）| exit=0 | ms=~2000 — `content_drafts http=200 count=0-0/1`（表存在+1 筆持久草稿）、`content_sources http=200 count=*/0`（表存在）→ ①② 部署運作證實
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp eval-file fix-7207.php`（soulful prod，preg_replace de-link href=/expressive-arts-emotional-wellness）| exit=0 | ms=~3000 — `REPLACED count=1 remaining_refs=0 status=draft`；複驗 `anchor_to_fake=0 plaintext_kept=1`；全站掃僅 7207 含此 slug、**已發佈文章零假連結**
+- REVIEW_WAIVED: NA -- ①② 無 code 改動（既存 critic-審過且運行）；③ 為單篇 draft 內容 de-link，非 code
+- BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=`content_drafts|content_sources|expressive-arts-emotional-wellness` | hits=route+migration+UI 一致；soulful 全站僅 7207 一處假 slug（已清）；TASKS 3 行過時描述已更正
+
+**[剩餘風險]** ③ 7207 仍為 draft（操作者發佈前可再審）；備份 `D:\tmp\soulful-7207-backup-20260616-223918.html`。② Inoreader/NewsAPI 待憑證。
+
+**[rollback]** ③ 從備份還原 7207 post_content；①② 無變更。TASKS 勾選 `git revert`。
+
 ### fix(mcp): MONOREPO_ROOT 未設 → 開機 9 個 MCP server 閃紅字視窗（筆電真根因）
 **[任務理解]** 使用者回報筆電「一開機跳出好幾次 PowerShell 紅字視窗、一秒消失」，**公司桌機沒有**。先前同 session 修的 doc-sync `-LiteralPath` + SystemGuard registrar 261 是**另一個症狀**（22:30 Daily 視窗 + doc-sync 紅字），**非開機閃窗**。VBC 重查：排程任務全排除（TaskScheduler 操作記錄開機後 0 任務啟動；AgencyOS 任務皆隱藏無 boot/logon 觸發；啟動資料夾/Run 機碼無 .ps1）。
 **[根因]** `.mcp.json`（`sync-mcp-config.ps1` 生成）對每個 powershell-launched MCP server 用 `-File ${env:MONOREPO_ROOT}\scripts\*.ps1`（line 160-161 刻意設計，git 共用、兩機不同碟靠各機 env var 解析）。**筆電 `MONOREPO_ROOT` User+Machine 範圍皆空**（`[Environment]::GetEnvironmentVariable('MONOREPO_ROOT','User')` = ''），→ MCP host（Claude Code/Cursor）一開機啟動時路徑變 `\scripts\run-llm-mcp.ps1` → powershell `-File 檔案不存在` 紅字（實測 exit -196608）→ 9 個 powershell server（gemini/chatgpt/grok ×fast/latest + postgres + trigger + filesystem）各閃一個 → 「好幾次」。桌機有設故不閃。**系統 gap**：`sync-mcp-config.ps1` 製造此依賴卻無任何腳本保證該 env var 存在（memory feedback_git_push.md 已註明是前置條件、bootstrap 沒設）。
