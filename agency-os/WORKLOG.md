@@ -23,6 +23,9 @@
 
 **[rollback]** 無 code 變更需回滾；測試草稿 #4 已刪、soulful 回 baseline。TASKS 勾選回退即 `git revert`。
 
+### fix(mcp): Codex 排除清單收斂為 trigger + cloudflare（使用者修正）
+**[修正]** 使用者要求恢復 6 個 LLM 橋接到 Codex，只排除 cloudflare + trigger。已從 `registry.template.json` 移除 chatgpt/gemini/grok×fast/latest 的 codex exclude，新增 cloudflare exclude（trigger 保留）。驗證：template JSON valid；codex config.toml = 20（6 橋接回歸、無 cloudflare/trigger）；`.mcp.json` 仍 22 個全員（cloudflare+trigger 都在，共用檔未動）。**澄清**：codex exclude 只影響 `~/.codex/config.toml`，從不刪改共用的 `.mcp.json`。
+
 ### fix(mcp): Codex 排除 6 LLM 橋接 + trigger — 減少開機閃窗（procmon 證實 host=codex.exe）
 **[任務理解]** 承上「又跳了、一次2個」。procmon（Win32 process-creation 監聽 75s）證實閃窗的 MCP server **parent=codex.exe**（不是 Claude Code）—— Codex 啟動/重載時一口氣開 ~21 個 stdio MCP server，每個 powershell/cmd 開一個 console 視窗。「一次2個」= trigger 的雙 powershell 鏈（`start-trigger-mcp.ps1` → `secrets-vault.ps1 ... npx trigger.dev mcp`）crash-loop。使用者選「精簡 Codex MCP 清單」。
 **[根因]** Codex 是 coding agent，卻被塞 6 個 LLM 橋接（chatgpt/gemini/grok × fast/latest，對 Codex 零價值）+ trigger（deploy-only、crash-loop）。`registry.template.json` 未對 Codex 排除它們。
