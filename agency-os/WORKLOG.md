@@ -45,7 +45,7 @@
 - **#3 分類抓現有**：新 route `/api/content/categories`（WP REST `/wp/v2/categories`，仿 related-posts auth）；handleGenerate 帶 `existingCategories`；generate-core CATEGORIES 指示改「從現有清單精確挑選」。
 - **#4 品牌語調表單**：`MarketingBrief`（受眾/定位/USP/漏斗階段/CTA/價格/情緒/疑慮/禁用聲明）→ `compileMarketingBrief()` 折回 `details`（後端契約不變、向後相容；freeform textarea 保留為進階）。
 - **#5 競業痛點**：新 route `/api/content/market-analysis`（Perplexity sonar 五角度：競品/痛點/搜尋意圖/疑慮/差異化 → JSON + 注入 block）；UI 面板 chips 顯示 + 產文時注入 `marketContext`。
-- **#6 Kadence 漏斗 patterns**：新 route `/api/content/patterns`（WP REST `/wp/v2/blocks` synced patterns）；`[KADENCE_PATTERN: id]` placeholder → markdown-to-blocks 新 `pattern` block + wordpress-core REST 路徑 → `<!-- wp:block {"ref":id} /-->`；plugin BlockLibrary 新 `pattern()` 方法+compose case+manifest（17→18 type）；**AWBRIDGE_VERSION 0.11.0→0.12.0**（header+define）。
+- **#6 Kadence 漏斗 patterns**：新 route `/api/content/patterns`（WP REST `/wp/v2/blocks` synced patterns）；`[KADENCE_PATTERN: id]` placeholder → markdown-to-blocks 新 `pattern` block + wordpress-core REST 路徑 → `<!-- wp:block {"ref":id} /-->`；plugin BlockLibrary 新 `pattern()` 方法+compose case+manifest（16→17 type）；**AWBRIDGE_VERSION 0.11.0→0.12.0**（header+define）。
 - **#7 AEO**：SYSTEM_PROMPT 加 Answer-Engine-Optimization 區塊（PAA 問句式 H2/H3、定義膠囊、清單/表格可抽取性、≤30 字可抽取句）。
 - **新檔**：`lib/content/wp-entities.ts`（共用 HTML entity 解碼，修 critic 找到的「strip 而非 decode」defeats #3 的 bug）。
 
@@ -66,7 +66,8 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv OPENAI_API_KEY/PERPLEXITY_API_KEY` | exit=0 | 容器實際拿到 OPENAI(sk-pro…PrUA 有效)+PERPLEXITY → GPT(#1)+市場分析(#5) 線上可用
 - REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke` | exit=0 | 26 passed/0 failed/6 skipped(無 auth 項)
 - REALTEST_EVIDENCE: tool=Bash | cmd=`release-wp-bridge.sh` | exit=0 | wp-bridge **v0.12.0 發版**，asset `aware-wave-wp-bridge-v0.12.0.zip` 已出（release.yml Action verified）
-**[仍待]** #6 patterns 要在 **soulful 安裝/更新 wp-bridge 0.12.0**（zip 已發佈，屬 operator/MainWP 安裝步驟）才會在站上渲染；安裝前發文章插入 pattern 仍安全（舊版插件遇 `wp:block ref` 由 WP 核心解析，非 bridge 專屬）。
+- REALTEST_EVIDENCE: tool=SSH(soulful 191.101.230.176:65002) | cmd=備份插件目錄→`wp plugin install awb-v0.12.0.zip --force`→驗證 | exit=0 | **soulful wp-bridge 0.11.0→0.12.0**：version=0.12.0/active/無 PHP fatal/home=200；bridge REST 路由全註冊(/health /post /blocks…)；`AWBRIDGE_VERSION=0.12.0`；BlockLibrary manifest 含 `pattern` type + `compose(pattern ref:7207)` 產出 `wp:block ref` 正確。備份 `/home/u942075013/awb-backup-0.11.0-20260616-225947`(348K)可即時 rollback。
+**[全部完成]** 6 功能+AEO+#6 端到端線上可用：next-admin 部署(72cc23d6) + soulful wp-bridge 0.12.0 已裝。zip 私有 repo→本機 gh 下載 scp 上傳安裝。**rollback**：soulful 若異常 `rm -rf plugins/aware-wave-wp-bridge && cp -r awb-backup-0.11.0-* .../aware-wave-wp-bridge`。
 **[rollback]** 程式皆已隨 checkpoint commit 進 main；如需回退按檔 `git checkout` 個別檔；plugin 未 release 故站上零影響。
 
 ### fix(hooks): ao-resume-on-prompt + post-push hook 加 -WindowStyle Hidden（消開機/每訊息 powershell 閃窗 真根因）
