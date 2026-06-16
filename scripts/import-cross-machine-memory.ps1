@@ -131,6 +131,29 @@ function Read-ExportManifest([string]$SecretsRoot) {
     return $best
 }
 
+# Per-machine export timestamp from .manifest-<machine>.json (full UTC, for same-date tie-break).
+function Get-MachineExportUtc([string]$SecretsRoot, [string]$Machine) {
+    if (-not $SecretsRoot -or -not $Machine -or -not (Test-Path -LiteralPath $SecretsRoot)) { return $null }
+    $mf = Join-Path $SecretsRoot ".manifest-$Machine.json"
+    if (-not (Test-Path -LiteralPath $mf)) { return $null }
+    try {
+        $data = Get-Content -LiteralPath $mf -Raw -Encoding UTF8 | ConvertFrom-Json
+        return [datetime]::Parse($data.exported_utc, $null,
+                   [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+    } catch { return $null }
+}
+
+# True when an other-machine folder dated the SAME calendar day as own machine carries a
+# strictly newer manifest timestamp (folder names hold date only -> must compare full UTC).
+# Unreadable / missing timestamps -> $false (keep the safe "skip same-date" behaviour).
+function Test-SameDateOtherNewer($Entry, $OwnUtc) {
+    if (-not $Entry.IsNewFormat -or -not $Entry.FolderMachine -or -not $OwnUtc) { return $false }
+    $sr = Split-Path (Split-Path $Entry.Folder.FullName -Parent) -Parent
+    $otherUtc = Get-MachineExportUtc $sr $Entry.FolderMachine
+    if (-not $otherUtc) { return $false }
+    return ($otherUtc -gt $OwnUtc)
+}
+
 # ── Local state: tracks SHA256 of each file at last successful import ─────────
 # Stored machine-locally (not in git, not synced to other machines).
 # Enables mtime-free conflict detection:
