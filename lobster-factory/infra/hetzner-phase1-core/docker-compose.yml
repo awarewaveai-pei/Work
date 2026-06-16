@@ -297,6 +297,9 @@ services:
       # AI handlers (/daily_review, /weekly_review) — falls back to raw JSON if unset
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
+      # Content Studio multi-provider: GPT article generation path reads this (lib/content/article/
+      # generate-core.ts streamOpenAiGeneration). Empty = GPT models unavailable; Claude path unaffected.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # Repair Center: backup gate + GitHub handoff + Slack interactive approval
       AUTO_REPAIR_BACKUP_WEBHOOK_URL: ${AUTO_REPAIR_BACKUP_WEBHOOK_URL:-}
       AUTO_REPAIR_BACKUP_WEBHOOK_TOKEN: ${AUTO_REPAIR_BACKUP_WEBHOOK_TOKEN:-}
