@@ -97,7 +97,8 @@ foreach ($r in $textRows) {
 # --- Image volume (counts by model, from ai_image_jobs) ---
 $imgRows = @()
 try {
-  $imgRows = Invoke-Rest $creds "ai_image_jobs?select=model_name,provider&created_at=gte.$sinceUtc&limit=100000"
+  # Only completed jobs bill as a real image (failed/queued/cancelled produced nothing).
+  $imgRows = Invoke-Rest $creds "ai_image_jobs?select=model_name,provider&status=eq.completed&created_at=gte.$sinceUtc&limit=100000"
 } catch {
   Write-Warning "ai_image_jobs query failed: $($_.Exception.Message)"
 }
@@ -142,7 +143,8 @@ if (-not $textAvailable) {
 foreach ($k in ($textByRoute.Keys | Sort-Object { $textByRoute[$_].usd } -Descending)) {
   $e = $textByRoute[$k]
   $ntd = [math]::Round($e.usd * $twdRate, 0)
-  [void]$sb.AppendLine("| $k | $($e.calls) | $($e.inTok) | $($e.outTok) | `$$([math]::Round($e.usd,4)) | NT`$$ntd |")
+  $kEsc = $k -replace '\|', '\|'   # a '|' in a route would break the markdown table
+  [void]$sb.AppendLine("| $kEsc | $($e.calls) | $($e.inTok) | $($e.outTok) | `$$([math]::Round($e.usd,4)) | NT`$$ntd |")
 }
 if ($textByRoute.Count -eq 0) { [void]$sb.AppendLine("| (no records) | | | | | |") }
 [void]$sb.AppendLine("")
@@ -151,7 +153,8 @@ if ($textByRoute.Count -eq 0) { [void]$sb.AppendLine("| (no records) | | | | | |
 [void]$sb.AppendLine("| Model | Count |")
 [void]$sb.AppendLine("|---|---:|")
 foreach ($k in ($imgByModel.Keys | Sort-Object { $imgByModel[$_] } -Descending)) {
-  [void]$sb.AppendLine("| $k | $($imgByModel[$k]) |")
+  $kEsc = $k -replace '\|', '\|'
+  [void]$sb.AppendLine("| $kEsc | $($imgByModel[$k]) |")
 }
 if ($imgByModel.Count -eq 0) { [void]$sb.AppendLine("| (no records) | |") }
 [void]$sb.AppendLine("")

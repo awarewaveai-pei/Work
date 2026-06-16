@@ -11,7 +11,7 @@ import { useMemo, useState } from "react";
 import { estimateMonthly, usdToNtd } from "@/lib/ai/cost-calculator";
 import { IMAGE_RATES, TEXT_FEATURES, DEFAULT_IMAGE_MODEL } from "@/lib/ai/cost-model";
 
-const NT = (usd: number) => `NT$${usdToNtd(usd).toLocaleString("zh-TW", { maximumFractionDigits: 0 })}`;
+const NT = (usd: number) => { const n = usdToNtd(usd); return `NT$${n.toLocaleString("zh-TW", { maximumFractionDigits: n < 1 ? 4 : 0 })}`; };
 const USD = (usd: number) => `$${usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 
 const FIELD: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 4 };

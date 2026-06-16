@@ -15,7 +15,9 @@ import { CostEstimator } from "./CostEstimator";
 
 export const dynamic = "force-dynamic";
 
-const NT = (usd: number) => `NT$${usdToNtd(usd).toLocaleString("zh-TW", { maximumFractionDigits: usd < 0.01 ? 4 : 0 })}`;
+// Round on the NTD magnitude (not USD) — most per-call NTD costs are < NT$1 and would otherwise
+// collapse to "NT$1"/"NT$0", hiding real sub-dollar spend.
+const NT = (usd: number) => { const n = usdToNtd(usd); return `NT$${n.toLocaleString("zh-TW", { maximumFractionDigits: n < 1 ? 4 : 0 })}`; };
 const USD = (usd: number) => `$${usd.toLocaleString("en-US", { maximumFractionDigits: usd < 0.1 ? 4 : 2 })}`;
 
 interface CallRow { route: string; model: string; vendor: string | null; cost_usd: number; input_tokens: number; output_tokens: number }
@@ -46,10 +48,13 @@ async function loadRealSpend(): Promise<RealSpend> {
     .gte("created_at", since)
     .limit(100000);
 
-  // Image volume — from ai_image_jobs (counts only; cost computed from the rate table).
+  // Image volume — from ai_image_jobs (counts only; cost computed from the rate table). Only
+  // status='completed' bills as a real image — failed/cancelled/queued/running produced no image
+  // and must not be costed (else the dominant cost line is systematically overstated).
   const { data: jobs } = await supabase
     .from("ai_image_jobs")
     .select("model_name,provider")
+    .eq("status", "completed")
     .gte("created_at", since)
     .limit(100000);
 
