@@ -79,7 +79,10 @@ const GRADE_LABEL: Record<RankMathReport["grade"], string> = {
 function ScoreRing({ score, color }: { score: number; color: string }) {
   const size = 74, r = 30, sw = 7;
   const circ = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(100, score));
+  // Coerce a non-finite score to 0 before clamping — guards both the gauge offset and the rendered
+  // number against ever showing NaN (unreachable from current producers, but cheap to make airtight).
+  const safe = Number.isFinite(score) ? score : 0;
+  const pct = Math.max(0, Math.min(100, safe));
   return (
     <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
