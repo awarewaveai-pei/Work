@@ -33,7 +33,7 @@
 **[剩餘風險]** ① **migration 0043 未套 prod**（High-risk DB，待 go-ahead）→ 套用前文字 logAiCall insert 落空（best-effort 吞錯，路由不受影響），文字真數從套用後起算。② **未 sg-deploy** → /ops/costs 頁與 logging 上線需部署。③ 基建月費為估算佔位（Hetzner/CF 帳單 repo 無記錄），待使用者填實際數字並把 `estimate` 設 false。④ 圖片成本＝量×費率（ai_image_jobs 無 cost 欄），非逐筆實扣（與文字不同）。
 **[rollback]** 全為新增/閘控：新檔 `git rm`、route logAiCall 行移除、migration 未套故 prod 零影響；/ops/costs 為新路由不影響既有頁。
 
- — 多供應商模型(Claude+GPT)/brand-voice URL 自動帶入/分類抓站上現有/品牌語調結構化表單/競業痛點分析/Kadence 漏斗 patterns + AEO
+### feat(content-studio): 6 項強化 + AEO — 多供應商模型(Claude+GPT)/brand-voice URL 自動帶入/分類抓站上現有/品牌語調結構化表單/競業痛點分析/Kadence 漏斗 patterns
 
 **[任務理解]** 使用者在 app.aware-wave.com/tools/content 列 6 項需求 + 「其他能提高 SEO/GEO/AEO/RankMath 行銷」的加值。決策：模型「只要 GPT」（Claude+OpenAI 雙供應商）、「一次全做完再交付」。
 
@@ -55,6 +55,7 @@
 - REALTEST_EVIDENCE: tool=curl | cmd=`GET soulful /wp/v2/categories` | exit=0 | 回真實分類（AI Drafts/Art Therapy/…）；`/wp/v2/blocks` 無 auth 回空陣列（驗 no-token guard 正確）
 - REALTEST_EVIDENCE: tool=Bash | cmd=Perplexity sonar market-analysis prompt | exit=0 | `PARSE_OK` 五 key 齊、真實痛點內容
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content app/tools/content` | exit=0 | 42 tests pass（含新增 3 個 #6 pattern 測試）
+- REALTEST_EVIDENCE: tool=Bash(node fetch，與 route 同機制) | cmd=live GPT-4o streaming（有效 key 來自 CREDENTIALS.md）| exit=0 | http=200/deltas=10/finish=stop/usage 捕捉(33+10 餵 logAiCall)/文字重建正確 — `streamOpenAiGeneration` SSE 端到端驗證；`/v1/models` 確認下拉 4 個 id 全存在於帳號
 - REVIEW_DONE: critic=Deep×2 | verdict=pass | 第一輪 0c/3m/4n + 第二輪 0c/1m/2n — 全部修正。第一輪：mid-stream OpenAI error frame 偵測、siteUrl 揭露移除、SSE 單行假設文件化、entity decode 共用化(新 wp-entities.ts)、patternCount NaN guard、isOpenAiModel 死碼簡化。第二輪（驗最終狀態+新檔）抓到**真 Major**：`resolveTermIds`(wordpress-core:275) 拿解碼後 AI 分類名比對 WP 編碼 `t.name` → 不符建重複（#3 在 REST 路徑復發）→ 修為 `decodeWpEntities(t.name)` 比對；+ wp-entities 單次解碼意圖註記、generate body 剝 imageRefData。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`marketContext\|patternCount\|existingCategories\|KADENCE_PATTERN\|isOpenAiModel\|streamOpenAiGeneration\|compileMarketingBrief\|api/content/(categories\|patterns\|market-analysis)` | hits=7 — 全部侷限在改/建的檔，無外部 stale call site、無 downstream consumer 需同步（headless block 走同一 core，新欄位皆 optional 透明）
 
