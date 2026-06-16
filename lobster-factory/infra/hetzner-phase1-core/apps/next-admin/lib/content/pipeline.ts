@@ -124,29 +124,58 @@ export async function runContentPipeline(
         stages: records,
       };
     }
-
-    for (const block of blocks) {
-      let out: { ok?: unknown; status?: unknown; error?: unknown; [k: string]: unknown } | null | undefined;
-      try {
-        out = (await block.run(ctx)) as typeof out;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        records.push({ kind, blockId: block.id, ok: false, note: "threw" });
-        return { ok: false, failedStage: kind, blockId: block.id, status: 500, error: `block "${block.id}" threw: ${msg}`, stages: records };
-      }
-
-      // 形狀防護 + ok 閘：null/非物件/ok!==true 一律當失敗短路（critic P3 標的：不可盲目把回傳當 ctx）。
-      if (!out || typeof out !== "object" || out.ok !== true) {
-        const status = typeof out?.status === "number" ? out.status : 500;
-        const error = typeof out?.error === "string" ? out.error : `block "${block.id}" returned non-ok result`;
-        records.push({ kind, blockId: block.id, ok: false });
-        return { ok: false, failedStage: kind, blockId: block.id, status, error, stages: records };
-      }
-
-      mergeStageOutput(kind, ctx, out as Record<string, unknown>);
-      if (kind === "publish") publishResult = out as unknown as WordPressPublishSuccess;
-      records.push({ kind, blockId: block.id, ok: true });
+    // 一 kind 一積木（線性資料流契約）：本管線是單鏈 article→quality→publish，非 fan-out。
+    // 若某 kind 誤裝 >1 積木，取首個並告警 → 避免靜默跑多個 publish 只留最後一筆（critic M2）。
+    if (blocks.length > 1) {
+      console.warn(
+        `[pipeline] kind "${kind}" has ${blocks.length} blocks; using first ("${blocks[0].id}"), ` +
+          `ignoring: ${blocks.slice(1).map((b) => b.id).join(", ")}`,
+      );
     }
+    const block = blocks[0];
+
+    let out: { ok?: unknown; status?: unknown; error?: unknown; [k: string]: unknown } | null | undefined;
+    try {
+      out = (await block.run(ctx)) as typeof out;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      records.push({ kind, blockId: block.id, ok: false, note: "threw" });
+      return { ok: false, failedStage: kind, blockId: block.id, status: 500, error: `block "${block.id}" threw: ${msg}`, stages: records };
+    }
+
+    // 形狀防護 + ok 閘：null/非物件/ok!==true 一律當失敗短路（critic P3 標的：不可盲目把回傳當 ctx）。
+    if (!out || typeof out !== "object" || out.ok !== true) {
+      const status = typeof out?.status === "number" ? out.status : 500;
+      const error = typeof out?.error === "string" ? out.error : `block "${block.id}" returned non-ok result`;
+      records.push({ kind, blockId: block.id, ok: false });
+      return { ok: false, failedStage: kind, blockId: block.id, status, error, stages: records };
+    }
+
+    mergeStageOutput(kind, ctx, out as Record<string, unknown>);
+
+    // article 後驗（critic M1+M3）：generate-core 在 stream error/truncate 時，仍回 ok:true，
+    // 但把 marker 嵌進 markdown 字串（generate-core.ts:590/597，由 caller 決定如何浮現）。headless
+    // 自走模式不可把殘缺稿當成功往下 quality/publish → 在此硬短路為 article 階段失敗（不污染歸因）。
+    if (kind === "article") {
+      const md = str(ctx.markdown);
+      if (!md) {
+        records.push({ kind, blockId: block.id, ok: false, note: "ok but no usable markdown" });
+        return {
+          ok: false, failedStage: "article", blockId: block.id, status: 502,
+          error: `block "${block.id}" returned ok but produced no usable markdown`, stages: records,
+        };
+      }
+      if (/<!-- GENERATION_(ERROR|TRUNCATED):/.test(md)) {
+        records.push({ kind, blockId: block.id, ok: false, note: "generation marker in markdown" });
+        return {
+          ok: false, failedStage: "article", blockId: block.id, status: 502,
+          error: "article generation incomplete (GENERATION_ERROR/TRUNCATED marker present)", stages: records,
+        };
+      }
+    }
+
+    if (kind === "publish") publishResult = out as unknown as WordPressPublishSuccess;
+    records.push({ kind, blockId: block.id, ok: true });
   }
 
   return {

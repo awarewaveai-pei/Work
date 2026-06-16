@@ -5,6 +5,7 @@ import type { WpSite } from "@/lib/content/wp-sites";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
 import type { RankMathReport } from "@/lib/seo/rankmath-checker";
 import { SeoCheckPanel } from "./SeoCheckPanel";
+import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -97,10 +98,22 @@ const HOOK_TYPES = [
   "Personal or Emotional",
 ] as const;
 
-const AI_IMAGE_PROVIDERS = [
-  { value: "none",      label: "None" },
-  { value: "replicate", label: "Replicate（AI 生圖）" },
+// Curated subset of the 15-model image-gen toolkit (lib/tarot/image-gen.ts, the same combo-pack the
+// Tarot tool uses). value = TarotModel id → sent straight to /api/content/image, which delegates to
+// generateTarotImage. `seed`/`img2img` mirror each model's live capability (image-gen.ts TAROT_MODELS):
+// they drive the enable/disable of the Seed + 參考圖(img2img) controls so the UI never offers a knob the
+// model ignores. "none" = 不生成 AI 圖片 — short-circuits autoReplaceImages + generateHeroImage as before.
+const AI_IMAGE_PROVIDERS: { value: string; label: string; seed: boolean; img2img: boolean }[] = [
+  { value: "none",                 label: "None（不生成）",                       seed: false, img2img: false },
+  { value: "flux-schnell",         label: "Flux Schnell（快速 · 預設）",          seed: true,  img2img: false },
+  { value: "flux-dev",             label: "Flux Dev（高品質 · 支援參考圖）",      seed: true,  img2img: true  },
+  { value: "ideogram-v3-balanced", label: "Ideogram v3（文字/排版精準）",          seed: true,  img2img: false },
+  { value: "nano-banana-pro",      label: "Nano Banana Pro（Google · 支援參考圖）", seed: false, img2img: true  },
+  { value: "flux-2-max",           label: "Flux.2 Max（旗艦畫質）",                seed: true,  img2img: false },
 ];
+
+// <optgroup> sections for the IMAGE STYLE picker, in catalog order (西方畫家 / 亞洲畫家 / 媒材 / 風格).
+const STYLE_GROUPS = [...new Set(STYLE_CATALOG.map(s => s.group))];
 
 // Media ratios = flux-schnell aspect_ratio enum values (these are sent through verbatim and actually
 // take effect; the old "1344x768"-style size strings were ignored by the model — every image came out
@@ -147,7 +160,9 @@ interface MediaHub {
   aiImages: string;
   imageCount: number;
   imageSize: string;
-  imageStyle: string;
+  imageStyle: string;     // STYLE_CATALOG `zh` key ("" = 不套用風格); resolved to its English .prompt at gen time
+  imageSeed: string;      // numeric seed string ("" = 隨機); only honoured when the model supports seed
+  imageRefData: string;   // single reference-image data: URL for img2img ("" = none); model-gated
   imageInstructions: string;
   brandName: string;
   includeKeywordAlt: boolean;
@@ -275,7 +290,8 @@ const DEFAULT_STRUCTURE: ArticleStructure = {
 
 const DEFAULT_MEDIA: MediaHub = {
   aiImages: "none", imageCount: 3, imageSize: "16:9",
-  imageStyle: "", imageInstructions: "", brandName: "",
+  imageStyle: "", imageSeed: "", imageRefData: "",
+  imageInstructions: "", brandName: "",
   includeKeywordAlt: true, autoAltText: false,
   youtubeSource: "none", youtubeCount: 1, youtubeLayout: "distribute",
   strictUnderHeadings: false,
