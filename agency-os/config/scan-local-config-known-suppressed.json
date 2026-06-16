@@ -88,6 +88,12 @@
       "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow."
     },
     {
+      "file": "mcp/user-env.ps1",
+      "pattern": "Trigger.dev token",
+      "sourceKey": "TRIGGER_ACCESS_TOKEN",
+      "reason": "Known local MCP env registry entry; gitignored; value governed by local vault/env workflow. Populated 2026-06-16 from AWARE_WAVE_CREDENTIALS.md (was empty; fixes trigger MCP auth)."
+    },
+    {
       "file": ".claude/settings.json",
       "pattern": "Google app password (4x4x4)",
       "sourceKey": "line:15",
