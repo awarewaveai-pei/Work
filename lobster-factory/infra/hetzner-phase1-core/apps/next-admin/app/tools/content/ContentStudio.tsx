@@ -920,6 +920,9 @@ export default function ContentStudio() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          // Drop the multi-MB img2img reference data URL — generate never reads it (only the image
+          // route does), so shipping it here is pure wire bloat (mirrors the draft-save strip).
+          media: { ...form.media, imageRefData: "" },
           details: effectiveDetails,
           externalLinks, internalLinks, referenceUrls,
           existingCategories,              // #3

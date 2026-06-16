@@ -470,8 +470,7 @@ def render_video(scenes: list, image_files: list, out_name: str):
 def run(mode: str, topic: str = "", article_title: str = "", article_content: str = "") -> dict:
     mode = mode.upper()
     safe_name = re.sub(r"[^\w一-鿿]", "_", (topic or article_title))[:40]
-    out_dir = config.OUTPUT_DIR / safe_name
-    out_dir.mkdir(parents=True, exist_ok=True)
+    # out_dir 由 render_video 統一建立並回傳（single source of truth；避免空名 fallback 分歧）
 
     try:
         if mode == "A":

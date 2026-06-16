@@ -12,6 +12,7 @@
 import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 import { isBridgeConfigured, bridgeBaseUrl, createPost } from "@/lib/studio/wp-bridge-client";
 import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
+import { decodeWpEntities } from "@/lib/content/wp-entities";
 
 /** 發佈輸入。欄位型別刻意保持 unknown（與原 route body 同形），coercion 在 core 內統一做 → route 與積木共用同一套寬鬆解析。 */
 export interface WordPressPublishInput {
@@ -272,7 +273,13 @@ async function resolveTermIds(
       );
       if (searchRes.ok) {
         const terms = await searchRes.json() as Array<{ id: number; name: string }>;
-        const match = terms.find(t => t.name.toLowerCase() === name.toLowerCase());
+        // Decode WP's entity-encoded term name before comparing: the AI is now shown decoded category
+        // names (#3, via decodeWpEntities), so a category like "Health – Wellness" arrives here as the
+        // decoded form while WP REST returns t.name encoded ("Health &#8211; Wellness"). Without decoding
+        // both sides, the exact-match misses and a DUPLICATE term is created — the very bug #3 targets,
+        // surviving on the standard-REST path (critic 2026-06-16 Major). decodeWpEntities is idempotent
+        // on already-plain names, so this is safe for entity-free names too.
+        const match = terms.find(t => decodeWpEntities(t.name).toLowerCase() === name.toLowerCase());
         if (match) { ids.push(match.id); continue; }
       }
       // Create term

@@ -9,6 +9,11 @@
  *
  * Scope: the common named entities + numeric (decimal/hex) references. Not a full HTML5 entity table —
  * WP term/title text only emits this handful in practice.
+ *
+ * INTENTIONALLY single-decode, for TRUSTED WP-origin text only (term/post titles). It does NOT guard
+ * against doubly-encoded input (named pass runs before numeric, so "&amp;#60;" → "<"). That is correct
+ * for WP, which never double-encodes term names. Do NOT reuse this on attacker-influenced strings as an
+ * XSS sanitiser — it is a display decoder, not a security boundary.
  */
 const NAMED: Record<string, string> = {
   "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"',
