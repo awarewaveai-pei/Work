@@ -100,6 +100,10 @@ function markdownToHtml(md: string): string {
     // "[YOUTUBE_PLACEHOLDER_N: ...]" cue never reaches a live post). Resolved ones are already bare
     // watch URLs by now and don't match. (critic 2026-06-15 Major)
     .replace(/\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]/g, "")
+    // #6 — strip only INLINE Kadence-pattern leftovers; a standalone-line placeholder is converted
+    // to a wp:block reference in the main loop below.
+    .replace(/(?<=\S)[ \t]*\[KADENCE_PATTERN:\s*\d+\s*\]/gi, "")
+    .replace(/\[KADENCE_PATTERN:\s*\d+\s*\][ \t]*(?=\S)/gi, "")
     .trim();
 
   const lines = clean.split("\n");
@@ -156,6 +160,16 @@ function markdownToHtml(md: string): string {
     // Blockquote
     if (line.startsWith("> ")) {
       out.push(`<blockquote><p>${inline(line.slice(2))}</p></blockquote>`);
+      continue;
+    }
+
+    // #6 — Kadence synced pattern placeholder alone on its line → Gutenberg synced-pattern reference.
+    // Even on the REST/HTML path, post_content carrying a <!-- wp:block {"ref":id} /--> comment is
+    // parsed and rendered by the block engine, so the brand-designed funnel pattern displays live.
+    const patMatch = line.trim().match(/^\[KADENCE_PATTERN:\s*(\d+)\s*\]$/i);
+    if (patMatch) {
+      const ref = parseInt(patMatch[1], 10);
+      if (ref > 0) out.push(`<!-- wp:block {"ref":${ref}} /-->`);
       continue;
     }
 

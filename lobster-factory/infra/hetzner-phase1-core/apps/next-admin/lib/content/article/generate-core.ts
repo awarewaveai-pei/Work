@@ -71,6 +71,12 @@ GEO / AI CITATION MECHANICS (2026 research-backed — mandatory):
 - RECENCY SIGNAL: at least one statistic or data point must be from within the last 12 months — cite with year. AI citation rates drop sharply for content older than 3 months; fresh data signals the article is current and worth citing.
 - GEO ANTI-PATTERNS (never do these in this article): ❌ No hyperlinks inside direct-answer capsule sentences ❌ No content hidden behind accordions/tabs (AI cannot see JavaScript-toggled content) ❌ No walls of text — even one bulleted sub-point breaks dense prose into extractable units ❌ No unsourced statistics — every number needs "according to [Source] ([Year])"
 
+AEO / ANSWER-ENGINE OPTIMISATION (for voice assistants, AI Overviews, and "People Also Ask"):
+- PAA ALIGNMENT: phrase at least 3 H2/H3 headings as the exact natural-language questions a reader would type or speak (who/what/why/how/when/"is X worth it"/"how much does X cost") — these map directly to Google's "People Also Ask" and to voice-search queries. Answer each in the first sentence beneath the heading.
+- DEFINITION CAPSULE: if the topic has a core term, include a one-sentence "X is …" definition early — answer engines lift these verbatim for featured snippets and voice answers.
+- LIST & TABLE EXTRACTABILITY: where a question has a step sequence or a set of options, present it as a numbered list or table — answer engines extract these structurally far more often than prose.
+- SCANNABILITY: keep answer sentences self-contained and under 30 words so they survive being lifted out of context into an AI answer.
+
 RANK MATH COMPLIANCE (24-test scoring system — target ≥81 green):
 
 BASIC SEO — 7 tests:

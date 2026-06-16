@@ -25,6 +25,7 @@ export type Block =
   | { type: "image"; url: string; alt: string }
   | { type: "embed"; url: string }
   | { type: "table"; rows: string[][] }
+  | { type: "pattern"; ref: number }
   | { type: "divider" };
 
 /**
@@ -89,6 +90,11 @@ export function markdownToBlocks(md: string): Block[] {
     // own line. By publish time a resolved placeholder is already a bare watch URL (no longer matches),
     // so this scrubs only the leftover authoring cue and never a real embed. (critic 2026-06-15 Major)
     .replace(/\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]/g, "")
+    // A KADENCE_PATTERN placeholder alone on its line is handled in the main loop below; this scrubs
+    // only INLINE leftovers (model glued one inside a sentence) so the raw cue never reaches the post.
+    // (?<=\S) / (?=\S) require a non-space neighbour, so a standalone line is left intact for the loop.
+    .replace(/(?<=\S)[ \t]*\[KADENCE_PATTERN:\s*\d+\s*\]/gi, "")
+    .replace(/\[KADENCE_PATTERN:\s*\d+\s*\][ \t]*(?=\S)/gi, "")
     .trim();
 
   const lines = clean.split("\n");
@@ -159,6 +165,16 @@ export function markdownToBlocks(md: string): Block[] {
     // Divider ─────────────────────────────────────────────────────────────
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
       blocks.push({ type: "divider" });
+      continue;
+    }
+
+    // Kadence synced pattern (#6 funnels) — [KADENCE_PATTERN: <id>] alone on its line becomes a
+    // pattern block. BlockLibrary.compose() maps it to <!-- wp:block {"ref":id} /--> so the site's
+    // hand-designed reusable pattern renders. Invalid/zero ids are dropped (never emit ref:0).
+    const pat = trimmed.match(/^\[KADENCE_PATTERN:\s*(\d+)\s*\]$/i);
+    if (pat) {
+      const ref = parseInt(pat[1], 10);
+      if (ref > 0) blocks.push({ type: "pattern", ref });
       continue;
     }
 
