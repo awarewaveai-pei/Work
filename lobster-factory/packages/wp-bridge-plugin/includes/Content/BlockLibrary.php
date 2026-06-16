@@ -112,6 +112,15 @@ final class BlockLibrary {
 			. '<!-- /wp:kadence/advancedbtn -->';
 	}
 
+	/**
+	 * Reference a saved synced pattern (wp_block post) by id. Emits the core synced-pattern reference
+	 * block so WordPress renders the site owner's hand-designed reusable pattern (e.g. a funnel CTA).
+	 * The id is cast to int by the caller, so no escaping is needed inside the JSON attribute.
+	 */
+	public function pattern( int $ref ): string {
+		return '<!-- wp:block {"ref":' . $ref . '} /-->';
+	}
+
 	/** @param string[] $items */
 	public function bulletList( array $items ): string {
 		$li = '';
@@ -454,6 +463,9 @@ final class BlockLibrary {
 			array( 'type' => 'gallery', 'aliases' => array(), 'desc' => 'Core gallery from image URLs.',
 				'fields' => array( $f( 'urls', 'string[]', true, 'Image URLs.' ) ),
 				'example' => array( 'urls' => array( 'https://example.com/a.jpg', 'https://example.com/b.jpg' ) ) ),
+			array( 'type' => 'pattern', 'aliases' => array(), 'desc' => 'Reference a saved synced pattern (wp_block) by id; renders the site owner\'s reusable pattern/funnel CTA.',
+				'fields' => array( $f( 'ref', 'int', true, 'wp_block post id of the synced pattern.' ) ),
+				'example' => array( 'ref' => 123 ) ),
 		);
 	}
 
@@ -523,6 +535,12 @@ final class BlockLibrary {
 					break;
 				case 'gallery':
 					$inner[] = $this->gallery( array_map( 'strval', (array) ( $b['urls'] ?? array() ) ) );
+					break;
+				case 'pattern':
+					$ref = (int) ( $b['ref'] ?? 0 );
+					if ( $ref > 0 ) {
+						$inner[] = $this->pattern( $ref );
+					}
 					break;
 				default:
 					$unknown[] = $type;

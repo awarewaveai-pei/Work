@@ -28,6 +28,13 @@ import subprocess
 import anthropic
 from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
+
+# Pillow>=10 移除了 Image.ANTIALIAS，但 moviepy 1.x 的 resize fx 仍引用它（resize→crash）。
+# requirements 同時鎖 pillow>=10 + moviepy<2，故必須在 import moviepy 前補回相容別名。
+# 守 hasattr 保證冪等，未來換 Pillow<10 時自動無作用。
+if not hasattr(Image, "ANTIALIAS"):
+    Image.ANTIALIAS = Image.Resampling.LANCZOS
+
 import edge_tts
 from moviepy.editor import (
     ImageClip, AudioFileClip, CompositeVideoClip,

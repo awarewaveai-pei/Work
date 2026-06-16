@@ -4,6 +4,31 @@
 
 ## 2026-06-16
 
+### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
+
+**[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
+
+**[現況分析]** ① route code（`app/api/webhooks/woo-order/route.ts`）已 deploy prod，但 prod machine-local `/root/lobster-phase1/docker-compose.yml` 未含 A2 env passthrough（sg-deploy 只 rsync `apps/`，不覆蓋 root compose → repo compose A2 wiring `e336d5da` 不會自動到 prod）→ 需手動補。② contract（讀 woo-webhook.ts）：`POD_AUTO_FULFILL_ENABLED==="true"` kill-switch + `WC_WEBHOOK_SECRET` HMAC-SHA256(base64, raw body) via `x-wc-webhook-signature`。③ POD Woo storefront = **soulful**（soulfulexpression.org，非 SG aware-wave.com — 後者無 Woo/0 商品）。
+
+**[已修改]**
+- SG `/root/lobster-phase1/.env`（machine-local，備份 `.env.bak-a2-20260616-145056`）— 追加 `POD_AUTO_FULFILL_ENABLED=true` + `WC_WEBHOOK_SECRET=<openssl rand -hex 32>`。
+- SG `/root/lobster-phase1/docker-compose.yml`（machine-local，備份 `docker-compose.yml.bak-a2-20260616-145056`）— next-admin `environment:` 區塊（line 365 後）插入兩變數 passthrough，鏡像 repo compose line 340-341。`docker compose config` OK → `up -d next-admin`（env-only recreate，無 rebuild）。
+- soulful WooCommerce — 建 2 active webhook（id4 order.updated、id5 order.created）→ `https://app.aware-wave.com/api/webhooks/woo-order`，同 secret HMAC，owner user=5。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin env \| grep POD_AUTO` | exit=0 | `POD_AUTO_FULFILL_ENABLED=true`+`WC_WEBHOOK_SECRET=<set>` 容器已吃到；healthy(try1)。
+- REALTEST_EVIDENCE: tool=curl | cmd=`POST http://127.0.0.1:3002/api/webhooks/woo-order`(unsigned) | exit=0 | http=401 unauthorized（**舊行為 200 auto_fulfill_disabled → flag 已翻**；HMAC 擋偽造，零草稿）。
+- REALTEST_EVIDENCE: tool=curl | cmd=`POST 同上 + 正確 HMAC sig, body 無地址` | exit=0 | http=400 recipient_incomplete（HMAC 通過→進解析→卡地址，**零草稿零金流**）。
+- REALTEST_EVIDENCE: tool=curl | cmd=`POST https://app.aware-wave.com/api/webhooks/woo-order`（soulful 外網過 CF+nginx；unsigned+signed）| exit=0 | 401 + 400 = **公開端到端鏈通**（webhook 真實路徑）。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n — note：soulful 既有 Printful 外掛 webhook(id1-3)→`store=18314943`(平台店,`PRINTFUL_STORE_ID`) 與 A2 native 店 `18324409`(`PRINTFUL_NATIVE_STORE_ID`) **不同店**；A2 draft-only 附加路徑，不改既有外掛履約，無雙扣款/雙印。SKU caveat：Woo 商品 SKU 非 native 變體 SKU 時 A2 draft benign fail(502,retry,零草稿) 直到上架 native 商品。
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`POD_AUTO_FULFILL_ENABLED\|WC_WEBHOOK_SECRET\|woo-order\|18314943\|18324409` | hits=memory/WORKLOG 既有記錄一致無 stale；無 repo code 改動（純 prod machine-local config + soulful Woo 設定）。
+
+**[剩餘風險]** ① 真實 soulful 訂單現會自動觸發 A2 建 native 草稿；SKU 未對齊前多 benign fail（看 next-admin log）。② confirm/charge/print 🔴 仍未建（金流紅線）。③ 兩 Printful 店並存（平台 18314943 外掛履約 + native 18324409 A2 草稿）使用者須知。
+
+**[rollback]** SG：`.env` 兩行移除（或設 false）+ `cp docker-compose.yml.bak-a2-20260616-145056 docker-compose.yml`→`docker compose up -d next-admin`。soulful：`wp wc webhook delete 4 5 --user=5`。
+
+AUTO_TASK_DONE: POD A2 自動轉單啟用 draft-only — SG flag+secret+compose passthrough、soulful 雙 webhook、localhost+公開端到端 401/400 實測通過（零草稿零金流）
+
 ### fix(mcp): trigger MCP project ref 修正 proj_rqykzz→proj_6c4f（3月舊ref→trigger crash-loop 真因）
 **[根因]** trigger MCP 一直連不上閃紅字（procmon 證實 codex 跑 `--project-ref proj_rqykzzwujizcxdzgnedn`）。VBC：`trigger.config.ts:7` 部署真相 = `proj_6c4f24492a705729fc2c`（4月換的），但 `mcp/user-env.ps1:75` 仍是 3 月舊 ref `proj_rqykzz...`（註解寫「From old Cursor MCP config」）+ User env var 同步舊值 → MCP 傳錯 ref → 連不上重試閃窗。另 `TRIGGER_ACCESS_TOKEN` 在 user-env.ps1 是空字串（值在 AWARE_WAVE_CREDENTIALS.md §15）。
 **[已修改]**（憑證來源：`C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`）
