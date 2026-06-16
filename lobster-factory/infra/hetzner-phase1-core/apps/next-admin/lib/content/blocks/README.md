@@ -92,7 +92,7 @@ CONTENT_TRENDING_FEEDS='[{"id":"hn","title":"Hacker News","url":"https://hnrss.o
 | `publish/wordpress` | publish | * | wp-bridge（`WPBRIDGE_*`） |
 | `product/copy` | product | * | `ANTHROPIC_API_KEY`（包 `lib/studio/product-copy.ts`；商品 SEO/GEO/AEO/RankMath 文案） |
 | `article/generate` | article | * | `ANTHROPIC_API_KEY`（包 route 的生成 core `lib/content/article/generate-core.ts`；長文 SEO/GEO/RankMath 部落格） |
-| `quality/check` | quality | * | 無（純函式；包 route 的檢測 core `lib/content/quality/seo-check-core.ts` → `lib/seo/rankmath-checker.ts` 24 點 RankMath） |
+| `quality/check` | quality | * | 無（純函式；包 route 的檢測 core `lib/content/quality/seo-check-core.ts` → `lib/seo/rankmath-checker.ts` 16 點 RankMath） |
 
 > `product` 是商品頁分類（短文、答案膠囊式），與 `article`（長文部落格）區隔：同一套 RankMath 引擎，
 > 但商品頁把長文專屬檢查（字數/內外鏈/多 H2 AEO/日期訊號）標 N/A，分數只計商品適用項（見 `product-copy.ts`）。

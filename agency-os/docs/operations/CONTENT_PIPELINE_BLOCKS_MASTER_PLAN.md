@@ -38,7 +38,7 @@
 | A2 | **search 積木家族**（google-news/reddit/ptt/perplexity/env-feed/DB 臨時源）| trending-sources.ts:251,266,284,312,334,205 |
 | A3 | **article route ×7**（generate 串流/title/keywords/outline/related-posts/humanize/drafts）；generate P2 後抽成 core，route 為薄殼、積木共用 | article/generate-core.ts `prepareArticleGeneration`/`streamArticleGeneration`、generate/route.ts（HTTP 殼）、blocks/article-generate.ts（積木）；title:8、keywords:8、outline:10、related-posts:15、humanize:22、drafts:72 |
 | A4 | brand-voice route | brand-voice/route.ts:34 |
-| A5 | **quality route ×3**（seo-check RankMath 24 點/seo-fix/image Flux）| seo-check:8、seo-fix:28、image:67 |
+| A5 | **quality route ×3**（seo-check RankMath 16 點/seo-fix/image Flux）；seo-check P3 後抽成 core，route 為薄殼、積木共用 | quality/seo-check-core.ts `runSeoCheck`、seo-check/route.ts（HTTP 殼）、blocks/seo-check.ts（積木）；seo-fix:28、image:67 |
 | A6 | **publish 核心**（wp-bridge Ed25519 + 標準 REST 雙路徑，**draft-first**）；P1 後抽成 core，route 為薄殼、積木共用 | wordpress-core.ts:283 `publishToWordPress`、publish/route.ts（HTTP 殼）、blocks/publish-wordpress.ts（積木）|
 | A7 | wp-post / newsletter(FluentCRM 草稿) / calendar | wp-post:19、newsletter:132、calendar:69 |
 | A8 | WP 站台 CRUD（sites / [id] / test）| sites/route.ts |
@@ -53,7 +53,7 @@
 | **P0** | 藍圖 + 進度總帳 | ✅ | （本次）| Low | — |
 | **P1** | `publish/wordpress` 抽 core + 包積木（行為保留）| ✅ | a488ae79（core/route/積木）+ 收尾本次 | Low-Med | ✓ |
 | **P2** | `article/generate` 抽 core + 包積木（行為保留：route 薄殼共用 core 串流，積木 headless 收集）| ✅ | 76f2d262（core/route/積木）+ bc405328（abort belt-and-suspenders 修）+ 收尾本次 | Low-Med | ✓ |
-| **P3** | `quality/check`(seo-check) 抽 core + 包積木 | 🔲 | — | Low | — |
+| **P3** | `quality/check`(seo-check) 抽 core + 包積木（行為保留：route 薄殼共用 core）| ✅ | 收尾本次（core=seo-check-core.ts／route 薄殼／blocks/seo-check.ts）| Low | — |
 | **P4** | `byKind()` 串 search→article→quality→publish headless 跑通 | 🔲 | — | Med | 待 |
 | **P5** | `publish/social`：lib/content/postiz.ts + /api/content/social-publish（draft 預設）| ⛔ | — | Med-High | 待+憑證 |
 | **P6** | 🗑️ 刪 Python publisher.py 直連（grep 確認無 caller）| 🔲 | — | Med | 待 |
@@ -135,7 +135,7 @@
 | article | humanize | :22 | 人性化/改寫（串流）| Claude Sonnet |
 | article | drafts | :72+ | 草稿 CRUD 自動存（migration 0041）| Supabase content_drafts |
 | article | brand-voice | :34 | 萃取品牌語氣 profile | Claude Haiku |
-| quality | seo-check | :8 | RankMath 24 點稽核 | rankmath-checker lib |
+| quality | seo-check | seo-check-core.ts（route.ts 薄殼）| RankMath 16 點稽核；P3 抽 core，route 薄殼 + 積木 headless 共用 | rankmath-checker lib |
 | quality | seo-fix | :28 | 修 SEO 缺失保留語氣 | Claude Sonnet |
 | quality | image | :67 | 社群/hero 圖生成 | Replicate Flux Schnell |
 | publish | **publish** | publish/route.ts:237 | **WP 發佈 draft**：bridge 路徑(Kadence blocks+sideload+RankMath meta，:309-366)或標準 REST(:368-438)；**永遠 draft :347** | **wp-bridge Ed25519** / WP REST / Supabase |
