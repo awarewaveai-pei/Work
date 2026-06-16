@@ -57,11 +57,20 @@ const READABILITIES = [
   { value: "Professional",            label: "專業級" },
 ];
 
+// Generation models. Anthropic ids stream via the SDK; gpt-* ids stream via the OpenAI Chat
+// Completions path. MUST stay in lockstep with generate-core.ts ALLOWED_MODELS — a value here that
+// the backend omits silently falls back to Sonnet. Grouped with <optgroup> in the dropdown.
 const AI_MODELS = [
-  { value: "claude-sonnet-4-6",         label: "Sonnet 4.6（推薦）" },
-  { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5（快速省 token）" },
-  { value: "claude-opus-4-8",           label: "Opus 4.8（最高品質）" },
+  { value: "claude-sonnet-4-6",         label: "Claude Sonnet 4.6（推薦）",        group: "Claude" },
+  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5（快速省 token）",  group: "Claude" },
+  { value: "claude-opus-4-8",           label: "Claude Opus 4.8（最高品質）",       group: "Claude" },
+  { value: "claude-fable-5",            label: "Claude Fable 5（創意文案）",        group: "Claude" },
+  { value: "gpt-5.5",                   label: "GPT-5.5（OpenAI 旗艦）",            group: "OpenAI" },
+  { value: "gpt-5.4",                   label: "GPT-5.4（OpenAI 高品質）",          group: "OpenAI" },
+  { value: "gpt-5.4-mini",              label: "GPT-5.4 mini（OpenAI 快速）",       group: "OpenAI" },
+  { value: "gpt-4o",                    label: "GPT-4o（OpenAI 經典）",             group: "OpenAI" },
 ];
+const AI_MODEL_GROUPS = [...new Set(AI_MODELS.map(m => m.group))];
 
 const SYN_PLATFORMS = [
   { key: "twitter",   label: "Twitter / X",  hasThread: true  },
@@ -1654,7 +1663,11 @@ export default function ContentStudio() {
               <div>
                 <label className="form-label">AI 模型</label>
                 <select className="form-select" value={form.model} onChange={e => setF("model", e.target.value)} disabled={isGenerating}>
-                  {AI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  {AI_MODEL_GROUPS.map(g => (
+                    <optgroup key={g} label={g}>
+                      {AI_MODELS.filter(m => m.group === g).map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
             </div>
