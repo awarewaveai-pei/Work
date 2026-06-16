@@ -32,7 +32,7 @@ DEFAULT OUTPUT FORMAT (follow unless overridden in user instructions):
    • Primary keyword in first 50% of the title
    • Include a POWER WORD matching the article's LANGUAGE — English: ultimate / proven / essential / expert / complete / effective / simple / step-by-step / critical / best. For CJK languages, a localized power-word list is supplied in the instructions below — use one of those (the English list will not register).
    • Include a NUMBER — write it as an Arabic digit (7, 5, 10, 2026), never spelled out or as a CJK numeral (七/五), because RankMath's number test only detects digits. Required for list/how-to articles; omit only when a number would genuinely distort the topic.
-   • Convey clear positive or negative SENTIMENT (curiosity, urgency, relief, excitement)
+   • SENTIMENT (separate from the power word): the title must LITERALLY contain at least one word RankMath scores as sentiment — English positive: best / amazing / essential / proven / surprising / effective / powerful / remarkable; English negative: avoid / mistake / warning / stop / worst. RankMath matches a fixed wordlist, not the overall vibe, so include an actual listed word (one word may satisfy both power-word and sentiment). For CJK use a localized emotion word per the CJK compliance block below.
    • Length: 50–60 characters for Latin-script languages, 14–30 characters for CJK; descriptive, not clickbait
 2. ## Quick Answer (80–150 words; FIRST SENTENCE directly answers the main question — no buildup)
 3. ## Key Takeaways (4–5 bullet points)

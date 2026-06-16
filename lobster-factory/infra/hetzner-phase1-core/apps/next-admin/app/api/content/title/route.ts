@@ -32,14 +32,14 @@ export async function POST(req: Request): Promise<Response> {
 - KEYWORD POSITION: place the primary keyword "${keyword}" in the FIRST HALF of the title.
 - POWER WORD (mandatory): include ONE of these localized power words — 終極 / 必備 / 實證 / 專家 / 完整 / 有效 / 簡單 / 關鍵 / 最佳 / 免費 / 立即 / 秘訣 / 揭密 / 一次搞懂 / 高效 / 避免 / 不可不知 / 獨家 / 快速 / 突破. CRITICAL: RankMath finds the power word by splitting on SPACES, so it MUST stand alone as its own space-separated token with a half-width space on BOTH sides — write 「藝術治療 完整 指南」(✓ 完整 is its own token), NOT 「完整指南」(✗ glued, won't register).
 - NUMBER (mandatory): include an Arabic digit — 例「7 個」「5 步驟」「2026 年」. NEVER use CJK numerals（七、五、十）; RankMath only detects 0-9.
-- SENTIMENT: convey clear positive/negative emotion (好奇 / 急迫 / 安心 / 興奮).
+- SENTIMENT (mandatory): include a localized emotion word as its OWN space-separated token — positive: 驚人 / 必看 / 有效 / 實用 / 簡單 / 安心；negative: 避免 / 別再 / 小心 / 錯誤 / 後悔. Note: RankMath's built-in sentiment list is English and cannot tokenize Chinese, so this test may still warn unless the site has a CJK sentiment list registered — convey the emotion regardless.
 - LENGTH: 14–30 characters.
 - YMYL safety: for health/wellness topics NEVER use overclaim words like 保證 / 治癒 / 根治.`
     : `RANKMATH TITLE RULES (follow all — these mirror the RankMath Title Readability tests):
 - KEYWORD POSITION: place the primary keyword "${keyword}" within the FIRST 50% of the title.
 - POWER WORD (mandatory): include ONE of: ultimate / proven / essential / expert / complete / effective / simple / step-by-step / critical / best / definitive / surprising.
 - NUMBER (mandatory): include an Arabic digit (7, 5, 10, 2026) — never spelled out as words. A title is short, so a number almost never distorts the topic; include one in every title.
-- SENTIMENT: convey clear positive or negative sentiment (curiosity, urgency, relief, excitement).
+- SENTIMENT (mandatory, separate from the power word): the title must LITERALLY contain at least one word RankMath scores as sentiment — positive: best / amazing / essential / proven / surprising / effective / powerful / remarkable / important; or negative: avoid / mistake / warning / stop / worst. RankMath matches a fixed wordlist, not the overall vibe, so an actual listed word must appear (one word may satisfy both power-word and sentiment).
 - LENGTH: 50–60 characters; descriptive, not clickbait.
 - YMYL safety: for health/wellness topics never use overclaim words like cure / guaranteed / heal.`;
 

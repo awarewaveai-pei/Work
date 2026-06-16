@@ -433,6 +433,7 @@ export default function ContentStudio() {
   // Newsletter (FluentCRM draft push — draft only, never sends; wp-bridge /newsletter)
   const [nlStatus, setNlStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [nlResult, setNlResult] = useState<{ edit_url?: string; error?: string } | null>(null);
+  const [nlArticleUrl, setNlArticleUrl] = useState<string>(""); // 公開文章網址（電子報 CTA 連結用，U-FluentCRM）
 
   // Humanize
   const [humMode,    setHumMode]    = useState<HumMode>("humanize");
@@ -1067,11 +1068,32 @@ export default function ContentStudio() {
     if (!subject) {
       setNlStatus("error"); setNlResult({ error: "缺少主旨（請先填 SEO 標題或關鍵字）" }); return;
     }
+    // U-FluentCRM: send a CONCISE teaser (hero + 摘要 + 閱讀全文 CTA) instead of the full article.
+    // excerpt = Meta 描述優先，否則取文章第一段正文；heroImage = 文章內第一張圖。
+    const firstParagraph = (md: string): string => {
+      for (const raw of md.split("\n")) {
+        const t = raw.trim();
+        if (!t || /^#{1,6}\s/.test(t) || /^!\[/.test(t) || t.startsWith("<!--")
+          || t.startsWith(">") || /^[-*+]\s/.test(t) || t.startsWith("|")) continue;
+        return t.replace(/[*_`#]/g, "").slice(0, 320);
+      }
+      return "";
+    };
+    const firstImgMatch = generated.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/);
+    const excerpt   = (metaData?.metaDesc?.trim() || firstParagraph(generated)).trim();
+    const heroImage = firstImgMatch ? firstImgMatch[1] : "";
+    const articleUrl = nlArticleUrl.trim();
     setNlStatus("sending"); setNlResult(null);
     try {
       const res = await fetch("/api/content/newsletter", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown: generated, subject, title: subject, preview: metaData?.metaDesc }),
+        body: JSON.stringify({
+          mode: "teaser",
+          markdown: generated, subject, title: subject, preview: metaData?.metaDesc,
+          excerpt,
+          heroImage: heroImage || undefined,
+          articleUrl: articleUrl || undefined,
+        }),
       });
       const json = await res.json().catch(() => ({})) as { ok?: boolean; edit_url?: string; error?: string; reason?: string };
       if (res.ok && json.ok) { setNlStatus("done"); setNlResult({ edit_url: json.edit_url }); }
@@ -1455,6 +1477,39 @@ export default function ContentStudio() {
       {/* ══════════════ 產文頁籤 ══════════════ */}
       {activeTab === "generate" && (
         <>
+          {/* ── 目標客戶（F-Sites：一律顯示連接中的客戶名稱+網址；>1 時可下拉切換）── */}
+          <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)", whiteSpace: "nowrap" }}>📍 目標客戶</span>
+              {wpSites.length === 0 && (
+                <span style={{ fontSize: "12px", color: "#f59e0b" }}>
+                  尚未連接任何網站 — 文章仍可生成，但無法推送。{" "}
+                  <a href="/tools/content/sites" style={{ color: "var(--btn-primary-bg)" }}>前往連接 ↗</a>
+                </span>
+              )}
+              {wpSites.length === 1 && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: wpSites[0].color, display: "inline-block" }} />
+                  <strong style={{ color: "var(--text-primary)" }}>{wpSites[0].name}</strong>
+                  <a href={wpSites[0].url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>{wpSites[0].url} ↗</a>
+                </span>
+              )}
+              {wpSites.length > 1 && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                  <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
+                    className="form-select" style={{ fontSize: "13px", padding: "4px 10px" }}>
+                    {wpSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  {(() => {
+                    const s = wpSites.find(x => x.id === selectedSiteId);
+                    return s ? <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>{s.url} ↗</a> : null;
+                  })()}
+                </span>
+              )}
+              <a href="/tools/content/sites" style={{ marginLeft: "auto", fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>管理客戶網站 →</a>
+            </div>
+          </div>
+
           <div className="form-block" style={{ marginBottom: "16px" }}>
             <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "14px", color: "var(--text-primary)" }}>文章設定</div>
 
@@ -1911,7 +1966,7 @@ export default function ContentStudio() {
           </SectionToggle>
 
           {/* ── 發布設定 ── */}
-          <div className="form-block" style={{ marginBottom: "20px" }}>
+          <div className="form-block form-block--wide" style={{ marginBottom: "20px" }}>
             <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "12px", color: "var(--text-primary)" }}>發布設定</div>
             <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
               <div>
@@ -1964,7 +2019,7 @@ export default function ContentStudio() {
 
           {/* ═══ 輸出區 ═══ */}
           {(hasContent || isGenerating) && (
-            <div className="form-block">
+            <div className="form-block form-block--wide">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
                 <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
                   產出文章
@@ -1978,24 +2033,6 @@ export default function ContentStudio() {
                       ⚠ 可能被截斷（超過長度上限）— 建議選短篇或拆主題重新生成
                     </span>
                   )}
-                </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  {hasContent && (
-                    <>
-                      <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => void navigator.clipboard.writeText(generated)}>複製 MD</button>
-                      <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => downloadMd(generated, `${slugify(form.keyword) || "article"}.md`)}>↓ .md</button>
-                    </>
-                  )}
-                  {hasContent && pubStatus === "idle" && (
-                    <button className="btn-primary" onClick={handlePublish} style={{ fontSize: "13px" }}>推送到 WordPress（草稿）</button>
-                  )}
-                  {pubStatus === "publishing" && <button className="btn-primary" disabled style={{ fontSize: "13px" }}>推送中…</button>}
-                  {pubStatus === "done" && pubResult?.edit_url && (
-                    <span style={{ fontSize: "13px", color: "#22c55e" }}>
-                      ✓ 草稿已建立 — <a href={pubResult.edit_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>WP 後台編輯 ↗</a>
-                    </span>
-                  )}
-                  {pubStatus === "error" && <span style={{ fontSize: "12px", color: "var(--color-error, #ef4444)" }}>推送失敗：{pubError}</span>}
                 </div>
               </div>
 
@@ -2022,6 +2059,27 @@ export default function ContentStudio() {
               )}
               <div className="form-hint" style={{ marginTop: "6px" }}>
                 可直接編輯後推送。<code>{"<!-- NEEDS_BRAND_VERIFY -->"}</code> = 填入真實品牌資料。
+              </div>
+
+              {/* ── 輸出動作列（移到文章下方：先讀後操作，UX 較順）── */}
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginTop: "12px",
+                paddingTop: "12px", borderTop: "1px solid var(--card-border)" }}>
+                {hasContent && (
+                  <>
+                    <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => void navigator.clipboard.writeText(generated)}>複製 MD</button>
+                    <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => downloadMd(generated, `${slugify(form.keyword) || "article"}.md`)}>↓ .md</button>
+                  </>
+                )}
+                {hasContent && pubStatus === "idle" && (
+                  <button className="btn-primary" onClick={handlePublish} style={{ fontSize: "13px" }}>推送到 WordPress（草稿）</button>
+                )}
+                {pubStatus === "publishing" && <button className="btn-primary" disabled style={{ fontSize: "13px" }}>推送中…</button>}
+                {pubStatus === "done" && pubResult?.edit_url && (
+                  <span style={{ fontSize: "13px", color: "#22c55e" }}>
+                    ✓ 草稿已建立 — <a href={pubResult.edit_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>WP 後台編輯 ↗</a>
+                  </span>
+                )}
+                {pubStatus === "error" && <span style={{ fontSize: "12px", color: "var(--color-error, #ef4444)" }}>推送失敗：{pubError}</span>}
               </div>
 
               {/* ── RankMath SEO 合規分數 ── */}
@@ -2227,31 +2285,58 @@ export default function ContentStudio() {
                 </div>
               )}
 
-              {/* ── 電子報草稿（FluentCRM，只建草稿不寄出）── */}
+              {/* ── 電子報草稿（FluentCRM，只建草稿不寄出）── U-FluentCRM：精簡導讀 + 文章連結 + 精美卡片 ── */}
               {genStatus === "done" && hasContent && (
-                <div style={{ marginTop: "16px", borderTop: "1px solid var(--card-border)", paddingTop: "14px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                    <button className="btn-primary" style={{ fontSize: "12px", padding: "5px 14px" }}
-                      onClick={handlePushNewsletter} disabled={nlStatus === "sending"}>
-                      {nlStatus === "sending" ? "推送中…" : "📧 推送到 FluentCRM 草稿"}
-                    </button>
-                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                      只建立草稿，不會寄出 — 收件人與寄送請在 FluentCRM 人工確認
-                    </span>
-                  </div>
-                  {nlStatus === "done" && (
-                    <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--text-primary)" }}>
-                      ✓ 已建立 FluentCRM 草稿
-                      {nlResult?.edit_url && (
-                        <> — <a href={nlResult.edit_url} target="_blank" rel="noopener noreferrer" style={{ color: "#5855d0" }}>在 FluentCRM 開啟</a></>
+                <div style={{ marginTop: "16px", borderTop: "1px solid var(--card-border)", paddingTop: "16px" }}>
+                  <div style={{
+                    background: "linear-gradient(135deg, rgba(88,85,208,0.06), rgba(88,85,208,0.02))",
+                    border: "1px solid rgba(88,85,208,0.25)", borderRadius: "12px", padding: "16px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                      <span style={{ fontSize: "15px" }}>📧</span>
+                      <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>電子報導讀（FluentCRM 草稿）</span>
+                    </div>
+                    <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginBottom: "12px", lineHeight: 1.5 }}>
+                      寄出的是<strong>精簡導讀</strong>（首圖＋摘要＋「閱讀完整文章」按鈕），吸引讀者點進全文 — 不是整篇貼上。<br />
+                      只建立草稿、<strong>不會寄出</strong>；收件人與寄送一律在 FluentCRM 人工確認。
+                    </div>
+
+                    {/* 文章公開連結 — CTA 按鈕指向這個網址 */}
+                    <label className="form-label" style={{ marginBottom: "4px" }}>文章公開連結（CTA 按鈕用）</label>
+                    <input
+                      className="form-input"
+                      style={{ fontSize: "12px" }}
+                      placeholder="https://soulfulexpression.org/your-article-slug（發布到 WordPress 並上線後貼上公開網址）"
+                      value={nlArticleUrl}
+                      onChange={e => setNlArticleUrl(e.target.value)}
+                    />
+                    <div className="form-hint" style={{ marginTop: "4px", marginBottom: "12px" }}>
+                      留空也可推送，但導讀就<strong>沒有</strong>「閱讀完整文章」按鈕。建議先用上方「推送到 WordPress（草稿）」發布、文章上線後把公開網址貼這裡。
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                      <button className="btn-primary" style={{ fontSize: "12px", padding: "6px 16px" }}
+                        onClick={handlePushNewsletter} disabled={nlStatus === "sending"}>
+                        {nlStatus === "sending" ? "推送中…" : "📧 建立 FluentCRM 導讀草稿"}
+                      </button>
+                      {!nlArticleUrl.trim() && (
+                        <span style={{ fontSize: "11px", color: "#f59e0b" }}>未填文章連結 — 導讀將不含按鈕</span>
                       )}
                     </div>
-                  )}
-                  {nlStatus === "error" && (
-                    <div style={{ marginTop: "8px", fontSize: "12px", color: "#c0392b" }}>
-                      ⚠ {nlResult?.error ?? "推送失敗"}
-                    </div>
-                  )}
+                    {nlStatus === "done" && (
+                      <div style={{ marginTop: "10px", fontSize: "12px", color: "var(--text-primary)" }}>
+                        ✓ 已建立 FluentCRM 草稿
+                        {nlResult?.edit_url && (
+                          <> — <a href={nlResult.edit_url} target="_blank" rel="noopener noreferrer" style={{ color: "#5855d0" }}>在 FluentCRM 開啟並寄送 ↗</a></>
+                        )}
+                      </div>
+                    )}
+                    {nlStatus === "error" && (
+                      <div style={{ marginTop: "10px", fontSize: "12px", color: "#c0392b" }}>
+                        ⚠ {nlResult?.error ?? "推送失敗"}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -572,6 +572,12 @@ pre {
   max-width: 640px;
 }
 
+/* Width modifier — opts a form-block out of the 640px cap so it spans the full
+   container width, matching the SectionToggle blocks (品牌聲音 etc.) that carry
+   no .form-block class. Used by the generate-tab 發布設定 + 產出文章 blocks so they
+   line up with the brand-voice block above them instead of looking narrower. */
+.form-block--wide { max-width: none; }
+
 .form-row { margin-bottom: 16px; }
 .form-label {
   display: block;

@@ -129,6 +129,38 @@ function markdownToEmailHtml(md: string): string {
   return out.join("\n");
 }
 
+/**
+ * Concise teaser email (U-FluentCRM) — hero image + title + short excerpt + a "閱讀完整文章" CTA
+ * button linking to the public article URL. Deliberately NOT the full article: the goal is to entice
+ * the reader to click through, and to keep the campaign short. All styles are inline (email clients
+ * strip <style>/<head>). Returns "" if there is no usable content so the caller can 400.
+ */
+function buildTeaserHtml(opts: { title: string; excerpt: string; heroImage?: string; articleUrl?: string }): string {
+  const title = opts.title.trim();
+  const excerpt = opts.excerpt.trim();
+  if (!title && !excerpt) return "";
+  const hero = opts.heroImage && /^https?:\/\//.test(opts.heroImage) ? opts.heroImage : "";
+  const url = opts.articleUrl && /^https?:\/\//.test(opts.articleUrl) ? opts.articleUrl : "";
+
+  const parts: string[] = [];
+  parts.push('<div style="max-width:600px;margin:0 auto;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">');
+  if (hero) {
+    parts.push(`<img src="${escapeHtml(hero)}" alt="${escapeHtml(title)}" style="width:100%;max-width:600px;height:auto;border-radius:12px;margin:0 0 20px;display:block;" />`);
+  }
+  if (title) {
+    parts.push(`<h1 style="font-size:24px;line-height:1.3;margin:0 0 14px;color:#111827;font-weight:700;">${escapeHtml(title)}</h1>`);
+  }
+  excerpt.split(/\n{2,}/).map(p => p.trim()).filter(Boolean).slice(0, 3).forEach(p => {
+    parts.push(`<p style="font-size:16px;line-height:1.6;margin:0 0 14px;color:#374151;">${inline(p)}</p>`);
+  });
+  if (url) {
+    parts.push(`<div style="margin:24px 0 8px;"><a href="${safeUrl(url)}" style="display:inline-block;background:#5855d0;color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;padding:13px 30px;border-radius:8px;">閱讀完整文章 →</a></div>`);
+    parts.push(`<p style="font-size:13px;line-height:1.5;color:#9ca3af;margin:0;">若按鈕無法點擊，請複製此連結：<br /><a href="${safeUrl(url)}" style="color:#5855d0;word-break:break-all;">${escapeHtml(url)}</a></p>`);
+  }
+  parts.push('</div>');
+  return parts.join("\n");
+}
+
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
@@ -149,13 +181,22 @@ export async function POST(req: Request): Promise<Response> {
   const preview  = (typeof body.preview  === "string" ? body.preview.trim()  : "");
   const designTemplate = typeof body.designTemplate === "string" ? body.designTemplate.trim() : "";
 
-  if (!markdown) return NextResponse.json({ ok: false, error: "markdown required" }, { status: 400 });
+  // U-FluentCRM: teaser mode builds a short CTA-driven email instead of converting the full article.
+  const mode       = typeof body.mode       === "string" ? body.mode : "";
+  const excerpt    = typeof body.excerpt    === "string" ? body.excerpt.trim()    : "";
+  const heroImage  = typeof body.heroImage  === "string" ? body.heroImage.trim()  : "";
+  const articleUrl = typeof body.articleUrl === "string" ? body.articleUrl.trim() : "";
+  const isTeaser   = mode === "teaser";
+
   if (!subject)  return NextResponse.json({ ok: false, error: "缺少主旨（subject）" }, { status: 400 });
-  if (Buffer.byteLength(markdown, "utf8") > MAX_MARKDOWN_BYTES) {
+  if (!isTeaser && !markdown) return NextResponse.json({ ok: false, error: "markdown required" }, { status: 400 });
+  if (markdown && Buffer.byteLength(markdown, "utf8") > MAX_MARKDOWN_BYTES) {
     return NextResponse.json({ ok: false, error: "內容過長" }, { status: 413 });
   }
 
-  const bodyHtml = markdownToEmailHtml(markdown);
+  const bodyHtml = isTeaser
+    ? buildTeaserHtml({ title, excerpt: excerpt || preview, heroImage, articleUrl })
+    : markdownToEmailHtml(markdown);
   if (!bodyHtml.trim()) return NextResponse.json({ ok: false, error: "no publishable content" }, { status: 400 });
 
   const r = await createNewsletter({
