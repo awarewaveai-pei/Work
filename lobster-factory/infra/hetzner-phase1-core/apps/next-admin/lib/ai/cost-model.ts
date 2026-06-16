@@ -11,10 +11,11 @@
  * lib/tarot/model-comparison.ts; OpenAI image API; Perplexity Sonar; Gemini Flash-Lite. Currency:
  * NT$ via TWD_RATE (single source — mirrors app/tools/ai-models/page.tsx, keep in sync).
  *
- * INFRA: Hetzner + Cloudflare figures are REAL (pulled 2026-06-17 from the Hetzner Cloud API
- * /v1/pricing + /v1/servers and the Cloudflare /zones API). This Hetzner account is billed in USD
- * (pricing API currency=USD, vat_rate=0) — values are USD as-is, NO currency conversion. Domains +
- * other SaaS remain `estimate: true` (registrar/SaaS billing is not in the Hetzner/CF APIs).
+ * INFRA: Hetzner figures are the ACTUAL billed price from the Hetzner console PRICE field
+ * (screenshots 2026-06-17), NOT the Hetzner API /v1/pricing list price — the API returns the
+ * current catalog rate ($30.99/$41.99), which is higher than this account's locked-in rate
+ * ($18.49/$16.49 in console). Always trust the console PRICE field for actual spend. Cloudflare
+ * real from /zones API. Domains + other SaaS remain `estimate: true` (not in any API).
  */
 
 /** USD → NT$ reference rate. Mirrors app/tools/ai-models/page.tsx:12 — update both together. */
