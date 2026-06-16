@@ -11,14 +11,11 @@
  * lib/tarot/model-comparison.ts; OpenAI image API; Perplexity Sonar; Gemini Flash-Lite. Currency:
  * NT$ via TWD_RATE (single source — mirrors app/tools/ai-models/page.tsx, keep in sync).
  *
- * INFRA: Hetzner + Cloudflare figures are REAL (pulled 2026-06-16 from the Hetzner Cloud API
- * /v1/servers and the Cloudflare /zones API). Hetzner bills EUR (account net==gross, no VAT applied);
- * stored here in USD at EUR→USD = 1.08 (see EUR_USD_RATE), original EUR in each note. Domains +
+ * INFRA: Hetzner + Cloudflare figures are REAL (pulled 2026-06-17 from the Hetzner Cloud API
+ * /v1/pricing + /v1/servers and the Cloudflare /zones API). This Hetzner account is billed in USD
+ * (pricing API currency=USD, vat_rate=0) — values are USD as-is, NO currency conversion. Domains +
  * other SaaS remain `estimate: true` (registrar/SaaS billing is not in the Hetzner/CF APIs).
  */
-
-/** EUR→USD used to express Hetzner's EUR bill in the model's USD unit. Update if the rate drifts. */
-export const EUR_USD_RATE = 1.08;
 
 /** USD → NT$ reference rate. Mirrors app/tools/ai-models/page.tsx:12 — update both together. */
 export const TWD_RATE = 32;
@@ -141,9 +138,9 @@ export interface InfraCost {
 }
 
 export const INFRA_MONTHLY: InfraCost[] = [
-  // Hetzner real (Cloud API 2026-06-16): EUR billed, net==gross. usdPerMonth = EUR × EUR_USD_RATE.
-  { key: "hetzner-sg", label: "Hetzner SG VPS (5.223.93.113, cpx22 2c/4GB, sin)", usdPerMonth: Math.round(30.99 * EUR_USD_RATE * 100) / 100, estimate: false, note: "真實: €30.99/月 (€22.99 + sin €8 加價)，Hetzner API" },
-  { key: "hetzner-eu", label: "Hetzner EU VPS (204.168.175.41, cpx32 4c/8GB, hel1)", usdPerMonth: Math.round(41.99 * EUR_USD_RATE * 100) / 100, estimate: false, note: "真實: €41.99/月，Hetzner API；Supabase/n8n/Postiz/Trigger 全自託管於此" },
+  // Hetzner real (Cloud API /v1/pricing 2026-06-17): account billed in USD, vat 0 — values as-is.
+  { key: "hetzner-sg", label: "Hetzner SG VPS (5.223.93.113, cpx22 2c/4GB, sin)", usdPerMonth: 30.99, estimate: false, note: "真實 $30.99/月 USD (cpx22 sin：$22.99 + 新加坡加價 $8)，Hetzner pricing API (currency=USD)" },
+  { key: "hetzner-eu", label: "Hetzner EU VPS (204.168.175.41, cpx32 4c/8GB, hel1)", usdPerMonth: 41.99, estimate: false, note: "真實 $41.99/月 USD (cpx32 hel1)，Hetzner pricing API；Supabase/n8n/Postiz/Trigger 全自託管於此" },
   { key: "cloudflare", label: "Cloudflare (DNS/WAF/R2)", usdPerMonth: 0, estimate: false, note: "真實: 2 zones (aware-wave.com / weartheworld.org) 皆 Free plan $0，CF API；R2 在免費額度內(10GB)，量大再加" },
   { key: "domains", label: "網域續約攤提 (aware-wave / weartheworld / soulful)", usdPerMonth: 8, estimate: true, note: "registrar 不在 CF/Hetzner API；soulful ~$80/年(Hostinger 待確認 line items)；攤成月" },
   { key: "saas-other", label: "其他 SaaS (Sentry/PostHog 等，若付費)", usdPerMonth: 0, estimate: true, note: "推測免費額度；有付費方案再加" },
