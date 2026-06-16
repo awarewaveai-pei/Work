@@ -745,6 +745,9 @@ async function* streamOpenAiGeneration(
         model: config.model,
         max_completion_tokens: config.maxTokens,
         stream: true,
+        // Ask OpenAI to emit a final usage frame so the cost ledger gets exact token counts
+        // (parallel to Anthropic's finalMessage().usage). Without this, streamed responses carry no usage.
+        stream_options: { include_usage: true },
         messages: [
           { role: "system", content: config.system },
           { role: "user", content: config.userPrompt },
@@ -761,6 +764,7 @@ async function* streamOpenAiGeneration(
     const dec = new TextDecoder();
     let buf = "";
     let finishReason = "";
+    let openaiUsage: { prompt_tokens?: number; completion_tokens?: number } | null = null;
     while (true) {
       if (signal?.aborted) break;
       const { done, value } = await reader.read();
@@ -777,13 +781,25 @@ async function* streamOpenAiGeneration(
         try {
           const j = JSON.parse(payload) as {
             choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>;
+            usage?: { prompt_tokens?: number; completion_tokens?: number };
           };
           const choice = j.choices?.[0];
           const piece = choice?.delta?.content;
           if (piece) yield piece;
           if (choice?.finish_reason) finishReason = choice.finish_reason;
+          if (j.usage) openaiUsage = j.usage; // final usage frame (stream_options.include_usage)
         } catch { /* skip a partial/non-JSON keepalive frame */ }
       }
+    }
+
+    // Cost ledger: log exact OpenAI token usage from the final usage frame (best-effort).
+    if (!signal?.aborted && openaiUsage) {
+      void logAiCall({
+        route: "content/article-generate",
+        model: config.model,
+        inputTokens: openaiUsage.prompt_tokens ?? 0,
+        outputTokens: openaiUsage.completion_tokens ?? 0,
+      });
     }
 
     // Truncation guard — parallel to the Anthropic stop_reason==="max_tokens" check.
