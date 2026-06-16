@@ -4,6 +4,34 @@
 
 ## 2026-06-16
 
+### feat(content-studio): 6 項強化 — 多供應商模型(Claude+GPT)/brand-voice URL 自動帶入/分類抓站上現有/品牌語調結構化表單/競業痛點分析/Kadence 漏斗 patterns + AEO
+
+**[任務理解]** 使用者在 app.aware-wave.com/tools/content 列 6 項需求 + 「其他能提高 SEO/GEO/AEO/RankMath 行銷」的加值。決策：模型「只要 GPT」（Claude+OpenAI 雙供應商）、「一次全做完再交付」。
+
+**[現況分析]** ContentStudio.tsx(2796 行 UI) + generate route 抽到 `lib/content/article/generate-core.ts`（純 Anthropic SDK streaming）+ publish 雙路徑 `wordpress-core.ts`（Bridge blocks→Kadence / REST HTML）+ plugin `BlockLibrary.php`（17 種 block 磚）。#3 分類**已半實作**（meta `CATEGORIES:` → extractMeta → publish fallback），缺口=模型不知站上現有分類會發明重複（REALTEST 證實站上「Art Therapy」+「Art Therapy Explained」並存）。
+
+**[已修改]**
+- **#1 多供應商**：generate-core 加 `OPENAI_MODELS`+`isOpenAiModel()`+`streamOpenAiGeneration()`（raw fetch SSE，零新依賴，仿 Perplexity pattern；`max_completion_tokens` 相容 gpt-5.x reasoning、省 temperature）；`streamArticleGeneration` 依 model 分流（Claude 路徑位元不變）。UI `AI_MODELS` 加 Fable 5 + 4 GPT，optgroup 分組。並行 session 已把 `logAiCall` cost-ledger 接進兩路徑。
+- **#2 brand-voice URL**：`bvUrlTouched` + useEffect 帶入選定站 `/about`（仿名稱自動帶入）。
+- **#3 分類抓現有**：新 route `/api/content/categories`（WP REST `/wp/v2/categories`，仿 related-posts auth）；handleGenerate 帶 `existingCategories`；generate-core CATEGORIES 指示改「從現有清單精確挑選」。
+- **#4 品牌語調表單**：`MarketingBrief`（受眾/定位/USP/漏斗階段/CTA/價格/情緒/疑慮/禁用聲明）→ `compileMarketingBrief()` 折回 `details`（後端契約不變、向後相容；freeform textarea 保留為進階）。
+- **#5 競業痛點**：新 route `/api/content/market-analysis`（Perplexity sonar 五角度：競品/痛點/搜尋意圖/疑慮/差異化 → JSON + 注入 block）；UI 面板 chips 顯示 + 產文時注入 `marketContext`。
+- **#6 Kadence 漏斗 patterns**：新 route `/api/content/patterns`（WP REST `/wp/v2/blocks` synced patterns）；`[KADENCE_PATTERN: id]` placeholder → markdown-to-blocks 新 `pattern` block + wordpress-core REST 路徑 → `<!-- wp:block {"ref":id} /-->`；plugin BlockLibrary 新 `pattern()` 方法+compose case+manifest（17→18 type）；**AWBRIDGE_VERSION 0.11.0→0.12.0**（header+define）。
+- **#7 AEO**：SYSTEM_PROMPT 加 Answer-Engine-Optimization 區塊（PAA 問句式 H2/H3、定義膠囊、清單/表格可抽取性、≤30 字可抽取句）。
+- **新檔**：`lib/content/wp-entities.ts`（共用 HTML entity 解碼，修 critic 找到的「strip 而非 decode」defeats #3 的 bug）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | clean（含 critic 修正後重跑）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php D:/tmp/blocklib_realtest.php`（standalone，BlockLibrary WP-free）| exit=0 | pattern→`wp:block {"ref":7207}`、ref:0 略過、18 manifest example 全 compose 無 unknown
+- REALTEST_EVIDENCE: tool=curl | cmd=`GET soulful /wp/v2/categories` | exit=0 | 回真實分類（AI Drafts/Art Therapy/…）；`/wp/v2/blocks` 無 auth 回空陣列（驗 no-token guard 正確）
+- REALTEST_EVIDENCE: tool=Bash | cmd=Perplexity sonar market-analysis prompt | exit=0 | `PARSE_OK` 五 key 齊、真實痛點內容
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content app/tools/content` | exit=0 | 42 tests pass（含新增 3 個 #6 pattern 測試）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/4n — 全部修正（mid-stream OpenAI error frame 偵測、siteUrl 資訊揭露移除、SSE 單行假設文件化、entity decode 共用化、patternCount NaN guard、isOpenAiModel 死碼簡化）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`marketContext\|patternCount\|existingCategories\|KADENCE_PATTERN\|isOpenAiModel\|streamOpenAiGeneration\|compileMarketingBrief\|api/content/(categories\|patterns\|market-analysis)` | hits=7 — 全部侷限在改/建的檔，無外部 stale call site、無 downstream consumer 需同步（headless block 走同一 core，新欄位皆 optional 透明）
+
+**[剩餘風險]** ⚠️ **vault `OPENAI_API_KEY` 直連 401 失效**（與同日 video-service 發現一致：直連 key 默默過期）→ GPT 程式碼正確且優雅降級（401 yield `GENERATION_ERROR`、UI 顯示錯誤、Claude 不受影響），但**GPT 實際生成在使用者刷新 key 前無法運作**。GPT model id（gpt-5.5/5.4/mini/4o）因 key 401 無法對帳，刷新後須確認帳號實際可用 id。#6 完整 pattern 清單需帶 token/部署後驗（無 token 時站上 blocks 不可見）。**未部署**：全部須 sg-deploy；#6 另需 wp-bridge 0.12.0 release。
+**[rollback]** 程式皆已隨 checkpoint commit 進 main；如需回退按檔 `git checkout` 個別檔；plugin 未 release 故站上零影響。
+
 ### fix(hooks): ao-resume-on-prompt + post-push hook 加 -WindowStyle Hidden（消開機/每訊息 powershell 閃窗 真根因）
 **[徹底根因]** 使用者反覆回報「送訊息就跳好幾次紅字 powershell 視窗」。全面盤點（procmon + settings.json hook 清單 + ao-resume spawn 追蹤）確認**真根因非 MCP/Codex**（那是另一層）：
 - `settings.json` `UserPromptSubmit` hook = `ao-resume-on-prompt.ps1`（`powershell.exe` **無 `-WindowStyle Hidden`**），**每則訊息觸發**（300s 去重）。
