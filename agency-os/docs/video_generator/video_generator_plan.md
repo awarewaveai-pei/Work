@@ -1,6 +1,12 @@
-# 全自動內容發佈系統 — 完整計畫
+# 全自動內容發佈系統 — 完整計畫（原型設計記錄 · 發佈/排程層已退役）
 
 > 一個全自動內容發佈系統，輸入主題或已有文章，自動生成文章＋卡通影片，發佈到 10 個平台，完全不需要人工干預。
+
+> **⚠️ P6 退役公告（2026-06-16）**：本文件保留為**原型設計記錄 + P7 影片生成參考**。下列直連發佈/排程層已移除，文中相關流程僅供歷史對照，**請勿據以執行**：
+> - 🗑️ `publisher.py`（10 平台直連）→ 違反 R1（與 Postiz 雙套社群）+ R4（繞 wp-bridge 簽章）。社群走 **Postiz**；WordPress 走 **wp-bridge 簽章發佈**。
+> - 🗑️ `master_controller.py` + `cron_setup.sh`（cron 主控/安裝器）→ 編排收斂進 next-admin `lib/content/pipeline.ts`（P4，draft-first）。
+> - ✅ 保留：`full_pipeline_v3.py`（文章→影片）作 P7 影片微服務移植參考。
+> SSOT：`agency-os/docs/operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` §10 P6。
 
 ---
 

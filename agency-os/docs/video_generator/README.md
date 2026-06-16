@@ -1,17 +1,22 @@
-# 全自動內容發佈系統
+# 全自動內容發佈系統（原型 — 部分已退役）
+
+> **⚠️ P6 退役公告（2026-06-16）**
+> 直連發佈與排程主控已移除，請勿再執行本資料夾的 Python 主控：
+> - 🗑️ `publisher.py`（10 平台直連發佈）— 違反 R1（與 Postiz 雙套社群發佈）+ R4（繞過 wp-bridge Ed25519 簽章）。**社群發佈一律走 Postiz；WordPress 一律走 wp-bridge 簽章發佈。**
+> - 🗑️ `master_controller.py`（cron 自動發佈主控）+ `cron_setup.sh`（其排程安裝器）— 編排已收斂進 next-admin `lib/content/pipeline.ts`（P4 headless 編排器，draft-first）。
+> 本資料夾**保留為 P7 影片生成參考**：`full_pipeline_v3.py`（文章→影片）及其依賴（`topic_fetcher.py` / `quality_control.py` / `growth.py` / `config.py` / `setup.sql`）僅作影片微服務移植參考，不再作為發佈執行入口。
+> SSOT：`agency-os/docs/operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` §10 P6。
 
 ## 檔案說明
 
 | 檔案 | 用途 |
 |---|---|
-| `config.py` | 所有設定集中在這裡 |
-| `setup.sql` | Supabase 建表 SQL |
-| `topic_fetcher.py` | 自動抓熱門議題 |
-| `full_pipeline_v3.py` | 文章→影片主腳本 |
-| `publisher.py` | 10 個平台發佈 |
-| `quality_control.py` | 品質控制 |
-| `growth.py` | 成長功能 |
-| `master_controller.py` | 主控腳本 |
+| `config.py` | 所有設定集中在這裡（P7 參考） |
+| `setup.sql` | Supabase 建表 SQL（P7 參考） |
+| `topic_fetcher.py` | 自動抓熱門議題（P7 參考） |
+| `full_pipeline_v3.py` | 文章→影片主腳本（**P7 影片參考，保留**） |
+| `quality_control.py` | 品質控制（P7 參考） |
+| `growth.py` | 成長功能（P7 參考） |
 
 ## 安裝
 
@@ -34,22 +39,15 @@ pip install -r requirements.txt   # moviepy 已鎖 1.0.3（程式用 1.x API，2
 > **密鑰原則**：所有 key 從環境變數讀取，禁止寫進 `config.py` / commit 進 git。
 > 本機可由 vault（`mcp/user-env.ps1`）注入；VPS cron 用 systemd `EnvironmentFile`。
 
-## 執行
+## 執行（已退役 — 見頂部 P6 公告）
 
-```bash
-# 手動執行
-python master_controller.py
+~~`python master_controller.py` / cron 排程~~ 已於 P6 移除。發佈與編排改走生產路徑：
 
-# 設定每日排程（早上 9 點）
-crontab -e
-0 9 * * * /usr/bin/python3 /你的路徑/master_controller.py >> /var/log/autopublish.log 2>&1
+- **內容編排**：next-admin `lib/content/pipeline.ts`（`byKind` article→quality→publish，draft-first）。
+- **WordPress 發佈**：wp-bridge 簽章發佈（`lib/content/publish/wordpress-core.ts`，draft-first 紅線）。
+- **社群發佈**：Postiz（唯一社群發佈路徑，P5）。
 
-# 每週一發電子報
-0 8 * * 1 /usr/bin/python3 /你的路徑/master_controller.py --newsletter >> /var/log/autopublish.log 2>&1
-
-# 每月更新舊文章
-0 10 1 * * /usr/bin/python3 /你的路徑/master_controller.py --update-old >> /var/log/autopublish.log 2>&1
-```
+本資料夾僅保留作 P7 影片生成（`full_pipeline_v3.py`）移植參考，不再直接排程執行。
 
 ## 平台設定說明
 

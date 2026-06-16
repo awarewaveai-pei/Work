@@ -4,6 +4,27 @@
 
 ## 2026-06-16
 
+### fix(seo-panel): /tools/publish SEO 面板修正到完美 — 圓環儀表重設計 + AI 修正永不退步 + 4 客觀缺陷修
+
+**[任務理解]** 操作者：「把這個設計修正到完美」，範圍選定「全修 + 視覺重新設計」→ 方向 A（圓環儀表）。4 客觀缺陷：① AI 自動修正非單調（80→90→80，全重生機制使分數可倒退）→ 改永不退步；② na 列「不適用」雙重冗字；③ 寫死色 `#22c55e`/`#f97316` 脫離 app 自身色階（系統 green=`#10b981`、amber=`#f59e0b`，舊色更亮不一致）；④ `PublishWizard` dead state 欄位 `rankGrade`/`rankScore`（前 WORKLOG 06-16:116/136 剩餘風險②③標「留待後續清/已知接受」，本檔即收斂該兩項）。
+
+**[現況分析（VBC）]** `git log` → 並行 cursor session 動 Media Hub/image-model 線（dba6d74f/ef133862），檔域 ContentStudio/image route，**與本檔（SeoCheckPanel + PublishWizard SEO 段）不重疊**。`SeoCheckPanel` 雙消費端：blog（ContentStudio `onFixApply` markdown 重寫路徑，**不設 na**）+ product（PublishWizard `onFix` 重生路徑，na 僅此觸發）→ 重設計須兩路徑皆不破。非單調根因：`PublishWizard.tsx` `runCopy` fix 路徑 `setCopy(...)` 無條件覆蓋、不知前次分數。na 雙字根因：面板渲染 `— 不適用（{detail}）` 而 `detail` 已以「不適用於商品頁…」起頭。
+
+**[已修改]**
+1. `app/tools/content/SeoCheckPanel.tsx`（dirty→本 commit）— ① `ScoreRing` SVG 圓環儀表（RankMath/Lighthouse idiom，track=`--card-border`、progress stroke=grade 色、`strokeDashoffset` gauge、`Number.isFinite` 守 NaN→0 防護分數圓+數字）取代扁平 pill；② `GRADE_RING/GRADE_TEXT/GRADE_LABEL` 色票 map（`--green`/`--yellow`/`--severity-medium`/`--red`，amber 文字用較深 `--severity-medium` 確保白底對比）取代寫死 `#22c55e`/`#f97316`/`#fff7ed`/`#f0fdf4`；③ na 列改 `· {check.detail}`（斜體中性）去除雙「不適用」、中性灰空心 chip 永不紅、排除錯誤計數+徽章+分類 defaultOpen；④ `onFix` 簽章回 `{ok,error?,message?}`，`fixSuccess` bool→`fixMessage` string state、原樣顯示 caller 回傳的分數 delta（含 `↑` 綠字）；header 加適用/通過/待修正/不適用拆解計數。
+2. `app/tools/publish/PublishWizard.tsx`（已落 auto-checkpoint `4ba71f0b`）— ① 移除 dead `rankGrade`/`rankScore`（type + setCopy，全 repo 0 殘留引用）；② 加 `copyRef`（useRef+useEffect 同步）讓 fix 讀到螢幕上即時分數（避 useCallback stale closure）；③ `runCopy` 永不退步守門：fix 為隨機全重生，**僅當新分數嚴格 > 螢幕分數才採用**（等/低→保留現稿、不 setCopy、回「重生 N 分未超過原版，保留 X 分」），採用回 delta 訊息「X → N ↑」；④ `runCopy`/`fixCopy` 回傳型加 `message?`。
+3. **critic（外部 oracle）修**：M2 — 等分重生原會洗掉文案卻顯「維持 X 分」（誤導+無謂 churn）→ 改嚴格 `>` 採用語意（等分=保留現稿，訊息單一明確）；N2 — `ScoreRing` 非有限分數防護（latent，補齊求完美）。M1/N1/N3/N4 經評估為刻意 UX/裝飾性/不值 churn/已驗證正確，不動。
+
+**[驗證結果]**（R0 四動作齊全）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin 全專案，重設計後+M2/N2 修後共兩次）| exit=0 — 型別 0 錯。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm run build`（next build 生產建置）| exit=0 — 兩消費端頁皆預渲染成功：`/tools/publish`（6.13 kB 重設計面板）+ `/tools/content`（23.1 kB 共用面板的 blog 頁）；證實重設計+永不退步邏輯在生產模式下兩流皆 build 通過（比 tsc 多抓 client/server 邊界+import）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/4n — 外部 oracle trace 全部 5 個資料流檔（兩改檔 + route.ts copy handler + product-copy.ts 計分 + ContentStudio blog caller）：永不退步守門逐 edge 確認正確（worse 必早 return 不洩漏螢幕、better/equal 不誤丟、prevScore=-1 無基線恆採用、newScore=-1 無分數視為退步保留）；prevScore/newScore 同尺度比較（兩版皆 na-排除子集分數）；雙 fix 路徑隔離（product `onFix` 優先 early-return、blog `onFixApply` fall-through、fixError/fixMessage 每次 handleFix 起手重置）；na 排除一致跨 5 站；na 雙字已去除。2 Minor（M1 訊息持久=刻意、M2 等分語意）+ 4 Nit；M2/N2 已即修並 tsc 複驗。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`rankGrade\|rankScore\|fixSuccess\|#22c55e\|#f97316\|onFix=\|onFixApply=` | hits=0(live) — dead 欄位全 repo 0 殘留消費端；SeoCheckPanel 0 脫色票字面（僅 migration 註解）；兩 `SeoCheckPanel` 消費端簽章皆相容；`#22c55e`/`#f97316` 殘留命中全在 `ContentStudio.tsx`（獨立 component 的 chrome，非 SEO 面板，本任務範圍外）；agency-os 命中皆 append-only WORKLOG/excerpt/report/daily 史料（描述面板早期狀態，不 retro 改，新真相由本條記錄）；scripts=0。
+
+**[剩餘風險]** ① **SG 部署未執行**——本輪 tsc+build+critic+bughunt 全綠但只 commit，**生產部署待操作者明示 go-ahead**（前端 Med，deploy flow `/check-drift`→`/verify`→go→`sg-deploy`→browser-test 驗圓環渲染/na 去重/AI 修正永不退步活測）。② `ContentStudio.tsx` chrome 仍有脫色票寫死色（lines 2040/2159/2210/2244/2537/2676）——同類不一致但屬獨立 component，本任務範圍外，已另起背景任務追蹤。③ critic M1（保留稿訊息持久顯示至下次點擊）為刻意 UX，未來編輯勿誤「修」。
+
+**[rollback]** `git revert`（SeoCheckPanel.tsx 本 commit + PublishWizard.tsx 於 `4ba71f0b`）；純前端 component + client 狀態邏輯，無 DB/migration/auth/金流改動，回滾零資料風險；blog 路徑（`onFixApply`）簽章未動，回滾不影響內容工作室。
+
 ### feat(content-studio): Media Hub 生圖積木整合 Phase 2 — 5 模型精選 + 風格預設 + img2img + 固定 seed
 
 **[任務理解]** 操作者要把自己的生圖積木（`lib/tarot/image-gen.ts`，15 模型 combo-pack，塔羅工具同源）接進內容工作室 Media Hub：① AI Images 下拉給她的模型（非寫死 flux-schnell）② IMAGE STYLE 有風格套風格、無則留白 ③ 以圖生圖（img2img 參考圖）④ 固定風格靠 seed（客戶要某風格可重現）。已批准決策：比例=方案 A（擴 toolkit `AspectRatio` type，image-gen.ts SSOT additive）；模型=精選子集（5 個非全 15）。
