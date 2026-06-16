@@ -9,6 +9,9 @@ import { TAROT_MODEL_COMPARISONS, TAROT_MODEL_SOURCES, type TarotModelComparison
 
 export const metadata = { title: "AI Model Guide · Lobster Factory" };
 
+const TWD_RATE = 32; // USD → NT$ reference rate (update periodically)
+const ntd = (usd: number) => Math.round(usd * TWD_RATE * 10) / 10;
+
 const sourceLabel: Record<string, string> = {
   openaiPricing: "OpenAI pricing",
   openaiGpt55: "GPT-5.5 docs",
@@ -197,8 +200,9 @@ function ImageModelsTable({ rows }: { rows: readonly TarotModelComparison[] }) {
                 <div style={{ color: "var(--text-muted)", marginTop: 6 }}>避開：{m.avoidFor}</div>
               </td>
               <td style={{ ...bodyCellStyle, width: 170 }}>
-                <div style={{ fontWeight: 800 }}>NT${m.costNt}/張</div>
-                <div style={{ color: "var(--text-muted)", marginTop: 3 }}>{m.publicPrice}</div>
+                <div style={{ fontWeight: 800 }}>US${m.costUsd.toFixed(3)}/張</div>
+                <div style={{ marginTop: 2 }}>NT${ntd(m.costUsd)}/張</div>
+                <div style={{ color: "var(--text-muted)", marginTop: 3, fontSize: 10.5 }}>{m.publicPrice}</div>
               </td>
               <td style={{ ...bodyCellStyle, width: 150 }}>{m.speed}</td>
               <td style={{ ...bodyCellStyle, width: 230 }}>
@@ -283,7 +287,7 @@ export default function AiModelGuidePage() {
               <h2 style={{ fontSize: 15, margin: 0 }}>圖片生成工具</h2>
               <div className="form-hint">比較 Tarot、Studio、Mockup 共用的 15 個生圖模型：風格、比例、參考圖、每張成本與速度。</div>
             </div>
-            <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>成本單位：NT$ / 張</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>成本：US$ (SSOT) / NT$ (換匯 1:{TWD_RATE})</div>
           </div>
           <ImageModelsTable rows={TAROT_MODEL_COMPARISONS} />
         </section>
