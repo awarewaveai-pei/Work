@@ -407,6 +407,10 @@ export default function ContentStudio() {
 
   // Auto-image generation counter (0 = idle, N = N images pending)
   const [autoImgN, setAutoImgN] = useState(0);
+  // Last image-gen rejection surfaced to the user (ok:false from /api/content/image, or a thrown
+  // network error). "" = no warning. Set by autoReplaceImages / generateHeroImage so a dropped
+  // reference image or a missing-key/timeout failure isn't silently swallowed.
+  const [imgGenWarn, setImgGenWarn] = useState("");
 
   // YouTube placeholder resolution (Phase 2): per-placeholder URL the operator pastes. No YouTube
   // Data API key yet, so resolution is manual — auto-search is deferred to the Phase 4 daily pipeline.
@@ -954,7 +958,9 @@ export default function ContentStudio() {
     const placeholders = [...md.matchAll(/!\[([^\]]*)\]\(IMAGE_PLACEHOLDER_(\d+)\)/g)];
     if (!placeholders.length) return;
     setAutoImgN(placeholders.length);
+    setImgGenWarn("");
     let remaining = placeholders.length;
+    let lastErr = "";
     for (const m of placeholders) {
       if (genRun !== imgRunRef.current) break; // user re-generated, abort
       const altText = m[1].trim() || form.keyword;
@@ -968,15 +974,20 @@ export default function ContentStudio() {
           body: JSON.stringify({ prompt: altText, platform: "twitter_post", aspectRatio: form.media.imageSize, ...mediaImageParams() }),
         });
         if (genRun !== imgRunRef.current) break;
-        const json = await res.json() as { ok: boolean; imageUrl?: string };
+        const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string };
         if (json.ok && json.imageUrl) {
           setGenerated(prev => prev.replace(`IMAGE_PLACEHOLDER_${n}`, json.imageUrl!));
+        } else {
+          // Route answers 200 + ok:false (missing key / timeout / bad reference) or 4xx with an error
+          // body. Don't swallow it — remember the reason so the operator sees why a placeholder stayed.
+          lastErr = (typeof json.error === "string" && json.error) || "圖片生成失敗";
         }
-      } catch { /* skip this placeholder */ }
+      } catch { lastErr = "圖片生成連線失敗，請稍後重試"; }
       remaining--;
       setAutoImgN(remaining);
     }
     setAutoImgN(0);
+    if (lastErr && genRun === imgRunRef.current) setImgGenWarn(`內文配圖：${lastErr}`);
   }
 
   // ─── YouTube placeholder resolution (Phase 2) ─────────────────────────────
@@ -1017,9 +1028,14 @@ export default function ContentStudio() {
         body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams() }),
       });
       if (genRun !== imgRunRef.current) return; // user re-generated, abort
-      const json = await res.json() as { ok: boolean; imageUrl?: string };
+      const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string };
       if (json.ok && json.imageUrl) setHeroImageUrl(json.imageUrl);
-    } catch { /* best-effort: no hero image */ }
+      // Hero is best-effort (never blocks publish) but a silent failure hid missing-key / bad-reference
+      // problems — surface the reason so the operator can fix the model/reference and retry.
+      else if (genRun === imgRunRef.current) {
+        setImgGenWarn(`首圖：${(typeof json.error === "string" && json.error) || "圖片生成失敗"}`);
+      }
+    } catch { if (genRun === imgRunRef.current) setImgGenWarn("首圖：圖片生成連線失敗，請稍後重試"); }
     finally { if (genRun === imgRunRef.current) setHeroLoading(false); }
   }
 

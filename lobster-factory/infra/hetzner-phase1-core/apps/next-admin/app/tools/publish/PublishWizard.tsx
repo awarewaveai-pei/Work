@@ -57,12 +57,16 @@ export default function PublishWizard() {
     metaDescription?: string;
     shortDescriptionHtml?: string;
     bullets?: string[];
-    rankGrade?: "green" | "orange" | "red";
-    rankScore?: number;
     // Full 16-check RankMath report (6 blog-only checks marked N/A) → rendered in <SeoCheckPanel>.
+    // Score/grade are read from rankMath directly — no separate mirror fields (avoids drift).
     rankMath?: RankMathReport;
     error?: string;
   }>({ state: "idle" });
+  // Latest copy snapshot for the never-regress AI-fix compare (avoids a stale closure over `copy`).
+  const copyRef = useRef(copy);
+  useEffect(() => {
+    copyRef.current = copy;
+  }, [copy]);
 
   const [printMode, setPrintMode] = useState<PrintMode>("original");
   const [upscale, setUpscale] = useState<{
