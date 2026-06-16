@@ -4,6 +4,20 @@
 
 ## 2026-06-16
 
+### fix(mcp): trigger MCP project ref 修正 proj_rqykzz→proj_6c4f（3月舊ref→trigger crash-loop 真因）
+**[根因]** trigger MCP 一直連不上閃紅字（procmon 證實 codex 跑 `--project-ref proj_rqykzzwujizcxdzgnedn`）。VBC：`trigger.config.ts:7` 部署真相 = `proj_6c4f24492a705729fc2c`（4月換的），但 `mcp/user-env.ps1:75` 仍是 3 月舊 ref `proj_rqykzz...`（註解寫「From old Cursor MCP config」）+ User env var 同步舊值 → MCP 傳錯 ref → 連不上重試閃窗。另 `TRIGGER_ACCESS_TOKEN` 在 user-env.ps1 是空字串（值在 AWARE_WAVE_CREDENTIALS.md §15）。
+**[已修改]**（憑證來源：`C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md`）
+- `mcp/user-env.ps1`（untracked）— TRIGGER_PROJECT_REF→`proj_6c4f24492a705729fc2c`；補 TRIGGER_ACCESS_TOKEN（`tr_prod_...`，原為空）。
+- User env var TRIGGER_PROJECT_REF + TRIGGER_ACCESS_TOKEN 直接設正確值。
+- `.cursor/mcp.json`（tracked）+ `claude_desktop_config.json`（untracked, Claude Desktop 自管）— 寫死的舊 `-ProjectRef` literal 直接替換成新 ref。
+- `.mcp.json` 用 `${env:TRIGGER_PROJECT_REF}` placeholder（host 啟動讀 env），無需改。codex 已排除 trigger（不影響）。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=全設定檔 Select-String 舊ref | exit=0 | **6 檔（.mcp.json/.cursor/codex/claude_desktop/user-env/template）舊ref 命中全 0**；User env ref=proj_6c4f、token len=56。
+- REVIEW: 純值替換（ref + token），無邏輯改動；對照 trigger.config.ts:7 + 憑證檔 §15 雙來源確認正確值。
+- BUGHUNT_DONE: scope=mcp,scripts | grep=`proj_rqykzzwujizcxdzgnedn` | hits=0(live configs) — 殘留只剩歷史 WORKLOG/reports/build.json（append-only/auto-gen，不改）。
+**[剩餘風險]** 須**重啟 Claude Code / Cursor / Claude Desktop** 才生效（trigger 才會用新 ref 連上）。trigger 在 Codex 仍排除（使用者要求），故 Codex 不受此修影響。
+**[rollback]** 各檔還原 ref 值即可（user-env.ps1 + .cursor + claude_desktop）。
+
 ### claude 2026-06-16 — fix(cross-machine): import 同日 tie-break（folder-date → manifest timestamp）+ 手動套用桌機 export
 
 **[任務理解]** 兩件事：(1) 使用者手動把桌機 Google Drive export 下載到 `C:\Users\user1115\Desktop\20260616 G`，要套用到本機（筆電 LAPTOP-R7I86OR5）；(2) 修根因 —— 跨機 import 用資料夾名「日期(yyyy-MM-dd)」比新舊（`import-cross-machine-memory.ps1` 舊 L331 `$_.DateStr -gt $ownLatestDateStr`），同一天的他機較新匯出被 `-gt`=false 排除 → 整批 skip。今天桌機 07:29 UTC 比筆電 00:34 UTC 新卻同日被跳過 = bug。
