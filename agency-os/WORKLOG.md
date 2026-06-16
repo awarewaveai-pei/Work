@@ -4,6 +4,25 @@
 
 ## 2026-06-16
 
+### claude 2026-06-16 — REALTEST: bridge /newsletter → soulful FluentCRM 草稿（e2e 閉環，零改 code）
+
+**[任務理解]** 使用者交辦三項：① REALTEST 連 soulful 真建 FluentCRM 草稿→驗 draft→刪除（不寄不留痕）② 發版 release-wp-bridge.sh（兩 repo）→ soulful 更新外掛 ③ next-admin `/api/content/newsletter` route + ContentStudio 推送按鈕。
+
+**[現況分析 / VBC]** 先 git log + 跨檔比對才動手：② 與 ③ **早已被另一 session 做完，WORKLOG（line 366/10387）記「未發版/0.10.0/route 未建/button 未建」已過時**。實證：正本 repo `awarewaveai-pei/aware-wave-wp-bridge` **v0.11.0 已發布**（2026-06-16 03:51）；Work 端 plugin 全樹（`git ls-files includes/ aware-wave-wp-bridge.php` 逐檔 git hash-object）vs release@v0.11.0 **DIFF=0 byte-identical**；soulful 真機 health 回 `version 0.11.0 crypto_ready=true keys_ok=true`；`app/api/content/newsletter/route.ts` + `ContentStudio.tsx` `handlePushNewsletter`（line 2438-2480）+ `lib/studio/wp-bridge-client.ts` `createNewsletter` 全部已存在。→ ②③ 無事可做；唯 ① REALTEST 真正待辦。
+
+**[已修改]** 無 code 改動（純 REALTEST + 文件）。TASKS.md line 60 改 `[ ] 進行中` → `[x] 完成`，記四子項閉環。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin node /tmp/nl-realtest.js`（SG 容器真 WPBRIDGE key 簽章 POST soulful `/?rest_route=/aware-wave-bridge/v1/newsletter`，scheme 精確複製 wp-bridge-client.bridgePost：canonical=`POST\n{fullPath}\n{ts}\n{nonce}\n{sha256hex(body)}` + Ed25519）| exit=0 | ms=~1500 — 回 `HTTP 201 {status:committed,campaign_id:4,campaign_status:draft,ok:true}`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`ssh hostinger_soulful wp eval 'Campaign::find(4)'`（獨立交叉驗，非信 API 回應）| exit=0 | ms=~3000 — `id=4 status=draft subject=[REALTEST] FluentCRM 草稿驗證（請忽略，勿寄）`
+- REALTEST_EVIDENCE: tool=SSH | cmd=`wp eval` subject-guard 刪除（僅當 subject 含 REALTEST 才 `->delete()` + 清 CampaignEmail）| exit=0 | ms=~3000 — `DELETED id4_now=gone total_campaigns=1`（回 baseline，無痕）；暫存腳本 SG host+container 皆 `gone`
+- REVIEW_WAIVED: NA -- 無 code 改動；驗證的 NewsletterCreator/RestController/route.ts 皆前 session critic 審過且 v0.11.0 已上線運行
+- BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=`NewsletterCreator|/newsletter|createNewsletter|AWBRIDGE_VERSION` | hits=route+creator+client+button 四處一致；Work 全樹 vs release v0.11.0 DIFF=0（無 stale/未發版主張殘留）；TASKS line 60 過時聲稱已更正
+
+**[剩餘風險]** 紅線守住：NewsletterCreator 天然不設收件人、紅線斷言 `status!==draft 即 fail`、bridge 無 send/schedule 路由 → 結構上不可能自動寄出。FluentCRM 後台寄送仍 100% 人工門控。
+
+**[rollback]** 無 code 變更需回滾；測試草稿 #4 已刪、soulful 回 baseline。TASKS 勾選回退即 `git revert`。
+
 ### fix(mcp): MONOREPO_ROOT 未設 → 開機 9 個 MCP server 閃紅字視窗（筆電真根因）
 **[任務理解]** 使用者回報筆電「一開機跳出好幾次 PowerShell 紅字視窗、一秒消失」，**公司桌機沒有**。先前同 session 修的 doc-sync `-LiteralPath` + SystemGuard registrar 261 是**另一個症狀**（22:30 Daily 視窗 + doc-sync 紅字），**非開機閃窗**。VBC 重查：排程任務全排除（TaskScheduler 操作記錄開機後 0 任務啟動；AgencyOS 任務皆隱藏無 boot/logon 觸發；啟動資料夾/Run 機碼無 .ps1）。
 **[根因]** `.mcp.json`（`sync-mcp-config.ps1` 生成）對每個 powershell-launched MCP server 用 `-File ${env:MONOREPO_ROOT}\scripts\*.ps1`（line 160-161 刻意設計，git 共用、兩機不同碟靠各機 env var 解析）。**筆電 `MONOREPO_ROOT` User+Machine 範圍皆空**（`[Environment]::GetEnvironmentVariable('MONOREPO_ROOT','User')` = ''），→ MCP host（Claude Code/Cursor）一開機啟動時路徑變 `\scripts\run-llm-mcp.ps1` → powershell `-File 檔案不存在` 紅字（實測 exit -196608）→ 9 個 powershell server（gemini/chatgpt/grok ×fast/latest + postgres + trigger + filesystem）各閃一個 → 「好幾次」。桌機有設故不閃。**系統 gap**：`sync-mcp-config.ps1` 製造此依賴卻無任何腳本保證該 env var 存在（memory feedback_git_push.md 已註明是前置條件、bootstrap 沒設）。
