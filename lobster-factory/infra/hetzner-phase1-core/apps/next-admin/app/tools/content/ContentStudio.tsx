@@ -121,7 +121,7 @@ const LAYOUT_OPTIONS = [
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Tab       = "generate" | "humanize" | "bulk";
+type Tab       = "generate" | "humanize" | "bulk" | "drafts";
 type GenStatus = "idle" | "streaming" | "done" | "error";
 type PubStatus = "idle" | "publishing" | "done" | "error";
 type SynStatus = "idle" | "generating" | "done" | "error";
@@ -187,6 +187,21 @@ interface GenerateForm {
 }
 
 interface MetaData { seoTitle: string; metaDesc: string; focusKeyword?: string; categories?: string[]; tags?: string[]; }
+
+// Light row from GET /api/content/drafts (list). Full draft (markdown + form snapshot) is fetched
+// on-demand via GET ?id=. See migration 0041_content_drafts.sql + app/api/content/drafts/route.ts.
+interface DraftListItem {
+  id: string;
+  keyword: string;
+  title: string | null;
+  language: string | null;
+  articleType: string | null;
+  slugHint: string | null;
+  seoScore: number | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface BulkRow {
   id: number;
@@ -355,6 +370,15 @@ export default function ContentStudio() {
 
   // Slug hint (parsed from <!-- SLUG_HINT: ... --> in generated article)
   const [slugHint, setSlugHint] = useState("");
+
+  // Draft persistence (migration 0041). draftId tracks the currently-loaded/saved row so a
+  // re-save updates instead of duplicating; "" = unsaved. saveState drives the header indicator.
+  const [draftId,      setDraftId]      = useState("");
+  const [draftSaveState, setDraftSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [drafts,       setDrafts]       = useState<DraftListItem[]>([]);
+  const [draftsLoading, setDraftsLoading] = useState(false);
+  const [draftsError,  setDraftsError]  = useState("");
+  const draftSaveRef = useRef(0);
 
   // Auto-image generation counter (0 = idle, N = N images pending)
   const [autoImgN, setAutoImgN] = useState(0);
@@ -604,6 +628,7 @@ export default function ContentStudio() {
     setPubStatus("idle"); setPubResult(null);
     setSeoReport(null); setSeoChecking(false);
     setSlugHint(""); setAutoImgN(0);
+    setDraftId(""); setDraftSaveState("idle"); // fresh generation → new draft row
     setHeroImageUrl(""); setHeroLoading(false);
     setShowSyn(false); setSynStatus("idle"); setSynContent({});
     // Invalidate any in-flight image/hero writers from a PREVIOUS run NOW — unconditionally, even if
@@ -665,6 +690,11 @@ export default function ContentStudio() {
       if (genErrored) { setGenStatus("error"); setGenError("產生過程發生錯誤，文章可能不完整，請重試"); return; }
       setGenStatus("done");
 
+      // Autosave the finished draft so it survives reload / regenerate (migration 0041). Best-effort;
+      // a failure only flips the header indicator to ✗, never blocks the article. The SEO score is
+      // filled in by the seoReport useEffect once the background check resolves.
+      void saveDraft({ markdown: cleanMd, meta, slugHint: hint });
+
       // fire SEO check in background — non-blocking
       const myRun = ++seoRunRef.current;
       setSeoChecking(true);
@@ -696,6 +726,114 @@ export default function ContentStudio() {
       else { setGenStatus("error"); setGenError("產生失敗，請重試"); }
     }
   }
+
+  // ─── Draft persistence (migration 0041) ──────────────────────────────────
+
+  // site_id column is uuid; env-source sites carry synthetic non-uuid ids → only forward real uuids
+  // so a save never 500s on "invalid input syntax for type uuid".
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // Upsert the current article. Pass the freshly-computed values explicitly (React state from the
+  // same tick is stale). Returns the row id so a follow-up SEO-score save can target the same row.
+  const saveDraft = useCallback(async (payload: {
+    markdown: string; meta: MetaData | null; slugHint: string; seoScore?: number | null;
+  }): Promise<string | null> => {
+    const kw = form.keyword.trim();
+    if (!kw || !payload.markdown.trim()) return null;
+    const myRun = ++draftSaveRef.current;
+    setDraftSaveState("saving");
+    try {
+      const res = await fetch("/api/content/drafts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: draftId || undefined,
+          keyword: kw,
+          title: payload.meta?.seoTitle || form.title || null,
+          language: form.language,
+          articleType: form.articleType,
+          markdown: payload.markdown,
+          meta: payload.meta,
+          slugHint: payload.slugHint || null,
+          seoScore: payload.seoScore ?? null,
+          formSnapshot: form,
+          siteId: UUID_RE.test(selectedSiteId) ? selectedSiteId : undefined,
+        }),
+      });
+      const json = await res.json() as { ok: boolean; draft?: { id: string } };
+      if (myRun !== draftSaveRef.current) return null; // a newer save superseded this one
+      if (json.ok && json.draft) {
+        setDraftId(json.draft.id);
+        setDraftSaveState("saved");
+        return json.draft.id;
+      }
+      setDraftSaveState("error");
+      return null;
+    } catch {
+      if (myRun === draftSaveRef.current) setDraftSaveState("error");
+      return null;
+    }
+  }, [form, draftId, selectedSiteId]);
+
+  const loadDrafts = useCallback(async () => {
+    setDraftsLoading(true); setDraftsError("");
+    try {
+      const res  = await fetch("/api/content/drafts");
+      const json = await res.json() as { ok: boolean; drafts?: DraftListItem[]; error?: string };
+      if (json.ok && json.drafts) setDrafts(json.drafts);
+      else setDraftsError(json.error ?? "讀取失敗");
+    } catch { setDraftsError("網路錯誤，請重試"); }
+    finally { setDraftsLoading(false); }
+  }, []);
+
+  // Re-open a saved draft into the generate editor (full fetch: markdown + meta + form snapshot).
+  async function openDraft(id: string) {
+    try {
+      const res  = await fetch(`/api/content/drafts?id=${encodeURIComponent(id)}`);
+      const json = await res.json() as {
+        ok: boolean;
+        draft?: {
+          id: string; markdown: string; meta: MetaData | null; slugHint: string | null;
+          formSnapshot: GenerateForm | null; keyword: string;
+        };
+      };
+      if (!json.ok || !json.draft) { setDraftsError("草稿開啟失敗"); return; }
+      const d = json.draft;
+      // Restore the form snapshot (fall back to a minimal form if an old row lacks one).
+      if (d.formSnapshot) setForm({ ...DEFAULT_FORM, ...d.formSnapshot });
+      else setForm(prev => ({ ...prev, keyword: d.keyword }));
+      setGenerated(d.markdown);
+      setMetaData(d.meta ?? null);
+      setSlugHint(d.slugHint ?? "");
+      setDraftId(d.id);
+      setDraftSaveState("saved");
+      // Clear transient publish/SEO/image state from any previous article in the editor.
+      setPubStatus("idle"); setPubResult(null);
+      setSeoReport(null); setSeoChecking(false); setAutoImgN(0);
+      setGenStatus("done"); setGenError(""); setGenTruncated(false);
+      setActiveTab("generate");
+    } catch { setDraftsError("網路錯誤，請重試"); }
+  }
+
+  async function deleteDraft(id: string) {
+    try {
+      const res  = await fetch(`/api/content/drafts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const json = await res.json() as { ok: boolean };
+      if (json.ok) {
+        setDrafts(prev => prev.filter(d => d.id !== id));
+        if (draftId === id) { setDraftId(""); setDraftSaveState("idle"); }
+      }
+    } catch { /* silent — list refresh will reconcile */ }
+  }
+
+  // Load the drafts list whenever the drafts tab is opened.
+  useEffect(() => { if (activeTab === "drafts") void loadDrafts(); }, [activeTab, loadDrafts]);
+
+  // Once the background SEO check resolves AND we have a saved row, persist the score (best-effort).
+  useEffect(() => {
+    if (!draftId || !seoReport || !generated.trim()) return;
+    void saveDraft({ markdown: generated, meta: metaData, slugHint, seoScore: seoReport.score });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seoReport]);
 
   // ─── Auto-replace IMAGE_PLACEHOLDER_N with Replicate URLs ─────────────────
 
@@ -1154,9 +1292,9 @@ export default function ContentStudio() {
 
       {/* ── Tab bar ── */}
       <div style={{ display: "flex", borderBottom: "1px solid var(--card-border)", marginBottom: "24px" }}>
-        {(["generate", "humanize", "bulk"] as Tab[]).map(t => (
+        {(["generate", "humanize", "bulk", "drafts"] as Tab[]).map(t => (
           <button key={t} style={tabStyle(activeTab === t)} onClick={() => setActiveTab(t)}>
-            {t === "generate" ? "產文" : t === "humanize" ? "人性化 / 改寫" : "批量產文"}
+            {t === "generate" ? "產文" : t === "humanize" ? "人性化 / 改寫" : t === "bulk" ? "批量產文" : "📁 我的草稿"}
           </button>
         ))}
       </div>
@@ -1679,6 +1817,9 @@ export default function ContentStudio() {
                   產出文章
                   {isGenerating && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>串流中…</span>}
                   {genStatus === "done" && <span style={{ fontWeight: 400, color: "#22c55e", marginLeft: 8 }}>✓ 完成</span>}
+                  {genStatus === "done" && draftSaveState === "saving" && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>💾 儲存中…</span>}
+                  {genStatus === "done" && draftSaveState === "saved"  && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>💾 已存草稿</span>}
+                  {genStatus === "done" && draftSaveState === "error"  && <span style={{ fontWeight: 400, color: "#f59e0b", marginLeft: 8, fontSize: "12px" }}>⚠ 草稿未存（文章不受影響）</span>}
                   {genStatus === "done" && genTruncated && (
                     <span style={{ fontWeight: 500, color: "#f59e0b", marginLeft: 8, fontSize: "12px" }}>
                       ⚠ 可能被截斷（超過長度上限）— 建議選短篇或拆主題重新生成
@@ -2157,6 +2298,80 @@ export default function ContentStudio() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ══════════════ 我的草稿頁籤 ══════════════ */}
+      {activeTab === "drafts" && (
+        <div>
+          <div className="form-block" style={{ marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
+                我的草稿
+                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>
+                  （產文完成自動儲存；最多顯示 100 篇，新到舊）
+                </span>
+              </div>
+              <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => void loadDrafts()} disabled={draftsLoading}>
+                {draftsLoading ? "讀取中…" : "↻ 重新整理"}
+              </button>
+            </div>
+            {draftsError && (
+              <div style={{ marginTop: "10px", fontSize: "12px", color: "var(--color-error, #ef4444)" }}>{draftsError}</div>
+            )}
+          </div>
+
+          {!draftsLoading && drafts.length === 0 && !draftsError && (
+            <div style={{ padding: "60px 40px", textAlign: "center", color: "var(--text-muted)", border: "1px dashed var(--card-border)", borderRadius: "8px" }}>
+              還沒有草稿。到「產文」頁籤生成一篇文章，完成後會自動存到這裡。
+            </div>
+          )}
+
+          {drafts.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {drafts.map(d => (
+                <div key={d.id} style={{ border: "1px solid var(--card-border)", borderRadius: "8px", padding: "12px 14px",
+                  display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px",
+                  background: d.id === draftId ? "var(--bg-hover, #f5f5f5)" : "var(--bg-card, #fff)" }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "420px" }}>
+                        {d.title || d.keyword}
+                      </span>
+                      {typeof d.seoScore === "number" && (
+                        <span style={{ fontSize: "11px", padding: "1px 7px", borderRadius: "20px", fontWeight: 600,
+                          background: d.seoScore >= 81 ? "#dcfce7" : d.seoScore >= 51 ? "#fef9c3" : "#fee2e2",
+                          color: d.seoScore >= 81 ? "#166534" : d.seoScore >= 51 ? "#713f12" : "#991b1b" }}>
+                          SEO {d.seoScore}
+                        </span>
+                      )}
+                      {d.status !== "draft" && (
+                        <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                          {d.status === "published" ? "已發佈" : "已封存"}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "3px" }}>
+                      {d.keyword}
+                      {d.language ? ` · ${d.language}` : ""}
+                      {d.articleType ? ` · ${d.articleType}` : ""}
+                      {` · ${new Date(d.updatedAt).toLocaleString()}`}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
+                    <button className="btn-primary" style={{ fontSize: "12px", padding: "5px 12px" }} onClick={() => void openDraft(d.id)}>
+                      開啟
+                    </button>
+                    <button className="btn-secondary" style={{ fontSize: "12px", padding: "5px 10px", color: "var(--color-error, #ef4444)" }}
+                      onClick={() => { if (window.confirm(`刪除草稿「${d.title || d.keyword}」？此動作無法復原。`)) void deleteDraft(d.id); }}>
+                      刪除
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

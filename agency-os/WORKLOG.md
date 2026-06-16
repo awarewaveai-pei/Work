@@ -4,6 +4,27 @@
 
 ## 2026-06-16
 
+### fix(ao-resume): untrack machine-local .agency-state state files + defense-in-depth whitelist
+
+**根本問題**：3 個機器本地狀態檔（`ao-close-prev.txt`、`ao-resume-last-session-id.txt`、`monthly-checks-last.txt`）被 git tracking。雙 IDE 每次 checkpoint commit 均修改這些檔案 → rebase 衝突 → `ao-resume.ps1` 自解白名單未覆蓋 → exit=1，需人工介入。
+
+[已修改]
+- `.gitignore` +2 行：`ao-resume-last-session-id.txt`、`monthly-checks-last.txt`（`ao-close-prev.txt` 已在 line 67，補齊 untrack 即可）
+- `scripts/ao-resume.ps1:142`：自解白名單加 `agency-os/.agency-state/` 整目錄（防禦縱深）
+- `git rm --cached` 3 個檔案（disk 檔案不動，confirmed: `ls` 仍可見）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git ls-files agency-os/.agency-state/` | exit=0 | result=只剩 `pending-task-completions.example.txt`；disk 3 個 state 檔仍在
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git push` | exit=0 | result=`Everything up-to-date`；remote 同步確認
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n；regex pattern 正確，`-and -notmatch` 邏輯無誤；gitignore 精確路徑格式正確
+- BUGHUNT_DONE: scope=scripts agency-os mcp/claude-userlevel/hooks | grep=`ao-close-prev\|ao-resume-last-session-id\|monthly-checks-last` | hits=11 | 全部為 disk path 讀寫，無任何程式依賴 git tracking；`git-log-injector.js:70` missing 時 fallback -10（line 77）確認
+
+[剩餘風險]
+- `monthly-checks-last.txt` 跨機共享語意喪失（原：A 機跑了 monthly，B 機不跑 → 改：各機各自 30 天）。warn-only，無害。
+- ao-resume.ps1 defence-in-depth 是 whitelist（最後一道），若未來再有 state 檔被意外 track，push rejected → 自解通過 → 仍正常運作。
+
+AUTO_TASK_DONE: fix ao-resume rebase conflict on .agency-state state files
+
 ### feat(wp-bridge): FluentCRM newsletter draft route — 簽章寫入 DRAFT campaign（WIP，未發版）
 
 **[任務理解]** 使用者要 `/tools/content` 的「Email 電子報」能推進 WordPress FluentCRM 變草稿 campaign。**紅線：只草稿、永不寄**（FluentCRM 寄出不可逆、人工門控，治理 `WP_BRIDGE_CONTROL_PLANE_DESIGN.md:192`）。路徑 A = bridge plugin 加簽章路由（Fluent 與 bridge 同 WP，PHP 直呼 Campaign model，免外部 key）。
