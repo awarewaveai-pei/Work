@@ -7,7 +7,7 @@ export interface TarotModelComparison {
   tier: "preview" | "balanced" | "quality" | "character" | "editing";
   bestFor: string;
   avoidFor: string;
-  costNt: number;
+  costUsd: number;
   publicPrice: string;
   speed: string;
   promptLimit: string;
@@ -50,8 +50,8 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "preview",
     bestFor: "大量試 prompt、快速看構圖、低成本整套草稿",
     avoidFor: "需要角色一致、可讀文字、精細商用品質",
-    costNt: 0.1,
-    publicPrice: "Replicate 約 US$0.003/張",
+    costUsd: 0.003,
+    publicPrice: "Replicate on-demand",
     speed: "最快；1-4 steps，適合迭代",
     promptLimit: "schema 未公開明確字元上限；建議短到中等英文 prompt",
     referenceInput: "不支援參考圖",
@@ -72,8 +72,8 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "balanced",
     bestFor: "塔羅主風格定稿、插畫感、用一張圖帶風格",
     avoidFor: "大量低價預覽、需要多張角色參考",
-    costNt: 1,
-    publicPrice: "Replicate 約 US$0.025/張",
+    costUsd: 0.025,
+    publicPrice: "Replicate on-demand",
     speed: "中等；比 schnell 慢但品質穩",
     promptLimit: "schema 未公開明確字元上限；長 prompt 可用但建議聚焦",
     referenceInput: "支援單張 image/prompt_strength",
@@ -94,8 +94,8 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "quality",
     bestFor: "高質感單張、細節/真實感、需要 prompt 理解力",
     avoidFor: "超低成本 78 張、需要本工具內多參考圖",
-    costNt: 2.3,
-    publicPrice: "Replicate 約 US$0.04/run + US$0.03/輸出MP",
+    costUsd: 0.07,
+    publicPrice: "Replicate：$0.04/run + $0.03/MP (1MP 估)",
     speed: "中慢；品質取向",
     promptLimit: "schema 未公開明確字元上限",
     referenceInput: "Replicate schema 有 image input 計費；本工具目前未送參考圖",
@@ -116,8 +116,8 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "preview",
     bestFor: "便宜快速、圖文混合草稿、海報感構圖",
     avoidFor: "需要 4:5 精準比例或最高品質",
-    costNt: 1,
-    publicPrice: "Ideogram 2a Turbo US$0.025/張",
+    costUsd: 0.025,
+    publicPrice: "Ideogram API",
     speed: "快；Turbo 取向",
     promptLimit: "schema 未公開明確字元上限",
     referenceInput: "本工具未使用參考圖",
@@ -138,8 +138,8 @@ export const TAROT_MODEL_COMPARISONS: readonly TarotModelComparison[] = [
     tier: "balanced",
     bestFor: "品質/速度/成本平衡、需要文字穩定的牌面",
     avoidFor: "最便宜草稿或最高畫質輸出",
-    costNt: 2,
-    publicPrice: "Ideogram 3.0 Default US$0.06/張；Balanced 為平衡檔",
+    costUsd: 0.06,
+    publicPrice: "Ideogram API (v3 Balanced)",
     speed: "中等；平衡取向",
     promptLimit: "schema 未公開明確字元上限",
     referenceInput: "本工具未使用參考圖",

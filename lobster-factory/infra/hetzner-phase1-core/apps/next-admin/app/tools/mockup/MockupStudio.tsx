@@ -12,6 +12,12 @@ import {
   FLAT_LIGHTING,
   MODEL_POSES,
   MODEL_LIGHTING,
+  MODEL_ETHNICITIES,
+  MODEL_GENDERS,
+  MODEL_AGES,
+  MODEL_BODY_TYPES,
+  MODEL_MAKEUP,
+  MODEL_ACCESSORIES,
   buildFlatMockupPrompt,
   buildModelMockupPrompt,
   isChestOccludingPose,
@@ -19,8 +25,8 @@ import {
   type MockupMode,
 } from "../../../lib/studio/mockup-prompt";
 
-// Only models that can consume a reference image can place a design on a garment.
-const MOCKUP_MODELS = STUDIO_MODEL_OPTIONS.filter((m) => m.maxRefs > 0);
+// Show all 15 models; ref-count shown in label so user knows which ones apply the design.
+const MOCKUP_MODELS = STUDIO_MODEL_OPTIONS;
 
 interface DesignAsset {
   id: string;
@@ -53,10 +59,7 @@ export default function MockupStudio() {
   const [garment, setGarment] = useState("tshirt");
   const [color, setColor] = useState<GarmentColor>("white");
   const [model, setModel] = useState<StudioModel>("nano-banana-2");
-  // Default to a supported portrait ratio. "3:4" is NOT in VALID_ASPECT_RATIOS
-  // (lib/tarot/image-gen.ts) — the studio generate route rejects it with 400, so it
-  // must never be an input here. 4:5 is the closest supported apparel/portrait ratio.
-  const [aspect, setAspect] = useState<AspectRatio>("4:5");
+  const [aspect, setAspect] = useState<AspectRatio>("2:3");
   // flat controls
   const [surface, setSurface] = useState("light wooden table");
   const [flatStyle, setFlatStyle] = useState(FLAT_STYLES[0].value);
@@ -64,9 +67,15 @@ export default function MockupStudio() {
   const [propBL, setPropBL] = useState("");
   const [propTR, setPropTR] = useState("");
   const [propBR, setPropBR] = useState("");
-  // model controls
+  // model controls — descriptor dropdowns
   const [ageGroup, setAgeGroup] = useState<"adult" | "youth">("adult");
-  const [modelDesc, setModelDesc] = useState("");
+  const [mEthnicity, setMEthnicity] = useState("");
+  const [mGender, setMGender] = useState("");
+  const [mAge, setMAge] = useState("");
+  const [mBody, setMBody] = useState("");
+  const [mMakeup, setMMakeup] = useState("");
+  const [mAccessories, setMAccessories] = useState("");
+  const [modelDescManual, setModelDescManual] = useState("");
   const [pose, setPose] = useState(MODEL_POSES[0].value);
   const [environment, setEnvironment] = useState("");
   const [modelLighting, setModelLighting] = useState(MODEL_LIGHTING[0].value);
@@ -88,6 +97,11 @@ export default function MockupStudio() {
       }
     })();
   }, []);
+
+  const modelDesc = useMemo(() => {
+    if (modelDescManual.trim()) return modelDescManual.trim();
+    return [mEthnicity, mGender, mAge, mBody, mMakeup, mAccessories].filter(Boolean).join(", ");
+  }, [mEthnicity, mGender, mAge, mBody, mMakeup, mAccessories, modelDescManual]);
 
   const prompt = useMemo(() => {
     if (mode === "flat") {
@@ -253,10 +267,57 @@ export default function MockupStudio() {
                 <button className={ageGroup === "youth" ? "btn-primary" : "btn-secondary"} onClick={() => setAgeGroup("youth")}>Youth</button>
               </div>
             </div>
-            <label style={{ fontSize: 13 }}>
-              模特描述（族裔/膚色/性別/年齡/體型）
-              <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={modelDesc} onChange={(e) => setModelDesc(e.target.value)} placeholder="例：blonde Asian woman, 20s, slim" />
-            </label>
+            <div style={{ fontSize: 13 }}>
+              模特描述
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 4 }}>
+                <div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>族裔／膚色</div>
+                  <select className="btn-secondary" style={{ width: "100%" }} value={mEthnicity} onChange={(e) => setMEthnicity(e.target.value)}>
+                    {MODEL_ETHNICITIES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>性別</div>
+                  <select className="btn-secondary" style={{ width: "100%" }} value={mGender} onChange={(e) => setMGender(e.target.value)}>
+                    {MODEL_GENDERS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>年齡</div>
+                  <select className="btn-secondary" style={{ width: "100%" }} value={mAge} onChange={(e) => setMAge(e.target.value)}>
+                    {MODEL_AGES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>體型</div>
+                  <select className="btn-secondary" style={{ width: "100%" }} value={mBody} onChange={(e) => setMBody(e.target.value)}>
+                    {MODEL_BODY_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>妝造</div>
+                  <select className="btn-secondary" style={{ width: "100%" }} value={mMakeup} onChange={(e) => setMMakeup(e.target.value)}>
+                    {MODEL_MAKEUP.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>飾品</div>
+                  <select className="btn-secondary" style={{ width: "100%" }} value={mAccessories} onChange={(e) => setMAccessories(e.target.value)}>
+                    {MODEL_ACCESSORIES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              {modelDesc && !modelDescManual && (
+                <div style={{ fontSize: 11, opacity: 0.55, marginTop: 4 }}>→ {modelDesc}</div>
+              )}
+              <input
+                className="btn-secondary"
+                style={{ width: "100%", marginTop: 6 }}
+                value={modelDescManual}
+                onChange={(e) => setModelDescManual(e.target.value)}
+                placeholder="手動描述（覆蓋上方，例：blonde Asian woman, 20s）"
+              />
+            </div>
             <label style={{ fontSize: 13 }}>
               姿勢
               <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={pose} onChange={(e) => setPose(e.target.value)}>
@@ -288,18 +349,23 @@ export default function MockupStudio() {
         )}
 
         <label style={{ fontSize: 13 }}>
-          模型（吃參考圖者；勝率首選 Nano Banana 2）
+          模型（⟳ = 吃設計圖；首選 Nano Banana 2）
           <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={model} onChange={(e) => setModel(e.target.value as StudioModel)}>
             {MOCKUP_MODELS.map((m) => (
-              <option key={m.value} value={m.value}>{m.group} · {m.label} (~NT${m.costNt})</option>
+              <option key={m.value} value={m.value}>
+                {m.maxRefs > 0 ? "⟳ " : "○ "}{m.group} · {m.label} (~NT${m.costNt})
+              </option>
             ))}
           </select>
+          {MOCKUP_MODELS.find((m) => m.value === model)?.maxRefs === 0 && (
+            <span style={{ color: "#f5a623", fontSize: 12 }}>⚠ 此模型不吃參考圖，設計不會印上衣服</span>
+          )}
         </label>
 
         <label style={{ fontSize: 13 }}>
           比例
           <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={aspect} onChange={(e) => setAspect(e.target.value as AspectRatio)}>
-            {(["4:5", "1:1", "2:3", "3:2", "9:16"] as const).filter((a, i, arr) => arr.indexOf(a) === i).map((a) => (
+            {(["1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"] as const).map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>

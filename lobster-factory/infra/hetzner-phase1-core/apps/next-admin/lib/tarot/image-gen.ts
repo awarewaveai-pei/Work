@@ -36,7 +36,7 @@ export type TarotModel =
   | "flux-2-max";
 
 /** Canonical aspect ratio options. "2:3" is the traditional tarot portrait format. */
-export type AspectRatio = "2:3" | "3:2" | "4:5" | "1:1" | "9:16";
+export type AspectRatio = "2:3" | "3:2" | "4:5" | "1:1" | "9:16" | "4:3" | "3:4" | "16:9";
 
 /** Input to a model's buildInput function — shared across all apps using this combo-pack. */
 export interface BuildInputParams {
@@ -66,21 +66,28 @@ interface ModelConfig {
 
 // Ideogram v4 has NO aspect_ratio — resolution enum (WxH strings) only. NO seed either.
 // All five values below confirmed present in the live v4 resolution enum; 1792x2240 = 4:5 exact.
+// 4:3/3:4/16:9 entries are approximate ~3-4MP values (unverified against live enum; v4 is no-ref so not used in mockup tool).
 const IDEOGRAM_V4_RES: Record<AspectRatio, string> = {
   "2:3": "1664x2496",
   "3:2": "2496x1664",
   "4:5": "1792x2240",
   "1:1": "2048x2048",
   "9:16": "1440x2560",
+  "4:3": "2048x1536",
+  "3:4": "1536x2048",
+  "16:9": "2560x1440",
 };
 
-// Imagen 4 only exposes 5 ratios [1:1|9:16|16:9|3:4|4:3] — unsupported ones map to nearest.
+// Imagen 4 natively exposes [1:1|9:16|16:9|3:4|4:3] — unsupported ones map to nearest.
 const IMAGEN4_AR: Record<AspectRatio, string> = {
   "2:3": "3:4", // nearest portrait
   "3:2": "4:3", // nearest landscape
   "4:5": "3:4", // nearest portrait
   "1:1": "1:1",
   "9:16": "9:16",
+  "4:3": "4:3", // native
+  "3:4": "3:4", // native
+  "16:9": "16:9", // native
 };
 
 export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
@@ -237,7 +244,7 @@ export function isTarotModel(v: unknown): v is TarotModel {
   return typeof v === "string" && Object.prototype.hasOwnProperty.call(TAROT_MODELS, v);
 }
 
-export const VALID_ASPECT_RATIOS: readonly AspectRatio[] = ["2:3", "3:2", "4:5", "1:1", "9:16"];
+export const VALID_ASPECT_RATIOS: readonly AspectRatio[] = ["2:3", "3:2", "4:5", "1:1", "9:16", "4:3", "3:4", "16:9"];
 export function isAspectRatio(v: unknown): v is AspectRatio {
   return typeof v === "string" && (VALID_ASPECT_RATIOS as string[]).includes(v);
 }
@@ -515,6 +522,9 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
     "4:5": "1024x1536", // no 4:5 — use portrait
     "1:1": "1024x1024",
     "9:16": "1024x1536", // no 9:16 — use portrait
+    "4:3": "1536x1024", // landscape → nearest (3:2)
+    "3:4": "1024x1536", // portrait → nearest (2:3)
+    "16:9": "1536x1024", // widescreen → nearest landscape
   };
   const SIZE = sizeMap[params.aspectRatio ?? "2:3"];
   const quality = config.quality ?? "medium";

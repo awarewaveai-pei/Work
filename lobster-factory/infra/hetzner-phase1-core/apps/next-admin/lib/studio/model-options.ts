@@ -15,9 +15,9 @@ export type StudioModel =
   | "imagen-4"
   | "flux-2-max";
 
-export type AspectRatio = "2:3" | "3:2" | "4:5" | "1:1" | "9:16";
+export type AspectRatio = "2:3" | "3:2" | "4:5" | "1:1" | "9:16" | "4:3" | "3:4" | "16:9";
 
-export const VALID_ASPECT_RATIOS: readonly AspectRatio[] = ["2:3", "3:2", "4:5", "1:1", "9:16"];
+export const VALID_ASPECT_RATIOS: readonly AspectRatio[] = ["2:3", "3:2", "4:5", "1:1", "9:16", "4:3", "3:4", "16:9"];
 
 export function isAspectRatio(v: unknown): v is AspectRatio {
   return typeof v === "string" && (VALID_ASPECT_RATIOS as readonly string[]).includes(v);
