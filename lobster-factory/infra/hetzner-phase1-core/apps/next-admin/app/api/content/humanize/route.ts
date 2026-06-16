@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,6 +89,13 @@ Output ONLY the rewritten content in Markdown format, no preamble or explanation
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
             controller.enqueue(encoder.encode(event.delta.text));
           }
+        }
+
+        // Capture exact token usage from the completed stream (available on finalMessage) for the
+        // cost ledger. Best-effort: never blocks or breaks the already-streamed response.
+        if (!req.signal.aborted) {
+          const fm = await anthropicStream.finalMessage().catch(() => null);
+          if (fm) void logAiCall({ route: "/api/content/humanize", response: fm, actorRole: role });
         }
       } catch {
         if (!req.signal.aborted) {

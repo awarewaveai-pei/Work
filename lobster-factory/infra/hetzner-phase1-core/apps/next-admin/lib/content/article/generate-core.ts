@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { logAiCall } from "../../ai/log-ai-call";
 
 // Output token budgets. Raised 2026-06-16: the old medium=4096 truncated rich articles
 // (tables + nested H3 + lists) mid-sentence, cutting off the trailing CONTENT_META block →
@@ -678,6 +679,8 @@ export async function* streamArticleGeneration(
     // half-written article (the old 4096 budget truncated invisibly — 2026-06-16 root cause).
     if (!signal?.aborted) {
       const finalMsg = await anthropicStream.finalMessage().catch(() => null);
+      // Cost ledger: record exact token usage from the completed stream (best-effort, never throws).
+      if (finalMsg) void logAiCall({ route: "content/article-generate", response: finalMsg });
       if (finalMsg?.stop_reason === "max_tokens") {
         yield "\n\n<!-- GENERATION_TRUNCATED: hit the output length limit; pick a shorter article size or split the topic -->";
       }

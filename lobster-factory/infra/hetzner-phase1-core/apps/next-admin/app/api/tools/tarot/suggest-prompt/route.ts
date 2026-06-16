@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
+import { logAiCall } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -57,6 +58,8 @@ export async function POST(request: Request) {
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
     });
+
+    void logAiCall({ route: "/api/tools/tarot/suggest-prompt", response: msg, actorRole: resolved.role });
 
     const text = msg.content
       .filter((b) => b.type === "text")

@@ -81,6 +81,8 @@ Output ONLY the JSON, no markdown, no explanation.`,
     }],
   });
 
+  void logAiCall({ route: "/api/content/brand-voice", response: msg, actorRole: role });
+
   const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "{}";
   try {
     const match = text.match(/\{[\s\S]*\}/);
