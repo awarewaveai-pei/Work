@@ -36,7 +36,7 @@
 |---|---|---|
 | A1 | 積木 registry 合約（register/byKind/listAll/geoMatch）| registry.ts:18,40,51,56,66 |
 | A2 | **search 積木家族**（google-news/reddit/ptt/perplexity/env-feed/DB 臨時源）| trending-sources.ts:251,266,284,312,334,205 |
-| A3 | **article route ×7**（generate 串流/title/keywords/outline/related-posts/humanize/drafts）| generate:424、title:8、keywords:8、outline:10、related-posts:15、humanize:22、drafts:72 |
+| A3 | **article route ×7**（generate 串流/title/keywords/outline/related-posts/humanize/drafts）；generate P2 後抽成 core，route 為薄殼、積木共用 | article/generate-core.ts `prepareArticleGeneration`/`streamArticleGeneration`、generate/route.ts（HTTP 殼）、blocks/article-generate.ts（積木）；title:8、keywords:8、outline:10、related-posts:15、humanize:22、drafts:72 |
 | A4 | brand-voice route | brand-voice/route.ts:34 |
 | A5 | **quality route ×3**（seo-check RankMath 24 點/seo-fix/image Flux）| seo-check:8、seo-fix:28、image:67 |
 | A6 | **publish 核心**（wp-bridge Ed25519 + 標準 REST 雙路徑，**draft-first**）；P1 後抽成 core，route 為薄殼、積木共用 | wordpress-core.ts:283 `publishToWordPress`、publish/route.ts（HTTP 殼）、blocks/publish-wordpress.ts（積木）|
@@ -52,7 +52,7 @@
 |---|---|---|---|---|---|
 | **P0** | 藍圖 + 進度總帳 | ✅ | （本次）| Low | — |
 | **P1** | `publish/wordpress` 抽 core + 包積木（行為保留）| ✅ | a488ae79（core/route/積木）+ 收尾本次 | Low-Med | ✓ |
-| **P2** | `article/generate` 抽 core + 包積木 | 🔲 | — | Low-Med | 待 |
+| **P2** | `article/generate` 抽 core + 包積木（行為保留：route 薄殼共用 core 串流，積木 headless 收集）| ✅ | 76f2d262（core/route/積木）+ bc405328（abort belt-and-suspenders 修）+ 收尾本次 | Low-Med | ✓ |
 | **P3** | `quality/check`(seo-check) 抽 core + 包積木 | 🔲 | — | Low | — |
 | **P4** | `byKind()` 串 search→article→quality→publish headless 跑通 | 🔲 | — | Med | 待 |
 | **P5** | `publish/social`：lib/content/postiz.ts + /api/content/social-publish（draft 預設）| ⛔ | — | Med-High | 待+憑證 |
@@ -129,7 +129,7 @@
 |---|---|---|---|---|
 | search | trending | trending/route.ts:97 | 熱搜/suggest/questions | 積木 + Google Suggest + Perplexity + Supabase content_sources |
 | search | sources | sources/route.ts:57+ | 營運自訂 feed CRUD（migration 0042）| Supabase |
-| article | generate | generate/route.ts:424 | 全文串流生成（E-E-A-T/GEO/RankMath）| Claude Haiku/Sonnet/Opus + Perplexity 來源 |
+| article | generate | generate-core.ts（route.ts 薄殼）| 全文串流生成（E-E-A-T/GEO/RankMath）；P2 抽 core，route 薄殼 + 積木 headless 共用 | Claude Haiku/Sonnet/Opus + Perplexity 來源 |
 | article | title / keywords / outline | :8 / :8 / :10 | 標題×5 / NLP 關鍵字×20 / H2-H4 大綱 | Claude Haiku |
 | article | related-posts | :15 | 抓站內真實文章供內鏈 | WP REST |
 | article | humanize | :22 | 人性化/改寫（串流）| Claude Sonnet |

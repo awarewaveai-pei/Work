@@ -16,10 +16,34 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin 全專案）| exit=0 — 純 className 加既有 class 無型別/語法破壞。
 - REVIEW_WAIVED: NA -- 純 CSS class toggle（加既有 `form-block--wide`），零邏輯/狀態/資料流改動，與 critic 上輪已 Deep-pass 的 3 塊（目標客戶/發布設定/產出文章）同 pattern。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`form-block--wide\|form-block` | hits=`form-block` 5 檔（ContentStudio + globals.css 定義 + login + ops-console×2）；login/ops-console 刻意保留 640px cap（未動）；`form-block--wide` 定義存在 globals.css:579，無 stale。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | deployed=`3a462bbb`（prev 39d721c8）；container `lobster-next-admin` healthy 7s；HTTP smoke 4/4 200（/login、/api/ops/summary、nginx/wp、node-api）— 加寬已上線生產。
 
 **[剩餘風險]** humanize/bulk/drafts 頁籤仍 640px（內部一致，未抓）；操作者若要全頁籤統一加寬再補。
 
 **[rollback]** `git revert <本 commit>`（僅 ContentStudio.tsx 兩行 className）。
+
+### feat(content-blocks): P2 — `article/generate` 抽 core + 包積木（route 薄殼共用，行為保留）
+
+**[任務理解]** Content Pipeline Blocks 主計畫 T1 鎖定順序 P2：把 `app/api/content/generate/route.ts` POST handler 的全文生成核心抽成 `lib/content/article/generate-core.ts`，route 變薄殼（只管 HTTP/串流/role/apiKey），再包一個 `article/generate` 積木 headless 共用同一 core。原則：**一段邏輯、兩個入口（route 給 UI 串流、積木給 headless）、零重複**，行為 byte-identical、可回滾。
+
+**[現況分析（VBC）]** `git log` → 近期皆 checkpoint；publish（P1，A6）已是同 pattern 正本（`wordpress-core.ts` + 薄殼 route + `blocks/publish-wordpress.ts`），照抄。原 route 邏輯：role gate→apiKey check→json parse→驗證/coerce body（structure/media/maxTokens=SIZE_TOKENS 查表/referenceUrls.slice(0,3)/internalLinks.slice(0,10)/Perplexity 僅在無 externalLinks 時抓/model ALLOWED_MODELS 閘 + sonnet fallback/buildUserPrompt）→ `client.messages.stream` 串流 + truncation/error inline marker。關鍵坑：原 route abort 為 **belt-and-suspenders**——`req.signal.addEventListener` **與** `cancel(){anthropicStream.abort()}` 並存；App Router 的 `req.signal` 在 client disconnect 不可靠觸發，cancel() 是真正 backstop，不可只留一條。`tsconfig strict:false` → `!result.ok` 不 narrow discriminated union，須 cast（idiom 同 newsletter/route.ts）。
+
+**[已修改]**
+1. `lib/content/article/generate-core.ts`（**新**）— verbatim 搬原 route 行 9–423（SIZE_TOKENS/SYSTEM_PROMPT 12130 字/ArticleStructure/MediaHub/ALLOWED_MODELS/fetchRealSources(Perplexity)/fetchUrlText/buildUserPrompt，byte-identical 經 Python diff `region_match: True`）+ footer 三函式：`prepareArticleGeneration(body)`（驗證/coerce，唯一失敗=空 keyword→`{ok:false,400}`）、`streamArticleGeneration(config,apiKey,signal?)`（async generator，yield text delta + truncation/error marker，`signal` 轉發 abort 至 anthropicStream）、`generateArticleMarkdown(body,apiKey,signal?)`（prepare→收集 generator 成字串，積木用）。
+2. `app/api/content/generate/route.ts` — 重寫為 ~70 行薄殼：role→403 / apiKey→503（順序保留：在 json parse 前）/ json→400 / `prepareArticleGeneration` cast 失敗回傳 / route-owned `AbortController`（`req.signal` listener **與** `cancel()` 都呼 `ac.abort()`，`ac.signal` 餵進 core generator）→ `ReadableStream` 包成 text/plain 串流。output（含 GENERATION_TRUNCATED/ERROR marker）byte-identical。
+3. `lib/content/blocks/article-generate.ts`（**新**）— 自註冊 `article/generate` 積木（kind=article、enabled），`run(ctx)` 讀 `ANTHROPIC_API_KEY`（缺→`{ok:false,503}`）後呼 `generateArticleMarkdown`。dormant（無 import = 不在 registry，接 P4 編排器才活）。
+4. `lib/content/blocks/README.md` — manifest 補 `article/generate` 列、roadmap 移除 `article/claude`。
+5. `agency-os/TASKS.md:77` — stale `article/claude` 名 → `article/generate`（R4 stale-claim 修，同議題）。
+6. 本檔 §0.5 P2 列 🔲→✅ + A3/§3 capability 註明 generate 已抽 core。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（×2：抽 core 後 + abort 修後）&& `npx tsx -e '<import generate-core>'` 4 案 | exit=0 | ms=~6000 — tsc EXIT=0 兩次；tsx 實 invoke `prepareArticleGeneration`：T1 空 keyword→`{ok:false,status:400,error:"keyword required"}`；T2 keyword+opus+long→`model:claude-opus-4-8, maxTokens:16384, sysLen:12130, upHasKeyword:true`；T3 bad-model→`claude-sonnet-4-6`（fallback）；T4 short→`maxTokens:4096`。（offline：給 externalLinks 跳過 Perplexity 網路呼叫。）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=1c-fixed/0m/N-n — critic 外部 oracle 抓到 1 Major：首版薄殼用空 `cancel(){}` 僅靠 generator 的 `req.signal` listener，App Router disconnect 不可靠 → Anthropic stream 可能跑到 maxDuration=120s（浪費 token/連線）。已修：route-owned AbortController 兩路都 abort（引 Next.js Discussions #48682/#61972）。其餘為 pre-existing（移動前既有）或 minor，不在本次擴大。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`prepareArticleGeneration\|streamArticleGeneration\|generateArticleMarkdown\|article/generate\|generate-core\|ALLOWED_MODELS\|buildUserPrompt\|fetchRealSources` | hits=1 — TASKS.md:77 stale `article/claude` 名（已同 commit 修）；同名 local（其他檔 SIZE_TOKENS/buildUserPrompt 等）為獨立、原 route 內部從未 export 故無耦合；WORKLOG/worklog-excerpt 的 route.ts 引用為歷史非 stale；scripts=0。
+
+**[剩餘風險]** ① 積木 dormant，未接 P4 編排器（與 `publish/wordpress` 同狀態，刻意）。② `wp-bridge-plugin/.../RankMathPowerWords.php:12` 註解 "keep in sync with …generate/route.ts" 現指向處不精準（CJK power-words verbatim 搬進 generate-core.ts，仍經 route import 可達）——imprecise-not-broken，更新會觸發不成比例的 plugin release，列已知 follow-up 不在 P2 修。③ generate-core 抽出後若未來改 SYSTEM_PROMPT 須注意 route+積木兩入口共用（這正是設計目的）。
+
+**[rollback]** `git revert` P2 commits；core/積木為新增檔，刪除即移除；route 可由 git 還原回 inline 版（行 9–423 verbatim 保存於 core，無資訊遺失）。
 
 ### feat(content-blocks): 商品文案 → `product/copy` 積木 + publish UI 套完整 RankMath/SEO/GEO/AEO 面板 + AI 修正（方案B）
 

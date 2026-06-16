@@ -36,7 +36,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const prepared = await prepareArticleGeneration(body);
   // tsconfig strict:false → `!prepared.ok` does not narrow the discriminated union; cast
-  // (same idiom as newsletter/route.ts:171 and the publish route).
+  // (same idiom as newsletter/route.ts:213 and the publish route).
   if (!prepared.ok) {
     const fail = prepared as ArticleGenerateFailure;
     return new NextResponse(fail.error, { status: fail.status });
