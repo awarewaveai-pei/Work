@@ -6,6 +6,7 @@ import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
 import type { RankMathReport } from "@/lib/seo/rankmath-checker";
 import { SeoCheckPanel } from "./SeoCheckPanel";
 import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
+import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS } from "@/lib/ai/text-model-options";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -56,21 +57,6 @@ const READABILITIES = [
   { value: "College",                 label: "大學程度" },
   { value: "Professional",            label: "專業級" },
 ];
-
-// Generation models. Anthropic ids stream via the SDK; gpt-* ids stream via the OpenAI Chat
-// Completions path. MUST stay in lockstep with generate-core.ts ALLOWED_MODELS — a value here that
-// the backend omits silently falls back to Sonnet. Grouped with <optgroup> in the dropdown.
-const AI_MODELS = [
-  { value: "claude-sonnet-4-6",         label: "Claude Sonnet 4.6（推薦）",        group: "Claude" },
-  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5（快速省 token）",  group: "Claude" },
-  { value: "claude-opus-4-8",           label: "Claude Opus 4.8（最高品質）",       group: "Claude" },
-  { value: "claude-fable-5",            label: "Claude Fable 5（創意文案）",        group: "Claude" },
-  { value: "gpt-5.5",                   label: "GPT-5.5（OpenAI 旗艦）",            group: "OpenAI" },
-  { value: "gpt-5.4",                   label: "GPT-5.4（OpenAI 高品質）",          group: "OpenAI" },
-  { value: "gpt-5.4-mini",              label: "GPT-5.4 mini（OpenAI 快速）",       group: "OpenAI" },
-  { value: "gpt-4o",                    label: "GPT-4o（OpenAI 經典）",             group: "OpenAI" },
-];
-const AI_MODEL_GROUPS = [...new Set(AI_MODELS.map(m => m.group))];
 
 // #4 — Marketing brief selects. Funnel stage steers the article's intent + which CTA to lean on;
 // price positioning steers tone/word choice. Both compile into the generation `details` block.

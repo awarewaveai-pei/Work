@@ -5,6 +5,7 @@ import { roleHeader } from "../../../lib/ops-role";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import GradedPreview from "@/components/tools/GradedPreview";
+import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename } from "@/lib/studio/semantic-filename";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type TarotCard } from "./cards";
 
@@ -1165,6 +1166,34 @@ export default function TarotStudio() {
                 />
               </div>
             </div>
+            <ImageEditPromptPanel
+              sourceImage={previewImage}
+              currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText })}
+              imageModel={activeModel}
+              target="tarot-preview"
+              generateEndpoint="/api/tools/tarot/generate"
+              aspectRatio="2:3"
+              printQuality
+              styleAnchor={{
+                model: activeModel,
+                mode,
+                stylePrompt: effectiveEnglish,
+                subject: subjectText.trim(),
+                refs: referenceImages.length,
+              }}
+              onEditedImage={(image, meta) => {
+                setSelectedModels(new Set<TarotModel>([meta.model as TarotModel]));
+                setPreviewImage(image);
+                setPreviewSeed(meta.seed);
+                setPreviewSig(`${meta.model}::${meta.prompt}::edit=1`);
+                setLocked(false);
+                setBatch((prev) => {
+                  prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
+                  return [];
+                });
+                saveToGallery(image, "tarot-preview-edit", { model: meta.model, prompt: meta.prompt });
+              }}
+            />
             {/* 修圖積木 ([1-f])：色彩/色階/銳利度滑桿，即時 CSS 預覽。 */}
             <div style={{ width: 260 }}>
               <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />

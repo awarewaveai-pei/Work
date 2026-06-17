@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { DEFAULT_AI_TEXT_MODEL, isAiTextModel, isOpenAiTextModel, type AiTextModel } from "../../ai/text-model-options";
 import { logAiCall } from "../../ai/log-ai-call";
 
 // Output token budgets. Raised 2026-06-16: the old medium=4096 truncated rich articles
@@ -148,32 +149,8 @@ interface MediaHub {
   strictUnderHeadings?: boolean;
 }
 
-// Allowed generation models across providers. Anthropic ids route through the SDK stream; any id
-// in OPENAI_MODELS routes through the OpenAI Chat Completions SSE path (isOpenAiModel). Keep this in
-// lockstep with ContentStudio.AI_MODELS (the UI dropdown) — a model the UI offers but this list omits
-// silently falls back to sonnet (see prepareArticleGeneration model selection).
-const OPENAI_MODELS = [
-  "gpt-5.5",
-  "gpt-5.4",
-  "gpt-5.4-mini",
-  "gpt-4o",
-];
-const ALLOWED_MODELS = [
-  "claude-haiku-4-5-20251001",
-  "claude-sonnet-4-6",
-  "claude-opus-4-8",
-  "claude-fable-5",
-  ...OPENAI_MODELS,
-];
-
-/**
- * True when the model should stream via the OpenAI Chat Completions path rather than Anthropic.
- * `model` is always an ALLOWED_MODELS member by the time it reaches here (prepareArticleGeneration
- * clamps anything else to sonnet), so a plain membership check is exact — no prefix heuristic needed.
- */
-function isOpenAiModel(model: string): boolean {
-  return OPENAI_MODELS.includes(model);
-}
+// Allowed generation models across providers live in lib/ai/text-model-options.ts so Content Studio,
+// article generation, and image prompt tools share one Claude/OpenAI menu.
 
 /** Call Perplexity Sonar to get 3–5 real, verified external source URLs for the keyword. */
 async function fetchRealSources(keyword: string, language: string): Promise<string[]> {
@@ -583,8 +560,8 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
     : [];
 
   // Model selection (default: sonnet)
-  const requestedModel = str(body.model, "claude-sonnet-4-6");
-  const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : "claude-sonnet-4-6";
+  const requestedModel = str(body.model, DEFAULT_AI_TEXT_MODEL);
+  const model: AiTextModel = isAiTextModel(requestedModel) ? requestedModel : DEFAULT_AI_TEXT_MODEL;
 
   // #3 / #5 / #6 inputs — all best-effort: the UI fetches existing categories + patterns and runs the
   // market analysis up-front, then forwards them here. Missing/empty just disables that enhancement.
@@ -651,7 +628,7 @@ export async function* streamArticleGeneration(
   // Provider routing (P2 積木化 — multi-provider). GPT models stream through the OpenAI Chat
   // Completions SSE path; everything else stays on the byte-identical Anthropic path below. The
   // system + user prompt are provider-agnostic, so only the transport differs.
-  if (isOpenAiModel(config.model)) {
+  if (isOpenAiTextModel(config.model as AiTextModel)) {
     yield* streamOpenAiGeneration(config, signal);
     return;
   }

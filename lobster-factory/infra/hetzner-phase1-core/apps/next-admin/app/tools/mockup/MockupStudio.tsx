@@ -24,6 +24,7 @@ import {
   type GarmentColor,
   type MockupMode,
 } from "../../../lib/studio/mockup-prompt";
+import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 
 // Show all 15 models; ref-count shown in label so user knows which ones apply the design.
 const MOCKUP_MODELS = STUDIO_MODEL_OPTIONS;
@@ -393,6 +394,28 @@ export default function MockupStudio() {
               <a className="btn-secondary" href={gen.image} download={`mockup-${mode}-${color}.png`}>下載</a>
               <button className="btn-secondary" onClick={() => void generate()}>再合成一張</button>
               {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗</span> : null}
+            </div>
+            <div style={{ marginTop: 14 }}>
+              <ImageEditPromptPanel
+                sourceImage={gen.image}
+                currentPrompt={prompt}
+                imageModel={model}
+                target="mockup"
+                aspectRatio={aspect}
+                styleAnchor={{
+                  model,
+                  mode: "image",
+                  stylePrompt: prompt,
+                  subject: `${garment} ${color}`,
+                  refs: designRef ? 1 : 0,
+                  target: "mockup",
+                }}
+                onEditedImage={(image, meta) => {
+                  setModel(meta.model);
+                  setGen({ status: "done", image });
+                  setSaveState("idle");
+                }}
+              />
             </div>
           </>
         ) : null}

@@ -3,8 +3,8 @@
  *
  * 設計依據：`agency-os/docs/operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` §10 P4。
  * 把 P1–P3 抽好的 dormant 積木（`article/generate`、`quality/check`、`publish/wordpress`）接進一條
- * headless 管線。**編排器零改積木契約**：只多三行 side-effect import 讓積木自註冊（README 契約：
- * 「加新積木 = 新檔 register() 一次；編排器永遠不改，只新增 import」）。
+ * headless 管線。**編排器零改積木契約**：載入 `blocks/register-all` 讓積木自註冊（README 契約：
+ * 「加新積木 = 新檔 register() 一次；編排器永遠不改，只更新 loader」）。
  *
  * 為什麼 search 不入迴圈（誠實修正 §10「search→article→…」措辭）：
  *   search 積木回 `TrendingItem[]`（彙整型，見 `trending-sources.ts:364 runTrending`），與本管線三階段的
@@ -20,10 +20,8 @@ import type { RankMathReport } from "../seo/rankmath-checker";
 import type { WordPressPublishSuccess } from "./publish/wordpress-core";
 
 // 側效 import：載入即執行各檔的 register()，把 dormant 積木接進 module-level registry。
-// 編排器本體（下方）永遠不認識任何單一積木，只透過 byKind() 取用 → 加積木只動 import 這幾行。
-import "./blocks/article-generate";
-import "./blocks/seo-check";
-import "./blocks/publish-wordpress";
+// 編排器本體（下方）永遠不認識任何單一積木，只透過 byKind() 取用 → 加積木只動 loader。
+import "./blocks/register-all";
 
 /** 管線階段（限 `{ok}`-union 型積木；search 是上游 producer，不在此列，理由見檔頭）。 */
 export type PipelineStageKind = "article" | "quality" | "publish";

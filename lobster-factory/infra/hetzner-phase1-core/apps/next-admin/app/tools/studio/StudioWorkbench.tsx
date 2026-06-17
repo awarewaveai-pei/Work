@@ -8,6 +8,7 @@ import {
 } from "../../../lib/studio/model-options";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
+import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { bakeCssFilter } from "@/components/tools/bake-css-filter";
 import GradedPreview, { type GradedPreviewHandle } from "@/components/tools/GradedPreview";
 import { buildSemanticFilename, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
@@ -504,6 +505,31 @@ export default function StudioWorkbench() {
                 <div style={{ width: 260 }}>
                   <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
                 </div>
+                <ImageEditPromptPanel
+                  sourceImage={gen.image}
+                  currentPrompt={effectivePrompt}
+                  imageModel={model}
+                  target="pod-design"
+                  aspectRatio={aspect}
+                  styleAnchor={{
+                    model,
+                    mode: refImages.length > 0 ? "image" : "text",
+                    stylePrompt: effectivePrompt,
+                    subject: subject.trim(),
+                    refs: refImages.length,
+                    target: "pod-design",
+                  }}
+                  onEditedImage={(image, meta) => {
+                    setModel(meta.model);
+                    setGen({ status: "done", image, seed: meta.seed });
+                    setSaveState("idle");
+                    setBgState("idle");
+                    setOriginalImage(null);
+                    setMockupState("idle");
+                    setMockups([]);
+                    setSavedMockups({});
+                  }}
+                />
                 <div style={{ flex: 1, minWidth: 240 }}>
                   <OutputTrackBar image={gen.image} source="pod" colorGrade={grade.params} fileMeta={fileMeta} />
                 </div>
