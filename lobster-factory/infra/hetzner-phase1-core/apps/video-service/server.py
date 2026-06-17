@@ -49,8 +49,11 @@ def _is_safe_https_url(url: str) -> bool:
             return False
         for *_, sockaddr in socket.getaddrinfo(u.hostname, 443):
             ip = ipaddress.ip_address(sockaddr[0])
-            if ip.ipv4_mapped:            # 正規化 ::ffff:a.b.c.d，避免版本相依繞過
-                ip = ip.ipv4_mapped
+            # ipv4_mapped 僅 IPv6Address 有此屬性；IPv4Address 直接存取會 AttributeError
+            # → 被外層 except 吞成 fails-closed，誤擋所有 IPv4 host（Pexels CDN 即中此 bug）。
+            mapped = getattr(ip, "ipv4_mapped", None)
+            if mapped:                    # 正規化 ::ffff:a.b.c.d，避免版本相依繞過
+                ip = mapped
             if not ip.is_global:          # allowlist：非公網一律擋
                 return False
         return True
