@@ -448,7 +448,12 @@ function buildUserPrompt(params: {
   if (params.patternCount > 0 && params.patterns.length > 0) {
     lines.push("");
     lines.push("=== KADENCE FUNNEL PATTERNS (insert real call-to-action blocks at high-intent moments) ===");
-    lines.push(`Insert ${params.patternCount} of the following pre-built patterns into the article body. Choose the ones most relevant to the topic and reader intent:`);
+    const insertAll = params.patternCount >= params.patterns.length;
+    if (insertAll) {
+      lines.push(`Insert ALL ${params.patterns.length} of the following pre-built patterns into the article body (use every one of them):`);
+    } else {
+      lines.push(`Insert ${params.patternCount} of the following pre-built patterns into the article body. Choose the ones most relevant to the topic and reader intent:`);
+    }
     params.patterns.forEach(p => lines.push(`- id ${p.id}: ${p.title}`));
     lines.push("PLACEMENT RULES:");
     lines.push("- Put each chosen pattern ALONE on its own line, with a blank line before and after — NEVER inline inside a sentence or heading.");

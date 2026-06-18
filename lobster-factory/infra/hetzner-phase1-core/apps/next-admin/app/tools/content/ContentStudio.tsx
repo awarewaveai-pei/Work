@@ -444,9 +444,11 @@ export default function ContentStudio() {
   const [marketError,    setMarketError]    = useState("");
 
   // #6 — Available Kadence synced patterns on the target site (/api/content/patterns)
-  const [availablePatterns, setAvailablePatterns] = useState<Array<{ id: number; title: string }>>([]);
+  const [availablePatterns, setAvailablePatterns] = useState<Array<{ id: number; title: string; slug: string }>>([]);
   const [patternsLoading,   setPatternsLoading]   = useState(false);
   const [patternsNote,      setPatternsNote]      = useState("");
+  const [patternMode,       setPatternMode]       = useState<"auto" | "manual">("auto");
+  const [selectedPatternIds, setSelectedPatternIds] = useState<number[]>([]);
 
   // Media Hub brand name: auto-populate from selected site; stop once operator edits manually
   const [brandNameTouched, setBrandNameTouched] = useState(false);
@@ -899,7 +901,7 @@ export default function ContentStudio() {
     setPatternsLoading(true); setPatternsNote("");
     try {
       const res  = await fetch(`/api/content/patterns${selectedSiteId ? `?siteId=${encodeURIComponent(selectedSiteId)}` : ""}`);
-      const json = await res.json() as { ok: boolean; patterns?: Array<{ id: number; title: string }>; note?: string };
+      const json = await res.json() as { ok: boolean; patterns?: Array<{ id: number; title: string; slug: string }>; note?: string };
       if (json.ok && json.patterns) setAvailablePatterns(json.patterns);
       if (json.note) setPatternsNote(json.note);
     } catch { setPatternsNote("網路錯誤，請重試"); }
@@ -1034,8 +1036,17 @@ export default function ContentStudio() {
       const rawDetails = form.details.trim();
       const effectiveDetails = brief ? (rawDetails ? `${brief}\n\n${rawDetails}` : brief) : rawDetails;
 
-      // #6 — only send patterns when the operator asked for ≥1 funnel and the site has patterns.
-      const wantPatterns = form.patternCount > 0 && availablePatterns.length > 0;
+      // #6 — pattern mode: manual (operator selects specific ids) or auto (AI picks N from all)
+      const manualPatterns = availablePatterns.filter(p => selectedPatternIds.includes(p.id));
+      const wantPatterns = patternMode === "manual"
+        ? manualPatterns.length > 0
+        : form.patternCount > 0 && availablePatterns.length > 0;
+      const patternsToSend = wantPatterns
+        ? (patternMode === "manual" ? manualPatterns : availablePatterns)
+        : [];
+      const patternCountToSend = wantPatterns
+        ? (patternMode === "manual" ? manualPatterns.length : form.patternCount)
+        : 0;
 
       const res = await fetch("/api/content/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -1048,8 +1059,8 @@ export default function ContentStudio() {
           externalLinks, internalLinks, referenceUrls,
           existingCategories,              // #3
           marketContext,                   // #5 (empty unless analysis was run)
-          patterns: wantPatterns ? availablePatterns : [],  // #6
-          patternCount: wantPatterns ? form.patternCount : 0,
+          patterns: patternsToSend,        // #6
+          patternCount: patternCountToSend,
         }),
         signal: ac.signal,
       });
@@ -2630,28 +2641,79 @@ export default function ContentStudio() {
 
           {/* ── #6 Kadence 漏斗 Patterns ── */}
           <SectionToggle label="🧲 Kadence 漏斗 Patterns（在文章插入 CTA 區塊）" open={showPatterns} onToggle={() => setShowPatterns(v => !v)}>
-            <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", marginBottom: "8px" }}>
-              <div>
-                <label className="form-label" style={{ marginTop: 0 }}>插入數量</label>
-                <select className="form-select" style={{ width: "auto" }} value={String(form.patternCount)} disabled={isGenerating}
-                  onChange={e => setF("patternCount", Number(e.target.value) || 0)}>
-                  {[0, 1, 2, 3, 4].map(n => <option key={n} value={n}>{n === 0 ? "0（關閉）" : `${n} 個`}</option>)}
-                </select>
-              </div>
-              <button className="btn-secondary" onClick={() => void loadPatterns()} disabled={patternsLoading} style={{ fontSize: "12px" }}>
-                {patternsLoading ? "讀取中…" : "↻ 重新讀取站上 Patterns"}
+            {/* Mode toggle + refresh */}
+            <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "10px", flexWrap: "wrap" }}>
+              <button type="button" disabled={isGenerating}
+                onClick={() => setPatternMode("auto")}
+                style={{ padding: "3px 12px", fontSize: "12px", borderRadius: "4px", border: "1px solid", cursor: "pointer",
+                  background: patternMode === "auto" ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
+                  color: patternMode === "auto" ? "#fff" : "var(--text-secondary)",
+                  borderColor: patternMode === "auto" ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                AI 自動挑選
+              </button>
+              <button type="button" disabled={isGenerating}
+                onClick={() => setPatternMode("manual")}
+                style={{ padding: "3px 12px", fontSize: "12px", borderRadius: "4px", border: "1px solid", cursor: "pointer",
+                  background: patternMode === "manual" ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
+                  color: patternMode === "manual" ? "#fff" : "var(--text-secondary)",
+                  borderColor: patternMode === "manual" ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                手動選擇
+              </button>
+              <button className="btn-secondary" onClick={() => void loadPatterns()} disabled={patternsLoading}
+                style={{ fontSize: "12px", marginLeft: "auto" }}>
+                {patternsLoading ? "讀取中…" : "↻ 重新讀取"}
               </button>
             </div>
-            <div className="form-hint">
-              AI 會從下方站上既有的 synced patterns 中，挑選最相關的 {form.patternCount || "N"} 個，插入文章漏斗點（引言後、中段、結論前）。發布時自動轉成真實的 Kadence pattern 區塊。
-            </div>
+
+            {/* Auto mode: count selector + hint */}
+            {patternMode === "auto" && (
+              <div style={{ marginBottom: "8px" }}>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "6px" }}>
+                  <label className="form-label" style={{ marginTop: 0, marginBottom: 0 }}>AI 插入數量</label>
+                  <select className="form-select" style={{ width: "auto" }} value={String(form.patternCount)} disabled={isGenerating}
+                    onChange={e => setF("patternCount", Number(e.target.value) || 0)}>
+                    {[0, 1, 2, 3, 4].map(n => <option key={n} value={n}>{n === 0 ? "關閉" : `${n} 個`}</option>)}
+                  </select>
+                </div>
+                <div className="form-hint">AI 從下方 patterns 中挑選最相關的 {form.patternCount || "N"} 個，插入漏斗點（引言後、中段、結論前）。</div>
+              </div>
+            )}
+
+            {/* Manual mode hint */}
+            {patternMode === "manual" && (
+              <div className="form-hint" style={{ marginBottom: "6px" }}>
+                {selectedPatternIds.length === 0
+                  ? "點擊下方 pattern 來選擇（可多選）；AI 將按序插入文章漏斗點。"
+                  : `已選 ${selectedPatternIds.length} 個 → AI 將在漏斗點依序插入這些 patterns。`}
+              </div>
+            )}
+
+            {/* Pattern chips */}
             {availablePatterns.length > 0 ? (
-              <div style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                {availablePatterns.map(p => (
-                  <span key={p.id} style={{ display: "inline-block", padding: "2px 8px", background: "var(--bg-hover, #f5f5f5)", borderRadius: "4px", fontSize: "12px", color: "var(--text-primary)" }}>
-                    #{p.id} {p.title}
-                  </span>
-                ))}
+              <div style={{ marginTop: "6px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {availablePatterns.map(p => {
+                  const isSelected = patternMode === "manual" && selectedPatternIds.includes(p.id);
+                  return (
+                    <button key={p.id} type="button" disabled={isGenerating}
+                      title={`ID: ${p.id}${p.slug ? ` | ${p.slug}` : ""}`}
+                      onClick={() => {
+                        if (patternMode !== "manual") return;
+                        setSelectedPatternIds(prev =>
+                          prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]
+                        );
+                      }}
+                      style={{
+                        padding: "3px 10px", borderRadius: "4px", border: "1px solid",
+                        fontSize: "12px",
+                        cursor: patternMode === "manual" ? "pointer" : "default",
+                        background: isSelected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
+                        color: isSelected ? "#fff" : "var(--text-primary)",
+                        borderColor: isSelected ? "var(--color-primary, #2563eb)" : "var(--card-border)",
+                      }}>
+                      {p.title}
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <div className="form-hint" style={{ marginTop: 8, color: patternsNote && !patternsNote.includes("no auth") ? "var(--red, #dc2626)" : "var(--text-muted)" }}>
