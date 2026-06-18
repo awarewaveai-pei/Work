@@ -7,7 +7,7 @@ import {
   type StudioModel,
 } from "../../../lib/studio/model-options";
 import { resolveStylePrompt } from "@/app/tools/tarot/cards";
-import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
+import ImageStyleControls from "@/components/tools/ImageStyleControls";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
