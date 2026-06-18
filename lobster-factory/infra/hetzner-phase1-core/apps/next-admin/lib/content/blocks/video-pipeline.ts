@@ -32,6 +32,15 @@ export function resolveOrgId(ctxOrgId?: string): string | null {
 
 /** 渲染完成後記一筆 media_assets（asset_domain=ai_generated + mime video/mp4，靠 mime 與圖片區分）。
  *  best-effort：失敗只記 warn，不影響主結果。由 /status 在 EU 回 done 時呼叫。 */
+/** 由 primaryUrl 推導 media_assets.object_key（存與查共用此單一邏輯 → idempotent，不會因編碼不一致重複）。 */
+export function videoObjectKey(primaryUrl: string): string {
+  try {
+    return new URL(primaryUrl).pathname.replace(/^\//, "") || primaryUrl;
+  } catch {
+    return primaryUrl;
+  }
+}
+
 export async function recordVideoAsset(params: {
   organizationId: string;
   primaryUrl: string;
@@ -41,12 +50,7 @@ export async function recordVideoAsset(params: {
 }): Promise<void> {
   const supabase = getSupabaseWriteClient();
   if (!supabase) return;
-  let objectKey: string;
-  try {
-    objectKey = new URL(params.primaryUrl).pathname.replace(/^\//, "") || params.primaryUrl;
-  } catch {
-    objectKey = params.primaryUrl;
-  }
+  const objectKey = videoObjectKey(params.primaryUrl);
   const { error } = await supabase.from("media_assets").insert({
     organization_id: params.organizationId,
     storage_backend: "r2",
