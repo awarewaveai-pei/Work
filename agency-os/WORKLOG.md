@@ -198,6 +198,28 @@
 **[剩餘風險]** zoompan 平滑度視覺需操作者確認（自動測只驗無崩+時長）；Phase 2 容器化前 server SSRF 須改 pin-IP（TOCTOU 註解已留）。next-admin `video/pipeline` 積木（TS 端註冊+串接）仍未建 = Phase 1b 下一步。
 - AUTO_TASK_DONE (2026-06-17): video-service 合成引擎 moviepy→ffmpeg（9min→23s）+ A/V 同步 critic 修（6 場景 drift=0）+ server SSRF guard bug 修 + Pexels key 接入。
 
+### feat(video): Phase 1b — `video/pipeline` 積木（next-admin TS，串接既有能力 + Python render 服務）
+
+**[任務理解]** 操作者要求「生成影片＝註冊的積木（kind `video`）」。把影片生成做成 `register({id:"video/pipeline"})` 的 headless 積木，重用既有 article/image-gen 能力 + 已建好的 Python render 微服務，零重造。
+
+**[已修改]**（next-admin `lib/content/`）
+- 新 `video/video-script-core.ts`：`generateVideoScript(input,apiKey)` → Claude（`@anthropic-ai/sdk`，model claude-sonnet-4-6）生 6 場景 JSON（narration/image_prompt/broll_keyword/visual），容錯解析（剝 fence+regex fallback+型別驗證）。max_tokens 4096（防截斷）。
+- 新 `video/pexels.ts`：`fetchBrollUrl(keyword,key)` → 取 640-1920px https mp4 link，永不拋（null→降級 Flux）。
+- 新 `video/asset-prep.ts`：`dataUrlToTempFile`（Flux 回 data URL→解碼寫 temp png，內容 sha1 命名防競爭）+ `cleanupTempFiles`（finally 清，防 /tmp 增長）。
+- 新 `video/render-client.ts`：`callRenderService(scenes,assets,outName)` → POST video-service `/render`，含 `AbortSignal.timeout`（預設 600s，逾時→504）+ 錯誤分級（503 連不上/504 逾時/502 缺欄）。
+- 新 `blocks/video-pipeline.ts`：`register({id:"video/pipeline",kind:"video"})`，run(ctx)：env 守門→腳本→每場景一素材（broll+Pexels key→真片／否則 Flux 16:9 static→temp 檔）→ render 服務→回 `{ok,video:{outputs,out_dir},scenes,title}`。素材建置 try/finally 清 temp。
+- `blocks/register-all.ts`：+`import "./video-pipeline"`（側效自註冊，編排器零改）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin，獨立跑兩次：初版 + critic 修後）| exit=0 | 0 型別錯誤（CLAUDE.md 硬 build gate）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx`（import register-all）| 模組鏈（video-pipeline+image-gen+anthropic SDK）**載入無 throw**；listAll/byKind 的標準 runtime 驗證受 tsx ESM/CJS interop 限制，留 Next.js runtime（Phase 2）。
+- REALTEST_WAIVED: SMOKE_COVERED -- 完整 live e2e（積木→Replicate Flux→Pexels→render 服務）需服務部署 + next-admin env 三 key，屬 Phase 2（服務本身上一條目已 e2e 驗過真影片）。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1M/2m（無 Critical/契約 bug；asset≡scene 等長、回傳形狀、Pexels 永不拋、無密鑰外洩全驗清）。3 修已套並重 tsc：① render fetch timeout（防服務卡住永久 hang）② temp 檔 finally 清（防洩漏）③ dataUrlToTempFile try/catch 歸因。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`video/pipeline|generateVideoScript|callRenderService` | 新符號 def+caller 一致（17 命中），register-all 已 wire，無 stale。
+
+**[剩餘風險]** 完整 live e2e 待 Phase 2（服務容器化部署 + next-admin 注入 PEXELS/REPLICATE/ANTHROPIC env）。next-admin 與 video-service 需共享 /tmp volume（asset-prep 註解已標）。
+- AUTO_TASK_DONE (2026-06-17): video/pipeline 積木建好（5 lib + 註冊），tsc 0 + critic pass + 模組載入驗證；live e2e 待 Phase 2。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
