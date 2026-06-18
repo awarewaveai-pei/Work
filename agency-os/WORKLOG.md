@@ -351,6 +351,27 @@
 **[現況]** 引擎/積木/網頁/部署/R2/認證/TLS 全 live；**網頁能觸發、真能產出可播影片**（3 支已驗）；缺最後一哩：結果回填 UI + 畫廊記錄（背景工作存活問題）。
 - AUTO_TASK_DONE (2026-06-17): video async 修瀏覽器不再 524 ✅ + 第三支真機影片產出可播；發現 Next.js 背景 promise 未存活 → 結果回填 UI/畫廊待 robust 修（EU 自有 async job + SG 短輪詢代理+記錄）。
 
+### fix(video): definitive async ✅ 完整通 — 離開「背景工作」類別 → 畫廊記錄+可播驗證
+
+**[根因確認]** 此 Next.js standalone 部署**不可靠執行回應後的長背景工作**：`void async` 與官方 `after()` 都被切（實測 after() 也沒跑完 → EU 從沒收到 submit、job 永 running）。前兩次都在「背景工作」類別內繞圈，是真繞圈。
+
+**[正解]** 長/狀態工作只放在**會持久處**：① EU Python thread（render，已驗）② 瀏覽器輪詢。next-admin **零背景工作**：
+- block 拆 `prepare`：Claude 腳本 + Flux 圖**並行**（6 序列→Promise.all，壓 <100s）+ 提交 EU → 回 pending handle（euJobId/r2Keys/title/sceneCount）。
+- `/generate`：**同步**呼叫 prepare（~25s，不撞 CF 100s，無 after/fire-forget）→ 存 euJobId 等於 job-store → 202 jobId。
+- EU server.py：`/render` 改 async（驗證即回 jobId + 背景 thread 渲染）+ `GET /job?jobId` 查。
+- `/status`：每輪查 EU /job 一次（短請求）；**done 那刻**才 recordVideoAsset（asset_domain=ai_generated + mime video/mp4）+ 清 R2 暫存 → 全在快速請求內，非背景。
+- render-client 拆 `submitRender`(POST)/`pollRenderJob`(GET 單次)。
+
+**[驗證]**
+- REALTEST_EVIDENCE: tool=Chrome 真機 | 多主題生成（async）瀏覽器撐過 250s **無 524** ✅。
+- REALTEST_EVIDENCE: tool=Chrome+API | `/api/tools/designs?domain=ai_video` **count=1**（「三個提高團隊溝通效率的方法」video/mp4 + R2 URL + title）→ **畫廊影片 tab 記錄成功**（前次同步版/背景版皆 0）。
+- REALTEST_EVIDENCE: tool=Bash curl | 畫廊該影片公開 GET **200 video/mp4 15MB 可播**。
+- REALTEST_EVIDENCE: tool=Bash | `vtest_async.py` EU async API（submit 202→poll→done 四尺寸）PASS；py_compile + tsc 0。
+- 部署：EU `docker compose up --build`（async server）+ SG `sg-deploy next-admin`(de917f8d，smoke OK)。
+
+**[剩餘小風險]** 使用者若在生成中關閉/離開頁面 → 無人輪詢 /status → 該次不記錄（影片仍在 R2）；可日後加「離開後背景補記」或 EU 完成 webhook。in-memory job-store 容器重啟丟失 in-flight（產物在 R2，重生即可）。
+- AUTO_TASK_DONE (2026-06-17): video generator **完整端到端通**（瀏覽器生成→真影片→畫廊記錄+可播，無 524）；definitive async（EU thread + 瀏覽器輪詢，next-admin 零背景工作）解決 Next.js 背景限制。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
