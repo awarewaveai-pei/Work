@@ -10,6 +10,10 @@ export interface SiteContentDefaults {
   language?: string;
   targetCountry?: string;
   imageModel?: string;
+  tone?: string;
+  articleType?: string;
+  readability?: string;
+  pointOfView?: string;
   marketing?: {
     audience?: string;
     positioning?: string;

@@ -28,8 +28,43 @@ const IMAGE_MODELS = [
 
 const LANGUAGES = ["Traditional Chinese", "Simplified Chinese", "English", "Japanese", "Korean"];
 
+const ARTICLE_TYPES = [
+  { value: "",                label: "不指定" },
+  { value: "Pillar Article",  label: "支柱文章" },
+  { value: "How-to Guide",    label: "操作指南" },
+  { value: "Opinion Piece",   label: "觀點文章" },
+  { value: "Comparison",      label: "比較評測" },
+  { value: "Tutorial",        label: "教學教程" },
+  { value: "Q&A Page",        label: "Q&A 問答頁" },
+  { value: "Listicle",        label: "列表文章" },
+  { value: "Case Study",      label: "案例研究" },
+];
+const TONES = [
+  { value: "",                label: "不指定" },
+  { value: "Friendly",        label: "親切友善" },
+  { value: "Professional",    label: "專業正式" },
+  { value: "Educational",     label: "教育啟發" },
+  { value: "Inspirational",   label: "鼓舞人心" },
+  { value: "Warm & Credible", label: "溫暖可信" },
+];
+const READABILITIES = [
+  { value: "",                          label: "不指定" },
+  { value: "6th grade (very easy)",     label: "簡單（6 年級）" },
+  { value: "8th grade (recommended)",   label: "推薦（8 年級）" },
+  { value: "10th grade",                label: "一般（10 年級）" },
+  { value: "College",                   label: "大學程度" },
+  { value: "Professional",              label: "專業級" },
+];
+const POVS = [
+  { value: "",              label: "不指定" },
+  { value: "First person",  label: "第一人稱（我）" },
+  { value: "Second person", label: "第二人稱（你）" },
+  { value: "Third person",  label: "第三人稱（他／她）" },
+];
+
 const EMPTY_DEFAULTS: SiteContentDefaults = {
   language: "", targetCountry: "", imageModel: "",
+  tone: "", articleType: "", readability: "", pointOfView: "",
   marketing: { audience: "", positioning: "", usp: "", primaryCta: "", funnelStage: "", pricePositioning: "", emotionalTriggers: "", objections: "", forbiddenClaims: "" },
 };
 
@@ -69,6 +104,34 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
       {open && (
         <div style={{ marginTop: 10, padding: "14px 16px", background: "#12121e", border: "1px solid #333", borderRadius: 8, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ color: "#888", fontSize: 12 }}>選此站台時自動帶入 Content Studio 表單（只填空白欄位）。</div>
+
+          {/* Row 0: tone / articleType / readability / pointOfView */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+            <label>
+              <span style={lbl}>語氣風格</span>
+              <select style={sel} value={d.tone ?? ""} onChange={e => { setD(p => ({ ...p, tone: e.target.value })); setSaved(false); }}>
+                {TONES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </label>
+            <label>
+              <span style={lbl}>文章類型</span>
+              <select style={sel} value={d.articleType ?? ""} onChange={e => { setD(p => ({ ...p, articleType: e.target.value })); setSaved(false); }}>
+                {ARTICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </label>
+            <label>
+              <span style={lbl}>可讀性</span>
+              <select style={sel} value={d.readability ?? ""} onChange={e => { setD(p => ({ ...p, readability: e.target.value })); setSaved(false); }}>
+                {READABILITIES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </label>
+            <label>
+              <span style={lbl}>人稱視角</span>
+              <select style={sel} value={d.pointOfView ?? ""} onChange={e => { setD(p => ({ ...p, pointOfView: e.target.value })); setSaved(false); }}>
+                {POVS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </label>
+          </div>
 
           {/* Row 1: language / country / image model */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>

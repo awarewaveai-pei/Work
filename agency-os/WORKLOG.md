@@ -16,6 +16,10 @@
 **[剩餘風險]** Production 已上線；Playwright smoke 不會實際呼叫付費生圖 API，最終 3:2 操作體驗仍由操作者在 `/tools/studio` 生成一張圖確認。Build 只有既有 Sentry/ssh2 optional-native warnings，未阻擋部署。
 **[rollback]** `sg-deploy.sh` 已在部署前建立 `lobster-phase1-next-admin:rollback-20260618-034656`；如需回退，使用 `rollback-phase1.sh restore next-admin rollback-20260618-034656`，再確認 container healthy 與 4 個 smoke endpoints。
 
+- REALTEST_EVIDENCE: tool=Bash | cmd=python _split_narration() | exit=0 | ms=~200
+- REVIEW_DONE: critic=Deep | verdict=pass/warn | findings=0c/3m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=OPS_SYNC_KEY,resolveOrgId | hits=0
+
 ## 2026-06-17
 
 ### feat(pod): PublishWizard 真・全部一鍵 — 印刷檔＋商品圖＋合成圖＋文案＋Woo＋Printful native 串成單一按鈕

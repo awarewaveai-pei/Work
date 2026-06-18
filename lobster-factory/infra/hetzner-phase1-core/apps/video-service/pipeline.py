@@ -238,34 +238,47 @@ def generate_audio(scenes: list) -> list:
 # ═══════════════════════════════════════════
 # STEP 4：合成基礎影片（BASE_WIDTH x BASE_HEIGHT）
 # ═══════════════════════════════════════════
-def _split_narration(text: str) -> list:
-    """Split narration into short display segments (one sentence / ~20 chars each)."""
+def _split_narration(text: str, max_len: int = 28) -> list:
+    """Split narration into short display segments (~max_len chars each).
+    Priority: sentence endings → clause boundaries → word boundaries → hard cut."""
     import re as _re
-    # Split at sentence endings
+
+    def _hard_split(s: str) -> list:
+        """Split s into ≤max_len chunks at word boundaries, falling back to hard cut."""
+        words = s.split()
+        chunks, buf = [], ''
+        for w in words:
+            candidate = (buf + ' ' + w).strip() if buf else w
+            if len(candidate) <= max_len:
+                buf = candidate
+            else:
+                if buf:
+                    chunks.append(buf)
+                buf = w if len(w) <= max_len else w[:max_len]
+        if buf:
+            chunks.append(buf)
+        return chunks or [s[:max_len]]
+
+    # 1. Split at sentence endings
     parts = _re.split(r'(?<=[。！？\.!?])\s*', text.strip())
     parts = [p.strip() for p in parts if p.strip()]
+
     result = []
     for part in parts:
-        if len(part) <= 25:
+        if len(part) <= max_len:
             result.append(part)
         else:
-            # Split at clause boundaries
+            # 2. Split at clause boundaries (CJK and Latin)
             subs = _re.split(r'(?<=[，,、；;])\s*', part)
-            buf, buf_len = '', 0
-            for s in subs:
-                s = s.strip()
-                if not s:
-                    continue
-                if buf_len + len(s) <= 22:
-                    buf = buf + s if buf else s
-                    buf_len += len(s)
+            subs = [s.strip() for s in subs if s.strip()]
+            for sub in subs:
+                if len(sub) <= max_len:
+                    result.append(sub)
                 else:
-                    if buf:
-                        result.append(buf)
-                    buf, buf_len = s, len(s)
-            if buf:
-                result.append(buf)
-    return result or [text[:25]]
+                    # 3. Word-boundary + hard cut fallback
+                    result.extend(_hard_split(sub))
+
+    return result or [text[:max_len]]
 
 
 def _write_subtitle_textfiles(segments: list, scene_id) -> list:
