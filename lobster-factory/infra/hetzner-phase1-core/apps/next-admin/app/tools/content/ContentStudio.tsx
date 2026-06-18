@@ -121,6 +121,15 @@ const HOOK_TYPES = [
   "Personal or Emotional",
 ] as const;
 
+// Display labels for hook types (API keys stay English; only UI labels are Chinese)
+const HOOK_TYPE_LABELS: Record<typeof HOOK_TYPES[number], string> = {
+  "Question":              "提問式",
+  "Statistical or Fact":   "數據／事實",
+  "Quotation":             "名人引言",
+  "Anecdotal or Story":    "故事／案例",
+  "Personal or Emotional": "情感共鳴",
+};
+
 // Curated subset of the 15-model image-gen toolkit (lib/tarot/image-gen.ts, the same combo-pack the
 // Tarot tool uses). value = TarotModel id → sent straight to /api/content/image, which delegates to
 // generateTarotImage. `seed`/`img2img` mirror each model's live capability (image-gen.ts TAROT_MODELS):
@@ -966,6 +975,17 @@ export default function ContentStudio() {
     });
   }, [selectedSiteId, wpSites]);
 
+  // Auto-detect language from keyword: if keyword contains CJK characters and language is still
+  // the default "English" (meaning the operator hasn't manually changed it), switch to 繁體中文.
+  useEffect(() => {
+    if (!form.keyword.trim()) return;
+    if (form.language !== "English") return; // operator already chose a language — don't override
+    if (/[぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾟ]/.test(form.keyword)) {
+      setF("language", "繁體中文");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.keyword]);
+
   // ─── Image Generation ─────────────────────────────────────────────────────
 
   async function handleGenerateImage() {
@@ -1204,13 +1224,14 @@ export default function ContentStudio() {
   const loadDrafts = useCallback(async () => {
     setDraftsLoading(true); setDraftsError("");
     try {
-      const res  = await fetch("/api/content/drafts");
+      const qs  = selectedSiteId ? `?siteId=${encodeURIComponent(selectedSiteId)}` : "";
+      const res  = await fetch(`/api/content/drafts${qs}`);
       const json = await res.json() as { ok: boolean; drafts?: DraftListItem[]; error?: string };
       if (json.ok && json.drafts) setDrafts(json.drafts);
       else setDraftsError(json.error ?? "讀取失敗");
     } catch { setDraftsError("網路錯誤，請重試"); }
     finally { setDraftsLoading(false); }
-  }, []);
+  }, [selectedSiteId]);
 
   // Re-open a saved draft into the generate editor (full fetch: markdown + meta + form snapshot).
   async function openDraft(id: string) {
@@ -1644,9 +1665,9 @@ export default function ContentStudio() {
   const checkLabel: React.CSSProperties = { display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer", userSelect: "none" };
 
   const structLabels: Record<keyof ArticleStructure, string> = {
-    quickAnswer: "快速解答", keyTakeaways: "Key Takeaways", comparisonTable: "比較表格",
-    faq: "FAQ", conclusion: "Conclusion", tables: "Tables", h3: "H3",
-    lists: "Lists", italics: "Italics", quotes: "Quotes", bold: "Bold",
+    quickAnswer: "快速解答", keyTakeaways: "重點整理", comparisonTable: "比較表格",
+    faq: "FAQ", conclusion: "結論", tables: "表格", h3: "H3 小標",
+    lists: "列表", italics: "斜體", quotes: "引言", bold: "粗體",
     expertQuote: "專家引言", prosCons: "優缺點表", stepByStep: "步驟教學",
     calloutBox: "提示框 💡", caseStudy: "實際案例", statCallout: "數據亮點 📊",
   };
@@ -2092,7 +2113,7 @@ export default function ContentStudio() {
                         color: isActive ? "#fff" : isSelected ? "var(--btn-primary-bg, #5855d0)" : "var(--text-muted)",
                         fontWeight: isSelected ? 600 : 400,
                       }}>
-                      {ht}
+                      {HOOK_TYPE_LABELS[ht]}
                       {hookBriefSugs[ht] && !isActive && <span style={{ marginLeft: 4, opacity: 0.6 }}>✓</span>}
                     </button>
                   );
@@ -2108,7 +2129,7 @@ export default function ContentStudio() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
                   {Object.entries(hookBriefSugs).filter(([t]) => hookTypesSelected.has(t)).map(([t, brief]) => (
                     <div key={t} style={{ background: "var(--bg-subtle)", borderRadius: "var(--radius-sm)", padding: "7px 10px", fontSize: "12px", border: "1px solid var(--card-border)" }}>
-                      <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "3px" }}>{t}</div>
+                      <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "3px" }}>{HOOK_TYPE_LABELS[t as typeof HOOK_TYPES[number]] ?? t}</div>
                       <div style={{ color: "var(--text-primary)", lineHeight: 1.5 }}>{brief}</div>
                       <button type="button" onClick={() => { setF("introHookType", t as typeof HOOK_TYPES[number]); setF("introHookBrief", brief); }}
                         style={{ marginTop: "5px", fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover)" }}>

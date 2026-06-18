@@ -89,11 +89,14 @@ export async function GET(req: Request): Promise<Response> {
     return NextResponse.json({ ok: true, draft: toFull(data as DraftRow) });
   }
 
-  const { data, error } = await supabase
+  const siteId = new URL(req.url).searchParams.get("siteId");
+  let query = supabase
     .from("content_drafts")
     .select("id, organization_id, site_id, keyword, title, language, article_type, slug_hint, seo_score, status, created_at, updated_at")
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
+  if (siteId) query = query.eq("site_id", siteId);
+  const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   const drafts = (data as Array<Omit<DraftRow, "markdown" | "meta" | "form_snapshot">>).map(toListItem);
