@@ -482,7 +482,7 @@ export default function MockupStudio() {
       const res = await fetch("/api/tools/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceUrl: mockupUrl, prompt: `[printful:${productTitle}]`, source: "pod-studio" }),
+        body: JSON.stringify({ sourceUrl: mockupUrl, prompt: `[printful:${productTitle}]`, source: "mockup" }),
       });
       const json = (await res.json()) as { ok: boolean };
       setSaveMockupStates((prev) => ({ ...prev, [mockupUrl]: json.ok ? "saved" : "error" }));
@@ -498,7 +498,7 @@ export default function MockupStudio() {
       const res = await fetch("/api/tools/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: gen.image, prompt: `[mockup:${mode}:${color}] ${prompt}`, modelName: model }),
+        body: JSON.stringify({ image: gen.image, prompt: `[mockup:${mode}:${color}] ${prompt}`, modelName: model, source: "mockup" }),
       });
       const json = (await res.json()) as { ok: boolean };
       setSaveState(json.ok ? "saved" : "error");
