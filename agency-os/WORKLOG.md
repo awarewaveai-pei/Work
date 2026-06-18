@@ -4,6 +4,26 @@
 
 ## 2026-06-18
 
+### feat(video-studio): voice model selector + title animation intro
+
+**[任務理解]** Video Studio 配音固定 Edge TTS（機械感強）；無片頭標題動畫；用戶要求加 voice model 選擇（含定價）+ intro 片頭。
+**[已修改]**
+- `pipeline.py`: `_tts_openai()`, `_render_intro_scene()`, `generate_audio(tts_provider, tts_voice)`, `compose_base_video(intro_title, intro_duration)`, `render_video(all new params)`
+- `server.py`: `submit_render()` 新增 tts_provider allowlist 驗證 + intro_duration finite/positive/capped(15s) + (ValueError, TypeError) 同時 catch
+- `render-client.ts`: `submitRender()` 新增 `RenderOpts` + optional spread
+- `video-pipeline.ts`: 呼叫 `submitRender()` 時傳 ctx 新參數
+- `generate/route.ts`: GenerateBody + ctx 新增 4 欄位
+- `VideoStudio.tsx`: `VOICE_MODELS` 9 個選項含定價徽章 + `parseVoiceModel()` + intro 開關 + 時長滑桿
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile pipeline.py server.py` | exit=0 | ms=200
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=inline logic unit tests (split_narration, parseVoiceModel, validate_dur, allowlist) | exit=0 | ALL TESTS PASSED
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/1n — 2 Major 均已修（intro_duration clamp+finite check, tts_provider allowlist; TypeError→400 fix）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=submitRender|tts_provider|intro_title|generate_audio | hits=0 (no stale callers outside modified files)
+- BUGHUNT_SCOPE_NARROW: N/A — agency-os + scripts 均已含
+
+
+
 ### fix(studio): 比例契約貫通預覽、Canvas 與 WebP，並部署 SG production
 
 **[任務理解]** Studio 選 3:2 時，生成圖本身正確，但舊預覽調色 Fabric canvas、快速編輯 800×800 畫布與 POD `web-square` 輸出各自再次套用方形容器，造成預覽看不清、Canvas/下載/WebP 變成 1:1；同時比例、Style、模型仍是舊版控制項。

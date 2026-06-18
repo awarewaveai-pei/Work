@@ -192,9 +192,18 @@ def submit_render(payload: dict) -> str:
     """驗證後建 job + 起背景 thread，立即回 jobId（不阻塞）。"""
     scenes, assets, out_name = _validate(payload)
     tts_provider = payload.get("tts_provider", "edge")
+    if tts_provider not in ("edge", "openai"):
+        raise ValueError(f"unknown tts_provider: {tts_provider!r}; must be 'edge' or 'openai'")
     tts_voice = payload.get("tts_voice") or ""
     intro_title = payload.get("intro_title") or ""
-    intro_duration = float(payload.get("intro_duration", 3.0))
+    try:
+        intro_duration = float(payload.get("intro_duration", 3.0))
+    except (ValueError, TypeError):
+        raise ValueError("intro_duration must be a number")
+    import math
+    if not math.isfinite(intro_duration) or intro_duration <= 0:
+        raise ValueError("intro_duration must be a positive finite number")
+    intro_duration = min(intro_duration, 15.0)  # cap at 15s to prevent runaway renders
     job_id = uuid.uuid4().hex
     with _jobs_lock:
         _prune_jobs()
@@ -254,7 +263,7 @@ class _Handler(BaseHTTPRequestHandler):
             # async：驗證後即回 jobId（202），背景 thread 渲染；呼叫端短輪詢 GET /job
             job_id = submit_render(payload)
             self._json(202, {"jobId": job_id})
-        except ValueError as e:
+        except (ValueError, TypeError) as e:
             self._json(400, {"error": str(e)})
         except Exception as e:  # noqa: BLE001 — 回 500，不洩堆疊
             self._json(500, {"error": str(e)})
