@@ -179,7 +179,7 @@ register({
       },
       anthropicKey,
     );
-    if (!prep.ok) return prep;
+    if (!prep.ok) return prep as { ok: false; status: number; error: string };
     const { scenes, assets, r2Keys, title } = prep;
 
     // 3) 提交 EU（短請求，不等渲染）→ 回 euJobId。渲染在 EU thread 跑，由 /status 輪詢收尾。

@@ -7,11 +7,11 @@ import {
 
 describe("buildModelMockupPrompt", () => {
   const base = {
-    garment: "tshirt",
+    garmentPhrase: "Bella Canvas 3001 unisex crewneck t-shirt",
     ageGroup: "adult" as const,
     modelDescription: "blonde Asian woman, 20s, slim",
     pose: "standing",
-    environment: "cafe interior with coffee cups",
+    scene: "coffee-shop",
     lighting: "window",
   };
 
@@ -37,48 +37,44 @@ describe("buildModelMockupPrompt", () => {
     expect(p).toContain("wrinkles");
   });
 
-  it("includes model description, environment and props", () => {
+  it("includes model description, scene and props", () => {
     const p = buildModelMockupPrompt({
       ...base,
       color: "white",
-      propTopRight: "bookshelves",
-      propBottomLeft: "leather chair",
+      props: ["bookshelves", "leather chair"],
     });
     expect(p).toContain("blonde Asian woman");
-    expect(p).toContain("cafe interior");
-    expect(p).toContain("bookshelves in the top-right");
-    expect(p).toContain("leather chair in the bottom-left");
+    expect(p).toContain("coffee shop");
+    expect(p).toContain("bookshelves");
+    expect(p).toContain("leather chair");
   });
 });
 
 describe("buildFlatMockupPrompt", () => {
-  it("builds a flat-lay prompt with surface, style, lighting and corner props", () => {
+  it("builds a flat-lay prompt with surface, arrangement, lighting and props", () => {
     const p = buildFlatMockupPrompt({
-      garment: "tshirt",
+      garmentPhrase: "Bella Canvas 3001 unisex crewneck t-shirt",
       color: "white",
-      surface: "light wooden table",
-      style: "female-scrunched",
-      lighting: "soft-top",
-      propBottomLeft: "bubble tea",
-      propTopRight: "Taiwan flag",
-      propBottomRight: "travel map",
+      surface: "white-marble",
+      arrangement: "centered-hero",
+      lighting: "north-window",
+      props: ["bubble tea", "tarot cards"],
     });
     expect(p).toContain("flat-lay");
-    expect(p).toContain("light wooden table");
-    expect(p).toContain("scrunched");
-    expect(p).toContain("bubble tea in the bottom-left");
-    expect(p).toContain("Taiwan flag in the top-right");
-    expect(p).toContain("travel map in the bottom-right");
+    expect(p).toContain("marble");
+    expect(p).toContain("centered hero");
+    expect(p).toContain("bubble tea");
+    expect(p).toContain("tarot cards");
     expect(p).toContain("Shot from directly above");
   });
 
   it("locks colors on black flat-lay too", () => {
     const p = buildFlatMockupPrompt({
-      garment: "hoodie",
+      garmentPhrase: "unisex pullover hoodie",
       color: "black",
-      surface: "",
-      style: "male-relaxed",
-      lighting: "side-angle",
+      surface: "light-oak",
+      arrangement: "scatter",
+      lighting: "hard-side-rim",
     });
     expect(p).toContain("CRITICAL COLOR FIDELITY");
     expect(p).toContain("hoodie");

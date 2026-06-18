@@ -2,6 +2,32 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-19
+
+### feat(video-studio): draft review layer + improved Claude prompts + Ken Burns variants + fade transitions
+
+**[任務理解]** Video Studio 產出品質差（圖片不相關、旁白書面語、剪接死板）+ 全程黑盒無法編輯。根因：Claude prompt 太鬆、Flux prompt 無 cinematic prefix、Ken Burns 固定方向、無過渡效果、無人工審稿點。
+
+**[已修改]**
+- `video-script-core.ts`: Claude prompt 改：narration 15-30 字口語短句，image_prompt 強制 cinematic 16:9 格式（前景+背景+光線）
+- `video-pipeline.ts`: 抽出 `prepareScenes()` 匯出函式（腳本+圖，不渲染）；Flux prompt 加 cinematic prefix；`run()` 改呼叫 `prepareScenes()`；新增 `PreparedScenes` 介面
+- NEW `app/api/video/draft/route.ts`: POST → `prepareScenes()` → 回 scenes+imageUrls+r2Keys+title
+- NEW `app/api/video/render-draft/route.ts`: POST 接編輯後 scenes → imageUrl 來源 allowlist 驗證（R2+Pexels 限定）→ r2Keys 從 imageUrls 再推導（不信任 client）→ `submitRender()` → 202+jobId
+- `VideoStudio.tsx`: 新增 DraftScene 型別、draft 狀態、`handleGenerateDraft()`、`handleRenderDraft()`、`startPolling()`（共用）、`DraftEditor` 組件（圖片預覽+旁白 textarea 逐場景編輯）；按鈕改為「生成草稿」→審稿→「確認送出渲染」
+- `pipeline.py`: `_render_scene_ffmpeg()` 加 5 方向 Ken Burns variants（scene_id % 5：center-in/TL/TR/BL/zoom-out）；加 fade-in/fade-out（0.3s，capped 場景時長 15%）；兩者靜圖+影片路徑均套用
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (no video/draft or render-draft errors) | exit=0 | ms=~30000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/1m/1s — 兩個 Major 均已修正（imageUrl allowlist + r2Key re-derivation from URL）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=prepareScenes|render-draft|api/video/draft | hits=4 files (expected: all in lobster-factory/apps/next-admin, no stale references)
+- WORKLOG: 本段記錄
+
+**[剩餘風險]**
+- `/api/video/draft` 長達 30-60s 同步請求，CF 100s 上限有壓線風險（6 場景全 Flux 時）；若生產出現 524 error 可改 202+poll 模式
+- EU video-service 的 `pipeline.py` 修改需 `docker compose build` 才生效（需 SSH EU 重建）
+
+**[rollback]** `git revert 440ef224`（auto-checkpoint commit）+ `git revert <此 commit hash>`
+
 ## 2026-06-18
 
 ### feat(video-studio): voice model selector + title animation intro

@@ -105,6 +105,14 @@ const GradedPreview = forwardRef<GradedPreviewHandle, Props>(function GradedPrev
         const h = Math.max(1, Math.round(natH * scale));
         const fc = new fabric.StaticCanvas(canvasElRef.current, { enableRetinaScaling: false });
         fc.setDimensions({ width: w, height: h });
+        // Set CSS display size proportionally to fit within maxWidth/maxHeight.
+        // Without this, Fabric's wrapper div stays at buffer size (e.g. 1024×1536) while
+        // CSS max constraints only affect the <canvas> element itself, causing misalignment/crop.
+        const displayScale = Math.min(maxWidth / w, maxHeight / h, 1);
+        fc.setDimensions(
+          { width: Math.round(w * displayScale), height: Math.round(h * displayScale) },
+          { cssOnly: true }
+        );
         img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale, selectable: false });
         fc.add(img);
         fcRef.current = fc;
@@ -141,7 +149,7 @@ const GradedPreview = forwardRef<GradedPreviewHandle, Props>(function GradedPrev
     <canvas
       key={image}
       ref={canvasElRef}
-      style={{ maxWidth, maxHeight, width: "auto", height: "auto", borderRadius: 8, background: "#fff" }}
+      style={{ display: "block", borderRadius: 8, background: "#fff" }}
     />
   );
 });

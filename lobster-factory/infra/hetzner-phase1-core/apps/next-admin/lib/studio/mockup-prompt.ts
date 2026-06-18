@@ -2,14 +2,12 @@
  * Mockup Studio prompt assembly — pure functions, no I/O.
  *
  * Two output modes mirroring the MEGA Mockup Studio blueprint (POD_STUDIO_ROADMAP §B9-S):
- *   flat  — flat-lay garment on a surface with up to 3 corner props
+ *   flat  — flat-lay garment on a surface with props
  *   model — a person wearing the garment in a scene
  *
  * Bakes in the three iron rules from the 2026-06-11 P0 realism validation:
- *   1. dark garments need per-element color locking (the model otherwise "adapts"
- *      dark design colors to stay visible on dark fabric)
- *   2. chest-occluding poses hide the design — non-occluding poses get an explicit
- *      "full chest visible" clause, occluding ones are flagged for the UI to warn
+ *   1. dark garments need per-element color locking
+ *   2. chest-occluding poses hide the design
  *   3. the design image travels as image_input (handled by the caller, not here)
  */
 
@@ -24,14 +22,127 @@ export const GARMENTS: Record<string, { label: string; phrase: string }> = {
   youth: { label: "Youth Tee", phrase: "youth t-shirt" },
 };
 
-export const FLAT_STYLES = [
-  { value: "male-relaxed", label: "Male (relaxed)", phrase: "laid out naturally in a relaxed masculine style" },
-  { value: "female-scrunched", label: "Female (scrunched)", phrase: "casually scrunched in a soft feminine style" },
+// ── Model tab: scene options (15) ─────────────────────────────────────────────
+export const MODEL_SCENES = [
+  { value: "studio-white", label: "攝影棚・白背景", phrase: "a professional studio with a clean white cyclorama backdrop" },
+  { value: "studio-dark", label: "攝影棚・深色", phrase: "a professional studio with a dramatic charcoal backdrop" },
+  { value: "urban-street", label: "城市街道", phrase: "a vibrant urban street with city architecture" },
+  { value: "coffee-shop", label: "咖啡廳", phrase: "a cozy coffee shop interior with warm ambient lighting" },
+  { value: "rooftop", label: "屋頂露台", phrase: "a stylish rooftop terrace overlooking the city skyline" },
+  { value: "forest-path", label: "森林步道", phrase: "a serene forest path dappled with natural light" },
+  { value: "beach", label: "海灘", phrase: "a golden sand beach with soft ocean waves" },
+  { value: "loft", label: "工業風閣樓", phrase: "an industrial urban loft with exposed brick and large windows" },
+  { value: "gym", label: "健身房", phrase: "a modern gym with fitness equipment as backdrop" },
+  { value: "library", label: "圖書館／書店", phrase: "a cozy library with wooden shelves full of books" },
+  { value: "art-gallery", label: "藝廊", phrase: "a minimalist art gallery with white walls and gallery lighting" },
+  { value: "bedroom", label: "簡約臥室", phrase: "a clean minimalist bedroom with neutral tones and morning light" },
+  { value: "runway", label: "時裝伸展台", phrase: "a fashion runway with dramatic spotlights" },
+  { value: "warehouse", label: "工業倉庫", phrase: "a raw industrial warehouse with concrete floors and high ceilings" },
+  { value: "park", label: "公園", phrase: "a sunny park with lush greenery and natural light" },
 ];
 
+// ── Model tab: scene props (multi-select, 15) ─────────────────────────────────
+export const MODEL_PROPS = [
+  { value: "coffee-cup", label: "咖啡杯", phrase: "a coffee cup" },
+  { value: "sunglasses", label: "墨鏡", phrase: "sunglasses as a prop" },
+  { value: "skateboard", label: "滑板", phrase: "a skateboard" },
+  { value: "book", label: "書本", phrase: "an open book" },
+  { value: "smartphone", label: "手機", phrase: "a smartphone" },
+  { value: "camera", label: "相機", phrase: "a vintage film camera" },
+  { value: "tote-bag", label: "帆布包", phrase: "a canvas tote bag" },
+  { value: "headphones", label: "耳機", phrase: "wireless headphones" },
+  { value: "flowers", label: "花束", phrase: "fresh flowers" },
+  { value: "bicycle", label: "自行車", phrase: "a bicycle" },
+  { value: "guitar", label: "吉他", phrase: "an acoustic guitar" },
+  { value: "notebook", label: "筆記本", phrase: "an open notebook and pen" },
+  { value: "plant", label: "植物盆栽", phrase: "a lush potted plant" },
+  { value: "backpack", label: "背包", phrase: "a stylish backpack" },
+  { value: "vinyl-record", label: "黑膠唱片", phrase: "a vinyl record" },
+];
+
+// ── Flat tab: surface options (15) ────────────────────────────────────────────
+export const FLAT_SURFACES = [
+  { value: "white-marble", label: "白色大理石", phrase: "white marble with subtle grey veining" },
+  { value: "light-oak", label: "淺橡木", phrase: "light oak wood grain surface" },
+  { value: "dark-slate", label: "深灰石板", phrase: "dark slate stone surface" },
+  { value: "linen", label: "亞麻布料", phrase: "natural linen fabric surface" },
+  { value: "kraft-paper", label: "牛皮紙", phrase: "warm kraft paper surface" },
+  { value: "black-concrete", label: "黑色消光混凝土", phrase: "black matte concrete surface" },
+  { value: "terrazzo", label: "磨石子", phrase: "colorful terrazzo surface" },
+  { value: "rattan", label: "籐編", phrase: "natural rattan wicker surface" },
+  { value: "pink-cotton", label: "粉色棉織物", phrase: "soft pink blush cotton fabric surface" },
+  { value: "eucalyptus", label: "白底尤加利葉", phrase: "white surface with scattered eucalyptus leaves" },
+  { value: "pastel-gradient", label: "粉彩漸層", phrase: "soft pastel gradient background" },
+  { value: "reclaimed-wood", label: "復古木板", phrase: "aged reclaimed wood with character marks" },
+  { value: "black-glossy", label: "黑色光面", phrase: "black glossy reflective surface" },
+  { value: "sand", label: "沙灘質感", phrase: "fine beach sand texture" },
+  { value: "monstera", label: "龜背芋綠葉", phrase: "white surface with monstera tropical leaves" },
+];
+
+// ── Flat tab: arrangement styles (15) ─────────────────────────────────────────
+export const FLAT_ARRANGEMENTS = [
+  { value: "centered-hero", label: "中央主角構圖", phrase: "centered hero shot with the garment as the sole focal point" },
+  { value: "diagonal-thirds", label: "對角三分法", phrase: "diagonally composed along the rule of thirds" },
+  { value: "overhead-orbit", label: "正上俯視", phrase: "directly overhead flat-lay perspective" },
+  { value: "scatter", label: "隨意散落", phrase: "casually deconstructed and scattered with organic arrangement" },
+  { value: "editorial-symmetry", label: "對稱 Editorial", phrase: "perfectly symmetrical editorial composition" },
+  { value: "ghost-mannequin", label: "Ghost Mannequin 隱形人", phrase: "ghost mannequin technique giving a 3D shape without a visible model" },
+  { value: "knolling", label: "Knolling 整齊排列", phrase: "precise knolling-style grid with items aligned at 90 degrees" },
+  { value: "shadow-play", label: "光影對比", phrase: "dramatic shadow play with strong light-and-shadow contrast" },
+  { value: "lifestyle-stack", label: "生活感堆疊", phrase: "casual lifestyle-inspired stacking with layered depth" },
+  { value: "minimal-negative", label: "極簡留白", phrase: "minimal composition with generous negative space" },
+  { value: "layered-texture", label: "材質層疊", phrase: "richly layered texture composition with multiple surface materials" },
+  { value: "campaign-closeup", label: "品牌特寫", phrase: "campaign-style close-up emphasizing fabric texture and print detail" },
+  { value: "color-blocked", label: "色塊排列", phrase: "color-blocked row layout with complementary items" },
+  { value: "natural-flow", label: "自然鬆散", phrase: "naturally draped and flowing arrangement" },
+  { value: "angled-45", label: "45° 斜角", phrase: "45-degree angled dynamic composition" },
+];
+
+// Keep FLAT_STYLES alias for any legacy code
+export const FLAT_STYLES = FLAT_ARRANGEMENTS;
+
+// ── Flat tab: lighting options (10) ───────────────────────────────────────────
 export const FLAT_LIGHTING = [
-  { value: "soft-top", label: "Soft top-down", phrase: "soft even top-down lighting" },
-  { value: "side-angle", label: "Strong side-angle", phrase: "strong directional side-angle lighting with gentle shadows" },
+  { value: "north-window", label: "北窗漫射自然光", phrase: "soft diffused north window natural light, even and shadow-free" },
+  { value: "hard-side-rim", label: "強側光輪廓", phrase: "hard directional side rim lighting creating dramatic depth shadows" },
+  { value: "overhead-softbox", label: "頂部柔光箱", phrase: "overhead softbox studio lighting, clean and professional" },
+  { value: "golden-backlight", label: "黃金時刻背光", phrase: "warm golden hour backlight with a romantic glowing halo" },
+  { value: "ring-flat", label: "環形燈平光", phrase: "ring light producing flat even illumination with catchlights" },
+  { value: "dual-fill", label: "雙側補光", phrase: "balanced dual fill lights with neutral tones" },
+  { value: "low-key", label: "低調戲劇光", phrase: "dramatic low key lighting with deep shadows" },
+  { value: "high-key", label: "高調全白光", phrase: "studio high key lighting with a bright airy feel" },
+  { value: "candle-warm", label: "燭光暖調", phrase: "warm candlelight ambient glow, intimate and cozy" },
+  { value: "neon-accent", label: "霓虹補光", phrase: "cool blue hour neon accent light, editorial and moody" },
+];
+
+// ── Flat tab: props (multi-select, 15) ────────────────────────────────────────
+export const FLAT_PROPS = [
+  { value: "crystals", label: "水晶原石", phrase: "raw crystals and gemstones" },
+  { value: "dried-flowers", label: "乾燥花", phrase: "dried wildflowers" },
+  { value: "coffee-beans", label: "咖啡豆", phrase: "scattered coffee beans" },
+  { value: "cinnamon", label: "肉桂棒", phrase: "cinnamon sticks" },
+  { value: "coins", label: "古董硬幣", phrase: "vintage coins" },
+  { value: "sage-bundle", label: "鼠尾草束", phrase: "a sage bundle" },
+  { value: "eucalyptus-sprigs", label: "尤加利葉", phrase: "eucalyptus sprigs" },
+  { value: "tarot-cards", label: "塔羅牌", phrase: "tarot cards" },
+  { value: "ribbon", label: "絲帶", phrase: "silk ribbon" },
+  { value: "dried-citrus", label: "乾燥柑橘片", phrase: "dried citrus slices" },
+  { value: "ink-pen", label: "鋼筆墨水", phrase: "a fountain pen and ink bottle" },
+  { value: "small-candle", label: "蠟燭", phrase: "a small pillar candle" },
+  { value: "shells", label: "貝殼", phrase: "seashells" },
+  { value: "thread-spools", label: "彩色線軸", phrase: "colorful thread spools" },
+  { value: "wax-seal", label: "蠟封章", phrase: "a wax seal stamp" },
+];
+
+// ── Model tab: lighting options (7) ───────────────────────────────────────────
+export const MODEL_LIGHTING = [
+  { value: "daylight", label: "Soft daylight", phrase: "soft natural daylight" },
+  { value: "editorial", label: "Editorial studio", phrase: "clean editorial studio lighting" },
+  { value: "window", label: "Soft window light", phrase: "soft window light" },
+  { value: "golden-hour", label: "黃金時刻 Golden hour", phrase: "warm golden hour sunlight" },
+  { value: "high-key", label: "High-key 全白", phrase: "bright high-key studio lighting" },
+  { value: "low-key", label: "Low-key 戲劇側光", phrase: "dramatic low-key directional side lighting" },
+  { value: "ring-light", label: "環形燈", phrase: "ring light with sharp catchlights" },
 ];
 
 export const MODEL_POSES = [
@@ -118,33 +229,35 @@ export const MODEL_ACCESSORIES = [
   { value: "wearing chunky retro jewelry", label: "復古大件首飾" },
 ];
 
-export const MODEL_LIGHTING = [
-  { value: "daylight", label: "Soft daylight", phrase: "soft natural daylight" },
-  { value: "editorial", label: "Editorial studio", phrase: "clean editorial studio lighting" },
-  { value: "window", label: "Soft window light", phrase: "soft window light" },
-];
+// ── Interfaces ────────────────────────────────────────────────────────────────
 
 export interface FlatMockupParams {
-  garment: string; // key of GARMENTS
+  /** Free-form garment phrase, e.g. "Bella Canvas 3001 unisex t-shirt" */
+  garmentPhrase: string;
   color: GarmentColor;
-  surface: string; // e.g. "light wooden table"
-  style: string; // value of FLAT_STYLES
-  lighting: string; // value of FLAT_LIGHTING
-  propBottomLeft?: string;
-  propTopRight?: string;
-  propBottomRight?: string;
+  /** value from FLAT_SURFACES */
+  surface: string;
+  /** value from FLAT_ARRANGEMENTS */
+  arrangement: string;
+  /** value from FLAT_LIGHTING */
+  lighting: string;
+  /** prop labels (from FLAT_PROPS) to scatter around the garment */
+  props?: string[];
 }
 
 export interface ModelMockupParams {
-  garment: string;
+  /** Free-form garment phrase, e.g. "Bella Canvas 3001 unisex t-shirt" */
+  garmentPhrase: string;
   color: GarmentColor;
   ageGroup: "adult" | "youth";
-  modelDescription: string; // e.g. "blonde Asian woman, 20s, slim"
-  pose: string; // value of MODEL_POSES
-  environment: string; // e.g. "cafe interior with coffee cups"
-  lighting: string; // value of MODEL_LIGHTING
-  propTopRight?: string;
-  propBottomLeft?: string;
+  modelDescription: string;
+  pose: string;
+  /** value from MODEL_SCENES */
+  scene: string;
+  /** value from MODEL_LIGHTING */
+  lighting: string;
+  /** prop labels (from MODEL_PROPS) visible in the scene */
+  props?: string[];
 }
 
 /** Shared print-fidelity block. The dark-fabric lock is iron rule #1. */
@@ -173,17 +286,16 @@ function find<T extends { value: string; phrase: string }>(list: T[], value: str
 }
 
 export function buildFlatMockupPrompt(p: FlatMockupParams): string {
-  const garment = GARMENTS[p.garment] ?? GARMENTS.tshirt;
-  const style = find(FLAT_STYLES, p.style);
+  const surface = find(FLAT_SURFACES, p.surface);
+  const arrangement = find(FLAT_ARRANGEMENTS, p.arrangement);
   const lighting = find(FLAT_LIGHTING, p.lighting);
-  const props: string[] = [];
-  if (p.propBottomLeft?.trim()) props.push(`${p.propBottomLeft.trim()} in the bottom-left corner`);
-  if (p.propTopRight?.trim()) props.push(`${p.propTopRight.trim()} in the top-right corner, partially cropped`);
-  if (p.propBottomRight?.trim()) props.push(`${p.propBottomRight.trim()} in the bottom-right corner`);
-  const propClause = props.length > 0 ? ` Around the garment: ${props.join("; ")}.` : "";
+  const propClause =
+    p.props && p.props.length > 0
+      ? ` Styled with: ${p.props.join(", ")}.`
+      : "";
   return (
-    `Photorealistic e-commerce flat-lay product photo. A plain ${p.color} ${garment.phrase}, ` +
-    `${style.phrase}, on ${p.surface.trim() || "a clean neutral surface"}, ${lighting.phrase}. ` +
+    `Photorealistic e-commerce flat-lay product photo. A plain ${p.color} ${p.garmentPhrase}, ` +
+    `${arrangement.phrase}, on ${surface.phrase}, ${lighting.phrase}. ` +
     fidelityBlock(p.color) +
     propClause +
     " Shot from directly above, editorial product photography."
@@ -191,21 +303,20 @@ export function buildFlatMockupPrompt(p: FlatMockupParams): string {
 }
 
 export function buildModelMockupPrompt(p: ModelMockupParams): string {
-  const garment = GARMENTS[p.garment] ?? GARMENTS.tshirt;
+  const scene = find(MODEL_SCENES, p.scene);
   const pose = find(MODEL_POSES, p.pose);
   const lighting = find(MODEL_LIGHTING, p.lighting);
   const who = p.ageGroup === "youth" ? "A young person" : "An adult";
   const desc = p.modelDescription.trim() ? ` (${p.modelDescription.trim()})` : "";
-  // Iron rule #2: when the pose doesn't inherently occlude, demand an unobstructed chest.
   const chestClause = pose.occludes ? "" : " The full chest area is visible and unobstructed.";
-  const props: string[] = [];
-  if (p.propTopRight?.trim()) props.push(`${p.propTopRight.trim()} in the top-right of the frame, mostly cropped`);
-  if (p.propBottomLeft?.trim()) props.push(`${p.propBottomLeft.trim()} in the bottom-left of the frame, partially cropped`);
-  const propClause = props.length > 0 ? ` In the scene: ${props.join("; ")}.` : "";
+  const propClause =
+    p.props && p.props.length > 0
+      ? ` Visible in the scene: ${p.props.join(", ")}.`
+      : "";
   return (
     `Photorealistic e-commerce lifestyle photo. ${who}${desc}, ${pose.phrase}, ` +
-    `in ${p.environment.trim() || "a bright minimal interior"}, ${lighting.phrase}. ` +
-    `They wear a plain ${p.color} ${garment.phrase}. ` +
+    `in ${scene.phrase}, ${lighting.phrase}. ` +
+    `They wear a plain ${p.color} ${p.garmentPhrase}. ` +
     fidelityBlock(p.color) +
     chestClause +
     propClause +
