@@ -7,7 +7,7 @@ import {
   type StudioModel,
 } from "../../../lib/studio/model-options";
 import { resolveStylePrompt } from "@/app/tools/tarot/cards";
-import ImageStyleControls from "@/components/tools/ImageStyleControls";
+import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
@@ -185,7 +185,6 @@ export default function StudioWorkbench() {
   const [savedMockups, setSavedMockups] = useState<Record<string, "saving" | "saved" | "error">>({});
 
   // Trending news state
-  const [trendingOpen, setTrendingOpen] = useState(false);
   const [trendingCategory, setTrendingCategory] = useState("");
   const [trendingTopics, setTrendingTopics] = useState<string[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
