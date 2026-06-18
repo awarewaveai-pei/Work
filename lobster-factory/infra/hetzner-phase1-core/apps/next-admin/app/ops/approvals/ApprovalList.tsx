@@ -84,8 +84,8 @@ export function ApprovalList({ items, canAct }: Props) {
           <div
             key={it.id}
             style={{
-              background: "#fff",
-              border: "1px solid #e2e8f0",
+              background: "var(--approval-card-bg)",
+              border: "1px solid var(--approval-card-border)",
               borderRadius: 8,
               padding: "16px 20px",
             }}
@@ -98,15 +98,15 @@ export function ApprovalList({ items, canAct }: Props) {
                       fontFamily: "monospace",
                       fontSize: 14,
                       fontWeight: 600,
-                      color: "#0f172a",
+                      color: "var(--approval-text-primary)",
                     }}
                   >
                     {it.command}
                   </span>
                   <span
                     style={{
-                      background: it.risk_level === "critical" ? "#fee2e2" : "#fef3c7",
-                      color: it.risk_level === "critical" ? "#991b1b" : "#854d0e",
+                      background: it.risk_level === "critical" ? "var(--badge-red-bg)" : "var(--build-risk-medium-bg)",
+                      color: it.risk_level === "critical" ? "var(--badge-red-text)" : "var(--build-risk-medium-text)",
                       fontSize: 11,
                       padding: "2px 8px",
                       borderRadius: 4,
@@ -116,15 +116,15 @@ export function ApprovalList({ items, canAct }: Props) {
                   >
                     {it.risk_level}
                   </span>
-                  <span style={{ fontSize: 12, color: "#64748b" }}>
+                  <span style={{ fontSize: 12, color: "var(--approval-text-muted)" }}>
                     {it.source} · {it.actor_type}
                     {it.actor_ref ? ` ${it.actor_ref}` : ""}
                   </span>
                 </div>
-                <div style={{ fontSize: 12, color: "#475569", marginBottom: 4 }}>
+                <div style={{ fontSize: 12, color: "var(--approval-text-dim)", marginBottom: 4 }}>
                   參數：<code>{argsPreview}</code>
                 </div>
-                <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>
+                <div style={{ fontSize: 11, color: "var(--approval-text-faint)", fontFamily: "monospace" }}>
                   追蹤碼：{it.trace_id} · 收到時間：{new Date(it.received_at).toLocaleString("zh-TW")}
                 </div>
               </div>
@@ -151,7 +151,7 @@ export function ApprovalList({ items, canAct }: Props) {
                     </button>
                   </>
                 ) : (
-                  <span style={{ fontSize: 12, color: "#94a3b8" }}>唯讀</span>
+                  <span style={{ fontSize: 12, color: "var(--approval-text-faint)" }}>唯讀</span>
                 )}
               </div>
             </div>
@@ -162,13 +162,13 @@ export function ApprovalList({ items, canAct }: Props) {
                   padding: "8px 12px",
                   borderRadius: 4,
                   fontSize: 13,
-                  background: result.ok ? "#ecfdf5" : "#fef2f2",
-                  color: result.ok ? "#065f46" : "#991b1b",
-                  border: `1px solid ${result.ok ? "#a7f3d0" : "#fecaca"}`,
+                  background: result.ok ? "var(--approval-result-ok-bg)" : "var(--approval-result-err-bg)",
+                  color: result.ok ? "var(--approval-result-ok-text)" : "var(--approval-result-err-text)",
+                  border: `1px solid ${result.ok ? "var(--approval-result-ok-border)" : "var(--approval-result-err-border)"}`,
                 }}
               >
                 {result.ok ? "✅" : "❌"} {result.msg}
-                <span style={{ marginLeft: 8, fontSize: 11, color: "#64748b" }}>
+                <span style={{ marginLeft: 8, fontSize: 11, color: "var(--approval-text-muted)" }}>
                   （重新整理頁面看更新後的列表）
                 </span>
               </div>
