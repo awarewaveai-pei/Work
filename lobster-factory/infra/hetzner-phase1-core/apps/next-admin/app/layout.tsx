@@ -117,6 +117,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               {/* 6. 系統（技術內部）──────────────────────────── */}
               <div className="sidebar-section">
                 <div className="sidebar-section-label">System</div>
+                <Link href="/tools/theme" className="sidebar-link" title="主題色票 + CSS token 即時編輯器">
+                  <span className="sidebar-icon">🎨</span> Theme Editor
+                </Link>
                 <Link href="/ops-console" className="sidebar-link" title="架構邊界 · Tenant 設定 · M3 · AI Job">
                   <span className="sidebar-icon">▣</span> Ops Console
                 </Link>

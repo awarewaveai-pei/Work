@@ -564,7 +564,7 @@ export default function ContentStudio() {
   const [showStruct,   setShowStruct]   = useState(true);
   const [showMedia,    setShowMedia]    = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showMarketing, setShowMarketing] = useState(false); // #4 structured brand-tone form
+  const [showMarketing, setShowMarketing] = useState(true); // #4 structured brand-tone form
   const [showPatterns, setShowPatterns] = useState(false);   // #6 Kadence funnel patterns
 
   // Syndication
@@ -916,9 +916,14 @@ export default function ContentStudio() {
     if (!selectedSiteId) return;
     void (async () => {
       try {
-        const res  = await fetch(`/api/content/categories?siteId=${encodeURIComponent(selectedSiteId)}`);
-        const json = await res.json() as { ok: boolean; categories?: string[] };
-        if (json.ok && json.categories) setSiteCategories(json.categories);
+        const [catRes, tagRes] = await Promise.all([
+          fetch(`/api/content/categories?siteId=${encodeURIComponent(selectedSiteId)}`),
+          fetch(`/api/content/tags?siteId=${encodeURIComponent(selectedSiteId)}`),
+        ]);
+        const catJson = await catRes.json() as { ok: boolean; categories?: string[] };
+        const tagJson = await tagRes.json() as { ok: boolean; tags?: string[] };
+        if (catJson.ok && catJson.categories) setSiteCategories(catJson.categories);
+        if (tagJson.ok && tagJson.tags) setSiteTags(tagJson.tags);
       } catch { /* silent — chips just won't pre-populate */ }
     })();
   }, [selectedSiteId]);
@@ -2720,10 +2725,32 @@ export default function ContentStudio() {
               </div>
               <div style={{ flex: 1, minWidth: "200px" }}>
                 <label className="form-label">標籤</label>
+                {/* Chip row: existing site tags as quick-pick */}
+                {siteTags.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+                    {siteTags.slice(0, 20).map(tag => {
+                      const selected = form.wpTags.split(",").map(s => s.trim()).filter(Boolean).includes(tag);
+                      return (
+                        <button key={tag} type="button" disabled={isGenerating}
+                          onClick={() => {
+                            const cur = form.wpTags.split(",").map(s => s.trim()).filter(Boolean);
+                            const next = selected ? cur.filter(t => t !== tag) : [...cur, tag];
+                            setF("wpTags", next.join(", "));
+                          }}
+                          style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
+                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
+                            color: selected ? "#fff" : "var(--text-secondary)",
+                            borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 <input className="form-input" style={{ width: "100%" }}
                   value={form.wpTags} onChange={e => setF("wpTags", e.target.value)}
                   placeholder="檸檬精油, 精油配方, 天然保養" disabled={isGenerating} />
-                <div className="form-hint" style={{ marginTop: 4 }}>逗號分隔。不存在的標籤會自動建立。</div>
+                <div className="form-hint" style={{ marginTop: 4 }}>點選現有標籤，或直接輸入（逗號分隔）。不存在的標籤會自動建立。</div>
               </div>
             </div>
           </div>

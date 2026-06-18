@@ -74,7 +74,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   void (async () => {
     try {
-      const result = (await blocks[0].run(ctx)) as BlockResult;
+      const result = (await blocks[0].run(ctx)) as unknown as BlockResult;
       if (result.ok && result.video) {
         finishJob(job.id, { status: "done", video: result.video, title: result.title ?? "" });
       } else {

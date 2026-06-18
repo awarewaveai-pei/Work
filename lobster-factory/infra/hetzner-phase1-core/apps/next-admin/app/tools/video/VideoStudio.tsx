@@ -115,7 +115,7 @@ export default function VideoStudio() {
         let sj: StatusResp;
         try {
           const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`);
-          sj = (await sr.json()) as StatusResp;
+          sj = (await sr.json()) as unknown as StatusResp;
         } catch {
           window.setTimeout(() => void poll(), 5000); // 暫時性網路錯 → 繼續輪詢
           return;
