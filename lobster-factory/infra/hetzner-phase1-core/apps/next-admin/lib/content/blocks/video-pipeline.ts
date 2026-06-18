@@ -59,52 +59,65 @@ register({
     // ── 4. 每場景取一個視覺素材 ──────────────────────────────────────────────
     const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
     const assets: string[] = [];
+    const tempFiles: string[] = []; // Flux 落地的臨時檔 → render 完成後於 finally 統一清
 
-    for (const scene of scenes) {
-      // 策略：broll + 有 Pexels key → 嘗試抓真實影片；否則用 Flux 靜態圖
-      if (scene.visual === "broll" && pexelsKey) {
-        const brollUrl = await fetchBrollUrl(scene.broll_keyword, pexelsKey);
-        if (brollUrl) {
-          assets.push(brollUrl);
-          continue;
+    try {
+      for (const scene of scenes) {
+        // 策略：broll + 有 Pexels key → 嘗試抓真實影片；否則用 Flux 靜態圖
+        if (scene.visual === "broll" && pexelsKey) {
+          const brollUrl = await fetchBrollUrl(scene.broll_keyword, pexelsKey);
+          if (brollUrl) {
+            assets.push(brollUrl);
+            continue;
+          }
+          // Pexels 找不到結果 → 降級到 Flux（fall through）
         }
-        // Pexels 找不到結果 → 降級到 Flux（fall through）
+
+        // Flux 靜態圖（16:9 橫幅，適合影片）
+        const imgResult = await generateTarotImage({
+          model: "flux-schnell",
+          prompt: scene.image_prompt,
+          aspectRatio: "16:9",
+        });
+
+        if (imgResult.ok === false) {
+          return {
+            ok: false,
+            status: 502,
+            error: `場景 ${scene.id} 圖片生成失敗：${imgResult.error}`,
+          };
+        }
+
+        // Flux 回傳 data: URL → 寫入本機臨時檔（與 video-service 共享 /tmp volume）
+        let localPath: string;
+        try {
+          localPath = dataUrlToTempFile(imgResult.image, `scene${scene.id}`);
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          return { ok: false, status: 502, error: `場景 ${scene.id} 圖片格式錯誤：${msg}` };
+        }
+        tempFiles.push(localPath);
+        assets.push(localPath);
       }
 
-      // Flux 靜態圖（16:9 橫幅，適合影片）
-      const imgResult = await generateTarotImage({
-        model: "flux-schnell",
-        prompt: scene.image_prompt,
-        aspectRatio: "16:9",
-      });
+      // ── 5. 呼叫 Python render 服務 ──────────────────────────────────────────
+      const renderResult = await callRenderService(
+        scenes.map((s) => ({ id: s.id, narration: s.narration })),
+        assets,
+        title
+      );
 
-      if (imgResult.ok === false) {
-        return {
-          ok: false,
-          status: 502,
-          error: `場景 ${scene.id} 圖片生成失敗：${imgResult.error}`,
-        };
-      }
+      if (!renderResult.ok) return renderResult as { ok: false; status: number; error: string };
 
-      // Flux 回傳 data: URL → 寫入本機臨時檔（與 video-service 共享 /tmp volume）
-      const localPath = dataUrlToTempFile(imgResult.image, `scene${scene.id}`);
-      assets.push(localPath);
+      return {
+        ok: true,
+        video: { outputs: renderResult.outputs, out_dir: renderResult.out_dir },
+        scenes,
+        title,
+      };
+    } finally {
+      // render 同步消費完臨時檔後才清（含中途失敗的孤兒檔）→ 防 /tmp 無限增長
+      cleanupTempFiles(tempFiles);
     }
-
-    // ── 5. 呼叫 Python render 服務 ──────────────────────────────────────────
-    const renderResult = await callRenderService(
-      scenes.map((s) => ({ id: s.id, narration: s.narration })),
-      assets,
-      title
-    );
-
-    if (!renderResult.ok) return renderResult as { ok: false; status: number; error: string };
-
-    return {
-      ok: true,
-      video: { outputs: renderResult.outputs, out_dir: renderResult.out_dir },
-      scenes,
-      title,
-    };
   },
 });
