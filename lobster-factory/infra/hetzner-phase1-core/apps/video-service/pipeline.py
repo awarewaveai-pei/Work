@@ -412,14 +412,24 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
 # STEP 5：FFmpeg 輸出多平台尺寸
 # ═══════════════════════════════════════════
 def export_all_formats(base_video: str, out_dir) -> dict:
+    """Export base video (16:9 1920x1080) to all platform formats.
+    Uses scale+pad (letterbox) instead of scale+crop — no content is cut."""
     print("\n[5/6] 輸出多平台尺寸...")
+    # vf filter per format: scale to fit content, pad to exact target size with black bars
+    FORMAT_FILTERS = {
+        "youtube_linkedin":       f"scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
+        "tiktok_reels":           f"scale=1080:-2,pad=1080:1920:0:(oh-ih)/2:black,setsar=1",
+        "instagram_facebook":     f"scale=1080:-2,pad=1080:1080:0:(oh-ih)/2:black,setsar=1",
+        "twitter_reddit_bluesky": f"scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
+    }
     output_files = {}
-    for name, (w, h) in config.FORMATS.items():
+    for name, vf in FORMAT_FILTERS.items():
+        w, h = config.FORMATS[name]
         out_path = str(out_dir / f"{name}.mp4")
         cmd = [
             "ffmpeg", "-y",
             "-i", base_video,
-            "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}",
+            "-vf", vf,
             "-c:v", "libx264", "-crf", "23", "-preset", "fast",
             "-c:a", "aac", "-b:a", "128k",
             out_path,
