@@ -284,7 +284,13 @@ export function SeoCheckPanel({
           slug: slug ?? "", failedChecks: failed,
         }),
       });
-      const json = await res.json() as FixResponse;
+      let json: FixResponse;
+      try {
+        json = await res.json() as FixResponse;
+      } catch {
+        setFixError(`伺服器錯誤 (HTTP ${res.status})，請重試`);
+        return;
+      }
       if (!json.ok || !json.markdown) { setFixError(json.error ?? "AI 修正失敗"); return; }
       const meta = (json.seoTitle || json.metaDescription)
         ? { seoTitle: json.seoTitle ?? seoTitle ?? "", metaDesc: json.metaDescription ?? metaDescription ?? "" }

@@ -30,17 +30,17 @@ META_DESC: [improved description here]
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
-    return new NextResponse("forbidden", { status: 403 });
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return new NextResponse("ANTHROPIC_API_KEY not configured", { status: 503 });
+  if (!apiKey) return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return new NextResponse("invalid json", { status: 400 });
+    return NextResponse.json({ ok: false, error: "invalid json" }, { status: 400 });
   }
 
   const str = (v: unknown, fb = "") => (typeof v === "string" ? v : fb);
@@ -52,8 +52,8 @@ export async function POST(req: Request): Promise<Response> {
   const failedChecks   = (Array.isArray(body.failedChecks) ? body.failedChecks : [])
     .filter((c: unknown) => c && typeof (c as RankMathCheck).label === "string" && typeof (c as RankMathCheck).detail === "string") as RankMathCheck[];
 
-  if (!markdown)     return new NextResponse("markdown required", { status: 400 });
-  if (!focusKeyword) return new NextResponse("focusKeyword required", { status: 400 });
+  if (!markdown)     return NextResponse.json({ ok: false, error: "markdown required" }, { status: 400 });
+  if (!focusKeyword) return NextResponse.json({ ok: false, error: "focusKeyword required" }, { status: 400 });
   if (failedChecks.length === 0) return NextResponse.json({ ok: true, markdown });
 
   const failedList = failedChecks

@@ -41,6 +41,39 @@ const PRODUCT_CONFIG = {
     top: 480,          // vertical center of printable chest area
     left: 180,         // horizontal center: (1800 - 1440) / 2
   },
+  hoodie: {
+    product_id: 2,       // Gildan 18500 Heavy Blend Hoodie
+    variant_id: 1534,    // White / S
+    placement: "front" as const,
+    area_width: 1800,
+    area_height: 2400,
+    design_width: 1440,
+    design_height: 1440,
+    top: 480,
+    left: 180,
+  },
+  mug: {
+    product_id: 19,      // 11oz Mug (Orca Coating)
+    variant_id: 1321,    // White
+    placement: "default" as const,
+    area_width: 3600,
+    area_height: 1350,
+    design_width: 2880,
+    design_height: 1080,
+    top: 135,
+    left: 360,
+  },
+  tote: {
+    product_id: 6,       // Tote Bag
+    variant_id: 225,     // Natural
+    placement: "front" as const,
+    area_width: 1800,
+    area_height: 1800,
+    design_width: 1440,
+    design_height: 1440,
+    top: 180,
+    left: 180,
+  },
 } as const;
 
 type ProductType = keyof typeof PRODUCT_CONFIG;

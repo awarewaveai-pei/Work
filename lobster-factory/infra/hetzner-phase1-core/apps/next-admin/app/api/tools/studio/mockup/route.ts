@@ -7,7 +7,7 @@ export const maxDuration = 120;
 
 const MAX_IMAGE_CHARS = 12_000_000; // ~9 MB base64
 
-const SUPPORTED_PRODUCT_TYPES = ["tshirt"] as const;
+const SUPPORTED_PRODUCT_TYPES = ["tshirt", "hoodie", "mug", "tote"] as const;
 
 export async function POST(request: Request) {
   if (process.env.POD_DESIGNS_ENABLED !== "true") {
