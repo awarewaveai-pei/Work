@@ -444,14 +444,15 @@ export default function ThemePage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {group.tokens.map(token => {
-                const changed = values[token.name] !== token.default;
+                const def = serverDefaults[token.name] ?? token.default;
+                const changed = values[token.name] !== def;
                 return (
                   <TokenRow
                     key={token.name}
                     name={token.name}
                     type={token.type}
-                    value={values[token.name] ?? token.default}
-                    defaultValue={token.default}
+                    value={values[token.name] ?? def}
+                    defaultValue={def}
                     changed={changed}
                     onChange={handleChange}
                   />
@@ -504,9 +505,9 @@ export default function ThemePage() {
       <div className="card" style={{ padding: 20, background: 'var(--ai-bg)', border: '1px solid var(--border)' }}>
         <div style={{ fontWeight: 600, color: 'var(--ai-text)', marginBottom: 8, fontSize: 13 }}>Make changes permanent</div>
         <ol style={{ color: 'var(--ai-text)', fontSize: 13, lineHeight: 1.9, paddingLeft: 20 }}>
-          <li>Adjust above → live across the whole app.</li>
-          <li><strong>Save</strong> persists to this browser (localStorage).</li>
-          <li><strong>Copy CSS</strong> → paste the <code>:root &#123;…&#125;</code> block into <code>app/globals.css</code> to make it permanent for everyone.</li>
+          <li>Adjust above → live across the whole app instantly.</li>
+          <li><strong>Save</strong> writes to <code>app/globals.css</code> (permanent for all users) <em>and</em> localStorage (live preview fallback).</li>
+          <li><strong>Copy CSS</strong> → manual backup of the <code>:root &#123;…&#125;</code> block.</li>
         </ol>
       </div>
     </div>

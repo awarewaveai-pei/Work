@@ -34,10 +34,25 @@ function verifyBearer(req: Request): boolean {
 
 function parseRootTokens(css: string): Record<string, string> {
   const tokens: Record<string, string> = {};
-  // Match the :root { ... } block (non-greedy, handles nested content)
-  const rootMatch = css.match(/:root\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/s);
-  if (!rootMatch) return tokens;
-  const body = rootMatch[1];
+  // Match the :root { ... } block — find the first :root { and collect until
+  // the matching closing brace (simple depth counter; globals.css has no nested :root).
+  const rootStart = css.indexOf(":root");
+  if (rootStart === -1) return tokens;
+  const braceOpen = css.indexOf("{", rootStart);
+  if (braceOpen === -1) return tokens;
+  let depth = 0;
+  let i = braceOpen;
+  let braceClose = -1;
+  while (i < css.length) {
+    if (css[i] === "{") depth++;
+    else if (css[i] === "}") {
+      depth--;
+      if (depth === 0) { braceClose = i; break; }
+    }
+    i++;
+  }
+  if (braceClose === -1) return tokens;
+  const body = css.slice(braceOpen + 1, braceClose);
   // Match lines like:  --token-name: value;
   const lineRe = /(--[\w-]+)\s*:\s*([^;]+);/g;
   let m: RegExpExecArray | null;
@@ -106,7 +121,9 @@ export async function POST(req: Request) {
   for (const [name, value] of Object.entries(incoming)) {
     const safeValue = (value as string).trim();
     // Replace `name: anything;` within the CSS — safe because name is validated above.
-    const re = new RegExp(`(${name.replace(/[-]/g, "\\-")}\\s*:\\s*)[^;]+(;)`, "g");
+    // (?![\w-]) ensures we don't accidentally match a longer token with the same prefix.
+    const escapedName = name.replace(/[-]/g, "\\-");
+    const re = new RegExp(`(${escapedName}(?![\\w\\-])\\s*:\\s*)[^;]+(;)`, "g");
     updated = updated.replace(re, `$1${safeValue}$2`);
   }
 
