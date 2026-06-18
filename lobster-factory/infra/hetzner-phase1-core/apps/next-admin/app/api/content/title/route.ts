@@ -45,15 +45,26 @@ export async function POST(req: Request): Promise<Response> {
 - LENGTH: 50–60 characters; descriptive, not clickbait.
 - YMYL safety: for health/wellness topics never use overclaim words like cure / guaranteed / heal.`;
 
+  // When keyword contains commas (e.g. "ASD, ART Therapy"), treat as a TOPIC PHRASE, not a
+  // literal string to insert verbatim. Derive the actual topic and write natural, human-sounding titles.
+  const isMultiKeyword = keyword.includes(",");
+  const keywordInstruction = isMultiKeyword
+    ? `The input "${keyword}" is a list of related terms describing ONE topic. Your job is to:
+1. Understand what topic these terms collectively describe (e.g. "ASD, ART" = Art Therapy for Autism Spectrum Disorder)
+2. Write natural titles about THAT TOPIC — NEVER insert the raw comma-separated string into the title
+3. Use the most important term naturally within the title, as a real writer would`
+    : `Primary keyword to place in titles: "${keyword}"`;
+
   const client = new Anthropic({ apiKey });
   const msg = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 500,
     messages: [{
       role: "user",
-      content: `Generate 5 compelling SEO/GEO-optimized article titles for the keyword: "${keyword}"
+      content: `Generate 5 compelling SEO/GEO-optimized article titles.
 Language: ${language}
 Article type: ${articleType}
+${keywordInstruction}
 
 ${rankMathRules}
 
@@ -68,6 +79,7 @@ ENGAGEMENT RULES (these are AS important as the RankMath rules — a title that 
   5. CONTRARIAN / MYTH-BUSTING — challenges conventional wisdom: "The X Myth That's Holding You Back", "Stop Doing X: Here's What Actually Works"
 - NEVER produce generic, interchangeable titles like "The Complete Guide to X" or "Everything You Need to Know About X" — these get zero clicks.
 - CJK titles: apply the same 5 patterns in the target language. Use emotionally resonant phrasing like 「你可能不知道的...」「為什麼大多數人...」「...的 7 個關鍵秘密」.
+- CRITICAL: titles must read as natural human writing — NEVER mechanically insert a comma-separated keyword string like "ASD, ART" or "keyword1, keyword2" into the title.
 
 Return ONLY a valid JSON array of 5 title strings, nothing else.
 Example: ["Title One Here", "Title Two Here", "Title Three Here", "Title Four Here", "Title Five Here"]`,
