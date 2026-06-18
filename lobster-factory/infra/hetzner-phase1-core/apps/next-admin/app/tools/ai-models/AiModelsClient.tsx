@@ -1,0 +1,495 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import {
+  TEXT_MODEL_COMPARISONS,
+  CODING_TOOL_COMPARISONS,
+  AI_MODEL_SOURCES,
+  type TextModelComparison,
+  type CodingToolComparison,
+} from "@/lib/ai/model-comparison";
+import {
+  TAROT_MODEL_COMPARISONS,
+  TAROT_MODEL_SOURCES,
+  type TarotModelComparison,
+} from "@/lib/tarot/model-comparison";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type Tab = "text" | "image" | "coding";
+type SortMode = "default" | "cost" | "speed";
+
+type TaggedText = TextModelComparison & { _type: "text" };
+type TaggedImage = TarotModelComparison & { _type: "image" };
+type TaggedCoding = CodingToolComparison & { _type: "coding" };
+type AnyModel = TaggedText | TaggedImage | TaggedCoding;
+
+// ── Color maps ────────────────────────────────────────────────────────────────
+
+const SPEED_STYLE: Record<number, { label: string; color: string; bg: string }> = {
+  1: { label: "最快", color: "#166534", bg: "#dcfce7" },
+  2: { label: "快",   color: "#1e40af", bg: "#dbeafe" },
+  3: { label: "中等", color: "#92400e", bg: "#fef3c7" },
+  4: { label: "慢",   color: "#9a3412", bg: "#ffedd5" },
+};
+
+const TEXT_SOURCE_LABEL: Record<string, string> = {
+  openaiPricing: "OpenAI pricing",
+  openaiGpt55: "GPT-5 page",
+  codexPricing: "Codex page",
+  claudeModels: "Claude models",
+  claudePricing: "Claude pricing",
+  claudeCode: "Claude Code",
+  geminiModels: "Gemini models",
+  geminiPricing: "Gemini pricing",
+  geminiCodeAssist: "Code Assist",
+  perplexityPricing: "Perplexity pricing",
+  perplexityModels: "Perplexity models",
+  xaiModels: "xAI models",
+  grokBuild: "Grok Build",
+};
+
+const TWD = 32;
+
+// ── Utility functions ─────────────────────────────────────────────────────────
+
+function textCostStyle(c: number) {
+  if (c === 0)  return { label: "免費", color: "#166534", bg: "#dcfce7" };
+  if (c < 0.5)  return { label: "$",    color: "#166534", bg: "#dcfce7" };
+  if (c < 2)    return { label: "$$",   color: "#1e40af", bg: "#dbeafe" };
+  if (c < 4)    return { label: "$$$",  color: "#92400e", bg: "#fef3c7" };
+  return              { label: "$$$$", color: "#9a3412", bg: "#ffedd5" };
+}
+
+function imageCostStyle(c: number) {
+  if (c < 0.03)  return { label: "$",    color: "#166534", bg: "#dcfce7" };
+  if (c < 0.07)  return { label: "$$",   color: "#1e40af", bg: "#dbeafe" };
+  if (c < 0.12)  return { label: "$$$",  color: "#92400e", bg: "#fef3c7" };
+  return               { label: "$$$$", color: "#9a3412", bg: "#ffedd5" };
+}
+
+// ── Primitive components ──────────────────────────────────────────────────────
+
+function Chip({ label, color, bg }: { label: string; color: string; bg: string }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      padding: "2px 9px", borderRadius: 999,
+      fontSize: 11, fontWeight: 700, color, background: bg,
+      lineHeight: "18px", whiteSpace: "nowrap",
+    }}>
+      {label}
+    </span>
+  );
+}
+
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      display: "flex", gap: 10, padding: "5px 0",
+      borderBottom: "1px solid #f1f5f9", alignItems: "flex-start",
+    }}>
+      <span style={{
+        width: 58, flexShrink: 0,
+        fontSize: 9.5, fontWeight: 800,
+        letterSpacing: ".07em", textTransform: "uppercase",
+        color: "#94a3b8", paddingTop: 2,
+      }}>
+        {label}
+      </span>
+      <span style={{ fontSize: 12.5, color: "#1e293b", lineHeight: 1.55 }}>
+        {children}
+      </span>
+    </div>
+  );
+}
+
+function SrcLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" style={{
+      color: "var(--accent)", textDecoration: "none",
+      border: "1px solid var(--card-border)", background: "#fff",
+      borderRadius: 999, padding: "2px 8px", fontSize: 10.5, whiteSpace: "nowrap",
+    }}>
+      {label}
+    </a>
+  );
+}
+
+// ── Card base styles ──────────────────────────────────────────────────────────
+
+const CARD: React.CSSProperties = {
+  border: "1.5px solid var(--card-border)", borderRadius: 10,
+  background: "#fff", padding: "14px 16px",
+  display: "flex", flexDirection: "column", gap: 0,
+  transition: "box-shadow .15s, border-color .15s",
+};
+const CARD_SEL: React.CSSProperties = {
+  ...CARD, borderColor: "#3b82f6",
+  boxShadow: "0 0 0 3px #bfdbfe",
+};
+
+function CardHeader({ selected, onToggle, vendor, name, sub, badges }: {
+  selected: boolean; onToggle: () => void;
+  vendor: string; name: string; sub?: string;
+  badges: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+      <input
+        type="checkbox" checked={selected} onChange={onToggle}
+        title="選取此模型以比較"
+        style={{ marginTop: 3, width: 16, height: 16, cursor: "pointer", accentColor: "#3b82f6", flexShrink: 0 }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 3 }}>
+          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: ".07em", color: "#64748b", textTransform: "uppercase" }}>
+            {vendor}
+          </span>
+          {badges}
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>{name}</div>
+        {sub && <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+function ProCon({ strengths, tradeoffs }: { strengths: string; tradeoffs: string }) {
+  return (
+    <div style={{
+      background: "#f8fafc", borderRadius: 7, padding: "10px 12px",
+      marginBottom: 10, display: "flex", flexDirection: "column", gap: 6,
+    }}>
+      <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
+        <span style={{ fontSize: 14, lineHeight: "18px", flexShrink: 0 }}>✅</span>
+        <span style={{ fontSize: 12, color: "#374151", lineHeight: 1.5 }}>{strengths}</span>
+      </div>
+      <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
+        <span style={{ fontSize: 14, lineHeight: "18px", flexShrink: 0 }}>⚠️</span>
+        <span style={{ fontSize: 12, color: "#374151", lineHeight: 1.5 }}>{tradeoffs}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Model cards ───────────────────────────────────────────────────────────────
+
+function TextCard({ m, sel, onToggle }: { m: TextModelComparison; sel: boolean; onToggle: () => void }) {
+  const spd = SPEED_STYLE[m.speedRank];
+  const cst = textCostStyle(m.costInputPer1M);
+  return (
+    <div style={sel ? CARD_SEL : CARD}>
+      <CardHeader
+        selected={sel} onToggle={onToggle}
+        vendor={m.vendor} name={m.model} sub={m.surface}
+        badges={<><Chip {...spd} /><Chip {...cst} /></>}
+      />
+      <div style={{ marginBottom: 10 }}>
+        <InfoRow label="最適合">{m.bestFor}</InfoRow>
+        <InfoRow label="風格">{m.style}</InfoRow>
+        <InfoRow label="成本">{m.cost}</InfoRow>
+        <InfoRow label="Context">{m.context}</InfoRow>
+      </div>
+      <ProCon strengths={m.strengths} tradeoffs={m.tradeoffs} />
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+        {m.sourceKeys.map((k) => {
+          const url = AI_MODEL_SOURCES[k as keyof typeof AI_MODEL_SOURCES];
+          return url ? <SrcLink key={k} href={url} label={TEXT_SOURCE_LABEL[k] ?? k} /> : null;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ImageCard({ m, sel, onToggle }: { m: TarotModelComparison; sel: boolean; onToggle: () => void }) {
+  const spd = SPEED_STYLE[m.speedRank];
+  const cst = imageCostStyle(m.costUsd);
+  const tierColor: Record<string, { bg: string; color: string }> = {
+    preview:   { bg: "#f1f5f9", color: "#64748b" },
+    balanced:  { bg: "#dbeafe", color: "#1e40af" },
+    quality:   { bg: "#fce7f3", color: "#9d174d" },
+    character: { bg: "#ede9fe", color: "#6d28d9" },
+    editing:   { bg: "#d1fae5", color: "#065f46" },
+  };
+  const tc = tierColor[m.tier] ?? tierColor.preview;
+  return (
+    <div style={sel ? CARD_SEL : CARD}>
+      <CardHeader
+        selected={sel} onToggle={onToggle}
+        vendor={m.provider}
+        name={m.label}
+        sub={`US$${m.costUsd.toFixed(3)} · NT$${Math.round(m.costUsd * TWD * 10) / 10} / 張`}
+        badges={
+          <>
+            <span style={{ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:999, fontSize:10.5, fontWeight:700, ...tc }}>{m.tier}</span>
+            <Chip {...spd} />
+            <Chip {...cst} />
+          </>
+        }
+      />
+      <div style={{ marginBottom: 10 }}>
+        <InfoRow label="最適合">{m.bestFor}</InfoRow>
+        <InfoRow label="避開">{m.avoidFor}</InfoRow>
+        <InfoRow label="參考圖">{m.appReferenceLimit} · {m.referenceInput}</InfoRow>
+        <InfoRow label="文字渲染">{m.textRendering}</InfoRow>
+        <InfoRow label="Seed">{m.seedSupport}</InfoRow>
+      </div>
+      <ProCon strengths={m.strengths} tradeoffs={m.tradeoffs} />
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+        {m.sourceKeys.map((k) => {
+          const url = TAROT_MODEL_SOURCES[k as keyof typeof TAROT_MODEL_SOURCES];
+          return url ? <SrcLink key={k} href={url} label={k} /> : null;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CodingCard({ m, sel, onToggle }: { m: CodingToolComparison; sel: boolean; onToggle: () => void }) {
+  const spd = SPEED_STYLE[m.speedRank];
+  const cst = textCostStyle(m.costInputPer1M);
+  return (
+    <div style={sel ? CARD_SEL : CARD}>
+      <CardHeader
+        selected={sel} onToggle={onToggle}
+        vendor={m.vendor}
+        name={m.tool}
+        sub={`${m.model} · ${m.surface}`}
+        badges={<><Chip {...spd} /><Chip {...cst} /></>}
+      />
+      <div style={{ marginBottom: 10 }}>
+        <InfoRow label="最適合">{m.bestFor}</InfoRow>
+        <InfoRow label="工作流">{m.workflowStyle}</InfoRow>
+        <InfoRow label="成本">{m.cost}</InfoRow>
+        <InfoRow label="Context">{m.context}</InfoRow>
+      </div>
+      <ProCon strengths={m.strengths} tradeoffs={m.tradeoffs} />
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+        {m.sourceKeys.map((k) => {
+          const url = AI_MODEL_SOURCES[k as keyof typeof AI_MODEL_SOURCES];
+          return url ? <SrcLink key={k} href={url} label={TEXT_SOURCE_LABEL[k] ?? k} /> : null;
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Compare modal ─────────────────────────────────────────────────────────────
+
+function CompareModal({ models, onClose }: { models: AnyModel[]; onClose: () => void }) {
+  const type = models[0]._type;
+  type RowDef = { label: string; get: (m: AnyModel) => string };
+
+  const rows: RowDef[] = type === "text" ? [
+    { label: "供應商", get: (m) => (m as TaggedText).vendor },
+    { label: "最適合", get: (m) => (m as TaggedText).bestFor },
+    { label: "風格",   get: (m) => (m as TaggedText).style },
+    { label: "成本",   get: (m) => (m as TaggedText).cost },
+    { label: "速度",   get: (m) => (m as TaggedText).speed },
+    { label: "Context",get: (m) => (m as TaggedText).context },
+    { label: "優勢",   get: (m) => (m as TaggedText).strengths },
+    { label: "限制",   get: (m) => (m as TaggedText).tradeoffs },
+  ] : type === "image" ? [
+    { label: "供應商",  get: (m) => (m as TaggedImage).provider },
+    { label: "每張成本",get: (m) => `US$${(m as TaggedImage).costUsd.toFixed(3)} / NT$${Math.round((m as TaggedImage).costUsd * TWD * 10) / 10}` },
+    { label: "速度",    get: (m) => (m as TaggedImage).speed },
+    { label: "最適合",  get: (m) => (m as TaggedImage).bestFor },
+    { label: "避開",    get: (m) => (m as TaggedImage).avoidFor },
+    { label: "參考圖",  get: (m) => (m as TaggedImage).appReferenceLimit },
+    { label: "文字渲染",get: (m) => (m as TaggedImage).textRendering },
+    { label: "Seed",    get: (m) => (m as TaggedImage).seedSupport },
+    { label: "優勢",    get: (m) => (m as TaggedImage).strengths },
+    { label: "限制",    get: (m) => (m as TaggedImage).tradeoffs },
+  ] : [
+    { label: "供應商", get: (m) => (m as TaggedCoding).vendor },
+    { label: "最適合", get: (m) => (m as TaggedCoding).bestFor },
+    { label: "工作流", get: (m) => (m as TaggedCoding).workflowStyle },
+    { label: "成本",   get: (m) => (m as TaggedCoding).cost },
+    { label: "速度",   get: (m) => (m as TaggedCoding).speed },
+    { label: "Context",get: (m) => (m as TaggedCoding).context },
+    { label: "優勢",   get: (m) => (m as TaggedCoding).strengths },
+    { label: "限制",   get: (m) => (m as TaggedCoding).tradeoffs },
+  ];
+
+  const names = models.map((m) =>
+    m._type === "text" ? (m as TaggedText).model :
+    m._type === "image" ? (m as TaggedImage).label :
+    (m as TaggedCoding).tool
+  );
+
+  return (
+    <div
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:20 }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth: Math.min(models.length * 300 + 160, 1200), maxHeight:"88vh", overflow:"auto", padding:24, boxShadow:"0 20px 60px rgba(0,0,0,.25)" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+          <h2 style={{ margin:0, fontSize:17, fontWeight:800 }}>模型比較 · {names.join(" vs ")}</h2>
+          <button onClick={onClose} style={{ border:"none", background:"#f1f5f9", borderRadius:6, padding:"5px 12px", cursor:"pointer", fontSize:13, fontWeight:600 }}>關閉 ✕</button>
+        </div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"separate", borderSpacing:0 }}>
+            <thead>
+              <tr>
+                <th style={{ ...TH, width:80 }}>屬性</th>
+                {names.map((n) => <th key={n} style={TH}><div style={{ fontWeight:800 }}>{n}</div></th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={row.label} style={{ background: i % 2 === 0 ? "#fff" : "#f8fafc" }}>
+                  <td style={{ ...TD, fontWeight:700, color:"#64748b", fontSize:10.5, textTransform:"uppercase", letterSpacing:".06em" }}>{row.label}</td>
+                  {models.map((m, j) => <td key={j} style={TD}>{row.get(m)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const TH: React.CSSProperties = {
+  padding:"10px 14px", textAlign:"left",
+  background:"#f8fafc", borderBottom:"2px solid #e2e8f0",
+  fontSize:12, fontWeight:700, color:"#374151",
+  position:"sticky", top:0,
+};
+const TD: React.CSSProperties = {
+  padding:"10px 14px", borderBottom:"1px solid #f1f5f9",
+  fontSize:12.5, color:"#1e293b", lineHeight:1.55, verticalAlign:"top",
+};
+
+// ── Controls bar ──────────────────────────────────────────────────────────────
+
+function Controls({ sort, onSort, selCount, onCompare, onClear }: {
+  sort: SortMode; onSort: (s: SortMode) => void;
+  selCount: number; onCompare: () => void; onClear: () => void;
+}) {
+  const base: React.CSSProperties = { padding:"5px 13px", borderRadius:6, fontSize:12, fontWeight:600, border:"1px solid var(--card-border)", cursor:"pointer" };
+  const on: React.CSSProperties = { ...base, background:"var(--accent)", color:"#fff", borderColor:"var(--accent)" };
+  const off: React.CSSProperties = { ...base, background:"#fff", color:"#475569" };
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12, flexWrap:"wrap" }}>
+      <span style={{ fontSize:10.5, fontWeight:800, letterSpacing:".07em", textTransform:"uppercase", color:"#94a3b8" }}>排序</span>
+      <button style={sort==="default" ? on : off} onClick={() => onSort("default")}>預設</button>
+      <button style={sort==="cost"    ? on : off} onClick={() => onSort("cost")}>成本 ↑</button>
+      <button style={sort==="speed"   ? on : off} onClick={() => onSort("speed")}>速度 ↑</button>
+      {selCount > 0 && (
+        <div style={{ display:"flex", alignItems:"center", gap:6, marginLeft:"auto" }}>
+          <span style={{ fontSize:12, color:"#64748b" }}>已選 {selCount} 個（最多 4）</span>
+          <button
+            onClick={onCompare} disabled={selCount < 2}
+            style={{ ...base, background: selCount>=2 ? "#2563eb" : "#e2e8f0", color: selCount>=2 ? "#fff" : "#94a3b8", borderColor: selCount>=2 ? "#2563eb" : "#e2e8f0", cursor: selCount>=2 ? "pointer" : "not-allowed" }}
+          >比較 ⇄</button>
+          <button style={off} onClick={onClear}>清除</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+
+export default function AiModelsClient() {
+  const [tab, setTab] = useState<Tab>("text");
+  const [sort, setSort] = useState<SortMode>("default");
+  const [selText,   setSelText]   = useState<Set<string>>(new Set());
+  const [selImage,  setSelImage]  = useState<Set<string>>(new Set());
+  const [selCoding, setSelCoding] = useState<Set<string>>(new Set());
+  const [cmpOpen, setCmpOpen] = useState(false);
+
+  const curSel    = tab === "text" ? selText   : tab === "image" ? selImage  : selCoding;
+  const setCurSel = tab === "text" ? setSelText : tab === "image" ? setSelImage : setSelCoding;
+
+  function toggle(id: string) {
+    setCurSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 4) next.add(id);
+      return next;
+    });
+  }
+
+  const sortedText = useMemo(() => {
+    const r = [...TEXT_MODEL_COMPARISONS];
+    if (sort === "cost")  r.sort((a, b) => a.costInputPer1M - b.costInputPer1M);
+    if (sort === "speed") r.sort((a, b) => a.speedRank - b.speedRank);
+    return r;
+  }, [sort]);
+
+  const sortedImage = useMemo(() => {
+    const r = [...TAROT_MODEL_COMPARISONS];
+    if (sort === "cost")  r.sort((a, b) => a.costUsd - b.costUsd);
+    if (sort === "speed") r.sort((a, b) => a.speedRank - b.speedRank);
+    return r;
+  }, [sort]);
+
+  const sortedCoding = useMemo(() => {
+    const r = [...CODING_TOOL_COMPARISONS];
+    if (sort === "cost")  r.sort((a, b) => a.costInputPer1M - b.costInputPer1M);
+    if (sort === "speed") r.sort((a, b) => a.speedRank - b.speedRank);
+    return r;
+  }, [sort]);
+
+  const cmpModels = useMemo((): AnyModel[] => {
+    if (tab === "text")   return TEXT_MODEL_COMPARISONS.filter((m) => selText.has(m.model)).map((m) => ({ ...m, _type: "text" as const }));
+    if (tab === "image")  return TAROT_MODEL_COMPARISONS.filter((m) => selImage.has(m.id)).map((m) => ({ ...m, _type: "image" as const }));
+    return CODING_TOOL_COMPARISONS.filter((m) => selCoding.has(m.tool)).map((m) => ({ ...m, _type: "coding" as const }));
+  }, [tab, selText, selImage, selCoding]);
+
+  const tabBtn = (active: boolean): React.CSSProperties => ({
+    padding:"7px 18px", borderRadius:7, fontSize:13, fontWeight:700,
+    border:"none", cursor:"pointer",
+    background: active ? "var(--accent)" : "#f1f5f9",
+    color: active ? "#fff" : "#475569",
+  });
+
+  function changeTab(t: Tab) { setTab(t); setSort("default"); }
+
+  return (
+    <>
+      {/* Tabs */}
+      <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
+        <button style={tabBtn(tab==="text")}   onClick={() => changeTab("text")}>文字生成 {TEXT_MODEL_COMPARISONS.length}</button>
+        <button style={tabBtn(tab==="image")}  onClick={() => changeTab("image")}>圖片生成 {TAROT_MODEL_COMPARISONS.length}</button>
+        <button style={tabBtn(tab==="coding")} onClick={() => changeTab("coding")}>Coding 工具 {CODING_TOOL_COMPARISONS.length}</button>
+      </div>
+
+      {/* Controls */}
+      <Controls
+        sort={sort} onSort={setSort}
+        selCount={curSel.size}
+        onCompare={() => setCmpOpen(true)}
+        onClear={() => setCurSel(new Set())}
+      />
+
+      {/* Hint */}
+      {curSel.size === 0 && (
+        <p style={{ fontSize:12, color:"#94a3b8", margin:"0 0 12px" }}>
+          ☑ 勾選最多 4 個模型後可點「比較 ⇄」並排對照
+        </p>
+      )}
+
+      {/* Cards */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(310px, 1fr))", gap:14 }}>
+        {tab === "text" && sortedText.map((m) => (
+          <TextCard   key={m.model} m={m} sel={selText.has(m.model)}    onToggle={() => toggle(m.model)} />
+        ))}
+        {tab === "image" && sortedImage.map((m) => (
+          <ImageCard  key={m.id}    m={m} sel={selImage.has(m.id)}      onToggle={() => toggle(m.id)} />
+        ))}
+        {tab === "coding" && sortedCoding.map((m) => (
+          <CodingCard key={m.tool}  m={m} sel={selCoding.has(m.tool)}   onToggle={() => toggle(m.tool)} />
+        ))}
+      </div>
+
+      {/* Compare modal */}
+      {cmpOpen && cmpModels.length >= 2 && (
+        <CompareModal models={cmpModels} onClose={() => setCmpOpen(false)} />
+      )}
+    </>
+  );
+}
