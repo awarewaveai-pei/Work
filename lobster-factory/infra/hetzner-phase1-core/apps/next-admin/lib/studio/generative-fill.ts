@@ -64,11 +64,13 @@ export async function generativeFill(args: GenerativeFillInput): Promise<Generat
   if (!args.mask && !args.outpaint) return { ok: false, error: "mask_or_outpaint_required" };
   const version = process.env.GENFILL_VERSION ?? FLUX_FILL_PRO_VERSION_DEFAULT;
 
-  // PNG keeps the masked-fill edges clean; safety_tolerance default (2) is the model default.
+  // PNG keeps the masked-fill edges clean.
+  // safety_tolerance 5 = most permissive; avoids false-positive NSFW blocks on dark/gothic artwork.
   const input: Record<string, unknown> = {
     image: args.image,
     prompt: args.prompt.trim().slice(0, 1000),
     output_format: "png",
+    safety_tolerance: 5,
   };
   if (args.outpaint) input.outpaint = args.outpaint;
   else if (args.mask) input.mask = args.mask;

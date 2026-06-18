@@ -5,6 +5,7 @@ import type { WpSite } from "@/lib/content/wp-sites";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
 import type { RankMathReport } from "@/lib/seo/rankmath-checker";
 import { SeoCheckPanel } from "./SeoCheckPanel";
+import { CostChip } from "./CostChip";
 import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
 import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS } from "@/lib/ai/text-model-options";
 
@@ -2520,7 +2521,7 @@ export default function ContentStudio() {
           </div>
 
           {/* ── 產生按鈕 ── */}
-          <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "28px" }}>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "28px", flexWrap: "wrap" }}>
             <button className="btn-primary" onClick={handleGenerate}
               disabled={isGenerating || !form.keyword.trim()} style={{ fontSize: "14px", padding: "10px 24px" }}>
               {isGenerating ? "產生中…" : "產生文章"}
@@ -2529,6 +2530,9 @@ export default function ContentStudio() {
               <button className="btn-secondary" onClick={() => { abortRef.current?.abort(); setGenStatus("idle"); }}>停止</button>
             )}
             {genStatus === "error" && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "13px" }}>{genError}</span>}
+            <div style={{ marginLeft: "auto" }}>
+              <CostChip cost={sessionCost} />
+            </div>
           </div>
 
           {/* ═══ 輸出區 ═══ */}
