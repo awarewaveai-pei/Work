@@ -39,7 +39,7 @@ export function markdownPreview(md: string): string {
   // Strip meta + comment blocks
   const clean = md
     .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
-    .replace(/<!--.*?-->/gs, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
     .trim();
 
   const lines = clean.split("\n");

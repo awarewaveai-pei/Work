@@ -128,7 +128,26 @@ STRUCTURED DATA HINTS (for the CMS to apply):
 CONTENT FRESHNESS SIGNALS:
 - When citing research or statistics, always include the year (e.g. "a 2024 study by…")
 - Use "As of [year]" when describing a current state that may change
-- Avoid phrases like "recently" or "currently" — they become inaccurate quickly`;
+- Avoid phrases like "recently" or "currently" — they become inaccurate quickly
+
+GEO 在地化（台灣 / 亞太地區文章必須）：
+- 在文章中加入至少一個台灣在地地名或機構（如台北、高雄、台灣師範大學、衛生福利部）
+- 引用台灣官方數據或在地研究（例：衛福部統計、教育部資料、台灣指數等）
+- 至少一個段落提及台灣人的常見情境或生活脈絡（非泛稱亞洲）
+- 英文文章：如有多語言 SEO 需求，加一句說明台灣地區差異即可
+
+SCHEMA MARKUP HINTS（CMS 會自動產生 JSON-LD，以下信號決定品質）：
+- Article / BlogPosting：H1 是 Article.headline；## Quick Answer 第一句是 Article.description
+- FAQPage：已由 ## FAQ 觸發，答案必須自含、可獨立閱讀（不引用「上方」「如前所述」）
+- BreadcrumbList：確保 ## 段落標題能清楚描述所屬子分類（breadcrumb 從 H2 推斷）
+- HowToStep（操作指南類型）：如果文章是 How-to，每個步驟段落必須含明確動詞開頭（「安裝…」「打開…」「設定…」）
+- Article.author：若 instructions 有作者名，第一段必須自然帶入作者姓名與一句資歷描述
+- Article.datePublished：由 <!-- PUBLISH_DATE --> 替換（上方已說明，勿重複寫日期）
+
+READING EASE — 3 額外通過條件（RankMath Readability 評分）：
+- 被動語態 < 10%：用主動語態。錯誤：「方法被用來…」；正確：「你可以用這個方法…」
+- 連接詞開頭句 < 30%：避免每段第一句都是「所以…」「因此…」「此外…」
+- 轉換詞（Transition words）> 30%：在段落間用「首先…其次…最後…」「相較之下…」「舉例來說…」連接邏輯`;
 
 
 interface ArticleStructure {

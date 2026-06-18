@@ -3065,6 +3065,22 @@ export default function ContentStudio() {
                 {pubStatus === "error" && <span style={{ fontSize: "12px", color: "var(--color-error, #ef4444)" }}>推送失敗：{pubError}</span>}
               </div>
 
+              {/* ── 影片（decoupled — 文章先推，影片後嵌）── */}
+              {pubStatus === "done" && publishedPostId && (
+                <div style={{ marginTop: "10px", padding: "10px 14px", borderRadius: "6px",
+                  background: "#f0f9ff", border: "1px solid #bae6fd", fontSize: "13px" }}>
+                  🎬 影片生成（可選）：文章已推送，影片完成後自動嵌入文章
+                  {videoStatus === "idle" && (
+                    <button className="btn-secondary" style={{ fontSize: "12px", marginLeft: "12px" }}
+                      onClick={() => handleGenerateVideo(publishedPostId)}>生成影片並嵌入</button>
+                  )}
+                  {videoStatus === "generating" && <span style={{ marginLeft: 10, color: "#0284c7" }}>⏳ 影片生成中（預計 5-15 分鐘）…</span>}
+                  {videoStatus === "embedding"  && <span style={{ marginLeft: 10, color: "#0284c7" }}>⏳ 嵌入影片到 WP…</span>}
+                  {videoStatus === "done"       && <span style={{ marginLeft: 10, color: "#22c55e" }}>✓ 影片已嵌入文章</span>}
+                  {videoStatus === "error"      && <span style={{ marginLeft: 10, color: "var(--color-error, #ef4444)" }}>影片失敗：{videoError}（文章不受影響）</span>}
+                </div>
+              )}
+
               {/* ── RankMath SEO 合規分數 ── */}
               <SeoCheckPanel
                 report={seoReport}

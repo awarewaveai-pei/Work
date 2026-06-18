@@ -18,7 +18,7 @@ import { logImageCost } from "@/lib/ai/log-ai-call";
 
 /** Parse a data URL → { buffer, mime }. Returns null on malformed input. */
 function parseDataUrl(dataUrl: string): { buffer: Buffer; mime: string } | null {
-  const m = dataUrl.match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/s);
+  const m = dataUrl.match(/^data:(image\/[a-z0-9+.\-]+);base64,([\s\S]+)$/);
   if (!m) return null;
   try {
     return { mime: m[1], buffer: Buffer.from(m[2], "base64") };
