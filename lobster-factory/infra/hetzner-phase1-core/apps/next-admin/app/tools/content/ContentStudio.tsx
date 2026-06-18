@@ -1417,7 +1417,7 @@ export default function ContentStudio() {
     setSeoChecking(true);
     fetch("/api/content/seo-check", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markdown: fixedMd, focusKeyword: form.keyword, seoTitle: title, metaDescription: metaDesc, slug: slugHint || slugify(form.keyword) }),
+      body: JSON.stringify({ markdown: fixedMd, focusKeyword: form.keyword, seoTitle: title, metaDescription: metaDesc, slug: slugHint || slugify(form.keyword), siteDomain: (() => { try { const s = wpSites.find(x => x.id === selectedSiteId) ?? wpSites[0]; return s?.url ? new URL(s.url).hostname : undefined; } catch { return undefined; } })() }),
     })
       .then(r => r.ok ? r.json() as Promise<RankMathReport> : null)
       .then(j => { if (j && myRun === seoRunRef.current) setSeoReport(j); })

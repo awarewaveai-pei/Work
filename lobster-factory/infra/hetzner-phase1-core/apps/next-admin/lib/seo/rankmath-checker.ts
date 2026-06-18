@@ -34,7 +34,7 @@ export interface RankMathReport {
 }
 
 // Each CJK/kana/hangul character counts as one word (no spaces between them).
-const CJK_RE = /[　-鿿ꥠ-꥿가-퟿豈-﫿︰-﹏＀-￯]/g;
+const CJK_RE = /[　-鿿ꥠ-꥿가-퟿豈-﫿︰-﹏＀-￯]/gu;
 
 function countWords(text: string): number {
   const cjkCount = (text.match(CJK_RE) ?? []).length;
@@ -370,7 +370,7 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
   const hasFaqHeading = /^##\s+(FAQ|常見問題|問題解答|Q&A)/im.test(markdown);
   // count lines that look like a question inside the FAQ section (starts with ### or contains ？/?)
   const faqBlock = hasFaqHeading
-    ? markdown.slice(markdown.search(/^##\s+(FAQ|常見問題|問題解答|Q&A)/im))
+    ? markdown.slice(markdown.search(/^##\s+(FAQ|常見問題|問題解答|Q&A)/im)).split(/\n##\s/)[0]
     : "";
   const faqQCount = hasFaqHeading
     ? (faqBlock.match(/^###\s/gm) ?? []).length || (faqBlock.match(/\*\*[^*\n]+?[?？]\*\*/g) ?? []).length
