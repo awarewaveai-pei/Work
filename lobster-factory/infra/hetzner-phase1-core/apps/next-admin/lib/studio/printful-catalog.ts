@@ -23,13 +23,15 @@ export interface ProductSpec {
   areaHeight: number;
 }
 
-// Only include printable product types (skip packaging, labels, etc.)
+// Only include printable product types (skip embroidery, packaging, labels, etc.)
+// Note: Printful v2 API uses PHONE-CASE (hyphen) and DRINKWARE
 const WANTED_TYPES = new Set([
   "T-SHIRT", "SHIRT", "HOODIE", "SWEATSHIRT", "LONGSLEEVE",
   "TANK_TOP", "JACKET", "SHORTS", "LEGGINGS", "DRESS",
-  "MUG", "TOTE", "BACKPACK",
+  "MUG", "DRINKWARE", "TOTE", "BACKPACK",
   "POSTER", "CANVAS", "STICKER",
-  "PILLOW", "PHONE_CASE", "FACE_MASK",
+  "PILLOW", "PHONE_CASE", "PHONE-CASE", "FACE_MASK",
+  "SUBLIMATION",
 ]);
 
 // In-memory caches
@@ -49,24 +51,23 @@ function timedFetch(url: string, apiKey: string, storeId?: string): Promise<Resp
   }).finally(() => clearTimeout(t));
 }
 
-/** Return catalog product list (cached 1 h). */
+/** Return catalog product list (cached 1 h). Uses v2 catalog API (all Printful products, not store sync). */
 export async function fetchCatalogProducts(): Promise<CatalogProduct[]> {
   const apiKey = process.env.PRINTFUL_API_KEY;
-  const storeId = process.env.PRINTFUL_STORE_ID;
   if (!apiKey) return [];
 
   if (catalogCache && Date.now() - catalogCache.ts < TTL_MS) return catalogCache.items;
 
   try {
-    // Pass store ID — store-scoped tokens require it; account-level tokens ignore it safely.
-    const res = await timedFetch(`${PRINTFUL_API}/products?limit=100`, apiKey, storeId ?? undefined);
+    // /v2/catalog-products returns the full Printful product catalog (not store-synced products)
+    const res = await timedFetch(`${PRINTFUL_API}/v2/catalog-products?limit=100`, apiKey);
     if (!res.ok) return catalogCache?.items ?? [];
     const json = (await res.json()) as {
-      result: Array<{ id: number; title: string; image: string; type: string; type_name: string }>;
+      data: Array<{ id: number; name: string; image: string; type: string }>;
     };
-    const items: CatalogProduct[] = (json.result ?? [])
+    const items: CatalogProduct[] = (json.data ?? [])
       .filter((p) => WANTED_TYPES.has(p.type))
-      .map((p) => ({ id: p.id, title: p.title, image: p.image, typeName: p.type_name, typeCode: p.type }));
+      .map((p) => ({ id: p.id, title: p.name, image: p.image, typeName: p.type, typeCode: p.type }));
     catalogCache = { items, ts: Date.now() };
     return items;
   } catch {
@@ -84,22 +85,22 @@ export async function fetchProductSpec(productId: number): Promise<ProductSpec |
   if (hit && Date.now() - hit.ts < TTL_MS) return hit.spec;
 
   try {
-    // 1. Get variants — pick first white/medium in-stock, or first variant
-    const vRes = await timedFetch(`${PRINTFUL_API}/products/${productId}`, apiKey);
+    // 1. Get variants from v2 catalog API (not store-sync) — pick white/M or first
+    const vRes = await timedFetch(
+      `${PRINTFUL_API}/v2/catalog-products/${productId}/catalog-variants?limit=200`,
+      apiKey,
+    );
     if (!vRes.ok) {
-      specCache.set(productId, { spec: null, ts: Date.now() }); // negative-cache: skip retry for 1h
+      specCache.set(productId, { spec: null, ts: Date.now() });
       return null;
     }
     const vJson = (await vRes.json()) as {
-      result: {
-        variants: Array<{ id: number; color: string; size: string; in_stock: boolean }>;
-      };
+      data: Array<{ id: number; color: string; size: string }>;
     };
-    const variants = vJson.result?.variants ?? [];
+    const variants = vJson.data ?? [];
     const variantId = (
-      variants.find((v) => /white/i.test(v.color) && /^m$/i.test(v.size) && v.in_stock) ??
-      variants.find((v) => /white/i.test(v.color) && v.in_stock) ??
-      variants.find((v) => v.in_stock) ??
+      variants.find((v) => /white/i.test(v.color) && /^m$/i.test(v.size)) ??
+      variants.find((v) => /white/i.test(v.color)) ??
       variants[0]
     )?.id;
     if (!variantId) {
