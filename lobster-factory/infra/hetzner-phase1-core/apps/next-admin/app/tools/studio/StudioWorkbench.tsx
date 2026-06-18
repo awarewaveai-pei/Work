@@ -461,7 +461,7 @@ export default function StudioWorkbench() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, padding: 16 }}>
       {/* ── Controls ───────────────────────────────────────────── */}
-      <div className="build-panel" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="build-panel" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
 
         <label style={{ fontSize: 13 }}>
           商品類型
@@ -470,82 +470,109 @@ export default function StudioWorkbench() {
           </select>
         </label>
 
-        <div>
-          <label style={{ fontSize: 13 }}>
-            主題 Subject
-            <input className="btn-secondary" style={{ width: "100%", marginTop: 4, opacity: isTransformMode ? 0.5 : 1 }} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={isTransformMode ? "改圖模式：主題由上傳圖決定（可選）" : "例：lotus flower mandala"} />
-          </label>
+        <AccordionSection title="🎯 主題 Subject" summary={subject || "未填"} defaultOpen>
+          <input className="btn-secondary" style={{ width: "100%", marginBottom: 6, opacity: isTransformMode ? 0.5 : 1 }} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={isTransformMode ? "改圖模式：主題由上傳圖決定（可選）" : "例：lotus flower mandala"} />
           <PresetChips chips={SUBJECT_PRESETS} onSelect={setSubject} />
-        </div>
+        </AccordionSection>
 
-        <div>
-          <label style={{ fontSize: 13 }}>
-            題材 Theme
-            <input className="btn-secondary" style={{ width: "100%", marginTop: 4, opacity: isTransformMode ? 0.4 : 1 }} value={theme} onChange={(e) => setTheme(e.target.value)} placeholder={isTransformMode ? "改圖模式下不影響 prompt" : "例：spiritual healing"} />
-          </label>
+        <AccordionSection title="📚 題材 Theme" summary={theme || "未填"}>
+          <input className="btn-secondary" style={{ width: "100%", marginBottom: 6, opacity: isTransformMode ? 0.4 : 1 }} value={theme} onChange={(e) => setTheme(e.target.value)} placeholder={isTransformMode ? "改圖模式下不影響 prompt" : "例：spiritual healing"} />
           <PresetChips chips={THEME_PRESETS} onSelect={setTheme} />
-        </div>
+        </AccordionSection>
 
-        <div>
-          <label style={{ fontSize: 13 }}>
-            氛圍 Vibe
-            <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
-          </label>
+        <AccordionSection title="✨ 氛圍 Vibe" summary={vibe || "未填"}>
+          <input className="btn-secondary" style={{ width: "100%", marginBottom: 6 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
           <PresetChips chips={VIBE_PRESETS} onSelect={setVibe} />
-        </div>
+        </AccordionSection>
 
-        {/* 時事靈感 drawer */}
-        <div>
-          <button type="button" className="btn-secondary" style={{ width: "100%", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => setTrendingOpen((v) => !v)}>
-            <span>🔥 時事靈感</span>
-            <span style={{ opacity: 0.5 }}>{trendingOpen ? "▲" : "▼"}</span>
-          </button>
-          {trendingOpen && (
-            <div style={{ marginTop: 6, padding: 10, background: "var(--bg-tertiary, #1a1a1a)", borderRadius: 8, border: "1px solid var(--border, #333)" }}>
-              <p style={{ fontSize: 11, opacity: 0.55, marginBottom: 6 }}>選類別 → 抓今日熱門話題 → 點擊填入主題</p>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-                {TRENDING_CATEGORIES.map((cat) => (
-                  <button key={cat.value} type="button" onClick={() => onSelectTrendingCategory(cat.value)}
-                    style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, cursor: "pointer", background: trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--bg-secondary, #2a2a2a)", color: trendingCategory === cat.value ? "#fff" : "var(--text-muted, #888)", border: `1px solid ${trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--border, #333)"}`, transition: "all 0.15s" }}>
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-              {trendingLoading && <p style={{ fontSize: 11, opacity: 0.5 }}>搜尋中…</p>}
-              {!trendingLoading && trendingError && <p style={{ fontSize: 11, color: "#e5484d" }}>抓取失敗，請重試</p>}
-              {!trendingLoading && !trendingError && trendingTopics.length > 0 && (
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                  {trendingTopics.map((t, i) => (
-                    <button key={`${t}-${i}`} type="button" onClick={() => setSubject(t)}
-                      style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, cursor: "pointer", background: "var(--bg-secondary, #222)", border: "1px solid var(--border, #333)", color: "var(--text, #ccc)", textAlign: "left", transition: "border-color 0.15s" }}
-                      onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
-                      onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #333)")}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              )}
+        <AccordionSection title="🔥 時事靈感">
+          <p style={{ fontSize: 11, opacity: 0.55, marginBottom: 6 }}>選類別 → 抓今日熱門話題 → 點擊填入主題</p>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {TRENDING_CATEGORIES.map((cat) => (
+              <button key={cat.value} type="button" onClick={() => onSelectTrendingCategory(cat.value)}
+                style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, cursor: "pointer", background: trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--bg-secondary, #2a2a2a)", color: trendingCategory === cat.value ? "#fff" : "var(--text-muted, #888)", border: `1px solid ${trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--border, #333)"}`, transition: "all 0.15s" }}>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          {trendingLoading && <p style={{ fontSize: 11, opacity: 0.5 }}>搜尋中…</p>}
+          {!trendingLoading && trendingError && <p style={{ fontSize: 11, color: "#e5484d" }}>抓取失敗，請重試</p>}
+          {!trendingLoading && !trendingError && trendingTopics.length > 0 && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {trendingTopics.map((t, i) => (
+                <button key={`${t}-${i}`} type="button" onClick={() => setSubject(t)}
+                  style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, cursor: "pointer", background: "var(--bg-secondary, #222)", border: "1px solid var(--border, #333)", color: "var(--text, #ccc)", textAlign: "left", transition: "border-color 0.15s" }}
+                  onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
+                  onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #333)")}>
+                  {t}
+                </button>
+              ))}
             </div>
           )}
-        </div>
+        </AccordionSection>
 
-        <ImageStyleControls
-          selectedModels={selectedModels}
-          style={style}
-          onStyleChange={setStyle}
-          onModelsChange={onModelsChange}
-        />
+        <AccordionSection title="🎨 風格 Style" summary={style || "不指定"}>
+          <select className="btn-secondary" style={{ width: "100%" }} value={style} onChange={(e) => setStyle(e.target.value)}>
+            <option value="">不指定</option>
+            {Array.from(new Set(STYLE_CATALOG.map((item) => item.group))).map((group) => (
+              <optgroup key={group} label={group}>
+                {STYLE_CATALOG.filter((item) => item.group === group).map((item) => (
+                  <option key={item.zh} value={item.zh}>{item.zh}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </AccordionSection>
 
-        <label style={{ fontSize: 13 }}>
-          比例
-          <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={aspect} onChange={(e) => setAspect(e.target.value as AspectRatio)}>
+        <AccordionSection
+          title="🤖 圖片模型"
+          summary={selectedModels.size > 1 ? `已選 ${selectedModels.size} 個` : (STUDIO_MODEL_OPTIONS.find((o) => selectedModels.has(o.value))?.label ?? "")}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {Array.from(new Set(STUDIO_MODEL_OPTIONS.map((item) => item.group))).map((group) => (
+              <div key={group}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{group}</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {STUDIO_MODEL_OPTIONS.filter((item) => item.group === group).map((item) => {
+                    const active = selectedModels.has(item.value);
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => {
+                          onModelsChange((() => {
+                            const next = new Set(selectedModels);
+                            if (next.has(item.value)) { if (next.size > 1) next.delete(item.value); }
+                            else { next.add(item.value); }
+                            return next;
+                          })());
+                        }}
+                        title={item.maxRefs > 0 ? `最多 ${item.maxRefs} 張參考圖` : "純文字生圖"}
+                        style={{ padding: "5px 10px", borderRadius: 14, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #333)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #888)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}
+                      >
+                        {active && selectedModels.size === 1 ? "✓ " : active ? "☑ " : ""}{item.label}
+                        <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>NT${item.costNt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: 11, opacity: 0.55, marginTop: 6 }}>
+            {selectedModels.size > 1
+              ? `已選 ${selectedModels.size} 個模型 → 依序生成 ${selectedModels.size} 張比較圖`
+              : (() => { const m = STUDIO_MODEL_OPTIONS.find((o) => selectedModels.has(o.value)); return m?.maxRefs ? `此模型最多吃 ${m.maxRefs} 張參考圖` : "此模型不吃參考圖（純文字生圖）"; })()}
+          </p>
+        </AccordionSection>
+
+        <AccordionSection title="📐 比例" summary={aspect}>
+          <select className="btn-secondary" style={{ width: "100%" }} value={aspect} onChange={(e) => setAspect(e.target.value as AspectRatio)}>
             {ASPECTS.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
-        </label>
+        </AccordionSection>
 
-        {/* 參考圖 + 模式切換 */}
-        <div style={{ border: "1px solid var(--border, #333)", borderRadius: 8, padding: 10 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>參考圖</p>
+        <AccordionSection title="🖼️ 參考圖" summary={refImages.length > 0 ? `${refImages.length} 張` : refMode === "transform" ? "改圖模式" : "無"}>
           <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border, #333)", marginBottom: 8 }}>
             <button type="button" onClick={() => onSetRefMode("ref")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "ref" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "ref" ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
               🖼️ 風格參考
@@ -555,7 +582,7 @@ export default function StudioWorkbench() {
             </button>
           </div>
           <p style={{ fontSize: 10, opacity: 0.5, marginBottom: 8, lineHeight: 1.5 }}>
-            {refMode === "ref" ? "上傳圖作為視覺參考，AI 依 Subject/Style 生成新圖" : `直接把你的圖套用選定風格（建議 flux-kontext）`}
+            {refMode === "ref" ? "上傳圖作為視覺參考，AI 依 Subject/Style 生成新圖" : "直接把你的圖套用選定風格（建議 flux-kontext）"}
           </p>
           {maxRefs > 0 ? (
             <label style={{ fontSize: 12 }}>
@@ -573,7 +600,7 @@ export default function StudioWorkbench() {
           ) : (
             <p style={{ fontSize: 11, opacity: 0.45 }}>目前所選模型均不支援參考圖。{refMode === "transform" && " 改圖模式將自動切換至 flux-kontext-dev。"}</p>
           )}
-        </div>
+        </AccordionSection>
 
         <button className="btn-primary" disabled={busy} onClick={() => void generate()}>
           {busy ? `生成中… (${results.filter((r) => !r.busy).length}/${results.length})` : isMultiModel ? `生成比較（${selectedModels.size} 個模型）` : "生成"}
