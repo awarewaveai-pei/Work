@@ -8,9 +8,17 @@ import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { deleteDesignObject } from "../../../../lib/storage/r2";
 import { videoObjectKey } from "../../../../lib/content/blocks/video-pipeline";
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return result === 0;
+}
+
 export async function POST(req: NextRequest) {
   const authKey = req.headers.get("x-ops-sync-key");
-  if (authKey !== process.env.OPS_SYNC_KEY) {
+  const expected = process.env.OPS_PROXY_SHARED_SECRET;
+  if (!expected || !authKey || !timingSafeEqual(authKey, expected)) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
