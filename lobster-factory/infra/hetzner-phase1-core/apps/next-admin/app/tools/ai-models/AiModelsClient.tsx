@@ -106,15 +106,15 @@ function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: numb
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
-      <div style={{ fontSize:10, color:"#94a3b8", marginBottom:3, letterSpacing:".04em" }}>
+      <div style={{ ...ROW, paddingBottom:4, borderBottom:"1px solid #e2e8f0", marginBottom:3 }}>
+        <span style={{ ...LBL, fontWeight:700, color:"#475569" }}>合計（生成 1,000 字）</span>
+        <span style={{ ...VAL, color:"#0f172a", fontSize:12.5 }}>{fmtTwd(total)}</span>
+      </div>
+      <div style={{ fontSize:10, color:"#94a3b8", marginBottom:2, letterSpacing:".04em" }}>
         API: 輸入 ${costInputPer1M.toFixed(2)} · 輸出 ${costOutputPer1M.toFixed(2)} / 1M tokens
       </div>
       <div style={ROW}><span style={LBL}>✏️ 提示詞 ~{GEN1K_IN} tokens</span><span style={VAL}>{fmtTwd(inTwd)}</span></div>
       <div style={ROW}><span style={LBL}>📝 生成文字 ~{GEN1K_OUT} tokens</span><span style={VAL}>{fmtTwd(outTwd)}</span></div>
-      <div style={{ ...ROW, borderTop:"1px solid #e2e8f0", marginTop:3, paddingTop:4 }}>
-        <span style={{ ...LBL, fontWeight:700, color:"#475569" }}>合計（生成 1,000 字）</span>
-        <span style={{ ...VAL, color:"#0f172a", fontSize:12.5 }}>{fmtTwd(total)}</span>
-      </div>
     </div>
   );
 }
@@ -180,10 +180,11 @@ const CARD_SEL: React.CSSProperties = {
   boxShadow: "0 0 0 3px #bfdbfe",
 };
 
-function CardHeader({ selected, onToggle, vendor, name, sub, badges }: {
+function CardHeader({ selected, onToggle, vendor, name, sub, badges, nameSize = 15 }: {
   selected: boolean; onToggle: () => void;
   vendor: string; name: string; sub?: string;
   badges: React.ReactNode;
+  nameSize?: number;
 }) {
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
@@ -199,7 +200,7 @@ function CardHeader({ selected, onToggle, vendor, name, sub, badges }: {
           </span>
           {badges}
         </div>
-        <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>{name}</div>
+        <div style={{ fontSize: nameSize, fontWeight: 800, color: "#0f172a" }}>{name}</div>
         {sub && <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>{sub}</div>}
       </div>
     </div>
@@ -270,6 +271,7 @@ function ImageCard({ m, sel, onToggle }: { m: TarotModelComparison; sel: boolean
         selected={sel} onToggle={onToggle}
         vendor={m.provider}
         name={m.label}
+        nameSize={22}
         badges={
           <>
             <span style={{ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:999, fontSize:10.5, fontWeight:700, ...tc }}>{m.tier}</span>
@@ -278,12 +280,12 @@ function ImageCard({ m, sel, onToggle }: { m: TarotModelComparison; sel: boolean
           </>
         }
       />
-      {/* prominent cost block */}
+      {/* cost block — secondary to name */}
       <div style={{ display:"flex", alignItems:"baseline", gap:8, padding:"8px 0 4px", borderBottom:"1px solid var(--card-border)", marginBottom:8 }}>
-        <span style={{ fontSize:22, fontWeight:900, color:"var(--text-primary)", letterSpacing:"-0.5px" }}>
+        <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)" }}>
           NT${Math.round(m.costUsd * TWD * 10) / 10}
         </span>
-        <span style={{ fontSize:13, fontWeight:700, color:"var(--text-secondary)" }}>/ 張</span>
+        <span style={{ fontSize:12, fontWeight:600, color:"var(--text-secondary)" }}>/ 張</span>
         <span style={{ marginLeft:"auto", fontSize:11.5, color:"var(--text-muted)", fontWeight:600 }}>US${m.costUsd.toFixed(3)}</span>
       </div>
       <div style={{ marginBottom: 10 }}>
