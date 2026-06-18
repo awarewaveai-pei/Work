@@ -902,7 +902,10 @@ export default function ContentStudio() {
     try {
       const res  = await fetch(`/api/content/patterns${selectedSiteId ? `?siteId=${encodeURIComponent(selectedSiteId)}` : ""}`);
       const json = await res.json() as { ok: boolean; patterns?: Array<{ id: number; title: string; slug: string }>; note?: string };
-      if (json.ok && json.patterns) setAvailablePatterns(json.patterns);
+      if (json.ok && json.patterns) {
+        setAvailablePatterns(json.patterns);
+        setSelectedPatternIds(prev => prev.filter(id => json.patterns!.some(p => p.id === id)));
+      }
       if (json.note) setPatternsNote(json.note);
     } catch { setPatternsNote("網路錯誤，請重試"); }
     finally { setPatternsLoading(false); }
@@ -1061,6 +1064,7 @@ export default function ContentStudio() {
           marketContext,                   // #5 (empty unless analysis was run)
           patterns: patternsToSend,        // #6
           patternCount: patternCountToSend,
+          patternMode,                     // #6 — server uses this to raise the cap in manual mode
         }),
         signal: ac.signal,
       });

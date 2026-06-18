@@ -242,6 +242,7 @@ function buildUserPrompt(params: {
   marketContext: string;          // #5 — competitor + pain-point research block
   patterns: { id: number; title: string }[]; // #6 — saved Kadence synced patterns on the site
   patternCount: number;           // #6 — how many funnel patterns to weave in (0 = none)
+  insertAllPatterns?: boolean;    // #6 — true in manual mode: insert ALL listed patterns (not AI's choice)
 }): string {
   const lines: string[] = [];
 
@@ -448,8 +449,7 @@ function buildUserPrompt(params: {
   if (params.patternCount > 0 && params.patterns.length > 0) {
     lines.push("");
     lines.push("=== KADENCE FUNNEL PATTERNS (insert real call-to-action blocks at high-intent moments) ===");
-    const insertAll = params.patternCount >= params.patterns.length;
-    if (insertAll) {
+    if (params.insertAllPatterns) {
       lines.push(`Insert ALL ${params.patterns.length} of the following pre-built patterns into the article body (use every one of them):`);
     } else {
       lines.push(`Insert ${params.patternCount} of the following pre-built patterns into the article body. Choose the ones most relevant to the topic and reader intent:`);
@@ -617,8 +617,9 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
     })
     .filter((p): p is { id: number; title: string } => p !== null)
     .slice(0, 20);
+  const insertAllPatterns = body.patternMode === "manual" && Array.isArray(body.patterns) && body.patterns.length > 0;
   const patternCount = typeof body.patternCount === "number"
-    ? Math.min(Math.max(0, Math.floor(body.patternCount)), 4)
+    ? Math.min(Math.max(0, Math.floor(body.patternCount)), insertAllPatterns ? 20 : 4)
     : 0;
 
   const userPrompt = buildUserPrompt({
@@ -648,6 +649,7 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
     marketContext,
     patterns,
     patternCount,
+    insertAllPatterns,
   });
 
   return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt, perplexityCostUsd: perplexityCostUsd > 0 ? perplexityCostUsd : undefined } };
