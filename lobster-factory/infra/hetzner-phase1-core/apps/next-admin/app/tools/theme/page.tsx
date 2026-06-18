@@ -105,8 +105,8 @@ const TYPOGRAPHY_GROUPS: TokenGroup[] = [
   {
     label: 'Line Height & Spacing',
     tokens: [
-      { name: '--line-height-base',    default: '1.6',    type: 'text' },
-      { name: '--line-height-tight',   default: '1.3',    type: 'text' },
+      { name: '--line-height-base',     default: '1.6',    type: 'text' },
+      { name: '--line-height-tight',    default: '1.3',    type: 'text' },
       { name: '--letter-spacing-label', default: '0.07em', type: 'text' },
     ],
   },
@@ -125,6 +125,21 @@ const TYPOGRAPHY_GROUPS: TokenGroup[] = [
       { name: '--card-bg',    default: '#ffffff',  type: 'color' },
       { name: '--bg-subtle',  default: '#f5f7fd', type: 'color' },
       { name: '--sidebar-bg', default: '#f7f9fc', type: 'color' },
+    ],
+  },
+  {
+    label: 'Tab Component',
+    tokens: [
+      { name: '--tab-font-size',    default: '14px',               type: 'text'  },
+      { name: '--tab-font-weight',  default: '600',                type: 'text'  },
+      { name: '--tab-color',        default: '#64748b',            type: 'color' },
+      { name: '--tab-color-hover',  default: '#0d1526',            type: 'color' },
+      { name: '--tab-color-active', default: '#6366f1',            type: 'color' },
+      { name: '--tab-bg',           default: 'transparent',        type: 'text'  },
+      { name: '--tab-bg-hover',     default: 'rgba(99,102,241,0.05)', type: 'text' },
+      { name: '--tab-bg-active',    default: 'transparent',        type: 'text'  },
+      { name: '--tab-border-active',default: '#6366f1',            type: 'color' },
+      { name: '--tab-bar-border',   default: '#e6eaf4',            type: 'color' },
     ],
   },
 ];
@@ -453,6 +468,9 @@ export default function ThemePage() {
             </div>
           </div>
 
+          {/* Tab component live preview */}
+          <TabPreview />
+
           {/* Typography token groups */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16, marginBottom: 24 }}>
             {TYPOGRAPHY_GROUPS.map(group => (
@@ -682,6 +700,74 @@ function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
           title="Reset to default"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>↺</button>
       )}
+    </div>
+  );
+}
+
+// ── Tab component live preview ────────────────────────────────────────────────
+function TabPreview() {
+  const [active, setActive] = useState(0);
+  const DEMO_TABS = ['Overview', 'Settings', 'History', 'Disabled'];
+  const DEMO_CONTENT = [
+    'This is the Overview tab. Font size, weight, and colors are all controlled by --tab-* tokens above.',
+    'Settings content goes here. The active tab uses --tab-color-active and --tab-border-active.',
+    'History content. Hover a tab to see --tab-bg-hover and --tab-color-hover in action.',
+    '',
+  ];
+  return (
+    <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+      <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
+        Tab Component — Live Preview
+        <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', marginLeft: 8, letterSpacing: 0 }}>changes above reflect here instantly</span>
+      </div>
+
+      {/* Tab bar using .tab-bar + .tab + .tab--active classes */}
+      <div className="tab-bar" style={{ marginBottom: 0 }}>
+        {DEMO_TABS.map((label, i) => (
+          <button
+            key={label}
+            className={`tab${i === active ? ' tab--active' : ''}`}
+            onClick={() => i !== 3 && setActive(i)}
+            style={i === 3 ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content panel */}
+      <div style={{
+        padding: '16px 18px',
+        background: 'var(--bg-subtle)',
+        border: '1px solid var(--tab-bar-border)',
+        borderTop: 'none',
+        borderRadius: '0 0 var(--radius-sm) var(--radius-sm)',
+        fontSize: 'var(--font-size-sm)',
+        color: 'var(--text-muted)',
+        minHeight: 56,
+      }}>
+        {DEMO_CONTENT[active] || <em style={{ color: 'var(--text-muted)' }}>Tab is disabled</em>}
+      </div>
+
+      {/* Token reference */}
+      <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {[
+          { label: 'inactive color', tok: '--tab-color' },
+          { label: 'hover color',    tok: '--tab-color-hover' },
+          { label: 'active color',   tok: '--tab-color-active' },
+          { label: 'active border',  tok: '--tab-border-active' },
+          { label: 'bar border',     tok: '--tab-bar-border' },
+        ].map(({ label, tok }) => (
+          <span key={tok} style={{
+            fontSize: 10, fontFamily: 'monospace',
+            padding: '2px 7px', borderRadius: 4,
+            background: 'var(--bg-subtle)', border: '1px solid var(--border)',
+            color: 'var(--text-muted)',
+          }}>
+            {label}: <span style={{ color: 'var(--text-primary)' }}>{tok}</span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
