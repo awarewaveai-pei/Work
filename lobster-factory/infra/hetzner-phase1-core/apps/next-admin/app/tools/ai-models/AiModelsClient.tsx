@@ -87,32 +87,42 @@ function fmtTwd(n: number) {
   return `NT$${n.toFixed(1)}`;
 }
 
-function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: number; costOutputPer1M: number }) {
+// Top-of-card cost block — same layout as ImageCard cost block
+function TextCostBlock({ costInputPer1M, costOutputPer1M }: { costInputPer1M: number; costOutputPer1M: number }) {
+  const BLOCK: React.CSSProperties = {
+    display:"flex", alignItems:"baseline", gap:8,
+    padding:"8px 0 4px", borderBottom:"1px solid var(--card-border)", marginBottom:8,
+  };
   if (costInputPer1M === 0 && costOutputPer1M === 0) {
     return (
-      <div>
-        <div style={{ fontSize: 12.5, color: "#1e293b", fontWeight: 700 }}>免費</div>
-        <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>個人方案無費用</div>
+      <div style={BLOCK}>
+        <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)" }}>免費</span>
+        <span style={{ fontSize:12, fontWeight:600, color:"var(--text-secondary)" }}>個人方案</span>
       </div>
     );
   }
+  const total = gen1kCostTwd(costInputPer1M, costOutputPer1M);
+  return (
+    <div style={BLOCK}>
+      <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)" }}>{fmtTwd(total)}</span>
+      <span style={{ fontSize:12, fontWeight:600, color:"var(--text-secondary)" }}>/ 1,000字</span>
+      <span style={{ marginLeft:"auto", fontSize:11.5, color:"var(--text-muted)", fontWeight:600 }}>
+        US${costInputPer1M.toFixed(2)} in · US${costOutputPer1M.toFixed(2)} out / 1M
+      </span>
+    </div>
+  );
+}
+
+// Breakdown rows shown inside InfoRow
+function CostBreakdown({ costInputPer1M, costOutputPer1M }: { costInputPer1M: number; costOutputPer1M: number }) {
+  if (costInputPer1M === 0 && costOutputPer1M === 0) return null;
   const inTwd  = (GEN1K_IN  * costInputPer1M)  / 1_000_000 * TWD;
   const outTwd = (GEN1K_OUT * costOutputPer1M) / 1_000_000 * TWD;
-  const total  = inTwd + outTwd;
-
   const ROW: React.CSSProperties = { display:"flex", justifyContent:"space-between", fontSize:11.5, padding:"2px 0" };
   const LBL: React.CSSProperties = { color:"#64748b" };
   const VAL: React.CSSProperties = { color:"#1e293b", fontWeight:600 };
-
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
-      <div style={{ ...ROW, paddingBottom:4, borderBottom:"1px solid #e2e8f0", marginBottom:3 }}>
-        <span style={{ ...LBL, fontWeight:700, color:"#475569" }}>合計（生成 1,000 字）</span>
-        <span style={{ ...VAL, color:"#0f172a", fontSize:12.5 }}>{fmtTwd(total)}</span>
-      </div>
-      <div style={{ fontSize:10, color:"#94a3b8", marginBottom:2, letterSpacing:".04em" }}>
-        API: 輸入 ${costInputPer1M.toFixed(2)} · 輸出 ${costOutputPer1M.toFixed(2)} / 1M tokens
-      </div>
       <div style={ROW}><span style={LBL}>✏️ 提示詞 ~{GEN1K_IN} tokens</span><span style={VAL}>{fmtTwd(inTwd)}</span></div>
       <div style={ROW}><span style={LBL}>📝 生成文字 ~{GEN1K_OUT} tokens</span><span style={VAL}>{fmtTwd(outTwd)}</span></div>
     </div>
@@ -237,10 +247,11 @@ function TextCard({ m, sel, onToggle }: { m: TextModelComparison; sel: boolean; 
         vendor={m.vendor} name={m.model} sub={m.surface}
         badges={<><Chip {...spd} /><Chip {...cst} /></>}
       />
+      <TextCostBlock costInputPer1M={m.costInputPer1M} costOutputPer1M={m.costOutputPer1M} />
       <div style={{ marginBottom: 10 }}>
         <InfoRow label="最適合">{m.bestFor}</InfoRow>
         <InfoRow label="風格">{m.style}</InfoRow>
-        <InfoRow label="成本"><CostDisplay costInputPer1M={m.costInputPer1M} costOutputPer1M={m.costOutputPer1M} /></InfoRow>
+        <InfoRow label="明細"><CostBreakdown costInputPer1M={m.costInputPer1M} costOutputPer1M={m.costOutputPer1M} /></InfoRow>
         <InfoRow label="Context">{m.context}</InfoRow>
       </div>
       <ProCon strengths={m.strengths} tradeoffs={m.tradeoffs} />
@@ -318,10 +329,11 @@ function CodingCard({ m, sel, onToggle }: { m: CodingToolComparison; sel: boolea
         sub={`${m.model} · ${m.surface}`}
         badges={<><Chip {...spd} /><Chip {...cst} /></>}
       />
+      <TextCostBlock costInputPer1M={m.costInputPer1M} costOutputPer1M={m.costOutputPer1M} />
       <div style={{ marginBottom: 10 }}>
         <InfoRow label="最適合">{m.bestFor}</InfoRow>
         <InfoRow label="工作流">{m.workflowStyle}</InfoRow>
-        <InfoRow label="成本"><CostDisplay costInputPer1M={m.costInputPer1M} costOutputPer1M={m.costOutputPer1M} /></InfoRow>
+        <InfoRow label="明細"><CostBreakdown costInputPer1M={m.costInputPer1M} costOutputPer1M={m.costOutputPer1M} /></InfoRow>
         <InfoRow label="Context">{m.context}</InfoRow>
       </div>
       <ProCon strengths={m.strengths} tradeoffs={m.tradeoffs} />
