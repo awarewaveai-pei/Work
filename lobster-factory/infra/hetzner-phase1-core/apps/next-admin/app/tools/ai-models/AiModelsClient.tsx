@@ -71,10 +71,6 @@ function imageCostStyle(c: number) {
 
 // ── Cost display ──────────────────────────────────────────────────────────────
 
-// 1 article ≈ 1,500 input tokens + 800 output tokens
-const ARTICLE_IN = 1500;
-const ARTICLE_OUT = 800;
-
 function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: number; costOutputPer1M: number }) {
   if (costInputPer1M === 0 && costOutputPer1M === 0) {
     return (
@@ -84,13 +80,13 @@ function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: numb
       </div>
     );
   }
-  const articleUsd = (ARTICLE_IN * costInputPer1M + ARTICLE_OUT * costOutputPer1M) / 1_000_000;
-  const articleTwd = articleUsd * TWD;
-  const articleLabel = articleTwd < 0.01
-    ? `< NT$0.01`
-    : articleTwd < 1
-    ? `NT$${articleTwd.toFixed(2)}`
-    : `NT$${articleTwd.toFixed(1)}`;
+  // 1,000 Chinese chars ≈ 1,000 output tokens
+  const per1kTwd = (1000 / 1_000_000) * costOutputPer1M * TWD;
+  const per1kLabel = per1kTwd < 0.01
+    ? "< NT$0.01"
+    : per1kTwd < 1
+    ? `NT$${per1kTwd.toFixed(2)}`
+    : `NT$${per1kTwd.toFixed(1)}`;
 
   return (
     <div>
@@ -101,7 +97,7 @@ function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: numb
         <span style={{ color: "#94a3b8", fontSize: 10.5 }}> / 1M tokens</span>
       </div>
       <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
-        ✏️ 1 篇文章（~1,500 字）≈ <strong style={{ color: "#0f172a" }}>{articleLabel}</strong>
+        ✏️ 每 1,000 字輸出 ≈ <strong style={{ color: "#0f172a" }}>{per1kLabel}</strong>
       </div>
     </div>
   );
