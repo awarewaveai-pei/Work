@@ -73,6 +73,7 @@ export default function VideoStudio() {
     setGenResult(null);
 
     try {
+      // 1) 送出 → 立即拿 jobId（async：避免同步 >100s 撞 CF 超時）
       const res = await fetch("/api/video/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -86,20 +87,55 @@ export default function VideoStudio() {
           imageModel,
         }),
       });
-
-      type JsonOk = { ok: true; video: { outputs: Record<string, string>; out_dir: string }; title: string };
-      type JsonFail = { ok: false; status: number; error: string };
-      const json = (await res.json()) as JsonOk | JsonFail;
-
-      if (!json.ok) {
+      const start = (await res.json()) as { ok: boolean; jobId?: string; error?: string };
+      if (!start.ok || !start.jobId) {
         setGenStatus("error");
-        setGenError((json as JsonFail).error);
+        setGenError(start.error || "無法建立生成工作");
         return;
       }
 
-      const okJson = json as JsonOk;
-      setGenResult({ outputs: okJson.video.outputs, out_dir: okJson.video.out_dir, title: okJson.title });
-      setGenStatus("done");
+      // 2) 輪詢 status（每 5s，上限 ~12 分鐘）
+      const jobId = start.jobId;
+      const deadline = Date.now() + 12 * 60 * 1000;
+      type Status =
+        | { ok: true; status: "running" }
+        | { ok: true; status: "done"; video: { outputs: Record<string, string>; out_dir: string }; title: string }
+        | { ok: true; status: "error"; error: string; statusCode?: number }
+        | { ok: false; error: string };
+
+      const poll = async (): Promise<void> => {
+        if (Date.now() > deadline) {
+          setGenStatus("error");
+          setGenError("生成逾時（>12 分鐘）。影片可能仍在背景產出，稍後可至 My Designs 影片分頁查看。");
+          return;
+        }
+        let sj: Status;
+        try {
+          const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`);
+          sj = (await sr.json()) as Status;
+        } catch {
+          // 暫時性網路錯 → 繼續輪詢
+          window.setTimeout(() => void poll(), 5000);
+          return;
+        }
+        if (!sj.ok) {
+          setGenStatus("error");
+          setGenError(sj.error || "查詢生成狀態失敗");
+          return;
+        }
+        if (sj.status === "running") {
+          window.setTimeout(() => void poll(), 5000);
+          return;
+        }
+        if (sj.status === "done") {
+          setGenResult({ outputs: sj.video.outputs, out_dir: sj.video.out_dir, title: sj.title });
+          setGenStatus("done");
+          return;
+        }
+        setGenStatus("error");
+        setGenError(sj.error);
+      };
+      window.setTimeout(() => void poll(), 5000);
     } catch (e: unknown) {
       setGenStatus("error");
       setGenError(e instanceof Error ? e.message : "網路錯誤，請重試");

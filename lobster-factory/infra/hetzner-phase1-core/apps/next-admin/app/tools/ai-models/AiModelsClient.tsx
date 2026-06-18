@@ -270,7 +270,6 @@ function ImageCard({ m, sel, onToggle }: { m: TarotModelComparison; sel: boolean
         selected={sel} onToggle={onToggle}
         vendor={m.provider}
         name={m.label}
-        sub={`US$${m.costUsd.toFixed(3)} · NT$${Math.round(m.costUsd * TWD * 10) / 10} / 張`}
         badges={
           <>
             <span style={{ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:999, fontSize:10.5, fontWeight:700, ...tc }}>{m.tier}</span>
@@ -279,6 +278,14 @@ function ImageCard({ m, sel, onToggle }: { m: TarotModelComparison; sel: boolean
           </>
         }
       />
+      {/* prominent cost block */}
+      <div style={{ display:"flex", alignItems:"baseline", gap:8, padding:"8px 0 4px", borderBottom:"1px solid var(--card-border)", marginBottom:8 }}>
+        <span style={{ fontSize:22, fontWeight:900, color:"var(--text-primary)", letterSpacing:"-0.5px" }}>
+          NT${Math.round(m.costUsd * TWD * 10) / 10}
+        </span>
+        <span style={{ fontSize:13, fontWeight:700, color:"var(--text-secondary)" }}>/ 張</span>
+        <span style={{ marginLeft:"auto", fontSize:11.5, color:"var(--text-muted)", fontWeight:600 }}>US${m.costUsd.toFixed(3)}</span>
+      </div>
       <div style={{ marginBottom: 10 }}>
         <InfoRow label="最適合">{m.bestFor}</InfoRow>
         <InfoRow label="避開">{m.avoidFor}</InfoRow>
