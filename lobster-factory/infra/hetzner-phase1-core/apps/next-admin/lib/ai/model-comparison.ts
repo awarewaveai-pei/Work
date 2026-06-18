@@ -143,6 +143,7 @@ export const TEXT_MODEL_COMPARISONS: readonly TextModelComparison[] = [
     speed: "中",
     speedRank: 3,
     costInputPer1M: 1.25,
+    costOutputPer1M: 10.0,
     strengths: "複雜任務、長上下文、資料整合、Google grounding 生態",
     tradeoffs: "輸出成本不低；prompt 太鬆時會偏分析而非可交付稿",
     sourceKeys: ["geminiModels", "geminiPricing"],
