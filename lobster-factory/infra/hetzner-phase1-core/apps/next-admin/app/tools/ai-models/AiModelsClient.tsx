@@ -17,7 +17,9 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Tab = "text" | "image" | "coding";
-type SortMode = "default" | "cost" | "speed";
+type SortKey = "default" | "cost" | "speed";
+type SortDir = "asc" | "desc";
+type SortMode = "default" | "cost" | "speed"; // kept for compat
 
 type TaggedText = TextModelComparison & { _type: "text" };
 type TaggedImage = TarotModelComparison & { _type: "image" };
@@ -399,19 +401,20 @@ const TD: React.CSSProperties = {
 
 // ── Controls bar ──────────────────────────────────────────────────────────────
 
-function Controls({ sort, onSort, selCount, onCompare, onClear }: {
-  sort: SortMode; onSort: (s: SortMode) => void;
+function Controls({ sortKey, sortDir, onSort, selCount, onCompare, onClear }: {
+  sortKey: SortKey; sortDir: SortDir; onSort: (k: SortKey) => void;
   selCount: number; onCompare: () => void; onClear: () => void;
 }) {
   const base: React.CSSProperties = { padding:"5px 13px", borderRadius:6, fontSize:12, fontWeight:600, border:"1px solid var(--card-border)", cursor:"pointer" };
   const on: React.CSSProperties = { ...base, background:"var(--accent)", color:"#fff", borderColor:"var(--accent)" };
   const off: React.CSSProperties = { ...base, background:"#fff", color:"#475569" };
+  const arrow = (k: SortKey) => sortKey === k ? (sortDir === "asc" ? " ↑" : " ↓") : "";
   return (
     <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12, flexWrap:"wrap" }}>
       <span style={{ fontSize:10.5, fontWeight:800, letterSpacing:".07em", textTransform:"uppercase", color:"#94a3b8" }}>排序</span>
-      <button style={sort==="default" ? on : off} onClick={() => onSort("default")}>預設</button>
-      <button style={sort==="cost"    ? on : off} onClick={() => onSort("cost")}>成本 ↑</button>
-      <button style={sort==="speed"   ? on : off} onClick={() => onSort("speed")}>速度 ↑</button>
+      <button style={sortKey==="default" ? on : off} onClick={() => onSort("default")}>預設</button>
+      <button style={sortKey==="cost"    ? on : off} onClick={() => onSort("cost")}>成本{arrow("cost")}</button>
+      <button style={sortKey==="speed"   ? on : off} onClick={() => onSort("speed")}>速度{arrow("speed")}</button>
       {selCount > 0 && (
         <div style={{ display:"flex", alignItems:"center", gap:6, marginLeft:"auto" }}>
           <span style={{ fontSize:12, color:"#64748b" }}>已選 {selCount} 個（最多 4）</span>
@@ -430,11 +433,18 @@ function Controls({ sort, onSort, selCount, onCompare, onClear }: {
 
 export default function AiModelsClient() {
   const [tab, setTab] = useState<Tab>("text");
-  const [sort, setSort] = useState<SortMode>("default");
+  const [sortKey, setSortKey] = useState<SortKey>("default");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selText,   setSelText]   = useState<Set<string>>(new Set());
   const [selImage,  setSelImage]  = useState<Set<string>>(new Set());
   const [selCoding, setSelCoding] = useState<Set<string>>(new Set());
   const [cmpOpen, setCmpOpen] = useState(false);
+
+  function handleSort(k: SortKey) {
+    if (k === "default") { setSortKey("default"); setSortDir("asc"); return; }
+    if (k === sortKey) { setSortDir((d) => d === "asc" ? "desc" : "asc"); }
+    else { setSortKey(k); setSortDir("asc"); }
+  }
 
   const curSel    = tab === "text" ? selText   : tab === "image" ? selImage  : selCoding;
   const setCurSel = tab === "text" ? setSelText : tab === "image" ? setSelImage : setSelCoding;
@@ -448,26 +458,28 @@ export default function AiModelsClient() {
     });
   }
 
+  const dir = sortDir === "asc" ? 1 : -1;
+
   const sortedText = useMemo(() => {
     const r = [...TEXT_MODEL_COMPARISONS];
-    if (sort === "cost")  r.sort((a, b) => a.costInputPer1M - b.costInputPer1M);
-    if (sort === "speed") r.sort((a, b) => a.speedRank - b.speedRank);
+    if (sortKey === "cost")  r.sort((a, b) => (a.costInputPer1M - b.costInputPer1M) * dir);
+    if (sortKey === "speed") r.sort((a, b) => (a.speedRank - b.speedRank) * dir);
     return r;
-  }, [sort]);
+  }, [sortKey, sortDir]);
 
   const sortedImage = useMemo(() => {
     const r = [...TAROT_MODEL_COMPARISONS];
-    if (sort === "cost")  r.sort((a, b) => a.costUsd - b.costUsd);
-    if (sort === "speed") r.sort((a, b) => a.speedRank - b.speedRank);
+    if (sortKey === "cost")  r.sort((a, b) => (a.costUsd - b.costUsd) * dir);
+    if (sortKey === "speed") r.sort((a, b) => (a.speedRank - b.speedRank) * dir);
     return r;
-  }, [sort]);
+  }, [sortKey, sortDir]);
 
   const sortedCoding = useMemo(() => {
     const r = [...CODING_TOOL_COMPARISONS];
-    if (sort === "cost")  r.sort((a, b) => a.costInputPer1M - b.costInputPer1M);
-    if (sort === "speed") r.sort((a, b) => a.speedRank - b.speedRank);
+    if (sortKey === "cost")  r.sort((a, b) => (a.costInputPer1M - b.costInputPer1M) * dir);
+    if (sortKey === "speed") r.sort((a, b) => (a.speedRank - b.speedRank) * dir);
     return r;
-  }, [sort]);
+  }, [sortKey, sortDir]);
 
   const cmpModels = useMemo((): AnyModel[] => {
     if (tab === "text")   return TEXT_MODEL_COMPARISONS.filter((m) => selText.has(m.model)).map((m) => ({ ...m, _type: "text" as const }));
@@ -482,7 +494,7 @@ export default function AiModelsClient() {
     color: active ? "#fff" : "#475569",
   });
 
-  function changeTab(t: Tab) { setTab(t); setSort("default"); setCmpOpen(false); }
+  function changeTab(t: Tab) { setTab(t); setSortKey("default"); setSortDir("asc"); setCmpOpen(false); }
 
   return (
     <>
@@ -495,7 +507,7 @@ export default function AiModelsClient() {
 
       {/* Controls */}
       <Controls
-        sort={sort} onSort={setSort}
+        sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
         selCount={curSel.size}
         onCompare={() => setCmpOpen(true)}
         onClear={() => setCurSel(new Set())}
