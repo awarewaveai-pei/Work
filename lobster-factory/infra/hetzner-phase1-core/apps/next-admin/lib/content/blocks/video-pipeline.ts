@@ -148,7 +148,18 @@ register({
 
     // 3) 提交 EU（短請求，不等渲染）→ 回 euJobId。渲染在 EU thread 跑，由 /status 輪詢收尾。
     onProgress?.("提交合成任務（EU 伺服器）…");
-    const sub = await submitRender(scenes.map((s) => ({ id: s.id, narration: s.narration })), assets, title);
+    const sub = await submitRender(
+      scenes.map((s) => ({ id: s.id, narration: s.narration })),
+      assets,
+      title,
+      undefined,
+      {
+        ttsProvider: ctx.ttsProvider as string | undefined,
+        ttsVoice: ctx.ttsVoice as string | undefined,
+        introTitle: ctx.introTitle as string | undefined,
+        introDuration: ctx.introDuration as number | undefined,
+      },
+    );
     if (!sub.ok) {
       await cleanupVideoInputKeys(r2Keys);
       return {

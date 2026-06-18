@@ -40,18 +40,32 @@ const svcBase = (baseUrl?: string) => baseUrl ?? process.env.VIDEO_SERVICE_URL ?
  * 提交渲染給 EU video-service（一次短請求，不等渲染）。回 EU 端 jobId。
  * 渲染在 EU 自己的背景 thread 跑（持久），由 /status 輪詢 — next-admin 不做任何背景工作。
  */
+export interface RenderOpts {
+  ttsProvider?: string;
+  ttsVoice?: string;
+  introTitle?: string;
+  introDuration?: number;
+}
+
 export async function submitRender(
   scenes: RenderScene[],
   assets: string[],
   outName: string,
   baseUrl?: string,
+  opts?: RenderOpts,
 ): Promise<{ ok: true; jobId: string } | { ok: false; status: number; error: string }> {
   const base = svcBase(baseUrl);
   try {
     const res = await fetch(`${base}/render`, {
       method: "POST",
       headers: svcHeaders(true),
-      body: JSON.stringify({ scenes, assets, out_name: outName }),
+      body: JSON.stringify({
+        scenes, assets, out_name: outName,
+        ...(opts?.ttsProvider && { tts_provider: opts.ttsProvider }),
+        ...(opts?.ttsVoice && { tts_voice: opts.ttsVoice }),
+        ...(opts?.introTitle && { intro_title: opts.introTitle }),
+        ...(opts?.introDuration && { intro_duration: opts.introDuration }),
+      }),
       signal: AbortSignal.timeout(30_000),
     });
     const body = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string };

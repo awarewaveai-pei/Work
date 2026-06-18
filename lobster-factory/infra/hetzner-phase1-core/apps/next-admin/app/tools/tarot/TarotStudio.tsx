@@ -94,6 +94,7 @@ async function callGenerate(body: {
   referenceImages?: string[];
   seed?: number | null;
   printQuality?: boolean;
+  _jobId?: string | null;
 }): Promise<GenResponse> {
   const res = await fetch("/api/tools/tarot/generate", {
     method: "POST",
@@ -219,6 +220,8 @@ export default function TarotStudio() {
   // Generation token: incremented on each generateCompare call and on selectCompareResult.
   // The final setCompareResults is skipped if the token changed (prevents stale repaint after lock).
   const compareGenIdRef = useRef(0);
+  // Job ID: stable UUID per user-initiated generation session (preview / compare / group / single).
+  const jobIdRef = useRef<string | null>(null);
   // Prompt values captured at compare-generation time — used in selectCompareResult so that
   // previewSig reflects the prompt that actually made the comparison images, not an edited value.
   const compareStyleRef = useRef({ english: "", subject: "" });
@@ -360,6 +363,7 @@ export default function TarotStudio() {
     setLocked(false);
     setCompareResults([]);
     setCompareZoom(null);
+    jobIdRef.current = crypto.randomUUID();
     try {
       const resp = await callGenerate({
         model: activeModel,
@@ -367,6 +371,7 @@ export default function TarotStudio() {
         referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
         printQuality: true,
+        _jobId: jobIdRef.current,
       });
       if (!resp.ok || !resp.image) {
         setMessage(`預覽生成失敗：${resp.error ?? "unknown"}`);
@@ -390,6 +395,7 @@ export default function TarotStudio() {
     setCompareBusy(true);
     setLocked(false);
     setCompareZoom(null);
+    jobIdRef.current = crypto.randomUUID();
     const modelList = Array.from(selectedModels);
     const genId = ++compareGenIdRef.current;
     // Capture prompt at compare time; selectCompareResult reads these for previewSig.
@@ -410,6 +416,7 @@ export default function TarotStudio() {
           referenceImages: mode === "image" ? referenceImages.slice(0, modelOption(m).maxRefs) : [],
           seed: null,
           printQuality: true,
+          _jobId: jobIdRef.current,
         });
         result = { model: m, image: resp.ok && resp.image ? resp.image : null, seed: resp.ok ? (resp.seed ?? null) : null, error: resp.ok ? undefined : (resp.error ?? "unknown"), busy: false };
       } catch (e) {
@@ -495,6 +502,7 @@ export default function TarotStudio() {
         referenceImages: lockedRefs,
         seed: previewSeed,
         printQuality: true,
+        _jobId: jobIdRef.current,
       });
       if (!resp.ok || !resp.image) {
         patchItem(index, { status: "error", error: resp.error ?? "unknown" });
@@ -539,6 +547,7 @@ export default function TarotStudio() {
         `預估費用約 NT$${estNt}，約 ${mins} 分鐘，請保持此分頁開啟。\n\n確定開始？`,
     );
     if (!ok) return;
+    jobIdRef.current = crypto.randomUUID();
     setBatchBusy(true);
     setMessage(null);
     try {
@@ -635,6 +644,7 @@ export default function TarotStudio() {
   // Generate (or regenerate) a single card — fast, no confirm.
   async function generateSingle(index: number) {
     if (batchBusy) return;
+    jobIdRef.current = crypto.randomUUID();
     setBatchBusy(true);
     setMessage(null);
     try {

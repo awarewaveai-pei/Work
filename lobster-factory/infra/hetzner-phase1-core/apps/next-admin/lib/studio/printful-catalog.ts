@@ -34,7 +34,8 @@ const WANTED_TYPES = new Set([
 
 // In-memory caches
 let catalogCache: { items: CatalogProduct[]; ts: number } | null = null;
-const specCache = new Map<number, { spec: ProductSpec; ts: number }>();
+// null means "known to fail/unsupported" — also cached to prevent retry storms
+const specCache = new Map<number, { spec: ProductSpec | null; ts: number }>();
 
 function timedFetch(url: string, apiKey: string, storeId?: string): Promise<Response> {
   const ctrl = new AbortController();
@@ -51,12 +52,14 @@ function timedFetch(url: string, apiKey: string, storeId?: string): Promise<Resp
 /** Return catalog product list (cached 1 h). */
 export async function fetchCatalogProducts(): Promise<CatalogProduct[]> {
   const apiKey = process.env.PRINTFUL_API_KEY;
+  const storeId = process.env.PRINTFUL_STORE_ID;
   if (!apiKey) return [];
 
   if (catalogCache && Date.now() - catalogCache.ts < TTL_MS) return catalogCache.items;
 
   try {
-    const res = await timedFetch(`${PRINTFUL_API}/products?limit=100`, apiKey);
+    // Pass store ID — store-scoped tokens require it; account-level tokens ignore it safely.
+    const res = await timedFetch(`${PRINTFUL_API}/products?limit=100`, apiKey, storeId ?? undefined);
     if (!res.ok) return catalogCache?.items ?? [];
     const json = (await res.json()) as {
       result: Array<{ id: number; title: string; image: string; type: string; type_name: string }>;
@@ -83,7 +86,10 @@ export async function fetchProductSpec(productId: number): Promise<ProductSpec |
   try {
     // 1. Get variants — pick first white/medium in-stock, or first variant
     const vRes = await timedFetch(`${PRINTFUL_API}/products/${productId}`, apiKey);
-    if (!vRes.ok) return null;
+    if (!vRes.ok) {
+      specCache.set(productId, { spec: null, ts: Date.now() }); // negative-cache: skip retry for 1h
+      return null;
+    }
     const vJson = (await vRes.json()) as {
       result: {
         variants: Array<{ id: number; color: string; size: string; in_stock: boolean }>;
@@ -96,7 +102,10 @@ export async function fetchProductSpec(productId: number): Promise<ProductSpec |
       variants.find((v) => v.in_stock) ??
       variants[0]
     )?.id;
-    if (!variantId) return null;
+    if (!variantId) {
+      specCache.set(productId, { spec: null, ts: Date.now() });
+      return null;
+    }
 
     // 2. Get printfile area dimensions
     const pfRes = await timedFetch(
@@ -128,6 +137,7 @@ export async function fetchProductSpec(productId: number): Promise<ProductSpec |
     specCache.set(productId, { spec, ts: Date.now() });
     return spec;
   } catch {
+    specCache.set(productId, { spec: null, ts: Date.now() });
     return null;
   }
 }

@@ -7,6 +7,7 @@ import {
   type DynamicProductSpec,
 } from "../../../../../lib/studio/printful-mockup";
 import { fetchProductSpec } from "../../../../../lib/studio/printful-catalog";
+import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
     imageWidth?: number;
     imageHeight?: number;
     designSizePct?: number;  // 0.4–1.0, fraction of print-area width (default 0.8)
+    _jobId?: string;
   };
   try {
     body = await request.json() as typeof body;
@@ -83,7 +85,7 @@ export async function POST(request: Request) {
       designSizePct: typeof body.designSizePct === "number" ? body.designSizePct : 0.8,
     };
     const result = await generateMockupBySpec(imageInput, spec, imageDims);
-    return jsonResult(result);
+    return jsonResult(result, typeof body._jobId === "string" ? body._jobId : null);
   }
 
   // Legacy: productType key in PRODUCT_CONFIG
@@ -95,11 +97,16 @@ export async function POST(request: Request) {
     );
   }
   const result = await generateMockup(imageInput, productType, imageDims);
-  return jsonResult(result);
+  return jsonResult(result, typeof body._jobId === "string" ? body._jobId : null);
 }
 
-function jsonResult(result: { ok: boolean; error?: string; [k: string]: unknown }) {
-  if (result.ok) return NextResponse.json(result);
+function jsonResult(result: { ok: boolean; error?: string; [k: string]: unknown }, jobId?: string | null) {
+  if (result.ok) {
+    if (jobId) {
+      void logImageCost({ route: "tools/studio/mockup", model: "printful-mockup", vendor: "Printful", costUsd: 0, jobId, tool: "mockup" });
+    }
+    return NextResponse.json(result);
+  }
   const code = (result as { ok: false; error: string }).error;
   let friendly = `Mockup 生成失敗：${code}`;
   if (code.includes("missing_printful_key")) friendly = "伺服器未設定 Printful API Key（PRINTFUL_API_KEY）。";

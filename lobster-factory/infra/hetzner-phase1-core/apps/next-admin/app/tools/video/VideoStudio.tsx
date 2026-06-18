@@ -25,6 +25,35 @@ interface VideoOutputs {
   title: string;
 }
 
+// ─── Voice model options ──────────────────────────────────────────────────────
+
+interface VoiceModel {
+  id: string;          // "edge:VOICE" | "openai:MODEL:VOICE"
+  label: string;
+  lang: string;
+  badge: string;
+  badgeColor: string;
+  badgeBg: string;
+  note?: string;
+}
+
+const VOICE_MODELS: VoiceModel[] = [
+  { id: "edge:zh-TW-HsiaoChenNeural", label: "Edge TTS 繁中女聲", lang: "繁中", badge: "$0 免費", badgeColor: "#065f46", badgeBg: "#d1fae5" },
+  { id: "edge:zh-TW-YunJheNeural",    label: "Edge TTS 繁中男聲", lang: "繁中", badge: "$0 免費", badgeColor: "#065f46", badgeBg: "#d1fae5" },
+  { id: "edge:en-US-JennyNeural",     label: "Edge TTS English F", lang: "EN",  badge: "$0 免費", badgeColor: "#065f46", badgeBg: "#d1fae5" },
+  { id: "edge:en-US-GuyNeural",       label: "Edge TTS English M", lang: "EN",  badge: "$0 免費", badgeColor: "#065f46", badgeBg: "#d1fae5" },
+  { id: "openai:tts-1:nova",          label: "OpenAI nova",        lang: "多語", badge: "$0.015/1M", badgeColor: "#92400e", badgeBg: "#fef3c7", note: "自然、英文佳" },
+  { id: "openai:tts-1:shimmer",       label: "OpenAI shimmer",     lang: "多語", badge: "$0.015/1M", badgeColor: "#92400e", badgeBg: "#fef3c7", note: "柔和女聲" },
+  { id: "openai:tts-1:alloy",         label: "OpenAI alloy",       lang: "多語", badge: "$0.015/1M", badgeColor: "#92400e", badgeBg: "#fef3c7" },
+  { id: "openai:tts-1:onyx",          label: "OpenAI onyx",        lang: "多語", badge: "$0.015/1M", badgeColor: "#92400e", badgeBg: "#fef3c7", note: "低沉男聲" },
+  { id: "openai:tts-1-hd:nova",       label: "OpenAI nova HD",     lang: "多語", badge: "$0.030/1M", badgeColor: "#991b1b", badgeBg: "#fee2e2", note: "HD 品質" },
+];
+
+function parseVoiceModel(id: string): { ttsProvider: string; ttsVoice: string } {
+  const [provider, ...rest] = id.split(":");
+  return { ttsProvider: provider, ttsVoice: rest.join(":") };
+}
+
 // ─── Output format label map ──────────────────────────────────────────────────
 
 const OUTPUT_LABELS: Record<string, { label: string; ratio: string; icon: string }> = {
@@ -56,6 +85,9 @@ export default function VideoStudio() {
   const [totalScenes, setTotalScenes] = useState(6);
   const [customScenes, setCustomScenes] = useState(3);
   const [imageModel, setImageModel] = useState(DEFAULT_IMAGE_MODEL);
+  const [voiceModelId, setVoiceModelId] = useState(VOICE_MODELS[0].id);
+  const [introEnabled, setIntroEnabled] = useState(false);
+  const [introDuration, setIntroDuration] = useState(3);
 
   const brollScenes = Math.max(0, totalScenes - customScenes);
 
@@ -140,6 +172,9 @@ export default function VideoStudio() {
           customScenes: Math.min(customScenes, totalScenes),
           brollScenes,
           imageModel,
+          ...parseVoiceModel(voiceModelId),
+          introTitle: introEnabled ? (topic.trim() || undefined) : undefined,
+          introDuration: introEnabled ? introDuration : undefined,
         }),
       });
       const start = (await res.json()) as { ok: boolean; jobId?: string; error?: string };
@@ -250,6 +285,26 @@ export default function VideoStudio() {
                   ))}
                 </select>
               </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>配音模型</span>
+                <select value={voiceModelId} onChange={(e) => setVoiceModelId(e.target.value)} style={inputStyle}>
+                  {VOICE_MODELS.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label}{v.note ? ` — ${v.note}` : ""} [{v.lang}] {v.badge}
+                    </option>
+                  ))}
+                </select>
+                {(() => {
+                  const vm = VOICE_MODELS.find(v => v.id === voiceModelId);
+                  return vm ? (
+                    <span style={{ fontSize: 11, padding: "2px 7px", borderRadius: 4, display: "inline-block", alignSelf: "flex-start",
+                      color: vm.badgeColor, background: vm.badgeBg, fontWeight: 700 }}>
+                      {vm.badge}
+                    </span>
+                  ) : null;
+                })()}
+              </div>
             </div>
           </Card>
 
@@ -308,6 +363,23 @@ export default function VideoStudio() {
                     {["繁體中文", "English", "簡體中文", "日文", "西班牙文"].map((l) => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </div>
+              </div>
+
+              {/* Intro title card toggle */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: 8, background: "#f8fafc", border: "1px solid var(--border-subtle)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input type="checkbox" checked={introEnabled} onChange={e => setIntroEnabled(e.target.checked)} disabled={isLoading} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>標題動畫（片頭黑底 + fade-in 標題）</span>
+                </label>
+                {introEnabled && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{ fontSize: 11.5, color: "var(--text-muted)", whiteSpace: "nowrap" }}>時長 (秒)</span>
+                    <input type="range" min={2} max={6} step={0.5} value={introDuration}
+                      onChange={e => setIntroDuration(Number(e.target.value))}
+                      style={{ flex: 1, accentColor: "var(--accent)" }} disabled={isLoading} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", minWidth: 28 }}>{introDuration}s</span>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>

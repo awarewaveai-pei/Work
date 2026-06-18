@@ -148,6 +148,7 @@ export default function MockupStudio() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const inFlight = useRef(false);
   const printfulInFlight = useRef(false);
+  const jobIdRef = useRef<string | null>(null);
   // presets
   const [modelPresets, setModelPresets] = useState<PresetAsset[]>([]);
   const [productPresets, setProductPresets] = useState<PresetAsset[]>([]);
@@ -229,6 +230,7 @@ export default function MockupStudio() {
       return;
     }
     if (inFlight.current) return;
+    jobIdRef.current = crypto.randomUUID();
     inFlight.current = true;
     setGen({ status: "generating" });
     setSaveState("idle");
@@ -236,7 +238,7 @@ export default function MockupStudio() {
       const res = await fetch("/api/tools/studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, prompt, referenceImages: [designRef], aspectRatio: aspect }),
+        body: JSON.stringify({ model, prompt, referenceImages: [designRef], aspectRatio: aspect, _jobId: jobIdRef.current }),
       });
       const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
       if (!json.ok || !json.image) {
@@ -262,6 +264,7 @@ export default function MockupStudio() {
       return;
     }
     if (printfulInFlight.current) return;
+    jobIdRef.current = crypto.randomUUID();
     printfulInFlight.current = true;
 
     // Mark all selected as "generating"
@@ -278,8 +281,11 @@ export default function MockupStudio() {
     const isDataUrl = designRef.startsWith("data:");
     const sizeFraction = designSizePct / 100;
 
-    // Parallel generation for each selected product
-    await Promise.all([...selectedProductIds].map(async (pid) => {
+    // Batched generation — max 2 concurrent to avoid Printful 429 rate limits
+    const BATCH_SIZE = 2;
+    const pids = [...selectedProductIds];
+
+    const generateOne = async (pid: number) => {
       const prd = catalog.find((c) => c.id === pid);
       try {
         const res = await fetch("/api/tools/studio/mockup", {
@@ -312,7 +318,11 @@ export default function MockupStudio() {
           return next;
         });
       }
-    }));
+    };
+
+    for (let i = 0; i < pids.length; i += BATCH_SIZE) {
+      await Promise.all(pids.slice(i, i + BATCH_SIZE).map(generateOne));
+    }
 
     printfulInFlight.current = false;
   }, [designRef, selectedProductIds, catalog, designSizePct]);

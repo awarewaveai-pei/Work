@@ -198,6 +198,7 @@ export default function StudioWorkbench() {
 
   const bgInFlight = useRef<Record<string, boolean>>({});
   const mockupInFlight = useRef(false);
+  const jobIdRef = useRef<string | null>(null);
 
   const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
 
@@ -328,6 +329,7 @@ export default function StudioWorkbench() {
     }
 
     const genId = ++genIdRef.current;
+    jobIdRef.current = crypto.randomUUID();
     setBusy(true);
     setActiveIdx(0);
     setMockupState("idle");
@@ -351,7 +353,7 @@ export default function StudioWorkbench() {
         const res = await fetch("/api/tools/studio/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: m, prompt: effectivePrompt, referenceImages: refsForModel, aspectRatio: aspect }),
+          body: JSON.stringify({ model: m, prompt: effectivePrompt, referenceImages: refsForModel, aspectRatio: aspect, _jobId: jobIdRef.current }),
         });
         const json = (await res.json()) as { ok: boolean; image?: string; seed?: number | null; error?: string };
         slots[i] = json.ok && json.image
@@ -375,7 +377,7 @@ export default function StudioWorkbench() {
       const res = await fetch("/api/tools/studio/remove-bg", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image }),
+        body: JSON.stringify({ image, _jobId: jobIdRef.current }),
       });
       const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
       if (!json.ok || !json.image) { setBgStates((prev) => ({ ...prev, [model]: "error" })); return; }
@@ -426,7 +428,7 @@ export default function StudioWorkbench() {
       const res = await fetch("/api/tools/studio/mockup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image, productType }),
+        body: JSON.stringify({ image, productType, _jobId: jobIdRef.current }),
       });
       const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
       if (!json.ok || !json.mockups?.length) { setMockupState("error"); return; }

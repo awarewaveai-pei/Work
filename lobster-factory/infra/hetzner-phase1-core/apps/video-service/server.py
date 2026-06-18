@@ -135,12 +135,17 @@ def _validate(payload: dict):
     return scenes, assets, out_name
 
 
-def _do_render(scenes, assets, out_name) -> dict:
+def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
+               intro_title="", intro_duration=3.0) -> dict:
     """重活：序列化 materialize+render+R2 上傳。回 {outputs,out_dir,storage}。"""
     with _render_lock:  # 序列化：materialize(下載)+render 全程獨佔 TEMP_DIR（防並行撞檔）
         try:
             visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
-            outputs, _base, out_dir = pipeline.render_video(scenes, visual_files, out_name)
+            outputs, _base, out_dir = pipeline.render_video(
+                scenes, visual_files, out_name,
+                tts_provider=tts_provider, tts_voice=tts_voice,
+                intro_title=intro_title, intro_duration=intro_duration,
+            )
             # 跨機：產出上傳 R2 → 回 public URL。未設 R2 = 本機路徑（dev）。
             if _r2_video_configured():
                 base_key = "video/" + os.path.basename(str(out_dir))
@@ -170,9 +175,12 @@ def _prune_jobs():
         _JOBS.pop(jid, None)
 
 
-def _run_job(job_id: str, scenes, assets, out_name):
+def _run_job(job_id: str, scenes, assets, out_name,
+             tts_provider="edge", tts_voice="", intro_title="", intro_duration=3.0):
     try:
-        result = _do_render(scenes, assets, out_name)
+        result = _do_render(scenes, assets, out_name,
+                            tts_provider=tts_provider, tts_voice=tts_voice,
+                            intro_title=intro_title, intro_duration=intro_duration)
         with _jobs_lock:
             _JOBS[job_id] = {"status": "done", **result, "ts": time.time()}
     except Exception as e:  # noqa: BLE001
@@ -183,11 +191,19 @@ def _run_job(job_id: str, scenes, assets, out_name):
 def submit_render(payload: dict) -> str:
     """驗證後建 job + 起背景 thread，立即回 jobId（不阻塞）。"""
     scenes, assets, out_name = _validate(payload)
+    tts_provider = payload.get("tts_provider", "edge")
+    tts_voice = payload.get("tts_voice") or ""
+    intro_title = payload.get("intro_title") or ""
+    intro_duration = float(payload.get("intro_duration", 3.0))
     job_id = uuid.uuid4().hex
     with _jobs_lock:
         _prune_jobs()
         _JOBS[job_id] = {"status": "running", "ts": time.time()}
-    threading.Thread(target=_run_job, args=(job_id, scenes, assets, out_name), daemon=True).start()
+    threading.Thread(
+        target=_run_job,
+        args=(job_id, scenes, assets, out_name, tts_provider, tts_voice, intro_title, intro_duration),
+        daemon=True,
+    ).start()
     return job_id
 
 

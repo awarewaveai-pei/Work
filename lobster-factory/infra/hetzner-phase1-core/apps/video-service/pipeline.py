@@ -220,16 +220,32 @@ def generate_all_images(scenes: list) -> list:
 # ═══════════════════════════════════════════
 # STEP 3：Edge TTS 配音
 # ═══════════════════════════════════════════
-async def _tts(text: str, path: str):
-    await edge_tts.Communicate(text, config.TTS_VOICE).save(path)
+async def _tts(text: str, path: str, voice: str = ""):
+    await edge_tts.Communicate(text, voice or config.TTS_VOICE).save(path)
 
 
-def generate_audio(scenes: list) -> list:
-    print("\n[3/6] Edge TTS 生成配音...")
+def _tts_openai(text: str, path: str, model: str = "tts-1", voice: str = "alloy") -> None:
+    """OpenAI TTS (tts-1 / tts-1-hd) — better prosody for English and multi-language."""
+    config.require("OPENAI_API_KEY")
+    resp = _openai().audio.speech.create(model=model, voice=voice, input=text)
+    with open(path, "wb") as f:
+        f.write(resp.content)
+
+
+def generate_audio(scenes: list, tts_provider: str = "edge", tts_voice: str = "") -> list:
+    print(f"\n[3/6] {tts_provider.upper()} TTS 生成配音...")
     audio_files = []
     for scene in scenes:
         path = str(config.TEMP_DIR / f"audio_{scene['id']}.mp3")
-        asyncio.run(_tts(scene["narration"], path))
+        if tts_provider == "openai":
+            # tts_voice format: "MODEL:VOICE" e.g. "tts-1:nova" or "tts-1-hd:shimmer"
+            if ":" in (tts_voice or ""):
+                model, voice_name = tts_voice.split(":", 1)
+            else:
+                model, voice_name = "tts-1", tts_voice or "alloy"
+            _tts_openai(scene["narration"], path, model=model, voice=voice_name)
+        else:
+            asyncio.run(_tts(scene["narration"], path, voice=tts_voice))
         audio_files.append(path)
         print(f"   scene {scene['id']} done")
     return audio_files
@@ -391,12 +407,66 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
                            f"{res.stderr.decode('utf-8', 'ignore')[-500:]}")
 
 
-def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_name: str) -> str:
+def _render_intro_scene(title: str, duration: float, out_path: str, w: int, h: int, fps: int) -> None:
+    """Render a title card: black background + white text that fades in over 0.8s."""
+    font_path = ""
+    for fp in [
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    ]:
+        if os.path.exists(fp):
+            font_path = fp
+            break
+
+    title_file = str(config.TEMP_DIR / "intro_title.txt")
+    with open(title_file, "w", encoding="utf-8") as f:
+        f.write(title)
+
+    safe_path = title_file.replace("\\", "/").replace(":", "\\:")
+    font_arg = f"fontfile={font_path.replace(':', '\\:')}:" if font_path else ""
+    font_size = max(36, h // 18)
+
+    dt_filter = (
+        f"[0:v]drawtext={font_arg}"
+        f"textfile={safe_path}:"
+        f"fontsize={font_size}:"
+        f"fontcolor=white:"
+        f"alpha='if(lt(t,0.8),t/0.8,1)':"
+        f"borderw=2:bordercolor=black:"
+        f"x=(w-text_w)/2:y=(h-text_h)/2[v]"
+    )
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "lavfi", "-i", f"color=c=black:size={w}x{h}:r={fps}",
+        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+        "-filter_complex", dt_filter,
+        "-map", "[v]", "-map", "1:a",
+        "-t", f"{duration:.2f}",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+        out_path,
+    ]
+    res = subprocess.run(cmd, capture_output=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"intro render failed: {res.stderr.decode('utf-8', 'ignore')[-400:]}")
+
+
+def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_name: str,
+                       intro_title: str = "", intro_duration: float = 3.0) -> str:
     """純 ffmpeg 合成：每場景獨立 render 成統一參數 mp4，再 concat demuxer (-c copy) 秒級合併。
     靜圖走 zoompan Ken Burns、實拍走 cover-fit；混合由 _render_scene_ffmpeg 依副檔名派發。"""
     print(f"\n[4/6] 合成基礎影片（{config.BASE_WIDTH}x{config.BASE_HEIGHT}，ffmpeg per-scene + concat）...")
     w, h, fps = config.BASE_WIDTH, config.BASE_HEIGHT, config.FPS
     scene_paths = []
+
+    # Optional intro title card
+    if intro_title:
+        intro_path = str(config.TEMP_DIR / "scene_intro.mp4")
+        _render_intro_scene(intro_title, intro_duration, intro_path, w, h, fps)
+        scene_paths.append(intro_path)
+        print(f"   intro ({intro_duration:.1f}s): {intro_title[:40]}")
+
     for i, (scene, asset_path, audio_path) in enumerate(zip(scenes, visual_files, audio_files)):
         duration = _audio_duration(audio_path)
         sp = str(config.TEMP_DIR / f"scene_{i:03d}.mp4")
@@ -578,7 +648,9 @@ def cleanup():
 # ═══════════════════════════════════════════
 # Render-only 入口（給 next-admin video/pipeline 積木呼叫）
 # ═══════════════════════════════════════════
-def render_video(scenes: list, visual_files: list, out_name: str):
+def render_video(scenes: list, visual_files: list, out_name: str,
+                 tts_provider: str = "edge", tts_voice: str = "",
+                 intro_title: str = "", intro_duration: float = 3.0):
     """只做合成：scenes(含 narration) + 已備妥的視覺素材 → 配音 → 合成 → 多尺寸輸出。
 
     visual_files 每項可為「靜圖（Flux）」或「實拍影片片段（Pexels B-roll）」，
@@ -593,8 +665,9 @@ def render_video(scenes: list, visual_files: list, out_name: str):
     out_dir = config.OUTPUT_DIR / safe_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    audio_files = generate_audio(scenes)
-    base_video = compose_base_video(scenes, visual_files, audio_files, safe_name)
+    audio_files = generate_audio(scenes, tts_provider=tts_provider, tts_voice=tts_voice)
+    base_video = compose_base_video(scenes, visual_files, audio_files, safe_name,
+                                    intro_title=intro_title, intro_duration=intro_duration)
     output_files = export_all_formats(base_video, out_dir)
     return output_files, base_video, out_dir
 

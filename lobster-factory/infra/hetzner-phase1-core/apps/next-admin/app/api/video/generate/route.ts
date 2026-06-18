@@ -19,6 +19,10 @@ interface GenerateBody {
   customScenes?: number;
   brollScenes?: number;
   imageModel?: string;
+  ttsProvider?: string;
+  ttsVoice?: string;
+  introTitle?: string;
+  introDuration?: number;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -55,6 +59,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     customScenes: body.customScenes,
     brollScenes: body.brollScenes,
     imageModel: body.imageModel,
+    ttsProvider: body.ttsProvider,
+    ttsVoice: body.ttsVoice,
+    introTitle: body.introTitle,
+    introDuration: body.introDuration,
   };
 
   // prepare 回傳（pending handle）— 單一 interface + optional（避免 union narrowing TS 邊角）
