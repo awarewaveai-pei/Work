@@ -10,3 +10,4 @@ import "./publish-wordpress";
 import "./product-copy";
 import "./image-style-design-workbench";
 import "./ai-image-edit-prompt";
+import "./video-pipeline";

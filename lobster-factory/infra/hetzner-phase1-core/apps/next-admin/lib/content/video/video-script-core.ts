@@ -1,0 +1,178 @@
+/**
+ * video-script-core.ts — 呼叫 Claude 把主題 / 文章轉為結構化 6 場景腳本。
+ *
+ * 唯一職責：組提示 → 呼叫 Claude → 解析 JSON → 回傳型別安全結果。
+ * 不做 TTS、不做圖片生成、不做 render。
+ */
+import Anthropic from "@anthropic-ai/sdk";
+
+/** 與 Python pipeline.py CLAUDE_MODEL 對齊（影片生成共用同一模型 ID）。 */
+const CLAUDE_MODEL = "claude-sonnet-4-6";
+
+/** 單場景資料（Claude 回傳後每個元素的形狀）。 */
+export interface VideoScene {
+  id: number;
+  /** 旁白文字（約 35 字，TTS 用）。 */
+  narration: string;
+  /** 英文 AI 圖像提示（Flux 用）。 */
+  image_prompt: string;
+  /** 英文 B-roll 關鍵字（Pexels 搜尋用）。 */
+  broll_keyword: string;
+  /** 視覺策略：custom = AI 插圖；broll = 真實影片素材。 */
+  visual: "custom" | "broll";
+}
+
+export interface VideoScriptSuccess {
+  ok: true;
+  scenes: VideoScene[];
+  title: string;
+  description: string;
+}
+
+export type VideoScriptResult =
+  | VideoScriptSuccess
+  | { ok: false; status: number; error: string };
+
+/** 要求 Claude 回傳的 JSON 架構（供提示使用）。 */
+const SCHEMA_EXAMPLE = `{
+  "title": "...",
+  "description": "...",
+  "scenes": [
+    { "id": 1, "narration": "35 字以內的旁白", "image_prompt": "English prompt for AI illustration", "broll_keyword": "english search term", "visual": "custom" | "broll" },
+    ...6 scenes total...
+  ]
+}`;
+
+/** 解析 Claude 回傳字串（容錯：剝 markdown fence、fallback regex）。 */
+function parseScriptJson(raw: string): VideoScriptSuccess | null {
+  // 剝 ```json ... ``` fence
+  let text = raw.trim();
+  const fenceMatch = /```(?:json)?\s*([\s\S]*?)```/.exec(text);
+  if (fenceMatch) text = fenceMatch[1].trim();
+
+  // 嘗試直接 JSON.parse
+  try {
+    const obj = JSON.parse(text) as {
+      title?: unknown;
+      description?: unknown;
+      scenes?: unknown[];
+    };
+    return validate(obj);
+  } catch {
+    // fallback：用 regex 抓出最外層 { ... }
+    const bracketMatch = /\{[\s\S]*\}/.exec(text);
+    if (!bracketMatch) return null;
+    try {
+      const obj = JSON.parse(bracketMatch[0]) as {
+        title?: unknown;
+        description?: unknown;
+        scenes?: unknown[];
+      };
+      return validate(obj);
+    } catch {
+      return null;
+    }
+  }
+}
+
+/** 型別驗證：確認必填欄位存在且形狀正確。 */
+function validate(obj: {
+  title?: unknown;
+  description?: unknown;
+  scenes?: unknown[];
+}): VideoScriptSuccess | null {
+  if (typeof obj.title !== "string" || typeof obj.description !== "string") return null;
+  if (!Array.isArray(obj.scenes) || obj.scenes.length === 0) return null;
+
+  const scenes: VideoScene[] = [];
+  for (const s of obj.scenes) {
+    const sc = s as Record<string, unknown>;
+    if (
+      typeof sc.id !== "number" ||
+      typeof sc.narration !== "string" ||
+      typeof sc.image_prompt !== "string" ||
+      typeof sc.broll_keyword !== "string" ||
+      (sc.visual !== "custom" && sc.visual !== "broll")
+    ) {
+      return null;
+    }
+    scenes.push({
+      id: sc.id,
+      narration: sc.narration,
+      image_prompt: sc.image_prompt,
+      broll_keyword: sc.broll_keyword,
+      visual: sc.visual,
+    });
+  }
+  return { ok: true, scenes, title: obj.title, description: obj.description };
+}
+
+/**
+ * 呼叫 Claude 生成影片腳本。
+ * 輸入可為 topic 字串 或 已存在的文章（title + content）。
+ * language 預設繁體中文旁白（視覺 prompt 永遠英文）。
+ */
+export async function generateVideoScript(
+  input: {
+    topic?: string;
+    articleTitle?: string;
+    articleContent?: string;
+    language?: string;
+  },
+  apiKey: string
+): Promise<VideoScriptResult> {
+  const lang = input.language ?? "繁體中文";
+
+  // 組成使用者訊息：優先使用文章，其次用主題
+  let userContent: string;
+  if (input.articleTitle && input.articleContent) {
+    userContent =
+      `根據以下文章，生成一個 ${lang} 旁白的 6 場景影片腳本。\n\n` +
+      `文章標題：${input.articleTitle}\n\n${input.articleContent}`;
+  } else {
+    const topic = input.topic ?? "台灣旅遊精選";
+    userContent = `根據主題「${topic}」，生成一個 ${lang} 旁白的 6 場景影片腳本。`;
+  }
+
+  const systemPrompt =
+    `你是專業影片腳本作家。請嚴格以下方 JSON 格式回傳腳本，不要加任何說明文字。\n\n` +
+    `規則：\n` +
+    `- scenes 恰好 6 個，id 從 1 到 6\n` +
+    `- narration：${lang}，約 35 字，適合 TTS 朗讀，不含 Markdown\n` +
+    `- image_prompt：英文，描述場景的 AI 圖像生成提示，具體且有畫面感\n` +
+    `- broll_keyword：英文，1–3 個單字，適合 Pexels 搜尋的真實影片素材關鍵字\n` +
+    `- visual：「custom」= 此場景適合 AI 插畫；「broll」= 此場景適合真實影片素材\n` +
+    `- title：影片標題（${lang}）\n` +
+    `- description：SEO 影片描述（${lang}，50–120 字）\n\n` +
+    `JSON 架構：\n${SCHEMA_EXAMPLE}`;
+
+  let response: Awaited<ReturnType<Anthropic["messages"]["create"]>>;
+  try {
+    const client = new Anthropic({ apiKey });
+    response = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 2048,
+      messages: [{ role: "user", content: `${systemPrompt}\n\n${userContent}` }],
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, status: 502, error: `Claude API 呼叫失敗：${msg}` };
+  }
+
+  // 取出文字回應
+  const block = response.content[0];
+  if (!block || block.type !== "text") {
+    return { ok: false, status: 502, error: "Claude 回傳非文字內容" };
+  }
+
+  const parsed = parseScriptJson(block.text);
+  if (!parsed) {
+    return {
+      ok: false,
+      status: 502,
+      error: `Claude 回傳 JSON 解析失敗（前 300 字：${block.text.slice(0, 300)}）`,
+    };
+  }
+
+  return parsed;
+}

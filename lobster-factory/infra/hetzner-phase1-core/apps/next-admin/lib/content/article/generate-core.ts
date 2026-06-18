@@ -35,7 +35,12 @@ DEFAULT OUTPUT FORMAT (follow unless overridden in user instructions):
 4. Main body sections — each H2 opens with a 1–2 sentence direct answer BEFORE elaborating (optimises for AI Overview citation and Featured Snippets); use H3 sub-sections where helpful
 5. At least one comparison or evaluation table
 6. ## FAQ (5–8 questions; each answer is 40–120 words; first sentence directly answers; no vague pronouns)
-7. ## Conclusion (with a clear CTA)
+7. ## Conclusion — REQUIRED STRUCTURE (minimum 180 words; do NOT rehash the intro or copy Key Takeaways verbatim):
+   a) 2–3 sentence synthesis of the single most important takeaway — new framing, not repetition
+   b) 1 forward-looking sentence: what the reader should do or think about next
+   c) A clear, specific CTA tied to the article's primary marketing objective (e.g. "Book a free consultation", "Download the guide", "Try it for 7 days") — never generic "contact us"
+   d) Social proof signal if applicable ("practitioners find…", "clients report…", "research shows…")
+   e) Optional: 1 closing sentence that makes the reader feel seen / understood — emotional resonance increases time-on-page
 
 RULES:
 - Output clean Markdown only — no preamble, no "here is your article" opener

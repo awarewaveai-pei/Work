@@ -426,6 +426,10 @@ export default function ContentStudio() {
   // #6 — Available Kadence synced patterns on the target site (/api/content/patterns)
   const [availablePatterns, setAvailablePatterns] = useState<Array<{ id: number; title: string }>>([]);
   const [patternsLoading,   setPatternsLoading]   = useState(false);
+  const [patternsNote,      setPatternsNote]      = useState("");
+
+  // Media Hub brand name: auto-populate from selected site; stop once operator edits manually
+  const [brandNameTouched, setBrandNameTouched] = useState(false);
 
   // Trending keywords panel
   const [showTrending,    setShowTrending]    = useState(false);
@@ -598,6 +602,13 @@ export default function ContentStudio() {
     const site = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
     if (site?.url) setBvSampleUrl(`${site.url.replace(/\/$/, "")}/about`);
   }, [wpSites, selectedSiteId, bvUrlTouched]);
+
+  // Media Hub Brand Name follows the selected site — saves operator from re-typing every time.
+  useEffect(() => {
+    if (brandNameTouched) return;
+    const site = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
+    if (site?.name) setMedia("brandName", site.name.slice(0, 30));
+  }, [wpSites, selectedSiteId, brandNameTouched]);
 
   // ─── Form helpers ──────────────────────────────────────────────────────────
 
@@ -813,12 +824,13 @@ export default function ContentStudio() {
   // ─── #6 Load available Kadence synced patterns for the selected site ───────
 
   const loadPatterns = useCallback(async () => {
-    setPatternsLoading(true);
+    setPatternsLoading(true); setPatternsNote("");
     try {
       const res  = await fetch(`/api/content/patterns${selectedSiteId ? `?siteId=${encodeURIComponent(selectedSiteId)}` : ""}`);
-      const json = await res.json() as { ok: boolean; patterns?: Array<{ id: number; title: string }> };
+      const json = await res.json() as { ok: boolean; patterns?: Array<{ id: number; title: string }>; note?: string };
       if (json.ok && json.patterns) setAvailablePatterns(json.patterns);
-    } catch { /* silent — funnel patterns are optional */ }
+      if (json.note) setPatternsNote(json.note);
+    } catch { setPatternsNote("網路錯誤，請重試"); }
     finally { setPatternsLoading(false); }
   }, [selectedSiteId]);
 
@@ -1858,7 +1870,21 @@ export default function ContentStudio() {
             <div style={{ marginBottom: "16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                 <label className="form-label" style={{ margin: 0 }}>Introductory Hook Brief</label>
-                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{form.introHookBrief.length}/500</span>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <button type="button" disabled={isGenerating} style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover, #f5f5f5)" }}
+                    onClick={() => {
+                      // Auto-suggest best hook type based on article type
+                      const t = form.articleType;
+                      const suggested =
+                        t.includes("How-To") || t.includes("Tutorial") ? "Statistical or Fact" :
+                        t.includes("Listicle") || t.includes("Product") ? "Statistical or Fact" :
+                        t.includes("Case Study") ? "Anecdotal or Story" :
+                        t.includes("Opinion") || t.includes("Personal") ? "Personal or Emotional" :
+                        t.includes("Pillar") ? "Question" : "Question";
+                      setF("introHookType", suggested);
+                    }}>✦ 推薦</button>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{form.introHookBrief.length}/500</span>
+                </div>
               </div>
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
                 {HOOK_TYPES.map(ht => (
@@ -1876,7 +1902,7 @@ export default function ContentStudio() {
               <textarea className="form-textarea" style={{ minHeight: "72px" }}
                 value={form.introHookBrief} maxLength={500} disabled={isGenerating}
                 onChange={e => setF("introHookBrief", e.target.value)}
-                placeholder="Enter the type of hook for the article's opening sentence" />
+                placeholder={`補充 Hook 的具體方向（選填）。例：\n• Question → 「你有沒有想過，為什麼大多數人學了藝術治療卻沒有改變？」\n• Statistical or Fact → 「根據 2024 APA 研究，8 成焦慮者從未嘗試表達性藝術…」\n• Anecdotal or Story → 「3 年前，一位來訪者拿著一張全黑的畫走進工作室…」`} />
             </div>
 
             {/* Yes/No dropdowns grid */}
@@ -2019,8 +2045,11 @@ export default function ContentStudio() {
                   </div>
                   <input className="form-input" value={form.media.brandName} maxLength={30}
                     disabled={isGenerating || form.media.aiImages === "none"}
-                    onChange={e => setMedia("brandName", e.target.value)}
+                    onChange={e => { setMedia("brandName", e.target.value); setBrandNameTouched(true); }}
                     placeholder="Enter your brand name" />
+                  {!brandNameTouched && form.media.brandName && (
+                    <div className="form-hint" style={{ marginTop: 2 }}>已自動帶入目標客戶名稱，可直接覆寫。</div>
+                  )}
                 </div>
               </div>
 
@@ -2372,8 +2401,10 @@ export default function ContentStudio() {
                 ))}
               </div>
             ) : (
-              <div className="form-hint" style={{ marginTop: 8, color: "var(--text-muted)" }}>
-                {patternsLoading ? "" : "尚未讀取到 patterns（站台需設定連線權杖；按上方重新讀取）。"}
+              <div className="form-hint" style={{ marginTop: 8, color: patternsNote ? "var(--red, #dc2626)" : "var(--text-muted)" }}>
+                {patternsLoading ? "" : patternsNote
+                  ? `讀取失敗：${patternsNote}（請確認站台已設定 Application Password，且已在 WordPress → 使用者 → 應用程式密碼 中建立）`
+                  : "尚未讀取到 patterns（按上方按鈕讀取；站台需設定 Application Password 才可讀取 wp_block）。"}
               </div>
             )}
           </SectionToggle>
@@ -2472,9 +2503,19 @@ export default function ContentStudio() {
                       onChange={e => setMetaData(prev => prev ? { ...prev, seoTitle: e.target.value } : prev)} />
                   </div>
                   <div>
-                    <label className="form-label">Meta 描述 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>（{metaData.metaDesc.length} 字元）</span></label>
+                    <label className="form-label">
+                      Meta 描述{" "}
+                      <span style={{ fontWeight: 400, color: metaData.metaDesc.length > 160 ? "var(--red, #dc2626)" : "var(--text-muted)" }}>
+                        （{metaData.metaDesc.length} / 160 字元{metaData.metaDesc.length > 160 ? " ⚠ 超過上限" : ""}）
+                      </span>
+                    </label>
                     <input className="form-input" value={metaData.metaDesc}
                       onChange={e => setMetaData(prev => prev ? { ...prev, metaDesc: e.target.value } : prev)} />
+                    {metaData.metaDesc.length > 160 && (
+                      <div className="form-hint" style={{ color: "var(--red, #dc2626)", marginTop: 2 }}>
+                        RankMath 上限 160 字元；超出部分在搜尋結果會被截斷。請縮短後再發布。
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
