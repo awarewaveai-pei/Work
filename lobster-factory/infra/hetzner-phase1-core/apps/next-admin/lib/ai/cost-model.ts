@@ -122,6 +122,7 @@ export const TEXT_FEATURES: FeatureProfile[] = [
   { key: "syndicate",   label: "社群多平台改寫",             route: "/api/content/syndicate", model: "claude-haiku-4-5-20251001", inputTok: 1500, outputTok: 2000 },
   { key: "tarot-prompt",label: "塔羅 prompt 建議",           route: "/api/tools/tarot/suggest-prompt", model: "claude-haiku-4-5-20251001", inputTok: 500, outputTok: 400 },
   { key: "product-copy",label: "POD 商品文案 (SEO)",         route: "lib/studio/product-copy", model: "claude-sonnet-4-6", inputTok: 600, outputTok: 1000 },
+  { key: "video-script",label: "影片腳本生成 (6 場景)",       route: "lib/content/video/video-script-core", model: "claude-sonnet-4-6", inputTok: 1200, outputTok: 2200 },
 ];
 
 /**
