@@ -8,7 +8,8 @@
 -- ai_call_logs -----------------------------------------------------------------
 ALTER TABLE public.ai_call_logs
   ADD COLUMN IF NOT EXISTS job_id uuid NULL,
-  ADD COLUMN IF NOT EXISTS tool   text NULL;  -- e.g. "content" | "studio" | "tarot" | "video" | "mockup"
+  ADD COLUMN IF NOT EXISTS tool   text NULL,  -- e.g. "content" | "studio" | "tarot" | "video" | "mockup"
+  ADD COLUMN IF NOT EXISTS kind   text NULL;  -- "text" | "image" | "video" (NULL = text, for compat)
 
 CREATE INDEX IF NOT EXISTS ai_call_logs_job_id_idx ON public.ai_call_logs (job_id)
   WHERE job_id IS NOT NULL;

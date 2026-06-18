@@ -121,9 +121,43 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
       actor_role: actorRole ?? null,
       job_id: jobId ?? null,
       tool: tool ?? null,
+      kind: "text",
       metadata: resolved.fallback ? { ...(metadata ?? {}), rate_fallback: true, matched_rate: resolved.matchedKey } : (metadata ?? {}),
     });
   } catch {
     // Swallow — observability must never break the feature it observes.
   }
+}
+
+export interface LogImageCostArgs {
+  route: string;
+  model: string;
+  vendor: string;
+  costUsd: number;
+  jobId?: string | null;
+  tool?: string | null;
+}
+
+/** Best-effort image cost logger — writes one row to ai_call_logs with kind="image". Never throws. */
+export async function logImageCost(args: LogImageCostArgs): Promise<void> {
+  try {
+    const supabase = getSupabaseWriteClient();
+    if (!supabase) return;
+    await supabase.from("ai_call_logs").insert({
+      organization_id: null,
+      route: args.route,
+      model: args.model,
+      vendor: args.vendor,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
+      cost_usd: Number(args.costUsd.toFixed(6)),
+      actor_role: null,
+      job_id: args.jobId ?? null,
+      tool: args.tool ?? null,
+      kind: "image",
+      metadata: {},
+    });
+  } catch { /* never break the caller */ }
 }

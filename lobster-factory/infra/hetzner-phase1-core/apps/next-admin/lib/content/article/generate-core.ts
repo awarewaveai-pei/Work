@@ -511,6 +511,7 @@ export interface ArticlePreparedConfig {
   system: string;
   userPrompt: string;
   perplexityCostUsd?: number;
+  jobId?: string | null;
 }
 
 export interface ArticleGenerateFailure {
@@ -652,7 +653,8 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
     insertAllPatterns,
   });
 
-  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt, perplexityCostUsd: perplexityCostUsd > 0 ? perplexityCostUsd : undefined } };
+  const jobId = typeof body._jobId === "string" ? body._jobId : null;
+  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt, perplexityCostUsd: perplexityCostUsd > 0 ? perplexityCostUsd : undefined, jobId } };
 }
 
 /**
@@ -704,7 +706,7 @@ export async function* streamArticleGeneration(
       const finalMsg = await anthropicStream.finalMessage().catch(() => null);
       // Cost ledger: record exact token usage from the completed stream (best-effort, never throws).
       if (finalMsg) {
-        void logAiCall({ route: "content/article-generate", response: finalMsg });
+        void logAiCall({ route: "content/article-generate", response: finalMsg, jobId: config.jobId, tool: "content" });
         const costUsd = textCallCostUsd({ model: config.model, inputTokens: finalMsg.usage.input_tokens, outputTokens: finalMsg.usage.output_tokens, cacheReadTokens: finalMsg.usage.cache_read_input_tokens, cacheWriteTokens: finalMsg.usage.cache_creation_input_tokens });
         const { rate } = resolveTextRate(config.model);
         if (config.perplexityCostUsd) {
@@ -842,6 +844,8 @@ async function* streamOpenAiGeneration(
         model: config.model,
         inputTokens: openaiUsage.prompt_tokens ?? 0,
         outputTokens: openaiUsage.completion_tokens ?? 0,
+        jobId: config.jobId,
+        tool: "content",
       });
       const costUsd = textCallCostUsd({ model: config.model, inputTokens: openaiUsage.prompt_tokens ?? 0, outputTokens: openaiUsage.completion_tokens ?? 0 });
       const { rate } = resolveTextRate(config.model);
