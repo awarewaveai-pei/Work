@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { generativeFill, OUTPAINT_PRESETS, type OutpaintPreset } from "../../../../../lib/studio/generative-fill";
+import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
   }
 
-  let body: { image?: string; mask?: string; prompt?: string; outpaint?: string };
+  let body: { image?: string; mask?: string; prompt?: string; outpaint?: string; _jobId?: string };
   try {
     body = (await request.json()) as { image?: string; mask?: string; prompt?: string; outpaint?: string };
   } catch {
@@ -51,6 +52,12 @@ export async function POST(request: Request) {
     mask: hasOutpaint ? undefined : body.mask, // outpaint ignores the mask
     outpaint: hasOutpaint ? (body.outpaint as OutpaintPreset) : undefined,
   });
+  if (result.ok) {
+    const jobId = typeof body._jobId === "string" ? body._jobId : null;
+    if (jobId) {
+      void logImageCost({ route: "tools/studio/genfill", model: "flux-fill-pro", vendor: "Replicate", costUsd: 0.05, jobId, tool: "canvas" });
+    }
+  }
   // HTTP 200 with ok:false on failure — same nginx error_page rationale as the other studio routes.
   return NextResponse.json(result);
 }

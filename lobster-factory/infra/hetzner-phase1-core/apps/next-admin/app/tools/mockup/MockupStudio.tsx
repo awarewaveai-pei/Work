@@ -29,14 +29,22 @@ import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 // Show all 15 models; ref-count shown in label so user knows which ones apply the design.
 const MOCKUP_MODELS = STUDIO_MODEL_OPTIONS;
 
-const PRINTFUL_PRODUCTS = [
-  { value: "tshirt", label: "T-Shirt" },
-  { value: "hoodie", label: "Hoodie" },
-  { value: "mug", label: "Mug" },
-  { value: "tote", label: "Tote Bag" },
-] as const;
+interface CatalogProduct {
+  id: number;
+  title: string;
+  image: string;
+  typeName: string;
+  typeCode: string;
+}
 
-type PrintfulProductType = (typeof PRINTFUL_PRODUCTS)[number]["value"];
+interface ProductMockupResult {
+  productId: number;
+  productTitle: string;
+  productImage: string;
+  status: "generating" | "done" | "error";
+  mockups?: MockupView[];
+  error?: string;
+}
 
 interface DesignAsset {
   id: string;
@@ -68,11 +76,6 @@ interface GenState {
   error?: string;
 }
 
-interface PrintfulState {
-  status: "idle" | "generating" | "done" | "error";
-  mockups?: MockupView[];
-  error?: string;
-}
 
 interface SaveMockupState {
   [url: string]: "idle" | "saving" | "saved" | "error";
@@ -130,9 +133,13 @@ export default function MockupStudio() {
   const [modelLighting, setModelLighting] = useState(MODEL_LIGHTING[0].value);
   const [envPropTR, setEnvPropTR] = useState("");
   const [envPropBL, setEnvPropBL] = useState("");
-  // printful controls
-  const [printfulProduct, setPrintfulProduct] = useState<PrintfulProductType>("tshirt");
-  const [printfulState, setPrintfulState] = useState<PrintfulState>({ status: "idle" });
+  // printful catalog + multi-product
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(new Set());
+  const [designSizePct, setDesignSizePct] = useState(80); // 40-100
+  const [productResults, setProductResults] = useState<Map<number, ProductMockupResult>>(new Map());
+  // legacy single-product state (still used for bulk-save)
   const [saveMockupStates, setSaveMockupStates] = useState<SaveMockupState>({});
   const [selectedMockups, setSelectedMockups] = useState<Set<string>>(new Set());
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -156,6 +163,18 @@ export default function MockupStudio() {
         if (json.ok) setDesigns((json.assets ?? []).filter((a) => a.object_url));
       } catch {
         /* gallery unavailable — local upload still works */
+      }
+    })();
+    void (async () => {
+      setCatalogLoading(true);
+      try {
+        const res = await fetch("/api/tools/printful/catalog", { cache: "no-store" });
+        const json = (await res.json()) as { ok: boolean; products?: CatalogProduct[] };
+        if (json.ok && json.products) setCatalog(json.products);
+      } catch {
+        /* catalog unavailable */
+      } finally {
+        setCatalogLoading(false);
       }
     })();
     void (async () => {
@@ -234,42 +253,69 @@ export default function MockupStudio() {
 
   const generatePrintful = useCallback(async () => {
     if (!designRef) {
-      setPrintfulState({ status: "error", error: "請先選一張設計圖（My Designs 點選或上傳）" });
+      // Use first product result slot or just alert via state
+      setProductResults(new Map([[0, { productId: 0, productTitle: "", productImage: "", status: "error", error: "請先選一張設計圖（My Designs 點選或上傳）" }]]));
+      return;
+    }
+    if (selectedProductIds.size === 0) {
+      setProductResults(new Map([[0, { productId: 0, productTitle: "", productImage: "", status: "error", error: "請先選擇至少一個產品" }]]));
       return;
     }
     if (printfulInFlight.current) return;
     printfulInFlight.current = true;
-    setPrintfulState({ status: "generating" });
+
+    // Mark all selected as "generating"
+    const initial = new Map<number, ProductMockupResult>();
+    for (const pid of selectedProductIds) {
+      const prd = catalog.find((c) => c.id === pid);
+      initial.set(pid, { productId: pid, productTitle: prd?.title ?? `Product ${pid}`, productImage: prd?.image ?? "", status: "generating" });
+    }
+    setProductResults(new Map(initial));
     setSaveMockupStates({});
     setSelectedMockups(new Set());
-    try {
-      // Resolve true pixel dimensions for aspect-ratio-correct Printful position.
-      // img.naturalWidth/Height works cross-origin without CORS headers.
-      const dims = await getImageNaturalDims(designRef);
-      // Send imageUrl (R2 https://) or image (base64 data URL) — server handles both.
-      // Never fetch cross-origin in the browser (CORS).
-      const isDataUrl = designRef.startsWith("data:");
-      const res = await fetch("/api/tools/studio/mockup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...(isDataUrl ? { image: designRef } : { imageUrl: designRef }),
-          productType: printfulProduct,
-          ...(dims ? { imageWidth: dims.width, imageHeight: dims.height } : {}),
-        }),
-      });
-      const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
-      if (!json.ok || !json.mockups) {
-        setPrintfulState({ status: "error", error: json.error ?? `HTTP ${res.status}` });
-        return;
+
+    const dims = await getImageNaturalDims(designRef);
+    const isDataUrl = designRef.startsWith("data:");
+    const sizeFraction = designSizePct / 100;
+
+    // Parallel generation for each selected product
+    await Promise.all([...selectedProductIds].map(async (pid) => {
+      const prd = catalog.find((c) => c.id === pid);
+      try {
+        const res = await fetch("/api/tools/studio/mockup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(isDataUrl ? { image: designRef } : { imageUrl: designRef }),
+            productId: pid,
+            designSizePct: sizeFraction,
+            ...(dims ? { imageWidth: dims.width, imageHeight: dims.height } : {}),
+          }),
+        });
+        const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
+        setProductResults((prev) => {
+          const next = new Map(prev);
+          next.set(pid, {
+            productId: pid,
+            productTitle: prd?.title ?? `Product ${pid}`,
+            productImage: prd?.image ?? "",
+            status: json.ok && json.mockups ? "done" : "error",
+            mockups: json.mockups,
+            error: json.ok ? undefined : (json.error ?? "未知錯誤"),
+          });
+          return next;
+        });
+      } catch (err) {
+        setProductResults((prev) => {
+          const next = new Map(prev);
+          next.set(pid, { productId: pid, productTitle: prd?.title ?? `Product ${pid}`, productImage: prd?.image ?? "", status: "error", error: err instanceof Error ? err.message : String(err) });
+          return next;
+        });
       }
-      setPrintfulState({ status: "done", mockups: json.mockups });
-    } catch (err) {
-      setPrintfulState({ status: "error", error: err instanceof Error ? err.message : String(err) });
-    } finally {
-      printfulInFlight.current = false;
-    }
-  }, [designRef, printfulProduct]);
+    }));
+
+    printfulInFlight.current = false;
+  }, [designRef, selectedProductIds, catalog, designSizePct]);
 
   const toggleMockup = useCallback((url: string) => {
     setSelectedMockups((prev) => {
@@ -291,13 +337,15 @@ export default function MockupStudio() {
 
   const saveMockupToDesigns = useCallback(async (mockupUrl: string) => {
     setSaveMockupStates((prev) => ({ ...prev, [mockupUrl]: "saving" }));
+    // Find product title for label
+    const productTitle = [...productResults.values()].find((r) => r.mockups?.some((m) => m.url === mockupUrl))?.productTitle ?? "product";
     try {
       const res = await fetch("/api/tools/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sourceUrl: mockupUrl,
-          prompt: `[printful:${printfulProduct}]`,
+          prompt: `[printful:${productTitle}]`,
           source: "pod-studio",
         }),
       });
@@ -306,7 +354,7 @@ export default function MockupStudio() {
     } catch {
       setSaveMockupStates((prev) => ({ ...prev, [mockupUrl]: "error" }));
     }
-  }, [printfulProduct]);
+  }, [productResults]);
 
   const saveMockup = useCallback(async () => {
     if (gen.status !== "done" || !gen.image) return;
@@ -552,20 +600,80 @@ export default function MockupStudio() {
 
         {mode === "printful" ? (
           <>
+            {/* Product Catalog Grid */}
+            <div style={{ fontSize: 13, marginBottom: 4 }}>
+              選擇產品（多選）
+              {selectedProductIds.size > 0 && (
+                <span style={{ marginLeft: 8, color: "#4f8cff", fontSize: 12 }}>已選 {selectedProductIds.size} 個</span>
+              )}
+            </div>
+            {catalogLoading && <p style={{ fontSize: 12, opacity: 0.6 }}>載入產品目錄中…</p>}
+            {!catalogLoading && catalog.length === 0 && (
+              <p style={{ fontSize: 12, color: "#e5484d" }}>無法載入 Printful 產品目錄</p>
+            )}
+            {catalog.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, maxHeight: 320, overflowY: "auto" }}>
+                {catalog.map((p) => {
+                  const selected = selectedProductIds.has(p.id);
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => setSelectedProductIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(p.id)) next.delete(p.id); else next.add(p.id);
+                        return next;
+                      })}
+                      style={{
+                        cursor: "pointer",
+                        border: selected ? "2px solid #4f8cff" : "2px solid #333",
+                        borderRadius: 6,
+                        overflow: "hidden",
+                        background: "#111",
+                        position: "relative",
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.image} alt={p.title} style={{ width: "100%", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
+                      {selected && (
+                        <div style={{ position: "absolute", top: 3, right: 3, background: "#4f8cff", borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</div>
+                      )}
+                      <div style={{ fontSize: 9, padding: "3px 4px", lineHeight: 1.3, opacity: 0.8, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        {p.typeName} — {p.title.replace(/\s*\|.*$/, "")}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {catalog.length > 0 && (
+              <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                <button className="btn-secondary" style={{ fontSize: 11 }} onClick={() => setSelectedProductIds(new Set(catalog.map((c) => c.id)))}>全選</button>
+                <button className="btn-secondary" style={{ fontSize: 11 }} onClick={() => setSelectedProductIds(new Set())}>清除</button>
+              </div>
+            )}
+
+            {/* Design Size Slider */}
             <label style={{ fontSize: 13 }}>
-              產品類型
-              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={printfulProduct} onChange={(e) => setPrintfulProduct(e.target.value as PrintfulProductType)}>
-                {PRINTFUL_PRODUCTS.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
-              </select>
+              設計大小（{designSizePct}% 印刷寬度）
+              <input
+                type="range"
+                min={40}
+                max={100}
+                step={5}
+                value={designSizePct}
+                onChange={(e) => setDesignSizePct(Number(e.target.value))}
+                style={{ width: "100%", marginTop: 4 }}
+              />
             </label>
+
             <button
               className="btn-primary"
-              disabled={printfulState.status === "generating"}
+              disabled={[...productResults.values()].some((r) => r.status === "generating")}
               onClick={() => void generatePrintful()}
             >
-              {printfulState.status === "generating" ? "Printful 合成中（30–60 秒）…" : "生成 Printful Mockup"}
+              {[...productResults.values()].some((r) => r.status === "generating")
+                ? `合成中（${[...productResults.values()].filter((r) => r.status === "generating").length} 產品剩餘）…`
+                : `生成 Mockup（${selectedProductIds.size} 產品）`}
             </button>
           </>
         ) : (
@@ -795,75 +903,73 @@ export default function MockupStudio() {
         {/* Printful result */}
         {mode === "printful" && (
           <>
-            {printfulState.status === "idle" && <p style={{ opacity: 0.6 }}>選設計圖 → 選產品 → 生成 Printful Mockup。</p>}
-            {printfulState.status === "generating" && <p style={{ opacity: 0.7 }}>Printful 合成中（30–60 秒）…</p>}
-            {printfulState.status === "error" && <p style={{ color: "#e5484d" }}>{printfulState.error}</p>}
-            {printfulState.status === "done" && printfulState.mockups && (
-              <>
-                {/* Toolbar */}
-                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 13, opacity: 0.7 }}>
-                    {printfulState.mockups.length} 張（{PRINTFUL_PRODUCTS.find((p) => p.value === printfulProduct)?.label}）
-                  </span>
-                  <button
-                    className="btn-secondary"
-                    style={{ fontSize: 11 }}
-                    onClick={() => setSelectedMockups(new Set(printfulState.mockups!.map((m) => m.url)))}
-                  >
-                    全選
-                  </button>
-                  <button
-                    className="btn-secondary"
-                    style={{ fontSize: 11 }}
-                    onClick={() => setSelectedMockups(new Set())}
-                  >
-                    取消
-                  </button>
-                  {selectedMockups.size > 0 && (
-                    <button
-                      className="btn-primary"
-                      style={{ fontSize: 11 }}
-                      disabled={bulkSaving}
-                      onClick={() => void saveBulkMockups()}
-                    >
-                      {bulkSaving ? "儲存中…" : `存入 My Designs (${selectedMockups.size})`}
-                    </button>
-                  )}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-                  {printfulState.mockups.map((mv) => {
-                    const st = saveMockupStates[mv.url] ?? "idle";
-                    const checked = selectedMockups.has(mv.url);
-                    return (
-                      <div
-                        key={mv.url}
-                        style={{ display: "flex", flexDirection: "column", gap: 4, cursor: "pointer", position: "relative" }}
-                        onClick={() => toggleMockup(mv.url)}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={mv.url}
-                          alt={mv.label}
-                          style={{ width: "100%", borderRadius: 6, background: "#111", outline: checked ? "2px solid #4f8cff" : "none" }}
-                        />
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleMockup(mv.url)}
-                          style={{ position: "absolute", top: 4, left: 4, width: 16, height: 16, cursor: "pointer" }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        {st === "saved" && (
-                          <div style={{ position: "absolute", top: 4, right: 4, background: "#1a9e5c", color: "#fff", fontSize: 10, borderRadius: 3, padding: "1px 4px" }}>✓ 已存入</div>
-                        )}
-                        <div style={{ fontSize: 11, opacity: 0.7, textAlign: "center" }}>{mv.label}</div>
-                        {st === "error" && <span style={{ color: "#e5484d", fontSize: 10, textAlign: "center" }}>儲存失敗</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
+            {productResults.size === 0 && (
+              <p style={{ opacity: 0.6 }}>選設計圖 → 從左側選擇產品 → 生成 Mockup。</p>
             )}
+            {/* Global bulk-save toolbar */}
+            {productResults.size > 0 && [...productResults.values()].some((r) => r.status === "done") && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+                <button className="btn-secondary" style={{ fontSize: 11 }} onClick={() => {
+                  const allUrls = [...productResults.values()].flatMap((r) => r.mockups?.map((m) => m.url) ?? []);
+                  setSelectedMockups(new Set(allUrls));
+                }}>全選所有</button>
+                <button className="btn-secondary" style={{ fontSize: 11 }} onClick={() => setSelectedMockups(new Set())}>取消選取</button>
+                {selectedMockups.size > 0 && (
+                  <button className="btn-primary" style={{ fontSize: 11 }} disabled={bulkSaving} onClick={() => void saveBulkMockups()}>
+                    {bulkSaving ? "儲存中…" : `存入 My Designs (${selectedMockups.size})`}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Per-product result sections */}
+            {[...productResults.values()].map((pr) => (
+              <div key={pr.productId} style={{ marginBottom: 20 }}>
+                {/* Product header */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  {pr.productImage && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={pr.productImage} alt={pr.productTitle} style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4, background: "#222" }} />
+                  )}
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{pr.productTitle.replace(/\s*\|.*$/, "")}</span>
+                  {pr.status === "generating" && <span style={{ fontSize: 12, opacity: 0.6 }}>合成中…</span>}
+                  {pr.status === "done" && pr.mockups && (
+                    <span style={{ fontSize: 11, opacity: 0.5 }}>{pr.mockups.length} 張</span>
+                  )}
+                  {pr.status === "error" && <span style={{ fontSize: 12, color: "#e5484d" }}>✗ {pr.error}</span>}
+                </div>
+                {pr.status === "done" && pr.mockups && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                    {pr.mockups.map((mv) => {
+                      const st = saveMockupStates[mv.url] ?? "idle";
+                      const checked = selectedMockups.has(mv.url);
+                      return (
+                        <div
+                          key={mv.url}
+                          style={{ display: "flex", flexDirection: "column", gap: 3, cursor: "pointer", position: "relative" }}
+                          onClick={() => toggleMockup(mv.url)}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={mv.url} alt={mv.label} style={{ width: "100%", borderRadius: 6, background: "#111", outline: checked ? "2px solid #4f8cff" : "none" }} />
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleMockup(mv.url)}
+                            style={{ position: "absolute", top: 4, left: 4, width: 16, height: 16, cursor: "pointer" }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          {st === "saved" && (
+                            <div style={{ position: "absolute", top: 4, right: 4, background: "#1a9e5c", color: "#fff", fontSize: 10, borderRadius: 3, padding: "1px 4px" }}>✓</div>
+                          )}
+                          <div style={{ fontSize: 10, opacity: 0.65, textAlign: "center" }}>{mv.label}</div>
+                          {st === "error" && <span style={{ color: "#e5484d", fontSize: 10, textAlign: "center" }}>儲存失敗</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
           </>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { removeObject } from "../../../../../lib/studio/inpaint";
+import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
   }
 
-  let body: { image?: string; mask?: string };
+  let body: { image?: string; mask?: string; _jobId?: string };
   try {
     body = (await request.json()) as { image?: string; mask?: string };
   } catch {
@@ -34,6 +35,12 @@ export async function POST(request: Request) {
   }
 
   const result = await removeObject(body.image, body.mask);
+  if (result.ok) {
+    const jobId = typeof body._jobId === "string" ? body._jobId : null;
+    if (jobId) {
+      void logImageCost({ route: "tools/studio/inpaint", model: "bria-eraser", vendor: "Replicate", costUsd: 0.003, jobId, tool: "canvas" });
+    }
+  }
   // HTTP 200 with ok:false on failure — same nginx error_page rationale as the other studio routes.
   return NextResponse.json(result);
 }

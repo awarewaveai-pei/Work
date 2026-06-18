@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { removeBackground } from "../../../../../lib/studio/bg-remover";
+import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
   }
 
-  let body: { image?: string };
+  let body: { image?: string; _jobId?: string };
   try {
     body = (await request.json()) as { image?: string };
   } catch {
@@ -37,6 +38,10 @@ export async function POST(request: Request) {
 
   const result = await removeBackground(body.image);
   if (result.ok) {
+    const jobId = typeof body._jobId === "string" ? body._jobId : null;
+    if (jobId) {
+      void logImageCost({ route: "tools/studio/remove-bg", model: "rembg", vendor: "Replicate", costUsd: 0.002, jobId, tool: "studio" });
+    }
     return NextResponse.json(result);
   }
   // HTTP 200 with ok:false — same nginx error_page rationale as the generate routes.

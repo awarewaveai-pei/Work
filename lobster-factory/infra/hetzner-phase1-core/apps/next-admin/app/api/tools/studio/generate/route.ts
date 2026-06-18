@@ -7,6 +7,8 @@ import {
   STUDIO_MODEL_OPTIONS,
 } from "../../../../../lib/studio/image-provider";
 import { getDesignsPublicBase } from "../../../../../lib/storage/r2";
+import { imageCostUsd } from "../../../../../lib/ai/cost-calculator";
+import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,6 +19,7 @@ interface GenerateBody {
   referenceImages?: unknown;
   seed?: number | null;
   aspectRatio?: string;
+  _jobId?: string;
 }
 
 // Per-image ceiling matches the tarot generate route; per-model count comes from
@@ -118,6 +121,10 @@ export async function POST(request: Request) {
   });
 
   if (result.ok) {
+    const jobId = typeof body._jobId === "string" ? body._jobId : null;
+    if (jobId) {
+      void logImageCost({ route: "tools/studio/generate", model: body.model ?? "unknown", vendor: "Replicate", costUsd: imageCostUsd(body.model ?? ""), jobId, tool: "studio" });
+    }
     return NextResponse.json(result);
   }
   // HTTP 200 with ok:false so the JSON reaches the browser (nginx error_page would

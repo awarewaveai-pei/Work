@@ -104,6 +104,10 @@ export async function POST(request: Request) {
   });
 
   if (result.ok) {
+    const jobId = typeof body._jobId === "string" ? body._jobId : null;
+    if (jobId) {
+      void logImageCost({ route: "tools/tarot/generate", model: body.model, vendor: "Replicate", costUsd: imageCostUsd(body.model), jobId, tool: "tarot" });
+    }
     return NextResponse.json(result);
   }
   // Return HTTP 200 with ok:false so the JSON reaches the browser. A 5xx here would let
