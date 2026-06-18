@@ -60,14 +60,14 @@ const TRENDING_CATEGORIES = [
   { value: "artificial-intelligence", label: "AI" },
 ];
 
-// Transform-capable models (flux-kontext family handles img2img best)
 const TRANSFORM_MODEL: StudioModel = "flux-kontext-dev";
 
-interface GenState {
-  status: "idle" | "generating" | "done" | "error";
-  image?: string;
-  seed?: number | null;
+interface ModelResult {
+  model: StudioModel;
+  image: string | null;
+  seed: number | null;
   error?: string;
+  busy: boolean;
 }
 
 type RefMode = "ref" | "transform";
@@ -90,8 +90,7 @@ async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Pr
       const w = Math.max(1, Math.round(img.width * scale));
       const h = Math.max(1, Math.round(img.height * scale));
       const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
+      canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext("2d");
       if (!ctx) { resolve(dataUrl); return; }
       ctx.drawImage(img, 0, 0, w, h);
@@ -127,7 +126,7 @@ function PresetChips({ chips, onSelect }: { chips: string[]; onSelect: (v: strin
 }
 
 export default function StudioWorkbench() {
-  const [model, setModel] = useState<StudioModel>("flux-schnell");
+  const [selectedModels, setSelectedModels] = useState<Set<StudioModel>>(new Set<StudioModel>(["flux-schnell"]));
   const [productType, setProductType] = useState("tshirt");
   const [theme, setTheme] = useState("");
   const [vibe, setVibe] = useState("");
@@ -138,10 +137,17 @@ export default function StudioWorkbench() {
   const [aspect, setAspect] = useState<AspectRatio>("4:5");
   const [refImages, setRefImages] = useState<string[]>([]);
   const [refMode, setRefMode] = useState<RefMode>("ref");
-  const [gen, setGen] = useState<GenState>({ status: "idle" });
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [bgState, setBgState] = useState<"idle" | "removing" | "done" | "error">("idle");
-  const [originalImage, setOriginalImage] = useState<string | null>(null);
+
+  // Multi-model results: one slot per selected model, updated incrementally
+  const [results, setResults] = useState<ModelResult[]>([]);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const genIdRef = useRef(0);
+
+  // Per-result post-processing state (keyed by model value)
+  const [saveStates, setSaveStates] = useState<Record<string, "idle" | "saving" | "saved" | "error">>({});
+  const [bgStates, setBgStates] = useState<Record<string, "idle" | "removing" | "done" | "error">>({});
+  const [originalImages, setOriginalImages] = useState<Record<string, string>>({});
   const [mockupState, setMockupState] = useState<"idle" | "generating" | "done" | "error">("idle");
   const [mockups, setMockups] = useState<MockupView[]>([]);
   const [savedMockups, setSavedMockups] = useState<Record<string, "saving" | "saved" | "error">>({});
@@ -153,10 +159,22 @@ export default function StudioWorkbench() {
   const [trendingLoading, setTrendingLoading] = useState(false);
   const [trendingError, setTrendingError] = useState(false);
 
-  const bgInFlight = useRef(false);
+  const bgInFlight = useRef<Record<string, boolean>>({});
   const mockupInFlight = useRef(false);
 
   const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
+
+  // Primary model = first in the set (used for maxRefs, fileMeta, edit panel)
+  const primaryModel = useMemo<StudioModel>(() => Array.from(selectedModels)[0] ?? "flux-schnell", [selectedModels]);
+  const primaryModelOption = useMemo(() => STUDIO_MODEL_OPTIONS.find((m) => m.value === primaryModel), [primaryModel]);
+
+  // maxRefs = max across all selected models (upload limit; each model gets its own slice at generate time)
+  const maxRefs = useMemo(
+    () => selectedModels.size === 0 ? 0 : Math.max(...Array.from(selectedModels).map((m) => STUDIO_MODEL_OPTIONS.find((o) => o.value === m)?.maxRefs ?? 0)),
+    [selectedModels],
+  );
+
+  const resolvedStylePrompt = useMemo(() => (style ? resolveStylePrompt(style) : ""), [style]);
 
   const fileMeta = useMemo<SemanticFileMeta>(() => {
     const p = PRODUCT_TYPES.find((x) => x.value === productType);
@@ -167,11 +185,6 @@ export default function StudioWorkbench() {
     };
   }, [productType, subject, theme, style]);
 
-  const modelOption = useMemo(() => STUDIO_MODEL_OPTIONS.find((m) => m.value === model), [model]);
-  const maxRefs = modelOption?.maxRefs ?? 0;
-  const resolvedStylePrompt = useMemo(() => (style ? resolveStylePrompt(style) : ""), [style]);
-
-  // Transform mode assembles a different prompt: style is applied TO the uploaded image
   const assembledPrompt = useMemo(() => {
     if (refMode === "transform" && refImages.length > 0) {
       const parts = [
@@ -189,35 +202,42 @@ export default function StudioWorkbench() {
 
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
+  const activeResult = results[activeIdx] ?? null;
+
   const onPickProduct = useCallback((value: string) => {
     setProductType(value);
     const p = PRODUCT_TYPES.find((x) => x.value === value);
     if (p) setAspect(p.aspect);
   }, []);
 
-  // Switching to transform mode: auto-upgrade to a kontext model if current has no ref support
+  const onModelsChange = useCallback((next: Set<StudioModel>) => {
+    setSelectedModels(next);
+    const anySupportsRefs = Array.from(next).some(
+      (m) => (STUDIO_MODEL_OPTIONS.find((o) => o.value === m)?.maxRefs ?? 0) > 0,
+    );
+    if (!anySupportsRefs) setRefImages([]);
+  }, []);
+
   const onSetRefMode = useCallback((mode: RefMode) => {
     setRefMode(mode);
     if (mode === "transform") {
-      const cur = STUDIO_MODEL_OPTIONS.find((m) => m.value === model);
-      if ((cur?.maxRefs ?? 0) === 0) {
-        setModel(TRANSFORM_MODEL);
+      const anySupports = Array.from(selectedModels).some(
+        (m) => (STUDIO_MODEL_OPTIONS.find((o) => o.value === m)?.maxRefs ?? 0) > 0,
+      );
+      if (!anySupports) {
+        setSelectedModels(new Set<StudioModel>([TRANSFORM_MODEL]));
         setRefImages([]);
       }
     }
-  }, [model]);
+  }, [selectedModels]);
 
   const fetchTrending = useCallback(async (cat: string) => {
     const today = new Date().toISOString().slice(0, 10);
     const cacheKey = `studio_trending_v1_${cat}_${today}`;
     try {
       const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        setTrendingTopics(JSON.parse(cached) as string[]);
-        return;
-      }
-    } catch { /* ignore parse error */ }
-
+      if (cached) { setTrendingTopics(JSON.parse(cached) as string[]); return; }
+    } catch { /* ignore */ }
     setTrendingLoading(true);
     setTrendingTopics([]);
     setTrendingError(false);
@@ -231,12 +251,8 @@ export default function StudioWorkbench() {
       if (json.ok && json.topics) {
         setTrendingTopics(json.topics);
         try { localStorage.setItem(cacheKey, JSON.stringify(json.topics)); } catch { /* quota */ }
-      } else {
-        setTrendingError(true);
-      }
-    } catch { setTrendingError(true); } finally {
-      setTrendingLoading(false);
-    }
+      } else { setTrendingError(true); }
+    } catch { setTrendingError(true); } finally { setTrendingLoading(false); }
   }, []);
 
   const onSelectTrendingCategory = useCallback((cat: string) => {
@@ -244,144 +260,113 @@ export default function StudioWorkbench() {
     void fetchTrending(cat);
   }, [fetchTrending]);
 
-  const onUploadRefs = useCallback(
-    async (files: FileList | null) => {
-      if (!files || files.length === 0) return;
-      const room = Math.max(0, maxRefs - refImages.length);
-      const picked = Array.from(files).slice(0, room);
-      const urls: string[] = [];
-      for (const f of picked) {
-        try { urls.push(await downscaleImageFile(f)); } catch { /* skip */ }
-      }
-      setRefImages((prev) => [...prev, ...urls].slice(0, maxRefs));
-    },
-    [maxRefs, refImages.length],
-  );
+  const onUploadRefs = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const room = Math.max(0, maxRefs - refImages.length);
+    const picked = Array.from(files).slice(0, room);
+    const urls: string[] = [];
+    for (const f of picked) {
+      try { urls.push(await downscaleImageFile(f)); } catch { /* skip */ }
+    }
+    setRefImages((prev) => [...prev, ...urls].slice(0, maxRefs));
+  }, [maxRefs, refImages.length]);
 
+  // Sequential multi-model generation (avoids API 429, results appear incrementally)
   const generate = useCallback(async () => {
     if (!effectivePrompt || effectivePrompt.trim().length < 3) {
-      setGen({ status: "error", error: "請先填主題/描述（prompt 至少 3 字）" });
-      return;
-    }
-    if (model === "ideogram-character" && refImages.length === 0) {
-      setGen({ status: "error", error: "Ideogram Character 需要至少 1 張角色參考圖" });
+      setResults([{ model: primaryModel, image: null, seed: null, error: "請先填主題/描述（prompt 至少 3 字）", busy: false }]);
       return;
     }
     if (refMode === "transform" && refImages.length === 0) {
-      setGen({ status: "error", error: "改圖模式需要先上傳一張圖" });
+      setResults([{ model: primaryModel, image: null, seed: null, error: "改圖模式需要先上傳一張圖", busy: false }]);
       return;
     }
-    setGen({ status: "generating" });
-    setSaveState("idle");
-    setBgState("idle");
-    setOriginalImage(null);
+
+    const modelList = Array.from(selectedModels);
+
+    // Validate ideogram-character requires ref
+    if (modelList.includes("ideogram-character") && refImages.length === 0) {
+      setResults([{ model: "ideogram-character", image: null, seed: null, error: "Ideogram Character 需要至少 1 張角色參考圖", busy: false }]);
+      return;
+    }
+
+    const genId = ++genIdRef.current;
+    setBusy(true);
+    setActiveIdx(0);
     setMockupState("idle");
     setMockups([]);
     setSavedMockups({});
-    try {
-      const res = await fetch("/api/tools/studio/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          prompt: effectivePrompt,
-          referenceImages: refImages.slice(0, maxRefs),
-          aspectRatio: aspect,
-        }),
-      });
-      const json = (await res.json()) as { ok: boolean; image?: string; seed?: number | null; error?: string };
-      if (!json.ok || !json.image) {
-        setGen({ status: "error", error: json.error ?? `HTTP ${res.status}` });
-        return;
-      }
-      setGen({ status: "done", image: json.image, seed: json.seed ?? null });
-    } catch (err) {
-      setGen({ status: "error", error: err instanceof Error ? err.message : String(err) });
-    }
-  }, [model, effectivePrompt, refImages, maxRefs, aspect, refMode]);
+    setSaveStates({});
+    setBgStates({});
+    setOriginalImages({});
 
-  const removeBg = useCallback(async () => {
-    if (gen.status !== "done" || !gen.image) return;
-    if (bgInFlight.current) return;
-    bgInFlight.current = true;
-    setBgState("removing");
+    // Initialise all slots as busy so UI shows pending cards immediately
+    const slots: ModelResult[] = modelList.map((m) => ({ model: m, image: null, seed: null, busy: true }));
+    setResults([...slots]);
+
+    for (let i = 0; i < modelList.length; i++) {
+      if (genIdRef.current !== genId) break; // user re-clicked generate
+      const m = modelList[i];
+      const mOption = STUDIO_MODEL_OPTIONS.find((o) => o.value === m);
+      const refsForModel = refImages.slice(0, mOption?.maxRefs ?? 0);
+
+      try {
+        const res = await fetch("/api/tools/studio/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: m, prompt: effectivePrompt, referenceImages: refsForModel, aspectRatio: aspect }),
+        });
+        const json = (await res.json()) as { ok: boolean; image?: string; seed?: number | null; error?: string };
+        slots[i] = json.ok && json.image
+          ? { model: m, image: json.image, seed: json.seed ?? null, busy: false }
+          : { model: m, image: null, seed: null, error: json.error ?? `HTTP ${res.status}`, busy: false };
+      } catch (err) {
+        slots[i] = { model: m, image: null, seed: null, error: err instanceof Error ? err.message : String(err), busy: false };
+      }
+
+      if (genIdRef.current === genId) setResults([...slots]);
+    }
+
+    if (genIdRef.current === genId) setBusy(false);
+  }, [selectedModels, effectivePrompt, refImages, aspect, refMode, primaryModel]);
+
+  const removeBg = useCallback(async (model: StudioModel, image: string) => {
+    if (bgInFlight.current[model]) return;
+    bgInFlight.current[model] = true;
+    setBgStates((prev) => ({ ...prev, [model]: "removing" }));
     try {
       const res = await fetch("/api/tools/studio/remove-bg", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: gen.image }),
+        body: JSON.stringify({ image }),
       });
       const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
-      if (!json.ok || !json.image) { setBgState("error"); return; }
-      setOriginalImage(gen.image);
-      setGen((prev) => ({ ...prev, image: json.image }));
-      setBgState("done");
-      setSaveState("idle");
-    } catch { setBgState("error"); } finally { bgInFlight.current = false; }
-  }, [gen]);
+      if (!json.ok || !json.image) { setBgStates((prev) => ({ ...prev, [model]: "error" })); return; }
+      setOriginalImages((prev) => ({ ...prev, [model]: image }));
+      setResults((prev) => prev.map((r) => r.model === model ? { ...r, image: json.image! } : r));
+      setBgStates((prev) => ({ ...prev, [model]: "done" }));
+      setSaveStates((prev) => ({ ...prev, [model]: "idle" }));
+    } catch { setBgStates((prev) => ({ ...prev, [model]: "error" })); }
+    finally { bgInFlight.current[model] = false; }
+  }, []);
 
-  const restoreOriginal = useCallback(() => {
-    if (!originalImage) return;
-    setGen((prev) => ({ ...prev, image: originalImage }));
-    setOriginalImage(null);
-    setBgState("idle");
-    setSaveState("idle");
-    setMockupState("idle");
-    setMockups([]);
-    setSavedMockups({});
-  }, [originalImage]);
+  const restoreOriginal = useCallback((model: StudioModel) => {
+    const orig = originalImages[model];
+    if (!orig) return;
+    setResults((prev) => prev.map((r) => r.model === model ? { ...r, image: orig } : r));
+    setOriginalImages((prev) => { const n = { ...prev }; delete n[model]; return n; });
+    setBgStates((prev) => ({ ...prev, [model]: "idle" }));
+    setSaveStates((prev) => ({ ...prev, [model]: "idle" }));
+  }, [originalImages]);
 
-  const generateMockupFromDesign = useCallback(async () => {
-    if (gen.status !== "done" || !gen.image) return;
-    if (mockupInFlight.current) return;
-    mockupInFlight.current = true;
-    setMockupState("generating");
-    try {
-      const res = await fetch("/api/tools/studio/mockup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: gen.image, productType }),
-      });
-      const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
-      if (!json.ok || !json.mockups || json.mockups.length === 0) { setMockupState("error"); return; }
-      setMockups(json.mockups);
-      setMockupState("done");
-    } catch { setMockupState("error"); } finally { mockupInFlight.current = false; }
-  }, [gen, productType]);
-
-  const saveMockupToDesigns = useCallback(async (m: MockupView) => {
-    if (savedMockups[m.url] === "saving" || savedMockups[m.url] === "saved") return;
-    setSavedMockups((prev) => ({ ...prev, [m.url]: "saving" }));
+  const saveToDesigns = useCallback(async (model: StudioModel, image: string) => {
+    setSaveStates((prev) => ({ ...prev, [model]: "saving" }));
     try {
       const res = await fetch("/api/tools/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceUrl: m.url,
-          prompt: effectivePrompt,
-          modelName: model,
-          source: "printful-mockup",
-          productType: productType !== "none" ? productType : undefined,
-          subject: m.label,
-          styleTags: [m.group],
-        }),
-      });
-      const json = (await res.json()) as { ok: boolean; error?: string };
-      setSavedMockups((prev) => ({ ...prev, [m.url]: json.ok ? "saved" : "error" }));
-    } catch {
-      setSavedMockups((prev) => ({ ...prev, [m.url]: "error" }));
-    }
-  }, [savedMockups, effectivePrompt, model, productType]);
-
-  const saveToDesigns = useCallback(async () => {
-    if (gen.status !== "done" || !gen.image) return;
-    setSaveState("saving");
-    try {
-      const res = await fetch("/api/tools/designs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: gen.image,
+          image,
           prompt: effectivePrompt,
           modelName: model,
           source: "pod-studio",
@@ -392,140 +377,118 @@ export default function StudioWorkbench() {
         }),
       });
       const json = (await res.json()) as { ok: boolean; error?: string };
-      setSaveState(json.ok ? "saved" : "error");
-    } catch { setSaveState("error"); }
-  }, [gen, effectivePrompt, model, productType, theme, style, subject]);
+      setSaveStates((prev) => ({ ...prev, [model]: json.ok ? "saved" : "error" }));
+    } catch { setSaveStates((prev) => ({ ...prev, [model]: "error" })); }
+  }, [effectivePrompt, productType, theme, style, subject]);
 
-  const downloadOriginal = useCallback(() => {
-    if (!gen.image) return;
-    const ext = gen.image.startsWith("data:image/jpeg") ? "jpg" : gen.image.startsWith("data:image/webp") ? "webp" : "png";
+  const generateMockupFromDesign = useCallback(async (image: string) => {
+    if (mockupInFlight.current) return;
+    mockupInFlight.current = true;
+    setMockupState("generating");
+    try {
+      const res = await fetch("/api/tools/studio/mockup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image, productType }),
+      });
+      const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
+      if (!json.ok || !json.mockups?.length) { setMockupState("error"); return; }
+      setMockups(json.mockups);
+      setMockupState("done");
+    } catch { setMockupState("error"); }
+    finally { mockupInFlight.current = false; }
+  }, [productType]);
+
+  const saveMockupToDesigns = useCallback(async (m: MockupView) => {
+    if (savedMockups[m.url] === "saving" || savedMockups[m.url] === "saved") return;
+    setSavedMockups((prev) => ({ ...prev, [m.url]: "saving" }));
+    try {
+      const res = await fetch("/api/tools/designs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceUrl: m.url, prompt: effectivePrompt, modelName: primaryModel, source: "printful-mockup", productType: productType !== "none" ? productType : undefined, subject: m.label, styleTags: [m.group] }),
+      });
+      const json = (await res.json()) as { ok: boolean; error?: string };
+      setSavedMockups((prev) => ({ ...prev, [m.url]: json.ok ? "saved" : "error" }));
+    } catch { setSavedMockups((prev) => ({ ...prev, [m.url]: "error" })); }
+  }, [savedMockups, effectivePrompt, primaryModel, productType]);
+
+  const downloadImage = useCallback((image: string, model: StudioModel) => {
+    const ext = image.startsWith("data:image/jpeg") ? "jpg" : image.startsWith("data:image/webp") ? "webp" : "png";
     const a = document.createElement("a");
-    a.href = gen.image;
-    a.download = buildSemanticFilename({ ...fileMeta, track: "原圖" }, ext, `design.${ext}`);
+    a.href = image;
+    a.download = buildSemanticFilename({ ...fileMeta, track: model }, ext, `design.${ext}`);
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }, [gen.image, fileMeta]);
+  }, [fileMeta]);
 
   const isTransformMode = refMode === "transform";
+  const isMultiModel = selectedModels.size > 1;
+  const anyResults = results.some((r) => !r.busy && r.image);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, padding: 16 }}>
       {/* ── Controls ───────────────────────────────────────────── */}
       <div className="build-panel" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
 
-        {/* 商品類型 */}
         <label style={{ fontSize: 13 }}>
           商品類型
           <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={productType} onChange={(e) => onPickProduct(e.target.value)}>
-            {PRODUCT_TYPES.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
+            {PRODUCT_TYPES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </label>
 
-        {/* Subject */}
         <div>
           <label style={{ fontSize: 13 }}>
             主題 Subject
-            <input
-              className="btn-secondary"
-              style={{ width: "100%", marginTop: 4, opacity: isTransformMode ? 0.5 : 1 }}
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder={isTransformMode ? "改圖模式：主題由上傳圖決定（可選）" : "例：lotus flower mandala"}
-            />
+            <input className="btn-secondary" style={{ width: "100%", marginTop: 4, opacity: isTransformMode ? 0.5 : 1 }} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={isTransformMode ? "改圖模式：主題由上傳圖決定（可選）" : "例：lotus flower mandala"} />
           </label>
           <PresetChips chips={SUBJECT_PRESETS} onSelect={setSubject} />
         </div>
 
-        {/* Theme */}
         <div>
           <label style={{ fontSize: 13 }}>
             題材 Theme
-            <input
-              className="btn-secondary"
-              style={{ width: "100%", marginTop: 4, opacity: isTransformMode ? 0.4 : 1 }}
-              value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              placeholder={isTransformMode ? "改圖模式下不影響 prompt" : "例：spiritual healing"}
-            />
+            <input className="btn-secondary" style={{ width: "100%", marginTop: 4, opacity: isTransformMode ? 0.4 : 1 }} value={theme} onChange={(e) => setTheme(e.target.value)} placeholder={isTransformMode ? "改圖模式下不影響 prompt" : "例：spiritual healing"} />
           </label>
           <PresetChips chips={THEME_PRESETS} onSelect={setTheme} />
         </div>
 
-        {/* Vibe */}
         <div>
           <label style={{ fontSize: 13 }}>
             氛圍 Vibe
-            <input
-              className="btn-secondary"
-              style={{ width: "100%", marginTop: 4 }}
-              value={vibe}
-              onChange={(e) => setVibe(e.target.value)}
-              placeholder="例：calm, ethereal"
-            />
+            <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
           </label>
           <PresetChips chips={VIBE_PRESETS} onSelect={setVibe} />
         </div>
 
         {/* 時事靈感 drawer */}
         <div>
-          <button
-            type="button"
-            className="btn-secondary"
-            style={{ width: "100%", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}
-            onClick={() => setTrendingOpen((v) => !v)}
-          >
+          <button type="button" className="btn-secondary" style={{ width: "100%", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => setTrendingOpen((v) => !v)}>
             <span>🔥 時事靈感</span>
             <span style={{ opacity: 0.5 }}>{trendingOpen ? "▲" : "▼"}</span>
           </button>
-
           {trendingOpen && (
             <div style={{ marginTop: 6, padding: 10, background: "var(--bg-tertiary, #1a1a1a)", borderRadius: 8, border: "1px solid var(--border, #333)" }}>
               <p style={{ fontSize: 11, opacity: 0.55, marginBottom: 6 }}>選類別 → 抓今日熱門話題 → 點擊填入主題</p>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
                 {TRENDING_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.value}
-                    type="button"
-                    onClick={() => onSelectTrendingCategory(cat.value)}
-                    style={{
-                      fontSize: 11, padding: "3px 10px", borderRadius: 20, cursor: "pointer",
-                      background: trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--bg-secondary, #2a2a2a)",
-                      color: trendingCategory === cat.value ? "#fff" : "var(--text-muted, #888)",
-                      border: `1px solid ${trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--border, #333)"}`,
-                      transition: "all 0.15s",
-                    }}
-                  >
+                  <button key={cat.value} type="button" onClick={() => onSelectTrendingCategory(cat.value)}
+                    style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, cursor: "pointer", background: trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--bg-secondary, #2a2a2a)", color: trendingCategory === cat.value ? "#fff" : "var(--text-muted, #888)", border: `1px solid ${trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--border, #333)"}`, transition: "all 0.15s" }}>
                     {cat.label}
                   </button>
                 ))}
               </div>
-
-              {trendingLoading && (
-                <p style={{ fontSize: 11, opacity: 0.5 }}>搜尋中…</p>
-              )}
-
-              {!trendingLoading && trendingError && (
-                <p style={{ fontSize: 11, color: "#e5484d" }}>抓取失敗，請重試</p>
-              )}
-
+              {trendingLoading && <p style={{ fontSize: 11, opacity: 0.5 }}>搜尋中…</p>}
+              {!trendingLoading && trendingError && <p style={{ fontSize: 11, color: "#e5484d" }}>抓取失敗，請重試</p>}
               {!trendingLoading && !trendingError && trendingTopics.length > 0 && (
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                   {trendingTopics.map((t, i) => (
-                    <button
-                      key={`${t}-${i}`}
-                      type="button"
-                      onClick={() => setSubject(t)}
-                      style={{
-                        fontSize: 11, padding: "3px 9px", borderRadius: 6, cursor: "pointer",
-                        background: "var(--bg-secondary, #222)", border: "1px solid var(--border, #333)",
-                        color: "var(--text, #ccc)", textAlign: "left", transition: "border-color 0.15s",
-                      }}
+                    <button key={`${t}-${i}`} type="button" onClick={() => setSubject(t)}
+                      style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, cursor: "pointer", background: "var(--bg-secondary, #222)", border: "1px solid var(--border, #333)", color: "var(--text, #ccc)", textAlign: "left", transition: "border-color 0.15s" }}
                       onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
-                      onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #333)")}
-                    >
+                      onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #333)")}>
                       {t}
                     </button>
                   ))}
@@ -535,101 +498,54 @@ export default function StudioWorkbench() {
           )}
         </div>
 
-        {/* Style + Model */}
         <ImageStyleControls
-          model={model}
+          selectedModels={selectedModels}
           style={style}
           onStyleChange={setStyle}
-          onModelChange={(nextModel) => {
-            setModel(nextModel);
-            setRefImages([]);
-          }}
+          onModelsChange={onModelsChange}
         />
 
-        {/* 比例 */}
         <label style={{ fontSize: 13 }}>
           比例
           <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={aspect} onChange={(e) => setAspect(e.target.value as AspectRatio)}>
-            {ASPECTS.map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
+            {ASPECTS.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </label>
 
         {/* 參考圖 + 模式切換 */}
         <div style={{ border: "1px solid var(--border, #333)", borderRadius: 8, padding: 10 }}>
           <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>參考圖</p>
-
-          {/* Mode toggle */}
           <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border, #333)", marginBottom: 8 }}>
-            <button
-              type="button"
-              onClick={() => onSetRefMode("ref")}
-              style={{
-                flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none",
-                background: refMode === "ref" ? "var(--accent, #6366f1)" : "transparent",
-                color: refMode === "ref" ? "#fff" : "var(--text-muted, #888)",
-                transition: "all 0.15s",
-              }}
-            >
+            <button type="button" onClick={() => onSetRefMode("ref")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "ref" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "ref" ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
               🖼️ 風格參考
             </button>
-            <button
-              type="button"
-              onClick={() => onSetRefMode("transform")}
-              style={{
-                flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none",
-                background: refMode === "transform" ? "var(--accent, #6366f1)" : "transparent",
-                color: refMode === "transform" ? "#fff" : "var(--text-muted, #888)",
-                transition: "all 0.15s",
-              }}
-            >
+            <button type="button" onClick={() => onSetRefMode("transform")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "transform" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "transform" ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
               🎨 改圖模式
             </button>
           </div>
-
           <p style={{ fontSize: 10, opacity: 0.5, marginBottom: 8, lineHeight: 1.5 }}>
-            {refMode === "ref"
-              ? "上傳圖作為視覺參考，AI 依 Subject/Style 生成新圖"
-              : `直接把你的圖套用選定風格（已切至 ${model.includes("kontext") ? model : TRANSFORM_MODEL}）`}
+            {refMode === "ref" ? "上傳圖作為視覺參考，AI 依 Subject/Style 生成新圖" : `直接把你的圖套用選定風格（建議 flux-kontext）`}
           </p>
-
           {maxRefs > 0 ? (
             <label style={{ fontSize: 12 }}>
               {refMode === "transform" ? "上傳要改的圖" : `參考圖（${refImages.length}/${maxRefs}）`}
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                multiple
-                style={{ width: "100%", marginTop: 4 }}
-                onChange={(e) => void onUploadRefs(e.target.files)}
-              />
+              <input type="file" accept="image/png,image/jpeg,image/webp" multiple style={{ width: "100%", marginTop: 4 }} onChange={(e) => void onUploadRefs(e.target.files)} />
               {refImages.length > 0 && (
                 <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
                   {refImages.map((r, i) => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={i}
-                      src={r}
-                      alt={`ref-${i}`}
-                      style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, cursor: "pointer" }}
-                      title="點擊移除"
-                      onClick={() => setRefImages((prev) => prev.filter((_, j) => j !== i))}
-                    />
+                    <img key={i} src={r} alt={`ref-${i}`} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, cursor: "pointer" }} title="點擊移除" onClick={() => setRefImages((prev) => prev.filter((_, j) => j !== i))} />
                   ))}
                 </div>
               )}
             </label>
           ) : (
-            <p style={{ fontSize: 11, opacity: 0.45 }}>
-              目前模型不支援參考圖。
-              {refMode === "transform" && " 改圖模式將自動切換至 flux-kontext-dev。"}
-            </p>
+            <p style={{ fontSize: 11, opacity: 0.45 }}>目前所選模型均不支援參考圖。{refMode === "transform" && " 改圖模式將自動切換至 flux-kontext-dev。"}</p>
           )}
         </div>
 
-        <button className="btn-primary" disabled={gen.status === "generating"} onClick={() => void generate()}>
-          {gen.status === "generating" ? "生成中…" : "生成"}
+        <button className="btn-primary" disabled={busy} onClick={() => void generate()}>
+          {busy ? `生成中… (${results.filter((r) => !r.busy).length}/${results.length})` : isMultiModel ? `生成比較（${selectedModels.size} 個模型）` : "生成"}
         </button>
       </div>
 
@@ -637,66 +553,99 @@ export default function StudioWorkbench() {
       <div className="build-panel" style={{ padding: 14 }}>
         <label style={{ fontSize: 13 }}>
           Prompt（自動組裝，可直接改）
-          <textarea
-            className="btn-secondary"
-            style={{ width: "100%", marginTop: 4, minHeight: 72, fontFamily: "inherit" }}
-            value={effectivePrompt}
-            onChange={(e) => {
-              const v = e.target.value;
-              setPrompt(v);
-              setPromptTouched(v.trim().length > 0);
-            }}
-          />
+          <textarea className="btn-secondary" style={{ width: "100%", marginTop: 4, minHeight: 72, fontFamily: "inherit" }} value={effectivePrompt}
+            onChange={(e) => { const v = e.target.value; setPrompt(v); setPromptTouched(v.trim().length > 0); }} />
         </label>
         {promptTouched ? (
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-            <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => { setPromptTouched(false); setPrompt(""); }}>
-              回到自動組裝
-            </button>
+            <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => { setPromptTouched(false); setPrompt(""); }}>回到自動組裝</button>
             <span style={{ fontSize: 12, opacity: 0.6 }}>手動編輯中 — 左側欄位暫不影響 prompt</span>
           </div>
         ) : null}
 
         <div style={{ marginTop: 12 }}>
-          {gen.status === "idle" ? <p style={{ opacity: 0.6 }}>填好左側欄位後按「生成」。</p> : null}
-          {gen.status === "generating" ? <p style={{ opacity: 0.7 }}>生成中（依模型 5–60 秒）…</p> : null}
-          {gen.status === "error" ? <p style={{ color: "#e5484d" }}>{gen.error}</p> : null}
-          {gen.status === "done" && gen.image ? (
+          {results.length === 0 && <p style={{ opacity: 0.6 }}>填好左側欄位後按「生成」。</p>}
+
+          {/* Multi-model card strip */}
+          {isMultiModel && results.length > 0 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+              {results.map((r, i) => {
+                const opt = STUDIO_MODEL_OPTIONS.find((o) => o.value === r.model);
+                const isActive = i === activeIdx;
+                return (
+                  <div
+                    key={r.model}
+                    onClick={() => !r.busy && setActiveIdx(i)}
+                    style={{
+                      width: 140, cursor: r.busy ? "default" : "pointer",
+                      border: `2px solid ${isActive ? "var(--accent, #6366f1)" : "var(--border, #333)"}`,
+                      borderRadius: 8, overflow: "hidden", transition: "border-color 0.15s",
+                      opacity: r.busy ? 0.6 : 1,
+                    }}
+                  >
+                    {r.busy ? (
+                      <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-tertiary, #1a1a1a)", fontSize: 11, opacity: 0.5 }}>生成中…</div>
+                    ) : r.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={r.image} alt={r.model} style={{ width: "100%", height: 140, objectFit: "cover", display: "block", background: "#fff" }} />
+                    ) : (
+                      <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-tertiary, #1a1a1a)", fontSize: 10, color: "#e5484d", padding: 4, textAlign: "center" }}>{r.error ?? "失敗"}</div>
+                    )}
+                    <div style={{ padding: "4px 6px", fontSize: 10, background: "var(--bg-secondary, #111)" }}>
+                      <span style={{ opacity: 0.8 }}>{opt?.label ?? r.model}</span>
+                      <span style={{ opacity: 0.5, marginLeft: 4 }}>NT${opt?.costNt}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Active result detail */}
+          {activeResult && !activeResult.busy && activeResult.image ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={gen.image}
-                alt="generated design"
-                style={{ display: "block", width: "auto", height: "auto", maxWidth: "100%", maxHeight: 560, margin: "0 auto", objectFit: "contain", borderRadius: 8, background: "#fff" }}
-              />
+              <img src={activeResult.image} alt="generated design" style={{ display: "block", width: "auto", height: "auto", maxWidth: "100%", maxHeight: isMultiModel ? 420 : 560, margin: "0 auto", objectFit: "contain", borderRadius: 8, background: "#fff" }} />
+
+              {/* Action bar */}
               <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
-                  {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
-                </button>
-                <button className="btn-secondary" disabled={bgState === "removing" || bgState === "done"} onClick={() => void removeBg()}>
-                  {bgState === "done" ? "已去背 ✓" : bgState === "removing" ? "去背中…" : "去背（透明 PNG）"}
-                </button>
-                {bgState === "done" && originalImage ? (
-                  <button className="btn-secondary" style={{ fontSize: 12 }} onClick={restoreOriginal}>還原原圖</button>
-                ) : null}
-                {bgState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>去背失敗，請重試</span> : null}
-                {bgState === "done" && productType === "tshirt" ? (
-                  <button className="btn-secondary" disabled={mockupState === "generating" || mockupState === "done"} onClick={() => void generateMockupFromDesign()}>
-                    {mockupState === "done" ? "產品預覽 ✓" : mockupState === "generating" ? "生成 Mockup…" : "產品 Mockup（多風格＋模特）"}
-                  </button>
-                ) : null}
-                {mockupState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>Mockup 失敗，請重試</span> : null}
-                <button className="btn-secondary" onClick={downloadOriginal}>下載原圖</button>
-                {gen.seed != null ? <span style={{ fontSize: 12, opacity: 0.6 }}>seed {gen.seed}</span> : null}
-                {saveState === "saved" ? <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a> : null}
-                {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗（檢查 POD_DESIGNS_ENABLED）</span> : null}
+                {(() => {
+                  const m = activeResult.model;
+                  const img = activeResult.image!;
+                  const saveState = saveStates[m] ?? "idle";
+                  const bgState = bgStates[m] ?? "idle";
+                  const origImg = originalImages[m];
+                  return (
+                    <>
+                      <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns(m, img)}>
+                        {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
+                      </button>
+                      <button className="btn-secondary" disabled={bgState === "removing" || bgState === "done"} onClick={() => void removeBg(m, img)}>
+                        {bgState === "done" ? "已去背 ✓" : bgState === "removing" ? "去背中…" : "去背（透明 PNG）"}
+                      </button>
+                      {bgState === "done" && origImg && (
+                        <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => restoreOriginal(m)}>還原原圖</button>
+                      )}
+                      {bgState === "error" && <span style={{ color: "#e5484d", fontSize: 12 }}>去背失敗</span>}
+                      {bgState === "done" && productType === "tshirt" && (
+                        <button className="btn-secondary" disabled={mockupState === "generating" || mockupState === "done"} onClick={() => void generateMockupFromDesign(img)}>
+                          {mockupState === "done" ? "產品預覽 ✓" : mockupState === "generating" ? "生成 Mockup…" : "產品 Mockup"}
+                        </button>
+                      )}
+                      {mockupState === "error" && <span style={{ color: "#e5484d", fontSize: 12 }}>Mockup 失敗</span>}
+                      <button className="btn-secondary" onClick={() => downloadImage(img, m)}>下載</button>
+                      {activeResult.seed != null && <span style={{ fontSize: 12, opacity: 0.6 }}>seed {activeResult.seed}</span>}
+                      {saveState === "saved" && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a>}
+                      {saveState === "error" && <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗</span>}
+                    </>
+                  );
+                })()}
               </div>
 
-              {mockups.length > 0 ? (
+              {/* Mockups */}
+              {mockups.length > 0 && (
                 <div style={{ marginTop: 14 }}>
-                  <p style={{ fontSize: 13, marginBottom: 6, opacity: 0.7 }}>
-                    產品預覽（Printful · 設計 100% 忠實）— 平放/鬼影/真人模特；按「存到我的設計」即可在 Publish 當商品圖
-                  </p>
+                  <p style={{ fontSize: 13, marginBottom: 6, opacity: 0.7 }}>產品預覽（Printful · 設計 100% 忠實）</p>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     {mockups.map((m) => {
                       const st = savedMockups[m.url];
@@ -705,57 +654,52 @@ export default function StudioWorkbench() {
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={m.url} alt={m.label} style={{ width: 180, height: 180, objectFit: "contain", background: "#111", borderRadius: 8, border: "1px solid var(--border)" }} />
                           <div style={{ fontSize: 11, marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
-                            {m.lifestyle ? <span title="真人模特">🧍</span> : <span title="產品實拍">👕</span>}
+                            {m.lifestyle ? <span>🧍</span> : <span>👕</span>}
                             <span style={{ opacity: 0.8 }}>{m.label}</span>
                           </div>
-                          <button
-                            className="btn-secondary"
-                            style={{ fontSize: 11, marginTop: 3, width: "100%" }}
-                            disabled={st === "saving" || st === "saved"}
-                            onClick={() => void saveMockupToDesigns(m)}
-                          >
-                            {st === "saved" ? "已存 ✓" : st === "saving" ? "儲存中…" : st === "error" ? "重試存圖" : "存到我的設計"}
+                          <button className="btn-secondary" style={{ fontSize: 11, marginTop: 3, width: "100%" }} disabled={st === "saving" || st === "saved"} onClick={() => void saveMockupToDesigns(m)}>
+                            {st === "saved" ? "已存 ✓" : st === "saving" ? "儲存中…" : st === "error" ? "重試" : "存到我的設計"}
                           </button>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              ) : null}
+              )}
 
+              {/* AI edit panel + output track */}
               <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
                 <ImageEditPromptPanel
-                  sourceImage={gen.image}
+                  sourceImage={activeResult.image}
                   currentPrompt={effectivePrompt}
-                  imageModel={model}
+                  imageModel={activeResult.model}
                   target="pod-design"
                   aspectRatio={aspect}
                   title="AI image prompt（修圖）"
-                  styleAnchor={{
-                    model,
-                    mode: refImages.length > 0 ? "image" : "text",
-                    stylePrompt: resolvedStylePrompt || effectivePrompt,
-                    subject: subject.trim(),
-                    refs: refImages.length,
-                    target: "pod-design",
-                  }}
+                  styleAnchor={{ model: activeResult.model, mode: refImages.length > 0 ? "image" : "text", stylePrompt: resolvedStylePrompt || effectivePrompt, subject: subject.trim(), refs: refImages.length, target: "pod-design" }}
                   onEditedImage={(image, meta) => {
-                    setModel(meta.model);
-                    setGen({ status: "done", image, seed: meta.seed });
-                    setSaveState("idle");
-                    setBgState("idle");
-                    setOriginalImage(null);
-                    setMockupState("idle");
-                    setMockups([]);
-                    setSavedMockups({});
+                    setResults((prev) => prev.map((r, i) => i === activeIdx ? { ...r, image, seed: meta.seed } : r));
+                    setSaveStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                    setBgStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                    setOriginalImages((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                    setMockupState("idle"); setMockups([]); setSavedMockups({});
                   }}
                 />
                 <div style={{ flex: 1, minWidth: 240 }}>
-                  <OutputTrackBar image={gen.image} source="pod" fileMeta={fileMeta} />
+                  <OutputTrackBar image={activeResult.image} source="pod" fileMeta={fileMeta} />
                 </div>
               </div>
             </>
+          ) : activeResult && !activeResult.busy && activeResult.error ? (
+            <p style={{ color: "#e5484d" }}>{activeResult.error}</p>
+          ) : activeResult?.busy ? (
+            <p style={{ opacity: 0.7 }}>生成中（依模型 5–60 秒）…</p>
           ) : null}
+
+          {/* Single-model error (no results yet) */}
+          {!isMultiModel && results.length === 1 && results[0].error && !results[0].busy && !anyResults && (
+            <p style={{ color: "#e5484d" }}>{results[0].error}</p>
+          )}
         </div>
       </div>
     </div>
