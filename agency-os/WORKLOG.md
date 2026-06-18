@@ -335,6 +335,22 @@
 **[剩餘風險]** async 修前，網頁「生成」會 524（但影片仍產出於 R2，可手動取 URL）；畫廊影片 tab 暫不顯示（待 async 修讓 recordVideoAsset 執行）。
 - AUTO_TASK_DONE (2026-06-17): video 完整 page→block e2e 成功（真機產出 10.5MB 影片於 R2 可播）；發現 CF 100s 同步超時 → 待 async job 修（含修 SG compose 漂移 env bug）。
 
+### fix(video): async job 模式（解 CF 100s）— 瀏覽器不再 524 ✅；發現 Next.js post-response 背景工作未存活 → 畫廊記錄待修
+
+**[已做]** async job 模式部署上線：`job-store.ts`（記憶體）+ `/generate` 回 202 jobId + `/status` 輪詢 + VideoStudio poll（5s/上限12min）。sg-deploy commit 3a84c84。
+
+**[實測 — Chrome 真機]** 主題「提升遠距工作效率的三個方法」→ 生成：
+- ✅ **async 修生效**：瀏覽器撐過 110s/170s/250s **無 524**（舊同步版此時必超時）→ CF 100s 問題解決。
+- ✅ **影片產出**：R2 lobster-videos `video/提升遠距…/` 四尺寸（YouTube **16.2MB**，公開 GET 200 可播）。第三支真機 e2e 影片。
+- ⚠️ **畫廊未記錄 + 頁面停在 loading**：media_assets 仍 0 video 筆；next-admin log 無 video 活動（只有部署的 Ready）。
+
+**[根因（診斷）]** `/generate` 回 202 後，`void (async()=>{ block.run → recordVideoAsset → finishJob })()` 的**背景 promise 在 Next.js request lifecycle 結束後未保證存活**（fire-and-forget 在 Next.js 不可靠）。EU 收到 /render 全程請求 → 算完寫 R2（故影片在），但 SG 背景 promise 被收 → 沒走到 recordVideoAsset + 沒 finishJob → 畫廊無記錄、job 永 running。（次要可能：5 分鐘長 SG→EU 連線回應遺失，同樣指向不該長持連線/fire-forget。）
+
+**[robust 修（follow-up）]** EU video-service 改**自有 async job**（submit→即回 jobId→/status 查）；SG `/generate` 提交 EU 取 euJobId 即回；SG `/status` 短輪詢代理 EU + **首次見 done 時記 media_assets**。全程短連線、無 fire-and-forget。或快試 Next.js `after()`（但 5 分鐘長工作可能仍被限）。
+
+**[現況]** 引擎/積木/網頁/部署/R2/認證/TLS 全 live；**網頁能觸發、真能產出可播影片**（3 支已驗）；缺最後一哩：結果回填 UI + 畫廊記錄（背景工作存活問題）。
+- AUTO_TASK_DONE (2026-06-17): video async 修瀏覽器不再 524 ✅ + 第三支真機影片產出可播；發現 Next.js 背景 promise 未存活 → 結果回填 UI/畫廊待 robust 修（EU 自有 async job + SG 短輪詢代理+記錄）。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
