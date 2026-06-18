@@ -980,7 +980,7 @@ export default function ContentStudio() {
   useEffect(() => {
     if (!form.keyword.trim()) return;
     if (form.language !== "English") return; // operator already chose a language — don't override
-    if (/[぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾟ]/.test(form.keyword)) {
+    if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/.test(form.keyword)) {
       setF("language", "繁體中文");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1225,7 +1225,7 @@ export default function ContentStudio() {
   const loadDrafts = useCallback(async () => {
     setDraftsLoading(true); setDraftsError("");
     try {
-      const qs  = selectedSiteId ? `?siteId=${encodeURIComponent(selectedSiteId)}` : "";
+      const qs  = (selectedSiteId && UUID_RE.test(selectedSiteId)) ? `?siteId=${encodeURIComponent(selectedSiteId)}` : "";
       const res  = await fetch(`/api/content/drafts${qs}`);
       const json = await res.json() as { ok: boolean; drafts?: DraftListItem[]; error?: string };
       if (json.ok && json.drafts) setDrafts(json.drafts);
