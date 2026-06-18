@@ -39,9 +39,13 @@ export async function callRenderService(
 
   let res: Response;
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    // 跨機部署時帶 shared secret；本機（同機/無 token）可不設
+    const token = process.env.VIDEO_SERVICE_SECRET;
+    if (token) headers["X-Render-Token"] = token;
     res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ scenes, assets, out_name: outName }),
       signal: AbortSignal.timeout(timeoutMs),
     });

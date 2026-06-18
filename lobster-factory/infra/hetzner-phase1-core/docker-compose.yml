@@ -376,6 +376,12 @@ services:
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_DESIGNS_BUCKET: ${R2_DESIGNS_BUCKET:-lobster-designs}
       R2_DESIGNS_PUBLIC_BASE: ${R2_DESIGNS_PUBLIC_BASE:-}
+      # 影片生成積木（video/pipeline）：Flux 生圖(Replicate) + Pexels B-roll + 跨機 render 服務(EU)。
+      # 預設空值 fail-closed：缺 key → 積木回 {ok:false}，網頁顯示「未設定」，不崩。
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+      VIDEO_SERVICE_URL: ${VIDEO_SERVICE_URL:-}
+      VIDEO_SERVICE_SECRET: ${VIDEO_SERVICE_SECRET:-}
       # Printful (POD). STORE_ID = Woo-platform store (mockups + legacy sync/link).
       # NATIVE_STORE_ID = "Manual Order / API platform" store: the only one that accepts
       # POST /store/products, used for full-auto product creation (pfcreate) + P4 fulfillment.

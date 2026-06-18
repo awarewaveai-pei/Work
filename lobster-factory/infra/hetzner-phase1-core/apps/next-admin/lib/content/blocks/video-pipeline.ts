@@ -10,7 +10,13 @@
 import { register, type BlockCtx } from "./registry";
 import { generateVideoScript, type VideoScene } from "../video/video-script-core";
 import { fetchBrollUrl } from "../video/pexels";
-import { dataUrlToTempFile, cleanupTempFiles } from "../video/asset-prep";
+import {
+  parseImageDataUrl,
+  buildDesignKey,
+  putDesignObject,
+  deleteDesignObject,
+  isR2Configured,
+} from "../../storage/r2";
 import { callRenderService, type RenderOutputs } from "../video/render-client";
 import { generateTarotImage } from "../../tarot/image-gen";
 
@@ -57,9 +63,11 @@ register({
     const { scenes, title } = scriptResult;
 
     // ── 4. 每場景取一個視覺素材 ──────────────────────────────────────────────
+    // 跨機（next-admin SG → video-service EU）：素材必須是 https URL 供服務下載。
+    // Pexels 本就是 URL；Flux 回 data URL → 上傳 R2 取得 public URL（render 後刪）。
     const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
     const assets: string[] = [];
-    const tempFiles: string[] = []; // Flux 落地的臨時檔 → render 完成後於 finally 統一清
+    const r2Keys: string[] = []; // 本輪上傳的 Flux 輸入物件 → render 後於 finally 刪除
 
     try {
       for (const scene of scenes) {
@@ -73,31 +81,34 @@ register({
           // Pexels 找不到結果 → 降級到 Flux（fall through）
         }
 
+        // 需要生 Flux 圖 → 必須有 R2 才能把圖交給跨機服務
+        if (!isR2Configured()) {
+          return { ok: false, status: 503, error: "R2 未設定（跨機影片素材需 R2 暫存 Flux 圖）" };
+        }
+
         // Flux 靜態圖（16:9 橫幅，適合影片）
         const imgResult = await generateTarotImage({
           model: "flux-schnell",
           prompt: scene.image_prompt,
           aspectRatio: "16:9",
         });
-
         if (imgResult.ok === false) {
-          return {
-            ok: false,
-            status: 502,
-            error: `場景 ${scene.id} 圖片生成失敗：${imgResult.error}`,
-          };
+          return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${imgResult.error}` };
         }
 
-        // Flux 回傳 data: URL → 寫入本機臨時檔（與 video-service 共享 /tmp volume）
-        let localPath: string;
-        try {
-          localPath = dataUrlToTempFile(imgResult.image, `scene${scene.id}`);
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e);
-          return { ok: false, status: 502, error: `場景 ${scene.id} 圖片格式錯誤：${msg}` };
+        // Flux data URL → 解碼 → 上傳 R2 → 取 public URL（供 EU 服務下載）
+        const parsed = parseImageDataUrl(imgResult.image);
+        const key = parsed ? buildDesignKey(parsed.mime) : null;
+        if (!parsed || !key) {
+          return { ok: false, status: 502, error: `場景 ${scene.id} 圖片格式無法解析` };
         }
-        tempFiles.push(localPath);
-        assets.push(localPath);
+        const put = await putDesignObject(key, parsed.buffer, parsed.mime);
+        if (!put.ok) {
+          const msg = "error" in put ? put.error : "r2_put_failed";
+          return { ok: false, status: 502, error: `場景 ${scene.id} 圖片上傳 R2 失敗：${msg}` };
+        }
+        r2Keys.push(key);
+        assets.push(put.publicUrl);
       }
 
       // ── 5. 呼叫 Python render 服務 ──────────────────────────────────────────
@@ -116,8 +127,14 @@ register({
         title,
       };
     } finally {
-      // render 同步消費完臨時檔後才清（含中途失敗的孤兒檔）→ 防 /tmp 無限增長
-      cleanupTempFiles(tempFiles);
+      // render 已同步消費完輸入素材 → 刪除本輪上傳的 Flux 暫存物件（防 R2 累積）
+      for (const key of r2Keys) {
+        try {
+          await deleteDesignObject(key);
+        } catch {
+          /* 清理失敗忽略，不影響主結果 */
+        }
+      }
     }
   },
 });

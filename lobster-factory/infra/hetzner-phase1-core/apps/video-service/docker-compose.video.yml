@@ -1,0 +1,61 @@
+# video-service — EU 部署單元（4c/8GB，餘裕大；不放 SG 4GB box 以免 OOM）。
+# 容器僅在 docker 網路內 expose 8732；對外由 EU nginx 終止 TLS 的子網域反代過來，
+# 並要求 X-Render-Token（= RENDER_AUTH_TOKEN）。render 產出上傳 R2 → 回 public URL。
+#
+# 部署（EU）：
+#   docker compose -f docker-compose.video.yml --env-file .env.video up -d --build
+# .env.video 需含：RENDER_AUTH_TOKEN / R2_API_TOKEN / R2_ACCOUNT_ID / R2_DESIGNS_BUCKET /
+#   R2_DESIGNS_PUBLIC_BASE（皆非提交；見 runbook）。
+
+x-logging: &video-logging
+  driver: json-file
+  options:
+    max-size: "25m"
+    max-file: "5"
+
+services:
+  video-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lobster-video-service:local
+    container_name: lobster-video-service
+    restart: unless-stopped
+    environment:
+      VIDEO_SERVICE_HOST: "0.0.0.0"
+      VIDEO_SERVICE_PORT: "8732"
+      # 認證：必設；缺則服務 fail-closed（拒所有 /render）
+      RENDER_AUTH_TOKEN: ${RENDER_AUTH_TOKEN}
+      # 產出上傳 R2（CF R2 API；與 next-admin lib/storage/r2.ts 同 bucket）
+      R2_API_TOKEN: ${R2_API_TOKEN}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_DESIGNS_BUCKET: ${R2_DESIGNS_BUCKET:-lobster-designs}
+      R2_DESIGNS_PUBLIC_BASE: ${R2_DESIGNS_PUBLIC_BASE}
+      # 渲染上限（防資源失控）
+      RENDER_MAX_SCENES: ${RENDER_MAX_SCENES:-30}
+      RENDER_MAX_ASSET_MB: ${RENDER_MAX_ASSET_MB:-200}
+    # 僅 docker 網路可達；對外走 EU nginx 子網域 + TLS（段 B）
+    expose:
+      - "8732"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8732/health',timeout=4).getcode()==200 else 1)\"",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - video-net
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.00"
+    logging: *video-logging
+
+networks:
+  video-net:
+    name: lobster-video-net

@@ -19,10 +19,11 @@ https URL（prod，下載前過 SSRF guard：https-only + 擋私有/迴圈/link-
 """
 import os
 import json
+import hmac
 import socket
 import ipaddress
 import threading
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import requests
@@ -30,11 +31,42 @@ import requests
 import config
 import pipeline
 
+HOST = os.getenv("VIDEO_SERVICE_HOST", "127.0.0.1")
 PORT = int(os.getenv("VIDEO_SERVICE_PORT", "8732"))
 MAX_ASSET_BYTES = int(os.getenv("RENDER_MAX_ASSET_MB", "200")) * 1024 * 1024
 MAX_SCENES = int(os.getenv("RENDER_MAX_SCENES", "30"))
 MAX_BODY_BYTES = int(os.getenv("RENDER_MAX_BODY_KB", "256")) * 1024  # JSON 很小（素材是 URL/路徑非內嵌）
+# 認證：跨機部署時 /render 要 X-Render-Token == RENDER_AUTH_TOKEN。未設 = 本機/dev 放行。
+RENDER_AUTH_TOKEN = os.getenv("RENDER_AUTH_TOKEN", "")
+# 產出上傳 R2（CF R2 API；與 next-admin lib/storage/r2.ts 同 bucket/端點）
+R2_API_TOKEN = os.getenv("R2_API_TOKEN", "")
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "")
+R2_BUCKET = os.getenv("R2_DESIGNS_BUCKET", "lobster-designs")
+R2_PUBLIC_BASE = os.getenv("R2_DESIGNS_PUBLIC_BASE", "").rstrip("/")
 _render_lock = threading.Lock()
+
+
+def _r2_configured() -> bool:
+    return bool(R2_API_TOKEN and R2_ACCOUNT_ID and R2_BUCKET and R2_PUBLIC_BASE)
+
+
+def _r2_put(object_key: str, data: bytes, content_type: str) -> str:
+    """上傳一個物件到 R2（CF R2 API），回 public URL；失敗丟例外。"""
+    key_path = quote(object_key, safe="/")
+    url = (f"https://api.cloudflare.com/client/v4/accounts/{R2_ACCOUNT_ID}"
+           f"/r2/buckets/{R2_BUCKET}/objects/{key_path}")
+    r = requests.put(url, headers={"Authorization": f"Bearer {R2_API_TOKEN}",
+                                   "Content-Type": content_type}, data=data, timeout=120)
+    if not r.ok:
+        raise RuntimeError(f"r2_put_failed_{r.status_code}: {r.text[:200]}")
+    return f"{R2_PUBLIC_BASE}/{object_key}"
+
+
+def _authed(handler: "BaseHTTPRequestHandler") -> bool:
+    """RENDER_AUTH_TOKEN 有設 → 比對 X-Render-Token（constant-time）；未設 → 放行（本機/dev）。"""
+    if not RENDER_AUTH_TOKEN:
+        return True
+    return hmac.compare_digest(handler.headers.get("X-Render-Token", ""), RENDER_AUTH_TOKEN)
 
 
 def _is_safe_https_url(url: str) -> bool:
@@ -101,8 +133,15 @@ def render_request(payload: dict) -> dict:
         try:
             visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
             outputs, _base, out_dir = pipeline.render_video(scenes, visual_files, out_name)
-            # outputs 落在 out_dir（持久）；_base 在 TEMP_DIR 會被 cleanup 清掉，不回傳
-            return {"outputs": {k: str(v) for k, v in outputs.items()}, "out_dir": str(out_dir)}
+            # 跨機部署：產出上傳 R2 → 回 public URL（網頁可直接播/下載）。未設 R2 = 本機路徑（dev）。
+            if _r2_configured():
+                base_key = "video/" + os.path.basename(str(out_dir))
+                urls = {}
+                for fmt, path in outputs.items():
+                    with open(path, "rb") as fh:
+                        urls[fmt] = _r2_put(f"{base_key}/{fmt}.mp4", fh.read(), "video/mp4")
+                return {"outputs": urls, "out_dir": str(out_dir), "storage": "r2"}
+            return {"outputs": {k: str(v) for k, v in outputs.items()}, "out_dir": str(out_dir), "storage": "local"}
         finally:
             pipeline.cleanup()
 
@@ -126,6 +165,9 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path != "/render":
             self._json(404, {"error": "not found"})
             return
+        if not _authed(self):
+            self._json(401, {"error": "unauthorized"})
+            return
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if length > MAX_BODY_BYTES:
@@ -145,8 +187,11 @@ class _Handler(BaseHTTPRequestHandler):
 def main():
     config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     config.TEMP_DIR.mkdir(parents=True, exist_ok=True)
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
-    print(f"video-service render server on http://127.0.0.1:{PORT} (POST /render, GET /health)")
+    if HOST != "127.0.0.1" and not RENDER_AUTH_TOKEN:
+        print("[WARN] 綁非 localhost 但未設 RENDER_AUTH_TOKEN — /render 將無認證對外暴露！")
+    srv = ThreadingHTTPServer((HOST, PORT), _Handler)
+    print(f"video-service render server on http://{HOST}:{PORT} (POST /render[auth], GET /health) "
+          f"storage={'r2' if _r2_configured() else 'local'}")
     srv.serve_forever()
 
 
