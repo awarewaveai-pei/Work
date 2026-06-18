@@ -512,16 +512,35 @@ export default function StudioWorkbench() {
         </AccordionSection>
 
         <AccordionSection title="🎨 風格 Style" summary={style || "不指定"}>
-          <select className="btn-secondary" style={{ width: "100%" }} value={style} onChange={(e) => setStyle(e.target.value)}>
-            <option value="">不指定</option>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setStyle("")}
+              style={{ alignSelf: "flex-start", padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${style === "" ? "#6366f1" : "var(--border, #333)"}`, background: style === "" ? "#6366f1" : "rgba(127,127,127,0.08)", color: style === "" ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}
+            >
+              不指定
+            </button>
             {Array.from(new Set(STYLE_CATALOG.map((item) => item.group))).map((group) => (
-              <optgroup key={group} label={group}>
-                {STYLE_CATALOG.filter((item) => item.group === group).map((item) => (
-                  <option key={item.zh} value={item.zh}>{item.zh}</option>
-                ))}
-              </optgroup>
+              <div key={group}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{group}</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {STYLE_CATALOG.filter((item) => item.group === group).map((item) => {
+                    const active = style === item.zh;
+                    return (
+                      <button
+                        key={item.zh}
+                        type="button"
+                        onClick={() => setStyle(active ? "" : item.zh)}
+                        style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #333)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}
+                      >
+                        {item.zh}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
-          </select>
+          </div>
         </AccordionSection>
 
         <AccordionSection
@@ -567,12 +586,23 @@ export default function StudioWorkbench() {
         </AccordionSection>
 
         <AccordionSection title="📐 比例" summary={aspect}>
-          <select className="btn-secondary" style={{ width: "100%" }} value={aspect} onChange={(e) => setAspect(e.target.value as AspectRatio)}>
-            {ASPECTS.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {ASPECTS.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => setAspect(a)}
+                style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, cursor: "pointer", border: `1px solid ${aspect === a ? "#6366f1" : "var(--border, #333)"}`, background: aspect === a ? "#6366f1" : "rgba(127,127,127,0.08)", color: aspect === a ? "#fff" : "var(--text-muted, #888)", fontWeight: aspect === a ? 600 : 400, transition: "all 0.15s" }}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
         </AccordionSection>
 
-        <AccordionSection title="🖼️ 參考圖" summary={refImages.length > 0 ? `${refImages.length} 張` : refMode === "transform" ? "改圖模式" : "無"}>
+        {/* 參考圖 + 模式切換 — original bordered box style */}
+        <div style={{ border: "1px solid var(--border, #333)", borderRadius: 8, padding: 10 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>🖼️ 參考圖</p>
           <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border, #333)", marginBottom: 8 }}>
             <button type="button" onClick={() => onSetRefMode("ref")} style={{ flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none", background: refMode === "ref" ? "var(--accent, #6366f1)" : "transparent", color: refMode === "ref" ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
               🖼️ 風格參考
@@ -600,7 +630,7 @@ export default function StudioWorkbench() {
           ) : (
             <p style={{ fontSize: 11, opacity: 0.45 }}>目前所選模型均不支援參考圖。{refMode === "transform" && " 改圖模式將自動切換至 flux-kontext-dev。"}</p>
           )}
-        </AccordionSection>
+        </div>
 
         <button className="btn-primary" disabled={busy} onClick={() => void generate()}>
           {busy ? `生成中… (${results.filter((r) => !r.busy).length}/${results.length})` : isMultiModel ? `生成比較（${selectedModels.size} 個模型）` : "生成"}
