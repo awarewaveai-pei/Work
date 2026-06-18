@@ -77,6 +77,14 @@ const PRICE_POSITIONS = [
   { value: "value",   label: "平價親民（可近性）" },
 ];
 
+// #4 — Marketing brief preset chips (click to fill/append each field)
+const MKT_PRESETS: Record<string, string[]> = {
+  audience: ["台灣 30-45 歲女性", "有焦慮/壓力的上班族", "正在尋找自我療癒的成人", "對心理健康有興趣的父母", "藝術愛好者（非專業）", "身心科/諮商後進階探索者"],
+  primaryCta: ["預約免費體驗課", "立即報名工作坊", "加入候補名單", "下載免費指南", "訂閱電子報", "聯絡我們了解更多"],
+  emotionalTriggers: ["渴望被理解與接納", "想找回創造力與自信", "希望減輕焦慮與壓力", "尋找內心平靜與自我探索", "渴望與人真實連結", "想為孩子找到非藥物支持"],
+  objections: ["我沒有繪畫天份", "會不會很貴？值得嗎？", "我不確定這對我有效", "我沒有時間", "這跟一般心理諮商有什麼不同？", "我的孩子適合嗎？"],
+};
+
 const SYN_PLATFORMS = [
   { key: "twitter",   label: "Twitter / X",  hasThread: true  },
   { key: "instagram", label: "Instagram",     hasThread: false },
@@ -539,6 +547,10 @@ export default function ContentStudio() {
   // Selected hook types for batch brief generation (multi-select)
   const [hookTypesSelected, setHookTypesSelected] = useState<Set<string>>(new Set());
 
+  // Categories / tags chip UI — site's existing taxonomy (fetched on site change)
+  const [siteCategories, setSiteCategories] = useState<string[]>([]);
+  const [siteTags,       setSiteTags]       = useState<string[]>([]);
+
   // Outline auto-generate
   const [outlineLoading, setOutlineLoading] = useState(false);
 
@@ -897,6 +909,18 @@ export default function ContentStudio() {
   useEffect(() => {
     if (showPatterns) void loadPatterns();
   }, [showPatterns, loadPatterns]);
+
+  // Fetch site categories & tags when selected site changes (chip UI)
+  useEffect(() => {
+    if (!selectedSiteId) return;
+    void (async () => {
+      try {
+        const res  = await fetch(`/api/content/categories?siteId=${encodeURIComponent(selectedSiteId)}`);
+        const json = await res.json() as { ok: boolean; categories?: string[] };
+        if (json.ok && json.categories) setSiteCategories(json.categories);
+      } catch { /* silent — chips just won't pre-populate */ }
+    })();
+  }, [selectedSiteId]);
 
   // ─── Image Generation ─────────────────────────────────────────────────────
 
@@ -2448,6 +2472,14 @@ export default function ContentStudio() {
                 <label className="form-label" style={{ marginTop: 0 }}>目標受眾</label>
                 <input className="form-input" value={form.marketing.audience} disabled={isGenerating}
                   onChange={e => setMkt("audience", e.target.value)} placeholder="例：台灣成人，對表達藝術有興趣" />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  {MKT_PRESETS.audience.map(p => (
+                    <button key={p} type="button" disabled={isGenerating} onClick={() => setMkt("audience", p)}
+                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="form-label" style={{ marginTop: 0 }}>品牌定位（一句話）</label>
@@ -2470,6 +2502,14 @@ export default function ContentStudio() {
                 <label className="form-label">主要行動呼籲（CTA）</label>
                 <input className="form-input" value={form.marketing.primaryCta} disabled={isGenerating}
                   onChange={e => setMkt("primaryCta", e.target.value)} placeholder="例：預約免費體驗工作坊" />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  {MKT_PRESETS.primaryCta.map(p => (
+                    <button key={p} type="button" disabled={isGenerating} onClick={() => setMkt("primaryCta", p)}
+                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="form-label">價格定位</label>
@@ -2482,11 +2522,35 @@ export default function ContentStudio() {
                 <label className="form-label">情緒觸發點 / 讀者渴望</label>
                 <input className="form-input" value={form.marketing.emotionalTriggers} disabled={isGenerating}
                   onChange={e => setMkt("emotionalTriggers", e.target.value)} placeholder="例：渴望被理解、想找回創造力" />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  {MKT_PRESETS.emotionalTriggers.map(p => (
+                    <button key={p} type="button" disabled={isGenerating}
+                      onClick={() => {
+                        const cur = form.marketing.emotionalTriggers.trim();
+                        setMkt("emotionalTriggers", cur ? `${cur}、${p}` : p);
+                      }}
+                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="form-label">需化解的疑慮 / 抗拒點</label>
                 <input className="form-input" value={form.marketing.objections} disabled={isGenerating}
                   onChange={e => setMkt("objections", e.target.value)} placeholder="例：我沒有繪畫天份／會不會很貴" />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  {MKT_PRESETS.objections.map(p => (
+                    <button key={p} type="button" disabled={isGenerating}
+                      onClick={() => {
+                        const cur = form.marketing.objections.trim();
+                        setMkt("objections", cur ? `${cur}、${p}` : p);
+                      }}
+                      style={{ padding: "1px 7px", borderRadius: "10px", border: "1px solid var(--card-border)", fontSize: "11px", cursor: "pointer", background: "var(--bg-hover,#f5f5f5)", color: "var(--text-secondary)" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <label className="form-label">避免使用 / 禁用聲明（逗號分隔）</label>
@@ -2595,19 +2659,40 @@ export default function ContentStudio() {
                 </div>
                 <div className="form-hint" style={{ marginTop: 4 }}>狀態保持「草稿」，需從 WP 後台手動發布。</div>
               </div>
-              <div style={{ flex: 1, minWidth: "160px" }}>
-                <label className="form-label">分類（逗號分隔）</label>
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <label className="form-label">分類</label>
+                {/* Chip row: existing site categories as quick-pick */}
+                {siteCategories.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+                    {siteCategories.slice(0, 12).map(cat => {
+                      const selected = form.wpCategories.split(",").map(s => s.trim()).filter(Boolean).includes(cat);
+                      return (
+                        <button key={cat} type="button" disabled={isGenerating}
+                          onClick={() => {
+                            const cur = form.wpCategories.split(",").map(s => s.trim()).filter(Boolean);
+                            const next = selected ? cur.filter(c => c !== cat) : [...cur, cat];
+                            setF("wpCategories", next.join(", "));
+                          }}
+                          style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
+                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
+                            color: selected ? "#fff" : "var(--text-primary)", borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                          {selected ? "✓ " : ""}{cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 <input className="form-input" style={{ width: "100%" }}
                   value={form.wpCategories} onChange={e => setF("wpCategories", e.target.value)}
                   placeholder="芳療, DIY 保養, 精油教學" disabled={isGenerating} />
-                <div className="form-hint" style={{ marginTop: 4 }}>不存在的分類會自動建立。</div>
+                <div className="form-hint" style={{ marginTop: 4 }}>點選現有分類，或直接輸入（逗號分隔）。不存在的分類會自動建立。</div>
               </div>
-              <div style={{ flex: 1, minWidth: "160px" }}>
-                <label className="form-label">標籤（逗號分隔）</label>
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <label className="form-label">標籤</label>
                 <input className="form-input" style={{ width: "100%" }}
                   value={form.wpTags} onChange={e => setF("wpTags", e.target.value)}
                   placeholder="檸檬精油, 精油配方, 天然保養" disabled={isGenerating} />
-                <div className="form-hint" style={{ marginTop: 4 }}>不存在的標籤會自動建立。</div>
+                <div className="form-hint" style={{ marginTop: 4 }}>逗號分隔。不存在的標籤會自動建立。</div>
               </div>
             </div>
           </div>
