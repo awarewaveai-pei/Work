@@ -462,7 +462,7 @@ export default function AiModelsClient() {
 
   const sortedText = useMemo(() => {
     const r = [...TEXT_MODEL_COMPARISONS];
-    if (sortKey === "cost")  r.sort((a, b) => (a.costInputPer1M - b.costInputPer1M) * dir);
+    if (sortKey === "cost")  r.sort((a, b) => (a.costOutputPer1M - b.costOutputPer1M) * dir);
     if (sortKey === "speed") r.sort((a, b) => (a.speedRank - b.speedRank) * dir);
     return r;
   }, [sortKey, sortDir]);
@@ -476,7 +476,7 @@ export default function AiModelsClient() {
 
   const sortedCoding = useMemo(() => {
     const r = [...CODING_TOOL_COMPARISONS];
-    if (sortKey === "cost")  r.sort((a, b) => (a.costInputPer1M - b.costInputPer1M) * dir);
+    if (sortKey === "cost")  r.sort((a, b) => (a.costOutputPer1M - b.costOutputPer1M) * dir);
     if (sortKey === "speed") r.sort((a, b) => (a.speedRank - b.speedRank) * dir);
     return r;
   }, [sortKey, sortDir]);
