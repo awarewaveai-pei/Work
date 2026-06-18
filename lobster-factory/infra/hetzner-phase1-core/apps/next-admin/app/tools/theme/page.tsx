@@ -194,39 +194,42 @@ export default function ThemePage() {
   const [secDragIdx, setSecDragIdx]   = useState<number | null>(null);
   const [itemDragIdx, setItemDragIdx] = useState<number | null>(null);
 
-  // Fetch real token values from globals.css on mount.
+  // Load token defaults from API, then apply any localStorage overrides on top.
+  // localStorage always wins — this prevents the async API response from overwriting saved values.
   useEffect(() => {
+    let lsOverrides: Record<string, string> = {};
+    try {
+      const stored = localStorage.getItem(LS_TOKENS_KEY);
+      if (stored) lsOverrides = JSON.parse(stored) as Record<string, string>;
+    } catch {}
+
     fetch('/api/theme')
       .then(r => r.ok ? r.json() : null)
       .then((data: { tokens?: Record<string, string> } | null) => {
+        const apiDefaults: Record<string, string> = {};
         if (data?.tokens) {
-          const relevant: Record<string, string> = {};
           ALL_GROUPS.forEach(g =>
             g.tokens.forEach(t => {
-              if (t.name in data.tokens!) relevant[t.name] = data.tokens![t.name];
+              if (t.name in data.tokens!) apiDefaults[t.name] = data.tokens![t.name];
             })
           );
-          setServerDefaults(prev => ({ ...prev, ...relevant }));
-          setValues(prev => ({ ...prev, ...relevant }));
-          Object.entries(relevant).forEach(([k, v]) =>
+        }
+        // localStorage overrides win over API defaults
+        const merged = { ...apiDefaults, ...lsOverrides };
+        setServerDefaults(prev => ({ ...prev, ...apiDefaults }));
+        setValues(prev => ({ ...prev, ...merged }));
+        Object.entries(merged).forEach(([k, v]) =>
+          document.documentElement.style.setProperty(k, v)
+        );
+      })
+      .catch(() => {
+        if (Object.keys(lsOverrides).length > 0) {
+          setValues(prev => ({ ...prev, ...lsOverrides }));
+          Object.entries(lsOverrides).forEach(([k, v]) =>
             document.documentElement.style.setProperty(k, v)
           );
         }
-      })
-      .catch(() => { /* use STATIC_DEFAULTS */ });
-  }, []);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(LS_TOKENS_KEY);
-      if (stored) {
-        const overrides = JSON.parse(stored) as Record<string, string>;
-        setValues(prev => ({ ...prev, ...overrides }));
-        Object.entries(overrides).forEach(([k, v]) =>
-          document.documentElement.style.setProperty(k, v)
-        );
-      }
-    } catch {}
+      });
   }, []);
 
   useEffect(() => {
