@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
+import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
 import type { RankMathCheck } from "@/lib/seo/rankmath-checker";
 
 export const runtime = "nodejs";
@@ -84,6 +85,8 @@ Please output the COMPLETE improved article. Fix ONLY the listed failed checks â
     });
 
     void logAiCall({ route: "/api/content/seo-fix", response: msg, actorRole: role });
+    const { rate: seoRate } = resolveTextRate(msg.model);
+    const _cost = { usd: textCallCostUsd({ model: msg.model, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, cacheReadTokens: msg.usage.cache_read_input_tokens, cacheWriteTokens: msg.usage.cache_creation_input_tokens }), model: msg.model, vendor: seoRate.vendor };
 
     // Aggregate all text blocks (Anthropic may return multiple content blocks)
     const text = msg.content.filter(b => b.type === "text").map(b => (b as { type: "text"; text: string }).text).join("");
@@ -106,6 +109,7 @@ Please output the COMPLETE improved article. Fix ONLY the listed failed checks â
       markdown: fixedMarkdown,
       seoTitle: fixedSeoTitle,
       metaDescription: fixedMetaDescription,
+      _cost,
     });
   } catch (err) {
     console.error("[seo-fix] Anthropic error:", err);

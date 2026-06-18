@@ -9,6 +9,7 @@ interface FixResponse {
   seoTitle?: string;
   metaDescription?: string;
   error?: string;
+  _cost?: { usd: number; model: string; vendor: string };
 }
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
   metaDescription?: string;
   slug?: string;
   onFixApply?: (md: string, meta?: { seoTitle: string; metaDesc: string }) => void;
+  onCost?: (cost: { usd: number; model: string; vendor: string }) => void;
   /**
    * Custom fix path (e.g. product copy, which is structured 6 fields — not a Markdown article that
    * /api/content/seo-fix can rewrite). When provided, it REPLACES the built-in markdown-fix fetch:
@@ -234,7 +236,7 @@ function CategoryBlock({
 export function SeoCheckPanel({
   report, loading,
   articleMarkdown, focusKeyword, seoTitle, metaDescription, slug,
-  onFixApply, onFix,
+  onFixApply, onCost, onFix,
 }: Props) {
   const [fixing,     setFixing]     = useState(false);
   const [fixError,   setFixError]   = useState("");
@@ -288,6 +290,7 @@ export function SeoCheckPanel({
         ? { seoTitle: json.seoTitle ?? seoTitle ?? "", metaDesc: json.metaDescription ?? metaDescription ?? "" }
         : undefined;
       onFixApply!(json.markdown, meta);
+      if (json._cost) onCost?.(json._cost);
       setFixMessage("✓ 已更新，重新計分中…");
     } catch { setFixError("網路錯誤，請重試"); }
     finally   { setFixing(false); }

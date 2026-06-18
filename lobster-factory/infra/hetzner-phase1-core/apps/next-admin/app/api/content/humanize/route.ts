@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
+import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -95,7 +96,12 @@ Output ONLY the rewritten content in Markdown format, no preamble or explanation
         // cost ledger. Best-effort: never blocks or breaks the already-streamed response.
         if (!req.signal.aborted) {
           const fm = await anthropicStream.finalMessage().catch(() => null);
-          if (fm) void logAiCall({ route: "/api/content/humanize", response: fm, actorRole: role });
+          if (fm) {
+            void logAiCall({ route: "/api/content/humanize", response: fm, actorRole: role });
+            const costUsd = textCallCostUsd({ model: fm.model, inputTokens: fm.usage.input_tokens, outputTokens: fm.usage.output_tokens, cacheReadTokens: fm.usage.cache_read_input_tokens, cacheWriteTokens: fm.usage.cache_creation_input_tokens });
+            const { rate: hmRate } = resolveTextRate(fm.model);
+            controller.enqueue(encoder.encode(`\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: fm.model, vendor: hmRate.vendor, route: "content/humanize" })}`));
+          }
         }
       } catch {
         if (!req.signal.aborted) {

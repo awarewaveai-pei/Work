@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_AI_TEXT_MODEL, isAiTextModel, isOpenAiTextModel, type AiTextModel } from "../../ai/text-model-options";
 import { logAiCall } from "../../ai/log-ai-call";
+import { textCallCostUsd, resolveTextRate } from "../../ai/cost-calculator";
 
 // Output token budgets. Raised 2026-06-16: the old medium=4096 truncated rich articles
 // (tables + nested H3 + lists) mid-sentence, cutting off the trailing CONTENT_META block →
@@ -165,9 +166,9 @@ interface MediaHub {
 // article generation, and image prompt tools share one Claude/OpenAI menu.
 
 /** Call Perplexity Sonar to get 3–5 real, verified external source URLs for the keyword. */
-async function fetchRealSources(keyword: string, language: string): Promise<string[]> {
+async function fetchRealSources(keyword: string, language: string): Promise<{ sources: string[]; costUsd: number }> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
-  if (!apiKey) return [];
+  if (!apiKey) return { sources: [], costUsd: 0 };
   try {
     const res = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
@@ -185,13 +186,15 @@ async function fetchRealSources(keyword: string, language: string): Promise<stri
       }),
       signal: AbortSignal.timeout(8000),
     });
-    if (!res.ok) return [];
-    const data = await res.json() as { citations?: unknown[] };
-    return (data.citations ?? [])
+    if (!res.ok) return { sources: [], costUsd: 0 };
+    const data = await res.json() as { citations?: unknown[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+    const sources = (data.citations ?? [])
       .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u) && !/[\s\n\r]/.test(u))
       .slice(0, 5);
+    const costUsd = textCallCostUsd({ model: "sonar", inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0 });
+    return { sources, costUsd };
   } catch {
-    return [];
+    return { sources: [], costUsd: 0 };
   }
 }
 
@@ -502,6 +505,7 @@ export interface ArticlePreparedConfig {
   maxTokens: number;
   system: string;
   userPrompt: string;
+  perplexityCostUsd?: number;
 }
 
 export interface ArticleGenerateFailure {
@@ -586,9 +590,9 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
 
   // Perplexity real sources — only when user hasn't provided their own external links
   const userExternalLinks = sarr(body.externalLinks);
-  const realSources = userExternalLinks.length === 0
+  const { sources: realSources, costUsd: perplexityCostUsd } = userExternalLinks.length === 0
     ? await fetchRealSources(keyword, str(body.language, "English"))
-    : [];
+    : { sources: [], costUsd: 0 };
 
   // Model selection (default: sonnet)
   const requestedModel = str(body.model, DEFAULT_AI_TEXT_MODEL);
@@ -641,7 +645,7 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
     patternCount,
   });
 
-  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt } };
+  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt, perplexityCostUsd: perplexityCostUsd > 0 ? perplexityCostUsd : undefined } };
 }
 
 /**
@@ -692,7 +696,15 @@ export async function* streamArticleGeneration(
     if (!signal?.aborted) {
       const finalMsg = await anthropicStream.finalMessage().catch(() => null);
       // Cost ledger: record exact token usage from the completed stream (best-effort, never throws).
-      if (finalMsg) void logAiCall({ route: "content/article-generate", response: finalMsg });
+      if (finalMsg) {
+        void logAiCall({ route: "content/article-generate", response: finalMsg });
+        const costUsd = textCallCostUsd({ model: config.model, inputTokens: finalMsg.usage.input_tokens, outputTokens: finalMsg.usage.output_tokens, cacheReadTokens: finalMsg.usage.cache_read_input_tokens, cacheWriteTokens: finalMsg.usage.cache_creation_input_tokens });
+        const { rate } = resolveTextRate(config.model);
+        if (config.perplexityCostUsd) {
+          yield `[COST_JSON]${JSON.stringify({ usd: config.perplexityCostUsd, model: "sonar", vendor: "Perplexity", route: "content/fetchRealSources" })}`;
+        }
+        yield `[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate" })}`;
+      }
       if (finalMsg?.stop_reason === "max_tokens") {
         yield "\n\n<!-- GENERATION_TRUNCATED: hit the output length limit; pick a shorter article size or split the topic -->";
       }
@@ -824,6 +836,12 @@ async function* streamOpenAiGeneration(
         inputTokens: openaiUsage.prompt_tokens ?? 0,
         outputTokens: openaiUsage.completion_tokens ?? 0,
       });
+      const costUsd = textCallCostUsd({ model: config.model, inputTokens: openaiUsage.prompt_tokens ?? 0, outputTokens: openaiUsage.completion_tokens ?? 0 });
+      const { rate } = resolveTextRate(config.model);
+      if (config.perplexityCostUsd) {
+        yield `[COST_JSON]${JSON.stringify({ usd: config.perplexityCostUsd, model: "sonar", vendor: "Perplexity", route: "content/fetchRealSources" })}`;
+      }
+      yield `[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate" })}`;
     }
 
     // Truncation guard — parallel to the Anthropic stop_reason==="max_tokens" check.

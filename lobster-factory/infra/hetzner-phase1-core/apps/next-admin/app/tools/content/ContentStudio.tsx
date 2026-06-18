@@ -466,6 +466,19 @@ export default function ContentStudio() {
   const [imgResult,       setImgResult]       = useState<{ imageUrl: string; spec: { label: string; width: number; height: number } } | null>(null);
   const [imgError,        setImgError]        = useState("");
 
+  // Per-article cost tracking (client-side accumulation)
+  interface CostLineItem { route: string; model: string; vendor: string; usd: number }
+  interface SessionCost { lines: CostLineItem[]; totalUsd: number; textUsd: number; imageUsd: number }
+  const [sessionCost, setSessionCost] = useState<SessionCost | null>(null);
+  function addCostLine(line: CostLineItem) {
+    setSessionCost(prev => {
+      const lines = [...(prev?.lines ?? []), line];
+      const textUsd = lines.filter(l => l.vendor !== "Image").reduce((s, l) => s + l.usd, 0);
+      const imageUsd = lines.filter(l => l.vendor === "Image").reduce((s, l) => s + l.usd, 0);
+      return { lines, totalUsd: textUsd + imageUsd, textUsd, imageUsd };
+    });
+  }
+
   // Generate
   const [form, setForm]           = useState<GenerateForm>(DEFAULT_FORM);
   const [generated, setGenerated] = useState("");
@@ -653,8 +666,9 @@ export default function ContentStudio() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ keyword: form.keyword, language: form.language, articleType: form.articleType }),
       });
-      const json = await res.json() as { ok: boolean; titles?: string[] };
+      const json = await res.json() as { ok: boolean; titles?: string[]; _cost?: { usd: number; model: string; vendor: string } };
       if (json.ok && json.titles?.length) { setTitleSugs(json.titles); setShowTitleDrop(true); }
+      if (json._cost) addCostLine({ route: "content/title", model: json._cost.model, vendor: json._cost.vendor, usd: json._cost.usd });
     } catch { /* silent */ } finally { setTitleLoading(false); }
   }
 
@@ -668,8 +682,9 @@ export default function ContentStudio() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ keyword: form.keyword, language: form.language, articleType: form.articleType }),
       });
-      const json = await res.json() as { ok: boolean; keywords?: string[] };
+      const json = await res.json() as { ok: boolean; keywords?: string[]; _cost?: { usd: number; model: string; vendor: string } };
       if (json.ok && json.keywords?.length) { setKwSugs(json.keywords); setShowKwDrop(true); }
+      if (json._cost) addCostLine({ route: "content/keywords", model: json._cost.model, vendor: json._cost.vendor, usd: json._cost.usd });
     } catch { /* silent */ } finally { setKwLoading(false); }
   }
 
@@ -683,8 +698,9 @@ export default function ContentStudio() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ keyword: form.keyword, title: form.title, language: form.language, articleType: form.articleType, articleSize: form.articleSize }),
       });
-      const json = await res.json() as { ok: boolean; outline?: string };
+      const json = await res.json() as { ok: boolean; outline?: string; _cost?: { usd: number; model: string; vendor: string } };
       if (json.ok && json.outline) { setF("outline", json.outline); if (!showOutline) setShowOutline(true); }
+      if (json._cost) addCostLine({ route: "content/outline", model: json._cost.model, vendor: json._cost.vendor, usd: json._cost.usd });
     } catch { /* silent */ } finally { setOutlineLoading(false); }
   }
 
@@ -824,9 +840,10 @@ export default function ContentStudio() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ keyword: form.keyword, brand, audience: form.marketing.audience, language: form.language }),
       });
-      const json = await res.json() as { ok: boolean; analysis?: MarketAnalysisResult; context?: string; error?: string };
+      const json = await res.json() as { ok: boolean; analysis?: MarketAnalysisResult; context?: string; error?: string; _cost?: { usd: number; model: string; vendor: string } };
       if (!json.ok || !json.analysis) { setMarketError(json.error ?? "分析失敗"); }
       else { setMarketAnalysis(json.analysis); setMarketContext(json.context ?? ""); }
+      if (json._cost) addCostLine({ route: "content/market-analysis", model: json._cost.model, vendor: json._cost.vendor, usd: json._cost.usd });
     } catch { setMarketError("網路錯誤，請重試"); }
     finally { setMarketLoading(false); }
   }
@@ -875,6 +892,7 @@ export default function ContentStudio() {
     abortRef.current = ac;
 
     setGenerated(""); setMetaData(null);
+    setSessionCost(null);
     setGenStatus("streaming"); setGenError(""); setGenTruncated(false);
     setPubStatus("idle"); setPubResult(null);
     setSeoReport(null); setSeoChecking(false);
@@ -949,9 +967,13 @@ export default function ContentStudio() {
         const { done, value } = await reader.read();
         if (done) break;
         text += dec.decode(value, { stream: true });
-        setGenerated(text);
+        // Filter cost sentinels from live preview (they arrive as the last line(s))
+        setGenerated(text.split("\n").filter(l => !l.startsWith("[COST_JSON]")).join("\n"));
       }
       text += dec.decode();
+
+      // Parse and strip [COST_JSON] sentinel lines before article processing
+      { const lines = text.split("\n"); const costLines: string[] = []; const bodyLines = lines.filter(l => { if (l.startsWith("[COST_JSON]")) { costLines.push(l.slice("[COST_JSON]".length)); return false; } return true; }); text = bodyLines.join("\n"); for (const cl of costLines) { try { const c = JSON.parse(cl) as { usd: number; model: string; vendor: string; route: string }; addCostLine({ route: c.route, model: c.model, vendor: c.vendor, usd: c.usd }); } catch { /* ignore */ } } }
 
       // Detect + strip BOTH server-side markers so neither leaks into the published article body
       // (the standard REST publish path passes pure comment lines through verbatim — critic Major).
@@ -1163,12 +1185,11 @@ export default function ContentStudio() {
           body: JSON.stringify({ prompt: altText, platform: "twitter_post", aspectRatio: form.media.imageSize, ...mediaImageParams() }),
         });
         if (genRun !== imgRunRef.current) break;
-        const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string };
+        const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string; cost_usd?: number; model?: string };
         if (json.ok && json.imageUrl) {
           setGenerated(prev => prev.replace(`IMAGE_PLACEHOLDER_${n}`, json.imageUrl!));
+          if (json.cost_usd && json.model) addCostLine({ route: "content/image", model: json.model, vendor: "Image", usd: json.cost_usd });
         } else {
-          // Route answers 200 + ok:false (missing key / timeout / bad reference) or 4xx with an error
-          // body. Don't swallow it — remember the reason so the operator sees why a placeholder stayed.
           lastErr = (typeof json.error === "string" && json.error) || "圖片生成失敗";
         }
       } catch { lastErr = "圖片生成連線失敗，請稍後重試"; }
@@ -1295,9 +1316,10 @@ export default function ContentStudio() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ article: generated, platforms, twitterMode, articleUrl: pubResult?.view_url }),
       });
-      const json = await res.json() as { ok: boolean; posts?: Record<string, string> };
+      const json = await res.json() as { ok: boolean; posts?: Record<string, string>; _cost?: { usd: number; model: string; vendor: string } };
       if (json.ok && json.posts) { setSynContent(json.posts); setSynStatus("done"); }
       else                       { setSynStatus("error"); }
+      if (json._cost) addCostLine({ route: "content/syndicate", model: json._cost.model, vendor: json._cost.vendor, usd: json._cost.usd });
     } catch { setSynStatus("error"); }
   }
 
@@ -1374,9 +1396,11 @@ export default function ContentStudio() {
         const { done, value } = await reader.read();
         if (done) break;
         text += dec.decode(value, { stream: true });
-        setHumOutput(text);
+        setHumOutput(text.split("\n").filter(l => !l.startsWith("[COST_JSON]")).join("\n"));
       }
       text += dec.decode();
+      // Parse and strip cost sentinels
+      { const lines = text.split("\n"); const costLines: string[] = []; const bodyLines = lines.filter(l => { if (l.startsWith("[COST_JSON]")) { costLines.push(l.slice("[COST_JSON]".length)); return false; } return true; }); text = bodyLines.join("\n"); for (const cl of costLines) { try { const c = JSON.parse(cl) as { usd: number; model: string; vendor: string; route: string }; addCostLine({ route: c.route, model: c.model, vendor: c.vendor, usd: c.usd }); } catch { /* ignore */ } } }
       setHumOutput(text);
       setHumStatus("done");
     } catch (err) {
@@ -2586,6 +2610,7 @@ export default function ContentStudio() {
                 metaDescription={metaData?.metaDesc ?? ""}
                 slug={slugHint || slugify(form.keyword)}
                 onFixApply={handleFixApply}
+                onCost={(c) => addCostLine({ route: "content/seo-fix", model: c.model, vendor: c.vendor, usd: c.usd })}
               />
 
               {/* ── 自動圖片生成進度 ── */}

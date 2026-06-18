@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
+import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,10 +64,10 @@ Example format (primary keyword "art therapy" — exact in 1–2, variants elsew
   });
 
   void logAiCall({ route: "/api/content/outline", response: msg, actorRole: role });
+  const { rate } = resolveTextRate(msg.model);
+  const _cost = { usd: textCallCostUsd({ model: msg.model, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, cacheReadTokens: msg.usage.cache_read_input_tokens, cacheWriteTokens: msg.usage.cache_creation_input_tokens }), model: msg.model, vendor: rate.vendor };
 
   const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
-  // A truncated/empty completion would otherwise return ok:true with a blank outline, making the
-  // UI's "✨ 自動生成大綱" button a silent no-op. Surface it as a failure instead. (critic 2026-06-15)
   if (!text) return NextResponse.json({ ok: false, error: "empty outline" }, { status: 502 });
-  return NextResponse.json({ ok: true, outline: text });
+  return NextResponse.json({ ok: true, outline: text, _cost });
 }

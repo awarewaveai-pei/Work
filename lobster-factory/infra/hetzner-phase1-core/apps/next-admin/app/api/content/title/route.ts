@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
+import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,13 +75,15 @@ Example: ["Title One Here", "Title Two Here", "Title Three Here", "Title Four He
   });
 
   void logAiCall({ route: "/api/content/title", response: msg, actorRole: role });
+  const { rate } = resolveTextRate(msg.model);
+  const _cost = { usd: textCallCostUsd({ model: msg.model, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, cacheReadTokens: msg.usage.cache_read_input_tokens, cacheWriteTokens: msg.usage.cache_creation_input_tokens }), model: msg.model, vendor: rate.vendor };
 
   const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "[]";
   try {
     const match = text.match(/\[[\s\S]*\]/);
     const titles = JSON.parse(match?.[0] ?? "[]") as unknown[];
     const valid = titles.filter((t): t is string => typeof t === "string").slice(0, 5);
-    return NextResponse.json({ ok: true, titles: valid });
+    return NextResponse.json({ ok: true, titles: valid, _cost });
   } catch {
     return NextResponse.json({ ok: false, error: "Failed to parse title suggestions" }, { status: 500 });
   }

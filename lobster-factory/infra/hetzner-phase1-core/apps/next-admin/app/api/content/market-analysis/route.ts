@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { textCallCostUsd } from "@/lib/ai/cost-calculator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,7 +75,7 @@ Output ONLY the JSON, no markdown fences, no explanation.`;
       signal: AbortSignal.timeout(45000),
     });
     if (!res.ok) return NextResponse.json({ ok: false, error: `Perplexity error (${res.status})` }, { status: 502 });
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
     const text = data.choices?.[0]?.message?.content ?? "{}";
 
     const match  = text.match(/\{[\s\S]*\}/);
@@ -89,7 +90,8 @@ Output ONLY the JSON, no markdown fences, no explanation.`;
       objections:      arr(parsed.objections),
       differentiators: arr(parsed.differentiators),
     };
-    return NextResponse.json({ ok: true, analysis, context: buildContext(analysis) });
+    const _cost = { usd: textCallCostUsd({ model: "sonar", inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0 }), model: "sonar", vendor: "Perplexity" };
+    return NextResponse.json({ ok: true, analysis, context: buildContext(analysis), _cost });
   } catch {
     return NextResponse.json({ ok: false, error: "市場分析失敗，請重試" }, { status: 500 });
   }

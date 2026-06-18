@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
+import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,13 +45,15 @@ Example: ["keyword one", "phrase two", "term three"]`,
   });
 
   void logAiCall({ route: "/api/content/keywords", response: msg, actorRole: role });
+  const { rate } = resolveTextRate(msg.model);
+  const _cost = { usd: textCallCostUsd({ model: msg.model, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, cacheReadTokens: msg.usage.cache_read_input_tokens, cacheWriteTokens: msg.usage.cache_creation_input_tokens }), model: msg.model, vendor: rate.vendor };
 
   const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "[]";
   try {
     const match = text.match(/\[[\s\S]*\]/);
     const kws   = JSON.parse(match?.[0] ?? "[]") as unknown[];
     const valid = kws.filter((k): k is string => typeof k === "string").slice(0, 20);
-    return NextResponse.json({ ok: true, keywords: valid });
+    return NextResponse.json({ ok: true, keywords: valid, _cost });
   } catch {
     return NextResponse.json({ ok: false, error: "Failed to parse keywords" }, { status: 500 });
   }

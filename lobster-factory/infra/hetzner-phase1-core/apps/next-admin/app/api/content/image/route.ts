@@ -13,6 +13,7 @@ import {
   buildDesignKey,
   putDesignObject,
 } from "@/lib/storage/r2";
+import { imageCostUsd } from "@/lib/ai/cost-calculator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -165,6 +166,7 @@ export async function POST(req: Request): Promise<Response> {
     aspectRatio,
     seed: result.seed,
     spec: { label: spec.label, width: spec.width, height: spec.height, aspect: aspectRatio, note: spec.note },
+    cost_usd: imageCostUsd(model),
   });
 }
 
