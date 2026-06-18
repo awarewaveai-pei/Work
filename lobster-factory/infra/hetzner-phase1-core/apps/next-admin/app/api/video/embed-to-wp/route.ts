@@ -26,6 +26,7 @@ export async function POST(req: Request): Promise<Response> {
   const postId   = Number.isInteger(rawId) && rawId > 0 ? rawId : NaN;
 
   if (!videoUrl) return NextResponse.json({ ok: false, error: "videoUrl required" }, { status: 400 });
+  if (!/^https:\/\//i.test(videoUrl)) return NextResponse.json({ ok: false, error: "videoUrl must start with https://" }, { status: 400 });
   if (isNaN(postId)) return NextResponse.json({ ok: false, error: "postId must be a positive integer" }, { status: 400 });
 
   // Resolve site auth
@@ -58,8 +59,9 @@ export async function POST(req: Request): Promise<Response> {
     // Placeholder not found — append video at end instead of failing
     currentContent = currentContent.trimEnd() + `\n\n${videoUrl}\n`;
   } else {
-    // Replace placeholder with bare video URL (WP autoembed → responsive iframe)
-    currentContent = currentContent.replace("<!-- VIDEO_PLACEHOLDER -->", videoUrl);
+    // Replace placeholder with bare video URL (WP autoembed → responsive iframe).
+    // Use function replacer to prevent $ in the URL being interpreted as replacement pattern.
+    currentContent = currentContent.replace("<!-- VIDEO_PLACEHOLDER -->", () => videoUrl);
   }
 
   // PATCH the post content back

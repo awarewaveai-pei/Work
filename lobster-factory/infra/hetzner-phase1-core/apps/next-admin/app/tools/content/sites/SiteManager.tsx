@@ -71,6 +71,7 @@ const POVS = [
 const EMPTY_DEFAULTS: SiteContentDefaults = {
   language: "", targetCountry: "", imageModel: "",
   tone: "", articleType: "", readability: "", pointOfView: "none",
+  featuredImageFont: "sans", featuredImageTitlePosition: "bottom",
   marketing: { audience: "", positioning: "", usp: "", primaryCta: "", funnelStage: "", pricePositioning: "", emotionalTriggers: "", objections: "", forbiddenClaims: "" },
 };
 
@@ -165,7 +166,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <label>
               <span style={lbl}>精選圖片標題字型</span>
-              <select style={sel} value={(d as Record<string, unknown>).featuredImageFont as string ?? "sans"} onChange={e => { setD(p => ({ ...p, featuredImageFont: e.target.value })); setSaved(false); }}>
+              <select style={sel} value={d.featuredImageFont ?? "sans"} onChange={e => { setD(p => ({ ...p, featuredImageFont: e.target.value })); setSaved(false); }}>
                 <option value="sans">無黑體（Noto Sans CJK）</option>
                 <option value="serif">明體（Noto Serif CJK）</option>
                 <option value="none">不疊標題文字</option>
@@ -173,7 +174,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
             </label>
             <label>
               <span style={lbl}>標題文字位置</span>
-              <select style={sel} value={(d as Record<string, unknown>).featuredImageTitlePosition as string ?? "bottom"} onChange={e => { setD(p => ({ ...p, featuredImageTitlePosition: e.target.value })); setSaved(false); }}>
+              <select style={sel} value={d.featuredImageTitlePosition ?? "bottom"} onChange={e => { setD(p => ({ ...p, featuredImageTitlePosition: e.target.value })); setSaved(false); }}>
                 <option value="bottom">底部漸層（推薦）</option>
                 <option value="center">正中央</option>
               </select>

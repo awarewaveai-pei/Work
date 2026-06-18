@@ -14,6 +14,8 @@ export interface SiteContentDefaults {
   articleType?: string;
   readability?: string;
   pointOfView?: string;
+  featuredImageFont?: string;
+  featuredImageTitlePosition?: string;
   marketing?: {
     audience?: string;
     positioning?: string;
