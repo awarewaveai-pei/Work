@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { generateTarotImage, isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
 import { checkAndConsumeQuota } from "../../../../../lib/tarot/quota";
+import { imageCostUsd } from "../../../../../lib/ai/cost-calculator";
+import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,6 +15,7 @@ interface GenerateBody {
   seed?: number | null;
   aspectRatio?: string;
   printQuality?: boolean;
+  _jobId?: string;
 }
 
 const MAX_REF_IMAGES = 5;

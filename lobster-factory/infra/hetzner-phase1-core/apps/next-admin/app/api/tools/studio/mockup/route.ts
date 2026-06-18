@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
-import { generateMockup, SUPPORTED_PRODUCT_TYPES } from "../../../../../lib/studio/printful-mockup";
+import {
+  generateMockup,
+  generateMockupBySpec,
+  SUPPORTED_PRODUCT_TYPES,
+  type DynamicProductSpec,
+} from "../../../../../lib/studio/printful-mockup";
+import { fetchProductSpec } from "../../../../../lib/studio/printful-catalog";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -16,23 +22,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
   }
 
-  // Accept either a base64 data URL (`image`) or a pre-uploaded R2 URL (`imageUrl`).
-  // `imageUrl` is used when the design is already in R2 — avoids a browser CORS fetch.
-  // `imageWidth`/`imageHeight` carry the image's natural pixel dimensions so the
-  // server can compute aspect-ratio-correct print position (avoids 1:1 squish).
-  let body: { image?: string; imageUrl?: string; productType?: string; imageWidth?: number; imageHeight?: number };
+  let body: {
+    image?: string;
+    imageUrl?: string;
+    productType?: string;    // legacy (tshirt/hoodie/mug/tote)
+    productId?: number;      // catalog product ID (preferred)
+    variantId?: number;      // optional override for catalog product
+    imageWidth?: number;
+    imageHeight?: number;
+    designSizePct?: number;  // 0.4–1.0, fraction of print-area width (default 0.8)
+  };
   try {
-    body = (await request.json()) as { image?: string; imageUrl?: string; productType?: string; imageWidth?: number; imageHeight?: number };
+    body = await request.json() as typeof body;
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
   const imageInput = body.imageUrl ?? body.image;
   if (!imageInput || typeof imageInput !== "string") {
-    return NextResponse.json({ ok: false, error: "image (base64 data URL) or imageUrl (R2 https URL) is required" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "image (base64 data URL) or imageUrl (R2 https URL) is required" },
+      { status: 400 },
+    );
   }
 
-  // Validate: either a known R2 https URL, or a base64 data URL.
   const isR2Url = /^https:\/\/[^/]+\.r2\.dev\//.test(imageInput) || /^https:\/\/[^/]+\.r2\.cloudflarestorage\.com\//.test(imageInput);
   const isDataUrl = /^data:image\/(png|jpe?g|webp);base64,/.test(imageInput);
   if (!isR2Url && !isDataUrl) {
@@ -45,6 +58,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "image too large (~9MB limit)" }, { status: 413 });
   }
 
+  const imageDims =
+    typeof body.imageWidth === "number" && typeof body.imageHeight === "number" &&
+    body.imageWidth > 0 && body.imageHeight > 0
+      ? { width: body.imageWidth, height: body.imageHeight }
+      : undefined;
+
+  // ── Route: catalog product ID vs legacy product type ──────────────────────
+  if (typeof body.productId === "number") {
+    // Dynamic catalog path: fetch printfile spec, then generate
+    const catalogSpec = await fetchProductSpec(body.productId);
+    if (!catalogSpec) {
+      return NextResponse.json(
+        { ok: false, error: `無法取得 Printful 產品規格 (productId=${body.productId})。此產品可能不支援 Mockup Generator。` },
+        { status: 400 },
+      );
+    }
+    const spec: DynamicProductSpec = {
+      productId: catalogSpec.productId,
+      variantId: body.variantId ?? catalogSpec.variantId,
+      placement: catalogSpec.placement,
+      areaWidth: catalogSpec.areaWidth,
+      areaHeight: catalogSpec.areaHeight,
+      designSizePct: typeof body.designSizePct === "number" ? body.designSizePct : 0.8,
+    };
+    const result = await generateMockupBySpec(imageInput, spec, imageDims);
+    return jsonResult(result);
+  }
+
+  // Legacy: productType key in PRODUCT_CONFIG
   const productType = body.productType ?? "tshirt";
   if (!(SUPPORTED_PRODUCT_TYPES as string[]).includes(productType)) {
     return NextResponse.json(
@@ -52,19 +94,12 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-
-  const imageDims =
-    typeof body.imageWidth === "number" && typeof body.imageHeight === "number" &&
-    body.imageWidth > 0 && body.imageHeight > 0
-      ? { width: body.imageWidth, height: body.imageHeight }
-      : undefined;
-
   const result = await generateMockup(imageInput, productType, imageDims);
+  return jsonResult(result);
+}
 
-  if (result.ok) {
-    return NextResponse.json(result);
-  }
-  // HTTP 200 with ok:false — same nginx rationale as other studio routes
+function jsonResult(result: { ok: boolean; error?: string; [k: string]: unknown }) {
+  if (result.ok) return NextResponse.json(result);
   const code = (result as { ok: false; error: string }).error;
   let friendly = `Mockup 生成失敗：${code}`;
   if (code.includes("missing_printful_key")) friendly = "伺服器未設定 Printful API Key（PRINTFUL_API_KEY）。";

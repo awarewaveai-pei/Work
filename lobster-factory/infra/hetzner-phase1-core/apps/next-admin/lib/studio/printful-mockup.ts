@@ -80,6 +80,17 @@ export type ProductType = keyof typeof PRODUCT_CONFIG;
 /** Single source of truth for supported product keys — consumed by the mockup API route. */
 export const SUPPORTED_PRODUCT_TYPES = Object.keys(PRODUCT_CONFIG) as ProductType[];
 
+/** Dynamic product spec from catalog (not in PRODUCT_CONFIG). */
+export interface DynamicProductSpec {
+  productId: number;
+  variantId: number;
+  placement: string;
+  areaWidth: number;
+  areaHeight: number;
+  /** Design width as fraction of area (default 0.8). */
+  designSizePct?: number;
+}
+
 // Mockup style groups to request. Printful returns whatever's valid for the product
 // and silently ignores unknown groups (live-verified 2026-06-15). "Flat"/"Ghost" are
 // clean product shots; the "*Lifestyle"/"Couple's"/"Kids" groups are real-model photos.
@@ -146,11 +157,9 @@ function computePosition(
     return { area_width: cfg.area_width, area_height: cfg.area_height, width: cfg.design_width, height: cfg.design_height, top: cfg.top, left: cfg.left };
   }
   const { width: imgW, height: imgH } = imageDims;
-  // Scale from max design width, preserving aspect ratio.
   const maxW: number = cfg.design_width;
   let designW: number = maxW;
   let designH: number = Math.round((maxW * imgH) / imgW);
-  // Clamp to available height (area minus top/bottom margin).
   const availableH: number = cfg.area_height - cfg.top * 2;
   if (designH > availableH) {
     designH = availableH;
@@ -158,6 +167,34 @@ function computePosition(
   }
   const left = Math.round((cfg.area_width - designW) / 2);
   return { area_width: cfg.area_width, area_height: cfg.area_height, width: designW, height: designH, top: cfg.top, left };
+}
+
+/** Compute print-position for a dynamic (catalog) product spec. */
+function computeDynamicPosition(
+  spec: DynamicProductSpec,
+  imageDims?: { width: number; height: number },
+): { area_width: number; area_height: number; width: number; height: number; top: number; left: number } {
+  const sizePct = Math.min(1, Math.max(0.3, spec.designSizePct ?? 0.8));
+  const maxW = Math.round(spec.areaWidth * sizePct);
+  const topMargin = Math.round(spec.areaHeight * 0.15);
+  const availH = spec.areaHeight - topMargin * 2;
+
+  let designW: number;
+  let designH: number;
+  if (imageDims && imageDims.width > 0 && imageDims.height > 0) {
+    designW = maxW;
+    designH = Math.round((maxW * imageDims.height) / imageDims.width);
+    if (designH > availH) {
+      designH = availH;
+      designW = Math.round((availH * imageDims.width) / imageDims.height);
+    }
+  } else {
+    designW = maxW;
+    designH = maxW; // square fallback
+  }
+
+  const left = Math.round((spec.areaWidth - designW) / 2);
+  return { area_width: spec.areaWidth, area_height: spec.areaHeight, width: designW, height: designH, top: topMargin, left };
 }
 
 /**
@@ -318,5 +355,121 @@ export async function generateMockup(
     // status === "pending" | "processing" → keep polling
   }
 
+  return { ok: false, error: "printful_mockup_timeout" };
+}
+
+/**
+ * Same as generateMockup but accepts a dynamic product spec from the Printful catalog
+ * instead of a hardcoded PRODUCT_CONFIG key. Used when the user picks any catalog product.
+ */
+export async function generateMockupBySpec(
+  imageInput: string,
+  spec: DynamicProductSpec,
+  imageDims?: { width: number; height: number },
+): Promise<MockupResult> {
+  const apiKey = process.env.PRINTFUL_API_KEY;
+  const storeId = process.env.PRINTFUL_STORE_ID;
+  if (!apiKey) return { ok: false, error: "missing_printful_key" };
+  if (!storeId) return { ok: false, error: "missing_printful_store_id" };
+
+  let imageUrl: string;
+  if (isKnownR2Url(imageInput)) {
+    imageUrl = imageInput;
+  } else {
+    const parsed = parseImageDataUrl(imageInput);
+    if (!parsed) return { ok: false, error: "image_parse_failed" };
+    const objectKey = buildDesignKey(parsed.mime);
+    if (!objectKey) return { ok: false, error: "unsupported_image_mime" };
+    const r2 = await putDesignObject(objectKey, parsed.buffer, parsed.mime);
+    if (!r2.ok) return { ok: false, error: `r2_upload_failed: ${(r2 as { ok: false; error: string }).error}` };
+    imageUrl = r2.publicUrl;
+  }
+
+  let taskRes: Response;
+  try {
+    taskRes = await timedFetch(`${PRINTFUL_API}/mockup-generator/create-task/${spec.productId}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "X-PF-Store-Id": storeId,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        variant_ids: [spec.variantId],
+        option_groups: MOCKUP_OPTION_GROUPS,
+        files: [
+          {
+            placement: spec.placement,
+            image_url: imageUrl,
+            position: computeDynamicPosition(spec, imageDims),
+          },
+        ],
+        format: "jpg",
+      }),
+    });
+  } catch (e) {
+    const aborted = e instanceof Error && e.name === "AbortError";
+    return { ok: false, error: aborted ? "printful_task_timeout" : "printful_task_network_error" };
+  }
+
+  let taskJson: Record<string, unknown>;
+  try {
+    taskJson = (await taskRes.json()) as Record<string, unknown>;
+  } catch {
+    return { ok: false, error: "printful_task_bad_json" };
+  }
+
+  const taskCode = taskJson.code as number | undefined;
+  if (!taskRes.ok || (taskCode !== undefined && taskCode >= 400)) {
+    const msg = (taskJson.error as { message?: string } | undefined)?.message ?? `task_create_${taskRes.status}`;
+    return { ok: false, error: msg.slice(0, 200) };
+  }
+
+  const taskKey = (taskJson.result as Record<string, unknown> | undefined)?.task_key as string | undefined;
+  if (!taskKey) return { ok: false, error: "printful_task_no_key" };
+
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await sleep(POLL_INTERVAL_MS);
+    let pollRes: Response;
+    try {
+      pollRes = await timedFetch(
+        `${PRINTFUL_API}/mockup-generator/task?task_key=${encodeURIComponent(taskKey)}`,
+        { headers: { Authorization: `Bearer ${apiKey}`, "X-PF-Store-Id": storeId } },
+      );
+    } catch {
+      return { ok: false, error: "printful_poll_network_error" };
+    }
+    let pollJson: Record<string, unknown>;
+    try { pollJson = (await pollRes.json()) as Record<string, unknown>; } catch { continue; }
+
+    const result = pollJson.result as Record<string, unknown> | undefined;
+    const status = result?.status as string | undefined;
+
+    if (status === "completed") {
+      const rawMockups = (result?.mockups as Array<Record<string, unknown>> | undefined) ?? [];
+      const views: MockupView[] = [];
+      const seen = new Set<string>();
+      for (const m of rawMockups) {
+        const primary = m.mockup_url as string | undefined;
+        const extra = (m.extra as Array<Record<string, unknown>> | undefined) ?? [];
+        const labeled = extra.map((e) => ({
+          url: e.url as string | undefined,
+          group: (e.option_group as string | undefined) ?? "Flat",
+          view: (e.option as string | undefined) ?? (e.title as string | undefined) ?? "",
+        }));
+        const candidates = labeled.length > 0 ? labeled : primary ? [{ url: primary, group: "Product", view: "Front" }] : [];
+        for (const c of candidates) {
+          if (!c.url || seen.has(c.url)) continue;
+          seen.add(c.url);
+          views.push({ url: c.url, group: c.group, view: c.view, label: c.view ? `${c.group} · ${c.view}` : c.group, lifestyle: LIFESTYLE_GROUP_RE.test(c.group) });
+        }
+      }
+      if (views.length === 0) return { ok: false, error: "printful_no_mockup_url" };
+      views.sort((a, b) => rankGroup(a.group) - rankGroup(b.group));
+      return { ok: true, mockup_url: views[0].url, mockups: views };
+    }
+    if (status === "failed") return { ok: false, error: "printful_mockup_failed" };
+  }
   return { ok: false, error: "printful_mockup_timeout" };
 }
