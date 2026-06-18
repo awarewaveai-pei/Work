@@ -25,6 +25,12 @@ interface VideoOutputs {
   title: string;
 }
 
+interface DraftScene {
+  id: number;
+  narration: string;
+  imageUrl: string;
+}
+
 // ─── Voice model options ──────────────────────────────────────────────────────
 
 interface VoiceModel {
@@ -106,6 +112,13 @@ export default function VideoStudio() {
   const [genError, setGenError] = useState("");
   const [genResult, setGenResult] = useState<VideoOutputs | null>(null);
 
+  // ── Draft state ──
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftScenes, setDraftScenes] = useState<DraftScene[]>([]);
+  const [draftR2Keys, setDraftR2Keys] = useState<string[]>([]);
+  const [draftTitle, setDraftTitle] = useState("");
+  const draftReady = draftScenes.length > 0;
+
   // ── History ──
   const [history, setHistory] = useState<VideoHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -151,7 +164,123 @@ export default function VideoStudio() {
     }
   };
 
-  // ── Generate handler ──
+  // ── Shared polling helper ──
+  function startPolling(jobId: string) {
+    interface StatusResp {
+      ok: boolean;
+      status?: "running" | "done" | "error";
+      step?: string;
+      video?: { outputs: Record<string, string>; out_dir: string };
+      title?: string;
+      error?: string;
+    }
+    const deadline = Date.now() + 12 * 60 * 1000;
+    const poll = async (): Promise<void> => {
+      if (Date.now() > deadline) {
+        setGenStatus("error");
+        setGenError("生成逾時（>12 分鐘）。影片可能仍在背景產出，稍後可至下方歷史紀錄查看。");
+        return;
+      }
+      let sj: StatusResp;
+      try {
+        const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`);
+        sj = (await sr.json()) as StatusResp;
+      } catch {
+        pollRef.current = setTimeout(() => void poll(), 5000);
+        return;
+      }
+      if (!sj.ok) { setGenStatus("error"); setGenError(sj.error ?? "查詢生成狀態失敗"); return; }
+      if (sj.status === "running") {
+        if (sj.step) setGenStep(sj.step);
+        pollRef.current = setTimeout(() => void poll(), 5000);
+        return;
+      }
+      if (sj.status === "done" && sj.video) {
+        setGenResult({ outputs: sj.video.outputs, out_dir: sj.video.out_dir, title: sj.title ?? "" });
+        setGenStatus("done");
+        void loadHistory();
+        return;
+      }
+      setGenStatus("error");
+      setGenError(sj.error ?? "生成失敗");
+    };
+    pollRef.current = setTimeout(() => void poll(), 3000);
+  }
+
+  // ── Draft generation handler ──
+  async function handleGenerateDraft() {
+    if (!topic.trim()) return;
+    if (pollRef.current) clearTimeout(pollRef.current);
+    setDraftLoading(true);
+    setDraftScenes([]);
+    setGenError("");
+    setGenResult(null);
+    setGenStatus("idle");
+    try {
+      const res = await fetch("/api/video/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: topic.trim(),
+          articleTitle: articleTitle.trim() || undefined,
+          articleContent: articleContent.trim() || undefined,
+          language,
+        }),
+      });
+      const j = (await res.json()) as {
+        ok: boolean;
+        scenes?: { id: number; narration: string }[];
+        imageUrls?: string[];
+        r2Keys?: string[];
+        title?: string;
+        error?: string;
+      };
+      if (!j.ok || !j.scenes || !j.imageUrls) {
+        setGenError(j.error ?? "草稿生成失敗");
+        setGenStatus("error");
+        return;
+      }
+      setDraftScenes(j.scenes.map((s, i) => ({ id: s.id, narration: s.narration, imageUrl: j.imageUrls![i] ?? "" })));
+      setDraftR2Keys(j.r2Keys ?? []);
+      setDraftTitle(j.title ?? topic.trim());
+    } catch (e: unknown) {
+      setGenError(e instanceof Error ? e.message : "網路錯誤，請重試");
+      setGenStatus("error");
+    } finally {
+      setDraftLoading(false);
+    }
+  }
+
+  // ── Render draft handler ──
+  async function handleRenderDraft() {
+    if (pollRef.current) clearTimeout(pollRef.current);
+    setGenStatus("loading");
+    setGenStep("提交渲染中…");
+    setGenError("");
+    try {
+      const res = await fetch("/api/video/render-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scenes: draftScenes.map((s) => ({ id: s.id, narration: s.narration })),
+          imageUrls: draftScenes.map((s) => s.imageUrl),
+          r2Keys: draftR2Keys,
+          title: draftTitle,
+          ...parseVoiceModel(voiceModelId),
+          introTitle: introEnabled ? (topic.trim() || undefined) : undefined,
+          introDuration: introEnabled ? introDuration : undefined,
+        }),
+      });
+      const j = (await res.json()) as { ok: boolean; jobId?: string; error?: string };
+      if (!j.ok || !j.jobId) { setGenStatus("error"); setGenError(j.error ?? "提交渲染失敗"); return; }
+      startPolling(j.jobId);
+    } catch (e: unknown) {
+      setGenStatus("error");
+      setGenError(e instanceof Error ? e.message : "網路錯誤，請重試");
+    }
+  }
+
+  // ── Generate handler (direct, no draft) — kept for backward compat ──
   async function handleGenerate() {
     if (!topic.trim()) return;
     if (pollRef.current) clearTimeout(pollRef.current);
@@ -159,7 +288,6 @@ export default function VideoStudio() {
     setGenStep("準備中…");
     setGenError("");
     setGenResult(null);
-
     try {
       const res = await fetch("/api/video/generate", {
         method: "POST",
@@ -183,54 +311,7 @@ export default function VideoStudio() {
         setGenError(start.error ?? "無法建立生成工作");
         return;
       }
-
-      const jobId = start.jobId;
-      const deadline = Date.now() + 12 * 60 * 1000;
-
-      interface StatusResp {
-        ok: boolean;
-        status?: "running" | "done" | "error";
-        step?: string;
-        video?: { outputs: Record<string, string>; out_dir: string };
-        title?: string;
-        error?: string;
-      }
-
-      const poll = async (): Promise<void> => {
-        if (Date.now() > deadline) {
-          setGenStatus("error");
-          setGenError("生成逾時（>12 分鐘）。影片可能仍在背景產出，稍後可至下方歷史紀錄查看。");
-          return;
-        }
-        let sj: StatusResp;
-        try {
-          const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`);
-          sj = (await sr.json()) as StatusResp;
-        } catch {
-          pollRef.current = setTimeout(() => void poll(), 5000);
-          return;
-        }
-        if (!sj.ok) {
-          setGenStatus("error");
-          setGenError(sj.error ?? "查詢生成狀態失敗");
-          return;
-        }
-        if (sj.status === "running") {
-          if (sj.step) setGenStep(sj.step);
-          pollRef.current = setTimeout(() => void poll(), 5000);
-          return;
-        }
-        if (sj.status === "done" && sj.video) {
-          setGenResult({ outputs: sj.video.outputs, out_dir: sj.video.out_dir, title: sj.title ?? "" });
-          setGenStatus("done");
-          void loadHistory(); // refresh history
-          return;
-        }
-        setGenStatus("error");
-        setGenError(sj.error ?? "生成失敗");
-      };
-
-      pollRef.current = setTimeout(() => void poll(), 3000);
+      startPolling(start.jobId);
     } catch (e: unknown) {
       setGenStatus("error");
       setGenError(e instanceof Error ? e.message : "網路錯誤，請重試");
@@ -243,7 +324,8 @@ export default function VideoStudio() {
   }
 
   const isLoading = genStatus === "loading";
-  const canGenerate = topic.trim().length > 0 && !isLoading;
+  const isBusy = isLoading || draftLoading;
+  const canGenerate = topic.trim().length > 0 && !isBusy;
 
   return (
     <div style={{ padding: "24px 28px", background: "var(--bg-canvas)", minHeight: "100vh" }}>
@@ -395,24 +477,46 @@ export default function VideoStudio() {
                   style={{ ...inputStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12 }} disabled={isLoading} />
               </div>
 
-              <button onClick={handleGenerate} disabled={!canGenerate}
-                style={{
-                  padding: "11px 20px", borderRadius: 8, border: "none",
-                  cursor: canGenerate ? "pointer" : "not-allowed",
-                  background: canGenerate ? "var(--accent)" : "var(--border-subtle)",
-                  color: canGenerate ? "#fff" : "var(--text-muted)",
-                  fontSize: 14, fontWeight: 700, transition: "background 0.15s",
-                }}>
-                {isLoading ? "⏳ 生成中…" : "🎬 生成影片"}
-              </button>
+              {/* Draft editor (replaces buttons when draft is ready) */}
+              {draftReady ? (
+                <DraftEditor
+                  scenes={draftScenes}
+                  title={draftTitle}
+                  onChangeScene={(id, narration) =>
+                    setDraftScenes((prev) => prev.map((s) => s.id === id ? { ...s, narration } : s))
+                  }
+                  onBack={() => { setDraftScenes([]); setGenError(""); setGenStatus("idle"); }}
+                  onRender={handleRenderDraft}
+                  disabled={isBusy}
+                />
+              ) : (
+                <button onClick={handleGenerateDraft} disabled={!canGenerate}
+                  style={{
+                    padding: "11px 20px", borderRadius: 8, border: "none",
+                    cursor: canGenerate ? "pointer" : "not-allowed",
+                    background: canGenerate ? "var(--accent)" : "var(--border-subtle)",
+                    color: canGenerate ? "#fff" : "var(--text-muted)",
+                    fontSize: 14, fontWeight: 700, transition: "background 0.15s",
+                  }}>
+                  {draftLoading ? "⏳ 生成草稿中…" : "📋 生成草稿"}
+                </button>
+              )}
 
-              {/* Progress tracker */}
+              {/* Draft loading spinner */}
+              {draftLoading && (
+                <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8", marginBottom: 6 }}>🔄 生成草稿中…</div>
+                  <div style={{ fontSize: 12, color: "#3b82f6" }}>Claude 生成腳本 + Flux 生成圖片（約 30–60 秒）</div>
+                </div>
+              )}
+
+              {/* Progress tracker (render phase) */}
               {isLoading && <ProgressTracker step={genStep} />}
 
               {/* Error */}
               {genStatus === "error" && (
                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 14px" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#dc2626", marginBottom: 4 }}>生成失敗</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#dc2626", marginBottom: 4 }}>失敗</div>
                   <div style={{ fontSize: 12.5, color: "#7f1d1d" }}>{genError}</div>
                   {genError.toLowerCase().includes("video-service") && (
                     <div style={{ marginTop: 6, fontSize: 11.5, color: "#991b1b" }}>提示：EU video-service 需正常運行（健康狀態請查 Repair Center）。</div>
@@ -422,7 +526,7 @@ export default function VideoStudio() {
 
               {/* Success result */}
               {genStatus === "done" && genResult && (
-                <ResultPanel result={genResult} onClose={() => setGenStatus("idle")} />
+                <ResultPanel result={genResult} onClose={() => { setGenStatus("idle"); setDraftScenes([]); }} />
               )}
             </div>
           </Card>
@@ -502,6 +606,88 @@ export default function VideoStudio() {
             )}
           </Card>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── DraftEditor ──────────────────────────────────────────────────────────────
+
+function DraftEditor({
+  scenes, title, onChangeScene, onBack, onRender, disabled,
+}: {
+  scenes: DraftScene[];
+  title: string;
+  onChangeScene: (id: number, narration: string) => void;
+  onBack: () => void;
+  onRender: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
+          📋 草稿審核 — {title}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>可編輯旁白後送出渲染</div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 520, overflowY: "auto" }}>
+        {scenes.map((scene, idx) => (
+          <div key={scene.id} style={{
+            display: "flex", gap: 10, padding: "10px 12px",
+            border: "1px solid var(--border-subtle)", borderRadius: 8, background: "#fff",
+          }}>
+            {/* Image thumbnail */}
+            <div style={{ flexShrink: 0, width: 100, height: 68, borderRadius: 6, overflow: "hidden", background: "#0f172a" }}>
+              {scene.imageUrl.startsWith("https://") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={scene.imageUrl} alt={`場景 ${scene.id}`}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🎬</div>
+              )}
+            </div>
+            {/* Narration editor */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>場景 {idx + 1}</div>
+              <textarea
+                value={scene.narration}
+                onChange={(e) => onChangeScene(scene.id, e.target.value)}
+                rows={3}
+                disabled={disabled}
+                style={{
+                  width: "100%", borderRadius: 6, border: "1px solid var(--border-subtle)",
+                  padding: "6px 8px", fontSize: 12.5, fontFamily: "inherit",
+                  resize: "vertical", background: "var(--bg-canvas)", color: "var(--text-primary)",
+                  lineHeight: 1.55,
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={onBack} disabled={disabled}
+          style={{
+            padding: "10px 16px", borderRadius: 8, border: "1px solid var(--border-subtle)",
+            cursor: disabled ? "not-allowed" : "pointer",
+            background: "var(--bg-canvas)", color: "var(--text-secondary)",
+            fontSize: 13, fontWeight: 600,
+          }}>
+          ← 返回重生
+        </button>
+        <button onClick={onRender} disabled={disabled}
+          style={{
+            flex: 1, padding: "10px 16px", borderRadius: 8, border: "none",
+            cursor: disabled ? "not-allowed" : "pointer",
+            background: disabled ? "var(--border-subtle)" : "#16a34a",
+            color: disabled ? "var(--text-muted)" : "#fff",
+            fontSize: 13, fontWeight: 700,
+          }}>
+          {disabled ? "⏳ 處理中…" : "🎬 確認送出渲染"}
+        </button>
       </div>
     </div>
   );

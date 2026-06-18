@@ -91,6 +91,70 @@ type AssetResult =
   | { ok: true; asset: string; r2Key?: string }
   | { ok: false; status: number; error: string };
 
+/** 草稿生成結果：腳本 + 圖片 URL，不含渲染（供 /api/video/draft 使用）。 */
+export interface PreparedScenes {
+  ok: true;
+  scenes: import("../video/video-script-core").VideoScene[];
+  assets: string[];
+  r2Keys: string[];
+  title: string;
+}
+
+/** 步驟 1+2：生腳本 + 生圖；不提交 EU 渲染。可獨立呼叫供草稿預覽。 */
+export async function prepareScenes(
+  input: {
+    topic?: string;
+    articleTitle?: string;
+    articleContent?: string;
+    language?: string;
+    onProgress?: (step: string) => void;
+  },
+  anthropicKey: string,
+): Promise<PreparedScenes | { ok: false; status: number; error: string }> {
+  input.onProgress?.("腳本生成中（Claude）…");
+  const scriptResult = await generateVideoScript(
+    {
+      topic: input.topic,
+      articleTitle: input.articleTitle,
+      articleContent: input.articleContent,
+      language: input.language,
+    },
+    anthropicKey,
+  );
+  if (!scriptResult.ok) return scriptResult as { ok: false; status: number; error: string };
+  const { scenes, title } = scriptResult;
+
+  input.onProgress?.(`素材生成中（${scenes.length} 場景並行）…`);
+  const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
+  const buildAsset = async (scene: (typeof scenes)[number]): Promise<AssetResult> => {
+    if (scene.visual === "broll" && pexelsKey) {
+      const brollUrl = await fetchBrollUrl(scene.broll_keyword, pexelsKey);
+      if (brollUrl) return { ok: true, asset: brollUrl };
+    }
+    if (!isR2Configured()) return { ok: false, status: 503, error: "R2 未設定（跨機影片素材需 R2 暫存 Flux 圖）" };
+    // Cinematic prefix: dramatically improves Flux output quality for video use
+    const cinematicPrompt = `Cinematic wide-angle 16:9, realistic photography, dramatic natural lighting, rich color grade. ${scene.image_prompt}`;
+    const img = await generateTarotImage({ model: "flux-schnell", prompt: cinematicPrompt, aspectRatio: "16:9" });
+    if (img.ok === false) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${img.error}` };
+    const parsed = parseImageDataUrl(img.image);
+    const key = parsed ? buildDesignKey(parsed.mime) : null;
+    if (!parsed || !key) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片格式無法解析` };
+    const put = await putDesignObject(key, parsed.buffer, parsed.mime);
+    if (!put.ok) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片上傳 R2 失敗：${"error" in put ? put.error : "r2_put_failed"}` };
+    return { ok: true, asset: put.publicUrl, r2Key: key };
+  };
+
+  const results = await Promise.all(scenes.map(buildAsset));
+  const r2Keys = results.flatMap((r) => (r.ok && r.r2Key ? [r.r2Key] : []));
+  const failed = results.find((r): r is { ok: false; status: number; error: string } => !r.ok);
+  if (failed) {
+    await cleanupVideoInputKeys(r2Keys);
+    return failed;
+  }
+  const assets = results.map((r) => (r as { ok: true; asset: string }).asset);
+  return { ok: true, scenes, assets, r2Keys, title };
+}
+
 register({
   id: "video/pipeline",
   title: "影片生成",
@@ -104,47 +168,19 @@ register({
 
     const onProgress = (ctx as { onProgress?: (step: string) => void }).onProgress;
 
-    // 1) Claude 腳本
-    onProgress?.("腳本生成中（Claude）…");
-    const scriptResult = await generateVideoScript(
+    // 1+2) 腳本 + 素材（共用 prepareScenes，與 /api/video/draft 同邏輯）
+    const prep = await prepareScenes(
       {
         topic: (ctx.topic as string | undefined) ?? (ctx.keyword as string | undefined),
         articleTitle: ctx.articleTitle as string | undefined,
         articleContent: (ctx.articleContent as string | undefined) ?? (ctx.markdown as string | undefined),
         language: ctx.language as string | undefined,
+        onProgress,
       },
       anthropicKey,
     );
-    if (!scriptResult.ok) return scriptResult as { ok: false; status: number; error: string };
-    const { scenes, title } = scriptResult;
-
-    // 2) 每場景一素材 — **並行**（壓低 /generate 同步時間到 <100s；Pexels URL 或 Flux→R2）
-    onProgress?.(`素材生成中（${scenes.length} 場景並行）…`);
-    const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
-    const buildAsset = async (scene: (typeof scenes)[number]): Promise<AssetResult> => {
-      if (scene.visual === "broll" && pexelsKey) {
-        const brollUrl = await fetchBrollUrl(scene.broll_keyword, pexelsKey);
-        if (brollUrl) return { ok: true, asset: brollUrl };
-      }
-      if (!isR2Configured()) return { ok: false, status: 503, error: "R2 未設定（跨機影片素材需 R2 暫存 Flux 圖）" };
-      const img = await generateTarotImage({ model: "flux-schnell", prompt: scene.image_prompt, aspectRatio: "16:9" });
-      if (img.ok === false) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${img.error}` };
-      const parsed = parseImageDataUrl(img.image);
-      const key = parsed ? buildDesignKey(parsed.mime) : null;
-      if (!parsed || !key) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片格式無法解析` };
-      const put = await putDesignObject(key, parsed.buffer, parsed.mime);
-      if (!put.ok) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片上傳 R2 失敗：${"error" in put ? put.error : "r2_put_failed"}` };
-      return { ok: true, asset: put.publicUrl, r2Key: key };
-    };
-
-    const results = await Promise.all(scenes.map(buildAsset));
-    const r2Keys = results.flatMap((r) => (r.ok && r.r2Key ? [r.r2Key] : []));
-    const failed = results.find((r): r is { ok: false; status: number; error: string } => !r.ok);
-    if (failed) {
-      await cleanupVideoInputKeys(r2Keys);
-      return failed;
-    }
-    const assets = results.map((r) => (r as { ok: true; asset: string }).asset);
+    if (!prep.ok) return prep;
+    const { scenes, assets, r2Keys, title } = prep;
 
     // 3) 提交 EU（短請求，不等渲染）→ 回 euJobId。渲染在 EU thread 跑，由 /status 輪詢收尾。
     onProgress?.("提交合成任務（EU 伺服器）…");

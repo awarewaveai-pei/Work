@@ -138,8 +138,8 @@ export async function generateVideoScript(
     `你是專業影片腳本作家。請嚴格以下方 JSON 格式回傳腳本，不要加任何說明文字。\n\n` +
     `規則：\n` +
     `- scenes 恰好 6 個，id 從 1 到 6\n` +
-    `- narration：${lang}，約 35 字，適合 TTS 朗讀，不含 Markdown\n` +
-    `- image_prompt：英文，描述場景的 AI 圖像生成提示，具體且有畫面感\n` +
+    `- narration：${lang}，15-30 字，口語短句、主動語態，像真人對著鏡頭說話，避免「此外」「在此」「作為」等書面語，句尾要有自然停頓感\n` +
+    `- image_prompt：英文，cinematic 攝影風格的 16:9 場景描述，格式：[主體動作] + [環境背景] + [光線/色調]，30 字以內，禁用抽象詞，只寫可見的具體畫面\n` +
     `- broll_keyword：英文，1–3 個單字，適合 Pexels 搜尋的真實影片素材關鍵字\n` +
     `- visual：「custom」= 此場景適合 AI 插畫；「broll」= 此場景適合真實影片素材\n` +
     `- title：影片標題（${lang}）\n` +

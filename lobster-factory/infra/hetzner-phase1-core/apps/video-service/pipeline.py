@@ -347,17 +347,33 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
         times.append((t, t + seg_dur))
         t += seg_dur
 
+    # 5 Ken Burns variants (rotated per scene_id): zoom-in from 4 corners + zoom-out center
+    _KB = [
+        ("min(1+0.0009*on,1.12)", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),   # zoom-in center
+        ("min(1+0.0009*on,1.12)", "0",                 "0"),                   # zoom-in top-left
+        ("min(1+0.0009*on,1.12)", "iw-(iw/zoom)",      "0"),                   # zoom-in top-right
+        ("min(1+0.0009*on,1.12)", "0",                 "ih-(ih/zoom)"),        # zoom-in bottom-left
+        ("max(1.12-0.0009*on,1.0)", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),  # zoom-out center
+    ]
+    kb_z, kb_x, kb_y = _KB[scene_id % len(_KB)]
+    fade_dur = min(0.3, duration * 0.15)  # cap at 15% of scene duration
+    fade_out_st = max(0.0, duration - fade_dur)
+
     is_video = os.path.splitext(asset_path)[1].lower() in _VIDEO_EXTS
     if is_video:
         inputs = ["-stream_loop", "-1", "-i", asset_path, "-i", audio_path]
         vchain = (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
-                  f"crop={w}:{h},fps={fps},setsar=1[bg0]")
+                  f"crop={w}:{h},fps={fps},setsar=1,"
+                  f"fade=t=in:st=0:d={fade_dur:.3f},"
+                  f"fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}[bg0]")
     else:
         frames = max(1, int(round(duration * fps)))
         inputs = ["-loop", "1", "-i", asset_path, "-i", audio_path]
         vchain = (f"[0:v]scale={w * 2}:{h * 2}:force_original_aspect_ratio=increase,crop={w * 2}:{h * 2},"
-                  f"zoompan=z='min(1+0.0009*on,1.12)':d={frames}:"
-                  f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={w}x{h}:fps={fps}[bg0]")
+                  f"zoompan=z='{kb_z}':d={frames}:"
+                  f"x='{kb_x}':y='{kb_y}':s={w}x{h}:fps={fps},"
+                  f"fade=t=in:st=0:d={fade_dur:.3f},"
+                  f"fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}[bg0]")
 
     # Build chained drawtext filters
     font_size = max(22, h // 54)
