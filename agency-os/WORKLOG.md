@@ -277,6 +277,28 @@
 **[剩餘風險]** 段 B（prod，待操作者逐項 go）：EU 起容器 + nginx 子網域 + TLS + 注入 RENDER_AUTH_TOKEN/R2 env；SG .env 注入 4 把 key/url + sg-deploy 重部署 next-admin；live e2e 穿網頁。映像 build 尚未本機實證（Docker 環境問題），EU build 時若 requirements 有問題會在那裡現形。
 - AUTO_TASK_DONE (2026-06-17): video Phase 2-A 跨機部署 code 完成（Dockerfile/compose/認證/R2 handoff/compose env + 修 PRINTFUL 重複鍵），py_compile+tsc 0+vitest 6/6+render/auth test PASS+compose config OK；映像 build 順延段 B。
 
+### feat(video): Phase 2-A2 — 影片進 /tools/designs 畫廊（影片 tab + 獨立 R2 bucket）+ critic Critical 修
+
+**[任務理解]** 操作者要影片在 `/tools/designs` 用 **tab 分開展示**（圖片/影片），影片存**獨立 `lobster-videos` bucket**（隔離 + 7 天 lifecycle）。
+
+**[已修改]**（fullstack-engineer 實作 + 我驗證/修正）
+- `server.py` + `docker-compose.video.yml`：產出改上傳**獨立 video bucket**（`R2_VIDEO_BUCKET`/`R2_VIDEO_PUBLIC_BASE`，與圖片 bucket 隔離）；`_r2_put` 改吃 bucket+base 參數。
+- 積木 `video-pipeline.ts`：render 成功後**best-effort** 記一筆 `media_assets`（render 結果不受記錄失敗影響；gated on https URL + org uuid + supabase client）。
+- `designs/route.ts` GET + `DesignsGallery.tsx`：加圖片/影片 tab，影片 tab `?domain=ai_video` → `<video controls>` 卡片。`globals.css` 補 tab 樣式。
+
+**[critic Deep 發現並修]**
+- 🔴 **Critical（已修）**：原 `asset_domain:"ai_video"` 違反 DB CHECK（0011:42 僅允許 ai_generated/wp_product/wp_blog）→ insert 靜默失敗、影片永不顯示。**解法：不動 prod schema**——影片本就是 AI 生成內容，用允許的 `asset_domain="ai_generated"` + 靠 `mime_type`（video/* vs image/*）區分（route GET 改 `.like(mime_type, video/%|image/%)`）。**省掉一個 High-risk prod DB migration**。
+- 🔴 **NUL byte 損壞（已修）**：fullstack-engineer 把檔名清理 regex 寫成 raw 控制位元組（0x00/0x1F）而非 `\x00-\x1f` 跳脫 → DesignsGallery.tsx 含 NUL byte（rg 判 binary）。已用 byte-replace 修為正確跳脫序列。
+- critic 驗清：圖片 tab 無回歸（default→image/%）、產出不漏進圖片 bucket、XSS 安全（React 轉義）、記錄 best-effort 不破 render。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（多次：agent 後 + NUL 修後 + 約束修後）| exit=0；`py_compile server.py` OK；byte-scan DesignsGallery NUL=0/0x1f-raw=0。
+- REVIEW_DONE: critic=Deep | verdict=fail→**修後 pass** | 1 Critical（asset_domain 約束，已用 mime 方案繞過 prod migration）+ 1 Critical（NUL，已修）+ 2 minor（byte_size:0 留安全值/out_dir 同名碰撞）。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=`asset_domain|ai_video|mime_type` | route default→image/%、video→video/%，asset_domain 統一 ai_generated，無 stale ai_video 殘留。
+
+**[剩餘風險]** ① out_dir 以 title 衍生，同標題二次生成 → R2 key 碰撞 + media_assets 唯一索引擋掉第 2 筆（best-effort 丟，影片仍產出；follow-up：R2 key 加 uuid）。② byte_size 記 0（EU 端檔，next-admin 不知大小；UI 不顯示，無害）。③ 段 B prod：建 lobster-videos bucket + 公開存取 + 7 天 lifecycle + R2_VIDEO_PUBLIC_BASE 注入兩邊。
+- AUTO_TASK_DONE (2026-06-17): video Phase 2-A2 影片畫廊 tab + 獨立 bucket 完成；critic Critical（asset_domain 約束）用 mime 方案繞過 prod migration + NUL 損壞修；tsc 0。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。

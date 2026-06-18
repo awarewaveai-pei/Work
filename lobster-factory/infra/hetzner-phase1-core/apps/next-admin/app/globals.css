@@ -2048,6 +2048,31 @@ pre {
   border-color: rgba(239,68,68,0.4);
 }
 
+/* ── Tab bar（圖片 / 影片）── */
+.designs-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--card-border);
+}
+.designs-tab {
+  padding: 8px 18px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.designs-tab:hover { color: var(--text-primary, #111827); }
+.designs-tab--active {
+  color: var(--accent, #4f46e5);
+  border-bottom-color: var(--accent, #4f46e5);
+}
+
 /* ── Card grid ── */
 .designs-grid {
   display: grid;

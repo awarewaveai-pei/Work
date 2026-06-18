@@ -334,9 +334,10 @@ export async function GET(request: Request) {
     );
   }
 
-  // ?domain=ai_video → list videos; default (no param / any other value) → ai_generated images.
-  const domainParam = url.searchParams.get("domain");
-  const assetDomain = domainParam === "ai_video" ? "ai_video" : "ai_generated";
+  // 影片與圖片同屬 asset_domain="ai_generated"（DB CHECK 僅允許 ai_generated/wp_product/wp_blog），
+  // 用 mime_type 區分：?domain=ai_video → video/*；default → image/*。避免動 prod schema。
+  const wantVideo = url.searchParams.get("domain") === "ai_video";
+  const mimePrefix = wantVideo ? "video/%" : "image/%";
 
   // Prefer the service-role client: media_assets has RLS keyed to Clerk JWTs, and this
   // server route carries no user JWT — the anon client would silently return 0 rows.
@@ -350,7 +351,8 @@ export async function GET(request: Request) {
     .select("id,object_key,object_url,mime_type,byte_size,created_at,metadata")
     .eq("organization_id", organizationId)
     .eq("storage_backend", "r2")
-    .eq("asset_domain", assetDomain)
+    .eq("asset_domain", "ai_generated")
+    .like("mime_type", mimePrefix)
     .eq("is_current", true)
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);

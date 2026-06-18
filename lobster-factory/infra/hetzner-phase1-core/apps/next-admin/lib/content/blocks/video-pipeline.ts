@@ -52,10 +52,11 @@ async function recordVideoAsset(params: {
     objectKey = params.primaryUrl;
   }
 
+  // asset_domain 用允許值 "ai_generated"（DB CHECK 不含 ai_video）；圖片/影片以 mime_type 區分。
   const { error } = await supabase.from("media_assets").insert({
     organization_id: params.organizationId,
     storage_backend: "r2",
-    asset_domain: "ai_video",
+    asset_domain: "ai_generated",
     object_key: objectKey,
     object_url: params.primaryUrl,
     mime_type: "video/mp4",
