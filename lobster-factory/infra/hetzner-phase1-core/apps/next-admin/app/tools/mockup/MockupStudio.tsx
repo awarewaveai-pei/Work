@@ -166,11 +166,13 @@ function CatalogGrid({
                   position: "relative",
                 }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.image} alt={p.title} style={{ width: "100%", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
-                {selected && (
-                  <div style={{ position: "absolute", top: 4, right: 4, background: "#4f8cff", borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", fontWeight: 700 }}>✓</div>
-                )}
+                <div style={{ width: "100%", paddingTop: "100%", position: "relative", background: "#1a1a1a" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.image} alt={p.title} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                  {selected && (
+                    <div style={{ position: "absolute", top: 4, right: 4, background: "#4f8cff", borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", fontWeight: 700 }}>✓</div>
+                  )}
+                </div>
                 <div style={{ padding: "4px 6px" }}>
                   <div style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                     {p.title.replace(/\s*\|.*$/, "")}

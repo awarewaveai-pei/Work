@@ -2,7 +2,7 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
-## 2026-06-19
+$insert
 
 ### fix(seo): RankMath 22-check + 3 bug patches (Content Studio)
 
@@ -12099,3 +12099,4 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 ### Machine appendix (monthly-system-review)
 - 2026-06-16 21:37:04 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 36.76% (< 85%))
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=addCostLine,COST_JSON | hits=all 12 call sites audited + kind discriminator applied
+
