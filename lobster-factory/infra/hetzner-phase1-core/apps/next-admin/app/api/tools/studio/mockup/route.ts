@@ -16,24 +16,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
   }
 
-  let body: { image?: string; productType?: string };
+  // Accept either a base64 data URL (`image`) or a pre-uploaded R2 URL (`imageUrl`).
+  // `imageUrl` is used when the design is already in R2 — avoids a browser CORS fetch.
+  let body: { image?: string; imageUrl?: string; productType?: string };
   try {
-    body = (await request.json()) as { image?: string; productType?: string };
+    body = (await request.json()) as { image?: string; imageUrl?: string; productType?: string };
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
-  if (!body.image || typeof body.image !== "string") {
-    return NextResponse.json({ ok: false, error: "image (base64 data URL) is required" }, { status: 400 });
+  const imageInput = body.imageUrl ?? body.image;
+  if (!imageInput || typeof imageInput !== "string") {
+    return NextResponse.json({ ok: false, error: "image (base64 data URL) or imageUrl (R2 https URL) is required" }, { status: 400 });
   }
-  if (body.image.length > MAX_IMAGE_CHARS) {
-    return NextResponse.json({ ok: false, error: "image too large (~9MB limit)" }, { status: 413 });
-  }
-  if (!/^data:image\/(png|jpe?g|webp);base64,/.test(body.image)) {
+
+  // Validate: either a known R2 https URL, or a base64 data URL.
+  const isR2Url = /^https:\/\/[^/]+\.r2\.dev\//.test(imageInput) || /^https:\/\/[^/]+\.r2\.cloudflarestorage\.com\//.test(imageInput);
+  const isDataUrl = /^data:image\/(png|jpe?g|webp);base64,/.test(imageInput);
+  if (!isR2Url && !isDataUrl) {
     return NextResponse.json(
-      { ok: false, error: "image must be a png/jpeg/webp base64 data URL" },
+      { ok: false, error: "image must be a png/jpeg/webp base64 data URL or an R2 https:// URL" },
       { status: 400 },
     );
+  }
+  if (isDataUrl && imageInput.length > MAX_IMAGE_CHARS) {
+    return NextResponse.json({ ok: false, error: "image too large (~9MB limit)" }, { status: 413 });
   }
 
   const productType = body.productType ?? "tshirt";
@@ -44,7 +51,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await generateMockup(body.image, productType);
+  const result = await generateMockup(imageInput, productType);
 
   if (result.ok) {
     return NextResponse.json(result);

@@ -128,9 +128,24 @@ function timedFetch(url: string, init?: RequestInit): Promise<Response> {
   return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
-/** Generate a product mockup using the Printful Mockup Generator. */
+// R2 public origins we trust as already-uploaded design URLs.
+// Printful can fetch these directly — no re-upload needed.
+const R2_PUBLIC_HOSTS = new Set([
+  "pub-a88b06f569bd41a3b9e27e29644d520e.r2.dev",
+]);
+function isKnownR2Url(s: string): boolean {
+  try { return R2_PUBLIC_HOSTS.has(new URL(s).hostname); } catch { return false; }
+}
+
+/**
+ * Generate a product mockup using the Printful Mockup Generator.
+ *
+ * `imageInput` accepts:
+ *  - base64 data URL  → parsed and re-uploaded to R2 (original behaviour)
+ *  - https:// R2 URL  → used directly; skips re-upload (avoids browser CORS round-trip)
+ */
 export async function generateMockup(
-  imageDataUrl: string,
+  imageInput: string,
   productType: string = "tshirt",
 ): Promise<MockupResult> {
   const apiKey = process.env.PRINTFUL_API_KEY;
@@ -143,16 +158,23 @@ export async function generateMockup(
   }
   const cfg = PRODUCT_CONFIG[productType as ProductType];
 
-  // ── Step 1: parse base64 and upload to R2 ──────────────────────────────────
-  const parsed = parseImageDataUrl(imageDataUrl);
-  if (!parsed) return { ok: false, error: "image_parse_failed" };
+  // ── Step 1: resolve image URL for Printful ────────────────────────────────
+  // If the caller already has a publicly reachable R2 URL, skip re-upload.
+  let imageUrl: string;
+  if (isKnownR2Url(imageInput)) {
+    imageUrl = imageInput;
+  } else {
+    // base64 data URL → parse → upload to R2
+    const parsed = parseImageDataUrl(imageInput);
+    if (!parsed) return { ok: false, error: "image_parse_failed" };
 
-  const objectKey = buildDesignKey(parsed.mime);
-  if (!objectKey) return { ok: false, error: "unsupported_image_mime" };
+    const objectKey = buildDesignKey(parsed.mime);
+    if (!objectKey) return { ok: false, error: "unsupported_image_mime" };
 
-  const r2 = await putDesignObject(objectKey, parsed.buffer, parsed.mime);
-  if (!r2.ok) return { ok: false, error: `r2_upload_failed: ${(r2 as { ok: false; error: string }).error}` };
-  const imageUrl = r2.publicUrl;
+    const r2 = await putDesignObject(objectKey, parsed.buffer, parsed.mime);
+    if (!r2.ok) return { ok: false, error: `r2_upload_failed: ${(r2 as { ok: false; error: string }).error}` };
+    imageUrl = r2.publicUrl;
+  }
 
   // ── Step 2: create mockup task ─────────────────────────────────────────────
   let taskRes: Response;
