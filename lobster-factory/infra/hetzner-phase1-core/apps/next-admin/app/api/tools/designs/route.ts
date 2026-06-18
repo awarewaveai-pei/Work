@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import sharp from "sharp";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { buildDesignKey, deleteDesignObject, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
@@ -20,6 +21,17 @@ const PRINTFUL_MOCKUP_HOSTS = new Set([
   "files.cdn.printful.com",
 ]);
 const SOURCE_MIME_OK: Record<string, true> = { "image/jpeg": true, "image/png": true, "image/webp": true };
+
+/** Convert any image buffer to WebP targeting 50–100 KB (for gallery thumbnails). */
+async function toWebpOptimized(buffer: Buffer): Promise<{ buffer: Buffer; mime: "image/webp" }> {
+  for (const quality of [80, 65, 50, 40, 30]) {
+    const out = await sharp(buffer).webp({ quality }).toBuffer();
+    if (out.byteLength <= 100 * 1024) return { buffer: out, mime: "image/webp" };
+  }
+  // Absolute floor — quality 20 always fits in 100 KB for typical mockup photos
+  const out = await sharp(buffer).webp({ quality: 20 }).toBuffer();
+  return { buffer: out, mime: "image/webp" };
+}
 
 /** Fetch a Printful-CDN mockup into a buffer (SSRF-guarded, size+timeout capped). */
 async function fetchPrintfulMockup(
@@ -130,7 +142,9 @@ export async function POST(request: Request) {
       const f = fetched as { ok: false; status: number; error: string };
       return NextResponse.json({ ok: false, error: f.error }, { status: f.status });
     }
-    parsed = { mime: fetched.mime, buffer: fetched.buffer };
+    // Convert to WebP 50–100 KB so gallery thumbnails are small and load fast.
+    const converted = await toWebpOptimized(fetched.buffer);
+    parsed = { mime: converted.mime, buffer: converted.buffer };
   } else {
     if (!body.image || typeof body.image !== "string") {
       return NextResponse.json({ ok: false, error: "image (base64 data URL) or sourceUrl is required" }, { status: 400 });

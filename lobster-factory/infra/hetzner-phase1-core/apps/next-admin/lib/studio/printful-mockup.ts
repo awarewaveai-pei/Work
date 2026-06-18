@@ -137,16 +137,43 @@ function isKnownR2Url(s: string): boolean {
   try { return R2_PUBLIC_HOSTS.has(new URL(s).hostname); } catch { return false; }
 }
 
+/** Compute print-position preserving the image's true aspect ratio within the product's printable area. */
+function computePosition(
+  cfg: (typeof PRODUCT_CONFIG)[ProductType],
+  imageDims?: { width: number; height: number },
+): { area_width: number; area_height: number; width: number; height: number; top: number; left: number } {
+  if (!imageDims || imageDims.width <= 0 || imageDims.height <= 0) {
+    return { area_width: cfg.area_width, area_height: cfg.area_height, width: cfg.design_width, height: cfg.design_height, top: cfg.top, left: cfg.left };
+  }
+  const { width: imgW, height: imgH } = imageDims;
+  // Scale from max design width, preserving aspect ratio.
+  const maxW: number = cfg.design_width;
+  let designW: number = maxW;
+  let designH: number = Math.round((maxW * imgH) / imgW);
+  // Clamp to available height (area minus top/bottom margin).
+  const availableH: number = cfg.area_height - cfg.top * 2;
+  if (designH > availableH) {
+    designH = availableH;
+    designW = Math.round((availableH * imgW) / imgH);
+  }
+  const left = Math.round((cfg.area_width - designW) / 2);
+  return { area_width: cfg.area_width, area_height: cfg.area_height, width: designW, height: designH, top: cfg.top, left };
+}
+
 /**
  * Generate a product mockup using the Printful Mockup Generator.
  *
  * `imageInput` accepts:
  *  - base64 data URL  → parsed and re-uploaded to R2 (original behaviour)
  *  - https:// R2 URL  → used directly; skips re-upload (avoids browser CORS round-trip)
+ *
+ * `imageDims` — caller-supplied natural dimensions so Printful receives the correct
+ *  aspect-ratio position rather than the default hardcoded square.
  */
 export async function generateMockup(
   imageInput: string,
   productType: string = "tshirt",
+  imageDims?: { width: number; height: number },
 ): Promise<MockupResult> {
   const apiKey = process.env.PRINTFUL_API_KEY;
   const storeId = process.env.PRINTFUL_STORE_ID;
@@ -193,14 +220,7 @@ export async function generateMockup(
           {
             placement: cfg.placement,
             image_url: imageUrl,
-            position: {
-              area_width: cfg.area_width,
-              area_height: cfg.area_height,
-              width: cfg.design_width,
-              height: cfg.design_height,
-              top: cfg.top,
-              left: cfg.left,
-            },
+            position: computePosition(cfg, imageDims),
           },
         ],
         format: "jpg",

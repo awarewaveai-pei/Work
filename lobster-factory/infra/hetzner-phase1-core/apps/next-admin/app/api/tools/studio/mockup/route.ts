@@ -18,9 +18,11 @@ export async function POST(request: Request) {
 
   // Accept either a base64 data URL (`image`) or a pre-uploaded R2 URL (`imageUrl`).
   // `imageUrl` is used when the design is already in R2 — avoids a browser CORS fetch.
-  let body: { image?: string; imageUrl?: string; productType?: string };
+  // `imageWidth`/`imageHeight` carry the image's natural pixel dimensions so the
+  // server can compute aspect-ratio-correct print position (avoids 1:1 squish).
+  let body: { image?: string; imageUrl?: string; productType?: string; imageWidth?: number; imageHeight?: number };
   try {
-    body = (await request.json()) as { image?: string; imageUrl?: string; productType?: string };
+    body = (await request.json()) as { image?: string; imageUrl?: string; productType?: string; imageWidth?: number; imageHeight?: number };
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
@@ -51,7 +53,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await generateMockup(imageInput, productType);
+  const imageDims =
+    typeof body.imageWidth === "number" && typeof body.imageHeight === "number" &&
+    body.imageWidth > 0 && body.imageHeight > 0
+      ? { width: body.imageWidth, height: body.imageHeight }
+      : undefined;
+
+  const result = await generateMockup(imageInput, productType, imageDims);
 
   if (result.ok) {
     return NextResponse.json(result);

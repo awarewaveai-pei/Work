@@ -88,6 +88,16 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+/** Get natural pixel dimensions of an image (URL or data URL). No CORS needed for naturalWidth/Height. */
+function getImageNaturalDims(src: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
 export default function MockupStudio() {
   // design source
   const [designs, setDesigns] = useState<DesignAsset[]>([]);
@@ -124,6 +134,8 @@ export default function MockupStudio() {
   const [printfulProduct, setPrintfulProduct] = useState<PrintfulProductType>("tshirt");
   const [printfulState, setPrintfulState] = useState<PrintfulState>({ status: "idle" });
   const [saveMockupStates, setSaveMockupStates] = useState<SaveMockupState>({});
+  const [selectedMockups, setSelectedMockups] = useState<Set<string>>(new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
   // results
   const [gen, setGen] = useState<GenState>({ status: "idle" });
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -229,18 +241,22 @@ export default function MockupStudio() {
     printfulInFlight.current = true;
     setPrintfulState({ status: "generating" });
     setSaveMockupStates({});
+    setSelectedMockups(new Set());
     try {
+      // Resolve true pixel dimensions for aspect-ratio-correct Printful position.
+      // img.naturalWidth/Height works cross-origin without CORS headers.
+      const dims = await getImageNaturalDims(designRef);
       // Send imageUrl (R2 https://) or image (base64 data URL) — server handles both.
       // Never fetch cross-origin in the browser (CORS).
       const isDataUrl = designRef.startsWith("data:");
       const res = await fetch("/api/tools/studio/mockup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          isDataUrl
-            ? { image: designRef, productType: printfulProduct }
-            : { imageUrl: designRef, productType: printfulProduct },
-        ),
+        body: JSON.stringify({
+          ...(isDataUrl ? { image: designRef } : { imageUrl: designRef }),
+          productType: printfulProduct,
+          ...(dims ? { imageWidth: dims.width, imageHeight: dims.height } : {}),
+        }),
       });
       const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
       if (!json.ok || !json.mockups) {
@@ -254,6 +270,24 @@ export default function MockupStudio() {
       printfulInFlight.current = false;
     }
   }, [designRef, printfulProduct]);
+
+  const toggleMockup = useCallback((url: string) => {
+    setSelectedMockups((prev) => {
+      const next = new Set(prev);
+      if (next.has(url)) next.delete(url); else next.add(url);
+      return next;
+    });
+  }, []);
+
+  const saveBulkMockups = useCallback(async () => {
+    if (selectedMockups.size === 0 || bulkSaving) return;
+    setBulkSaving(true);
+    // Save in parallel; individual states updated by saveMockupToDesigns
+    await Promise.all([...selectedMockups].map((url) => saveMockupToDesigns(url)));
+    setBulkSaving(false);
+    setSelectedMockups(new Set());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMockups, bulkSaving]);
 
   const saveMockupToDesigns = useCallback(async (mockupUrl: string) => {
     setSaveMockupStates((prev) => ({ ...prev, [mockupUrl]: "saving" }));
@@ -766,30 +800,64 @@ export default function MockupStudio() {
             {printfulState.status === "error" && <p style={{ color: "#e5484d" }}>{printfulState.error}</p>}
             {printfulState.status === "done" && printfulState.mockups && (
               <>
-                <div style={{ fontSize: 13, marginBottom: 8, opacity: 0.7 }}>
-                  {printfulState.mockups.length} 張 Mockup（{PRINTFUL_PRODUCTS.find((p) => p.value === printfulProduct)?.label}）
+                {/* Toolbar */}
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, opacity: 0.7 }}>
+                    {printfulState.mockups.length} 張（{PRINTFUL_PRODUCTS.find((p) => p.value === printfulProduct)?.label}）
+                  </span>
+                  <button
+                    className="btn-secondary"
+                    style={{ fontSize: 11 }}
+                    onClick={() => setSelectedMockups(new Set(printfulState.mockups!.map((m) => m.url)))}
+                  >
+                    全選
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    style={{ fontSize: 11 }}
+                    onClick={() => setSelectedMockups(new Set())}
+                  >
+                    取消
+                  </button>
+                  {selectedMockups.size > 0 && (
+                    <button
+                      className="btn-primary"
+                      style={{ fontSize: 11 }}
+                      disabled={bulkSaving}
+                      onClick={() => void saveBulkMockups()}
+                    >
+                      {bulkSaving ? "儲存中…" : `存入 My Designs (${selectedMockups.size})`}
+                    </button>
+                  )}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
                   {printfulState.mockups.map((mv) => {
                     const st = saveMockupStates[mv.url] ?? "idle";
+                    const checked = selectedMockups.has(mv.url);
                     return (
-                      <div key={mv.url} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div
+                        key={mv.url}
+                        style={{ display: "flex", flexDirection: "column", gap: 4, cursor: "pointer", position: "relative" }}
+                        onClick={() => toggleMockup(mv.url)}
+                      >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={mv.url}
                           alt={mv.label}
-                          style={{ width: "100%", borderRadius: 6, background: "#111" }}
+                          style={{ width: "100%", borderRadius: 6, background: "#111", outline: checked ? "2px solid #4f8cff" : "none" }}
                         />
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleMockup(mv.url)}
+                          style={{ position: "absolute", top: 4, left: 4, width: 16, height: 16, cursor: "pointer" }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        {st === "saved" && (
+                          <div style={{ position: "absolute", top: 4, right: 4, background: "#1a9e5c", color: "#fff", fontSize: 10, borderRadius: 3, padding: "1px 4px" }}>✓ 已存入</div>
+                        )}
                         <div style={{ fontSize: 11, opacity: 0.7, textAlign: "center" }}>{mv.label}</div>
-                        <button
-                          className="btn-secondary"
-                          style={{ fontSize: 11 }}
-                          disabled={st === "saving" || st === "saved"}
-                          onClick={() => void saveMockupToDesigns(mv.url)}
-                        >
-                          {st === "saved" ? "已存入 ✓" : st === "saving" ? "儲存中…" : "存入 My Designs"}
-                        </button>
-                        {st === "error" && <span style={{ color: "#e5484d", fontSize: 10 }}>儲存失敗</span>}
+                        {st === "error" && <span style={{ color: "#e5484d", fontSize: 10, textAlign: "center" }}>儲存失敗</span>}
                       </div>
                     );
                   })}
