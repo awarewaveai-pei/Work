@@ -321,6 +321,20 @@
 **[剩餘風險]** ① 最後一哩：網頁 `/tools/video` → 積木 → Claude+Flux+Pexels → render → media_assets → 畫廊影片 tab 的**完整 page→block e2e** 需操作者登入瀏覽器跑（render 端已驗，積木 gen 部分段 A/A2 已測）。② deploy_smoke R2 測試物件留著，7 天 lifecycle 自動清。③ 同標題二次生成 R2 key 碰撞（best-effort，follow-up 加 uuid）。
 - AUTO_TASK_DONE (2026-06-17): video Phase 2-B 跨機 prod 部署上線完成（R2 bucket+lifecycle / EU 容器+nginx+TLS / SG env+deploy / authed render→R2→公開播放 e2e 驗證 200）；剩網頁 page→block 完整 e2e 待操作者瀏覽器。
 
+### test(video): Phase 2-B 完整 page→block e2e（Chrome 真機）— 影片產出成功 + 發現 CF 100s 同步超時
+
+**[實測]** Chrome MCP 驅動操作者登入的 app.aware-wave.com/tools/video（真機）：輸入主題「居家辦公提升專注力的三個技巧」→ 生成。
+
+**[結果]**
+- ✅ **完整管線 e2e 成功**：瀏覽器→積木→Claude 腳本+Flux 圖+Pexels→EU render→R2 上傳。R2 lobster-videos 產出 `video/居家辦公…/` 四尺寸真影片（YouTube **10.5MB**），公開 GET 200 video/mp4 可播。
+- ⚠️ **CF 100s 同步超時（待修）**：app.aware-wave.com 為 CF orange-proxied（100s 上限）；同步 `/api/video/generate`（Claude+6×Flux+render >100s）→ CF 回 524 HTML → 瀏覽器 `res.json()` 解析 `<!DOCTYPE` 失敗。CF 切連線連帶中止 SG handler → EU render 仍完成寫 R2，但 SG 沒走到 recordVideoAsset → 畫廊 media_assets 未記錄（org id 已設，非 org 問題）。
+- **修正中間插曲**：首次失敗根因＝SG 跑的 `/root/lobster-phase1/docker-compose.yml`（**非 repo 版**，sg-deploy 不同步 compose）缺 PEXELS/VIDEO_SERVICE_URL/SECRET env → render-client 用 default 127.0.0.1。已在運行中 compose awk 補 3 ref + recreate next-admin（容器 env 確認）。**教訓：SG env/compose 改動須直接改 `/root/lobster-phase1/docker-compose.yml`，repo 版不經 sg-deploy 同步。**
+
+**[根因]** 同步生成 >100s 撞 CF app 域 100s 上限。**robust 修＝async job 模式**（/generate 立即回 jobId → 背景跑管線 → 頁面 poll /status；順帶解決 recordVideoAsset 未執行）。快速緩解＝積木內 Flux 生圖並行化（6 序列→Promise.all，省 ~60s）但不保證所有情境 <100s。
+
+**[剩餘風險]** async 修前，網頁「生成」會 524（但影片仍產出於 R2，可手動取 URL）；畫廊影片 tab 暫不顯示（待 async 修讓 recordVideoAsset 執行）。
+- AUTO_TASK_DONE (2026-06-17): video 完整 page→block e2e 成功（真機產出 10.5MB 影片於 R2 可播）；發現 CF 100s 同步超時 → 待 async job 修（含修 SG compose 漂移 env bug）。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
