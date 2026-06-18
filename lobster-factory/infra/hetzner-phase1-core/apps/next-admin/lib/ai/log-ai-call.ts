@@ -32,6 +32,8 @@ export interface LogAiCallArgs {
   organizationId?: string | null;
   actorRole?: string | null;
   metadata?: Record<string, unknown>;
+  jobId?: string | null;
+  tool?: string | null;
 }
 
 /**
@@ -46,6 +48,8 @@ export interface LogAiCallFromResponse {
   organizationId?: string | null;
   actorRole?: string | null;
   metadata?: Record<string, unknown>;
+  jobId?: string | null;
+  tool?: string | null;
 }
 
 function isFromResponse(a: LogAiCallArgs | LogAiCallFromResponse): a is LogAiCallFromResponse {
@@ -63,6 +67,8 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
     let organizationId: string | null | undefined;
     let actorRole: string | null | undefined;
     let metadata: Record<string, unknown> | undefined;
+    let jobId: string | null | undefined;
+    let tool: string | null | undefined;
 
     if (isFromResponse(args)) {
       const u = args.response.usage ?? {};
@@ -75,6 +81,8 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
       organizationId = args.organizationId;
       actorRole = args.actorRole;
       metadata = args.metadata;
+      jobId = args.jobId;
+      tool = args.tool;
     } else {
       route = args.route;
       model = args.model;
@@ -85,6 +93,8 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
       organizationId = args.organizationId;
       actorRole = args.actorRole;
       metadata = args.metadata;
+      jobId = args.jobId;
+      tool = args.tool;
     }
 
     // Nothing to record (e.g. a request that failed before any tokens were spent).
@@ -109,6 +119,8 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
       cache_write_tokens: cacheWriteTokens,
       cost_usd: Number(costUsd.toFixed(6)),
       actor_role: actorRole ?? null,
+      job_id: jobId ?? null,
+      tool: tool ?? null,
       metadata: resolved.fallback ? { ...(metadata ?? {}), rate_fallback: true, matched_rate: resolved.matchedKey } : (metadata ?? {}),
     });
   } catch {

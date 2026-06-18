@@ -482,6 +482,8 @@ export default function ContentStudio() {
   // Per-article cost tracking (client-side accumulation)
   // Types imported from CostChip — single source of truth.
   const [sessionCost, setSessionCost] = useState<import("./CostChip").SessionCost | null>(null);
+  // Stable UUID shared by all API calls in one generation cycle — ties rows in ai_call_logs / ai_image_jobs.
+  const jobIdRef = React.useRef<string | null>(null);
   function addCostLine(line: import("./CostChip").CostLineItem) {
     setSessionCost(prev => {
       const lines = [...(prev?.lines ?? []), line];
@@ -994,6 +996,7 @@ export default function ContentStudio() {
 
     setGenerated(""); setMetaData(null);
     setSessionCost(null);
+    jobIdRef.current = crypto.randomUUID();
     setGenStatus("streaming"); setGenError(""); setGenTruncated(false);
     setPubStatus("idle"); setPubResult(null);
     setSeoReport(null); setSeoChecking(false);
@@ -1066,6 +1069,7 @@ export default function ContentStudio() {
           patterns: patternsToSend,        // #6
           patternCount: patternCountToSend,
           patternMode,                     // #6 — server uses this to raise the cap in manual mode
+          _jobId: jobIdRef.current,        // ledger grouping
         }),
         signal: ac.signal,
       });
@@ -1300,7 +1304,7 @@ export default function ContentStudio() {
           // form.media.imageSize is now a flux aspect_ratio (e.g. "16:9") — pass it so the chosen
           // ratio actually applies to body images (previously hardcoded twitter_post → ignored → 1:1).
           // mediaImageParams() adds the chosen model + style preset + seed + reference image (img2img).
-          body: JSON.stringify({ prompt: altText, platform: "twitter_post", aspectRatio: form.media.imageSize, ...mediaImageParams() }),
+          body: JSON.stringify({ prompt: altText, platform: "twitter_post", aspectRatio: form.media.imageSize, ...mediaImageParams(), _jobId: jobIdRef.current }),
         });
         if (genRun !== imgRunRef.current) break;
         const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string; cost_usd?: number; model?: string };
@@ -1353,7 +1357,7 @@ export default function ContentStudio() {
         method: "POST", headers: { "Content-Type": "application/json" },
         // Hero/featured = 16:9 (Google Discover + OG preview both favour the wide ratio). Same model +
         // style + seed + reference image as the body images so the hero matches the article's look.
-        body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams() }),
+        body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams(), _jobId: jobIdRef.current }),
       });
       if (genRun !== imgRunRef.current) return; // user re-generated, abort
       const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string; cost_usd?: number; model?: string };
