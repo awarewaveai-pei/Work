@@ -349,7 +349,7 @@ export default function VideoStudio() {
               {/* Status banner */}
               {genStatus === "loading" && (
                 <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, color: "#1d4ed8" }}>
-                  正在執行：腳本生成 → 素材準備 → 合成 → 輸出四個尺寸。請勿關閉頁面。
+                  正在執行：腳本生成 → 素材準備 → 合成 → 輸出四個尺寸。可留著看結果；也可關閉頁面，完成後會出現在 My Designs 的「影片」分頁。
                 </div>
               )}
 
