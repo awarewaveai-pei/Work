@@ -876,9 +876,12 @@ export default function ContentStudio() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: imgPrompt, platform: imgPlatform }),
       });
-      const json = await res.json() as { ok: boolean; imageUrl?: string; spec?: { label: string; width: number; height: number }; error?: string };
+      const json = await res.json() as { ok: boolean; imageUrl?: string; spec?: { label: string; width: number; height: number }; error?: string; cost_usd?: number; model?: string };
       if (!json.ok || !json.imageUrl) { setImgError(json.error ?? "圖片生成失敗"); }
-      else { setImgResult({ imageUrl: json.imageUrl, spec: json.spec! }); }
+      else {
+        setImgResult({ imageUrl: json.imageUrl, spec: json.spec! });
+        if (json.cost_usd && json.model) addCostLine({ route: "content/image", model: json.model, vendor: "Image", usd: json.cost_usd });
+      }
     } catch { setImgError("網路錯誤，請重試"); }
     finally { setImgLoading(false); }
   }
@@ -1238,8 +1241,11 @@ export default function ContentStudio() {
         body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams() }),
       });
       if (genRun !== imgRunRef.current) return; // user re-generated, abort
-      const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string };
-      if (json.ok && json.imageUrl) setHeroImageUrl(json.imageUrl);
+      const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string; cost_usd?: number; model?: string };
+      if (json.ok && json.imageUrl) {
+        setHeroImageUrl(json.imageUrl);
+        if (json.cost_usd && json.model) addCostLine({ route: "content/hero-image", model: json.model, vendor: "Image", usd: json.cost_usd });
+      }
       // Hero is best-effort (never blocks publish) but a silent failure hid missing-key / bad-reference
       // problems — surface the reason so the operator can fix the model/reference and retry.
       else if (genRun === imgRunRef.current) {
