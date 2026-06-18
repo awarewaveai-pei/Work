@@ -78,6 +78,24 @@ interface SaveMockupState {
   [url: string]: "idle" | "saving" | "saved" | "error";
 }
 
+/**
+ * If the ref is already a base64 data URL, return as-is.
+ * If it's an https:// URL (e.g. R2 public object), fetch it and convert to data URL.
+ * Printful mockup API requires base64; AI generate API accepts both.
+ */
+async function resolveToDataUrl(ref: string): Promise<string> {
+  if (ref.startsWith("data:")) return ref;
+  const res = await fetch(ref);
+  if (!res.ok) throw new Error(`fetch_design_failed_${res.status}`);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("blob_read_failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -229,10 +247,19 @@ export default function MockupStudio() {
     setPrintfulState({ status: "generating" });
     setSaveMockupStates({});
     try {
+      // Printful API requires base64 data URL; designRef may be an R2 https:// URL.
+      let imageDataUrl: string;
+      try {
+        imageDataUrl = await resolveToDataUrl(designRef);
+      } catch (e) {
+        setPrintfulState({ status: "error", error: `設計圖讀取失敗：${e instanceof Error ? e.message : String(e)}` });
+        printfulInFlight.current = false;
+        return;
+      }
       const res = await fetch("/api/tools/studio/mockup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: designRef, productType: printfulProduct }),
+        body: JSON.stringify({ image: imageDataUrl, productType: printfulProduct }),
       });
       const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
       if (!json.ok || !json.mockups) {
