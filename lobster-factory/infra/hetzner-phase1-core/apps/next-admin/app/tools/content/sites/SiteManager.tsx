@@ -161,6 +161,25 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
             </label>
           </div>
 
+          {/* Row 1b: featured image overlay settings */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <label>
+              <span style={lbl}>精選圖片標題字型</span>
+              <select style={sel} value={(d as Record<string, unknown>).featuredImageFont as string ?? "sans"} onChange={e => { setD(p => ({ ...p, featuredImageFont: e.target.value })); setSaved(false); }}>
+                <option value="sans">無黑體（Noto Sans CJK）</option>
+                <option value="serif">明體（Noto Serif CJK）</option>
+                <option value="none">不疊標題文字</option>
+              </select>
+            </label>
+            <label>
+              <span style={lbl}>標題文字位置</span>
+              <select style={sel} value={(d as Record<string, unknown>).featuredImageTitlePosition as string ?? "bottom"} onChange={e => { setD(p => ({ ...p, featuredImageTitlePosition: e.target.value })); setSaved(false); }}>
+                <option value="bottom">底部漸層（推薦）</option>
+                <option value="center">正中央</option>
+              </select>
+            </label>
+          </div>
+
           {/* Marketing grid — 2-col, matches ContentStudio layout */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {/* audience */}

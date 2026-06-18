@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.69.0",
+    "sharp": "^0.34.5",
     "@google/generative-ai": "^0.24.1",
     "@sentry/nextjs": "^9",
     "@supabase/ssr": "^0.10.3",

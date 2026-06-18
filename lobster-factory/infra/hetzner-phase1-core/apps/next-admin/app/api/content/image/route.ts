@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import {
@@ -9,12 +10,111 @@ import {
 } from "@/lib/tarot/image-gen";
 import {
   isR2Configured,
-  parseImageDataUrl,
   buildDesignKey,
   putDesignObject,
 } from "@/lib/storage/r2";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
 import { logImageCost } from "@/lib/ai/log-ai-call";
+
+/** Parse a data URL → { buffer, mime }. Returns null on malformed input. */
+function parseDataUrl(dataUrl: string): { buffer: Buffer; mime: string } | null {
+  const m = dataUrl.match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/s);
+  if (!m) return null;
+  try {
+    return { mime: m[1], buffer: Buffer.from(m[2], "base64") };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compress any image buffer to WebP ≤200KB @ 1200px wide.
+ * Falls back gracefully: if sharp errors, returns the original PNG buffer + mime unchanged.
+ */
+async function toWebP(
+  buf: Buffer,
+  titleText?: string,
+  imgWidth?: number,
+  imgHeight?: number,
+): Promise<{ buffer: Buffer; mime: string }> {
+  try {
+    let img = sharp(buf).resize({ width: 1200, withoutEnlargement: true });
+
+    // Title overlay — bottom gradient bar + white text rendered via SVG.
+    // CJK rendering requires Noto CJK fonts installed in the container (Dockerfile adds them).
+    if (titleText && titleText.trim()) {
+      const meta   = await sharp(buf).resize({ width: 1200, withoutEnlargement: true }).metadata();
+      const W      = meta.width  ?? 1200;
+      const H      = meta.height ?? 675;
+      const barH   = Math.round(H * 0.28);         // bottom 28% gradient bar
+      const fontSize = Math.max(24, Math.min(48, Math.round(W / 22)));
+      const maxChars = Math.floor(W / (fontSize * 0.65));
+      // Truncate long titles to fit single line
+      const text   = titleText.length > maxChars ? titleText.slice(0, maxChars - 1) + "…" : titleText;
+      const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      const svgOverlay = `
+<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)" />
+      <stop offset="100%" stop-color="rgba(0,0,0,0.72)" />
+    </linearGradient>
+  </defs>
+  <rect x="0" y="${H - barH}" width="${W}" height="${barH}" fill="url(#g)" />
+  <text
+    x="${W / 2}" y="${H - Math.round(barH * 0.28)}"
+    font-family="'Noto Sans TC','Noto Sans SC','Noto Sans CJK TC',sans-serif"
+    font-size="${fontSize}" font-weight="700"
+    fill="white" text-anchor="middle" dominant-baseline="middle"
+    filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.6))"
+  >${escapedText}</text>
+</svg>`;
+      const svgBuf = Buffer.from(svgOverlay.trim());
+      img = sharp(buf)
+        .resize({ width: 1200, withoutEnlargement: true })
+        .composite([{ input: svgBuf, top: 0, left: 0 }]);
+      // Recalculate with actual composited img
+    }
+
+    let webp = await img.webp({ quality: 80 }).toBuffer();
+    if (webp.length > 200_000) {
+      // Re-run with lower quality if still >200KB
+      let img2 = sharp(buf).resize({ width: 1200, withoutEnlargement: true });
+      if (titleText && titleText.trim()) {
+        const meta   = await sharp(buf).resize({ width: 1200, withoutEnlargement: true }).metadata();
+        const W      = meta.width  ?? 1200;
+        const H      = meta.height ?? 675;
+        const barH   = Math.round(H * 0.28);
+        const fontSize = Math.max(24, Math.min(48, Math.round(W / 22)));
+        const maxChars = Math.floor(W / (fontSize * 0.65));
+        const text   = titleText.length > maxChars ? titleText.slice(0, maxChars - 1) + "…" : titleText;
+        const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        const svgOverlay = `
+<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="rgba(0,0,0,0)" />
+    <stop offset="100%" stop-color="rgba(0,0,0,0.72)" />
+  </linearGradient></defs>
+  <rect x="0" y="${H - barH}" width="${W}" height="${barH}" fill="url(#g)" />
+  <text x="${W / 2}" y="${H - Math.round(barH * 0.28)}"
+    font-family="'Noto Sans TC','Noto Sans SC','Noto Sans CJK TC',sans-serif"
+    font-size="${fontSize}" font-weight="700" fill="white" text-anchor="middle" dominant-baseline="middle"
+    filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.6))"
+  >${escapedText}</text>
+</svg>`;
+        img2 = sharp(buf)
+          .resize({ width: 1200, withoutEnlargement: true })
+          .composite([{ input: Buffer.from(svgOverlay.trim()), top: 0, left: 0 }]);
+      }
+      webp = await img2.webp({ quality: 62 }).toBuffer();
+    }
+    return { buffer: webp, mime: "image/webp" };
+  } catch (err) {
+    console.warn("[image/route] sharp compression failed, returning original:", err);
+    // Graceful fallback: return original PNG buffer
+    return { buffer: buf, mime: "image/png" };
+  }
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -143,20 +243,26 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: friendlyError(code), code }, { status: 200 });
   }
 
-  // Persist the data URL to R2 → stable public https URL (consumers embed it into markdown / the hero
-  // slot; WP sideloads at publish). Fall back to the raw data URL when R2 isn't configured.
+  // Optional title text overlay on hero/featured images (e.g. from ContentStudio heroTitle param).
+  const titleText = typeof body.titleText === "string" ? body.titleText.trim() : "";
+
+  // Parse the generated image → compress to WebP ~150KB @ 1200px wide (+ optional title overlay).
+  const parsed = parseDataUrl(result.image);
+
+  // Persist to R2 → stable public https URL. Fall back to data URL when R2 isn't configured.
   let imageUrl = result.image;
-  if (isR2Configured()) {
-    const parsed = parseImageDataUrl(result.image);
-    if (parsed) {
-      const key = buildDesignKey(parsed.mime);
-      if (key) {
-        const put = await putDesignObject(key, parsed.buffer, parsed.mime);
-        // Only swap in the public URL on a confirmed write. On failure keep the data URL (imageUrl
-        // already = result.image) — synthesizing `${base}/${key}` would hand back a 404 dead link.
-        if (put.ok) imageUrl = put.publicUrl;
-      }
+  if (isR2Configured() && parsed) {
+    const { buffer: webpBuf, mime: webpMime } = await toWebP(parsed.buffer, titleText || undefined);
+    const key = buildDesignKey(webpMime);
+    if (key) {
+      const put = await putDesignObject(key, webpBuf, webpMime);
+      // Only swap in the public URL on a confirmed write.
+      if (put.ok) imageUrl = put.publicUrl;
     }
+  } else if (parsed && titleText) {
+    // No R2 but title overlay requested: return WebP data URL
+    const { buffer: webpBuf, mime: webpMime } = await toWebP(parsed.buffer, titleText);
+    imageUrl = `data:${webpMime};base64,${webpBuf.toString("base64")}`;
   }
 
   const costUsd = imageCostUsd(model);

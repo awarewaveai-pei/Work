@@ -7,6 +7,7 @@ import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
 import type { RankMathReport } from "@/lib/seo/rankmath-checker";
 import { SeoCheckPanel } from "./SeoCheckPanel";
 import { CostChip } from "./CostChip";
+import { markdownPreview } from "@/lib/content/client-markdown";
 import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
 import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS } from "@/lib/ai/text-model-options";
 
@@ -510,10 +511,15 @@ export default function ContentStudio() {
   const [genError,  setGenError]  = useState("");
   const [genTruncated, setGenTruncated] = useState(false);
 
+  // Article preview toggle (false = raw markdown editor, true = rendered HTML preview)
+  const [showPreview, setShowPreview] = useState(false);
+
   // Publish
-  const [pubStatus, setPubStatus] = useState<PubStatus>("idle");
-  const [pubResult, setPubResult] = useState<{ edit_url?: string; view_url?: string } | null>(null);
-  const [pubError,  setPubError]  = useState("");
+  const [pubStatus,    setPubStatus]    = useState<PubStatus>("idle");
+  const [pubResult,    setPubResult]    = useState<{ edit_url?: string; view_url?: string } | null>(null);
+  const [pubError,     setPubError]     = useState("");
+  const [pubMode,      setPubMode]      = useState<"draft" | "publish" | "future">("draft");
+  const [scheduleDate, setScheduleDate] = useState("");   // ISO datetime for "future" mode
 
   // SEO check
   const [seoReport,   setSeoReport]   = useState<RankMathReport | null>(null);
@@ -1389,7 +1395,8 @@ export default function ContentStudio() {
         method: "POST", headers: { "Content-Type": "application/json" },
         // Hero/featured = 16:9 (Google Discover + OG preview both favour the wide ratio). Same model +
         // style + seed + reference image as the body images so the hero matches the article's look.
-        body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams(), _jobId: jobIdRef.current }),
+        // titleText → Sharp SVG overlay (bottom gradient bar + white title text) baked into the WebP.
+        body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams(), titleText: metaData?.seoTitle || form.keyword || "", _jobId: jobIdRef.current }),
       });
       if (genRun !== imgRunRef.current) return; // user re-generated, abort
       const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string; cost_usd?: number; model?: string };
@@ -1427,8 +1434,10 @@ export default function ContentStudio() {
 
   // ─── Publish ─────────────────────────────────────────────────────────────
 
-  async function handlePublish() {
+  async function handlePublish(mode?: "draft" | "publish" | "future") {
     if (!generated.trim()) return;
+    const resolvedMode = mode ?? pubMode;
+    setPubMode(resolvedMode);
     setPubStatus("publishing"); setPubError(""); setPubResult(null);
     try {
       const res  = await fetch("/api/content/publish", {
@@ -1439,7 +1448,8 @@ export default function ContentStudio() {
           seoTitle: metaData?.seoTitle,
           metaDescription: metaData?.metaDesc,
           focusKeyword: form.keyword,
-          scheduleDate: form.scheduleDate || undefined,
+          publishStatus: resolvedMode,
+          scheduleDate: resolvedMode === "future" ? (scheduleDate || form.scheduleDate || undefined) : undefined,
           siteId: selectedSiteId || undefined,
           // Manual form fields win; fall back to the AI-suggested CATEGORIES/TAGS from the meta block.
           categories: form.wpCategories
@@ -2938,12 +2948,34 @@ export default function ContentStudio() {
                   </>
                 )}
                 {hasContent && pubStatus === "idle" && (
-                  <button className="btn-primary" onClick={handlePublish} style={{ fontSize: "13px" }}>推送到 WordPress（草稿）</button>
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
+                    <button className="btn-secondary" style={{ fontSize: "12px" }}
+                      onClick={() => handlePublish("draft")}>📝 草稿</button>
+                    <button className="btn-primary" style={{ fontSize: "12px" }}
+                      onClick={() => handlePublish("publish")}>🚀 直接發佈</button>
+                    <button className="btn-secondary" style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: 4 }}
+                      onClick={() => setPubMode(prev => prev === "future" ? "draft" : "future")}>
+                      📅 排程{pubMode === "future" ? " ▴" : " ▾"}
+                    </button>
+                    {pubMode === "future" && (
+                      <>
+                        <input type="datetime-local" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)}
+                          style={{ fontSize: "12px", padding: "3px 6px", border: "1px solid var(--card-border)", borderRadius: 4, background: "var(--bg-page)", color: "var(--text-primary)" }} />
+                        <button className="btn-primary" style={{ fontSize: "12px" }}
+                          disabled={!scheduleDate}
+                          onClick={() => handlePublish("future")}>確認排程</button>
+                      </>
+                    )}
+                  </div>
                 )}
                 {pubStatus === "publishing" && <button className="btn-primary" disabled style={{ fontSize: "13px" }}>推送中…</button>}
                 {pubStatus === "done" && pubResult?.edit_url && (
                   <span style={{ fontSize: "13px", color: "#22c55e" }}>
-                    ✓ 草稿已建立 — <a href={pubResult.edit_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>WP 後台編輯 ↗</a>
+                    ✓ {pubMode === "publish" ? "已發佈" : pubMode === "future" ? "已排程" : "草稿已建立"} —{" "}
+                    <a href={pubResult.edit_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>WP 後台編輯 ↗</a>
+                    {pubResult.view_url && pubMode === "publish" && (
+                      <> · <a href={pubResult.view_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>查看文章 ↗</a></>
+                    )}
                   </span>
                 )}
                 {pubStatus === "error" && <span style={{ fontSize: "12px", color: "var(--color-error, #ef4444)" }}>推送失敗：{pubError}</span>}

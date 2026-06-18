@@ -35,7 +35,9 @@ ENV HOSTNAME=0.0.0.0
 # with an embedded ICC /OutputIntent (lib/studio/ghostscript-pdfx.ts). Bundles a SWOP
 # CMYK profile at /usr/share/ghostscript/iccprofiles/default_cmyk.icc (the default
 # DestOutputProfile). Enable the pass at runtime with POD_OUTPUT_INTENT_DEPLOYED=true.
-RUN apk add --no-cache ghostscript
+# font-noto + font-noto-cjk: CJK characters in Sharp SVG overlays (featured image title text).
+# fontconfig: required by librsvg/Sharp to locate installed fonts at runtime.
+RUN apk add --no-cache ghostscript fontconfig font-noto font-noto-cjk && fc-cache -f
 
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 --ingroup nodejs nextjs
@@ -46,6 +48,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 # (runtime-only imports used in API routes are often missed)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@anthropic-ai ./node_modules/@anthropic-ai
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/ssh2 ./node_modules/ssh2
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs

@@ -23,11 +23,14 @@ export interface WordPressPublishInput {
   focusKeyword?: unknown;
   categories?: unknown;
   tags?: unknown;
+  /** ISO 8601 datetime for scheduled posts. Used when publishStatus="future". */
   scheduleDate?: unknown;
   siteId?: unknown;
   featuredImageUrl?: unknown;
   featuredImageAlt?: unknown;
   internalLinkKeywords?: unknown;
+  /** "draft" (default) | "publish" (immediate) | "future" (scheduled — requires scheduleDate). */
+  publishStatus?: unknown;
 }
 
 export interface WordPressPublishSuccess {
@@ -156,7 +159,8 @@ function markdownToHtml(md: string): string {
     const h4 = line.match(/^####\s+(.*)/);   if (h4) { out.push(`<h4>${inline(h4[1])}</h4>`); continue; }
     const h3 = line.match(/^###\s+(.*)/);    if (h3) { out.push(`<h3>${inline(h3[1])}</h3>`); continue; }
     const h2 = line.match(/^##\s+(.*)/);     if (h2) { out.push(`<h2>${inline(h2[1])}</h2>`); continue; }
-    const h1 = line.match(/^#\s+(.*)/);      if (h1) { out.push(`<h1>${inline(h1[1])}</h1>`); continue; }
+    // H1 is already used as post_title — never emit it into body content (avoids duplicate H1 with WP title).
+    const h1 = line.match(/^#\s+(.*)/);      if (h1) { continue; }
 
     // Blockquote
     if (line.startsWith("> ")) {
@@ -334,6 +338,11 @@ export async function publishToWordPress(body: WordPressPublishInput): Promise<W
   const markdown = (typeof body.markdown === "string" ? body.markdown : "").trim();
   if (!markdown) return { ok: false, status: 400, error: "markdown required", wire: "text" };
 
+  // Resolve publish status. Bridge only supports "draft"/"publish" (no scheduled posts yet).
+  const rawStatus = typeof body.publishStatus === "string" ? body.publishStatus.trim() : "draft";
+  const publishStatus: "draft" | "publish" | "future" =
+    rawStatus === "publish" ? "publish" : rawStatus === "future" ? "future" : "draft";
+
   const h1 = extractH1(markdown);
   const seoTitle = typeof body.seoTitle === "string" ? body.seoTitle.trim() : "";
   const title = seoTitle || h1 || "Untitled Article";
@@ -360,14 +369,13 @@ export async function publishToWordPress(body: WordPressPublishInput): Promise<W
     try { bridgeHostMatch = new URL(bridgeBase).host === new URL(base).host; } catch { bridgeHostMatch = false; }
   }
   if (bridgeHostMatch) {
-    // The Bridge /post route creates a draft only — the plugin's PostCreator has no post_date
-    // support yet (scheduling is a P3 plugin item). Fail loud rather than silently dropping a
-    // user-set schedule (the standard-REST path below honors body.scheduleDate via payload.date).
-    if (typeof body.scheduleDate === "string" && body.scheduleDate.trim()) {
+    // Bridge supports "draft" and "publish". Scheduled posts ("future") require the WP date field
+    // which the plugin's PostCreator does not yet support → fall through to standard-REST for those.
+    if (publishStatus === "future") {
       return {
         ok: false,
         status: 400,
-        error: "scheduling is not yet supported for this site; publish without a schedule date",
+        error: "排程發佈尚不支援此站台（Bridge 路徑）。請使用「直接發佈」或改用標準 WP REST 站台。",
         wire: "json",
       };
     }
@@ -388,7 +396,7 @@ export async function publishToWordPress(body: WordPressPublishInput): Promise<W
     const result = await createPost({
       title,
       blocks,
-      status: "draft",
+      status: publishStatus === "publish" ? "publish" : "draft",
       excerpt,
       categories: catNames,
       tags: tagNames,
@@ -415,12 +423,19 @@ export async function publishToWordPress(body: WordPressPublishInput): Promise<W
   const content = markdownToHtml(markdown);
   const endpoint = `${base}/wp-json/wp/v2/posts`;
 
+  // For "future" status, WP requires status="future" + date field (ISO 8601).
+  // Without a valid date, fall back to "draft" to avoid a WP 400 error.
+  const scheduleDate = typeof body.scheduleDate === "string" ? body.scheduleDate.trim() : "";
+  const resolvedStatus =
+    publishStatus === "future" && scheduleDate ? "future" :
+    publishStatus === "publish" ? "publish" : "draft";
+
   const payload: Record<string, unknown> = {
     title,
     content,
     slug,
     excerpt,
-    status: "draft",
+    status: resolvedStatus,
   };
 
   // Resolve category + tag names → WP term IDs
@@ -434,8 +449,8 @@ export async function publishToWordPress(body: WordPressPublishInput): Promise<W
     if (tagIds.length > 0) payload.tags = tagIds;
   }
 
-  if (typeof body.scheduleDate === "string" && body.scheduleDate.trim()) {
-    payload.date = body.scheduleDate.trim();
+  if (scheduleDate && resolvedStatus === "future") {
+    payload.date = scheduleDate;
   }
 
   const metaPayload: Record<string, string> = {};
