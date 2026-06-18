@@ -95,7 +95,10 @@ function getIntroWords(md: string, count = 150): string {
 
 export function checkRankMath(input: RankMathInput): RankMathReport {
   const { markdown, focusKeyword, seoTitle, metaDescription, slug, siteDomain } = input;
-  const kw = focusKeyword.toLowerCase().trim();
+  // RankMath treats comma as a separator between multiple focus keywords.
+  // Use only the first term for all presence checks (matches RankMath's primary-keyword logic).
+  const kwTerms = focusKeyword.toLowerCase().trim().split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
+  const kw = kwTerms[0] ?? focusKeyword.toLowerCase().trim();
   const kwSlug = kw.replace(/\s+/g, "-");
   const plain = stripMarkdown(markdown).toLowerCase();
   const checks: RankMathCheck[] = [];

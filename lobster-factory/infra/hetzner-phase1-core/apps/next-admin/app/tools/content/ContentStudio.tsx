@@ -325,9 +325,10 @@ function extractMeta(text: string): MetaData | null {
   const catM = inner.match(/CATEGORIES:\s*(.+)/);
   const tagM = inner.match(/TAGS:\s*(.+)/);
   const splitCsv = (s?: string) => (s ? s.split(",").map(x => x.trim()).filter(Boolean) : undefined);
+  const rawMetaDesc = metaM[1].trim();
   return {
     seoTitle: titleM[1].trim(),
-    metaDesc: metaM[1].trim(),
+    metaDesc: rawMetaDesc.length > 160 ? rawMetaDesc.slice(0, 157) + "..." : rawMetaDesc,
     focusKeyword: kwM?.[1]?.trim(),
     categories: splitCsv(catM?.[1]),
     tags: splitCsv(tagM?.[1]),
