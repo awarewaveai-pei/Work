@@ -10,7 +10,7 @@
  * 不加 EU↔SG 反向耦合（不在 EU 放任何 SG 憑證）；重用 recordVideoAsset（記錄邏輯單一真相）。
  */
 import { getSupabaseWriteClient } from "../../supabase-server";
-import { recordVideoAsset, resolveOrgId } from "../blocks/video-pipeline";
+import { recordVideoAsset, resolveOrgId, videoObjectKey } from "../blocks/video-pipeline";
 
 const OUTPUT_FORMATS = ["youtube_linkedin", "tiktok_reels", "instagram_facebook", "twitter_reddit_bluesky"];
 
