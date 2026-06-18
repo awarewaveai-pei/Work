@@ -1987,16 +1987,24 @@ export default function ContentStudio() {
                   return (
                     <button key={ht} type="button" disabled={isGenerating}
                       onClick={() => {
-                        // Single-click: set as active hook type for generation
-                        setF("introHookType", isActive ? "" : ht);
-                        // Also toggle in multi-select set
                         setHookTypesSelected(prev => {
                           const next = new Set(prev);
-                          if (next.has(ht)) next.delete(ht); else next.add(ht);
+                          if (next.has(ht)) {
+                            next.delete(ht);
+                            // If deselecting the active type, promote first remaining member
+                            if (isActive) {
+                              const promote = [...next][0] ?? "";
+                              setF("introHookType", promote);
+                              if (promote && hookBriefSugs[promote]) setF("introHookBrief", hookBriefSugs[promote]);
+                            }
+                          } else {
+                            next.add(ht);
+                            // Make newly added chip active + pre-fill brief if available
+                            setF("introHookType", ht);
+                            if (hookBriefSugs[ht]) setF("introHookBrief", hookBriefSugs[ht]);
+                          }
                           return next;
                         });
-                        // If a brief was generated for this type, pre-fill
-                        if (!isActive && hookBriefSugs[ht]) setF("introHookBrief", hookBriefSugs[ht]);
                       }}
                       style={{ padding: "3px 10px", borderRadius: "20px", fontSize: "11px", cursor: "pointer",
                         border: isSelected ? "1.5px solid var(--btn-primary-bg, #5855d0)" : "1px solid var(--card-border)",
@@ -2015,10 +2023,10 @@ export default function ContentStudio() {
                   </span>
                 )}
               </div>
-              {/* Generated hook brief suggestions — one per type */}
-              {Object.keys(hookBriefSugs).length > 0 && (
+              {/* Generated hook brief suggestions — only for currently selected types */}
+              {Object.keys(hookBriefSugs).filter(t => hookTypesSelected.has(t)).length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
-                  {Object.entries(hookBriefSugs).map(([t, brief]) => (
+                  {Object.entries(hookBriefSugs).filter(([t]) => hookTypesSelected.has(t)).map(([t, brief]) => (
                     <div key={t} style={{ background: "var(--bg-subtle)", borderRadius: "var(--radius-sm)", padding: "7px 10px", fontSize: "12px", border: "1px solid var(--card-border)" }}>
                       <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "3px" }}>{t}</div>
                       <div style={{ color: "var(--text-primary)", lineHeight: 1.5 }}>{brief}</div>

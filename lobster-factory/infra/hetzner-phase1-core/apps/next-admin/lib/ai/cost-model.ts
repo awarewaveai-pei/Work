@@ -119,6 +119,7 @@ export const TEXT_FEATURES: FeatureProfile[] = [
   { key: "outline",     label: "大綱生成",                   route: "/api/content/outline",  model: "claude-haiku-4-5-20251001", inputTok: 400, outputTok: 700 },
   { key: "title",       label: "標題建議 (5 個)",            route: "/api/content/title",    model: "claude-haiku-4-5-20251001", inputTok: 400, outputTok: 500 },
   { key: "keywords",    label: "LSI/NLP 關鍵字 (20)",        route: "/api/content/keywords", model: "claude-haiku-4-5-20251001", inputTok: 300, outputTok: 600 },
+  { key: "hook-brief",  label: "Hook Brief 草稿（批次）",     route: "/api/content/hook-brief", model: "claude-haiku-4-5-20251001", inputTok: 600, outputTok: 500 },
   { key: "syndicate",   label: "社群多平台改寫",             route: "/api/content/syndicate", model: "claude-haiku-4-5-20251001", inputTok: 1500, outputTok: 2000 },
   { key: "tarot-prompt",label: "塔羅 prompt 建議",           route: "/api/tools/tarot/suggest-prompt", model: "claude-haiku-4-5-20251001", inputTok: 500, outputTok: 400 },
   { key: "product-copy",label: "POD 商品文案 (SEO)",         route: "lib/studio/product-copy", model: "claude-sonnet-4-6", inputTok: 600, outputTok: 1000 },

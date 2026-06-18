@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
+import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,9 +81,9 @@ Example: {"Question": "...", "Statistical or Fact": "..."}`;
 
   void logAiCall({ route: "/api/content/hook-brief", response: msg, actorRole: role });
 
-  const text  = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "{}";
-  const usage = msg.usage;
-  const usd   = ((usage.input_tokens * 0.80) + (usage.output_tokens * 4.00)) / 1_000_000;
+  const text         = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "{}";
+  const { rate }     = resolveTextRate(msg.model);
+  const usd          = textCallCostUsd({ model: msg.model, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, cacheReadTokens: msg.usage.cache_read_input_tokens, cacheWriteTokens: msg.usage.cache_creation_input_tokens });
 
   try {
     const match  = text.match(/\{[\s\S]*\}/);
@@ -91,7 +92,7 @@ Example: {"Question": "...", "Statistical or Fact": "..."}`;
     for (const t of hookTypes) {
       if (typeof parsed[t] === "string") briefs[t] = parsed[t] as string;
     }
-    return NextResponse.json({ ok: true, briefs, _cost: { usd, model: "claude-haiku-4-5-20251001", vendor: "anthropic" } });
+    return NextResponse.json({ ok: true, briefs, _cost: { usd, model: msg.model, vendor: rate.vendor } });
   } catch {
     return NextResponse.json({ ok: false, error: "Failed to parse hook brief suggestions" }, { status: 500 });
   }
