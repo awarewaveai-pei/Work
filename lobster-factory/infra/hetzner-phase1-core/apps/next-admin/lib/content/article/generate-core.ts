@@ -137,6 +137,13 @@ interface ArticleStructure {
   italics?: boolean;
   quotes?: boolean;
   bold?: boolean;
+  // Extended structure options
+  expertQuote?: boolean;   // named expert attribution with title/org (E-E-A-T)
+  prosCons?: boolean;      // pros and cons section / table
+  stepByStep?: boolean;    // numbered step-by-step instructions
+  calloutBox?: boolean;    // tip / warning / note callout (> **💡 Tip:** text)
+  caseStudy?: boolean;     // real-world example or mini case study
+  statCallout?: boolean;   // standalone data / stat highlight block
 }
 
 interface MediaHub {
@@ -283,6 +290,19 @@ function buildUserPrompt(params: {
   if (s.italics === false)         lines.push("DO NOT use italic text.");
   if (s.quotes === false)          lines.push("DO NOT include block quotes.");
   if (s.bold === false)            lines.push("DO NOT use bold text for emphasis.");
+  // Extended structure opt-outs
+  if (s.expertQuote === true)      lines.push("INCLUDE at least one named expert quote with full attribution (Name, Title, Organization/Year). Example: > \"[Quote].\" — Dr. Jane Lim, Clinical Psychologist, NUS (2024)");
+  if (s.expertQuote === false)     lines.push("DO NOT include named expert quotes or external authority attributions.");
+  if (s.prosCons === true)         lines.push("INCLUDE a dedicated Pros and Cons section (use a 2-column markdown table with ✅ Pros and ❌ Cons headers).");
+  if (s.prosCons === false)        lines.push("DO NOT include a Pros and Cons section or table.");
+  if (s.stepByStep === true)       lines.push("INCLUDE a step-by-step numbered instruction section (use ordered list 1. 2. 3. …; each step has a bold action label and 2–3 sentences of detail).");
+  if (s.stepByStep === false)      lines.push("DO NOT include a numbered step-by-step section.");
+  if (s.calloutBox === true)       lines.push("INCLUDE at least 2 callout boxes using markdown blockquote format: > **💡 Tip:** [actionable tip] or > **⚠ Warning:** [important caution]. Place them at high-value moments in the article.");
+  if (s.calloutBox === false)      lines.push("DO NOT include callout boxes (💡 Tip / ⚠ Warning blockquotes).");
+  if (s.caseStudy === true)        lines.push("INCLUDE a real-world example or mini case study section (H2 or H3 labelled 'Real-World Example', 'Case Study', or '實際案例'). Use a specific scenario with concrete details — not a generic hypothetical.");
+  if (s.caseStudy === false)       lines.push("DO NOT include a dedicated case study or real-world example section.");
+  if (s.statCallout === true)      lines.push("INCLUDE at least 2 standalone stat/data callouts formatted as markdown blockquotes: > **📊 Data:** [statistic — source, year]. These highlight key numbers for scanning and AI citation.");
+  if (s.statCallout === false)     lines.push("DO NOT include standalone stat callout blocks.");
 
   // Positive enforcement — the negative `=== false` opt-outs above are NOT enough. When these
   // sections are enabled the model still silently skips them, relying on the system prompt default
@@ -525,6 +545,12 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
     italics:         bool(rawStruct.italics),
     quotes:          bool(rawStruct.quotes),
     bold:            bool(rawStruct.bold),
+    expertQuote:     bool(rawStruct.expertQuote,  false), // off by default — requires real expert
+    prosCons:        bool(rawStruct.prosCons,     false),
+    stepByStep:      bool(rawStruct.stepByStep,   false),
+    calloutBox:      bool(rawStruct.calloutBox,   false),
+    caseStudy:       bool(rawStruct.caseStudy,    false),
+    statCallout:     bool(rawStruct.statCallout,  false),
   };
 
   const rawMedia = (body.media ?? {}) as Record<string, unknown>;

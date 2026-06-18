@@ -167,6 +167,13 @@ interface ArticleStructure {
   italics: boolean;
   quotes: boolean;
   bold: boolean;
+  // Extended
+  expertQuote: boolean;
+  prosCons: boolean;
+  stepByStep: boolean;
+  calloutBox: boolean;
+  caseStudy: boolean;
+  statCallout: boolean;
 }
 
 interface MediaHub {
@@ -343,6 +350,9 @@ function downloadMd(text: string, filename = "article.md") {
 const DEFAULT_STRUCTURE: ArticleStructure = {
   quickAnswer: true, keyTakeaways: true, comparisonTable: true, faq: true, conclusion: true,
   tables: true, h3: true, lists: true, italics: true, quotes: true, bold: true,
+  // Extended — off by default; operator opts in per article
+  expertQuote: false, prosCons: false, stepByStep: false,
+  calloutBox: false, caseStudy: false, statCallout: false,
 };
 
 const DEFAULT_MEDIA: MediaHub = {
@@ -1488,6 +1498,8 @@ export default function ContentStudio() {
     quickAnswer: "快速解答", keyTakeaways: "Key Takeaways", comparisonTable: "比較表格",
     faq: "FAQ", conclusion: "Conclusion", tables: "Tables", h3: "H3",
     lists: "Lists", italics: "Italics", quotes: "Quotes", bold: "Bold",
+    expertQuote: "專家引言", prosCons: "優缺點表", stepByStep: "步驟教學",
+    calloutBox: "提示框 💡", caseStudy: "實際案例", statCallout: "數據亮點 📊",
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -1909,15 +1921,29 @@ export default function ContentStudio() {
                 placeholder={`補充 Hook 的具體方向（選填）。例：\n• Question → 「你有沒有想過，為什麼大多數人學了藝術治療卻沒有改變？」\n• Statistical or Fact → 「根據 2024 APA 研究，8 成焦慮者從未嘗試表達性藝術…」\n• Anecdotal or Story → 「3 年前，一位來訪者拿著一張全黑的畫走進工作室…」`} />
             </div>
 
-            {/* Yes/No dropdowns grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px 16px", marginBottom: "12px" }}>
-              {(["conclusion", "tables", "h3", "lists", "italics", "quotes", "keyTakeaways", "faq", "bold"] as const).map(key => (
+            {/* Yes/No dropdowns grid — 4 cols, 17 items = 5 rows */}
+            <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: ".05em" }}>基本結構</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px 16px", marginBottom: "14px" }}>
+              {(["quickAnswer", "keyTakeaways", "comparisonTable", "faq", "conclusion", "tables", "h3", "lists", "italics", "quotes", "bold"] as const).map(key => (
                 <div key={key}>
                   <label className="form-label" style={{ marginBottom: "4px" }}>{structLabels[key]}</label>
                   <select className="form-select" value={form.structure[key] ? "yes" : "no"} disabled={isGenerating}
                     onChange={e => setStruct(key, e.target.value === "yes")}>
                     <option value="yes">Yes</option>
                     <option value="no">No</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: ".05em" }}>進階內容元素</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px 16px", marginBottom: "12px" }}>
+              {(["expertQuote", "prosCons", "stepByStep", "calloutBox", "caseStudy", "statCallout"] as const).map(key => (
+                <div key={key}>
+                  <label className="form-label" style={{ marginBottom: "4px" }}>{structLabels[key]}</label>
+                  <select className="form-select" value={form.structure[key] ? "yes" : "no"} disabled={isGenerating}
+                    onChange={e => setStruct(key, e.target.value === "yes")}>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
                   </select>
                 </div>
               ))}
