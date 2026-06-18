@@ -382,15 +382,8 @@ services:
       PEXELS_API_KEY: ${PEXELS_API_KEY:-}
       VIDEO_SERVICE_URL: ${VIDEO_SERVICE_URL:-}
       VIDEO_SERVICE_SECRET: ${VIDEO_SERVICE_SECRET:-}
-      # Printful (POD). STORE_ID = Woo-platform store (mockups + legacy sync/link).
-      # NATIVE_STORE_ID = "Manual Order / API platform" store: the only one that accepts
-      # POST /store/products, used for full-auto product creation (pfcreate) + P4 fulfillment.
-      PRINTFUL_API_KEY: ${PRINTFUL_API_KEY:-}
-      PRINTFUL_STORE_ID: ${PRINTFUL_STORE_ID:-}
-      PRINTFUL_NATIVE_STORE_ID: ${PRINTFUL_NATIVE_STORE_ID:-}
-      # POD auto-fulfillment (Woo paid order -> Printful DRAFT). Kill switch, DEFAULT OFF. DRAFT-only.
-      POD_AUTO_FULFILL_ENABLED: ${POD_AUTO_FULFILL_ENABLED:-false}
-      WC_WEBHOOK_SECRET: ${WC_WEBHOOK_SECRET:-}
+      # PRINTFUL_API_KEY / STORE_ID / NATIVE_STORE_ID / POD_AUTO_FULFILL_ENABLED / WC_WEBHOOK_SECRET
+      # 已在上方（line ~337）定義；此處原有重複定義已移除（YAML 重複鍵 → docker compose config 失敗）。
       # POD print track ([0-a-gs]): enable the Ghostscript PDF/X-1a OutputIntent pass.
       # Default OFF — CMYK print destinations return a clear "not deployed" error until
       # gs is in the image (it now is, via Dockerfile) AND this flag is set true.
