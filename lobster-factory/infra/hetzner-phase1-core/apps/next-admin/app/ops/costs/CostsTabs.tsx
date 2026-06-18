@@ -9,7 +9,6 @@ import AiModelsClient from "@/app/tools/ai-models/AiModelsClient";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface RealSpend {
-  available: boolean;
   note?: string;
   textByRoute: { route: string; calls: number; usd: number; inTok: number; outTok: number }[];
   textUsd: number;

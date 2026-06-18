@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
-import { IMAGE_RATES, INFRA_MONTHLY, TWD_RATE } from "@/lib/ai/cost-model";
+import { INFRA_MONTHLY, TWD_RATE } from "@/lib/ai/cost-model";
 import { CostsTabs, type RealSpend } from "./CostsTabs";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ interface CallRow { route: string; model: string; vendor: string | null; cost_us
 interface JobRow { model_name: string; provider: string | null }
 
 async function loadRealSpend(): Promise<RealSpend> {
-  const empty: RealSpend = { available: false, textByRoute: [], textUsd: 0, textCalls: 0, imageByModel: [], imageUsd: 0, imageCount: 0 };
+  const empty: RealSpend = { textByRoute: [], textUsd: 0, textCalls: 0, imageByModel: [], imageUsd: 0, imageCount: 0 };
   const supabase = getSupabaseWriteClient();
   if (!supabase) return { ...empty, note: "Supabase service-role 未設定 — 無法讀取真實花費。" };
 
@@ -52,7 +52,6 @@ async function loadRealSpend(): Promise<RealSpend> {
     .sort((a, b) => b.usd - a.usd);
 
   return {
-    available: !callErr || imageByModel.length > 0,
     note: callErr ? "ai_call_logs 表尚未套用 (migration 0043) 或尚無文字呼叫記錄；圖片量來自既有 ai_image_jobs。" : undefined,
     textByRoute,
     textUsd: textByRoute.reduce((s, r) => s + r.usd, 0),
