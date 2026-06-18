@@ -175,7 +175,13 @@ export async function POST(request: Request) {
       metadata: {
         source: "mockup-studio",
         preset_name: presetName,
-        preset_settings: body.presetSettings ?? null,
+        // Cap preset_settings to prevent JSONB row bloat (only UI-controlled keys expected).
+        preset_settings: (() => {
+          if (!body.presetSettings) return null;
+          const s = JSON.stringify(body.presetSettings);
+          if (s.length > 4096) return null; // silently drop oversized blobs
+          return body.presetSettings;
+        })(),
         actor_role: resolved.role,
         role_source: resolved.source,
         trace_id: traceId,
@@ -188,6 +194,17 @@ export async function POST(request: Request) {
     console.error("[presets] media_assets insert failed:", error.message);
     return NextResponse.json({ ok: false, error: "insert_failed" }, { status: 500 });
   }
+
+  // Audit trail for preset creation (symmetry with preset_deleted).
+  await supabase.from("ops_audit_events").insert({
+    organization_id: organizationId,
+    actor_role: resolved.role,
+    event_type: "preset_saved",
+    target_type: "media_assets",
+    target_id: data.id,
+    trace_id: traceId,
+    payload: { object_key: uploaded.objectKey, preset_type: body.presetType, role_source: resolved.source },
+  });
 
   return NextResponse.json({ ok: true, preset: data });
 }
@@ -213,10 +230,20 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ ok: false, error: "supabase_write_not_configured" }, { status: 503 });
   }
 
+  // Resolve org boundary — DELETE must be scoped to the caller's org.
+  const deleteOrgId = new URL(request.url).searchParams.get("organizationId") ?? defaultOrganizationId();
+  if (!deleteOrgId || !isUuid(deleteOrgId)) {
+    return NextResponse.json(
+      { ok: false, error: "organizationId is required (or set POD_DESIGNS_DEFAULT_ORG_ID)" },
+      { status: 400 },
+    );
+  }
+
   const { data: asset, error: fetchErr } = await supabase
     .from("media_assets")
     .select("id,object_key,organization_id")
     .eq("id", assetId)
+    .eq("organization_id", deleteOrgId)
     .eq("storage_backend", "r2")
     .in("asset_domain", PRESET_DOMAINS)
     .single();

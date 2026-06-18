@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
-import { generateMockup } from "../../../../../lib/studio/printful-mockup";
+import { generateMockup, SUPPORTED_PRODUCT_TYPES } from "../../../../../lib/studio/printful-mockup";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const MAX_IMAGE_CHARS = 12_000_000; // ~9 MB base64
-
-const SUPPORTED_PRODUCT_TYPES = ["tshirt", "hoodie", "mug", "tote"] as const;
 
 export async function POST(request: Request) {
   if (process.env.POD_DESIGNS_ENABLED !== "true") {
@@ -39,7 +37,7 @@ export async function POST(request: Request) {
   }
 
   const productType = body.productType ?? "tshirt";
-  if (!SUPPORTED_PRODUCT_TYPES.includes(productType as (typeof SUPPORTED_PRODUCT_TYPES)[number])) {
+  if (!(SUPPORTED_PRODUCT_TYPES as string[]).includes(productType)) {
     return NextResponse.json(
       { ok: false, error: `unsupported productType: ${productType}. Supported: ${SUPPORTED_PRODUCT_TYPES.join(", ")}` },
       { status: 400 },

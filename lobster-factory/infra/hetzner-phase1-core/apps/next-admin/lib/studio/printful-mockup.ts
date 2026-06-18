@@ -76,7 +76,9 @@ const PRODUCT_CONFIG = {
   },
 } as const;
 
-type ProductType = keyof typeof PRODUCT_CONFIG;
+export type ProductType = keyof typeof PRODUCT_CONFIG;
+/** Single source of truth for supported product keys — consumed by the mockup API route. */
+export const SUPPORTED_PRODUCT_TYPES = Object.keys(PRODUCT_CONFIG) as ProductType[];
 
 // Mockup style groups to request. Printful returns whatever's valid for the product
 // and silently ignores unknown groups (live-verified 2026-06-15). "Flat"/"Ghost" are
