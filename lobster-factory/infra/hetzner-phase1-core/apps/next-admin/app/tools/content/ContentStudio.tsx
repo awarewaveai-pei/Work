@@ -984,6 +984,7 @@ export default function ContentStudio() {
       setF("language", "繁體中文");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // (form.language intentionally omitted: only re-run when keyword changes; guard reads latest value via closure)
   }, [form.keyword]);
 
   // ─── Image Generation ─────────────────────────────────────────────────────
