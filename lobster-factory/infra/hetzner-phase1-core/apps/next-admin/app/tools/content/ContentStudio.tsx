@@ -1956,34 +1956,80 @@ export default function ContentStudio() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                 <label className="form-label" style={{ margin: 0 }}>Introductory Hook Brief</label>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <button type="button" disabled={isGenerating} style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover, #f5f5f5)" }}
+                  <button type="button" disabled={isGenerating || hookBriefLoading || !form.keyword.trim()}
+                    style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover, #f5f5f5)" }}
+                    title={hookTypesSelected.size > 1 ? `為 ${hookTypesSelected.size} 個類型各生成一個 Hook 範例` : "AI 幫你寫一個 Hook 草稿"}
                     onClick={() => {
-                      // Auto-suggest best hook type — matches exact ARTICLE_TYPES values (lines 21-30)
-                      const t = form.articleType;
-                      const suggested: typeof HOOK_TYPES[number] =
-                        t === "How-to Guide" || t === "Tutorial" ? "Statistical or Fact" :
-                        t === "Listicle" || t === "Comparison" || t === "Q&A Page" ? "Statistical or Fact" :
-                        t === "Case Study" ? "Anecdotal or Story" :
-                        t === "Opinion Piece" ? "Personal or Emotional" :
-                        "Question"; // Pillar Article + fallback
-                      setF("introHookType", suggested);
-                    }}>✦ 推薦</button>
+                      // If nothing selected, auto-select the recommended type first then generate
+                      if (hookTypesSelected.size === 0) {
+                        const t = form.articleType;
+                        const suggested: typeof HOOK_TYPES[number] =
+                          t === "How-to Guide" || t === "Tutorial" ? "Statistical or Fact" :
+                          t === "Listicle" || t === "Comparison" || t === "Q&A Page" ? "Statistical or Fact" :
+                          t === "Case Study" ? "Anecdotal or Story" :
+                          t === "Opinion Piece" ? "Personal or Emotional" :
+                          "Question";
+                        setHookTypesSelected(new Set([suggested]));
+                        setF("introHookType", suggested);
+                      }
+                      void handleGenHookBriefs();
+                    }}>
+                    {hookBriefLoading ? "…" : `✦ ${hookTypesSelected.size > 1 ? `批次生成（${hookTypesSelected.size}）` : "推薦並生成"}`}
+                  </button>
                   <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{form.introHookBrief.length}/500</span>
                 </div>
               </div>
+              {/* Multi-select hook types: left-click = select for article generation; right-click = nothing */}
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
-                {HOOK_TYPES.map(ht => (
-                  <button key={ht} type="button"
-                    onClick={() => setF("introHookType", form.introHookType === ht ? "" : ht)}
-                    disabled={isGenerating}
-                    style={{ padding: "3px 10px", borderRadius: "20px", fontSize: "11px", cursor: "pointer",
-                      border: "1px solid var(--card-border)",
-                      background: form.introHookType === ht ? "var(--btn-primary-bg, #5855d0)" : "transparent",
-                      color: form.introHookType === ht ? "#fff" : "var(--text-muted)" }}>
-                    {ht}
-                  </button>
-                ))}
+                {HOOK_TYPES.map(ht => {
+                  const isActive   = form.introHookType === ht;
+                  const isSelected = hookTypesSelected.has(ht);
+                  return (
+                    <button key={ht} type="button" disabled={isGenerating}
+                      onClick={() => {
+                        // Single-click: set as active hook type for generation
+                        setF("introHookType", isActive ? "" : ht);
+                        // Also toggle in multi-select set
+                        setHookTypesSelected(prev => {
+                          const next = new Set(prev);
+                          if (next.has(ht)) next.delete(ht); else next.add(ht);
+                          return next;
+                        });
+                        // If a brief was generated for this type, pre-fill
+                        if (!isActive && hookBriefSugs[ht]) setF("introHookBrief", hookBriefSugs[ht]);
+                      }}
+                      style={{ padding: "3px 10px", borderRadius: "20px", fontSize: "11px", cursor: "pointer",
+                        border: isSelected ? "1.5px solid var(--btn-primary-bg, #5855d0)" : "1px solid var(--card-border)",
+                        background: isActive ? "var(--btn-primary-bg, #5855d0)" : isSelected ? "color-mix(in srgb, var(--btn-primary-bg, #5855d0) 12%, transparent)" : "transparent",
+                        color: isActive ? "#fff" : isSelected ? "var(--btn-primary-bg, #5855d0)" : "var(--text-muted)",
+                        fontWeight: isSelected ? 600 : 400,
+                      }}>
+                      {ht}
+                      {hookBriefSugs[ht] && !isActive && <span style={{ marginLeft: 4, opacity: 0.6 }}>✓</span>}
+                    </button>
+                  );
+                })}
+                {hookTypesSelected.size > 0 && (
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)", alignSelf: "center" }}>
+                    {hookTypesSelected.size > 1 ? `已選 ${hookTypesSelected.size} 個 → 按推薦並生成批次生成草稿` : ""}
+                  </span>
+                )}
               </div>
+              {/* Generated hook brief suggestions — one per type */}
+              {Object.keys(hookBriefSugs).length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
+                  {Object.entries(hookBriefSugs).map(([t, brief]) => (
+                    <div key={t} style={{ background: "var(--bg-subtle)", borderRadius: "var(--radius-sm)", padding: "7px 10px", fontSize: "12px", border: "1px solid var(--card-border)" }}>
+                      <div style={{ fontWeight: 600, fontSize: "11px", color: "var(--text-muted)", marginBottom: "3px" }}>{t}</div>
+                      <div style={{ color: "var(--text-primary)", lineHeight: 1.5 }}>{brief}</div>
+                      <button type="button" onClick={() => { setF("introHookType", t as typeof HOOK_TYPES[number]); setF("introHookBrief", brief); }}
+                        style={{ marginTop: "5px", fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover)" }}>
+                        使用此草稿
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <textarea className="form-textarea" style={{ minHeight: "72px" }}
                 value={form.introHookBrief} maxLength={500} disabled={isGenerating}
                 onChange={e => setF("introHookBrief", e.target.value)}

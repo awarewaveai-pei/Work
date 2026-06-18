@@ -11,6 +11,7 @@ export interface TextModelComparison {
   speed: "最快" | "快" | "中" | "慢" | "依搜尋深度";
   speedRank: 1 | 2 | 3 | 4 | 5; // 1=fastest
   costInputPer1M: number; // USD per 1M input tokens (for sort)
+  costOutputPer1M: number; // USD per 1M output tokens
   strengths: string;
   tradeoffs: string;
   sourceKeys: string[];
@@ -26,6 +27,7 @@ export interface CodingToolComparison {
   speed: "最快" | "快" | "中" | "慢" | "早期測試";
   speedRank: 1 | 2 | 3 | 4 | 5; // 1=fastest
   costInputPer1M: number; // USD per 1M input tokens (0 = free)
+  costOutputPer1M: number; // USD per 1M output tokens (0 = free)
   context: string;
   workflowStyle: string;
   strengths: string;
@@ -61,6 +63,7 @@ export const TEXT_MODEL_COMPARISONS: readonly TextModelComparison[] = [
     speed: "中",
     speedRank: 3,
     costInputPer1M: 5.0,
+    costOutputPer1M: 30.0,
     strengths: "推理、規格、長上下文與多步驟任務很強；適合做主稿與決策稿",
     tradeoffs: "輸出價高；長上下文或高推理工作會明顯拉高成本",
     sourceKeys: ["openaiPricing", "openaiGpt55"],
@@ -76,6 +79,7 @@ export const TEXT_MODEL_COMPARISONS: readonly TextModelComparison[] = [
     speed: "快",
     speedRank: 2,
     costInputPer1M: 2.5,
+    costOutputPer1M: 15.0,
     strengths: "5.4 是成本/能力平衡；mini 適合大量輕任務與分類",
     tradeoffs: "最難的策略、長篇推理、程式規劃不如 GPT-5.5",
     sourceKeys: ["openaiPricing"],
@@ -91,6 +95,7 @@ export const TEXT_MODEL_COMPARISONS: readonly TextModelComparison[] = [
     speed: "中",
     speedRank: 3,
     costInputPer1M: 5.0,
+    costOutputPer1M: 25.0,
     strengths: "深思、長文、程式碼審查與高風險 reasoning 很強",
     tradeoffs: "比 Sonnet/Haiku 貴；Fast mode 更貴但可提速",
     sourceKeys: ["claudeModels", "claudePricing", "claudeCode"],
@@ -106,6 +111,7 @@ export const TEXT_MODEL_COMPARISONS: readonly TextModelComparison[] = [
     speed: "快",
     speedRank: 2,
     costInputPer1M: 3.0,
+    costOutputPer1M: 15.0,
     strengths: "速度/成本/品質平衡最好之一；長內容很穩",
     tradeoffs: "極限推理與高難 agentic work 不如 Opus",
     sourceKeys: ["claudeModels", "claudePricing"],
@@ -121,6 +127,7 @@ export const TEXT_MODEL_COMPARISONS: readonly TextModelComparison[] = [
     speed: "最快",
     speedRank: 1,
     costInputPer1M: 1.0,
+    costOutputPer1M: 5.0,
     strengths: "低成本高吞吐，適合自動化內容前處理",
     tradeoffs: "深度策略、長篇高一致性與複雜程式任務較弱",
     sourceKeys: ["claudeModels", "claudePricing"],
