@@ -69,17 +69,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     status?: number;
   }
 
-  const { createJob, finishJob } = await import("@/lib/content/video/job-store");
+  const { createJob, finishJob, updateJobStep } = await import("@/lib/content/video/job-store");
   const { resolveOrgId, cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
   const job = createJob();
 
   // 關鍵：**同步**呼叫 prepare（Claude 腳本 + Flux 圖並行 + 提交 EU，~25s，無背景工作、不撞 CF 100s）。
   // 渲染在 EU thread 跑（持久）；/status 輪詢 EU 收尾。無 after()/fire-and-forget → 不再撞 Next.js 背景限制。
+  const ctxWithProgress = {
+    ...ctx,
+    onProgress: (step: string) => updateJobStep(job.id, step),
+  };
   let prep: PrepareResult;
   try {
-    prep = (await blocks[0].run(ctx)) as unknown as PrepareResult;
+    prep = (await blocks[0].run(ctxWithProgress)) as unknown as PrepareResult;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
+    console.error("[video/generate] prepare threw:", e);
     finishJob(job.id, { status: "error", error: `prepare 例外：${msg}`, statusCode: 500 });
     return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });
   }

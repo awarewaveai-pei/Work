@@ -29,9 +29,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, status: "error", error: job.error, statusCode: job.statusCode });
   }
 
-  // running：若還沒提交 EU（prepare 仍在/失敗已轉 error），回 running
+  // running：若還沒提交 EU（prepare 仍在/失敗已轉 error），回 running + step
   if (!job.euJobId) {
-    return NextResponse.json({ ok: true, status: "running" });
+    return NextResponse.json({ ok: true, status: "running", step: job.step ?? "準備中…" });
   }
 
   // 查 EU 一次
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const poll = await pollRenderJob(job.euJobId);
 
   if (poll.status === "running") {
-    return NextResponse.json({ ok: true, status: "running" });
+    return NextResponse.json({ ok: true, status: "running", step: "TTS 配音 + ffmpeg 合成中（EU 伺服器）…" });
   }
 
   if (poll.status === "done") {

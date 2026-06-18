@@ -102,7 +102,10 @@ register({
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     if (!anthropicKey) return { ok: false, status: 503, error: "ANTHROPIC_API_KEY not configured" };
 
+    const onProgress = (ctx as { onProgress?: (step: string) => void }).onProgress;
+
     // 1) Claude 腳本
+    onProgress?.("腳本生成中（Claude）…");
     const scriptResult = await generateVideoScript(
       {
         topic: (ctx.topic as string | undefined) ?? (ctx.keyword as string | undefined),
@@ -116,6 +119,7 @@ register({
     const { scenes, title } = scriptResult;
 
     // 2) 每場景一素材 — **並行**（壓低 /generate 同步時間到 <100s；Pexels URL 或 Flux→R2）
+    onProgress?.(`素材生成中（${scenes.length} 場景並行）…`);
     const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
     const buildAsset = async (scene: (typeof scenes)[number]): Promise<AssetResult> => {
       if (scene.visual === "broll" && pexelsKey) {
@@ -143,6 +147,7 @@ register({
     const assets = results.map((r) => (r as { ok: true; asset: string }).asset);
 
     // 3) 提交 EU（短請求，不等渲染）→ 回 euJobId。渲染在 EU thread 跑，由 /status 輪詢收尾。
+    onProgress?.("提交合成任務（EU 伺服器）…");
     const sub = await submitRender(scenes.map((s) => ({ id: s.id, narration: s.narration })), assets, title);
     if (!sub.ok) {
       await cleanupVideoInputKeys(r2Keys);

@@ -16,6 +16,7 @@ export type VideoJobStatus = "running" | "done" | "error";
 export interface VideoJob {
   id: string;
   status: VideoJobStatus;
+  step?: string;                 // 目前執行到哪個步驟（給 UI 顯示進度）
   video?: { outputs: Record<string, string>; out_dir: string };
   title?: string;
   error?: string;
@@ -48,6 +49,12 @@ export function createJob(): VideoJob {
 
 export function getJob(id: string): VideoJob | undefined {
   return JOBS.get(id);
+}
+
+/** 更新進行中 job 的步驟描述（給 UI 顯示 "正在做什麼"）。 */
+export function updateJobStep(id: string, step: string): void {
+  const job = JOBS.get(id);
+  if (job) job.step = step;
 }
 
 /** 背景管線完成/失敗時更新 job（done 帶 video/title；error 帶 error/statusCode）。 */
