@@ -533,6 +533,12 @@ export default function ContentStudio() {
   const [kwSugs,    setKwSugs]      = useState<string[]>([]);
   const [showKwDrop, setShowKwDrop] = useState(false);
 
+  // Hook brief AI suggestions: map of hook type → generated brief text
+  const [hookBriefLoading,  setHookBriefLoading]  = useState(false);
+  const [hookBriefSugs,     setHookBriefSugs]     = useState<Record<string, string>>({});
+  // Selected hook types for batch brief generation (multi-select)
+  const [hookTypesSelected, setHookTypesSelected] = useState<Set<string>>(new Set());
+
   // Outline auto-generate
   const [outlineLoading, setOutlineLoading] = useState(false);
 
@@ -686,6 +692,32 @@ export default function ContentStudio() {
       if (json.ok && json.keywords?.length) { setKwSugs(json.keywords); setShowKwDrop(true); }
       if (json._cost) addCostLine({ route: "content/keywords", model: json._cost.model, vendor: json._cost.vendor, usd: json._cost.usd, kind: "text" });
     } catch { /* silent */ } finally { setKwLoading(false); }
+  }
+
+  // ─── Hook Brief AI suggestions (batch — one call for all selected types) ────
+
+  async function handleGenHookBriefs() {
+    const types = hookTypesSelected.size > 0 ? [...hookTypesSelected] : [form.introHookType].filter(Boolean);
+    if (!types.length || !form.keyword.trim() || hookBriefLoading) return;
+    setHookBriefLoading(true);
+    try {
+      const res  = await fetch("/api/content/hook-brief", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyword: form.keyword, language: form.language, articleType: form.articleType, hookTypes: types }),
+      });
+      const json = await res.json() as { ok: boolean; briefs?: Record<string, string>; _cost?: { usd: number; model: string; vendor: string } };
+      if (json.ok && json.briefs) {
+        setHookBriefSugs(prev => ({ ...prev, ...json.briefs }));
+        // If only one type selected/returned, auto-fill the brief textarea and select the type
+        const entries = Object.entries(json.briefs ?? {});
+        if (entries.length === 1) {
+          const [t, brief] = entries[0];
+          setF("introHookType", t);
+          setF("introHookBrief", brief);
+        }
+      }
+      if (json._cost) addCostLine({ route: "content/hook-brief", model: json._cost.model, vendor: json._cost.vendor, usd: json._cost.usd, kind: "text" });
+    } catch { /* silent */ } finally { setHookBriefLoading(false); }
   }
 
   // ─── Auto-generate Outline ────────────────────────────────────────────────
@@ -988,7 +1020,14 @@ export default function ContentStudio() {
       const meta    = extractMeta(detrunc);
       const hint    = extractSlugHint(detrunc);
       const cleanMd = stripSlugHint(meta ? stripMeta(detrunc) : detrunc);
-      if (meta) setMetaData(meta);
+      if (meta) {
+        setMetaData(meta);
+        // Auto-fill categories/tags from AI suggestion if user hasn't typed anything manually
+        if (!form.wpCategories.trim() && meta.categories?.length)
+          setF("wpCategories", meta.categories.join(", "));
+        if (!form.wpTags.trim() && meta.tags?.length)
+          setF("wpTags", meta.tags.join(", "));
+      }
       setGenerated(cleanMd);
       setSlugHint(hint);
       // A mid-stream API error arrives as stream CONTENT, not a thrown exception — surface it as an
