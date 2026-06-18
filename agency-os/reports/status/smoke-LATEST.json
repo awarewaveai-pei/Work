@@ -6,9 +6,9 @@
                                          "system_mode":  "normal",
                                          "table_ok":  true
                                      },
-                   "client_sites":  "skip:http401",
+                   "client_sites":  "skip:http502",
                    "n8n_mcp":  "ok",
                    "repair_center":  "ok"
                },
-    "generated":  "2026-06-18 14:32:34"
+    "generated":  "2026-06-18 14:39:01"
 }
