@@ -299,6 +299,28 @@
 **[剩餘風險]** ① out_dir 以 title 衍生，同標題二次生成 → R2 key 碰撞 + media_assets 唯一索引擋掉第 2 筆（best-effort 丟，影片仍產出；follow-up：R2 key 加 uuid）。② byte_size 記 0（EU 端檔，next-admin 不知大小；UI 不顯示，無害）。③ 段 B prod：建 lobster-videos bucket + 公開存取 + 7 天 lifecycle + R2_VIDEO_PUBLIC_BASE 注入兩邊。
 - AUTO_TASK_DONE (2026-06-17): video Phase 2-A2 影片畫廊 tab + 獨立 bucket 完成；critic Critical（asset_domain 約束）用 mime 方案繞過 prod migration + NUL 損壞修；tsc 0。
 
+### feat(video): Phase 2-B — 跨機 prod 部署上線（EU render 服務 + R2 + SG next-admin）
+
+**[任務理解]** 操作者授權上線。EU 部署 render 微服務（避 SG OOM），跨機走 R2 + 認證端點。High-risk 多機 prod，逐步做、每步驗。
+
+**[已部署]**
+1. **R2**：建 `lobster-videos` bucket + 7 天 lifecycle + r2.dev 公開讀取（`https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev`）。put+公開 GET 200 驗證。
+2. **密鑰**：產高熵 `RENDER_AUTH_TOKEN`/`VIDEO_SERVICE_SECRET`（同值）存 vault；`R2_VIDEO_PUBLIC_BASE`/`VIDEO_SERVICE_URL` 存 vault。
+3. **EU 容器**：`/root/Work` git pull → `docker compose -f docker-compose.video.yml up -d --build`（映像 build 成功＝段 A Dockerfile 真機實證）→ healthy；`.env.video`（RENDER_AUTH_TOKEN + R2 video creds，base64 經 SSH 寫入不進 transcript）；compose 改 `127.0.0.1:8732` publish（host nginx 反代）+ mem 1.5G。
+4. **EU 對外**：CF DNS `video-svc.aware-wave.com` A→204.168.175.41 **grey/DNS-only**（避 CF 100s proxy 超時，render 可較久；靠 X-Render-Token+TLS 保護）；nginx vhost（proxy 127.0.0.1:8732，read_timeout 600s）；certbot **獨立憑證**（不動服務 7 子網域共用 SAN cert）+ 80→443。外部驗：`/health`→`{"ok":true}`、`/render` 無 token→401。
+5. **SG**：`.env` 附加 `PEXELS_API_KEY`/`VIDEO_SERVICE_URL`/`VIDEO_SERVICE_SECRET`（REPLICATE 本已 set；**我的 compose edit 讓它真的傳進 next-admin 容器**＝順修 Flux 在容器缺 token 潛在問題）→ `sg-deploy.sh next-admin`（tsc+npm test gate→build→healthy 6s→smoke 全 OK，commit 446bc59f）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH(eu) | cmd=docker compose up --build | 容器 healthy、`/health` ok、`/render` 無 token→401、image build 成功。
+- REALTEST_EVIDENCE: tool=Bash(curl 外部) | `https://video-svc.aware-wave.com/health`→`{"ok":true}` + `/render`→401 + TLS 憑證部署。
+- REALTEST_EVIDENCE: tool=SSH(sg) | `sg-deploy.sh next-admin` exit=0、healthy 6s、smoke /login+/api/ops/summary+wp+node-api 全 200。
+- REALTEST_EVIDENCE: tool=SSH(eu)+Bash | authed `/render`（2 真 Pexels 素材）→ `storage:r2` + 4 R2 URL；公開 GET youtube_linkedin → **200 video/mp4 3.19MB**（render→R2→公開播放全鏈通）。
+- REVIEW_DONE: critic=已於段 A/A2 審；本段為部署，逐步外部驗證取代 critic。
+- BUGHUNT_DONE: scope=部署 | grep=env keys | SG .env 3 keys SET、EU .env.video 5 keys、無重複/無洩漏（密鑰皆 base64 經加密 SSH，transcript 只見 $env 參照）。
+
+**[剩餘風險]** ① 最後一哩：網頁 `/tools/video` → 積木 → Claude+Flux+Pexels → render → media_assets → 畫廊影片 tab 的**完整 page→block e2e** 需操作者登入瀏覽器跑（render 端已驗，積木 gen 部分段 A/A2 已測）。② deploy_smoke R2 測試物件留著，7 天 lifecycle 自動清。③ 同標題二次生成 R2 key 碰撞（best-effort，follow-up 加 uuid）。
+- AUTO_TASK_DONE (2026-06-17): video Phase 2-B 跨機 prod 部署上線完成（R2 bucket+lifecycle / EU 容器+nginx+TLS / SG env+deploy / authed render→R2→公開播放 e2e 驗證 200）；剩網頁 page→block 完整 e2e 待操作者瀏覽器。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
