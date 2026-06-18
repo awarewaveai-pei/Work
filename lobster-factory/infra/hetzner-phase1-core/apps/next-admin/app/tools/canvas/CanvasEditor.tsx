@@ -222,14 +222,28 @@ export default function CanvasEditor() {
         try {
           const img = await fabric.FabricImage.fromURL(source, { crossOrigin: "anonymous" });
           if (disposed || !canvas) return;
-          // fit the base image inside the canvas, centered
-          const cw = canvas.getWidth();
-          const ch = canvas.getHeight();
-          const scale = Math.min(cw / (img.width || cw), ch / (img.height || ch), 1);
-          img.scale(scale);
-          img.set({ selectable: true });
+          // Match the canvas to the imported image instead of forcing every handoff into
+          // the default 800×800 square. Work in source-pixel coordinates and zoom the
+          // preview down to fit; exportPng() restores the full source dimensions.
+          const realW = Math.max(1, img.width || 800);
+          const realH = Math.max(1, img.height || 800);
+          const maxDisplay = 800;
+          const dispScale = Math.min(1, maxDisplay / Math.max(realW, realH));
+          canvas.setZoom(dispScale);
+          canvas.setDimensions({
+            width: Math.round(realW * dispScale),
+            height: Math.round(realH * dispScale),
+          });
+          canvasMetaRef.current = { realW, realH, dispScale, dpi: szDpi };
+          setSzInfo(`來源 ${realW}×${realH}px（預覽 ${Math.round(dispScale * 100)}%）`);
+          img.set({
+            left: realW / 2,
+            top: realH / 2,
+            originX: "center",
+            originY: "center",
+            selectable: true,
+          });
           canvas.add(img);
-          canvas.centerObject(img);
           canvas.requestRenderAll();
         } catch {
           setError("底圖載入失敗（可能是跨來源限制）。仍可加文字／上傳圖片。");
@@ -1293,7 +1307,7 @@ export default function CanvasEditor() {
 
       {/* 畫布 + 右側可捲動工具欄（vector-trace-demo 風格）。面板垂直堆疊、可收合。 */}
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: 802, background: "#fff", flexShrink: 0 }}>
+        <div style={{ border: "1px solid var(--card-border)", borderRadius: 8, width: 802, background: "#fff", flexShrink: 0, display: "flex", justifyContent: "center" }}>
           <canvas ref={canvasElRef} width={800} height={800} />
         </div>
 
