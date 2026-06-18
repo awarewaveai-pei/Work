@@ -701,9 +701,9 @@ export async function* streamArticleGeneration(
         const costUsd = textCallCostUsd({ model: config.model, inputTokens: finalMsg.usage.input_tokens, outputTokens: finalMsg.usage.output_tokens, cacheReadTokens: finalMsg.usage.cache_read_input_tokens, cacheWriteTokens: finalMsg.usage.cache_creation_input_tokens });
         const { rate } = resolveTextRate(config.model);
         if (config.perplexityCostUsd) {
-          yield `[COST_JSON]${JSON.stringify({ usd: config.perplexityCostUsd, model: "sonar", vendor: "Perplexity", route: "content/fetchRealSources" })}`;
+          yield `\n[COST_JSON]${JSON.stringify({ usd: config.perplexityCostUsd, model: "sonar", vendor: "Perplexity", route: "content/fetchRealSources" })}`;
         }
-        yield `[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate" })}`;
+        yield `\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate" })}`;
       }
       if (finalMsg?.stop_reason === "max_tokens") {
         yield "\n\n<!-- GENERATION_TRUNCATED: hit the output length limit; pick a shorter article size or split the topic -->";
@@ -839,9 +839,9 @@ async function* streamOpenAiGeneration(
       const costUsd = textCallCostUsd({ model: config.model, inputTokens: openaiUsage.prompt_tokens ?? 0, outputTokens: openaiUsage.completion_tokens ?? 0 });
       const { rate } = resolveTextRate(config.model);
       if (config.perplexityCostUsd) {
-        yield `[COST_JSON]${JSON.stringify({ usd: config.perplexityCostUsd, model: "sonar", vendor: "Perplexity", route: "content/fetchRealSources" })}`;
+        yield `\n[COST_JSON]${JSON.stringify({ usd: config.perplexityCostUsd, model: "sonar", vendor: "Perplexity", route: "content/fetchRealSources" })}`;
       }
-      yield `[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate" })}`;
+      yield `\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate" })}`;
     }
 
     // Truncation guard — parallel to the Anthropic stop_reason==="max_tokens" check.

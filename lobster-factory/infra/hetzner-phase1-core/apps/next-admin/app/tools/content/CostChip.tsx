@@ -7,6 +7,7 @@ export interface CostLineItem {
   model: string;
   vendor: string;
   usd: number;
+  kind: "text" | "image";
 }
 
 export interface SessionCost {
@@ -50,8 +51,8 @@ export function CostChip({ cost }: Props) {
 
   if (!cost) return null;
 
-  const textLines  = cost.lines.filter(l => l.vendor !== "Image");
-  const imageLines = cost.lines.filter(l => l.vendor === "Image");
+  const textLines  = cost.lines.filter(l => l.kind === "text");
+  const imageLines = cost.lines.filter(l => l.kind === "image");
 
   return (
     <div style={{ display: "inline-block", position: "relative" }}>
