@@ -5,19 +5,25 @@ import type { ManagedSite, SiteContentDefaults } from "@/app/api/content/sites/r
 
 const FUNNEL_STAGES = [
   { value: "",              label: "不指定" },
-  { value: "awareness",     label: "認知" },
-  { value: "interest",      label: "興趣" },
-  { value: "consideration", label: "考慮" },
-  { value: "decision",      label: "決策" },
-  { value: "retention",     label: "留存" },
+  { value: "awareness",     label: "認知（剛發現問題，建立信任）" },
+  { value: "interest",      label: "興趣（在比較方案、找資訊）" },
+  { value: "consideration", label: "考慮（評估是否適合自己）" },
+  { value: "decision",      label: "決策（準備行動／購買）" },
+  { value: "retention",     label: "留存（既有客戶深化關係）" },
 ];
 const PRICE_POSITIONS = [
   { value: "",        label: "不指定" },
-  { value: "premium", label: "高端精品" },
-  { value: "midhigh", label: "中高端" },
-  { value: "mid",     label: "中端" },
-  { value: "value",   label: "平價親民" },
+  { value: "premium", label: "高端精品（強調價值與稀缺）" },
+  { value: "midhigh", label: "中高端（品質與專業）" },
+  { value: "mid",     label: "中端（性價比）" },
+  { value: "value",   label: "平價親民（可近性）" },
 ];
+const MKT_PRESETS: Record<string, string[]> = {
+  audience: ["台灣 30-45 歲女性", "有焦慮/壓力的上班族", "正在尋找自我療癒的成人", "對心理健康有興趣的父母", "藝術愛好者（非專業）", "身心科/諮商後進階探索者"],
+  primaryCta: ["預約免費體驗課", "立即報名工作坊", "加入候補名單", "下載免費指南", "訂閱電子報", "聯絡我們了解更多"],
+  emotionalTriggers: ["渴望被理解與接納", "想找回創造力與自信", "希望減輕焦慮與壓力", "尋找內心平靜與自我探索", "渴望與人真實連結", "想為孩子找到非藥物支持"],
+  objections: ["我沒有繪畫天份", "會不會很貴？值得嗎？", "我不確定這對我有效", "我沒有時間", "這跟一般心理諮商有什麼不同？", "我的孩子適合嗎？"],
+};
 const IMAGE_MODELS = [
   { value: "none",                 label: "None（不生成）" },
   { value: "flux-schnell",         label: "Flux Schnell（預設）" },
@@ -155,56 +161,96 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
             </label>
           </div>
 
-          {/* Row 2: audience / positioning / USP */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            <label>
+          {/* Marketing grid — 2-col, matches ContentStudio layout */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {/* audience */}
+            <div>
               <span style={lbl}>目標受眾</span>
-              <input style={inp} value={d.marketing?.audience ?? ""} placeholder="台灣 30-45 歲女性…" onChange={e => setM("audience", e.target.value)} />
-            </label>
-            <label>
+              <input style={inp} value={d.marketing?.audience ?? ""} placeholder="例：台灣成人，對表達藝術有興趣"
+                onChange={e => { setM("audience", e.target.value); }} />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                {MKT_PRESETS.audience.map(p => (
+                  <button key={p} type="button" onClick={() => setM("audience", p)}
+                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid #444", fontSize: 11, cursor: "pointer", background: "#1e1e2e", color: "#aaa" }}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* positioning */}
+            <div>
               <span style={lbl}>品牌定位（一句話）</span>
-              <input style={inp} value={d.marketing?.positioning ?? ""} placeholder="陪伴而非治療…" onChange={e => setM("positioning", e.target.value)} />
-            </label>
-            <label>
-              <span style={lbl}>獨特賣點（USP）</span>
-              <input style={inp} value={d.marketing?.usp ?? ""} placeholder="跨文化、結構化模組…" onChange={e => setM("usp", e.target.value)} />
-            </label>
-          </div>
-
-          {/* Row 3: CTA / funnel / price */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            <label>
-              <span style={lbl}>主要 CTA</span>
-              <input style={inp} value={d.marketing?.primaryCta ?? ""} placeholder="預約免費體驗課" onChange={e => setM("primaryCta", e.target.value)} />
-            </label>
-            <label>
+              <input style={inp} value={d.marketing?.positioning ?? ""} placeholder="例：陪伴而非治療的藝術自我探索空間"
+                onChange={e => { setM("positioning", e.target.value); }} />
+            </div>
+            {/* USP */}
+            <div>
+              <span style={lbl}>獨特賣點 / 差異化（USP）</span>
+              <input style={inp} value={d.marketing?.usp ?? ""} placeholder="例：跨文化、結構化模組、真人帶領"
+                onChange={e => { setM("usp", e.target.value); }} />
+            </div>
+            {/* funnel */}
+            <div>
               <span style={lbl}>漏斗階段預設</span>
               <select style={sel} value={d.marketing?.funnelStage ?? ""} onChange={e => setM("funnelStage", e.target.value)}>
                 {FUNNEL_STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
-            </label>
-            <label>
-              <span style={lbl}>價格定位預設</span>
+            </div>
+            {/* CTA */}
+            <div>
+              <span style={lbl}>主要行動呼籲（CTA）</span>
+              <input style={inp} value={d.marketing?.primaryCta ?? ""} placeholder="例：預約免費體驗工作坊"
+                onChange={e => { setM("primaryCta", e.target.value); }} />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                {MKT_PRESETS.primaryCta.map(p => (
+                  <button key={p} type="button" onClick={() => setM("primaryCta", p)}
+                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid #444", fontSize: 11, cursor: "pointer", background: "#1e1e2e", color: "#aaa" }}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* price */}
+            <div>
+              <span style={lbl}>價格定位</span>
               <select style={sel} value={d.marketing?.pricePositioning ?? ""} onChange={e => setM("pricePositioning", e.target.value)}>
                 {PRICE_POSITIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
-            </label>
-          </div>
-
-          {/* Row 4: emotional / objections / forbidden */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            <label>
-              <span style={lbl}>情緒觸發點</span>
-              <input style={inp} value={d.marketing?.emotionalTriggers ?? ""} placeholder="渴望被理解…" onChange={e => setM("emotionalTriggers", e.target.value)} />
-            </label>
-            <label>
-              <span style={lbl}>常見疑慮 / 抗拒點</span>
-              <input style={inp} value={d.marketing?.objections ?? ""} placeholder="我沒有繪畫天份…" onChange={e => setM("objections", e.target.value)} />
-            </label>
-            <label>
-              <span style={lbl}>禁用聲明（逗號）</span>
-              <input style={inp} value={d.marketing?.forbiddenClaims ?? ""} placeholder="治癒, 保證療效…" onChange={e => setM("forbiddenClaims", e.target.value)} />
-            </label>
+            </div>
+            {/* emotional triggers */}
+            <div>
+              <span style={lbl}>情緒觸發點 / 讀者渴望</span>
+              <input style={inp} value={d.marketing?.emotionalTriggers ?? ""} placeholder="例：渴望被理解、想找回創造力"
+                onChange={e => { setM("emotionalTriggers", e.target.value); }} />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                {MKT_PRESETS.emotionalTriggers.map(p => (
+                  <button key={p} type="button" onClick={() => setM("emotionalTriggers", p)}
+                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid #444", fontSize: 11, cursor: "pointer", background: "#1e1e2e", color: "#aaa" }}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* objections */}
+            <div>
+              <span style={lbl}>要化解的疑慮 / 抗拒點</span>
+              <input style={inp} value={d.marketing?.objections ?? ""} placeholder="例：我沒有繪畫天份／會不會很貴"
+                onChange={e => { setM("objections", e.target.value); }} />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                {MKT_PRESETS.objections.map(p => (
+                  <button key={p} type="button" onClick={() => setM("objections", p)}
+                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid #444", fontSize: 11, cursor: "pointer", background: "#1e1e2e", color: "#aaa" }}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* forbidden claims — full width */}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <span style={lbl}>避免使用 / 禁用聲明（逗號分隔）</span>
+              <input style={inp} value={d.marketing?.forbiddenClaims ?? ""} placeholder="例：治癒, 治療疾病, 保證療效"
+                onChange={e => { setM("forbiddenClaims", e.target.value); }} />
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
