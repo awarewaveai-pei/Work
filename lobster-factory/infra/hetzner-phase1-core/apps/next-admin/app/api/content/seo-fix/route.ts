@@ -90,7 +90,7 @@ Please output the COMPLETE improved article. Fix ONLY the listed failed checks â
 
     // Aggregate all text blocks (Anthropic may return multiple content blocks)
     const text = msg.content.filter(b => b.type === "text").map(b => (b as { type: "text"; text: string }).text).join("");
-    if (!text) return new NextResponse("empty response from AI", { status: 502 });
+    if (!text) return NextResponse.json({ ok: false, error: "empty response from AI" }, { status: 502 });
 
     // Parse optional meta block â€” use tolerant per-field regexes before stripping
     const blockMatch = text.match(/<!-- CONTENT_META_START -->([\s\S]*?)<!-- CONTENT_META_END -->/);
