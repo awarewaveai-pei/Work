@@ -167,6 +167,22 @@
   --approvals-err-text: #991b1b;
   --approval-role-ok: #059669;
   --approval-role-deny: #b91c1c;
+
+  /* Typography tokens (2026-06-18) */
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-md: 15px;
+  --font-size-lg: 17px;
+  --font-size-xl: 22px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-heavy: 800;
+  --line-height-base: 1.6;
+  --line-height-tight: 1.3;
+  --letter-spacing-label: 0.07em;
 }
 
 body {

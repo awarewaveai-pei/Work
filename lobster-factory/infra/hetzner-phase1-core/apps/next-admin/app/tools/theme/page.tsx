@@ -3,10 +3,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { DEFAULT_SECTIONS, itemKey, type NavSection, type NavItem } from '../../SidebarNav';
 
 // ── Token definitions ───────────────────────────────────────────────────────
-const TOKEN_GROUPS: Array<{
-  label: string;
-  tokens: Array<{ name: string; default: string; type: 'color' | 'text' }>;
-}> = [
+type TokenDef = { name: string; default: string; type: 'color' | 'text' };
+type TokenGroup = { label: string; tokens: TokenDef[] };
+
+const COLOR_GROUPS: TokenGroup[] = [
   {
     label: 'Brand',
     tokens: [
@@ -25,14 +25,6 @@ const TOKEN_GROUPS: Array<{
       { name: '--bg-subtle', default: '#f5f7fd', type: 'color' },
       { name: '--bg-hover',  default: '#eef1f9', type: 'color' },
       { name: '--surface-2', default: '#f5f7fd', type: 'color' },
-    ],
-  },
-  {
-    label: 'Text',
-    tokens: [
-      { name: '--text-primary',   default: '#0d1526', type: 'color' },
-      { name: '--text-muted',     default: '#64748b', type: 'color' },
-      { name: '--text-secondary', default: '#64748b', type: 'color' },
     ],
   },
   {
@@ -88,12 +80,65 @@ const TOKEN_GROUPS: Array<{
   },
 ];
 
-// Static fallback defaults (used if API fetch fails or during SSR).
+const TYPOGRAPHY_GROUPS: TokenGroup[] = [
+  {
+    label: 'Font Sizes',
+    tokens: [
+      { name: '--font-size-xs',   default: '11px', type: 'text' },
+      { name: '--font-size-sm',   default: '13px', type: 'text' },
+      { name: '--font-size-base', default: '14px', type: 'text' },
+      { name: '--font-size-md',   default: '15px', type: 'text' },
+      { name: '--font-size-lg',   default: '17px', type: 'text' },
+      { name: '--font-size-xl',   default: '22px', type: 'text' },
+    ],
+  },
+  {
+    label: 'Font Weights',
+    tokens: [
+      { name: '--font-weight-normal',   default: '400', type: 'text' },
+      { name: '--font-weight-medium',   default: '500', type: 'text' },
+      { name: '--font-weight-semibold', default: '600', type: 'text' },
+      { name: '--font-weight-bold',     default: '700', type: 'text' },
+      { name: '--font-weight-heavy',    default: '800', type: 'text' },
+    ],
+  },
+  {
+    label: 'Line Height & Spacing',
+    tokens: [
+      { name: '--line-height-base',    default: '1.6',    type: 'text' },
+      { name: '--line-height-tight',   default: '1.3',    type: 'text' },
+      { name: '--letter-spacing-label', default: '0.07em', type: 'text' },
+    ],
+  },
+  {
+    label: 'Text Colors',
+    tokens: [
+      { name: '--text-primary',   default: '#0d1526', type: 'color' },
+      { name: '--text-muted',     default: '#64748b', type: 'color' },
+      { name: '--text-secondary', default: '#64748b', type: 'color' },
+    ],
+  },
+  {
+    label: 'Backgrounds',
+    tokens: [
+      { name: '--body-bg',    default: '#f2f5fb', type: 'color' },
+      { name: '--card-bg',    default: '#ffffff',  type: 'color' },
+      { name: '--bg-subtle',  default: '#f5f7fd', type: 'color' },
+      { name: '--sidebar-bg', default: '#f7f9fc', type: 'color' },
+    ],
+  },
+];
+
+// Merge all groups for STATIC_DEFAULTS and API save
+const ALL_GROUPS = [...COLOR_GROUPS, ...TYPOGRAPHY_GROUPS];
+
 const STATIC_DEFAULTS: Record<string, string> = {};
-TOKEN_GROUPS.forEach(g => g.tokens.forEach(t => { STATIC_DEFAULTS[t.name] = t.default; }));
+ALL_GROUPS.forEach(g => g.tokens.forEach(t => { STATIC_DEFAULTS[t.name] = t.default; }));
 
 const LS_TOKENS_KEY = 'aw-theme-overrides';
 const LS_ORDER_KEY  = 'aw-sidebar-order';
+
+type Tab = 'colors' | 'typography' | 'sidebar';
 
 interface SavedLayout {
   sectionOrder?: string[];
@@ -124,14 +169,13 @@ function applyLayoutToSections(sections: NavSection[], layout: SavedLayout): Nav
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function ThemePage() {
-  // serverDefaults: token values as written in globals.css (fetched on mount).
-  // Falls back to STATIC_DEFAULTS if the API is unavailable.
+  const [activeTab, setActiveTab]     = useState<Tab>('colors');
   const [serverDefaults, setServerDefaults] = useState<Record<string, string>>({ ...STATIC_DEFAULTS });
-  const [values, setValues]       = useState<Record<string, string>>({ ...STATIC_DEFAULTS });
-  const [sections, setSections]   = useState<NavSection[]>(DEFAULT_SECTIONS);
+  const [values, setValues]           = useState<Record<string, string>>({ ...STATIC_DEFAULTS });
+  const [sections, setSections]       = useState<NavSection[]>(DEFAULT_SECTIONS);
   const [expandedSec, setExpandedSec] = useState<string | null>(null);
-  const [savedMsg, setSavedMsg]   = useState('');
-  const [copiedMsg, setCopiedMsg] = useState('');
+  const [savedMsg, setSavedMsg]       = useState('');
+  const [copiedMsg, setCopiedMsg]     = useState('');
   const [secDragIdx, setSecDragIdx]   = useState<number | null>(null);
   const [itemDragIdx, setItemDragIdx] = useState<number | null>(null);
 
@@ -141,16 +185,14 @@ export default function ThemePage() {
       .then(r => r.ok ? r.json() : null)
       .then((data: { tokens?: Record<string, string> } | null) => {
         if (data?.tokens) {
-          // Only bring in tokens that are in our TOKEN_GROUPS (ignore layout tokens etc.)
           const relevant: Record<string, string> = {};
-          TOKEN_GROUPS.forEach(g =>
+          ALL_GROUPS.forEach(g =>
             g.tokens.forEach(t => {
               if (t.name in data.tokens!) relevant[t.name] = data.tokens![t.name];
             })
           );
           setServerDefaults(prev => ({ ...prev, ...relevant }));
           setValues(prev => ({ ...prev, ...relevant }));
-          // Apply server values to live document (before localStorage overrides below)
           Object.entries(relevant).forEach(([k, v]) =>
             document.documentElement.style.setProperty(k, v)
           );
@@ -177,7 +219,6 @@ export default function ThemePage() {
       const raw = localStorage.getItem(LS_ORDER_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        // Migrate legacy shape: was string[] (section IDs only)
         const layout: SavedLayout = Array.isArray(parsed) ? { sectionOrder: parsed } : parsed;
         setSections(applyLayoutToSections(DEFAULT_SECTIONS, layout));
       }
@@ -192,29 +233,22 @@ export default function ThemePage() {
   }, []);
 
   const handleSave = async () => {
-    // 1. Persist token overrides to localStorage (live preview fallback).
     const overrides: Record<string, string> = {};
     Object.entries(values).forEach(([k, v]) => { if (v !== serverDefaults[k]) overrides[k] = v; });
     localStorage.setItem(LS_TOKENS_KEY, JSON.stringify(overrides));
 
-    // 2. Persist layout to localStorage + notify sidebar.
     const layout: SavedLayout = {
       sectionOrder: sections.map(s => s.id),
       itemOrders: Object.fromEntries(
-        sections.map(sec => [
-          sec.id,
-          sec.items.map((item, i) => itemKey(item, i)),
-        ])
+        sections.map(sec => [sec.id, sec.items.map((item, i) => itemKey(item, i))])
       ),
     };
     const layoutJson = JSON.stringify(layout);
     localStorage.setItem(LS_ORDER_KEY, layoutJson);
     window.dispatchEvent(new StorageEvent('storage', { key: LS_ORDER_KEY, newValue: layoutJson }));
 
-    // 3. Persist changed tokens to globals.css via API (all tokens, not just overrides,
-    //    so that the file stays in sync even if defaults changed server-side).
     const tokenPayload: Record<string, string> = {};
-    TOKEN_GROUPS.forEach(g => g.tokens.forEach(t => {
+    ALL_GROUPS.forEach(g => g.tokens.forEach(t => {
       if (t.name in values) tokenPayload[t.name] = values[t.name];
     }));
 
@@ -225,7 +259,6 @@ export default function ThemePage() {
         body: JSON.stringify({ tokens: tokenPayload }),
       });
       if (res.ok) {
-        // Update serverDefaults so changedCount resets to 0.
         setServerDefaults(prev => ({ ...prev, ...tokenPayload }));
         setSavedMsg('✓ Saved to globals.css');
       } else {
@@ -241,7 +274,7 @@ export default function ThemePage() {
   const handleReset = () => {
     localStorage.removeItem(LS_TOKENS_KEY);
     localStorage.removeItem(LS_ORDER_KEY);
-    TOKEN_GROUPS.forEach(g => g.tokens.forEach(t => document.documentElement.style.removeProperty(t.name)));
+    ALL_GROUPS.forEach(g => g.tokens.forEach(t => document.documentElement.style.removeProperty(t.name)));
     setValues({ ...serverDefaults });
     setSections(DEFAULT_SECTIONS);
     setSavedMsg('');
@@ -260,7 +293,7 @@ export default function ThemePage() {
     setSavedMsg('');
   };
 
-  // ── Item drag (within a section) ────────────────────────────────────────
+  // ── Item drag ────────────────────────────────────────────────────────────
   const moveItem = (secId: string, from: number, to: number) => {
     setSections(prev => prev.map(sec => {
       if (sec.id !== secId) return sec;
@@ -281,14 +314,20 @@ export default function ThemePage() {
   });
   const orderChanged = sectionOrderChanged || itemOrderChanged;
 
+  const TABS: { id: Tab; label: string; badge?: number }[] = [
+    { id: 'colors',     label: 'Colors',     badge: changedCount > 0 ? changedCount : undefined },
+    { id: 'typography', label: 'Typography' },
+    { id: 'sidebar',    label: 'Sidebar',    badge: orderChanged ? 1 : undefined },
+  ];
+
   return (
     <div className="page">
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Theme Editor</h1>
           <p style={{ color: 'var(--text-muted)', marginTop: 4, fontSize: 13 }}>
-            Changes apply live.
+            Changes apply live across the whole app.
             {(changedCount > 0 || orderChanged) && (
               <span style={{ color: 'var(--accent)', marginLeft: 8 }}>
                 {[
@@ -306,207 +345,219 @@ export default function ThemePage() {
         </div>
       </div>
 
-      {/* ── Quick Colors ────────────────────────────────────────────── */}
-      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-        <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
-          Quick Colors
-        </div>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <BigSwatch
-            label="Page background"
-            name="--body-bg"
-            value={values['--body-bg'] ?? serverDefaults['--body-bg']}
-            defaultValue={serverDefaults['--body-bg']}
-            onChange={handleChange}
-          />
-          <BigSwatch
-            label="Sidebar background"
-            name="--sidebar-bg"
-            value={values['--sidebar-bg'] ?? serverDefaults['--sidebar-bg']}
-            defaultValue={serverDefaults['--sidebar-bg']}
-            onChange={handleChange}
-          />
-          <BigSwatch
-            label="Card background"
-            name="--card-bg"
-            value={values['--card-bg'] ?? serverDefaults['--card-bg']}
-            defaultValue={serverDefaults['--card-bg']}
-            onChange={handleChange}
-          />
-          <BigSwatch
-            label="Accent / Brand"
-            name="--accent"
-            value={values['--accent'] ?? serverDefaults['--accent']}
-            defaultValue={serverDefaults['--accent']}
-            onChange={handleChange}
-          />
-          <BigSwatch
-            label="Primary text"
-            name="--text-primary"
-            value={values['--text-primary'] ?? serverDefaults['--text-primary']}
-            defaultValue={serverDefaults['--text-primary']}
-            onChange={handleChange}
-          />
-        </div>
-      </div>
-
-      {/* ── Sidebar order ───────────────────────────────────────────── */}
-      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-        <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
-          Sidebar Menu Order
-          <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', marginLeft: 8, letterSpacing: 0 }}>drag · or ↑↓ · click section to reorder items</span>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 420 }}>
-          {sections.map((sec, si) => {
-            const isExpanded = expandedSec === sec.id;
-            const def = DEFAULT_SECTIONS.find(d => d.id === sec.id);
-            const secItemsChanged = def
-              ? sec.items.map((it, i) => itemKey(it, i)).join() !== def.items.map((it, i) => itemKey(it, i)).join()
-              : false;
-
-            return (
-              <div key={sec.id}>
-                {/* Section row */}
-                <div
-                  draggable
-                  onDragStart={() => setSecDragIdx(si)}
-                  onDragOver={e => { e.preventDefault(); if (secDragIdx !== null && secDragIdx !== si) { moveSection(secDragIdx, si); setSecDragIdx(si); } }}
-                  onDragEnd={() => setSecDragIdx(null)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '8px 12px',
-                    background: secDragIdx === si ? 'var(--accent-light)' : isExpanded ? 'var(--accent-light)' : 'var(--bg-subtle)',
-                    border: `1px solid ${secDragIdx === si || isExpanded ? 'var(--accent)' : 'var(--border)'}`,
-                    borderRadius: isExpanded ? '8px 8px 0 0' : 'var(--radius-sm)',
-                    cursor: 'grab', userSelect: 'none',
-                  }}
-                >
-                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>⠿</span>
-                  <button
-                    onClick={() => setExpandedSec(isExpanded ? null : sec.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', flex: 1, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}
-                  >
-                    <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{sec.label}</span>
-                    {secItemsChanged && <span style={{ fontSize: 10, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 5px', borderRadius: 4 }}>edited</span>}
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 2 }}>{sec.items.length} items</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{isExpanded ? '▲' : '▼'}</span>
-                  </button>
-                  <ArrowBtns i={si} total={sections.length} onUp={() => moveSection(si, si - 1)} onDown={() => moveSection(si, si + 1)} />
-                </div>
-
-                {/* Items panel */}
-                {isExpanded && (
-                  <div style={{
-                    border: '1px solid var(--accent)', borderTop: 'none',
-                    borderRadius: '0 0 8px 8px',
-                    padding: '8px 10px',
-                    background: 'var(--card-bg)',
-                    display: 'flex', flexDirection: 'column', gap: 4,
-                  }}>
-                    {sec.items.map((item, ii) => (
-                      <div
-                        key={itemKey(item, ii)}
-                        draggable
-                        onDragStart={() => setItemDragIdx(ii)}
-                        onDragOver={e => { e.preventDefault(); if (itemDragIdx !== null && itemDragIdx !== ii) { moveItem(sec.id, itemDragIdx, ii); setItemDragIdx(ii); } }}
-                        onDragEnd={() => setItemDragIdx(null)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '5px 8px',
-                          background: itemDragIdx === ii ? 'var(--accent-light)' : 'var(--bg-subtle)',
-                          border: `1px solid ${itemDragIdx === ii ? 'var(--accent)' : 'var(--border)'}`,
-                          borderRadius: 6, cursor: 'grab', userSelect: 'none',
-                        }}
-                      >
-                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>⠿</span>
-                        <span style={{ fontSize: 16, lineHeight: 1 }}>{item.icon}</span>
-                        <span style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)' }}>{item.label}</span>
-                        {'href' in item && (
-                          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item.href}</span>
-                        )}
-                        <ArrowBtns i={ii} total={sec.items.length} onUp={() => moveItem(sec.id, ii, ii - 1)} onDown={() => moveItem(sec.id, ii, ii + 1)} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Token groups grid ───────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16, marginBottom: 24 }}>
-        {TOKEN_GROUPS.map(group => (
-          <div key={group.label} className="card" style={{ padding: 20 }}>
-            <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
-              {group.label}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {group.tokens.map(token => {
-                const def = serverDefaults[token.name] ?? token.default;
-                const changed = values[token.name] !== def;
-                return (
-                  <TokenRow
-                    key={token.name}
-                    name={token.name}
-                    type={token.type}
-                    value={values[token.name] ?? def}
-                    defaultValue={def}
-                    changed={changed}
-                    onChange={handleChange}
-                  />
-                );
-              })}
-            </div>
-          </div>
+      {/* ── Tab bar ─────────────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', gap: 2, marginBottom: 20,
+        borderBottom: '2px solid var(--border)',
+        paddingBottom: 0,
+      }}>
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '8px 16px',
+              fontSize: 13, fontWeight: activeTab === tab.id ? 600 : 400,
+              color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-muted)',
+              borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
+              marginBottom: -2, borderRadius: '6px 6px 0 0',
+              display: 'flex', alignItems: 'center', gap: 6,
+              transition: 'color 0.15s',
+            }}
+          >
+            {tab.label}
+            {tab.badge !== undefined && (
+              <span style={{
+                background: 'var(--accent)', color: '#fff',
+                borderRadius: 10, fontSize: 10, fontWeight: 700,
+                padding: '1px 6px', lineHeight: '14px',
+              }}>{tab.badge}</span>
+            )}
+          </button>
         ))}
       </div>
 
-      {/* ── Live preview ────────────────────────────────────────────── */}
-      <div className="card" style={{ padding: 24, marginBottom: 24 }}>
-        <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 16 }}>
-          Live Preview
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16, alignItems: 'center' }}>
-          <button className="btn-primary">Primary</button>
-          <button className="btn-secondary">Secondary</button>
-          {[
-            { label: 'Success',  bg: 'var(--green)' },
-            { label: 'Error',    bg: 'var(--red)' },
-            { label: 'Warning',  bg: 'var(--yellow)' },
-            { label: 'Critical', bg: 'var(--severity-critical)' },
-            { label: 'AI',       bg: 'var(--ai-bg)', color: 'var(--ai-text)' },
-          ].map(b => (
-            <span key={b.label} style={{
-              background: b.bg, color: b.color ?? '#fff',
-              padding: '3px 10px', borderRadius: 'var(--radius-sm)',
-              fontSize: 12, fontWeight: 500,
-            }}>{b.label}</span>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius)', padding: 16, flex: '1 1 180px' }}>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>Card</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Muted body text inside a card.</div>
+      {/* ── Colors tab ──────────────────────────────────────────────── */}
+      {activeTab === 'colors' && (
+        <>
+          {/* Quick Colors */}
+          <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+            <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
+              Quick Colors
+            </div>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              {[
+                { label: 'Page background', name: '--body-bg' },
+                { label: 'Sidebar background', name: '--sidebar-bg' },
+                { label: 'Card background', name: '--card-bg' },
+                { label: 'Accent / Brand', name: '--accent' },
+                { label: 'Primary text', name: '--text-primary' },
+              ].map(({ label, name }) => (
+                <BigSwatch
+                  key={name}
+                  label={label}
+                  name={name}
+                  value={values[name] ?? serverDefaults[name]}
+                  defaultValue={serverDefaults[name]}
+                  onChange={handleChange}
+                />
+              ))}
+            </div>
           </div>
-          <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 16, flex: '1 1 180px' }}>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>Subtle surface</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Secondary text.</div>
+
+          {/* Token groups grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16, marginBottom: 24 }}>
+            {COLOR_GROUPS.map(group => (
+              <TokenGroupCard
+                key={group.label}
+                group={group}
+                values={values}
+                serverDefaults={serverDefaults}
+                onChange={handleChange}
+              />
+            ))}
           </div>
-          <div style={{ background: 'var(--code-bg)', borderRadius: 'var(--radius)', padding: 16, flex: '1 1 180px' }}>
-            <code style={{ color: '#4ade80', fontSize: 13 }}>$ code block</code>
+        </>
+      )}
+
+      {/* ── Typography tab ──────────────────────────────────────────── */}
+      {activeTab === 'typography' && (
+        <>
+          {/* Quick preview */}
+          <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+            <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
+              Live Preview
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                { label: '--font-size-xl',  weight: '--font-weight-heavy',    text: 'Heading XL' },
+                { label: '--font-size-lg',  weight: '--font-weight-bold',     text: 'Heading LG' },
+                { label: '--font-size-md',  weight: '--font-weight-semibold', text: 'Heading MD' },
+                { label: '--font-size-base',weight: '--font-weight-normal',   text: 'Body base text — regular weight' },
+                { label: '--font-size-sm',  weight: '--font-weight-normal',   text: 'Small text — secondary label' },
+                { label: '--font-size-xs',  weight: '--font-weight-medium',   text: 'XS caption text' },
+              ].map(row => (
+                <span key={row.label} style={{
+                  fontSize: `var(${row.label})`,
+                  fontWeight: `var(${row.weight})`,
+                  color: 'var(--text-primary)',
+                  lineHeight: `var(--line-height-base)`,
+                }}>{row.text}</span>
+              ))}
+            </div>
+            <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>Primary</span>
+              <span style={{ color: 'var(--text-muted)',   fontSize: 'var(--font-size-sm)' }}>Muted</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Secondary</span>
+            </div>
+          </div>
+
+          {/* Typography token groups */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16, marginBottom: 24 }}>
+            {TYPOGRAPHY_GROUPS.map(group => (
+              <TokenGroupCard
+                key={group.label}
+                group={group}
+                values={values}
+                serverDefaults={serverDefaults}
+                onChange={handleChange}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── Sidebar tab ─────────────────────────────────────────────── */}
+      {activeTab === 'sidebar' && (
+        <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
+            Sidebar Menu Order
+            <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', marginLeft: 8, letterSpacing: 0 }}>drag · or ↑↓ · click section to reorder items</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 480 }}>
+            {sections.map((sec, si) => {
+              const isExpanded = expandedSec === sec.id;
+              const def = DEFAULT_SECTIONS.find(d => d.id === sec.id);
+              const secItemsChanged = def
+                ? sec.items.map((it, i) => itemKey(it, i)).join() !== def.items.map((it, i) => itemKey(it, i)).join()
+                : false;
+
+              return (
+                <div key={sec.id}>
+                  <div
+                    draggable
+                    onDragStart={() => setSecDragIdx(si)}
+                    onDragOver={e => { e.preventDefault(); if (secDragIdx !== null && secDragIdx !== si) { moveSection(secDragIdx, si); setSecDragIdx(si); } }}
+                    onDragEnd={() => setSecDragIdx(null)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '8px 12px',
+                      background: secDragIdx === si || isExpanded ? 'var(--accent-light)' : 'var(--bg-subtle)',
+                      border: `1px solid ${secDragIdx === si || isExpanded ? 'var(--accent)' : 'var(--border)'}`,
+                      borderRadius: isExpanded ? '8px 8px 0 0' : 'var(--radius-sm)',
+                      cursor: 'grab', userSelect: 'none',
+                    }}
+                  >
+                    <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>⠿</span>
+                    <button
+                      onClick={() => setExpandedSec(isExpanded ? null : sec.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', flex: 1, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}
+                    >
+                      <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{sec.label}</span>
+                      {secItemsChanged && <span style={{ fontSize: 10, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 5px', borderRadius: 4 }}>edited</span>}
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 2 }}>{sec.items.length} items</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{isExpanded ? '▲' : '▼'}</span>
+                    </button>
+                    <ArrowBtns i={si} total={sections.length} onUp={() => moveSection(si, si - 1)} onDown={() => moveSection(si, si + 1)} />
+                  </div>
+
+                  {isExpanded && (
+                    <div style={{
+                      border: '1px solid var(--accent)', borderTop: 'none',
+                      borderRadius: '0 0 8px 8px', padding: '8px 10px',
+                      background: 'var(--card-bg)',
+                      display: 'flex', flexDirection: 'column', gap: 4,
+                    }}>
+                      {sec.items.map((item, ii) => (
+                        <div
+                          key={itemKey(item, ii)}
+                          draggable
+                          onDragStart={() => setItemDragIdx(ii)}
+                          onDragOver={e => { e.preventDefault(); if (itemDragIdx !== null && itemDragIdx !== ii) { moveItem(sec.id, itemDragIdx, ii); setItemDragIdx(ii); } }}
+                          onDragEnd={() => setItemDragIdx(null)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '5px 8px',
+                            background: itemDragIdx === ii ? 'var(--accent-light)' : 'var(--bg-subtle)',
+                            border: `1px solid ${itemDragIdx === ii ? 'var(--accent)' : 'var(--border)'}`,
+                            borderRadius: 6, cursor: 'grab', userSelect: 'none',
+                          }}
+                        >
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>⠿</span>
+                          <span style={{ fontSize: 16, lineHeight: 1 }}>{item.icon}</span>
+                          <span style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)' }}>{item.label}</span>
+                          {'href' in item && (
+                            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item.href}</span>
+                          )}
+                          <ArrowBtns i={ii} total={sec.items.length} onUp={() => moveItem(sec.id, ii, ii - 1)} onDown={() => moveItem(sec.id, ii, ii + 1)} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
-        <div style={{ marginTop: 14, height: 6, borderRadius: 3, background: 'linear-gradient(90deg, var(--accent) 0%, var(--accent-hover) 100%)' }} />
-      </div>
+      )}
 
       {/* ── Instructions ────────────────────────────────────────────── */}
       <div className="card" style={{ padding: 20, background: 'var(--ai-bg)', border: '1px solid var(--border)' }}>
         <div style={{ fontWeight: 600, color: 'var(--ai-text)', marginBottom: 8, fontSize: 13 }}>Make changes permanent</div>
         <ol style={{ color: 'var(--ai-text)', fontSize: 13, lineHeight: 1.9, paddingLeft: 20 }}>
-          <li>Adjust above → live across the whole app instantly.</li>
-          <li><strong>Save</strong> writes to <code>app/globals.css</code> (permanent for all users) <em>and</em> localStorage (live preview fallback).</li>
+          <li>Adjust tokens above → live across the whole app instantly.</li>
+          <li><strong>Save</strong> writes to <code>app/globals.css</code> (permanent for all users) <em>and</em> localStorage.</li>
           <li><strong>Copy CSS</strong> → manual backup of the <code>:root &#123;…&#125;</code> block.</li>
         </ol>
       </div>
@@ -514,7 +565,40 @@ export default function ThemePage() {
   );
 }
 
-// ── Big swatch (Quick Colors) ───────────────────────────────────────────────
+// ── Shared token group card ─────────────────────────────────────────────────
+function TokenGroupCard({ group, values, serverDefaults, onChange }: {
+  group: TokenGroup;
+  values: Record<string, string>;
+  serverDefaults: Record<string, string>;
+  onChange: (name: string, value: string) => void;
+}) {
+  return (
+    <div className="card" style={{ padding: 20 }}>
+      <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
+        {group.label}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {group.tokens.map(token => {
+          const def = serverDefaults[token.name] ?? token.default;
+          const changed = values[token.name] !== def;
+          return (
+            <TokenRow
+              key={token.name}
+              name={token.name}
+              type={token.type}
+              value={values[token.name] ?? def}
+              defaultValue={def}
+              changed={changed}
+              onChange={onChange}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Big swatch ───────────────────────────────────────────────────────────────
 function BigSwatch({ label, name, value, defaultValue, onChange }: {
   label: string; name: string; value: string; defaultValue: string;
   onChange: (name: string, val: string) => void;
@@ -524,8 +608,7 @@ function BigSwatch({ label, name, value, defaultValue, onChange }: {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', minWidth: 88 }}>
       <label style={{ cursor: 'pointer', position: 'relative' }}>
         <span style={{
-          display: 'block', width: 72, height: 48,
-          borderRadius: 'var(--radius-sm)',
+          display: 'block', width: 72, height: 48, borderRadius: 'var(--radius-sm)',
           background: value,
           border: changed ? '2px solid var(--accent)' : '1px solid var(--border)',
           boxShadow: changed ? 'var(--shadow-hover)' : 'none',
@@ -556,7 +639,7 @@ function BigSwatch({ label, name, value, defaultValue, onChange }: {
   );
 }
 
-// ── Token row ───────────────────────────────────────────────────────────────
+// ── Token row ────────────────────────────────────────────────────────────────
 function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
   name: string; type: 'color' | 'text'; value: string; defaultValue: string;
   changed: boolean; onChange: (name: string, value: string) => void;
@@ -580,12 +663,11 @@ function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
       )}
       <input type="text" value={value} onChange={e => onChange(name, e.target.value)}
         style={{
-          width: type === 'color' ? 88 : 116, fontSize: 11,
+          width: type === 'color' ? 88 : 120, fontSize: 11,
           fontFamily: 'ui-monospace, Menlo, monospace',
           padding: '3px 7px',
           border: changed ? '1px solid var(--accent)' : '1px solid var(--border)',
-          borderRadius: 5,
-          color: 'var(--text-primary)',
+          borderRadius: 5, color: 'var(--text-primary)',
           background: changed ? 'var(--accent-light)' : 'var(--bg-subtle)',
           outline: 'none', flexShrink: 0,
         }}
@@ -604,7 +686,7 @@ function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
   );
 }
 
-// ── ArrowBtns ────────────────────────────────────────────────────────────────
+// ── ArrowBtns ─────────────────────────────────────────────────────────────────
 function ArrowBtns({ i, total, onUp, onDown }: { i: number; total: number; onUp: () => void; onDown: () => void }) {
   return (
     <>
