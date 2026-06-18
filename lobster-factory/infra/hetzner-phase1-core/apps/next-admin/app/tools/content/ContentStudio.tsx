@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import type { WpSite } from "@/lib/content/wp-sites";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
