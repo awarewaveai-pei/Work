@@ -1,7 +1,160 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { ManagedSite } from "@/app/api/content/sites/route";
+import type { ManagedSite, SiteContentDefaults } from "@/app/api/content/sites/route";
+
+const FUNNEL_STAGES = [
+  { value: "",              label: "不指定" },
+  { value: "awareness",     label: "認知" },
+  { value: "interest",      label: "興趣" },
+  { value: "consideration", label: "考慮" },
+  { value: "decision",      label: "決策" },
+  { value: "retention",     label: "留存" },
+];
+const PRICE_POSITIONS = [
+  { value: "",        label: "不指定" },
+  { value: "premium", label: "高端精品" },
+  { value: "midhigh", label: "中高端" },
+  { value: "mid",     label: "中端" },
+  { value: "value",   label: "平價親民" },
+];
+const IMAGE_MODELS = [
+  { value: "none",                 label: "None（不生成）" },
+  { value: "flux-schnell",         label: "Flux Schnell（預設）" },
+  { value: "flux-dev",             label: "Flux Dev（高品質）" },
+  { value: "ideogram-v3-balanced", label: "Ideogram v3" },
+  { value: "flux-2-max",           label: "Flux.2 Max（旗艦）" },
+];
+
+const LANGUAGES = ["Traditional Chinese", "Simplified Chinese", "English", "Japanese", "Korean"];
+
+const EMPTY_DEFAULTS: SiteContentDefaults = {
+  language: "", targetCountry: "", imageModel: "",
+  marketing: { audience: "", positioning: "", usp: "", primaryCta: "", funnelStage: "", pricePositioning: "", emotionalTriggers: "", objections: "", forbiddenClaims: "" },
+};
+
+function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (updated: ManagedSite) => void }) {
+  const [open, setOpen]     = useState(false);
+  const [d, setD]           = useState<SiteContentDefaults>(() => ({ ...EMPTY_DEFAULTS, ...site.contentDefaults, marketing: { ...EMPTY_DEFAULTS.marketing, ...(site.contentDefaults?.marketing ?? {}) } }));
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+
+  function setM(k: keyof NonNullable<SiteContentDefaults["marketing"]>, v: string) {
+    setD(p => ({ ...p, marketing: { ...p.marketing, [k]: v } }));
+    setSaved(false);
+  }
+
+  async function handleSave() {
+    setSaving(true); setSaved(false);
+    try {
+      const res  = await fetch(`/api/content/sites/${site.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentDefaults: d }),
+      });
+      const json = await res.json() as { ok: boolean; site?: ManagedSite };
+      if (json.ok && json.site) { onSaved(json.site); setSaved(true); }
+    } finally { setSaving(false); }
+  }
+
+  const inp: React.CSSProperties = { background: "#12121e", border: "1px solid #333", borderRadius: 5, color: "#e0e0f0", padding: "6px 8px", fontSize: 13, width: "100%", boxSizing: "border-box" };
+  const sel: React.CSSProperties = { ...inp };
+  const lbl: React.CSSProperties = { color: "#aaa", fontSize: 12, display: "block", marginBottom: 3 };
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ fontSize: 12, color: "#5855d0", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+        {open ? "▲ 收合" : "▼ Content Studio 預設設定"}
+      </button>
+      {open && (
+        <div style={{ marginTop: 10, padding: "14px 16px", background: "#12121e", border: "1px solid #333", borderRadius: 8, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ color: "#888", fontSize: 12 }}>選此站台時自動帶入 Content Studio 表單（只填空白欄位）。</div>
+
+          {/* Row 1: language / country / image model */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <label>
+              <span style={lbl}>語言</span>
+              <select style={sel} value={d.language ?? ""} onChange={e => { setD(p => ({ ...p, language: e.target.value })); setSaved(false); }}>
+                <option value="">不指定</option>
+                {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </label>
+            <label>
+              <span style={lbl}>目標國家</span>
+              <input style={inp} value={d.targetCountry ?? ""} placeholder="例：台灣"
+                onChange={e => { setD(p => ({ ...p, targetCountry: e.target.value })); setSaved(false); }} />
+            </label>
+            <label>
+              <span style={lbl}>圖片模型</span>
+              <select style={sel} value={d.imageModel ?? ""} onChange={e => { setD(p => ({ ...p, imageModel: e.target.value })); setSaved(false); }}>
+                {IMAGE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </label>
+          </div>
+
+          {/* Row 2: audience / positioning / USP */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <label>
+              <span style={lbl}>目標受眾</span>
+              <input style={inp} value={d.marketing?.audience ?? ""} placeholder="台灣 30-45 歲女性…" onChange={e => setM("audience", e.target.value)} />
+            </label>
+            <label>
+              <span style={lbl}>品牌定位（一句話）</span>
+              <input style={inp} value={d.marketing?.positioning ?? ""} placeholder="陪伴而非治療…" onChange={e => setM("positioning", e.target.value)} />
+            </label>
+            <label>
+              <span style={lbl}>獨特賣點（USP）</span>
+              <input style={inp} value={d.marketing?.usp ?? ""} placeholder="跨文化、結構化模組…" onChange={e => setM("usp", e.target.value)} />
+            </label>
+          </div>
+
+          {/* Row 3: CTA / funnel / price */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <label>
+              <span style={lbl}>主要 CTA</span>
+              <input style={inp} value={d.marketing?.primaryCta ?? ""} placeholder="預約免費體驗課" onChange={e => setM("primaryCta", e.target.value)} />
+            </label>
+            <label>
+              <span style={lbl}>漏斗階段預設</span>
+              <select style={sel} value={d.marketing?.funnelStage ?? ""} onChange={e => setM("funnelStage", e.target.value)}>
+                {FUNNEL_STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </label>
+            <label>
+              <span style={lbl}>價格定位預設</span>
+              <select style={sel} value={d.marketing?.pricePositioning ?? ""} onChange={e => setM("pricePositioning", e.target.value)}>
+                {PRICE_POSITIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </label>
+          </div>
+
+          {/* Row 4: emotional / objections / forbidden */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <label>
+              <span style={lbl}>情緒觸發點</span>
+              <input style={inp} value={d.marketing?.emotionalTriggers ?? ""} placeholder="渴望被理解…" onChange={e => setM("emotionalTriggers", e.target.value)} />
+            </label>
+            <label>
+              <span style={lbl}>常見疑慮 / 抗拒點</span>
+              <input style={inp} value={d.marketing?.objections ?? ""} placeholder="我沒有繪畫天份…" onChange={e => setM("objections", e.target.value)} />
+            </label>
+            <label>
+              <span style={lbl}>禁用聲明（逗號）</span>
+              <input style={inp} value={d.marketing?.forbiddenClaims ?? ""} placeholder="治癒, 保證療效…" onChange={e => setM("forbiddenClaims", e.target.value)} />
+            </label>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button className="btn btn-primary" style={{ fontSize: 13 }} onClick={handleSave} disabled={saving}>
+              {saving ? "儲存中…" : "儲存預設"}
+            </button>
+            {saved && <span style={{ color: "#10b981", fontSize: 12 }}>✓ 已儲存，下次選此站台會自動帶入</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const PRESET_COLORS = [
   "#5855d0", "#10b981", "#f59e0b", "#ef4444",
@@ -56,6 +209,7 @@ function SiteCard({
   onDelete,
   onTest,
   onEdit,
+  onSiteUpdated,
   testResult,
   testing,
 }: {
@@ -64,6 +218,7 @@ function SiteCard({
   onDelete: (id: string) => void;
   onTest: (id: string) => void;
   onEdit: (site: ManagedSite) => void;
+  onSiteUpdated: (updated: ManagedSite) => void;
   testResult: TestResult;
   testing: boolean;
 }) {
@@ -181,6 +336,12 @@ function SiteCard({
           <span style={{ fontSize: 12, color: "#666" }}>由環境變數設定，請在伺服器上修改</span>
         )}
       </div>
+      {/* Content Studio defaults — full width below actions */}
+      {site.source === "db" && (
+        <div style={{ width: "100%", marginTop: 2 }}>
+          <ContentDefaultsPanel site={site} onSaved={onSiteUpdated} />
+        </div>
+      )}
     </div>
   );
 }
@@ -500,6 +661,7 @@ export default function SiteManager() {
             onDelete={handleDelete}
             onTest={handleTest}
             onEdit={s => { setEditingSite(s); setShowForm(false); setFormError(null); }}
+            onSiteUpdated={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
             testResult={testResults[site.id] ?? null}
             testing={testingIds.has(site.id)}
           />
@@ -520,6 +682,7 @@ export default function SiteManager() {
               onDelete={() => undefined}
               onTest={() => undefined}
               onEdit={() => undefined}
+              onSiteUpdated={() => undefined}
               testResult={null}
               testing={false}
             />

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { WpSite } from "@/lib/content/wp-sites";
+import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
 import type { RankMathReport } from "@/lib/seo/rankmath-checker";
 import { SeoCheckPanel } from "./SeoCheckPanel";
@@ -419,8 +420,8 @@ export default function ContentStudio() {
 
   const [activeTab, setActiveTab] = useState<Tab>("generate");
 
-  // Multi-site
-  const [wpSites,       setWpSites]       = useState<WpSite[]>([]);
+  // Multi-site (ManagedSite carries contentDefaults; WpSite is the internal server type)
+  const [wpSites,       setWpSites]       = useState<ManagedSite[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
 
   // Brand Voice
@@ -618,7 +619,7 @@ export default function ContentStudio() {
   useEffect(() => {
     fetch("/api/content/sites")
       .then(r => r.json())
-      .then((data: { ok: boolean; sites?: WpSite[] }) => {
+      .then((data: { ok: boolean; sites?: ManagedSite[] }) => {
         if (data.ok && data.sites?.length) {
           setWpSites(data.sites);
           setSelectedSiteId(data.sites[0].id);
@@ -921,6 +922,36 @@ export default function ContentStudio() {
       } catch { /* silent — chips just won't pre-populate */ }
     })();
   }, [selectedSiteId]);
+
+  // Auto-fill Content Studio defaults from the selected site's contentDefaults.
+  // Only fills fields that are currently EMPTY — never overwrites operator-entered values.
+  useEffect(() => {
+    const site = wpSites.find(s => s.id === selectedSiteId);
+    const d = site?.contentDefaults;
+    if (!d) return;
+    setForm(prev => {
+      const next = { ...prev };
+      if (d.language     && !prev.language.trim())     next.language     = d.language;
+      if (d.targetCountry && !prev.targetCountry.trim()) next.targetCountry = d.targetCountry;
+      if (d.imageModel   && prev.media.aiImages === DEFAULT_MEDIA.aiImages)
+        next.media = { ...prev.media, aiImages: d.imageModel };
+      if (d.marketing) {
+        const m = { ...prev.marketing };
+        const dm = d.marketing;
+        if (dm.audience          && !m.audience.trim())          m.audience          = dm.audience;
+        if (dm.positioning       && !m.positioning.trim())       m.positioning       = dm.positioning;
+        if (dm.usp               && !m.usp.trim())               m.usp               = dm.usp;
+        if (dm.primaryCta        && !m.primaryCta.trim())        m.primaryCta        = dm.primaryCta;
+        if (dm.funnelStage       && !m.funnelStage)              m.funnelStage       = dm.funnelStage;
+        if (dm.pricePositioning  && !m.pricePositioning)         m.pricePositioning  = dm.pricePositioning;
+        if (dm.emotionalTriggers && !m.emotionalTriggers.trim()) m.emotionalTriggers = dm.emotionalTriggers;
+        if (dm.objections        && !m.objections.trim())        m.objections        = dm.objections;
+        if (dm.forbiddenClaims   && !m.forbiddenClaims.trim())   m.forbiddenClaims   = dm.forbiddenClaims;
+        next.marketing = m;
+      }
+      return next;
+    });
+  }, [selectedSiteId, wpSites]);
 
   // ─── Image Generation ─────────────────────────────────────────────────────
 

@@ -6,6 +6,23 @@ import { getWpSites } from "@/lib/content/wp-sites";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+export interface SiteContentDefaults {
+  language?: string;
+  targetCountry?: string;
+  imageModel?: string;
+  marketing?: {
+    audience?: string;
+    positioning?: string;
+    usp?: string;
+    primaryCta?: string;
+    funnelStage?: string;
+    pricePositioning?: string;
+    emotionalTriggers?: string;
+    objections?: string;
+    forbiddenClaims?: string;
+  };
+}
+
 export interface ManagedSite {
   id: string;
   name: string;
@@ -17,6 +34,7 @@ export interface ManagedSite {
   note: string | null;
   source: "db" | "env";
   createdAt?: string;
+  contentDefaults?: SiteContentDefaults;
 }
 
 // GET /api/content/sites — list all sites (no tokens in response)
@@ -28,13 +46,14 @@ export async function GET(req: Request): Promise<Response> {
   if (supabase) {
     const { data, error } = await supabase
       .from("wp_sites")
-      .select("id, name, url, color, active, note, created_at, token, username")
+      .select("id, name, url, color, active, note, created_at, token, username, content_defaults")
       .order("created_at");
 
     if (!error && data) {
       const sites: ManagedSite[] = (data as Array<{
         id: string; name: string; url: string; color: string;
         active: boolean; note: string | null; created_at: string; token: string; username: string;
+        content_defaults: SiteContentDefaults | null;
       }>).map(r => ({
         id: r.id,
         name: r.name,
@@ -46,6 +65,7 @@ export async function GET(req: Request): Promise<Response> {
         note: r.note,
         source: "db" as const,
         createdAt: r.created_at,
+        contentDefaults: r.content_defaults ?? {},
       }));
       return NextResponse.json({ ok: true, sites });
     }

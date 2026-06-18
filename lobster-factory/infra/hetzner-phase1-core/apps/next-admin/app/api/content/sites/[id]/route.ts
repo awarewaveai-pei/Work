@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import type { ManagedSite } from "@/app/api/content/sites/route";
+import type { ManagedSite, SiteContentDefaults } from "@/app/api/content/sites/route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,12 +30,15 @@ export async function PATCH(
   if (typeof body.username === "string" && body.username.trim()) patch.username = body.username.trim();
   // Token/AppPassword only updated when explicitly provided and non-empty
   if (typeof body.token    === "string" && body.token.trim()) patch.token = body.token.trim();
+  // Content Studio per-site defaults (full replace — caller sends complete object)
+  if (body.contentDefaults !== undefined && typeof body.contentDefaults === "object" && body.contentDefaults !== null)
+    patch.content_defaults = body.contentDefaults;
 
   const { data, error } = await supabase
     .from("wp_sites")
     .update(patch)
     .eq("id", id)
-    .select("id, name, url, color, active, note, created_at, token, username")
+    .select("id, name, url, color, active, note, created_at, token, username, content_defaults")
     .single();
 
   if (error) {
@@ -43,7 +46,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: error.message }, { status });
   }
 
-  const row = data as { id: string; name: string; url: string; color: string; active: boolean; note: string | null; created_at: string; token: string; username: string };
+  const row = data as { id: string; name: string; url: string; color: string; active: boolean; note: string | null; created_at: string; token: string; username: string; content_defaults: SiteContentDefaults | null };
   const site: ManagedSite = {
     id: row.id,
     name: row.name,
@@ -55,6 +58,7 @@ export async function PATCH(
     note: row.note,
     source: "db",
     createdAt: row.created_at,
+    contentDefaults: row.content_defaults ?? {},
   };
   return NextResponse.json({ ok: true, site });
 }
