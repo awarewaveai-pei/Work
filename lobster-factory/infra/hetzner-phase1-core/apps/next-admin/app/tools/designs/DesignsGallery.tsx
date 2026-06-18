@@ -44,7 +44,7 @@ interface VideoAsset {
   metadata: VideoAssetMetadata | null;
 }
 
-type ActiveTab = "images" | "videos";
+type ActiveTab = "designs" | "mockups" | "videos";
 type LoadState = "loading" | "ready" | "error" | "disabled";
 type SortOrder = "desc" | "asc";
 type TimeRange = "all" | "today" | "week" | "month";
@@ -263,7 +263,7 @@ function Chips({
 
 export default function DesignsGallery() {
   /* ── tab ── */
-  const [activeTab, setActiveTab] = useState<ActiveTab>("images");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("designs");
 
   /* ── images state ── */
   const [assets, setAssets] = useState<DesignAsset[]>([]);
@@ -483,6 +483,11 @@ export default function DesignsGallery() {
       : null;
 
     const filtered = assets.filter((a) => {
+      /* tab segregation */
+      const isMockupAsset = toolGroup(a.metadata?.source) === "mockup";
+      if (activeTab === "designs" && isMockupAsset) return false;
+      if (activeTab === "mockups" && !isMockupAsset) return false;
+
       if (filterModel !== "all" && a.metadata?.model_name !== filterModel) return false;
       if (filterProduct !== "all" && assetProduct(a) !== filterProduct) return false;
       if (filterTheme !== "all" && a.metadata?.theme !== filterTheme) return false;
@@ -492,7 +497,7 @@ export default function DesignsGallery() {
     });
 
     return sortOrder === "asc" ? [...filtered].reverse() : filtered;
-  }, [assets, filterModel, filterProduct, filterTheme, filterBrand, filterTime, sortOrder]);
+  }, [assets, activeTab, filterModel, filterProduct, filterTheme, filterBrand, filterTime, sortOrder]);
 
   /* bulk delete — scoped to visible set so filtered-out assets are never deleted */
   const bulkDelete = useCallback(async () => {
@@ -588,10 +593,16 @@ export default function DesignsGallery() {
   const TabBar = (
     <div className="designs-tabs">
       <button
-        className={`designs-tab${activeTab === "images" ? " designs-tab--active" : ""}`}
-        onClick={() => setActiveTab("images")}
+        className={`designs-tab${activeTab === "designs" ? " designs-tab--active" : ""}`}
+        onClick={() => setActiveTab("designs")}
       >
-        圖片
+        設計圖
+      </button>
+      <button
+        className={`designs-tab${activeTab === "mockups" ? " designs-tab--active" : ""}`}
+        onClick={() => setActiveTab("mockups")}
+      >
+        Mockup
       </button>
       <button
         className={`designs-tab${activeTab === "videos" ? " designs-tab--active" : ""}`}
@@ -844,6 +855,15 @@ export default function DesignsGallery() {
           </div>
         );
       })()}
+
+      {/* ── Per-tab empty hint ───────────────────────────────────── */}
+      {visible.length === 0 && (
+        <div className="designs-state">
+          {activeTab === "mockups"
+            ? "還沒有已儲存的 Mockup — 在 Mockup 工具生成後會自動出現在這裡。"
+            : "還沒有已儲存的設計 — 生成後會自動出現在這裡。"}
+        </div>
+      )}
 
       {/* ── Grid ─────────────────────────────────────────────────── */}
       <div className="designs-grid">
