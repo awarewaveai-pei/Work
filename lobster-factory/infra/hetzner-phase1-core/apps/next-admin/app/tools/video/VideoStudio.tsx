@@ -9,7 +9,8 @@ import { usdToNtd } from "@/lib/ai/cost-calculator";
 
 const NT = (usd: number) => {
   const n = usdToNtd(usd);
-  return `NT$${n.toLocaleString("zh-TW", { maximumFractionDigits: n < 1 ? 4 : 0 })}`;
+  // 每支影片成本多在 NT$1–3：小額需保留小數才精確（n<1→4 位、<100→2 位、其餘整數）
+  return `NT$${n.toLocaleString("zh-TW", { maximumFractionDigits: n < 1 ? 4 : n < 100 ? 2 : 0 })}`;
 };
 const USD = (usd: number) =>
   `$${usd.toLocaleString("en-US", { maximumFractionDigits: usd < 0.01 ? 4 : 2 })}`;
