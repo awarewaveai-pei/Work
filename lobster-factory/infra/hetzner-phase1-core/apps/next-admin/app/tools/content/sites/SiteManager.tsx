@@ -209,7 +209,6 @@ function SiteCard({
   onDelete,
   onTest,
   onEdit,
-  onSiteUpdated,
   testResult,
   testing,
 }: {
@@ -218,7 +217,6 @@ function SiteCard({
   onDelete: (id: string) => void;
   onTest: (id: string) => void;
   onEdit: (site: ManagedSite) => void;
-  onSiteUpdated: (updated: ManagedSite) => void;
   testResult: TestResult;
   testing: boolean;
 }) {
@@ -336,12 +334,6 @@ function SiteCard({
           <span style={{ fontSize: 12, color: "#666" }}>由環境變數設定，請在伺服器上修改</span>
         )}
       </div>
-      {/* Content Studio defaults — full width below actions */}
-      {site.source === "db" && (
-        <div style={{ width: "100%", marginTop: 2 }}>
-          <ContentDefaultsPanel site={site} onSaved={onSiteUpdated} />
-        </div>
-      )}
     </div>
   );
 }
@@ -636,36 +628,42 @@ export default function SiteManager() {
       )}
 
       {dbSites.map(site => (
-        editingSite?.id === site.id ? (
-          <SiteForm
-            key={site.id}
-            initial={{
-              id: site.id,
-              name: site.name,
-              url: site.url,
-              username: "",
-              token: "",
-              color: site.color,
-              note: site.note ?? "",
-            }}
-            onSave={handleEdit}
-            onCancel={() => { setEditingSite(null); setFormError(null); }}
-            saving={saving}
-            error={formError}
-          />
-        ) : (
-          <SiteCard
-            key={site.id}
-            site={site}
-            onToggle={handleToggle}
-            onDelete={handleDelete}
-            onTest={handleTest}
-            onEdit={s => { setEditingSite(s); setShowForm(false); setFormError(null); }}
-            onSiteUpdated={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
-            testResult={testResults[site.id] ?? null}
-            testing={testingIds.has(site.id)}
-          />
-        )
+        <div key={site.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          {editingSite?.id === site.id ? (
+            <SiteForm
+              initial={{
+                id: site.id,
+                name: site.name,
+                url: site.url,
+                username: "",
+                token: "",
+                color: site.color,
+                note: site.note ?? "",
+              }}
+              onSave={handleEdit}
+              onCancel={() => { setEditingSite(null); setFormError(null); }}
+              saving={saving}
+              error={formError}
+            />
+          ) : (
+            <SiteCard
+              site={site}
+              onToggle={handleToggle}
+              onDelete={handleDelete}
+              onTest={handleTest}
+              onEdit={s => { setEditingSite(s); setShowForm(false); setFormError(null); }}
+              testResult={testResults[site.id] ?? null}
+              testing={testingIds.has(site.id)}
+            />
+          )}
+          {/* Content Studio defaults always visible regardless of edit state */}
+          <div style={{ background: "#1e1e2e", border: "1px solid #333", borderTop: "none", borderRadius: "0 0 8px 8px", padding: "0 16px 10px" }}>
+            <ContentDefaultsPanel
+              site={sites.find(x => x.id === site.id) ?? site}
+              onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
+            />
+          </div>
+        </div>
       ))}
 
       {/* ENV fallback sites (read-only) */}
@@ -682,7 +680,6 @@ export default function SiteManager() {
               onDelete={() => undefined}
               onTest={() => undefined}
               onEdit={() => undefined}
-              onSiteUpdated={() => undefined}
               testResult={null}
               testing={false}
             />
