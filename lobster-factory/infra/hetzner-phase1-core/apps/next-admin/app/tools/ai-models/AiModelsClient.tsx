@@ -81,6 +81,12 @@ export function gen1kCostTwd(costInputPer1M: number, costOutputPer1M: number) {
   return (GEN1K_IN * costInputPer1M + GEN1K_OUT * costOutputPer1M) / 1_000_000 * TWD;
 }
 
+function fmtTwd(n: number) {
+  if (n < 0.005) return "< NT$0.01";
+  if (n < 1) return `NT$${n.toFixed(2)}`;
+  return `NT$${n.toFixed(1)}`;
+}
+
 function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: number; costOutputPer1M: number }) {
   if (costInputPer1M === 0 && costOutputPer1M === 0) {
     return (
@@ -90,23 +96,24 @@ function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: numb
       </div>
     );
   }
-  const twd = gen1kCostTwd(costInputPer1M, costOutputPer1M);
-  const label = twd < 0.01
-    ? "< NT$0.01"
-    : twd < 1
-    ? `NT$${twd.toFixed(2)}`
-    : `NT$${twd.toFixed(1)}`;
+  const inTwd  = (GEN1K_IN  * costInputPer1M)  / 1_000_000 * TWD;
+  const outTwd = (GEN1K_OUT * costOutputPer1M) / 1_000_000 * TWD;
+  const total  = inTwd + outTwd;
+
+  const ROW: React.CSSProperties = { display:"flex", justifyContent:"space-between", fontSize:11.5, padding:"2px 0" };
+  const LBL: React.CSSProperties = { color:"#64748b" };
+  const VAL: React.CSSProperties = { color:"#1e293b", fontWeight:600 };
 
   return (
-    <div>
-      <div style={{ fontSize: 12, color: "#1e293b" }}>
-        <span style={{ fontWeight: 700 }}>輸入</span> ${costInputPer1M.toFixed(2)}
-        <span style={{ color: "#94a3b8", margin: "0 4px" }}>·</span>
-        <span style={{ fontWeight: 700 }}>輸出</span> ${costOutputPer1M.toFixed(2)}
-        <span style={{ color: "#94a3b8", fontSize: 10.5 }}> / 1M tokens</span>
+    <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
+      <div style={{ fontSize:10, color:"#94a3b8", marginBottom:3, letterSpacing:".04em" }}>
+        API: 輸入 ${costInputPer1M.toFixed(2)} · 輸出 ${costOutputPer1M.toFixed(2)} / 1M tokens
       </div>
-      <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
-        ✏️ 生成 1,000 字（含提示詞）≈ <strong style={{ color: "#0f172a" }}>{label}</strong>
+      <div style={ROW}><span style={LBL}>✏️ 提示詞 ~{GEN1K_IN} tokens</span><span style={VAL}>{fmtTwd(inTwd)}</span></div>
+      <div style={ROW}><span style={LBL}>📝 生成文字 ~{GEN1K_OUT} tokens</span><span style={VAL}>{fmtTwd(outTwd)}</span></div>
+      <div style={{ ...ROW, borderTop:"1px solid #e2e8f0", marginTop:3, paddingTop:4 }}>
+        <span style={{ ...LBL, fontWeight:700, color:"#475569" }}>合計（生成 1,000 字）</span>
+        <span style={{ ...VAL, color:"#0f172a", fontSize:12.5 }}>{fmtTwd(total)}</span>
       </div>
     </div>
   );
