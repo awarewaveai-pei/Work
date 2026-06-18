@@ -11,10 +11,8 @@ import ImageStyleControls from "@/components/tools/ImageStyleControls";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
-// type-only import — printful-mockup is server-side (sharp/r2); erased from the client bundle.
 import type { MockupView } from "@/lib/studio/printful-mockup";
 
-/** Product types steer the prompt suffix + default aspect ratio (print canvas comes later, P-print). */
 const PRODUCT_TYPES = [
   { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: "t-shirt graphic design, centered composition, plain background" },
   { value: "hoodie", label: "Hoodie", aspect: "4:5" as AspectRatio, suffix: "hoodie front print design, centered composition, plain background" },
@@ -26,12 +24,53 @@ const PRODUCT_TYPES = [
 
 const ASPECTS: AspectRatio[] = ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "16:9", "9:16"];
 
+const SUBJECT_PRESETS = [
+  "Dragon warrior", "Celestial goddess", "Skull with flowers",
+  "Koi fish spirit", "Mountain with moon", "Tiger spirit",
+  "Astronaut drifting", "Wolf howling at moon", "Phoenix rising",
+  "Samurai warrior", "Sacred geometry", "Mermaid deep sea",
+  "Lion with crown", "Butterfly mandala", "Cyberpunk cityscape",
+];
+
+const THEME_PRESETS = [
+  "Sports & competition", "Music culture", "Street fashion",
+  "Ancient mythology", "Future technology", "Nature ecology",
+  "Spiritual journey", "Social satire", "Art therapy",
+  "Gaming culture", "Psychology & mind", "Historical heritage",
+  "Animal liberation", "Space exploration", "Luxury lifestyle",
+];
+
+const VIBE_PRESETS = [
+  "Bold & powerful", "Dark & mysterious", "Calm & ethereal",
+  "Playful & whimsical", "Romantic & dreamy", "Raw & edgy",
+  "Sacred & divine", "Nostalgic & warm", "Sharp & modern",
+  "Electric & vibrant", "Zen & peaceful", "Epic & grand",
+  "Melancholic & deep", "Rebellious & wild", "Tender & intimate",
+];
+
+const TRENDING_CATEGORIES = [
+  { value: "international-news", label: "國際" },
+  { value: "politics", label: "政治" },
+  { value: "finance-economy", label: "財經" },
+  { value: "sports", label: "運動" },
+  { value: "entertainment", label: "玩樂" },
+  { value: "lifestyle-culture", label: "品味" },
+  { value: "health-wellness", label: "健康" },
+  { value: "gaming-tech", label: "遊戲3C" },
+  { value: "artificial-intelligence", label: "AI" },
+];
+
+// Transform-capable models (flux-kontext family handles img2img best)
+const TRANSFORM_MODEL: StudioModel = "flux-kontext-dev";
+
 interface GenState {
   status: "idle" | "generating" | "done" | "error";
   image?: string;
   seed?: number | null;
   error?: string;
 }
+
+type RefMode = "ref" | "transform";
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -42,8 +81,6 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-// Same downscale rationale as TarotStudio: style refs don't need full resolution and the
-// request body must stay under the route limit.
 async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Promise<string> {
   const dataUrl = await readFileAsDataUrl(file);
   return new Promise((resolve, reject) => {
@@ -56,16 +93,37 @@ async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Pr
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        resolve(dataUrl);
-        return;
-      }
+      if (!ctx) { resolve(dataUrl); return; }
       ctx.drawImage(img, 0, 0, w, h);
       resolve(canvas.toDataURL("image/jpeg", quality));
     };
     img.onerror = () => reject(new Error("image_decode_failed"));
     img.src = dataUrl;
   });
+}
+
+function PresetChips({ chips, onSelect }: { chips: string[]; onSelect: (v: string) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+      {chips.map((c, i) => (
+        <button
+          key={`${c}-${i}`}
+          type="button"
+          onClick={() => onSelect(c)}
+          style={{
+            fontSize: 11, padding: "2px 9px", borderRadius: 20,
+            background: "var(--bg-tertiary, #1e1e1e)", border: "1px solid var(--border, #333)",
+            cursor: "pointer", color: "var(--text-muted, #888)", lineHeight: 1.6,
+            transition: "border-color 0.15s",
+          }}
+          onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
+          onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #333)")}
+        >
+          {c}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export default function StudioWorkbench() {
@@ -79,21 +137,27 @@ export default function StudioWorkbench() {
   const [promptTouched, setPromptTouched] = useState(false);
   const [aspect, setAspect] = useState<AspectRatio>("4:5");
   const [refImages, setRefImages] = useState<string[]>([]);
+  const [refMode, setRefMode] = useState<RefMode>("ref");
   const [gen, setGen] = useState<GenState>({ status: "idle" });
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [bgState, setBgState] = useState<"idle" | "removing" | "done" | "error">("idle");
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [mockupState, setMockupState] = useState<"idle" | "generating" | "done" | "error">("idle");
-  // All Printful mockup styles (flat / ghost / real-model lifestyle) — every one faithful.
   const [mockups, setMockups] = useState<MockupView[]>([]);
   const [savedMockups, setSavedMockups] = useState<Record<string, "saving" | "saved" | "error">>({});
-  const bgInFlight = useRef(false); // state lags a render — ref blocks same-tick double-click
+
+  // Trending news state
+  const [trendingOpen, setTrendingOpen] = useState(false);
+  const [trendingCategory, setTrendingCategory] = useState("");
+  const [trendingTopics, setTrendingTopics] = useState<string[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(false);
+  const [trendingError, setTrendingError] = useState(false);
+
+  const bgInFlight = useRef(false);
   const mockupInFlight = useRef(false);
 
   const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
 
-  // Semantic-filename metadata for downloads (產品-主圖名稱-風格). Built from the same
-  // controls that steer the prompt; "None"/"不限商品" segments drop out via seg().
   const fileMeta = useMemo<SemanticFileMeta>(() => {
     const p = PRODUCT_TYPES.find((x) => x.value === productType);
     return {
@@ -102,20 +166,26 @@ export default function StudioWorkbench() {
       style: style || undefined,
     };
   }, [productType, subject, theme, style]);
+
   const modelOption = useMemo(() => STUDIO_MODEL_OPTIONS.find((m) => m.value === model), [model]);
   const maxRefs = modelOption?.maxRefs ?? 0;
   const resolvedStylePrompt = useMemo(() => (style ? resolveStylePrompt(style) : ""), [style]);
 
+  // Transform mode assembles a different prompt: style is applied TO the uploaded image
   const assembledPrompt = useMemo(() => {
-    const parts = [
-      subject.trim(),
-      theme.trim(),
-      vibe.trim(),
-      resolvedStylePrompt,
-      product.suffix,
-    ].filter(Boolean);
+    if (refMode === "transform" && refImages.length > 0) {
+      const parts = [
+        "Transform this image.",
+        resolvedStylePrompt ? `Apply style: ${resolvedStylePrompt}.` : "",
+        vibe.trim() ? `Mood: ${vibe.trim()}.` : "",
+        subject.trim() ? `Keep subject: ${subject.trim()}.` : "",
+        product.suffix,
+      ].filter(Boolean);
+      return parts.join(" ");
+    }
+    const parts = [subject.trim(), theme.trim(), vibe.trim(), resolvedStylePrompt, product.suffix].filter(Boolean);
     return parts.join(", ");
-  }, [subject, theme, vibe, resolvedStylePrompt, product]);
+  }, [subject, theme, vibe, resolvedStylePrompt, product, refMode, refImages.length]);
 
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
@@ -125,6 +195,55 @@ export default function StudioWorkbench() {
     if (p) setAspect(p.aspect);
   }, []);
 
+  // Switching to transform mode: auto-upgrade to a kontext model if current has no ref support
+  const onSetRefMode = useCallback((mode: RefMode) => {
+    setRefMode(mode);
+    if (mode === "transform") {
+      const cur = STUDIO_MODEL_OPTIONS.find((m) => m.value === model);
+      if ((cur?.maxRefs ?? 0) === 0) {
+        setModel(TRANSFORM_MODEL);
+        setRefImages([]);
+      }
+    }
+  }, [model]);
+
+  const fetchTrending = useCallback(async (cat: string) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const cacheKey = `studio_trending_v1_${cat}_${today}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        setTrendingTopics(JSON.parse(cached) as string[]);
+        return;
+      }
+    } catch { /* ignore parse error */ }
+
+    setTrendingLoading(true);
+    setTrendingTopics([]);
+    setTrendingError(false);
+    try {
+      const res = await fetch("/api/tools/studio/trending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: cat }),
+      });
+      const json = (await res.json()) as { ok: boolean; topics?: string[]; error?: string };
+      if (json.ok && json.topics) {
+        setTrendingTopics(json.topics);
+        try { localStorage.setItem(cacheKey, JSON.stringify(json.topics)); } catch { /* quota */ }
+      } else {
+        setTrendingError(true);
+      }
+    } catch { setTrendingError(true); } finally {
+      setTrendingLoading(false);
+    }
+  }, []);
+
+  const onSelectTrendingCategory = useCallback((cat: string) => {
+    setTrendingCategory(cat);
+    void fetchTrending(cat);
+  }, [fetchTrending]);
+
   const onUploadRefs = useCallback(
     async (files: FileList | null) => {
       if (!files || files.length === 0) return;
@@ -132,11 +251,7 @@ export default function StudioWorkbench() {
       const picked = Array.from(files).slice(0, room);
       const urls: string[] = [];
       for (const f of picked) {
-        try {
-          urls.push(await downscaleImageFile(f));
-        } catch {
-          /* skip unreadable file */
-        }
+        try { urls.push(await downscaleImageFile(f)); } catch { /* skip */ }
       }
       setRefImages((prev) => [...prev, ...urls].slice(0, maxRefs));
     },
@@ -150,6 +265,10 @@ export default function StudioWorkbench() {
     }
     if (model === "ideogram-character" && refImages.length === 0) {
       setGen({ status: "error", error: "Ideogram Character 需要至少 1 張角色參考圖" });
+      return;
+    }
+    if (refMode === "transform" && refImages.length === 0) {
+      setGen({ status: "error", error: "改圖模式需要先上傳一張圖" });
       return;
     }
     setGen({ status: "generating" });
@@ -179,11 +298,11 @@ export default function StudioWorkbench() {
     } catch (err) {
       setGen({ status: "error", error: err instanceof Error ? err.message : String(err) });
     }
-  }, [model, effectivePrompt, refImages, maxRefs, aspect]);
+  }, [model, effectivePrompt, refImages, maxRefs, aspect, refMode]);
 
   const removeBg = useCallback(async () => {
     if (gen.status !== "done" || !gen.image) return;
-    if (bgInFlight.current) return; // double-click = double Replicate charge
+    if (bgInFlight.current) return;
     bgInFlight.current = true;
     setBgState("removing");
     try {
@@ -193,19 +312,12 @@ export default function StudioWorkbench() {
         body: JSON.stringify({ image: gen.image }),
       });
       const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
-      if (!json.ok || !json.image) {
-        setBgState("error");
-        return;
-      }
+      if (!json.ok || !json.image) { setBgState("error"); return; }
       setOriginalImage(gen.image);
       setGen((prev) => ({ ...prev, image: json.image }));
       setBgState("done");
-      setSaveState("idle"); // transparent version not saved yet
-    } catch {
-      setBgState("error");
-    } finally {
-      bgInFlight.current = false;
-    }
+      setSaveState("idle");
+    } catch { setBgState("error"); } finally { bgInFlight.current = false; }
   }, [gen]);
 
   const restoreOriginal = useCallback(() => {
@@ -231,21 +343,12 @@ export default function StudioWorkbench() {
         body: JSON.stringify({ image: gen.image, productType }),
       });
       const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
-      if (!json.ok || !json.mockups || json.mockups.length === 0) {
-        setMockupState("error");
-        return;
-      }
+      if (!json.ok || !json.mockups || json.mockups.length === 0) { setMockupState("error"); return; }
       setMockups(json.mockups);
       setMockupState("done");
-    } catch {
-      setMockupState("error");
-    } finally {
-      mockupInFlight.current = false;
-    }
+    } catch { setMockupState("error"); } finally { mockupInFlight.current = false; }
   }, [gen, productType]);
 
-  // Persist one Printful mockup (temporary CDN URL) into My Designs so it can be used
-  // as a Woo product image in the Publish wizard. Server fetches the allowlisted CDN URL.
   const saveMockupToDesigns = useCallback(async (m: MockupView) => {
     if (savedMockups[m.url] === "saving" || savedMockups[m.url] === "saved") return;
     setSavedMockups((prev) => ({ ...prev, [m.url]: "saving" }));
@@ -290,18 +393,12 @@ export default function StudioWorkbench() {
       });
       const json = (await res.json()) as { ok: boolean; error?: string };
       setSaveState(json.ok ? "saved" : "error");
-    } catch {
-      setSaveState("error");
-    }
+    } catch { setSaveState("error"); }
   }, [gen, effectivePrompt, model, productType, theme, style, subject]);
 
   const downloadOriginal = useCallback(() => {
     if (!gen.image) return;
-    const ext = gen.image.startsWith("data:image/jpeg")
-      ? "jpg"
-      : gen.image.startsWith("data:image/webp")
-        ? "webp"
-        : "png";
+    const ext = gen.image.startsWith("data:image/jpeg") ? "jpg" : gen.image.startsWith("data:image/webp") ? "webp" : "png";
     const a = document.createElement("a");
     a.href = gen.image;
     a.download = buildSemanticFilename({ ...fileMeta, track: "原圖" }, ext, `design.${ext}`);
@@ -310,10 +407,14 @@ export default function StudioWorkbench() {
     a.remove();
   }, [gen.image, fileMeta]);
 
+  const isTransformMode = refMode === "transform";
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, padding: 16 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, padding: 16 }}>
       {/* ── Controls ───────────────────────────────────────────── */}
       <div className="build-panel" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+
+        {/* 商品類型 */}
         <label style={{ fontSize: 13 }}>
           商品類型
           <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={productType} onChange={(e) => onPickProduct(e.target.value)}>
@@ -323,18 +424,118 @@ export default function StudioWorkbench() {
           </select>
         </label>
 
-        <label style={{ fontSize: 13 }}>
-          主題 Subject
-          <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="例：lotus flower mandala" />
-        </label>
-        <label style={{ fontSize: 13 }}>
-          題材 Theme
-          <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="例：spiritual healing" />
-        </label>
-        <label style={{ fontSize: 13 }}>
-          氛圍 Vibe
-          <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
-        </label>
+        {/* Subject */}
+        <div>
+          <label style={{ fontSize: 13 }}>
+            主題 Subject
+            <input
+              className="btn-secondary"
+              style={{ width: "100%", marginTop: 4, opacity: isTransformMode ? 0.5 : 1 }}
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder={isTransformMode ? "改圖模式：主題由上傳圖決定（可選）" : "例：lotus flower mandala"}
+            />
+          </label>
+          <PresetChips chips={SUBJECT_PRESETS} onSelect={setSubject} />
+        </div>
+
+        {/* Theme */}
+        <div>
+          <label style={{ fontSize: 13 }}>
+            題材 Theme
+            <input
+              className="btn-secondary"
+              style={{ width: "100%", marginTop: 4, opacity: isTransformMode ? 0.4 : 1 }}
+              value={theme}
+              onChange={(e) => setTheme(e.target.value)}
+              placeholder={isTransformMode ? "改圖模式下不影響 prompt" : "例：spiritual healing"}
+            />
+          </label>
+          <PresetChips chips={THEME_PRESETS} onSelect={setTheme} />
+        </div>
+
+        {/* Vibe */}
+        <div>
+          <label style={{ fontSize: 13 }}>
+            氛圍 Vibe
+            <input
+              className="btn-secondary"
+              style={{ width: "100%", marginTop: 4 }}
+              value={vibe}
+              onChange={(e) => setVibe(e.target.value)}
+              placeholder="例：calm, ethereal"
+            />
+          </label>
+          <PresetChips chips={VIBE_PRESETS} onSelect={setVibe} />
+        </div>
+
+        {/* 時事靈感 drawer */}
+        <div>
+          <button
+            type="button"
+            className="btn-secondary"
+            style={{ width: "100%", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}
+            onClick={() => setTrendingOpen((v) => !v)}
+          >
+            <span>🔥 時事靈感</span>
+            <span style={{ opacity: 0.5 }}>{trendingOpen ? "▲" : "▼"}</span>
+          </button>
+
+          {trendingOpen && (
+            <div style={{ marginTop: 6, padding: 10, background: "var(--bg-tertiary, #1a1a1a)", borderRadius: 8, border: "1px solid var(--border, #333)" }}>
+              <p style={{ fontSize: 11, opacity: 0.55, marginBottom: 6 }}>選類別 → 抓今日熱門話題 → 點擊填入主題</p>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+                {TRENDING_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => onSelectTrendingCategory(cat.value)}
+                    style={{
+                      fontSize: 11, padding: "3px 10px", borderRadius: 20, cursor: "pointer",
+                      background: trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--bg-secondary, #2a2a2a)",
+                      color: trendingCategory === cat.value ? "#fff" : "var(--text-muted, #888)",
+                      border: `1px solid ${trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--border, #333)"}`,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {trendingLoading && (
+                <p style={{ fontSize: 11, opacity: 0.5 }}>搜尋中…</p>
+              )}
+
+              {!trendingLoading && trendingError && (
+                <p style={{ fontSize: 11, color: "#e5484d" }}>抓取失敗，請重試</p>
+              )}
+
+              {!trendingLoading && !trendingError && trendingTopics.length > 0 && (
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {trendingTopics.map((t, i) => (
+                    <button
+                      key={`${t}-${i}`}
+                      type="button"
+                      onClick={() => setSubject(t)}
+                      style={{
+                        fontSize: 11, padding: "3px 9px", borderRadius: 6, cursor: "pointer",
+                        background: "var(--bg-secondary, #222)", border: "1px solid var(--border, #333)",
+                        color: "var(--text, #ccc)", textAlign: "left", transition: "border-color 0.15s",
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
+                      onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #333)")}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Style + Model */}
         <ImageStyleControls
           model={model}
           style={style}
@@ -345,6 +546,7 @@ export default function StudioWorkbench() {
           }}
         />
 
+        {/* 比例 */}
         <label style={{ fontSize: 13 }}>
           比例
           <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={aspect} onChange={(e) => setAspect(e.target.value as AspectRatio)}>
@@ -354,20 +556,77 @@ export default function StudioWorkbench() {
           </select>
         </label>
 
-        {maxRefs > 0 ? (
-          <label style={{ fontSize: 13 }}>
-            參考圖（{refImages.length}/{maxRefs}）
-            <input type="file" accept="image/png,image/jpeg,image/webp" multiple style={{ width: "100%", marginTop: 4 }} onChange={(e) => void onUploadRefs(e.target.files)} />
-            {refImages.length > 0 ? (
-              <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
-                {refImages.map((r, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={r} alt={`ref-${i}`} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, cursor: "pointer" }} title="點擊移除" onClick={() => setRefImages((prev) => prev.filter((_, j) => j !== i))} />
-                ))}
-              </div>
-            ) : null}
-          </label>
-        ) : null}
+        {/* 參考圖 + 模式切換 */}
+        <div style={{ border: "1px solid var(--border, #333)", borderRadius: 8, padding: 10 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>參考圖</p>
+
+          {/* Mode toggle */}
+          <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border, #333)", marginBottom: 8 }}>
+            <button
+              type="button"
+              onClick={() => onSetRefMode("ref")}
+              style={{
+                flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none",
+                background: refMode === "ref" ? "var(--accent, #6366f1)" : "transparent",
+                color: refMode === "ref" ? "#fff" : "var(--text-muted, #888)",
+                transition: "all 0.15s",
+              }}
+            >
+              🖼️ 風格參考
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetRefMode("transform")}
+              style={{
+                flex: 1, padding: "6px 4px", fontSize: 11, cursor: "pointer", border: "none",
+                background: refMode === "transform" ? "var(--accent, #6366f1)" : "transparent",
+                color: refMode === "transform" ? "#fff" : "var(--text-muted, #888)",
+                transition: "all 0.15s",
+              }}
+            >
+              🎨 改圖模式
+            </button>
+          </div>
+
+          <p style={{ fontSize: 10, opacity: 0.5, marginBottom: 8, lineHeight: 1.5 }}>
+            {refMode === "ref"
+              ? "上傳圖作為視覺參考，AI 依 Subject/Style 生成新圖"
+              : `直接把你的圖套用選定風格（已切至 ${model.includes("kontext") ? model : TRANSFORM_MODEL}）`}
+          </p>
+
+          {maxRefs > 0 ? (
+            <label style={{ fontSize: 12 }}>
+              {refMode === "transform" ? "上傳要改的圖" : `參考圖（${refImages.length}/${maxRefs}）`}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                multiple
+                style={{ width: "100%", marginTop: 4 }}
+                onChange={(e) => void onUploadRefs(e.target.files)}
+              />
+              {refImages.length > 0 && (
+                <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
+                  {refImages.map((r, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={i}
+                      src={r}
+                      alt={`ref-${i}`}
+                      style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, cursor: "pointer" }}
+                      title="點擊移除"
+                      onClick={() => setRefImages((prev) => prev.filter((_, j) => j !== i))}
+                    />
+                  ))}
+                </div>
+              )}
+            </label>
+          ) : (
+            <p style={{ fontSize: 11, opacity: 0.45 }}>
+              目前模型不支援參考圖。
+              {refMode === "transform" && " 改圖模式將自動切換至 flux-kontext-dev。"}
+            </p>
+          )}
+        </div>
 
         <button className="btn-primary" disabled={gen.status === "generating"} onClick={() => void generate()}>
           {gen.status === "generating" ? "生成中…" : "生成"}
@@ -385,7 +644,6 @@ export default function StudioWorkbench() {
             onChange={(e) => {
               const v = e.target.value;
               setPrompt(v);
-              // Clearing the box returns to auto-assembly instead of stranding an empty prompt.
               setPromptTouched(v.trim().length > 0);
             }}
           />
@@ -409,19 +667,9 @@ export default function StudioWorkbench() {
               <img
                 src={gen.image}
                 alt="generated design"
-                style={{
-                  display: "block",
-                  width: "auto",
-                  height: "auto",
-                  maxWidth: "100%",
-                  maxHeight: 560,
-                  margin: "0 auto",
-                  objectFit: "contain",
-                  borderRadius: 8,
-                  background: "#fff",
-                }}
+                style={{ display: "block", width: "auto", height: "auto", maxWidth: "100%", maxHeight: 560, margin: "0 auto", objectFit: "contain", borderRadius: 8, background: "#fff" }}
               />
-              <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
                 <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
                   {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
                 </button>
@@ -433,24 +681,17 @@ export default function StudioWorkbench() {
                 ) : null}
                 {bgState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>去背失敗，請重試</span> : null}
                 {bgState === "done" && productType === "tshirt" ? (
-                  <button
-                    className="btn-secondary"
-                    disabled={mockupState === "generating" || mockupState === "done"}
-                    onClick={() => void generateMockupFromDesign()}
-                  >
+                  <button className="btn-secondary" disabled={mockupState === "generating" || mockupState === "done"} onClick={() => void generateMockupFromDesign()}>
                     {mockupState === "done" ? "產品預覽 ✓" : mockupState === "generating" ? "生成 Mockup…" : "產品 Mockup（多風格＋模特）"}
                   </button>
                 ) : null}
                 {mockupState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>Mockup 失敗，請重試</span> : null}
-                <button className="btn-secondary" onClick={downloadOriginal}>
-                  下載原圖
-                </button>
+                <button className="btn-secondary" onClick={downloadOriginal}>下載原圖</button>
                 {gen.seed != null ? <span style={{ fontSize: 12, opacity: 0.6 }}>seed {gen.seed}</span> : null}
                 {saveState === "saved" ? <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a> : null}
-                {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗（檢查 POD_DESIGNS_ENABLED 與 POD_DESIGNS_DEFAULT_ORG_ID / 伺服器 log）</span> : null}
+                {saveState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>儲存失敗（檢查 POD_DESIGNS_ENABLED）</span> : null}
               </div>
 
-              {/* Printful product mockups — all faithful (real garment + real file); 模特款=真人實拍 */}
               {mockups.length > 0 ? (
                 <div style={{ marginTop: 14 }}>
                   <p style={{ fontSize: 13, marginBottom: 6, opacity: 0.7 }}>
@@ -462,11 +703,7 @@ export default function StudioWorkbench() {
                       return (
                         <div key={m.url} style={{ width: 180 }}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={m.url}
-                            alt={m.label}
-                            style={{ width: 180, height: 180, objectFit: "contain", background: "#111", borderRadius: 8, border: "1px solid var(--border)" }}
-                          />
+                          <img src={m.url} alt={m.label} style={{ width: 180, height: 180, objectFit: "contain", background: "#111", borderRadius: 8, border: "1px solid var(--border)" }} />
                           <div style={{ fontSize: 11, marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
                             {m.lifestyle ? <span title="真人模特">🧍</span> : <span title="產品實拍">👕</span>}
                             <span style={{ opacity: 0.8 }}>{m.label}</span>
@@ -486,7 +723,6 @@ export default function StudioWorkbench() {
                 </div>
               ) : null}
 
-              {/* AI image prompt + 輸出軌。調色/修圖統一交給「快速編輯」Canvas。 */}
               <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
                 <ImageEditPromptPanel
                   sourceImage={gen.image}

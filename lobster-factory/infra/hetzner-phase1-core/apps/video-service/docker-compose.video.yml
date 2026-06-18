@@ -4,8 +4,8 @@
 #
 # 部署（EU）：
 #   docker compose -f docker-compose.video.yml --env-file .env.video up -d --build
-# .env.video 需含：RENDER_AUTH_TOKEN / R2_API_TOKEN / R2_ACCOUNT_ID / R2_DESIGNS_BUCKET /
-#   R2_DESIGNS_PUBLIC_BASE（皆非提交；見 runbook）。
+# .env.video 需含：RENDER_AUTH_TOKEN / R2_API_TOKEN / R2_ACCOUNT_ID /
+#   R2_VIDEO_BUCKET / R2_VIDEO_PUBLIC_BASE（皆非提交；見 runbook）。
 
 x-logging: &video-logging
   driver: json-file
@@ -26,11 +26,11 @@ services:
       VIDEO_SERVICE_PORT: "8732"
       # 認證：必設；缺則服務 fail-closed（拒所有 /render）
       RENDER_AUTH_TOKEN: ${RENDER_AUTH_TOKEN}
-      # 產出上傳 R2（CF R2 API；與 next-admin lib/storage/r2.ts 同 bucket）
+      # 產出上傳 R2（CF R2 API；影片用獨立 bucket，與圖片 bucket 隔離）
       R2_API_TOKEN: ${R2_API_TOKEN}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
-      R2_DESIGNS_BUCKET: ${R2_DESIGNS_BUCKET:-lobster-designs}
-      R2_DESIGNS_PUBLIC_BASE: ${R2_DESIGNS_PUBLIC_BASE}
+      R2_VIDEO_BUCKET: ${R2_VIDEO_BUCKET:-lobster-videos}
+      R2_VIDEO_PUBLIC_BASE: ${R2_VIDEO_PUBLIC_BASE}
       # 渲染上限（防資源失控）
       RENDER_MAX_SCENES: ${RENDER_MAX_SCENES:-30}
       RENDER_MAX_ASSET_MB: ${RENDER_MAX_ASSET_MB:-200}

@@ -19,6 +19,59 @@ import {
 } from "../../storage/r2";
 import { callRenderService, type RenderOutputs } from "../video/render-client";
 import { generateTarotImage } from "../../tarot/image-gen";
+import { getSupabaseWriteClient } from "../../supabase-server";
+
+/** POD_DESIGNS_DEFAULT_ORG_ID を使って組織 ID を解決（designs route と同じ規約）。 */
+function defaultOrganizationId(): string | null {
+  return process.env.POD_DESIGNS_DEFAULT_ORG_ID ?? null;
+}
+
+function isUuid(v: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
+
+/** ベストエフォート：renders 成功後に media_assets 行を 1 件挿入する。
+ *  失敗してもレンダー成功結果は返す（try/catch 必須）。*/
+async function recordVideoAsset(params: {
+  organizationId: string;
+  primaryUrl: string;
+  outputs: RenderOutputs;
+  title: string;
+  sceneCount: number;
+}): Promise<void> {
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return; // Supabase 未設定 → skip（best-effort）
+
+  // object_key: URL から "video/..." パスを抽出できれば使う、できなければ主 URL そのまま
+  let objectKey: string;
+  try {
+    const u = new URL(params.primaryUrl);
+    // pathname は "/video/<dir>/<fmt>.mp4" → 先頭 "/" を取る
+    objectKey = u.pathname.replace(/^\//, "") || params.primaryUrl;
+  } catch {
+    objectKey = params.primaryUrl;
+  }
+
+  const { error } = await supabase.from("media_assets").insert({
+    organization_id: params.organizationId,
+    storage_backend: "r2",
+    asset_domain: "ai_video",
+    object_key: objectKey,
+    object_url: params.primaryUrl,
+    mime_type: "video/mp4",
+    byte_size: 0,
+    is_current: true,
+    metadata: {
+      title: params.title,
+      formats: params.outputs,
+      sceneCount: params.sceneCount,
+    },
+  });
+
+  if (error) {
+    console.warn("[video-pipeline] media_assets insert failed (best-effort):", error.message);
+  }
+}
 
 /** video/pipeline 積木的成功回傳形狀。 */
 interface VideoPipelineSuccess {
@@ -119,6 +172,25 @@ register({
       );
 
       if (!renderResult.ok) return renderResult as { ok: false; status: number; error: string };
+
+      // ── 6. ベストエフォートで media_assets に記録（R2 モードかつ https URL の場合のみ）──
+      const primaryUrl = renderResult.outputs["youtube_linkedin"] ?? Object.values(renderResult.outputs)[0];
+      if (primaryUrl && primaryUrl.startsWith("https://")) {
+        const orgId = (ctx.organizationId as string | undefined) ?? defaultOrganizationId();
+        if (orgId && isUuid(orgId)) {
+          try {
+            await recordVideoAsset({
+              organizationId: orgId,
+              primaryUrl,
+              outputs: renderResult.outputs,
+              title,
+              sceneCount: scenes.length,
+            });
+          } catch (e) {
+            console.warn("[video-pipeline] recordVideoAsset threw (best-effort):", e);
+          }
+        }
+      }
 
       return {
         ok: true,

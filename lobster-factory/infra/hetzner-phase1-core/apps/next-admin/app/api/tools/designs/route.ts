@@ -334,6 +334,10 @@ export async function GET(request: Request) {
     );
   }
 
+  // ?domain=ai_video → list videos; default (no param / any other value) → ai_generated images.
+  const domainParam = url.searchParams.get("domain");
+  const assetDomain = domainParam === "ai_video" ? "ai_video" : "ai_generated";
+
   // Prefer the service-role client: media_assets has RLS keyed to Clerk JWTs, and this
   // server route carries no user JWT — the anon client would silently return 0 rows.
   const supabase = getSupabaseWriteClient() ?? getSupabaseReadClient();
@@ -346,7 +350,7 @@ export async function GET(request: Request) {
     .select("id,object_key,object_url,mime_type,byte_size,created_at,metadata")
     .eq("organization_id", organizationId)
     .eq("storage_backend", "r2")
-    .eq("asset_domain", "ai_generated")
+    .eq("asset_domain", assetDomain)
     .eq("is_current", true)
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
