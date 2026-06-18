@@ -56,7 +56,17 @@ Article type: ${articleType}
 
 ${rankMathRules}
 
-Every one of the 5 titles must satisfy ALL the rules above (keyword position + power word + number + sentiment + length). Vary the angle across the 5 (e.g. how-to, list, benefit, comparison, guide) but never drop a required element.
+Every one of the 5 titles must satisfy ALL the rules above (keyword position + power word + number + sentiment + length).
+
+ENGAGEMENT RULES (these are AS important as the RankMath rules — a title that passes RankMath but nobody clicks is worthless):
+- Each title must use a DIFFERENT headline pattern from the list below. Assign one pattern per title:
+  1. CURIOSITY GAP — hint at something surprising or counterintuitive: "Why Most People Get X Wrong", "The Hidden Truth About X", "What Nobody Tells You About X"
+  2. NUMBERED LIST WITH HOOK — specific number + compelling modifier: "7 Proven X Techniques That Actually Work (Even for Beginners)", "5 Essential X Secrets Experts Don't Share"
+  3. HOW-TO WITH OUTCOME — specific result + timeframe or condition: "How to X in 30 Days (Without Y)", "How to Finally X — Even If Z"
+  4. QUESTION THAT CREATES URGENCY — makes reader feel behind or uncertain: "Is X Worth It? 5 Essential Facts Before You Decide", "Are You Making These X Mistakes?"
+  5. CONTRARIAN / MYTH-BUSTING — challenges conventional wisdom: "The X Myth That's Holding You Back", "Stop Doing X: Here's What Actually Works"
+- NEVER produce generic, interchangeable titles like "The Complete Guide to X" or "Everything You Need to Know About X" — these get zero clicks.
+- CJK titles: apply the same 5 patterns in the target language. Use emotionally resonant phrasing like 「你可能不知道的...」「為什麼大多數人...」「...的 7 個關鍵秘密」.
 
 Return ONLY a valid JSON array of 5 title strings, nothing else.
 Example: ["Title One Here", "Title Two Here", "Title Three Here", "Title Four Here", "Title Five Here"]`,

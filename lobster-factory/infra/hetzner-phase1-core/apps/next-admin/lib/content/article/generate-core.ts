@@ -445,7 +445,7 @@ function buildUserPrompt(params: {
     lines.push("OUTPUT ORDER (follow EXACTLY): FIRST output the meta block below verbatim (keep the exact comment markers and KEY: prefixes, one field per line). THEN, immediately after the <!-- CONTENT_META_END --> line, write the complete article. Do NOT place the meta block at the end.");
     lines.push("<!-- CONTENT_META_START -->");
     lines.push("SEO_TITLE: [SEO title — 50-60 chars for Latin scripts / 14-30 chars for CJK; primary keyword in first half; include a power word AND an Arabic-digit number]");
-    lines.push("META_DESC: [meta description — 145-155 chars for Latin scripts / 60-80 chars for CJK; includes primary keyword]");
+    lines.push("META_DESC: [meta description — RULES: (1) LENGTH: exactly 145-155 chars for Latin / 60-80 chars for CJK — count carefully, do not exceed 160 (2) KEYWORD: place the PRIMARY KEYWORD within the FIRST 60 characters — RankMath checks the first 80 chars for keyword presence (3) VOICE: write as a compelling benefit-driven statement or question that makes a reader click — NOT a bland restatement of the title (4) NEVER truncate with ellipsis or leave a sentence unfinished]");
     lines.push("FOCUS_KEYWORD: [the primary keyword exactly as provided]");
     if (params.existingCategories.length > 0) {
       // #3 — feed the site's REAL category list so the model classifies into an existing taxonomy
