@@ -74,9 +74,9 @@ export default async function ApprovalsPage() {
       >
         你的角色：<strong>{role}</strong>{" "}
         {canAct ? (
-          <span style={{ color: "#059669" }}>（可核准／拒絕）</span>
+          <span style={{ color: "var(--approval-role-ok)" }}>（可核准／拒絕）</span>
         ) : (
-          <span style={{ color: "#b91c1c" }}>（唯讀 — 需 owner / admin 才能操作）</span>
+          <span style={{ color: "var(--approval-role-deny)" }}>（唯讀 — 需 owner / admin 才能操作）</span>
         )}
       </div>
 
