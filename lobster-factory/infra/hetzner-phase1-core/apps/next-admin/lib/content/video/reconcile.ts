@@ -63,15 +63,16 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
   // 3) 缺 media_assets 的補上（依 object_key 去重 → idempotent）
   let recorded = 0;
   for (const dir of dirs) {
-    const primaryKey = `video/${dir}/youtube_linkedin.mp4`;
-    const { data, error } = await supabase.from("media_assets").select("id").eq("object_key", primaryKey).limit(1);
-    if (error) continue;            // 查詢失敗 → 跳過本筆，下輪再試
-    if (data && data.length > 0) continue; // 已記錄
     const outputs: Record<string, string> = {};
     for (const fmt of OUTPUT_FORMATS) {
       if (keys.includes(`video/${dir}/${fmt}.mp4`)) outputs[fmt] = `${cfg.publicBase}/video/${dir}/${fmt}.mp4`;
     }
     if (!outputs["youtube_linkedin"]) continue;
+    // 存在性檢查用與 recordVideoAsset 相同的 object_key 推導（編碼一致 → idempotent）
+    const checkKey = videoObjectKey(outputs["youtube_linkedin"]);
+    const { data, error } = await supabase.from("media_assets").select("id").eq("object_key", checkKey).limit(1);
+    if (error) continue;            // 查詢失敗 → 跳過本筆，下輪再試
+    if (data && data.length > 0) continue; // 已記錄
     try {
       await recordVideoAsset({ organizationId: orgId, primaryUrl: outputs["youtube_linkedin"], outputs, title: dir, sceneCount: 0 });
       recorded++;
