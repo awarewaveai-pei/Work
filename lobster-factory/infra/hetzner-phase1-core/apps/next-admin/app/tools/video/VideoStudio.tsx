@@ -97,11 +97,14 @@ export default function VideoStudio() {
       // 2) 輪詢 status（每 5s，上限 ~12 分鐘）
       const jobId = start.jobId;
       const deadline = Date.now() + 12 * 60 * 1000;
-      type Status =
-        | { ok: true; status: "running" }
-        | { ok: true; status: "done"; video: { outputs: Record<string, string>; out_dir: string }; title: string }
-        | { ok: true; status: "error"; error: string; statusCode?: number }
-        | { ok: false; error: string };
+      // 單一 interface + optional（避免 union narrowing 邊角；防禦式讀取）
+      interface StatusResp {
+        ok: boolean;
+        status?: "running" | "done" | "error";
+        video?: { outputs: Record<string, string>; out_dir: string };
+        title?: string;
+        error?: string;
+      }
 
       const poll = async (): Promise<void> => {
         if (Date.now() > deadline) {
@@ -109,13 +112,12 @@ export default function VideoStudio() {
           setGenError("生成逾時（>12 分鐘）。影片可能仍在背景產出，稍後可至 My Designs 影片分頁查看。");
           return;
         }
-        let sj: Status;
+        let sj: StatusResp;
         try {
           const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`);
-          sj = (await sr.json()) as Status;
+          sj = (await sr.json()) as StatusResp;
         } catch {
-          // 暫時性網路錯 → 繼續輪詢
-          window.setTimeout(() => void poll(), 5000);
+          window.setTimeout(() => void poll(), 5000); // 暫時性網路錯 → 繼續輪詢
           return;
         }
         if (!sj.ok) {
@@ -127,13 +129,13 @@ export default function VideoStudio() {
           window.setTimeout(() => void poll(), 5000);
           return;
         }
-        if (sj.status === "done") {
-          setGenResult({ outputs: sj.video.outputs, out_dir: sj.video.out_dir, title: sj.title });
+        if (sj.status === "done" && sj.video) {
+          setGenResult({ outputs: sj.video.outputs, out_dir: sj.video.out_dir, title: sj.title ?? "" });
           setGenStatus("done");
           return;
         }
         setGenStatus("error");
-        setGenError(sj.error);
+        setGenError(sj.error || "生成失敗");
       };
       window.setTimeout(() => void poll(), 5000);
     } catch (e: unknown) {

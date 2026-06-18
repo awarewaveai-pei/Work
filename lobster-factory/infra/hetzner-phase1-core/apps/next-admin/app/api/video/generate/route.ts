@@ -57,9 +57,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     imageModel: body.imageModel,
   };
 
-  type BlockResult =
-    | { ok: true; video: { outputs: Record<string, string>; out_dir: string }; scenes: unknown[]; title: string }
-    | { ok: false; status: number; error: string };
+  // 單一 interface + optional 欄位（避免 discriminated-union narrowing 的 TS 邊角；防禦式讀取）
+  interface BlockResult {
+    ok?: boolean;
+    video?: { outputs: Record<string, string>; out_dir: string };
+    title?: string;
+    error?: string;
+    status?: number;
+  }
 
   // Async：建 job，背景跑管線（不 await），立即回 jobId。
   // 同步生成 >100s 會撞 app.aware-wave.com 的 CF orange 100s 上限（524）→ 必須 async。
@@ -70,10 +75,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   void (async () => {
     try {
       const result = (await blocks[0].run(ctx)) as BlockResult;
-      if (result.ok) {
-        finishJob(job.id, { status: "done", video: result.video, title: result.title });
+      if (result.ok && result.video) {
+        finishJob(job.id, { status: "done", video: result.video, title: result.title ?? "" });
       } else {
-        finishJob(job.id, { status: "error", error: result.error, statusCode: result.status });
+        finishJob(job.id, { status: "error", error: result.error ?? "unknown", statusCode: result.status ?? 500 });
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
