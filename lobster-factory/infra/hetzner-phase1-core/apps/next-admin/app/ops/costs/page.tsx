@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
 import { INFRA_MONTHLY, TWD_RATE } from "@/lib/ai/cost-model";
-import { CostsTabs, type RealSpend } from "./CostsTabs";
+import { CostsTabs, type RealSpend, type LedgerRow } from "./CostsTabs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "AI & 工具成本 · Ops" };
@@ -62,8 +62,22 @@ async function loadRealSpend(): Promise<RealSpend> {
   };
 }
 
+async function loadLedger(): Promise<LedgerRow[]> {
+  const supabase = getSupabaseWriteClient();
+  if (!supabase) return [];
+  const since = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
+  const { data } = await supabase
+    .from("ai_call_logs")
+    .select("id,created_at,route,model,vendor,cost_usd,kind,tool,job_id")
+    .gte("created_at", since)
+    .not("job_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(2000);
+  return (data ?? []) as LedgerRow[];
+}
+
 export default async function CostsPage() {
-  const real = await loadRealSpend();
+  const [real, ledger] = await Promise.all([loadRealSpend(), loadLedger()]);
   const monthlyInfraUsd = INFRA_MONTHLY.reduce((s, i) => s + i.usdPerMonth, 0);
 
   return (
@@ -85,7 +99,7 @@ export default async function CostsPage() {
         </p>
       </div>
 
-      <CostsTabs real={real} monthlyInfraUsd={monthlyInfraUsd} />
+      <CostsTabs real={real} monthlyInfraUsd={monthlyInfraUsd} ledger={ledger} />
     </div>
   );
 }

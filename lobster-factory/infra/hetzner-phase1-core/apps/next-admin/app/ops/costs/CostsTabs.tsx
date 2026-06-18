@@ -18,12 +18,25 @@ export interface RealSpend {
   imageCount: number;
 }
 
+export interface LedgerRow {
+  id: string;
+  created_at: string;
+  route: string;
+  model: string;
+  vendor: string | null;
+  cost_usd: number;
+  kind: string | null;
+  tool: string | null;
+  job_id: string;
+}
+
 interface Props {
   real: RealSpend;
   monthlyInfraUsd: number;
+  ledger: LedgerRow[];
 }
 
-type Tab = "spend" | "rates" | "estimator" | "models";
+type Tab = "spend" | "rates" | "estimator" | "models" | "ledger";
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
 
@@ -293,9 +306,124 @@ function ModelsTab() {
   );
 }
 
+// ── Ledger tab ─────────────────────────────────────────────────────────────────
+
+const TOOL_LABEL: Record<string, string> = {
+  content: "SEO Content",
+  studio:  "Studio",
+  tarot:   "Tarot",
+  video:   "Video",
+  mockup:  "Mockup",
+};
+
+const ROUTE_LABEL: Record<string, string> = {
+  "content/article-generate": "文章生成",
+  "content/fetchRealSources": "Perplexity 搜尋",
+  "content/image":            "內文圖片",
+  "content/hero-image":       "首圖",
+  "content/title":            "標題建議",
+  "content/keywords":         "關鍵字",
+  "content/outline":          "大綱",
+  "content/hook-brief":       "Hook Brief",
+  "content/seo-fix":          "SEO 修正",
+  "content/syndicate":        "社群改寫",
+  "content/humanize":         "人性化改寫",
+  "content/market-analysis":  "市場分析",
+};
+
+function routeLabel(route: string) {
+  return ROUTE_LABEL[route] ?? route;
+}
+
+function LedgerTab({ rows }: { rows: LedgerRow[] }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  if (rows.length === 0) {
+    return (
+      <div style={{ padding: "40px 0", textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>
+        尚無帶 job_id 的記錄。產生文章後此處顯示每篇費用明細。
+        <div style={{ marginTop: 8, fontSize: 12 }}>（需 migration 0046 + 重新部署）</div>
+      </div>
+    );
+  }
+
+  // Group by job_id
+  const jobMap = new Map<string, { rows: LedgerRow[]; totalUsd: number; tool: string | null; createdAt: string }>();
+  for (const r of rows) {
+    const entry = jobMap.get(r.job_id) ?? { rows: [], totalUsd: 0, tool: r.tool, createdAt: r.created_at };
+    entry.rows.push(r);
+    entry.totalUsd += Number(r.cost_usd) || 0;
+    if (r.created_at < entry.createdAt) entry.createdAt = r.created_at; // earliest = job start
+    jobMap.set(r.job_id, entry);
+  }
+
+  const jobs = [...jobMap.entries()]
+    .sort(([, a], [, b]) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 200);
+
+  const toggle = (id: string) =>
+    setExpanded(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1px solid var(--border-subtle)", borderRadius: 10, overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 90px 90px 28px", gap: 0, padding: "7px 14px", background: "#fafafa", borderBottom: "1px solid var(--border-subtle)", fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>
+        <span>工具 / 時間</span>
+        <span style={{ textAlign: "right" }}>NT$</span>
+        <span style={{ textAlign: "right" }}>USD</span>
+        <span style={{ textAlign: "right" }}>明細數</span>
+        <span />
+      </div>
+
+      {jobs.map(([jobId, job]) => {
+        const open = expanded.has(jobId);
+        const tool = job.tool ?? "?";
+        const date = new Date(job.createdAt).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+        return (
+          <div key={jobId} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+            {/* Job row */}
+            <div
+              onClick={() => toggle(jobId)}
+              style={{ display: "grid", gridTemplateColumns: "1fr 120px 90px 90px 28px", gap: 0, padding: "10px 14px", cursor: "pointer", background: open ? "var(--bg-subtle)" : "#fff", alignItems: "center" }}
+            >
+              <div>
+                <span style={{ display: "inline-block", fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 4, background: "var(--accent)", color: "#fff", marginRight: 8 }}>
+                  {TOOL_LABEL[tool] ?? tool}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{date}</span>
+              </div>
+              <span style={{ textAlign: "right", fontWeight: 700, fontSize: 13 }}>{NT(job.totalUsd)}</span>
+              <span style={{ textAlign: "right", fontSize: 12, color: "var(--text-secondary)" }}>{USD(job.totalUsd)}</span>
+              <span style={{ textAlign: "right", fontSize: 12, color: "var(--text-muted)" }}>{job.rows.length} 項</span>
+              <span style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)" }}>{open ? "▲" : "▼"}</span>
+            </div>
+
+            {/* Detail rows */}
+            {open && job.rows.map((r) => {
+              const rowUsd = Number(r.cost_usd) || 0;
+              return (
+              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 90px 90px 28px", gap: 0, padding: "6px 14px 6px 28px", background: "#fafafa", borderTop: "1px solid var(--border-subtle)", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{routeLabel(r.route)}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 8 }}>{r.model} · {r.kind ?? "text"}</span>
+                </div>
+                <span style={{ textAlign: "right", fontSize: 12 }}>{NT(rowUsd)}</span>
+                <span style={{ textAlign: "right", fontSize: 11, color: "var(--text-secondary)" }}>{USD(rowUsd)}</span>
+                <span />
+                <span />
+              </div>
+            );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main export ────────────────────────────────────────────────────────────────
 
-export function CostsTabs({ real, monthlyInfraUsd }: Props) {
+export function CostsTabs({ real, monthlyInfraUsd, ledger }: Props) {
   const [tab, setTab] = useState<Tab>("spend");
 
   const tabs: { key: Tab; label: string }[] = [
@@ -303,6 +431,7 @@ export function CostsTabs({ real, monthlyInfraUsd }: Props) {
     { key: "rates",     label: "② 費率表" },
     { key: "estimator", label: "③ 月費試算" },
     { key: "models",    label: "④ AI 模型" },
+    { key: "ledger",    label: "⑤ 流水帳" },
   ];
 
   return (
@@ -333,6 +462,7 @@ export function CostsTabs({ real, monthlyInfraUsd }: Props) {
       {tab === "rates"     && <RatesTab monthlyInfraUsd={monthlyInfraUsd} />}
       {tab === "estimator" && <CostEstimator />}
       {tab === "models"    && <ModelsTab />}
+      {tab === "ledger"    && <LedgerTab rows={ledger} />}
     </div>
   );
 }
