@@ -89,7 +89,11 @@ export async function GET(req: Request): Promise<Response> {
     return NextResponse.json({ ok: true, draft: toFull(data as DraftRow) });
   }
 
-  const siteId = new URL(req.url).searchParams.get("siteId");
+  const rawSiteId = new URL(req.url).searchParams.get("siteId");
+  // Only filter by site_id when it is a valid UUID — env-sourced sites use non-UUID ids like "1",
+  // which Postgres rejects with "invalid input syntax for type uuid" and returns a 500.
+  const uuidRe    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const siteId    = rawSiteId && uuidRe.test(rawSiteId) ? rawSiteId : null;
   let query = supabase
     .from("content_drafts")
     .select("id, organization_id, site_id, keyword, title, language, article_type, slug_hint, seo_score, status, created_at, updated_at")
