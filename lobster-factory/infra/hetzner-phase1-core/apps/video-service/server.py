@@ -20,10 +20,12 @@ https URL（prod，下載前過 SSRF guard：https-only + 擋私有/迴圈/link-
 import os
 import json
 import hmac
+import time
+import uuid
 import socket
 import ipaddress
 import threading
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse, quote, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import requests
@@ -120,7 +122,7 @@ def _materialize_asset(asset: str, idx: int) -> str:
     return dst
 
 
-def render_request(payload: dict) -> dict:
+def _validate(payload: dict):
     scenes = payload.get("scenes")
     assets = payload.get("assets")
     out_name = payload.get("out_name", "video")
@@ -130,11 +132,16 @@ def render_request(payload: dict) -> dict:
         raise ValueError(f"scenes 過多（{len(scenes)} > {MAX_SCENES}）")
     if not isinstance(assets, list) or len(assets) != len(scenes):
         raise ValueError("assets 必須與 scenes 等長")
+    return scenes, assets, out_name
+
+
+def _do_render(scenes, assets, out_name) -> dict:
+    """重活：序列化 materialize+render+R2 上傳。回 {outputs,out_dir,storage}。"""
     with _render_lock:  # 序列化：materialize(下載)+render 全程獨佔 TEMP_DIR（防並行撞檔）
         try:
             visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
             outputs, _base, out_dir = pipeline.render_video(scenes, visual_files, out_name)
-            # 跨機部署：產出上傳 R2 → 回 public URL（網頁可直接播/下載）。未設 R2 = 本機路徑（dev）。
+            # 跨機：產出上傳 R2 → 回 public URL。未設 R2 = 本機路徑（dev）。
             if _r2_video_configured():
                 base_key = "video/" + os.path.basename(str(out_dir))
                 urls = {}
@@ -150,6 +157,45 @@ def render_request(payload: dict) -> dict:
             pipeline.cleanup()
 
 
+# ── async job store：POST /render 即回 jobId，背景 thread 渲染，GET /job?jobId= 查狀態 ──
+# 解決「跨機長連線回應遺失 + 呼叫端 fire-and-forget 不存活」：改短連線提交+輪詢。
+_JOBS: dict = {}
+_jobs_lock = threading.Lock()
+_JOB_TTL = 60 * 60  # 1h
+
+
+def _prune_jobs():
+    now = time.time()
+    for jid in [k for k, v in _JOBS.items() if now - v.get("ts", now) > _JOB_TTL]:
+        _JOBS.pop(jid, None)
+
+
+def _run_job(job_id: str, scenes, assets, out_name):
+    try:
+        result = _do_render(scenes, assets, out_name)
+        with _jobs_lock:
+            _JOBS[job_id] = {"status": "done", **result, "ts": time.time()}
+    except Exception as e:  # noqa: BLE001
+        with _jobs_lock:
+            _JOBS[job_id] = {"status": "error", "error": str(e), "ts": time.time()}
+
+
+def submit_render(payload: dict) -> str:
+    """驗證後建 job + 起背景 thread，立即回 jobId（不阻塞）。"""
+    scenes, assets, out_name = _validate(payload)
+    job_id = uuid.uuid4().hex
+    with _jobs_lock:
+        _prune_jobs()
+        _JOBS[job_id] = {"status": "running", "ts": time.time()}
+    threading.Thread(target=_run_job, args=(job_id, scenes, assets, out_name), daemon=True).start()
+    return job_id
+
+
+def get_job(job_id: str):
+    with _jobs_lock:
+        return _JOBS.get(job_id)
+
+
 class _Handler(BaseHTTPRequestHandler):
     def _json(self, code: int, obj: dict):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -161,9 +207,20 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._json(200, {"ok": True})
-        else:
-            self._json(404, {"error": "not found"})
+            self._json(200, {"ok": True})  # healthcheck 免認證
+            return
+        if self.path.split("?")[0] == "/job":
+            if not _authed(self):
+                self._json(401, {"error": "unauthorized"})
+                return
+            jid = parse_qs(urlparse(self.path).query).get("jobId", [None])[0]
+            job = get_job(jid) if jid else None
+            if not job:
+                self._json(404, {"error": "job_not_found"})
+                return
+            self._json(200, {"jobId": jid, **{k: v for k, v in job.items() if k != "ts"}})
+            return
+        self._json(404, {"error": "not found"})
 
     def do_POST(self):
         if self.path != "/render":
@@ -178,7 +235,9 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(413, {"error": f"body 過大（{length} > {MAX_BODY_BYTES}）"})
                 return
             payload = json.loads(self.rfile.read(length) or b"{}")
-            self._json(200, render_request(payload))
+            # async：驗證後即回 jobId（202），背景 thread 渲染；呼叫端短輪詢 GET /job
+            job_id = submit_render(payload)
+            self._json(202, {"jobId": job_id})
         except ValueError as e:
             self._json(400, {"error": str(e)})
         except Exception as e:  # noqa: BLE001 — 回 500，不洩堆疊
