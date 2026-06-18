@@ -6,7 +6,8 @@
  * The old preview was `<img style={{filter: cssFilter}}>` — CSS can't do gamma/sharpen/levels,
  * so those sliders moved with no visible effect ("看不到怎麼調整"). This renders the image
  * through Fabric's filter pipeline (same engine as the Canvas editor), so EVERY slider shows
- * its real result, and `exportPng()` returns exactly what the preview shows — preview === download.
+ * its real result, and `exportPng()` returns exactly what the preview shows — preview === this
+ * convenience export (capped at MAX_EDGE; print-grade output goes through OutputTrackBar's Sharp pipeline).
  *
  * Robustness (critic 2026-06-14):
  *  - fabric module + latest params are cached in refs so `[params]` and `exportPng()` apply
