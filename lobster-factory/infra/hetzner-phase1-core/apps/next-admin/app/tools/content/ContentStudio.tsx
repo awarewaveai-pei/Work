@@ -2854,6 +2854,7 @@ export default function ContentStudio() {
                     </span>
                   )}
                 </div>
+                <CostChip cost={sessionCost} />
               </div>
 
               <textarea
