@@ -178,6 +178,26 @@
 **[剩餘風險]** TOCTOU 對外暴露前須改 pin-IP（已註解）；local-path 分支信任邊界依賴 127.0.0.1+積木不轉發使用者路徑（已註解）。積木 `video-pipeline.ts` 為下一步。
 - AUTO_TASK_DONE (2026-06-17): video-service HTTP render 微服務 server.py 建好 + critic 安全硬化（SSRF/temp-clobber/redirect/上限），real-test 通過。
 
+### perf(video-service): 合成引擎 moviepy → 純 ffmpeg（修 9 分鐘卡死）+ server SSRF guard bug 修 + Pexels key
+
+**[任務理解]** 操作者鎖定「混合畫面（Flux 自訂圖 + 免費 Pexels 實拍 B-roll）+ Edge TTS、近免費、品質超好」。完整混合 e2e 首跑時 moviepy 逐幀嚼真實影片片段 ~1.1 幀/秒 → render 卡在 70% 且進程被收掉（背景任務 2.4h 無進展）。根因：moviepy 不適合逐幀合成影片片段。
+
+**[已修改]**
+- `pipeline.py` **合成引擎重寫**：移除 moviepy 合成（`make_subtitle_overlay`/`ken_burns`/`_fit_video_clip`/`make_visual_clip`），moviepy import 縮到只剩 `AudioFileClip`（取時長）。新 `_render_scene_ffmpeg()`（純 ffmpeg 單場景：靜圖 zoompan Ken Burns／實拍 stream_loop+cover-fit，疊字幕 PNG overlay + 接 TTS，統一編碼參數）+ `make_subtitle_png()`（PIL CJK 字幕 PNG）+ `_audio_duration()`。`compose_base_video` 改 per-scene render → concat demuxer `-c copy` 秒級合併。**效能：moviepy 9min+卡死 → ffmpeg 23s 出 29s/6 場景影片**。
+- `pipeline.py` **critic Critical/Major 修**（2 場景測不出、6-8 場景 production 會爆）：① `[2:a]apad` 把音軌補到與 `-t` 等長 → 修 A/V 漂移逐段累積（audio 短 0.5s + AAC priming）。② zoompan 縮放改 `on`（累積輸出幀號）驅動 → 修長靜圖場景 sawtooth 重置。③ `-ac 2` 鎖聲道數 → 防不同 TTS 來源破 concat。④ concat list 路徑單引號跳脫硬化。
+- `server.py` **SSRF guard bug 修**：硬化版 `if ip.ipv4_mapped` 對 IPv4Address 拋 AttributeError → 被 except 吞成 fails-closed，誤擋所有 IPv4 host（Pexels CDN 104.18.x.x 全被擋、e2e 回 400）。改 `getattr(ip,"ipv4_mapped",None)` → IPv4 不誤擋、保留 IPv6-mapped 正規化。
+- `AWARE_WAVE_CREDENTIALS.md` + vault：新增 `PEXELS_API_KEY`（免費影片 B-roll，已驗 200）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`venv python D:/tmp/vtest_multiscene.py`（6 場景混合靜圖+實拍、旁白長度不一、真 Edge TTS）| exit=0 | `REALTEST_MULTISCENE_PASS` — **A/V drift=0.000s**（video 29.10s==audio 29.10s），四尺寸正確，23s 完成。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`vault run … vtest_hybrid_e2e.py`（Claude→gpt-image-1 自訂圖+真 Pexels 片→server.py /render→ffmpeg）| exit=0 | `REALTEST_HYBRID_E2E_PASS` RENDER_STATUS=200，四尺寸真影片已交付操作者（YT 5.7MB）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=materialize 真實 Pexels link | `MATERIALIZE_OK 2008913 bytes`（guard 修後不誤擋、無重導向問題）。
+- REVIEW_DONE: critic=Deep（兩輪）| verdict=pass | findings: 引擎重寫 2 Critical（A/V漂移+zoompan sawtooth）+1 Major（聲道數）全修並 6 場景 drift=0 複驗；server guard bug 經 debug 證實 IPv4 全誤擋後修。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`make_subtitle_overlay|ken_burns|make_visual_clip|_fit_video_clip` | hits=0 stale（移除函式無殘留引用，僅 .venv 與已修 docstring）。
+
+**[剩餘風險]** zoompan 平滑度視覺需操作者確認（自動測只驗無崩+時長）；Phase 2 容器化前 server SSRF 須改 pin-IP（TOCTOU 註解已留）。next-admin `video/pipeline` 積木（TS 端註冊+串接）仍未建 = Phase 1b 下一步。
+- AUTO_TASK_DONE (2026-06-17): video-service 合成引擎 moviepy→ffmpeg（9min→23s）+ A/V 同步 critic 修（6 場景 drift=0）+ server SSRF guard bug 修 + Pexels key 接入。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。

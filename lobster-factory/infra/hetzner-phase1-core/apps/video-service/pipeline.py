@@ -292,17 +292,21 @@ def _render_scene_ffmpeg(asset_path, subtitle_png, audio_path, duration, out_pat
     else:
         frames = max(1, int(round(duration * fps)))
         inputs = ["-loop", "1", "-i", asset_path, "-loop", "1", "-i", subtitle_png, "-i", audio_path]
-        # 2x 超取樣後 zoompan 降到 w×h；d=總幀數 + 下方 -t → 單一 batch，連續平滑放大（無 sawtooth）
+        # 2x 超取樣後 zoompan 降到 w×h。縮放用 on（累積輸出幀號，單調遞增）驅動 → 即使 -loop 餵多個
+        # input frame 也不會 sawtooth 重置（critic 修正：原 z=zoom+inc 在長靜圖場景可能中途歸零）。
         vchain = (f"[0:v]scale={w * 2}:{h * 2}:force_original_aspect_ratio=increase,crop={w * 2}:{h * 2},"
-                  f"zoompan=z='min(zoom+0.0009,1.12)':d={frames}:"
+                  f"zoompan=z='min(1+0.0009*on,1.12)':d={frames}:"
                   f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={w}x{h}:fps={fps}[bg]")
+    # [2:a]apad：把音軌補靜音到與 -t 等長 → 每場景 A/V 嚴格等長，concat -c copy 不會逐段累積漂移
+    # （critic Critical：audio 比 video 短 0.5s + AAC priming，多段 concat 後旁白與畫面失同步）。
+    # -ac 2 鎖聲道數，避免不同 TTS 來源聲道不一致破 concat。
     cmd = [
         "ffmpeg", "-y", *inputs,
-        "-filter_complex", f"{vchain};[bg][1:v]overlay=0:0[v]",
-        "-map", "[v]", "-map", "2:a",
+        "-filter_complex", f"{vchain};[bg][1:v]overlay=0:0[v];[2:a]apad[aud]",
+        "-map", "[v]", "-map", "[aud]",
         "-t", f"{duration:.3f}", "-r", str(fps),
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
-        "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
         out_path,
     ]
     res = subprocess.run(cmd, capture_output=True)
@@ -329,7 +333,9 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
     list_path = config.TEMP_DIR / "concat.txt"
     with open(list_path, "w", encoding="utf-8") as f:
         for sp in scene_paths:
-            f.write("file '%s'\n" % sp.replace("\\", "/"))
+            # concat demuxer 單引號跳脫：path 內的 ' → '\'' （TEMP_DIR 為 env 可控，硬化防斷）
+            safe = sp.replace("\\", "/").replace("'", "'\\''")
+            f.write("file '%s'\n" % safe)
     base_path = str(config.TEMP_DIR / f"{out_name}_base.mp4")
     res = subprocess.run(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-c", "copy", base_path],
