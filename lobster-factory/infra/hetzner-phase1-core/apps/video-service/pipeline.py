@@ -238,37 +238,45 @@ def generate_audio(scenes: list) -> list:
 # ═══════════════════════════════════════════
 # STEP 4：合成基礎影片（BASE_WIDTH x BASE_HEIGHT）
 # ═══════════════════════════════════════════
-def make_subtitle_png(text: str, w: int, h: int) -> str:
-    """整幀透明字幕 PNG（CJK 自動換行 + 半透明底 + 描邊），回傳路徑。
-    CJK 排版交給 PIL（比 ffmpeg drawtext 穩）；ffmpeg overlay 疊上。"""
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    font = None
-    for fp in [
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "C:/Windows/Fonts/msjh.ttc",
-    ]:
-        if os.path.exists(fp):
-            font = ImageFont.truetype(fp, max(28, h // 24))
-            break
-    if font is None:
-        font = ImageFont.load_default()
+def _split_narration(text: str) -> list:
+    """Split narration into short display segments (one sentence / ~20 chars each)."""
+    import re as _re
+    # Split at sentence endings
+    parts = _re.split(r'(?<=[。！？\.!?])\s*', text.strip())
+    parts = [p.strip() for p in parts if p.strip()]
+    result = []
+    for part in parts:
+        if len(part) <= 25:
+            result.append(part)
+        else:
+            # Split at clause boundaries
+            subs = _re.split(r'(?<=[，,、；;])\s*', part)
+            buf, buf_len = '', 0
+            for s in subs:
+                s = s.strip()
+                if not s:
+                    continue
+                if buf_len + len(s) <= 22:
+                    buf = buf + s if buf else s
+                    buf_len += len(s)
+                else:
+                    if buf:
+                        result.append(buf)
+                    buf, buf_len = s, len(s)
+            if buf:
+                result.append(buf)
+    return result or [text[:25]]
 
-    lines = textwrap.wrap(text, width=28)
-    line_h = max(36, h // 20)
-    y = h - len(lines) * line_h - int(h * 0.07)
-    for line in lines:
-        bbox = draw.textbbox((0, 0), line, font=font)
-        x = (w - (bbox[2] - bbox[0])) // 2
-        draw.rectangle([x - 8, y - 4, x + (bbox[2] - bbox[0]) + 8, y + line_h], fill=(0, 0, 0, 160))
-        draw.text((x + 2, y + 2), line, font=font, fill=(0, 0, 0, 200))
-        draw.text((x, y), line, font=font, fill=(255, 255, 255, 255))
-        y += line_h
 
-    path = str(config.TEMP_DIR / f"sub_{abs(hash(text + str(w)))}.png")
-    img.save(path)
-    return path
+def _write_subtitle_textfiles(segments: list, scene_id) -> list:
+    """Write each segment to a temp textfile, return list of paths."""
+    paths = []
+    for i, seg in enumerate(segments):
+        p = str(config.TEMP_DIR / f"sub_{scene_id}_{i}.txt")
+        with open(p, 'w', encoding='utf-8') as f:
+            f.write(seg)
+        paths.append(p)
+    return paths
 
 
 def _audio_duration(audio_path: str) -> float:
@@ -280,30 +288,85 @@ def _audio_duration(audio_path: str) -> float:
         a.close()
 
 
-def _render_scene_ffmpeg(asset_path, subtitle_png, audio_path, duration, out_path, w, h, fps):
-    """單場景 → 統一參數 mp4（純 ffmpeg，快）。
-    靜圖：zoompan Ken Burns（2x 超取樣降抖，單 batch 平滑）；實拍：stream_loop + cover-fit。
-    兩者皆疊字幕 PNG（-loop 撐滿）+ 接 TTS 旁白，-t 裁到 duration。輸出參數統一以利 concat -c copy。"""
+def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, w, h, fps, scene_id=0):
+    """單場景 → 統一參數 mp4。字幕改用 drawtext+textfile（timed per segment，取代 PIL PNG overlay）。"""
+    # Find CJK-capable font
+    font_path = ""
+    for fp in [
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+    ]:
+        if os.path.exists(fp):
+            font_path = fp
+            break
+
+    # Split narration into timed segments
+    segments = _split_narration(narration)
+    n = len(segments)
+    # Distribute time proportionally by char count
+    char_counts = [max(len(s), 1) for s in segments]
+    total_chars = sum(char_counts)
+    seg_files = _write_subtitle_textfiles(segments, scene_id)
+
+    # Calculate timing: leave 0.1s gap before first, 0.2s at end
+    usable = max(duration - 0.3, duration * 0.9)
+    times = []  # list of (start, end)
+    t = 0.1
+    for c in char_counts:
+        seg_dur = (c / total_chars) * usable
+        times.append((t, t + seg_dur))
+        t += seg_dur
+
     is_video = os.path.splitext(asset_path)[1].lower() in _VIDEO_EXTS
     if is_video:
-        inputs = ["-stream_loop", "-1", "-i", asset_path, "-loop", "1", "-i", subtitle_png, "-i", audio_path]
+        inputs = ["-stream_loop", "-1", "-i", asset_path, "-i", audio_path]
         vchain = (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
-                  f"crop={w}:{h},fps={fps},setsar=1[bg]")
+                  f"crop={w}:{h},fps={fps},setsar=1[bg0]")
     else:
         frames = max(1, int(round(duration * fps)))
-        inputs = ["-loop", "1", "-i", asset_path, "-loop", "1", "-i", subtitle_png, "-i", audio_path]
-        # 2x 超取樣後 zoompan 降到 w×h。縮放用 on（累積輸出幀號，單調遞增）驅動 → 即使 -loop 餵多個
-        # input frame 也不會 sawtooth 重置（critic 修正：原 z=zoom+inc 在長靜圖場景可能中途歸零）。
+        inputs = ["-loop", "1", "-i", asset_path, "-i", audio_path]
         vchain = (f"[0:v]scale={w * 2}:{h * 2}:force_original_aspect_ratio=increase,crop={w * 2}:{h * 2},"
                   f"zoompan=z='min(1+0.0009*on,1.12)':d={frames}:"
-                  f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={w}x{h}:fps={fps}[bg]")
-    # [2:a]apad：把音軌補靜音到與 -t 等長 → 每場景 A/V 嚴格等長，concat -c copy 不會逐段累積漂移
-    # （critic Critical：audio 比 video 短 0.5s + AAC priming，多段 concat 後旁白與畫面失同步）。
-    # -ac 2 鎖聲道數，避免不同 TTS 來源聲道不一致破 concat。
+                  f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={w}x{h}:fps={fps}[bg0]")
+
+    # Build chained drawtext filters
+    font_size = max(22, h // 54)
+    margin_v = max(28, h // 40)
+    box_border = max(4, h // 270)
+    dt_filters = []
+    for i, (seg_file, (start, end)) in enumerate(zip(seg_files, times)):
+        in_tag = f"[bg{i}]"
+        out_tag = f"[bg{i+1}]"
+        # Escape path for FFmpeg (replace backslash, colon)
+        safe_path = seg_file.replace("\\", "/").replace(":", "\\:")
+        font_arg = f"fontfile={font_path.replace(':', '\\:')}:" if font_path else ""
+        dt = (
+            f"{in_tag}drawtext="
+            f"{font_arg}"
+            f"textfile={safe_path}:"
+            f"fontsize={font_size}:"
+            f"fontcolor=white:"
+            f"borderw=2:"
+            f"bordercolor=black:"
+            f"box=1:"
+            f"boxcolor=black@0.45:"
+            f"boxborderw={box_border}:"
+            f"x=(w-text_w)/2:"
+            f"y=h-text_h-{margin_v}:"
+            f"enable='between(t,{start:.3f},{end:.3f})'"
+            f"{out_tag}"
+        )
+        dt_filters.append(dt)
+
+    final_v_tag = f"[bg{n}]"
+    subtitle_chain = ";".join(dt_filters)
+    filter_complex = f"{vchain};{subtitle_chain};[1:a]apad[aud]"
+
     cmd = [
         "ffmpeg", "-y", *inputs,
-        "-filter_complex", f"{vchain};[bg][1:v]overlay=0:0[v];[2:a]apad[aud]",
-        "-map", "[v]", "-map", "[aud]",
+        "-filter_complex", filter_complex,
+        "-map", final_v_tag, "-map", "[aud]",
         "-t", f"{duration:.3f}", "-r", str(fps),
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
         "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
@@ -312,7 +375,7 @@ def _render_scene_ffmpeg(asset_path, subtitle_png, audio_path, duration, out_pat
     res = subprocess.run(cmd, capture_output=True)
     if res.returncode != 0:
         raise RuntimeError(f"scene render failed ({os.path.basename(asset_path)}): "
-                           f"{res.stderr.decode('utf-8', 'ignore')[-400:]}")
+                           f"{res.stderr.decode('utf-8', 'ignore')[-500:]}")
 
 
 def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_name: str) -> str:
@@ -323,9 +386,8 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
     scene_paths = []
     for i, (scene, asset_path, audio_path) in enumerate(zip(scenes, visual_files, audio_files)):
         duration = _audio_duration(audio_path)
-        sub_png = make_subtitle_png(scene["narration"], w, h)
         sp = str(config.TEMP_DIR / f"scene_{i:03d}.mp4")
-        _render_scene_ffmpeg(asset_path, sub_png, audio_path, duration, sp, w, h, fps)
+        _render_scene_ffmpeg(asset_path, scene["narration"], audio_path, duration, sp, w, h, fps, scene_id=i)
         scene_paths.append(sp)
         print(f"   scene {scene.get('id', i)} ({duration:.1f}s)")
 

@@ -78,6 +78,8 @@ export default function VideoStudio() {
   const [history, setHistory] = useState<VideoHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<VideoHistoryItem | null>(null);
+  const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
+  const [deletingVideos, setDeletingVideos] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -96,6 +98,26 @@ export default function VideoStudio() {
   }, []);
 
   useEffect(() => { void loadHistory(); }, [loadHistory]);
+
+  // ── Delete selected videos ──
+  const deleteSelected = async () => {
+    if (selectedVideos.size === 0) return;
+    if (!confirm(`刪除 ${selectedVideos.size} 個影片？此操作無法復原。`)) return;
+    setDeletingVideos(true);
+    try {
+      await Promise.all(
+        Array.from(selectedVideos).map(id =>
+          fetch(`/api/video/${id}`, { method: "DELETE" })
+        )
+      );
+      setSelectedVideos(new Set());
+      void loadHistory();
+    } catch (e) {
+      console.error("delete failed", e);
+    } finally {
+      setDeletingVideos(false);
+    }
+  };
 
   // ── Generate handler ──
   async function handleGenerate() {
@@ -347,12 +369,49 @@ export default function VideoStudio() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {history.length > 0 && (
+                  <div className="flex items-center gap-3 mb-3">
+                    <label className="flex items-center gap-2 text-sm text-neutral-400 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedVideos.size === history.length && history.length > 0}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setSelectedVideos(new Set(history.map((v) => v.id)));
+                          } else {
+                            setSelectedVideos(new Set());
+                          }
+                        }}
+                      />
+                      全選
+                    </label>
+                    {selectedVideos.size > 0 && (
+                      <button
+                        onClick={deleteSelected}
+                        disabled={deletingVideos}
+                        className="px-3 py-1 rounded text-sm bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                      >
+                        {deletingVideos ? "刪除中..." : `刪除 ${selectedVideos.size} 個`}
+                      </button>
+                    )}
+                    <span className="text-xs text-neutral-500 ml-auto">
+                      {selectedVideos.size > 0 ? `已選 ${selectedVideos.size}` : `共 ${history.length} 個`}
+                    </span>
+                  </div>
+                )}
                 {history.map((item) => (
                   <HistoryRow
                     key={item.id}
                     item={item}
                     active={selectedVideo?.id === item.id}
                     onSelect={() => setSelectedVideo(selectedVideo?.id === item.id ? null : item)}
+                    checked={selectedVideos.has(item.id)}
+                    onCheck={e => {
+                      const next = new Set(selectedVideos);
+                      if (e.target.checked) next.add(item.id);
+                      else next.delete(item.id);
+                      setSelectedVideos(next);
+                    }}
                   />
                 ))}
               </div>
@@ -518,7 +577,13 @@ function VideoViewer({ title, outputs, primaryUrl, onClose }: {
 
 // ─── HistoryRow ───────────────────────────────────────────────────────────────
 
-function HistoryRow({ item, active, onSelect }: { item: VideoHistoryItem; active: boolean; onSelect: () => void }) {
+function HistoryRow({ item, active, onSelect, checked, onCheck }: {
+  item: VideoHistoryItem;
+  active: boolean;
+  onSelect: () => void;
+  checked: boolean;
+  onCheck: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
   const date = new Date(item.created_at);
   const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
   const formatCount = Object.keys(item.formats).length;
@@ -534,6 +599,13 @@ function HistoryRow({ item, active, onSelect }: { item: VideoHistoryItem; active
         transition: "border-color 0.1s, background 0.1s",
       }}
     >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onCheck}
+        className="mt-1 cursor-pointer"
+        onClick={e => e.stopPropagation()}
+      />
       <div style={{ width: 36, height: 36, borderRadius: 6, background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 18 }}>
         🎬
       </div>

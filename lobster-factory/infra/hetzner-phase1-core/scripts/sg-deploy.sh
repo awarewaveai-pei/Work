@@ -33,12 +33,14 @@ fail() { log "ERROR: $*"; exit 1; }
 
 SKIP_PULL=0
 DRY_RUN=0
+FORCE=0
 APPS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-pull) SKIP_PULL=1; shift ;;
     --dry-run)   DRY_RUN=1; shift ;;
+    --force)     FORCE=1; shift ;;
     -h|--help)
       sed -n '1,30p' "$0"
       exit 0
@@ -46,6 +48,23 @@ while [[ $# -gt 0 ]]; do
     *) APPS+=("$1"); shift ;;
   esac
 done
+
+# ─── Deploy lock (prevent concurrent runs) ───────────────────────
+LOCK_FILE="/tmp/sg-deploy.lock"
+LOCK_HELD=0
+if [ -f "$LOCK_FILE" ] && [ "$FORCE" -eq 0 ]; then
+  LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
+  if [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null; then
+    echo "[sg-deploy] Another deploy is running (PID $LOCK_PID). Use --force to override."
+    exit 1
+  else
+    echo "[sg-deploy] Stale lock found, removing."
+    rm -f "$LOCK_FILE"
+  fi
+fi
+echo $$ > "$LOCK_FILE"
+LOCK_HELD=1
+trap 'if [ $LOCK_HELD -eq 1 ]; then rm -f "$LOCK_FILE"; fi' EXIT INT TERM
 
 if [[ ${#APPS[@]} -eq 0 ]]; then
   APPS=(next-admin)
