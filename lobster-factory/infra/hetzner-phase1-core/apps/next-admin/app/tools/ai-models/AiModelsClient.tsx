@@ -31,6 +31,7 @@ const SPEED_STYLE: Record<number, { label: string; color: string; bg: string }> 
   2: { label: "快",   color: "#1e40af", bg: "#dbeafe" },
   3: { label: "中等", color: "#92400e", bg: "#fef3c7" },
   4: { label: "慢",   color: "#9a3412", bg: "#ffedd5" },
+  5: { label: "最慢", color: "#7f1d1d", bg: "#fee2e2" },
 };
 
 const TEXT_SOURCE_LABEL: Record<string, string> = {
@@ -447,7 +448,7 @@ export default function AiModelsClient() {
     color: active ? "#fff" : "#475569",
   });
 
-  function changeTab(t: Tab) { setTab(t); setSort("default"); }
+  function changeTab(t: Tab) { setTab(t); setSort("default"); setCmpOpen(false); }
 
   return (
     <>
