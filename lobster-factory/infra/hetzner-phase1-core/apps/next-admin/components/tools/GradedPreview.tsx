@@ -104,7 +104,7 @@ const GradedPreview = forwardRef<GradedPreviewHandle, Props>(function GradedPrev
         const w = Math.max(1, Math.round(natW * scale));
         const h = Math.max(1, Math.round(natH * scale));
         const fc = new fabric.StaticCanvas(canvasElRef.current, { enableRetinaScaling: false });
-        fc.setDimensions({ width: w, height: h });
+        fc.setDimensions({ width: w, height: h }, { backstoreOnly: true });
         // Set CSS display size proportionally to fit within maxWidth/maxHeight.
         // Without this, Fabric's wrapper div stays at buffer size (e.g. 1024×1536) while
         // CSS max constraints only affect the <canvas> element itself, causing misalignment/crop.
