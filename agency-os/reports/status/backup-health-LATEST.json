@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-06-18T02:00:23.8638765Z",
+    "generatedAt":  "2026-06-18T02:01:37.3621306Z",
     "overall":  "PASS",
     "fatal":  false,
     "fatalReason":  "",
@@ -11,7 +11,7 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "9.0G",
+               "backup_size":  "9.2G",
                "latest_time":  "2026-06-18 02:00:02",
                "oldest_time":  "2026-06-10 02:00:01",
                "backup_age_days":  "0"
@@ -24,8 +24,8 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "5.3G",
-               "latest_time":  "2026-06-17 02:30:40",
+               "backup_size":  "5.5G",
+               "latest_time":  "2026-06-18 02:01:18",
                "oldest_time":  "2026-06-10 02:30:35",
                "backup_age_days":  "0"
            },
