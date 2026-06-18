@@ -56,7 +56,7 @@ const READABILITIES = [
   { value: "Professional",              label: "專業級" },
 ];
 const POVS = [
-  { value: "",              label: "不指定" },
+  { value: "none",          label: "不指定" },
   { value: "First person",  label: "第一人稱（我）" },
   { value: "Second person", label: "第二人稱（你）" },
   { value: "Third person",  label: "第三人稱（他／她）" },
@@ -64,7 +64,7 @@ const POVS = [
 
 const EMPTY_DEFAULTS: SiteContentDefaults = {
   language: "", targetCountry: "", imageModel: "",
-  tone: "", articleType: "", readability: "", pointOfView: "",
+  tone: "", articleType: "", readability: "", pointOfView: "none",
   marketing: { audience: "", positioning: "", usp: "", primaryCta: "", funnelStage: "", pricePositioning: "", emotionalTriggers: "", objections: "", forbiddenClaims: "" },
 };
 
