@@ -4,7 +4,7 @@
  * 與 `app/api/content/seo-check/route.ts` 共用同一個 core（`lib/content/quality/seo-check-core.ts`）：
  *   - route  = UI 入口（解析 HTTP Request → core → NextResponse）
  *   - 本積木 = 編排器 headless 入口（從 ctx 取參數 → 同一個 core）
- * 一段邏輯、兩個入口、零重複。RankMath 16 點評分由 core 保證，積木不重寫檢測邏輯。
+ * 一段邏輯、兩個入口、零重複。RankMath 22 點評分由 core 保證，積木不重寫檢測邏輯。
  *
  * 註冊即生效：本檔被 import 時執行 `register()`。P4 已接進 `byKind("quality")` 編排器
  * （`lib/content/pipeline.ts` side-effect import 本檔，介於 article 與 publish 之間；編排器永遠不改，只新增 import）。

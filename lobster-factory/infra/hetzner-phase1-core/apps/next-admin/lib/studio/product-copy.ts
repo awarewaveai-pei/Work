@@ -168,7 +168,7 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
 
   // On a fix re-generation, tell the model exactly which RankMath checks the previous copy failed
   // (the checker's suggestions are human-readable, often zh-TW) — it produces a full fresh copy that
-  // resolves them while keeping every base rule. Bounded to 12 hints (a report has 16 checks max).
+  // resolves them while keeping every base rule. Bounded to 12 hints (a report has 22 checks max).
   const hints = Array.isArray(input.improveHints)
     ? input.improveHints.map((h) => (typeof h === "string" ? h.trim() : "")).filter((h) => h.length > 0).slice(0, 12)
     : [];
@@ -239,7 +239,7 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
     slug: copy.focusKeyword.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
     siteDomain: input.siteDomain,
   });
-  // Keep ALL 16 checks so the publish UI shows the familiar full RankMath panel, but mark the
+  // Keep ALL 22 checks so the publish UI shows the familiar full RankMath panel, but mark the
   // blog-only ones N/A: the checker is tuned for 600+ word articles, so word-count / external+internal
   // links / multi-H2 AEO coverage / article date would cap a (correctly) short product page at "red"
   // regardless of copy quality. N/A checks are excluded from score / grade / error counts (critic

@@ -268,12 +268,72 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
     detail: `${titleLen} characters`,
   });
 
-  // 12. meta-length
+  // 11b. title-kw-position — keyword must appear in the FIRST HALF of the title (RankMath requirement)
+  const titleLower = seoTitle.toLowerCase();
+  const kwPosInTitle = titleLower.indexOf(kw);
+  const titleKwPosPass = kwPosInTitle >= 0 && kwPosInTitle <= Math.floor(titleLower.length / 2);
+  checks.push({
+    id: "title-kw-position",
+    label: "Focus keyword in first half of title",
+    pass: titleKwPosPass,
+    detail: titleKwPosPass
+      ? `"${kw}" starts at position ${kwPosInTitle} (within first half)`
+      : kwPosInTitle < 0
+        ? `"${kw}" not found in title`
+        : `"${kw}" at position ${kwPosInTitle} — too late (title length ${titleLen}); move keyword earlier`,
+  });
+
+  // 11c. title-power-word — RankMath Title Readability: must contain a power word
+  const POWER_WORDS_EN = ["ultimate", "proven", "essential", "expert", "complete", "effective", "simple",
+    "critical", "best", "amazing", "powerful", "surprising", "remarkable", "free", "step-by-step"];
+  const POWER_WORDS_CJK = ["終極", "必備", "實證", "專家", "完整", "有效", "簡單", "關鍵", "最佳",
+    "免費", "立即", "秘訣", "揭密", "一次搞懂", "高效", "避免", "不可不知", "獨家", "快速", "突破"];
+  const powerList = titleIsCjk ? POWER_WORDS_CJK : POWER_WORDS_EN;
+  const titleLowerFull = seoTitle.toLowerCase();
+  const hasPowerWord = powerList.some(w => titleLowerFull.includes(w.toLowerCase()));
+  checks.push({
+    id: "title-power-word",
+    label: "Title contains a power word",
+    pass: hasPowerWord,
+    detail: hasPowerWord
+      ? "Power word found in title"
+      : `No power word found. Add one of: ${powerList.slice(0, 5).join(" / ")} …`,
+  });
+
+  // 11d. title-sentiment — RankMath Title Readability: must contain a positive or negative sentiment word
+  const SENTIMENT_EN = ["best", "amazing", "essential", "proven", "surprising", "effective", "powerful",
+    "remarkable", "avoid", "mistake", "warning", "stop", "worst", "easy", "simple", "fast", "secret"];
+  const SENTIMENT_CJK = ["驚人", "必看", "有效", "實用", "安心", "避免", "別再", "小心", "錯誤",
+    "神奇", "完美", "超強", "輕鬆", "快速", "秘密", "揭密", "獨家"];
+  const sentList = titleIsCjk ? SENTIMENT_CJK : SENTIMENT_EN;
+  const hasSentiment = sentList.some(w => titleLowerFull.includes(w.toLowerCase()));
+  checks.push({
+    id: "title-sentiment",
+    label: "Title contains a sentiment word",
+    pass: hasSentiment,
+    detail: hasSentiment
+      ? "Sentiment word found in title"
+      : `No sentiment word. Add one of: ${sentList.slice(0, 5).join(" / ")} …`,
+  });
+
+  // 11e. title-number — RankMath Title Readability: must contain an Arabic digit
+  const hasTitleNumber = /\d/.test(seoTitle);
+  checks.push({
+    id: "title-number",
+    label: "Title contains a number (Arabic digit)",
+    pass: hasTitleNumber,
+    detail: hasTitleNumber
+      ? "Arabic digit found in title"
+      : "No digit in title — add a number (7 tips / 5 steps / 2025) so RankMath's number test passes",
+  });
+
+  // 12. meta-length — CJK meta is shorter (60-80 chars); Latin stays at 120-160
   const metaLen = metaDescription.length;
-  const metaLenPass = metaLen >= 120 && metaLen <= 160;
+  const metaIsCjk = hasCjk(metaDescription) || titleIsCjk;
+  const metaLenPass = metaIsCjk ? (metaLen >= 60 && metaLen <= 80) : (metaLen >= 120 && metaLen <= 160);
   checks.push({
     id: "meta-length",
-    label: "Meta description 120–160 characters",
+    label: metaIsCjk ? "Meta description 60–80 characters (CJK)" : "Meta description 120–160 characters",
     pass: metaLenPass,
     detail: `${metaLen} characters`,
   });
@@ -285,6 +345,46 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
     label: "URL slug ≤ 75 characters",
     pass: slugLenPass,
     detail: `${slug.length} characters`,
+  });
+
+  // 13b. kw-in-image-alt — Additional SEO: keyword in at least one image alt attribute
+  const imgAltPattern = /!\[([^\]]*)\]\([^)]+\)/g;
+  const imgAlts: string[] = [];
+  let imgM: RegExpExecArray | null;
+  while ((imgM = imgAltPattern.exec(markdown)) !== null) {
+    imgAlts.push(imgM[1].toLowerCase());
+  }
+  const kwInAlt = imgAlts.some(a => a.includes(kw));
+  checks.push({
+    id: "kw-in-image-alt",
+    label: "Focus keyword in at least one image alt text",
+    pass: kwInAlt,
+    detail: imgAlts.length === 0
+      ? "No images found in article"
+      : kwInAlt
+        ? `Keyword found in image alt text (${imgAlts.length} image(s))`
+        : `"${kw}" not in any alt text (${imgAlts.length} image(s))`,
+  });
+
+  // 13c. faq-section — verify ## FAQ section with ≥5 question-answer pairs
+  const hasFaqHeading = /^##\s+(FAQ|常見問題|問題解答|Q&A)/im.test(markdown);
+  // count lines that look like a question inside the FAQ section (starts with ### or contains ？/?)
+  const faqBlock = hasFaqHeading
+    ? markdown.slice(markdown.search(/^##\s+(FAQ|常見問題|問題解答|Q&A)/im))
+    : "";
+  const faqQCount = hasFaqHeading
+    ? (faqBlock.match(/^###\s/gm) ?? []).length || (faqBlock.match(/\*\*[^*\n]+?[?？]\*\*/g) ?? []).length
+    : 0;
+  const faqPass = hasFaqHeading && faqQCount >= 5;
+  checks.push({
+    id: "faq-section",
+    label: "FAQ section with ≥5 Q&A pairs (FAQPage schema)",
+    pass: faqPass,
+    detail: !hasFaqHeading
+      ? "No ## FAQ section found — add one for FAQPage JSON-LD schema"
+      : faqQCount < 5
+        ? `FAQ section found but only ${faqQCount} question(s) detected (need ≥5 for FAQPage schema)`
+        : `FAQ section found with ${faqQCount} question(s)`,
   });
 
   // ── AEO / GEO checks ─────────────────────────────────────────────────────
@@ -342,10 +442,30 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
       : (titleLen < 30
           ? `SEO 標題過短（${titleLen} 字元）；擴展到 30–60 字元`
           : `SEO 標題過長（${titleLen} 字元）；縮短到 60 字元以內`),
-    "meta-length":          metaLen < 120
-      ? `Meta 描述過短（${metaLen} 字元）；補充到 120–160 字元，加入關鍵字與行動 CTA`
-      : `Meta 描述過長（${metaLen} 字元）；截短到 160 字元以內`,
+    "title-kw-position":    `關鍵字「${kw}」在標題中位置過後；將它移到標題前半段（例：「${kw}：完整指南」）`,
+    "title-power-word":     titleIsCjk
+      ? `標題缺少力量詞；在標題中加入其中一個：終極 / 必備 / 完整 / 最佳 / 關鍵 / 有效 / 高效 / 揭密`
+      : `Title missing a power word; add one: ultimate / proven / essential / expert / complete / best`,
+    "title-sentiment":      titleIsCjk
+      ? `標題缺少情緒詞；加入：驚人 / 必看 / 有效 / 實用 / 避免 / 輕鬆 / 揭密 / 超強`
+      : `Title missing a sentiment word; add one: amazing / proven / avoid / effective / surprising`,
+    "title-number":         titleIsCjk
+      ? `標題缺少阿拉伯數字；加入「7 個」「5 步驟」「2025 年」等（不可用漢字數字七/五/十）`
+      : `Title needs a number; add a digit like "7 tips", "5 steps", or the year "2025"`,
+    "meta-length":          metaIsCjk
+      ? (metaLen < 60
+          ? `CJK meta 過短（${metaLen} 字元）；補充到 60–80 字元，加入關鍵字與行動 CTA`
+          : `CJK meta 過長（${metaLen} 字元）；截短到 80 字元以內`)
+      : (metaLen < 120
+          ? `Meta 描述過短（${metaLen} 字元）；補充到 120–160 字元，加入關鍵字與行動 CTA`
+          : `Meta 描述過長（${metaLen} 字元）；截短到 160 字元以內`),
     "slug-length":          `URL slug 過長（${slug.length} 字元）；縮短到 75 字元以內`,
+    "kw-in-image-alt":      imgAlts.length === 0
+      ? `文章中沒有圖片；加入至少 1 張圖（含「${kw}」的 alt text）`
+      : `圖片 alt text 未含「${kw}」；在第一張圖的 alt 自然帶入關鍵字`,
+    "faq-section":          !hasFaqHeading
+      ? `加入 ## FAQ 段落（5–8 組問答，每個答案自給自足）；系統會自動轉成 FAQPage JSON-LD`
+      : `FAQ 段落問題數不足（${faqQCount} 題）；補充到至少 5 題`,
     "aeo-quick-answer":     `加入 ## Quick Answer 段落（文章開頭 2–3 句直接回答問題，方便 AI 引用）`,
     "aeo-subquery-coverage": `增加 H2/H3 小標題（涵蓋更多子問題面向，目前 ${h2h3Count} 個，需至少 4 個）`,
     "aeo-date-signal":      `在內文加入年份或「2024 年研究」等時間標記，提高 AI 引用可信度`,

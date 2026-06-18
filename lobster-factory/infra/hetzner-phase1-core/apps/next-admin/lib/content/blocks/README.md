@@ -115,7 +115,7 @@ CONTENT_TRENDING_FEEDS='[{"id":"hn","title":"Hacker News","url":"https://hnrss.o
 | `search/<env feed>` | search | `registered` | `CONTENT_TRENDING_FEEDS` → `trending-sources.ts` | `CONTENT_TRENDING_FEEDS` | 營運設定的 RSS/Atom feed |
 | `search/db/<id>` | search | `route/action` | `buildDbSearchBlocks()` | DB row + safe URL | 由 UI/DB 暫時注入，傳給 `runTrending(..., extraBlocks)` |
 | `article/generate` | article | `registered` + `pipeline` | `lib/content/blocks/article-generate.ts` | `ANTHROPIC_API_KEY` | 長文 SEO/GEO/RankMath 文章生成，包 `generate-core.ts` |
-| `quality/check` | quality | `registered` + `pipeline` | `lib/content/blocks/seo-check.ts` | 無 | RankMath/SEO 16 點檢測，包 `seo-check-core.ts` |
+| `quality/check` | quality | `registered` + `pipeline` | `lib/content/blocks/seo-check.ts` | 無 | RankMath/SEO 22 點檢測，包 `seo-check-core.ts` |
 | `publish/wordpress` | publish | `registered` + `pipeline` | `lib/content/blocks/publish-wordpress.ts` | wp-bridge (`WPBRIDGE_*`) | 發佈到 WordPress draft；draft-first 紅線在 core |
 | `product/copy` | product | `registered` | `lib/content/blocks/product-copy.ts` | `ANTHROPIC_API_KEY` | POD 商品文案 + SEO/GEO/AEO + RankMath 商品版評分 |
 

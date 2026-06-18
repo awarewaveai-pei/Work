@@ -44,12 +44,12 @@ const CATEGORIES: { key: string; label: string; ids: string[] }[] = [
   {
     key: "additional",
     label: "Additional SEO",
-    ids: ["kw-in-h2h3", "external-links", "internal-links", "slug-length"],
+    ids: ["kw-in-h2h3", "external-links", "internal-links", "slug-length", "kw-in-image-alt", "faq-section"],
   },
   {
     key: "title",
     label: "Title Readability",
-    ids: ["title-length"],
+    ids: ["title-length", "title-kw-position", "title-power-word", "title-sentiment", "title-number"],
   },
   {
     key: "content",

@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * SEO 檢測 HTTP 入口（P3 積木化）。檢測核心（body coercion + 兩個必填閘 + RankMath 16 點）抽到
+ * SEO 檢測 HTTP 入口（P3 積木化）。檢測核心（body coercion + 兩個必填閘 + RankMath 22 點）抽到
  * `lib/content/quality/seo-check-core.ts`，同一段邏輯也被 `quality/check` 積木 headless 呼叫
  * （一段邏輯、兩個入口、零重複）。本檔只負責 HTTP 殼：角色閘 + JSON 解析 + 結果還原成 NextResponse。
  * 行為與抽取前位元相同（失敗回 text、成功回 JSON report、400/403 狀態碼一致）。

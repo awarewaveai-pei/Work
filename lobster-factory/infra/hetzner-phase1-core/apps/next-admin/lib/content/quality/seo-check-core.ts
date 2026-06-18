@@ -7,7 +7,7 @@
  * 一段邏輯、兩個入口、零重複。
  *
  * 本檔只做「body 寬鬆 coercion + 兩個必填驗證 + 呼叫純函式 `checkRankMath`」，與抽取前 route 位元相同
- * （含 `str()` fallback、`.trim()`、`siteDomain` 的 `|| undefined`、兩個 400 的訊息字串）。實際 16 點
+ * （含 `str()` fallback、`.trim()`、`siteDomain` 的 `|| undefined`、兩個 400 的訊息字串）。實際 22 點
  * RankMath 評分仍在 `lib/seo/rankmath-checker.ts`，本檔不重寫評分邏輯。
  */
 import { checkRankMath, type RankMathReport } from "../../seo/rankmath-checker";

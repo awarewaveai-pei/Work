@@ -337,7 +337,7 @@ function extractMeta(text: string): MetaData | null {
   const rawMetaDesc = metaM[1].trim();
   return {
     seoTitle: titleM[1].trim(),
-    metaDesc: rawMetaDesc.length > 160 ? rawMetaDesc.slice(0, 157) + "..." : rawMetaDesc,
+    metaDesc: rawMetaDesc.length > 160 ? rawMetaDesc.slice(0, 160) : rawMetaDesc,
     focusKeyword: kwM?.[1]?.trim(),
     categories: splitCsv(catM?.[1]),
     tags: splitCsv(tagM?.[1]),
@@ -1148,6 +1148,11 @@ export default function ContentStudio() {
       // fire SEO check in background — non-blocking
       const myRun = ++seoRunRef.current;
       setSeoChecking(true);
+      // Derive siteDomain so the checker can distinguish internal vs external links when related-posts
+      // returns full absolute URLs (e.g. https://soulfulexpression.org/...). Without this, every
+      // absolute internal link was counted as external and the internal-links check always failed.
+      const _seoSite = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
+      const _siteDomain = _seoSite?.url ? (() => { try { return new URL(_seoSite.url).hostname; } catch { return undefined; } })() : undefined;
       fetch("/api/content/seo-check", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1156,6 +1161,7 @@ export default function ContentStudio() {
           seoTitle: meta?.seoTitle ?? "",
           metaDescription: meta?.metaDesc ?? "",
           slug: hint || slugify(form.keyword),
+          siteDomain: _siteDomain,
         }),
       })
         .then(r => r.ok ? r.json() as Promise<RankMathReport> : null)
