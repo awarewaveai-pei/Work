@@ -247,7 +247,10 @@ export default function ThemePage() {
     setSavedMsg('');
   }, []);
 
-  const handleSave = async () => {
+  const handleSave = () => {
+    // Persist all changed tokens to localStorage.
+    // layout.tsx injects these before first paint via an inline <script>,
+    // so the theme survives page reload without any server round-trip.
     const overrides: Record<string, string> = {};
     Object.entries(values).forEach(([k, v]) => { if (v !== serverDefaults[k]) overrides[k] = v; });
     localStorage.setItem(LS_TOKENS_KEY, JSON.stringify(overrides));
@@ -262,28 +265,9 @@ export default function ThemePage() {
     localStorage.setItem(LS_ORDER_KEY, layoutJson);
     window.dispatchEvent(new StorageEvent('storage', { key: LS_ORDER_KEY, newValue: layoutJson }));
 
-    const tokenPayload: Record<string, string> = {};
-    ALL_GROUPS.forEach(g => g.tokens.forEach(t => {
-      if (t.name in values) tokenPayload[t.name] = values[t.name];
-    }));
-
-    try {
-      const res = await fetch('/api/theme', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tokens: tokenPayload }),
-      });
-      if (res.ok) {
-        setServerDefaults(prev => ({ ...prev, ...tokenPayload }));
-        setSavedMsg('✓ Saved to globals.css');
-      } else {
-        const err = await res.json().catch(() => ({ error: res.statusText }));
-        setSavedMsg(`✗ API error: ${err.error ?? res.status}`);
-      }
-    } catch (e) {
-      setSavedMsg(`✗ ${(e as Error).message}`);
-    }
-    setTimeout(() => setSavedMsg(''), 3000);
+    setServerDefaults(prev => ({ ...prev, ...values }));
+    setSavedMsg('✓ Saved');
+    setTimeout(() => setSavedMsg(''), 2000);
   };
 
   const handleReset = () => {
