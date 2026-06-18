@@ -528,6 +528,8 @@ export default function ContentStudio() {
   const [videoError,  setVideoError]  = useState("");
   const [videoJobId,  setVideoJobId]  = useState("");
   const videoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Clear interval on unmount to prevent state updates on an unmounted component.
+  useEffect(() => () => { if (videoPollRef.current) clearInterval(videoPollRef.current); }, []);
 
   // SEO check
   const [seoReport,   setSeoReport]   = useState<RankMathReport | null>(null);
@@ -1404,7 +1406,13 @@ export default function ContentStudio() {
         // Hero/featured = 16:9 (Google Discover + OG preview both favour the wide ratio). Same model +
         // style + seed + reference image as the body images so the hero matches the article's look.
         // titleText → Sharp SVG overlay (bottom gradient bar + white title text) baked into the WebP.
-        body: JSON.stringify({ prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams(), titleText: metaData?.seoTitle || form.keyword || "", _jobId: jobIdRef.current }),
+        body: JSON.stringify({
+          prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams(),
+          titleText: metaData?.seoTitle || form.keyword || "",
+          featuredImageFont: (wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.contentDefaults?.featuredImageFont ?? "sans",
+          featuredImageTitlePosition: (wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0])?.contentDefaults?.featuredImageTitlePosition ?? "bottom",
+          _jobId: jobIdRef.current,
+        }),
       });
       if (genRun !== imgRunRef.current) return; // user re-generated, abort
       const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string; cost_usd?: number; model?: string };
@@ -1507,18 +1515,22 @@ export default function ContentStudio() {
       videoPollRef.current = setInterval(async () => {
         try {
           const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`);
-          const sj = await sr.json() as { ok: boolean; status?: string; primaryUrl?: string; error?: string };
+          const sj = await sr.json() as { ok: boolean; status?: string; video?: { outputs?: Record<string, string> }; error?: string };
           if (!sj.ok || sj.status === "error") {
             clearInterval(videoPollRef.current!); videoPollRef.current = null;
             setVideoStatus("error"); setVideoError(sj.error ?? "影片渲染失敗"); return;
           }
-          if (sj.status === "done" && sj.primaryUrl) {
+          if (sj.status === "done" && sj.video?.outputs) {
+            const primaryUrl = sj.video.outputs["youtube_linkedin"] ?? Object.values(sj.video.outputs)[0] ?? "";
+            if (!primaryUrl) { /* outputs exists but is empty — treat as error */
+              clearInterval(videoPollRef.current!); videoPollRef.current = null;
+              setVideoStatus("error"); setVideoError("影片輸出 URL 不存在"); return;
+            }
             clearInterval(videoPollRef.current!); videoPollRef.current = null;
             setVideoStatus("embedding");
-            // Fetch WP post HTML, replace placeholder, PATCH back
             const embedRes = await fetch("/api/video/embed-to-wp", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ postId, siteId: selectedSiteId || undefined, videoUrl: sj.primaryUrl }),
+              body: JSON.stringify({ postId, siteId: selectedSiteId || undefined, videoUrl: primaryUrl }),
             });
             const ej = await embedRes.json() as { ok: boolean; error?: string };
             if (ej.ok) setVideoStatus("done");
