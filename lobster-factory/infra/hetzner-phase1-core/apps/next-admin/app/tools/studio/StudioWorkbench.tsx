@@ -6,11 +6,10 @@ import {
   type AspectRatio,
   type StudioModel,
 } from "../../../lib/studio/model-options";
-import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
+import { resolveStylePrompt } from "@/app/tools/tarot/cards";
+import ImageStyleControls from "@/components/tools/ImageStyleControls";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
-import { bakeCssFilter } from "@/components/tools/bake-css-filter";
-import GradedPreview, { type GradedPreviewHandle } from "@/components/tools/GradedPreview";
 import { buildSemanticFilename, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
 // type-only import — printful-mockup is server-side (sharp/r2); erased from the client bundle.
 import type { MockupView } from "@/lib/studio/printful-mockup";
@@ -25,12 +24,7 @@ const PRODUCT_TYPES = [
   { value: "none", label: "（不限商品）", aspect: "1:1" as AspectRatio, suffix: "" },
 ];
 
-const STYLE_PRESETS = [
-  "None", "Art Deco", "Kawaii", "Line Art", "Minimalist", "Pop Art",
-  "Retro", "Street Art", "Typography", "Vintage Poster", "Watercolor",
-];
-
-const ASPECTS: AspectRatio[] = ["2:3", "3:2", "4:5", "1:1", "9:16"];
+const ASPECTS: AspectRatio[] = ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "16:9", "9:16"];
 
 interface GenState {
   status: "idle" | "generating" | "done" | "error";
@@ -80,7 +74,7 @@ export default function StudioWorkbench() {
   const [theme, setTheme] = useState("");
   const [vibe, setVibe] = useState("");
   const [subject, setSubject] = useState("");
-  const [style, setStyle] = useState("None");
+  const [style, setStyle] = useState("");
   const [prompt, setPrompt] = useState("");
   const [promptTouched, setPromptTouched] = useState(false);
   const [aspect, setAspect] = useState<AspectRatio>("4:5");
@@ -95,8 +89,6 @@ export default function StudioWorkbench() {
   const [savedMockups, setSavedMockups] = useState<Record<string, "saving" | "saved" | "error">>({});
   const bgInFlight = useRef(false); // state lags a render — ref blocks same-tick double-click
   const mockupInFlight = useRef(false);
-  const grade = useColorGrade(); // 修圖積木：色彩/色階/銳利度
-  const previewRef = useRef<GradedPreviewHandle>(null); // true WYSIWYG preview (Fabric); export === preview
 
   const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
 
@@ -107,22 +99,23 @@ export default function StudioWorkbench() {
     return {
       product: p && p.value !== "none" ? p.label : undefined,
       subject: subject.trim() || theme.trim() || undefined,
-      style: style !== "None" ? style : undefined,
+      style: style || undefined,
     };
   }, [productType, subject, theme, style]);
   const modelOption = useMemo(() => STUDIO_MODEL_OPTIONS.find((m) => m.value === model), [model]);
   const maxRefs = modelOption?.maxRefs ?? 0;
+  const resolvedStylePrompt = useMemo(() => (style ? resolveStylePrompt(style) : ""), [style]);
 
   const assembledPrompt = useMemo(() => {
     const parts = [
       subject.trim(),
       theme.trim(),
       vibe.trim(),
-      style !== "None" ? `${style} style` : "",
+      resolvedStylePrompt,
       product.suffix,
     ].filter(Boolean);
     return parts.join(", ");
-  }, [subject, theme, vibe, style, product]);
+  }, [subject, theme, vibe, resolvedStylePrompt, product]);
 
   const effectivePrompt = promptTouched ? prompt : assembledPrompt;
 
@@ -281,20 +274,17 @@ export default function StudioWorkbench() {
     if (gen.status !== "done" || !gen.image) return;
     setSaveState("saving");
     try {
-      // Save exactly what the WYSIWYG preview shows (full-res Fabric export). Falls back to
-      // the CSS bake, then the raw image, if the Fabric canvas isn't ready (洞2 + WYSIWYG fix).
-      const image = previewRef.current?.exportPng() ?? (await bakeCssFilter(gen.image, grade.cssFilter));
       const res = await fetch("/api/tools/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          image,
+          image: gen.image,
           prompt: effectivePrompt,
           modelName: model,
           source: "pod-studio",
           productType: productType !== "none" ? productType : undefined,
           theme: theme.trim() || undefined,
-          styleTags: style !== "None" ? [style] : [],
+          styleTags: style ? [style] : [],
           subject: subject.trim() || undefined,
         }),
       });
@@ -303,30 +293,22 @@ export default function StudioWorkbench() {
     } catch {
       setSaveState("error");
     }
-  }, [gen, effectivePrompt, model, productType, theme, style, subject, grade.cssFilter]);
+  }, [gen, effectivePrompt, model, productType, theme, style, subject]);
 
-  // Download the current image with the colour adjustment baked in (洞2 fix).
-  const downloadGraded = useCallback(async () => {
+  const downloadOriginal = useCallback(() => {
     if (!gen.image) return;
-    // Download exactly what the WYSIWYG preview shows (full-res Fabric export), falling back
-    // to the CSS bake / raw image if the Fabric canvas isn't ready yet.
-    const fromPreview = previewRef.current?.exportPng();
-    const baked = fromPreview ?? (await bakeCssFilter(gen.image, grade.cssFilter));
-    const ext =
-      !fromPreview && grade.neutral
-        ? gen.image.startsWith("data:image/jpeg")
-          ? "jpg"
-          : gen.image.startsWith("data:image/webp")
-            ? "webp"
-            : "png"
-        : "png"; // Fabric/baked output is always PNG
+    const ext = gen.image.startsWith("data:image/jpeg")
+      ? "jpg"
+      : gen.image.startsWith("data:image/webp")
+        ? "webp"
+        : "png";
     const a = document.createElement("a");
-    a.href = baked;
+    a.href = gen.image;
     a.download = buildSemanticFilename({ ...fileMeta, track: "原圖" }, ext, `design.${ext}`);
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }, [gen.image, grade.cssFilter, grade.neutral, fileMeta]);
+  }, [gen.image, fileMeta]);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, padding: 16 }}>
@@ -353,25 +335,15 @@ export default function StudioWorkbench() {
           氛圍 Vibe
           <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="例：calm, ethereal" />
         </label>
-        <label style={{ fontSize: 13 }}>
-          風格 Style
-          <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={style} onChange={(e) => setStyle(e.target.value)}>
-            {STYLE_PRESETS.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </label>
-
-        <label style={{ fontSize: 13 }}>
-          模型
-          <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={model} onChange={(e) => { setModel(e.target.value as StudioModel); setRefImages([]); }}>
-            {STUDIO_MODEL_OPTIONS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.group} · {m.label} (~NT${m.costNt}{m.maxRefs > 0 ? ` · ${m.maxRefs} 參考圖` : ""})
-              </option>
-            ))}
-          </select>
-        </label>
+        <ImageStyleControls
+          model={model}
+          style={style}
+          onStyleChange={setStyle}
+          onModelChange={(nextModel) => {
+            setModel(nextModel);
+            setRefImages([]);
+          }}
+        />
 
         <label style={{ fontSize: 13 }}>
           比例
@@ -433,8 +405,22 @@ export default function StudioWorkbench() {
           {gen.status === "error" ? <p style={{ color: "#e5484d" }}>{gen.error}</p> : null}
           {gen.status === "done" && gen.image ? (
             <>
-              {/* True WYSIWYG preview — every slider (incl. gamma/sharpen) shows its real effect. */}
-              <GradedPreview ref={previewRef} image={gen.image} params={grade.params} maxHeight={560} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={gen.image}
+                alt="generated design"
+                style={{
+                  display: "block",
+                  width: "auto",
+                  height: "auto",
+                  maxWidth: "100%",
+                  maxHeight: 560,
+                  margin: "0 auto",
+                  objectFit: "contain",
+                  borderRadius: 8,
+                  background: "#fff",
+                }}
+              />
               <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
                 <button className="btn-primary" disabled={saveState === "saving" || saveState === "saved"} onClick={() => void saveToDesigns()}>
                   {saveState === "saved" ? "已存入 My Designs ✓" : saveState === "saving" ? "儲存中…" : "存入 My Designs"}
@@ -456,8 +442,8 @@ export default function StudioWorkbench() {
                   </button>
                 ) : null}
                 {mockupState === "error" ? <span style={{ color: "#e5484d", fontSize: 12 }}>Mockup 失敗，請重試</span> : null}
-                <button className="btn-secondary" onClick={() => void downloadGraded()}>
-                  下載{!grade.neutral ? "（含調色）" : ""}
+                <button className="btn-secondary" onClick={downloadOriginal}>
+                  下載原圖
                 </button>
                 {gen.seed != null ? <span style={{ fontSize: 12, opacity: 0.6 }}>seed {gen.seed}</span> : null}
                 {saveState === "saved" ? <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a> : null}
@@ -500,21 +486,19 @@ export default function StudioWorkbench() {
                 </div>
               ) : null}
 
-              {/* 修圖積木 + 輸出軌 ([1-f]/[1-g])。POD 商品印刷檔（非卡片尺寸）為後續切片，此處不給 print 目的地。 */}
+              {/* AI image prompt + 輸出軌。調色/修圖統一交給「快速編輯」Canvas。 */}
               <div style={{ display: "flex", gap: 12, marginTop: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
-                <div style={{ width: 260 }}>
-                  <ColorGradePanel state={grade.state} onSet={grade.set} onReset={grade.reset} neutral={grade.neutral} />
-                </div>
                 <ImageEditPromptPanel
                   sourceImage={gen.image}
                   currentPrompt={effectivePrompt}
                   imageModel={model}
                   target="pod-design"
                   aspectRatio={aspect}
+                  title="AI image prompt（修圖）"
                   styleAnchor={{
                     model,
                     mode: refImages.length > 0 ? "image" : "text",
-                    stylePrompt: effectivePrompt,
+                    stylePrompt: resolvedStylePrompt || effectivePrompt,
                     subject: subject.trim(),
                     refs: refImages.length,
                     target: "pod-design",
@@ -531,7 +515,7 @@ export default function StudioWorkbench() {
                   }}
                 />
                 <div style={{ flex: 1, minWidth: 240 }}>
-                  <OutputTrackBar image={gen.image} source="pod" colorGrade={grade.params} fileMeta={fileMeta} />
+                  <OutputTrackBar image={gen.image} source="pod" fileMeta={fileMeta} />
                 </div>
               </div>
             </>
