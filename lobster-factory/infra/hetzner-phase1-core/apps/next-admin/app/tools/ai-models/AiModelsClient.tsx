@@ -69,6 +69,44 @@ function imageCostStyle(c: number) {
   return               { label: "$$$$", color: "#9a3412", bg: "#ffedd5" };
 }
 
+// ── Cost display ──────────────────────────────────────────────────────────────
+
+// 1 article ≈ 1,500 input tokens + 800 output tokens
+const ARTICLE_IN = 1500;
+const ARTICLE_OUT = 800;
+
+function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: number; costOutputPer1M: number }) {
+  if (costInputPer1M === 0 && costOutputPer1M === 0) {
+    return (
+      <div>
+        <div style={{ fontSize: 12.5, color: "#1e293b", fontWeight: 700 }}>免費</div>
+        <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>個人方案無費用</div>
+      </div>
+    );
+  }
+  const articleUsd = (ARTICLE_IN * costInputPer1M + ARTICLE_OUT * costOutputPer1M) / 1_000_000;
+  const articleTwd = articleUsd * TWD;
+  const articleLabel = articleTwd < 0.01
+    ? `< NT$0.01`
+    : articleTwd < 1
+    ? `NT$${articleTwd.toFixed(2)}`
+    : `NT$${articleTwd.toFixed(1)}`;
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: "#1e293b" }}>
+        <span style={{ fontWeight: 700 }}>輸入</span> ${costInputPer1M.toFixed(2)}
+        <span style={{ color: "#94a3b8", margin: "0 4px" }}>·</span>
+        <span style={{ fontWeight: 700 }}>輸出</span> ${costOutputPer1M.toFixed(2)}
+        <span style={{ color: "#94a3b8", fontSize: 10.5 }}> / 1M tokens</span>
+      </div>
+      <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
+        ✏️ 1 篇文章（~1,500 字）≈ <strong style={{ color: "#0f172a" }}>{articleLabel}</strong>
+      </div>
+    </div>
+  );
+}
+
 // ── Primitive components ──────────────────────────────────────────────────────
 
 function Chip({ label, color, bg }: { label: string; color: string; bg: string }) {
@@ -189,7 +227,7 @@ function TextCard({ m, sel, onToggle }: { m: TextModelComparison; sel: boolean; 
       <div style={{ marginBottom: 10 }}>
         <InfoRow label="最適合">{m.bestFor}</InfoRow>
         <InfoRow label="風格">{m.style}</InfoRow>
-        <InfoRow label="成本">{m.cost}</InfoRow>
+        <InfoRow label="成本"><CostDisplay costInputPer1M={m.costInputPer1M} costOutputPer1M={m.costOutputPer1M} /></InfoRow>
         <InfoRow label="Context">{m.context}</InfoRow>
       </div>
       <ProCon strengths={m.strengths} tradeoffs={m.tradeoffs} />
@@ -262,7 +300,7 @@ function CodingCard({ m, sel, onToggle }: { m: CodingToolComparison; sel: boolea
       <div style={{ marginBottom: 10 }}>
         <InfoRow label="最適合">{m.bestFor}</InfoRow>
         <InfoRow label="工作流">{m.workflowStyle}</InfoRow>
-        <InfoRow label="成本">{m.cost}</InfoRow>
+        <InfoRow label="成本"><CostDisplay costInputPer1M={m.costInputPer1M} costOutputPer1M={m.costOutputPer1M} /></InfoRow>
         <InfoRow label="Context">{m.context}</InfoRow>
       </div>
       <ProCon strengths={m.strengths} tradeoffs={m.tradeoffs} />
