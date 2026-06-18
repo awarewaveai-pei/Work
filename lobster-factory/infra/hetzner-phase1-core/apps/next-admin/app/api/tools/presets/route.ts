@@ -33,7 +33,6 @@ function isUuid(value: string): boolean {
 
 interface SavePresetBody {
   image?: string;
-  sourceUrl?: string;
   presetType: "model" | "product";
   presetName: string;
   presetSettings?: Record<string, unknown>;
@@ -115,25 +114,17 @@ export async function POST(request: Request) {
   const assetDomain: PresetDomain =
     body.presetType === "model" ? "mockup_model_preset" : "mockup_product_preset";
 
-  // Parse image
-  let parsed: { mime: string; buffer: Buffer } | null = null;
-  if (typeof body.image === "string" && body.image.length > 0) {
-    if (body.image.length > MAX_IMAGE_CHARS) {
-      return NextResponse.json({ ok: false, error: "image too large (~9MB limit)" }, { status: 413 });
-    }
-    parsed = parseImageDataUrl(body.image);
-    if (!parsed) {
-      return NextResponse.json(
-        { ok: false, error: "image must be a png/jpeg/webp base64 data URL" },
-        { status: 400 },
-      );
-    }
+  if (!body.image || typeof body.image !== "string") {
+    return NextResponse.json({ ok: false, error: "image (base64 data URL) is required" }, { status: 400 });
+  }
+  if (body.image.length > MAX_IMAGE_CHARS) {
+    return NextResponse.json({ ok: false, error: "image too large (~9MB limit)" }, { status: 413 });
   }
 
-  // If no image provided for product presets, that's fine (thumbnail optional)
-  if (!parsed && (!body.sourceUrl || typeof body.sourceUrl !== "string")) {
+  const parsed = parseImageDataUrl(body.image);
+  if (!parsed) {
     return NextResponse.json(
-      { ok: false, error: "image (base64 data URL) or sourceUrl is required" },
+      { ok: false, error: "image must be a png/jpeg/webp base64 data URL" },
       { status: 400 },
     );
   }
@@ -158,12 +149,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "supabase_write_not_configured" }, { status: 503 });
   }
 
-  const objectKey = buildDesignKey(parsed!.mime);
+  const objectKey = buildDesignKey(parsed.mime);
   if (!objectKey) {
     return NextResponse.json({ ok: false, error: "unsupported_mime" }, { status: 400 });
   }
 
-  const uploaded = await putDesignObject(objectKey, parsed!.buffer, parsed!.mime);
+  const uploaded = await putDesignObject(objectKey, parsed.buffer, parsed.mime);
   if (!uploaded.ok) {
     const code = (uploaded as { ok: false; error: string }).error;
     return NextResponse.json({ ok: false, error: code }, { status: 502 });
@@ -178,7 +169,7 @@ export async function POST(request: Request) {
       asset_domain: assetDomain,
       object_key: uploaded.objectKey,
       object_url: uploaded.publicUrl,
-      mime_type: parsed!.mime,
+      mime_type: parsed.mime,
       byte_size: uploaded.byteSize,
       checksum_sha256: uploaded.checksumSha256,
       metadata: {
