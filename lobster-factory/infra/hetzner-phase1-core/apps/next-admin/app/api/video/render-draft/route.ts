@@ -64,7 +64,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   );
 
   if (!sub.ok) {
-    return NextResponse.json({ ok: false, error: sub.error }, { status: sub.status });
+    const err = sub as { ok: false; status: number; error: string };
+    return NextResponse.json({ ok: false, error: err.error }, { status: err.status });
   }
 
   const job = createJob();
