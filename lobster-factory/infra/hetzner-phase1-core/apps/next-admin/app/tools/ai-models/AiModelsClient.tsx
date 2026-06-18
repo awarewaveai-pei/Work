@@ -73,6 +73,14 @@ function imageCostStyle(c: number) {
 
 // ── Cost display ──────────────────────────────────────────────────────────────
 
+// Real cost to generate 1,000 chars: ~500 input tokens (prompt) + 1,000 output tokens
+const GEN1K_IN = 500;
+const GEN1K_OUT = 1000;
+
+export function gen1kCostTwd(costInputPer1M: number, costOutputPer1M: number) {
+  return (GEN1K_IN * costInputPer1M + GEN1K_OUT * costOutputPer1M) / 1_000_000 * TWD;
+}
+
 function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: number; costOutputPer1M: number }) {
   if (costInputPer1M === 0 && costOutputPer1M === 0) {
     return (
@@ -82,13 +90,12 @@ function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: numb
       </div>
     );
   }
-  // 1,000 Chinese chars ≈ 1,000 output tokens
-  const per1kTwd = (1000 / 1_000_000) * costOutputPer1M * TWD;
-  const per1kLabel = per1kTwd < 0.01
+  const twd = gen1kCostTwd(costInputPer1M, costOutputPer1M);
+  const label = twd < 0.01
     ? "< NT$0.01"
-    : per1kTwd < 1
-    ? `NT$${per1kTwd.toFixed(2)}`
-    : `NT$${per1kTwd.toFixed(1)}`;
+    : twd < 1
+    ? `NT$${twd.toFixed(2)}`
+    : `NT$${twd.toFixed(1)}`;
 
   return (
     <div>
@@ -99,7 +106,7 @@ function CostDisplay({ costInputPer1M, costOutputPer1M }: { costInputPer1M: numb
         <span style={{ color: "#94a3b8", fontSize: 10.5 }}> / 1M tokens</span>
       </div>
       <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>
-        ✏️ 每 1,000 字輸出 ≈ <strong style={{ color: "#0f172a" }}>{per1kLabel}</strong>
+        ✏️ 生成 1,000 字（含提示詞）≈ <strong style={{ color: "#0f172a" }}>{label}</strong>
       </div>
     </div>
   );
@@ -462,7 +469,7 @@ export default function AiModelsClient() {
 
   const sortedText = useMemo(() => {
     const r = [...TEXT_MODEL_COMPARISONS];
-    if (sortKey === "cost")  r.sort((a, b) => (a.costOutputPer1M - b.costOutputPer1M) * dir);
+    if (sortKey === "cost")  r.sort((a, b) => (gen1kCostTwd(a.costInputPer1M, a.costOutputPer1M) - gen1kCostTwd(b.costInputPer1M, b.costOutputPer1M)) * dir);
     if (sortKey === "speed") r.sort((a, b) => (a.speedRank - b.speedRank) * dir);
     return r;
   }, [sortKey, sortDir]);
@@ -476,7 +483,7 @@ export default function AiModelsClient() {
 
   const sortedCoding = useMemo(() => {
     const r = [...CODING_TOOL_COMPARISONS];
-    if (sortKey === "cost")  r.sort((a, b) => (a.costOutputPer1M - b.costOutputPer1M) * dir);
+    if (sortKey === "cost")  r.sort((a, b) => (gen1kCostTwd(a.costInputPer1M, a.costOutputPer1M) - gen1kCostTwd(b.costInputPer1M, b.costOutputPer1M)) * dir);
     if (sortKey === "speed") r.sort((a, b) => (a.speedRank - b.speedRank) * dir);
     return r;
   }, [sortKey, sortDir]);
