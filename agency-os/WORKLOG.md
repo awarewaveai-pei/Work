@@ -2,6 +2,20 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-18
+
+### fix(studio): 比例契約貫通預覽、Canvas 與 WebP，並部署 SG production
+
+**[任務理解]** Studio 選 3:2 時，生成圖本身正確，但舊預覽調色 Fabric canvas、快速編輯 800×800 畫布與 POD `web-square` 輸出各自再次套用方形容器，造成預覽看不清、Canvas/下載/WebP 變成 1:1；同時比例、Style、模型仍是舊版控制項。
+**[已修改]** `StudioWorkbench.tsx` 比例補齊 8 種並改用共用 `ImageStyleControls` + `STYLE_CATALOG` resolved prompt；移除 Studio 調色積木，預覽/原圖下載直接保留生成圖；`OutputTrackBar.tsx` POD WebP 改走 `web-original`；`to-product-image.ts` 新增保留來源比例的 WebP preset；`CanvasEditor.tsx` handoff 依來源像素比例建立畫布；新增 3:2 WebP 契約測試。
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`/root/lobster-phase1/scripts/sg-deploy.sh next-admin` | exit=0 | deployed=`b76102d62650210b65118956c4581258dbe205d1`; typecheck PASS；vitest 30 files / 390 tests PASS；Docker build PASS；`lobster-next-admin` healthy 7s；HTTP smoke 4/4 200
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/playwright-runner.ps1 -Mode smoke -SkipInstall` | exit=0 | 26 passed / 0 failed / 6 skipped；evidence=`agency-os/reports/e2e/2026-06-18/smoke/`
+- REVIEW_WAIVED: NA -- 本輪是已驗證程式碼的 production deploy；部署後已讀回 production source，確認 8 比例、POD=`web-original`、Canvas source-ratio handoff 均存在，且容器名稱正常、無 rename anomaly
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`web-square|web-original|ASPECTS|ColorGradePanel|GradedPreview` | hits=77 — Studio 無殘留調色預覽依賴；Canvas 保留完整快速編輯調色工具；Tarot 保留 `web-tarot`；舊 `web-square` 僅留給明確需要方形縮圖的其他流程
+**[剩餘風險]** Production 已上線；Playwright smoke 不會實際呼叫付費生圖 API，最終 3:2 操作體驗仍由操作者在 `/tools/studio` 生成一張圖確認。Build 只有既有 Sentry/ssh2 optional-native warnings，未阻擋部署。
+**[rollback]** `sg-deploy.sh` 已在部署前建立 `lobster-phase1-next-admin:rollback-20260618-034656`；如需回退，使用 `rollback-phase1.sh restore next-admin rollback-20260618-034656`，再確認 container healthy 與 4 個 smoke endpoints。
+
 ## 2026-06-17
 
 ### feat(pod): PublishWizard 真・全部一鍵 — 印刷檔＋商品圖＋合成圖＋文案＋Woo＋Printful native 串成單一按鈕
@@ -11874,5 +11888,3 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 
 ### Machine appendix (monthly-system-review)
 - 2026-06-16 21:37:04 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 36.76% (< 85%))
-
-
