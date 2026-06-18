@@ -101,6 +101,38 @@ async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Pr
   });
 }
 
+function AccordionSection({
+  title, summary, children, defaultOpen = false, icon,
+}: {
+  title: string; summary?: string; children: React.ReactNode; defaultOpen?: boolean; icon?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        type="button"
+        className="btn-secondary"
+        style={{ width: "100%", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px" }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {icon && <span>{icon}</span>}
+          <span>{title}</span>
+          {summary && !open && (
+            <span style={{ fontSize: 11, opacity: 0.45, marginLeft: 4, fontWeight: 400 }}>{summary}</span>
+          )}
+        </span>
+        <span style={{ opacity: 0.4, fontSize: 11 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div style={{ marginTop: 4, padding: 10, background: "var(--bg-tertiary, #1a1a1a)", borderRadius: 8, border: "1px solid var(--border, #333)" }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PresetChips({ chips, onSelect }: { chips: string[]; onSelect: (v: string) => void }) {
   return (
     <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
