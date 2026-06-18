@@ -9,7 +9,7 @@
  * Failure: { ok: false, status, error }
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 
 interface GenerateBody {
   topic?: string;
@@ -72,7 +72,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const { createJob, finishJob } = await import("@/lib/content/video/job-store");
   const job = createJob();
 
-  void (async () => {
+  // after()：回應送出後仍保證執行（比裸 fire-and-forget 在 Next.js 可靠）。
+  // 管線內的 render 已改「短輪詢 EU /job」，無長連線；after 跑完整個 ~3 分鐘流程後 finishJob。
+  after(async () => {
     try {
       const result = (await blocks[0].run(ctx)) as unknown as BlockResult;
       if (result.ok && result.video) {
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const msg = e instanceof Error ? e.message : String(e);
       finishJob(job.id, { status: "error", error: `積木執行例外：${msg}`, statusCode: 500 });
     }
-  })();
+  });
 
   // 202 Accepted + jobId；前端輪詢 /api/video/status?jobId=
   return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });

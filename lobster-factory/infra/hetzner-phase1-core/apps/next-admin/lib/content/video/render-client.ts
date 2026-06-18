@@ -26,6 +26,18 @@ export type RenderResult =
  * @param outName 輸出檔名前綴（例：影片標題）
  * @param baseUrl 服務基礎 URL，預設 VIDEO_SERVICE_URL 環境變數或 http://127.0.0.1:8732
  */
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * 提交渲染給 video-service（async），短輪詢 /job 直到完成。
+ * 為何不一次 POST 等到底：跨機長連線（數分鐘）回應易遺失。改「提交→即回 jobId→短輪詢」，
+ * 每次呼叫都短（<30s），不持長連線。輪詢上限 ~12 分鐘。
+ *
+ * @param scenes  腳本場景陣列（id + narration）
+ * @param assets  視覺素材路徑/URL 陣列（必須與 scenes 等長）
+ * @param outName 輸出檔名前綴
+ * @param baseUrl 服務基礎 URL，預設 VIDEO_SERVICE_URL 或 http://127.0.0.1:8732
+ */
 export async function callRenderService(
   scenes: RenderScene[],
   assets: string[],
@@ -33,57 +45,53 @@ export async function callRenderService(
   baseUrl?: string
 ): Promise<RenderResult> {
   const base = baseUrl ?? process.env.VIDEO_SERVICE_URL ?? "http://127.0.0.1:8732";
-  const url = `${base}/render`;
-  // render 是同步 TTS+ffmpeg，可能數十秒~數分鐘；給寬限上限避免服務卡住時 block 永久 hang。
-  const timeoutMs = Number(process.env.VIDEO_RENDER_TIMEOUT_MS ?? 600_000);
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = process.env.VIDEO_SERVICE_SECRET;
+  if (token) headers["X-Render-Token"] = token;
 
-  let res: Response;
+  // 1) 提交 → 即回 jobId（202）
+  let jobId: string;
   try {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    // 跨機部署時帶 shared secret；本機（同機/無 token）可不設
-    const token = process.env.VIDEO_SERVICE_SECRET;
-    if (token) headers["X-Render-Token"] = token;
-    res = await fetch(url, {
+    const res = await fetch(`${base}/render`, {
       method: "POST",
       headers,
       body: JSON.stringify({ scenes, assets, out_name: outName }),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: AbortSignal.timeout(30_000),
     });
+    const body = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string };
+    if (!res.ok || !body.jobId) {
+      return { ok: false, status: res.status || 502, error: body.error ?? `提交渲染失敗（HTTP ${res.status}）` };
+    }
+    jobId = body.jobId;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
-    return timedOut
-      ? { ok: false, status: 504, error: `video-service render 逾時（>${timeoutMs}ms）` }
-      : { ok: false, status: 503, error: `無法連線到 video-service（${base}）：${msg}` };
+    return { ok: false, status: 503, error: `無法連線到 video-service（${base}）：${msg}` };
   }
 
-  // 嘗試解析回應 JSON（成功或錯誤都是 JSON）
-  let body: { outputs?: RenderOutputs; out_dir?: string; error?: string };
-  try {
-    body = (await res.json()) as typeof body;
-  } catch {
-    return {
-      ok: false,
-      status: res.status,
-      error: `video-service 回傳非 JSON（HTTP ${res.status}）`,
-    };
+  // 2) 短輪詢 GET /job?jobId=（每 8s，上限 ~12 分鐘）
+  const pollHeaders = token ? { "X-Render-Token": token } : undefined;
+  const deadline = Date.now() + 12 * 60 * 1000;
+  while (Date.now() < deadline) {
+    await sleep(8_000);
+    let job: { status?: string; outputs?: RenderOutputs; out_dir?: string; error?: string };
+    try {
+      const r = await fetch(`${base}/job?jobId=${encodeURIComponent(jobId)}`, {
+        headers: pollHeaders,
+        signal: AbortSignal.timeout(30_000),
+      });
+      job = (await r.json().catch(() => ({}))) as typeof job;
+      if (r.status === 404) return { ok: false, status: 404, error: "render job 不存在（服務可能重啟）" };
+    } catch {
+      continue; // 暫時性網路錯 → 下一輪
+    }
+    if (job.status === "running") continue;
+    if (job.status === "done") {
+      if (!job.outputs || typeof job.out_dir !== "string") {
+        return { ok: false, status: 502, error: "render done 但缺 outputs/out_dir" };
+      }
+      return { ok: true, outputs: job.outputs, out_dir: job.out_dir };
+    }
+    return { ok: false, status: 502, error: job.error ?? "render 失敗" };
   }
-
-  if (!res.ok) {
-    return {
-      ok: false,
-      status: res.status,
-      error: body.error ?? `video-service 回傳 HTTP ${res.status}`,
-    };
-  }
-
-  if (!body.outputs || typeof body.out_dir !== "string") {
-    return {
-      ok: false,
-      status: 502,
-      error: "video-service 回傳缺少 outputs 或 out_dir 欄位",
-    };
-  }
-
-  return { ok: true, outputs: body.outputs, out_dir: body.out_dir };
+  return { ok: false, status: 504, error: "render 輪詢逾時（>12 分鐘）" };
 }

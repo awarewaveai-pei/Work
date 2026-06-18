@@ -184,6 +184,12 @@ export default function StudioWorkbench() {
   const [mockups, setMockups] = useState<MockupView[]>([]);
   const [savedMockups, setSavedMockups] = useState<Record<string, "saving" | "saved" | "error">>({});
 
+  // Style / Model group filter state
+  const STYLE_GROUPS = Array.from(new Set(STYLE_CATALOG.map((item) => item.group)));
+  const MODEL_GROUPS = Array.from(new Set(STUDIO_MODEL_OPTIONS.map((item) => item.group)));
+  const [styleGroup, setStyleGroup] = useState(STYLE_GROUPS[0] ?? "");
+  const [modelGroup, setModelGroup] = useState(MODEL_GROUPS[0] ?? "");
+
   // Trending news state
   const [trendingCategory, setTrendingCategory] = useState("");
   const [trendingTopics, setTrendingTopics] = useState<string[]>([]);
@@ -512,34 +518,26 @@ export default function StudioWorkbench() {
         </AccordionSection>
 
         <AccordionSection title="🎨 風格 Style" summary={style || "不指定"}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => setStyle("")}
-              style={{ alignSelf: "flex-start", padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${style === "" ? "#6366f1" : "var(--border, #333)"}`, background: style === "" ? "#6366f1" : "rgba(127,127,127,0.08)", color: style === "" ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}
-            >
-              不指定
-            </button>
-            {Array.from(new Set(STYLE_CATALOG.map((item) => item.group))).map((group) => (
-              <div key={group}>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{group}</div>
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                  {STYLE_CATALOG.filter((item) => item.group === group).map((item) => {
-                    const active = style === item.zh;
-                    return (
-                      <button
-                        key={item.zh}
-                        type="button"
-                        onClick={() => setStyle(active ? "" : item.zh)}
-                        style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #333)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}
-                      >
-                        {item.zh}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          {/* Row 1: group chips */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {STYLE_GROUPS.map((g) => (
+              <button key={g} type="button" onClick={() => setStyleGroup(g)}
+                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${styleGroup === g ? "#6366f1" : "var(--border, #333)"}`, background: styleGroup === g ? "#6366f1" : "rgba(127,127,127,0.08)", color: styleGroup === g ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
+                {g}
+              </button>
             ))}
+          </div>
+          {/* Row 2: style chips for selected group */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {STYLE_CATALOG.filter((item) => item.group === styleGroup).map((item) => {
+              const active = style === item.zh;
+              return (
+                <button key={item.zh} type="button" onClick={() => setStyle(active ? "" : item.zh)}
+                  style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #333)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
+                  {item.zh}
+                </button>
+              );
+            })}
           </div>
         </AccordionSection>
 
@@ -547,36 +545,36 @@ export default function StudioWorkbench() {
           title="🤖 圖片模型"
           summary={selectedModels.size > 1 ? `已選 ${selectedModels.size} 個` : (STUDIO_MODEL_OPTIONS.find((o) => selectedModels.has(o.value))?.label ?? "")}
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {Array.from(new Set(STUDIO_MODEL_OPTIONS.map((item) => item.group))).map((group) => (
-              <div key={group}>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{group}</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {STUDIO_MODEL_OPTIONS.filter((item) => item.group === group).map((item) => {
-                    const active = selectedModels.has(item.value);
-                    return (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => {
-                          onModelsChange((() => {
-                            const next = new Set(selectedModels);
-                            if (next.has(item.value)) { if (next.size > 1) next.delete(item.value); }
-                            else { next.add(item.value); }
-                            return next;
-                          })());
-                        }}
-                        title={item.maxRefs > 0 ? `最多 ${item.maxRefs} 張參考圖` : "純文字生圖"}
-                        style={{ padding: "5px 10px", borderRadius: 14, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #333)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #888)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}
-                      >
-                        {active && selectedModels.size === 1 ? "✓ " : active ? "☑ " : ""}{item.label}
-                        <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>NT${item.costNt}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          {/* Row 1: group chips */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+            {MODEL_GROUPS.map((g) => (
+              <button key={g} type="button" onClick={() => setModelGroup(g)}
+                style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: "pointer", border: `1px solid ${modelGroup === g ? "#6366f1" : "var(--border, #333)"}`, background: modelGroup === g ? "#6366f1" : "rgba(127,127,127,0.08)", color: modelGroup === g ? "#fff" : "var(--text-muted, #888)", transition: "all 0.15s" }}>
+                {g}
+              </button>
             ))}
+          </div>
+          {/* Row 2: model chips for selected group */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {STUDIO_MODEL_OPTIONS.filter((item) => item.group === modelGroup).map((item) => {
+              const active = selectedModels.has(item.value);
+              return (
+                <button key={item.value} type="button"
+                  onClick={() => {
+                    onModelsChange((() => {
+                      const next = new Set(selectedModels);
+                      if (next.has(item.value)) { if (next.size > 1) next.delete(item.value); }
+                      else { next.add(item.value); }
+                      return next;
+                    })());
+                  }}
+                  title={item.maxRefs > 0 ? `最多 ${item.maxRefs} 張參考圖` : "純文字生圖"}
+                  style={{ padding: "5px 10px", borderRadius: 14, fontSize: 12, cursor: "pointer", border: `1px solid ${active ? "#6366f1" : "var(--border, #333)"}`, background: active ? "#6366f1" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted, #888)", fontWeight: active ? 600 : 400, transition: "all 0.15s" }}>
+                  {active && selectedModels.size === 1 ? "✓ " : active ? "☑ " : ""}{item.label}
+                  <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>NT${item.costNt}</span>
+                </button>
+              );
+            })}
           </div>
           <p style={{ fontSize: 11, opacity: 0.55, marginTop: 6 }}>
             {selectedModels.size > 1

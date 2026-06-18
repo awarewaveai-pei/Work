@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { DEFAULT_SECTIONS, type NavSection } from '../../SidebarNav';
+import { DEFAULT_SECTIONS, itemKey, type NavSection, type NavItem } from '../../SidebarNav';
 
 // ── Token definitions ───────────────────────────────────────────────────────
 const TOKEN_GROUPS: Array<{
@@ -94,15 +94,43 @@ TOKEN_GROUPS.forEach(g => g.tokens.forEach(t => { ALL_DEFAULTS[t.name] = t.defau
 const LS_TOKENS_KEY = 'aw-theme-overrides';
 const LS_ORDER_KEY  = 'aw-sidebar-order';
 
+interface SavedLayout {
+  sectionOrder?: string[];
+  itemOrders?: Record<string, string[]>;
+}
+
+function applyLayoutToSections(sections: NavSection[], layout: SavedLayout): NavSection[] {
+  const map = new Map(sections.map(s => [s.id, s]));
+  let ordered: NavSection[];
+  if (layout.sectionOrder) {
+    ordered = layout.sectionOrder.flatMap(id => map.has(id) ? [map.get(id)!] : []);
+    sections.forEach(s => { if (!layout.sectionOrder!.includes(s.id)) ordered.push(s); });
+  } else {
+    ordered = [...sections];
+  }
+  if (layout.itemOrders) {
+    return ordered.map(sec => {
+      const itemOrder = layout.itemOrders![sec.id];
+      if (!itemOrder) return sec;
+      const itemMap = new Map(sec.items.map((item, i) => [itemKey(item, i), item]));
+      const reordered = itemOrder.flatMap(k => itemMap.has(k) ? [itemMap.get(k)!] : []);
+      sec.items.forEach((item, i) => { if (!itemOrder.includes(itemKey(item, i))) reordered.push(item); });
+      return { ...sec, items: reordered };
+    });
+  }
+  return ordered;
+}
+
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function ThemePage() {
-  const [values, setValues]     = useState<Record<string, string>>({ ...ALL_DEFAULTS });
-  const [sections, setSections] = useState<NavSection[]>(DEFAULT_SECTIONS);
+  const [values, setValues]       = useState<Record<string, string>>({ ...ALL_DEFAULTS });
+  const [sections, setSections]   = useState<NavSection[]>(DEFAULT_SECTIONS);
+  const [expandedSec, setExpandedSec] = useState<string | null>(null);
   const [savedMsg, setSavedMsg]   = useState('');
   const [copiedMsg, setCopiedMsg] = useState('');
-  const [dragIdx, setDragIdx]   = useState<number | null>(null);
+  const [secDragIdx, setSecDragIdx]   = useState<number | null>(null);
+  const [itemDragIdx, setItemDragIdx] = useState<number | null>(null);
 
-  // Load token overrides from localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem(LS_TOKENS_KEY);
@@ -116,13 +144,12 @@ export default function ThemePage() {
     } catch {}
   }, []);
 
-  // Load saved sidebar order
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_ORDER_KEY);
       if (raw) {
-        const order = JSON.parse(raw) as string[];
-        setSections(applyOrder(DEFAULT_SECTIONS, order));
+        const layout = JSON.parse(raw) as SavedLayout;
+        setSections(applyLayoutToSections(DEFAULT_SECTIONS, layout));
       }
     } catch {}
   }, []);
@@ -135,20 +162,22 @@ export default function ThemePage() {
   }, []);
 
   const handleSave = () => {
-    // Save token overrides
     const overrides: Record<string, string> = {};
-    Object.entries(values).forEach(([k, v]) => {
-      if (v !== ALL_DEFAULTS[k]) overrides[k] = v;
-    });
+    Object.entries(values).forEach(([k, v]) => { if (v !== ALL_DEFAULTS[k]) overrides[k] = v; });
     localStorage.setItem(LS_TOKENS_KEY, JSON.stringify(overrides));
 
-    // Save sidebar order
-    localStorage.setItem(LS_ORDER_KEY, JSON.stringify(sections.map(s => s.id)));
-    // Notify other tabs (SidebarNav listens)
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: LS_ORDER_KEY,
-      newValue: JSON.stringify(sections.map(s => s.id)),
-    }));
+    const layout: SavedLayout = {
+      sectionOrder: sections.map(s => s.id),
+      itemOrders: Object.fromEntries(
+        sections.map(sec => [
+          sec.id,
+          sec.items.map((item, i) => itemKey(item, i)),
+        ])
+      ),
+    };
+    const layoutJson = JSON.stringify(layout);
+    localStorage.setItem(LS_ORDER_KEY, layoutJson);
+    window.dispatchEvent(new StorageEvent('storage', { key: LS_ORDER_KEY, newValue: layoutJson }));
 
     setSavedMsg('✓ Saved');
     setTimeout(() => setSavedMsg(''), 2000);
@@ -157,9 +186,7 @@ export default function ThemePage() {
   const handleReset = () => {
     localStorage.removeItem(LS_TOKENS_KEY);
     localStorage.removeItem(LS_ORDER_KEY);
-    TOKEN_GROUPS.forEach(g => g.tokens.forEach(t => {
-      document.documentElement.style.removeProperty(t.name);
-    }));
+    TOKEN_GROUPS.forEach(g => g.tokens.forEach(t => document.documentElement.style.removeProperty(t.name)));
     setValues({ ...ALL_DEFAULTS });
     setSections(DEFAULT_SECTIONS);
     setSavedMsg('');
@@ -173,27 +200,32 @@ export default function ThemePage() {
     });
   };
 
-  // ── Sidebar order handlers ──────────────────────────────────────────────
+  // ── Section drag ────────────────────────────────────────────────────────
   const moveSection = (from: number, to: number) => {
-    setSections(prev => {
-      const next = [...prev];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return next;
-    });
+    setSections(prev => { const n = [...prev]; const [x] = n.splice(from, 1); n.splice(to, 0, x); return n; });
     setSavedMsg('');
   };
 
-  const onDragStart = (i: number) => setDragIdx(i);
-  const onDragOver  = (e: React.DragEvent, i: number) => {
-    e.preventDefault();
-    if (dragIdx !== null && dragIdx !== i) moveSection(dragIdx, i);
-    setDragIdx(i);
+  // ── Item drag (within a section) ────────────────────────────────────────
+  const moveItem = (secId: string, from: number, to: number) => {
+    setSections(prev => prev.map(sec => {
+      if (sec.id !== secId) return sec;
+      const items = [...sec.items];
+      const [x] = items.splice(from, 1);
+      items.splice(to, 0, x);
+      return { ...sec, items };
+    }));
+    setSavedMsg('');
   };
-  const onDragEnd   = () => setDragIdx(null);
 
   const changedCount = Object.entries(values).filter(([k, v]) => v !== ALL_DEFAULTS[k]).length;
-  const orderChanged = sections.map(s => s.id).join() !== DEFAULT_SECTIONS.map(s => s.id).join();
+  const sectionOrderChanged = sections.map(s => s.id).join() !== DEFAULT_SECTIONS.map(s => s.id).join();
+  const itemOrderChanged = sections.some(sec => {
+    const def = DEFAULT_SECTIONS.find(d => d.id === sec.id);
+    if (!def) return false;
+    return sec.items.map((it, i) => itemKey(it, i)).join() !== def.items.map((it, i) => itemKey(it, i)).join();
+  });
+  const orderChanged = sectionOrderChanged || itemOrderChanged;
 
   return (
     <div className="page">
@@ -268,44 +300,84 @@ export default function ThemePage() {
       <div className="card" style={{ padding: 20, marginBottom: 16 }}>
         <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
           Sidebar Menu Order
-          <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', marginLeft: 8, letterSpacing: 0 }}>drag · or use ↑↓</span>
+          <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', marginLeft: 8, letterSpacing: 0 }}>drag · or ↑↓ · click section to reorder items</span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 360 }}>
-          {sections.map((sec, i) => (
-            <div
-              key={sec.id}
-              draggable
-              onDragStart={() => onDragStart(i)}
-              onDragOver={e => onDragOver(e, i)}
-              onDragEnd={onDragEnd}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '8px 12px',
-                background: dragIdx === i ? 'var(--accent-light)' : 'var(--bg-subtle)',
-                border: `1px solid ${dragIdx === i ? 'var(--accent)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-sm)',
-                cursor: 'grab',
-                userSelect: 'none',
-                transition: 'background 0.1s',
-              }}
-            >
-              <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>⠿</span>
-              <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{sec.label}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{sec.items.length} items</span>
-              <button
-                onClick={() => i > 0 && moveSection(i, i - 1)}
-                disabled={i === 0}
-                style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? 'var(--border)' : 'var(--text-muted)', fontSize: 14, padding: '0 2px' }}
-              >↑</button>
-              <button
-                onClick={() => i < sections.length - 1 && moveSection(i, i + 1)}
-                disabled={i === sections.length - 1}
-                style={{ background: 'none', border: 'none', cursor: i === sections.length - 1 ? 'default' : 'pointer', color: i === sections.length - 1 ? 'var(--border)' : 'var(--text-muted)', fontSize: 14, padding: '0 2px' }}
-              >↓</button>
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 420 }}>
+          {sections.map((sec, si) => {
+            const isExpanded = expandedSec === sec.id;
+            const def = DEFAULT_SECTIONS.find(d => d.id === sec.id);
+            const secItemsChanged = def
+              ? sec.items.map((it, i) => itemKey(it, i)).join() !== def.items.map((it, i) => itemKey(it, i)).join()
+              : false;
+
+            return (
+              <div key={sec.id}>
+                {/* Section row */}
+                <div
+                  draggable
+                  onDragStart={() => setSecDragIdx(si)}
+                  onDragOver={e => { e.preventDefault(); if (secDragIdx !== null && secDragIdx !== si) { moveSection(secDragIdx, si); setSecDragIdx(si); } }}
+                  onDragEnd={() => setSecDragIdx(null)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 12px',
+                    background: secDragIdx === si ? 'var(--accent-light)' : isExpanded ? 'var(--accent-light)' : 'var(--bg-subtle)',
+                    border: `1px solid ${secDragIdx === si || isExpanded ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: isExpanded ? '8px 8px 0 0' : 'var(--radius-sm)',
+                    cursor: 'grab', userSelect: 'none',
+                  }}
+                >
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>⠿</span>
+                  <button
+                    onClick={() => setExpandedSec(isExpanded ? null : sec.id)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', flex: 1, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}
+                  >
+                    <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{sec.label}</span>
+                    {secItemsChanged && <span style={{ fontSize: 10, color: 'var(--accent)', background: 'var(--accent-light)', padding: '1px 5px', borderRadius: 4 }}>edited</span>}
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 2 }}>{sec.items.length} items</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{isExpanded ? '▲' : '▼'}</span>
+                  </button>
+                  <ArrowBtns i={si} total={sections.length} onUp={() => moveSection(si, si - 1)} onDown={() => moveSection(si, si + 1)} />
+                </div>
+
+                {/* Items panel */}
+                {isExpanded && (
+                  <div style={{
+                    border: '1px solid var(--accent)', borderTop: 'none',
+                    borderRadius: '0 0 8px 8px',
+                    padding: '8px 10px',
+                    background: 'var(--card-bg)',
+                    display: 'flex', flexDirection: 'column', gap: 4,
+                  }}>
+                    {sec.items.map((item, ii) => (
+                      <div
+                        key={itemKey(item, ii)}
+                        draggable
+                        onDragStart={() => setItemDragIdx(ii)}
+                        onDragOver={e => { e.preventDefault(); if (itemDragIdx !== null && itemDragIdx !== ii) { moveItem(sec.id, itemDragIdx, ii); setItemDragIdx(ii); } }}
+                        onDragEnd={() => setItemDragIdx(null)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '5px 8px',
+                          background: itemDragIdx === ii ? 'var(--accent-light)' : 'var(--bg-subtle)',
+                          border: `1px solid ${itemDragIdx === ii ? 'var(--accent)' : 'var(--border)'}`,
+                          borderRadius: 6, cursor: 'grab', userSelect: 'none',
+                        }}
+                      >
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>⠿</span>
+                        <span style={{ fontSize: 16, lineHeight: 1 }}>{item.icon}</span>
+                        <span style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)' }}>{item.label}</span>
+                        {'href' in item && (
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item.href}</span>
+                        )}
+                        <ArrowBtns i={ii} total={sec.items.length} onUp={() => moveItem(sec.id, ii, ii - 1)} onDown={() => moveItem(sec.id, ii, ii + 1)} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -477,10 +549,14 @@ function TokenRow({ name, type, value, defaultValue, changed, onChange }: {
   );
 }
 
-// ── helpers ─────────────────────────────────────────────────────────────────
-function applyOrder(sections: NavSection[], order: string[]): NavSection[] {
-  const map = new Map(sections.map(s => [s.id, s]));
-  const ordered = order.flatMap(id => map.has(id) ? [map.get(id)!] : []);
-  sections.forEach(s => { if (!order.includes(s.id)) ordered.push(s); });
-  return ordered;
+// ── ArrowBtns ────────────────────────────────────────────────────────────────
+function ArrowBtns({ i, total, onUp, onDown }: { i: number; total: number; onUp: () => void; onDown: () => void }) {
+  return (
+    <>
+      <button onClick={e => { e.stopPropagation(); onUp(); }} disabled={i === 0}
+        style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? 'var(--border)' : 'var(--text-muted)', fontSize: 13, padding: '0 2px', lineHeight: 1 }}>↑</button>
+      <button onClick={e => { e.stopPropagation(); onDown(); }} disabled={i === total - 1}
+        style={{ background: 'none', border: 'none', cursor: i === total - 1 ? 'default' : 'pointer', color: i === total - 1 ? 'var(--border)' : 'var(--text-muted)', fontSize: 13, padding: '0 2px', lineHeight: 1 }}>↓</button>
+    </>
+  );
 }
