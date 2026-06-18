@@ -56,7 +56,6 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     items: [
       { type: 'link',     href: '/tools/content',      icon: '✍', label: 'SEO Content',   title: 'SEO/GEO 文章產出' },
       { type: 'link',     href: '/tools/video',         icon: '🎬', label: 'Video',          title: '影片生成工具' },
-      { type: 'link',     href: '/tools/ai-models',     icon: 'AI', label: 'AI Models',      title: '文字/圖片生成模型選型' },
       { type: 'link',     href: '/tools/tarot',         icon: '🔮', label: 'Tarot',           title: '塔羅牌印刷檔生成工具' },
       { type: 'link',     href: '/tools/studio',        icon: '✏', label: 'Studio',          title: 'POD 設計生成器' },
       { type: 'link',     href: '/tools/mockup',        icon: '👕', label: 'Mockup',          title: 'AI 擬真商品照' },
