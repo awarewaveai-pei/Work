@@ -63,13 +63,13 @@ export default async function ApprovalsPage() {
 
       <div
         style={{
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
+          background: "var(--approvals-info-bg)",
+          border: "1px solid var(--approvals-info-border)",
           borderRadius: 8,
           padding: "12px 16px",
           marginBottom: 24,
           fontSize: 13,
-          color: "#475569",
+          color: "var(--approvals-info-text)",
         }}
       >
         你的角色：<strong>{role}</strong>{" "}
@@ -83,9 +83,9 @@ export default async function ApprovalsPage() {
       {dbError && (
         <div
           style={{
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            color: "#991b1b",
+            background: "var(--approvals-err-bg)",
+            border: "1px solid var(--approvals-err-border)",
+            color: "var(--approvals-err-text)",
             borderRadius: 8,
             padding: "12px 16px",
             marginBottom: 24,
@@ -98,18 +98,18 @@ export default async function ApprovalsPage() {
       {!dbError && pending.length === 0 && (
         <div
           style={{
-            background: "#ecfdf5",
-            border: "1px solid #a7f3d0",
-            color: "#065f46",
+            background: "var(--approvals-empty-bg)",
+            border: "1px solid var(--approvals-empty-border)",
+            color: "var(--approvals-empty-text)",
             borderRadius: 8,
             padding: "20px 24px",
           }}
         >
           <div style={{ fontWeight: 600, marginBottom: 8 }}>✅ 目前沒有待簽核項目，佇列是空的。</div>
-          <div style={{ fontSize: 13, lineHeight: 1.7, color: "#047857" }}>
+          <div style={{ fontSize: 13, lineHeight: 1.7, color: "var(--approvals-empty-detail)" }}>
             此佇列只收「需 owner / admin 簽核」的 high / critical 指令（例如未來的內部排程或 webhook 來源）。
             常見疑問：<strong>解除 emergency_stop（緊急停止）不會出現在這裡</strong> — 請改到{" "}
-            <Link href="/ops/system-modes" style={{ color: "#065f46", fontWeight: 600 }}>System Modes</Link>{" "}
+            <Link href="/ops/system-modes" style={{ color: "var(--approvals-empty-text)", fontWeight: 600 }}>System Modes</Link>{" "}
             切回 normal（Telegram 發 <code>/normal_mode</code> 屬 high-risk，會被 policy 直接擋下，不入此佇列）。
           </div>
         </div>

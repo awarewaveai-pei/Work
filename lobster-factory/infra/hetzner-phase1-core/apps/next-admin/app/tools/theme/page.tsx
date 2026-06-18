@@ -88,8 +88,9 @@ const TOKEN_GROUPS: Array<{
   },
 ];
 
-const ALL_DEFAULTS: Record<string, string> = {};
-TOKEN_GROUPS.forEach(g => g.tokens.forEach(t => { ALL_DEFAULTS[t.name] = t.default; }));
+// Static fallback defaults (used if API fetch fails or during SSR).
+const STATIC_DEFAULTS: Record<string, string> = {};
+TOKEN_GROUPS.forEach(g => g.tokens.forEach(t => { STATIC_DEFAULTS[t.name] = t.default; }));
 
 const LS_TOKENS_KEY = 'aw-theme-overrides';
 const LS_ORDER_KEY  = 'aw-sidebar-order';
@@ -123,13 +124,40 @@ function applyLayoutToSections(sections: NavSection[], layout: SavedLayout): Nav
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function ThemePage() {
-  const [values, setValues]       = useState<Record<string, string>>({ ...ALL_DEFAULTS });
+  // serverDefaults: token values as written in globals.css (fetched on mount).
+  // Falls back to STATIC_DEFAULTS if the API is unavailable.
+  const [serverDefaults, setServerDefaults] = useState<Record<string, string>>({ ...STATIC_DEFAULTS });
+  const [values, setValues]       = useState<Record<string, string>>({ ...STATIC_DEFAULTS });
   const [sections, setSections]   = useState<NavSection[]>(DEFAULT_SECTIONS);
   const [expandedSec, setExpandedSec] = useState<string | null>(null);
   const [savedMsg, setSavedMsg]   = useState('');
   const [copiedMsg, setCopiedMsg] = useState('');
   const [secDragIdx, setSecDragIdx]   = useState<number | null>(null);
   const [itemDragIdx, setItemDragIdx] = useState<number | null>(null);
+
+  // Fetch real token values from globals.css on mount.
+  useEffect(() => {
+    fetch('/api/theme')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { tokens?: Record<string, string> } | null) => {
+        if (data?.tokens) {
+          // Only bring in tokens that are in our TOKEN_GROUPS (ignore layout tokens etc.)
+          const relevant: Record<string, string> = {};
+          TOKEN_GROUPS.forEach(g =>
+            g.tokens.forEach(t => {
+              if (t.name in data.tokens!) relevant[t.name] = data.tokens![t.name];
+            })
+          );
+          setServerDefaults(prev => ({ ...prev, ...relevant }));
+          setValues(prev => ({ ...prev, ...relevant }));
+          // Apply server values to live document (before localStorage overrides below)
+          Object.entries(relevant).forEach(([k, v]) =>
+            document.documentElement.style.setProperty(k, v)
+          );
+        }
+      })
+      .catch(() => { /* use STATIC_DEFAULTS */ });
+  }, []);
 
   useEffect(() => {
     try {
@@ -163,11 +191,13 @@ export default function ThemePage() {
     setSavedMsg('');
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // 1. Persist token overrides to localStorage (live preview fallback).
     const overrides: Record<string, string> = {};
-    Object.entries(values).forEach(([k, v]) => { if (v !== ALL_DEFAULTS[k]) overrides[k] = v; });
+    Object.entries(values).forEach(([k, v]) => { if (v !== serverDefaults[k]) overrides[k] = v; });
     localStorage.setItem(LS_TOKENS_KEY, JSON.stringify(overrides));
 
+    // 2. Persist layout to localStorage + notify sidebar.
     const layout: SavedLayout = {
       sectionOrder: sections.map(s => s.id),
       itemOrders: Object.fromEntries(
@@ -181,15 +211,38 @@ export default function ThemePage() {
     localStorage.setItem(LS_ORDER_KEY, layoutJson);
     window.dispatchEvent(new StorageEvent('storage', { key: LS_ORDER_KEY, newValue: layoutJson }));
 
-    setSavedMsg('✓ Saved');
-    setTimeout(() => setSavedMsg(''), 2000);
+    // 3. Persist changed tokens to globals.css via API (all tokens, not just overrides,
+    //    so that the file stays in sync even if defaults changed server-side).
+    const tokenPayload: Record<string, string> = {};
+    TOKEN_GROUPS.forEach(g => g.tokens.forEach(t => {
+      if (t.name in values) tokenPayload[t.name] = values[t.name];
+    }));
+
+    try {
+      const res = await fetch('/api/theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tokens: tokenPayload }),
+      });
+      if (res.ok) {
+        // Update serverDefaults so changedCount resets to 0.
+        setServerDefaults(prev => ({ ...prev, ...tokenPayload }));
+        setSavedMsg('✓ Saved to globals.css');
+      } else {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        setSavedMsg(`✗ API error: ${err.error ?? res.status}`);
+      }
+    } catch (e) {
+      setSavedMsg(`✗ ${(e as Error).message}`);
+    }
+    setTimeout(() => setSavedMsg(''), 3000);
   };
 
   const handleReset = () => {
     localStorage.removeItem(LS_TOKENS_KEY);
     localStorage.removeItem(LS_ORDER_KEY);
     TOKEN_GROUPS.forEach(g => g.tokens.forEach(t => document.documentElement.style.removeProperty(t.name)));
-    setValues({ ...ALL_DEFAULTS });
+    setValues({ ...serverDefaults });
     setSections(DEFAULT_SECTIONS);
     setSavedMsg('');
   };
@@ -219,7 +272,7 @@ export default function ThemePage() {
     setSavedMsg('');
   };
 
-  const changedCount = Object.entries(values).filter(([k, v]) => v !== ALL_DEFAULTS[k]).length;
+  const changedCount = Object.entries(values).filter(([k, v]) => v !== serverDefaults[k]).length;
   const sectionOrderChanged = sections.map(s => s.id).join() !== DEFAULT_SECTIONS.map(s => s.id).join();
   const itemOrderChanged = sections.some(sec => {
     const def = DEFAULT_SECTIONS.find(d => d.id === sec.id);
@@ -262,36 +315,36 @@ export default function ThemePage() {
           <BigSwatch
             label="Page background"
             name="--body-bg"
-            value={values['--body-bg'] ?? ALL_DEFAULTS['--body-bg']}
-            defaultValue={ALL_DEFAULTS['--body-bg']}
+            value={values['--body-bg'] ?? serverDefaults['--body-bg']}
+            defaultValue={serverDefaults['--body-bg']}
             onChange={handleChange}
           />
           <BigSwatch
             label="Sidebar background"
             name="--sidebar-bg"
-            value={values['--sidebar-bg'] ?? ALL_DEFAULTS['--sidebar-bg']}
-            defaultValue={ALL_DEFAULTS['--sidebar-bg']}
+            value={values['--sidebar-bg'] ?? serverDefaults['--sidebar-bg']}
+            defaultValue={serverDefaults['--sidebar-bg']}
             onChange={handleChange}
           />
           <BigSwatch
             label="Card background"
             name="--card-bg"
-            value={values['--card-bg'] ?? ALL_DEFAULTS['--card-bg']}
-            defaultValue={ALL_DEFAULTS['--card-bg']}
+            value={values['--card-bg'] ?? serverDefaults['--card-bg']}
+            defaultValue={serverDefaults['--card-bg']}
             onChange={handleChange}
           />
           <BigSwatch
             label="Accent / Brand"
             name="--accent"
-            value={values['--accent'] ?? ALL_DEFAULTS['--accent']}
-            defaultValue={ALL_DEFAULTS['--accent']}
+            value={values['--accent'] ?? serverDefaults['--accent']}
+            defaultValue={serverDefaults['--accent']}
             onChange={handleChange}
           />
           <BigSwatch
             label="Primary text"
             name="--text-primary"
-            value={values['--text-primary'] ?? ALL_DEFAULTS['--text-primary']}
-            defaultValue={ALL_DEFAULTS['--text-primary']}
+            value={values['--text-primary'] ?? serverDefaults['--text-primary']}
+            defaultValue={serverDefaults['--text-primary']}
             onChange={handleChange}
           />
         </div>
