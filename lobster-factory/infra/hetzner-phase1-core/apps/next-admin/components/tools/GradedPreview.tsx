@@ -113,7 +113,7 @@ const GradedPreview = forwardRef<GradedPreviewHandle, Props>(function GradedPrev
           { width: Math.round(w * displayScale), height: Math.round(h * displayScale) },
           { cssOnly: true }
         );
-        img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale, selectable: false });
+        img.set({ left: 0, top: 0, originX: "left", originY: "top", scaleX: scale, scaleY: scale, selectable: false });
         fc.add(img);
         fcRef.current = fc;
         imgRef.current = img;
