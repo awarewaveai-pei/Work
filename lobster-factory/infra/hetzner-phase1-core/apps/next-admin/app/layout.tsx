@@ -81,6 +81,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/tools/content" className="sidebar-link" title="SEO/GEO 文章產出：關鍵字 → AI 產文 → WordPress 草稿一鍵推送">
                   <span className="sidebar-icon">✍</span> SEO Content
                 </Link>
+                <Link href="/tools/video" className="sidebar-link" title="影片生成工具：主題/文章 → 腳本 → 素材 → ffmpeg 合成 → 四平台尺寸輸出">
+                  <span className="sidebar-icon">🎬</span> Video
+                </Link>
                 <Link href="/tools/ai-models" className="sidebar-link" title="文字生成、Vibe Coding、圖片生成模型選型與成本比較">
                   <span className="sidebar-icon">AI</span> AI Models
                 </Link>

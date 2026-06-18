@@ -86,17 +86,18 @@ export default function VideoStudio() {
         }),
       });
 
-      const json = (await res.json()) as
-        | { ok: true; video: { outputs: Record<string, string>; out_dir: string }; title: string }
-        | { ok: false; status: number; error: string };
+      type JsonOk = { ok: true; video: { outputs: Record<string, string>; out_dir: string }; title: string };
+      type JsonFail = { ok: false; status: number; error: string };
+      const json = (await res.json()) as JsonOk | JsonFail;
 
       if (!json.ok) {
         setGenStatus("error");
-        setGenError(json.error);
+        setGenError((json as JsonFail).error);
         return;
       }
 
-      setGenResult({ outputs: json.video.outputs, out_dir: json.video.out_dir, title: json.title });
+      const okJson = json as JsonOk;
+      setGenResult({ outputs: okJson.video.outputs, out_dir: okJson.video.out_dir, title: okJson.title });
       setGenStatus("done");
     } catch (e: unknown) {
       setGenStatus("error");

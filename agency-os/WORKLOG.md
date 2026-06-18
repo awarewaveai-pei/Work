@@ -220,6 +220,26 @@
 **[剩餘風險]** 完整 live e2e 待 Phase 2（服務容器化部署 + next-admin 注入 PEXELS/REPLICATE/ANTHROPIC env）。next-admin 與 video-service 需共享 /tmp volume（asset-prep 註解已標）。
 - AUTO_TASK_DONE (2026-06-17): video/pipeline 積木建好（5 lib + 註冊），tsc 0 + critic pass + 模組載入驗證；live e2e 待 Phase 2。
 
+### feat(video): Phase 1c — `/tools/video` 網頁工具（流程清單可擴充刪減 + 每支精確成本）
+
+**[任務理解]** 操作者要：① 影片變成像 `/tools/vector-editor` 的網頁工具 ② 把用到的工具/流程寫上去且**可擴充刪減** ③ **精確計算每支成本**，比照既有 `/ops/costs`。
+
+**[已修改]**（next-admin）
+- 新 `lib/content/video/video-cost.ts` — **流程+成本 SSOT**：宣告式 `VIDEO_PIPELINE_STEPS`（script/image/broll/tts/render/publish，各含 tool/vendor/cost/enabled）一份陣列同時驅動「流程顯示」與「成本」。`computeVideoCost(cfg)` 沿用 `cost-model.ts` 定價（不另立價）。加一筆=流程+成本自動含入；enabled:false 或刪除=移除（對齊積木「刪整段即關」契約）。
+- `lib/ai/cost-model.ts` — TEXT_FEATURES 加 `video-script`（claude-sonnet-4-6，1200in/2200out）→ /ops/costs 也認得影片腳本成本。
+- 新 `app/tools/video/page.tsx` + `VideoStudio.tsx`（client）：流程面板 `VIDEO_PIPELINE_STEPS.map`（停用步驟 muted/刪除線）+ 設定鈕（場景數/custom-broll 分配/生圖模型 select 來自 IMAGE_RATES）+ 成本面板 `computeVideoCost().lines.map`（USD+NT$ 逐項，免費標記，隨設定 useMemo 即時重算）+ 生成表單 → POST。**全程 map SSOT 非 hardcode**（UI 並標註去 video-cost.ts 改）。
+- 新 `app/api/video/generate/route.ts`：POST → 驗 body → 側效 import register-all → `byKind("video")[0].run(ctx)` → 回結果（失敗映射 status，try/catch 例外，無密鑰外洩）。受 middleware session auth 保護（與 /api/content/* 一致，付費端點不開放）。
+- `app/layout.tsx`：sidebar Content Tools 加 `🎬 Video` 連結。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run video-cost.test.ts` | exit=0 | **6/6 pass** — 精確成本：預設 6 場景(4 custom+2 broll, flux-schnell)=**$0.0486/支=NT$1.56**；flux-dev→$0.1366；移除 image 步驟→$0.0366（可刪減驗）；加 music 步驟→成本含入（可擴充驗）；free 步驟 total=0。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（獨立兩次：frontend-designer 後 + 我複驗）| exit=0 | 0 型別錯誤（CLAUDE.md build gate）。
+- REVIEW_DONE: critic=Quick（自審+讀回）| verdict=pass | route 邏輯（body 驗證/byKind/try-catch/status 映射/無密鑰外洩）+ UI 確認 map SSOT 非 hardcode + auth 經 middleware（matcher 涵蓋 /api/video，非 PUBLIC）驗清。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`VIDEO_PIPELINE_STEPS|computeVideoCost|video-script` | def+caller 一致（cost-model/video-cost/VideoStudio/test），無 stale。
+
+**[剩餘風險]** 頁面按「生成」真正出片需 Python video-service 在跑 + next-admin 注入三 key（Phase 2 部署）；UI 已對「服務未連線」優雅顯示錯誤。成本估算採規劃 custom/broll 分配，Pexels miss 降級 Flux 會略高（UI 已註）。
+- AUTO_TASK_DONE (2026-06-17): /tools/video 網頁工具完成（流程清單 SSOT 可擴充刪減 + 每支精確成本 $0.0486≈NT$1.56），vitest 6/6 + tsc 0；live 出片待 Phase 2 部署。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
