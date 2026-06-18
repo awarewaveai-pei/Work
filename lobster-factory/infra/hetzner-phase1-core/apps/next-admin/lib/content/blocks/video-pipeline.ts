@@ -10,7 +10,7 @@
 import { register, type BlockCtx } from "./registry";
 import { generateVideoScript, type VideoScene } from "../video/video-script-core";
 import { fetchBrollUrl } from "../video/pexels";
-import { dataUrlToTempFile } from "../video/asset-prep";
+import { dataUrlToTempFile, cleanupTempFiles } from "../video/asset-prep";
 import { callRenderService, type RenderOutputs } from "../video/render-client";
 import { generateTarotImage } from "../../tarot/image-gen";
 

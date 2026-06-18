@@ -34,6 +34,8 @@ export async function callRenderService(
 ): Promise<RenderResult> {
   const base = baseUrl ?? process.env.VIDEO_SERVICE_URL ?? "http://127.0.0.1:8732";
   const url = `${base}/render`;
+  // render 是同步 TTS+ffmpeg，可能數十秒~數分鐘；給寬限上限避免服務卡住時 block 永久 hang。
+  const timeoutMs = Number(process.env.VIDEO_RENDER_TIMEOUT_MS ?? 600_000);
 
   let res: Response;
   try {
@@ -41,10 +43,14 @@ export async function callRenderService(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ scenes, assets, out_name: outName }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, status: 503, error: `無法連線到 video-service（${base}）：${msg}` };
+    const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+    return timedOut
+      ? { ok: false, status: 504, error: `video-service render 逾時（>${timeoutMs}ms）` }
+      : { ok: false, status: 503, error: `無法連線到 video-service（${base}）：${msg}` };
   }
 
   // 嘗試解析回應 JSON（成功或錯誤都是 JSON）

@@ -38,7 +38,7 @@ DEFAULT OUTPUT FORMAT (follow unless overridden in user instructions):
 7. ## Conclusion — REQUIRED STRUCTURE (minimum 180 words; do NOT rehash the intro or copy Key Takeaways verbatim):
    a) 2–3 sentence synthesis of the single most important takeaway — new framing, not repetition
    b) 1 forward-looking sentence: what the reader should do or think about next
-   c) A clear, specific CTA tied to the article's primary marketing objective (e.g. "Book a free consultation", "Download the guide", "Try it for 7 days") — never generic "contact us"
+   c) CTA: if a primary marketing objective or service is stated in the instructions, write a specific CTA tied to it (e.g. "Book a free consultation", "Download the guide"); if none is provided, write a soft, genuine next-step sentence instead — NEVER fabricate a service name or promise that wasn't in the brief
    d) Social proof signal if applicable ("practitioners find…", "clients report…", "research shows…")
    e) Optional: 1 closing sentence that makes the reader feel seen / understood — emotional resonance increases time-on-page
 

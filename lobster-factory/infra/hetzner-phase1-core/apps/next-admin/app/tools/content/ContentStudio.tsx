@@ -1072,8 +1072,12 @@ export default function ContentStudio() {
       if (!json.ok || !json.draft) { setDraftsError("草稿開啟失敗"); return; }
       const d = json.draft;
       // Restore the form snapshot (fall back to a minimal form if an old row lacks one).
-      if (d.formSnapshot) setForm({ ...DEFAULT_FORM, ...d.formSnapshot });
-      else setForm(prev => ({ ...prev, keyword: d.keyword }));
+      if (d.formSnapshot) {
+        setForm({ ...DEFAULT_FORM, ...d.formSnapshot });
+        // If the snapshot has a non-empty brandName, lock it so the auto-populate effect
+        // doesn't overwrite it with the site name after restore.
+        if (d.formSnapshot.media?.brandName) setBrandNameTouched(true);
+      } else setForm(prev => ({ ...prev, keyword: d.keyword }));
       setGenerated(d.markdown);
       setMetaData(d.meta ?? null);
       setSlugHint(d.slugHint ?? "");
@@ -1873,14 +1877,14 @@ export default function ContentStudio() {
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                   <button type="button" disabled={isGenerating} style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover, #f5f5f5)" }}
                     onClick={() => {
-                      // Auto-suggest best hook type based on article type
+                      // Auto-suggest best hook type — matches exact ARTICLE_TYPES values (lines 21-30)
                       const t = form.articleType;
-                      const suggested =
-                        t.includes("How-To") || t.includes("Tutorial") ? "Statistical or Fact" :
-                        t.includes("Listicle") || t.includes("Product") ? "Statistical or Fact" :
-                        t.includes("Case Study") ? "Anecdotal or Story" :
-                        t.includes("Opinion") || t.includes("Personal") ? "Personal or Emotional" :
-                        t.includes("Pillar") ? "Question" : "Question";
+                      const suggested: typeof HOOK_TYPES[number] =
+                        t === "How-to Guide" || t === "Tutorial" ? "Statistical or Fact" :
+                        t === "Listicle" || t === "Comparison" || t === "Q&A Page" ? "Statistical or Fact" :
+                        t === "Case Study" ? "Anecdotal or Story" :
+                        t === "Opinion Piece" ? "Personal or Emotional" :
+                        "Question"; // Pillar Article + fallback
                       setF("introHookType", suggested);
                     }}>✦ 推薦</button>
                   <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{form.introHookBrief.length}/500</span>
@@ -2401,9 +2405,11 @@ export default function ContentStudio() {
                 ))}
               </div>
             ) : (
-              <div className="form-hint" style={{ marginTop: 8, color: patternsNote ? "var(--red, #dc2626)" : "var(--text-muted)" }}>
+              <div className="form-hint" style={{ marginTop: 8, color: patternsNote && !patternsNote.includes("no auth") ? "var(--red, #dc2626)" : "var(--text-muted)" }}>
                 {patternsLoading ? "" : patternsNote
-                  ? `讀取失敗：${patternsNote}（請確認站台已設定 Application Password，且已在 WordPress → 使用者 → 應用程式密碼 中建立）`
+                  ? patternsNote.includes("no auth")
+                    ? "此站台尚未設定 Application Password，無法讀取 wp_block（WordPress → 使用者 → 你的帳號 → 應用程式密碼 → 新增）。"
+                    : `讀取異常（${patternsNote}）— 請確認站台 Application Password 設定正確。`
                   : "尚未讀取到 patterns（按上方按鈕讀取；站台需設定 Application Password 才可讀取 wp_block）。"}
               </div>
             )}

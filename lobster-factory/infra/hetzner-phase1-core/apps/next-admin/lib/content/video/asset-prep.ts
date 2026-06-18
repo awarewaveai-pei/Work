@@ -40,3 +40,17 @@ export function dataUrlToTempFile(dataUrl: string, hint: string): string {
 
   return filePath;
 }
+
+/**
+ * 刪除本輪建立的臨時素材檔（呼叫端在 render 完成後於 finally 統一清，防 /tmp 無限增長）。
+ * 永不拋出：個別刪除失敗只忽略（檔可能已被外部 reaper 清掉）。
+ */
+export function cleanupTempFiles(paths: string[]): void {
+  for (const p of paths) {
+    try {
+      fs.rmSync(p, { force: true });
+    } catch {
+      /* 已不存在 / 權限問題 — 忽略 */
+    }
+  }
+}

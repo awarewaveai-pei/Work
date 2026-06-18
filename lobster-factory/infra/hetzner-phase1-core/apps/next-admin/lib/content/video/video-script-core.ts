@@ -151,7 +151,7 @@ export async function generateVideoScript(
     const client = new Anthropic({ apiKey });
     response = await client.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096, // 6 場景含 narration+image_prompt+broll+description，2048 易截斷致 JSON 解析失敗（對齊 Python pipeline 4000 的 headroom）
       messages: [{ role: "user", content: `${systemPrompt}\n\n${userContent}` }],
     });
   } catch (e: unknown) {
