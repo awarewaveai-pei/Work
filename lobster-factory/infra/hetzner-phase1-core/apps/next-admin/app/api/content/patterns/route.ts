@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 // <!-- wp:block {"ref":id} /-->. The wp_block REST endpoint requires auth (edit_posts cap), so this only
 // returns patterns when the site has a token configured. Read-only. Mirrors related-posts auth pattern.
 
-interface PatternItem { id: number; title: string }
+interface PatternItem { id: number; title: string; slug: string }
 
 export async function GET(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
@@ -35,7 +35,7 @@ export async function GET(req: Request): Promise<Response> {
     status: "publish",
     orderby: "title",
     order: "asc",
-    _fields: "id,title",
+    _fields: "id,title,slug",
   });
   try {
     const res = await fetch(`${site.url}/wp-json/wp/v2/blocks?${params}`, {
@@ -43,13 +43,20 @@ export async function GET(req: Request): Promise<Response> {
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return NextResponse.json({ ok: true, patterns: [], note: `wp returned ${res.status}` });
-    const raw = await res.json() as Array<{ id?: number; title?: { rendered?: string } }>;
+    const raw = await res.json() as Array<{ id?: number; title?: { rendered?: string }; slug?: string }>;
     const patterns: PatternItem[] = raw
       .filter(p => typeof p.id === "number" && p.id > 0)
-      .map(p => ({
-        id: p.id!,
-        title: decodeWpEntities(p.title?.rendered ?? "") || `Pattern ${p.id}`,
-      }));
+      .map(p => {
+        const slug = typeof p.slug === "string" ? p.slug : "";
+        const titleFromRendered = decodeWpEntities(p.title?.rendered ?? "");
+        // Slug is the most reliable display name: convert kebab-case to Title Case
+        const titleFromSlug = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        return {
+          id: p.id!,
+          slug,
+          title: titleFromRendered || titleFromSlug || `Pattern ${p.id}`,
+        };
+      });
     return NextResponse.json({ ok: true, patterns });
   } catch {
     return NextResponse.json({ ok: true, patterns: [] });
