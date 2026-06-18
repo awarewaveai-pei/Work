@@ -1,9 +1,10 @@
 /**
  * Web product image bake — RGB WebP for product pages / social / preview.
  *
- * Two presets (composable blocks; each tool picks what it needs):
+ * Presets (composable blocks; each tool picks what it needs):
  *   - web-tarot  : 667×1000, fit cover, NO padding   (Tarot keeps its 2:3 card shape)
  *   - web-square : 1000×1000, fit contain, white bg   (POD Studio square thumbnails)
+ *   - web-original: keep the source ratio and dimensions, capped at 1600px
  *
  * sRGB only — web is sRGB by definition. The print path (CMYK PDF) is to-print-file.ts.
  * Real sizing is the pixel box; screens ignore embedded density, so we set none.
@@ -17,29 +18,31 @@
 import sharp from "sharp";
 import { applyColorGrade, type ColorGradeParams } from "./color-grade";
 
-export type WebPreset = "web-tarot" | "web-square";
-
-type WebPresetSpec = {
+type FixedWebPresetSpec = {
   width: number;
   height: number;
   fit: "cover" | "contain";
+  background: { r: number; g: number; b: number; alpha: number };
+};
+
+type OriginalRatioWebPresetSpec = {
+  maxDimension: number;
   /**
-   * Opaque background. Used both for contain letterbox padding AND for the
-   * final `.flatten()` that removes any source alpha — see toProductImage().
-   * Required (not optional): web output must always be opaque white. A
-   * de-backgrounded subject (bg-remover.ts emits transparent PNG upstream)
-   * otherwise leaves transparent holes that show the page background, and a
-   * contain preset with no background gets Sharp's default BLACK letterbox.
+   * Opaque background for the final `.flatten()` that removes source alpha.
+   * `web-original` does not add letterbox padding.
    */
   background: { r: number; g: number; b: number; alpha: number };
 };
 
 const WHITE = { r: 255, g: 255, b: 255, alpha: 1 };
 
-export const WEB_PRESETS: Record<WebPreset, WebPresetSpec> = {
+export const WEB_PRESETS = {
   "web-tarot": { width: 667, height: 1000, fit: "cover", background: WHITE },
   "web-square": { width: 1000, height: 1000, fit: "contain", background: WHITE },
-};
+  "web-original": { maxDimension: 1600, background: WHITE },
+} as const satisfies Record<string, FixedWebPresetSpec | OriginalRatioWebPresetSpec>;
+
+export type WebPreset = keyof typeof WEB_PRESETS;
 
 const WEBP_QUALITY = 80;
 const SHARP_LIMIT_INPUT_PIXELS = 50_000_000;
@@ -55,11 +58,20 @@ export async function toProductImage(
 ): Promise<Buffer> {
   const spec = WEB_PRESETS[preset];
 
-  let img = sharp(input, { limitInputPixels: SHARP_LIMIT_INPUT_PIXELS }).resize(
-    spec.width,
-    spec.height,
-    { fit: spec.fit, background: spec.background } // background = contain letterbox fill
-  );
+  let img = sharp(input, { limitInputPixels: SHARP_LIMIT_INPUT_PIXELS });
+  if ("width" in spec) {
+    img = img.resize(spec.width, spec.height, {
+      fit: spec.fit,
+      background: spec.background,
+    });
+  } else {
+    img = img.resize({
+      width: spec.maxDimension,
+      height: spec.maxDimension,
+      fit: "inside",
+      withoutEnlargement: true,
+    });
+  }
 
   // Composable color blocks (modulate → levels → gamma → sharpen); each neutral-skipped.
   if (colorGrade) img = applyColorGrade(img, colorGrade);

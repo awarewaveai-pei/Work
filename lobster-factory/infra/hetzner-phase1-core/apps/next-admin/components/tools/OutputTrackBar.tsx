@@ -36,7 +36,7 @@ type ProcessResponse = {
 type Props = {
   /** current image data URL — the source the server re-bakes (grade applied fresh) */
   image: string;
-  /** which studio — picks the web preset (tarot keeps 2:3, pod is square) */
+  /** which studio — tarot uses its fixed card output; POD preserves the generated ratio */
   source: "tarot" | "pod";
   /** derived from useColorGrade(); omitted/neutral → server skips the op */
   colorGrade?: ColorGradeParams;
@@ -109,7 +109,7 @@ export default function OutputTrackBar({
     [image, grade, fileMeta]
   );
 
-  const webPreset = source === "tarot" ? "web-tarot" : "web-square";
+  const webPreset = source === "tarot" ? "web-tarot" : "web-original";
   const showPrint = !!printDestinations && printDestinations.length > 0;
 
   return (
