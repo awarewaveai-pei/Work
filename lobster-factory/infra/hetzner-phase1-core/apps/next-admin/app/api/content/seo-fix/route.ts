@@ -77,8 +77,11 @@ Please output the COMPLETE improved article. Fix ONLY the listed failed checks â
 
   try {
     const client = new Anthropic({ apiKey });
+    // haiku is used here (not sonnet) because seo-fix is a structural text-editing task (fix density,
+    // paragraph length, add a section) â€” not creative writing. haiku responds in ~5-10s vs sonnet's
+    // ~60-90s, which matters because Cloudflare's 100s proxy timeout would 502 on large articles.
     const msg = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 8192,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],

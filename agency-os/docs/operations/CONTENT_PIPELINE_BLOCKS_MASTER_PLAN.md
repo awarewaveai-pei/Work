@@ -140,7 +140,7 @@
 | article | drafts | :72+ | 草稿 CRUD 自動存（migration 0041）| Supabase content_drafts |
 | article | brand-voice | :34 | 萃取品牌語氣 profile | Claude Haiku |
 | quality | seo-check | seo-check-core.ts（route.ts 薄殼）| RankMath 16 點稽核；P3 抽 core，route 薄殼 + 積木 headless 共用 | rankmath-checker lib |
-| quality | seo-fix | :28 | 修 SEO 缺失保留語氣 | Claude Sonnet |
+| quality | seo-fix | :28 | 修 SEO 缺失保留語氣 | Claude Haiku（~5-10s；避免 CF 100s timeout 502）|
 | quality | image | :67 | 社群/hero 圖生成 | Replicate Flux Schnell |
 | publish | **publish** | publish/route.ts:237 | **WP 發佈 draft**：bridge 路徑(Kadence blocks+sideload+RankMath meta，:309-366)或標準 REST(:368-438)；**永遠 draft :347** | **wp-bridge Ed25519** / WP REST / Supabase |
 | publish | wp-post | :19+ | 改文章日期/狀態/標題 or 移到垃圾桶 | WP REST |

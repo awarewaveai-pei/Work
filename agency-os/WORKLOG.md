@@ -4,6 +4,26 @@
 
 $insert
 
+## 2026-06-19
+
+### fix(content): 4 bugs — seo-fix 502, Quick Answer missing, meta desc short, keyword cap
+
+[任務理解] 用戶說「還是有問題」，需找出 /tools/content 頁面的剩餘 bug。
+
+[已修改]
+- `app/api/content/seo-fix/route.ts` — model: sonnet → haiku（避免 Cloudflare 100s 切斷 → 502）
+- `lib/content/article/generate-core.ts` — SYSTEM_PROMPT 頂部加 3 條 NON-NEGOTIABLE RULES（Quick Answer 強制為第一 H2、關鍵字 ≤6 次、CJK meta 60-80 chars）
+- `agency-os/docs/operations/CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` — seo-fix 模型更新 Haiku
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run | exit=0 | ms=~1800 | tests=390/390
+- REALTEST_EVIDENCE: tool=Chrome | action=click 🤖 AI 自動修正 SEO | result=HTTP 502（根因確認；fix 部署後需再測）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n(fixed inline: Quick Answer carve-out added)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=seo-fix,quickAnswer,claude-haiku-4-5-20251001 | hits=1 stale doc(fixed: CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md)
+
+[剩餘風險] seo-fix 502 fix 需部署後在真實環境驗證（haiku ~5-10s < CF 100s）。Tags 顯示跨站資料（Mini Golf 等）是 WP 站本身舊 tag，非 code bug。
+
 ### fix(seo): RankMath 22-check + 3 bug patches (Content Studio)
 
 **[任務理解]** 用戶要求徹底改善 /tools/content SEO 工具，產出 100 分 RankMath 文章。  
