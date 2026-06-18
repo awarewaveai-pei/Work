@@ -520,6 +520,14 @@ export default function ContentStudio() {
   const [pubError,     setPubError]     = useState("");
   const [pubMode,      setPubMode]      = useState<"draft" | "publish" | "future">("draft");
   const [scheduleDate, setScheduleDate] = useState("");   // ISO datetime for "future" mode
+  // post_id returned by WP after publish — used for video embed patch
+  const [publishedPostId, setPublishedPostId] = useState<number | null>(null);
+
+  // Video fire-and-forget state (decoupled from article publish)
+  const [videoStatus, setVideoStatus] = useState<"idle" | "generating" | "embedding" | "done" | "error">("idle");
+  const [videoError,  setVideoError]  = useState("");
+  const [videoJobId,  setVideoJobId]  = useState("");
+  const videoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // SEO check
   const [seoReport,   setSeoReport]   = useState<RankMathReport | null>(null);
@@ -1466,10 +1474,59 @@ export default function ContentStudio() {
           internalLinkKeywords: form.keyword.trim() ? [form.keyword.trim()] : undefined,
         }),
       });
-      const json = await res.json() as { ok: boolean; error?: string; edit_url?: string; view_url?: string };
+      const json = await res.json() as { ok: boolean; error?: string; edit_url?: string; view_url?: string; post_id?: number };
       if (!json.ok) { setPubStatus("error"); setPubError(json.error ?? "未知錯誤"); }
-      else           { setPubStatus("done"); setPubResult({ edit_url: json.edit_url, view_url: json.view_url }); }
+      else {
+        setPubStatus("done"); setPubResult({ edit_url: json.edit_url, view_url: json.view_url });
+        if (json.post_id) setPublishedPostId(json.post_id);
+      }
     } catch { setPubStatus("error"); setPubError("網路錯誤"); }
+  }
+
+  // ─── Video fire-and-forget ────────────────────────────────────────────────────
+  // Fire video generation AFTER article is published (postId must be known).
+  // When render completes, call /api/video/embed-to-wp to replace <!-- VIDEO_PLACEHOLDER -->.
+  async function handleGenerateVideo(postId: number) {
+    if (videoStatus === "generating" || videoStatus === "embedding") return;
+    setVideoStatus("generating"); setVideoError("");
+    try {
+      const res = await fetch("/api/video/generate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          articleTitle: metaData?.seoTitle || form.keyword,
+          articleContent: generated,
+          language: form.language || "繁體中文",
+        }),
+      });
+      const json = await res.json() as { ok: boolean; euJobId?: string; jobId?: string; error?: string };
+      if (!json.ok) { setVideoStatus("error"); setVideoError(json.error ?? "影片生成失敗"); return; }
+      const jobId = json.euJobId ?? json.jobId ?? "";
+      setVideoJobId(jobId);
+      // Poll /api/video/status every 15 s until done, then patch WP post
+      if (videoPollRef.current) clearInterval(videoPollRef.current);
+      videoPollRef.current = setInterval(async () => {
+        try {
+          const sr = await fetch(`/api/video/status?jobId=${encodeURIComponent(jobId)}`);
+          const sj = await sr.json() as { ok: boolean; status?: string; primaryUrl?: string; error?: string };
+          if (!sj.ok || sj.status === "error") {
+            clearInterval(videoPollRef.current!); videoPollRef.current = null;
+            setVideoStatus("error"); setVideoError(sj.error ?? "影片渲染失敗"); return;
+          }
+          if (sj.status === "done" && sj.primaryUrl) {
+            clearInterval(videoPollRef.current!); videoPollRef.current = null;
+            setVideoStatus("embedding");
+            // Fetch WP post HTML, replace placeholder, PATCH back
+            const embedRes = await fetch("/api/video/embed-to-wp", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ postId, siteId: selectedSiteId || undefined, videoUrl: sj.primaryUrl }),
+            });
+            const ej = await embedRes.json() as { ok: boolean; error?: string };
+            if (ej.ok) setVideoStatus("done");
+            else { setVideoStatus("error"); setVideoError(ej.error ?? "影片嵌入 WP 失敗"); }
+          }
+        } catch { /* keep polling */ }
+      }, 15_000);
+    } catch { setVideoStatus("error"); setVideoError("影片生成連線失敗"); }
   }
 
   // ─── Syndicate ───────────────────────────────────────────────────────────
@@ -2903,12 +2960,39 @@ export default function ContentStudio() {
                 <CostChip cost={sessionCost} />
               </div>
 
-              <textarea
-                style={{ width: "100%", minHeight: "480px", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.6,
-                  padding: "12px", border: "1px solid var(--card-border)", borderRadius: "6px",
-                  background: "var(--bg-page, #f8f9fc)", color: "var(--text-primary)", resize: "vertical", boxSizing: "border-box" }}
-                value={generated} onChange={e => setGenerated(e.target.value)} spellCheck={false}
-                placeholder="文章將在此串流顯示…" />
+              {/* ── Preview / Edit toggle ── */}
+              <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  style={{ fontSize: "12px", padding: "3px 10px", borderRadius: 4, border: "1px solid var(--card-border)",
+                    background: !showPreview ? "var(--btn-primary-bg, #6366f1)" : "transparent",
+                    color: !showPreview ? "#fff" : "var(--text-muted)", cursor: "pointer" }}>
+                  ✏️ 編輯 MD
+                </button>
+                <button
+                  onClick={() => setShowPreview(true)}
+                  style={{ fontSize: "12px", padding: "3px 10px", borderRadius: 4, border: "1px solid var(--card-border)",
+                    background: showPreview ? "var(--btn-primary-bg, #6366f1)" : "transparent",
+                    color: showPreview ? "#fff" : "var(--text-muted)", cursor: "pointer" }}>
+                  👁 預覽排版
+                </button>
+              </div>
+
+              {showPreview ? (
+                <div
+                  style={{ width: "100%", minHeight: "480px", padding: "20px 24px", border: "1px solid var(--card-border)",
+                    borderRadius: "6px", background: "#fff", color: "#111", boxSizing: "border-box",
+                    fontFamily: "'Noto Sans TC',sans-serif", fontSize: "15px", lineHeight: 1.8, overflowY: "auto" }}
+                  dangerouslySetInnerHTML={{ __html: markdownPreview(generated) }}
+                />
+              ) : (
+                <textarea
+                  style={{ width: "100%", minHeight: "480px", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.6,
+                    padding: "12px", border: "1px solid var(--card-border)", borderRadius: "6px",
+                    background: "var(--bg-page, #f8f9fc)", color: "var(--text-primary)", resize: "vertical", boxSizing: "border-box" }}
+                  value={generated} onChange={e => setGenerated(e.target.value)} spellCheck={false}
+                  placeholder="文章將在此串流顯示…" />
+              )}
 
               {metaData && (
                 <div style={{ marginTop: "12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>

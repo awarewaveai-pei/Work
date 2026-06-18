@@ -38,6 +38,9 @@ export async function PATCH(req: Request): Promise<Response> {
   if (typeof body.status === "string" && ["draft", "publish", "future", "pending"].includes(body.status))
     wpPatch.status = body.status;
   if (typeof body.title === "string" && body.title.trim()) wpPatch.title = body.title.trim();
+  // content: used for video embedding — replaces <!-- VIDEO_PLACEHOLDER --> with the embed URL.
+  // WARNING: this overwrites the entire post_content; only use when you have the full patched HTML.
+  if (typeof body.content === "string" && body.content.trim()) wpPatch.content = body.content.trim();
 
   if (Object.keys(wpPatch).length === 0)
     return NextResponse.json({ ok: false, error: "No fields to update" }, { status: 400 });
