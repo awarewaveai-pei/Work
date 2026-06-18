@@ -148,7 +148,9 @@ export default function ThemePage() {
     try {
       const raw = localStorage.getItem(LS_ORDER_KEY);
       if (raw) {
-        const layout = JSON.parse(raw) as SavedLayout;
+        const parsed = JSON.parse(raw);
+        // Migrate legacy shape: was string[] (section IDs only)
+        const layout: SavedLayout = Array.isArray(parsed) ? { sectionOrder: parsed } : parsed;
         setSections(applyLayoutToSections(DEFAULT_SECTIONS, layout));
       }
     } catch {}
@@ -194,10 +196,9 @@ export default function ThemePage() {
 
   const handleCopy = () => {
     const lines = Object.entries(values).map(([k, v]) => `  ${k}: ${v};`).join('\n');
-    navigator.clipboard.writeText(`:root {\n${lines}\n}`).then(() => {
-      setCopiedMsg('✓ Copied');
-      setTimeout(() => setCopiedMsg(''), 2000);
-    });
+    navigator.clipboard.writeText(`:root {\n${lines}\n}`)
+      .then(() => { setCopiedMsg('✓ Copied'); setTimeout(() => setCopiedMsg(''), 2000); })
+      .catch(() => { setCopiedMsg('✗ Failed');  setTimeout(() => setCopiedMsg(''), 2000); });
   };
 
   // ── Section drag ────────────────────────────────────────────────────────

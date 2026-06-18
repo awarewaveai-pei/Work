@@ -101,7 +101,11 @@ interface SavedLayout {
 function loadLayout(): SavedLayout | null {
   try {
     const raw = localStorage.getItem(LS_ORDER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Migrate legacy shape: was string[] (section IDs only)
+    if (Array.isArray(parsed)) return { sectionOrder: parsed };
+    return parsed as SavedLayout;
   } catch { return null; }
 }
 
