@@ -120,6 +120,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/ops/inbox" className="sidebar-link" title="事件收斂中心：所有來源事件 + AI 分類 + 原始 payload">
                   <span className="sidebar-icon">◇</span> Ops Inbox
                 </Link>
+                <Link href="/ops/costs" className="sidebar-link" title="LLM 呼叫花費帳本：token 數 + USD，按 route/model 分組">
+                  <span className="sidebar-icon">$</span> AI Costs
+                </Link>
                 <Link href="/api-check-client" className="sidebar-link" title="Node API 健康（browser-side）">
                   <span className="sidebar-icon">⬡</span> API Health (browser)
                 </Link>
