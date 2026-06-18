@@ -34,9 +34,10 @@ services:
       # 渲染上限（防資源失控）
       RENDER_MAX_SCENES: ${RENDER_MAX_SCENES:-30}
       RENDER_MAX_ASSET_MB: ${RENDER_MAX_ASSET_MB:-200}
-    # 僅 docker 網路可達；對外走 EU nginx 子網域 + TLS（段 B）
-    expose:
-      - "8732"
+    # publish 到 127.0.0.1（host nginx 在主機上，非容器）→ 由 video-svc.aware-wave.com vhost 反代 + TLS。
+    # 綁 127.0.0.1 → 不對 0.0.0.0 公開，外部只能經 nginx（含 TLS）+ X-Render-Token。
+    ports:
+      - "127.0.0.1:8732:8732"
     healthcheck:
       test:
         [
@@ -52,7 +53,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 1536M   # EU 有 ~2.5G available；render 為 ffmpeg 模式記憶體溫和，1.5G 留足餘裕
           cpus: "2.00"
     logging: *video-logging
 
