@@ -21,6 +21,11 @@ export interface VideoJob {
   error?: string;
   statusCode?: number;
   createdAt: number;
+  // ── async 收尾用（/generate prepare 後填；/status 輪詢 EU + 完成記錄）──
+  euJobId?: string;              // EU video-service 的 render job id
+  r2Keys?: string[];            // 本輪 Flux 暫存物件 key（render 完成後清）
+  recordParams?: { title: string; sceneCount: number; organizationId: string };
+  recorded?: boolean;           // media_assets 已記錄（只記一次）
 }
 
 const JOBS = new Map<string, VideoJob>();

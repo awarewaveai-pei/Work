@@ -9,7 +9,7 @@
  * Failure: { ok: false, status, error }
  */
 
-import { NextRequest, NextResponse, after } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 interface GenerateBody {
   topic?: string;
@@ -57,37 +57,49 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     imageModel: body.imageModel,
   };
 
-  // 單一 interface + optional 欄位（避免 discriminated-union narrowing 的 TS 邊角；防禦式讀取）
-  interface BlockResult {
+  // prepare 回傳（pending handle）— 單一 interface + optional（避免 union narrowing TS 邊角）
+  interface PrepareResult {
     ok?: boolean;
-    video?: { outputs: Record<string, string>; out_dir: string };
+    pending?: boolean;
+    euJobId?: string;
+    r2Keys?: string[];
     title?: string;
+    sceneCount?: number;
     error?: string;
     status?: number;
   }
 
-  // Async：建 job，背景跑管線（不 await），立即回 jobId。
-  // 同步生成 >100s 會撞 app.aware-wave.com 的 CF orange 100s 上限（524）→ 必須 async。
-  // next-admin 為常駐 Node 容器，回應後未 await 的 promise 會在 event loop 繼續執行。
   const { createJob, finishJob } = await import("@/lib/content/video/job-store");
+  const { resolveOrgId, cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
   const job = createJob();
 
-  // after()：回應送出後仍保證執行（比裸 fire-and-forget 在 Next.js 可靠）。
-  // 管線內的 render 已改「短輪詢 EU /job」，無長連線；after 跑完整個 ~3 分鐘流程後 finishJob。
-  after(async () => {
-    try {
-      const result = (await blocks[0].run(ctx)) as unknown as BlockResult;
-      if (result.ok && result.video) {
-        finishJob(job.id, { status: "done", video: result.video, title: result.title ?? "" });
-      } else {
-        finishJob(job.id, { status: "error", error: result.error ?? "unknown", statusCode: result.status ?? 500 });
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      finishJob(job.id, { status: "error", error: `積木執行例外：${msg}`, statusCode: 500 });
-    }
-  });
+  // 關鍵：**同步**呼叫 prepare（Claude 腳本 + Flux 圖並行 + 提交 EU，~25s，無背景工作、不撞 CF 100s）。
+  // 渲染在 EU thread 跑（持久）；/status 輪詢 EU 收尾。無 after()/fire-and-forget → 不再撞 Next.js 背景限制。
+  let prep: PrepareResult;
+  try {
+    prep = (await blocks[0].run(ctx)) as unknown as PrepareResult;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    finishJob(job.id, { status: "error", error: `prepare 例外：${msg}`, statusCode: 500 });
+    return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });
+  }
 
-  // 202 Accepted + jobId；前端輪詢 /api/video/status?jobId=
+  if (prep.ok && prep.euJobId) {
+    const orgId = resolveOrgId(); // ctx 無 organizationId → 用 POD_DESIGNS_DEFAULT_ORG_ID
+    finishJob(job.id, {
+      status: "running",
+      euJobId: prep.euJobId,
+      r2Keys: prep.r2Keys ?? [],
+      recordParams: orgId
+        ? { title: prep.title ?? "", sceneCount: prep.sceneCount ?? 0, organizationId: orgId }
+        : undefined,
+    });
+  } else {
+    // prepare 失敗（腳本/生圖/提交）→ 清暫存 + 標記錯誤
+    if (prep.r2Keys?.length) await cleanupVideoInputKeys(prep.r2Keys);
+    finishJob(job.id, { status: "error", error: prep.error ?? "prepare 失敗", statusCode: prep.status ?? 500 });
+  }
+
+  // 202 + jobId；前端輪詢 /api/video/status?jobId=（由 /status 輪詢 EU 收尾）
   return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });
 }
