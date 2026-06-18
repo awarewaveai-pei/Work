@@ -372,6 +372,26 @@
 **[剩餘小風險]** 使用者若在生成中關閉/離開頁面 → 無人輪詢 /status → 該次不記錄（影片仍在 R2）；可日後加「離開後背景補記」或 EU 完成 webhook。in-memory job-store 容器重啟丟失 in-flight（產物在 R2，重生即可）。
 - AUTO_TASK_DONE (2026-06-17): video generator **完整端到端通**（瀏覽器生成→真影片→畫廊記錄+可播，無 524）；definitive async（EU thread + 瀏覽器輪詢，next-admin 零背景工作）解決 Next.js 背景限制。
 
+### feat(video): 孤兒對帳 reconciler 上線（self-healing 畫廊）+ ⚠️ lifecycle-vs-keep 決策待拍板
+
+**[已做]** 方案 C（對帳掃描）部署上線，解「生成中關頁/容器重啟 → 影片在 R2 卻沒進畫廊」：
+- `lib/content/video/reconcile.ts`：掃 R2 video bucket → 缺 media_assets 的補（重用 recordVideoAsset；共用 `videoObjectKey()` 存查同把 key → **idempotent**）。
+- `/api/video/reconcile`：POST，走既有 `x-ops-sync-key` middleware 閘（零新攻擊面、零 EU 耦合）。
+- SG cron `*/15`：`/root/lobster-phase1/scripts/reconcile-videos.sh` → curl reconcile → log `/var/log/reconcile-videos.log`。
+- VideoStudio loading 提示改「可關閉頁面，完成後在 My Designs 影片分頁」。
+- next-admin env + 運行 compose 補 `R2_VIDEO_BUCKET`/`R2_VIDEO_PUBLIC_BASE`。
+
+**[驗證]**
+- REALTEST_EVIDENCE: tool=SSH(sg) curl | reconcile #1 `recorded:5`→#2 `recorded:4`（抓到 CJK 編碼 idempotency bug）→ 修 `videoObjectKey()` 共用 → 重跑 #1#2 皆 `recorded:0`（idempotent 確認）。cron 腳本實跑 log `{ok:true,checked:5,recorded:0}`。
+- 清測試產物：EU psql `DELETE ... mime video/% = 5 列`；R2 lobster-videos purge `21 物件→0`（畫廊+桶乾淨，正式影片之後才生）。
+- 部署 commit a6e9cf75（sg-deploy smoke OK）。
+
+**[⚠️ 待操作者決策｜30 年一致性]** 影片 R2 設了 **7 天 lifecycle**（當初視為 transient render 輸出），但畫廊 media_assets 列**永久**。7 天後 R2 刪檔、列還在 → 畫廊死連結。**這是「影片要長存(畫廊資料庫) vs 短暫(7天)」的產品決策**：
+  - A 長存：移除/延長 lifecycle（儲存量增，使用者可手動刪）。
+  - B 短暫：保留 lifecycle + reconciler 加 **prune**（刪 R2 已不存在的 media_assets 列）→ 自洽。
+  尚未實作任一；現況 7 天後會有死連結。建議 B（prune 擴充小、儲存有界、畫廊永遠一致）或 A 看是否要當作品庫長留。
+- AUTO_TASK_DONE (2026-06-17): video 孤兒對帳 reconciler 上線（idempotent+cron+清測試產物，畫廊 self-healing）；剩 lifecycle-vs-keep 一致性決策待操作者拍板（7天後死連結，建議加 prune 或延長保留）。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
