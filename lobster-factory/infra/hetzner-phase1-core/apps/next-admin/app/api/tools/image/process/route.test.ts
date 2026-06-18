@@ -95,6 +95,22 @@ describe("POST /api/tools/image/process — bake modes", () => {
     expect(j.filename).toBe("web-square.webp");
   });
 
+  it("web-original keeps a 3:2 source as 3:2", async () => {
+    const buf = await sharp({
+      create: { width: 300, height: 200, channels: 3, background: { r: 20, g: 40, b: 60 } },
+    })
+      .png()
+      .toBuffer();
+    const image = `data:image/png;base64,${buf.toString("base64")}`;
+    const res = await POST(makeRequest({ mode: "web", image, preset: "web-original" }, OP));
+    const j = await res.json();
+    const out = Buffer.from(j.image.split(",")[1], "base64");
+    const meta = await sharp(out).metadata();
+    expect(j.ok).toBe(true);
+    expect(j.filename).toBe("web-original.webp");
+    expect([meta.width, meta.height]).toEqual([300, 200]);
+  });
+
   it("print tgc → sRGB PNG data URL (no OutputIntent needed)", async () => {
     const res = await POST(makeRequest({ mode: "print", image: await pngDataUrl(), destination: "tgc" }, OP));
     expect(res.status).toBe(200);

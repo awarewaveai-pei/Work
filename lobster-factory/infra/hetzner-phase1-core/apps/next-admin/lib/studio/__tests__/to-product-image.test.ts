@@ -30,6 +30,19 @@ describe("to-product-image (real sharp bake)", () => {
     expect(m.space).toBe("srgb");
   });
 
+  it("web-original preserves the source ratio and does not add square padding", async () => {
+    const wide = await sharp({
+      create: { width: 300, height: 200, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .png()
+      .toBuffer();
+    const out = await toProductImage(wide, "web-original");
+    const m = await sharp(out).metadata();
+    expect(m.format).toBe("webp");
+    expect(m.width).toBe(300);
+    expect(m.height).toBe(200);
+  });
+
   it("colorGrade applies without throwing; neutral grade is a no-op", async () => {
     const graded = await toProductImage(await testInput(), "web-square", {
       hue: 15,

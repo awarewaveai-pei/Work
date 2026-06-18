@@ -37,10 +37,9 @@ if not hasattr(Image, "ANTIALIAS"):
     Image.ANTIALIAS = getattr(Image, "Resampling", Image).LANCZOS
 
 import edge_tts
-from moviepy.editor import (
-    ImageClip, VideoFileClip, AudioFileClip, CompositeVideoClip,
-    concatenate_videoclips, vfx,
-)
+# 合成走純 ffmpeg（per-scene + concat，比 moviepy 逐幀嚼影片快 10-50x）；
+# moviepy 僅用 AudioFileClip 取配音長度（即開即關）。
+from moviepy.editor import AudioFileClip
 
 # 影片片段（Pexels B-roll）與靜圖（Flux）的副檔名判別 — 混合 render 用
 _VIDEO_EXTS = (".mp4", ".mov", ".webm", ".m4v", ".mkv")
@@ -239,7 +238,9 @@ def generate_audio(scenes: list) -> list:
 # ═══════════════════════════════════════════
 # STEP 4：合成基礎影片（BASE_WIDTH x BASE_HEIGHT）
 # ═══════════════════════════════════════════
-def make_subtitle_overlay(text: str, duration: float, w: int, h: int) -> ImageClip:
+def make_subtitle_png(text: str, w: int, h: int) -> str:
+    """整幀透明字幕 PNG（CJK 自動換行 + 半透明底 + 描邊），回傳路徑。
+    CJK 排版交給 PIL（比 ffmpeg drawtext 穩）；ffmpeg overlay 疊上。"""
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = None
@@ -267,85 +268,76 @@ def make_subtitle_overlay(text: str, duration: float, w: int, h: int) -> ImageCl
 
     path = str(config.TEMP_DIR / f"sub_{abs(hash(text + str(w)))}.png")
     img.save(path)
-    return ImageClip(path).set_duration(duration)
+    return path
 
 
-def ken_burns(img_path: str, duration: float, w: int, h: int) -> ImageClip:
-    """Ken Burns 效果：慢慢放大。"""
-    clip = ImageClip(img_path).set_duration(duration)
-    clip = clip.resize(height=int(h * 1.15))
-    if clip.w < w:
-        clip = clip.resize(width=int(w * 1.15))
-    clip = clip.resize(lambda t: 1 + 0.04 * t / duration)
-    clip = clip.crop(x_center=clip.w / 2, y_center=clip.h / 2, width=w, height=h)
-    return clip
+def _audio_duration(audio_path: str) -> float:
+    """配音長度 + 0.5s 收尾。用 moviepy AudioFileClip 即開即關（不留 reader），避免依賴 ffprobe。"""
+    a = AudioFileClip(audio_path)
+    try:
+        return a.duration + 0.5
+    finally:
+        a.close()
 
 
-def _fit_video_clip(video_path: str, duration: float, w: int, h: int, open_sources: list = None):
-    """實拍 B-roll 片段：去原音（用 TTS 旁白）、cover-fit 到 w×h、loop/trim 對齊配音時長。
-
-    VideoFileClip 會開 ffmpeg reader subprocess/fd → 必須在 write_videofile 後關閉，否則
-    長壽 worker（next-admin/Trigger.dev 重複呼叫）會累積洩漏。把 source handle 收進
-    open_sources，由 compose_base_video 在 finally 統一 close（不能在這裡 close，
-    衍生 clip 寫檔前還需要 reader）。
-    """
-    src = VideoFileClip(video_path)
-    if open_sources is not None:
-        open_sources.append(src)
-    clip = src.without_audio()
-    clip = clip.resize(height=h)
-    if clip.w < w:
-        clip = clip.resize(width=w)
-    clip = clip.crop(x_center=clip.w / 2, y_center=clip.h / 2, width=w, height=h)
-    if clip.duration < duration:
-        clip = clip.fx(vfx.loop, duration=duration)  # 太短 → 無縫循環補滿
+def _render_scene_ffmpeg(asset_path, subtitle_png, audio_path, duration, out_path, w, h, fps):
+    """單場景 → 統一參數 mp4（純 ffmpeg，快）。
+    靜圖：zoompan Ken Burns（2x 超取樣降抖，單 batch 平滑）；實拍：stream_loop + cover-fit。
+    兩者皆疊字幕 PNG（-loop 撐滿）+ 接 TTS 旁白，-t 裁到 duration。輸出參數統一以利 concat -c copy。"""
+    is_video = os.path.splitext(asset_path)[1].lower() in _VIDEO_EXTS
+    if is_video:
+        inputs = ["-stream_loop", "-1", "-i", asset_path, "-loop", "1", "-i", subtitle_png, "-i", audio_path]
+        vchain = (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
+                  f"crop={w}:{h},fps={fps},setsar=1[bg]")
     else:
-        clip = clip.subclip(0, duration)              # 太長 → 裁到旁白長
-    return clip.set_duration(duration)                # subclip 分支需要；loop 分支冪等
-
-
-def make_visual_clip(asset_path: str, duration: float, w: int, h: int, open_sources: list = None):
-    """混合 render 派發：靜圖 → Ken Burns；實拍影片 → _fit_video_clip。
-    依副檔名判別；未知副檔名當靜圖處理（保守，與舊行為一致）。
-    open_sources：影片 source handle 收集清單（供呼叫端寫檔後 close）。"""
-    ext = os.path.splitext(asset_path)[1].lower()
-    if ext in _VIDEO_EXTS:
-        return _fit_video_clip(asset_path, duration, w, h, open_sources)
-    return ken_burns(asset_path, duration, w, h)
+        frames = max(1, int(round(duration * fps)))
+        inputs = ["-loop", "1", "-i", asset_path, "-loop", "1", "-i", subtitle_png, "-i", audio_path]
+        # 2x 超取樣後 zoompan 降到 w×h；d=總幀數 + 下方 -t → 單一 batch，連續平滑放大（無 sawtooth）
+        vchain = (f"[0:v]scale={w * 2}:{h * 2}:force_original_aspect_ratio=increase,crop={w * 2}:{h * 2},"
+                  f"zoompan=z='min(zoom+0.0009,1.12)':d={frames}:"
+                  f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={w}x{h}:fps={fps}[bg]")
+    cmd = [
+        "ffmpeg", "-y", *inputs,
+        "-filter_complex", f"{vchain};[bg][1:v]overlay=0:0[v]",
+        "-map", "[v]", "-map", "2:a",
+        "-t", f"{duration:.3f}", "-r", str(fps),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+        out_path,
+    ]
+    res = subprocess.run(cmd, capture_output=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"scene render failed ({os.path.basename(asset_path)}): "
+                           f"{res.stderr.decode('utf-8', 'ignore')[-400:]}")
 
 
 def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_name: str) -> str:
-    print(f"\n[4/6] 合成基礎影片（{config.BASE_WIDTH}x{config.BASE_HEIGHT}）...")
-    clips = []
-    open_sources = []   # AudioFileClip / VideoFileClip readers — 寫檔後統一關閉，防 fd/subprocess 洩漏
-    final = None
-    try:
-        for scene, asset_path, audio_path in zip(scenes, visual_files, audio_files):
-            audio = AudioFileClip(audio_path)
-            open_sources.append(audio)
-            duration = audio.duration + 0.5
-            bg = make_visual_clip(asset_path, duration, config.BASE_WIDTH, config.BASE_HEIGHT, open_sources)
-            subtitle = make_subtitle_overlay(scene["narration"], duration, config.BASE_WIDTH, config.BASE_HEIGHT)
-            composite = CompositeVideoClip([bg, subtitle]).set_audio(audio)
-            clips.append(composite)
-            print(f"   scene {scene['id']} ({duration:.1f}s)")
+    """純 ffmpeg 合成：每場景獨立 render 成統一參數 mp4，再 concat demuxer (-c copy) 秒級合併。
+    靜圖走 zoompan Ken Burns、實拍走 cover-fit；混合由 _render_scene_ffmpeg 依副檔名派發。"""
+    print(f"\n[4/6] 合成基礎影片（{config.BASE_WIDTH}x{config.BASE_HEIGHT}，ffmpeg per-scene + concat）...")
+    w, h, fps = config.BASE_WIDTH, config.BASE_HEIGHT, config.FPS
+    scene_paths = []
+    for i, (scene, asset_path, audio_path) in enumerate(zip(scenes, visual_files, audio_files)):
+        duration = _audio_duration(audio_path)
+        sub_png = make_subtitle_png(scene["narration"], w, h)
+        sp = str(config.TEMP_DIR / f"scene_{i:03d}.mp4")
+        _render_scene_ffmpeg(asset_path, sub_png, audio_path, duration, sp, w, h, fps)
+        scene_paths.append(sp)
+        print(f"   scene {scene.get('id', i)} ({duration:.1f}s)")
 
-        base_path = str(config.TEMP_DIR / f"{out_name}_base.mp4")
-        final = concatenate_videoclips(clips, method="compose")
-        final.write_videofile(
-            base_path, fps=config.FPS, codec="libx264", audio_codec="aac",
-            temp_audiofile=str(config.TEMP_DIR / "tmp_audio.m4a"),
-            remove_temp=True, logger="bar",
-        )
-        return base_path
-    finally:
-        # 寫檔完成後才關閉所有 reader（衍生 clip 寫檔前仍依賴 source）
-        for c in [final, *clips, *open_sources]:
-            try:
-                if c is not None:
-                    c.close()
-            except Exception:
-                pass
+    # 所有場景同編碼參數 → concat demuxer -c copy（無重新編碼，秒級）
+    list_path = config.TEMP_DIR / "concat.txt"
+    with open(list_path, "w", encoding="utf-8") as f:
+        for sp in scene_paths:
+            f.write("file '%s'\n" % sp.replace("\\", "/"))
+    base_path = str(config.TEMP_DIR / f"{out_name}_base.mp4")
+    res = subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-c", "copy", base_path],
+        capture_output=True,
+    )
+    if res.returncode != 0:
+        raise RuntimeError(f"concat failed: {res.stderr.decode('utf-8', 'ignore')[-400:]}")
+    return base_path
 
 
 # ═══════════════════════════════════════════
@@ -499,7 +491,7 @@ def render_video(scenes: list, visual_files: list, out_name: str):
     """只做合成：scenes(含 narration) + 已備妥的視覺素材 → 配音 → 合成 → 多尺寸輸出。
 
     visual_files 每項可為「靜圖（Flux）」或「實拍影片片段（Pexels B-roll）」，
-    由 make_visual_clip 依副檔名自動派發（混合 render）。
+    由 _render_scene_ffmpeg 依副檔名自動派發（ffmpeg 混合 render：靜圖 zoompan / 實拍 cover-fit）。
     刻意「不」生腳本、不生圖/抓素材、不發佈 —— 那些由 next-admin 既有能力負責
     （article core / image-gen / Pexels fetch / wp-bridge），本服務只保留影片合成價值。
     回傳 (output_files: dict, base_video: str, out_dir: Path)。呼叫端負責 cleanup()。
