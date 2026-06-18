@@ -243,6 +243,8 @@ export interface FlatMockupParams {
   lighting: string;
   /** prop labels (from FLAT_PROPS) to scatter around the garment */
   props?: string[];
+  /** design size as % of printable area (40–100), default 80 */
+  designSizePct?: number;
 }
 
 export interface ModelMockupParams {
@@ -258,6 +260,8 @@ export interface ModelMockupParams {
   lighting: string;
   /** prop labels (from MODEL_PROPS) visible in the scene */
   props?: string[];
+  /** design size as % of chest print area (40–100), default 80 */
+  designSizePct?: number;
 }
 
 /** Shared print-fidelity block. The dark-fabric lock is iron rule #1. */
@@ -293,10 +297,13 @@ export function buildFlatMockupPrompt(p: FlatMockupParams): string {
     p.props && p.props.length > 0
       ? ` Styled with: ${p.props.join(", ")}.`
       : "";
+  const sizePct = p.designSizePct ?? 80;
+  const sizeClause = ` The printed graphic should be prominent, occupying approximately ${sizePct}% of the center chest area.`;
   return (
     `Photorealistic e-commerce flat-lay product photo. A plain ${p.color} ${p.garmentPhrase}, ` +
     `${arrangement.phrase}, on ${surface.phrase}, ${lighting.phrase}. ` +
     fidelityBlock(p.color) +
+    sizeClause +
     propClause +
     " Shot from directly above, editorial product photography."
   );
@@ -313,11 +320,14 @@ export function buildModelMockupPrompt(p: ModelMockupParams): string {
     p.props && p.props.length > 0
       ? ` Visible in the scene: ${p.props.join(", ")}.`
       : "";
+  const sizePct = p.designSizePct ?? 80;
+  const sizeClause = ` The printed graphic covers approximately ${sizePct}% of the chest print area.`;
   return (
     `Photorealistic e-commerce lifestyle photo. ${who}${desc}, ${pose.phrase}, ` +
     `in ${scene.phrase}, ${lighting.phrase}. ` +
     `They wear a plain ${p.color} ${p.garmentPhrase}. ` +
     fidelityBlock(p.color) +
+    sizeClause +
     chestClause +
     propClause +
     " Editorial product photography, shallow depth of field, 85mm lens."

@@ -150,7 +150,7 @@ function CatalogGrid({
         <p style={{ fontSize: 12, color: "#e5484d" }}>無法載入 Printful 產品目錄</p>
       )}
       {catalog.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, maxHeight: 280, overflowY: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, maxHeight: 360, overflowY: "auto" }}>
           {catalog.map((p) => {
             const selected = selectedIds.has(p.id);
             return (
@@ -169,10 +169,15 @@ function CatalogGrid({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.image} alt={p.title} style={{ width: "100%", aspectRatio: "1/1", objectFit: "cover", display: "block" }} />
                 {selected && (
-                  <div style={{ position: "absolute", top: 3, right: 3, background: "#4f8cff", borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</div>
+                  <div style={{ position: "absolute", top: 4, right: 4, background: "#4f8cff", borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", fontWeight: 700 }}>✓</div>
                 )}
-                <div style={{ fontSize: 9, padding: "3px 4px", lineHeight: 1.3, opacity: 0.8, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                  {p.typeName} — {p.title.replace(/\s*\|.*$/, "")}
+                <div style={{ padding: "4px 6px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                    {p.title.replace(/\s*\|.*$/, "")}
+                  </div>
+                  <div style={{ fontSize: 10, opacity: 0.55, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                    {p.typeName} · #{p.id}
+                  </div>
                 </div>
               </div>
             );
@@ -336,6 +341,7 @@ export default function MockupStudio() {
         arrangement: flatArrangement,
         lighting: flatLighting,
         props: [...flatProps].map((v) => FLAT_PROPS.find((p) => p.value === v)?.label ?? v),
+        designSizePct,
       });
     }
     return buildModelMockupPrompt({
@@ -347,6 +353,7 @@ export default function MockupStudio() {
       scene: modelScene,
       lighting: modelLighting,
       props: [...modelProps].map((v) => MODEL_PROPS.find((p) => p.value === v)?.label ?? v),
+      designSizePct,
     });
   }, [mode, color, flatSurface, flatArrangement, flatLighting, flatProps,
       selectedFlatProductIds, selectedModelProductIds, garmentPhraseFor,
@@ -369,10 +376,11 @@ export default function MockupStudio() {
     setGen({ status: "generating" });
     setSaveState("idle");
     try {
+      const processedRef = await applyDesignOpacity(designRef, designOpacity);
       const res = await fetch("/api/tools/studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, prompt, referenceImages: [designRef], aspectRatio: aspect, _jobId: jobIdRef.current }),
+        body: JSON.stringify({ model, prompt, referenceImages: [processedRef], aspectRatio: aspect, _jobId: jobIdRef.current }),
       });
       const json = (await res.json()) as { ok: boolean; image?: string; error?: string };
       if (!json.ok || !json.image) { setGen({ status: "error", error: json.error ?? `HTTP ${res.status}` }); return; }
@@ -708,6 +716,21 @@ export default function MockupStudio() {
         {/* ═══════════════════ MODEL TAB ═══════════════════════ */}
         {mode === "model" && (
           <>
+            <label style={{ fontSize: 13 }}>
+              設計大小（{designSizePct}% 胸前範圍）
+              <input type="range" min={40} max={100} step={5} value={designSizePct}
+                onChange={(e) => setDesignSizePct(Number(e.target.value))}
+                style={{ width: "100%", marginTop: 4 }} />
+            </label>
+
+            <label style={{ fontSize: 13 }}>
+              圖案透明度 {designOpacity}%
+              <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 6 }}>（僅對上傳圖有效）</span>
+              <input type="range" min={60} max={100} step={5} value={designOpacity}
+                onChange={(e) => setDesignOpacity(Number(e.target.value))}
+                style={{ width: "100%", marginTop: 4 }} />
+            </label>
+
             <CatalogGrid
               catalog={catalog} catalogLoading={catalogLoading}
               selectedIds={selectedModelProductIds}
@@ -806,6 +829,21 @@ export default function MockupStudio() {
         {/* ═══════════════════ FLAT TAB ════════════════════════ */}
         {mode === "flat" && (
           <>
+            <label style={{ fontSize: 13 }}>
+              設計大小（{designSizePct}% 胸前範圍）
+              <input type="range" min={40} max={100} step={5} value={designSizePct}
+                onChange={(e) => setDesignSizePct(Number(e.target.value))}
+                style={{ width: "100%", marginTop: 4 }} />
+            </label>
+
+            <label style={{ fontSize: 13 }}>
+              圖案透明度 {designOpacity}%
+              <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 6 }}>（僅對上傳圖有效）</span>
+              <input type="range" min={60} max={100} step={5} value={designOpacity}
+                onChange={(e) => setDesignOpacity(Number(e.target.value))}
+                style={{ width: "100%", marginTop: 4 }} />
+            </label>
+
             <CatalogGrid
               catalog={catalog} catalogLoading={catalogLoading}
               selectedIds={selectedFlatProductIds}

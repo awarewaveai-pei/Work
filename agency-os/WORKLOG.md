@@ -4,6 +4,28 @@
 
 ## 2026-06-19
 
+### fix(seo): RankMath 22-check + 3 bug patches (Content Studio)
+
+**[任務理解]** 用戶要求徹底改善 /tools/content SEO 工具，產出 100 分 RankMath 文章。  
+前半 session（壓縮前）：新增 6 個 RankMath 檢測（16→22 點）+ fix meta desc CJK 長度 + fix siteDomain generate-time + fix meta truncation。  
+後半 session（此 commit 25b16249）：修補 verify-recent critic 回報的 3 個 bug。
+
+**[已修改]**
+- `lib/seo/rankmath-checker.ts`: CJK_RE 加 `u` flag；faqBlock 加 `.split(/\n##\s/)[0]` 邊界
+- `app/tools/content/ContentStudio.tsx`: handleFixApply 補 siteDomain（AI 修正後 re-check 不再誤判 internal links）
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run lib/seo | exit=0 | ms=~35000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m (all prior findings fixed)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=CJK_RE|faqBlock|handleFixApply | hits=3 (all in next-admin, no stale refs)
+- BUGHUNT_WAIVED: DOC_ONLY -- stale "16 點" comment strings updated in prior session commit
+
+**[剩餘風險]** None blocking. Minor: faqBlock `split(/\n##\s/)` strips the `## ` prefix from the heading — only affects counting which is after the heading so harmless.
+
+**[rollback]** `git revert 25b16249`
+
+---
+
 ### feat(video-studio): draft review layer + improved Claude prompts + Ken Burns variants + fade transitions
 
 **[任務理解]** Video Studio 產出品質差（圖片不相關、旁白書面語、剪接死板）+ 全程黑盒無法編輯。根因：Claude prompt 太鬆、Flux prompt 無 cinematic prefix、Ken Burns 固定方向、無過渡效果、無人工審稿點。
