@@ -254,6 +254,29 @@
 **[剩餘風險]** 頁面按「生成」真正出片需 Python video-service 在跑 + next-admin 注入三 key（Phase 2 部署）；UI 已對「服務未連線」優雅顯示錯誤。成本估算採規劃 custom/broll 分配，Pexels miss 降級 Flux 會略高（UI 已註）。
 - AUTO_TASK_DONE (2026-06-17): /tools/video 網頁工具完成（流程清單 SSOT 可擴充刪減 + 每支精確成本 $0.0486≈NT$1.56），vitest 6/6 + tsc 0；live 出片待 Phase 2 部署。
 
+### feat(video): Phase 2-A — 跨機部署 code（容器化 + 認證端點 + R2 素材/產出 + compose）
+
+**[任務理解]** 操作者選 EU 部署 render 服務（8GB 餘裕，避 SG 4GB OOM）。EU = 跨機 → /tmp 共享失效 → 素材/產出改走 R2；render 端點暴露網際網路 → 加認證。本段只做 code（可逆、不碰 prod）。
+
+**[已修改]**
+- 新 `apps/video-service/Dockerfile`（python:3.12-slim + ffmpeg + fonts-noto-cjk + requirements；HEALTHCHECK /health）+ `.dockerignore`（排除 .venv/output/temp/金鑰檔）。
+- 新 `apps/video-service/docker-compose.video.yml`（EU 部署單元：expose-only 不對外、healthcheck、mem 2G/cpu 2、R2+RENDER_AUTH_TOKEN env）。
+- `server.py`：① 綁 `VIDEO_SERVICE_HOST`（容器 0.0.0.0）② `/render` 加 **shared-secret 認證**（`X-Render-Token` vs `RENDER_AUTH_TOKEN`，hmac.compare_digest；未設=本機放行）③ render 後**產出上傳 R2**（CF R2 API，回 public URL；未設 R2=本機路徑 dev）④ 啟動警示非-localhost 無 token。
+- 積木 `video-pipeline.ts`：Flux data URL **改走 R2**（重用 `lib/storage/r2.ts` parseImageDataUrl/buildDesignKey/putDesignObject）→ public URL 交服務；render 後 finally 刪 R2 暫存物件；無 R2 設定回 503。`render-client.ts`：加 `X-Render-Token`（`VIDEO_SERVICE_SECRET`）。刪除已無用的 `asset-prep.ts`。
+- SG `docker-compose.yml`：next-admin env 補 `REPLICATE_API_TOKEN`/`PEXELS_API_KEY`/`VIDEO_SERVICE_URL`/`VIDEO_SERVICE_SECRET`（皆 `:-` 空值 fail-closed）。**順手修既有 bug**：移除 PRINTFUL/POD/WC 重複鍵塊（line 337 與 388 重複 → `docker compose config` 失敗，會擋 sg-deploy 驗證）。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`py_compile server.py pipeline.py` exit=0；`vtest_server.py`（render_request 全渲染 + HTTP health/400/SSRF/404）→ `REALTEST_SERVER_PASS`（auth 未設→放行、無 R2→本機路徑，皆正確）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`server._authed`（RENDER_AUTH_TOKEN=secret123）| no-token→False、wrong→False、right→True（認證正確）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin）exit=0（修 R2 union narrowing 用 `"error" in put`）；`vitest video-cost` 6/6。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker compose config`（video-compose + SG-compose）| 皆 OK（SG 修重複鍵後通過）。
+- REALTEST_WAIVED: docker image build -- Docker Desktop 本機 build 中途引擎關閉且未恢復（環境問題非 code）；Dockerfile 標準（slim+apt+pip -r），映像 build 由段 B EU `docker compose build` 執行驗證。
+- REVIEW_DONE: critic=Quick（自審）| server.py 認證(hmac constant-time)/R2 上傳/bind + 積木 R2 handoff + cleanup 邏輯讀回；無密鑰寫死（皆 env）。
+- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os | grep=`asset-prep|RENDER_AUTH_TOKEN|VIDEO_SERVICE_SECRET|PRINTFUL_API_KEY` | asset-prep 0 殘留引用（已刪）；PRINTFUL 重複鍵移除後 next-admin 區塊內無重複（跨服務同名正常）。
+
+**[剩餘風險]** 段 B（prod，待操作者逐項 go）：EU 起容器 + nginx 子網域 + TLS + 注入 RENDER_AUTH_TOKEN/R2 env；SG .env 注入 4 把 key/url + sg-deploy 重部署 next-admin；live e2e 穿網頁。映像 build 尚未本機實證（Docker 環境問題），EU build 時若 requirements 有問題會在那裡現形。
+- AUTO_TASK_DONE (2026-06-17): video Phase 2-A 跨機部署 code 完成（Dockerfile/compose/認證/R2 handoff/compose env + 修 PRINTFUL 重複鍵），py_compile+tsc 0+vitest 6/6+render/auth test PASS+compose config OK；映像 build 順延段 B。
+
 ### ops(pod-a2): A2 自動轉單 dormant → ENABLED（draft-only）— SG env 啟用 + soulful Woo webhook 建立 + 端到端實測
 
 **[任務理解]** 使用者明示「測試期結束，啟用 A2 draft-only」（AskUserQuestion 確認，因該功能有「要/不要」打錯字歷史 + 金流紅線，先鎖死語意才碰 prod）。A2 = Woo 成交 → 系統在 Printful 建**草稿單**（不扣款不印）；confirm/charge/print 紅線維持不建。
