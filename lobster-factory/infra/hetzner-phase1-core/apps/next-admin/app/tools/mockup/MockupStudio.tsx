@@ -442,7 +442,7 @@ export default function MockupStudio() {
     } catch (err) {
       setGen({ status: "error", error: err instanceof Error ? err.message : String(err) });
     } finally { inFlight.current = false; }
-  }, [designRef, model, prompt, aspect]);
+  }, [designRef, model, prompt, aspect, designOpacity]);
 
   const generatePrintful = useCallback(async () => {
     if (!designRef) {
@@ -515,7 +515,7 @@ export default function MockupStudio() {
       await Promise.all(pids.slice(i, i + BATCH_SIZE).map(generateOne));
     }
     printfulInFlight.current = false;
-  }, [designRef, selectedProductIds, catalog, designSizePct, designOpacity]);
+  }, [designRef, selectedProductIds, catalog, designSizePct, designOpacity, color]);
 
   const toggleMockup = useCallback((url: string) => {
     setSelectedMockups((prev) => { const next = new Set(prev); if (next.has(url)) next.delete(url); else next.add(url); return next; });

@@ -6,6 +6,25 @@ $insert
 
 ## 2026-06-19
 
+### fix(mockup): 白/灰/黑全出白 — generatePrintful useCallback 漏 color dep（stale closure）
+
+[任務理解] 顏色 variant 修好後，用戶回報白/灰/黑全部還是出白色。
+
+[真因] `generatePrintful` 的 useCallback deps `[designRef, selectedProductIds, catalog, designSizePct, designOpacity]` **漏了 `color`** → React stale closure，函式抓的是初始 color="white"，永遠送 white 給後端 → variant 永遠 4012。variant 選色邏輯本身（上一個 commit）是對的，卡在前端 closure。
+
+[已修改] `app/tools/mockup/MockupStudio.tsx`：
+- `generatePrintful` deps 補 `color`（真因）。
+- 順手補 AI `generate()` deps 漏的 `designOpacity`（line 433 有用、deps 沒有，透明度也 stale）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REVIEW_DONE: 自審（2 行 deps 修正，標準 stale-closure fix）；variant 選色邏輯上個 commit 已 critic Deep pass + live 驗（白4012/灰6949/黑4017）
+- BUGHUNT_DONE: scope=lobster-factory | grep=color in JSON.stringify body + useCallback deps | hits=0 其他漏（saveMockup deps 已含 color；AI generate 用 prompt useMemo 已含全部控制）
+
+[剩餘風險] 大小問題仍未修（下一輪）。需用戶實測灰/黑是否真的出對色。
+
+[rollback] git revert（單檔 2 行）。
+
 ### feat(video): ScriptForge 目標受眾 → 分類複選選擇器（Q1）
 
 [任務理解] 使用者要 手動生成 的「目標受眾」從單一文字框 → 分類、可複選、可（原問）全選的選擇器。設計討論後採：分類複選 + 每類自訂 + 常用人設一鍵套組（**不做全選**：受眾全選=失焦，AI 寫得泛；常用人設更實用）。
