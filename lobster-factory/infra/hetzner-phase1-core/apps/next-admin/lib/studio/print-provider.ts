@@ -122,22 +122,63 @@ async function pf<T>(
   }
 }
 
-/** Catalog variants of a product (default 71 = Bella+Canvas 3001), filtered to colors. */
+/** Catalog variants of a product (e.g. 71 = Bella+Canvas 3001), filtered to the requested colours.
+ *  `colors` accepts Printful colour NAMES or hex (`#rrggbb`) — each is matched case-insensitively
+ *  against BOTH the variant's `color` (name) and `color_code` (hex). Uses the **v2** catalog endpoint:
+ *  it is the only one returning `color_code`, so hex matching requires it (the legacy v1
+ *  `/products/{id}` this used to call carries no hex). v2 caps limit at 100 (popular tees have 500+
+ *  variants), so paginate. Back-compatible: existing callers passing colour names still match on name. */
 export async function getCatalogVariants(
   catalogProductId: number,
   colors: string[],
 ): Promise<PrintfulResult<CatalogVariant[]>> {
-  const r = await pf<{ variants: { id: number; color: string; size: string; in_stock?: boolean }[] }>(
-    `/products/${catalogProductId}`,
-  );
-  // tsconfig here does not narrow `!r.ok` — same cast convention as the tarot/designs routes.
-  if (!r.ok) return { ok: false, error: (r as { ok: false; error: string }).error };
-  const wanted = new Set(colors.map((c) => c.toLowerCase()));
+  const token = process.env.PRINTFUL_API_KEY;
+  if (!token) return { ok: false, error: "printful_not_configured" };
+  type V2Variant = { id: number; color: string; color_code?: string; size: string };
+  const all: V2Variant[] = [];
+  // Catalog reads need no store header. Stop on a short page (<100); 2000 is only a runaway guard.
+  for (let offset = 0; offset < 2000; offset += 100) {
+    const controller = new AbortController();
+    const killer = setTimeout(() => controller.abort(), 25_000);
+    let res: Response;
+    try {
+      res = await fetch(
+        `${API_BASE}/v2/catalog-products/${catalogProductId}/catalog-variants?limit=100&offset=${offset}`,
+        { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal },
+      );
+    } catch {
+      clearTimeout(killer);
+      return { ok: false, error: controller.signal.aborted ? "printful_timeout" : "printful_network_error" };
+    }
+    clearTimeout(killer);
+    // Flat status here (no pf<>-style body `code` 404 disambiguation) — intentional: none of the 3
+    // call sites inspect `.code`, they propagate `.error` as a 502. Revisit only if a future caller
+    // needs to tell "product absent" from "upstream blip".
+    if (!res.ok) return { ok: false, error: `printful_${res.status}`, status: res.status };
+    let json: { data?: V2Variant[]; paging?: { total?: number } };
+    try {
+      json = (await res.json()) as typeof json;
+    } catch {
+      return { ok: false, error: `printful_bad_json_${res.status}`, status: res.status };
+    }
+    const page = json.data ?? [];
+    all.push(...page);
+    // Stop on a short page OR when paging.total is reached — avoids one wasted empty request on exact
+    // multiples of 100, and removes the only truncation point under the 2000 guard (same pattern as
+    // printful-catalog.ts fetchAllVariants).
+    const total = json.paging?.total;
+    if (page.length < 100 || (typeof total === "number" && all.length >= total)) break;
+  }
+  // Match each requested colour against the variant NAME or hex, both lower-cased (Printful
+  // color_code casing is not contractually lowercase). Lets callers pass "White" OR "#ffffff".
+  const wanted = new Set(colors.map((c) => c.trim().toLowerCase()));
   return {
     ok: true,
-    value: r.value.variants
-      .filter((v) => wanted.has(v.color.toLowerCase()))
-      .map((v) => ({ id: v.id, color: v.color, size: v.size, inStock: Boolean(v.in_stock) })),
+    value: all
+      .filter((v) => wanted.has(v.color.toLowerCase()) || wanted.has((v.color_code ?? "").toLowerCase()))
+      // v2 catalog-variants carries no stock flag (it lists a product's printable specs, not live
+      // availability); inStock has no consumer today, so report true as a "spec exists" placeholder.
+      .map((v) => ({ id: v.id, color: v.color, size: v.size, inStock: true })),
   };
 }
 

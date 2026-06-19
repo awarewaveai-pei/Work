@@ -6,6 +6,22 @@ $insert
 
 ## 2026-06-20
 
+### feat(pod): Phase 1a — `getCatalogVariants` 改 v2 + hex/name 雙比對（向後相容）
+
+[任務] PLAN Phase 1 第一步:`getCatalogVariants` 從 v1 `/products/{id}`（不回 `color_code`）改 v2 `catalog-variants`（回 `color_code`），支援 hex 比對 + 向後相容顏色名（critic Major 1 修復）。
+
+[已修改] `print-provider.ts` `getCatalogVariants`:① 換 v2 endpoint（自 fetch + 分頁;`pf<>` 解析 v1 `json.result`，與 v2 `json.data` 不相容）② 雙比對（colors 比 `color` name **或** `color_code` hex，case-insensitive，可傳 "White" 或 "#ffffff"）③ `inStock`→true 佔位（v2 無庫存欄，零 consumer）④ paging.total break。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(SSH hetzner-sg + docker node fetch Printful v2 API) | cmd=模擬雙比對 4 案例 | exit=0 | 向後相容(71 White+Black→18 names match)+ hex(57 #9b969c→Sport Grey 7)+ 大寫 hex(#9B969C→7 case-insensitive)+ name(Sport Grey→7)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/2n（採納 paging.total break + 404 code 註解 intentional）;verified clean:v1→v2 name 無 drift（REALTEST 覆蓋 downstream keying）、store header 省略正確（v2 catalog global endpoint 官方確認）、分頁/clearTimeout/edge cases robust
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=getCatalogVariants,inStock,in_stock | hits: `inStock` 0 consumer（安全改 true）;`getCatalogVariants` 3 call sites（route.ts:392/506 + printful/sync:51）全傳顏色名 → 雙比對向後相容無破壞
+
+[剩餘風險] 向後相容增量（現有流程仍用名，未啟用 hex 對接）。⚠️ Phase 1b（`create` 產 hex vmap + `pfcreate` 用 hex + `pod-product` 多色變體）才真用 hex，critic 警告 Woo/Printful 多色須同步否則 SKU join drift;並行 session 可能撞 create/pfcreate。
+
+[rollback] git revert `getCatalogVariants`;向後相容，現有流程不變。
+
 ### feat(pod): Phase 0 — 一鍵上架規格 SSOT `pod-catalog-config.ts`（3 款 × 4 色 hex）
 
 [任務] `PLAN-pod-one-click-auto-publish-design-to-woo-printful.md` Phase 0:建 SSOT 取代寫死的 `getCatalogVariants(71,…)` + `POD_COLORS=["White","Black"]`。3 款 T-shirt（Gildan 2400 長袖 id57 / Stanley-Stella STTU169 id456 / Gildan 5000 id438）× 各 4 色（hex-keyed）× S-2XL。
