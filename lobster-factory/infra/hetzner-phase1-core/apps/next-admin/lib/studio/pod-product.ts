@@ -1,16 +1,24 @@
 /**
  * POD product payload builder — pure function from publish-form fields to the
  * wp-bridge /product payload (template: agency-os/docs/wp-bridge-product-template.md,
- * verified live on soulful product 7117). Bella 3001 white/black per the POD plan;
- * plus sizes (2XL+) carry the higher price (Printful wholesale is $2–3 more).
+ * verified live on soulful product 7117).
+ *
+ * Colours come from the selected `model` (pod-catalog-config, hex-keyed). When no model is supplied
+ * (legacy single-product callers) it falls back to White/Black, matched by NAME via getCatalogVariants'
+ * dual name/hex match. Plus sizes (2XL+) carry the higher price (Printful wholesale is $2–3 more).
  */
 
-export const POD_SIZES_DEFAULT = ["S", "M", "L", "XL", "2XL"]; // TODO(Phase 1): fold onto pod-catalog-config POD_SIZES (single source of sizes).
+import type { PodColor, PodProductModel } from "./pod-catalog-config";
+
+export const POD_SIZES_DEFAULT = ["S", "M", "L", "XL", "2XL"];
 export const POD_PLUS_SIZES = new Set(["2XL", "3XL", "4XL", "5XL"]);
-// TODO(Phase 1): DELETE — superseded by pod-catalog-config POD_PRODUCT_MODELS[].colors (hex-keyed,
-// per-product). buildVariantPlan/buildPodProductPayload must read model.colors instead, else Woo
-// (2 colours) and Printful (4 colours) diverge and break the SKU join. See PLAN §6 Phase 1.
+// Legacy default when no model is passed. Hex is empty → getCatalogVariants matches these by NAME
+// (its dual match accepts a name OR a hex), so the legacy White/Black path keeps working unchanged.
 export const POD_COLORS = ["White", "Black"] as const;
+const LEGACY_COLORS: PodColor[] = [
+  { hex: "", printfulName: "White", label: "White" },
+  { hex: "", printfulName: "Black", label: "Black" },
+];
 
 export interface PodProductParams {
   title: string;
@@ -25,10 +33,18 @@ export interface PodProductParams {
   bullets?: string[];
   /** RankMath SEO meta — wp-bridge ProductCreator.applySeo writes these to the product. */
   seo?: { focus_keyword?: string; title?: string; description?: string };
+  /** POD model (pod-catalog-config) — its hex-keyed colours + displayName drive variants & copy.
+   *  Absent (legacy callers) → White/Black via LEGACY_COLORS. */
+  model?: PodProductModel;
 }
 
 export interface PodVariantPlan {
-  color: (typeof POD_COLORS)[number];
+  /** Woo Color attribute value (display label, e.g. "運動灰 Sport Grey"). */
+  color: string;
+  /** Printful catalog colour NAME (e.g. "Sport Grey") — the pfcreate join key (unique within a product). */
+  printfulColor: string;
+  /** Printful `color_code` (hex) — carried for reference / future hex-keyed binding ("" for legacy). */
+  colorHex: string;
   size: string;
   sku: string;
   price: string;
@@ -44,20 +60,43 @@ function skuSlug(text: string): string {
   );
 }
 
+/** A short, unique-per-product SKU token from the Printful colour name (e.g. "Sport Grey" → "SPORT-GREY").
+ *  Replaces the old first-initial scheme (W/B), which collided across 4 colours (e.g. Forest Green vs
+ *  French Navy both → F). */
+function colorToken(printfulName: string): string {
+  return skuSlug(printfulName).slice(0, 12);
+}
+
+/** Resolve the colours to build: the model's hex-keyed set, or legacy White/Black. */
+function colorsFor(params: PodProductParams): PodColor[] {
+  return params.model?.colors && params.model.colors.length > 0 ? params.model.colors : LEGACY_COLORS;
+}
+
 export function priceForSize(size: string, retailPrice: string, plusPrice?: string): string {
   return POD_PLUS_SIZES.has(size.toUpperCase()) ? (plusPrice ?? retailPrice) : retailPrice;
 }
 
 export function buildVariantPlan(params: PodProductParams): PodVariantPlan[] {
-  const sizes = params.sizes && params.sizes.length > 0 ? params.sizes : POD_SIZES_DEFAULT;
+  const sizes = params.sizes && params.sizes.length > 0 ? params.sizes : params.model?.sizes ?? POD_SIZES_DEFAULT;
   const seed = skuSlug(params.designName ?? params.title);
+  const colors = colorsFor(params);
+  // Per-product SKU prefix keeps SKUs distinct across models when one design is published to several
+  // products (Phase 3 loop) — each colour×size still unique within a product.
+  const modelTag = params.model ? `${params.model.catalogProductId}-` : "";
   const plan: PodVariantPlan[] = [];
-  for (const color of POD_COLORS) {
+  for (const c of colors) {
     for (const size of sizes) {
       plan.push({
-        color,
+        color: c.label,
+        printfulColor: c.printfulName,
+        colorHex: c.hex,
         size,
-        sku: `POD-${seed}-${color[0]}-${size}`,
+        // model path: per-product tag + colour-name token (collision-free across 4 colours, e.g.
+        // Forest Green vs French Navy). legacy path (no model): keep the original first-initial
+        // scheme (W/B) for full back-compat with already-built products + existing tests.
+        sku: params.model
+          ? `POD-${seed}-${modelTag}${colorToken(c.printfulName)}-${size}`
+          : `POD-${seed}-${c.printfulName[0]}-${size}`,
         price: priceForSize(size, params.retailPrice, params.plusPrice),
       });
     }
@@ -66,17 +105,21 @@ export function buildVariantPlan(params: PodProductParams): PodVariantPlan[] {
 }
 
 export function buildPodProductPayload(params: PodProductParams): Record<string, unknown> {
-  const sizes = params.sizes && params.sizes.length > 0 ? params.sizes : POD_SIZES_DEFAULT;
+  const sizes = params.sizes && params.sizes.length > 0 ? params.sizes : params.model?.sizes ?? POD_SIZES_DEFAULT;
+  const colors = colorsFor(params);
   const plan = buildVariantPlan(params);
-  // AI bullets (Phase 4) drive the icon_list + short_description fallback; otherwise
-  // fall back to the original Bella 3001 boilerplate so nothing regresses.
+  const colorLabels = colors.map((c) => c.label);
+  const colorsPhrase = colorLabels.join(" / ");
+  const productLine = params.model?.displayName ?? "Bella+Canvas 3001 unisex tee";
+  // AI bullets (Phase 4) drive the icon_list + short_description fallback; otherwise fall back to
+  // boilerplate (now colour-aware so it never says "white/black" for a 4-colour product).
   const bullets =
     params.bullets && params.bullets.length > 0
       ? params.bullets
-      : ["100% ring-spun cotton", "Unisex regular fit", "White / Black", "Printed to order — less waste"];
+      : ["100% ring-spun cotton", "Unisex regular fit", colorsPhrase, "Printed to order — less waste"];
   const shortDescription =
     params.shortDescription ??
-    `<p>${params.title} — premium unisex tee, white/black.</p><ul>${bullets.map((b) => `<li>${b}</li>`).join("")}</ul>`;
+    `<p>${params.title} — premium unisex tee (${colorsPhrase}).</p><ul>${bullets.map((b) => `<li>${b}</li>`).join("")}</ul>`;
   return {
     type: "variable",
     name: params.title,
@@ -92,7 +135,7 @@ export function buildPodProductPayload(params: PodProductParams): Record<string,
       { type: "heading", text: params.title, level: 2 },
       {
         type: "paragraph",
-        text: "Soft, breathable Bella+Canvas 3001 unisex tee printed on demand with water-based inks.",
+        text: `Soft, breathable ${productLine} printed on demand with water-based inks.`,
       },
       { type: "icon_list", items: bullets },
       { type: "heading", text: "Care", level: 3 },
@@ -102,11 +145,11 @@ export function buildPodProductPayload(params: PodProductParams): Record<string,
     tags: ["pod", "soulful-expression"],
     images: (params.mockupUrls ?? []).map((src, i) => ({ src, alt: `${params.title} ${i + 1}` })),
     attributes: [
-      { name: "Color", options: [...POD_COLORS], visible: true, variation: true, position: 0 },
+      { name: "Color", options: colorLabels, visible: true, variation: true, position: 0 },
       { name: "Size", options: sizes, visible: true, variation: true, position: 1 },
     ],
     default_attributes: [
-      { name: "Color", option: "White" },
+      { name: "Color", option: colorLabels[0] },
       { name: "Size", option: sizes.includes("M") ? "M" : sizes[0] },
     ],
     variations: plan.map((v, i) => ({

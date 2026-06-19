@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APPAREL_PRINT_DESTINATIONS } from "@/lib/studio/apparel-print-destinations";
+import { POD_PRODUCT_MODELS } from "@/lib/studio/pod-catalog-config";
 import { SeoCheckPanel } from "@/app/tools/content/SeoCheckPanel";
 import type { RankMathReport, RankMathCheck } from "@/lib/seo/rankmath-checker";
 
@@ -14,6 +15,9 @@ interface DesignAsset {
 interface VariantMapEntry {
   variationId: number;
   color: string;
+  // Printful colour name + hex echoed by `create` — pfcreate binds on printfulColor (unique per product).
+  printfulColor?: string;
+  colorHex?: string;
   size: string;
   // Echoed by `create` — the authoritative SKU (P4 join key) + price that pfcreate consumes verbatim.
   sku: string;
@@ -51,6 +55,8 @@ export default function PublishWizard() {
   const [designUrl, setDesignUrl] = useState<string | null>(null);
   const [mockupUrls, setMockupUrls] = useState<string[]>([]);
   const [title, setTitle] = useState("");
+  // Which T-shirt model to publish (pod-catalog-config). Drives colours (Woo variants) + Printful binding.
+  const [catalogProductId, setCatalogProductId] = useState<number>(POD_PRODUCT_MODELS[0].catalogProductId);
   const [retailPrice, setRetailPrice] = useState("24.99");
   const [plusPrice, setPlusPrice] = useState("26.99");
   const [keywordHint, setKeywordHint] = useState("");
@@ -186,6 +192,15 @@ export default function PublishWizard() {
     setLink({ state: "idle" });
     setPfcreate({ state: "idle" });
   }, [printMode]);
+  // Switching the T-shirt model invalidates every variant-bound step — a stale variantMap from the
+  // previous model (its colours/SKUs) must NOT be carried into pfcreate, which would try to bind the
+  // old model's colours against the newly-selected product (critic Phase 1b). Force a re-create.
+  useEffect(() => {
+    setCreate({ state: "idle" });
+    setSync({ state: "idle" });
+    setLink({ state: "idle" });
+    setPfcreate({ state: "idle" });
+  }, [catalogProductId]);
 
   const runUpscale = useCallback(async () => {
     if (!designUrl) return;
@@ -310,6 +325,7 @@ export default function PublishWizard() {
     setCreate({ state: "running" });
     const json = await post({
       action: "create",
+      catalogProductId,
       title,
       retailPrice,
       plusPrice,
@@ -334,7 +350,7 @@ export default function PublishWizard() {
       // Surface the source-side "SKU map dropped" signal so the native path can refuse and steer to legacy.
       variantMapDropped: Boolean(json.variantMapDropped),
     });
-  }, [title, retailPrice, plusPrice, mockupUrls, copy, post]);
+  }, [catalogProductId, title, retailPrice, plusPrice, mockupUrls, copy, post]);
 
   const runStatus = useCallback(async () => {
     if (!create.productId) return;
@@ -380,6 +396,7 @@ export default function PublishWizard() {
     setPfcreate({ state: "running" });
     const json = await post({
       action: "pfcreate",
+      catalogProductId,
       wooProductId: create.productId,
       title,
       printFileUrl: upscale.printFileUrl,
@@ -399,7 +416,7 @@ export default function PublishWizard() {
       alreadyExisted: Boolean(json.alreadyExisted),
       faithful: upscale.faithful,
     });
-  }, [create.productId, create.variantMap, upscale.printFileUrl, upscale.faithful, title, retailPrice, plusPrice, mockupUrls, pfcreate.state, post]);
+  }, [create.productId, create.variantMap, upscale.printFileUrl, upscale.faithful, title, retailPrice, plusPrice, mockupUrls, pfcreate.state, catalogProductId, post]);
 
   // 🚀 ONE-CLICK: print file → product image → flat-lay → AI copy → Woo product → Printful native, in
   // sequence, aborting on the first hard failure. Each step's payload MIRRORS its run* function above;
@@ -499,6 +516,7 @@ export default function PublishWizard() {
     setCreate({ state: "running" });
     const cr = await post({
       action: "create",
+      catalogProductId,
       title,
       retailPrice,
       plusPrice,
@@ -537,6 +555,7 @@ export default function PublishWizard() {
     setPfcreate({ state: "running" });
     const pf = await post({
       action: "pfcreate",
+      catalogProductId,
       wooProductId: productId,
       title,
       printFileUrl,
@@ -562,7 +581,7 @@ export default function PublishWizard() {
     } finally {
       runAllLatch.current = false;
     }
-  }, [designUrl, title, printMode, flatlayBg, designAssets, keywordHint, retailPrice, plusPrice, post]);
+  }, [designUrl, title, printMode, flatlayBg, designAssets, keywordHint, retailPrice, plusPrice, catalogProductId, post]);
 
   const busy = allRun.state === "running";
 
@@ -737,6 +756,25 @@ export default function PublishWizard() {
         <label style={{ fontSize: 13, flex: "1 1 280px" }}>
           商品名稱
           <input className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：Soulful Bloom Tee" />
+        </label>
+        <label style={{ fontSize: 13, flex: "1 1 280px" }}>
+          款式 T-shirt（決定顏色 + Printful 綁定）
+          <select
+            className="btn-secondary"
+            style={{ width: "100%", marginTop: 4 }}
+            value={catalogProductId}
+            disabled={busy}
+            onChange={(e) => setCatalogProductId(Number(e.target.value))}
+          >
+            {POD_PRODUCT_MODELS.map((m) => (
+              <option key={m.catalogProductId} value={m.catalogProductId}>
+                {m.displayName}（{m.sleeve === "long" ? "長袖" : "短袖"}）
+              </option>
+            ))}
+          </select>
+          <span style={{ fontSize: 11, opacity: 0.6, display: "block", marginTop: 2 }}>
+            顏色：{(POD_PRODUCT_MODELS.find((m) => m.catalogProductId === catalogProductId)?.colors ?? []).map((c) => c.label).join("、")}
+          </span>
         </label>
         <label style={{ fontSize: 13 }}>
           價格（S–XL）

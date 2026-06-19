@@ -8,6 +8,7 @@ import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
 import { buildPodProductPayload, buildVariantPlan, priceForSize } from "../../../../lib/studio/pod-product";
+import { podModelById } from "../../../../lib/studio/pod-catalog-config";
 import {
   createDraftOrderOnNative,
   createSyncProductOnNative,
@@ -73,10 +74,13 @@ interface PublishBody {
   bullets?: string[];
   seo?: { focus_keyword?: string; title?: string; description?: string };
   mockupUrls?: string[];
+  /** POD model selection (pod-catalog-config catalogProductId). Drives colours + Printful binding.
+   *  Absent → legacy single product 71 (Bella 3001) White/Black. */
+  catalogProductId?: number;
   // status / link
   wooProductId?: number;
   printFileUrl?: string;
-  variantMap?: { variationId: number; color: string; size: string; sku?: string; price?: string }[];
+  variantMap?: { variationId: number; color: string; printfulColor?: string; colorHex?: string; size: string; sku?: string; price?: string }[];
   // pforder (P4 draft fulfillment — Woo order → Printful DRAFT print order, no confirm)
   wooOrderId?: number;
   recipient?: {
@@ -306,15 +310,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "plusPrice must look like 26.99" }, { status: 400 });
     }
     const mockupUrls = (body.mockupUrls ?? []).filter((u) => typeof u === "string" && u.startsWith(designsBase));
+    // Resolve the POD model (colours + display name + Printful catalog id). Absent → legacy White/Black.
+    const model = Number.isInteger(body.catalogProductId) ? podModelById(body.catalogProductId as number) : undefined;
     const params = {
       title: body.title.trim(),
       retailPrice: body.retailPrice,
       plusPrice: body.plusPrice,
-      sizes: body.sizes,
+      sizes: body.sizes ?? model?.sizes,
       shortDescription: body.shortDescription,
       bullets: Array.isArray(body.bullets) ? body.bullets.filter((b) => typeof b === "string") : undefined,
       seo: body.seo && typeof body.seo === "object" ? body.seo : undefined,
       mockupUrls,
+      model,
     };
     // Always a real write (plugin has no /product dry-run) — payload is draft-status.
     const payload = buildPodProductPayload(params);
@@ -330,6 +337,8 @@ export async function POST(request: Request) {
       ? value.variation_ids!.map((variationId, i) => ({
           variationId,
           color: plan[i].color,
+          printfulColor: plan[i].printfulColor,
+          colorHex: plan[i].colorHex,
           size: plan[i].size,
           sku: plan[i].sku,
           price: plan[i].price,
@@ -503,17 +512,47 @@ export async function POST(request: Request) {
         { status: 422 },
       );
     }
-    const catalog = await getCatalogVariants(71, ["White", "Black"]);
+    // Which Printful product to bind to. Validate against the KNOWN model set (not just >0) so `create`
+    // and `pfcreate` can't disagree on the product; absent → legacy 71 (Bella 3001).
+    let pfCatalogProductId = 71;
+    if (Number.isInteger(body.catalogProductId)) {
+      const pid = body.catalogProductId as number;
+      if (podModelById(pid)) pfCatalogProductId = pid;
+      else if (pid !== 71) {
+        return NextResponse.json(
+          { ok: false, error: "unknown_catalogProductId", hint: "Must be a pod-catalog-config model id (or omit for legacy 71)." },
+          { status: 400 },
+        );
+      }
+    }
+    // Bind on HEX — the SSOT join key (pod-catalog-config), immune to Printful colour renames. Legacy
+    // rows without a hex (White/Black, colorHex="") fall back to NAME. getCatalogVariants' dual match
+    // resolves either; we then look each vmap row up by its hex (model) or name (legacy).
+    const wantColors = [...new Set(vmap.map((m) => (m.colorHex || m.printfulColor || m.color) as string))];
+    const catalog = await getCatalogVariants(pfCatalogProductId, wantColors);
     if (!catalog.ok) {
       return NextResponse.json({ ok: false, error: (catalog as { ok: false; error: string }).error }, { status: 502 });
     }
-    const catalogByKey = new Map(catalog.value.map((v) => [`${v.color.toLowerCase()}|${v.size.toLowerCase()}`, v.id]));
+    // Index by BOTH name|size and hex|size. Fail loud on a duplicate NAME key (two variants colliding on
+    // name+size) rather than silently keeping the last — a mis-bind guard. (hex+size is unique by build.)
+    const catalogByKey = new Map<string, number>();
+    for (const v of catalog.value) {
+      const nameKey = `name:${v.color.toLowerCase()}|${v.size.toLowerCase()}`;
+      if (catalogByKey.has(nameKey)) {
+        return NextResponse.json({ ok: false, error: "catalog_duplicate_key", key: nameKey }, { status: 502 });
+      }
+      catalogByKey.set(nameKey, v.id);
+      if (v.colorHex) catalogByKey.set(`hex:${v.colorHex}|${v.size.toLowerCase()}`, v.id);
+    }
     const variants: { externalId: string; catalogVariantId: number; retailPrice: string; printFileUrl: string }[] = [];
     const skipped: { sku: string; reason: string }[] = [];
     for (const m of vmap) {
-      const catalogId = catalogByKey.get(`${m.color.toLowerCase()}|${m.size.toLowerCase()}`);
+      // Prefer hex bind (model path, rename-immune); legacy rows (no hex) bind by name.
+      const catalogId = m.colorHex
+        ? catalogByKey.get(`hex:${m.colorHex.toLowerCase()}|${m.size.toLowerCase()}`)
+        : catalogByKey.get(`name:${((m.printfulColor ?? m.color) as string).toLowerCase()}|${m.size.toLowerCase()}`);
       if (!catalogId) {
-        skipped.push({ sku: m.sku as string, reason: `no_catalog_${m.color}_${m.size}` });
+        skipped.push({ sku: m.sku as string, reason: `no_catalog_${m.colorHex || m.printfulColor || m.color}_${m.size}` });
         continue;
       }
       variants.push({

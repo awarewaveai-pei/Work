@@ -21,6 +21,8 @@ const API_BASE = "https://api.printful.com";
 export interface CatalogVariant {
   id: number;
   color: string;
+  /** Printful `color_code` (hex, lowercase) — the stable join key, immune to colour renames. "" if absent. */
+  colorHex: string;
   size: string;
   inStock: boolean;
 }
@@ -178,7 +180,7 @@ export async function getCatalogVariants(
       .filter((v) => wanted.has(v.color.toLowerCase()) || wanted.has((v.color_code ?? "").toLowerCase()))
       // v2 catalog-variants carries no stock flag (it lists a product's printable specs, not live
       // availability); inStock has no consumer today, so report true as a "spec exists" placeholder.
-      .map((v) => ({ id: v.id, color: v.color, size: v.size, inStock: true })),
+      .map((v) => ({ id: v.id, color: v.color, colorHex: (v.color_code ?? "").toLowerCase(), size: v.size, inStock: true })),
   };
 }
 
