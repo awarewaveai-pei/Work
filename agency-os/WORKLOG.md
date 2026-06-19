@@ -85,6 +85,30 @@ $insert
 
 [rollback] `git revert` 至 578c97c0 並 sg-deploy；所有改動為 additive（新檔 + 既有函式擴充），無 destructive migration。
 
+### fix(mockup): Printful 規格抓取 limit=200 超上限 → 永遠 400（所有 catalog 產品 mockup 失敗）
+
+[任務理解] 用戶回報「無法取得 Printful 產品規格 (productId=837)。此產品可能不支援 Mockup Generator」。
+
+[真因（real API 實測，host + 容器內雙路徑）]
+- `fetchProductSpec` 抓 `/v2/catalog-products/{id}/catalog-variants?limit=200`，但 **Printful v2 limit 上限=100**（`limit=101` → HTTP 400 "Invalid limit value (required 1-100)"）→ vRes.ok=false → 回 null → 錯誤訊息。**影響所有 catalog 路徑產品，非僅 837**。
+- 次因：失敗的 null 用跟成功一樣的 1h TTL 快取（printful-catalog.ts），一次失敗鎖死該產品 1 小時。
+- 837 本身完全正常（Latte Mug, variant 21352, printfiles HTTP 200, placement default 1988×1196）。
+
+[已修改] `lib/studio/printful-catalog.ts`
+- L98: `catalog-variants?limit=200` → `?limit=100`（真因修正 + 註解說明上限）。
+- L7/L90: 新增 `NULL_TTL_MS=60s`；cache 改 `hit.spec===null ? NULL_TTL_MS : TTL_MS` → 失敗只快取 60s（transient 自癒），成功仍 1h（防禦性副修）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH/curl | cmd=Printful catalog-variants limit=100/101/200 | result=100→HTTP200, 101/200→HTTP400 "required 1-100"（確認上限）
+- REALTEST_EVIDENCE: tool=SSH/docker-node | cmd=容器內複製 fetchProductSpec 邏輯 limit=100 | result=837→spec{variantId:21352,placement:default,1988×1196} ✓、71→spec{4025,front,1800×2400} ✓
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（TTL ternary 正確、limit=100 無新 null path、無其他 limit>100 v2 endpoint、3 處 null-cache 寫入皆走 NULL_TTL）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=catalog-variants?limit=,limit=[1-9]\d{2,} | hits=0 殘留（僅該處，其餘皆 ≤100）
+
+[剩餘風險] 部署重啟會清掉現有 stale null cache。>100 variants 的產品若 white 不在前 100 → fallback variants[0]（仍有效，僅非白底）。
+
+[rollback] git revert；改動 additive，無 destructive。
+
 ### fix(mockup): CatalogGrid 圖片填滿方形卡片（aspect-ratio + gridAutoRows:max-content，響應式不重疊）
 
 [任務理解] 用戶嫌 50×50 小圖配寬卡片醜，要求「圖片填滿卡片、一排 3 張」。
