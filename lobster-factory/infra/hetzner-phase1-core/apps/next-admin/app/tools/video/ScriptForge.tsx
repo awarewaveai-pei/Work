@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, createContext, useContext } from "react";
+import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 
 const C = {
   white:"#FFFFFF",paper:"#F7F5F2",fog:"#EDEBE7",border:"#E2DDD8",
@@ -18,8 +19,10 @@ function saveHistory(e){try{const h=JSON.parse(localStorage.getItem("sf_history"
 function getHistory(){try{return JSON.parse(localStorage.getItem("sf_history")||"[]");}catch{return [];}}
 
 /* ── CLAUDE API（改走伺服器中轉 /api/tools/script-forge；SYS 在 route 端，瀏覽器不再直連 api.anthropic.com → 修掉 401 + 金鑰外洩）── */
+// 模型選擇（模組級可變，避免穿過 23 個 claude() callsite）；UI 由設定列下拉設定，server 端會白名單化。
+let SF_MODEL: string = DEFAULT_AI_TEXT_MODEL;
 async function claude(prompt: string, onChunk?: (full: string) => void){
-  const res=await fetch("/api/tools/script-forge",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt})});
+  const res=await fetch("/api/tools/script-forge",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,model:SF_MODEL})});
   if(!res.ok||!res.body){throw new Error(`腳本生成失敗（${res.status}）`);}
   const reader=res.body.getReader();const dec=new TextDecoder();let full="";
   while(true){const{done,value}=await reader.read();if(done)break;full+=dec.decode(value,{stream:true});onChunk?.(full);}
@@ -651,6 +654,7 @@ export default function ScriptForge({ onSendToProduction }: { onSendToProduction
   const gNavs=groups.map(g=>({group:g,items:NAVS.filter(n=>n.group===g)}));
   // ── 串接客戶：載入 內容工具›網站管理 的客戶 contentDefaults.marketing 當品牌語境（零新後端，GET 已回 marketing）──
   const[clients,setClients]=useState<any[]>([]);
+  const[model,setModel]=useState<string>(SF_MODEL);
   useEffect(()=>{(async()=>{try{const r=await fetch("/api/content/sites");const j=await r.json();if(j?.ok&&Array.isArray(j.sites))setClients(j.sites.filter((s:any)=>s.active!==false));}catch{/* best-effort：未登入/無客戶 → 下拉為空 */}})();},[]);
   function loadClient(id:string){
     const s=clients.find((c:any)=>c.id===id);if(!s)return;
@@ -692,14 +696,29 @@ export default function ScriptForge({ onSendToProduction }: { onSendToProduction
                 {items.map(n=><button key={n.id} onClick={()=>setNav(n.id)} style={{padding:"5px 8px",borderRadius:6,border:"none",background:nav===n.id?C.corallt:"transparent",color:nav===n.id?C.coral:C.mid,fontWeight:nav===n.id?700:400,fontSize:11,cursor:"pointer",whiteSpace:"nowrap",transition:"all .15s",fontFamily:"inherit",flexShrink:0}}>{n.icon} {n.label}</button>)}
               </div>)}
             </div>
-            {clients.length>0&&<select value={brand?._clientId||""} onChange={e=>{if(e.target.value){loadClient(e.target.value);}else if(brand?._clientId){clearBrand();}else if(brand){if(confirm("清除目前手動建立的品牌語境？"))clearBrand();}}} title="載入客戶品牌語境（來自 內容工具 › 網站管理 的行銷預設）" style={{marginLeft:8,flexShrink:0,padding:"4px 8px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11,fontFamily:"inherit",cursor:"pointer",maxWidth:150}}>
-              <option value="">👤 載入客戶…</option>
-              {clients.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>}
-            {brand?.name&&<div style={{marginLeft:6,padding:"3px 9px",background:C.jadelt,borderRadius:999,fontSize:10.5,color:C.jade,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>✅ {brand.name}</div>}
           </div>
         </div>
       </nav>
+
+      {/* 設定列：使用流程提示 + AI 模型 + 載入客戶（從擠爆的 nav 移出，對齊 Content Studio 體驗）*/}
+      <div style={{background:C.white,borderBottom:`1.5px solid ${C.border}`}}>
+        <div style={{maxWidth:960,margin:"0 auto",padding:"9px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+          <span style={{fontSize:11.5,color:C.mid,lineHeight:1.5}}>
+            <b style={{color:C.ink}}>怎麼用：</b>① 上方選功能（預設「手動生成」）→ ② 填主題、按生成 → ③ 結果頁按「<b style={{color:C.coral}}>🎬 送去生產影片</b>」轉成影片
+          </span>
+          <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🤖 AI 模型</label>
+            <select value={model} onChange={e=>{setModel(e.target.value);SF_MODEL=e.target.value;}} title="文字 AI 模型（與內容工具共用同一份選單）" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer"}}>
+              {["Claude","OpenAI"].map((g)=><optgroup key={g} label={g}>{AI_TEXT_MODELS.filter((m)=>m.group===g).map((m)=><option key={m.value} value={m.value}>{m.label}</option>)}</optgroup>)}
+            </select>
+            {clients.length>0&&<select value={brand?._clientId||""} onChange={e=>{if(e.target.value){loadClient(e.target.value);}else if(brand?._clientId){clearBrand();}else if(brand){if(confirm("清除目前手動建立的品牌語境？"))clearBrand();}}} title="載入客戶品牌語境（來自 內容工具 › 網站管理 的行銷預設）" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer",maxWidth:160}}>
+              <option value="">👤 載入客戶…</option>
+              {clients.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>}
+            {brand?.name&&<div style={{padding:"3px 9px",background:C.jadelt,borderRadius:999,fontSize:10.5,color:C.jade,fontWeight:700,whiteSpace:"nowrap"}}>✅ {brand.name}</div>}
+          </div>
+        </div>
+      </div>
       <div style={{maxWidth:960,margin:"0 auto",padding:"22px 14px 80px",animation:"fadeUp .3s ease"}}>
         {nav==="manual"&&<ManualModule brand={brand}/>}
         {nav==="article"&&<ArticleModule brand={brand}/>}

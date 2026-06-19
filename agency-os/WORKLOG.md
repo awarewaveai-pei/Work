@@ -6,6 +6,26 @@ $insert
 
 ## 2026-06-19
 
+### feat(video): ScriptForge 加多供應商 AI 模型選擇器 + 工具列 UX（對齊 Content Studio）
+
+[任務理解] 用戶要求 (1) ScriptForge 加上 Content Studio 那個「AI 模型」選單（Claude+OpenAI 8 款）；(2) 反映「看不出怎麼用」— 排版/串接需更清楚（實際看 prod 截圖：topbar+VideoTabs+ScriptForge 自家 nav 三條橫列疊加 + 24 項 nav 橫向溢出、載入客戶擠最右）。
+
+[已修改]
+- `app/api/tools/script-forge/route.ts`：重寫為**多供應商**。body 收 `{prompt,model}` → `normalizeAiTextModel`（白名單，非清單值→預設 claude）+ `isOpenAiTextModel` 決定供應商。Claude→Anthropic SDK stream；GPT→OpenAI Chat Completions SSE（`max_completion_tokens`，照 `generate-core.ts` streamOpenAiGeneration pattern）。供應商各自 key check（缺→503 before stream）。SYS 仍 server 端、prompt 24k 封頂、AbortController 雙保險。
+- `app/tools/video/ScriptForge.tsx`：import `AI_TEXT_MODELS`/`DEFAULT_AI_TEXT_MODEL`（與 Content Studio 共用同一份選單）；模組級 `let SF_MODEL` 供 `claude()` 帶入 body（免穿 23 callsite）+ root `model` state；**nav 下方新增乾淨工具列**＝使用流程提示「①選功能→②填主題生成→③送去生產影片」+「🤖 AI 模型」分組下拉（Claude/OpenAI optgroup）+ 載入客戶下拉（從擠爆的 nav 移出）+ 品牌徽章。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl dev /tools/video` | result=200，HTML 含「AI 模型」label + 「怎麼用」流程提示 + Claude Sonnet 4.6 + GPT-5.5 選項（載入客戶本機無 Supabase 資料故隱藏）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -XPOST /api/tools/script-forge`（各 model）| result=`claude-opus-4-8`→503 ANTHROPIC（分支正確,本機無 key）；`garbage-model`→正規化成預設 claude→503 ANTHROPIC（白名單擋住）；**`gpt-5.4`/`gpt-4o`→回傳真實 OpenAI 串流 JSON（OpenAI 供應商路徑端到端證實可用）**
+- REALTEST_EVIDENCE: tool=Browser(Chrome MCP) | result=實看 prod /tools/video + /tools/content 截圖，確認 UX 問題（三橫列疊加/nav 溢出）後才改
+- REVIEW_DONE: critic=Deep | verdict=pass（Low，0 Critical/0 Major；安全關鍵：client model string 經 `normalizeAiTextModel` 白名單，無法把任意 model 送到供應商；auth/SYS/abort/503-before-stream 全清）| findings=0c/0m/3n（全非阻斷）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`SF_MODEL|AI_TEXT_MODELS|normalizeAiTextModel|isOpenAiTextModel|script-forge` | hits=新符號僅 ScriptForge.tsx/route.ts 內部；route 無其他 caller（僅 ScriptForge claude()）；text-model-options 匯出齊全
+
+[剩餘風險/延後（critic Minor，非阻斷）] (1) **cost ledger 未接**：route 未 `logAiCall`／無 usage 追蹤，模型選擇器讓用戶可選 gpt-5.5/Opus 跑 24 模組→花費不入帳本（per-call 仍有界：24k in/4k out；prior 單供應商版也無，非迴歸）— 之後仿 generate-core 加 `stream_options.include_usage`+logAiCall。(2) 外層 catch 直送 `err.message`（operator-gated，洩供應商內部訊息；pre-existing）。(3) SF_MODEL dev-HMR 可能與 model state desync（prod 不重評估模組，server 白名單兜底，僅 dev）。
+
+[rollback] `git revert <hash>` + sg-deploy；route 向後相容（不帶 model→預設 claude，行為同舊版）。
+
 ### deploy(sg): ScriptForge 整合 + 串接客戶 上線（3cf5476c）
 
 [驗證結果]
