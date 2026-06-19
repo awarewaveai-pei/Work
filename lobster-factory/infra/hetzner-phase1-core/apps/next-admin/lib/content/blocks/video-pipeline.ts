@@ -109,22 +109,40 @@ export async function prepareScenes(
     language?: string;
     /** 已解析的英文風格 prompt（前端 resolveStylePrompt 後傳入）。空 = 用 cinematic 預設。 */
     visualStyle?: string;
+    /** 深層接力：前製腳本已寫好的場景（台詞+畫面）→ 跳過 Claude 重生，直接用這些。 */
+    providedScenes?: { narration: string; imagePrompt: string }[];
     onProgress?: (step: string) => void;
   },
   anthropicKey: string,
 ): Promise<PreparedScenes | { ok: false; status: number; error: string }> {
-  input.onProgress?.("腳本生成中（Claude）…");
-  const scriptResult = await generateVideoScript(
-    {
-      topic: input.topic,
-      articleTitle: input.articleTitle,
-      articleContent: input.articleContent,
-      language: input.language,
-    },
-    anthropicKey,
-  );
-  if (!scriptResult.ok) return scriptResult as { ok: false; status: number; error: string };
-  const { scenes, title } = scriptResult;
+  let scenes: import("../video/video-script-core").VideoScene[];
+  let title: string;
+  if (input.providedScenes && input.providedScenes.length > 0) {
+    // 深層接力：直接用前製腳本場景（台詞→旁白、畫面→生圖提示），跳過 Claude 重生 → 影片貼合腳本。
+    input.onProgress?.("使用前製腳本場景，生成素材…");
+    scenes = input.providedScenes.map((s, i) => ({
+      id: i + 1,
+      narration: (s.narration || "").trim(),
+      image_prompt: (s.imagePrompt || "").trim() || (s.narration || "").trim(),
+      broll_keyword: "",
+      visual: "custom" as const,
+    }));
+    title = (input.articleTitle || input.topic || "影片").trim();
+  } else {
+    input.onProgress?.("腳本生成中（Claude）…");
+    const scriptResult = await generateVideoScript(
+      {
+        topic: input.topic,
+        articleTitle: input.articleTitle,
+        articleContent: input.articleContent,
+        language: input.language,
+      },
+      anthropicKey,
+    );
+    if (!scriptResult.ok) return scriptResult as { ok: false; status: number; error: string };
+    scenes = scriptResult.scenes;
+    title = scriptResult.title;
+  }
 
   input.onProgress?.(`素材生成中（${scenes.length} 場景並行）…`);
   const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;

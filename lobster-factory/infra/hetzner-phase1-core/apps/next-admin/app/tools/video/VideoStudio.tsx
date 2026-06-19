@@ -107,6 +107,8 @@ interface VideoStudioInitial {
   topic?: string;
   articleTitle?: string;
   articleContent?: string;
+  /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 直接出片，不重生。 */
+  scenes?: { narration: string; imagePrompt: string }[];
 }
 
 export default function VideoStudio({ initial }: { initial?: VideoStudioInitial } = {}) {
@@ -129,6 +131,8 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [topic, setTopic] = useState(initial?.topic ?? "");
   const [articleTitle, setArticleTitle] = useState(initial?.articleTitle ?? "");
   const [articleContent, setArticleContent] = useState(initial?.articleContent ?? "");
+  // 深層接力：前製腳本場景（若有）→ 生成草稿時直接用，跳過 Claude 重生。
+  const [providedScenes] = useState(initial?.scenes ?? []);
   const [language, setLanguage] = useState("繁體中文");
   const [videoStyle, setVideoStyle] = useState("");
   const [videoStyleGroup, setVideoStyleGroup] = useState(VIDEO_STYLE_GROUPS[0] ?? "");
@@ -252,6 +256,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           articleContent: articleContent.trim() || undefined,
           language,
           visualStyle: videoStyle ? resolveVideoStyle(videoStyle) : undefined,
+          scenes: providedScenes.length > 0 ? providedScenes : undefined,
         }),
       });
       const j = (await res.json()) as {
@@ -376,46 +381,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
             </div>
           </Card>
 
-          {/* §2 — Config controls */}
-          <Card title="② 場景設定">
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <KnobRow label="場景總數" hint={`${totalScenes} 場`} min={1} max={20} step={1} value={totalScenes} onChange={handleTotalChange} />
-              <KnobRow
-                label={`自訂 AI 圖（Flux），目前 ${customScenes}/${totalScenes}`}
-                hint={`B-roll：${brollScenes}`}
-                min={0} max={totalScenes} step={1}
-                value={customScenes} onChange={setCustomScenes}
-              />
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>生圖模型</span>
-                <select value={imageModel} onChange={(e) => setImageModel(e.target.value)} style={inputStyle}>
-                  {Object.entries(IMAGE_RATES).map(([id, r]) => (
-                    <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>配音模型</span>
-                <select value={voiceModelId} onChange={(e) => setVoiceModelId(e.target.value)} style={inputStyle}>
-                  {VOICE_MODELS.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label}{v.note ? ` — ${v.note}` : ""} [{v.lang}] {v.badge}
-                    </option>
-                  ))}
-                </select>
-                {(() => {
-                  const vm = VOICE_MODELS.find(v => v.id === voiceModelId);
-                  return vm ? (
-                    <span style={{ fontSize: 11, padding: "2px 7px", borderRadius: 4, display: "inline-block", alignSelf: "flex-start",
-                      color: vm.badgeColor, background: vm.badgeBg, fontWeight: 700 }}>
-                      {vm.badge}
-                    </span>
-                  ) : null;
-                })()}
-              </div>
-            </div>
-          </Card>
+          {/* §2 場景設定 → 已移入右欄 §4（內容後、生成前），讓主流程由上到下一條順下來 */}
 
           {/* §3 — Cost breakdown */}
           <Card title="③ 成本明細">

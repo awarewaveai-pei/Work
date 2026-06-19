@@ -18,6 +18,8 @@ interface DraftBody {
   language?: string;
   /** 已解析的英文風格 prompt（前端 resolveStylePrompt 後傳入）。 */
   visualStyle?: string;
+  /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 跳過 Claude 重生。 */
+  scenes?: { narration: string; imagePrompt: string }[];
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -29,8 +31,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const topic = body.topic?.trim();
-  if (!topic) {
-    return NextResponse.json({ ok: false, error: "topic 為必填" }, { status: 400 });
+  const providedScenes = Array.isArray(body.scenes)
+    ? body.scenes.filter((s) => s && typeof s.narration === "string" && s.narration.trim())
+    : [];
+  if (!topic && providedScenes.length === 0) {
+    return NextResponse.json({ ok: false, error: "topic 或 scenes 為必填" }, { status: 400 });
   }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -47,6 +52,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       articleContent: body.articleContent,
       language: body.language ?? "繁體中文",
       visualStyle: body.visualStyle,
+      providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
     },
     anthropicKey,
   );
