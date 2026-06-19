@@ -495,6 +495,62 @@ function PreviewModule(){
 }
 
 /* ── REMAINING MODULES (condensed) ── */
+
+/* ── 目標受眾分類複選選擇器（Q1）：分類標籤可複選 + 每類自訂 + 常用人設一鍵套組；組成字串餵 prompt ── */
+const AUDIENCE_CATS: { key: string; label: string; opts: string[]; custom?: boolean }[] = [
+  { key: "age", label: "年齡層", opts: ["18–24", "25–34", "35–44", "45–54", "55+"] },
+  { key: "gender", label: "性別", opts: ["女性", "男性", "不限"] },
+  { key: "job", label: "職業 / 身分", opts: ["上班族", "學生", "創業 / 自雇", "家長", "退休族", "創作者"], custom: true },
+  { key: "emotion", label: "情緒 / 心理狀態", opts: ["焦慮壓力", "想自我成長", "尋找療癒", "缺乏自信", "想被理解"], custom: true },
+  { key: "awareness", label: "對主題的熟悉度", opts: ["完全新手", "在比較方案", "進階老手"] },
+  { key: "spending", label: "消費力", opts: ["平價親民", "中等", "高端精品"] },
+];
+const AUDIENCE_PRESETS: { label: string; sel: Record<string, string[]> }[] = [
+  { label: "想成長的年輕上班族", sel: { age: ["25–34"], gender: ["不限"], job: ["上班族"], emotion: ["想自我成長"], awareness: ["在比較方案"], spending: ["中等"] } },
+  { label: "尋求療癒的家長", sel: { age: ["35–44"], gender: ["女性"], job: ["家長"], emotion: ["尋找療癒"], awareness: ["完全新手"], spending: ["中等"] } },
+  { label: "想學創作的新手", sel: { age: ["25–34", "35–44"], gender: ["不限"], job: ["創作者", "上班族"], emotion: ["缺乏自信", "想自我成長"], awareness: ["完全新手"], spending: ["平價親民"] } },
+];
+function AudiencePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [sel, setSel] = useState<Record<string, string[]>>({});
+  const [custom, setCustom] = useState<Record<string, string>>({});
+  useEffect(() => { if (!value) { setSel({}); setCustom({}); } }, [value]); // 外部清空(reset/clearAll/載入範例為空)→同步清掉 chips，避免顯示與選取脫鉤
+  function emit(s: Record<string, string[]>, c: Record<string, string>) {
+    const parts: string[] = [];
+    for (const cat of AUDIENCE_CATS) {
+      const vals = [...(s[cat.key] || [])];
+      const cv = (c[cat.key] || "").trim(); if (cv) vals.push(cv);
+      if (vals.length) parts.push(`${cat.label}：${vals.join("、")}`);
+    }
+    onChange(parts.join("；"));
+  }
+  function toggle(k: string, o: string) { const cur = sel[k] || []; const next = cur.includes(o) ? cur.filter((x) => x !== o) : [...cur, o]; const ns = { ...sel, [k]: next }; setSel(ns); emit(ns, custom); }
+  function setC(k: string, v: string) { const nc = { ...custom, [k]: v }; setCustom(nc); emit(sel, nc); }
+  function applyPreset(p: { sel: Record<string, string[]> }) { setSel(p.sel); setCustom({}); emit(p.sel, {}); }
+  function clearAll() { setSel({}); setCustom({}); onChange(""); }
+  const hasSel = Object.values(sel).some((a) => a && a.length > 0) || Object.values(custom).some((v) => (v || "").trim());
+  return (
+    <div style={{ display: "grid", gap: 11 }}>
+      {AUDIENCE_CATS.map((cat) => (
+        <div key={cat.key}>
+          <div style={{ fontSize: 11.5, color: C.mid, marginBottom: 5 }}>{cat.label}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+            {cat.opts.map((o) => <Pill key={o} label={o} active={(sel[cat.key] || []).includes(o)} onClick={() => toggle(cat.key, o)} />)}
+            {cat.custom && <input value={custom[cat.key] || ""} onChange={(e) => setC(cat.key, e.target.value)} placeholder="+ 自訂" style={{ padding: "6px 11px", borderRadius: 999, border: `1.5px dashed ${C.border}`, fontSize: 12, width: 96, fontFamily: "inherit", outline: "none", color: C.ink, background: C.white, boxSizing: "border-box" }} />}
+          </div>
+        </div>
+      ))}
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
+        <div style={{ fontSize: 11.5, color: C.mid, marginBottom: 6 }}>⚡ 常用人設（一鍵套整組）</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {AUDIENCE_PRESETS.map((p) => <button key={p.label} type="button" onClick={() => applyPreset(p)} style={{ padding: "6px 12px", borderRadius: 8, border: `1.5px solid ${C.violet}`, background: C.violetl, color: C.violet, fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{p.label}</button>)}
+          {hasSel && <button type="button" onClick={clearAll} style={{ padding: "6px 12px", borderRadius: 8, border: `1.5px solid ${C.border}`, background: C.white, color: C.mid, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}>清除</button>}
+        </div>
+        {hasSel && <div style={{ marginTop: 8, fontSize: 11, color: C.jade, background: C.jadelt, borderRadius: 6, padding: "6px 9px", lineHeight: 1.5 }}>✅ 已選：{value}</div>}
+      </div>
+    </div>
+  );
+}
+
 function ManualModule({brand}){
   const[st,setSt]=useState("brief");const[brief,setBrief]=useState({topic:"",platform:"",duration:"",goal:"",tone:"",cta:"",audience:""});const[angles,setAngles]=useState(null);const[script,setScript]=useState(null);const[score,setScore]=useState(null);const[loading,setLoading]=useState(false);const[err,setErr]=useState("");
   const plat=PLATFORMS.find(p=>p.id===brief.platform)?.label||"";const bv=brand?.voice?`\n品牌語氣：${brand.voice}${brand.forbidden?`\n禁用：${brand.forbidden}`:""}`:""
@@ -502,7 +558,7 @@ function ManualModule({brand}){
   async function doAngles(){if(!brief.topic||!brief.platform){setErr("請填入主題並選擇平台");return;}setErr("");setLoading(true);setAngles(null);setSt("angles");try{const raw=await claude(`根據brief產生4個腳本角度。主題：${brief.topic}|平台：${plat}|長度：${brief.duration||"60秒"}|受眾：${brief.audience||"一般觀眾"}|目的：${brief.goal||"吸粉"}|語氣：${brief.tone||"專業"}|CTA：${brief.cta||"追蹤"}${bv}\n純JSON：{"angles":[{"id":1,"name":"","type":"反常識/故事/教學/爭議/情緒/銷售其一","hook":"","core":"","why":"(25字內)","risk":"(15字內)","score":8}]}`);setAngles(pj(raw).angles);}catch{setErr("失敗，請再試");setSt("brief");}setLoading(false);}
   async function doScript(angle){setSt("script");setScript(null);setScore(null);setLoading(true);try{const raw=await claude(`生成完整影片腳本。主題：${brief.topic}|平台：${plat}|長度：${brief.duration||"60秒"}|受眾：${brief.audience||"一般觀眾"}|目的：${brief.goal||"吸粉"}|語氣：${brief.tone||"專業"}|CTA：${brief.cta||"追蹤"}|角度：${angle.name}|鉤子：${angle.hook}${bv}\n純JSON：{"title":"","hook":"","core_idea":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"(≤12字)","shoot_tip":"","edit_tip":""}],"cta":"","alt_hooks":["","",""],"titles":["","","","",""],"hashtags":["","","","",""],"shoot_checklist":["","",""],"edit_notes":""}\nscenes安排6-8個場景。`);const s=pj(raw);setScript(s);const sr=await claude(`評估腳本。鉤子：${s.hook}|場景：${s.scenes?.length}|CTA：${s.cta}\n純JSON：{"scores":{"hook":0,"rhythm":0,"clarity":0,"emotion":0,"shootability":0,"conversion":0},"overall":0,"optimized_hook":"","optimized_cta":""}`);setScore(pj(sr));}catch{}setLoading(false);}
   function reset(){setSt("brief");setAngles(null);setScript(null);setScore(null);setBrief({topic:"",platform:"",duration:"",goal:"",tone:"",cta:"",audience:""});}
-  if(st==="brief")return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>手動生成腳本</h2><p style={{fontSize:12.5,color:C.mid}}>填入需求，AI完成策略、分鏡、評分</p>{brand?.voice&&<div style={{marginTop:6,padding:"5px 11px",background:C.jadelt,borderRadius:6,fontSize:11.5,color:C.jade,fontWeight:700,display:"inline-block"}}>✅ 已套用品牌語氣：{brand.name||"我的品牌"}</div>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}><span style={{fontSize:11,color:C.mid,alignSelf:"center"}}>範例：</span>{EXAMPLES.map((ex,i)=><button key={i} onClick={()=>setBrief(ex)} style={{padding:"4px 10px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,cursor:"pointer",fontFamily:"inherit"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.coral} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>{ex.topic.slice(0,12)}...</button>)}</div><div><SL ch="主題 *"/><TA value={brief.topic} onChange={e=>setBrief({...brief,topic:e.target.value})} placeholder="例如：新手如何開始學畫畫..." rows={2}/></div><div><SL ch="平台 *"/><PlatGrid value={brief.platform} onChange={v=>setBrief({...brief,platform:v})}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>{[["影片長度","duration",DURATIONS],["內容目的","goal",GOALS],["語氣風格","tone",TONES],["觀眾行動","cta",CTAS]].map(([l,k,opts]: any)=><div key={k}><SL ch={l}/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{opts.map(o=><Pill key={o} label={o} active={brief[k]===o} onClick={()=>setBrief({...brief,[k]:o})}/>)}</div></div>)}</div><div><SL ch="目標受眾"/><IN value={brief.audience} onChange={e=>setBrief({...brief,audience:e.target.value})} placeholder="例如：25–35歲想學創作的上班族"/></div>{err&&<div style={{padding:"7px 11px",background:C.roselt,border:`1.5px solid ${C.rose}`,borderRadius:7,fontSize:12.5,color:C.rose,fontWeight:600}}>{err}</div>}<PBtn ch="產生腳本角度 →" onClick={doAngles} disabled={!brief.topic||!brief.platform} full/></div>);
+  if(st==="brief")return(<div style={{display:"grid",gap:18}}><div><h2 style={{fontSize:19,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",marginBottom:3}}>手動生成腳本</h2><p style={{fontSize:12.5,color:C.mid}}>填入需求，AI完成策略、分鏡、評分</p>{brand?.voice&&<div style={{marginTop:6,padding:"5px 11px",background:C.jadelt,borderRadius:6,fontSize:11.5,color:C.jade,fontWeight:700,display:"inline-block"}}>✅ 已套用品牌語氣：{brand.name||"我的品牌"}</div>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}><span style={{fontSize:11,color:C.mid,alignSelf:"center"}}>範例：</span>{EXAMPLES.map((ex,i)=><button key={i} onClick={()=>setBrief(ex)} style={{padding:"4px 10px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,cursor:"pointer",fontFamily:"inherit"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.coral} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>{ex.topic.slice(0,12)}...</button>)}</div><div><SL ch="主題 *"/><TA value={brief.topic} onChange={e=>setBrief({...brief,topic:e.target.value})} placeholder="例如：新手如何開始學畫畫..." rows={2}/></div><div><SL ch="平台 *"/><PlatGrid value={brief.platform} onChange={v=>setBrief({...brief,platform:v})}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>{[["影片長度","duration",DURATIONS],["內容目的","goal",GOALS],["語氣風格","tone",TONES],["觀眾行動","cta",CTAS]].map(([l,k,opts]: any)=><div key={k}><SL ch={l}/><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{opts.map(o=><Pill key={o} label={o} active={brief[k]===o} onClick={()=>setBrief({...brief,[k]:o})}/>)}</div></div>)}</div><div><SL ch="目標受眾"/><AudiencePicker value={brief.audience} onChange={(v)=>setBrief({...brief,audience:v})}/></div>{err&&<div style={{padding:"7px 11px",background:C.roselt,border:`1.5px solid ${C.rose}`,borderRadius:7,fontSize:12.5,color:C.rose,fontWeight:600}}>{err}</div>}<PBtn ch="產生腳本角度 →" onClick={doAngles} disabled={!brief.topic||!brief.platform} full/></div>);
   if(st==="angles")return(<div><div style={{display:"flex",alignItems:"center",gap:9,marginBottom:18}}><GBtn ch="← 返回" onClick={()=>setSt("brief")}/><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>選擇腳本角度</h2></div>{loading&&!angles&&<Spin label="AI 正在生成角度..."/>}{angles&&<div style={{display:"grid",gap:11}}>{angles.map(a=><div key={a.id} onClick={()=>doScript(a)} style={{background:C.white,border:`2px solid ${C.border}`,borderRadius:13,overflow:"hidden",cursor:"pointer",transition:"all .2s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.coral;e.currentTarget.style.boxShadow="0 3px 14px rgba(255,92,58,.1)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.boxShadow="none";}}><div style={{padding:"10px 15px",borderBottom:`1.5px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{display:"flex",alignItems:"center",gap:7}}><Tag ch={a.type} c={C.violet} bg={C.violetl}/><span style={{fontSize:13.5,fontWeight:800,color:C.black,fontFamily:"DM Serif Display,serif"}}>{a.name}</span></div><div style={{fontSize:15,fontWeight:900,color:C.coral}}>{a.score}<span style={{fontSize:9,color:C.mid}}>/10</span></div></div><div style={{padding:"12px 15px"}}><div style={{background:C.violetl,borderRadius:8,padding:"8px 11px",marginBottom:9}}><div style={{fontSize:9,color:C.violet,fontWeight:700,letterSpacing:1,marginBottom:3}}>開頭鉤子</div><div style={{fontSize:13,color:C.violet,fontStyle:"italic",fontFamily:"DM Serif Display,serif"}}>「{a.hook}」</div></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><div style={{fontSize:9.5,color:C.mid,marginBottom:1}}>核心概念</div><div style={{fontSize:12,color:C.ink}}>{a.core}</div></div><div><div style={{fontSize:9.5,color:C.mid,marginBottom:1}}>為什麼有效</div><div style={{fontSize:12,color:C.ink}}>{a.why}</div></div></div><div style={{marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}><Tag ch={`⚠ ${a.risk}`} c={C.rose} bg={C.roselt} small/><span style={{fontSize:11.5,color:C.coral,fontWeight:700}}>選擇此角度 →</span></div></div></div>)}</div>}</div>);
   if(st==="script")return(<div><div style={{display:"flex",alignItems:"center",gap:9,marginBottom:18}}><GBtn ch="← 返回" onClick={()=>setSt("angles")}/><h2 style={{fontSize:17,fontWeight:900,color:C.black,fontFamily:"DM Serif Display,serif",margin:0}}>完整腳本</h2></div>{loading&&!script&&<Spin label="AI 正在撰寫腳本..."/>}{script&&<ScriptResult script={script} score={score} onReset={reset} autoSaveTag="手動生成"/>}</div>);
 }

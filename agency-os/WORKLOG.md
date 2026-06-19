@@ -6,6 +6,23 @@ $insert
 
 ## 2026-06-19
 
+### feat(video): ScriptForge 目標受眾 → 分類複選選擇器（Q1）
+
+[任務理解] 使用者要 手動生成 的「目標受眾」從單一文字框 → 分類、可複選、可（原問）全選的選擇器。設計討論後採：分類複選 + 每類自訂 + 常用人設一鍵套組（**不做全選**：受眾全選=失焦，AI 寫得泛；常用人設更實用）。
+
+[已修改]
+- `app/tools/video/ScriptForge.tsx`：新增 `AUDIENCE_CATS`（6 類：年齡/性別/職業/情緒/熟悉度/消費力）+ `AUDIENCE_PRESETS`（3 常用人設）+ `AudiencePicker` 元件（重用既有 `Pill` + `C` 配色；分類標籤複選、職業/情緒可加自訂、常用人設一鍵套整組、清除）；ManualModule 受眾 `<IN>` → `<AudiencePicker>`，選取 emit 成「年齡層：25–34、35–44；職業：上班族」字串餵 doAngles/doScript prompt。critic 修：`useEffect([value])` 外部清空同步 + banner/清除改由內部 hasSel 驅動（避免 write-only 顯示脫鉤）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（×2，含 critic 修正後）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl dev /tools/video` | result=200，SSR 含 6 分類 + 常用人設 + preset + 「+ 自訂」；舊單欄 placeholder 移除；dev log 乾淨
+- REVIEW_DONE: critic=Deep | verdict=pass（Low，0 Crit/0 Major；compose/toggle/preset/empty-state/downstream prompt 全正確、無 stale-closure、無安全面）| findings=0c/0m/2n（已修：write-only 脫鉤 → useEffect + 內部狀態驅動 banner/清除）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`AudiencePicker|AUDIENCE_CATS|AUDIENCE_PRESETS|brief.audience` | hits=brief.audience 僅 doAngles/doScript 字串內插消費（無結構解析、無破壞）；brand.audience/ans.audience 為無關欄位
+
+[剩餘風險] 載入 EXAMPLES（freeform audience）時 chips 不反映該字串（但仍餵 prompt，banner 已不誤顯）；Q2（分工釐清+文章轉腳本拉出）/Q3（影片生產流水線排版）/深層接力 未做 —— 依使用者「最完美最完整」方向之後做（保留快速捷徑+前製為主+場景直接對映）。
+
+[rollback] `git revert <hash>` + sg-deploy；純前端 additive。
+
 ### fix(mockup): Printful 出 Aqua 不出白 — variant 選色 + limit=100 漏白根因
 
 [任務理解] 用戶 Printful tab 出來是水藍色不是白；要 White/Grey/Black 三色。用戶指正「該讀 Printful 資料不是看圖」。
