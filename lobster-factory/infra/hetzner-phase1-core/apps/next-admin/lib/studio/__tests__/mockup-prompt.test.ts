@@ -182,4 +182,32 @@ describe("buildModelMockupPrompt — framing + product category", () => {
     expect(p).toContain("jewelry");
     expect(p).not.toContain("chest print area");
   });
+
+  it("product-photo mode reproduces the real product, not a printed design", () => {
+    const design = buildModelMockupPrompt({ ...base, productCategory: "jewelry", referenceKind: "design" });
+    expect(design).not.toContain("ACTUAL finished product");
+
+    const product = buildModelMockupPrompt({ ...base, productCategory: "jewelry", referenceKind: "product" });
+    expect(product).toContain("exact piece of jewelry shown in the reference image");
+    expect(product).toContain("ACTUAL finished product");
+    expect(product).toContain("Do NOT add any printed graphics");
+    expect(product).not.toContain("printed large on"); // no design-print fidelity block
+  });
+});
+
+describe("buildFlatMockupPrompt — product-photo mode", () => {
+  it("reproduces the exact product instead of printing a design", () => {
+    const p = buildFlatMockupPrompt({
+      garmentPhrase: "gold pendant necklace",
+      color: "white",
+      surface: "white-marble",
+      arrangement: "centered-hero",
+      lighting: "north-window",
+      productCategory: "jewelry",
+      referenceKind: "product",
+    });
+    expect(p).toContain("exact product shown in the reference image");
+    expect(p).toContain("ACTUAL finished product");
+    expect(p).not.toContain("printed large on");
+  });
 });

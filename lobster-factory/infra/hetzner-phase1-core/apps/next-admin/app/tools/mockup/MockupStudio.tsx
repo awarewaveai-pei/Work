@@ -23,12 +23,16 @@ import {
   MODEL_MAKEUP,
   MODEL_ACCESSORIES,
   MODEL_FRAMING,
+  CATEGORY_OPTIONS,
+  REFERENCE_KIND_OPTIONS,
   productCategoryFromType,
   buildFlatMockupPrompt,
   buildModelMockupPrompt,
   isChestOccludingPose,
   type GarmentColor,
   type MockupMode,
+  type ProductCategory,
+  type ReferenceKind,
 } from "../../../lib/studio/mockup-prompt";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 
@@ -283,6 +287,10 @@ export default function MockupStudio() {
   const [modelLighting, setModelLighting] = useState(MODEL_LIGHTING[0].value);
   const [modelFraming, setModelFraming] = useState("three-quarter");
   const [modelProps, setModelProps] = useState<Set<string>>(new Set());
+  // reference-image kind (design to print vs photo of a finished product) + manual category
+  // override — both let the user mock up THEIR OWN products (not just the Printful catalog).
+  const [referenceKind, setReferenceKind] = useState<ReferenceKind>("design");
+  const [categoryOverride, setCategoryOverride] = useState<"" | ProductCategory>("");
   // results
   const [productResults, setProductResults] = useState<Map<number, ProductMockupResult>>(new Map());
   const [saveMockupStates, setSaveMockupStates] = useState<SaveMockupState>({});
@@ -346,18 +354,20 @@ export default function MockupStudio() {
 
   /** Model-interaction category (apparel→wear / mug→hold / jewelry→wear-accessory) derived
    *  from the first selected product's Printful type, so the model prompt adapts automatically. */
-  const modelCategory = useMemo(() => {
+  const modelCategory = useMemo<ProductCategory>(() => {
+    if (categoryOverride) return categoryOverride;
     const first = [...selectedModelProductIds][0];
     const prd = first != null ? catalog.find((c) => c.id === first) : undefined;
     return productCategoryFromType(prd?.typeName);
-  }, [selectedModelProductIds, catalog]);
+  }, [categoryOverride, selectedModelProductIds, catalog]);
 
   /** Same derivation for the flat tab — non-apparel 3-D products shoot upright (立拍). */
-  const flatCategory = useMemo(() => {
+  const flatCategory = useMemo<ProductCategory>(() => {
+    if (categoryOverride) return categoryOverride;
     const first = [...selectedFlatProductIds][0];
     const prd = first != null ? catalog.find((c) => c.id === first) : undefined;
     return productCategoryFromType(prd?.typeName);
-  }, [selectedFlatProductIds, catalog]);
+  }, [categoryOverride, selectedFlatProductIds, catalog]);
 
   const prompt = useMemo(() => {
     if (mode === "printful") return "";
@@ -371,6 +381,7 @@ export default function MockupStudio() {
         props: [...flatProps].map((v) => FLAT_PROPS.find((p) => p.value === v)?.label ?? v),
         designSizePct,
         productCategory: flatCategory,
+        referenceKind,
       });
     }
     return buildModelMockupPrompt({
@@ -385,11 +396,12 @@ export default function MockupStudio() {
       designSizePct,
       framing: modelFraming,
       productCategory: modelCategory,
+      referenceKind,
     });
   }, [mode, color, flatSurface, flatArrangement, flatLighting, flatProps,
       selectedFlatProductIds, selectedModelProductIds, garmentPhraseFor,
       ageGroup, modelDesc, pose, modelScene, modelLighting, modelProps,
-      designSizePct, modelFraming, modelCategory, flatCategory]);
+      designSizePct, modelFraming, modelCategory, flatCategory, referenceKind]);
 
   const onUploadDesign = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -749,6 +761,26 @@ export default function MockupStudio() {
         {mode === "model" && (
           <>
             <label style={{ fontSize: 13 }}>
+              參考圖類型
+              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={referenceKind} onChange={(e) => setReferenceKind(e.target.value as ReferenceKind)}>
+                {REFERENCE_KIND_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
+                {REFERENCE_KIND_OPTIONS.find((o) => o.value === referenceKind)?.hint}
+              </span>
+            </label>
+
+            <label style={{ fontSize: 13 }}>
+              產品類型
+              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={categoryOverride} onChange={(e) => setCategoryOverride(e.target.value as "" | ProductCategory)}>
+                {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
+                自己的產品（不在 Printful，如珠寶）在這裡指定類型。
+              </span>
+            </label>
+
+            <label style={{ fontSize: 13 }}>
               設計大小（{designSizePct}% {modelCategory === "apparel" ? "胸前範圍" : "印刷範圍"}）
               <input type="range" min={40} max={100} step={5} value={designSizePct}
                 onChange={(e) => setDesignSizePct(Number(e.target.value))}
@@ -877,6 +909,26 @@ export default function MockupStudio() {
         {/* ═══════════════════ FLAT TAB ════════════════════════ */}
         {mode === "flat" && (
           <>
+            <label style={{ fontSize: 13 }}>
+              參考圖類型
+              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={referenceKind} onChange={(e) => setReferenceKind(e.target.value as ReferenceKind)}>
+                {REFERENCE_KIND_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
+                {REFERENCE_KIND_OPTIONS.find((o) => o.value === referenceKind)?.hint}
+              </span>
+            </label>
+
+            <label style={{ fontSize: 13 }}>
+              產品類型
+              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={categoryOverride} onChange={(e) => setCategoryOverride(e.target.value as "" | ProductCategory)}>
+                {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
+                自己的產品（不在 Printful，如珠寶）在這裡指定類型。
+              </span>
+            </label>
+
             {flatCategory !== "apparel" && (
               <div style={{ fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "rgba(79,140,255,0.12)", color: "#4f8cff" }}>
                 偵測到非服飾產品（{flatCategory}）→ {flatCategory === "jewelry" ? "以俯拍平擺呈現" : "改用「立拍」：產品站立、斜前角度，而非平躺俯拍。"}

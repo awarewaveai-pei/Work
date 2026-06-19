@@ -170,6 +170,37 @@ export function productCategoryFromType(typeName: string | null | undefined): Pr
   return "apparel";
 }
 
+/** UI options for manually overriding the product category — needed for the user's OWN
+ *  products (not in the Printful catalog, e.g. jewelry). "" = auto-detect from selection. */
+export const CATEGORY_OPTIONS: { value: "" | ProductCategory; label: string }[] = [
+  { value: "", label: "自動（依選的產品）" },
+  { value: "apparel", label: "服飾（穿在身上）" },
+  { value: "drinkware", label: "杯／瓶／飲品" },
+  { value: "jewelry", label: "珠寶（項鍊／戒指／耳環）" },
+  { value: "wall-art", label: "海報／帆布／相框" },
+  { value: "bag", label: "托特包／背包" },
+  { value: "phone", label: "手機殼" },
+  { value: "pillow", label: "抱枕／靠枕" },
+];
+
+/** What the uploaded reference image represents. */
+export type ReferenceKind = "design" | "product";
+
+export const REFERENCE_KIND_OPTIONS: { value: ReferenceKind; label: string; hint: string }[] = [
+  { value: "design", label: "設計圖（印在產品上）", hint: "上傳的是要印上去的圖案／設計" },
+  { value: "product", label: "產品實照（AI 重現）", hint: "上傳的是現成產品的照片，AI 忠實重現它" },
+];
+
+/** Fidelity block for PRODUCT-photo mode: reproduce the real product, do not print a graphic. */
+function productFidelityBlock(): string {
+  return (
+    "The reference image shows the ACTUAL finished product. Reproduce that exact product " +
+    "faithfully — identical shape, materials, colours, proportions and fine details — as a real " +
+    "photographed object. Do NOT add any printed graphics or text, and do NOT redesign, restyle " +
+    "or alter the product in any way."
+  );
+}
+
 export const MODEL_POSES = [
   { value: "standing", label: "站姿・輕鬆", phrase: "standing casually with hands relaxed at their sides", occludes: false },
   { value: "hands-hips", label: "雙手叉腰", phrase: "standing confidently with hands on hips", occludes: false },
@@ -273,6 +304,9 @@ export interface FlatMockupParams {
   /** product category — apparel/jewelry shoot as a top-down flat-lay; mug/bottle/3D
    *  objects shoot UPRIGHT (立拍) instead. Default apparel. */
   productCategory?: ProductCategory;
+  /** what the uploaded reference image is. "design" (default) = a graphic to PRINT on the
+   *  product; "product" = a photo of the actual finished product to REPRODUCE faithfully. */
+  referenceKind?: ReferenceKind;
 }
 
 export interface ModelMockupParams {
@@ -294,6 +328,9 @@ export interface ModelMockupParams {
   framing?: string;
   /** how the model presents the product (default apparel = wear on chest) */
   productCategory?: ProductCategory;
+  /** "design" (default) = graphic printed on the product; "product" = reproduce the actual
+   *  finished product from the reference photo (e.g. the user's own jewelry). */
+  referenceKind?: ReferenceKind;
 }
 
 /** Shared print-fidelity block. The dark-fabric lock is iron rule #1.
@@ -475,6 +512,22 @@ export function buildFlatMockupPrompt(p: FlatMockupParams): string {
       : "";
   const sizePct = p.designSizePct ?? 80;
   const category: ProductCategory = p.productCategory ?? "apparel";
+  const isProduct = p.referenceKind === "product";
+
+  // Product-photo mode: reproduce the EXACT product from the reference image (the user's own
+  // finished goods, e.g. jewelry). Upright for 3-D objects, flat-lay for apparel/jewelry.
+  if (isProduct) {
+    const camera = isUprightProduct(category)
+      ? " Shot upright from a slight front three-quarter angle at eye level, editorial studio product photography with soft natural shadows."
+      : " Shot from directly above, editorial flat-lay product photography.";
+    const composition = isUprightProduct(category) ? "standing upright" : "arranged elegantly";
+    return (
+      `Photorealistic e-commerce product photo of the exact product shown in the reference image, ${composition} on ${surface.phrase}, ${lighting.phrase}. ` +
+      productFidelityBlock() +
+      propClause +
+      camera
+    );
+  }
 
   // Non-apparel: standalone product shot. 3-D objects (mug/bottle/bag…) shoot UPRIGHT;
   // jewelry stays a top-down flat-lay.
@@ -508,12 +561,34 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/** Product-photo-mode sentence: the model presents the EXACT product from the reference image. */
+function modelProductSentence(category: ProductCategory): string {
+  switch (category) {
+    case "drinkware":
+      return "They hold the exact drinkware item shown in the reference image up near their face.";
+    case "wall-art":
+      return "They hold up the exact framed art shown in the reference image, facing the camera.";
+    case "bag":
+      return "They carry the exact bag shown in the reference image.";
+    case "phone":
+      return "They hold up the exact phone shown in the reference image, screen or case facing the camera.";
+    case "pillow":
+      return "They hold the exact throw pillow shown in the reference image.";
+    case "jewelry":
+      return "They wear the exact piece of jewelry shown in the reference image, in an elegant close-up.";
+    case "apparel":
+    default:
+      return "They wear the exact garment shown in the reference image.";
+  }
+}
+
 export function buildModelMockupPrompt(p: ModelMockupParams): string {
   const scene = find(MODEL_SCENES, p.scene);
   const pose = find(MODEL_POSES, p.pose);
   const lighting = find(MODEL_LIGHTING, p.lighting);
   const framing = find(MODEL_FRAMING, p.framing ?? "three-quarter");
   const category: ProductCategory = p.productCategory ?? "apparel";
+  const isProduct = p.referenceKind === "product";
   const who = p.ageGroup === "youth" ? "A young person" : "An adult";
   const desc = p.modelDescription.trim() ? ` (${p.modelDescription.trim()})` : "";
   const propClause =
@@ -522,13 +597,15 @@ export function buildModelMockupPrompt(p: ModelMockupParams): string {
       : "";
   const sizePct = p.designSizePct ?? 80;
   const product = modelProductClause(category, p.color, p.garmentPhrase, sizePct, pose.occludes);
+  // Product-photo mode reproduces the real product; design mode prints a graphic on it.
+  const productBlock = isProduct
+    ? modelProductSentence(category) + " " + productFidelityBlock() + product.visibilityClause
+    : product.sentence + " " + fidelityBlock(p.color, product.surface, product.behavior) +
+      product.sizeClause + product.visibilityClause;
   return (
     `Photorealistic e-commerce lifestyle photo. ${who}${desc}, ${pose.phrase}, ` +
     `in ${scene.phrase}, ${lighting.phrase}. ` +
-    product.sentence + " " +
-    fidelityBlock(p.color, product.surface, product.behavior) +
-    product.sizeClause +
-    product.visibilityClause +
+    productBlock +
     propClause +
     ` ${framing.phrase}` +
     " The model's full head and face are clearly visible and must NOT be cropped out of frame." +
