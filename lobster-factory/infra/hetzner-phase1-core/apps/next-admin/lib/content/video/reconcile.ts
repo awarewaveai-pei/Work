@@ -12,7 +12,7 @@
 import { getSupabaseWriteClient } from "../../supabase-server";
 import { recordVideoAsset, resolveOrgId, videoObjectKey } from "../blocks/video-pipeline";
 
-const OUTPUT_FORMATS = ["youtube_linkedin", "tiktok_reels", "instagram_facebook", "twitter_reddit_bluesky"];
+const OUTPUT_FORMATS = ["16x9", "9x16", "4x5", "youtube_linkedin", "tiktok_reels", "instagram_facebook", "twitter_reddit_bluesky"];
 
 function r2cfg(): { apiToken: string; accountId: string; bucket: string; publicBase: string } | null {
   const apiToken = process.env.R2_API_TOKEN;
@@ -53,10 +53,10 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
     cursor = j.result_info?.is_truncated ? j.result_info?.cursor : undefined;
   } while (cursor);
 
-  // 2) 找出有 youtube_linkedin.mp4 的影片組（dir = sanitized 標題）
+  // 2) 找出有 landscape 主檔（16x9 新 / youtube_linkedin 舊）的影片組（dir = sanitized 標題）
   const dirs = new Set<string>();
   for (const k of keys) {
-    const m = /^video\/(.+)\/youtube_linkedin\.mp4$/.exec(k);
+    const m = /^video\/(.+)\/(?:16x9|youtube_linkedin)\.mp4$/.exec(k);
     if (m) dirs.add(m[1]);
   }
 
@@ -67,14 +67,15 @@ export async function reconcileVideos(): Promise<ReconcileResult> {
     for (const fmt of OUTPUT_FORMATS) {
       if (keys.includes(`video/${dir}/${fmt}.mp4`)) outputs[fmt] = `${cfg.publicBase}/video/${dir}/${fmt}.mp4`;
     }
-    if (!outputs["youtube_linkedin"]) continue;
+    const primary = outputs["16x9"] ?? outputs["youtube_linkedin"];
+    if (!primary) continue;
     // 存在性檢查用與 recordVideoAsset 相同的 object_key 推導（編碼一致 → idempotent）
-    const checkKey = videoObjectKey(outputs["youtube_linkedin"]);
+    const checkKey = videoObjectKey(primary);
     const { data, error } = await supabase.from("media_assets").select("id").eq("object_key", checkKey).limit(1);
     if (error) continue;            // 查詢失敗 → 跳過本筆，下輪再試
     if (data && data.length > 0) continue; // 已記錄
     try {
-      await recordVideoAsset({ organizationId: orgId, primaryUrl: outputs["youtube_linkedin"], outputs, title: dir, sceneCount: 0 });
+      await recordVideoAsset({ organizationId: orgId, primaryUrl: primary, outputs, title: dir, sceneCount: 0 });
       recorded++;
     } catch {
       /* best-effort：下輪再補 */

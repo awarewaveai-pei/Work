@@ -6,6 +6,31 @@ $insert
 
 ## 2026-06-20
 
+### feat(video): 字幕加大 + 輸出尺寸改長寬比（16:9 / 9:16 / 4:5，取代平台命名）
+
+[任務理解] 使用者：(1) 燒錄字幕太小（截圖 16:9 字幕約 22px）；(2) 輸出尺寸不要依平台命名，要 4:5 / 9:16 / 16:9。
+
+[已修改]
+- **video-service（Python，py_compile OK）**
+  - `config.py` FORMATS：4 平台鍵 → 3 長寬比鍵 `{16x9:(1920,1080), 9x16:(1080,1920), 4x5:(1080,1350)}`（鍵用檔名/R2 安全字）。
+  - `pipeline.py` 字幕 `font_size max(22,h//54)`→`max(48,h//20)`（1080p 22→54px）；`margin_v`→`max(40,h//30)`；`borderw 2→3`。
+  - `pipeline.py` `export_all_formats` FORMAT_FILTERS：3 條 vf（16x9 decrease+pad；9x16/4x5 scale=1080:-2+pad；centered black、setsar=1）；YouTube 主檔 `get("16x9")`；docstring 更新。
+- **next-admin（tsc exit=0）**
+  - `VideoStudio.tsx` OUTPUT_LABELS：加 16x9/9x16/4x5（保留舊 4 鍵相容歷史影片）；primaryKey `16x9 ? 16x9 : youtube_linkedin`。
+  - `status/route.ts`、`ContentStudio.tsx`：primary `["16x9"] ?? ["youtube_linkedin"] ?? Object.values[0]`。
+  - `reconcile.ts`：OUTPUT_FORMATS union；group marker regex `(?:16x9|youtube_linkedin)\.mp4`；primary fallback。
+  - `DesignsGallery.tsx` FORMAT_LABELS：加新鍵（保留舊）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile config.py pipeline.py` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REVIEW_DONE: critic=Deep | verdict=pass（Low，0 Crit/0 Major；ffmpeg pad 幾何全正確無負 pad/crop、scale=:-2 偶數高 libx264 OK、config.FORMATS↔FORMAT_FILTERS 鍵一致無 KeyError、所有 next-admin output-key consumer 追蹤皆有 16x9?? youtube_linkedin?? values[0] fallback、embed-to-wp/history/[id] 為 format-agnostic、reconcile 新舊 marker 相容無重複）| findings=0c/0m/3n
+- BUGHUNT_DONE: scope=lobster-factory（video-service + next-admin app/lib）| grep=`youtube_linkedin|tiktok_reels|instagram_facebook|twitter_reddit_bluesky|16x9` | hits=殘留舊鍵僅在「保留相容」的 label maps（VideoStudio OUTPUT_LABELS / DesignsGallery FORMAT_LABELS），無 functional primary/marker 漏改
+
+[剩餘風險] (1) **直式字幕位置**（critic Minor）：字幕燒在 16:9 base 底部 → export 縮放加黑邊後，9:16/4:5 字幕浮在內容底（下方有黑條），非貼到整框最底；本次只加大字級（主訴），貼底/裁切填滿為可選 refinement（需 per-format 後燒字幕）。(2) 1:1 與 720p 變體已移除（依需求），新影片出 3 檔；歷史影片舊鍵仍可顯示（label union）。(3) EU video-service 需 rebuild（image 由源碼 build）。
+
+[rollback] `git revert <hash>`；video-service rebuild 回前版 image；next-admin sg-deploy。
+
 ### fix(video): ScriptForge 加輸出語言選擇器（修「打英文卻出中文」）
 
 [任務理解] 使用者打英文主題「Healing Through Art」但腳本角度出中文。根因：ScriptForge 腳本生成 prompt **無輸出語言指定**（SYS 與 prompt 皆中文）→ AI 預設輸出中文，與主題語言無關；前製腳本（不同於影片生產 tab）**無語言選擇器**。

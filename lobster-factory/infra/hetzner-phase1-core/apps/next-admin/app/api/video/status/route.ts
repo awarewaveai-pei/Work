@@ -46,7 +46,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // 收尾：記 media_assets（best-effort，只記一次）+ 清 R2 暫存
     const { recordVideoAsset, cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
     if (!job.recorded && job.recordParams) {
-      const primaryUrl = poll.outputs["youtube_linkedin"] ?? Object.values(poll.outputs)[0];
+      const primaryUrl = poll.outputs["16x9"] ?? poll.outputs["youtube_linkedin"] ?? Object.values(poll.outputs)[0];
       if (primaryUrl && primaryUrl.startsWith("https://")) {
         try {
           await recordVideoAsset({

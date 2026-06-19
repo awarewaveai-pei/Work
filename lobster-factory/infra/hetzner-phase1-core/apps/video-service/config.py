@@ -60,12 +60,11 @@ CARTOON_STYLE = os.getenv(
     "flat design cartoon illustration, colorful, simple, clean, 2D animation style, no text, ",
 )
 
-# 輸出尺寸（多平台）
+# 輸出尺寸（依長寬比，非平台）。鍵用檔名/R2 安全字（前端顯示 16:9 / 9:16 / 4:5）。
 FORMATS = {
-    "youtube_linkedin":       (1920, 1080),
-    "tiktok_reels":           (1080, 1920),
-    "instagram_facebook":     (1080, 1080),
-    "twitter_reddit_bluesky": (1280, 720),
+    "16x9": (1920, 1080),  # 橫式（YouTube/LinkedIn/橫向）
+    "9x16": (1080, 1920),  # 直式（Reels/TikTok/Shorts）
+    "4x5":  (1080, 1350),  # 直式 4:5（IG/FB 動態最佳版位）
 }
 
 # 輸出 / 暫存目錄（可被 env 覆蓋，方便排程指定絕對路徑）

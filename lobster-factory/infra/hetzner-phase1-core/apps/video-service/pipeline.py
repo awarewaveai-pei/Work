@@ -10,11 +10,10 @@ pipeline.py — 文章 → 卡通影片 → 多尺寸輸出 → YouTube + WordPr
 
 設定：複製 .env.example 為 .env 後填值（見 README）。
 
-輸出平台尺寸：
-  youtube_linkedin.mp4        1920x1080
-  tiktok_reels.mp4            1080x1920
-  instagram_facebook.mp4      1080x1080
-  twitter_reddit_bluesky.mp4  1280x720
+輸出尺寸（依長寬比）：
+  16x9.mp4   1920x1080  （橫式）
+  9x16.mp4   1080x1920  （直式）
+  4x5.mp4    1080x1350  （直式 4:5）
 """
 
 import os
@@ -376,8 +375,8 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
                   f"fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}[bg0]")
 
     # Build chained drawtext filters
-    font_size = max(22, h // 54)
-    margin_v = max(28, h // 40)
+    font_size = max(48, h // 20)  # 字幕字級加大（1080p≈54px；舊 h//54≈22px 太小，9:16 縮放後幾乎看不到）
+    margin_v = max(40, h // 30)
     box_border = max(4, h // 270)
     dt_filters = []
     for i, (seg_file, (start, end)) in enumerate(zip(seg_files, times)):
@@ -392,7 +391,7 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
             f"textfile={safe_path}:"
             f"fontsize={font_size}:"
             f"fontcolor=white:"
-            f"borderw=2:"
+            f"borderw=3:"
             f"bordercolor=black:"
             f"box=1:"
             f"boxcolor=black@0.45:"
@@ -516,10 +515,9 @@ def export_all_formats(base_video: str, out_dir) -> dict:
     print("\n[5/6] 輸出多平台尺寸...")
     # vf filter per format: scale to fit content, pad to exact target size with black bars
     FORMAT_FILTERS = {
-        "youtube_linkedin":       f"scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
-        "tiktok_reels":           f"scale=1080:-2,pad=1080:1920:0:(oh-ih)/2:black,setsar=1",
-        "instagram_facebook":     f"scale=1080:-2,pad=1080:1080:0:(oh-ih)/2:black,setsar=1",
-        "twitter_reddit_bluesky": f"scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
+        "16x9": f"scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
+        "9x16": f"scale=1080:-2,pad=1080:1920:0:(oh-ih)/2:black,setsar=1",
+        "4x5":  f"scale=1080:-2,pad=1080:1350:0:(oh-ih)/2:black,setsar=1",
     }
     output_files = {}
     for name, vf in FORMAT_FILTERS.items():
@@ -712,7 +710,7 @@ def run(mode: str, topic: str = "", article_title: str = "", article_content: st
         youtube_url = embed_code = ""
         if config.YOUTUBE_ENABLE:
             youtube_url, embed_code = upload_youtube(
-                output_files.get("youtube_linkedin", base_video), video_meta
+                output_files.get("16x9", base_video), video_meta
             )
 
         wp_url = ""

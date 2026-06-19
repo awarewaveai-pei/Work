@@ -1525,7 +1525,7 @@ export default function ContentStudio() {
             setVideoStatus("error"); setVideoError(sj.error ?? "影片渲染失敗"); return;
           }
           if (sj.status === "done" && sj.video?.outputs) {
-            const primaryUrl = sj.video.outputs["youtube_linkedin"] ?? Object.values(sj.video.outputs)[0] ?? "";
+            const primaryUrl = sj.video.outputs["16x9"] ?? sj.video.outputs["youtube_linkedin"] ?? Object.values(sj.video.outputs)[0] ?? "";
             if (!primaryUrl) { /* outputs exists but is empty — treat as error */
               clearInterval(videoPollRef.current!); videoPollRef.current = null;
               setVideoStatus("error"); setVideoError("影片輸出 URL 不存在"); return;

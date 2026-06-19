@@ -80,6 +80,10 @@ function parseVoiceModel(id: string): { ttsProvider: string; ttsVoice: string } 
 // ─── Output format label map ──────────────────────────────────────────────────
 
 const OUTPUT_LABELS: Record<string, { label: string; ratio: string; icon: string }> = {
+  "16x9": { label: "16:9 橫式", ratio: "16:9", icon: "▶" },
+  "9x16": { label: "9:16 直式", ratio: "9:16", icon: "📱" },
+  "4x5":  { label: "4:5 直式",  ratio: "4:5",  icon: "📷" },
+  // 舊格式鍵（相容歷史影片顯示）
   youtube_linkedin: { label: "YouTube / LinkedIn", ratio: "16:9", icon: "▶" },
   tiktok_reels:    { label: "TikTok / Reels",     ratio: "9:16",  icon: "📱" },
   instagram_facebook: { label: "Instagram / Facebook", ratio: "1:1", icon: "📷" },
@@ -806,7 +810,7 @@ function ProgressTracker({ step }: { step: string }) {
 // ─── ResultPanel ──────────────────────────────────────────────────────────────
 
 function ResultPanel({ result, onClose }: { result: VideoOutputs; onClose: () => void }) {
-  const primaryKey = "youtube_linkedin";
+  const primaryKey = result.outputs["16x9"] ? "16x9" : "youtube_linkedin";
   const primaryUrl = result.outputs[primaryKey] ?? Object.values(result.outputs)[0] ?? "";
 
   return (

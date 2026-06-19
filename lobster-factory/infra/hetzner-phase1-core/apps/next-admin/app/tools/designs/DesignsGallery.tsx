@@ -610,6 +610,9 @@ export default function DesignsGallery() {
   /* ─── Videos tab rendering ─── */
   if (activeTab === "videos") {
     const FORMAT_LABELS: Record<string, string> = {
+      "16x9": "16:9 橫式",
+      "9x16": "9:16 直式",
+      "4x5": "4:5 直式",
       youtube_linkedin: "YouTube / LinkedIn",
       tiktok_reels: "TikTok / Reels",
       instagram_facebook: "Instagram / Facebook",
