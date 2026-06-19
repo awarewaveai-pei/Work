@@ -6,6 +6,15 @@ $insert
 
 ## 2026-06-19
 
+### deploy(sg): ScriptForge 整合 + 串接客戶 上線（3cf5476c）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` | exit=0 | result=image built(130s)→lobster-next-admin healthy 7s→HTTP smoke 4/4 200(login/ops-summary/wp/node-api)→`.deployed-commit` 3cf5476c(prev e77fa839)，未觸發 rollback
+- REALTEST_EVIDENCE: tool=SSH | cmd=`curl 127.0.0.1:3002`（prod 容器）| result=POST `/api/tools/script-forge`→401(與同級 `/api/content/generate` 一致＝middleware 閘正常+route 存在)；GET `/tools/video`→307(導登入)；`.next/server/app/api/tools/script-forge/route.js` 12KB 已 baked
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke` | exit=0 | result=26 passed / 0 failed / 6 skipped(需 session)；evidence `reports/e2e/2026-06-19/smoke`
+
+兩 commit（bf3b9b81 整合 + 3cf5476c 串接客戶）已上線 app.aware-wave.com `/tools/video`。
+
 ### feat(video): ScriptForge 串接客戶（Phase 2：載入 content/sites 品牌語境）
 
 [任務理解] Phase 2：ScriptForge 加「載入客戶」讓 24 模組自動套用客戶品牌語境，免每次手填。資料源已存在（GET /api/content/sites 回 `contentDefaults.marketing`），零新後端。
