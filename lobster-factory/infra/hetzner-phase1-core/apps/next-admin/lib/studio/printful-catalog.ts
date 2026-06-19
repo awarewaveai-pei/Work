@@ -4,7 +4,11 @@
  */
 
 const PRINTFUL_API = "https://api.printful.com";
-const TTL_MS = 60 * 60 * 1000; // 1 hour
+const TTL_MS = 60 * 60 * 1000; // 1 hour — successful results
+// Failures (null spec) cache for only 1 min. A transient Printful timeout/blip must NOT
+// lock a product out of the mockup generator for a full hour (root cause of the
+// "無法取得 Printful 產品規格" error on productId=837, a fully-supported MUG).
+const NULL_TTL_MS = 60 * 1000; // 1 minute — failed results
 
 export interface CatalogProduct {
   id: number;
@@ -82,12 +86,16 @@ export async function fetchProductSpec(productId: number): Promise<ProductSpec |
   if (!apiKey || !storeId) return null;
 
   const hit = specCache.get(productId);
-  if (hit && Date.now() - hit.ts < TTL_MS) return hit.spec;
+  // Successes cache 1 h; failures only 1 min so a transient error self-heals on retry.
+  if (hit && Date.now() - hit.ts < (hit.spec === null ? NULL_TTL_MS : TTL_MS)) return hit.spec;
 
   try {
     // 1. Get variants from v2 catalog API (not store-sync) — pick white/M or first
     const vRes = await timedFetch(
-      `${PRINTFUL_API}/v2/catalog-products/${productId}/catalog-variants?limit=200`,
+      // Printful v2 caps limit at 100 — limit>100 returns HTTP 400 "Invalid limit value
+      // (required 1-100)", which made fetchProductSpec return null for EVERY catalog product
+      // ("無法取得 Printful 產品規格"). 100 variants is ample to find a white/first variant.
+      `${PRINTFUL_API}/v2/catalog-products/${productId}/catalog-variants?limit=100`,
       apiKey,
     );
     if (!vRes.ok) {
