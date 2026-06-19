@@ -46,8 +46,11 @@ $insert
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（全 async 化 + 5 caller await 後型別過）
 - REVIEW_DONE: critic=Deep(db-expert) | verdict=**GO**（0 Critical/0 Major；additive+idempotent 照 0039 precedent、零 lock 風險空表、code↔schema 欄名逐一吻合、r2_keys jsonb↔string[] round-trip 正確、CHECK 對齊 code status 值、並發 double-record 由 `uq_media_assets_org_backend_key_version` unique 兜底）| findings=0c/0m/3n（已採納：補 down-migration + deny policy）
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`createJob|getJob|finishJob|updateJobStep|video_jobs|new Map` | hits=video route 3 caller 全 await/void 處理、無漏接同步 caller、job-store 無 Map 殘留、video_jobs 僅 migration+job-store 引用
-- REALTEST_EVIDENCE（apply）: <待補：SSH EU supabase-db psql apply + service_role write/delete 驗證>
-- REALTEST_EVIDENCE（deploy）: <待補：sg-deploy + 端到端 render 不再 job_not_found>
+- REALTEST_EVIDENCE: tool=SSH(EU) | cmd=`sftp_write 0047 + docker exec supabase-db psql -U supabase_admin -v ON_ERROR_STOP=1 -f` | exit=0 | result=sha256 byte-identical(55cbb3fd…)、CREATE TABLE/INDEX/POLICY 全過、表存在 12 欄 RLS=t policy=video_jobs_deny_non_service、NOTIFY pgrst reload；pre-0047 schema backup 388K 存 /root/db-backups/
+- REALTEST_EVIDENCE: tool=SSH(EU) | cmd=`set role service_role; insert/update/select/delete video_jobs` | exit=0(ON_ERROR_STOP) | result=service_role 對新表 CRUD 全通（db-expert 唯一靜態無法確認的 grant 假設→證實）
+- REALTEST_EVIDENCE: tool=SSH(SG) | cmd=`sg-deploy.sh next-admin`（並行 session 觸發，origin HEAD 含我 4a7d33fa）| exit=0 | result=deployed 8970b4cd（descends from 4a7d33fa＝我的 fix 上線）、healthy 9s、smoke 4/4 200
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke` | exit=0 | result=26 passed/0 failed/6 skipped（無迴歸）
+- 套用順序正確：migration(建表+NOTIFY) 先於 deploy code → 新 job-store 上線時 video_jobs 已就緒
 
 [剩餘風險] 套用順序：必須先 apply migration（建表）+ NOTIFY pgrst reload → 再 deploy code（否則新碼查無表→降級回 job_not_found，非災難）。service_role 對新表的 table grant 需 apply 後 write test 確認（0039 wp_sites 同法為 precedent，應 ok）。
 
