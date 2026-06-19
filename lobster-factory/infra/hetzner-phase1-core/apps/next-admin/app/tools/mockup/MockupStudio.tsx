@@ -166,7 +166,12 @@ function CatalogGrid({
                   position: "relative",
                 }}
               >
-                <div style={{ width: "100%", paddingTop: "100%", position: "relative", background: "#1a1a1a" }}>
+                {/* translateZ(0) promotes each card to its own compositing layer —
+                    fixes a Chrome GPU paint glitch where the wrapper has the correct
+                    layout box (158×158, verified via getBoundingClientRect) but
+                    rasterizes as a thin sliver inside the overflow:auto scroll
+                    container until a manual repaint (scroll / zoom / devtools) is forced. */}
+                <div style={{ width: "100%", paddingTop: "100%", position: "relative", background: "#1a1a1a", transform: "translateZ(0)" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.image} alt={p.title} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                   {selected && (
@@ -359,7 +364,8 @@ export default function MockupStudio() {
     });
   }, [mode, color, flatSurface, flatArrangement, flatLighting, flatProps,
       selectedFlatProductIds, selectedModelProductIds, garmentPhraseFor,
-      ageGroup, modelDesc, pose, modelScene, modelLighting, modelProps]);
+      ageGroup, modelDesc, pose, modelScene, modelLighting, modelProps,
+      designSizePct]);
 
   const onUploadDesign = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;

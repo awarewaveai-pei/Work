@@ -6,6 +6,25 @@ $insert
 
 ## 2026-06-19
 
+### fix(mockup): Chrome paint-sliver glitch + designSizePct 滑桿無效（useMemo deps 漏）
+
+[任務理解] 用戶連續多輪回報「選擇產品」卡片是細條不是正方形，且「設計大小/透明度似乎沒吃」。過去多次「修好」其實是部署了不含改動的 checkpoint commit + 從沒看實際 render 的 DOM（盲改）。本輪用 Chrome MCP 接真實瀏覽器量 DOM 找真因。
+
+[已修改]
+- `app/tools/mockup/MockupStudio.tsx` (CatalogGrid 卡片 wrapper) — 加 `transform: "translateZ(0)"`：提升每張卡片為獨立 GPU 合成層。根因：layout box 正確（live 量到 158×158）但 Chrome 在 `overflow:auto` 捲動容器內把它 rasterize 成細條，需手動重繪才正常。
+- `app/tools/mockup/MockupStudio.tsx` (prompt useMemo, line 365-367) — deps array 補 `designSizePct`：原本漏掉 → 拖「設計大小」滑桿時 prompt 不重算，size% 傳不到 AI（即用戶抱怨的「設計大小沒吃」根因，模特/平面 tab）。critic 抓出。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~7000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=7/7
+- REALTEST_EVIDENCE: tool=Chrome(MCP) | action=量 live DOM app.aware-wave.com/tools/mockup | result=catalog grid wrapPaddingTop=158px, wrap/img=158×158（layout 正確，證明細條是 paint glitch 非 layout）; serviceWorker=[], cf-cache-status=DYNAMIC（排除 SW/CF 快取）; 容器單一、chunk 單一含 paddingTop（排除雙容器）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（critic 另抓出 designSizePct useMemo deps 漏 → 本輪一併修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=designSizePct,translateZ | hits=0（agency-os 0 stale docs / scripts 0；lobster-factory 4 檔 designSizePct 全一致，critic 驗 percent vs fraction 兩尺度乾淨分區）
+
+[剩餘風險] translateZ paint fix 需部署後在用戶真實瀏覽器目視確認細條消失（getBoundingClientRect 量不出 paint 狀態，只能目視）。
+
+[rollback] git revert 本 commit；translateZ + deps 兩處皆為 additive，移除即回原狀。
+
 ### fix(content): 4 bugs — seo-fix 502, Quick Answer missing, meta desc short, keyword cap
 
 [任務理解] 用戶說「還是有問題」，需找出 /tools/content 頁面的剩餘 bug。
