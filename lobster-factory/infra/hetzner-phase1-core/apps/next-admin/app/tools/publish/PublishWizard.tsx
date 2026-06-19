@@ -42,7 +42,12 @@ const hasUsablePfMap = (vmap?: VariantMapEntry[]): boolean =>
   vmap.every((m) => typeof m?.sku === "string" && m.sku.length > 0 && typeof m?.price === "string" && PF_PRICE_RE.test(m.price));
 
 export default function PublishWizard() {
-  const [designs, setDesigns] = useState<DesignAsset[]>([]);
+  // Split the picker by source group so the two actions never share one flooded list:
+  //   designAssets → 設計圖 (印刷檔來源, single-select)   mockupAssets → 商品照 (gallery, multi-select)
+  // Each is fetched with its own ?group= so the 60-row cap applies per-group — a tarot-flooded
+  // gallery can no longer bury mockups out of the 商品照 picker (the洗版 bug we hit live).
+  const [designAssets, setDesignAssets] = useState<DesignAsset[]>([]);
+  const [mockupAssets, setMockupAssets] = useState<DesignAsset[]>([]);
   const [designUrl, setDesignUrl] = useState<string | null>(null);
   const [mockupUrls, setMockupUrls] = useState<string[]>([]);
   const [title, setTitle] = useState("");
@@ -128,9 +133,16 @@ export default function PublishWizard() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/tools/designs", { cache: "no-store" });
-        const json = (await res.json()) as { ok: boolean; assets?: DesignAsset[] };
-        if (json.ok) setDesigns((json.assets ?? []).filter((a) => a.object_url));
+        // Two grouped fetches: 設計圖 art for the print-file source, mockups for the商品照 gallery.
+        // Each carries its own LIST_LIMIT, so neither starves the other (per-group洗版 fix).
+        const [dRes, mRes] = await Promise.all([
+          fetch("/api/tools/designs?group=design", { cache: "no-store" }),
+          fetch("/api/tools/designs?group=mockup", { cache: "no-store" }),
+        ]);
+        const dJson = (await dRes.json()) as { ok: boolean; assets?: DesignAsset[] };
+        const mJson = (await mRes.json()) as { ok: boolean; assets?: DesignAsset[] };
+        if (dJson.ok) setDesignAssets((dJson.assets ?? []).filter((a) => a.object_url));
+        if (mJson.ok) setMockupAssets((mJson.assets ?? []).filter((a) => a.object_url));
       } catch {
         /* gallery unavailable */
       }
@@ -229,7 +241,7 @@ export default function PublishWizard() {
     // existing report on screen — the panel's own "AI 修正中…" flag signals progress — then swaps the
     // fresh report in place (don't blank to "running", which would unmount the panel mid-fix).
     if (!isFix) setCopy({ state: "running" });
-    const design = designs.find((d) => d.object_url === designUrl);
+    const design = designAssets.find((d) => d.object_url === designUrl);
     const json = await post({
       action: "copy",
       designPrompt: design?.metadata?.prompt ?? undefined,
@@ -276,7 +288,7 @@ export default function PublishWizard() {
       return { ok: true, message: prevScore < 0 ? undefined : `${prevScore} → ${newScore} ↑` };
     }
     return { ok: true };
-  }, [designs, designUrl, title, keywordHint, post]);
+  }, [designAssets, designUrl, title, keywordHint, post]);
 
   // Product AI-fix: regenerate the copy, feeding the failed checks' suggestions back as hints. Product
   // copy is structured (6 fields), so the fix is a re-generate — NOT the Markdown /api/content/seo-fix
@@ -449,7 +461,7 @@ export default function PublishWizard() {
     let shortDescription: string | undefined;
     let bullets: string[] | undefined;
     let seo: { focus_keyword?: string; title?: string; description?: string } | undefined;
-    const design = designs.find((d) => d.object_url === designUrl);
+    const design = designAssets.find((d) => d.object_url === designUrl);
     const cp = await post({
       action: "copy",
       designPrompt: design?.metadata?.prompt ?? undefined,
@@ -546,7 +558,7 @@ export default function PublishWizard() {
     } finally {
       runAllLatch.current = false;
     }
-  }, [designUrl, title, printMode, flatlayBg, designs, keywordHint, retailPrice, plusPrice, post]);
+  }, [designUrl, title, printMode, flatlayBg, designAssets, keywordHint, retailPrice, plusPrice, post]);
 
   const busy = allRun.state === "running";
 
@@ -558,6 +570,17 @@ export default function PublishWizard() {
     setMockupUrls((prev) => (prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]));
   };
 
+  // The gallery's FIRST entry is Woo's featured image (pod-product.ts:100 → ProductCreator.php
+  // set_image_id). "設為主圖" therefore = move this url to index 0; it also adds it if not yet picked.
+  const setAsMain = (url: string) => {
+    if (busy) return;
+    setMockupUrls((prev) => [url, ...prev.filter((u) => u !== url)]);
+  };
+  const removeFromGallery = (url: string) => {
+    if (busy) return;
+    setMockupUrls((prev) => prev.filter((u) => u !== url));
+  };
+
   return (
     <div style={{ padding: 16, maxWidth: 980 }}>
       <p style={{ opacity: 0.7, fontSize: 13 }}>
@@ -565,13 +588,15 @@ export default function PublishWizard() {
         ③ <b>🚀 一鍵上 Printful</b>（native store 全自動：一次建品＋綁所有變體＋上傳印刷檔，<b>免後台手動匯入</b>）→ 後台 review 後 publish 開賣。
       </p>
 
-      {/* design + mockup pickers */}
+      {/* ① 設計圖 picker — 印刷檔來源，單選。只顯示「設計圖」類（mockup 移到 ②，不再擠一起）。
+          勾選框讓設計圖原稿也能當一張商品圖（使用者要的 gallery「設計圖 1 張」）。 */}
       <div className="build-panel" style={{ padding: 14, marginTop: 10 }}>
         <div style={{ fontSize: 13, marginBottom: 6 }}>
-          ① 選<b>設計圖</b>（單選 — 會放大成印刷檔）；② 勾<b>商品照</b>（多選 — 上架用 mockup）
+          ① 選<b>設計圖</b>（單選 — 會放大成印刷檔）
+          <span style={{ opacity: 0.6 }}>　·　只顯示設計圖類；勾選框可把原稿也加進商品照</span>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 180, overflowY: "auto" }}>
-          {designs.map((d) => {
+          {designAssets.map((d) => {
             const isDesign = designUrl === d.object_url;
             const isMockup = mockupUrls.includes(d.object_url!);
             return (
@@ -580,7 +605,7 @@ export default function PublishWizard() {
                 <img
                   src={d.object_url!}
                   alt={d.metadata?.prompt ?? d.id}
-                  title="左鍵=設為設計圖；勾選框=加入商品照"
+                  title="左鍵=設為設計圖（印刷檔來源）；勾選框=加入商品照"
                   style={{
                     width: 72,
                     height: 72,
@@ -605,7 +630,97 @@ export default function PublishWizard() {
             );
           })}
         </div>
-        {designs.length === 0 ? <p style={{ opacity: 0.6, fontSize: 13 }}>圖庫是空的 — 先去 Studio/Mockup 存圖。</p> : null}
+        {designAssets.length === 0 ? <p style={{ opacity: 0.6, fontSize: 13 }}>沒有設計圖 — 先去 Studio / Canvas 生成設計並存到 My Designs。</p> : null}
+      </div>
+
+      {/* ② 商品照 picker — 上架 gallery，多選 + 設主圖。只顯示「Mockup」類（模特／平拍／合成）。
+          已選列把 gallery 排序攤開，第一張 = Woo 主圖（pod-product.ts:100），可一鍵改主圖／移除。 */}
+      <div className="build-panel" style={{ padding: 14, marginTop: 10 }}>
+        <div style={{ fontSize: 13, marginBottom: 6 }}>
+          ② 選<b>商品照</b>（多選 — 上架商品圖庫）
+          <span style={{ opacity: 0.6 }}>　·　只顯示 Mockup 類（模特／平拍／裝飾合成）</span>
+        </div>
+
+        {/* 已選 gallery：順序 = 上架順序，第一張 = 主圖。★ 設主圖 / ✕ 移除 */}
+        {mockupUrls.length > 0 ? (
+          <div style={{ marginBottom: 8, padding: 8, background: "#0c0c0c", borderRadius: 6 }}>
+            <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
+              已選 {mockupUrls.length} 張 ·{" "}
+              <b style={{ color: "#f5a623" }}>★ 第一張 = 主圖（上架封面）</b>，其餘進 product gallery
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {mockupUrls.map((url, i) => {
+                const isMain = i === 0;
+                return (
+                  <div key={url} style={{ position: "relative", width: 60 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`商品照 ${i + 1}`}
+                      style={{
+                        width: 60, height: 60, objectFit: "contain", background: "#111", borderRadius: 6,
+                        border: isMain ? "2px solid #f5a623" : "2px solid #333",
+                      }}
+                    />
+                    {isMain ? (
+                      <span style={{ position: "absolute", top: 0, left: 0, fontSize: 9, background: "#f5a623", color: "#000", padding: "0 3px", borderTopLeftRadius: 6, borderBottomRightRadius: 6 }}>主圖</span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setAsMain(url)}
+                        title="設為主圖（移到第一張）"
+                        style={{ position: "absolute", top: 0, left: 0, fontSize: 9, lineHeight: 1.5, padding: "0 3px", cursor: busy ? "not-allowed" : "pointer", background: "#222", color: "#f5a623", border: "none", borderTopLeftRadius: 6, borderBottomRightRadius: 6 }}
+                      >★主圖</button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => removeFromGallery(url)}
+                      title="從商品照移除"
+                      style={{ position: "absolute", top: 0, right: 0, fontSize: 10, lineHeight: 1.3, width: 16, height: 16, cursor: busy ? "not-allowed" : "pointer", background: "rgba(0,0,0,0.65)", color: "#e5484d", border: "none", borderRadius: 3 }}
+                    >✕</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {/* 從 Mockup 庫挑（勾選 = 加入商品照） */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 180, overflowY: "auto" }}>
+          {mockupAssets.map((d) => {
+            const isMockup = mockupUrls.includes(d.object_url!);
+            return (
+              <div key={d.id} style={{ position: "relative" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={d.object_url!}
+                  alt={d.metadata?.prompt ?? d.id}
+                  title="勾選框=加入商品照"
+                  style={{
+                    width: 72,
+                    height: 72,
+                    objectFit: "contain",
+                    background: "#111",
+                    borderRadius: 6,
+                    opacity: busy ? 0.55 : 1,
+                    border: isMockup ? "2px solid #46a758" : "2px solid transparent",
+                  }}
+                />
+                <input
+                  type="checkbox"
+                  checked={isMockup}
+                  disabled={busy}
+                  onChange={() => toggleMockup(d.object_url!)}
+                  style={{ position: "absolute", top: 2, right: 2 }}
+                  title="加入商品照"
+                />
+              </div>
+            );
+          })}
+        </div>
+        {mockupAssets.length === 0 ? <p style={{ opacity: 0.6, fontSize: 13 }}>沒有商品照 — 先去 <b>Mockup 工具</b>生模特／平拍／裝飾照並「存到 My Designs」，這裡就會出現。</p> : null}
       </div>
 
       {/* form */}

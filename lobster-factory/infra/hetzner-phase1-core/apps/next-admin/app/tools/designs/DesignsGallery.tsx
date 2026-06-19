@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { STYLE_PRESETS } from "../tarot/cards";
+// SSOT for source→group classification — shared with the publish picker + /api/tools/designs filter.
+import { assetToolGroup as toolGroup } from "../../../lib/studio/asset-group";
 
 interface AssetMetadata {
   prompt?: string | null;
@@ -88,14 +90,6 @@ const PRODUCT_LABELS: Record<string, string> = {
   sticker: "Sticker",
   "mockup-composite": "商品合成",
 };
-
-function toolGroup(source: string | null | undefined): string {
-  if (!source) return "unknown";
-  if (source === "tarot" || source === "tarot-preview" || source === "tarot-compare") return "tarot";
-  if (source === "pod-studio") return "studio";
-  if (source === "mockup") return "mockup";
-  return source;
-}
 
 function assetProduct(asset: DesignAsset): string | null {
   const src = asset.metadata?.source;

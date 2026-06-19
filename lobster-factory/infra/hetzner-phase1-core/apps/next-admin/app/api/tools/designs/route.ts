@@ -353,6 +353,15 @@ export async function GET(request: Request) {
   const wantVideo = url.searchParams.get("domain") === "ai_video";
   const mimePrefix = wantVideo ? "video/%" : "image/%";
 
+  // Optional source-group filter for the publish picker's split 設計圖 / 商品照 sections.
+  // "mockup" → only product mockups; "design" → everything that is NOT a mockup (tarot / studio /
+  // canvas / null source). Applied in the DB BEFORE .limit() so each group gets its own LIST_LIMIT
+  // budget — a gallery flooded with tarot art can no longer starve mockups out of the publish picker
+  // (the洗版 bug: 60-row cap × 87% tarot left mockups invisible). source lives at metadata->>source.
+  // Unknown values are ignored (falls back to the un-filtered list — backward compatible with
+  // My Designs, which never passes ?group).
+  const group = url.searchParams.get("group");
+
   // Prefer the service-role client: media_assets has RLS keyed to Clerk JWTs, and this
   // server route carries no user JWT — the anon client would silently return 0 rows.
   const supabase = getSupabaseWriteClient() ?? getSupabaseReadClient();
@@ -360,14 +369,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("media_assets")
     .select("id,object_key,object_url,mime_type,byte_size,created_at,metadata")
     .eq("organization_id", organizationId)
     .eq("storage_backend", "r2")
     .eq("asset_domain", "ai_generated")
     .like("mime_type", mimePrefix)
-    .eq("is_current", true)
+    .eq("is_current", true);
+
+  if (group === "mockup") {
+    query = query.eq("metadata->>source", "mockup");
+  } else if (group === "design") {
+    query = query.or("metadata->>source.is.null,metadata->>source.neq.mockup");
+  }
+
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
 
