@@ -649,6 +649,18 @@ export default function ScriptForge({ onSendToProduction }: { onSendToProduction
   const[brand,setBrand]=useState(()=>{try{const s=localStorage.getItem("sf_brand");return s?JSON.parse(s):null;}catch{return null;}});
   const groups=["生成","工具","分析","設定","規劃","紀錄"];
   const gNavs=groups.map(g=>({group:g,items:NAVS.filter(n=>n.group===g)}));
+  // ── 串接客戶：載入 內容工具›網站管理 的客戶 contentDefaults.marketing 當品牌語境（零新後端，GET 已回 marketing）──
+  const[clients,setClients]=useState<any[]>([]);
+  useEffect(()=>{(async()=>{try{const r=await fetch("/api/content/sites");const j=await r.json();if(j?.ok&&Array.isArray(j.sites))setClients(j.sites.filter((s:any)=>s.active!==false));}catch{/* best-effort：未登入/無客戶 → 下拉為空 */}})();},[]);
+  function loadClient(id:string){
+    const s=clients.find((c:any)=>c.id===id);if(!s)return;
+    const m=s.contentDefaults?.marketing||{};
+    // CTA + 疑慮也折進 voice（模組只讀 brand.voice/forbidden/name；critic 2026-06-19 Minor：勿留死欄位）
+    const voice=[m.positioning&&`品牌定位：${m.positioning}`,m.audience&&`目標受眾：${m.audience}`,m.usp&&`獨特賣點：${m.usp}`,m.emotionalTriggers&&`情緒訴求：${m.emotionalTriggers}`,m.pricePositioning&&`價格定位：${m.pricePositioning}`,m.primaryCta&&`主要行動呼籲：${m.primaryCta}`,m.objections&&`需化解的疑慮：${m.objections}`,s.contentDefaults?.tone&&`語氣：${s.contentDefaults.tone}`].filter(Boolean).join("；");
+    const b={name:s.name,voice:voice||s.name,forbidden:m.forbiddenClaims||"",_clientId:s.id};
+    setBrand(b);try{localStorage.setItem("sf_brand",JSON.stringify(b));}catch{}
+  }
+  function clearBrand(){setBrand(null);try{localStorage.removeItem("sf_brand");}catch{}}
   return(
     <ProductionBridge.Provider value={onSendToProduction ?? null}>
     <div style={{minHeight:"100vh",background:C.paper,fontFamily:"DM Sans,sans-serif"}}>
@@ -680,6 +692,10 @@ export default function ScriptForge({ onSendToProduction }: { onSendToProduction
                 {items.map(n=><button key={n.id} onClick={()=>setNav(n.id)} style={{padding:"5px 8px",borderRadius:6,border:"none",background:nav===n.id?C.corallt:"transparent",color:nav===n.id?C.coral:C.mid,fontWeight:nav===n.id?700:400,fontSize:11,cursor:"pointer",whiteSpace:"nowrap",transition:"all .15s",fontFamily:"inherit",flexShrink:0}}>{n.icon} {n.label}</button>)}
               </div>)}
             </div>
+            {clients.length>0&&<select value={brand?._clientId||""} onChange={e=>{if(e.target.value){loadClient(e.target.value);}else if(brand?._clientId){clearBrand();}else if(brand){if(confirm("清除目前手動建立的品牌語境？"))clearBrand();}}} title="載入客戶品牌語境（來自 內容工具 › 網站管理 的行銷預設）" style={{marginLeft:8,flexShrink:0,padding:"4px 8px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11,fontFamily:"inherit",cursor:"pointer",maxWidth:150}}>
+              <option value="">👤 載入客戶…</option>
+              {clients.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>}
             {brand?.name&&<div style={{marginLeft:6,padding:"3px 9px",background:C.jadelt,borderRadius:999,fontSize:10.5,color:C.jade,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>✅ {brand.name}</div>}
           </div>
         </div>

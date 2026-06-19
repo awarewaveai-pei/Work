@@ -6,6 +6,24 @@ $insert
 
 ## 2026-06-19
 
+### feat(video): ScriptForge 串接客戶（Phase 2：載入 content/sites 品牌語境）
+
+[任務理解] Phase 2：ScriptForge 加「載入客戶」讓 24 模組自動套用客戶品牌語境，免每次手填。資料源已存在（GET /api/content/sites 回 `contentDefaults.marketing`），零新後端。
+
+[已修改]
+- `app/tools/video/ScriptForge.tsx`：根元件加 `clients` state + useEffect GET `/api/content/sites`（filter `active!==false`）；`loadClient(id)` 把 `contentDefaults.marketing`（定位/受眾/賣點/情緒/價格/主CTA/疑慮 + `tone`）折成 `brand.voice`、`forbiddenClaims`→`brand.forbidden`、`site.name`→`brand.name`、`_clientId`，setBrand + localStorage `sf_brand`；nav 加「👤 載入客戶」下拉（`clients.length>0` 才顯示）；選空白佔位對手動品牌加 `confirm` guard（防誤清）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（含 Phase 2 兩次 critic 修正後）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node -e`（loadClient voice 映射）| exit=0 | result=滿欄 marketing→多段 voice + name/forbidden/_clientId 正確；空 marketing→voice fallback site.name、forbidden=""（無崩潰）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl dev /tools/video` + `/api/content/sites` | result=200 / 200（render 無迴歸 + ScriptForge 抓取的資料源 route 可用）
+- REVIEW_DONE: critic=Standard | verdict=pass（Low，0 Critical/0 Major；XSS clean React-escape；無 secret 入 localStorage——GET 只回 `tokenSet` bool 不回 token）| findings=0c/0m/2n | 已修：`cta`/`objections` 折進 `voice`（勿留死欄位，模組只讀 voice）+ clearBrand confirm guard
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`loadClient|clearBrand|setClients|_clientId|content_defaults` | hits=新符號僅 ScriptForge.tsx 內部使用（無外部 caller）；GET /api/content/sites 仍回 `contentDefaults`（route.ts:74，無 schema drift）
+
+[剩餘風險] BrandModule 表單 `preferred`（常用詞）載入客戶後仍空白（marketing 無對應欄，不影響生成只影響顯示）；本機無 Supabase 客戶資料，下拉實際填充待 deploy 後用戶真選一個客戶確認。
+
+[rollback] `git revert <hash>` + sg-deploy；純前端 additive。
+
 ### feat(video): ScriptForge 影片腳本生成器整合進 /tools/video（前製腳本 → 影片生產接力）
 
 [任務理解] 用戶自寫一個 ScriptForge 短影音腳本生成器（704 行 React artifact，24 模組：手動/文章轉/產業模板/A-B-C 廣告/品牌故事/Hook/痛點/爆款拆解/多語/30天計畫/客戶提案…），要「整合進 /tools/video 並用它生成影片」。核心定位：ScriptForge=前製（寫台詞/分鏡/字幕），既有 VideoStudio=生產（腳本→Flux 圖→TTS→MP4），互補。**致命阻斷**：artifact 的 `claude()` 瀏覽器直連 `api.anthropic.com` 無金鑰 → 生產必 401 + 金鑰外洩風險。
