@@ -373,6 +373,10 @@ export async function POST(request: Request) {
   }
 
   // ── Step 4: link every synced variant → catalog variant + print file ───────
+  // LEGACY (demoted) path — the Woo-platform store manual sync dance. Binds White/Black against Bella
+  // 3001 (71) ONLY; it is NOT model-aware (ignores catalogProductId + multi-colour vmap). The native
+  // `pfcreate` path supersedes it. A model product (57/456/438) must NOT be run through this — it would
+  // bind only 2 of 4 colours against the wrong catalog. Kept solely for the old single-product fallback.
   if (body.action === "link") {
     if (!isPrintfulConfigured()) {
       return NextResponse.json({ ok: false, error: "printful_not_configured" }, { status: 503 });
