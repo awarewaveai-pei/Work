@@ -6,6 +6,24 @@ $insert
 
 ## 2026-06-19
 
+### feat(video): 加 3 個影片專屬攝影風格 preset（8b37c752）
+
+[任務理解] 用戶要求風格選擇除了 tarot 畫家/媒材風格，也要影片攝影風格：電影感（預設）/紀錄片/商業攝影（自帶英文 prompt）。
+
+[已修改]
+- `app/tools/video/VideoStudio.tsx`：新增 `VIDEO_STYLE_PRESETS`（3 攝影 preset，group「📹 影片風格」放最前=預設組）+ `VIDEO_PRESET_BY_LABEL` map + `VIDEO_STYLE_CATALOG`（preset+tarot 合併）+ `resolveVideoStyle`（preset 回英文 prompt，否則 fallback tarot resolveStylePrompt）；UI filter 與 group 改用合併目錄；draft body 改 resolveVideoStyle。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0（build gate clean）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx 驗 resolveVideoStyle（4 cases）| exit=0 | result=電影感→"Cinematic wide-angle 16:9, dramatic lighting, rich color grade ..."；紀錄片/商業攝影同理回各自英文 prompt；達文西→tarot fallback "In the style of Da Vinci..." 不破
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin | exit=0 | result=8b37c752 healthy 7s + HTTP smoke 4/4 全 200
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m（純前端 string-map additive，無 IO/auth/state-race；tsc + real-exec 雙證）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=resolveVideoStyle,VIDEO_STYLE_CATALOG,VIDEO_STYLE_PRESETS,VIDEO_PRESET_BY_LABEL,STYLE_CATALOG | hits=0（11 callsites 全一致，STYLE_CATALOG 仍被 spread 使用無 unused）
+
+[剩餘風險] preset prompt 末無句號，接 " Wide 16:9 cinematic framing." 稍黏（FLUX CFG=1 容忍，無實質影響）；用戶用各 preset 生成一篇目視確認攝影風格差異。
+
+[rollback] `git revert 8b37c752` 並 sg-deploy；純前端 additive。
+
 ### feat(video): 視覺風格選擇器 + B-roll 改靜態圖修復（911980bc / 69f0ad2b）
 
 [任務理解] 用戶回報 Video Studio 草稿(1) B-roll 場景縮圖全黑 + 渲染 404；(2) 想要像 /tools/studio 那樣的圖片風格選擇。根因 (1)：`fetchBrollUrl` 用 Pexels **Videos** API 回 .mp4 URL，EU Ken Burns pipeline 只吃靜態圖 → `<img>` 無法顯示 + EU fetch 後當圖處理失敗。
