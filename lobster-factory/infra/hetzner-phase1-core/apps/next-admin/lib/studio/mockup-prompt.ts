@@ -153,6 +153,30 @@ export const MODEL_FRAMING = [
   { value: "portrait", label: "特寫（肩上）", phrase: "Close-up portrait framed from the shoulders up, with the full face clearly visible." },
 ];
 
+// ── Model tab: emotion / facial expression (more options = more product appeal) ──
+export const MODEL_EMOTIONS = [
+  { value: "", label: "自然（不指定）", phrase: "" },
+  { value: "warm-smile", label: "溫暖微笑", phrase: "a warm, genuine smile" },
+  { value: "big-laugh", label: "開懷大笑", phrase: "laughing joyfully with a big natural laugh" },
+  { value: "soft-smile", label: "淺淺微笑", phrase: "a soft, subtle closed-mouth smile" },
+  { value: "confident", label: "自信", phrase: "a confident, self-assured expression" },
+  { value: "joyful", label: "愉悅雀躍", phrase: "a bright, joyful and delighted expression" },
+  { value: "serene", label: "平靜療癒", phrase: "a serene, calm and peaceful expression" },
+  { value: "playful", label: "俏皮", phrase: "a playful, mischievous expression" },
+  { value: "surprised", label: "驚喜", phrase: "a pleasantly surprised, delighted expression" },
+  { value: "thoughtful", label: "若有所思", phrase: "a thoughtful, contemplative expression" },
+  { value: "cool", label: "酷／高冷", phrase: "a cool, aloof, editorial expression" },
+  { value: "dreamy", label: "夢幻", phrase: "a soft, dreamy and wistful expression" },
+  { value: "proud", label: "驕傲自豪", phrase: "a proud, accomplished expression" },
+  { value: "content", label: "滿足", phrase: "a relaxed, content and satisfied expression" },
+  { value: "excited", label: "興奮", phrase: "an excited, enthusiastic expression" },
+  { value: "candid-laugh", label: "自然偷笑", phrase: "a candid, caught-mid-laugh natural expression" },
+  { value: "empowered", label: "強勢自信", phrase: "a fierce, empowered and bold expression" },
+  { value: "friendly", label: "親切", phrase: "a friendly, warm and approachable expression" },
+  { value: "melancholic", label: "淡淡憂鬱", phrase: "a soft, melancholic and pensive expression" },
+  { value: "neutral", label: "中性 Editorial", phrase: "a neutral, high-fashion editorial expression" },
+];
+
 // ── Product category → how the model presents the product (apparel = wear; others = hold/show) ──
 export type ProductCategory =
   | "apparel" | "drinkware" | "wall-art" | "bag" | "phone" | "pillow" | "jewelry";
@@ -200,6 +224,14 @@ function productFidelityBlock(): string {
     "or alter the product in any way."
   );
 }
+
+/** Shared closing quality directive — pushes every mockup toward high-end commercial work. */
+const PRO_QUALITY =
+  " Award-winning professional commercial product photography by a world-class studio: " +
+  "ultra-realistic and photorealistic, tack-sharp focus, immaculate professional lighting with " +
+  "natural soft shadows and gentle highlights, true-to-life colour, fine micro-detail and texture, " +
+  "clean balanced composition with comfortable negative space, high-end magazine advertising " +
+  "quality — indistinguishable from a premium global brand campaign.";
 
 export const MODEL_POSES = [
   { value: "standing", label: "站姿・輕鬆", phrase: "standing casually with hands relaxed at their sides", occludes: false },
@@ -307,6 +339,8 @@ export interface FlatMockupParams {
   /** what the uploaded reference image is. "design" (default) = a graphic to PRINT on the
    *  product; "product" = a photo of the actual finished product to REPRODUCE faithfully. */
   referenceKind?: ReferenceKind;
+  /** when true, arrange tasteful decorative props in the four corners of a flat-lay frame. */
+  cornerDecor?: boolean;
 }
 
 export interface ModelMockupParams {
@@ -331,6 +365,8 @@ export interface ModelMockupParams {
   /** "design" (default) = graphic printed on the product; "product" = reproduce the actual
    *  finished product from the reference photo (e.g. the user's own jewelry). */
   referenceKind?: ReferenceKind;
+  /** value from MODEL_EMOTIONS — the model's facial expression (default = unspecified). */
+  emotion?: string;
 }
 
 /** Shared print-fidelity block. The dark-fabric lock is iron rule #1.
@@ -596,6 +632,8 @@ export function buildModelMockupPrompt(p: ModelMockupParams): string {
       ? ` Visible in the scene: ${p.props.join(", ")}.`
       : "";
   const sizePct = p.designSizePct ?? 80;
+  const emotion = find(MODEL_EMOTIONS, p.emotion ?? "");
+  const emotionClause = emotion.phrase ? ` Their facial expression shows ${emotion.phrase}.` : "";
   const product = modelProductClause(category, p.color, p.garmentPhrase, sizePct, pose.occludes);
   // Product-photo mode reproduces the real product; design mode prints a graphic on it.
   const productBlock = isProduct
@@ -606,9 +644,10 @@ export function buildModelMockupPrompt(p: ModelMockupParams): string {
     `Photorealistic e-commerce lifestyle photo. ${who}${desc}, ${pose.phrase}, ` +
     `in ${scene.phrase}, ${lighting.phrase}. ` +
     productBlock +
+    emotionClause +
     propClause +
     ` ${framing.phrase}` +
     " The model's full head and face are clearly visible and must NOT be cropped out of frame." +
-    " Editorial product photography, shallow depth of field."
+    PRO_QUALITY
   );
 }
