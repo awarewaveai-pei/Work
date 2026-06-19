@@ -211,3 +211,49 @@ describe("buildFlatMockupPrompt — product-photo mode", () => {
     expect(p).not.toContain("printed large on");
   });
 });
+
+describe("mockup quality + appeal upgrades", () => {
+  const flatBase = {
+    garmentPhrase: "Latte Mug",
+    color: "white" as const,
+    surface: "white-marble",
+    arrangement: "centered-hero",
+    lighting: "north-window",
+  };
+  const modelBase = {
+    garmentPhrase: "Bella Canvas 3001 unisex crewneck t-shirt",
+    color: "white" as const,
+    ageGroup: "adult" as const,
+    modelDescription: "",
+    pose: "standing",
+    scene: "studio-white",
+    lighting: "window",
+  };
+
+  it("appends the pro-quality directive to flat and model prompts", () => {
+    expect(buildFlatMockupPrompt(flatBase)).toContain("professional commercial product photography");
+    expect(buildModelMockupPrompt(modelBase)).toContain("professional commercial product photography");
+  });
+
+  it("drinkware shows the mug handle and is not shot too close", () => {
+    const p = buildFlatMockupPrompt({ ...flatBase, productCategory: "drinkware" });
+    expect(p).toContain("handle");
+    expect(p).toContain("not too close");
+    expect(p).toContain("negative space");
+  });
+
+  it("corner-decor adds four-corner props only when enabled", () => {
+    const off = buildFlatMockupPrompt(flatBase);
+    expect(off).not.toContain("four corners");
+    const on = buildFlatMockupPrompt({ ...flatBase, cornerDecor: true });
+    expect(on).toContain("four corners");
+  });
+
+  it("injects the model's emotion when chosen", () => {
+    const none = buildModelMockupPrompt(modelBase);
+    expect(none).not.toContain("facial expression shows");
+    const happy = buildModelMockupPrompt({ ...modelBase, emotion: "big-laugh" });
+    expect(happy).toContain("facial expression shows");
+    expect(happy).toContain("laughing");
+  });
+});

@@ -23,6 +23,7 @@ import {
   MODEL_MAKEUP,
   MODEL_ACCESSORIES,
   MODEL_FRAMING,
+  MODEL_EMOTIONS,
   CATEGORY_OPTIONS,
   REFERENCE_KIND_OPTIONS,
   productCategoryFromType,
@@ -286,6 +287,8 @@ export default function MockupStudio() {
   const [modelScene, setModelScene] = useState(MODEL_SCENES[0].value);
   const [modelLighting, setModelLighting] = useState(MODEL_LIGHTING[0].value);
   const [modelFraming, setModelFraming] = useState("three-quarter");
+  const [modelEmotion, setModelEmotion] = useState("");
+  const [flatCornerDecor, setFlatCornerDecor] = useState(false);
   const [modelProps, setModelProps] = useState<Set<string>>(new Set());
   // reference-image kind (design to print vs photo of a finished product) + manual category
   // override — both let the user mock up THEIR OWN products (not just the Printful catalog).
@@ -382,6 +385,7 @@ export default function MockupStudio() {
         designSizePct,
         productCategory: flatCategory,
         referenceKind,
+        cornerDecor: flatCornerDecor,
       });
     }
     return buildModelMockupPrompt({
@@ -397,11 +401,13 @@ export default function MockupStudio() {
       framing: modelFraming,
       productCategory: modelCategory,
       referenceKind,
+      emotion: modelEmotion,
     });
   }, [mode, color, flatSurface, flatArrangement, flatLighting, flatProps,
       selectedFlatProductIds, selectedModelProductIds, garmentPhraseFor,
       ageGroup, modelDesc, pose, modelScene, modelLighting, modelProps,
-      designSizePct, modelFraming, modelCategory, flatCategory, referenceKind]);
+      designSizePct, modelFraming, modelCategory, flatCategory, referenceKind,
+      modelEmotion, flatCornerDecor]);
 
   const onUploadDesign = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -889,6 +895,16 @@ export default function MockupStudio() {
               </span>
             </label>
 
+            <label style={{ fontSize: 13 }}>
+              模特情緒 Emotion
+              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={modelEmotion} onChange={(e) => setModelEmotion(e.target.value)}>
+                {MODEL_EMOTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+              <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
+                有情緒的表情更能提升產品吸引力。
+              </span>
+            </label>
+
             {modelCategory !== "apparel" && (
               <div style={{ fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "rgba(79,140,255,0.12)", color: "#4f8cff" }}>
                 偵測到非服飾產品（{modelCategory}）→ 模特會以「{modelCategory === "drinkware" ? "手持杯子" : modelCategory === "jewelry" ? "配戴飾品特寫" : modelCategory === "wall-art" ? "手持展示" : modelCategory === "bag" ? "揹／拿著包" : modelCategory === "phone" ? "手持手機" : modelCategory === "pillow" ? "抱著抱枕" : "展示"}」方式入鏡，而非穿在身上。
@@ -990,6 +1006,11 @@ export default function MockupStudio() {
                 onToggle={(v) => setFlatProps((prev) => { const next = new Set(prev); if (next.has(v)) next.delete(v); else next.add(v); return next; })}
               />
             </div>
+
+            <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={flatCornerDecor} onChange={(e) => setFlatCornerDecor(e.target.checked)} />
+              四角裝飾（道具擺在畫面四個角落，中間留給產品）
+            </label>
           </>
         )}
 

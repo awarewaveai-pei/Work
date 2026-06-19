@@ -550,18 +550,31 @@ export function buildFlatMockupPrompt(p: FlatMockupParams): string {
   const category: ProductCategory = p.productCategory ?? "apparel";
   const isProduct = p.referenceKind === "product";
 
+  // Upright (立拍) camera with breathing room so the product isn't too close / cropped.
+  const uprightCamera =
+    " Shot upright from a slight front three-quarter angle at eye level, with the entire product " +
+    "comfortably within the frame and generous negative space around it — not cropped, not too close, " +
+    "editorial studio product photography with soft natural shadows.";
+  const flatLayCamera = " Shot from directly above, editorial flat-lay product photography.";
+  // Decorative props in the four corners (user request — for flat-lay friendly products).
+  const cornerClause = p.cornerDecor
+    ? " Tasteful decorative props are elegantly arranged in the four corners of the frame to frame the product, keeping the centre clear."
+    : "";
+  // A real mug has a handle — make it visible (the print sits on the body facing camera).
+  const mugHandle = category === "drinkware"
+    ? " The mug has a handle turned slightly to one side so the handle is clearly visible."
+    : "";
+
   // Product-photo mode: reproduce the EXACT product from the reference image (the user's own
   // finished goods, e.g. jewelry). Upright for 3-D objects, flat-lay for apparel/jewelry.
   if (isProduct) {
-    const camera = isUprightProduct(category)
-      ? " Shot upright from a slight front three-quarter angle at eye level, editorial studio product photography with soft natural shadows."
-      : " Shot from directly above, editorial flat-lay product photography.";
+    const camera = isUprightProduct(category) ? uprightCamera : flatLayCamera;
     const composition = isUprightProduct(category) ? "standing upright" : "arranged elegantly";
     return (
       `Photorealistic e-commerce product photo of the exact product shown in the reference image, ${composition} on ${surface.phrase}, ${lighting.phrase}. ` +
-      productFidelityBlock() +
-      propClause +
-      camera
+      productFidelityBlock() + mugHandle +
+      propClause + cornerClause +
+      camera + PRO_QUALITY
     );
   }
 
@@ -569,27 +582,25 @@ export function buildFlatMockupPrompt(p: FlatMockupParams): string {
   // jewelry stays a top-down flat-lay.
   if (category !== "apparel") {
     const prod = flatProductClause(category, p.color, sizePct, p.garmentPhrase);
-    const camera = isUprightProduct(category)
-      ? " Shot upright from a slight front three-quarter angle at eye level, editorial studio product photography with soft natural shadows."
-      : " Shot from directly above, editorial flat-lay product photography.";
+    const camera = isUprightProduct(category) ? uprightCamera : flatLayCamera;
     return (
       `Photorealistic e-commerce product photo. ${capitalize(prod.object)} ${prod.composition} on ${surface.phrase}, ${lighting.phrase}. ` +
       fidelityBlock(p.color, prod.surface, prod.behavior) +
-      prod.sizeClause +
-      propClause +
-      camera
+      prod.sizeClause + mugHandle +
+      propClause + cornerClause +
+      camera + PRO_QUALITY
     );
   }
 
-  // Apparel — original flat-lay garment shot (unchanged).
+  // Apparel — original flat-lay garment shot (+ optional corner decor + pro-quality tail).
   const sizeClause = ` The printed graphic should be prominent, occupying approximately ${sizePct}% of the center chest area.`;
   return (
     `Photorealistic e-commerce flat-lay product photo. A plain ${p.color} ${p.garmentPhrase}, ` +
     `${arrangement.phrase}, on ${surface.phrase}, ${lighting.phrase}. ` +
     fidelityBlock(p.color) +
     sizeClause +
-    propClause +
-    " Shot from directly above, editorial product photography."
+    propClause + cornerClause +
+    " Shot from directly above, editorial product photography." + PRO_QUALITY
   );
 }
 
