@@ -149,12 +149,15 @@ function CatalogGrid({
       {!catalogLoading && catalog.length === 0 && (
         <p style={{ fontSize: 12, color: "#e5484d" }}>無法載入 Printful 產品目錄</p>
       )}
-      {/* 3 columns, fixed 50×50 thumbnails. Fixed-PIXEL image sizing (not paddingTop:"100%"
-          percentage height) is deliberate: the percentage trick formed a circular sizing
-          dependency with the grid's row height that collapsed rows to ~5.6px (slivers) or
-          made cards overlap. Fixed px has no such dependency — verified live on production DOM. */}
+      {/* 3-col grid of SQUARE cards, image fills each card. Two CSS facts are load-bearing
+          (both verified live on production DOM, do NOT change without re-testing):
+          • aspectRatio:"1 / 1" on the card → square that scales with the column width.
+          • gridAutoRows:"max-content" on the grid → REQUIRED so each row takes the card's
+            full aspect-ratio height. With the default auto/1fr rows, the aspect-ratio
+            height does NOT feed grid track sizing here, rows collapse, and cards OVERLAP
+            (live test: max-content→no overlap; auto/1fr→cards overlap by ~80px). */}
       {catalog.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", alignItems: "start", gap: 6, maxHeight: 360, overflowY: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gridAutoRows: "max-content", gap: 6, maxHeight: 360, overflowY: "auto" }}>
           {catalog.map((p) => {
             const selected = selectedIds.has(p.id);
             const name = p.title.replace(/\s*\|.*$/, "");
@@ -167,26 +170,22 @@ function CatalogGrid({
                   cursor: "pointer",
                   border: selected ? "2px solid #4f8cff" : "2px solid #333",
                   borderRadius: 6,
-                  background: "#111",
+                  overflow: "hidden",
+                  background: "#1a1a1a",
                   position: "relative",
-                  padding: 6,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 4,
-                  textAlign: "center",
+                  aspectRatio: "1 / 1",
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.image} alt={name} style={{ width: 50, height: 50, objectFit: "cover", borderRadius: 4, display: "block", flexShrink: 0 }} />
+                <img src={p.image} alt={name} loading="lazy" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 {selected && (
-                  <div style={{ position: "absolute", top: 4, right: 4, background: "#4f8cff", borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#fff", fontWeight: 700 }}>✓</div>
+                  <div style={{ position: "absolute", top: 4, right: 4, background: "#4f8cff", borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", fontWeight: 700, zIndex: 2 }}>✓</div>
                 )}
-                <div style={{ width: "100%" }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "14px 6px 4px", background: "linear-gradient(transparent, rgba(0,0,0,0.85))", zIndex: 1 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: "#fff", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                     {name}
                   </div>
-                  <div style={{ fontSize: 9, opacity: 0.55, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.7)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                     {p.typeName} · #{p.id}
                   </div>
                 </div>

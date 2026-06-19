@@ -85,6 +85,29 @@ $insert
 
 [rollback] `git revert` 至 578c97c0 並 sg-deploy；所有改動為 additive（新檔 + 既有函式擴充），無 destructive migration。
 
+### fix(mockup): CatalogGrid 圖片填滿方形卡片（aspect-ratio + gridAutoRows:max-content，響應式不重疊）
+
+[任務理解] 用戶嫌 50×50 小圖配寬卡片醜，要求「圖片填滿卡片、一排 3 張」。
+
+[現況分析（live DOM 實測各方案）] 在 production DOM 注入候選 CSS 量「方形 + 圖填滿 + 不重疊」：
+- aspect-ratio 卡片 + gridAutoRows:auto/1fr/alignItems:start → 卡片是方形但 **row2 top < row1 bottom = 重疊 ~80px**（aspect-ratio 高度不參與 grid row 計算）。
+- 固定 px gridAutoRows → 不重疊但非響應式 magic number。
+- **✅ aspect-ratio:"1/1" 卡片 + gridAutoRows:"max-content" → 101×101 方形 + 無重疊（max-content 強制 row 認 aspect-ratio 高度）**。響應式、無 magic number。
+
+[已修改]
+- `app/tools/mockup/MockupStudio.tsx` (CatalogGrid) — grid 改 `gridAutoRows:"max-content"`（移除 alignItems:start，max-content 不需要）；卡片改 `aspectRatio:"1/1"`（響應式方形）；圖片改 `position:absolute, inset:0, 100%×100%, objectFit:cover`（填滿卡片）；名稱+型號改底部漸層浮層（white text）；img 加 `loading="lazy"`（critic 建議，圖變多變大）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Chrome(MCP) | action=live DOM 實測 aspect-ratio+max-content | result=cardWxH=101x101, square=true, noOverlap=true(row2 706 ≥ row1 700), 對照 auto/1fr noOverlap=false
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=7/7
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（JSX 正確、z-index image<overlay(1)<badge(2)、overlay 不擋 onClick、行為無退化）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=paddingTop,aspectRatio,gridAutoRows | hits=0 stale（無殘留錯誤 pattern）
+
+[剩餘風險] 部署後需 production 目視 + 量 DOM 確認 3 欄方形填滿無重疊。Critic 非阻斷建議（未做）：卡片 keyboard a11y、img onError fallback。
+
+[rollback] git revert；純 presentational JSX。
+
 ### fix(mockup): CatalogGrid 改 3 欄固定 50×50 px 縮圖（徹底棄用 paddingTop% 百分比高度）
 
 [任務理解] alignItems:start 雖讓 cell 不塌，但用戶回報卡片「疊在一起」，並明確要求「50×50 圖、一排 3 個」。
