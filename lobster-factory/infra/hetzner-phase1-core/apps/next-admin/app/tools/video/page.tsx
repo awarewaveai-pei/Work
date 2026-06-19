@@ -1,4 +1,4 @@
-import VideoStudio from "./VideoStudio";
+import VideoTabs from "./VideoTabs";
 
 export const metadata = { title: "影片生成工具 · Lobster Factory" };
 
@@ -7,9 +7,9 @@ export default function VideoPage() {
     <>
       <div className="topbar">
         <span className="topbar-title">影片生成工具</span>
-        <span className="topbar-env">流程 · 成本 · 多平台尺寸輸出</span>
+        <span className="topbar-env">前製腳本 → 影片生產 · 一鍵接力出片</span>
       </div>
-      <VideoStudio />
+      <VideoTabs />
     </>
   );
 }

@@ -6,6 +6,28 @@ $insert
 
 ## 2026-06-19
 
+### feat(video): ScriptForge 影片腳本生成器整合進 /tools/video（前製腳本 → 影片生產接力）
+
+[任務理解] 用戶自寫一個 ScriptForge 短影音腳本生成器（704 行 React artifact，24 模組：手動/文章轉/產業模板/A-B-C 廣告/品牌故事/Hook/痛點/爆款拆解/多語/30天計畫/客戶提案…），要「整合進 /tools/video 並用它生成影片」。核心定位：ScriptForge=前製（寫台詞/分鏡/字幕），既有 VideoStudio=生產（腳本→Flux 圖→TTS→MP4），互補。**致命阻斷**：artifact 的 `claude()` 瀏覽器直連 `api.anthropic.com` 無金鑰 → 生產必 401 + 金鑰外洩風險。
+
+[已修改]
+- `app/api/tools/script-forge/route.ts`（新）：單一 LLM 串流中轉端點，照抄 `content/generate/route.ts` 慣例（role gate `resolveOpsRole`+`canCreateAiImageJob` → `ANTHROPIC_API_KEY` server 端 → plain-text ReadableStream from `@anthropic-ai/sdk`）；SYS 固定 server 端（受限端點，client 只送 prompt）；model `claude-sonnet-4-6`；prompt 24k 字封頂（bound input-token 成本）；AbortController belt-and-suspenders。
+- `app/tools/video/ScriptForge.tsx`（由 `scripts/script_forge_video.jsx` 移植）：加 `"use client"`；`claude()` 改打中轉 route 讀 plain-text（修掉 401/金鑰）+ 末尾 `dec.decode()` flush（CJK 尾字防斷）；加 `ProductionBridge` context 讓共用 `ScriptResult` 取得 `onSendToProduction` 免穿 24 模組 + 「🎬 送去生產影片」按鈕（scene.dialogue→narration / title→topic+articleTitle）；修原 artifact 2 個真語法 bug（`setAudience`/`setKeyword` 漏 `)`，瀏覽器本來也會炸）；`e.target.style`→`e.currentTarget.style`；mini-component prop bag 標 `:any`（tsc strict:false 下必填推斷）。
+- `app/tools/video/VideoTabs.tsx`（新）：外層兩分頁（📝前製腳本 ↔ 🎬影片生產）+ prefill 接力狀態（條件渲染確保 VideoStudio 以最新 initial 重新 seed）。
+- `app/tools/video/VideoStudio.tsx`：加選用 `initial?:{topic,articleTitle,articleContent}` prop seed 三個 useState（向後相容）。
+- `app/tools/video/page.tsx`：渲染 `<VideoTabs/>` 取代 `<VideoStudio/>`。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（build gate clean；移植檔 + 新 route + 全元件圖編譯過）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl localhost:3000/tools/video`（dev, auth-disabled）| exit=0 | result=HTTP 200，46KB SSR HTML 含「前製腳本」「影片生產」「ScriptForge」→ page+VideoTabs+ScriptForge+VideoStudio 全數編譯且伺服器渲染成功
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl -XPOST localhost:3000/api/tools/script-forge`（operator）| exit=0 | result=HTTP 503「ANTHROPIC_API_KEY not configured」→ route 載入、權限閘通過、無金鑰乾淨降級（非 404/500）；happy-path Claude 串流本機無 key 未測（該段照抄 content/generate）
+- REVIEW_DONE: critic=Deep | verdict=pass（0 Critical，無 auth bypass/secret leak/injection；401 金鑰 bug 確認修復）| findings=0c/2m/3n | 已修：Major prompt 長度封頂 + Minor decode flush；延後：Major 每日 quota（與 content/generate 同水位，仿 `lib/tarot/quota.ts` 之後做）、Minor 24 模組錯誤外顯 + client 端 AbortController 取消（優化非正確性）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`script-forge|VideoTabs|VideoStudio|ScriptForge|api.anthropic.com/v1/messages` | hits=預期內全部一致（VideoTabs 唯一 import 點 page.tsx；VideoStudio/ScriptForge 唯一 import 點 VideoTabs；無殘留直連 api.anthropic.com；scripts/script_forge_video.jsx 為原始 artifact 已被 .tsx 取代）
+
+[剩餘風險] (1) 本機無金鑰，真 Claude 串流 + 24 模組逐一 happy-path 未端到端跑過（deploy 後需用戶實點各模組）。(2) Task B 串接客戶（載入 content/sites `contentDefaults.marketing` 當品牌語境）尚未做——資料已存在（GET /api/content/sites 已回 marketing），零新後端，下一步。(3) 未 deploy（High-risk gated，等用戶 go）。(4) 原始 `scripts/script_forge_video.jsx` 仍在（含 2 個已在 .tsx 修掉的語法 bug），為 scratch source，可移除。
+
+[rollback] `git revert <hash>` + sg-deploy；新增 route/元件為 additive，page.tsx 一行改回 `<VideoStudio/>` 即還原。
+
 ### feat(video): 加 3 個影片專屬攝影風格 preset（8b37c752）
 
 [任務理解] 用戶要求風格選擇除了 tarot 畫家/媒材風格，也要影片攝影風格：電影感（預設）/紀錄片/商業攝影（自帶英文 prompt）。

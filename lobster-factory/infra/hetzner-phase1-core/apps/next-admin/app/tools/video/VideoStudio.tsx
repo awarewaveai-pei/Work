@@ -103,7 +103,13 @@ function getCurrentStepIndex(step: string): number {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function VideoStudio() {
+interface VideoStudioInitial {
+  topic?: string;
+  articleTitle?: string;
+  articleContent?: string;
+}
+
+export default function VideoStudio({ initial }: { initial?: VideoStudioInitial } = {}) {
   // ── Config knobs ──
   const [totalScenes, setTotalScenes] = useState(6);
   const [customScenes, setCustomScenes] = useState(3);
@@ -119,10 +125,10 @@ export default function VideoStudio() {
     [totalScenes, customScenes, brollScenes, imageModel],
   );
 
-  // ── Generate form ──
-  const [topic, setTopic] = useState("");
-  const [articleTitle, setArticleTitle] = useState("");
-  const [articleContent, setArticleContent] = useState("");
+  // ── Generate form ── (initial = 從 ScriptForge「送去生產」帶入的腳本預填)
+  const [topic, setTopic] = useState(initial?.topic ?? "");
+  const [articleTitle, setArticleTitle] = useState(initial?.articleTitle ?? "");
+  const [articleContent, setArticleContent] = useState(initial?.articleContent ?? "");
   const [language, setLanguage] = useState("繁體中文");
   const [videoStyle, setVideoStyle] = useState("");
   const [videoStyleGroup, setVideoStyleGroup] = useState(VIDEO_STYLE_GROUPS[0] ?? "");
