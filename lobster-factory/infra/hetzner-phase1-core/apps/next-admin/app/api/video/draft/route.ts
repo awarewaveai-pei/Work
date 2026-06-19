@@ -39,7 +39,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) {
+  // providedScenes 路徑跳過 Claude 生腳本 → 不需 anthropicKey；只有要生腳本時才強制。
+  if (!anthropicKey && providedScenes.length === 0) {
     return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
   }
 
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       visualStyle: body.visualStyle,
       providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
     },
-    anthropicKey,
+    anthropicKey ?? "",
   );
 
   if (!result.ok) {

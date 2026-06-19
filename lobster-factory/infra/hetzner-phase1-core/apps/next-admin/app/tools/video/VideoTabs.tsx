@@ -13,6 +13,7 @@ interface ProductionPrefill {
   topic: string;
   articleTitle: string;
   articleContent: string;
+  scenes?: { narration: string; imagePrompt: string }[];
 }
 
 const TABS = [

@@ -425,6 +425,16 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           <Card title="④ 生成影片">
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
+              {providedScenes.length > 0 ? (
+                <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: "#166534", lineHeight: 1.6 }}>
+                  ✅ 已從前製腳本帶入 <b>{providedScenes.length}</b> 個場景（台詞＝旁白、畫面＝生圖）。下方調整場景設定後，按「📋 生成草稿」即用此腳本出片，不重寫。
+                </div>
+              ) : (
+                <div style={{ background: "#f8fafc", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "9px 12px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                  💡 想用寫好的腳本？到「📝 前製腳本」寫完按「送去生產影片」帶過來；或在此直接打主題快速生成。
+                </div>
+              )}
+
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <label style={labelStyle}>主題 / 關鍵字 <span style={{ color: "#dc2626" }}>*</span></label>
                 <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)}
@@ -492,6 +502,42 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                 <textarea value={articleContent} onChange={(e) => setArticleContent(e.target.value)}
                   placeholder="留白 = 以主題/標題生成腳本" rows={4}
                   style={{ ...inputStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12 }} disabled={isLoading} />
+              </div>
+
+              {/* §2 場景設定（移入主流程：內容後、生成前 — Q3 由上到下一條順下來）*/}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "12px 14px", borderRadius: 8, background: "#f8fafc", border: "1px solid var(--border-subtle)" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)" }}>場景設定</span>
+                {providedScenes.length === 0 ? (
+                  <>
+                    <KnobRow label="場景總數" hint={`${totalScenes} 場`} min={1} max={20} step={1} value={totalScenes} onChange={handleTotalChange} />
+                    <KnobRow
+                      label={`自訂 AI 圖（Flux），目前 ${customScenes}/${totalScenes}`}
+                      hint={`B-roll：${brollScenes}`}
+                      min={0} max={totalScenes} step={1}
+                      value={customScenes} onChange={setCustomScenes}
+                    />
+                  </>
+                ) : (
+                  <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>場景數由前製腳本決定（{providedScenes.length} 場），每場依「畫面」生 AI 圖。</div>
+                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>生圖模型</span>
+                  <select value={imageModel} onChange={(e) => setImageModel(e.target.value)} style={inputStyle}>
+                    {Object.entries(IMAGE_RATES).map(([id, r]) => (
+                      <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>配音模型</span>
+                  <select value={voiceModelId} onChange={(e) => setVoiceModelId(e.target.value)} style={inputStyle}>
+                    {VOICE_MODELS.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}{v.note ? ` — ${v.note}` : ""} [{v.lang}] {v.badge}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Draft editor (replaces buttons when draft is ready) */}
