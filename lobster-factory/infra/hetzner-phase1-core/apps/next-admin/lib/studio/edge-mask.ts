@@ -325,9 +325,10 @@ export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
       let drips = "";
       for (let i = 0; i < 3; i++) {
         const x = w * (0.28 + rnd() * 0.44);
-        const top = h / 2 + ry * 0.62;
+        const top = h / 2 + ry * 0.55;
         const dr = Math.min(w, h) * (0.05 + rnd() * 0.05);
-        drips += `<circle cx="${f1(x)}" cy="${f1(top + dr * 2 * rnd())}" r="${f1(dr)}"/>`;
+        const cy = Math.min(h, top + dr * 2 * rnd()); // keep drip inside the box (critic 2026-06-20)
+        drips += `<circle cx="${f1(x)}" cy="${f1(cy)}" r="${f1(dr)}"/>`;
       }
       return `<g fill="#fff"><path d="${path}"/>${drips}</g>`;
     },

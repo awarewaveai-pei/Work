@@ -12,6 +12,12 @@ import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
 import type { MockupView } from "@/lib/studio/printful-mockup";
+import {
+  EDGE_MASK_STYLES,
+  applyEdgeMask,
+  buildMaskSvg,
+  type EdgeMaskId,
+} from "@/lib/studio/edge-mask";
 
 const PRODUCT_TYPES = [
   { value: "tshirt", label: "T-shirt", aspect: "4:5" as AspectRatio, suffix: "t-shirt graphic design, centered composition, plain background" },
@@ -61,6 +67,9 @@ const TRENDING_CATEGORIES = [
 ];
 
 const TRANSFORM_MODEL: StudioModel = "flux-kontext-dev";
+
+// Fixed seed so the edge-style preview thumbnails match what `applyEdge` actually composites.
+const EDGE_APPLY_SEED = 7;
 
 interface ModelResult {
   model: StudioModel;
@@ -184,6 +193,12 @@ export default function StudioWorkbench() {
   const [mockups, setMockups] = useState<MockupView[]>([]);
   const [savedMockups, setSavedMockups] = useState<Record<string, "saving" | "saved" | "error">>({});
 
+  // ✨ Edge-mask (organic edge → transparent PNG) per-result post-processing state
+  const [edgeStates, setEdgeStates] = useState<Record<string, "idle" | "applying" | "done" | "error">>({});
+  const [edgeOriginals, setEdgeOriginals] = useState<Record<string, string>>({});
+  const [edgeApplied, setEdgeApplied] = useState<Record<string, EdgeMaskId | undefined>>({});
+  const [edgeAmount, setEdgeAmount] = useState(55);
+
   // Style / Model group filter state
   const STYLE_GROUPS = Array.from(new Set(STYLE_CATALOG.map((item) => item.group)));
   const MODEL_GROUPS = Array.from(new Set(STUDIO_MODEL_OPTIONS.map((item) => item.group)));
@@ -199,6 +214,8 @@ export default function StudioWorkbench() {
   const bgInFlight = useRef<Record<string, boolean>>({});
   const mockupInFlight = useRef(false);
   const jobIdRef = useRef<string | null>(null);
+  const edgeInFlight = useRef<Record<string, boolean>>({});
+  const edgePending = useRef<Record<string, { styleId: EdgeMaskId; amount: number } | null>>({});
 
   const product = PRODUCT_TYPES.find((p) => p.value === productType) ?? PRODUCT_TYPES[0];
 
@@ -213,6 +230,18 @@ export default function StudioWorkbench() {
   );
 
   const resolvedStylePrompt = useMemo(() => (style ? resolveStylePrompt(style) : ""), [style]);
+
+  // Pre-rendered edge-style thumbnails (white shape on transparent) — fixed preview params.
+  const edgePreviews = useMemo(
+    () =>
+      EDGE_MASK_STYLES.map((s) => ({
+        id: s.id,
+        zh: s.label,
+        en: s.labelEn,
+        svg: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildMaskSvg(s.id, 48, 48, { amount: 62, seed: EDGE_APPLY_SEED }))}`,
+      })),
+    [],
+  );
 
   const fileMeta = useMemo<SemanticFileMeta>(() => {
     const p = PRODUCT_TYPES.find((x) => x.value === productType);
@@ -338,6 +367,9 @@ export default function StudioWorkbench() {
     setSaveStates({});
     setBgStates({});
     setOriginalImages({});
+    setEdgeStates({});
+    setEdgeOriginals({});
+    setEdgeApplied({});
 
     // Initialise all slots as busy so UI shows pending cards immediately
     const slots: ModelResult[] = modelList.map((m) => ({ model: m, image: null, seed: null, busy: true }));
@@ -385,6 +417,9 @@ export default function StudioWorkbench() {
       setResults((prev) => prev.map((r) => r.model === model ? { ...r, image: json.image! } : r));
       setBgStates((prev) => ({ ...prev, [model]: "done" }));
       setSaveStates((prev) => ({ ...prev, [model]: "idle" }));
+      setEdgeStates((prev) => ({ ...prev, [model]: "idle" }));
+      setEdgeOriginals((prev) => { const n = { ...prev }; delete n[model]; return n; });
+      setEdgeApplied((prev) => { const n = { ...prev }; delete n[model]; return n; });
     } catch { setBgStates((prev) => ({ ...prev, [model]: "error" })); }
     finally { bgInFlight.current[model] = false; }
   }, []);
@@ -396,7 +431,55 @@ export default function StudioWorkbench() {
     setOriginalImages((prev) => { const n = { ...prev }; delete n[model]; return n; });
     setBgStates((prev) => ({ ...prev, [model]: "idle" }));
     setSaveStates((prev) => ({ ...prev, [model]: "idle" }));
+    setEdgeStates((prev) => ({ ...prev, [model]: "idle" }));
+    setEdgeOriginals((prev) => { const n = { ...prev }; delete n[model]; return n; });
+    setEdgeApplied((prev) => { const n = { ...prev }; delete n[model]; return n; });
   }, [originalImages]);
+
+  // ✨ Apply an organic edge mask to the active design (client-side canvas compositing).
+  // Always masks from the pre-edge base, so switching styles replaces rather than stacks.
+  // While one composite is in flight the latest request is QUEUED (not dropped) and drained
+  // when it finishes — so a fast slider drag can't leave the image on a stale amount.
+  const applyEdge = useCallback(async (model: StudioModel, styleId: EdgeMaskId) => {
+    if (edgeInFlight.current[model]) {
+      edgePending.current[model] = { styleId, amount: edgeAmount };
+      return;
+    }
+    const cur = results.find((r) => r.model === model);
+    const base = edgeOriginals[model] ?? cur?.image;
+    if (!base) return;
+    edgeInFlight.current[model] = true;
+    setEdgeStates((prev) => ({ ...prev, [model]: "applying" }));
+    let nextStyle: EdgeMaskId | null = styleId;
+    let nextAmount = edgeAmount;
+    try {
+      while (nextStyle) {
+        const appliedStyle: EdgeMaskId = nextStyle;
+        const res = await applyEdgeMask(base, appliedStyle, { amount: nextAmount, seed: EDGE_APPLY_SEED });
+        if (!res.ok) { setEdgeStates((prev) => ({ ...prev, [model]: "error" })); break; }
+        setEdgeOriginals((prev) => (prev[model] ? prev : { ...prev, [model]: base }));
+        setResults((prev) => prev.map((r) => r.model === model ? { ...r, image: res.image } : r));
+        setEdgeApplied((prev) => ({ ...prev, [model]: appliedStyle }));
+        setSaveStates((prev) => ({ ...prev, [model]: "idle" }));
+        const pending = edgePending.current[model];
+        edgePending.current[model] = null;
+        if (!pending) { setEdgeStates((prev) => ({ ...prev, [model]: "done" })); break; }
+        nextStyle = pending.styleId;
+        nextAmount = pending.amount;
+      }
+    } catch { setEdgeStates((prev) => ({ ...prev, [model]: "error" })); }
+    finally { edgeInFlight.current[model] = false; edgePending.current[model] = null; }
+  }, [results, edgeOriginals, edgeAmount]);
+
+  const restoreEdge = useCallback((model: StudioModel) => {
+    const base = edgeOriginals[model];
+    if (!base) return;
+    setResults((prev) => prev.map((r) => r.model === model ? { ...r, image: base } : r));
+    setEdgeOriginals((prev) => { const n = { ...prev }; delete n[model]; return n; });
+    setEdgeApplied((prev) => { const n = { ...prev }; delete n[model]; return n; });
+    setEdgeStates((prev) => ({ ...prev, [model]: "idle" }));
+    setSaveStates((prev) => ({ ...prev, [model]: "idle" }));
+  }, [edgeOriginals]);
 
   const saveToDesigns = useCallback(async (model: StudioModel, image: string) => {
     setSaveStates((prev) => ({ ...prev, [model]: "saving" }));
@@ -730,6 +813,63 @@ export default function StudioWorkbench() {
                 })()}
               </div>
 
+              {/* ✨ 邊緣風格 — 套上有機邊 → 透明 PNG（後續存圖 / 建商品 / 印刷都用這版） */}
+              {(() => {
+                const m = activeResult.model;
+                const est = edgeStates[m] ?? "idle";
+                const applied = edgeApplied[m];
+                return (
+                  <div style={{ marginTop: 12, padding: 10, border: "1px solid var(--border, #333)", borderRadius: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>✨ 邊緣風格</span>
+                      <span style={{ fontSize: 11, opacity: 0.55 }}>有機邊 → 透明 PNG（深色衣服也印得出來）</span>
+                      {est === "applying" && <span style={{ fontSize: 11, opacity: 0.6 }}>套用中…</span>}
+                      {est === "error" && <span style={{ fontSize: 11, color: "#e5484d" }}>套用失敗</span>}
+                      {applied && (
+                        <button className="btn-secondary" style={{ fontSize: 11, marginLeft: "auto" }} onClick={() => restoreEdge(m)}>
+                          還原原圖
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {edgePreviews.map((pv) => {
+                        const active = applied === pv.id;
+                        return (
+                          <button
+                            key={pv.id}
+                            type="button"
+                            title={pv.en}
+                            disabled={est === "applying"}
+                            onClick={() => void applyEdge(m, pv.id)}
+                            style={{
+                              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                              width: 60, padding: 4, borderRadius: 8, cursor: "pointer",
+                              background: active ? "rgba(99,102,241,0.15)" : "rgba(127,127,127,0.06)",
+                              border: `1px solid ${active ? "#6366f1" : "var(--border, #333)"}`,
+                              transition: "all 0.15s",
+                            }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={pv.svg} alt={pv.zh} style={{ width: 40, height: 40, background: "#3a3a3a", borderRadius: 4 }} />
+                            <span style={{ fontSize: 10, opacity: 0.8, lineHeight: 1.1, textAlign: "center" }}>{pv.zh}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                      <span style={{ fontSize: 11, opacity: 0.6 }}>邊緣強度</span>
+                      <input
+                        type="range" min={10} max={90} step={1} value={edgeAmount}
+                        onChange={(e) => setEdgeAmount(Number(e.target.value))}
+                        onPointerUp={() => { if (applied) void applyEdge(m, applied); }}
+                        style={{ flex: 1 }}
+                      />
+                      <span style={{ fontSize: 11, opacity: 0.6, width: 28, textAlign: "right" }}>{edgeAmount}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Mockups */}
               {mockups.length > 0 && (
                 <div style={{ marginTop: 14 }}>
@@ -770,6 +910,9 @@ export default function StudioWorkbench() {
                     setSaveStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
                     setBgStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
                     setOriginalImages((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                    setEdgeStates((prev) => ({ ...prev, [activeResult.model]: "idle" }));
+                    setEdgeOriginals((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
+                    setEdgeApplied((prev) => { const n = { ...prev }; delete n[activeResult.model]; return n; });
                     setMockupState("idle"); setMockups([]); setSavedMockups({});
                   }}
                 />

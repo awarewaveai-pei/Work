@@ -6,6 +6,26 @@ $insert
 
 ## 2026-06-20
 
+### feat(studio): 邊緣遮罩積木 Phase 1/3 — 生成圖一鍵套有機邊→透明 PNG
+
+[任務] studio/tarot 生成圖是硬直邊,做服飾設計需要筆刷/有機邊(可印深色衣)。Phase 1/3:核心模組 + studio 內嵌一鍵套用(Phase 2 = designs 圖庫撈圖入口+一鍵建商品 handoff;Phase 3 = canvas 手動面板)。使用者明確要 studio「直接做」、designs「撈出來做並順下去建商品」。
+
+[已修改]
+- 新增 `lib/studio/edge-mask.ts`:11 風格積木註冊表(有機水滴/變形蟲/墨漬/油漆飛濺/水花/煙霧/雲朵/液體/融化/熔岩/乾毛筆)。平滑類 bézier blob,紋理類 feTurbulence displacement;`applyEdgeMask` 用 canvas `globalCompositeOperation='destination-in'` 合成→透明 PNG。純程式零素材、離線、免費。client-only(DOM 只在函式內,pure layer SSR-safe)。
+- `StudioWorkbench.tsx`:生成圖下方加「✨ 邊緣風格」面板(縮圖一鍵套 + 強度滑桿 + 還原),鏡像 removeBg pattern;edge state 與 removeBg/restoreOriginal/onEditedImage/generate 一致清理(圖換了就丟 edge 基準);slider 連拖用 queue-drain(不丟 trailing)。套用後 `results[].image` 換透明 PNG,下游 存圖/OutputTrackBar/建商品自動沿用。
+- 新增 `lib/studio/edge-mask.test.ts`:8 純函式測試(11 風格 SVG 有效性/紋理 filter/決定性/seed 變異/amount clamp/無 NaN)。
+- 全鏈透明確認:印刷檔 `buildFaithfulPrintFile` 用 `sharp.png()` 不 flatten(`print-file.ts:118`)→綁 Printful `files[type:front]`→軟邊真的印得出(深色衣 OK)。只有 mockup 預覽/web 縮圖/塔羅卡 CMYK flatten(本該白底,不影響服飾印刷)。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 (全專案無型別錯)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/studio/edge-mask.test.ts | exit=0 | 8/8 pass
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/4n → 修3(slider trailing 改 queue-drain / lava drip cy clamp(0,h) / seed 抽 EDGE_APPLY_SEED 常數);verified clean:SVG 無使用者字串(無 XSS)/destination-in 邏輯/taint try-catch/edge-state 5 路徑清理一致/無 stale closure。browser-only `applyEdgeMask`(vitest 無 DOM 測不到)逐行人工驗證。
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=applyEdgeMask|EDGE_MASK_STYLES|buildMaskSvg|EdgeMaskId|getEdgeMaskStyle | hits=3(全=新增/改的3檔本身;agency-os/scripts 0 外部 consumer;純新增無既有 symbol 改名/移除,無 stale)
+
+[剩餘風險] 真實瀏覽器 canvas 合成待部署後 browser-test 親測(vitest 無 DOM)。Phase 2/Phase 3 未做。
+
+[rollback] git revert;純新增(無既有 symbol 改名/移除),移除面板與模組即復原。
+
 ### feat(pod): Phase 1b — 多色多款對接（hex bind）一條鏈
 
 [任務] PLAN Phase 1b:啟用多色多款。pod-product / route / PublishWizard 一條 color 鏈,Woo 建 `model.colors` + Printful **用 hex 綁定**(免 Printful colour rename)。
