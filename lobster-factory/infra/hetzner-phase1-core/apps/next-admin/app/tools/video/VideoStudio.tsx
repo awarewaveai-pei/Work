@@ -8,8 +8,20 @@ import type { VideoHistoryItem } from "@/app/api/video/history/route";
 import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
 import { resolveStylePrompt } from "@/app/tools/tarot/cards";
 
-// 重用 tarot/studio 的風格目錄（103 風格，4 組）。前端解析成英文 prompt 再傳 API。
-const VIDEO_STYLE_GROUPS = Array.from(new Set(STYLE_CATALOG.map((s) => s.group)));
+// 影片專屬攝影風格 preset（放最前 = 預設組）。值為英文 prompt，直接送 Flux。
+const VIDEO_STYLE_PRESETS: { zh: string; group: string; prompt: string }[] = [
+  { zh: "電影感", group: "📹 影片風格", prompt: "Cinematic wide-angle 16:9, dramatic lighting, rich color grade" },
+  { zh: "紀錄片", group: "📹 影片風格", prompt: "Documentary photography, natural light, authentic moment" },
+  { zh: "商業攝影", group: "📹 影片風格", prompt: "Clean commercial photography, studio lighting, professional" },
+];
+const VIDEO_PRESET_BY_LABEL = new Map(VIDEO_STYLE_PRESETS.map((p) => [p.zh, p.prompt]));
+// 影片 preset + tarot/studio 103 風格合併（preset 在前 → 預設組）。
+const VIDEO_STYLE_CATALOG = [...VIDEO_STYLE_PRESETS, ...STYLE_CATALOG];
+const VIDEO_STYLE_GROUPS = Array.from(new Set(VIDEO_STYLE_CATALOG.map((s) => s.group)));
+// preset 直接回英文 prompt；其餘走 tarot resolveStylePrompt（zh label → 英文）。
+function resolveVideoStyle(label: string): string {
+  return VIDEO_PRESET_BY_LABEL.get(label) ?? resolveStylePrompt(label);
+}
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
@@ -233,7 +245,7 @@ export default function VideoStudio() {
           articleTitle: articleTitle.trim() || undefined,
           articleContent: articleContent.trim() || undefined,
           language,
-          visualStyle: videoStyle ? resolveStylePrompt(videoStyle) : undefined,
+          visualStyle: videoStyle ? resolveVideoStyle(videoStyle) : undefined,
         }),
       });
       const j = (await res.json()) as {
@@ -468,7 +480,7 @@ export default function VideoStudio() {
                   ))}
                 </div>
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
-                  {STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
+                  {VIDEO_STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
                     const active = videoStyle === item.zh;
                     return (
                       <button key={item.zh} type="button" onClick={() => setVideoStyle(active ? "" : item.zh)} disabled={isBusy}
