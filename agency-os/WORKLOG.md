@@ -85,6 +85,24 @@ $insert
 
 [rollback] `git revert` 至 578c97c0 並 sg-deploy；所有改動為 additive（新檔 + 既有函式擴充），無 destructive migration。
 
+### fix(mockup): CatalogGrid 改 3 欄固定 50×50 px 縮圖（徹底棄用 paddingTop% 百分比高度）
+
+[任務理解] alignItems:start 雖讓 cell 不塌，但用戶回報卡片「疊在一起」，並明確要求「50×50 圖、一排 3 個」。
+
+[已修改]
+- `app/tools/mockup/MockupStudio.tsx` (CatalogGrid) — grid 改 `repeat(3, 1fr)`；卡片改 flex 直排（圖在上、名稱+型號在下、置中）；圖片改**固定 `width:50 height:50` px**（objectFit:cover），完全移除 `paddingTop:"100%"` wrapper。固定像素無循環依賴 → 不塌不疊（critic 已證 designs 那排固定 px 一直正常）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=7/7
+- REALTEST_EVIDENCE: tool=Chrome(MCP) | action=部署後量 production DOM（見 commit 後驗證）| result=待部署後填
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（JSX 正確、百分比高度循環依賴完全移除、badge 錨點正確、onClick/alt/title 行為無退化）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=paddingTop | hits=0（CatalogGrid 僅註解提及，無實際 paddingTop style 殘留）
+
+[剩餘風險] 50×50 在 3 欄 ~106px 卡片中偏小、兩側留白；若用戶要更大可調。需部署後 production 目視 + 量 DOM 確認 3 欄無重疊。
+
+[rollback] git revert；純 presentational JSX 改動，無資料/邏輯影響。
+
 ### fix(mockup): CatalogGrid 細條真因 = grid align-items:stretch + paddingTop% 循環依賴塌列（前 translateZ 誤診修正）
 
 [任務理解] 卡片細條前面修多次（paddingTop / translateZ）全無效，用戶要求看清整個架構。本輪在 production live DOM 逐層量高度 + JS 實測候選修法定位真因。
