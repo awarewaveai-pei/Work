@@ -21,8 +21,13 @@ function getHistory(){try{return JSON.parse(localStorage.getItem("sf_history")||
 /* ── CLAUDE API（改走伺服器中轉 /api/tools/script-forge；SYS 在 route 端，瀏覽器不再直連 api.anthropic.com → 修掉 401 + 金鑰外洩）── */
 // 模型選擇（模組級可變，避免穿過 23 個 claude() callsite）；UI 由設定列下拉設定，server 端會白名單化。
 let SF_MODEL: string = DEFAULT_AI_TEXT_MODEL;
+// 輸出語言（模組級，工具列下拉設定）；在 claude() 注入「預設語言」指令 → 所有模組輸出該語言
+// （與你打的主題/文章語言無關；多語言模組的明確目標仍可覆蓋此預設）。
+const SF_LANGS = ["繁體中文", "English", "簡體中文", "日本語", "한국어", "Español", "Bahasa Melayu"];
+let SF_LANG: string = SF_LANGS[0];
 async function claude(prompt: string, onChunk?: (full: string) => void){
-  const res=await fetch("/api/tools/script-forge",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,model:SF_MODEL})});
+  const langified=`【預設輸出語言：${SF_LANG}】未另行指定語言時，所有文字內容（標題/台詞/字幕/說明等）請用此語言撰寫；JSON 的英文 key 與結構保持不變。\n\n${prompt}`;
+  const res=await fetch("/api/tools/script-forge",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:langified,model:SF_MODEL})});
   if(!res.ok||!res.body){throw new Error(`腳本生成失敗（${res.status}）`);}
   const reader=res.body.getReader();const dec=new TextDecoder();let full="";
   while(true){const{done,value}=await reader.read();if(done)break;full+=dec.decode(value,{stream:true});onChunk?.(full);}
@@ -711,6 +716,7 @@ export default function ScriptForge({ onSendToProduction }: { onSendToProduction
   // ── 串接客戶：載入 內容工具›網站管理 的客戶 contentDefaults.marketing 當品牌語境（零新後端，GET 已回 marketing）──
   const[clients,setClients]=useState<any[]>([]);
   const[model,setModel]=useState<string>(SF_MODEL);
+  const[lang,setLang]=useState<string>(SF_LANG);
   useEffect(()=>{(async()=>{try{const r=await fetch("/api/content/sites");const j=await r.json();if(j?.ok&&Array.isArray(j.sites))setClients(j.sites.filter((s:any)=>s.active!==false));}catch{/* best-effort：未登入/無客戶 → 下拉為空 */}})();},[]);
   function loadClient(id:string){
     const s=clients.find((c:any)=>c.id===id);if(!s)return;
@@ -763,6 +769,10 @@ export default function ScriptForge({ onSendToProduction }: { onSendToProduction
             <b style={{color:C.ink}}>怎麼用：</b>① 上方選功能（預設「手動生成」）→ ② 填主題、按生成 → ③ 結果頁按「<b style={{color:C.coral}}>🎬 送去生產影片</b>」轉成影片
           </span>
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🌐 語言</label>
+            <select value={lang} onChange={e=>{setLang(e.target.value);SF_LANG=e.target.value;}} title="腳本輸出語言（與你打的主題語言無關）" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer"}}>
+              {SF_LANGS.map((l)=><option key={l} value={l}>{l}</option>)}
+            </select>
             <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🤖 AI 模型</label>
             <select value={model} onChange={e=>{setModel(e.target.value);SF_MODEL=e.target.value;}} title="文字 AI 模型（與內容工具共用同一份選單）" style={{padding:"5px 9px",borderRadius:7,border:`1.5px solid ${C.border}`,background:C.white,color:C.ink,fontSize:11.5,fontFamily:"inherit",cursor:"pointer"}}>
               {["Claude","OpenAI"].map((g)=><optgroup key={g} label={g}>{AI_TEXT_MODELS.filter((m)=>m.group===g).map((m)=><option key={m.value} value={m.value}>{m.label}</option>)}</optgroup>)}

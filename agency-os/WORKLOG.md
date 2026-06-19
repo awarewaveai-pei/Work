@@ -6,6 +6,24 @@ $insert
 
 ## 2026-06-20
 
+### fix(video): ScriptForge 加輸出語言選擇器（修「打英文卻出中文」）
+
+[任務理解] 使用者打英文主題「Healing Through Art」但腳本角度出中文。根因：ScriptForge 腳本生成 prompt **無輸出語言指定**（SYS 與 prompt 皆中文）→ AI 預設輸出中文，與主題語言無關；前製腳本（不同於影片生產 tab）**無語言選擇器**。
+
+[已修改]
+- `app/tools/video/ScriptForge.tsx`：加 `SF_LANGS`（繁中/English/簡中/日本語/한국어/Español/Bahasa Melayu）+ 模組級 `SF_LANG`；`claude()` 注入「【預設輸出語言：X】未另行指定時所有文字用此語言（JSON 英文 key/結構不變）」前綴（多語言模組的明確目標仍可覆蓋此預設）；工具列加「🌐 語言」下拉（與「🤖 AI 模型」並排）+ `lang` state。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl dev /tools/video` | result=200，SSR 含「🌐 語言」+ English/日本語 選項
+- REVIEW_DONE: critic=Quick(self) | verdict=pass | findings=0c/0m/1n（語言指令採「預設/未另指定」措辭 → 不覆蓋 TranslateModule 明確目標；本變更為已 critic 過的 model-selector pattern 之近似 clone）
+- BUGHUNT_DONE: scope=lobster-factory | grep=`SF_LANG|langified` | hits=claude() 單一注入點（24 模組共用）+ 工具列下拉 + lang state 一致
+- BUGHUNT_SCOPE_NARROW: 純前端單檔 UI + prompt 前綴，無 agency-os/scripts call sites
+
+[剩餘風險] 語言行為依賴 LLM 遵循指令（本機無 ANTHROPIC key 未端到端跑；deploy 後使用者選 English 實測一篇）。
+
+[rollback] `git revert <hash>` + sg-deploy。
+
 ### fix(publish): 選圖器分設計圖/商品照兩區 + ?group 篩選解洗版 + ★設主圖
 
 [任務理解] 使用者：My Designs 有設計圖/Mockup/影片 tab 分類，但 `/tools/publish` 選圖器全部圖擠一起。實機（browser MCP）驗證揭露更致命的洗版：designs 庫全庫 78 張 image（design 72 / mockup 6），但 publish 一次 fetch 最新 60 張且不分類 → 6 張 mockup 有 3 張被 `LIST_LIMIT=60` 擠出，在 publish **永遠選不到**。
