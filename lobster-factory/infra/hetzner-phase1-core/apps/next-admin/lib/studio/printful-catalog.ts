@@ -1,7 +1,10 @@
 /**
- * Printful product catalog — fetches available products with images + printfile specs.
- * All results are cached in-memory (1 h TTL) to avoid hammering the API.
+ * Printful product catalog — fetches the fixed set of POD products we sell (SSOT:
+ * pod-catalog-config) with images + printfile specs. All results are cached in-memory
+ * (1 h TTL) to avoid hammering the API.
  */
+
+import { POD_PRODUCT_MODELS } from "./pod-catalog-config";
 
 const PRINTFUL_API = "https://api.printful.com";
 const TTL_MS = 60 * 60 * 1000; // 1 hour — successful results
@@ -26,17 +29,6 @@ export interface ProductSpec {
   areaWidth: number;
   areaHeight: number;
 }
-
-// Only include printable product types (skip embroidery, packaging, labels, etc.)
-// Note: Printful v2 API uses PHONE-CASE (hyphen) and DRINKWARE
-const WANTED_TYPES = new Set([
-  "T-SHIRT", "SHIRT", "HOODIE", "SWEATSHIRT", "LONGSLEEVE",
-  "TANK_TOP", "JACKET", "SHORTS", "LEGGINGS", "DRESS",
-  "MUG", "DRINKWARE", "TOTE", "BACKPACK",
-  "POSTER", "CANVAS", "STICKER",
-  "PILLOW", "PHONE_CASE", "PHONE-CASE", "FACE_MASK",
-  "SUBLIMATION",
-]);
 
 /** Shirt colours the mockup UI offers. Maps to a real Printful variant per product. */
 export type GarmentColorChoice = "white" | "grey" | "black";
@@ -111,28 +103,53 @@ function timedFetch(url: string, apiKey: string, storeId?: string): Promise<Resp
   }).finally(() => clearTimeout(t));
 }
 
-/** Return catalog product list (cached 1 h). Uses v2 catalog API (all Printful products, not store sync). */
+/**
+ * Fetch a single catalog product by id → CatalogProduct, or null on any failure.
+ * NEVER throws (full try/catch + `!res.ok` guard) — required by the `Promise.all` caller in
+ * fetchCatalogProducts, which must not short-circuit when one product fails.
+ * A missing `image` is treated as failure so a broken-image product cannot pass the
+ * completeness check and get cached for 1 h.
+ */
+async function fetchCatalogProductById(id: number, apiKey: string): Promise<CatalogProduct | null> {
+  try {
+    const res = await timedFetch(`${PRINTFUL_API}/v2/catalog-products/${id}`, apiKey);
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      data?: { id: number; name: string; image: string; type: string };
+    };
+    const p = json.data;
+    if (!p || !p.image) return null;
+    return { id: p.id, title: p.name, image: p.image, typeName: p.type, typeCode: p.type };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Return the catalog product list (cached 1 h) — the fixed POD set from pod-catalog-config,
+ * fetched by id. We deliberately do NOT use the /v2/catalog-products LIST endpoint: it caps at
+ * limit=100 sorted by id, and our products 438 (Gildan 5000) & 456 (STTU169) sort past the first
+ * 100 (verified 2026-06-20: list limit=100 → max id 373, has438=false, has456=false), so a
+ * list+filter approach silently drops them. By-id fetch returns exactly our models, order preserved.
+ */
 export async function fetchCatalogProducts(): Promise<CatalogProduct[]> {
   const apiKey = process.env.PRINTFUL_API_KEY;
   if (!apiKey) return [];
 
   if (catalogCache && Date.now() - catalogCache.ts < TTL_MS) return catalogCache.items;
 
-  try {
-    // /v2/catalog-products returns the full Printful product catalog (not store-synced products)
-    const res = await timedFetch(`${PRINTFUL_API}/v2/catalog-products?limit=100`, apiKey);
-    if (!res.ok) return catalogCache?.items ?? [];
-    const json = (await res.json()) as {
-      data: Array<{ id: number; name: string; image: string; type: string }>;
-    };
-    const items: CatalogProduct[] = (json.data ?? [])
-      .filter((p) => WANTED_TYPES.has(p.type))
-      .map((p) => ({ id: p.id, title: p.name, image: p.image, typeName: p.type, typeCode: p.type }));
+  const ids = POD_PRODUCT_MODELS.map((m) => m.catalogProductId);
+  const resolved = await Promise.all(ids.map((id) => fetchCatalogProductById(id, apiKey)));
+  const items = resolved.filter((p): p is CatalogProduct => p !== null);
+
+  // Cache ONLY a complete fetch (every model resolved). A partial result (transient API blip on
+  // one product) is served this once but not cached, so the next call retries instead of locking
+  // a missing product out of the picker for an hour.
+  if (items.length === ids.length) {
     catalogCache = { items, ts: Date.now() };
     return items;
-  } catch {
-    return catalogCache?.items ?? [];
   }
+  return catalogCache?.items ?? items;
 }
 
 /** Return printfile spec for a product in the requested colour (cached 1 h per product+colour). */

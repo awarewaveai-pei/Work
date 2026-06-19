@@ -6,6 +6,25 @@ $insert
 
 ## 2026-06-20
 
+### feat(pod): Phase 0 — 一鍵上架規格 SSOT `pod-catalog-config.ts`（3 款 × 4 色 hex）
+
+[任務] `PLAN-pod-one-click-auto-publish-design-to-woo-printful.md` Phase 0:建 SSOT 取代寫死的 `getCatalogVariants(71,…)` + `POD_COLORS=["White","Black"]`。3 款 T-shirt（Gildan 2400 長袖 id57 / Stanley-Stella STTU169 id456 / Gildan 5000 id438）× 各 4 色（hex-keyed）× S-2XL。
+
+[已修改]
+- `lib/studio/pod-catalog-config.ts`（新）:`POD_PRODUCT_MODELS`（hex-keyed colors + `sleeve` 長短袖）+ `normalizeHex`/`podModelById`/`allPodVariantKeys` + **load-time 不變量斷言**（hex `/^#[0-9a-f]{6}$/`、款內無重複 hex、sizes 非空）。docstring/JSDoc 警告 Phase 1:join 走 **v2** endpoint（v1 不回 `color_code`）、Printful `color_code` 也要過 `normalizeHex`。
+- `lib/studio/pod-product.ts`:`POD_COLORS` / `POD_SIZES_DEFAULT` 標 `TODO(Phase 1)` deprecation。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(SSH hetzner-sg + docker exec node fetch Printful **v2** API) | cmd=12 ×(catalogProductId,hex) 查 catalog-variants | exit=0 | **ALL_OK 12/12 resolve + S-2XL complete 零缺口**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=Bash(node) | cmd=mirror load-time assertion vs hex 資料 | exit=0 | ASSERTION_OK（import 不 throw）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/3M/3n — config clean；3 Major 皆 Phase 1 盲點已硬化進 config（v2 endpoint / 兩邊 normalizeHex / POD_COLORS TODO）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=pod-catalog-config,POD_PRODUCT_MODELS,POD_COLORS,fetchCatalogProducts | hits=1 **並行（非 stale）**— `printful-catalog.ts` 已被並行 session 改成 import `POD_PRODUCT_MODELS`、`fetchCatalogProducts` by-id 取代 list+filter（只回 3 款）。影響面=`app/api/tools/printful/catalog/route.ts` 1 處；tsc 相容；保留不 revert。
+
+[剩餘風險] ⚠️ **並行 session 警示**:`printful-catalog.ts` + 本 WORKLOG + `DesignsGallery.tsx` 同 working tree 被並行改 → 另一 session 正動 POD/video → **暫停我方 Phase 1 待釐清**（防 2026-05-22 並行搶 commit 重工）。Phase 1 須:`getCatalogVariants` 換 v2 + 兩邊 `normalizeHex` + 刪 `POD_COLORS` 改讀 `model.colors`。
+
+[rollback] git revert config（新檔）+ pod-product（僅註解）;additive。
+
 ### feat(video): 字幕加大 + 輸出尺寸改長寬比（16:9 / 9:16 / 4:5，取代平台命名）
 
 [任務理解] 使用者：(1) 燒錄字幕太小（截圖 16:9 字幕約 22px）；(2) 輸出尺寸不要依平台命名，要 4:5 / 9:16 / 16:9。

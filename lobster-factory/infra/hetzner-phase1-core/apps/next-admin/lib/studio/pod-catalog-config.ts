@@ -1,7 +1,7 @@
 /**
  * POD product + colour catalog — SSOT for the one-click auto-publish flow.
  *
- * Replaces two hardcoded sites:
+ * Replaces two hardcoded sites (Phase 1 must rewire + delete the originals — tracked there):
  *   - `getCatalogVariants(71, ["White","Black"])` in app/api/tools/publish/route.ts (single product)
  *   - `POD_COLORS = ["White","Black"]` in lib/studio/pod-product.ts (two colours)
  *
@@ -10,9 +10,15 @@
  * 5000), and each product's grey is named differently (Sport Grey vs Heather Grey). Name matching is
  * unsafe; hex is the stable join key to a catalog variant.
  *
- * VERIFIED against the Printful catalog API on 2026-06-20 (SSH SG → container `node` fetch):
- * all 3 catalogProductIds resolve, and every hex below matched an actual variant's `color_code`,
- * with sizes S/M/L/XL/2XL present on all three. See
+ * ⚠️ Phase 1 JOIN TARGET = the **v2** endpoint `GET /v2/catalog-products/{id}/catalog-variants`
+ * (each variant carries `color_code`). The legacy v1 `/products/{id}` that `getCatalogVariants`
+ * currently calls does NOT return `color_code` — Phase 1 MUST switch to v2, or every hex compares
+ * against `undefined` → zero variants bound → silent empty Printful product. Match case-insensitively:
+ * run BOTH sides through `normalizeHex` (Printful casing is not contractually lowercase).
+ *
+ * VERIFIED against the Printful **v2** catalog API on 2026-06-20 (SSH SG → container `node` fetch):
+ * all 3 catalogProductIds resolve, every hex below matched an actual variant's `color_code`, and
+ * S/M/L/XL/2XL are present on all three (zero gaps). See
  * docs/PLAN-pod-one-click-auto-publish-design-to-woo-printful.md §4.1.
  */
 
@@ -83,6 +89,7 @@ export const POD_PRODUCT_MODELS: PodProductModel[] = [
     sleeve: "short",
     sizes: [...POD_SIZES],
     colors: [
+      // off-white — Printful's Gildan 5000 white is #fffefa, NOT #ffffff; verified, do not "correct".
       { hex: "#fffefa", printfulName: "White", label: "白 White" },
       { hex: "#c4c0be", printfulName: "Sport Grey", label: "運動灰 Sport Grey" },
       { hex: "#141313", printfulName: "Black", label: "黑 Black" },
@@ -91,12 +98,18 @@ export const POD_PRODUCT_MODELS: PodProductModel[] = [
   },
 ];
 
-/** Normalize a hex to lowercase `#rrggbb` for matching against Printful `color_code`. */
+/**
+ * Normalize a hex to lowercase `#rrggbb` for matching against Printful `color_code`.
+ * ⚠️ Phase 1 MUST call this on the **Printful** `color_code` too, not just config hex — Printful's
+ * casing is not contractually lowercase (e.g. `#1A3B23`), and `===`/Map lookup is case-sensitive, so
+ * an uppercase value would silently drop that colour. Kept lenient (no throw) so a stray Printful hex
+ * can't crash the matcher; config hexes are validated strictly by the load-time invariant below.
+ */
 export function normalizeHex(hex: string): string {
   return hex.trim().toLowerCase();
 }
 
-/** Look up a model by its Printful catalog product id. */
+/** Look up a model by its Printful catalog product id (Phase 3 resolves a Woo product back to its model). */
 export function podModelById(catalogProductId: number): PodProductModel | undefined {
   return POD_PRODUCT_MODELS.find((m) => m.catalogProductId === catalogProductId);
 }
@@ -106,4 +119,20 @@ export function allPodVariantKeys(): { catalogProductId: number; hex: string; pr
   return POD_PRODUCT_MODELS.flatMap((m) =>
     m.colors.map((c) => ({ catalogProductId: m.catalogProductId, hex: normalizeHex(c.hex), printfulName: c.printfulName })),
   );
+}
+
+// ── Load-time invariants ───────────────────────────────────────────────────────────────────────
+// `hex` is a plain `string`, so tsc can't catch a malformed or duplicated hex — a typo (`#fff`,
+// uppercase, or a repeat) would otherwise surface only as a silent zero-match at publish time in
+// Phase 3. Validate the SSOT at import so a bad edit fails fast (build/test), not in production.
+for (const m of POD_PRODUCT_MODELS) {
+  if (m.sizes.length === 0) throw new Error(`pod-catalog-config: "${m.slug}" has no sizes`);
+  const seen = new Set<string>();
+  for (const c of m.colors) {
+    if (!/^#[0-9a-f]{6}$/.test(c.hex)) {
+      throw new Error(`pod-catalog-config: "${m.slug}" colour "${c.printfulName}" has malformed hex "${c.hex}" (need lowercase #rrggbb)`);
+    }
+    if (seen.has(c.hex)) throw new Error(`pod-catalog-config: "${m.slug}" has duplicate hex ${c.hex}`);
+    seen.add(c.hex);
+  }
 }

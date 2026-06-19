@@ -5,8 +5,11 @@
  * plus sizes (2XL+) carry the higher price (Printful wholesale is $2–3 more).
  */
 
-export const POD_SIZES_DEFAULT = ["S", "M", "L", "XL", "2XL"];
+export const POD_SIZES_DEFAULT = ["S", "M", "L", "XL", "2XL"]; // TODO(Phase 1): fold onto pod-catalog-config POD_SIZES (single source of sizes).
 export const POD_PLUS_SIZES = new Set(["2XL", "3XL", "4XL", "5XL"]);
+// TODO(Phase 1): DELETE — superseded by pod-catalog-config POD_PRODUCT_MODELS[].colors (hex-keyed,
+// per-product). buildVariantPlan/buildPodProductPayload must read model.colors instead, else Woo
+// (2 colours) and Printful (4 colours) diverge and break the SKU join. See PLAN §6 Phase 1.
 export const POD_COLORS = ["White", "Black"] as const;
 
 export interface PodProductParams {
