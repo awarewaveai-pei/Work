@@ -6,6 +6,24 @@ $insert
 
 ## 2026-06-20
 
+### fix(video): 渲染失敗時不刪輸入圖（修場景圖 404：重試素材被清掉）
+
+[任務理解] 使用者渲染遇 `404 Client Error: Not Found ... pub-a88b06….r2.dev/designs/2026-06/<uuid>.png`。診斷：① CF API GET 該物件→404（不在 lobster-designs）；② 其他 designs/2026-06 物件存在且 public GET 200；③ public 網域正確（pub-a88b06=bucketId a88b06=lobster-designs，enabled）；④ 無 object-expiry lifecycle（只 multipart-abort 7d）；⑤ EU `/app/output` 有對應 render 資料夾（render 真的到 EU；video-service `PYTHONUNBUFFERED` 未設故 docker logs 空非無活動）。→ 圖被上傳後刪除，唯一刪 fresh designs 圖者＝`cleanupVideoInputKeys`。根因 bug：`/api/video/status` 在 **EU render 失敗時也 `cleanupVideoInputKeys(r2Keys)`** → 失敗後重試 render 時 EU 抓圖 404（輸入圖已被自己刪）。
+
+[已修改]
+- `app/api/video/status/route.ts`：EU error 分支移除 `cleanupVideoInputKeys` 呼叫（+import）→ 失敗時**保留** Flux 輸入圖供重試；只在 done（成功）時清。孤兒圖為小量 PNG，後續 age-based 清理處理。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH(SG) | cmd=`curl CF R2 API`（next-admin token）| result=失敗物件 API GET=404（不在 bucket）、其他 designs/2026-06 存在、public GET 既有物件=200、lifecycle 無過期規則、managed domain pub-a88b06=lobster-designs enabled → 確認「被刪非設定錯」
+- REALTEST_EVIDENCE: tool=SSH(EU) | cmd=`docker exec lobster-video-service ls /app/output` | result=有 render 資料夾「下班後_…」→ render 抵達 EU、composition 抓圖 404；PYTHONUNBUFFERED 未設釋疑空 log
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0
+- REVIEW_DONE: critic=Quick(self) | verdict=pass | findings=0c/0m/1n（n=成功路徑仍清理＝正確；error 路徑保留輸入圖會留少量孤兒，可接受/後續 age-cleanup）
+- BUGHUNT_WAIVED: NA -- 單檔移除誤刪呼叫；cleanupVideoInputKeys done 分支獨立 import 不受影響
+
+[剩餘風險] 立即未阻：使用者該次的圖已被刪 → 需**重新生成草稿**（上傳新圖）再渲染。若 404 是首次渲染（非重試）則另有觸發，待使用者 repro 確認。designs 輸入圖目前無 age-based 清理（孤兒小量累積；follow-up）。
+
+[rollback] `git revert <hash>` + sg-deploy。
+
 ### feat(video): Q2 兩 Tab 分工釐清 + Q3 影片生產流水線 + 深層接力（場景直接對映）
 
 [任務理解] 使用者「全做好」Q2/Q3/深層接力。Q2：前製=寫腳本、影片生產=純生產但保留快速捷徑（雙模式明標）；Q3：影片生產改由上到下流水線（內容→場景設定→生成）；深層接力：前製場景直接對映到生產（台詞→旁白、畫面→生圖提示），不重生 → 影片貼合腳本。

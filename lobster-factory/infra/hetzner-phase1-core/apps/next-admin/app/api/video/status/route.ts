@@ -66,9 +66,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, status: "done", video: { outputs: poll.outputs, out_dir: poll.out_dir }, title: job.recordParams?.title });
   }
 
-  // EU error → 清暫存 + 標記
-  const { cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
-  if (job.r2Keys?.length) await cleanupVideoInputKeys(job.r2Keys);
+  // EU error → 只標記錯誤；**不**清暫存圖：保留 Flux 輸入圖讓使用者能重試 render（先前在失敗時就刪掉
+  // 輸入圖 → 重試時 EU 抓圖 404，即此 bug 根因，2026-06-20）。孤兒圖為小量 PNG，由 age-based 清理處理。
   await finishJob(jobId, { status: "error", error: poll.error, statusCode: 502 });
   return NextResponse.json({ ok: true, status: "error", error: poll.error, statusCode: 502 });
 }
