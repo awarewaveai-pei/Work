@@ -95,7 +95,7 @@ $insert
 [驗證結果]
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=7/7
-- REALTEST_EVIDENCE: tool=Chrome(MCP) | action=部署後量 production DOM（見 commit 後驗證）| result=待部署後填
+- REALTEST_EVIDENCE: tool=Chrome(MCP) | action=部署 a9e27a9e 後量 production DOM | result=gridColumns=3欄, img=50×50, 前6張 row1 top=599/row2 top=703(無重疊), threePerRow=true, noOverlap=true → FIXED ✓
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（JSX 正確、百分比高度循環依賴完全移除、badge 錨點正確、onClick/alt/title 行為無退化）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=paddingTop | hits=0（CatalogGrid 僅註解提及，無實際 paddingTop style 殘留）
 
