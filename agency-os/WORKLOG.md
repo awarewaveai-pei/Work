@@ -6,6 +6,24 @@ $insert
 
 ## 2026-06-19
 
+### fix(video): EU video-service R2 上傳未設定（影片渲染完卻看不到/下不了）
+
+[任務理解] job_not_found 修好後渲染會完成，但「生成完成」面板顯示 `/app/output/<title>/<fmt>.mp4` 本機路徑（非 https），無法播放/下載、也不進「最近生成記錄」。根因：EU `lobster-video-service` 的 R2 env 全空 — `R2_API_TOKEN`/`R2_ACCOUNT_ID`/`R2_VIDEO_PUBLIC_BASE` 皆未設（無 `.env.video`，compose `${R2_*}` resolve 成空），故 `server.py:_r2_enabled()`=False → 跳過 R2 上傳、回本機路徑。影片自 6/18 起一直沒上 R2（既有設定缺漏，非本 session code 造成；job_not_found 修好後才暴露此下一層）。
+
+[已修改]（EU 伺服器設定，非 repo code）
+- 建 `/root/Work/lobster-factory/infra/hetzner-phase1-core/apps/video-service/.env.video`（mode 600）：`RENDER_AUTH_TOKEN=`（空，與 next-admin 一致＝兩端不啟用 render auth，避免擋呼叫）、`R2_API_TOKEN=`（取自 SG next-admin proven 值，reconcile 已用同組存取 lobster-videos）、`R2_ACCOUNT_ID=aea1a836…`、`R2_VIDEO_BUCKET=lobster-videos`、`R2_VIDEO_PUBLIC_BASE=https://pub-bd79a1c3….r2.dev`（皆 next-admin 實際值，同 R2 帳號）。
+- `docker compose --env-file .env.video -f docker-compose.video.yml up -d` 重建容器。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH(EU) | cmd=`docker exec lobster-video-service python3 -c _r2_enabled` | result=**r2_enabled=True**（4 個 R2 var 到位：token 53 / account 32 / bucket / public base）、容器 healthy 6s、/health 200
+- REALTEST_EVIDENCE: tool=SSH(EU) | cmd=`curl CF R2 API PUT/GET/DELETE`（同 server.py _r2_put endpoint，token 從 .env.video source 不外露）| result=PUT 200 `success:true`、GET 公開 base 200（可播放/下載）、DELETE 200 → R2 上傳端到端可用
+- REVIEW_DONE: critic=Quick(self) | verdict=pass | findings=0c/0m/1n（n=.env.video 為 server-only，未進 deploy 自動化 → rebuild 會丟，需補 runbook）
+- BUGHUNT_WAIVED: NA -- 伺服器設定改動（非 repo code）；reconcile.ts/server.py upload key 格式已對照（`video/<dir>/<fmt>.mp4`）
+
+[剩餘風險/疏失] ① **疏失**：重啟前未先 `docker cp` 出 `/app/output`（ephemeral，無 volume）→ 3 支已渲染舊片（學畫畫/台灣芒果/藝術療癒）被 recreate 清除。**但該 3 片本就無法存取**（本機路徑、不在 R2、不在畫廊），對使用者實質無損；需重新生成。教訓：改 ephemeral-output 服務前先備份產物 OR 該服務 /app/output 應掛 volume（R2 上傳已即時，故非必要）。② `.env.video` 僅存 EU 伺服器、未進 git/deploy 自動化 → EU rebuild/redeploy 若未帶 `--env-file .env.video` 會失效；需補進 video-service 部署 runbook（follow-up）。
+
+[rollback] 移除 `.env.video` + 重啟 = 退回（但即回到「不上 R2」壞狀態）；無資料破壞。
+
 ### feat(mockup): 加「圖案位置」控制（胸前置中/左右胸/滿版前/整件滿版）
 
 [任務理解] 用戶問「圖案位置應該怎麼設定」—— 現況位置寫死「胸前置中」，根本沒這個設定。
