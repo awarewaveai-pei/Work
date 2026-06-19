@@ -107,6 +107,8 @@ export async function prepareScenes(
     articleTitle?: string;
     articleContent?: string;
     language?: string;
+    /** 已解析的英文風格 prompt（前端 resolveStylePrompt 後傳入）。空 = 用 cinematic 預設。 */
+    visualStyle?: string;
     onProgress?: (step: string) => void;
   },
   anthropicKey: string,
