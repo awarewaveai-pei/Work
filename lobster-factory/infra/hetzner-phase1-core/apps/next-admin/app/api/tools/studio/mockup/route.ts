@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     imageWidth?: number;
     imageHeight?: number;
     designSizePct?: number;  // 0.4–1.0, fraction of print-area width (default 0.8)
+    color?: "white" | "grey" | "black"; // shirt colour → real Printful variant (default white)
     _jobId?: string;
   };
   try {
@@ -69,7 +70,8 @@ export async function POST(request: Request) {
   // ── Route: catalog product ID vs legacy product type ──────────────────────
   if (typeof body.productId === "number") {
     // Dynamic catalog path: fetch printfile spec, then generate
-    const catalogSpec = await fetchProductSpec(body.productId);
+    const color = body.color === "grey" || body.color === "black" ? body.color : "white";
+    const catalogSpec = await fetchProductSpec(body.productId, color);
     if (!catalogSpec) {
       return NextResponse.json(
         { ok: false, error: `無法取得 Printful 產品規格 (productId=${body.productId})。此產品可能不支援 Mockup Generator。` },

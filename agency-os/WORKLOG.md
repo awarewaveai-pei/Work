@@ -6,6 +6,29 @@ $insert
 
 ## 2026-06-19
 
+### fix(mockup): Printful 出 Aqua 不出白 — variant 選色 + limit=100 漏白根因
+
+[任務理解] 用戶 Printful tab 出來是水藍色不是白；要 White/Grey/Black 三色。用戶指正「該讀 Printful 資料不是看圖」。
+
+[真因（讀 Printful API 實證，非看圖）] `fetchProductSpec` 只抓 `catalog-variants?limit=100`，但 Bella 3001（#71）有 590 variant（84 色），White/Black 字母排序在最後（offset ~580）→ **被 limit=100 切掉** → 白色 heuristic 失敗 → fallback variants[0]=Aqua。這是我先前 limit=200→100 修法的副作用。實測真實 variant：White=4012 / Athletic Heather(灰)=6949 / Black=4017。
+
+[已修改]
+- `lib/studio/printful-catalog.ts`：① `fetchAllVariants()` 分頁抓**完整** variant（用 `paging.total` 停、2000 backstop）；**只在分頁完整跑完才快取**（critic 抓出：中途失敗快取部分清單會 sticky 1h 復活 Aqua bug）② `pickVariantByColor()` 依 white/grey/black 精準選 variant（grey 優先 Athletic Heather + GREY_RE 排除彩色 heather）③ `fetchProductSpec(productId, color)` color-aware，specCache key 改 `productId:color`。
+- `route.ts`：body 加 `color`（allow-list 驗證，default white）傳入。
+- `MockupStudio.tsx`：顏色選擇器 白/黑 → **白/灰/黑**，且**所有 tab 都顯示**（原本 Printful tab 沒有）；Printful 生成 body 送 `color`。
+- `mockup-prompt.ts`：`GarmentColor` 加 "grey"（只有 black 有鎖色，grey 同 white 行為）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH/docker-node | cmd=對 product 71 跑 pickVariantByColor 邏輯 | result=白→4012 White/M、灰→6949 Athletic Heather/M、黑→4017 Black/M（全對，live Printful 資料）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0（4 檔 0 錯）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=25/25
+- REVIEW_DONE: critic=Deep | verdict=pass(after fix) | findings=0c/1m→fixed/2n（Major: 部分清單快取復活 bug → 改成 complete flag 只快取完整清單；Minor: 800 ceiling → 改 paging.total；natural fallback anchored）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=fetchProductSpec,specCache.set(productId,fetchAllVariants | hits=0 stale（唯一 caller route.ts 已更新、無 number-key 殘留）
+
+[剩餘風險] 大小問題（Printful 太小/AI 太大）尚未修，下一輪。無純白的產品（如某些 tee）white 會 fallback 到 Natural。
+
+[rollback] git revert；additive。
+
 ### fix(video): EU video-service R2 上傳未設定（影片渲染完卻看不到/下不了）
 
 [任務理解] job_not_found 修好後渲染會完成，但「生成完成」面板顯示 `/app/output/<title>/<fmt>.mp4` 本機路徑（非 https），無法播放/下載、也不進「最近生成記錄」。根因：EU `lobster-video-service` 的 R2 env 全空 — `R2_API_TOKEN`/`R2_ACCOUNT_ID`/`R2_VIDEO_PUBLIC_BASE` 皆未設（無 `.env.video`，compose `${R2_*}` resolve 成空），故 `server.py:_r2_enabled()`=False → 跳過 R2 上傳、回本機路徑。影片自 6/18 起一直沒上 R2（既有設定缺漏，非本 session code 造成；job_not_found 修好後才暴露此下一層）。

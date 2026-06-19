@@ -38,10 +38,66 @@ const WANTED_TYPES = new Set([
   "SUBLIMATION",
 ]);
 
+/** Shirt colours the mockup UI offers. Maps to a real Printful variant per product. */
+export type GarmentColorChoice = "white" | "grey" | "black";
+
+interface Variant { id: number; color: string; size: string }
+
 // In-memory caches
 let catalogCache: { items: CatalogProduct[]; ts: number } | null = null;
-// null means "known to fail/unsupported" — also cached to prevent retry storms
-const specCache = new Map<number, { spec: ProductSpec | null; ts: number }>();
+// null means "known to fail/unsupported" — also cached to prevent retry storms.
+// Keyed by `${productId}:${color}` because each colour resolves to a different variant.
+const specCache = new Map<string, { spec: ProductSpec | null; ts: number }>();
+// Full variant list per product (paginated once, reused for every colour pick).
+const variantsCache = new Map<number, { variants: Variant[]; ts: number }>();
+
+/** Printful v2 caps limit at 100; popular tees have 500-600 variants (84 colours × sizes) and
+ *  "White"/"Black" sort alphabetically LAST, so a single limit=100 page misses them entirely
+ *  (the bug that made every shirt come out "Aqua"). Paginate the whole list, cache 1 h. */
+async function fetchAllVariants(productId: number, apiKey: string): Promise<Variant[]> {
+  const hit = variantsCache.get(productId);
+  if (hit && Date.now() - hit.ts < TTL_MS) return hit.variants;
+  const all: Variant[] = [];
+  let complete = false;
+  // `paging.total` lets us stop exactly (no fixed ceiling that could truncate a future
+  // >N-variant product). The 2000 guard is only a runaway backstop.
+  for (let offset = 0; offset < 2000; offset += 100) {
+    const r = await timedFetch(
+      `${PRINTFUL_API}/v2/catalog-products/${productId}/catalog-variants?limit=100&offset=${offset}`,
+      apiKey,
+    );
+    if (!r.ok) break; // transient (429/5xx/timeout) — leave `complete` false so we don't cache
+    const j = (await r.json()) as { data?: Variant[]; paging?: { total?: number } };
+    const vs = j.data ?? [];
+    all.push(...vs);
+    const total = j.paging?.total;
+    if (vs.length < 100 || (typeof total === "number" && all.length >= total)) { complete = true; break; }
+  }
+  // Cache ONLY a complete list. A partial list (early error break) is returned for this one
+  // call but never cached, so the next call re-paginates instead of locking a wrong colour in
+  // for an hour (the original "everything comes out Aqua" failure mode).
+  if (complete && all.length) variantsCache.set(productId, { variants: all, ts: Date.now() });
+  return all;
+}
+
+// Greys that are actually grey (Printful also has "Heather Aqua/Forest/…" which are NOT grey).
+const GREY_RE = /^(athletic heather|dark grey heather|dark grey|deep heather|black heather|heather slate|heather dust|ash|asphalt|grey|gray|graphite heather|storm)$/i;
+
+/** Pick the real variant id for the requested colour, preferring size M. Falls back to the
+ *  first variant of that colour, then to the very first variant (so a mockup always renders). */
+function pickVariantByColor(variants: Variant[], color: GarmentColorChoice): number | undefined {
+  let pool: Variant[];
+  if (color === "grey") {
+    pool = variants.filter((v) => /^athletic heather$/i.test(v.color));
+    if (!pool.length) pool = variants.filter((v) => GREY_RE.test(v.color));
+  } else {
+    const exact = color === "black" ? /^black$/i : /^white$/i;
+    pool = variants.filter((v) => exact.test(v.color));
+    // last resort for products with no pure white (e.g. only "Heather Natural" / "Natural")
+    if (!pool.length && color === "white") pool = variants.filter((v) => /^(heather )?natural$/i.test(v.color));
+  }
+  return (pool.find((v) => /^m$/i.test(v.size)) ?? pool[0] ?? variants[0])?.id;
+}
 
 function timedFetch(url: string, apiKey: string, storeId?: string): Promise<Response> {
   const ctrl = new AbortController();
@@ -79,40 +135,30 @@ export async function fetchCatalogProducts(): Promise<CatalogProduct[]> {
   }
 }
 
-/** Return printfile spec for a product (cached 1 h). */
-export async function fetchProductSpec(productId: number): Promise<ProductSpec | null> {
+/** Return printfile spec for a product in the requested colour (cached 1 h per product+colour). */
+export async function fetchProductSpec(
+  productId: number,
+  color: GarmentColorChoice = "white",
+): Promise<ProductSpec | null> {
   const apiKey = process.env.PRINTFUL_API_KEY;
   const storeId = process.env.PRINTFUL_STORE_ID;
   if (!apiKey || !storeId) return null;
 
-  const hit = specCache.get(productId);
+  const key = `${productId}:${color}`;
+  const hit = specCache.get(key);
   // Successes cache 1 h; failures only 1 min so a transient error self-heals on retry.
   if (hit && Date.now() - hit.ts < (hit.spec === null ? NULL_TTL_MS : TTL_MS)) return hit.spec;
 
   try {
-    // 1. Get variants from v2 catalog API (not store-sync) — pick white/M or first
-    const vRes = await timedFetch(
-      // Printful v2 caps limit at 100 — limit>100 returns HTTP 400 "Invalid limit value
-      // (required 1-100)", which made fetchProductSpec return null for EVERY catalog product
-      // ("無法取得 Printful 產品規格"). 100 variants is ample to find a white/first variant.
-      `${PRINTFUL_API}/v2/catalog-products/${productId}/catalog-variants?limit=100`,
-      apiKey,
-    );
-    if (!vRes.ok) {
-      specCache.set(productId, { spec: null, ts: Date.now() });
+    // 1. Full variant list (paginated) → pick the variant matching the requested colour.
+    const variants = await fetchAllVariants(productId, apiKey);
+    if (!variants.length) {
+      specCache.set(key, { spec: null, ts: Date.now() });
       return null;
     }
-    const vJson = (await vRes.json()) as {
-      data: Array<{ id: number; color: string; size: string }>;
-    };
-    const variants = vJson.data ?? [];
-    const variantId = (
-      variants.find((v) => /white/i.test(v.color) && /^m$/i.test(v.size)) ??
-      variants.find((v) => /white/i.test(v.color)) ??
-      variants[0]
-    )?.id;
+    const variantId = pickVariantByColor(variants, color);
     if (!variantId) {
-      specCache.set(productId, { spec: null, ts: Date.now() });
+      specCache.set(key, { spec: null, ts: Date.now() });
       return null;
     }
 
@@ -143,10 +189,10 @@ export async function fetchProductSpec(productId: number): Promise<ProductSpec |
     }
 
     const spec: ProductSpec = { productId, variantId, placement, areaWidth, areaHeight };
-    specCache.set(productId, { spec, ts: Date.now() });
+    specCache.set(key, { spec, ts: Date.now() });
     return spec;
   } catch {
-    specCache.set(productId, { spec: null, ts: Date.now() });
+    specCache.set(key, { spec: null, ts: Date.now() });
     return null;
   }
 }

@@ -12,7 +12,7 @@
  */
 
 export type MockupMode = "flat" | "model";
-export type GarmentColor = "white" | "black";
+export type GarmentColor = "white" | "grey" | "black";
 
 export const GARMENTS: Record<string, { label: string; phrase: string }> = {
   tshirt: { label: "T-shirt (Bella 3001)", phrase: "Bella Canvas 3001 unisex crewneck t-shirt" },

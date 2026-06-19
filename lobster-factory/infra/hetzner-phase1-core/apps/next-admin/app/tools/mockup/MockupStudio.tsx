@@ -485,6 +485,7 @@ export default function MockupStudio() {
             ...(isDataUrl ? { image: processedDesign } : { imageUrl: processedDesign }),
             productId: pid,
             designSizePct: sizeFraction,
+            color,
             ...(dims ? { imageWidth: dims.width, imageHeight: dims.height } : {}),
           }),
         });
@@ -718,16 +719,21 @@ export default function MockupStudio() {
           <button className={mode === "printful" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("printful")}>Printful</button>
         </div>
 
-        {/* ── Shared color (model + flat tabs) ── */}
-        {mode !== "printful" && (
-          <div style={{ fontSize: 13 }}>
-            顏色（白/黑）
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              <button className={color === "white" ? "btn-primary" : "btn-secondary"} onClick={() => setColor("white")}>白</button>
-              <button className={color === "black" ? "btn-primary" : "btn-secondary"} onClick={() => setColor("black")}>黑（自動鎖色）</button>
-            </div>
+        {/* ── Shared shirt colour (all tabs). On Printful it picks the real White/Grey/Black
+              variant from Printful's data; on AI tabs it sets the garment colour in the prompt. ── */}
+        <div style={{ fontSize: 13 }}>
+          顏色
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <button className={color === "white" ? "btn-primary" : "btn-secondary"} onClick={() => setColor("white")}>白</button>
+            <button className={color === "grey" ? "btn-primary" : "btn-secondary"} onClick={() => setColor("grey")}>灰</button>
+            <button className={color === "black" ? "btn-primary" : "btn-secondary"} onClick={() => setColor("black")}>黑（自動鎖色）</button>
           </div>
-        )}
+          {mode === "printful" && (
+            <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
+              對應 Printful 真實 variant（白=White、灰=Athletic Heather、黑=Black）
+            </span>
+          )}
+        </div>
 
         {/* ═══════════════════ PRINTFUL TAB ═══════════════════ */}
         {mode === "printful" && (
