@@ -30,8 +30,3 @@ export function assetToolGroup(source: string | null | undefined): string {
   if ((MOCKUP_SOURCES as readonly string[]).includes(source)) return "mockup";
   return source;
 }
-
-/** True when the asset is a product mockup (商品照); false for design art / tarot / studio / unknown. */
-export function isMockupSource(source: string | null | undefined): boolean {
-  return assetToolGroup(source) === "mockup";
-}

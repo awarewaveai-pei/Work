@@ -6,6 +6,28 @@ $insert
 
 ## 2026-06-20
 
+### fix(publish): 選圖器分設計圖/商品照兩區 + ?group 篩選解洗版 + ★設主圖
+
+[任務理解] 使用者：My Designs 有設計圖/Mockup/影片 tab 分類，但 `/tools/publish` 選圖器全部圖擠一起。實機（browser MCP）驗證揭露更致命的洗版：designs 庫全庫 78 張 image（design 72 / mockup 6），但 publish 一次 fetch 最新 60 張且不分類 → 6 張 mockup 有 3 張被 `LIST_LIMIT=60` 擠出，在 publish **永遠選不到**。
+
+[根因] commit `b553d5d4` 只幫 My Designs 加 `toolGroup` tab 分類，publish picker 沒同步套；且 `GET /api/tools/designs` 無 source 篩選 → limit 60 在塔羅洗版（87% tarot）下截斷 mockup。
+
+[已修改]
+- `lib/studio/asset-group.ts`（新）：SSOT 抽 `assetToolGroup` + `MOCKUP_SOURCES`（`["mockup","printful-mockup"]`）。`printful-mockup`（StudioWorkbench.tsx:448 存的 Printful mockup）原被 DesignsGallery 本地 toolGroup 漏歸類成設計圖 → 一併修正（critic Major）。
+- `app/tools/designs/DesignsGallery.tsx`：改 `import { assetToolGroup as toolGroup }`，刪本地定義，消 SSOT 重複，行為不變（call sites :481/:866 經 alias 接上）。
+- `app/api/tools/designs/route.ts`：GET 加 `?group=design|mockup`，DB 層 or/and 篩選套在 `.limit()` **前** → 每組獨立 60 額度，根治洗版。mockup=`or-of-eq(MOCKUP_SOURCES)`；design=`or(is.null, and(neq...))` 涵蓋 null source（Postgres 三值邏輯防漏）。無 group 維持原行為（向後相容 My Designs）。
+- `app/tools/publish/PublishWizard.tsx`：`designs` state 拆 `designAssets`/`mockupAssets`，兩次 grouped fetch；picker 拆設計圖區（單選設 designUrl + checkbox 把原稿加進 gallery）/商品照區（mockup 庫勾選 + 已選 gallery 預覽列 ★設主圖/✕移除）；第一張=Woo 主圖（pod-product.ts:100 契約）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(SSH hetzner-sg + docker exec lobster-next-admin node) | cmd=PostgREST HEAD count probe（內建 fetch 直打 `$NEXT_PUBLIC_SUPABASE_URL/rest/v1/media_assets`，測 route 建構的 ?group 字串）| exit=0 | all=78 / mockup=6 / design=72 → **6+72=78 完美 partition**（status 200 = `and()` 巢狀 + `metadata->>source` arrow-key + or 語法 PostgREST 全接受；反證洗版：全庫 mockup 6 張但最新 60 含 3 → 3 張被擠出）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1M/2n（Major: printful-mockup 漏歸類已修；2 Minor polish: design-change 保留手選註解 + 兩區重複「已加入商品照」badge）。critic 另 verify 主圖契約 / stale-closure(mockupUrlsRef) / 向後相容(My Designs 不傳 group=原行為) / jsonb null 三值邏輯全 INTACT，jsonb 語法對照 PostgREST 官方文件確認。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isMockupSource,MOCKUP_SOURCES,`source:["']`,toolGroup,`\bdesigns\b`,asset-group | hits=0 stale（5 save-site 確認 mockup 來源=mockup+printful-mockup；isMockupSource 無 consumer 已移除避 dead export；scripts 0；agency-os 7 命中皆 incidental 歷史報告非 stale claim）
+
+[剩餘風險] publish 前端分區 UI 尚未部署 prod 實機驗（純 React 渲染，tsc+critic 已覆蓋邏輯）；待 `sg-deploy` 後 browser 實測兩區渲染 + 設主圖。jsonb 後端語法已實測通過。
+
+[rollback] git revert；全 additive（新 lib + API 加參數向後相容 + 前端 picker 重構，無 schema/auth/金流面）。
+
 ### fix(video): 渲染失敗時不刪輸入圖（修場景圖 404：重試素材被清掉）
 
 [任務理解] 使用者渲染遇 `404 Client Error: Not Found ... pub-a88b06….r2.dev/designs/2026-06/<uuid>.png`。診斷：① CF API GET 該物件→404（不在 lobster-designs）；② 其他 designs/2026-06 物件存在且 public GET 200；③ public 網域正確（pub-a88b06=bucketId a88b06=lobster-designs，enabled）；④ 無 object-expiry lifecycle（只 multipart-abort 7d）；⑤ EU `/app/output` 有對應 render 資料夾（render 真的到 EU；video-service `PYTHONUNBUFFERED` 未設故 docker logs 空非無活動）。→ 圖被上傳後刪除，唯一刪 fresh designs 圖者＝`cleanupVideoInputKeys`。根因 bug：`/api/video/status` 在 **EU render 失敗時也 `cleanupVideoInputKeys(r2Keys)`** → 失敗後重試 render 時 EU 抓圖 404（輸入圖已被自己刪）。
