@@ -32,8 +32,13 @@ $insert
 
 [任務理解] 用戶要求按順序處理 7 項：①SEO/AEO/GEO/RankMath 近滿分 ②文章 body 不要 H1 ③精選圖標題 overlay 固定字型可設定 ④WebP ~150KB（原 1MB PNG）⑤排版預覽+可編輯+圖片可見（WP 仍收 markdown）⑥加直接發佈+排程 ⑦影片與文章解耦。code 已在前次 session commit（266f69d6 含 critic 6 修），本 session 任務 = 真實驗證每項 + 部署上線 + live 確認先前無法驗的項目。
 
-[已修改]（本 session 無 code 改動；驗證 + 部署既有 commit）
-- 部署 next-admin → SG prod：`.deployed-commit` 578c97c0 → c80ad74b（含全部 7 項 + 新 Dockerfile：font-noto-cjk + sharp standalone copy）。並行 session 同時 deploy 同 commit，已收斂無衝突。
+[已修改]
+- 部署 next-admin → SG prod：`.deployed-commit` 578c97c0 → c80ad74b（含 7 項 + 新 Dockerfile：font-noto-cjk + sharp standalone copy）。並行 session 同時 deploy 同 commit，已收斂無衝突。
+- **post-deploy critic 覆審抓出 1 Major + 3 Minor，本 session 修 4 處**（需 re-deploy 才 live）：
+  - `ContentStudio.tsx:1507`（Major）— handleGenerateVideo 漏送 `topic`，但 /api/video/generate:36-39 必填 → 每次點「生成影片並嵌入」都 400、job 沒建立 → 影片嵌入功能從 UI 全壞。補 `topic: metaData?.seoTitle || form.keyword`（route :54-55 同時當 topic+keyword）。VideoStudio.tsx:305 本就送 topic（只 ContentStudio 壞）。
+  - `embed-to-wp/route.ts:65`（Minor）— `.replace(string)` 只換第一個 placeholder → 改 `/g` global regex + function replacer（多 placeholder + $-safe；用 regex 而非 replaceAll 避免 ES2021 lib 依賴）。
+  - `image/route.ts:82`（Minor）— CJK 截斷在 W<24 反轉（slice 負索引保留整串）→ `Math.max(1, …)` clamp（prod W 恆 1200 不可達，加固）。
+  - `ContentStudio.tsx:1360`（Minor）— IMAGE_PLACEHOLDER replace 潛在 $-pattern 脆弱（現 URL 皆 $-free）→ function replacer 一致化。
 
 [驗證結果]
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000（build gate clean）
@@ -43,8 +48,11 @@ $insert
 - REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin node -e require('sharp') | result=sharp OK v0.34.5（item 4 runtime live 證實）
 - REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin（並行 session）| exit=0 | result=container healthy 7s + HTTP smoke 4/4（login/ops/nginx/node-api 全 200）
 - REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner -Mode smoke | result=25 pass/1 fail/6 skip；唯一 fail=04-onboard screenshot protocol flake（200 斷言通過、mobile 版同測全過、與 content 無關），非回歸
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=1c/4m/0n（前次 session 對 8 檔；6 項全修：video status shape sj.video.outputs、setInterval unmount cleanup、$-replacement function replacer、videoUrl ^https:// 驗證、CJK 截斷 1.0 ratio、fontStyle:none skip overlay）+ 本 session live 復驗全部已套用
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=featuredImageFont,featuredImageTitlePosition,primaryUrl,publishStatus,VIDEO_PLACEHOLDER | hits=0（接線鏈完整：SiteContentDefaults type→SiteManager UI→ContentStudio→image route→toWebP；無 stale）
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1m/3n（本 session post-deploy 對 9 檔；前 6 修確認在位 + 新抓 1 Major[video topic]+3 Minor 全修）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（4 修窄範圍覆核，逐項 CONFIRMED 無新問題）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（4 修後）| exit=0（global-regex replace + topic 欄位 + maxChars clamp 編譯乾淨）
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --eval 測 fix3 多placeholder+$-safe / fix4 clamp | result=fix3 兩 placeholder 全換且 $1 字面 PASS；fix4 W=1200→25、病態 W=1→1 無負 slice PASS
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=featuredImageFont,featuredImageTitlePosition,primaryUrl,publishStatus,VIDEO_PLACEHOLDER,/api/video/generate | hits=0（接線鏈完整；/api/video/generate 2 caller：VideoStudio:305 送 topic 正常、ContentStudio 已補；無其他漏 topic）
 
 [逐項真相]
 - ① SEO：generation 端完整（RankMath title 4-test、answer capsule、density+CJK 處理、meta 規則、reading-ease、schema hints）。誠實限制：「接近滿分」對 on-page content 測試成立；FAQPage JSON-LD 等 schema 分數另依各站 RankMath 外掛設定，非工具單獨保證。
@@ -53,9 +61,9 @@ $insert
 - ④ WebP：實測 106KB（典型圖）。cap 200KB／q62 fallback。
 - ⑤ 預覽：client-markdown.ts 瀏覽器端 render + textarea 可編輯 toggle + 圖片顯示；handlePublish 送 `markdown: generated`（ContentStudio:1462）→ 回答用戶問題：**是，傳 WP 仍用 markdown**。
 - ⑥ 發佈模式：draft/publish 兩路徑皆可。**已知限制**：排程(future) 僅標準 REST 站可用；Bridge 外掛站回友善錯誤引導用「直接發佈」（wordpress-core.ts:374，因 plugin PostCreator 未支援 date 欄位）。
-- ⑦ 影片：解耦架構完成（文章先發 → `<!-- VIDEO_PLACEHOLDER -->` → 輪詢 → embed-to-wp 套入），正是用戶建議的最佳方案。embed glue 對齊真實 status shape 驗證。**未獨立重測**底層影片 generation 引擎（既有 VideoStudio，本 session 只接線未驗 EU render）。
+- ⑦ 影片：解耦架構完成（文章先發 → `<!-- VIDEO_PLACEHOLDER -->` → 輪詢 → embed-to-wp 套入），正是用戶建議的最佳方案。**critic 抓出按鈕漏 `topic` 從頭全壞，本 session 已修**。embed glue 對齊真實 status shape。底層 EU render 引擎未本 session 重測（既有 VideoStudio 同引擎已驗）。
 
-[剩餘風險] ⑥排程在 Bridge 站不可用（需改 wp-bridge plugin 支援 date + 發版才完整）；⑦影片 generation 引擎未本 session 重測；③④需用戶實際生成一篇文章目視確認 overlay 文字位置與 WebP 上傳大小。
+[剩餘風險] **4 修需 re-deploy 才 live（c80ad74b 的影片按鈕仍 400）**；⑥排程在 Bridge 站不可用（需改 wp-bridge plugin 支援 date + 發版才完整）；⑦底層 EU render 引擎未本 session 重測；③④需用戶實際生成一篇文章目視確認 overlay 文字位置與 WebP 上傳大小。
 
 [rollback] `git revert` 至 578c97c0 並 sg-deploy；所有改動為 additive（新檔 + 既有函式擴充），無 destructive migration。
 
