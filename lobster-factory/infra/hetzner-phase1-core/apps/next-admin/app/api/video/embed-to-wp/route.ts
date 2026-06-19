@@ -59,9 +59,10 @@ export async function POST(req: Request): Promise<Response> {
     // Placeholder not found — append video at end instead of failing
     currentContent = currentContent.trimEnd() + `\n\n${videoUrl}\n`;
   } else {
-    // Replace placeholder with bare video URL (WP autoembed → responsive iframe).
-    // Use function replacer to prevent $ in the URL being interpreted as replacement pattern.
-    currentContent = currentContent.replace("<!-- VIDEO_PLACEHOLDER -->", () => videoUrl);
+    // Replace ALL placeholders with the bare video URL (WP autoembed → responsive iframe).
+    // Global regex + function replacer: replaces every occurrence (not just the first) AND prevents
+    // $ in the URL being interpreted as a replacement pattern. The needle has no regex-special chars.
+    currentContent = currentContent.replace(/<!-- VIDEO_PLACEHOLDER -->/g, () => videoUrl);
   }
 
   // PATCH the post content back

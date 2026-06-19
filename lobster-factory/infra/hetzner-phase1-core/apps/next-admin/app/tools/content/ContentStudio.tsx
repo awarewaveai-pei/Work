@@ -1357,7 +1357,7 @@ export default function ContentStudio() {
         if (genRun !== imgRunRef.current) break;
         const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string; cost_usd?: number; model?: string };
         if (json.ok && json.imageUrl) {
-          setGenerated(prev => prev.replace(`IMAGE_PLACEHOLDER_${n}`, json.imageUrl!));
+          setGenerated(prev => prev.replace(`IMAGE_PLACEHOLDER_${n}`, () => json.imageUrl!));
           if (json.cost_usd && json.model) addCostLine({ route: "content/image", model: json.model, vendor: "Image", usd: json.cost_usd, kind: "image" });
         } else {
           lastErr = (typeof json.error === "string" && json.error) || "圖片生成失敗";
@@ -1501,6 +1501,10 @@ export default function ContentStudio() {
       const res = await fetch("/api/video/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          // /api/video/generate requires `topic` (it uses topic as both topic + keyword) — without it
+          // the route 400s before a job is ever created (critic 2026-06-19). seoTitle (→ keyword
+          // fallback) is the natural article topic.
+          topic: metaData?.seoTitle || form.keyword,
           articleTitle: metaData?.seoTitle || form.keyword,
           articleContent: generated,
           language: form.language || "繁體中文",

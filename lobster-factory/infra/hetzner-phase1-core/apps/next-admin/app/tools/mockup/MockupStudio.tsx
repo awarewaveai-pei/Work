@@ -149,8 +149,14 @@ function CatalogGrid({
       {!catalogLoading && catalog.length === 0 && (
         <p style={{ fontSize: 12, color: "#e5484d" }}>無法載入 Printful 產品目錄</p>
       )}
+      {/* alignItems:"start" on the grid below is LOAD-BEARING — without it the default
+          align-items:stretch creates a circular sizing dependency with the children's
+          percentage height (paddingTop:"100%"), collapsing every grid row to ~5.6px so
+          cards render as thin slivers clipped by overflow:hidden. Verified live on
+          production DOM: stretch→cell 6px, start→cell 193px with a 150×150 square image.
+          Do NOT remove alignItems:"start". */}
       {catalog.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, maxHeight: 360, overflowY: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", alignItems: "start", gap: 8, maxHeight: 360, overflowY: "auto" }}>
           {catalog.map((p) => {
             const selected = selectedIds.has(p.id);
             return (
@@ -166,12 +172,7 @@ function CatalogGrid({
                   position: "relative",
                 }}
               >
-                {/* translateZ(0) promotes each card to its own compositing layer —
-                    fixes a Chrome GPU paint glitch where the wrapper has the correct
-                    layout box (158×158, verified via getBoundingClientRect) but
-                    rasterizes as a thin sliver inside the overflow:auto scroll
-                    container until a manual repaint (scroll / zoom / devtools) is forced. */}
-                <div style={{ width: "100%", paddingTop: "100%", position: "relative", background: "#1a1a1a", transform: "translateZ(0)" }}>
+                <div style={{ width: "100%", paddingTop: "100%", position: "relative", background: "#1a1a1a" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.image} alt={p.title} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                   {selected && (

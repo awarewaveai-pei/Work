@@ -79,7 +79,7 @@ async function toWebP(
       const fontSize = Math.max(24, Math.min(48, Math.round(W / 22)));
       // CJK characters occupy ~1.0em width; Latin ~0.65em
       const hasCJK   = /[一-鿿぀-ヿ가-힯]/.test(titleText!);
-      const maxChars = Math.floor(W / (fontSize * (hasCJK ? 1.0 : 0.65)));
+      const maxChars = Math.max(1, Math.floor(W / (fontSize * (hasCJK ? 1.0 : 0.65))));
       const text     = titleText!.length > maxChars ? titleText!.slice(0, maxChars - 1) + "…" : titleText!;
       const escaped  = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
       const fontFamily = fontStyle === "serif"
