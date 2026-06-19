@@ -59,7 +59,33 @@ $insert
 
 [rollback] `git revert` 至 578c97c0 並 sg-deploy；所有改動為 additive（新檔 + 既有函式擴充），無 destructive migration。
 
-### fix(mockup): Chrome paint-sliver glitch + designSizePct 滑桿無效（useMemo deps 漏）
+### fix(mockup): CatalogGrid 細條真因 = grid align-items:stretch + paddingTop% 循環依賴塌列（前 translateZ 誤診修正）
+
+[任務理解] 卡片細條前面修多次（paddingTop / translateZ）全無效，用戶要求看清整個架構。本輪在 production live DOM 逐層量高度 + JS 實測候選修法定位真因。
+
+[真因（live DOM 鐵證）]
+- `GRID.gridTemplateRows = "5.625px 5.625px ..."`：每個 grid row 塌成 5.6px。`CELL.height=5.625px`（卡片壓扁），內含 `WRAPPER paddingTop=158px` 被 `overflow:hidden` 裁成細條。
+- 機制：grid 預設 `align-items:stretch` 拉 item 填 row 高，而 row 高由 item 內容定，內容高來自 `paddingTop:"100%"`（基準=row 高）→ 循環依賴 → Chromium 解成 ~0 → 塌列。
+- 前一輪 translateZ(0) 是誤診（以為 GPU paint glitch），沒碰 grid 層所以無效。我之前只量 wrapper=158 就斷定好了、從沒量 CELL 高也沒看畫面 = 自己分頁也壞卻回報好。
+
+[實測（live JS 注入 production DOM）] baseline cellH=6；wrapper 改 aspect-ratio 單獨=6（無效）；**grid 加 `alignItems:"start"` → cellH=193, imgH=150, imgSquare=true ✓**。
+
+[已修改]
+- `app/tools/mockup/MockupStudio.tsx` (CatalogGrid 容器) — 加 `alignItems: "start"` + LOAD-BEARING 註解（禁移除）。
+- 同檔卡片 wrapper — 移除誤診的 `transform: "translateZ(0)"` + 錯誤註解。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Chrome(MCP) | action=live JS 注入 production DOM 實測各修法 | result=alignItems:start → cellH 6→193, imgH=150, imgSquare=true（最強實證）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=7/7
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n/1s（alignItems:start 無副作用、translateZ 移除乾淨、其他 3 grid 用自然/固定高度不受影響）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=translateZ,alignItems,paddingTop | hits=0（translateZ 全移除 0 殘留；僅 CatalogGrid 用 paddingTop% pattern）
+
+[剩餘風險] 需部署後在 production 重量 CELL 高度（≈193 非 6）確認 deploy 帶上。Critic 建議（非必要）：未來改 wrapper 用 `aspect-ratio:1/1` 讓卡片自包含。
+
+[rollback] git revert；alignItems 為 additive，移除即回原狀。
+
+### fix(mockup): Chrome paint-sliver glitch + designSizePct 滑桿無效（useMemo deps 漏）— ⚠️ paint glitch 診斷後證實誤判，真因見上一條（grid align-items）；designSizePct deps 修正仍有效
 
 [任務理解] 用戶連續多輪回報「選擇產品」卡片是細條不是正方形，且「設計大小/透明度似乎沒吃」。過去多次「修好」其實是部署了不含改動的 checkpoint commit + 從沒看實際 render 的 DOM（盲改）。本輪用 Chrome MCP 接真實瀏覽器量 DOM 找真因。
 
