@@ -6,6 +6,30 @@ $insert
 
 ## 2026-06-20
 
+### feat(pod): Phase 1b — 多色多款對接（hex bind）一條鏈
+
+[任務] PLAN Phase 1b:啟用多色多款。pod-product / route / PublishWizard 一條 color 鏈,Woo 建 `model.colors` + Printful **用 hex 綁定**(免 Printful colour rename)。
+
+[已修改]
+- `pod-product.ts`:`buildVariantPlan`/`buildPodProductPayload` 用 `model.colors`(PodColor[]);plan 帶 color(label)/printfulColor/colorHex;legacy fallback White/Black(SKU 首字母向後相容,既有 test 不破);model SKU = `tag+colorToken`(防 4 色首字母撞)。
+- `route.ts` create:`podModelById(catalogProductId)`→model;variantMap 加 printfulColor/colorHex。
+- `route.ts` pfcreate:**hex bind**(catalogByKey `hex:hex|size`,prefer hex,legacy name fallback)+ dup-key fail-loud + `podModelById` 驗 catalogProductId(unknown→400)。
+- `route.ts` link:標 legacy 71-only(不 model-aware)。
+- `print-provider.ts`:`CatalogVariant` 加 `colorHex`;`getCatalogVariants` 回 `color_code`。
+- `PublishWizard.tsx`:`catalogProductId` state + model 下拉 + 4 post 傳 + VariantMapEntry printfulColor/colorHex + **切 model reset 變體狀態**(防 stale variantMap)。
+- `pod-product.test.ts`:+ 多色 test。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(SSH hetzner-sg + docker node Printful v2 API) | cmd=模擬 pfcreate hex bind | exit=0 | **3 models × 4 hex × 5 sizes = 20/20 each,零 skip**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test(全) | exit=0 | **30 files 413 tests passed**(含 native-sync-product / woo-order 履約相關未 break)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/2M/3n → **全採納**:① hex bind(原用 name 違反 config hex SSOT → 改 hex join key,免 rename;hex 已 threaded 只需當 key)② legacy link 標 71-only ③ model 切換 reset 變體 ④ podModelById 驗 catalogProductId ⑤ dup-key fail-loud;verified clean:金流紅線 draft-only(無 confirm/charge)/SKU 唯一/drift guard(Woo↔Printful count)/back-compat
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=catalogProductId,printfulColor,colorHex,getCatalogVariants,podModelById | hits=0 stale(color 鏈一致 + 向後相容)
+
+[剩餘風險] 真機建 Woo draft 端到端待部署後驗(Phase 4)。Phase 2(批次合成)/ Phase 3(一鍵 loop)未做。
+
+[rollback] git revert;向後相容(無 model = legacy White/Black 不變)。
+
 ### feat(pod): Phase 1a — `getCatalogVariants` 改 v2 + hex/name 雙比對（向後相容）
 
 [任務] PLAN Phase 1 第一步:`getCatalogVariants` 從 v1 `/products/{id}`（不回 `color_code`）改 v2 `catalog-variants`（回 `color_code`），支援 hex 比對 + 向後相容顏色名（critic Major 1 修復）。
