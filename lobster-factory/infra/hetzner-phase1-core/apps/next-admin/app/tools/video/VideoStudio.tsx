@@ -121,18 +121,21 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
   const [introDuration, setIntroDuration] = useState(3);
 
   const brollScenes = Math.max(0, totalScenes - customScenes);
+  // 深層接力：前製腳本場景（若有）→ 生成草稿時直接用，跳過 Claude 重生。
+  const [providedScenes] = useState(initial?.scenes ?? []);
 
+  // 成本：providedScenes 路徑每場都 Flux 自訂圖、無 B-roll → 以腳本場景數估算；否則用滑桿值。
   const costBreakdown = useMemo(
-    () => computeVideoCost({ totalScenes, customScenes: Math.min(customScenes, totalScenes), brollScenes, imageModel }),
-    [totalScenes, customScenes, brollScenes, imageModel],
+    () => providedScenes.length > 0
+      ? computeVideoCost({ totalScenes: providedScenes.length, customScenes: providedScenes.length, brollScenes: 0, imageModel })
+      : computeVideoCost({ totalScenes, customScenes: Math.min(customScenes, totalScenes), brollScenes, imageModel }),
+    [providedScenes, totalScenes, customScenes, brollScenes, imageModel],
   );
 
   // ── Generate form ── (initial = 從 ScriptForge「送去生產」帶入的腳本預填)
   const [topic, setTopic] = useState(initial?.topic ?? "");
   const [articleTitle, setArticleTitle] = useState(initial?.articleTitle ?? "");
   const [articleContent, setArticleContent] = useState(initial?.articleContent ?? "");
-  // 深層接力：前製腳本場景（若有）→ 生成草稿時直接用，跳過 Claude 重生。
-  const [providedScenes] = useState(initial?.scenes ?? []);
   const [language, setLanguage] = useState("繁體中文");
   const [videoStyle, setVideoStyle] = useState("");
   const [videoStyleGroup, setVideoStyleGroup] = useState(VIDEO_STYLE_GROUPS[0] ?? "");
@@ -238,7 +241,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 
   // ── Draft generation handler ──
   async function handleGenerateDraft() {
-    if (!topic.trim()) return;
+    if (!topic.trim() && providedScenes.length === 0) return;
     if (pollRef.current) clearTimeout(pollRef.current);
     setDraftLoading(true);
     setDraftScenes([]);
@@ -357,7 +360,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
 
   const isLoading = genStatus === "loading";
   const isBusy = isLoading || draftLoading;
-  const canGenerate = topic.trim().length > 0 && !isBusy;
+  const canGenerate = (topic.trim().length > 0 || providedScenes.length > 0) && !isBusy;
 
   return (
     <div style={{ padding: "24px 28px", background: "var(--bg-canvas)", minHeight: "100vh" }}>

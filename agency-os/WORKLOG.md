@@ -4,6 +4,29 @@
 
 $insert
 
+## 2026-06-20
+
+### feat(video): Q2 兩 Tab 分工釐清 + Q3 影片生產流水線 + 深層接力（場景直接對映）
+
+[任務理解] 使用者「全做好」Q2/Q3/深層接力。Q2：前製=寫腳本、影片生產=純生產但保留快速捷徑（雙模式明標）；Q3：影片生產改由上到下流水線（內容→場景設定→生成）；深層接力：前製場景直接對映到生產（台詞→旁白、畫面→生圖提示），不重生 → 影片貼合腳本。
+
+[已修改]
+- `lib/content/blocks/video-pipeline.ts`：`prepareScenes` 加 optional `providedScenes` → 有值則跳過 Claude `generateVideoScript`、直接用前製場景建 VideoScene（`visual:"custom"`、image_prompt=畫面）；else 原路徑（critic git-verified byte-equivalent）。
+- `app/api/video/draft/route.ts`：DraftBody 加 `scenes`；topic 檢查放寬（topic 或 scenes 擇一）；anthropicKey 檢查放寬（providedScenes 路徑不需 Claude）；傳 `providedScenes` + `anthropicKey ?? ""`。
+- `app/tools/video/VideoStudio.tsx`：`initial` 加 `scenes` + `providedScenes` state（上移至 costBreakdown 前）；handleGenerateDraft 帶 `scenes`；**Q3** 把 ②場景設定 從左欄移進 §4（內文後/生成前），scene-count 滑桿於 providedScenes 時改顯示腳本場景數；**Q2** §4 頂雙模式 banner（從前製帶入 / 快速）；成本以腳本場景數估、生成閘 `topic||providedScenes`、handleGenerateDraft guard 放寬（critic 三修）。
+- `app/tools/video/ScriptForge.tsx`：`SendToProduction` 型別加 `scenes`；送去生產按鈕帶 `scenes`（dialogue→narration、visual→imagePrompt），filtered 後空則不送（critic）。
+- `app/tools/video/VideoTabs.tsx`：`ProductionPrefill` 加 `scenes` 透傳。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（多次，含 critic 修正後）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`curl dev POST /api/video/draft` | result=scenes-only(無 topic)→「R2 未設定」(證明走 providedScenes 路徑、跳過 topic+anthropic 檢查、抵達 buildAsset；prod 有 R2 會生圖)；無 topic 無 scenes→400「topic 或 scenes 為必填」
+- REVIEW_DONE: critic=Deep | verdict=pass（Low，0 Crit/0 Major；else-branch git-verified byte-equivalent、providedScenes 建出合法 VideoScene 且 buildAsset/submitRender 正確消費、安全沿用 render-draft 既有 host allowlist）| findings=0c/0m/3n（已修：生成閘放寬空標題死路、空台詞不送 scenes、成本以腳本場景數估算）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`providedScenes|scenes|② 場景設定` | hits=型別鏈一致（ScriptForge→VideoTabs→VideoStudio→draft→prepareScenes）、②場景設定 左欄殘留=0
+
+[剩餘風險] providedScenes 的 imagePrompt = 前製「畫面」(中文)→Flux 品質略弱（英文 style prefix 兜底；之後可加翻譯）；本機無 R2，真渲染端到端未跑 → deploy 後用 Chrome 切「影片生產」tab 驗證（場景設定在流程內 + 帶入 banner + 生成）。
+
+[rollback] `git revert <hash>` + sg-deploy；全 additive（不傳 providedScenes＝原行為，預設路徑 byte-equivalent）。
+
 ## 2026-06-19
 
 ### fix(mockup): 白/灰/黑全出白 — generatePrintful useCallback 漏 color dep（stale closure）
