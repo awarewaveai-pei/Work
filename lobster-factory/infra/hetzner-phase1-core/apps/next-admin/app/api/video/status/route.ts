@@ -16,7 +16,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const { getJob, finishJob } = await import("@/lib/content/video/job-store");
-  const job = getJob(jobId);
+  const job = await getJob(jobId);
   if (!job) {
     return NextResponse.json({ ok: false, error: "job_not_found" }, { status: 404 });
   }
@@ -62,13 +62,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       }
     }
     if (job.r2Keys?.length) await cleanupVideoInputKeys(job.r2Keys);
-    finishJob(jobId, { status: "done", recorded: true, video: { outputs: poll.outputs, out_dir: poll.out_dir }, title: job.recordParams?.title });
+    await finishJob(jobId, { status: "done", recorded: true, video: { outputs: poll.outputs, out_dir: poll.out_dir }, title: job.recordParams?.title });
     return NextResponse.json({ ok: true, status: "done", video: { outputs: poll.outputs, out_dir: poll.out_dir }, title: job.recordParams?.title });
   }
 
   // EU error → 清暫存 + 標記
   const { cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
   if (job.r2Keys?.length) await cleanupVideoInputKeys(job.r2Keys);
-  finishJob(jobId, { status: "error", error: poll.error, statusCode: 502 });
+  await finishJob(jobId, { status: "error", error: poll.error, statusCode: 502 });
   return NextResponse.json({ ok: true, status: "error", error: poll.error, statusCode: 502 });
 }

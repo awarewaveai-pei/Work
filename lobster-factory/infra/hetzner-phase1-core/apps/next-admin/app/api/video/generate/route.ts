@@ -79,13 +79,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { createJob, finishJob, updateJobStep } = await import("@/lib/content/video/job-store");
   const { resolveOrgId, cleanupVideoInputKeys } = await import("@/lib/content/blocks/video-pipeline");
-  const job = createJob();
+  const job = await createJob();
 
   // 關鍵：**同步**呼叫 prepare（Claude 腳本 + Flux 圖並行 + 提交 EU，~25s，無背景工作、不撞 CF 100s）。
   // 渲染在 EU thread 跑（持久）；/status 輪詢 EU 收尾。無 after()/fire-and-forget → 不再撞 Next.js 背景限制。
   const ctxWithProgress = {
     ...ctx,
-    onProgress: (step: string) => updateJobStep(job.id, step),
+    onProgress: (step: string) => { void updateJobStep(job.id, step); },
   };
   let prep: PrepareResult;
   try {
@@ -93,13 +93,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[video/generate] prepare threw:", e);
-    finishJob(job.id, { status: "error", error: `prepare 例外：${msg}`, statusCode: 500 });
+    await finishJob(job.id, { status: "error", error: `prepare 例外：${msg}`, statusCode: 500 });
     return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });
   }
 
   if (prep.ok && prep.euJobId) {
     const orgId = resolveOrgId(); // ctx 無 organizationId → 用 POD_DESIGNS_DEFAULT_ORG_ID
-    finishJob(job.id, {
+    await finishJob(job.id, {
       status: "running",
       euJobId: prep.euJobId,
       r2Keys: prep.r2Keys ?? [],
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } else {
     // prepare 失敗（腳本/生圖/提交）→ 清暫存 + 標記錯誤
     if (prep.r2Keys?.length) await cleanupVideoInputKeys(prep.r2Keys);
-    finishJob(job.id, { status: "error", error: prep.error ?? "prepare 失敗", statusCode: prep.status ?? 500 });
+    await finishJob(job.id, { status: "error", error: prep.error ?? "prepare 失敗", statusCode: prep.status ?? 500 });
   }
 
   // 202 + jobId；前端輪詢 /api/video/status?jobId=（由 /status 輪詢 EU 收尾）

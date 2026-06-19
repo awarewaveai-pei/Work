@@ -6,6 +6,27 @@ $insert
 
 ## 2026-06-19
 
+### fix(video): 影片 job 進度票改存 Supabase（修 job_not_found，重啟/部署不再斷渲染）
+
+[任務理解] 使用者按「確認送出渲染」遇 `失敗 job_not_found`。根因：`lib/content/video/job-store.ts` 用 module-level in-memory Map 存 job；我當下連續跑兩次 sg-deploy，`docker compose up -d` 重啟容器 → JOBS Map 清空 → /status 輪詢找不到 job。非影片遺失（影片在 R2 + media_assets，reconcile cron 每 15 分補孤兒）；脆弱點僅即時進度票。使用者選「最完美：搬進 Supabase」（授權 prod migration，High-risk）。
+
+[已修改]
+- `packages/db/migrations/0047_video_jobs.sql`（新）：建 `video_jobs` 表（id/status(check running|done|error)/step/eu_job_id/video jsonb/title/error/status_code/r2_keys jsonb/record_params jsonb/recorded/created_at）+ created_at 索引 + RLS 開 + deny anon/authenticated policy（service_role 繞過；照 0039/0033 precedent）。idempotent（if not exists / drop-create policy）。
+- `packages/db/scripts/0047_video_jobs_down.sql`（新）：down migration（drop table；EU 強制 rollback 規範）。
+- `lib/content/video/job-store.ts`：in-memory Map → Supabase（`getSupabaseWriteClient` service_role）。create/get/update/finish 全 async；rowToJob 映 snake→camel + created_at→ms；createJob 順手清 1h 過期列；介面（VideoJob camelCase）不變。
+- callers 改 await：`render-draft`（createJob/finishJob）、`status`（getJob/2× finishJob）、`generate`（createJob/3× finishJob + onProgress callback 改 `void updateJobStep` fire-and-forget）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0（全 async 化 + 5 caller await 後型別過）
+- REVIEW_DONE: critic=Deep(db-expert) | verdict=**GO**（0 Critical/0 Major；additive+idempotent 照 0039 precedent、零 lock 風險空表、code↔schema 欄名逐一吻合、r2_keys jsonb↔string[] round-trip 正確、CHECK 對齊 code status 值、並發 double-record 由 `uq_media_assets_org_backend_key_version` unique 兜底）| findings=0c/0m/3n（已採納：補 down-migration + deny policy）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`createJob|getJob|finishJob|updateJobStep|video_jobs|new Map` | hits=video route 3 caller 全 await/void 處理、無漏接同步 caller、job-store 無 Map 殘留、video_jobs 僅 migration+job-store 引用
+- REALTEST_EVIDENCE（apply）: <待補：SSH EU supabase-db psql apply + service_role write/delete 驗證>
+- REALTEST_EVIDENCE（deploy）: <待補：sg-deploy + 端到端 render 不再 job_not_found>
+
+[剩餘風險] 套用順序：必須先 apply migration（建表）+ NOTIFY pgrst reload → 再 deploy code（否則新碼查無表→降級回 job_not_found，非災難）。service_role 對新表的 table grant 需 apply 後 write test 確認（0039 wp_sites 同法為 precedent，應 ok）。
+
+[rollback] code：`git revert <hash>` + sg-deploy（job-store 退回前版）；DB：`packages/db/scripts/0047_video_jobs_down.sql`（drop table，僅丟非持久進度列）。
+
 ### feat(video): ScriptForge 加多供應商 AI 模型選擇器 + 工具列 UX（對齊 Content Studio）
 
 [任務理解] 用戶要求 (1) ScriptForge 加上 Content Studio 那個「AI 模型」選單（Claude+OpenAI 8 款）；(2) 反映「看不出怎麼用」— 排版/串接需更清楚（實際看 prod 截圖：topbar+VideoTabs+ScriptForge 自家 nav 三條橫列疊加 + 24 項 nav 橫向溢出、載入客戶擠最右）。

@@ -115,9 +115,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: err.error }, { status: err.status });
   }
 
-  const job = createJob();
+  const job = await createJob();
   const orgId = resolveOrgId();
-  finishJob(job.id, {
+  await finishJob(job.id, {
     status: "running",
     euJobId: sub.jobId,
     r2Keys,
