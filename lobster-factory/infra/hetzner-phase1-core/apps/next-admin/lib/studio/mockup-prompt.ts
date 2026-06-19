@@ -381,7 +381,12 @@ function fidelityBlock(
   const base =
     `The exact design from the reference image is printed large on ${surface}. ` +
     "Reproduce the reference design EXACTLY: same colors, same shapes, same proportions, no redesign, " +
-    `no added text or elements. The print ${behavior}.`;
+    `no added text or elements. The print ${behavior}. ` +
+    // Anti-"pasted sticker" — the #1 realism failure of AI mockups.
+    "CRITICAL: the print is physically embedded INTO the material itself — it bends, stretches, " +
+    "creases and warps with every wrinkle, fold and curve of the surface, sits under the same " +
+    "lighting and shadows, and shares the exact same perspective and slight fabric grain/sheen. It " +
+    "must NOT look like a flat sticker, decal, patch or graphic floating or pasted on top.";
   if (color === "black") {
     return (
       base +
@@ -390,6 +395,18 @@ function fidelityBlock(
     );
   }
   return base;
+}
+
+/** Qualitative size phrase — AI image models obey "large/oversized" far better than an exact "%".
+ *  (The Printful tab still uses the numeric fraction for true mechanical placement.) */
+function sizePhrase(pct: number, area: string): string {
+  const size =
+    pct <= 50 ? "a small, understated"
+    : pct <= 70 ? "a moderately sized"
+    : pct <= 85 ? "a large, prominent"
+    : "an oversized, dominant";
+  const fill = pct > 85 ? ", covering most of it" : "";
+  return ` The printed graphic is ${size} print on ${area}${fill}.`;
 }
 
 /** Per-category description of how the model holds/wears the product and where the print sits. */
@@ -406,7 +423,7 @@ function modelProductClause(
         sentence: `They hold a ${color} ceramic mug up near their face, with the printed side turned toward the camera.`,
         surface: "the side of the mug facing the camera",
         behavior: "wraps smoothly around the mug's curved glossy ceramic surface with accurate lighting and soft reflections",
-        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the mug's printable wrap area.`,
+        sizeClause: sizePhrase(sizePct, "the mug's printable wrap area"),
         visibilityClause: " The printed side of the mug is fully visible, unobstructed and facing the camera.",
       };
     case "wall-art":
@@ -422,7 +439,7 @@ function modelProductClause(
         sentence: `They carry a ${color} tote bag, with the printed front face turned toward the camera.`,
         surface: "the front face of the bag",
         behavior: "follows the canvas fabric's natural drape and folds with accurate lighting and shadow",
-        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the bag's front print area.`,
+        sizeClause: sizePhrase(sizePct, "the bag's front print area"),
         visibilityClause: " The printed front of the bag is fully visible and facing the camera.",
       };
     case "phone":
@@ -430,7 +447,7 @@ function modelProductClause(
         sentence: "They hold a phone up, with the printed back of the case turned toward the camera.",
         surface: "the back of the phone case",
         behavior: "sits flat on the rigid glossy case with accurate lighting and reflections",
-        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the case back.`,
+        sizeClause: sizePhrase(sizePct, "the back of the phone case"),
         visibilityClause: " The printed back of the case is fully visible and facing the camera.",
       };
     case "pillow":
@@ -438,7 +455,7 @@ function modelProductClause(
         sentence: "They hold a square throw pillow, with the printed front turned toward the camera.",
         surface: "the front face of the pillow",
         behavior: "follows the soft fabric's gentle bulge and folds with accurate lighting and shadow",
-        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the pillow's front.`,
+        sizeClause: sizePhrase(sizePct, "the pillow's front"),
         visibilityClause: " The printed front of the pillow is fully visible and facing the camera.",
       };
     case "jewelry":
@@ -455,7 +472,7 @@ function modelProductClause(
         sentence: `They wear a plain ${color} ${garmentPhrase}.`,
         surface: "the center chest of the garment",
         behavior: "follows the fabric's natural wrinkles, folds and drape realistically, with accurate lighting, shadows and subtle cotton fabric texture",
-        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the chest print area.`,
+        sizeClause: sizePhrase(sizePct, "the chest print area"),
         visibilityClause: poseOccludes ? "" : " The full chest area is visible and unobstructed.",
       };
   }
@@ -492,7 +509,7 @@ function flatProductClause(
         composition: "standing upright",
         surface: "the side of the product facing the camera",
         behavior: "wraps smoothly around the product's curved glossy surface with accurate lighting and soft reflections",
-        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the product's printable wrap area.`,
+        sizeClause: sizePhrase(sizePct, "the product's printable wrap area"),
       };
     case "wall-art":
       return {
@@ -508,7 +525,7 @@ function flatProductClause(
         composition: "standing upright with the printed front face shown",
         surface: "the front face of the bag",
         behavior: "follows the canvas fabric's natural drape and folds with accurate lighting and shadow",
-        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the bag's front print area.`,
+        sizeClause: sizePhrase(sizePct, "the bag's front print area"),
       };
     case "phone":
       return {
@@ -516,7 +533,7 @@ function flatProductClause(
         composition: "standing upright with the printed back of the case shown",
         surface: "the back of the phone case",
         behavior: "sits flat on the rigid glossy case with accurate lighting and reflections",
-        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the case back.`,
+        sizeClause: sizePhrase(sizePct, "the back of the phone case"),
       };
     case "pillow":
       return {
@@ -524,7 +541,7 @@ function flatProductClause(
         composition: "propped upright with the printed front shown",
         surface: "the front face of the pillow",
         behavior: "follows the soft fabric's gentle bulge and folds with accurate lighting and shadow",
-        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the pillow's front.`,
+        sizeClause: sizePhrase(sizePct, "the pillow's front"),
       };
     case "jewelry":
     default:
@@ -594,7 +611,7 @@ export function buildFlatMockupPrompt(p: FlatMockupParams): string {
   }
 
   // Apparel — original flat-lay garment shot (+ optional corner decor + pro-quality tail).
-  const sizeClause = ` The printed graphic should be prominent, occupying approximately ${sizePct}% of the center chest area.`;
+  const sizeClause = sizePhrase(sizePct, "the center chest area");
   return (
     `Photorealistic e-commerce flat-lay product photo. A plain ${p.color} ${p.garmentPhrase}, ` +
     `${arrangement.phrase}, on ${surface.phrase}, ${lighting.phrase}. ` +

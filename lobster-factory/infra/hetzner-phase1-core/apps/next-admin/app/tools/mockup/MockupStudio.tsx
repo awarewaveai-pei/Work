@@ -745,7 +745,7 @@ export default function MockupStudio() {
 
             <label style={{ fontSize: 13 }}>
               圖案透明度 {designOpacity}%
-              <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 6 }}>（僅對上傳圖有效）</span>
+              <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 6 }}>（褪色／復古效果，<b>不是</b>融合；僅對上傳圖有效，圖庫選的不生效）</span>
               <input type="range" min={60} max={100} step={5} value={designOpacity}
                 onChange={(e) => setDesignOpacity(Number(e.target.value))}
                 style={{ width: "100%", marginTop: 4 }} />
@@ -795,7 +795,7 @@ export default function MockupStudio() {
 
             <label style={{ fontSize: 13 }}>
               圖案透明度 {designOpacity}%
-              <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 6 }}>（僅對上傳圖有效）</span>
+              <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 6 }}>（褪色／復古效果，<b>不是</b>融合；僅對上傳圖有效，圖庫選的不生效）</span>
               <input type="range" min={60} max={100} step={5} value={designOpacity}
                 onChange={(e) => setDesignOpacity(Number(e.target.value))}
                 style={{ width: "100%", marginTop: 4 }} />
@@ -959,7 +959,7 @@ export default function MockupStudio() {
 
             <label style={{ fontSize: 13 }}>
               圖案透明度 {designOpacity}%
-              <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 6 }}>（僅對上傳圖有效）</span>
+              <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 6 }}>（褪色／復古效果，<b>不是</b>融合；僅對上傳圖有效，圖庫選的不生效）</span>
               <input type="range" min={60} max={100} step={5} value={designOpacity}
                 onChange={(e) => setDesignOpacity(Number(e.target.value))}
                 style={{ width: "100%", marginTop: 4 }} />

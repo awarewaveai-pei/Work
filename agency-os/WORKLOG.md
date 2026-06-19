@@ -6,6 +6,32 @@ $insert
 
 ## 2026-06-19
 
+### fix(mockup): AI 滑桿無效真因 + 融合感（反貼紙）+ 大小改 AI 級距 + 透明度標清楚
+
+[任務理解] 用戶：3 個 tab 的「設計大小%」「圖案透明度%」完全沒作用；且 AI 合成的圖案像貼上去、沒跟實體融合，很困擾。
+
+[診斷（讀 code 確認，非臆測）]
+- AI tab 的「設計大小」只是 prompt 文字「約 X%」→ AI 文生圖天生不照精確數字 → 看似無效（Printful tab 是真實機械合成，大小有效）。
+- 「圖案透明度」：`applyDesignOpacity` `!src.startsWith("data:")` 直接跳過 → 圖庫(R2)選的不生效；且降透明度只是褪色，非融合。
+- 「沒融合」= AI mockup 第一大弱點（平貼貼紙感），靠 prompt 而非透明度解。
+
+[用戶選擇] 三點都改。
+
+[已修改] `lib/studio/mockup-prompt.ts`：
+- `fidelityBlock` 加反貼紙融合指令（印花嵌入材質、隨皺褶起伏、非平貼貼紙）→ 所有 design-mode prompt 生效。
+- 新 `sizePhrase(pct, area)` 把 40–100 映射成 AI 聽得懂的級距（小/中/大/滿版 + >85 covering most），取代所有「approximately X%」inline 字串（不再洩漏 % 給 AI）。Printful 機械路徑（`designSizePct/100`）不動。
+- `MockupStudio.tsx`：3 個 tab 透明度 hint 標清楚「褪色/復古效果，不是融合；僅上傳圖有效，圖庫不生效」。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=24/24（+融合/大小級距測試）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0（我的檔 0 錯）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（向後相容 chest-area 斷言全綠、級距邊界正確、融合句只出現一次且 product-mode 不含、無 % 洩漏）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=sizePhrase,covers approximately | hits=0 stale（舊 % 字串全清、sizePhrase module-private 僅 1 檔）
+
+[剩餘風險] AI 融合是機率改善（prompt 強化），非保證；最真實仍是 Printful tab 真實合成。圖庫圖透明度仍不生效（R2 CORS，刻意不碰）。
+
+[rollback] git revert；additive。
+
 ### fix(video): 影片 job 進度票改存 Supabase（修 job_not_found，重啟/部署不再斷渲染）
 
 [任務理解] 使用者按「確認送出渲染」遇 `失敗 job_not_found`。根因：`lib/content/video/job-store.ts` 用 module-level in-memory Map 存 job；我當下連續跑兩次 sg-deploy，`docker compose up -d` 重啟容器 → JOBS Map 清空 → /status 輪詢找不到 job。非影片遺失（影片在 R2 + media_assets，reconcile cron 每 15 分補孤兒）；脆弱點僅即時進度票。使用者選「最完美：搬進 Supabase」（授權 prod migration，High-risk）。

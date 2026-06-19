@@ -38,6 +38,21 @@ describe("buildModelMockupPrompt", () => {
     expect(p).toContain("wrinkles");
   });
 
+  it("forbids the pasted-sticker look (fusion)", () => {
+    const p = buildModelMockupPrompt({ ...base, color: "white" });
+    expect(p).toContain("must NOT look like a flat sticker");
+    expect(p).toContain("embedded INTO the material");
+  });
+
+  it("uses qualitative size buckets the AI can follow, not an exact %", () => {
+    const small = buildModelMockupPrompt({ ...base, color: "white", designSizePct: 45 });
+    const full = buildModelMockupPrompt({ ...base, color: "white", designSizePct: 100 });
+    expect(small).toContain("small, understated");
+    expect(full).toContain("oversized, dominant");
+    expect(full).toContain("covering most of it");
+    expect(small).not.toMatch(/\d+%/); // no raw percentage leaks into the AI prompt
+  });
+
   it("includes model description, scene and props", () => {
     const p = buildModelMockupPrompt({
       ...base,
