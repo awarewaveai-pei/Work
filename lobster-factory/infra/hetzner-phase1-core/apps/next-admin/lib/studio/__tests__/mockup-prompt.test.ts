@@ -3,6 +3,7 @@ import {
   buildFlatMockupPrompt,
   buildModelMockupPrompt,
   isChestOccludingPose,
+  productCategoryFromType,
 } from "../mockup-prompt";
 
 describe("buildModelMockupPrompt", () => {
@@ -86,5 +87,69 @@ describe("isChestOccludingPose", () => {
     expect(isChestOccludingPose("arms-crossed")).toBe(true);
     expect(isChestOccludingPose("standing")).toBe(false);
     expect(isChestOccludingPose("unknown")).toBe(false);
+  });
+});
+
+describe("productCategoryFromType", () => {
+  it("maps Printful typeNames to model-interaction categories", () => {
+    expect(productCategoryFromType("MUG")).toBe("drinkware");
+    expect(productCategoryFromType("DRINKWARE")).toBe("drinkware");
+    expect(productCategoryFromType("POSTER")).toBe("wall-art");
+    expect(productCategoryFromType("CANVAS")).toBe("wall-art");
+    expect(productCategoryFromType("TOTE")).toBe("bag");
+    expect(productCategoryFromType("PHONE-CASE")).toBe("phone");
+    expect(productCategoryFromType("PILLOW")).toBe("pillow");
+    expect(productCategoryFromType("NECKLACE")).toBe("jewelry");
+  });
+  it("defaults unknown / apparel types to apparel", () => {
+    expect(productCategoryFromType("T-SHIRT")).toBe("apparel");
+    expect(productCategoryFromType("HOODIE")).toBe("apparel");
+    expect(productCategoryFromType("")).toBe("apparel");
+    expect(productCategoryFromType(null)).toBe("apparel");
+    expect(productCategoryFromType("SOME_NEW_THING")).toBe("apparel");
+  });
+});
+
+describe("buildModelMockupPrompt — framing + product category", () => {
+  const base = {
+    garmentPhrase: "Bella Canvas 3001 unisex crewneck t-shirt",
+    color: "white" as const,
+    ageGroup: "adult" as const,
+    modelDescription: "",
+    pose: "standing",
+    scene: "studio-white",
+    lighting: "window",
+  };
+
+  it("always demands the head is not cropped", () => {
+    const p = buildModelMockupPrompt(base);
+    expect(p).toContain("must NOT be cropped");
+  });
+
+  it("full-body framing asks for head to feet", () => {
+    const full = buildModelMockupPrompt({ ...base, framing: "full-body" });
+    expect(full).toContain("head to feet");
+    const portrait = buildModelMockupPrompt({ ...base, framing: "portrait" });
+    expect(portrait).toContain("shoulders up");
+  });
+
+  it("apparel (default) keeps the wear-on-chest behavior", () => {
+    const p = buildModelMockupPrompt(base);
+    expect(p).toContain("wear a plain white");
+    expect(p).toContain("chest print area");
+  });
+
+  it("drinkware makes the model hold a mug, not wear it", () => {
+    const p = buildModelMockupPrompt({ ...base, productCategory: "drinkware" });
+    expect(p).toContain("mug");
+    expect(p).toContain("hold");
+    expect(p).not.toContain("wear a plain");
+    expect(p).not.toContain("chest print area");
+  });
+
+  it("jewelry presents the worn piece, no chest print", () => {
+    const p = buildModelMockupPrompt({ ...base, productCategory: "jewelry" });
+    expect(p).toContain("jewelry");
+    expect(p).not.toContain("chest print area");
   });
 });

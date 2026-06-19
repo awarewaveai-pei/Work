@@ -145,6 +145,31 @@ export const MODEL_LIGHTING = [
   { value: "ring-light", label: "環形燈", phrase: "ring light with sharp catchlights" },
 ];
 
+// ── Model tab: framing options (controls full-body vs close-up, prevents head crop) ──
+export const MODEL_FRAMING = [
+  { value: "full-body", label: "全身（頭到腳）", phrase: "Full-body shot: the model's entire figure from head to feet is fully visible and centered in the frame, nothing cropped." },
+  { value: "three-quarter", label: "七分身（膝上）", phrase: "Three-quarter shot framed from roughly the knees up, with the model's full head clearly visible." },
+  { value: "upper-body", label: "半身（腰上）", phrase: "Upper-body shot framed from the waist up, with the full head and face visible." },
+  { value: "portrait", label: "特寫（肩上）", phrase: "Close-up portrait framed from the shoulders up, with the full face clearly visible." },
+];
+
+// ── Product category → how the model presents the product (apparel = wear; others = hold/show) ──
+export type ProductCategory =
+  | "apparel" | "drinkware" | "wall-art" | "bag" | "phone" | "pillow" | "jewelry";
+
+/** Map a Printful catalog typeName (e.g. "MUG", "T-SHIRT") to a model-interaction category.
+ *  Unknown / apparel-like types default to "apparel" (preserves the original behavior). */
+export function productCategoryFromType(typeName: string | null | undefined): ProductCategory {
+  const t = (typeName ?? "").toUpperCase();
+  if (/MUG|DRINKWARE|BOTTLE|TUMBLER|CUP/.test(t)) return "drinkware";
+  if (/POSTER|CANVAS|FRAMED|WALL.?ART|ART.?PRINT/.test(t)) return "wall-art";
+  if (/TOTE|BACKPACK|BAG|POUCH|DUFFLE/.test(t)) return "bag";
+  if (/PHONE/.test(t)) return "phone";
+  if (/PILLOW|CUSHION/.test(t)) return "pillow";
+  if (/NECKLACE|RING|JEWELR|EARRING|BRACELET|PENDANT/.test(t)) return "jewelry";
+  return "apparel";
+}
+
 export const MODEL_POSES = [
   { value: "standing", label: "站姿・輕鬆", phrase: "standing casually with hands relaxed at their sides", occludes: false },
   { value: "hands-hips", label: "雙手叉腰", phrase: "standing confidently with hands on hips", occludes: false },
@@ -262,23 +287,102 @@ export interface ModelMockupParams {
   props?: string[];
   /** design size as % of chest print area (40–100), default 80 */
   designSizePct?: number;
+  /** value from MODEL_FRAMING — controls full-body vs close-up (default three-quarter) */
+  framing?: string;
+  /** how the model presents the product (default apparel = wear on chest) */
+  productCategory?: ProductCategory;
 }
 
-/** Shared print-fidelity block. The dark-fabric lock is iron rule #1. */
-function fidelityBlock(color: GarmentColor): string {
+/** Shared print-fidelity block. The dark-fabric lock is iron rule #1.
+ *  Defaults describe an apparel chest print so flat-lay + apparel callers are unchanged;
+ *  non-apparel products pass a different `surface` (where the print sits) and `behavior`
+ *  (how the print conforms to that surface). */
+function fidelityBlock(
+  color: GarmentColor,
+  surface = "the center chest of the garment",
+  behavior = "follows the fabric's natural wrinkles, folds and drape realistically, with accurate lighting, shadows and subtle cotton fabric texture",
+): string {
   const base =
-    "The exact design from the reference image is printed large on the center chest of the garment. " +
+    `The exact design from the reference image is printed large on ${surface}. ` +
     "Reproduce the reference design EXACTLY: same colors, same shapes, same proportions, no redesign, " +
-    "no added text or elements. The print follows the fabric's natural wrinkles, folds and drape " +
-    "realistically, with accurate lighting, shadows and subtle cotton fabric texture.";
+    `no added text or elements. The print ${behavior}.`;
   if (color === "black") {
     return (
       base +
       " CRITICAL COLOR FIDELITY: keep every color of the reference design exactly as-is even on the " +
-      "black fabric — do NOT lighten, darken, invert or recolor any element to make it more visible."
+      "black surface — do NOT lighten, darken, invert or recolor any element to make it more visible."
     );
   }
   return base;
+}
+
+/** Per-category description of how the model holds/wears the product and where the print sits. */
+function modelProductClause(
+  category: ProductCategory,
+  color: GarmentColor,
+  garmentPhrase: string,
+  sizePct: number,
+  poseOccludes: boolean,
+): { sentence: string; surface: string; behavior: string; sizeClause: string; visibilityClause: string } {
+  switch (category) {
+    case "drinkware":
+      return {
+        sentence: `They hold a ${color} ceramic mug up near their face, with the printed side turned toward the camera.`,
+        surface: "the side of the mug facing the camera",
+        behavior: "wraps smoothly around the mug's curved glossy ceramic surface with accurate lighting and soft reflections",
+        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the mug's printable wrap area.`,
+        visibilityClause: " The printed side of the mug is fully visible, unobstructed and facing the camera.",
+      };
+    case "wall-art":
+      return {
+        sentence: "They hold up a framed art print, displaying the printed side toward the camera.",
+        surface: "the framed print inside the frame",
+        behavior: "sits perfectly flat within the frame with accurate lighting and no glare",
+        sizeClause: " The artwork fills the frame edge to edge.",
+        visibilityClause: " The framed print faces the camera, fully visible and unobstructed.",
+      };
+    case "bag":
+      return {
+        sentence: `They carry a ${color} tote bag, with the printed front face turned toward the camera.`,
+        surface: "the front face of the bag",
+        behavior: "follows the canvas fabric's natural drape and folds with accurate lighting and shadow",
+        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the bag's front print area.`,
+        visibilityClause: " The printed front of the bag is fully visible and facing the camera.",
+      };
+    case "phone":
+      return {
+        sentence: "They hold a phone up, with the printed back of the case turned toward the camera.",
+        surface: "the back of the phone case",
+        behavior: "sits flat on the rigid glossy case with accurate lighting and reflections",
+        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the case back.`,
+        visibilityClause: " The printed back of the case is fully visible and facing the camera.",
+      };
+    case "pillow":
+      return {
+        sentence: "They hold a square throw pillow, with the printed front turned toward the camera.",
+        surface: "the front face of the pillow",
+        behavior: "follows the soft fabric's gentle bulge and folds with accurate lighting and shadow",
+        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the pillow's front.`,
+        visibilityClause: " The printed front of the pillow is fully visible and facing the camera.",
+      };
+    case "jewelry":
+      return {
+        sentence: "They wear the piece of jewelry from the reference image, presented elegantly and clearly visible.",
+        surface: "the jewelry piece itself, matching the reference exactly",
+        behavior: "is rendered as a real metal/gemstone piece with accurate material, lighting and reflections",
+        sizeClause: "",
+        visibilityClause: " The jewelry is the sharp focal point, clearly visible and unobstructed.",
+      };
+    case "apparel":
+    default:
+      return {
+        sentence: `They wear a plain ${color} ${garmentPhrase}.`,
+        surface: "the center chest of the garment",
+        behavior: "follows the fabric's natural wrinkles, folds and drape realistically, with accurate lighting, shadows and subtle cotton fabric texture",
+        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the chest print area.`,
+        visibilityClause: poseOccludes ? "" : " The full chest area is visible and unobstructed.",
+      };
+  }
 }
 
 export function isChestOccludingPose(pose: string): boolean {
@@ -313,23 +417,26 @@ export function buildModelMockupPrompt(p: ModelMockupParams): string {
   const scene = find(MODEL_SCENES, p.scene);
   const pose = find(MODEL_POSES, p.pose);
   const lighting = find(MODEL_LIGHTING, p.lighting);
+  const framing = find(MODEL_FRAMING, p.framing ?? "three-quarter");
+  const category: ProductCategory = p.productCategory ?? "apparel";
   const who = p.ageGroup === "youth" ? "A young person" : "An adult";
   const desc = p.modelDescription.trim() ? ` (${p.modelDescription.trim()})` : "";
-  const chestClause = pose.occludes ? "" : " The full chest area is visible and unobstructed.";
   const propClause =
     p.props && p.props.length > 0
       ? ` Visible in the scene: ${p.props.join(", ")}.`
       : "";
   const sizePct = p.designSizePct ?? 80;
-  const sizeClause = ` The printed graphic covers approximately ${sizePct}% of the chest print area.`;
+  const product = modelProductClause(category, p.color, p.garmentPhrase, sizePct, pose.occludes);
   return (
     `Photorealistic e-commerce lifestyle photo. ${who}${desc}, ${pose.phrase}, ` +
     `in ${scene.phrase}, ${lighting.phrase}. ` +
-    `They wear a plain ${p.color} ${p.garmentPhrase}. ` +
-    fidelityBlock(p.color) +
-    sizeClause +
-    chestClause +
+    product.sentence + " " +
+    fidelityBlock(p.color, product.surface, product.behavior) +
+    product.sizeClause +
+    product.visibilityClause +
     propClause +
-    " Editorial product photography, shallow depth of field, 85mm lens."
+    ` ${framing.phrase}` +
+    " The model's full head and face are clearly visible and must NOT be cropped out of frame." +
+    " Editorial product photography, shallow depth of field."
   );
 }

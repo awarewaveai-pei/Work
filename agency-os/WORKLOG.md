@@ -85,6 +85,29 @@ $insert
 
 [rollback] `git revert` 至 578c97c0 並 sg-deploy；所有改動為 additive（新檔 + 既有函式擴充），無 destructive migration。
 
+### feat(mockup): 模特 tab 加框景控制 + 非服飾產品 category-aware（穿/持/配戴）
+
+[任務理解] 用戶：模特合成圖常裁到頭、要全身；且杯子/相框/項鍊/戒指等非服飾產品也要模特照。問做平拍還是第 4 個 tab。
+
+[決策] 經評估推薦**擴充現有模特 tab**（平拍=俯拍無模特定義衝突；第 4 個=控制重複重工）。用戶確認：擴充模特 tab + 框景一起做。
+
+[已修改]
+- `lib/studio/mockup-prompt.ts`：①新增 `MODEL_FRAMING`（全身/七分/半身/特寫）②新增 `productCategoryFromType(typeName)` 依 Printful 型號分 apparel/drinkware/wall-art/bag/phone/pillow/jewelry（未知→apparel）③`fidelityBlock(color, surface?, behavior?)` 泛化，**預設參數=原 apparel 用詞**（flat/apparel 行為保留）④新增 `modelProductClause()` 各 category 的穿/持/配戴句 ⑤`buildModelMockupPrompt` 加 `framing`+`productCategory`，組框景句 + 強制「頭不裁切」。
+- `app/tools/mockup/MockupStudio.tsx`：模特 tab 加「框景」select；新增 `modelFraming` state + `modelCategory` useMemo（依選到產品 typeName 自動帶）；prompt useMemo 傳 framing+category 並補 deps；非服飾顯示提示 banner。
+- `lib/studio/__tests__/mockup-prompt.test.ts`：+7 測試（框景 head-not-cropped/full-body、category drinkware-hold/jewelry、productCategoryFromType 映射），共 14 pass。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=14/14（7 原 + 7 新）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0（full 專案綠；我的檔 0 錯）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（2 Minor 皆文件用詞：fidelityBlock 黑色鎖 "fabric"→"surface"、移除 "85mm lens"；非 code 缺陷。採納 2 regex 收緊：/PHONE|CASE/→/PHONE/、FRAME→FRAMED 避免誤判）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=MODEL_FRAMING,productCategoryFromType,modelProductClause | hits=0 stale（新 symbol 僅 3 個改的檔，agency-os/scripts 0）
+
+[已知變動（誠實標註，避免日後誤判 regression）] fidelityBlock 黑色鎖句 "black fabric"→"black surface"（因 mug/bag 共用）；model prompt 移除 "85mm lens"（shallow DoF 已隱含）。flat/apparel 語意不變，測試全綠。
+
+[剩餘風險] Printful 篩選清單（WANTED_TYPES）目前**不含 jewelry**，所以項鍊/戒指暫時不會出現在 catalog；category 邏輯已備好，未來放開即生效。動工時 working tree 有並行 session 的 ScriptForge video WIP（未追蹤、與本任務無關），本 commit 明確只 add 自己 3 檔 + WORKLOG，未碰 video 檔。
+
+[rollback] git revert；改動 additive（新 export + 既有函式加選參），無 destructive。
+
 ### fix(mockup): Printful 規格抓取 limit=200 超上限 → 永遠 400（所有 catalog 產品 mockup 失敗）
 
 [任務理解] 用戶回報「無法取得 Printful 產品規格 (productId=837)。此產品可能不支援 Mockup Generator」。

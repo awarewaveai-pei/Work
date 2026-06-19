@@ -22,6 +22,8 @@ import {
   MODEL_BODY_TYPES,
   MODEL_MAKEUP,
   MODEL_ACCESSORIES,
+  MODEL_FRAMING,
+  productCategoryFromType,
   buildFlatMockupPrompt,
   buildModelMockupPrompt,
   isChestOccludingPose,
@@ -279,6 +281,7 @@ export default function MockupStudio() {
   const [pose, setPose] = useState(MODEL_POSES[0].value);
   const [modelScene, setModelScene] = useState(MODEL_SCENES[0].value);
   const [modelLighting, setModelLighting] = useState(MODEL_LIGHTING[0].value);
+  const [modelFraming, setModelFraming] = useState("three-quarter");
   const [modelProps, setModelProps] = useState<Set<string>>(new Set());
   // results
   const [productResults, setProductResults] = useState<Map<number, ProductMockupResult>>(new Map());
@@ -341,6 +344,14 @@ export default function MockupStudio() {
     return prd.title.replace(/\s*\|.*$/, "").toLowerCase();
   }, [catalog]);
 
+  /** Model-interaction category (apparel→wear / mug→hold / jewelry→wear-accessory) derived
+   *  from the first selected product's Printful type, so the model prompt adapts automatically. */
+  const modelCategory = useMemo(() => {
+    const first = [...selectedModelProductIds][0];
+    const prd = first != null ? catalog.find((c) => c.id === first) : undefined;
+    return productCategoryFromType(prd?.typeName);
+  }, [selectedModelProductIds, catalog]);
+
   const prompt = useMemo(() => {
     if (mode === "printful") return "";
     if (mode === "flat") {
@@ -364,11 +375,13 @@ export default function MockupStudio() {
       lighting: modelLighting,
       props: [...modelProps].map((v) => MODEL_PROPS.find((p) => p.value === v)?.label ?? v),
       designSizePct,
+      framing: modelFraming,
+      productCategory: modelCategory,
     });
   }, [mode, color, flatSurface, flatArrangement, flatLighting, flatProps,
       selectedFlatProductIds, selectedModelProductIds, garmentPhraseFor,
       ageGroup, modelDesc, pose, modelScene, modelLighting, modelProps,
-      designSizePct]);
+      designSizePct, modelFraming, modelCategory]);
 
   const onUploadDesign = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -825,6 +838,22 @@ export default function MockupStudio() {
                 {MODEL_LIGHTING.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </label>
+
+            <label style={{ fontSize: 13 }}>
+              框景 Framing
+              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={modelFraming} onChange={(e) => setModelFraming(e.target.value)}>
+                {MODEL_FRAMING.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+              <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
+                全身會露出整個人；模特的頭一律不裁切。
+              </span>
+            </label>
+
+            {modelCategory !== "apparel" && (
+              <div style={{ fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "rgba(79,140,255,0.12)", color: "#4f8cff" }}>
+                偵測到非服飾產品（{modelCategory}）→ 模特會以「{modelCategory === "drinkware" ? "手持杯子" : modelCategory === "jewelry" ? "配戴飾品特寫" : modelCategory === "wall-art" ? "手持展示" : modelCategory === "bag" ? "揹／拿著包" : modelCategory === "phone" ? "手持手機" : modelCategory === "pillow" ? "抱著抱枕" : "展示"}」方式入鏡，而非穿在身上。
+              </div>
+            )}
 
             <div style={{ fontSize: 13 }}>
               場景道具（可複選）
