@@ -560,8 +560,9 @@ export function buildFlatMockupPrompt(p: FlatMockupParams): string {
   const cornerClause = p.cornerDecor
     ? " Tasteful decorative props are elegantly arranged in the four corners of the frame to frame the product, keeping the centre clear."
     : "";
-  // A real mug has a handle — make it visible (the print sits on the body facing camera).
-  const mugHandle = category === "drinkware"
+  // A real mug has a handle — make it visible (design mode only; in product-photo mode the
+  // reference already shows the real handle, so adding a directive would fight "reproduce exactly").
+  const mugHandle = !isProduct && category === "drinkware"
     ? " The mug has a handle turned slightly to one side so the handle is clearly visible."
     : "";
 

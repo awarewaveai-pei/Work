@@ -154,6 +154,29 @@ $insert
 
 [rollback] `git revert` 至 578c97c0 並 sg-deploy；所有改動為 additive（新檔 + 既有函式擴充），無 destructive migration。
 
+### feat(mockup): 自有產品支援（產品實照模式+手動類型）+ 品質升級（專業攝影/情緒/四角裝飾/把手/留白）
+
+[任務理解] 用戶（1）有自己的產品（含 Printful 印不了的珠寶），要能做 mockup（兩種：上傳設計圖印上去 / 上傳產品實照 AI 重現）（2）平拍杯子太靠近、沒顯示把手、品質遠不及國際商攝（3）平拍想要四角擺裝飾（4）模特要可選情緒提升吸引力。
+
+[已修改] `lib/studio/mockup-prompt.ts` + `app/tools/mockup/MockupStudio.tsx`
+- **自有產品**：`referenceKind`(design/product) + `CATEGORY_OPTIONS` 手動產品類型覆寫（不靠 Printful catalog）+ `productFidelityBlock()`（產品實照=忠實重現實物、不印圖不改造）+ `modelProductSentence()`。UI：兩 tab 加「參考圖類型」「產品類型」選單。
+- **品質**：`PRO_QUALITY` 專業商攝指令套所有 prompt 結尾。
+- **太靠近**：立拍 camera 改「完整產品入框 + 四周留白、不裁切不過近」。
+- **把手**：drinkware（design 模式）加「馬克杯把手轉側面可見」（product 模式不加，避免與忠實重現衝突，critic 建議）。
+- **四角裝飾**：`cornerDecor` + 平拍 checkbox → 道具擺四角、中間留產品。
+- **模特情緒**：`MODEL_EMOTIONS`（20 選項）+ 模特 tab 選單 + prompt 注入表情。
+- `__tests__`：+8 測試（產品實照/品質/把手/留白/四角/情緒），共 22 pass。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=22/22
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0（我的檔 0 錯；full 專案綠）
+- REVIEW_DONE: critic=Standard×2 | verdict=pass | findings=0c/0m/0n（兩輪：產品實照模式 + 品質批次；採納 mugHandle 限 design 模式建議）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=MODEL_EMOTIONS,referenceKind,cornerDecor,productFidelityBlock,REFERENCE_KIND_OPTIONS | hits=0 stale（僅 3 個改的檔；node_modules/TS compiler 自身命中無關）
+
+[剩餘風險] 純 prompt 文字 + UI，additive，無 auth/DB/金流面。apparel/flat-lay 既有行為靠 toContain 測試保住。SSH 部署本輪稍早斷線已重連。working tree 仍有並行 session ScriptForge WIP（已自行 commit 到 origin，與本任務無關）；本 commit 明確只 add 自己 3 檔 + WORKLOG。
+
+[rollback] git revert；additive。
+
 ### feat(mockup): 平拍 tab 立體產品改「立拍」(upright)，杯/瓶/包不再平躺俯拍
 
 [任務理解] 用戶：平拍是針對衣服，杯子/瓶子等立體物應該立拍（站立、斜前角度），不是平躺俯拍。
