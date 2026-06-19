@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { buildDesignKey, deleteDesignObject, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
+import { MOCKUP_SOURCES } from "../../../../lib/studio/asset-group";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -379,9 +380,14 @@ export async function GET(request: Request) {
     .eq("is_current", true);
 
   if (group === "mockup") {
-    query = query.eq("metadata->>source", "mockup");
+    // 商品照: any mockup save-source (MOCKUP_SOURCES SSOT). or-of-eq keeps each disjunct a primitive.
+    query = query.or(MOCKUP_SOURCES.map((s) => `metadata->>source.eq.${s}`).join(","));
   } else if (group === "design") {
-    query = query.or("metadata->>source.is.null,metadata->>source.neq.mockup");
+    // 設計圖: NOT any mockup source, INCLUDING null source. jsonb ->> yields NULL for an absent key,
+    // which a bare .neq would silently drop (Postgres three-valued logic) — so OR in is.null
+    // explicitly; the per-source negations are AND-ed (must differ from every mockup source).
+    const negated = MOCKUP_SOURCES.map((s) => `metadata->>source.neq.${s}`).join(",");
+    query = query.or(`metadata->>source.is.null,and(${negated})`);
   }
 
   const { data, error } = await query

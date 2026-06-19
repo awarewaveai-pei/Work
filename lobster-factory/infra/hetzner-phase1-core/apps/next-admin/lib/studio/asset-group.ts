@@ -15,12 +15,19 @@
  *   "canvas" | anything else                    → passed through verbatim
  */
 
+/** Raw `metadata.source` values that mean "product mockup 商品照" — BOTH mockup save-paths:
+ *  MockupStudio saves "mockup" (MockupStudio.tsx:540,556); the Studio workbench's Printful mockups
+ *  save "printful-mockup" (StudioWorkbench.tsx:448). SSOT consumed by assetToolGroup AND the
+ *  /api/tools/designs ?group= DB filter — add a new mockup save-source here and the publish picker,
+ *  My Designs Mockup tab, and the API filter all follow in lockstep (no drift). */
+export const MOCKUP_SOURCES = ["mockup", "printful-mockup"] as const;
+
 /** Collapse a raw `metadata.source` into a coarse tool group (tarot / studio / mockup / …). */
 export function assetToolGroup(source: string | null | undefined): string {
   if (!source) return "unknown";
   if (source === "tarot" || source === "tarot-preview" || source === "tarot-compare") return "tarot";
   if (source === "pod-studio") return "studio";
-  if (source === "mockup") return "mockup";
+  if ((MOCKUP_SOURCES as readonly string[]).includes(source)) return "mockup";
   return source;
 }
 

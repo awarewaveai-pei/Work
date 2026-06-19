@@ -159,6 +159,10 @@ export default function PublishWizard() {
   }, []);
 
   // Changing the design invalidates everything downstream (stale-print-file trap).
+  // Deliberate asymmetry: we clear AUTO-DERIVED images (productimage/flatlay — baked from the old
+  // design, so definitely stale) but PRESERVE the operator's manually-picked library mockups — a
+  // hand-chosen product photo may still be valid and only the operator knows. They can ✕-remove any
+  // that no longer fit from the 已選 gallery row (critic Minor — documenting the intent).
   useEffect(() => {
     setUpscale({ state: "idle" });
     // Drop the previous design's product image from the picker (it's stale now).
@@ -626,6 +630,11 @@ export default function PublishWizard() {
                   style={{ position: "absolute", top: 2, right: 2 }}
                   title="加入商品照"
                 />
+                {/* When a design原稿 is also checked into the gallery it shows in BOTH sections;
+                    this badge makes that duplication read as intentional (critic Minor). */}
+                {isMockup ? (
+                  <span style={{ position: "absolute", bottom: 2, left: 2, fontSize: 9, background: "#46a758", color: "#fff", padding: "0 3px", borderRadius: 3 }}>已加入商品照</span>
+                ) : null}
               </div>
             );
           })}
