@@ -6,6 +6,25 @@ $insert
 
 ## 2026-06-19
 
+### feat(mockup): 加「圖案位置」控制（胸前置中/左右胸/滿版前/整件滿版）
+
+[任務理解] 用戶問「圖案位置應該怎麼設定」—— 現況位置寫死「胸前置中」，根本沒這個設定。
+
+[已修改]
+- `lib/studio/mockup-prompt.ts`：新增 `GARMENT_PLACEMENT`（5 選項）+ `placementArea(placement?)` helper（回印刷區域片語，default=center chest print area 保持向後相容）；`Model/FlatMockupParams` 加 `placement?`；`modelProductClause` apparel case 與 flat apparel branch 改用 `sizePhrase(sizePct, placementArea(...))`（位置=WHERE，大小=HOW BIG，正交）。非服飾不受影響。
+- `app/tools/mockup/MockupStudio.tsx`：`placement` state（default center-chest）+ 串進兩 builder + deps；模特/平拍 tab 在 apparel 時顯示「圖案位置」selector。
+- `__tests__`：+1 測試（default→center chest、left-chest、full-front），共 25 pass。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=25/25
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0（我的檔 0 錯）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（向後相容 chest-area/visibilityClause 全綠、placementArea 窮舉、非服飾無洩漏、deps 含 placement）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=placementArea,GARMENT_PLACEMENT | hits=0 stale（僅 2 個改的檔）
+
+[剩餘風險] AI 位置同樣是質性提示（非像素精準）；Printful tab 仍機械置中（之後可依 placement 算 top/left 做精準，本輪未做）。
+
+[rollback] git revert；additive。
+
 ### fix(mockup): AI 滑桿無效真因 + 融合感（反貼紙）+ 大小改 AI 級距 + 透明度標清楚
 
 [任務理解] 用戶：3 個 tab 的「設計大小%」「圖案透明度%」完全沒作用；且 AI 合成的圖案像貼上去、沒跟實體融合，很困擾。

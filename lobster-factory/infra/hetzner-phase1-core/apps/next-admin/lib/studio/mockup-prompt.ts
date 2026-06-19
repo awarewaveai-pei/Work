@@ -177,6 +177,28 @@ export const MODEL_EMOTIONS = [
   { value: "neutral", label: "中性 Editorial", phrase: "a neutral, high-fashion editorial expression" },
 ];
 
+// ── Design placement on apparel (WHERE the print sits; size = HOW BIG, separate slider) ──
+export const GARMENT_PLACEMENT = [
+  { value: "center-chest", label: "胸前置中（大圖）" },
+  { value: "left-chest", label: "左胸（小 logo）" },
+  { value: "right-chest", label: "右胸（小 logo）" },
+  { value: "full-front", label: "滿版前幅" },
+  { value: "all-over", label: "整件滿版" },
+];
+
+/** Where on the garment the print sits — feeds the prompt's print-area phrase. Defaults to
+ *  center chest (keeps the "chest print area" wording for non-apparel-safe backward compat). */
+function placementArea(placement: string | undefined): string {
+  switch (placement) {
+    case "left-chest": return "the left chest, as a small pocket-style placement";
+    case "right-chest": return "the right chest, as a small pocket-style placement";
+    case "full-front": return "the full front of the garment, spanning edge to edge from chest to hem";
+    case "all-over": return "the entire garment as a seamless all-over print";
+    case "center-chest":
+    default: return "the center chest print area";
+  }
+}
+
 // ── Product category → how the model presents the product (apparel = wear; others = hold/show) ──
 export type ProductCategory =
   | "apparel" | "drinkware" | "wall-art" | "bag" | "phone" | "pillow" | "jewelry";
@@ -341,6 +363,8 @@ export interface FlatMockupParams {
   referenceKind?: ReferenceKind;
   /** when true, arrange tasteful decorative props in the four corners of a flat-lay frame. */
   cornerDecor?: boolean;
+  /** value from GARMENT_PLACEMENT — where the print sits on apparel (default center chest). */
+  placement?: string;
 }
 
 export interface ModelMockupParams {
@@ -367,6 +391,8 @@ export interface ModelMockupParams {
   referenceKind?: ReferenceKind;
   /** value from MODEL_EMOTIONS — the model's facial expression (default = unspecified). */
   emotion?: string;
+  /** value from GARMENT_PLACEMENT — where the print sits on apparel (default center chest). */
+  placement?: string;
 }
 
 /** Shared print-fidelity block. The dark-fabric lock is iron rule #1.
@@ -416,6 +442,7 @@ function modelProductClause(
   garmentPhrase: string,
   sizePct: number,
   poseOccludes: boolean,
+  placement?: string,
 ): { sentence: string; surface: string; behavior: string; sizeClause: string; visibilityClause: string } {
   switch (category) {
     case "drinkware":
@@ -472,7 +499,7 @@ function modelProductClause(
         sentence: `They wear a plain ${color} ${garmentPhrase}.`,
         surface: "the center chest of the garment",
         behavior: "follows the fabric's natural wrinkles, folds and drape realistically, with accurate lighting, shadows and subtle cotton fabric texture",
-        sizeClause: sizePhrase(sizePct, "the chest print area"),
+        sizeClause: sizePhrase(sizePct, placementArea(placement)),
         visibilityClause: poseOccludes ? "" : " The full chest area is visible and unobstructed.",
       };
   }
@@ -611,7 +638,7 @@ export function buildFlatMockupPrompt(p: FlatMockupParams): string {
   }
 
   // Apparel — original flat-lay garment shot (+ optional corner decor + pro-quality tail).
-  const sizeClause = sizePhrase(sizePct, "the center chest area");
+  const sizeClause = sizePhrase(sizePct, placementArea(p.placement));
   return (
     `Photorealistic e-commerce flat-lay product photo. A plain ${p.color} ${p.garmentPhrase}, ` +
     `${arrangement.phrase}, on ${surface.phrase}, ${lighting.phrase}. ` +
@@ -663,7 +690,7 @@ export function buildModelMockupPrompt(p: ModelMockupParams): string {
   const sizePct = p.designSizePct ?? 80;
   const emotion = find(MODEL_EMOTIONS, p.emotion ?? "");
   const emotionClause = emotion.phrase ? ` Their facial expression shows ${emotion.phrase}.` : "";
-  const product = modelProductClause(category, p.color, p.garmentPhrase, sizePct, pose.occludes);
+  const product = modelProductClause(category, p.color, p.garmentPhrase, sizePct, pose.occludes, p.placement);
   // Product-photo mode reproduces the real product; design mode prints a graphic on it.
   const productBlock = isProduct
     ? modelProductSentence(category) + " " + productFidelityBlock() + product.visibilityClause

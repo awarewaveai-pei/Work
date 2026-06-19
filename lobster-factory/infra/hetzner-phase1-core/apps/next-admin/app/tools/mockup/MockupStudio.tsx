@@ -24,6 +24,7 @@ import {
   MODEL_ACCESSORIES,
   MODEL_FRAMING,
   MODEL_EMOTIONS,
+  GARMENT_PLACEMENT,
   CATEGORY_OPTIONS,
   REFERENCE_KIND_OPTIONS,
   productCategoryFromType,
@@ -294,6 +295,7 @@ export default function MockupStudio() {
   // override — both let the user mock up THEIR OWN products (not just the Printful catalog).
   const [referenceKind, setReferenceKind] = useState<ReferenceKind>("design");
   const [categoryOverride, setCategoryOverride] = useState<"" | ProductCategory>("");
+  const [placement, setPlacement] = useState("center-chest");
   // results
   const [productResults, setProductResults] = useState<Map<number, ProductMockupResult>>(new Map());
   const [saveMockupStates, setSaveMockupStates] = useState<SaveMockupState>({});
@@ -386,6 +388,7 @@ export default function MockupStudio() {
         productCategory: flatCategory,
         referenceKind,
         cornerDecor: flatCornerDecor,
+        placement,
       });
     }
     return buildModelMockupPrompt({
@@ -402,12 +405,13 @@ export default function MockupStudio() {
       productCategory: modelCategory,
       referenceKind,
       emotion: modelEmotion,
+      placement,
     });
   }, [mode, color, flatSurface, flatArrangement, flatLighting, flatProps,
       selectedFlatProductIds, selectedModelProductIds, garmentPhraseFor,
       ageGroup, modelDesc, pose, modelScene, modelLighting, modelProps,
       designSizePct, modelFraming, modelCategory, flatCategory, referenceKind,
-      modelEmotion, flatCornerDecor]);
+      modelEmotion, flatCornerDecor, placement]);
 
   const onUploadDesign = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -786,6 +790,15 @@ export default function MockupStudio() {
               </span>
             </label>
 
+            {modelCategory === "apparel" && (
+              <label style={{ fontSize: 13 }}>
+                圖案位置 Placement
+                <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={placement} onChange={(e) => setPlacement(e.target.value)}>
+                  {GARMENT_PLACEMENT.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </label>
+            )}
+
             <label style={{ fontSize: 13 }}>
               設計大小（{designSizePct}% {modelCategory === "apparel" ? "胸前範圍" : "印刷範圍"}）
               <input type="range" min={40} max={100} step={5} value={designSizePct}
@@ -949,6 +962,14 @@ export default function MockupStudio() {
               <div style={{ fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "rgba(79,140,255,0.12)", color: "#4f8cff" }}>
                 偵測到非服飾產品（{flatCategory}）→ {flatCategory === "jewelry" ? "以俯拍平擺呈現" : "改用「立拍」：產品站立、斜前角度，而非平躺俯拍。"}
               </div>
+            )}
+            {flatCategory === "apparel" && (
+              <label style={{ fontSize: 13 }}>
+                圖案位置 Placement
+                <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={placement} onChange={(e) => setPlacement(e.target.value)}>
+                  {GARMENT_PLACEMENT.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </label>
             )}
             <label style={{ fontSize: 13 }}>
               設計大小（{designSizePct}% {flatCategory === "apparel" ? "胸前範圍" : "印刷範圍"}）

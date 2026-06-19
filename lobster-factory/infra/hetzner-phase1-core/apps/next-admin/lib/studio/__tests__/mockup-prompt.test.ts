@@ -44,6 +44,16 @@ describe("buildModelMockupPrompt", () => {
     expect(p).toContain("embedded INTO the material");
   });
 
+  it("places the design where placement says (default center chest)", () => {
+    const def = buildModelMockupPrompt({ ...base, color: "white" });
+    expect(def).toContain("center chest print area");
+    const left = buildModelMockupPrompt({ ...base, color: "white", placement: "left-chest" });
+    expect(left).toContain("left chest");
+    expect(left).not.toContain("center chest print area");
+    const full = buildModelMockupPrompt({ ...base, color: "white", placement: "full-front" });
+    expect(full).toContain("full front of the garment");
+  });
+
   it("uses qualitative size buckets the AI can follow, not an exact %", () => {
     const small = buildModelMockupPrompt({ ...base, color: "white", designSizePct: 45 });
     const full = buildModelMockupPrompt({ ...base, color: "white", designSizePct: 100 });
