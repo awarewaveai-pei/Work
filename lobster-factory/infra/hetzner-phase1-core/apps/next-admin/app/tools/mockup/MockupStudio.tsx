@@ -352,6 +352,13 @@ export default function MockupStudio() {
     return productCategoryFromType(prd?.typeName);
   }, [selectedModelProductIds, catalog]);
 
+  /** Same derivation for the flat tab — non-apparel 3-D products shoot upright (立拍). */
+  const flatCategory = useMemo(() => {
+    const first = [...selectedFlatProductIds][0];
+    const prd = first != null ? catalog.find((c) => c.id === first) : undefined;
+    return productCategoryFromType(prd?.typeName);
+  }, [selectedFlatProductIds, catalog]);
+
   const prompt = useMemo(() => {
     if (mode === "printful") return "";
     if (mode === "flat") {
@@ -363,6 +370,7 @@ export default function MockupStudio() {
         lighting: flatLighting,
         props: [...flatProps].map((v) => FLAT_PROPS.find((p) => p.value === v)?.label ?? v),
         designSizePct,
+        productCategory: flatCategory,
       });
     }
     return buildModelMockupPrompt({
@@ -381,7 +389,7 @@ export default function MockupStudio() {
   }, [mode, color, flatSurface, flatArrangement, flatLighting, flatProps,
       selectedFlatProductIds, selectedModelProductIds, garmentPhraseFor,
       ageGroup, modelDesc, pose, modelScene, modelLighting, modelProps,
-      designSizePct, modelFraming, modelCategory]);
+      designSizePct, modelFraming, modelCategory, flatCategory]);
 
   const onUploadDesign = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -741,7 +749,7 @@ export default function MockupStudio() {
         {mode === "model" && (
           <>
             <label style={{ fontSize: 13 }}>
-              設計大小（{designSizePct}% 胸前範圍）
+              設計大小（{designSizePct}% {modelCategory === "apparel" ? "胸前範圍" : "印刷範圍"}）
               <input type="range" min={40} max={100} step={5} value={designSizePct}
                 onChange={(e) => setDesignSizePct(Number(e.target.value))}
                 style={{ width: "100%", marginTop: 4 }} />
@@ -869,8 +877,13 @@ export default function MockupStudio() {
         {/* ═══════════════════ FLAT TAB ════════════════════════ */}
         {mode === "flat" && (
           <>
+            {flatCategory !== "apparel" && (
+              <div style={{ fontSize: 12, padding: "6px 10px", borderRadius: 6, background: "rgba(79,140,255,0.12)", color: "#4f8cff" }}>
+                偵測到非服飾產品（{flatCategory}）→ {flatCategory === "jewelry" ? "以俯拍平擺呈現" : "改用「立拍」：產品站立、斜前角度，而非平躺俯拍。"}
+              </div>
+            )}
             <label style={{ fontSize: 13 }}>
-              設計大小（{designSizePct}% 胸前範圍）
+              設計大小（{designSizePct}% {flatCategory === "apparel" ? "胸前範圍" : "印刷範圍"}）
               <input type="range" min={40} max={100} step={5} value={designSizePct}
                 onChange={(e) => setDesignSizePct(Number(e.target.value))}
                 style={{ width: "100%", marginTop: 4 }} />
@@ -899,12 +912,16 @@ export default function MockupStudio() {
               </select>
             </label>
 
-            <label style={{ fontSize: 13 }}>
-              擺放 Arrangement
-              <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={flatArrangement} onChange={(e) => setFlatArrangement(e.target.value)}>
-                {FLAT_ARRANGEMENTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </label>
+            {/* Arrangement only drives the apparel flat-lay composition; for non-apparel the
+                composition is fixed per product type (upright / leaning / flat-lay), so hide it. */}
+            {flatCategory === "apparel" && (
+              <label style={{ fontSize: 13 }}>
+                擺放 Arrangement
+                <select className="btn-secondary" style={{ width: "100%", marginTop: 4 }} value={flatArrangement} onChange={(e) => setFlatArrangement(e.target.value)}>
+                  {FLAT_ARRANGEMENTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </label>
+            )}
 
             <label style={{ fontSize: 13 }}>
               光線 Lighting

@@ -270,6 +270,9 @@ export interface FlatMockupParams {
   props?: string[];
   /** design size as % of printable area (40–100), default 80 */
   designSizePct?: number;
+  /** product category — apparel/jewelry shoot as a top-down flat-lay; mug/bottle/3D
+   *  objects shoot UPRIGHT (立拍) instead. Default apparel. */
+  productCategory?: ProductCategory;
 }
 
 export interface ModelMockupParams {
@@ -393,6 +396,75 @@ function find<T extends { value: string; phrase: string }>(list: T[], value: str
   return list.find((x) => x.value === value) ?? list[0];
 }
 
+/** Categories whose products are 3-D objects that must be shot UPRIGHT (立拍), not flat-lay.
+ *  apparel + jewelry (and unknown→apparel) stay top-down flat-lay. */
+function isUprightProduct(category: ProductCategory): boolean {
+  return category === "drinkware" || category === "wall-art" ||
+    category === "bag" || category === "phone" || category === "pillow";
+}
+
+/** Per-category standalone-product clause for the flat/upright tab (no model). */
+function flatProductClause(
+  category: ProductCategory,
+  color: GarmentColor,
+  sizePct: number,
+  productName: string,
+): { object: string; composition: string; surface: string; behavior: string; sizeClause: string } {
+  switch (category) {
+    case "drinkware":
+      // Use the real product name so a bottle/tumbler isn't mislabeled as a mug; the
+      // surface/behavior are neutral wording that fits any curved drinkware.
+      return {
+        object: `a ${color} ${productName}`,
+        composition: "standing upright",
+        surface: "the side of the product facing the camera",
+        behavior: "wraps smoothly around the product's curved glossy surface with accurate lighting and soft reflections",
+        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the product's printable wrap area.`,
+      };
+    case "wall-art":
+      return {
+        object: "a framed art print",
+        composition: "standing upright, leaning at a slight angle",
+        surface: "the print inside the frame",
+        behavior: "sits perfectly flat within the frame with accurate lighting and no glare",
+        sizeClause: " The artwork fills the frame edge to edge.",
+      };
+    case "bag":
+      return {
+        object: `a ${color} tote bag`,
+        composition: "standing upright with the printed front face shown",
+        surface: "the front face of the bag",
+        behavior: "follows the canvas fabric's natural drape and folds with accurate lighting and shadow",
+        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the bag's front print area.`,
+      };
+    case "phone":
+      return {
+        object: "a phone in a printed case",
+        composition: "standing upright with the printed back of the case shown",
+        surface: "the back of the phone case",
+        behavior: "sits flat on the rigid glossy case with accurate lighting and reflections",
+        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the case back.`,
+      };
+    case "pillow":
+      return {
+        object: "a square throw pillow",
+        composition: "propped upright with the printed front shown",
+        surface: "the front face of the pillow",
+        behavior: "follows the soft fabric's gentle bulge and folds with accurate lighting and shadow",
+        sizeClause: ` The printed graphic covers approximately ${sizePct}% of the pillow's front.`,
+      };
+    case "jewelry":
+    default:
+      return {
+        object: "the piece of jewelry from the reference image",
+        composition: "arranged elegantly",
+        surface: "the jewelry piece itself, matching the reference exactly",
+        behavior: "is rendered as a real metal/gemstone piece with accurate material, lighting and reflections",
+        sizeClause: "",
+      };
+  }
+}
+
 export function buildFlatMockupPrompt(p: FlatMockupParams): string {
   const surface = find(FLAT_SURFACES, p.surface);
   const arrangement = find(FLAT_ARRANGEMENTS, p.arrangement);
@@ -402,6 +474,25 @@ export function buildFlatMockupPrompt(p: FlatMockupParams): string {
       ? ` Styled with: ${p.props.join(", ")}.`
       : "";
   const sizePct = p.designSizePct ?? 80;
+  const category: ProductCategory = p.productCategory ?? "apparel";
+
+  // Non-apparel: standalone product shot. 3-D objects (mug/bottle/bag…) shoot UPRIGHT;
+  // jewelry stays a top-down flat-lay.
+  if (category !== "apparel") {
+    const prod = flatProductClause(category, p.color, sizePct, p.garmentPhrase);
+    const camera = isUprightProduct(category)
+      ? " Shot upright from a slight front three-quarter angle at eye level, editorial studio product photography with soft natural shadows."
+      : " Shot from directly above, editorial flat-lay product photography.";
+    return (
+      `Photorealistic e-commerce product photo. ${capitalize(prod.object)} ${prod.composition} on ${surface.phrase}, ${lighting.phrase}. ` +
+      fidelityBlock(p.color, prod.surface, prod.behavior) +
+      prod.sizeClause +
+      propClause +
+      camera
+    );
+  }
+
+  // Apparel — original flat-lay garment shot (unchanged).
   const sizeClause = ` The printed graphic should be prominent, occupying approximately ${sizePct}% of the center chest area.`;
   return (
     `Photorealistic e-commerce flat-lay product photo. A plain ${p.color} ${p.garmentPhrase}, ` +
@@ -411,6 +502,10 @@ export function buildFlatMockupPrompt(p: FlatMockupParams): string {
     propClause +
     " Shot from directly above, editorial product photography."
   );
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export function buildModelMockupPrompt(p: ModelMockupParams): string {

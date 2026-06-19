@@ -80,6 +80,36 @@ describe("buildFlatMockupPrompt", () => {
     expect(p).toContain("CRITICAL COLOR FIDELITY");
     expect(p).toContain("hoodie");
   });
+
+  it("shoots drinkware UPRIGHT (立拍), not a top-down flat-lay", () => {
+    const p = buildFlatMockupPrompt({
+      garmentPhrase: "Latte Mug",
+      color: "white",
+      surface: "white-marble",
+      arrangement: "centered-hero",
+      lighting: "north-window",
+      productCategory: "drinkware",
+    });
+    expect(p.toLowerCase()).toContain("mug"); // real product name flows into the prompt
+    expect(p).toContain("upright");
+    expect(p).not.toContain("flat-lay");
+    expect(p).not.toContain("Shot from directly above");
+    expect(p).not.toContain("chest area");
+  });
+
+  it("keeps jewelry as a top-down flat-lay", () => {
+    const p = buildFlatMockupPrompt({
+      garmentPhrase: "pendant",
+      color: "white",
+      surface: "white-marble",
+      arrangement: "centered-hero",
+      lighting: "north-window",
+      productCategory: "jewelry",
+    });
+    expect(p).toContain("jewelry");
+    expect(p).toContain("Shot from directly above");
+    expect(p).not.toContain("chest area");
+  });
 });
 
 describe("isChestOccludingPose", () => {

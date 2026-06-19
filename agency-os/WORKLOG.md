@@ -125,6 +125,25 @@ $insert
 
 [rollback] `git revert` 至 578c97c0 並 sg-deploy；所有改動為 additive（新檔 + 既有函式擴充），無 destructive migration。
 
+### feat(mockup): 平拍 tab 立體產品改「立拍」(upright)，杯/瓶/包不再平躺俯拍
+
+[任務理解] 用戶：平拍是針對衣服，杯子/瓶子等立體物應該立拍（站立、斜前角度），不是平躺俯拍。
+
+[已修改]
+- `lib/studio/mockup-prompt.ts`：①`FlatMockupParams` 加 `productCategory?`；②`isUprightProduct()`（drinkware/wall-art/bag/phone/pillow=立拍；apparel/jewelry=flat-lay）；③`flatProductClause()` 各 category 站立/擺放句；④`buildFlatMockupPrompt` 分支：非服飾走產品攝影句（立體=斜前立拍、jewelry=俯拍），apparel byte-identical 不變；⑤drinkware 用真實產品名（杯/瓶不再都寫 mug）。
+- `app/tools/mockup/MockupStudio.tsx`：`flatCategory` useMemo + 傳入 + deps + 立拍提示 banner；critic polish 3 項：尺寸標籤非服飾改「印刷範圍」(model+flat)、擺放下拉非服飾隱藏、杯/瓶用產品名。
+- `__tests__/mockup-prompt.test.ts`：+2 測試（drinkware 立拍 / jewelry 俯拍），共 16 pass。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run mockup-prompt.test.ts | exit=0 | tests=16/16
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0（我的檔 0 錯）
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（2 Minor UI polish 已修 + 杯/瓶 noun suggestion 已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=flatProductClause,isUprightProduct,flatCategory | hits=0 stale
+
+[剩餘風險] apparel flat-lay byte-identical（測試全綠）。working tree 有並行 session ScriptForge WIP（未追蹤無關）；本 commit 明確只 add 自己檔。
+
+[rollback] git revert；additive。
+
 ### feat(mockup): 模特 tab 加框景控制 + 非服飾產品 category-aware（穿/持/配戴）
 
 [任務理解] 用戶：模特合成圖常裁到頭、要全身；且杯子/相框/項鍊/戒指等非服飾產品也要模特照。問做平拍還是第 4 個 tab。
