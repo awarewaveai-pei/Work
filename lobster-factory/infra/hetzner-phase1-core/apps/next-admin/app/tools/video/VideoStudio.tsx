@@ -5,6 +5,11 @@ import { VIDEO_PIPELINE_STEPS, computeVideoCost } from "@/lib/content/video/vide
 import { IMAGE_RATES, DEFAULT_IMAGE_MODEL } from "@/lib/ai/cost-model";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import type { VideoHistoryItem } from "@/app/api/video/history/route";
+import { STYLE_CATALOG } from "@/app/tools/tarot/tarotStyles";
+import { resolveStylePrompt } from "@/app/tools/tarot/cards";
+
+// 重用 tarot/studio 的風格目錄（103 風格，4 組）。前端解析成英文 prompt 再傳 API。
+const VIDEO_STYLE_GROUPS = Array.from(new Set(STYLE_CATALOG.map((s) => s.group)));
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
@@ -107,6 +112,8 @@ export default function VideoStudio() {
   const [articleTitle, setArticleTitle] = useState("");
   const [articleContent, setArticleContent] = useState("");
   const [language, setLanguage] = useState("繁體中文");
+  const [videoStyle, setVideoStyle] = useState("");
+  const [videoStyleGroup, setVideoStyleGroup] = useState(VIDEO_STYLE_GROUPS[0] ?? "");
   const [genStatus, setGenStatus] = useState<GenStatus>("idle");
   const [genStep, setGenStep] = useState("");
   const [genError, setGenError] = useState("");
@@ -213,6 +220,7 @@ export default function VideoStudio() {
     if (pollRef.current) clearTimeout(pollRef.current);
     setDraftLoading(true);
     setDraftScenes([]);
+    setDraftR2Keys([]);
     setGenError("");
     setGenResult(null);
     setGenStatus("idle");
@@ -225,6 +233,7 @@ export default function VideoStudio() {
           articleTitle: articleTitle.trim() || undefined,
           articleContent: articleContent.trim() || undefined,
           language,
+          visualStyle: videoStyle ? resolveStylePrompt(videoStyle) : undefined,
         }),
       });
       const j = (await res.json()) as {
@@ -444,6 +453,30 @@ export default function VideoStudio() {
                   <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }} disabled={isLoading}>
                     {["繁體中文", "English", "簡體中文", "日文", "西班牙文"].map((l) => <option key={l} value={l}>{l}</option>)}
                   </select>
+                </div>
+              </div>
+
+              {/* 視覺風格（重用 tarot/studio 風格目錄）— 套用到所有 Flux 場景，影片視覺連貫 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={labelStyle}>🎨 視覺風格 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>{videoStyle || "不指定（電影感預設）"}</span></label>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+                  {VIDEO_STYLE_GROUPS.map((g) => (
+                    <button key={g} type="button" onClick={() => setVideoStyleGroup(g)} disabled={isBusy}
+                      style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${videoStyleGroup === g ? "var(--accent)" : "var(--border-subtle)"}`, background: videoStyleGroup === g ? "var(--accent)" : "rgba(127,127,127,0.08)", color: videoStyleGroup === g ? "#fff" : "var(--text-muted)", transition: "all 0.15s" }}>
+                      {g}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
+                  {STYLE_CATALOG.filter((item) => item.group === videoStyleGroup).map((item) => {
+                    const active = videoStyle === item.zh;
+                    return (
+                      <button key={item.zh} type="button" onClick={() => setVideoStyle(active ? "" : item.zh)} disabled={isBusy}
+                        style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: isBusy ? "not-allowed" : "pointer", border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`, background: active ? "var(--accent)" : "rgba(127,127,127,0.08)", color: active ? "#fff" : "var(--text-muted)", transition: "all 0.15s" }}>
+                        {item.zh}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

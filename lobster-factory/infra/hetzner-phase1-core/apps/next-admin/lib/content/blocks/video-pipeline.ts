@@ -134,9 +134,13 @@ export async function prepareScenes(
       if (brollUrl) return { ok: true, asset: brollUrl };
     }
     if (!isR2Configured()) return { ok: false, status: 503, error: "R2 未設定（跨機影片素材需 R2 暫存 Flux 圖）" };
-    // Cinematic prefix: dramatically improves Flux output quality for video use
-    const cinematicPrompt = `Cinematic wide-angle 16:9, realistic photography, dramatic natural lighting, rich color grade. ${scene.image_prompt}`;
-    const img = await generateTarotImage({ model: "flux-schnell", prompt: cinematicPrompt, aspectRatio: "16:9" });
+    // 風格前綴：使用者選了風格 → 用該風格（已含材質/光線/色盤），補 16:9 框景；
+    // 否則用 cinematic 預設。風格 prompt 在前、scene 主體在後（與 tarot 同慣例）。
+    const stylePrefix = input.visualStyle?.trim()
+      ? `${input.visualStyle.trim()} Wide 16:9 cinematic framing.`
+      : "Cinematic wide-angle 16:9, realistic photography, dramatic natural lighting, rich color grade.";
+    const styledPrompt = `${stylePrefix} ${scene.image_prompt}`;
+    const img = await generateTarotImage({ model: "flux-schnell", prompt: styledPrompt, aspectRatio: "16:9" });
     if (img.ok === false) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${img.error}` };
     const parsed = parseImageDataUrl(img.image);
     const key = parsed ? buildDesignKey(parsed.mime) : null;
@@ -177,6 +181,7 @@ register({
         articleTitle: ctx.articleTitle as string | undefined,
         articleContent: (ctx.articleContent as string | undefined) ?? (ctx.markdown as string | undefined),
         language: ctx.language as string | undefined,
+        visualStyle: ctx.visualStyle as string | undefined,
         onProgress,
       },
       anthropicKey,
