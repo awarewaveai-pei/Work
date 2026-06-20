@@ -6,6 +6,31 @@ $insert
 
 ## 2026-06-21
 
+### diag(pod): 每色 mockup 真機驗證 → 空白衣服 bug → debugger 實測確定根因 + patch（修交新對話 task_36d83851）
+
+[任務] 真機 browser 跑 POD 一鍵上架（Gildan 2400 長袖 4 色）驗證每色 Printful mockup 效果。操作者實測回報「非常爛」三問題：① 每色 mockup 是空白衣服（沒設計圖）② 展示圖該 <100KB ③ 要 Printful 標準色塊變色（模特也變）+ 設計圖印在衣服上（對照官方 STTU020 snake 範例）。
+
+[現況] runAll 流程本身正常（browser 實測：啟動→印刷檔→每色 mockup 逐色生成 progress n/4→AI 文案→Woo 草稿建好 editLink 出現→Printful native 收尾）；問題只在 mockup 圖片內容空白。
+
+[根因（debugger 全程實測，非推理）] **設計圖確實有印上正面**（實測下載 front.jpg 胸前有圖／back.jpg 全白）；bug 是 `generateMockupBySpec` 回的 `mockup_url` 取到背面空白圖。兩缺陷疊加：
+- (a) 主因 `printful-mockup.ts:466-483`（+ 孿生 block 334-362）：extra[] 非空就丟掉 primary 只用 extra[]；但此產品 extra[] 無 front、只有空白 Back，唯一 front 在 primary → 被丟。且 sort 的 rankGroup(126-130) 只看 group 不看 view，Back 的 group=Flat（與 Front 同級）→ views[0] 落空白背面。
+- (b) 深層因 `MOCKUP_OPTION_GROUPS`(97-105) 寫 "Men's Lifestyle"，Gildan 2400 真實 group="Men's"；傳錯名讓 Printful 回應塌縮成只剩 Flat 才觸發 (a)。實測不傳 option_groups 回最完整（Flat Front/Back + Men's 5 模特圖含正面有設計）。
+- 排除：imageWidth/imageHeight 有傳（PublishWizard:182）；position {1440×864@top768,left180} 落 1800×2400 print area 內，設計確實印上 → position/dims 非根因。
+
+[已做] ① browser 真機驗證 runAll 全流程（commit e630fa69 上線版）② debugger 實測 Printful API（curl Gildan 2400 變體 + 真設計圖，下載比對 front/back）確定根因 ③ patch 設計（Patch 1 核心止血：candidates 永遠納 primary + 新增 rankView 對背面降權 + sort 先 view 再 group；Patch 2：option group 改 "Men's"／或不傳 option_groups 讓模特圖回來）④ spawn_task `task_36d83851` 帶確切 file:line patch 交新對話修。
+
+[未做（交新對話）] 實際改 code + tsc + npm test + critic + sg-deploy + 真機驗證；100KB 確認（toWebpOptimized 是否壓到）；清空白測試圖；三產品（57/456/438）真實 group 名探測（debugger 因 429 只驗 57）。本對話 context 已極長，刻意不在耗盡 context 硬修第四次。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(debugger) | cmd=curl Printful mockup-generator/create-task/57 + 下載 front/back.jpg 視覺比對 | 結果=front 胸前有設計 / back 全白 / mockup_url 誤取 back
+- REALTEST_EVIDENCE: tool=Chrome(browser) | runAll Gildan 2400 4 色 | 啟動+progress(每色 n/4)+Woo 草稿+Printful native 全跑通，唯 mockup 內容空白
+- REVIEW_WAIVED: NA -- 本輪未改 code（純診斷+交接）；patch 由新對話實作時 critic review
+- BUGHUNT_WAIVED: NA -- 本輪未改 code；根因已 cross-file 定位（printful-mockup 兩 block + 下游 picker MockupStudio/StudioWorkbench）
+
+[剩餘風險] e630fa69（含此空白 bug）仍在線上 — 在新對話修好部署前，POD 一鍵生的每色變體圖會是空白背面，勿用此功能正式上架。
+
+[rollback] 本輪無 code 改動，無須 rollback；新對話修後取代 e630fa69。
+
 ### fix(studio): Printful mockup 圖案被擠成正方形+太小 ／ feat: Phase 2 My Designs 一鍵套邊→建商品
 
 [任務] 使用者實測發現 studio mockup 預覽圖案比例不對（2:3 直圖被擠成方形）+ 太小；且要做 Phase 2（My Designs 撈圖一鍵套邊 → 順下去建商品）。一起 deploy。
