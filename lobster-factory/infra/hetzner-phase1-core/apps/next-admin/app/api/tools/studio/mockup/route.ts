@@ -7,6 +7,7 @@ import {
   type DynamicProductSpec,
 } from "../../../../../lib/studio/printful-mockup";
 import { fetchProductSpec } from "../../../../../lib/studio/printful-catalog";
+import { getCatalogVariants } from "../../../../../lib/studio/print-provider";
 import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
 export const runtime = "nodejs";
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
     imageHeight?: number;
     designSizePct?: number;  // 0.4–1.0, fraction of print-area width (default 0.8)
     color?: "white" | "grey" | "black"; // shirt colour → real Printful variant (default white)
+    colorHex?: string;       // resolve the variant by Printful hex (per-colour mockup) — preferred over variantId/color
     _jobId?: string;
   };
   try {
@@ -78,9 +80,20 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    // Resolve the mockup garment variant: explicit variantId > colorHex lookup (per-colour mockup,
+    // uses the hex Phase 1b already verified) > catalog default. The mockup is per-colour not per-size,
+    // so prefer the M variant of that colour.
+    let resolvedVariantId = body.variantId ?? catalogSpec.variantId;
+    if (!body.variantId && body.colorHex) {
+      const cv = await getCatalogVariants(body.productId, [body.colorHex]);
+      if (cv.ok && cv.value.length > 0) {
+        const m = cv.value.find((v) => /^m$/i.test(v.size)) ?? cv.value[0];
+        resolvedVariantId = m.id;
+      }
+    }
     const spec: DynamicProductSpec = {
       productId: catalogSpec.productId,
-      variantId: body.variantId ?? catalogSpec.variantId,
+      variantId: resolvedVariantId,
       placement: catalogSpec.placement,
       areaWidth: catalogSpec.areaWidth,
       areaHeight: catalogSpec.areaHeight,
