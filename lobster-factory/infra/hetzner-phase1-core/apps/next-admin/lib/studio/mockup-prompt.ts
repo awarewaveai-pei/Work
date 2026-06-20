@@ -400,7 +400,7 @@ export interface ModelMockupParams {
  *  non-apparel products pass a different `surface` (where the print sits) and `behavior`
  *  (how the print conforms to that surface). */
 function fidelityBlock(
-  color: GarmentColor,
+  color: string,
   surface = "the center chest of the garment",
   behavior = "follows the fabric's natural wrinkles, folds and drape realistically, with accurate lighting, shadows and subtle cotton fabric texture",
 ): string {
@@ -438,7 +438,7 @@ function sizePhrase(pct: number, area: string): string {
 /** Per-category description of how the model holds/wears the product and where the print sits. */
 function modelProductClause(
   category: ProductCategory,
-  color: GarmentColor,
+  color: string,
   garmentPhrase: string,
   sizePct: number,
   poseOccludes: boolean,
@@ -523,7 +523,7 @@ function isUprightProduct(category: ProductCategory): boolean {
 /** Per-category standalone-product clause for the flat/upright tab (no model). */
 function flatProductClause(
   category: ProductCategory,
-  color: GarmentColor,
+  color: string,
   sizePct: number,
   productName: string,
 ): { object: string; composition: string; surface: string; behavior: string; sizeClause: string } {
