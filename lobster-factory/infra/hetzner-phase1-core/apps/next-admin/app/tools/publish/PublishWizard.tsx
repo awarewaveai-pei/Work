@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APPAREL_PRINT_DESTINATIONS } from "@/lib/studio/apparel-print-destinations";
-import { POD_PRODUCT_MODELS } from "@/lib/studio/pod-catalog-config";
+import { POD_PRODUCT_MODELS, podModelById } from "@/lib/studio/pod-catalog-config";
+import { buildBatchMockupSpecs } from "@/lib/studio/batch-mockup";
 import { SeoCheckPanel } from "@/app/tools/content/SeoCheckPanel";
 import type { RankMathReport, RankMathCheck } from "@/lib/seo/rankmath-checker";
 
@@ -162,6 +163,30 @@ export default function PublishWizard() {
       body: JSON.stringify(payload),
     });
     return (await res.json()) as Record<string, unknown> & { ok: boolean; error?: string };
+  }, []);
+
+  // Generate one AI mockup from a prompt + the design as reference, then persist it to My Designs.
+  // Returns the saved R2 url, or null on any failure (caller decides whether to abort). Org defaults
+  // to POD_DESIGNS_DEFAULT_ORG_ID server-side (same as the Mockup tool's save path).
+  const genMockup = useCallback(async (prompt: string, refDesignUrl: string): Promise<string | null> => {
+    try {
+      const gRes = await fetch("/api/tools/studio/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "nano-banana-2", prompt, referenceImages: [refDesignUrl] }),
+      });
+      const g = (await gRes.json()) as { ok: boolean; image?: string };
+      if (!g.ok || !g.image) return null;
+      const sRes = await fetch("/api/tools/designs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: g.image, source: "mockup", prompt: "[auto-mockup]" }),
+      });
+      const s = (await sRes.json()) as { ok: boolean; asset?: { object_url?: string } };
+      return s.ok ? (s.asset?.object_url ?? null) : null;
+    } catch {
+      return null;
+    }
   }, []);
 
   // Changing the design invalidates everything downstream (stale-print-file trap).
@@ -446,33 +471,28 @@ export default function PublishWizard() {
       meetsTarget: Boolean(up.meetsTarget),
     });
 
-    // 2) WebP product image → gallery
-    setAllRun({ state: "running", stage: "商品圖" });
-    setProductImg({ state: "running" });
-    const pi = await post({ action: "productimage", designUrl });
-    if (!pi.ok) {
-      setProductImg({ state: "error", error: pi.error });
-      setAllRun({ state: "error", stage: "商品圖", error: pi.error });
-      return;
+    // 2) batch mockups — auto-generate the 4 商品圖 (white-bg flat = main, 2 models, decor flat) from
+    //    the design via /api/tools/studio/generate, each saved to My Designs. White-bg first so it
+    //    becomes Woo's featured image. A single failure is skipped; abort only if ALL fail.
+    const model = podModelById(catalogProductId);
+    const specs = model ? buildBatchMockupSpecs(model) : [];
+    const generatedUrls: string[] = [];
+    for (let i = 0; i < specs.length; i++) {
+      const spec = specs[i];
+      setAllRun({ state: "running", stage: `合成 ${spec.label}（AI ${i + 1}/${specs.length}）` });
+      const url = await genMockup(spec.prompt, designUrl);
+      if (url) generatedUrls.push(url);
     }
-    const productImageUrl = pi.productImageUrl as string;
-    setProductImg({ state: "done", url: productImageUrl });
-
-    // 3) faithful flat-lay composite → gallery
-    setAllRun({ state: "running", stage: "合成平拍圖" });
-    setFlatlay({ state: "running" });
-    const fl = await post({ action: "flatlay", designUrl, bgColor: flatlayBg });
-    if (!fl.ok) {
-      setFlatlay({ state: "error", error: fl.error });
-      setAllRun({ state: "error", stage: "合成平拍圖", error: fl.error });
-      return;
+    // All AI generations failing must NOT abort the publish — the print file is already made and the
+    // design original is itself a valid product image. Fall back to it (best-effort, same tolerance as
+    // the AI-copy step below) rather than blocking on a transient AI-image outage (critic Phase 2-3).
+    if (generatedUrls.length === 0) {
+      setAllRun({ state: "running", stage: "商品圖 AI 全部失敗 — 改用設計圖原稿續行" });
     }
-    const flatlayUrl = fl.flatlayUrl as string;
-    setFlatlay({ state: "done", url: flatlayUrl });
 
-    // assemble the product gallery: existing user picks + the two freshly generated images (dedup,
-    // insertion order preserved — first entry is Woo's main image).
-    const gallery = Array.from(new Set([...mockupUrlsRef.current, productImageUrl, flatlayUrl]));
+    // assemble the product gallery: AI mockups (white-bg first = main image) + the design original,
+    // plus any existing manual picks. dedup, insertion order preserved (first entry = Woo main image).
+    const gallery = Array.from(new Set([...generatedUrls, designUrl, ...mockupUrlsRef.current]));
     setMockupUrls(gallery);
 
     // 4) AI SEO/GEO copy — BEST EFFORT (a copy failure must not abort the publish; create tolerates
@@ -581,7 +601,7 @@ export default function PublishWizard() {
     } finally {
       runAllLatch.current = false;
     }
-  }, [designUrl, title, printMode, flatlayBg, designAssets, keywordHint, retailPrice, plusPrice, catalogProductId, post]);
+  }, [designUrl, title, printMode, designAssets, keywordHint, retailPrice, plusPrice, catalogProductId, genMockup, post]);
 
   const busy = allRun.state === "running";
 
@@ -607,8 +627,8 @@ export default function PublishWizard() {
   return (
     <div style={{ padding: 16, maxWidth: 980 }}>
       <p style={{ opacity: 0.7, fontSize: 13 }}>
-        串連：設計圖 → ① 產生印刷檔（預設<b>原圖 100% 忠實</b>，不改像素）→ ② 建 Woo <b>草稿</b>商品（白/黑 × {SIZES.join("/")}）→
-        ③ <b>🚀 一鍵上 Printful</b>（native store 全自動：一次建品＋綁所有變體＋上傳印刷檔，<b>免後台手動匯入</b>）→ 後台 review 後 publish 開賣。
+        <b>🚀 一鍵</b>：選設計圖 + 款式 → 自動 產印刷檔 + <b>AI 批次商品圖</b>（白背平拍＋2 模特＋裝飾平拍，依款式分長短袖）+ AI 文案
+        → 建 Woo <b>草稿</b>（該款多色 × {SIZES.join("/")}）+ Printful native 綁變體＋傳設計稿（hex 對應，<b>免後台手動匯入</b>）→ 後台 review 後 publish 開賣。
       </p>
 
       {/* ① 設計圖 picker — 印刷檔來源，單選。只顯示「設計圖」類（mockup 移到 ②，不再擠一起）。
@@ -826,7 +846,7 @@ export default function PublishWizard() {
           onClick={() => void runAll()}
           title="一次跑完：產生印刷檔 → 商品圖 → 合成平拍圖 → AI 文案 → 建 Woo 草稿（含全部圖）→ 上 Printful native（建品＋綁變體＋印刷檔）"
         >
-          🚀 全部一鍵完成（印刷檔＋商品圖＋合成圖＋文案＋Woo＋Printful）
+          🚀 全部一鍵完成（印刷檔＋AI 批次商品圖＋文案＋Woo＋Printful native）
         </button>
         {busy ? <span style={{ fontSize: 13, color: "#4f8cff" }}>⏳ {allRun.stage}…</span> : null}
         {allRun.state === "done" ? (

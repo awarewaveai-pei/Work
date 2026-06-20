@@ -6,6 +6,25 @@ $insert
 
 ## 2026-06-20
 
+### feat(pod): Phase 2-3 — 一鍵自動批次生圖（白背+2模特+裝飾平拍）串進 runAll
+
+[任務] PLAN Phase 2-3:設計圖一鍵 → 自動合成 4 商品圖（白背平拍主圖 + 2 模特 + 裝飾平拍,依款式分長短袖）取代手動 mockup,接回現有 runAll 後段（建 Woo + Printful）。
+
+[已修改]
+- `lib/studio/batch-mockup.ts`（新）:`buildBatchMockupSpecs(model)` → 4 specs（flat-white / model-a / model-b / flat-decor），prompt 複用 `mockup-prompt` builders（scene/pose/lighting/裝飾積木），長短袖經 `garmentPhrase`（model.displayName 含 Long Sleeve/Tee）。
+- `PublishWizard.tsx`:`genMockup` helper（POST `/api/tools/studio/generate` → 存 `/api/tools/designs` source=mockup）+ runAll step 2-3 改批次合成（取代 productimage/flatlay）;gallery white-bg first = 主圖;**all-fail fallback 設計圖原稿續行**（不 abort，best-effort）;progress n/4;按鈕/串連文案更新。分步 productimage/flatlay 按鈕保留（手動）。
+- `batch-mockup.test.ts`:+5 test。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test（全） | exit=0 | **32 files 426 passed**（含 batch-mockup 5 + pod-product 10）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/2n → 採納（all-fail fallback 不 abort + progress n/4）;verified clean:金流紅線 draft-only / re-entrancy latch / gallery white-bg=主圖順序 / genMockup null-skip / org server 預設 / 長短袖 / 移除 productimage 後分步按鈕完好
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=buildBatchMockupSpecs,genMockup,batch-mockup | hits=0 stale
+
+[剩餘風險] AI 生圖**品質波動**（模特手/臉,plan §7）→ draft 安全網 + 操作者 review 換圖;真機批次合成 pipeline 待部署後驗。critic Minor 2（image-gen mime harden）留 future（今天 nano-banana 輸出 png/jpeg/webp 不觸發）。
+
+[rollback] git revert;runAll 可回 productimage/flatlay（分步按鈕仍在）。
+
 ### feat(studio): 邊緣遮罩積木 Phase 1/3 — 生成圖一鍵套有機邊→透明 PNG
 
 [任務] studio/tarot 生成圖是硬直邊,做服飾設計需要筆刷/有機邊(可印深色衣)。Phase 1/3:核心模組 + studio 內嵌一鍵套用(Phase 2 = designs 圖庫撈圖入口+一鍵建商品 handoff;Phase 3 = canvas 手動面板)。使用者明確要 studio「直接做」、designs「撈出來做並順下去建商品」。
