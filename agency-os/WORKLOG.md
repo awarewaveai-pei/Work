@@ -6,6 +6,27 @@ $insert
 
 ## 2026-06-20
 
+### fix(pod): 改方向 — 每色 Printful 官方 mockup + WooCommerce 變體圖（取代自製 AI 批次合成）
+
+[任務] 操作者要 **Printful 標準**:顏色色塊 → 衣服+模特換該色(每色官方 mockup)。修正方向:Phase 2-3 自製 AI 批次合成(方向錯)→ 每色 Printful Mockup Generator + variation image。系統後端**全齊,不改 plugin**。
+
+[已修改]
+- `mockup/route.ts`:body 加 `colorHex` → `getCatalogVariants` 該色 M variant → `generateMockupBySpec` 生該色官方 mockup(faithful 真模特)
+- `pod-product.ts`:`variations[].image = colorMockups[printfulColor]`(每色變體圖,`ProductCreator.php:459` set_image_id)
+- `publish/route.ts` create:body `colorMockups`(filter designsBase)→ `buildPodProductPayload`
+- `PublishWizard.tsx`:`genColorMockup`(每色 mockup → 存 designs sourceUrl)+ runAll step 2 每色 loop(取代自製 AI)+ create 傳 colorMockups + gallery 每色;**移除 dead** genMockup/batch import
+- 規格:`docs/PLAN-pod-printful-per-colour-mockup-variation-swatch.md`(G1-G5 + swatch 設定)
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test(全) | exit=0 | **32 files 426 passed**
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0M/2n(文件;採納刪 stale comment);verified clean:hex 防撞名 / printfulName keys match(每款色名 distinct)/ Printful CDN allowlist 已 live / 變體圖端到端(ProductCreator:459 sideload)/ 金流紅線 draft-only / all-fail fallback / re-entrancy latch
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=colorHex,colorMockups,genColorMockup | hits=0 stale
+
+[剩餘風險] 真機每色 Printful mockup(~30-60s/色,既有 generateMockupBySpec 複用)待部署後操作者驗;客戶站需設 Color **swatch**(Kadence 內建 / Variation Swatches 外掛 + hex,規格 §4)。自製 AI `batch-mockup.ts` 保留(未來手動自製可用)。
+
+[rollback] git revert;向後相容(無 colorMockups → 無變體圖,parent gallery 仍在)。
+
 ### feat(pod): Phase 2-3 — 一鍵自動批次生圖（白背+2模特+裝飾平拍）串進 runAll
 
 [任務] PLAN Phase 2-3:設計圖一鍵 → 自動合成 4 商品圖（白背平拍主圖 + 2 模特 + 裝飾平拍,依款式分長短袖）取代手動 mockup,接回現有 runAll 後段（建 Woo + Printful）。

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APPAREL_PRINT_DESTINATIONS } from "@/lib/studio/apparel-print-destinations";
 import { POD_PRODUCT_MODELS, podModelById } from "@/lib/studio/pod-catalog-config";
-import { buildBatchMockupSpecs } from "@/lib/studio/batch-mockup";
 import { SeoCheckPanel } from "@/app/tools/content/SeoCheckPanel";
 import type { RankMathReport, RankMathCheck } from "@/lib/seo/rankmath-checker";
 
@@ -163,30 +162,6 @@ export default function PublishWizard() {
       body: JSON.stringify(payload),
     });
     return (await res.json()) as Record<string, unknown> & { ok: boolean; error?: string };
-  }, []);
-
-  // Generate one AI mockup from a prompt + the design as reference, then persist it to My Designs.
-  // Returns the saved R2 url, or null on any failure (caller decides whether to abort). Org defaults
-  // to POD_DESIGNS_DEFAULT_ORG_ID server-side (same as the Mockup tool's save path).
-  const genMockup = useCallback(async (prompt: string, refDesignUrl: string): Promise<string | null> => {
-    try {
-      const gRes = await fetch("/api/tools/studio/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "nano-banana-2", prompt, referenceImages: [refDesignUrl] }),
-      });
-      const g = (await gRes.json()) as { ok: boolean; image?: string };
-      if (!g.ok || !g.image) return null;
-      const sRes = await fetch("/api/tools/designs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: g.image, source: "mockup", prompt: "[auto-mockup]" }),
-      });
-      const s = (await sRes.json()) as { ok: boolean; asset?: { object_url?: string } };
-      return s.ok ? (s.asset?.object_url ?? null) : null;
-    } catch {
-      return null;
-    }
   }, []);
 
   // Generate the Printful OFFICIAL mockup for ONE colour (faithful — real garment + real model shown in
@@ -495,9 +470,6 @@ export default function PublishWizard() {
       meetsTarget: Boolean(up.meetsTarget),
     });
 
-    // 2) batch mockups — auto-generate the 4 商品圖 (white-bg flat = main, 2 models, decor flat) from
-    //    the design via /api/tools/studio/generate, each saved to My Designs. White-bg first so it
-    //    becomes Woo's featured image. A single failure is skipped; abort only if ALL fail.
     // 2) per-colour Printful OFFICIAL mockups — for each colour of the chosen model, generate the real
     //    Printful mockup (faithful garment + model in THAT colour) and save it. Each becomes the colour's
     //    variation image (swatch → right colour) AND a gallery image. First colour = Woo main image.
@@ -633,7 +605,7 @@ export default function PublishWizard() {
     } finally {
       runAllLatch.current = false;
     }
-  }, [designUrl, title, printMode, designAssets, keywordHint, retailPrice, plusPrice, catalogProductId, genMockup, post]);
+  }, [designUrl, title, printMode, designAssets, keywordHint, retailPrice, plusPrice, catalogProductId, genColorMockup, post]);
 
   const busy = allRun.state === "running";
 
