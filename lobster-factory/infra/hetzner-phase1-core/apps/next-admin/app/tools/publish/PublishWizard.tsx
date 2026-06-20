@@ -169,10 +169,17 @@ export default function PublishWizard() {
   // Returns the saved url or null. This is what makes the swatch show the right colour garment.
   const genColorMockup = useCallback(async (colorHex: string, refDesignUrl: string): Promise<string | null> => {
     try {
+      // Natural dims so Printful preserves aspect ratio (else square fallback squishes tall art).
+      const dims = await new Promise<{ width: number; height: number } | null>((resolve) => {
+        const im = new window.Image();
+        im.onload = () => resolve({ width: im.naturalWidth, height: im.naturalHeight });
+        im.onerror = () => resolve(null);
+        im.src = refDesignUrl;
+      });
       const mRes = await fetch("/api/tools/studio/mockup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: refDesignUrl, productId: catalogProductId, colorHex }),
+        body: JSON.stringify({ imageUrl: refDesignUrl, productId: catalogProductId, colorHex, ...(dims ? { imageWidth: dims.width, imageHeight: dims.height } : {}) }),
       });
       const m = (await mRes.json()) as { ok: boolean; mockup_url?: string };
       if (!m.ok || !m.mockup_url) return null;

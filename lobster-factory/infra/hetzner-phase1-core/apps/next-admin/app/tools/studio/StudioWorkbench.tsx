@@ -508,10 +508,18 @@ export default function StudioWorkbench() {
     mockupInFlight.current = true;
     setMockupState("generating");
     try {
+      // Pass the design's natural dimensions so Printful preserves the aspect ratio (else the
+      // mockup falls back to a hardcoded square → tall art squished + shrunk — 2026-06-20).
+      const dims = await new Promise<{ width: number; height: number } | null>((resolve) => {
+        const im = new window.Image();
+        im.onload = () => resolve({ width: im.naturalWidth, height: im.naturalHeight });
+        im.onerror = () => resolve(null);
+        im.src = image;
+      });
       const res = await fetch("/api/tools/studio/mockup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image, productType, _jobId: jobIdRef.current }),
+        body: JSON.stringify({ image, productType, _jobId: jobIdRef.current, ...(dims ? { imageWidth: dims.width, imageHeight: dims.height } : {}) }),
       });
       const json = (await res.json()) as { ok: boolean; mockups?: MockupView[]; error?: string };
       if (!json.ok || !json.mockups?.length) { setMockupState("error"); return; }
