@@ -189,6 +189,30 @@ export default function PublishWizard() {
     }
   }, []);
 
+  // Generate the Printful OFFICIAL mockup for ONE colour (faithful — real garment + real model shown in
+  // THAT colour, via Printful's mockup generator) then persist the Printful CDN image to My Designs.
+  // Returns the saved url or null. This is what makes the swatch show the right colour garment.
+  const genColorMockup = useCallback(async (colorHex: string, refDesignUrl: string): Promise<string | null> => {
+    try {
+      const mRes = await fetch("/api/tools/studio/mockup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: refDesignUrl, productId: catalogProductId, colorHex }),
+      });
+      const m = (await mRes.json()) as { ok: boolean; mockup_url?: string };
+      if (!m.ok || !m.mockup_url) return null;
+      const sRes = await fetch("/api/tools/designs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceUrl: m.mockup_url, source: "printful-mockup", prompt: "[auto-colour-mockup]" }),
+      });
+      const s = (await sRes.json()) as { ok: boolean; asset?: { object_url?: string } };
+      return s.ok ? (s.asset?.object_url ?? null) : null;
+    } catch {
+      return null;
+    }
+  }, [catalogProductId]);
+
   // Changing the design invalidates everything downstream (stale-print-file trap).
   // Deliberate asymmetry: we clear AUTO-DERIVED images (productimage/flatlay — baked from the old
   // design, so definitely stale) but PRESERVE the operator's manually-picked library mockups — a
@@ -474,25 +498,32 @@ export default function PublishWizard() {
     // 2) batch mockups — auto-generate the 4 商品圖 (white-bg flat = main, 2 models, decor flat) from
     //    the design via /api/tools/studio/generate, each saved to My Designs. White-bg first so it
     //    becomes Woo's featured image. A single failure is skipped; abort only if ALL fail.
+    // 2) per-colour Printful OFFICIAL mockups — for each colour of the chosen model, generate the real
+    //    Printful mockup (faithful garment + model in THAT colour) and save it. Each becomes the colour's
+    //    variation image (swatch → right colour) AND a gallery image. First colour = Woo main image.
     const model = podModelById(catalogProductId);
-    const specs = model ? buildBatchMockupSpecs(model) : [];
-    const generatedUrls: string[] = [];
-    for (let i = 0; i < specs.length; i++) {
-      const spec = specs[i];
-      setAllRun({ state: "running", stage: `合成 ${spec.label}（AI ${i + 1}/${specs.length}）` });
-      const url = await genMockup(spec.prompt, designUrl);
-      if (url) generatedUrls.push(url);
+    const colors = model?.colors ?? [];
+    const colorMockups: Record<string, string> = {};
+    const galleryMockups: string[] = [];
+    for (let i = 0; i < colors.length; i++) {
+      const c = colors[i];
+      setAllRun({ state: "running", stage: `生成 ${c.label} Printful mockup（${i + 1}/${colors.length}）` });
+      const url = await genColorMockup(c.hex, designUrl);
+      if (url) {
+        colorMockups[c.printfulName] = url;
+        galleryMockups.push(url);
+      }
     }
-    // All AI generations failing must NOT abort the publish — the print file is already made and the
-    // design original is itself a valid product image. Fall back to it (best-effort, same tolerance as
-    // the AI-copy step below) rather than blocking on a transient AI-image outage (critic Phase 2-3).
-    if (generatedUrls.length === 0) {
-      setAllRun({ state: "running", stage: "商品圖 AI 全部失敗 — 改用設計圖原稿續行" });
+    // All mockups failing must NOT abort the publish — the print file is already made and the design
+    // original is a valid product image. Fall back to it (best-effort) rather than blocking on a
+    // transient Printful-mockup outage.
+    if (galleryMockups.length === 0) {
+      setAllRun({ state: "running", stage: "每色 mockup 全失敗 — 改用設計圖原稿續行" });
     }
 
-    // assemble the product gallery: AI mockups (white-bg first = main image) + the design original,
-    // plus any existing manual picks. dedup, insertion order preserved (first entry = Woo main image).
-    const gallery = Array.from(new Set([...generatedUrls, designUrl, ...mockupUrlsRef.current]));
+    // gallery: per-colour Printful mockups (first colour = main image) + design original + existing
+    // picks. dedup, insertion order preserved (first entry = Woo main image).
+    const gallery = Array.from(new Set([...galleryMockups, designUrl, ...mockupUrlsRef.current]));
     setMockupUrls(gallery);
 
     // 4) AI SEO/GEO copy — BEST EFFORT (a copy failure must not abort the publish; create tolerates
@@ -542,6 +573,7 @@ export default function PublishWizard() {
       plusPrice,
       sizes: SIZES,
       mockupUrls: gallery,
+      colorMockups,
       shortDescription,
       bullets,
       seo,

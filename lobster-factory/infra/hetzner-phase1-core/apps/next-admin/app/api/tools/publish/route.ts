@@ -77,6 +77,8 @@ interface PublishBody {
   /** POD model selection (pod-catalog-config catalogProductId). Drives colours + Printful binding.
    *  Absent → legacy single product 71 (Bella 3001) White/Black. */
   catalogProductId?: number;
+  /** Per-colour mockup URLs (Printful colour name → My Designs URL) → each colour's variation image. */
+  colorMockups?: Record<string, string>;
   // status / link
   wooProductId?: number;
   printFileUrl?: string;
@@ -322,6 +324,12 @@ export async function POST(request: Request) {
       seo: body.seo && typeof body.seo === "object" ? body.seo : undefined,
       mockupUrls,
       model,
+      colorMockups:
+        body.colorMockups && typeof body.colorMockups === "object"
+          ? Object.fromEntries(
+              Object.entries(body.colorMockups).filter(([, u]) => typeof u === "string" && u.startsWith(designsBase)),
+            )
+          : undefined,
     };
     // Always a real write (plugin has no /product dry-run) — payload is draft-status.
     const payload = buildPodProductPayload(params);

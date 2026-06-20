@@ -36,6 +36,9 @@ export interface PodProductParams {
   /** POD model (pod-catalog-config) — its hex-keyed colours + displayName drive variants & copy.
    *  Absent (legacy callers) → White/Black via LEGACY_COLORS. */
   model?: PodProductModel;
+  /** Per-colour mockup URLs keyed by Printful colour NAME (e.g. "Sport Grey" → My Designs URL). Each
+   *  becomes that colour's variation image so WooCommerce shows the right colour when a swatch is picked. */
+  colorMockups?: Record<string, string>;
 }
 
 export interface PodVariantPlan {
@@ -158,6 +161,9 @@ export function buildPodProductPayload(params: PodProductParams): Record<string,
       regular_price: v.price,
       status: "publish", // variations must be publish to be selectable; parent stays draft
       menu_order: i,
+      // Per-colour variation image (Printful mockup of that colour) → the swatch shows the right colour
+      // garment when the customer picks it (ProductCreator.php:459 set_image_id on the variation).
+      ...(params.colorMockups?.[v.printfulColor] ? { image: { src: params.colorMockups[v.printfulColor] } } : {}),
     })),
   };
 }
