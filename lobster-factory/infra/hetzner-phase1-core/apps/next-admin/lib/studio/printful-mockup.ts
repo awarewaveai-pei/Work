@@ -153,20 +153,27 @@ function computePosition(
   cfg: (typeof PRODUCT_CONFIG)[ProductType],
   imageDims?: { width: number; height: number },
 ): { area_width: number; area_height: number; width: number; height: number; top: number; left: number } {
-  if (!imageDims || imageDims.width <= 0 || imageDims.height <= 0) {
-    return { area_width: cfg.area_width, area_height: cfg.area_height, width: cfg.design_width, height: cfg.design_height, top: cfg.top, left: cfg.left };
+  const aw = cfg.area_width;
+  const ah = cfg.area_height;
+  // Fit the design into ~90% of the print area preserving its TRUE aspect ratio, then centre it.
+  // Replaces the old fixed-square fallback + fixed top margin, which squished a tall 2:3 design
+  // into a square and shrank it to ~53% of the chest when imageDims was missing (2026-06-20).
+  const FILL = 0.9;
+  const maxW = aw * FILL;
+  const maxH = ah * FILL;
+  const imgW = imageDims && imageDims.width > 0 ? imageDims.width : cfg.design_width;
+  const imgH = imageDims && imageDims.height > 0 ? imageDims.height : cfg.design_height;
+  let designW = maxW;
+  let designH = (maxW * imgH) / imgW;
+  if (designH > maxH) {
+    designH = maxH;
+    designW = (maxH * imgW) / imgH;
   }
-  const { width: imgW, height: imgH } = imageDims;
-  const maxW: number = cfg.design_width;
-  let designW: number = maxW;
-  let designH: number = Math.round((maxW * imgH) / imgW);
-  const availableH: number = cfg.area_height - cfg.top * 2;
-  if (designH > availableH) {
-    designH = availableH;
-    designW = Math.round((availableH * imgW) / imgH);
-  }
-  const left = Math.round((cfg.area_width - designW) / 2);
-  return { area_width: cfg.area_width, area_height: cfg.area_height, width: designW, height: designH, top: cfg.top, left };
+  designW = Math.round(designW);
+  designH = Math.round(designH);
+  const top = Math.round((ah - designH) / 2);
+  const left = Math.round((aw - designW) / 2);
+  return { area_width: aw, area_height: ah, width: designW, height: designH, top, left };
 }
 
 /** Compute print-position for a dynamic (catalog) product spec. */
@@ -174,27 +181,33 @@ function computeDynamicPosition(
   spec: DynamicProductSpec,
   imageDims?: { width: number; height: number },
 ): { area_width: number; area_height: number; width: number; height: number; top: number; left: number } {
-  const sizePct = Math.min(1, Math.max(0.3, spec.designSizePct ?? 0.8));
-  const maxW = Math.round(spec.areaWidth * sizePct);
-  const topMargin = Math.round(spec.areaHeight * 0.15);
-  const availH = spec.areaHeight - topMargin * 2;
-
+  const aw = spec.areaWidth;
+  const ah = spec.areaHeight;
+  // designSizePct = fraction of the print area the design fills (default 0.85). Fit preserving the
+  // true aspect ratio, then centre — same fix as computePosition (no fixed top margin shrinking
+  // tall art, no square fallback squish when dims are present) — 2026-06-20.
+  const fill = Math.min(1, Math.max(0.3, spec.designSizePct ?? 0.85));
+  const maxW = aw * fill;
+  const maxH = ah * fill;
   let designW: number;
   let designH: number;
   if (imageDims && imageDims.width > 0 && imageDims.height > 0) {
     designW = maxW;
-    designH = Math.round((maxW * imageDims.height) / imageDims.width);
-    if (designH > availH) {
-      designH = availH;
-      designW = Math.round((availH * imageDims.width) / imageDims.height);
+    designH = (maxW * imageDims.height) / imageDims.width;
+    if (designH > maxH) {
+      designH = maxH;
+      designW = (maxH * imageDims.width) / imageDims.height;
     }
   } else {
-    designW = maxW;
-    designH = maxW; // square fallback
+    const side = Math.min(maxW, maxH);
+    designW = side;
+    designH = side; // square fallback only when dims unknown
   }
-
-  const left = Math.round((spec.areaWidth - designW) / 2);
-  return { area_width: spec.areaWidth, area_height: spec.areaHeight, width: designW, height: designH, top: topMargin, left };
+  designW = Math.round(designW);
+  designH = Math.round(designH);
+  const top = Math.round((ah - designH) / 2);
+  const left = Math.round((aw - designW) / 2);
+  return { area_width: aw, area_height: ah, width: designW, height: designH, top, left };
 }
 
 /**
