@@ -6,6 +6,37 @@ $insert
 
 ## 2026-06-21
 
+### fix(pod): 每色 mockup 取到背面空白圖 → 修為取正面有設計圖 + 模特 group 名修正（task_36d83851 完成）
+
+[任務理解] 承接 task_36d83851 診斷：POD 一鍵每色 Printful mockup 全是空白衣服（無設計圖）。三症狀=① 空白衫 ② 展示圖該 <100KB ③ 要色塊變色+模特+設計印上。
+
+[現況分析] 新對話 context 乾淨，R0/R4 不盲信前 session debugger 輸出，自己重打真實 Printful 確認。讀 `printful-mockup.ts`（兩函式 `generateMockup`/`generateMockupBySpec` 同一取圖邏輯）+ `mockup/route.ts` + `PublishWizard.tsx` runAll/genColorMockup + `pod-product.ts` colorMockups + `pod-catalog-config.ts`（productId 57=Gildan 2400 長袖，對應截圖）+ designs `route.ts` toWebpOptimized。`git log` 確認 `87e47c39` 是前 session 診斷（未修），無並行搶修。
+
+[根因（全程真實 Printful API + 視覺實測）]
+- **主因**：`generateMockupBySpec`（+孿生 `generateMockup`）取圖：`extra[]` 非空就丟 primary，只用 extra[]。實測 product 57 白M：`mockup_url`(primary)=正面有設計✅、extra[0]=`Flat/Back`空白❌ → primary 被丟，只剩空白 Back；sort 又只看 group（rankGroup）不看正反面，Back 的 group=Flat → views[0]=空白背面 → 每色變體圖空白。視覺下載 front.jpg(胸前紅box)/back.jpg(全白) 鐵證。
+- **②的模特**：第一次 probe 用 code 寫的 "Men's Lifestyle" → Printful 只回 Flat front+back、零模特（我一度誤判「此產品無模特圖」）。重測**不傳 option_groups / 用 "Men's"** → 回 11 張模特圖（Men's/Women's: Front/Left/Right/Left Front/Right Front/Back）。**真實 group 名是 "Men's"/"Women's"，"Men's Lifestyle" 被 Printful 忽略**（前 session debugger 此點是對的；修正我的中途誤判）。
+- **③的 100KB**：`designs/route.ts` `toWebpOptimized` 已壓 ≤100KB（quality 80→20 階梯），每色 mockup 存 My Designs 都 ≤100KB；①修好後每色商品圖即 ≤100KB 正面設計圖。無需改。
+
+[已修改] `lib/studio/printful-mockup.ts`：
+1. 兩函式取圖：永遠把 primary（正面有設計）納入候選（不再 extra[]非空就丟）。
+2. 新增 `rankView`：正面(0)>angled含模特(100+)>純側面(200)>背面(300 殿後)；兩 sort 改用 rankView + 顯式 insertion-order tiebreak（primary 正面 pushed first → 必勝，不靠 sort stability）。
+3. `MOCKUP_OPTION_GROUPS` 修正 `Men's Lifestyle`→`Men's`/`Women's`（真實 group 名；模特圖入 mockups[] 供 Studio picker）。
+4. `LIFESTYLE_GROUP_RE` 加 `\b` word boundary（避免 "Cement"→"men" 誤判）。
+5. 三處過時註解改正（header / option_groups / 內聯假設）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(ssh→docker exec lobster-next-admin node) | cmd=複製 generateMockupBySpec 打真實 Printful create-task/57 白M + 修正後 rankView | result=mockup_url=Flat/Front rank0(PASS, file=*-front-*) + 11 模特圖入array(含 Women's/Front) + 背面排 300 殿後 | exit=0
+- REALTEST_EVIDENCE: tool=Read(image) | 下載 picked front.jpg | result=白長袖胸前有 AW-FIX 設計（修前取到的 back.jpg=全白）視覺確認
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | 3× (各階段改動後)
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test` | exit=0 | 426 passed/32 files（零回歸）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2M/4n（兩輪 sonnet；M1 tiebreak/m2 regex/m3 empty-view/m4 comment 已修；M2 synthetic-group 加註；S1 R2-url-mismatch=既有不相關，defer）
+- BUGHUNT_DONE: scope=lobster-factory/next-admin | grep=`mockup_url|MockupView|rankView|generateMockup` | hits=15（消費端 MockupStudio/StudioWorkbench/PublishWizard/mockup-route 全部相容：取 mockup_url=現正面，或顯示 mockups[]=正面在前背面殿後；無依賴舊「丟primary/盲排序」行為）
+- BUGHUNT_SCOPE_NARROW: 改動純 next-admin app code；`agency-os`/`scripts` 無 printful-mockup 符號 call site（app-internal），故 scope 不含該二根。
+
+[剩餘風險] ① 未 sg-deploy（gated，等 go-ahead）→ 線上仍是 e630fa69 空白版，部署前勿正式上架。② 已知限制：背印/all-over 商品會被 rankView 埋掉設計面（現有 3 款全 front-print，已 TODO 註記）。③ My Designs 庫內前次測試的空白圖待清（pending 操作者確認）。④ 模特圖目前只入 mockups[] 供 Studio picker；一鍵 gallery 每色仍只存正面平拍（模特入 gallery=enhancement，待操作者 UX 決定）。
+
+[rollback] `git revert <commit>` 單檔還原；或 sg-deploy 內建 healthcheck 失敗自動 rollback。
+
 ### diag(pod): 每色 mockup 真機驗證 → 空白衣服 bug → debugger 實測確定根因 + patch（修交新對話 task_36d83851）
 
 [任務] 真機 browser 跑 POD 一鍵上架（Gildan 2400 長袖 4 色）驗證每色 Printful mockup 效果。操作者實測回報「非常爛」三問題：① 每色 mockup 是空白衣服（沒設計圖）② 展示圖該 <100KB ③ 要 Printful 標準色塊變色（模特也變）+ 設計圖印在衣服上（對照官方 STTU020 snake 範例）。

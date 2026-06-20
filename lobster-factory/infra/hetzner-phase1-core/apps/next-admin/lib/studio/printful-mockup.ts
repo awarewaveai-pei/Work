@@ -6,10 +6,13 @@
  *       → poll until completed → return ALL mockup styles (Printful CDN JPEGs).
  *
  * Every mockup is FAITHFUL: Printful places the artist's real uploaded file onto a
- * real garment photo — it never reinterprets the design (unlike AI redraw). The
- * styles come back via the task's `extra[]` array. We request the lifestyle/model
- * groups explicitly so real-model shots are included (live-verified 2026-06-15:
- * option_groups ["Men's Lifestyle", …] → extra[] gains "Men's Lifestyle / Front|Back").
+ * real garment photo — it never reinterprets the design (unlike AI redraw). The DEFAULT
+ * front view (with the design) comes back as `mockup_url`; additional requested option_groups
+ * come back in `extra[]`. Live-probed 2026-06-21 (Gildan 2400 / product 57): `mockup_url` = the
+ * FRONT with the design; requesting group "Men's" adds real-model shots (Left / Right / Left Front /
+ * Right Front / Back); the misnamed "Men's Lifestyle" returns nothing. The one-click flow uses the
+ * clean straight FRONT as each colour's variation image (see rankView); the model shots are available
+ * in mockups[] for the manual Studio picker.
  *
  * Requires: PRINTFUL_API_KEY, PRINTFUL_STORE_ID, R2_* (existing designs bucket).
  * The Printful Mockup API needs a publicly reachable URL; R2 is the same bucket
@@ -91,17 +94,17 @@ export interface DynamicProductSpec {
   designSizePct?: number;
 }
 
-// Mockup style groups to request. Printful returns whatever's valid for the product
-// and silently ignores unknown groups (live-verified 2026-06-15). "Flat"/"Ghost" are
-// clean product shots; the "*Lifestyle"/"Couple's"/"Kids" groups are real-model photos.
+// Mockup style groups to request. Printful returns whatever's valid for the product and silently ignores
+// the rest. CORRECTED 2026-06-21 (live probe, product 57): the real model-shot group is "Men's"/"Women's"
+// — the previously-used "Men's Lifestyle"/"…Lifestyle" names are IGNORED by Printful (they returned NO
+// model shots). With "Men's", product 57 returns Left/Right/Left Front/Right Front/Back model views.
+// rankView keeps a clean straight FRONT as each colour's variation image; the model shots populate
+// mockups[] for the manual Studio picker. Requesting an unsupported group is harmless.
 const MOCKUP_OPTION_GROUPS = [
-  "Flat",
+  "Flat",      // clean flat-lay front (+ blank back); the straight front is the per-colour variation image
+  "Men's",     // real-model shots — live-verified group name 2026-06-21 (NOT "Men's Lifestyle")
+  "Women's",
   "Ghost",
-  "Men's Lifestyle",
-  "Women's Lifestyle",
-  "Couple's",
-  "Kids",
-  "Lifestyle",
 ];
 
 /** One generated mockup view. `url` is a Printful CDN JPEG; every one is faithful. */
@@ -120,13 +123,30 @@ export type MockupResult =
   | { ok: true; mockup_url: string; mockups: MockupView[] }
   | { ok: false; error: string };
 
-const LIFESTYLE_GROUP_RE = /lifestyle|couple|kids|women|men/i;
+const LIFESTYLE_GROUP_RE = /\b(lifestyle|couple|kids|women|men)\b/i;
 
 /** Order: real-model lifestyle first (hero shots), then flat, then ghost. */
 function rankGroup(group: string): number {
   if (LIFESTYLE_GROUP_RE.test(group)) return 0;
   if (/flat/i.test(group)) return 1;
   return 2;
+}
+
+const BACK_VIEW_RE = /back/i;
+const SIDE_VIEW_RE = /^(left|right)$/i;
+const FRONT_VIEW_RE = /^front$/i;
+/** Sort key for the MAIN / per-colour variation image. A front-only print shows the design best
+ *  STRAIGHT-ON, so a plain "Front" wins; angled fronts (Left/Right Front — incl. real-model shots,
+ *  group "Men's") come next, lifestyle preferred over flat there; pure side views (design edge-on)
+ *  after; and a BACK view (blank for a front print) ALWAYS last. The back rule is the 2026-06-21
+ *  blank-shirt fix: a "Flat / Back" must never be picked as the main/variation image. (Live-probed:
+ *  product 57 + "Men's" yields Left/Right/Left Front/Right Front/Back — none is a straight front, so
+ *  the clean Flat/Front correctly wins as each colour's variation image.) */
+function rankView(v: { group: string; view: string }): number {
+  if (BACK_VIEW_RE.test(v.view)) return 300;                  // blank back → always last
+  if (SIDE_VIEW_RE.test(v.view)) return 200;                  // pure side → design edge-on
+  if (FRONT_VIEW_RE.test(v.view)) return 0;                   // straight front → clearest design
+  return 100 + rankGroup(v.group);                            // angled front: real-model over flat
 }
 
 function sleep(ms: number) {
@@ -332,19 +352,27 @@ export async function generateMockup(
       const views: MockupView[] = [];
       const seen = new Set<string>();
       for (const m of rawMockups) {
+        // `mockup_url` is Printful's DEFAULT view = the FRONT, with the design on it. `extra[]` holds
+        // the additional requested option_groups — which (live-probed 2026-06-21, product 57) can be
+        // JUST a blank "Flat / Back". PRIOR BUG: a non-empty extra[] DROPPED the primary front, leaving
+        // the blank back as the only candidate → it became mockup_url (the "blank shirt"). Fix: ALWAYS
+        // include the primary front, add the labelled extras, then rank BACK views last (see rankView)
+        // so the design-bearing front — or a real-model lifestyle shot — always wins as the main image.
+        // ASSUMES front-placement print (all current pod-catalog-config products). The primary's group/
+        // lifestyle flag here are SYNTHETIC ("Flat"/"Front") — correct for these flat-front products, but a
+        // back-placement or lifestyle-primary product would mislabel it and could bury the real design.
+        // TODO(back-placement): make rankView placement-aware before adding a back/all-over product.
         const primary = m.mockup_url as string | undefined;
-        // The labelled variants (incl. their true group: Flat/Ghost/Lifestyle) live in extra[].
-        // Prefer those — never assume the primary's group (it could be a lifestyle render).
-        // Fall back to the primary only when extra[] is absent (defensive — every observed
-        // response includes the front view in extra, so the primary is normally a dup of it).
         const extra = (m.extra as Array<Record<string, unknown>> | undefined) ?? [];
-        const labeled = extra.map((e) => ({
-          url: e.url as string | undefined,
-          group: (e.option_group as string | undefined) ?? "Flat",
-          view: (e.option as string | undefined) ?? (e.title as string | undefined) ?? "",
-        }));
-        const candidates: { url?: string; group: string; view: string }[] =
-          labeled.length > 0 ? labeled : primary ? [{ url: primary, group: "Product", view: "Front" }] : [];
+        const candidates: { url?: string; group: string; view: string }[] = [];
+        if (primary) candidates.push({ url: primary, group: "Flat", view: "Front" });
+        for (const e of extra) {
+          candidates.push({
+            url: e.url as string | undefined,
+            group: (e.option_group as string | undefined) ?? "Flat",
+            view: (e.option as string | undefined) ?? (e.title as string | undefined) ?? "",
+          });
+        }
         for (const c of candidates) {
           if (!c.url || seen.has(c.url)) continue;
           seen.add(c.url);
@@ -358,7 +386,11 @@ export async function generateMockup(
         }
       }
       if (views.length === 0) return { ok: false, error: "printful_no_mockup_url" };
-      views.sort((a, b) => rankGroup(a.group) - rankGroup(b.group));
+      // Explicit insertion-order tie-break (do NOT lean on sort stability): the primary front is pushed
+      // FIRST, so among equal-rank "Front" views it always wins → mockup_url = the canonical design-bearing
+      // front, independent of the JS engine's sort implementation.
+      const order = new Map(views.map((v, i) => [v, i] as const));
+      views.sort((a, b) => rankView(a) - rankView(b) || (order.get(a)! - order.get(b)!));
       return { ok: true, mockup_url: views[0].url, mockups: views };
     }
 
@@ -464,14 +496,19 @@ export async function generateMockupBySpec(
       const views: MockupView[] = [];
       const seen = new Set<string>();
       for (const m of rawMockups) {
+        // See generateMockup: include the primary FRONT (design-bearing), add labelled extras, rank
+        // BACK views last — a blank "Flat / Back" must never become mockup_url (2026-06-21 blank-shirt fix).
         const primary = m.mockup_url as string | undefined;
         const extra = (m.extra as Array<Record<string, unknown>> | undefined) ?? [];
-        const labeled = extra.map((e) => ({
-          url: e.url as string | undefined,
-          group: (e.option_group as string | undefined) ?? "Flat",
-          view: (e.option as string | undefined) ?? (e.title as string | undefined) ?? "",
-        }));
-        const candidates = labeled.length > 0 ? labeled : primary ? [{ url: primary, group: "Product", view: "Front" }] : [];
+        const candidates: { url?: string; group: string; view: string }[] = [];
+        if (primary) candidates.push({ url: primary, group: "Flat", view: "Front" });
+        for (const e of extra) {
+          candidates.push({
+            url: e.url as string | undefined,
+            group: (e.option_group as string | undefined) ?? "Flat",
+            view: (e.option as string | undefined) ?? (e.title as string | undefined) ?? "",
+          });
+        }
         for (const c of candidates) {
           if (!c.url || seen.has(c.url)) continue;
           seen.add(c.url);
@@ -479,7 +516,11 @@ export async function generateMockupBySpec(
         }
       }
       if (views.length === 0) return { ok: false, error: "printful_no_mockup_url" };
-      views.sort((a, b) => rankGroup(a.group) - rankGroup(b.group));
+      // Explicit insertion-order tie-break (do NOT lean on sort stability): the primary front is pushed
+      // FIRST, so among equal-rank "Front" views it always wins → mockup_url = the canonical design-bearing
+      // front, independent of the JS engine's sort implementation.
+      const order = new Map(views.map((v, i) => [v, i] as const));
+      views.sort((a, b) => rankView(a) - rankView(b) || (order.get(a)! - order.get(b)!));
       return { ok: true, mockup_url: views[0].url, mockups: views };
     }
     if (status === "failed") return { ok: false, error: "printful_mockup_failed" };
