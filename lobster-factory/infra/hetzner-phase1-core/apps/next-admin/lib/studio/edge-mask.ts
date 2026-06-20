@@ -417,7 +417,7 @@ export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
       const uid = `em-flat-${p.seed}`;
       const md = Math.min(w, h);
       const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
-      // anisotropic (horizontal-biased) displacement → broad flat-brush drag marks
+      // anisotropic displacement → broad flat-brush drag streaks
       const filter = brushFilter(uid, "0.004 0.09", 2, md * (0.05 + p.amount / 1100), p.seed % 90, { alphaTable: "0 1 1" });
       return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
     },

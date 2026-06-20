@@ -45,6 +45,15 @@ $insert
 
 [rollback] git revert;純新增(無既有 symbol 改名/移除),移除面板與模組即復原。
 
+#### 追加（同日）: edge-mask +10 筆刷風格（11→21）
+
+[已修改] `edge-mask.ts` 加 `brushFilter` helper（generalised turbFilter：turbType/blur/alphaTable options）+ 10 個 brush entry（柔筆刷/粗筆刷/平頭刷/排刷/書法毛筆/粉筆/炭筆/點刷/刮刷/濕筆），純 additive 不動既有 11。`edge-mask.test.ts` 更新為 21。使用者要求「各式筆刷邊緣再做 10 個」。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/studio/edge-mask.test.ts | exit=0 | 8/8（測 21 風格全產生有效 SVG + textured 含 feTurbulence + 無 NaN + 決定性）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/0n/2suggestion（唯一 flat-brush 註解措辭,已修）；SVG 合法性/15 filter id 全不撞/位移不出框/無 copy-paste 錯 全 verified clean
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=brushFilter|soft-brush|rough-brush|...|wet-brush | hits=2（只 edge-mask.ts + test,0 外部 consumer）
+
 ### feat(pod): Phase 1b — 多色多款對接（hex bind）一條鏈
 
 [任務] PLAN Phase 1b:啟用多色多款。pod-product / route / PublishWizard 一條 color 鏈,Woo 建 `model.colors` + Printful **用 hex 綁定**(免 Printful colour rename)。
