@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { STYLE_PRESETS } from "../tarot/cards";
 // SSOT for source→group classification — shared with the publish picker + /api/tools/designs filter.
 import { assetToolGroup as toolGroup } from "../../../lib/studio/asset-group";
+import {
+  EDGE_MASK_STYLES,
+  applyEdgeMask,
+  buildMaskSvg,
+  type EdgeMaskId,
+} from "../../../lib/studio/edge-mask";
 
 interface AssetMetadata {
   prompt?: string | null;
@@ -269,6 +275,16 @@ export default function DesignsGallery() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [zoom, setZoom] = useState<string | null>(null);
 
+  /* ✨ edge-mask editor — apply an organic edge to a saved design → new transparent PNG */
+  const [editAsset, setEditAsset] = useState<DesignAsset | null>(null);
+  const [editResult, setEditResult] = useState<string | null>(null);
+  const [editStyle, setEditStyle] = useState<EdgeMaskId | null>(null);
+  const [editAmount, setEditAmount] = useState(55);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editSavedUrl, setEditSavedUrl] = useState<string | null>(null);
+
   /* multi-select */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -405,6 +421,99 @@ export default function DesignsGallery() {
       return n;
     });
   }, []);
+
+  /* ─── ✨ edge-mask editor (fetch via same-origin proxy → client canvas compositing) ─── */
+  const edgePreviews = useMemo(
+    () =>
+      EDGE_MASK_STYLES.map((s) => ({
+        id: s.id,
+        zh: s.label,
+        en: s.labelEn,
+        svg: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildMaskSvg(s.id, 48, 48, { amount: 62, seed: 7 }))}`,
+      })),
+    [],
+  );
+
+  const openEdgeEdit = useCallback((asset: DesignAsset) => {
+    setEditAsset(asset);
+    setEditResult(null);
+    setEditStyle(null);
+    setEditError(null);
+    setEditSavedUrl(null);
+    setEditAmount(55);
+  }, []);
+
+  const closeEdgeEdit = useCallback(() => {
+    setEditAsset(null);
+    setEditResult(null);
+    setEditStyle(null);
+    setEditError(null);
+    setEditSavedUrl(null);
+  }, []);
+
+  const applyEdgeStyle = useCallback(async (styleId: EdgeMaskId) => {
+    if (!editAsset?.object_url) return;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      // Same-origin proxy → no canvas taint for the cross-origin R2 image.
+      const proxied = `/api/tools/studio/proxy-image?url=${encodeURIComponent(editAsset.object_url)}`;
+      const res = await applyEdgeMask(proxied, styleId, { amount: editAmount, seed: 7 });
+      if (res.ok) {
+        setEditResult(res.image);
+        setEditStyle(styleId);
+        setEditSavedUrl(null);
+      } else {
+        // tsconfig here does not narrow the !ok branch — same cast convention as the routes.
+        setEditError((res as { ok: false; error: string }).error);
+      }
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "edge_failed");
+    } finally {
+      setEditBusy(false);
+    }
+  }, [editAsset, editAmount]);
+
+  const saveEdged = useCallback(async (): Promise<string | null> => {
+    if (!editResult || !editAsset) return null;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const styleLabel = editStyle ? EDGE_MASK_STYLES.find((s) => s.id === editStyle)?.label ?? editStyle : null;
+      const res = await fetch("/api/tools/designs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: editResult,
+          source: "edge-mask",
+          productType: editAsset.metadata?.product_type ?? undefined,
+          theme: editAsset.metadata?.theme ?? undefined,
+          prompt: editAsset.metadata?.prompt ?? undefined,
+          subject: editAsset.metadata?.subject ?? editAsset.metadata?.card_name ?? undefined,
+          styleTags: styleLabel ? [`邊緣｜${styleLabel}`] : undefined,
+        }),
+      });
+      const json = (await res.json()) as { ok: boolean; asset?: { object_url?: string }; error?: string };
+      if (json.ok) {
+        const u = json.asset?.object_url ?? null;
+        setEditSavedUrl(u);
+        void load();
+        return u;
+      }
+      setEditError(`儲存失敗：${json.error ?? "unknown"}`);
+      return null;
+    } catch {
+      setEditError("儲存失敗（網路錯誤）");
+      return null;
+    } finally {
+      setEditSaving(false);
+    }
+  }, [editResult, editAsset, editStyle, load]);
+
+  const goToProductFromEdit = useCallback(async () => {
+    const url = editSavedUrl ?? (await saveEdged());
+    if (url) window.location.assign("/tools/publish");
+  }, [editSavedUrl, saveEdged]);
 
   /* ─── derive filter option lists ─── */
   const modelOptions = useMemo(() => {
@@ -989,6 +1098,15 @@ export default function DesignsGallery() {
 
               {/* ── action buttons ── */}
               <div className="designs-actions">
+                {asset.object_url ? (
+                  <button
+                    className="designs-action-btn"
+                    onClick={() => openEdgeEdit(asset)}
+                    title="套上有機／筆刷邊 → 透明 PNG，再去建商品"
+                  >
+                    ✨ 改邊緣
+                  </button>
+                ) : null}
                 <button
                   className={`designs-action-btn${copiedId === asset.id ? " designs-action-btn--copied" : ""}`}
                   onClick={() => void copyUrl(asset)}
@@ -1016,6 +1134,153 @@ export default function DesignsGallery() {
           );
         })}
       </div>
+
+      {/* ── ✨ Edge-mask editor modal ─────────────────────────────── */}
+      {editAsset ? (
+        <div className="designs-lightbox" onClick={closeEdgeEdit}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--color-background-primary, #1c1c1c)",
+              border: "1px solid rgba(127,127,127,0.3)",
+              borderRadius: 12,
+              width: "min(680px, 94vw)",
+              maxHeight: "92vh",
+              overflow: "auto",
+              padding: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>✨ 改邊緣</span>
+              <span style={{ fontSize: 12, opacity: 0.55 }}>
+                {editAsset.metadata?.card_name ?? editAsset.metadata?.subject ?? editAsset.metadata?.theme ?? "設計圖"} → 透明 PNG
+              </span>
+              <button className="designs-action-btn" style={{ marginLeft: "auto" }} onClick={closeEdgeEdit}>關閉 ✕</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>原圖</div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={editAsset.object_url ?? ""} alt="原圖" style={{ width: "100%", borderRadius: 8, display: "block" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>套邊後（透明）</div>
+                <div
+                  style={{
+                    width: "100%",
+                    aspectRatio: "1",
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: "#fff",
+                    backgroundImage:
+                      "linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%)",
+                    backgroundSize: "16px 16px",
+                    backgroundPosition: "0 0,0 8px,8px -8px,-8px 0px",
+                    overflow: "hidden",
+                  }}
+                >
+                  {editBusy ? (
+                    <span style={{ fontSize: 12, color: "#333" }}>處理中…</span>
+                  ) : editResult ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={editResult} alt="套邊後" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  ) : (
+                    <span style={{ fontSize: 12, color: "#555" }}>選一個邊緣風格 →</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {editError ? <span style={{ fontSize: 12, color: "#e5484d" }}>套用失敗：{editError}</span> : null}
+
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {edgePreviews.map((pv) => {
+                const active = editStyle === pv.id;
+                return (
+                  <button
+                    key={pv.id}
+                    type="button"
+                    title={pv.en}
+                    disabled={editBusy}
+                    onClick={() => void applyEdgeStyle(pv.id)}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 3,
+                      width: 58,
+                      padding: 4,
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      background: active ? "rgba(99,102,241,0.18)" : "rgba(127,127,127,0.06)",
+                      border: `1px solid ${active ? "#6366f1" : "rgba(127,127,127,0.25)"}`,
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={pv.svg} alt={pv.zh} style={{ width: 38, height: 38, background: "#3a3a3a", borderRadius: 4 }} />
+                    <span style={{ fontSize: 10, opacity: 0.8, lineHeight: 1.1, textAlign: "center" }}>{pv.zh}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 11, opacity: 0.6 }}>邊緣強度</span>
+              <input
+                type="range"
+                min={10}
+                max={90}
+                step={1}
+                value={editAmount}
+                disabled={editBusy}
+                onChange={(e) => setEditAmount(Number(e.target.value))}
+                onPointerUp={() => { if (editStyle) void applyEdgeStyle(editStyle); }}
+                style={{ flex: 1 }}
+              />
+              <span style={{ fontSize: 11, opacity: 0.6, width: 28, textAlign: "right" }}>{editAmount}</span>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                className="designs-action-btn"
+                disabled={!editResult || editSaving || !!editSavedUrl}
+                onClick={() => void saveEdged()}
+              >
+                {editSavedUrl ? "已存回 ✓" : editSaving ? "儲存中…" : "存回 My Designs"}
+              </button>
+              <button
+                className="designs-action-btn"
+                disabled={!editResult || editSaving}
+                onClick={() => void goToProductFromEdit()}
+                style={{ borderColor: "#6366f1" }}
+              >
+                → 去建商品
+              </button>
+              {editResult ? (
+                <button
+                  className="designs-action-btn"
+                  onClick={() => {
+                    const a = document.createElement("a");
+                    a.href = editResult;
+                    a.download = `${designBaseName(editAsset)}-edge.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                  }}
+                >
+                  下載 PNG
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Zoom lightbox ─────────────────────────────────────────── */}
       {zoom ? (

@@ -4,6 +4,33 @@
 
 $insert
 
+## 2026-06-21
+
+### fix(studio): Printful mockup 圖案被擠成正方形+太小 ／ feat: Phase 2 My Designs 一鍵套邊→建商品
+
+[任務] 使用者實測發現 studio mockup 預覽圖案比例不對（2:3 直圖被擠成方形）+ 太小；且要做 Phase 2（My Designs 撈圖一鍵套邊 → 順下去建商品）。一起 deploy。
+
+[已修改]
+**Fix A — mockup 比例/大小（pre-existing bug）**
+- 根因：`generateMockupFromDesign`（StudioWorkbench:514）+ `genColorMockup`（PublishWizard:175）POST 給 mockup API 時漏傳 imageWidth/imageHeight → route imageDims=undefined → `computePosition` 回退寫死 1440×1440 正方形 → 直圖被擠 + top 邊距砍小。對照 MockupStudio 有正確傳 dims 所以正常。
+- `printful-mockup.ts`：computePosition/computeDynamicPosition 改寫成「等比例縮放填滿 ~90% 印刷區 + 置中」（取代正方退回 + 固定 top 邊距）；加 `Math.max(1,…)` 防病態比例 round-to-0。
+- StudioWorkbench / PublishWizard：補載入設計圖 naturalWidth/Height 隨 POST 傳（跨域讀 dims 不 taint）。
+- 釐清：此為 mockup **預覽**擺放；實際印刷檔 Printful 自動填滿（pfcreate 綁 files[front] 無 position），不受影響。
+
+**Phase 2 — My Designs 一鍵套邊 → 建商品**
+- 新檔 `app/api/tools/studio/proxy-image/route.ts`：同源 image proxy（SSRF 守到 designs bucket `startsWith(base+"/")` + redirect:manual + MIME allowlist），讓 client canvas 不被跨域 R2 圖 taint（避開依賴 R2 CORS / sharp 不渲 feTurbulence 的險）。
+- `DesignsGallery.tsx`：每張卡片加「✨ 改邊緣」→ modal（21 風格選擇 + 強度滑桿 + 套邊預覽透明棋盤底 + 存回 My Designs + 「→ 去建商品」handoff 到 /tools/publish）。client 端複用既有 `applyEdgeMask`（瀏覽器渲染 21 風格保真）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 | 32 files 426 tests pass（含 batch-mockup；position 改寫未破測）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/4n/3suggestion（修 2：slider editBusy disable + position Math.max 防呆）；**SSRF 實測 9 種 bypass 全擋** / position 數學無負/0/NaN（mug 寬扁精算）/ 跨域讀 dims 不 taint / saveEdged 不帶 roleHeader 正確（middleware 注入真 role）全 verified clean
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=proxy-image\|computePosition\|computeDynamicPosition\|openEdgeEdit\|applyEdgeStyle | hits=2（改動 symbol 限 2 改檔；proxy route 無外部 consumer；agency-os/scripts 0）
+
+[剩餘風險] mockup 真實 Printful 端到端效果待部署後 browser-test 親測。proxy route content-length 缺失時 size cap 走事後檢查（同既有 fetchPrintfulMockup 模式，target 鎖自家 R2 低風險）。
+
+[rollback] git revert；Fix A 純改 position 數學 + 補傳欄位（向後相容，dims 缺失仍退回）；Phase 2 純新增（route + UI），移除即復原。
+
 ## 2026-06-20
 
 ### fix(pod): 改方向 — 每色 Printful 官方 mockup + WooCommerce 變體圖（取代自製 AI 批次合成）

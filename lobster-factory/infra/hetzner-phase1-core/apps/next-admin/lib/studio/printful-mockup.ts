@@ -169,8 +169,8 @@ function computePosition(
     designH = maxH;
     designW = (maxH * imgW) / imgH;
   }
-  designW = Math.round(designW);
-  designH = Math.round(designH);
+  designW = Math.max(1, Math.round(designW));
+  designH = Math.max(1, Math.round(designH));
   const top = Math.round((ah - designH) / 2);
   const left = Math.round((aw - designW) / 2);
   return { area_width: aw, area_height: ah, width: designW, height: designH, top, left };
@@ -203,8 +203,8 @@ function computeDynamicPosition(
     designW = side;
     designH = side; // square fallback only when dims unknown
   }
-  designW = Math.round(designW);
-  designH = Math.round(designH);
+  designW = Math.max(1, Math.round(designW));
+  designH = Math.max(1, Math.round(designH));
   const top = Math.round((ah - designH) / 2);
   const left = Math.round((aw - designW) / 2);
   return { area_width: aw, area_height: ah, width: designW, height: designH, top, left };
