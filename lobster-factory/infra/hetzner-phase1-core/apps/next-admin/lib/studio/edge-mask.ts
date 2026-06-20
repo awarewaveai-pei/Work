@@ -30,7 +30,17 @@ export type EdgeMaskId =
   | "liquid-shape"
   | "melted-edge"
   | "lava-shape"
-  | "dry-brush";
+  | "dry-brush"
+  | "soft-brush"
+  | "rough-brush"
+  | "flat-brush"
+  | "comb-brush"
+  | "calligraphy-brush"
+  | "chalk-brush"
+  | "charcoal-brush"
+  | "stipple-brush"
+  | "scratch-brush"
+  | "wet-brush";
 
 export interface EdgeMaskParams {
   /** 0–100. Higher = edge eats further in + (textured styles) rougher displacement. */
@@ -149,6 +159,30 @@ function turbFilter(
   return (
     `<filter id="${uid}" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">` +
     `<feTurbulence type="fractalNoise" baseFrequency="${baseFrequency}" numOctaves="${numOctaves}" seed="${seed}" result="n"/>` +
+    `<feDisplacementMap in="SourceGraphic" in2="n" scale="${f1(scale)}" xChannelSelector="R" yChannelSelector="G"/>` +
+    gb +
+    ct +
+    `</filter>`
+  );
+}
+
+/** Brush-family edge filter — generalised turbulence displacement with optional blur / alpha steps. */
+function brushFilter(
+  uid: string,
+  baseFrequency: string,
+  numOctaves: number,
+  scale: number,
+  seed: number,
+  opts: { turbType?: "fractalNoise" | "turbulence"; blur?: number; alphaTable?: string } = {},
+): string {
+  const turbType = opts.turbType ?? "fractalNoise";
+  const gb = opts.blur && opts.blur > 0 ? `<feGaussianBlur stdDeviation="${f1(opts.blur)}"/>` : "";
+  const ct = opts.alphaTable
+    ? `<feComponentTransfer><feFuncA type="discrete" tableValues="${opts.alphaTable}"/></feComponentTransfer>`
+    : "";
+  return (
+    `<filter id="${uid}" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">` +
+    `<feTurbulence type="${turbType}" baseFrequency="${baseFrequency}" numOctaves="${numOctaves}" seed="${seed}" result="n"/>` +
     `<feDisplacementMap in="SourceGraphic" in2="n" scale="${f1(scale)}" xChannelSelector="R" yChannelSelector="G"/>` +
     gb +
     ct +
@@ -344,6 +378,147 @@ export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
       const scale = Math.min(w, h) * (0.04 + p.amount / 1400);
       // anisotropic high-frequency turbulence + alpha threshold → streaky dry-brush edge.
       const filter = turbFilter(uid, "0.006 0.12", 2, scale, p.seed % 90, 0, true);
+      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/></g>`;
+    },
+  },
+  {
+    id: "soft-brush",
+    label: "柔筆刷",
+    labelEn: "Soft Brush",
+    kind: "texture",
+    build: (w, h, p) => {
+      const uid = `em-soft-${p.seed}`;
+      const md = Math.min(w, h);
+      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
+      const filter = brushFilter(uid, "0.01 0.02", 2, md * (0.04 + p.amount / 1300), p.seed % 90, { blur: md * 0.012 });
+      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
+    },
+  },
+  {
+    id: "rough-brush",
+    label: "粗筆刷",
+    labelEn: "Rough Brush",
+    kind: "texture",
+    build: (w, h, p) => {
+      const uid = `em-rough-${p.seed}`;
+      const md = Math.min(w, h);
+      const rnd = mulberry32(p.seed * 311 + 7);
+      const path = closedSmoothPath(blobPoints(w, h, 8, 0.2, insetFrom(p.amount) + 0.04, rnd));
+      const filter = brushFilter(uid, "0.008 0.018", 3, md * (0.07 + p.amount / 800), p.seed % 90, {});
+      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/></g>`;
+    },
+  },
+  {
+    id: "flat-brush",
+    label: "平頭刷",
+    labelEn: "Flat Brush",
+    kind: "texture",
+    build: (w, h, p) => {
+      const uid = `em-flat-${p.seed}`;
+      const md = Math.min(w, h);
+      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
+      // anisotropic (horizontal-biased) displacement → broad flat-brush drag marks
+      const filter = brushFilter(uid, "0.004 0.09", 2, md * (0.05 + p.amount / 1100), p.seed % 90, { alphaTable: "0 1 1" });
+      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
+    },
+  },
+  {
+    id: "comb-brush",
+    label: "排刷",
+    labelEn: "Comb Brush",
+    kind: "texture",
+    build: (w, h, p) => {
+      const uid = `em-comb-${p.seed}`;
+      const md = Math.min(w, h);
+      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.02);
+      // very fine parallel streaks → comb / bristle separation
+      const filter = brushFilter(uid, "0.003 0.26", 2, md * 0.05, p.seed % 90, { alphaTable: "0 0 1 1" });
+      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
+    },
+  },
+  {
+    id: "calligraphy-brush",
+    label: "書法毛筆",
+    labelEn: "Calligraphy Brush",
+    kind: "texture",
+    build: (w, h, p) => {
+      const uid = `em-calli-${p.seed}`;
+      const md = Math.min(w, h);
+      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.05);
+      // crisp ink threshold → sharp brushed-ink edge
+      const filter = brushFilter(uid, "0.006 0.05", 2, md * (0.06 + p.amount / 1000), p.seed % 90, { alphaTable: "0 1" });
+      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
+    },
+  },
+  {
+    id: "chalk-brush",
+    label: "粉筆",
+    labelEn: "Chalk",
+    kind: "texture",
+    build: (w, h, p) => {
+      const uid = `em-chalk-${p.seed}`;
+      const md = Math.min(w, h);
+      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
+      // high-frequency turbulence + broken alpha steps → grainy chalk edge
+      const filter = brushFilter(uid, "0.05 0.05", 3, md * 0.04, p.seed % 90, { turbType: "turbulence", alphaTable: "0 0 0 1 1" });
+      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
+    },
+  },
+  {
+    id: "charcoal-brush",
+    label: "炭筆",
+    labelEn: "Charcoal",
+    kind: "texture",
+    build: (w, h, p) => {
+      const uid = `em-charcoal-${p.seed}`;
+      const md = Math.min(w, h);
+      const rnd = mulberry32(p.seed * 373 + 13);
+      const path = closedSmoothPath(blobPoints(w, h, 7, 0.18, insetFrom(p.amount) + 0.04, rnd));
+      // displacement + slight blur + alpha steps → smudgy charcoal
+      const filter = brushFilter(uid, "0.02 0.02", 3, md * 0.05, p.seed % 90, { blur: md * 0.005, alphaTable: "0 0 1 1" });
+      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/></g>`;
+    },
+  },
+  {
+    id: "stipple-brush",
+    label: "點刷",
+    labelEn: "Stipple",
+    kind: "texture",
+    build: (w, h, p) => {
+      const uid = `em-stipple-${p.seed}`;
+      const md = Math.min(w, h);
+      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
+      // very high-frequency turbulence + hard alpha cut → speckled sponge/stipple edge
+      const filter = brushFilter(uid, "0.09 0.09", 2, md * 0.03, p.seed % 90, { turbType: "turbulence", alphaTable: "0 0 0 1" });
+      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
+    },
+  },
+  {
+    id: "scratch-brush",
+    label: "刮刷",
+    labelEn: "Scratch Brush",
+    kind: "texture",
+    build: (w, h, p) => {
+      const uid = `em-scratch-${p.seed}`;
+      const md = Math.min(w, h);
+      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
+      // strong anisotropic streaks + gappy alpha → scraped / scratched edge
+      const filter = brushFilter(uid, "0.004 0.2", 2, md * (0.06 + p.amount / 1000), p.seed % 90, { alphaTable: "0 1 0 1 1" });
+      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
+    },
+  },
+  {
+    id: "wet-brush",
+    label: "濕筆",
+    labelEn: "Wet Brush",
+    kind: "texture",
+    build: (w, h, p) => {
+      const uid = `em-wet-${p.seed}`;
+      const md = Math.min(w, h);
+      const rnd = mulberry32(p.seed * 431 + 19);
+      const path = closedSmoothPath(blobPoints(w, h, 10, 0.16, insetFrom(p.amount) + 0.02, rnd));
+      // soft displacement + blur → wet, flowing brush bleed
+      const filter = brushFilter(uid, "0.012 0.012", 2, md * (0.05 + p.amount / 1100), p.seed % 90, { blur: md * 0.01 });
       return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/></g>`;
     },
   },

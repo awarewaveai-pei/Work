@@ -18,13 +18,23 @@ const EXPECTED_IDS: EdgeMaskId[] = [
   "melted-edge",
   "lava-shape",
   "dry-brush",
+  "soft-brush",
+  "rough-brush",
+  "flat-brush",
+  "comb-brush",
+  "calligraphy-brush",
+  "chalk-brush",
+  "charcoal-brush",
+  "stipple-brush",
+  "scratch-brush",
+  "wet-brush",
 ];
 
 describe("edge-mask registry", () => {
-  it("exposes all 11 requested styles with unique ids + bilingual labels", () => {
-    expect(EDGE_MASK_STYLES).toHaveLength(11);
+  it("exposes all 21 requested styles with unique ids + bilingual labels", () => {
+    expect(EDGE_MASK_STYLES).toHaveLength(21);
     const ids = EDGE_MASK_STYLES.map((s) => s.id);
-    expect(new Set(ids).size).toBe(11);
+    expect(new Set(ids).size).toBe(21);
     expect(ids).toEqual(EXPECTED_IDS);
     for (const s of EDGE_MASK_STYLES) {
       expect(s.label.length).toBeGreaterThan(0);
