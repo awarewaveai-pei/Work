@@ -13076,5 +13076,21 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - 2026-06-16 21:37:04 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 36.76% (< 85%))
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=addCostLine,COST_JSON | hits=all 12 call sites audited + kind discriminator applied
 
+### fix(canvas,designs): asset brush strength slider unlock
+
+[任務] CanvasEditor + DesignsGallery 的邊緣強度 slider 對 asset 筆刷類型顯示「固定」，無法調整。
+[根因] 兩個檔案呼叫 applyEdgeMask 時未傳 assetStrength，isAsset guard 把 slider disabled。
+
+[已修改]
+- CanvasEditor.tsx: 在 applyEdgeMaskToSelected 內計算 isAssetStyle，傳 assetStrength = amount/100；slider 移除 disabled/opacity 限制
+- DesignsGallery.tsx: 同上；刪除死碼 editIsAsset 定義及過時 comment
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=<60000
+- REALTEST_EVIDENCE: tool=PowerShell | cmd=npm test (next-admin) | exit=0 | result=428/428 pass
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n (1 stale comment suggestion, fixed inline)
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=editIsAsset|"固定" | hits=0
+- BUGHUNT_SCOPE_NARROW: N/A — agency-os and scripts included in scope above
+
 
 
