@@ -174,20 +174,6 @@
                                                   "REPLICATE_WEBHOOK_SIGNING_KEY":  "${env:REPLICATE_WEBHOOK_SIGNING_KEY}"
                                               }
                                   },
-                    "perplexity":  {
-                                       "enabled":  true,
-                                       "transport":  "stdio",
-                                       "command":  "cmd",
-                                       "args":  [
-                                                    "/c",
-                                                    "npx",
-                                                    "-y",
-                                                    "@perplexity-ai/mcp-server"
-                                                ],
-                                       "env":  {
-                                                   "PERPLEXITY_API_KEY":  "${env:PERPLEXITY_API_KEY}"
-                                               }
-                                   },
                     "wordpress":  {
                                       "enabled":  true,
                                       "transport":  "stdio",
