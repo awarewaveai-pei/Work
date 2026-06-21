@@ -86,8 +86,15 @@ final class ColorSwatches {
 			$swatches[] = array( 'value' => $label, 'hex' => $hex );
 		}
 
-		$selectId   = isset( $args['id'] ) && (string) $args['id'] !== '' ? (string) $args['id'] : '';
-		$selectName = isset( $args['name'] ) && (string) $args['name'] !== '' ? (string) $args['name'] : '';
+		// WC computes the <select> id/name from the attribute when its own id/name args are empty (the
+		// common case for local attributes — see wc_dropdown_variation_attribute_options), yet passes the
+		// ORIGINAL empty args to this filter. Mirror that derivation so the JS binds to the right <select>
+		// by id/name rather than depending on DOM adjacency (which a theme could break).
+		$attr       = isset( $args['attribute'] ) ? (string) $args['attribute'] : '';
+		$selectId   = ( isset( $args['id'] ) && (string) $args['id'] !== '' ) ? (string) $args['id'] : sanitize_title( $attr );
+		$selectName = ( isset( $args['name'] ) && (string) $args['name'] !== '' )
+			? (string) $args['name']
+			: ( $attr !== '' ? 'attribute_' . sanitize_title( $attr ) : '' );
 		$this->printAssetsOnce();
 
 		// Swatches first (the visible control), then the original <select> kept for WC's JS — JS hides it.
