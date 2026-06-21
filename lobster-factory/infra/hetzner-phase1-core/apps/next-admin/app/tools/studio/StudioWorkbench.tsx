@@ -238,7 +238,7 @@ export default function StudioWorkbench() {
         id: s.id,
         zh: s.label,
         en: s.labelEn,
-        svg: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildMaskSvg(s.id, 48, 48, { amount: 62, seed: EDGE_APPLY_SEED }))}`,
+        svg: s.maskUrl ?? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildMaskSvg(s.id, 48, 48, { amount: 62, seed: EDGE_APPLY_SEED }))}`,
       })),
     [],
   );

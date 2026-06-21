@@ -1,51 +1,55 @@
 /**
  * Edge-mask blocks — turn a hard rectangular design into an organic-edged transparent PNG.
  *
- * WHY: Studio / Tarot image models always output a rectangle with hard straight edges.
- * For apparel prints that reads as a sticker slapped on the shirt. An alpha "brush mask"
- * (compositing the artwork through a shape via `globalCompositeOperation='destination-in'`)
- * turns that into a watercolour / torn / brush / splash edge. The output keeps its alpha
- * channel, so the soft edge prints correctly on coloured garments (the faithful print file
- * — print-file.ts — re-encodes PNG losslessly and Printful prints transparency as no-ink).
+ * WHY: Studio / Tarot image models always output a rectangle with hard straight edges. For
+ * apparel prints that reads as a sticker slapped on the shirt. Compositing the artwork through
+ * a brush/grunge mask (`globalCompositeOperation='destination-in'`) turns that into an organic
+ * brush edge. The output keeps its alpha channel, so the soft edge prints correctly on coloured
+ * garments (the faithful print file re-encodes PNG losslessly; Printful prints transparency as
+ * no-ink).
  *
- * ARCHITECTURE (積木 registry, same ethos as color-grade.ts / the vector-editor blocks):
- * every style is one entry in EDGE_MASK_STYLES with a pure `build(w,h,params) → svg-inner`
- * generator. Adding a style = append one entry. No other file changes. Smooth shapes are
- * procedural bézier blobs; textured shapes (ink / splash / smoke / dry-brush) use an SVG
- * feTurbulence displacement filter — all code, zero raster assets, offline, free.
+ * TWO mask sources, same destination-in pipeline:
+ *  - ASSET styles (`maskUrl`): real vector/scanned brush masks pre-rasterised to white-on-
+ *    transparent PNGs under /public/edge-masks/ — the authentic brush feel. Mask COLOUR is
+ *    irrelevant to destination-in (only alpha matters); white just makes the chip preview show.
+ *  - PROCEDURAL styles (`build`): SVG roundedRect + feTurbulence displacement (the rectangular
+ *    dry-brush family). Lightweight, always-available fallbacks.
  *
- * ⚠️ CLIENT-ONLY runtime: `applyEdgeMask` uses `document`/`Image`/`<canvas>`. It must only
- * be CALLED in the browser. The pure data layer (EDGE_MASK_STYLES, buildMaskSvg) touches no
- * DOM and is import-safe from server components / tests. Keep all DOM access inside functions.
+ * ⚠️ CLIENT-ONLY runtime: `applyEdgeMask` uses document/Image/<canvas>; call in the browser only.
+ * The pure data layer (EDGE_MASK_STYLES, buildMaskSvg) touches no DOM and is import-safe.
  */
 
 export type EdgeMaskId =
-  | "organic-blob"
-  | "amoeba"
-  | "ink-splash"
-  | "paint-splash"
-  | "water-splash"
-  | "smoke-edge"
-  | "cloud-edge"
-  | "liquid-shape"
-  | "melted-edge"
-  | "lava-shape"
+  | "mask-01"
+  | "mask-02"
+  | "mask-03"
+  | "mask-04"
+  | "mask-05"
+  | "mask-06"
+  | "mask-07"
+  | "mask-08"
+  | "mask-09"
+  | "mask-10"
+  | "mask-11"
+  | "mask-12"
+  | "mask-13"
+  | "mask-14"
+  | "mask-15"
+  | "mask-16"
+  | "mask-17"
   | "dry-brush"
   | "soft-brush"
-  | "rough-brush"
   | "flat-brush"
   | "comb-brush"
   | "calligraphy-brush"
   | "chalk-brush"
-  | "charcoal-brush"
   | "stipple-brush"
-  | "scratch-brush"
-  | "wet-brush";
+  | "scratch-brush";
 
 export interface EdgeMaskParams {
-  /** 0–100. Higher = edge eats further in + (textured styles) rougher displacement. */
+  /** 0–100. Higher = (procedural) edge eats further in + rougher displacement. */
   amount: number;
-  /** Variation seed so the same style does not look identical every time. Integer ≥ 1. */
+  /** Variation seed (procedural styles). Integer ≥ 1. */
   seed: number;
 }
 
@@ -53,11 +57,13 @@ export interface EdgeMaskStyle {
   id: EdgeMaskId;
   /** zh label (UI). */
   label: string;
-  /** English label (bilingual — shown as tooltip / aria). */
+  /** English label (tooltip / aria). */
   labelEn: string;
-  kind: "shape" | "texture";
-  /** Pure generator: returns the INNER svg markup (white shape on transparent) for a w×h box. */
-  build: (w: number, h: number, p: EdgeMaskParams) => string;
+  kind: "texture" | "asset";
+  /** Procedural styles only — returns the INNER svg markup (white shape on transparent). */
+  build?: (w: number, h: number, p: EdgeMaskParams) => string;
+  /** Asset styles only — same-origin white-on-transparent PNG alpha mask. */
+  maskUrl?: string;
 }
 
 export const DEFAULT_EDGE_PARAMS: EdgeMaskParams = { amount: 55, seed: 7 };
@@ -66,82 +72,28 @@ export const DEFAULT_EDGE_PARAMS: EdgeMaskParams = { amount: 55, seed: 7 };
 
 const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
 
-/** Deterministic PRNG (mulberry32) — same seed → same mask (reproducible + variable). */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** amount(0–100) → fractional inset (margin) from the box edge: 5%…18%. */
 const insetFrom = (amount: number): number => 0.05 + (clamp(amount, 0, 100) / 100) * 0.13;
 
 const f1 = (n: number): string => n.toFixed(1);
 
-/** Points around an ellipse with per-vertex radius wobble — the raw blob skeleton. */
-function blobPoints(
-  w: number,
-  h: number,
-  lobes: number,
-  irregularity: number,
-  inset: number,
-  rnd: () => number,
-): Array<[number, number]> {
-  const cx = w / 2;
-  const cy = h / 2;
-  const rx = (w / 2) * (1 - inset);
-  const ry = (h / 2) * (1 - inset);
-  const pts: Array<[number, number]> = [];
-  for (let i = 0; i < lobes; i++) {
-    const a = (i / lobes) * Math.PI * 2;
-    const k = 1 - irregularity * rnd();
-    pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]);
-  }
-  return pts;
+/** Rounded-rect path inset into the box (base shape for the procedural dry-brush family). */
+function roundedRect(w: number, h: number, inset: number): string {
+  const m = Math.min(w, h) * inset;
+  const r = Math.min(w, h) * 0.06;
+  const x0 = m;
+  const y0 = m;
+  const x1 = w - m;
+  const y1 = h - m;
+  return (
+    `M${f1(x0 + r)} ${f1(y0)} L${f1(x1 - r)} ${f1(y0)} Q${f1(x1)} ${f1(y0)} ${f1(x1)} ${f1(y0 + r)} ` +
+    `L${f1(x1)} ${f1(y1 - r)} Q${f1(x1)} ${f1(y1)} ${f1(x1 - r)} ${f1(y1)} ` +
+    `L${f1(x0 + r)} ${f1(y1)} Q${f1(x0)} ${f1(y1)} ${f1(x0)} ${f1(y1 - r)} ` +
+    `L${f1(x0)} ${f1(y0 + r)} Q${f1(x0)} ${f1(y0)} ${f1(x0 + r)} ${f1(y0)} Z`
+  );
 }
 
-/** Closed Catmull-Rom → cubic-bézier path through the points (smooth organic outline). */
-function closedSmoothPath(pts: Array<[number, number]>): string {
-  const n = pts.length;
-  if (n < 3) return "";
-  const d: string[] = [];
-  for (let i = 0; i < n; i++) {
-    const p0 = pts[(i - 1 + n) % n];
-    const p1 = pts[i];
-    const p2 = pts[(i + 1) % n];
-    const p3 = pts[(i + 2) % n];
-    if (i === 0) d.push(`M${f1(p1[0])} ${f1(p1[1])}`);
-    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
-    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
-    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
-    d.push(`C${f1(c1x)} ${f1(c1y)} ${f1(c2x)} ${f1(c2y)} ${f1(p2[0])} ${f1(p2[1])}`);
-  }
-  d.push("Z");
-  return d.join(" ");
-}
-
-/** Scattered droplets near the perimeter (ink / splash satellites). Filtered with the body. */
-function droplets(w: number, h: number, n: number, rnd: () => number): string {
-  const cx = w / 2;
-  const cy = h / 2;
-  const R = Math.min(w, h) / 2;
-  let s = "";
-  for (let i = 0; i < n; i++) {
-    const a = rnd() * Math.PI * 2;
-    const dist = R * (0.74 + rnd() * 0.5);
-    const r = R * (0.025 + rnd() * 0.075);
-    s += `<circle cx="${f1(cx + Math.cos(a) * dist)}" cy="${f1(cy + Math.sin(a) * dist)}" r="${f1(r)}"/>`;
-  }
-  return s;
-}
-
-/** A feTurbulence + feDisplacementMap filter that roughens a shape's edge. */
+/** A feTurbulence + feDisplacementMap filter that roughens a shape's edge (dry-brush). */
 function turbFilter(
   uid: string,
   baseFrequency: string,
@@ -152,7 +104,6 @@ function turbFilter(
   threshold: boolean,
 ): string {
   const gb = blur > 0 ? `<feGaussianBlur stdDeviation="${f1(blur)}"/>` : "";
-  // discrete alpha steps → broken, streaky edge (dry brush).
   const ct = threshold
     ? `<feComponentTransfer><feFuncA type="discrete" tableValues="0 0 1 1"/></feComponentTransfer>`
     : "";
@@ -190,183 +141,22 @@ function brushFilter(
   );
 }
 
-/** Rounded-rect path inset into the box (base shape for dry-brush / smoke rectangles). */
-function roundedRect(w: number, h: number, inset: number): string {
-  const m = Math.min(w, h) * inset;
-  const r = Math.min(w, h) * 0.06;
-  const x0 = m;
-  const y0 = m;
-  const x1 = w - m;
-  const y1 = h - m;
-  return (
-    `M${f1(x0 + r)} ${f1(y0)} L${f1(x1 - r)} ${f1(y0)} Q${f1(x1)} ${f1(y0)} ${f1(x1)} ${f1(y0 + r)} ` +
-    `L${f1(x1)} ${f1(y1 - r)} Q${f1(x1)} ${f1(y1)} ${f1(x1 - r)} ${f1(y1)} ` +
-    `L${f1(x0 + r)} ${f1(y1)} Q${f1(x0)} ${f1(y1)} ${f1(x0)} ${f1(y1 - r)} ` +
-    `L${f1(x0)} ${f1(y0 + r)} Q${f1(x0)} ${f1(y0)} ${f1(x0 + r)} ${f1(y0)} Z`
-  );
-}
-
 /* ─────────────────────────── style registry (積木) ─────────────────────────── */
 
 export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
-  {
-    id: "organic-blob",
-    label: "有機水滴",
-    labelEn: "Organic Blob",
-    kind: "shape",
-    build: (w, h, p) => {
-      const rnd = mulberry32(p.seed * 131 + 7);
-      const path = closedSmoothPath(blobPoints(w, h, 8, 0.17, insetFrom(p.amount), rnd));
-      return `<g fill="#fff"><path d="${path}"/></g>`;
-    },
-  },
-  {
-    id: "amoeba",
-    label: "變形蟲輪廓",
-    labelEn: "Amoeba Shape",
-    kind: "shape",
-    build: (w, h, p) => {
-      const rnd = mulberry32(p.seed * 197 + 11);
-      const path = closedSmoothPath(blobPoints(w, h, 7, 0.46, insetFrom(p.amount), rnd));
-      return `<g fill="#fff"><path d="${path}"/></g>`;
-    },
-  },
-  {
-    id: "ink-splash",
-    label: "墨漬",
-    labelEn: "Ink Splash",
-    kind: "texture",
-    build: (w, h, p) => {
-      const rnd = mulberry32(p.seed * 211 + 1);
-      const uid = `em-ink-${p.seed}`;
-      const path = closedSmoothPath(blobPoints(w, h, 9, 0.22, insetFrom(p.amount) + 0.04, rnd));
-      const scale = Math.min(w, h) * (0.05 + p.amount / 1100);
-      const filter = turbFilter(uid, "0.012 0.012", 3, scale, p.seed % 90, 0, false);
-      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/>${droplets(w, h, 7, rnd)}</g>`;
-    },
-  },
-  {
-    id: "paint-splash",
-    label: "油漆飛濺",
-    labelEn: "Paint Splash",
-    kind: "texture",
-    build: (w, h, p) => {
-      const rnd = mulberry32(p.seed * 233 + 17);
-      const uid = `em-paint-${p.seed}`;
-      const path = closedSmoothPath(blobPoints(w, h, 8, 0.3, insetFrom(p.amount) + 0.05, rnd));
-      const scale = Math.min(w, h) * (0.07 + p.amount / 900);
-      const filter = turbFilter(uid, "0.009 0.014", 3, scale, p.seed % 90, 0, false);
-      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/>${droplets(w, h, 10, rnd)}</g>`;
-    },
-  },
-  {
-    id: "water-splash",
-    label: "水花",
-    labelEn: "Water Splash",
-    kind: "texture",
-    build: (w, h, p) => {
-      const rnd = mulberry32(p.seed * 251 + 5);
-      const uid = `em-water-${p.seed}`;
-      const path = closedSmoothPath(blobPoints(w, h, 10, 0.18, insetFrom(p.amount) + 0.03, rnd));
-      const scale = Math.min(w, h) * 0.045;
-      const filter = turbFilter(uid, "0.014 0.014", 2, scale, p.seed % 90, Math.min(w, h) * 0.004, false);
-      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/>${droplets(w, h, 13, rnd)}</g>`;
-    },
-  },
-  {
-    id: "smoke-edge",
-    label: "煙霧",
-    labelEn: "Smoke Edge",
-    kind: "texture",
-    build: (w, h, p) => {
-      const uid = `em-smoke-${p.seed}`;
-      const inset = insetFrom(p.amount) + 0.06;
-      const cx = w / 2;
-      const cy = h / 2;
-      const rx = (w / 2) * (1 - inset);
-      const ry = (h / 2) * (1 - inset);
-      const scale = Math.min(w, h) * 0.06;
-      const filter = turbFilter(uid, "0.006 0.01", 4, scale, p.seed % 90, Math.min(w, h) * 0.02, false);
-      return `${filter}<g filter="url(#${uid})" fill="#fff"><ellipse cx="${f1(cx)}" cy="${f1(cy)}" rx="${f1(rx)}" ry="${f1(ry)}"/></g>`;
-    },
-  },
-  {
-    id: "cloud-edge",
-    label: "雲朵",
-    labelEn: "Cloud Edge",
-    kind: "shape",
-    build: (w, h, p) => {
-      const rnd = mulberry32(p.seed * 53 + 9);
-      const inset = insetFrom(p.amount);
-      const cx = w / 2;
-      const cy = h / 2;
-      const rx = (w / 2) * (1 - inset);
-      const ry = (h / 2) * (1 - inset);
-      const n = 11;
-      let puffs = "";
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2;
-        const pr = Math.min(rx, ry) * (0.3 + rnd() * 0.12);
-        puffs += `<circle cx="${f1(cx + Math.cos(a) * rx * 0.72)}" cy="${f1(cy + Math.sin(a) * ry * 0.72)}" r="${f1(pr)}"/>`;
-      }
-      return `<g fill="#fff"><ellipse cx="${f1(cx)}" cy="${f1(cy)}" rx="${f1(rx * 0.74)}" ry="${f1(ry * 0.74)}"/>${puffs}</g>`;
-    },
-  },
-  {
-    id: "liquid-shape",
-    label: "液體輪廓",
-    labelEn: "Liquid Shape",
-    kind: "shape",
-    build: (w, h, p) => {
-      const rnd = mulberry32(p.seed * 167 + 23);
-      const path = closedSmoothPath(blobPoints(w, h, 6, 0.2, insetFrom(p.amount), rnd));
-      return `<g fill="#fff"><path d="${path}"/></g>`;
-    },
-  },
-  {
-    id: "melted-edge",
-    label: "融化邊",
-    labelEn: "Melted Edge",
-    kind: "shape",
-    build: (w, h, p) => {
-      const rnd = mulberry32(p.seed * 71 + 3);
-      const m = Math.min(w, h) * insetFrom(p.amount);
-      const bodyBot = h * 0.55;
-      const drips = 7;
-      const seg = (w - 2 * m) / drips;
-      let d = `M${f1(m)} ${f1(m)} L${f1(w - m)} ${f1(m)} L${f1(w - m)} ${f1(bodyBot)} `;
-      for (let i = 0; i < drips; i++) {
-        const x1 = w - m - i * seg;
-        const x2 = x1 - seg;
-        const ctrl = (x1 + x2) / 2;
-        const depth = bodyBot + (h - bodyBot) * (0.3 + rnd() * 0.62);
-        d += `Q${f1(ctrl)} ${f1(depth)} ${f1(x2)} ${f1(bodyBot)} `;
-      }
-      d += "Z";
-      return `<g fill="#fff"><path d="${d}"/></g>`;
-    },
-  },
-  {
-    id: "lava-shape",
-    label: "熔岩輪廓",
-    labelEn: "Lava Shape",
-    kind: "shape",
-    build: (w, h, p) => {
-      const rnd = mulberry32(p.seed * 89 + 5);
-      const inset = insetFrom(p.amount);
-      const path = closedSmoothPath(blobPoints(w, h, 9, 0.29, inset, rnd));
-      const ry = (h / 2) * (1 - inset);
-      let drips = "";
-      for (let i = 0; i < 3; i++) {
-        const x = w * (0.28 + rnd() * 0.44);
-        const top = h / 2 + ry * 0.55;
-        const dr = Math.min(w, h) * (0.05 + rnd() * 0.05);
-        const cy = Math.min(h, top + dr * 2 * rnd()); // keep drip inside the box (critic 2026-06-20)
-        drips += `<circle cx="${f1(x)}" cy="${f1(cy)}" r="${f1(dr)}"/>`;
-      }
-      return `<g fill="#fff"><path d="${path}"/>${drips}</g>`;
-    },
-  },
+  // 17 real brush masks (pre-rasterised vector brushes → white-on-transparent PNG alpha masks).
+  ...Array.from({ length: 17 }, (_, i) => {
+    const n = i + 1;
+    const id = `mask-${String(n).padStart(2, "0")}` as EdgeMaskId;
+    return {
+      id,
+      label: `筆刷 ${n}`,
+      labelEn: `Brush ${n}`,
+      kind: "asset" as const,
+      maskUrl: `/edge-masks/${id}.png`,
+    };
+  }),
+  // Procedural rectangular dry-brush family (lightweight fallbacks).
   {
     id: "dry-brush",
     label: "乾毛筆筆刷",
@@ -376,7 +166,6 @@ export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
       const uid = `em-brush-${p.seed}`;
       const path = roundedRect(w, h, insetFrom(p.amount) + 0.03);
       const scale = Math.min(w, h) * (0.04 + p.amount / 1400);
-      // anisotropic high-frequency turbulence + alpha threshold → streaky dry-brush edge.
       const filter = turbFilter(uid, "0.006 0.12", 2, scale, p.seed % 90, 0, true);
       return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/></g>`;
     },
@@ -392,20 +181,6 @@ export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
       const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
       const filter = brushFilter(uid, "0.01 0.02", 2, md * (0.04 + p.amount / 1300), p.seed % 90, { blur: md * 0.012 });
       return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
-    },
-  },
-  {
-    id: "rough-brush",
-    label: "粗筆刷",
-    labelEn: "Rough Brush",
-    kind: "texture",
-    build: (w, h, p) => {
-      const uid = `em-rough-${p.seed}`;
-      const md = Math.min(w, h);
-      const rnd = mulberry32(p.seed * 311 + 7);
-      const path = closedSmoothPath(blobPoints(w, h, 8, 0.2, insetFrom(p.amount) + 0.04, rnd));
-      const filter = brushFilter(uid, "0.008 0.018", 3, md * (0.07 + p.amount / 800), p.seed % 90, {});
-      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/></g>`;
     },
   },
   {
@@ -431,7 +206,6 @@ export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
       const uid = `em-comb-${p.seed}`;
       const md = Math.min(w, h);
       const shape = roundedRect(w, h, insetFrom(p.amount) + 0.02);
-      // very fine parallel streaks → comb / bristle separation
       const filter = brushFilter(uid, "0.003 0.26", 2, md * 0.05, p.seed % 90, { alphaTable: "0 0 1 1" });
       return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
     },
@@ -445,7 +219,6 @@ export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
       const uid = `em-calli-${p.seed}`;
       const md = Math.min(w, h);
       const shape = roundedRect(w, h, insetFrom(p.amount) + 0.05);
-      // crisp ink threshold → sharp brushed-ink edge
       const filter = brushFilter(uid, "0.006 0.05", 2, md * (0.06 + p.amount / 1000), p.seed % 90, { alphaTable: "0 1" });
       return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
     },
@@ -459,24 +232,8 @@ export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
       const uid = `em-chalk-${p.seed}`;
       const md = Math.min(w, h);
       const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
-      // high-frequency turbulence + broken alpha steps → grainy chalk edge
       const filter = brushFilter(uid, "0.05 0.05", 3, md * 0.04, p.seed % 90, { turbType: "turbulence", alphaTable: "0 0 0 1 1" });
       return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
-    },
-  },
-  {
-    id: "charcoal-brush",
-    label: "炭筆",
-    labelEn: "Charcoal",
-    kind: "texture",
-    build: (w, h, p) => {
-      const uid = `em-charcoal-${p.seed}`;
-      const md = Math.min(w, h);
-      const rnd = mulberry32(p.seed * 373 + 13);
-      const path = closedSmoothPath(blobPoints(w, h, 7, 0.18, insetFrom(p.amount) + 0.04, rnd));
-      // displacement + slight blur + alpha steps → smudgy charcoal
-      const filter = brushFilter(uid, "0.02 0.02", 3, md * 0.05, p.seed % 90, { blur: md * 0.005, alphaTable: "0 0 1 1" });
-      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/></g>`;
     },
   },
   {
@@ -488,7 +245,6 @@ export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
       const uid = `em-stipple-${p.seed}`;
       const md = Math.min(w, h);
       const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
-      // very high-frequency turbulence + hard alpha cut → speckled sponge/stipple edge
       const filter = brushFilter(uid, "0.09 0.09", 2, md * 0.03, p.seed % 90, { turbType: "turbulence", alphaTable: "0 0 0 1" });
       return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
     },
@@ -502,36 +258,21 @@ export const EDGE_MASK_STYLES: readonly EdgeMaskStyle[] = [
       const uid = `em-scratch-${p.seed}`;
       const md = Math.min(w, h);
       const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
-      // strong anisotropic streaks + gappy alpha → scraped / scratched edge
       const filter = brushFilter(uid, "0.004 0.2", 2, md * (0.06 + p.amount / 1000), p.seed % 90, { alphaTable: "0 1 0 1 1" });
       return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${shape}"/></g>`;
     },
   },
-  {
-    id: "wet-brush",
-    label: "濕筆",
-    labelEn: "Wet Brush",
-    kind: "texture",
-    build: (w, h, p) => {
-      const uid = `em-wet-${p.seed}`;
-      const md = Math.min(w, h);
-      const rnd = mulberry32(p.seed * 431 + 19);
-      const path = closedSmoothPath(blobPoints(w, h, 10, 0.16, insetFrom(p.amount) + 0.02, rnd));
-      // soft displacement + blur → wet, flowing brush bleed
-      const filter = brushFilter(uid, "0.012 0.012", 2, md * (0.05 + p.amount / 1100), p.seed % 90, { blur: md * 0.01 });
-      return `${filter}<g filter="url(#${uid})" fill="#fff"><path d="${path}"/></g>`;
-    },
-  },
-] as const;
+];
 
 export function getEdgeMaskStyle(id: EdgeMaskId): EdgeMaskStyle | undefined {
   return EDGE_MASK_STYLES.find((s) => s.id === id);
 }
 
-/** Assemble a complete, standalone SVG mask string (white shape on transparent) at w×h. */
+/** Assemble a complete SVG mask string for a PROCEDURAL style (white shape on transparent) at w×h.
+ *  Returns "" for asset styles (those use `maskUrl` directly). */
 export function buildMaskSvg(id: EdgeMaskId, w: number, h: number, params: EdgeMaskParams): string {
   const style = getEdgeMaskStyle(id);
-  if (!style) return "";
+  if (!style || !style.build) return "";
   const p: EdgeMaskParams = {
     amount: clamp(Math.round(params?.amount ?? DEFAULT_EDGE_PARAMS.amount), 0, 100),
     seed: Math.max(1, Math.floor(params?.seed ?? DEFAULT_EDGE_PARAMS.seed)),
@@ -562,16 +303,17 @@ const MAX_EDGE_LONG_EDGE = 4096;
 
 /**
  * Apply an edge mask to a source image → transparent PNG data URL.
- * Browser-only (uses <canvas>). `sourceUrl` may be a data URL (no taint) or a CORS-enabled
- * remote URL (R2 designs bucket must send Access-Control-Allow-Origin, else toDataURL throws
- * SecurityError → returns { ok:false, error:"canvas_tainted" }).
+ * Browser-only (uses <canvas>). `sourceUrl` may be a data URL (no taint) or a CORS-enabled /
+ * same-origin remote URL (the gallery routes R2 art through a same-origin proxy). The mask is a
+ * same-origin asset PNG (`maskUrl`) or a procedural SVG data URL — neither taints the canvas.
  */
 export async function applyEdgeMask(
   sourceUrl: string,
   id: EdgeMaskId,
   params: EdgeMaskParams,
 ): Promise<EdgeMaskResult> {
-  if (!getEdgeMaskStyle(id)) return { ok: false, error: "unknown_style" };
+  const style = getEdgeMaskStyle(id);
+  if (!style) return { ok: false, error: "unknown_style" };
   if (typeof document === "undefined") return { ok: false, error: "not_in_browser" };
   try {
     const src = await loadImage(sourceUrl, true);
@@ -592,8 +334,11 @@ export async function applyEdgeMask(
 
     ctx.drawImage(src, 0, 0, w, h);
 
-    const svg = buildMaskSvg(id, w, h, params);
-    const mask = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`, false);
+    // Asset styles use their pre-rasterised PNG mask; procedural styles build an SVG mask.
+    const maskSrc = style.maskUrl
+      ? style.maskUrl
+      : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildMaskSvg(id, w, h, params))}`;
+    const mask = await loadImage(maskSrc, false);
 
     ctx.globalCompositeOperation = "destination-in"; // keep source only where mask is opaque
     ctx.drawImage(mask, 0, 0, w, h);
