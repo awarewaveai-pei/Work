@@ -181,12 +181,24 @@ export default function PublishWizard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageUrl: refDesignUrl, productId: catalogProductId, colorHex, ...(dims ? { imageWidth: dims.width, imageHeight: dims.height } : {}) }),
       });
-      const m = (await mRes.json()) as { ok: boolean; mockup_url?: string };
+      const m = (await mRes.json()) as {
+        ok: boolean;
+        mockup_url?: string;
+        mockups?: Array<{ url: string; group: string; view: string; lifestyle?: boolean }>;
+      };
       if (!m.ok || !m.mockup_url) return null;
+      // Per-colour swatch image: prefer a real-MODEL front (the customer sees the model wearing THAT
+      // colour when they click the swatch — the Printful behaviour the operator asked for). Straight
+      // "Front" beats a 3/4 model front; fall back to the clean flat front (mockup_url) when this product
+      // returns no model shots.
+      const modelFronts = (m.mockups ?? []).filter(
+        (v) => v.lifestyle && /front/i.test(v.view) && !/back/i.test(v.view),
+      );
+      const sourceUrl = (modelFronts.find((v) => /^front$/i.test(v.view)) ?? modelFronts[0])?.url ?? m.mockup_url;
       const sRes = await fetch("/api/tools/designs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceUrl: m.mockup_url, source: "printful-mockup", prompt: "[auto-colour-mockup]" }),
+        body: JSON.stringify({ sourceUrl, source: "printful-mockup", prompt: "[auto-colour-mockup]" }),
       });
       const s = (await sRes.json()) as { ok: boolean; asset?: { object_url?: string } };
       return s.ok ? (s.asset?.object_url ?? null) : null;

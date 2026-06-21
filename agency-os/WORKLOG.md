@@ -4,6 +4,34 @@
 
 ## 2026-06-21
 
+### feat(wp-bridge v0.14.0): Color 屬性 hex 色塊外掛 + 每色變體圖改模特正面 + 先同步 0.13.0 回 Work
+
+[任務理解] 操作者要的不是「每站手動設 Kadence swatch」，而是**一個 drop-in 外掛**：裝進任何客戶 WooCommerce → Color 屬性顯示成 hex 色塊，點色塊 → 模特穿該色（Printful 標準效果）。我先前一直推手動設定＝避重就輕。
+
+[現況分析] **關鍵：Work 落後 release repo 一版**。release repo `aware-wave-wp-bridge` = v0.13.0（含 Woo shipping profile endpoint，commit 894b0d9f）；Work monorepo = 0.12.0，0.13.0 沒同步回來。直接在 0.12.0 上加功能發版會**蓋掉 0.13.0 運費端點**。讀主檔 + ProductCreator（local attribute set_options，無 term → hex 走 product meta）+ pod-product/PublishWizard。
+
+[已修改]
+- **Step 1 同步**（commit b6551c18）：clone release repo，驗證 Work 0.12.0 == release 0.12.0（只差 CRLF），複製 0.13.0 的 3 檔（主檔/RestController/新 ShippingProfileManager.php）回 Work → Work=0.13.0，運費端點零遺失。
+- **Step 2 swatch 功能（0.14.0）**：
+  - `includes/Frontend/ColorSwatches.php`（新）：WC filter `woocommerce_dropdown_variation_attribute_options_html` 資料驅動偵測（讀 product meta `_awbridge_color_swatches` label→hex map，全選項有 hex 才渲染，否則保留下拉）→ 渲染 hex 色塊 + 隱藏原 select；inline JS 點色塊設 select+jQuery change → WC 內建換變體圖。CSP nonce（wp_print_inline_script_tag）+ is_singular('product') + form-scoped select 綁定（critic 修補）。
+  - 主檔：版本 0.13.0→0.14.0（header+define）+ 註冊 ColorSwatches。
+  - `pod-product.ts`：create payload 加 `meta_data:[{_awbridge_color_swatches: JSON(label→hex)}]`（全色有 hex 才出，legacy White/Black 空 hex → 無 map → 外掛保留下拉）。
+  - `PublishWizard.tsx` genColorMockup：每色變體圖改 `pickModelFront`（mockups[] 取 lifestyle && /front/ && !/back/，直拍 Front 優先）→ 點色塊換成「模特穿該色」；無模特退回平拍。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`php -l ColorSwatches.php + aware-wave-wp-bridge.php` | exit=0（兩檔 No syntax errors）
+- REALTEST_EVIDENCE: tool=Bash | cmd=抽 inline JS `node --check /tmp/swatch.js` | exit=0（JS syntax OK, 43 行）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` (next-admin) | exit=0
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npm test` | exit=0 | 426 passed/32 files
+- REALTEST_EVIDENCE: tool=Bash(ssh→docker exec node) + Read(image) | pickModelFront 對 product 57 白M → Women's/Front（直拍模特），下載確認真人模特穿白長袖+胸前設計 ✓
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2M/多n（sonnet；無 XSS/注入，所有輸出 esc_attr、normalizeHex airtight、JS 無危險 sink）。Major: CSP nonce（已修 wp_print_inline_script_tag）、IE11 closest（accept，2026 淘汰）；Minor is_singular/form-scoped 綁定（已修）。
+- BUGHUNT_DONE: scope=lobster-factory(wp-bridge-plugin,next-admin) | grep=`_awbridge_color_swatches|ColorSwatches|pickModelFront|AWBRIDGE_VERSION` | hits=11（meta key writer pod-product.ts:149 == reader ColorSwatches.php:32 META_KEY 完全一致；ColorSwatches 已註冊；版本 0.14.0 兩處一致無殘留）
+- BUGHUNT_SCOPE_NARROW: 純 plugin + next-admin app code；`agency-os`/`scripts` 無相關 call site
+
+[剩餘風險] ① 待發版（release-wp-bridge.sh → 0.14.0）+ sg-deploy next-admin 才生效。② 模特正面圖目前驗過 product 57（Gildan 2400）；456/438 若無模特正面則該色退回平拍（fallback 安全）。③ 嚴格 CSP 站 style-src 若擋 inline style 只失視覺、行為仍在。④ 真機瀏覽器點色塊換圖待操作者實測（MCP 帳號環境卡，未自動跑）。
+
+[rollback] plugin：release repo 退回 v0.13.0 tag；next-admin：`git revert` 兩檔或 sg-deploy 自動 rollback。
+
 ### feat(video-service): /generate-job endpoint + 自動影片生成管道
 
 **根本問題**: 2 個 WP 站每天自動生成影片。EU n8n 無法透過 Cloudflare 呼叫 SG next-admin（CF managed challenge 擋住 server-to-server curl）。

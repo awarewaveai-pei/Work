@@ -113,6 +113,15 @@ export function buildPodProductPayload(params: PodProductParams): Record<string,
   const plan = buildVariantPlan(params);
   const colorLabels = colors.map((c) => c.label);
   const colorsPhrase = colorLabels.join(" / ");
+  // Colour→hex map for the wp-bridge ColorSwatches plugin (storefront renders the Color attribute as
+  // hex swatches). Keyed by the SAME label used as the Woo Color option (c.label) so the plugin matches
+  // each option to a hex. Emitted ONLY when every colour has a valid hex (model path); the legacy
+  // White/Black path has empty hexes → no map → the plugin leaves the normal dropdown untouched.
+  const swatchEntries = colors
+    .filter((c) => /^#[0-9a-fA-F]{6}$/.test(c.hex))
+    .map((c) => [c.label, c.hex.toLowerCase()] as const);
+  const colorSwatchMap: Record<string, string> | null =
+    swatchEntries.length === colors.length && colors.length > 0 ? Object.fromEntries(swatchEntries) : null;
   const productLine = params.model?.displayName ?? "Bella+Canvas 3001 unisex tee";
   // AI bullets (Phase 4) drive the icon_list + short_description fallback; otherwise fall back to
   // boilerplate (now colour-aware so it never says "white/black" for a 4-colour product).
@@ -133,6 +142,11 @@ export function buildPodProductPayload(params: PodProductParams): Record<string,
     // RankMath SEO meta — written by wp-bridge ProductCreator.applySeo (v0.9.0+, live-verified).
     ...(params.seo && (params.seo.focus_keyword || params.seo.title || params.seo.description)
       ? { seo: params.seo }
+      : {}),
+    // Colour swatch map → parent product meta `_awbridge_color_swatches` (wp-bridge ProductCreator
+    // applyMetaData writes it; the ColorSwatches plugin reads it to render hex swatches). v0.14.0+.
+    ...(colorSwatchMap
+      ? { meta_data: [{ key: "_awbridge_color_swatches", value: JSON.stringify(colorSwatchMap) }] }
       : {}),
     blocks: [
       { type: "heading", text: params.title, level: 2 },
