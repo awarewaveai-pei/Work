@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { roleHeader } from "../../../lib/ops-role";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
-import { STUDIO_MODEL_OPTIONS, type StudioModel } from "../../../lib/studio/model-options";
+import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, type StudioModel } from "../../../lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
 
@@ -369,11 +369,12 @@ export default function BannerStudio() {
   // Assembled AI bg prompt from blocks
   const assembledBgPrompt = useMemo(() => {
     const styleStr = s.aiBgStyle ? resolveStylePrompt(s.aiBgStyle) : "";
-    const parts = [s.aiBgSubject.trim(), s.aiBgVibe.trim(), styleStr, "banner background image"].filter(Boolean);
-    return parts.join(", ");
+    const parts = [s.aiBgSubject.trim(), s.aiBgVibe.trim(), styleStr].filter(Boolean);
+    return parts.length ? parts.join(", ") + ", banner background image" : "";
   }, [s.aiBgSubject, s.aiBgVibe, s.aiBgStyle]);
 
   const effectiveBgPrompt = s.aiBgPromptTouched ? s.aiBgPromptOvr : assembledBgPrompt;
+  const aiBgHasInput = !!(s.aiBgSubject || s.aiBgVibe || s.aiBgStyle || s.aiBgPromptTouched);
 
   // ── Preview helpers ──
   function previewBg(): React.CSSProperties {
@@ -526,7 +527,7 @@ export default function BannerStudio() {
         body:    JSON.stringify({
           image:     png,
           source:    "banner",
-          prompt:    s.headline || effectiveBgPrompt || undefined,
+          prompt:    s.headline || (s.bgMode === "ai" ? effectiveBgPrompt : undefined) || undefined,
           modelName: s.bgMode === "ai" ? s.aiBgModel : undefined,
           subject:   s.preset,
         }),
@@ -842,32 +843,38 @@ export default function BannerStudio() {
                 {/* 參考圖 */}
                 <AccordionSection title="參考圖" summary={s.aiBgRefMode === "ref" ? "風格參考" : "無"} icon="🖼">
                   <input ref={aiBgFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAiBgRefUpload} />
-                  <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                    {(["none", "ref"] as const).map((mode) => (
-                      <button key={mode}
-                        className={s.aiBgRefMode === mode ? "btn btn-primary" : "btn btn-ghost"}
-                        style={{ fontSize: 12, padding: "3px 10px" }}
-                        onClick={() => {
-                          set("aiBgRefMode", mode);
-                          if (mode === "none") set("aiBgRefImage", null);
-                        }}>
-                        {{ none: "無", ref: "🖼 風格參考" }[mode]}
-                      </button>
-                    ))}
-                  </div>
-                  {s.aiBgRefMode === "ref" && (
-                    <div>
-                      <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => aiBgFileRef.current?.click()}>
-                        {s.aiBgRefImage ? "✓ 已上傳，換圖" : "上傳參考圖…"}
-                      </button>
-                      {s.aiBgRefImage && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={s.aiBgRefImage} alt="" style={{ display: "block", marginTop: 6, height: 60, borderRadius: 4, objectFit: "cover" }} />
+                  {!modelSupportsRefs(s.aiBgModel) ? (
+                    <p className="form-hint">此模型純文字生圖，不支援參考圖</p>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                        {(["none", "ref"] as const).map((mode) => (
+                          <button key={mode}
+                            className={s.aiBgRefMode === mode ? "btn btn-primary" : "btn btn-ghost"}
+                            style={{ fontSize: 12, padding: "3px 10px" }}
+                            onClick={() => {
+                              set("aiBgRefMode", mode);
+                              if (mode === "none") set("aiBgRefImage", null);
+                            }}>
+                            {{ none: "無", ref: "🖼 風格參考" }[mode]}
+                          </button>
+                        ))}
+                      </div>
+                      {s.aiBgRefMode === "ref" && (
+                        <div>
+                          <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => aiBgFileRef.current?.click()}>
+                            {s.aiBgRefImage ? "✓ 已上傳，換圖" : "上傳參考圖…"}
+                          </button>
+                          {s.aiBgRefImage && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={s.aiBgRefImage} alt="" style={{ display: "block", marginTop: 6, height: 60, borderRadius: 4, objectFit: "cover" }} />
+                          )}
+                          <p className="form-hint" style={{ marginTop: 4 }}>
+                            模型仿照參考圖的風格（非內容）
+                          </p>
+                        </div>
                       )}
-                      <p className="form-hint" style={{ marginTop: 4 }}>
-                        模型仿照參考圖的風格（非內容）
-                      </p>
-                    </div>
+                    </>
                   )}
                 </AccordionSection>
 
@@ -891,7 +898,7 @@ export default function BannerStudio() {
                 </div>
 
                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-                  <button className="btn btn-primary" disabled={s.generating || !effectiveBgPrompt.trim()}
+                  <button className="btn btn-primary" disabled={s.generating || !aiBgHasInput}
                     onClick={generateAiBg}>
                     {s.generating ? "生成中…" : s.bgImage && s.bgMode === "ai" ? "重新生成" : "生成背景"}
                   </button>
