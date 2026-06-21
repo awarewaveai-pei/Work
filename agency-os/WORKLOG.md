@@ -11942,7 +11942,7 @@ npx playwright test smoke/04-onboard-page.spec.ts --project smoke --reporter=lis
 - `docs/releases/release-notes.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-06-20 14:30:03 UTC_
+_Last synced: 2026-06-21 14:30:03 UTC_
 
 ## 2026-06-16 AO-CLOSE prep — 15:xx session close
 
@@ -13091,6 +13091,7 @@ printQuality=true 路徑傳 `aspect_ratio:"custom"` + `width`/`height`。
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n (1 stale comment suggestion, fixed inline)
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=editIsAsset|"固定" | hits=0
 - BUGHUNT_SCOPE_NARROW: N/A — agency-os and scripts included in scope above
+
 
 
 
