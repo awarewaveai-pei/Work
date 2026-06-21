@@ -87,7 +87,7 @@ export default async function ClientDetailPage({
           .from("wp_sites")
           .select("id,name,url,color,active,content_defaults")
           .ilike("url", `%${siteHostname}%`)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   // ── M3 department coverage (server-side) ────────────────────────────────────

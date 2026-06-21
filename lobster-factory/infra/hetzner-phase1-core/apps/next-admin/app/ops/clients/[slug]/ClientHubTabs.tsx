@@ -54,6 +54,7 @@ export interface ClientHubTabsProps {
 // ── Provider catalogue ────────────────────────────────────────────────────────
 
 const PROVIDER_GROUPS: Array<{ label: string; providers: Array<{ key: string; name: string }> }> = [
+  // Changes to this array automatically update the "未設定" metric below via TOTAL_PROVIDERS
   {
     label: "監控 & 分析",
     providers: [
@@ -84,11 +85,14 @@ const PROVIDER_GROUPS: Array<{ label: string; providers: Array<{ key: string; na
   },
 ];
 
+const TOTAL_PROVIDERS = PROVIDER_GROUPS.reduce((n, g) => n + g.providers.length, 0);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function relativeTime(isoStr: string | null | undefined): string {
   if (!isoStr) return "—";
   const ms = Date.now() - new Date(isoStr).getTime();
+  if (Number.isNaN(ms)) return "—";
   const m = Math.floor(ms / 60_000);
   if (m < 1) return "剛才";
   if (m < 60) return `${m} 分鐘前`;
@@ -272,7 +276,7 @@ function IntegrationsTab({ integrations }: Pick<ClientHubTabsProps, "integration
       <MetricGrid items={[
         { label: "已連線", value: activeCount, color: "#16a34a" },
         { label: "失敗", value: failedCount, color: failedCount > 0 ? "#dc2626" : "var(--text-muted)" },
-        { label: "未設定", value: 13 - integrations.length, color: "var(--text-muted)" },
+        { label: "未設定", value: TOTAL_PROVIDERS - integrations.length, color: "var(--text-muted)" },
       ]} />
 
       {PROVIDER_GROUPS.map((group) => (
@@ -432,9 +436,9 @@ function MaintenanceTab({ org, cfg, wp, runs, installRuns }: Pick<ClientHubTabsP
               { label: "需手動授權", value: pluginSkipped.length, color: "#ca8a04" },
               { label: "失敗", value: pluginFailed.length, color: "#dc2626" },
             ]} />
-            {pluginInstalled.slice(0, 5).map((r, i) => {
+            {pluginInstalled.slice(0, 5).map((r) => {
               const s = r.result_summary as InstallSummary;
-              return <PluginRow key={i} name={s.plugin_slug ?? "—"} to={s.version ?? undefined} statusColor="#16a34a" />;
+              return <PluginRow key={r.id} name={s.plugin_slug ?? "—"} to={s.version ?? undefined} statusColor="#16a34a" />;
             })}
           </>
         )}

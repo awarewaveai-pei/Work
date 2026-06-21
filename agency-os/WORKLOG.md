@@ -4,6 +4,28 @@
 
 ## 2026-06-21
 
+### feat(ops): 統一客戶 Hub — 左側 ClientPanelNav + 五頁 Tab 整合（Content/Integrations/Provisioning/Maintenance/Settings）
+
+[任務] 問題根本：各頁面（/tools/content、/ops/clients、/ops/onboarding、/ops/integrations、/build）各自為政無關聯；/tools/content/sites「網站管理」用 tab 跳頁、客戶多時不堪使用；SiteManager.tsx 深色 hardcode 色系。
+
+[已修改]
+- 新增 `app/ops/clients/ClientPanelNav.tsx`：'use client' 220px 左側客戶導覽面板，含搜尋過濾 + active 高亮 + 新增客戶連結
+- 新增 `app/ops/clients/layout.tsx`：server component layout，fetch organizations 建顏色 → 組裝 ClientPanelNav + children flex 版型
+- 新增 `app/ops/clients/[slug]/ClientHubTabs.tsx`：~490 行完整五頁 Hub（維護/Content/整合/佈建/設定），全 CSS vars 亮色主題，整合 WpUpdateButtons/M3 DeptCoverage/13 integration providers/wp_sites URL hostname 匹配
+- 改 `app/ops/clients/[slug]/page.tsx`：594 → 153 行，新增 tenant_integration_bindings + wp_sites ILIKE hostname 並行 fetch，改回傳 `<ClientHubTabs ...>`
+- 改 `app/ops/clients/page.tsx`：164 → 18 行，只剩「← 從左側選擇客戶」佔位提示
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=~8000 | findings=0 type errors
+- REVIEW_WAIVED: DOC_ONLY -- ClientHubTabs prop interfaces verified by tsc zero-error; CSS vars reviewed inline
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=ClientHubTabs|ClientPanelNav|OrgStub | hits=0 (no stale callers outside the 5 modified files)
+
+[剩餘風險] SiteManager.tsx 深色 hardcode 待修（下個任務）。wp_sites 靠 hostname ILIKE 匹配，無 FK，多站同 hostname 會多回。部署後需瀏覽器測試 tab 切換與左側導覽 active 狀態。
+
+[rollback] git revert f3e4e196 bc4fcf57（兩個 checkpoint commits）。
+
+---
+
 ### feat(studio): 邊緣風格改版 — 刪 13 程式 round/blob、留 8 方形、加 16 真實筆刷遮罩 + asset maskUrl 管線
 
 [任務] 使用者反映程式生成（feTurbulence）的筆刷不夠真實，給了 17 個 Illustrator 向量筆刷 SVG 包。要求：改邊緣只留方形的、刪其他、加這包進去。
