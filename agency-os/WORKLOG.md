@@ -4,6 +4,33 @@
 
 ## 2026-06-22
 
+### analysis(video): R0 video pipeline 全系統審查 — 端對端驗證通過，根因為 UX 認知落差
+
+[任務理解] 使用者在 /tools/video 看到「只有圖片」→ 懷疑 video-service 未部署或 pipeline 失敗。
+全系統 R0 審查：VideoStudio.tsx / pipeline.py / server.py / render-client.ts / render-draft/route.ts / status/route.ts / job-store.ts / docker-compose.video.yml
+
+[現況分析]
+- EU `lobster-video-service`：Up 13h (healthy)（前一 Cursor session 已完成部署）
+- nginx vhost `video-svc.aware-wave.com` 存在，Cloudflare Proxied SSL
+- SG `.env`：VIDEO_SERVICE_URL / VIDEO_SERVICE_SECRET / R2_VIDEO_BUCKET / R2_VIDEO_PUBLIC_BASE 全已設
+- UX 流程為兩步：① 「📋 生成草稿」→ DraftEditor（預覽圖片+編輯旁白）→ ② 「🎬 確認送出渲染」→ EU render → R2 MP4
+
+[根本原因] 使用者停在草稿預覽步驟（第一步），未繼續按第二步綠色按鈕「確認送出渲染」。後端 pipeline 完全正常。
+
+[已修改] 無程式碼改動（VBC 確認 = 系統已完全部署）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=curl -s -X POST https://video-svc.aware-wave.com/render -H X-Render-Token:... (English narration + Pexels image) | exit=0 | ms=~1200 → {"jobId":"49a3aa270781412f88e18bf32ff65c38"}
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=curl -s https://video-svc.aware-wave.com/job?jobId=49a3... | exit=0 → {"status":"done","outputs":{"16x9":"https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/video/test_render/16x9.mp4","9x16":"...","4x5":"..."},"storage":"r2"}
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n — 全 pipeline 程式碼讀回（VideoStudio→render-client→server.py→pipeline.py→status route）架構完整、auth 正確、R2 上傳正常、錯誤路徑處理完整
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=video-service|VIDEO_SERVICE|render-draft | hits=所有 callers 一致，無 stale 聲稱
+
+[剩餘風險]
+- 測試影片 `test_render/{16x9,9x16,4x5}.mp4` 留在 R2，可手動清除（無生產影響）
+- CJK 旁白需用 file + base64 方式傳（已知 Bash CJK encoding trap）
+
+[rollback] 無程式碼改動，N/A
+
 ### deploy: sg-deploy next-admin — Postiz 整合全線上線（Task 3-6 + Gate C）
 
 [部署資訊] commit: `78451ebc` → SG `5.223.93.113`；tsc PASS；npm test 33/431 PASS；Docker 138s；healthy 7s；smoke /login /api/ops/summary nginx node-api 全 200
