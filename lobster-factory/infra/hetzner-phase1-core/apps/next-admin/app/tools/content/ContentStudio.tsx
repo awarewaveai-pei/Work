@@ -1845,18 +1845,21 @@ export default function ContentStudio() {
 
   // ─── Save current form state as client content_defaults ─────────────────
   async function saveAsClientDefault() {
-    const siteId = selectedSiteId || wpSites[0]?.id;
-    if (!siteId) return;
+    const site = wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0];
+    if (!site) return;
     setSavingDefaults(true);
     setSaveDefaultsMsg(null);
+    // Merge: preserve fields not managed by the form (featuredImageFont, featuredImageTitlePosition)
+    const existing = site.contentDefaults ?? {};
     const contentDefaults = {
+      ...existing,
       language: form.language,
       targetCountry: form.targetCountry,
       tone: form.tone,
       articleType: form.articleType,
       readability: form.readability,
       pointOfView: form.pointOfView,
-      imageModel: form.media.aiImages,
+      imageModel: form.media.aiImages === "none" ? undefined : form.media.aiImages,
       brandVoiceInstructions: form.details || undefined,
       marketing: {
         audience: form.marketing.audience || undefined,
@@ -1871,15 +1874,16 @@ export default function ContentStudio() {
       },
     };
     try {
-      const r = await fetch(`/api/content/sites/${siteId}`, {
+      const r = await fetch(`/api/content/sites/${site.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contentDefaults }),
       });
-      const data = await r.json() as { ok: boolean; error?: string };
+      const data = await r.json() as { ok: boolean; site?: { contentDefaults?: typeof contentDefaults }; error?: string };
       setSaveDefaultsMsg(data.ok ? "✓ 已存為客戶預設" : `錯誤：${data.error ?? "unknown"}`);
       if (data.ok) {
-        setWpSites(prev => prev.map(s => s.id === siteId ? { ...s, contentDefaults } : s));
+        const saved = data.site?.contentDefaults ?? contentDefaults;
+        setWpSites(prev => prev.map(s => s.id === site.id ? { ...s, contentDefaults: saved } : s));
       }
     } catch {
       setSaveDefaultsMsg("網路錯誤，請重試");
