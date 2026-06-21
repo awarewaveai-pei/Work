@@ -648,7 +648,7 @@ export default function ContentStudio() {
   const [showStruct,   setShowStruct]   = useState(true);
   const [showMedia,    setShowMedia]    = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showMarketing, setShowMarketing] = useState(true); // #4 structured brand-tone form
+  const [showMarketing, setShowMarketing] = useState(false); // #4 structured brand-tone form
   const [showPatterns, setShowPatterns] = useState(false);   // #6 Kadence funnel patterns
 
   // Syndication
