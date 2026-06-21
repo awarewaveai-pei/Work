@@ -1864,11 +1864,11 @@ export default function ContentStudio() {
               background: "var(--bg-card)", display: "flex", alignItems: "center", gap: "5px" }}>
             📅 內容行事曆
           </a>
-          <a href="/tools/content/sites"
+          <a href="/ops/clients"
             style={{ fontSize: "12px", padding: "5px 12px", border: "1px solid var(--card-border)",
               borderRadius: "6px", color: "var(--text-muted)", textDecoration: "none",
               background: "var(--bg-card)", display: "flex", alignItems: "center", gap: "5px" }}>
-            🔗 網站管理
+            🔗 客戶管理
           </a>
         </div>
       </div>
@@ -2097,7 +2097,15 @@ export default function ContentStudio() {
                   })()}
                 </span>
               )}
-              <a href="/tools/content/sites" style={{ marginLeft: "auto", fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>管理客戶網站 →</a>
+              {(() => {
+                const sel = wpSites.find(x => x.id === selectedSiteId);
+                const clientHref = sel?.org_slug ? `/ops/clients/${sel.org_slug}` : "/ops/clients";
+                return (
+                  <a href={clientHref} style={{ marginLeft: "auto", fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>
+                    管理客戶 →
+                  </a>
+                );
+              })()}
             </div>
           </div>
 

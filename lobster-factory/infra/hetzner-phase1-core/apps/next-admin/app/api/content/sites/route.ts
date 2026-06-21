@@ -41,6 +41,7 @@ export interface ManagedSite {
   source: "db" | "env";
   createdAt?: string;
   contentDefaults?: SiteContentDefaults;
+  org_slug?: string | null;
 }
 
 // GET /api/content/sites — list all sites (no tokens in response)
@@ -50,29 +51,55 @@ export async function GET(req: Request): Promise<Response> {
 
   const supabase = getSupabaseWriteClient();
   if (supabase) {
-    const { data, error } = await supabase
-      .from("wp_sites")
-      .select("id, name, url, color, active, note, created_at, token, username, content_defaults")
-      .order("created_at");
+    const [sitesResult, orgsResult] = await Promise.all([
+      supabase
+        .from("wp_sites")
+        .select("id, name, url, color, active, note, created_at, token, username, content_defaults")
+        .order("created_at"),
+      supabase
+        .from("organizations")
+        .select("slug, metadata")
+        .order("created_at"),
+    ]);
 
-    if (!error && data) {
-      const sites: ManagedSite[] = (data as Array<{
+    if (!sitesResult.error && sitesResult.data) {
+      // Build hostname → org_slug map from organizations.metadata.client_config.site_url
+      // First-writer-wins on duplicate hostnames (deterministic via created_at order).
+      const hostnameSlugMap = new Map<string, string>();
+      for (const org of (orgsResult.data ?? []) as Array<{ slug: string; metadata: unknown }>) {
+        const meta = org.metadata;
+        if (typeof meta !== "object" || meta === null) continue;
+        const clientConfig = (meta as Record<string, unknown>).client_config as { site_url?: string } | undefined;
+        if (clientConfig?.site_url) {
+          try {
+            const host = new URL(clientConfig.site_url).hostname;
+            if (!hostnameSlugMap.has(host)) hostnameSlugMap.set(host, org.slug);
+          } catch { /* skip malformed URL */ }
+        }
+      }
+
+      const sites: ManagedSite[] = (sitesResult.data as Array<{
         id: string; name: string; url: string; color: string;
         active: boolean; note: string | null; created_at: string; token: string; username: string;
         content_defaults: SiteContentDefaults | null;
-      }>).map(r => ({
-        id: r.id,
-        name: r.name,
-        url: r.url,
-        color: r.color,
-        active: r.active,
-        tokenSet: Boolean(r.token),
-        usernameSet: Boolean(r.username),
-        note: r.note,
-        source: "db" as const,
-        createdAt: r.created_at,
-        contentDefaults: r.content_defaults ?? {},
-      }));
+      }>).map(r => {
+        let org_slug: string | null = null;
+        try { org_slug = hostnameSlugMap.get(new URL(r.url).hostname) ?? null; } catch { /* skip */ }
+        return {
+          id: r.id,
+          name: r.name,
+          url: r.url,
+          color: r.color,
+          active: r.active,
+          tokenSet: Boolean(r.token),
+          usernameSet: Boolean(r.username),
+          note: r.note,
+          source: "db" as const,
+          createdAt: r.created_at,
+          contentDefaults: r.content_defaults ?? {},
+          org_slug,
+        };
+      });
       return NextResponse.json({ ok: true, sites });
     }
   }

@@ -356,8 +356,8 @@ export default function StudioWorkbench() {
 
     const modelList = Array.from(selectedModels);
 
-    // Validate ideogram-character requires ref
-    if (modelList.includes("ideogram-character") && refImages.length === 0) {
+    // Validate ideogram-character requires ref (refMode="none" sends [] regardless of stale refImages)
+    if (modelList.includes("ideogram-character") && (refMode === "none" || refImages.length === 0)) {
       setResults([{ model: "ideogram-character", image: null, seed: null, error: "Ideogram Character 需要至少 1 張角色參考圖", busy: false }]);
       return;
     }
@@ -460,7 +460,9 @@ export default function StudioWorkbench() {
     try {
       while (nextStyle) {
         const appliedStyle: EdgeMaskId = nextStyle;
-        const res = await applyEdgeMask(base, appliedStyle, { amount: nextAmount, seed: EDGE_APPLY_SEED });
+        const isAsset = EDGE_MASK_STYLES.find((s) => s.id === appliedStyle)?.kind === "asset";
+        const assetOpacity = isAsset ? 0.2 + (nextAmount / 100) * 0.8 : undefined;
+        const res = await applyEdgeMask(base, appliedStyle, { amount: nextAmount, seed: EDGE_APPLY_SEED, assetOpacity });
         if (!res.ok) { setEdgeStates((prev) => ({ ...prev, [model]: "error" })); break; }
         setEdgeOriginals((prev) => (prev[model] ? prev : { ...prev, [model]: base }));
         setResults((prev) => prev.map((r) => r.model === model ? { ...r, image: res.image } : r));
@@ -846,7 +848,6 @@ export default function StudioWorkbench() {
                 const est = edgeStates[m] ?? "idle";
                 const applied = edgeApplied[m];
                 // Asset (real brush) masks are fixed images — the strength slider has no effect on them.
-                const appliedIsAsset = applied ? EDGE_MASK_STYLES.find((s) => s.id === applied)?.kind === "asset" : false;
                 return (
                   <div style={{ marginTop: 12, padding: 10, border: "1px solid var(--border, #333)", borderRadius: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>

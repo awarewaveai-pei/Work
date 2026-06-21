@@ -59,6 +59,28 @@
 
 ---
 
+### feat(content-studio): nav links → /ops/clients + org_slug 反查
+
+[任務] ContentStudio「🔗 網站管理」和「管理客戶網站 →」均指向 /tools/content/sites（WP 連線管理），用戶要最佳 UX → 應導到 /ops/clients/[slug] 客戶 Hub。
+
+[已修改]
+- `app/api/content/sites/route.ts`：新增 `org_slug?: string | null` 欄位至 `ManagedSite`；GET 並行 fetch `organizations`（.order("created_at")），build hostname→slug map（first-writer-wins；typeof guard 防非 object metadata crash；try/catch 防 URL 解析失敗）→ 每筆 wp_site 帶 `org_slug`
+- `app/tools/content/ContentStudio.tsx`：「🔗 網站管理」→「🔗 客戶管理」→ `/ops/clients`；「管理客戶網站 →」→ IIFE 計算 `selectedSite.org_slug`，deep-link 到 `/ops/clients/${slug}`，fallback `/ops/clients`
+- `app/tools/content/calendar/ContentCalendar.tsx`：同步更新「🔗 網站管理」→「🔗 客戶管理」→ `/ops/clients`
+- 保留：「前往連接 ↗」仍指 `/tools/content/sites`（唯一需要它的場景：尚未連接任何 WP 站時引導新增連線）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | 全 3 次（改後、critic 修後、ContentCalendar 修後）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/3m（已修：metadata typeof guard、first-writer-wins、variable rename clientConfig）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=org_slug\|管理客戶網站\|/tools/content/sites | hits=3（ContentCalendar 已修；WORKLOG 歷史段；前往連接 ↗ 保留刻意）
+- BUGHUNT_WAIVED: NA -- agency-os/scripts 無 org_slug call site（純 API route 內部欄位，無下游腳本引用）
+
+[剩餘風險] 當 organizations.metadata.client_config.site_url 與 wp_sites.url hostname 不一致時 org_slug=null → fallback `/ops/clients`（可接受；不需人工維護 FK）。部署後需手動確認 deep-link 跳轉正確。
+
+[rollback] git revert。
+
+---
+
 ### feat(studio): 邊緣風格改版 — 刪 13 程式 round/blob、留 8 方形、加 16 真實筆刷遮罩 + asset maskUrl 管線
 
 [任務] 使用者反映程式生成（feTurbulence）的筆刷不夠真實，給了 17 個 Illustrator 向量筆刷 SVG 包。要求：改邊緣只留方形的、刪其他、加這包進去。

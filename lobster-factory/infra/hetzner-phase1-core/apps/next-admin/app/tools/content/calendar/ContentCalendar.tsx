@@ -322,7 +322,7 @@ export default function ContentCalendar() {
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          <a href="/tools/content/sites" className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg transition text-gray-400">🔗 網站管理</a>
+          <a href="/ops/clients" className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg transition text-gray-400">🔗 客戶管理</a>
           <a href="/tools/content" className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg transition text-gray-400">← 內容工作室</a>
           <button onClick={() => void load()} className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg transition text-gray-400">↻ 重整</button>
         </div>

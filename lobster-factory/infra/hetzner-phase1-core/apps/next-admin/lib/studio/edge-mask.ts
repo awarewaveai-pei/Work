@@ -50,6 +50,12 @@ export interface EdgeMaskParams {
   amount: number;
   /** Variation seed (procedural styles). Integer ≥ 1. */
   seed: number;
+  /**
+   * Opacity override for asset (pre-rasterised PNG) masks only. 0–1.
+   * Omit (or pass undefined) to keep the mask at full opacity — backward-compatible default.
+   * Procedural SVG masks use `amount` for shape control; this field has no effect on them.
+   */
+  assetOpacity?: number;
 }
 
 export interface EdgeMaskStyle {
@@ -339,8 +345,8 @@ export async function applyEdgeMask(
       : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildMaskSvg(id, w, h, params))}`;
     const mask = await loadImage(maskSrc, false);
 
-    // Asset brushes: use edgeAmount to control mask opacity (20–100%); procedural SVGs use it for shape.
-    if (style.maskUrl) ctx.globalAlpha = 0.2 + (clamp(params.amount, 0, 100) / 100) * 0.8;
+    // Asset brushes: opt-in opacity via assetOpacity param (0–1). Defaults to 1 (backward-compatible).
+    if (style.maskUrl && params.assetOpacity != null) ctx.globalAlpha = params.assetOpacity;
     ctx.globalCompositeOperation = "destination-in"; // keep source only where mask is opaque
     ctx.drawImage(mask, 0, 0, w, h);
     ctx.globalAlpha = 1;
