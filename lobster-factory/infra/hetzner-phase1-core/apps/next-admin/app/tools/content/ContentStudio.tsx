@@ -565,7 +565,7 @@ export default function ContentStudio() {
   // Video config (mirrors tools/video config panel)
   const [videoTotalScenes,  setVideoTotalScenes]  = useState(6);
   const [videoCustomScenes, setVideoCustomScenes] = useState(3);
-  const [videoImageModel,   setVideoImageModel]   = useState(DEFAULT_IMAGE_MODEL);
+  const [videoImageModel,   setVideoImageModel]   = useState("pexels-all");
   const [videoVoiceId,      setVideoVoiceId]      = useState(VOICE_MODELS_VIDEO[0].id);
   const [videoStyleZh,      setVideoStyleZh]      = useState("");
   const [videoStyleGroup,   setVideoStyleGroup]   = useState(VIDEO_STYLE_GROUPS[0] ?? "");

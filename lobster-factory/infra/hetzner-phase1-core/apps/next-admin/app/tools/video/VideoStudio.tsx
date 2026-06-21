@@ -263,6 +263,7 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
           articleContent: articleContent.trim() || undefined,
           language,
           visualStyle: videoStyle ? resolveVideoStyle(videoStyle) : undefined,
+          imageModel,
           scenes: providedScenes.length > 0 ? providedScenes : undefined,
         }),
       });

@@ -60,6 +60,7 @@ export const FALLBACK_TEXT_MODEL = "claude-sonnet-4-6";
 
 /** Per-image price in USD. Keys = the app's image model ids (lib/tarot/image-gen.ts TAROT_MODELS). */
 export const IMAGE_RATES: Record<string, { usd: number; label: string; vendor: string }> = {
+  "pexels-all":          { usd: 0,     label: "Pexels 免費照片 $0", vendor: "Pexels (免費)" },
   "flux-schnell":        { usd: 0.003, label: "FLUX schnell", vendor: "BFL/Replicate" },
   "flux-dev":            { usd: 0.025, label: "FLUX dev", vendor: "BFL/Replicate" },
   "flux-kontext-dev":    { usd: 0.045, label: "FLUX Kontext Dev", vendor: "BFL/Replicate" },

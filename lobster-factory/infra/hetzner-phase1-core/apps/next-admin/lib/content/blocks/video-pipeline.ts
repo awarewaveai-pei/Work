@@ -20,7 +20,7 @@ import {
   isR2Configured,
 } from "../../storage/r2";
 import { submitRender, type RenderOutputs } from "../video/render-client";
-import { generateTarotImage } from "../../tarot/image-gen";
+import { generateTarotImage, isTarotModel } from "../../tarot/image-gen";
 import { getSupabaseWriteClient } from "../../supabase-server";
 
 /** POD_DESIGNS_DEFAULT_ORG_ID（designs route 同規約）；ctx.organizationId 優先。 */
@@ -109,6 +109,13 @@ export async function prepareScenes(
     language?: string;
     /** 已解析的英文風格 prompt（前端 resolveStylePrompt 後傳入）。空 = 用 cinematic 預設。 */
     visualStyle?: string;
+    /**
+     * 生圖來源 / 模型。
+     * "pexels-all" → 全部場景用 Pexels 免費照片（$0，不需 R2）。
+     * 其他字串 → 傳給 Flux 作為 model ID（如 "flux-schnell"、"flux-dev"）。
+     * 省略 → 依 scene.visual 決定（broll=Pexels，custom=flux-schnell）。
+     */
+    imageModel?: string;
     /** 深層接力：前製腳本已寫好的場景（台詞+畫面）→ 跳過 Claude 重生，直接用這些。 */
     providedScenes?: { narration: string; imagePrompt: string }[];
     onProgress?: (step: string) => void;
@@ -146,10 +153,17 @@ export async function prepareScenes(
 
   input.onProgress?.(`素材生成中（${scenes.length} 場景並行）…`);
   const pexelsKey = process.env.PEXELS_API_KEY as string | undefined;
+  const forcePexels = input.imageModel === "pexels-all";
+  const fluxModel = (!input.imageModel || input.imageModel === "pexels-all") ? "flux-schnell" : input.imageModel;
+
   const buildAsset = async (scene: (typeof scenes)[number]): Promise<AssetResult> => {
-    if (scene.visual === "broll" && pexelsKey) {
-      const brollUrl = await fetchBrollUrl(scene.broll_keyword, pexelsKey);
+    // Pexels 路徑：明確選 pexels-all（全部場景），或 Claude 判定為 broll 場景
+    if ((forcePexels || scene.visual === "broll") && pexelsKey) {
+      const keyword = scene.broll_keyword || scene.image_prompt.split(" ").slice(0, 3).join(" ");
+      const brollUrl = await fetchBrollUrl(keyword, pexelsKey);
       if (brollUrl) return { ok: true, asset: brollUrl };
+      // pexels-all 模式：Pexels 抓失敗 → 不 fallback Flux（避免非預期費用）
+      if (forcePexels) return { ok: false, status: 502, error: `場景 ${scene.id} Pexels 搜圖失敗（keyword: ${keyword}）` };
     }
     if (!isR2Configured()) return { ok: false, status: 503, error: "R2 未設定（跨機影片素材需 R2 暫存 Flux 圖）" };
     // 風格前綴：使用者選了風格 → 用該風格（已含材質/光線/色盤），補 16:9 框景；
@@ -158,7 +172,8 @@ export async function prepareScenes(
       ? `${input.visualStyle.trim()} Wide 16:9 cinematic framing.`
       : "Cinematic wide-angle 16:9, realistic photography, dramatic natural lighting, rich color grade.";
     const styledPrompt = `${stylePrefix} ${scene.image_prompt}`;
-    const img = await generateTarotImage({ model: "flux-schnell", prompt: styledPrompt, aspectRatio: "16:9" });
+    const safeModel = isTarotModel(fluxModel) ? fluxModel : "flux-schnell";
+    const img = await generateTarotImage({ model: safeModel, prompt: styledPrompt, aspectRatio: "16:9" });
     if (img.ok === false) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${img.error}` };
     const parsed = parseImageDataUrl(img.image);
     const key = parsed ? buildDesignKey(parsed.mime) : null;
@@ -200,6 +215,7 @@ register({
         articleContent: (ctx.articleContent as string | undefined) ?? (ctx.markdown as string | undefined),
         language: ctx.language as string | undefined,
         visualStyle: ctx.visualStyle as string | undefined,
+        imageModel: ctx.imageModel as string | undefined,
         onProgress,
       },
       anthropicKey,
