@@ -65,7 +65,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 // Fetch timeout for remote image download (20 s)
 const IMAGE_FETCH_TIMEOUT_MS = 20_000;
 
-type RawIntegration = {
+export type RawIntegration = {
   id: string;
   name: string;
   identifier: string;
@@ -84,6 +84,11 @@ async function fetchPostizIntegrations(cfg: PostizConfig): Promise<RawIntegratio
     throw new Error(`Postiz /integrations returned ${res.status}: ${body}`);
   }
   return res.json() as Promise<RawIntegration[]>;
+}
+
+export async function listAllIntegrations(): Promise<RawIntegration[]> {
+  const cfg = getPostizConfig();
+  return fetchPostizIntegrations(cfg);
 }
 
 export async function listIntegrations(clientId: string): Promise<SocialChannel[]> {

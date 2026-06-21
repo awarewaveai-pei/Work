@@ -13,8 +13,8 @@ import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 import { isBridgeConfigured, bridgeBaseUrl, createPost } from "@/lib/studio/wp-bridge-client";
 import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
 import { decodeWpEntities } from "@/lib/content/wp-entities";
-import { normalizeForWp } from "@/lib/studio/wp-web-image";
-import { getDesignsPublicBase } from "@/lib/storage/r2";
+import { normalizeManyForWp } from "@/lib/studio/wp-web-image";
+import { isDesignsAsset } from "@/lib/storage/r2";
 
 /** 發佈輸入。欄位型別刻意保持 unknown（與原 route body 同形），coercion 在 core 內統一做 → route 與積木共用同一套寬鬆解析。 */
 export interface WordPressPublishInput {
@@ -396,22 +396,13 @@ export async function publishToWordPress(body: WordPressPublishInput): Promise<W
     // the R2 designs/ masters are untouched. Per-image failure → keep the original URL (logged), never
     // block the publish. Mirrors the POD path (app/api/tools/publish/route.ts `create`).
     //
-    // Only normalise OUR generated assets (R2 designs bucket) — never fetch arbitrary in-article URLs
-    // server-side (SSRF) and never re-host an author's externally hot-linked image. External URLs pass
-    // through unchanged (the bridge sideloads them as before, same as pre-change behaviour).
-    const designsBase = getDesignsPublicBase();
-    const isOurAsset = (u: string) => u.startsWith(designsBase);
+    // Only normalise OUR generated assets (R2 designs bucket, host-checked) — never fetch arbitrary
+    // in-article URLs server-side (SSRF) and never re-host an author's externally hot-linked image.
+    // External URLs pass through unchanged (the bridge sideloads them as before, same as pre-change).
     const articleImageUrls = new Set<string>();
-    for (const b of blocks) if (b.type === "image" && b.url && isOurAsset(b.url)) articleImageUrls.add(b.url);
-    if (heroRaw && isOurAsset(heroRaw)) articleImageUrls.add(heroRaw);
-    const articleWebMap = new Map<string, string>();
-    await Promise.all(
-      [...articleImageUrls].map(async (u) => {
-        const web = await normalizeForWp(u);
-        if (!web) console.warn(`[wordpress-core] WebP normalise failed; uploading original to WP: ${u}`);
-        articleWebMap.set(u, web ?? u);
-      }),
-    );
+    for (const b of blocks) if (b.type === "image" && isDesignsAsset(b.url)) articleImageUrls.add(b.url);
+    if (isDesignsAsset(heroRaw)) articleImageUrls.add(heroRaw);
+    const articleWebMap = await normalizeManyForWp(articleImageUrls);
     for (const b of blocks) if (b.type === "image" && b.url) b.url = articleWebMap.get(b.url) ?? b.url;
     const featuredImageUrl = heroRaw ? articleWebMap.get(heroRaw) ?? heroRaw : undefined;
     const featuredImageAlt =

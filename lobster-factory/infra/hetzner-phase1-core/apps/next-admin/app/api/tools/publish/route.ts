@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
-import { buildDesignKey, getDesignsPublicBase, putDesignObject } from "../../../../lib/storage/r2";
+import { buildDesignKey, getDesignsPublicBase, isDesignsAsset, putDesignObject } from "../../../../lib/storage/r2";
 import { upscaleToPrintFile } from "../../../../lib/studio/upscaler";
 import { buildFaithfulPrintFile } from "../../../../lib/studio/print-file";
 import { toProductImage } from "../../../../lib/studio/to-product-image";
-import { normalizeForWp } from "../../../../lib/studio/wp-web-image";
+import { normalizeManyForWp } from "../../../../lib/studio/wp-web-image";
 import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { createWooProduct, isBridgeConfigured } from "../../../../lib/studio/wp-bridge-client";
@@ -312,25 +312,18 @@ export async function POST(request: Request) {
     if (body.plusPrice !== undefined && !PRICE_RE.test(body.plusPrice)) {
       return NextResponse.json({ ok: false, error: "plusPrice must look like 26.99" }, { status: 400 });
     }
-    const rawMockupUrls = (body.mockupUrls ?? []).filter((u) => typeof u === "string" && u.startsWith(designsBase));
+    const rawMockupUrls = (body.mockupUrls ?? []).filter((u): u is string => isDesignsAsset(u));
     const rawColorMockups: Record<string, string> =
       body.colorMockups && typeof body.colorMockups === "object"
-        ? Object.fromEntries(
-            Object.entries(body.colorMockups).filter(([, u]) => typeof u === "string" && u.startsWith(designsBase)),
-          )
+        ? Object.fromEntries(Object.entries(body.colorMockups).filter(([, u]) => isDesignsAsset(u)))
         : {};
 
     // Operator invariant: every storefront image (gallery + colour-variation) is WebP ≤150KB. Bake a
     // small DISPLAY derivative for each (on our sharp infra — host-independent) before handing URLs to
     // the wp-bridge. The R2 designs/ MASTERS stay full-res (re-editing) and the print file → Printful
-    // path is untouched (printing needs full res). Convert each unique URL once; on a per-image failure
-    // fall back to the original URL (logged) so one bad image never aborts the whole product.
-    const wpImageMap = new Map<string, string>();
-    for (const u of new Set<string>([...rawMockupUrls, ...Object.values(rawColorMockups)])) {
-      const web = await normalizeForWp(u);
-      if (!web) console.warn(`[publish/create] WebP normalise failed; uploading original to WP: ${u}`);
-      wpImageMap.set(u, web ?? u);
-    }
+    // path is untouched (printing needs full res). Bounded-concurrency + dedup; a per-image failure
+    // falls back to the original URL (logged) so one bad image never aborts the whole product.
+    const wpImageMap = await normalizeManyForWp([...rawMockupUrls, ...Object.values(rawColorMockups)]);
     const mockupUrls = rawMockupUrls.map((u) => wpImageMap.get(u) ?? u);
     const colorMockups = Object.keys(rawColorMockups).length
       ? Object.fromEntries(

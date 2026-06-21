@@ -4,6 +4,32 @@
 
 ## 2026-06-22
 
+### fix(pod+content): 上 WP 的圖一律 WebP ≤150KB（顯示衍生圖邊界）— R2 原圖 / Printful 印刷檔不碰
+
+[任務] 操作者回報：一鍵生成的圖傳到 WP 仍是 3MB/7MB PNG，違反「≤150KB + WebP」規則。
+
+[根因（file:line 證據）] 上傳 WP 的路徑零壓縮 / 零轉檔：
+- `packages/wp-bridge-plugin/includes/Content/MediaSideloader.php:27` `media_sideload_image` 原樣吞 URL；wp-bridge 外掛全包無任何 WebP/壓縮邏輯（grep 0 命中）。
+- POD `create`（`app/api/tools/publish/route.ts:314`）把 R2 designs 原始設計圖 + Printful mockup 直接塞 gallery / 變體圖。
+- WebP 烤製能力 `toProductImage`（`publish/route.ts:210`）存在但只接「手動 productimage 按鈕」，一鍵 gallery 用原始 `designUrl`。
+- 文章 hero/內文圖（`lib/content/publish/wordpress-core.ts:404`）同樣原樣 sideload。
+
+[已修改]
+- `lib/studio/wp-web-image.ts`（新）：`toWebUnder150KB`（sharp 尺寸[1280..600]×品質[82..42]遞減 + metadata 跳過 oversize 步 + 壓不到上限時 warn）/ `normalizeForWp`（fetch `redirect:"manual"` fail-closed → 轉 → R2 `web/`；已合規 webp 快速放行）/ `normalizeManyForWp`（bounded 並行 3 + dedup）。
+- `lib/storage/r2.ts`：`buildWebImageKey()`（`web/` 衍生 prefix，與 `designs/` 原圖分離）+ `isDesignsAsset()`（host 比對 SSRF allowlist）。
+- `app/api/tools/publish/route.ts` `create`：filter→`normalizeManyForWp`→gallery/變體圖用 WebP 衍生；原圖 / `printFileUrl`→Printful 不碰。
+- `lib/content/publish/wordpress-core.ts` bridge 路徑：hero + 內文圖（僅 `isDesignsAsset` 我們的 R2 圖）轉 WebP 衍生；外部 URL 原樣放行（防 SSRF）。
+
+[範圍邊界（誠實）] 非 bridge 站的標準 REST 發佈路徑（`app/api/content/publish/route.ts` 447+）仍 hot-link 原圖，本次未涵蓋（soulful 是 bridge 站，POD 已覆蓋）。R2 `web/` 衍生圖目前無 GC（待加 lifecycle rule）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/studio/__tests__/wp-web-image.test.ts | exit=0 | ms=~200 → 3/3（WebP + ≤150KB + 不放大 + 透明壓白，real sharp encode）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test | exit=0 → 33 檔 / 431 測全綠
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=2c/3m/3low → 修 SSRF（host 比對 + `redirect:"manual"`）、over-cap warn、bounded 並行
+- BUGHUNT_DONE: scope=next-admin（image→WP sideload 全路徑列舉）+ agency-os + scripts | grep=heroImage|imageUrl|sideload|featured_image_url|mockupUrls|isDesignsAsset|normalizeForWp | hits=0 stale（新 symbol 僅 2 預期 call site；REST 路徑記為範圍邊界）
+- 真站 e2e（建商品驗媒體庫 webp ≤150KB）：deploy 後執行
+
 ### feat(postiz): Task 3 完成 — lib/content/postiz.ts + social-publish route + Gates A/B/D/E.1/E.2
 
 [任務] Postiz 社群發佈整合 Task 3（POSTIZ_SOCIAL_PUBLISHING_PLAN.md）。
