@@ -516,7 +516,7 @@ export default function DesignsGallery() {
     if (url) window.location.assign("/tools/publish");
   }, [editSavedUrl, saveEdged]);
 
-  // Asset (real brush) masks are fixed images — the strength slider has no effect on them.
+
 
 
   /* ─── derive filter option lists ─── */
