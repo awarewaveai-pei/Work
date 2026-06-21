@@ -23,7 +23,7 @@ interface Props {
 
 const ROUTE_LABEL: Record<string, string> = {
   "content/article-generate":  "文章生成",
-  "content/fetchRealSources":  "Perplexity 搜尋",
+  "content/fetchRealSources":  "Serper 搜尋",
   "content/title":             "標題生成",
   "content/keywords":          "關鍵字",
   "content/outline":           "大綱",

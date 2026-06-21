@@ -520,7 +520,7 @@ export default function ContentStudio() {
   const [bvError,           setBvError]           = useState("");
   const [bvApplied,         setBvApplied]         = useState(false);
 
-  // #5 — Competitor & pain-point analysis (Perplexity-backed /api/content/market-analysis)
+  // #5 — Competitor & pain-point analysis (Claude Haiku /api/content/market-analysis)
   const [showMarket,     setShowMarket]     = useState(false);
   const [marketLoading,  setMarketLoading]  = useState(false);
   const [marketAnalysis, setMarketAnalysis] = useState<MarketAnalysisResult | null>(null);
@@ -2099,7 +2099,7 @@ export default function ContentStudio() {
             )}
             {trendTab === "trending" && trendingItems.length === 0 && !trendLoading && (
               <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                點擊「搜尋」載入今日熱搜（內建：Google News / Reddit / PTT / Perplexity，外加你在「⚙️ 管理來源」新增的自訂 RSS 來源）
+                點擊「搜尋」載入今日熱搜（內建：Google News / Reddit / PTT / Serper，外加你在「⚙️ 管理來源」新增的自訂 RSS 來源）
               </div>
             )}
 
@@ -2144,7 +2144,7 @@ export default function ContentStudio() {
             {trendTab === "sources" && (
               <div>
                 <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "10px", lineHeight: 1.6 }}>
-                  內建來源：📰 Google News · 👽 Reddit · 🗣️ PTT · 🔮 Perplexity（不可刪）。
+                  內建來源：📰 Google News · 👽 Reddit · 🗣️ PTT · 🔍 Serper（不可刪）。
                   下方可新增自訂 RSS / Atom feed（須為公開 https 網址），會跟內建來源一起出現在「今日熱搜」。
                 </div>
 
@@ -3214,7 +3214,7 @@ export default function ContentStudio() {
               {marketContext && <span style={{ color: "#16a34a", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
               {marketError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{marketError}</span>}
             </div>
-            <div className="form-hint">用 Perplexity 即時搜尋，從競爭對手、讀者痛點、搜尋意圖、轉換疑慮、差異化機會五個角度分析，結果會引導文章定位。需先填關鍵字。</div>
+            <div className="form-hint">用 AI 多角度分析，從競爭對手、讀者痛點、搜尋意圖、轉換疑慮、差異化機會五個角度，結果會引導文章定位。需先填關鍵字。</div>
             {marketAnalysis && (
               <div style={{ marginTop: "12px", display: "grid", gap: "10px", fontSize: "12px" }}>
                 {([
