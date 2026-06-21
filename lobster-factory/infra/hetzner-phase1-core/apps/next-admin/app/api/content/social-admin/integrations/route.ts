@@ -24,9 +24,7 @@ export async function GET(req: Request): Promise<Response> {
     const integrations = await listAllIntegrations();
     return NextResponse.json({ ok: true, integrations });
   } catch (err) {
-    return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    console.error("[social-admin/integrations] failed:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ ok: false, error: "failed to list integrations" }, { status: 502 });
   }
 }

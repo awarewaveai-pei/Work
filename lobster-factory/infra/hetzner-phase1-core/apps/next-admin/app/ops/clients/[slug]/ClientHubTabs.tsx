@@ -912,9 +912,177 @@ function SettingsTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cf
   );
 }
 
+// ── Social channels tab ───────────────────────────────────────────────────────
+
+type PostizIntegrationItem = {
+  id: string;
+  name: string;
+  identifier: string;
+  picture: string | null;
+  disabled: boolean;
+  profile: string;
+};
+
+type ConnectedChannelItem = {
+  clientId: string;
+  postizIntegrationId: string;
+  platform: string;
+  label: string;
+  status: string;
+};
+
+const SUPPORTED_PLATFORMS = new Set([
+  "instagram", "facebook", "reddit", "linkedin", "x",
+  "threads", "tiktok", "pinterest", "bluesky",
+]);
+
+function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
+  const [integrations, setIntegrations] = useState<PostizIntegrationItem[]>([]);
+  const [connected, setConnected] = useState<ConnectedChannelItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const [intsRes, chRes] = await Promise.all([
+        fetch("/api/content/social-admin/integrations"),
+        fetch(`/api/content/social-channels?clientId=${org.id}`),
+      ]);
+      if (!intsRes.ok) throw new Error(`integrations fetch failed: ${intsRes.status}`);
+      if (!chRes.ok) throw new Error(`channels fetch failed: ${chRes.status}`);
+      const [intsData, chData] = await Promise.all([intsRes.json(), chRes.json()]);
+      setIntegrations(intsData.integrations ?? []);
+      setConnected(chData.channels ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [org.id]);
+
+  async function connect(integration: PostizIntegrationItem) {
+    setSaving(integration.id);
+    try {
+      const res = await fetch("/api/content/social-admin/connections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: org.id,
+          postizIntegrationId: integration.id,
+          platform: integration.identifier,
+          label: integration.name,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function disconnect(integrationId: string) {
+    setSaving(integrationId);
+    try {
+      const res = await fetch(
+        `/api/content/social-admin/connections?clientId=${encodeURIComponent(org.id)}&integrationId=${encodeURIComponent(integrationId)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  const connectedMap = new Map(connected.map((c) => [c.postizIntegrationId, c]));
+
+  if (loading) return <div style={{ padding: 24, color: "var(--text-muted)", fontSize: 13 }}>載入中⋯</div>;
+
+  return (
+    <>
+      {error && (
+        <div style={{
+          margin: "0 0 12px", padding: "10px 14px", borderRadius: 8, fontSize: 12,
+          background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca",
+        }}>
+          {error}
+        </div>
+      )}
+      <MetricGrid items={[
+        { label: "已連結", value: connected.filter((c) => c.status === "connected").length, color: "#16a34a" },
+        { label: "可用帳號", value: integrations.length, color: "var(--text-muted)" },
+      ]} />
+      <Card title="Postiz 帳號">
+        {integrations.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Postiz 尚無整合帳號。</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {integrations.map((integration) => {
+              const isConnected = connectedMap.has(integration.id);
+              const isSaving = saving === integration.id;
+              const isSupported = SUPPORTED_PLATFORMS.has(integration.identifier);
+              return (
+                <div
+                  key={integration.id}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 12px", borderRadius: 8,
+                    border: `1px solid ${isConnected ? "var(--accent)" : "var(--card-border)"}`,
+                    background: isConnected ? "#f0fdf4" : "var(--bg-canvas)",
+                    opacity: !isSupported && !isConnected ? 0.5 : 1,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                      {integration.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                      {integration.identifier}
+                      {integration.profile && integration.profile !== integration.name && ` · ${integration.profile}`}
+                      {integration.disabled && <span style={{ color: "#f59e0b", marginLeft: 6 }}>已停用</span>}
+                    </div>
+                  </div>
+                  {!isSupported ? (
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>不支援</div>
+                  ) : (
+                    <button
+                      disabled={isSaving}
+                      onClick={() => isConnected ? disconnect(integration.id) : connect(integration)}
+                      style={{
+                        padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                        cursor: isSaving ? "default" : "pointer",
+                        border: "none", flexShrink: 0,
+                        background: isConnected ? "#fee2e2" : "var(--accent)",
+                        color: isConnected ? "#dc2626" : "#fff",
+                        opacity: isSaving ? 0.6 : 1,
+                      }}
+                    >
+                      {isSaving ? "⋯" : isConnected ? "解除" : "連結"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
-const TABS = ["內容工具", "整合", "佈建", "維護", "設定"] as const;
+const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "社群頻道"] as const;
 type Tab = typeof TABS[number];
 
 export function ClientHubTabs(props: ClientHubTabsProps) {
@@ -993,6 +1161,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "佈建" && <ProvisioningTab deptSummary={deptSummary} runs={runs} cfg={cfg} />}
         {activeTab === "維護" && <MaintenanceTab org={org} cfg={cfg} wp={wp} runs={runs} installRuns={installRuns} />}
         {activeTab === "設定" && <SettingsTab org={org} cfg={cfg} wpSites={wpSites} />}
+        {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
       </div>
     </div>
   );
