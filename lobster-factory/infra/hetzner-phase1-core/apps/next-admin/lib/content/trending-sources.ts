@@ -24,23 +24,18 @@ export interface TrendingItem {
 
 // ─── 共用工具 ────────────────────────────────────────────────────────────────
 
-export async function perplexityChat(prompt: string, timeoutMs = 10000): Promise<string> {
-  const apiKey = process.env.PERPLEXITY_API_KEY;
+export async function perplexityChat(prompt: string, _timeoutMs = 10000): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return "";
   try {
-    const res = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "sonar",
-        messages: [{ role: "user", content: prompt }],
-        search_recency_filter: "day",
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      messages: [{ role: "user", content: prompt }],
     });
-    if (!res.ok) return "";
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return data.choices?.[0]?.message?.content ?? "";
+    return msg.content[0]?.type === "text" ? msg.content[0].text : "";
   } catch { return ""; }
 }
 
@@ -324,7 +319,7 @@ searchBlock({
       const res = await fetch("https://google.serper.dev/news", {
         method: "POST",
         headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ q, gl: p.gl.toLowerCase(), hl: p.hl, num: 10 }),
+        body: JSON.stringify({ q, gl: p.gl.toLowerCase(), hl: p.hl.split("-")[0].toLowerCase(), num: 10 }),
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) return [];

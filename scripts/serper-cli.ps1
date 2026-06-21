@@ -1,6 +1,6 @@
 param(
     [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$Args
+    [string[]]$CliArgs
 )
 
 Set-StrictMode -Version Latest
@@ -55,9 +55,10 @@ function Write-SearchResults {
         Write-Output $ans
         Write-Output ""
     }
-    $items = @($Response.organic ?? $Response.news ?? $Response.images ?? @())
+    $items = if ($Response.organic) { @($Response.organic) } elseif ($Response.news) { @($Response.news) } elseif ($Response.images) { @($Response.images) } else { @() }
     foreach ($item in $items) {
-        Write-Output ($item.title ?? $item.imageUrl ?? "(no title)")
+        $titleVal = if ($item.title) { $item.title } elseif ($item.imageUrl) { $item.imageUrl } else { "(no title)" }
+        Write-Output $titleVal
         if ($item.link) { Write-Output "  $($item.link)" }
         if ($item.snippet) { Write-Output "  $($item.snippet)" }
         if ($item.date) { Write-Output "  $($item.date)" }
@@ -65,12 +66,12 @@ function Write-SearchResults {
     }
 }
 
-if (-not $Args -or $Args.Count -eq 0 -or $Args[0] -in @("help", "--help", "-h")) {
+if (-not $CliArgs -or $CliArgs.Count -eq 0 -or $CliArgs[0] -in @("help", "--help", "-h")) {
     Show-Usage; exit 0
 }
 
-$command = $Args[0].ToLowerInvariant()
-$rest = @($Args | Select-Object -Skip 1)
+$command = $CliArgs[0].ToLowerInvariant()
+$rest = @($CliArgs | Select-Object -Skip 1)
 $json = $false
 $gl = "us"
 $num = 10
@@ -79,8 +80,8 @@ $queryParts = [System.Collections.Generic.List[string]]::new()
 for ($i = 0; $i -lt $rest.Count; $i++) {
     switch ($rest[$i]) {
         "--json" { $json = $true }
-        "--gl"   { $i++; $gl = $rest[$i] }
-        "--num"  { $i++; $num = [int]$rest[$i] }
+        "--gl"   { if ($i + 1 -lt $rest.Count) { $i++; $gl = $rest[$i] } else { throw "--gl requires a value" } }
+        "--num"  { if ($i + 1 -lt $rest.Count) { $i++; if (-not [int]::TryParse($rest[$i], [ref]$num)) { throw "--num must be an integer" } } else { throw "--num requires a value" } }
         default  { $queryParts.Add($rest[$i]) }
     }
 }

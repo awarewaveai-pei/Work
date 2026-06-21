@@ -76,44 +76,32 @@ v1 必須具備：
 
 ---
 
-## Gate A — API base path smoke test（Task 3 開工前必完成）
+## Gate A — API base path smoke test ✅ 完成 2026-06-22
 
-**[C3 補強]** Postiz API base path 有歧義，Task 3 工程師不得在 Gate A 完成前寫死任何 URL。
-
-暫定 base path（基於 docker-compose `NEXT_PUBLIC_BACKEND_URL`）：
-```
-POSTIZ_API_BASE_URL=https://postiz.aware-wave.com/api
-```
-Public API 路徑：`$POSTIZ_API_BASE_URL/public/v1/integrations`
-
-**Gate A 驗證指令（在任何有網路的機器執行）：**
-```bash
-# 先在 Postiz UI Settings > Developers > Public API 產生 API key，存入 POSTIZ_API_KEY
-curl -i "https://postiz.aware-wave.com/api/public/v1/integrations" \
-  -H "Authorization: $POSTIZ_API_KEY"
-```
-
-**必須記錄並更新本計畫：**
-- 實際 status code（若 307/301 → 記錄 redirect 目的地與最終 path）
-- 實際 response shape（即使是 `[]`）
-- 是否需要 trailing slash
-- 是否 CF 或 nginx 有 rewrite 改變 path
-- 鎖定最終 `POSTIZ_API_BASE_URL` 值 → 放 EU `.env` + `secrets-vault.ps1`
+**結果：**
+- `POSTIZ_API_BASE_URL=https://postiz.aware-wave.com/api` **鎖定**（無 redirect，無 CF rewrite）
+- `Authorization: <raw_key>`（無 Bearer 前綴）確認有效
+- API key 從 `Organization.apiKey` 欄位讀取（DB table，非 Postiz UI 手動建立；已存入 vault + SG .env）
+- curl on EU: `curl -si "http://127.0.0.1:4007/api/public/v1/integrations" -H "Authorization: $POSTIZ_API_KEY"` → **HTTP/1.1 200 OK**，無 trailing slash 需求
+- 鎖定值已存：SG `/root/lobster-phase1/.env` + 本機 `secrets-vault.ps1`
 
 ---
 
-## Gate B — `GET /integrations` schema snapshot
+## Gate B — `GET /integrations` schema snapshot ✅ 完成 2026-06-22
 
-把實機 response 存成 fixture：**`app/api/content/social-publish/__tests__/fixtures/postiz-integrations.sample.json`**
+實機 response（v2.11.3，1 個 Bluesky integration）已存入 fixture：
+**`app/api/content/social-publish/__tests__/fixtures/postiz-integrations.sample.json`**
 
-> **[C10 修正]** 路徑改為 `app/api/content/social-publish/__tests__/fixtures/`，符合 next-admin 現有 `lib/**/__tests__/` 目錄慣例。
-
-至少確認並映射：
-- Postiz integration id
-- platform/provider type（字串值，如 `instagram` / `facebook` / `reddit`）
-- display name / account name
-- disabled / expired / connected 狀態欄位名稱
-- workspace / organization 關聯欄位（若有）
+**API response 欄位實測結果：**
+```json
+[{ "id": "cmqe3jw960001p58nt0xohbi8", "name": "soulfulexpression.bsky.social",
+   "identifier": "bluesky", "picture": null, "disabled": false,
+   "profile": "soulfulexpression.bsky.social" }]
+```
+- `id` = postiz integration id（內部 cuid）
+- `identifier` = platform 識別字（`bluesky`、`instagram` 等）— **這是 `platform` 欄位的值**
+- `disabled` = boolean（true = 停用）
+- **無 workspace 欄位**（single-workspace 實例）— D6 confirmed: single workspace
 
 前端 channel gate 不得猜欄位；必須透過 `lib/content/postiz.ts` normalize 成內部型別：
 
@@ -187,53 +175,33 @@ create table social_postiz_connections (
 
 ## Gate E — 前置驗證（所有 Task 3+ 開工前）
 
-### Gate E.1 — next-admin Supabase client 連線模式
+### Gate E.1 — next-admin Supabase client 連線模式 ✅ 完成 2026-06-22
 
-**[C2 補強]** next-admin 目前無 Supabase client，Task 3 需要查 `social_postiz_connections`。
+**實際狀況（VBC 已查）**：next-admin 已有 `lib/supabase-server.ts` 提供 `getSupabaseWriteClient()`（service role）和 `getSupabaseReadClient()`（anon），`@supabase/supabase-js ^2.49.8` 已在 `package.json`，env vars `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` 已在 SG `.env`。
 
-**決定採用 `@supabase/supabase-js` server-side service role client：**
+**結論**：無需新建任何 client 或安裝套件。`lib/content/postiz.ts` 直接 `import { getSupabaseWriteClient } from "@/lib/supabase-server"`。
 
-```
-新增 env vars（EU .env + secrets-vault.ps1）：
-  NEXT_PUBLIC_SUPABASE_URL=https://...（EU 自架 Supabase URL）
-  SUPABASE_SERVICE_ROLE_KEY=...
+### Gate E.2 — Postiz multi-workspace ✅ 完成 2026-06-22（D6 決策落地）
 
-新增 lib/supabase/server.ts：
-  import { createClient } from '@supabase/supabase-js'
-  export function getSupabaseAdmin() {
-    return createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    )
-  }
-```
+**實際查驗（DB + API）**：
+- `Organization` 表只有 1 筆（id `b4e7399b...`，name `AwareWave`）
+- API key 儲存在 `Organization.apiKey` 欄位（per-org，非 Postiz UI 手動建立）
+- v2.11.3 `DISABLE_REGISTRATION=true`（單帳號），無法在 UI 建立第二個 workspace
 
-**此 client 僅在 API route server-side 使用，禁止在 `"use client"` 元件匯入。**
-Task 3 `lib/content/postiz.ts` 的 `listIntegrations(clientId)` 透過此 client 查 `social_postiz_connections`。
-
-### Gate E.2 — Postiz multi-workspace 可行性驗證
-
-**[C5 補強]** 登入 `postiz.aware-wave.com`，確認：
-- 能否在 UI 建立第二個 workspace？
-- 每個 workspace 有獨立 API key？
-- `GET /public/v1/integrations` 是否 workspace-scoped？
-
-**結果對 D6 的影響：**
-- 若可行 → 每客戶建一個 workspace，API key 加密存 DB（`postiz_api_key_enc` column + `POSTIZ_ENCRYPTION_KEY` env 解密）
-- 若不可行（v2.11.3 限制）→ 維持 single workspace + integration allowlist per client_id（v1 方案），D3 secret 設計不變
+**D6 決策（confirmed single-workspace）**：v1 維持 single workspace + `social_postiz_connections` integration allowlist per `client_id`。API key 單一 env var `POSTIZ_API_KEY`，不加密存 DB。v2 才評估 multi-workspace。
 
 ---
 
 ## Phase 2 開工前 gates 一覽（Task 5 UI 合併前必完成）
 
-| Gate | 必完成時間點 | 關鍵產出 |
-|------|------------|---------|
-| **E.1** Supabase client 模式 | Task 3 開工前 | `lib/supabase/server.ts` + env vars 就位 |
-| **E.2** Multi-workspace 可行性 | Task 4 開工前 | D6 決策落地 |
-| **A** Base path smoke test | Task 3 開工前 | 鎖定 `POSTIZ_API_BASE_URL` 值 |
-| **B** Integrations schema snapshot | Task 4 開工前 | fixture JSON 存入 `__tests__/fixtures/` |
-| **C** Media upload pipeline | Task 5 開工前 | server-side fetch+multipart 實測通過 |
-| **D** Tenant isolation schema | Task 3 開工前 | migration SQL + RLS deployed |
+| Gate | 狀態 | 關鍵產出 |
+|------|------|---------|
+| **E.1** Supabase client 模式 | ✅ 2026-06-22 | 已有 `lib/supabase-server.ts`；直接用 `getSupabaseWriteClient()` |
+| **E.2** Multi-workspace 可行性 | ✅ 2026-06-22 | D6 confirmed: single workspace + allowlist |
+| **A** Base path smoke test | ✅ 2026-06-22 | `POSTIZ_API_BASE_URL=https://postiz.aware-wave.com/api` 鎖定 |
+| **B** Integrations schema snapshot | ✅ 2026-06-22 | fixture JSON 存入 `__tests__/fixtures/` |
+| **C** Media upload pipeline | ⏳ Task 5 開工前 | server-side fetch+multipart 實測通過 |
+| **D** Tenant isolation schema | ✅ 2026-06-22 | `social_postiz_connections` deployed on EU Supabase |
 
 ---
 
@@ -265,7 +233,7 @@ Task 3 `lib/content/postiz.ts` 的 `listIntegrations(clientId)` 透過此 client
 - **Task 0** `web-researcher`：✅ 完成（API 契約事實表，2026-06-16）
 - **Task 1** `devops-engineer`：✅ 完成（Postiz v2.11.3 live，Bluesky e2e 2026-06-15）；補項：smoke test 記錄、備份策略確認、`API_LIMIT` env 確認。
 - **Task 2** `web-researcher` + 操作者：各平台 dev app + 審核送件，callback 指向 Postiz。並行整條 code track；每平台審核通過時上線，不阻塞。
-- **Task 3** `fullstack-engineer`：`lib/supabase/server.ts` + `lib/content/postiz.ts` + `/api/content/social-publish` route。不卡 Task 2。需 Gate E.1 + A + D 完成。
+- **Task 3** `fullstack-engineer`：✅ 完成 2026-06-22 — `lib/content/postiz.ts` + `/api/content/social-publish/route.ts`（Gate E.1 已有 `lib/supabase-server.ts`；Gate A/D 已完成）。
 - **Task 4** `fullstack-engineer`：帳號連接 flow + `/api/content/social-channels` route + admin mapping UI（把 postiz_integration_id 對應到 client_id）。需 Gate E.2 + B 完成。
 - **Task 5** `fullstack-engineer`：把死面板接成真發佈（channel 選擇 + Draft/Now 模式 toggle + 二次確認 modal + 發佈鈕，帶 `imgResult.imageUrl`）。需 Task 3 + 4 + Gate C 完成。
 - **Task 6** `fullstack-engineer`：ops runbook（token 過期重連、rate limit 處理、連線狀態巡查），回扣 SSOT §49。

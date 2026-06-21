@@ -2,6 +2,88 @@
 
 > Historical snapshot note: this file records decisions/events by date. For current operating rules and commands, use the event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (startup/AO-RESUME) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (shutdown/AO-CLOSE).
 
+## 2026-06-22
+
+### feat(postiz): Task 3 完成 — lib/content/postiz.ts + social-publish route + Gates A/B/D/E.1/E.2
+
+[任務] Postiz 社群發佈整合 Task 3（POSTIZ_SOCIAL_PUBLISHING_PLAN.md）。
+
+[根因/背景] Postiz v2.11.3 已上線 EU 但無整合碼。Gates A/B/D/E 全部需在 Task 3 前完成。
+
+[已修改]
+- `lib/content/postiz.ts`（新建）：`getPostizConfig()` / `listIntegrations()` / `uploadMedia()` / `createSocialPost()` / `assertCanPublishNow()`；雙形態 imageUrl（data: URL + https:// R2）均走 multipart upload；per-platform 串行 call；fail-closed
+- `app/api/content/social-publish/route.ts`（新建）：thin HTTP shell；ops-role gate + DB allowlist server-side + `confirmPublishNow` 雙重 gate for `now` mode
+- `app/api/content/social-publish/__tests__/fixtures/postiz-integrations.sample.json`（Gate B fixture）
+- `packages/db/migrations/0011_social_postiz_connections.sql`（Gate D，已 deploy EU Supabase）
+- `infra/hetzner-phase1-core/.env.example`：加 POSTIZ env vars 文件
+- `agency-os/docs/operations/POSTIZ_SOCIAL_PUBLISHING_PLAN.md`：Gates A/B/D/E.1/E.2 結果；Task 3 ✅；D6 落地
+
+[Gate 結果]
+- Gate A ✅：base URL 鎖定，HTTP 200，API key 從 Organization.apiKey 取得
+- Gate B ✅：`{ id, identifier, disabled, ... }` — fixture 已存
+- Gate D ✅：`social_postiz_connections` deployed EU Supabase
+- Gate E.1 ✅：`lib/supabase-server.ts` 已有，env vars 已在 SG .env
+- Gate E.2 ✅：single workspace；D6 = integration allowlist per client_id
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=curl -si http://127.0.0.1:4007/api/public/v1/integrations | exit=0 | ms=~150 → HTTP/1.1 200 OK
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=docker exec supabase-db psql \d social_postiz_connections | exit=0 → table + 2 indexes confirmed
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n (tsc --noEmit clean, 0 errors)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=social-publish|postiz|SocialChannel|createSocialPost | hits=2 (只有新建的兩個檔案)
+
+[剩餘風險]
+- Gate C media upload 實測：Task 5 前必完成（需真實 Bluesky test post with image）
+- `social_postiz_connections` 無 rows：需 Task 4 admin mapping UI 才可使用
+- IG/FB/Reddit/LinkedIn OAuth apps（Task 2）仍 pending，阻塞這些平台上線
+
+[rollback]
+- `drop table social_postiz_connections;` — 無下游 FK 依賴
+- `git revert <commit>` — 3 個新建檔案，不改任何既有路由
+
+---
+
+## 2026-06-22
+
+### fix(search): Serper替換完整 + perplexityChat→Haiku + hl locale修正 + serper-cli PS5修正
+
+[任務] 接續 2026-06-21 fix：完成 Perplexity 消耗點 #2/#4/#6/#7（Serper替換 + perplexityChat→Haiku）。
+
+[根因] 上一 session 完成 #1/#3/#5，但 #2(trending searchBlock)/#4(fetchRealSources)/#6(perplexity-cli.ps1) 待 verify。Bughunt 另發現第 7 個消耗點：`trending-sources.ts perplexityChat` 被 `content/trending/route.ts` 引用（suggest/questions fallback）。
+
+[已修改]
+- `lib/content/trending-sources.ts`:
+  - `search/perplexity` searchBlock → `search/serper` block（Serper.dev /news）
+  - `hl: p.hl` → `hl: p.hl.split("-")[0].toLowerCase()`（Serper 需 2-letter code，不是 locale）
+  - `perplexityChat()` 底層：Perplexity API → Anthropic Haiku（dynamic import，無新依賴）
+- `lib/content/article/generate-core.ts`: `fetchRealSources` → Serper /search（organic results）
+- `scripts/serper-cli.ps1`（新建）: 替代 perplexity-cli.ps1；PS5相容（無 `??`）；`--gl`/`--num` bounds-check；`$CliArgs` 避免 $Args shadowing
+- `mcp/user-env.ps1`: 加 SERPER_API_KEY；PERPLEXITY_API_KEY 加 `# quota exhausted` 注解
+- VPS SG `.env`: 加 SERPER_API_KEY
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell serper-cli.ps1 help | exit=0 | ms=~300 → usage 輸出正常
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~9000 → 無型別錯誤
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1M(fixed: hl locale→2letter)/2m(fixed: bounds-check+$Args)/1sug(cost-ledger stale label—dead code, deferred)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=SERPER_API_KEY|perplexityChat|fetchRealSources|search/serper | hits=expected (all in new files + trending/route.ts caller confirmed)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=search/perplexity|perplexityCostUsd | hits=0 in active code paths (perplexityCostUsd is dead code in generate-core, stale label Suggestion)
+
+[消耗點總結 — 全部完成]
+| # | 位置 | 替換方案 | 狀態 |
+|---|------|---------|------|
+| 1 | studio/trending/route.ts | Claude Haiku | ✅ (2026-06-21) |
+| 2 | trending-sources.ts searchBlock | Serper /news | ✅ |
+| 3 | market-analysis/route.ts | Claude Haiku | ✅ (2026-06-21) |
+| 4 | generate-core.ts fetchRealSources | Serper /search | ✅ |
+| 5 | .mcp.json + registry.template.json | 移除 | ✅ (2026-06-21) |
+| 6 | perplexity-cli.ps1 | scripts/serper-cli.ps1 | ✅ |
+| 7 | trending-sources.ts perplexityChat (suggest/questions fallback) | Claude Haiku | ✅ |
+
+[剩餘風險] cost-ledger 中 `perplexityCostUsd`/`vendor:"Perplexity"` 標籤是 dead code（costUsd 永遠 0，if-block 不執行）；不影響功能，留 Suggestion 等後續 cleanup。
+
+[rollback] `git revert` 任一 commit；VPS 手動刪 SERPER_API_KEY 行 + 還原 PERPLEXITY_API_KEY 行。
+
+---
+
 ## 2026-06-21
 
 ### fix(search): replace Perplexity → Claude Haiku; remove Perplexity MCP
