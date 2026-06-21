@@ -1156,7 +1156,8 @@ export default function ContentStudio() {
           ...form,
           // Drop the multi-MB img2img reference data URL — generate never reads it (only the image
           // route does), so shipping it here is pure wire bloat (mirrors the draft-save strip).
-          media: { ...form.media, imageRefData: "" },
+          // ai-video 模式下後端不插 YouTube placeholder（影片由 embed-to-wp 單獨嵌入）
+          media: { ...form.media, imageRefData: "", youtubeSource: form.media.youtubeSource === "ai-video" ? "none" : form.media.youtubeSource },
           details: effectiveDetails,
           externalLinks, internalLinks, referenceUrls,
           existingCategories,              // #3
@@ -1329,7 +1330,12 @@ export default function ContentStudio() {
       const d = json.draft;
       // Restore the form snapshot (fall back to a minimal form if an old row lacks one).
       if (d.formSnapshot) {
-        setForm({ ...DEFAULT_FORM, ...d.formSnapshot });
+        const restored = { ...DEFAULT_FORM, ...d.formSnapshot };
+        // Normalize removed youtubeSource values ("auto" was removed in 2026-06) to "none"
+        if (!["none", "ai-video"].includes(restored.media?.youtubeSource)) {
+          restored.media = { ...restored.media, youtubeSource: "none" };
+        }
+        setForm(restored);
         // If the snapshot has a non-empty brandName, lock it so the auto-populate effect
         // doesn't overwrite it with the site name after restore.
         if (d.formSnapshot.media?.brandName) setBrandNameTouched(true);
@@ -2492,14 +2498,13 @@ export default function ContentStudio() {
                   <select className="form-select" value={form.media.youtubeSource} disabled={isGenerating}
                     onChange={e => setMedia("youtubeSource", e.target.value)}>
                     <option value="none">None</option>
-                    <option value="auto">Auto（AI 建議）</option>
-                    <option value="ai-video">🎬 自製 AI 影片（$0 免費）</option>
+                    <option value="ai-video">🎬 AI 影片</option>
                   </select>
                 </div>
                 <div>
                   <label className="form-label">Number of videos</label>
                   <select className="form-select" value={form.media.youtubeCount}
-                    disabled={isGenerating || form.media.youtubeSource === "none"}
+                    disabled={isGenerating || form.media.youtubeSource === "none" || form.media.youtubeSource === "ai-video"}
                     onChange={e => setMedia("youtubeCount", Number(e.target.value))}>
                     <option>1</option><option>2</option><option>3</option>
                   </select>
@@ -2507,7 +2512,7 @@ export default function ContentStudio() {
                 <div>
                   <label className="form-label">Layout Options</label>
                   <select className="form-select" value={form.media.youtubeLayout}
-                    disabled={isGenerating || form.media.youtubeSource === "none"}
+                    disabled={isGenerating || form.media.youtubeSource === "none" || form.media.youtubeSource === "ai-video"}
                     onChange={e => setMedia("youtubeLayout", e.target.value)}>
                     {LAYOUT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
