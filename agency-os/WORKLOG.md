@@ -4,6 +4,34 @@
 
 ## 2026-06-21
 
+### fix(search): replace Perplexity → Claude Haiku; remove Perplexity MCP
+
+[任務] PERPLEXITY_API_KEY quota 耗盡；MCP server 靜默用 premium 模型（sonar-pro/deep-research）燒費；studio/trending 頁面顯示「抓取失敗」。
+
+[根因] 1) MCP server `@perplexity-ai/mcp-server` 在每次 agent session 用 sonar-pro 等 premium 模型，費用遠超 app 本身的 sonar 呼叫。2) `studio/trending/route.ts` + `market-analysis/route.ts` 直接呼叫 Perplexity API，key 失效後硬回 402。
+
+[已修改]
+- `app/api/tools/studio/trending/route.ts`: Perplexity → Claude Haiku（ANTHROPIC_API_KEY，已配置）
+- `app/api/content/market-analysis/route.ts`: Perplexity → Claude Haiku；max_tokens 提升至 2048；JSON.parse 獨立 try/catch + raw echo on fail；stop_reason=max_tokens 早返 502；修正 stale comment
+- `mcp/registry.template.json`: 移除 `@perplexity-ai/mcp-server` entry
+- `.mcp.json`（本機 untracked）: 移除 perplexity block
+
+[不動理由]
+- `lib/content/trending-sources.ts` Perplexity block：`enabled: !!process.env.PERPLEXITY_API_KEY` 已保護，key 空 = 積木不啟動，其他來源（Google News / Reddit / PTT）繼續運作
+- `lib/content/article/generate-core.ts` fetchRealSources：`if (!apiKey) return { sources: [], costUsd: 0 }` 已保護
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~8000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2M(fixed)/3m — 2 Major 已修（JSON.parse 隔離 + max_tokens 截斷處理）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PERPLEXITY_API_KEY | hits=3 (generate-core:194 + trending-sources:28,317 — 均為 gated usage，非 bug)
+- REALTEST_WAIVED: SMOKE_COVERED -- Next.js API routes; SDK call shape verified against generate-core.ts:703; cost: ~$0 (Haiku) vs Perplexity premium drain
+
+[剩餘風險] `fetchRealSources` in generate-core 仍使用 Perplexity key；quota 空時返 `{sources:[],costUsd:0}`，文章可生成但無 citation URLs。Perplexity block in trending-sources 也靜默停用。兩者皆可接受降級。
+
+[rollback] git revert 或手動還原 2 個 route 檔案
+
+---
+
 ### refactor(content-studio): 4-card UI/UX layout grouping (A文章/B品牌/C分發/D發布)
 
 [任務] 表單區所有 SectionToggle 混排一片，視覺無層次。重排為 4 色卡：A(藍)文章設定、B(紫)品牌資料、C(綠)分發設定、D(橘)發布。社群分發+電子報從輸出區（hasContent 條件）移至 Card C（永遠可見，無內容時顯示 placeholder）。

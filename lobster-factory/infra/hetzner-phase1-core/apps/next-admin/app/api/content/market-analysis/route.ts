@@ -7,10 +7,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// #5 — Competitor & pain-point market analysis. Uses Perplexity Sonar (web-grounded, same provider as
-// generate-core's fetchRealSources) to research the topic from multiple marketing angles, then returns
-// BOTH a structured summary (for the UI) and a ready-to-inject `context` string (threaded into
-// /api/content/generate as `marketContext`). Read-only research — no writes, no persistence.
+// #5 — Competitor & pain-point market analysis. Uses Claude Haiku (knowledge-based, not web-grounded)
+// to research the topic from multiple marketing angles, then returns BOTH a structured summary (for the
+// UI) and a ready-to-inject `context` string (threaded into /api/content/generate as `marketContext`).
+// Read-only research — no writes, no persistence.
 
 export interface MarketAnalysis {
   competitors: string[];   // notable players / alternatives in this space
@@ -68,14 +68,24 @@ Output ONLY the JSON, no markdown fences, no explanation.`;
     const client = new Anthropic({ apiKey });
     const msg = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [{ role: "user", content: prompt }],
     });
+    if (msg.stop_reason === "max_tokens") {
+      return NextResponse.json({ ok: false, error: "Response truncated — retry with a simpler keyword" }, { status: 502 });
+    }
     const _cost = { usd: textCallCostUsd({ model: "claude-haiku-4-5-20251001", inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens }), model: "claude-haiku-4-5-20251001", vendor: "Anthropic" };
-    const text = msg.content[0]?.type === "text" ? msg.content[0].text : "{}";
+    const textBlock = msg.content.find(b => b.type === "text");
+    const text = textBlock?.type === "text" ? textBlock.text : "";
+    if (!text) return NextResponse.json({ ok: false, error: "Empty model response" }, { status: 502 });
 
-    const match  = text.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(match?.[0] ?? "{}") as Record<string, unknown>;
+    const match = text.match(/\{[\s\S]*\}/);
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(match?.[0] ?? "{}") as Record<string, unknown>;
+    } catch {
+      return NextResponse.json({ ok: false, error: "JSON parse failed", raw: text.slice(0, 300) }, { status: 502 });
+    }
     const arr = (v: unknown): string[] =>
       Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim() !== "").map(x => x.trim()).slice(0, 8) : [];
 
