@@ -28,9 +28,7 @@ export async function GET(req: Request): Promise<Response> {
     const channels = await listIntegrations(clientId);
     return NextResponse.json({ ok: true, channels });
   } catch (err) {
-    return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    console.error("[social-channels] failed:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ ok: false, error: "failed to load channels" }, { status: 500 });
   }
 }
