@@ -10,7 +10,7 @@ import { openInCanvas } from "@/components/tools/canvas-handoff";
 
 const PRESETS = {
   // WP 網站 banners
-  "hero-desktop":  { label: "Hero 桌機",     w: 1920, h: 600,  aspect: "16:9", group: "wp" as const },
+  "hero-desktop":  { label: "Hero 桌機",     w: 1920, h: 640,  aspect: "16:9", group: "wp" as const },
   "hero-full":     { label: "Hero 全版",      w: 1920, h: 1080, aspect: "16:9", group: "wp" as const },
   "hero-mobile":   { label: "Hero 手機",      w: 768,  h: 768,  aspect: "1:1",  group: "wp" as const },
   "featured-og":   { label: "Featured / OG", w: 1200, h: 800,  aspect: "3:2",  group: "wp" as const },
