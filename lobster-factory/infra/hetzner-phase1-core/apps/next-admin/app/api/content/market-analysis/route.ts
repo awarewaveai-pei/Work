@@ -65,22 +65,14 @@ Return ONLY a valid JSON object with these arrays (each item a short phrase, 4-8
 Output ONLY the JSON, no markdown fences, no explanation.`;
 
   try {
-    const res = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "sonar",
-        messages: [{ role: "user", content: prompt }],
-        search_recency_filter: "year",
-      }),
-      signal: AbortSignal.timeout(45000),
+    const client = new Anthropic({ apiKey });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
     });
-    if (!res.ok) return NextResponse.json({ ok: false, error: `Perplexity error (${res.status})` }, { status: 502 });
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
-    // Compute cost immediately from usage — before the JSON parse that can throw — so it's tracked even
-    // on parse failures (the API call was still billed).
-    const _cost = { usd: textCallCostUsd({ model: "sonar", inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0 }), model: "sonar", vendor: "Perplexity" };
-    const text = data.choices?.[0]?.message?.content ?? "{}";
+    const _cost = { usd: textCallCostUsd({ model: "claude-haiku-4-5-20251001", inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens }), model: "claude-haiku-4-5-20251001", vendor: "Anthropic" };
+    const text = msg.content[0]?.type === "text" ? msg.content[0].text : "{}";
 
     const match  = text.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(match?.[0] ?? "{}") as Record<string, unknown>;
