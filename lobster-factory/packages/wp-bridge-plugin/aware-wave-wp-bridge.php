@@ -3,7 +3,7 @@
  * Plugin Name:       AwareWave WP Bridge
  * Plugin URI:        https://aware-wave.com
  * Description:       Ed25519-authenticated, self-healing control plane that lets an AI operate this site safely (signed requests, render-verify, auto-rollback).
- * Version:           0.15.0
+ * Version:           0.16.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            AwareWave
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AWBRIDGE_VERSION', '0.15.0' );
+define( 'AWBRIDGE_VERSION', '0.16.0' );
 define( 'AWBRIDGE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AWBRIDGE_REST_NAMESPACE', 'aware-wave-bridge/v1' );
 
@@ -72,4 +72,9 @@ add_action(
 // Product-editor UI to set the swatch hex map by hand (so a manually-built WooCommerce product gets
 // colour swatches too — not only the one-click publish flow). Admin screens only; zero front-end cost.
 ( new Admin\ColorSwatchAdmin() )->register();
+
+// Master colour palette (Products → 🎨 色票調色盤) — the operator-managed, provider-agnostic colour
+// list the storefront falls back to (when a product has no per-product map) and the per-product box
+// pre-fills from. The Printful one-click flow is untouched (it writes its own per-product Printful map).
+( new Admin\SwatchPalette() )->register();
 
