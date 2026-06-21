@@ -9,14 +9,27 @@ import { openInCanvas } from "@/components/tools/canvas-handoff";
 // ---------------------------------------------------------------------------
 
 const PRESETS = {
-  "fb-cover":  { label: "FB Cover",       w: 1200, h: 630,  aspect: "3:2"  },
-  "ig-post":   { label: "IG Post",         w: 1080, h: 1080, aspect: "1:1"  },
-  "ig-story":  { label: "IG Story",        w: 1080, h: 1920, aspect: "9:16" },
-  "yt-thumb":  { label: "YT Thumbnail",    w: 1280, h: 720,  aspect: "16:9" },
-  "linkedin":  { label: "LinkedIn Banner", w: 1584, h: 396,  aspect: "16:9" },
-  "twitter":   { label: "Twitter Header",  w: 1500, h: 500,  aspect: "16:9" },
-} as const satisfies Record<string, { label: string; w: number; h: number; aspect: string }>;
+  // WP 網站 banners
+  "hero-desktop":  { label: "Hero 桌機",     w: 1920, h: 600,  aspect: "16:9", group: "wp" as const },
+  "hero-full":     { label: "Hero 全版",      w: 1920, h: 1080, aspect: "16:9", group: "wp" as const },
+  "hero-mobile":   { label: "Hero 手機",      w: 768,  h: 400,  aspect: "16:9", group: "wp" as const },
+  "featured-og":   { label: "Featured / OG", w: 1200, h: 628,  aspect: "3:2",  group: "wp" as const },
+  "woo-product":   { label: "WooCommerce",    w: 800,  h: 800,  aspect: "1:1",  group: "wp" as const },
+  // 社交平台 post 圖
+  "ig-square":     { label: "IG 方形",        w: 1080, h: 1080, aspect: "1:1",  group: "social" as const },
+  "ig-portrait":   { label: "IG 直式 ★",     w: 1080, h: 1350, aspect: "4:5",  group: "social" as const },
+  "ig-story":      { label: "IG Story/Reels", w: 1080, h: 1920, aspect: "9:16", group: "social" as const },
+  "fb-post":       { label: "FB Post",        w: 1200, h: 628,  aspect: "3:2",  group: "social" as const },
+  "twitter-x":     { label: "X (Twitter)",    w: 1200, h: 675,  aspect: "16:9", group: "social" as const },
+  "pinterest":     { label: "Pinterest Pin",  w: 1000, h: 1500, aspect: "2:3",  group: "social" as const },
+  "linkedin-post": { label: "LinkedIn Post",  w: 1200, h: 627,  aspect: "3:2",  group: "social" as const },
+} as const satisfies Record<string, { label: string; w: number; h: number; aspect: string; group: "wp" | "social" }>;
 type PresetKey = keyof typeof PRESETS;
+
+const PRESET_GROUPS: { key: "wp" | "social"; label: string }[] = [
+  { key: "wp",     label: "WP 網站" },
+  { key: "social", label: "社交平台" },
+];
 
 const FONTS = [
   { value: "'Noto Sans TC', 'PingFang TC', sans-serif",  label: "黑體" },
@@ -61,7 +74,7 @@ interface State {
 }
 
 const INIT: State = {
-  preset:    "ig-post",
+  preset:    "featured-og",
   bgMode:    "color",
   bgColor:   "#1a1a2e",
   gradFrom:  "#667eea",
@@ -342,21 +355,30 @@ export default function BannerStudio() {
           {/* Step 1: Size */}
           <div className="card">
             <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 1 · 尺寸</h2>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {(Object.keys(PRESETS) as PresetKey[]).map((k) => (
-                <button
-                  key={k}
-                  className={s.preset === k ? "btn btn-primary" : "btn btn-ghost"}
-                  style={{ fontSize: 12, padding: "4px 10px" }}
-                  onClick={() => set("preset", k)}
-                >
-                  {PRESETS[k].label}
-                  <span style={{ opacity: 0.6, marginLeft: 4, fontSize: 10 }}>
-                    {PRESETS[k].w}×{PRESETS[k].h}
-                  </span>
-                </button>
-              ))}
-            </div>
+            {PRESET_GROUPS.map((grp) => (
+              <div key={grp.key} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, opacity: 0.5, marginBottom: 6 }}>
+                  {grp.label}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  {(Object.keys(PRESETS) as PresetKey[])
+                    .filter((k) => PRESETS[k].group === grp.key)
+                    .map((k) => (
+                      <button
+                        key={k}
+                        className={s.preset === k ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 11, padding: "3px 8px" }}
+                        onClick={() => set("preset", k)}
+                      >
+                        {PRESETS[k].label}
+                        <span style={{ opacity: 0.55, marginLeft: 4, fontSize: 9 }}>
+                          {PRESETS[k].w}×{PRESETS[k].h}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Step 2: Background */}
