@@ -178,6 +178,8 @@ export default function CanvasEditor() {
           setTextSelected(false);
         }
         setImageSelected(o?.type === "image");
+        // reflect THIS image's own applied edge style (or none) in the edge-mask panel
+        setEdgeStyleApplied((o as unknown as { edgeStyle?: EdgeMaskId } | null)?.edgeStyle ?? null);
         setAnySelected(!!o);
         setMultiSelected((o as { type?: string } | null)?.type === "activeselection");
         setGroupSelected((o as { type?: string } | null)?.type === "group");
@@ -205,6 +207,7 @@ export default function CanvasEditor() {
       canvas.on("selection:cleared", () => {
         setTextSelected(false);
         setImageSelected(false);
+        setEdgeStyleApplied(null);
         setAnySelected(false);
         setMultiSelected(false);
         setGroupSelected(false);
@@ -940,6 +943,7 @@ export default function CanvasEditor() {
         originX: img.originX, originY: img.originY, name: img.name,
       });
       (baked as unknown as Record<string, unknown>).edgeOriginal = base;
+      (baked as unknown as Record<string, unknown>).edgeStyle = styleId;
       canvas.remove(img);
       canvas.add(baked);
       canvas.setActiveObject(baked);

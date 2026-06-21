@@ -4,6 +4,24 @@
 
 ## 2026-06-21
 
+### feat(studio): Mockup 版面左右對調（預覽大）+ Canvas 加「邊緣遮罩」工具
+
+[任務] 使用者要求：① Mockup 預覽放大、控制移右、預覽移左；② Canvas 加上改邊緣工具。
+
+[已修改]
+- **Mockup**（`MockupStudio.tsx`，CSS-only）：grid `360px 1fr`→`1fr 360px` + `alignItems:start`；控制面板加 `gridColumn:2`（移右）、預覽面板加 `gridColumn:1,gridRow:1`（移左大）。DOM 順序不動，純 grid 對調。
+- **Canvas**（`CanvasEditor.tsx`）：加「✂️ 邊緣遮罩」SidebarPanel（imageSelected 區塊內、genfx 後）：24 筆刷格 + 強度滑桿（asset disable）。`applyEdgeMaskToSelected` 鏡像 `posterizeSelected`：取選取 image `toDataURL(withoutTransform)`→`applyEdgeMask`→新 FabricImage 套回原 transform→換掉。**取代非疊加**：物件上存 `edgeOriginal`(pre-mask 原圖) 當遮罩來源 + `edgeStyle`(風格id)；切換筆刷從 edgeOriginal 重遮罩。選取變化時依物件還原 `edgeStyleApplied`（修 critic Major：跨物件 chip 高亮殘留）。`EDGE_PREVIEWS` 模組常數複用。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1M(已修)/4n/3sug；transform 保留與 posterizeSelected byte-identical / async stale guard / try-finally / 取代非疊加(無累積失真+縮放漂移) / 同源不 taint / Mockup grid 顯式 gridColumn+gridRow 無重疊 全 verified
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=applyEdgeMaskToSelected\|EDGE_PREVIEWS\|edgeOriginal\|edgeStyleApplied | hits=0 外部（只 CanvasEditor.tsx）
+- 已知行為（critic note，Phase1 可接受）：① Canvas 邊緣建議「最後一步」做 —— 套邊後再改色階/濾鏡，切換筆刷時會從 edgeOriginal 快照重算而丟掉新濾鏡 ② edgeOriginal 不進 toJSON（省存檔大小），reload 後再切筆刷會從已套邊的圖重算，建議 reload 後重套。
+
+[剩餘風險] Canvas 邊緣真實瀏覽器套用待部署後 browser-test。Mockup 窄螢幕(<520px)固定 360px 欄會擠（同改前，非退化）。
+
+[rollback] git revert。Mockup 純 grid 對調、Canvas 純新增面板+callback。
+
 ### feat(ops): 統一客戶 Hub — 左側 ClientPanelNav + 五頁 Tab 整合（Content/Integrations/Provisioning/Maintenance/Settings）
 
 [任務] 問題根本：各頁面（/tools/content、/ops/clients、/ops/onboarding、/ops/integrations、/build）各自為政無關聯；/tools/content/sites「網站管理」用 tab 跳頁、客戶多時不堪使用；SiteManager.tsx 深色 hardcode 色系。
