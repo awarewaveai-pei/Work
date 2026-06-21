@@ -1748,6 +1748,7 @@ export default function ContentStudio() {
 
   async function loadPostizChannels() {
     if (!selectedSiteId) { setPostizChError("請先選擇目標客戶"); return; }
+    if (postizChLoading) return;
     setPostizChLoading(true); setPostizChError("");
     try {
       const res = await fetch(`/api/content/social-channels?clientId=${encodeURIComponent(selectedSiteId)}`);
@@ -1765,7 +1766,7 @@ export default function ContentStudio() {
       content: postizCustomText[platform] ?? getSynContentForPlatform(platform),
     })).filter(p => p.content.trim());
 
-    if (posts.length === 0) { setPostizPushStatus("error"); return; }
+    if (posts.length === 0) { setPostizChError("所選頻道內容皆為空，請填入貼文內容"); return; }
 
     if (postizMode === "now" && !confirmed) {
       setPostizShowConfirm(true);
@@ -1793,7 +1794,8 @@ export default function ContentStudio() {
       };
       if (json.ok) {
         setPostizPushStatus("done");
-        setPostizPushResults(json.results ?? []);
+        const skippedAsResults = (json.skipped ?? []).map(s => ({ platform: s.platform, status: "error" as const, error: s.error }));
+        setPostizPushResults([...(json.results ?? []), ...skippedAsResults]);
       } else {
         setPostizPushStatus("error");
       }
@@ -4324,8 +4326,9 @@ export default function ContentStudio() {
                 取消
               </button>
               <button className="btn-primary" style={{ fontSize: 13, background: "#dc2626", borderColor: "#dc2626" }}
-                onClick={() => void handlePostizPublish(true)}>
-                確認發佈
+                onClick={() => void handlePostizPublish(true)}
+                disabled={postizPushStatus === "pushing"}>
+                {postizPushStatus === "pushing" ? "推送中…" : "確認發佈"}
               </button>
             </div>
           </div>
