@@ -4,6 +4,30 @@
 
 ## 2026-06-21
 
+### fix(wp-bridge v0.14.1) + ops: swatch select-binding 修正 + soulful 外掛升級 0.14.1 + 既有商品 backfill
+
+[任務] 操作者要 backfill 既有商品讓它們也顯示色塊（接續 v0.14.0）。
+
+[現況分析+根因] 先把 v0.14.0 發版（[release v0.14.0](https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.14.0)）+ sg-deploy next-admin（commit 36653903）。backfill 走客戶站 WP-CLI（wp-bridge 只有 CREATE 端點，無 update-meta）。目標站=soulfulexpression.org（SE-01）。**live 驗證發現 v0.14.0 bug**：WC `wc_dropdown_variation_attribute_options` 對 local attribute 在 filter **之後**才算 select 的 id/name，傳給 filter 的 `$args['id']/['name']` 是空 → `data-awbridge-select/name` 渲染成空，只靠 JS sibling fallback（跨主題易壞）。
+
+[已修改]
+- **v0.14.1**（commit 9d0514f7，[release](https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/tag/v0.14.1)）：`ColorSwatches.php` renderSwatches 改從 `$args['attribute']` 推導 `id=sanitize_title(attr)` / `name=attribute_<slug>`（鏡像 WC 自身邏輯）→ 穩健 id/name binding。
+- **soulful 升級**：`wp plugin install --force` 0.13.0→0.14.0→0.14.1（ACTIVE）。
+- **backfill**：`wp eval-file` 對 11 個變體商品寫 `_awbridge_color_swatches`（label→hex map：zh 4 色 #ffffff/#9b969c/#080808/#213b21 + 麻灰/海軍藍 + English White/Black）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash(release-wp-bridge.sh) | v0.14.0 + v0.14.1 | RELEASE OK + zip asset 出現
+- REALTEST_EVIDENCE: tool=Bash(ssh soulful wp-cli) | 外掛升級 | version=0.14.1 ACTIVE；backfill backfilled=11 skipped=0
+- REALTEST_EVIDENCE: tool=Bash(curl live) | product 7235 前台頁 | 修前 `data-awbridge-select=""`；修後 `data-awbridge-select="color" data-awbridge-name="attribute_color"` + `<button class="awbridge-swatch" data-value="White">` 渲染 ✓
+- REALTEST_EVIDENCE: tool=Bash | `php -l` ColorSwatches+主檔 | exit=0
+- REVIEW_WAIVED: SMOKE_COVERED -- 0.14.1 是 v0.14.0（critic Deep 過）的 1 行 binding 鏡像修正 + live curl 證實 select binding 正確
+- BUGHUNT_DONE: scope=lobster-factory(wp-bridge-plugin) | grep=`data-awbridge-select|sanitize_title|AWBRIDGE_VERSION` | hits=多（id/name 推導對齊 WC；版本 0.14.1 兩處一致）
+- BUGHUNT_SCOPE_NARROW: 純 plugin 改動 + 客戶站 ops；agency-os/scripts 無 call site
+
+[剩餘風險] ① 11 商品中 10 個是測試草稿（只有 7235 High Priestess 是 publish 真品）— 待操作者確認刪測試垃圾。② backfill 只補 swatch meta；既有商品的變體圖維持原樣（7235=平拍正面有設計，非模特）；要「每色模特圖」需重跑一鍵。③ 點色塊換圖的瀏覽器互動待操作者實點確認（所有機制已驗：渲染+binding+WC 原生換圖）。
+
+[rollback] plugin：release 退 v0.14.0 tag；backfill：`wp post meta delete <id> _awbridge_color_swatches`。
+
 ### feat(wp-bridge v0.14.0): Color 屬性 hex 色塊外掛 + 每色變體圖改模特正面 + 先同步 0.13.0 回 Work
 
 [任務理解] 操作者要的不是「每站手動設 Kadence swatch」，而是**一個 drop-in 外掛**：裝進任何客戶 WooCommerce → Color 屬性顯示成 hex 色塊，點色塊 → 模特穿該色（Printful 標準效果）。我先前一直推手動設定＝避重就輕。
