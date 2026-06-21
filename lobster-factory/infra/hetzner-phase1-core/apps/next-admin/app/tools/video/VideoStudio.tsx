@@ -519,18 +519,29 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)" }}>場景設定</span>
 
                 {/* 素材模式 */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>素材模式</span>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {[
-                      { id: "pexels-video", label: "📹 Pexels 真實影片", badge: "$0", tip: "真實動態影片片段，最自然" },
-                      { id: "pexels-all",   label: "🖼 Pexels 照片動畫", badge: "$0", tip: "免費照片 + Ken Burns 縮放效果" },
-                      { id: "flux-schnell", label: "✨ AI 生圖",         badge: "~$0.003/張", tip: "Flux AI 插圖，視覺一致性高" },
+                      { id: "pexels-video", label: "📹 真實影片", badge: "$0", tip: "真實動態影片片段，最自然" },
+                      { id: "pexels-all",   label: "🖼 照片動畫", badge: "$0", tip: "免費照片 + Ken Burns 縮放效果" },
+                      { id: "__ai__",       label: "✨ AI 生圖",  badge: "按模型", tip: "Flux / Ideogram 等 AI 插圖" },
                     ].map(({ id, label, badge, tip }) => {
-                      const active = imageModel === id;
+                      const isAiMode = id === "__ai__";
+                      const active = isAiMode
+                        ? (imageModel !== "pexels-video" && imageModel !== "pexels-all")
+                        : imageModel === id;
                       return (
                         <button key={id} type="button" title={tip}
-                          onClick={() => setImageModel(id)} disabled={isBusy}
+                          onClick={() => {
+                            if (isAiMode) {
+                              if (imageModel === "pexels-video" || imageModel === "pexels-all") setImageModel(DEFAULT_IMAGE_MODEL);
+                              // else keep current AI model
+                            } else {
+                              setImageModel(id);
+                            }
+                          }}
+                          disabled={isBusy}
                           style={{
                             padding: "6px 12px", borderRadius: 8, border: `2px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
                             background: active ? "var(--accent)" : "var(--bg-canvas)",
@@ -548,6 +559,19 @@ export default function VideoStudio({ initial }: { initial?: VideoStudioInitial 
                   {imageModel === "pexels-video" && (
                     <div style={{ fontSize: 11, color: "#065f46", background: "#d1fae5", padding: "6px 10px", borderRadius: 6, lineHeight: 1.6 }}>
                       ✅ 每場景自動搜尋 Pexels 影片片段（HD MP4）→ EU FFmpeg 拼接 + TTS 配音。費用 $0。
+                    </div>
+                  )}
+                  {/* AI生圖模式：顯示完整生圖模型下拉選單 */}
+                  {imageModel !== "pexels-video" && imageModel !== "pexels-all" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>生圖模型</span>
+                      <select value={imageModel} onChange={(e) => setImageModel(e.target.value)} style={inputStyle} disabled={isBusy}>
+                        {Object.entries(IMAGE_RATES)
+                          .filter(([id]) => id !== "pexels-video" && id !== "pexels-all")
+                          .map(([id, r]) => (
+                            <option key={id} value={id}>{r.label} — {r.vendor} (${r.usd}/張)</option>
+                          ))}
+                      </select>
                     </div>
                   )}
                 </div>
