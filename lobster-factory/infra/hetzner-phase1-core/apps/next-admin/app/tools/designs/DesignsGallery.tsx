@@ -1147,24 +1147,17 @@ export default function DesignsGallery() {
               background: "var(--color-background-primary, #1c1c1c)",
               border: "1px solid rgba(127,127,127,0.3)",
               borderRadius: 12,
-              width: "min(1200px, 96vw)",
+              width: "min(1400px, 97vw)",
               height: "92vh",
               overflow: "hidden",
               padding: 14,
               display: "flex",
-              flexDirection: "column",
-              gap: 10,
+              flexDirection: "row",
+              gap: 14,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>✨ 改邊緣</span>
-              <span style={{ fontSize: 12, opacity: 0.55 }}>
-                {editAsset.metadata?.card_name ?? editAsset.metadata?.subject ?? editAsset.metadata?.theme ?? "設計圖"} → 透明 PNG
-              </span>
-              <button className="designs-action-btn" style={{ marginLeft: "auto" }} onClick={closeEdgeEdit}>關閉 ✕</button>
-            </div>
-
-            <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {/* ── LEFT: big preview (原圖 + 套邊後) ── */}
+            <div style={{ flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
                 <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4, flex: "none" }}>原圖</div>
                 <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1196,92 +1189,113 @@ export default function DesignsGallery() {
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={editResult} alt="套邊後" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                   ) : (
-                    <span style={{ fontSize: 13, color: "#555" }}>← 選下面一個筆刷</span>
+                    <span style={{ fontSize: 13, color: "#555" }}>選右側的筆刷 →</span>
                   )}
                 </div>
               </div>
             </div>
 
-            {editError ? <span style={{ fontSize: 12, color: "#e5484d" }}>套用失敗：{editError}</span> : null}
+            {/* ── RIGHT: 工具列側欄 ── */}
+            <div style={{ flex: "0 0 300px", display: "flex", flexDirection: "column", gap: 10, minHeight: 0, borderLeft: "1px solid rgba(127,127,127,0.2)", paddingLeft: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none" }}>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>✨ 改邊緣</span>
+                <button className="designs-action-btn" style={{ marginLeft: "auto" }} onClick={closeEdgeEdit}>關閉 ✕</button>
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.55, flex: "none" }}>
+                {editAsset.metadata?.card_name ?? editAsset.metadata?.subject ?? editAsset.metadata?.theme ?? "設計圖"} → 透明 PNG
+              </div>
 
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", flex: "none" }}>
-              {edgePreviews.map((pv) => {
-                const active = editStyle === pv.id;
-                return (
-                  <button
-                    key={pv.id}
-                    type="button"
-                    title={pv.en}
-                    disabled={editBusy}
-                    onClick={() => void applyEdgeStyle(pv.id)}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: 3,
-                      width: 58,
-                      padding: 4,
-                      borderRadius: 8,
-                      cursor: "pointer",
-                      background: active ? "rgba(99,102,241,0.18)" : "rgba(127,127,127,0.06)",
-                      border: `1px solid ${active ? "#6366f1" : "rgba(127,127,127,0.25)"}`,
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={pv.svg} alt={pv.zh} style={{ width: 38, height: 38, background: "#3a3a3a", borderRadius: 4 }} />
-                    <span style={{ fontSize: 10, opacity: 0.8, lineHeight: 1.1, textAlign: "center" }}>{pv.zh}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none", opacity: editIsAsset ? 0.4 : 1 }}>
-              <span style={{ fontSize: 11, opacity: 0.6 }}>邊緣強度</span>
-              <input
-                type="range"
-                min={10}
-                max={90}
-                step={1}
-                value={editAmount}
-                disabled={editBusy || editIsAsset}
-                onChange={(e) => setEditAmount(Number(e.target.value))}
-                onPointerUp={() => { if (editStyle && !editIsAsset) void applyEdgeStyle(editStyle); }}
-                style={{ flex: 1 }}
-              />
-              <span style={{ fontSize: 11, opacity: 0.6, width: 44, textAlign: "right" }}>{editIsAsset ? "固定" : editAmount}</span>
-            </div>
-
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flex: "none" }}>
-              <button
-                className="designs-action-btn"
-                disabled={!editResult || editSaving || !!editSavedUrl}
-                onClick={() => void saveEdged()}
+              {/* 筆刷格 — 填滿側欄高度，只有螢幕太矮才捲 */}
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: "auto",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(50px, 1fr))",
+                  gap: 6,
+                  alignContent: "start",
+                }}
               >
-                {editSavedUrl ? "已存回 ✓" : editSaving ? "儲存中…" : "存回 My Designs"}
-              </button>
-              <button
-                className="designs-action-btn"
-                disabled={!editResult || editSaving}
-                onClick={() => void goToProductFromEdit()}
-                style={{ borderColor: "#6366f1" }}
-              >
-                → 去建商品
-              </button>
-              {editResult ? (
+                {edgePreviews.map((pv) => {
+                  const active = editStyle === pv.id;
+                  return (
+                    <button
+                      key={pv.id}
+                      type="button"
+                      title={pv.en}
+                      disabled={editBusy}
+                      onClick={() => void applyEdgeStyle(pv.id)}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 2,
+                        padding: 3,
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        background: active ? "rgba(99,102,241,0.18)" : "rgba(127,127,127,0.06)",
+                        border: `1px solid ${active ? "#6366f1" : "rgba(127,127,127,0.25)"}`,
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={pv.svg} alt={pv.zh} style={{ width: "100%", aspectRatio: "1", background: "#3a3a3a", borderRadius: 4 }} />
+                      <span style={{ fontSize: 9, opacity: 0.8, lineHeight: 1.05, textAlign: "center" }}>{pv.zh}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {editError ? <span style={{ fontSize: 12, color: "#e5484d", flex: "none" }}>套用失敗：{editError}</span> : null}
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none", opacity: editIsAsset ? 0.4 : 1 }}>
+                <span style={{ fontSize: 11, opacity: 0.6 }}>強度</span>
+                <input
+                  type="range"
+                  min={10}
+                  max={90}
+                  step={1}
+                  value={editAmount}
+                  disabled={editBusy || editIsAsset}
+                  onChange={(e) => setEditAmount(Number(e.target.value))}
+                  onPointerUp={() => { if (editStyle && !editIsAsset) void applyEdgeStyle(editStyle); }}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ fontSize: 11, opacity: 0.6, width: 36, textAlign: "right" }}>{editIsAsset ? "固定" : editAmount}</span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: "none" }}>
                 <button
                   className="designs-action-btn"
-                  onClick={() => {
-                    const a = document.createElement("a");
-                    a.href = editResult;
-                    a.download = `${designBaseName(editAsset)}-edge.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                  }}
+                  disabled={!editResult || editSaving || !!editSavedUrl}
+                  onClick={() => void saveEdged()}
                 >
-                  下載 PNG
+                  {editSavedUrl ? "已存回 ✓" : editSaving ? "儲存中…" : "存回 My Designs"}
                 </button>
-              ) : null}
+                <button
+                  className="designs-action-btn"
+                  disabled={!editResult || editSaving}
+                  onClick={() => void goToProductFromEdit()}
+                  style={{ borderColor: "#6366f1" }}
+                >
+                  → 去建商品
+                </button>
+                {editResult ? (
+                  <button
+                    className="designs-action-btn"
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = editResult;
+                      a.download = `${designBaseName(editAsset)}-edge.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                    }}
+                  >
+                    下載 PNG
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
