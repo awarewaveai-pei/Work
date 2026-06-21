@@ -936,6 +936,20 @@ const SUPPORTED_PLATFORMS = new Set([
   "threads", "tiktok", "pinterest", "bluesky",
 ]);
 
+async function fetchSocialData(orgId: string) {
+  const [intsRes, chRes] = await Promise.all([
+    fetch("/api/content/social-admin/integrations"),
+    fetch(`/api/content/social-channels?clientId=${orgId}`),
+  ]);
+  if (!intsRes.ok) throw new Error("社群整合載入失敗");
+  if (!chRes.ok) throw new Error("已連結帳號載入失敗");
+  const [intsData, chData] = await Promise.all([intsRes.json(), chRes.json()]);
+  return {
+    integrations: (intsData.integrations ?? []) as PostizIntegrationItem[],
+    connected: (chData.channels ?? []) as ConnectedChannelItem[],
+  };
+}
+
 function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [integrations, setIntegrations] = useState<PostizIntegrationItem[]>([]);
   const [connected, setConnected] = useState<ConnectedChannelItem[]>([]);
@@ -943,28 +957,35 @@ function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
+  // useEffect with mounted guard to prevent stale state on unmount/org change
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setError(null);
+    fetchSocialData(org.id)
+      .then(({ integrations: ints, connected: conn }) => {
+        if (mounted) { setIntegrations(ints); setConnected(conn); }
+      })
+      .catch((e: unknown) => {
+        if (mounted) setError(e instanceof Error ? e.message : "載入失敗");
+      })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [org.id]);
+
   async function load() {
     setLoading(true);
     setError(null);
     try {
-      const [intsRes, chRes] = await Promise.all([
-        fetch("/api/content/social-admin/integrations"),
-        fetch(`/api/content/social-channels?clientId=${org.id}`),
-      ]);
-      if (!intsRes.ok) throw new Error(`integrations fetch failed: ${intsRes.status}`);
-      if (!chRes.ok) throw new Error(`channels fetch failed: ${chRes.status}`);
-      const [intsData, chData] = await Promise.all([intsRes.json(), chRes.json()]);
-      setIntegrations(intsData.integrations ?? []);
-      setConnected(chData.channels ?? []);
+      const { integrations: ints, connected: conn } = await fetchSocialData(org.id);
+      setIntegrations(ints);
+      setConnected(conn);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(e instanceof Error ? e.message : "載入失敗");
     } finally {
       setLoading(false);
     }
   }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [org.id]);
 
   async function connect(integration: PostizIntegrationItem) {
     setSaving(integration.id);
@@ -972,17 +993,22 @@ function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
       const res = await fetch("/api/content/social-admin/connections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // platform is derived server-side from postizIntegrationId; do not send from client
         body: JSON.stringify({
           clientId: org.id,
           postizIntegrationId: integration.id,
-          platform: integration.identifier,
           label: integration.name,
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        if (res.status === 409) throw new Error("已連結");
+        if (res.status === 403) throw new Error("權限不足");
+        if (res.status === 404) throw new Error("找不到帳號或客戶");
+        throw new Error(`連結失敗 (${res.status})`);
+      }
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(e instanceof Error ? e.message : "連結失敗");
     } finally {
       setSaving(null);
     }
@@ -995,10 +1021,13 @@ function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
         `/api/content/social-admin/connections?clientId=${encodeURIComponent(org.id)}&integrationId=${encodeURIComponent(integrationId)}`,
         { method: "DELETE" }
       );
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        if (res.status === 403) throw new Error("權限不足");
+        throw new Error(`解除失敗 (${res.status})`);
+      }
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(e instanceof Error ? e.message : "解除失敗");
     } finally {
       setSaving(null);
     }

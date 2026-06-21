@@ -159,7 +159,7 @@
 | 項目 | 現況 |
 |---|---|
 | Postiz | ✅ **已部署** postiz.aware-wave.com v2.11.3（EU，commit a951190c，2026-06-14 驗過）|
-| Postiz 整合碼 | ❌ **零**（grep 全 repo 無 client / 無 /api/content/social-publish；POSTIZ plan Task 3 未動）|
+| Postiz 整合碼 | ✅ Task 3+4 完成 2026-06-22：`lib/content/postiz.ts`（getPostizConfig/listIntegrations/listAllIntegrations/uploadMedia/createSocialPost/assertCanPublishNow）+ `social-publish` route + `social-channels` route + `social-admin/integrations` + `social-admin/connections` + `ClientHubTabs` 社群頻道 tab |
 | Python publisher.py | ❌ 10 平台直連（IG/FB/TikTok/Threads/Reddit 直發 = 踩 R1+R4 紅線）→ **刪** |
 
 **圖例**：✅ 可用 ｜ 🟡 部分 ｜ 🔴 缺口/死碼 ｜ ❌ 要刪

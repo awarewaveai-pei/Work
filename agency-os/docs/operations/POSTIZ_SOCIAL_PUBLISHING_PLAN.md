@@ -234,7 +234,7 @@ create table social_postiz_connections (
 - **Task 1** `devops-engineer`：✅ 完成（Postiz v2.11.3 live，Bluesky e2e 2026-06-15）；補項：smoke test 記錄、備份策略確認、`API_LIMIT` env 確認。
 - **Task 2** `web-researcher` + 操作者：各平台 dev app + 審核送件，callback 指向 Postiz。並行整條 code track；每平台審核通過時上線，不阻塞。
 - **Task 3** `fullstack-engineer`：✅ 完成 2026-06-22 — `lib/content/postiz.ts` + `/api/content/social-publish/route.ts`（Gate E.1 已有 `lib/supabase-server.ts`；Gate A/D 已完成）。
-- **Task 4** `fullstack-engineer`：帳號連接 flow + `/api/content/social-channels` route + admin mapping UI（把 postiz_integration_id 對應到 client_id）。需 Gate E.2 + B 完成。
+- **Task 4** `fullstack-engineer`：✅ 完成 2026-06-22 — `GET /api/content/social-channels?clientId=xxx`（operator+）+ `GET /api/content/social-admin/integrations`（admin+）+ `POST/DELETE /api/content/social-admin/connections`（admin+，server-side org 驗證 + platform 由 server 從 Postiz 推導，不信任 client）+ `ClientHubTabs` 新增「社群頻道」tab（connect/disconnect UI，useEffect 含 mounted guard）。
 - **Task 5** `fullstack-engineer`：把死面板接成真發佈（channel 選擇 + Draft/Now 模式 toggle + 二次確認 modal + 發佈鈕，帶 `imgResult.imageUrl`）。需 Task 3 + 4 + Gate C 完成。
 - **Task 6** `fullstack-engineer`：ops runbook（token 過期重連、rate limit 處理、連線狀態巡查），回扣 SSOT §49。
 

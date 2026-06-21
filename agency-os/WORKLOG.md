@@ -4,6 +4,31 @@
 
 ## 2026-06-22
 
+### feat(postiz): Task 4 完成 — social-channels route + social-admin CRUD + ClientHubTabs 社群頻道 tab
+
+[任務理解] Task 3 建好了 postiz lib + social-publish route，但 social_postiz_connections 表無 rows，需要 admin UI 讓操作者把 Postiz 整合帳號 assign 給 client。
+
+[已修改]
+- `lib/content/postiz.ts`：export `RawIntegration` type + add `listAllIntegrations()`（thin wrapper over 內部 `fetchPostizIntegrations`）
+- `app/api/content/social-channels/route.ts`（新）：GET `?clientId=xxx`，operator+ auth，呼叫 `listIntegrations(clientId)`，回 `SocialChannel[]`
+- `app/api/content/social-admin/integrations/route.ts`（新）：GET，admin+ auth，呼叫 `listAllIntegrations()`，回 raw Postiz 整合列表
+- `app/api/content/social-admin/connections/route.ts`（新）：POST+DELETE，admin+ auth；POST 驗 org 存在（`organizations` FK）+ 驗 integrationId 在 Postiz 存在 + **server-side 推導 platform**（不信任 client 傳值）+ label 截 200 chars；409 for duplicate；錯誤不洩漏 DB internals
+- `app/ops/clients/[slug]/ClientHubTabs.tsx`：加 `useEffect` import + 新 "社群頻道" tab + `SocialChannelsTab` 元件（`fetchSocialData` 工具函式 + useEffect mounted guard + connect/disconnect 含友善錯誤訊息）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=<60000 (兩次 clean pass — 改前 + 改後 critic 修正後)
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=2c/3m/3s → 全部 Major 修完（org 驗證 + server-side platform + error scrubbing + useEffect race + friendly errors）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=social.channels|social.admin|social_postiz|SocialChannel|listIntegrations|listAllIntegrations|createSocialPost|social.publish | hits=多（全是新建 callsites，無 stale 舊 callers；stale 聲明 CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md:162 + POSTIZ_SOCIAL_PUBLISHING_PLAN.md:237 已更新）
+
+[剩餘風險]
+- Gate C 未跑：real media upload test（multipart with Bluesky image）— 需 Task 5 前完成
+- `social_postiz_connections` 仍 0 rows — 需操作者打開 client hub「社群頻道」tab 手動 connect
+- Task 5 dead panel 接線（ContentStudio.tsx channel selector + Draft/Now toggle）尚未動工
+
+[rollback]
+- DB：`drop table social_postiz_connections;` — 無下游 FK 依賴（Tasks 3+4 全在 application layer）
+- Code：`git revert` Task 3+4 commits（約 6 個 checkpoint commits）
+
 ### fix(pod+content): 上 WP 的圖一律 WebP ≤150KB（顯示衍生圖邊界）— R2 原圖 / Printful 印刷檔不碰
 
 [任務] 操作者回報：一鍵生成的圖傳到 WP 仍是 3MB/7MB PNG，違反「≤150KB + WebP」規則。
