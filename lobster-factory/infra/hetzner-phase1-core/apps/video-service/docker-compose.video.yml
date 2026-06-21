@@ -50,6 +50,7 @@ services:
       start_period: 20s
     networks:
       - video-net
+      - lobster-net    # n8n (lobster-net) → video-service:8732 直連，不過 host loopback
     deploy:
       resources:
         limits:
@@ -60,3 +61,6 @@ services:
 networks:
   video-net:
     name: lobster-video-net
+  lobster-net:
+    external: true
+    name: lobster-net
