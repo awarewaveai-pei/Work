@@ -4,6 +4,25 @@
 
 ## 2026-06-22
 
+### feat(postiz): Gate C 完成 — media upload pipeline 實測通過（Bluesky draft + image）
+
+[任務理解] Gate C = Postiz `/public/v1/upload`（multipart）+ `/public/v1/posts`（draft+image）端到端驗證。POSTIZ_API_KEY 從 SG `.env` 取用，測試從 SG 對 postiz.aware-wave.com 執行。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=curl POST /public/v1/upload (multipart PNG 69B) | exit=0 → HTTP 201 `{ id: "e9d185d9...", path: "https://postiz.aware-wave.com/uploads/2026/06/21/ba8810a2aef6f3e16f234fdc2f8b2d49d.png" }`
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=curl POST /public/v1/posts (type:draft, Bluesky, image ref) | exit=0 → HTTP 201 `[{ postId: "cmqo1wijz0005p58ncl1mtssr", integration: "cmqe3jw960001p58nt0xohbi8" }]`
+- REVIEW_WAIVED: NA -- curl/HTTP test only, no code change
+- BUGHUNT_WAIVED: NA -- no code change, runtime test only
+
+[已修改]
+- `POSTIZ_SOCIAL_PUBLISHING_PLAN.md`：Gate C → ✅ + Phase 2 gates 表更新 + Gate C 段加實測結果
+
+[剩餘風險]
+- 測試 draft `cmqo1wijz0005p58ncl1mtssr` 在 Postiz UI 中，需手動刪除
+- Rate limit: 30/hour；高頻批量發布時需留意（v2 backlog）
+
+[rollback] N/A — 無 code 改動
+
 ### feat(postiz): Task 5 完成 — ContentStudio 社群發佈面板（channel selector + Draft/Now toggle + 二次確認 modal）
 
 [任務理解] ContentStudio.tsx 社群發佈區塊為「dead panel」— state、UI、handler 皆缺失。Task 5 接線：loadPostizChannels()、handlePostizPublish()、per-channel textarea（synContent 預填 / 手動）、Draft/Now toggle、confirm modal、results 含 skipped。

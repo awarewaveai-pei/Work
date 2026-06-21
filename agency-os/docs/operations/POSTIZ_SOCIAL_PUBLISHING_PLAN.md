@@ -118,7 +118,13 @@ export type SocialChannel = {
 
 ---
 
-## Gate C — media upload pipeline（完整修訂）
+## Gate C — media upload pipeline（完整修訂）✅ 完成 2026-06-22
+
+**實測結果（from SG `5.223.93.113` → `postiz.aware-wave.com`）：**
+- `POST /public/v1/upload` (multipart PNG 69B) → HTTP 201 `{ id: "e9d185d9-f649-4274-b6f6-dff9ffdcb323", path: "https://postiz.aware-wave.com/uploads/2026/06/21/ba8810a2aef6f3e16f234fdc2f8b2d49d.png" }`
+- `POST /public/v1/posts` (type:draft, Bluesky + image) → HTTP 201 `[{ postId: "cmqo1wijz0005p58ncl1mtssr", integration: "cmqe3jw960001p58nt0xohbi8" }]`
+- Rate limit: `x-ratelimit-limit: 30 / reset: 3600s` 確認
+- ⚠️ 測試 draft `cmqo1wijz0005p58ncl1mtssr` 在 Postiz UI 中，需手動刪除
 
 **[C1 補強]** `imgResult.imageUrl` 有兩種形態，Postiz 用 `STORAGE_PROVIDER=local`（不支援 upload-from-url）。唯一路徑：multipart upload 到 `POST /public/v1/upload`。
 
@@ -200,7 +206,7 @@ create table social_postiz_connections (
 | **E.2** Multi-workspace 可行性 | ✅ 2026-06-22 | D6 confirmed: single workspace + allowlist |
 | **A** Base path smoke test | ✅ 2026-06-22 | `POSTIZ_API_BASE_URL=https://postiz.aware-wave.com/api` 鎖定 |
 | **B** Integrations schema snapshot | ✅ 2026-06-22 | fixture JSON 存入 `__tests__/fixtures/` |
-| **C** Media upload pipeline | ⏳ Task 5 開工前 | server-side fetch+multipart 實測通過 |
+| **C** Media upload pipeline | ✅ 2026-06-22 | multipart upload → `{ id, path }` + draft+image POST → `postId` 實測通過（from SG→postiz.aware-wave.com） |
 | **D** Tenant isolation schema | ✅ 2026-06-22 | `social_postiz_connections` deployed on EU Supabase |
 
 ---
