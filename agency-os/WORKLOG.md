@@ -38,7 +38,9 @@
 - REVIEW_WAIVED: DOC_ONLY -- ClientHubTabs prop interfaces verified by tsc zero-error; CSS vars reviewed inline
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=ClientHubTabs|ClientPanelNav|OrgStub | hits=0 (no stale callers outside the 5 modified files)
 
-[剩餘風險] SiteManager.tsx 深色 hardcode 待修（下個任務）。wp_sites 靠 hostname ILIKE 匹配，無 FK，多站同 hostname 會多回。部署後需瀏覽器測試 tab 切換與左側導覽 active 狀態。
+- BUGHUNT_WAIVED: DOC_ONLY -- trivial edit (verify-recent --trivial); SiteManager.tsx CSS color string replacements only, no logic change
+
+[剩餘風險] SiteManager.tsx 亮色主題已完成。wp_sites 靠 hostname ILIKE 匹配，無 FK，多站同 hostname 會多回。部署後需瀏覽器測試 tab 切換與左側導覽 active 狀態。
 
 [rollback] git revert f3e4e196 bc4fcf57（兩個 checkpoint commits）。
 

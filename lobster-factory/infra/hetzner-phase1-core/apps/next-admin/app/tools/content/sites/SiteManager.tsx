@@ -98,19 +98,19 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
     } finally { setSaving(false); }
   }
 
-  const inp: React.CSSProperties = { background: "#12121e", border: "1px solid #333", borderRadius: 5, color: "#e0e0f0", padding: "6px 8px", fontSize: 13, width: "100%", boxSizing: "border-box" };
+  const inp: React.CSSProperties = { background: "var(--form-input-bg)", border: "1px solid var(--card-border)", borderRadius: 5, color: "var(--text-primary)", padding: "6px 8px", fontSize: 13, width: "100%", boxSizing: "border-box" };
   const sel: React.CSSProperties = { ...inp };
-  const lbl: React.CSSProperties = { color: "#aaa", fontSize: 12, display: "block", marginBottom: 3 };
+  const lbl: React.CSSProperties = { color: "var(--text-muted)", fontSize: 12, display: "block", marginBottom: 3 };
 
   return (
     <div style={{ marginTop: 8 }}>
       <button type="button" onClick={() => setOpen(o => !o)}
-        style={{ fontSize: 12, color: "#5855d0", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+        style={{ fontSize: 12, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
         {open ? "▲ 收合" : "▼ Content Studio 預設設定"}
       </button>
       {open && (
-        <div style={{ marginTop: 10, padding: "14px 16px", background: "#12121e", border: "1px solid #333", borderRadius: 8, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ color: "#888", fontSize: 12 }}>選此站台時自動帶入 Content Studio 表單（只填空白欄位）。</div>
+        <div style={{ marginTop: 10, padding: "14px 16px", background: "var(--form-input-bg)", border: "1px solid var(--card-border)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ color: "var(--text-muted)", fontSize: 12 }}>選此站台時自動帶入 Content Studio 表單（只填空白欄位）。</div>
 
           {/* Row 0: tone / articleType / readability / pointOfView */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
@@ -191,7 +191,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
                 {MKT_PRESETS.audience.map(p => (
                   <button key={p} type="button" onClick={() => setM("audience", p)}
-                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid #444", fontSize: 11, cursor: "pointer", background: "#1e1e2e", color: "#aaa" }}>
+                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid var(--card-border)", fontSize: 11, cursor: "pointer", background: "var(--bg-card)", color: "var(--text-muted)" }}>
                     {p}
                   </button>
                 ))}
@@ -224,7 +224,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
                 {MKT_PRESETS.primaryCta.map(p => (
                   <button key={p} type="button" onClick={() => setM("primaryCta", p)}
-                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid #444", fontSize: 11, cursor: "pointer", background: "#1e1e2e", color: "#aaa" }}>
+                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid var(--card-border)", fontSize: 11, cursor: "pointer", background: "var(--bg-card)", color: "var(--text-muted)" }}>
                     {p}
                   </button>
                 ))}
@@ -245,7 +245,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
                 {MKT_PRESETS.emotionalTriggers.map(p => (
                   <button key={p} type="button" onClick={() => setM("emotionalTriggers", p)}
-                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid #444", fontSize: 11, cursor: "pointer", background: "#1e1e2e", color: "#aaa" }}>
+                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid var(--card-border)", fontSize: 11, cursor: "pointer", background: "var(--bg-card)", color: "var(--text-muted)" }}>
                     {p}
                   </button>
                 ))}
@@ -259,7 +259,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
                 {MKT_PRESETS.objections.map(p => (
                   <button key={p} type="button" onClick={() => setM("objections", p)}
-                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid #444", fontSize: 11, cursor: "pointer", background: "#1e1e2e", color: "#aaa" }}>
+                    style={{ padding: "1px 7px", borderRadius: 10, border: "1px solid var(--card-border)", fontSize: 11, cursor: "pointer", background: "var(--bg-card)", color: "var(--text-muted)" }}>
                     {p}
                   </button>
                 ))}
@@ -354,8 +354,8 @@ function SiteCard({
   return (
     <div
       style={{
-        background: "#1e1e2e",
-        border: "1px solid #333",
+        background: "var(--bg-card)",
+        border: "1px solid var(--card-border)",
         borderLeft: `4px solid ${site.color}`,
         borderRadius: 8,
         padding: "14px 16px",
@@ -374,21 +374,21 @@ function SiteCard({
               background: site.color, display: "inline-block", flexShrink: 0,
             }}
           />
-          <strong style={{ color: "#e0e0f0", fontSize: 15 }}>{site.name}</strong>
+          <strong style={{ color: "var(--text-primary)", fontSize: 15 }}>{site.name}</strong>
           {site.source === "env" && (
-            <span style={{ fontSize: 11, color: "#888", background: "#2a2a3e", padding: "2px 6px", borderRadius: 4 }}>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-canvas)", padding: "2px 6px", borderRadius: 4 }}>
               ENV（唯讀）
             </span>
           )}
           {!site.active && (
-            <span style={{ fontSize: 11, color: "#f59e0b", background: "#2a2010", padding: "2px 6px", borderRadius: 4 }}>
+            <span style={{ fontSize: 11, color: "#f59e0b", background: "rgba(245,158,11,0.12)", padding: "2px 6px", borderRadius: 4 }}>
               停用
             </span>
           )}
         </div>
-        <div style={{ color: "#888", fontSize: 13, marginTop: 3, paddingLeft: 18 }}>{site.url}</div>
+        <div style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 3, paddingLeft: 18 }}>{site.url}</div>
         {site.note && (
-          <div style={{ color: "#666", fontSize: 12, marginTop: 2, paddingLeft: 18 }}>{site.note}</div>
+          <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 2, paddingLeft: 18 }}>{site.note}</div>
         )}
         <div style={{ paddingLeft: 18, marginTop: 4, fontSize: 12, color: site.usernameSet ? "#10b981" : "#f59e0b" }}>
           用戶：{site.usernameSet ? "已設定 ✓" : "未設定"} ／ 密碼：{site.tokenSet ? "已設定 ✓" : "未設定 ✗"}
@@ -460,7 +460,7 @@ function SiteCard({
           </>
         )}
         {site.source === "env" && (
-          <span style={{ fontSize: 12, color: "#666" }}>由環境變數設定，請在伺服器上修改</span>
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>由環境變數設定，請在伺服器上修改</span>
         )}
       </div>
     </div>
@@ -488,10 +488,10 @@ function SiteForm({
   }
 
   const inputStyle: React.CSSProperties = {
-    background: "#12121e",
-    border: "1px solid #333",
+    background: "var(--form-input-bg)",
+    border: "1px solid var(--card-border)",
     borderRadius: 6,
-    color: "#e0e0f0",
+    color: "var(--text-primary)",
     padding: "8px 10px",
     fontSize: 14,
     width: "100%",
@@ -501,8 +501,8 @@ function SiteForm({
   return (
     <div
       style={{
-        background: "#1a1a2e",
-        border: "1px solid #5855d0",
+        background: "var(--bg-card)",
+        border: "1px solid var(--accent)",
         borderRadius: 10,
         padding: 20,
         display: "flex",
@@ -510,13 +510,13 @@ function SiteForm({
         gap: 14,
       }}
     >
-      <strong style={{ color: "#e0e0f0", fontSize: 16 }}>
+      <strong style={{ color: "var(--text-primary)", fontSize: 16 }}>
         {isEdit ? "編輯網站" : "新增 WordPress 網站"}
       </strong>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "#aaa", fontSize: 13 }}>網站名稱 *</span>
+          <span style={{ color: "var(--text-muted)", fontSize: 13 }}>網站名稱 *</span>
           <input
             style={inputStyle}
             placeholder="例：soulful.com.tw"
@@ -525,7 +525,7 @@ function SiteForm({
           />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "#aaa", fontSize: 13 }}>WordPress 網址 *</span>
+          <span style={{ color: "var(--text-muted)", fontSize: 13 }}>WordPress 網址 *</span>
           <input
             style={inputStyle}
             placeholder="https://example.com"
@@ -537,7 +537,7 @@ function SiteForm({
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "#aaa", fontSize: 13 }}>WP 用戶名稱 *</span>
+          <span style={{ color: "var(--text-muted)", fontSize: 13 }}>WP 用戶名稱 *</span>
           <input
             style={inputStyle}
             placeholder="例：admin"
@@ -545,12 +545,12 @@ function SiteForm({
             onChange={e => set("username", e.target.value)}
             autoComplete="username"
           />
-          <span style={{ color: "#666", fontSize: 11 }}>WP 登入帳號</span>
+          <span style={{ color: "var(--text-muted)", fontSize: 11 }}>WP 登入帳號</span>
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "#aaa", fontSize: 13 }}>
+          <span style={{ color: "var(--text-muted)", fontSize: 13 }}>
             Application Password *
-            {isEdit && <span style={{ color: "#666", marginLeft: 6 }}>（留空 = 不變更）</span>}
+            {isEdit && <span style={{ color: "var(--text-muted)", marginLeft: 6 }}>（留空 = 不變更）</span>}
           </span>
           <input
             style={inputStyle}
@@ -560,19 +560,19 @@ function SiteForm({
             onChange={e => set("token", e.target.value)}
             autoComplete="new-password"
           />
-          <span style={{ color: "#666", fontSize: 11 }}>
+          <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
             WP Admin → 用戶 → 個人資料 → Application Passwords
           </span>
         </label>
       </div>
 
       <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <span style={{ color: "#aaa", fontSize: 13 }}>標籤顏色</span>
+        <span style={{ color: "var(--text-muted)", fontSize: 13 }}>標籤顏色</span>
         <ColorPicker value={form.color} onChange={v => set("color", v)} />
       </label>
 
       <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ color: "#aaa", fontSize: 13 }}>備註（可選）</span>
+        <span style={{ color: "var(--text-muted)", fontSize: 13 }}>備註（可選）</span>
         <input
           style={inputStyle}
           placeholder="客戶名稱、合約備注…"
@@ -582,7 +582,7 @@ function SiteForm({
       </label>
 
       {error && (
-        <div style={{ color: "#ef4444", fontSize: 13, background: "#2a1010", padding: "8px 12px", borderRadius: 6 }}>
+        <div style={{ color: "#ef4444", fontSize: 13, background: "rgba(239,68,68,0.10)", padding: "8px 12px", borderRadius: 6 }}>
           {error}
         </div>
       )}
@@ -713,8 +713,8 @@ export default function SiteManager() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h2 style={{ color: "#e0e0f0", margin: 0, fontSize: 22 }}>WordPress 網站連線</h2>
-          <p style={{ color: "#888", margin: "4px 0 0", fontSize: 13 }}>
+          <h2 style={{ color: "var(--text-primary)", margin: 0, fontSize: 22 }}>WordPress 網站連線</h2>
+          <p style={{ color: "var(--text-muted)", margin: "4px 0 0", fontSize: 13 }}>
             管理所有客戶的 WP 站點。Token 加密儲存，不會顯示明文。
           </p>
         </div>
@@ -739,17 +739,17 @@ export default function SiteManager() {
       )}
 
       {/* Loading */}
-      {loading && <div style={{ color: "#888", textAlign: "center", padding: 32 }}>載入中…</div>}
+      {loading && <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 32 }}>載入中…</div>}
 
       {/* DB sites */}
       {!loading && dbSites.length === 0 && !showForm && (
         <div
           style={{
-            border: "1px dashed #333",
+            border: "1px dashed var(--card-border)",
             borderRadius: 8,
             padding: 32,
             textAlign: "center",
-            color: "#666",
+            color: "var(--text-muted)",
           }}
         >
           尚無 WordPress 網站連線。點「+ 新增網站」開始設定。
@@ -786,7 +786,7 @@ export default function SiteManager() {
             />
           )}
           {/* Content Studio defaults always visible regardless of edit state */}
-          <div style={{ background: "#1e1e2e", border: "1px solid #333", borderTop: "none", borderRadius: "0 0 8px 8px", padding: "0 16px 10px" }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--card-border)", borderTop: "none", borderRadius: "0 0 8px 8px", padding: "0 16px 10px" }}>
             <ContentDefaultsPanel
               site={sites.find(x => x.id === site.id) ?? site}
               onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
@@ -798,7 +798,7 @@ export default function SiteManager() {
       {/* ENV fallback sites (read-only) */}
       {envSites.length > 0 && (
         <>
-          <div style={{ color: "#666", fontSize: 12, marginTop: 8 }}>
+          <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 8 }}>
             以下網站由伺服器環境變數設定（唯讀）：
           </div>
           {envSites.map(site => (
@@ -818,10 +818,10 @@ export default function SiteManager() {
 
       {/* Footer nav */}
       <div style={{ marginTop: 8, display: "flex", gap: 12 }}>
-        <a href="/tools/content" style={{ color: "#5855d0", fontSize: 13, textDecoration: "none" }}>
+        <a href="/tools/content" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>
           ← 返回 Content Studio
         </a>
-        <a href="/tools/content/calendar" style={{ color: "#5855d0", fontSize: 13, textDecoration: "none" }}>
+        <a href="/tools/content/calendar" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>
           內容行事曆 →
         </a>
       </div>
