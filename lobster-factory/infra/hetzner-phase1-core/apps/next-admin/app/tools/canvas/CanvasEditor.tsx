@@ -928,7 +928,8 @@ export default function CanvasEditor() {
     setError(null);
     try {
       const base = img.edgeOriginal ?? img.toDataURL({ format: "png", multiplier: 1, withoutTransform: true });
-      const res = await applyEdgeMask(base, styleId, { amount: edgeAmount, seed: 7 });
+      const isAssetStyle = EDGE_MASK_STYLES.find((s) => s.id === styleId)?.kind === "asset";
+      const res = await applyEdgeMask(base, styleId, { amount: edgeAmount, seed: 7, assetStrength: isAssetStyle ? edgeAmount / 100 : undefined });
       if (!res.ok) {
         setError(`套邊失敗：${(res as { ok: false; error: string }).error}`);
         return;
@@ -1650,22 +1651,17 @@ export default function CanvasEditor() {
                   );
                 })}
               </div>
-              {(() => {
-                const isAsset = edgeStyleApplied ? EDGE_MASK_STYLES.find((s) => s.id === edgeStyleApplied)?.kind === "asset" : false;
-                return (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, opacity: isAsset ? 0.4 : 1 }}>
-                    <span style={{ opacity: 0.6 }}>強度</span>
-                    <input
-                      type="range" min={10} max={90} step={1} value={edgeAmount}
-                      disabled={genBusy || isAsset}
-                      onChange={(e) => setEdgeAmount(Number(e.target.value))}
-                      onPointerUp={() => { if (edgeStyleApplied && !isAsset) void applyEdgeMaskToSelected(edgeStyleApplied); }}
-                      style={{ flex: 1 }}
-                    />
-                    <span style={{ opacity: 0.6, width: 30, textAlign: "right" }}>{isAsset ? "固定" : edgeAmount}</span>
-                  </div>
-                );
-              })()}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ opacity: 0.6 }}>強度</span>
+                <input
+                  type="range" min={10} max={90} step={1} value={edgeAmount}
+                  disabled={genBusy}
+                  onChange={(e) => setEdgeAmount(Number(e.target.value))}
+                  onPointerUp={() => { if (edgeStyleApplied) void applyEdgeMaskToSelected(edgeStyleApplied); }}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ opacity: 0.6, width: 30, textAlign: "right" }}>{edgeAmount}</span>
+              </div>
               {genBusy ? <span style={{ opacity: 0.6 }}>套用中…</span> : null}
             </div>
           </SidebarPanel>

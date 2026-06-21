@@ -458,7 +458,8 @@ export default function DesignsGallery() {
     try {
       // Same-origin proxy → no canvas taint for the cross-origin R2 image.
       const proxied = `/api/tools/studio/proxy-image?url=${encodeURIComponent(editAsset.object_url)}`;
-      const res = await applyEdgeMask(proxied, styleId, { amount: editAmount, seed: 7 });
+      const isAssetStyle = EDGE_MASK_STYLES.find((s) => s.id === styleId)?.kind === "asset";
+      const res = await applyEdgeMask(proxied, styleId, { amount: editAmount, seed: 7, assetStrength: isAssetStyle ? editAmount / 100 : undefined });
       if (res.ok) {
         setEditResult(res.image);
         setEditStyle(styleId);
@@ -516,7 +517,7 @@ export default function DesignsGallery() {
   }, [editSavedUrl, saveEdged]);
 
   // Asset (real brush) masks are fixed images — the strength slider has no effect on them.
-  const editIsAsset = !!editStyle && EDGE_MASK_STYLES.find((s) => s.id === editStyle)?.kind === "asset";
+
 
   /* ─── derive filter option lists ─── */
   const modelOptions = useMemo(() => {
@@ -1248,7 +1249,7 @@ export default function DesignsGallery() {
 
               {editError ? <span style={{ fontSize: 12, color: "#e5484d", flex: "none" }}>套用失敗：{editError}</span> : null}
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none", opacity: editIsAsset ? 0.4 : 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none" }}>
                 <span style={{ fontSize: 11, opacity: 0.6 }}>強度</span>
                 <input
                   type="range"
@@ -1256,12 +1257,12 @@ export default function DesignsGallery() {
                   max={90}
                   step={1}
                   value={editAmount}
-                  disabled={editBusy || editIsAsset}
+                  disabled={editBusy}
                   onChange={(e) => setEditAmount(Number(e.target.value))}
-                  onPointerUp={() => { if (editStyle && !editIsAsset) void applyEdgeStyle(editStyle); }}
+                  onPointerUp={() => { if (editStyle) void applyEdgeStyle(editStyle); }}
                   style={{ flex: 1 }}
                 />
-                <span style={{ fontSize: 11, opacity: 0.6, width: 36, textAlign: "right" }}>{editIsAsset ? "固定" : editAmount}</span>
+                <span style={{ fontSize: 11, opacity: 0.6, width: 36, textAlign: "right" }}>{editAmount}</span>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: "none" }}>
