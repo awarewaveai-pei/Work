@@ -2667,6 +2667,67 @@ export default function ContentStudio() {
             </div>
           </SectionToggle>
 
+          {/* ── 分類 / 標籤 ── */}
+          <div className="form-block form-block--wide" style={{ marginBottom: "12px" }}>
+            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <label className="form-label">分類</label>
+                {siteCategories.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+                    {siteCategories.slice(0, 12).map(cat => {
+                      const selected = form.wpCategories.split(",").map(s => s.trim()).filter(Boolean).includes(cat);
+                      return (
+                        <button key={cat} type="button" disabled={isGenerating}
+                          onClick={() => {
+                            const cur = form.wpCategories.split(",").map(s => s.trim()).filter(Boolean);
+                            const next = selected ? cur.filter(c => c !== cat) : [...cur, cat];
+                            setF("wpCategories", next.join(", "));
+                          }}
+                          style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
+                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
+                            color: selected ? "#fff" : "var(--text-primary)", borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                          {selected ? "✓ " : ""}{cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <input className="form-input" style={{ width: "100%" }}
+                  value={form.wpCategories} onChange={e => setF("wpCategories", e.target.value)}
+                  placeholder="芳療, DIY 保養, 精油教學" disabled={isGenerating} />
+                <div className="form-hint" style={{ marginTop: 4 }}>點選現有分類，或直接輸入（逗號分隔）。不存在的分類會自動建立。</div>
+              </div>
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <label className="form-label">標籤</label>
+                {siteTags.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
+                    {siteTags.slice(0, 20).map(tag => {
+                      const selected = form.wpTags.split(",").map(s => s.trim()).filter(Boolean).includes(tag);
+                      return (
+                        <button key={tag} type="button" disabled={isGenerating}
+                          onClick={() => {
+                            const cur = form.wpTags.split(",").map(s => s.trim()).filter(Boolean);
+                            const next = selected ? cur.filter(t => t !== tag) : [...cur, tag];
+                            setF("wpTags", next.join(", "));
+                          }}
+                          style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
+                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
+                            color: selected ? "#fff" : "var(--text-secondary)",
+                            borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <input className="form-input" style={{ width: "100%" }}
+                  value={form.wpTags} onChange={e => setF("wpTags", e.target.value)}
+                  placeholder="檸檬精油, 精油配方, 天然保養" disabled={isGenerating} />
+                <div className="form-hint" style={{ marginTop: 4 }}>點選現有標籤，或直接輸入（逗號分隔）。不存在的標籤會自動建立。</div>
+              </div>
+            </div>
+          </div>
+
           {/* ── 大綱編輯器 ── */}
           <SectionToggle label="大綱編輯器（先看大綱、可改再生成全文）" open={showOutline} onToggle={() => setShowOutline(v => !v)}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
@@ -3018,83 +3079,24 @@ export default function ContentStudio() {
           {/* ── 發布設定 ── */}
           <div className="form-block form-block--wide" style={{ marginBottom: "20px" }}>
             <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "12px", color: "var(--text-primary)" }}>發布設定</div>
-            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
-              <div>
-                <label className="form-label">發布日期</label>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <label style={checkLabel}>
-                    <input type="radio" name="scheduleMode" checked={!form.scheduleDate} onChange={() => setF("scheduleDate", "")} disabled={isGenerating} />
-                    立即存為草稿
-                  </label>
-                  <label style={checkLabel}>
-                    <input type="radio" name="scheduleMode" checked={!!form.scheduleDate}
-                      onChange={() => setF("scheduleDate", new Date(Date.now() + 86400000).toISOString().slice(0, 16))} disabled={isGenerating} />
-                    排程
-                  </label>
-                  {form.scheduleDate && (
-                    <input type="datetime-local" className="form-input" style={{ width: "auto", fontSize: "12px" }}
-                      value={form.scheduleDate} onChange={e => setF("scheduleDate", e.target.value)} disabled={isGenerating} />
-                  )}
-                </div>
-                <div className="form-hint" style={{ marginTop: 4 }}>狀態保持「草稿」，需從 WP 後台手動發布。</div>
-              </div>
-              <div style={{ flex: 1, minWidth: "200px" }}>
-                <label className="form-label">分類</label>
-                {/* Chip row: existing site categories as quick-pick */}
-                {siteCategories.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
-                    {siteCategories.slice(0, 12).map(cat => {
-                      const selected = form.wpCategories.split(",").map(s => s.trim()).filter(Boolean).includes(cat);
-                      return (
-                        <button key={cat} type="button" disabled={isGenerating}
-                          onClick={() => {
-                            const cur = form.wpCategories.split(",").map(s => s.trim()).filter(Boolean);
-                            const next = selected ? cur.filter(c => c !== cat) : [...cur, cat];
-                            setF("wpCategories", next.join(", "));
-                          }}
-                          style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
-                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
-                            color: selected ? "#fff" : "var(--text-primary)", borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
-                          {selected ? "✓ " : ""}{cat}
-                        </button>
-                      );
-                    })}
-                  </div>
+            <div>
+              <label className="form-label">發布日期</label>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <label style={checkLabel}>
+                  <input type="radio" name="scheduleMode" checked={!form.scheduleDate} onChange={() => setF("scheduleDate", "")} disabled={isGenerating} />
+                  立即存為草稿
+                </label>
+                <label style={checkLabel}>
+                  <input type="radio" name="scheduleMode" checked={!!form.scheduleDate}
+                    onChange={() => setF("scheduleDate", new Date(Date.now() + 86400000).toISOString().slice(0, 16))} disabled={isGenerating} />
+                  排程
+                </label>
+                {form.scheduleDate && (
+                  <input type="datetime-local" className="form-input" style={{ width: "auto", fontSize: "12px" }}
+                    value={form.scheduleDate} onChange={e => setF("scheduleDate", e.target.value)} disabled={isGenerating} />
                 )}
-                <input className="form-input" style={{ width: "100%" }}
-                  value={form.wpCategories} onChange={e => setF("wpCategories", e.target.value)}
-                  placeholder="芳療, DIY 保養, 精油教學" disabled={isGenerating} />
-                <div className="form-hint" style={{ marginTop: 4 }}>點選現有分類，或直接輸入（逗號分隔）。不存在的分類會自動建立。</div>
               </div>
-              <div style={{ flex: 1, minWidth: "200px" }}>
-                <label className="form-label">標籤</label>
-                {/* Chip row: existing site tags as quick-pick */}
-                {siteTags.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "6px" }}>
-                    {siteTags.slice(0, 20).map(tag => {
-                      const selected = form.wpTags.split(",").map(s => s.trim()).filter(Boolean).includes(tag);
-                      return (
-                        <button key={tag} type="button" disabled={isGenerating}
-                          onClick={() => {
-                            const cur = form.wpTags.split(",").map(s => s.trim()).filter(Boolean);
-                            const next = selected ? cur.filter(t => t !== tag) : [...cur, tag];
-                            setF("wpTags", next.join(", "));
-                          }}
-                          style={{ padding: "2px 8px", borderRadius: "12px", border: "1px solid", fontSize: "12px", cursor: "pointer",
-                            background: selected ? "var(--color-primary, #2563eb)" : "var(--bg-hover, #f5f5f5)",
-                            color: selected ? "#fff" : "var(--text-secondary)",
-                            borderColor: selected ? "var(--color-primary, #2563eb)" : "var(--card-border)" }}>
-                          {tag}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <input className="form-input" style={{ width: "100%" }}
-                  value={form.wpTags} onChange={e => setF("wpTags", e.target.value)}
-                  placeholder="檸檬精油, 精油配方, 天然保養" disabled={isGenerating} />
-                <div className="form-hint" style={{ marginTop: 4 }}>點選現有標籤，或直接輸入（逗號分隔）。不存在的標籤會自動建立。</div>
-              </div>
+              <div className="form-hint" style={{ marginTop: 4 }}>狀態保持「草稿」，需從 WP 後台手動發布。</div>
             </div>
           </div>
 
