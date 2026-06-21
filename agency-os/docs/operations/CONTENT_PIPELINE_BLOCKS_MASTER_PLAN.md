@@ -207,7 +207,7 @@
 | **R4** | **禁繞過 wp-bridge 簽章** — WP 只走 Ed25519 + read-back + auto-rollback | ADR 007；publish/route.ts:309-366 |
 | **R5** | **影片生成 defer 到 post-Wave-2**（原為 optional embed slot；full AI video 是獨立決策）| decision 2026-06-15:197-200；content-engine §3.2:444(P2) |
 | **R6** | **禁地理 WAF**（操作者全球移動）— 保護一律 server-side（LLAR）| decision pre-mortem |
-| **R7** | **Postiz = 唯一社群入口**（IG/FB/Reddit/LinkedIn/TikTok/Threads/Pinterest；X 因 $100/mo 暫緩）| POSTIZ plan:4-5,24 |
+| **R7** | **Postiz = 唯一社群入口**（IG/FB/Reddit/LinkedIn/TikTok/Threads/Pinterest；X API pricing/credits/寫入權限需另驗，v1 不承諾）| POSTIZ plan:4-5,24 |
 | **R8** | 發佈前 Semantic Coverage ≥75 + Quality Gate 強制 | decision observability；content-engine:687-726 |
 | **R9** | per-client distinctiveness 指標（draft-edit-rate / unique-topic ≥6/30d），禁總計 | decision 2026-06-15:290-293 |
 
