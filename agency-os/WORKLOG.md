@@ -4,6 +4,19 @@
 
 ## 2026-06-22
 
+### deploy: sg-deploy next-admin — Postiz 整合全線上線（Task 3-6 + Gate C）
+
+[部署資訊] commit: `78451ebc` → SG `5.223.93.113`；tsc PASS；npm test 33/431 PASS；Docker 138s；healthy 7s；smoke /login /api/ops/summary nginx node-api 全 200
+
+[已上線路由] `/api/content/social-channels` / `social-admin/integrations` / `social-admin/connections` / `social-publish` / `/tools/content`（含 Postiz 面板 42.3kB）
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=mcp__hetzner-ssh__ssh_exec | cmd=sg-deploy.sh next-admin | exit=0 | ms=~180000 → deployed 78451ebc, all smoke OK
+- REVIEW_WAIVED: NA -- deploy step, no code change
+- BUGHUNT_WAIVED: NA -- deploy only
+
+[rollback] snapshot: `lobster-phase1-next-admin:rollback-20260621-173347`（sg-deploy 自動建）
+
 ### docs(postiz): Task 6 完成 — POSTIZ-OPS-RUNBOOK.md（token 過期/rate limit/key 輪替/故障/清理/onboard）
 
 [已修改]
