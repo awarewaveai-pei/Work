@@ -301,34 +301,50 @@ export default function StudioWorkbench() {
     }
   }, [selectedModels]);
 
-  const fetchTrending = useCallback(async (cat: string) => {
+  const fetchAllTrending = useCallback(async () => {
     const today = new Date().toISOString().slice(0, 10);
-    const cacheKey = `studio_trending_v1_${cat}_${today}`;
-    try {
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) { setTrendingTopics(JSON.parse(cached) as string[]); return; }
-    } catch { /* ignore */ }
-    setTrendingLoading(true);
-    setTrendingTopics([]);
-    setTrendingError(false);
-    try {
-      const res = await fetch("/api/tools/studio/trending", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: cat }),
-      });
-      const json = (await res.json()) as { ok: boolean; topics?: string[]; error?: string };
-      if (json.ok && json.topics) {
-        setTrendingTopics(json.topics);
-        try { localStorage.setItem(cacheKey, JSON.stringify(json.topics)); } catch { /* quota */ }
-      } else { setTrendingError(true); }
-    } catch { setTrendingError(true); } finally { setTrendingLoading(false); }
+    // Load whatever is already cached today
+    const fromCache: Record<string, string[]> = {};
+    const missing: typeof TRENDING_CATEGORIES = [];
+    for (const cat of TRENDING_CATEGORIES) {
+      try {
+        const val = localStorage.getItem(`studio_trending_v1_${cat.value}_${today}`);
+        if (val) { fromCache[cat.value] = JSON.parse(val) as string[]; }
+        else { missing.push(cat); }
+      } catch { missing.push(cat); }
+    }
+    setAllTopics((prev) => ({ ...prev, ...fromCache }));
+    if (missing.length === 0) return;
+    setTrendingFetching(true);
+    await Promise.allSettled(missing.map(async (cat) => {
+      try {
+        const res = await fetch("/api/tools/studio/trending", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category: cat.value }),
+        });
+        const json = (await res.json()) as { ok: boolean; topics?: string[] };
+        if (json.ok && json.topics?.length) {
+          try { localStorage.setItem(`studio_trending_v1_${cat.value}_${today}`, JSON.stringify(json.topics)); } catch { /* quota */ }
+          setAllTopics((prev) => ({ ...prev, [cat.value]: json.topics! }));
+        }
+      } catch { /* skip this category */ }
+    }));
+    setTrendingFetching(false);
   }, []);
 
-  const onSelectTrendingCategory = useCallback((cat: string) => {
-    setTrendingCategory(cat);
-    void fetchTrending(cat);
-  }, [fetchTrending]);
+  // On mount: restore today's cache without any API call
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const fromCache: Record<string, string[]> = {};
+    for (const cat of TRENDING_CATEGORIES) {
+      try {
+        const val = localStorage.getItem(`studio_trending_v1_${cat.value}_${today}`);
+        if (val) fromCache[cat.value] = JSON.parse(val) as string[];
+      } catch { /* ignore */ }
+    }
+    if (Object.keys(fromCache).length > 0) setAllTopics(fromCache);
+  }, []);
 
   const onUploadRefs = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -588,29 +604,36 @@ export default function StudioWorkbench() {
         </AccordionSection>
 
         <AccordionSection title="🔥 時事靈感">
-          <p style={{ fontSize: 11, opacity: 0.55, marginBottom: 6 }}>選類別 → 抓今日熱門話題 → 點擊填入主題</p>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-            {TRENDING_CATEGORIES.map((cat) => (
-              <button key={cat.value} type="button" onClick={() => onSelectTrendingCategory(cat.value)}
-                style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, cursor: "pointer", background: trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--chip-bg, #eef1f7)", color: trendingCategory === cat.value ? "#fff" : "var(--text-muted, #3a4560)", border: `1px solid ${trendingCategory === cat.value ? "var(--accent, #6366f1)" : "var(--border, #d4d9e8)"}`, transition: "all 0.15s" }}>
-                {cat.label}
-              </button>
-            ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主題欄</p>
+            <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
+              style={{ fontSize: 11, padding: "3px 12px", borderRadius: 20, cursor: trendingFetching ? "default" : "pointer", background: "var(--accent, #6366f1)", color: "#fff", border: "none", opacity: trendingFetching ? 0.6 : 1, flexShrink: 0 }}>
+              {trendingFetching ? "搜尋中…" : "抓取今日熱搜"}
+            </button>
           </div>
-          {trendingLoading && <p style={{ fontSize: 11, opacity: 0.5 }}>搜尋中…</p>}
-          {!trendingLoading && trendingError && <p style={{ fontSize: 11, color: "#e5484d" }}>抓取失敗，請重試</p>}
-          {!trendingLoading && !trendingError && trendingTopics.length > 0 && (
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-              {trendingTopics.map((t, i) => (
-                <button key={`${t}-${i}`} type="button" onClick={() => setSubject(t)}
-                  style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, cursor: "pointer", background: "var(--chip-bg, #eef1f7)", border: "1px solid var(--border, #d4d9e8)", color: "var(--text, #1a202c)", textAlign: "left", transition: "border-color 0.15s" }}
-                  onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
-                  onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #d4d9e8)")}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          )}
+          {TRENDING_CATEGORIES.map((cat) => {
+            const topics = allTopics[cat.value];
+            const loading = trendingFetching && !topics;
+            if (!topics && !trendingFetching) return null;
+            return (
+              <div key={cat.value} style={{ marginBottom: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted, #3a4560)", display: "inline-block", minWidth: 40, marginRight: 4 }}>{cat.label}</span>
+                {loading && <span style={{ fontSize: 11, opacity: 0.4 }}>…</span>}
+                {topics && (
+                  <span style={{ display: "inline-flex", gap: 3, flexWrap: "wrap" }}>
+                    {topics.map((t, i) => (
+                      <button key={`${cat.value}-${i}`} type="button" onClick={() => setSubject(t)}
+                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, cursor: "pointer", background: "var(--chip-bg, #eef1f7)", border: "1px solid var(--border, #d4d9e8)", color: "var(--text, #1a202c)", transition: "border-color 0.15s" }}
+                        onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent, #6366f1)")}
+                        onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border, #d4d9e8)")}>
+                        {t}
+                      </button>
+                    ))}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </AccordionSection>
 
         <AccordionSection title="🎨 風格 Style" summary={style || "不指定"}>
