@@ -50,15 +50,6 @@ export interface EdgeMaskParams {
   amount: number;
   /** Variation seed (procedural styles). Integer ≥ 1. */
   seed: number;
-  /**
-   * Spatial strength for asset (pre-rasterised PNG) masks only. 0–1.
-   * Controls how deep the brush stroke cuts into the image by scaling the mask:
-   *   0 → mask at 110% of canvas size (brush barely visible at edge)
-   *   1 → mask at 80% of canvas size (brush cuts ~10% in from each edge)
-   * Omit (or pass undefined) → draw mask at full canvas size (backward-compatible).
-   * Procedural SVG masks use `amount` for shape control; this field has no effect on them.
-   */
-  assetStrength?: number;
 }
 
 export interface EdgeMaskStyle {
@@ -349,10 +340,10 @@ export async function applyEdgeMask(
     const mask = await loadImage(maskSrc, false);
 
     ctx.globalCompositeOperation = "destination-in"; // keep source only where mask is opaque
-    if (style.maskUrl && params.assetStrength != null) {
-      // Scale the mask to control brush-stroke depth: smaller mask → brush cuts further in.
-      // strength=0 → scale 1.10 (barely visible); strength=1 → scale 0.80 (deep cut ~10% each side)
-      const scale = 1.1 - params.assetStrength * 0.3;
+    if (style.maskUrl) {
+      // Asset masks: use amount (10–90) to control how deep the brush cuts in spatially.
+      // amount=10 → scale 1.07 (barely touches edge); amount=90 → scale 0.83 (cuts ~8% each side)
+      const scale = 1.1 - (params.amount / 100) * 0.3;
       const mx = (w * (1 - scale)) / 2;
       const my = (h * (1 - scale)) / 2;
       ctx.drawImage(mask, mx, my, w * scale, h * scale);
