@@ -4,6 +4,32 @@
 
 ## 2026-06-21
 
+### refactor(content-studio): 4-card UI/UX layout grouping (A文章/B品牌/C分發/D發布)
+
+[任務] 表單區所有 SectionToggle 混排一片，視覺無層次。重排為 4 色卡：A(藍)文章設定、B(紫)品牌資料、C(綠)分發設定、D(橘)發布。社群分發+電子報從輸出區（hasContent 條件）移至 Card C（永遠可見，無內容時顯示 placeholder）。
+
+[已修改]
+- `app/tools/content/ContentStudio.tsx`：
+  - 新增 4 個彩色 header card 包裝器（`<div style={{ border, borderRadius, overflow: hidden }}>` + gradient header）
+  - Card A（藍 #1d4ed8）：Structure → 大綱 → SEO/NLP → 分類/標籤 → 內部連結 → 參考URL → 外部連結 → Media Hub → Kadence
+  - Card B（紫 #6d28d9）：品牌聲音 → 競業與痛點分析 → 品牌語調/精準行銷 → 品牌語調/進階
+  - Card C（綠 #15803d）：社群分發（button-toggle → SectionToggle，!hasContent placeholder） + 電子報草稿（!hasContent placeholder）
+  - Card D（橘 #c2410c）：發布設定
+  - 修 critic Minor：`synStatus === "error"` 在 Card C 加顯示文字
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=~9000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/1m(synError→fixed)/1sug(dead videoConfigOpen state)
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=handleSyndicate|社群分發|SYN_PLATFORMS|showSyn|nlArticleUrl | hits=stale line refs in POSTIZ_SOCIAL_PUBLISHING_PLAN.md (doc-only, no code breakage)
+
+[剩餘風險] 瀏覽器實測待 sg-deploy + browser-test。Card C 社群分發在無內容時點 SectionToggle 可展開（placeholder 可見），行為符合設計意圖。
+
+[rollback] git revert。
+
+---
+
+## 2026-06-21
+
 ### feat(studio): Mockup 版面左右對調（預覽大）+ Canvas 加「邊緣遮罩」工具
 
 [任務] 使用者要求：① Mockup 預覽放大、控制移右、預覽移左；② Canvas 加上改邊緣工具。

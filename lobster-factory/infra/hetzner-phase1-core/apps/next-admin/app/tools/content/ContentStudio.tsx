@@ -3236,6 +3236,9 @@ export default function ContentStudio() {
                     {synStatus === "generating" ? "生成中…" : "生成社群貼文"}
                   </button>
                 </div>
+                {synStatus === "error" && (
+                  <div style={{ fontSize: "12px", color: "var(--color-error, #ef4444)", marginTop: "6px" }}>社群貼文生成失敗，請重試</div>
+                )}
                 {synStatus === "done" && Object.keys(synContent).length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                     {Object.entries(synContent).map(([key, content]) => {
