@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""server.py — video-service HTTP 介面（render-only 微服務）。
+"""server.py — video-service HTTP 介面（render-only 微服務 + /generate-job 全自動管道）。
 
 next-admin `video/pipeline` 積木負責：生腳本(Claude) + 生圖(Flux) + 抓 B-roll(Pexels)，
 然後把 scenes + 視覺素材交給本服務合成。本服務刻意只做 render（見 pipeline.render_video）。
@@ -8,9 +8,16 @@ next-admin `video/pipeline` 積木負責：生腳本(Claude) + 生圖(Flux) + �
     { "scenes":  [{"id":1,"narration":"旁白...","duration":8}, ...],
       "assets":  ["/local/path.png" | "https://cdn/clip.mp4", ...],   # 與 scenes 等長
       "out_name": "影片名" }
-    → 200 { "outputs": {fmt: path,...}, "out_dir": "..." }
-    → 400 參數錯 / 不安全 URL；500 render 失敗
+    → 202 { "jobId": "..." }
 
+  POST /generate-job   body JSON:
+    { "topic": "主題", "language": "繁體中文", "scene_count": 6,
+      "tts_voice": "zh-TW-HsiaoChenNeural", "intro_title": "", "intro_duration": 3.0 }
+    全自動：Claude 腳本 → Pexels B-roll → render → R2 上傳
+    → 202 { "jobId": "..." }
+    → 400 缺 topic；503 未設 CLAUDE_API_KEY / PEXELS_API_KEY
+
+  GET /job?jobId=<id> → { "jobId", "status": "running"|"done"|"error", ... }
   GET /health → { "ok": true }
 
 零新依賴（stdlib http.server）。綁 127.0.0.1（內網服務）。render 全域序列化
@@ -18,6 +25,7 @@ next-admin `video/pipeline` 積木負責：生腳本(Claude) + 生圖(Flux) + �
 https URL（prod，下載前過 SSRF guard：https-only + 擋私有/迴圈/link-local）。
 """
 import os
+import re
 import json
 import hmac
 import time
@@ -47,6 +55,10 @@ R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "")
 R2_VIDEO_BUCKET = os.getenv("R2_VIDEO_BUCKET", "lobster-videos")
 R2_VIDEO_PUBLIC_BASE = os.getenv("R2_VIDEO_PUBLIC_BASE", "").rstrip("/")
 _render_lock = threading.Lock()
+
+# /generate-job 全自動管道憑證
+CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "")
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
 
 
 def _r2_video_configured() -> bool:
@@ -221,6 +233,104 @@ def get_job(job_id: str):
         return _JOBS.get(job_id)
 
 
+# ── /generate-job：全自動管道（Claude 腳本 → Pexels B-roll → render）──────────────
+
+def _claude_generate_script(topic: str, language: str, scene_count: int) -> tuple:
+    """Call Claude Haiku to generate video script. Returns (scenes_list, title)."""
+    if not CLAUDE_API_KEY:
+        raise RuntimeError("CLAUDE_API_KEY not configured — set in .env.video")
+    prompt = (
+        f"你是專業影片腳本作家。根據主題「{topic}」，生成一個 {language} 旁白的 {scene_count} 場景影片腳本。\n"
+        f"嚴格以 JSON 格式回傳，不要加任何說明文字：\n"
+        f'{{"title":"影片標題（{language}）","scenes":['
+        f'{{"id":1,"narration":"{language} 旁白 15-30 字，口語短句","broll_keyword":"english 1-3 words for Pexels"}},...]}}'
+    )
+    r = requests.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={
+            "x-api-key": CLAUDE_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        json={
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 2048,
+            "messages": [{"role": "user", "content": prompt}],
+        },
+        timeout=60,
+    )
+    if not r.ok:
+        raise RuntimeError(f"Claude API {r.status_code}: {r.text[:300]}")
+    text = r.json()["content"][0]["text"]
+    # Strip markdown fence
+    m = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+    if m:
+        text = m.group(1).strip()
+    # Extract JSON object
+    m2 = re.search(r"\{[\s\S]*\}", text)
+    if m2:
+        text = m2.group(0)
+    data = json.loads(text)
+    scenes = data.get("scenes", [])
+    title = data.get("title", topic)
+    if not scenes:
+        raise RuntimeError("Claude returned empty scenes")
+    return scenes, title
+
+
+def _pexels_fetch_photo(keyword: str) -> str | None:
+    """Search Pexels for a landscape photo, return direct image URL or None."""
+    if not PEXELS_API_KEY:
+        return None
+    r = requests.get(
+        "https://api.pexels.com/v1/search",
+        headers={"Authorization": PEXELS_API_KEY},
+        params={"query": keyword, "per_page": 3, "orientation": "landscape"},
+        timeout=15,
+    )
+    if not r.ok:
+        return None
+    photos = r.json().get("photos", [])
+    if not photos:
+        return None
+    return photos[0]["src"]["large2x"]
+
+
+def _run_generate_job(job_id: str, topic: str, language: str, scene_count: int,
+                      tts_voice: str, intro_title: str, intro_duration: float):
+    """Full pipeline background thread: Claude → Pexels → render → R2."""
+    try:
+        # 1) Generate script with Claude
+        scenes_data, title = _claude_generate_script(topic, language, scene_count)
+
+        # 2) Fetch Pexels image for each scene
+        assets = []
+        scenes = []
+        for i, s in enumerate(scenes_data[:scene_count]):
+            keyword = str(s.get("broll_keyword", "") or topic).strip() or topic
+            img_url = _pexels_fetch_photo(keyword) or _pexels_fetch_photo(topic)
+            if not img_url:
+                raise RuntimeError(f"Pexels 無法為場景 {i+1} 找到圖片（keyword: {keyword}）— 請確認 PEXELS_API_KEY")
+            assets.append(img_url)
+            scenes.append({
+                "id": s.get("id", i + 1),
+                "narration": str(s.get("narration", "")).strip(),
+                "duration": 5,
+            })
+
+        # 3) Render + R2 upload
+        result = _do_render(
+            scenes, assets, title,
+            tts_provider="edge", tts_voice=tts_voice,
+            intro_title=intro_title, intro_duration=intro_duration,
+        )
+        with _jobs_lock:
+            _JOBS[job_id] = {"status": "done", "title": title, **result, "ts": time.time()}
+    except Exception as e:  # noqa: BLE001
+        with _jobs_lock:
+            _JOBS[job_id] = {"status": "error", "error": str(e), "ts": time.time()}
+
+
 class _Handler(BaseHTTPRequestHandler):
     def _json(self, code: int, obj: dict):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -248,7 +358,8 @@ class _Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path != "/render":
+        path = self.path.split("?")[0]
+        if path not in ("/render", "/generate-job"):
             self._json(404, {"error": "not found"})
             return
         if not _authed(self):
@@ -260,9 +371,43 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(413, {"error": f"body 過大（{length} > {MAX_BODY_BYTES}）"})
                 return
             payload = json.loads(self.rfile.read(length) or b"{}")
-            # async：驗證後即回 jobId（202），背景 thread 渲染；呼叫端短輪詢 GET /job
-            job_id = submit_render(payload)
-            self._json(202, {"jobId": job_id})
+
+            if path == "/generate-job":
+                topic = str(payload.get("topic", "")).strip()
+                if not topic:
+                    self._json(400, {"error": "topic 為必填"})
+                    return
+                if not CLAUDE_API_KEY:
+                    self._json(503, {"error": "CLAUDE_API_KEY not configured in video-service env"})
+                    return
+                if not PEXELS_API_KEY:
+                    self._json(503, {"error": "PEXELS_API_KEY not configured in video-service env"})
+                    return
+                language = str(payload.get("language", "繁體中文"))
+                scene_count = max(1, min(int(payload.get("scene_count", 6)), MAX_SCENES))
+                tts_voice = str(payload.get("tts_voice", "") or config.TTS_VOICE)
+                intro_title = str(payload.get("intro_title", "") or "")
+                try:
+                    intro_duration = float(payload.get("intro_duration", 3.0))
+                except (ValueError, TypeError):
+                    intro_duration = 3.0
+                import math
+                intro_duration = min(max(intro_duration if math.isfinite(intro_duration) else 3.0, 1.0), 10.0)
+                job_id = uuid.uuid4().hex
+                with _jobs_lock:
+                    _prune_jobs()
+                    _JOBS[job_id] = {"status": "running", "ts": time.time()}
+                threading.Thread(
+                    target=_run_generate_job,
+                    args=(job_id, topic, language, scene_count, tts_voice, intro_title, intro_duration),
+                    daemon=True,
+                ).start()
+                self._json(202, {"jobId": job_id})
+            else:
+                # /render — existing behaviour
+                job_id = submit_render(payload)
+                self._json(202, {"jobId": job_id})
+
         except (ValueError, TypeError) as e:
             self._json(400, {"error": str(e)})
         except Exception as e:  # noqa: BLE001 — 回 500，不洩堆疊
@@ -278,8 +423,10 @@ def main():
     if HOST != "127.0.0.1" and not RENDER_AUTH_TOKEN:
         print("[WARN] 綁非 localhost 但未設 RENDER_AUTH_TOKEN — /render 將無認證對外暴露！")
     srv = ThreadingHTTPServer((HOST, PORT), _Handler)
-    print(f"video-service render server on http://{HOST}:{PORT} (POST /render[auth], GET /health) "
-          f"storage={'r2' if _r2_video_configured() else 'local'}")
+    generate_ready = "✓" if (CLAUDE_API_KEY and PEXELS_API_KEY) else "✗ (missing CLAUDE_API_KEY/PEXELS_API_KEY)"
+    print(f"video-service on http://{HOST}:{PORT} "
+          f"storage={'r2' if _r2_video_configured() else 'local'} "
+          f"/generate-job={generate_ready}")
     srv.serve_forever()
 
 
