@@ -3,7 +3,7 @@
  * Plugin Name:       AwareWave WP Bridge
  * Plugin URI:        https://aware-wave.com
  * Description:       Ed25519-authenticated, self-healing control plane that lets an AI operate this site safely (signed requests, render-verify, auto-rollback).
- * Version:           0.16.0
+ * Version:           0.17.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            AwareWave
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AWBRIDGE_VERSION', '0.16.0' );
+define( 'AWBRIDGE_VERSION', '0.17.0' );
 define( 'AWBRIDGE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AWBRIDGE_REST_NAMESPACE', 'aware-wave-bridge/v1' );
 
@@ -77,4 +77,9 @@ add_action(
 // list the storefront falls back to (when a product has no per-product map) and the per-product box
 // pre-fills from. The Printful one-click flow is untouched (it writes its own per-product Printful map).
 ( new Admin\SwatchPalette() )->register();
+
+// STANDARD swatch config (how mature swatch plugins do it): a colour picker on each global product-
+// attribute TERM (Products → Attributes → Color → term). Define a colour once on the term and EVERY
+// variable product using that attribute renders swatches — no per-product setup. (0.17.0)
+( new Admin\AttributeSwatchTerms() )->register();
 

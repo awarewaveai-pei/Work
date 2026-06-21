@@ -85,8 +85,8 @@ final class AttributeSwatchTerms {
 		if ( ! isset( $_POST['awbridge_swatch_color'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WC term form nonce already verified before created_/edited_ fire
 			return;
 		}
-		if ( ! current_user_can( 'manage_woocommerce' ) && ! current_user_can( 'manage_product_terms' ) ) {
-			return;
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return; // WC grants this to admins + shop managers; the term-edit screen already gates access.
 		}
 		$hex = $this->normalizeHex( (string) wp_unslash( $_POST['awbridge_swatch_color'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- see above
 		if ( $hex !== '' ) {

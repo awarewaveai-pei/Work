@@ -82,11 +82,13 @@ final class ColorSwatches {
 		$swatches = array();
 		foreach ( $options as $option ) {
 			$value = (string) $option; // what WC's <select> expects: term slug (taxonomy) or label (local)
+			$label = $value;           // human label for title/aria-label (term NAME for taxonomy)
 			$hex   = '';
 			if ( $isTaxonomy ) {
 				$term = get_term_by( 'slug', $value, $attribute );
 				if ( $term && ! is_wp_error( $term ) ) {
-					$hex = $this->normalizeHex( (string) get_term_meta( $term->term_id, \AwareWave\WpBridge\Admin\AttributeSwatchTerms::TERM_META, true ) );
+					$label = $term->name;
+					$hex   = $this->normalizeHex( (string) get_term_meta( $term->term_id, \AwareWave\WpBridge\Admin\AttributeSwatchTerms::TERM_META, true ) );
 					if ( $hex === '' ) {
 						$hex = $this->normalizeHex( $perProduct[ $term->name ] ?? ( $palette[ $term->name ] ?? '' ) );
 					}
@@ -97,7 +99,7 @@ final class ColorSwatches {
 			if ( $hex === '' ) {
 				return $html; // an option without a colour -> not safely a colour attribute; bail.
 			}
-			$swatches[] = array( 'value' => $value, 'hex' => $hex );
+			$swatches[] = array( 'value' => $value, 'label' => $label, 'hex' => $hex );
 		}
 
 		// WC computes the <select> id/name from the attribute when its own id/name args are empty, yet
@@ -118,8 +120,8 @@ final class ColorSwatches {
 			$out .= sprintf(
 				'<button type="button" class="awbridge-swatch" role="radio" aria-checked="false"'
 				. ' data-value="%1$s" title="%2$s" aria-label="%2$s"><span style="background:%3$s"></span></button>',
-				esc_attr( $s['value'] ),
-				esc_attr( $s['value'] ),
+				esc_attr( $s['value'] ), // data-value = slug (taxonomy) / label (local) — what the <select> submits
+				esc_attr( $s['label'] ), // title + aria-label = human display name
 				esc_attr( $s['hex'] )
 			);
 		}
@@ -134,23 +136,26 @@ final class ColorSwatches {
 	 *
 	 * @return array<string,string>
 	 */
-	private function colorMap( int $productId ): array {
-		// Per-product meta (written by the one-click Printful flow, or the per-product box) takes
-		// precedence; the provider-agnostic palette fills any remaining options. So a Printful product
-		// keeps its exact Printful-bound colours, while a hand-built product whose Colour values match
-		// palette names gets swatches with NO per-product setup.
-		$palette    = \AwareWave\WpBridge\Admin\SwatchPalette::palette();
-		$perProduct = array();
-		$raw        = get_post_meta( $productId, self::META_KEY, true );
-		$decoded    = is_string( $raw ) && $raw !== '' ? json_decode( $raw, true ) : ( is_array( $raw ) ? $raw : null );
-		if ( is_array( $decoded ) ) {
-			foreach ( $decoded as $label => $hex ) {
-				if ( is_string( $label ) && is_string( $hex ) ) {
-					$perProduct[ $label ] = $hex;
-				}
+	/**
+	 * This product's per-product colour map (`_awbridge_color_swatches` — the Printful one-click flow or
+	 * the per-product box). label=>hex; empty when none set. The palette + term colours are layered on
+	 * per-option in renderSwatches, so this returns ONLY the per-product source.
+	 *
+	 * @return array<string,string>
+	 */
+	private function productMap( int $productId ): array {
+		$raw     = get_post_meta( $productId, self::META_KEY, true );
+		$decoded = is_string( $raw ) && $raw !== '' ? json_decode( $raw, true ) : ( is_array( $raw ) ? $raw : null );
+		if ( ! is_array( $decoded ) ) {
+			return array();
+		}
+		$map = array();
+		foreach ( $decoded as $label => $hex ) {
+			if ( is_string( $label ) && is_string( $hex ) ) {
+				$map[ $label ] = $hex;
 			}
 		}
-		return $perProduct + $palette; // '+' keeps left (per-product) keys on collision.
+		return $map;
 	}
 
 	/** Validate + normalize a hex colour to lowercase #rrggbb, or '' if malformed (never trust meta blindly). */
@@ -200,7 +205,7 @@ final class ColorSwatches {
     // variation form is on a page — related products / quick-view). Then fall back to id, then sibling.
     var name = group.getAttribute('data-awbridge-name');
     var form = group.closest('form.variations_form') || group.closest('form');
-    if(name && form){ var esc=(window.CSS&&CSS.escape)?CSS.escape(name):name; var byName = form.querySelector('select[name="'+esc+'"]'); if(byName){ return byName; } }
+    if(name && form){ var esc=(window.CSS&&CSS.escape)?CSS.escape(name):String(name).replace(/[^\w-]/g,'\\$&'); var byName = form.querySelector('select[name="'+esc+'"]'); if(byName){ return byName; } }
     var id = group.getAttribute('data-awbridge-select');
     var byId = id ? document.getElementById(id) : null;
     if(byId && byId.tagName==='SELECT'){ return byId; }
