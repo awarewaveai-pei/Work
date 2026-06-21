@@ -47,6 +47,25 @@ export function getDesignsPublicBase(): string {
   return (process.env.R2_DESIGNS_PUBLIC_BASE || DEFAULT_PUBLIC_BASE).replace(/\/+$/, "");
 }
 
+/**
+ * True iff `url` is one of OUR R2 designs-bucket assets (designs/ master OR web/ derivative). Used as
+ * an SSRF allowlist before any server-side fetch of the URL: a bare `startsWith(base)` is bypassable
+ * (`https://<base-host>.attacker.tld/x` passes a prefix test), so we require a `/` boundary AND assert
+ * the parsed origin is https with the exact bucket host. Mirrors the guard in lib/tarot/image-gen.ts.
+ */
+export function isDesignsAsset(url: unknown): url is string {
+  if (typeof url !== "string") return false;
+  const base = getDesignsPublicBase();
+  if (!url.startsWith(base + "/")) return false;
+  try {
+    const u = new URL(url);
+    const b = new URL(base);
+    return u.protocol === "https:" && u.host === b.host;
+  } catch {
+    return false;
+  }
+}
+
 export function sha256Hex(buffer: Buffer): string {
   return createHash("sha256").update(buffer).digest("hex");
 }
