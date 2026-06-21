@@ -1617,6 +1617,54 @@ export default function CanvasEditor() {
               </div>
             </div>
           </SidebarPanel>
+
+          {/* ✂️ 邊緣遮罩 — brush/grunge edge on the selected image → transparent PNG */}
+          <SidebarPanel id="edge-mask" title="✂️ 邊緣遮罩（筆刷邊）" defaultPos={{ x: 816, y: 496 }} width={276} defaultCollapsed>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
+              <div style={{ opacity: 0.6 }}>點筆刷 → 把選取的圖套有機邊（透明 PNG）。可換不同筆刷。</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(44px, 1fr))", gap: 5 }}>
+                {EDGE_PREVIEWS.map((pv) => {
+                  const active = edgeStyleApplied === pv.id;
+                  return (
+                    <button
+                      key={pv.id}
+                      type="button"
+                      title={pv.en}
+                      disabled={genBusy}
+                      onClick={() => void applyEdgeMaskToSelected(pv.id)}
+                      style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 2,
+                        borderRadius: 6, cursor: "pointer",
+                        background: active ? "rgba(99,102,241,0.18)" : "rgba(127,127,127,0.06)",
+                        border: `1px solid ${active ? "#6366f1" : "rgba(127,127,127,0.25)"}`,
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={pv.svg} alt={pv.zh} style={{ width: "100%", aspectRatio: "1", background: "#3a3a3a", borderRadius: 3 }} />
+                      <span style={{ fontSize: 8.5, opacity: 0.8, lineHeight: 1, textAlign: "center" }}>{pv.zh}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {(() => {
+                const isAsset = edgeStyleApplied ? EDGE_MASK_STYLES.find((s) => s.id === edgeStyleApplied)?.kind === "asset" : false;
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, opacity: isAsset ? 0.4 : 1 }}>
+                    <span style={{ opacity: 0.6 }}>強度</span>
+                    <input
+                      type="range" min={10} max={90} step={1} value={edgeAmount}
+                      disabled={genBusy || isAsset}
+                      onChange={(e) => setEdgeAmount(Number(e.target.value))}
+                      onPointerUp={() => { if (edgeStyleApplied && !isAsset) void applyEdgeMaskToSelected(edgeStyleApplied); }}
+                      style={{ flex: 1 }}
+                    />
+                    <span style={{ opacity: 0.6, width: 30, textAlign: "right" }}>{isAsset ? "固定" : edgeAmount}</span>
+                  </div>
+                );
+              })()}
+              {genBusy ? <span style={{ opacity: 0.6 }}>套用中…</span> : null}
+            </div>
+          </SidebarPanel>
           </>
         ) : null}
 
