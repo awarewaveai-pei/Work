@@ -63,6 +63,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ...(R2_VIDEO_PUBLIC_BASE ? [new URL(R2_VIDEO_PUBLIC_BASE).hostname] : []),
     "images.pexels.com",
     "videos.pexels.com",
+    "player.vimeo.com",  // Pexels API 舊影片 host（Vimeo-sourced clips）
   ]);
   for (const url of imageUrls) {
     try {

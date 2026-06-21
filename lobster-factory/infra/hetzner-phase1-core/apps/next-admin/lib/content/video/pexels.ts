@@ -100,12 +100,22 @@ export async function fetchBrollVideoUrl(
     for (const video of videos) {
       const files = video.video_files ?? [];
       // 偏好 HD 橫式 ~1280px；次選任何 HD MP4
+      // Pexels API 回傳兩種 host：新影片 = videos.pexels.com；舊 Vimeo-sourced = player.vimeo.com
+      // 兩者均接受（EU _is_safe_https_url is_global 均可通過；render-draft ALLOWED_HOSTS 已同步加入）
+      const isAllowedVideoUrl = (link: string) => {
+        try {
+          const h = new URL(link).hostname;
+          return (h === "videos.pexels.com" || h === "player.vimeo.com") && /\.mp4(\?|$)/.test(link);
+        } catch { return false; }
+      };
       const preferred = files.find(
-        (f) => f.quality === "hd" && f.file_type === "video/mp4" && f.width >= 1280 && f.width > f.height,
+        (f) => f.quality === "hd" && f.file_type === "video/mp4" && f.width >= 1280 && f.width > f.height && isAllowedVideoUrl(f.link),
       ) ?? files.find(
-        (f) => f.quality === "hd" && f.file_type === "video/mp4",
+        (f) => f.quality === "hd" && f.file_type === "video/mp4" && isAllowedVideoUrl(f.link),
+      ) ?? files.find(
+        (f) => f.file_type === "video/mp4" && isAllowedVideoUrl(f.link),
       );
-      if (preferred?.link?.startsWith("https://videos.pexels.com/")) return preferred.link;
+      if (preferred?.link) return preferred.link;
     }
     return null;
   } catch {

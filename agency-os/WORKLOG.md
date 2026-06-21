@@ -4,6 +4,42 @@
 
 ## 2026-06-22
 
+### feat(banner): Banner Studio P1 — 文案生成 + 產品圖去背 + 步驟重編
+
+[任務理解] 使用者要在 `/tools/banner` 加 (1) AI 文案生成（5 組 headline/subtext）(2) 產品圖上傳 + 一鍵去背。前一 session 已完成基本 Banner Studio；本次 P1 擴充。
+
+[現況分析]
+- 讀 `BannerStudio.tsx`（654 行）確認現有 state、presets、exportToPng 結構
+- 讀 `/api/tools/studio/remove-bg/route.ts` 確認 input format、roleHeader 要求、response `{ok, image}`
+- 讀 `ScriptForge.tsx` 確認 streaming pattern：TextDecoder `{stream:true}` + final `dec.decode()` flush + pj()
+- 讀 `canvas-handoff.ts` 確認 `openInCanvas(image, baseName)` 簽名
+- 讀 `lib/studio/asset-group.ts`：`assetToolGroup("banner")` → passthrough `"banner"`（不會被過濾）
+
+[已修改]
+- `app/tools/banner/BannerStudio.tsx`：完全重寫 ~860 行
+  - 新 State 欄位：`copyBrief/copyTone/copyGenerating/copyVariants/copyStream` + `productOrig/productImage/productRemoving/productPos/productScale`
+  - 新 Step 0（文案生成）：4 語氣選鈕 + streaming copy gen → 5 組可點擊 variant → 自動填入 headline/subtext
+  - 新 Step 2（產品圖）：upload + 去背（`/api/tools/studio/remove-bg`）+ position 4 選（center/left/right/bottom-right）+ scale slider
+  - `exportToPng` 層序更新：bg → dim overlay → product image（contain-fit, 位置對齊）→ text
+  - 預覽 CSS：product `<img>` absolute, z-index 在 dim overlay 之上、text 之下
+  - 步驟重編：Step 0=文案, 1=尺寸, 2=產品圖, 3=背景, 4=文字, 5=匯出
+  - Critic 三項 minor fix：`roleHeader("operator")` 加到 copy gen + save；`Array.isArray(parsed?.variants)` guard；product 移除重置 `saved: false`
+
+[驗證結果]
+- REALTEST_WAIVED: SMOKE_COVERED -- tsc clean + critic pass；需 sg-deploy 後 browser 全流程實測（本地無 next-admin dev server）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3minor（全修）— XSS 無路徑（dataURL only）、canvas memory 無洩漏、wrapText CJK 邏輯正確、productPos 型別安全
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=source.*banner|openInCanvas|CANVAS_SOURCE_KEY|assetToolGroup | hits=assetToolGroup("banner")=passthrough(ok), openInCanvas callers=一致
+- tsc: 0 errors（兩次確認，修 critic 後再跑）
+- commit: `437eb3cb` (auto-checkpoint) — 3 critic fixes captured
+
+[剩餘風險]
+- 未 browser 實測：去背 API 要求 `POD_DESIGNS_ENABLED=true`（SG .env 已有）、AI 生成 aspect ratio 映射（hero-desktop 3:1 用 16:9 cover-fit）
+- copy gen 無 AbortController（同 ScriptForge.tsx 現有設計，低優先）
+
+[rollback] `git revert 437eb3cb`（僅 BannerStudio.tsx；no DB migration, no API change）
+
+AUTO_TASK_DONE: feat(banner): Banner Studio P1 文案生成 + 產品圖去背
+
 ### feat(video): pexels-video 模式 + 目標時長控制（1/3/5 分鐘）
 
 [任務理解] 使用者要真實 AI 影片，現有 pipeline 是靜態圖 + Ken Burns 動畫。方案：用 Pexels Videos API 抓真實 MP4 片段，EU pipeline.py 已有 stream_loop 支援，只需加 fetchBrollVideoUrl() + 前端 UI。

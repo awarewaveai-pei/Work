@@ -771,7 +771,7 @@ function DraftEditor({
           }}>
             {/* Thumbnail — 照片用 img；Pexels MP4 用靜音 video 預覽 */}
             <div style={{ flexShrink: 0, width: 100, height: 68, borderRadius: 6, overflow: "hidden", background: "#0f172a" }}>
-              {scene.imageUrl.endsWith(".mp4") || scene.imageUrl.includes("videos.pexels.com") ? (
+              {/\.mp4(\?|$)/.test(scene.imageUrl) || scene.imageUrl.includes("videos.pexels.com") || scene.imageUrl.includes("player.vimeo.com") ? (
                 <video src={scene.imageUrl} muted loop autoPlay playsInline
                   style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : scene.imageUrl.startsWith("https://") ? (
