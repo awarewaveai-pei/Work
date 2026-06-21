@@ -301,7 +301,7 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
     setAP(ap => ({ ...ap, [field]: ap[field] === val ? undefined : val }));
   }
   function applyPreset(sel: Record<string, string[]>) {
-    setAP(ap => ({ ...ap, ...sel }));
+    setAP(ap => ({ ...ap, ...sel, jobCustom: undefined, emotionCustom: undefined }));
   }
 
   async function save() {

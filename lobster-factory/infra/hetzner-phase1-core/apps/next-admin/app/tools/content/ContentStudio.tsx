@@ -1051,6 +1051,24 @@ export default function ContentStudio() {
         if (dm.emotionalTriggers && !m.emotionalTriggers.trim()) m.emotionalTriggers = dm.emotionalTriggers;
         if (dm.objections        && !m.objections.trim())        m.objections        = dm.objections;
         if (dm.forbiddenClaims   && !m.forbiddenClaims.trim())   m.forbiddenClaims   = dm.forbiddenClaims;
+        // Inject audienceProfile chip selections → audience text (rich, structured)
+        if (d.audienceProfile && !m.audience.trim()) {
+          const ap = d.audienceProfile;
+          const parts: string[] = [];
+          if (ap.age?.length)       parts.push(`年齡層：${ap.age.join('、')}`);
+          if (ap.gender?.length)    parts.push(`性別：${ap.gender.join('、')}`);
+          const job = [...(ap.job ?? []), ...(ap.jobCustom?.trim() ? [ap.jobCustom.trim()] : [])];
+          if (job.length)           parts.push(`職業／身分：${job.join('、')}`);
+          const emo = [...(ap.emotion ?? []), ...(ap.emotionCustom?.trim() ? [ap.emotionCustom.trim()] : [])];
+          if (emo.length)           parts.push(`情緒狀態：${emo.join('、')}`);
+          if (ap.awareness?.length) parts.push(`對主題熟悉度：${ap.awareness.join('、')}`);
+          if (ap.spending?.length)  parts.push(`消費力：${ap.spending.join('、')}`);
+          if (ap.contentGoal)       parts.push(`內容目標：${ap.contentGoal}`);
+          if (ap.contentTone)       parts.push(`語氣偏向：${ap.contentTone}`);
+          if (ap.audienceAction)    parts.push(`期望觀眾行動：${ap.audienceAction}`);
+          const apText = parts.join('；');
+          if (apText) m.audience = apText;
+        }
         next.marketing = m;
       }
       return next;
