@@ -781,14 +781,22 @@ export default function DesignsGallery() {
     try {
       const { default: JSZip } = await import("jszip");
       const zip = new JSZip();
+      const usedVideoNames = new Set<string>();
       for (const v of selected) {
         try {
           const res = await fetch(v.object_url!, { cache: "no-store" });
           if (!res.ok) { failed++; continue; }
           const blob = await res.blob();
           const ext = v.object_key.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? "mp4";
-          const title = v.metadata?.title ? safeFilePart(v.metadata.title, "video") : "video";
-          zip.file(`${title}.${ext}`, blob);
+          const base = v.metadata?.title ? safeFilePart(v.metadata.title, "video") : "video";
+          let candidate = `${base}.${ext}`;
+          let suffix = 2;
+          while (usedVideoNames.has(candidate.toLowerCase())) {
+            candidate = `${base}-${suffix}.${ext}`;
+            suffix++;
+          }
+          usedVideoNames.add(candidate.toLowerCase());
+          zip.file(candidate, blob);
           added++;
         } catch { failed++; }
         finally { setVideoBulkDownloadDone((p) => p + 1); }
@@ -941,7 +949,7 @@ export default function DesignsGallery() {
                   {v.object_url && (
                     <button
                       className="designs-action-btn"
-                      disabled={isDownloading || isDeleting}
+                      disabled={isDownloading || isDeleting || videoBulkDeleting || videoBulkDownloading}
                       onClick={() => void downloadVideo(v)}
                     >
                       {isDownloading ? "下載中…" : "下載"}
@@ -949,7 +957,7 @@ export default function DesignsGallery() {
                   )}
                   <button
                     className="designs-action-btn designs-action-btn--danger"
-                    disabled={isDeleting || isDownloading}
+                    disabled={isDeleting || isDownloading || videoBulkDeleting || videoBulkDownloading}
                     onClick={() => void deleteVideo(v)}
                   >
                     {isDeleting ? "刪除中…" : "刪除"}

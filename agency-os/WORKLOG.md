@@ -4,6 +4,35 @@
 
 ## 2026-06-22
 
+### feat(designs): 影片 tab 加入 filter / sort / 全選 / 下載 / 刪除
+
+[任務理解] 影片 tab 無 filter、排序、全選、下載、刪除功能；圖片 tab 全有。補齊 feature parity。
+
+[現況分析]
+- 讀 `DesignsGallery.tsx`（1322 行）確認圖片 tab 實作：filter-panel / toolbar / 全選 / bulkDownload(JSZip) / bulkDelete / per-card actions
+- 影片 tab 舊實作：只有 grid + format links，無任何互動功能
+- DELETE API (`/api/tools/designs?id=<uuid>`) 已同時支援圖片和影片（按 id 查詢，與 mime_type 無關）
+- `git log` 確認無並行 session 改動此檔
+
+[已修改]
+- `app/tools/designs/DesignsGallery.tsx`
+  - 新增 state：`videoSelectedIds`, `videoSortOrder`, `videoFilterTime`, `videoBulkDeleting/Downloading`, `videoBulkDownloadDone/Total`, `videoDeletingId`, `videoDownloadingId`
+  - 新增 `visibleVideos` useMemo（時間 filter + asc/desc sort）
+  - 新增 callbacks：`toggleVideoSelect`, `deleteVideo`, `downloadVideo`, `videoBulkDelete`, `videoBulkDownload`（含 JSZip + dedupe）
+  - 影片 tab UI：filter panel（時間 + 排序 + 重新整理）+ toolbar（全選/下載N部/刪除N部）+ per-card checkbox + 下載/刪除按鈕
+  - Critic 修正：per-card 按鈕在 bulk op 進行中鎖定（防 concurrent same-id DELETE）；ZIP dedupe（untitled video 用 suffix 避免覆蓋）
+
+[驗證結果]
+- REALTEST_WAIVED: SMOKE_COVERED -- tsc clean + critic pass; sg-deploy 後 browser 實測
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/4n（Major 和 Suggestion 已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=videoSelectedIds|visibleVideos|deleteVideo|downloadVideo | hits=0
+- tsc: PASS（0 errors）
+
+[剩餘風險]
+- video `object_key` 若帶 query string → extension fallback `.mp4`；R2 key 格式不含 query string，低風險
+
+[rollback] `git revert <commit>` — no DB migration, no API change
+
 ### feat(banner): Banner Studio P1 — 文案生成 + 產品圖去背 + 步驟重編
 
 [任務理解] 使用者要在 `/tools/banner` 加 (1) AI 文案生成（5 組 headline/subtext）(2) 產品圖上傳 + 一鍵去背。前一 session 已完成基本 Banner Studio；本次 P1 擴充。
