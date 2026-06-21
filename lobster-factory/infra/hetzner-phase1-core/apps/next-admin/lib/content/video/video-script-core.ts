@@ -33,15 +33,29 @@ export type VideoScriptResult =
   | VideoScriptSuccess
   | { ok: false; status: number; error: string };
 
+/** targetMinutes → { sceneCount, charsPerScene }
+ * Chinese Edge TTS ≈ 280 chars/min；各梯次保留 ~10% 餘裕。
+ * 5min: 10 × 160 ≈ 1600 chars ÷ 280 ≈ 5.7 min
+ * 3min: 8 × 120 ≈ 960 chars ÷ 280 ≈ 3.4 min
+ * 1min: 6 × 50 ≈ 300 chars ÷ 280 ≈ 1.1 min（預設，與原行為一致）
+ */
+function scriptParams(targetMinutes?: number): { sceneCount: number; charsPerScene: number } {
+  if (targetMinutes && targetMinutes >= 4) return { sceneCount: 10, charsPerScene: 160 };
+  if (targetMinutes && targetMinutes >= 2) return { sceneCount: 8,  charsPerScene: 120 };
+  return { sceneCount: 6, charsPerScene: 50 };
+}
+
 /** 要求 Claude 回傳的 JSON 架構（供提示使用）。 */
-const SCHEMA_EXAMPLE = `{
+function schemaExample(sceneCount: number) {
+  return `{
   "title": "...",
   "description": "...",
   "scenes": [
-    { "id": 1, "narration": "35 字以內的旁白", "image_prompt": "English prompt for AI illustration", "broll_keyword": "english search term", "visual": "custom" | "broll" },
-    ...6 scenes total...
+    { "id": 1, "narration": "旁白文字", "image_prompt": "English prompt for AI illustration", "broll_keyword": "english search term", "visual": "custom" | "broll" },
+    ...${sceneCount} scenes total...
   ]
 }`;
+}
 
 /** 解析 Claude 回傳字串（容錯：剝 markdown fence、fallback regex）。 */
 function parseScriptJson(raw: string): VideoScriptSuccess | null {
@@ -118,33 +132,36 @@ export async function generateVideoScript(
     articleTitle?: string;
     articleContent?: string;
     language?: string;
+    /** 目標影片長度（分鐘）→ 控制場景數與旁白字數。預設 1 分鐘（6 場景 × 50 字）。 */
+    targetMinutes?: number;
   },
   apiKey: string
 ): Promise<VideoScriptResult> {
   const lang = input.language ?? "繁體中文";
+  const { sceneCount, charsPerScene } = scriptParams(input.targetMinutes);
 
   // 組成使用者訊息：優先使用文章，其次用主題
   let userContent: string;
   if (input.articleTitle && input.articleContent) {
     userContent =
-      `根據以下文章，生成一個 ${lang} 旁白的 6 場景影片腳本。\n\n` +
+      `根據以下文章，生成一個 ${lang} 旁白的 ${sceneCount} 場景影片腳本。\n\n` +
       `文章標題：${input.articleTitle}\n\n${input.articleContent}`;
   } else {
     const topic = input.topic ?? "台灣旅遊精選";
-    userContent = `根據主題「${topic}」，生成一個 ${lang} 旁白的 6 場景影片腳本。`;
+    userContent = `根據主題「${topic}」，生成一個 ${lang} 旁白的 ${sceneCount} 場景影片腳本。`;
   }
 
   const systemPrompt =
     `你是專業影片腳本作家。請嚴格以下方 JSON 格式回傳腳本，不要加任何說明文字。\n\n` +
     `規則：\n` +
-    `- scenes 恰好 6 個，id 從 1 到 6\n` +
-    `- narration：${lang}，15-30 字，口語短句、主動語態，像真人對著鏡頭說話，避免「此外」「在此」「作為」等書面語，句尾要有自然停頓感\n` +
+    `- scenes 恰好 ${sceneCount} 個，id 從 1 到 ${sceneCount}\n` +
+    `- narration：${lang}，${charsPerScene} 字左右，口語短句、主動語態，像真人對著鏡頭說話，避免「此外」「在此」「作為」等書面語，句尾要有自然停頓感\n` +
     `- image_prompt：英文，cinematic 攝影風格的 16:9 場景描述，格式：[主體動作] + [環境背景] + [光線/色調]，30 字以內，禁用抽象詞，只寫可見的具體畫面\n` +
     `- broll_keyword：英文，1–3 個單字，適合 Pexels 搜尋的真實影片素材關鍵字\n` +
     `- visual：「custom」= 此場景適合 AI 插畫；「broll」= 此場景適合真實影片素材\n` +
     `- title：影片標題（${lang}）\n` +
     `- description：SEO 影片描述（${lang}，50–120 字）\n\n` +
-    `JSON 架構：\n${SCHEMA_EXAMPLE}`;
+    `JSON 架構：\n${schemaExample(sceneCount)}`;
 
   let response: Awaited<ReturnType<Anthropic["messages"]["create"]>>;
   try {

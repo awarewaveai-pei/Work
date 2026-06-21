@@ -1,11 +1,12 @@
 /**
- * pexels.ts — 從 Pexels Photos API 抓取 B-roll 靜態圖 URL。
+ * pexels.ts — Pexels Photos API（B-roll 靜態圖）+ Pexels Videos API（B-roll 真實影片）。
  *
- * 回傳一條合適的 https 圖片連結（large2x 或 large），或 null（找不到 / API 無效）。
- * 永不拋出例外：所有錯誤都捕獲並回傳 null，讓呼叫端降級到 Flux 靜態圖。
+ * fetchBrollUrl：回傳 Pexels 照片 URL（large2x）→ EU pipeline 走 zoompan（Ken Burns）。
+ * fetchBrollVideoUrl：回傳 Pexels HD MP4 URL → EU pipeline 走 stream_loop（真實影片）。
+ * 兩者永不拋出例外，失敗一律回 null，讓呼叫端自行降級。
  *
- * 注意：改用 Photos API（/v1/search）而非 Videos API，因為影片 URL（.mp4）
- * 無法作為靜態圖輸入 EU video-service Ken Burns pipeline。
+ * 注意：原先只用 Photos API，因為 Videos URL（.mp4）無法送進 Ken Burns pipeline。
+ * 現在 pexels-video 模式明確要求真實影片，故同時開放 Videos API。
  */
 
 interface PexelsPhotoSrc {
@@ -20,6 +21,22 @@ interface PexelsPhoto {
 
 interface PexelsPhotoSearchResponse {
   photos?: PexelsPhoto[];
+}
+
+interface PexelsVideoFile {
+  quality: string;   // "hd" | "sd" | "uhd"
+  file_type: string; // "video/mp4"
+  width: number;
+  height: number;
+  link: string;      // https://videos.pexels.com/video-files/...
+}
+
+interface PexelsVideo {
+  video_files: PexelsVideoFile[];
+}
+
+interface PexelsVideoSearchResponse {
+  videos?: PexelsVideo[];
 }
 
 /**
@@ -53,6 +70,45 @@ export async function fetchBrollUrl(
     return null;
   } catch {
     // 網路錯誤、AbortError、JSON 解析失敗 — 一律 null，讓 Flux 接手
+    return null;
+  }
+}
+
+/**
+ * 以關鍵字搜尋 Pexels 影片，回傳一個 HD MP4 直連 URL（videos.pexels.com）。
+ * 優先選 1280px 寬的 HD 橫式影片；找不到時回傳任何可用 HD MP4。
+ * @param keyword 英文搜尋關鍵字（建議 1–3 個單字）
+ * @param apiKey  process.env.PEXELS_API_KEY
+ * @param signal  可選的 AbortSignal
+ */
+export async function fetchBrollVideoUrl(
+  keyword: string,
+  apiKey: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  try {
+    const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(keyword)}&per_page=5&orientation=landscape`;
+    const res = await fetch(url, {
+      headers: { Authorization: apiKey },
+      signal: signal ?? AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as PexelsVideoSearchResponse;
+    const videos = data.videos ?? [];
+
+    for (const video of videos) {
+      const files = video.video_files ?? [];
+      // 偏好 HD 橫式 ~1280px；次選任何 HD MP4
+      const preferred = files.find(
+        (f) => f.quality === "hd" && f.file_type === "video/mp4" && f.width >= 1280 && f.width > f.height,
+      ) ?? files.find(
+        (f) => f.quality === "hd" && f.file_type === "video/mp4",
+      );
+      if (preferred?.link?.startsWith("https://videos.pexels.com/")) return preferred.link;
+    }
+    return null;
+  } catch {
     return null;
   }
 }

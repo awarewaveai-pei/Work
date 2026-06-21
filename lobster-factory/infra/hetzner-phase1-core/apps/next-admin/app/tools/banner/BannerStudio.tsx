@@ -46,17 +46,39 @@ const GRAD_DIRS: { value: string; label: string }[] = [
   { value: "45deg",  label: "↗ 反斜" },
 ];
 
-type BgMode  = "color" | "gradient" | "upload" | "ai";
-type TextPos = "top" | "center" | "bottom";
+const COPY_TONES = ["促銷", "品牌形象", "活動", "教育"] as const;
+type CopyTone = typeof COPY_TONES[number];
+type BgMode   = "color" | "gradient" | "upload" | "ai";
+type TextPos  = "top" | "center" | "bottom";
+type ProductPos = "center" | "left" | "right" | "bottom-right";
+
+interface CopyVariant { headline: string; subtext: string }
 
 interface State {
-  preset:    PresetKey;
+  preset:       PresetKey;
+  // copy generation
+  copyBrief:    string;
+  copyTone:     CopyTone;
+  copyGenerating: boolean;
+  copyVariants: CopyVariant[];
+  copyStream:   string;
+  // product image
+  productOrig:     string | null;
+  productImage:    string | null;
+  productRemoving: boolean;
+  productPos:      ProductPos;
+  productScale:    number;
+  // background
   bgMode:    BgMode;
   bgColor:   string;
   gradFrom:  string;
   gradTo:    string;
   gradAngle: string;
   bgImage:   string | null;
+  aiPrompt:  string;
+  aiModel:   string;
+  generating: boolean;
+  // text
   headline:  string;
   subtext:   string;
   textColor: string;
@@ -65,22 +87,33 @@ interface State {
   subtextSize:  number;
   textPos:   TextPos;
   dimOverlay: boolean;
-  aiPrompt:  string;
-  aiModel:   string;
-  generating: boolean;
+  // export
   saving:    boolean;
   saved:     boolean;
   error:     string | null;
 }
 
 const INIT: State = {
-  preset:    "featured-og",
+  preset:       "featured-og",
+  copyBrief:    "",
+  copyTone:     "促銷",
+  copyGenerating: false,
+  copyVariants: [],
+  copyStream:   "",
+  productOrig:     null,
+  productImage:    null,
+  productRemoving: false,
+  productPos:      "center",
+  productScale:    0.6,
   bgMode:    "color",
   bgColor:   "#1a1a2e",
   gradFrom:  "#667eea",
   gradTo:    "#764ba2",
   gradAngle: "135deg",
   bgImage:   null,
+  aiPrompt:  "",
+  aiModel:   "flux-dev",
+  generating: false,
   headline:  "",
   subtext:   "",
   textColor: "#ffffff",
@@ -89,70 +122,89 @@ const INIT: State = {
   subtextSize:  32,
   textPos:   "center",
   dimOverlay: true,
-  aiPrompt:  "",
-  aiModel:   "flux-dev",
-  generating: false,
   saving:    false,
   saved:     false,
   error:     null,
 };
 
 // ---------------------------------------------------------------------------
-// Canvas export helper
+// Canvas export  (layer order: bg → dim → product → text)
 // ---------------------------------------------------------------------------
 
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload  = () => res(img);
+    img.onerror = () => rej(new Error("image_load_failed"));
+    img.src = src;
+  });
+}
+
 async function exportToPng(state: State): Promise<string> {
-  const p = PRESETS[state.preset];
-  const canvas = document.createElement("canvas");
-  canvas.width  = p.w;
-  canvas.height = p.h;
-  const ctx = canvas.getContext("2d");
+  const p   = PRESETS[state.preset];
+  const cv  = document.createElement("canvas");
+  cv.width  = p.w;
+  cv.height = p.h;
+  const ctx = cv.getContext("2d");
   if (!ctx) throw new Error("canvas_unavailable");
 
-  // Background
+  // ── Background ──
   if (state.bgMode === "color") {
     ctx.fillStyle = state.bgColor;
     ctx.fillRect(0, 0, p.w, p.h);
   } else if (state.bgMode === "gradient") {
-    const angleDeg = Number.isFinite(parseFloat(state.gradAngle)) ? parseFloat(state.gradAngle) : 135;
-    const rad      = (angleDeg * Math.PI) / 180;
-    const cx       = p.w / 2;
-    const cy       = p.h / 2;
-    const halfLen  = Math.sqrt(cx * cx + cy * cy);
-    const grd = ctx.createLinearGradient(
-      cx - Math.cos(rad) * halfLen, cy - Math.sin(rad) * halfLen,
-      cx + Math.cos(rad) * halfLen, cy + Math.sin(rad) * halfLen,
+    const deg    = Number.isFinite(parseFloat(state.gradAngle)) ? parseFloat(state.gradAngle) : 135;
+    const rad    = (deg * Math.PI) / 180;
+    const cx     = p.w / 2;
+    const cy     = p.h / 2;
+    const half   = Math.sqrt(cx * cx + cy * cy);
+    const grd    = ctx.createLinearGradient(
+      cx - Math.cos(rad) * half, cy - Math.sin(rad) * half,
+      cx + Math.cos(rad) * half, cy + Math.sin(rad) * half,
     );
     grd.addColorStop(0, state.gradFrom);
     grd.addColorStop(1, state.gradTo);
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, p.w, p.h);
   } else if (state.bgImage) {
-    await new Promise<void>((res, rej) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        const scale = Math.max(p.w / img.width, p.h / img.height);
-        const sw = img.width * scale;
-        const sh = img.height * scale;
-        ctx.drawImage(img, (p.w - sw) / 2, (p.h - sh) / 2, sw, sh);
-        res();
-      };
-      img.onerror = () => rej(new Error("bg_image_load_failed"));
-      img.src = state.bgImage!;
-    });
+    const img   = await loadImage(state.bgImage);
+    const scale = Math.max(p.w / img.width, p.h / img.height);
+    const sw    = img.width  * scale;
+    const sh    = img.height * scale;
+    ctx.drawImage(img, (p.w - sw) / 2, (p.h - sh) / 2, sw, sh);
   } else {
     ctx.fillStyle = state.bgColor;
     ctx.fillRect(0, 0, p.w, p.h);
   }
 
-  // Dim overlay
+  // ── Dim overlay ──
   if (state.dimOverlay) {
     ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.fillRect(0, 0, p.w, p.h);
   }
 
-  // Text
+  // ── Product image (above dim, below text) ──
+  if (state.productImage) {
+    const img  = await loadImage(state.productImage);
+    const isCtr = state.productPos === "center";
+    const maxW  = p.w * state.productScale * (isCtr ? 0.7 : 0.45);
+    const maxH  = p.h * 0.85;
+    const scale = Math.min(maxW / img.width, maxH / img.height);
+    const sw    = img.width  * scale;
+    const sh    = img.height * scale;
+    const pad   = p.w * 0.05;
+    let x: number, y: number;
+    switch (state.productPos) {
+      case "left":         x = pad;              y = (p.h - sh) / 2;  break;
+      case "right":        x = p.w - sw - pad;   y = (p.h - sh) / 2;  break;
+      case "bottom-right": x = p.w - sw - pad;   y = p.h - sh - pad;  break;
+      default:             x = (p.w - sw) / 2;   y = (p.h - sh) / 2;
+    }
+    ctx.drawImage(img, x, y, sw, sh);
+  }
+
+  // ── Text ──
   const padding  = Math.round(p.w * 0.07);
   const maxWidth = p.w - padding * 2;
   ctx.fillStyle  = state.textColor;
@@ -165,50 +217,37 @@ async function exportToPng(state: State): Promise<string> {
   const blockH    = headlineH + gap + subtextH;
 
   let blockY: number;
-  if (state.textPos === "top")    blockY = padding + blockH / 2;
+  if (state.textPos === "top")         blockY = padding + blockH / 2;
   else if (state.textPos === "bottom") blockY = p.h - padding - blockH / 2;
-  else blockY = p.h / 2;
+  else                                  blockY = p.h / 2;
 
   if (state.headline) {
     ctx.font = `bold ${state.headlineSize}px ${state.fontFamily}`;
-    const lines = wrapText(ctx, state.headline, maxWidth, state.headlineSize);
+    const lines  = wrapText(ctx, state.headline, maxWidth);
     const totalH = lines.length * state.headlineSize * 1.2;
     let y = blockY - blockH / 2 + state.headlineSize / 2;
-    for (const line of lines) {
-      ctx.fillText(line, p.w / 2, y);
-      y += state.headlineSize * 1.2;
-    }
+    for (const line of lines) { ctx.fillText(line, p.w / 2, y); y += state.headlineSize * 1.2; }
     blockY = blockY - blockH / 2 + totalH + gap + subtextH / 2;
   }
   if (state.subtext) {
     ctx.font = `${state.subtextSize}px ${state.fontFamily}`;
-    const lines = wrapText(ctx, state.subtext, maxWidth, state.subtextSize);
-    let y = state.headline
-      ? blockY
-      : blockY - subtextH / 2 + state.subtextSize / 2;
-    for (const line of lines) {
-      ctx.fillText(line, p.w / 2, y);
-      y += state.subtextSize * 1.2;
-    }
+    const lines = wrapText(ctx, state.subtext, maxWidth);
+    let y = state.headline ? blockY : blockY - subtextH / 2 + state.subtextSize / 2;
+    for (const line of lines) { ctx.fillText(line, p.w / 2, y); y += state.subtextSize * 1.2; }
   }
 
-  return canvas.toDataURL("image/png");
+  return cv.toDataURL("image/png");
 }
 
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, _fontSize: number): string[] {
-  // CJK text has no spaces — split into individual chars and re-join by measure.
-  const isCjk = /[　-鿿豈-﫿]/.test(text);
-  const tokens = isCjk ? text.split("") : text.split(" ");
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const isCjk   = /[　-鿿豈-﫿]/.test(text);
+  const tokens   = isCjk ? text.split("") : text.split(" ");
   const lines: string[] = [];
   let current = "";
   for (const tok of tokens) {
     const test = isCjk ? current + tok : (current ? `${current} ${tok}` : tok);
-    if (ctx.measureText(test).width <= maxWidth) {
-      current = test;
-    } else {
-      if (current) lines.push(current);
-      current = tok;
-    }
+    if (ctx.measureText(test).width <= maxWidth) { current = test; }
+    else { if (current) lines.push(current); current = tok; }
   }
   if (current) lines.push(current);
   return lines.length ? lines : [text];
@@ -219,46 +258,51 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number,
 // ---------------------------------------------------------------------------
 
 export default function BannerStudio() {
-  const [s, setS] = useState<State>(INIT);
-  const fileRef   = useRef<HTMLInputElement>(null);
+  const [s, setS]      = useState<State>(INIT);
+  const bgFileRef      = useRef<HTMLInputElement>(null);
+  const productFileRef = useRef<HTMLInputElement>(null);
 
   const set = useCallback(<K extends keyof State>(key: K, val: State[K]) =>
-    setS((prev) => ({ ...prev, [key]: val, saved: key === "saved" ? val as boolean : false, error: null }))
+    setS((prev) => ({ ...prev, [key]: val, saved: key === "saved" ? (val as boolean) : false, error: null }))
   , []);
 
-  const p = PRESETS[s.preset];
-
-  // Preview aspect ratio (clamped so very tall/wide stays usable)
+  const p        = PRESETS[s.preset];
   const previewW = 520;
   const previewH = Math.round(previewW * (p.h / p.w));
 
-  // CSS background for preview
+  // ── Preview helpers ──
   function previewBg(): React.CSSProperties {
-    if ((s.bgMode === "upload" || s.bgMode === "ai") && s.bgImage) {
+    if ((s.bgMode === "upload" || s.bgMode === "ai") && s.bgImage)
       return { backgroundImage: `url(${s.bgImage})`, backgroundSize: "cover", backgroundPosition: "center" };
-    }
-    if (s.bgMode === "gradient") {
+    if (s.bgMode === "gradient")
       return { backgroundImage: `linear-gradient(${s.gradAngle}, ${s.gradFrom}, ${s.gradTo})` };
-    }
     return { backgroundColor: s.bgColor };
+  }
+
+  function productPreviewStyle(): React.CSSProperties {
+    const base: React.CSSProperties = { position: "absolute", pointerEvents: "none", objectFit: "contain", maxHeight: "85%" };
+    const wPct = `${Math.round(s.productScale * (s.productPos === "center" ? 70 : 45))}%`;
+    switch (s.productPos) {
+      case "left":         return { ...base, width: wPct, left: "5%",  top:    "50%", transform: "translateY(-50%)" };
+      case "right":        return { ...base, width: wPct, right: "5%", top:    "50%", transform: "translateY(-50%)" };
+      case "bottom-right": return { ...base, width: wPct, right: "5%", bottom: "5%" };
+      default:             return { ...base, width: wPct, left: "50%", top:    "50%", transform: "translate(-50%,-50%)" };
+    }
   }
 
   function textBlockStyle(): React.CSSProperties {
     const base: React.CSSProperties = {
-      position:  "absolute",
-      left:      "7%",
-      right:     "7%",
-      textAlign: "center",
-      color:     s.textColor,
-      fontFamily: s.fontFamily,
-      pointerEvents: "none",
+      position: "absolute", left: "7%", right: "7%",
+      textAlign: "center", color: s.textColor, fontFamily: s.fontFamily, pointerEvents: "none",
     };
     if (s.textPos === "top")    return { ...base, top:    "8%" };
     if (s.textPos === "bottom") return { ...base, bottom: "8%" };
     return { ...base, top: "50%", transform: "translateY(-50%)" };
   }
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  // ── Handlers ──
+
+  async function handleBgUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -267,24 +311,87 @@ export default function BannerStudio() {
     reader.readAsDataURL(file);
   }
 
+  async function handleProductUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload  = () => setS((prev) => ({
+      ...prev, productOrig: reader.result as string, productImage: reader.result as string, error: null,
+    }));
+    reader.onerror = () => setS((prev) => ({ ...prev, error: "upload_read_failed" }));
+    reader.readAsDataURL(file);
+  }
+
+  async function removeProductBg() {
+    if (!s.productOrig) return;
+    setS((prev) => ({ ...prev, productRemoving: true, error: null }));
+    try {
+      const res  = await fetch("/api/tools/studio/remove-bg", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
+        body:    JSON.stringify({ image: s.productOrig }),
+      });
+      const data = await res.json() as { ok: boolean; image?: string; error?: string };
+      if (!data.ok || !data.image) throw new Error(data.error ?? "remove_bg_failed");
+      setS((prev) => ({ ...prev, productImage: data.image!, productRemoving: false }));
+    } catch (err) {
+      setS((prev) => ({ ...prev, productRemoving: false, error: String(err) }));
+    }
+  }
+
   async function generateAiBg() {
     if (!s.aiPrompt.trim()) return;
     setS((prev) => ({ ...prev, generating: true, error: null }));
     try {
-      const res = await fetch("/api/tools/tarot/generate", {
+      const res  = await fetch("/api/tools/tarot/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body: JSON.stringify({
-          model:       s.aiModel,
-          prompt:      s.aiPrompt,
-          aspectRatio: p.aspect,
-        }),
+        body:    JSON.stringify({ model: s.aiModel, prompt: s.aiPrompt, aspectRatio: p.aspect }),
       });
       const data = await res.json() as { ok: boolean; image?: string; error?: string };
       if (!data.ok || !data.image) throw new Error(data.error ?? "generation_failed");
       setS((prev) => ({ ...prev, bgImage: data.image!, bgMode: "ai", generating: false }));
     } catch (err) {
       setS((prev) => ({ ...prev, generating: false, error: String(err) }));
+    }
+  }
+
+  async function generateCopy() {
+    if (!s.copyBrief.trim()) return;
+    setS((prev) => ({ ...prev, copyGenerating: true, copyVariants: [], copyStream: "", error: null }));
+    try {
+      const platform = p.group === "wp" ? "WP 網站 Banner" : "社交媒體貼文圖";
+      const prompt =
+        `【Banner 文案生成】\n` +
+        `用途：${platform} · ${p.label} (${p.w}×${p.h})\n` +
+        `語氣風格：${s.copyTone}\n` +
+        `產品/服務描述：${s.copyBrief}\n\n` +
+        `請生成 5 組 banner 文案，每組包含：\n` +
+        `- headline：主標題，簡潔有力，8-15 字\n` +
+        `- subtext：副標題或行動呼籲（CTA），10-25 字\n\n` +
+        `輸出純 JSON，不含任何 markdown 包裹：\n` +
+        `{"variants":[{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."}]}`;
+      const langified = `【預設輸出語言：繁體中文】未另行指定時，所有文字請用繁體中文；JSON key 保持英文。\n\n${prompt}`;
+      const res = await fetch("/api/tools/script-forge", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ prompt: langified, model: "claude-sonnet-4-6" }),
+      });
+      if (!res.ok || !res.body) throw new Error(`文案生成失敗（${res.status}）`);
+      const reader = res.body.getReader();
+      const dec    = new TextDecoder();
+      let full     = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        full += dec.decode(value, { stream: true });
+        setS((prev) => ({ ...prev, copyStream: full }));
+      }
+      full += dec.decode();
+      const parsed = JSON.parse(full.replace(/```json|```/g, "").trim()) as { variants: CopyVariant[] };
+      setS((prev) => ({ ...prev, copyGenerating: false, copyVariants: parsed.variants, copyStream: "" }));
+    } catch (err) {
+      setS((prev) => ({ ...prev, copyGenerating: false, copyStream: "", error: String(err) }));
     }
   }
 
@@ -295,7 +402,7 @@ export default function BannerStudio() {
       const res = await fetch("/api/tools/designs", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body:    JSON.stringify({
           image:     png,
           source:    "banner",
           prompt:    s.headline || s.aiPrompt || undefined,
@@ -338,7 +445,7 @@ export default function BannerStudio() {
     <div className="page">
       <h1 style={{ fontSize: 22, margin: "0 0 4px" }}>🖼 Banner Studio</h1>
       <p className="form-hint" style={{ marginBottom: 20 }}>
-        社群媒體橫幅生成器 · AI 背景 + 文字排版 · 匯出高解析 PNG
+        WP 網站 + 社交平台 · AI 文案 + 產品圖去背 + AI 背景 · 匯出高解析 PNG
       </p>
 
       {s.error && (
@@ -350,9 +457,71 @@ export default function BannerStudio() {
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
 
         {/* ── Left: controls ── */}
-        <div style={{ flex: "0 0 320px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ flex: "0 0 340px", display: "flex", flexDirection: "column", gap: 16 }}>
 
-          {/* Step 1: Size */}
+          {/* Step 0: 文案生成 */}
+          <div className="card">
+            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 0 · 文案生成 <span style={{ fontWeight: 400, opacity: 0.5, fontSize: 11 }}>選填</span></h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div className="form-row">
+                <label className="form-label">描述</label>
+                <textarea
+                  className="form-input"
+                  rows={2}
+                  placeholder="產品/服務一句話描述，例：有機冷壓橄欖油，主打健康家庭"
+                  value={s.copyBrief}
+                  onChange={(e) => set("copyBrief", e.target.value)}
+                  style={{ resize: "vertical", fontSize: 13 }}
+                />
+              </div>
+              <div className="form-row">
+                <label className="form-label">語氣</label>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {COPY_TONES.map((t) => (
+                    <button key={t}
+                      className={s.copyTone === t ? "btn btn-primary" : "btn btn-ghost"}
+                      style={{ fontSize: 12, padding: "3px 8px" }}
+                      onClick={() => set("copyTone", t)}
+                    >{t}</button>
+                  ))}
+                </div>
+              </div>
+              <button
+                className="btn btn-primary"
+                disabled={s.copyGenerating || !s.copyBrief.trim()}
+                onClick={generateCopy}
+                style={{ alignSelf: "flex-start" }}
+              >
+                {s.copyGenerating ? "生成中…" : "生成文案"}
+              </button>
+
+              {/* Streaming indicator */}
+              {s.copyGenerating && s.copyStream && (
+                <div style={{ fontSize: 11, opacity: 0.5, fontFamily: "monospace", maxHeight: 40, overflow: "hidden" }}>
+                  {s.copyStream.slice(-80)}
+                </div>
+              )}
+
+              {/* Variants */}
+              {s.copyVariants.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+                  {s.copyVariants.map((v, i) => (
+                    <button
+                      key={i}
+                      className="btn btn-ghost"
+                      style={{ textAlign: "left", padding: "8px 10px", fontSize: 12, lineHeight: 1.4 }}
+                      onClick={() => setS((prev) => ({ ...prev, headline: v.headline, subtext: v.subtext, saved: false, error: null }))}
+                    >
+                      <div style={{ fontWeight: 600 }}>{v.headline}</div>
+                      <div style={{ opacity: 0.65, fontSize: 11 }}>{v.subtext}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Step 1: 尺寸 */}
           <div className="card">
             <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 1 · 尺寸</h2>
             {PRESET_GROUPS.map((grp) => (
@@ -381,16 +550,72 @@ export default function BannerStudio() {
             ))}
           </div>
 
-          {/* Step 2: Background */}
+          {/* Step 2: 產品圖 */}
           <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 2 · 背景</h2>
+            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 2 · 產品圖 <span style={{ fontWeight: 400, opacity: 0.5, fontSize: 11 }}>選填</span></h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input ref={productFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleProductUpload} />
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => productFileRef.current?.click()}>
+                  {s.productImage ? "換圖" : "上傳產品圖"}
+                </button>
+                {s.productOrig && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12 }}
+                    disabled={s.productRemoving}
+                    onClick={removeProductBg}
+                  >
+                    {s.productRemoving ? "去背中…" : s.productImage !== s.productOrig ? "✓ 已去背" : "一鍵去背"}
+                  </button>
+                )}
+                {s.productImage && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, color: "var(--red)" }}
+                    onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null }))}
+                  >
+                    移除
+                  </button>
+                )}
+              </div>
 
+              {s.productImage && (
+                <>
+                  <div className="form-row">
+                    <label className="form-label">位置</label>
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                      {(["center", "left", "right", "bottom-right"] as ProductPos[]).map((pos) => (
+                        <button key={pos}
+                          className={s.productPos === pos ? "btn btn-primary" : "btn btn-ghost"}
+                          style={{ fontSize: 11, padding: "3px 8px" }}
+                          onClick={() => set("productPos", pos)}
+                        >{{ center: "中央", left: "左", right: "右", "bottom-right": "右下" }[pos]}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <label className="form-label">大小</label>
+                    <input type="range" min={0.2} max={1.0} step={0.05} value={s.productScale}
+                      onChange={(e) => set("productScale", Number(e.target.value))}
+                      style={{ flex: 1 }} />
+                    <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 32 }}>
+                      {Math.round(s.productScale * 100)}%
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Step 3: 背景 */}
+          <div className="card">
+            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 3 · 背景</h2>
             <div className="form-row">
               <label className="form-label">類型</label>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {(["color", "gradient", "upload", "ai"] as BgMode[]).map((m) => (
-                  <button
-                    key={m}
+                  <button key={m}
                     className={s.bgMode === m ? "btn btn-primary" : "btn btn-ghost"}
                     style={{ fontSize: 12, padding: "4px 10px" }}
                     onClick={() => set("bgMode", m)}
@@ -404,12 +629,8 @@ export default function BannerStudio() {
             {s.bgMode === "color" && (
               <div className="form-row" style={{ marginTop: 10 }}>
                 <label className="form-label">背景色</label>
-                <input
-                  type="color"
-                  value={s.bgColor}
-                  onChange={(e) => set("bgColor", e.target.value)}
-                  style={{ width: 44, height: 32, border: "none", cursor: "pointer", background: "none" }}
-                />
+                <input type="color" value={s.bgColor} onChange={(e) => set("bgColor", e.target.value)}
+                  style={{ width: 44, height: 32, border: "none", cursor: "pointer", background: "none" }} />
               </div>
             )}
 
@@ -442,8 +663,8 @@ export default function BannerStudio() {
 
             {s.bgMode === "upload" && (
               <div style={{ marginTop: 10 }}>
-                <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleUpload} />
-                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => fileRef.current?.click()}>
+                <input ref={bgFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleBgUpload} />
+                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => bgFileRef.current?.click()}>
                   {s.bgImage ? "✓ 已上傳，點此換圖" : "選擇圖片…"}
                 </button>
               </div>
@@ -473,12 +694,8 @@ export default function BannerStudio() {
                     style={{ resize: "vertical", fontSize: 13 }}
                   />
                 </div>
-                <button
-                  className="btn btn-primary"
-                  disabled={s.generating || !s.aiPrompt.trim()}
-                  onClick={generateAiBg}
-                  style={{ alignSelf: "flex-start" }}
-                >
+                <button className="btn btn-primary" disabled={s.generating || !s.aiPrompt.trim()}
+                  onClick={generateAiBg} style={{ alignSelf: "flex-start" }}>
                   {s.generating ? "生成中…" : s.bgImage ? "重新生成" : "生成背景"}
                 </button>
                 {s.bgImage && s.bgMode === "ai" && (
@@ -488,52 +705,43 @@ export default function BannerStudio() {
             )}
           </div>
 
-          {/* Step 3: Text */}
+          {/* Step 4: 文字 */}
           <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 3 · 文字</h2>
-
+            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 4 · 文字</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div className="form-row">
                 <label className="form-label">標題</label>
                 <input className="form-input" type="text" placeholder="主標題…"
                   value={s.headline} onChange={(e) => set("headline", e.target.value)} />
               </div>
-
               <div className="form-row">
                 <label className="form-label">副標</label>
                 <input className="form-input" type="text" placeholder="副標題或 CTA…"
                   value={s.subtext} onChange={(e) => set("subtext", e.target.value)} />
               </div>
-
               <div className="form-row">
                 <label className="form-label">字體</label>
                 <select className="form-select" value={s.fontFamily} onChange={(e) => set("fontFamily", e.target.value)}>
                   {FONTS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
               </div>
-
               <div className="form-row">
                 <label className="form-label">字色</label>
                 <input type="color" value={s.textColor} onChange={(e) => set("textColor", e.target.value)}
                   style={{ width: 44, height: 32, border: "none", cursor: "pointer", background: "none" }} />
               </div>
-
               <div className="form-row">
                 <label className="form-label">標題 px</label>
                 <input type="range" min={24} max={200} value={s.headlineSize}
-                  onChange={(e) => set("headlineSize", Number(e.target.value))}
-                  style={{ flex: 1 }} />
+                  onChange={(e) => set("headlineSize", Number(e.target.value))} style={{ flex: 1 }} />
                 <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.headlineSize}</span>
               </div>
-
               <div className="form-row">
                 <label className="form-label">副標 px</label>
                 <input type="range" min={12} max={120} value={s.subtextSize}
-                  onChange={(e) => set("subtextSize", Number(e.target.value))}
-                  style={{ flex: 1 }} />
+                  onChange={(e) => set("subtextSize", Number(e.target.value))} style={{ flex: 1 }} />
                 <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.subtextSize}</span>
               </div>
-
               <div className="form-row">
                 <label className="form-label">位置</label>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -546,7 +754,6 @@ export default function BannerStudio() {
                   ))}
                 </div>
               </div>
-
               <div className="form-row">
                 <label className="form-label">暗化背景</label>
                 <input type="checkbox" checked={s.dimOverlay}
@@ -564,25 +771,23 @@ export default function BannerStudio() {
           {/* Preview */}
           <div className="card" style={{ marginBottom: 16 }}>
             <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>
-              預覽 · {p.label} <span style={{ fontWeight: 400, opacity: 0.6, fontSize: 12 }}>{p.w}×{p.h}</span>
+              預覽 · {p.label}
+              <span style={{ fontWeight: 400, opacity: 0.6, fontSize: 12, marginLeft: 6 }}>{p.w}×{p.h}</span>
             </h2>
-            <div
-              style={{
-                width: previewW,
-                height: previewH,
-                maxWidth: "100%",
-                position: "relative",
-                borderRadius: 6,
-                overflow: "hidden",
-                ...previewBg(),
-              }}
-            >
+            <div style={{
+              width: previewW, height: previewH, maxWidth: "100%",
+              position: "relative", borderRadius: 6, overflow: "hidden",
+              ...previewBg(),
+            }}>
               {/* Dim overlay */}
               {s.dimOverlay && (
-                <div style={{
-                  position: "absolute", inset: 0,
-                  background: "rgba(0,0,0,0.45)",
-                }} />
+                <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+              )}
+
+              {/* Product image (above dim, below text) */}
+              {s.productImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={s.productImage} alt="" style={productPreviewStyle()} />
               )}
 
               {/* Text block */}
@@ -590,53 +795,47 @@ export default function BannerStudio() {
                 <div style={textBlockStyle()}>
                   {s.headline && (
                     <div style={{
-                      fontSize: scaledHeadline,
-                      fontWeight: 700,
-                      lineHeight: 1.2,
+                      fontSize: scaledHeadline, fontWeight: 700, lineHeight: 1.2,
                       marginBottom: s.subtext ? Math.round(scaledHeadline * 0.3) : 0,
                       textShadow: "0 2px 8px rgba(0,0,0,0.5)",
-                    }}>
-                      {s.headline}
-                    </div>
+                    }}>{s.headline}</div>
                   )}
                   {s.subtext && (
                     <div style={{
-                      fontSize: scaledSubtext,
-                      lineHeight: 1.4,
-                      opacity: 0.9,
+                      fontSize: scaledSubtext, lineHeight: 1.4, opacity: 0.9,
                       textShadow: "0 1px 4px rgba(0,0,0,0.5)",
-                    }}>
-                      {s.subtext}
-                    </div>
+                    }}>{s.subtext}</div>
                   )}
                 </div>
               )}
 
               {/* Loading overlay */}
-              {s.generating && (
+              {(s.generating || s.productRemoving) && (
                 <div style={{
-                  position: "absolute", inset: 0,
-                  background: "rgba(0,0,0,0.6)",
+                  position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: "#fff", fontSize: 14,
                 }}>
-                  AI 生成中…
+                  {s.productRemoving ? "去背中…" : "AI 生成中…"}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Export actions */}
+          {/* Export */}
           <div className="card">
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 4 · 匯出</h2>
+            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 5 · 匯出</h2>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="btn btn-primary" onClick={handleSave} disabled={s.saving || s.generating}>
+              <button className="btn btn-primary" onClick={handleSave}
+                disabled={s.saving || s.generating || s.productRemoving}>
                 {s.saving ? "儲存中…" : s.saved ? "✓ 已存到圖庫" : "存到圖庫"}
               </button>
-              <button className="btn btn-ghost" onClick={handleDownload} disabled={s.generating}>
+              <button className="btn btn-ghost" onClick={handleDownload}
+                disabled={s.generating || s.productRemoving}>
                 下載 PNG
               </button>
-              <button className="btn btn-ghost" onClick={handleOpenInCanvas} disabled={s.generating}>
+              <button className="btn btn-ghost" onClick={handleOpenInCanvas}
+                disabled={s.generating || s.productRemoving}>
                 在 Canvas Editor 開啟
               </button>
             </div>

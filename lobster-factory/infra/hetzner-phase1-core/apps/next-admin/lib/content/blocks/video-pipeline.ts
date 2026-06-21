@@ -11,7 +11,7 @@
  */
 import { register, type BlockCtx } from "./registry";
 import { generateVideoScript } from "../video/video-script-core";
-import { fetchBrollUrl } from "../video/pexels";
+import { fetchBrollUrl, fetchBrollVideoUrl } from "../video/pexels";
 import {
   parseImageDataUrl,
   buildDesignKey,
@@ -111,11 +111,14 @@ export async function prepareScenes(
     visualStyle?: string;
     /**
      * 生圖來源 / 模型。
-     * "pexels-all" → 全部場景用 Pexels 免費照片（$0，不需 R2）。
-     * 其他字串 → 傳給 Flux 作為 model ID（如 "flux-schnell"、"flux-dev"）。
-     * 省略 → 依 scene.visual 決定（broll=Pexels，custom=flux-schnell）。
+     * "pexels-video" → 全部場景用 Pexels 真實影片片段（$0，不需 R2，EU stream_loop）。
+     * "pexels-all"   → 全部場景用 Pexels 免費照片（$0，不需 R2）。
+     * 其他字串       → 傳給 Flux 作為 model ID（如 "flux-schnell"、"flux-dev"）。
+     * 省略           → 依 scene.visual 決定（broll=Pexels 照片，custom=flux-schnell）。
      */
     imageModel?: string;
+    /** 目標影片時長（分鐘）→ 控制場景數與旁白字數。1=6場景, 3=8場景, 5=10場景。 */
+    targetMinutes?: number;
     /** 深層接力：前製腳本已寫好的場景（台詞+畫面）→ 跳過 Claude 重生，直接用這些。 */
     providedScenes?: { narration: string; imagePrompt: string }[];
     onProgress?: (step: string) => void;
@@ -143,6 +146,7 @@ export async function prepareScenes(
         articleTitle: input.articleTitle,
         articleContent: input.articleContent,
         language: input.language,
+        targetMinutes: input.targetMinutes,
       },
       anthropicKey,
     );
